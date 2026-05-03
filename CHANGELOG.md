@@ -6,6 +6,18 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-03 · Rescate de cliente (banner + panel huérfana)
+
+- **feat (review):** banner de importador no reconocido suma tercera opción **Asignar a uno existente** que abre un picker de tus clientes. Si elegís uno sin CUIT, le sumamos automáticamente el CUIT del PDF (siempre que no choque con otro cliente).
+- **feat (ready):** panel **"operación huérfana"** en pantalla Listo. Si terminás el TXT MARIA sin cliente activo, aparece un panel discreto con tres opciones: crear cliente nuevo (form prellenado), asignar a uno existente, o más tarde. La operación queda guardada al historial del cliente elegido.
+- **fix (data integrity):** pre-check `by-cuit` antes de **POST** y **PUT** de clientes (el backend no valida duplicados de CUIT). Si ya existe, ofrecemos usar ese.
+- **fix (idempotencia):** `saveOperationToHistory` ahora respeta `state.operationSavedFor` para no duplicar la operación si la pantalla Listo se re-renderiza (back→forward, panel huérfana asignando cliente).
+- **feat (componente):** `cliente_picker.js` nuevo, reusable (~200 líneas). Modal con búsqueda en vivo, ESC cierra, fallback a `GET /api/clientes` si el cache está vacío.
+- **telemetría:** `importador_assign_existing_*`, `importador_cuit_attached_to_existing`, `importador_create_blocked_by_cuit_match`, `op_orphan_panel_shown/create_clicked/assign_clicked/dismissed/resolved`.
+- Backend intacto.
+
+---
+
 ## 2026-05-03 · Hints contextuales just-in-time
 
 - **feat (hints):** 3 micro-tooltips que aparecen UNA sola vez en el momento exacto que cada feature se activa, con datos reales del usuario:

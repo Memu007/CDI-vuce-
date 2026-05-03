@@ -147,6 +147,7 @@
                             <div class="review-pending-importador-sub" data-banner-subtitle></div>
                             <div class="review-pending-importador-actions">
                                 <button type="button" class="btn btn-secondary btn-sm" data-banner-ignorar>No por ahora</button>
+                                <button type="button" class="btn btn-secondary btn-sm" data-banner-asignar>Asignar a uno existente</button>
                                 <button type="button" class="btn btn-primary btn-sm" data-banner-crear>Crear cliente y usar</button>
                             </div>
                         </div>
@@ -514,6 +515,34 @@
                                 </button>
                             </header>
                             <pre class="ready-preview-body" id="readyPreview"></pre>
+                        </div>
+
+                        <!-- Panel "operación huérfana": aparece solo si no hay cliente activo. -->
+                        <div id="readyOrphanPanel" class="ready-orphan-panel" hidden>
+                            <div class="ready-orphan-header">
+                                <h3 class="ready-orphan-title">Esta operación no quedó asociada a un cliente</h3>
+                                <p class="ready-orphan-text">Guardala al historial para encontrarla después.</p>
+                            </div>
+                            <div class="ready-orphan-actions">
+                                <button type="button" class="btn btn-primary btn-sm" id="orphanCreateBtn">+ Crear cliente nuevo</button>
+                                <button type="button" class="btn btn-secondary btn-sm" id="orphanAssignBtn">Asignar a uno existente</button>
+                                <button type="button" class="btn btn-ghost btn-sm" id="orphanLaterBtn">Más tarde</button>
+                            </div>
+                            <div id="readyOrphanCreateForm" class="ready-orphan-form" hidden>
+                                <div class="field">
+                                    <label class="field-label" for="orphanCreateNombre">Razón social</label>
+                                    <input type="text" id="orphanCreateNombre" class="field-input" autocomplete="off" maxlength="200">
+                                </div>
+                                <div class="field">
+                                    <label class="field-label" for="orphanCreateCuit">CUIT (opcional)</label>
+                                    <input type="text" id="orphanCreateCuit" class="field-input" autocomplete="off" maxlength="13" placeholder="XX-XXXXXXXX-X">
+                                </div>
+                                <div class="ready-orphan-form-actions">
+                                    <button type="button" class="btn btn-ghost btn-sm" id="orphanCreateCancelBtn">Cancelar</button>
+                                    <button type="button" class="btn btn-primary btn-sm" id="orphanCreateSaveBtn">Guardar y asignar</button>
+                                </div>
+                                <div class="ready-orphan-form-error" id="orphanCreateError" hidden></div>
+                            </div>
                         </div>
                     </div>
 
@@ -1070,6 +1099,7 @@
     <script src="/static/v2/topbar_financials.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/semaforo.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/clientes.js?v={{ version }}" defer></script>
+    <script src="/static/v2/screens/cliente_picker.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/catalogo.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/profile.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/ncm_notes.js?v={{ version }}" defer></script>

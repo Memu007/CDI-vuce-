@@ -261,6 +261,11 @@
             CDI.state.items = items;
             CDI.state.sourceFormat = currentFormat;
             CDI.state.uploadedAt = new Date().toISOString();
+            // Reset flags de la operación anterior: cada PDF nuevo es una
+            // operación nueva, el panel huérfana y la idempotencia de
+            // guardado deben funcionar de cero.
+            CDI.state.operationSavedFor = null;
+            CDI.state.orphanDismissedFor = null;
 
             // Auto-detectar importador desde el CUIT extraido del PDF.
             // Si el user ya tiene un cliente cargado con ese CUIT, lo activa solo.

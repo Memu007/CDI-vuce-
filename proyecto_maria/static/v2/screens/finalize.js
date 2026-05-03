@@ -395,17 +395,211 @@
 
         rFilename.textContent = lastMaria.filename || 'MARIA.TXT';
         rPreview.textContent = trimPreview(lastMaria.content || '', 60);
+
+        // Render del panel "operación huérfana": aparece solo si no hay
+        // cliente activo y el user no hizo "Más tarde" en esta operación.
+        renderOrphanPanel();
+    }
+
+    /* ---------- Panel "operación huérfana" ---------- */
+    function renderOrphanPanel() {
+        const panel = document.getElementById('readyOrphanPanel');
+        if (!panel) return;
+        const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
+        const opCode = (lastMaria && lastMaria.filename) || null;
+        const dismissedFor = (CDI.state && CDI.state.orphanDismissedFor) || null;
+        const wasDismissed = !!(dismissedFor && opCode && dismissedFor === opCode);
+
+        if (cliente && cliente.id) { panel.hidden = true; return; }
+        if (wasDismissed) { panel.hidden = true; return; }
+
+        panel.hidden = false;
+        // Reset del form interno por si quedó abierto antes
+        const form = document.getElementById('readyOrphanCreateForm');
+        if (form) form.hidden = true;
+        clearOrphanCreateError();
+        setupOrphanPanelListeners();
+        prefillOrphanCreateForm();
+        try { CDI.track && CDI.track('op_orphan_panel_shown'); } catch (_) {}
+    }
+
+    let _orphanListenersWired = false;
+    function setupOrphanPanelListeners() {
+        if (_orphanListenersWired) return;
+        const btnCreate = document.getElementById('orphanCreateBtn');
+        const btnAssign = document.getElementById('orphanAssignBtn');
+        const btnLater  = document.getElementById('orphanLaterBtn');
+        const btnSave   = document.getElementById('orphanCreateSaveBtn');
+        const btnCancel = document.getElementById('orphanCreateCancelBtn');
+        const form      = document.getElementById('readyOrphanCreateForm');
+
+        if (btnCreate) btnCreate.addEventListener('click', () => {
+            CDI.track && CDI.track('op_orphan_create_clicked');
+            if (form) form.hidden = false;
+            const inp = document.getElementById('orphanCreateNombre');
+            if (inp) inp.focus();
+        });
+        if (btnCancel) btnCancel.addEventListener('click', () => {
+            if (form) form.hidden = true;
+            clearOrphanCreateError();
+        });
+        if (btnAssign) btnAssign.addEventListener('click', orphanAssignClick);
+        if (btnLater)  btnLater.addEventListener('click', orphanLaterClick);
+        if (btnSave)   btnSave.addEventListener('click', orphanCreateSubmit);
+
+        _orphanListenersWired = true;
+    }
+
+    function prefillOrphanCreateForm() {
+        const op = (CDI.state && CDI.state.operacion) || {};
+        const inpNom = document.getElementById('orphanCreateNombre');
+        const inpCuit = document.getElementById('orphanCreateCuit');
+        if (inpNom && !inpNom.value) inpNom.value = String(op.comprador_nombre || '').trim();
+        if (inpCuit && !inpCuit.value) {
+            const c = String(op.comprador_cuit || '').trim();
+            inpCuit.value = (CDI.formatCuit && c) ? CDI.formatCuit(c) : c;
+        }
+    }
+
+    function showOrphanCreateError(msg) {
+        const el = document.getElementById('orphanCreateError');
+        if (!el) return;
+        el.textContent = msg || '';
+        el.hidden = !msg;
+    }
+    function clearOrphanCreateError() { showOrphanCreateError(''); }
+
+    async function lookupClienteByCuit(cuit) {
+        try {
+            const res = await CDI.api('/api/clientes/by-cuit/' + encodeURIComponent(cuit));
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return null;
+            if (data.match === 'exact' && data.cliente) return data.cliente;
+            return null;
+        } catch (_) { return null; }
+    }
+
+    function humanizeApiError(detail, fallback) {
+        if (!detail) return fallback;
+        if (typeof detail === 'string') return detail;
+        if (Array.isArray(detail)) {
+            const msg = detail.map(d => (d && d.msg) || '').filter(Boolean).join('; ');
+            return msg || fallback;
+        }
+        if (detail.msg) return String(detail.msg);
+        try { return JSON.stringify(detail); } catch (_) { return fallback; }
+    }
+
+    async function orphanCreateSubmit() {
+        const btn = document.getElementById('orphanCreateSaveBtn');
+        const inpNom = document.getElementById('orphanCreateNombre');
+        const inpCuit = document.getElementById('orphanCreateCuit');
+        const nombre = String((inpNom && inpNom.value) || '').trim();
+        const cuitRaw = String((inpCuit && inpCuit.value) || '').trim();
+        const cuit = (CDI.normalizeCuit && cuitRaw) ? CDI.normalizeCuit(cuitRaw) : '';
+        clearOrphanCreateError();
+        if (!nombre) {
+            showOrphanCreateError('Ingresá la razón social.');
+            if (inpNom) inpNom.focus();
+            return;
+        }
+        if (cuit && cuit.length !== 11) {
+            showOrphanCreateError('El CUIT debe tener 11 dígitos.');
+            if (inpCuit) inpCuit.focus();
+            return;
+        }
+        if (btn) btn.disabled = true;
+        try {
+            // Pre-check: si ya existe un cliente con este CUIT, ofrecer usar ese.
+            if (cuit) {
+                const existente = await lookupClienteByCuit(cuit);
+                if (existente) {
+                    CDI.track && CDI.track('op_orphan_create_blocked_by_cuit_match');
+                    const ok = window.confirm(
+                        'Ya tenés a "' + (existente.nombre || '') + '" con este CUIT.\n' +
+                        '¿Querés usar ese cliente en su lugar?'
+                    );
+                    if (ok) {
+                        CDI.setClienteActivo(existente);
+                        await reSaveOperationAndClosePanel('create');
+                    }
+                    return;
+                }
+            }
+            const body = { nombre: nombre };
+            if (cuit) body.cuit = cuit;
+            const res = await CDI.api('/api/clientes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            const out = await res.json().catch(() => ({}));
+            if (!res.ok || !out.success || !out.cliente) {
+                showOrphanCreateError(humanizeApiError(out.detail, 'No se pudo crear el cliente.'));
+                return;
+            }
+            CDI.clientesCache = [];
+            CDI.setClienteActivo(out.cliente);
+            await reSaveOperationAndClosePanel('create');
+        } catch (err) {
+            showOrphanCreateError('Error de red. Probá de nuevo.');
+            console.warn('[orphan] crear cliente', err && err.message);
+        } finally {
+            if (btn) btn.disabled = false;
+        }
+    }
+
+    function orphanAssignClick() {
+        if (!CDI.openClientePicker) return;
+        CDI.track && CDI.track('op_orphan_assign_clicked');
+        CDI.openClientePicker({
+            title: 'Asignar a un cliente existente',
+            subtitle: 'La operación va a quedar guardada en su historial',
+            onSelect: async (c) => {
+                CDI.setClienteActivo(c);
+                await reSaveOperationAndClosePanel('assign');
+            },
+        });
+    }
+
+    function orphanLaterClick() {
+        const opCode = (lastMaria && lastMaria.filename) || null;
+        if (opCode) {
+            CDI.state = CDI.state || {};
+            CDI.state.orphanDismissedFor = opCode;
+        }
+        const panel = document.getElementById('readyOrphanPanel');
+        if (panel) panel.hidden = true;
+        CDI.track && CDI.track('op_orphan_dismissed');
+    }
+
+    async function reSaveOperationAndClosePanel(via) {
+        const items = (CDI.state && CDI.state.items) || [];
+        await saveOperationToHistory(items, lastMaria || {});
+        const panel = document.getElementById('readyOrphanPanel');
+        if (panel) panel.hidden = true;
+        const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
+        const nombre = (cliente && cliente.nombre) || 'cliente';
+        CDI.toast && CDI.toast('Operación guardada', 'En el historial de ' + nombre, 'success');
+        CDI.track && CDI.track('op_orphan_resolved', { via: via });
     }
 
     async function saveOperationToHistory(items, mariaData) {
         const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
         if (!cliente || !cliente.id) return;
+        const opCode = (mariaData && mariaData.filename) || null;
+        // Idempotencia: si ya guardamos esta misma operación para este mismo
+        // cliente, no la re-posteamos (cubre re-entry a Listo, F5 suave, etc.).
+        const savedFor = (CDI.state && CDI.state.operationSavedFor) || null;
+        if (savedFor && savedFor.cliente_id === cliente.id && savedFor.op_code === opCode) {
+            return;
+        }
         const stats = (lastValidation && lastValidation.estadisticas) || {};
         const op = (CDI.state && CDI.state.operacion) || {};
         const total_valor = Number(stats.total_valor_usd || 0);
         const total_peso = Number(stats.total_peso_kg || 0);
         const body = {
-            operation_id: (mariaData && mariaData.filename) || null,
+            operation_id: opCode,
             source: 'pdf_v2',
             currency: (op.moneda || 'USD').toString().toUpperCase(),
             resumen: {
@@ -433,6 +627,8 @@
             );
             const data = await res.json().catch(() => ({}));
             if (res.ok && data && data.success) {
+                CDI.state = CDI.state || {};
+                CDI.state.operationSavedFor = { cliente_id: cliente.id, op_code: opCode };
                 CDI.track('operation_saved_to_history', {
                     cliente_id: cliente.id,
                     items: items.length

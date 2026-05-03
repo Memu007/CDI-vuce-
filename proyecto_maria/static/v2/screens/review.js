@@ -827,9 +827,13 @@
         }
 
         const btnCrear = el.querySelector('[data-banner-crear]');
+        const btnAsignar = el.querySelector('[data-banner-asignar]');
         const btnIgn = el.querySelector('[data-banner-ignorar]');
         if (btnCrear) {
-            btnCrear.onclick = () => crearClienteDesdeBanner(data);
+            btnCrear.onclick = () => crearClienteDesdeBanner(data, btnCrear);
+        }
+        if (btnAsignar) {
+            btnAsignar.onclick = () => asignarExistenteDesdeBanner(data);
         }
         if (btnIgn) {
             btnIgn.onclick = () => {
@@ -840,12 +844,42 @@
         }
     }
 
-    async function crearClienteDesdeBanner(data) {
+    // Buscamos si el user ya tiene un cliente con este CUIT antes de crear:
+    // evita duplicados que hoy el backend NO valida.
+    async function lookupClienteByCuit(cuit) {
+        try {
+            const res = await CDI.api('/api/clientes/by-cuit/' + encodeURIComponent(cuit));
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return null;
+            if (data.match === 'exact' && data.cliente) return data.cliente;
+            return null;
+        } catch (_) { return null; }
+    }
+
+    async function crearClienteDesdeBanner(data, btn) {
         const nombre = String((data && data.nombre) || '').trim();
         const cuit = CDI.normalizeCuit && CDI.normalizeCuit(data && data.cuit);
         if (!nombre || !cuit || cuit.length !== 11) return;
         CDI.track && CDI.track('importador_quick_create_clicked');
+        if (btn) btn.disabled = true;
         try {
+            // Pre-check: si ya tenemos a alguien con este CUIT, ofrecer usar ese.
+            const existente = await lookupClienteByCuit(cuit);
+            if (existente) {
+                CDI.track && CDI.track('importador_create_blocked_by_cuit_match');
+                const ok = window.confirm(
+                    'Ya tenés a "' + (existente.nombre || '') + '" con este CUIT.\n' +
+                    '¿Querés usar ese cliente en su lugar?'
+                );
+                if (ok) {
+                    CDI.setClienteActivo(existente);
+                    try { sessionStorage.removeItem(_PENDING_IMPORTADOR_KEY); } catch (_) {}
+                    hidePendingImporterBanner();
+                    populate();
+                    CDI.toast && CDI.toast('Listo', 'Cliente activado: ' + (existente.nombre || ''), 'success');
+                }
+                return;
+            }
             const res = await CDI.api('/api/clientes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -853,10 +887,8 @@
             });
             const out = await res.json().catch(() => ({}));
             if (!res.ok || !out.success || !out.cliente) {
-                const det = typeof out.detail === 'string'
-                    ? out.detail
-                    : (out.detail && JSON.stringify(out.detail));
-                CDI.toast && CDI.toast('No se pudo crear', det || '', 'error');
+                const det = humanizeApiError(out.detail, 'No se pudo crear el cliente');
+                CDI.toast && CDI.toast('No se pudo crear', det, 'error');
                 return;
             }
             CDI.clientesCache = [];
@@ -873,7 +905,71 @@
                 'error'
             );
             console.warn('[review] crear cliente banner', err && err.message);
+        } finally {
+            if (btn) btn.disabled = false;
         }
+    }
+
+    // "Asignar a uno existente": abre picker; si el cliente no tenía CUIT
+    // y nadie más lo tiene, le sumamos el del PDF.
+    function asignarExistenteDesdeBanner(data) {
+        if (!CDI.openClientePicker) return;
+        const pdfCuit = CDI.normalizeCuit && CDI.normalizeCuit(data && data.cuit);
+        CDI.track && CDI.track('importador_assign_existing_clicked');
+        CDI.openClientePicker({
+            title: 'Asignar a un cliente existente',
+            subtitle: 'Buscá por nombre o CUIT',
+            onSelect: async (c) => {
+                CDI.setClienteActivo(c);
+                try { sessionStorage.removeItem(_PENDING_IMPORTADOR_KEY); } catch (_) {}
+                hidePendingImporterBanner();
+                populate();
+                CDI.track && CDI.track('importador_assign_existing_ok', { cliente_id: c.id });
+
+                // Si el cliente elegido no tenía CUIT y el del PDF no choca con
+                // otro cliente, se lo cargamos. Si choca, no tocamos nada.
+                if (pdfCuit && pdfCuit.length === 11 && !c.cuit) {
+                    const otro = await lookupClienteByCuit(pdfCuit);
+                    if (otro && otro.id !== c.id) {
+                        CDI.toast && CDI.toast(
+                            'Asignado',
+                            'El CUIT del PDF ya está en otro cliente; lo dejamos como estaba.',
+                            'success'
+                        );
+                        return;
+                    }
+                    try {
+                        const res = await CDI.api('/api/clientes/' + encodeURIComponent(c.id), {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ cuit: pdfCuit }),
+                        });
+                        const out = await res.json().catch(() => ({}));
+                        if (res.ok && out && out.success && out.cliente) {
+                            CDI.clientesCache = [];
+                            CDI.setClienteActivo(out.cliente);
+                            CDI.track && CDI.track('importador_cuit_attached_to_existing', { cliente_id: c.id });
+                            CDI.toast && CDI.toast('Listo', 'Cliente actualizado con CUIT del PDF', 'success');
+                            return;
+                        }
+                    } catch (_) {}
+                    CDI.toast && CDI.toast('Asignado', (c.nombre || '') + ' es el cliente activo', 'success');
+                } else {
+                    CDI.toast && CDI.toast('Asignado', (c.nombre || '') + ' es el cliente activo', 'success');
+                }
+            },
+        });
+    }
+
+    function humanizeApiError(detail, fallback) {
+        if (!detail) return fallback;
+        if (typeof detail === 'string') return detail;
+        if (Array.isArray(detail)) {
+            const msg = detail.map(d => (d && d.msg) || '').filter(Boolean).join('; ');
+            return msg || fallback;
+        }
+        if (detail.msg) return String(detail.msg);
+        try { return JSON.stringify(detail); } catch (_) { return fallback; }
     }
 
     CDI.registerScreen('review', {
