@@ -144,6 +144,9 @@
     let initialized = false;
     let prorrateoTrackedOpen = false;
     let incotermWarningTracked = false;
+    // Snapshot de los valores que vinieron del PDF (despues de normalizar) para
+    // distinguir despues "Detectado del PDF" de "lo escribio el usuario".
+    let initialPdfValues = {};
 
     // Incoterms que tipicamente ya incluyen flete/seguro en el precio CIF.
     // Si el despachante carga flete/seguro aparte con estos incoterms, suele ser
@@ -253,11 +256,15 @@
         init();
         if (!form) return;
         const op = (CDI.state && CDI.state.operacion) || {};
+        initialPdfValues = {};
         FIELDS.forEach(key => {
             const el = form.querySelector('[name="' + key + '"]');
             if (!el) return;
             const normalized = normalizeValueForField(key, op[key]);
             el.value = normalized;
+            if (normalized !== '' && normalized !== 0 && String(normalized).trim() !== '0') {
+                initialPdfValues[key] = String(normalized).trim();
+            }
             // Sincronizar de vuelta al state (por si normalizamos USD->DOL)
             if (normalized !== op[key]) {
                 if (el.type === 'number') {
@@ -602,6 +609,9 @@
     function updateFieldHint(name) {
         const hintEl = form.querySelector('[data-hint-for="' + name + '"]');
         if (!hintEl) return;
+        // Si ya esta marcado como "Desde cliente activo", respetarlo y salir.
+        if (hintEl.classList.contains('is-cliente')) return;
+
         const el = form.querySelector('[name="' + name + '"]');
         const val = el && el.value && String(el.value).trim();
 
@@ -610,8 +620,15 @@
 
         hintEl.classList.remove('is-detected', 'is-missing');
         if (val) {
-            hintEl.classList.add('is-detected');
-            hintEl.textContent = 'Detectado del PDF';
+            const fromPdf = initialPdfValues[name];
+            if (fromPdf && fromPdf === val) {
+                hintEl.classList.add('is-detected');
+                hintEl.textContent = 'Detectado del PDF';
+            } else {
+                // El usuario lo edito o lo cargo a mano: sin pista verde,
+                // que no transmita "esto vino del PDF" si no es cierto.
+                hintEl.textContent = '';
+            }
         } else {
             if (REQUIRED.indexOf(name) !== -1) {
                 hintEl.classList.add('is-missing');

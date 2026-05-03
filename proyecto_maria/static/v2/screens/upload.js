@@ -210,6 +210,18 @@
             if (cid) {
                 form.append('cliente_id', cid);
                 form.append('use_mapping', 'true');
+            } else {
+                const ok = window.confirm(
+                    'No hay cliente seleccionado.\n\n' +
+                    'El Excel se procesará con el mapeo genérico de columnas, no con el mapeo personalizado de tu cliente.\n\n' +
+                    '¿Querés continuar igual? (Cancelar para volver y elegir un cliente primero)'
+                );
+                if (!ok) {
+                    setBusy(false);
+                    CDI.track('upload_cancelled_no_cliente', { format: 'excel' });
+                    return;
+                }
+                CDI.track('upload_excel_sin_cliente', { filename: file.name });
             }
         }
 

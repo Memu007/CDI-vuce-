@@ -60,10 +60,10 @@
             label.textContent = 'Validacion';
         } else if (count === 0) {
             label.textContent = 'Todo OK';
-        } else if (count === 1) {
-            label.textContent = '1 aviso';
+        } else if (kind === 'error') {
+            label.textContent = count === 1 ? '1 error' : count + ' errores';
         } else {
-            label.textContent = count + ' avisos';
+            label.textContent = count === 1 ? '1 aviso' : count + ' avisos';
         }
         fab.dataset.kind = kind;
     }

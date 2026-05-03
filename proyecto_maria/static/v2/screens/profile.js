@@ -39,6 +39,9 @@
             el.addEventListener('keydown', (ev) => {
                 if (ev.key === 'Enter') { ev.preventDefault(); save(); }
             });
+            el.addEventListener('input', () => {
+                if (cuitErrorEl && !cuitErrorEl.hidden) clearError();
+            });
         });
         document.addEventListener('keydown', (ev) => {
             if (ev.key === 'Escape' && modal.classList.contains('is-open')) close();
