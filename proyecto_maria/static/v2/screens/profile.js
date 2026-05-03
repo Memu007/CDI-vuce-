@@ -11,6 +11,7 @@
     let modal, overlay, closeBtn, cancelBtn, saveBtn;
     let nameInput, cuitInput, emailEl, cuitErrorEl;
     let pfDefaultAduana, pfDefaultPuerto, pfDefaultTipoDest;
+    let replayTourBtn;
     let initialized = false;
     let loading = false;
 
@@ -30,6 +31,7 @@
         pfDefaultAduana = $('pfDefaultAduana');
         pfDefaultPuerto = $('pfDefaultPuerto');
         pfDefaultTipoDest = $('pfDefaultTipoDest');
+        replayTourBtn = $('pfReplayTour');
         if (!modal) return;
 
         closeBtn.addEventListener('click', close);
@@ -50,6 +52,16 @@
         document.addEventListener('keydown', (ev) => {
             if (ev.key === 'Escape' && modal.classList.contains('is-open')) close();
         });
+
+        if (replayTourBtn) {
+            replayTourBtn.addEventListener('click', () => {
+                close();
+                // El tour cierra el modal y arranca desde paso 1.
+                setTimeout(() => {
+                    if (CDI.openTour) CDI.openTour();
+                }, 260);
+            });
+        }
 
         initialized = true;
     }

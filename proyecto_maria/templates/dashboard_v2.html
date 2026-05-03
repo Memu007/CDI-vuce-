@@ -672,6 +672,27 @@
 
     <div id="toastHost"></div>
 
+    <!-- Tour de bienvenida: coachmark sutil + tooltip por paso. -->
+    <div class="tour-coachmark" id="tourCoachmark" hidden role="dialog" aria-labelledby="tourCmTitle">
+        <div class="tour-coachmark-body">
+            <p class="tour-coachmark-title" id="tourCmTitle">¿Te muestro cómo funciona?</p>
+            <p class="tour-coachmark-text">Un recorrido de 30 segundos por los 3 pasos principales.</p>
+        </div>
+        <div class="tour-coachmark-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="tourLater">Ahora no</button>
+            <button type="button" class="btn btn-primary btn-sm" id="tourStart">Mostrame</button>
+        </div>
+    </div>
+    <div class="tour-tooltip" id="tourTooltip" hidden role="dialog" aria-labelledby="tourTitle">
+        <div class="tour-tooltip-step caption" id="tourStepLabel">Paso 1 de 3</div>
+        <h3 class="tour-tooltip-title" id="tourTitle">…</h3>
+        <p class="tour-tooltip-text" id="tourText">…</p>
+        <div class="tour-tooltip-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="tourSkip">Saltá tour</button>
+            <button type="button" class="btn btn-primary btn-sm" id="tourCta">Siguiente</button>
+        </div>
+    </div>
+
     <div class="overlay" id="ncmOverlay" role="dialog" aria-modal="true" aria-label="Asistente NCM" hidden>
         <div class="spotlight">
             <div class="spotlight-header">
@@ -892,6 +913,10 @@
                 <label class="field-label">Email</label>
                 <p class="caption" id="pfEmail">—</p>
             </div>
+            <div class="field">
+                <button type="button" class="btn btn-ghost btn-sm" id="pfReplayTour">Ver tour de bienvenida</button>
+                <span class="field-hint">Repasá en 30 segundos los 3 pasos del flujo (subir, revisar, descargar).</span>
+            </div>
         </div>
         <footer class="modal-footer">
             <button type="button" class="btn btn-ghost" id="profileCancel">Cancelar</button>
@@ -1049,5 +1074,6 @@
     <script src="/static/v2/screens/finalize.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/calculadora.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/enrich.js?v={{ version }}" defer></script>
+    <script src="/static/v2/screens/tour.js?v={{ version }}" defer></script>
 </body>
 </html>

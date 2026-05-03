@@ -4183,3 +4183,126 @@ tr:hover .ncm-note-pill.is-empty {
     margin: 0 0 var(--s-3) 0;
     border-radius: var(--r-md, 10px);
     background: linear-gradient(135deg, var(--c-success-soft, #e8f7ee) 0
+/* ────────────────── Tour de bienvenida ────────────────── */
+
+.tour-coachmark {
+    position: fixed;
+    right: var(--s-4, 16px);
+    bottom: var(--s-4, 16px);
+    z-index: 1500;
+    width: 320px;
+    max-width: calc(100vw - 32px);
+    padding: var(--s-3, 12px) var(--s-4, 16px) var(--s-3, 12px);
+    background: #fff;
+    border-radius: var(--r-lg, 14px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+    border: 1px solid var(--c-border, #e5e7eb);
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-3, 12px);
+    transform: translateY(12px);
+    opacity: 0;
+    transition: opacity 200ms ease, transform 220ms ease;
+    pointer-events: auto;
+}
+.tour-coachmark.is-visible {
+    transform: translateY(0);
+    opacity: 1;
+}
+.tour-coachmark[hidden] { display: none; }
+.tour-coachmark-body { display: flex; flex-direction: column; gap: 4px; }
+.tour-coachmark-title {
+    margin: 0;
+    font-size: var(--t-15, 15px);
+    font-weight: var(--w-semibold, 600);
+    color: var(--c-text-1, #1f2937);
+}
+.tour-coachmark-text {
+    margin: 0;
+    font-size: var(--t-13, 13px);
+    color: var(--c-text-2, #6b7280);
+    line-height: 1.4;
+}
+.tour-coachmark-actions {
+    display: flex;
+    gap: var(--s-2, 8px);
+    justify-content: flex-end;
+    align-items: center;
+}
+
+.tour-tooltip {
+    position: fixed;
+    top: -9999px;
+    left: 0;
+    z-index: 1600;
+    width: 320px;
+    max-width: calc(100vw - 24px);
+    padding: var(--s-4, 16px);
+    background: #fff;
+    border-radius: var(--r-lg, 14px);
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
+    border: 1px solid var(--c-border, #e5e7eb);
+    opacity: 0;
+    transform: translateY(8px);
+    transition: opacity 180ms ease, transform 200ms ease;
+    pointer-events: auto;
+}
+.tour-tooltip.is-visible { opacity: 1; transform: translateY(0); }
+.tour-tooltip[hidden] { display: none; }
+.tour-tooltip-step {
+    margin: 0 0 4px 0;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--c-text-3, #9ca3af);
+    font-size: 11px;
+    font-weight: var(--w-semibold, 600);
+}
+.tour-tooltip-title {
+    margin: 0 0 6px 0;
+    font-size: var(--t-16, 16px);
+    font-weight: var(--w-semibold, 600);
+    color: var(--c-text-1, #1f2937);
+}
+.tour-tooltip-text {
+    margin: 0 0 var(--s-3, 12px) 0;
+    font-size: var(--t-13, 13px);
+    color: var(--c-text-2, #6b7280);
+    line-height: 1.5;
+}
+.tour-tooltip-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--s-2, 8px);
+}
+
+/* Halo sobre el target del paso actual: sin backdrop oscuro full-screen,
+   solo un anillo pulsante para guiar la vista. */
+.tour-spotlight {
+    position: relative;
+    z-index: 1550;
+    box-shadow: 0 0 0 4px rgba(44, 111, 255, 0.18),
+                0 0 0 8px rgba(44, 111, 255, 0.10);
+    border-radius: var(--r-md, 10px);
+    animation: tourPulse 1600ms ease-in-out infinite;
+}
+@keyframes tourPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 4px rgba(44, 111, 255, 0.18),
+                    0 0 0 8px rgba(44, 111, 255, 0.10);
+    }
+    50% {
+        box-shadow: 0 0 0 6px rgba(44, 111, 255, 0.28),
+                    0 0 0 12px rgba(44, 111, 255, 0.14);
+    }
+}
+
+@media (max-width: 480px) {
+    .tour-coachmark {
+        right: 8px;
+        left: 8px;
+        bottom: 8px;
+        width: auto;
+    }
+    .tour-tooltip { width: calc(100vw - 24px); }
+}

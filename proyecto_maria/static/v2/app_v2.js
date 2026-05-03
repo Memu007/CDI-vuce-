@@ -82,6 +82,14 @@
         if (handlers[name] && typeof handlers[name].onEnter === 'function') {
             try { handlers[name].onEnter(state || {}); } catch (err) { console.error('[CDI v2] onEnter:', err); }
         }
+        // Evento global para que modulos externos (ej. tour de bienvenida)
+        // sepan a que pantalla acaba de llegar el usuario y reaccionen sin
+        // hacer polling.
+        try {
+            document.dispatchEvent(new CustomEvent('cdi:screen-enter', {
+                detail: { screen: name, state: state || {} }
+            }));
+        } catch (_) {}
         track('screen_shown', { screen: name });
     }
 
