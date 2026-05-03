@@ -470,6 +470,20 @@
             CDI.state.catalogAutofillBanner = null;
             div.remove();
         });
+
+        // Hint contextual: la primera vez que el user ve este banner,
+        // le explicamos qué es el auto-catálogo en lenguaje simple.
+        try {
+            if (CDI.hint) {
+                CDI.hint('banner_autofill', {
+                    target: div,
+                    title: '✨ Auto-catálogo en acción',
+                    text: 'Reconocimos al proveedor de este PDF y te sugerimos los NCM que ya usó antes. Revisalos: vos confirmás, la AI propone.',
+                    cta: 'Entendido',
+                    ttl: 12000,
+                });
+            }
+        } catch (_) {}
     }
 
     function onAutofillUndo() {
@@ -778,6 +792,23 @@
             data_source: it.ncm_source || 'unknown'
         });
         if (it.descripcion) saveNcmUsage(it.descripcion, ncmFmt);
+
+        // Hint contextual: la primera vez que el user asigna un NCM,
+        // le contamos que se va a guardar para [cliente] + [proveedor].
+        try {
+            if (CDI.hint) {
+                const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
+                const op = (CDI.state && CDI.state.operacion) || {};
+                const cliNombre = (cliente && cliente.nombre) ? cliente.nombre : 'el cliente activo';
+                const provNombre = String(op.vendedor_nombre || '').trim() || 'el proveedor';
+                CDI.hint('autocatalogo', {
+                    title: '🧠 Memoria activada',
+                    text: 'Guardamos este NCM para ' + cliNombre + ' · ' + provNombre +
+                          '. En la próxima factura del mismo proveedor ya te lo sugerimos.',
+                    cta: 'Entendido',
+                });
+            }
+        } catch (_) {}
 
         const activeIdx = spotActiveIdx;
         closeSpotlight();

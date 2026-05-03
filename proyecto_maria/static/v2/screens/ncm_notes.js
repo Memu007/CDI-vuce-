@@ -197,6 +197,20 @@
             newInput.value = '';
             await refreshList();
             CDI.track('ncm_note_added', { ncm: currentNcmKey });
+
+            // Hint contextual: la primera vez que guarda una nota,
+            // le contamos que se atan al cliente activo.
+            try {
+                if (CDI.hint) {
+                    const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
+                    const cliNombre = (cliente && cliente.nombre) ? cliente.nombre : 'el cliente activo';
+                    CDI.hint('nota_cliente', {
+                        title: '📌 Nota guardada para ' + cliNombre,
+                        text: 'La próxima vez que este cliente tenga este NCM, te la recordamos arriba de todo.',
+                        cta: 'Entendido',
+                    });
+                }
+            } catch (_) {}
         } catch (err) {
             showError(String(err.message || err));
         } finally {

@@ -6,6 +6,19 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-03 · Hints contextuales just-in-time
+
+- **feat (hints):** 3 micro-tooltips que aparecen UNA sola vez en el momento exacto que cada feature se activa, con datos reales del usuario:
+  - **🧠 Memoria activada** — al asignar el primer NCM: "Guardamos este NCM para [Cliente] · [Proveedor]".
+  - **📌 Nota guardada** — al agregar la primera nota NCM: se ata al cliente activo.
+  - **✨ Auto-catálogo en acción** — la primera vez que aparece el banner de autocompletado.
+- **chore:** motor `CDI.hint(id, opts)` reusable en `proyecto_maria/static/v2/screens/hints.js`. Persistencia por usuario en `localStorage` (key `cdi_hint_<id>_v1`).
+- **telemetría:** `hint_shown` y `hint_closed` (`reason: cta|x|timeout|outside`) van a `telemetry_events`.
+- **a11y:** respeto `prefers-reduced-motion` + responsive móvil.
+- Para resetear y volver a verlos: `CDI.resetHints()` en consola del navegador.
+
+---
+
 ## 2026-05-03 · Tour v2 — polish UX
 
 - **feat (tour):** rediseño del tour de bienvenida. "Ver tour" del footer ahora arranca directo el paso 1 (saltea el cartelito, respeta la intención), cierra drawers abiertos antes, flechita que apunta al botón destacado, puntitos de progreso (● ● ○), ESC cierra, "Saltar" siempre visible. Sube z-index a 9600 para no quedar tapado en ninguna pantalla.
