@@ -11,7 +11,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **docs:** dos reglas nuevas para todos los asistentes (Cursor / Antigravity / Cascade):
   - **Equipo virtual de 6 roles** (PM, Tech Lead, Backend, Frontend, QA, Security/DevOps). Cada respuesta no-trivial empieza indicando los roles consultados entre corchetes.
   - **Persistencia GitHub al día**: después de cada cambio significativo, actualizar `HANDOFF.md` + `CHANGELOG.md`, commit y push. La fuente de verdad es GitHub para que cualquier asistente continúe donde se quedó otro.
-- **archivos:** `.cursor/rules/equipo-virtual.mdc`, `.cursor/rules/persistencia-github-al-dia.mdc`, sección §2.bis nueva en `AGENTS.md`.
+- **wrappers para todos los IDEs**: `AGENTS.md` es ahora la fuente de verdad oficial. Wrappers cortos creados para que cada asistente las encuentre en su archivo nativo:
+  - `.cursor/rules/*.mdc` (Cursor)
+  - `.windsurf/rules/leeme-primero.md` (Cascade / Windsurf)
+  - `CLAUDE.md` (Claude Code)
+  - `.github/copilot-instructions.md` (GitHub Copilot)
+  - `CONVENTIONS.md` (Aider y otros)
 
 ---
 

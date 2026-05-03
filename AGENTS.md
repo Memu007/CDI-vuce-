@@ -1,6 +1,16 @@
 # AGENTS.md — instrucciones para asistentes de IA
 
-> Cualquier asistente (Cursor, Claude Code, Antigravity, Codex, etc.) que tome este repo lee este archivo primero, después `HANDOFF.md`.
+> **Esta es la fuente de verdad para CUALQUIER asistente** (Cursor, Antigravity, Cascade/Windsurf, Claude Code, Codex, GitHub Copilot, Aider, etc.) que tome este repo. Lo lee este archivo primero, después `HANDOFF.md`.
+>
+> Cada IDE tiene su propio archivo wrapper que apunta acá:
+>
+> - Cursor → `.cursor/rules/*.mdc`
+> - Cascade/Windsurf → `.windsurf/rules/leeme-primero.md`
+> - Claude Code → `CLAUDE.md`
+> - GitHub Copilot → `.github/copilot-instructions.md`
+> - Aider y otros → `CONVENTIONS.md`
+>
+> **Si modificás reglas, modificalas acá o en `.cursor/rules/`. Los wrappers son cortos y no duplican contenido.**
 
 ## 1. Antes de tocar nada
 
