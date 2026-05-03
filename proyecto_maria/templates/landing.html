@@ -214,6 +214,8 @@
             <h2 class="auth-title">Bienvenido de nuevo.</h2>
             <p class="auth-sub">Usá tu usuario y contraseña.</p>
 
+            <div class="auth-error" id="loginError" hidden></div>
+
             <label class="field">
                 <span>Usuario</span>
                 <input name="username" type="text" autocomplete="username" required />
@@ -222,7 +224,6 @@
                 <span>Contraseña</span>
                 <input name="password" type="password" autocomplete="current-password" required />
             </label>
-            <div class="auth-error" id="loginError" hidden></div>
             <button type="submit" class="btn-primary btn-lg btn-block">Ingresar</button>
             <p class="auth-hint">¿No tenés cuenta? <a href="#" data-tab="register" class="auth-link">Crear cuenta →</a></p>
             <p class="auth-hint">Para probar: <code>demo</code> / <code>demo123</code></p>
@@ -231,6 +232,8 @@
         <form id="registerForm" class="auth-form" autocomplete="on" novalidate>
             <h2 class="auth-title">Creá tu cuenta.</h2>
             <p class="auth-sub">Podés probar sin datos reales.</p>
+
+            <div class="auth-error" id="registerError" hidden></div>
 
             <label class="field">
                 <span>Nombre</span>
@@ -277,7 +280,6 @@
                 </div>
             </fieldset>
 
-            <div class="auth-error" id="registerError" hidden></div>
             <button type="submit" class="btn-primary btn-lg btn-block">Empezar trial de 14 días</button>
             <p class="auth-hint">¿Ya tenés cuenta? <a href="#" data-tab="login" class="auth-link">Ingresar →</a></p>
         </form>
@@ -537,6 +539,7 @@
                 else if (data && typeof data.message === 'string') msg = data.message;
                 errorEl.textContent = msg;
                 errorEl.hidden = false;
+                try { errorEl.scrollIntoView({ block: 'start', behavior: 'smooth' }); } catch (_) {}
                 return;
             }
 
@@ -583,8 +586,29 @@
     });
     forms.register.addEventListener('submit', (e) => {
         e.preventDefault();
-        submitAuth(forms.register, '/auth/register', document.getElementById('registerError'));
+        const errorEl = document.getElementById('registerError');
+        const pwd = forms.register.querySelector('input[name=password]');
+        if (pwd && pwd.value && pwd.value.length < 8) {
+            errorEl.textContent = 'La contraseña debe tener al menos 8 caracteres.';
+            errorEl.hidden = false;
+            try { pwd.focus({ preventScroll: false }); } catch (_) { pwd.focus(); }
+            try { pwd.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
+            return;
+        }
+        submitAuth(forms.register, '/auth/register', errorEl);
     });
+
+    function wireAuthErrorClear(form, errorEl) {
+        if (!form || !errorEl) return;
+        form.addEventListener('input', () => {
+            if (!errorEl.hidden) {
+                errorEl.hidden = true;
+                errorEl.textContent = '';
+            }
+        });
+    }
+    wireAuthErrorClear(forms.login, document.getElementById('loginError'));
+    wireAuthErrorClear(forms.register, document.getElementById('registerError'));
 
     /* ---------- Deep link via hash ---------- */
     if (window.location.hash === '#auth' || window.location.hash === '#login') openAuth('login');
