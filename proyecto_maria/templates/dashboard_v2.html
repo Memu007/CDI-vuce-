@@ -304,7 +304,8 @@
                                     </div>
                                     <div class="field">
                                         <label class="field-label" for="f_puerto_destino">Puerto destino</label>
-                                        <input class="input" type="text" id="f_puerto_destino" name="puerto_destino" autocomplete="off">
+                                        <input class="input" type="text" id="f_puerto_destino" name="puerto_destino" placeholder="ARBUE" autocomplete="off">
+                                        <span class="field-hint">Si lo dejás vacío usamos ARBUE (Ezeiza) por defecto.</span>
                                     </div>
                                     <div class="field">
                                         <label class="field-label" for="f_fecha_embarque">Fecha de embarque</label>
@@ -321,6 +322,35 @@
                                     <div class="field">
                                         <label class="field-label" for="f_contenedor_peso">Peso contenedor (kg)</label>
                                         <input class="input" type="number" step="0.01" min="0" id="f_contenedor_peso" name="contenedor_peso" autocomplete="off">
+                                    </div>
+                                </div>
+                            </details>
+
+                            <details class="review-optional" id="aduanaBlock">
+                                <summary class="review-optional-summary">
+                                    <span class="review-optional-summary-text">
+                                        <strong>Datos para MARIA (avanzado)</strong>
+                                        <span class="caption">Aduana, tipo de destinación. Si los dejás como están, usamos los valores típicos.</span>
+                                    </span>
+                                    <svg class="review-optional-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                                </summary>
+                                <div class="review-grid review-optional-body">
+                                    <div class="field">
+                                        <label class="field-label" for="f_aduana_codigo">Código de aduana</label>
+                                        <input class="input" type="text" id="f_aduana_codigo" name="aduana_codigo" placeholder="001" autocomplete="off">
+                                        <span class="field-hint">Por defecto: 001 (Buenos Aires capital). Cambialo si despachás por otra aduana.</span>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_tipo_destinacion">Tipo de destinación</label>
+                                        <select class="select" id="f_tipo_destinacion" name="tipo_destinacion">
+                                            <option value="">Por defecto: IC04 (Importación a consumo)</option>
+                                            <option value="IC04">IC04 - Importación a consumo</option>
+                                            <option value="IC05">IC05 - Importación a consumo (zona franca)</option>
+                                            <option value="IT01">IT01 - Importación temporal</option>
+                                            <option value="ZFI1">ZFI1 - Zona franca</option>
+                                            <option value="TRAN">TRAN - Tránsito</option>
+                                        </select>
+                                        <span class="field-hint">El 90% de las operaciones es IC04. Cambialo solo si sabés que es otro tipo.</span>
                                     </div>
                                 </div>
                             </details>

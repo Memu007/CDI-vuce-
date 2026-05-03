@@ -19,7 +19,9 @@
         // Transporte opcional: si vienen en el PDF los precargamos
         'transporte_medio', 'bl', 'buque',
         'puerto_origen', 'puerto_destino', 'fecha_embarque',
-        'contenedor_numero', 'contenedor_tipo', 'contenedor_peso'
+        'contenedor_numero', 'contenedor_tipo', 'contenedor_peso',
+        // Bloque "Datos para MARIA" (aduana, tipo destinacion). Opcionales.
+        'aduana_codigo', 'tipo_destinacion'
     ];
 
     // Campos obligatorios para pasar a NCM (los demas son "nice to have")
@@ -286,6 +288,12 @@
             details.open = true;
         }
 
+        // Auto-expandir bloque "Datos para MARIA" si tiene valores no-default
+        const aduanaBlock = $('aduanaBlock');
+        if (aduanaBlock && hasAduanaCustom(op) && !aduanaBlock.open) {
+            aduanaBlock.open = true;
+        }
+
         renderMetaPill();
         recomputeHints();
         validateAll({ silent: true });
@@ -303,6 +311,17 @@
             if (typeof v === 'number' && v === 0) return false;
             return true;
         });
+    }
+
+    // Devuelve true si el usuario customizo aduana/tipo destinacion
+    // (algun valor cargado distinto al default). Asi expandimos el bloque
+    // automatico para mostrarle lo que tiene seteado.
+    function hasAduanaCustom(op) {
+        const aduana = String(op.aduana_codigo || '').trim();
+        const tipo = String(op.tipo_destinacion || '').trim().toUpperCase();
+        if (aduana && aduana !== '001') return true;
+        if (tipo && tipo !== 'IC04') return true;
+        return false;
     }
 
     /* ---------- Integracion con cliente activo ----------
