@@ -217,8 +217,8 @@
             <div class="auth-error" id="loginError" hidden></div>
 
             <label class="field">
-                <span>Usuario</span>
-                <input name="username" type="text" autocomplete="username" required />
+                <span>Usuario o email</span>
+                <input name="username" type="text" autocomplete="username" placeholder="emiliano  o  vos@empresa.com" required />
             </label>
             <label class="field">
                 <span>Contraseña</span>
@@ -238,10 +238,6 @@
             <label class="field">
                 <span>Nombre</span>
                 <input name="name" type="text" autocomplete="name" required />
-            </label>
-            <label class="field">
-                <span>Usuario</span>
-                <input name="username" type="text" autocomplete="username" required />
             </label>
             <label class="field">
                 <span>Email</span>
@@ -478,6 +474,21 @@
         return '/dashboard';
     }
 
+    // Deriva un username valido desde el email para el alta. El usuario
+    // siempre podra ingresar despues con su email (login acepta ambos).
+    // Sufijo de 4 digitos para evitar colisiones tipicas (emi@x, emi@y).
+    function deriveUsernameFromEmail(email) {
+        const base = String(email || '').split('@')[0]
+            .toLowerCase()
+            .replace(/[^a-z0-9_-]/g, '-')
+            .replace(/-+/g, '-')
+            .replace(/^-|-$/g, '')
+            .slice(0, 20);
+        const safeBase = base.length >= 3 ? base : 'user';
+        const suffix = Math.floor(1000 + Math.random() * 9000);
+        return safeBase + '-' + suffix;
+    }
+
     async function submitAuth(form, endpoint, errorEl) {
         errorEl.hidden = true;
         errorEl.textContent = '';
@@ -489,8 +500,10 @@
         const payload = {};
         new FormData(form).forEach((v, k) => { payload[k] = v; });
 
-        // Si es el registro, armamos payment_method y quitamos los campos
-        // de tarjeta individuales del payload plano antes de enviar.
+        if (form === forms.register && !payload.username) {
+            payload.username = deriveUsernameFromEmail(payload.email);
+        }
+
         if (form === forms.register) {
             const cardErr = validateCardFields(payload);
             if (cardErr) {

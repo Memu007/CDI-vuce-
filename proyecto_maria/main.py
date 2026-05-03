@@ -1398,8 +1398,11 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
     username = login_request.username
     password = login_request.password
     
-    # Buscar usuario en DB
-    result = await db.execute(select(User).where(User.username == username))
+    # Buscar por username o por email (los usuarios nuevos se identifican
+    # por email; el username se autogenera y casi nadie lo recuerda).
+    result = await db.execute(
+        select(User).where((User.username == username) | (User.email == username))
+    )
     user = result.scalars().first()
     
     # Función auxiliar para manejar fallo y rate limit
