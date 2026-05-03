@@ -247,7 +247,7 @@
         if (selectedRows.size === 0 || !items.length) return;
         const factor = Number(batchFactor && batchFactor.value);
         if (!isFinite(factor) || factor <= 0) {
-            if (CDI.toast) CDI.toast('Factor invalido', 'Usa un numero mayor a 0', 'error');
+            if (CDI.toast) CDI.toast('Factor inválido', 'Usá un número mayor a 0', 'error');
             return;
         }
         if (factor === 1) {
@@ -274,8 +274,8 @@
         const items = (CDI.state && CDI.state.items) || [];
         if (selectedRows.size === 0 || !items.length) return;
         const raw = (batchNcm && batchNcm.value || '').replace(/\D/g, '');
-        if (raw.length !== 8) {
-            if (CDI.toast) CDI.toast('NCM invalido', 'Necesita 8 digitos', 'error');
+        if (raw.length !== 8 && raw.length !== 10) {
+            if (CDI.toast) CDI.toast('NCM inválido', 'Necesita 8 dígitos (o 10 con sufijo SIM)', 'error');
             return;
         }
         const formatted = CDI.formatNcm ? CDI.formatNcm(raw) : raw;
@@ -524,19 +524,34 @@
     function updateSummary() {
         const items = (CDI.state && CDI.state.items) || [];
         const total = items.length;
-        const done = items.filter(it => !!(it.pieza && it.pieza.trim())).length;
-        const missing = total - done;
+        // Un item esta "listo" solo si su NCM cumple el formato (8 o 10 digitos).
+        // Antes contabamos cualquier texto y eso permitia avanzar con codigos
+        // mal formados o incompletos.
+        const done = items.filter(it => isValidNcm(it.pieza)).length;
+        const incomplete = items.filter(it => {
+            const v = String(it.pieza || '').trim();
+            return v && !isValidNcm(v);
+        }).length;
+        const empty = total - done - incomplete;
+        const missing = empty + incomplete;
         if (summaryEl) {
             if (missing === 0) {
                 summaryEl.innerHTML = total + ' productos · <strong style="color: var(--c-success);">todos listos</strong>';
             } else {
-                summaryEl.innerHTML = total + ' productos · <strong style="color: var(--c-warning);">' +
-                    missing + ' sin NCM</strong> · ' + done + ' listos';
+                let breakdown = '<strong style="color: var(--c-warning);">' + missing + ' sin NCM válido</strong>';
+                if (incomplete > 0 && empty > 0) {
+                    breakdown += ' (' + empty + ' vacíos · ' + incomplete + ' incompletos)';
+                } else if (incomplete > 0) {
+                    breakdown += ' (' + incomplete + ' incompleto' + (incomplete > 1 ? 's' : '') + ')';
+                }
+                summaryEl.innerHTML = total + ' productos · ' + breakdown + ' · ' + done + ' listos';
             }
         }
         if (continueBtn) {
             continueBtn.disabled = missing > 0 || total === 0;
-            continueBtn.firstChild.nodeValue = missing === 0 ? 'Continuar a validar ' : 'Asignar ' + missing + ' NCM ';
+            continueBtn.firstChild.nodeValue = missing === 0
+                ? 'Continuar a validar '
+                : 'Asignar ' + missing + ' NCM ';
         }
     }
 
@@ -559,8 +574,21 @@
         if (!items[idx]) return;
         if (val && !isValidNcm(val)) {
             inp.classList.add('is-error');
+            // Toast con mensaje explicativo: antes solo se ponia rojo y el
+            // usuario no entendia que estaba mal.
+            const digits = String(val).replace(/\D/g, '').length;
+            let detail;
+            if (digits < 8) {
+                detail = 'Te faltan dígitos: el NCM tiene 8 (ej. 8471.30.00).';
+            } else if (digits === 9 || digits > 10) {
+                detail = 'Sobran dígitos: el NCM es de 8 (o 10 con sufijo SIM).';
+            } else {
+                detail = 'Solo números. Formato: 8 dígitos (ej. 8471.30.00).';
+            }
+            if (CDI.toast) CDI.toast('NCM inválido', detail, 'error');
             return;
         }
+        inp.classList.remove('is-error');
         // Canonizar a XXXX.XX.XX al salir del input
         if (val && CDI.formatNcm) {
             val = CDI.formatNcm(val);
@@ -590,8 +618,16 @@
     }
 
     function isValidNcm(v) {
-        // 4 a 10 digitos (con o sin puntos). Aceptamos formato tipo 8471.30.00.
-        const norm = String(v).replace(/[.\s]/g, '');
+        // Argentina usa NCM de 8 digitos (formato XXXX.XX.XX), o 10 con sufijo
+        // SIM. Aceptamos cualquiera de los dos para considerar valido un codigo.
+        const norm = String(v || '').replace(/[.\s]/g, '');
+        return /^\d{8}$|^\d{10}$/.test(norm);
+    }
+
+    // Tolerancia para mientras el usuario tipea en el spotlight (todavia
+    // no termino de escribir el codigo): 4-10 digitos.
+    function isPartialNcm(v) {
+        const norm = String(v || '').replace(/[.\s]/g, '');
         return /^\d{4,10}$/.test(norm);
     }
 
@@ -627,13 +663,21 @@
     }
 
     function closeSpotlight() {
+        const prevIdx = spotActiveIdx;
         overlay.hidden = true;
         spotActiveIdx = -1;
         hideVucePreview();
         clearTimeout(vuceDebounce);
         vuceLastNcm = '';
-        // Devolver foco al boton que lo abrio (o input correspondiente)
-        if (spotActiveIdx === -1) return;
+        // Devolver foco al input de la fila que abrio el spotlight, para
+        // accesibilidad y para que se pueda seguir tabulando sin saltar al body.
+        if (prevIdx >= 0) {
+            const sel = 'input.ncm-input[data-row="' + prevIdx + '"]';
+            const inp = tbody && tbody.querySelector(sel);
+            if (inp) {
+                try { inp.focus({ preventScroll: false }); } catch (_) { inp.focus(); }
+            }
+        }
     }
 
     function onSpotInput() {
@@ -647,11 +691,11 @@
                 const it = (CDI.state.items || [])[spotActiveIdx] || {};
                 fetchSuggestions(it.descripcion || '', true);
                 hideVucePreview();
-            } else if (q.length >= 3 && !isValidNcm(q)) {
+            } else if (q.length >= 3 && !isPartialNcm(q)) {
                 fetchSuggestions(q, false);
                 hideVucePreview();
-            } else if (isValidNcm(q)) {
-                // El usuario esta tipeando un NCM directo: offrecer asignar ese
+            } else if (isPartialNcm(q)) {
+                // El usuario esta tipeando un NCM directo: ofrecer asignar ese
                 renderDirectCode(q);
                 // Si tiene 6+ digitos, consultar VUCE para mostrar descripcion oficial y alicuotas
                 const clean = String(q).replace(/\D/g, '');
@@ -818,6 +862,14 @@
         }
         if (groups.ia.length) {
             chunks.push('<div class="spotlight-section-label">Sugerencias de IA</div>');
+            // Disclaimer: las sugerencias son orientativas. La responsabilidad
+            // final del NCM es del despachante. Aparece solo cuando hay IA en
+            // pantalla para no inflar la UI.
+            chunks.push(
+                '<div class="spotlight-ia-disclaimer">' +
+                'Orientativas: contrastá con la mercadería y VUCE antes de asignar.' +
+                '</div>'
+            );
             groups.ia.forEach(e => chunks.push(renderSpotItem(e)));
         }
         if (groups.manual.length) {

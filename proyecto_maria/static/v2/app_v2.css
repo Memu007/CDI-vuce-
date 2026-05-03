@@ -1369,6 +1369,13 @@ body.cdi-dragging-row { cursor: grabbing; }
     text-transform: uppercase;
     letter-spacing: 0.04em;
 }
+.spotlight-ia-disclaimer {
+    padding: 0 var(--s-5) var(--s-2);
+    font-size: var(--t-12);
+    color: var(--c-text-2);
+    font-style: italic;
+    line-height: 1.4;
+}
 .spotlight-item {
     display: flex;
     align-items: center;

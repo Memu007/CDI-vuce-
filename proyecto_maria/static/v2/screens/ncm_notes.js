@@ -20,6 +20,18 @@
 
     function $(id) { return document.getElementById(id); }
 
+    function humanizeError(detail, fallback) {
+        // Si el backend devolvio un mensaje claro y corto, lo mostramos tal cual.
+        // Si parece tecnico (stack trace, detail de SQL, muy largo) caemos al
+        // fallback amigable para no asustar al usuario.
+        const s = String(detail || '').trim();
+        if (!s) return fallback;
+        if (s.length > 180) return fallback;
+        const tecnico = /traceback|exception|sqlalchemy|psycopg|operationalerror|integrityerror|<class /i;
+        if (tecnico.test(s)) return fallback;
+        return s;
+    }
+
     function prefix4(ncm) {
         if (!ncm) return '';
         const digits = String(ncm).replace(/\D/g, '');
@@ -181,7 +193,7 @@
                 body: JSON.stringify({ ncm: currentNcmKey, nota: val })
             });
             const data = await res.json().catch(() => ({}));
-            if (!res.ok) throw new Error(data.detail || 'No se pudo guardar la nota');
+            if (!res.ok) throw new Error(humanizeError(data.detail, 'No se pudo guardar la nota'));
             newInput.value = '';
             await refreshList();
             CDI.track('ncm_note_added', { ncm: currentNcmKey });
@@ -203,7 +215,7 @@
             );
             if (!res.ok) {
                 const data = await res.json().catch(() => ({}));
-                throw new Error(data.detail || 'No se pudo eliminar');
+                throw new Error(humanizeError(data.detail, 'No se pudo eliminar'));
             }
             await refreshList();
         } catch (err) {
@@ -258,7 +270,7 @@
         );
         if (!res.ok) {
             const data = await res.json().catch(() => ({}));
-            throw new Error(data.detail || 'No se pudo actualizar');
+            throw new Error(humanizeError(data.detail, 'No se pudo actualizar'));
         }
         await refreshList();
     }
