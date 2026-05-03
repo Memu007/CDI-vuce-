@@ -374,6 +374,67 @@ async def _migrate_add_user_cuit_column():
         print(f"⚠️ No se pudo migrar users.cuit: {mig_err}")
 
 
+async def _migrate_sync_clients_columns():
+    """Sincroniza columnas del modelo Client con la DB.
+
+    Hay envs (ej. Railway) donde la tabla clients fue creada con un esquema
+    viejo y faltan columnas que el modelo SQLAlchemy ahora espera (notes,
+    address, favorite, default_origin, etc.). Sin estas columnas, CUALQUIER
+    SELECT(Client) revienta con UndefinedColumnError y rompe /api/clientes,
+    /api/clientes/by-cuit, etc.
+
+    Esta migracion checkea por information_schema (Postgres) o PRAGMA (SQLite)
+    cuales faltan y las crea con el tipo correspondiente. Idempotente.
+    """
+    import traceback
+    from proyecto_maria.database.connection import engine, IS_SQLITE
+    expected = [
+        ("name", "VARCHAR(200) NOT NULL"),
+        ("email", "VARCHAR(100)"),
+        ("phone", "VARCHAR(50)"),
+        ("cuit", "VARCHAR(15)"),
+        ("address", "TEXT"),
+        ("notes", "TEXT"),
+        ("favorite", "BOOLEAN DEFAULT FALSE"),
+        ("default_origin", "VARCHAR(3) DEFAULT 'CN'"),
+        ("preferred_currency", "VARCHAR(3) DEFAULT 'USD'"),
+        ("auto_ncm_enabled", "BOOLEAN DEFAULT TRUE"),
+        ("fecha_inic_activ", "VARCHAR(10)"),
+        ("column_mapping", "TEXT" if IS_SQLITE else "JSON"),
+        ("is_active", "BOOLEAN DEFAULT TRUE"),
+    ]
+    # Para columnas con NOT NULL que ya pueden tener filas: las agregamos
+    # nullables y el modelo se encarga del default. Asi evitamos romper en
+    # tablas con datos.
+    safe_types = {
+        "name": "VARCHAR(200)",  # quitar NOT NULL en migracion
+    }
+    try:
+        async with engine.begin() as conn:
+            if IS_SQLITE:
+                res = await conn.exec_driver_sql("PRAGMA table_info(clients)")
+                existing = {row[1] for row in res.fetchall()}
+            else:
+                res = await conn.exec_driver_sql(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'clients'"
+                )
+                existing = {row[0] for row in res.fetchall()}
+
+            for col, coltype in expected:
+                if col in existing:
+                    continue
+                effective_type = safe_types.get(col, coltype)
+                await conn.exec_driver_sql(
+                    f"ALTER TABLE clients ADD COLUMN {col} {effective_type}"
+                )
+                print(f"✅ Migracion: agregada columna clients.{col}")
+    except Exception as mig_err:
+        print("❌ Error sincronizando columnas de clients:")
+        print(traceback.format_exc())
+        print(f"❌ Error original: {mig_err!r}")
+
+
 async def _migrate_add_user_op_defaults_columns():
     """Agrega columnas de defaults de operacion al usuario (despachante).
 
@@ -703,6 +764,10 @@ async def lifespan(app: FastAPI):
     await _migrate_add_user_cuit_column()
     await _migrate_add_user_billing_columns()
     await _migrate_add_user_op_defaults_columns()
+    # IMPORTANTE: _migrate_sync_clients_columns() debe correr ANTES de las
+    # otras de clientes, porque agrega notes/address/favorite que las otras
+    # podrian asumir presentes.
+    await _migrate_sync_clients_columns()
     await _migrate_clients_email_nullable()
     await _migrate_add_client_column_mapping()
     await _migrate_add_client_fecha_inic_activ()
@@ -1516,6 +1581,7 @@ async def dev_run_migrations(user=Depends(get_current_user)):
         ("user_cuit", _migrate_add_user_cuit_column),
         ("user_billing", _migrate_add_user_billing_columns),
         ("user_op_defaults", _migrate_add_user_op_defaults_columns),
+        ("sync_clients_columns", _migrate_sync_clients_columns),
         ("clients_email_nullable", _migrate_clients_email_nullable),
         ("client_column_mapping", _migrate_add_client_column_mapping),
         ("client_fecha_inic_activ", _migrate_add_client_fecha_inic_activ),
