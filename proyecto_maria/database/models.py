@@ -29,6 +29,12 @@ class User(Base):
     # Es por usuario y no cambia entre operaciones, por eso vive en el perfil
     # y no en cada MariaRequest (aunque sigue aceptandose via request).
     cuit = Column(String(15), nullable=True)
+    # Defaults de operacion del despachante: si tiene cargados estos en perfil,
+    # se usan como fallback en cada operacion en vez de los defaults globales
+    # (ARBUE/001/IC04). El usuario puede pisarlos por operacion en Revisar.
+    default_aduana_codigo = Column(String(10), nullable=True)
+    default_puerto_destino = Column(String(10), nullable=True)
+    default_tipo_destinacion = Column(String(10), nullable=True)
     plan = Column(String(20), default="trial")
     roles = Column(JSON, default=[])
     is_verified = Column(Boolean, default=False)

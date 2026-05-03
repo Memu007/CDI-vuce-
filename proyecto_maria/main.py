@@ -374,6 +374,40 @@ async def _migrate_add_user_cuit_column():
         print(f"⚠️ No se pudo migrar users.cuit: {mig_err}")
 
 
+async def _migrate_add_user_op_defaults_columns():
+    """Agrega columnas de defaults de operacion al usuario (despachante).
+
+    Permite que cada despachante guarde su aduana/puerto/tipo destinacion
+    habituales. Cuando el frontend genera el TXT MARIA, si la operacion no
+    trae esos valores, se aplican estos defaults del perfil antes de caer
+    al default global ARBUE/001/IC04. Idempotente.
+    """
+    from proyecto_maria.database.connection import engine, IS_SQLITE
+    new_cols = [
+        ("default_aduana_codigo", "VARCHAR(10)"),
+        ("default_puerto_destino", "VARCHAR(10)"),
+        ("default_tipo_destinacion", "VARCHAR(10)"),
+    ]
+    try:
+        async with engine.begin() as conn:
+            if IS_SQLITE:
+                res = await conn.exec_driver_sql("PRAGMA table_info(users)")
+                existing = {row[1] for row in res.fetchall()}
+                for col, coltype in new_cols:
+                    if col not in existing:
+                        await conn.exec_driver_sql(
+                            f"ALTER TABLE users ADD COLUMN {col} {coltype}"
+                        )
+                        print(f"✅ Migracion: agregada columna users.{col} (SQLite)")
+            else:
+                for col, coltype in new_cols:
+                    await conn.exec_driver_sql(
+                        f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {coltype}"
+                    )
+    except Exception as mig_err:
+        print(f"⚠️ No se pudo migrar columnas de defaults de operacion: {mig_err}")
+
+
 async def _migrate_add_user_billing_columns():
     """Agrega las columnas de billing (trial + PM simulado) a users.
 
@@ -652,6 +686,7 @@ async def lifespan(app: FastAPI):
     await init_db()
     await _migrate_add_user_cuit_column()
     await _migrate_add_user_billing_columns()
+    await _migrate_add_user_op_defaults_columns()
     await _migrate_clients_email_nullable()
     await _migrate_add_client_column_mapping()
     await _migrate_add_client_fecha_inic_activ()
@@ -985,6 +1020,9 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
         "is_verified": user.is_verified,
         "billing_status": user.billing_status or "none",
         "trial_ends_at": user.trial_ends_at.isoformat() if user.trial_ends_at else None,
+        "default_aduana_codigo": user.default_aduana_codigo or "",
+        "default_puerto_destino": user.default_puerto_destino or "",
+        "default_tipo_destinacion": user.default_tipo_destinacion or "",
     }
 
 
@@ -1015,6 +1053,9 @@ async def get_user_profile(
             "cuit": u.cuit or "",
             "plan": u.plan or "basic",
             "is_verified": bool(u.is_verified),
+            "default_aduana_codigo": u.default_aduana_codigo or "",
+            "default_puerto_destino": u.default_puerto_destino or "",
+            "default_tipo_destinacion": u.default_tipo_destinacion or "",
         },
     }
 
@@ -1058,6 +1099,19 @@ async def update_user_profile(
                 )
             u.cuit = digits
 
+    # Defaults del despachante: solo letras/numeros, max 10. Vacio = limpiar.
+    def _sanitize_op_default(raw, max_len=10):
+        s = str(raw or "").strip().upper()
+        s = re.sub(r"[^A-Z0-9]", "", s)
+        return s[:max_len] or None
+
+    if "default_aduana_codigo" in body:
+        u.default_aduana_codigo = _sanitize_op_default(body.get("default_aduana_codigo"))
+    if "default_puerto_destino" in body:
+        u.default_puerto_destino = _sanitize_op_default(body.get("default_puerto_destino"))
+    if "default_tipo_destinacion" in body:
+        u.default_tipo_destinacion = _sanitize_op_default(body.get("default_tipo_destinacion"))
+
     await db.commit()
     await db.refresh(u)
     return {
@@ -1069,6 +1123,9 @@ async def update_user_profile(
             "cuit": u.cuit or "",
             "plan": u.plan or "basic",
             "is_verified": bool(u.is_verified),
+            "default_aduana_codigo": u.default_aduana_codigo or "",
+            "default_puerto_destino": u.default_puerto_destino or "",
+            "default_tipo_destinacion": u.default_tipo_destinacion or "",
         },
     }
 

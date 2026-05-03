@@ -254,17 +254,45 @@
         return String(val);
     }
 
+    let fieldsFromUserDefaults = {};
+    function applyUserDefaults(op) {
+        // Si el despachante guardo en su perfil un puerto/aduana/tipo destinacion
+        // habitual, lo usamos cuando la operacion viene vacia. Asi evita tener
+        // que abrir el bloque "Datos para MARIA" cada vez que crea una operacion.
+        fieldsFromUserDefaults = {};
+        const defaults = (CDI && CDI.userDefaults) || {};
+        const fieldsFromUser = {
+            aduana_codigo: defaults.aduana_codigo,
+            puerto_destino: defaults.puerto_destino,
+            tipo_destinacion: defaults.tipo_destinacion
+        };
+        Object.keys(fieldsFromUser).forEach(k => {
+            const v = String(fieldsFromUser[k] || '').trim();
+            const current = String(op[k] || '').trim();
+            if (v && !current) {
+                op[k] = v;
+                fieldsFromUserDefaults[k] = v;
+            }
+        });
+    }
+
     function populate() {
         init();
         if (!form) return;
         const op = (CDI.state && CDI.state.operacion) || {};
+        applyUserDefaults(op);
         initialPdfValues = {};
         FIELDS.forEach(key => {
             const el = form.querySelector('[name="' + key + '"]');
             if (!el) return;
             const normalized = normalizeValueForField(key, op[key]);
             el.value = normalized;
-            if (normalized !== '' && normalized !== 0 && String(normalized).trim() !== '0') {
+            // Si el valor viene del default del perfil (no del PDF), NO lo
+            // marcamos como "Detectado del PDF" porque seria mentira.
+            if (
+                normalized !== '' && normalized !== 0 && String(normalized).trim() !== '0'
+                && !fieldsFromUserDefaults[key]
+            ) {
                 initialPdfValues[key] = String(normalized).trim();
             }
             // Sincronizar de vuelta al state (por si normalizamos USD->DOL)

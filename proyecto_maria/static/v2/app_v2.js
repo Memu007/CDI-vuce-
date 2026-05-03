@@ -185,6 +185,12 @@
             const user = await res.json();
             currentUser = user;
             CDI.currentUser = user;
+            // Cachear defaults de operacion del despachante (los usa Revisar como fallback)
+            CDI.userDefaults = {
+                aduana_codigo: user.default_aduana_codigo || '',
+                puerto_destino: user.default_puerto_destino || '',
+                tipo_destinacion: user.default_tipo_destinacion || ''
+            };
             const avatar = document.getElementById('userAvatar');
             const name = document.getElementById('userName');
             const initials = ((user.name || user.username || '?')

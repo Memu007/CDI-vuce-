@@ -855,6 +855,39 @@
                 <span class="field-hint">Se usa como CDDTAGR en cada MARIA.TXT generado. Se configura una sola vez.</span>
                 <span class="field-error" id="pfCuitError" hidden></span>
             </div>
+            <details class="review-optional" id="pfDefaultsBlock">
+                <summary class="review-optional-summary">
+                    <span class="review-optional-summary-text">
+                        <strong>Mis defaults para MARIA</strong>
+                        <span class="caption">Aduana, puerto y tipo de destinación habituales. Si los cargás acá, se aplican solos en cada operación nueva.</span>
+                    </span>
+                    <svg class="review-optional-chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </summary>
+                <div class="review-optional-body" style="display:flex; flex-direction:column; gap: var(--s-3);">
+                    <div class="field">
+                        <label class="field-label" for="pfDefaultAduana">Código de aduana habitual</label>
+                        <input class="input" type="text" id="pfDefaultAduana" placeholder="001" autocomplete="off" maxlength="10">
+                        <span class="field-hint">Por defecto del sistema: 001 (Buenos Aires capital). Cargá el tuyo si despachás siempre por otra aduana.</span>
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="pfDefaultPuerto">Puerto/aeropuerto de destino habitual</label>
+                        <input class="input" type="text" id="pfDefaultPuerto" placeholder="ARBUE" autocomplete="off" maxlength="10">
+                        <span class="field-hint">Por defecto del sistema: ARBUE (Ezeiza). Si trabajás siempre con otro, cargalo acá.</span>
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="pfDefaultTipoDest">Tipo de destinación habitual</label>
+                        <select class="select" id="pfDefaultTipoDest">
+                            <option value="">Por defecto del sistema: IC04</option>
+                            <option value="IC04">IC04 - Importación a consumo</option>
+                            <option value="IC05">IC05 - Importación a consumo (zona franca)</option>
+                            <option value="IT01">IT01 - Importación temporal</option>
+                            <option value="ZFI1">ZFI1 - Zona franca</option>
+                            <option value="TRAN">TRAN - Tránsito</option>
+                        </select>
+                        <span class="field-hint">El 90% de los despachantes usa IC04. Cambialo solo si la mayoría de tus operaciones son de otro tipo.</span>
+                    </div>
+                </div>
+            </details>
             <div class="field">
                 <label class="field-label">Email</label>
                 <p class="caption" id="pfEmail">—</p>

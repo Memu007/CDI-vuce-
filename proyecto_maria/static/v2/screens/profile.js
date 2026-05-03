@@ -10,6 +10,7 @@
 
     let modal, overlay, closeBtn, cancelBtn, saveBtn;
     let nameInput, cuitInput, emailEl, cuitErrorEl;
+    let pfDefaultAduana, pfDefaultPuerto, pfDefaultTipoDest;
     let initialized = false;
     let loading = false;
 
@@ -26,6 +27,9 @@
         cuitInput = $('pfCuit');
         emailEl = $('pfEmail');
         cuitErrorEl = $('pfCuitError');
+        pfDefaultAduana = $('pfDefaultAduana');
+        pfDefaultPuerto = $('pfDefaultPuerto');
+        pfDefaultTipoDest = $('pfDefaultTipoDest');
         if (!modal) return;
 
         closeBtn.addEventListener('click', close);
@@ -89,6 +93,19 @@
             nameInput.value = p.name || '';
             cuitInput.value = p.cuit ? CDI.formatCuit(p.cuit) : '';
             emailEl.textContent = p.email || '—';
+            if (pfDefaultAduana) pfDefaultAduana.value = p.default_aduana_codigo || '';
+            if (pfDefaultPuerto) pfDefaultPuerto.value = p.default_puerto_destino || '';
+            if (pfDefaultTipoDest) pfDefaultTipoDest.value = p.default_tipo_destinacion || '';
+            // Si tiene algun default cargado, mostrar el bloque expandido
+            const defBlock = document.getElementById('pfDefaultsBlock');
+            const hasAnyDefault = !!(p.default_aduana_codigo || p.default_puerto_destino || p.default_tipo_destinacion);
+            if (defBlock && hasAnyDefault) defBlock.open = true;
+            // Cachear globalmente para que review/finalize lo lean sin pegarle a la API otra vez
+            CDI.userDefaults = {
+                aduana_codigo: p.default_aduana_codigo || '',
+                puerto_destino: p.default_puerto_destino || '',
+                tipo_destinacion: p.default_tipo_destinacion || ''
+            };
         } catch (err) {
             CDI.toast('Error', String(err.message || err), 'error');
         } finally {
@@ -119,12 +136,22 @@
             return;
         }
 
+        const aduanaVal = pfDefaultAduana ? String(pfDefaultAduana.value || '').trim().toUpperCase() : '';
+        const puertoVal = pfDefaultPuerto ? String(pfDefaultPuerto.value || '').trim().toUpperCase() : '';
+        const tipoVal = pfDefaultTipoDest ? String(pfDefaultTipoDest.value || '').trim().toUpperCase() : '';
+
         saveBtn.disabled = true;
         saveBtn.textContent = 'Guardando…';
         try {
             const res = await CDI.api('/api/user/profile', {
                 method: 'PUT',
-                body: JSON.stringify({ name, cuit: cuitNorm })
+                body: JSON.stringify({
+                    name,
+                    cuit: cuitNorm,
+                    default_aduana_codigo: aduanaVal,
+                    default_puerto_destino: puertoVal,
+                    default_tipo_destinacion: tipoVal
+                })
             });
             const data = await res.json();
             if (!res.ok || !data.success) throw new Error((data && data.detail) || 'No se pudo guardar');
@@ -133,8 +160,17 @@
                 CDI.currentUser.name = data.profile.name;
                 CDI.currentUser.cuit = data.profile.cuit;
             }
-            CDI.toast('Perfil actualizado', cuitNorm ? 'El CUIT se usará en las próximas operaciones.' : 'Datos guardados.', 'success');
-            CDI.track('profile_saved', { has_cuit: !!cuitNorm });
+            CDI.userDefaults = {
+                aduana_codigo: data.profile.default_aduana_codigo || '',
+                puerto_destino: data.profile.default_puerto_destino || '',
+                tipo_destinacion: data.profile.default_tipo_destinacion || ''
+            };
+            const hasDefaults = !!(aduanaVal || puertoVal || tipoVal);
+            const subtitle = hasDefaults
+                ? 'Tus defaults se aplicarán en las próximas operaciones.'
+                : (cuitNorm ? 'El CUIT se usará en las próximas operaciones.' : 'Datos guardados.');
+            CDI.toast('Perfil actualizado', subtitle, 'success');
+            CDI.track('profile_saved', { has_cuit: !!cuitNorm, has_defaults: hasDefaults });
             close();
         } catch (err) {
             showError(String(err.message || err));
