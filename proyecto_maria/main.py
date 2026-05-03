@@ -1418,6 +1418,87 @@ def app_fixed_js():
     """Sirve el JS fijo de la aplicación (Cache Buster)"""
     return FileResponse(os.path.join(basedir, "proyecto_maria", "static", "app_fixed.js"), media_type="application/javascript")
 
+@app.get("/api/dev/test-clientes")
+async def dev_test_clientes(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reproduce la query de /api/clientes pero atrapa cualquier error y lo
+    devuelve como JSON para diagnostico. Hace los 4 pasos por separado para
+    identificar cual rompe.
+    """
+    import traceback
+    steps = []
+    username = user["username"]
+    try:
+        steps.append({"step": "auth", "ok": True, "username": username})
+
+        result = await db.execute(
+            sa_select(ClientModel).where(
+                ClientModel.owner_username == username,
+                ClientModel.is_active == True,  # noqa: E712
+            ).order_by(ClientModel.favorite.desc(), ClientModel.name.asc())
+        )
+        clients = [c for c in result.scalars().all() if c.name]
+        steps.append({"step": "select_clients", "ok": True, "count": len(clients)})
+
+        ids = [c.id for c in clients]
+        if ids:
+            ops_stats = await db.execute(
+                sa_select(
+                    OperationModel.client_id,
+                    sa_func.count(OperationModel.id).label("ops_count"),
+                    sa_func.sum(OperationModel.total_value).label("valor_total"),
+                    sa_func.max(OperationModel.created_at).label("ultimo"),
+                )
+                .where(
+                    OperationModel.client_id.in_(ids),
+                    OperationModel.owner_username == username,
+                )
+                .group_by(OperationModel.client_id)
+            )
+            ops_rows = ops_stats.all()
+            steps.append({"step": "ops_stats", "ok": True, "rows": len(ops_rows)})
+
+            ncm_stats = await db.execute(
+                sa_select(
+                    ClientProductHistoryModel.client_id,
+                    ClientProductHistoryModel.ncm,
+                    sa_func.sum(ClientProductHistoryModel.veces_usado).label("usos"),
+                )
+                .where(ClientProductHistoryModel.client_id.in_(ids))
+                .group_by(
+                    ClientProductHistoryModel.client_id,
+                    ClientProductHistoryModel.ncm,
+                )
+            )
+            ncm_rows = ncm_stats.all()
+            steps.append({"step": "ncm_stats", "ok": True, "rows": len(ncm_rows)})
+
+        # Probar serializacion del primer cliente (puede romper aca si hay datos raros)
+        if clients:
+            first = clients[0]
+            sample = {
+                "id": first.id,
+                "name": first.name,
+                "cuit": first.cuit,
+                "email": first.email,
+                "fecha_inic_activ": getattr(first, "fecha_inic_activ", None),
+                "column_mapping": getattr(first, "column_mapping", None),
+            }
+            steps.append({"step": "serialize_sample", "ok": True, "sample": sample})
+
+        return {"ok": True, "steps": steps, "summary": "Todos los pasos OK"}
+    except Exception as e:
+        steps.append({"step": "FAILED", "ok": False, "error": repr(e)})
+        return {
+            "ok": False,
+            "steps": steps,
+            "error": repr(e),
+            "traceback": traceback.format_exc(),
+        }
+
+
 @app.post("/api/dev/run-migrations")
 async def dev_run_migrations(user=Depends(get_current_user)):
     """Re-ejecuta las migraciones idempotentes de columnas en users.
