@@ -421,6 +421,22 @@ body {
     font-size: var(--t-12);
 }
 
+.footer-bar .btn-footer-link {
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 0;
+    margin: 0;
+    font: inherit;
+    font-size: inherit;
+    color: var(--c-primary, #2c6fff);
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+.footer-bar .btn-footer-link:hover {
+    filter: brightness(0.92);
+}
+
 /* ---------- 4. Componentes base ---------- */
 .btn {
     display: inline-flex;
@@ -4189,7 +4205,7 @@ tr:hover .ncm-note-pill.is-empty {
     position: fixed;
     right: var(--s-4, 16px);
     bottom: var(--s-4, 16px);
-    z-index: 1500;
+    z-index: 8500;
     width: 320px;
     max-width: calc(100vw - 32px);
     padding: var(--s-3, 12px) var(--s-4, 16px) var(--s-3, 12px);
@@ -4234,7 +4250,7 @@ tr:hover .ncm-note-pill.is-empty {
     position: fixed;
     top: -9999px;
     left: 0;
-    z-index: 1600;
+    z-index: 8600;
     width: 320px;
     max-width: calc(100vw - 24px);
     padding: var(--s-4, 16px);
@@ -4280,7 +4296,7 @@ tr:hover .ncm-note-pill.is-empty {
    solo un anillo pulsante para guiar la vista. */
 .tour-spotlight {
     position: relative;
-    z-index: 1550;
+    z-index: 8550;
     box-shadow: 0 0 0 4px rgba(44, 111, 255, 0.18),
                 0 0 0 8px rgba(44, 111, 255, 0.10);
     border-radius: var(--r-md, 10px);
