@@ -534,9 +534,7 @@
 .auth-overlay {
     position: fixed;
     inset: 0;
-    background: rgba(29, 29, 31, 0.35);
-    backdrop-filter: blur(4px);
-    -webkit-backdrop-filter: blur(4px);
+    background: rgba(29, 29, 31, 0.5);
     opacity: 0;
     transition: opacity var(--transition);
     z-index: 199;
