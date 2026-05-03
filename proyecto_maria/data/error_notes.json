@@ -1,0 +1,38 @@
+{
+  "error_counts": {
+    "Exception:/internal/error-insights/test": 2
+  },
+  "error_notes": [
+    {
+      "error_type": "Exception",
+      "error_message": "Error de prueba para testing del sistema de tracking",
+      "endpoint": "/internal/error-insights/test",
+      "user_plan": "testing",
+      "context": {
+        "endpoint": "/internal/error-insights/test",
+        "user_plan": "testing",
+        "test_mode": true
+      },
+      "improvement_note": "Este es un error de prueba para verificar el sistema de tracking",
+      "timestamp": "2025-10-18T07:35:59.757184",
+      "frequency": 1,
+      "priority": "low"
+    },
+    {
+      "error_type": "Exception",
+      "error_message": "Error de prueba para testing del sistema de tracking",
+      "endpoint": "/internal/error-insights/test",
+      "user_plan": "testing",
+      "context": {
+        "endpoint": "/internal/error-insights/test",
+        "user_plan": "testing",
+        "test_mode": true
+      },
+      "improvement_note": "Este es un error de prueba para verificar el sistema de tracking",
+      "timestamp": "2025-10-18T07:54:03.611399",
+      "frequency": 2,
+      "priority": "low"
+    }
+  ],
+  "last_updated": "2025-10-18T07:54:03.611483"
+}

@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CDI Developer Console</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'JetBrains Mono', monospace;
+            background-color: #0d1117;
+            color: #c9d1d9;
+        }
+        .card {
+            background-color: #161b22;
+            border: 1px solid #30363d;
+        }
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #58a6ff;
+        }
+        .stat-label {
+            color: #8b949e;
+            font-size: 0.9rem;
+        }
+        .log-table {
+            font-size: 0.85rem;
+        }
+        .log-table th {
+            color: #8b949e;
+            border-bottom: 1px solid #30363d;
+        }
+        .log-table td {
+            border-bottom: 1px solid #21262d;
+            padding: 8px;
+        }
+        .status-200 { color: #3fb950; }
+        .status-400 { color: #d29922; }
+        .status-500 { color: #f85149; }
+        
+        .refresh-btn {
+            background-color: #238636;
+            color: white;
+            border: none;
+            padding: 5px 15px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            cursor: pointer;
+        }
+        .refresh-btn:hover {
+            background-color: #2ea043;
+        }
+        .live-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background-color: #3fb950;
+            border-radius: 50%;
+            margin-right: 5px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body class="p-4">
+    <div class="container-fluid">
+        <header class="d-flex justify-content-between align-items-center mb-4">
+            <h1 class="h3 mb-0" style="display: flex; align-items: center; gap: 0.5rem;">
+                <svg width="28" height="28" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="36" height="36" rx="6" fill="#3fb950"/>
+                    <path d="M10 13L18 8L26 13V23L18 28L10 23V13Z" stroke="white" stroke-width="2" fill="none"/>
+                    <circle cx="18" cy="18" r="2.5" fill="white"/>
+                </svg>
+                CDI DevConsole
+            </h1>
+            <div class="d-flex align-items-center">
+                <span class="live-indicator"></span>
+                <span class="text-muted me-3">Live System</span>
+                <button onclick="fetchStats()" class="refresh-btn">Refresh</button>
+            </div>
+        </header>
+
+        <!-- Stats Row -->
+        <div class="row g-4 mb-4">
+            <div class="col-md-4">
+                <div class="card p-3">
+                    <div class="stat-label">REQUESTS (24H)</div>
+                    <div class="stat-value" id="total-req">...</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card p-3">
+                    <div class="stat-label">AVG LATENCY</div>
+                    <div class="stat-value" id="avg-latency">...</div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card p-3">
+                    <div class="stat-label">ERROR RATE</div>
+                    <div class="stat-value" id="error-rate">...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Wave 1 KPI (telemetry_events SQL) -->
+        <div class="card mb-4">
+            <div class="card-header border-bottom border-secondary bg-transparent py-3 d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Wave 1 · KPIs (telemetría SQL)</h5>
+                <button type="button" class="refresh-btn py-1" onclick="fetchWave1()" style="font-size:0.82rem;">Refresh Wave1</button>
+            </div>
+            <div class="card-body">
+                <p class="text-muted small mb-3">Ventana móvil: últimos <span id="wave1-days-label">14</span> días. Requiere eventos persistidos tras el próximo restart del server.</p>
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="stat-label">EVENTOS (MUESTRA)</div>
+                        <div class="stat-value" id="wave1-rows">...</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-label">USUARIOS IDENTIFICADOS</div>
+                        <div class="stat-value" id="wave1-users">...</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-label">DEMO VS PDF (% DEMO)</div>
+                        <div class="stat-value" id="wave1-demo">...</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-label">TIEMPO MEDIO SESIÓN → PDF (SEG)</div>
+                        <div class="stat-value" id="wave1-ttv">...</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-label">AUTO-DETECT OK</div>
+                        <div class="stat-value" id="wave1-autook">...</div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="stat-label">AUTO-DETECT SIN MATCH</div>
+                        <div class="stat-value" id="wave1-automiss">...</div>
+                    </div>
+                </div>
+
+                <hr class="border-secondary my-4" />
+                <h6 class="text-muted mb-3" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.04em;">
+                    Activación (ver docs/wave1_activation_definitions.md)
+                </h6>
+                <div class="row g-3 mb-3">
+                    <div class="col-md-3 col-6">
+                        <div class="stat-label" style="font-size: 0.7rem;">USUARIOS · MARIA</div>
+                        <div class="stat-value" style="font-size: 1.6rem;" id="wave1-act-maria">...</div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="stat-label" style="font-size: 0.7rem;">USUARIOS · PDF</div>
+                        <div class="stat-value" style="font-size: 1.6rem;" id="wave1-act-pdf">...</div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="stat-label" style="font-size: 0.7rem;">CUENTAS NUEVAS (DB)</div>
+                        <div class="stat-value" style="font-size: 1.6rem;" id="wave1-act-db">...</div>
+                    </div>
+                    <div class="col-md-3 col-6">
+                        <div class="stat-label" style="font-size: 0.7rem;">ALTA MAIL PENDIENTE (evt)</div>
+                        <div class="stat-value" style="font-size: 1.6rem;" id="wave1-act-pverify">...</div>
+                    </div>
+                </div>
+                <div id="wave1-detail" class="mt-4 small text-muted" style="max-height:10rem; overflow:auto;"></div>
+                <details class="mt-3">
+                    <summary class="small text-muted" style="cursor:pointer;">Activation JSON · documentación enlazada</summary>
+                    <pre id="wave1-activation-dump" class="small mt-2 mb-0 p-3 rounded" style="background:#010409;max-height:16rem;overflow:auto;color:#8b949e;"></pre>
+                </details>
+
+            </div>
+        </div>
+
+        <!-- Logs Section -->
+        <div class="card">
+            <div class="card-header border-bottom border-secondary bg-transparent py-3">
+                <h5 class="card-title mb-0">Live Traffic Logs</h5>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0 log-table">
+                        <thead>
+                            <tr>
+                                <th>TIME</th>
+                                <th>METHOD</th>
+                                <th>ENDPOINT</th>
+                                <th>STATUS</th>
+                                <th>LATENCY</th>
+                                <th>IP</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-body">
+                            <tr><td colspan="6" class="text-center py-4 text-muted">Loading logs...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function fetchStats() {
+            try {
+                const response = await fetch('/api/dev/stats');
+                const data = await response.json();
+                
+                // Update Stats
+                document.getElementById('total-req').textContent = data.stats.total_requests_24h.toLocaleString();
+                document.getElementById('avg-latency').textContent = data.stats.avg_latency_ms + ' ms';
+                
+                const errorRate = data.stats.error_rate;
+                const errorEl = document.getElementById('error-rate');
+                errorEl.textContent = errorRate + '%';
+                errorEl.style.color = errorRate > 5 ? '#f85149' : '#3fb950';
+
+                // Update Logs
+                const tbody = document.getElementById('logs-body');
+                tbody.innerHTML = '';
+                
+                data.logs.forEach(log => {
+                    const statusClass = log.status >= 500 ? 'status-500' : 
+                                      log.status >= 400 ? 'status-400' : 'status-200';
+                    
+                    const row = `
+                        <tr>
+                            <td class="text-muted">${log.time}</td>
+                            <td><span class="badge bg-secondary">${log.method}</span></td>
+                            <td>${log.endpoint}</td>
+                            <td class="${statusClass}">${log.status}</td>
+                            <td>${log.latency} ms</td>
+                            <td class="text-muted">${log.ip}</td>
+                        </tr>
+                    `;
+                    tbody.innerHTML += row;
+                });
+            } catch (error) {
+                console.error('Error fetching stats:', error);
+            }
+        }
+
+        async function fetchWave1() {
+            try {
+                const response = await fetch('/api/dev/wave1-kpis?days=14');
+                const w = await response.json();
+                if (!response.ok) {
+                    document.getElementById('wave1-rows').textContent = '—';
+                    document.getElementById('wave1-detail').textContent = JSON.stringify(w);
+                    ['wave1-act-maria', 'wave1-act-pdf', 'wave1-act-db', 'wave1-act-pverify'].forEach((id) => {
+                        const el = document.getElementById(id);
+                        if (el) el.textContent = '—';
+                    });
+                    const dum = document.getElementById('wave1-activation-dump');
+                    if (dum) dum.textContent = '';
+                    return;
+                }
+                document.getElementById('wave1-days-label').textContent = String(w.days ?? 14);
+                document.getElementById('wave1-rows').textContent = String(w.telemetry_rows_sampled ?? 0);
+                document.getElementById('wave1-users').textContent = String(w.distinct_logged_users ?? 0);
+                const pct = w.demo_share_pct_of_demo_plus_pdf;
+                document.getElementById('wave1-demo').textContent =
+                    pct == null ? '—' : (pct + '%');
+                const med = w.median_sec_session_start_to_pdf;
+                document.getElementById('wave1-ttv').textContent =
+                    med == null ? '—' : String(Math.round(med));
+                document.getElementById('wave1-autook').textContent = String(w.auto_detect_pdf_hits ?? 0);
+                document.getElementById('wave1-automiss').textContent = String(w.auto_detect_misses ?? 0);
+
+                const aa = w.activation_aliases_for_dashboard || {};
+                document.getElementById('wave1-act-maria').textContent =
+                    aa.users_maria_generated == null ? '—' : String(aa.users_maria_generated);
+                document.getElementById('wave1-act-pdf').textContent =
+                    aa.users_pdf_uploaded == null ? '—' : String(aa.users_pdf_uploaded);
+                const adb = ((w.activation || {}).database_window_accounts) || {};
+                document.getElementById('wave1-act-db').textContent =
+                    adb.new_accounts_in_window == null ? '—' : String(adb.new_accounts_in_window);
+                const apv = ((w.activation || {}).event_counts_no_unique_logged_user_typical) || {};
+                document.getElementById('wave1-act-pverify').textContent =
+                    String(apv.register_pending_verify ?? 0);
+
+                const dump = document.getElementById('wave1-activation-dump');
+                if (dump) {
+                    dump.textContent = JSON.stringify(w.activation || {}, null, 2);
+                }
+
+                const cnt = w.counts || {};
+                const top = Object.entries(cnt).slice(0, 40).map(([k, v]) => k + ': ' + v).join(', ');
+                document.getElementById('wave1-detail').textContent = top || '(sin datos)';
+            } catch (e) {
+                console.error('Wave1 KPI error', e);
+            }
+        }
+
+        fetchWave1();
+
+        // Initial load
+        fetchStats();
+        
+        // Auto-refresh every 5 seconds
+        setInterval(fetchStats, 5000);
+    </script>
+</body>
+</html>

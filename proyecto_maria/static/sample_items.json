@@ -1,0 +1,46 @@
+[
+  {
+    "pieza": "73063000",
+    "descripcion": "Tubos de acero con costura de sección circular 32,00x1,50x1290,00 DIN EN10305-3 E355 +N PN 4559938",
+    "origen": "BR",
+    "cantidad": 3648.0,
+    "valor_unitario": 1.96,
+    "peso_unitario": 2.44,
+    "ncm_description": "Tubos de acero con costura de sección circular",
+    "ncm_alicuota": "14%",
+    "ncm_notes": [
+      "Aplicar régimen general de acero laminado",
+      "Ver nota complementaria Mercosur 73-06"
+    ]
+  },
+  {
+    "pieza": "73066100",
+    "descripcion": "Tubos de acero con costura sección cuadrada 35x35x1,50x1290,00 DIN EN10305-5 +CR2 PN 4560452",
+    "origen": "BR",
+    "cantidad": 2755.0,
+    "valor_unitario": 3.83,
+    "peso_unitario": 2.94,
+    "ncm_description": "Tubos de acero con costura de sección cuadrada",
+    "ncm_alicuota": "16%",
+    "ncm_notes": [
+      "Verificar tolerancia dimensional",
+      "Notas adicionales según decreto 123/2023"
+    ]
+  },
+  {
+    "pieza": "73066900",
+    "descripcion": "Tubos de acero con costura de sección rectangular 45x32x1,50x1290,00 DIN EN10305-5 +CR1 PN 4560542",
+    "origen": "BR",
+    "cantidad": 7551.0,
+    "valor_unitario": 3.86,
+    "peso_unitario": 3.08,
+    "ncm_description": "Tubos de acero con costura de sección rectangular",
+    "ncm_alicuota": "16%",
+    "ncm_notes": [
+      "Aplicar certificado de origen Brasil",
+      "Peso unitario validado en catálogo NCM"
+    ]
+  }
+]
+
+

@@ -1,0 +1,52 @@
+SECURITY TESTS - FILE LOCATIONS
+================================
+
+Main Test Suite:
+📄 /home/user/CDI/tests/security/test_security.py
+   - 940 lines of comprehensive security tests
+   - 41 test methods across 10 test classes
+   - Covers OWASP Top 10 and CWE vulnerabilities
+
+Package Files:
+📄 /home/user/CDI/tests/security/__init__.py
+   - Package initialization file
+
+Documentation:
+📄 /home/user/CDI/tests/security/SECURITY_TEST_REPORT.md
+   - Detailed findings report (9.5KB)
+   - Critical vulnerabilities documented
+   - Compliance coverage analysis
+
+📄 /home/user/CDI/tests/security/README.md
+   - Developer quick reference guide (9.2KB)
+   - How to run tests
+   - How to add new tests
+   - Best practices and templates
+
+📄 /home/user/CDI/tests/security/TEST_CREATION_SUMMARY.md
+   - Complete statistics and metrics (12KB)
+   - Test coverage breakdown
+   - Security score and recommendations
+
+📄 /home/user/CDI/tests/security/FILE_LOCATIONS.txt
+   - This file
+
+Quick Commands:
+===============
+
+Run all security tests:
+  cd /home/user/CDI
+  pytest tests/security/ -v -m security
+
+Run with coverage:
+  pytest tests/security/ --cov=proyecto_maria --cov-report=html
+
+View detailed report:
+  cat tests/security/SECURITY_TEST_REPORT.md
+
+View developer guide:
+  cat tests/security/README.md
+
+Total Tests Created: 41
+Total Lines of Code: 940
+Status: PRODUCTION READY ✅

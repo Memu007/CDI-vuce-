@@ -1,0 +1,122 @@
+{
+  "_meta": {
+    "version": "1.0",
+    "descripcion": "Catálogo de productos por proveedor para auto-completado NCM/origen",
+    "creado": "2026-04-11",
+    "total_proveedores": 3,
+    "ultima_actualizacion": "2026-04-20T22:25:35.384770"
+  },
+  "proveedores": {
+    "acme_widgets_corp": {
+      "nombre": "ACME Widgets Corp",
+      "productos": {
+        "cable hdmi 2m": {
+          "descripcion_original": "Cable HDMI 2m",
+          "ncm": "85444290",
+          "origen": "CN",
+          "unidad_medida": null,
+          "precio_ref": null,
+          "usos": 1,
+          "ultima_vez": "2026-04-20"
+        },
+        "cargador 20w usb c": {
+          "descripcion_original": "Cargador 20W USB-C",
+          "ncm": "85044010",
+          "origen": "CN",
+          "unidad_medida": null,
+          "precio_ref": null,
+          "usos": 1,
+          "ultima_vez": "2026-04-20"
+        }
+      },
+      "creado": "2026-04-20T20:49:49.642486",
+      "ultima_actualizacion": "2026-04-20T20:49:49.642555"
+    },
+    "acme_sh": {
+      "nombre": "ACME SH",
+      "productos": {
+        "cable hdmi": {
+          "descripcion_original": "Cable HDMI",
+          "ncm": "85444290",
+          "origen": "CN",
+          "unidad_medida": null,
+          "precio_ref": null,
+          "usos": 1,
+          "ultima_vez": "2026-04-20"
+        },
+        "adaptador usb c": {
+          "descripcion_original": "Adaptador USB-C",
+          "ncm": "85369000",
+          "origen": "CN",
+          "unidad_medida": null,
+          "precio_ref": null,
+          "usos": 1,
+          "ultima_vez": "2026-04-20"
+        },
+        "cargador 20w": {
+          "descripcion_original": "Cargador 20W",
+          "ncm": "85044010",
+          "origen": "CN",
+          "unidad_medida": null,
+          "precio_ref": null,
+          "usos": 1,
+          "ultima_vez": "2026-04-20"
+        }
+      },
+      "creado": "2026-04-20T20:50:13.226235",
+      "ultima_actualizacion": "2026-04-20T20:50:13.226317"
+    },
+    "acme_global_trading_co_ltd": {
+      "nombre": "Acme Global Trading Co. Ltd.",
+      "productos": {
+        "cable hdmi 2m premium con conectores dorados": {
+          "descripcion_original": "Cable HDMI 2m premium con conectores dorados",
+          "ncm": "8544.42.00",
+          "origen": "CN",
+          "unidad_medida": null,
+          "precio_ref": null,
+          "usos": 4,
+          "ultima_vez": "2026-04-20"
+        },
+        "adaptador usb c a hdmi 4k": {
+          "descripcion_original": "Adaptador USB-C a HDMI 4K",
+          "ncm": "1111.11.11",
+          "origen": "CN",
+          "unidad_medida": null,
+          "precio_ref": null,
+          "usos": 4,
+          "ultima_vez": "2026-04-20"
+        },
+        "cargador usb c 20w con certificacion pd": {
+          "descripcion_original": "Cargador USB-C 20W con certificación PD",
+          "ncm": "8504.40.10",
+          "origen": "CN",
+          "unidad_medida": null,
+          "precio_ref": null,
+          "usos": 4,
+          "ultima_vez": "2026-04-20"
+        },
+        "funda silicona para auriculares inalambricos": {
+          "descripcion_original": "Funda silicona para auriculares inalámbricos",
+          "ncm": "3926.90.90",
+          "origen": "CN",
+          "unidad_medida": null,
+          "precio_ref": null,
+          "usos": 4,
+          "ultima_vez": "2026-04-20"
+        },
+        "protector de pantalla vidrio templado 6 1": {
+          "descripcion_original": "Protector de pantalla vidrio templado 6.1\"",
+          "ncm": "1111.11.11",
+          "origen": "CN",
+          "unidad_medida": null,
+          "precio_ref": null,
+          "usos": 4,
+          "ultima_vez": "2026-04-20"
+        }
+      },
+      "creado": "2026-04-20T20:56:21.836947",
+      "ultima_actualizacion": "2026-04-20T22:25:35.384699"
+    }
+  }
+}

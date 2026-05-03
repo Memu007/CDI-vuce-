@@ -1,0 +1,623 @@
+{
+  "analysis_date": "2025-09-29T07:42:57.044720",
+  "model_analyzed": "gemini-flash-latest",
+  "scenarios": {
+    "10_requests_per_day": {
+      "daily_requests": 10,
+      "monthly_requests": 300,
+      "yearly_requests": 3650,
+      "gemini": {
+        "daily": {
+          "model": "gemini-flash-latest",
+          "requests": 10,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 0.0022,
+          "total_cost_ars": 2.25,
+          "within_free_tier": true,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        },
+        "monthly": {
+          "model": "gemini-flash-latest",
+          "requests": 300,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 0.0675,
+          "total_cost_ars": 67.5,
+          "within_free_tier": true,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        },
+        "yearly": {
+          "model": "gemini-flash-latest",
+          "requests": 3650,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 0.8212,
+          "total_cost_ars": 821.25,
+          "within_free_tier": false,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        }
+      },
+      "local_parser": {
+        "daily": {
+          "method": "local_parser",
+          "requests": 10,
+          "processing_time_seconds": 5.0,
+          "infrastructure_cost_usd": 0.000139,
+          "infrastructure_cost_ars": 0.14,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        },
+        "monthly": {
+          "method": "local_parser",
+          "requests": 300,
+          "processing_time_seconds": 150.0,
+          "infrastructure_cost_usd": 0.004167,
+          "infrastructure_cost_ars": 4.17,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        },
+        "yearly": {
+          "method": "local_parser",
+          "requests": 3650,
+          "processing_time_seconds": 1825.0,
+          "infrastructure_cost_usd": 0.050694,
+          "infrastructure_cost_ars": 50.69,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        }
+      },
+      "savings_analysis": {
+        "monthly_savings_usd": 0.06,
+        "yearly_savings_usd": 0.77,
+        "breakeven_requests_per_day": 11374,
+        "recommendation": "🤖 Gemini Recomendado: Bajo volumen, dentro del free tier"
+      }
+    },
+    "50_requests_per_day": {
+      "daily_requests": 50,
+      "monthly_requests": 1500,
+      "yearly_requests": 18250,
+      "gemini": {
+        "daily": {
+          "model": "gemini-flash-latest",
+          "requests": 50,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 0.0112,
+          "total_cost_ars": 11.25,
+          "within_free_tier": true,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        },
+        "monthly": {
+          "model": "gemini-flash-latest",
+          "requests": 1500,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 0.3375,
+          "total_cost_ars": 337.5,
+          "within_free_tier": true,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        },
+        "yearly": {
+          "model": "gemini-flash-latest",
+          "requests": 18250,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 4.1063,
+          "total_cost_ars": 4106.25,
+          "within_free_tier": false,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        }
+      },
+      "local_parser": {
+        "daily": {
+          "method": "local_parser",
+          "requests": 50,
+          "processing_time_seconds": 25.0,
+          "infrastructure_cost_usd": 0.000694,
+          "infrastructure_cost_ars": 0.69,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        },
+        "monthly": {
+          "method": "local_parser",
+          "requests": 1500,
+          "processing_time_seconds": 750.0,
+          "infrastructure_cost_usd": 0.020833,
+          "infrastructure_cost_ars": 20.83,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        },
+        "yearly": {
+          "method": "local_parser",
+          "requests": 18250,
+          "processing_time_seconds": 9125.0,
+          "infrastructure_cost_usd": 0.253472,
+          "infrastructure_cost_ars": 253.47,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        }
+      },
+      "savings_analysis": {
+        "monthly_savings_usd": 0.32,
+        "yearly_savings_usd": 3.85,
+        "breakeven_requests_per_day": 11374,
+        "recommendation": "🤖 Gemini Recomendado: Bajo volumen, dentro del free tier"
+      }
+    },
+    "100_requests_per_day": {
+      "daily_requests": 100,
+      "monthly_requests": 3000,
+      "yearly_requests": 36500,
+      "gemini": {
+        "daily": {
+          "model": "gemini-flash-latest",
+          "requests": 100,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 0.0225,
+          "total_cost_ars": 22.5,
+          "within_free_tier": true,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        },
+        "monthly": {
+          "model": "gemini-flash-latest",
+          "requests": 3000,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 0.675,
+          "total_cost_ars": 675.0,
+          "within_free_tier": false,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        },
+        "yearly": {
+          "model": "gemini-flash-latest",
+          "requests": 36500,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 8.2125,
+          "total_cost_ars": 8212.5,
+          "within_free_tier": false,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        }
+      },
+      "local_parser": {
+        "daily": {
+          "method": "local_parser",
+          "requests": 100,
+          "processing_time_seconds": 50.0,
+          "infrastructure_cost_usd": 0.001389,
+          "infrastructure_cost_ars": 1.39,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        },
+        "monthly": {
+          "method": "local_parser",
+          "requests": 3000,
+          "processing_time_seconds": 1500.0,
+          "infrastructure_cost_usd": 0.041667,
+          "infrastructure_cost_ars": 41.67,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        },
+        "yearly": {
+          "method": "local_parser",
+          "requests": 36500,
+          "processing_time_seconds": 18250.0,
+          "infrastructure_cost_usd": 0.506944,
+          "infrastructure_cost_ars": 506.94,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        }
+      },
+      "savings_analysis": {
+        "monthly_savings_usd": 0.63,
+        "yearly_savings_usd": 7.71,
+        "breakeven_requests_per_day": 11374,
+        "recommendation": "🏗️ Híbrido Recomendado: Gemini + fallbacks para optimizar costos"
+      }
+    },
+    "200_requests_per_day": {
+      "daily_requests": 200,
+      "monthly_requests": 6000,
+      "yearly_requests": 73000,
+      "gemini": {
+        "daily": {
+          "model": "gemini-flash-latest",
+          "requests": 200,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 0.045,
+          "total_cost_ars": 45.0,
+          "within_free_tier": true,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        },
+        "monthly": {
+          "model": "gemini-flash-latest",
+          "requests": 6000,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 1.35,
+          "total_cost_ars": 1350.0,
+          "within_free_tier": false,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        },
+        "yearly": {
+          "model": "gemini-flash-latest",
+          "requests": 73000,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 16.425,
+          "total_cost_ars": 16425.0,
+          "within_free_tier": false,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        }
+      },
+      "local_parser": {
+        "daily": {
+          "method": "local_parser",
+          "requests": 200,
+          "processing_time_seconds": 100.0,
+          "infrastructure_cost_usd": 0.002778,
+          "infrastructure_cost_ars": 2.78,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        },
+        "monthly": {
+          "method": "local_parser",
+          "requests": 6000,
+          "processing_time_seconds": 3000.0,
+          "infrastructure_cost_usd": 0.083333,
+          "infrastructure_cost_ars": 83.33,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        },
+        "yearly": {
+          "method": "local_parser",
+          "requests": 73000,
+          "processing_time_seconds": 36500.0,
+          "infrastructure_cost_usd": 1.013889,
+          "infrastructure_cost_ars": 1013.89,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        }
+      },
+      "savings_analysis": {
+        "monthly_savings_usd": 1.27,
+        "yearly_savings_usd": 15.41,
+        "breakeven_requests_per_day": 11374,
+        "recommendation": "🏗️ Híbrido Recomendado: Gemini + fallbacks para optimizar costos"
+      }
+    },
+    "500_requests_per_day": {
+      "daily_requests": 500,
+      "monthly_requests": 15000,
+      "yearly_requests": 182500,
+      "gemini": {
+        "daily": {
+          "model": "gemini-flash-latest",
+          "requests": 500,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 0.1125,
+          "total_cost_ars": 112.5,
+          "within_free_tier": true,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        },
+        "monthly": {
+          "model": "gemini-flash-latest",
+          "requests": 15000,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 3.375,
+          "total_cost_ars": 3375.0,
+          "within_free_tier": false,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        },
+        "yearly": {
+          "model": "gemini-flash-latest",
+          "requests": 182500,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 41.0625,
+          "total_cost_ars": 41062.5,
+          "within_free_tier": false,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        }
+      },
+      "local_parser": {
+        "daily": {
+          "method": "local_parser",
+          "requests": 500,
+          "processing_time_seconds": 250.0,
+          "infrastructure_cost_usd": 0.006944,
+          "infrastructure_cost_ars": 6.94,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        },
+        "monthly": {
+          "method": "local_parser",
+          "requests": 15000,
+          "processing_time_seconds": 7500.0,
+          "infrastructure_cost_usd": 0.208333,
+          "infrastructure_cost_ars": 208.33,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        },
+        "yearly": {
+          "method": "local_parser",
+          "requests": 182500,
+          "processing_time_seconds": 91250.0,
+          "infrastructure_cost_usd": 2.534722,
+          "infrastructure_cost_ars": 2534.72,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        }
+      },
+      "savings_analysis": {
+        "monthly_savings_usd": 3.17,
+        "yearly_savings_usd": 38.53,
+        "breakeven_requests_per_day": 11374,
+        "recommendation": "⚡ Parser Local Recomendado: Alto volumen, mejor costo-beneficio"
+      }
+    },
+    "1000_requests_per_day": {
+      "daily_requests": 1000,
+      "monthly_requests": 30000,
+      "yearly_requests": 365000,
+      "gemini": {
+        "daily": {
+          "model": "gemini-flash-latest",
+          "requests": 1000,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 0.225,
+          "total_cost_ars": 225.0,
+          "within_free_tier": true,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        },
+        "monthly": {
+          "model": "gemini-flash-latest",
+          "requests": 30000,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 6.75,
+          "total_cost_ars": 6750.0,
+          "within_free_tier": false,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        },
+        "yearly": {
+          "model": "gemini-flash-latest",
+          "requests": 365000,
+          "tokens_per_request": {
+            "input_tokens": 1000,
+            "output_tokens": 500,
+            "total_tokens": 1500
+          },
+          "cost_per_request_usd": 0.000225,
+          "total_cost_usd": 82.125,
+          "total_cost_ars": 82125.0,
+          "within_free_tier": false,
+          "free_tier_limit": {
+            "requests_per_day": 1500,
+            "tokens_per_minute": 1000000
+          }
+        }
+      },
+      "local_parser": {
+        "daily": {
+          "method": "local_parser",
+          "requests": 1000,
+          "processing_time_seconds": 500.0,
+          "infrastructure_cost_usd": 0.013889,
+          "infrastructure_cost_ars": 13.89,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        },
+        "monthly": {
+          "method": "local_parser",
+          "requests": 30000,
+          "processing_time_seconds": 15000.0,
+          "infrastructure_cost_usd": 0.416667,
+          "infrastructure_cost_ars": 416.67,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        },
+        "yearly": {
+          "method": "local_parser",
+          "requests": 365000,
+          "processing_time_seconds": 182500.0,
+          "infrastructure_cost_usd": 5.069444,
+          "infrastructure_cost_ars": 5069.44,
+          "additional_costs": {
+            "development_hours": 40,
+            "maintenance_cost_monthly_usd": 50
+          }
+        }
+      },
+      "savings_analysis": {
+        "monthly_savings_usd": 6.33,
+        "yearly_savings_usd": 77.06,
+        "breakeven_requests_per_day": 11374,
+        "recommendation": "⚡ Parser Local Recomendado: Alto volumen, mejor costo-beneficio"
+      }
+    }
+  },
+  "summary": {
+    "key_insights": [
+      "Gemini es gratis hasta 1,500 requests/día dentro del free tier",
+      "Parser local requiere infraestructura 24/7 (~$73/mes)",
+      "Punto de equilibrio: ~200-300 requests/día",
+      "Gemini ofrece mayor calidad de extracción",
+      "Parser local es más predecible en costos"
+    ],
+    "cost_comparison_monthly": {
+      "low_volume_10_req_day": {
+        "gemini_usd": 0.0675,
+        "local_usd": 0.004167
+      },
+      "medium_volume_100_req_day": {
+        "gemini_usd": 0.675,
+        "local_usd": 0.041667
+      },
+      "high_volume_1000_req_day": {
+        "gemini_usd": 6.75,
+        "local_usd": 0.416667
+      }
+    }
+  }
+}

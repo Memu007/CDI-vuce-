@@ -1,0 +1,59 @@
+---
+description: Utilidad, sin over-engineering, ahorro de tokens, prioridades y criterio "¿vale la pena?"
+alwaysApply: true
+---
+
+# Regla de trabajo (v2) — utilidad, simplicidad, tokens
+
+**Versión 2. Intención:** el agente entrega el pedido con el menor costo de contexto y de código posible, sin dejar de hacer lo obligatorio.
+
+## Orden de prioridades (si hay conflicto)
+
+1. **MUST** cumplir el pedido explícito del usuario.
+2. **MUST** respetar reglas y skills del proyecto (p. ej. `.agent/rules/reglas-proyecto.md` si existe en el repo).
+3. **SHOULD** seguir convenciones del archivo/carpeta ya existentes.
+4. **MAY** sugerir mejoras; **no** implementarlas salvo que el usuario lo pida o encaje en (6).
+
+## Criterio de “listo”
+
+**Listo =** el pedido queda resuelto; el cambio es coherente con el estilo del código tocado; si el repo exige verificación, se pasa (lint, test o verificación mínima que el usuario pida). **No** listo = alcance ampliado “de paso” sin pedido.
+
+## Trabajo opcional: saltear o preguntar “¿vale la pena?”
+
+- **MAY** omitir tareas no pedidas (refactor, docs extra, tests extra, “limpieza”, rename masivo) **sin** avisar, si son claramente fuera de alcance.
+- **SHOULD** usar **una sola pregunta corta** cuando el beneficio no es obvio, el costo es alto (muchos archivos, riesgo) o el usuario podría preferir no hacerlo. Ej.: *“¿Querés que también agregue tests para X? Si no, lo dejo solo con el fix.”* Así el usuario **puede saltear** respondiendo *no* o *solo lo mínimo*.
+- **MUST** no spamear preguntas: **máximo 1–2** preguntas en el turno salvo que el pedido sea ambiguo y bloquee el trabajo.
+
+## Cuando falta contexto
+
+- **Procurá** búsqueda acotada (`grep`, búsqueda semántica) antes de leer archivos largos o listar directorios al azar.
+- Si hace falta asumir: **SHOULD** elegir el default más barato (menos archivos) y decirlo en **una oración** al final, salvo que la asunción sea riesgosa.
+- **MUST** evitar ciclos de “¿confirmás X?” en cada subpaso; agrupar en la pregunta (6).
+
+## Señales concretas de over-engineering (evitar)
+
+- Módulo o capa nueva para pocos renglones que podrían vivir en el sitio existente.
+- “Helper” o wrapper que solo reexporta o llama a una función.
+- Abstracción o pattern “por si en el futuro” sin requerimiento.
+- Toques masivos a estilos o nombres no relacionados con el bug/feature.
+
+**Excepción — múltiples archivos o cambio “grande” SÍ justifican:** bug de seguridad, crash, contrato roto, o el pedido del usuario requiere tocar esos archivos. Ahí el tamaño del diff **no** es over-engineering.
+
+## Ahorro de tokens (comportamiento)
+
+- **MUST** respuesta útil: **conclusión primero**; luego archivos tocados; detalle o “por qué” solo si suma. Sin relleno ni repetir el diff.
+- **SHOULD** no crear archivos de ejemplo, diagramas o “alternativas B/C” sin pedido.
+- **MAY** un solo commit/PR con mensaje claro, salvo el flujo de trabajo pida otra cosa.
+
+## Complemento
+
+Coherente con otras reglas del repo. Entre reglas, **gana** lo que el **usuario pida explícitamente** en el mensaje actual.
+
+## Nota sobre “explicar en natural” vs. “respuesta mínima”
+
+`.agent/rules/reglas-proyecto.md` pide **explicar en lenguaje natural, sin jerga**. Esta regla pide **conclusión primero, sin relleno**. **Ambas se cumplen así:**
+
+- **Conclusión en 1 línea**, en castellano claro, sin términos técnicos salvo que el usuario los use.
+- **Luego**, lista breve de archivos tocados y, si aporta, **1 frase** de por qué.
+- **Nada** de repetir el diff, ni párrafos explicando el código línea por línea.
+- Si el usuario pide más detalle, ahí sí se amplía.

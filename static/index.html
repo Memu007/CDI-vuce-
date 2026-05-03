@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimizador MARIA</title>
+    <link rel="stylesheet" href="/static/style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1><i class="fas fa-file-excel"></i> Optimizador MARIA</h1>
+            <p>Transforma tus datos en archivos Excel válidos para el sistema MARIA de despachantes de aduana</p>
+            <div class="demo-badge">
+                <i class="fas fa-star"></i> DEMO PROFESIONAL
+            </div>
+        </header>
+
+        <!-- Selector de modo -->
+        <div class="mode-selector">
+            <button type="button" id="manualModeBtn" class="mode-btn active">
+                <i class="fas fa-edit"></i> Ingreso Manual
+            </button>
+            <button type="button" id="uploadModeBtn" class="mode-btn">
+                <i class="fas fa-upload"></i> Subir Excel
+            </button>
+            <button type="button" id="pdfModeBtn" class="mode-btn">
+                <i class="fas fa-file-pdf"></i> Subir PDF
+            </button>
+            <a href="/cost-analysis" class="mode-btn" style="text-decoration: none; display: inline-flex; align-items: center; justify-content: center;">
+                <i class="fas fa-calculator"></i> Análisis de Costos
+            </a>
+        </div>
+
+        <!-- Formulario de subida de archivo -->
+        <form id="uploadForm" class="hidden">
+            <div class="form-section">
+                <h2><i class="fas fa-file-upload"></i> Subir Archivo Excel</h2>
+                <div class="form-group">
+                    <label for="excelFile">Seleccionar archivo Excel (.xlsx o .xls):</label>
+                    <input type="file" id="excelFile" accept=".xlsx,.xls" required>
+                    <small class="help-text">
+                        <strong>🤖 Detección Inteligente:</strong> El sistema reconoce automáticamente columnas como:<br>
+                        • Pieza/NCM/Código • Descripción/Desc • Origen/País/Country<br>
+                        • Peso/Peso Unitario • Cantidad/Cant/Qty • Valor/Precio/Valor Unitario
+                    </small>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-upload"></i> Procesar Excel
+                </button>
+            </div>
+        </form>
+
+        <!-- Formulario de subida de PDF -->
+        <form id="pdfForm" class="hidden">
+            <div class="form-section">
+                <h2><i class="fas fa-file-pdf"></i> Subir Archivo PDF</h2>
+                
+                <!-- Selector de Método de Extracción -->
+                <div class="form-group">
+                    <label for="extractionMethod">Método de Extracción:</label>
+                    <select id="extractionMethod" class="form-control">
+                        <option value="gemini_hybrid" selected>🤖 Gemini Híbrido (Recomendado)</option>
+                        <option value="gemini_only">🎯 Solo Gemini (Máxima Calidad)</option>
+                        <option value="traditional">⚡ Parser Tradicional (Más Rápido)</option>
+                    </select>
+                    <small class="help-text">
+                        <strong>Híbrido:</strong> Usa IA cuando es posible, fallbacks garantizados<br>
+                        <strong>Solo Gemini:</strong> Máxima calidad, puede fallar con algunos PDFs<br>
+                        <strong>Tradicional:</strong> Rápido y confiable, menor precisión
+                    </small>
+                </div>
+                
+                <div class="form-group">
+                    <label for="pdfFile">Seleccionar archivo PDF:</label>
+                    <input type="file" id="pdfFile" accept=".pdf" required>
+                    <small class="help-text">
+                        <strong>🤖 IA AVANZADA HABILITADA:</strong> Procesamiento inteligente de PDFs con LLM.<br>
+                        • Extrae automáticamente los 13 campos AVG • Detecta marca, modelo, especificaciones<br>
+                        • Compatible con facturas en español, inglés y portugués<br>
+                        <em>Sube tu factura y revisa los datos extraídos antes de generar el Excel</em>
+                    </small>
+                </div>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-robot"></i> Procesar PDF con IA
+                </button>
+            </div>
+        </form>
+
+        <!-- Formulario manual -->
+        <form id="operationForm">
+            <div class="form-section">
+                <h2><i class="fas fa-info-circle"></i> Información de la Operación</h2>
+                <div class="form-group">
+                    <label for="operationId">Código de Operación:</label>
+                    <input type="text" id="operationId" required placeholder="Ej: 25DI00241">
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2><i class="fas fa-list"></i> Items de la Operación</h2>
+                <div id="itemsContainer">
+                    <!-- Items se agregarán dinámicamente aquí -->
+                </div>
+                <button type="button" id="addItemBtn" class="btn btn-secondary">
+                    <i class="fas fa-plus"></i> Agregar Item
+                </button>
+            </div>
+
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-cog"></i> Generar Excel AVG
+                </button>
+                <button type="button" id="clearBtn" class="btn btn-secondary">
+                    <i class="fas fa-trash"></i> Limpiar Todo
+                </button>
+            </div>
+        </form>
+
+        <div id="results" class="results hidden">
+            <h2><i class="fas fa-check-circle"></i> ¡Operación Procesada!</h2>
+            <div id="successMessage"></div>
+            <div class="download-section">
+                <a id="downloadLink" href="#" download class="btn btn-success">
+                    <i class="fas fa-download"></i> Descargar Excel AVG
+                </a>
+            </div>
+        </div>
+
+        <div id="errorMessage" class="error-message hidden"></div>
+
+        <div id="loading" class="loading hidden">
+            <i class="fas fa-spinner fa-spin"></i>
+            <p>Procesando operación...</p>
+        </div>
+    </div>
+
+    <script src="/static/script.js"></script>
+</body>
+</html>
+

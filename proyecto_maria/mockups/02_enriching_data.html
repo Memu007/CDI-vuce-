@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CDI · Datos del despacho</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="mockup-tag">Mockup 02 · enriching_data</div>
+
+    <div class="app">
+        <header class="topbar">
+            <div class="topbar-brand">CDI<span class="dot">·</span>Despachos</div>
+            <div class="context-bar" style="margin-bottom: 0; margin-left: var(--s-6);">
+                <span class="ctx-key">Factura</span>
+                <span class="ctx-val">D10170586</span>
+                <span class="ctx-sep">·</span>
+                <span class="ctx-key">Proveedor</span>
+                <span class="ctx-val">WILHELMSEN SHIPS</span>
+                <span class="ctx-sep">·</span>
+                <span class="pill pill-warning"><span class="dot-status is-warning"></span> Faltan datos</span>
+            </div>
+            <div class="topbar-meta">
+                <button class="btn btn-ghost" style="height: 32px; padding: 0 var(--s-3); font-size: var(--t-13);">Cancelar</button>
+                <span class="avatar">EM</span>
+            </div>
+        </header>
+
+        <main class="main" style="max-width: 720px;">
+
+            <!-- Progreso 5 pasos -->
+            <div class="progress">
+                <div class="progress-step is-done"><span class="num">✓</span> Subir</div>
+                <div class="progress-line"></div>
+                <div class="progress-step is-active"><span class="num">2</span> Completar datos</div>
+                <div class="progress-line"></div>
+                <div class="progress-step"><span class="num">3</span> Asignar NCM</div>
+                <div class="progress-line"></div>
+                <div class="progress-step"><span class="num">4</span> Validar</div>
+                <div class="progress-line"></div>
+                <div class="progress-step"><span class="num">5</span> Generar</div>
+            </div>
+
+            <!-- Card centrada: una pregunta por vez -->
+            <div class="card card-elevated" style="padding: var(--s-10);">
+
+                <!-- Header del step -->
+                <div style="margin-bottom: var(--s-8);">
+                    <div class="caption" style="color: var(--c-accent); font-weight: var(--w-semibold); margin-bottom: var(--s-2); letter-spacing: 0.04em; text-transform: uppercase;">
+                        PASO 2 DE 5
+                    </div>
+                    <h1 class="title-2" style="margin-bottom: var(--s-3);">Completá los datos del despacho</h1>
+                    <p class="subtitle">
+                        Detectamos un proveedor nuevo. Lo que cargues acá se guarda en tu catálogo
+                        para que la próxima vez no tengas que repetirlo.
+                    </p>
+                </div>
+
+                <!-- Form: campos críticos solamente, una columna -->
+                <div class="stack-6">
+
+                    <!-- Datos detectados (mostrados, no editables a primera vista) -->
+                    <div style="background: var(--c-surface-2); border-radius: var(--r-md); padding: var(--s-4) var(--s-5);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--s-3);">
+                            <div class="caption" style="font-weight: var(--w-semibold); color: var(--c-text-2);">DETECTADO DEL PDF</div>
+                            <button class="btn btn-ghost" style="height: 28px; padding: 0 var(--s-3); font-size: var(--t-13); color: var(--c-accent);">Editar</button>
+                        </div>
+                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-3); font-size: var(--t-13);">
+                            <div>
+                                <div class="caption">Factura</div>
+                                <div style="color: var(--c-text); font-weight: var(--w-medium);">D10170586</div>
+                            </div>
+                            <div>
+                                <div class="caption">Fecha</div>
+                                <div style="color: var(--c-text); font-weight: var(--w-medium);">18/02/2025</div>
+                            </div>
+                            <div>
+                                <div class="caption">Proveedor</div>
+                                <div style="color: var(--c-text); font-weight: var(--w-medium);">WILHELMSEN SHIPS SERVICE</div>
+                            </div>
+                            <div>
+                                <div class="caption">País origen</div>
+                                <div style="color: var(--c-text); font-weight: var(--w-medium);">Argentina (AR)</div>
+                            </div>
+                            <div>
+                                <div class="caption">Items</div>
+                                <div style="color: var(--c-text); font-weight: var(--w-medium);">3 productos</div>
+                            </div>
+                            <div>
+                                <div class="caption">FOB total</div>
+                                <div style="color: var(--c-text); font-weight: var(--w-medium);">USD 291.350</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="divider" style="margin: 0;"></div>
+
+                    <!-- Campos que faltan (lo que la persona tiene que completar) -->
+                    <div>
+                        <h2 class="title-3" style="margin-bottom: var(--s-2);">Faltan 4 datos del despacho</h2>
+                        <p class="caption" style="margin-bottom: var(--s-6);">
+                            Datos requeridos por María/AVG. Podés completarlos ahora o saltar al asignado de NCM.
+                        </p>
+
+                        <div class="stack-4">
+
+                            <!-- Comprador / Importador -->
+                            <div class="field">
+                                <label class="field-label" for="comprador">Comprador / Importador</label>
+                                <input class="input" id="comprador" type="text" placeholder="Razón social del importador" value="COSTA CROCIERE SPA">
+                                <span class="field-hint">Detectado del PDF, verificá que esté correcto</span>
+                            </div>
+
+                            <!-- CUIT comprador -->
+                            <div class="field">
+                                <label class="field-label" for="cuit">CUIT del importador</label>
+                                <input class="input is-error" id="cuit" type="text" placeholder="XX-XXXXXXXX-X">
+                                <span class="field-error">Requerido. Ejemplo: 30-71490128-6</span>
+                            </div>
+
+                            <!-- Moneda + Incoterm en una fila -->
+                            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--s-4);">
+                                <div class="field">
+                                    <label class="field-label" for="moneda">Moneda</label>
+                                    <select class="select" id="moneda">
+                                        <option>Dólar (DOL)</option>
+                                        <option>Euro (EUR)</option>
+                                        <option>Real (BRL)</option>
+                                    </select>
+                                </div>
+                                <div class="field">
+                                    <label class="field-label" for="incoterm">Incoterm</label>
+                                    <select class="select" id="incoterm">
+                                        <option>FOB</option>
+                                        <option>CIF</option>
+                                        <option>FCA</option>
+                                        <option>EXW</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Cliente (mapeo opcional) -->
+                            <div class="field">
+                                <label class="field-label" for="cliente">Cliente <span class="caption" style="font-weight: 400;">(opcional, para usar su mapeo de columnas)</span></label>
+                                <select class="select" id="cliente">
+                                    <option>Sin asignar…</option>
+                                    <option>COSTA CROCIERE</option>
+                                    <option>MSC CRUISES</option>
+                                </select>
+                            </div>
+
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- Acciones del step: una primaria, una secundaria sutil -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: var(--s-10); padding-top: var(--s-6); border-top: 1px solid var(--c-border-soft);">
+                    <button class="btn btn-ghost">Saltar este paso</button>
+                    <div class="row-3">
+                        <button class="btn btn-secondary">Volver</button>
+                        <button class="btn btn-primary btn-lg">
+                            Continuar a NCM
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+                                <polyline points="12 5 19 12 12 19"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Hint sutil debajo -->
+            <p class="caption center" style="margin-top: var(--s-6);">
+                <kbd style="background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 4px; padding: 1px 6px; font-family: var(--font-mono); font-size: 11px;">Enter</kbd>
+                continúa ·
+                <kbd style="background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 4px; padding: 1px 6px; font-family: var(--font-mono); font-size: 11px;">Esc</kbd>
+                cancela
+            </p>
+
+        </main>
+
+        <footer class="footer-bar">Guardado automático · hace 3 segundos</footer>
+    </div>
+
+    <nav class="mockup-nav">
+        <a href="index.html">Index</a>
+        <a href="01_awaiting_upload.html">1 · Subir</a>
+        <a href="02_enriching_data.html" class="active">2 · Datos</a>
+        <a href="03_assigning_ncm.html">3 · NCM</a>
+        <a href="04_validating.html">4 · Validar</a>
+        <a href="05_ready_to_generate.html">5 · Generar</a>
+    </nav>
+</body>
+</html>

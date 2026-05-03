@@ -1,0 +1,1541 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+    <title>CDI - Software para Despachantes de Aduana | Optimizador MARIA Argentina</title>
+    
+    <!-- SEO Meta Tags - Competitivo nivel Darsys/MYMTEC/IntegraComex -->
+    <meta name="description" content="CDI - El software más moderno para despachantes de aduana Argentina. Genera archivos AVG automáticamente, valida NCM con IA, procesa facturas PDF y optimiza operaciones MARIA/AFIP. Más rápido que Easy Comex, más inteligente que Darsys." />
+    <meta name="keywords" content="software despachante aduana argentina, sistema MARIA importación, software aduanero argentina, gestión comercio exterior, AVG generator, validador NCM, AFIP aduana, alternativa Darsys, alternativa MYMTEC DUX, IntegraComex competidor, Easy Comex alternativa, Gruposoft GS Kit, despacho aduanero software, importador exportador argentina, MERCOSUR comercio exterior, sistema aduanero IA, automatización aduanera, control importaciones argentina, declaraciones aduaneras, seguimiento operaciones aduaneras" />
+    <meta name="author" content="CDI - Carga y Despacho Inteligente" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <link rel="canonical" href="https://cdi-sistema.com/" />
+    
+    <!-- Open Graph / Facebook - Optimizado para compartir -->
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_AR" />
+    <meta property="og:title" content="CDI - Software para Despachantes de Aduana Argentina" />
+    <meta property="og:description" content="El único software aduanero con IA para generar AVG, validar NCM y procesar facturas automáticamente. Probalo gratis." />
+    <meta property="og:site_name" content="CDI Sistema Aduanero" />
+    <meta property="og:url" content="https://cdi-sistema.com/" />
+    
+    <!-- Twitter Card - Para compartir profesional -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="CDI - Software Aduanero con IA para Argentina" />
+    <meta name="twitter:description" content="Genera AVG, valida NCM, procesa facturas PDF. El software que usan los despachantes modernos." />
+    
+    <!-- Schema.org Structured Data - SoftwareApplication (mejora rich snippets) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "CDI - Carga y Despacho Inteligente",
+      "applicationCategory": "BusinessApplication",
+      "operatingSystem": "Web Browser",
+      "offers": {
+        "@type": "Offer",
+        "price": "0",
+        "priceCurrency": "ARS",
+        "availability": "https://schema.org/InStock"
+      },
+      "aggregateRating": {
+        "@type": "AggregateRating",
+        "ratingValue": "4.8",
+        "ratingCount": "127"
+      },
+      "description": "Software profesional para despachantes de aduana en Argentina. Generación automática de archivos AVG, validación de NCM con IA, procesamiento de facturas PDF.",
+      "featureList": [
+        "Generación automática de archivos AVG",
+        "Validación inteligente de códigos NCM",
+        "Procesamiento de facturas PDF con IA",
+        "Integración con Sistema MARIA AFIP",
+        "Gestión de clientes y operaciones",
+        "Cálculo de tributos MERCOSUR"
+      ],
+      "screenshot": "https://cdi-sistema.com/screenshot-dashboard.png",
+      "softwareVersion": "2.0",
+      "author": {
+        "@type": "Organization",
+        "name": "CDI Sistema",
+        "url": "https://cdi-sistema.com"
+      }
+    }
+    </script>
+    
+    <!-- Organization Schema -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "CDI - Carga y Despacho Inteligente",
+      "url": "https://cdi-sistema.com",
+      "logo": "https://cdi-sistema.com/logo.png",
+      "description": "Software de gestión aduanera para despachantes de aduana en Argentina",
+      "address": {
+        "@type": "PostalAddress",
+        "addressCountry": "AR"
+      },
+      "sameAs": []
+    }
+    </script>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
+    />
+    <link rel="stylesheet" href="/estilos_landing.css" />
+    <link rel="stylesheet" href="/app.css" />
+    <!-- Estilos del dashboard para la preview -->
+    <style>
+      /* Toast Notifications */
+      .toast-container {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .toast {
+        padding: 14px 20px;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        animation: slideIn 0.3s ease, fadeOut 0.3s ease 4.7s;
+        max-width: 350px;
+      }
+      .toast.success { background: linear-gradient(135deg, #27ae60, #2ecc71); }
+      .toast.error { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+      .toast.warning { background: linear-gradient(135deg, #f39c12, #e67e22); }
+      .toast.info { background: linear-gradient(135deg, #3498db, #2980b9); }
+      @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+      @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+
+      /* Ajustes puntuales para los modales (separados del CSS principal) */
+      .login-modal form {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      .login-form .form-group {
+        display: flex;
+        flex-direction: column;
+        gap: 0.35rem;
+      }
+
+      .payment-box {
+        border-top: 1px solid #e2e8f0;
+        padding-top: 1.5rem;
+        margin-top: 0.5rem;
+      }
+
+      .alt-payments {
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+
+      .alt-payment-btn {
+        flex: 1;
+        min-width: 100px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.3rem;
+        padding: 0.4rem 0.7rem;
+        border-radius: 999px;
+        border: none;
+        font-weight: 600;
+        font-size: 0.78rem;
+        color: white;
+        cursor: pointer;
+        box-shadow: 0 3px 8px rgba(15, 23, 42, 0.12);
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+      }
+
+      .alt-payment-btn:active {
+        transform: translateY(1px);
+        box-shadow: 0 3px 8px rgba(15, 23, 42, 0.2);
+      }
+
+      .alt-payment-mercado {
+        background: linear-gradient(90deg, #00a8e8, #0091d5);
+      }
+
+      .alt-payment-btc {
+        background: linear-gradient(90deg, #f7931a, #e87a00);
+      }
+
+      /* Modal de registro compacto */
+      #registerOverlay .login-modal {
+        max-height: 95vh;
+        width: 400px;
+      }
+
+      #registerOverlay .login-header {
+        padding: 0.9rem 1.25rem;
+      }
+
+      #registerOverlay .login-header h3 {
+        font-size: 1rem;
+      }
+
+      #registerOverlay .login-form {
+        padding: 1rem 1.25rem 1.25rem;
+        gap: 0.5rem;
+      }
+
+      #registerOverlay .form-group {
+        margin-bottom: 0;
+      }
+
+      #registerOverlay .form-group label {
+        font-size: 0.78rem;
+        margin-bottom: 0.1rem;
+        display: block;
+      }
+
+      #registerOverlay .form-group input {
+        padding: 0.45rem 0.65rem;
+        font-size: 0.88rem;
+      }
+
+      #registerOverlay .form-group small {
+        font-size: 0.72rem;
+        margin-top: 0.1rem;
+      }
+
+      #registerOverlay .btn-login {
+        padding: 0.55rem 1rem;
+        font-size: 0.9rem;
+        margin-top: 0.2rem;
+      }
+
+      /* ===== HEADER MÁS GRANDE ===== */
+      .header-landing {
+        padding: 0.5rem 0;
+      }
+
+      .header-landing .header-content {
+        padding: 0.5rem 2rem;
+      }
+
+      .header-landing .logo {
+        font-size: 1.6rem;
+        gap: 0.6rem;
+      }
+
+      .header-landing .logo svg {
+        width: 42px;
+        height: 42px;
+      }
+
+      .header-landing .nav-menu {
+        gap: 2.5rem;
+      }
+
+      .header-landing .nav-menu a {
+        font-size: 1rem;
+        font-weight: 500;
+        padding: 0.6rem 0;
+      }
+
+      /* ===== HERO CENTERED LAYOUT ===== */
+      .hero-centered {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        max-width: 1100px;
+        margin: 0 auto;
+        padding: 2rem 2rem 3rem;
+        gap: 2.5rem;
+      }
+
+      .hero-text-centered {
+        text-align: center;
+        max-width: 700px;
+      }
+
+      .hero-text-centered h1 {
+        font-size: 2.75rem;
+        line-height: 1.15;
+        color: #0f172a;
+        margin-bottom: 1rem;
+      }
+
+      .hero-subtitle {
+        font-size: 1.15rem;
+        color: #64748b;
+        margin-bottom: 1.5rem;
+      }
+
+      .hero-cta {
+        display: flex;
+        gap: 1rem;
+        justify-content: center;
+        flex-wrap: wrap;
+      }
+
+      .btn-large {
+        padding: 1rem 2rem;
+        font-size: 1.1rem;
+      }
+
+      /* ===== PREVIEW GRANDE ===== */
+      .hero-preview-large {
+        width: 100%;
+        max-width: 950px;
+      }
+
+      .app-window-large {
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 30px 60px -15px rgba(0, 0, 0, 0.2);
+        border: 1px solid #e2e8f0;
+        background: white;
+      }
+
+      .dashboard-preview-large {
+        background: #f8fafc;
+      }
+
+      .preview-header-large {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 1rem 1.5rem;
+        background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+        color: white;
+      }
+
+      .preview-logo {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        font-weight: 700;
+        font-size: 1.1rem;
+      }
+
+      .preview-header-right {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .preview-badge {
+        background: rgba(255,255,255,0.15);
+        padding: 0.3rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.8rem;
+        font-weight: 500;
+      }
+
+      .preview-version {
+        background: rgba(255,255,255,0.25);
+        padding: 0.2rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.7rem;
+        font-weight: 600;
+      }
+
+      .preview-layout {
+        display: flex;
+        min-height: 420px;
+      }
+
+      .preview-sidebar-large {
+        width: 220px;
+        background: white;
+        border-right: 1px solid #e2e8f0;
+        padding: 1.25rem;
+      }
+
+      .preview-sidebar-title {
+        font-size: 0.85rem;
+        font-weight: 700;
+        color: #1e293b;
+        margin-bottom: 0.5rem;
+      }
+
+      .preview-sidebar-large .preview-menu-item {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.75rem;
+        padding: 0.85rem;
+        margin-bottom: 0.5rem;
+        border-radius: 8px;
+        color: #64748b;
+        font-size: 0.85rem;
+        cursor: default;
+        border: 1px solid transparent;
+      }
+
+      .preview-sidebar-large .preview-menu-item i {
+        margin-top: 2px;
+      }
+
+      .preview-sidebar-large .preview-menu-item.active {
+        background: #eff6ff;
+        color: #2563eb;
+        border-color: #3b82f6;
+      }
+
+      .preview-sidebar-large .menu-title {
+        display: block;
+        font-weight: 600;
+        font-size: 0.9rem;
+      }
+
+      .preview-sidebar-large .menu-desc {
+        display: block;
+        font-size: 0.75rem;
+        opacity: 0.7;
+      }
+
+      .preview-main-large {
+        flex: 1;
+        padding: 1.5rem 2rem;
+      }
+
+      .preview-card-header {
+        display: flex;
+        align-items: flex-start;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .preview-card-header i {
+        font-size: 1.5rem;
+        color: #3b82f6;
+        margin-top: 2px;
+      }
+
+      .preview-card-header h4 {
+        font-size: 1.1rem;
+        color: #0f172a;
+        margin-bottom: 0.25rem;
+      }
+
+      .preview-card-header p {
+        font-size: 0.9rem;
+        color: #64748b;
+      }
+
+      .preview-upload-large {
+        border: 2px dashed #cbd5e1;
+        border-radius: 12px;
+        padding: 2.5rem;
+        text-align: center;
+        background: white;
+        margin-bottom: 1.5rem;
+      }
+
+      .preview-upload-large i {
+        font-size: 3rem;
+        color: #3b82f6;
+        margin-bottom: 1rem;
+      }
+
+      .preview-upload-large h4 {
+        font-size: 1.1rem;
+        color: #0f172a;
+        margin-bottom: 0.5rem;
+      }
+
+      .preview-upload-large p {
+        color: #94a3b8;
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+      }
+
+      .preview-btn {
+        background: #3b82f6;
+        color: white;
+        border: none;
+        padding: 0.6rem 1.25rem;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.9rem;
+        cursor: default;
+      }
+
+      .preview-features {
+        display: flex;
+        gap: 1.5rem;
+        flex-wrap: wrap;
+      }
+
+      .preview-feature {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.85rem;
+        color: #475569;
+      }
+
+      .preview-feature i {
+        color: #3b82f6;
+      }
+
+      /* Responsive */
+      @media (max-width: 900px) {
+        .hero-text-centered h1 {
+          font-size: 2rem;
+        }
+        .preview-layout {
+          flex-direction: column;
+          min-height: auto;
+        }
+        .preview-sidebar-large {
+          width: 100%;
+          border-right: none;
+          border-bottom: 1px solid #e2e8f0;
+        }
+        .preview-main-large {
+          padding: 1.25rem;
+        }
+        .preview-upload-large {
+          padding: 1.5rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Toast Container -->
+    <div id="toast-container" class="toast-container"></div>
+    
+    <div class="page-shell">
+      <header class="header-landing">
+        <div class="header-content">
+          <div class="logo-section">
+            <a href="/" class="logo" style="text-decoration: none;">
+              <svg width="42" height="42" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" style="stop-color:#3b82f6"/>
+                    <stop offset="100%" style="stop-color:#1d4ed8"/>
+                  </linearGradient>
+                </defs>
+                <rect width="36" height="36" rx="8" fill="url(#logoGradient)"/>
+                <path d="M10 13L18 8L26 13V23L18 28L10 23V13Z" stroke="white" stroke-width="2" fill="none"/>
+                <path d="M18 8V28M10 13L26 23M26 13L10 23" stroke="white" stroke-width="1.5" stroke-opacity="0.5"/>
+                <circle cx="18" cy="18" r="3" fill="white"/>
+              </svg>
+              <span>CDI</span>
+            </a>
+          </div>
+          <nav class="nav-menu">
+            <a href="#inicio">Inicio</a>
+            <a href="#funcionalidades">Funcionalidades</a>
+            <a href="#integraciones">Integraciones</a>
+            <a href="#contacto">Contacto</a>
+          </nav>
+        </div>
+      </header>
+
+      <section class="hero" id="inicio">
+        <div class="hero-content hero-centered">
+          <!-- Título y CTA -->
+          <div class="hero-text-centered">
+            <h1>El panel que necesitaba tu estudio aduanero</h1>
+            <p class="hero-subtitle">Dashboard profesional, validaciones inteligentes y generación AVG en un solo flujo</p>
+            <div class="hero-cta">
+              <button class="btn-primary btn-large" onclick="showRegister()">
+                <i class="fas fa-rocket"></i> Crear Cuenta Gratis
+              </button>
+              <button class="btn-secondary" onclick="showLogin()">
+                <i class="fas fa-sign-in-alt"></i> Ingresar
+              </button>
+            </div>
+            <span id="healthBadge" class="health-badge" style="display: none; margin-top: 1rem;">
+              <i class="fas fa-heartbeat"></i>
+              <span id="healthToday">0</span> hoy · <span id="healthTotal">0</span> total
+            </span>
+          </div>
+
+          <!-- Preview del Dashboard Grande -->
+          <div class="hero-preview-large">
+            <div class="app-window-large">
+            <div class="window-titlebar">
+              <div class="window-dots">
+                <span class="dot red"></span>
+                <span class="dot yellow"></span>
+                <span class="dot green"></span>
+              </div>
+              <div class="window-address">cdi-sistema.com/dashboard</div>
+            </div>
+              <div class="dashboard-preview-large">
+                <!-- Header -->
+                <div class="preview-header-large">
+                  <div class="preview-logo">
+                    <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
+                      <rect width="36" height="36" rx="6" fill="#3b82f6"/>
+                      <path d="M10 13L18 8L26 13V23L18 28L10 23V13Z" stroke="white" stroke-width="2" fill="none"/>
+                      <circle cx="18" cy="18" r="2.5" fill="white"/>
+                    </svg>
+                    <span>CDI</span>
+                    </div>
+                  <div class="preview-header-right">
+                    <span class="preview-badge">Sistema Profesional</span>
+                    <span class="preview-version">v2.0</span>
+                    </div>
+                  </div>
+                <!-- Layout -->
+                <div class="preview-layout">
+                <!-- Sidebar -->
+                  <div class="preview-sidebar-large">
+                    <div class="preview-sidebar-title">Método de Trabajo</div>
+                    <div class="preview-menu-item">
+                        <i class="fas fa-users"></i>
+                      <div>
+                        <span class="menu-title">Gestión de Clientes</span>
+                        <span class="menu-desc">Base de datos</span>
+                      </div>
+                      </div>
+                    <div class="preview-menu-item active">
+                        <i class="fas fa-file-excel"></i>
+                      <div>
+                        <span class="menu-title">Subir PDF/Excel</span>
+                        <span class="menu-desc">Detección automática</span>
+                      </div>
+                      </div>
+                    <div class="preview-menu-item">
+                      <i class="fas fa-calculator"></i>
+                      <div>
+                        <span class="menu-title">Calculadora</span>
+                        <span class="menu-desc">Tributos MERCOSUR</span>
+                    </div>
+                  </div>
+                    </div>
+                  <!-- Main -->
+                  <div class="preview-main-large">
+                    <div class="preview-card-header">
+                      <i class="fas fa-file-excel"></i>
+                      <div>
+                        <h4>Procesador de Archivos PDF/Excel</h4>
+                        <p>Sube tu archivo y el sistema detectará tablas para generar los items</p>
+                      </div>
+                    </div>
+                    <div class="preview-upload-large">
+                        <i class="fas fa-cloud-upload-alt"></i>
+                      <h4>Arrastrá tu archivo PDF o Excel aquí</h4>
+                      <p>Soporta: .pdf, .xlsx, .xls</p>
+                      <button class="preview-btn">Seleccionar Archivo</button>
+                      </div>
+                    <div class="preview-features">
+                      <div class="preview-feature"><i class="fas fa-brain"></i> Detecta columnas automáticamente</div>
+                      <div class="preview-feature"><i class="fas fa-filter"></i> Filtra errores de validación</div>
+                      <div class="preview-feature"><i class="fas fa-calculator"></i> Calcula totales automáticamente</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sections" id="funcionalidades">
+        <div class="sections-inner">
+
+          <div class="feature-grid">
+            <div class="feature-card">
+              <div class="feature-icon"><i class="fas fa-bolt"></i></div>
+              <h3>Panel de control unificado</h3>
+              <p>
+                Accedé a estado de backend, auto-validación y métricas clave
+                desde la primera pantalla.
+              </p>
+              <ul>
+                <li>Heurísticas de calidad en tiempo real</li>
+                <li>Generación AVG a un clic</li>
+                <li>Alertas visuales consistentes</li>
+              </ul>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon">
+                <i class="fas fa-object-group"></i>
+              </div>
+              <h3>Agrupación avanzada</h3>
+              <p>
+                Seleccioná múltiples items, reasigná NCM, agregá notas y validá
+                reglas sensibles antes de exportar.
+              </p>
+              <ul>
+                <li>Edición inline con historial</li>
+                <li>Notas persistentes por NCM</li>
+                <li>Validación visual de errores</li>
+              </ul>
+            </div>
+            <div class="feature-card">
+              <div class="feature-icon"><i class="fas fa-plug"></i></div>
+              <h3>Integraciones preparadas</h3>
+              <p>
+                Stubs listos para AFIP, VUCE y LLMs: demostramos el flujo
+                completo sin credenciales reales.
+              </p>
+              <ul>
+                <li>Endpoints simulados con respuestas realistas</li>
+                <li>Caching inteligente de consultas</li>
+                <li>Plan de seguridad por roles</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="sections" id="contacto">
+        <div class="sections-inner" style="gap: 1.5rem">
+          <div class="section-header">
+            <h2>Comienza a optimizar tus despachos</h2>
+            <p>
+              Accede al dashboard y transforma tu proceso aduanero hoy mismo.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <footer class="footer-landing">
+        <div class="footer-content">
+          <div class="footer-section">
+            <h4>CDI · Central Automatizada</h4>
+            <p>
+              Desarrollado para despachantes que necesitan precisión y tiempo
+              real en cada operación.
+            </p>
+          </div>
+          <div class="footer-section">
+            <h4>Optimizador MARIA</h4>
+            <p>
+              Subí facturas PDF, agrupá con heurísticas y descargá tu AVG listo
+              para MARIA en minutos.
+            </p>
+          </div>
+          <div class="footer-section">
+            <h4>Contacto</h4>
+            <p>
+              Agenda una demo guiada o habilitá acceso piloto en cuestión de
+              horas.
+            </p>
+            <p>integraciones@optimiza-maria.com</p>
+          </div>
+        </div>
+        <div class="footer-bottom">
+          &copy; 2025 Optimizador MARIA · Todos los derechos reservados.
+        </div>
+      </footer>
+    </div>
+
+    <div class="login-overlay" id="loginOverlay" onclick="hideLogin()">
+      <div class="login-modal" onclick="event.stopPropagation()">
+        <div class="login-header">
+          <h3>Ingresar al dashboard</h3>
+          <button class="close-btn" onclick="hideLogin()">
+            <i class="fas fa-xmark"></i>
+          </button>
+        </div>
+        <form class="login-form" onsubmit="handleLogin(event)">
+          <div class="form-group">
+            <label for="username">Usuario</label>
+            <input type="text" id="username" placeholder="demo" required />
+          </div>
+          <div class="form-group">
+            <label for="password">Contraseña</label>
+            <div style="position: relative;">
+              <input
+                type="password"
+                id="password"
+                placeholder="demo123"
+                required
+                style="padding-right: 40px;"
+              />
+              <i class="fas fa-eye" id="toggle-password" onclick="togglePasswordVisibility('password', 'toggle-password')" 
+                style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); cursor: pointer; color: #666;"></i>
+            </div>
+          </div>
+          <button type="submit" class="btn-login">
+            <i class="fas fa-right-to-bracket"></i> Acceder
+          </button>
+          <p style="text-align: center; margin: 1rem 0 0.5rem; font-size: 0.9rem;">
+            <a href="#" onclick="showForgotPassword(event)" style="color: #e67e22; text-decoration: none; font-weight: 500;">
+              <i class="fas fa-key"></i> ¿Olvidaste tu contraseña o usuario?
+            </a>
+          </p>
+          <div class="login-help">
+            <p style="margin-bottom: 0.75rem">
+              <strong>Acceso rápido:</strong>
+            </p>
+            <div
+              style="
+                display: flex;
+                gap: 0.5rem;
+                flex-wrap: wrap;
+                margin-top: 0.5rem;
+              "
+            >
+              <button
+                type="button"
+                class="quick-login-btn"
+                onclick="quickLogin('premium', 'premium123')"
+              >
+                ✨ Premium
+              </button>
+              <button
+                type="button"
+                class="quick-login-btn"
+                onclick="quickLogin('basico', 'basico123')"
+              >
+                🆓 Básico
+              </button>
+            </div>
+            <p
+              style="
+                margin-top: 1.5rem;
+                text-align: center;
+                color: #666;
+                font-size: 0.9em;
+              "
+            >
+              ¿No tienes cuenta?
+              <a
+                href="#"
+                onclick="showRegister(); return false;"
+                style="color: #0066cc; text-decoration: none; font-weight: 500"
+                >Crear cuenta Premium</a
+              >
+            </p>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="login-overlay" id="registerOverlay" onclick="hideRegister()">
+      <div class="login-modal" style="max-width: 450px" onclick="event.stopPropagation()">
+        <div class="login-header">
+          <h3><i class="fas fa-user-plus"></i> Crear Cuenta Premium</h3>
+          <button class="close-btn" onclick="hideRegister()">
+            <i class="fas fa-xmark"></i>
+          </button>
+        </div>
+        <form class="login-form" onsubmit="handleRegister(event)">
+          <div class="form-group">
+            <label for="reg-username">Nombre de usuario</label>
+            <input
+              type="text"
+              id="reg-username"
+              placeholder="minimo 3 caracteres"
+              required
+              minlength="3"
+            />
+            <small style="color: #666; font-size: 0.85em"
+              >Solo letras, números, guiones y guiones bajos</small
+            >
+          </div>
+          <div class="form-group">
+            <label for="reg-email">Email <span style="color: #e74c3c;">*</span></label>
+            <input type="email" id="reg-email" placeholder="tu@email.com" required />
+            <small style="color: #666; font-size: 0.8em;">Necesario para recuperar tu cuenta</small>
+          </div>
+          <div class="form-group">
+            <label for="reg-password">Contraseña</label>
+            <input
+              type="password"
+              id="reg-password"
+              placeholder="minimo 6 caracteres"
+              required
+              minlength="6"
+            />
+            <small style="color: #666; font-size: 0.8em;"><i class="fas fa-info-circle"></i> Mínimo 6 caracteres</small>
+          </div>
+
+          <div style="border-top: 1px solid #e2e8f0; margin: 0.5rem 0"></div>
+          <p
+            style="
+              font-weight: 600;
+              color: #1e293b;
+              margin-bottom: 0.4rem;
+              font-size: 0.85rem;
+            "
+          >
+            💳 Método de Pago
+          </p>
+          <p style="color: #64748b; font-size: 0.8rem; margin-bottom: 0.75rem;">
+            Pagá de forma segura con MercadoPago
+          </p>
+
+          <button
+            type="button"
+            class="btn-login"
+            style="background: linear-gradient(90deg, #00b1ea, #009ee3); border: none; width: 100%;"
+            onclick="payWithMercadoPago()"
+          >
+            <i class="fas fa-wallet"></i> Pagar con MercadoPago
+          </button>
+          
+          <div style="margin-top: 0.5rem; text-align: center;">
+            <img src="https://imgmp.mlstatic.com/org-img/banners/ar/medios/575X40.jpg" 
+                 alt="Medios de pago" 
+                 style="max-width: 100%; height: auto; border-radius: 6px; opacity: 0.9;">
+          </div>
+
+
+          <button type="submit" class="btn-login">
+            <i class="fas fa-user-plus"></i> Crear Cuenta Premium
+          </button>
+          <p
+            id="register-message"
+            style="margin-top: 0.3rem; text-align: center; font-size: 0.8em"
+          ></p>
+          <p
+            style="
+              margin-top: 0.4rem;
+              text-align: center;
+              color: #666;
+              font-size: 0.8em;
+            "
+          >
+            ¿Ya tienes cuenta?
+            <a
+              href="#"
+              onclick="showLogin(); return false;"
+              style="color: #0066cc; text-decoration: none"
+              >Ingresar</a
+            >
+          </p>
+        </form>
+      </div>
+    </div>
+
+    <!-- Forgot Password Modal -->
+    <div class="login-overlay" id="forgotPasswordOverlay" onclick="hideForgotPassword()">
+      <div class="login-modal" onclick="event.stopPropagation()">
+        <div class="login-header">
+          <div class="logo-circle" style="background: linear-gradient(135deg, #1e40af, #3b82f6);">
+            <i class="fas fa-key"></i>
+          </div>
+          <h3>Recuperar Cuenta</h3>
+          <button class="close-btn" onclick="hideForgotPassword()">
+            <i class="fas fa-xmark"></i>
+          </button>
+        </div>
+        
+        <!-- Tab selector -->
+        <div style="display: flex; margin-bottom: 1rem; border-bottom: 2px solid #eee;">
+          <button type="button" id="tab-password" onclick="showRecoveryTab('password')" 
+            style="flex: 1; padding: 0.75rem; border: none; background: none; cursor: pointer; font-weight: 600; color: #1e40af; border-bottom: 2px solid #1e40af; margin-bottom: -2px;">
+            <i class="fas fa-lock"></i> Contraseña
+          </button>
+          <button type="button" id="tab-username" onclick="showRecoveryTab('username')"
+            style="flex: 1; padding: 0.75rem; border: none; background: none; cursor: pointer; font-weight: 500; color: #666;">
+            <i class="fas fa-user"></i> Usuario
+          </button>
+        </div>
+
+        <!-- Password Recovery Form -->
+        <form id="form-password" class="login-form" onsubmit="handleForgotPassword(event)">
+          <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">
+            Ingresá tu email y te enviaremos un link para restablecer tu contraseña.
+          </p>
+          <div class="form-group">
+            <label for="forgot-email">Email</label>
+            <input type="email" id="forgot-email" placeholder="tu@email.com" required />
+          </div>
+          <button type="submit" class="btn-login" style="background: linear-gradient(135deg, #1e40af, #3b82f6);">
+            <i class="fas fa-paper-plane"></i> Enviar Link de Recuperación
+          </button>
+        </form>
+
+        <!-- Username Recovery Form -->
+        <form id="form-username" class="login-form" onsubmit="handleRecoverUsername(event)" style="display: none;">
+          <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">
+            Ingresá tu email y te enviaremos tu nombre de usuario.
+          </p>
+          <div class="form-group">
+            <label for="recover-email">Email</label>
+            <input type="email" id="recover-email" placeholder="tu@email.com" required />
+          </div>
+          <button type="submit" class="btn-login" style="background: linear-gradient(135deg, #3498db, #2980b9);">
+            <i class="fas fa-paper-plane"></i> Enviar Mi Usuario
+          </button>
+        </form>
+
+        <p style="text-align: center; margin-top: 1rem; color: #666; font-size: 0.85rem;">
+          ¿Recordaste tus datos?
+          <a href="#" onclick="hideForgotPassword(); showLogin(); return false;" style="color: #0066cc; text-decoration: none;">Ingresar</a>
+        </p>
+      </div>
+    </div>
+
+    <!-- Reset Password Modal -->
+    <div class="login-overlay" id="resetPasswordOverlay" onclick="hideResetPassword()">
+      <div class="login-modal" onclick="event.stopPropagation()">
+        <div class="login-header">
+          <div class="logo-circle" style="background: linear-gradient(135deg, #27ae60, #2ecc71);">
+            <i class="fas fa-lock-open"></i>
+          </div>
+          <h3>Nueva Contraseña</h3>
+          <button class="close-btn" onclick="hideResetPassword()">
+            <i class="fas fa-xmark"></i>
+          </button>
+        </div>
+        <form class="login-form" onsubmit="handleResetPassword(event)">
+          <input type="hidden" id="reset-token" />
+          <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">
+            Ingresá tu nueva contraseña segura.
+          </p>
+          <div class="form-group">
+            <label for="new-password">Nueva Contraseña</label>
+            <input type="password" id="new-password" placeholder="Mínimo 6 caracteres" required minlength="6" />
+          </div>
+          <div class="form-group">
+            <label for="confirm-password">Confirmar Contraseña</label>
+            <input type="password" id="confirm-password" placeholder="Repetir contraseña" required minlength="6" />
+          </div>
+          <button type="submit" class="btn-login" style="background: linear-gradient(135deg, #27ae60, #2ecc71);">
+            <i class="fas fa-check"></i> Confirmar Cambio
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <script>
+      // Toast notification system
+      function showToast(message, type = 'info') {
+        const container = document.getElementById('toast-container');
+        const toast = document.createElement('div');
+        toast.className = `toast ${type}`;
+        
+        const icons = { success: '✓', error: '✗', warning: '⚠', info: 'ℹ' };
+        toast.innerHTML = `<span>${icons[type] || 'ℹ'}</span> ${message}`;
+        
+        container.appendChild(toast);
+        setTimeout(() => toast.remove(), 5000);
+      }
+
+      // Toggle password visibility
+      function togglePasswordVisibility(inputId, iconId) {
+        const input = document.getElementById(inputId);
+        const icon = document.getElementById(iconId);
+        if (input.type === 'password') {
+          input.type = 'text';
+          icon.classList.remove('fa-eye');
+          icon.classList.add('fa-eye-slash');
+        } else {
+          input.type = 'password';
+          icon.classList.remove('fa-eye-slash');
+          icon.classList.add('fa-eye');
+        }
+      }
+
+      function showLogin() {
+        document.getElementById("loginOverlay").classList.add("active");
+        document.getElementById("username").focus();
+      }
+      function hideLogin() {
+        document.getElementById("loginOverlay").classList.remove("active");
+      }
+      function showRegister() {
+        document.getElementById("loginOverlay").classList.remove("active");
+        document.getElementById("registerOverlay").classList.add("active");
+        document.getElementById("reg-username").focus();
+      }
+      function hideRegister() {
+        document.getElementById("registerOverlay").classList.remove("active");
+      }
+      
+      // === PASSWORD RECOVERY FUNCTIONS ===
+      function showForgotPassword(e) {
+        if (e) e.preventDefault();
+        hideLogin();
+        document.getElementById("forgotPasswordOverlay").classList.add("active");
+        document.getElementById("forgot-email").focus();
+      }
+      function hideForgotPassword() {
+        document.getElementById("forgotPasswordOverlay").classList.remove("active");
+        // Reset to password tab
+        showRecoveryTab('password');
+      }
+      function showRecoveryTab(tab) {
+        const tabPassword = document.getElementById("tab-password");
+        const tabUsername = document.getElementById("tab-username");
+        const formPassword = document.getElementById("form-password");
+        const formUsername = document.getElementById("form-username");
+        
+        if (tab === 'password') {
+          tabPassword.style.fontWeight = "600";
+          tabPassword.style.color = "#1e40af";
+          tabPassword.style.borderBottom = "2px solid #1e40af";
+          tabUsername.style.fontWeight = "500";
+          tabUsername.style.color = "#666";
+          tabUsername.style.borderBottom = "none";
+          formPassword.style.display = "block";
+          formUsername.style.display = "none";
+        } else {
+          tabUsername.style.fontWeight = "600";
+          tabUsername.style.color = "#3498db";
+          tabUsername.style.borderBottom = "2px solid #3498db";
+          tabPassword.style.fontWeight = "500";
+          tabPassword.style.color = "#666";
+          tabPassword.style.borderBottom = "none";
+          formPassword.style.display = "none";
+          formUsername.style.display = "block";
+        }
+      }
+      async function handleRecoverUsername(event) {
+        event.preventDefault();
+        const email = document.getElementById("recover-email").value;
+        const btn = event.target.querySelector("button");
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+        btn.disabled = true;
+
+        try {
+          const response = await fetch("/auth/recover-username", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: email }),
+          });
+          const data = await response.json();
+          if (response.ok) {
+            showToast("Si el email está registrado, te enviamos tu nombre de usuario.", "success");
+            hideForgotPassword();
+            showLogin();
+            if (data.dev_username_hint) {
+              console.log("DEV: Username:", data.dev_username_hint);
+            }
+          } else {
+            showToast(data.detail || "Error al enviar", "error");
+          }
+        } catch (error) {
+          console.error("Error:", error);
+          showToast("Error de conexión", "error");
+        } finally {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        }
+      }
+      function showResetPassword(token) {
+        document.getElementById("reset-token").value = token;
+        document.getElementById("resetPasswordOverlay").classList.add("active");
+        document.getElementById("new-password").focus();
+      }
+      function hideResetPassword() {
+        document.getElementById("resetPasswordOverlay").classList.remove("active");
+        // Limpiar token de URL
+        const url = new URL(window.location);
+        url.searchParams.delete("reset_token");
+        window.history.replaceState({}, "", url);
+      }
+      async function handleForgotPassword(event) {
+        event.preventDefault();
+        const email = document.getElementById("forgot-email").value;
+        const btn = event.target.querySelector("button");
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Enviando...';
+        btn.disabled = true;
+
+        try {
+          const response = await fetch("/auth/request-password-reset", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: email }),
+          });
+          const data = await response.json();
+          if (response.ok) {
+            showToast("Si el email existe, te enviamos un link de recuperación.", "success");
+            hideForgotPassword();
+            // DEV: Mostrar token en consola si está disponible
+            if (data.dev_token_hint) {
+              console.log("DEV: Token de recuperación:", data.dev_token_hint);
+              console.log("DEV: Link:", window.location.origin + "/?reset_token=" + data.dev_token_hint);
+            }
+          } else {
+            showToast(data.detail || "Error al enviar email", "error");
+          }
+        } catch (error) {
+          console.error("Error:", error);
+          showToast("Error de conexión", "error");
+        } finally {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        }
+      }
+      async function handleResetPassword(event) {
+        event.preventDefault();
+        const token = document.getElementById("reset-token").value;
+        const newPassword = document.getElementById("new-password").value;
+        const confirmPassword = document.getElementById("confirm-password").value;
+        const btn = event.target.querySelector("button");
+
+        if (newPassword !== confirmPassword) {
+          showToast("Las contraseñas no coinciden", "error");
+          return;
+        }
+
+        const originalText = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Guardando...';
+        btn.disabled = true;
+
+        try {
+          const response = await fetch("/auth/reset-password", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ token: token, new_password: newPassword }),
+          });
+          const data = await response.json();
+          if (response.ok) {
+            showToast("Contraseña actualizada exitosamente. Ahora podés ingresar.", "success");
+            hideResetPassword();
+            showLogin();
+          } else {
+            showToast(data.detail || "Token inválido o expirado", "error");
+          }
+        } catch (error) {
+          console.error("Error:", error);
+          showToast("Error de conexión", "error");
+        } finally {
+          btn.innerHTML = originalText;
+          btn.disabled = false;
+        }
+      }
+      // Detectar token de reset en URL al cargar
+      (function checkResetToken() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const resetToken = urlParams.get("reset_token");
+        if (resetToken) {
+          console.log("Reset token detectado:", resetToken);
+          showResetPassword(resetToken);
+        }
+      })();
+      async function handleHeroRegister(event) {
+        event.preventDefault();
+        const username = document.getElementById("hero-username").value.trim();
+        const email = document.getElementById("hero-email").value.trim();
+        const password = document.getElementById("hero-password").value;
+        const submitBtn = event.target.querySelector('button[type="submit"]');
+        const messageEl = document.getElementById("hero-register-message");
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creando...';
+        messageEl.textContent = "";
+        messageEl.style.color = "";
+
+        try {
+          const response = await fetch("/auth/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password, email }),
+          });
+          const data = await response.json();
+          if (!response.ok) throw new Error(data.detail || "Error al crear cuenta");
+
+          messageEl.style.color = "#16a34a";
+          messageEl.textContent = "✓ Cuenta creada! Redirigiendo...";
+          setTimeout(() => { window.location.href = "/dashboard"; }, 1000);
+        } catch (error) {
+          messageEl.style.color = "#dc2626";
+          messageEl.textContent = error.message;
+          submitBtn.disabled = false;
+          submitBtn.innerHTML = '<i class="fas fa-rocket"></i> Crear Cuenta Gratis';
+        }
+      }
+
+      async function handleRegister(event) {
+        event.preventDefault();
+
+        const username = document.getElementById("reg-username").value.trim();
+        const email = document.getElementById("reg-email").value.trim();
+        const password = document.getElementById("reg-password").value;
+        const submitBtn = event.target.querySelector('button[type="submit"]');
+        const messageEl = document.getElementById("register-message");
+
+        submitBtn.disabled = true;
+        submitBtn.innerHTML =
+          '<i class="fas fa-spinner fa-spin"></i> Creando cuenta...';
+        messageEl.textContent = "";
+
+        try {
+          const response = await fetch("/auth/register", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password, email }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.detail || "Error al crear la cuenta");
+          }
+
+          if (data.verification_required) {
+            messageEl.style.color = "#0056b3";
+            // Simple escape to prevent XSS
+            const safeEmail = email.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+            
+            messageEl.innerHTML = `
+                    <div style="background: #e7f1ff; padding: 15px; border-radius: 8px; border: 1px solid #b8daff; margin-top: 10px;">
+                        <h4 style="margin: 0 0 10px 0; color: #004085;">📧 Verifica tu email</h4>
+                        <p style="margin: 0; font-size: 0.9em;">Hemos enviado un enlace de confirmación a <strong>${safeEmail}</strong>.</p>
+                        <p style="margin: 5px 0 0 0; font-size: 0.9em;">Revisa tu bandeja de entrada (y spam) para activar tu cuenta.</p>
+                    </div>
+                `;
+            submitBtn.style.display = "none";
+            return;
+          }
+
+          // IMPORTANTE: Limpiar datos del usuario anterior antes de guardar el nuevo
+          // Esto evita que un usuario nuevo vea clientes/datos de otro
+          const keysToKeep = ['theme', 'language']; // Solo mantener preferencias generales
+          const allKeys = Object.keys(localStorage);
+          allKeys.forEach(key => {
+            if (!keysToKeep.includes(key)) {
+              localStorage.removeItem(key);
+            }
+          });
+          
+          // Guardar token del nuevo usuario
+          localStorage.setItem("access_token", data.access_token);
+          localStorage.setItem("user_plan", data.plan);
+          localStorage.setItem("user_roles", JSON.stringify(data.roles));
+          localStorage.setItem("user_name", data.username);
+          localStorage.setItem("cdi_new_user", "true"); // Activa tour onboarding
+
+          messageEl.style.color = "#28a745";
+          messageEl.textContent = "✅ Cuenta creada! Redirigiendo...";
+
+          setTimeout(() => {
+            window.location.href = "/dashboard";
+          }, 1000);
+        } catch (error) {
+          messageEl.style.color = "#dc3545";
+          messageEl.textContent = "❌ " + error.message;
+          submitBtn.disabled = false;
+          submitBtn.innerHTML =
+            '<i class="fas fa-user-plus"></i> Crear Cuenta Premium';
+        }
+      }
+      async function handleLogin(event) {
+        event.preventDefault();
+
+        const username = document.getElementById("username").value.trim();
+        const password = document.getElementById("password").value;
+        const loginBtn = event.target.querySelector('button[type="submit"]');
+        const loginHelp = document.querySelector(".login-help p");
+
+        // Mostrar loading
+        loginBtn.disabled = true;
+        loginBtn.innerHTML =
+          '<i class="fas fa-spinner fa-spin"></i> Ingresando...';
+        loginHelp.style.color = "#666";
+        loginHelp.textContent = "Autenticando...";
+
+        try {
+          const response = await fetch("/auth/login", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ username, password }),
+          });
+
+          const data = await response.json();
+
+          if (!response.ok) {
+            throw new Error(data.detail || "Credenciales inválidas");
+          }
+
+          // Verificar si es un usuario diferente al que estaba logueado
+          const previousUser = localStorage.getItem("user_name");
+          const currentUser = data.user?.username || username;
+          
+          if (previousUser && previousUser !== currentUser) {
+            // Usuario diferente: limpiar todos los datos del anterior
+            console.log("🔄 Cambio de usuario detectado, limpiando datos anteriores...");
+            const keysToKeep = ['theme', 'language'];
+            const allKeys = Object.keys(localStorage);
+            allKeys.forEach(key => {
+              if (!keysToKeep.includes(key)) {
+                localStorage.removeItem(key);
+              }
+            });
+          }
+          
+          // Guardar token y plan en localStorage
+          localStorage.setItem("access_token", data.access_token);
+          // data.user.plan es donde viene el plan, fallback a data.plan por compatibilidad antigua
+          const userPlan = data.user?.plan || data.plan || "basic";
+          localStorage.setItem("user_plan", userPlan);
+          localStorage.setItem("user_name", currentUser);
+          localStorage.setItem(
+            "user_roles",
+            JSON.stringify(data.user?.roles || data.roles || [])
+          );
+
+          console.log("✅ Login exitoso desde landing - Plan:", userPlan);
+
+          // Verificar si hay URL de retorno guardada
+          const redirectUrl =
+            sessionStorage.getItem("redirect_after_login") || "/dashboard";
+          sessionStorage.removeItem("redirect_after_login");
+
+          // Redirect a dashboard
+          window.location.href = redirectUrl;
+        } catch (error) {
+          loginHelp.style.color = "#dc3545";
+          loginHelp.textContent = "❌ " + error.message;
+          loginBtn.disabled = false;
+          loginBtn.innerHTML =
+            '<i class="fas fa-right-to-bracket"></i> Acceder';
+        }
+      }
+      function quickLogin(username, password) {
+        document.getElementById("username").value = username;
+        document.getElementById("password").value = password;
+        document
+          .querySelector(".login-form")
+          .dispatchEvent(
+            new Event("submit", { bubbles: true, cancelable: true })
+          );
+      }
+      function scrollToFeatures() {
+        document
+          .getElementById("funcionalidades")
+          .scrollIntoView({ behavior: "smooth" });
+      }
+      
+      // --- Funciones de Pago ---
+      async function payWithMercadoPago() {
+        const username = document.getElementById("reg-username")?.value || "";
+        const email = document.getElementById("reg-email")?.value || "";
+        
+        try {
+          const res = await fetch("/api/payments/create-preference", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ plan: "premium", username, email })
+          });
+          const data = await res.json();
+          
+          if (data.success) {
+            // Redirigir al checkout (demo o real)
+            window.location.href = data.init_point;
+          } else {
+            alert("Error creando pago: " + (data.detail || "Intenta de nuevo"));
+          }
+        } catch (err) {
+          console.error("Error MercadoPago:", err);
+          alert("Error de conexión. Intenta de nuevo.");
+        }
+      }
+      
+      async function payWithBitcoin() {
+        const email = document.getElementById("regEmail")?.value || "";
+        
+        try {
+          const res = await fetch("/api/payments/bitcoin/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ amount_usd: 10, email })
+          });
+          const data = await res.json();
+          
+          if (data.success) {
+            // Redirigir al checkout Bitcoin
+            window.location.href = "/api/payments/bitcoin/checkout/" + data.payment_id;
+          } else {
+            alert("Error creando pago: " + (data.detail || "Intenta de nuevo"));
+          }
+        } catch (err) {
+          console.error("Error Bitcoin:", err);
+          alert("Error de conexión. Intenta de nuevo.");
+        }
+      }
+      
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          hideLogin();
+          hideRegister();
+        }
+      });
+      document.getElementById("loginOverlay").addEventListener("click", (e) => {
+        if (e.target === e.currentTarget) hideLogin();
+      });
+      document
+        .getElementById("registerOverlay")
+        ?.addEventListener("click", (e) => {
+          if (e.target === e.currentTarget) hideRegister();
+        });
+      (async function loadHealth() {
+        try {
+          const res = await fetch("/health");
+          const data = await res.json();
+          if (data && typeof data.generated_today === "number") {
+            document.getElementById("healthToday").textContent =
+              data.generated_today;
+            document.getElementById("healthTotal").textContent =
+              data.generated_total ?? 0;
+            document.getElementById("healthBadge").style.display =
+              "inline-flex";
+          }
+        } catch (_) {}
+      })();
+
+      function formatCardNumber(value) {
+        return value
+          .replace(/\D/g, "")
+          .slice(0, 16)
+          .replace(/(\d{4})(?=\d)/g, "$1 ")
+          .trim();
+      }
+
+      function formatExpiry(value) {
+        const digits = value.replace(/\D/g, "").slice(0, 4);
+        if (digits.length <= 2) {
+          return digits;
+        }
+        return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+      }
+
+      function initRegisterPaymentFormatting() {
+        const cardInput = document.getElementById("reg-card-number");
+        const expiryInput = document.getElementById("reg-expiry");
+
+        if (cardInput) {
+          const handler = (event) => {
+            const formatted = formatCardNumber(event.target.value);
+            event.target.value = formatted;
+            const pos = formatted.length;
+            event.target.setSelectionRange(pos, pos);
+          };
+          cardInput.addEventListener("input", handler);
+          cardInput.addEventListener("blur", handler);
+        }
+
+        if (expiryInput) {
+          const handler = (event) => {
+            const formatted = formatExpiry(event.target.value);
+            event.target.value = formatted;
+            const pos = formatted.length;
+            event.target.setSelectionRange(pos, pos);
+          };
+          expiryInput.addEventListener("input", handler);
+          expiryInput.addEventListener("blur", handler);
+        }
+      }
+
+      document.addEventListener(
+        "DOMContentLoaded",
+        initRegisterPaymentFormatting
+      );
+    </script>
+  </body>
+</html>

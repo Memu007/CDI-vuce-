@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CDI · Despachos</title>
+    <link rel="stylesheet" href="/static/v2/app_v2.css?v={{ version }}">
+</head>
+<body>
+    <div class="app">
+        <div class="beta-banner" id="betaBanner" role="status">
+            <span class="beta-banner-text">
+                <strong>Beta cerrada.</strong>
+                Si encontrás algo raro, escribime a
+                <a href="mailto:hola@ynera.com.ar?subject=CDI%20bug">hola@ynera.com.ar</a>.
+            </span>
+            <button type="button" class="beta-banner-close" id="betaBannerClose" aria-label="Cerrar aviso">×</button>
+        </div>
+        <header class="topbar">
+            <div class="topbar-brand">CDI<span class="dot">·</span>Despachos</div>
+            <a class="ynera-badge" href="https://ynera.com.ar" target="_blank" rel="noopener" title="Producto e ingeniería por Ynera">
+                <span class="ynera-badge-dot"></span>
+                <span class="ynera-badge-by">by</span>
+                <span class="ynera-badge-name">Ynera</span>
+            </a>
+
+            <nav class="topbar-nav">
+                <button class="btn btn-ghost" data-action="go-upload">Nueva operación</button>
+                <button class="btn btn-ghost" data-action="go-clientes">Clientes</button>
+            </nav>
+
+            <div class="topbar-meta">
+                <div class="topbar-financials" id="topbarFinancials" aria-label="Cotizaciones y estado del sistema" hidden>
+                    <span class="tf-pill" id="tfBna" title="Dólar BNA (venta)">
+                        <span class="tf-pill-label">BNA</span>
+                        <span class="tf-pill-value" id="tfBnaValue">—</span>
+                    </span>
+                    <span class="tf-pill" id="tfBlue" title="Dólar Blue (venta)">
+                        <span class="tf-pill-label">Blue</span>
+                        <span class="tf-pill-value" id="tfBlueValue">—</span>
+                    </span>
+                    <button type="button" class="tf-system" id="tfSystemChip" title="Estado del sistema" aria-haspopup="dialog" aria-expanded="false" aria-controls="tfSystemPopover">
+                        <span class="dot-status" id="tfSystemDot"></span>
+                        <span class="tf-system-label" id="tfSystemLabel">Sistema</span>
+                        <span class="cx-demo-badge" id="tfDemoBadge" hidden>DEMO</span>
+                    </button>
+                    <div class="tf-system-popover" id="tfSystemPopover" role="dialog" aria-label="Estado de conectores" hidden></div>
+                </div>
+                <button type="button" class="cliente-pill is-empty" id="clientePill" aria-label="Cliente activo">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    <span class="cliente-pill-label">Cliente</span>
+                </button>
+                <span id="userName" class="caption"></span>
+                <button type="button" class="avatar" id="userAvatar" title="Mi perfil" aria-label="Mi perfil">?</button>
+                <button type="button" class="topbar-logout" id="logoutBtn" title="Cerrar sesión" aria-label="Cerrar sesión" onclick="CDI.logout()">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                </button>
+            </div>
+        </header>
+
+        <main class="main">
+            <div class="fake-source-banner" id="fakeSourceBanner" role="status" aria-live="polite" hidden>
+                <svg class="fake-banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                <span class="fake-banner-text">Algunos NCMs usan <strong>datos de muestra</strong> porque la fuente oficial no respondi&oacute;. Revis&aacute; los valores antes de generar el TXT.</span>
+                <button type="button" class="fake-banner-close" id="fakeSourceBannerClose" aria-label="Cerrar aviso">&times;</button>
+            </div>
+            <nav class="progress" aria-label="Progreso">
+                <div class="progress-step" data-step="upload"><span class="num">1</span> Subir</div>
+                <span class="progress-line"></span>
+                <div class="progress-step" data-step="review"><span class="num">2</span> Revisar</div>
+                <span class="progress-line"></span>
+                <div class="progress-step" data-step="ncm"><span class="num">3</span> NCM</div>
+                <span class="progress-line"></span>
+                <div class="progress-step" data-step="validating"><span class="num">4</span> Validar</div>
+                <span class="progress-line"></span>
+                <div class="progress-step" data-step="ready"><span class="num">5</span> Listo</div>
+            </nav>
+
+            <section class="screen" data-screen="upload">
+                <div class="upload-hero">
+                    <div class="upload-icon" aria-hidden="true">
+                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                    </div>
+                    <h1 class="title-1 upload-title">Nueva operación</h1>
+                    <p class="subtitle upload-subtitle">Cargá el PDF del proveedor o una planilla Excel para generar el archivo MARIA.</p>
+
+                    <div class="upload-format-toggle" role="tablist" aria-label="Formato de archivo">
+                        <button type="button" class="upload-format-opt is-active" role="tab" aria-selected="true" data-format="pdf" id="uploadFormatPdf">PDF</button>
+                        <button type="button" class="upload-format-opt" role="tab" aria-selected="false" data-format="excel" id="uploadFormatExcel">Excel</button>
+                    </div>
+
+                    <div id="uploadDropzone" class="card card-elevated dropzone" aria-label="Arrastrá un archivo aquí o utilizá el botón Seleccionar archivo">
+                        <div class="dropzone-hint" id="uploadDropzoneHint">Arrastrá el PDF aquí</div>
+                        <button type="button" class="btn btn-primary btn-lg" id="uploadPickBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                            </svg>
+                            Seleccionar archivo
+                        </button>
+                        <div class="dropzone-meta" id="uploadDropzoneMeta">PDF · hasta 10 MB</div>
+                    </div>
+                    <input type="file" id="uploadFileInput" accept=".pdf,application/pdf" class="sr-only" tabindex="-1" aria-hidden="true">
+                    <p class="upload-hint-excel" id="uploadHintExcel" hidden>Podés descargar la plantilla desde <button type="button" class="btn-link-inline" data-action="go-clientes">Clientes</button>.</p>
+
+                    <div class="upload-progress" id="uploadProgress" hidden aria-live="polite">
+                        <div class="spinner" aria-hidden="true"></div>
+                        <div class="upload-progress-text">
+                            <p class="upload-progress-title" id="uploadProgressTitle">Procesando PDF…</p>
+                            <p class="upload-progress-sub" id="uploadProgressSub">Extrayendo datos del proveedor y los ítems.</p>
+                        </div>
+                    </div>
+
+                    <div class="upload-error" id="uploadError" hidden role="alert"></div>
+
+                    <div class="upload-footer-muted">
+                        <div class="upload-simulate">
+                            <button type="button" class="btn-link-inline" id="uploadSimulateBtn">Simular operación con datos de prueba</button>
+                            <span class="upload-simulate-hint">Solo para previsualizar el flujo.</span>
+                        </div>
+
+                        <div class="upload-simulate">
+                            <button type="button" class="btn-link-inline" id="uploadBlankTemplateBtn">O empezar desde cero · descargar plantilla en blanco</button>
+                            <span class="upload-simulate-hint">Excel AVG con columnas canónicas para cargar a mano.</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section class="screen" data-screen="review">
+                <div class="review-shell">
+                    <div class="card card-elevated card-padded review-card">
+                        <header class="review-step-header">
+                            <div class="review-step-kicker">Paso 2 de 5</div>
+                            <h1 class="title-2">Revisá los datos</h1>
+                            <p class="subtitle">Los datos detectados son editables. Los campos faltantes están marcados.</p>
+                        </header>
+
+                        <div class="review-meta-pill" id="reviewMetaPill" aria-live="polite"></div>
+
+                        <div id="reviewPendingImporterBanner" class="review-pending-importador" hidden aria-hidden="true">
+                            <div class="review-pending-importador-strong" data-banner-title></div>
+                            <div class="review-pending-importador-sub" data-banner-subtitle></div>
+                            <div class="review-pending-importador-actions">
+                                <button type="button" class="btn btn-secondary btn-sm" data-banner-ignorar>No por ahora</button>
+                                <button type="button" class="btn btn-primary btn-sm" data-banner-crear>Crear cliente y usar</button>
+                            </div>
+                        </div>
+
+                        <form id="reviewForm" class="stack-8" autocomplete="off" novalidate>
+                            <fieldset class="review-section">
+                                <legend class="review-section-title">Proveedor</legend>
+                                <div class="review-grid">
+                                    <div class="field field-col-2">
+                                        <label class="field-label" for="f_vendedor_nombre">Razón social</label>
+                                        <input class="input" type="text" id="f_vendedor_nombre" name="vendedor_nombre" autocomplete="off">
+                                        <span class="field-hint" data-hint-for="vendedor_nombre"></span>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_vendedor_id">Tax ID / CUIT</label>
+                                        <input class="input" type="text" id="f_vendedor_id" name="vendedor_id" autocomplete="off">
+                                        <span class="field-hint" data-hint-for="vendedor_id"></span>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_vendedor_pais">País</label>
+                                        <input class="input" type="text" id="f_vendedor_pais" name="vendedor_pais" placeholder="Ej: BR, CN, US" autocomplete="off">
+                                        <span class="field-hint" data-hint-for="vendedor_pais"></span>
+                                    </div>
+                                    <div class="field field-col-2">
+                                        <label class="field-label" for="f_vendedor_direccion">Dirección</label>
+                                        <input class="input" type="text" id="f_vendedor_direccion" name="vendedor_direccion" autocomplete="off">
+                                        <span class="field-hint" data-hint-for="vendedor_direccion"></span>
+                                    </div>
+                                </div>
+                            </fieldset>
+
+                            <fieldset class="review-section">
+                                <legend class="review-section-title">Importador</legend>
+                                <div class="review-grid">
+                                    <div class="field field-col-2">
+                                        <label class="field-label" for="f_comprador_nombre">Razón social</label>
+                                        <input class="input" type="text" id="f_comprador_nombre" name="comprador_nombre" autocomplete="off">
+                                        <span class="field-hint" data-hint-for="comprador_nombre"></span>
+                                    </div>
+                                    <div class="field field-col-2">
+                                        <label class="field-label" for="f_comprador_cuit">CUIT <span class="field-required">· requerido</span></label>
+                                        <input class="input" type="text" id="f_comprador_cuit" name="comprador_cuit" placeholder="XX-XXXXXXXX-X" inputmode="numeric" autocomplete="off">
+                                        <span class="field-hint" data-hint-for="comprador_cuit">Ejemplo: 30-71490128-6</span>
+                                        <span class="field-error" data-error-for="comprador_cuit" hidden></span>
+                                    </div>
+                                </div>
+                            </fieldset>
+
+                            <fieldset class="review-section">
+                                <legend class="review-section-title">Operación</legend>
+                                <div class="review-grid">
+                                    <div class="field">
+                                        <label class="field-label" for="f_numero_factura">Número de factura</label>
+                                        <input class="input" type="text" id="f_numero_factura" name="numero_factura" autocomplete="off">
+                                        <span class="field-hint" data-hint-for="numero_factura"></span>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_fecha_emision">Fecha de emisión</label>
+                                        <input class="input" type="text" id="f_fecha_emision" name="fecha_emision" placeholder="DD/MM/AAAA" autocomplete="off">
+                                        <span class="field-hint" data-hint-for="fecha_emision"></span>
+                                        <span class="field-error" data-error-for="fecha_emision" hidden></span>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_moneda">Moneda</label>
+                                        <select class="select" id="f_moneda" name="moneda">
+                                            <option value="DOL">Dólar (DOL)</option>
+                                            <option value="EUR">Euro (EUR)</option>
+                                            <option value="BRL">Real (BRL)</option>
+                                            <option value="ARS">Peso (ARS)</option>
+                                        </select>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_incoterm">Incoterm</label>
+                                        <select class="select" id="f_incoterm" name="incoterm">
+                                            <option value="FOB">FOB</option>
+                                            <option value="CIF">CIF</option>
+                                            <option value="CFR">CFR</option>
+                                            <option value="FCA">FCA</option>
+                                            <option value="EXW">EXW</option>
+                                            <option value="DAP">DAP</option>
+                                            <option value="DDP">DDP</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </fieldset>
+
+                            <fieldset class="review-section">
+                                <legend class="review-section-title">Costos adicionales</legend>
+                                <div class="review-grid">
+                                    <div class="field">
+                                        <label class="field-label" for="f_flete">Flete (USD)</label>
+                                        <input class="input" type="number" step="0.01" min="0" id="f_flete" name="flete" autocomplete="off">
+                                        <span class="field-hint">Dejar en 0 si el PDF ya lo incluye.</span>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_seguro">Seguro (USD)</label>
+                                        <input class="input" type="number" step="0.01" min="0" id="f_seguro" name="seguro" autocomplete="off">
+                                        <span class="field-hint">Dejar en 0 si no aplica.</span>
+                                    </div>
+                                </div>
+                                <div class="cx-incoterm-warning" id="reviewIncotermWarning" hidden role="alert"></div>
+                                <details class="cx-prorrateo-panel" id="reviewProrrateoPanel" hidden>
+                                    <summary class="cx-prorrateo-summary">
+                                        <span class="cx-prorrateo-summary-text">
+                                            <strong>Prorrateo CIF por item</strong>
+                                            <span class="caption" id="reviewProrrateoCaption">Ver como se distribuye el flete y el seguro</span>
+                                        </span>
+                                        <svg class="cx-prorrateo-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                                    </summary>
+                                    <div class="cx-prorrateo-body" id="reviewProrrateoBody"></div>
+                                </details>
+                            </fieldset>
+
+                            <details class="review-optional" id="transportBlock">
+                                <summary class="review-optional-summary">
+                                    <span class="review-optional-summary-text">
+                                        <strong>Agregar datos de transporte</strong>
+                                        <span class="caption">BL, buque, puerto, contenedor. Opcional.</span>
+                                    </span>
+                                    <svg class="review-optional-chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                                </summary>
+                                <div class="review-grid review-optional-body">
+                                    <div class="field">
+                                        <label class="field-label" for="f_transporte_medio">Medio</label>
+                                        <select class="select" id="f_transporte_medio" name="transporte_medio">
+                                            <option value="">Sin especificar</option>
+                                            <option value="MARITIMO">Marítimo</option>
+                                            <option value="AEREO">Aéreo</option>
+                                            <option value="TERRESTRE">Terrestre</option>
+                                            <option value="OTRO">Otro</option>
+                                        </select>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_bl">BL / documento</label>
+                                        <input class="input" type="text" id="f_bl" name="bl" autocomplete="off">
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_buque">Buque / viaje</label>
+                                        <input class="input" type="text" id="f_buque" name="buque" autocomplete="off">
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_puerto_origen">Puerto origen</label>
+                                        <input class="input" type="text" id="f_puerto_origen" name="puerto_origen" autocomplete="off">
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_puerto_destino">Puerto destino</label>
+                                        <input class="input" type="text" id="f_puerto_destino" name="puerto_destino" autocomplete="off">
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_fecha_embarque">Fecha de embarque</label>
+                                        <input class="input" type="text" id="f_fecha_embarque" name="fecha_embarque" placeholder="DD/MM/AAAA" autocomplete="off">
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_contenedor_numero">Contenedor #</label>
+                                        <input class="input" type="text" id="f_contenedor_numero" name="contenedor_numero" autocomplete="off">
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_contenedor_tipo">Tipo contenedor</label>
+                                        <input class="input" type="text" id="f_contenedor_tipo" name="contenedor_tipo" placeholder="20ST, 40HC..." autocomplete="off">
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_contenedor_peso">Peso contenedor (kg)</label>
+                                        <input class="input" type="number" step="0.01" min="0" id="f_contenedor_peso" name="contenedor_peso" autocomplete="off">
+                                    </div>
+                                </div>
+                            </details>
+                        </form>
+
+                        <footer class="review-footer-actions">
+                            <button type="button" class="btn btn-ghost" data-action="back-to-upload">Volver</button>
+                            <div class="row-3">
+                                <span class="review-missing-count" id="reviewMissingCount" aria-live="polite"></span>
+                                <button type="button" class="btn btn-primary btn-lg" id="reviewContinueBtn" disabled>
+                                    Continuar a NCM
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <line x1="5" y1="12" x2="19" y2="12"/>
+                                        <polyline points="12 5 19 12 12 19"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </footer>
+                    </div>
+                </div>
+            </section>
+
+            <section class="screen" data-screen="ncm">
+                <div class="ncm-header">
+                    <div>
+                        <h1 class="title-2">Asigná los códigos NCM</h1>
+                        <p class="subtitle" id="ncmSummary"></p>
+                    </div>
+                    <div class="row-3">
+                        <button type="button" class="btn btn-ghost" data-action="go-review">Volver</button>
+                        <button type="button" class="btn btn-ghost" id="ncmCalcBtn" title="Calculadora de tributos">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="12" y1="10" x2="14" y2="10"/><line x1="16" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="12" y1="14" x2="14" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/><line x1="12" y1="18" x2="14" y2="18"/><line x1="16" y1="18" x2="16" y2="18"/></svg>
+                            Calculadora
+                        </button>
+                        <button type="button" class="btn btn-ghost" id="ncmEnrichAllBtn" title="Consultar alícuotas de todos los items">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 12 11 12"/></svg>
+                            Ver alícuotas de todos
+                        </button>
+                        <button type="button" class="btn btn-primary btn-lg" id="ncmContinueBtn" disabled>
+                            Continuar a validar
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                <line x1="5" y1="12" x2="19" y2="12"/>
+                                <polyline points="12 5 19 12 12 19"/>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+                <div class="card ncm-card">
+                    <div class="ncm-batch-bar" id="ncmBatchBar" hidden>
+                        <span class="ncm-batch-count" id="ncmBatchCount">0 seleccionados</span>
+                        <div class="ncm-batch-actions">
+                            <label class="ncm-batch-field">
+                                <span class="caption">Multiplicar cantidad ×</span>
+                                <input type="number" class="input input-sm" id="ncmBatchFactor" min="0" step="1" value="1" inputmode="numeric">
+                            </label>
+                            <button type="button" class="btn btn-ghost btn-sm" id="ncmBatchApplyQty">Aplicar</button>
+                            <span class="ncm-batch-sep">·</span>
+                            <label class="ncm-batch-field">
+                                <span class="caption">NCM para todos</span>
+                                <input type="text" class="input input-sm" id="ncmBatchNcm" placeholder="0000.00.00" inputmode="numeric">
+                            </label>
+                            <button type="button" class="btn btn-ghost btn-sm" id="ncmBatchApplyNcm">Aplicar NCM</button>
+                            <button type="button" class="btn btn-ghost btn-sm" id="ncmBatchClear">Deseleccionar</button>
+                        </div>
+                    </div>
+                    <div class="ncm-table-scroll">
+                        <table class="ncm-table" aria-label="Items">
+                            <thead>
+                                <tr>
+                                    <th class="col-check"><input type="checkbox" id="ncmSelectAll" aria-label="Seleccionar todos"></th>
+                                    <th class="col-num">#</th>
+                                    <th class="col-ref">Ref.</th>
+                                    <th class="col-desc">Descripción</th>
+                                    <th class="col-pais">Origen</th>
+                                    <th class="col-cant">Cant</th>
+                                    <th class="col-ncm">Código NCM</th>
+                                    <th class="col-actions"></th>
+                                </tr>
+                            </thead>
+                            <tbody id="ncmTbody"></tbody>
+                        </table>
+                    </div>
+                </div>
+                <p class="caption center ncm-help">
+                    <kbd>Tab</kbd> pasa al siguiente ·
+                    <kbd>Enter</kbd> abre el asistente ·
+                    <kbd>Esc</kbd> cierra
+                </p>
+            </section>
+
+            <section class="screen" data-screen="validating">
+                <div class="validating-shell">
+                    <div id="validatingLoading" class="validating-loading">
+                        <div class="spinner" aria-hidden="true"></div>
+                        <h1 class="title-2">Validando…</h1>
+                        <p class="subtitle">Verificamos pesos, valores y restricciones de NCM.</p>
+                    </div>
+
+                    <div id="validatingResults" hidden>
+                        <header class="validating-header">
+                            <div class="validating-status" id="validatingStatus"></div>
+                            <h1 class="title-2" id="validatingTitle">Revisión completa</h1>
+                            <p class="subtitle" id="validatingSubtitle"></p>
+                        </header>
+
+                        <div class="validating-stats card card-body" id="validatingStats"></div>
+
+                        <div class="validating-issues" id="validatingIssues"></div>
+
+                        <footer class="validating-actions">
+                            <button type="button" class="btn btn-ghost" data-action="go-ncm-from-validating">Volver a NCM</button>
+                            <div class="row-3">
+                                <button type="button" class="btn btn-secondary" id="validatingRerun">Volver a validar</button>
+                                <button type="button" class="btn btn-primary btn-lg" id="validatingGenerate">
+                                    Generar MARIA.TXT
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <line x1="5" y1="12" x2="19" y2="12"/>
+                                        <polyline points="12 5 19 12 12 19"/>
+                                    </svg>
+                                </button>
+                            </div>
+                        </footer>
+                    </div>
+                </div>
+            </section>
+
+            <section class="screen" data-screen="ready">
+                <div class="ready-shell">
+                    <div id="readyGenerating" class="validating-loading">
+                        <div class="spinner" aria-hidden="true"></div>
+                        <h1 class="title-2">Generando archivo…</h1>
+                        <p class="subtitle">Preparando archivo para descarga…</p>
+                    </div>
+
+                    <div id="readyDone" hidden>
+                        <div class="ready-check" aria-hidden="true">
+                            <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <polyline points="20 6 9 17 4 12"/>
+                            </svg>
+                        </div>
+                        <h1 class="title-1 ready-title">Operación lista</h1>
+                        <p class="subtitle ready-subtitle" id="readySubtitle"></p>
+
+                        <div class="ready-actions">
+                            <button type="button" class="btn btn-primary btn-xl" id="readyDownloadBtn">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                    <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                                    <polyline points="7 10 12 15 17 10"/>
+                                    <line x1="12" y1="15" x2="12" y2="3"/>
+                                </svg>
+                                Descargar MARIA.TXT
+                            </button>
+                            <button type="button" class="btn btn-secondary" data-action="back-to-upload">Nueva operación</button>
+                        </div>
+
+                        <div class="card ready-preview">
+                            <header class="ready-preview-header">
+                                <span class="caption" id="readyFilename">—</span>
+                                <button type="button" class="btn btn-ghost btn-icon" id="readyCopyBtn" aria-label="Copiar contenido" title="Copiar">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+                                </button>
+                            </header>
+                            <pre class="ready-preview-body" id="readyPreview"></pre>
+                        </div>
+                    </div>
+
+                    <div id="readyError" class="upload-error" hidden role="alert"></div>
+                </div>
+            </section>
+
+            <section class="screen" data-screen="clientes">
+                <div class="cx-shell">
+                    <header class="cx-header">
+                        <div class="cx-header-titles">
+                            <h1 class="title-1 cx-title">Clientes</h1>
+                            <p class="subtitle cx-subtitle">Tu lista de importadores y el historial de operaciones.</p>
+                        </div>
+                        <div class="cx-header-search">
+                            <svg class="cx-search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="text" id="cxSearch" class="cx-search-input" placeholder="Buscar por nombre o CUIT…" autocomplete="off" aria-label="Buscar clientes">
+                            <button type="button" class="cx-search-help" id="cxHelpBtn" aria-label="Atajos de teclado" title="Atajos: / buscar, ↑↓ navegar, Enter abrir, U usar, F favorito, E editar, N nuevo, Esc volver">?</button>
+                        </div>
+                        <div class="cx-header-actions">
+                            <button type="button" class="btn btn-primary" id="cxNewBtn">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                Nuevo cliente
+                            </button>
+                        </div>
+                    </header>
+
+                    <div class="cx-toolbar">
+                        <div class="cx-filters" role="tablist" aria-label="Filtro de clientes">
+                            <button type="button" class="cx-chip is-active" role="tab" aria-selected="true" data-filter="all">Todos</button>
+                            <button type="button" class="cx-chip" role="tab" aria-selected="false" data-filter="favs">Favoritos</button>
+                            <button type="button" class="cx-chip" role="tab" aria-selected="false" data-filter="recent">Recientes</button>
+                        </div>
+                        <div class="cx-sort">
+                            <label class="caption cx-sort-label" for="cxSort">Ordenar</label>
+                            <select id="cxSort" class="cx-sort-select">
+                                <option value="alpha">Alfabético</option>
+                                <option value="used">Más usados</option>
+                                <option value="value">Último valor</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="cx-split" id="cxSplit">
+                        <aside class="cx-list-pane" aria-label="Lista de clientes">
+                            <div class="cx-list-loading" id="cxLoading">
+                                <div class="spinner spinner-sm" aria-hidden="true"></div>
+                                <span class="caption">Cargando…</span>
+                            </div>
+                            <div class="cx-list-empty cx-empty-state" id="cxEmptyList" hidden>
+                                <div class="cx-empty-state-icon" aria-hidden="true">
+                                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21v-1a6 6 0 016-6h2a6 6 0 016 6v1"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>
+                                </div>
+                                <h3 class="cx-empty-state-title">Todavía no tenés clientes</h3>
+                                <p class="cx-empty-state-sub">Creá tu primer cliente importador para empezar a cargar operaciones.</p>
+                                <button type="button" class="btn btn-primary cx-empty-state-cta" id="cxEmptyCreateBtn">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                    Crear tu primer cliente
+                                </button>
+                            </div>
+                            <ul class="cx-list" id="cxList" role="listbox" aria-label="Clientes" hidden></ul>
+                        </aside>
+
+                        <section class="cx-detail-pane" id="cxDetail" aria-label="Detalle del cliente">
+                            <div class="cx-empty" id="cxEmptySelection">
+                                <div class="cx-empty-icon" aria-hidden="true">
+                                    <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 016-6h4a6 6 0 016 6v1"/></svg>
+                                </div>
+                                <h2 class="cx-empty-title">Elegí un cliente</h2>
+                                <p class="cx-empty-sub">Seleccioná uno de la lista para ver su historial, KPIs y mapeo de Excel.</p>
+                                <ul class="cx-empty-hints">
+                                    <li><kbd>↑</kbd><kbd>↓</kbd> navegar</li>
+                                    <li><kbd>Enter</kbd> abrir</li>
+                                    <li><kbd>N</kbd> nuevo</li>
+                                    <li><kbd>/</kbd> buscar</li>
+                                </ul>
+                            </div>
+
+                            <article class="cx-detail" id="cxDetailBody" hidden aria-live="polite">
+                                <button type="button" class="cx-back-btn" id="cxBackBtn" aria-label="Volver a la lista" hidden>
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                                    Volver
+                                </button>
+                                <header class="cx-hero" id="cxHero"></header>
+
+                                <div class="cx-kpis" id="cxKpis">
+                                    <div class="cx-kpi">
+                                        <span class="cx-kpi-label">Operaciones</span>
+                                        <span class="cx-kpi-value" id="cxKpiOps">—</span>
+                                    </div>
+                                    <div class="cx-kpi">
+                                        <span class="cx-kpi-label">Valor total</span>
+                                        <span class="cx-kpi-value" id="cxKpiValor">—</span>
+                                    </div>
+                                    <div class="cx-kpi">
+                                        <span class="cx-kpi-label">Última</span>
+                                        <span class="cx-kpi-value" id="cxKpiUltimo">—</span>
+                                    </div>
+                                </div>
+
+                                <nav class="cx-tabs" role="tablist" aria-label="Secciones del cliente">
+                                    <button type="button" class="cx-tab is-active" role="tab" aria-selected="true" data-tab="ops" id="cxTabOps">Operaciones</button>
+                                    <button type="button" class="cx-tab" role="tab" aria-selected="false" data-tab="mapeo" id="cxTabMapeo">Mapeo Excel</button>
+                                    <button type="button" class="cx-tab" role="tab" aria-selected="false" data-tab="datos" id="cxTabDatos">Datos</button>
+                                    <span class="cx-tabs-underline" id="cxTabsUnderline" aria-hidden="true"></span>
+                                </nav>
+
+                                <div class="cx-tab-panel" role="tabpanel" data-panel="ops" aria-labelledby="cxTabOps">
+                                    <ul class="cx-ops-list" id="cxOpsList"></ul>
+                                    <div class="cx-ops-empty cx-empty-state cx-empty-state-inline" id="cxOpsEmpty" hidden>
+                                        <div class="cx-empty-state-icon" aria-hidden="true">
+                                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg>
+                                        </div>
+                                        <h3 class="cx-empty-state-title">Todavía no subiste ningún PDF</h3>
+                                        <p class="cx-empty-state-sub">Cuando cargues una factura desde "Nueva operación", la operación va a aparecer acá con su historial.</p>
+                                        <button type="button" class="btn btn-primary cx-empty-state-cta" data-action="go-upload">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+                                            Subir mi primer PDF
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="cx-tab-panel" role="tabpanel" data-panel="mapeo" aria-labelledby="cxTabMapeo" hidden>
+                                    <p class="caption cx-mapeo-caption" id="cxMapeoIntro">El mapeo vincula las columnas de tu Excel con los campos del sistema. Si el auto-match falla, ajustalo acá.</p>
+                                    <div class="cx-mapeo-empty" id="cxMapeoEmpty" hidden>
+                                        <p class="caption">Todavía no hay un mapeo guardado para este cliente.</p>
+                                        <p class="caption">Subí un Excel y si no se reconocen las columnas, vas a poder mapearlas desde acá.</p>
+                                    </div>
+                                    <ul class="cx-mapeo-list" id="cxMapeoList" hidden></ul>
+                                    <div class="cx-mapeo-actions" id="cxMapeoActions" hidden>
+                                        <button type="button" class="btn btn-ghost btn-sm" id="cxMapeoReset">Resetear mapeo</button>
+                                        <button type="button" class="btn btn-primary btn-sm" id="cxMapeoSave">Guardar cambios</button>
+                                    </div>
+                                </div>
+
+                                <div class="cx-tab-panel" role="tabpanel" data-panel="datos" aria-labelledby="cxTabDatos" hidden>
+                                    <dl class="cx-datos-grid" id="cxDatosGrid"></dl>
+                                </div>
+                            </article>
+                        </section>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer-bar">
+            <span class="footer-left">CDI v3 · beta cerrada</span>
+            <span class="footer-mid">Diseñado para despachantes que valoran su tiempo</span>
+            <span class="footer-right">
+                <a href="#" id="goCatalogoBtn" class="link-inline" onclick="event.preventDefault(); CDI && CDI.openCatalogoDrawer && CDI.openCatalogoDrawer();">Mi catálogo</a>
+                <span class="footer-sep" aria-hidden="true">·</span>
+                <a href="#" id="goLegacyBtn2" class="link-inline" onclick="event.preventDefault(); CDI && CDI.goToLegacy && CDI.goToLegacy();">Volver a la versión clásica</a>
+            </span>
+        </footer>
+    </div>
+
+    <div id="toastHost"></div>
+
+    <div class="overlay" id="ncmOverlay" role="dialog" aria-modal="true" aria-label="Asistente NCM" hidden>
+        <div class="spotlight">
+            <div class="spotlight-header">
+                <span class="spotlight-progress" id="spotProgress">Ítem 1 de 1</span>
+                <div class="spotlight-header-body">
+                    <div class="caption" id="spotItemRef"></div>
+                    <div class="spotlight-item-title" id="spotItemDesc"></div>
+                </div>
+            </div>
+            <input class="spotlight-search" id="spotSearch" type="text" autocomplete="off"
+                   placeholder="Buscar por código o descripción…" aria-label="Buscar NCM">
+            <div class="spotlight-results" id="spotResults" role="listbox"></div>
+            <div class="spotlight-vuce" id="spotVuce" hidden aria-live="polite"></div>
+            <div class="spotlight-footer">
+                <div class="spotlight-hints">
+                    <span class="kbd-hint"><kbd>up</kbd><kbd>down</kbd> navegar</span>
+                    <span class="kbd-hint"><kbd>enter</kbd> asignar</span>
+                </div>
+                <span class="kbd-hint"><kbd>esc</kbd> cerrar</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal form nuevo/editar cliente -->
+    <dialog class="cx-modal" id="cxFormModal" aria-labelledby="cxFormTitle">
+        <form method="dialog" class="cx-modal-shell" id="cxFormShell">
+            <header class="cx-modal-header">
+                <h3 class="cx-modal-title" id="cxFormTitle">Nuevo cliente</h3>
+                <button type="button" class="btn btn-ghost btn-icon" id="cxFormClose" aria-label="Cerrar">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </header>
+            <div class="cx-modal-body">
+                <div class="field">
+                    <label class="field-label" for="cfNombre">Razón social <span class="field-required">· requerido</span></label>
+                    <input class="input" type="text" id="cfNombre" autocomplete="off">
+                </div>
+                <div class="field-row">
+                    <div class="field">
+                        <label class="field-label" for="cfCuit">CUIT</label>
+                        <input class="input" type="text" id="cfCuit" placeholder="XX-XXXXXXXX-X" inputmode="numeric" autocomplete="off">
+                        <span class="field-hint">11 dígitos. Se normaliza al guardar.</span>
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="cfDireccion">Domicilio</label>
+                        <input class="input" type="text" id="cfDireccion" autocomplete="off">
+                        <span class="field-hint">Opcional. Se usa en el MARIA.TXT.</span>
+                    </div>
+                </div>
+
+                <details class="cx-form-advanced" id="cfAdvanced">
+                    <summary class="cx-form-advanced-summary">
+                        <span>Más datos</span>
+                        <svg class="chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"/></svg>
+                    </summary>
+                    <div class="cx-form-advanced-body">
+                        <div class="field-row">
+                            <div class="field">
+                                <label class="field-label" for="cfEmail">Email</label>
+                                <input class="input" type="email" id="cfEmail" autocomplete="off">
+                            </div>
+                            <div class="field">
+                                <label class="field-label" for="cfTelefono">Teléfono</label>
+                                <input class="input" type="tel" id="cfTelefono" autocomplete="off">
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <div class="field">
+                                <label class="field-label" for="cfOrigen">Origen habitual</label>
+                                <select class="input" id="cfOrigen">
+                                    <option value="">—</option>
+                                    <option value="CN">CN · China</option>
+                                    <option value="BR">BR · Brasil</option>
+                                    <option value="US">US · EE.UU.</option>
+                                    <option value="DE">DE · Alemania</option>
+                                    <option value="IT">IT · Italia</option>
+                                    <option value="ES">ES · España</option>
+                                    <option value="JP">JP · Japón</option>
+                                    <option value="KR">KR · Corea</option>
+                                    <option value="TR">TR · Turquía</option>
+                                    <option value="IN">IN · India</option>
+                                </select>
+                            </div>
+                            <div class="field">
+                                <label class="field-label" for="cfMoneda">Moneda</label>
+                                <select class="input" id="cfMoneda">
+                                    <option value="">—</option>
+                                    <option value="USD">USD</option>
+                                    <option value="EUR">EUR</option>
+                                    <option value="ARS">ARS</option>
+                                    <option value="BRL">BRL</option>
+                                    <option value="CNY">CNY</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="field-row">
+                            <div class="field">
+                                <label class="field-label" for="cfFechaInicActiv">Inicio de actividad</label>
+                                <input class="input" type="date" id="cfFechaInicActiv" autocomplete="off">
+                                <span class="field-hint">Se propaga al MARIA.TXT en cada operación.</span>
+                            </div>
+                            <div class="field"></div>
+                        </div>
+                        <div class="field">
+                            <label class="field-label" for="cfNotas">Notas internas</label>
+                            <textarea class="input" id="cfNotas" rows="3" autocomplete="off"></textarea>
+                        </div>
+                    </div>
+                </details>
+
+                <div class="cx-form-error" id="cfError" hidden role="alert"></div>
+            </div>
+            <footer class="cx-modal-footer">
+                <button type="button" class="btn btn-ghost" id="cxFormCancel">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="cxFormSave">Guardar</button>
+            </footer>
+        </form>
+    </dialog>
+
+    <!-- Drawer lateral: catálogo aprendido (proveedores + productos) -->
+    <div class="drawer-overlay" id="catalogoOverlay" hidden aria-hidden="true"></div>
+    <aside class="drawer" id="catalogoDrawer" role="dialog" aria-modal="true" aria-label="Catálogo aprendido" hidden>
+        <header class="drawer-header">
+            <h2 class="drawer-title">Mi catálogo aprendido</h2>
+            <button type="button" class="btn btn-ghost btn-icon" id="catalogoDrawerClose" aria-label="Cerrar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </header>
+        <div class="drawer-search">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="catalogoSearch" placeholder="Buscar proveedor..." autocomplete="off" aria-label="Buscar proveedores">
+        </div>
+        <div class="drawer-body" id="catalogoBody">
+            <div class="drawer-empty" id="catalogoEmpty" hidden>
+                <p>Tu catálogo está vacío.</p>
+                <p class="caption">Cuando generes un MARIA.TXT, el sistema aprende los productos de cada proveedor automáticamente.</p>
+            </div>
+            <div class="drawer-loading" id="catalogoLoading">
+                <div class="spinner spinner-sm" aria-hidden="true"></div>
+                <span class="caption">Cargando…</span>
+            </div>
+            <ul class="catalogo-vendor-list" id="catalogoList" role="listbox" hidden></ul>
+        </div>
+
+        <!-- Sub-panel: detalle del proveedor con tabla de productos -->
+        <section class="drawer-form drawer-detail" id="catalogoDetail" hidden aria-labelledby="catalogoDetailTitle">
+            <header class="drawer-form-header">
+                <button type="button" class="btn btn-ghost btn-icon" id="catalogoDetailBack" aria-label="Volver">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                </button>
+                <h3 class="drawer-form-title" id="catalogoDetailTitle">Proveedor</h3>
+                <button type="button" class="btn btn-ghost btn-icon" id="catalogoVendorDelete" aria-label="Eliminar proveedor" title="Eliminar proveedor">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/></svg>
+                </button>
+            </header>
+            <div class="drawer-form-body" id="catalogoDetailBody">
+                <div class="catalogo-detail-header" id="catalogoDetailHeader"></div>
+                <ul class="catalogo-product-list" id="catalogoProductList"></ul>
+                <p class="caption catalogo-product-empty" id="catalogoProductEmpty" hidden>Este proveedor no tiene productos guardados.</p>
+            </div>
+        </section>
+    </aside>
+
+    <!-- Modal de perfil del despachante -->
+    <div class="drawer-overlay" id="profileOverlay" hidden aria-hidden="true"></div>
+    <div class="modal" id="profileModal" role="dialog" aria-modal="true" aria-label="Mi perfil" hidden>
+        <header class="modal-header">
+            <h2 class="modal-title">Mi perfil</h2>
+            <button type="button" class="btn btn-ghost btn-icon" id="profileClose" aria-label="Cerrar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </header>
+        <div class="modal-body">
+            <div class="field">
+                <label class="field-label" for="pfName">Nombre</label>
+                <input class="input" type="text" id="pfName" autocomplete="off">
+            </div>
+            <div class="field">
+                <label class="field-label" for="pfCuit">Mi CUIT (despachante)</label>
+                <input class="input" type="text" id="pfCuit" placeholder="XX-XXXXXXXX-X" inputmode="numeric" autocomplete="off">
+                <span class="field-hint">Se usa como CDDTAGR en cada MARIA.TXT generado. Se configura una sola vez.</span>
+                <span class="field-error" id="pfCuitError" hidden></span>
+            </div>
+            <div class="field">
+                <label class="field-label">Email</label>
+                <p class="caption" id="pfEmail">—</p>
+            </div>
+        </div>
+        <footer class="modal-footer">
+            <button type="button" class="btn btn-ghost" id="profileCancel">Cancelar</button>
+            <button type="button" class="btn btn-primary" id="profileSave">Guardar</button>
+        </footer>
+    </div>
+
+    <!-- Modal de notas NCM del despachante -->
+    <div class="drawer-overlay" id="ncmNotesOverlay" hidden aria-hidden="true"></div>
+    <div class="modal" id="ncmNotesModal" role="dialog" aria-modal="true" aria-label="Notas de NCM" hidden>
+        <header class="modal-header">
+            <div>
+                <h2 class="modal-title">Notas de NCM</h2>
+                <p class="caption" id="nnSubtitle">Capítulo <span id="nnNcmLabel">—</span></p>
+            </div>
+            <button type="button" class="btn btn-ghost btn-icon" id="ncmNotesClose" aria-label="Cerrar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </header>
+        <div class="modal-body">
+            <p class="caption" style="margin-bottom: var(--s-3)">Recordatorios privados del capítulo NCM: licencias, tratamientos arancelarios, observaciones.</p>
+            <ul class="ncm-notes-list" id="nnList"></ul>
+            <div class="field" style="margin-top: var(--s-4)">
+                <label class="field-label" for="nnNewInput">Nueva nota</label>
+                <textarea class="input" id="nnNewInput" rows="2" placeholder="Ej: requiere LNA, revisar origen…"></textarea>
+            </div>
+            <div class="drawer-form-error" id="nnError" hidden role="alert"></div>
+        </div>
+        <footer class="modal-footer">
+            <button type="button" class="btn btn-ghost" id="ncmNotesCloseFooter">Cerrar</button>
+            <button type="button" class="btn btn-primary" id="nnAddBtn">Agregar nota</button>
+        </footer>
+    </div>
+
+    <!-- Calculadora de tributos -->
+    <div class="drawer-overlay" id="calcOverlay" hidden aria-hidden="true"></div>
+    <div class="modal modal-wide" id="calcModal" role="dialog" aria-modal="true" aria-label="Calculadora de tributos" hidden>
+        <header class="modal-header">
+            <div>
+                <h2 class="modal-title">Calculadora de tributos</h2>
+                <p class="caption">Estimación de DI, IVA, tasa estadística y costo final para un item.</p>
+            </div>
+            <button type="button" class="btn btn-ghost btn-icon" id="calcClose" aria-label="Cerrar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </header>
+        <div class="modal-body">
+            <div class="calc-grid">
+                <div class="field">
+                    <label class="field-label" for="calcNcm">NCM</label>
+                    <input class="input" type="text" id="calcNcm" placeholder="0000.00.00" inputmode="numeric" autocomplete="off">
+                </div>
+                <div class="field">
+                    <label class="field-label" for="calcFob">Valor FOB unitario (USD)</label>
+                    <input class="input" type="number" id="calcFob" min="0" step="0.01" placeholder="100.00" inputmode="decimal">
+                </div>
+                <div class="field">
+                    <label class="field-label" for="calcCantidad">Cantidad</label>
+                    <input class="input" type="number" id="calcCantidad" min="0" step="1" value="1" inputmode="numeric">
+                </div>
+                <div class="field">
+                    <label class="field-label" for="calcPeso">Peso unitario (kg)</label>
+                    <input class="input" type="number" id="calcPeso" min="0" step="0.01" value="1" inputmode="decimal">
+                </div>
+                <div class="field">
+                    <label class="field-label" for="calcOrigen">Origen</label>
+                    <select class="input" id="calcOrigen">
+                        <option value="CN">China (CN)</option>
+                        <option value="BR">Brasil (BR)</option>
+                        <option value="PY">Paraguay (PY)</option>
+                        <option value="UY">Uruguay (UY)</option>
+                        <option value="US">Estados Unidos (US)</option>
+                        <option value="DE">Alemania (DE)</option>
+                        <option value="IT">Italia (IT)</option>
+                        <option value="ES">España (ES)</option>
+                        <option value="JP">Japón (JP)</option>
+                        <option value="KR">Corea del Sur (KR)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="drawer-form-error" id="calcError" hidden role="alert"></div>
+            <div class="calc-result" id="calcResult" hidden></div>
+        </div>
+        <footer class="modal-footer">
+            <button type="button" class="btn btn-ghost" id="calcReset">Limpiar</button>
+            <button type="button" class="btn btn-primary" id="calcRun">Calcular tributos</button>
+        </footer>
+    </div>
+
+    <!-- Panel lateral: enrich masivo de alícuotas -->
+    <div class="drawer-overlay" id="enrichOverlay" hidden aria-hidden="true"></div>
+    <aside class="drawer drawer-compact" id="enrichDrawer" role="dialog" aria-modal="true" aria-label="Resumen de alícuotas" hidden>
+        <header class="drawer-header">
+            <div>
+                <h2 class="drawer-title">Alícuotas por ítem</h2>
+                <p class="caption" id="enrichSubtitle">—</p>
+            </div>
+            <button type="button" class="btn btn-ghost btn-icon" id="enrichClose" aria-label="Cerrar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </header>
+        <div class="drawer-body" id="enrichBody">
+            <div class="drawer-loading" id="enrichLoading">
+                <div class="spinner spinner-sm" aria-hidden="true"></div>
+                <span class="caption">Consultando fuentes…</span>
+            </div>
+            <div id="enrichResult" hidden></div>
+        </div>
+    </aside>
+
+    <div class="semaforo-fab" id="semaforoFAB" role="button" tabindex="0" aria-label="Estado de validacion" hidden>
+        <span class="dot-status" id="semaforoDot"></span>
+        <span class="semaforo-label" id="semaforoLabel">Validando…</span>
+    </div>
+    <div class="semaforo-popover" id="semaforoPopover" role="dialog" aria-label="Detalle de validacion" hidden>
+        <header class="semaforo-popover-header">
+            <h3 class="semaforo-popover-title" id="semaforoPopoverTitle">Validacion</h3>
+            <button type="button" class="btn btn-ghost btn-icon" id="semaforoClose" aria-label="Cerrar">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </header>
+        <div class="semaforo-popover-body" id="semaforoBody">
+            <p class="caption" id="semaforoEmpty">Sin validaciones activas.</p>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            try {
+                var banner = document.getElementById('betaBanner');
+                var closer = document.getElementById('betaBannerClose');
+                if (banner && sessionStorage.getItem('cdi_beta_banner_dismissed') === '1') {
+                    banner.style.display = 'none';
+                }
+                if (closer && banner) {
+                    closer.addEventListener('click', function () {
+                        banner.style.display = 'none';
+                        try { sessionStorage.setItem('cdi_beta_banner_dismissed', '1'); } catch (_) {}
+                    });
+                }
+            } catch (_) {}
+        })();
+    </script>
+
+    <script src="/static/v2/app_v2.js?v={{ version }}" defer></script>
+    <script src="/static/v2/topbar_financials.js?v={{ version }}" defer></script>
+    <script src="/static/v2/screens/semaforo.js?v={{ version }}" defer></script>
+    <script src="/static/v2/screens/clientes.js?v={{ version }}" defer></script>
+    <script src="/static/v2/screens/catalogo.js?v={{ version }}" defer></script>
+    <script src="/static/v2/screens/profile.js?v={{ version }}" defer></script>
+    <script src="/static/v2/screens/ncm_notes.js?v={{ version }}" defer></script>
+    <script src="/static/v2/screens/upload.js?v={{ version }}" defer></script>
+    <script src="/static/v2/screens/review.js?v={{ version }}" defer></script>
+    <script src="/static/v2/screens/ncm.js?v={{ version }}" defer></script>
+    <script src="/static/v2/screens/finalize.js?v={{ version }}" defer></script>
+    <script src="/static/v2/screens/calculadora.js?v={{ version }}" defer></script>
+    <script src="/static/v2/screens/enrich.js?v={{ version }}" defer></script>
+</body>
+</html>

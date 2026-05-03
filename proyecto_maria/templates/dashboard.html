@@ -1,0 +1,2485 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- SEO Meta Tags - Dashboard (noindex porque requiere login) -->
+    <meta name="description" content="Dashboard CDI - Panel de control para generar archivos AVG, gestionar clientes y procesar operaciones aduaneras." />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+
+    <!-- Preconnect para mejorar performance de CDNs externos -->
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com">
+    <link rel="dns-prefetch" href="https://cdnjs.cloudflare.com">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+    <meta name="theme-color" content="#667eea">
+    <title>CDI - Carga y Despacho Inteligente</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+    <link rel="stylesheet" href="/app.css?v={{ version }}">
+    <style>
+        /* === SISTEMA DE PLANES: Ocultar elementos premium para usuarios básicos === */
+        body[data-user-plan="basic"] .premium-only {
+            display: none !important;
+        }
+
+        /* Badge informativo para usuarios básicos */
+        body[data-user-plan="basic"] .plan-badge-basic {
+            display: block;
+            background: #fef3cd;
+            color: #856404;
+            padding: 10px 16px;
+            text-align: center;
+            font-size: 13px;
+            border-bottom: 2px solid #ffeaa7;
+            font-weight: 500;
+        }
+
+        body[data-user-plan="premium"] .plan-badge-basic {
+            display: none !important;
+        }
+
+        /* Badge Premium eliminado a pedido */
+        body[data-user-plan="premium"] .plan-badge-premium {
+            display: none;
+        }
+
+        body[data-user-plan="basic"] .plan-badge-premium {
+            display: none;
+        }
+
+        /* Badge Premium */
+        .plan-badge-premium {
+            display: none;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 12px 16px;
+            text-align: center;
+            font-size: 14px;
+            border-bottom: 2px solid #5a67d8;
+            font-weight: 500;
+            box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+        }
+
+        /* Estilo para botones bloqueados (upgrade CTA) */
+        .premium-upgrade-cta {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            color: #333;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .premium-upgrade-cta:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(255, 215, 0, 0.4);
+        }
+
+        /* Tooltips para features Premium */
+        .premium-only {
+            position: relative;
+        }
+
+        body[data-user-plan="basic"] .premium-only::after {
+            content: "🔒 Premium";
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: linear-gradient(135deg, #ffd700 0%, #ffed4e 100%);
+            color: #333;
+            padding: 2px 8px;
+            border-radius: 10px;
+            font-size: 10px;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(255, 215, 0, 0.3);
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        body[data-user-plan="basic"] .premium-only:hover::before {
+            content: attr(data-premium-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            white-space: nowrap;
+            z-index: 100;
+            margin-bottom: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+        }
+
+        /* Overlay bloqueante para Basic */
+        body[data-user-plan="basic"] .premium-only {
+            opacity: 0.5;
+            cursor: not-allowed;
+            filter: grayscale(60%);
+        }
+
+        /* === PANEL DATOS DE OPERACIÓN === */
+
+        .operacion-header {
+            background: transparent;
+            color: #1e293b;
+            padding: 0 0 1rem 0;
+            border-bottom: 1px solid #e2e8f0;
+            margin-bottom: 1rem;
+            cursor: default;
+        }
+
+        .operacion-header h3 {
+            margin: 0;
+            font-size: 15px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #0f172a;
+        }
+
+        .operacion-toggle {
+            display: none;
+        }
+
+        .operacion-panel.collapsed .operacion-content {
+            display: block; /* Desactivar collapse global para el drawer fixed */
+        }
+
+        /* Layout legacy de 2 columnas (1fr 320px) eliminado: ahora la
+           tabla es full-width y el panel "Datos del despacho" es un
+           drawer fixed a la derecha. Las reglas viejas pisaban
+           position:fixed con position:sticky y dejaban el panel
+           centrado en el medio del flujo. */
+        .split-view-container {
+            display: block;
+            margin-top: 1rem;
+        }
+        .main-table-area {
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .operacion-content {
+            padding: 0;
+        }
+
+        .operacion-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 16px;
+        }
+
+        .operacion-field {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .operacion-field.span-2 {
+            grid-column: span 1;
+        }
+
+        .operacion-field label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #374151;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .operacion-field input,
+        .operacion-field select {
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 8px;
+            font-size: 14px;
+            transition: all 0.2s;
+            background: white;
+        }
+
+        .operacion-field input:focus,
+        .operacion-field select:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .operacion-field input::placeholder {
+            color: #9ca3af;
+        }
+
+        @media (max-width: 768px) {
+            .operacion-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header corporativo -->
+        <header class="header-corporativo">
+            <div class="header-content">
+                <div class="logo-section">
+                    <div class="logo-icon">
+                        <svg width="24" height="24" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M10 13L18 8L26 13V23L18 28L10 23V13Z" stroke="white" stroke-width="2.5" fill="none"/>
+                            <circle cx="18" cy="18" r="3" fill="white"/>
+                        </svg>
+                    </div>
+                    <div class="company-info">
+                        <h1>CDI</h1>
+                    </div>
+                </div>
+
+
+                
+                <div class="product-info">
+                    <div class="product-actions" style="display: flex; justify-content: flex-end; align-items: center; gap: 1.5rem;">
+                        
+                        <!-- FINANCIAL STATS WIDGET (Relocated) -->
+                        <div class="financial-stats-container" id="financialStats">
+                            <div class="stat-item loading">
+                                <span class="stat-label">U$S OFICIAL</span>
+                                <span class="stat-value" id="dolarBnaValue">--.--</span>
+                            </div>
+                            <div class="stat-item loading">
+                                <span class="stat-label">U$S BLUE</span>
+                                <span class="stat-value" id="dolarBlueValue">--.--</span>
+                            </div>
+                            <div class="stat-item status-ok">
+                                <span class="stat-indicator"></span>
+                                <span class="stat-label">AFIP ONLINE</span>
+                            </div>
+                        </div>
+
+                        <button id="logoutBtn" class="btn-logout" onclick="logout()">
+                            <i class="fas fa-sign-out-alt"></i> Salir
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Badge informativo para usuarios básicos (estilo suave) -->
+        <div class="plan-badge-basic" style="background: #f1f5f9; color: #64748b; border-bottom: 1px solid #e2e8f0; padding: 8px 16px; font-size: 13px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                <span>Plan Gratuito <span id="dailyLimitsBadge" style="opacity: 0.7;"></span></span>
+                <a href="#" onclick="showUpgradeModal(); return false;" style="color: #3b82f6; text-decoration: none; font-weight: 500;">Actualizar →</a>
+            </div>
+        </div>
+
+        <!-- Badge Premium eliminado -->
+
+        <!-- Hero principal: saludo personalizado + CTA gigante + preview de pasos -->
+        <section class="welcome-hero" id="welcomeBanner" aria-labelledby="welcomeHeroTitle">
+            <button class="welcome-close" onclick="closeWelcome()" aria-label="Cerrar bienvenida" title="Cerrar bienvenida">
+                <i class="fas fa-times" aria-hidden="true"></i>
+            </button>
+
+            <div class="welcome-hero-text">
+                <p class="welcome-hero-eyebrow" id="welcomeHeroEyebrow">Bienvenido</p>
+                <h2 class="welcome-hero-title" id="welcomeHeroTitle">
+                    Hola, <span id="welcomeHeroName">¡qué bueno verte!</span>
+                </h2>
+                <p class="welcome-hero-subtitle">
+                    Subí la factura del proveedor y armamos el archivo AVG para vos. Sin completar formularios largos.
+                </p>
+
+                <button type="button" class="welcome-hero-cta" onclick="switchMode('upload'); document.getElementById('uploadForm')?.scrollIntoView({behavior:'smooth', block:'start'});">
+                    <i class="fas fa-cloud-upload-alt" aria-hidden="true"></i>
+                    Subir factura ahora
+                </button>
+                <p class="welcome-hero-cta-hint">PDF o Excel · Importación o exportación · Lleva menos de 2 minutos</p>
+            </div>
+
+            <ol class="welcome-hero-steps" aria-label="Cómo funciona">
+                <li>
+                    <span class="welcome-hero-step-num">1</span>
+                    <div>
+                        <strong>Subí la factura</strong>
+                        <span>PDF o Excel del proveedor</span>
+                    </div>
+                </li>
+                <li>
+                    <span class="welcome-hero-step-num">2</span>
+                    <div>
+                        <strong>Revisá los datos</strong>
+                        <span>Detectamos NCM, cantidades y precios</span>
+                    </div>
+                </li>
+                <li>
+                    <span class="welcome-hero-step-num">3</span>
+                    <div>
+                        <strong>Descargá el AVG</strong>
+                        <span>Listo para presentar</span>
+                    </div>
+                </li>
+            </ol>
+        </section>
+
+        <!-- Layout de 2 columnas -->
+        <div class="workspace-layout">
+            <!-- Sidebar de selección -->
+            <aside class="sidebar">
+                <div class="sidebar-header">
+                    <h3>¿Qué querés hacer?</h3>
+                </div>
+                
+                <div class="mode-options">
+                    <button type="button" class="mode-option active" id="uploadModeCard" data-mode="upload" aria-pressed="true">
+                        <div class="mode-icon-small">
+                            <i class="fas fa-cloud-upload-alt"></i>
+                        </div>
+                        <div class="mode-content">
+                            <h4>Subir factura</h4>
+                            <p>PDF o Excel del proveedor</p>
+                        </div>
+                    </button>
+
+                    <button type="button" class="mode-option" id="clientsModeCard" data-mode="clients" aria-pressed="false">
+                        <div class="mode-icon-small">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <div class="mode-content">
+                            <h4>Mis clientes</h4>
+                            <p>Base de datos de clientes</p>
+                        </div>
+                    </button>
+
+                    <button type="button" class="mode-option" id="catalogModeCard" data-mode="catalog" aria-pressed="false">
+                        <div class="mode-icon-small">
+                            <i class="fas fa-boxes-stacked"></i>
+                        </div>
+                        <div class="mode-content">
+                            <h4>Catálogo de productos</h4>
+                            <p>NCMs guardados por proveedor</p>
+                        </div>
+                    </button>
+                </div>
+
+                <details class="mode-options-more">
+                    <summary>Más opciones</summary>
+                    <div class="mode-options">
+                        <button type="button" class="mode-option" id="manualModeCard" data-mode="manual" aria-pressed="false">
+                            <div class="mode-icon-small">
+                                <i class="fas fa-keyboard"></i>
+                            </div>
+                            <div class="mode-content">
+                                <h4>Cargar a mano</h4>
+                                <p>Sin factura digital</p>
+                            </div>
+                        </button>
+                    </div>
+                </details>
+
+
+
+
+            </aside>
+
+            <!-- Área principal de trabajo -->
+            <main class="main-workspace">
+                <!-- Mensaje de error persistente (UX Overhaul Fase 4):
+                     visible al inicio del workspace para que el usuario lo
+                     vea inline cuando algo falla, en vez de solo un toast
+                     que se va a los 4-5s. -->
+                <div id="errorMessage" class="error-container hidden" role="alert" aria-live="assertive"></div>
+
+                <!-- Formulario de subida de Excel -->
+                <form id="uploadForm" class="form-container hidden">
+                    <div class="form-header">
+                        <h3><i class="fas fa-cloud-upload-alt"></i> Subir factura</h3>
+                        <p>Subí el PDF o Excel del proveedor y armamos el Excel AVG en minutos</p>
+                    </div>
+
+                    <div class="upload-context-row">
+                        <fieldset class="operation-type-inline">
+                            <legend>Tipo de operación</legend>
+                            <label>
+                                <input type="radio" name="operationType" value="import" checked>
+                                <span><i class="fas fa-arrow-down"></i> Importación</span>
+                            </label>
+                            <label>
+                                <input type="radio" name="operationType" value="export">
+                                <span><i class="fas fa-arrow-up"></i> Exportación</span>
+                            </label>
+                        </fieldset>
+                    </div>
+
+                    <div class="form-row" style="display:flex; gap:.5rem; align-items:center; margin-bottom:.5rem;">
+                        <label class="toolbar-label">Cliente (mapeo opcional)</label>
+                        <select id="clientSelector" class="toolbar-select" style="min-width:220px;">
+                            <option value="">(sin mapeo)</option>
+                        </select>
+                        <label class="toolbar-checkbox" title="Aplicar mapeo de columnas del cliente al subir Excel">
+                            <input type="checkbox" id="useMappingToggleUpload" checked>
+                            <span>Usar mapeo</span>
+                        </label>
+                        <span id="mappingStatusHint" class="mapping-status-hint" title="Estado del mapeo para este cliente"></span>
+                    </div>
+                    
+                    <div class="upload-zone">
+                        <!-- Sin required: el input es hidden y el browser no puede focusarlo
+                             para mostrar el error de validacion nativa, lo que aborta la submission
+                             silenciosamente. La validacion se hace en handleUpload (si !file). -->
+                        <input type="file" id="excelFile" accept=".xlsx,.xls,.pdf" hidden>
+                        <div class="upload-area" onclick="document.getElementById('excelFile').click()">
+                            <div class="upload-icon">
+                                <i class="fas fa-cloud-upload-alt"></i>
+                            </div>
+                            <h4>Arrastra tu archivo PDF o Excel aquí</h4>
+                            <p>o haz click para seleccionar</p>
+                            <div class="file-types">Soporta: .pdf, .xlsx, .xls</div>
+                        </div>
+                    </div>
+
+                    <div class="capabilities-grid">
+                        <div class="capability">
+                            <i class="fas fa-brain"></i>
+                            <span>Detecta columnas automáticamente</span>
+                        </div>
+                        <div class="capability">
+                            <i class="fas fa-filter"></i>
+                            <span>Filtra errores de validación</span>
+                        </div>
+                        <div class="capability">
+                            <i class="fas fa-calculator"></i>
+                            <span>Calcula totales automáticamente</span>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-primary">
+                        <i class="fas fa-magic"></i>
+                        Procesar Archivo
+                    </button>
+                </form>
+
+                
+
+                <!-- Formulario manual -->
+                <form id="operationForm" class="form-container">
+                    <div class="form-header">
+                        <h3><i class="fas fa-edit"></i> Ingreso Manual de Datos</h3>
+                        <p>Completa los datos de tu operación manualmente</p>
+                    </div>
+
+                    <div class="form-section">
+                        <label for="operationId">Código de Operación</label>
+                        <input type="text" id="operationId" required placeholder="Ej: 25DI00241" class="input-modern">
+                    </div>
+
+                    <div class="items-section">
+                        <div class="section-header">
+                            <h4><i class="fas fa-list"></i> Items de la Operación</h4>
+                            <button type="button" id="addItemBtn" class="btn-secondary">
+                                <i class="fas fa-plus"></i> Agregar Item
+                            </button>
+                        </div>
+                        <div id="itemsContainer" class="items-grid">
+                            <!-- Items se agregarán dinámicamente aquí -->
+                        </div>
+                    </div>
+
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">
+                            <i class="fas fa-cog"></i>
+                            Generar Excel AVG
+                        </button>
+                        <button type="button" id="clearBtn" class="btn-outline">
+                            <i class="fas fa-trash"></i>
+                            Limpiar Todo
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- SECCIÓN: Gestión de Clientes (MOVIDA AQUI) -->
+                <div id="clientsSection" class="clients-dashboard-section hidden">
+                    <div class="clients-dashboard-header">
+                        <h2><i class="fas fa-users"></i> Gestión de Clientes</h2>
+                        <p>Administra tu base de clientes para facilitar el reconocimiento automático en las facturas</p>
+                    </div>
+
+                    <!-- Barra de búsqueda y filtros -->
+                    <div class="clients-filters">
+                        <div class="search-wrapper">
+                            <i class="fas fa-search"></i>
+                            <input id="clientSearch" type="text" placeholder="Buscar por nombre de cliente..." oninput="filterClientes()" />
+                        </div>
+                        <label class="only-favs">
+                            <input type="checkbox" id="onlyFavs" onchange="filterClientes()" />
+                            <span>Solo favoritos</span>
+                        </label>
+                    </div>
+
+                    <div class="clients-dashboard-actions">
+                        <button class="btn btn-primary" onclick="showAddClientModal()">
+                            <i class="fas fa-plus"></i>
+                            Agregar Cliente
+                        </button>
+                        <button class="btn btn-outline" onclick="loadClientes()">
+                            <i class="fas fa-sync"></i>
+                            Actualizar Lista
+                        </button>
+                    </div>
+
+                    <div class="clients-dashboard-list" id="clientsDashboardList">
+                        <div class="client-card loading">
+                            <div class="client-info">
+                                <h4>Cargando clientes...</h4>
+                                <p>Espera un momento</p>
+                            </div>
+                            <div class="client-actions">
+                                <button class="btn-icon" disabled aria-label="Editar cliente" title="Editar cliente">
+                                    <i class="fas fa-edit" aria-hidden="true"></i>
+                                </button>
+                                <button class="btn-icon" disabled aria-label="Eliminar cliente" title="Eliminar cliente">
+                                    <i class="fas fa-trash" aria-hidden="true"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ============================================================
+                     CATÁLOGO DE PRODUCTOS (Fase 4) — UI de gestión
+                     Master view: lista de proveedores conocidos.
+                     Detail view: tabla editable de productos del proveedor.
+                     ============================================================ -->
+                <div id="catalogSection" class="catalog-section hidden">
+                    <div class="catalog-master-view" id="catalogMasterView">
+                        <div class="catalog-header">
+                            <div>
+                                <h2><i class="fas fa-boxes-stacked"></i> Catálogo de Productos</h2>
+                                <p>Proveedores reconocidos automáticamente con sus NCMs y orígenes guardados</p>
+                            </div>
+                            <button class="btn btn-outline" onclick="loadCatalogVendors()">
+                                <i class="fas fa-sync"></i> Refrescar
+                            </button>
+                        </div>
+
+                        <div class="catalog-summary" id="catalogSummary">
+                            <span class="catalog-summary-chip">
+                                <i class="fas fa-store"></i>
+                                <strong id="catalogVendorCount">0</strong> proveedores
+                            </span>
+                            <span class="catalog-summary-chip">
+                                <i class="fas fa-cube"></i>
+                                <strong id="catalogProductCount">0</strong> productos totales
+                            </span>
+                        </div>
+
+                        <div id="catalogVendorsList" class="catalog-vendors-grid">
+                            <div class="catalog-loading">
+                                <i class="fas fa-spinner fa-spin"></i> Cargando catálogo...
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="catalog-detail-view hidden" id="catalogDetailView">
+                        <div class="catalog-detail-header">
+                            <button class="btn btn-outline catalog-back-btn" onclick="backToCatalogList()">
+                                <i class="fas fa-arrow-left"></i> Volver
+                            </button>
+                            <div class="catalog-detail-title">
+                                <h2 id="catalogDetailVendorName">Proveedor</h2>
+                                <p id="catalogDetailVendorMeta">—</p>
+                            </div>
+                            <button class="btn btn-danger" id="catalogDeleteVendorBtn" onclick="confirmDeleteVendorFromUI()">
+                                <i class="fas fa-trash"></i> Eliminar proveedor
+                            </button>
+                        </div>
+
+                        <div class="catalog-products-table-wrapper">
+                            <table class="catalog-products-table" id="catalogProductsTable">
+                                <thead>
+                                    <tr>
+                                        <th>Descripción</th>
+                                        <th class="col-ncm">NCM</th>
+                                        <th class="col-origen">País</th>
+                                        <th class="col-num">Usos</th>
+                                        <th class="col-fecha">Última vez</th>
+                                        <th class="col-actions">Acciones</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="catalogProductsTbody">
+                                </tbody>
+                            </table>
+                            <div id="catalogProductsEmpty" class="catalog-empty hidden">
+                                <i class="fas fa-inbox"></i>
+                                <p>Este proveedor no tiene productos guardados.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- NUEVA SECCIÓN: Agrupación de Items (MOVIDA AQUI) -->
+                <div id="groupingSection" class="grouping-section hidden">
+                    <!-- ZONA 1 — Status header sticky con breadcrumb, progreso inline y acción primaria contextual -->
+                    <header id="reviewStatusBar" class="review-status-bar" role="region" aria-label="Estado de la operación">
+                        <div class="rsb-breadcrumb">
+                            <div class="rsb-crumb">
+                                <span class="rsb-label">Factura</span>
+                                <strong class="rsb-value" id="rsbFactura">—</strong>
+                            </div>
+                            <span class="rsb-sep" aria-hidden="true">·</span>
+                            <div class="rsb-crumb">
+                                <span class="rsb-label">Proveedor</span>
+                                <strong class="rsb-value" id="rsbProveedor">—</strong>
+                            </div>
+                            <span class="rsb-sep" aria-hidden="true">·</span>
+                            <div class="rsb-crumb">
+                                <span class="rsb-label">Items</span>
+                                <strong class="rsb-value" id="rsbItemsCount">0</strong>
+                                <span class="rsb-pending hidden" id="rsbItemsPending"></span>
+                            </div>
+                            <span class="rsb-sep rsb-sep-meta hidden" aria-hidden="true" id="rsbSepFecha">·</span>
+                            <div class="rsb-crumb rsb-crumb-meta hidden" id="rsbCrumbFecha">
+                                <span class="rsb-label">Fecha</span>
+                                <strong class="rsb-value" id="rsbFecha">—</strong>
+                            </div>
+                            <span class="rsb-sep rsb-sep-meta hidden" aria-hidden="true" id="rsbSepMoneda">·</span>
+                            <div class="rsb-crumb rsb-crumb-meta hidden" id="rsbCrumbMoneda">
+                                <span class="rsb-label">Moneda</span>
+                                <strong class="rsb-value" id="rsbMoneda">—</strong>
+                            </div>
+                            <span class="rsb-sep rsb-sep-meta hidden" aria-hidden="true" id="rsbSepIncoterm">·</span>
+                            <div class="rsb-crumb rsb-crumb-meta hidden" id="rsbCrumbIncoterm">
+                                <span class="rsb-label">Incoterm</span>
+                                <strong class="rsb-value" id="rsbIncoterm">—</strong>
+                            </div>
+                            <ol class="rsb-progress" aria-label="Progreso de la operación">
+                                <li class="rsb-step done"   data-step="upload"    title="Factura cargada"></li>
+                                <li class="rsb-step active" data-step="review"    title="Revisando datos"></li>
+                                <li class="rsb-step"        data-step="validated" title="Validar NCM"></li>
+                                <li class="rsb-step"        data-step="generated" title="Generar AVG"></li>
+                            </ol>
+                        </div>
+
+                        <div class="rsb-client">
+                            <label for="clientSelectorGrouping" class="rsb-client-label">Cliente</label>
+                            <select id="clientSelectorGrouping" class="rsb-client-select">
+                                <option value="">Sin asignar…</option>
+                            </select>
+                            <button type="button" class="rsb-icon-btn" id="refreshClientsBtn"
+                                    title="Actualizar lista de clientes" aria-label="Actualizar lista de clientes">
+                                <i class="fas fa-sync" aria-hidden="true"></i>
+                            </button>
+                        </div>
+
+                        <div class="rsb-actions">
+                            <button type="button" id="primaryActionBtn" class="rsb-primary" disabled>
+                                Validar NCM
+                            </button>
+                            <div class="dropdown-wrapper">
+                                <button type="button" class="rsb-secondary" id="advancedMenuBtn"
+                                        onclick="toggleAdvancedMenu()" aria-haspopup="menu" aria-expanded="false">
+                                    Opciones
+                                    <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                                </button>
+                                <div id="advancedMenu" class="dropdown-content rsb-dropdown hidden" role="menu">
+                                    <label class="dropdown-item dropdown-toggle">
+                                        <input type="checkbox" id="autoValidateToggle">
+                                        <span>Auto-validar al cargar</span>
+                                    </label>
+                                    <label class="dropdown-item dropdown-toggle premium-only"
+                                           data-premium-tooltip="Guarda hasta 1000 operaciones">
+                                        <input type="checkbox" id="saveHistoryToggle" checked>
+                                        <span>Guardar en historial</span>
+                                    </label>
+                                    <div class="dropdown-sep" aria-hidden="true"></div>
+                                    <button type="button" class="dropdown-item premium-only"
+                                            id="openTemplatesBtn"
+                                            data-premium-tooltip="Reutiliza operaciones guardadas">
+                                        <i class="fas fa-bookmark" aria-hidden="true"></i> Cargar plantilla
+                                    </button>
+                                    <button type="button" class="dropdown-item premium-only"
+                                            id="viewHistoryBtn"
+                                            data-premium-tooltip="Consulta tu historial completo">
+                                        <i class="fas fa-history" aria-hidden="true"></i> Ver historial
+                                    </button>
+                                    <button type="button" class="dropdown-item" id="editMappingBtn">
+                                        <i class="fas fa-columns" aria-hidden="true"></i> Mapeo de columnas
+                                    </button>
+                                    <div class="dropdown-sep" aria-hidden="true"></div>
+                                    <button type="button" class="dropdown-item" onclick="showTour()">
+                                        <i class="fas fa-graduation-cap" aria-hidden="true"></i> Ver tour
+                                    </button>
+                                </div>
+                            </div>
+                            <span id="autosaveIndicator" class="save-indicator hidden" aria-live="polite">
+                                <i class="fas fa-check-circle" aria-hidden="true"></i> Guardado
+                            </span>
+                        </div>
+
+                        <!-- Stats inline ocultas pero presentes (las usa app.js) -->
+                        <div id="groupingStats" class="visually-hidden" aria-hidden="true"></div>
+                    </header>
+
+                    <div class="split-view-container">
+                    <!-- ZONA 3 — Drawer derecho colapsable "Datos del despacho".
+                         Por defecto colapsado: solapa vertical con badge de campos completos.
+                         Se abre con click en la solapa o cuando se carga un PDF y faltan campos críticos. -->
+                    <button type="button" id="operacionDrawerHandle" class="operacion-drawer-handle" aria-expanded="false" aria-controls="operacionPanel">
+                        <span class="odh-text">Datos del despacho</span>
+                        <span class="odh-badge" id="operacionDrawerBadge" aria-hidden="true">0/12</span>
+                        <i class="fas fa-chevron-left" aria-hidden="true"></i>
+                    </button>
+                    <div id="operacionDrawerScrim" class="operacion-drawer-scrim" hidden></div>
+                    <aside id="operacionPanel" class="operacion-panel operacion-drawer hidden" role="complementary" aria-label="Datos del despacho">
+                        <div class="operacion-header">
+                            <h3><i class="fas fa-file-invoice" aria-hidden="true"></i> Datos del despacho</h3>
+                            <button type="button" id="operacionDrawerClose" class="operacion-drawer-close" aria-label="Cerrar panel">
+                                <i class="fas fa-times" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                        <div class="operacion-content">
+
+                            <div class="operacion-grid">
+                                <!-- Factura y Fecha -->
+                                <div class="operacion-field">
+                                    <label>Nº Factura</label>
+                                    <input type="text" id="op_numero_factura" placeholder="Ej: E001-1">
+                                </div>
+                                <div class="operacion-field">
+                                    <label>Fecha Emisión</label>
+                                    <input type="text" id="op_fecha_emision" placeholder="DD/MM/YYYY">
+                                </div>
+                                
+                                <!-- Vendedor -->
+                                <div class="operacion-field span-2">
+                                    <label>Vendedor (Proveedor)</label>
+                                    <input type="text" id="op_vendedor_nombre" placeholder="Nombre del vendedor">
+                                </div>
+                                <div class="operacion-field">
+                                    <label>ID Tributario</label>
+                                    <input type="text" id="op_vendedor_id" placeholder="Tax ID / RUT / CNPJ">
+                                </div>
+                                <div class="operacion-field">
+                                    <label>País</label>
+                                    <select id="op_vendedor_pais">
+                                        <option value="CN">China (CN)</option>
+                                        <option value="BR">Brasil (BR)</option>
+                                        <option value="US">USA (US)</option>
+                                        <option value="AR">Argentina (AR)</option>
+                                        <option value="DE">Alemania (DE)</option>
+                                        <option value="IT">Italia (IT)</option>
+                                        <option value="ES">España (ES)</option>
+                                        <option value="VN">Vietnam (VN)</option>
+                                        <option value="PE">Perú (PE)</option>
+                                        <option value="CL">Chile (CL)</option>
+                                        <option value="XX">Otro (XX)</option>
+                                    </select>
+                                </div>
+                                
+                                <!-- Comprador -->
+                                <div class="operacion-field span-2">
+                                    <label>Comprador (Importador)</label>
+                                    <input type="text" id="op_comprador_nombre" placeholder="Nombre del importador">
+                                </div>
+                                <div class="operacion-field">
+                                    <label>CUIT</label>
+                                    <input type="text" id="op_comprador_cuit" placeholder="XX-XXXXXXXX-X">
+                                </div>
+                                
+                                <!-- Valores -->
+                                <div class="operacion-field">
+                                    <label>Moneda</label>
+                                    <select id="op_moneda">
+                                        <option value="DOL">DOL (Dólares)</option>
+                                        <option value="EUR">EUR (Euros)</option>
+                                    </select>
+                                </div>
+                                <div class="operacion-field">
+                                    <label title="Incoterm: condición de venta internacional acordada con el proveedor. Define quién paga el flete, el seguro y dónde se transfiere la responsabilidad de la mercadería (FOB, CIF, EXW, DDP...).">
+                                        Incoterm <span class="jargon-hint" aria-hidden="true">?</span>
+                                    </label>
+                                    <select id="op_incoterm" title="Incoterm: condición de venta internacional">
+                                        <option value="FOB">FOB</option>
+                                        <option value="CIF">CIF</option>
+                                        <option value="DDP">DDP</option>
+                                        <option value="EXW">EXW</option>
+                                        <option value="FRE">FRE</option>
+                                    </select>
+                                </div>
+                                <div class="operacion-field">
+                                    <label>Flete</label>
+                                    <input type="number" id="op_flete" value="0" step="0.01" min="0">
+                                </div>
+                                <div class="operacion-field">
+                                    <label>Seguro</label>
+                                    <input type="number" id="op_seguro" value="0" step="0.01" min="0">
+                                </div>
+                            </div>
+                            
+                            <!-- Panel Transporte (colapsable) -->
+                            <details class="transport-panel" style="margin-top: 1rem; border: 1px solid #e2e8f0; border-radius: 8px; padding: 0.5rem;">
+                                <summary style="cursor: pointer; font-weight: 600; color: #1e40af; padding: 0.5rem;">
+                                    <i class="fas fa-ship"></i> Datos de Transporte (opcional)
+                                </summary>
+                                <div class="operacion-grid" style="margin-top: 0.75rem;">
+                                    <div class="operacion-field">
+                                        <label>Nº BL/AWB</label>
+                                        <input type="text" id="op_bl" placeholder="MAEU123456789" maxlength="30">
+                                    </div>
+                                    <div class="operacion-field">
+                                        <label>Puerto Embarque</label>
+                                        <input type="text" id="op_puerto_origen" placeholder="Ej: CNSHA (Shanghai)" maxlength="10">
+                                    </div>
+                                    <div class="operacion-field">
+                                        <label>Puerto Destino</label>
+                                        <input type="text" id="op_puerto_destino" placeholder="Ej: ARBUE (Buenos Aires)" maxlength="10" value="ARBUE">
+                                    </div>
+                                    <div class="operacion-field">
+                                        <label>Nombre Buque</label>
+                                        <input type="text" id="op_buque" placeholder="Ej: MSC OSCAR" maxlength="30">
+                                    </div>
+                                    <div class="operacion-field">
+                                        <label>Nº Viaje</label>
+                                        <input type="text" id="op_viaje" placeholder="Ej: 001W" maxlength="10">
+                                    </div>
+                                    <div class="operacion-field">
+                                        <label>Fecha Embarque</label>
+                                        <input type="date" id="op_fecha_embarque">
+                                    </div>
+                                </div>
+                                
+                                <!-- Contenedor (sub-panel) -->
+                                <details style="margin-top: 0.5rem; padding: 0.5rem; background: #f8fafc; border-radius: 6px;">
+                                    <summary style="cursor: pointer; font-size: 0.85rem; color: #64748b;">
+                                        <i class="fas fa-cube"></i> Datos de Contenedor
+                                    </summary>
+                                    <div class="operacion-grid" style="margin-top: 0.5rem;">
+                                        <div class="operacion-field">
+                                            <label>Nº Contenedor</label>
+                                            <input type="text" id="op_contenedor" placeholder="MSKU1234567" maxlength="15">
+                                        </div>
+                                        <div class="operacion-field">
+                                            <label>Tipo</label>
+                                            <select id="op_contenedor_tipo">
+                                                <option value="">Seleccionar</option>
+                                                <option value="20">20 pies</option>
+                                                <option value="40">40 pies</option>
+                                                <option value="40HC">40 HC</option>
+                                            </select>
+                                        </div>
+                                        <div class="operacion-field">
+                                            <label>Peso Bruto (kg)</label>
+                                            <input type="number" id="op_contenedor_peso" step="0.01" min="0" placeholder="15000">
+                                        </div>
+                                    </div>
+                                </details>
+                            </details>
+                        </div>
+                    </aside>
+
+                    <div class="main-table-area">
+                    <!-- Alerta de notas por NCM -->
+                    <div id="ncmNotesAlert" class="ncm-notes-alert hidden">
+                        <div class="alert-icon"><i class="fas fa-info-circle"></i></div>
+                        <div class="alert-content">
+                            <div class="alert-title">Notas para NCM <span id="ncmNotesCode"></span></div>
+                            <div id="ncmNotesList" class="alert-notes"></div>
+                        </div>
+                        <div class="alert-actions">
+                            <button class="btn btn-outline" id="viewNcmNotesBtn">Ver / editar</button>
+                        </div>
+                    </div>
+
+                    <!-- Barra batch contextual flotante (Gmail-style): aparece sólo con selección -->
+                    <div class="batch-bar hidden" id="batchActionsBar" role="toolbar" aria-label="Acciones masivas">
+                        <div class="batch-bar-info">
+                            <span class="batch-counter">0 items seleccionados</span>
+                            <label class="batch-select-all">
+                                <input type="checkbox" id="oldSelectAllItems" onclick="toggleSelectAll(this)">
+                                <span>Seleccionar todos</span>
+                            </label>
+                        </div>
+
+                        <div class="batch-bar-actions">
+                            <div class="batch-action-group">
+                                <label class="batch-label" for="bulkOrigenSelect">Origen</label>
+                                <select id="bulkOrigenSelect" class="batch-select">
+                                    <option value="">—</option>
+                                    <option value="BR">BR · Brasil</option>
+                                    <option value="CN">CN · China</option>
+                                    <option value="US">US · Estados Unidos</option>
+                                    <option value="DE">DE · Alemania</option>
+                                    <option value="PY">PY · Paraguay</option>
+                                    <option value="UY">UY · Uruguay</option>
+                                    <option value="CL">CL · Chile</option>
+                                    <option value="MX">MX · México</option>
+                                    <option value="IT">IT · Italia</option>
+                                    <option value="ES">ES · España</option>
+                                    <option value="JP">JP · Japón</option>
+                                    <option value="KR">KR · Corea del Sur</option>
+                                    <option value="__otro__">Otro…</option>
+                                </select>
+                                <input type="text" id="bulkOrigenManual" placeholder="Ej: AR"
+                                       class="batch-input hidden" maxlength="2" style="text-transform: uppercase;">
+                                <button type="button" class="btn-batch btn-apply" onclick="batchApplyOrigenInline()">
+                                    Aplicar
+                                </button>
+                            </div>
+
+                            <div class="batch-action-group">
+                                <label class="batch-label" for="oldBulkNcmInput">NCM</label>
+                                <input id="oldBulkNcmInput" placeholder="Ej: 7306" class="batch-input" />
+                                <button type="button" class="btn-batch btn-apply" id="oldAssignSelectedBtn">
+                                    Asignar
+                                </button>
+                            </div>
+
+                            <div class="batch-separator" aria-hidden="true"></div>
+
+                            <button type="button" class="btn-batch" onclick="batchDuplicateSelected()" title="Duplicar items seleccionados">
+                                <i class="fas fa-clone" aria-hidden="true"></i> Duplicar
+                            </button>
+                            <button type="button" class="btn-batch btn-danger" onclick="batchDeleteSelected()" title="Eliminar items seleccionados">
+                                <i class="fas fa-trash" aria-hidden="true"></i> Eliminar
+                            </button>
+
+                            <div class="dropdown-wrapper">
+                                <button type="button" class="btn-batch" onclick="toggleBatchMenu()" aria-haspopup="menu">
+                                    Más <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                                </button>
+                                <div id="batchMenu" class="dropdown-content hidden" role="menu">
+                                    <button type="button" class="dropdown-item" onclick="batchMultiplyQuantity()">
+                                        <i class="fas fa-times" aria-hidden="true"></i> Multiplicar cantidad
+                                    </button>
+                                    <button type="button" class="dropdown-item" onclick="saveCurrentAsTemplate()">
+                                        <i class="fas fa-save" aria-hidden="true"></i> Guardar como plantilla
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Inputs ocultos (legacy): aún consumidos por handlers existentes.
+                         La UI visible vive en .batch-bar (#batchActionsBar) que aparece sólo
+                         con selección activa. ncmBulkBar fue eliminada: duplicaba la barra batch. -->
+                    <div id="ncmBulkBar" class="ncm-bulk-bar visually-hidden" aria-hidden="true">
+                        <input type="checkbox" id="selectAllItems">
+                        <span id="selectedCount">0 seleccionados</span>
+                        <input type="text" id="bulkNcmInput" maxlength="11">
+                        <button type="button" id="assignBulkNcm" disabled></button>
+                        <select id="bulkOrigenInput"><option value=""></option></select>
+                        <button type="button" id="assignBulkOrigen" disabled></button>
+                        <input type="number" id="bulkCantidadInput">
+                        <button type="button" id="assignBulkCantidad" disabled></button>
+                        <input type="number" id="bulkPrecioInput" step="0.01">
+                        <button type="button" id="assignBulkPrecio" disabled></button>
+                        <input type="number" id="bulkPesoInput" step="0.1">
+                        <button type="button" id="assignBulkPeso" disabled></button>
+                    </div>
+
+                    <!-- Filtros de items en chips (Gmail-style filter pills) -->
+                    <div class="items-filter-bar" role="toolbar" aria-label="Filtrar items">
+                        <button type="button" class="filter-chip active" data-filter="all">
+                            Todos <span class="filter-chip-count" id="filterCountAll">0</span>
+                        </button>
+                        <button type="button" class="filter-chip" data-filter="errors">
+                            Con errores <span class="filter-chip-count" id="filterCountErrors">0</span>
+                        </button>
+                        <button type="button" class="filter-chip" data-filter="missing-ncm">
+                            Sin NCM <span class="filter-chip-count" id="filterCountMissing">0</span>
+                        </button>
+                        <button type="button" class="filter-chip" data-filter="missing-origen">
+                            Sin origen <span class="filter-chip-count" id="filterCountOrigen">0</span>
+                        </button>
+                    </div>
+
+                    <!-- Smart Task Panel: aparece tras cargar PDF -->
+                    <div id="smartTaskPanel" style="display:none; margin-bottom: 0.75rem;"></div>
+
+                    <!-- Banner de 4 pasos: oculto visualmente; el progreso se muestra en #reviewStatusBar > .rsb-progress.
+                         Lo dejamos en el DOM porque app.js sigue actualizando sus clases (.step-active, .step-done)
+                         y un MutationObserver propaga el estado al header sticky. -->
+                    <div class="steps-banner steps-banner--legacy" id="stepsBanner" aria-hidden="true">
+                      <div class="step-item step-done" id="stepUpload">
+                        <div class="step-number">1</div>
+                        <div>
+                          <div class="step-label">↑ Cargar factura</div>
+                          <span class="step-sublabel">PDF o Excel</span>
+                        </div>
+                      </div>
+                      <div class="step-item step-active" id="stepReview">
+                        <div class="step-number">2</div>
+                        <div>
+                          <div class="step-label">Revisar items</div>
+                          <span class="step-sublabel">Asigná NCM y origen</span>
+                        </div>
+                      </div>
+                      <div class="step-item" id="stepVerify">
+                        <div class="step-number">3</div>
+                        <div>
+                          <div class="step-label">Verificar NCM</div>
+                          <span class="step-sublabel">Validar códigos</span>
+                        </div>
+                      </div>
+                      <div class="step-item" id="stepGenerate">
+                        <div class="step-number">4</div>
+                        <div>
+                          <div class="step-label">Generar Excel AVG</div>
+                          <span class="step-sublabel">Listo para aduana</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div class="items-grouping-table">
+                        <div class="table-header">
+                            <div class="col-item">#</div>
+                            <div class="col-ncm">
+                                <span>Cód. NCM</span>
+                                <span class="ux-tooltip-icon" title="Código Arancelario de 8 dígitos (posición arancelaria). Ej: 84713010 = Laptops">?</span>
+                            </div>
+                            <div class="col-codparte">
+                                <span>Ref. Interna</span>
+                                <span class="ux-tooltip-icon" title="Código interno del proveedor (opcional). Se incluye tal cual en el documento.">?</span>
+                            </div>
+                            <div class="col-desc">Descripción</div>
+                            <div class="col-origen">
+                                <span>País</span>
+                                <span class="ux-tooltip-icon" title="País de origen de la mercancía. Usar código ISO-2. Ej: CN=China, US=USA, BR=Brasil">?</span>
+                            </div>
+                            <div class="col-cantidad">Cant</div>
+                            <div class="col-precio">
+                                <span>Precio</span>
+                                <span class="ux-tooltip-icon" title="Valor FOB unitario en USD (Free On Board = precio sin flete ni seguro)">?</span>
+                            </div>
+                            <div class="col-peso">Peso kg</div>
+                        </div>
+                        <div class="table-body" id="itemsToGroup">
+                            <!-- Empty state mejorado -->
+                            <div id="emptyTableState" class="empty-table-enhanced">
+                                <div class="empty-icon">📦</div>
+                                <p class="empty-title">No hay items cargados aún</p>
+                                <p class="empty-sub">Subí tu factura en PDF o Excel y el sistema detectará los productos automáticamente.</p>
+                                <div class="empty-actions">
+                                    <button type="button" class="empty-action-btn primary" onclick="switchMode('upload')">
+                                        <i class="fas fa-cloud-upload-alt"></i> Subir factura
+                                    </button>
+                                    <button type="button" class="empty-action-btn secondary" onclick="switchMode('manual')">
+                                        <i class="fas fa-keyboard"></i> Ingresar a mano
+                                    </button>
+                                </div>
+                            </div>
+                            <!-- Items editables se cargan aquí -->
+                        </div>
+                    </div>
+
+                    <!-- Preview de la operación -->
+                    <div id="operationPreview" class="operation-preview hidden">
+                        <div class="preview-header">
+                            <h3><i class="fas fa-chart-pie"></i> Preview de la Operación</h3>
+                        </div>
+
+                        <!-- Resumen General -->
+                        <div class="preview-summary">
+                            <div class="preview-stat">
+                                <span class="stat-label">Items</span>
+                                <span class="stat-value" id="preview-items">0</span>
+                            </div>
+                            <div class="preview-stat">
+                                <span class="stat-label">Grupos NCM</span>
+                                <span class="stat-value" id="preview-groups">0</span>
+                            </div>
+                            <div class="preview-stat">
+                                <span class="stat-label">FOB Total</span>
+                                <span class="stat-value" id="preview-fob">USD 0</span>
+                            </div>
+                            <div class="preview-stat premium-only" data-premium-tooltip="Valor CIF = FOB + Flete + Seguro">
+                                <span class="stat-label">CIF Estimado</span>
+                                <span class="stat-value" id="preview-cif">USD 0</span>
+                            </div>
+                            <div class="preview-stat premium-only" data-premium-tooltip="Cálculo de aranceles e impuestos">
+                                <span class="stat-label">Tributos Estimados</span>
+                                <span class="stat-value" id="preview-tributos" style="color: #f59e0b;">~USD 0</span>
+                                <span style="font-size: 0.65rem; color: #92400e; display: block; margin-top: 0.25rem;">⚠️ Valor aproximado, puede variar</span>
+                            </div>
+                        </div>
+
+                        <!-- Detalle por NCM (solo premium) -->
+                        <div class="preview-breakdown premium-only" data-premium-tooltip="Breakdown completo de tributos por NCM">
+                            <h4>Detalle por Posición Arancelaria</h4>
+                            <table class="preview-table">
+                                <thead>
+                                    <tr>
+                                        <th>NCM</th>
+                                        <th>Items</th>
+                                        <th>FOB Total</th>
+                                        <th>% Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="preview-ncm-breakdown">
+                                    <!-- Se llena dinámicamente -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Fila legacy de verificación: oculta visualmente.
+                         La acción primaria (Validar/Generar/Revisar errores) vive en el
+                         header sticky (#primaryActionBtn). El badge y el dropdown siguen
+                         poblándose por JS y se exponen via toasts/footer status. -->
+                    <div class="legacy-verify-row" aria-hidden="true">
+                        <button type="button" class="btn-verify" id="verifyNCMBtn"
+                                title="Validar NCM: chequea que cada código arancelario tenga 8 dígitos y sea válido.">
+                            Validar NCM
+                        </button>
+                        <button type="button" id="enrichVuceBtn"
+                                title="VUCE: consulta alícuotas y licencias para cada NCM.">
+                            Consultar VUCE
+                        </button>
+                        <div id="validationStatusBadge" class="validation-status status-pending">
+                            Sin validar
+                        </div>
+                        <div id="validationSummaryInline" class="validation-dropdown hidden">
+                            <button type="button" class="validation-dropdown-btn" onclick="toggleValidationDropdown()">
+                                <span id="validationSummaryText">Errores encontrados</span>
+                                <span class="dropdown-icon">▾</span>
+                            </button>
+                            <div id="validationDropdownContent" class="validation-dropdown-content hidden">
+                                <div id="validationErrorsList"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Botones legacy de generación: ocultos visualmente; siguen siendo
+                         los puntos de entrada reales (handlers, eventos) y los botones del
+                         footer fijo (.review-footer) los disparan por id. -->
+                    <div class="legacy-generate-row" aria-hidden="true">
+                        <button type="button" class="btn-primary" id="generateGroupedBtn" disabled
+                                title="AVG: Archivo de Valor de las Mercaderías. Es el Excel oficial que se presenta en aduana junto al despacho.">
+                            <i class="fas fa-file-excel" aria-hidden="true"></i> Generar Excel AVG
+                        </button>
+                        <button type="button" class="btn-primary" id="generateMariaBtn" disabled
+                                title="MARIA: Sistema Informático MARIA / SIM de la AFIP.">
+                            MARIA TXT
+                        </button>
+                    </div>
+
+                    <!-- StickyTotals legacy: oculto. Los datos #st-items/#st-groups/#st-fob
+                         se sincronizan al footer fijo (.review-footer) por JS. -->
+                    <div class="sticky-totals-bar legacy-sticky-totals" id="stickyTotalsBar" aria-hidden="true">
+                      <div class="ts-stat"><span class="ts-label">Items</span><span class="ts-value" id="st-items">0</span></div>
+                      <div class="ts-stat"><span class="ts-label">Grupos NCM</span><span class="ts-value" id="st-groups">0</span></div>
+                      <div class="ts-stat"><span class="ts-label">FOB Total</span><span class="ts-value" id="st-fob">USD 0</span></div>
+                      <div class="ts-actions">
+                        <button class="btn-vuce-sticky" onclick="enrichItemsWithVuce()">VUCE</button>
+                        <button class="btn-generate-sticky" id="generateStickyBtn" disabled onclick="generateGroupedExcel()">Generar Excel</button>
+                      </div>
+                    </div>
+
+                    <!-- Acordeón de validación (solo aparece si hay errores) - OCULTO -->
+                    <div id="validationAccordion" class="validation-accordion hidden" style="display: none !important;">
+                        <button class="accordion-header" onclick="toggleValidationPanel()" type="button">
+                            <span id="validationSummary">⚠️ Errores encontrados</span>
+                            <span class="accordion-icon">▾</span>
+                            <button type="button" class="accordion-close" onclick="closeValidationPanel(event)" title="Cerrar">✕</button>
+                        </button>
+                        <div id="validationContent" class="accordion-content hidden">
+                            <div id="validationList"></div>
+                            <div id="validationBreakdown"></div>
+                            <div class="accordion-actions">
+                                <button type="button" class="btn-secondary" id="downloadErrorsBtn">
+                                    📋 Descargar CSV
+                                </button>
+                                <label class="toolbar-checkbox">
+                                    <input type="checkbox" id="extraRulesToggle">
+                                    <span>Reglas extra</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel de validación -->
+                    <div id="validationPanel" style="display:none; margin-top: 1rem;">
+                        <button id="validateItemsBtn" class="btn btn-primary" style="display:none;">
+                            <i class="fas fa-check-circle"></i> Validar Items
+                        </button>
+                        <span id="validationCount" style="display:none;"></span>
+                        <button id="clearDraftBtn" style="display:none;"></button>
+                    </div>
+                    </div> <!-- end main-table-area -->
+                    </div> <!-- end split-view-container -->
+
+                    <!-- Botones secundarios (Volver / Último resultado): se mantienen ocultos
+                         visualmente y los puntos de entrada vivos en el footer fijo. -->
+                    <div class="secondary-actions legacy-secondary" aria-hidden="true">
+                        <button type="button" class="btn-secondary" id="cancelGroupingBtn">Volver</button>
+                        <button type="button" class="btn-secondary" id="downloadLastBtn">Último resultado</button>
+                    </div>
+
+                    <!-- ZONA 4 — Footer fijo: totales a la izquierda, acciones a la derecha. -->
+                    <footer id="reviewFooter" class="review-footer" role="region" aria-label="Resumen y acciones">
+                        <div class="rf-totals">
+                            <div class="rf-stat">
+                                <span class="rf-label">Items</span>
+                                <strong class="rf-value" id="rfItems">0</strong>
+                            </div>
+                            <div class="rf-stat">
+                                <span class="rf-label">Grupos NCM</span>
+                                <strong class="rf-value" id="rfGroups">0</strong>
+                            </div>
+                            <div class="rf-stat">
+                                <span class="rf-label">FOB total</span>
+                                <strong class="rf-value" id="rfFob">USD 0</strong>
+                            </div>
+                            <div class="rf-stat rf-stat-status">
+                                <span class="rf-label">Estado</span>
+                                <strong class="rf-value" id="rfStatus">Sin validar</strong>
+                            </div>
+                        </div>
+                        <div class="rf-actions">
+                            <button type="button" class="rf-btn rf-btn-link" id="rfBackBtn"
+                                    onclick="document.getElementById('cancelGroupingBtn')?.click()">
+                                <i class="fas fa-arrow-left" aria-hidden="true"></i> Volver
+                            </button>
+                            <button type="button" class="rf-btn rf-btn-secondary" id="rfVuceBtn"
+                                    onclick="document.getElementById('enrichVuceBtn')?.click()"
+                                    title="VUCE: alícuotas y licencias por NCM">
+                                Consultar VUCE
+                            </button>
+                            <button type="button" class="rf-btn rf-btn-secondary" id="rfMariaBtn" disabled
+                                    onclick="document.getElementById('generateMariaBtn')?.click()"
+                                    title="MARIA TXT (SIM/AFIP)">
+                                MARIA TXT
+                            </button>
+                            <button type="button" class="rf-btn rf-btn-primary" id="rfGenerateBtn" disabled
+                                    onclick="document.getElementById('generateGroupedBtn')?.click()"
+                                    title="Excel AVG (Archivo de Valor de las Mercaderías)">
+                                <i class="fas fa-file-excel" aria-hidden="true"></i>
+                                Generar Excel AVG
+                            </button>
+                        </div>
+                    </footer>
+                </div>
+            </main>
+        </div>
+
+        <!-- Resultados -->
+        <div id="results" class="results-container hidden">
+            <div class="results-header">
+                <i class="fas fa-check-circle"></i>
+                <h3>¡Procesamiento Exitoso!</h3>
+            </div>
+            <div id="successMessage" class="results-content"></div>
+            <div class="results-actions">
+                <a id="downloadLink" href="#" download class="btn-success">
+                    <i class="fas fa-download"></i>
+                    Descargar Excel AVG
+                </a>
+            </div>
+        </div>
+
+        <!-- Loading -->
+        <div id="loading" class="loading-overlay hidden" role="status" aria-live="polite">
+            <div class="loading-content">
+                <div class="loading-spinner" aria-hidden="true">
+                    <i class="fas fa-cog fa-spin"></i>
+                </div>
+                <h3 id="loadingTitle">Procesando tu factura</h3>
+                <p id="loadingSubtitle">Esto suele tardar entre 5 y 20 segundos.</p>
+
+                <ol class="loading-steps" id="loadingSteps" aria-label="Etapas del procesamiento">
+                    <li data-step="read"><span class="loading-step-dot"></span> Leyendo el archivo</li>
+                    <li data-step="extract"><span class="loading-step-dot"></span> Detectando NCM, cantidades y precios</li>
+                    <li data-step="finish"><span class="loading-step-dot"></span> Armando la vista de revisión</li>
+                </ol>
+            </div>
+        </div>
+
+        <!-- (#errorMessage se moviò dentro de .main-workspace para visibilidad
+             inmediata — UX Overhaul Fase 4) -->
+
+        <!-- Footer compacto -->
+        <footer style="text-align: center; padding: 1rem; color: #94a3b8; font-size: 0.8rem; border-top: 1px solid #e2e8f0; margin-top: auto;">
+            CDI v2.1 • Optimizado para despachantes de aduana
+            <span style="margin: 0 0.6rem; color: #cbd5e1;">·</span>
+            <a href="/dashboard?v=2"
+               id="tryV2Link"
+               style="color: #0066cc; text-decoration: none; font-weight: 500;"
+               title="Probar la nueva interfaz en beta cerrada. Podes volver a esta version cuando quieras.">
+                Probar la nueva version (beta)
+            </a>
+        </footer>
+    </div>
+
+    <!-- Modal de Cliente -->
+    <div class="client-overlay" id="clientOverlay">
+        <div class="client-modal">
+            <div class="client-header">
+                <h3 id="clientModalTitle">Agregar Cliente</h3>
+                <button class="close-btn" onclick="hideClientModal()" aria-label="Cerrar" title="Cerrar">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+            </div>
+
+            <form class="client-form" id="clientForm" onsubmit="handleClientSubmit(event)">
+                <input type="hidden" id="clientId" value="">
+
+                <div class="form-group">
+                    <label for="clientNombre">Nombre del Cliente *</label>
+                    <input type="text" id="clientNombre" required placeholder="Ej: Empresa ABC S.A." maxlength="100">
+                </div>
+
+                <div class="form-group">
+                    <label for="clientEmail">Email</label>
+                    <input type="email" id="clientEmail" placeholder="contacto@empresa.com">
+                </div>
+
+                <div class="form-group">
+                    <label for="clientTelefono">Teléfono</label>
+                    <input type="tel" id="clientTelefono" placeholder="011-1234-5678">
+                </div>
+
+                <div class="form-group">
+                    <label for="clientDireccion">Dirección</label>
+                    <textarea id="clientDireccion" placeholder="Calle, número, ciudad..." rows="2" maxlength="200"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="clientNotas">Notas</label>
+                    <textarea id="clientNotas" placeholder="Información adicional sobre el cliente..." rows="3" maxlength="500"></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" onclick="hideClientModal()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary" id="clientSubmitBtn">
+                        <i class="fas fa-save"></i>
+                        Guardar Cliente
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal de Notas por NCM (reusa estilos de cliente) -->
+    <div class="client-overlay" id="noteOverlay">
+        <div class="client-modal">
+            <div class="client-header">
+                <h3>Notas para NCM <span id="noteModalNcm">----</span></h3>
+                <button class="close-btn" onclick="hideNoteModal()" aria-label="Cerrar" title="Cerrar"><i class="fas fa-times" aria-hidden="true"></i></button>
+            </div>
+            <div class="client-form">
+                <input type="hidden" id="noteNcm">
+                <div class="form-group">
+                    <label>Notas existentes</label>
+                    <div id="noteList" class="note-list"></div>
+                </div>
+                <div class="form-group">
+                    <label for="noteText">Agregar nueva nota</label>
+                    <textarea id="noteText" rows="3" maxlength="400" placeholder="Detalle (ej: documentación requerida, resoluciones, etc.)"></textarea>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" onclick="hideNoteModal()">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="saveNcmNote()"><i class="fas fa-save"></i> Guardar Nota</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de edición de producto del catálogo -->
+    <div class="client-overlay" id="productEditOverlay" role="dialog" aria-modal="true" aria-label="Editar producto del catálogo">
+        <div class="client-modal">
+            <div class="client-header">
+                <h3 id="productEditTitle">Editar producto</h3>
+                <button class="close-btn" onclick="closeProductEditModal()" aria-label="Cerrar">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <form class="client-form" id="productEditForm" onsubmit="submitProductEdit(event)">
+                <input type="hidden" id="productEditVendorId" value="">
+                <input type="hidden" id="productEditOriginalKey" value="">
+
+                <div class="form-group">
+                    <label for="productEditDesc">Descripción *</label>
+                    <textarea id="productEditDesc" required rows="2" maxlength="500" placeholder="Descripción del producto"></textarea>
+                    <small class="form-hint">Si cambiás la descripción, el producto se guarda bajo una nueva clave preservando los usos.</small>
+                </div>
+
+                <div class="form-row" style="display:flex; gap:.75rem;">
+                    <div class="form-group" style="flex:1;">
+                        <label for="productEditNcm">NCM (8 dígitos)</label>
+                        <input type="text" id="productEditNcm" inputmode="numeric" pattern="[0-9]{0,8}" maxlength="8" placeholder="84713010">
+                    </div>
+                    <div class="form-group" style="width:120px;">
+                        <label for="productEditOrigen">País</label>
+                        <input type="text" id="productEditOrigen" maxlength="3" placeholder="CN" style="text-transform:uppercase;">
+                    </div>
+                </div>
+
+                <div class="form-row" style="display:flex; gap:.75rem;">
+                    <div class="form-group" style="flex:1;">
+                        <label for="productEditUnidad">Unidad de medida</label>
+                        <input type="text" id="productEditUnidad" maxlength="20" placeholder="Ej: U, KG, M">
+                    </div>
+                    <div class="form-group" style="flex:1;">
+                        <label for="productEditPrecio">Precio referencia</label>
+                        <input type="number" id="productEditPrecio" step="0.0001" min="0" placeholder="0.00">
+                    </div>
+                </div>
+
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeProductEditModal()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i> Guardar cambios
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal Info/Reglas NCM -->
+    <div class="client-overlay" id="ncmInfoOverlay">
+        <div class="client-modal">
+            <div class="client-header">
+                <h3>Reglas / Info NCM <span id="ncmInfoCode">----</span></h3>
+                <button class="close-btn" onclick="hideNcmInfo()" aria-label="Cerrar" title="Cerrar"><i class="fas fa-times" aria-hidden="true"></i></button>
+            </div>
+            <div class="client-form">
+                <div id="ncmInfoContent" class="ncm-info-content">Cargando...</div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-primary" onclick="hideNcmInfo()">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Mapeo de Columnas por Cliente -->
+    <div class="client-overlay" id="mappingOverlay">
+        <div class="client-modal">
+            <div class="client-header">
+                <h3>Mapeo de columnas para <span id="mappingClientName">cliente</span></h3>
+                <button class="close-btn" onclick="hideMappingModal()" aria-label="Cerrar" title="Cerrar"><i class="fas fa-times" aria-hidden="true"></i></button>
+            </div>
+            <div class="client-form">
+                <p>Asigna tus encabezados a los campos estándar. Solo completa lo que necesites.</p>
+                <div class="form-grid">
+                    <div class="form-group"><label>Encabezado origen → Pieza (NCM)</label><input id="map_pieza" placeholder="ej: codigo ncm" /></div>
+                    <div class="form-group"><label>Encabezado origen → Descripción</label><input id="map_descripcion" placeholder="ej: detalle" /></div>
+                    <div class="form-group"><label>Encabezado origen → Origen</label><input id="map_origen" placeholder="ej: pais" /></div>
+                    <div class="form-group"><label>Encabezado origen → Cantidad</label><input id="map_cantidad" placeholder="ej: qty" /></div>
+                    <div class="form-group"><label>Encabezado origen → Valor unitario</label><input id="map_valor_unitario" placeholder="ej: price" /></div>
+                    <div class="form-group"><label>Encabezado origen → Peso unitario</label><input id="map_peso_unitario" placeholder="ej: weight" /></div>
+                </div>
+                <div class="form-actions">
+                    <button class="btn btn-outline" onclick="hideMappingModal()">Cancelar</button>
+                    <button class="btn btn-outline" onclick="restoreMappingInputs()">Restablecer</button>
+                    <button class="btn btn-danger" onclick="deleteColumnMapping()"><i class="fas fa-trash"></i> Borrar mapeo</button>
+                    <button class="btn btn-primary" onclick="saveColumnMapping()"><i class="fas fa-save"></i> Guardar mapeo</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Historial por Cliente -->
+    <div class="client-overlay" id="historyOverlay">
+        <div class="client-modal">
+            <div class="client-header">
+                <h3>Historial del Cliente</h3>
+                <button class="close-btn" onclick="hideHistoryModal()" aria-label="Cerrar" title="Cerrar"><i class="fas fa-times" aria-hidden="true"></i></button>
+            </div>
+            <div class="client-form">
+                <div id="historyMetrics" class="history-metrics"></div>
+                <div id="historyList" class="history-list">Cargando...</div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" id="exportCsvBtn"><i class="fas fa-file-csv"></i> Exportar CSV</button>
+                    <button type="button" class="btn btn-primary" onclick="hideHistoryModal()">Cerrar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Confirmación Genérico -->
+    <div class="confirm-overlay hidden" id="confirmOverlay">
+        <div class="confirm-modal">
+            <div class="confirm-header">
+                <i class="fas fa-exclamation-triangle confirm-icon"></i>
+                <h3 id="confirmTitle">Confirmar Acción</h3>
+            </div>
+            <div class="confirm-body">
+                <p id="confirmMessage">¿Estás seguro de que quieres continuar?</p>
+            </div>
+            <div class="confirm-actions">
+                <button class="btn btn-outline" id="confirmCancelBtn">Cancelar</button>
+                <button class="btn btn-danger" id="confirmAcceptBtn">Aceptar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast de notificaciones -->
+    <div id="toastContainer" class="toast-container"></div>
+
+    <!-- Modal de Calculadora de Tributos -->
+    <div class="client-overlay hidden" id="calculatorOverlay">
+        <div class="client-modal" style="max-width: 900px;">
+            <div class="client-header">
+                <h3><i class="fas fa-calculator"></i> Calculadora de Tributos MERCOSUR</h3>
+                <button class="close-btn" onclick="closeCalculatorModal()" aria-label="Cerrar" title="Cerrar"><i class="fas fa-times" aria-hidden="true"></i></button>
+            </div>
+            <div class="client-form">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label for="calc_ncm">NCM (6-8 dígitos) *</label>
+                        <select id="calc_ncm_select" onchange="handleNcmSelection(this.value)" style="margin-bottom: 8px;">
+                            <option value="">Seleccionar NCM de items cargados...</option>
+                            <option value="__manual__">⌨️ Ingresar NCM manualmente</option>
+                        </select>
+                        <input type="text" id="calc_ncm" placeholder="Ej: 84713010" required maxlength="8" style="display:none;">
+                    </div>
+                    <div class="form-group">
+                        <label for="calc_origen">País de Origen *</label>
+                        <select id="calc_origen" required>
+                            <option value="">Seleccione...</option>
+                            <option value="BR">Brasil (BR)</option>
+                            <option value="PY">Paraguay (PY)</option>
+                            <option value="UY">Uruguay (UY)</option>
+                            <option value="CN">China (CN)</option>
+                            <option value="US">Estados Unidos (US)</option>
+                            <option value="DE">Alemania (DE)</option>
+                            <option value="OTHER">Otro país</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="calc_fob">FOB Unitario (USD) *</label>
+                        <input type="number" id="calc_fob" placeholder="1000.00" step="0.01" min="0" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="calc_cantidad">Cantidad *</label>
+                        <input type="number" id="calc_cantidad" placeholder="10" step="1" min="1" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="calc_flete">Flete (% sobre FOB)</label>
+                        <input type="number" id="calc_flete" placeholder="5" step="0.1" min="0" max="100">
+                    </div>
+                    <div class="form-group">
+                        <label for="calc_seguro">Seguro (% sobre FOB)</label>
+                        <input type="number" id="calc_seguro" placeholder="1" step="0.1" min="0" max="100">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeCalculatorModal()">Cancelar</button>
+                    <button type="button" class="btn btn-primary" onclick="calculateSingleValorPlaza()">
+                        <i class="fas fa-calculator"></i> Calcular
+                    </button>
+                    <button type="button" class="btn btn-outline" onclick="compareOriginsCalc()">
+                        <i class="fas fa-balance-scale"></i> Comparar Orígenes
+                    </button>
+                </div>
+
+                <!-- Badge informativo de rate limiting -->
+                <div class="rate-limit-info" style="
+                    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                    color: white;
+                    padding: 8px 16px;
+                    text-align: center;
+                    font-size: 13px;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 10px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                    margin-top: 1rem;
+                    border-radius: 8px;
+                ">
+                    <i class="fas fa-info-circle"></i>
+                    <span><strong>Límite de API:</strong> Espera 3 segundos entre cálculos para evitar errores (Tarifar API)</span>
+                </div>
+
+                <!-- Resultado del cálculo -->
+                <div id="calculatorResults" class="hidden" style="margin-top: 1.5rem;">
+                    <div class="grouping-header">
+                        <h3><i class="fas fa-chart-line"></i> Resultados</h3>
+                    </div>
+                    <div id="calculatorResultsContent"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Plantillas -->
+    <div class="client-overlay hidden" id="templatesOverlay">
+        <div class="client-modal" style="max-width: 800px;">
+            <div class="client-header">
+                <h3><i class="fas fa-file-alt"></i> Plantillas Guardadas</h3>
+                <button class="close-btn" onclick="closeTemplatesModal()" aria-label="Cerrar" title="Cerrar"><i class="fas fa-times" aria-hidden="true"></i></button>
+            </div>
+            <div class="client-form">
+                <div id="templatesList" class="history-list">
+                    <p style="text-align: center; color: #666;">Cargando plantillas...</p>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeTemplatesModal()">Cerrar</button>
+                    <button type="button" class="btn btn-primary" onclick="refreshTemplatesList()">
+                        <i class="fas fa-sync"></i> Actualizar
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Upgrade a Premium -->
+    <div class="client-overlay hidden" id="upgradeOverlay">
+        <div class="client-modal" style="max-width: 700px;">
+            <div class="client-header" style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%); color: #fff;">
+                <h3>✨ Actualizar a Plan Premium</h3>
+                <button class="close-btn" onclick="hideUpgradeModal()" aria-label="Cerrar" title="Cerrar"><i class="fas fa-times" aria-hidden="true"></i></button>
+            </div>
+            <div class="client-form">
+                <div style="text-align: center; margin-bottom: 2rem;">
+                    <h2 style="color: #1e3a8a; margin-bottom: 0.5rem;">Desbloquea todas las funcionalidades</h2>
+                    <p style="color: #475569;">Pasa al siguiente nivel con herramientas profesionales</p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-bottom: 2rem;">
+                    <!-- Columna Basic -->
+                    <div style="border: 2px solid #e2e8f0; border-radius: 8px; padding: 1.5rem; background: #f8fafc;">
+                        <h4 style="color: #475569; margin-top: 0;">Plan Básico (Actual)</h4>
+                        <ul style="list-style: none; padding: 0; margin: 1rem 0;">
+                            <li style="padding: 0.5rem 0; color: #475569;">✅ Upload PDF/Excel (3 por día)</li>
+                            <li style="padding: 0.5rem 0; color: #64748b;">✅ Hasta 15 items por operación</li>
+                            <li style="padding: 0.5rem 0; color: #64748b;">✅ Máximo 45 items diarios</li>
+                            <li style="padding: 0.5rem 0; color: #64748b;">✅ Acceso a VUCE</li>
+                            <li style="padding: 0.5rem 0; color: #64748b;">✅ Gestión de clientes</li>
+                            <li style="padding: 0.5rem 0; color: #64748b;">❌ Sin calculadora de tributos</li>
+                            <li style="padding: 0.5rem 0; color: #64748b;">❌ Sin comparación de orígenes</li>
+                            <li style="padding: 0.5rem 0; color: #64748b;">❌ Sin historial completo</li>
+                            <li style="padding: 0.5rem 0; color: #64748b;">❌ Sin plantillas reutilizables</li>
+                            <li style="padding: 0.5rem 0; color: #64748b;">❌ Excel con marca "BÁSICO"</li>
+                        </ul>
+                    </div>
+
+                    <!-- Columna Premium -->
+                    <div style="border: 3px solid #2563eb; border-radius: 8px; padding: 1.5rem; background: #eef2ff;">
+                        <h4 style="color: #1e3a8a; margin-top: 0;">Plan Premium ✨</h4>
+                        <ul style="list-style: none; padding: 0; margin: 1rem 0;">
+                            <li style="padding: 0.5rem 0; color: #0f766e; font-weight: 600;">✅ Operaciones ilimitadas</li>
+                            <li style="padding: 0.5rem 0; color: #059669; font-weight: 600;">✅ Items ilimitados por operación</li>
+                            <li style="padding: 0.5rem 0; color: #059669; font-weight: 600;">✅ Sin límites diarios</li>
+                            <li style="padding: 0.5rem 0; color: #059669; font-weight: 600;">✅ Calculadora de tributos MERCOSUR completa</li>
+                            <li style="padding: 0.5rem 0; color: #059669; font-weight: 600;">✅ Comparar 4 orígenes automáticamente</li>
+                            <li style="padding: 0.5rem 0; color: #059669; font-weight: 600;">✅ Historial de 1000 operaciones</li>
+                            <li style="padding: 0.5rem 0; color: #059669; font-weight: 600;">✅ Plantillas reutilizables</li>
+                            <li style="padding: 0.5rem 0; color: #059669; font-weight: 600;">✅ Excel con tu logo profesional</li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div style="background: #e0f2fe; border: 2px solid #38bdf8; border-radius: 8px; padding: 1.5rem; margin-bottom: 1.5rem;">
+                    <h4 style="color: #0f172a; margin-top: 0;">💰 Ahorra tiempo y dinero</h4>
+                    <p style="margin: 0.5rem 0; color: #0f4c81;">
+                        <strong>Calculadora automática:</strong> Evita errores costosos en cálculo de tributos MERCOSUR
+                    </p>
+                    <p style="margin: 0.5rem 0; color: #0f4c81;">
+                        <strong>Comparación de orígenes:</strong> Encuentra la mejor alternativa para tus importaciones
+                    </p>
+                    <p style="margin: 0.5rem 0; color: #0f4c81;">
+                        <strong>Sin límites:</strong> Procesa miles de items sin restricciones diarias
+                    </p>
+                </div>
+
+                <!-- Formulario de Pago - Solo MercadoPago -->
+                <div style="margin-top: 1.5rem;">
+                    <div style="background: #f8fafc; border: 1px solid #dbeafe; border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);">
+                        <h4 style="color: #1e3a8a; margin-top: 0; margin-bottom: 1rem;">💳 Método de Pago</h4>
+                        
+                        <p style="color: #475569; margin-bottom: 1.5rem;">
+                            Pagá de forma segura con MercadoPago. Aceptamos tarjetas de crédito, débito, transferencias y más.
+                        </p>
+
+                        <button type="button" class="btn btn-primary" onclick="processUpgradeMP()" style="width: 100%; padding: 1rem; font-size: 1.1rem; background: linear-gradient(135deg, #00b1ea 0%, #009ee3 100%); border: none;">
+                            <i class="fas fa-wallet"></i> Pagar con MercadoPago
+                        </button>
+                        
+                        <div style="margin-top: 1rem; text-align: center;">
+                            <img src="https://imgmp.mlstatic.com/org-img/banners/ar/medios/575X40.jpg" alt="Medios de pago MercadoPago" style="max-width: 100%; height: auto; border-radius: 8px;">
+                        </div>
+                    </div>
+
+                <div class="form-actions" style="display: flex; gap: 1rem;">
+                    <button type="button" class="btn btn-outline" onclick="hideUpgradeModal()" style="flex: 1;">
+                        Tal vez después
+                    </button>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal de Agradecimiento por Upgrade -->
+    <div class="client-overlay hidden" id="upgradeThanksOverlay">
+        <div class="client-modal" style="max-width: 500px;">
+            <div class="client-header" style="background: linear-gradient(135deg, #1d4ed8 0%, #4338ca 100%); color: white;">
+                <h3>🎉 ¡Bienvenido a Premium!</h3>
+            </div>
+            <div class="client-form" style="text-align: center; padding: 2rem;">
+                <div style="font-size: 4rem; margin-bottom: 1rem; color: #2563eb;">✨</div>
+                <h2 style="color: #1e3a8a; margin-bottom: 1rem;">¡Upgrade Exitoso!</h2>
+                <p style="color: #475569; font-size: 16px; line-height: 1.6; margin-bottom: 1.5rem;">
+                    Tu cuenta ha sido actualizada a <strong style="color: #2563eb;">Plan Premium</strong>.
+                    <br>Ahora tienes acceso a todas las funcionalidades avanzadas.
+                </p>
+                <div style="background: #e0e7ff; border: 2px solid #a5b4fc; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem;">
+                    <p style="color: #312e81; margin: 0; font-weight: 500;">
+                        🚀 La página se recargará automáticamente en unos segundos...
+                    </p>
+                </div>
+                <div style="color: #94a3b8; font-size: 14px;">
+                    <i class="fas fa-check-circle" style="color: #2563eb;"></i> Pago procesado correctamente
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Semáforo de validación (flotante) -->
+    <div id="validationSemaphore" class="validation-semaphore hidden">
+        <div class="semaphore-icon" id="semaphoreIcon">🟢</div>
+        <div class="semaphore-text" id="semaphoreText">Sin validar</div>
+        <button class="semaphore-btn" onclick="showValidationDetails()">Ver detalles</button>
+    </div>
+
+    <script>
+        // Proteger dashboard - requiere autenticación
+        const token = localStorage.getItem('access_token');
+        if (!token) {
+            console.log('⚠️ No hay token - Redirigiendo a landing');
+            // Guardar URL para volver después del login
+            sessionStorage.setItem('redirect_after_login', window.location.pathname + window.location.search);
+            window.location.href = '/';  // Redirect a landing
+        }
+
+        // Inyectar plan de usuario desde localStorage
+        window.userPlan = localStorage.getItem('user_plan') || 'basic';
+        document.body.setAttribute('data-user-plan', window.userPlan);
+        console.log('🔑 Plan de usuario (inicial):', window.userPlan);
+
+        // Verificar plan real con el backend
+        fetch('/auth/me', {
+            headers: { 'Authorization': 'Bearer ' + token }
+        })
+        .then(r => r.json())
+        .then(user => {
+            // Personalizar el saludo del hero con el nombre del usuario
+            // (UX Overhaul Fase 2: hero personalizado)
+            try {
+                const heroName = document.getElementById('welcomeHeroName');
+                const heroEyebrow = document.getElementById('welcomeHeroEyebrow');
+                if (heroName && user.username) {
+                    heroName.textContent = user.username;
+                    if (heroEyebrow) {
+                        const h = new Date().getHours();
+                        heroEyebrow.textContent = h < 12 ? 'Buen día' : (h < 19 ? 'Buenas tardes' : 'Buenas noches');
+                    }
+                }
+            } catch (_) {}
+
+            if (user.plan && user.plan !== window.userPlan) {
+                console.log('🔄 Actualizando plan a:', user.plan);
+                localStorage.setItem('user_plan', user.plan);
+                window.userPlan = user.plan;
+                document.body.setAttribute('data-user-plan', user.plan);
+                
+                // Forzar ocultamiento visual inmediato si es premium
+                if (user.plan === 'premium') {
+                    const basicBadge = document.querySelector('.plan-badge-basic');
+                    if (basicBadge) basicBadge.style.setProperty('display', 'none', 'important');
+                }
+
+                // Forzar recarga de UI si es necesario
+                window.dispatchEvent(new Event('plan-updated'));
+            }
+        })
+        .catch(e => console.error('Error verificando plan:', e));
+
+    // ========== TOUR V4 - CONTEXTUAL, NO INVASIVO ==========
+    // Cambios sobre V3 (que el usuario reportó como "raro"):
+    //  - Sin auto-start: aparece un coach mark sutil opt-in (Pendo/Userpilot 2026).
+    //  - Sin backdrop oscuro full-screen: usamos spotlight (halo) sobre el target.
+    //  - Sin demo data fake: nunca inyectamos items falsos.
+    //  - Sin switchMode automático: respetamos en qué pantalla está el usuario.
+    //  - 3 pasos con outcomes (qué vas a poder hacer), no features.
+    //  - Paso 2 es CONTEXTUAL: solo avanza cuando el usuario realmente sube algo.
+    //  - "Saltá tour" siempre visible.
+    //  - Botón "Ver tour" en Opciones para re-disparar.
+    const CDI_TOUR_KEY = 'cdi_tour_v4';
+    let currentTourStep = -1;
+
+    const tourSteps = [
+        {
+            id: 'upload',
+            targetId: 'uploadModeCard',
+            title: 'Subí tu primera factura',
+            text: 'Empezá por acá: arrastrá un PDF o Excel del proveedor y leemos los items por vos.',
+            cta: 'Entendido'
+        },
+        {
+            id: 'review',
+            // Targets futuros (zona 1 nueva); fallback al contenedor actual.
+            targetId: 'reviewStatusBar',
+            fallbackId: 'groupingSection',
+            title: 'Revisá los datos extraídos',
+            text: 'Cuando subas la factura, vas a ver los items detectados acá. Editás lo que falte y listo.',
+            cta: 'Siguiente'
+        },
+        {
+            id: 'generate',
+            targetId: 'primaryActionBtn',
+            fallbackId: 'generateGroupedBtn',
+            title: 'Generá el Excel AVG',
+            text: 'Cuando los datos están OK, con un clic descargás el archivo listo para presentar en aduana.',
+            cta: 'Listo'
+        }
+    ];
+
+    function _getTourState() {
+        try { return localStorage.getItem(CDI_TOUR_KEY) || 'pending'; }
+        catch (_) { return 'pending'; }
+    }
+    function _setTourState(s) {
+        try { localStorage.setItem(CDI_TOUR_KEY, s); } catch (_) {}
+    }
+
+    function initTour() {
+        // No molestar a quien ya lo vio o lo descartó.
+        const state = _getTourState();
+        if (state === 'completed' || state === 'dismissed') return;
+
+        // Coach mark sutil DESPUÉS de que la app respiró (2.5s).
+        // El usuario decide si quiere el tour, no lo imponemos.
+        setTimeout(_showTourCoachMark, 2500);
+    }
+
+    function _showTourCoachMark() {
+        const cm = document.getElementById('tourCoachMark');
+        if (cm) cm.classList.remove('hidden');
+    }
+    function _hideTourCoachMark() {
+        document.getElementById('tourCoachMark')?.classList.add('hidden');
+    }
+
+    function startTour() {
+        _hideTourCoachMark();
+        _showTourStep(0);
+    }
+
+    function dismissTour() {
+        _setTourState('dismissed');
+        _hideTourCoachMark();
+        _closeActiveTooltip();
+    }
+
+    function _showTourStep(idx) {
+        _closeActiveTooltip();
+
+        if (idx >= tourSteps.length) {
+            _completeTour();
+            return;
+        }
+        currentTourStep = idx;
+        const step = tourSteps[idx];
+        const target = _resolveTarget(step);
+
+        if (!target) {
+            // Target no visible (ej: paso 2 antes de subir factura).
+            // No avanzamos a la fuerza: dejamos pending para que el evento
+            // contextual (cdi:grouping-shown) lo dispare cuando corresponda.
+            _setTourState('paused_at_' + step.id);
+            return;
+        }
+
+        target.classList.add('tour-spotlight');
+        target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+        // Esperamos al scroll antes de posicionar el tooltip.
+        setTimeout(() => _positionTourTooltip(target, step), 320);
+    }
+
+    function _resolveTarget(step) {
+        let t = document.getElementById(step.targetId);
+        if (!t || t.offsetParent === null) {
+            if (step.fallbackId) t = document.getElementById(step.fallbackId);
+        }
+        if (!t || t.offsetParent === null) return null;
+        return t;
+    }
+
+    function _positionTourTooltip(target, step) {
+        const tooltip = document.getElementById('tourTooltip');
+        if (!tooltip) return;
+
+        tooltip.querySelector('.tour-tooltip-title').textContent = step.title;
+        tooltip.querySelector('.tour-tooltip-text').textContent = step.text;
+        tooltip.querySelector('.tour-tooltip-step').textContent =
+            `Paso ${currentTourStep + 1} de ${tourSteps.length}`;
+        const ctaBtn = tooltip.querySelector('.tour-tooltip-cta');
+        ctaBtn.textContent = step.cta || 'Siguiente';
+
+        const rect = target.getBoundingClientRect();
+        const tw = 320;
+        const th = 180;
+        const margin = 16;
+        const vw = window.innerWidth;
+        const vh = window.innerHeight;
+
+        let left, top;
+        // Preferimos la derecha. Si no entra, abajo. Si no, arriba. Si no, izquierda.
+        if (rect.right + margin + tw < vw - margin) {
+            left = rect.right + margin;
+            top = Math.max(margin, Math.min(rect.top, vh - th - margin));
+        } else if (rect.bottom + margin + th < vh - margin) {
+            left = Math.max(margin, Math.min(rect.left, vw - tw - margin));
+            top = rect.bottom + margin;
+        } else if (rect.top - margin - th > margin) {
+            left = Math.max(margin, Math.min(rect.left, vw - tw - margin));
+            top = rect.top - th - margin;
+        } else {
+            left = Math.max(margin, rect.left - tw - margin);
+            top = Math.max(margin, Math.min(rect.top, vh - th - margin));
+        }
+
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = top + 'px';
+        tooltip.classList.remove('hidden');
+    }
+
+    function tourNextStep() {
+        _showTourStep(currentTourStep + 1);
+    }
+
+    function _closeActiveTooltip() {
+        document.querySelectorAll('.tour-spotlight').forEach(el => {
+            el.classList.remove('tour-spotlight');
+        });
+        document.getElementById('tourTooltip')?.classList.add('hidden');
+    }
+
+    function _completeTour() {
+        _closeActiveTooltip();
+        _setTourState('completed');
+        currentTourStep = -1;
+        if (typeof showToast === 'function') {
+            showToast('Listo',
+                'Cualquier duda, podés volver a ver el tour desde Opciones.',
+                'success', 4000);
+        }
+    }
+
+    // Trigger CONTEXTUAL: cuando el usuario realmente carga una factura y
+    // aparece la vista de revisión, avanzamos al paso 2 (si el tour estaba
+    // pausado esperando). Esto reemplaza el viejo "demo data fake".
+    window.addEventListener('cdi:grouping-shown', () => {
+        const state = _getTourState();
+        if (state === 'completed' || state === 'dismissed') return;
+        if (state.startsWith('paused_at_review') || currentTourStep < 1) {
+            // Si nunca arrancó el tour pero el usuario ya está en la vista
+            // de revisión, no lo iniciamos a la fuerza: el coach mark
+            // todavía está disponible para que decida.
+            if (currentTourStep >= 0) _showTourStep(1);
+        }
+    });
+
+    // Re-disparar el tour manualmente (botón "Ver tour" en Opciones).
+    function showTour() {
+        _setTourState('pending');
+        startTour();
+    }
+    window.showTour = showTour;
+    window.dismissTour = dismissTour;
+    window.startTour = startTour;
+    window.tourNextStep = tourNextStep;
+
+    function _legacyTourDeprecated_remove(stepIndex) {
+        const step = tourSteps[stepIndex];
+        const target = document.getElementById(step.targetId);
+        const tooltip = document.getElementById('tourTooltip');
+        
+        if (!target || !tooltip) return;
+        
+        // 1. OCULTAR TOOLTIP INMEDIATAMENTE (VISIBLE PARA EL USUARIO)
+        tooltip.style.transition = 'opacity 0.15s ease';
+        tooltip.style.opacity = '0';
+        
+        // 2. DESPUÉS DE QUE EL TOOLTIP DESAPAREZCA (150ms), CAMBIAR EL FONDO
+        setTimeout(() => {
+            tooltip.classList.add('hidden');
+            
+            // Limpiar highlights anteriores
+            document.querySelectorAll('.tour-target-highlight').forEach(el => el.classList.remove('tour-target-highlight'));
+            
+            // CAMBIAR MODO segun el step (UX Overhaul v2: tour redux 3 pasos)
+            try {
+                if (step.mode === 'upload' && typeof switchMode === 'function') {
+                    switchMode('upload');
+                } else if (step.mode === 'demo' && typeof switchMode === 'function') {
+                    switchMode('upload');
+                    injectTourDemoData();
+                }
+            } catch (_) {}
+            
+            // Preparar vista
+            if (target.classList.contains('hidden')) {
+                target.classList.remove('hidden');
+                target.dataset.tourTempVisible = 'true';
+            }
+            target.classList.add('tour-target-highlight');
+            target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            
+            // Actualizar textos (tooltip todavía oculto)
+            document.getElementById('tourStepIndicator').textContent = `${stepIndex + 1}/${tourSteps.length}`;
+            document.getElementById('tourTitle').textContent = step.title;
+            document.getElementById('tourText').innerHTML = step.text;
+            tooltip.classList.toggle('tour-featured', step.featured || false);
+            
+            const nextBtn = document.getElementById('tourNextBtn');
+            nextBtn.innerHTML = (stepIndex === tourSteps.length - 1) ? '¡Empezar! 🎯' : 'Siguiente →';
+            
+            // 3. MOSTRAR TOOLTIP DESPUÉS DE UN DELAY MÁS LARGO (Usuario ya vio el fondo cambiar)
+            setTimeout(() => {
+                positionTooltip(target, tooltip, step);
+                tooltip.classList.remove('hidden');
+                // Forzar reflow antes de animar
+                tooltip.offsetHeight;
+                tooltip.style.transition = 'opacity 0.3s ease';
+                tooltip.style.opacity = '1';
+            }, 800); // 800ms para que el usuario VEA el fondo nuevo
+            
+        }, 150); // 150ms para que el fade-out del tooltip termine
+    }
+
+    function positionTooltip(target, tooltip, step) {
+        const rect = target.getBoundingClientRect();
+        const tooltipWidth = 300;
+        const tooltipHeight = 180;
+        const margin = 16;
+        const viewportWidth = window.innerWidth;
+        const viewportHeight = window.innerHeight;
+        
+        tooltip.style.position = 'fixed';
+        tooltip.classList.remove('arrow-left', 'arrow-right', 'arrow-bottom', 'arrow-top');
+        
+        let left, top;
+        let arrowClass = '';
+        
+        if (step?.position === 'top') {
+            // Posición ARRIBA del elemento - centrado horizontalmente
+            left = rect.left + rect.width / 2 - tooltipWidth / 2;
+            top = rect.top - tooltipHeight - margin;
+            arrowClass = 'arrow-bottom';
+            
+            // Ajustar horizontal para que no salga del viewport
+            if (left < margin) left = margin;
+            if (left + tooltipWidth > viewportWidth - margin) left = viewportWidth - tooltipWidth - margin;
+            
+            // Si no cabe arriba, poner abajo
+            if (top < margin) {
+                top = rect.bottom + margin;
+                arrowClass = 'arrow-top';
+            }
+            // Si tampoco cabe abajo, ajustar al límite superior
+            if (top + tooltipHeight > viewportHeight - margin) {
+                top = viewportHeight - tooltipHeight - margin;
+            }
+        } else {
+            // Posición por defecto: DERECHA del elemento
+            left = rect.right + margin;
+            top = rect.top + rect.height / 2 - tooltipHeight / 2;
+            arrowClass = 'arrow-left';
+            
+            // Si no cabe a la derecha, poner a la izquierda
+            if (left + tooltipWidth > viewportWidth - margin) {
+                left = rect.left - tooltipWidth - margin;
+                arrowClass = 'arrow-right';
+            }
+            // Ajustar vertical
+            if (top < margin) top = margin;
+            if (top + tooltipHeight > viewportHeight - margin) {
+                top = viewportHeight - tooltipHeight - margin;
+            }
+        }
+        
+        tooltip.style.left = left + 'px';
+        tooltip.style.top = top + 'px';
+        if (arrowClass) tooltip.classList.add(arrowClass);
+    }
+
+    // ========== DEMO DATA PARA TOUR ==========
+    function injectTourDemoData() {
+        // Items demo que simulan datos reales procesados
+        const demoItems = [
+            { ncm: '8471.30.19', codparte: 'LAPTOP-001', desc: 'Notebook Dell Inspiron 15', origen: 'CN', cant: 5, precio: 890.00, peso: 12.5 },
+            { ncm: '8528.72.00', codparte: 'TV-SMART-55', desc: 'Smart TV LED 55" Samsung', origen: 'KR', cant: 3, precio: 450.00, peso: 18.3 },
+            { ncm: '3926.90.90', codparte: 'ACC-PLAST-01', desc: 'Accesorios plásticos varios', origen: 'BR', cant: 100, precio: 2.50, peso: 8.0 }
+        ];
+        
+        // 1. CONTENIDO - Ocultar uploadForm y mostrar groupingSection
+        const uploadForm = document.getElementById('uploadForm');
+        const groupingSection = document.getElementById('groupingSection');
+        
+        if (uploadForm && !uploadForm.classList.contains('hidden')) {
+            uploadForm.classList.add('hidden');
+            uploadForm.dataset.tourWasVisible = 'true';
+        }
+        if (groupingSection) {
+            groupingSection.classList.remove('hidden');
+            groupingSection.dataset.tourTempVisible = 'true';
+        }
+        
+        // 2. DATOS - Inyectar items con estructura EXACTA de renderItemsForGrouping
+        const tbody = document.getElementById('itemsToGroup');
+        if (!tbody) return;
+        if (tbody.querySelector('[data-tour-demo-item]')) return;
+        
+        // Usar misma estructura HTML que app.js renderItemsForGrouping (líneas 1794-1845)
+        tbody.innerHTML = demoItems.map((item, i) => `
+            <div class="item-grouping-row" data-tour-demo-item="true" data-item-index="${i}">
+                <div style="display: flex; align-items: center; gap: 0.5rem;">
+                    <input type="checkbox" class="row-checkbox" disabled>
+                    <span class="item-number">${i + 1}</span>
+                </div>
+                <div class="ncm-cell">
+                    <input type="text" class="edit-input ncm" value="${item.ncm}" readonly
+                           style="background: #f0fdf4; cursor: default;">
+                    <button type="button" class="btn-notes" title="📝 Nota NCM">📝</button>
+                </div>
+                <div>
+                    <input type="text" class="edit-input codparte" value="${item.codparte}" readonly
+                           style="background: #f0fdf4; font-size: 0.75rem; cursor: default;">
+                </div>
+                <div>
+                    <input type="text" class="edit-input desc-input" value="${item.desc}" readonly
+                           style="background: #f0fdf4; cursor: default;">
+                </div>
+                <div>
+                    <input type="text" class="edit-input" value="${item.origen}" readonly
+                           style="background: #f0fdf4; cursor: default;" maxlength="3">
+                </div>
+                <div>
+                    <input type="number" class="edit-input number" value="${item.cant}" readonly
+                           style="background: #f0fdf4; cursor: default;">
+                </div>
+                <div>
+                    <input type="number" class="edit-input number" value="${item.precio.toFixed(2)}" readonly
+                           style="background: #f0fdf4; cursor: default;">
+                </div>
+                <div>
+                    <input type="number" class="edit-input number" value="${item.peso}" readonly
+                           style="background: #f0fdf4; cursor: default;">
+                </div>
+            </div>
+        `).join('');
+        
+        // 3. BOTONES - Habilitar generación
+        document.getElementById('generateGroupedBtn')?.removeAttribute('disabled');
+        document.getElementById('generateMariaBtn')?.removeAttribute('disabled');
+        
+        // 4. ESTADÍSTICAS - Actualizar contadores
+        const statsEl = document.getElementById('groupingStats');
+        if (statsEl) {
+            const totalValor = demoItems.reduce((sum, it) => sum + (it.cant * it.precio), 0);
+            statsEl.innerHTML = `
+                <div class="grouping-stat"><div class="grouping-stat-number">3</div><div class="grouping-stat-label">Grupos Detectados</div></div>
+                <div class="grouping-stat"><div class="grouping-stat-number">${demoItems.length}</div><div class="grouping-stat-label">Items Total</div></div>
+                <div class="grouping-stat"><div class="grouping-stat-number">$${totalValor.toFixed(0)}</div><div class="grouping-stat-label">Valor Total</div></div>
+            `;
+        }
+    }
+    
+    function clearTourDemoData() {
+        // 1. DATOS - Limpiar items demo
+        document.querySelectorAll('[data-tour-demo-item]').forEach(el => el.remove());
+        
+        // 2. CONTENIDO - Restaurar estado
+        const uploadForm = document.getElementById('uploadForm');
+        const groupingSection = document.getElementById('groupingSection');
+        
+        if (groupingSection?.dataset.tourTempVisible) {
+            groupingSection.classList.add('hidden');
+            delete groupingSection.dataset.tourTempVisible;
+        }
+        if (uploadForm?.dataset.tourWasVisible) {
+            uploadForm.classList.remove('hidden');
+            delete uploadForm.dataset.tourWasVisible;
+        }
+        
+        // 3. ESTADÍSTICAS - Resetear
+        const statsEl = document.getElementById('groupingStats');
+        if (statsEl) {
+            statsEl.innerHTML = `
+                <div class="grouping-stat"><div class="grouping-stat-number">0</div><div class="grouping-stat-label">Grupos Detectados</div></div>
+                <div class="grouping-stat"><div class="grouping-stat-number">0</div><div class="grouping-stat-label">Items Total</div></div>
+                <div class="grouping-stat"><div class="grouping-stat-number">$0</div><div class="grouping-stat-label">Valor Total</div></div>
+            `;
+        }
+        
+        // 4. BOTONES - Deshabilitar si no hay items reales
+        const tbody = document.getElementById('itemsToGroup');
+        const realItems = tbody?.querySelectorAll('.item-grouping-row:not([data-tour-demo-item])');
+        if (!realItems || realItems.length === 0) {
+            document.getElementById('generateGroupedBtn')?.setAttribute('disabled', '');
+            document.getElementById('generateMariaBtn')?.setAttribute('disabled', '');
+        }
+        
+        // 5. MODO - Al salir del tour volvemos a 'upload' (acción primaria),
+        //    NO a manual (UX Overhaul v2: el manual está demoteado).
+        if (typeof switchMode === 'function') {
+            switchMode('upload');
+        }
+    }
+
+    function nextTourStep() {
+        currentTourStep++;
+        if (currentTourStep >= tourSteps.length) {
+            closeTour();
+        } else {
+            showTooltipStep(currentTourStep);
+        }
+    }
+
+    function closeTour() {
+        // Limpiar datos demo del tour
+        clearTourDemoData();
+        
+        document.getElementById('tourBackdrop').classList.add('hidden');
+        document.getElementById('tourTooltip').classList.add('hidden');
+        document.querySelectorAll('.tour-target-highlight').forEach(el => el.classList.remove('tour-target-highlight'));
+        // Ocultar elementos que se mostraron temporalmente durante el tour
+        document.querySelectorAll('[data-tour-temp-visible]').forEach(el => {
+            el.classList.add('hidden');
+            delete el.dataset.tourTempVisible;
+        });
+        try { localStorage.setItem('cdi_tour_v3', 'true'); } catch (_) {}
+    }
+
+    document.addEventListener('DOMContentLoaded', initTour);
+    
+    // === OPERATION TYPE TOGGLE (Importación/Exportación) ===
+    // El highlight visual lo maneja CSS (.operation-type-inline label:has(...)).
+    // Aquí solo actualizamos el texto del botón MARIA segun la operación.
+    function initOperationTypeToggle() {
+        const radios = document.querySelectorAll('input[name="operationType"]');
+        radios.forEach(radio => {
+            radio.addEventListener('change', function() {
+                const isExport = this.value === 'export';
+                const mariaBtn = document.getElementById('generateMariaBtn');
+                if (mariaBtn) {
+                    mariaBtn.innerHTML = isExport ? '📦 MARIA TXT (Export)' : '📋 MARIA TXT';
+                }
+            });
+        });
+    }
+    
+    document.addEventListener('DOMContentLoaded', initOperationTypeToggle);
+    </script>
+
+    <!-- Tour V4: Coach mark opt-in + Tooltip flotante con spotlight (sin backdrop) -->
+    <div id="tourCoachMark" class="tour-coachmark hidden" role="dialog" aria-labelledby="tourCoachMarkTitle">
+        <div class="tour-coachmark-content">
+            <strong id="tourCoachMarkTitle">¿Te muestro cómo funciona?</strong>
+            <span>3 pasos cortos. Menos de 30 segundos.</span>
+        </div>
+        <div class="tour-coachmark-actions">
+            <button type="button" onclick="dismissTour()" class="tour-coachmark-skip">Ahora no</button>
+            <button type="button" onclick="startTour()" class="tour-coachmark-cta">Mostrame</button>
+        </div>
+    </div>
+
+    <div id="tourTooltip" class="tour-tooltip hidden" role="dialog" aria-labelledby="tourTooltipTitle">
+        <div class="tour-tooltip-header">
+            <span class="tour-tooltip-step">Paso 1 de 3</span>
+            <button type="button" onclick="dismissTour()" class="tour-tooltip-close" aria-label="Cerrar tour">×</button>
+        </div>
+        <h4 class="tour-tooltip-title" id="tourTooltipTitle">…</h4>
+        <p class="tour-tooltip-text">…</p>
+        <div class="tour-tooltip-actions">
+            <button type="button" onclick="dismissTour()" class="tour-tooltip-skip">Saltá tour</button>
+            <button type="button" onclick="tourNextStep()" class="tour-tooltip-cta">Siguiente</button>
+        </div>
+    </div>
+
+    <style>
+        /* === TOUR V4 — Coach mark + spotlight, sin backdrop oscuro === */
+        .tour-coachmark {
+            position: fixed;
+            bottom: 1.25rem;
+            right: 1.25rem;
+            z-index: 9000;
+            background: #ffffff;
+            border-radius: 0.75rem;
+            box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+            padding: 0.95rem 1.05rem 0.85rem;
+            width: 290px;
+            border: 1px solid var(--gray-200, #e2e8f0);
+            animation: tourCoachMarkSlide 0.35s ease-out;
+        }
+        .tour-coachmark.hidden { display: none; }
+        @keyframes tourCoachMarkSlide {
+            from { opacity: 0; transform: translateY(16px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .tour-coachmark-content strong {
+            display: block;
+            color: var(--gray-900, #0f172a);
+            font-size: 0.95rem;
+            margin-bottom: 0.15rem;
+        }
+        .tour-coachmark-content span {
+            display: block;
+            color: var(--gray-600, #475569);
+            font-size: 0.82rem;
+            margin-bottom: 0.85rem;
+        }
+        .tour-coachmark-actions {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+        }
+        .tour-coachmark-actions button {
+            padding: 0.45rem 0.9rem;
+            border-radius: 0.5rem;
+            font-size: 0.82rem;
+            cursor: pointer;
+            transition: filter 0.15s ease;
+        }
+        .tour-coachmark-skip {
+            background: #ffffff;
+            border: 1px solid var(--gray-200, #e2e8f0);
+            color: var(--gray-700, #334155);
+        }
+        .tour-coachmark-skip:hover { background: var(--gray-50, #f8fafc); }
+        .tour-coachmark-cta {
+            background: var(--primary-navy, #1e293b);
+            color: #ffffff;
+            border: 1px solid var(--primary-navy, #1e293b);
+            font-weight: 600;
+        }
+        .tour-coachmark-cta:hover { filter: brightness(1.1); }
+
+        /* Spotlight: halo alrededor del target SIN oscurecer el resto */
+        .tour-spotlight {
+            position: relative;
+            z-index: 9501;
+            box-shadow:
+                0 0 0 4px rgba(59, 130, 246, 0.55),
+                0 0 0 8px rgba(59, 130, 246, 0.18),
+                0 12px 30px rgba(0, 0, 0, 0.10);
+            border-radius: 12px;
+            transition: box-shadow 0.25s ease;
+        }
+
+        /* Tooltip flotante chico */
+        .tour-tooltip {
+            position: fixed;
+            z-index: 9600;
+            width: 320px;
+            background: #ffffff;
+            border-radius: 0.75rem;
+            padding: 0.95rem 1.1rem 0.85rem;
+            box-shadow: 0 12px 28px rgba(15, 23, 42, 0.18);
+            border: 1px solid var(--gray-200, #e2e8f0);
+            animation: tourTooltipFade 0.2s ease-out;
+        }
+        .tour-tooltip.hidden { display: none; }
+        @keyframes tourTooltipFade {
+            from { opacity: 0; transform: translateY(4px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .tour-tooltip-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.4rem;
+        }
+        .tour-tooltip-step {
+            font-size: 0.7rem;
+            color: var(--gray-500, #64748b);
+            font-weight: 600;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+        .tour-tooltip-close {
+            background: none;
+            border: none;
+            font-size: 1.25rem;
+            line-height: 1;
+            color: var(--gray-500, #64748b);
+            cursor: pointer;
+            padding: 0 0.3rem;
+        }
+        .tour-tooltip-close:hover { color: var(--gray-900, #0f172a); }
+        .tour-tooltip-title {
+            margin: 0 0 0.4rem 0;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--gray-900, #0f172a);
+        }
+        .tour-tooltip-text {
+            margin: 0 0 0.85rem 0;
+            font-size: 0.88rem;
+            line-height: 1.45;
+            color: var(--gray-700, #334155);
+        }
+        .tour-tooltip-actions {
+            display: flex;
+            gap: 0.5rem;
+            justify-content: flex-end;
+        }
+        .tour-tooltip-skip {
+            padding: 0.5rem 0.85rem;
+            background: #ffffff;
+            border: 1px solid var(--gray-200, #e2e8f0);
+            border-radius: 0.5rem;
+            color: var(--gray-700, #334155);
+            font-size: 0.82rem;
+            cursor: pointer;
+        }
+        .tour-tooltip-skip:hover { background: var(--gray-50, #f8fafc); }
+        .tour-tooltip-cta {
+            padding: 0.5rem 1.1rem;
+            background: var(--primary-navy, #1e293b);
+            color: #ffffff;
+            border: 1px solid var(--primary-navy, #1e293b);
+            border-radius: 0.5rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+        }
+        .tour-tooltip-cta:hover { filter: brightness(1.1); }
+
+        @media (max-width: 640px) {
+            .tour-coachmark,
+            .tour-tooltip {
+                left: 0.75rem;
+                right: 0.75rem;
+                width: auto;
+                bottom: 0.75rem;
+            }
+            .tour-tooltip {
+                top: auto !important;
+                left: 0.75rem !important;
+            }
+        }
+    </style>
+    <script src="/features_integration.js?v=20251018_fix422" defer></script>
+    <script src="/static/financials.js?v={{ version }}" defer></script>
+    <script src="/app.js?v={{ version }}" defer></script>
+</body>
+</html>

@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CDI · Listo para generar</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: var(--s-4);
+            margin: var(--s-8) 0;
+        }
+        .summary-cell {
+            padding: var(--s-5);
+            background: var(--c-surface-2);
+            border-radius: var(--r-md);
+            text-align: left;
+        }
+        .summary-cell .label {
+            font-size: var(--t-11);
+            color: var(--c-text-3);
+            font-weight: var(--w-semibold);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: var(--s-1);
+        }
+        .summary-cell .value {
+            font-size: var(--t-22);
+            font-weight: var(--w-semibold);
+            color: var(--c-text);
+            letter-spacing: -0.012em;
+        }
+        .summary-cell .value-mono {
+            font-family: var(--font-mono);
+            font-size: var(--t-17);
+        }
+
+        .checklist {
+            text-align: left;
+            margin: var(--s-8) auto;
+            max-width: 480px;
+        }
+        .checklist-item {
+            display: flex;
+            align-items: center;
+            gap: var(--s-3);
+            padding: var(--s-2) 0;
+            color: var(--c-text-2);
+            font-size: var(--t-15);
+        }
+        .checklist-item .check {
+            width: 20px;
+            height: 20px;
+            background: var(--c-success);
+            color: white;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            flex-shrink: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="mockup-tag">Mockup 05 · ready_to_generate</div>
+
+    <div class="app">
+        <header class="topbar">
+            <div class="topbar-brand">CDI<span class="dot">·</span>Despachos</div>
+            <div class="context-bar" style="margin-bottom: 0; margin-left: var(--s-6);">
+                <span class="ctx-key">Factura</span>
+                <span class="ctx-val">D10170586</span>
+                <span class="ctx-sep">·</span>
+                <span class="ctx-val">WILHELMSEN SHIPS</span>
+                <span class="ctx-sep">·</span>
+                <span class="pill pill-success"><span class="dot-status is-success"></span> Validado</span>
+            </div>
+            <div class="topbar-meta">
+                <button class="btn btn-ghost" style="height: 32px; padding: 0 var(--s-3); font-size: var(--t-13);">Ver tabla</button>
+                <span class="avatar">EM</span>
+            </div>
+        </header>
+
+        <main class="main" style="display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 52px - 40px);">
+            <div style="width: 100%; max-width: 720px; text-align: center;">
+
+                <!-- Progreso completo -->
+                <div class="progress" style="justify-content: center; margin-bottom: var(--s-12);">
+                    <div class="progress-step is-done"><span class="num">✓</span></div>
+                    <div class="progress-line" style="background: var(--c-success); flex-basis: 24px;"></div>
+                    <div class="progress-step is-done"><span class="num">✓</span></div>
+                    <div class="progress-line" style="background: var(--c-success); flex-basis: 24px;"></div>
+                    <div class="progress-step is-done"><span class="num">✓</span></div>
+                    <div class="progress-line" style="background: var(--c-success); flex-basis: 24px;"></div>
+                    <div class="progress-step is-done"><span class="num">✓</span></div>
+                    <div class="progress-line" style="background: var(--c-success); flex-basis: 24px;"></div>
+                    <div class="progress-step is-active">
+                        <span class="num" style="background: var(--c-accent);">5</span>
+                        <span style="color: var(--c-text);">Generar</span>
+                    </div>
+                </div>
+
+                <!-- Icono check sutil -->
+                <div style="width: 64px; height: 64px; margin: 0 auto var(--s-6);
+                            background: rgba(52, 199, 89, 0.12); border-radius: var(--r-pill);
+                            display: flex; align-items: center; justify-content: center;
+                            color: var(--c-success);">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                </div>
+
+                <h1 class="title-1" style="margin-bottom: var(--s-3);">Tu Excel AVG está listo</h1>
+                <p class="subtitle" style="margin-bottom: var(--s-2);">
+                    Validamos los 10 NCMs contra Aduana sin observaciones.
+                </p>
+
+                <!-- Resumen compacto -->
+                <div class="summary-grid">
+                    <div class="summary-cell">
+                        <div class="label">ITEMS</div>
+                        <div class="value">10</div>
+                    </div>
+                    <div class="summary-cell">
+                        <div class="label">GRUPOS NCM</div>
+                        <div class="value">3</div>
+                    </div>
+                    <div class="summary-cell">
+                        <div class="label">FOB TOTAL</div>
+                        <div class="value value-mono">$ 265.648</div>
+                    </div>
+                    <div class="summary-cell">
+                        <div class="label">CIF EST.</div>
+                        <div class="value value-mono">$ 281.987</div>
+                    </div>
+                </div>
+
+                <!-- Acción primaria gigante -->
+                <button class="btn btn-primary btn-xl" style="min-width: 320px; height: 64px; font-size: var(--t-22);">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="7 10 12 15 17 10"/>
+                        <line x1="12" y1="15" x2="12" y2="3"/>
+                    </svg>
+                    Descargar Excel AVG
+                </button>
+
+                <!-- Acción secundaria sutil -->
+                <div style="margin-top: var(--s-5);">
+                    <button class="btn btn-ghost" style="font-size: var(--t-13);">
+                        También generar TXT MARIA
+                    </button>
+                </div>
+
+                <!-- Checklist sutil de qué incluye -->
+                <div class="divider" style="margin-top: var(--s-12); max-width: 320px; margin-left: auto; margin-right: auto;"></div>
+                <div class="checklist">
+                    <div class="checklist-item">
+                        <span class="check">✓</span>
+                        <span>10 ítems agrupados por NCM (3 grupos)</span>
+                    </div>
+                    <div class="checklist-item">
+                        <span class="check">✓</span>
+                        <span>Alícuotas y derechos calculados</span>
+                    </div>
+                    <div class="checklist-item">
+                        <span class="check">✓</span>
+                        <span>Totales FOB, CIF y promedios por grupo</span>
+                    </div>
+                    <div class="checklist-item">
+                        <span class="check">✓</span>
+                        <span>Catálogo actualizado con 8 productos nuevos de WILHELMSEN</span>
+                    </div>
+                </div>
+
+                <!-- Acción terciaria -->
+                <div style="margin-top: var(--s-8);">
+                    <a href="01_awaiting_upload.html" class="caption" style="color: var(--c-accent);">
+                        Procesar otra factura →
+                    </a>
+                </div>
+
+            </div>
+        </main>
+
+        <footer class="footer-bar">Operación guardada en tu historial · podés volver a verla cuando quieras</footer>
+    </div>
+
+    <!-- Toast: catálogo actualizado (estilo macOS) -->
+    <div class="toast">
+        <span class="toast-icon">✓</span>
+        <div class="toast-body">
+            <p class="toast-title">Catálogo actualizado</p>
+            <p class="toast-text">Agregamos 8 productos nuevos de WILHELMSEN. La próxima vez los reconocemos automáticamente.</p>
+        </div>
+    </div>
+
+    <nav class="mockup-nav">
+        <a href="index.html">Index</a>
+        <a href="01_awaiting_upload.html">1 · Subir</a>
+        <a href="02_enriching_data.html">2 · Datos</a>
+        <a href="03_assigning_ncm.html">3 · NCM</a>
+        <a href="04_validating.html">4 · Validar</a>
+        <a href="05_ready_to_generate.html" class="active">5 · Generar</a>
+    </nav>
+</body>
+</html>

@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CDI · Subir factura</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="mockup-tag">Mockup 01 · awaiting_upload</div>
+
+    <div class="app">
+        <!-- Topbar minimalista, una sola línea -->
+        <header class="topbar">
+            <div class="topbar-brand">CDI<span class="dot">·</span>Despachos</div>
+
+            <nav style="display:flex; gap: var(--s-2); margin-left: var(--s-6);">
+                <button class="btn btn-ghost" style="height: 32px; padding: 0 var(--s-3); font-size: var(--t-13);">Inicio</button>
+                <button class="btn btn-ghost" style="height: 32px; padding: 0 var(--s-3); font-size: var(--t-13); color: var(--c-text-3);">Operaciones</button>
+                <button class="btn btn-ghost" style="height: 32px; padding: 0 var(--s-3); font-size: var(--t-13); color: var(--c-text-3);">Catálogo</button>
+            </nav>
+
+            <div class="topbar-meta">
+                <span class="pill pill-accent">Plan Premium</span>
+                <span class="avatar">EM</span>
+            </div>
+        </header>
+
+        <!-- Main: empty state generoso, todo respira -->
+        <main class="main" style="display: flex; align-items: center; justify-content: center; min-height: calc(100vh - 52px - 40px);">
+            <div style="width: 100%; max-width: 560px; text-align: center;">
+
+                <!-- Icono sutil -->
+                <div style="width: 72px; height: 72px; margin: 0 auto var(--s-6);
+                            background: var(--c-accent-soft); border-radius: var(--r-xl);
+                            display: flex; align-items: center; justify-content: center;
+                            color: var(--c-accent);">
+                    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+                        <polyline points="17 8 12 3 7 8"/>
+                        <line x1="12" y1="3" x2="12" y2="15"/>
+                    </svg>
+                </div>
+
+                <h1 class="title-1" style="margin-bottom: var(--s-3);">¿Qué factura armamos?</h1>
+                <p class="subtitle" style="margin-bottom: var(--s-10); max-width: 420px; margin-left: auto; margin-right: auto;">
+                    Subí el PDF o Excel de tu proveedor y generamos el AVG en menos de 2 minutos.
+                </p>
+
+                <!-- Dropzone limpia -->
+                <div class="card card-elevated" style="padding: var(--s-10) var(--s-8);
+                                                       border: 2px dashed var(--c-border);
+                                                       background: var(--c-surface);
+                                                       transition: border-color var(--transition);">
+                    <div style="color: var(--c-text-3); margin-bottom: var(--s-4); font-size: var(--t-13);">
+                        Arrastrá tu archivo acá
+                    </div>
+                    <button class="btn btn-primary btn-lg">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                        Seleccionar archivo
+                    </button>
+                    <div style="margin-top: var(--s-4); color: var(--c-text-3); font-size: var(--t-13);">
+                        PDF · XLSX · XLS  · hasta 10 MB
+                    </div>
+                </div>
+
+                <!-- Tres atajos sutiles abajo -->
+                <div style="display: flex; justify-content: center; gap: var(--s-8);
+                            margin-top: var(--s-10); color: var(--c-text-3); font-size: var(--t-13);">
+                    <a href="#" style="display: inline-flex; align-items: center; gap: 6px; transition: color var(--transition);"
+                       onmouseover="this.style.color='var(--c-accent)'" onmouseout="this.style.color=''">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                        Continuar última operación
+                    </a>
+                    <a href="#" style="display: inline-flex; align-items: center; gap: 6px; transition: color var(--transition);"
+                       onmouseover="this.style.color='var(--c-accent)'" onmouseout="this.style.color=''">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 12h6M12 9v6"/></svg>
+                        Cargar plantilla
+                    </a>
+                </div>
+
+            </div>
+        </main>
+
+        <footer class="footer-bar">CDI v3.0 · diseñado para despachantes que valoran su tiempo</footer>
+    </div>
+
+    <!-- Nav entre mockups -->
+    <nav class="mockup-nav">
+        <a href="index.html">Index</a>
+        <a href="01_awaiting_upload.html" class="active">1 · Subir</a>
+        <a href="02_enriching_data.html">2 · Datos</a>
+        <a href="03_assigning_ncm.html">3 · NCM</a>
+        <a href="04_validating.html">4 · Validar</a>
+        <a href="05_ready_to_generate.html">5 · Generar</a>
+    </nav>
+</body>
+</html>

@@ -1,0 +1,87 @@
+# ========================================================================
+# Cloud Build - CI/CD Automático para CDI Sistema MARÍA
+# ========================================================================
+# Este archivo configura el deployment automático cuando haces git push
+#
+# Uso:
+#   gcloud builds submit --config=cloudbuild.yaml
+#
+# O automático con Cloud Build Triggers:
+#   gcloud builds triggers create github \
+#     --repo-name=CDI \
+#     --repo-owner=Memu007 \
+#     --branch-pattern="^main$" \
+#     --build-config=cloudbuild.yaml
+# ========================================================================
+
+steps:
+  # Step 1: Build Docker image
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "build"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/cdi-backend:$COMMIT_SHA"
+      - "-t"
+      - "gcr.io/$PROJECT_ID/cdi-backend:latest"
+      - "."
+    timeout: 600s
+
+  # Step 2: Push to Container Registry
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "gcr.io/$PROJECT_ID/cdi-backend:$COMMIT_SHA"
+
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      - "push"
+      - "gcr.io/$PROJECT_ID/cdi-backend:latest"
+
+  # Step 3: Deploy to Cloud Run (optimizado para 2000+ usuarios)
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "cdi-backend"
+      - "--image"
+      - "gcr.io/$PROJECT_ID/cdi-backend:$COMMIT_SHA"
+      - "--region"
+      - "us-central1"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--memory"
+      - "2Gi"
+      - "--cpu"
+      - "2"
+      - "--max-instances"
+      - "5"
+      - "--min-instances"
+      - "1"
+      - "--concurrency"
+      - "80"
+      - "--timeout"
+      - "120s"
+      - "--set-secrets"
+      - "GEMINI_API_KEY=gemini-api-key:latest,DATABASE_URL=database-url:latest,JWT_SECRET_KEY=jwt-secret-key:latest"
+      - "--set-env-vars"
+      - "ENVIRONMENT=production,ENABLE_HSTS=true"
+
+# Images to store in Container Registry
+images:
+  - "gcr.io/$PROJECT_ID/cdi-backend:$COMMIT_SHA"
+  - "gcr.io/$PROJECT_ID/cdi-backend:latest"
+
+# Build timeout
+timeout: 1200s
+
+# Opciones de build
+options:
+  machineType: "N1_HIGHCPU_8"
+  logging: CLOUD_LOGGING_ONLY
+
+# Substituciones (variables que se pasan al build)
+substitutions:
+  _GEMINI_API_KEY: "your-gemini-api-key-here"
+  _DATABASE_URL: "postgresql://user:pass@host/db"

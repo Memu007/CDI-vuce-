@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+
+    <title>CDI · Software para despachantes de aduana</title>
+    <meta name="description" content="Lee la factura del proveedor, sugiere el NCM correcto contra VUCE, marca intervenciones, y te devuelve el TXT para pegar en MARIA." />
+    <link rel="canonical" href="https://cdi-sistema.com/" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_AR" />
+    <meta property="og:title" content="CDI · Software para despachantes de aduana" />
+    <meta property="og:description" content="Del PDF al TXT MARIA. Sugerencias NCM desde tu historial + VUCE. Intervenciones claras. Multi-factura." />
+    <meta property="og:url" content="https://cdi-sistema.com/" />
+    <meta property="og:site_name" content="CDI" />
+
+    <link rel="stylesheet" href="/static/v2/app_v2.css">
+    <link rel="stylesheet" href="/static/v2/landing.css">
+</head>
+
+<body>
+<div class="landing">
+
+    <!-- ================= Beta banner ================= -->
+    <div class="beta-banner" id="betaBanner" role="status">
+        <span class="beta-banner-text">
+            <strong>Beta cerrada.</strong>
+            Estás probando una version preliminar. Si encontrás algo raro, escribime a
+            <a href="mailto:hola@ynera.com.ar?subject=CDI%20bug">hola@ynera.com.ar</a>
+            o por WhatsApp.
+        </span>
+        <button type="button" class="beta-banner-close" id="betaBannerClose" aria-label="Cerrar aviso">×</button>
+    </div>
+
+    <!-- ================= Topbar ================= -->
+    <header class="topbar landing-topbar">
+        <a class="topbar-brand" href="#top" aria-label="Inicio">CDI<span class="dot">·</span>Despachos</a>
+        <nav class="topbar-nav" aria-label="Secciones">
+            <a class="btn-ghost" href="#caps">Capacidades</a>
+            <a class="btn-ghost" href="#seguridad">Seguridad</a>
+        </nav>
+        <div class="topbar-meta">
+            <button type="button" class="btn-primary btn-topbar" id="btnOpenAuth" aria-haspopup="dialog" aria-expanded="false" aria-controls="authPopover">Ingresar</button>
+        </div>
+    </header>
+
+    <!-- ================= Hero ================= -->
+    <section id="top" class="hero">
+        <div class="hero-grid">
+
+            <div class="hero-copy">
+                <div class="eyebrow">
+                    <span class="eyebrow-dot"></span>
+                    <span>En beta · pensado para despachantes</span>
+                </div>
+                <h1 class="hero-title">
+                    El despacho arranca con un PDF.<br>
+                    <span class="hero-title-accent">Todo lo demás, te lo hago yo.</span>
+                </h1>
+                <p class="hero-sub">
+                    Leo la factura del proveedor, te sugiero el NCM correcto contra VUCE,
+                    marco intervenciones, y te devuelvo el TXT para pegar en MARIA.
+                    Vos decidís.
+                </p>
+                <div class="hero-keys">
+                    <span class="key">Pegás el PDF.</span>
+                    <span class="key-sep">→</span>
+                    <span class="key">El sistema lee.</span>
+                    <span class="key-sep">→</span>
+                    <span class="key">Vos revisás.</span>
+                    <span class="key-sep">→</span>
+                    <span class="key key-out">MARIA sale.</span>
+                </div>
+            </div>
+
+            <!-- Mockup del stepper tal cual el dashboard, con blink en el activo -->
+            <div class="hero-mockup" aria-hidden="true">
+                <div class="mockup-window">
+                    <div class="mockup-bar">
+                        <span class="dot-r"></span>
+                        <span class="dot-y"></span>
+                        <span class="dot-g"></span>
+                        <span class="mockup-url">cdi-sistema.com/dashboard</span>
+                    </div>
+                    <div class="mockup-inner">
+                        <div class="mockup-head">
+                            <span class="mockup-brand">CDI<span class="dot">·</span>Despachos</span>
+                            <span class="mockup-step-caption">Paso 3 de 5</span>
+                        </div>
+                        <div class="mockup-stepper">
+                            <div class="progress-step is-done"><span class="num">1</span> Subir</div>
+                            <div class="progress-line"></div>
+                            <div class="progress-step is-done"><span class="num">2</span> Revisar</div>
+                            <div class="progress-line"></div>
+                            <div class="progress-step is-active blink"><span class="num">3</span> NCM</div>
+                            <div class="progress-line"></div>
+                            <div class="progress-step"><span class="num">4</span> Validar</div>
+                            <div class="progress-line"></div>
+                            <div class="progress-step"><span class="num">5</span> Listo</div>
+                        </div>
+                        <div class="mockup-table">
+                            <div class="mockup-row head">
+                                <span>Descripción</span>
+                                <span>NCM</span>
+                                <span>Origen</span>
+                            </div>
+                            <div class="mockup-row">
+                                <span>Cable HDMI 2m premium</span>
+                                <span class="mono">8544.42.00</span>
+                                <span>CN</span>
+                            </div>
+                            <div class="mockup-row">
+                                <span>Adaptador USB-C a HDMI</span>
+                                <span class="mono">8517.62.59</span>
+                                <span>CN</span>
+                            </div>
+                            <div class="mockup-row highlighted">
+                                <span>Cargador USB-C 20W</span>
+                                <span class="mono">8504.40.29</span>
+                                <span>CN</span>
+                                <span class="chip chip-warn">LNA</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </section>
+
+    <!-- ================= Capacidades ================= -->
+    <section id="caps" class="caps">
+        <div class="section-head">
+            <h2>Tres cosas que CDI hace, concretas.</h2>
+            <p>No un "asistente con IA". Un flujo corto, auditable, que termina en el TXT que pegás en MARIA.</p>
+        </div>
+
+        <div class="caps-grid">
+
+            <article class="cap-card">
+                <div class="cap-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
+                </div>
+                <h3>Lee el PDF, no lo adivina.</h3>
+                <p>Usa Gemini Vision cuando el PDF es escaneado. Preserva el NCM del proveedor si viene, y lo valida después. Multi-factura en el mismo despacho.</p>
+                <div class="cap-example">
+                    <span class="example-label">Ejemplo</span>
+                    <span class="mono">factura_CN_03.pdf</span>
+                    <span class="arrow">→</span>
+                    <span>12 ítems extraídos</span>
+                </div>
+            </article>
+
+            <article class="cap-card">
+                <div class="cap-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10"/><path d="M12 2a15.3 15.3 0 0 0-4 10 15.3 15.3 0 0 0 4 10"/><line x1="2" y1="12" x2="22" y2="12"/></svg>
+                </div>
+                <h3>Te dice qué NCM corresponde.</h3>
+                <p>Sugerencias desde tu historial por cliente, cruzadas con VUCE oficial. Marca LNA, LA y antidumping con semáforo — sin carteles que asustan, con info que sirve.</p>
+                <div class="cap-example">
+                    <span class="example-label">Ejemplo</span>
+                    <span class="mono">8544.42.00</span>
+                    <span class="arrow">→</span>
+                    <span>Alícuota 16%</span>
+                    <span class="chip chip-warn small">LNA</span>
+                </div>
+            </article>
+
+            <article class="cap-card">
+                <div class="cap-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                </div>
+                <h3>Genera el TXT MARIA, no un PDF bonito.</h3>
+                <p>Un click. Multi-factura en un solo despacho. Defaults de Aduana, Destinación y PSAD configurables por usuario — se acuerda de cómo trabajás.</p>
+                <div class="cap-example">
+                    <span class="example-label">Ejemplo</span>
+                    <span class="mono">despacho_001.txt</span>
+                    <span class="arrow">→</span>
+                    <span>pegá en MARIA</span>
+                </div>
+            </article>
+
+        </div>
+    </section>
+
+    <!-- ================= Seguridad & confiabilidad ================= -->
+    <section id="seguridad" class="stack">
+        <div class="stack-inner">
+            <div class="stack-left">
+                <h2>Tus datos, tu negocio.</h2>
+                <p>Hecho con la misma paranoia que vos tenés con una factura mal cargada. Sin letra chica, sin compromisos raros.</p>
+            </div>
+            <ul class="stack-pills">
+                <li><span class="pill">Sesión cifrada</span><small>cookies HttpOnly, no hay token expuesto</small></li>
+                <li><span class="pill">Tus PDFs, tuyos</span><small>los procesamos y los olvidamos</small></li>
+                <li><span class="pill">Base exportable</span><small>clientes y catálogos en JSON, cuando quieras</small></li>
+                <li><span class="pill">Datos oficiales VUCE</span><small>NCM, alícuotas e intervenciones desde la fuente</small></li>
+                <li><span class="pill">Probá sin riesgo</span><small>usuario demo, sin datos reales</small></li>
+                <li><span class="pill">Sin contratos</span><small>beta gratuita, avisamos 30 días antes de cualquier cambio</small></li>
+            </ul>
+        </div>
+    </section>
+
+    <!-- ================= Auth popover ================= -->
+    <div class="auth-overlay" id="authOverlay" hidden></div>
+    <div class="auth-popover" id="authPopover" role="dialog" aria-modal="true" aria-label="Ingresar" hidden>
+        <button type="button" class="auth-close" id="btnCloseAuth" aria-label="Cerrar">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+
+        <form id="loginForm" class="auth-form is-active" autocomplete="on" novalidate>
+            <h2 class="auth-title">Bienvenido de nuevo.</h2>
+            <p class="auth-sub">Usá tu usuario y contraseña.</p>
+
+            <label class="field">
+                <span>Usuario</span>
+                <input name="username" type="text" autocomplete="username" required />
+            </label>
+            <label class="field">
+                <span>Contraseña</span>
+                <input name="password" type="password" autocomplete="current-password" required />
+            </label>
+            <div class="auth-error" id="loginError" hidden></div>
+            <button type="submit" class="btn-primary btn-lg btn-block">Ingresar</button>
+            <p class="auth-hint">¿No tenés cuenta? <a href="#" data-tab="register" class="auth-link">Crear cuenta →</a></p>
+            <p class="auth-hint">Para probar: <code>demo</code> / <code>demo123</code></p>
+        </form>
+
+        <form id="registerForm" class="auth-form" autocomplete="on" novalidate>
+            <h2 class="auth-title">Creá tu cuenta.</h2>
+            <p class="auth-sub">Podés probar sin datos reales.</p>
+
+            <label class="field">
+                <span>Nombre</span>
+                <input name="name" type="text" autocomplete="name" required />
+            </label>
+            <label class="field">
+                <span>Usuario</span>
+                <input name="username" type="text" autocomplete="username" required />
+            </label>
+            <label class="field">
+                <span>Email</span>
+                <input name="email" type="email" autocomplete="email" required />
+            </label>
+            <label class="field">
+                <span>Contraseña</span>
+                <input name="password" type="password" autocomplete="new-password" minlength="6" required />
+            </label>
+
+            <fieldset class="pay-fieldset pay-fieldset-demo">
+                <legend>Método de pago <span class="pay-mode">modo demo · beta</span></legend>
+                <div class="pay-demo-banner">
+                    <strong>Estás en una beta cerrada.</strong>
+                    No se cobra absolutamente nada. Podés usar cualquier número de tarjeta válido (Luhn). Si no querés inventar uno, hacé click en
+                    <button type="button" class="btn-fill-test-card" id="btnFillTestCard">usar tarjeta de prueba</button>
+                    y completamos los campos por vos.
+                </div>
+                <label class="field">
+                    <span>Titular</span>
+                    <input name="cardholder" type="text" autocomplete="cc-name" required />
+                </label>
+                <label class="field">
+                    <span>Número</span>
+                    <input name="card_number" type="text" inputmode="numeric" autocomplete="cc-number" maxlength="23" placeholder="4242 4242 4242 4242" required />
+                </label>
+                <div class="field-row">
+                    <label class="field">
+                        <span>Vencimiento</span>
+                        <input name="card_exp" type="text" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/YY" maxlength="5" required />
+                    </label>
+                    <label class="field">
+                        <span>CVC</span>
+                        <input name="card_cvc" type="text" inputmode="numeric" autocomplete="cc-csc" maxlength="4" placeholder="123" required />
+                    </label>
+                </div>
+            </fieldset>
+
+            <div class="auth-error" id="registerError" hidden></div>
+            <button type="submit" class="btn-primary btn-lg btn-block">Empezar trial de 14 días</button>
+            <p class="auth-hint">¿Ya tenés cuenta? <a href="#" data-tab="login" class="auth-link">Ingresar →</a></p>
+        </form>
+
+        <div id="verifySent" class="auth-form" role="status" aria-live="polite">
+            <h2 class="auth-title">Revisá tu email.</h2>
+            <p class="auth-sub">Te mandamos un link a <strong id="verifySentEmail">tu casilla</strong> para confirmar la cuenta.</p>
+            <p class="auth-hint">Si no lo ves, mirá la carpeta de spam. El link vence en 24 horas.</p>
+            <p class="auth-hint">Ya confirmaste? <a href="#" data-tab="login" class="auth-link">Ingresar →</a></p>
+        </div>
+    </div>
+
+    <!-- ================= Floating contact ================= -->
+    <a href="mailto:hola@ynera.com.ar?subject=CDI%20%C2%B7%20Consulta" class="contact-fab" aria-label="Hablar con un humano">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span class="contact-fab-label">Hablar con un humano</span>
+    </a>
+
+    <!-- ================= Footer ================= -->
+    <footer class="landing-footer">
+        <div class="footer-inner">
+            <div class="footer-brand">
+                <span class="topbar-brand">CDI<span class="dot">·</span>Despachos</span>
+                <span class="footer-year">© <span id="yearNow">2026</span></span>
+            </div>
+            <div class="footer-ynera">
+                <span class="ynera-handmade">Hecho con onda por</span>
+                <a href="https://ynera.com.ar" target="_blank" rel="noopener" class="ynera-mark">
+                    <span class="ynera-logo">Ynera</span>
+                    <span class="ynera-tag">Consultora de producto e ingeniería</span>
+                </a>
+            </div>
+        </div>
+    </footer>
+
+</div>
+
+<script>
+(function () {
+    'use strict';
+
+    document.getElementById('yearNow').textContent = new Date().getFullYear();
+
+    /* Beta banner: cerrar solo por la sesion actual del navegador */
+    try {
+        const banner = document.getElementById('betaBanner');
+        const closer = document.getElementById('betaBannerClose');
+        if (banner && sessionStorage.getItem('cdi_beta_banner_dismissed') === '1') {
+            banner.style.display = 'none';
+        }
+        if (closer && banner) {
+            closer.addEventListener('click', () => {
+                banner.style.display = 'none';
+                try { sessionStorage.setItem('cdi_beta_banner_dismissed', '1'); } catch (_) {}
+            });
+        }
+    } catch (_) {}
+
+    /* ---------- Popover de auth ---------- */
+    const popover = document.getElementById('authPopover');
+    const overlay = document.getElementById('authOverlay');
+    const btnOpen = document.getElementById('btnOpenAuth');
+    const btnClose = document.getElementById('btnCloseAuth');
+    const forms = {
+        login:    document.getElementById('loginForm'),
+        register: document.getElementById('registerForm'),
+        verify:   document.getElementById('verifySent'),
+    };
+    function activate(tab) {
+        Object.keys(forms).forEach(k => forms[k].classList.toggle('is-active', k === tab));
+    }
+    function openAuth(tab) {
+        if (tab) activate(tab);
+        popover.hidden = false;
+        overlay.hidden = false;
+        btnOpen.setAttribute('aria-expanded', 'true');
+        requestAnimationFrame(() => {
+            popover.classList.add('is-open');
+            overlay.classList.add('is-open');
+            const first = popover.querySelector('.auth-form.is-active input');
+            if (first) first.focus();
+        });
+    }
+    function closeAuth() {
+        popover.classList.remove('is-open');
+        overlay.classList.remove('is-open');
+        btnOpen.setAttribute('aria-expanded', 'false');
+        setTimeout(() => { popover.hidden = true; overlay.hidden = true; }, 180);
+    }
+    btnOpen.addEventListener('click', () => openAuth('login'));
+    btnClose.addEventListener('click', closeAuth);
+    overlay.addEventListener('click', closeAuth);
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !popover.hidden) closeAuth();
+    });
+    document.querySelectorAll('[data-open-auth]').forEach(el => {
+        el.addEventListener('click', () => openAuth(el.dataset.openAuth || 'login'));
+    });
+    document.querySelectorAll('[data-tab]').forEach(el => {
+        el.addEventListener('click', (e) => {
+            e.preventDefault();
+            activate(el.dataset.tab);
+        });
+    });
+
+    /* ---------- Card formatting + Luhn (client-side pre-check) ---------- */
+    const cardNumberInput = forms.register.querySelector('input[name="card_number"]');
+    const cardExpInput = forms.register.querySelector('input[name="card_exp"]');
+    const cardCvcInput = forms.register.querySelector('input[name="card_cvc"]');
+
+    if (cardNumberInput) {
+        cardNumberInput.addEventListener('input', (e) => {
+            const digits = e.target.value.replace(/\D/g, '').slice(0, 19);
+            e.target.value = digits.replace(/(.{4})/g, '$1 ').trim();
+        });
+    }
+    if (cardExpInput) {
+        cardExpInput.addEventListener('input', (e) => {
+            let v = e.target.value.replace(/\D/g, '').slice(0, 4);
+            if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2);
+            e.target.value = v;
+        });
+    }
+    if (cardCvcInput) {
+        cardCvcInput.addEventListener('input', (e) => {
+            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4);
+        });
+    }
+
+    /* "Usar tarjeta de prueba" autollena el form con datos validos */
+    const btnFillTestCard = document.getElementById('btnFillTestCard');
+    if (btnFillTestCard) {
+        btnFillTestCard.addEventListener('click', () => {
+            const cardholder = forms.register.querySelector('input[name="cardholder"]');
+            if (cardholder && !cardholder.value.trim()) cardholder.value = 'Test User';
+            if (cardNumberInput) {
+                cardNumberInput.value = '4242 4242 4242 4242';
+            }
+            if (cardExpInput) cardExpInput.value = '12/29';
+            if (cardCvcInput) cardCvcInput.value = '123';
+        });
+    }
+
+    function passesLuhn(digits) {
+        let sum = 0;
+        for (let i = 0; i < digits.length; i++) {
+            let n = parseInt(digits[digits.length - 1 - i], 10);
+            if (i % 2 === 1) { n *= 2; if (n > 9) n -= 9; }
+            sum += n;
+        }
+        return sum % 10 === 0;
+    }
+
+    function validateCardFields(payload) {
+        const digits = (payload.card_number || '').replace(/\D/g, '');
+        if (digits.length < 13 || digits.length > 19) return 'Número de tarjeta inválido.';
+        if (!passesLuhn(digits)) return 'Número de tarjeta inválido.';
+        const exp = (payload.card_exp || '').replace(/\s/g, '');
+        const m = exp.match(/^(\d{2})\/(\d{2})$/);
+        if (!m) return 'Vencimiento inválido. Usá MM/YY.';
+        const month = parseInt(m[1], 10);
+        const year = 2000 + parseInt(m[2], 10);
+        const now = new Date();
+        if (month < 1 || month > 12) return 'Mes de vencimiento inválido.';
+        if (year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth() + 1)) {
+            return 'La tarjeta está vencida.';
+        }
+        const cvc = (payload.card_cvc || '');
+        if (!/^\d{3,4}$/.test(cvc)) return 'CVC inválido.';
+        if (!(payload.cardholder || '').trim()) return 'Falta el titular de la tarjeta.';
+        return null;
+    }
+
+    /** Telemetria best-effort (misma cookie de sesión que el siguiente fetch si aplicó login/registro OK). */
+    function landingUiTelemetry(payload) {
+        try {
+            const body = JSON.stringify(Object.assign({
+                version: 'landing',
+                ts: Date.now(),
+            }, payload));
+            fetch('/api/ui/event', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body,
+                keepalive: true,
+            }).catch(() => {});
+        } catch (_) {}
+    }
+
+    /* ---------- Auth submit ---------- */
+    function nextUrl() {
+        try {
+            const u = new URL(window.location.href);
+            const nxt = u.searchParams.get('next');
+            if (nxt && nxt.startsWith('/')) return nxt;
+        } catch (_) {}
+        return '/dashboard';
+    }
+
+    async function submitAuth(form, endpoint, errorEl) {
+        errorEl.hidden = true;
+        errorEl.textContent = '';
+        const btn = form.querySelector('button[type=submit]');
+        btn.disabled = true;
+        const original = btn.textContent;
+        btn.textContent = 'Enviando...';
+
+        const payload = {};
+        new FormData(form).forEach((v, k) => { payload[k] = v; });
+
+        // Si es el registro, armamos payment_method y quitamos los campos
+        // de tarjeta individuales del payload plano antes de enviar.
+        if (form === forms.register) {
+            const cardErr = validateCardFields(payload);
+            if (cardErr) {
+                errorEl.textContent = cardErr;
+                errorEl.hidden = false;
+                btn.disabled = false;
+                btn.textContent = original;
+                return;
+            }
+            payload.payment_method = {
+                cardholder: payload.cardholder,
+                number: (payload.card_number || '').replace(/\s/g, ''),
+                exp: payload.card_exp,
+                cvc: payload.card_cvc,
+            };
+            delete payload.cardholder;
+            delete payload.card_number;
+            delete payload.card_exp;
+            delete payload.card_cvc;
+        }
+
+        try {
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload),
+            });
+            const data = await res.json().catch(() => ({}));
+
+            if (!res.ok) {
+                // 403 email_not_verified (login): mostrar pantalla "revisa tu mail"
+                // en vez de error generico. El back ya reenvio el mail solo.
+                const detail = data && data.detail;
+                if (res.status === 403 && detail && typeof detail === 'object' && detail.code === 'email_not_verified') {
+                    const emailEl = document.getElementById('verifySentEmail');
+                    if (emailEl) emailEl.textContent = detail.email || 'tu casilla';
+                    activate('verify');
+                    return;
+                }
+                let msg = 'No pudimos autenticarte. Revisá los datos.';
+                if (typeof detail === 'string') msg = detail;
+                else if (detail && typeof detail.message === 'string') msg = detail.message;
+                else if (data && typeof data.message === 'string') msg = data.message;
+                errorEl.textContent = msg;
+                errorEl.hidden = false;
+                return;
+            }
+
+            // Alta con verificacion obligatoria: el back no entrega token.
+            // Mostrar pantalla de "revisa tu mail" en vez de redirigir.
+            if (data && data.verification_required === true) {
+                const emailEl = document.getElementById('verifySentEmail');
+                if (emailEl) emailEl.textContent = data.email || payload.email || 'tu casilla';
+                if (endpoint === '/auth/register') {
+                    landingUiTelemetry({ action: 'register_pending_verify', screen: 'landing_register' });
+                }
+                activate('verify');
+                return;
+            }
+
+            // UX only: guardamos el nombre para saludar. El token va en cookie HttpOnly.
+            try {
+                if (data && data.user && data.user.name) {
+                    localStorage.setItem('user_name', data.user.name);
+                } else if (payload.username) {
+                    localStorage.setItem('user_name', payload.username);
+                }
+            } catch (_) {}
+
+            if (endpoint === '/auth/register') {
+                landingUiTelemetry({ action: 'register_completed', screen: 'landing_register' });
+            } else if (endpoint === '/auth/login') {
+                landingUiTelemetry({ action: 'login_completed', screen: 'landing_login' });
+            }
+
+            window.location.href = nextUrl();
+        } catch (err) {
+            errorEl.textContent = 'No hay conexión con el servidor.';
+            errorEl.hidden = false;
+        } finally {
+            btn.disabled = false;
+            btn.textContent = original;
+        }
+    }
+
+    forms.login.addEventListener('submit', (e) => {
+        e.preventDefault();
+        submitAuth(forms.login, '/auth/login', document.getElementById('loginError'));
+    });
+    forms.register.addEventListener('submit', (e) => {
+        e.preventDefault();
+        submitAuth(forms.register, '/auth/register', document.getElementById('registerError'));
+    });
+
+    /* ---------- Deep link via hash ---------- */
+    if (window.location.hash === '#auth' || window.location.hash === '#login') openAuth('login');
+    if (window.location.hash === '#register') openAuth('register');
+})();
+</script>
+</body>
+</html>

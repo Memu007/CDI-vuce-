@@ -1,0 +1,73 @@
+BRIEF PARA CLAUDE 4.1 — DISEÑO NCM SUGGEST (MVP BARATO Y ROBUSTO)
+
+Instrucciones de formato para Claude (muy importante):
+- Razona en privado y responde solo con el resultado final.
+- Responde en español, con secciones claras y bullets concisos.
+- Estructura obligatoria de salida: 1) Resumen ejecutivo (≤10 líneas). 2) Alternativas (tabla costo/latencia/calidad). 3) Pipeline recomendado (fuzzy + umbrales). 4) API propuesta (request/response). 5) Prompt LLM (≤200 tokens) para fallback. 6) Métricas y validación. 7) Plan de despliegue en GCP. 8) Riesgos y mitigaciones. 9) Pasos accionables (checklist corto).
+- Limita tu respuesta a ~800–1000 tokens.
+
+1) Objetivo (1 línea)
+Diseñar un MVP de “sugerencia de NCM” barato, rápido y suficientemente preciso para despachantes, integrable a nuestro backend FastAPI, con fuzzy local + (opcional) fallback LLM de bajo costo.
+
+2) Contexto del sistema (resumen breve)
+- Proyecto: CACA - Optimizador MARIA. Convierte Excel/PDF desordenados a formato AVG para SIM/MARÍA. UI/UX en HTML/JS plano; backend FastAPI.
+- Endpoints clave ya implementados: /validate_items, /process_operation, /generated, /api/clientes/*, /ncm/suggest (PoC).
+- Validaciones y UX listas (panel de errores, auto-validación, CSV de errores, plantillas por cliente/AVG, métricas /health, historial por cliente).
+- Fase 4: integrar sugerencia de NCM. Queremos: costo cercano a $0, latencia baja, control on‑prem/Cloud Run.
+- Regla general: simplicidad primero, sin vendor lock‑in fuerte, sin DB nueva si no es necesario.
+
+3) Requisitos funcionales y no funcionales
+- Input: descripción del ítem (spanish/english), opcional marca/modelo.
+- Output: top‑3 sugerencias [{ ncm, confidence, method }].
+- Latencia objetivo: p95 < 300 ms (sin LLM). Costo: $0/mes base; LLM opcional por debajo de centavos/mes con cache.
+- Infra: desplegamos en Google Cloud Run. CSV de nomenclador NCM en contenedor o bucket GCS.
+- Contrato API coherente: JSON con success:boolean, suggestions[], detail? (error).
+
+4) Datos disponibles/previstos
+- Nomenclador NCM MERCOSUR (código y descripción). Lo podemos mantener en CSV: data/ncm_mercosur.csv con columnas [ncm, descripcion].
+- Posible bucket GCS para actualizar CSV sin redeploy. Opcional sinonimias/stopwords.
+
+5) Lo que necesitamos de vos (Claude)
+Propón un diseño concreto y barato que cumpla:
+- 3 alternativas con tabla comparativa (costo estimado, latencia, calidad, complejidad, mantenimiento, riesgo de lock‑in).
+- Pipeline recomendado (sin LLM por defecto):
+  - Normalización de texto (lower, ASCII, stopwords ES, stemming opcional ligero).
+  - Similaridad: especifica métricas de RapidFuzz (token_set_ratio, WRatio u otra), umbrales (ej. 85/75/65) y lógica de top‑k.
+  - Reglas post‑proceso (filtrar ruido, preferir NCM de 8 dígitos completos, desempate por longitud/score).
+  - Devolver top‑3 con confidence normalizada [0..1] y method:"fuzzy".
+- Fallback LLM (solo si score < umbral), con:
+  - Modelo recomendado en GCP: Vertex AI Gemini 1.5 Flash.
+  - Prompt corto (≤200 tokens) y estructura de output JSON.
+  - Cache 24h por descripción (clave hash) para casi eliminar costos repetidos.
+- API propuesta final para POST /ncm/suggest:
+  - Request: { descripcion: string, brand?: string, extra?: { idioma?: "es"|"en" } }
+  - Response: { success: boolean, suggestions: [{ ncm, confidence, method }], used_fallback?: boolean, detail?: string }
+- Métricas/Evaluación: cómo medir offline (precisión@1/@3), dataset de prueba mínimo, y estrategia para iterar el CSV (sin DB).
+- Plan de despliegue: Cloud Run, CSV en contenedor o GCS con variable NCM_CSV_URL, caché en memoria simple.
+- Riesgos y mitigaciones (sin overengineering).
+- Checklist de implementación (≤10 ítems) y pseudocódigo del fuzzy.
+
+6) Restricciones
+- No incorporar bases de datos nuevas; preferir CSV + memoria.
+- Mantener contrato de API del proyecto (success boolean, detail opcional, consistencia en JSON).
+- Mantener costes bajos y latencia predecible.
+- Español como idioma principal en UI/mensajes.
+
+7) Ejemplos de entrada/salida esperada
+- Input: “Laptop portátil 14 pulgadas i7 16GB” → Sugerencias: 84713010 (0.90), 84713020 (0.72)…
+- Input: “Teléfono celular 5G” → 85171200 (0.88), …
+- Input: “Diodos LED alta luminosidad” → 85414010 (0.86), …
+- Input: “Tornillos acero inoxidable” → (si sin match fuerte, sugerir NCM probable y marcar fallback si aplica).
+
+8) Consideraciones de calidad y operación
+- Versionado del CSV.
+- Logs de sugerencias para ajustar umbrales.
+- Seguridad: sanitizar inputs; límites de rate si exponemos públicamente.
+
+9) Preguntas específicas para que respondas
+- ¿Qué umbrales y métrica(s) de RapidFuzz recomiendas para español con descripciones ruidosas?
+- ¿Cómo normalizarías el confidence a [0..1] para comunicar certeza al usuario?
+- ¿Qué estrategia de cache propones (clave, TTL) para balances latencia/costo en fallback LLM?
+- ¿Top‑k=3 es razonable o propones k dinámico por gap de score?
+
+Gracias. Entrega la respuesta final con la estructura indicada, concisa y accionable.

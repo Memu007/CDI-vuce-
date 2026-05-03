@@ -1,0 +1,36 @@
+{
+  "clients": [
+    {
+      "id": "demo-1",
+      "nombre": "Transmetal SRL",
+      "cuit": "30-12345678-9",
+      "email": "contacto@transmetal.com",
+      "telefono": "+54 11 4321 0001",
+      "direccion": "Av. Belgrano 2450, CABA",
+      "notas": "Cliente habitual. Prefiere entrega en depósito Zona Sur.",
+      "favorito": true
+    },
+    {
+      "id": "demo-2",
+      "nombre": "Importadora Río SA",
+      "cuit": "30-66778899-3",
+      "email": "compras@importadorario.com",
+      "telefono": "+54 351 555 1122",
+      "direccion": "Av. Colón 1234, Córdoba",
+      "notas": "Solicita notificaciones por WhatsApp.",
+      "favorito": false
+    },
+    {
+      "id": "demo-3",
+      "nombre": "Global Freight LLC",
+      "cuit": "904-55-112233",
+      "email": "ops@globalfreight.com",
+      "telefono": "+1 305 555 8899",
+      "direccion": "1200 Brickell Ave, Miami",
+      "notas": "Operaciones aéreas frecuentes.",
+      "favorito": false
+    }
+  ]
+}
+
+

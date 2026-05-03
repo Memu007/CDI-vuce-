@@ -1,0 +1,27 @@
+# robots.txt para CDI - Software Aduanero Argentina
+# Competimos con: Darsys, MYMTEC DUX, IntegraComex, Easy Comex, Gruposoft
+# https://www.robotstxt.org/
+
+# Permitir todos los crawlers principales
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /api/
+Disallow: /admin/
+Disallow: /dev/
+
+# Googlebot específico (para mejor indexación)
+User-agent: Googlebot
+Allow: /
+Crawl-delay: 1
+
+# Bingbot
+User-agent: Bingbot
+Allow: /
+Crawl-delay: 2
+
+# Sitemap (actualizar cuando se genere el sitemap real)
+Sitemap: https://cdi-sistema.com/sitemap.xml
+
+# Host preferido
+Host: https://cdi-sistema.com

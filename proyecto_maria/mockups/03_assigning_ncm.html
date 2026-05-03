@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CDI · Asignar NCM</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        /* Estilos específicos de tabla NCM */
+        .ncm-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            font-size: var(--t-13);
+        }
+        .ncm-table thead th {
+            position: sticky;
+            top: 52px;
+            background: var(--c-surface);
+            border-bottom: 1px solid var(--c-border);
+            text-align: left;
+            padding: var(--s-3) var(--s-4);
+            font-weight: var(--w-medium);
+            color: var(--c-text-3);
+            font-size: var(--t-11);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .ncm-table tbody td {
+            padding: var(--s-3) var(--s-4);
+            border-bottom: 1px solid var(--c-border-soft);
+            color: var(--c-text-2);
+            vertical-align: middle;
+        }
+        .ncm-table tbody tr {
+            transition: background var(--transition);
+        }
+        .ncm-table tbody tr:hover { background: var(--c-bg); }
+
+        /* Foco en columna NCM: esa columna mantiene color, las otras se atenúan sutilmente */
+        .ncm-table td:not(.col-ncm):not(.col-num):not(.col-actions) {
+            color: var(--c-text-3);
+        }
+        .col-ncm { font-family: var(--font-mono); font-weight: var(--w-medium); color: var(--c-text) !important; }
+        .col-ncm.is-empty { color: var(--c-error) !important; }
+
+        .ncm-input {
+            width: 110px;
+            height: 32px;
+            padding: 0 var(--s-3);
+            background: var(--c-surface-2);
+            border: 1px solid transparent;
+            border-radius: var(--r-sm);
+            font: var(--w-medium) var(--t-13) / 1 var(--font-mono);
+            color: var(--c-text);
+        }
+        .ncm-input:focus {
+            outline: none;
+            background: var(--c-surface);
+            border-color: var(--c-accent);
+            box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15);
+        }
+        .ncm-input.is-error {
+            border-color: var(--c-error);
+            background: var(--c-error-soft);
+        }
+
+        .row-pending { background: rgba(255, 149, 0, 0.04); }
+        .row-pending:hover { background: rgba(255, 149, 0, 0.08) !important; }
+
+        /* Spotlight modal */
+        .spotlight {
+            width: 580px;
+            max-width: calc(100vw - 32px);
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: saturate(180%) blur(30px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            border-radius: var(--r-xl);
+            box-shadow: var(--shadow-xl);
+            overflow: hidden;
+            animation: spotlight-in 250ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        @keyframes spotlight-in {
+            from { transform: scale(0.96) translateY(-10px); opacity: 0; }
+            to   { transform: scale(1) translateY(0); opacity: 1; }
+        }
+        .spotlight-header {
+            padding: var(--s-4) var(--s-5);
+            border-bottom: 1px solid var(--c-border-soft);
+            display: flex;
+            align-items: center;
+            gap: var(--s-3);
+        }
+        .spotlight-progress {
+            font-size: var(--t-11);
+            color: var(--c-text-3);
+            font-weight: var(--w-medium);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .spotlight-search {
+            border: none;
+            background: transparent;
+            font-size: var(--t-22);
+            font-weight: var(--w-regular);
+            color: var(--c-text);
+            width: 100%;
+            padding: var(--s-3) var(--s-5) var(--s-4);
+            outline: none;
+            font-family: var(--font-mono);
+        }
+        .spotlight-search::placeholder { color: var(--c-text-3); font-family: var(--font-sans); }
+        .spotlight-section { padding: var(--s-2) 0; }
+        .spotlight-section-label {
+            padding: var(--s-2) var(--s-5);
+            font-size: var(--t-11);
+            color: var(--c-text-3);
+            font-weight: var(--w-semibold);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+        .spotlight-item {
+            display: flex;
+            align-items: center;
+            gap: var(--s-4);
+            padding: var(--s-3) var(--s-5);
+            cursor: pointer;
+            transition: background var(--transition);
+        }
+        .spotlight-item:hover, .spotlight-item.is-selected {
+            background: var(--c-accent);
+            color: white;
+        }
+        .spotlight-item.is-selected .spotlight-item-meta { color: rgba(255, 255, 255, 0.85); }
+        .spotlight-item.is-selected .spotlight-item-code { color: rgba(255, 255, 255, 0.95); }
+        .spotlight-item-code {
+            font-family: var(--font-mono);
+            font-weight: var(--w-medium);
+            font-size: var(--t-15);
+            color: var(--c-text);
+            flex-shrink: 0;
+            width: 110px;
+        }
+        .spotlight-item-body { flex: 1; min-width: 0; }
+        .spotlight-item-title { font-size: var(--t-15); }
+        .spotlight-item-meta { font-size: var(--t-13); color: var(--c-text-3); margin-top: 2px; }
+        .spotlight-footer {
+            padding: var(--s-3) var(--s-5);
+            background: var(--c-surface-2);
+            border-top: 1px solid var(--c-border-soft);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: var(--t-11);
+            color: var(--c-text-3);
+        }
+        .kbd-hint {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+        .kbd-hint kbd {
+            background: var(--c-surface);
+            border: 1px solid var(--c-border);
+            border-radius: 4px;
+            padding: 1px 6px;
+            font-family: var(--font-mono);
+            font-size: 10px;
+            color: var(--c-text-2);
+        }
+    </style>
+</head>
+<body>
+    <div class="mockup-tag">Mockup 03 · assigning_ncm  ·  con asistente Spotlight abierto</div>
+
+    <div class="app">
+        <header class="topbar">
+            <div class="topbar-brand">CDI<span class="dot">·</span>Despachos</div>
+            <div class="context-bar" style="margin-bottom: 0; margin-left: var(--s-6);">
+                <span class="ctx-key">Factura</span>
+                <span class="ctx-val">D10170586</span>
+                <span class="ctx-sep">·</span>
+                <span class="ctx-val">WILHELMSEN SHIPS</span>
+                <span class="ctx-sep">·</span>
+                <span class="pill pill-warning"><span class="dot-status is-warning"></span> 8 sin NCM</span>
+            </div>
+            <div class="topbar-meta">
+                <button class="btn btn-ghost" style="height: 32px; padding: 0 var(--s-3); font-size: var(--t-13);">Datos del despacho</button>
+                <span class="avatar">EM</span>
+            </div>
+        </header>
+
+        <main class="main" style="max-width: 1100px;">
+
+            <!-- Progreso -->
+            <div class="progress">
+                <div class="progress-step is-done"><span class="num">✓</span> Subir</div>
+                <div class="progress-line"></div>
+                <div class="progress-step is-done"><span class="num">✓</span> Datos</div>
+                <div class="progress-line"></div>
+                <div class="progress-step is-active"><span class="num">3</span> Asignar NCM</div>
+                <div class="progress-line"></div>
+                <div class="progress-step"><span class="num">4</span> Validar</div>
+                <div class="progress-line"></div>
+                <div class="progress-step"><span class="num">5</span> Generar</div>
+            </div>
+
+            <!-- Header de la sección -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: var(--s-6);">
+                <div>
+                    <h1 class="title-2" style="margin-bottom: var(--s-2);">Asigná los códigos arancelarios</h1>
+                    <p class="subtitle" style="font-size: var(--t-15);">
+                        10 productos · <strong style="color: var(--c-warning);">8 sin NCM</strong> · 2 listos
+                    </p>
+                </div>
+                <div class="row-3">
+                    <button class="btn btn-secondary">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-9-9c2.5 0 4.7 1 6.4 2.6L21 8"/><path d="M21 3v5h-5"/></svg>
+                        Sugerir desde catálogo
+                    </button>
+                    <button class="btn btn-primary">
+                        Asignar 8 NCMs
+                        <kbd style="background: rgba(255,255,255,.25); border-radius: 3px; padding: 1px 5px; font-size: 11px; font-family: var(--font-mono);">↵</kbd>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Tabla con foco en columna NCM -->
+            <div class="card" style="overflow: hidden;">
+                <table class="ncm-table">
+                    <thead>
+                        <tr>
+                            <th class="col-num" style="width: 40px;">#</th>
+                            <th style="width: 140px;">REF.</th>
+                            <th>DESCRIPCIÓN</th>
+                            <th style="width: 60px; text-align: center;">PAÍS</th>
+                            <th style="width: 60px; text-align: right;">CANT</th>
+                            <th class="col-ncm" style="width: 140px; color: var(--c-text-2);">CÓDIGO NCM</th>
+                            <th class="col-actions" style="width: 80px;"></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="row-pending">
+                            <td class="col-num" style="color: var(--c-text-3);">1</td>
+                            <td>HY-CT11-1</td>
+                            <td style="color: var(--c-text);">MULTI CLEAN</td>
+                            <td style="text-align: center;">CN</td>
+                            <td style="text-align: right;">100</td>
+                            <td class="col-ncm">
+                                <input class="ncm-input" type="text" placeholder="– – – – – – – –" autofocus>
+                            </td>
+                            <td><button class="btn btn-ghost" style="height: 28px; padding: 0 var(--s-3); font-size: var(--t-13); color: var(--c-accent);">Asistente ⌘K</button></td>
+                        </tr>
+                        <tr class="row-pending">
+                            <td class="col-num" style="color: var(--c-text-3);">2</td>
+                            <td>EH8712</td>
+                            <td style="color: var(--c-text);">OXYGEN SCAVENGER PLUS</td>
+                            <td style="text-align: center;">CN</td>
+                            <td style="text-align: right;">50</td>
+                            <td class="col-ncm is-empty">– – – – – – – –</td>
+                            <td><button class="btn btn-ghost" style="height: 28px; padding: 0 var(--s-3); font-size: var(--t-13); color: var(--c-accent);">Asistente</button></td>
+                        </tr>
+                        <tr class="row-pending">
+                            <td class="col-num" style="color: var(--c-text-3);">3</td>
+                            <td>SY7752</td>
+                            <td style="color: var(--c-text);">NATURAL HANDCLEANER</td>
+                            <td style="text-align: center;">CN</td>
+                            <td style="text-align: right;">75</td>
+                            <td class="col-ncm is-empty">– – – – – – – –</td>
+                            <td><button class="btn btn-ghost" style="height: 28px; padding: 0 var(--s-3); font-size: var(--t-13); color: var(--c-accent);">Asistente</button></td>
+                        </tr>
+                        <tr>
+                            <td class="col-num" style="color: var(--c-text-3);">4</td>
+                            <td>HY-CT10</td>
+                            <td style="color: var(--c-text);">TABLE TRANSPARENT</td>
+                            <td style="text-align: center;">CN</td>
+                            <td style="text-align: right;">100</td>
+                            <td class="col-ncm">3402.50.00</td>
+                            <td><span style="color: var(--c-success);">✓</span></td>
+                        </tr>
+                        <tr class="row-pending">
+                            <td class="col-num" style="color: var(--c-text-3);">5</td>
+                            <td>HY-T021</td>
+                            <td style="color: var(--c-text);">TABLE TRANSPARENT</td>
+                            <td style="text-align: center;">CN</td>
+                            <td style="text-align: right;">170</td>
+                            <td class="col-ncm is-empty">– – – – – – – –</td>
+                            <td><button class="btn btn-ghost" style="height: 28px; padding: 0 var(--s-3); font-size: var(--t-13); color: var(--c-accent);">Asistente</button></td>
+                        </tr>
+                        <tr class="row-pending">
+                            <td class="col-num" style="color: var(--c-text-3);">6</td>
+                            <td>HY-T021</td>
+                            <td style="color: var(--c-text);">TABLE TRANSPARENT</td>
+                            <td style="text-align: center;">CN</td>
+                            <td style="text-align: right;">144</td>
+                            <td class="col-ncm is-empty">– – – – – – – –</td>
+                            <td><button class="btn btn-ghost" style="height: 28px; padding: 0 var(--s-3); font-size: var(--t-13); color: var(--c-accent);">Asistente</button></td>
+                        </tr>
+                        <tr>
+                            <td class="col-num" style="color: var(--c-text-3);">7</td>
+                            <td>HY-T020</td>
+                            <td style="color: var(--c-text);">TABLE TRANSPARENT</td>
+                            <td style="text-align: center;">CN</td>
+                            <td style="text-align: right;">150</td>
+                            <td class="col-ncm">3402.50.00</td>
+                            <td><span style="color: var(--c-success);">✓</span></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <p class="caption center" style="margin-top: var(--s-6);">
+                <kbd style="background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 4px; padding: 1px 6px; font-family: var(--font-mono); font-size: 11px;">⌘K</kbd>
+                abre el asistente NCM ·
+                <kbd style="background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 4px; padding: 1px 6px; font-family: var(--font-mono); font-size: 11px;">Tab</kbd>
+                pasa al siguiente ·
+                <kbd style="background: var(--c-surface); border: 1px solid var(--c-border); border-radius: 4px; padding: 1px 6px; font-family: var(--font-mono); font-size: 11px;">Esc</kbd>
+                cierra
+            </p>
+
+        </main>
+
+        <footer class="footer-bar">10 items · USD 265.648 · Estado: 2/10 con NCM asignado</footer>
+    </div>
+
+    <!-- ====== Spotlight: asistente NCM abierto ====== -->
+    <div class="overlay">
+        <div class="spotlight" role="dialog" aria-label="Asistente NCM">
+
+            <div class="spotlight-header">
+                <span class="spotlight-progress">Item 1 de 8</span>
+                <div style="flex: 1; min-width: 0;">
+                    <div style="font-size: var(--t-13); color: var(--c-text-3);">HY-CT11-1</div>
+                    <div style="font-size: var(--t-15); font-weight: var(--w-medium); color: var(--c-text);">MULTI CLEAN</div>
+                </div>
+                <span class="pill" style="background: var(--c-surface-2); color: var(--c-text-3); font-family: var(--font-mono);">⌘K</span>
+            </div>
+
+            <input class="spotlight-search"
+                   type="text"
+                   placeholder="Buscá por código o descripción…"
+                   value="3402"
+                   autofocus>
+
+            <div class="spotlight-section">
+                <div class="spotlight-section-label">Sugerencias del catálogo de WILHELMSEN</div>
+
+                <div class="spotlight-item is-selected">
+                    <span class="spotlight-item-code">3402.50.00</span>
+                    <div class="spotlight-item-body">
+                        <div class="spotlight-item-title">Preparaciones tensoactivas para limpieza</div>
+                        <div class="spotlight-item-meta">Usado 12 veces en este proveedor · alícuota 18%</div>
+                    </div>
+                    <span style="color: rgba(255,255,255,.85); font-size: var(--t-11);">↵</span>
+                </div>
+
+                <div class="spotlight-item">
+                    <span class="spotlight-item-code">3402.20.00</span>
+                    <div class="spotlight-item-body">
+                        <div class="spotlight-item-title">Preparaciones acondicionadas para venta al por menor</div>
+                        <div class="spotlight-item-meta">Usado 4 veces · alícuota 18%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="height: 1px; background: var(--c-border-soft); margin: 0 var(--s-5);"></div>
+
+            <div class="spotlight-section">
+                <div class="spotlight-section-label">Otras coincidencias</div>
+
+                <div class="spotlight-item">
+                    <span class="spotlight-item-code">3402.90.10</span>
+                    <div class="spotlight-item-body">
+                        <div class="spotlight-item-title">Otras preparaciones tensoactivas</div>
+                        <div class="spotlight-item-meta">Tarifar · alícuota 18%</div>
+                    </div>
+                </div>
+
+                <div class="spotlight-item">
+                    <span class="spotlight-item-code">3402.11.00</span>
+                    <div class="spotlight-item-body">
+                        <div class="spotlight-item-title">Aniónicos</div>
+                        <div class="spotlight-item-meta">Tarifar · alícuota 14%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="spotlight-footer">
+                <div style="display: flex; gap: var(--s-4);">
+                    <span class="kbd-hint"><kbd>↑</kbd><kbd>↓</kbd> navegar</span>
+                    <span class="kbd-hint"><kbd>↵</kbd> confirmar</span>
+                    <span class="kbd-hint"><kbd>⇥</kbd> saltar</span>
+                </div>
+                <span class="kbd-hint"><kbd>Esc</kbd> cerrar</span>
+            </div>
+
+        </div>
+    </div>
+
+    <nav class="mockup-nav">
+        <a href="index.html">Index</a>
+        <a href="01_awaiting_upload.html">1 · Subir</a>
+        <a href="02_enriching_data.html">2 · Datos</a>
+        <a href="03_assigning_ncm.html" class="active">3 · NCM</a>
+        <a href="04_validating.html">4 · Validar</a>
+        <a href="05_ready_to_generate.html">5 · Generar</a>
+    </nav>
+</body>
+</html>
