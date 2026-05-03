@@ -1948,8 +1948,8 @@ Busca esta información en el encabezado de la factura:
 6. vendedor_direccion: Dirección del vendedor
 7. comprador_nombre: Nombre del comprador/importador/buyer
 8. comprador_cuit: CUIT del comprador argentino (si aparece)
-9. moneda: Moneda de la factura (DOL=dólares, EUR=euros)
-10. incoterm: Términos de entrega (FOB, CIF, DDP, EXW, etc.)
+9. moneda: Moneda de la factura. Devolver SIEMPRE el codigo de 3 letras: DOL, EUR, BRL, ARS, CLP, UYU, GBP, JPY, CNY. Si no aparece la palabra "moneda" o "currency" pero hay simbolos en los valores, inferir asi: $ o "USD" o "U$S" -> DOL; "EUR" o EUR$ -> EUR; "R$" o "BRL" -> BRL; "AR$" o "ARS" -> ARS. Ante duda, DOL (es la moneda mas comun en facturas de importacion a Argentina).
+10. incoterm: Términos de entrega (FOB, CIF, DDP, EXW, etc.). Si viene con ciudad/puerto al lado (ej: "FOB Genova", "CIF Buenos Aires"), devolver SOLO las 3 letras del codigo.
 11. flete: Valor del flete/freight (número, 0 si no aparece)
 12. seguro: Valor del seguro/insurance (número, 0 si no aparece)
 
@@ -2192,8 +2192,8 @@ Busca esta información en el encabezado de la factura:
 6. vendedor_direccion: Dirección del vendedor
 7. comprador_nombre: Nombre del comprador/importador/buyer
 8. comprador_cuit: CUIT del comprador argentino (si aparece)
-9. moneda: Moneda de la factura (DOL=dólares, EUR=euros)
-10. incoterm: Términos de entrega (FOB, CIF, DDP, EXW, etc.)
+9. moneda: Moneda de la factura. Devolver SIEMPRE el codigo de 3 letras: DOL, EUR, BRL, ARS, CLP, UYU, GBP, JPY, CNY. Si no aparece la palabra "moneda" o "currency" pero hay simbolos en los valores, inferir asi: $ o "USD" o "U$S" -> DOL; "EUR" o EUR$ -> EUR; "R$" o "BRL" -> BRL; "AR$" o "ARS" -> ARS. Ante duda, DOL (es la moneda mas comun en facturas de importacion a Argentina).
+10. incoterm: Términos de entrega (FOB, CIF, DDP, EXW, etc.). Si viene con ciudad/puerto al lado (ej: "FOB Genova", "CIF Buenos Aires"), devolver SOLO las 3 letras del codigo.
 11. flete: Valor del flete/freight (número, 0 si no aparece)
 12. seguro: Valor del seguro/insurance (número, 0 si no aparece)
 
