@@ -380,8 +380,15 @@ async def _migrate_add_user_op_defaults_columns():
     Permite que cada despachante guarde su aduana/puerto/tipo destinacion
     habituales. Cuando el frontend genera el TXT MARIA, si la operacion no
     trae esos valores, se aplican estos defaults del perfil antes de caer
-    al default global ARBUE/001/IC04. Idempotente.
+    al default global ARBUE/001/IC04.
+
+    Idempotente: chequea existencia con PRAGMA (SQLite) o
+    information_schema (Postgres) antes de ALTER. Si algo falla, log
+    completo y RAISE: si no hay columnas, los SELECT sobre users que
+    SQLAlchemy hace mas adelante van a explotar peor (500 en /api/clientes,
+    /auth/current_user, etc), asi que es mejor que la app no arranque.
     """
+    import traceback
     from proyecto_maria.database.connection import engine, IS_SQLITE
     new_cols = [
         ("default_aduana_codigo", "VARCHAR(10)"),
@@ -393,19 +400,28 @@ async def _migrate_add_user_op_defaults_columns():
             if IS_SQLITE:
                 res = await conn.exec_driver_sql("PRAGMA table_info(users)")
                 existing = {row[1] for row in res.fetchall()}
-                for col, coltype in new_cols:
-                    if col not in existing:
-                        await conn.exec_driver_sql(
-                            f"ALTER TABLE users ADD COLUMN {col} {coltype}"
-                        )
-                        print(f"✅ Migracion: agregada columna users.{col} (SQLite)")
             else:
-                for col, coltype in new_cols:
-                    await conn.exec_driver_sql(
-                        f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col} {coltype}"
-                    )
+                res = await conn.exec_driver_sql(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'users'"
+                )
+                existing = {row[0] for row in res.fetchall()}
+
+            for col, coltype in new_cols:
+                if col in existing:
+                    continue
+                await conn.exec_driver_sql(
+                    f"ALTER TABLE users ADD COLUMN {col} {coltype}"
+                )
+                print(f"✅ Migracion: agregada columna users.{col}")
     except Exception as mig_err:
-        print(f"⚠️ No se pudo migrar columnas de defaults de operacion: {mig_err}")
+        # Si fallo, NO atrapamos silenciosamente: queremos ver el stack en
+        # los logs de Railway. Pero tampoco hacemos raise: prefiero que la
+        # app arranque "rota" para tener un /health que devuelva diagnostico
+        # antes que un container que no levanta nunca.
+        print("❌ Error migrando columnas de defaults de operacion en users:")
+        print(traceback.format_exc())
+        print(f"❌ Error original: {mig_err!r}")
 
 
 async def _migrate_add_user_billing_columns():
@@ -1401,6 +1417,48 @@ def app_js():
 def app_fixed_js():
     """Sirve el JS fijo de la aplicación (Cache Buster)"""
     return FileResponse(os.path.join(basedir, "proyecto_maria", "static", "app_fixed.js"), media_type="application/javascript")
+
+@app.get("/api/dev/users-schema")
+async def dev_users_schema(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Devuelve las columnas existentes de la tabla users en la DB.
+
+    Util para diagnosticar si una migracion (ej. defaults de despachante)
+    corrio correctamente en produccion. Requiere auth para no exponer
+    estructura interna a internet abierto.
+    """
+    from sqlalchemy import text
+    from proyecto_maria.database.connection import IS_SQLITE
+    try:
+        if IS_SQLITE:
+            res = await db.execute(text("PRAGMA table_info(users)"))
+            cols = [{"name": row[1], "type": row[2]} for row in res.fetchall()]
+        else:
+            res = await db.execute(
+                text(
+                    "SELECT column_name, data_type FROM information_schema.columns "
+                    "WHERE table_name = 'users' ORDER BY ordinal_position"
+                )
+            )
+            cols = [{"name": row[0], "type": row[1]} for row in res.fetchall()]
+        col_names = {c["name"] for c in cols}
+        expected_new = {
+            "default_aduana_codigo",
+            "default_puerto_destino",
+            "default_tipo_destinacion",
+        }
+        missing = sorted(expected_new - col_names)
+        return {
+            "ok": True,
+            "columns": cols,
+            "missing_new_columns": missing,
+            "migration_applied": not missing,
+        }
+    except Exception as e:
+        return {"ok": False, "error": repr(e)}
+
 
 @app.get("/health")
 async def health(db: AsyncSession = Depends(get_db)):
