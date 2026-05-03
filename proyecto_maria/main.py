@@ -1418,6 +1418,42 @@ def app_fixed_js():
     """Sirve el JS fijo de la aplicación (Cache Buster)"""
     return FileResponse(os.path.join(basedir, "proyecto_maria", "static", "app_fixed.js"), media_type="application/javascript")
 
+@app.post("/api/dev/run-migrations")
+async def dev_run_migrations(user=Depends(get_current_user)):
+    """Re-ejecuta las migraciones idempotentes de columnas en users.
+
+    Util cuando la migracion al startup fallo por algun motivo (lock,
+    timeout, version vieja de PG sin IF NOT EXISTS) y la tabla users
+    quedo desincronizada con el modelo SQLAlchemy. El resultado lista
+    el output de cada migracion.
+    """
+    import io
+    import contextlib
+    buf = io.StringIO()
+    results = {}
+    migrations = [
+        ("user_cuit", _migrate_add_user_cuit_column),
+        ("user_billing", _migrate_add_user_billing_columns),
+        ("user_op_defaults", _migrate_add_user_op_defaults_columns),
+        ("clients_email_nullable", _migrate_clients_email_nullable),
+        ("client_column_mapping", _migrate_add_client_column_mapping),
+        ("client_fecha_inic_activ", _migrate_add_client_fecha_inic_activ),
+        ("telemetry_events", _migrate_create_telemetry_events_table),
+    ]
+    for label, fn in migrations:
+        try:
+            with contextlib.redirect_stdout(buf):
+                await fn()
+            results[label] = "ok"
+        except Exception as e:
+            results[label] = f"error: {e!r}"
+    return {
+        "ok": all(v == "ok" for v in results.values()),
+        "results": results,
+        "log": buf.getvalue(),
+    }
+
+
 @app.get("/api/dev/users-schema")
 async def dev_users_schema(
     user=Depends(get_current_user),
