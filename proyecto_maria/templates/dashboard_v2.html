@@ -685,12 +685,15 @@
             <button type="button" class="btn btn-primary btn-sm" id="tourStart">Mostrame</button>
         </div>
     </div>
-    <div class="tour-tooltip" id="tourTooltip" hidden role="dialog" aria-labelledby="tourTitle">
-        <div class="tour-tooltip-step caption" id="tourStepLabel">Paso 1 de 3</div>
+    <div class="tour-tooltip" id="tourTooltip" hidden role="dialog" aria-labelledby="tourTitle" data-arrow="bottom">
+        <div class="tour-tooltip-header">
+            <span class="tour-tooltip-step caption" id="tourStepLabel">Paso 1 de 3</span>
+            <div class="tour-tooltip-dots" id="tourDots" aria-hidden="true"></div>
+        </div>
         <h3 class="tour-tooltip-title" id="tourTitle">…</h3>
         <p class="tour-tooltip-text" id="tourText">…</p>
         <div class="tour-tooltip-actions">
-            <button type="button" class="btn btn-ghost btn-sm" id="tourSkip">Saltá tour</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="tourSkip">Saltar tour</button>
             <button type="button" class="btn btn-primary btn-sm" id="tourCta">Siguiente</button>
         </div>
     </div>

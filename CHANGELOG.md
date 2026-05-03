@@ -6,6 +6,15 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-03 · Tour v2 — polish UX
+
+- **feat (tour):** rediseño del tour de bienvenida. "Ver tour" del footer ahora arranca directo el paso 1 (saltea el cartelito, respeta la intención), cierra drawers abiertos antes, flechita que apunta al botón destacado, puntitos de progreso (● ● ○), ESC cierra, "Saltar" siempre visible. Sube z-index a 9600 para no quedar tapado en ninguna pantalla.
+- **fix (css):** eliminado bloque CSS duplicado y truncado de `.ncm-autofill-banner` (arrastrado desde `f4dd88b`) que rompía el parseo de todos los estilos del tour.
+- **a11y:** respeto `prefers-reduced-motion` — sin animaciones si el sistema las bajó.
+- Archivos tocados: `proyecto_maria/static/v2/screens/tour.js`, `proyecto_maria/static/v2/app_v2.css`, `proyecto_maria/templates/dashboard_v2.html`.
+
+---
+
 ## 2026-05-02 · Wave 1 cerrada + repo unificado
 
 - **chore (repo):** unificado el proyecto en `~/Desktop/CDI-app/` (antes había tres clones que divergían). Subido a GitHub privado `Memu007/CDI-vuce-`. `.gitignore` ajustado: nunca van `.env`, `.env.afip`, `*.db`, `venv/`, `viejo/`, ni PDFs de clientes.

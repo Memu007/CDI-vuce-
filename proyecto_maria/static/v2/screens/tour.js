@@ -1,15 +1,16 @@
 /* ============================================================
    CDI v2 — Tour de bienvenida (3 pasos contextuales)
 
-   Diseno (heredado del Tour V4 de v1):
-   - NO bloquea: coachmark sutil opt-in a los 2.5s.
-   - 3 pasos: subir, revisar, descargar (no es feature tour, es outcome tour).
-   - Contextual: paso 2 y 3 solo aparecen cuando el user llega a esas
-     pantallas (escucha `cdi:screen-enter`).
-   - "Salta tour" siempre visible.
-   - Estado en localStorage: pending | started | paused_at_<id> |
-     dismissed | completed.
-   - Reabrible desde "Mi perfil" (CDI.openTour).
+   UX v2.1 (mayo 2026):
+   - Primera visita: coachmark sutil abajo-a-la-derecha a los 2.5s.
+     Pasivo, opt-in. Si el user toca "Ahora no" queda dismissed.
+   - Reapertura explícita ("Ver tour" en footer o perfil): arranca
+     DIRECTO el paso 1, cerrando drawers abiertos si hacen falta.
+     No re-preguntamos: si clickeó "Ver tour", ya decidió.
+   - Tooltip con flechita que apunta al target, puntitos de progreso,
+     ESC para cerrar, "Saltar tour" siempre visible.
+   - Contextual: pasos 2 y 3 retoman solos cuando el user llega a la
+     pantalla correspondiente (listener cdi:screen-enter).
    ============================================================ */
 (function () {
     'use strict';
@@ -22,7 +23,7 @@
             screen: 'upload',
             targetId: 'uploadPickBtn',
             title: 'Subí tu primera factura',
-            text: 'Arrastrá un PDF o Excel del proveedor y leemos los items por vos.',
+            text: 'Arrastrá un PDF o Excel del proveedor y leemos los ítems por vos.',
             cta: 'Entendido',
         },
         {
@@ -46,6 +47,7 @@
     let currentStep = -1;
     let activeTooltip = null;
     let activeTarget = null;
+    let escListener = null;
 
     function getState() {
         try { return localStorage.getItem(KEY) || 'pending'; }
@@ -59,12 +61,12 @@
         try { CDI.track && CDI.track(action, props || {}); } catch (_) {}
     }
 
+    /* ---------- Coachmark pasivo (solo primera visita) ---------- */
     function init() {
         const state = getState();
         if (state === 'completed' || state === 'dismissed') return;
         if (state.indexOf && state.indexOf('paused_at_') === 0) {
-            // Si quedo pausado, NO mostramos el coachmark; esperamos a que
-            // el usuario llegue a la pantalla correcta y retomamos solos.
+            // Pausado: esperamos a que llegue solo a la pantalla correcta.
             const idx = STEPS.findIndex(s => 'paused_at_' + s.id === state);
             if (idx >= 0) currentStep = idx - 1;
             return;
@@ -84,9 +86,10 @@
         const cm = document.getElementById('tourCoachmark');
         if (!cm) return;
         cm.classList.remove('is-visible');
-        setTimeout(() => { cm.hidden = true; }, 220);
+        setTimeout(() => { cm.hidden = true; }, 240);
     }
 
+    /* ---------- Flow ---------- */
     function start() {
         hideCoachmark();
         setState('started');
@@ -99,7 +102,34 @@
         track('tour_dismissed', { at_step: currentStep });
         hideCoachmark();
         closeActiveTooltip();
+        removeEscListener();
         currentStep = -1;
+    }
+
+    function closeOpenOverlays() {
+        // Cerrar drawer de clientes si está abierto.
+        try { CDI.closeClientesDrawer && CDI.closeClientesDrawer(); } catch (_) {}
+        // Cerrar overlay NCM si está abierto.
+        try {
+            const ncmOverlay = document.getElementById('ncmOverlay');
+            if (ncmOverlay && !ncmOverlay.hidden) ncmOverlay.hidden = true;
+        } catch (_) {}
+    }
+
+    function addEscListener() {
+        if (escListener) return;
+        escListener = function (e) {
+            if (e.key === 'Escape' || e.keyCode === 27) {
+                e.stopPropagation();
+                dismiss();
+            }
+        };
+        document.addEventListener('keydown', escListener, true);
+    }
+    function removeEscListener() {
+        if (!escListener) return;
+        document.removeEventListener('keydown', escListener, true);
+        escListener = null;
     }
 
     function showStep(idx) {
@@ -123,9 +153,22 @@
         }
         activeTarget = target;
         target.classList.add('tour-spotlight');
+        addEscListener();
         try { target.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (_) {}
         setTimeout(() => positionTooltip(target, step, idx), 320);
         track('tour_step_shown', { step: step.id });
+    }
+
+    function renderDots(idx) {
+        const host = document.getElementById('tourDots');
+        if (!host) return;
+        const total = STEPS.length;
+        let html = '';
+        for (let i = 0; i < total; i++) {
+            const cls = i < idx ? 'dot is-done' : (i === idx ? 'dot is-active' : 'dot');
+            html += '<span class="' + cls + '"></span>';
+        }
+        host.innerHTML = html;
     }
 
     function positionTooltip(target, step, idx) {
@@ -139,28 +182,46 @@
         if (textEl) textEl.textContent = step.text;
         if (ctaEl) ctaEl.textContent = step.cta;
         if (stepEl) stepEl.textContent = 'Paso ' + (idx + 1) + ' de ' + STEPS.length;
+        renderDots(idx);
 
         activeTooltip = tooltip;
         tooltip.hidden = false;
-        // Reseteamos posicion para medir bien
         tooltip.style.top = '-9999px';
         tooltip.style.left = '0';
 
         requestAnimationFrame(() => {
             const rect = target.getBoundingClientRect();
             const ttRect = tooltip.getBoundingClientRect();
-            let top = rect.bottom + 12;
+            const gap = 14; // espacio para la flechita
+            const vw = window.innerWidth;
+            const vh = window.innerHeight;
+
+            // Preferimos tooltip DEBAJO del target (flecha apuntando arriba).
+            let arrow = 'bottom';
+            let top = rect.bottom + gap;
+            if (top + ttRect.height > vh - 12) {
+                // No entra abajo: lo ponemos arriba.
+                top = rect.top - ttRect.height - gap;
+                arrow = 'top';
+            }
+            if (top < 12) { top = 12; arrow = 'none'; }
+
             let left = rect.left + (rect.width / 2) - (ttRect.width / 2);
-            if (top + ttRect.height > window.innerHeight - 12) {
-                top = rect.top - ttRect.height - 12;
-            }
-            if (top < 12) top = 12;
             if (left < 12) left = 12;
-            if (left + ttRect.width > window.innerWidth - 12) {
-                left = window.innerWidth - ttRect.width - 12;
-            }
+            if (left + ttRect.width > vw - 12) left = vw - ttRect.width - 12;
+
+            // Calcular X relativa para posicionar la flecha sobre el target.
+            const targetCenterX = rect.left + (rect.width / 2);
+            let arrowX = targetCenterX - left;
+            // Margen mínimo: que la flecha no se pegue al borde del tooltip.
+            const minArrow = 18, maxArrow = ttRect.width - 18;
+            if (arrowX < minArrow) arrowX = minArrow;
+            if (arrowX > maxArrow) arrowX = maxArrow;
+
             tooltip.style.top = top + 'px';
             tooltip.style.left = left + 'px';
+            tooltip.style.setProperty('--arrow-x', arrowX + 'px');
+            tooltip.setAttribute('data-arrow', arrow);
             tooltip.classList.add('is-visible');
         });
     }
@@ -173,7 +234,7 @@
         if (activeTooltip) {
             const t = activeTooltip;
             t.classList.remove('is-visible');
-            setTimeout(() => { t.hidden = true; }, 220);
+            setTimeout(() => { t.hidden = true; }, 240);
             activeTooltip = null;
         }
     }
@@ -184,13 +245,13 @@
 
     function complete() {
         closeActiveTooltip();
+        removeEscListener();
         setState('completed');
         currentStep = -1;
         track('tour_completed');
     }
 
-    // Avance contextual: cuando el user cambia de pantalla, si hay un step
-    // pendiente que corresponde a esa pantalla, lo mostramos.
+    /* ---------- Avance contextual ---------- */
     document.addEventListener('cdi:screen-enter', (ev) => {
         const state = getState();
         if (state === 'completed' || state === 'dismissed') return;
@@ -200,11 +261,11 @@
         if (!screenName) return;
         const idx = STEPS.findIndex(s => s.screen === screenName);
         if (idx === -1) return;
-        // Nunca retrocedemos: si el step ya pasó, no lo volvemos a mostrar.
         if (idx <= currentStep && currentStep >= 0) return;
         setTimeout(() => showStep(idx), 250);
     });
 
+    /* ---------- Listeners de UI ---------- */
     function setupListeners() {
         const btnStart = document.getElementById('tourStart');
         const btnLater = document.getElementById('tourLater');
@@ -216,16 +277,20 @@
         if (btnSkip) btnSkip.addEventListener('click', dismiss);
     }
 
-    // Reabrir el tour desde "Mi perfil"
+    /* ---------- Public API: reapertura explícita ---------- */
+    // Se llama desde "Ver tour" en footer y desde Mi Perfil.
+    // UX: si el user clickeó explícitamente, arrancamos DIRECTO, sin
+    // re-preguntar con el coachmark. Cerramos overlays abiertos y vamos
+    // a la pantalla del paso 1.
     CDI.openTour = function () {
+        closeOpenOverlays();
+        hideCoachmark();
+        closeActiveTooltip();
         setState('started');
         currentStep = -1;
-        closeActiveTooltip();
-        // Aseguramos estar en la pantalla del paso 1
-        if (CDI.goTo) {
-            try { CDI.goTo('upload'); } catch (_) {}
-        }
-        setTimeout(() => showStep(0), 350);
+        try { CDI.goTo && CDI.goTo('upload'); } catch (_) {}
+        setTimeout(() => showStep(0), 320);
+        track('tour_reopened');
     };
 
     if (document.readyState === 'loading') {

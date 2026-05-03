@@ -4194,18 +4194,13 @@ tr:hover .ncm-note-pill.is-empty {
     color: var(--c-primary, #2c6fff);
 }
 
-/* ── Autofill memoria cliente / proveedor ──────────────── */
-.ncm-autofill-banner {
-    margin: 0 0 var(--s-3) 0;
-    border-radius: var(--r-md, 10px);
-    background: linear-gradient(135deg, var(--c-success-soft, #e8f7ee) 0
 /* ────────────────── Tour de bienvenida ────────────────── */
 
 .tour-coachmark {
     position: fixed;
     right: var(--s-4, 16px);
     bottom: var(--s-4, 16px);
-    z-index: 8500;
+    z-index: 9500;
     width: 320px;
     max-width: calc(100vw - 32px);
     padding: var(--s-3, 12px) var(--s-4, 16px) var(--s-3, 12px);
@@ -4216,13 +4211,14 @@ tr:hover .ncm-note-pill.is-empty {
     display: flex;
     flex-direction: column;
     gap: var(--s-3, 12px);
-    transform: translateY(12px);
+    transform: translateY(12px) scale(0.98);
     opacity: 0;
-    transition: opacity 200ms ease, transform 220ms ease;
+    transition: opacity 240ms cubic-bezier(0.16, 1, 0.3, 1),
+                transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
     pointer-events: auto;
 }
 .tour-coachmark.is-visible {
-    transform: translateY(0);
+    transform: translateY(0) scale(1);
     opacity: 1;
 }
 .tour-coachmark[hidden] { display: none; }
@@ -4250,7 +4246,7 @@ tr:hover .ncm-note-pill.is-empty {
     position: fixed;
     top: -9999px;
     left: 0;
-    z-index: 8600;
+    z-index: 9600;
     width: 320px;
     max-width: calc(100vw - 24px);
     padding: var(--s-4, 16px);
@@ -4259,19 +4255,82 @@ tr:hover .ncm-note-pill.is-empty {
     box-shadow: 0 16px 40px rgba(0, 0, 0, 0.22);
     border: 1px solid var(--c-border, #e5e7eb);
     opacity: 0;
-    transform: translateY(8px);
-    transition: opacity 180ms ease, transform 200ms ease;
+    transform: translateY(6px) scale(0.98);
+    transition: opacity 240ms cubic-bezier(0.16, 1, 0.3, 1),
+                transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
     pointer-events: auto;
 }
-.tour-tooltip.is-visible { opacity: 1; transform: translateY(0); }
+.tour-tooltip.is-visible { opacity: 1; transform: translateY(0) scale(1); }
 .tour-tooltip[hidden] { display: none; }
+
+/* Flechita que apunta al target. Cambia de lado según data-arrow. */
+.tour-tooltip::before,
+.tour-tooltip::after {
+    content: '';
+    position: absolute;
+    left: var(--arrow-x, 50%);
+    width: 14px;
+    height: 14px;
+    transform: translateX(-50%) rotate(45deg);
+    pointer-events: none;
+}
+.tour-tooltip::before {
+    background: transparent;
+    border: 1px solid var(--c-border, #e5e7eb);
+    z-index: -1;
+}
+.tour-tooltip::after { background: #fff; }
+.tour-tooltip[data-arrow="bottom"]::before,
+.tour-tooltip[data-arrow="bottom"]::after {
+    top: -7px;
+    border-right-color: transparent;
+    border-bottom-color: transparent;
+}
+.tour-tooltip[data-arrow="top"]::before,
+.tour-tooltip[data-arrow="top"]::after {
+    bottom: -7px;
+    border-left-color: transparent;
+    border-top-color: transparent;
+}
+.tour-tooltip[data-arrow="none"]::before,
+.tour-tooltip[data-arrow="none"]::after {
+    display: none;
+}
+
+.tour-tooltip-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--s-2, 8px);
+    margin: 0 0 6px 0;
+}
 .tour-tooltip-step {
-    margin: 0 0 4px 0;
+    margin: 0;
     text-transform: uppercase;
     letter-spacing: 0.04em;
     color: var(--c-text-3, #9ca3af);
     font-size: 11px;
     font-weight: var(--w-semibold, 600);
+}
+.tour-tooltip-dots {
+    display: inline-flex;
+    gap: 6px;
+    align-items: center;
+}
+.tour-tooltip-dots .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--c-border, #e5e7eb);
+    transition: width 200ms ease, background 200ms ease;
+}
+.tour-tooltip-dots .dot.is-active {
+    width: 18px;
+    border-radius: 3px;
+    background: var(--c-accent, #2c6fff);
+}
+.tour-tooltip-dots .dot.is-done {
+    background: var(--c-accent-soft, rgba(44, 111, 255, 0.35));
 }
 .tour-tooltip-title {
     margin: 0 0 6px 0;
@@ -4291,12 +4350,18 @@ tr:hover .ncm-note-pill.is-empty {
     align-items: center;
     gap: var(--s-2, 8px);
 }
+#tourSkip {
+    color: var(--c-text-2, #6b7280);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+}
+#tourSkip:hover { color: var(--c-text-1, #1f2937); }
 
 /* Halo sobre el target del paso actual: sin backdrop oscuro full-screen,
    solo un anillo pulsante para guiar la vista. */
 .tour-spotlight {
     position: relative;
-    z-index: 8550;
+    z-index: 9400;
     box-shadow: 0 0 0 4px rgba(44, 111, 255, 0.18),
                 0 0 0 8px rgba(44, 111, 255, 0.10);
     border-radius: var(--r-md, 10px);
@@ -4321,4 +4386,16 @@ tr:hover .ncm-note-pill.is-empty {
         width: auto;
     }
     .tour-tooltip { width: calc(100vw - 24px); }
+}
+
+/* Respeto accesibilidad: sin animaciones si el usuario las bajó. */
+@media (prefers-reduced-motion: reduce) {
+    .tour-coachmark,
+    .tour-tooltip {
+        transition: opacity 120ms linear;
+        transform: none;
+    }
+    .tour-coachmark.is-visible,
+    .tour-tooltip.is-visible { transform: none; }
+    .tour-spotlight { animation: none; }
 }
