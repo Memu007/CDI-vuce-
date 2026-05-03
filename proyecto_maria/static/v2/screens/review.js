@@ -281,7 +281,7 @@
 
         renderMetaPill();
         recomputeHints();
-        validateAll();
+        validateAll({ silent: true });
         renderIncotermWarning();
         renderProrrateoPanel();
     }
@@ -626,7 +626,8 @@
         FIELDS.forEach(updateFieldHint);
     }
 
-    function validateField(name) {
+    function validateField(name, opts) {
+        const silent = !!(opts && opts.silent);
         const el = form.querySelector('[name="' + name + '"]');
         const errEl = form.querySelector('[data-error-for="' + name + '"]');
         if (!el) return true;
@@ -637,8 +638,10 @@
         if (validator) errMsg = validator(value);
 
         if (errMsg) {
-            el.classList.add('is-error');
-            if (errEl) { errEl.textContent = errMsg; errEl.hidden = false; }
+            if (!silent) {
+                el.classList.add('is-error');
+                if (errEl) { errEl.textContent = errMsg; errEl.hidden = false; }
+            }
             return false;
         }
         el.classList.remove('is-error');
@@ -646,9 +649,9 @@
         return true;
     }
 
-    function validateAll() {
+    function validateAll(opts) {
         let okCount = 0;
-        FIELDS.forEach(name => { if (validateField(name)) okCount++; });
+        FIELDS.forEach(name => { if (validateField(name, opts)) okCount++; });
         renderMissingCount();
         updateContinueEnabled();
         return okCount;
