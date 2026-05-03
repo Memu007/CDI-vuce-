@@ -210,17 +210,21 @@
                                         <span class="field-error" data-error-for="fecha_emision" hidden></span>
                                     </div>
                                     <div class="field">
-                                        <label class="field-label" for="f_moneda">Moneda</label>
+                                        <label class="field-label" for="f_moneda">Moneda <span class="field-required">· requerido</span></label>
                                         <select class="select" id="f_moneda" name="moneda">
+                                            <option value="">Elegí una opción…</option>
                                             <option value="DOL">Dólar (DOL)</option>
                                             <option value="EUR">Euro (EUR)</option>
                                             <option value="BRL">Real (BRL)</option>
                                             <option value="ARS">Peso (ARS)</option>
                                         </select>
+                                        <span class="field-hint" data-hint-for="moneda"></span>
+                                        <span class="field-error" data-error-for="moneda" hidden></span>
                                     </div>
                                     <div class="field">
-                                        <label class="field-label" for="f_incoterm">Incoterm</label>
+                                        <label class="field-label" for="f_incoterm">Incoterm <span class="field-required">· requerido</span></label>
                                         <select class="select" id="f_incoterm" name="incoterm">
+                                            <option value="">Elegí una opción…</option>
                                             <option value="FOB">FOB</option>
                                             <option value="CIF">CIF</option>
                                             <option value="CFR">CFR</option>
@@ -229,6 +233,8 @@
                                             <option value="DAP">DAP</option>
                                             <option value="DDP">DDP</option>
                                         </select>
+                                        <span class="field-hint" data-hint-for="incoterm"></span>
+                                        <span class="field-error" data-error-for="incoterm" hidden></span>
                                     </div>
                                 </div>
                             </fieldset>

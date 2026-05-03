@@ -235,7 +235,9 @@
         }
         if (name === 'incoterm') {
             const upper = String(val).trim().toUpperCase();
-            return INCOTERM_WHITELIST.indexOf(upper) !== -1 ? upper : '';
+            if (INCOTERM_WHITELIST.indexOf(upper) !== -1) return upper;
+            const m = upper.match(/\b(FOB|CIF|CFR|FCA|EXW|DAP|DDP)\b/);
+            return m ? m[1] : '';
         }
         if (name === 'flete' || name === 'seguro') {
             const n = Number(val);
@@ -663,16 +665,21 @@
         });
     }
 
+    const REQUIRED_LABELS = {
+        comprador_cuit: 'CUIT del importador',
+        moneda: 'Moneda',
+        incoterm: 'Incoterm',
+    };
+
     function renderMissingCount() {
         if (!missingCountEl) return;
         const missing = missingRequired();
         if (missing.length === 0) {
             missingCountEl.textContent = '';
-        } else if (missing.length === 1) {
-            missingCountEl.textContent = 'Falta 1 dato requerido';
-        } else {
-            missingCountEl.textContent = 'Faltan ' + missing.length + ' datos requeridos';
+            return;
         }
+        const labels = missing.map(n => REQUIRED_LABELS[n] || n);
+        missingCountEl.textContent = (missing.length === 1 ? 'Falta: ' : 'Faltan: ') + labels.join(', ');
     }
 
     function updateContinueEnabled() {
@@ -685,10 +692,12 @@
         const allValid = FIELDS.every(validateField);
         const missing = missingRequired();
         if (!allValid || missing.length > 0) {
-            // Focus primer error
             const firstErr = form.querySelector('.input.is-error') ||
                              form.querySelector('[name="' + missing[0] + '"]');
-            if (firstErr) firstErr.focus();
+            if (firstErr) {
+                try { firstErr.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
+                try { firstErr.focus({ preventScroll: true }); } catch (_) { firstErr.focus(); }
+            }
             CDI.track('review_continue_blocked', { missing: missing });
             return;
         }
