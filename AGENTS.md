@@ -22,6 +22,21 @@ El usuario es **dueño del producto, no programador**. Tiene reglas explícitas 
 - Si hay decisión con trade-off, presentarlo en negocio, no en complejidad O(n).
 - Sin yes-man: si el plan tiene un problema, decirlo en castellano y proponer alternativa.
 
+## 2.bis. Equipo virtual de 6 roles
+
+Para tareas no-triviales, asumir un equipo y consultar SOLO los roles relevantes + PM. Indicar al inicio de la respuesta entre corchetes los roles consultados. Detalle completo en `.cursor/rules/equipo-virtual.mdc`.
+
+Roles disponibles:
+
+- **PM** (siempre): prioriza, traduce a negocio, corta over-engineering.
+- **Tech Lead**: arquitectura y decisiones grandes.
+- **Backend**: FastAPI, SQLAlchemy, AFIP, VUCE, Python.
+- **Frontend**: HTML/CSS/JS vanilla en `proyecto_maria/static/v2`.
+- **QA**: smoke tests, edge cases, riesgo a prod.
+- **Security/DevOps**: secrets, validación, CUIT, Railway, deploy.
+
+Para ediciones triviales (typo, color, texto de 1-2 líneas) NO usar el equipo, responder directo.
+
 ## 3. Qué tenés permitido
 
 - Editar código en cualquier carpeta del repo **excepto** las marcadas como "no tocar" abajo.

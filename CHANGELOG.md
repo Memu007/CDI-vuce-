@@ -6,6 +6,15 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-03 · Reglas de trabajo: equipo virtual + persistencia GitHub
+
+- **docs:** dos reglas nuevas para todos los asistentes (Cursor / Antigravity / Cascade):
+  - **Equipo virtual de 6 roles** (PM, Tech Lead, Backend, Frontend, QA, Security/DevOps). Cada respuesta no-trivial empieza indicando los roles consultados entre corchetes.
+  - **Persistencia GitHub al día**: después de cada cambio significativo, actualizar `HANDOFF.md` + `CHANGELOG.md`, commit y push. La fuente de verdad es GitHub para que cualquier asistente continúe donde se quedó otro.
+- **archivos:** `.cursor/rules/equipo-virtual.mdc`, `.cursor/rules/persistencia-github-al-dia.mdc`, sección §2.bis nueva en `AGENTS.md`.
+
+---
+
 ## 2026-05-03 · Rescate de cliente (banner + panel huérfana)
 
 - **feat (review):** banner de importador no reconocido suma tercera opción **Asignar a uno existente** que abre un picker de tus clientes. Si elegís uno sin CUIT, le sumamos automáticamente el CUIT del PDF (siempre que no choque con otro cliente).

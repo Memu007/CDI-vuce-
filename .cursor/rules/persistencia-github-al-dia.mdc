@@ -1,0 +1,48 @@
+---
+description: Después de cada cambio significativo, actualizar HANDOFF + CHANGELOG, commitear y pushear a GitHub para que cualquier asistente (Cursor, Antigravity, Cascade) pueda continuar desde donde se quedó
+alwaysApply: true
+---
+
+# Persistencia y GitHub al día
+
+## Contexto
+
+El USER trabaja con varios asistentes (Cursor, Antigravity, Cascade) y necesita que cualquiera pueda agarrar el repo y continuar. La fuente de verdad es **GitHub**, no la memoria de un asistente puntual.
+
+## Regla
+
+Después de cada cambio significativo (feature nueva, fix, refactor):
+
+1. Si cambió el comportamiento del producto: actualizar `HANDOFF.md` §6 ("Estado actual").
+2. Si se agregó/sacó endpoint o columna de DB: actualizar `HANDOFF.md` §5 (Estructura).
+3. Sumar 1-3 líneas en `CHANGELOG.md` con la fecha del día y prefijo (`feat:` / `fix:` / `chore:` / `docs:` / `refactor:` / `test:`).
+4. `git add -A && git commit -m "<prefijo>: <descripción clara>"` (mensaje en castellano).
+5. `git push origin main` (sin `--force`).
+
+## Cuándo NO commitear
+
+- Si el código está roto o incompleto: documentar en `HANDOFF.md` sección "TODO siguiente sesión" qué quedó pendiente.
+- Si tocaste secrets, `.env`, `.env.afip` o cualquier archivo gitignored: NUNCA commitearlos.
+- Si el USER explícitamente pidió no commitear todavía.
+
+## Archivos clave (orden de lectura para una IA nueva)
+
+1. `AGENTS.md` — instrucciones para cualquier asistente. Se lee primero.
+2. `HANDOFF.md` — estado actual, qué funciona, qué es frágil, stack.
+3. `CHANGELOG.md` — historial reciente para entender qué cambió.
+4. `.cursor/rules/` — reglas específicas (esta y otras).
+
+## Smoke test si tocaste backend
+
+```bash
+PYTHONPATH=. uvicorn proyecto_maria.main:app --host 127.0.0.1 --port 8000 &
+sleep 4
+BASE_URL=http://127.0.0.1:8000 ./scripts/testing/smoke_friccion.sh
+kill %1
+```
+
+Si falla, no declarar la tarea cerrada. Documentar el error y avisar al USER.
+
+## Tags / hitos
+
+Para cierres de feature, fin de Wave o fix grande: **proponer un tag al USER** (no crearlo unilateralmente). Sin tags borrados sin avisar.
