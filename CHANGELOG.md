@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-04 · Rules más livianas
+
+- **docs:** `AGENTS.md` quedó como resumen maestro corto para no sobrecargar asistentes.
+- **rules:** nueva regla `copiloto-producto` concentra trato, negocio primero y no asumir decisiones sensibles.
+
+---
+
 ## 2026-05-04 · Regla modo tranquilo
 
 - **docs:** nueva regla compartida `modo-tranquilo-calidad`: calidad sobre velocidad, cambios chicos, revisar y probar antes de seguir.

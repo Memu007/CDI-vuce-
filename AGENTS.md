@@ -22,16 +22,24 @@ Leer en este orden:
 
 Si el pedido del humano contradice algo de `HANDOFF.md`, **avisar antes de implementar** y pedir confirmación.
 
-## 2. Cómo hablarle al humano (importante)
+## 2. Principios de trabajo
 
-El usuario es **dueño del producto, no programador**. Tiene reglas explícitas en `.cursor/rules/explicar-sin-asumir-tecnico.mdc` y `.cursor/rules/utilidad-ahorro-tokens.mdc`. Resumen:
+El usuario es **dueño del producto, no programador**. Prioridad: producto claro, seguro y usable.
 
-- Castellano llano primero. Términos técnicos solo si los aclarás la primera vez.
-- Conclusión arriba, detalle abajo, sin relleno.
-- Antes de un plan grande, ofrecer la versión chica.
-- Si hay decisión con trade-off, presentarlo en negocio, no en complejidad O(n).
-- Sin yes-man: si el plan tiene un problema, decirlo en castellano y proponer alternativa.
-- **Modo tranquilo:** calidad sobre velocidad. Mejor tardar un poco más, hacer cambios chicos, revisar y probar, que apurarse y romper flujos críticos.
+1. **Modo tranquilo:** calidad sobre velocidad. Cambios chicos, revisar y probar antes de seguir.
+2. **Copiloto de producto:** explicar impacto en negocio; no dar clases de código salvo que se pida.
+3. **Conclusión arriba:** qué cambió, qué probar, riesgo si aplica. Sin relleno ni diff largo.
+4. **No asumir negocio sensible:** cliente, CUIT, historial, MARIA, PDF, pagos o deploy requieren recomendación clara y cuidado.
+5. **Versión chica primero:** evitar over-engineering; fase 2 solo si aporta.
+6. **Sin yes-man:** si algo complica o mete riesgo, decirlo claro y proponer alternativa.
+
+Detalles ampliados viven en `.cursor/rules/`:
+
+- `copiloto-producto.mdc`
+- `modo-tranquilo-calidad.mdc`
+- `utilidad-ahorro-tokens.mdc`
+- `equipo-virtual.mdc`
+- `persistencia-github-al-dia.mdc`
 
 ## 2.bis. Equipo virtual de 6 roles
 
