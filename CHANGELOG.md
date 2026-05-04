@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-04 · Tour automático al alta
+
+- **ux (onboarding):** después de registro/verificación el tour se fuerza una vez aunque el estado local estuviera cerrado.
+- **safe:** el tour no se repite infinitamente al recargar y el botón `Ver tour` sigue funcionando.
+
+---
+
 ## 2026-05-04 · Fix eliminar clientes
 
 - **fix (clientes):** al eliminar cliente ahora también se limpia su historial de productos asociado para evitar errores 500.

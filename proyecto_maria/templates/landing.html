@@ -560,6 +560,7 @@
                 const emailEl = document.getElementById('verifySentEmail');
                 if (emailEl) emailEl.textContent = data.email || payload.email || 'tu casilla';
                 if (endpoint === '/auth/register') {
+                    try { sessionStorage.setItem('cdi_force_tour_after_signup', '1'); } catch (_) {}
                     landingUiTelemetry({ action: 'register_pending_verify', screen: 'landing_register' });
                 }
                 activate('verify');

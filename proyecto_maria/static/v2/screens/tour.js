@@ -17,6 +17,8 @@
     const CDI = window.CDI = window.CDI || {};
 
     const KEY = 'cdi_tour_v2';
+    const FORCE_KEY = 'cdi_tour_forced_after_signup';
+    const SIGNUP_SESSION_KEY = 'cdi_force_tour_after_signup';
     const STEPS = [
         {
             id: 'upload',
@@ -57,12 +59,46 @@
         try { localStorage.setItem(KEY, s); } catch (_) {}
     }
 
+    function hasSignupSignal() {
+        try {
+            const qs = new URLSearchParams(window.location.search || '');
+            if (qs.get('verified') === 'true') return true;
+        } catch (_) {}
+        try {
+            if (sessionStorage.getItem(SIGNUP_SESSION_KEY) === '1') return true;
+        } catch (_) {}
+        return false;
+    }
+
+    function shouldForceAfterSignup() {
+        if (!hasSignupSignal()) return false;
+        try {
+            if (sessionStorage.getItem(FORCE_KEY) === '1') return false;
+        } catch (_) {}
+        return true;
+    }
+
+    function markForcedAfterSignup() {
+        try { sessionStorage.setItem(FORCE_KEY, '1'); } catch (_) {}
+        try { sessionStorage.removeItem(SIGNUP_SESSION_KEY); } catch (_) {}
+    }
+
     function track(action, props) {
         try { CDI.track && CDI.track(action, props || {}); } catch (_) {}
     }
 
     /* ---------- Coachmark pasivo (solo primera visita) ---------- */
     function init() {
+        if (shouldForceAfterSignup()) {
+            markForcedAfterSignup();
+            setState('started');
+            setTimeout(() => {
+                try { CDI.goTo && CDI.goTo('upload'); } catch (_) {}
+                showStep(0);
+            }, 700);
+            track('tour_forced_after_signup');
+            return;
+        }
         const state = getState();
         if (state === 'completed' || state === 'dismissed') return;
         if (state.indexOf && state.indexOf('paused_at_') === 0) {
