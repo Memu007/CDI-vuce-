@@ -3389,42 +3389,65 @@ async def delete_cliente(
     username = user["username"]
     client = await _get_owned_client(db, client_id, username)
 
-    # CASCADE: operation_items → operations del cliente (solo del user).
-    op_rows = await db.execute(
-        sa_select(OperationModel.id).where(
-            OperationModel.client_id == client_id,
-            OperationModel.owner_username == username,
-        )
-    )
-    op_ids = [row[0] for row in op_rows.fetchall()]
-    if op_ids:
-        await db.execute(
-            sa_delete(OperationItemModel).where(
-                OperationItemModel.operation_id.in_(op_ids)
-            )
-        )
-        await db.execute(
-            sa_delete(OperationModel).where(
-                OperationModel.id.in_(op_ids),
+    try:
+        # CASCADE: operation_items → operations del cliente (solo del user).
+        op_rows = await db.execute(
+            sa_select(OperationModel.id).where(
+                OperationModel.client_id == client_id,
                 OperationModel.owner_username == username,
             )
         )
+        op_ids = [row[0] for row in op_rows.fetchall()]
+        if op_ids:
+            await db.execute(
+                sa_delete(OperationItemModel).where(
+                    OperationItemModel.operation_id.in_(op_ids)
+                )
+            )
+            await db.execute(
+                sa_delete(OperationModel).where(
+                    OperationModel.id.in_(op_ids),
+                    OperationModel.owner_username == username,
+                )
+            )
 
-    # Notas NCM asociadas al cliente (si las había vinculadas).
-    await db.execute(
-        sa_delete(NCMNoteModel).where(
-            NCMNoteModel.client_id == client_id,
-            NCMNoteModel.owner_username == username,
+        # Historial de productos asociado al cliente.
+        await db.execute(
+            sa_delete(ClientProductHistoryModel).where(
+                ClientProductHistoryModel.client_id == client_id,
+                ClientProductHistoryModel.owner_username == username,
+            )
         )
-    )
 
-    await db.delete(client)
-    await db.commit()
-    return {
-        "success": True,
-        "message": "Cliente y operaciones eliminados",
-        "operaciones_eliminadas": len(op_ids),
-    }
+        # Notas NCM asociadas al cliente (si las había vinculadas).
+        await db.execute(
+            sa_delete(NCMNoteModel).where(
+                NCMNoteModel.client_id == client_id,
+                NCMNoteModel.owner_username == username,
+            )
+        )
+
+        await db.delete(client)
+        await db.commit()
+        return {
+            "success": True,
+            "message": "Cliente y operaciones eliminados",
+            "operaciones_eliminadas": len(op_ids),
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        await db.rollback()
+        logging.exception(
+            "delete_cliente failed client_id=%s owner=%s: %s",
+            client_id,
+            username,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="No se pudo eliminar el cliente. Probá de nuevo o avisame.",
+        )
 
 
 @app.get("/api/clientes/{client_id}/operaciones")
@@ -3435,35 +3458,50 @@ async def get_client_operations(
 ):
     """Historial de operaciones del cliente (solo del user logueado)."""
     username = user["username"]
-    # Verifica que el cliente sea del user (404 si no).
-    await _get_owned_client(db, client_id, username)
+    try:
+        # Verifica que el cliente sea del user (404 si no).
+        await _get_owned_client(db, client_id, username)
 
-    result = await db.execute(
-        sa_select(OperationModel)
-        .where(
-            OperationModel.client_id == client_id,
-            OperationModel.owner_username == username,
+        result = await db.execute(
+            sa_select(OperationModel)
+            .where(
+                OperationModel.client_id == client_id,
+                OperationModel.owner_username == username,
+            )
+            .order_by(sa_desc(OperationModel.created_at))
+            .limit(50)
         )
-        .order_by(sa_desc(OperationModel.created_at))
-        .limit(50)
-    )
-    operations = result.scalars().all()
-    return {
-        "success": True,
-        "operaciones": [
-            {
-                "id": op.id,
-                "op_code": op.op_code,
-                "fecha": op.created_at.isoformat() if op.created_at else None,
-                "total_items": op.total_items,
-                "total_value": op.total_value,
-                "total_weight": op.total_weight,
-                "generated_file": op.generated_file,
-                "currency": op.currency,
-            }
-            for op in operations
-        ],
-    }
+        operations = result.scalars().all()
+        return {
+            "success": True,
+            "operaciones": [
+                {
+                    "id": op.id,
+                    "op_code": op.op_code,
+                    "fecha": op.created_at.isoformat() if op.created_at else None,
+                    "total_items": op.total_items,
+                    "total_value": op.total_value,
+                    "total_weight": op.total_weight,
+                    "generated_file": op.generated_file,
+                    "currency": op.currency,
+                }
+                for op in operations
+            ],
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        await db.rollback()
+        logging.exception(
+            "get_client_operations failed client_id=%s owner=%s: %s",
+            client_id,
+            username,
+            exc,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="No se pudo cargar el historial del cliente. Probá de nuevo o avisame.",
+        )
 
 
 @app.post("/api/clientes/{client_id}/operaciones")
