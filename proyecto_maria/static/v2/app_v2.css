@@ -4284,6 +4284,13 @@ tr:hover .ncm-note-pill.is-empty {
     color: var(--c-text-2, #6b7280);
     line-height: 1.5;
 }
+.tour-welcome-intro {
+    margin: 0 0 var(--s-3, 12px) 0;
+    font-size: var(--t-15, 15px);
+    color: var(--c-text-1, #1f2937);
+    line-height: 1.5;
+    font-weight: var(--w-medium, 500);
+}
 
 .tour-welcome-slides {
     position: relative;
