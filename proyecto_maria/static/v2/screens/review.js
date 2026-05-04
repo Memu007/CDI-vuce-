@@ -790,6 +790,17 @@
         el.setAttribute('aria-hidden', 'true');
     }
 
+    function showReviewClientSuccess(title, text) {
+        const el = document.getElementById('reviewClientSuccess');
+        if (!el) return;
+        const titleEl = el.querySelector('[data-client-success-title]');
+        const textEl = el.querySelector('[data-client-success-text]');
+        if (titleEl) titleEl.textContent = title || '';
+        if (textEl) textEl.textContent = text || '';
+        el.hidden = false;
+        try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_) {}
+    }
+
     function maybeShowPendingImporterBanner() {
         const el = document.getElementById('reviewPendingImporterBanner');
         if (!form || !el) return;
@@ -881,6 +892,10 @@
                     try { sessionStorage.removeItem(_PENDING_IMPORTADOR_KEY); } catch (_) {}
                     hidePendingImporterBanner();
                     populate();
+                    showReviewClientSuccess(
+                        'Cliente asignado a esta operación',
+                        (existente.nombre || 'El cliente') + ' quedó asociado. La próxima vez se detecta por CUIT.'
+                    );
                     CDI.toast && CDI.toast('Listo', 'Cliente activado: ' + (existente.nombre || ''), 'success');
                 }
                 return;
@@ -903,6 +918,10 @@
             try { sessionStorage.removeItem(_PENDING_IMPORTADOR_KEY); } catch (_) {}
             hidePendingImporterBanner();
             populate();
+            showReviewClientSuccess(
+                'Cliente creado con éxito',
+                (out.cliente.nombre || nombre) + ' quedó asociado a esta operación. La próxima vez se detecta por CUIT.'
+            );
             CDI.toast && CDI.toast('Listo', 'Cliente guardado y activado', 'success');
             CDI.track && CDI.track('importador_quick_create_ok', { has_cuit: !!body.cuit });
         } catch (err) {
@@ -932,6 +951,10 @@
                 try { sessionStorage.removeItem(_PENDING_IMPORTADOR_KEY); } catch (_) {}
                 hidePendingImporterBanner();
                 populate();
+                showReviewClientSuccess(
+                    'Cliente asignado a esta operación',
+                    (c.nombre || 'El cliente') + ' quedó asociado a esta operación.'
+                );
                 CDI.track && CDI.track('importador_assign_existing_ok', { cliente_id: c.id });
 
                 // Si el cliente elegido no tenía CUIT y el del PDF no choca con
@@ -957,13 +980,17 @@
                             CDI.clientesCache = [];
                             CDI.setClienteActivo(out.cliente);
                             CDI.track && CDI.track('importador_cuit_attached_to_existing', { cliente_id: c.id });
+                            showReviewClientSuccess(
+                                'Cliente asignado y actualizado',
+                                (out.cliente.nombre || c.nombre || 'El cliente') + ' quedó asociado con el CUIT del PDF.'
+                            );
                             CDI.toast && CDI.toast('Listo', 'Cliente actualizado con CUIT del PDF', 'success');
                             return;
                         }
                     } catch (_) {}
-                    CDI.toast && CDI.toast('Asignado', (c.nombre || '') + ' es el cliente activo', 'success');
+                    CDI.toast && CDI.toast('Asignado', (c.nombre || '') + ' quedó asociado a esta operación', 'success');
                 } else {
-                    CDI.toast && CDI.toast('Asignado', (c.nombre || '') + ' es el cliente activo', 'success');
+                    CDI.toast && CDI.toast('Asignado', (c.nombre || '') + ' quedó asociado a esta operación', 'success');
                 }
             },
         });

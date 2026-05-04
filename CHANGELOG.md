@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-04 · Confirmación visible al crear cliente
+
+- **ux (cliente):** al crear o asignar cliente desde PDF no reconocido ahora queda una tarjeta verde visible en Revisar/Listo, además del toast.
+
+---
+
 ## 2026-05-04 · Rules más livianas
 
 - **docs:** `AGENTS.md` quedó como resumen maestro corto para no sobrecargar asistentes.

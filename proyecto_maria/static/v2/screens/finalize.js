@@ -513,6 +513,17 @@
     }
     function clearOrphanCreateError() { showOrphanCreateError(''); }
 
+    function showReadyClientSuccess(title, text) {
+        const el = document.getElementById('readyClientSuccess');
+        if (!el) return;
+        const titleEl = el.querySelector('[data-client-success-title]');
+        const textEl = el.querySelector('[data-client-success-text]');
+        if (titleEl) titleEl.textContent = title || '';
+        if (textEl) textEl.textContent = text || '';
+        el.hidden = false;
+        try { el.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (_) {}
+    }
+
     async function lookupClienteByCuit(cuit) {
         try {
             const res = await CDI.api('/api/clientes/by-cuit/' + encodeURIComponent(cuit));
@@ -627,6 +638,10 @@
         if (panel) panel.hidden = true;
         const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
         const nombre = (cliente && cliente.nombre) || 'cliente';
+        showReadyClientSuccess(
+            via === 'assign' ? 'Cliente asignado a esta operación' : 'Cliente creado con éxito',
+            'Operación asociada a ' + nombre + '. La próxima factura con este CUIT se detecta sola.'
+        );
         CDI.toast && CDI.toast(
             'Cliente guardado',
             'La próxima factura con este CUIT se detecta sola. Operación asociada a ' + nombre + '.',

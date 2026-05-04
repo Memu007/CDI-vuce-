@@ -829,7 +829,31 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: var(--s-3);
-    align-items: center;
+}
+
+.client-success-card {
+    margin-bottom: var(--s-6);
+    padding: var(--s-4) var(--s-5);
+    border: 1px solid rgba(52, 199, 89, 0.28);
+    border-radius: var(--radius-card, 8px);
+    background: linear-gradient(135deg, rgba(52, 199, 89, 0.12), rgba(230, 240, 250, 0.8));
+    color: var(--c-text);
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.08);
+}
+.client-success-card strong {
+    display: block;
+    margin-bottom: 4px;
+    font-size: var(--t-15);
+    color: #166534;
+}
+.client-success-card span {
+    display: block;
+    color: var(--c-text-2);
+    font-size: var(--t-14);
+    line-height: 1.45;
+}
+.client-success-card-ready {
+    margin-top: var(--s-5, 24px);
 }
 
 .dropzone {
