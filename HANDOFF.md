@@ -118,7 +118,7 @@ CDI-app/
 - Cliente activo (clientes guardados se eligen, no se "pisan" por el PDF).
 - Auto-detect importador por CUIT (cuando NO hay cliente activo).
 - Banner en revisión: "este importador no está en tu lista" con 3 opciones (crear y usar / asignar a existente / no por ahora). Pre-check `by-cuit` evita duplicados.
-- Panel "operación huérfana" en pantalla Listo: si terminás el TXT sin cliente activo, ofrece crear / asignar / más tarde (rescate al final).
+- Panel final de cliente no reconocido: si terminás el TXT sin cliente activo, ofrece crear / asignar / más tarde. El alta corta prellena razón social, CUIT y domicilio si vienen de la factura, y asocia la operación al historial.
 - Telemetría: eventos UI persistidos en SQL (`telemetry_events`) + JSONL.
 - Panel KPIs Wave 1 (`/dev/dashboard`): demo vs PDF, auto-detect OK / sin match, activación (usuarios únicos por acción + cuentas DB).
 - Endpoints: `GET /api/clientes/by-cuit/{cuit}`, `POST /api/ui/event`, alias `POST /api/session/state`, `GET /api/dev/wave1-kpis`.

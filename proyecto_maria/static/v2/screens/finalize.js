@@ -419,6 +419,7 @@
         if (form) form.hidden = true;
         clearOrphanCreateError();
         setupOrphanPanelListeners();
+        renderOrphanDetectedData();
         prefillOrphanCreateForm();
         try { CDI.track && CDI.track('op_orphan_panel_shown'); } catch (_) {}
     }
@@ -454,11 +455,54 @@
         const op = (CDI.state && CDI.state.operacion) || {};
         const inpNom = document.getElementById('orphanCreateNombre');
         const inpCuit = document.getElementById('orphanCreateCuit');
+        const inpDir = document.getElementById('orphanCreateDireccion');
         if (inpNom && !inpNom.value) inpNom.value = String(op.comprador_nombre || '').trim();
         if (inpCuit && !inpCuit.value) {
             const c = String(op.comprador_cuit || '').trim();
             inpCuit.value = (CDI.formatCuit && c) ? CDI.formatCuit(c) : c;
         }
+        if (inpDir && !inpDir.value) inpDir.value = String(op.comprador_domicilio || '').trim();
+    }
+
+    function renderOrphanDetectedData() {
+        const box = document.getElementById('readyOrphanDetected');
+        if (!box) return;
+        const op = (CDI.state && CDI.state.operacion) || {};
+        const rows = [
+            ['Razón social', String(op.comprador_nombre || '').trim() || 'No detectado'],
+            ['CUIT', formatDetectedCuit(op.comprador_cuit) || 'No detectado'],
+            ['Factura', String(op.numero_factura || '').trim()],
+            ['Fecha', String(op.fecha_emision || '').trim()],
+        ].filter(row => row[1]);
+        box.innerHTML = rows.map(row => (
+            '<div class="ready-orphan-detected-row">' +
+                '<span>' + escapeHtml(row[0]) + '</span>' +
+                '<strong>' + escapeHtml(row[1]) + '</strong>' +
+            '</div>'
+        )).join('');
+        box.hidden = !rows.length;
+        try {
+            CDI.track && CDI.track('op_orphan_invoice_data_prefilled', {
+                has_cuit: !!String(op.comprador_cuit || '').trim(),
+                has_address: !!String(op.comprador_domicilio || '').trim()
+            });
+        } catch (_) {}
+    }
+
+    function formatDetectedCuit(cuit) {
+        const raw = String(cuit || '').trim();
+        if (!raw) return '';
+        return (CDI.formatCuit ? CDI.formatCuit(raw) : raw);
+    }
+
+    function escapeHtml(value) {
+        return String(value || '').replace(/[&<>"']/g, ch => ({
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#39;'
+        }[ch]));
     }
 
     function showOrphanCreateError(msg) {
@@ -494,9 +538,11 @@
         const btn = document.getElementById('orphanCreateSaveBtn');
         const inpNom = document.getElementById('orphanCreateNombre');
         const inpCuit = document.getElementById('orphanCreateCuit');
+        const inpDir = document.getElementById('orphanCreateDireccion');
         const nombre = String((inpNom && inpNom.value) || '').trim();
         const cuitRaw = String((inpCuit && inpCuit.value) || '').trim();
         const cuit = (CDI.normalizeCuit && cuitRaw) ? CDI.normalizeCuit(cuitRaw) : '';
+        const direccion = String((inpDir && inpDir.value) || '').trim();
         clearOrphanCreateError();
         if (!nombre) {
             showOrphanCreateError('Ingresá la razón social.');
@@ -528,6 +574,7 @@
             }
             const body = { nombre: nombre };
             if (cuit) body.cuit = cuit;
+            if (direccion) body.direccion = direccion;
             const res = await CDI.api('/api/clientes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -580,7 +627,11 @@
         if (panel) panel.hidden = true;
         const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
         const nombre = (cliente && cliente.nombre) || 'cliente';
-        CDI.toast && CDI.toast('Operación guardada', 'En el historial de ' + nombre, 'success');
+        CDI.toast && CDI.toast(
+            'Cliente guardado',
+            'La próxima factura con este CUIT se detecta sola. Operación asociada a ' + nombre + '.',
+            'success'
+        );
         CDI.track && CDI.track('op_orphan_resolved', { via: via });
     }
 

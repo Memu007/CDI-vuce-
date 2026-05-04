@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-04 · Alta corta de cliente al final del PDF
+
+- **feat (ready):** el panel final para cliente no reconocido ahora explica que puede guardarse desde la factura para que la próxima vez se detecte solo.
+- **feat (cliente):** alta corta prellenada con razón social, CUIT y domicilio si viene de la factura; al guardar crea el cliente, lo activa y asocia la operación.
+
+---
+
 ## 2026-05-04 · Fix creación de clientes sin email en Railway
 
 - **fix (backend):** la migración de `clients.email` nullable ahora también corre en Postgres/Railway. Esto evita el `500` al crear un cliente desde el PDF cuando solo tenemos razón social + CUIT.

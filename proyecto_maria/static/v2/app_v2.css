@@ -4648,6 +4648,31 @@ tr:hover .ncm-note-pill.is-empty {
     font-size: var(--t-13, 13px);
     color: var(--c-text-2, #6b7280);
 }
+.ready-orphan-detected {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: var(--s-2, 8px);
+    margin-bottom: var(--s-3, 12px);
+    padding: var(--s-3, 12px);
+    border: 1px solid var(--c-border, #e5e7eb);
+    border-radius: var(--r-3, 12px);
+    background: rgba(255, 255, 255, 0.72);
+}
+.ready-orphan-detected-row {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.ready-orphan-detected-row span {
+    color: var(--c-text-3, #9ca3af);
+    font-size: var(--t-12, 12px);
+}
+.ready-orphan-detected-row strong {
+    color: var(--c-text-1, #1f2937);
+    font-size: var(--t-13, 13px);
+    font-weight: var(--w-semibold, 600);
+    overflow-wrap: anywhere;
+}
 .ready-orphan-actions {
     display: flex;
     flex-wrap: wrap;
