@@ -267,6 +267,13 @@
             CDI.state.operationSavedFor = null;
             CDI.state.orphanDismissedFor = null;
 
+            if (currentFormat === 'pdf' && CDI.setClienteActivo) {
+                CDI.setClienteActivo(null);
+                CDI.track && CDI.track('cliente_activo_cleared_for_pdf', {
+                    filename: data && data.filename,
+                });
+            }
+
             // Auto-detectar importador desde el CUIT extraido del PDF.
             // Si el user ya tiene un cliente cargado con ese CUIT, lo activa solo.
             // Asi se ahorra abrir el drawer y tocar "Asignar importador" en el 90% de los casos.

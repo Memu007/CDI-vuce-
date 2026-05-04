@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-04 · PDF no arrastra cliente anterior
+
+- **fix (cliente):** al subir un PDF nuevo se limpia el cliente activo anterior antes de redetectar por CUIT. Si el CUIT existe, se activa el cliente correcto; si no, queda listo para crear/asignar.
+- **safe:** Excel mantiene el cliente activo para no romper mapeos por cliente.
+
+---
+
 ## 2026-05-04 · Alta corta de cliente al final del PDF
 
 - **feat (ready):** el panel final para cliente no reconocido ahora explica que puede guardarse desde la factura para que la próxima vez se detecte solo.

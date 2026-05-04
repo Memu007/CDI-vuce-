@@ -115,7 +115,7 @@ CDI-app/
 
 - Landing → registro → login → app v2.
 - Subida de PDF → extracción → revisión → NCM → generación TXT MARIA.
-- Cliente activo (clientes guardados se eligen, no se "pisan" por el PDF).
+- Cliente activo: en PDF nuevo se limpia antes de redetectar por CUIT, para que no arrastre el cliente de la operación anterior. En Excel se mantiene para no romper mapeos por cliente.
 - Auto-detect importador por CUIT (cuando NO hay cliente activo).
 - Banner en revisión: "este importador no está en tu lista" con 3 opciones (crear y usar / asignar a existente / no por ahora). Pre-check `by-cuit` evita duplicados.
 - Panel final de cliente no reconocido: si terminás el TXT sin cliente activo, ofrece crear / asignar / más tarde. El alta corta prellena razón social, CUIT y domicilio si vienen de la factura, y asocia la operación al historial.
