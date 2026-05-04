@@ -198,32 +198,38 @@
             return;
         }
 
-        startTs = Date.now();
-        CDI.track('upload_start', { format: currentFormat, filename: file.name, size: file.size });
-        setBusy(true, 'Subiendo ' + file.name + '…', 'Puede tardar unos segundos.');
-
-        const form = new FormData();
-        form.append('file', file);
-
+        let excelCliente = null;
         if (currentFormat === 'excel') {
-            const cid = (CDI.state && CDI.state.clienteActivo && CDI.state.clienteActivo.id) || '';
-            if (cid) {
-                form.append('cliente_id', cid);
-                form.append('use_mapping', 'true');
-            } else {
+            excelCliente = await pickClienteForExcel(file.name);
+            if (!excelCliente) {
                 const ok = window.confirm(
                     'No hay cliente seleccionado.\n\n' +
                     'El Excel se procesará con el mapeo genérico de columnas, no con el mapeo personalizado de tu cliente.\n\n' +
-                    '¿Querés continuar igual? (Cancelar para volver y elegir un cliente primero)'
+                    '¿Querés continuar igual? (Cancelar para elegir un cliente primero)'
                 );
                 if (!ok) {
-                    setBusy(false);
                     CDI.track('upload_cancelled_no_cliente', { format: 'excel' });
                     return;
                 }
                 CDI.track('upload_excel_sin_cliente', { filename: file.name });
             }
         }
+
+        const form = new FormData();
+        form.append('file', file);
+
+        if (currentFormat === 'excel') {
+            const cid = (excelCliente && excelCliente.id) || '';
+            if (cid) {
+                form.append('cliente_id', cid);
+                form.append('use_mapping', 'true');
+                CDI.setClienteActivo && CDI.setClienteActivo(excelCliente);
+            }
+        }
+
+        startTs = Date.now();
+        CDI.track('upload_start', { format: currentFormat, filename: file.name, size: file.size });
+        setBusy(true, 'Subiendo ' + file.name + '…', 'Puede tardar unos segundos.');
 
         try {
             const slowTimer = setTimeout(() => {
@@ -360,6 +366,33 @@
         } catch (err) {
             console.warn('[upload] auto-match importador skip:', err && err.message);
         }
+    }
+
+    function pickClienteForExcel(filename) {
+        return new Promise(resolve => {
+            if (!CDI.openClientePicker) {
+                resolve(null);
+                return;
+            }
+            let settled = false;
+            function done(cliente) {
+                if (settled) return;
+                settled = true;
+                resolve(cliente || null);
+            }
+            CDI.openClientePicker({
+                title: 'Elegí cliente para este Excel',
+                subtitle: 'Así usamos su mapeo de columnas. También podés cancelar y seguir genérico.',
+                onSelect: c => {
+                    CDI.track && CDI.track('upload_excel_cliente_selected', {
+                        cliente_id: c && c.id,
+                        filename: filename,
+                    });
+                    done(c);
+                },
+                onCancel: () => done(null),
+            });
+        });
     }
 
     async function tryCatalogAutofill(items, vendorName, clienteId) {

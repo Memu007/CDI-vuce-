@@ -188,17 +188,6 @@
         // Keyboard global (scoped a la screen)
         document.addEventListener('keydown', onGlobalKeydown);
 
-        // Sync cuando cambia cliente activo
-        document.addEventListener('cdi:cliente-activo-cambio', () => {
-            if (entered) {
-                renderList();
-                if (detailClienteId) {
-                    const c = clientes.find(x => x.id === detailClienteId);
-                    if (c) renderHero(c);
-                }
-            }
-        });
-
         initialized = true;
     }
 
@@ -424,7 +413,6 @@
         listEl.hidden = false;
 
         // Agrupamos por fav + resto solo cuando no hay busqueda/filtro que aplique orden distinto
-        const activo = CDI.getClienteActivo();
         const rows = [];
         const usarGrupos = !filterText && sortMode === 'alpha' && filterMode === 'all';
 
@@ -433,14 +421,14 @@
             const others = base.filter(c => !c.favorito);
             if (favs.length) {
                 rows.push('<li class="cx-list-section" role="presentation">Favoritos</li>');
-                favs.forEach(c => rows.push(renderCard(c, activo)));
+                favs.forEach(c => rows.push(renderCard(c)));
             }
             if (others.length) {
                 if (favs.length) rows.push('<li class="cx-list-section" role="presentation">Todos</li>');
-                others.forEach(c => rows.push(renderCard(c, activo)));
+                others.forEach(c => rows.push(renderCard(c)));
             }
         } else {
-            base.forEach(c => rows.push(renderCard(c, activo)));
+            base.forEach(c => rows.push(renderCard(c)));
         }
 
         listEl.innerHTML = rows.join('');
@@ -465,8 +453,7 @@
         return parts.map(p => p.charAt(0).toUpperCase()).join('') || '?';
     }
 
-    function renderCard(c, activo) {
-        const isActive = !!(activo && activo.id === c.id);
+    function renderCard(c) {
         const isSelected = detailClienteId === c.id;
         const fav = !!c.favorito;
         const cuitFmt = c.cuit && CDI.formatCuit ? CDI.formatCuit(c.cuit) : (c.cuit || '');
@@ -479,7 +466,6 @@
         return (
             '<li class="cx-card' +
                 (isSelected ? ' is-selected' : '') +
-                (isActive ? ' is-active' : '') +
                 (fav ? ' is-favorite' : '') +
                 '" data-cliente-id="' + CDI.escapeHtml(c.id) + '" ' +
                 'role="option" aria-selected="' + (isSelected ? 'true' : 'false') + '" ' +
@@ -494,7 +480,6 @@
                     '</div>' +
                     (meta ? '<div class="cx-card-meta">' + meta + '</div>' : '') +
                 '</div>' +
-                (isActive ? '<span class="cx-card-active">Activo</span>' : '') +
             '</li>'
         );
     }
@@ -554,9 +539,7 @@
         if (!id) return;
         const c = clientes.find(x => x.id === id);
         if (!c) return;
-        CDI.setClienteActivo(c);
-        CDI.toast && CDI.toast.success('Cliente asignado', c.nombre || '');
-        CDI.track && CDI.track('cliente_use_activated', { id: id, method: 'dblclick' });
+        selectCliente(id);
     }
 
     function selectCliente(id) {
@@ -611,21 +594,14 @@
     function renderHero(c) {
         if (!heroEl) return;
         const cuit = c.cuit && CDI.formatCuit ? CDI.formatCuit(c.cuit) : (c.cuit || '');
-        const activo = CDI.getClienteActivo();
-        const isActive = activo && activo.id === c.id;
         const tags = [];
         if (c.favorito) tags.push('<span class="cx-hero-tag is-favorite">★ Favorito</span>');
-        if (isActive) tags.push('<span class="cx-hero-tag is-active">Activo</span>');
         if (c.default_origin) tags.push('<span class="cx-hero-tag">Origen ' + CDI.escapeHtml(c.default_origin) + '</span>');
         if (c.preferred_currency) tags.push('<span class="cx-hero-tag">' + CDI.escapeHtml(c.preferred_currency) + '</span>');
 
         const metaParts = [];
         if (cuit) metaParts.push(CDI.escapeHtml(cuit));
         if (c.direccion) metaParts.push(CDI.escapeHtml(c.direccion));
-
-        const usarBtn = isActive
-            ? '<button type="button" class="btn btn-secondary" id="cxUseBtn" disabled>En uso ✓</button>'
-            : '<button type="button" class="btn btn-primary" id="cxUseBtn" title="Atajo: U">Usar en esta operación</button>';
 
         heroEl.innerHTML = (
             '<div class="cx-hero-avatar" aria-hidden="true">' + CDI.escapeHtml(initials(c.nombre)) + '</div>' +
@@ -637,7 +613,6 @@
                 (metaParts.length ? '<p class="cx-hero-meta">' + metaParts.join(' · ') + '</p>' : '') +
             '</div>' +
             '<div class="cx-hero-actions">' +
-                usarBtn +
                 '<div class="cx-kebab-wrap" id="cxKebabWrap">' +
                     '<button type="button" class="cx-kebab-btn" id="cxKebabBtn" aria-haspopup="menu" aria-label="Más acciones">' +
                         '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>' +
@@ -656,8 +631,6 @@
             '</div>'
         );
 
-        const useBtn = $('cxUseBtn');
-        if (useBtn) useBtn.addEventListener('click', () => useDetailCliente());
         const kebabBtn = $('cxKebabBtn');
         const kebabMenu = $('cxKebabMenu');
         if (kebabBtn && kebabMenu) {
@@ -959,17 +932,6 @@
     /* ==========================================================
        Acciones puntuales
        ========================================================== */
-    function useDetailCliente() {
-        if (!detailClienteId) return;
-        const c = clientes.find(x => x.id === detailClienteId);
-        if (!c) return;
-        CDI.setClienteActivo(c);
-        renderList();
-        renderHero(c);
-        CDI.toast && CDI.toast.success('Cliente asignado', c.nombre || '');
-        CDI.track && CDI.track('cliente_use_activated', { id: c.id, method: 'detail' });
-    }
-
     async function onFavClick(id) {
         try {
             await toggleFavorito(id);
@@ -1231,12 +1193,6 @@
                 }
                 CDI.clientesCache = clientes;
 
-                const activo = CDI.getClienteActivo();
-                if (isEdit && activo && activo.id === guardado.id) {
-                    CDI.setClienteActivo(guardado);
-                } else if (!isEdit) {
-                    CDI.setClienteActivo(guardado);
-                }
                 renderList();
                 selectCliente(guardado.id);
             }
@@ -1324,10 +1280,7 @@
                 return;
             }
             if (!detailClienteId) return;
-            if (key === 'u' || key === 'U') {
-                ev.preventDefault();
-                useDetailCliente();
-            } else if (key === 'f' || key === 'F') {
+            if (key === 'f' || key === 'F') {
                 ev.preventDefault();
                 onFavClick(detailClienteId);
             } else if (key === 'e' || key === 'E') {

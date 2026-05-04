@@ -210,7 +210,7 @@
         }
     }
 
-    /* ---------- 6b. Cliente activo (persistido en localStorage) ---------- */
+    /* ---------- 6b. Cliente de la operación actual ---------- */
     const CLIENTE_KEY = 'cdi_cliente_activo';
 
     function normalizeCuit(raw) {
@@ -225,26 +225,14 @@
 
     function getClienteActivo() {
         if (CDI.state && CDI.state.clienteActivo) return CDI.state.clienteActivo;
-        try {
-            const raw = localStorage.getItem(CLIENTE_KEY);
-            if (!raw) return null;
-            const parsed = JSON.parse(raw);
-            return parsed || null;
-        } catch (_) { return null; }
+        return null;
     }
 
     function setClienteActivo(cliente) {
         CDI.state = CDI.state || {};
         CDI.state.clienteActivo = cliente || null;
         try {
-            if (cliente) localStorage.setItem(CLIENTE_KEY, JSON.stringify({
-                id: cliente.id,
-                nombre: cliente.nombre,
-                cuit: cliente.cuit || '',
-                direccion: cliente.direccion || '',
-                fecha_inic_activ: cliente.fecha_inic_activ || ''
-            }));
-            else localStorage.removeItem(CLIENTE_KEY);
+            localStorage.removeItem(CLIENTE_KEY);
         } catch (_) {}
         updateClientePill();
         try {
@@ -295,16 +283,16 @@
         if (activo && activo.nombre) {
             pill.classList.add('is-active');
             pill.classList.remove('is-empty');
-            pill.title = activo.cuit ? 'Cliente: ' + activo.nombre + ' · ' + formatCuit(activo.cuit) : activo.nombre;
+            pill.title = activo.cuit ? 'Cliente de esta operación: ' + activo.nombre + ' · ' + formatCuit(activo.cuit) : activo.nombre;
             pill.innerHTML =
                 '<span class="dot-status is-success"></span>' +
-                '<span class="cliente-pill-label">Cliente:</span> ' +
+                '<span class="cliente-pill-label">Cliente operación:</span> ' +
                 '<span class="cliente-pill-name"></span>';
             pill.querySelector('.cliente-pill-name').textContent = activo.nombre;
         } else {
             pill.classList.add('is-empty');
             pill.classList.remove('is-active');
-            pill.title = 'Seleccionar cliente';
+            pill.title = 'Sin cliente para esta operación';
             pill.innerHTML =
                 '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>' +
                 '<span class="cliente-pill-label">Cliente</span>';
@@ -473,6 +461,7 @@
 
     /* ---------- 10. Bootstrap ---------- */
     document.addEventListener('DOMContentLoaded', () => {
+        try { localStorage.removeItem(CLIENTE_KEY); } catch (_) {}
         loadCurrentUser();
         updateClientePill();
         setupFakeSourceBanner();
@@ -504,9 +493,8 @@
             const action = target.getAttribute('data-action');
             if (action === 'go-upload' || action === 'back-to-upload') {
                 e.preventDefault();
-                // Mantener cliente activo al reiniciar operacion (es sticky)
-                const clienteActivo = CDI.state && CDI.state.clienteActivo;
-                CDI.state = { clienteActivo: clienteActivo || getClienteActivo() };
+                CDI.state = {};
+                setClienteActivo(null);
                 document.dispatchEvent(new CustomEvent('cdi:nueva-operacion'));
                 goTo('upload');
             } else if (action === 'go-clientes') {
