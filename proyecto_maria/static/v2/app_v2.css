@@ -4250,52 +4250,52 @@ tr:hover .ncm-note-pill.is-empty {
 .tour-welcome[hidden] { display: none; }
 
 .tour-welcome-card {
-    background: #fff;
-    border: 1px solid var(--c-border, #e5e7eb);
-    border-radius: var(--r-3, 12px);
-    box-shadow: 0 16px 48px rgba(0,0,0,0.12);
+    background: var(--c-surface);
+    border: 1px solid var(--c-border-soft);
+    border-radius: var(--r-lg);
+    box-shadow: var(--shadow-xl);
     max-width: 640px;
     width: 100%;
-    padding: var(--s-5, 20px) var(--s-6, 24px);
+    padding: var(--s-5) var(--s-6);
     transform: translateY(12px) scale(0.98);
     transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 .tour-welcome.is-visible .tour-welcome-card { transform: translateY(0) scale(1); }
 
-.tour-welcome-head { margin-bottom: var(--s-5, 20px); }
+.tour-welcome-head { margin-bottom: var(--s-5); }
 .tour-welcome-kicker {
     display: inline-block;
-    font-size: 11px;
-    font-weight: var(--w-semibold, 600);
+    font-size: var(--t-11);
+    font-weight: var(--w-semibold);
     text-transform: uppercase;
     letter-spacing: 0.06em;
-    color: var(--c-accent, #2c6fff);
-    margin-bottom: 6px;
+    color: var(--c-accent);
+    margin-bottom: var(--s-1);
 }
 .tour-welcome-head h2 {
-    margin: 0 0 6px 0;
-    font-size: var(--t-20, 20px);
-    font-weight: var(--w-bold, 700);
-    color: var(--c-text-1, #1f2937);
+    margin: 0 0 var(--s-1) 0;
+    font-size: var(--t-20);
+    font-weight: var(--w-bold);
+    color: var(--c-text-1);
 }
 .tour-welcome-head p {
     margin: 0;
-    font-size: var(--t-14, 14px);
-    color: var(--c-text-2, #6b7280);
+    font-size: var(--t-14);
+    color: var(--c-text-2);
     line-height: 1.5;
 }
 .tour-welcome-intro {
-    margin: 0 0 var(--s-3, 12px) 0;
-    font-size: var(--t-15, 15px);
-    color: var(--c-text-1, #1f2937);
+    margin: 0 0 var(--s-3) 0;
+    font-size: var(--t-15);
+    color: var(--c-text-1);
     line-height: 1.5;
-    font-weight: var(--w-medium, 500);
+    font-weight: var(--w-medium);
 }
 
 .tour-welcome-slides {
     position: relative;
     min-height: 220px;
-    margin-bottom: var(--s-5, 20px);
+    margin-bottom: var(--s-5);
 }
 
 .tour-welcome-slide {
@@ -4306,7 +4306,7 @@ tr:hover .ncm-note-pill.is-empty {
     align-items: center;
     justify-content: center;
     text-align: center;
-    gap: var(--s-3, 12px);
+    gap: var(--s-3);
     opacity: 0;
     transform: translateX(20px);
     transition: opacity 220ms ease, transform 220ms ease;
@@ -4325,21 +4325,21 @@ tr:hover .ncm-note-pill.is-empty {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: var(--c-accent-soft, rgba(44,111,255,0.12));
-    color: var(--c-accent, #2c6fff);
-    font-size: 16px;
-    font-weight: var(--w-bold, 700);
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+    font-size: var(--t-16);
+    font-weight: var(--w-bold);
 }
 .tour-welcome-slide h2 {
     margin: 0;
-    font-size: var(--t-18, 18px);
-    font-weight: var(--w-semibold, 600);
-    color: var(--c-text-1, #1f2937);
+    font-size: var(--t-18);
+    font-weight: var(--w-semibold);
+    color: var(--c-text-1);
 }
 .tour-welcome-slide p {
     margin: 0;
-    font-size: var(--t-14, 14px);
-    color: var(--c-text-2, #6b7280);
+    font-size: var(--t-14);
+    color: var(--c-text-2);
     line-height: 1.55;
     max-width: 44ch;
 }
@@ -4353,24 +4353,24 @@ tr:hover .ncm-note-pill.is-empty {
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--c-border, #e5e7eb);
+    background: var(--c-border);
     transition: width 200ms ease, background 200ms ease;
 }
 .tour-welcome-dots .dot.is-active {
     width: 18px;
-    border-radius: 3px;
-    background: var(--c-accent, #2c6fff);
+    border-radius: var(--s-1);
+    background: var(--c-accent);
 }
 
 .tour-welcome-actions {
     display: flex;
-    gap: var(--s-2, 8px);
+    gap: var(--s-2);
     justify-content: flex-end;
     align-items: center;
 }
 
 @media (max-width: 560px) {
-    .tour-welcome-slide { padding: 0 var(--s-2, 8px); }
+    .tour-welcome-slide { padding: 0 var(--s-2); }
     .tour-welcome-actions { flex-wrap: wrap; }
 }
 @media (prefers-reduced-motion: reduce) {
