@@ -94,6 +94,7 @@ from proyecto_maria.database.connection import get_async_session, init_db
 from proyecto_maria.database.models import User, Client, PasswordResetToken
 import uuid
 import logging
+from sqlalchemy.exc import IntegrityError
 from passlib.context import CryptContext
 
 from proyecto_maria.core.rate_limit import limiter, get_dynamic_rate_limit
@@ -673,10 +674,14 @@ async def _migrate_clients_email_nullable():
     minimalist drawer that only asks razon social + CUIT + domicilio).
     """
     from proyecto_maria.database.connection import engine, IS_SQLITE
-    if not IS_SQLITE:
-        return
     try:
         async with engine.begin() as conn:
+            if not IS_SQLITE:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE clients ALTER COLUMN email DROP NOT NULL"
+                )
+                return
+
             info = await conn.exec_driver_sql("PRAGMA table_info(clients)")
             rows = info.fetchall()
             if not rows:
@@ -3227,9 +3232,24 @@ async def create_cliente(
         is_active=True,
     )
     db.add(new_client)
-    await db.commit()
-    await db.refresh(new_client)
-    return {"success": True, "cliente": _client_to_dict(new_client)}
+    try:
+        await db.commit()
+        await db.refresh(new_client)
+        return {"success": True, "cliente": _client_to_dict(new_client)}
+    except IntegrityError as e:
+        await db.rollback()
+        logging.exception("create_cliente integrity error")
+        raise HTTPException(
+            status_code=409,
+            detail="No se pudo crear el cliente porque ya existe un dato duplicado o falta un dato requerido.",
+        ) from e
+    except Exception as e:
+        await db.rollback()
+        logging.exception("create_cliente failed")
+        raise HTTPException(
+            status_code=500,
+            detail="No se pudo crear el cliente. Probá de nuevo en unos segundos.",
+        ) from e
 
 
 @app.put("/api/clientes/{client_id}")

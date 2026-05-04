@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-04 · Fix creación de clientes sin email en Railway
+
+- **fix (backend):** la migración de `clients.email` nullable ahora también corre en Postgres/Railway. Esto evita el `500` al crear un cliente desde el PDF cuando solo tenemos razón social + CUIT.
+- **fix (errores):** `POST /api/clientes` ahora captura errores de integridad de base y devuelve mensaje legible en vez de un 500 mudo.
+
+---
+
 ## 2026-05-03 · Reglas de trabajo: equipo virtual + persistencia GitHub
 
 - **docs:** dos reglas nuevas para todos los asistentes (Cursor / Antigravity / Cascade):
