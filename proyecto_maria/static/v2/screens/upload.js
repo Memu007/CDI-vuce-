@@ -305,12 +305,29 @@
     async function tryAutoMatchImportador(operacion) {
         try {
             const pdfCuit = CDI.normalizeCuit && CDI.normalizeCuit(operacion && operacion.comprador_cuit);
-            if (!pdfCuit || pdfCuit.length !== 11) return;
+            const compradorNombre = String((operacion && operacion.comprador_nombre) || '').trim();
 
             const activo = CDI.getClienteActivo && CDI.getClienteActivo();
             if (activo) return;
 
             try { sessionStorage.removeItem('cdi.pending_create_client'); } catch (_) {}
+
+            if (!pdfCuit || pdfCuit.length !== 11) {
+                if (compradorNombre) {
+                    try {
+                        sessionStorage.setItem('cdi.pending_create_client', JSON.stringify({
+                            cuit: '',
+                            nombre: compradorNombre,
+                            captured_at: new Date().toISOString(),
+                        }));
+                    } catch (_) {}
+                    CDI.track && CDI.track('importador_no_match', {
+                        has_name: true,
+                        has_cuit: false,
+                    });
+                }
+                return;
+            }
 
             const res = await CDI.api('/api/clientes/by-cuit/' + encodeURIComponent(pdfCuit));
             const data = await res.json().catch(() => ({}));
@@ -327,9 +344,9 @@
                 return;
             }
 
-            const compradorNombre = String((operacion && operacion.comprador_nombre) || '').trim();
             CDI.track && CDI.track('importador_no_match', {
                 has_name: !!compradorNombre,
+                has_cuit: true,
             });
             if (compradorNombre) {
                 try {

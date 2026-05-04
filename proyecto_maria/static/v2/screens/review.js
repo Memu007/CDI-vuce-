@@ -811,10 +811,11 @@
         }
         const nom = String((data && data.nombre) || '').trim();
         const cDigits = CDI.normalizeCuit && CDI.normalizeCuit(data && data.cuit);
-        if (!data || !cDigits || cDigits.length !== 11 || !nom) {
+        if (!data || !nom) {
             hidePendingImporterBanner();
             return;
         }
+        const hasValidCuit = !!(cDigits && cDigits.length === 11);
 
         el.hidden = false;
         el.removeAttribute('aria-hidden');
@@ -823,7 +824,9 @@
         if (title) title.textContent = 'Este importador no está en tus clientes';
         if (subtitle) {
             subtitle.textContent =
-                nom + ' · CUIT ' + (CDI.formatCuit ? CDI.formatCuit(cDigits) : cDigits);
+                hasValidCuit
+                    ? nom + ' · CUIT ' + (CDI.formatCuit ? CDI.formatCuit(cDigits) : cDigits)
+                    : nom + ' · CUIT pendiente de completar';
         }
 
         const btnCrear = el.querySelector('[data-banner-crear]');
@@ -858,13 +861,15 @@
 
     async function crearClienteDesdeBanner(data, btn) {
         const nombre = String((data && data.nombre) || '').trim();
-        const cuit = CDI.normalizeCuit && CDI.normalizeCuit(data && data.cuit);
-        if (!nombre || !cuit || cuit.length !== 11) return;
+        const cuitFromField = getFieldValue('comprador_cuit');
+        const cuitRaw = cuitFromField || (data && data.cuit);
+        const cuit = CDI.normalizeCuit && CDI.normalizeCuit(cuitRaw);
+        if (!nombre) return;
         CDI.track && CDI.track('importador_quick_create_clicked');
         if (btn) btn.disabled = true;
         try {
             // Pre-check: si ya tenemos a alguien con este CUIT, ofrecer usar ese.
-            const existente = await lookupClienteByCuit(cuit);
+            const existente = (cuit && cuit.length === 11) ? await lookupClienteByCuit(cuit) : null;
             if (existente) {
                 CDI.track && CDI.track('importador_create_blocked_by_cuit_match');
                 const ok = window.confirm(
@@ -880,10 +885,12 @@
                 }
                 return;
             }
+            const body = { nombre: nombre };
+            if (cuit && cuit.length === 11) body.cuit = cuit;
             const res = await CDI.api('/api/clientes', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ nombre: nombre, cuit: cuit }),
+                body: JSON.stringify(body),
             });
             const out = await res.json().catch(() => ({}));
             if (!res.ok || !out.success || !out.cliente) {
@@ -897,7 +904,7 @@
             hidePendingImporterBanner();
             populate();
             CDI.toast && CDI.toast('Listo', 'Cliente guardado y activado', 'success');
-            CDI.track && CDI.track('importador_quick_create_ok');
+            CDI.track && CDI.track('importador_quick_create_ok', { has_cuit: !!body.cuit });
         } catch (err) {
             CDI.toast && CDI.toast(
                 'Error',
@@ -914,7 +921,8 @@
     // y nadie más lo tiene, le sumamos el del PDF.
     function asignarExistenteDesdeBanner(data) {
         if (!CDI.openClientePicker) return;
-        const pdfCuit = CDI.normalizeCuit && CDI.normalizeCuit(data && data.cuit);
+        const cuitFromField = getFieldValue('comprador_cuit');
+        const pdfCuit = CDI.normalizeCuit && CDI.normalizeCuit(cuitFromField || (data && data.cuit));
         CDI.track && CDI.track('importador_assign_existing_clicked');
         CDI.openClientePicker({
             title: 'Asignar a un cliente existente',

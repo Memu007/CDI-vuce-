@@ -9,6 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-05-04 · PDF no arrastra cliente anterior
 
 - **fix (cliente):** al subir un PDF nuevo se limpia el cliente activo anterior antes de redetectar por CUIT. Si el CUIT existe, se activa el cliente correcto; si no, queda listo para crear/asignar.
+- **fix (review):** si el PDF trae razón social del importador pero no trae CUIT válido, igual aparece la opción de crear/asignar cliente.
 - **safe:** Excel mantiene el cliente activo para no romper mapeos por cliente.
 
 ---
