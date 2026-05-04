@@ -114,6 +114,7 @@ CDI-app/
 ### Funciona
 
 - Landing → registro → login → app v2.
+- Registro: soporta modo prueba acotado por variables `REGISTER_TEST_EMAILS` + `REGISTER_TEST_EMAIL_REPLACE=true` para reusar emails de test sin afectar usuarios reales.
 - Subida de PDF → extracción → revisión → NCM → generación TXT MARIA.
 - Extracción de CUIT argentino: se normaliza a 11 dígitos sin prefijo país (`AR306...` pasa a `306...`).
 - Cliente por operación, sin selección global persistente: PDF arranca limpio, detecta por CUIT o propone crear/asignar. Excel pide elegir cliente puntualmente solo si se quiere usar mapeo personalizado.

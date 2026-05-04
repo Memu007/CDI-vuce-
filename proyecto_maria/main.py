@@ -175,6 +175,37 @@ def _email_verification_enabled() -> bool:
     return os.getenv("EMAIL_VERIFICATION_REQUIRED", "false").lower() == "true"
 
 
+def _register_test_emails() -> set[str]:
+    raw = os.getenv("REGISTER_TEST_EMAILS", "")
+    return {
+        e.strip().lower()
+        for e in raw.split(",")
+        if e.strip()
+    }
+
+
+def _register_test_email_replace_enabled() -> bool:
+    return os.getenv("REGISTER_TEST_EMAIL_REPLACE", "false").lower() == "true"
+
+
+def _is_replaceable_register_test_email(email: str | None) -> bool:
+    clean = (email or "").strip().lower()
+    return bool(
+        clean
+        and _register_test_email_replace_enabled()
+        and clean in _register_test_emails()
+    )
+
+
+def _archived_test_email(email: str, username: str) -> str:
+    local, _, domain = email.partition("@")
+    suffix = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
+    safe_local = re.sub(r"[^a-zA-Z0-9._+-]", "_", local or "test")[:24]
+    safe_user = re.sub(r"[^a-zA-Z0-9._+-]", "_", username or "user")[:24]
+    safe_domain = (domain or "example.test")[:40]
+    return f"{safe_local}+archivado-{safe_user}-{suffix}@{safe_domain}"[:100]
+
+
 def build_email_verification_token(username: str) -> str:
     """Firma un JWT dedicado para verificacion de email (24h).
 
@@ -1888,9 +1919,28 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
 
     # Verificar si el email ya existe (solo si se proporciona email)
     if request.email:
-        result = await db.execute(select(User).where(User.email == request.email))
-        if result.scalars().first():
-            raise HTTPException(status_code=400, detail="Email ya registrado. Usa otro email o ingresa con tu cuenta existente.")
+        clean_email = request.email.strip().lower()
+        result = await db.execute(select(User).where(func.lower(User.email) == clean_email))
+        existing_email_user = result.scalars().first()
+        if existing_email_user:
+            if _is_replaceable_register_test_email(clean_email):
+                old_email = existing_email_user.email
+                existing_email_user.email = _archived_test_email(
+                    clean_email,
+                    existing_email_user.username,
+                )
+                existing_email_user.is_verified = False
+                await db.commit()
+                logging.warning(
+                    "test register replace: email liberado para nueva alta "
+                    "%s (usuario anterior: %s, email anterior: %s)",
+                    clean_email,
+                    existing_email_user.username,
+                    old_email,
+                )
+            else:
+                raise HTTPException(status_code=400, detail="Email ya registrado. Usa otro email o ingresa con tu cuenta existente.")
+        request.email = clean_email
 
     user_name = request.name or request.username
 

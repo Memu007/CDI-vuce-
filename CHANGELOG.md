@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-04 · Modo prueba para reusar email de registro
+
+- **feat (registro):** se agregó modo controlado por variables `REGISTER_TEST_EMAILS` y `REGISTER_TEST_EMAIL_REPLACE=true` para liberar emails de prueba y re-registrarlos.
+- **safe:** el comportamiento normal sigue bloqueando emails duplicados; no se tocaron `.env` ni secrets.
+
+---
+
 ## 2026-05-04 · Confirmación visible al crear cliente
 
 - **ux (cliente):** al crear o asignar cliente desde PDF no reconocido ahora queda una tarjeta verde visible en Revisar/Listo, además del toast.
