@@ -4624,11 +4624,14 @@ tr:hover .ncm-note-pill.is-empty {
 
 /* ────────────────── Panel "operación huérfana" ────────────────── */
 .ready-orphan-panel {
-    margin-top: var(--s-4, 16px);
-    padding: var(--s-4, 16px);
-    background: linear-gradient(135deg, var(--c-surface-2, #f5f7fa) 0%, #fff 100%);
-    border: 1px solid var(--c-border, #e5e7eb);
-    border-radius: var(--r-lg, 14px);
+    margin-top: var(--s-5, 24px);
+    padding: clamp(22px, 3vw, 32px);
+    background:
+        radial-gradient(circle at top left, rgba(37, 99, 235, 0.16), transparent 34%),
+        linear-gradient(135deg, #eff6ff 0%, #fff 74%);
+    border: 2px solid rgba(37, 99, 235, 0.28);
+    border-radius: 22px;
+    box-shadow: 0 18px 48px rgba(15, 23, 42, 0.12);
     text-align: left;
     animation: orphanIn 280ms cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -4636,27 +4639,30 @@ tr:hover .ncm-note-pill.is-empty {
     from { opacity: 0; transform: translateY(6px); }
     to   { opacity: 1; transform: translateY(0); }
 }
-.ready-orphan-header { margin-bottom: var(--s-3, 12px); }
+.ready-orphan-header { margin-bottom: var(--s-4, 16px); }
 .ready-orphan-title {
-    margin: 0 0 4px 0;
-    font-size: var(--t-15, 15px);
-    font-weight: var(--w-semibold, 600);
-    color: var(--c-text-1, #1f2937);
+    margin: 0 0 8px 0;
+    font-size: clamp(22px, 3vw, 30px);
+    line-height: 1.12;
+    font-weight: 800;
+    color: #0f172a;
 }
 .ready-orphan-text {
     margin: 0;
-    font-size: var(--t-13, 13px);
-    color: var(--c-text-2, #6b7280);
+    max-width: 680px;
+    font-size: clamp(15px, 1.8vw, 18px);
+    line-height: 1.45;
+    color: #334155;
 }
 .ready-orphan-detected {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: var(--s-2, 8px);
-    margin-bottom: var(--s-3, 12px);
-    padding: var(--s-3, 12px);
-    border: 1px solid var(--c-border, #e5e7eb);
-    border-radius: var(--r-3, 12px);
-    background: rgba(255, 255, 255, 0.72);
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: var(--s-3, 12px);
+    margin-bottom: var(--s-4, 16px);
+    padding: var(--s-4, 16px);
+    border: 1px solid rgba(37, 99, 235, 0.18);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.84);
 }
 .ready-orphan-detected-row {
     display: flex;
@@ -4664,28 +4670,35 @@ tr:hover .ncm-note-pill.is-empty {
     gap: 2px;
 }
 .ready-orphan-detected-row span {
-    color: var(--c-text-3, #9ca3af);
-    font-size: var(--t-12, 12px);
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
 .ready-orphan-detected-row strong {
-    color: var(--c-text-1, #1f2937);
-    font-size: var(--t-13, 13px);
-    font-weight: var(--w-semibold, 600);
+    color: #0f172a;
+    font-size: 15px;
+    font-weight: 750;
     overflow-wrap: anywhere;
 }
 .ready-orphan-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--s-2, 8px);
+    gap: var(--s-3, 12px);
     align-items: center;
 }
+.ready-orphan-actions .btn {
+    min-height: 42px;
+    padding-inline: 16px;
+}
 .ready-orphan-form {
-    margin-top: var(--s-3, 12px);
-    padding-top: var(--s-3, 12px);
-    border-top: 1px solid var(--c-border, #e5e7eb);
+    margin-top: var(--s-4, 16px);
+    padding-top: var(--s-4, 16px);
+    border-top: 1px solid rgba(37, 99, 235, 0.18);
     display: flex;
     flex-direction: column;
-    gap: var(--s-3, 12px);
+    gap: var(--s-4, 16px);
 }
 .ready-orphan-form-actions {
     display: flex;

@@ -10,6 +10,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **feat (ready):** el panel final para cliente no reconocido ahora explica que puede guardarse desde la factura para que la próxima vez se detecte solo.
 - **feat (cliente):** alta corta prellenada con razón social, CUIT y domicilio si viene de la factura; al guardar crea el cliente, lo activa y asocia la operación.
+- **ux:** el panel final se agrandó y resalta más para que el despachante no lo pase por alto.
 
 ---
 
