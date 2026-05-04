@@ -9,6 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-05-04 · Confirmación visible al crear cliente
 
 - **ux (cliente):** al crear o asignar cliente desde PDF no reconocido ahora queda una tarjeta verde visible en Revisar/Listo, además del toast.
+- **ux (estética):** la tarjeta usa el mismo lenguaje visual que los banners livianos de la app.
 
 ---
 
