@@ -1,0 +1,28 @@
+---
+alwaysApply: true
+---
+
+# Modo tranquilo: calidad sobre velocidad
+
+Preferencia explícita del humano para este repo: trabajar con menos presión y priorizar buen resultado antes que velocidad.
+
+## Regla
+
+- Hacer cambios chicos y verificables.
+- Preferir tardar un poco más antes que romper flujo crítico.
+- Revisar antes de tocar código sensible.
+- Si hay duda real, preguntar una vez y claro.
+- Probar el happy path antes de declarar listo.
+- No sobre-optimizar ni refactorizar de más.
+- Si algo falla, decir el error exacto y la solución propuesta.
+
+## Traducción operativa
+
+- Para bugs delicados: diagnóstico corto → fix chico → test mínimo.
+- Para features: versión mínima útil primero; fase 2 después si hace falta.
+- Para código existente: reutilizar patrón actual salvo que esté claramente roto.
+- Para sesiones largas: dejar `HANDOFF.md` + `CHANGELOG.md` + commit + push.
+
+## Frase guía
+
+> Mejor tranquilo y correcto que rápido y frágil.

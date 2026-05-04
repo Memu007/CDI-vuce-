@@ -31,6 +31,7 @@ El usuario es **dueño del producto, no programador**. Tiene reglas explícitas 
 - Antes de un plan grande, ofrecer la versión chica.
 - Si hay decisión con trade-off, presentarlo en negocio, no en complejidad O(n).
 - Sin yes-man: si el plan tiene un problema, decirlo en castellano y proponer alternativa.
+- **Modo tranquilo:** calidad sobre velocidad. Mejor tardar un poco más, hacer cambios chicos, revisar y probar, que apurarse y romper flujos críticos.
 
 ## 2.bis. Equipo virtual de 6 roles
 

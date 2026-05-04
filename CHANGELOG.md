@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-04 · Regla modo tranquilo
+
+- **docs:** nueva regla compartida `modo-tranquilo-calidad`: calidad sobre velocidad, cambios chicos, revisar y probar antes de seguir.
+- **rules:** `AGENTS.md` suma el principio para que lo sigan todos los asistentes.
+
+---
+
 ## 2026-05-04 · CUIT argentino sin prefijo país
 
 - **fix (extracción):** el prompt de Gemini ahora aclara que el CUIT argentino tiene exactamente 11 dígitos y no debe incluir prefijos como `AR`.
