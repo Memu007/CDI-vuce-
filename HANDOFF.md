@@ -115,6 +115,7 @@ CDI-app/
 
 - Landing → registro → login → app v2.
 - Subida de PDF → extracción → revisión → NCM → generación TXT MARIA.
+- Extracción de CUIT argentino: se normaliza a 11 dígitos sin prefijo país (`AR306...` pasa a `306...`).
 - Cliente por operación, sin selección global persistente: PDF arranca limpio, detecta por CUIT o propone crear/asignar. Excel pide elegir cliente puntualmente solo si se quiere usar mapeo personalizado.
 - Auto-detect importador por CUIT (cuando NO hay cliente activo).
 - Banner en revisión: "este importador no está en tu lista" con 3 opciones (crear y usar / asignar a existente / no por ahora). Aparece aunque falte CUIT si hay razón social; si hay CUIT, pre-check `by-cuit` evita duplicados.

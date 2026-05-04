@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-04 · CUIT argentino sin prefijo país
+
+- **fix (extracción):** el prompt de Gemini ahora aclara que el CUIT argentino tiene exactamente 11 dígitos y no debe incluir prefijos como `AR`.
+- **fix (normalización):** si la extracción trae `AR306121238201`, backend/frontend lo limpian a `306121238201`.
+
+---
+
 ## 2026-05-04 · Cliente por operación, sin selección global
 
 - **refactor (cliente):** el cliente ya no queda persistido globalmente entre operaciones. PDF arranca limpio y usa detección por CUIT o rescate crear/asignar.

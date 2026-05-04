@@ -17,6 +17,16 @@ load_dotenv(os.path.join(basedir, '.env'))
 PDF_LLM_CACHE = OrderedDict()
 PDF_LLM_CACHE_MAX = 100
 
+
+def _normalize_argentine_cuit(raw) -> str:
+    value = str(raw or "").strip().upper()
+    if not value:
+        return ""
+    if value.startswith("AR"):
+        value = value[2:]
+    digits = re.sub(r"\D", "", value)
+    return digits if len(digits) == 11 else ""
+
 # Contexto rico para Gemini: explica rol, impacto y estrategia
 SYSTEM_CONTEXT = """
 Eres el motor de IA de MARÍA, sistema que automatiza despachos aduaneros argentinos.
@@ -1947,7 +1957,7 @@ Busca esta información en el encabezado de la factura:
 5. vendedor_pais: País del vendedor (código ISO2: CN, BR, US, PE, etc.)
 6. vendedor_direccion: Dirección del vendedor
 7. comprador_nombre: Nombre del comprador/importador/buyer
-8. comprador_cuit: CUIT del comprador argentino (si aparece)
+8. comprador_cuit: CUIT del comprador argentino (si aparece). REGLA CRÍTICA: CUIT argentino tiene EXACTAMENTE 11 dígitos numéricos. Formato esperado: 30-61212382-01 o 306121238201. NO agregar prefijo país. Si el PDF dice "AR306121238201", devolver "306121238201" sin "AR". Si no hay 11 dígitos, devolver "".
 9. moneda: Moneda de la factura. Devolver SIEMPRE el codigo de 3 letras: DOL, EUR, BRL, ARS, CLP, UYU, GBP, JPY, CNY. Si no aparece la palabra "moneda" o "currency" pero hay simbolos en los valores, inferir asi: $ o "USD" o "U$S" -> DOL; "EUR" o EUR$ -> EUR; "R$" o "BRL" -> BRL; "AR$" o "ARS" -> ARS. Ante duda, DOL (es la moneda mas comun en facturas de importacion a Argentina).
 10. incoterm: Términos de entrega (FOB, CIF, DDP, EXW, etc.). Si viene con ciudad/puerto al lado (ej: "FOB Genova", "CIF Buenos Aires"), devolver SOLO las 3 letras del codigo.
 11. flete: Valor del flete/freight (número, 0 si no aparece)
@@ -2071,7 +2081,7 @@ IMPORTANTE:
                         'vendedor_pais': str(operacion.get('vendedor_pais', 'BR'))[:2].upper(),
                         'vendedor_direccion': str(operacion.get('vendedor_direccion', '')),
                         'comprador_nombre': str(operacion.get('comprador_nombre', '')),
-                        'comprador_cuit': str(operacion.get('comprador_cuit', '')),
+                        'comprador_cuit': _normalize_argentine_cuit(operacion.get('comprador_cuit', '')),
                         'moneda': str(operacion.get('moneda', 'DOL'))[:3].upper(),
                         'incoterm': str(operacion.get('incoterm', 'FOB'))[:3].upper(),
                         'flete': float(operacion.get('flete', 0) or 0),
@@ -2191,7 +2201,7 @@ Busca esta información en el encabezado de la factura:
 5. vendedor_pais: País del vendedor (código ISO2: CN, BR, US, PE, etc.)
 6. vendedor_direccion: Dirección del vendedor
 7. comprador_nombre: Nombre del comprador/importador/buyer
-8. comprador_cuit: CUIT del comprador argentino (si aparece)
+8. comprador_cuit: CUIT del comprador argentino (si aparece). REGLA CRÍTICA: CUIT argentino tiene EXACTAMENTE 11 dígitos numéricos. Formato esperado: 30-61212382-01 o 306121238201. NO agregar prefijo país. Si el PDF dice "AR306121238201", devolver "306121238201" sin "AR". Si no hay 11 dígitos, devolver "".
 9. moneda: Moneda de la factura. Devolver SIEMPRE el codigo de 3 letras: DOL, EUR, BRL, ARS, CLP, UYU, GBP, JPY, CNY. Si no aparece la palabra "moneda" o "currency" pero hay simbolos en los valores, inferir asi: $ o "USD" o "U$S" -> DOL; "EUR" o EUR$ -> EUR; "R$" o "BRL" -> BRL; "AR$" o "ARS" -> ARS. Ante duda, DOL (es la moneda mas comun en facturas de importacion a Argentina).
 10. incoterm: Términos de entrega (FOB, CIF, DDP, EXW, etc.). Si viene con ciudad/puerto al lado (ej: "FOB Genova", "CIF Buenos Aires"), devolver SOLO las 3 letras del codigo.
 11. flete: Valor del flete/freight (número, 0 si no aparece)
@@ -2271,7 +2281,7 @@ IMPORTANTE:
                             'vendedor_pais': str(operacion.get('vendedor_pais', 'CN'))[:2].upper(),
                             'vendedor_direccion': str(operacion.get('vendedor_direccion', '')),
                             'comprador_nombre': str(operacion.get('comprador_nombre', '')),
-                            'comprador_cuit': str(operacion.get('comprador_cuit', '')),
+                            'comprador_cuit': _normalize_argentine_cuit(operacion.get('comprador_cuit', '')),
                             'moneda': str(operacion.get('moneda', 'DOL'))[:3].upper(),
                             'incoterm': str(operacion.get('incoterm', 'FOB'))[:3].upper(),
                             'flete': float(operacion.get('flete', 0) or 0),

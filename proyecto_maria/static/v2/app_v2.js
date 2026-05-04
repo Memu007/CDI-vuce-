@@ -214,7 +214,9 @@
     const CLIENTE_KEY = 'cdi_cliente_activo';
 
     function normalizeCuit(raw) {
-        return String(raw || '').replace(/\D/g, '');
+        let value = String(raw || '').trim().toUpperCase();
+        if (value.indexOf('AR') === 0) value = value.slice(2);
+        return value.replace(/\D/g, '');
     }
 
     function formatCuit(raw) {
