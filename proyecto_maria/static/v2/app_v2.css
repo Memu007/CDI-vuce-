@@ -806,18 +806,22 @@ body {
 
 .review-pending-importador {
     margin-bottom: var(--s-6);
-    padding: var(--s-5) var(--s-6);
-    border-radius: var(--radius-card, 8px);
-    background: rgba(88, 166, 255, 0.08);
-    border: 1px solid var(--c-border);
+    padding: var(--s-6) var(--s-7);
+    border-radius: var(--r-lg, 12px);
+    background:
+        radial-gradient(circle at top left, rgba(0, 102, 204, 0.10), transparent 34%),
+        rgba(0, 102, 204, 0.075);
+    border: 1px solid rgba(0, 102, 204, 0.20);
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
     font-size: var(--t-13, 13px);
-    line-height: 1.4;
+    line-height: 1.45;
 }
 
 .review-pending-importador-strong {
-    font-weight: 600;
+    font-weight: 700;
     color: var(--c-text);
     margin-bottom: var(--s-2);
+    font-size: var(--t-14, 14px);
 }
 
 .review-pending-importador-sub {
@@ -829,6 +833,10 @@ body {
     display: flex;
     flex-wrap: wrap;
     gap: var(--s-3);
+    align-items: center;
+}
+.review-pending-importador-actions .btn {
+    min-height: 34px;
 }
 
 .client-success-card {
