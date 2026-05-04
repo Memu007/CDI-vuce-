@@ -716,6 +716,42 @@
     <div id="toastHost"></div>
 
     <!-- Tour de bienvenida: coachmark sutil + tooltip por paso. -->
+    <div class="tour-welcome" id="tourWelcomeModal" hidden role="dialog" aria-modal="true" aria-labelledby="tourWelcomeTitle">
+        <div class="tour-welcome-card">
+            <div class="tour-welcome-head">
+                <span class="tour-welcome-kicker">Bienvenida</span>
+                <h2 id="tourWelcomeTitle">Antes de subir tu primer PDF</h2>
+                <p>CDI no solo genera el MARIA.TXT: aprende tus clientes y productos para ahorrarte carga repetida.</p>
+            </div>
+            <div class="tour-welcome-grid">
+                <article class="tour-welcome-item">
+                    <span class="tour-welcome-icon">1</span>
+                    <h3>Subí PDF o Excel</h3>
+                    <p>Traés la factura o planilla y armamos la operación editable.</p>
+                </article>
+                <article class="tour-welcome-item">
+                    <span class="tour-welcome-icon">2</span>
+                    <h3>Clientes por operación</h3>
+                    <p>Cada carga elige o detecta su cliente, sin selección global confusa.</p>
+                </article>
+                <article class="tour-welcome-item">
+                    <span class="tour-welcome-icon">3</span>
+                    <h3>Reconocimiento automático</h3>
+                    <p>Si el CUIT coincide, asociamos el importador y su historial.</p>
+                </article>
+                <article class="tour-welcome-item">
+                    <span class="tour-welcome-icon">4</span>
+                    <h3>Autocatálogo</h3>
+                    <p>CDI recuerda productos y NCM para sugerirlos la próxima vez.</p>
+                </article>
+            </div>
+            <div class="tour-welcome-actions">
+                <button type="button" class="btn btn-ghost btn-sm" id="tourWelcomeSkip">Saltar</button>
+                <button type="button" class="btn btn-secondary btn-sm" id="tourWelcomeGuide">Ver guía rápida</button>
+                <button type="button" class="btn btn-primary btn-sm" id="tourWelcomeStart">Empezar operación</button>
+            </div>
+        </div>
+    </div>
     <div class="tour-coachmark" id="tourCoachmark" hidden role="dialog" aria-labelledby="tourCmTitle">
         <div class="tour-coachmark-body">
             <p class="tour-coachmark-title" id="tourCmTitle">¿Te muestro cómo funciona?</p>

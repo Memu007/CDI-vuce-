@@ -6,10 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
-## 2026-05-04 · Tour automático al alta
+## 2026-05-04 · Tour con tarjetas de bienvenida
 
-- **ux (onboarding):** después de registro/verificación el tour se fuerza una vez aunque el estado local estuviera cerrado.
-- **safe:** el tour no se repite infinitamente al recargar y el botón `Ver tour` sigue funcionando.
+- **ux (onboarding):** al alta nueva se abre automáticamente una bienvenida con tarjetas explicativas del producto (PDF, clientes, reconocimiento, autocatálogo).
+- **safe:** si el usuario la cierra, no se repite. El botón `Ver tour` la vuelve a abrir.
+- **feature:** desde la bienvenida se puede elegir `Empezar operación` o `Ver guía rápida` (tooltip de pasos).
 
 ---
 

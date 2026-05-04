@@ -114,7 +114,7 @@ CDI-app/
 ### Funciona
 
 - Landing → registro → login → app v2.
-- Onboarding: después de registro/verificación, el tour v2 se fuerza una vez aunque el navegador tuviera el tour marcado como cerrado.
+- Onboarding: al alta nueva aparece automáticamente una bienvenida con tarjetas explicando el producto (PDF, clientes, reconocimiento, autocatálogo). Se cierra una vez y no molesta. El botón `Ver tour` la vuelve a abrir.
 - Registro: soporta modo prueba acotado por variables `REGISTER_TEST_EMAILS` + `REGISTER_TEST_EMAIL_REPLACE=true` para reusar emails de test sin afectar usuarios reales.
 - Subida de PDF → extracción → revisión → NCM → generación TXT MARIA.
 - Extracción de CUIT argentino: se normaliza a 11 dígitos sin prefijo país (`AR306...` pasa a `306...`).

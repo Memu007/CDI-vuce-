@@ -91,10 +91,10 @@
     function init() {
         if (shouldForceAfterSignup()) {
             markForcedAfterSignup();
-            setState('started');
+            setState('welcome_seen');
             setTimeout(() => {
                 try { CDI.goTo && CDI.goTo('upload'); } catch (_) {}
-                showStep(0);
+                showWelcome();
             }, 700);
             track('tour_forced_after_signup');
             return;
@@ -123,6 +123,46 @@
         if (!cm) return;
         cm.classList.remove('is-visible');
         setTimeout(() => { cm.hidden = true; }, 240);
+    }
+
+    function showWelcome() {
+        closeOpenOverlays();
+        hideCoachmark();
+        closeActiveTooltip();
+        const modal = document.getElementById('tourWelcomeModal');
+        if (!modal) {
+            start();
+            return;
+        }
+        modal.hidden = false;
+        requestAnimationFrame(() => modal.classList.add('is-visible'));
+        track('tour_welcome_shown');
+    }
+
+    function hideWelcome() {
+        const modal = document.getElementById('tourWelcomeModal');
+        if (!modal) return;
+        modal.classList.remove('is-visible');
+        setTimeout(() => { modal.hidden = true; }, 180);
+    }
+
+    function startFromWelcome() {
+        hideWelcome();
+        setState('completed');
+        track('tour_welcome_start_operation');
+        try { CDI.goTo && CDI.goTo('upload'); } catch (_) {}
+    }
+
+    function guideFromWelcome() {
+        hideWelcome();
+        setTimeout(start, 220);
+        track('tour_welcome_guide_clicked');
+    }
+
+    function skipWelcome() {
+        hideWelcome();
+        setState('dismissed');
+        track('tour_welcome_skipped');
     }
 
     /* ---------- Flow ---------- */
@@ -307,10 +347,16 @@
         const btnLater = document.getElementById('tourLater');
         const btnCta = document.getElementById('tourCta');
         const btnSkip = document.getElementById('tourSkip');
+        const btnWelcomeStart = document.getElementById('tourWelcomeStart');
+        const btnWelcomeGuide = document.getElementById('tourWelcomeGuide');
+        const btnWelcomeSkip = document.getElementById('tourWelcomeSkip');
         if (btnStart) btnStart.addEventListener('click', start);
         if (btnLater) btnLater.addEventListener('click', dismiss);
         if (btnCta) btnCta.addEventListener('click', next);
         if (btnSkip) btnSkip.addEventListener('click', dismiss);
+        if (btnWelcomeStart) btnWelcomeStart.addEventListener('click', startFromWelcome);
+        if (btnWelcomeGuide) btnWelcomeGuide.addEventListener('click', guideFromWelcome);
+        if (btnWelcomeSkip) btnWelcomeSkip.addEventListener('click', skipWelcome);
     }
 
     /* ---------- Public API: reapertura explícita ---------- */
@@ -322,10 +368,9 @@
         closeOpenOverlays();
         hideCoachmark();
         closeActiveTooltip();
-        setState('started');
         currentStep = -1;
         try { CDI.goTo && CDI.goTo('upload'); } catch (_) {}
-        setTimeout(() => showStep(0), 320);
+        setTimeout(showWelcome, 220);
         track('tour_reopened');
     };
 
