@@ -125,6 +125,35 @@
         setTimeout(() => { cm.hidden = true; }, 240);
     }
 
+    const WELCOME_SLIDES_COUNT = 5;
+    let welcomeCurrent = 0;
+
+    function renderWelcomeDots() {
+        const host = document.getElementById('tourWelcomeDots');
+        if (!host) return;
+        let html = '';
+        for (let i = 0; i < WELCOME_SLIDES_COUNT; i++) {
+            const cls = i === welcomeCurrent ? 'dot is-active' : 'dot';
+            html += '<span class="' + cls + '"></span>';
+        }
+        host.innerHTML = html;
+    }
+
+    function showWelcomeSlide(idx) {
+        welcomeCurrent = idx;
+        const slides = document.querySelectorAll('.tour-welcome-slide');
+        slides.forEach((s, i) => {
+            s.classList.toggle('is-active', i === idx);
+        });
+        renderWelcomeDots();
+        const btnPrev = document.getElementById('tourWelcomePrev');
+        const btnNext = document.getElementById('tourWelcomeNext');
+        const btnStart = document.getElementById('tourWelcomeStart');
+        if (btnPrev) btnPrev.hidden = idx === 0;
+        if (btnNext) btnNext.hidden = idx === WELCOME_SLIDES_COUNT - 1;
+        if (btnStart) btnStart.hidden = idx !== WELCOME_SLIDES_COUNT - 1;
+    }
+
     function showWelcome() {
         closeOpenOverlays();
         hideCoachmark();
@@ -134,6 +163,8 @@
             start();
             return;
         }
+        welcomeCurrent = 0;
+        showWelcomeSlide(0);
         modal.hidden = false;
         requestAnimationFrame(() => modal.classList.add('is-visible'));
         track('tour_welcome_shown');
@@ -146,17 +177,23 @@
         setTimeout(() => { modal.hidden = true; }, 180);
     }
 
+    function welcomeNext() {
+        if (welcomeCurrent < WELCOME_SLIDES_COUNT - 1) {
+            showWelcomeSlide(welcomeCurrent + 1);
+        }
+    }
+
+    function welcomePrev() {
+        if (welcomeCurrent > 0) {
+            showWelcomeSlide(welcomeCurrent - 1);
+        }
+    }
+
     function startFromWelcome() {
         hideWelcome();
         setState('completed');
         track('tour_welcome_start_operation');
         try { CDI.goTo && CDI.goTo('upload'); } catch (_) {}
-    }
-
-    function guideFromWelcome() {
-        hideWelcome();
-        setTimeout(start, 220);
-        track('tour_welcome_guide_clicked');
     }
 
     function skipWelcome() {
@@ -348,14 +385,16 @@
         const btnCta = document.getElementById('tourCta');
         const btnSkip = document.getElementById('tourSkip');
         const btnWelcomeStart = document.getElementById('tourWelcomeStart');
-        const btnWelcomeGuide = document.getElementById('tourWelcomeGuide');
+        const btnWelcomeNext = document.getElementById('tourWelcomeNext');
+        const btnWelcomePrev = document.getElementById('tourWelcomePrev');
         const btnWelcomeSkip = document.getElementById('tourWelcomeSkip');
         if (btnStart) btnStart.addEventListener('click', start);
         if (btnLater) btnLater.addEventListener('click', dismiss);
         if (btnCta) btnCta.addEventListener('click', next);
         if (btnSkip) btnSkip.addEventListener('click', dismiss);
         if (btnWelcomeStart) btnWelcomeStart.addEventListener('click', startFromWelcome);
-        if (btnWelcomeGuide) btnWelcomeGuide.addEventListener('click', guideFromWelcome);
+        if (btnWelcomeNext) btnWelcomeNext.addEventListener('click', welcomeNext);
+        if (btnWelcomePrev) btnWelcomePrev.addEventListener('click', welcomePrev);
         if (btnWelcomeSkip) btnWelcomeSkip.addEventListener('click', skipWelcome);
     }
 

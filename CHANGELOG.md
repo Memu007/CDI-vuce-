@@ -6,11 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
-## 2026-05-04 · Tour con tarjetas de bienvenida
+## 2026-05-04 · Tour wizard con slides de bienvenida
 
-- **ux (onboarding):** al alta nueva se abre automáticamente una bienvenida con tarjetas explicativas del producto (PDF, clientes, reconocimiento, autocatálogo).
+- **ux (onboarding):** al alta nueva se abre automáticamente un wizard de 5 slides explicando el producto paso a paso (PDF, revisión, clientes, autocatálogo, MARIA.TXT).
 - **safe:** si el usuario la cierra, no se repite. El botón `Ver tour` la vuelve a abrir.
-- **feature:** desde la bienvenida se puede elegir `Empezar operación` o `Ver guía rápida` (tooltip de pasos).
+- **feature:** navegación con `Siguiente`/`Anterior`, dots de progreso y `Empezar operación` en la última slide.
 
 ---
 

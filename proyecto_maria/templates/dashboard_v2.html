@@ -715,40 +715,45 @@
 
     <div id="toastHost"></div>
 
-    <!-- Tour de bienvenida: coachmark sutil + tooltip por paso. -->
-    <div class="tour-welcome" id="tourWelcomeModal" hidden role="dialog" aria-modal="true" aria-labelledby="tourWelcomeTitle">
+    <!-- Tour de bienvenida: wizard con slides explicativas -->
+    <div class="tour-welcome" id="tourWelcomeModal" hidden role="dialog" aria-modal="true" aria-labelledby="tourSlideTitle">
         <div class="tour-welcome-card">
             <div class="tour-welcome-head">
                 <span class="tour-welcome-kicker">Bienvenida</span>
-                <h2 id="tourWelcomeTitle">Antes de subir tu primer PDF</h2>
-                <p>CDI no solo genera el MARIA.TXT: aprende tus clientes y productos para ahorrarte carga repetida.</p>
+                <div class="tour-welcome-dots" id="tourWelcomeDots" aria-hidden="true"></div>
             </div>
-            <div class="tour-welcome-grid">
-                <article class="tour-welcome-item">
-                    <span class="tour-welcome-icon">1</span>
-                    <h3>Subí PDF o Excel</h3>
-                    <p>Traés la factura o planilla y armamos la operación editable.</p>
+            <div class="tour-welcome-slides" id="tourWelcomeSlides">
+                <article class="tour-welcome-slide is-active" data-slide="0">
+                    <span class="tour-welcome-step-num">1</span>
+                    <h2 id="tourSlideTitle">Subí tu factura</h2>
+                    <p>Arrastrá un PDF o Excel del proveedor. CDI lee los ítems, cantidades, precios y NCM automáticamente.</p>
                 </article>
-                <article class="tour-welcome-item">
-                    <span class="tour-welcome-icon">2</span>
-                    <h3>Clientes por operación</h3>
-                    <p>Cada carga elige o detecta su cliente, sin selección global confusa.</p>
+                <article class="tour-welcome-slide" data-slide="1">
+                    <span class="tour-welcome-step-num">2</span>
+                    <h2>Revisá los datos</h2>
+                    <p>Editá lo que falte en una tabla clara. Cuando estén todos los datos requeridos, avanzás al siguiente paso.</p>
                 </article>
-                <article class="tour-welcome-item">
-                    <span class="tour-welcome-icon">3</span>
-                    <h3>Reconocimiento automático</h3>
-                    <p>Si el CUIT coincide, asociamos el importador y su historial.</p>
+                <article class="tour-welcome-slide" data-slide="2">
+                    <span class="tour-welcome-step-num">3</span>
+                    <h2>Clientes reconocidos</h2>
+                    <p>Si el CUIT del importador ya está en tu lista, CDI lo detecta solo y carga su historial de productos.</p>
                 </article>
-                <article class="tour-welcome-item">
-                    <span class="tour-welcome-icon">4</span>
-                    <h3>Autocatálogo</h3>
-                    <p>CDI recuerda productos y NCM para sugerirlos la próxima vez.</p>
+                <article class="tour-welcome-slide" data-slide="3">
+                    <span class="tour-welcome-step-num">4</span>
+                    <h2>Autocatálogo inteligente</h2>
+                    <p>CDI aprende qué NCM usás para cada producto. La próxima vez te lo sugiere sin que tengas que buscarlo.</p>
+                </article>
+                <article class="tour-welcome-slide" data-slide="4">
+                    <span class="tour-welcome-step-num">5</span>
+                    <h2>Descargá el MARIA.TXT</h2>
+                    <p>Cuando todo está OK, generás el archivo listo para presentar en aduana. Una operación completa en minutos.</p>
                 </article>
             </div>
             <div class="tour-welcome-actions">
                 <button type="button" class="btn btn-ghost btn-sm" id="tourWelcomeSkip">Saltar</button>
-                <button type="button" class="btn btn-secondary btn-sm" id="tourWelcomeGuide">Ver guía rápida</button>
-                <button type="button" class="btn btn-primary btn-sm" id="tourWelcomeStart">Empezar operación</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="tourWelcomePrev" hidden>Anterior</button>
+                <button type="button" class="btn btn-primary btn-sm" id="tourWelcomeNext">Siguiente</button>
+                <button type="button" class="btn btn-primary btn-sm" id="tourWelcomeStart" hidden>Empezar operación</button>
             </div>
         </div>
     </div>
