@@ -117,6 +117,7 @@ CDI-app/
 - Onboarding: al alta nueva aparece automáticamente una bienvenida con tarjetas explicando el producto (PDF, clientes, reconocimiento, autocatálogo). Se cierra una vez y no molesta. El botón `Ver tour` la vuelve a abrir.
 - Registro: soporta modo prueba acotado por variables `REGISTER_TEST_EMAILS` + `REGISTER_TEST_EMAIL_REPLACE=true` para reusar emails de test sin afectar usuarios reales.
 - Subida de PDF → extracción → revisión → NCM → generación TXT MARIA.
+- Carga manual: botón "Cargar manualmente" en upload para crear operaciones sin PDF/Excel. Elige cliente, tipea productos (descripción, cantidad, precio, NCM opcional) y va a Revisión igual que si viniera de PDF. El autocatálogo aprende los NCM cargados a mano.
 - Extracción de CUIT argentino: se normaliza a 11 dígitos sin prefijo país (`AR306...` pasa a `306...`).
 - Cliente por operación, sin selección global persistente: PDF arranca limpio, detecta por CUIT o propone crear/asignar. Excel pide elegir cliente puntualmente solo si se quiere usar mapeo personalizado.
 - Auto-detect importador por CUIT (cuando NO hay cliente activo).

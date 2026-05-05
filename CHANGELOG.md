@@ -6,6 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-04 · Carga manual de operaciones
+
+- **feat (upload):** nuevo botón "Cargar manualmente" para crear operaciones sin PDF/Excel.
+- **feature:** elegís cliente, completás productos (descripción, cantidad, precio, NCM opcional), y se guarda como operación `draft`.
+- **safe:** al guardar se redirige a Revisión igual que si viniera de PDF. El autocatálogo aprende los NCMs cargados a mano.
+
+---
+
 ## 2026-05-04 · Tour wizard con slides de bienvenida
 
 - **ux (onboarding):** al alta nueva se abre automáticamente un wizard de 5 slides explicando el producto paso a paso (PDF, revisión, clientes, autocatálogo, MARIA.TXT).
