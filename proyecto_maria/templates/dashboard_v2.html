@@ -119,6 +119,11 @@
 
                     <div class="upload-footer-muted">
                         <div class="upload-simulate">
+                            <button type="button" class="btn-link-inline" id="uploadManualBtn">¿No tenés la factura digital? Cargar manualmente</button>
+                            <span class="upload-simulate-hint">Creá la operación tipeando los datos directo.</span>
+                        </div>
+
+                        <div class="upload-simulate">
                             <button type="button" class="btn-link-inline" id="uploadSimulateBtn">Simular operación con datos de prueba</button>
                             <span class="upload-simulate-hint">Solo para previsualizar el flujo.</span>
                         </div>
@@ -714,6 +719,40 @@
     </div>
 
     <div id="toastHost"></div>
+
+    <!-- Modal carga manual -->
+    <div class="tour-welcome" id="manualUploadModal" hidden role="dialog" aria-modal="true" aria-labelledby="manualUploadTitle">
+        <div class="tour-welcome-card manual-upload-card">
+            <div class="tour-welcome-head">
+                <span class="tour-welcome-kicker">Carga manual</span>
+                <h2 id="manualUploadTitle">Cargá la operación sin PDF</h2>
+                <p>Seleccioná el cliente y completá los productos. Después los revisás y editás como si vinieran de una factura.</p>
+            </div>
+
+            <div class="manual-form">
+                <label class="field-label" for="manualCliente">Cliente</label>
+                <select class="select" id="manualCliente" required>
+                    <option value="">Elegí un cliente…</option>
+                </select>
+
+                <div class="manual-items" id="manualItems">
+                    <div class="manual-item-row" data-row="0">
+                        <input type="text" class="input manual-desc" placeholder="Descripción del producto" required>
+                        <input type="number" class="input manual-qty" placeholder="Cantidad" min="1" value="1" required>
+                        <input type="number" class="input manual-price" placeholder="Precio unitario" min="0" step="0.01" required>
+                        <input type="text" class="input manual-ncm" placeholder="NCM (opcional)" maxlength="10">
+                        <button type="button" class="btn btn-ghost btn-sm manual-remove" title="Quitar">×</button>
+                    </div>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" id="manualAddItem">+ Agregar producto</button>
+            </div>
+
+            <div class="tour-welcome-actions manual-upload-actions">
+                <button type="button" class="btn btn-ghost btn-sm" id="manualCancel">Cancelar</button>
+                <button type="button" class="btn btn-primary btn-sm" id="manualSave">Guardar y continuar</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Tour de bienvenida: wizard con slides explicativas -->
     <div class="tour-welcome" id="tourWelcomeModal" hidden role="dialog" aria-modal="true" aria-labelledby="tourSlideTitle">

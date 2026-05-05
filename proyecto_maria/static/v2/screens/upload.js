@@ -470,6 +470,148 @@
         }
     }
 
+    // ---------- Carga manual ----------
+    let manualModal, manualCliente, manualItemsContainer, manualAddBtn, manualSaveBtn, manualCancelBtn;
+    let manualInitialized = false;
+
+    function initManualUpload() {
+        if (manualInitialized) return;
+        manualModal = $('manualUploadModal');
+        manualCliente = $('manualCliente');
+        manualItemsContainer = $('manualItems');
+        manualAddBtn = $('manualAddItem');
+        manualSaveBtn = $('manualSave');
+        manualCancelBtn = $('manualCancel');
+        if (!manualModal) return;
+
+        const manualBtn = $('uploadManualBtn');
+        if (manualBtn) manualBtn.addEventListener('click', openManualModal);
+        if (manualCancelBtn) manualCancelBtn.addEventListener('click', closeManualModal);
+        if (manualSaveBtn) manualSaveBtn.addEventListener('click', saveManualOperation);
+        if (manualAddBtn) manualAddBtn.addEventListener('click', addManualRow);
+        manualItemsContainer.addEventListener('click', (e) => {
+            const btn = e.target && e.target.closest('.manual-remove');
+            if (!btn) return;
+            const row = btn.closest('.manual-item-row');
+            if (row && manualItemsContainer.querySelectorAll('.manual-item-row').length > 1) {
+                row.remove();
+            }
+        });
+        manualInitialized = true;
+    }
+
+    async function openManualModal() {
+        initManualUpload();
+        if (!manualModal) return;
+        // Cargar clientes
+        try {
+            manualCliente.innerHTML = '<option value="">Elegí un cliente…</option>';
+            const res = await CDI.api('/api/clientes');
+            if (res.ok) {
+                const data = await res.json();
+                (data.clientes || []).forEach(c => {
+                    const opt = document.createElement('option');
+                    opt.value = c.id;
+                    opt.textContent = c.nombre + (c.cuit ? ' (' + c.cuit + ')' : '');
+                    manualCliente.appendChild(opt);
+                });
+            }
+        } catch (_) {}
+        // Reset filas
+        manualItemsContainer.innerHTML = '';
+        addManualRow();
+        manualModal.hidden = false;
+        requestAnimationFrame(() => manualModal.classList.add('is-visible'));
+        CDI.track && CDI.track('manual_upload_open');
+    }
+
+    function closeManualModal() {
+        if (!manualModal) return;
+        manualModal.classList.remove('is-visible');
+        setTimeout(() => { manualModal.hidden = true; }, 220);
+    }
+
+    function addManualRow() {
+        if (!manualItemsContainer) return;
+        const row = document.createElement('div');
+        row.className = 'manual-item-row';
+        row.innerHTML =
+            '<input type="text" class="input manual-desc" placeholder="Descripción del producto" required>' +
+            '<input type="number" class="input manual-qty" placeholder="Cantidad" min="1" value="1" required>' +
+            '<input type="number" class="input manual-price" placeholder="Precio unitario" min="0" step="0.01" required>' +
+            '<input type="text" class="input manual-ncm" placeholder="NCM (opcional)" maxlength="10">' +
+            '<button type="button" class="btn btn-ghost btn-sm manual-remove" title="Quitar">×</button>';
+        manualItemsContainer.appendChild(row);
+    }
+
+    async function saveManualOperation() {
+        const clientId = manualCliente.value;
+        if (!clientId) {
+            if (CDI.toast) CDI.toast.error('Elegí un cliente primero');
+            return;
+        }
+        const rows = manualItemsContainer.querySelectorAll('.manual-item-row');
+        const items = [];
+        for (const row of rows) {
+            const desc = row.querySelector('.manual-desc').value.trim();
+            const qty = parseFloat(row.querySelector('.manual-qty').value) || 0;
+            const price = parseFloat(row.querySelector('.manual-price').value) || 0;
+            const ncm = row.querySelector('.manual-ncm').value.trim();
+            if (!desc || qty <= 0 || price < 0) {
+                if (CDI.toast) CDI.toast.error('Completá todos los campos obligatorios');
+                return;
+            }
+            items.push({
+                descripcion: desc,
+                cantidad: qty,
+                valor_unitario: price,
+                pieza: ncm,
+                origen: 'XX',
+                peso_unitario: 0,
+            });
+        }
+        if (!items.length) {
+            if (CDI.toast) CDI.toast.error('Agregá al menos un producto');
+            return;
+        }
+
+        manualSaveBtn.disabled = true;
+        manualSaveBtn.textContent = 'Guardando…';
+        try {
+            const res = await CDI.api('/api/operations/manual', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ client_id: clientId, items: items }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(data.detail || 'Error al guardar');
+            }
+
+            CDI.state = CDI.state || {};
+            CDI.state.filename = 'carga_manual';
+            CDI.state.operacion = { comprador_nombre: '', comprador_cuit: '' };
+            CDI.state.items = items;
+            CDI.state.sourceFormat = 'manual';
+            CDI.state.uploadedAt = new Date().toISOString();
+            CDI.state.operationSavedFor = null;
+            CDI.state.orphanDismissedFor = null;
+
+            // Setear cliente activo
+            const clienteNombre = manualCliente.options[manualCliente.selectedIndex].text;
+            CDI.setClienteActivo && CDI.setClienteActivo({ id: clientId, nombre: clienteNombre });
+
+            CDI.track('manual_upload_saved', { items: items.length });
+            closeManualModal();
+            CDI.goTo('review', { fromUpload: true });
+        } catch (err) {
+            if (CDI.toast) CDI.toast.error(err.message || 'No se pudo guardar');
+        } finally {
+            manualSaveBtn.disabled = false;
+            manualSaveBtn.textContent = 'Guardar y continuar';
+        }
+    }
+
     async function downloadBlankTemplate() {
         try {
             const res = await CDI.api('/api/plantillas/avg_blanco');

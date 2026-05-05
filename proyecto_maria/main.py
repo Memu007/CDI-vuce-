@@ -2187,6 +2187,83 @@ async def simulate_charge(user=Depends(get_current_user), db: AsyncSession = Dep
     }
 
 
+@app.post("/api/operations/manual")
+@limiter.limit(get_dynamic_rate_limit)
+async def create_manual_operation(
+    request: Request,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Crea una operación cargada manualmente (sin PDF/Excel).
+
+    El body espera: { client_id: string, items: [{ descripcion, cantidad, valor_unitario, pieza?, origen? }] }
+    Devuelve la operación con items, listo para navegar a Revisión.
+    """
+    try:
+        data = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Body JSON inválido")
+
+    client_id = data.get("client_id", "").strip()
+    items_raw = data.get("items", [])
+
+    if not client_id:
+        raise HTTPException(status_code=400, detail="Falta client_id")
+    if not items_raw or not isinstance(items_raw, list):
+        raise HTTPException(status_code=400, detail="Falta lista de items")
+
+    username = user["username"]
+
+    # Verificar que el cliente pertenezca al usuario
+    try:
+        await _get_owned_client(db, client_id, username)
+    except HTTPException:
+        raise HTTPException(status_code=404, detail="Cliente no encontrado")
+
+    operation_id = f"MANUAL_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+
+    # Calcular totales
+    total_items = len(items_raw)
+    total_value = sum(float(it.get("valor_unitario", 0) or 0) * float(it.get("cantidad", 0) or 0) for it in items_raw)
+    total_weight = sum(float(it.get("peso_unitario", 0) or 0) * float(it.get("cantidad", 0) or 0) for it in items_raw)
+
+    # Crear operación
+    operation = OperationModel(
+        id=operation_id,
+        owner_username=username,
+        client_id=client_id,
+        source="manual",
+        total_items=total_items,
+        total_value=total_value,
+        total_weight=total_weight,
+    )
+    db.add(operation)
+    await db.flush()
+
+    # Crear items
+    for idx, it in enumerate(items_raw):
+        item = OperationItemModel(
+            operation_id=operation_id,
+            pieza=str(it.get("pieza", "") or ""),
+            descripcion=str(it.get("descripcion", "") or ""),
+            origen=str(it.get("origen", "") or "XX").upper()[:3],
+            cantidad=float(it.get("cantidad", 0) or 0),
+            valor_unitario=float(it.get("valor_unitario", 0) or 0),
+            peso_unitario=float(it.get("peso_unitario", 0) or 0),
+        )
+        db.add(item)
+
+    await db.commit()
+
+    return {
+        "success": True,
+        "operation_id": operation_id,
+        "client_id": client_id,
+        "total_items": total_items,
+        "items": items_raw,
+    }
+
+
 @app.post("/process_operation/")
 @limiter.limit(get_dynamic_rate_limit)
 async def process_operation(
