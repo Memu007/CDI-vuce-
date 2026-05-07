@@ -147,6 +147,11 @@
         const emptyCreateBtn = $('cxEmptyCreateBtn');
         if (emptyCreateBtn) emptyCreateBtn.addEventListener('click', () => openForm());
 
+        // Importador clientes
+        const importBtn = $('cxImportBtn');
+        if (importBtn) importBtn.addEventListener('click', openImportModal);
+        initImportModal();
+
         // Tabs
         if (tabOps)   tabOps.addEventListener('click', () => switchTab('ops'));
         if (tabMapeo) tabMapeo.addEventListener('click', () => switchTab('mapeo'));
@@ -234,8 +239,131 @@
     }
 
     /* ==========================================================
-       API
+       Importador clientes (CSV/Excel)
        ========================================================== */
+    let importInitialized = false;
+    let importModalEl, importInput, importDropzone, importPickBtn, importFilenameEl;
+    let importProgress, importResult, importCancel;
+
+    function initImportModal() {
+        if (importInitialized) return;
+        importModalEl   = $('importClientesModal');
+        importInput     = $('importFileInput');
+        importDropzone  = $('importDropzone');
+        importPickBtn   = $('importPickBtn');
+        importFilenameEl = $('importFilename');
+        importProgress  = $('importProgress');
+        importResult    = $('importResult');
+        importCancel    = $('importCancel');
+        if (!importModalEl) return;
+
+        if (importPickBtn) importPickBtn.addEventListener('click', () => importInput.click());
+        if (importDropzone) {
+            importDropzone.addEventListener('click', (e) => {
+                if (e.target === importPickBtn) return;
+                importInput.click();
+            });
+            ['dragenter', 'dragover'].forEach(evt =>
+                importDropzone.addEventListener(evt, (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    importDropzone.classList.add('is-dragging');
+                })
+            );
+            ['dragleave', 'drop'].forEach(evt =>
+                importDropzone.addEventListener(evt, (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    importDropzone.classList.remove('is-dragging');
+                })
+            );
+            importDropzone.addEventListener('drop', (e) => {
+                const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+                if (file) handleImportFile(file);
+            });
+        }
+        if (importInput) {
+            importInput.addEventListener('change', (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (file) handleImportFile(file);
+                importInput.value = '';
+            });
+        }
+        if (importCancel) importCancel.addEventListener('click', closeImportModal);
+        importModalEl.addEventListener('click', (e) => {
+            if (e.target === importModalEl) closeImportModal();
+        });
+        importInitialized = true;
+    }
+
+    function openImportModal() {
+        initImportModal();
+        if (!importModalEl) return;
+        if (importResult) { importResult.hidden = true; importResult.innerHTML = ''; importResult.classList.remove('is-error'); }
+        if (importFilenameEl) importFilenameEl.textContent = 'CSV · XLSX · XLS';
+        importModalEl.hidden = false;
+        requestAnimationFrame(() => importModalEl.classList.add('is-visible'));
+        CDI.track && CDI.track('import_clientes_open');
+    }
+
+    function closeImportModal() {
+        if (!importModalEl) return;
+        importModalEl.classList.remove('is-visible');
+        setTimeout(() => { importModalEl.hidden = true; }, 220);
+    }
+
+    async function handleImportFile(file) {
+        if (!file) return;
+        const name = file.name || '';
+        const ok = /\.(csv|xlsx|xls)$/i.test(name);
+        if (!ok) {
+            showImportError('Formato no soportado. Usá CSV, XLSX o XLS.');
+            return;
+        }
+        if (importFilenameEl) importFilenameEl.textContent = name;
+        if (importProgress) importProgress.hidden = false;
+        if (importResult) { importResult.hidden = true; importResult.innerHTML = ''; importResult.classList.remove('is-error'); }
+
+        const form = new FormData();
+        form.append('file', file);
+
+        try {
+            const res = await CDI.api('/api/clientes/import', { method: 'POST', body: form });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || ('Error ' + res.status));
+            renderImportResult(data);
+            // Refrescar lista
+            refresh();
+            CDI.track && CDI.track('import_clientes_done', {
+                creados: data.creados, duplicados: data.duplicados, productos: data.productos_aprendidos
+            });
+        } catch (err) {
+            showImportError(err.message || 'No se pudo importar');
+        } finally {
+            if (importProgress) importProgress.hidden = true;
+        }
+    }
+
+    function renderImportResult(d) {
+        if (!importResult) return;
+        const errCount = (d.errores || []).length;
+        importResult.innerHTML =
+            '<div class="import-result-stat"><span>Clientes creados</span><strong>' + (d.creados || 0) + '</strong></div>' +
+            '<div class="import-result-stat"><span>Duplicados saltados</span><strong>' + (d.duplicados || 0) + '</strong></div>' +
+            '<div class="import-result-stat"><span>Productos aprendidos</span><strong>' + (d.productos_aprendidos || 0) + '</strong></div>' +
+            '<div class="import-result-stat"><span>Filas con error</span><strong>' + errCount + '</strong></div>' +
+            (errCount ? '<div class="import-result-error">Primer error: fila ' +
+                d.errores[0].fila + ' — ' + d.errores[0].error + '</div>' : '');
+        importResult.hidden = false;
+        importResult.classList.remove('is-error');
+        if (CDI.toast) CDI.toast.success('Importación completa', (d.creados || 0) + ' clientes creados');
+    }
+
+    function showImportError(msg) {
+        if (!importResult) return;
+        importResult.innerHTML = '<strong>Error:</strong> ' + msg;
+        importResult.classList.add('is-error');
+        importResult.hidden = false;
+    }
+
     async function refresh() {
         if (loading) return;
         loading = true;

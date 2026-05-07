@@ -580,6 +580,10 @@
                             <button type="button" class="cx-search-help" id="cxHelpBtn" aria-label="Atajos de teclado" title="Atajos: / buscar, ↑↓ navegar, Enter abrir, U usar, F favorito, E editar, N nuevo, Esc volver">?</button>
                         </div>
                         <div class="cx-header-actions">
+                            <button type="button" class="btn btn-secondary" id="cxImportBtn" title="Importar clientes desde CSV o Excel">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                Importar
+                            </button>
                             <button type="button" class="btn btn-primary" id="cxNewBtn">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                                 Nuevo cliente
@@ -719,6 +723,46 @@
     </div>
 
     <div id="toastHost"></div>
+
+    <!-- Modal importar clientes -->
+    <div class="tour-welcome" id="importClientesModal" hidden role="dialog" aria-modal="true" aria-labelledby="importClientesTitle">
+        <div class="tour-welcome-card manual-upload-card">
+            <div class="tour-welcome-head">
+                <span class="tour-welcome-kicker">Migración</span>
+                <h2 id="importClientesTitle">Importar clientes desde CSV o Excel</h2>
+                <p>Subí una planilla con tus clientes (de PreMaría o cualquier app). Detectamos las columnas solos.</p>
+            </div>
+
+            <div class="manual-form">
+                <div class="import-hint">
+                    <strong>Columnas reconocidas:</strong>
+                    <code>nombre / razón social</code>, <code>cuit</code>, <code>dirección</code>, <code>email</code>, <code>teléfono</code>.
+                    <br>
+                    <small>Bonus: si tu archivo trae <code>descripción</code> + <code>ncm</code>, el autocatálogo arranca entrenado.</small>
+                </div>
+
+                <input type="file" id="importFileInput" accept=".csv,.xlsx,.xls" class="sr-only">
+                <div class="dropzone" id="importDropzone">
+                    <div class="dropzone-hint">Arrastrá tu CSV o Excel aquí</div>
+                    <button type="button" class="btn btn-primary btn-sm" id="importPickBtn">Seleccionar archivo</button>
+                    <div class="dropzone-meta" id="importFilename">CSV · XLSX · XLS</div>
+                </div>
+
+                <div class="upload-progress" id="importProgress" hidden>
+                    <div class="spinner" aria-hidden="true"></div>
+                    <div class="upload-progress-text">
+                        <p class="upload-progress-title">Importando…</p>
+                    </div>
+                </div>
+
+                <div class="import-result" id="importResult" hidden></div>
+            </div>
+
+            <div class="tour-welcome-actions manual-upload-actions">
+                <button type="button" class="btn btn-ghost btn-sm" id="importCancel">Cerrar</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Modal carga manual -->
     <div class="tour-welcome" id="manualUploadModal" hidden role="dialog" aria-modal="true" aria-labelledby="manualUploadTitle">

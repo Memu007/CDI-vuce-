@@ -3299,6 +3299,184 @@ async def get_cliente_por_cuit(
     return {"success": True, "match": "none"}
 
 
+def _normalize_header(h: str) -> str:
+    """Normaliza un header de CSV/Excel: minúsculas, sin acentos, sin espacios."""
+    import unicodedata as _ud
+    s = str(h or "").strip().lower()
+    s = "".join(c for c in _ud.normalize("NFKD", s) if not _ud.combining(c))
+    s = re.sub(r"[\s_\-\.]+", "", s)
+    return s
+
+
+# Mapeo de nombres comunes (incluyendo PreMaría) a campos canónicos
+_COL_ALIASES = {
+    "nombre": ["nombre", "razonsocial", "razon", "cliente", "importador", "name", "denominacion"],
+    "cuit": ["cuit", "cuitcuil", "cuitdni", "documento", "doc", "tax_id", "taxid"],
+    "direccion": ["direccion", "domicilio", "domiciliofiscal", "address", "calle", "domicilioreal"],
+    "email": ["email", "mail", "correo", "correoelectronico", "e_mail"],
+    "telefono": ["telefono", "tel", "phone", "celular", "movil"],
+    "descripcion": ["descripcion", "producto", "detalle", "description", "item"],
+    "ncm": ["ncm", "posicionarancelaria", "posicion", "hscode", "codigoncm", "partidaarancelaria"],
+}
+
+
+def _detect_columns(headers: list) -> dict:
+    """Devuelve {campo_canonico: nombre_original} detectando aliases."""
+    norm_to_orig = {_normalize_header(h): h for h in headers}
+    mapping = {}
+    for canon, aliases in _COL_ALIASES.items():
+        for alias in aliases:
+            if alias in norm_to_orig:
+                mapping[canon] = norm_to_orig[alias]
+                break
+    return mapping
+
+
+@app.post("/api/clientes/import")
+async def import_clientes(
+    request: Request,
+    file: UploadFile = File(...),
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Importa clientes (y opcionalmente productos+NCM) desde CSV/Excel.
+
+    Detecta automáticamente formato común o de PreMaría por nombres de columnas.
+    Salta duplicados por CUIT (mismo owner). Si vienen columnas `descripcion`+`ncm`,
+    alimenta el autocatálogo del cliente.
+    """
+    import io as _io
+    from proyecto_maria.services.client_memory import upsert_client_product_history
+
+    username = user["username"]
+    filename = (file.filename or "").lower()
+
+    # Leer archivo
+    try:
+        content = await file.read()
+        if filename.endswith(".csv"):
+            try:
+                df = pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False)
+            except Exception:
+                df = pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False, sep=";")
+        elif filename.endswith((".xlsx", ".xls")):
+            df = pd.read_excel(_io.BytesIO(content), dtype=str, keep_default_na=False)
+        else:
+            raise HTTPException(status_code=400, detail="Formato no soportado. Usá .csv, .xlsx o .xls")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo: {str(e)[:120]}")
+
+    if df.empty:
+        raise HTTPException(status_code=400, detail="El archivo está vacío")
+
+    # Detectar columnas
+    cols = _detect_columns(list(df.columns))
+    if "nombre" not in cols and "cuit" not in cols:
+        raise HTTPException(
+            status_code=400,
+            detail="No se detectaron columnas reconocibles. Necesitamos al menos 'nombre' o 'cuit'.",
+        )
+
+    # Buscar clientes existentes del usuario por CUIT para evitar duplicados
+    existing_cuits = set()
+    existing_by_cuit: dict[str, ClientModel] = {}
+    res = await db.execute(
+        sa_select(ClientModel).where(
+            ClientModel.owner_username == username,
+            ClientModel.is_active == True,  # noqa: E712
+        )
+    )
+    for c in res.scalars().all():
+        if c.cuit:
+            cuit_clean = re.sub(r"\D", "", c.cuit)
+            if cuit_clean:
+                existing_cuits.add(cuit_clean)
+                existing_by_cuit[cuit_clean] = c
+
+    creados = 0
+    duplicados = 0
+    errores: list[dict] = []
+    productos_aprendidos = 0
+
+    # Procesar filas
+    for idx, row in df.iterrows():
+        try:
+            nombre = str(row.get(cols.get("nombre", ""), "") or "").strip()[:200]
+            cuit_raw = str(row.get(cols.get("cuit", ""), "") or "").strip()
+            cuit_clean = re.sub(r"\D", "", cuit_raw)[:11] if cuit_raw else ""
+            direccion = str(row.get(cols.get("direccion", ""), "") or "").strip()
+            email = str(row.get(cols.get("email", ""), "") or "").strip()[:100]
+            telefono = str(row.get(cols.get("telefono", ""), "") or "").strip()[:50]
+
+            # Sin nombre y sin CUIT, saltar
+            if not nombre and not cuit_clean:
+                continue
+            if not nombre:
+                nombre = f"Cliente {cuit_clean}"
+
+            # Duplicado por CUIT
+            if cuit_clean and cuit_clean in existing_cuits:
+                duplicados += 1
+                target_client = existing_by_cuit.get(cuit_clean)
+            else:
+                # Crear cliente
+                target_client = ClientModel(
+                    id=str(uuid.uuid4()),
+                    owner_username=username,
+                    name=nombre,
+                    email=email or None,
+                    phone=telefono or None,
+                    cuit=cuit_clean or None,
+                    address=direccion or None,
+                    is_active=True,
+                )
+                db.add(target_client)
+                await db.flush()
+                if cuit_clean:
+                    existing_cuits.add(cuit_clean)
+                    existing_by_cuit[cuit_clean] = target_client
+                creados += 1
+
+            # Si hay producto + NCM, alimentar autocatálogo del cliente
+            if "descripcion" in cols and "ncm" in cols and target_client:
+                desc = str(row.get(cols["descripcion"], "") or "").strip()
+                ncm = str(row.get(cols["ncm"], "") or "").strip()
+                # Limpiar puntos del NCM (8471.30 -> 847130)
+                ncm = re.sub(r"\D", "", ncm)
+                if desc and ncm and len(ncm) >= 6:
+                    res_h = await upsert_client_product_history(
+                        db,
+                        owner_username=username,
+                        client_id=target_client.id,
+                        ncm=ncm,
+                        descripcion=desc,
+                    )
+                    if res_h:
+                        productos_aprendidos += 1
+
+        except Exception as exc:
+            errores.append({"fila": int(idx) + 2, "error": str(exc)[:120]})
+
+    try:
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        logging.exception("import_clientes commit failed")
+        raise HTTPException(status_code=500, detail=f"No se pudo guardar la importación: {str(exc)[:120]}")
+
+    return {
+        "success": True,
+        "creados": creados,
+        "duplicados": duplicados,
+        "productos_aprendidos": productos_aprendidos,
+        "errores": errores,
+        "columnas_detectadas": cols,
+        "total_filas": int(len(df)),
+    }
+
+
 @app.post("/api/clientes")
 @app.post("/api/clientes/public")
 async def create_cliente(

@@ -6,6 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-04 · Importador de clientes (migración desde PreMaría y otras apps)
+
+- **feat (clientes):** botón "Importar" en Clientes acepta CSV y Excel, detecta solo formato simple o de PreMaría por nombres de columna.
+- **feature:** salta duplicados por CUIT (mismo owner) y, si vienen `descripcion` + `ncm`, alimenta el autocatálogo del cliente.
+- **safe:** muestra resumen post-import (creados / duplicados / productos aprendidos / errores). Endpoint `POST /api/clientes/import`.
+
+---
+
 ## 2026-05-04 · Carga manual de operaciones
 
 - **feat (upload):** nuevo botón "Cargar manualmente" para crear operaciones sin PDF/Excel.
