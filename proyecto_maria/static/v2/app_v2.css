@@ -4016,13 +4016,13 @@ tr:hover .ncm-note-pill.is-empty {
     color: var(--c-error, #b91c1c);
     font-size: var(--t-13);
 }
-.cx-delete-modal { max-width: 440px; }
-.cx-delete-modal .cx-modal-body {
+.cdi-confirm-modal { max-width: 440px; }
+.cdi-confirm-modal .cx-modal-body {
     align-items: center;
     text-align: center;
     gap: var(--s-2);
 }
-.cx-delete-warning {
+.cdi-confirm-icon {
     width: 44px;
     height: 44px;
     border-radius: 50%;
@@ -4034,13 +4034,21 @@ tr:hover .ncm-note-pill.is-empty {
     font-size: var(--t-20);
     font-weight: var(--w-bold);
 }
-.cx-delete-title {
+.cdi-confirm-icon.is-warning {
+    background: var(--c-warning-soft);
+    color: var(--c-warning);
+}
+.cdi-confirm-icon.is-info {
+    background: var(--c-accent-soft);
+    color: var(--c-accent);
+}
+.cdi-confirm-lead {
     margin: var(--s-2) 0 0;
     font-size: var(--t-17);
     font-weight: var(--w-semibold);
     color: var(--c-text);
 }
-.cx-delete-text {
+.cdi-confirm-text {
     margin: 0;
     max-width: 34ch;
     font-size: var(--t-14);

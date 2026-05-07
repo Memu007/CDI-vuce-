@@ -883,10 +883,14 @@
             const existente = (cuit && cuit.length === 11) ? await lookupClienteByCuit(cuit) : null;
             if (existente) {
                 CDI.track && CDI.track('importador_create_blocked_by_cuit_match');
-                const ok = window.confirm(
-                    'Ya tenés a "' + (existente.nombre || '') + '" con este CUIT.\n' +
-                    '¿Querés usar ese cliente en su lugar?'
-                );
+                const ok = await CDI.confirm({
+                    title: 'Cliente ya existente',
+                    lead: 'Ya tenés a "' + (existente.nombre || 'este cliente') + '" con este CUIT.',
+                    text: 'Podés usar ese cliente en esta operación en lugar de crear uno duplicado.',
+                    acceptText: 'Usar cliente',
+                    cancelText: 'No por ahora',
+                    kind: 'info',
+                });
                 if (ok) {
                     CDI.setClienteActivo(existente);
                     try { sessionStorage.removeItem(_PENDING_IMPORTADOR_KEY); } catch (_) {}

@@ -220,7 +220,13 @@
     }
 
     async function onDelete(idx) {
-        const ok = window.confirm('¿Eliminar esta nota?');
+        const ok = await CDI.confirm({
+            title: 'Eliminar nota',
+            lead: '¿Eliminar esta nota NCM?',
+            text: 'Se borrará solo esta nota privada. Esta acción no se puede deshacer.',
+            acceptText: 'Eliminar nota',
+            kind: 'danger',
+        });
         if (!ok) return;
         try {
             const res = await CDI.api(

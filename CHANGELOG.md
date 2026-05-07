@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-07 · Popups unificados en v2
+
+- **fix (ux):** todos los carteles de confirmación de la app v2 ahora usan el modal visual de CDI en vez del cartel nativo del navegador.
+- **safe:** se verificó que no queden `window.confirm`, `window.alert` ni `window.prompt` en `static/v2`; la versión clásica v1 no se tocó.
+
+---
+
 ## 2026-05-07 · UX eliminar cliente y telemetría
 
 - **ux (clientes):** eliminar cliente ahora usa un modal propio de la app, no el cartel nativo del navegador.

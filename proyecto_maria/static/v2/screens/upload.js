@@ -202,11 +202,14 @@
         if (currentFormat === 'excel') {
             excelCliente = await pickClienteForExcel(file.name);
             if (!excelCliente) {
-                const ok = window.confirm(
-                    'No hay cliente seleccionado.\n\n' +
-                    'El Excel se procesará con el mapeo genérico de columnas, no con el mapeo personalizado de tu cliente.\n\n' +
-                    '¿Querés continuar igual? (Cancelar para elegir un cliente primero)'
-                );
+                const ok = await CDI.confirm({
+                    title: 'Excel sin cliente',
+                    lead: '¿Continuar sin cliente seleccionado?',
+                    text: 'El Excel se procesará con el mapeo genérico de columnas, no con el mapeo personalizado de un cliente.',
+                    acceptText: 'Continuar igual',
+                    cancelText: 'Elegir cliente',
+                    kind: 'warning',
+                });
                 if (!ok) {
                     CDI.track('upload_cancelled_no_cliente', { format: 'excel' });
                     return;

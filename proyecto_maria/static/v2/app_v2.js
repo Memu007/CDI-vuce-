@@ -180,6 +180,97 @@
         toastTimer = setTimeout(() => { host.innerHTML = ''; }, 4000);
     }
 
+    let confirmRefs = null;
+    let confirmResolve = null;
+    function getConfirmRefs() {
+        if (confirmRefs) return confirmRefs;
+        const modal = document.getElementById('cdiConfirmModal');
+        if (!modal) return null;
+        confirmRefs = {
+            modal: modal,
+            title: document.getElementById('cdiConfirmTitle'),
+            close: document.getElementById('cdiConfirmClose'),
+            icon: document.getElementById('cdiConfirmIcon'),
+            lead: document.getElementById('cdiConfirmLead'),
+            text: document.getElementById('cdiConfirmText'),
+            cancel: document.getElementById('cdiConfirmCancel'),
+            accept: document.getElementById('cdiConfirmAccept'),
+        };
+        const closeAsCancel = () => closeConfirm(false);
+        if (confirmRefs.close) confirmRefs.close.addEventListener('click', closeAsCancel);
+        if (confirmRefs.cancel) confirmRefs.cancel.addEventListener('click', closeAsCancel);
+        if (confirmRefs.accept) confirmRefs.accept.addEventListener('click', () => closeConfirm(true));
+        modal.addEventListener('click', (ev) => {
+            if (ev.target === modal) closeConfirm(false);
+        });
+        modal.addEventListener('cancel', (ev) => {
+            ev.preventDefault();
+            closeConfirm(false);
+        });
+        document.addEventListener('keydown', (ev) => {
+            if (ev.key !== 'Escape') return;
+            if (!modal.open) return;
+            ev.preventDefault();
+            ev.stopPropagation();
+            closeConfirm(false);
+        }, true);
+        return confirmRefs;
+    }
+
+    function closeConfirm(ok) {
+        const refs = confirmRefs;
+        if (refs && refs.modal) {
+            if (typeof refs.modal.close === 'function' && refs.modal.open) {
+                try { refs.modal.close(); } catch (_) { refs.modal.removeAttribute('open'); }
+            } else {
+                refs.modal.removeAttribute('open');
+            }
+        }
+        const resolve = confirmResolve;
+        confirmResolve = null;
+        if (resolve) resolve(!!ok);
+    }
+
+    function confirmDialog(options) {
+        const refs = getConfirmRefs();
+        if (!refs) {
+            toast('No se pudo abrir la confirmación', 'Probá de nuevo en unos segundos.', 'error');
+            return Promise.resolve(false);
+        }
+        if (confirmResolve) closeConfirm(false);
+        const cfg = Object.assign({
+            title: 'Confirmar acción',
+            lead: '¿Querés continuar?',
+            text: 'Confirmá para seguir.',
+            acceptText: 'Aceptar',
+            cancelText: 'Cancelar',
+            kind: 'info',
+        }, options || {});
+        if (refs.title) refs.title.textContent = cfg.title || '';
+        if (refs.lead) refs.lead.textContent = cfg.lead || '';
+        if (refs.text) refs.text.textContent = cfg.text || '';
+        if (refs.cancel) refs.cancel.textContent = cfg.cancelText || 'Cancelar';
+        if (refs.accept) {
+            refs.accept.textContent = cfg.acceptText || 'Aceptar';
+            refs.accept.className = 'btn ' + (cfg.kind === 'danger' ? 'btn-danger' : 'btn-primary');
+        }
+        if (refs.icon) {
+            refs.icon.className = 'cdi-confirm-icon';
+            if (cfg.kind === 'warning') refs.icon.classList.add('is-warning');
+            if (cfg.kind !== 'danger' && cfg.kind !== 'warning') refs.icon.classList.add('is-info');
+            refs.icon.textContent = cfg.kind === 'danger' ? '!' : (cfg.kind === 'warning' ? '!' : 'i');
+        }
+        return new Promise(resolve => {
+            confirmResolve = resolve;
+            if (typeof refs.modal.showModal === 'function') {
+                try { refs.modal.showModal(); } catch (_) { refs.modal.setAttribute('open', ''); }
+            } else {
+                refs.modal.setAttribute('open', '');
+            }
+            setTimeout(() => refs.cancel && refs.cancel.focus(), 80);
+        });
+    }
+
     /* ---------- 5. Toggle a v1 ---------- */
     function goToLegacy() {
         document.cookie = 'cdi_ui=; Path=/; Max-Age=0; SameSite=Lax';
@@ -319,6 +410,7 @@
     CDI.goBack = goBack;
     CDI.goToLegacy = goToLegacy;
     CDI.track = track;
+    CDI.confirm = confirmDialog;
     // Exponemos toast como funcion y tambien con .success/.error/.info
     // porque distintos modulos (clientes.js) usan ambas formas.
     toast.success = (title, text) => toast(title, text, 'success');

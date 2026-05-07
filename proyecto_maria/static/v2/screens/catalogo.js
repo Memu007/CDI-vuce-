@@ -334,7 +334,13 @@
 
     async function deleteProduct(row, productKey) {
         if (!detailVendorId) return;
-        const ok = window.confirm('¿Eliminar este producto del catálogo?');
+        const ok = await CDI.confirm({
+            title: 'Eliminar producto',
+            lead: '¿Eliminar este producto del catálogo?',
+            text: 'Se borrará del catálogo aprendido de este proveedor. Esta acción no se puede deshacer.',
+            acceptText: 'Eliminar producto',
+            kind: 'danger',
+        });
         if (!ok) return;
         try {
             const res = await CDI.api(
@@ -361,7 +367,13 @@
     async function onDeleteVendor() {
         if (!detailVendorId) return;
         const nombre = (detailVendor && (detailVendor.nombre || detailVendor.vendor_id)) || 'este proveedor';
-        const ok = window.confirm('¿Eliminar "' + nombre + '" del catálogo? Esto borra todos sus productos aprendidos.');
+        const ok = await CDI.confirm({
+            title: 'Eliminar proveedor',
+            lead: '¿Eliminar "' + nombre + '" del catálogo?',
+            text: 'Se borrarán todos sus productos aprendidos. Esta acción no se puede deshacer.',
+            acceptText: 'Eliminar proveedor',
+            kind: 'danger',
+        });
         if (!ok) return;
         try {
             const res = await CDI.api('/api/catalog/' + encodeURIComponent(detailVendorId), {
