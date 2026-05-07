@@ -3842,8 +3842,11 @@ async def save_client_operation(
         raise
     except Exception as e:
         await db.rollback()
-        logging.exception("save_client_operation failed")
-        return {"success": False, "error": "no se pudo guardar la operación"}
+        logging.exception("save_client_operation failed client_id=%s", client_id)
+        raise HTTPException(
+            status_code=500,
+            detail=f"No se pudo guardar la operación al cliente: {str(e)[:200]}",
+        )
 
 
 @app.get("/api/clientes/{client_id}/metricas")

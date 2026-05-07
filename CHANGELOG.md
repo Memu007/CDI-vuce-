@@ -6,6 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-07 · Fix guardado de operación al cliente
+
+- **fix (historial):** cuando una operación no se podía guardar al historial del cliente, fallaba en silencio. Ahora muestra toast con el error real y lo loguea.
+- **fix (backend):** `POST /api/clientes/{id}/operaciones` ahora devuelve HTTP 500 con detalle en vez de `{success: false}` mudo.
+- **safe:** la generación del MARIA.TXT no se ve afectada; el guardado al historial sigue siendo best-effort pero ahora visible.
+
+---
+
 ## 2026-05-04 · Importador de clientes (migración desde PreMaría y otras apps)
 
 - **feat (clientes):** botón "Importar" en Clientes acepta CSV y Excel, detecta solo formato simple o de PreMaría por nombres de columna.

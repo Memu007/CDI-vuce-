@@ -652,13 +652,16 @@
 
     async function saveOperationToHistory(items, mariaData) {
         const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
-        if (!cliente || !cliente.id) return;
+        if (!cliente || !cliente.id) {
+            console.warn('[history] no hay cliente activo, no se guarda al historial');
+            return { ok: false, reason: 'sin_cliente' };
+        }
         const opCode = (mariaData && mariaData.filename) || null;
         // Idempotencia: si ya guardamos esta misma operación para este mismo
         // cliente, no la re-posteamos (cubre re-entry a Listo, F5 suave, etc.).
         const savedFor = (CDI.state && CDI.state.operationSavedFor) || null;
         if (savedFor && savedFor.cliente_id === cliente.id && savedFor.op_code === opCode) {
-            return;
+            return { ok: true, reason: 'ya_guardada' };
         }
         const stats = (lastValidation && lastValidation.estadisticas) || {};
         const op = (CDI.state && CDI.state.operacion) || {};
@@ -699,9 +702,39 @@
                     cliente_id: cliente.id,
                     items: items.length
                 });
+                return { ok: true, cliente_id: cliente.id };
             }
-        } catch (_) { /* best-effort */ }
+            // Error real: mostrar al user en vez de silenciar.
+            const msg = (data && data.detail) || ('HTTP ' + res.status);
+            console.error('[history] save_client_operation fallo:', msg, data);
+            CDI.track('operation_save_failed', {
+                cliente_id: cliente.id,
+                status: res.status,
+                detail: String(msg).slice(0, 120)
+            });
+            CDI.toast && CDI.toast(
+                'No se guardó al cliente',
+                'La operación no quedó en el historial de ' + (cliente.nombre || 'el cliente') + '. Detalle: ' + String(msg).slice(0, 100),
+                'error'
+            );
+            return { ok: false, reason: 'http_error', error: msg };
+        } catch (err) {
+            console.error('[history] save_client_operation excepción:', err);
+            CDI.track('operation_save_failed', {
+                cliente_id: cliente.id,
+                detail: String(err && err.message || err).slice(0, 120)
+            });
+            CDI.toast && CDI.toast(
+                'No se guardó al cliente',
+                'Error de red al guardar la operación al historial. Volvé a Listo y reintentá.',
+                'error'
+            );
+            return { ok: false, reason: 'network', error: String(err) };
+        }
     }
+
+    // Expongo para que el panel huérfano u otro lugar pueda forzar un reintento.
+    CDI.saveOperationToHistory = saveOperationToHistory;
 
     async function saveCatalogLearn(items) {
         const op = (CDI.state && CDI.state.operacion) || {};
