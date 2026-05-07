@@ -479,6 +479,76 @@ async def _migrate_sync_clients_columns():
         print(f"❌ Error original: {mig_err!r}")
 
 
+async def _migrate_sync_operations_columns():
+    """Sincroniza columnas del modelo Operation/OperationItem con la DB.
+
+    En Railway la tabla `operations` fue creada con un schema viejo que no
+    tiene `op_code`, `source`, `currency`, `extra`, etc. Cualquier INSERT
+    revienta con UndefinedColumnError. Idem `operation_items`.
+
+    Idempotente. Igual patrón que `_migrate_sync_clients_columns`.
+    """
+    import traceback
+    from proyecto_maria.database.connection import engine, IS_SQLITE
+
+    operations_expected = [
+        ("client_id", "VARCHAR"),
+        ("op_code", "VARCHAR(100)"),
+        ("operation_type", "VARCHAR(20) DEFAULT 'import'"),
+        ("source", "VARCHAR(50)"),
+        ("currency", "VARCHAR(3) DEFAULT 'USD'"),
+        ("exchange_rate", "FLOAT"),
+        ("source_file", "VARCHAR(255)"),
+        ("generated_file", "VARCHAR(255)"),
+        ("extraction_method", "VARCHAR(50)"),
+        ("total_items", "INTEGER DEFAULT 0"),
+        ("total_value", "FLOAT DEFAULT 0.0"),
+        ("total_weight", "FLOAT DEFAULT 0.0"),
+        ("processing_time_ms", "INTEGER"),
+        ("extra", "TEXT" if IS_SQLITE else "JSON"),
+        ("owner_username", "VARCHAR(50)"),
+    ]
+    operation_items_expected = [
+        ("operation_id", "VARCHAR"),
+        ("pieza", "VARCHAR(10)"),
+        ("descripcion", "TEXT"),
+        ("origen", "VARCHAR(3)"),
+        ("cantidad", "FLOAT DEFAULT 1.0"),
+        ("valor_unitario", "FLOAT DEFAULT 0.0"),
+        ("peso_unitario", "FLOAT DEFAULT 0.5"),
+    ]
+
+    async def _sync(conn, table_name, expected_cols):
+        if IS_SQLITE:
+            res = await conn.exec_driver_sql(f"PRAGMA table_info({table_name})")
+            existing = {row[1] for row in res.fetchall()}
+        else:
+            res = await conn.exec_driver_sql(
+                "SELECT column_name FROM information_schema.columns "
+                f"WHERE table_name = '{table_name}'"
+            )
+            existing = {row[0] for row in res.fetchall()}
+        if not existing:
+            # Tabla no existe aún (primer arranque). Salimos: init_db la crea.
+            return
+        for col, coltype in expected_cols:
+            if col in existing:
+                continue
+            await conn.exec_driver_sql(
+                f"ALTER TABLE {table_name} ADD COLUMN {col} {coltype}"
+            )
+            print(f"✅ Migracion: agregada columna {table_name}.{col}")
+
+    try:
+        async with engine.begin() as conn:
+            await _sync(conn, "operations", operations_expected)
+            await _sync(conn, "operation_items", operation_items_expected)
+    except Exception as mig_err:
+        print("❌ Error sincronizando columnas de operations/operation_items:")
+        print(traceback.format_exc())
+        print(f"❌ Error original: {mig_err!r}")
+
+
 async def _migrate_add_user_op_defaults_columns():
     """Agrega columnas de defaults de operacion al usuario (despachante).
 
@@ -819,6 +889,7 @@ async def lifespan(app: FastAPI):
     await _migrate_clients_email_nullable()
     await _migrate_add_client_column_mapping()
     await _migrate_add_client_fecha_inic_activ()
+    await _migrate_sync_operations_columns()
     await _migrate_create_telemetry_events_table()
     
     # Montar Admin Router si no está montado
@@ -1633,6 +1704,7 @@ async def dev_run_migrations(user=Depends(get_current_user)):
         ("clients_email_nullable", _migrate_clients_email_nullable),
         ("client_column_mapping", _migrate_add_client_column_mapping),
         ("client_fecha_inic_activ", _migrate_add_client_fecha_inic_activ),
+        ("sync_operations_columns", _migrate_sync_operations_columns),
         ("telemetry_events", _migrate_create_telemetry_events_table),
     ]
     for label, fn in migrations:
