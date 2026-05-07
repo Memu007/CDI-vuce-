@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-07 · UX eliminar cliente y telemetría
+
+- **ux (clientes):** eliminar cliente ahora usa un modal propio de la app, no el cartel nativo del navegador.
+- **fix (telemetría):** el frontend usa `/api/session/state` y silencia la telemetría si el navegador o una extensión la bloquea, sin afectar el flujo.
+
+---
+
 ## 2026-05-07 · Fix guardado de operación al cliente
 
 - **fix (historial):** cuando una operación no se podía guardar al historial del cliente, fallaba en silencio. Ahora muestra toast con el error real y lo loguea.

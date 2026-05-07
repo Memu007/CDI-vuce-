@@ -960,6 +960,26 @@
         </form>
     </dialog>
 
+    <dialog class="cx-modal cx-delete-modal" id="cxDeleteModal" aria-labelledby="cxDeleteTitle" aria-describedby="cxDeleteText">
+        <div class="cx-modal-shell">
+            <header class="cx-modal-header">
+                <h3 class="cx-modal-title" id="cxDeleteTitle">Eliminar cliente</h3>
+                <button type="button" class="btn btn-ghost btn-icon" id="cxDeleteClose" aria-label="Cerrar">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+            </header>
+            <div class="cx-modal-body">
+                <div class="cx-delete-warning" aria-hidden="true">!</div>
+                <p class="cx-delete-title" id="cxDeleteName">¿Eliminar este cliente?</p>
+                <p class="cx-delete-text" id="cxDeleteText">Se borrará su historial de operaciones, productos aprendidos y notas NCM. Esta acción no se puede deshacer.</p>
+            </div>
+            <footer class="cx-modal-footer">
+                <button type="button" class="btn btn-ghost" id="cxDeleteCancel">Cancelar</button>
+                <button type="button" class="btn btn-danger" id="cxDeleteConfirm">Eliminar cliente</button>
+            </footer>
+        </div>
+    </dialog>
+
     <!-- Drawer lateral: catálogo aprendido (proveedores + productos) -->
     <div class="drawer-overlay" id="catalogoOverlay" hidden aria-hidden="true"></div>
     <aside class="drawer" id="catalogoDrawer" role="dialog" aria-modal="true" aria-label="Catálogo aprendido" hidden>

@@ -460,6 +460,8 @@ body {
 .btn-secondary:hover { background: var(--c-border); }
 .btn-ghost     { background: transparent; color: var(--c-text-2); }
 .btn-ghost:hover { background: var(--c-surface-2); color: var(--c-text); }
+.btn-danger    { background: var(--c-error); color: #fff; }
+.btn-danger:hover { background: #d92d24; }
 
 .btn-lg { height: 48px; padding: 0 var(--s-8); font-size: var(--t-17); border-radius: var(--r-lg); }
 .btn-xl { height: 56px; padding: 0 var(--s-10); font-size: var(--t-17); border-radius: var(--r-lg); font-weight: var(--w-semibold); }
@@ -4013,6 +4015,37 @@ tr:hover .ncm-note-pill.is-empty {
     background: var(--c-error-soft, #fee2e2);
     color: var(--c-error, #b91c1c);
     font-size: var(--t-13);
+}
+.cx-delete-modal { max-width: 440px; }
+.cx-delete-modal .cx-modal-body {
+    align-items: center;
+    text-align: center;
+    gap: var(--s-2);
+}
+.cx-delete-warning {
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--c-error-soft);
+    color: var(--c-error);
+    font-size: var(--t-20);
+    font-weight: var(--w-bold);
+}
+.cx-delete-title {
+    margin: var(--s-2) 0 0;
+    font-size: var(--t-17);
+    font-weight: var(--w-semibold);
+    color: var(--c-text);
+}
+.cx-delete-text {
+    margin: 0;
+    max-width: 34ch;
+    font-size: var(--t-14);
+    line-height: 1.5;
+    color: var(--c-text-2);
 }
 
 /* Responsive */

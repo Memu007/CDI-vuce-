@@ -128,10 +128,12 @@
     }
 
     /* ---------- 3. Telemetria comun v1/v2 ---------- */
-    const TELEMETRY_ENDPOINT = '/api/ui/event';
+    const TELEMETRY_ENDPOINT = '/api/session/state';
     const sessionStartMs = Date.now();
+    let telemetryMuted = false;
 
     function track(action, extra) {
+        if (telemetryMuted) return;
         const payload = Object.assign({
             version: 'v2',
             screen: currentScreen || 'boot',
@@ -139,16 +141,17 @@
             duration_ms: Date.now() - sessionStartMs,
             ts: new Date().toISOString()
         }, extra || {});
+        const body = JSON.stringify(payload);
         try {
-            navigator.sendBeacon && navigator.sendBeacon(
-                TELEMETRY_ENDPOINT,
-                new Blob([JSON.stringify(payload)], { type: 'application/json' })
-            );
-        } catch (_) {
-            api(TELEMETRY_ENDPOINT, {
+            fetch(TELEMETRY_ENDPOINT, {
                 method: 'POST',
-                body: JSON.stringify(payload)
-            }).catch(() => {});
+                credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/json' },
+                body: body,
+                keepalive: true
+            }).catch(() => { telemetryMuted = true; });
+        } catch (_) {
+            telemetryMuted = true;
         }
         if (window.__CDI_DEBUG__) console.log('[telemetry]', payload);
     }

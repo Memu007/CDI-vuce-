@@ -28,6 +28,7 @@
     // Modal form refs
     let formModal, formShell, formClose, formCancel, formSave, formTitleEl, formError;
     let fNombre, fCuit, fDireccion, fEmail, fTelefono, fOrigen, fMoneda, fNotas, fFechaInicActiv, fAdvanced;
+    let deleteModal, deleteClose, deleteCancel, deleteConfirm, deleteNameEl;
 
     // -------- Estado interno --------
     let clientes = [];
@@ -44,6 +45,7 @@
 
     let editingId = null;            // null = nuevo, string = edit
     let detailClienteId = null;
+    let pendingDeleteResolve = null;
     let activeIndex = -1;            // indice del item "focuseado" por teclado en vista filtrada
     let visibleIds = [];             // ids en el orden renderizado (para flechas)
     let scrollToOpsNext = false;
@@ -111,6 +113,11 @@
         fNotas      = $('cfNotas');
         fFechaInicActiv = $('cfFechaInicActiv');
         fAdvanced   = $('cfAdvanced');
+        deleteModal = $('cxDeleteModal');
+        deleteClose = $('cxDeleteClose');
+        deleteCancel = $('cxDeleteCancel');
+        deleteConfirm = $('cxDeleteConfirm');
+        deleteNameEl = $('cxDeleteName');
 
         // Restaurar "solo favoritos" de sesiones previas
         try {
@@ -176,6 +183,18 @@
                 closeForm();
             });
         }
+        if (deleteClose) deleteClose.addEventListener('click', () => closeDeleteModal(false));
+        if (deleteCancel) deleteCancel.addEventListener('click', () => closeDeleteModal(false));
+        if (deleteConfirm) deleteConfirm.addEventListener('click', () => closeDeleteModal(true));
+        if (deleteModal) {
+            deleteModal.addEventListener('click', (ev) => {
+                if (ev.target === deleteModal) closeDeleteModal(false);
+            });
+            deleteModal.addEventListener('cancel', (ev) => {
+                ev.preventDefault();
+                closeDeleteModal(false);
+            });
+        }
         // Enter en inputs = guardar (excepto textarea)
         [fNombre, fCuit, fDireccion, fEmail, fTelefono].forEach(el => {
             if (!el) return;
@@ -236,6 +255,7 @@
         entered = false;
         // Cerrar modal si quedo abierto
         closeForm();
+        closeDeleteModal(false);
     }
 
     /* ==========================================================
@@ -1076,7 +1096,7 @@
     async function onDeleteClick(id) {
         const c = clientes.find(x => x.id === id);
         if (!c) return;
-        const ok = window.confirm('¿Eliminar "' + c.nombre + '"? Esta acción no se puede deshacer.');
+        const ok = await confirmDeleteCliente(c);
         if (!ok) return;
         try {
             await deleteCliente(id);
@@ -1091,6 +1111,44 @@
         } catch (err) {
             CDI.toast && CDI.toast.error('No se pudo eliminar', String(err.message || err));
         }
+    }
+
+    function confirmDeleteCliente(c) {
+        if (!deleteModal || !c) {
+            CDI.toast && CDI.toast.error('No se pudo abrir la confirmación.');
+            return Promise.resolve(false);
+        }
+        if (deleteNameEl) {
+            deleteNameEl.textContent = '¿Eliminar "' + (c.nombre || 'este cliente') + '"?';
+        }
+        CDI.track && CDI.track('cliente_delete_confirm_open', { id: c.id });
+        return new Promise(resolve => {
+            pendingDeleteResolve = resolve;
+            showDeleteModal();
+            setTimeout(() => deleteCancel && deleteCancel.focus(), 80);
+        });
+    }
+
+    function showDeleteModal() {
+        if (!deleteModal) return;
+        if (typeof deleteModal.showModal === 'function') {
+            try { deleteModal.showModal(); } catch (_) { deleteModal.setAttribute('open', ''); }
+        } else {
+            deleteModal.setAttribute('open', '');
+        }
+    }
+
+    function closeDeleteModal(ok) {
+        if (deleteModal) {
+            if (typeof deleteModal.close === 'function' && deleteModal.open) {
+                try { deleteModal.close(); } catch (_) { deleteModal.removeAttribute('open'); }
+            } else {
+                deleteModal.removeAttribute('open');
+            }
+        }
+        const resolve = pendingDeleteResolve;
+        pendingDeleteResolve = null;
+        if (resolve) resolve(!!ok);
     }
 
     async function onCsvClick(id) {
@@ -1355,6 +1413,13 @@
             if (ev.key === 'Escape') {
                 ev.preventDefault();
                 closeForm();
+            }
+            return;
+        }
+        if (deleteModal && deleteModal.open) {
+            if (ev.key === 'Escape') {
+                ev.preventDefault();
+                closeDeleteModal(false);
             }
             return;
         }
