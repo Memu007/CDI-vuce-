@@ -355,9 +355,17 @@ async def _http_exception_friendly(request: Request, exc: StarletteHTTPException
             "HTTPException 5xx en %s %s: %s",
             request.method, request.url.path, exc.detail,
         )
+        # Mantener el mensaje amigable como `detail` para users finales,
+        # pero exponer el detail técnico en `dev_detail` para diagnóstico
+        # desde DevTools. No filtra nada nuevo: ya iba al log de Railway.
+        dev_detail = str(exc.detail)[:400] if exc.detail else ""
         return JSONResponse(
             status_code=exc.status_code,
-            content={"detail": _FRIENDLY_5XX, "code": "internal_error"},
+            content={
+                "detail": _FRIENDLY_5XX,
+                "dev_detail": dev_detail,
+                "code": "internal_error",
+            },
         )
     detail = exc.detail if exc.detail is not None else ""
     return JSONResponse(status_code=exc.status_code, content={"detail": detail})
@@ -370,7 +378,11 @@ async def _unhandled_exception_friendly(request: Request, exc: Exception):
     )
     return JSONResponse(
         status_code=500,
-        content={"detail": _FRIENDLY_5XX, "code": "internal_error"},
+        content={
+            "detail": _FRIENDLY_5XX,
+            "dev_detail": f"{type(exc).__name__}: {str(exc)[:300]}",
+            "code": "internal_error",
+        },
     )
 
 # Agregar middleware de seguridad

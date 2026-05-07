@@ -705,7 +705,9 @@
                 return { ok: true, cliente_id: cliente.id };
             }
             // Error real: mostrar al user en vez de silenciar.
-            const msg = (data && data.detail) || ('HTTP ' + res.status);
+            // Preferimos dev_detail (técnico) si vino, para diagnosticar; si no, el detail amigable.
+            const dev = data && data.dev_detail;
+            const msg = dev || (data && data.detail) || ('HTTP ' + res.status);
             console.error('[history] save_client_operation fallo:', msg, data);
             CDI.track('operation_save_failed', {
                 cliente_id: cliente.id,
