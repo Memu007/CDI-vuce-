@@ -1,3 +1,4 @@
+import logging
 import os
 from datetime import datetime, timedelta
 from typing import Optional
@@ -9,21 +10,35 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from proyecto_maria.config import get_settings
 
 settings = get_settings()
+_log = logging.getLogger("maria.auth")
 
 
 def _current_environment() -> str:
     return getattr(settings, "environment", os.getenv("ENVIRONMENT", "production"))
 
 
+def _is_testing_runtime() -> bool:
+    """Solo permitimos el bypass de auth si estamos REALMENTE corriendo tests.
+
+    Antes alcanzaba con `ENVIRONMENT=testing`; eso era veneno latente:
+    si Railway recibia esa variable por error, cualquier request sin token
+    pasaba como admin. Ahora exigimos ademas estar dentro de pytest
+    (variable `PYTEST_CURRENT_TEST` que pytest setea solo durante el run).
+    """
+    if _current_environment() != "testing":
+        return False
+    return bool(os.getenv("PYTEST_CURRENT_TEST"))
+
+
 class TestingHTTPBearer(HTTPBearer):
     def __init__(self) -> None:
-        super().__init__(auto_error=_current_environment() != "testing")
+        super().__init__(auto_error=not _is_testing_runtime())
 
     async def __call__(self, request: Request):
         try:
             return await super().__call__(request)
         except HTTPException:
-            if _current_environment() == "testing":
+            if _is_testing_runtime():
                 return None
             raise
 
@@ -78,10 +93,20 @@ def decode_token(token: str) -> dict:
 
 def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(security)) -> dict:
     if credentials is None:
+        # Defensa en profundidad: si por error llegamos aca sin estar en
+        # pytest real, devolvemos 401 en vez de un admin fake.
+        if not _is_testing_runtime():
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Autenticación requerida",
+            )
+        _log.warning("auth.jwt_utils: returning testing user (PYTEST runtime)")
+        # Privilegio minimo: operador, plan basic. Antes era admin/premium,
+        # demasiado para un fallback de tests.
         return {
             "sub": "testing-user",
-            "roles": ["admin"],
-            "plan": "premium",
+            "roles": ["operador"],
+            "plan": "basic",
             "environment": _current_environment(),
         }
     return decode_token(credentials.credentials)

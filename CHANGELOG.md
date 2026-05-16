@@ -6,6 +6,15 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-16 · Seguridad Wave 1 (pre-prueba)
+
+- **security (auth):** el fallback de `proyecto_maria/auth/jwt_utils.py` que devolvía un `admin` fake cuando `ENVIRONMENT=testing` ahora exige además estar dentro de pytest real (`PYTEST_CURRENT_TEST`). Si por error Railway recibe esa variable, se devuelve 401, no admin.
+- **security (auth):** el usuario fake de tests baja de `roles=["admin"]/plan=premium` a `roles=["operador"]/plan=basic` (mínimo privilegio).
+- **safe:** los routers que usan `require_role`/`require_plan` viven en `routers/_deprecated/` y NO están enchufados en `main.py`; el riesgo era latente, no activo.
+- **verificado:** sin leaks de `JWT_SECRET_KEY`, `GEMINI_API_KEY` ni `MP_ACCESS_TOKEN` en historial de git; `.env*` ignorado correctamente; CORS ya falla cerrado en prod si `ALLOWED_ORIGINS` está vacío; `/upload_pdf/public` y `/upload_excel/public` ya requieren auth (el sufijo `public` queda solo por compat del frontend).
+
+---
+
 ## 2026-05-07 · Popups unificados en v2
 
 - **fix (ux):** todos los carteles de confirmación de la app v2 ahora usan el modal visual de CDI en vez del cartel nativo del navegador.
