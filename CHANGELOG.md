@@ -6,6 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-22 · Seguridad Wave 3 (rate limit IA + audit XSS)
+
+- **security (ai-cost):** nuevo módulo `proyecto_maria/core/ai_quota.py` con cuota diaria por usuario. `POST /upload_pdf/public` ahora levanta 429 si el usuario excede `AI_DAILY_PDF_LIMIT` (default 50/día). Corta abuso / facturazo de tokens Gemini.
+- **safe (xss):** auditoría de `innerHTML` en `static/v2/screens/{clientes,catalogo,review,ncm_notes}.js`. Todos los datos de usuario o IA (nombre, CUIT, descripción, NCM, notas, etc.) ya pasan por `CDI.escapeHtml(...)`. Sin cambios; queda documentado.
+- **pendiente (no urgente):** sacar `'unsafe-inline'` de CSP `script-src` y agregar header CSRF custom — quedan para después de feedback de la prueba (cambios invasivos en frontend).
+
+---
+
 ## 2026-05-22 · Seguridad Wave 2 (prompt-injection + multi-tenant check)
 
 - **security (ai):** `proyecto_maria/pdf_extractor.py` ahora encierra el texto del PDF entre `<<<DOCUMENTO>>>...<<<FIN_DOCUMENTO>>>` y le aclara al modelo que todo lo de adentro es DATO crudo, no instrucciones. Defensa contra prompt-injection vía PDF malicioso.

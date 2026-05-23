@@ -2569,6 +2569,11 @@ async def upload_pdf_public(
         if not file.filename.lower().endswith('.pdf'):
             raise HTTPException(status_code=400, detail="Solo se permiten archivos PDF")
 
+        # Cuota diaria de IA por usuario: corta abuso / facturazo de tokens.
+        # Configurable via AI_DAILY_PDF_LIMIT (default 50/dia/usuario).
+        from proyecto_maria.core.ai_quota import enforce_pdf_quota
+        enforce_pdf_quota(user.get("username") if isinstance(user, dict) else None)
+
         contents = await file.read()
         
         max_upload_bytes = _get_max_upload_bytes()
