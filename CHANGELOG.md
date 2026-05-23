@@ -6,6 +6,15 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-22 · Seguridad Wave 2 (prompt-injection + multi-tenant check)
+
+- **security (ai):** `proyecto_maria/pdf_extractor.py` ahora encierra el texto del PDF entre `<<<DOCUMENTO>>>...<<<FIN_DOCUMENTO>>>` y le aclara al modelo que todo lo de adentro es DATO crudo, no instrucciones. Defensa contra prompt-injection vía PDF malicioso.
+- **security (ai):** cap duro del texto enviado al LLM (`PDF_LLM_MAX_INPUT_CHARS`, default 60k chars) para evitar DoS por tokens / facturazos de API.
+- **security (ai):** validación estricta del JSON que devuelve el modelo antes de persistir: `pieza` solo dígitos (6-8); `origen` solo letras ISO; strings se limpian de chars de control; máximo 2000 items por factura. Defensa en profundidad si el modelo igual se "deja convencer".
+- **safe (multitenant):** revisión rápida de endpoints `/api/clientes`, `/api/ncm/notas`, `/api/catalog/*`: todos usan `Depends(get_current_user)` y filtran por `owner_username` (71 referencias en `main.py`, helper `_get_owned_client` consistente). Sin cambios; queda documentado.
+
+---
+
 ## 2026-05-16 · Seguridad Wave 1 (pre-prueba)
 
 - **security (auth):** el fallback de `proyecto_maria/auth/jwt_utils.py` que devolvía un `admin` fake cuando `ENVIRONMENT=testing` ahora exige además estar dentro de pytest real (`PYTEST_CURRENT_TEST`). Si por error Railway recibe esa variable, se devuelve 401, no admin.
