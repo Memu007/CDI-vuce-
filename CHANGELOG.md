@@ -6,6 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-26 · Sprint 25 días — Día 2 (T5-lite)
+
+- **feat (db):** nueva columna `users.team_owner_username VARCHAR(50) NULL` (FK self-ref + índice). Migración idempotente `_migrate_add_user_team_owner_column` corre en startup y `POST /api/dev/run-migrations`. Soporta SQLite y PostgreSQL.
+- **feat (api):** `get_current_user` ahora devuelve `team_owner_username` y `effective_owner` (= username hoy, porque la columna está NULL para todos). Camino preparado para multi-puesto sin refactor invasivo.
+- **decisión (PM):** T5-full (refactor de 71 queries para filtrar por `effective_owner`) postergado a on-demand cuando un cliente real lo pida. Discovery todavía no validó el caso de uso multi-user.
+
+---
+
 ## 2026-05-26 · Sprint 25 días — Día 1 (T1–T4)
 
 - **fix (tests):** `test_excel_generation_with_empty_ncm_fields` ahora arma el path absoluto en `CDI/data/`. `test_pdf_upload_rejects_non_pdf` acepta 401 además de 400/422 (Wave 1 cambió a auth obligatoria).

@@ -43,6 +43,17 @@ Cualquier asistente (Cursor, Antigravity, Cascade, Claude) que continúe este sp
   - `landing_legacy.html` no tocado (no se sirve, solo referencia).
 - **Trial 14d → 15d** en backend (`main.py`): `register` ahora arranca con `trial_ends_at = now + 15d` cuando el user carga tarjeta. Comentarios actualizados. La lógica de `simulate-charge` sigue extendiendo +30d por ciclo mensual (otro concepto).
 - **Naming "Kit María" → "Kit SIM"** en landing, dashboard y discovery_guion.md (decisión de PM: queda más limpio).
+
+## Día 2 · T5-lite (multi-puesto / equipo, infra preparada)
+
+**Decisión de PM:** NO hacer T5-full ahora (4-6h, riesgo alto, sin demanda validada). Hacer T5-lite (1h, sin riesgo).
+
+- **DB:** nueva columna `users.team_owner_username VARCHAR(50) NULL` con FK self-ref a `users.username` e índice. Default NULL = el user es su propio team. En `database/models.py`.
+- **Migración:** `_migrate_add_user_team_owner_column()` idempotente, corre en startup y vía `POST /api/dev/run-migrations` (label `user_team_owner`). SQLite y PostgreSQL.
+- **API:** `get_current_user` ahora devuelve también `team_owner_username` (NULL hoy) y `effective_owner` (= username hoy). Esto deja el camino preparado para que endpoints futuros filtren por `effective_owner` sin tener que volver a leer el user de DB.
+- **Refactor de queries: NO HECHO.** Las 71 referencias a `owner_username == user["username"]` siguen igual. Cambio postergado a T5-full, on-demand cuando un cliente real diga "mi asistente carga ops bajo mi CUIT".
+- **Riesgo:** cero. Columna nueva opcional, ningún path la lee con valor != NULL todavía.
+- **Tests:** `test_regression_phase0.py::TestPDFEndpoint` y `TestUserProfile` siguen verdes (2 passed).
 - **Bug preexistente NO causado por mí:** `tests/test_regression_phase0.py::TestBackupRestore::*` (2 tests) fallan también en `main` antes de mi cambio. Verificado con `git stash`. No bloquea el sprint.
 - Commit + push pendiente al final del Día 1.
 

@@ -634,6 +634,40 @@ async def _migrate_add_user_billing_columns():
         print(f"⚠️ No se pudo migrar columnas de billing: {mig_err}")
 
 
+async def _migrate_add_user_team_owner_column():
+    """Agrega `users.team_owner_username` (NULLABLE) si no existe.
+
+    T5-lite (Sprint 25 Día 2): infraestructura para multi-puesto / equipo.
+    Default NULL = el user es su propio team (comportamiento actual). El
+    refactor de queries para usar `effective_owner` queda pendiente para
+    T5-full (cuando un cliente real lo pida).
+
+    Idempotente, corre en cada startup.
+    """
+    from proyecto_maria.database.connection import engine, IS_SQLITE
+    try:
+        async with engine.begin() as conn:
+            if IS_SQLITE:
+                res = await conn.exec_driver_sql("PRAGMA table_info(users)")
+                existing = {row[1] for row in res.fetchall()}
+                if "team_owner_username" not in existing:
+                    await conn.exec_driver_sql(
+                        "ALTER TABLE users ADD COLUMN team_owner_username VARCHAR(50)"
+                    )
+                    print("✅ Migracion: agregada columna users.team_owner_username (SQLite)")
+            else:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS team_owner_username VARCHAR(50)"
+                )
+                # Index separado: PostgreSQL no permite IF NOT EXISTS dentro de ALTER ADD COLUMN.
+                await conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS ix_users_team_owner_username "
+                    "ON users (team_owner_username)"
+                )
+    except Exception as mig_err:
+        print(f"⚠️ No se pudo migrar columna team_owner_username: {mig_err}")
+
+
 async def _migrate_add_client_column_mapping():
     """Agrega `clients.column_mapping` (JSON/TEXT) si no existe.
 
@@ -881,6 +915,7 @@ async def lifespan(app: FastAPI):
     await init_db()
     await _migrate_add_user_cuit_column()
     await _migrate_add_user_billing_columns()
+    await _migrate_add_user_team_owner_column()
     await _migrate_add_user_op_defaults_columns()
     # IMPORTANTE: _migrate_sync_clients_columns() debe correr ANTES de las
     # otras de clientes, porque agrega notes/address/favorite que las otras
@@ -1211,6 +1246,14 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
         except Exception:
             await db.rollback()
 
+    # T5-lite: si el user pertenece a un equipo, las queries de tenant deben
+    # filtrar por team_owner_username en lugar de username. Por ahora la
+    # columna existe pero NADIE tiene valor != NULL (comportamiento actual).
+    # `effective_owner` se expone aca para que endpoints futuros lo usen sin
+    # tener que volver a leer el user.
+    team_owner = getattr(user, "team_owner_username", None)
+    effective_owner = team_owner or user.username
+
     return {
         "username": user.username,
         "name": user.name,
@@ -1223,6 +1266,9 @@ async def get_current_user(request: Request, db: AsyncSession = Depends(get_db))
         "default_aduana_codigo": user.default_aduana_codigo or "",
         "default_puerto_destino": user.default_puerto_destino or "",
         "default_tipo_destinacion": user.default_tipo_destinacion or "",
+        # T5-lite: NULL salvo que el user sea operador de un team owner.
+        "team_owner_username": team_owner,
+        "effective_owner": effective_owner,
     }
 
 
@@ -1701,6 +1747,7 @@ async def dev_run_migrations(user=Depends(get_current_user)):
     migrations = [
         ("user_cuit", _migrate_add_user_cuit_column),
         ("user_billing", _migrate_add_user_billing_columns),
+        ("user_team_owner", _migrate_add_user_team_owner_column),
         ("user_op_defaults", _migrate_add_user_op_defaults_columns),
         ("sync_clients_columns", _migrate_sync_clients_columns),
         ("clients_email_nullable", _migrate_clients_email_nullable),

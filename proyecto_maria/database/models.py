@@ -39,6 +39,18 @@ class User(Base):
     roles = Column(JSON, default=[])
     is_verified = Column(Boolean, default=False)
 
+    # Multi-puesto / equipo (T5-lite, Sprint 25 Día 2):
+    # Si NULL, el user es su propio "team" (comportamiento por defecto).
+    # Si tiene valor, sus queries de tenant deben filtrar por team_owner_username
+    # en lugar de username (refactor pendiente para T5-full, on-demand).
+    # FK self-referencial a users.username.
+    team_owner_username = Column(
+        String(50),
+        ForeignKey("users.username"),
+        nullable=True,
+        index=True,
+    )
+
     # --- Billing (simulated / stripe / mercadopago) ---
     # none=sin pm cargado, trial=prueba gratis, active=cobrando, past_due=trial
     # vencido sin cobro exitoso, canceled=dado de baja.
