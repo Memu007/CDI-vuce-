@@ -192,10 +192,17 @@ class TestPDFToAVGConversion:
         with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
             try:
                 # Generate AVG Excel
-                output_path = create_maria_excel(mock_items, "test-operation")
-                
+                # create_maria_excel devuelve solo el filename; el archivo
+                # se guarda en CDI/data/ (ver excel_generator.py:93-95).
+                filename = create_maria_excel(mock_items, "test-operation")
+                data_dir = os.path.join(
+                    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+                    'data',
+                )
+                output_path = os.path.join(data_dir, filename)
+
                 # Verify file was created
-                assert os.path.exists(output_path)
+                assert os.path.exists(output_path), f"No existe: {output_path}"
                 assert os.path.getsize(output_path) > 0
                 
                 # Clean up generated file

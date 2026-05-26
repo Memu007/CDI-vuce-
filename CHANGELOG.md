@@ -6,6 +6,16 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-26 · Sprint 25 días — Día 1 (T1–T4)
+
+- **fix (tests):** `test_excel_generation_with_empty_ncm_fields` ahora arma el path absoluto en `CDI/data/`. `test_pdf_upload_rejects_non_pdf` acepta 401 además de 400/422 (Wave 1 cambió a auth obligatoria).
+- **fix:** `/landing_nueva` ya no devuelve 500. Ahora redirige 307 a `/`.
+- **feat (ux):** cartel de bienvenida en `/v2` con 3 pasos (subir PDF → revisar → generar TXT al Kit SIM). Persiste dismiss en `localStorage.cdi_welcome_seen`.
+- **docs:** copy de `landing.html` actualizado: hero menciona "Kit María SIM 7.0 (ARCA · Malvina)" y step final "TXT al Kit SIM".
+- **docs:** creados `docs/sprint_25_progress.md` (bitácora del sprint, handoff-friendly) y `docs/discovery_guion.md` (8 preguntas + plantillas WhatsApp/email).
+
+---
+
 ## 2026-05-22 · Seguridad Wave 3 (rate limit IA + audit XSS)
 
 - **security (ai-cost):** nuevo módulo `proyecto_maria/core/ai_quota.py` con cuota diaria por usuario. `POST /upload_pdf/public` ahora levanta 429 si el usuario excede `AI_DAILY_PDF_LIMIT` (default 50/día). Corta abuso / facturazo de tokens Gemini.

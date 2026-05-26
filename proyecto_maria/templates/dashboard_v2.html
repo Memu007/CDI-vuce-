@@ -64,6 +64,17 @@
                 <span class="fake-banner-text">Algunos NCMs usan <strong>datos de muestra</strong> porque la fuente oficial no respondi&oacute;. Revis&aacute; los valores antes de generar el TXT.</span>
                 <button type="button" class="fake-banner-close" id="fakeSourceBannerClose" aria-label="Cerrar aviso">&times;</button>
             </div>
+            <aside class="welcome-card" id="welcomeCard" role="region" aria-label="Bienvenida" hidden>
+                <button type="button" class="welcome-close" id="welcomeClose" aria-label="Cerrar bienvenida">×</button>
+                <h2 class="welcome-title">Bienvenido a CDI · Despachos</h2>
+                <p class="welcome-sub">3 pasos para tu primera operación. Después esto desaparece.</p>
+                <ol class="welcome-steps">
+                    <li><strong>Subí el PDF de la factura</strong> del proveedor (acá abajo, arrastrar o clickear).</li>
+                    <li><strong>Revisá los items</strong>: el sistema sugiere NCM, vos confirmás o corregís.</li>
+                    <li><strong>Generá el TXT</strong> y cargalo en tu Kit María SIM 7.0 (ARCA / Malvina).</li>
+                </ol>
+                <button type="button" class="btn btn-primary welcome-cta" id="welcomeCta">Listo, lo tengo</button>
+            </aside>
             <nav class="progress" aria-label="Progreso">
                 <div class="progress-step" data-step="upload"><span class="num">1</span> Subir</div>
                 <span class="progress-line"></span>

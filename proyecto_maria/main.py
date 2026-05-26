@@ -1453,8 +1453,10 @@ def read_root():
 
 @app.get("/landing_nueva")
 def landing_nueva():
-    """Sirve la nueva landing page para pruebas"""
-    return FileResponse(os.path.join(basedir, "proyecto_maria", "templates", "landing_nueva.html"), media_type="text/html")
+    """Alias historico. landing_nueva.html fue removido; redirigimos a / para
+    no devolver 500 si alguien guarda el link viejo."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/", status_code=307)
 
 @app.get("/web")
 def web_interface():

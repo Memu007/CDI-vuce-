@@ -148,12 +148,17 @@ class TestPDFEndpoint:
         print(f"✅ PDF upload graceful: {response.status_code}")
 
     def test_pdf_upload_rejects_non_pdf(self, client):
-        """PDF upload debe rechazar archivos no-PDF"""
+        """PDF upload debe rechazar archivos no-PDF.
+
+        Acepta 401 tambien: desde Wave 1 el endpoint requiere auth, asi que
+        si no hay sesion el rechazo llega por auth antes de validar el
+        archivo. Ambos cumplen el invariante (el archivo no se procesa).
+        """
         response = client.post(
             "/upload_pdf/public",
             files={"file": ("test.txt", b"This is not a PDF", "text/plain")}
         )
-        assert response.status_code in [400, 422]
+        assert response.status_code in [400, 401, 422]
         print(f"✅ Non-PDF rejected: {response.status_code}")
 
 

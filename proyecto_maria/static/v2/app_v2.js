@@ -556,12 +556,35 @@
         }
     }
 
+    /* ---------- Welcome card (primera vez) ----------
+       Muestra el cartel de bienvenida solo si el user no lo cerró antes
+       (localStorage.cdi_welcome_seen). Una vez cerrado, no vuelve. */
+    function setupWelcomeCard() {
+        const card = document.getElementById('welcomeCard');
+        if (!card) return;
+        let seen = '0';
+        try { seen = localStorage.getItem('cdi_welcome_seen') || '0'; } catch (_) {}
+        if (seen === '1') return; // ya lo vio
+        card.hidden = false;
+        const dismiss = () => {
+            card.hidden = true;
+            try { localStorage.setItem('cdi_welcome_seen', '1'); } catch (_) {}
+            track('welcome_card_dismissed');
+        };
+        const cta = document.getElementById('welcomeCta');
+        const close = document.getElementById('welcomeClose');
+        if (cta) cta.addEventListener('click', dismiss);
+        if (close) close.addEventListener('click', dismiss);
+        track('welcome_card_shown');
+    }
+
     /* ---------- 10. Bootstrap ---------- */
     document.addEventListener('DOMContentLoaded', () => {
         try { localStorage.removeItem(CLIENTE_KEY); } catch (_) {}
         loadCurrentUser();
         updateClientePill();
         setupFakeSourceBanner();
+        setupWelcomeCard();
         track('session_start');
 
         // El link "Volver a la version clasica" esta en el footer como

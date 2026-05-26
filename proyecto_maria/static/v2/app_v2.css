@@ -5,6 +5,34 @@
    v1 (dashboard.html + app.css) NO se ve afectado.
    ============================================================ */
 
+/* ---------- Welcome card (primera vez) ---------- */
+/* Cartel de bienvenida que aparece solo si localStorage.cdi_welcome_seen != '1'.
+   Se oculta cuando el usuario clickea "Listo, lo tengo" o la X. */
+.welcome-card {
+    position: relative;
+    background: linear-gradient(180deg, #fafbff 0%, #f3f5fb 100%);
+    border: 1px solid #e2e8f4;
+    border-radius: 16px;
+    padding: 24px 28px;
+    margin: 0 auto 24px;
+    max-width: 720px;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
+}
+.welcome-title { font-size: 22px; font-weight: 600; margin: 0 0 6px; color: #0f172a; letter-spacing: -0.01em; }
+.welcome-sub { font-size: 14px; color: #475569; margin: 0 0 16px; }
+.welcome-steps { margin: 0 0 18px; padding-left: 22px; color: #1e293b; font-size: 14px; line-height: 1.65; }
+.welcome-steps li { margin-bottom: 6px; }
+.welcome-steps strong { color: #0f172a; font-weight: 600; }
+.welcome-cta { min-width: 160px; }
+.welcome-close {
+    position: absolute; top: 12px; right: 14px;
+    background: transparent; border: 0; color: #94a3b8;
+    font-size: 22px; line-height: 1; cursor: pointer;
+    padding: 4px 10px; border-radius: 6px;
+    transition: color 120ms ease, background-color 120ms ease;
+}
+.welcome-close:hover { color: #0f172a; background: rgba(15, 23, 42, 0.05); }
+
 /* ---------- Beta banner global ---------- */
 .beta-banner {
     background: #fff8d6;
