@@ -268,7 +268,7 @@ class RegisterRequest(BaseModel):
     name: str = None  # Optional, defaults to username
     email: str  # REQUIRED - needed for password recovery
     plan: str = "trial"
-    # Opcional: si viene, se valida y se arranca trial 14d con PM simulado.
+    # Opcional: si viene, se valida y se arranca trial 15d con PM simulado.
     # Si no viene, user queda con billing_status='none' y sin trial activo.
     payment_method: CardInput | None = None
 
@@ -2056,10 +2056,10 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
         is_verified=not require_verify,
     )
 
-    # Si el user cargo tarjeta, arrancamos trial 14d con PM simulado guardado.
+    # Si el user cargo tarjeta, arrancamos trial 15d con PM simulado guardado.
     if pm_meta is not None:
         new_user.billing_status = "trial"
-        new_user.trial_ends_at = datetime.now(timezone.utc) + timedelta(days=14)
+        new_user.trial_ends_at = datetime.now(timezone.utc) + timedelta(days=15)
         new_user.payment_provider = "simulated"
         new_user.payment_customer_id = pm_meta["customer_id"]
         new_user.payment_method_last4 = pm_meta["last4"]

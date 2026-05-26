@@ -86,7 +86,7 @@ Gracias y saludos,
 ```
 Hola [Nombre], además de la charla, te quería pedir un favor técnico:
 para validar que el formato TXT que genero es 100% compatible con
-el Kit María SIM 7.0 actual, ¿podríamos hacer 30 min adicionales
+el Kit SIM 7.0 actual, ¿podríamos hacer 30 min adicionales
 donde vos cargás un TXT de prueba que yo te paso, en tu Kit, y vemos
 si entra OK?
 

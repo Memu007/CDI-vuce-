@@ -31,16 +31,18 @@ Cualquier asistente (Cursor, Antigravity, Cascade, Claude) que continúe este sp
 ### Día 1 cerrado · resto de tareas hechas
 
 - **T3** cartel de bienvenida en `/v2` (`#welcomeCard` en `dashboard_v2.html`):
-  - 3 pasos: subir PDF / revisar items / generar TXT y cargar al Kit María SIM 7.0 (ARCA / Malvina).
+  - 3 pasos: subir PDF / revisar items / generar TXT y cargar al Kit SIM 7.0 (ARCA / Malvina).
   - Aparece solo en el primer login. Persiste en `localStorage.cdi_welcome_seen`.
   - Tracking: `welcome_card_shown` y `welcome_card_dismissed`.
   - CSS: `.welcome-card` en `app_v2.css` (estilo Apple minimal).
   - JS: `setupWelcomeCard()` en `app_v2.js`, llamado en bootstrap.
-- **T4** copy de `landing.html` actualizado para mencionar **Kit María SIM 7.0 (ARCA / Malvina)** explícitamente:
-  - Hero: "...te devuelvo el TXT listo para pegar en tu **Kit María SIM 7.0** (ARCA · Malvina)".
+- **T4** copy de `landing.html` actualizado para mencionar **Kit SIM 7.0 (ARCA / Malvina)** explícitamente:
+  - Hero: "...te devuelvo el TXT listo para pegar en tu **Kit SIM 7.0** (ARCA · Malvina)".
   - Step final: "TXT al Kit SIM" (antes "MARIA sale").
   - Meta description y OG description actualizadas igual.
   - `landing_legacy.html` no tocado (no se sirve, solo referencia).
+- **Trial 14d → 15d** en backend (`main.py`): `register` ahora arranca con `trial_ends_at = now + 15d` cuando el user carga tarjeta. Comentarios actualizados. La lógica de `simulate-charge` sigue extendiendo +30d por ciclo mensual (otro concepto).
+- **Naming "Kit María" → "Kit SIM"** en landing, dashboard y discovery_guion.md (decisión de PM: queda más limpio).
 - **Bug preexistente NO causado por mí:** `tests/test_regression_phase0.py::TestBackupRestore::*` (2 tests) fallan también en `main` antes de mi cambio. Verificado con `git stash`. No bloquea el sprint.
 - Commit + push pendiente al final del Día 1.
 

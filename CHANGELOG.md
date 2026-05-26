@@ -11,7 +11,9 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix (tests):** `test_excel_generation_with_empty_ncm_fields` ahora arma el path absoluto en `CDI/data/`. `test_pdf_upload_rejects_non_pdf` acepta 401 además de 400/422 (Wave 1 cambió a auth obligatoria).
 - **fix:** `/landing_nueva` ya no devuelve 500. Ahora redirige 307 a `/`.
 - **feat (ux):** cartel de bienvenida en `/v2` con 3 pasos (subir PDF → revisar → generar TXT al Kit SIM). Persiste dismiss en `localStorage.cdi_welcome_seen`.
-- **docs:** copy de `landing.html` actualizado: hero menciona "Kit María SIM 7.0 (ARCA · Malvina)" y step final "TXT al Kit SIM".
+- **docs:** copy de `landing.html` actualizado: hero menciona "Kit SIM 7.0 (ARCA · Malvina)" y step final "TXT al Kit SIM".
+- **fix (billing):** trial gratis pasó de 14 a 15 días en `register` (`User.trial_ends_at = now + 15d`). Decisión de PM.
+- **docs (naming):** "Kit María SIM 7.0" → "Kit SIM 7.0" en landing, dashboard y discovery_guion. Más limpio para venderlo.
 - **docs:** creados `docs/sprint_25_progress.md` (bitácora del sprint, handoff-friendly) y `docs/discovery_guion.md` (8 preguntas + plantillas WhatsApp/email).
 
 ---
