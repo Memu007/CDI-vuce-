@@ -44,6 +44,18 @@ Cualquier asistente (Cursor, Antigravity, Cascade, Claude) que continúe este sp
 - **Trial 14d → 15d** en backend (`main.py`): `register` ahora arranca con `trial_ends_at = now + 15d` cuando el user carga tarjeta. Comentarios actualizados. La lógica de `simulate-charge` sigue extendiendo +30d por ciclo mensual (otro concepto).
 - **Naming "Kit María" → "Kit SIM"** en landing, dashboard y discovery_guion.md (decisión de PM: queda más limpio).
 
+## Día 3 · T6-UI (banner billing en dashboard v2)
+
+- **HTML** `#billingBanner` arriba de fake-source-banner en `dashboard_v2.html`. Estructura: icono + texto + CTA + close.
+- **JS** `renderBillingBanner(user)` en `app_v2.js` (línea ~566). Llamada desde `loadCurrentUser` cuando llega `/auth/current_user`.
+- **Estados:**
+  - `trial` con días > 0 → soft (azul) "X días de prueba gratis. Activá el plan cuando quieras."
+  - `past_due` → urgente (naranja con pulse) "Tu prueba gratis terminó. Activá el plan ahora."
+  - `active` / `canceled` / `none` → oculto.
+- **Click CTA** → `POST /api/billing/checkout` → `window.location.href = init_point` (redirige a MP).
+- **Telemetría:** `billing_banner_shown`, `billing_cta_clicked`, `billing_banner_dismissed`.
+- **Verificado live:** `curl /static/v2/app_v2.js` sirve la función nueva.
+
 ## Día 2 · T6-lite (MercadoPago real, backend solo)
 
 **Decisión de PM:** NO hacer T6-full (subscripciones recurrentes con pre-approval, retries, chargebacks). Para MVP basta con cobro one-shot mensual + webhook validado.

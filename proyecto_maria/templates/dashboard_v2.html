@@ -59,6 +59,13 @@
         </header>
 
         <main class="main">
+            <!-- Banner billing: trial restante / past_due / activar plan. Se muestra/oculta desde JS según /auth/current_user. -->
+            <div class="billing-banner" id="billingBanner" role="status" aria-live="polite" hidden>
+                <span class="billing-banner-icon" aria-hidden="true">●</span>
+                <span class="billing-banner-text" id="billingBannerText"></span>
+                <button type="button" class="billing-banner-cta" id="billingBannerCta">Activar plan</button>
+                <button type="button" class="billing-banner-close" id="billingBannerClose" aria-label="Cerrar aviso" hidden>&times;</button>
+            </div>
             <div class="fake-source-banner" id="fakeSourceBanner" role="status" aria-live="polite" hidden>
                 <svg class="fake-banner-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                 <span class="fake-banner-text">Algunos NCMs usan <strong>datos de muestra</strong> porque la fuente oficial no respondi&oacute;. Revis&aacute; los valores antes de generar el TXT.</span>

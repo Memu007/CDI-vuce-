@@ -287,6 +287,8 @@
             const user = await res.json();
             currentUser = user;
             CDI.currentUser = user;
+            // Banner de billing (trial / past_due / activar plan).
+            renderBillingBanner(user);
             // Cachear defaults de operacion del despachante (los usa Revisar como fallback)
             CDI.userDefaults = {
                 aduana_codigo: user.default_aduana_codigo || '',
@@ -554,6 +556,78 @@
                 track('fake_banner_dismissed');
             });
         }
+    }
+
+    /* ---------- Billing banner (trial / past_due / activar plan) ----------
+       Renderiza un banner soft con días de trial restantes, o uno urgente si
+       el trial ya venció. Click en CTA → POST /api/billing/checkout → redirige
+       al init_point de MercadoPago (o demo si no hay credenciales).
+       Se llama desde loadCurrentUser una vez que tenemos billing_status. */
+    function renderBillingBanner(user) {
+        const banner = document.getElementById('billingBanner');
+        const text = document.getElementById('billingBannerText');
+        const cta = document.getElementById('billingBannerCta');
+        const close = document.getElementById('billingBannerClose');
+        if (!banner || !text || !cta) return;
+
+        const status = (user && user.billing_status) || 'none';
+        const trialEnd = user && user.trial_ends_at ? new Date(user.trial_ends_at) : null;
+        const now = new Date();
+        const daysLeft = trialEnd ? Math.ceil((trialEnd - now) / (1000 * 60 * 60 * 24)) : 0;
+
+        // Estados visibles para el user:
+        //  - trial activo → banner soft con días restantes.
+        //  - past_due (trial venció) → banner urgente.
+        //  - active / canceled / none → ocultar.
+        if (status === 'trial' && daysLeft > 0) {
+            banner.classList.remove('is-urgent');
+            text.innerHTML = '<strong>' + daysLeft + ' día' + (daysLeft === 1 ? '' : 's') + '</strong> de prueba gratis. Activá el plan cuando quieras.';
+            cta.textContent = 'Activar plan';
+            close.hidden = false;
+            banner.hidden = false;
+        } else if (status === 'past_due') {
+            banner.classList.add('is-urgent');
+            text.innerHTML = '<strong>Tu prueba gratis terminó.</strong> Activá el plan para seguir generando TXT.';
+            cta.textContent = 'Activar plan ahora';
+            close.hidden = true;
+            banner.hidden = false;
+        } else {
+            banner.hidden = true;
+            return;
+        }
+
+        // Click en CTA → abrir checkout MP en la misma ventana.
+        if (!cta._wired) {
+            cta._wired = true;
+            cta.addEventListener('click', async () => {
+                cta.disabled = true;
+                cta.textContent = 'Abriendo...';
+                track('billing_cta_clicked', { status: status });
+                try {
+                    const res = await api('/api/billing/checkout', { method: 'POST' });
+                    const data = await res.json().catch(() => ({}));
+                    if (data && data.init_point) {
+                        window.location.href = data.init_point;
+                        return;
+                    }
+                    if (CDI.toast) CDI.toast('Error', 'No se pudo iniciar el cobro. Probemos de nuevo.', 'error');
+                } catch (err) {
+                    console.warn('[billing] checkout error', err);
+                    if (CDI.toast) CDI.toast('Error', 'No se pudo iniciar el cobro.', 'error');
+                } finally {
+                    cta.disabled = false;
+                    cta.textContent = status === 'past_due' ? 'Activar plan ahora' : 'Activar plan';
+                }
+            });
+        }
+        if (close && !close._wired) {
+            close._wired = true;
+            close.addEventListener('click', () => {
+                banner.hidden = true;
+                track('billing_banner_dismissed', { status: status });
+            });
+        }
+        track('billing_banner_shown', { status: status, days_left: daysLeft });
     }
 
     /* ---------- Welcome card (primera vez) ----------

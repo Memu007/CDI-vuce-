@@ -6,6 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-27 · Sprint 25 días — Día 3 (T6-UI, banner billing en dashboard)
+
+- **feat (ux):** banner de billing en dashboard v2 (`#billingBanner`). Muestra días de trial restantes (soft, azul) o trial vencido (urgente, naranja con pulse). CTA "Activar plan" llama `POST /api/billing/checkout` y redirige al `init_point` de MP.
+- **feat (telemetry):** eventos `billing_banner_shown`, `billing_cta_clicked`, `billing_banner_dismissed` para medir conversión del trial al pago.
+- **css:** `.billing-banner` + variante `.is-urgent` en `app_v2.css`. Estilo Apple minimal igual que welcome card y fake-source-banner.
+
+---
+
 ## 2026-05-27 · Sprint 25 días — Día 2 (T6-lite, MercadoPago real)
 
 - **security (CRÍTICO):** webhook `/api/payments/webhook` ahora valida firma HMAC-SHA256 con `MP_WEBHOOK_SECRET`. Antes cualquiera podía hitear el endpoint y activar premium gratis. En prod sin secret → rechaza todo.
