@@ -39,6 +39,7 @@
         <a class="topbar-brand" href="#top" aria-label="Inicio">CDI<span class="dot">·</span>Despachos</a>
         <nav class="topbar-nav" aria-label="Secciones">
             <a class="btn-ghost" href="#caps">Capacidades</a>
+            <a class="btn-ghost" href="#precio">Precio</a>
             <a class="btn-ghost" href="#seguridad">Seguridad</a>
         </nav>
         <div class="topbar-meta">
@@ -186,6 +187,40 @@
         </div>
     </section>
 
+    <!-- ================= Precio (un solo plan, sin letra chica) ================= -->
+    <section id="precio" class="pricing">
+        <div class="section-head">
+            <h2>Un precio. Sin tiers, sin sorpresas.</h2>
+            <p>Probás 15 días gratis. Si te sirve, seguís. Si no, no pagás nada.</p>
+        </div>
+
+        <div class="pricing-card">
+            <div class="pricing-head">
+                <span class="pricing-eyebrow">Plan único</span>
+                <div class="pricing-amount">
+                    <span class="pricing-currency">$</span>
+                    <span class="pricing-number">15.000</span>
+                    <span class="pricing-period">ARS / mes</span>
+                </div>
+                <p class="pricing-sub">Cobrado por MercadoPago. Cancelás cuando quieras desde el dashboard.</p>
+            </div>
+
+            <ul class="pricing-list">
+                <li><strong>PDF → TXT ilimitado.</strong> Las facturas que necesites, cuando las necesites.</li>
+                <li><strong>Sugerencias NCM con VUCE oficial.</strong> Tu historial por cliente + datos del aráncel.</li>
+                <li><strong>Multi-factura en un mismo despacho.</strong> Una sola corrida, un solo TXT.</li>
+                <li><strong>Intervenciones marcadas (LNA / LA / antidumping).</strong> Sin carteles que asustan.</li>
+                <li><strong>Defaults de Aduana / Destinación / PSAD por usuario.</strong> Se acuerda cómo trabajás.</li>
+                <li><strong>Soporte directo con humano</strong> por mail o WhatsApp. No bots.</li>
+            </ul>
+
+            <div class="pricing-cta">
+                <button type="button" class="btn-primary btn-lg" id="btnPriceCta">Empezar 15 días gratis</button>
+                <span class="pricing-hint">Sin tarjeta requerida para arrancar.</span>
+            </div>
+        </div>
+    </section>
+
     <!-- ================= Seguridad & confiabilidad ================= -->
     <section id="seguridad" class="stack">
         <div class="stack-inner">
@@ -275,7 +310,7 @@
                 </div>
             </fieldset>
 
-            <button type="submit" class="btn-primary btn-lg btn-block">Empezar trial de 14 días</button>
+            <button type="submit" class="btn-primary btn-lg btn-block">Empezar trial de 15 días</button>
             <p class="auth-hint">¿Ya tenés cuenta? <a href="#" data-tab="login" class="auth-link">Ingresar →</a></p>
         </form>
 
@@ -365,6 +400,14 @@
         setTimeout(() => { popover.hidden = true; overlay.hidden = true; }, 180);
     }
     btnOpen.addEventListener('click', () => openAuth('login'));
+    // CTA de la sección de precio: abre el form de registro directo.
+    const btnPriceCta = document.getElementById('btnPriceCta');
+    if (btnPriceCta) {
+        btnPriceCta.addEventListener('click', () => {
+            try { landingUiTelemetry({ action: 'pricing_cta_clicked', screen: 'landing_pricing' }); } catch (_) {}
+            openAuth('register');
+        });
+    }
     btnClose.addEventListener('click', closeAuth);
     overlay.addEventListener('click', closeAuth);
     document.addEventListener('keydown', (e) => {

@@ -44,6 +44,33 @@ Cualquier asistente (Cursor, Antigravity, Cascade, Claude) que continúe este sp
 - **Trial 14d → 15d** en backend (`main.py`): `register` ahora arranca con `trial_ends_at = now + 15d` cuando el user carga tarjeta. Comentarios actualizados. La lógica de `simulate-charge` sigue extendiendo +30d por ciclo mensual (otro concepto).
 - **Naming "Kit María" → "Kit SIM"** en landing, dashboard y discovery_guion.md (decisión de PM: queda más limpio).
 
+## Día 4 · T8 (pricing en landing) + T7 bloqueado
+
+### T8 hecho (landing pricing)
+
+- Nueva sección `#precio` en `landing.html` entre Capacidades y Seguridad.
+- Tarjeta única: $15.000 ARS/mes, 6 bullets de qué incluye, CTA "Empezar 15 días gratis".
+- CTA dispara `openAuth('register')` + telemetría `pricing_cta_clicked`.
+- Topbar nav agregado link a `#precio`.
+- Fix copy residual: "trial de 14 días" → "15 días" en form de registro.
+- CSS: `.pricing-card` + `.pricing-list` con check verde, en `static/v2/landing.css`.
+- Verificado live: `curl /` devuelve la sección con `15.000`.
+
+### T7 BLOQUEADO (validación TXT Kit SIM)
+
+**Por qué bloqueado:** no hay TXT de referencia validado por un despachante real. Busqué en todo el repo, en home directories, sólo aparecen .txt de docs (CLAUDE_BRIEF, FILE_LOCATIONS, robots, etc) — ninguno es output del Kit SIM.
+
+**Mini-checklist para cuando llegue el TXT** (no perder tiempo después):
+
+1. Comparar header/cabecera DDT byte a byte contra el output de `maria_generator.py`.
+2. Verificar campos posicionales: `CDDTAGR`, `CDDIMP`, `DDTITEMS`, separadores, paddings (espacios vs ceros).
+3. Encoding: ¿UTF-8 o latin-1? El generador hoy usa UTF-8.
+4. Salto de línea: `\r\n` (Windows/MARIA) vs `\n`.
+5. Contar items y validar totales (FOB, peso, unidades) coinciden con la factura.
+6. Si hay diff → ajustar `maria_generator.py` y regenerar test.
+
+**Para vos:** pedile a 1 despachante un TXT de un despacho real (anonimizado si querés) que él haya cargado OK en su Kit SIM. Con eso, T7 se cierra en 2-3h. Sin eso, no avanzo.
+
 ## Día 3 · T6-UI (banner billing en dashboard v2)
 
 - **HTML** `#billingBanner` arriba de fake-source-banner en `dashboard_v2.html`. Estructura: icono + texto + CTA + close.

@@ -6,6 +6,15 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-27 · Sprint 25 días — Día 4 (T8 pricing + T7 bloqueado)
+
+- **feat (landing):** nueva sección `#precio` con tarjeta de plan único ($15.000 ARS/mes alineado con `MP_PLAN_PRICE_ARS`). 6 bullets de qué incluye, CTA "Empezar 15 días gratis" abre el form de registro.
+- **fix (copy):** "Empezar trial de 14 días" → "15 días" en el botón de registro de la landing (residual del cambio del Día 1).
+- **feat (telemetry):** evento `pricing_cta_clicked` para medir conversión landing → registro desde precio.
+- **decisión PM:** T7 (validación de TXT contra Kit SIM 7.0 real) **bloqueado** hasta que un despachante pase un TXT bueno validado. No hay TXT de referencia en repo ni en home. Cambios al generador a ojo = ruleta rusa.
+
+---
+
 ## 2026-05-27 · Sprint 25 días — Día 3 (T6-UI, banner billing en dashboard)
 
 - **feat (ux):** banner de billing en dashboard v2 (`#billingBanner`). Muestra días de trial restantes (soft, azul) o trial vencido (urgente, naranja con pulse). CTA "Activar plan" llama `POST /api/billing/checkout` y redirige al `init_point` de MP.
