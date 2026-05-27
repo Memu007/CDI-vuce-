@@ -6,6 +6,16 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-05-27 · Sprint 25 días — Día 2 (T6-lite, MercadoPago real)
+
+- **security (CRÍTICO):** webhook `/api/payments/webhook` ahora valida firma HMAC-SHA256 con `MP_WEBHOOK_SECRET`. Antes cualquiera podía hitear el endpoint y activar premium gratis. En prod sin secret → rechaza todo.
+- **fix (billing consistency):** webhook MP ahora sincroniza `billing_status='active'`, `trial_ends_at=now+30d`, `payment_provider='mercadopago'` y `payment_customer_id`. Antes solo cambiaba `plan` y dejaba el billing inconsistente.
+- **feat (api):** nuevo `POST /api/billing/checkout` autenticado (saca `username` del JWT, no del body). Reemplaza al inseguro `/api/payments/create-preference` que aceptaba cualquier username del cliente. El viejo queda intacto para no romper landing legacy (no se sirve).
+- **env:** nuevas vars `MP_WEBHOOK_SECRET` (HMAC) y `MP_PLAN_PRICE_ARS` (default 15000).
+- **tests:** `tests/test_mp_webhook_signature.py` con 5 casos: firma válida, secret incorrecto, headers faltantes, sin secret en prod (rechaza), sin secret en dev (pasa).
+
+---
+
 ## 2026-05-26 · Sprint 25 días — Día 2 (T5-lite)
 
 - **feat (db):** nueva columna `users.team_owner_username VARCHAR(50) NULL` (FK self-ref + índice). Migración idempotente `_migrate_add_user_team_owner_column` corre en startup y `POST /api/dev/run-migrations`. Soporta SQLite y PostgreSQL.

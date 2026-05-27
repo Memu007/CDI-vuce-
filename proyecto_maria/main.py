@@ -4924,6 +4924,12 @@ import mercadopago
 
 # Configuración MercadoPago (usar variable de entorno en producción)
 MP_ACCESS_TOKEN = os.environ.get("MP_ACCESS_TOKEN", "")
+# Secret HMAC para validar firma del webhook. Lo configura MP en el panel de
+# integraciones. Si no esta seteado en producción, el webhook rechaza todo
+# (defensa en profundidad: nadie puede activar premium hiteando el endpoint).
+MP_WEBHOOK_SECRET = os.environ.get("MP_WEBHOOK_SECRET", "")
+# Precio mensual en ARS. Se puede pisar via env para subir/bajar el plan.
+MP_PLAN_PRICE_ARS = float(os.environ.get("MP_PLAN_PRICE_ARS", "15000"))
 
 class PaymentRequest(BaseModel):
     plan: str = "premium"
@@ -5162,39 +5168,185 @@ async def payment_pending():
     """
     return HTMLResponse(content=html)
 
+def _verify_mp_webhook_signature(request: Request, raw_body: bytes) -> bool:
+    """Valida la firma HMAC-SHA256 del webhook MP.
+
+    MP manda header `x-signature: ts=...,v1=...` y `x-request-id`. Se firma
+    el string `id:<data.id>;request-id:<req_id>;ts:<ts>;` con el secret.
+    Doc: https://www.mercadopago.com/developers/es/docs/your-integrations/notifications/webhooks#bookmark_validar_el_origen_de_la_notificación
+
+    Si `MP_WEBHOOK_SECRET` no esta seteado:
+      - en produccion: rechaza (False) → defensa en profundidad.
+      - en dev/sandbox: pasa (True) para no frenar tests locales.
+    """
+    if not MP_WEBHOOK_SECRET:
+        return not IS_PRODUCTION
+
+    sig_header = request.headers.get("x-signature", "")
+    req_id = request.headers.get("x-request-id", "")
+    if not sig_header or not req_id:
+        return False
+
+    # Parsear ts=...,v1=...
+    parts = dict(p.strip().split("=", 1) for p in sig_header.split(",") if "=" in p)
+    ts = parts.get("ts", "")
+    received_v1 = parts.get("v1", "")
+    if not ts or not received_v1:
+        return False
+
+    # data.id viene en el body
+    try:
+        body = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+    except Exception:
+        return False
+    data_id = str(body.get("data", {}).get("id", ""))
+    if not data_id:
+        return False
+
+    import hmac as _hmac
+    import hashlib as _hashlib
+    manifest = f"id:{data_id};request-id:{req_id};ts:{ts};"
+    expected = _hmac.new(
+        MP_WEBHOOK_SECRET.encode("utf-8"),
+        manifest.encode("utf-8"),
+        _hashlib.sha256,
+    ).hexdigest()
+    return _hmac.compare_digest(expected, received_v1)
+
+
 @app.post("/api/payments/webhook")
 async def mercadopago_webhook(request: Request):
-    """Webhook para recibir notificaciones de MercadoPago"""
+    """Webhook para recibir notificaciones de MercadoPago.
+
+    Seguridad:
+      - Valida firma HMAC contra MP_WEBHOOK_SECRET (rechaza con 401 si falla).
+      - En prod sin secret seteado → rechaza siempre.
+
+    Efecto sobre billing al recibir un pago aprobado:
+      - user.plan = <plan del external_reference>
+      - user.billing_status = 'active'
+      - user.trial_ends_at = now + 30d (proximo cobro)
+      - user.payment_provider = 'mercadopago'
+      - user.payment_customer_id = <id del payer MP>
+    """
+    raw_body = await request.body()
+
+    if not _verify_mp_webhook_signature(request, raw_body):
+        print("⚠️ Webhook MP: firma invalida o ausente, rechazado")
+        raise HTTPException(status_code=401, detail="Firma invalida")
+
     try:
-        body = await request.json()
-        print(f"📩 Webhook MP recibido: {body}")
-        
-        if body.get("type") == "payment":
-            payment_id = body.get("data", {}).get("id")
-            if payment_id and MP_ACCESS_TOKEN:
-                sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
-                payment_info = sdk.payment().get(payment_id)
-                
-                if payment_info["response"]["status"] == "approved":
-                    # Activar cuenta premium
-                    external_ref = payment_info["response"].get("external_reference", "")
-                    if "|" in external_ref:
-                        username, plan = external_ref.split("|", 1)
-                        print(f"✅ Pago aprobado para {username} - Plan: {plan}")
-                        # Actualizar plan en DB
-                        async for session in get_async_session():
-                            result = await session.execute(select(User).where(User.username == username))
-                            user = result.scalars().first()
-                            if user:
-                                user.plan = plan
-                                await session.commit()
-                                print(f"✅ Plan actualizado a {plan} para {username}")
-                            break
-        
+        body = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+        print(f"📩 Webhook MP recibido: {body.get('type')} id={body.get('data', {}).get('id')}")
+
+        if body.get("type") != "payment":
+            return {"success": True, "skipped": "not a payment event"}
+
+        payment_id = body.get("data", {}).get("id")
+        if not payment_id or not MP_ACCESS_TOKEN:
+            return {"success": True, "skipped": "no payment_id or no MP token"}
+
+        sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
+        payment_info = sdk.payment().get(payment_id)
+        pay_resp = payment_info.get("response", {}) if isinstance(payment_info, dict) else {}
+
+        if pay_resp.get("status") != "approved":
+            return {"success": True, "skipped": f"status={pay_resp.get('status')}"}
+
+        external_ref = pay_resp.get("external_reference", "")
+        if "|" not in external_ref:
+            return {"success": True, "skipped": "no external_reference"}
+
+        username, plan = external_ref.split("|", 1)
+        payer_id = str(pay_resp.get("payer", {}).get("id", "") or "")
+
+        async for session in get_async_session():
+            result = await session.execute(select(User).where(User.username == username))
+            db_user = result.scalars().first()
+            if db_user:
+                db_user.plan = plan
+                db_user.billing_status = "active"
+                db_user.trial_ends_at = datetime.now(timezone.utc) + timedelta(days=30)
+                db_user.payment_provider = "mercadopago"
+                if payer_id:
+                    db_user.payment_customer_id = payer_id
+                await session.commit()
+                print(f"✅ Pago aprobado y billing sincronizado: {username} → {plan} (active +30d)")
+            else:
+                print(f"⚠️ Webhook MP: user '{username}' no existe en DB")
+            break
+
         return {"success": True}
     except Exception as e:
         print(f"Error en webhook: {e}")
+        # 200 para que MP no reintente eternamente por bugs nuestros.
         return {"success": False, "error": str(e)}
+
+
+@app.post("/api/billing/checkout")
+async def billing_checkout(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Genera una preference de MercadoPago para el user logueado.
+
+    Reemplazo seguro de /api/payments/create-preference (que aceptaba
+    username del body, vulnerable a checkouts cruzados). Acá el username
+    siempre sale del JWT.
+
+    Returns:
+      - mode: 'demo' | 'sandbox' | 'live'
+      - init_point: URL para redirigir al user al checkout MP.
+    """
+    username = user["username"]
+    email = user.get("email")
+    plan = "premium"
+
+    # Modo demo cuando no hay credenciales configuradas
+    if not MP_ACCESS_TOKEN:
+        demo_id = f"demo_{uuid.uuid4().hex[:8]}"
+        return {
+            "success": True,
+            "mode": "demo",
+            "preference_id": demo_id,
+            "init_point": f"/api/payments/demo-checkout/{demo_id}",
+            "message": "Modo demo - MP_ACCESS_TOKEN no configurado",
+        }
+
+    try:
+        sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
+        preference_data = {
+            "items": [
+                {
+                    "title": "CDI · Plan mensual",
+                    "quantity": 1,
+                    "unit_price": MP_PLAN_PRICE_ARS,
+                    "currency_id": "ARS",
+                }
+            ],
+            "external_reference": f"{username}|{plan}",
+        }
+        if email:
+            preference_data["payer"] = {"email": email}
+
+        pref_response = sdk.preference().create(preference_data)
+        if pref_response.get("status") != 201:
+            err = pref_response.get("response", {})
+            raise HTTPException(status_code=400, detail=f"MP rechazo: {err}")
+
+        pref = pref_response["response"]
+        is_sandbox = MP_ACCESS_TOKEN.startswith("TEST-")
+        return {
+            "success": True,
+            "mode": "sandbox" if is_sandbox else "live",
+            "preference_id": pref["id"],
+            "init_point": pref.get("sandbox_init_point") if is_sandbox else pref["init_point"],
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Error creando preference MP (checkout): {e}")
+        raise HTTPException(status_code=500, detail=f"Error con MercadoPago: {e}")
 
 # --- BITCOIN (Demo) ---
 bitcoin_payments = {}

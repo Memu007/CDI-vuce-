@@ -44,6 +44,20 @@ Cualquier asistente (Cursor, Antigravity, Cascade, Claude) que continúe este sp
 - **Trial 14d → 15d** en backend (`main.py`): `register` ahora arranca con `trial_ends_at = now + 15d` cuando el user carga tarjeta. Comentarios actualizados. La lógica de `simulate-charge` sigue extendiendo +30d por ciclo mensual (otro concepto).
 - **Naming "Kit María" → "Kit SIM"** en landing, dashboard y discovery_guion.md (decisión de PM: queda más limpio).
 
+## Día 2 · T6-lite (MercadoPago real, backend solo)
+
+**Decisión de PM:** NO hacer T6-full (subscripciones recurrentes con pre-approval, retries, chargebacks). Para MVP basta con cobro one-shot mensual + webhook validado.
+
+- **CRÍTICO de seguridad:** `_verify_mp_webhook_signature()` HMAC-SHA256. Antes el webhook era abierto: cualquiera podía hitearlo con un body falso y activar premium gratis.
+- **Webhook ahora sincroniza billing completo** al recibir `payment.approved`: `plan`, `billing_status='active'`, `trial_ends_at=now+30d`, `payment_provider='mercadopago'`, `payment_customer_id`.
+- **Nuevo endpoint** `POST /api/billing/checkout` autenticado (username sale del JWT, no del body). Reemplazo seguro de `/api/payments/create-preference`.
+- **Env nuevas** que **vos tenés que setear en Railway** antes de cobrar real:
+  - `MP_ACCESS_TOKEN` (Production token de tu cuenta MP)
+  - `MP_WEBHOOK_SECRET` (Secret del webhook que MP genera en el panel)
+  - `MP_PLAN_PRICE_ARS` (default 15000, podés cambiarlo)
+- **UI del checkout: NO HECHA hoy.** Día 3.
+- **Tests:** `tests/test_mp_webhook_signature.py` (5 casos) + smoke regresión phase0 (7 verdes, 2 rojos preexistentes ajenos).
+
 ## Día 2 · T5-lite (multi-puesto / equipo, infra preparada)
 
 **Decisión de PM:** NO hacer T5-full ahora (4-6h, riesgo alto, sin demanda validada). Hacer T5-lite (1h, sin riesgo).
