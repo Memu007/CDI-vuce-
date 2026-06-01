@@ -1103,6 +1103,60 @@
                 <button type="button" class="btn btn-ghost btn-sm" id="pfReplayTour">Ver tour de bienvenida</button>
                 <span class="field-hint">Repasá en 30 segundos los 3 pasos del flujo (subir, revisar, descargar).</span>
             </div>
+
+            <!-- Sección Seguridad: cambio de password (autoservicio) -->
+            <details class="review-optional" id="pfSecurityBlock">
+                <summary class="review-optional-summary">
+                    <span class="review-optional-summary-text">
+                        <strong>Seguridad</strong>
+                        <span class="caption">Cambiar tu contraseña.</span>
+                    </span>
+                </summary>
+                <div class="review-optional-body">
+                    <div class="field">
+                        <label class="field-label" for="pfCurrentPassword">Contraseña actual</label>
+                        <input type="password" id="pfCurrentPassword" class="input" autocomplete="current-password" />
+                    </div>
+                    <div class="field">
+                        <label class="field-label" for="pfNewPassword">Nueva contraseña</label>
+                        <input type="password" id="pfNewPassword" class="input" autocomplete="new-password" minlength="8" />
+                        <span class="field-hint">Mínimo 8 caracteres.</span>
+                    </div>
+                    <div class="field">
+                        <span class="field-error" id="pfPasswordError" hidden></span>
+                        <button type="button" class="btn btn-secondary btn-sm" id="pfChangePassword">Cambiar contraseña</button>
+                    </div>
+                </div>
+            </details>
+
+            <!-- Sección Plan y facturación: estado, próximo cobro, cancelar/reactivar -->
+            <details class="review-optional" id="pfBillingBlock">
+                <summary class="review-optional-summary">
+                    <span class="review-optional-summary-text">
+                        <strong>Plan y facturación</strong>
+                        <span class="caption" id="pfBillingSummary">—</span>
+                    </span>
+                </summary>
+                <div class="review-optional-body">
+                    <div class="field">
+                        <label class="field-label">Estado actual</label>
+                        <p class="caption" id="pfBillingStatus">—</p>
+                    </div>
+                    <div class="field" id="pfBillingNextWrap" hidden>
+                        <label class="field-label" id="pfBillingNextLabel">Próximo cobro</label>
+                        <p class="caption" id="pfBillingNext">—</p>
+                    </div>
+                    <div class="field" id="pfBillingPmWrap" hidden>
+                        <label class="field-label">Método de pago</label>
+                        <p class="caption" id="pfBillingPm">—</p>
+                    </div>
+                    <div class="field">
+                        <button type="button" class="btn btn-secondary btn-sm" id="pfBillingActivate" hidden>Activar plan</button>
+                        <button type="button" class="btn btn-secondary btn-sm" id="pfBillingReactivate" hidden>Reactivar plan</button>
+                        <button type="button" class="btn btn-ghost btn-sm" id="pfBillingCancel" hidden>Cancelar plan</button>
+                    </div>
+                </div>
+            </details>
         </div>
         <footer class="modal-footer">
             <button type="button" class="btn btn-ghost" id="profileCancel">Cancelar</button>

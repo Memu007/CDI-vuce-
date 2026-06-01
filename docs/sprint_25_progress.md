@@ -44,6 +44,32 @@ Cualquier asistente (Cursor, Antigravity, Cascade, Claude) que continúe este sp
 - **Trial 14d → 15d** en backend (`main.py`): `register` ahora arranca con `trial_ends_at = now + 15d` cuando el user carga tarjeta. Comentarios actualizados. La lógica de `simulate-charge` sigue extendiendo +30d por ciclo mensual (otro concepto).
 - **Naming "Kit María" → "Kit SIM"** en landing, dashboard y discovery_guion.md (decisión de PM: queda más limpio).
 
+## Día 5 · T9 (settings + billing autoservicio)
+
+**Decisión PM:** extender el `profileModal` existente en vez de crear pantalla nueva. Menos navegación, menos código duplicado, mismo lugar donde el user ya entra a tocar CUIT/defaults.
+
+### Backend (3 endpoints)
+
+- `POST /api/user/change-password` (`main.py` ~1387): requiere `current_password` + `new_password`, valida ambos en threadpool. 401 si la actual no coincide. 400 si la nueva tiene < 8 chars o es igual a la actual.
+- `POST /api/billing/cancel` (~1423): `billing_status='canceled'` pero **NO** corta servicio. Mantiene `trial_ends_at` como fecha hasta cuando el user ya pagó. 409 si el estado actual no es trial/active.
+- `POST /api/billing/reactivate` (~1455): si `trial_ends_at` está en el futuro → vuelve a `active` sin cobrar. Si ya venció → marca `past_due` + responde `needs_checkout: true`.
+
+### Frontend (profile.js + dashboard_v2.html)
+
+- Modal de perfil tiene 2 nuevas secciones plegables (`<details>`):
+  - **Seguridad**: 2 inputs (pass actual + nueva) + botón "Cambiar contraseña".
+  - **Plan y facturación**: estado label, fecha relevante (cambia copy según estado), PM `brand ···· last4`, y 3 botones contextuales:
+    - `trial`/`active` → muestra Cancelar.
+    - `past_due`/`none` → muestra Activar.
+    - `canceled` → muestra Reactivar.
+- `loadBilling()` pega a `/api/billing/me` (ya existía) en paralelo con `loadProfile()` al abrir el modal.
+- Cancelación pasa por `CDI.confirm` (modal blocking) para evitar mistaps.
+- Telemetría: `password_changed`, `billing_canceled`, `billing_reactivated`.
+
+### Email change pendiente
+
+Scope cortado. Requiere flow de re-verify (mandar nuevo email, link de confirmación, manejar el periodo en que tiene 2 emails). 1-2h de trabajo extra. Lo dejo para Día 6 si hay tiempo.
+
 ## Día 4 · T8 (pricing en landing) + T7 bloqueado
 
 ### T8 hecho (landing pricing)

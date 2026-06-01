@@ -12,6 +12,12 @@
     let nameInput, cuitInput, emailEl, cuitErrorEl;
     let pfDefaultAduana, pfDefaultPuerto, pfDefaultTipoDest;
     let replayTourBtn;
+    // Seguridad (cambio password)
+    let currentPwdInput, newPwdInput, pwdErrorEl, changePwdBtn;
+    // Plan y facturación
+    let billingSummary, billingStatusEl, billingNextWrap, billingNextEl;
+    let billingPmWrap, billingPmEl;
+    let billingActivateBtn, billingReactivateBtn, billingCancelBtn;
     let initialized = false;
     let loading = false;
 
@@ -63,6 +69,27 @@
             });
         }
 
+        // Sección Seguridad (cambio password)
+        currentPwdInput = $('pfCurrentPassword');
+        newPwdInput = $('pfNewPassword');
+        pwdErrorEl = $('pfPasswordError');
+        changePwdBtn = $('pfChangePassword');
+        if (changePwdBtn) changePwdBtn.addEventListener('click', changePassword);
+
+        // Sección Plan y facturación
+        billingSummary = $('pfBillingSummary');
+        billingStatusEl = $('pfBillingStatus');
+        billingNextWrap = $('pfBillingNextWrap');
+        billingNextEl = $('pfBillingNext');
+        billingPmWrap = $('pfBillingPmWrap');
+        billingPmEl = $('pfBillingPm');
+        billingActivateBtn = $('pfBillingActivate');
+        billingReactivateBtn = $('pfBillingReactivate');
+        billingCancelBtn = $('pfBillingCancel');
+        if (billingActivateBtn) billingActivateBtn.addEventListener('click', () => openCheckout('activate'));
+        if (billingReactivateBtn) billingReactivateBtn.addEventListener('click', reactivateBilling);
+        if (billingCancelBtn) billingCancelBtn.addEventListener('click', cancelBilling);
+
         initialized = true;
     }
 
@@ -76,8 +103,11 @@
             overlay.classList.add('is-visible');
         });
         clearError();
+        clearPasswordError();
+        if (currentPwdInput) currentPwdInput.value = '';
+        if (newPwdInput) newPwdInput.value = '';
         // Cargar valores actuales
-        await loadProfile();
+        await Promise.all([loadProfile(), loadBilling()]);
         setTimeout(() => cuitInput && cuitInput.focus(), 150);
         CDI.track('profile_modal_open');
     }
@@ -189,6 +219,190 @@
         } finally {
             saveBtn.disabled = false;
             saveBtn.textContent = 'Guardar';
+        }
+    }
+
+    /* ---------- Seguridad: cambio de password ---------- */
+    function clearPasswordError() {
+        if (!pwdErrorEl) return;
+        pwdErrorEl.textContent = '';
+        pwdErrorEl.hidden = true;
+    }
+    function showPasswordError(msg) {
+        if (!pwdErrorEl) return;
+        pwdErrorEl.textContent = msg;
+        pwdErrorEl.hidden = false;
+    }
+
+    async function changePassword() {
+        clearPasswordError();
+        const current = String((currentPwdInput && currentPwdInput.value) || '');
+        const next = String((newPwdInput && newPwdInput.value) || '');
+        if (!current) { showPasswordError('Ingresá tu contraseña actual.'); return; }
+        if (next.length < 8) { showPasswordError('La nueva contraseña debe tener al menos 8 caracteres.'); return; }
+        if (next === current) { showPasswordError('La nueva contraseña no puede ser igual a la actual.'); return; }
+
+        changePwdBtn.disabled = true;
+        const originalText = changePwdBtn.textContent;
+        changePwdBtn.textContent = 'Cambiando…';
+        try {
+            const res = await CDI.api('/api/user/change-password', {
+                method: 'POST',
+                body: JSON.stringify({ current_password: current, new_password: next })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) {
+                throw new Error((data && data.detail) || 'No se pudo cambiar la contraseña');
+            }
+            CDI.toast('Contraseña actualizada', 'Usá la nueva la próxima vez que ingreses.', 'success');
+            CDI.track('password_changed');
+            currentPwdInput.value = '';
+            newPwdInput.value = '';
+        } catch (err) {
+            showPasswordError(String(err.message || err));
+        } finally {
+            changePwdBtn.disabled = false;
+            changePwdBtn.textContent = originalText;
+        }
+    }
+
+    /* ---------- Plan y facturación ---------- */
+    function formatDateAr(iso) {
+        if (!iso) return '—';
+        try {
+            const d = new Date(iso);
+            return d.toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' });
+        } catch (_) { return '—'; }
+    }
+
+    async function loadBilling() {
+        if (!billingStatusEl) return;
+        try {
+            const res = await CDI.api('/api/billing/me');
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error((data && data.detail) || 'No se pudo cargar billing');
+            renderBilling(data);
+        } catch (err) {
+            billingStatusEl.textContent = 'No disponible';
+            console.warn('[profile] loadBilling error', err);
+        }
+    }
+
+    function renderBilling(b) {
+        const status = (b && b.billing_status) || 'none';
+        const trialEnd = b && b.trial_ends_at;
+        const pm = b && b.payment_method;
+
+        // Reset visibilidad
+        billingActivateBtn.hidden = true;
+        billingReactivateBtn.hidden = true;
+        billingCancelBtn.hidden = true;
+        billingNextWrap.hidden = true;
+        billingPmWrap.hidden = true;
+
+        // Etiqueta de estado por estado de billing.
+        const labels = {
+            none: 'Sin plan',
+            trial: 'Prueba gratis',
+            active: 'Activo',
+            past_due: 'Plan vencido',
+            canceled: 'Cancelado'
+        };
+        billingStatusEl.textContent = labels[status] || status;
+        billingSummary.textContent = labels[status] || status;
+
+        // Fecha relevante: próximo cobro / fin de trial / fin de servicio.
+        const nextLabel = document.getElementById('pfBillingNextLabel');
+        if (trialEnd) {
+            billingNextWrap.hidden = false;
+            billingNextEl.textContent = formatDateAr(trialEnd);
+            if (nextLabel) {
+                if (status === 'trial') nextLabel.textContent = 'Trial vence';
+                else if (status === 'active') nextLabel.textContent = 'Próximo cobro';
+                else if (status === 'canceled') nextLabel.textContent = 'Servicio activo hasta';
+                else nextLabel.textContent = 'Fecha';
+            }
+        }
+
+        // Método de pago si existe (last4 + brand).
+        if (pm && pm.last4) {
+            billingPmWrap.hidden = false;
+            const brand = (pm.brand || 'tarjeta').toString();
+            billingPmEl.textContent = brand + ' ···· ' + pm.last4;
+        }
+
+        // Botones por estado.
+        if (status === 'trial' || status === 'active') {
+            billingCancelBtn.hidden = false;
+        }
+        if (status === 'past_due' || status === 'none') {
+            billingActivateBtn.hidden = false;
+        }
+        if (status === 'canceled') {
+            billingReactivateBtn.hidden = false;
+        }
+    }
+
+    async function openCheckout() {
+        try {
+            const res = await CDI.api('/api/billing/checkout', { method: 'POST' });
+            const data = await res.json().catch(() => ({}));
+            if (data && data.init_point) {
+                window.location.href = data.init_point;
+                return;
+            }
+            CDI.toast('Error', 'No se pudo iniciar el cobro.', 'error');
+        } catch (err) {
+            CDI.toast('Error', String(err.message || err), 'error');
+        }
+    }
+
+    async function cancelBilling() {
+        const ok = await CDI.confirm({
+            title: 'Cancelar plan',
+            lead: '¿Seguro que querés cancelar?',
+            text: 'Vas a poder seguir usando CDI hasta el fin del período ya pagado. Después no se renueva automáticamente. Podés reactivar cuando quieras.',
+            confirmText: 'Sí, cancelar',
+            cancelText: 'Volver'
+        });
+        if (!ok) return;
+        billingCancelBtn.disabled = true;
+        billingCancelBtn.textContent = 'Cancelando…';
+        try {
+            const res = await CDI.api('/api/billing/cancel', { method: 'POST' });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) throw new Error((data && data.detail) || 'No se pudo cancelar');
+            CDI.toast('Plan cancelado', 'Podés reactivar cuando quieras desde este mismo panel.', 'success');
+            CDI.track('billing_canceled');
+            await loadBilling();
+        } catch (err) {
+            CDI.toast('Error', String(err.message || err), 'error');
+        } finally {
+            billingCancelBtn.disabled = false;
+            billingCancelBtn.textContent = 'Cancelar plan';
+        }
+    }
+
+    async function reactivateBilling() {
+        billingReactivateBtn.disabled = true;
+        billingReactivateBtn.textContent = 'Reactivando…';
+        try {
+            const res = await CDI.api('/api/billing/reactivate', { method: 'POST' });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) throw new Error((data && data.detail) || 'No se pudo reactivar');
+            if (data.needs_checkout) {
+                CDI.toast('Reactivar plan', 'Tu período pagado terminó. Te llevamos al checkout.', 'info');
+                await openCheckout();
+                return;
+            }
+            CDI.toast('Plan reactivado', 'Sigue activo hasta el próximo cobro.', 'success');
+            CDI.track('billing_reactivated');
+            await loadBilling();
+        } catch (err) {
+            CDI.toast('Error', String(err.message || err), 'error');
+        } finally {
+            billingReactivateBtn.disabled = false;
+            billingReactivateBtn.textContent = 'Reactivar plan';
         }
     }
 

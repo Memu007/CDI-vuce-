@@ -6,6 +6,20 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-01 · Sprint 25 días — Día 5 (T9 settings + billing autoservicio)
+
+- **feat (api):** 3 endpoints nuevos autenticados:
+  - `POST /api/user/change-password` (valida pass actual, mín 8 chars, hash en threadpool).
+  - `POST /api/billing/cancel` (marca `canceled`, mantiene servicio hasta `trial_ends_at`).
+  - `POST /api/billing/reactivate` (vuelve a `active` o redirige a checkout si el período venció).
+- **feat (ux):** modal de perfil ahora tiene 2 secciones nuevas plegables:
+  - **Seguridad**: cambio de password con validación inline.
+  - **Plan y facturación**: estado, fecha relevante (trial vence / próximo cobro / servicio hasta), método de pago (last4 + brand), botones contextuales (Activar / Cancelar / Reactivar) con `CDI.confirm` para cancelar.
+- **feat (telemetry):** `password_changed`, `billing_canceled`, `billing_reactivated`.
+- **email change:** scope cortado por PM. Requería re-verify y complicaba T9. Pendiente.
+
+---
+
 ## 2026-05-27 · Sprint 25 días — Día 4 (T8 pricing + T7 bloqueado)
 
 - **feat (landing):** nueva sección `#precio` con tarjeta de plan único ($15.000 ARS/mes alineado con `MP_PLAN_PRICE_ARS`). 6 bullets de qué incluye, CTA "Empezar 15 días gratis" abre el form de registro.

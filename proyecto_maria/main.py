@@ -1376,6 +1376,125 @@ async def update_user_profile(
     }
 
 
+# --- USER SECURITY: cambio de password (autenticado) ---
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@app.post("/api/user/change-password")
+async def change_password(
+    body: ChangePasswordRequest,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cambia la contraseña del usuario logueado.
+
+    Seguridad:
+      - Requiere la password actual (defensa contra session-hijacking).
+      - Mínimo 8 chars en la nueva.
+      - Hashing en threadpool (bcrypt CPU-bound).
+    """
+    if not body.new_password or len(body.new_password) < 8:
+        raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 8 caracteres")
+    if body.new_password == body.current_password:
+        raise HTTPException(status_code=400, detail="La nueva contraseña no puede ser igual a la actual")
+
+    result = await db.execute(select(User).where(User.username == user["username"]))
+    db_user = result.scalars().first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    is_valid = await run_in_threadpool(verify_password, body.current_password, db_user.password)
+    if not is_valid:
+        raise HTTPException(status_code=401, detail="La contraseña actual es incorrecta")
+
+    db_user.password = await run_in_threadpool(hash_password, body.new_password)
+    await db.commit()
+    print(f"🔒 Password cambiada por el propio user: {db_user.username}")
+    return {"success": True, "message": "Contraseña actualizada"}
+
+
+# --- BILLING: cancelar / reactivar plan (autoservicio) ---
+
+
+@app.post("/api/billing/cancel")
+async def cancel_billing(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Cancela la suscripción del usuario.
+
+    No corta el servicio inmediatamente: deja `billing_status='canceled'` pero
+    mantiene `trial_ends_at` como fecha hasta cuándo el user ya pagó (o cuándo
+    vence el trial). Cuando esa fecha pase, get_current_user lo marca past_due.
+    """
+    result = await db.execute(select(User).where(User.username == user["username"]))
+    db_user = result.scalars().first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    if db_user.billing_status not in ("trial", "active"):
+        raise HTTPException(
+            status_code=409,
+            detail=f"No se puede cancelar desde el estado actual: {db_user.billing_status}",
+        )
+
+    db_user.billing_status = "canceled"
+    await db.commit()
+    print(f"🚪 User canceló suscripción: {db_user.username} (servicio activo hasta {db_user.trial_ends_at})")
+    return {
+        "success": True,
+        "billing_status": "canceled",
+        "service_until": db_user.trial_ends_at.isoformat() if db_user.trial_ends_at else None,
+    }
+
+
+@app.post("/api/billing/reactivate")
+async def reactivate_billing(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Reactiva una suscripción cancelada.
+
+    Si el `trial_ends_at` aún está en el futuro → simplemente vuelve a 'active'
+    (no hay que cobrar de nuevo, el user ya pagó hasta esa fecha).
+    Si ya venció → marca past_due y el front debe abrir el checkout.
+    """
+    result = await db.execute(select(User).where(User.username == user["username"]))
+    db_user = result.scalars().first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    if db_user.billing_status != "canceled":
+        raise HTTPException(status_code=409, detail="La suscripción no está cancelada")
+
+    end = db_user.trial_ends_at
+    if end is not None and end.tzinfo is None:
+        end = end.replace(tzinfo=timezone.utc)
+    if end is None or end < datetime.now(timezone.utc):
+        db_user.billing_status = "past_due"
+        await db.commit()
+        return {
+            "success": True,
+            "billing_status": "past_due",
+            "needs_checkout": True,
+            "message": "Tu período pagado ya terminó. Activá el plan para continuar.",
+        }
+
+    db_user.billing_status = "active"
+    await db.commit()
+    print(f"🔄 User reactivó suscripción: {db_user.username}")
+    return {
+        "success": True,
+        "billing_status": "active",
+        "needs_checkout": False,
+        "service_until": db_user.trial_ends_at.isoformat() if db_user.trial_ends_at else None,
+    }
+
+
 # --- DEV DASHBOARD ENDPOINTS ---
 
 @app.get("/dev/dashboard")
