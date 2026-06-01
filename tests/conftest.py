@@ -1,4 +1,5 @@
 import pytest
+import tempfile
 from fastapi.testclient import TestClient
 import os
 from dotenv import load_dotenv
@@ -9,9 +10,26 @@ load_dotenv()
 # Override environment for testing
 os.environ['ENVIRONMENT'] = 'testing'
 os.environ['SENTRY_DSN'] = ''  # Disable Sentry in tests
-os.environ['DATABASE_URL'] = 'sqlite+aiosqlite:///:memory:' # Use in-memory DB for tests
+# DB en archivo temporal (no in-memory): SQLite in-memory crea una DB nueva
+# por cada conexión async, lo que rompe tests que abren más de una sesión.
+# Archivo en /tmp se borra al final del proceso de tests (lo limpia OS).
+_test_db_fd, _test_db_path = tempfile.mkstemp(suffix='.db', prefix='cdi_pytest_')
+os.close(_test_db_fd)
+os.environ['DATABASE_URL'] = f'sqlite+aiosqlite:///{_test_db_path}'
 
 from proyecto_maria.main import app  # noqa: E402
+from proyecto_maria.database.connection import engine as _test_engine  # noqa: E402
+from sqlalchemy import event  # noqa: E402
+
+# Configurar SQLite para que tolere accesos concurrentes durante los tests.
+# Sin esto, operaciones bloqueantes como bcrypt (~300ms) provocan
+# "database is locked" cuando otra request quiere escribir en paralelo.
+@event.listens_for(_test_engine.sync_engine, "connect")
+def _set_sqlite_pragma(dbapi_connection, _):
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA busy_timeout=30000")  # 30s
+    cursor.close()
 import asyncio
 
 @pytest.fixture(scope="session")

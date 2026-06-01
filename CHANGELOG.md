@@ -6,6 +6,15 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-01 · Sprint 25 días — Día 6 (T10 tests E2E billing autoservicio)
+
+- **test (CRÍTICO):** `tests/test_billing_autoservicio.py` con 13 tests E2E del flujo de billing autoservicio (registro → trial → cancel → reactivate → checkout) + cambio de password. Red de seguridad antes de cobrar real.
+- **Cubre:** `change-password` (OK + 401 actual mala + 400 short + 400 same), `cancel` (OK + 409 desde none/canceled), `reactivate` (vigente → active sin cobrar, vencido → past_due+needs_checkout), auth obligatoria en los 3.
+- **fix (test infra):** `conftest.py` usa archivo SQLite temporal en lugar de `:memory:` (multi-conexión async no comparte estado en memoria) y aplica PRAGMA `journal_mode=WAL` + `busy_timeout=30s` para evitar `database is locked` durante bcrypt en threadpool.
+- **NO incluye:** integración real con MercadoPago sandbox (eso queda en smoke manual con TEST_ACCESS_TOKEN).
+
+---
+
 ## 2026-06-01 · Sprint 25 días — Día 5 (T9 settings + billing autoservicio)
 
 - **feat (api):** 3 endpoints nuevos autenticados:

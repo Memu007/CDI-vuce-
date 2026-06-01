@@ -44,6 +44,39 @@ Cualquier asistente (Cursor, Antigravity, Cascade, Claude) que continúe este sp
 - **Trial 14d → 15d** en backend (`main.py`): `register` ahora arranca con `trial_ends_at = now + 15d` cuando el user carga tarjeta. Comentarios actualizados. La lógica de `simulate-charge` sigue extendiendo +30d por ciclo mensual (otro concepto).
 - **Naming "Kit María" → "Kit SIM"** en landing, dashboard y discovery_guion.md (decisión de PM: queda más limpio).
 
+## Día 6 · T10 (tests E2E billing autoservicio)
+
+**Decisión PM:** antes de cobrar real, red de tests sobre el flujo de billing. Si esto se rompe en silencio mientras vendemos, el dolor es enorme (chargebacks, users sin acceso, etc).
+
+### Cobertura (13 tests)
+
+`tests/test_billing_autoservicio.py`:
+
+- **Cambio de password** (4 tests):
+  - OK con pass actual correcta + login con la nueva funciona.
+  - 401 con pass actual incorrecta.
+  - 400 con pass nueva < 8 chars.
+  - 400 con pass nueva igual a actual.
+- **Cancelar plan** (3 tests):
+  - Desde trial → 200 + `canceled` + `service_until` mantiene `trial_ends_at`.
+  - Desde `none` (sin tarjeta cargada) → 409.
+  - Cancelar dos veces → la segunda 409.
+- **Reactivar plan** (3 tests):
+  - Cancelado con período vigente → 200 + `active` + `needs_checkout=False` (sin re-cobro).
+  - Sin haber cancelado → 409.
+  - Período ya vencido → 200 + `past_due` + `needs_checkout=True` (front debe abrir checkout).
+- **Auth obligatoria** (3 tests): `change-password`, `cancel`, `reactivate` → 401 sin cookie.
+
+### Fix de infraestructura de tests
+
+- `conftest.py` migrado de `sqlite:///:memory:` a archivo temporal en `/tmp`. Razón: SQLite in-memory crea una DB separada por cada conexión async; los tests con multi-sesión rompían con "no such table".
+- Listener de evento `connect` aplica `PRAGMA journal_mode=WAL` + `PRAGMA busy_timeout=30000` al arrancar cada conexión SQLite. Razón: bcrypt en threadpool tarda ~300ms y, sin WAL + busy_timeout, otra request concurrente disparaba `database is locked`.
+
+### Fuera de scope
+
+- **Integración real MP sandbox.** Requiere `MP_ACCESS_TOKEN=TEST-...` y red. Queda en smoke manual.
+- **Webhook de pagos**: ya cubierto por `test_mp_webhook_signature.py` (Día 2).
+
 ## Día 5 · T9 (settings + billing autoservicio)
 
 **Decisión PM:** extender el `profileModal` existente en vez de crear pantalla nueva. Menos navegación, menos código duplicado, mismo lugar donde el user ya entra a tocar CUIT/defaults.
