@@ -44,6 +44,36 @@ Cualquier asistente (Cursor, Antigravity, Cascade, Claude) que continúe este sp
 - **Trial 14d → 15d** en backend (`main.py`): `register` ahora arranca con `trial_ends_at = now + 15d` cuando el user carga tarjeta. Comentarios actualizados. La lógica de `simulate-charge` sigue extendiendo +30d por ciclo mensual (otro concepto).
 - **Naming "Kit María" → "Kit SIM"** en landing, dashboard y discovery_guion.md (decisión de PM: queda más limpio).
 
+## Día 8 · T12 (tests CORE del TXT) + FIX bug de país
+
+**Decisión PM:** el flujo de billing ya tenía red de tests; el CORE del producto (generar el TXT) no. Antes de demos a despachantes reales, hay que blindar la parte determinística.
+
+### HALLAZGO: bug de código de país (datos aduaneros)
+
+Escribiendo los tests encontré que `get_pais_codigo()` devolvía códigos INDEC **equivocados**:
+
+- `China` → 208 (¡código de **Chile**!) en vez de 218.
+- `España` → 212 (¡código de **Estados Unidos**!) en vez de 210.
+
+**Causa raíz:** el match hacía `key.upper().startswith(input[:2])`. Para "China", el `"CH"` pegaba en "Chile" (que viene antes en el dict) antes de llegar al match exacto "China". Idem España vs Estados Unidos por "ES".
+
+**Impacto real:** si la factura del proveedor decía origen "China" o "España" (nombre completo, no código), el TXT salía con el país equivocado. Un despachante que lo cargaba en el Kit SIM declaraba mal el origen ante Aduana.
+
+**Fix:** 2 pasadas en `get_pais_codigo()` — match exacto primero, prefijo solo como fallback. `maria_generator.py:34-48`.
+
+### Tests (22, archivo `test_generar_maria_txt.py`)
+
+- **18 unit de `generate_maria_txt`** (función pura, sin red ni DB): secciones obligatorias, CRLF, 1 [ART] por item, total FOB, uso de valor_total, formato NCM con puntos, CUIT del despachante, defaults aduana/destinación, incoterm/moneda, proporcional flete/seguro, códigos de país (+ regresión del bug).
+- **4 E2E de `/generate_maria`**: happy path (200 + content), 401 sin auth, 400 con items inválidos, fallback de CUIT desde el perfil.
+
+### Fix de infra de tests (definitivo)
+
+- `conftest.py` ahora usa `StaticPool` (una conexión SQLite compartida para todo el proceso). Reemplaza `_conn.engine` y `_conn.AsyncSessionLocal` después de importar la app. Esto serializa el acceso y **elimina** el `database is locked` que veníamos parcheando con WAL/busy_timeout. Bonus: la suite de billing bajó de ~35s a ~3s.
+
+### Fuera de scope
+
+- **Extracción con Gemini Vision** (upload PDF → items): requiere red + tokens + mocks pesados. Queda en smoke manual. Lo determinístico (que es donde estaban los bugs) ya está cubierto.
+
 ## Día 7 · T11 (SEO landing)
 
 **Decisión PM:** había 13 tests de SEO ya escritos esperando implementación (rojos). Trabajo medio resuelto + es lo que hace que Google encuentre la landing cuando un despachante busca "software MARIA / Kit SIM".

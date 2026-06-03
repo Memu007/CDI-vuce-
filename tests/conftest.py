@@ -18,14 +18,27 @@ os.close(_test_db_fd)
 os.environ['DATABASE_URL'] = f'sqlite+aiosqlite:///{_test_db_path}'
 
 from proyecto_maria.main import app  # noqa: E402
-from proyecto_maria.database.connection import engine as _test_engine  # noqa: E402
 from sqlalchemy import event  # noqa: E402
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession  # noqa: E402
+from sqlalchemy.pool import StaticPool  # noqa: E402
+import proyecto_maria.database.connection as _conn  # noqa: E402
 
-# Configurar SQLite para que tolere accesos concurrentes durante los tests.
-# Sin esto, operaciones bloqueantes como bcrypt (~300ms) provocan
-# "database is locked" cuando otra request quiere escribir en paralelo.
-# Usamos busy_timeout (espera en vez de fallar) en lugar de WAL: cambiar a
-# WAL requiere lock exclusivo y falla si otra suite dejó conexiones abiertas.
+# Reemplazar el engine por uno con StaticPool: una sola conexión compartida
+# para todo el proceso de tests. Razón: SQLite con múltiples conexiones async
+# escribiendo en paralelo (p.ej. bcrypt ~300ms + registros concurrentes)
+# dispara "database is locked". StaticPool serializa el acceso y lo elimina.
+_test_engine = create_async_engine(
+    os.environ['DATABASE_URL'],
+    future=True,
+    poolclass=StaticPool,
+    connect_args={"check_same_thread": False, "timeout": 30},
+)
+_conn.engine = _test_engine
+_conn.AsyncSessionLocal = async_sessionmaker(
+    _test_engine, class_=AsyncSession, expire_on_commit=False,
+)
+
+
 @event.listens_for(_test_engine.sync_engine, "connect")
 def _set_sqlite_pragma(dbapi_connection, _):
     cursor = dbapi_connection.cursor()

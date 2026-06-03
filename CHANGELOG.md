@@ -6,6 +6,15 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-02 · Sprint 25 días — Día 8 (T12 tests core TXT + FIX bug país)
+
+- **fix (CRÍTICO, datos aduaneros):** `get_pais_codigo()` devolvía el código de país EQUIVOCADO para nombres completos que comparten las 2 primeras letras. `China`→208 (Chile) y `España`→212 (Estados Unidos). El match por prefijo pegaba en el país equivocado antes del match exacto. Ahora hace 2 pasadas (exacto primero). **Esto metía el código INDEC errado en el TXT que el despachante carga en el Kit SIM.**
+- **test (CORE):** `tests/test_generar_maria_txt.py` con 22 tests del corazón del producto: 18 unit de `generate_maria_txt` (secciones [DDT]/[ART]/[CPL]/[DVD]/[SBT], CRLF, total FOB, formato NCM, proporcional flete/seguro, defaults aduana, códigos país) + 4 E2E del endpoint `/generate_maria` (auth, validación, cuit del perfil).
+- **fix (test infra):** `conftest.py` usa `StaticPool` (conexión SQLite única compartida) para eliminar `database is locked`. Bajó el tiempo de la suite de billing de ~35s a ~3s.
+- **NO incluye:** extracción con Gemini Vision (requiere red + tokens), queda en smoke manual.
+
+---
+
 ## 2026-06-02 · Sprint 25 días — Día 7 (T11 SEO landing)
 
 - **feat (SEO):** landing completa para indexación de Google. Fix `<title>` (ahora menciona Aduana + MARIA + Kit SIM), agregada `<meta name="keywords">` con términos competitivos (software aduana, despachante, argentina), y **Schema.org JSON-LD** (`SoftwareApplication` con precio $15.000 ARS y provider Organization).
