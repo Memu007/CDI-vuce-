@@ -44,6 +44,37 @@ Cualquier asistente (Cursor, Antigravity, Cascade, Claude) que continúe este sp
 - **Trial 14d → 15d** en backend (`main.py`): `register` ahora arranca con `trial_ends_at = now + 15d` cuando el user carga tarjeta. Comentarios actualizados. La lógica de `simulate-charge` sigue extendiendo +30d por ciclo mensual (otro concepto).
 - **Naming "Kit María" → "Kit SIM"** en landing, dashboard y discovery_guion.md (decisión de PM: queda más limpio).
 
+## Día 7 · T11 (SEO landing)
+
+**Decisión PM:** había 13 tests de SEO ya escritos esperando implementación (rojos). Trabajo medio resuelto + es lo que hace que Google encuentre la landing cuando un despachante busca "software MARIA / Kit SIM".
+
+### Qué se agregó
+
+- `landing.html`:
+  - Fix `<title>`: ahora "CDI · Software para despachantes de Aduana (MARIA / Kit SIM)". El test exigía "Aduana" (mayúscula) o "MARIA" — antes decía "aduana" minúscula y fallaba.
+  - `<meta name="keywords">` con términos competitivos (software aduana, despachante, argentina, NCM, AVG, AFIP, ARCA, MARIA, Kit SIM, VUCE).
+  - **Schema.org JSON-LD** tipo `SoftwareApplication`: nombre, categoría, descripción, precio ($15.000 ARS), provider Organization. Habilita rich results en Google.
+- `dashboard_v2.html`: `<meta name="robots" content="noindex, nofollow">`. El área privada no debe aparecer en búsquedas.
+
+### Ya existían (no toqué, solo verifiqué)
+
+- `static/robots.txt`: User-agent, Disallow /dashboard /api/ /admin/ /dev/, Sitemap, reglas para Googlebot/Bingbot.
+- `static/sitemap.xml`: urlset con la home.
+
+### Fix de infra de tests
+
+- `conftest.py`: cambié `PRAGMA journal_mode=WAL` por solo `busy_timeout=30000`. Razón: WAL requiere lock exclusivo al cambiar de modo y fallaba con "database is locked" cuando `test_seo` (que usa su propio AsyncClient + lifespan) dejaba conexiones abiertas antes de `test_billing`. `busy_timeout` resuelve el problema original (bcrypt concurrente) sin necesitar lock exclusivo.
+
+### Resultado
+
+- `test_seo.py`: 13/13 verde (antes 5 rojos).
+- Suites combinadas (seo + billing + webhook): 31/31 verde, sin importar el orden.
+
+### Pendiente para producción real
+
+- Cuando tengamos el dominio final, actualizar `cdi-sistema.com` en canonical, og:url, robots.txt, sitemap.xml.
+- Generar `og:image` (1200x630) para que el preview en WhatsApp/LinkedIn se vea pro. Hoy no hay imagen OG.
+
 ## Día 6 · T10 (tests E2E billing autoservicio)
 
 **Decisión PM:** antes de cobrar real, red de tests sobre el flujo de billing. Si esto se rompe en silencio mientras vendemos, el dolor es enorme (chargebacks, users sin acceso, etc).

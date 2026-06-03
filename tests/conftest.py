@@ -24,11 +24,12 @@ from sqlalchemy import event  # noqa: E402
 # Configurar SQLite para que tolere accesos concurrentes durante los tests.
 # Sin esto, operaciones bloqueantes como bcrypt (~300ms) provocan
 # "database is locked" cuando otra request quiere escribir en paralelo.
+# Usamos busy_timeout (espera en vez de fallar) en lugar de WAL: cambiar a
+# WAL requiere lock exclusivo y falla si otra suite dejó conexiones abiertas.
 @event.listens_for(_test_engine.sync_engine, "connect")
 def _set_sqlite_pragma(dbapi_connection, _):
     cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA journal_mode=WAL")
-    cursor.execute("PRAGMA busy_timeout=30000")  # 30s
+    cursor.execute("PRAGMA busy_timeout=30000")  # 30s: esperar el lock, no fallar
     cursor.close()
 import asyncio
 

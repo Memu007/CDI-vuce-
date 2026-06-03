@@ -6,6 +6,16 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-02 · Sprint 25 días — Día 7 (T11 SEO landing)
+
+- **feat (SEO):** landing completa para indexación de Google. Fix `<title>` (ahora menciona Aduana + MARIA + Kit SIM), agregada `<meta name="keywords">` con términos competitivos (software aduana, despachante, argentina), y **Schema.org JSON-LD** (`SoftwareApplication` con precio $15.000 ARS y provider Organization).
+- **feat (SEO):** `<meta name="robots" content="noindex, nofollow">` en `dashboard_v2.html` (área privada no debe indexarse).
+- **ya existían:** `/static/robots.txt` (bloquea /dashboard, /api/, /admin/) y `/static/sitemap.xml`. Verificados por tests.
+- **test:** los 13 tests de `test_seo.py` (preexistentes, estaban en rojo) ahora pasan en verde.
+- **fix (test infra):** `conftest.py` usa `PRAGMA busy_timeout` en vez de `journal_mode=WAL` (WAL requiere lock exclusivo y rompía al correr suites juntas).
+
+---
+
 ## 2026-06-01 · Sprint 25 días — Día 6 (T10 tests E2E billing autoservicio)
 
 - **test (CRÍTICO):** `tests/test_billing_autoservicio.py` con 13 tests E2E del flujo de billing autoservicio (registro → trial → cancel → reactivate → checkout) + cambio de password. Red de seguridad antes de cobrar real.
