@@ -48,11 +48,20 @@ def get_pais_codigo(pais: str) -> int:
     if str(pais).isdigit():
         return int(pais)
     
+    # Dos pasadas: primero match EXACTO (case-insensitive) para no colisionar.
+    # Antes, el startswith de 2 letras devolvia el pais equivocado: p.ej.
+    # "China" matcheaba "Chile" (208) y "Colombia" caia en "Corea" (220).
     pais_upper = pais.strip().upper()
     for key, code in PAISES_INDEC.items():
-        if key.upper() == pais_upper or key.upper().startswith(pais_upper[:2]):
+        if key.upper() == pais_upper:
             return code
-    
+    # Segunda pasada: prefijo estricto (>=3 chars) como fallback, solo si no hubo exacto.
+    prefijo = pais_upper[:4]
+    if len(prefijo) >= 3:
+        for key, code in PAISES_INDEC.items():
+            if key.upper().startswith(prefijo):
+                return code
+
     return 212  # USA por defecto
 
 

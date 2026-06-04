@@ -40,10 +40,13 @@ def get_pais_codigo(pais: str) -> int:
     for key, code in PAISES_INDEC.items():
         if key.upper() == pais_upper:
             return code
-    # Segunda pasada: prefijo de 2 letras como fallback (solo si no hubo exacto).
-    for key, code in PAISES_INDEC.items():
-        if key.upper().startswith(pais_upper[:2]):
-            return code
+    # Segunda pasada: prefijo estricto (>=3 chars) como fallback, solo si no hubo exacto.
+    # Antes el prefijo de 2 letras adivinaba mal: "Colombia" caia en "Corea" (220).
+    prefijo = pais_upper[:4]
+    if len(prefijo) >= 3:
+        for key, code in PAISES_INDEC.items():
+            if key.upper().startswith(prefijo):
+                return code
 
     return 218  # China por defecto
 

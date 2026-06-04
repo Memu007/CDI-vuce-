@@ -6,6 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-04 · Sprint 25 días — Día 9 (T13 auditoría generador TXT)
+
+- **fix (CRÍTICO, datos aduaneros):** el generador de EXPORTACIÓN (`maria_generator_export.py`) tenía el MISMO bug de país que ya arreglamos en importación (match exacto OR prefijo en una sola pasada → `China` caía en `Chile`). Ahora hace 2 pasadas, exacto primero.
+- **fix (matching laxo):** el fallback por prefijo de 2 letras adivinaba mal países desconocidos (`Colombia`→`Corea` 220). Endurecido a prefijo de >=3 chars en ambos generadores.
+- **auditoría:** detectados (NO corregidos aún, requieren decisión del dueño): tabla de países con códigos dudosos/repetidos (`Alemania`=212 idéntico a EEUU); defaults hardcodeados con datos de OTRO cliente (`13/07/2016`, `DR. SALVADOR MAZZA 1996`); procedencia siempre EEUU (`CARTPAYPRC=222`); unidad siempre "Unidades" (`CARTUNTDCL=07`); fecha embarque inventada (hoy+365); sufijos `[SBT]` del sample.
+
+---
+
 ## 2026-06-02 · Sprint 25 días — Día 8 (T12 tests core TXT + FIX bug país)
 
 - **fix (CRÍTICO, datos aduaneros):** `get_pais_codigo()` devolvía el código de país EQUIVOCADO para nombres completos que comparten las 2 primeras letras. `China`→208 (Chile) y `España`→212 (Estados Unidos). El match por prefijo pegaba en el país equivocado antes del match exacto. Ahora hace 2 pasadas (exacto primero). **Esto metía el código INDEC errado en el TXT que el despachante carga en el Kit SIM.**
