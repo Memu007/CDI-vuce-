@@ -2818,9 +2818,9 @@ class MariaRequest(BaseModel):
     vendedor_id: str = ""
     comprador_nombre: str = ""
     comprador_cuit: str = ""
-    # Datos del importador que antes se hardcodeaban en el TXT. Si vienen
-    # vacios se mantiene el fallback historico para no romper operaciones
-    # ya existentes.
+    # Datos del importador. Si vienen vacios el generador OMITE el bloque [CPL]
+    # correspondiente (antes metia datos de otro cliente del sample en la
+    # declaracion). El despachante los completa a mano en el Kit SIM.
     comprador_domicilio: str = ""
     comprador_fecha_inic_activ: str = ""
     flete: float = 0

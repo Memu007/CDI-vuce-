@@ -207,27 +207,30 @@ def generate_maria_txt(operation_id: str, items: list,
         lines.append(f"MCPL={vendedor_id:<40}")
         lines.append("")
     
-    # 6. Fecha Inicio Actividad (del cliente, con fallback al default historico)
-    fecha_ini_act = (str(comprador_fecha_inic_activ or "").strip()
-                     or "13/07/2016")
-    lines.append("[CPL]")
-    lines.append("NART=0000")
-    lines.append("ICPLDIF=D")
-    lines.append("CCPL=FECHA INIC.ACTIV")
-    lines.append(f"MCPL={fecha_ini_act:<40}")
-    lines.append("")
+    # 6. Fecha Inicio Actividad (del cliente). Si no viene, NO se emite el bloque.
+    # Antes caia el default "13/07/2016" (dato de OTRO cliente del sample) en
+    # CUALQUIER declaracion. Mejor omitir y que el despachante lo complete a mano
+    # que meter datos falsos de otra empresa en la declaracion aduanera.
+    fecha_ini_act = str(comprador_fecha_inic_activ or "").strip()
+    if fecha_ini_act:
+        lines.append("[CPL]")
+        lines.append("NART=0000")
+        lines.append("ICPLDIF=D")
+        lines.append("CCPL=FECHA INIC.ACTIV")
+        lines.append(f"MCPL={fecha_ini_act:<40}")
+        lines.append("")
 
-    # 7. Domicilio Establecimiento (del cliente, con fallback al default historico)
-    domicilio_est = (str(comprador_domicilio or "").strip()
-                     or "DR. SALVADOR MAZZA 1996")
-    # MARIA tiene ancho 40 chars maximo para MCPL; recortamos preservando fin
-    domicilio_est = domicilio_est[:40]
-    lines.append("[CPL]")
-    lines.append("NART=0000")
-    lines.append("ICPLDIF=D")
-    lines.append("CCPL=DOMICIL.ESTABLEC")
-    lines.append(f"MCPL={domicilio_est:<40}")
-    lines.append("")
+    # 7. Domicilio Establecimiento (del cliente). Mismo criterio: si no viene se
+    # omite. Antes caia "DR. SALVADOR MAZZA 1996" (domicilio de otro cliente).
+    # MARIA tiene ancho 40 chars maximo para MCPL; recortamos preservando inicio.
+    domicilio_est = str(comprador_domicilio or "").strip()[:40]
+    if domicilio_est:
+        lines.append("[CPL]")
+        lines.append("NART=0000")
+        lines.append("ICPLDIF=D")
+        lines.append("CCPL=DOMICIL.ESTABLEC")
+        lines.append(f"MCPL={domicilio_est:<40}")
+        lines.append("")
     
     # === [DVD] Documento Vinculado (Factura) ===
     lines.append("[DVD]")

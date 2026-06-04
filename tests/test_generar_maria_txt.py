@@ -145,6 +145,31 @@ def test_get_pais_codigo_no_colisiona_por_prefijo():
     assert get_pais_codigo("Estados Unidos") == 212
 
 
+def test_txt_no_filtra_datos_de_otro_cliente():
+    """Regresión: sin domicilio/fecha del cliente NO deben aparecer los datos
+    hardcodeados del sample (otro cliente) en la declaración aduanera.
+    """
+    txt = generate_maria_txt("OP1", ITEMS_OK)
+    assert "DR. SALVADOR MAZZA 1996" not in txt
+    assert "13/07/2016" not in txt
+    # Sin dato, el bloque [CPL] correspondiente directamente no se emite.
+    assert "CCPL=DOMICIL.ESTABLEC" not in txt
+    assert "CCPL=FECHA INIC.ACTIV" not in txt
+
+
+def test_txt_usa_datos_reales_del_cliente():
+    """Cuando vienen domicilio y fecha del cliente, se emiten esos valores."""
+    txt = generate_maria_txt(
+        "OP1", ITEMS_OK,
+        comprador_domicilio="AV. CORRIENTES 1234",
+        comprador_fecha_inic_activ="01/03/2020",
+    )
+    assert "CCPL=DOMICIL.ESTABLEC" in txt
+    assert "AV. CORRIENTES 1234" in txt
+    assert "CCPL=FECHA INIC.ACTIV" in txt
+    assert "01/03/2020" in txt
+
+
 # ---------- validate_items_for_maria ----------
 
 

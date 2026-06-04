@@ -10,7 +10,8 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix (CRÍTICO, datos aduaneros):** el generador de EXPORTACIÓN (`maria_generator_export.py`) tenía el MISMO bug de país que ya arreglamos en importación (match exacto OR prefijo en una sola pasada → `China` caía en `Chile`). Ahora hace 2 pasadas, exacto primero.
 - **fix (matching laxo):** el fallback por prefijo de 2 letras adivinaba mal países desconocidos (`Colombia`→`Corea` 220). Endurecido a prefijo de >=3 chars en ambos generadores.
-- **auditoría:** detectados (NO corregidos aún, requieren decisión del dueño): tabla de países con códigos dudosos/repetidos (`Alemania`=212 idéntico a EEUU); defaults hardcodeados con datos de OTRO cliente (`13/07/2016`, `DR. SALVADOR MAZZA 1996`); procedencia siempre EEUU (`CARTPAYPRC=222`); unidad siempre "Unidades" (`CARTUNTDCL=07`); fecha embarque inventada (hoy+365); sufijos `[SBT]` del sample.
+- **fix (CRÍTICO, privacidad/datos):** si el cliente no tenía cargado domicilio o fecha de inicio de actividad, el TXT salía con los datos de OTRO cliente del sample (`DR. SALVADOR MAZZA 1996`, `13/07/2016`). Ahora si no hay dato real, el bloque `[CPL]` simplemente no se emite y el despachante lo completa en el Kit SIM. +2 tests de regresión.
+- **auditoría:** pendientes de decisión del dueño: tabla de países con códigos dudosos/repetidos (`Alemania`=212 idéntico a EEUU); procedencia siempre EEUU (`CARTPAYPRC=222`); unidad siempre "Unidades" (`CARTUNTDCL=07`); fecha embarque inventada (hoy+365); sufijos `[SBT]` del sample.
 
 ---
 
