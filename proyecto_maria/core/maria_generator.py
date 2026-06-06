@@ -35,6 +35,41 @@ PAISES_INDEC = {
     "DE": 438, "Alemania": 438,
 }
 
+# Códigos de Tipo de Unidades oficiales del Sistema MARIA (AFIP).
+# Solo las unidades de comercio mas comunes; el resto cae al default 07 (UNIDAD).
+UNIDADES_MARIA = {
+    "01": "01",  # passthrough si ya viene el codigo
+    "kg": "01", "kgs": "01", "kilo": "01", "kilos": "01",
+    "kilogramo": "01", "kilogramos": "01",
+    "m": "02", "mt": "02", "mts": "02", "metro": "02", "metros": "02",
+    "m2": "03", "metro cuadrado": "03",
+    "m3": "04", "metro cubico": "04",
+    "l": "05", "lt": "05", "lts": "05", "litro": "05", "litros": "05",
+    "u": "07", "un": "07", "und": "07", "unid": "07",
+    "unidad": "07", "unidades": "07",
+    "pc": "07", "pcs": "07", "pieza": "07", "piezas": "07",
+    "pieces": "07", "unit": "07", "units": "07", "ea": "07", "each": "07",
+    "par": "08", "pares": "08", "pair": "08", "pairs": "08",
+    "docena": "09", "docenas": "09", "dozen": "09",
+    "millar": "11", "millares": "11",
+    "gr": "14", "gramo": "14", "gramos": "14",
+    "ton": "29", "tn": "29", "tonelada": "29", "toneladas": "29",
+}
+
+
+def get_unidad_codigo(unidad: str) -> str:
+    """Mapea una unidad de medida a su código oficial MARIA (2 dígitos).
+    Default: '07' (UNIDAD) si no se reconoce. Antes estaba hardcodeado a '07'
+    para TODO, declarando "unidades" aunque la mercaderia fuera por kg/litro/etc.
+    """
+    if not unidad:
+        return "07"
+    clave = str(unidad).strip().lower()
+    if clave.isdigit():  # ya vino el codigo numerico
+        return clave.zfill(2)
+    return UNIDADES_MARIA.get(clave, "07")
+
+
 def get_pais_codigo(pais: str) -> int:
     """Obtiene el código INDEC para un país."""
     if not pais:
@@ -283,6 +318,9 @@ def generate_maria_txt(operation_id: str, items: list,
         # que ademas con la tabla oficial es PERU, no EEUU como decia el sample).
         pais_proc = (item.get('pais_procedencia') or item.get('procedencia') or pais)
         pais_proc_codigo = get_pais_codigo(pais_proc)
+        # Unidad de medida del item (con fallback a 07=UNIDAD si no viene).
+        unidad_codigo = get_unidad_codigo(
+            item.get('unidad') or item.get('unidad_medida') or item.get('um'))
         
         # Calcular proporcional de flete y seguro
         proporcion = valor_total / fob_total if fob_total > 0 else 0
@@ -302,9 +340,9 @@ def generate_maria_txt(operation_id: str, items: list,
         lines.append(f"QARTKGRNET={peso_kg:.3f}")
         lines.append(f"CARTPAYORI={pais_codigo}")
         lines.append(f"CARTPAYPRC={pais_proc_codigo}") # Procedencia (default = origen)
-        lines.append("CARTUNTDCL=07") # Unidades (07 = Unidades)
+        lines.append(f"CARTUNTDCL={unidad_codigo}") # Unidad declarada (oficial MARIA)
         lines.append(f"QARTUNTDCL={cantidad:.2f}")
-        lines.append("CARTUNTEST=07")
+        lines.append(f"CARTUNTEST={unidad_codigo}")
         lines.append(f"QARTUNTEST={cantidad:.2f}")
         lines.append(f"MARTFOB={valor_total:.2f}")
         lines.append(f"MARTASS={seguro_item:.2f}")

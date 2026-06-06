@@ -7,7 +7,7 @@ from datetime import datetime
 
 # Códigos de país oficiales del Sistema MARIA: una sola tabla (la de importación)
 # para que import y export no diverjan. La tabla anterior tenia codigos MAL.
-from proyecto_maria.core.maria_generator import PAISES_INDEC
+from proyecto_maria.core.maria_generator import PAISES_INDEC, get_unidad_codigo
 
 # Tipos de destinación de exportación
 TIPOS_DESTINACION_EXPORT = {
@@ -182,6 +182,10 @@ def generate_maria_export_txt(
         
         # Para exportación, el país origen siempre es Argentina
         pais_origen_codigo = 200  # Argentina
+        # Unidad de medida del item (fallback 07=UNIDAD). Antes era 07 fijo con
+        # comentario "kilogramos" (el comentario mentia: 07 es UNIDAD, no kg).
+        unidad_codigo = get_unidad_codigo(
+            item.get('unidad') or item.get('unidad_medida') or item.get('um'))
         
         # Calcular proporcional de flete y seguro
         proporcion = valor_total / fob_total if fob_total > 0 else 0
@@ -200,9 +204,9 @@ def generate_maria_export_txt(
         lines.append(f"QARTKGRNET={peso_kg:.3f}")
         lines.append(f"CARTPAYORI={pais_origen_codigo}")  # Argentina
         lines.append(f"CARTPAYDST={pais_destino_codigo}")  # País destino
-        lines.append("CARTUNTDCL=07")  # Unidad: kilogramos
+        lines.append(f"CARTUNTDCL={unidad_codigo}")  # Unidad declarada (oficial MARIA)
         lines.append(f"QARTUNTDCL={cantidad:.2f}")
-        lines.append("CARTUNTEST=07")
+        lines.append(f"CARTUNTEST={unidad_codigo}")
         lines.append(f"QARTUNTEST={cantidad:.2f}")
         lines.append(f"MARTFOB={valor_total:.2f}")
         

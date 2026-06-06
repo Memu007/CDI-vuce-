@@ -197,6 +197,29 @@ def test_txt_procedencia_explicita():
     assert "CARTPAYPRC=225" in txt   # procedencia Uruguay oficial
 
 
+def test_txt_unidad_default_es_unidad():
+    """Sin unidad explícita, CARTUNTDCL debe ser 07 (UNIDAD)."""
+    items = [{"pieza": "84713010", "descripcion": "X", "cantidad": 5,
+              "valor_unitario": 100, "origen": "China"}]
+    txt = generate_maria_txt("OP1", items)
+    assert "CARTUNTDCL=07" in txt
+    assert "CARTUNTEST=07" in txt
+
+
+def test_txt_unidad_kg_y_par():
+    """La unidad del item se mapea al código oficial: kg=01, par=08."""
+    items = [{"pieza": "84713010", "descripcion": "A", "cantidad": 10,
+              "valor_unitario": 100, "origen": "China", "unidad": "kg"}]
+    txt = generate_maria_txt("OP1", items)
+    assert "CARTUNTDCL=01" in txt   # kilogramo oficial
+    assert "CARTUNTDCL=07" not in txt
+
+    items2 = [{"pieza": "64041100", "descripcion": "Zapatillas", "cantidad": 20,
+               "valor_unitario": 50, "origen": "China", "unidad_medida": "pares"}]
+    txt2 = generate_maria_txt("OP2", items2)
+    assert "CARTUNTDCL=08" in txt2   # par oficial
+
+
 # ---------- validate_items_for_maria ----------
 
 
