@@ -278,6 +278,11 @@ def generate_maria_txt(operation_id: str, items: list,
         peso_kg = float(item.get('peso_kg', item.get('peso_unitario', 0)) or 0)
         pais = item.get('pais_origen') or item.get('origen', 'CN')
         pais_codigo = get_pais_codigo(pais)
+        # Procedencia: pais desde donde se despacha. Si no viene, se asume el
+        # mismo que el origen (caso mas comun) en vez de un hardcode (antes 222,
+        # que ademas con la tabla oficial es PERU, no EEUU como decia el sample).
+        pais_proc = (item.get('pais_procedencia') or item.get('procedencia') or pais)
+        pais_proc_codigo = get_pais_codigo(pais_proc)
         
         # Calcular proporcional de flete y seguro
         proporcion = valor_total / fob_total if fob_total > 0 else 0
@@ -296,7 +301,7 @@ def generate_maria_txt(operation_id: str, items: list,
         lines.append("CARTUSO=3")
         lines.append(f"QARTKGRNET={peso_kg:.3f}")
         lines.append(f"CARTPAYORI={pais_codigo}")
-        lines.append(f"CARTPAYPRC={222}") # Procedencia default EEUU (Sample) o parametrizable
+        lines.append(f"CARTPAYPRC={pais_proc_codigo}") # Procedencia (default = origen)
         lines.append("CARTUNTDCL=07") # Unidades (07 = Unidades)
         lines.append(f"QARTUNTDCL={cantidad:.2f}")
         lines.append("CARTUNTEST=07")

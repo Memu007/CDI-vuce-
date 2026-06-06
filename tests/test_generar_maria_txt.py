@@ -175,6 +175,28 @@ def test_txt_usa_datos_reales_del_cliente():
     assert "01/03/2020" in txt
 
 
+def test_txt_procedencia_default_es_origen():
+    """Sin procedencia explícita, CARTPAYPRC debe igualar al origen (CARTPAYORI),
+    no un hardcode. Antes era fijo 222 (que en la tabla oficial es Perú).
+    """
+    items = [{"pieza": "84713010", "descripcion": "X", "cantidad": 1,
+              "valor_unitario": 100, "origen": "China"}]
+    txt = generate_maria_txt("OP1", items)
+    assert "CARTPAYORI=310" in txt   # China oficial
+    assert "CARTPAYPRC=310" in txt   # procedencia = origen
+    assert "CARTPAYPRC=222" not in txt
+
+
+def test_txt_procedencia_explicita():
+    """Si el item trae procedencia distinta al origen, se respeta."""
+    items = [{"pieza": "84713010", "descripcion": "X", "cantidad": 1,
+              "valor_unitario": 100, "origen": "China",
+              "pais_procedencia": "Uruguay"}]
+    txt = generate_maria_txt("OP1", items)
+    assert "CARTPAYORI=310" in txt   # origen China
+    assert "CARTPAYPRC=225" in txt   # procedencia Uruguay oficial
+
+
 # ---------- validate_items_for_maria ----------
 
 

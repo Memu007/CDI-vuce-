@@ -12,7 +12,8 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix (matching laxo):** el fallback por prefijo de 2 letras adivinaba mal países desconocidos (`Colombia`→`Corea` 220). Endurecido a prefijo de >=3 chars en ambos generadores.
 - **fix (CRÍTICO, privacidad/datos):** si el cliente no tenía cargado domicilio o fecha de inicio de actividad, el TXT salía con los datos de OTRO cliente del sample (`DR. SALVADOR MAZZA 1996`, `13/07/2016`). Ahora si no hay dato real, el bloque `[CPL]` simplemente no se emite y el despachante lo completa en el Kit SIM. +2 tests de regresión.
 - **fix (CRÍTICO, datos aduaneros):** la tabla de países tenía casi TODOS los códigos mal. Se reemplazó por la tabla **oficial AFIP "Códigos María"**. Ejemplos del error: `China`=218 (era México), `Alemania`=212 (era EEUU), `España`=210 (era Ecuador), `Japón`=217 (era Jamaica), `México`=214 (era Guyana). **El default "China" valía 218 = México**, así que toda operación sin país explícito declaraba México como origen. Ahora China=310, default=310. Tabla unificada: export importa la misma de import (single source of truth). Tests actualizados a los valores oficiales.
-- **auditoría:** pendientes de decisión del dueño: procedencia siempre EEUU (`CARTPAYPRC=222`); unidad siempre "Unidades" (`CARTUNTDCL=07`); fecha embarque inventada (hoy+365); sufijos `[SBT]` del sample.
+- **fix (datos aduaneros):** procedencia del item (`CARTPAYPRC`) ya no es un hardcode `222` (que con la tabla oficial es Perú, no EEUU como creía el sample). Ahora usa `pais_procedencia`/`procedencia` del item y, si no viene, asume el mismo país que el origen (caso más común). +2 tests.
+- **auditoría:** pendientes de decisión del dueño: unidad siempre "Unidades" (`CARTUNTDCL=07`); fecha embarque inventada (hoy+365); sufijos `[SBT]` del sample.
 
 ---
 
