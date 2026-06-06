@@ -5,30 +5,9 @@ Sistema SIM de AFIP - Destinaciones de Exportación.
 
 from datetime import datetime
 
-# Códigos de país INDEC (reutilizado de importación)
-PAISES_INDEC = {
-    "AR": 200, "Argentina": 200,
-    "BR": 203, "Brasil": 203,
-    "CL": 208, "Chile": 208,
-    "CN": 218, "China": 218,
-    "US": 212, "USA": 212, "Estados Unidos": 212,
-    "UY": 286, "Uruguay": 286,
-    "VE": 226, "Venezuela": 226,
-    "MX": 214, "Mexico": 214, "México": 214,
-    "DE": 212, "Alemania": 212,
-    "IT": 213, "Italia": 213,
-    "ES": 210, "España": 210,
-    "FR": 211, "Francia": 211,
-    "JP": 217, "Japón": 217, "Japon": 217,
-    "KR": 220, "Corea": 220, "Corea del Sur": 220,
-    "TW": 221, "Taiwan": 221, "Taiwán": 221,
-    "GB": 222, "Reino Unido": 222, "UK": 222,
-    "PE": 282, "Peru": 282, "Perú": 282,
-    "CO": 280, "Colombia": 280,
-    "EC": 283, "Ecuador": 283,
-    "BO": 284, "Bolivia": 284,
-    "PY": 285, "Paraguay": 285,
-}
+# Códigos de país oficiales del Sistema MARIA: una sola tabla (la de importación)
+# para que import y export no diverjan. La tabla anterior tenia codigos MAL.
+from proyecto_maria.core.maria_generator import PAISES_INDEC
 
 # Tipos de destinación de exportación
 TIPOS_DESTINACION_EXPORT = {

@@ -3,29 +3,42 @@ Generador de archivos TXT en formato MARIA para Sistema SIM de AFIP.
 """
 from datetime import datetime, timedelta
 
-# Códigos de país INDEC
+# Códigos de país oficiales del Sistema MARIA (AFIP - "Códigos María").
+# Fuente: https://www.afip.gob.ar/genericos/documentos/codigos-maria.pdf
+# OJO: la tabla anterior tenia casi todos los codigos MAL (China=218 era Mexico,
+# Alemania=212 era EEUU, España=210 era Ecuador, etc.), metiendo el pais de
+# origen equivocado en CADA declaracion aduanera.
 PAISES_INDEC = {
     "AR": 200, "Argentina": 200,
+    "BO": 202, "Bolivia": 202,
     "BR": 203, "Brasil": 203,
+    "CA": 204, "Canada": 204, "Canadá": 204,
+    "CO": 205, "Colombia": 205,
     "CL": 208, "Chile": 208,
-    "CN": 218, "China": 218,
-    "US": 212, "USA": 212, "Estados Unidos": 212,
-    "UY": 286, "Uruguay": 286,
+    "EC": 210, "Ecuador": 210,
+    "US": 212, "USA": 212, "EEUU": 212, "Estados Unidos": 212,
+    "MX": 218, "Mexico": 218, "México": 218,
+    "PY": 221, "Paraguay": 221,
+    "PE": 222, "Peru": 222, "Perú": 222,
+    "UY": 225, "Uruguay": 225,
     "VE": 226, "Venezuela": 226,
-    "MX": 214, "Mexico": 214, "México": 214,
-    "DE": 212, "Alemania": 212,
-    "IT": 213, "Italia": 213,
-    "ES": 210, "España": 210,
-    "FR": 211, "Francia": 211,
-    "JP": 217, "Japón": 217, "Japon": 217,
-    "KR": 220, "Corea": 220, "Corea del Sur": 220,
-    "TW": 221, "Taiwan": 221, "Taiwán": 221,
+    "KP": 308, "Corea del Norte": 308,
+    "KR": 309, "Corea": 309, "Corea del Sur": 309,
+    "CN": 310, "China": 310,
+    "TW": 313, "Taiwan": 313, "Taiwán": 313,
+    "IN": 315, "India": 315,
+    "JP": 320, "Japón": 320, "Japon": 320,
+    "ES": 410, "España": 410, "Espana": 410,
+    "FR": 412, "Francia": 412,
+    "IT": 417, "Italia": 417,
+    "GB": 426, "Reino Unido": 426, "UK": 426,
+    "DE": 438, "Alemania": 438,
 }
 
 def get_pais_codigo(pais: str) -> int:
     """Obtiene el código INDEC para un país."""
     if not pais:
-        return 218  # China por defecto
+        return 310  # China por defecto (codigo oficial MARIA)
     
     # Si ya es un número, devolverlo
     if str(pais).isdigit():
@@ -48,7 +61,7 @@ def get_pais_codigo(pais: str) -> int:
             if key.upper().startswith(prefijo):
                 return code
 
-    return 218  # China por defecto
+    return 310  # China por defecto (codigo oficial MARIA)
 
 
 def generate_maria_txt(operation_id: str, items: list, 

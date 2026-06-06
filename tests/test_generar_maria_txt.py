@@ -122,26 +122,31 @@ def test_txt_proporcional_flete_seguro():
     assert "MARTASS=50.00" in txt
 
 
-def test_get_pais_codigo_indec():
-    """Códigos INDEC de país: China=218, USA=212, default=218."""
-    assert get_pais_codigo("CN") == 218
-    assert get_pais_codigo("China") == 218
+def test_get_pais_codigo_oficial_maria():
+    """Códigos OFICIALES del Sistema MARIA (AFIP). La tabla vieja estaba mal:
+    China era 218 (=México), Alemania 212 (=EEUU), España 210 (=Ecuador), etc.
+    """
+    assert get_pais_codigo("CN") == 310
+    assert get_pais_codigo("China") == 310
     assert get_pais_codigo("US") == 212
-    assert get_pais_codigo("") == 218  # default China
+    assert get_pais_codigo("Estados Unidos") == 212
+    assert get_pais_codigo("Mexico") == 218
+    assert get_pais_codigo("Alemania") == 438
+    assert get_pais_codigo("Japon") == 320
+    assert get_pais_codigo("") == 310  # default China (codigo oficial)
     assert get_pais_codigo("203") == 203  # ya numérico
 
 
 def test_get_pais_codigo_no_colisiona_por_prefijo():
     """Regresión: nombres completos no deben colisionar por prefijo de 2 letras.
 
-    Bug histórico: 'China' devolvía 208 (Chile) y 'España' devolvía 212
-    (Estados Unidos) porque el match por prefijo de 2 chars pegaba en el país
-    equivocado antes del match exacto. Resultado: código de país errado en el
-    TXT aduanero.
+    Bug histórico: 'China' devolvía Chile y 'España' devolvía Estados Unidos
+    porque el match por prefijo de 2 chars pegaba en el país equivocado antes
+    del match exacto. Resultado: código de país errado en el TXT aduanero.
     """
-    assert get_pais_codigo("China") == 218
+    assert get_pais_codigo("China") == 310
     assert get_pais_codigo("Chile") == 208
-    assert get_pais_codigo("España") == 210
+    assert get_pais_codigo("España") == 410
     assert get_pais_codigo("Estados Unidos") == 212
 
 
