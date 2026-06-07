@@ -6,6 +6,16 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-07 · Sprint 25 días — Día 9 (validación contra golden file real)
+
+- **validación (clave):** conseguimos un TXT MARIA **real y validado por el despachante** (op 001790125, importador VOWYNNS). Comparado campo por campo contra nuestro generador: **coincide en todo lo estructural** y confirma que los 7 fixes de T13 fueron correctos. Corrección importante: lo que antes llamamos "datos de otro cliente / sample falso" (fecha `13/07/2016`, domicilio `DR. SALVADOR MAZZA 1996`, procedencia `222`) eran **datos reales de VOWYNNS** usados como default global — el fix de T13 (no usarlos para todos) sigue siendo correcto. Y `PSAD`/`PSAD06`/`GANANCIASOP3`/`COMERC`/`IVAAD1` resultaron ser **constantes legítimas de MARIA, no bugs**.
+- **test (CORE):** nuevo **test golden de regresión** (`test_golden_*`, 3 tests) que reproduce la operación real **anonimizada** (`tests/fixtures/maria_golden_anon.TXT`): se falsean CUITs/nombres/domicilio/`[SBT]`, se mantienen NCM/pesos/montos reales para validar cálculos. Incluye guard anti-leak que falla si algún dato real de VOWYNNS aparece en el fixture. Total suite generador: 33 tests.
+- **fix:** `GTOS-POS-FOB` ahora usa formato `:.2f` (antes `str(flete+seguro)` podía dar `3271.6600000000003`).
+- **refactor:** el sufijo `[SBT] CSBTSVL` es ahora parámetro `sbt_sufijo_valor` (default = legacy). **Leak conocido pendiente:** el default contiene `AA(VOWYNNS)` → para clientes que no sean VOWYNNS sale dato ajeno; la regla real por importador (qué son `AB(...)` y `CA00`) requiere confirmación del despachante.
+- **pendiente despachante:** (1) qué significan `AB(...)` y `CA00` en `[SBT]` y si `AA()` es siempre el importador; (2) si `DDDTVENEMB` es obligatorio para el Kit SIM.
+
+---
+
 ## 2026-06-04 · Sprint 25 días — Día 9 (T13 auditoría generador TXT)
 
 - **fix (CRÍTICO, datos aduaneros):** el generador de EXPORTACIÓN (`maria_generator_export.py`) tenía el MISMO bug de país que ya arreglamos en importación (match exacto OR prefijo en una sola pasada → `China` caía en `Chile`). Ahora hace 2 pasadas, exacto primero.

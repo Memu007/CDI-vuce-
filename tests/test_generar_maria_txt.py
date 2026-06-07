@@ -232,6 +232,68 @@ def test_txt_fecha_embarque_real_se_usa():
     assert "DDDTVENEMB=15/08/2026" in txt
 
 
+# ---------- Golden regression (op real del despachante, anonimizada) ----------
+
+# Inputs que reproducen la operación real 001790125 (importador VOWYNNS) con
+# TODOS los datos identificatorios anonimizados. NCM/pesos/montos quedan reales
+# para validar los cálculos. Ver tests/fixtures/maria_golden_anon.TXT.
+GOLDEN_INPUTS = dict(
+    operation_id="000999001",
+    items=[{
+        "pieza": "84798999900H", "descripcion": "MAQUINA DEMO",
+        "cantidad": 1, "valor_unitario": 5000, "valor_total": 5000,
+        "peso_kg": 1220, "origen": "AR", "pais_procedencia": "PE",
+    }],
+    moneda="DOL", incoterm="DDP",
+    cuit_agr="20111111112",
+    vendedor_nombre="(00999) PROVEEDOR DEMO S.A.",
+    vendedor_id="20999999991",
+    comprador_nombre="IMPORTADORA DEMO S.A",
+    comprador_cuit="30999999990",
+    comprador_domicilio="CALLE FALSA 123",
+    comprador_fecha_inic_activ="01/01/2010",
+    flete=3221.66, seguro=50,
+    fecha_embarque="02/01/2026", fecha_emision="18/07/2025",
+    sbt_sufijo_valor="AA(DEMO)-AB(DEMO)-CA00-",
+    aduana_codigo="001", tipo_destinacion="IC04",
+)
+
+_GOLDEN_PATH = os.path.join(os.path.dirname(__file__), "fixtures",
+                            "maria_golden_anon.TXT")
+
+
+def test_golden_reproduce_estructura_real():
+    """El generador debe reproducir el TXT validado por el despachante (anonimizado).
+
+    Snapshot de regresión: si cambia el output del generador, este test avisa.
+    Ya verificamos manualmente que esta estructura coincide con el TXT real
+    (op 001790125) que el Kit SIM aceptó.
+    """
+    with open(_GOLDEN_PATH, "r", newline="") as f:
+        esperado = f.read()
+    generado = generate_maria_txt(**GOLDEN_INPUTS)
+    assert generado == esperado
+
+
+def test_golden_calculos_clave():
+    """Valida los cálculos contra los números reales conocidos de la operación."""
+    txt = generate_maria_txt(**GOLDEN_INPUTS)
+    assert "MARTBASIMP=8271.66" in txt          # FOB 5000 + flete 3221.66 + seg 50
+    assert "MCPL=3271.66" in txt                # GTOS-POS-FOB = flete + seguro
+    assert "IESPNCE=8479.89.99.900H" in txt     # NCM con sufijo SIM preservado
+    assert "CARTPAYORI=200" in txt              # Argentina
+    assert "CARTPAYPRC=222" in txt              # procedencia distinta del origen
+
+
+def test_golden_no_filtra_datos_reales():
+    """El fixture NO debe contener datos del cliente real (VOWYNNS)."""
+    with open(_GOLDEN_PATH, "r", newline="") as f:
+        contenido = f.read().upper()
+    for prohibido in ("VOWYNNS", "VITTO", "ARDEN", "SALVADOR MAZZA",
+                       "30715958844", "20324717073", "20613363263"):
+        assert prohibido.upper() not in contenido
+
+
 # ---------- validate_items_for_maria ----------
 
 

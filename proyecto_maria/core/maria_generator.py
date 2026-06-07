@@ -119,6 +119,10 @@ def generate_maria_txt(operation_id: str, items: list,
                        viaje_numero: str = "",
                        fecha_embarque: str = "",
                        fecha_emision: str = "",
+                       # Sufijo de valor [SBT]. Default = valor legacy del sample
+                       # (VOWYNNS). OJO: es especifico de ese cliente; la regla real
+                       # por importador esta pendiente de confirmar con el despachante.
+                       sbt_sufijo_valor: str = "",
                        # Container data
                        contenedor_numero: str = "",
                        contenedor_tipo: str = "",
@@ -225,13 +229,14 @@ def generate_maria_txt(operation_id: str, items: list,
     lines.append(f"MCPL={fecha_factura:<40}")
     lines.append("")
     
-    # 3. Gastos Post FOB (Total Flete + Seguro)
-    gastos_post_fob = flete + seguro
+    # 3. Gastos Post FOB (Total Flete + Seguro). Formato 2 decimales para evitar
+    # artefactos float (str(3221.66+50) podia dar "3271.6600000000003").
+    gastos_post_fob = f"{flete + seguro:.2f}"
     lines.append("[CPL]")
     lines.append("NART=0000")
     lines.append("ICPLDIF=D")
     lines.append("CCPL=GTOS-POS-FOB    ")
-    lines.append(f"MCPL={str(gastos_post_fob):<40}")
+    lines.append(f"MCPL={gastos_post_fob:<40}")
     lines.append("")
     
     # 4. Defaults PSAD (Hardcoded por ahora, configurable a futuro)
@@ -381,8 +386,11 @@ def generate_maria_txt(operation_id: str, items: list,
         lines.append(f"NART={idx:04d}")
         lines.append("ISBT=0000")
         lines.append(f"IEXT={idx}-1") # Referencia dummy
-        # Sufijos de valor hardcoded por ahora, podrian venir de UI
-        lines.append("CSBTSVL=AA(VOWYNNS)-AB(VITTO)-CA00-")
+        # Sufijo de valor: usa el parametro si viene; sino el legacy del sample.
+        # El default contiene "VOWYNNS" (cliente del sample) -> es un leak para
+        # otros clientes; la regla real por importador esta pendiente de despachante.
+        sufijo_sbt = sbt_sufijo_valor.strip() or "AA(VOWYNNS)-AB(VITTO)-CA00-"
+        lines.append(f"CSBTSVL={sufijo_sbt}")
         lines.append("")
 
     return "\r\n".join(lines)
