@@ -1,7 +1,7 @@
 """
 Generador de archivos TXT en formato MARIA para Sistema SIM de AFIP.
 """
-from datetime import datetime, timedelta
+from datetime import datetime
 
 # Códigos de país oficiales del Sistema MARIA (AFIP - "Códigos María").
 # Fuente: https://www.afip.gob.ar/genericos/documentos/codigos-maria.pdf
@@ -196,9 +196,12 @@ def generate_maria_txt(operation_id: str, items: list,
     lines.append(f"NDDTIMMTRN={operation_id[:5] if len(operation_id)>=5 else '00000'}")
     
     lines.append(f"CDDTINCOTE={incoterm}")
-    # Fecha embarque default futura si no hay
-    fecha_emb_header = fecha_embarque if fecha_embarque else (datetime.now() + timedelta(days=365)).strftime("%d/%m/%Y")
-    lines.append(f"DDDTVENEMB={fecha_emb_header}")
+    # Fecha de embarque: solo si hay dato real. Antes se inventaba hoy+365, lo que
+    # metia una fecha falsa en la declaracion. Mejor omitir y que el despachante
+    # la complete en el Kit SIM. (El TXT es clave=valor, omitir una linea es seguro.)
+    fecha_emb_header = str(fecha_embarque or "").strip()
+    if fecha_emb_header:
+        lines.append(f"DDDTVENEMB={fecha_emb_header}")
     lines.append("CDDTIVA=S")
     lines.append("")
     

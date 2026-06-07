@@ -220,6 +220,18 @@ def test_txt_unidad_kg_y_par():
     assert "CARTUNTDCL=08" in txt2   # par oficial
 
 
+def test_txt_fecha_embarque_no_se_inventa():
+    """Sin fecha de embarque, NO debe emitirse DDDTVENEMB (antes inventaba hoy+365)."""
+    txt = generate_maria_txt("OP1", ITEMS_OK)
+    assert "DDDTVENEMB" not in txt
+
+
+def test_txt_fecha_embarque_real_se_usa():
+    """Con fecha de embarque real, se emite tal cual."""
+    txt = generate_maria_txt("OP1", ITEMS_OK, fecha_embarque="15/08/2026")
+    assert "DDDTVENEMB=15/08/2026" in txt
+
+
 # ---------- validate_items_for_maria ----------
 
 
