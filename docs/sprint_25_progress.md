@@ -6,6 +6,45 @@
 
 Cualquier asistente (Cursor, Antigravity, Cascade, Claude) que continúe este sprint, lee este archivo + `HANDOFF.md` + `CHANGELOG.md` y arranca desde donde quedó.
 
+## Día 13 — 2026-06-07 · BLOQUE 3 cerrado (validación TXT) + auditoría generador
+
+**Lo más importante del sprint según el PM (validar que el TXT entra al Kit SIM) quedó esencialmente cerrado.** Conseguimos un TXT MARIA **real validado por el despachante** (op 001790125, importador VOWYNNS) y lo comparamos campo por campo contra `maria_generator.py`: **coincide en todo lo estructural**.
+
+### Auditoría del generador (7 fixes, todos con tests)
+
+1. Tabla de países reemplazada por la **oficial AFIP** (el default "China" valía 218 = México; ahora 310).
+2. Bug de país en exportación + matching laxo endurecido.
+3. Datos de un cliente ya no se filtran como default global.
+4. Procedencia (`CARTPAYPRC`) usa dato del item, no `222` fijo.
+5. Unidad de medida usa la real del item (`get_unidad_codigo`), no `07` fijo.
+6. Fecha de embarque (`DDDTVENEMB`) no se inventa.
+7. `GTOS-POS-FOB` con formato `:.2f`.
+
+### Validación golden
+
+- La comparación confirmó que `PSAD`/`PSAD06`/`GANANCIASOP3`/`COMERC`/`IVAAD1` son **constantes legítimas de MARIA, no bugs**.
+- Lo que parecían "datos falsos" (`13/07/2016`, `DR. SALVADOR MAZZA 1996`, `222`) eran **datos reales de VOWYNNS** usados como default global. El fix igual era correcto.
+- **Test golden de regresión** anonimizado: `tests/fixtures/maria_golden_anon.TXT` + 3 tests (incluye guard anti-leak). Suite generador: 33 tests verdes.
+- `[SBT] CSBTSVL` ahora es parámetro (`sbt_sufijo_valor`); default legacy contiene `AA(VOWYNNS)`.
+
+### Limpieza
+
+- Borrados 4 tests muertos que rompían la colección (arquitectura vieja). Tag `v0.2-t13` creado.
+
+### Pendiente (bloqueado por despachante)
+
+- Que un despachante cargue un TXT generado por NUESTRA app en SU Kit SIM (validación 100%).
+- Qué son `AB(...)` y `CA00` en `[SBT]`; si `AA()` es siempre el importador.
+- Si `DDDTVENEMB` es obligatorio para el Kit SIM.
+
+### Próximo bloque de valor
+
+- **Bloque 4 (CSRF) + Bloque 5 (MercadoPago real)** — sin esto no hay "2-3 pagando" para Día 17/25.
+
+### Nota de infra
+
+- La suite COMPLETA con `--cov` sobre `main.py` se cuelga (preexistente; sospecha: test de billing async / red sin mock). Apuntar tests directos funciona (`pytest tests/test_generar_maria_txt.py` ~2s). Pendiente no urgente: `pytest-timeout`.
+
 ## Día 1 — 2026-05-26
 
 ### Hecho
