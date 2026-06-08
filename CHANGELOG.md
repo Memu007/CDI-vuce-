@@ -6,6 +6,15 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-08 · Red de tests confiable + fix de seguridad (secretos filtrados)
+
+- **fix (infra tests):** la suite completa se colgaba por 2 scripts manuales de Gemini (`test_gemini_vision.py`, `test_simple_extraction.py`) que ejecutaban **llamadas reales a la API en el import** (durante la colección de pytest). Borrados esos + `test_gemini_extraction.py` (script manual, no test). Ahora la suite corre entera: **211 passed, 102 skipped, ~3min**, antes colgaba indefinidamente.
+- **fix (red de seguridad):** agregado `pytest-timeout==2.4.0` + `--timeout=120 --timeout-method=thread` en `pytest.ini`. Mata cualquier test colgado en el futuro en vez de trabar todo.
+- **🔴 SEGURIDAD (acción requerida del humano):** había **secretos de producción reales commiteados**: `GEMINI_API_KEY` (en los scripts borrados + `docs/deployment/RAILWAY_SETUP.md`) y `JWT_SECRET_KEY` (en RAILWAY_SETUP.md). Reemplazados por placeholders en el doc. **Quedan en el historial de git → hay que ROTAR ambas claves**: la API key de Gemini en Google Cloud y el JWT_SECRET_KEY en Railway (rotar JWT desloguea a todos los users).
+- **pendiente (triaje):** al correr la suite completa por primera vez aparecieron 7 tests rojos preexistentes (no relacionados al generador MARIA): `test_regression_phase0` backup/restore (2), `test_main_process_operation` (2), `test_main_upload` (3). A revisar próxima sesión.
+
+---
+
 ## 2026-06-07 · Sprint 25 días — Día 9 (validación contra golden file real)
 
 - **validación (clave):** conseguimos un TXT MARIA **real y validado por el despachante** (op 001790125, importador VOWYNNS). Comparado campo por campo contra nuestro generador: **coincide en todo lo estructural** y confirma que los 7 fixes de T13 fueron correctos. Corrección importante: lo que antes llamamos "datos de otro cliente / sample falso" (fecha `13/07/2016`, domicilio `DR. SALVADOR MAZZA 1996`, procedencia `222`) eran **datos reales de VOWYNNS** usados como default global — el fix de T13 (no usarlos para todos) sigue siendo correcto. Y `PSAD`/`PSAD06`/`GANANCIASOP3`/`COMERC`/`IVAAD1` resultaron ser **constantes legítimas de MARIA, no bugs**.

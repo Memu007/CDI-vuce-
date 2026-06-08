@@ -30,8 +30,8 @@ con * son criticas para esta beta.
 ```
 ENVIRONMENT=production
 EMAIL_VERIFICATION_REQUIRED=false
-JWT_SECRET_KEY=HD1j_usMSlqHoj4cjVOqmMM8XQJmFJp5gInKdyNgf2OR5aSXbWGHrn-MjCivdFNfm64V3mFAd_ecOYGgwX5sQA
-GEMINI_API_KEY=AIzaSyBi-JgR5zF2J1xpC9_PuNGT0dgg7_2E1rI
+JWT_SECRET_KEY=<GENERAR_CON_secrets.token_urlsafe(64)>
+GEMINI_API_KEY=<TU_API_KEY_DE_GEMINI>
 GEMINI_MODEL=gemini-3.1-flash-lite-preview
 ```
 
