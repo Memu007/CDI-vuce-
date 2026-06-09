@@ -10,9 +10,10 @@ from proyecto_maria.main import app
 
 
 @pytest.fixture()
-def main_client(monkeypatch):
+def main_client(monkeypatch, auth_override):
     # Ensure each test can tweak env vars safely
     monkeypatch.setenv("MAX_UPLOAD_MB", "1")
+    # auth_override autentica /upload_excel/ sin tocar la DB.
     return TestClient(app)
 
 

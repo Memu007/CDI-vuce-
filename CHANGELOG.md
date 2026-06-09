@@ -6,6 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-09 · Suite de tests 100% verde (fix de los 7 rojos por auth)
+
+- **test (infra):** arreglados los 7 tests rojos preexistentes que fallaban con `401 No autenticado` (`test_regression_phase0` backup/restore, `test_main_process_operation`, `test_main_upload`). No tocaban sesión y los endpoints ahora exigen auth.
+- **fix (forma correcta):** en vez de debilitar los tests, se autentican vía override de la dependencia `get_current_user` (nuevo fixture `auth_override` en `tests/conftest.py`). No escribe en la DB → sin locks ni flakiness por orden de tests. Se descartó registrar usuarios reales porque generaba `database is locked` bajo SQLite/async.
+- **resultado:** suite completa **218 passed, 102 skipped, 0 fallas, ~44s** (antes 211 passed + 7 failed, ~3min).
+
+---
+
 ## 2026-06-08 · Red de tests confiable + fix de seguridad (secretos filtrados)
 
 - **fix (infra tests):** la suite completa se colgaba por 2 scripts manuales de Gemini (`test_gemini_vision.py`, `test_simple_extraction.py`) que ejecutaban **llamadas reales a la API en el import** (durante la colección de pytest). Borrados esos + `test_gemini_extraction.py` (script manual, no test). Ahora la suite corre entera: **211 passed, 102 skipped, ~3min**, antes colgaba indefinidamente.

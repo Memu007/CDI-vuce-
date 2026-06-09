@@ -5,7 +5,8 @@ from proyecto_maria import main
 
 
 @pytest.fixture()
-def main_client():
+def main_client(auth_override):
+    # auth_override autentica /process_operation/ sin tocar la DB.
     return TestClient(main.app)
 
 

@@ -59,8 +59,9 @@ class TestBackupRestore:
     """Tests para los endpoints de backup/restore localStorage"""
 
     @pytest.fixture
-    def client(self):
+    def client(self, auth_override):
         from proyecto_maria.main import app
+        # auth_override autentica backup/restore sin tocar la DB.
         return TestClient(app)
 
     def test_backup_localstorage_accepts_data(self, client):

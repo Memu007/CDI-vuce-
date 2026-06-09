@@ -72,6 +72,36 @@ def auth_headers():
     """Mock authentication headers"""
     return {"Authorization": "Bearer test-token"}
 
+
+@pytest.fixture
+def auth_override():
+    """Autentica los endpoints sobreescribiendo la dependencia get_current_user.
+
+    Evita escribir en la DB (sin locks ni flakiness por orden de tests).
+    Devuelve el dict de user falso por si el test quiere inspeccionarlo.
+    Limpia el override al terminar.
+    """
+    from proyecto_maria.main import get_current_user
+
+    fake_user = {
+        "username": "test_user",
+        "name": "Test User",
+        "email": "test_user@test.cdi",
+        "cuit": "",
+        "plan": "basic",
+        "is_verified": True,
+        "billing_status": "active",
+        "trial_ends_at": None,
+        "default_aduana_codigo": "",
+        "default_puerto_destino": "",
+        "default_tipo_destinacion": "",
+        "team_owner_username": None,
+        "effective_owner": "test_user",
+    }
+    app.dependency_overrides[get_current_user] = lambda: fake_user
+    yield fake_user
+    app.dependency_overrides.pop(get_current_user, None)
+
 @pytest.fixture(autouse=True)
 def reset_environment():
     """Reset environment between tests"""
