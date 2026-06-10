@@ -5557,6 +5557,18 @@ async def billing_checkout(
         if email:
             preference_data["payer"] = {"email": email}
 
+        # Vuelta al dashboard despues de pagar. auto_return y notification_url
+        # solo con URL publica https (MP rechaza localhost).
+        base_url = get_frontend_url()
+        preference_data["back_urls"] = {
+            "success": f"{base_url}/v2?billing=success",
+            "failure": f"{base_url}/v2?billing=failure",
+            "pending": f"{base_url}/v2?billing=pending",
+        }
+        if base_url.startswith("https://"):
+            preference_data["auto_return"] = "approved"
+            preference_data["notification_url"] = f"{base_url}/api/payments/webhook"
+
         pref_response = sdk.preference().create(preference_data)
         if pref_response.get("status") != 201:
             err = pref_response.get("response", {})

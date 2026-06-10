@@ -663,10 +663,35 @@
         track('welcome_card_shown');
     }
 
+    /* ---------- 9b. Vuelta del checkout MP (?billing=success|failure|pending) ---------- */
+    function handleBillingReturn() {
+        const params = new URLSearchParams(window.location.search);
+        const status = params.get('billing');
+        if (!status) return;
+        // Limpiar la URL para que un refresh no repita el toast
+        params.delete('billing');
+        const clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
+        try { window.history.replaceState({}, '', clean); } catch (_) {}
+        if (status === 'success') {
+            toast.success('¡Pago recibido!', 'Tu plan se activa en unos segundos.');
+            track('billing_return_success');
+            // El webhook actualiza la DB async: refrescamos el user a los 4s
+            // para que el banner de billing desaparezca solo.
+            setTimeout(loadCurrentUser, 4000);
+        } else if (status === 'pending') {
+            toast.info('Pago pendiente', 'Te avisamos cuando se acredite. Podés seguir usando la app.');
+            track('billing_return_pending');
+        } else {
+            toast.error('El pago no se completó', 'Podés reintentar desde el banner o tu perfil.');
+            track('billing_return_failure');
+        }
+    }
+
     /* ---------- 10. Bootstrap ---------- */
     document.addEventListener('DOMContentLoaded', () => {
         try { localStorage.removeItem(CLIENTE_KEY); } catch (_) {}
         loadCurrentUser();
+        handleBillingReturn();
         updateClientePill();
         setupFakeSourceBanner();
         setupWelcomeCard();

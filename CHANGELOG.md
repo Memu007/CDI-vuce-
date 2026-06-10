@@ -6,6 +6,15 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-10 · MercadoPago real: vuelta del checkout cerrada (Bloque 5, parte 1)
+
+- **feat (billing):** la preference de `/api/billing/checkout` ahora incluye `back_urls` (vuelve a `/v2?billing=success|failure|pending`), y con `FRONTEND_URL` https agrega `auto_return=approved` + `notification_url` al webhook. Antes el user pagaba y quedaba varado en MP.
+- **feat (UI):** al volver del checkout, el dashboard muestra toast según resultado y refresca el estado de billing solo (el webhook activa el plan async). Telemetría: `billing_return_*`.
+- **test:** 4 tests nuevos (`tests/test_billing_checkout.py`, MP mockeado). Suite: **229 passed, ~12s**.
+- **pendiente (humano):** para probar sandbox real hacen falta credenciales `TEST-` de MP (`MP_ACCESS_TOKEN`) y en prod setear `MP_ACCESS_TOKEN`, `MP_WEBHOOK_SECRET` y `FRONTEND_URL` en Railway.
+
+---
+
 ## 2026-06-10 · CSRF mínimo (Bloque 4) en modo report-only
 
 - **feat (seguridad):** protección CSRF double-submit cookie. Al loguear/registrar se setea cookie `csrf_token`; el front v2 (helper `api()`) la reenvía como header `X-CSRF-Token` en POST/PUT/DELETE; un middleware valida que coincidan. Exentos: login/register/logout/verify-email, estáticos y webhook MP (validado por firma).
