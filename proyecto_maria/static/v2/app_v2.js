@@ -15,11 +15,22 @@
     // el token — evita exposición XSS. La cookie se envía automáticamente
     // en peticiones same-origin por el browser.
 
+    // CSRF double-submit: leemos la cookie csrf_token y la mandamos como header
+    function getCsrfToken() {
+        const m = document.cookie.match(/(?:^|;\s*)csrf_token=([^;]+)/);
+        return m ? decodeURIComponent(m[1]) : '';
+    }
+
     async function api(path, options = {}) {
         const headers = Object.assign({}, options.headers || {});
         if (options.body && !(options.body instanceof FormData) &&
             !headers['Content-Type']) {
             headers['Content-Type'] = 'application/json';
+        }
+        const method = (options.method || 'GET').toUpperCase();
+        if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && !headers['X-CSRF-Token']) {
+            const csrf = getCsrfToken();
+            if (csrf) headers['X-CSRF-Token'] = csrf;
         }
         const res = await fetch(path, Object.assign({}, options, { headers, credentials: 'same-origin' }));
         if (res.status === 401) {

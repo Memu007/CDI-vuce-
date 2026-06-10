@@ -6,6 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-10 · CSRF mínimo (Bloque 4) en modo report-only
+
+- **feat (seguridad):** protección CSRF double-submit cookie. Al loguear/registrar se setea cookie `csrf_token`; el front v2 (helper `api()`) la reenvía como header `X-CSRF-Token` en POST/PUT/DELETE; un middleware valida que coincidan. Exentos: login/register/logout/verify-email, estáticos y webhook MP (validado por firma).
+- **modo seguro:** arranca en **report-only** (loguea warning, no bloquea). Para bloquear de verdad: setear `CSRF_ENFORCE=true` en Railway después de revisar logs un par de días. Sesiones viejas reciben la cookie al pegar a `/auth/current_user`.
+- **fix (infra tests):** `MetricsMiddleware` ya no escribe logs a la DB bajo pytest (causaba `database is locked` flaky en `test_security`). Suite: **225 passed, 0 errores, ~27s** (+7 tests nuevos en `tests/test_csrf.py`).
+
+---
+
 ## 2026-06-09 · Suite de tests 100% verde (fix de los 7 rojos por auth)
 
 - **test (infra):** arreglados los 7 tests rojos preexistentes que fallaban con `401 No autenticado` (`test_regression_phase0` backup/restore, `test_main_process_operation`, `test_main_upload`). No tocaban sesión y los endpoints ahora exigen auth.

@@ -328,7 +328,7 @@ app.add_middleware(
     allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
 )
 
 # Configurar Rate Limiting
@@ -1149,8 +1149,14 @@ class MetricsMiddleware(BaseHTTPMiddleware):
             # Calcular tiempo de ejecución
             process_time = (datetime.now() - start_time).total_seconds() * 1000
             
-            # Ignorar endpoints de health y estáticos para no ensuciar logs
-            if request.url.path not in ["/health", "/metrics"] and not request.url.path.startswith("/static"):
+            # Ignorar endpoints de health y estáticos para no ensuciar logs.
+            # Bajo pytest tampoco logueamos: el task en background corre
+            # mientras los tests dropean tablas → "database is locked" flaky.
+            if (
+                request.url.path not in ["/health", "/metrics"]
+                and not request.url.path.startswith("/static")
+                and not os.getenv("PYTEST_CURRENT_TEST")
+            ):
                 # Fire-and-forget logging (Background Task)
                 # Nota: En un entorno real de alta concurrencia, esto debería ir a una cola (Redis/Celery)
                 # Aquí lo hacemos directo a DB en background para simplicidad del MVP
@@ -1195,12 +1201,108 @@ class MetricsMiddleware(BaseHTTPMiddleware):
 app.add_middleware(MetricsMiddleware)
 
 
+# --- CSRF (double-submit cookie) ---
+# Proteccion contra CSRF para requests autenticados por cookie. Patron:
+# el server setea una cookie legible `csrf_token`; el front la reenvia en el
+# header `X-CSRF-Token`. El middleware exige que coincidan en metodos de
+# escritura. Si el caller NO usa cookie (Bearer header), no es vulnerable a
+# CSRF y se deja pasar. La cookie HttpOnly de sesion ya usa SameSite=Strict,
+# asi que esto es defensa en profundidad.
+import secrets as _csrf_secrets
+
+CSRF_COOKIE_NAME = "csrf_token"
+CSRF_HEADER_NAME = "x-csrf-token"
+_CSRF_SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
+# Paths donde NO aplica: el caller no es un browser con sesion por cookie.
+_CSRF_EXEMPT_PREFIXES = (
+    "/auth/login",
+    "/auth/register",
+    "/auth/logout",
+    "/auth/verify-email",
+    "/static",
+    "/health",
+)
+
+
+def _csrf_enforce_enabled() -> bool:
+    """Lee el flag en vivo para poder togglear sin reiniciar (y en tests).
+
+    Default: report-only (loguea pero no bloquea). Poner CSRF_ENFORCE=true en
+    el .env cuando se confirme que el front manda el header en todas las
+    operaciones de escritura.
+    """
+    return os.getenv("CSRF_ENFORCE", "false").strip().lower() in ("1", "true", "yes")
+
+
+def generate_csrf_token() -> str:
+    return _csrf_secrets.token_urlsafe(32)
+
+
+def set_csrf_cookie(response: Response) -> None:
+    """Setea (o refresca) la cookie csrf_token legible por el front."""
+    response.set_cookie(
+        key=CSRF_COOKIE_NAME,
+        value=generate_csrf_token(),
+        httponly=False,  # el front necesita leerla para reenviarla en el header
+        secure=IS_PRODUCTION,
+        samesite="strict",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+
+
+class CSRFMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        method = request.method.upper()
+        path = request.url.path
+        if (
+            method in _CSRF_SAFE_METHODS
+            or path.startswith(_CSRF_EXEMPT_PREFIXES)
+            or "webhook" in path
+        ):
+            return await call_next(request)
+
+        # Solo nos importa si la sesion va por cookie. Sin cookie de sesion,
+        # el caller usa Bearer (API/tests) y no es atacable via CSRF.
+        if request.cookies.get("access_token"):
+            cookie_token = request.cookies.get(CSRF_COOKIE_NAME)
+            header_token = request.headers.get(CSRF_HEADER_NAME)
+            valid = (
+                bool(cookie_token)
+                and bool(header_token)
+                and _csrf_secrets.compare_digest(cookie_token, header_token)
+            )
+            if not valid:
+                if _csrf_enforce_enabled():
+                    return JSONResponse(
+                        status_code=403,
+                        content={
+                            "detail": "Token CSRF invalido o ausente. Recarga la pagina.",
+                            "code": "csrf_failed",
+                        },
+                    )
+                logging.warning(
+                    "CSRF report-only: token faltante/invalido en %s %s "
+                    "(cookie=%s, header=%s)",
+                    method, path, bool(cookie_token), bool(header_token),
+                )
+        return await call_next(request)
+
+
+app.add_middleware(CSRFMiddleware)
+
+
 # --- AUTH DEPENDENCY (movido arriba para que endpoints posteriores la usen como Depends) ---
 @app.get("/auth/current_user")
-async def get_current_user(request: Request, db: AsyncSession = Depends(get_db)):
+async def get_current_user(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     """Obtiene el usuario actual desde la cookie HttpOnly. Tambien se usa
     como Depends() para proteger endpoints."""
     token = request.cookies.get("access_token")
+
+    # Bootstrap CSRF: si la sesion viene por cookie pero todavia no tiene
+    # csrf_token (sesiones anteriores al deploy), la sembramos. Solo si falta,
+    # para no rotar el token en cada poll y romper requests en vuelo.
+    if token and not request.cookies.get(CSRF_COOKIE_NAME):
+        set_csrf_cookie(response)
 
     # Fallback to Authorization header for API clients (optional)
     if not token:
@@ -2065,6 +2167,8 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
         samesite="strict",  # Max protection against CSRF
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
     )
+    # Token CSRF legible para el front (double-submit cookie).
+    set_csrf_cookie(response)
     
     return {
         "message": "Login exitoso",
@@ -2081,6 +2185,7 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
 async def logout(response: Response):
     """Cierra sesión eliminando la cookie"""
     response.delete_cookie("access_token")
+    response.delete_cookie(CSRF_COOKIE_NAME)
     return {"message": "Sesión cerrada"}
 
 # ============== BACKUP/RESTORE LOCALSTORAGE ==============
@@ -2287,6 +2392,8 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
         samesite="strict",
         max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
     )
+    # Token CSRF legible para el front (double-submit cookie).
+    set_csrf_cookie(response)
 
     return {
         "message": "Usuario creado exitosamente",
@@ -2341,6 +2448,8 @@ async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
             samesite="strict",
             max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
         )
+        # Token CSRF legible para el front (double-submit cookie).
+        set_csrf_cookie(response)
         return response
 
     except jwt.PyJWTError:
