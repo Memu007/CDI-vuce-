@@ -3794,6 +3794,33 @@ _COL_ALIASES = {
     "ncm": ["ncm", "posicionarancelaria", "posicion", "hscode", "codigoncm", "partidaarancelaria"],
 }
 
+# Aliases para las 6 columnas canónicas de ítems en Excel de operaciones.
+# Formato: {canon: [variantes normalizadas]}.
+_ITEM_COL_ALIASES = {
+    "pieza": [
+        "pieza", "ncm", "codigo", "codigopieza", "partida", "partidaarancelaria",
+        "posicionarancelaria", "hscode", "hs", "codigoncm", "itemcode", "sku",
+    ],
+    "descripcion": [
+        "descripcion", "descripción", "producto", "detalle", "description", "item",
+        "articulo", "artículo", "nombre", "desc", "mercaderia", "mercadería",
+    ],
+    "origen": [
+        "origen", "pais", "país", "country", "procedencia", "paisorigen", "paísorigen",
+    ],
+    "cantidad": [
+        "cantidad", "qty", "quantity", "cant", "unidades", "piezas", "bultos",
+    ],
+    "valor_unitario": [
+        "valorunitario", "valor", "precio", "price", "unitprice", "preciounitario",
+        "valorunit", "preciounit", "unitvalue", "costounitario",
+    ],
+    "peso_unitario": [
+        "pesounitario", "peso", "weight", "pesounit", "unitweight", "pesototal",
+        "pesobruto", "pesoneto",
+    ],
+}
+
 
 def _detect_columns(headers: list) -> dict:
     """Devuelve {campo_canonico: nombre_original} detectando aliases."""
@@ -3805,6 +3832,38 @@ def _detect_columns(headers: list) -> dict:
                 mapping[canon] = norm_to_orig[alias]
                 break
     return mapping
+
+
+def _detect_item_columns(headers: list) -> dict:
+    """Devuelve {nombre_original: campo_canonico} para las 6 columnas de ítems.
+
+    El formato es {source: canon} para ser compatible con `Client.column_mapping`
+    y con `upload_excel_v2`.
+    """
+    norm_to_orig = {_normalize_header(h): h for h in headers}
+    mapping: dict[str, str] = {}
+    for canon, aliases in _ITEM_COL_ALIASES.items():
+        for alias in aliases:
+            if alias in norm_to_orig:
+                mapping[norm_to_orig[alias]] = canon
+                break
+    return mapping
+
+
+def _merge_column_mapping(existing: dict, detected: dict) -> dict:
+    """Mergea un mapping existente con uno detectado. Los valores detectados
+    no pisan claves ya definidas (el usuario puede haberlas editado)."""
+    merged = dict(existing or {})
+    for src, canon in detected.items():
+        # Si el header detectado ya está mapeado a otro canon, no lo pisamos.
+        if src in merged:
+            continue
+        # Evitar que un canon quede duplicado: si ya existe este canon con otro header,
+        # preferimos el existente.
+        if canon in merged.values():
+            continue
+        merged[src] = canon
+    return merged
 
 
 @app.post("/api/clientes/import")
@@ -4645,6 +4704,239 @@ async def delete_client_column_mapping(
     return {"success": True, "cliente_id": client_id, "mapping": {}}
 
 
+# === CATALOGO UNIFICADO POR CLIENTE (Plan 04) ===
+# Los endpoints de /column_mapping arriba se mantienen por compatibilidad
+# pero se consideran deprecated; la UI v2 usa /catalogo/*.
+
+
+def _column_mapping_status(mapping: dict) -> dict:
+    """Devuelve metadata de completitud del mapping de columnas."""
+    detected = set(mapping.values()) & set(_CANON_COLUMNS)
+    return {
+        "total": len(_CANON_COLUMNS),
+        "detectadas": len(detected),
+        "faltantes": [c for c in _CANON_COLUMNS if c not in detected],
+        "completo": len(detected) == len(_CANON_COLUMNS),
+    }
+
+
+def _product_history_to_dict(row: ClientProductHistoryModel) -> dict:
+    return {
+        "id": row.id,
+        "ncm": row.ncm,
+        "descripcion": row.descripcion,
+        "descripcion_normalizada": row.descripcion_normalizada or "",
+        "origen": row.origen_frecuente or "XX",
+        "peso_unitario_avg": row.peso_unitario_avg,
+        "valor_unitario_avg": row.valor_unitario_avg,
+        "cantidad_avg": row.cantidad_avg,
+        "veces_usado": row.veces_usado or 1,
+        "primera_vez": row.primera_vez.isoformat() if row.primera_vez else None,
+        "ultima_vez": row.ultima_vez.isoformat() if row.ultima_vez else None,
+    }
+
+
+@app.get("/api/clientes/{client_id}/catalogo/columnas")
+async def get_client_catalogo_columnas(
+    client_id: str,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Devuelve el catálogo de columnas del cliente (mapeo Excel)."""
+    client = await _get_owned_client(db, client_id, user["username"])
+    mapping = client.column_mapping if isinstance(client.column_mapping, dict) else {}
+    return {
+        "success": True,
+        "cliente_id": client_id,
+        "columnas": mapping or {},
+        "canonicos": _CANON_COLUMNS,
+        "status": _column_mapping_status(mapping),
+    }
+
+
+@app.put("/api/clientes/{client_id}/catalogo/columnas")
+async def set_client_catalogo_columnas(
+    client_id: str,
+    body: dict,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Guarda el catálogo de columnas del cliente. Body: {columnas: {header: canon}}."""
+    client = await _get_owned_client(db, client_id, user["username"])
+    raw = body.get("columnas") if isinstance(body, dict) else None
+    clean = _sanitize_column_mapping(raw or {})
+    client.column_mapping = clean or None
+    await db.commit()
+    await db.refresh(client)
+    mapping = client.column_mapping if isinstance(client.column_mapping, dict) else {}
+    return {
+        "success": True,
+        "cliente_id": client_id,
+        "columnas": mapping or {},
+        "status": _column_mapping_status(mapping),
+    }
+
+
+@app.delete("/api/clientes/{client_id}/catalogo/columnas")
+async def delete_client_catalogo_columnas(
+    client_id: str,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Borra el catálogo de columnas del cliente."""
+    client = await _get_owned_client(db, client_id, user["username"])
+    client.column_mapping = None
+    await db.commit()
+    return {
+        "success": True,
+        "cliente_id": client_id,
+        "columnas": {},
+        "status": _column_mapping_status({}),
+    }
+
+
+@app.get("/api/clientes/{client_id}/catalogo/productos")
+async def get_client_catalogo_productos(
+    client_id: str,
+    q: str | None = None,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Devuelve los productos aprendidos del cliente (ClientProductHistory)."""
+    username = user["username"]
+    await _get_owned_client(db, client_id, username)
+
+    stmt = sa_select(ClientProductHistoryModel).where(
+        ClientProductHistoryModel.owner_username == username,
+        ClientProductHistoryModel.client_id == client_id,
+    ).order_by(sa_desc(ClientProductHistoryModel.ultima_vez))
+    result = await db.execute(stmt)
+    rows = result.scalars().all()
+
+    products = [_product_history_to_dict(r) for r in rows]
+    if q:
+        qnorm = q.strip().lower()
+        products = [p for p in products if qnorm in (p["descripcion"] or "").lower()]
+
+    return {
+        "success": True,
+        "cliente_id": client_id,
+        "productos": products,
+        "total": len(products),
+    }
+
+
+@app.post("/api/clientes/{client_id}/catalogo/productos/learn")
+async def learn_client_catalogo_productos(
+    client_id: str,
+    body: dict,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Aprende/actualiza productos a partir de items de una operación."""
+    username = user["username"]
+    await _get_owned_client(db, client_id, username)
+
+    items = body.get("items") if isinstance(body, dict) else None
+    if not isinstance(items, list):
+        raise HTTPException(status_code=400, detail="Se requiere body.items como lista")
+
+    from proyecto_maria.services.client_memory import upsert_client_product_history
+
+    updated = 0
+    for item in items:
+        ncm = str(item.get("ncm") or item.get("pieza") or "").strip()
+        desc = str(item.get("descripcion") or "").strip()
+        if not ncm or not desc:
+            continue
+        try:
+            await upsert_client_product_history(
+                db,
+                owner_username=username,
+                client_id=client_id,
+                ncm=ncm,
+                descripcion=desc,
+                origen=str(item.get("origen") or "").strip() or None,
+                valor_unitario=float(item.get("valor_unitario") or 0) or None,
+                cantidad=float(item.get("cantidad") or 0) or None,
+                peso_unitario=float(item.get("peso_unitario") or 0) or None,
+            )
+            updated += 1
+        except Exception:
+            logging.exception("learn_client_catalogo_productos fallo para client_id=%s", client_id)
+
+    await db.commit()
+    return {"success": True, "cliente_id": client_id, "aprendidos": updated}
+
+
+@app.put("/api/clientes/{client_id}/catalogo/productos/{product_id}")
+async def update_client_catalogo_producto(
+    client_id: str,
+    product_id: str,
+    body: dict,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Edita un producto aprendido del cliente (NCM, origen, peso)."""
+    username = user["username"]
+    await _get_owned_client(db, client_id, username)
+
+    result = await db.execute(
+        sa_select(ClientProductHistoryModel).where(
+            ClientProductHistoryModel.id == product_id,
+            ClientProductHistoryModel.client_id == client_id,
+            ClientProductHistoryModel.owner_username == username,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+
+    if not isinstance(body, dict):
+        body = {}
+    if "ncm" in body:
+        row.ncm = str(body["ncm"]).strip()[:10]
+    if "origen" in body:
+        row.origen_frecuente = str(body["origen"]).strip()[:3] or "XX"
+    if "peso_unitario_avg" in body:
+        try:
+            row.peso_unitario_avg = float(body["peso_unitario_avg"])
+        except (TypeError, ValueError):
+            pass
+    if "descripcion" in body:
+        from proyecto_maria.core.catalog_service import _normalize as _cat_normalize
+        row.descripcion = str(body["descripcion"]).strip()
+        row.descripcion_normalizada = _cat_normalize(row.descripcion)[:200]
+
+    await db.commit()
+    await db.refresh(row)
+    return {"success": True, "producto": _product_history_to_dict(row)}
+
+
+@app.delete("/api/clientes/{client_id}/catalogo/productos/{product_id}")
+async def delete_client_catalogo_producto(
+    client_id: str,
+    product_id: str,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Elimina un producto aprendido del cliente."""
+    username = user["username"]
+    await _get_owned_client(db, client_id, username)
+
+    result = await db.execute(
+        sa_delete(ClientProductHistoryModel).where(
+            ClientProductHistoryModel.id == product_id,
+            ClientProductHistoryModel.client_id == client_id,
+            ClientProductHistoryModel.owner_username == username,
+        )
+    )
+    await db.commit()
+    if result.rowcount == 0:
+        raise HTTPException(status_code=404, detail="Producto no encontrado")
+    return {"success": True, "cliente_id": client_id, "producto_id": product_id}
+
+
 @app.get("/api/clientes/{client_id}/plantilla")
 async def download_client_template(
     client_id: str,
@@ -4778,9 +5070,18 @@ async def upload_excel_v2(
         engine = "openpyxl" if temp_filename.endswith(".xlsx") else "xlrd"
         df = pd.read_excel(temp_filename, engine=engine)
 
+        # Detectar columnas del Excel (independientemente de si el cliente ya tiene mapping)
+        detected_mapping = _detect_item_columns(list(df.columns))
+
         # Aplicar mapping renombrando columnas a canonicas antes de extraer
+        effective_mapping: dict = {}
         if mapping:
-            rename = {src: canon for src, canon in mapping.items() if canon in _CANON_COLUMNS}
+            effective_mapping = {src: canon for src, canon in mapping.items() if canon in _CANON_COLUMNS}
+        elif detected_mapping:
+            effective_mapping = detected_mapping
+
+        if effective_mapping:
+            rename = {src: canon for src, canon in effective_mapping.items() if canon in _CANON_COLUMNS}
             df = df.rename(columns=rename)
 
         items = extract_items_from_excel(df, file.filename)
@@ -4789,6 +5090,27 @@ async def upload_excel_v2(
                 status_code=400,
                 detail="No se pudieron extraer items. Verificá el archivo o el mapeo de columnas.",
             )
+
+        # Persistir/mergear columnas detectadas en el cliente (Fase 0 Plan 04)
+        catalogo_info: dict = {"columnas_detectadas": 0, "columnas_faltantes": [], "total": len(_CANON_COLUMNS)}
+        if cliente_id and use_mapping:
+            try:
+                c = await _get_owned_client(db, cliente_id, user["username"])
+                current_mapping = c.column_mapping if isinstance(c.column_mapping, dict) else {}
+                merged = _merge_column_mapping(current_mapping, detected_mapping)
+                # Solo guardar si aprendimos algo nuevo o el cliente no tenía nada.
+                if merged and merged != current_mapping:
+                    c.column_mapping = _sanitize_column_mapping(merged) or None
+                    await db.commit()
+                    await db.refresh(c)
+                # Recalcular info con el mapping final
+                final_mapping = c.column_mapping if isinstance(c.column_mapping, dict) else {}
+                detected_canons = set(final_mapping.values())
+                catalogo_info["columnas_detectadas"] = len(detected_canons & set(_CANON_COLUMNS))
+                catalogo_info["columnas_faltantes"] = [c for c in _CANON_COLUMNS if c not in detected_canons]
+                catalogo_info["completo"] = catalogo_info["columnas_detectadas"] == len(_CANON_COLUMNS)
+            except HTTPException:
+                pass
 
         # Serializar items al shape que consume review/ncm en v2
         items_data = [
@@ -4824,7 +5146,8 @@ async def upload_excel_v2(
             "items": items_data,
             "items_count": len(items_data),
             "operacion": operacion,
-            "applied_mapping": bool(mapping),
+            "applied_mapping": bool(effective_mapping),
+            "catalogo": catalogo_info,
         }
     except HTTPException:
         raise
