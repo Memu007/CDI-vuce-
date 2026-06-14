@@ -13,7 +13,8 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **feat (ux):** pestaña "Mapeo Excel" renombrada a **"Catálogo"** en el drawer del cliente. Muestra columnas reconocidas con badge (completo/parcial/sin catálogo) y la lista de productos aprendidos del cliente.
 - **feat (autofill):** en review, los ítems que matchean con el catálogo del cliente ahora también precargan el **peso unitario** y muestran el icono 📚 en el chip.
 - **feat (ui):** productos aprendidos editables inline (NCM, origen, peso) y botón "Olvidar" con confirmación.
-- **test + qa:** +5 tests de Plan 04 (aprendizaje de columnas, uso de mapping persistido, CRUD de catálogo, lookup de cliente). Smoke headless Plan 04 pasa. Suite completa **250 passed, 102 skipped**; 24 errores preexistentes por `pytest-asyncio`.
+- **fix (excel):** `extract_items_from_excel` ahora acepta `peso_unitario = 0`, permitiendo que el autofill de peso desde el catálogo del cliente funcione en la segunda operación.
+- **test + qa:** +5 tests de Plan 04 (aprendizaje de columnas, uso de mapping persistido, CRUD de catálogo, lookup de cliente). Smoke headless Plan 04 pasa (cliente → upload → catálogo aprendido → segunda planilla → autofill de origen/peso → chip 📚 en NCM). Suite completa **250 passed, 102 skipped**; 24 errores preexistentes por `pytest-asyncio`.
 
 ---
 

@@ -1,7 +1,7 @@
 # HANDOFF — CDI (vuce / CDI-app)
 
 > Estado vivo del proyecto. **La próxima AI o persona que entre lo lee primero.**
-> Última actualización: 2026-06-14 · Ola 3 en progreso: Plan 04 Catálogo unificado (versión chica) · persistencia de columnas solucionada.
+> Última actualización: 2026-06-14 · Ola 3 cerrada: Plan 04 Catálogo unificado (versión chica) · tag `v0.3-wave3` propuesto.
 
 ---
 
@@ -146,11 +146,11 @@ CDI-app/
   - Plan 02: drawer de clientes con 6 KPIs, badge `N ops`, orden por último movimiento, export CSV, expand de operaciones.
   - Plan 03: alta rápida de cliente desde review (buscador server-side + mini formulario inline).
   - Fix urgente: tabla NCM ahora muestra **Valor unitario** y **Peso unitario**.
-- **Ola 3 EN PROGRESO — Plan 04 Catálogo unificado (versión chica):**
-  - Fase 0 cerrada: persistencia de mapeo de columnas al subir Excel; nuevos endpoints `/api/clientes/{id}/catalogo/*`; pestaña "Catálogo" en drawer con columnas reconocidas + productos aprendidos; autofill de peso unitario e icono 📚 para matches de cliente.
-  - Fase 1 cerrada: edición inline de NCM/origen/peso y botón "Olvidar" para productos aprendidos.
-  - Smoke headless Plan 04 pasa: upload API → catálogo aprendido → UI muestra 6/6 columnas → persiste tras reload.
-  - Pendiente para cerrar Ola 3: smoke del flujo completo con productos (cliente nuevo → upload → aprende → generar MARIA → segunda op → reconoce) y posible fuzzy match más permisivo en review.
+- **Ola 3 CERRADA — Plan 04 Catálogo unificado (versión chica):**
+  - Fase 0: persistencia de mapeo de columnas al subir Excel; nuevos endpoints `/api/clientes/{id}/catalogo/*`; pestaña "Catálogo" en drawer con columnas reconocidas + productos aprendidos; autofill de peso unitario e icono 📚 para matches de cliente.
+  - Fase 1: edición inline de NCM/origen/peso y botón "Olvidar" para productos aprendidos.
+  - Fix: `extract_items_from_excel` acepta `peso_unitario = 0` para que el autofill de peso del catálogo del cliente pueda dispararse en la segunda operación.
+  - Smoke end-to-end navegador pasa: cliente nuevo → aprender producto → segunda planilla con origen XX y peso 0 → review muestra origen CN y peso 1.5 con `__autofillSource: 'cliente'` → NCM muestra chip 📚.
 - **Mantenimiento pendiente:**
   - Vulnerabilidades de dependencias documentadas en `docs/maintenance/vulnerabilidades_pendientes.md` (`requests`, `pdfminer.six`, `starlette`). Prioridad media; atacar en ventana tranquila.
 - **Plan 03 cerrado (Ola 2):** endpoint `/api/clientes/search?q=` para búsqueda server-side; picker con debounce; botón **+ Nuevo cliente** en review con mini formulario inline para alta rápida de cliente desde la operación.
