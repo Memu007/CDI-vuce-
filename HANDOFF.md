@@ -1,7 +1,7 @@
 # HANDOFF — CDI (vuce / CDI-app)
 
 > Estado vivo del proyecto. **La próxima AI o persona que entre lo lee primero.**
-> Última actualización: 2026-06-14 · Plan 02 cerrado + smoke headless OK · Ola 2 en curso.
+> Última actualización: 2026-06-14 · Ola 2 cerrada + tag `v0.2-wave2` · Ola 3 por definir.
 
 ---
 
@@ -142,6 +142,15 @@ CDI-app/
 - Catálogo de proveedor en disco (`product_catalog.json`) se reinicia con cada deploy. El histórico por cliente (DB) sí persiste.
 - Generador MARIA TXT: validado contra un golden file real del despachante (op 001790125). Hay test de regresión golden anonimizado en `tests/test_generar_maria_txt.py` + `tests/fixtures/maria_golden_anon.TXT` (33 tests del generador). Resto del repo: solo smoke + pytest parcial.
 - **Novedades ARCA:** widget en Upload con endpoint `/api/arca/novedades` (público, cache 15 min). Fuente real de ARCA/AFIP.
+- **Ola 2 CERRADA** (tag `v0.2-wave2`):
+  - Plan 02: drawer de clientes con 6 KPIs, badge `N ops`, orden por último movimiento, export CSV, expand de operaciones.
+  - Plan 03: alta rápida de cliente desde review (buscador server-side + mini formulario inline).
+  - Fix urgente: tabla NCM ahora muestra **Valor unitario** y **Peso unitario**.
+- **Ola 3 POR DEFINIR**:
+  - Opción recomendada: Plan 04 **Catálogo unificado** (`plans/04_catalogo_unificado.plan.md`) — aprendizaje automático de columnas Excel y productos por cliente, autofill silencioso en review. Es la más grande hasta ahora (~4-5h).
+  - Alternativas a discutir: maintenance de dependencias vulnerables (`docs/maintenance/vulnerabilidades_pendientes.md`), onboarding de nuevos usuarios, o mejoras de cobro/billing.
+- **Mantenimiento pendiente:**
+  - Vulnerabilidades de dependencias documentadas en `docs/maintenance/vulnerabilidades_pendientes.md` (`requests`, `pdfminer.six`, `starlette`). Prioridad media; atacar en ventana tranquila.
 - **Plan 03 cerrado (Ola 2):** endpoint `/api/clientes/search?q=` para búsqueda server-side; picker con debounce; botón **+ Nuevo cliente** en review con mini formulario inline para alta rápida de cliente desde la operación.
 - **Fix urgente tabla NCM:** ahora muestra **Valor unitario** y **Peso unitario** junto con Ref./Descripción/Origen/Cant/Código NCM.
 - **Plan 02 cerrado (Ola 2):** drawer de clientes con 6 KPIs (operaciones/ítems/promedio/origen frecuente/valor/última), orden por último movimiento, badge `N ops`, export CSV backend, expand de operaciones. Smoke headless de Plan 02 pasa.

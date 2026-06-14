@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-14 · Cierre Ola 2 + tag `v0.2-wave2`
+
+- **docs:** creado `docs/maintenance/vulnerabilidades_pendientes.md` con dependencias vulnerables detectadas (`requests`, `pdfminer.six`, `starlette`) y plan de ataque.
+- **tag:** `v0.2-wave2` apunta al cierre de Plan 02 y Plan 03.
+
+---
+
 ## 2026-06-14 · Plan 03: Alta de cliente desde operación + fix tabla NCM (Ola 2)
 
 - **feat (clientes):** endpoint `GET /api/clientes/search?q=` para búsqueda server-side por nombre o CUIT parcial.
