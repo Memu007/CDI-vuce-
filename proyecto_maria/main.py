@@ -505,6 +505,8 @@ async def _migrate_sync_operations_columns():
         ("total_value", "FLOAT DEFAULT 0.0"),
         ("total_weight", "FLOAT DEFAULT 0.0"),
         ("processing_time_ms", "INTEGER"),
+        ("estado", "VARCHAR(20) DEFAULT 'borrador'"),
+        ("canal", "VARCHAR(10)"),
         ("extra", "TEXT" if IS_SQLITE else "JSON"),
         ("owner_username", "VARCHAR(50)"),
     ]
@@ -4145,6 +4147,133 @@ async def get_client_operations(
             status_code=500,
             detail="No se pudo cargar el historial del cliente. Probá de nuevo o avisame.",
         )
+
+
+# --- COCKPIT DE OPERACIONES ---
+# Estados del despacho (hitos) en orden de avance. El despachante los va
+# marcando a mano (no hay integracion VUCE todavia).
+COCKPIT_ESTADOS = ["borrador", "oficializada", "canal", "liberada"]
+COCKPIT_CANALES = ["verde", "naranja", "rojo"]
+
+
+@app.get("/api/operations")
+async def list_operations(
+    estado: str = None,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lista todas las operaciones del despachante para el cockpit.
+
+    Tablero unico: estado, canal, cliente, totales y fechas. Filtra por
+    `estado` si se pasa. Siempre acotado al owner logueado (aislamiento).
+    """
+    username = user["username"]
+    try:
+        query = (
+            sa_select(OperationModel, ClientModel.name)
+            .outerjoin(ClientModel, OperationModel.client_id == ClientModel.id)
+            .where(OperationModel.owner_username == username)
+        )
+        if estado and estado in COCKPIT_ESTADOS:
+            query = query.where(OperationModel.estado == estado)
+        query = query.order_by(sa_desc(OperationModel.created_at)).limit(200)
+
+        rows = (await db.execute(query)).all()
+
+        # Conteo por estado para los chips del cockpit
+        counts = {e: 0 for e in COCKPIT_ESTADOS}
+        count_rows = (
+            await db.execute(
+                sa_select(OperationModel.estado, sa_func.count(OperationModel.id))
+                .where(OperationModel.owner_username == username)
+                .group_by(OperationModel.estado)
+            )
+        ).all()
+        for est, n in count_rows:
+            counts[est or "borrador"] = counts.get(est or "borrador", 0) + n
+
+        return {
+            "success": True,
+            "counts": counts,
+            "total": sum(counts.values()),
+            "operaciones": [
+                {
+                    "id": op.id,
+                    "op_code": op.op_code,
+                    "cliente": client_name or "Sin cliente",
+                    "estado": op.estado or "borrador",
+                    "canal": op.canal,
+                    "fecha": op.created_at.isoformat() if op.created_at else None,
+                    "total_items": op.total_items,
+                    "total_value": op.total_value,
+                    "currency": op.currency,
+                    "generated_file": op.generated_file,
+                }
+                for op, client_name in rows
+            ],
+        }
+    except Exception as exc:
+        await db.rollback()
+        logging.exception("list_operations failed owner=%s: %s", username, exc)
+        raise HTTPException(
+            status_code=500,
+            detail="No se pudo cargar el tablero de operaciones. Probá de nuevo.",
+        )
+
+
+@app.patch("/api/operations/{operation_id}/estado")
+async def update_operation_estado(
+    operation_id: str,
+    request: Request,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Actualiza el estado/canal de una operación (solo del owner).
+
+    Body: { estado?: str, canal?: str }. Valida contra las listas permitidas.
+    """
+    username = user["username"]
+    try:
+        data = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="Body JSON inválido")
+
+    nuevo_estado = (data.get("estado") or "").strip().lower() or None
+    nuevo_canal = (data.get("canal") or "").strip().lower() or None
+
+    if nuevo_estado and nuevo_estado not in COCKPIT_ESTADOS:
+        raise HTTPException(status_code=400, detail=f"Estado inválido: {nuevo_estado}")
+    if nuevo_canal and nuevo_canal not in COCKPIT_CANALES:
+        raise HTTPException(status_code=400, detail=f"Canal inválido: {nuevo_canal}")
+
+    result = await db.execute(
+        sa_select(OperationModel).where(
+            OperationModel.id == operation_id,
+            OperationModel.owner_username == username,
+        )
+    )
+    op = result.scalars().first()
+    if not op:
+        raise HTTPException(status_code=404, detail="Operación no encontrada")
+
+    if nuevo_estado:
+        op.estado = nuevo_estado
+    if nuevo_canal is not None:
+        op.canal = nuevo_canal
+
+    try:
+        await db.commit()
+    except Exception as exc:
+        await db.rollback()
+        logging.exception("update_operation_estado failed id=%s: %s", operation_id, exc)
+        raise HTTPException(status_code=500, detail="No se pudo guardar el cambio.")
+
+    return {
+        "success": True,
+        "id": op.id,
+        "estado": op.estado,
+        "canal": op.canal,
+    }
 
 
 @app.post("/api/clientes/{client_id}/operaciones")

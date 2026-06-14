@@ -732,6 +732,9 @@
                 if (typeof CDI.openClientesDrawer === 'function') {
                     CDI.openClientesDrawer();
                 }
+            } else if (action === 'go-cockpit') {
+                e.preventDefault();
+                goTo('cockpit');
             }
         });
 

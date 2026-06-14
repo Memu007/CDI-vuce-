@@ -162,6 +162,11 @@ class Operation(Base):
     total_weight = Column(Float, default=0.0)
     processing_time_ms = Column(Integer, nullable=True)
 
+    # Cockpit: estado del despacho (borrador -> oficializada -> canal -> liberada)
+    estado = Column(String(20), default="borrador")
+    # Canal aduanero asignado: verde / naranja / rojo (None hasta oficializar)
+    canal = Column(String(10), nullable=True)
+
     # Blob flexible para datos auxiliares (resumen, items snapshot, etc.)
     extra = Column(JSON, nullable=True)
 

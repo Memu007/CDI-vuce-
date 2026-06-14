@@ -6,6 +6,16 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-14 · Cockpit de operaciones + seguridad S1/S3 (Ola 1)
+
+- **feat (cockpit):** nuevo tablero `Operaciones` en el dashboard v2 — lista todas las operaciones del despachante con estado editable (borrador → oficializada → canal → liberada), canal aduanero (verde/naranja/rojo), cliente, ítems, valor y fecha. Filtros por estado con contadores. Reemplaza el Excel de seguimiento. Endpoints `GET /api/operations` y `PATCH /api/operations/{id}/estado` (aislados por owner). Nuevas columnas `operations.estado` y `operations.canal` (migración idempotente).
+- **fix (seguridad S1):** eliminados endpoints legacy de pagos sin auth (`/api/payments/create-preference` que aceptaba username del body → checkout cruzado; y los `/api/payments/bitcoin/*` demo). El checkout real sigue siendo `/api/billing/checkout` (autenticado).
+- **fix (seguridad S3):** los 5 endpoints `/api/dev/*` (stats, kpis, run-migrations, etc.) ahora exigen rol admin vía nueva dependencia `require_admin` (env `ADMIN_USERNAMES` o rol en DB). El user `demo` es admin en dev.
+- **verificado:** el dólar BNA/Blue del topbar ya funcionaba (módulo "datos vivos" OK).
+- **test:** +27 tests nuevos (`test_seguridad_s1_s3.py`, `test_cockpit.py` con aislamiento multi-tenant). Suite: **256 passed, ~12s**.
+
+---
+
 ## 2026-06-10 · MercadoPago real: vuelta del checkout cerrada (Bloque 5, parte 1)
 
 - **feat (billing):** la preference de `/api/billing/checkout` ahora incluye `back_urls` (vuelve a `/v2?billing=success|failure|pending`), y con `FRONTEND_URL` https agrega `auto_return=approved` + `notification_url` al webhook. Antes el user pagaba y quedaba varado en MP.

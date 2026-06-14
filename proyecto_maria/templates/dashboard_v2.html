@@ -27,6 +27,7 @@
 
             <nav class="topbar-nav">
                 <button class="btn btn-ghost" data-action="go-upload">Nueva operación</button>
+                <button class="btn btn-ghost" data-action="go-cockpit">Operaciones</button>
                 <button class="btn btn-ghost" data-action="go-clientes">Clientes</button>
             </nav>
 
@@ -583,6 +584,49 @@
                     </div>
 
                     <div id="readyError" class="upload-error" hidden role="alert"></div>
+                </div>
+            </section>
+
+            <section class="screen" data-screen="cockpit">
+                <div class="ck-shell">
+                    <header class="ck-header">
+                        <div class="ck-header-titles">
+                            <h1 class="title-1">Operaciones</h1>
+                            <p class="subtitle">Todas tus operaciones en un tablero. Marcá el estado a medida que avanzan.</p>
+                        </div>
+                        <div class="ck-header-actions">
+                            <button type="button" class="btn btn-primary" data-action="go-upload">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                Nueva operación
+                            </button>
+                        </div>
+                    </header>
+
+                    <div class="ck-filters" id="ckFilters" role="tablist" aria-label="Filtrar por estado"></div>
+
+                    <div class="ck-loading" id="ckLoading" hidden>Cargando operaciones…</div>
+                    <div class="ck-error" id="ckError" hidden role="alert"></div>
+                    <div class="ck-empty" id="ckEmpty" hidden>
+                        <p>Todavía no hay operaciones.</p>
+                        <button type="button" class="btn btn-primary" data-action="go-upload">Crear la primera</button>
+                    </div>
+
+                    <div class="ck-table-wrap" id="ckTableWrap" hidden>
+                        <table class="ck-table">
+                            <thead>
+                                <tr>
+                                    <th>Operación</th>
+                                    <th>Cliente</th>
+                                    <th>Estado</th>
+                                    <th>Canal</th>
+                                    <th>Ítems</th>
+                                    <th>Valor</th>
+                                    <th>Fecha</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ckTableBody"></tbody>
+                        </table>
+                    </div>
                 </div>
             </section>
 
@@ -1305,6 +1349,7 @@
     <script src="/static/v2/app_v2.js?v={{ version }}" defer></script>
     <script src="/static/v2/topbar_financials.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/semaforo.js?v={{ version }}" defer></script>
+    <script src="/static/v2/screens/cockpit.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/clientes.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/cliente_picker.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/catalogo.js?v={{ version }}" defer></script>
