@@ -1,7 +1,7 @@
 # HANDOFF — CDI (vuce / CDI-app)
 
 > Estado vivo del proyecto. **La próxima AI o persona que entre lo lee primero.**
-> Última actualización: 2026-06-14 · Ola 2 cerrada + tag `v0.2-wave2` · Ola 3 por definir.
+> Última actualización: 2026-06-14 · Ola 3 en progreso: Plan 04 Catálogo unificado (versión chica) · persistencia de columnas solucionada.
 
 ---
 
@@ -139,23 +139,23 @@ CDI-app/
 - VUCE en `modo_fake=true` por default. Para prod real hay que conectar API real o cliente HTTP a Tarifar.
 - Sin `GEMINI_API_KEY` la subida de PDF falla.
 - No hay rol admin formal — cualquier usuario logueado ve `/dev/dashboard`.
-- Catálogo de proveedor en disco (`product_catalog.json`) se reinicia con cada deploy. El histórico por cliente (DB) sí persiste.
+- Catálogo de proveedor en disco (`product_catalog.json`) se reinicia con cada deploy. El histórico por cliente (DB) sí persiste. **Fix reciente (Plan 04 v0):** al subir Excel con `cliente_id`, el mapeo de columnas ahora se detecta y guarda en `Client.column_mapping` (antes se usaba pero no se persistía).
 - Generador MARIA TXT: validado contra un golden file real del despachante (op 001790125). Hay test de regresión golden anonimizado en `tests/test_generar_maria_txt.py` + `tests/fixtures/maria_golden_anon.TXT` (33 tests del generador). Resto del repo: solo smoke + pytest parcial.
 - **Novedades ARCA:** widget en Upload con endpoint `/api/arca/novedades` (público, cache 15 min). Fuente real de ARCA/AFIP.
 - **Ola 2 CERRADA** (tag `v0.2-wave2`):
   - Plan 02: drawer de clientes con 6 KPIs, badge `N ops`, orden por último movimiento, export CSV, expand de operaciones.
   - Plan 03: alta rápida de cliente desde review (buscador server-side + mini formulario inline).
   - Fix urgente: tabla NCM ahora muestra **Valor unitario** y **Peso unitario**.
-- **Ola 3 POR DEFINIR**:
-  - Opción recomendada: Plan 04 **Catálogo unificado** (`plans/04_catalogo_unificado.plan.md`) — aprendizaje automático de columnas Excel y productos por cliente, autofill silencioso en review. Es la más grande hasta ahora (~4-5h).
-  - Alternativas a discutir: maintenance de dependencias vulnerables (`docs/maintenance/vulnerabilidades_pendientes.md`), onboarding de nuevos usuarios, o mejoras de cobro/billing.
+- **Ola 3 EN PROGRESO — Plan 04 Catálogo unificado (versión chica):**
+  - Fase 0 cerrada: persistencia de mapeo de columnas al subir Excel; nuevos endpoints `/api/clientes/{id}/catalogo/*`; pestaña "Catálogo" en drawer con columnas reconocidas + productos aprendidos; autofill de peso unitario e icono 📚 para matches de cliente.
+  - Pendiente para cerrar Ola 3: smoke headless de flujo completo (cliente nuevo → upload → aprende → segunda op → reconoce), edición/olvidar de productos aprendidos desde UI, y posible fuzzy match más permisivo en review.
 - **Mantenimiento pendiente:**
   - Vulnerabilidades de dependencias documentadas en `docs/maintenance/vulnerabilidades_pendientes.md` (`requests`, `pdfminer.six`, `starlette`). Prioridad media; atacar en ventana tranquila.
 - **Plan 03 cerrado (Ola 2):** endpoint `/api/clientes/search?q=` para búsqueda server-side; picker con debounce; botón **+ Nuevo cliente** en review con mini formulario inline para alta rápida de cliente desde la operación.
 - **Fix urgente tabla NCM:** ahora muestra **Valor unitario** y **Peso unitario** junto con Ref./Descripción/Origen/Cant/Código NCM.
 - **Plan 02 cerrado (Ola 2):** drawer de clientes con 6 KPIs (operaciones/ítems/promedio/origen frecuente/valor/última), orden por último movimiento, badge `N ops`, export CSV backend, expand de operaciones. Smoke headless de Plan 02 pasa.
 - **Fix reciente:** corregido `exportClientCsv is not defined` que rompía la apertura del drawer al hacer click en Exportar CSV (`clientes.js`).
-- **Tests:** suite completa **245 passed, 102 skipped**; 24 errores preexistentes por compatibilidad de `pytest-asyncio` en `tests/security/test_security.py` y `tests/test_seo.py` (no relacionados con cambios recientes). Smoke NCM y Plan 03 pasan con PDFs reales usando Gemini.
+- **Tests:** suite completa **250 passed, 102 skipped**; 24 errores preexistentes por compatibilidad de `pytest-asyncio` en `tests/security/test_security.py` y `tests/test_seo.py` (no relacionados con cambios recientes). Smoke `smoke_friccion.sh` pasa local.
 - **Ola 1 cerrada:** Cockpit + S1/S3 + upload.js race fix + Novedades ARCA + UX Plan 01.
 - **Leak conocido `[SBT]`:** el sufijo `CSBTSVL` por default trae `AA(VOWYNNS)` (cliente del sample). Para otros clientes sale ese dato ajeno. Ya es parámetro (`sbt_sufijo_valor`) pero falta la regla real por importador (qué son `AB(...)` y `CA00`) → pendiente de confirmar con el despachante.
 - Pendiente despachante: confirmar si `DDDTVENEMB` (fecha embarque) es obligatorio para el Kit SIM.

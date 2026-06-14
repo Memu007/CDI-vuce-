@@ -6,6 +6,16 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-14 · Plan 04: Catálogo unificado — versión chica (Ola 3)
+
+- **fix (persistencia):** al subir un Excel con `cliente_id`, el backend ahora detecta y **persiste** el mapeo de columnas en `Client.column_mapping`. Antes se usaba para leer pero nunca se guardaba, por eso "se borraba al cerrar sesión".
+- **feat (api):** nuevos endpoints `/api/clientes/{id}/catalogo/columnas` (GET/PUT/DELETE) y `/api/clientes/{id}/catalogo/productos` (GET/PUT/DELETE/learn). Los viejos `/column_mapping` siguen funcionando como aliases.
+- **feat (ux):** pestaña "Mapeo Excel" renombrada a **"Catálogo"** en el drawer del cliente. Muestra columnas reconocidas con badge (completo/parcial/sin catálogo) y la lista de productos aprendidos del cliente.
+- **feat (autofill):** en review, los ítems que matchean con el catálogo del cliente ahora también precargan el **peso unitario** y muestran el icono 📚 en el chip.
+- **test + qa:** +5 tests de Plan 04 (aprendizaje de columnas, uso de mapping persistido, CRUD de catálogo, lookup de cliente). Suite completa **250 passed, 102 skipped**; 24 errores preexistentes por `pytest-asyncio`.
+
+---
+
 ## 2026-06-14 · Cierre Ola 2 + tag `v0.2-wave2`
 
 - **docs:** creado `docs/maintenance/vulnerabilidades_pendientes.md` con dependencias vulnerables detectadas (`requests`, `pdfminer.six`, `starlette`) y plan de ataque.
