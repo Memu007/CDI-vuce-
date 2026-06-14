@@ -843,6 +843,37 @@
         const btnCrear = el.querySelector('[data-banner-crear]');
         const btnAsignar = el.querySelector('[data-banner-asignar]');
         const btnIgn = el.querySelector('[data-banner-ignorar]');
+        const btnNuevo = el.querySelector('[data-banner-nuevo]');
+        const quickForm = document.getElementById('reviewQuickClientForm');
+        if (btnNuevo && quickForm) {
+            btnNuevo.onclick = () => {
+                CDI.track && CDI.track('importador_quick_form_open');
+                quickForm.hidden = false;
+                btnNuevo.hidden = true;
+                const nombreInput = quickForm.querySelector('[name="nombre"]');
+                const cuitInput = quickForm.querySelector('[name="cuit"]');
+                if (nombreInput) nombreInput.value = nom || '';
+                if (cuitInput && cDigits) cuitInput.value = CDI.formatCuit ? CDI.formatCuit(cDigits) : cDigits;
+                setTimeout(() => { if (nombreInput) nombreInput.focus(); }, 50);
+            };
+            const btnCancel = quickForm.querySelector('[data-banner-nuevo-cancel]');
+            if (btnCancel) {
+                btnCancel.onclick = () => {
+                    quickForm.hidden = true;
+                    if (btnNuevo) btnNuevo.hidden = false;
+                };
+            }
+            quickForm.onsubmit = (ev) => {
+                ev.preventDefault();
+                const nombreInput = quickForm.querySelector('[name="nombre"]');
+                const cuitInput = quickForm.querySelector('[name="cuit"]');
+                const formData = {
+                    nombre: (nombreInput && nombreInput.value || '').trim(),
+                    cuit: CDI.normalizeCuit && cuitInput ? CDI.normalizeCuit(cuitInput.value) : ''
+                };
+                crearClienteDesdeForm(formData, quickForm);
+            };
+        }
         if (btnCrear) {
             btnCrear.onclick = () => crearClienteDesdeBanner(data, btnCrear);
         }
@@ -937,6 +968,67 @@
             console.warn('[review] crear cliente banner', err && err.message);
         } finally {
             if (btn) btn.disabled = false;
+        }
+    }
+
+    async function crearClienteDesdeForm(data, formEl) {
+        const nombre = String((data && data.nombre) || '').trim();
+        const cuit = CDI.normalizeCuit && CDI.normalizeCuit(data && data.cuit);
+        if (!nombre) {
+            CDI.toast && CDI.toast('Falta nombre', 'La razón social es obligatoria.', 'error');
+            return;
+        }
+        const submitBtn = formEl && formEl.querySelector('button[type="submit"]');
+        if (submitBtn) submitBtn.disabled = true;
+        try {
+            const existente = (cuit && cuit.length === 11) ? await lookupClienteByCuit(cuit) : null;
+            if (existente) {
+                const ok = await CDI.confirm({
+                    title: 'Cliente ya existente',
+                    lead: 'Ya tenés a "' + (existente.nombre || 'este cliente') + '" con este CUIT.',
+                    text: '¿Usar este cliente en la operación?',
+                    acceptText: 'Usar cliente',
+                    cancelText: 'No por ahora',
+                    kind: 'info',
+                });
+                if (ok) {
+                    CDI.setClienteActivo(existente);
+                    try { sessionStorage.removeItem(_PENDING_IMPORTADOR_KEY); } catch (_) {}
+                    hidePendingImporterBanner();
+                    populate();
+                    showReviewClientSuccess('Cliente asignado a esta operación', (existente.nombre || 'El cliente') + ' quedó asociado.');
+                }
+                return;
+            }
+            const body = { nombre: nombre };
+            if (cuit && cuit.length === 11) body.cuit = cuit;
+            const res = await CDI.api('/api/clientes', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            const out = await res.json().catch(() => ({}));
+            if (!res.ok || !out.success || !out.cliente) {
+                const det = humanizeApiError(out.detail, 'No se pudo crear el cliente');
+                CDI.toast && CDI.toast('No se pudo crear', det, 'error');
+                return;
+            }
+            CDI.clientesCache = [];
+            CDI.setClienteActivo(out.cliente);
+            try { sessionStorage.removeItem(_PENDING_IMPORTADOR_KEY); } catch (_) {}
+            hidePendingImporterBanner();
+            populate();
+            showReviewClientSuccess(
+                'Cliente creado con éxito',
+                (out.cliente.nombre || nombre) + ' quedó asociado a esta operación.'
+            );
+            CDI.toast && CDI.toast('Listo', 'Cliente guardado y activado', 'success');
+            CDI.track && CDI.track('importador_form_create_ok', { has_cuit: !!body.cuit });
+        } catch (err) {
+            CDI.toast && CDI.toast('Error', 'Podés cargarlo desde la pantalla Clientes.', 'error');
+            console.warn('[review] crear cliente form', err && err.message);
+        } finally {
+            if (submitBtn) submitBtn.disabled = false;
         }
     }
 

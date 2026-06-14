@@ -6,7 +6,23 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-14 · Plan 03: Alta de cliente desde operación + fix tabla NCM (Ola 2)
+
+- **feat (clientes):** endpoint `GET /api/clientes/search?q=` para búsqueda server-side por nombre o CUIT parcial.
+- **feat (ux):** picker de clientes ahora busca en el servidor con debounce (≥2 caracteres) en lugar de cargar toda la lista.
+- **feat (review):** botón **+ Nuevo cliente** en el banner de importador desconocido; abre mini formulario inline para crear/editar cliente sin salir de la pantalla.
+- **fix (ncm):** tabla de asignación de NCM ahora muestra **Valor unitario** y **Peso unitario** además de las columnas previas. El origen ya se mostraba cuando el PDF lo extrae correctamente.
+- **test + qa:** +5 tests de `/api/clientes/search`; smoke Plan 03 pasa (alta desde review); smoke tabla NCM pasa con PDF real. Suite completa **245 passed, 102 skipped**.
+
+---
+
 ## 2026-06-14 · Plan 02: Clientes drawer polish (Ola 2)
+
+- **feat (clientes):** endpoint `GET /api/clientes/search?q=` para búsqueda server-side por nombre o CUIT parcial.
+- **feat (ux):** picker de clientes ahora busca en el servidor con debounce (≥2 caracteres) en lugar de cargar toda la lista.
+- **feat (review):** botón **+ Nuevo cliente** en el banner de importador desconocido; abre mini formulario inline para crear/editar cliente sin salir de la pantalla.
+- **fix (ncm):** tabla de asignación de NCM ahora muestra **Valor unitario** y **Peso unitario** además de las columnas previas. El origen ya se mostraba cuando el PDF lo extrae correctamente.
+- **test + qa:** +5 tests de `/api/clientes/search`; smoke Plan 03 pasa (alta desde review); smoke tabla NCM pasa con PDF real. Suite completa **245 passed, 102 skipped**.
 
 - **feat (clientes):** 6 mejoras en el drawer de clientes:
   1. Lista ordenada por favorito + último movimiento DESC + nombre ASC.

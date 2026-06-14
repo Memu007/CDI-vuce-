@@ -190,10 +190,27 @@
                             <div class="review-pending-importador-strong" data-banner-title></div>
                             <div class="review-pending-importador-sub" data-banner-subtitle></div>
                             <div class="review-pending-importador-actions">
-                                <button type="button" class="btn btn-secondary btn-sm" data-banner-ignorar>No por ahora</button>
+                                <button type="button" class="btn btn-ghost btn-sm" data-banner-ignorar>No por ahora</button>
                                 <button type="button" class="btn btn-secondary btn-sm" data-banner-asignar>Asignar a uno existente</button>
                                 <button type="button" class="btn btn-primary btn-sm" data-banner-crear>Crear cliente y usar</button>
+                                <button type="button" class="btn btn-primary btn-sm" data-banner-nuevo>+ Nuevo cliente</button>
                             </div>
+                            <form id="reviewQuickClientForm" class="review-quick-client-form" hidden>
+                                <div class="rqcf-grid">
+                                    <div class="field">
+                                        <label class="field-label" for="rqcfNombre">Razón social</label>
+                                        <input class="input" type="text" id="rqcfNombre" name="nombre" autocomplete="off">
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="rqcfCuit">CUIT</label>
+                                        <input class="input" type="text" id="rqcfCuit" name="cuit" placeholder="XX-XXXXXXXX-X" inputmode="numeric" autocomplete="off">
+                                    </div>
+                                </div>
+                                <div class="rqcf-actions">
+                                    <button type="button" class="btn btn-ghost btn-sm" data-banner-nuevo-cancel>Cancelar</button>
+                                    <button type="submit" class="btn btn-primary btn-sm">Guardar y usar</button>
+                                </div>
+                            </form>
                         </div>
                         <div id="reviewClientSuccess" class="client-success-card" hidden aria-live="polite">
                             <strong data-client-success-title></strong>
@@ -475,6 +492,8 @@
                                     <th class="col-desc">Descripción</th>
                                     <th class="col-pais">Origen</th>
                                     <th class="col-cant">Cant</th>
+                                    <th class="col-valor">Valor unit.</th>
+                                    <th class="col-peso">Peso unit.</th>
                                     <th class="col-ncm">Código NCM</th>
                                     <th class="col-actions"></th>
                                 </tr>

@@ -1,5 +1,5 @@
 # admin_router imported at line 58
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Header, Request, Response, BackgroundTasks
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Header, Request, Response, BackgroundTasks, Query
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
@@ -3296,7 +3296,7 @@ from proyecto_maria.database.models import (
     NCMNote as NCMNoteModel,
     ClientProductHistory as ClientProductHistoryModel,
 )
-from sqlalchemy import delete as sa_delete, select as sa_select, func as sa_func, desc as sa_desc
+from sqlalchemy import delete as sa_delete, select as sa_select, func as sa_func, desc as sa_desc, or_ as sa_or
 
 
 def _client_to_dict(c: ClientModel) -> dict:
@@ -3728,6 +3728,50 @@ async def get_cliente_por_cuit(
         if cand == needle:
             return {"success": True, "match": "exact", "cliente": _client_to_dict(row)}
     return {"success": True, "match": "none"}
+
+
+@app.get("/api/clientes/search")
+async def search_clientes(
+    q: str = Query(..., min_length=1, max_length=100),
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Búsqueda rápida de clientes por nombre similar o CUIT parcial.
+
+    Usada desde el picker de clientes (operación huérfana, asignar en revisión,
+    etc.) para evitar cargar toda la lista cuando hay muchos clientes.
+    """
+    username = user["username"]
+    q_raw = (q or "").strip()
+    if not q_raw:
+        raise HTTPException(status_code=400, detail="Query vacía")
+    q_norm = q_raw.lower()
+    digit_q = _digits_only(q_norm, 20)
+
+    filters = []
+    # Filtro por nombre (contains case-insensitive)
+    filters.append(ClientModel.name.ilike(f"%{q_norm}%"))
+    # Filtro por CUIT parcial (ignora guiones/espacios)
+    if digit_q:
+        cuit_digits = sa_func.replace(sa_func.replace(ClientModel.cuit, "-", ""), " ", "")
+        filters.append(cuit_digits.contains(digit_q))
+
+    result = await db.execute(
+        sa_select(ClientModel)
+        .where(
+            ClientModel.owner_username == username,
+            ClientModel.is_active == True,  # noqa: E712
+            sa_or(*filters),
+        )
+        .order_by(ClientModel.name.asc())
+        .limit(50)
+    )
+    rows = result.scalars().all()
+    return {
+        "success": True,
+        "query": q_raw,
+        "clientes": [_client_to_dict(c) for c in rows],
+    }
 
 
 def _normalize_header(h: str) -> str:

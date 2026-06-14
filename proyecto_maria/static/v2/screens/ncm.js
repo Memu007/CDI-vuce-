@@ -393,12 +393,16 @@
         const ref = CDI.escapeHtml(it.codigo_parte || '—');
         const origen = CDI.escapeHtml(it.origen || '—');
         const cantidad = it.cantidad != null ? Number(it.cantidad) : '';
+        const valorUnitario = Number(it.valor_unitario || 0);
+        const pesoUnitario = Number(it.peso_unitario || 0);
         const piezaFmt = (CDI.formatNcm ? CDI.formatNcm(pieza) : pieza);
         const ncmValue = CDI.escapeHtml(piezaFmt);
         const assistText = isOk ? 'Cambiar' : 'Asistente';
         const notesPill = renderNotesPill(pieza, i);
         const checked = selectedRows.has(i) ? ' checked' : '';
         const autofillChip = renderAutofillChip(it);
+        const fmtMoney = (v) => v ? '$' + v.toLocaleString('es-AR', { maximumFractionDigits: 2 }) : '—';
+        const fmtPeso = (v) => v ? v.toLocaleString('es-AR', { maximumFractionDigits: 2 }) + ' kg' : '—';
         return (
             '<tr class="' + rowClass + '" data-row="' + i + '" data-index="' + i + '">' +
                 '<td class="col-check"><input type="checkbox" class="ncm-row-check" data-row-check="' + i + '"' + checked + ' aria-label="Seleccionar item ' + (i + 1) + '"></td>' +
@@ -407,6 +411,8 @@
                 '<td class="col-desc">' + desc + '</td>' +
                 '<td class="col-pais">' + origen + '</td>' +
                 '<td class="col-cant">' + cantidad + '</td>' +
+                '<td class="col-valor">' + fmtMoney(valorUnitario) + '</td>' +
+                '<td class="col-peso">' + fmtPeso(pesoUnitario) + '</td>' +
                 '<td class="col-ncm">' +
                     '<div class="ncm-cell">' +
                         '<input class="ncm-input" type="text" placeholder="- - - -"' +

@@ -1,26 +1,23 @@
 /* ============================================================
-   CDI v2 — Cliente Picker (modal-overlay reusable)
-
-   Selector chico de clientes con buscador en vivo. Lo usan:
-   - Banner de revisión: "Asignar a uno existente"
-   - Panel "operación huérfana" en pantalla Listo
+   CDI v2 — Cliente Picker con búsqueda server-side (Plan 03)
 
    API:
      CDI.openClientePicker({
          title:      'Asignar a un cliente existente',
          subtitle:   'Buscá por nombre o CUIT',
-         onSelect:   function(cliente) {...},   // requerido
-         onCancel:   function() {...},          // opcional
-         excludeIds: [],                        // opcional
+         onSelect:   function(cliente) {...},
+         onCancel:   function() {...},
+         excludeIds: [],
      });
 
-   Implementación: overlay full-screen con backdrop, modal centrado, ESC
-   y click afuera cierran. Usa CDI.clientesCache si está; si no, fetch.
+   Si el usuario escribe ≥2 caracteres, busca en /api/clientes/search.
+   Si borra, vuelve a mostrar todos los clientes cacheados.
    ============================================================ */
 (function () {
     'use strict';
     const CDI = window.CDI = window.CDI || {};
     let activePicker = null;
+    const DEBOUNCE_MS = 180;
 
     function escapeHtml(s) {
         if (CDI.escapeHtml) return CDI.escapeHtml(s);
@@ -48,8 +45,7 @@
         }
     }
 
-    async function loadClientes() {
-        // Cache primero
+    async function loadAllClientes() {
         if (Array.isArray(CDI.clientesCache) && CDI.clientesCache.length) {
             return CDI.clientesCache.slice();
         }
@@ -60,6 +56,17 @@
             const list = Array.isArray(data && data.clientes) ? data.clientes : [];
             CDI.clientesCache = list;
             return list.slice();
+        } catch (_) {
+            return [];
+        }
+    }
+
+    async function searchServer(query) {
+        try {
+            const res = await CDI.api('/api/clientes/search?q=' + encodeURIComponent(query));
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) return [];
+            return Array.isArray(data && data.clientes) ? data.clientes : [];
         } catch (_) {
             return [];
         }
@@ -76,20 +83,11 @@
         );
     }
 
-    function applyFilter(query, allClientes, listEl, emptyEl) {
-        const q = normalize(query);
-        let visibles = allClientes;
-        if (q) {
-            visibles = allClientes.filter(c => {
-                const n = normalize(c.nombre || c.name);
-                const u = normalize(c.cuit).replace(/-/g, '');
-                return n.indexOf(q) !== -1 || u.indexOf(q.replace(/-/g, '')) !== -1;
-            });
-        }
+    function renderList(visibles, listEl, emptyEl, query) {
         if (!visibles.length) {
             listEl.innerHTML = '';
             emptyEl.hidden = false;
-            emptyEl.textContent = q
+            emptyEl.textContent = query
                 ? 'Ningún cliente coincide con "' + query + '".'
                 : 'Todavía no tenés clientes cargados.';
             return [];
@@ -138,8 +136,9 @@
         const searchEl = overlay.querySelector('.cp-search');
         let currentVisible = [];
         let allClientes = [];
+        let debounceTimer = null;
+        let isLoading = false;
 
-        // Loading inicial
         emptyEl.hidden = false;
         emptyEl.textContent = 'Cargando clientes…';
         listEl.innerHTML = '';
@@ -153,11 +152,8 @@
         document.addEventListener('keydown', escHandler, true);
 
         activePicker = { overlay: overlay, escHandler: escHandler, opts: opts };
-
-        // Mostrar con animación
         requestAnimationFrame(() => overlay.classList.add('is-visible'));
 
-        // Listeners
         overlay.querySelector('.cp-backdrop').addEventListener('click', () => close('cancel'));
         overlay.querySelector('.cp-close').addEventListener('click', () => close('cancel'));
         overlay.querySelector('.cp-cancel').addEventListener('click', () => close('cancel'));
@@ -168,22 +164,53 @@
             const idx = parseInt(row.getAttribute('data-idx'), 10);
             const c = currentVisible[idx];
             if (!c) return;
-            // Cerrar antes para dar feedback inmediato; el caller decide qué hacer.
             close('select');
             try { opts.onSelect(c); } catch (err) {
                 console.error('[cliente_picker] onSelect error', err);
             }
         });
 
-        searchEl.addEventListener('input', () => {
-            currentVisible = applyFilter(searchEl.value, allClientes, listEl, emptyEl);
-        });
+        function setLoading(flag) {
+            isLoading = flag;
+            if (flag) {
+                emptyEl.hidden = false;
+                emptyEl.textContent = 'Buscando…';
+                listEl.innerHTML = '';
+            }
+        }
 
-        // Cargar y renderizar
-        loadClientes().then(list => {
+        async function applySearch(query) {
+            const q = String(query || '').trim();
+            if (debounceTimer) clearTimeout(debounceTimer);
+
+            // Con menos de 2 caracteres y si tenemos cache, filtramos localmente.
+            const useServer = q.length >= 2 || (q.length > 0 && !Array.isArray(allClientes) && allClientes.length === 0);
+
+            if (!useServer) {
+                currentVisible = renderList(
+                    q
+                        ? allClientes.filter(c => normalize(c.nombre || c.name).indexOf(normalize(q)) !== -1)
+                        : allClientes,
+                    listEl, emptyEl, q
+                );
+                return;
+            }
+
+            debounceTimer = setTimeout(async () => {
+                setLoading(true);
+                const found = await searchServer(q);
+                currentVisible = renderList(found, listEl, emptyEl, q);
+            }, DEBOUNCE_MS);
+        }
+
+        searchEl.addEventListener('input', () => applySearch(searchEl.value));
+
+        // Cargar todos al abrir
+        loadAllClientes().then(list => {
             const exclude = Array.isArray(opts.excludeIds) ? opts.excludeIds : [];
             allClientes = list.filter(c => exclude.indexOf(c.id) === -1);
-            currentVisible = applyFilter('', allClientes, listEl, emptyEl);
+            currentVisible = renderList(allClientes, listEl, emptyEl, '');
+            searchEl.focus();
         });
     };
 })();
