@@ -1078,23 +1078,87 @@
         catalogoProductosEmpty.hidden = true;
         catalogoProductosList.innerHTML = productos.map(p => {
             const ultima = p.ultima_vez ? CDI.formatDate ? CDI.formatDate(p.ultima_vez) : p.ultima_vez.slice(0, 10) : '—';
+            const peso = p.peso_unitario_avg != null ? p.peso_unitario_avg.toFixed(3) : '';
             return (
                 '<li class="cx-catalogo-producto-row" data-producto-id="' + CDI.escapeHtml(p.id) + '">' +
                     '<div class="cx-catalogo-producto-main">' +
                         '<div class="cx-catalogo-producto-desc" title="' + CDI.escapeHtml(p.descripcion) + '">' + CDI.escapeHtml(p.descripcion) + '</div>' +
                         '<div class="cx-catalogo-producto-sub">' +
-                            '<span class="cx-catalogo-producto-ncm">' + CDI.escapeHtml(p.ncm) + '</span>' +
-                            ' · Origen ' + CDI.escapeHtml(p.origen || 'XX') +
-                            ' · Peso ' + (p.peso_unitario_avg != null ? p.peso_unitario_avg.toFixed(3) : '—') + ' kg' +
+                            '<input type="text" class="cx-catalogo-producto-input" data-field="ncm" value="' + CDI.escapeHtml(p.ncm) + '" title="NCM" maxlength="10">' +
+                            '<span> · Origen </span>' +
+                            '<input type="text" class="cx-catalogo-producto-input" data-field="origen" value="' + CDI.escapeHtml(p.origen || 'XX') + '" title="Origen" maxlength="3">' +
+                            '<span> · Peso </span>' +
+                            '<input type="number" step="0.001" class="cx-catalogo-producto-input" data-field="peso_unitario_avg" value="' + peso + '" title="Peso unitario">' +
+                            '<span> kg</span>' +
                         '</div>' +
                     '</div>' +
                     '<div class="cx-catalogo-producto-meta">' +
                         '<span class="cx-catalogo-producto-usos" title="Veces usado">' + (p.veces_usado || 1) + '×</span>' +
                         '<span class="cx-catalogo-producto-ultima" title="Última operación">' + ultima + '</span>' +
+                        '<button type="button" class="cx-catalogo-producto-delete" data-action="delete-producto" title="Olvidar producto">×</button>' +
                     '</div>' +
                 '</li>'
             );
         }).join('');
+
+        catalogoProductosList.querySelectorAll('.cx-catalogo-producto-input').forEach(input => {
+            input.addEventListener('change', onProductoFieldChange);
+            input.addEventListener('keydown', (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); } });
+        });
+        catalogoProductosList.querySelectorAll('[data-action="delete-producto"]').forEach(btn => {
+            btn.addEventListener('click', onProductoDelete);
+        });
+    }
+
+    async function onProductoFieldChange(ev) {
+        const input = ev.target;
+        const row = input.closest('.cx-catalogo-producto-row');
+        if (!row || !detailClienteId) return;
+        const productoId = row.getAttribute('data-producto-id');
+        const field = input.getAttribute('data-field');
+        let value = input.value.trim();
+        if (field === 'peso_unitario_avg') {
+            value = parseFloat(value);
+            if (isNaN(value)) value = 0;
+        }
+        try {
+            const res = await CDI.api('/api/clientes/' + encodeURIComponent(detailClienteId) + '/catalogo/productos/' + encodeURIComponent(productoId), {
+                method: 'PUT', body: JSON.stringify({ [field]: value }),
+            });
+            if (!res || !res.ok) throw new Error('No se pudo guardar');
+            CDI.toast && CDI.toast.success('Producto actualizado');
+            CDI.track && CDI.track('catalogo_producto_updated', { cliente_id: detailClienteId, producto_id: productoId, field });
+        } catch (err) {
+            CDI.toast && CDI.toast.error(String(err.message || err));
+        }
+    }
+
+    async function onProductoDelete(ev) {
+        const btn = ev.target.closest('[data-action="delete-producto"]');
+        const row = btn && btn.closest('.cx-catalogo-producto-row');
+        if (!row || !detailClienteId) return;
+        const productoId = row.getAttribute('data-producto-id');
+        const desc = row.querySelector('.cx-catalogo-producto-desc').textContent || 'este producto';
+        const ok = await CDI.confirm({
+            title: 'Olvidar producto',
+            lead: '¿Borrar ' + desc + ' del catálogo?',
+            text: 'Se dejará de sugerir en futuras operaciones.',
+            acceptText: 'Olvidar',
+            kind: 'warning',
+        });
+        if (!ok) return;
+        try {
+            const res = await CDI.api('/api/clientes/' + encodeURIComponent(detailClienteId) + '/catalogo/productos/' + encodeURIComponent(productoId), { method: 'DELETE' });
+            if (!res || !res.ok) throw new Error('No se pudo borrar');
+            row.remove();
+            if (!catalogoProductosList.querySelector('.cx-catalogo-producto-row')) {
+                catalogoProductosEmpty.hidden = false;
+            }
+            CDI.toast && CDI.toast.success('Producto olvidado');
+            CDI.track && CDI.track('catalogo_producto_deleted', { cliente_id: detailClienteId, producto_id: productoId });
+        } catch (err) {
+            CDI.toast && CDI.toast.error(String(err.message || err));
+        }
     }
 
     async function loadDetailData(id) {

@@ -4104,6 +4104,37 @@ tr:hover .ncm-note-pill.is-empty {
     font-size: var(--t-11);
     color: var(--c-text-3);
     margin-top: 2px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+.cx-catalogo-producto-input {
+    width: 64px;
+    border: 1px solid var(--c-border);
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: var(--t-11);
+    background: var(--c-surface);
+    color: var(--c-text);
+}
+.cx-catalogo-producto-input[data-field="ncm"] { width: 80px; }
+.cx-catalogo-producto-input[data-field="origen"] { width: 36px; text-transform: uppercase; }
+.cx-catalogo-producto-input[data-field="peso_unitario_avg"] { width: 58px; }
+.cx-catalogo-producto-delete {
+    margin-left: 6px;
+    width: 20px;
+    height: 20px;
+    border: none;
+    background: transparent;
+    color: var(--c-text-3);
+    cursor: pointer;
+    border-radius: 4px;
+    line-height: 1;
+}
+.cx-catalogo-producto-delete:hover {
+    background: var(--c-danger-subtle, #fee2e2);
+    color: var(--c-danger, #dc2626);
 }
 .cx-catalogo-producto-meta {
     display: flex;
