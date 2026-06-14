@@ -148,7 +148,9 @@ CDI-app/
   - Fix urgente: tabla NCM ahora muestra **Valor unitario** y **Peso unitario**.
 - **Ola 3 EN PROGRESO — Plan 04 Catálogo unificado (versión chica):**
   - Fase 0 cerrada: persistencia de mapeo de columnas al subir Excel; nuevos endpoints `/api/clientes/{id}/catalogo/*`; pestaña "Catálogo" en drawer con columnas reconocidas + productos aprendidos; autofill de peso unitario e icono 📚 para matches de cliente.
-  - Pendiente para cerrar Ola 3: smoke headless de flujo completo (cliente nuevo → upload → aprende → segunda op → reconoce), edición/olvidar de productos aprendidos desde UI, y posible fuzzy match más permisivo en review.
+  - Fase 1 cerrada: edición inline de NCM/origen/peso y botón "Olvidar" para productos aprendidos.
+  - Smoke headless Plan 04 pasa: upload API → catálogo aprendido → UI muestra 6/6 columnas → persiste tras reload.
+  - Pendiente para cerrar Ola 3: smoke del flujo completo con productos (cliente nuevo → upload → aprende → generar MARIA → segunda op → reconoce) y posible fuzzy match más permisivo en review.
 - **Mantenimiento pendiente:**
   - Vulnerabilidades de dependencias documentadas en `docs/maintenance/vulnerabilidades_pendientes.md` (`requests`, `pdfminer.six`, `starlette`). Prioridad media; atacar en ventana tranquila.
 - **Plan 03 cerrado (Ola 2):** endpoint `/api/clientes/search?q=` para búsqueda server-side; picker con debounce; botón **+ Nuevo cliente** en review con mini formulario inline para alta rápida de cliente desde la operación.
