@@ -6,6 +6,19 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-14 · Plan 02: Clientes drawer polish (Ola 2)
+
+- **feat (clientes):** 6 mejoras en el drawer de clientes:
+  1. Lista ordenada por favorito + último movimiento DESC + nombre ASC.
+  2. Badges `· N ops` en cada tarjeta (usando `total_operaciones` del backend).
+  3. 5 KPIs completos en el detalle: operaciones, ítems, promedio ítems/op, origen frecuente, valor total, última fecha. El backend de métricas ahora calcula `origen_frecuente` desde `OperationItem.origen`.
+  4. Botón **Exportar CSV** conectado al endpoint backend (`/api/clientes/{id}/export.csv`).
+  5. Lista de operaciones muestra las primeras 5 y botón **Ver todas / Mostrar menos**.
+  6. Filtros `all/favs/recent` (preexistentes) verificados funcionando.
+- **test + qa:** endpoint CSV testeado; suite completa **261 passed, 102 skipped**. Backend probado manualmente con curl.
+
+---
+
 ## 2026-06-14 · Novedades ARCA + cierre Ola 1
 
 - **feat (datos vivos):** nuevo widget **Novedades ARCA** en la pantalla de Upload. Consume la fuente oficial de ARCA/AFIP (`https://servicioscf.afip.gob.ar/publico/sitio/contenido/novedad/listadoxml.aspx`), muestra las últimas 5 novedades con título/imagen/link y es colapsable. Endpoint nuevo: `GET /api/arca/novedades` (público, caché 15 min).

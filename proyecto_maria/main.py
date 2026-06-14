@@ -11,6 +11,8 @@ import jwt
 import json
 import os
 import re
+import csv
+import io
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -3589,20 +3591,47 @@ async def list_clientes(
 ):
     """Lista los clientes del usuario autenticado con resumen inline.
 
-    Incluye por cliente: ops_count, valor_total, ultimo (ISO date string)
-    y ncm_top. Se calcula en 2 queries agregadas para evitar N+1 al abrir
-    el drawer en v2.
+    Incluye por cliente: total_operaciones, valor_total, ultimo_movimiento
+    (ISO date string) y ncm_top. Se calcula en 2 queries agregadas para
+    evitar N+1 al abrir el drawer en v2.
+
+    Orden: favoritos primero, luego por ultimo_movimiento DESC, luego nombre ASC.
     """
     username = user["username"]
+
+    # Subquery: ultimo movimiento por cliente para orden server-side
+    ultimo_mov_subq = (
+        sa_select(
+            OperationModel.client_id.label("client_id"),
+            sa_func.max(OperationModel.created_at).label("ultimo"),
+        )
+        .where(
+            OperationModel.owner_username == username,
+            OperationModel.client_id.isnot(None),
+        )
+        .group_by(OperationModel.client_id)
+        .subquery()
+    )
+
     result = await db.execute(
-        sa_select(ClientModel)
+        sa_select(
+            ClientModel,
+            sa_func.coalesce(ultimo_mov_subq.c.ultimo, sa_func.min(ClientModel.created_at)).label(
+                "ultimo_movimiento"
+            ),
+        )
+        .outerjoin(ultimo_mov_subq, ClientModel.id == ultimo_mov_subq.c.client_id)
         .where(
             ClientModel.owner_username == username,
             ClientModel.is_active == True,  # noqa: E712
         )
-        .order_by(ClientModel.favorite.desc(), ClientModel.name.asc())
+        .group_by(ClientModel.id)
+        .order_by(ClientModel.favorite.desc(), sa_desc("ultimo_movimiento"), ClientModel.name.asc())
     )
-    clients = [c for c in result.scalars().all() if c.name]
+    rows = result.all()
+    clients = [row[0] for row in rows if row[0].name]
+    # Mapeo client_id -> ultimo_movimiento para la serializacion
+    ultimo_por_cliente = {row[0].id: row[1] for row in rows}
 
     resumen: dict[str, dict] = {}
     if clients:
@@ -3662,8 +3691,10 @@ async def list_clientes(
             "ncm_top": None,
         })
         data["ops_count"] = r["ops_count"]
+        data["total_operaciones"] = r["ops_count"]
         data["valor_total"] = r["valor_total"]
         data["ultimo"] = r["ultimo"]
+        data["ultimo_movimiento"] = ultimo_por_cliente.get(c.id, data["ultimo"])
         data["ncm_top"] = r["ncm_top"]
         return data
 
@@ -4405,13 +4436,94 @@ async def get_client_metrics(
     ultimo = row.ultimo.strftime("%d/%m/%Y") if row.ultimo else "-"
     promedio = round(total_items / total_ops, 1) if total_ops > 0 else 0
 
+    # Origen más frecuente: cuenta apariciones por origen en los items del cliente
+    origen_frecuente = "-"
+    if total_ops > 0:
+        orig_rows = await db.execute(
+            sa_select(
+                OperationItemModel.origen,
+                sa_func.count(OperationItemModel.id).label("n"),
+            )
+            .join(OperationModel, OperationItemModel.operation_id == OperationModel.id)
+            .where(
+                OperationModel.client_id == client_id,
+                OperationModel.owner_username == username,
+                OperationItemModel.origen.isnot(None),
+                OperationItemModel.origen != "",
+            )
+            .group_by(OperationItemModel.origen)
+            .order_by(sa_desc("n"))
+            .limit(1)
+        )
+        top = orig_rows.first()
+        if top:
+            origen_frecuente = str(top.origen or "-")
+
     return {
         "total_operaciones": total_ops,
         "total_items": total_items,
         "valor_total": valor_total,
         "promedio_items_por_operacion": promedio,
         "ultimo_movimiento": ultimo,
+        "origen_frecuente": origen_frecuente,
     }
+
+
+@app.get("/api/clientes/{client_id}/export.csv")
+async def export_client_csv(
+    client_id: str,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Exporta el historial de operaciones de un cliente a CSV (UTF-8 BOM para Excel)."""
+    username = user["username"]
+    client = await _get_owned_client(db, client_id, username)
+
+    ops_result = await db.execute(
+        sa_select(OperationModel)
+        .where(
+            OperationModel.client_id == client_id,
+            OperationModel.owner_username == username,
+        )
+        .order_by(OperationModel.created_at.desc())
+    )
+    operations = ops_result.scalars().all()
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["fecha", "op_id", "total_items", "valor_total", "ncms", "origenes"])
+
+    for op in operations:
+        items_result = await db.execute(
+            sa_select(OperationItemModel)
+            .where(OperationItemModel.operation_id == op.id)
+            .order_by(OperationItemModel.id)
+        )
+        items = items_result.scalars().all()
+        ncms = []
+        origenes = []
+        for it in items:
+            if it.pieza and it.pieza not in ncms:
+                ncms.append(it.pieza)
+            if it.origen and it.origen not in origenes:
+                origenes.append(it.origen)
+        writer.writerow([
+            op.created_at.strftime("%d/%m/%Y") if op.created_at else "",
+            op.op_code or op.id,
+            op.total_items,
+            op.total_value,
+            " ".join(ncms),
+            " ".join(origenes),
+        ])
+
+    csv_bytes = output.getvalue().encode("utf-8-sig")
+    safe_name = re.sub(r'[^\w\s-]', '', client.name or "cliente").strip().replace(" ", "_") or "cliente"
+    filename = f"operaciones_{safe_name}.csv"
+    headers = {
+        "Content-Disposition": f'attachment; filename="{filename}"',
+        "Content-Type": "text/csv; charset=utf-8-sig",
+    }
+    return Response(content=csv_bytes, headers=headers)
 
 
 # === COLUMN MAPPING (Excel AVG) ===

@@ -18,9 +18,9 @@
     let searchInput, helpBtn, newBtn;
     let listEl, loadingEl, emptyListEl;
     let emptySelectionEl, detailBodyEl, backBtn;
-    let heroEl, kpiOps, kpiValor, kpiUltimo;
+    let heroEl, kpiOps, kpiItems, kpiPromedio, kpiOrigen, kpiValor, kpiUltimo;
     let tabOps, tabMapeo, tabDatos, panelOps, panelMapeo, panelDatos;
-    let opsList, opsEmpty;
+    let opsList, opsEmpty, opsExpand, opsExpandBtn, exportCsvBtn;
     let mapeoList, mapeoEmpty, mapeoActions, mapeoReset, mapeoSave;
     let datosGrid;
     let filterChips = [], sortSelect;
@@ -41,6 +41,7 @@
     let loading = false;
     let initialized = false;
     let entered = false;
+    let opsExpanded = false;
 
     let editingId = null;            // null = nuevo, string = edit
     let detailClienteId = null;
@@ -75,6 +76,9 @@
         backBtn        = $('cxBackBtn');
         heroEl         = $('cxHero');
         kpiOps         = $('cxKpiOps');
+        kpiItems       = $('cxKpiItems');
+        kpiPromedio    = $('cxKpiPromedio');
+        kpiOrigen      = $('cxKpiOrigen');
         kpiValor       = $('cxKpiValor');
         kpiUltimo      = $('cxKpiUltimo');
         tabOps         = $('cxTabOps');
@@ -85,6 +89,9 @@
         panelDatos     = screenEl.querySelector('[data-panel="datos"]');
         opsList        = $('cxOpsList');
         opsEmpty       = $('cxOpsEmpty');
+        opsExpand      = $('cxOpsExpand');
+        opsExpandBtn   = $('cxOpsExpandBtn');
+        exportCsvBtn   = $('cxExportCsvBtn');
         mapeoList      = $('cxMapeoList');
         mapeoEmpty     = $('cxMapeoEmpty');
         mapeoActions   = $('cxMapeoActions');
@@ -158,6 +165,10 @@
         if (tabDatos) tabDatos.addEventListener('click', () => switchTab('datos'));
         if (mapeoReset) mapeoReset.addEventListener('click', resetMapping);
         if (mapeoSave)  mapeoSave.addEventListener('click', saveMapping);
+
+        // Export CSV e expand de operaciones
+        if (exportCsvBtn) exportCsvBtn.addEventListener('click', exportClientCsv);
+        if (opsExpandBtn) opsExpandBtn.addEventListener('click', toggleOpsExpanded);
 
         // Back (mobile)
         if (backBtn) backBtn.addEventListener('click', closeDetailMobile);
@@ -784,12 +795,15 @@
     function renderKpis(metricas) {
         if (!kpiOps) return;
         if (!metricas) {
-            kpiOps.textContent = '—';
-            kpiValor.textContent = '—';
-            kpiUltimo.textContent = '—';
+            [kpiOps, kpiItems, kpiPromedio, kpiOrigen, kpiValor, kpiUltimo].forEach(el => {
+                if (el) el.textContent = '—';
+            });
             return;
         }
-        kpiOps.textContent = String(metricas.total_operaciones || 0);
+        kpiOps.textContent      = String(metricas.total_operaciones || 0);
+        kpiItems.textContent    = String(metricas.total_items || 0);
+        kpiPromedio.textContent = String(metricas.promedio_items_por_operacion || 0);
+        kpiOrigen.textContent   = metricas.origen_frecuente || '—';
         const v = Number(metricas.valor_total || 0);
         kpiValor.textContent = v > 0 ? formatMoney(v) : '—';
         kpiUltimo.textContent = metricas.ultimo_movimiento || '—';
@@ -807,22 +821,37 @@
             currentOps = [];
             opsList.innerHTML = '<li class="caption" style="padding: var(--s-2) 0; color: var(--c-text-3);">Cargando…</li>';
             opsEmpty.hidden = true;
+            if (opsExpand) opsExpand.hidden = true;
             return;
         }
         currentOps = operaciones.slice();
         if (!operaciones.length) {
             opsList.innerHTML = '';
             opsEmpty.hidden = false;
+            if (opsExpand) opsExpand.hidden = true;
             return;
         }
         opsEmpty.hidden = true;
+        const total = operaciones.length;
+        const maxVisible = opsExpanded ? total : Math.min(5, total);
+        const visibleOps = operaciones.slice(0, maxVisible);
+
+        if (opsExpand) {
+            opsExpand.hidden = total <= 5;
+            if (opsExpandBtn) {
+                opsExpandBtn.textContent = opsExpanded
+                    ? 'Mostrar menos'
+                    : ('Ver todas (' + total + ')');
+            }
+        }
+
         const downloadIcon =
             '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
                 '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>' +
                 '<polyline points="7 10 12 15 17 10"/>' +
                 '<line x1="12" y1="15" x2="12" y2="3"/>' +
             '</svg>';
-        opsList.innerHTML = operaciones.map(op => {
+        opsList.innerHTML = visibleOps.map(op => {
             const fecha = op.fecha ? new Date(op.fecha).toLocaleDateString('es-AR') : '—';
             const items = Number(op.total_items || 0);
             const val = Number(op.total_value || 0);
@@ -1012,6 +1041,7 @@
     }
 
     async function loadDetailData(id) {
+        opsExpanded = false;
         try {
             const [metRes, opsRes] = await Promise.all([
                 CDI.api('/api/clientes/' + encodeURIComponent(id) + '/metricas'),
@@ -1021,7 +1051,7 @@
                 const mdata = await metRes.json().catch(() => ({}));
                 renderKpis(mdata.metricas || mdata);
             } else {
-                renderKpis({ total_operaciones: 0, valor_total: 0, ultimo_movimiento: '—' });
+                renderKpis({ total_operaciones: 0, total_items: 0, promedio_items_por_operacion: 0, origen_frecuente: '—', valor_total: 0, ultimo_movimiento: '—' });
             }
             if (opsRes && opsRes.ok) {
                 const odata = await opsRes.json().catch(() => ({}));
@@ -1031,9 +1061,14 @@
             }
         } catch (err) {
             console.error('[cliente-detail]', err);
-            renderKpis({ total_operaciones: 0, valor_total: 0, ultimo_movimiento: '—' });
+            renderKpis({ total_operaciones: 0, total_items: 0, promedio_items_por_operacion: 0, origen_frecuente: '—', valor_total: 0, ultimo_movimiento: '—' });
             renderOps([]);
         }
+    }
+
+    function toggleOpsExpanded() {
+        opsExpanded = !opsExpanded;
+        renderOps(currentOps);
     }
 
     async function downloadTemplate() {
@@ -1109,52 +1144,27 @@
         const c = clientes.find(x => x.id === id);
         if (!c) return;
         try {
-            const res = await CDI.api('/api/clientes/' + encodeURIComponent(id) + '/operaciones');
+            const res = await CDI.api('/api/clientes/' + encodeURIComponent(id) + '/export.csv');
             if (!res || !res.ok) {
-                const err = await res.json().catch(() => ({}));
-                throw new Error(err.detail || ('Error ' + (res && res.status)));
+                const err = await res.text().catch(() => 'Error ' + (res && res.status));
+                throw new Error(err);
             }
-            const data = await res.json().catch(() => ({}));
-            const operaciones = Array.isArray(data.operaciones) ? data.operaciones : [];
-            if (!operaciones.length) {
-                CDI.toast && CDI.toast.info('Sin operaciones para exportar.');
-                return;
-            }
-            const header = ['Fecha', 'Código', 'Archivo', 'Ítems', 'Valor', 'Moneda'];
-            const rows = operaciones.map(op => {
-                const fecha = op.fecha ? new Date(op.fecha).toLocaleDateString('es-AR') : '';
-                return [
-                    fecha,
-                    op.op_code || '',
-                    op.generated_file || '',
-                    String(op.total_items || 0),
-                    (op.total_value != null ? String(op.total_value) : ''),
-                    op.currency || '',
-                ];
-            });
-            const csv = [header, ...rows].map(r => r.map(csvEscape).join(',')).join('\r\n');
-            const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8' });
+            const blob = await res.blob();
             const slug = (c.nombre || 'cliente').toLowerCase()
                 .replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'cliente';
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'historial_' + slug + '.csv';
+            a.download = 'operaciones_' + slug + '.csv';
             document.body.appendChild(a);
             a.click();
             a.remove();
             setTimeout(() => URL.revokeObjectURL(url), 2000);
-            CDI.toast && CDI.toast.success('CSV descargado', operaciones.length + ' ops');
-            CDI.track && CDI.track('cliente_csv_export', { id: id, rows: operaciones.length });
+            CDI.toast && CDI.toast.success('CSV descargado');
+            CDI.track && CDI.track('cliente_csv_export', { id: id });
         } catch (err) {
             CDI.toast && CDI.toast.error(String(err.message || err));
         }
-    }
-
-    function csvEscape(v) {
-        const s = String(v == null ? '' : v);
-        if (/[",\r\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
-        return s;
     }
 
     function onEditCurrent() {
