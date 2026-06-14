@@ -3225,8 +3225,9 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict) -> list[Item]:
             except (ValueError, TypeError):
                 continue  # Saltar fila si no puede convertir números
 
-            # Solo agregar si tiene datos básicos
-            if pieza and descripcion and origen and peso_unitario > 0 and cantidad > 0 and valor_unitario > 0:
+            # Solo agregar si tiene datos básicos. El peso puede venir en 0
+            # para que el autofill del catálogo del cliente lo complete después.
+            if pieza and descripcion and origen and cantidad > 0 and valor_unitario > 0:
                 item = Item(
                     pieza=pieza,
                     descripcion=descripcion,
