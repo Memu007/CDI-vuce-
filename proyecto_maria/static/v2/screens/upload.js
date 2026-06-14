@@ -165,6 +165,7 @@
 
     function setBusy(on, title, sub) {
         busy = on;
+        if (!dz) return; // todavia no se inicializo el DOM (race de carga)
         if (on) {
             dz.classList.add('is-disabled');
             progress.hidden = false;
@@ -677,9 +678,11 @@
 
     CDI.registerScreen('upload', {
         onEnter() {
+            // init() primero: asigna dz y demas refs. Evita el race donde
+            // app_v2 dispara goTo('upload') antes de que corra el init propio.
+            if (!dz || !dz.isConnected) init();
             hideError();
             setBusy(false);
-            if (!dz || !dz.isConnected) init();
         },
         onLeave() { /* nothing to cleanup yet */ },
     });

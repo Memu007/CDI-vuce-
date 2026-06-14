@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-14 · Fix race condition en pantalla Upload
+
+- **fix (ui):** se eliminó el error `Cannot read properties of undefined (reading 'classList')` que aparecía al entrar a la pantalla de subida (`upload.js`). El `onEnter` ahora garantiza que el DOM esté inicializado antes de llamar a `setBusy`, y `setBusy` tiene guard ante referencias aún no cargadas.
+- **verificado:** sintaxis JS OK, suite completa **256 passed, 102 skipped**.
+
+---
+
 ## 2026-06-14 · Cockpit de operaciones + seguridad S1/S3 (Ola 1)
 
 - **feat (cockpit):** nuevo tablero `Operaciones` en el dashboard v2 — lista todas las operaciones del despachante con estado editable (borrador → oficializada → canal → liberada), canal aduanero (verde/naranja/rojo), cliente, ítems, valor y fecha. Filtros por estado con contadores. Reemplaza el Excel de seguimiento. Endpoints `GET /api/operations` y `PATCH /api/operations/{id}/estado` (aislados por owner). Nuevas columnas `operations.estado` y `operations.canal` (migración idempotente).
