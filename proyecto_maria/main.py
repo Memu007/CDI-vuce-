@@ -954,10 +954,14 @@ async def lifespan(app: FastAPI):
                 result = await session.execute(select(User).where(User.username == user_data["username"]))
                 existing_user = result.scalars().first()
                 
+                # En dev, el user 'demo' es admin para poder ver /dev/dashboard
+                roles = ["admin"] if user_data["username"] == "demo" else []
                 if existing_user:
                     if existing_user.plan != user_data["plan"]:
                         existing_user.plan = user_data["plan"]
                         print(f"✅ Actualizado plan de {user_data['username']} a {user_data['plan']}")
+                    if user_data["username"] == "demo" and "admin" not in (existing_user.roles or []):
+                        existing_user.roles = ["admin"]
                 else:
                     hashed_pw = hash_password(user_data["password"])
                     new_user = User(
@@ -965,7 +969,8 @@ async def lifespan(app: FastAPI):
                         password=hashed_pw,
                         name=user_data["name"],
                         plan=user_data["plan"],
-                        is_verified=True
+                        is_verified=True,
+                        roles=roles,
                     )
                     session.add(new_user)
                     print(f"✅ Creado usuario demo: {user_data['username']} ({user_data['plan']})")
@@ -1371,7 +1376,24 @@ async def get_current_user(request: Request, response: Response, db: AsyncSessio
         # T5-lite: NULL salvo que el user sea operador de un team owner.
         "team_owner_username": team_owner,
         "effective_owner": effective_owner,
+        "roles": user.roles or [],
     }
+
+
+# --- ADMIN DEPENDENCY ---
+# Un user es admin si su username esta en ADMIN_USERNAMES (env, separado por
+# comas) o si tiene "admin" en roles. Protege endpoints sensibles /api/dev/*.
+def _admin_usernames() -> set:
+    raw = os.getenv("ADMIN_USERNAMES", "")
+    return {u.strip() for u in raw.split(",") if u.strip()}
+
+
+async def require_admin(user=Depends(get_current_user)):
+    """Dependencia: exige que el user autenticado sea admin. 403 si no."""
+    is_admin = user["username"] in _admin_usernames() or "admin" in (user.get("roles") or [])
+    if not is_admin:
+        raise HTTPException(status_code=403, detail="Requiere permisos de administrador")
+    return user
 
 
 # --- USER PROFILE ENDPOINTS ---
@@ -1607,7 +1629,7 @@ def dev_dashboard(request: Request):
 
 @app.get("/api/dev/stats")
 async def get_dev_stats(
-    user=Depends(get_current_user),
+    user=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Estadísticas en tiempo real para el dashboard (requiere auth).
@@ -1660,7 +1682,7 @@ async def get_dev_stats(
 @app.get("/api/dev/wave1-kpis")
 async def get_dev_wave1_kpis(
     days: int = 14,
-    user=Depends(get_current_user),
+    user=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """KPIs Wave 1 sobre tabla `telemetry_events` (14 días por defecto).
@@ -1873,7 +1895,7 @@ def app_fixed_js():
 
 @app.get("/api/dev/test-clientes")
 async def dev_test_clientes(
-    user=Depends(get_current_user),
+    user=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Reproduce la query de /api/clientes pero atrapa cualquier error y lo
@@ -1953,7 +1975,7 @@ async def dev_test_clientes(
 
 
 @app.post("/api/dev/run-migrations")
-async def dev_run_migrations(user=Depends(get_current_user)):
+async def dev_run_migrations(user=Depends(require_admin)):
     """Re-ejecuta las migraciones idempotentes de columnas en users.
 
     Util cuando la migracion al startup fallo por algun motivo (lock,
@@ -1993,7 +2015,7 @@ async def dev_run_migrations(user=Depends(get_current_user)):
 
 @app.get("/api/dev/users-schema")
 async def dev_users_schema(
-    user=Depends(get_current_user),
+    user=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Devuelve las columnas existentes de la tabla users en la DB.
@@ -5159,96 +5181,12 @@ MP_WEBHOOK_SECRET = os.environ.get("MP_WEBHOOK_SECRET", "")
 # Precio mensual en ARS. Se puede pisar via env para subir/bajar el plan.
 MP_PLAN_PRICE_ARS = float(os.environ.get("MP_PLAN_PRICE_ARS", "15000"))
 
-class PaymentRequest(BaseModel):
-    plan: str = "premium"
-    email: str = None
-    username: str = None
+# SEGURIDAD: /api/payments/create-preference (sin auth, username del body) y
+# los endpoints bitcoin demo fueron eliminados. El checkout real es
+# /api/billing/checkout (autenticado, username del JWT).
 
-class BitcoinPaymentRequest(BaseModel):
-    amount_usd: float = 10.0
-    email: str = None
-
-# Almacenar pagos pendientes en memoria (en producción usar DB)
+# Almacenar pagos pendientes en memoria (solo para el flujo demo sin credenciales)
 pending_payments = {}
-
-@app.post("/api/payments/create-preference")
-async def create_mercadopago_preference(request: PaymentRequest):
-    """
-    Crea una preferencia de pago en MercadoPago.
-    Precio: $1 ARS para testing.
-    """
-    if not MP_ACCESS_TOKEN:
-        # Modo demo sin credenciales reales
-        demo_preference_id = f"demo_{uuid.uuid4().hex[:8]}"
-        pending_payments[demo_preference_id] = {
-            "status": "pending",
-            "email": request.email,
-            "username": request.username,
-            "plan": request.plan,
-            "amount": 1.0,
-            "currency": "ARS"
-        }
-        return {
-            "success": True,
-            "mode": "demo",
-            "preference_id": demo_preference_id,
-            "init_point": f"/api/payments/demo-checkout/{demo_preference_id}",
-            "message": "Modo demo - MP_ACCESS_TOKEN no configurado"
-        }
-    
-    try:
-        sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
-        
-        preference_data = {
-            "items": [
-                {
-                    "title": "CDI Premium - Plan Mensual",
-                    "quantity": 1,
-                    "unit_price": 100.0,  # $100 ARS
-                    "currency_id": "ARS"
-                }
-            ],
-            "external_reference": f"{request.username}|{request.plan}"
-            # Nota: back_urls y auto_return requieren URLs públicas (no localhost)
-            # Para producción, configurar con dominio real
-        }
-        
-        if request.email:
-            preference_data["payer"] = {"email": request.email}
-        
-        preference_response = sdk.preference().create(preference_data)
-        print(f"📦 Respuesta MercadoPago: {preference_response}")
-        
-        # Verificar si hay error
-        if preference_response.get("status") != 201:
-            error_msg = preference_response.get("response", {})
-            print(f"❌ Error MP: {error_msg}")
-            raise HTTPException(status_code=400, detail=f"MercadoPago rechazó la solicitud: {error_msg}")
-        
-        preference = preference_response["response"]
-        
-        # Guardar referencia
-        pending_payments[preference["id"]] = {
-            "status": "pending",
-            "email": request.email,
-            "username": request.username,
-            "plan": request.plan
-        }
-        
-        # Detectar si estamos en modo sandbox (token empieza con TEST-)
-        is_sandbox = MP_ACCESS_TOKEN.startswith("TEST-")
-        
-        return {
-            "success": True,
-            "mode": "sandbox" if is_sandbox else "live",
-            "preference_id": preference["id"],
-            "init_point": preference.get("sandbox_init_point") if is_sandbox else preference["init_point"],
-            "sandbox_init_point": preference.get("sandbox_init_point")
-        }
-        
-    except Exception as e:
-        print(f"Error creando preferencia MP: {e}")
-        raise HTTPException(status_code=500, detail=f"Error con MercadoPago: {str(e)}")
 
 @app.get("/api/payments/demo-checkout/{preference_id}")
 async def demo_checkout_page(preference_id: str):
@@ -5533,6 +5471,13 @@ async def billing_checkout(
     # Modo demo cuando no hay credenciales configuradas
     if not MP_ACCESS_TOKEN:
         demo_id = f"demo_{uuid.uuid4().hex[:8]}"
+        # Registrar el pago demo para que la pagina demo-checkout no devuelva 404
+        pending_payments[demo_id] = {
+            "status": "pending",
+            "username": username,
+            "email": email,
+            "plan": plan,
+        }
         return {
             "success": True,
             "mode": "demo",
@@ -5588,105 +5533,8 @@ async def billing_checkout(
         print(f"Error creando preference MP (checkout): {e}")
         raise HTTPException(status_code=500, detail=f"Error con MercadoPago: {e}")
 
-# --- BITCOIN (Demo) ---
-bitcoin_payments = {}
-
-@app.post("/api/payments/bitcoin/create")
-async def create_bitcoin_payment(request: BitcoinPaymentRequest):
-    """
-    Crea un pago Bitcoin demo.
-    En producción usar BTCPay Server o Coinbase Commerce.
-    """
-    payment_id = f"btc_{uuid.uuid4().hex[:12]}"
-    
-    # Dirección demo (NO usar en producción)
-    demo_address = f"bc1q{uuid.uuid4().hex[:38]}"
-    
-    # Precio simulado: $10 USD = ~0.00025 BTC
-    btc_amount = round(request.amount_usd / 40000, 8)  # Precio BTC aprox
-    
-    bitcoin_payments[payment_id] = {
-        "status": "pending",
-        "address": demo_address,
-        "amount_btc": btc_amount,
-        "amount_usd": request.amount_usd,
-        "email": request.email,
-        "created_at": datetime.now().isoformat()
-    }
-    
-    return {
-        "success": True,
-        "payment_id": payment_id,
-        "address": demo_address,
-        "amount_btc": btc_amount,
-        "amount_usd": request.amount_usd,
-        "qr_data": f"bitcoin:{demo_address}?amount={btc_amount}",
-        "expires_in": 900  # 15 minutos
-    }
-
-@app.get("/api/payments/bitcoin/checkout/{payment_id}")
-async def bitcoin_checkout_page(payment_id: str):
-    """Página de checkout Bitcoin"""
-    if payment_id not in bitcoin_payments:
-        raise HTTPException(status_code=404, detail="Pago no encontrado")
-    
-    payment = bitcoin_payments[payment_id]
-    
-    html = f"""
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>Pago Bitcoin - CDI</title>
-        <style>
-            body {{ font-family: system-ui; background: linear-gradient(135deg, #f7931a 0%, #ffb347 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; margin: 0; }}
-            .checkout-box {{ background: white; padding: 2rem; border-radius: 12px; box-shadow: 0 10px 40px rgba(0,0,0,0.2); max-width: 400px; text-align: center; }}
-            h2 {{ color: #333; margin-bottom: 0.5rem; }}
-            .btc-logo {{ font-size: 3rem; margin-bottom: 1rem; }}
-            .amount {{ font-size: 1.5rem; font-weight: bold; color: #f7931a; margin: 1rem 0; }}
-            .address {{ background: #f5f5f5; padding: 0.75rem; border-radius: 6px; font-family: monospace; font-size: 0.75rem; word-break: break-all; margin: 1rem 0; }}
-            .qr-placeholder {{ width: 200px; height: 200px; background: #eee; margin: 1rem auto; display: flex; align-items: center; justify-content: center; border-radius: 8px; }}
-            .btn {{ background: #f7931a; color: white; border: none; padding: 1rem 2rem; border-radius: 8px; font-size: 1.1rem; cursor: pointer; width: 100%; margin-top: 1rem; }}
-            .btn:hover {{ background: #e8851a; }}
-            .demo-notice {{ background: #fff3cd; color: #856404; padding: 0.75rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem; }}
-            .timer {{ color: #666; font-size: 0.9rem; margin-top: 0.5rem; }}
-        </style>
-    </head>
-    <body>
-        <div class="checkout-box">
-            <div class="btc-logo">₿</div>
-            <div class="demo-notice">⚠️ Modo Demo - Pago simulado</div>
-            <h2>CDI Premium</h2>
-            <div class="amount">{payment['amount_btc']} BTC</div>
-            <p style="color: #666;">≈ ${payment['amount_usd']} USD</p>
-            <div class="qr-placeholder">
-                <span style="color: #999;">QR Code</span>
-            </div>
-            <div class="address">{payment['address']}</div>
-            <p class="timer">⏱️ Expira en 15 minutos</p>
-            <button class="btn" onclick="confirmPayment()">✓ Simular Pago Recibido</button>
-        </div>
-        <script>
-            async function confirmPayment() {{
-                const res = await fetch('/api/payments/bitcoin/confirm/{payment_id}', {{ method: 'POST' }});
-                const data = await res.json();
-                if (data.success) {{
-                    window.location.href = '/api/payments/success?demo=true&method=bitcoin';
-                }}
-            }}
-        </script>
-    </body>
-    </html>
-    """
-    return HTMLResponse(content=html)
-
-@app.post("/api/payments/bitcoin/confirm/{payment_id}")
-async def confirm_bitcoin_payment(payment_id: str):
-    """Confirma un pago Bitcoin demo"""
-    if payment_id not in bitcoin_payments:
-        raise HTTPException(status_code=404, detail="Pago no encontrado")
-    
-    bitcoin_payments[payment_id]["status"] = "confirmed"
-    return {"success": True, "message": "Pago Bitcoin confirmado"}
+# SEGURIDAD: endpoints Bitcoin demo eliminados (eran simulaciones sin auth ni
+# valor real). Si en el futuro se acepta cripto, usar BTCPay/Coinbase Commerce.
 
 
 # ─────────────────────────────────────────────────────────────
