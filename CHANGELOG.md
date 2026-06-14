@@ -11,11 +11,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **feat (clientes):** 6 mejoras en el drawer de clientes:
   1. Lista ordenada por favorito + último movimiento DESC + nombre ASC.
   2. Badges `· N ops` en cada tarjeta (usando `total_operaciones` del backend).
-  3. 5 KPIs completos en el detalle: operaciones, ítems, promedio ítems/op, origen frecuente, valor total, última fecha. El backend de métricas ahora calcula `origen_frecuente` desde `OperationItem.origen`.
+  3. 6 KPIs completos en el detalle: operaciones, ítems, promedio ítems/op, origen frecuente, valor total, última fecha. El backend de métricas ahora calcula `origen_frecuente` desde `OperationItem.origen`.
   4. Botón **Exportar CSV** conectado al endpoint backend (`/api/clientes/{id}/export.csv`).
   5. Lista de operaciones muestra las primeras 5 y botón **Ver todas / Mostrar menos**.
   6. Filtros `all/favs/recent` (preexistentes) verificados funcionando.
-- **test + qa:** endpoint CSV testeado; suite completa **261 passed, 102 skipped**. Backend probado manualmente con curl.
+- **fix (clientes):** corregido error `exportClientCsv is not defined` que rompía la apertura del drawer al hacer click en Exportar CSV.
+- **test + qa:** endpoint CSV testeado; smoke headless de Plan 02 pasa (drawer, KPIs, export, expand de operaciones). Suite completa **240 passed, 102 skipped**; 24 errores preexistentes por compatibilidad de `pytest-asyncio` en tests de seguridad/SEO.
+- **chore:** inicialización de tablas en tests movida a `pytest_sessionstart` para no interferir con el loop de pytest-asyncio.
 
 ---
 

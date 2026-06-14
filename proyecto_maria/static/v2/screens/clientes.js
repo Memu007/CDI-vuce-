@@ -784,7 +784,7 @@
                 const action = btn.getAttribute('data-kaction');
                 if (action === 'edit')      onEditCurrent();
                 else if (action === 'fav')  onFavClick(c.id);
-                else if (action === 'csv')  onCsvClick(c.id);
+                else if (action === 'csv')  exportClientCsv(c.id);
                 else if (action === 'template') { detailClienteId = c.id; downloadTemplate(); }
                 else if (action === 'delete') onDeleteClick(c.id);
             });
@@ -1140,11 +1140,12 @@
         }
     }
 
-    async function onCsvClick(id) {
-        const c = clientes.find(x => x.id === id);
+    async function exportClientCsv(id) {
+        const targetId = id || detailClienteId;
+        const c = clientes.find(x => x.id === targetId);
         if (!c) return;
         try {
-            const res = await CDI.api('/api/clientes/' + encodeURIComponent(id) + '/export.csv');
+            const res = await CDI.api('/api/clientes/' + encodeURIComponent(targetId) + '/export.csv');
             if (!res || !res.ok) {
                 const err = await res.text().catch(() => 'Error ' + (res && res.status));
                 throw new Error(err);
@@ -1161,7 +1162,7 @@
             a.remove();
             setTimeout(() => URL.revokeObjectURL(url), 2000);
             CDI.toast && CDI.toast.success('CSV descargado');
-            CDI.track && CDI.track('cliente_csv_export', { id: id });
+            CDI.track && CDI.track('cliente_csv_export', { id: targetId });
         } catch (err) {
             CDI.toast && CDI.toast.error(String(err.message || err));
         }

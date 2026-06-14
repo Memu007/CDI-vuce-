@@ -2617,7 +2617,7 @@ async def create_manual_operation(
     except HTTPException:
         raise HTTPException(status_code=404, detail="Cliente no encontrado")
 
-    operation_id = f"MANUAL_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+    operation_id = f"MANUAL_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:6]}"
 
     # Calcular totales
     total_items = len(items_raw)

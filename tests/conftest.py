@@ -22,6 +22,7 @@ from sqlalchemy import event  # noqa: E402
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 import proyecto_maria.database.connection as _conn  # noqa: E402
+from proyecto_maria.database.connection import init_db  # noqa: E402
 
 # Reemplazar el engine por uno con StaticPool: una sola conexión compartida
 # para todo el proceso de tests. Razón: SQLite con múltiples conexiones async
@@ -44,7 +45,13 @@ def _set_sqlite_pragma(dbapi_connection, _):
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA busy_timeout=30000")  # 30s: esperar el lock, no fallar
     cursor.close()
-import asyncio
+import asyncio  # noqa: E402
+
+
+def pytest_sessionstart(session):
+    """Crear tablas antes de la sesión de tests (idempotente con checkfirst)."""
+    asyncio.run(init_db())
+
 
 @pytest.fixture(scope="session")
 def event_loop():
