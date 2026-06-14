@@ -153,6 +153,25 @@
                             <span class="upload-simulate-hint">Excel AVG con columnas canónicas para cargar a mano.</span>
                         </div>
                     </div>
+
+                    <!-- Novedades ARCA -->
+                    <div class="arca-news-widget" id="arcaNewsWidget" aria-label="Novedades de ARCA">
+                        <button type="button" class="arca-news-title">
+                            <span class="arca-news-dot" aria-hidden="true"></span>
+                            Novedades ARCA
+                            <span class="arca-news-chevron" aria-hidden="true"></span>
+                        </button>
+                        <div class="arca-news-body">
+                            <div class="arca-news-loader" id="arcaNewsLoader">
+                                <span class="spinner" aria-hidden="true"></span>
+                                <span>Cargando novedades…</span>
+                            </div>
+                            <div class="arca-news-empty" id="arcaNewsEmpty" hidden>
+                                No pudimos cargar las novedades de ARCA. <a href="https://www.arca.gob.ar/landing/" target="_blank" rel="noopener noreferrer">Ver en arca.gob.ar</a>
+                            </div>
+                            <div class="arca-news-list" id="arcaNewsList"></div>
+                        </div>
+                    </div>
                 </div>
             </section>
 
@@ -1356,6 +1375,7 @@
     <script src="/static/v2/screens/profile.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/ncm_notes.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/upload.js?v={{ version }}" defer></script>
+    <script src="/static/v2/screens/arca_news.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/review.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/ncm.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/finalize.js?v={{ version }}" defer></script>

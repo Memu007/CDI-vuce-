@@ -106,3 +106,7 @@ AVG_*.xlsx
 # Internal/utility files
 PROMPT_FOR_OPUS.md
 fix_claude_code.sh
+olaa.md
+smoke_arca_widget.js
+package.json
+package-lock.json

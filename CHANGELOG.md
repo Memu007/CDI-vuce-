@@ -6,6 +6,15 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-14 · Novedades ARCA + cierre Ola 1
+
+- **feat (datos vivos):** nuevo widget **Novedades ARCA** en la pantalla de Upload. Consume la fuente oficial de ARCA/AFIP (`https://servicioscf.afip.gob.ar/publico/sitio/contenido/novedad/listadoxml.aspx`), muestra las últimas 5 novedades con título/imagen/link y es colapsable. Endpoint nuevo: `GET /api/arca/novedades` (público, caché 15 min).
+- **feat (ux flujo principal):** se verificó y completó el Plan 01 — máscara de fechas `DD/MM/AAAA` en review, preview VUCE al tipear NCM en el spotlight (descripción oficial + alícuotas), y botón Clientes en topbar.
+- **test + qa:** +4 tests del backend ARCA; suite completa **260 passed, 102 skipped**. Smoke headless con Playwright verificó login, render de novedades reales y colapso del widget.
+- **chore:** ajustado smoke test para soportar startup del server de 4s.
+
+---
+
 ## 2026-06-14 · Fix race condition en pantalla Upload
 
 - **fix (ui):** se eliminó el error `Cannot read properties of undefined (reading 'classList')` que aparecía al entrar a la pantalla de subida (`upload.js`). El `onEnter` ahora garantiza que el DOM esté inicializado antes de llamar a `setBusy`, y `setBusy` tiene guard ante referencias aún no cargadas.

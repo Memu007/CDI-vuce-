@@ -1734,6 +1734,16 @@ async def get_financials():
     }
 
 
+@app.get("/api/arca/novedades")
+async def get_arca_novedades():
+    """
+    Últimas novedades de ARCA/AFIP, consumidas desde el feed XML público.
+    Cache en memoria de 15 minutos para no golpear la fuente oficial.
+    """
+    from proyecto_maria.core.arca_news import fetch_arca_novedades
+    return await fetch_arca_novedades()
+
+
 # Montar archivos estáticos
 app.mount("/static", StaticFiles(directory=os.path.join(basedir, "proyecto_maria", "static")), name="static")
 
