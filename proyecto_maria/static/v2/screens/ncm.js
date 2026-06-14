@@ -513,12 +513,12 @@
     function renderAutofillChip(it) {
         if (!it || !it.__autofillSource) return '';
         const src = it.__autofillSource;
-        let label = '', cls = '';
-        if (src === 'cliente') { label = 'Cliente'; cls = 'chip-cliente'; }
+        let label = '', cls = '', icon = '';
+        if (src === 'cliente') { label = 'Cliente'; cls = 'chip-cliente'; icon = '📚 '; }
         else if (src === 'proveedor') { label = 'Proveedor'; cls = 'chip-proveedor'; }
         else return '';
         const conf = it.__autofillConfidence ? ' (' + Math.round(it.__autofillConfidence * 100) + '%)' : '';
-        return '<span class="ncm-autofill-chip ' + cls + '" title="NCM sugerido desde ' + label.toLowerCase() + conf + '">' + label + '</span>';
+        return '<span class="ncm-autofill-chip ' + cls + '" title="NCM sugerido desde ' + label.toLowerCase() + conf + '">' + icon + label + '</span>';
     }
 
     function renderNotesPill(ncm, rowIdx) {

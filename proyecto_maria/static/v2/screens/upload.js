@@ -277,6 +277,18 @@
             CDI.state.operationSavedFor = null;
             CDI.state.orphanDismissedFor = null;
 
+            // Toast sutil si el backend aprendió/actualizó columnas del cliente.
+            const catalogo = data && data.catalogo;
+            if (currentFormat === 'excel' && catalogo && catalogo.columnas_detectadas > 0 && CDI.toast) {
+                const total = catalogo.total || 6;
+                const faltan = (catalogo.columnas_faltantes || []).length;
+                if (faltan === 0) {
+                    CDI.toast('Catálogo aprendido', total + '/' + total + ' columnas reconocidas.', 'success');
+                } else {
+                    CDI.toast('Catálogo parcial', catalogo.columnas_detectadas + '/' + total + ' columnas reconocidas.', 'info');
+                }
+            }
+
             if (currentFormat === 'pdf' && CDI.setClienteActivo) {
                 CDI.setClienteActivo(null);
                 CDI.track && CDI.track('cliente_activo_cleared_for_pdf', {
@@ -436,6 +448,11 @@
                 const curOrigen = String(it.origen || '').toUpperCase();
                 if ((!curOrigen || curOrigen === 'XX') && m.origen) {
                     it.origen = m.origen;
+                    changed = true;
+                }
+                // Autofill silencioso de peso unitario desde memoria del cliente.
+                if (m.source === 'cliente' && m.peso_unitario_avg && !(it.peso_unitario > 0)) {
+                    it.peso_unitario = Number(m.peso_unitario_avg);
                     changed = true;
                 }
                 if (changed) {

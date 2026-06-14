@@ -1,6 +1,6 @@
 /* ============================================================
    CDI v2 - Screen Clientes (full-screen two-pane)
-   Responsabilidad: CRUD minimo + historial + mapeo Excel.
+   Responsabilidad: CRUD minimo + historial + catalogo del cliente.
    Registrado como screen via CDI.registerScreen('clientes').
 
    Exponemos:
@@ -19,9 +19,9 @@
     let listEl, loadingEl, emptyListEl;
     let emptySelectionEl, detailBodyEl, backBtn;
     let heroEl, kpiOps, kpiItems, kpiPromedio, kpiOrigen, kpiValor, kpiUltimo;
-    let tabOps, tabMapeo, tabDatos, panelOps, panelMapeo, panelDatos;
+    let tabOps, tabCatalogo, tabDatos, panelOps, panelCatalogo, panelDatos;
     let opsList, opsEmpty, opsExpand, opsExpandBtn, exportCsvBtn;
-    let mapeoList, mapeoEmpty, mapeoActions, mapeoReset, mapeoSave;
+    let catalogoList, catalogoEmpty, catalogoActions, catalogoReset, catalogoSave, catalogoBadge, catalogoProductosList, catalogoProductosEmpty;
     let datosGrid;
     let filterChips = [], sortSelect;
 
@@ -82,21 +82,24 @@
         kpiValor       = $('cxKpiValor');
         kpiUltimo      = $('cxKpiUltimo');
         tabOps         = $('cxTabOps');
-        tabMapeo       = $('cxTabMapeo');
+        tabCatalogo    = $('cxTabCatalogo');
         tabDatos       = $('cxTabDatos');
         panelOps       = screenEl.querySelector('[data-panel="ops"]');
-        panelMapeo     = screenEl.querySelector('[data-panel="mapeo"]');
+        panelCatalogo  = screenEl.querySelector('[data-panel="catalogo"]');
         panelDatos     = screenEl.querySelector('[data-panel="datos"]');
         opsList        = $('cxOpsList');
         opsEmpty       = $('cxOpsEmpty');
         opsExpand      = $('cxOpsExpand');
         opsExpandBtn   = $('cxOpsExpandBtn');
         exportCsvBtn   = $('cxExportCsvBtn');
-        mapeoList      = $('cxMapeoList');
-        mapeoEmpty     = $('cxMapeoEmpty');
-        mapeoActions   = $('cxMapeoActions');
-        mapeoReset     = $('cxMapeoReset');
-        mapeoSave      = $('cxMapeoSave');
+        catalogoList           = $('cxCatalogoList');
+        catalogoEmpty          = $('cxCatalogoEmpty');
+        catalogoActions        = $('cxCatalogoActions');
+        catalogoReset          = $('cxCatalogoReset');
+        catalogoSave           = $('cxCatalogoSave');
+        catalogoBadge          = $('cxCatalogoBadge');
+        catalogoProductosList  = $('cxCatalogoProductosList');
+        catalogoProductosEmpty = $('cxCatalogoProductosEmpty');
         datosGrid      = $('cxDatosGrid');
         filterChips    = Array.from(screenEl.querySelectorAll('.cx-chip[data-filter]'));
         sortSelect     = $('cxSort');
@@ -161,10 +164,10 @@
 
         // Tabs
         if (tabOps)   tabOps.addEventListener('click', () => switchTab('ops'));
-        if (tabMapeo) tabMapeo.addEventListener('click', () => switchTab('mapeo'));
-        if (tabDatos) tabDatos.addEventListener('click', () => switchTab('datos'));
-        if (mapeoReset) mapeoReset.addEventListener('click', resetMapping);
-        if (mapeoSave)  mapeoSave.addEventListener('click', saveMapping);
+        if (tabCatalogo) tabCatalogo.addEventListener('click', () => switchTab('catalogo'));
+        if (tabDatos)    tabDatos.addEventListener('click', () => switchTab('datos'));
+        if (catalogoReset) catalogoReset.addEventListener('click', resetCatalogo);
+        if (catalogoSave)  catalogoSave.addEventListener('click', saveCatalogo);
 
         // Export CSV e expand de operaciones
         if (exportCsvBtn) exportCsvBtn.addEventListener('click', exportClientCsv);
@@ -902,23 +905,23 @@
        ========================================================== */
     function switchTab(tab) {
         activeTab = tab;
-        [[tabOps, 'ops'], [tabMapeo, 'mapeo'], [tabDatos, 'datos']].forEach(([btn, t]) => {
+        [[tabOps, 'ops'], [tabCatalogo, 'catalogo'], [tabDatos, 'datos']].forEach(([btn, t]) => {
             if (!btn) return;
             const active = tab === t;
             btn.classList.toggle('is-active', active);
             btn.setAttribute('aria-selected', active ? 'true' : 'false');
         });
-        if (panelOps)   panelOps.hidden   = tab !== 'ops';
-        if (panelMapeo) panelMapeo.hidden = tab !== 'mapeo';
-        if (panelDatos) panelDatos.hidden = tab !== 'datos';
-        if (tab === 'mapeo' && detailClienteId && currentMapping == null) {
-            CDI.track && CDI.track('mapping_opened', { id: detailClienteId });
-            loadMapping(detailClienteId);
+        if (panelOps)      panelOps.hidden      = tab !== 'ops';
+        if (panelCatalogo) panelCatalogo.hidden = tab !== 'catalogo';
+        if (panelDatos)    panelDatos.hidden    = tab !== 'datos';
+        if (tab === 'catalogo' && detailClienteId && currentMapping == null) {
+            CDI.track && CDI.track('catalogo_opened', { id: detailClienteId });
+            loadCatalogo(detailClienteId);
         }
     }
 
     /* ==========================================================
-       Mapeo Excel
+       Catálogo del cliente (columnas + productos aprendidos)
        ========================================================== */
     const CANON_LABELS = {
         pieza: 'NCM / Pieza',
@@ -930,56 +933,81 @@
     };
     const CANON_ORDER = ['pieza', 'descripcion', 'origen', 'cantidad', 'valor_unitario', 'peso_unitario'];
 
-    async function loadMapping(id) {
-        if (!mapeoList) return;
-        renderMapping(null);
+    async function loadCatalogo(id) {
+        if (!catalogoList) return;
+        renderCatalogo(null);
         try {
-            const res = await CDI.api('/api/clientes/' + encodeURIComponent(id) + '/column_mapping');
-            if (!res || !res.ok) throw new Error('No se pudo cargar el mapeo');
-            const data = await res.json().catch(() => ({}));
-            currentMapping = (data && data.mapping) || {};
+            const [colRes, prodRes] = await Promise.all([
+                CDI.api('/api/clientes/' + encodeURIComponent(id) + '/catalogo/columnas'),
+                CDI.api('/api/clientes/' + encodeURIComponent(id) + '/catalogo/productos'),
+            ]);
+            if (!colRes || !colRes.ok) throw new Error('No se pudo cargar el catálogo');
+            const colData = await colRes.json().catch(() => ({}));
+            currentMapping = (colData && colData.columnas) || {};
             mappingDraft = Object.assign({}, currentMapping);
-            renderMapping(mappingDraft);
+            renderCatalogo(mappingDraft, (colData && colData.status) || {});
+
+            const prodData = await prodRes.json().catch(() => ({}));
+            renderCatalogoProductos((prodData && prodData.productos) || []);
         } catch (err) {
-            console.error('[mapping] load', err);
-            renderMapping({});
-            CDI.toast && CDI.toast.error('No se pudo cargar el mapeo.');
+            console.error('[catalogo] load', err);
+            renderCatalogo({});
+            renderCatalogoProductos([]);
+            CDI.toast && CDI.toast.error('No se pudo cargar el catálogo.');
         }
     }
 
-    function renderMapping(mapping) {
-        if (!mapeoList || !mapeoEmpty || !mapeoActions) return;
+    function renderCatalogo(mapping, status) {
+        if (!catalogoList || !catalogoEmpty || !catalogoActions || !catalogoBadge) return;
         if (mapping == null) {
-            mapeoList.hidden = true;
-            mapeoEmpty.hidden = true;
-            mapeoActions.hidden = true;
+            catalogoList.hidden = true;
+            catalogoEmpty.hidden = true;
+            catalogoActions.hidden = true;
+            catalogoBadge.hidden = true;
             return;
         }
         const entries = Object.entries(mapping || {});
+        const detectedCanons = new Set(entries.map(([, canon]) => canon));
+        const total = CANON_ORDER.length;
+        const detected = CANON_ORDER.filter(c => detectedCanons.has(c)).length;
+
+        // Badge
+        catalogoBadge.hidden = false;
+        if (detected === 0) {
+            catalogoBadge.textContent = 'Sin catálogo aún';
+            catalogoBadge.className = 'cx-catalogo-badge is-empty';
+        } else if (detected === total) {
+            catalogoBadge.textContent = total + '/' + total + ' ✓';
+            catalogoBadge.className = 'cx-catalogo-badge is-complete';
+        } else {
+            catalogoBadge.textContent = detected + '/' + total + ' Parcial';
+            catalogoBadge.className = 'cx-catalogo-badge is-partial';
+        }
+
         if (!entries.length) {
-            mapeoList.hidden = true;
-            mapeoEmpty.hidden = false;
-            mapeoActions.hidden = true;
+            catalogoList.hidden = true;
+            catalogoEmpty.hidden = false;
+            catalogoActions.hidden = true;
             return;
         }
-        mapeoEmpty.hidden = true;
-        mapeoList.hidden = false;
-        mapeoActions.hidden = false;
-        mapeoList.innerHTML = entries.map(([header, canon]) => {
+        catalogoEmpty.hidden = true;
+        catalogoList.hidden = false;
+        catalogoActions.hidden = false;
+        catalogoList.innerHTML = entries.map(([header, canon]) => {
             const options = ['<option value="">(ignorar)</option>']
                 .concat(CANON_ORDER.map(c =>
                     '<option value="' + c + '"' + (c === canon ? ' selected' : '') + '>' +
                         CDI.escapeHtml(CANON_LABELS[c] || c) + '</option>'
                 ));
             return (
-                '<li class="cx-mapeo-row">' +
+                '<li class="cx-catalogo-row">' +
                     '<span class="mapping-src" title="' + CDI.escapeHtml(header) + '">' + CDI.escapeHtml(header) + '</span>' +
                     '<span class="mapping-arrow">→</span>' +
                     '<select data-mapping-header="' + CDI.escapeHtml(header) + '">' + options.join('') + '</select>' +
                 '</li>'
             );
         }).join('');
-        mapeoList.querySelectorAll('select[data-mapping-header]').forEach(sel => {
+        catalogoList.querySelectorAll('select[data-mapping-header]').forEach(sel => {
             sel.addEventListener('change', (ev) => {
                 const h = sel.getAttribute('data-mapping-header');
                 const v = String(ev.target.value || '').trim();
@@ -990,54 +1018,83 @@
         });
     }
 
-    async function saveMapping() {
+    async function saveCatalogo() {
         if (!detailClienteId || !mappingDraft) return;
-        mapeoSave.disabled = true;
+        catalogoSave.disabled = true;
         try {
-            const res = await CDI.api('/api/clientes/' + encodeURIComponent(detailClienteId) + '/column_mapping', {
-                method: 'POST', body: JSON.stringify({ mapping: mappingDraft }),
+            const res = await CDI.api('/api/clientes/' + encodeURIComponent(detailClienteId) + '/catalogo/columnas', {
+                method: 'PUT', body: JSON.stringify({ columnas: mappingDraft }),
             });
             if (!res || !res.ok) {
                 const err = await res.json().catch(() => ({}));
                 throw new Error(err.detail || 'No se pudo guardar');
             }
             const data = await res.json().catch(() => ({}));
-            currentMapping = (data && data.mapping) || {};
+            currentMapping = (data && data.columnas) || {};
             mappingDraft = Object.assign({}, currentMapping);
-            renderMapping(mappingDraft);
-            CDI.toast && CDI.toast.success('Mapeo guardado');
-            CDI.track && CDI.track('mapping_saved', { id: detailClienteId });
+            renderCatalogo(mappingDraft, (data && data.status) || {});
+            CDI.toast && CDI.toast.success('Catálogo guardado');
+            CDI.track && CDI.track('catalogo_saved', { id: detailClienteId });
         } catch (err) {
             CDI.toast && CDI.toast.error(String(err.message || err));
         } finally {
-            mapeoSave.disabled = false;
+            catalogoSave.disabled = false;
         }
     }
 
-    async function resetMapping() {
+    async function resetCatalogo() {
         if (!detailClienteId) return;
         const ok = await CDI.confirm({
-            title: 'Borrar mapeo',
-            lead: '¿Borrar el mapeo guardado?',
-            text: 'El próximo Excel de este cliente volverá a usar el mapeo genérico hasta que guardes uno nuevo.',
-            acceptText: 'Borrar mapeo',
+            title: 'Olvidar columnas',
+            lead: '¿Borrar las columnas reconocidas?',
+            text: 'El próximo Excel de este cliente volverá a usar el mapeo genérico hasta que se vuelva a aprender.',
+            acceptText: 'Olvidar',
             kind: 'warning',
         });
         if (!ok) return;
-        mapeoReset.disabled = true;
+        catalogoReset.disabled = true;
         try {
-            const res = await CDI.api('/api/clientes/' + encodeURIComponent(detailClienteId) + '/column_mapping', { method: 'DELETE' });
+            const res = await CDI.api('/api/clientes/' + encodeURIComponent(detailClienteId) + '/catalogo/columnas', { method: 'DELETE' });
             if (!res || !res.ok) throw new Error('No se pudo resetear');
             currentMapping = {};
             mappingDraft = {};
-            renderMapping({});
-            CDI.toast && CDI.toast.success('Mapeo eliminado');
-            CDI.track && CDI.track('mapping_reset', { id: detailClienteId });
+            renderCatalogo({}, { total: CANON_ORDER.length, detectadas: 0, faltantes: CANON_ORDER.slice(), completo: false });
+            CDI.toast && CDI.toast.success('Columnas olvidadas');
+            CDI.track && CDI.track('catalogo_reset', { id: detailClienteId });
         } catch (err) {
             CDI.toast && CDI.toast.error(String(err.message || err));
         } finally {
-            mapeoReset.disabled = false;
+            catalogoReset.disabled = false;
         }
+    }
+
+    function renderCatalogoProductos(productos) {
+        if (!catalogoProductosList || !catalogoProductosEmpty) return;
+        if (!productos || !productos.length) {
+            catalogoProductosList.innerHTML = '';
+            catalogoProductosEmpty.hidden = false;
+            return;
+        }
+        catalogoProductosEmpty.hidden = true;
+        catalogoProductosList.innerHTML = productos.map(p => {
+            const ultima = p.ultima_vez ? CDI.formatDate ? CDI.formatDate(p.ultima_vez) : p.ultima_vez.slice(0, 10) : '—';
+            return (
+                '<li class="cx-catalogo-producto-row" data-producto-id="' + CDI.escapeHtml(p.id) + '">' +
+                    '<div class="cx-catalogo-producto-main">' +
+                        '<div class="cx-catalogo-producto-desc" title="' + CDI.escapeHtml(p.descripcion) + '">' + CDI.escapeHtml(p.descripcion) + '</div>' +
+                        '<div class="cx-catalogo-producto-sub">' +
+                            '<span class="cx-catalogo-producto-ncm">' + CDI.escapeHtml(p.ncm) + '</span>' +
+                            ' · Origen ' + CDI.escapeHtml(p.origen || 'XX') +
+                            ' · Peso ' + (p.peso_unitario_avg != null ? p.peso_unitario_avg.toFixed(3) : '—') + ' kg' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="cx-catalogo-producto-meta">' +
+                        '<span class="cx-catalogo-producto-usos" title="Veces usado">' + (p.veces_usado || 1) + '×</span>' +
+                        '<span class="cx-catalogo-producto-ultima" title="Última operación">' + ultima + '</span>' +
+                    '</div>' +
+                '</li>'
+            );
+        }).join('');
     }
 
     async function loadDetailData(id) {

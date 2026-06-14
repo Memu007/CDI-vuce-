@@ -779,7 +779,7 @@
 
                                 <nav class="cx-tabs" role="tablist" aria-label="Secciones del cliente">
                                     <button type="button" class="cx-tab is-active" role="tab" aria-selected="true" data-tab="ops" id="cxTabOps">Operaciones</button>
-                                    <button type="button" class="cx-tab" role="tab" aria-selected="false" data-tab="mapeo" id="cxTabMapeo">Mapeo Excel</button>
+                                    <button type="button" class="cx-tab" role="tab" aria-selected="false" data-tab="catalogo" id="cxTabCatalogo">Catálogo</button>
                                     <button type="button" class="cx-tab" role="tab" aria-selected="false" data-tab="datos" id="cxTabDatos">Datos</button>
                                     <span class="cx-tabs-underline" id="cxTabsUnderline" aria-hidden="true"></span>
                                 </nav>
@@ -805,16 +805,32 @@
                                     </div>
                                 </div>
 
-                                <div class="cx-tab-panel" role="tabpanel" data-panel="mapeo" aria-labelledby="cxTabMapeo" hidden>
-                                    <p class="caption cx-mapeo-caption" id="cxMapeoIntro">El mapeo vincula las columnas de tu Excel con los campos del sistema. Si el auto-match falla, ajustalo acá.</p>
-                                    <div class="cx-mapeo-empty" id="cxMapeoEmpty" hidden>
-                                        <p class="caption">Todavía no hay un mapeo guardado para este cliente.</p>
-                                        <p class="caption">Subí un Excel y si no se reconocen las columnas, vas a poder mapearlas desde acá.</p>
+                                <div class="cx-tab-panel" role="tabpanel" data-panel="catalogo" aria-labelledby="cxTabCatalogo" hidden>
+                                    <div class="cx-catalogo-section">
+                                        <div class="cx-catalogo-header">
+                                            <h4 class="cx-catalogo-title">Columnas reconocidas</h4>
+                                            <span class="cx-catalogo-badge" id="cxCatalogoBadge">—</span>
+                                        </div>
+                                        <p class="caption cx-catalogo-caption" id="cxCatalogoIntro">El catálogo vincula las columnas de tu Excel con los campos del sistema. Se aprende automáticamente al subir un Excel y podés corregirlo acá.</p>
+                                        <div class="cx-catalogo-empty" id="cxCatalogoEmpty" hidden>
+                                            <p class="caption">Todavía no hay columnas reconocidas para este cliente.</p>
+                                            <p class="caption">Subí un Excel y el sistema va a aprender el formato automáticamente.</p>
+                                        </div>
+                                        <ul class="cx-catalogo-list" id="cxCatalogoList" hidden></ul>
+                                        <div class="cx-catalogo-actions" id="cxCatalogoActions" hidden>
+                                            <button type="button" class="btn btn-ghost btn-sm" id="cxCatalogoReset">Olvidar columnas</button>
+                                            <button type="button" class="btn btn-primary btn-sm" id="cxCatalogoSave">Guardar cambios</button>
+                                        </div>
                                     </div>
-                                    <ul class="cx-mapeo-list" id="cxMapeoList" hidden></ul>
-                                    <div class="cx-mapeo-actions" id="cxMapeoActions" hidden>
-                                        <button type="button" class="btn btn-ghost btn-sm" id="cxMapeoReset">Resetear mapeo</button>
-                                        <button type="button" class="btn btn-primary btn-sm" id="cxMapeoSave">Guardar cambios</button>
+                                    <div class="cx-catalogo-section">
+                                        <div class="cx-catalogo-header">
+                                            <h4 class="cx-catalogo-title">Productos aprendidos</h4>
+                                        </div>
+                                        <div class="cx-catalogo-productos-empty" id="cxCatalogoProductosEmpty" hidden>
+                                            <p class="caption">Todavía no aprendí productos de este cliente.</p>
+                                            <p class="caption">Se van a guardar cuando generés una MARIA con ítems asociados a este cliente.</p>
+                                        </div>
+                                        <ul class="cx-catalogo-productos-list" id="cxCatalogoProductosList"></ul>
                                     </div>
                                 </div>
 
