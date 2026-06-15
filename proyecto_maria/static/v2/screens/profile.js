@@ -373,7 +373,7 @@
 
     async function openCheckout() {
         try {
-            const plan = billingPlanSelect && !billingPlanSelect.hidden ? billingPlanSelect.value : 'basic';
+            const plan = billingPlanSelect && !billingPlanSelect.hidden ? billingPlanSelect.value : 'premium';
             const res = await CDI.api('/api/billing/checkout', {
                 method: 'POST',
                 body: JSON.stringify({ plan: plan })

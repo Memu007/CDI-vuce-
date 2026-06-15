@@ -50,19 +50,13 @@ TOPUP_OPS = int(os.environ.get("MP_TOPUP_OPS", "10"))
 
 
 # Planes internos. Precios y límites deben coincidir con lo configurado en MP.
+# Ola 4 MVP: se ofrece un único plan Premium de $30.000 ARS/mes, 10 ops/mes.
 PLANS: dict[str, dict[str, Any]] = {
-    "basic": {
-        "name": "Básico",
-        "price": 15000,
-        "ops": 4,
-        "clients": 10,
-        "users": 1,
-    },
     "premium": {
         "name": "Premium",
         "price": 30000,
-        "ops": None,  # ilimitado (dentro de lo razonable)
-        "clients": None,
+        "ops": 10,
+        "clients": None,  # ilimitados
         "users": 3,
     },
 }
@@ -81,7 +75,10 @@ def _get_sdk():
 
 
 def get_plan(plan_id: str) -> dict[str, Any]:
+    # Ola 4 MVP: solo existe Premium. Cualquier otro id cae a Premium.
     plan = PLANS.get(plan_id)
+    if not plan and PLANS:
+        return list(PLANS.values())[0]
     if not plan:
         raise ValueError(f"Plan desconocido: {plan_id}")
     return plan
