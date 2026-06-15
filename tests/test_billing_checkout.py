@@ -42,7 +42,7 @@ def test_checkout_requiere_auth():
 
 
 def test_checkout_modo_demo_sin_credenciales(client, monkeypatch):
-    monkeypatch.setattr(main, "MP_ACCESS_TOKEN", "")
+    monkeypatch.delenv("MP_ACCESS_TOKEN", raising=False)
     resp = client.post("/api/billing/checkout", json={"plan": "premium"})
     assert resp.status_code == 200
     data = resp.json()
@@ -52,9 +52,9 @@ def test_checkout_modo_demo_sin_credenciales(client, monkeypatch):
 
 def test_checkout_sandbox_incluye_back_urls(client, monkeypatch):
     _FakeSDK.captured = {}
-    monkeypatch.setattr(main.billing_service, "MP_ACCESS_TOKEN", "TEST-token-sandbox")
-    monkeypatch.setattr(main.mercadopago, "SDK", _FakeSDK)
-    monkeypatch.delenv("FRONTEND_URL", raising=False)  # dev: http://127.0.0.1:8010
+    monkeypatch.setenv("MP_ACCESS_TOKEN", "TEST-token-sandbox")
+    monkeypatch.setattr(main.billing_service.mercadopago, "SDK", _FakeSDK)
+    monkeypatch.delenv("FRONTEND_URL", raising=False)  # dev default: http://127.0.0.1:8000
 
     resp = client.post("/api/billing/checkout", json={"plan": "premium"})
     assert resp.status_code == 200
@@ -73,9 +73,9 @@ def test_checkout_sandbox_incluye_back_urls(client, monkeypatch):
 
 def test_checkout_prod_https_agrega_auto_return(client, monkeypatch):
     _FakeSDK.captured = {}
-    monkeypatch.setattr(main.billing_service, "MP_ACCESS_TOKEN", "APP_USR-token-live")
-    monkeypatch.setattr(main.billing_service, "MP_SANDBOX", False)
-    monkeypatch.setattr(main.mercadopago, "SDK", _FakeSDK)
+    monkeypatch.setenv("MP_ACCESS_TOKEN", "APP_USR-token-live")
+    monkeypatch.setenv("MP_SANDBOX", "false")
+    monkeypatch.setattr(main.billing_service.mercadopago, "SDK", _FakeSDK)
     monkeypatch.setenv("FRONTEND_URL", "https://cdi.example.com")
 
     resp = client.post("/api/billing/checkout", json={"plan": "premium"})

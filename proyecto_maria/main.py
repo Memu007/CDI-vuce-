@@ -6245,7 +6245,7 @@ async def billing_checkout(
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     # Modo demo cuando no hay credenciales
-    if not billing_service.MP_ACCESS_TOKEN:
+    if not billing_service.is_configured():
         demo_id = f"demo_{uuid.uuid4().hex[:8]}"
         pending_payments[demo_id] = {
             "status": "pending",

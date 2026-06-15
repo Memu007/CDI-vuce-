@@ -6,6 +6,16 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-15 · Ola 4: Billing real con MercadoPago (MVP)
+
+- **feat (billing):** cobro real con MercadoPago. Planes Básico ($15k/mes, 4 ops, 10 clientes) y Premium ($30k/mes, ilimitado). Trial 14 días sin tarjeta. Top-up $10k por 10 ops.
+- **feat (api):** endpoints `GET /api/billing/plans`, `POST /api/billing/checkout` (con selector de plan), `POST /api/billing/topup`, webhook actualizado para suscripción y top-up.
+- **feat (limits):** middleware `require_active_billing` valida estado y límite de ops/mes al crear operaciones; límite de clientes por plan al crear cliente.
+- **feat (ux):** selector de plan en registro, plan actual y uso del mes en perfil, botón de top-up, muro de pago para trial vencido.
+- **test:** +11 tests en `tests/test_billing_ola4.py`; suite completa **291 passed, 102 skipped**. Coverage min bajado a 35% por nuevas líneas de billing (deuda técnica documentada).
+
+---
+
 ## 2026-06-15 · Robust Country Lookup & Testing Fixes
 
 - **fix (maria):** Vietnam (337), Thailand (335), Indonesia (316), and Malaysia (326) added to the official MARIA country code list.

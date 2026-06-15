@@ -615,7 +615,11 @@
                 cta.textContent = 'Abriendo...';
                 track('billing_cta_clicked', { status: status });
                 try {
-                    const res = await api('/api/billing/checkout', { method: 'POST' });
+                    const plan = (user && user.plan) || 'basic';
+                    const res = await api('/api/billing/checkout', {
+                        method: 'POST',
+                        body: JSON.stringify({ plan })
+                    });
                     const data = await res.json().catch(() => ({}));
                     if (data && data.init_point) {
                         window.location.href = data.init_point;
@@ -672,12 +676,14 @@
         params.delete('billing');
         const clean = window.location.pathname + (params.toString() ? '?' + params.toString() : '');
         try { window.history.replaceState({}, '', clean); } catch (_) {}
-        if (status === 'success') {
+        if (status === 'success' || status === 'success_preapproval') {
             toast.success('¡Pago recibido!', 'Tu plan se activa en unos segundos.');
             track('billing_return_success');
-            // El webhook actualiza la DB async: refrescamos el user a los 4s
-            // para que el banner de billing desaparezca solo.
             setTimeout(loadCurrentUser, 4000);
+        } else if (status === 'topup_success') {
+            toast.success('Top-up acreditado', 'Ya tenés 10 operaciones adicionales.');
+            track('billing_return_topup_success');
+            setTimeout(loadCurrentUser, 2000);
         } else if (status === 'pending') {
             toast.info('Pago pendiente', 'Te avisamos cuando se acredite. Podés seguir usando la app.');
             track('billing_return_pending');

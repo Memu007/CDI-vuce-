@@ -1259,6 +1259,17 @@
                         <label class="field-label">Estado actual</label>
                         <p class="caption" id="pfBillingStatus">—</p>
                     </div>
+                    <div class="field" id="pfBillingPlanWrap" hidden>
+                        <label class="field-label">Plan</label>
+                        <select id="pfBillingPlanSelect" class="select">
+                            <option value="basic">Básico — $15.000/mes · 4 ops · 10 clientes</option>
+                            <option value="premium">Premium — $30.000/mes · ops ilimitadas · clientes ilimitados</option>
+                        </select>
+                    </div>
+                    <div class="field" id="pfBillingUsageWrap" hidden>
+                        <label class="field-label">Uso del mes</label>
+                        <p class="caption" id="pfBillingUsage">—</p>
+                    </div>
                     <div class="field" id="pfBillingNextWrap" hidden>
                         <label class="field-label" id="pfBillingNextLabel">Próximo cobro</label>
                         <p class="caption" id="pfBillingNext">—</p>
@@ -1271,6 +1282,7 @@
                         <button type="button" class="btn btn-secondary btn-sm" id="pfBillingActivate" hidden>Activar plan</button>
                         <button type="button" class="btn btn-secondary btn-sm" id="pfBillingReactivate" hidden>Reactivar plan</button>
                         <button type="button" class="btn btn-ghost btn-sm" id="pfBillingCancel" hidden>Cancelar plan</button>
+                        <button type="button" class="btn btn-secondary btn-sm" id="pfBillingTopup" hidden>+10 ops ($10.000)</button>
                     </div>
                 </div>
             </details>

@@ -310,33 +310,15 @@
                 <input name="password" type="password" autocomplete="new-password" minlength="8" required />
             </label>
 
-            <fieldset class="pay-fieldset pay-fieldset-demo">
-                <legend>Método de pago <span class="pay-mode">modo demo · beta</span></legend>
-                <div class="pay-demo-banner">
-                    <strong>Beta cerrada.</strong> No se cobra nada.
-                    <button type="button" class="btn-fill-test-card" id="btnFillTestCard">Usar tarjeta de prueba</button>
-                </div>
-                <label class="field">
-                    <span>Titular</span>
-                    <input name="cardholder" type="text" autocomplete="cc-name" required />
-                </label>
-                <label class="field">
-                    <span>Número</span>
-                    <input name="card_number" type="text" inputmode="numeric" autocomplete="cc-number" maxlength="23" placeholder="4242 4242 4242 4242" required />
-                </label>
-                <div class="field-row">
-                    <label class="field">
-                        <span>Vencimiento</span>
-                        <input name="card_exp" type="text" inputmode="numeric" autocomplete="cc-exp" placeholder="MM/YY" maxlength="5" required />
-                    </label>
-                    <label class="field">
-                        <span>CVC</span>
-                        <input name="card_cvc" type="text" inputmode="numeric" autocomplete="cc-csc" maxlength="4" placeholder="123" required />
-                    </label>
-                </div>
-            </fieldset>
+            <label class="field">
+                <span>Elegí tu plan</span>
+                <select name="plan" required>
+                    <option value="basic" selected>Básico — 14 días gratis · luego $15.000/mes · 4 ops/mes</option>
+                    <option value="premium">Premium — 14 días gratis · luego $30.000/mes · ops ilimitadas</option>
+                </select>
+            </label>
 
-            <button type="submit" class="btn-primary btn-lg btn-block">Empezar trial de 15 días</button>
+            <button type="submit" class="btn-primary btn-lg btn-block">Empezar trial de 14 días</button>
             <p class="auth-hint">¿Ya tenés cuenta? <a href="#" data-tab="login" class="auth-link">Ingresar →</a></p>
         </form>
 
@@ -449,71 +431,11 @@
         });
     });
 
-    /* ---------- Card formatting + Luhn (client-side pre-check) ---------- */
-    const cardNumberInput = forms.register.querySelector('input[name="card_number"]');
-    const cardExpInput = forms.register.querySelector('input[name="card_exp"]');
-    const cardCvcInput = forms.register.querySelector('input[name="card_cvc"]');
-
-    if (cardNumberInput) {
-        cardNumberInput.addEventListener('input', (e) => {
-            const digits = e.target.value.replace(/\D/g, '').slice(0, 19);
-            e.target.value = digits.replace(/(.{4})/g, '$1 ').trim();
-        });
-    }
-    if (cardExpInput) {
-        cardExpInput.addEventListener('input', (e) => {
-            let v = e.target.value.replace(/\D/g, '').slice(0, 4);
-            if (v.length >= 3) v = v.slice(0, 2) + '/' + v.slice(2);
-            e.target.value = v;
-        });
-    }
-    if (cardCvcInput) {
-        cardCvcInput.addEventListener('input', (e) => {
-            e.target.value = e.target.value.replace(/\D/g, '').slice(0, 4);
-        });
-    }
-
-    /* "Usar tarjeta de prueba" autollena el form con datos validos */
-    const btnFillTestCard = document.getElementById('btnFillTestCard');
-    if (btnFillTestCard) {
-        btnFillTestCard.addEventListener('click', () => {
-            const cardholder = forms.register.querySelector('input[name="cardholder"]');
-            if (cardholder && !cardholder.value.trim()) cardholder.value = 'Test User';
-            if (cardNumberInput) {
-                cardNumberInput.value = '4242 4242 4242 4242';
-            }
-            if (cardExpInput) cardExpInput.value = '12/29';
-            if (cardCvcInput) cardCvcInput.value = '123';
-        });
-    }
-
-    function passesLuhn(digits) {
-        let sum = 0;
-        for (let i = 0; i < digits.length; i++) {
-            let n = parseInt(digits[digits.length - 1 - i], 10);
-            if (i % 2 === 1) { n *= 2; if (n > 9) n -= 9; }
-            sum += n;
+    /* ---------- Plan validation ---------- */
+    function validatePlan(payload) {
+        if (!payload.plan || !['basic', 'premium'].includes(payload.plan)) {
+            return 'Seleccioná un plan válido.';
         }
-        return sum % 10 === 0;
-    }
-
-    function validateCardFields(payload) {
-        const digits = (payload.card_number || '').replace(/\D/g, '');
-        if (digits.length < 13 || digits.length > 19) return 'Número de tarjeta inválido.';
-        if (!passesLuhn(digits)) return 'Número de tarjeta inválido.';
-        const exp = (payload.card_exp || '').replace(/\s/g, '');
-        const m = exp.match(/^(\d{2})\/(\d{2})$/);
-        if (!m) return 'Vencimiento inválido. Usá MM/YY.';
-        const month = parseInt(m[1], 10);
-        const year = 2000 + parseInt(m[2], 10);
-        const now = new Date();
-        if (month < 1 || month > 12) return 'Mes de vencimiento inválido.';
-        if (year < now.getFullYear() || (year === now.getFullYear() && month < now.getMonth() + 1)) {
-            return 'La tarjeta está vencida.';
-        }
-        const cvc = (payload.card_cvc || '');
-        if (!/^\d{3,4}$/.test(cvc)) return 'CVC inválido.';
-        if (!(payload.cardholder || '').trim()) return 'Falta el titular de la tarjeta.';
         return null;
     }
 
@@ -575,24 +497,14 @@
         }
 
         if (form === forms.register) {
-            const cardErr = validateCardFields(payload);
-            if (cardErr) {
-                errorEl.textContent = cardErr;
+            const planErr = validatePlan(payload);
+            if (planErr) {
+                errorEl.textContent = planErr;
                 errorEl.hidden = false;
                 btn.disabled = false;
                 btn.textContent = original;
                 return;
             }
-            payload.payment_method = {
-                cardholder: payload.cardholder,
-                number: (payload.card_number || '').replace(/\s/g, ''),
-                exp: payload.card_exp,
-                cvc: payload.card_cvc,
-            };
-            delete payload.cardholder;
-            delete payload.card_number;
-            delete payload.card_exp;
-            delete payload.card_cvc;
         }
 
         try {

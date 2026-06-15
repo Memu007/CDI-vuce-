@@ -61,6 +61,14 @@ class User(Base):
     payment_method_last4 = Column(String(4), nullable=True)
     payment_method_brand = Column(String(20), nullable=True)
 
+    # Ola 4: contadores y metadata de suscripción/tarjeta.
+    mp_preapproval_id = Column(String(100), nullable=True)
+    mp_plan_id = Column(String(100), nullable=True)
+    ops_used_this_period = Column(Integer, default=0)
+    extra_ops_remaining = Column(Integer, default=0)
+    billing_period_started_at = Column(DateTime(timezone=True), nullable=True)
+    last_topup_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 

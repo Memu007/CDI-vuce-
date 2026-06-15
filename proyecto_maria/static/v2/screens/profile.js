@@ -17,7 +17,8 @@
     // Plan y facturación
     let billingSummary, billingStatusEl, billingNextWrap, billingNextEl;
     let billingPmWrap, billingPmEl;
-    let billingActivateBtn, billingReactivateBtn, billingCancelBtn;
+    let billingPlanWrap, billingPlanSelect, billingUsageWrap, billingUsageEl;
+    let billingActivateBtn, billingReactivateBtn, billingCancelBtn, billingTopupBtn;
     let initialized = false;
     let loading = false;
 
@@ -86,9 +87,15 @@
         billingActivateBtn = $('pfBillingActivate');
         billingReactivateBtn = $('pfBillingReactivate');
         billingCancelBtn = $('pfBillingCancel');
+        billingPlanWrap = $('pfBillingPlanWrap');
+        billingPlanSelect = $('pfBillingPlanSelect');
+        billingUsageWrap = $('pfBillingUsageWrap');
+        billingUsageEl = $('pfBillingUsage');
+        billingTopupBtn = $('pfBillingTopup');
         if (billingActivateBtn) billingActivateBtn.addEventListener('click', () => openCheckout('activate'));
         if (billingReactivateBtn) billingReactivateBtn.addEventListener('click', reactivateBilling);
         if (billingCancelBtn) billingCancelBtn.addEventListener('click', cancelBilling);
+        if (billingTopupBtn) billingTopupBtn.addEventListener('click', openTopup);
 
         initialized = true;
     }
@@ -294,11 +301,14 @@
         const pm = b && b.payment_method;
 
         // Reset visibilidad
-        billingActivateBtn.hidden = true;
-        billingReactivateBtn.hidden = true;
-        billingCancelBtn.hidden = true;
-        billingNextWrap.hidden = true;
-        billingPmWrap.hidden = true;
+        if (billingActivateBtn) billingActivateBtn.hidden = true;
+        if (billingReactivateBtn) billingReactivateBtn.hidden = true;
+        if (billingCancelBtn) billingCancelBtn.hidden = true;
+        if (billingTopupBtn) billingTopupBtn.hidden = true;
+        if (billingNextWrap) billingNextWrap.hidden = true;
+        if (billingPmWrap) billingPmWrap.hidden = true;
+        if (billingPlanWrap) billingPlanWrap.hidden = true;
+        if (billingUsageWrap) billingUsageWrap.hidden = true;
 
         // Etiqueta de estado por estado de billing.
         const labels = {
@@ -311,9 +321,24 @@
         billingStatusEl.textContent = labels[status] || status;
         billingSummary.textContent = labels[status] || status;
 
-        // Fecha relevante: próximo cobro / fin de trial / fin de servicio.
+        // Mostrar uso del mes siempre.
+        if (billingUsageWrap && billingUsageEl) {
+            billingUsageWrap.hidden = false;
+            const used = (b && b.ops_used_this_period) || 0;
+            const limit = (b && b.ops_limit) || '—';
+            const extra = (b && b.extra_ops_remaining) || 0;
+            billingUsageEl.textContent = used + ' / ' + limit + ' ops usadas' + (extra ? ' (' + extra + ' créditos extra)' : '');
+        }
+
+        // Selector de plan visible solo si no está active (puede cambiar plan).
+        if (billingPlanWrap && billingPlanSelect && status !== 'active') {
+            billingPlanWrap.hidden = false;
+            billingPlanSelect.value = (b && b.plan) || 'basic';
+        }
+
+        // Fecha relevante.
         const nextLabel = document.getElementById('pfBillingNextLabel');
-        if (trialEnd) {
+        if (trialEnd && billingNextWrap) {
             billingNextWrap.hidden = false;
             billingNextEl.textContent = formatDateAr(trialEnd);
             if (nextLabel) {
@@ -324,8 +349,8 @@
             }
         }
 
-        // Método de pago si existe (last4 + brand).
-        if (pm && pm.last4) {
+        // Método de pago si existe.
+        if (pm && pm.last4 && billingPmWrap) {
             billingPmWrap.hidden = false;
             const brand = (pm.brand || 'tarjeta').toString();
             billingPmEl.textContent = brand + ' ···· ' + pm.last4;
@@ -333,25 +358,46 @@
 
         // Botones por estado.
         if (status === 'trial' || status === 'active') {
-            billingCancelBtn.hidden = false;
+            if (billingCancelBtn) billingCancelBtn.hidden = false;
         }
         if (status === 'past_due' || status === 'none') {
-            billingActivateBtn.hidden = false;
+            if (billingActivateBtn) billingActivateBtn.hidden = false;
         }
         if (status === 'canceled') {
-            billingReactivateBtn.hidden = false;
+            if (billingReactivateBtn) billingReactivateBtn.hidden = false;
+        }
+        if (billingTopupBtn && status !== 'none' && status !== 'past_due') {
+            billingTopupBtn.hidden = false;
         }
     }
 
     async function openCheckout() {
         try {
-            const res = await CDI.api('/api/billing/checkout', { method: 'POST' });
+            const plan = billingPlanSelect && !billingPlanSelect.hidden ? billingPlanSelect.value : 'basic';
+            const res = await CDI.api('/api/billing/checkout', {
+                method: 'POST',
+                body: JSON.stringify({ plan: plan })
+            });
             const data = await res.json().catch(() => ({}));
             if (data && data.init_point) {
                 window.location.href = data.init_point;
                 return;
             }
             CDI.toast('Error', 'No se pudo iniciar el cobro.', 'error');
+        } catch (err) {
+            CDI.toast('Error', String(err.message || err), 'error');
+        }
+    }
+
+    async function openTopup() {
+        try {
+            const res = await CDI.api('/api/billing/topup', { method: 'POST', body: JSON.stringify({}) });
+            const data = await res.json().catch(() => ({}));
+            if (data && data.init_point) {
+                window.location.href = data.init_point;
+                return;
+            }
+            CDI.toast('Error', 'No se pudo iniciar el top-up.', 'error');
         } catch (err) {
             CDI.toast('Error', String(err.message || err), 'error');
         }

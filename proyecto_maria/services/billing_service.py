@@ -21,15 +21,33 @@ from typing import Any, Tuple
 import mercadopago
 
 
-MP_ACCESS_TOKEN = os.environ.get("MP_ACCESS_TOKEN", "")
-MP_SANDBOX = os.environ.get("MP_SANDBOX", "true").lower() in ("1", "true", "yes")
-FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://127.0.0.1:8000")
+# Lectura dinámica de envs para que tests con monkeypatch funcionen sin recargar módulo.
+def _access_token() -> str:
+    return os.environ.get("MP_ACCESS_TOKEN", "")
 
-MP_PREAPPROVAL_PLAN_ID_BASIC = os.environ.get("MP_PREAPPROVAL_PLAN_ID_BASIC", "")
-MP_PREAPPROVAL_PLAN_ID_PREMIUM = os.environ.get("MP_PREAPPROVAL_PLAN_ID_PREMIUM", "")
+
+def _is_sandbox() -> bool:
+    return _access_token().startswith("TEST-") or os.environ.get("MP_SANDBOX", "true").lower() in ("1", "true", "yes")
+
+
+def get_frontend_url() -> str:
+    url = os.environ.get("FRONTEND_URL", "").rstrip("/")
+    if url:
+        return url
+    return "http://127.0.0.1:8000"
+
+
+def _preapproval_plan_id(plan_id: str) -> str | None:
+    if plan_id == "basic":
+        return os.environ.get("MP_PREAPPROVAL_PLAN_ID_BASIC", "") or None
+    if plan_id == "premium":
+        return os.environ.get("MP_PREAPPROVAL_PLAN_ID_PREMIUM", "") or None
+    return None
+
 
 TOPUP_PRICE_ARS = float(os.environ.get("MP_TOPUP_PRICE_ARS", "10000"))
 TOPUP_OPS = int(os.environ.get("MP_TOPUP_OPS", "10"))
+
 
 # Planes internos. Precios y límites deben coincidir con lo configurado en MP.
 PLANS: dict[str, dict[str, Any]] = {
@@ -50,18 +68,16 @@ PLANS: dict[str, dict[str, Any]] = {
 }
 
 
-def get_frontend_url() -> str:
-    return os.environ.get("FRONTEND_URL", "http://127.0.0.1:8000").rstrip("/")
-
-
-def is_sandbox() -> bool:
-    return MP_ACCESS_TOKEN.startswith("TEST-") or MP_SANDBOX
+def is_configured() -> bool:
+    """True si hay token de MP configurado."""
+    return bool(_access_token())
 
 
 def _get_sdk():
-    if not MP_ACCESS_TOKEN:
+    token = _access_token()
+    if not token:
         raise RuntimeError("MP_ACCESS_TOKEN no configurado")
-    return mercadopago.SDK(MP_ACCESS_TOKEN)
+    return mercadopago.SDK(token)
 
 
 def get_plan(plan_id: str) -> dict[str, Any]:
@@ -85,13 +101,6 @@ def plans_public() -> list[dict[str, Any]]:
         for plan_id, p in PLANS.items()
     ]
 
-
-def get_mp_preapproval_plan_id(plan_id: str) -> str | None:
-    if plan_id == "basic":
-        return MP_PREAPPROVAL_PLAN_ID_BASIC or None
-    if plan_id == "premium":
-        return MP_PREAPPROVAL_PLAN_ID_PREMIUM or None
-    return None
 
 
 def can_create_operation(user) -> Tuple[bool, str | None]:
@@ -156,7 +165,7 @@ def create_checkout(user, plan_id: str) -> dict[str, Any]:
     base_url = get_frontend_url()
     back_url = f"{base_url}/v2?billing=success"
 
-    mp_preapproval_plan_id = get_mp_preapproval_plan_id(plan_id)
+    mp_preapproval_plan_id = _preapproval_plan_id(plan_id)
     sdk = _get_sdk()
 
     if mp_preapproval_plan_id:
@@ -176,7 +185,7 @@ def create_checkout(user, plan_id: str) -> dict[str, Any]:
 
         result = resp["response"]
         return {
-            "mode": "sandbox" if is_sandbox() else "live",
+            "mode": "sandbox" if _is_sandbox() else "live",
             "type": "subscription",
             "preapproval_id": result.get("id"),
             "init_point": result.get("init_point") or result.get("sandbox_init_point"),
@@ -212,10 +221,10 @@ def create_checkout(user, plan_id: str) -> dict[str, Any]:
 
     result = resp["response"]
     return {
-        "mode": "sandbox" if is_sandbox() else "live",
-        "type": "checkout",
-        "preference_id": result.get("id"),
-        "init_point": result.get("sandbox_init_point") if is_sandbox() else result.get("init_point"),
+            "mode": "sandbox" if _is_sandbox() else "live",
+            "type": "checkout",
+            "preference_id": result.get("id"),
+            "init_point": result.get("sandbox_init_point") if _is_sandbox() else result.get("init_point"),
         "external_reference": external_reference,
     }
 
@@ -256,10 +265,10 @@ def create_topup_checkout(user) -> dict[str, Any]:
 
     result = resp["response"]
     return {
-        "mode": "sandbox" if is_sandbox() else "live",
+        "mode": "sandbox" if _is_sandbox() else "live",
         "type": "topup",
         "preference_id": result.get("id"),
-        "init_point": result.get("sandbox_init_point") if is_sandbox() else result.get("init_point"),
+        "init_point": result.get("sandbox_init_point") if _is_sandbox() else result.get("init_point"),
         "external_reference": external_reference,
     }
 

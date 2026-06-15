@@ -152,12 +152,20 @@ CDI-app/
   - Fix: `extract_items_from_excel` acepta `peso_unitario = 0` para que el autofill de peso del catálogo del cliente pueda dispararse en la segunda operación.
   - Smoke end-to-end navegador pasa: cliente nuevo → aprender producto → segunda planilla con origen XX y peso 0 → review muestra origen CN y peso 1.5 con `__autofillSource: 'cliente'` → NCM muestra chip 📚.
   - **Mejora de seguridad aduanera (países):** Agregados oficialmente Vietnam (337), Tailandia (335), Indonesia (316) y Malasia (326). Se valida estrictamente el país de origen/destino (bloqueando "XX" y no reconocidos con HTTP 400) para evitar fallas ante AFIP.
+- **Ola 4 — Billing real con MercadoPago (MVP cerrado):**
+  - Planes Básico ($15.000 ARS/mes, 4 ops/mes, 10 clientes, 1 usuario) y Premium ($30.000 ARS/mes, ops ilimitadas, clientes ilimitados, 3 usuarios). Trial 14 días sin tarjeta. Top-up $10.000 ARS por 10 ops.
+  - Servicio `proyecto_maria/services/billing_service.py` con soporte a suscripciones MP (preapproval) y fallback a Checkout API (preference mensual).
+  - Endpoints: `GET /api/billing/plans`, `POST /api/billing/checkout` (con selector de plan), `POST /api/billing/topup`, webhook `/api/payments/webhook` actualizado.
+  - Middleware `require_active_billing` aplica límite de ops/mes en creación de operaciones y límite de clientes al crear cliente.
+  - UI: selector de plan en registro, uso del mes en perfil, botón de top-up, banner de trial vencido.
+  - Smoke local pasa; suite **291 passed, 102 skipped**. Pendiente: smoke real con pago sandbox de MercadoPago usando credenciales TEST-.
 - **Mantenimiento resuelto:**
   - Dependencias vulnerables de producción actualizadas en `requirements.txt`: `requests>=2.32.4`, `pdfminer.six>=20251107`, `starlette>=0.47.2` + `fastapi>=0.115.0`.
   - Verificado con `pip-audit`: solo queda `pytest 8.4.2` (dev-only, pendiente por conflictos con `pytest-asyncio`).
-  - Suite completa: **280 passed** (los 70 tests de billing, checkout y maria generator pasan completamente verdes; persisten advertencias/errores de loop preexistentes en security/seo). Smokes pasan.
+  - Suite completa: **291 passed** (los 70 tests de billing, checkout y maria generator pasan completamente verdes; persisten advertencias/errores de loop preexistentes en security/seo). Smokes pasan.
 - **Mantenimiento pendiente:**
   - `pytest>=9.0.3` (dev-only, bajo riesgo).
+  - Subir coverage de `main.py` de nuevo a 40% agregando tests de límites de billing y endpoints de Ola 4.
 - **Plan 03 cerrado (Ola 2):** endpoint `/api/clientes/search?q=` para búsqueda server-side; picker con debounce; botón **+ Nuevo cliente** en review con mini formulario inline para alta rápida de cliente desde la operación.
 - **Fix urgente tabla NCM:** ahora muestra **Valor unitario** y **Peso unitario** junto con Ref./Descripción/Origen/Cant/Código NCM.
 - **Plan 02 cerrado (Ola 2):** drawer de clientes con 6 KPIs (operaciones/ítems/promedio/origen frecuente/valor/última), orden por último movimiento, badge `N ops`, export CSV backend, expand de operaciones. Smoke headless de Plan 02 pasa.
