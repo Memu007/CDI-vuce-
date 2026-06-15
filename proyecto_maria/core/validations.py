@@ -3,6 +3,7 @@
 # que deben cumplir todos los items antes de generar el Excel AVG.
 
 from proyecto_maria.models.operations import Item  # Modelo Pydantic de items
+from proyecto_maria.core.maria_generator import pais_reconocido
 from typing import List, Tuple  # Type hints para mejor documentación
 
 def run_pre_maria_validations(items: List[Item]) -> Tuple[List[Item], List[str]]:
@@ -224,10 +225,18 @@ def run_smart_validations(items: List[Item]) -> dict:
                 )
         
         # === VALIDACIONES DE ORIGEN ===
-        origen = (item.origen or '').strip().upper()
-        if origen == "XX":
-            sugerencias.append(
-                f"💡 Ítem {i} ({pieza}): Origen 'XX' debe reemplazarse por país real antes de oficializar."
+        origen = (item.origen or '').strip()
+        if not origen:
+            advertencias.append(
+                f"⚠️ Ítem {i} ({pieza}): Falta indicar el país de origen."
+            )
+        elif origen.upper() == "XX":
+            advertencias.append(
+                f"⚠️ Ítem {i} ({pieza}): Origen 'XX' debe reemplazarse por país real antes de oficializar."
+            )
+        elif not pais_reconocido(origen):
+            advertencias.append(
+                f"⚠️ Ítem {i} ({pieza}): País de origen '{origen}' no reconocido por el sistema MARIA. Por favor, corríjalo."
             )
         
         # === VALIDACIONES DE DESCRIPCIÓN ===

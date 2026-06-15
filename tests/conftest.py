@@ -89,13 +89,17 @@ def auth_override():
     Limpia el override al terminar.
     """
     from proyecto_maria.main import get_current_user
+    from proyecto_maria.database.connection import AsyncSessionLocal
+    from proyecto_maria.database.models import User as DBUser
+    from sqlalchemy import select
+    import asyncio
 
     fake_user = {
         "username": "test_user",
         "name": "Test User",
         "email": "test_user@test.cdi",
         "cuit": "",
-        "plan": "basic",
+        "plan": "premium",
         "is_verified": True,
         "billing_status": "active",
         "trial_ends_at": None,
@@ -105,6 +109,26 @@ def auth_override():
         "team_owner_username": None,
         "effective_owner": "test_user",
     }
+    
+    async def _ensure_test_user_exists():
+        async with AsyncSessionLocal() as session:
+            res = await session.execute(select(DBUser).where(DBUser.username == "test_user"))
+            u = res.scalars().first()
+            if not u:
+                u = DBUser(
+                    username="test_user",
+                    password="dummy_password_hash",
+                    name="Test User",
+                    email="test_user@test.cdi",
+                    plan="premium",
+                    billing_status="active",
+                    is_verified=True,
+                )
+                session.add(u)
+                await session.commit()
+                
+    asyncio.run(_ensure_test_user_exists())
+    
     app.dependency_overrides[get_current_user] = lambda: fake_user
     yield fake_user
     app.dependency_overrides.pop(get_current_user, None)

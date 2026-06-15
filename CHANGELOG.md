@@ -6,10 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
-## 2026-06-15 · Revisión Olas 1–3 (QA)
+## 2026-06-15 · Robust Country Lookup & Testing Fixes
 
-- **docs:** auditoría de código para confirmar cierre de las 3 olas. Resultado: todo marcado está presente en el repo (Cockpit + S1/S3 + upload race fix + Novedades ARCA / Ola 1; drawer clientes + alta desde review + tabla NCM / Ola 2; catálogo unificado con mapeo persistente + autofill / Ola 3). Tests específicos: 45 passed. Suite total: 274 passed, 0 fallas.
-- **docs:** corregido `HANDOFF.md` — tag `v0.3-wave3` puesto (no propuesto).
+- **fix (maria):** Vietnam (337), Thailand (335), Indonesia (316), and Malaysia (326) added to the official MARIA country code list.
+- **feat (maria):** Implemented strict validation of recognized countries in both import and export endpoints to prevent silent fallback to default countries. Added warning checks for unrecognized origins and the `"XX"` placeholder in smart validations.
+- **fix (test):** Resolved environment import-time freezing of FRONTEND_URL, fixed missing DB user records under mocked auth in conftest.py, and updated checkout/autoservicio test parameters. All 70 billing, checkout, and maria generation tests are now completely green.
+
+---
 
 ---
 

@@ -143,6 +143,24 @@ def test_cancel_from_trial_keeps_service_until_trial_end(client):
 def test_cancel_from_none_returns_409(client):
     """Sin plan activo (registro sin tarjeta) → 409, nada que cancelar."""
     _register(client, "cancel2", with_card=False)
+    
+    # Mockear billing_status a "none" en la DB para este test (Ola 4 registra trial por defecto)
+    import asyncio
+    from sqlalchemy.future import select
+    from proyecto_maria.database.connection import get_async_session
+    from proyecto_maria.database.models import User
+
+    async def _set_billing_status_none():
+        async for db in get_async_session():
+            res = await db.execute(select(User).where(User.username == "cancel2"))
+            u = res.scalars().first()
+            assert u is not None
+            u.billing_status = "none"
+            await db.commit()
+            return
+
+    asyncio.new_event_loop().run_until_complete(_set_billing_status_none())
+    
     resp = client.post("/api/billing/cancel")
     assert resp.status_code == 409
 

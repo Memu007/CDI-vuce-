@@ -407,3 +407,94 @@ def test_generate_maria_usa_cuit_del_perfil(client):
     })
     assert resp.status_code == 200, resp.text
     assert "CDDTAGR=20111222333" in resp.json()["content"]
+
+
+def test_get_pais_codigo_vietnam_thailand_indonesia_malaysia():
+    assert get_pais_codigo("VN") == 337
+    assert get_pais_codigo("Vietnam") == 337
+    assert get_pais_codigo("vietnam") == 337
+    assert get_pais_codigo("TH") == 335
+    assert get_pais_codigo("Thailand") == 335
+    assert get_pais_codigo("Tailandia") == 335
+    assert get_pais_codigo("ID") == 316
+    assert get_pais_codigo("Indonesia") == 316
+    assert get_pais_codigo("MY") == 326
+    assert get_pais_codigo("Malaysia") == 326
+    assert get_pais_codigo("Malasia") == 326
+
+
+def test_pais_reconocido_cases():
+    from proyecto_maria.core.maria_generator import pais_reconocido
+    assert pais_reconocido("XX") is False
+    assert pais_reconocido("Vietnam") is True
+    assert pais_reconocido("VN") is True
+    assert pais_reconocido("cn") is True
+    assert pais_reconocido("Brazil") is True
+    assert pais_reconocido("UnknownCountry") is False
+    assert pais_reconocido("") is False
+    assert pais_reconocido(None) is False
+
+
+def test_validate_items_for_maria_unrecognized_origin():
+    # Origen no reconocido
+    items_bad = [
+        {"pieza": "84713010", "descripcion": "Laptop", "cantidad": 10,
+         "valor_unitario": 500, "peso_unitario": 2.5, "origen": "XX"}
+    ]
+    valido, errores = validate_items_for_maria(items_bad)
+    assert valido is False
+    assert any("origen no reconocido" in e.lower() for e in errores)
+
+
+def test_generate_maria_unrecognized_origin_returns_400(client):
+    _register(client, "maria4")
+    resp = client.post("/generate_maria", json={
+        "operation_id": "OP_BAD_ORIGIN",
+        "items": [
+            {"pieza": "84713010", "descripcion": "Laptop", "cantidad": 10,
+             "valor_unitario": 500, "peso_unitario": 2.5, "origen": "XX"}
+        ],
+        "moneda": "DOL",
+        "incoterm": "FOB",
+    })
+    assert resp.status_code == 400
+    assert any("origen no reconocido" in e.lower() for e in resp.json()["detail"]["errors"])
+
+
+def test_generate_maria_export_unrecognized_destination_returns_400(client):
+    _register(client, "maria5")
+    resp = client.post("/generate_maria_export", json={
+        "operation_id": "EXP_BAD_DEST",
+        "items": [
+            {"pieza": "84713010", "descripcion": "Laptop", "cantidad": 10,
+             "valor_unitario": 500, "peso_kg": 2.5}
+        ],
+        "moneda": "DOL",
+        "incoterm": "FOB",
+        "comprador_pais": "XX",
+        "comprador_nombre": "Test Buyer",
+    })
+    assert resp.status_code == 400
+    assert any("país de destino no reconocido" in e.lower() for e in resp.json()["detail"]["errors"])
+
+
+def test_validations_smart_country_warning():
+    from proyecto_maria.core.validations import run_smart_validations
+    from proyecto_maria.models.operations import Item
+    
+    # Item con origen XX
+    item_xx = Item(
+        pieza="84713010", descripcion="Laptop Super Pro", cantidad=10,
+        valor_unitario=500.0, peso_unitario=2.5, origen="XX"
+    )
+    res = run_smart_validations([item_xx])
+    assert any("Origen 'XX' debe reemplazarse por país real" in w for w in res["advertencias"])
+
+    # Item con origen no reconocido
+    item_bad = Item(
+        pieza="84713010", descripcion="Laptop Super Pro", cantidad=10,
+        valor_unitario=500.0, peso_unitario=2.5, origen="InvalidCountry"
+    )
+    res_bad = run_smart_validations([item_bad])
+    assert any("no reconocido por el sistema MARIA" in w for w in res_bad["advertencias"])
+

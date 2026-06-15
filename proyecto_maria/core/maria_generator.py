@@ -1,6 +1,7 @@
 """
 Generador de archivos TXT en formato MARIA para Sistema SIM de AFIP.
 """
+import unicodedata
 from datetime import datetime
 
 # Códigos de país oficiales del Sistema MARIA (AFIP - "Códigos María").
@@ -33,7 +34,50 @@ PAISES_INDEC = {
     "IT": 417, "Italia": 417,
     "GB": 426, "Reino Unido": 426, "UK": 426,
     "DE": 438, "Alemania": 438,
+    "VN": 337, "Vietnam": 337,
+    "TH": 335, "Tailandia": 335, "Thailand": 335,
+    "ID": 316, "Indonesia": 316,
+    "MY": 326, "Malasia": 326, "Malaysia": 326,
 }
+
+# Alias en ingles / variantes de escritura -> MISMO codigo ya verificado arriba.
+# IMPORTANTE: NO agregar paises nuevos aca sin el codigo oficial MARIA verificado.
+# Si un pais no esta en la tabla, get_pais_codigo lo marca como NO reconocido
+# (pais_reconocido == False) para que el sistema avise en vez de adivinar.
+PAISES_ALIAS = {
+    "Brazil": 203,
+    "Germany": 438,
+    "Japan": 320,
+    "Spain": 410,
+    "France": 412,
+    "Italy": 417,
+    "England": 426, "Great Britain": 426, "United Kingdom": 426,
+    "Korea": 309, "South Korea": 309, "North Korea": 308,
+    "China (Mainland)": 310, "Mainland China": 310,
+    "P.R. China": 310, "PR China": 310, "RP China": 310,
+    "Republica Popular China": 310, "República Popular China": 310,
+    "Estados Unidos de America": 212, "United States of America": 212,
+    "EE.UU.": 212, "EEUU.": 212,
+}
+PAISES_INDEC = {**PAISES_INDEC, **PAISES_ALIAS}
+
+
+def _normalizar_pais(pais: str) -> str:
+    """Normaliza un nombre/código de país para comparar sin sorpresas:
+    mayúsculas, sin acentos, sin puntos, espacios colapsados.
+    Ej: 'EE.UU.' -> 'EEUU', 'España' -> 'ESPANA', 'P.R. China' -> 'PR CHINA'.
+    """
+    if not pais:
+        return ""
+    s = unicodedata.normalize("NFKD", str(pais))
+    s = "".join(c for c in s if not unicodedata.combining(c))  # saca acentos
+    s = s.upper().replace(".", " ")
+    s = " ".join(s.split())  # colapsa espacios
+    return s
+
+
+# Lookup normalizado precomputado (clave normalizada -> código).
+_PAISES_NORM = {_normalizar_pais(k): v for k, v in PAISES_INDEC.items()}
 
 # Códigos de Tipo de Unidades oficiales del Sistema MARIA (AFIP).
 # Solo las unidades de comercio mas comunes; el resto cae al default 07 (UNIDAD).
@@ -70,33 +114,50 @@ def get_unidad_codigo(unidad: str) -> str:
     return UNIDADES_MARIA.get(clave, "07")
 
 
+PAIS_DEFAULT_IMPORT = 310  # China (codigo oficial MARIA) cuando no se reconoce
+
+
+def pais_reconocido(pais) -> bool:
+    """True si el país se reconoce con certeza (código numérico o match exacto
+    en la tabla verificada). NO cuenta el fallback por prefijo ni el default,
+    que son adivinanzas. Sirve para que el sistema AVISE en vez de meter un
+    código de origen errado en el TXT aduanero (ej: 'XX', 'Vietnam').
+    """
+    if pais is None or str(pais).strip() == "":
+        return False
+    if str(pais).strip().isdigit():
+        return True
+    return _normalizar_pais(pais) in _PAISES_NORM
+
+
 def get_pais_codigo(pais: str) -> int:
-    """Obtiene el código INDEC para un país."""
+    """Obtiene el código de país oficial MARIA para un nombre/código.
+
+    Estrategia: normaliza (mayúsculas, sin acentos ni puntos) y busca match
+    EXACTO primero (evita la colisión histórica donde 'China' devolvía Chile
+    y 'España' devolvía Estados Unidos). Si no hay exacto, prueba prefijo
+    estricto (>=4 chars) como último recurso. Si nada matchea, devuelve el
+    default; usar `pais_reconocido()` para detectar ese caso y avisar.
+    """
     if not pais:
-        return 310  # China por defecto (codigo oficial MARIA)
-    
+        return PAIS_DEFAULT_IMPORT
+
     # Si ya es un número, devolverlo
-    if str(pais).isdigit():
-        return int(pais)
-    
-    # Buscar en el diccionario.
-    # Dos pasadas: primero match EXACTO (case-insensitive) para no colisionar.
-    # Antes, el startswith de 2 letras devolvia el pais equivocado: p.ej.
-    # "China" matcheaba "Chile" (208) y "España" matcheaba "Estados Unidos" (212),
-    # metiendo codigos de pais erroneos en el TXT aduanero.
-    pais_upper = pais.strip().upper()
-    for key, code in PAISES_INDEC.items():
-        if key.upper() == pais_upper:
-            return code
-    # Segunda pasada: prefijo estricto (>=3 chars) como fallback, solo si no hubo exacto.
-    # Antes el prefijo de 2 letras adivinaba mal: "Colombia" caia en "Corea" (220).
-    prefijo = pais_upper[:4]
-    if len(prefijo) >= 3:
-        for key, code in PAISES_INDEC.items():
-            if key.upper().startswith(prefijo):
+    if str(pais).strip().isdigit():
+        return int(str(pais).strip())
+
+    norm = _normalizar_pais(pais)
+    # 1) Match exacto normalizado
+    if norm in _PAISES_NORM:
+        return _PAISES_NORM[norm]
+    # 2) Fallback por prefijo estricto (>=4 chars) solo si no hubo exacto
+    if len(norm) >= 4:
+        prefijo = norm[:4]
+        for key_norm, code in _PAISES_NORM.items():
+            if key_norm.startswith(prefijo):
                 return code
 
-    return 310  # China por defecto (codigo oficial MARIA)
+    return PAIS_DEFAULT_IMPORT
 
 
 def generate_maria_txt(operation_id: str, items: list, 
@@ -417,5 +478,11 @@ def validate_items_for_maria(items: list) -> tuple[bool, list]:
         valor = item.get('valor_unitario') or item.get('valor_total')
         if not valor or float(valor) <= 0:
             errors.append(f"Item {idx}: Valor inválido")
+            
+        origen = item.get('origen')
+        if not origen:
+            errors.append(f"Item {idx}: Falta origen/país de origen")
+        elif not pais_reconocido(origen):
+            errors.append(f"Item {idx}: Origen no reconocido '{origen}'. Debe indicar un país válido.")
     
     return len(errors) == 0, errors

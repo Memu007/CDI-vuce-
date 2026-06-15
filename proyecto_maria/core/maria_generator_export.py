@@ -7,7 +7,15 @@ from datetime import datetime
 
 # Códigos de país oficiales del Sistema MARIA: una sola tabla (la de importación)
 # para que import y export no diverjan. La tabla anterior tenia codigos MAL.
-from proyecto_maria.core.maria_generator import PAISES_INDEC, get_unidad_codigo
+from proyecto_maria.core.maria_generator import (
+    PAISES_INDEC,
+    get_unidad_codigo,
+    _normalizar_pais,
+    _PAISES_NORM,
+    pais_reconocido,
+)
+
+PAIS_DEFAULT_EXPORT = 212  # USA por defecto en exportación cuando no se reconoce
 
 # Tipos de destinación de exportación
 TIPOS_DESTINACION_EXPORT = {
@@ -20,28 +28,30 @@ TIPOS_DESTINACION_EXPORT = {
 
 
 def get_pais_codigo(pais: str) -> int:
-    """Obtiene el código INDEC para un país."""
+    """Obtiene el código de país oficial MARIA para exportación.
+
+    Misma estrategia que importación (match exacto normalizado primero, luego
+    prefijo estricto) pero con default 212 (USA) en vez de China. Usar
+    `pais_reconocido()` para detectar el caso "no reconocido" y avisar.
+    """
     if not pais:
-        return 212  # USA por defecto para export
-    
-    if str(pais).isdigit():
-        return int(pais)
-    
-    # Dos pasadas: primero match EXACTO (case-insensitive) para no colisionar.
-    # Antes, el startswith de 2 letras devolvia el pais equivocado: p.ej.
-    # "China" matcheaba "Chile" (208) y "Colombia" caia en "Corea" (220).
-    pais_upper = pais.strip().upper()
-    for key, code in PAISES_INDEC.items():
-        if key.upper() == pais_upper:
-            return code
-    # Segunda pasada: prefijo estricto (>=3 chars) como fallback, solo si no hubo exacto.
-    prefijo = pais_upper[:4]
-    if len(prefijo) >= 3:
-        for key, code in PAISES_INDEC.items():
-            if key.upper().startswith(prefijo):
+        return PAIS_DEFAULT_EXPORT
+
+    if str(pais).strip().isdigit():
+        return int(str(pais).strip())
+
+    norm = _normalizar_pais(pais)
+    # 1) Match exacto normalizado
+    if norm in _PAISES_NORM:
+        return _PAISES_NORM[norm]
+    # 2) Fallback por prefijo estricto (>=4 chars) solo si no hubo exacto
+    if len(norm) >= 4:
+        prefijo = norm[:4]
+        for key_norm, code in _PAISES_NORM.items():
+            if key_norm.startswith(prefijo):
                 return code
 
-    return 212  # USA por defecto
+    return PAIS_DEFAULT_EXPORT
 
 
 def generate_maria_export_txt(

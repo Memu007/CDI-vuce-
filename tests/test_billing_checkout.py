@@ -43,7 +43,7 @@ def test_checkout_requiere_auth():
 
 def test_checkout_modo_demo_sin_credenciales(client, monkeypatch):
     monkeypatch.setattr(main, "MP_ACCESS_TOKEN", "")
-    resp = client.post("/api/billing/checkout")
+    resp = client.post("/api/billing/checkout", json={"plan": "premium"})
     assert resp.status_code == 200
     data = resp.json()
     assert data["mode"] == "demo"
@@ -52,18 +52,18 @@ def test_checkout_modo_demo_sin_credenciales(client, monkeypatch):
 
 def test_checkout_sandbox_incluye_back_urls(client, monkeypatch):
     _FakeSDK.captured = {}
-    monkeypatch.setattr(main, "MP_ACCESS_TOKEN", "TEST-token-sandbox")
+    monkeypatch.setattr(main.billing_service, "MP_ACCESS_TOKEN", "TEST-token-sandbox")
     monkeypatch.setattr(main.mercadopago, "SDK", _FakeSDK)
     monkeypatch.delenv("FRONTEND_URL", raising=False)  # dev: http://127.0.0.1:8010
 
-    resp = client.post("/api/billing/checkout")
+    resp = client.post("/api/billing/checkout", json={"plan": "premium"})
     assert resp.status_code == 200
     data = resp.json()
     assert data["mode"] == "sandbox"
     assert data["init_point"] == "https://sandbox.mp.example/checkout"
 
     pref = _FakeSDK.captured["preference_data"]
-    assert pref["external_reference"] == "test_user|premium"
+    assert pref["external_reference"] == "test_user:premium"
     assert pref["back_urls"]["success"].endswith("/v2?billing=success")
     assert pref["back_urls"]["failure"].endswith("/v2?billing=failure")
     # Sin https publica NO se manda auto_return (MP rechaza localhost)
@@ -73,11 +73,12 @@ def test_checkout_sandbox_incluye_back_urls(client, monkeypatch):
 
 def test_checkout_prod_https_agrega_auto_return(client, monkeypatch):
     _FakeSDK.captured = {}
-    monkeypatch.setattr(main, "MP_ACCESS_TOKEN", "APP_USR-token-live")
+    monkeypatch.setattr(main.billing_service, "MP_ACCESS_TOKEN", "APP_USR-token-live")
+    monkeypatch.setattr(main.billing_service, "MP_SANDBOX", False)
     monkeypatch.setattr(main.mercadopago, "SDK", _FakeSDK)
     monkeypatch.setenv("FRONTEND_URL", "https://cdi.example.com")
 
-    resp = client.post("/api/billing/checkout")
+    resp = client.post("/api/billing/checkout", json={"plan": "premium"})
     assert resp.status_code == 200
     data = resp.json()
     assert data["mode"] == "live"

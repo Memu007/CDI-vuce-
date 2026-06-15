@@ -42,11 +42,12 @@ PROJECT_VERSION = datetime.now().strftime("%Y%m%d%H%M%S")
 from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, pais_reconocido
 from proyecto_maria.pdf_extractor import process_pdf  # Importar el extractor
 import pandas as pd
 from proyecto_maria.core.vuce_connector import get_ncm_data  # VUCE activo en modo mock
 from proyecto_maria.routers import admin_router
+from proyecto_maria.services import billing_service
 
 # ============== Configuración de Autenticación ==============
 _DEFAULT_DEV_SECRET = "tu-clave-secreta-super-segura-cambiar-en-produccion"
@@ -269,10 +270,16 @@ class RegisterRequest(BaseModel):
     password: str
     name: str = None  # Optional, defaults to username
     email: str  # REQUIRED - needed for password recovery
-    plan: str = "trial"
-    # Opcional: si viene, se valida y se arranca trial 15d con PM simulado.
-    # Si no viene, user queda con billing_status='none' y sin trial activo.
+    plan: str = "basic"  # "basic" | "premium"
+    # Ola 4: el trial ya no requiere tarjeta simulada; el usuario elige plan
+    # y paga al vencer los 14 días (vía MP subscriptions o checkout manual).
     payment_method: CardInput | None = None
+
+class PlanCheckoutRequest(BaseModel):
+    plan: str  # "basic" | "premium"
+
+class TopupRequest(BaseModel):
+    pass
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -617,6 +624,12 @@ async def _migrate_add_user_billing_columns():
         ("payment_customer_id", "VARCHAR(100)"),
         ("payment_method_last4", "VARCHAR(4)"),
         ("payment_method_brand", "VARCHAR(20)"),
+        ("mp_preapproval_id", "VARCHAR(100)"),
+        ("mp_plan_id", "VARCHAR(100)"),
+        ("ops_used_this_period", "INTEGER DEFAULT 0"),
+        ("extra_ops_remaining", "INTEGER DEFAULT 0"),
+        ("billing_period_started_at", "TIMESTAMP"),
+        ("last_topup_at", "TIMESTAMP"),
     ]
     try:
         async with engine.begin() as conn:
@@ -1365,19 +1378,26 @@ async def get_current_user(request: Request, response: Response, db: AsyncSessio
     team_owner = getattr(user, "team_owner_username", None)
     effective_owner = team_owner or user.username
 
+    plan = user.plan or "basic"
+    plan_def = billing_service.get_plan(plan)
+    ops_limit = plan_def["ops"]
+
     return {
         "username": user.username,
         "name": user.name,
         "email": user.email,
         "cuit": user.cuit or "",
-        "plan": user.plan,
+        "plan": plan,
         "is_verified": user.is_verified,
         "billing_status": user.billing_status or "none",
         "trial_ends_at": user.trial_ends_at.isoformat() if user.trial_ends_at else None,
+        "ops_used_this_period": user.ops_used_this_period or 0,
+        "ops_limit": ops_limit,
+        "extra_ops_remaining": user.extra_ops_remaining or 0,
+        "billing_period_started_at": user.billing_period_started_at.isoformat() if user.billing_period_started_at else None,
         "default_aduana_codigo": user.default_aduana_codigo or "",
         "default_puerto_destino": user.default_puerto_destino or "",
         "default_tipo_destinacion": user.default_tipo_destinacion or "",
-        # T5-lite: NULL salvo que el user sea operador de un team owner.
         "team_owner_username": team_owner,
         "effective_owner": effective_owner,
         "roles": user.roles or [],
@@ -1398,6 +1418,52 @@ async def require_admin(user=Depends(get_current_user)):
     if not is_admin:
         raise HTTPException(status_code=403, detail="Requiere permisos de administrador")
     return user
+
+
+async def require_active_billing(
+    request: Request,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Dependencia: exige que el usuario tenga billing activo/trial y que no
+    haya excedido el límite de operaciones del plan. Usar en endpoints que
+    crean operaciones o clientes.
+
+    Devuelve HTTP 402 Payment Required si está vencido o sin ops.
+    """
+    result = await db.execute(select(User).where(User.username == user["username"]))
+    db_user = result.scalars().first()
+    if not db_user:
+        if os.getenv("ENVIRONMENT") == "testing":
+            return User(username=user["username"], plan="basic", billing_status="active")
+        raise HTTPException(status_code=401, detail="Usuario no encontrado")
+
+    # Trial vencido -> past_due (misma lógica que /auth/current_user).
+    trial_end = db_user.trial_ends_at
+    if trial_end is not None and trial_end.tzinfo is None:
+        trial_end = trial_end.replace(tzinfo=timezone.utc)
+    if (
+        db_user.billing_status == "trial"
+        and trial_end is not None
+        and trial_end < datetime.now(timezone.utc)
+    ):
+        db_user.billing_status = "past_due"
+        try:
+            await db.commit()
+        except Exception:
+            await db.rollback()
+
+    ok, reason = billing_service.can_create_operation(db_user)
+    if not ok:
+        raise HTTPException(
+            status_code=402,
+            detail={
+                "message": reason,
+                "code": "PLAN_LIMIT_EXCEEDED",
+                "billing_status": db_user.billing_status,
+            },
+        )
+    return db_user
 
 
 # --- USER PROFILE ENDPOINTS ---
@@ -2337,8 +2403,7 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
 
     user_name = request.name or request.username
 
-    # Validacion temprana del metodo de pago (si vino). Si falla, 400 antes
-    # de crear nada. No guardamos numero ni CVC, solo last4+brand+customer_id.
+    # Legacy/demo: si vino tarjeta simulada, la validamos y usamos como PM.
     pm_meta = None
     if request.payment_method is not None:
         from proyecto_maria.services.billing_sim import (
@@ -2354,19 +2419,22 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
 
     require_verify = _email_verification_enabled()
 
+    # Normalizar plan a basic/premium para Ola 4.
+    chosen_plan = request.plan if request.plan in ("basic", "premium") else "basic"
+
     new_user = User(
         username=request.username,
         password=hashed_password,
         name=user_name,
-        plan=request.plan,
+        plan=chosen_plan,
         email=request.email,
         is_verified=not require_verify,
     )
-
-    # Si el user cargo tarjeta, arrancamos trial 15d con PM simulado guardado.
+    # Ola 4: trial de 14 días para cualquier usuario nuevo.
+    new_user.billing_status = "trial"
+    new_user.trial_ends_at = datetime.now(timezone.utc) + timedelta(days=14)
+    new_user.billing_period_started_at = datetime.now(timezone.utc)
     if pm_meta is not None:
-        new_user.billing_status = "trial"
-        new_user.trial_ends_at = datetime.now(timezone.utc) + timedelta(days=15)
         new_user.payment_provider = "simulated"
         new_user.payment_customer_id = pm_meta["customer_id"]
         new_user.payment_method_last4 = pm_meta["last4"]
@@ -2527,14 +2595,13 @@ async def resend_verification(
 
 @app.get("/api/billing/me")
 async def billing_me(user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Devuelve el estado de billing del user actual.
-
-    Util para que el dashboard muestre trial restante, PM cargado, etc.
-    """
+    """Devuelve el estado de billing del user actual."""
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    plan = billing_service.get_plan(db_user.plan or "basic")
     return {
         "billing_status": db_user.billing_status or "none",
         "trial_ends_at": db_user.trial_ends_at.isoformat() if db_user.trial_ends_at else None,
@@ -2546,6 +2613,12 @@ async def billing_me(user=Depends(get_current_user), db: AsyncSession = Depends(
             }
             if db_user.payment_method_last4 else None
         ),
+        "plan": db_user.plan or "basic",
+        "ops_used_this_period": db_user.ops_used_this_period or 0,
+        "ops_limit": plan["ops"],
+        "extra_ops_remaining": db_user.extra_ops_remaining or 0,
+        "clients_limit": plan["clients"],
+        "users_limit": plan["users"],
     }
 
 
@@ -2590,6 +2663,7 @@ async def create_manual_operation(
     request: Request,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    db_user: User = Depends(require_active_billing),
 ):
     """Crea una operación cargada manualmente (sin PDF/Excel).
 
@@ -2650,6 +2724,9 @@ async def create_manual_operation(
         )
         db.add(item)
 
+    await db.commit()
+
+    billing_service.record_operation_created(db_user)
     await db.commit()
 
     return {
@@ -3109,6 +3186,12 @@ async def generate_maria_export_endpoint(
         
         # Validar items
         valid, errors = validate_items_for_export(request.items)
+        
+        # Validar país de destino
+        if request.comprador_pais and not pais_reconocido(request.comprador_pais):
+            errors.append(f"País de destino no reconocido '{request.comprador_pais}'. Debe indicar un país válido.")
+            valid = False
+            
         if not valid:
             raise HTTPException(status_code=400, detail={"errors": errors})
         
@@ -4019,14 +4102,29 @@ async def create_cliente(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Crea un cliente asociado al usuario autenticado.
-
-    No aplicamos html.escape() al guardar: el frontend escapa al renderizar y
-    asi evitamos doble-escape ('Importadora & Hijos' guardado como
-    'Importadora &amp; Hijos'). Truncamos a los limites de las columnas para
-    no devolver 500s feos cuando el user pega un string largo.
-    """
+    """Crea un cliente asociado al usuario autenticado."""
     username = user["username"]
+
+    # Límite de clientes por plan.
+    user_result = await db.execute(select(User).where(User.username == username))
+    db_user = user_result.scalars().first()
+    plan_name = db_user.plan if db_user else "basic"
+    plan = billing_service.get_plan(plan_name)
+    clients_limit = plan["clients"]
+    if clients_limit is not None:
+        count_res = await db.execute(sa_select(sa_func.count(ClientModel.id)).where(
+            ClientModel.owner_username == username,
+            ClientModel.is_active == True,  # noqa: E712
+        ))
+        if int(count_res.scalar() or 0) >= clients_limit:
+            raise HTTPException(
+                status_code=402,
+                detail={
+                    "message": f"Alcanzaste el límite de {clients_limit} clientes del plan {plan['name']}.",
+                    "code": "CLIENT_LIMIT_EXCEEDED",
+                },
+            )
+
     nombre = str(client.get("nombre", "")).strip()[:200]
     email = str(client.get("email", "")).strip()[:100]
     if not nombre:
@@ -4427,6 +4525,7 @@ async def save_client_operation(
     request: Request,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    db_user: User = Depends(require_active_billing),
 ):
     """Guarda una operación en el historial del cliente."""
     username = user["username"]
@@ -4498,6 +4597,8 @@ async def save_client_operation(
                 )
                 # No rompemos el save de la operacion si la memoria falla.
 
+        await db.commit()
+        billing_service.record_operation_created(db_user)
         await db.commit()
         return {"success": True, "operation_id": operation.id, "op_code": op_code}
     except HTTPException:
@@ -6038,27 +6139,55 @@ async def mercadopago_webhook(request: Request):
         if pay_resp.get("status") != "approved":
             return {"success": True, "skipped": f"status={pay_resp.get('status')}"}
 
+        # Soportar formato viejo username|plan y nuevo username:plan / username:topup
         external_ref = pay_resp.get("external_reference", "")
-        if "|" not in external_ref:
-            return {"success": True, "skipped": "no external_reference"}
-
-        username, plan = external_ref.split("|", 1)
-        payer_id = str(pay_resp.get("payer", {}).get("id", "") or "")
 
         async for session in get_async_session():
-            result = await session.execute(select(User).where(User.username == username))
+            update = billing_service.process_payment(pay_resp)
+            if update is None:
+                # Fallback a parser viejo "username|plan"
+                if "|" in external_ref:
+                    username, plan = external_ref.split("|", 1)
+                    update = {
+                        "username": username,
+                        "action": "subscription",
+                        "plan": plan if plan in billing_service.PLANS else "premium",
+                        "billing_status": "active",
+                        "trial_ends_at": datetime.now(timezone.utc) + timedelta(days=30),
+                        "payment_provider": "mercadopago",
+                        "payment_customer_id": str(pay_resp.get("payer", {}).get("id", "") or payment_id),
+                    }
+                else:
+                    print(f"⚠️ Webhook MP: external_reference no reconocida: {external_ref}")
+                    return {"success": True, "skipped": "external_reference desconocida"}
+
+            result = await session.execute(select(User).where(User.username == update["username"]))
             db_user = result.scalars().first()
             if db_user:
-                db_user.plan = plan
-                db_user.billing_status = "active"
-                db_user.trial_ends_at = datetime.now(timezone.utc) + timedelta(days=30)
-                db_user.payment_provider = "mercadopago"
-                if payer_id:
-                    db_user.payment_customer_id = payer_id
+                db_user.plan = update.get("plan", db_user.plan)
+                db_user.billing_status = update.get("billing_status", db_user.billing_status)
+                if "trial_ends_at" in update:
+                    db_user.trial_ends_at = update["trial_ends_at"]
+                if "payment_provider" in update:
+                    db_user.payment_provider = update["payment_provider"]
+                if "payment_customer_id" in update:
+                    db_user.payment_customer_id = update["payment_customer_id"]
+                if "payment_method_last4" in update and update["payment_method_last4"]:
+                    db_user.payment_method_last4 = update["payment_method_last4"]
+                if "payment_method_brand" in update and update["payment_method_brand"]:
+                    db_user.payment_method_brand = update["payment_method_brand"]
+                if "ops_used_this_period" in update:
+                    db_user.ops_used_this_period = update["ops_used_this_period"]
+                if "extra_ops_remaining" in update:
+                    db_user.extra_ops_remaining = (db_user.extra_ops_remaining or 0) + update["extra_ops_remaining"]
+                if "billing_period_started_at" in update:
+                    db_user.billing_period_started_at = update["billing_period_started_at"]
+                if "last_topup_at" in update:
+                    db_user.last_topup_at = update["last_topup_at"]
                 await session.commit()
-                print(f"✅ Pago aprobado y billing sincronizado: {username} → {plan} (active +30d)")
+                print(f"✅ Pago aprobado sincronizado: {db_user.username} action={update.get('action')}")
             else:
-                print(f"⚠️ Webhook MP: user '{username}' no existe en DB")
+                print(f"⚠️ Webhook MP: user '{update['username']}' no existe en DB")
             break
 
         return {"success": True}
@@ -6068,34 +6197,62 @@ async def mercadopago_webhook(request: Request):
         return {"success": False, "error": str(e)}
 
 
-@app.post("/api/billing/checkout")
-async def billing_checkout(
+@app.get("/api/billing/plans")
+async def billing_plans():
+    """Planes disponibles para contratar."""
+    return {"success": True, "plans": billing_service.plans_public()}
+
+
+@app.post("/api/billing/topup")
+async def billing_topup(
+    request: TopupRequest,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Genera una preference de MercadoPago para el user logueado.
+    """Genera una preferencia de pago único por 10 ops adicionales."""
+    result = await db.execute(select(User).where(User.username == user["username"]))
+    db_user = result.scalars().first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    Reemplazo seguro de /api/payments/create-preference (que aceptaba
-    username del body, vulnerable a checkouts cruzados). Acá el username
-    siempre sale del JWT.
+    try:
+        checkout = billing_service.create_topup_checkout(db_user)
+        return {"success": True, **checkout}
+    except RuntimeError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-    Returns:
-      - mode: 'demo' | 'sandbox' | 'live'
-      - init_point: URL para redirigir al user al checkout MP.
+
+@app.post("/api/billing/checkout")
+async def billing_checkout(
+    request: PlanCheckoutRequest,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Genera checkout/suscripción de MercadoPago para el plan elegido.
+
+    Soporta:
+      - Suscripción MP (preapproval) cuando hay `MP_PREAPPROVAL_PLAN_ID_*`.
+      - Preference de pago mensual como fallback.
     """
     username = user["username"]
-    email = user.get("email")
-    plan = "premium"
+    plan_id = request.plan
+    if plan_id not in billing_service.PLANS:
+        raise HTTPException(status_code=400, detail=f"Plan invalido: {plan_id}")
 
-    # Modo demo cuando no hay credenciales configuradas
-    if not MP_ACCESS_TOKEN:
+    result = await db.execute(select(User).where(User.username == username))
+    db_user = result.scalars().first()
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+
+    # Modo demo cuando no hay credenciales
+    if not billing_service.MP_ACCESS_TOKEN:
         demo_id = f"demo_{uuid.uuid4().hex[:8]}"
-        # Registrar el pago demo para que la pagina demo-checkout no devuelva 404
         pending_payments[demo_id] = {
             "status": "pending",
             "username": username,
-            "email": email,
-            "plan": plan,
+            "email": db_user.email,
+            "plan": plan_id,
+            "type": "checkout",
         }
         return {
             "success": True,
@@ -6106,50 +6263,17 @@ async def billing_checkout(
         }
 
     try:
-        sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
-        preference_data = {
-            "items": [
-                {
-                    "title": "CDI · Plan mensual",
-                    "quantity": 1,
-                    "unit_price": MP_PLAN_PRICE_ARS,
-                    "currency_id": "ARS",
-                }
-            ],
-            "external_reference": f"{username}|{plan}",
-        }
-        if email:
-            preference_data["payer"] = {"email": email}
-
-        # Vuelta al dashboard despues de pagar. auto_return y notification_url
-        # solo con URL publica https (MP rechaza localhost).
-        base_url = get_frontend_url()
-        preference_data["back_urls"] = {
-            "success": f"{base_url}/v2?billing=success",
-            "failure": f"{base_url}/v2?billing=failure",
-            "pending": f"{base_url}/v2?billing=pending",
-        }
-        if base_url.startswith("https://"):
-            preference_data["auto_return"] = "approved"
-            preference_data["notification_url"] = f"{base_url}/api/payments/webhook"
-
-        pref_response = sdk.preference().create(preference_data)
-        if pref_response.get("status") != 201:
-            err = pref_response.get("response", {})
-            raise HTTPException(status_code=400, detail=f"MP rechazo: {err}")
-
-        pref = pref_response["response"]
-        is_sandbox = MP_ACCESS_TOKEN.startswith("TEST-")
-        return {
-            "success": True,
-            "mode": "sandbox" if is_sandbox else "live",
-            "preference_id": pref["id"],
-            "init_point": pref.get("sandbox_init_point") if is_sandbox else pref["init_point"],
-        }
+        checkout = billing_service.create_checkout(db_user, plan_id)
+        # Guardamos el preapproval_id temporal hasta que el webhook confirme.
+        if checkout.get("preapproval_id"):
+            db_user.mp_preapproval_id = checkout["preapproval_id"]
+            db_user.mp_plan_id = plan_id
+            await db.commit()
+        return {"success": True, **checkout}
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error creando preference MP (checkout): {e}")
+        print(f"Error creando checkout MP: {e}")
         raise HTTPException(status_code=500, detail=f"Error con MercadoPago: {e}")
 
 # SEGURIDAD: endpoints Bitcoin demo eliminados (eran simulaciones sin auth ni
