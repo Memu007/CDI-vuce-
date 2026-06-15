@@ -37,6 +37,22 @@
             window.location.href = '/?next=' + encodeURIComponent(window.location.pathname + window.location.search);
             throw new Error('unauthorized');
         }
+        if (res.status === 402) {
+            // Plan vencido o sin suscripción activa: mostrar modal con CTA a pagar.
+            if (CDI.confirm) {
+                CDI.confirm({
+                    title: 'Tu plan venció',
+                    lead: 'Necesitás renovar tu suscripción para seguir usando CDI.',
+                    text: 'Después de pagar podés volver a usar todas las funciones.',
+                    confirmText: 'Ir a pagar',
+                    cancelText: 'Volver',
+                    icon: '💳',
+                }).then(ok => {
+                    if (ok) window.location.href = '/v2?screen=profile';
+                });
+            }
+            throw new Error('payment_required');
+        }
         return res;
     }
 

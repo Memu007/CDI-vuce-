@@ -75,12 +75,9 @@ def _get_sdk():
 
 
 def get_plan(plan_id: str) -> dict[str, Any]:
-    # Ola 4 MVP: solo existe Premium. Cualquier otro id cae a Premium.
     plan = PLANS.get(plan_id)
-    if not plan and PLANS:
-        return list(PLANS.values())[0]
     if not plan:
-        raise ValueError(f"Plan desconocido: {plan_id}")
+        raise ValueError(f"Plan '{plan_id}' no disponible. El único plan activo es Premium.")
     return plan
 
 
@@ -100,6 +97,17 @@ def plans_public() -> list[dict[str, Any]]:
 
 
 
+EXTRA_OPS_MAX = 100
+
+
+def _expire_extra_ops(user) -> None:
+    """Si los créditos extra ya vencieron, los resetea a 0."""
+    expires = getattr(user, "extra_ops_expires_at", None)
+    if expires and datetime.now(timezone.utc) > expires:
+        user.extra_ops_remaining = 0
+        user.extra_ops_expires_at = None
+
+
 def can_create_operation(user) -> Tuple[bool, str | None]:
     """Chequea si el usuario puede crear una operación según su plan.
 
@@ -109,7 +117,10 @@ def can_create_operation(user) -> Tuple[bool, str | None]:
     if status not in ("trial", "active"):
         return False, "No tenés una suscripción activa o trial vigente."
 
-    plan_id = getattr(user, "plan", "basic") or "basic"
+    # Limpiar créditos extra vencidos antes de evaluar.
+    _expire_extra_ops(user)
+
+    plan_id = getattr(user, "plan", "premium") or "premium"
     plan = get_plan(plan_id)
     ops_limit = plan["ops"]
 
@@ -301,6 +312,7 @@ def process_payment(payment_info: dict[str, Any]) -> dict[str, Any] | None:
             "action": "topup",
             "extra_ops_remaining": TOPUP_OPS,
             "last_topup_at": now,
+            "extra_ops_expires_at": now + timedelta(days=30),
         }
 
     if kind in PLANS:

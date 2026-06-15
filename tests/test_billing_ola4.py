@@ -13,30 +13,30 @@ class FakeUser:
         self.extra_ops_remaining = extra
 
 
-def test_basic_plan_limit_enforced():
-    u = FakeUser(plan="basic", used=4)
+def test_premium_plan_limit_enforced():
+    u = FakeUser(plan="premium", used=10)
     ok, reason = billing_service.can_create_operation(u)
     assert not ok
     assert "límite" in reason.lower()
 
 
-def test_basic_with_extra_credit_allows():
-    u = FakeUser(plan="basic", used=4, extra=1)
+def test_premium_with_extra_credit_allows():
+    u = FakeUser(plan="premium", used=10, extra=1)
     ok, reason = billing_service.can_create_operation(u)
     assert ok is True
     assert reason is None
 
 
-def test_premium_unlimited():
-    u = FakeUser(plan="premium", used=999)
+def test_premium_within_limit_allows():
+    u = FakeUser(plan="premium", used=9)
     ok, reason = billing_service.can_create_operation(u)
     assert ok is True
 
 
 def test_record_operation_consumed_extra_credit():
-    u = FakeUser(plan="basic", used=4, extra=2)
+    u = FakeUser(plan="premium", used=10, extra=2)
     billing_service.record_operation_created(u)
-    assert u.ops_used_this_period == 5
+    assert u.ops_used_this_period == 11
     assert u.extra_ops_remaining == 1
 
 
@@ -48,14 +48,14 @@ def test_trial_without_billing_blocked():
 
 
 def test_get_plan_unknown_raises():
-    with pytest.raises(ValueError, match="Plan desconocido"):
+    with pytest.raises(ValueError, match="no disponible"):
         billing_service.get_plan("enterprise")
 
 
-def test_plans_public_has_basic_and_premium():
+def test_plans_public_has_premium():
     plans = billing_service.plans_public()
     ids = {p["id"] for p in plans}
-    assert ids >= {"basic", "premium"}
+    assert "premium" in ids
     for p in plans:
         assert "price" in p
         assert "ops" in p
@@ -65,14 +65,14 @@ def test_webhook_payment_parses_subscription():
     payment = {
         "id": "123",
         "status": "approved",
-        "external_reference": "alice:basic",
+        "external_reference": "alice:premium",
         "payer": {"id": "payer-1"},
         "card": {"last_four_digits": "1234", "payment_method": {"name": "visa"}},
     }
     update = billing_service.process_payment(payment)
     assert update is not None
     assert update["action"] == "subscription"
-    assert update["plan"] == "basic"
+    assert update["plan"] == "premium"
     assert update["username"] == "alice"
 
 
@@ -103,7 +103,7 @@ def test_webhook_payment_pending_ignored():
     payment = {
         "id": "999",
         "status": "pending",
-        "external_reference": "alice:basic",
+        "external_reference": "alice:premium",
         "payer": {"id": "payer-1"},
     }
     assert billing_service.process_payment(payment) is None

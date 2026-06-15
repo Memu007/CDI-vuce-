@@ -6,6 +6,17 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-15 · Ola 4: Seguridad y robustez post-MVP
+
+- **fix (webhook):** códigos HTTP correctos: 401 firma inválida, 400 usuario no existe (MP reintenta), 500 bug inesperado. Logging estructurado con payment_id/external_reference. Deduplicación por `last_payment_id` para no reprocesar el mismo pago.
+- **fix (billing):** plan único Premium validado estrictamente; registro rechaza `basic` con 400. `extra_ops_remaining` limitado a 100 créditos y expira a 30 días. Créditos vencidos se limpian automáticamente antes de evaluar límite.
+- **feat (ui):** frontend intercepta HTTP 402 y muestra modal "Tu plan venció" con CTA a pagar.
+- **feat (cron):** al iniciar la app, usuarios con trial vencido pasan automáticamente a `past_due`.
+- **fix (static):** CustomStaticFiles rechaza `.env`, `*.db`, `*.jsonl`, logs/ y secrets/.
+- **test:** suite completa **291 passed, 102 skipped**.
+
+---
+
 ## 2026-06-15 · Ola 4: Billing real con MercadoPago (MVP)
 
 - **feat (billing):** cobro real con MercadoPago. Plan único **Premium** ($30.000 ARS/mes, 10 ops/mes, clientes ilimitados, 3 usuarios). Trial 14 días sin tarjeta. Top-up $10k por 10 ops.

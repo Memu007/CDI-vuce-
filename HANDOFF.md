@@ -157,8 +157,14 @@ CDI-app/
   - Servicio `proyecto_maria/services/billing_service.py` con Checkout API manual (preference mensual). Soporte a suscripciones MP (preapproval) preparado para cuando haya `preapproval_plan_id`.
   - Endpoints: `GET /api/billing/plans`, `POST /api/billing/checkout` (con selector de plan), `POST /api/billing/topup`, webhook `/api/payments/webhook` actualizado.
   - Middleware `require_active_billing` aplica límite de ops/mes en creación de operaciones y límite de clientes al crear cliente.
-  - UI: selector de plan en registro, uso del mes en perfil, botón de top-up, banner de trial vencido.
+  - UI: selector de plan en registro, uso del mes en perfil, botón de top-up, banner de trial vencido, **modal de pago cuando backend devuelve 402**.
   - Smoke local con checkout real de MercadoPago genera preference `live` OK. Pendiente: smoke real de pago + webhook en deploy con dominio público.
+- **Ola 4 — Seguridad y robustez (post-MVP, cerrado):**
+  - Webhook MP: códigos HTTP correctos (401 firma, 400 error recuperable, 500 bug), logging estructurado, deduplicación por `last_payment_id`.
+  - Plan strict: registro rechaza `basic` con HTTP 400. `get_plan()` levanta error en vez de caer silencioso a premium.
+  - Top-up limitado a 100 créditos extra; expiran a 30 días. Créditos vencidos se limpian automáticamente.
+  - Trial cron: al iniciar la app, usuarios con trial vencido pasan a `past_due`.
+  - Static files: CustomStaticFiles rechaza `.env`, `*.db`, `*.jsonl`, logs/ y secrets/.
 - **Mantenimiento resuelto:**
   - Dependencias vulnerables de producción actualizadas en `requirements.txt`: `requests>=2.32.4`, `pdfminer.six>=20251107`, `starlette>=0.47.2` + `fastapi>=0.115.0`.
   - Verificado con `pip-audit`: solo queda `pytest 8.4.2` (dev-only, pendiente por conflictos con `pytest-asyncio`).

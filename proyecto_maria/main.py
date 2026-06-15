@@ -270,7 +270,7 @@ class RegisterRequest(BaseModel):
     password: str
     name: str = None  # Optional, defaults to username
     email: str  # REQUIRED - needed for password recovery
-    plan: str = "basic"  # "basic" | "premium"
+    plan: str = "premium"
     # Ola 4: el trial ya no requiere tarjeta simulada; el usuario elige plan
     # y paga al vencer los 14 días (vía MP subscriptions o checkout manual).
     payment_method: CardInput | None = None
@@ -630,6 +630,8 @@ async def _migrate_add_user_billing_columns():
         ("extra_ops_remaining", "INTEGER DEFAULT 0"),
         ("billing_period_started_at", "TIMESTAMP"),
         ("last_topup_at", "TIMESTAMP"),
+        ("last_payment_id", "VARCHAR(100)"),
+        ("extra_ops_expires_at", "TIMESTAMP"),
     ]
     try:
         async with engine.begin() as conn:
@@ -649,6 +651,34 @@ async def _migrate_add_user_billing_columns():
                     )
     except Exception as mig_err:
         print(f"⚠️ No se pudo migrar columnas de billing: {mig_err}")
+
+
+async def _check_expired_trials():
+    """Al iniciar la app, pasa a 'past_due' los usuarios cuyo trial venció.
+
+    Evita que un usuario que nunca volvió a entrar quede eternamente en trial.
+    Idempotente: solo afecta usuarios con billing_status='trial' y
+    trial_ends_at en el pasado.
+    """
+    from proyecto_maria.database.connection import engine
+    from proyecto_maria.database.models import User
+    from sqlalchemy import update
+    try:
+        async with engine.begin() as conn:
+            now = datetime.now(timezone.utc)
+            stmt = (
+                update(User)
+                .where(
+                    User.billing_status == "trial",
+                    User.trial_ends_at < now,
+                )
+                .values(billing_status="past_due")
+            )
+            result = await conn.execute(stmt)
+            if result.rowcount:
+                print(f"✅ Trial cron: {result.rowcount} usuario(s) pasados a past_due")
+    except Exception as e:
+        print(f"⚠️ Trial cron error: {e}")
 
 
 async def _migrate_add_user_team_owner_column():
@@ -943,6 +973,7 @@ async def lifespan(app: FastAPI):
     await _migrate_add_client_fecha_inic_activ()
     await _migrate_sync_operations_columns()
     await _migrate_create_telemetry_events_table()
+    await _check_expired_trials()
     
     # Montar Admin Router si no está montado
     # FastAPI lifespan se ejecuta antes de empezar a servir peticiones
@@ -1378,7 +1409,7 @@ async def get_current_user(request: Request, response: Response, db: AsyncSessio
     team_owner = getattr(user, "team_owner_username", None)
     effective_owner = team_owner or user.username
 
-    plan = user.plan or "basic"
+    plan = user.plan or "premium"
     plan_def = billing_service.get_plan(plan)
     ops_limit = plan_def["ops"]
 
@@ -1812,8 +1843,33 @@ async def get_arca_novedades():
     return await fetch_arca_novedades()
 
 
-# Montar archivos estáticos
-app.mount("/static", StaticFiles(directory=os.path.join(basedir, "proyecto_maria", "static")), name="static")
+class CustomStaticFiles(StaticFiles):
+    """StaticFiles que rechaza archivos potencialmente sensibles (.env, .db, logs)."""
+
+    BLOCKED_EXTENSIONS = {".env", ".db", ".jsonl", ".log", ".sqlite", ".sqlite3"}
+    BLOCKED_NAMES = {".env", ".env.local", ".env.afip", ".gitignore"}
+    BLOCKED_PATHS = {"logs/", "secrets/", "private/", ".git/"}
+
+    async def get_response(self, path, scope):
+        lower = path.lower()
+        if any(lower.endswith(ext) for ext in self.BLOCKED_EXTENSIONS):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=403, detail="Acceso denegado")
+        if os.path.basename(lower) in self.BLOCKED_NAMES:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=403, detail="Acceso denegado")
+        if any(part in lower for part in self.BLOCKED_PATHS):
+            from fastapi import HTTPException
+            raise HTTPException(status_code=403, detail="Acceso denegado")
+        return await super().get_response(path, scope)
+
+
+# Montar archivos estáticos (con protección de archivos sensibles)
+app.mount(
+    "/static",
+    CustomStaticFiles(directory=os.path.join(basedir, "proyecto_maria", "static")),
+    name="static",
+)
 
 @app.get("/")
 def read_root():
@@ -2419,8 +2475,13 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
 
     require_verify = _email_verification_enabled()
 
-    # Normalizar plan a basic/premium para Ola 4.
-    chosen_plan = request.plan if request.plan in ("basic", "premium") else "basic"
+    # Ola 4: solo existe plan premium. Forzar a premium siempre.
+    chosen_plan = "premium"
+    if request.plan and request.plan not in billing_service.PLANS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Plan '{request.plan}' no disponible. El único plan activo es Premium."
+        )
 
     new_user = User(
         username=request.username,
@@ -2601,7 +2662,7 @@ async def billing_me(user=Depends(get_current_user), db: AsyncSession = Depends(
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    plan = billing_service.get_plan(db_user.plan or "basic")
+    plan = billing_service.get_plan(db_user.plan or "premium")
     return {
         "billing_status": db_user.billing_status or "none",
         "trial_ends_at": db_user.trial_ends_at.isoformat() if db_user.trial_ends_at else None,
@@ -2613,7 +2674,7 @@ async def billing_me(user=Depends(get_current_user), db: AsyncSession = Depends(
             }
             if db_user.payment_method_last4 else None
         ),
-        "plan": db_user.plan or "basic",
+        "plan": db_user.plan or "premium",
         "ops_used_this_period": db_user.ops_used_this_period or 0,
         "ops_limit": plan["ops"],
         "extra_ops_remaining": db_user.extra_ops_remaining or 0,
@@ -4108,7 +4169,7 @@ async def create_cliente(
     # Límite de clientes por plan.
     user_result = await db.execute(select(User).where(User.username == username))
     db_user = user_result.scalars().first()
-    plan_name = db_user.plan if db_user else "basic"
+    plan_name = db_user.plan if db_user else "premium"
     plan = billing_service.get_plan(plan_name)
     clients_limit = plan["clients"]
     if clients_limit is not None:
@@ -6105,7 +6166,7 @@ async def mercadopago_webhook(request: Request):
     """Webhook para recibir notificaciones de MercadoPago.
 
     Seguridad:
-      - Valida firma HMAC contra MP_WEBHOOK_SECRET (rechaza con 401 si falla).
+      - Valida firma HMAC contra MP_WEBHOOK_SECRET (401 si falla).
       - En prod sin secret seteado → rechaza siempre.
 
     Efecto sobre billing al recibir un pago aprobado:
@@ -6114,23 +6175,35 @@ async def mercadopago_webhook(request: Request):
       - user.trial_ends_at = now + 30d (proximo cobro)
       - user.payment_provider = 'mercadopago'
       - user.payment_customer_id = <id del payer MP>
+
+    HTTP status:
+      - 200 → procesado OK (MP no reintenta).
+      - 400 → datos inválidos o usuario no existe (MP reintenta, alerta).
+      - 401 → firma inválida (MP no reintenta, ataque).
+      - 500 → bug inesperado (MP reintenta).
     """
+    import logging
+    logger = logging.getLogger("mp_webhook")
+
     raw_body = await request.body()
 
     if not _verify_mp_webhook_signature(request, raw_body):
-        print("⚠️ Webhook MP: firma invalida o ausente, rechazado")
+        logger.warning("Webhook MP: firma invalida o ausente, rechazado")
         raise HTTPException(status_code=401, detail="Firma invalida")
 
     try:
         body = json.loads(raw_body.decode("utf-8")) if raw_body else {}
-        print(f"📩 Webhook MP recibido: {body.get('type')} id={body.get('data', {}).get('id')}")
+        event_type = body.get("type", "")
+        data_id = body.get("data", {}).get("id", "")
+        logger.info("Webhook MP recibido: type=%s data.id=%s", event_type, data_id)
 
-        if body.get("type") != "payment":
+        if event_type != "payment":
             return {"success": True, "skipped": "not a payment event"}
 
-        payment_id = body.get("data", {}).get("id")
+        payment_id = str(data_id) if data_id else ""
         if not payment_id or not MP_ACCESS_TOKEN:
-            return {"success": True, "skipped": "no payment_id or no MP token"}
+            logger.warning("Webhook MP: falta payment_id o MP_ACCESS_TOKEN")
+            raise HTTPException(status_code=400, detail="Falta payment_id o token")
 
         sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
         payment_info = sdk.payment().get(payment_id)
@@ -6139,13 +6212,14 @@ async def mercadopago_webhook(request: Request):
         if pay_resp.get("status") != "approved":
             return {"success": True, "skipped": f"status={pay_resp.get('status')}"}
 
-        # Soportar formato viejo username|plan y nuevo username:plan / username:topup
         external_ref = pay_resp.get("external_reference", "")
+        logger.info("Webhook MP: pago aprobado payment_id=%s external_ref=%s",
+                    payment_id, external_ref)
 
+        # Soportar formato viejo username|plan y nuevo username:plan / username:topup
         async for session in get_async_session():
             update = billing_service.process_payment(pay_resp)
             if update is None:
-                # Fallback a parser viejo "username|plan"
                 if "|" in external_ref:
                     username, plan = external_ref.split("|", 1)
                     update = {
@@ -6158,43 +6232,62 @@ async def mercadopago_webhook(request: Request):
                         "payment_customer_id": str(pay_resp.get("payer", {}).get("id", "") or payment_id),
                     }
                 else:
-                    print(f"⚠️ Webhook MP: external_reference no reconocida: {external_ref}")
-                    return {"success": True, "skipped": "external_reference desconocida"}
+                    logger.warning("Webhook MP: external_reference no reconocida: %s", external_ref)
+                    raise HTTPException(status_code=400, detail="external_reference desconocida")
 
-            result = await session.execute(select(User).where(User.username == update["username"]))
+            username = update["username"]
+            result = await session.execute(select(User).where(User.username == username))
             db_user = result.scalars().first()
-            if db_user:
-                db_user.plan = update.get("plan", db_user.plan)
-                db_user.billing_status = update.get("billing_status", db_user.billing_status)
-                if "trial_ends_at" in update:
-                    db_user.trial_ends_at = update["trial_ends_at"]
-                if "payment_provider" in update:
-                    db_user.payment_provider = update["payment_provider"]
-                if "payment_customer_id" in update:
-                    db_user.payment_customer_id = update["payment_customer_id"]
-                if "payment_method_last4" in update and update["payment_method_last4"]:
-                    db_user.payment_method_last4 = update["payment_method_last4"]
-                if "payment_method_brand" in update and update["payment_method_brand"]:
-                    db_user.payment_method_brand = update["payment_method_brand"]
-                if "ops_used_this_period" in update:
-                    db_user.ops_used_this_period = update["ops_used_this_period"]
-                if "extra_ops_remaining" in update:
-                    db_user.extra_ops_remaining = (db_user.extra_ops_remaining or 0) + update["extra_ops_remaining"]
-                if "billing_period_started_at" in update:
-                    db_user.billing_period_started_at = update["billing_period_started_at"]
-                if "last_topup_at" in update:
-                    db_user.last_topup_at = update["last_topup_at"]
-                await session.commit()
-                print(f"✅ Pago aprobado sincronizado: {db_user.username} action={update.get('action')}")
-            else:
-                print(f"⚠️ Webhook MP: user '{update['username']}' no existe en DB")
+
+            if not db_user:
+                logger.warning("Webhook MP: usuario '%s' no existe en DB", username)
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Usuario '{username}' no existe. MP reintentará."
+                )
+
+            # Deduplicación: si ya procesamos este payment_id, saltear.
+            if db_user.last_payment_id == payment_id:
+                logger.info("Webhook MP: payment_id=%s ya procesado para %s", payment_id, username)
+                return {"success": True, "skipped": "payment_id ya procesado"}
+
+            db_user.last_payment_id = payment_id
+            db_user.plan = update.get("plan", db_user.plan)
+            db_user.billing_status = update.get("billing_status", db_user.billing_status)
+            if "trial_ends_at" in update:
+                db_user.trial_ends_at = update["trial_ends_at"]
+            if "payment_provider" in update:
+                db_user.payment_provider = update["payment_provider"]
+            if "payment_customer_id" in update:
+                db_user.payment_customer_id = update["payment_customer_id"]
+            if "payment_method_last4" in update and update["payment_method_last4"]:
+                db_user.payment_method_last4 = update["payment_method_last4"]
+            if "payment_method_brand" in update and update["payment_method_brand"]:
+                db_user.payment_method_brand = update["payment_method_brand"]
+            if "ops_used_this_period" in update:
+                db_user.ops_used_this_period = update["ops_used_this_period"]
+            if "extra_ops_remaining" in update:
+                total = (db_user.extra_ops_remaining or 0) + update["extra_ops_remaining"]
+                db_user.extra_ops_remaining = min(total, billing_service.EXTRA_OPS_MAX)
+            if "billing_period_started_at" in update:
+                db_user.billing_period_started_at = update["billing_period_started_at"]
+            if "last_topup_at" in update:
+                db_user.last_topup_at = update["last_topup_at"]
+            if "extra_ops_expires_at" in update:
+                db_user.extra_ops_expires_at = update["extra_ops_expires_at"]
+
+            await session.commit()
+            logger.info("Webhook MP: pago sincronizado user=%s action=%s payment_id=%s",
+                        username, update.get("action"), payment_id)
             break
 
         return {"success": True}
+
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error en webhook: {e}")
-        # 200 para que MP no reintente eternamente por bugs nuestros.
-        return {"success": False, "error": str(e)}
+        logger.exception("Webhook MP: error inesperado: %s", e)
+        raise HTTPException(status_code=500, detail="Error interno, MP reintentará")
 
 
 @app.get("/api/billing/plans")

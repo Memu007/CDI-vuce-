@@ -69,6 +69,10 @@ class User(Base):
     billing_period_started_at = Column(DateTime(timezone=True), nullable=True)
     last_topup_at = Column(DateTime(timezone=True), nullable=True)
 
+    # Ola 4 robustez: evitar reprocesar el mismo pago MP; créditos extra expiran.
+    last_payment_id = Column(String(100), nullable=True)
+    extra_ops_expires_at = Column(DateTime(timezone=True), nullable=True)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
