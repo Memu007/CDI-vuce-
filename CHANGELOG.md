@@ -13,6 +13,8 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **feat (ui):** frontend intercepta HTTP 402 y muestra modal "Tu plan venció" con CTA a pagar.
 - **feat (cron):** al iniciar la app, usuarios con trial vencido pasan automáticamente a `past_due`.
 - **fix (static):** CustomStaticFiles rechaza `.env`, `*.db`, `*.jsonl`, logs/ y secrets/.
+- **chore (deps):** `pytest>=9.1.0`, `pytest-asyncio>=1.4.0`, cobertura mínima subida a 38%.
+- **docs:** `docs/billing/planes_y_cobros.md` con tabla de precios, límites, flujo trial, top-up y variables de entorno.
 - **test:** suite completa **291 passed, 102 skipped**.
 
 ---
