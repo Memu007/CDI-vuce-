@@ -1,7 +1,7 @@
 # HANDOFF — CDI (vuce / CDI-app)
 
 > Estado vivo del proyecto. **La próxima AI o persona que entre lo lee primero.**
-> Última actualización: 2026-06-14 · Ola 3 cerrada: Plan 04 Catálogo unificado (versión chica) · tag `v0.3-wave3` propuesto.
+> Última actualización: 2026-06-15 · Ola 3 cerrada: Plan 04 Catálogo unificado (versión chica) · tag `v0.3-wave3` puesto.
 
 ---
 
