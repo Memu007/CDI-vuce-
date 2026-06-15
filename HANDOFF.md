@@ -1,7 +1,7 @@
 # HANDOFF — CDI (vuce / CDI-app)
 
 > Estado vivo del proyecto. **La próxima AI o persona que entre lo lee primero.**
-> Última actualización: 2026-06-15 · Ola 3 cerrada: Plan 04 Catálogo unificado (versión chica) · tag `v0.3-wave3` puesto.
+> Última actualización: 2026-06-15 · Ola 4 cerrada: billing real con MercadoPago + seguridad/robustez · tag `v0.4-wave4` puesto.
 
 ---
 
@@ -37,7 +37,8 @@ Usuarios demo (creados al primer arranque, NO en `ENVIRONMENT=production`):
 |---------|------|------|
 | `demo` | `demo123` | Premium |
 | `premium` | `premium123` | Premium |
-| `basico` | `basico123` | Basic |
+
+> Nota: el usuario `basico` de demo se eliminó; el plan único activo es Premium.
 
 ---
 
@@ -127,7 +128,7 @@ CDI-app/
 - Popups v2: las confirmaciones usan el modal visual de CDI (`CDI.confirm`) en vez de carteles nativos del navegador.
 - Eliminación de clientes: borra operaciones, ítems, notas NCM e historial de productos del cliente manteniendo aislamiento por usuario.
 - Telemetría: eventos UI persistidos en SQL (`telemetry_events`) + JSONL; el frontend usa `/api/session/state` para reducir bloqueos por extensiones.
-- Seguridad Wave 1: fallback de auth en `proyecto_maria/auth/jwt_utils.py` solo entrega usuario fake si `ENVIRONMENT=testing` Y hay `PYTEST_CURRENT_TEST` (no se puede activar por accidente en Railway). El fake user tiene `roles=["operador"]/plan=basic`. CORS prod falla cerrado sin `ALLOWED_ORIGINS`. `/upload_*/public` requieren auth.
+- Seguridad Wave 1: fallback de auth en `proyecto_maria/auth/jwt_utils.py` solo entrega usuario fake si `ENVIRONMENT=testing` Y hay `PYTEST_CURRENT_TEST`. El fake user tiene `roles=["operador"]/plan=premium`. CORS prod falla cerrado sin `ALLOWED_ORIGINS`. `/upload_*/public` requieren auth.
 - Seguridad Wave 2: `pdf_extractor.py` encierra el texto del PDF en `<<<DOCUMENTO>>>` y le dice al modelo que ignore instrucciones dentro. Cap de input al LLM (`PDF_LLM_MAX_INPUT_CHARS=60000`) y de items (≤2000). Sanitización estricta de cada item antes de persistir (NCM solo dígitos, origen ISO, strings sin chars de control). Multi-tenant verificado: 71 referencias a `owner_username` con helper `_get_owned_client`.
 - Seguridad Wave 3: cuota diaria de IA por usuario (`proyecto_maria/core/ai_quota.py`, `AI_DAILY_PDF_LIMIT=50/día/usuario`) aplicada en `POST /upload_pdf/public`. XSS audit de v2 OK (todos los `innerHTML` con dato externo escapan vía `CDI.escapeHtml`). Pendiente no urgente: sacar `unsafe-inline` de CSP `script-src` y CSRF header custom.
 - Panel KPIs Wave 1 (`/dev/dashboard`): demo vs PDF, auto-detect OK / sin match, activación (usuarios únicos por acción + cuentas DB).
@@ -168,7 +169,7 @@ CDI-app/
 - **Mantenimiento resuelto:**
   - Dependencias vulnerables de producción actualizadas en `requirements.txt`: `requests>=2.32.4`, `pdfminer.six>=20251107`, `starlette>=0.47.2` + `fastapi>=0.115.0`.
   - Verificado con `pip-audit`: solo queda `pytest 8.4.2` (dev-only, pendiente por conflictos con `pytest-asyncio`).
-  - Suite completa: **291 passed** (los 70 tests de billing, checkout y maria generator pasan completamente verdes; persisten advertencias/errores de loop preexistentes en security/seo). Smokes pasan.
+  - Suite completa: **292 passed** (los 70 tests de billing, checkout y maria generator pasan completamente verdes; además de un nuevo test unitario previniendo 500 en operations/manual). Smokes pasan.
 - **Mantenimiento pendiente:**
   - `pytest>=9.0.3` (dev-only, bajo riesgo).
   - Subir coverage de `main.py` de nuevo a 40% agregando tests de límites de billing y endpoints de Ola 4.

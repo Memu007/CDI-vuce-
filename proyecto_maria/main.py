@@ -2736,7 +2736,7 @@ async def create_manual_operation(
     except Exception:
         raise HTTPException(status_code=400, detail="Body JSON inválido")
 
-    client_id = data.get("client_id", "").strip()
+    client_id = str(data.get("client_id") or "").strip()
     items_raw = data.get("items", [])
 
     if not client_id:

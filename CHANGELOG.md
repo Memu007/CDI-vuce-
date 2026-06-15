@@ -13,10 +13,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **feat (ui):** frontend intercepta HTTP 402 y muestra modal "Tu plan venció" con CTA a pagar.
 - **feat (cron):** al iniciar la app, usuarios con trial vencido pasan automáticamente a `past_due`.
 - **fix (static):** CustomStaticFiles rechaza `.env`, `*.db`, `*.jsonl`, logs/ y secrets/.
-- **chore (deps):** `pytest>=9.1.0`, `pytest-asyncio>=1.4.0`, cobertura mínima subida a 38%.
+- **chore (deps):** `pytest>=9.1.0`, `pytest-asyncio>=1.4.0`, cobertura mínima 38% (`pytest.ini`).
+- **fix (ops):** prevención de crash 500 en `/api/operations/manual` cuando se envía `client_id` nulo explícitamente (se ataja con 400).
+- **test:** nuevo archivo `tests/test_operations_manual.py` para asegurar que operaciones sin cliente retornan 400 en lugar de 500.
 - **docs:** `docs/billing/planes_y_cobros.md` con tabla de precios, límites, flujo trial, top-up y variables de entorno.
 - **fix:** consistencia total del plan único Premium — eliminados todos los fallbacks y referencias a `basic` en `main.py`, `billing_service.py`, `profile.js`, `app_v2.js`, `jwt_utils.py`, `landing.html`, `plan_middleware.py` y tests.
-- **test:** suite completa **291 passed, 102 skipped**.
+- **test:** suite completa **292 passed, 102 skipped**.
 
 ---
 
