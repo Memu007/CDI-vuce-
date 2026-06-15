@@ -151,8 +151,12 @@ CDI-app/
   - Fase 1: edición inline de NCM/origen/peso y botón "Olvidar" para productos aprendidos.
   - Fix: `extract_items_from_excel` acepta `peso_unitario = 0` para que el autofill de peso del catálogo del cliente pueda dispararse en la segunda operación.
   - Smoke end-to-end navegador pasa: cliente nuevo → aprender producto → segunda planilla con origen XX y peso 0 → review muestra origen CN y peso 1.5 con `__autofillSource: 'cliente'` → NCM muestra chip 📚.
+- **Mantenimiento resuelto:**
+  - Dependencias vulnerables de producción actualizadas en `requirements.txt`: `requests>=2.32.4`, `pdfminer.six>=20251107`, `starlette>=0.47.2` + `fastapi>=0.115.0`.
+  - Verificado con `pip-audit`: solo queda `pytest 8.4.2` (dev-only, pendiente por conflictos con `pytest-asyncio`).
+  - Suite completa **250 passed** y smokes (`smoke_friccion.sh`, Plan 04, Plan 04 e2e) pasan.
 - **Mantenimiento pendiente:**
-  - Vulnerabilidades de dependencias documentadas en `docs/maintenance/vulnerabilidades_pendientes.md` (`requests`, `pdfminer.six`, `starlette`). Prioridad media; atacar en ventana tranquila.
+  - `pytest>=9.0.3` (dev-only, bajo riesgo).
 - **Plan 03 cerrado (Ola 2):** endpoint `/api/clientes/search?q=` para búsqueda server-side; picker con debounce; botón **+ Nuevo cliente** en review con mini formulario inline para alta rápida de cliente desde la operación.
 - **Fix urgente tabla NCM:** ahora muestra **Valor unitario** y **Peso unitario** junto con Ref./Descripción/Origen/Cant/Código NCM.
 - **Plan 02 cerrado (Ola 2):** drawer de clientes con 6 KPIs (operaciones/ítems/promedio/origen frecuente/valor/última), orden por último movimiento, badge `N ops`, export CSV backend, expand de operaciones. Smoke headless de Plan 02 pasa.

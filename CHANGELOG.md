@@ -18,7 +18,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
-## 2026-06-14 · Cierre Ola 2 + tag `v0.2-wave2`
+## 2026-06-14 · Maintenance: dependencias vulnerables de producción
+
+- **chore (deps):** actualizado `requirements.txt` con mínimos seguros de dependencias vulnerables:
+  - `requests>=2.32.4` (GHSA-9hjg-9r4m-mvj7)
+  - `pdfminer.six>=20251107` (GHSA-wf5f-4jwr-ppcp)
+  - `starlette>=0.47.2` y `fastapi>=0.115.0` (CVE-2024-47874, CVE-2025-54121)
+- **docs:** actualizado `docs/maintenance/vulnerabilidades_pendientes.md` con estado resuelto/pendiente.
+- **test + qa:** `pip-audit` sobre `requirements.txt` ya no reporta vulnerabilidades de producción. Queda `pytest 8.4.2` (dev-only). Suite completa **250 passed, 102 skipped**; smokes `smoke_friccion.sh`, Plan 04 y Plan 04 e2e pasan.
 
 - **docs:** creado `docs/maintenance/vulnerabilidades_pendientes.md` con dependencias vulnerables detectadas (`requests`, `pdfminer.six`, `starlette`) y plan de ataque.
 - **tag:** `v0.2-wave2` apunta al cierre de Plan 02 y Plan 03.
