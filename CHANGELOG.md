@@ -8,11 +8,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-06-15 · Ola 4: Billing real con MercadoPago (MVP)
 
-- **feat (billing):** cobro real con MercadoPago. Planes Básico ($15k/mes, 4 ops, 10 clientes) y Premium ($30k/mes, ilimitado). Trial 14 días sin tarjeta. Top-up $10k por 10 ops.
+- **feat (billing):** cobro real con MercadoPago. Plan único **Premium** ($30.000 ARS/mes, 10 ops/mes, clientes ilimitados, 3 usuarios). Trial 14 días sin tarjeta. Top-up $10k por 10 ops.
 - **feat (api):** endpoints `GET /api/billing/plans`, `POST /api/billing/checkout` (con selector de plan), `POST /api/billing/topup`, webhook actualizado para suscripción y top-up.
 - **feat (limits):** middleware `require_active_billing` valida estado y límite de ops/mes al crear operaciones; límite de clientes por plan al crear cliente.
 - **feat (ux):** selector de plan en registro, plan actual y uso del mes en perfil, botón de top-up, muro de pago para trial vencido.
-- **test:** +11 tests en `tests/test_billing_ola4.py`; suite completa **291 passed, 102 skipped**. Coverage min bajado a 35% por nuevas líneas de billing (deuda técnica documentada).
+- **test + qa:** +11 tests en `tests/test_billing_ola4.py`; suite completa **291 passed, 102 skipped**. Smoke local con checkout real de MercadoPago genera preference `live` correctamente. Smoke real de pago + webhook queda pendiente para deploy con dominio público.
 
 ---
 

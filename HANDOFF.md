@@ -153,12 +153,12 @@ CDI-app/
   - Smoke end-to-end navegador pasa: cliente nuevo → aprender producto → segunda planilla con origen XX y peso 0 → review muestra origen CN y peso 1.5 con `__autofillSource: 'cliente'` → NCM muestra chip 📚.
   - **Mejora de seguridad aduanera (países):** Agregados oficialmente Vietnam (337), Tailandia (335), Indonesia (316) y Malasia (326). Se valida estrictamente el país de origen/destino (bloqueando "XX" y no reconocidos con HTTP 400) para evitar fallas ante AFIP.
 - **Ola 4 — Billing real con MercadoPago (MVP cerrado):**
-  - Planes Básico ($15.000 ARS/mes, 4 ops/mes, 10 clientes, 1 usuario) y Premium ($30.000 ARS/mes, ops ilimitadas, clientes ilimitados, 3 usuarios). Trial 14 días sin tarjeta. Top-up $10.000 ARS por 10 ops.
-  - Servicio `proyecto_maria/services/billing_service.py` con soporte a suscripciones MP (preapproval) y fallback a Checkout API (preference mensual).
+  - Plan único **Premium** ($30.000 ARS/mes, 10 ops/mes, clientes ilimitados, 3 usuarios). Trial 14 días sin tarjeta. Top-up $10.000 ARS por 10 ops.
+  - Servicio `proyecto_maria/services/billing_service.py` con Checkout API manual (preference mensual). Soporte a suscripciones MP (preapproval) preparado para cuando haya `preapproval_plan_id`.
   - Endpoints: `GET /api/billing/plans`, `POST /api/billing/checkout` (con selector de plan), `POST /api/billing/topup`, webhook `/api/payments/webhook` actualizado.
   - Middleware `require_active_billing` aplica límite de ops/mes en creación de operaciones y límite de clientes al crear cliente.
   - UI: selector de plan en registro, uso del mes en perfil, botón de top-up, banner de trial vencido.
-  - Smoke local pasa; suite **291 passed, 102 skipped**. Pendiente: smoke real con pago sandbox de MercadoPago usando credenciales TEST-.
+  - Smoke local con checkout real de MercadoPago genera preference `live` OK. Pendiente: smoke real de pago + webhook en deploy con dominio público.
 - **Mantenimiento resuelto:**
   - Dependencias vulnerables de producción actualizadas en `requirements.txt`: `requests>=2.32.4`, `pdfminer.six>=20251107`, `starlette>=0.47.2` + `fastapi>=0.115.0`.
   - Verificado con `pip-audit`: solo queda `pytest 8.4.2` (dev-only, pendiente por conflictos con `pytest-asyncio`).
