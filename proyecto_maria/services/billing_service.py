@@ -5,11 +5,10 @@ Soporta dos modos:
 1. Suscripciones (preapproval) cuando hay `MP_PREAPPROVAL_PLAN_ID_*` configurado.
 2. Checkout API (preference mensual) como fallback.
 
-Planes CDI:
-- basic: $15.000 ARS/mes, 4 ops/mes, 10 clientes, 1 usuario.
-- premium: $30.000 ARS/mes, ops ilimitadas, clientes ilimitados, 3 usuarios.
+Plan CDI (Ola 4 MVP):
+- premium: $30.000 ARS/mes, 10 ops/mes, clientes ilimitados, 3 usuarios.
 
-Top-up: $10.000 ARS por 10 ops adicionales.
+Top-up: $10.000 ARS por 10 ops adicionales (vencen a 30 días, máx 100 acumulados).
 """
 
 from __future__ import annotations
@@ -38,8 +37,6 @@ def get_frontend_url() -> str:
 
 
 def _preapproval_plan_id(plan_id: str) -> str | None:
-    if plan_id == "basic":
-        return os.environ.get("MP_PREAPPROVAL_PLAN_ID_BASIC", "") or None
     if plan_id == "premium":
         return os.environ.get("MP_PREAPPROVAL_PLAN_ID_PREMIUM", "") or None
     return None
@@ -140,7 +137,8 @@ def can_create_operation(user) -> Tuple[bool, str | None]:
 
 def record_operation_created(user):
     """Incrementa contadores y consume extra_ops si hace falta."""
-    plan_id = getattr(user, "plan", "basic") or "basic"
+    # Ola 4 MVP: solo existe Premium, fallback a premium.
+    plan_id = getattr(user, "plan", "premium") or "premium"
     plan = get_plan(plan_id)
     ops_limit = plan["ops"]
 

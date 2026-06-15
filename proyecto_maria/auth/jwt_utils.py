@@ -101,12 +101,12 @@ def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(
                 detail="Autenticación requerida",
             )
         _log.warning("auth.jwt_utils: returning testing user (PYTEST runtime)")
-        # Privilegio minimo: operador, plan basic. Antes era admin/premium,
-        # demasiado para un fallback de tests.
+        # Ola 4 MVP: solo existe Premium. El fallback de tests usa premium
+        # para no romper validaciones de plan, con rol mínimo operador.
         return {
             "sub": "testing-user",
             "roles": ["operador"],
-            "plan": "basic",
+            "plan": "premium",
             "environment": _current_environment(),
         }
     return decode_token(credentials.credentials)

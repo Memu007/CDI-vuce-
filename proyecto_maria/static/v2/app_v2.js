@@ -631,7 +631,7 @@
                 cta.textContent = 'Abriendo...';
                 track('billing_cta_clicked', { status: status });
                 try {
-                    const plan = (user && user.plan) || 'basic';
+                    const plan = (user && user.plan) || 'premium';
                     const res = await api('/api/billing/checkout', {
                         method: 'POST',
                         body: JSON.stringify({ plan })

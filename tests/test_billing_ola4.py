@@ -6,7 +6,7 @@ from proyecto_maria.database.models import User
 
 
 class FakeUser:
-    def __init__(self, plan="basic", billing_status="trial", used=0, extra=0):
+    def __init__(self, plan="premium", billing_status="trial", used=0, extra=0):
         self.plan = plan
         self.billing_status = billing_status
         self.ops_used_this_period = used

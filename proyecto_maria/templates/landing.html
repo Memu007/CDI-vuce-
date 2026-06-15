@@ -432,8 +432,8 @@
 
     /* ---------- Plan validation ---------- */
     function validatePlan(payload) {
-        if (!payload.plan || !['basic', 'premium'].includes(payload.plan)) {
-            return 'Seleccioná un plan válido.';
+        if (payload.plan !== 'premium') {
+            return 'Seleccioná el plan Premium.';
         }
         return null;
     }

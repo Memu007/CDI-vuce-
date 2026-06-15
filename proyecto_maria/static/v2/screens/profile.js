@@ -333,7 +333,7 @@
         // Selector de plan visible solo si no está active (puede cambiar plan).
         if (billingPlanWrap && billingPlanSelect && status !== 'active') {
             billingPlanWrap.hidden = false;
-            billingPlanSelect.value = (b && b.plan) || 'basic';
+            billingPlanSelect.value = (b && b.plan) || 'premium';
         }
 
         // Fecha relevante.
