@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-15 · Revisión Olas 1–3 (QA)
+
+- **docs:** auditoría de código para confirmar cierre de las 3 olas. Resultado: todo marcado está presente en el repo (Cockpit + S1/S3 + upload race fix + Novedades ARCA / Ola 1; drawer clientes + alta desde review + tabla NCM / Ola 2; catálogo unificado con mapeo persistente + autofill / Ola 3). Tests específicos: 45 passed. Suite total: 274 passed, 0 fallas.
+- **docs:** corregido `HANDOFF.md` — tag `v0.3-wave3` puesto (no propuesto).
+
+---
+
 ## 2026-06-14 · Plan 04: Catálogo unificado — versión chica (Ola 3)
 
 - **fix (persistencia):** al subir un Excel con `cliente_id`, el backend ahora detecta y **persiste** el mapeo de columnas en `Client.column_mapping`. Antes se usaba para leer pero nunca se guardaba, por eso "se borraba al cerrar sesión".
