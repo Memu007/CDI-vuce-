@@ -276,7 +276,7 @@ class RegisterRequest(BaseModel):
     payment_method: CardInput | None = None
 
 class PlanCheckoutRequest(BaseModel):
-    plan: str  # "basic" | "premium"
+    plan: str  # solo "premium" (Ola 4 MVP)
 
 class TopupRequest(BaseModel):
     pass
@@ -989,7 +989,7 @@ async def lifespan(app: FastAPI):
             
             demo_users = [
                 {"username": "premium", "password": "premium123", "name": "Usuario Premium", "plan": "premium"},
-                {"username": "basico", "password": "basico123", "name": "Usuario Básico", "plan": "basic"},
+                {"username": "basico", "password": "basico123", "name": "Usuario Premium", "plan": "premium"},
                 {"username": "demo", "password": "demo123", "name": "Demo User", "plan": "premium"},
             ]
             
@@ -1466,7 +1466,7 @@ async def require_active_billing(
     db_user = result.scalars().first()
     if not db_user:
         if os.getenv("ENVIRONMENT") == "testing":
-            return User(username=user["username"], plan="basic", billing_status="active")
+            return User(username=user["username"], plan="premium", billing_status="active")
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
 
     # Trial vencido -> past_due (misma lógica que /auth/current_user).

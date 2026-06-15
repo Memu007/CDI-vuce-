@@ -1,7 +1,7 @@
 """
 Middleware de validación de planes de suscripción.
 
-Permite restringir endpoints según el plan del usuario (basic, premium, etc.)
+Permite restringir endpoints según el plan del usuario (premium, etc.)
 """
 
 from typing import Annotated
@@ -32,7 +32,7 @@ def require_plan(*allowed_plans: str):
             normalized_plans.append(str(plan).lower())
 
     async def checker(user: Annotated[dict, Depends(get_current_user)]):
-        user_plan = str(user.get("plan", "basic")).lower()
+        user_plan = str(user.get("plan", "premium")).lower()
 
         if normalized_plans and user_plan not in normalized_plans:
             raise HTTPException(
@@ -50,9 +50,9 @@ def get_user_plan(user: Annotated[dict, Depends(get_current_user)]) -> str:
     Helper para obtener el plan del usuario actual.
 
     Returns:
-        str: Plan del usuario (basic, premium, etc.)
+        str: Plan del usuario (premium, etc.)
     """
-    return user.get("plan", "basic")
+    return user.get("plan", "premium")
 
 
 def validate_file_size(file_size_bytes: int, user_plan: str) -> tuple[bool, str]:
@@ -61,7 +61,7 @@ def validate_file_size(file_size_bytes: int, user_plan: str) -> tuple[bool, str]
 
     Args:
         file_size_bytes: Tamaño del archivo en bytes
-        user_plan: Plan del usuario ('basic' o 'premium')
+        user_plan: Plan del usuario ('premium')
 
     Returns:
         tuple: (es_válido, mensaje_error)

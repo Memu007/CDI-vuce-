@@ -15,8 +15,8 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix (static):** CustomStaticFiles rechaza `.env`, `*.db`, `*.jsonl`, logs/ y secrets/.
 - **chore (deps):** `pytest>=9.1.0`, `pytest-asyncio>=1.4.0`, cobertura mínima subida a 38%.
 - **docs:** `docs/billing/planes_y_cobros.md` con tabla de precios, límites, flujo trial, top-up y variables de entorno.
-- **fix:** consistencia total del plan único Premium — eliminados todos los fallbacks y referencias a `basic` en `main.py`, `billing_service.py`, `profile.js`, `app_v2.js`, `jwt_utils.py`, `landing.html` y tests.
-- **test:** suite completa **291 passed, 102 skipped**, smoke OK.
+- **fix:** consistencia total del plan único Premium — eliminados todos los fallbacks y referencias a `basic` en `main.py`, `billing_service.py`, `profile.js`, `app_v2.js`, `jwt_utils.py`, `landing.html`, `plan_middleware.py` y tests.
+- **test:** suite completa **291 passed, 102 skipped**.
 
 ---
 
