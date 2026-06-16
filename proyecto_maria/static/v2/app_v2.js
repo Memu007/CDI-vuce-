@@ -48,7 +48,10 @@
                     cancelText: 'Volver',
                     icon: '💳',
                 }).then(ok => {
-                    if (ok) window.location.href = '/v2?screen=profile';
+                    if (ok) {
+                        if (CDI.goTo) CDI.goTo('profile');
+                        else window.location.href = '/dashboard?v=2&screen=profile';
+                    }
                 });
             }
             throw new Error('payment_required');
@@ -635,7 +638,7 @@
                     const res = await api('/api/billing/checkout', {
                         method: 'POST',
                         body: JSON.stringify({ plan })
-                    });
+ })
                     const data = await res.json().catch(() => ({}));
                     if (data && data.init_point) {
                         window.location.href = data.init_point;
