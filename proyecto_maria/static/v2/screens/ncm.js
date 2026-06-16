@@ -326,6 +326,11 @@
             inp.addEventListener('blur', onNcmBlur);
             inp.addEventListener('keydown', onNcmKeydown);
         });
+        tbody.querySelectorAll('.ncm-edit').forEach(inp => {
+            inp.addEventListener('input', onFieldInput);
+            inp.addEventListener('blur', onFieldBlur);
+            inp.addEventListener('keydown', onFieldKeydown);
+        });
         tbody.querySelectorAll('[data-assist]').forEach(btn => {
             btn.addEventListener('click', () => {
                 const idx = parseInt(btn.getAttribute('data-assist'), 10);
@@ -391,7 +396,7 @@
         const rowClass = isOk ? 'row-ok' : 'row-pending';
         const desc = CDI.escapeHtml(it.descripcion || it.codigo_parte || '');
         const ref = CDI.escapeHtml(it.codigo_parte || '—');
-        const origen = CDI.escapeHtml(it.origen || '—');
+        const origen = CDI.escapeHtml(it.origen || '');
         const cantidad = it.cantidad != null ? Number(it.cantidad) : '';
         const valorUnitario = Number(it.valor_unitario || 0);
         const pesoUnitario = Number(it.peso_unitario || 0);
@@ -401,18 +406,19 @@
         const notesPill = renderNotesPill(pieza, i);
         const checked = selectedRows.has(i) ? ' checked' : '';
         const autofillChip = renderAutofillChip(it);
-        const fmtMoney = (v) => v ? '$' + v.toLocaleString('es-AR', { maximumFractionDigits: 2 }) : '—';
-        const fmtPeso = (v) => v ? v.toLocaleString('es-AR', { maximumFractionDigits: 2 }) + ' kg' : '—';
+        const fmtMoney = (v) => v ? '$' + v.toLocaleString('es-AR', { maximumFractionDigits: 2 }) : '';
+        const fmtPeso = (v) => v ? v.toLocaleString('es-AR', { maximumFractionDigits: 2 }) : '';
+        const cantVal = cantidad === '' ? '' : cantidad;
         return (
             '<tr class="' + rowClass + '" data-row="' + i + '" data-index="' + i + '">' +
                 '<td class="col-check"><input type="checkbox" class="ncm-row-check" data-row-check="' + i + '"' + checked + ' aria-label="Seleccionar item ' + (i + 1) + '"></td>' +
                 '<td class="col-num" title="Arrastrar para reordenar"><span class="drag-grip" aria-hidden="true">⋮⋮</span>' + (i + 1) + '</td>' +
                 '<td class="col-ref">' + ref + '</td>' +
                 '<td class="col-desc">' + desc + '</td>' +
-                '<td class="col-pais">' + origen + '</td>' +
-                '<td class="col-cant">' + cantidad + '</td>' +
-                '<td class="col-valor">' + fmtMoney(valorUnitario) + '</td>' +
-                '<td class="col-peso">' + fmtPeso(pesoUnitario) + '</td>' +
+                '<td class="col-pais"><input class="ncm-edit ncm-edit-pais input input-sm" type="text" maxlength="2" value="' + origen + '" data-row="' + i + '" data-field="origen" aria-label="Origen item ' + (i + 1) + '"></td>' +
+                '<td class="col-cant"><input class="ncm-edit ncm-edit-cant input input-sm" type="number" min="1" step="1" value="' + cantVal + '" data-row="' + i + '" data-field="cantidad" aria-label="Cantidad item ' + (i + 1) + '"></td>' +
+                '<td class="col-valor"><input class="ncm-edit ncm-edit-valor input input-sm" type="number" min="0" step="0.01" value="' + (valorUnitario || '') + '" data-row="' + i + '" data-field="valor_unitario" aria-label="Valor unitario item ' + (i + 1) + '"></td>' +
+                '<td class="col-peso"><input class="ncm-edit ncm-edit-peso input input-sm" type="number" min="0" step="0.01" value="' + (pesoUnitario || '') + '" data-row="' + i + '" data-field="peso_unitario" aria-label="Peso unitario item ' + (i + 1) + '"></td>' +
                 '<td class="col-ncm">' +
                     '<div class="ncm-cell">' +
                         '<input class="ncm-input" type="text" placeholder="- - - -"' +
@@ -634,6 +640,86 @@
             ev.preventDefault();
             const idx = parseInt(ev.target.getAttribute('data-row'), 10);
             openSpotlight(idx);
+        }
+    }
+
+    // Países reconocidos por MARIA/AFIP (ISO 3166-1 alpha-2). En prod este
+    // listado debería venir del backend, pero mantenemos uno mínimo para
+    // validación rápida en el cliente.
+    const PAIS_RECONOCIDOS = new Set([
+        'AR','BO','BR','CA','CL','CN','CO','CR','DE','EC','ES','FR','GB','GT','HK','IN','ID','IT','JP','KR','MX','MY','NI','NL','PA','PE','PY','SV','TH','TW','US','UY','VN','ZA'
+    ]);
+
+    function setItemField(idx, field, raw) {
+        const items = CDI.state && CDI.state.items;
+        if (!items || !items[idx]) return;
+        const it = items[idx];
+        let value = raw;
+        if (field === 'origen') {
+            value = String(raw || '').trim().toUpperCase().slice(0, 2);
+        } else {
+            const n = Number(raw);
+            value = Number.isFinite(n) ? n : 0;
+        }
+        it[field] = value;
+        return value;
+    }
+
+    function markFieldError(inp, isError) {
+        if (isError) inp.classList.add('is-error');
+        else inp.classList.remove('is-error');
+    }
+
+    function onFieldInput(ev) {
+        const inp = ev.target;
+        if (!inp) return;
+        const idx = parseInt(inp.getAttribute('data-row'), 10);
+        const field = inp.getAttribute('data-field');
+        if (isNaN(idx) || !field) return;
+
+        if (field === 'origen') {
+            // Forzar mayúsculas mientras tipea
+            inp.value = (inp.value || '').toUpperCase();
+            const val = inp.value.trim();
+            const ok = val.length === 2 && PAIS_RECONOCIDOS.has(val);
+            markFieldError(inp, val.length === 2 && !ok);
+        }
+        setItemField(idx, field, inp.value);
+        updateSummary();
+    }
+
+    function onFieldBlur(ev) {
+        const inp = ev.target;
+        if (!inp) return;
+        const idx = parseInt(inp.getAttribute('data-row'), 10);
+        const field = inp.getAttribute('data-field');
+        if (isNaN(idx) || !field) return;
+
+        const finalValue = setItemField(idx, field, inp.value);
+        if (field === 'origen') {
+            inp.value = finalValue || '';
+            const ok = finalValue.length === 2 && PAIS_RECONOCIDOS.has(finalValue);
+            markFieldError(inp, !ok && finalValue.length > 0);
+            if (finalValue === 'XX') {
+                if (CDI.toast) CDI.toast('Origen no válido', '«XX» no es un país reconocido por AFIP. Usá el código ISO de dos letras (ej: CN, BR, US).', 'error');
+            } else if (!ok && finalValue.length > 0) {
+                if (CDI.toast) CDI.toast('Origen no reconocido', 'Código "' + finalValue + '" no está en la lista de países válidos.', 'warning');
+            }
+        }
+        updateSummary();
+    }
+
+    function onFieldKeydown(ev) {
+        if (ev.key === 'Enter') {
+            ev.preventDefault();
+            ev.target.blur();
+            const idx = parseInt(ev.target.getAttribute('data-row'), 10);
+            const field = ev.target.getAttribute('data-field');
+            const next = ev.target.closest('tr') && ev.target.closest('tr').nextElementSibling;
+            if (next) {
+                const nextInput = next.querySelector('.ncm-edit[data-field="' + field + '"]');
+                if (nextInput) nextInput.focus();
+            }
         }
     }
 

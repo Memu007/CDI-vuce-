@@ -5274,3 +5274,23 @@ tr:hover .ncm-note-pill.is-empty {
 @media (prefers-reduced-motion: reduce) {
     .arca-news-item { transform: none !important; }
 }
+
+/* NCM inline editing */
+.ncm-edit {
+    width: 100%;
+    min-width: 48px;
+    padding: 4px 6px;
+    font-size: 13px;
+    text-align: right;
+}
+.ncm-edit-pais { text-align: center; text-transform: uppercase; }
+.ncm-edit-cant { min-width: 56px; }
+.ncm-edit-valor,
+.ncm-edit-peso { min-width: 80px; }
+.ncm-table th,
+.ncm-table td { vertical-align: middle; }
+.ncm-table td.col-pais,
+.ncm-table td.col-cant,
+.ncm-table td.col-valor,
+.ncm-table td.col-peso { padding: 4px; }
+
