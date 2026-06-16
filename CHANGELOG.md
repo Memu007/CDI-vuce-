@@ -6,6 +6,16 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-16 · Pre-lanzamiento: Testing Bloque 1 y 2
+
+- **test (prelaunch):** `tests/test_prelaunch_block1.py` — 44 tests del core sin pagos: registro + trial 14 días, login/logout, subida Excel, generación MARIA TXT, operaciones manuales, clientes + catálogo + CSV, límite 10 ops, errores como JSON. **44/44 passed**.
+- **test (prelaunch):** `tests/test_prelaunch_block2.py` — 37 tests de billing: checkout MP (sandbox + demo), webhook firma/deduplicación/aprobado/rechazado, límite 10 ops → HTTP 402, trial vencido → past_due, top-up $10k/10ops/máx100/30días, billing/me, planes solo premium. **37/37 passed**.
+- **fix (tests):** patching correcto de constantes de módulo (`IS_PRODUCTION`, `MP_WEBHOOK_SECRET`, `MP_ACCESS_TOKEN`) con `monkeypatch.setattr` en lugar de `setenv` post-importación.
+- **fix (tests):** datetimes naive de SQLite normalizados con `.replace(tzinfo=timezone.utc)` para comparar con aware datetimes.
+- **chore:** suite acumulada **93 tests pre-lanzamiento** en verde.
+
+---
+
 ## 2026-06-15 · Ola 4: Seguridad y robustez post-MVP
 
 - **fix (webhook):** códigos HTTP correctos: 401 firma inválida, 400 usuario no existe (MP reintenta), 500 bug inesperado. Logging estructurado con payment_id/external_reference. Deduplicación por `last_payment_id` para no reprocesar el mismo pago.
