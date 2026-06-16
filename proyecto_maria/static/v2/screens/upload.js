@@ -165,16 +165,20 @@
 
     function setBusy(on, title, sub) {
         busy = on;
-        if (!dz) return; // todavia no se inicializo el DOM (race de carga)
+        if (!dz) {
+            // La pantalla aún no montó el DOM (raro, pero defensivo).
+            console.warn('[upload] setBusy called before dropzone initialized');
+            return;
+        }
         if (on) {
             dz.classList.add('is-disabled');
-            progress.hidden = false;
-            if (title) progressTitle.textContent = title;
-            if (sub) progressSub.textContent = sub;
+            if (progress) progress.hidden = false;
+            if (title && progressTitle) progressTitle.textContent = title;
+            if (sub && progressSub) progressSub.textContent = sub;
             hideError();
         } else {
             dz.classList.remove('is-disabled');
-            progress.hidden = true;
+            if (progress) progress.hidden = true;
         }
     }
 
