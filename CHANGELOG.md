@@ -16,6 +16,15 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-16 · Pre-lanzamiento: Testing Bloque 3 — Seguridad y Producción
+
+- **test (prelaunch):** `tests/test_prelaunch_block3.py` — 66 tests de seguridad (60 originales + 6 de regresión del fix). CustomStaticFiles bloquea .env/.db/.jsonl/logs/secrets con 403; IS_PRODUCTION previene demo users; webhook 401 con firma inválida/ausente; JWT rechaza clave errónea/expirado/malformado/alg-none; 11 endpoints sensibles 401 sin auth; logging no expone tarjetas; past_due/none/canceled → 402; rate limiter no hardcodeado. **66/66 passed**.
+- **fix (security 🔴):** Bug dual JWT secret resuelto — `config.py` cambiado de `alias="JWT_SECRET"` a `validation_alias=AliasChoices("JWT_SECRET_KEY", "SECRET_KEY", "JWT_SECRET")`. Ahora `jwt_utils.py` y `main.py` usan la misma clave en el mismo orden de prioridad. Tokens emitidos por `/auth/login` son verificables por `decode_token`. Ver [`config.py`](proyecto_maria/config.py).
+- **finding (low):** `plan` defaultea a `"premium"` si el JWT no incluye el claim — tokens legacy/malformados heredan el plan más alto. Sin impacto en prod (todos los tokens nuevos incluyen el claim), no se corrige en esta sesión.
+- **chore:** Suite completa **439 passed, 102 skipped**. Cobertura 40%. Pre-lanzamiento: Bloque 1 (44) + Bloque 2 (37) + Bloque 3 (66) + regresión manual (1) = 148 tests de pre-lanzamiento.
+
+---
+
 ## 2026-06-15 · Ola 4: Seguridad y robustez post-MVP
 
 - **fix (webhook):** códigos HTTP correctos: 401 firma inválida, 400 usuario no existe (MP reintenta), 500 bug inesperado. Logging estructurado con payment_id/external_reference. Deduplicación por `last_payment_id` para no reprocesar el mismo pago.

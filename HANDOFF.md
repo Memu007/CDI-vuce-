@@ -1,7 +1,7 @@
 # HANDOFF — CDI (vuce / CDI-app)
 
 > Estado vivo del proyecto. **La próxima AI o persona que entre lo lee primero.**
-> Última actualización: 2026-06-15 · Ola 4 cerrada: billing real con MercadoPago + seguridad/robustez · tag `v0.4-wave4` puesto.
+> Última actualización: 2026-06-16 · Pre-lanzamiento completo: 439 tests passed, cobertura 40% · listo para deploy.
 
 ---
 
@@ -166,13 +166,11 @@ CDI-app/
   - Top-up limitado a 100 créditos extra; expiran a 30 días. Créditos vencidos se limpian automáticamente.
   - Trial cron: al iniciar la app, usuarios con trial vencido pasan a `past_due`.
   - Static files: CustomStaticFiles rechaza `.env`, `*.db`, `*.jsonl`, logs/ y secrets/.
-- **Mantenimiento resuelto:**
-  - Dependencias vulnerables de producción actualizadas en `requirements.txt`: `requests>=2.32.4`, `pdfminer.six>=20251107`, `starlette>=0.47.2` + `fastapi>=0.115.0`.
-  - Verificado con `pip-audit`: solo queda `pytest 8.4.2` (dev-only, pendiente por conflictos con `pytest-asyncio`).
-  - Suite completa: **292 passed** (los 70 tests de billing, checkout y maria generator pasan completamente verdes; además de un nuevo test unitario previniendo 500 en operations/manual). Smokes pasan.
-- **Mantenimiento pendiente:**
-  - `pytest>=9.0.3` (dev-only, bajo riesgo).
-  - Subir coverage de `main.py` de nuevo a 40% agregando tests de límites de billing y endpoints de Ola 4.
+- **Ola 4 — Pre-lanzamiento completo (listo para deploy):**
+  - Test suite pre-lanzamiento: 148 tests (Bloque 1: 44 core + Bloque 2: 37 billing + Bloque 3: 66 security + 1 regresión manual). Todos en verde.
+  - Fix crítico dual JWT secret: `config.py` ahora lee `JWT_SECRET_KEY → SECRET_KEY → JWT_SECRET` con `AliasChoices`, alineado con `main.py`.
+  - Suite completa: **439 passed, 102 skipped**; cobertura 40%.
+  - Pendiente: smoke real de pago + webhook en deploy con dominio público.
 - **Plan 03 cerrado (Ola 2):** endpoint `/api/clientes/search?q=` para búsqueda server-side; picker con debounce; botón **+ Nuevo cliente** en review con mini formulario inline para alta rápida de cliente desde la operación.
 - **Fix urgente tabla NCM:** ahora muestra **Valor unitario** y **Peso unitario** junto con Ref./Descripción/Origen/Cant/Código NCM.
 - **Plan 02 cerrado (Ola 2):** drawer de clientes con 6 KPIs (operaciones/ítems/promedio/origen frecuente/valor/última), orden por último movimiento, badge `N ops`, export CSV backend, expand de operaciones. Smoke headless de Plan 02 pasa.
