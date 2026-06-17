@@ -6292,6 +6292,80 @@ async def mercadopago_webhook(request: Request):
         raise HTTPException(status_code=500, detail="Error interno, MP reintentará")
 
 
+@app.post("/api/payments/simulate-webhook")
+async def simulate_webhook(request: Request):
+    """ Endpoint temporal para probar el procesamiento de webhooks de MP
+    sin depender de un pago real. Requiere el header X-Webhook-Secret con
+    el mismo valor que MP_WEBHOOK_SECRET. Solo usar en staging/validación.
+    """
+    secret_header = request.headers.get("x-webhook-secret", "")
+    if not MP_WEBHOOK_SECRET or secret_header != MP_WEBHOOK_SECRET:
+        raise HTTPException(status_code=401, detail="Secret inválido o no configurado")
+
+    body = await request.json()
+    username = body.get("username")
+    action = body.get("action", "subscription")
+    if not username:
+        raise HTTPException(status_code=400, detail="Falta username")
+
+    # Construir un pay_resp mínimo similar al de MercadoPago.
+    now = datetime.now(timezone.utc)
+    payment_id = "sim_" + uuid.uuid4().hex[:16]
+    # Para subscription usamos siempre el plan premium (único plan activo).
+    external_reference = f"{username}:premium" if action == "subscription" else f"{username}:topup"
+
+    pay_resp = {
+        "id": payment_id,
+        "status": "approved",
+        "external_reference": external_reference,
+        "payer": {"id": "sim_payer_123"},
+        "transaction_amount": 30000.00 if action == "subscription" else 10000.00,
+        "date_created": now.isoformat(),
+        "payment_method_id": "simulated",
+    }
+
+    update = billing_service.process_payment(pay_resp)
+    if update is None:
+        raise HTTPException(status_code=400, detail="external_reference inválida")
+
+    async for session in get_async_session():
+        result = await session.execute(select(User).where(User.username == username))
+        db_user = result.scalars().first()
+        if not db_user:
+            raise HTTPException(status_code=400, detail="Usuario no existe")
+
+        db_user.last_payment_id = payment_id
+        db_user.plan = update.get("plan", db_user.plan)
+        db_user.billing_status = update.get("billing_status", db_user.billing_status)
+        if "trial_ends_at" in update:
+            db_user.trial_ends_at = update["trial_ends_at"]
+        if "payment_provider" in update:
+            db_user.payment_provider = update["payment_provider"]
+        if "payment_customer_id" in update:
+            db_user.payment_customer_id = update["payment_customer_id"]
+        if "ops_used_this_period" in update:
+            db_user.ops_used_this_period = update["ops_used_this_period"]
+        if "extra_ops_remaining" in update:
+            total = (db_user.extra_ops_remaining or 0) + update["extra_ops_remaining"]
+            db_user.extra_ops_remaining = min(total, billing_service.EXTRA_OPS_MAX)
+        if "extra_ops_expires_at" in update:
+            db_user.extra_ops_expires_at = update["extra_ops_expires_at"]
+        if "last_topup_at" in update:
+            db_user.last_topup_at = update["last_topup_at"]
+        if "billing_period_started_at" in update:
+            db_user.billing_period_started_at = update["billing_period_started_at"]
+
+        await session.commit()
+        await session.refresh(db_user)
+        return {
+            "success": True,
+            "payment_id": payment_id,
+            "billing_status": db_user.billing_status,
+            "trial_ends_at": db_user.trial_ends_at.isoformat() if db_user.trial_ends_at else None,
+            "extra_ops_remaining": db_user.extra_ops_remaining,
+        }
+
+
 @app.get("/api/billing/plans")
 async def billing_plans():
     """Planes disponibles para contratar."""
