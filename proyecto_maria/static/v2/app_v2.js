@@ -49,8 +49,11 @@
                     icon: '💳',
                 }).then(ok => {
                     if (ok) {
-                        if (CDI.goTo) CDI.goTo('profile');
-                        else window.location.href = '/dashboard?v=2&screen=profile';
+                        if (typeof CDI.openProfileModal === 'function') {
+                            CDI.openProfileModal();
+                        } else {
+                            window.location.reload();
+                        }
                     }
                 });
             }

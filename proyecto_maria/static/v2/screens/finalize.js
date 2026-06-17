@@ -725,6 +725,10 @@
             );
             return { ok: false, reason: 'http_error', error: msg };
         } catch (err) {
+            if (err && err.message === 'payment_required') {
+                console.warn('[history] save_client_operation: 402 payment required');
+                return { ok: false, reason: 'payment_required', error: 'Plan vencido o límite alcanzado' };
+            }
             console.error('[history] save_client_operation excepción:', err);
             CDI.track('operation_save_failed', {
                 cliente_id: cliente.id,

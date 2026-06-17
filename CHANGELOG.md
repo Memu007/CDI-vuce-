@@ -16,6 +16,16 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-16 · Hotfixes pre-lanzamiento: navegación v2, facturación y clientes
+
+- **fix (v2):** modal HTTP 402 "Tu plan venció" ahora abre el perfil correctamente vía `CDI.openProfileModal()`, sin caer en URL rota `/v2?screen=profile`.
+- **fix (clientes):** `GET /api/clientes` devuelve 200 incluso si el usuario está en `past_due` o trial vencido; corregido `GROUP BY` para PostgreSQL.
+- **fix (billing):** `get_current_user` y `require_active_billing` hacen `db.refresh()` tras mutar `billing_status`, evitando estados inconsistentes.
+- **fix (finalize):** `saveOperationToHistory` no crashea ante HTTP 402; devuelve `reason: 'payment_required'` para que el flujo pueda mostrar el modal de pago.
+- **test:** `tests/test_api_clientes_billing.py` cubre listado de clientes con `past_due` y trial vencido.
+
+---
+
 ## 2026-06-16 · Pre-lanzamiento: Testing Bloque 3 — Seguridad y Producción
 
 - **test (prelaunch):** `tests/test_prelaunch_block3.py` — 66 tests de seguridad (60 originales + 6 de regresión del fix). CustomStaticFiles bloquea .env/.db/.jsonl/logs/secrets con 403; IS_PRODUCTION previene demo users; webhook 401 con firma inválida/ausente; JWT rechaza clave errónea/expirado/malformado/alg-none; 11 endpoints sensibles 401 sin auth; logging no expone tarjetas; past_due/none/canceled → 402; rate limiter no hardcodeado. **66/66 passed**.

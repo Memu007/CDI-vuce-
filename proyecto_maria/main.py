@@ -1398,6 +1398,7 @@ async def get_current_user(request: Request, response: Response, db: AsyncSessio
         user.billing_status = "past_due"
         try:
             await db.commit()
+            await db.refresh(user)
         except Exception:
             await db.rollback()
 
@@ -1481,6 +1482,7 @@ async def require_active_billing(
         db_user.billing_status = "past_due"
         try:
             await db.commit()
+            await db.refresh(db_user)
         except Exception:
             await db.rollback()
 
@@ -3770,7 +3772,7 @@ async def list_clientes(
             ClientModel.owner_username == username,
             ClientModel.is_active == True,  # noqa: E712
         )
-        .group_by(ClientModel.id)
+        .group_by(ClientModel.id, ultimo_mov_subq.c.ultimo)
         .order_by(ClientModel.favorite.desc(), sa_desc("ultimo_movimiento"), ClientModel.name.asc())
     )
     rows = result.all()

@@ -167,10 +167,11 @@ CDI-app/
   - Trial cron: al iniciar la app, usuarios con trial vencido pasan a `past_due`.
   - Static files: CustomStaticFiles rechaza `.env`, `*.db`, `*.jsonl`, logs/ y secrets/.
 - **Ola 4 — Pre-lanzamiento completo (listo para deploy):**
-  - Test suite pre-lanzamiento: 148 tests (Bloque 1: 44 core + Bloque 2: 37 billing + Bloque 3: 66 security + 1 regresión manual). Todos en verde.
+  - Test suite pre-lanzamiento: 148 tests de bloques 1–3 + 1 regresión manual + 3 tests API clientes con billing vencido.
   - Fix crítico dual JWT secret: `config.py` ahora lee `JWT_SECRET_KEY → SECRET_KEY → JWT_SECRET` con `AliasChoices`, alineado con `main.py`.
   - Suite completa: **439 passed, 102 skipped**; cobertura 40%.
-  - Pendiente: smoke real de pago + webhook en deploy con dominio público.
+  - Hotfixes de producción: modal 402 abre perfil, `/api/clientes` funciona en `past_due`/trial vencido, `saveOperationToHistory` no crashea ante 402.
+  - Pendiente: smoke real de pago + webhook con nuevas credenciales de MercadoPago.
 - **Plan 03 cerrado (Ola 2):** endpoint `/api/clientes/search?q=` para búsqueda server-side; picker con debounce; botón **+ Nuevo cliente** en review con mini formulario inline para alta rápida de cliente desde la operación.
 - **Fix urgente tabla NCM:** ahora muestra **Valor unitario** y **Peso unitario** junto con Ref./Descripción/Origen/Cant/Código NCM.
 - **Plan 02 cerrado (Ola 2):** drawer de clientes con 6 KPIs (operaciones/ítems/promedio/origen frecuente/valor/última), orden por último movimiento, badge `N ops`, export CSV backend, expand de operaciones. Smoke headless de Plan 02 pasa.
