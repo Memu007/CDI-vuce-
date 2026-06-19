@@ -719,7 +719,7 @@
         renderHero(c);
         renderKpis(null);
         renderOps(null);
-        renderMapping(null);
+        renderCatalogo(null);
         renderDatos(c);
         currentMapping = null;
         mappingDraft = null;
