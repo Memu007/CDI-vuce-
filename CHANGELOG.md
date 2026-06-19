@@ -6,6 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-19 · Auditoría UX (Simulación 50 usuarios)
+
+- **feat (ui/ux):** añadido botón "+ Agregar producto" en NCM para evitar el punto muerto de Carga Manual.
+- **fix (ui/ux):** validación de fechas flexible. Ahora auto-completa años de 2 dígitos y acepta barras/guiones.
+- **feat (ui/ux):** Incoterms convertidos a campo abierto con sugerencias (`datalist`) para no bloquear casos atípicos (CPT, CIP).
+- **fix (ui/ux):** buffer de Deshacer (Ctrl+Z) invalidado automáticamente al editar celdas a mano, evitando pérdida de datos por colisión de historial.
+
+
 ## 2026-06-19 · Robustez de UX/UI y Persistencia de Estado
 
 - **feat (ui/ux):** se incorporó `localStorage` para autoguardar la operación en curso cada 2.5 segundos si el usuario está a la mitad del flujo. También se sumó una alerta de `beforeunload` para evitar que recargar la página (F5) o cerrar la pestaña por error borre el trabajo de la pantalla.
