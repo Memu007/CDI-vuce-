@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-19 · Fix selector de archivo doble
+
+- **fix (upload):** evitado bug que causaba que el selector de archivos del sistema se abriera dos veces seguidas al hacer clic en "Seleccionar archivo" (se previno inicialización duplicada de listeners en `upload.js`).
+
+---
+
 ## 2026-06-16 · Pre-lanzamiento: Testing Bloque 1 y 2
 
 - **test (prelaunch):** `tests/test_prelaunch_block1.py` — 44 tests del core sin pagos: registro + trial 14 días, login/logout, subida Excel, generación MARIA TXT, operaciones manuales, clientes + catálogo + CSV, límite 10 ops, errores como JSON. **44/44 passed**.

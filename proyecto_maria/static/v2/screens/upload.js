@@ -44,10 +44,13 @@
     let currentFormat = 'pdf';
     let startTs = 0;
     let busy = false;
+    let initialized = false;
 
     function $(id) { return document.getElementById(id); }
 
     function init() {
+        if (initialized) return;
+        initialized = true;
         dz = $('uploadDropzone');
         input = $('uploadFileInput');
         pickBtn = $('uploadPickBtn');

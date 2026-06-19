@@ -1,7 +1,7 @@
 # HANDOFF — CDI (vuce / CDI-app)
 
 > Estado vivo del proyecto. **La próxima AI o persona que entre lo lee primero.**
-> Última actualización: 2026-06-16 · Pre-lanzamiento completo: 439 tests passed, cobertura 40% · listo para deploy.
+> Última actualización: 2026-06-19 · Fix selector de archivo doble en pantalla de subida.
 
 ---
 
