@@ -1,7 +1,7 @@
 # HANDOFF — CDI (vuce / CDI-app)
 
 > Estado vivo del proyecto. **La próxima AI o persona que entre lo lee primero.**
-> Última actualización: 2026-06-19 · Limpieza de elementos de prueba en UI (botón SISTEMA DEMO y simulación).
+> Última actualización: 2026-06-19 · Rediseño del flujo de Carga Manual directo a la pantalla de Revisión.
 
 ---
 

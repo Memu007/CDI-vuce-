@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-19 · Nuevo flujo de Carga Manual
+
+- **feat (ui):** rediseñado el flujo de "Carga manual". Ahora, en lugar de abrir un modal restrictivo, se inicializa una operación en blanco y redirige directamente a la pantalla de Revisión con una fila vacía. Esto permite aprovechar la vista de grilla (Excel-like) a pantalla completa para una carga de datos mucho más ágil y cómoda. Se eliminó el código del modal antiguo.
+
 ## 2026-06-19 · Limpieza de elementos de prueba en UI
 
 - **chore (ui):** eliminados botones de "SISTEMA DEMO" de la barra superior y accesos directos de carga de "Simular operación" y "Descargar plantilla en blanco" para simplificar la interfaz en producción.
