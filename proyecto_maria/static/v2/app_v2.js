@@ -754,7 +754,11 @@
                 CDI.state = {};
                 setClienteActivo(null);
                 document.dispatchEvent(new CustomEvent('cdi:nueva-operacion'));
-                goTo('upload');
+        // Solo ir a upload si no hay items ya cargados (evita pisar
+        // un goTo('review') que pudo ejecutarse antes del DOMContentLoaded).
+        if (!CDI.state || !CDI.state.items || !CDI.state.items.length) {
+            goTo('upload');
+        }
             } else if (action === 'go-clientes') {
                 e.preventDefault();
                 if (typeof CDI.openClientesDrawer === 'function') {
