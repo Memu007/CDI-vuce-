@@ -767,14 +767,15 @@
         missingCountEl.appendChild(textNode);
 
         if (missing.includes('_no_cliente')) {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'btn btn-secondary btn-sm';
-            btn.style.marginLeft = '12px';
-            btn.style.marginTop = '8px';
-            btn.style.display = 'inline-block';
-            btn.textContent = 'Seleccionar cliente';
-            btn.onclick = () => {
+            missingCountEl.appendChild(document.createElement('br'));
+            
+            const btnSel = document.createElement('button');
+            btnSel.type = 'button';
+            btnSel.className = 'btn btn-secondary btn-sm';
+            btnSel.style.marginTop = '8px';
+            btnSel.style.display = 'inline-block';
+            btnSel.textContent = 'Seleccionar cliente';
+            btnSel.onclick = () => {
                 if (window.CDI && CDI.openClientesDrawer) {
                     CDI.openClientesDrawer();
                 } else {
@@ -782,8 +783,48 @@
                     if (headerBtn) headerBtn.click();
                 }
             };
-            missingCountEl.appendChild(document.createElement('br'));
-            missingCountEl.appendChild(btn);
+            missingCountEl.appendChild(btnSel);
+
+            // Si ya escribió un nombre en "Razón social del importador", ofrecemos crearlo directo
+            const nombreImp = form && form.querySelector('[name="comprador_nombre"]');
+            const valNombre = nombreImp ? nombreImp.value.trim() : '';
+            if (valNombre) {
+                const btnCrear = document.createElement('button');
+                btnCrear.type = 'button';
+                btnCrear.className = 'btn btn-primary btn-sm';
+                btnCrear.style.marginLeft = '8px';
+                btnCrear.style.marginTop = '8px';
+                btnCrear.style.display = 'inline-block';
+                btnCrear.textContent = 'Crear cliente "' + (valNombre.length > 15 ? valNombre.slice(0, 15) + '...' : valNombre) + '"';
+                btnCrear.onclick = async () => {
+                    const cuitImp = form.querySelector('[name="comprador_cuit"]');
+                    const valCuit = cuitImp ? cuitImp.value.trim() : '';
+                    btnCrear.disabled = true;
+                    btnCrear.textContent = 'Creando...';
+                    try {
+                        const res = await CDI.api('/api/clientes', {
+                            method: 'POST',
+                            body: JSON.stringify({ nombre: valNombre, cuit: valCuit })
+                        });
+                        const data = await res.json();
+                        if (res.ok && data.success && data.cliente) {
+                            if (window.CDI && CDI.setClienteActivo) {
+                                CDI.setClienteActivo(data.cliente);
+                            }
+                            if (CDI.toast) CDI.toast.success('Cliente creado y asignado.');
+                            renderMissingCount();
+                            updateContinueEnabled();
+                        } else {
+                            throw new Error(data.error || 'Error al crear cliente');
+                        }
+                    } catch (err) {
+                        if (CDI.toast) CDI.toast.error(err.message);
+                        btnCrear.disabled = false;
+                        btnCrear.textContent = 'Reintentar crear';
+                    }
+                };
+                missingCountEl.appendChild(btnCrear);
+            }
         }
     }
 
