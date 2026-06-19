@@ -106,10 +106,10 @@
             return null;
         },
         incoterm: (v) => {
-            if (!v) return 'Requerido.';
+            if (!v) return null;
             const upper = String(v).trim().toUpperCase();
-            if (INCOTERM_WHITELIST.indexOf(upper) === -1) {
-                return 'Incoterm no reconocido. Usa FOB, CIF, CFR, FCA, EXW, DAP, DDP.';
+            if (upper.length !== 3) {
+                return 'El Incoterm debe tener 3 letras.';
             }
             return null;
         },
@@ -129,14 +129,14 @@
         },
         fecha_emision: (v) => {
             if (!v) return null;
-            if (!/^\d{2}\/\d{2}\/\d{4}$/.test(String(v).trim())) {
+            if (!/^\d{2}\/\d{2}\/(\d{2}|\d{4})$/.test(String(v).trim())) {
                 return 'Formato esperado: DD/MM/AAAA';
             }
             return null;
         },
         fecha_embarque: (v) => {
             if (!v) return null;
-            if (!/^\d{2}\/\d{2}\/\d{4}$/.test(String(v).trim())) {
+            if (!/^\d{2}\/\d{2}\/(\d{2}|\d{4})$/.test(String(v).trim())) {
                 return 'Formato esperado: DD/MM/AAAA';
             }
             return null;
@@ -242,9 +242,9 @@
         }
         if (name === 'incoterm') {
             const upper = String(val).trim().toUpperCase();
-            if (INCOTERM_WHITELIST.indexOf(upper) !== -1) return upper;
-            const m = upper.match(/\b(FOB|CIF|CFR|FCA|EXW|DAP|DDP)\b/);
-            return m ? m[1] : '';
+            if (upper.length === 3) return upper;
+            const m = upper.match(/\b([A-Z]{3})\b/);
+            return m ? m[1] : upper.slice(0, 3);
         }
         if (name === 'flete' || name === 'seguro') {
             const n = Number(val);

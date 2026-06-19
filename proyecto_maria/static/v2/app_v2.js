@@ -506,6 +506,17 @@
 
         input.addEventListener('input', applyFormat);
         input.addEventListener('paste', () => setTimeout(applyFormat, 0));
+        input.addEventListener('blur', () => {
+            const val = input.value;
+            if (/^\d{2}\/\d{2}\/\d{2}$/.test(val)) {
+                const parts = val.split('/');
+                const y = parseInt(parts[2], 10);
+                parts[2] = (y > 50 ? '19' : '20') + (y < 10 ? '0' + y : y);
+                input.value = parts.join('/');
+                // Trigger change to validate
+                input.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        });
         // Normalizar value inicial si venia prefilleado
         if (input.value) applyFormat();
     }

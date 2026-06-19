@@ -281,16 +281,20 @@
                                     </div>
                                     <div class="field">
                                         <label class="field-label" for="f_incoterm">Incoterm <span class="field-required">· requerido</span></label>
-                                        <select class="select" id="f_incoterm" name="incoterm">
-                                            <option value="">Elegí una opción…</option>
-                                            <option value="FOB">FOB</option>
-                                            <option value="CIF">CIF</option>
-                                            <option value="CFR">CFR</option>
-                                            <option value="FCA">FCA</option>
-                                            <option value="EXW">EXW</option>
-                                            <option value="DAP">DAP</option>
-                                            <option value="DDP">DDP</option>
-                                        </select>
+                                        <input class="input" type="text" id="f_incoterm" name="incoterm" list="incoterms_list" autocomplete="off" placeholder="Elegí o escribí una opción…">
+                                        <datalist id="incoterms_list">
+                                            <option value="FOB"></option>
+                                            <option value="CIF"></option>
+                                            <option value="CFR"></option>
+                                            <option value="FCA"></option>
+                                            <option value="EXW"></option>
+                                            <option value="DAP"></option>
+                                            <option value="DDP"></option>
+                                            <option value="CPT"></option>
+                                            <option value="CIP"></option>
+                                            <option value="FAS"></option>
+                                            <option value="DPU"></option>
+                                        </datalist>
                                         <span class="field-hint" data-hint-for="incoterm"></span>
                                         <span class="field-error" data-error-for="incoterm" hidden></span>
                                     </div>
@@ -434,6 +438,10 @@
                     </div>
                     <div class="row-3">
                         <button type="button" class="btn btn-ghost" data-action="go-review">Volver</button>
+                        <button type="button" class="btn btn-ghost" id="ncmAddRowBtn" title="Agregar un producto manualmente">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            Agregar producto
+                        </button>
                         <button type="button" class="btn btn-ghost" id="ncmCalcBtn" title="Calculadora de tributos">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="12" y1="10" x2="14" y2="10"/><line x1="16" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="12" y1="14" x2="14" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/><line x1="12" y1="18" x2="14" y2="18"/><line x1="16" y1="18" x2="16" y2="18"/></svg>
                             Calculadora

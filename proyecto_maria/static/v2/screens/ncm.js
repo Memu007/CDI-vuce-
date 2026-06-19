@@ -45,7 +45,26 @@
         spotItemDesc = $('spotItemDesc');
         spotProgress = $('spotProgress');
         spotVuce = $('spotVuce');
+        const ncmAddRowBtn = $('ncmAddRowBtn');
         if (!tbody) return;
+
+        if (ncmAddRowBtn) {
+            ncmAddRowBtn.addEventListener('click', () => {
+                if (!CDI.state) CDI.state = {};
+                if (!CDI.state.items) CDI.state.items = [];
+                // Invalidamos deshacer antes de agregar fila
+                lastSnapshot = null;
+                CDI.state.items.push({
+                    pieza: '',
+                    cantidad: 1,
+                    valor_unitario: 0,
+                    descripcion: ''
+                });
+                render();
+                updateBatchBar();
+                try { CDI.track && CDI.track('ncm_row_added_manually'); } catch (_) {}
+            });
+        }
 
         continueBtn.addEventListener('click', onContinue);
 
@@ -614,6 +633,8 @@
         const idx = parseInt(inp.getAttribute('data-row'), 10);
         const items = CDI.state.items || [];
         if (!items[idx]) return;
+        // Invalidamos el deshacer si el usuario edita a mano
+        lastSnapshot = null;
         // La mascara ya insertó los puntos; guardamos el valor formateado.
         const val = (inp.value || '').trim();
         items[idx].pieza = val;
@@ -704,6 +725,9 @@
         const idx = parseInt(inp.getAttribute('data-row'), 10);
         const field = inp.getAttribute('data-field');
         if (isNaN(idx) || !field) return;
+
+        // Invalidamos el deshacer si el usuario edita a mano
+        lastSnapshot = null;
 
         if (field === 'origen') {
             // Forzar mayúsculas mientras tipea
