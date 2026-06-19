@@ -1,7 +1,7 @@
 # HANDOFF — CDI (vuce / CDI-app)
 
 > Estado vivo del proyecto. **La próxima AI o persona que entre lo lee primero.**
-> Última actualización: 2026-06-19 · Rediseño del flujo de Carga Manual directo a la pantalla de Revisión.
+> Última actualización: 2026-06-19 · Rediseño UX de Carga Manual (flujo directo a tabla de revisión + validación dinámica de campos requeridos).
 
 ---
 
