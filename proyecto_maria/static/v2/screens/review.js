@@ -759,12 +759,27 @@
     function renderMissingCount() {
         if (!missingCountEl) return;
         const missing = missingRequired();
-        if (missing.length === 0) {
-            missingCountEl.textContent = '';
-            return;
-        }
+        missingCountEl.innerHTML = '';
+        if (missing.length === 0) return;
+
         const labels = missing.map(n => REQUIRED_LABELS[n] || n);
-        missingCountEl.textContent = (missing.length === 1 ? 'Falta: ' : 'Faltan: ') + labels.join(', ');
+        const textNode = document.createTextNode((missing.length === 1 ? 'Falta: ' : 'Faltan: ') + labels.join(', '));
+        missingCountEl.appendChild(textNode);
+
+        if (missing.includes('_no_cliente')) {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn btn-ghost btn-sm';
+            btn.style.marginLeft = '8px';
+            btn.style.padding = '4px 8px';
+            btn.style.verticalAlign = 'baseline';
+            btn.textContent = 'Seleccionar cliente';
+            btn.onclick = () => {
+                const headerBtn = document.getElementById('clientePill');
+                if (headerBtn) headerBtn.click();
+            };
+            missingCountEl.appendChild(btn);
+        }
     }
 
     function updateContinueEnabled() {
