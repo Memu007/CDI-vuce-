@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-19 · Limpieza de elementos de prueba en UI
+
+- **chore (ui):** eliminados botones de "SISTEMA DEMO" de la barra superior y accesos directos de carga de "Simular operación" y "Descargar plantilla en blanco" para simplificar la interfaz en producción.
+
 ## 2026-06-19 · Fix validación de longitud NCM y AI prompt
 
 - **fix (ncm):** corregida validación visual en tabla para marcar en rojo NCMs ingresados que no tengan exactamente 8 dígitos, en lugar de mostrarlos como válidos.
