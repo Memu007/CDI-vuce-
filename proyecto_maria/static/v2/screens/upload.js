@@ -73,6 +73,35 @@
             });
         }
 
+        // ---------- Carga manual (Flujo Directo) ----------
+        const manualBtn = $('uploadManualBtn');
+        if (manualBtn) {
+            manualBtn.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                if (busy) return;
+                
+                CDI.state = CDI.state || {};
+                CDI.state.filename = 'Carga Manual';
+                CDI.state.operacion = { comprador_nombre: '', comprador_cuit: '' };
+                // Pre-cargamos una fila vacía para que el usuario pueda empezar a tipear
+                CDI.state.items = [
+                    { descripcion: '', cantidad: 1, valor_unitario: 0, pieza: '', origen: 'XX', peso_unitario: 0 }
+                ];
+                CDI.state.sourceFormat = 'manual';
+                CDI.state.uploadedAt = new Date().toISOString();
+                CDI.state.operationSavedFor = null;
+                CDI.state.orphanDismissedFor = null;
+
+                // Limpiamos el cliente activo para que lo asigne luego
+                if (CDI.setClienteActivo) {
+                    CDI.setClienteActivo(null);
+                }
+
+                CDI.track && CDI.track('manual_upload_start');
+                CDI.goTo('review', { fromUpload: true });
+            });
+        }
+
         // CTA: descargar plantilla AVG en blanco (caso atipico pero util para
         // el despachante que quiere cargar datos a mano desde Excel).
         const blankTpl = $('uploadBlankTemplateBtn');
@@ -517,36 +546,7 @@
         }
     }
 
-    // ---------- Carga manual (Flujo Directo) ----------
-    function initManualUpload() {
-        const manualBtn = $('uploadManualBtn');
-        if (!manualBtn) return;
-        
-        manualBtn.addEventListener('click', (ev) => {
-            ev.preventDefault();
-            if (busy) return;
-            
-            CDI.state = CDI.state || {};
-            CDI.state.filename = 'Carga Manual';
-            CDI.state.operacion = { comprador_nombre: '', comprador_cuit: '' };
-            // Pre-cargamos una fila vacía para que el usuario pueda empezar a tipear
-            CDI.state.items = [
-                { descripcion: '', cantidad: 1, valor_unitario: 0, pieza: '', origen: 'XX', peso_unitario: 0 }
-            ];
-            CDI.state.sourceFormat = 'manual';
-            CDI.state.uploadedAt = new Date().toISOString();
-            CDI.state.operationSavedFor = null;
-            CDI.state.orphanDismissedFor = null;
 
-            // Limpiamos el cliente activo para que lo asigne luego
-            if (CDI.setClienteActivo) {
-                CDI.setClienteActivo(null);
-            }
-
-            CDI.track && CDI.track('manual_upload_start');
-            CDI.goTo('review', { fromUpload: true });
-        });
-    }
 
     async function downloadBlankTemplate() {
         try {
