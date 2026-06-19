@@ -316,6 +316,7 @@
             });
 
             setBusy(false);
+            console.log('[upload] items listos:', items.length, '→ goTo review');
             CDI.goTo('review', { fromUpload: true });
         } catch (err) {
             const msg = (err && err.message) || 'No se pudo procesar el archivo.';
@@ -325,6 +326,8 @@
             // Si el error es payment_required, el modal ya se mostró via app_v2.js.
             if (msg === 'payment_required') return;
             showError(msg);
+            // Toast visible para debug
+            if (CDI.toast) CDI.toast.error('Error al subir', msg);
         }
     }
 
