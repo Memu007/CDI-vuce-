@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-19 · Robustez de UX/UI y Persistencia de Estado
+
+- **feat (ui/ux):** se incorporó `localStorage` para autoguardar la operación en curso cada 2.5 segundos si el usuario está a la mitad del flujo. También se sumó una alerta de `beforeunload` para evitar que recargar la página (F5) o cerrar la pestaña por error borre el trabajo de la pantalla.
+- **fix (ui/ux):** se agregó una validación estricta para bloquear el avance ("Siguiente" deshabilitado) tanto en la pantalla de Revisión como en NCM si el usuario vacía la lista de ítems (`items.length === 0`).
+- **fix (ui/ux):** si ocurre un error de red o timeout al clickear "Validar" en el último paso para exportar a MARIA, el estado interno ya no se pierde; ahora se muestra un botón para poder "Reintentar" directamente en pantalla.
+
 ## 2026-06-19 · Campos requeridos dinámicos en Carga Manual
 
 - **feat (ui):** en la pantalla de Revisión, si la operación es de Carga Manual, ahora se marcan explícitamente como requeridos (`· requerido` y `Falta completar` en naranja) los campos básicos que antes el sistema intentaba inferir del PDF (Razón social del proveedor, Razón social del importador, Número de factura y Fecha de emisión). Esto bloquea el avance hasta que el usuario complete lo mínimo indispensable, igualando la UX de plataformas como Intercom.
