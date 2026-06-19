@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-19 · Campos requeridos dinámicos en Carga Manual
+
+- **feat (ui):** en la pantalla de Revisión, si la operación es de Carga Manual, ahora se marcan explícitamente como requeridos (`· requerido` y `Falta completar` en naranja) los campos básicos que antes el sistema intentaba inferir del PDF (Razón social del proveedor, Razón social del importador, Número de factura y Fecha de emisión). Esto bloquea el avance hasta que el usuario complete lo mínimo indispensable, igualando la UX de plataformas como Intercom.
+
 ## 2026-06-19 · Nuevo flujo de Carga Manual
 
 - **feat (ui):** rediseñado el flujo de "Carga manual". Ahora, en lugar de abrir un modal restrictivo, se inicializa una operación en blanco y redirige directamente a la pantalla de Revisión con una fila vacía. Esto permite aprovechar la vista de grilla (Excel-like) a pantalla completa para una carga de datos mucho más ágil y cómoda. Se eliminó el código del modal antiguo.
