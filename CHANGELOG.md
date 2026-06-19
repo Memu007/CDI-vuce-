@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-19 · Origen masivo en tabla NCM
+
+- **feat (ncm):** añadida opción para aplicar un "Origen para todos" a múltiples ítems seleccionados en la pantalla de NCM, funcionando igual que la asignación masiva de NCM.
+
+---
+
 ## 2026-06-19 · Fix selector de archivo doble
 
 - **fix (upload):** evitado bug que causaba que el selector de archivos del sistema se abriera dos veces seguidas al hacer clic en "Seleccionar archivo" (se previno inicialización duplicada de listeners en `upload.js`).

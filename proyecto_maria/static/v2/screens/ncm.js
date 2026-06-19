@@ -15,7 +15,7 @@
 
     // Batch selection / acciones en lote
     const selectedRows = new Set();
-    let batchBar, batchCount, batchFactor, batchApplyQty, batchNcm, batchApplyNcm, batchClear, selectAllBox;
+    let batchBar, batchCount, batchFactor, batchApplyQty, batchNcm, batchApplyNcm, batchOrigin, batchApplyOrigin, batchClear, selectAllBox;
     let lastSnapshot = null;   // { items: [...], label: 'x2 a 3 items', ts: ms }
     let undoTimer = null;
 
@@ -76,6 +76,8 @@
         batchApplyQty = $('ncmBatchApplyQty');
         batchNcm = $('ncmBatchNcm');
         batchApplyNcm = $('ncmBatchApplyNcm');
+        batchOrigin = $('ncmBatchOrigin');
+        batchApplyOrigin = $('ncmBatchApplyOrigin');
         batchClear = $('ncmBatchClear');
         selectAllBox = $('ncmSelectAll');
 
@@ -97,6 +99,7 @@
         }
         if (batchApplyQty) batchApplyQty.addEventListener('click', applyBatchMultiply);
         if (batchApplyNcm) batchApplyNcm.addEventListener('click', applyBatchNcm);
+        if (batchApplyOrigin) batchApplyOrigin.addEventListener('click', applyBatchOrigin);
         if (batchClear) batchClear.addEventListener('click', () => {
             selectedRows.clear();
             if (selectAllBox) selectAllBox.checked = false;
@@ -289,6 +292,28 @@
         });
         try { CDI.track && CDI.track('ncm_batch_ncm_applied', { count: touched, ncm: formatted }); } catch (_) {}
         scheduleUndoClear('NCM ' + formatted + ' a ' + touched + (touched === 1 ? ' item' : ' items'));
+        render();
+        updateBatchBar();
+    }
+
+    function applyBatchOrigin() {
+        const items = (CDI.state && CDI.state.items) || [];
+        if (selectedRows.size === 0 || !items.length) return;
+        const raw = (batchOrigin && batchOrigin.value || '').toUpperCase().trim();
+        if (raw.length !== 2 || !/^[A-Z]{2}$/.test(raw)) {
+            if (CDI.toast) CDI.toast('Origen inválido', 'Debe ser un código ISO de 2 letras (ej: CN, US)', 'error');
+            return;
+        }
+        lastSnapshot = { items: snapshotItems(), ts: Date.now() };
+        let touched = 0;
+        selectedRows.forEach(i => {
+            const it = items[i];
+            if (!it) return;
+            it.origen = raw;
+            touched++;
+        });
+        try { CDI.track && CDI.track('ncm_batch_origin_applied', { count: touched, origin: raw }); } catch (_) {}
+        scheduleUndoClear('Origen ' + raw + ' a ' + touched + (touched === 1 ? ' item' : ' items'));
         render();
         updateBatchBar();
     }
