@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+
+## 2026-06-19 · Refinamiento UX de Carga Manual
+
+- **feat (ui):** añadido botón inteligente "Crear cliente" en la validación de Carga Manual. Si el usuario ingresa un importador no registrado, el sistema permite crearlo y auto-asignarlo con un clic directo sin abrir modales.
+- **fix (ui):** se corrigió un bug lógico donde al seleccionar un cliente desde el panel lateral, el mensaje de error de validación en pantalla ("Falta: Cliente asignado") no se limpiaba dinámicamente.
 ## 2026-06-19 · Auditoría UX (Simulación 50 usuarios)
 
 - **feat (ui/ux):** añadido botón "+ Agregar producto" en NCM para evitar el punto muerto de Carga Manual.
