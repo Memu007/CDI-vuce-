@@ -725,13 +725,23 @@
 
     function missingRequired() {
         const op = (CDI.state && CDI.state.operacion) || {};
-        return REQUIRED.filter(name => {
+        const missing = REQUIRED.filter(name => {
             const v = op[name];
             if (v === undefined || v === null || v === '') return true;
             const validator = VALIDATORS[name];
             if (validator && validator(v)) return true;
             return false;
         });
+        
+        if (!CDI.state || !CDI.state.items || CDI.state.items.length === 0) {
+            missing.push('_no_items');
+        }
+        
+        if (!CDI.state || !CDI.state.clienteActivo) {
+            missing.push('_no_cliente');
+        }
+        
+        return missing;
     }
 
     const REQUIRED_LABELS = {
@@ -741,7 +751,9 @@
         vendedor_nombre: 'Razón social del proveedor',
         comprador_nombre: 'Razón social del importador',
         numero_factura: 'Número de factura',
-        fecha_emision: 'Fecha de emisión'
+        fecha_emision: 'Fecha de emisión',
+        _no_items: 'Al menos 1 producto',
+        _no_cliente: 'Cliente (Importador) asignado'
     };
 
     function renderMissingCount() {

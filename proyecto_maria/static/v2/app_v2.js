@@ -754,11 +754,7 @@
                 CDI.state = {};
                 setClienteActivo(null);
                 document.dispatchEvent(new CustomEvent('cdi:nueva-operacion'));
-        // Solo ir a upload si no hay items ya cargados (evita pisar
-        // un goTo('review') que pudo ejecutarse antes del DOMContentLoaded).
-        if (!CDI.state || !CDI.state.items || !CDI.state.items.length) {
-            goTo('upload');
-        }
+                goTo('upload');
             } else if (action === 'go-clientes') {
                 e.preventDefault();
                 if (typeof CDI.openClientesDrawer === 'function') {
@@ -770,6 +766,50 @@
             }
         });
 
-        goTo('upload');
+        // Persistence: Load from localStorage
+        let restored = false;
+        try {
+            const savedStateStr = localStorage.getItem('cdi_v2_state');
+            if (savedStateStr) {
+                const parsed = JSON.parse(savedStateStr);
+                if (parsed && parsed.items && parsed.items.length > 0) {
+                    CDI.state = parsed;
+                    if (parsed.clienteActivo) setClienteActivo(parsed.clienteActivo);
+                    restored = true;
+                    if (CDI.toast) CDI.toast.info('Recuperado', 'Se recuperó la operación en curso.');
+                }
+            }
+        } catch (e) {
+            console.warn('[app_v2] failed to restore state', e);
+        }
+
+        // Si ya había items (por ej. carga asíncrona de PDF, o restaurado recién)
+        // nos vamos a review. Sino, arrancamos en upload.
+        if (CDI.state && CDI.state.items && CDI.state.items.length > 0) {
+            goTo('review');
+        } else {
+            goTo('upload');
+        }
     });
+
+    /* ---------- 11. Persistence Auto-Save & BeforeUnload ---------- */
+    window.addEventListener('beforeunload', (e) => {
+        const state = CDI.state || {};
+        if (state.items && state.items.length > 0 && currentScreen !== 'upload' && currentScreen !== 'ready') {
+            e.preventDefault();
+            e.returnValue = '';
+            try { localStorage.setItem('cdi_v2_state', JSON.stringify(state)); } catch (_) {}
+        }
+    });
+
+    setInterval(() => {
+        const state = CDI.state || {};
+        // Auto-guardamos si estamos a mitad de flujo
+        if (state.items && state.items.length > 0 && currentScreen !== 'upload' && currentScreen !== 'ready') {
+            try { localStorage.setItem('cdi_v2_state', JSON.stringify(state)); } catch (_) {}
+        } else if (currentScreen === 'upload' || currentScreen === 'ready') {
+            // Limpiamos el localStorage si la operacion fue terminada o cancelada
+            try { localStorage.removeItem('cdi_v2_state'); } catch (_) {}
+        }
+    }, 2500);
 })();

@@ -1192,7 +1192,8 @@
     /* ---------- Continuar ---------- */
     function onContinue() {
         const items = CDI.state.items || [];
-        const missing = items.filter(it => !it.pieza || !String(it.pieza).trim()).length;
+        if (items.length === 0) return;
+        const missing = items.filter(it => !isValidNcm(it.pieza)).length;
         if (missing > 0) return;
         CDI.track('ncm_all_assigned', { items: items.length });
         CDI.goTo('validating', { fromNcm: true });

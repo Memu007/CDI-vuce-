@@ -794,7 +794,9 @@
         hide(rGenerating);
         hide(rDone);
         show(rError);
-        rError.textContent = msg || 'No se pudo generar el archivo.';
+        const errText = document.getElementById('readyErrorText');
+        if (errText) errText.textContent = msg || 'No se pudo generar el archivo.';
+        else rError.textContent = msg || 'No se pudo generar el archivo.';
     }
 
     /* ---------- Actions ---------- */
@@ -825,10 +827,18 @@
         }
     }
 
-    /* ---------- Back-nav from validating to NCM ---------- */
     document.addEventListener('click', (e) => {
         const t = e.target.closest('[data-action="go-ncm-from-validating"]');
-        if (t) { e.preventDefault(); CDI.goTo('ncm'); }
+        if (t) {
+            e.preventDefault();
+            CDI.goTo('ncm');
+        }
+        
+        const retry = e.target.closest('[data-action="retry-generate"]');
+        if (retry) {
+            e.preventDefault();
+            generateMaria();
+        }
     });
 
     /* ---------- Registro ---------- */
