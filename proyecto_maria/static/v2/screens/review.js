@@ -25,7 +25,8 @@
     ];
 
     // Campos obligatorios para pasar a NCM (los demas son "nice to have")
-    const REQUIRED = ['comprador_cuit', 'moneda', 'incoterm'];
+    // CUIT no es obligatorio: clientes extranjeros no tienen CUIT argentino.
+    const REQUIRED = ['moneda', 'incoterm'];
 
     // Whitelist de monedas habituales en despachos (ISO4217 + alias MARIA)
     const MONEDA_WHITELIST = ['DOL', 'EUR', 'BRL', 'ARS', 'CLP', 'UYU', 'GBP', 'JPY', 'CNY'];
@@ -74,7 +75,8 @@
     // Validacion por campo: retorna string con error o null si OK
     const VALIDATORS = {
         comprador_cuit: (v) => {
-            if (!v) return 'Requerido. Ej: 30-71490128-6';
+            // Opcional: solo validar formato si el usuario lo completa.
+            if (!v) return null;
             return validateCuitAR(v);
         },
         vendedor_id: (v) => {
