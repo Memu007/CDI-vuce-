@@ -300,15 +300,13 @@
                 });
             }
 
-            // Auto-detectar importador desde el CUIT extraido del PDF.
-            // Si el user ya tiene un cliente cargado con ese CUIT, lo activa solo.
-            // Asi se ahorra abrir el drawer y tocar "Asignar importador" en el 90% de los casos.
-            await tryAutoMatchImportador(operacion);
+            // Auto-detectar importador: si falla, no frenar el flujo.
+            try { await tryAutoMatchImportador(operacion); } catch (e) { console.warn('[upload] auto-match skip:', e && e.message); }
 
             // Lookup combinado: memoria del cliente + catalogo del proveedor
             const vendorName = operacion && (operacion.vendedor_nombre || operacion.comprador_nombre_vendor);
             const clienteId = (CDI.state && CDI.state.clienteActivo && CDI.state.clienteActivo.id) || null;
-            await tryCatalogAutofill(CDI.state.items, vendorName, clienteId);
+            try { await tryCatalogAutofill(CDI.state.items, vendorName, clienteId); } catch (e) { console.warn('[upload] catalog autofill skip:', e && e.message); }
 
             CDI.track('pdf_uploaded', {
                 format: currentFormat,
@@ -321,9 +319,11 @@
             CDI.goTo('review', { fromUpload: true });
         } catch (err) {
             const msg = (err && err.message) || 'No se pudo procesar el archivo.';
-            console.error('[CDI v2 upload]', err);
+            console.error('[CDI v2 upload] ERROR:', msg, err);
             CDI.track('upload_error', { format: currentFormat, message: msg });
             setBusy(false);
+            // Si el error es payment_required, el modal ya se mostró via app_v2.js.
+            if (msg === 'payment_required') return;
             showError(msg);
         }
     }
