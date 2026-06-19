@@ -1011,6 +1011,11 @@ async def lifespan(app: FastAPI):
                         print(f"✅ Actualizado plan de {user_data['username']} a {user_data['plan']}")
                     if user_data["username"] == "demo" and "admin" not in (existing_user.roles or []):
                         existing_user.roles = ["admin"]
+                    # Asegurar que los demo users siempre estén active
+                    if existing_user.billing_status != "active":
+                        existing_user.billing_status = "active"
+                        existing_user.trial_ends_at = datetime.now(timezone.utc) + timedelta(days=3650)
+                        print(f"✅ {user_data['username']}: billing_status -> active")
                 else:
                     hashed_pw = hash_password(user_data["password"])
                     new_user = User(
@@ -1020,6 +1025,8 @@ async def lifespan(app: FastAPI):
                         plan=user_data["plan"],
                         is_verified=True,
                         roles=roles,
+                        billing_status="active",
+                        trial_ends_at=datetime.now(timezone.utc) + timedelta(days=3650),
                     )
                     session.add(new_user)
                     print(f"✅ Creado usuario demo: {user_data['username']} ({user_data['plan']})")
