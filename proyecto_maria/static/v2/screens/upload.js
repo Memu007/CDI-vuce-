@@ -339,7 +339,29 @@
             try { sessionStorage.removeItem('cdi.pending_create_client'); } catch (_) {}
 
             if (!pdfCuit || pdfCuit.length !== 11) {
+                // Sin CUIT válido: intentar match por nombre antes de offering crear.
                 if (compradorNombre) {
+                    try {
+                        const searchRes = await CDI.api('/api/clientes/search?q=' + encodeURIComponent(compradorNombre));
+                        if (searchRes && searchRes.ok) {
+                            const searchData = await searchRes.json().catch(() => ({}));
+                            const results = searchData.clientes || searchData.results || [];
+                            // Match exacto (case-insensitive) por nombre
+                            const exact = results.find(c => (c.nombre || '').toLowerCase() === compradorNombre.toLowerCase());
+                            if (exact) {
+                                CDI.setClienteActivo && CDI.setClienteActivo(exact);
+                                CDI.track && CDI.track('importador_auto_detected', {
+                                    source: 'by_name_api',
+                                });
+                                if (CDI.toast) {
+                                    CDI.toast('Importador detectado', exact.nombre || '', 'success');
+                                }
+                                return;
+                            }
+                        }
+                    } catch (_) {}
+
+                    // No se encontró por nombre: dejar pendiente para crear.
                     try {
                         sessionStorage.setItem('cdi.pending_create_client', JSON.stringify({
                             cuit: '',
