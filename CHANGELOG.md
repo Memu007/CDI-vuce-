@@ -16,6 +16,17 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-18 · Webhook MercadoPago: soporte IPN + smoke test producción
+
+- **feat (webhook):** `/api/payments/webhook` ahora acepta notificaciones IPN clásicas de MercadoPago (`?id=...&topic=payment`) como fallback cuando no llega firma HMAC. Esto resuelve el problema real en producción donde MP envía IPN sin headers de firma.
+- **security (webhook):** si no hay firma HMAC válida Y no hay query params IPN válidos (`id`+`topic`), se rechaza con 401. Un request con body JSON sin firma ni query es rechazado.
+- **feat (billing):** endpoint temporal `/api/payments/simulate-webhook` para smoke test de webhook sin pago real (protegido con `MP_WEBHOOK_SECRET`).
+- **test:** `tests/test_webhook_ipn.py` — 3 tests de regresión para IPN (payment aprobado, merchant_order skip, HMAC inválido).
+- **fix (config):** agregada constante `IS_TESTING` para distinguir entorno de testing.
+- **smoke real:** checkout live con MP genera preference OK; pago con tarjeta de prueba procesado; webhook IPN recibido en producción (200). Usuario pasa de `trial` a `active` correctamente.
+
+---
+
 ## 2026-06-16 · Hotfixes pre-lanzamiento: navegación v2, facturación y clientes
 
 - **fix (v2):** modal HTTP 402 "Tu plan venció" ahora abre el perfil correctamente vía `CDI.openProfileModal()`, sin caer en URL rota `/v2?screen=profile`.

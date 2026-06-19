@@ -53,6 +53,7 @@ from proyecto_maria.services import billing_service
 _DEFAULT_DEV_SECRET = "tu-clave-secreta-super-segura-cambiar-en-produccion"
 SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("SECRET_KEY", _DEFAULT_DEV_SECRET)
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "development") == "production"
+IS_TESTING = os.getenv("ENVIRONMENT") == "testing"
 
 # --- SECURITY CHECK reforzado ---
 # 1) Default dev key nunca puede usarse en prod.
@@ -6187,22 +6188,49 @@ async def mercadopago_webhook(request: Request):
     import logging
     logger = logging.getLogger("mp_webhook")
 
-    raw_body = await request.body()
-
-    if not _verify_mp_webhook_signature(request, raw_body):
-        logger.warning("Webhook MP: firma invalida o ausente, rechazado")
-        raise HTTPException(status_code=401, detail="Firma invalida")
-
     try:
-        body = json.loads(raw_body.decode("utf-8")) if raw_body else {}
-        event_type = body.get("type", "")
-        data_id = body.get("data", {}).get("id", "")
-        logger.info("Webhook MP recibido: type=%s data.id=%s", event_type, data_id)
+        event_type = ""
+        payment_id = ""
+        raw_body = await request.body()
+        sig_header = request.headers.get("x-signature", "")
+        signature_ok = _verify_mp_webhook_signature(request, raw_body)
+
+        if sig_header:
+            # Si vino header de firma, debe ser válida obligatoriamente.
+            if not signature_ok:
+                logger.warning("Webhook MP: firma invalida, rechazado")
+                raise HTTPException(status_code=401, detail="Firma invalida")
+            body = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+            event_type = body.get("type", "")
+            payment_id = str(body.get("data", {}).get("id", ""))
+        elif signature_ok:
+            # Sin header pero verificación pasa (dev/testing sin secret):
+            # procesamos el body JSON como webhook normal.
+            body = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+            event_type = body.get("type", "")
+            payment_id = str(body.get("data", {}).get("id", ""))
+        else:
+            # Fallback: IPN clásico de MercadoPago (query string).
+            # Solo se acepta si trae id + topic (formato IPN real). Un request
+            # con body JSON pero sin firma ni query params es sospechoso → 401.
+            topic = request.query_params.get("topic", "")
+            payment_id = str(request.query_params.get("id", ""))
+            if not payment_id or not topic:
+                logger.warning("Webhook MP: sin firma y sin IPN válida, rechazado")
+                raise HTTPException(status_code=401, detail="Firma o IPN requerida")
+            logger.info("Webhook MP (IPN): topic=%s id=%s", topic, payment_id)
+            if topic == "payment":
+                event_type = "payment"
+            elif topic == "merchant_order":
+                return {"success": True, "skipped": "merchant_order, esperando payment"}
+            else:
+                return {"success": True, "skipped": f"topic={topic}"}
+
+        logger.info("Webhook MP recibido: type=%s payment_id=%s", event_type, payment_id)
 
         if event_type != "payment":
             return {"success": True, "skipped": "not a payment event"}
 
-        payment_id = str(data_id) if data_id else ""
         if not payment_id or not MP_ACCESS_TOKEN:
             logger.warning("Webhook MP: falta payment_id o MP_ACCESS_TOKEN")
             raise HTTPException(status_code=400, detail="Falta payment_id o token")
