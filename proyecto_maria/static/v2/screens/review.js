@@ -26,7 +26,7 @@
 
     // Campos obligatorios para pasar a NCM (los demas son "nice to have")
     // CUIT no es obligatorio: clientes extranjeros no tienen CUIT argentino.
-    const REQUIRED = ['moneda', 'incoterm'];
+    let REQUIRED = ['moneda', 'incoterm'];
 
     // Whitelist de monedas habituales en despachos (ISO4217 + alias MARIA)
     const MONEDA_WHITELIST = ['DOL', 'EUR', 'BRL', 'ARS', 'CLP', 'UYU', 'GBP', 'JPY', 'CNY'];
@@ -738,6 +738,10 @@
         comprador_cuit: 'CUIT del importador',
         moneda: 'Moneda',
         incoterm: 'Incoterm',
+        vendedor_nombre: 'Razón social del proveedor',
+        comprador_nombre: 'Razón social del importador',
+        numero_factura: 'Número de factura',
+        fecha_emision: 'Fecha de emisión'
     };
 
     function renderMissingCount() {
@@ -1106,7 +1110,26 @@
     }
 
     CDI.registerScreen('review', {
-        onEnter() { populate(); },
+        onEnter() {
+            if (!initialized) init();
+            const isManual = CDI.state.sourceFormat === 'manual';
+            REQUIRED = isManual 
+                ? ['vendedor_nombre', 'comprador_nombre', 'numero_factura', 'fecha_emision', 'moneda', 'incoterm']
+                : ['moneda', 'incoterm'];
+                
+            if (form) {
+                FIELDS.forEach(name => {
+                    const label = form.querySelector('label[for="f_' + name + '"]');
+                    if (!label) return;
+                    const oldReq = label.querySelector('.field-required');
+                    if (oldReq) oldReq.remove();
+                    if (REQUIRED.indexOf(name) !== -1) {
+                        label.insertAdjacentHTML('beforeend', ' <span class="field-required">· requerido</span>');
+                    }
+                });
+            }
+            populate();
+        },
         onLeave() {}
     });
 
