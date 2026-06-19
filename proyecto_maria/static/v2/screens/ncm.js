@@ -417,7 +417,9 @@
 
     function renderRow(it, i) {
         const pieza = (it.pieza || '').trim();
-        const isOk = !!pieza;
+        const isValid = isValidNcm(pieza);
+        const isOk = !!pieza && isValid;
+        const isError = !!pieza && !isValid;
         const rowClass = isOk ? 'row-ok' : 'row-pending';
         const desc = CDI.escapeHtml(it.descripcion || it.codigo_parte || '');
         const ref = CDI.escapeHtml(it.codigo_parte || '—');
@@ -434,6 +436,7 @@
         const fmtMoney = (v) => v ? '$' + v.toLocaleString('es-AR', { maximumFractionDigits: 2 }) : '';
         const fmtPeso = (v) => v ? v.toLocaleString('es-AR', { maximumFractionDigits: 2 }) : '';
         const cantVal = cantidad === '' ? '' : cantidad;
+        const inputClass = 'ncm-input' + (isError ? ' is-error' : '');
         return (
             '<tr class="' + rowClass + '" data-row="' + i + '" data-index="' + i + '">' +
                 '<td class="col-check"><input type="checkbox" class="ncm-row-check" data-row-check="' + i + '"' + checked + ' aria-label="Seleccionar item ' + (i + 1) + '"></td>' +
@@ -446,7 +449,7 @@
                 '<td class="col-peso"><input class="ncm-edit ncm-edit-peso input input-sm" type="number" min="0" step="0.01" value="' + (pesoUnitario || '') + '" data-row="' + i + '" data-field="peso_unitario" aria-label="Peso unitario item ' + (i + 1) + '"></td>' +
                 '<td class="col-ncm">' +
                     '<div class="ncm-cell">' +
-                        '<input class="ncm-input" type="text" placeholder="- - - -"' +
+                        '<input class="' + inputClass + '" type="text" placeholder="- - - -"' +
                         ' data-row="' + i + '" aria-label="NCM item ' + (i + 1) + '"' +
                         ' value="' + ncmValue + '">' +
                         notesPill +

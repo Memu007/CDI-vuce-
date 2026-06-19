@@ -5852,9 +5852,9 @@ async def sugerir_ncm(data: dict, user=Depends(get_current_user)):
             prompt = f"""Eres experto en comercio internacional MERCOSUR.
 Para este producto: "{descripcion}"
 
-Sugiere los 3 códigos NCM (Nomenclatura Común del Mercosur) más probables.
+Sugiere los 3 códigos NCM (Nomenclatura Común del Mercosur, 8 dígitos) más probables.
 Responde SOLO en formato JSON array:
-[{{"ncm": "8471.30", "desc": "Laptops y notebooks"}}, ...]
+[{{"ncm": "8471.30.00", "desc": "Laptops y notebooks"}}, ...]
 
 Solo el JSON, sin explicación."""
 

@@ -1,7 +1,7 @@
 # HANDOFF — CDI (vuce / CDI-app)
 
 > Estado vivo del proyecto. **La próxima AI o persona que entre lo lee primero.**
-> Última actualización: 2026-06-19 · Agregada opción para asignar Origen masivamente en la tabla NCM.
+> Última actualización: 2026-06-19 · Fix validación UI NCM (incompletos muestran error visual) y formato de 8 dígitos obligatorio en AI.
 
 ---
 

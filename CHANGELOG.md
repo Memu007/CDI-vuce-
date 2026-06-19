@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-19 · Fix validación de longitud NCM y AI prompt
+
+- **fix (ncm):** corregida validación visual en tabla para marcar en rojo NCMs ingresados que no tengan exactamente 8 dígitos, en lugar de mostrarlos como válidos.
+- **fix (ai):** actualizado prompt de Gemini para que las sugerencias de NCM siempre devuelvan 8 dígitos y no posiciones a nivel subpartida de 6 dígitos.
+
 ## 2026-06-19 · Origen masivo en tabla NCM
 
 - **feat (ncm):** añadida opción para aplicar un "Origen para todos" a múltiples ítems seleccionados en la pantalla de NCM, funcionando igual que la asignación masiva de NCM.
