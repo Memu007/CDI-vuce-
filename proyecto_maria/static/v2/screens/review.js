@@ -224,6 +224,7 @@
             if (document.querySelector('[data-screen="review"].is-active')) {
                 applyClienteActivo();
                 renderMetaPill();
+                validateAll();
             }
         });
 
