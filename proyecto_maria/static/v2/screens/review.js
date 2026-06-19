@@ -769,15 +769,20 @@
         if (missing.includes('_no_cliente')) {
             const btn = document.createElement('button');
             btn.type = 'button';
-            btn.className = 'btn btn-ghost btn-sm';
-            btn.style.marginLeft = '8px';
-            btn.style.padding = '4px 8px';
-            btn.style.verticalAlign = 'baseline';
+            btn.className = 'btn btn-secondary btn-sm';
+            btn.style.marginLeft = '12px';
+            btn.style.marginTop = '8px';
+            btn.style.display = 'inline-block';
             btn.textContent = 'Seleccionar cliente';
             btn.onclick = () => {
-                const headerBtn = document.getElementById('clientePill');
-                if (headerBtn) headerBtn.click();
+                if (window.CDI && CDI.openClientesDrawer) {
+                    CDI.openClientesDrawer();
+                } else {
+                    const headerBtn = document.getElementById('clientePill');
+                    if (headerBtn) headerBtn.click();
+                }
             };
+            missingCountEl.appendChild(document.createElement('br'));
             missingCountEl.appendChild(btn);
         }
     }
