@@ -365,10 +365,12 @@ async def get_cohort_retention(
         last_op = last_op_result.scalar_one_or_none()
         
         # 3. Obtener el agrupamiento por mes de las operaciones
-        # Usamos strftime para compatibilidad con SQLite (ya que los tests corren en SQLite)
+        # Usamos extract() para compatibilidad con PostgreSQL y SQLite
+        from sqlalchemy import extract, String
         ops_by_month_result = await db.execute(
             select(
-                func.strftime('%Y-%m', Operation.created_at).label('month'),
+                (extract('year', Operation.created_at) * 100 +
+                 extract('month', Operation.created_at)).cast(String).label('month'),
                 func.count().label('count')
             )
             .where(Operation.owner_username == u.username)
@@ -376,10 +378,14 @@ async def get_cohort_retention(
             .order_by('month')
         )
         
-        ops_by_month = [
-            {"month": row.month, "count": row.count}
-            for row in ops_by_month_result
-        ]
+        ops_by_month = []
+        for row in ops_by_month_result:
+            month_raw = str(row.month).split('.')[0] # handle float return from extract sometimes
+            if len(month_raw) == 6:
+                formatted_month = f"{month_raw[:4]}-{month_raw[4:6]}"
+            else:
+                formatted_month = month_raw
+            ops_by_month.append({"month": formatted_month, "count": row.count})
         
         cohort_data.append({
             "username": u.username,
