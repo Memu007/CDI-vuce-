@@ -268,10 +268,18 @@
             }
         }
 
+        let arsText = '';
+        const tc = meta.tipo_cambio_usd;
+        if (tc && tc > 0) {
+            const arsTotal = itemCalc.costo_total * tc;
+            arsText = '<div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">~ ARS $' + arsTotal.toLocaleString('es-AR', {minimumFractionDigits: 0, maximumFractionDigits: 0}) + ' <span class="caption">(TC BNA: $' + tc + ')</span></div>';
+        }
+
         resultEl.innerHTML = (
             '<div class="calc-result-head">' +
                 '<div><span class="caption">Costo final estimado</span>' +
                     '<div class="calc-total">' + fmtUsd(itemCalc.costo_total) + '</div>' +
+                    arsText +
                 '</div>' +
                 modeChip +
             '</div>' +
