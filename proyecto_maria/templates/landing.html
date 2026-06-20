@@ -287,6 +287,9 @@
                 <input name="password" type="password" autocomplete="current-password" required />
             </label>
             <button type="submit" class="btn-primary btn-lg btn-block">Ingresar</button>
+            <div style="margin-top: 10px; text-align: center;">
+                <a href="#" data-tab="forgot" class="auth-link" style="font-size: 0.85rem;">Olvidé mi contraseña →</a>
+            </div>
             <p class="auth-hint">¿No tenés cuenta? <a href="#" data-tab="register" class="auth-link">Crear cuenta →</a></p>
             <p class="auth-hint">Para probar: <code>demo</code> / <code>demo123</code></p>
         </form>
@@ -319,6 +322,23 @@
 
             <button type="submit" class="btn-primary btn-lg btn-block">Empezar trial de 14 días</button>
             <p class="auth-hint">¿Ya tenés cuenta? <a href="#" data-tab="login" class="auth-link">Ingresar →</a></p>
+        </form>
+
+        <form id="forgotForm" class="auth-form" autocomplete="on" novalidate>
+            <h2 class="auth-title">Recuperá tu acceso.</h2>
+            <p class="auth-sub">Ingresá tu email registrado.</p>
+
+            <div class="auth-error" id="forgotError" hidden></div>
+            <div class="auth-hint" id="forgotSuccess" style="color: var(--color-success); border: 1px solid var(--color-success); padding: 8px; border-radius: 4px; display: none;">
+                Si el email existe, te mandamos un link. Revisá spam.
+            </div>
+
+            <label class="field">
+                <span>Email</span>
+                <input name="email" type="email" autocomplete="email" placeholder="vos@empresa.com" required />
+            </label>
+            <button type="submit" class="btn-primary btn-lg btn-block">Enviar link de recuperación</button>
+            <p class="auth-hint"><a href="#" data-tab="login" class="auth-link">← Volver al login</a></p>
         </form>
 
         <div id="verifySent" class="auth-form" role="status" aria-live="polite">
@@ -383,6 +403,7 @@
     const forms = {
         login:    document.getElementById('loginForm'),
         register: document.getElementById('registerForm'),
+        forgot:   document.getElementById('forgotForm'),
         verify:   document.getElementById('verifySent'),
     };
     function activate(tab) {
@@ -589,6 +610,44 @@
             return;
         }
         submitAuth(forms.register, '/auth/register', errorEl);
+    });
+
+    forms.forgot.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const errorEl = document.getElementById('forgotError');
+        const successEl = document.getElementById('forgotSuccess');
+        const btn = forms.forgot.querySelector('button[type=submit]');
+        const email = forms.forgot.querySelector('input[name=email]').value;
+        
+        errorEl.hidden = true;
+        successEl.style.display = 'none';
+        
+        if (!email) {
+            errorEl.textContent = 'Ingresá tu email.';
+            errorEl.hidden = false;
+            return;
+        }
+
+        btn.disabled = true;
+        const original = btn.textContent;
+        btn.textContent = 'Enviando...';
+
+        try {
+            await fetch('/auth/request-password-reset', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: email })
+            });
+            // Mostrar éxito siempre, anti-enumeración
+            successEl.style.display = 'block';
+            forms.forgot.reset();
+        } catch (err) {
+            errorEl.textContent = 'Error de conexión.';
+            errorEl.hidden = false;
+        } finally {
+            btn.disabled = false;
+            btn.textContent = original;
+        }
     });
 
     function wireAuthErrorClear(form, errorEl) {
