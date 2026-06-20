@@ -364,9 +364,9 @@ _FRIENDLY_5XX = (
 
 @app.exception_handler(StarletteHTTPException)
 async def _http_exception_friendly(request: Request, exc: StarletteHTTPException):
-    if exc.status_code >= 500:
+    if exc.status_code == 500:
         logging.exception(
-            "HTTPException 5xx en %s %s: %s",
+            "HTTPException 500 en %s %s: %s",
             request.method, request.url.path, exc.detail,
         )
         # Mantener el mensaje amigable como `detail` para users finales,
@@ -381,8 +381,13 @@ async def _http_exception_friendly(request: Request, exc: StarletteHTTPException
                 "code": "internal_error",
             },
         )
+    # 4xx y 5xx controlados (503, 429, etc.) pasan sin ofuscar
     detail = exc.detail if exc.detail is not None else ""
-    return JSONResponse(status_code=exc.status_code, content={"detail": detail})
+    return JSONResponse(
+        status_code=exc.status_code, 
+        content={"detail": detail},
+        headers=getattr(exc, "headers", None) or {}
+    )
 
 
 @app.exception_handler(Exception)

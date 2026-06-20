@@ -223,4 +223,4 @@ def test_share_quote_tarifar_fails_returns_503(client, auth_override, test_opera
     
     res = client.post("/api/quotes/share", json={"operation_id": test_operation})
     assert res.status_code == 503
-    assert res.json()["detail"] == "fuente_arancelaria_no_disponible"
+    assert res.json()["detail"] == "tarifar_unavailable"
