@@ -1,5 +1,6 @@
 import secrets
 from datetime import datetime, timedelta, timezone
+import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -56,13 +57,29 @@ async def share_quote(
         for i in items
     ]
 
-    # Calculate aranceles
-    calculo = TARIFAR_CLIENT.calcular_aranceles(calc_items, tc_usd)
+    # Calculate aranceles (async wrapper and try/except)
+    try:
+        calculo = await asyncio.to_thread(
+            TARIFAR_CLIENT.calcular_aranceles, calc_items, tc_usd
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail="tarifar_unavailable",
+            headers={"Retry-After": "300"}
+        )
 
     # Attach calculo details to items
+    # Build dictionary to match securely by NCM
+    calc_by_ncm = {
+        c_item["item"]["ncm"]: c_item["calculo"]
+        for c_item in calculo.get("items", [])
+        if "item" in c_item and "ncm" in c_item["item"] and "calculo" in c_item
+    }
+
     items_snapshot = []
-    for idx, i in enumerate(items):
-        item_calc = calculo["items"][idx]["calculo"] if "items" in calculo and idx < len(calculo["items"]) else {}
+    for i in items:
+        item_calc = calc_by_ncm.get(i.pieza, {})
         items_snapshot.append({
             "pieza": i.pieza,
             "descripcion": i.descripcion,
