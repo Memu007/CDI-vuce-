@@ -41,7 +41,7 @@ async def share_quote(
     items = items_res.scalars().all()
 
     # Get TC
-    tc = get_dolar_snapshot()
+    tc = await get_dolar_snapshot()
     tc_usd = tc.get("oficial", {}).get("venta", 1000.0)
 
     # Prepare items for tarifar_connector

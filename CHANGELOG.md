@@ -7,12 +7,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ---
 
 
-## 2026-06-20 · Fases 1 y 2 (Mitigaciones DD y Presupuestos Públicos)
+## 2026-06-20 · Fases 0, 1 y 2 (Métricas PMF y Presupuestos Públicos)
 
+- **feat:** agregado endpoint `/api/admin/cohort-retention` para extracción de métricas de retención de cohortes en usuarios activos (Fase 0).
+- **test:** implementado `scripts/testing/smoke_quotes.sh` para validación automática del flujo de Presupuestos Públicos en producción y local.
 - **chore:** sanitización de endpoints (Swagger oculto en prod, borrado de código muerto en `_deprecated/`).
 - **refactor:** unificación de autenticación centralizada en `auth/dependencies.py` para prevenir dependencias circulares.
-- **fix:** refactor del conector aduanero para usar HTTP 200 con data stale o 503 estricto, erradicando datos fake en producción.
-- **feat:** nuevo pilar de negocio (Presupuestos Públicos) con endpoint shareable, UI pública y botón "Copiar link" en el Cockpit y Calculadora.
+- **fix:** refactor del conector aduanero para bloquear modo fake en producción y asegurar 503 o datos estáticos con disclaimer.
+- **feat:** nuevo pilar de negocio (Presupuestos Públicos) con endpoint shareable, inyección de alícuotas y botón "Copiar link" en el Cockpit y Calculadora.
 
 ## 2026-06-19 · Refinamiento UX de Carga Manual
 

@@ -119,8 +119,8 @@ CDI-app/
 - Seguridad Wave 2: `pdf_extractor.py` encierra el texto del PDF en `<<<DOCUMENTO>>>` y le dice al modelo que ignore instrucciones dentro. Cap de input al LLM (`PDF_LLM_MAX_INPUT_CHARS=60000`) y de items (≤2000). Sanitización estricta de cada item antes de persistir (NCM solo dígitos, origen ISO, strings sin chars de control). Multi-tenant verificado: 71 referencias a `owner_username` con helper `_get_owned_client`.
 - Seguridad Wave 3: cuota diaria de IA por usuario (`proyecto_maria/core/ai_quota.py`, `AI_DAILY_PDF_LIMIT=50/día/usuario`) aplicada en `POST /upload_pdf/public`. XSS audit de v2 OK (todos los `innerHTML` con dato externo escapan vía `CDI.escapeHtml`). Pendiente no urgente: sacar `unsafe-inline` de CSP `script-src` y CSRF header custom.
 - Panel KPIs Wave 1 (`/dev/dashboard`): demo vs PDF, auto-detect OK / sin match, activación (usuarios únicos por acción + cuentas DB).
-- Endpoints: `GET /api/clientes/by-cuit/{cuit}`, `POST /api/ui/event`, alias `POST /api/session/state`, `GET /api/dev/wave1-kpis`.
-- Smoke local: `./scripts/testing/smoke_friccion.sh` (con server arriba).
+- Endpoints: `GET /api/clientes/by-cuit/{cuit}`, `POST /api/ui/event`, alias `POST /api/session/state`, `GET /api/dev/wave1-kpis`, `GET /api/admin/cohort-retention` (Fase 0 PMF).
+- Smoke local: `./scripts/testing/smoke_friccion.sh` y `./scripts/testing/smoke_quotes.sh` (con server arriba).
 
 ### Pendiente / frágil
 
@@ -244,4 +244,5 @@ Si te perdés: pedí explícitamente al humano un overview en castellano antes d
 
 ## 11. TODO siguiente sesión
 
+- **Ejecutar tests en local y prod**: Validar el PMF con el dueño/PM mediante el script de extracción de retención y el de cotizaciones.
 - **Tests flakies (`test_api_clientes_billing.py`)**: Durante la implementación de Fases 1 y 2, 3 tests en `test_api_clientes_billing.py` fallaron en la suite completa con error `sqlite3.OperationalError: no such table: users`. Esto ocurre porque la DB de testing (StaticPool + SQLite + aiosqlite en un archivo temporal) parece descartar o no inicializar correctamente las tablas cuando se ejecutan en cadena, posiblemente afectado por el import order tras mover `get_db` a `dependencies.py`. Si se corre el archivo aislado (`pytest tests/test_api_clientes_billing.py`), **pasa todo en verde**. Toca investigar el setup de fixtures (`auth_override` y `get_async_session`) en `conftest.py` para resolver este estado sucio entre tests concurrentes en SQLite async.

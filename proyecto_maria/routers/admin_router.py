@@ -7,7 +7,13 @@ from fastapi.responses import JSONResponse
 import psutil
 import time
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, List
+
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, func, desc, text
+from proyecto_maria.auth.dependencies import get_db
+from proyecto_maria.auth.roles import require_role
+from proyecto_maria.database.models import User, Operation
 
 router = APIRouter(prefix='/api/admin', tags=['admin'])
 
@@ -330,3 +336,63 @@ async def test_sentry_integration() -> Dict[str, Any]:
         # El error será capturado automáticamente por Sentry
         # debido a la integración FastAPI
         raise HTTPException(500, f"Test error captured by Sentry: {str(e)}")
+
+@router.get('/cohort-retention')
+async def get_cohort_retention(
+    db: AsyncSession = Depends(get_db),
+    user: dict = Depends(require_role('admin'))
+) -> Dict[str, Any]:
+    """
+    Extrae datos de retención de cohortes para los usuarios activos o en trial.
+    SOLO LECTURA. No expone PII sensible ni tokens.
+    """
+    # 1. Obtener los usuarios relevantes
+    users_result = await db.execute(
+        select(User).where(User.billing_status.in_(['active', 'trial']))
+    )
+    users = users_result.scalars().all()
+    
+    cohort_data = []
+    
+    for u in users:
+        # 2. Obtener la última operación
+        last_op_result = await db.execute(
+            select(Operation.created_at)
+            .where(Operation.owner_username == u.username)
+            .order_by(desc(Operation.created_at))
+            .limit(1)
+        )
+        last_op = last_op_result.scalar_one_or_none()
+        
+        # 3. Obtener el agrupamiento por mes de las operaciones
+        # Usamos strftime para compatibilidad con SQLite (ya que los tests corren en SQLite)
+        ops_by_month_result = await db.execute(
+            select(
+                func.strftime('%Y-%m', Operation.created_at).label('month'),
+                func.count().label('count')
+            )
+            .where(Operation.owner_username == u.username)
+            .group_by('month')
+            .order_by('month')
+        )
+        
+        ops_by_month = [
+            {"month": row.month, "count": row.count}
+            for row in ops_by_month_result
+        ]
+        
+        cohort_data.append({
+            "username": u.username,
+            "created_at": u.created_at.isoformat() if u.created_at else None,
+            "billing_status": u.billing_status,
+            "ops_used_this_period": u.ops_used_this_period,
+            "billing_period_started_at": u.billing_period_started_at.isoformat() if u.billing_period_started_at else None,
+            "last_topup_at": u.last_topup_at.isoformat() if u.last_topup_at else None,
+            "last_operation_at": last_op.isoformat() if last_op else None,
+            "operations_by_month": ops_by_month
+        })
+        
+    return {
+        "success": True,
+        "cohorts": cohort_data
+    }
