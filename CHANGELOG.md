@@ -7,6 +7,15 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ---
 
 
+---
+
+## 2026-06-20 · Hardening Pilar B + Tests E2E
+
+- **feat (backend):** refactor en `quote_router.py` para usar `asyncio.to_thread` al llamar a Tarifar (evitando bloquear el event loop).
+- **feat (backend):** refactor en la lógica de armado de presupuestos para enlazar resultados de Tarifar vía `NCM` (propiedad `pieza`) en lugar de posición en el índice, mejorando robustez contra reordenamientos del proveedor externo.
+- **fix (backend):** agregado try/except sobre la llamada a Tarifar para devolver HTTP 503 Service Unavailable y abortar persistencia si falla.
+- **test (backend):** añadida suite E2E completa en `tests/test_pilar_b_quotes.py` cubriendo los 8 casos de uso requeridos (auth, propiedad, expiración, rate-limit, validación estructural).
+
 ## 2026-06-20 · Fases 0, 1 y 2 (Métricas PMF y Presupuestos Públicos)
 
 - **feat:** agregado endpoint `/api/admin/cohort-retention` para extracción de métricas de retención de cohortes en usuarios activos (Fase 0).

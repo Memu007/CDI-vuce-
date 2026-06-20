@@ -1,7 +1,7 @@
 # HANDOFF — CDI (vuce / CDI-app)
 
 > Estado vivo del proyecto. **La próxima AI o persona que entre lo lee primero.**
-> Última actualización: 2026-06-20 · Fases 1 y 2 (Mitigaciones DD y Presupuestos Públicos) completadas.
+> Última actualización: 2026-06-20 · Hardening de Pilar B (Cotizaciones) y tests E2E completados.
 
 ---
 
@@ -244,5 +244,5 @@ Si te perdés: pedí explícitamente al humano un overview en castellano antes d
 
 ## 11. TODO siguiente sesión
 
-- **Ejecutar tests en local y prod**: Validar el PMF con el dueño/PM mediante el script de extracción de retención y el de cotizaciones.
-- **Tests flakies (`test_api_clientes_billing.py`)**: Durante la implementación de Fases 1 y 2, 3 tests en `test_api_clientes_billing.py` fallaron en la suite completa con error `sqlite3.OperationalError: no such table: users`. Esto ocurre porque la DB de testing (StaticPool + SQLite + aiosqlite en un archivo temporal) parece descartar o no inicializar correctamente las tablas cuando se ejecutan en cadena, posiblemente afectado por el import order tras mover `get_db` a `dependencies.py`. Si se corre el archivo aislado (`pytest tests/test_api_clientes_billing.py`), **pasa todo en verde**. Toca investigar el setup de fixtures (`auth_override` y `get_async_session`) en `conftest.py` para resolver este estado sucio entre tests concurrentes en SQLite async.
+- **Tests flakies (`test_api_clientes_billing.py`)**: Durante la ejecución de la suite completa, este test falla con `sqlite3.OperationalError: no such table: users`. Si se corre el archivo aislado, **pasa todo en verde**. Hay que resolver el estado sucio de la base de SQLite async entre tests concurrentes en `conftest.py` (probablemente por uso de lifespan en testclient o fixtures asíncronas).
+- **Avanzar con Fase 3 / Pilar A**: Una vez aprobados los resultados de PMF del cohort retention y el Pilar B, iniciar el Pilar A (API Pública para sistemas corporativos).
