@@ -135,3 +135,92 @@ def test_get_public_quote_rate_limit(client, auth_override, test_operation, monk
     assert res.status_code == 429
     
     limiter.enabled = False
+
+@pytest.fixture
+async def multi_item_operation(auth_override):
+    op_id = f"test_op_{uuid.uuid4().hex[:8]}"
+    async with AsyncSessionLocal() as session:
+        op = Operation(
+            id=op_id,
+            owner_username=auth_override["username"],
+            op_code="QUOTE-MULTI",
+            client_id="test_client"
+        )
+        item1 = OperationItem(
+            id=f"item_1_{uuid.uuid4().hex[:8]}",
+            operation_id=op_id,
+            pieza="8517.12.31",
+            descripcion="Smartphone",
+            origen="CN",
+            cantidad=100,
+            valor_unitario=150.0,
+            peso_unitario=0.2
+        )
+        item2 = OperationItem(
+            id=f"item_2_{uuid.uuid4().hex[:8]}",
+            operation_id=op_id,
+            pieza="9999.00.00",
+            descripcion="Otro",
+            origen="CN",
+            cantidad=10,
+            valor_unitario=50.0,
+            peso_unitario=1.0
+        )
+        session.add_all([op, item1, item2])
+        await session.commit()
+    return op_id
+
+def test_share_quote_tarifar_returns_reordered_items(client, auth_override, multi_item_operation, monkeypatch):
+    import proyecto_maria.routers.quote_router as qr
+    
+    def mock_calcular_aranceles(items, tc_usd):
+        # Devuelve alícuotas en orden inverso (9999.00.00 primero, 8517.12.31 segundo)
+        # Identificando por 'ncm' como lo hace el backend de VUCE
+        return {"items": [
+            {
+                "item": {"ncm": "9999.00.00"},
+                "calculo": {
+                    "simulacion_id": "sim_9999",
+                    "alicuotas": {"die": 0.0, "te": 0.0},
+                    "total_usd": 500.0
+                }
+            },
+            {
+                "item": {"ncm": "8517.12.31"},
+                "calculo": {
+                    "simulacion_id": "sim_8517",
+                    "alicuotas": {"die": 0.16, "te": 0.03},
+                    "total_usd": 15000.0
+                }
+            }
+        ]}
+        
+    monkeypatch.setattr(qr.TARIFAR_CLIENT, "calcular_aranceles", mock_calcular_aranceles)
+    
+    res = client.post("/api/quotes/share", json={"operation_id": multi_item_operation})
+    assert res.status_code == 200
+    token = res.json()["token"]
+    
+    # Check public quote correctly assigned alicuotas by NCM, not position
+    res_pub = client.get(f"/api/quotes/public/{token}")
+    assert res_pub.status_code == 200
+    items = res_pub.json()["snapshot"]["items"]
+    
+    # Buscar el item de Smartphone (8517.12.31) y el Otro (9999.00.00)
+    item_8517 = next(i for i in items if i["pieza"] == "8517.12.31")
+    item_9999 = next(i for i in items if i["pieza"] == "9999.00.00")
+    
+    assert item_8517["alicuotas"]["die"] == 0.16
+    assert item_9999["alicuotas"]["die"] == 0.0
+
+def test_share_quote_tarifar_fails_returns_503(client, auth_override, test_operation, monkeypatch):
+    import proyecto_maria.routers.quote_router as qr
+    
+    def mock_calcular_aranceles_error(items, tc_usd):
+        raise Exception("timeout de tarifar")
+        
+    monkeypatch.setattr(qr.TARIFAR_CLIENT, "calcular_aranceles", mock_calcular_aranceles_error)
+    
+    res = client.post("/api/quotes/share", json={"operation_id": test_operation})
+    assert res.status_code == 503
+    assert res.json()["detail"] == "fuente_arancelaria_no_disponible"
