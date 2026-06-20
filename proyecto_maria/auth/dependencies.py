@@ -108,8 +108,15 @@ async def get_current_user(request: Request, response: Response, db: AsyncSessio
     effective_owner = team_owner or user.username
 
     plan = user.plan or "premium"
-    plan_def = billing_service.get_plan(plan)
-    ops_limit = plan_def["ops"]
+    try:
+        plan_def = billing_service.get_plan(plan)
+        ops_limit = plan_def["ops"]
+    except (KeyError, ValueError) as e:
+        import logging
+        logging.warning(f"[auth] plan inválido '{plan}' para user '{user.username}', fallback a premium. Error: {e}")
+        plan = "premium"
+        plan_def = billing_service.get_plan("premium")
+        ops_limit = plan_def["ops"]
 
     return {
         "username": user.username,
