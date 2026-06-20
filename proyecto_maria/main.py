@@ -1038,6 +1038,22 @@ async def lifespan(app: FastAPI):
             
             await session.commit()
             print("✅ Usuarios demo verificados/creados")
+
+            # Bootstrap admin via ADMIN_USERNAMES (funciona en cualquier entorno)
+            admin_identifiers = _admin_usernames()
+            for identifier in admin_identifiers:
+                result = await session.execute(
+                    select(User).where(
+                        (User.username == identifier) | (User.email == identifier)
+                    )
+                )
+                user = result.scalars().first()
+                if user and "admin" not in (user.roles or []):
+                    new_roles = list(user.roles) if user.roles else []
+                    new_roles.append("admin")
+                    user.roles = new_roles
+                    await session.commit()
+                    logging.info(f"✅ {user.username} promovido a admin via ADMIN_USERNAMES")
         except Exception as e:
             print(f"⚠️ Error creando usuarios demo: {e}")
         break  # Solo necesitamos ejecutar esto una vez
