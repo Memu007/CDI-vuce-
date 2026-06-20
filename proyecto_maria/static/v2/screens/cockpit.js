@@ -94,8 +94,17 @@
                 '<td>' + (op.total_items || 0) + '</td>' +
                 '<td>' + fmtMoney(op.total_value, op.currency) + '</td>' +
                 '<td>' + fmtFecha(op.fecha) + '</td>' +
+                '<td class="ck-actions">' +
+                    '<button type="button" class="btn-ghost btn-sm ck-share-btn" data-op="' + CDI.escapeHtml(op.id) + '" aria-label="Copiar link público" title="Copiar link público">' +
+                        '<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+                    '</button>' +
+                '</td>' +
                 '</tr>';
         }).join('');
+        // Bind after render
+        document.querySelectorAll('.ck-share-btn').forEach(function(btn) {
+            btn.addEventListener('click', onShareClick);
+        });
     }
 
     async function cargar() {
@@ -149,6 +158,32 @@
         } catch (err) {
             console.error('[CDI cockpit] update error:', err);
             CDI.toast && CDI.toast.error('No se pudo guardar', 'Probá de nuevo en unos segundos.');
+        }
+    }
+
+    async function onShareClick(e) {
+        var btn = e.currentTarget;
+        var opId = btn.getAttribute('data-op');
+        if (!opId) return;
+
+        btn.disabled = true;
+        try {
+            const res = await CDI.api('/api/quotes/share', {
+                method: 'POST',
+                body: JSON.stringify({ operation_id: opId })
+            });
+            if (res.success && res.share_url) {
+                var fullUrl = window.location.origin + res.share_url;
+                await navigator.clipboard.writeText(fullUrl);
+                CDI.toast && CDI.toast('Link copiado al portapapeles');
+            } else {
+                throw new Error(res.detail || 'Error al generar link');
+            }
+        } catch (err) {
+            console.error('Share error:', err);
+            CDI.toast && CDI.toast('Error al compartir', 'error');
+        } finally {
+            btn.disabled = false;
         }
     }
 

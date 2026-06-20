@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Presupuesto Aduanero</title>
+    <link rel="stylesheet" href="/static/v2/css/index.css">
+    <style>
+        body {
+            background-color: var(--cdi-bg);
+            color: var(--cdi-text);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .quote-container {
+            max-width: 600px;
+            width: 100%;
+            background: var(--cdi-surface);
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+            border-bottom: 1px solid var(--cdi-border);
+            padding-bottom: 16px;
+        }
+        .branding-text {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--cdi-primary);
+            margin: 0;
+        }
+        .quote-title {
+            font-size: 1.5rem;
+            margin: 8px 0 0 0;
+            color: var(--cdi-text);
+        }
+        .meta-info {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            color: var(--cdi-text-muted);
+            margin-bottom: 24px;
+        }
+        .item-card {
+            background: var(--cdi-bg);
+            border: 1px solid var(--cdi-border);
+            border-radius: 8px;
+            padding: 16px;
+            margin-bottom: 16px;
+        }
+        .item-title {
+            font-weight: 600;
+            margin: 0 0 8px 0;
+        }
+        .item-detail {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.875rem;
+            margin-bottom: 4px;
+        }
+        .total-section {
+            margin-top: 24px;
+            padding-top: 16px;
+            border-top: 2px dashed var(--cdi-border);
+            display: flex;
+            justify-content: space-between;
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+        .footer {
+            margin-top: 32px;
+            text-align: center;
+            font-size: 0.75rem;
+            color: var(--cdi-text-muted);
+        }
+    </style>
+</head>
+<body>
+    <div class="quote-container">
+        <div class="header">
+            <h1 class="branding-text" id="brandingName">Cargando...</h1>
+            <h2 class="quote-title">Presupuesto Estimado</h2>
+        </div>
+        
+        <div class="meta-info">
+            <span id="opCode">--</span>
+            <span id="expiresAt">Expira: --</span>
+        </div>
+
+        <div id="itemsContainer">
+            <!-- Items rendered here -->
+            <div style="text-align: center; padding: 20px;">Cargando detalles...</div>
+        </div>
+
+        <div class="total-section">
+            <span>Total Estimado</span>
+            <span id="totalValue">--</span>
+        </div>
+
+        <div class="footer">
+            <p>Valores estimativos. Sujetos a modificaciones por tipo de cambio y aforo aduanero al momento de oficializar.</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const token = window.location.pathname.split('/').pop();
+            try {
+                const response = await fetch(`/api/quotes/public/${token}`);
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    document.querySelector('.quote-container').innerHTML = 
+                        `<div style="text-align:center; padding: 40px; color: var(--cdi-danger)">
+                            <h3>Error</h3>
+                            <p>${data.detail || 'No se pudo cargar el presupuesto'}</p>
+                        </div>`;
+                    return;
+                }
+
+                const snap = data.snapshot;
+                const op = snap.operation;
+                
+                document.getElementById('brandingName').textContent = snap.branding.company_name;
+                document.getElementById('opCode').textContent = `Ref: ${op.op_code || op.id.split('-')[0]}`;
+                document.getElementById('expiresAt').textContent = `Expira: ${new Date(data.expires_at).toLocaleDateString('es-AR')}`;
+                
+                const fmtMoney = (val, cur) => Number(val||0).toLocaleString('es-AR', { style: 'currency', currency: cur||'USD' });
+                
+                document.getElementById('totalValue').textContent = fmtMoney(snap.costo_total_operacion || op.total_value, 'USD');
+
+                const container = document.getElementById('itemsContainer');
+                container.innerHTML = snap.items.map(i => `
+                    <div class="item-card">
+                        <h3 class="item-title">${i.descripcion}</h3>
+                        <div class="item-detail"><span>NCM</span> <span>${i.pieza}</span></div>
+                        <div class="item-detail"><span>Cantidad</span> <span>${i.cantidad}</span></div>
+                        <div class="item-detail"><span>Origen</span> <span>${i.origen}</span></div>
+                        <div class="item-detail"><span>FOB Unitario</span> <span>${fmtMoney(i.valor_unitario, op.currency)}</span></div>
+                        <div style="margin-top: 12px; border-top: 1px solid var(--cdi-border); padding-top: 8px;">
+                            <div class="item-detail" style="color: var(--cdi-text-muted);"><span>Arancel Base</span> <span>${i.alicuotas?.arancel_base || 0}%</span></div>
+                            <div class="item-detail" style="color: var(--cdi-text-muted);"><span>Tasa Estadística</span> <span>${i.alicuotas?.estadistica || 0}%</span></div>
+                            <div class="item-detail" style="color: var(--cdi-text-muted);"><span>IVA</span> <span>${i.alicuotas?.iva || 0}%</span></div>
+                            <div class="item-detail" style="font-weight: 600; margin-top: 4px;"><span>Costo Total (Item)</span> <span>${fmtMoney(i.costo_total, op.currency)}</span></div>
+                        </div>
+                    </div>
+                `).join('');
+
+            } catch (err) {
+                console.error(err);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -5,6 +5,11 @@ from typing import Dict, Any, Optional
 
 import requests
 
+class SourceUnavailableError(Exception):
+    def __init__(self, ncm: str):
+        self.ncm = ncm
+        super().__init__(f"Fuente arancelaria no disponible para NCM {ncm}")
+
 logger = logging.getLogger(__name__)
 
 # Cache en memoria (proceso-local). El cache persistente vive en la tabla
@@ -59,15 +64,20 @@ class VuceClient:
 
     def _request(self, path: str, params: Optional[dict] = None) -> Dict[str, Any]:
         mode = self.config.mode
+        is_production = os.getenv("ENVIRONMENT", "development") == "production"
+
         if mode == "fake":
+            if is_production:
+                logger.error("[vuce] Intento de usar modo fake en produccion abortado.")
+                raise SourceUnavailableError(ncm=path.split("/")[-1])
             return self._fake_response(path, params)
         if mode == "scrape":
             data = self._scrape_response(path, params)
             if data:
                 return data
-            # Fallback silencioso: no rompemos la UI si el scraper falla
-            logger.warning("[vuce] scrape vacio, fallback a fake para %s", path)
-            return self._fake_response(path, params)
+            # Fallback a Error 503 en lugar de fake (Fisura C M&A)
+            logger.warning("[vuce] scrape vacio, lanzando SourceUnavailableError para %s", path)
+            raise SourceUnavailableError(ncm=path.split("/")[-1])
         # mode == "api"
         return self._real_request(path, params)
 

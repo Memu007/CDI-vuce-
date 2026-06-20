@@ -6,7 +6,7 @@ Permite restringir endpoints según el plan del usuario (premium, etc.)
 
 from typing import Annotated
 from fastapi import Depends, HTTPException, status
-from proyecto_maria.auth.jwt_utils import get_current_user
+from proyecto_maria.auth.dependencies import get_current_user
 
 
 def require_plan(*allowed_plans: str):

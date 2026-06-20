@@ -1,7 +1,7 @@
 # HANDOFF — CDI (vuce / CDI-app)
 
 > Estado vivo del proyecto. **La próxima AI o persona que entre lo lee primero.**
-> Última actualización: 2026-06-19 · Rediseño UX de Carga Manual (flujo directo a tabla de revisión + validación dinámica de campos requeridos).
+> Última actualización: 2026-06-20 · Fases 1 y 2 (Mitigaciones DD y Presupuestos Públicos) completadas.
 
 ---
 
@@ -112,19 +112,6 @@ CDI-app/
 
 ## 6. Estado actual (qué está vivo, qué no)
 
-### Funciona
-
-- Landing → registro → login → app v2.
-- Onboarding: al alta nueva aparece automáticamente una bienvenida con tarjetas explicando el producto (PDF, clientes, reconocimiento, autocatálogo). Se cierra una vez y no molesta. El botón `Ver tour` la vuelve a abrir.
-- Registro: soporta modo prueba acotado por variables `REGISTER_TEST_EMAILS` + `REGISTER_TEST_EMAIL_REPLACE=true` para reusar emails de test sin afectar usuarios reales.
-- Subida de PDF → extracción → revisión → NCM → generación TXT MARIA.
-- Importador de clientes: botón "Importar" en pantalla Clientes acepta CSV/Excel, detecta columnas comunes y de PreMaría, salta duplicados por CUIT y entrena el autocatálogo si vienen `descripcion` + `ncm`. Endpoint `POST /api/clientes/import`.
-- Carga manual: botón "Cargar manualmente" en upload para crear operaciones sin PDF/Excel. Elige cliente, tipea productos (descripción, cantidad, precio, NCM opcional) y va a Revisión igual que si viniera de PDF. El autocatálogo aprende los NCM cargados a mano.
-- Extracción de CUIT argentino: se normaliza a 11 dígitos sin prefijo país (`AR306...` pasa a `306...`).
-- Cliente por operación, sin selección global persistente: PDF arranca limpio, detecta por CUIT o propone crear/asignar. Excel pide elegir cliente puntualmente solo si se quiere usar mapeo personalizado.
-- Auto-detect importador por CUIT (cuando NO hay cliente activo).
-- Banner en revisión: "este importador no está en tu lista" con 3 opciones (crear y usar / asignar a existente / no por ahora). Aparece aunque falte CUIT si hay razón social; si hay CUIT, pre-check `by-cuit` evita duplicados. Al resolver, muestra tarjeta verde persistente.
-- Panel final de cliente no reconocido: si terminás el TXT sin cliente activo, ofrece crear / asignar / más tarde. El alta corta prellena razón social, CUIT y domicilio si vienen de la factura, asocia la operación al historial y muestra confirmación visible.
 - Popups v2: las confirmaciones usan el modal visual de CDI (`CDI.confirm`) en vez de carteles nativos del navegador.
 - Eliminación de clientes: borra operaciones, ítems, notas NCM e historial de productos del cliente manteniendo aislamiento por usuario.
 - Telemetría: eventos UI persistidos en SQL (`telemetry_events`) + JSONL; el frontend usa `/api/session/state` para reducir bloqueos por extensiones.
@@ -252,3 +239,9 @@ Empezá leyendo, en este orden:
 Si vas a deployar / debug Railway: `docs/deployment/RAILWAY_SETUP.md`.
 
 Si te perdés: pedí explícitamente al humano un overview en castellano antes de tocar código.
+
+---
+
+## 11. TODO siguiente sesión
+
+- **Tests flakies (`test_api_clientes_billing.py`)**: Durante la implementación de Fases 1 y 2, 3 tests en `test_api_clientes_billing.py` fallaron en la suite completa con error `sqlite3.OperationalError: no such table: users`. Esto ocurre porque la DB de testing (StaticPool + SQLite + aiosqlite en un archivo temporal) parece descartar o no inicializar correctamente las tablas cuando se ejecutan en cadena, posiblemente afectado por el import order tras mover `get_db` a `dependencies.py`. Si se corre el archivo aislado (`pytest tests/test_api_clientes_billing.py`), **pasa todo en verde**. Toca investigar el setup de fixtures (`auth_override` y `get_async_session`) en `conftest.py` para resolver este estado sucio entre tests concurrentes en SQLite async.

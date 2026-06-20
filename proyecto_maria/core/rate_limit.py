@@ -34,6 +34,12 @@ limiter = Limiter(
     # Fallback to defaults; actual limits applied per route
 )
 
+def get_client_ip(request: "fastapi.Request") -> str:
+    """Extrae la IP real del cliente, respetando proxies como Railway/Cloudflare."""
+    if "x-forwarded-for" in request.headers:
+        return request.headers["x-forwarded-for"].split(",")[0].strip()
+    return request.client.host if request.client else "127.0.0.1"
+
 def get_dynamic_rate_limit():
     """
     Returns a rate limit string (e.g., '10/minute') dynamically.

@@ -46,8 +46,9 @@ from proyecto_maria.core.maria_generator import generate_maria_txt, validate_ite
 from proyecto_maria.pdf_extractor import process_pdf  # Importar el extractor
 import pandas as pd
 from proyecto_maria.core.vuce_connector import get_ncm_data  # VUCE activo en modo mock
-from proyecto_maria.routers import admin_router
+from proyecto_maria.routers import admin_router, quote_router
 from proyecto_maria.services import billing_service
+from proyecto_maria.auth.dependencies import get_current_user
 
 # ============== Configuración de Autenticación ==============
 _DEFAULT_DEV_SECRET = "tu-clave-secreta-super-segura-cambiar-en-produccion"
@@ -299,6 +300,9 @@ app = FastAPI(
     title="Optimizador de Carga para Sistema MARIA",
     description="Un proyecto para validar, enriquecer y generar archivos de carga para despachantes de aduana.",
     version="0.2.0 (Con Interfaz Web)",
+    docs_url=None if IS_PRODUCTION else "/docs",
+    redoc_url=None if IS_PRODUCTION else "/redoc",
+    openapi_url=None if IS_PRODUCTION else "/openapi.json"
 )
 
 # Configurar CORS (OWASP A5 - Broken Access Control)
@@ -982,6 +986,7 @@ async def lifespan(app: FastAPI):
         admin_router.router,
         dependencies=[Depends(get_current_user)]
     )
+    app.include_router(quote_router.router)
     print("🔒 Admin Router mounted with Authentication enabled.")
 
     async for session in get_async_session():
@@ -1352,96 +1357,12 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 app.add_middleware(CSRFMiddleware)
 
 
-# --- AUTH DEPENDENCY (movido arriba para que endpoints posteriores la usen como Depends) ---
+# --- AUTH DEPENDENCY ---
+
 @app.get("/auth/current_user")
-async def get_current_user(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
-    """Obtiene el usuario actual desde la cookie HttpOnly. Tambien se usa
-    como Depends() para proteger endpoints."""
-    token = request.cookies.get("access_token")
+async def current_user_info(user=Depends(get_current_user)):
+    return user
 
-    # Bootstrap CSRF: si la sesion viene por cookie pero todavia no tiene
-    # csrf_token (sesiones anteriores al deploy), la sembramos. Solo si falta,
-    # para no rotar el token en cada poll y romper requests en vuelo.
-    if token and not request.cookies.get(CSRF_COOKIE_NAME):
-        set_csrf_cookie(response)
-
-    # Fallback to Authorization header for API clients (optional)
-    if not token:
-        auth_header = request.headers.get("Authorization")
-        if auth_header and auth_header.startswith("Bearer "):
-            token = auth_header
-
-    if not token:
-        raise HTTPException(status_code=401, detail="No autenticado")
-
-    if token.startswith("Bearer "):
-        token = token.split(" ")[1]
-
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise HTTPException(status_code=401, detail="Token inválido")
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Token inválido o expirado")
-
-    result = await db.execute(select(User).where(User.username == username))
-    user = result.scalars().first()
-
-    if user is None:
-        raise HTTPException(status_code=401, detail="Usuario no encontrado")
-
-    # Trial vencido: si seguimos en 'trial' y la fecha paso, marcamos past_due.
-    # No bloqueamos el request (eso sera decision del front/middleware en v2);
-    # solo flaggeamos para que el dashboard pueda mostrar el banner adecuado.
-    # SQLite persiste datetimes sin tz, los normalizamos a UTC-aware al comparar.
-    trial_end = user.trial_ends_at
-    if trial_end is not None and trial_end.tzinfo is None:
-        trial_end = trial_end.replace(tzinfo=timezone.utc)
-    if (
-        user.billing_status == "trial"
-        and trial_end is not None
-        and trial_end < datetime.now(timezone.utc)
-    ):
-        user.billing_status = "past_due"
-        try:
-            await db.commit()
-            await db.refresh(user)
-        except Exception:
-            await db.rollback()
-
-    # T5-lite: si el user pertenece a un equipo, las queries de tenant deben
-    # filtrar por team_owner_username en lugar de username. Por ahora la
-    # columna existe pero NADIE tiene valor != NULL (comportamiento actual).
-    # `effective_owner` se expone aca para que endpoints futuros lo usen sin
-    # tener que volver a leer el user.
-    team_owner = getattr(user, "team_owner_username", None)
-    effective_owner = team_owner or user.username
-
-    plan = user.plan or "premium"
-    plan_def = billing_service.get_plan(plan)
-    ops_limit = plan_def["ops"]
-
-    return {
-        "username": user.username,
-        "name": user.name,
-        "email": user.email,
-        "cuit": user.cuit or "",
-        "plan": plan,
-        "is_verified": user.is_verified,
-        "billing_status": user.billing_status or "none",
-        "trial_ends_at": user.trial_ends_at.isoformat() if user.trial_ends_at else None,
-        "ops_used_this_period": user.ops_used_this_period or 0,
-        "ops_limit": ops_limit,
-        "extra_ops_remaining": user.extra_ops_remaining or 0,
-        "billing_period_started_at": user.billing_period_started_at.isoformat() if user.billing_period_started_at else None,
-        "default_aduana_codigo": user.default_aduana_codigo or "",
-        "default_puerto_destino": user.default_puerto_destino or "",
-        "default_tipo_destinacion": user.default_tipo_destinacion or "",
-        "team_owner_username": team_owner,
-        "effective_owner": effective_owner,
-        "roles": user.roles or [],
-    }
 
 
 # --- ADMIN DEPENDENCY ---
@@ -1898,7 +1819,15 @@ def web_interface():
     """Sirve la landing page"""
     return FileResponse(os.path.join(basedir, "proyecto_maria", "templates", "landing.html"), media_type="text/html")
 
-@app.get("/dashboard")
+@app.get("/quotes/{hash}", response_class=HTMLResponse)
+async def view_public_quote(request: Request, hash: str):
+    return templates.TemplateResponse(
+        name="public_quote.html",
+        request=request,
+        context={"version": PROJECT_VERSION}
+    )
+
+@app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
     """Sirve el dashboard.
 
@@ -5626,6 +5555,7 @@ class CalculadoraRequest(BaseModel):
 async def calcular_tributos(
     request_data: CalculadoraRequest,
     user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """Calcula tributos (DI, IVA, tasa estadistica, etc.) para un item hipotético.
 
@@ -5666,8 +5596,40 @@ async def calcular_tributos(
     try:
         calc = TARIFAR_CLIENT.calcular_aranceles([item], tipo_cambio_usd=tipo_cambio_usd)
     except Exception as err:
-        logging.error(f"[calculadora] calcular_aranceles fallo: {err}")
-        raise HTTPException(status_code=502, detail=f"No se pudo calcular: {err}")
+        from proyecto_maria.core.vuce_connector import SourceUnavailableError
+        # Unwrap SourceUnavailableError if it was wrapped by tarifar_connector
+        # Catch both VUCE scraper errors and Tarifar API errors
+        err_msg = str(err).lower()
+        if isinstance(err, SourceUnavailableError) or "fuente arancelaria no disponible" in err_msg or "tarifar" in err_msg:
+            from proyecto_maria.database.models import NCMCache
+            from sqlalchemy.future import select
+            
+            result = await db.execute(select(NCMCache).where(NCMCache.ncm == ncm_clean))
+            row = result.scalars().first()
+            if row and row.payload:
+                from proyecto_maria.core.vuce_connector import VUCE_CACHE
+                import json
+                
+                payload = row.payload
+                if isinstance(payload, str):
+                    try:
+                        payload = json.loads(payload)
+                    except Exception:
+                        pass
+                
+                VUCE_CACHE[ncm_clean] = payload
+                # Re-try
+                calc = TARIFAR_CLIENT.calcular_aranceles([item], tipo_cambio_usd=tipo_cambio_usd)
+                if "metadata" not in calc:
+                    calc["metadata"] = {}
+                calc["metadata"]["stale"] = True
+                calc["metadata"]["stale_reason"] = "tarifar_unreachable"
+            else:
+                # No cache available, pure 503
+                raise HTTPException(status_code=503, detail="fuente_arancelaria_no_disponible")
+        else:
+            logging.error(f"[calculadora] calcular_aranceles fallo: {err}")
+            raise HTTPException(status_code=502, detail=f"No se pudo calcular: {err}")
 
     simulacion = None
     if request_data.simular_origenes:

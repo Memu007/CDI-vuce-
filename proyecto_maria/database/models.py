@@ -411,3 +411,24 @@ class NCMCache(Base):
     source = Column(String(32), nullable=False)  # scrape:tarifar | scrape:arancel | api:vuce | fake | manual
     fetched_at = Column(DateTime(timezone=True), server_default=func.now())
     expires_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class PublicQuote(Base):
+    """Snapshot de presupuesto arancelario para compartir con clientes.
+    
+    Generado a partir de una Operation existente, inmutable y con expiración.
+    Accesible públicamente mediante el token_id.
+    """
+    __tablename__ = "public_quotes"
+    
+    # token_id generado con secrets.token_urlsafe(16)
+    token_id = Column(String(50), primary_key=True)
+    operation_id = Column(String, ForeignKey("operations.id"), nullable=False)
+    
+    # Snapshot JSON con los datos arancelarios calculados y el branding de la empresa
+    snapshot_data = Column(JSON, nullable=False)
+    
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+    
+    operation = relationship("Operation")

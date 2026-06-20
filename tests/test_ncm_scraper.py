@@ -174,13 +174,13 @@ def test_vuce_mode_scrape_falls_back_to_fake_on_empty(monkeypatch):
         "proyecto_maria.core.ncm_scraper.fetch_ncm_scrape",
         lambda _ncm: None,
     )
-    from proyecto_maria.core.vuce_connector import VuceConfig, VuceClient
+    from proyecto_maria.core.vuce_connector import VuceConfig, VuceClient, SourceUnavailableError
     cfg = VuceConfig()
     assert cfg.mode == "scrape"
     client = VuceClient(cfg)
-    data = client._request("ncm/84771000")
-    # Debe caer al fake y devolver algo (no romper UI)
-    assert data is not None
+    with pytest.raises(SourceUnavailableError) as exc_info:
+        data = client._request("ncm/84771000")
+    assert "Fuente arancelaria no disponible" in str(exc_info.value)
 
 
 def test_vuce_mode_api_without_key_raises(monkeypatch):

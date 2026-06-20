@@ -283,6 +283,12 @@
                 '</div>' +
                 modeChip +
             '</div>' +
+            '<div style="text-align: right; margin-top: 8px;">' +
+                '<button type="button" class="btn btn-outline btn-sm ck-share-calc-btn" onclick="CDI.toast && CDI.toast(\'Para copiar el link público, la operación debe estar guardada en el Cockpit.\', \'info\')">' +
+                    '<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="vertical-align: middle; margin-right: 4px;"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" stroke-linecap="round" stroke-linejoin="round"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" stroke-linecap="round" stroke-linejoin="round"/></svg>' +
+                    'Copiar link público' +
+                '</button>' +
+            '</div>' +
             staleBanner +
             '<div class="calc-breakdown">' +
                 '<table class="calc-table">' +

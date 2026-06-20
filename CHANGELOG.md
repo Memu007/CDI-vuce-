@@ -7,6 +7,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ---
 
 
+## 2026-06-20 · Fases 1 y 2 (Mitigaciones DD y Presupuestos Públicos)
+
+- **chore:** sanitización de endpoints (Swagger oculto en prod, borrado de código muerto en `_deprecated/`).
+- **refactor:** unificación de autenticación centralizada en `auth/dependencies.py` para prevenir dependencias circulares.
+- **fix:** refactor del conector aduanero para usar HTTP 200 con data stale o 503 estricto, erradicando datos fake en producción.
+- **feat:** nuevo pilar de negocio (Presupuestos Públicos) con endpoint shareable, UI pública y botón "Copiar link" en el Cockpit y Calculadora.
+
 ## 2026-06-19 · Refinamiento UX de Carga Manual
 
 - **feat (ui):** añadido botón inteligente "Crear cliente" en la validación de Carga Manual. Si el usuario ingresa un importador no registrado, el sistema permite crearlo y auto-asignarlo con un clic directo sin abrir modales.
