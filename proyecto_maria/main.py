@@ -2170,7 +2170,7 @@ reset_attempts = {} # {ip: {"count": 0, "block_until": timestamp}} - Para reset 
 @limiter.limit("5/minute")
 async def login(request: Request, login_request: LoginRequest, response: Response, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     """Endpoint de login con HttpOnly Cookie y Rate Limiting"""
-    client_ip = request.client.host
+    client_ip = request.client.host if request.client else "unknown"
     now = datetime.now(timezone.utc).timestamp()
     
     # Verificar bloqueo
@@ -2253,7 +2253,7 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
     if client_ip in login_attempts:
         del login_attempts[client_ip]
     
-    token = create_access_token({"sub": username, "plan": user.plan})
+    token = create_access_token({"sub": user.username, "plan": user.plan})
     
     # Set HttpOnly Cookie (Strict CSRF Protection)
     response.set_cookie(
@@ -2272,8 +2272,8 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
         "access_token": token,
         "token_type": "bearer",
         "user": {
-            "username": username,
-            "name": user.name or username,
+            "username": user.username,
+            "name": user.name or user.username,
             "plan": user.plan
         }
     }
