@@ -157,7 +157,7 @@ CDI-app/
   - **Compatibilidad Postgres**: Reemplazo de `func.strftime` (SQLite) por `sqlalchemy.extract` en dashboard de retención.
   - **Auth y Billing**: Protección en `get_current_user` con fallback automático a Premium ante un plan nulo/inválido o error en `get_plan()`.
   - **UX**: Formulario y link de "Olvidé mi contraseña" integrados en `landing.html` con anti-enumeración de correos.
-  - **Robustez Pilar B**: Tests añadidos en presupuestos públicos validando reordenamiento de alícuotas por NCM y correcto fallback a HTTP 503 con `fuente_arancelaria_no_disponible` sin interceptación de middleware.
+  - **Robustez Pilar B**: Tests añadidos en presupuestos públicos validando reordenamiento de alícuotas por NCM y correcto fallback a HTTP 503 con `tarifar_unavailable`. Exception handler global actualizado para no ofuscar 4xx/5xx controlados.
 - **Ola 4 — Pre-lanzamiento completo (listo para deploy):**
   - Test suite pre-lanzamiento: 148 tests de bloques 1–3 + 1 regresión manual + 3 tests API clientes con billing vencido.
   - Fix crítico dual JWT secret: `config.py` ahora lee `JWT_SECRET_KEY → SECRET_KEY → JWT_SECRET` con `AliasChoices`, alineado con `main.py`.

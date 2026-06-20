@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-20 · Iteración C: Bug Fixes & UX
+
+- **fix (admin):** Reemplazo de `func.strftime` (SQLite-only) por `sqlalchemy.extract` en `/api/admin/cohort-retention` para compatibilidad con PostgreSQL en producción.
+- **fix (auth):** `get_current_user` defensivo contra planes inválidos (legacy "trial", None, etc.) con fallback automático a Premium y log de warning.
+- **feat (ui):** Link y formulario "Olvidé mi contraseña" migrados a `landing.html` con mensaje anti-enumeración.
+- **test (pilar B):** 2 tests nuevos en `test_pilar_b_quotes.py` cubriendo reordenamiento de items de Tarifar (match por NCM) y fallback a 503.
+- **fix (handler):** Exception handler global respeta 4xx/5xx controlados (503, 429) sin ofuscar; solo ofusca 500 no controlados.
 
 ---
 
