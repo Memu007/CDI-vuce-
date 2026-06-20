@@ -9,6 +9,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-20 · Iteración A: Auth Fix & Bootstrap Admin
+
+- **fix (auth):** Corregido bug crítico en `/auth/login` que usaba el input del usuario (ej: email) como claim `sub` del JWT en lugar del `username` canónico de la BD, causando errores 401 sistemáticos.
+- **feat (admin):** Implementada promoción automática a rol `admin` durante el arranque de la app para los usuarios (por username o email) listados en la variable de entorno `ADMIN_USERNAMES`. Esto desbloquea el acceso del dueño en producción sin requerir acceso directo a la BD.
+
+---
 ## 2026-06-20 · Hardening Pilar B + Tests E2E
 
 - **feat (backend):** refactor en `quote_router.py` para usar `asyncio.to_thread` al llamar a Tarifar (evitando bloquear el event loop).

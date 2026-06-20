@@ -126,7 +126,7 @@ CDI-app/
 
 - VUCE en `modo_fake=true` por default. Para prod real hay que conectar API real o cliente HTTP a Tarifar.
 - Sin `GEMINI_API_KEY` la subida de PDF falla.
-- No hay rol admin formal — cualquier usuario logueado ve `/dev/dashboard`.
+- No hay UI para asignar rol admin — los dueños se auto-asignan el rol en producción usando la variable de entorno `ADMIN_USERNAMES` al arrancar. Cualquier usuario puede ver `/dev/dashboard` actualmente.
 - Catálogo de proveedor en disco (`product_catalog.json`) se reinicia con cada deploy. El histórico por cliente (DB) sí persiste. **Fix reciente (Plan 04 v0):** al subir Excel con `cliente_id`, el mapeo de columnas ahora se detecta y guarda en `Client.column_mapping` (antes se usaba pero no se persistía).
 - Generador MARIA TXT: validado contra un golden file real del despachante (op 001790125). Hay test de regresión golden anonimizado en `tests/test_generar_maria_txt.py` + `tests/fixtures/maria_golden_anon.TXT` (33 tests del generador). Resto del repo: solo smoke + pytest parcial.
 - **Novedades ARCA:** widget en Upload con endpoint `/api/arca/novedades` (público, cache 15 min). Fuente real de ARCA/AFIP.
@@ -244,5 +244,7 @@ Si te perdés: pedí explícitamente al humano un overview en castellano antes d
 
 ## 11. TODO siguiente sesión
 
+- **Hardening de Pilar B**: Implementar `asyncio.to_thread` para Tarifar, validación estricta y matches por NCM (postergado a próxima iteración).
+- **Olvidé mi contraseña**: Migrar link de recuperación a `landing.html` (postergado al backlog / iteración C).
 - **Tests flakies (`test_api_clientes_billing.py`)**: Durante la ejecución de la suite completa, este test falla con `sqlite3.OperationalError: no such table: users`. Si se corre el archivo aislado, **pasa todo en verde**. Hay que resolver el estado sucio de la base de SQLite async entre tests concurrentes en `conftest.py` (probablemente por uso de lifespan en testclient o fixtures asíncronas).
 - **Avanzar con Fase 3 / Pilar A**: Una vez aprobados los resultados de PMF del cohort retention y el Pilar B, iniciar el Pilar A (API Pública para sistemas corporativos).
