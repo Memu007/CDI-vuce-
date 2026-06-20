@@ -153,6 +153,11 @@ CDI-app/
   - Top-up limitado a 100 créditos extra; expiran a 30 días. Créditos vencidos se limpian automáticamente.
   - Trial cron: al iniciar la app, usuarios con trial vencido pasan a `past_due`.
   - Static files: CustomStaticFiles rechaza `.env`, `*.db`, `*.jsonl`, logs/ y secrets/.
+- **Iteración C — Bug Fixes & UX (Cerrada):**
+  - **Compatibilidad Postgres**: Reemplazo de `func.strftime` (SQLite) por `sqlalchemy.extract` en dashboard de retención.
+  - **Auth y Billing**: Protección en `get_current_user` con fallback automático a Premium ante un plan nulo/inválido o error en `get_plan()`.
+  - **UX**: Formulario y link de "Olvidé mi contraseña" integrados en `landing.html` con anti-enumeración de correos.
+  - **Robustez Pilar B**: Tests añadidos en presupuestos públicos validando reordenamiento de alícuotas por NCM y correcto fallback a HTTP 503 con `fuente_arancelaria_no_disponible` sin interceptación de middleware.
 - **Ola 4 — Pre-lanzamiento completo (listo para deploy):**
   - Test suite pre-lanzamiento: 148 tests de bloques 1–3 + 1 regresión manual + 3 tests API clientes con billing vencido.
   - Fix crítico dual JWT secret: `config.py` ahora lee `JWT_SECRET_KEY → SECRET_KEY → JWT_SECRET` con `AliasChoices`, alineado con `main.py`.
@@ -244,7 +249,5 @@ Si te perdés: pedí explícitamente al humano un overview en castellano antes d
 
 ## 11. TODO siguiente sesión
 
-- **Hardening de Pilar B**: Implementar `asyncio.to_thread` para Tarifar, validación estricta y matches por NCM (postergado a próxima iteración).
-- **Olvidé mi contraseña**: Migrar link de recuperación a `landing.html` (postergado al backlog / iteración C).
 - **Tests flakies (`test_api_clientes_billing.py`)**: Durante la ejecución de la suite completa, este test falla con `sqlite3.OperationalError: no such table: users`. Si se corre el archivo aislado, **pasa todo en verde**. Hay que resolver el estado sucio de la base de SQLite async entre tests concurrentes en `conftest.py` (probablemente por uso de lifespan en testclient o fixtures asíncronas).
 - **Avanzar con Fase 3 / Pilar A**: Una vez aprobados los resultados de PMF del cohort retention y el Pilar B, iniciar el Pilar A (API Pública para sistemas corporativos).
