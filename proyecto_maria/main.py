@@ -5634,6 +5634,7 @@ async def calcular_tributos(
     pantalla NCM para estimar costo total antes de generar el MARIA.TXT.
     """
     from proyecto_maria.core.tarifar_connector import CLIENT as TARIFAR_CLIENT
+    from proyecto_maria.core.dolar_service import get_dolar_snapshot
 
     ncm_clean = re.sub(r"[^0-9]", "", request_data.ncm or "")[:8]
     if len(ncm_clean) < 6:
@@ -5655,7 +5656,15 @@ async def calcular_tributos(
     }
 
     try:
-        calc = TARIFAR_CLIENT.calcular_aranceles([item])
+        snap = await get_dolar_snapshot()
+        oficial = snap.get("oficial", {})
+        tipo_cambio_usd = float(oficial.get("venta", 385.50) or 385.50)
+    except Exception as err:
+        logging.error(f"[calculadora] Error al obtener tipo de cambio: {err}")
+        tipo_cambio_usd = 385.50
+
+    try:
+        calc = TARIFAR_CLIENT.calcular_aranceles([item], tipo_cambio_usd=tipo_cambio_usd)
     except Exception as err:
         logging.error(f"[calculadora] calcular_aranceles fallo: {err}")
         raise HTTPException(status_code=502, detail=f"No se pudo calcular: {err}")

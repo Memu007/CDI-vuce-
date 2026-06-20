@@ -135,7 +135,7 @@ class TarifarClient:
         self._cache = {}
         self._request_count = 0
 
-    def calcular_aranceles(self, items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def calcular_aranceles(self, items: List[Dict[str, Any]], tipo_cambio_usd: float = 385.50) -> Dict[str, Any]:
         """
         Calcula aranceles e impuestos para una lista de items.
 
@@ -144,11 +144,11 @@ class TarifarClient:
         - REAL: Consulta API de Tarifar con API key
         """
         if self.config.fake_mode:
-            return self._calcular_aranceles_fake(items)
+            return self._calcular_aranceles_fake(items, tipo_cambio_usd)
         else:
-            return self._calcular_aranceles_real(items)
+            return self._calcular_aranceles_real(items, tipo_cambio_usd)
 
-    def _calcular_aranceles_fake(self, items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _calcular_aranceles_fake(self, items: List[Dict[str, Any]], tipo_cambio_usd: float = 385.50) -> Dict[str, Any]:
         """Calculo local de aranceles e impuestos.
 
         El calculo en si corre siempre local (el scraper publico no expone una
@@ -205,13 +205,13 @@ class TarifarClient:
             },
             "metadata": {
                 "fecha_calculo": datetime.now().isoformat(),
-                "tipo_cambio_usd": 385.50,  # Simulado (pendiente hookear a /api/financials)
+                "tipo_cambio_usd": tipo_cambio_usd,
                 "source": aggregate_source,
                 "version_arancel": "2024.09"
             }
         }
 
-    def _calcular_aranceles_real(self, items: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _calcular_aranceles_real(self, items: List[Dict[str, Any]], tipo_cambio_usd: float = 385.50) -> Dict[str, Any]:
         """
         Modo REAL: Consulta API de Tarifar.
 
