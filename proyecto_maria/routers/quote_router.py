@@ -2,6 +2,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -63,10 +64,9 @@ async def share_quote(
             TARIFAR_CLIENT.calcular_aranceles, calc_items, tc_usd
         )
     except Exception as e:
-        raise HTTPException(
+        return JSONResponse(
             status_code=503,
-            detail="tarifar_unavailable",
-            headers={"Retry-After": "300"}
+            content={"detail": "fuente_arancelaria_no_disponible"}
         )
 
     # Attach calculo details to items
