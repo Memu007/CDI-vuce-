@@ -30,7 +30,7 @@ Antes de escribir una línea de código del Pilar B, necesitamos validar el "Pro
 
 ### 1.3. Fallback de Datos Aduaneros (No más "Fake Data" en Prod)
 - **Riesgo:** Si el scraper cae, servir datos mockeados en producción genera riesgo legal por multas.
-- **Acción:** Si falla Tarifar o VUCE oficial, verificamos el caché (`ncm_cache`). Si hay caché, devolvemos HTTP 503 con la data marcada estrictamente como **stale** y se renderiza un banner explícito. **Si no hay caché (NCM nuevo), se devuelve HTTP 503 puro sin body de datos, deteniendo la operación.** Se prohíbe el uso de datos `fake` en el entorno de producción.
+- **Acción:** Si falla Tarifar o VUCE oficial, verificamos el caché (`ncm_cache`). Si hay caché, devolvemos **HTTP 200 con `meta.stale=true` y `meta.stale_reason="tarifar_unreachable"`** y se renderiza un banner explícito en UI. **Si no hay caché (NCM nunca visto), se devuelve HTTP 503 sin body de datos, deteniendo la operación.** Se prohíbe terminantemente el uso de datos `fake` en el entorno de producción.
 
 ### 1.4. Transferencia de Conocimiento de Dominio
 - **Acción:** Crear la estructura y template base de `docs/DOMINIO_ADUANERO.md`. 
@@ -44,13 +44,13 @@ Antes de escribir una línea de código del Pilar B, necesitamos validar el "Pro
 Creación del modelo `PublicQuote` en SQLAlchemy:
 - `hash_id` (String primary_key): ID generado criptográficamente.
 - **`owner_username` (String, ForeignKey("users.username"))**: Respetando la convención de FKs del repo.
-- `snapshot_data` (JSON): Tipo de cambio, alícuotas, costo total.
+- `snapshot_data` (JSON): Incluye items (desc, NCM, cant, valor_unit, origen, peso), tipo de cambio, alícuotas_por_ncm, costo_total.
 - `created_at` (DateTime).
-- **`expires_at` (DateTime):** Los presupuestos vivirán por 30 días para no exponer data obsoleta y controlar el crecimiento de la tabla. Habrá **lazy cleanup** (si un GET accede a un hash vencido, retorna 404 y borra el registro) y limpieza por script periódico.
+- **`expires_at` (DateTime):** Los presupuestos vivirán por 30 días. Habrá **lazy cleanup** en v1 (si un GET accede a un hash vencido, retorna 404 y borra el registro).
 
-### 2.2. Capa API y Seguridad Crítica (`routes/quote_router.py`)
-- **`POST /api/quotes/share` (Autenticado):** Recibe el payload del presupuesto, genera un ID robusto usando **`secrets.token_urlsafe(16)`** (~128 bits, resistente a brute-force) y persiste en DB.
-- **`GET /api/quotes/public/{hash}` (Sin Auth):** Retorna el JSON. **Requisito excluyente:** Estará protegido por un **Rate Limit estricto** (ej. 10 req/min por IP) usando la librería `slowapi` ya instalada en el proyecto para evitar escaneos masivos.
+### 2.2. Capa API y Seguridad Crítica (`proyecto_maria/routers/quote_router.py`)
+- **`POST /api/quotes/share` (Autenticado):** Recibe el `{operation_id}` (validado contra el owner_username actual). El backend lee la Operation persistida de la DB y freeza los datos (items, tipo de cambio, alícuotas) creando el Quote. Genera un ID robusto usando **`secrets.token_urlsafe(16)`**.
+- **`GET /api/quotes/public/{hash}` (Sin Auth):** Retorna el JSON. **Requisito excluyente:** Protegido por un Rate Limit estricto mediante `slowapi`, usando un **`key_func` custom que parsee `X-Forwarded-For` (o ProxyFix)** para evitar bypasses detrás de un proxy.
 
 ### 2.3. Capa Frontend y Efecto Moat (`templates/public_quote.html`)
 - UI mobile-first para el Importador.
