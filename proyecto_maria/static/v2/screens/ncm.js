@@ -122,7 +122,6 @@
                     e.preventDefault();
                     e.stopPropagation();
                     const idx = parseInt(assist.getAttribute('data-assist'), 10);
-                    console.log('[ncm] click assist row', idx, assist);
                     try {
                         openSpotlight(idx);
                     } catch (err) {
@@ -813,11 +812,7 @@
     /* ---------- Spotlight ---------- */
     function openSpotlight(idx) {
         const items = CDI.state.items || [];
-        console.log('[ncm] openSpotlight', idx, 'items', items.length, 'exists', !!items[idx]);
-        if (!items[idx]) {
-            console.log('[ncm] openSpotlight: item not found, aborting');
-            return;
-        }
+        if (!items[idx]) return;
         spotActiveIdx = idx;
         const it = items[idx];
         spotItemRef.textContent = it.codigo_parte || ('Item ' + (idx + 1));
@@ -830,22 +825,7 @@
         spotLastQuery = '';
         spotSuggestions = [];
         spotSelectedSugIdx = 0;
-        console.log('[ncm] openSpotlight: overlay exists', !!overlay, 'hidden before', overlay && overlay.hidden);
         overlay.hidden = false;
-        console.log('[ncm] openSpotlight: hidden after', overlay.hidden, 'display', getComputedStyle(overlay).display);
-        // Verificar si algun padre oculta el overlay
-        let parent = overlay.parentElement;
-        let depth = 0;
-        while (parent && depth < 10) {
-            const style = getComputedStyle(parent);
-            console.log('[ncm] openSpotlight: parent', parent.tagName, parent.className, 'display', style.display, 'visibility', style.visibility, 'hidden', parent.hidden);
-            if (style.display === 'none' || style.visibility === 'hidden') {
-                console.warn('[ncm] openSpotlight: hidden parent found', parent);
-                break;
-            }
-            parent = parent.parentElement;
-            depth++;
-        }
         hideVucePreview();
         renderSpotLoading();
         // Prefetch sugerencias con la descripcion del item
