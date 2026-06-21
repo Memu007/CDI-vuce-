@@ -32,6 +32,7 @@ google-api-python-client==2.161.0  # Google APIs client
 # DATA PROCESSING (Required)
 # ==========================================
 pandas==2.3.2                 # Data manipulation
+numpy<2.0.0                   # Fix crash with pandas 2.x
 openpyxl==3.1.5              # Excel files (.xlsx)
 PyPDF2==3.0.1                # PDF extraction
 pdfminer.six>=20251107       # GHSA-wf5f-4jwr-ppcp
