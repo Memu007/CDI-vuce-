@@ -580,6 +580,7 @@
 
             if (endpoint === '/auth/register') {
                 try { sessionStorage.setItem('cdi_force_tour_after_signup', '1'); } catch (_) {}
+                try { sessionStorage.removeItem('cdi_tour_forced_after_signup'); } catch (_) {}
                 landingUiTelemetry({ action: 'register_completed', screen: 'landing_register' });
             } else if (endpoint === '/auth/login') {
                 landingUiTelemetry({ action: 'login_completed', screen: 'landing_login' });
