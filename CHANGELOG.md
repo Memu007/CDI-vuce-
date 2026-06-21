@@ -8,6 +8,9 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-06-21 · Fixes UX: revisión, perfil y topbar
 
+- **feat (landing):** botones CTA en el hero — "Empezar 14 días gratis" y "Ver de qué se trata". Antes el usuario tenía que scrollear hasta precio para encontrar un botón.
+- **fix (landing):** sacada jerga "Gemini Vision" de la card de capacidades. Ahora dice "Si el PDF es escaneado (una imagen, no texto), lo lee igual con IA".
+- **fix (landing):** credenciales demo (demo/demo123) ahora solo se muestran en localhost. En producción no aparecen.
 - **fix (ux):** botón "Crear cliente" dejó de aparecer duplicado en revisión. Solo queda el banner azul de arriba.
 - **fix (ux):** banner "Este importador no está en tus clientes" ahora aparece también para importadores extranjeros sin CUIT argentino.
 - **feat (ux):** pill de usuario en topbar — unifica nombre + iniciales en azul en un botón visible con borde y hover. Antes era un círculo gris chico difícil de ver.

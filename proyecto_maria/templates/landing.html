@@ -101,6 +101,10 @@
                     <span class="key-sep">→</span>
                     <span class="key key-out">TXT al Kit SIM.</span>
                 </div>
+                <div class="hero-ctas">
+                    <a href="#precio" class="btn-primary btn-lg">Empezar 14 días gratis</a>
+                    <a href="#caps" class="btn-ghost btn-lg">Ver de qué se trata</a>
+                </div>
             </div>
 
             <!-- Mockup del stepper tal cual el dashboard, con blink en el activo -->
@@ -172,7 +176,7 @@
                     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
                 </div>
                 <h3>Lee el PDF, no lo adivina.</h3>
-                <p>Usa Gemini Vision cuando el PDF es escaneado. Preserva el NCM del proveedor si viene, y lo valida después. Multi-factura en el mismo despacho.</p>
+                <p>Si el PDF es escaneado (una imagen, no texto), lo lee igual con IA. Preserva el NCM del proveedor si viene, y lo valida después. Multi-factura en el mismo despacho.</p>
                 <div class="cap-example">
                     <span class="example-label">Ejemplo</span>
                     <span class="mono">factura_CN_03.pdf</span>
@@ -292,7 +296,7 @@
                 <a href="#" data-tab="forgot" class="auth-link" style="font-size: 0.85rem;">Olvidé mi contraseña →</a>
             </div>
             <p class="auth-hint">¿No tenés cuenta? <a href="#" data-tab="register" class="auth-link">Crear cuenta →</a> · <a href="#" data-tab="org" class="auth-link">Crear estudio →</a></p>
-            <p class="auth-hint">Para probar: <code>demo</code> / <code>demo123</code></p>
+            <p class="auth-hint" id="demoHint" style="display:none">Para probar: <code>demo</code> / <code>demo123</code></p>
         </form>
 
         <form id="registerForm" class="auth-form" autocomplete="on" novalidate>
@@ -425,6 +429,15 @@
                 banner.style.display = 'none';
                 try { sessionStorage.setItem('cdi_beta_banner_dismissed', '1'); } catch (_) {}
             });
+        }
+    } catch (_) {}
+
+    // Credenciales demo: solo en localhost / dev
+    try {
+        var host = location.hostname;
+        if (host === 'localhost' || host === '127.0.0.1' || host.endsWith('.local')) {
+            var hint = document.getElementById('demoHint');
+            if (hint) hint.style.display = '';
         }
     } catch (_) {}
 
