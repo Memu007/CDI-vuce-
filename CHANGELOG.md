@@ -190,6 +190,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-21 · Fix tour de bienvenida no aparece al registrar sin verificación de email
+
+- **fix (frontend):** el tour de bienvenida no aparecía para usuarios nuevos cuando `EMAIL_VERIFICATION_REQUIRED=false` (default beta). Faltaba setear `sessionStorage.setItem('cdi_force_tour_after_signup', '1')` en el camino sin verificación. Agregado en `landing.html`.
+
+---
+
 ## 2026-06-21 · Agrupar advertencias KIT Maria
 
 - **fix (backend):** `validate_for_kit_maria` ahora agrupa advertencias por tipo en vez de una línea por item. 1 item → "Item #5: ...", 2-3 → "Items #2, #7: ...", 4+ → "NCM sin letra... en 200 ítems." Evita ruido visual con operaciones grandes. Los errores siguen por item (necesita saber cuál corregir).
