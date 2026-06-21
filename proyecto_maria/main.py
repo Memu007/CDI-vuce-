@@ -96,7 +96,7 @@ security = HTTPBearer()
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from proyecto_maria.database.connection import get_async_session, init_db
-from proyecto_maria.database.models import User, Client, PasswordResetToken
+from proyecto_maria.database.models import User, Client, PasswordResetToken, Organization, Invitation
 import uuid
 import logging
 from sqlalchemy.exc import IntegrityError
@@ -276,6 +276,8 @@ class RegisterRequest(BaseModel):
     # Ola 4: el trial ya no requiere tarjeta simulada; el usuario elige plan
     # y paga al vencer los 14 días (vía MP subscriptions o checkout manual).
     payment_method: CardInput | None = None
+    # Organizaciones: token de invitación para unirse a un estudio
+    invite_token: str | None = None
 
 class PlanCheckoutRequest(BaseModel):
     plan: str  # solo "premium" (Ola 4 MVP)
@@ -2610,8 +2612,33 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
         new_user.payment_method_last4 = pm_meta["last4"]
         new_user.payment_method_brand = pm_meta["brand"]
 
+    # Organizaciones: si vino invite_token, validar y linkear a la org
+    invite_org = None
+    if request.invite_token:
+        inv = await db.execute(select(Invitation).where(Invitation.token == request.invite_token))
+        inv = inv.scalars().first()
+        if not inv:
+            raise HTTPException(status_code=400, detail="Token de invitación inválido")
+        if inv.status == "accepted":
+            raise HTTPException(status_code=400, detail="Esta invitación ya fue usada")
+        if inv.expires_at and inv.expires_at < datetime.now(timezone.utc):
+            raise HTTPException(status_code=400, detail="Esta invitación expiró")
+        invite_org = await db.execute(select(Organization).where(Organization.id == inv.org_id))
+        invite_org = invite_org.scalars().first()
+        if not invite_org:
+            raise HTTPException(status_code=400, detail="El estudio ya no existe")
+        new_user.organization_id = invite_org.id
+
     db.add(new_user)
     await db.commit()
+
+    # Si vino por invitación, marcarla como accepted
+    if request.invite_token:
+        inv = await db.execute(select(Invitation).where(Invitation.token == request.invite_token))
+        inv = inv.scalars().first()
+        if inv and inv.status == "pending":
+            inv.status = "accepted"
+            await db.commit()
 
     # Email de verificacion (solo si el toggle esta on). Lo mandamos en
     # background para no frenar el response. Pasamos strings, no el ORM,
@@ -6182,6 +6209,306 @@ def logout_root(response: Response):
 def features_integration_js():
     """Sirve un JS vacío para evitar errores 404 y conflictos de variables"""
     return FileResponse(os.path.join(basedir, "proyecto_maria", "static", "dummy_features.js"), media_type="application/javascript")
+
+# ============================================================================
+# ORGANIZACIONES (estudios) — multi-usuario con billing compartido
+# ============================================================================
+
+class CreateOrgRequest(BaseModel):
+    name: str
+    username: str
+    password: str
+    email: str
+    plan: str = "premium"
+
+class InviteRequest(BaseModel):
+    email: str
+
+
+@app.post("/api/organizations/create")
+async def create_organization(
+    req: CreateOrgRequest,
+    background_tasks: BackgroundTasks,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+):
+    """Crea un estudio: Organization + User admin vinculado.
+
+    Flujo desde la landing: el usuario elige 'Crear cuenta de estudio',
+    completa nombre del estudio + sus datos personales, y se crea todo junto.
+    El admin queda con organization_id apuntando a la org nueva.
+    """
+    import re, uuid as _uuid
+
+    if not req.name or not req.name.strip():
+        raise HTTPException(status_code=400, detail="El nombre del estudio es obligatorio")
+    if not re.match(r'^[a-zA-Z0-9_-]{3,30}$', req.username):
+        raise HTTPException(status_code=400, detail="Username inválido (3-30 chars alfanuméricos)")
+
+    # Validar username duplicado
+    existing = await db.execute(select(User).where(User.username == req.username))
+    if existing.scalars().first():
+        raise HTTPException(status_code=400, detail="Usuario ya existe")
+
+    # Validar email duplicado
+    clean_email = req.email.strip().lower()
+    existing_email = await db.execute(select(User).where(func.lower(User.email) == clean_email))
+    if existing_email.scalars().first():
+        raise HTTPException(status_code=400, detail="Email ya registrado")
+
+    # Crear usuario admin
+    hashed = await run_in_threadpool(hash_password, req.password)
+    require_verify = _email_verification_enabled()
+
+    new_user = User(
+        username=req.username,
+        password=hashed,
+        name=req.username,
+        email=clean_email,
+        plan="premium",
+        is_verified=not require_verify,
+        billing_status="trial",
+        trial_ends_at=datetime.now(timezone.utc) + timedelta(days=14),
+        billing_period_started_at=datetime.now(timezone.utc),
+    )
+    db.add(new_user)
+    await db.flush()
+
+    # Crear organización
+    org = Organization(
+        id=str(_uuid.uuid4()),
+        name=req.name.strip(),
+        owner_username=req.username,
+        plan="premium",
+        billing_status="trial",
+        trial_ends_at=datetime.now(timezone.utc) + timedelta(days=14),
+        billing_period_started_at=datetime.now(timezone.utc),
+    )
+    db.add(org)
+    await db.flush()
+
+    # Vincular user a la org
+    new_user.organization_id = org.id
+    await db.commit()
+
+    if require_verify and clean_email:
+        background_tasks.add_task(
+            send_verification_email, req.username, clean_email, req.username,
+        )
+
+    if require_verify:
+        return {
+            "message": "Estudio creado. Revisa tu email para confirmar.",
+            "verification_required": True,
+            "email": clean_email,
+            "username": req.username,
+            "org_id": org.id,
+            "org_name": org.name,
+        }
+
+    access_token = create_access_token({
+        "sub": req.username, "plan": "premium", "roles": ["operador"],
+    })
+    response.set_cookie(
+        key="access_token", value=f"Bearer {access_token}",
+        httponly=True, secure=IS_PRODUCTION, samesite="strict",
+        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )
+    set_csrf_cookie(response)
+
+    return {
+        "message": "Estudio creado exitosamente",
+        "verification_required": False,
+        "access_token": access_token,
+        "username": req.username,
+        "org_id": org.id,
+        "org_name": org.name,
+    }
+
+
+@app.get("/api/organizations/mine")
+async def get_my_organization(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Devuelve los datos de la organización del usuario actual.
+
+    Si el user no tiene organización, devuelve null (es cuenta individual).
+    Si es miembro, devuelve info básica de la org + listado de miembros.
+    """
+    db_user = await db.execute(select(User).where(User.username == user["username"]))
+    db_user = db_user.scalars().first()
+    if not db_user or not db_user.organization_id:
+        return {"organization": None}
+
+    org = await db.execute(select(Organization).where(Organization.id == db_user.organization_id))
+    org = org.scalars().first()
+    if not org:
+        return {"organization": None}
+
+    members = await db.execute(
+        select(User).where(User.organization_id == org.id).order_by(User.username)
+    )
+    members_list = [
+        {
+            "username": m.username,
+            "name": m.name or m.username,
+            "email": m.email,
+            "is_owner": m.username == org.owner_username,
+        }
+        for m in members.scalars().all()
+    ]
+
+    plan_def = billing_service.get_plan(org.plan or "premium")
+    return {
+        "organization": {
+            "id": org.id,
+            "name": org.name,
+            "owner_username": org.owner_username,
+            "plan": org.plan,
+            "billing_status": org.billing_status,
+            "trial_ends_at": org.trial_ends_at.isoformat() if org.trial_ends_at else None,
+            "ops_used_this_period": org.ops_used_this_period or 0,
+            "ops_limit": plan_def["ops"],
+            "extra_ops_remaining": org.extra_ops_remaining or 0,
+            "members": members_list,
+            "is_owner": user["username"] == org.owner_username,
+        }
+    }
+
+
+@app.post("/api/organizations/invite")
+async def invite_to_organization(
+    req: InviteRequest,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Invita a un usuario por email a la organización del admin.
+
+    Solo el owner de la org puede invitar. Crea un registro en invitations
+    con token único y expiración de 7 días. Devuelve el link de invitación
+    para que el admin lo comparta (por WhatsApp, email, etc).
+    """
+    import uuid as _uuid
+
+    db_user = await db.execute(select(User).where(User.username == user["username"]))
+    db_user = db_user.scalars().first()
+    if not db_user or not db_user.organization_id:
+        raise HTTPException(status_code=400, detail="No pertenecés a un estudio")
+
+    org = await db.execute(select(Organization).where(Organization.id == db_user.organization_id))
+    org = org.scalars().first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organización no encontrada")
+
+    if user["username"] != org.owner_username:
+        raise HTTPException(status_code=403, detail="Solo el administrador del estudio puede invitar")
+
+    clean_email = (req.email or "").strip().lower()
+    if not clean_email or "@" not in clean_email:
+        raise HTTPException(status_code=400, detail="Email inválido")
+
+    # Si ya existe un user con ese email en la org, no invitamos
+    existing = await db.execute(
+        select(User).where(func.lower(User.email) == clean_email, User.organization_id == org.id)
+    )
+    if existing.scalars().first():
+        raise HTTPException(status_code=400, detail="Ese email ya es miembro del estudio")
+
+    token = _csrf_secrets.token_urlsafe(32)
+    invitation = Invitation(
+        id=str(_uuid.uuid4()),
+        org_id=org.id,
+        email=clean_email,
+        token=token,
+        status="pending",
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+    )
+    db.add(invitation)
+    await db.commit()
+
+    invite_link = f"{get_frontend_url()}/?invite={token}"
+    return {
+        "success": True,
+        "invite_link": invite_link,
+        "email": clean_email,
+        "expires_at": invitation.expires_at.isoformat(),
+    }
+
+
+@app.get("/api/invitations/{token}")
+async def validate_invitation(
+    token: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """Valida un token de invitación antes de mostrar el formulario de registro.
+
+    Devuelve info de la org + email al que fue invitado, o error si expiró/ya se usó.
+    """
+    inv = await db.execute(select(Invitation).where(Invitation.token == token))
+    inv = inv.scalars().first()
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invitación no encontrada")
+
+    if inv.status == "accepted":
+        raise HTTPException(status_code=400, detail="Esta invitación ya fue usada")
+
+    if inv.expires_at and inv.expires_at < datetime.now(timezone.utc):
+        if inv.status != "expired":
+            inv.status = "expired"
+            await db.commit()
+        raise HTTPException(status_code=400, detail="Esta invitación expiró")
+
+    org = await db.execute(select(Organization).where(Organization.id == inv.org_id))
+    org = org.scalars().first()
+    if not org:
+        raise HTTPException(status_code=404, detail="El estudio ya no existe")
+
+    return {
+        "valid": True,
+        "email": inv.email,
+        "org_name": org.name,
+        "org_id": org.id,
+    }
+
+
+@app.delete("/api/organizations/members/{username}")
+async def remove_member(
+    username: str,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Saca a un miembro del estudio. Solo el owner puede hacerlo.
+
+    El usuario removido queda como cuenta individual (organization_id = NULL).
+    No se borra su usuario ni sus datos.
+    """
+    db_user = await db.execute(select(User).where(User.username == user["username"]))
+    db_user = db_user.scalars().first()
+    if not db_user or not db_user.organization_id:
+        raise HTTPException(status_code=400, detail="No pertenecés a un estudio")
+
+    org = await db.execute(select(Organization).where(Organization.id == db_user.organization_id))
+    org = org.scalars().first()
+    if not org:
+        raise HTTPException(status_code=404, detail="Organización no encontrada")
+
+    if user["username"] != org.owner_username:
+        raise HTTPException(status_code=403, detail="Solo el administrador puede remover miembros")
+
+    if username == org.owner_username:
+        raise HTTPException(status_code=400, detail="No podés removerte a vos mismo del estudio")
+
+    member = await db.execute(select(User).where(User.username == username, User.organization_id == org.id))
+    member = member.scalars().first()
+    if not member:
+        raise HTTPException(status_code=404, detail="Ese usuario no es miembro del estudio")
+
+    member.organization_id = None
+    await db.commit()
+
+    return {"success": True, "message": f"{username} fue removido del estudio"}
+
 
 # ============================================================================
 # PAGOS - MercadoPago + Bitcoin
