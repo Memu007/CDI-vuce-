@@ -2737,8 +2737,8 @@ select.input {
     z-index: 210;
     opacity: 0;
     transition: opacity 120ms ease-out, transform 120ms ease-out;
-    display: grid;
-    grid-template-rows: auto 1fr auto;
+    display: flex;
+    flex-direction: column;
     max-height: 90vh;
     overflow: hidden;
 }
@@ -2752,6 +2752,7 @@ select.input {
     align-items: center;
     justify-content: space-between;
     border-bottom: 1px solid var(--c-border-soft);
+    flex-shrink: 0;
 }
 .modal-title {
     margin: 0;
@@ -2764,6 +2765,7 @@ select.input {
     flex-direction: column;
     gap: var(--s-4);
     overflow-y: auto;
+    flex: 1;
     min-height: 0;
 }
 .modal-footer {
@@ -2772,6 +2774,7 @@ select.input {
     display: flex;
     justify-content: flex-end;
     gap: var(--s-2);
+    flex-shrink: 0;
 }
 
 /* Sticker "Desde cliente activo" (variante del hint) */
