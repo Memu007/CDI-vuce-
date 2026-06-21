@@ -2668,7 +2668,7 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
             raise HTTPException(status_code=400, detail="Token de invitación inválido")
         if invite_inv.status == "accepted":
             raise HTTPException(status_code=400, detail="Esta invitación ya fue usada")
-        if invite_inv.expires_at and invite_inv.expires_at < datetime.now(timezone.utc):
+        if invite_inv.expires_at and invite_inv.expires_at < datetime.utcnow():
             raise HTTPException(status_code=400, detail="Esta invitación expiró")
         invite_org = await db.execute(select(Organization).where(Organization.id == invite_inv.org_id))
         invite_org = invite_org.scalars().first()

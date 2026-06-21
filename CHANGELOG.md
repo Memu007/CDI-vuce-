@@ -13,6 +13,9 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **feat (dashboard):** sección "Mi estudio" en el modal de perfil. Muestra nombre del estudio, lista de miembros con badge admin, botón invitar (genera link copiable), y opción de remover miembros (solo admin).
 - **fix (backend):** endpoint GET /api/invitations/{token} comparaba fechas con y sin zona horaria (SQLite no guarda tz). Cambiado a datetime.utcnow() sin tz.
 - **fix (security):** link de invitación en profile.js se insertaba con innerHTML sin sanitizar (XSS potencial). Cambiado a createElement + textContent + validación de esquema http/https.
+- **fix (backend):** registro con invite_token comparaba expires_at con datetime.now(timezone.utc) (con tz) pero SQLite no guarda tz. Cambiado a datetime.utcnow() sin tz, igual que validate_invitation.
+- **fix (ux):** link "Crear cuenta de estudio" agregado al form de login del modal y a la sección de precios de la landing. Antes estaba escondido dentro del form de registro.
+- **fix (ux):** texto auth-hint agrandado (t-11 → t-13) y mejor contraste para mejor legibilidad.
 
 ---
 
