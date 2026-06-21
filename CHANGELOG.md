@@ -8,7 +8,8 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-06-21 · Fixes UX: revisión, perfil y topbar
 
-- **feat (quotes):** página pública ahora muestra estado en vivo de la operación (Borrador → Oficializada → Canal → Liberada) con timeline visual. El despachante cambia el estado en el cockpit y el cliente lo ve al refrescar el link. El presupuesto sigue siendo foto fija.
+- **feat (quotes):** página pública ahora muestra estado en vivo de la operación (Borrador → Oficializada → Canal → Liberada) con timeline visual. El despachante cambia el estado en el cockpit y el cliente lo ve al refrescar el link. El presupuesto sigue siendo foto fija. Auditorado por QA (OK).
+- **fix (quotes):** bug latente en timeline — `const currentIdx` reasignado tiraba TypeError si llegaba un estado no reconocido. Cambiado a `let`.
 - **feat (landing):** botones CTA en el hero — "Empezar 14 días gratis" y "Ver de qué se trata". Antes el usuario tenía que scrollear hasta precio para encontrar un botón.
 - **fix (landing):** sacada jerga "Gemini Vision" de la card de capacidades. Ahora dice "Si el PDF es escaneado (una imagen, no texto), lo lee igual con IA".
 - **fix (landing):** credenciales demo (demo/demo123) ahora solo se muestran en localhost. En producción no aparecen.
