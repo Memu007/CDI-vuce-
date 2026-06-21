@@ -6,6 +6,19 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-21 · Fixes de seguridad pre-producción
+
+- **fix (security):** CSRF enforce ahora bloquea por defecto en producción (antes solo logueaba). En dev/test sigue en modo report-only.
+- **fix (security):** `/upload_pdf/public` ahora usa `validate_file_upload` con magic bytes + validación de PDF real. Antes solo chequeaba extensión.
+- **fix (security):** Mock email no imprime body completo en logs de producción. En dev sigue mostrando para debug.
+- **fix (security):** CSP header agregado (`default-src 'self'`, `frame-ancestors 'none'`) + `X-Content-Type-Options: nosniff` + `X-Frame-Options: DENY`.
+- **fix (security):** `public_quote.html` ahora escapa todos los campos dinámicos del snapshot antes de inyectarlos en el DOM (XSS).
+- **fix (security):** `clientes.js` escapa mensaje de error del backend antes de inyectarlo en el DOM.
+- **fix (security):** `ClientService` ahora acepta `owner_username` en get/get_clients/update/delete/detect (defense in depth — los endpoints de main.py ya filtraban con `_get_owned_client`).
+- **fix (security):** Log de upload PDF usa `sanitize_filename` en vez de imprimir el nombre crudo del archivo.
+
+---
+
 ## 2026-06-21 · Fixes UX: revisión, perfil y topbar
 
 - **feat (quotes):** página pública ahora muestra estado en vivo de la operación (Borrador → Oficializada → Canal → Liberada) con timeline visual. El despachante cambia el estado en el cockpit y el cliente lo ve al refrescar el link. El presupuesto sigue siendo foto fija. Auditorado por QA (OK).

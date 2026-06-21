@@ -373,7 +373,7 @@
 
     function showImportError(msg) {
         if (!importResult) return;
-        importResult.innerHTML = '<strong>Error:</strong> ' + msg;
+        importResult.innerHTML = '<strong>Error:</strong> ' + CDI.escapeHtml(msg);
         importResult.classList.add('is-error');
         importResult.hidden = false;
     }

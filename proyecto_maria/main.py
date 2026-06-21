@@ -123,15 +123,18 @@ def send_email(to_email: str, subject: str, body: str):
     smtp_from = os.getenv("SMTP_FROM_EMAIL")
 
     if not all([smtp_server, smtp_port, smtp_user, smtp_password, smtp_from]):
-        print("=" * 60, flush=True)
-        print("MOCK EMAIL - SMTP no configurado", flush=True)
-        print("=" * 60, flush=True)
-        print(f"To: {to_email}", flush=True)
-        print(f"Subject: {subject}", flush=True)
-        print("-" * 60, flush=True)
-        print("Body (HTML):", flush=True)
-        print(body, flush=True)
-        print("=" * 60, flush=True)
+        if IS_PRODUCTION:
+            logging.warning("SMTP no configurado — email no enviado a %s", to_email[:3] + "***")
+        else:
+            print("=" * 60, flush=True)
+            print("MOCK EMAIL - SMTP no configurado", flush=True)
+            print("=" * 60, flush=True)
+            print(f"To: {to_email}", flush=True)
+            print(f"Subject: {subject}", flush=True)
+            print("-" * 60, flush=True)
+            print("Body (HTML):", flush=True)
+            print(body, flush=True)
+            print("=" * 60, flush=True)
         return False
 
     try:
@@ -346,6 +349,23 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
 )
+
+# Content-Security-Policy: previene XSS y exfiltracion de datos
+@app.middleware("http")
+async def csp_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; "
+        "font-src 'self'; "
+        "connect-src 'self'; "
+        "frame-ancestors 'none'"
+    )
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    return response
 
 # Configurar Rate Limiting
 app.state.limiter = limiter
@@ -1475,11 +1495,11 @@ _CSRF_EXEMPT_PREFIXES = (
 def _csrf_enforce_enabled() -> bool:
     """Lee el flag en vivo para poder togglear sin reiniciar (y en tests).
 
-    Default: report-only (loguea pero no bloquea). Poner CSRF_ENFORCE=true en
-    el .env cuando se confirme que el front manda el header en todas las
-    operaciones de escritura.
+    Default: en produccion bloquea (true), en dev/test reporta solo (false).
+    Setear CSRF_ENFORCE=false en .env para desactivar manualmente.
     """
-    return os.getenv("CSRF_ENFORCE", "false").strip().lower() in ("1", "true", "yes")
+    default = "true" if IS_PRODUCTION else "false"
+    return os.getenv("CSRF_ENFORCE", default).strip().lower() in ("1", "true", "yes")
 
 
 def generate_csrf_token() -> str:
@@ -3218,26 +3238,18 @@ async def upload_pdf_public(
     Requiere sesión activa (Gemini Vision consume créditos).
     """
     try:
-        if not file.filename.lower().endswith('.pdf'):
-            raise HTTPException(status_code=400, detail="Solo se permiten archivos PDF")
-
         # Cuota diaria de IA por usuario: corta abuso / facturazo de tokens.
         # Configurable via AI_DAILY_PDF_LIMIT (default 50/dia/usuario).
         from proyecto_maria.core.ai_quota import enforce_pdf_quota
         enforce_pdf_quota(user.get("username") if isinstance(user, dict) else None)
 
-        contents = await file.read()
-        
+        from proyecto_maria.security.file_security import validate_file_upload, sanitize_filename
         max_upload_bytes = _get_max_upload_bytes()
-        if len(contents) > max_upload_bytes:
-            max_mb = max_upload_bytes / 1024 / 1024
-            raise HTTPException(
-                status_code=413,
-                detail=f"El archivo PDF excede el tamaño máximo permitido ({max_mb:.0f} MB)"
-            )
-            
+        contents = await validate_file_upload(file, 'pdf', max_size=max_upload_bytes)
+
         # Procesar PDF con el extractor
-        print(f"Procesando PDF: {file.filename} ({len(contents)} bytes)")
+        safe_name = sanitize_filename(file.filename or 'upload.pdf')
+        logging.info("Procesando PDF: %s (%d bytes)", safe_name, len(contents))
         result = process_pdf(contents)
         
         # Manejar tanto formato nuevo (dict) como viejo (lista)

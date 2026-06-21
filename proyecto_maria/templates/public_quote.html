@@ -204,6 +204,12 @@
     </div>
 
     <script>
+        function escapeHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+            });
+        }
+
         document.addEventListener('DOMContentLoaded', async () => {
             const token = window.location.pathname.split('/').pop();
             try {
@@ -214,7 +220,7 @@
                     document.querySelector('.quote-container').innerHTML = 
                         `<div style="text-align:center; padding: 40px; color: var(--cdi-danger)">
                             <h3>Error</h3>
-                            <p>${data.detail || 'No se pudo cargar el presupuesto'}</p>
+                            <p>${escapeHtml(data.detail || 'No se pudo cargar el presupuesto')}</p>
                         </div>`;
                     return;
                 }
@@ -257,10 +263,10 @@
                 const container = document.getElementById('itemsContainer');
                 container.innerHTML = snap.items.map(i => `
                     <div class="item-card">
-                        <h3 class="item-title">${i.descripcion}</h3>
-                        <div class="item-detail"><span>NCM</span> <span>${i.pieza}</span></div>
-                        <div class="item-detail"><span>Cantidad</span> <span>${i.cantidad}</span></div>
-                        <div class="item-detail"><span>Origen</span> <span>${i.origen}</span></div>
+                        <h3 class="item-title">${escapeHtml(i.descripcion)}</h3>
+                        <div class="item-detail"><span>NCM</span> <span>${escapeHtml(i.pieza)}</span></div>
+                        <div class="item-detail"><span>Cantidad</span> <span>${escapeHtml(i.cantidad)}</span></div>
+                        <div class="item-detail"><span>Origen</span> <span>${escapeHtml(i.origen)}</span></div>
                         <div class="item-detail"><span>FOB Unitario</span> <span>${fmtMoney(i.valor_unitario, op.currency)}</span></div>
                         <div style="margin-top: 12px; border-top: 1px solid var(--cdi-border); padding-top: 8px;">
                             <div class="item-detail" style="color: var(--cdi-text-muted);"><span>Arancel Base</span> <span>${i.alicuotas?.arancel_base || 0}%</span></div>

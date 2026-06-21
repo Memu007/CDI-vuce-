@@ -43,36 +43,38 @@ class ClientService:
             return client
     
     @staticmethod
-    async def get_client(client_id: str) -> Optional[Client]:
-        """Get client by ID"""
+    async def get_client(client_id: str, owner_username: str = None) -> Optional[Client]:
+        """Get client by ID. Si se pasa owner_username, filtra por tenant."""
         async with AsyncSessionLocal() as session:
+            stmt = select(Client).where(Client.id == client_id)
+            if owner_username:
+                stmt = stmt.where(Client.owner_username == owner_username)
             result = await session.execute(
-                select(Client)
-                .where(Client.id == client_id)
-                .options(selectinload(Client.ncm_notes))
+                stmt.options(selectinload(Client.ncm_notes))
             )
             return result.scalar_one_or_none()
     
     @staticmethod
-    async def get_clients(active_only: bool = True) -> List[Client]:
-        """Get all clients"""
+    async def get_clients(active_only: bool = True, owner_username: str = None) -> List[Client]:
+        """Get all clients. Si se pasa owner_username, filtra por tenant."""
         async with AsyncSessionLocal() as session:
             query = select(Client)
             if active_only:
                 query = query.where(Client.is_active == True)
+            if owner_username:
+                query = query.where(Client.owner_username == owner_username)
             
             result = await session.execute(query.order_by(Client.name))
             return result.scalars().all()
     
     @staticmethod
-    async def update_client(client_id: str, **updates) -> Optional[Client]:
-        """Update client information"""
+    async def update_client(client_id: str, owner_username: str = None, **updates) -> Optional[Client]:
+        """Update client information. Si se pasa owner_username, filtra por tenant."""
         async with AsyncSessionLocal() as session:
-            await session.execute(
-                update(Client)
-                .where(Client.id == client_id)
-                .values(**updates)
-            )
+            stmt = update(Client).where(Client.id == client_id)
+            if owner_username:
+                stmt = stmt.where(Client.owner_username == owner_username)
+            await session.execute(stmt.values(**updates))
             await session.commit()
             
             # Return updated client
@@ -80,17 +82,19 @@ class ClientService:
             return result.scalar_one_or_none()
     
     @staticmethod
-    async def delete_client(client_id: str, soft_delete: bool = True) -> bool:
-        """Delete or deactivate client"""
+    async def delete_client(client_id: str, soft_delete: bool = True, owner_username: str = None) -> bool:
+        """Delete or deactivate client. Si se pasa owner_username, filtra por tenant."""
         async with AsyncSessionLocal() as session:
             if soft_delete:
-                await session.execute(
-                    update(Client)
-                    .where(Client.id == client_id)
-                    .values(is_active=False)
-                )
+                stmt = update(Client).where(Client.id == client_id)
+                if owner_username:
+                    stmt = stmt.where(Client.owner_username == owner_username)
+                await session.execute(stmt.values(is_active=False))
             else:
-                await session.execute(delete(Client).where(Client.id == client_id))
+                stmt = delete(Client).where(Client.id == client_id)
+                if owner_username:
+                    stmt = stmt.where(Client.owner_username == owner_username)
+                await session.execute(stmt)
             
             await session.commit()
             logger.info(f"✅ Client {'deactivated' if soft_delete else 'deleted'}: {client_id}")
@@ -178,10 +182,10 @@ class ClientService:
     # ==================== AUTO-COMPLETADO INTELIGENTE ====================
 
     @staticmethod
-    async def detect_client_from_text(text: str) -> Optional[Dict[str, Any]]:
+    async def detect_client_from_text(text: str, owner_username: str = None) -> Optional[Dict[str, Any]]:
         """
         Detectar cliente a partir del texto extraído del PDF
-        Busca por CUIT o nombre de empresa
+        Busca por CUIT o nombre de empresa. Si se pasa owner_username, filtra por tenant.
         """
         import re
 
@@ -192,9 +196,10 @@ class ClientService:
 
             for cuit_raw in cuit_matches:
                 cuit = cuit_raw.replace('-', '')
-                result = await session.execute(
-                    select(Client).where(Client.cuit == cuit)
-                )
+                stmt = select(Client).where(Client.cuit == cuit)
+                if owner_username:
+                    stmt = stmt.where(Client.owner_username == owner_username)
+                result = await session.execute(stmt)
                 client = result.scalar_one_or_none()
                 if client:
                     return {
@@ -205,9 +210,10 @@ class ClientService:
                     }
 
             # Buscar por nombre de empresa
-            clients_result = await session.execute(
-                select(Client).where(Client.is_active == True)
-            )
+            stmt = select(Client).where(Client.is_active == True)
+            if owner_username:
+                stmt = stmt.where(Client.owner_username == owner_username)
+            clients_result = await session.execute(stmt)
             clients = clients_result.scalars().all()
 
             for client in clients:
