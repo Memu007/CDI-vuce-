@@ -195,6 +195,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix (frontend):** cálculo de días restantes de trial tenía un `* 60` extra → un trial de 14 días mostraba "1 día" y el banner desaparecía prematuramente.
 - **fix (frontend):** modal de "plan vencido" (HTTP 402) pasaba `confirmText`/`icon` en vez de `acceptText`/`kind` → el botón decía "Aceptar" en vez de "Ir a pagar".
 - **fix (frontend):** botón "Asistente" NCM ahora usa delegación de eventos en `tbody` en lugar de listeners individuales por fila, para evitar que el listener se pierda al regenerar la tabla.
+- **chore (debug):** agregados logs temporales en `openSpotlight` para diagnosticar por qué el overlay no se abre en el navegador del usuario.
 
 - **docs:** creado `docs/maintenance/vulnerabilidades_pendientes.md` con dependencias vulnerables detectadas (`requests`, `pdfminer.six`, `starlette`) y plan de ataque.
 - **tag:** `v0.2-wave2` apunta al cierre de Plan 02 y Plan 03.
