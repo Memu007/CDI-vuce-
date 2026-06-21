@@ -158,16 +158,20 @@ def record_operation_created(user):
         raise RuntimeError("Límite de operaciones excedido")
 
 
-def create_checkout(user, plan_id: str) -> dict[str, Any]:
+def create_checkout(user, plan_id: str, org_id: str | None = None) -> dict[str, Any]:
     """Genera checkout MP para el plan elegido.
 
     Usa preapproval si hay plan_id de MP configurado; sino preference.
+    Si org_id está seteado, el external_reference incluye el prefijo org:.
     """
     plan = get_plan(plan_id)
     email = getattr(user, "email", None) or ""
     username = getattr(user, "username", "")
 
-    external_reference = f"{username}:{plan_id}"
+    if org_id:
+        external_reference = f"org:{org_id}:{plan_id}"
+    else:
+        external_reference = f"{username}:{plan_id}"
     base_url = get_frontend_url()
     back_url = f"{base_url}/dashboard?billing=success"
 
@@ -235,11 +239,14 @@ def create_checkout(user, plan_id: str) -> dict[str, Any]:
     }
 
 
-def create_topup_checkout(user) -> dict[str, Any]:
+def create_topup_checkout(user, org_id: str | None = None) -> dict[str, Any]:
     """Genera una preference de pago único para top-up de 10 ops."""
     email = getattr(user, "email", None) or ""
     username = getattr(user, "username", "")
-    external_reference = f"{username}:topup"
+    if org_id:
+        external_reference = f"org:{org_id}:topup"
+    else:
+        external_reference = f"{username}:topup"
     base_url = get_frontend_url()
 
     sdk = _get_sdk()
@@ -283,6 +290,9 @@ def process_payment(payment_info: dict[str, Any]) -> dict[str, Any] | None:
     """Procesa un pago aprobado de MP y devuelve datos para actualizar DB.
 
     Determina si es pago de plan o top-up a partir del external_reference.
+    Soporta 2 formatos:
+      - Individual: 'username:plan' o 'username:topup'
+      - Organización: 'org:{org_id}:plan' o 'org:{org_id}:topup'
     """
     if payment_info.get("status") != "approved":
         return None
@@ -291,18 +301,28 @@ def process_payment(payment_info: dict[str, Any]) -> dict[str, Any] | None:
     if ":" not in external_ref:
         return None
 
-    username, kind = external_ref.split(":", 1)
     payer_id = str(payment_info.get("payer", {}).get("id", "") or "")
     payment_id = str(payment_info.get("id", "") or "")
     now = datetime.now(timezone.utc)
 
     base_update = {
-        "username": username,
         "payment_provider": "mercadopago",
         "payment_customer_id": payer_id or payment_id,
         "payment_method_last4": _last4_from_payment(payment_info),
         "payment_method_brand": _brand_from_payment(payment_info),
     }
+
+    # Formato org: {org_id}:{kind}
+    if external_ref.startswith("org:"):
+        parts = external_ref.split(":")
+        if len(parts) != 3:
+            return None
+        org_id, kind = parts[1], parts[2]
+        base_update["org_id"] = org_id
+    else:
+        # Formato individual: {username}:{kind}
+        username, kind = external_ref.split(":", 1)
+        base_update["username"] = username
 
     if kind == "topup":
         return {

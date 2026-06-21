@@ -1091,6 +1091,36 @@ async def _migrate_create_invitations_table():
         print(f"⚠️ No se pudo crear invitations: {mig_err}")
 
 
+async def _migrate_add_org_billing_columns():
+    """Agrega columnas de billing faltantes a organizations (idempotente)."""
+    from proyecto_maria.database.connection import engine, IS_SQLITE
+    new_cols = [
+        ("payment_provider", "VARCHAR(20)"),
+        ("payment_customer_id", "VARCHAR(100)"),
+        ("payment_method_last4", "VARCHAR(4)"),
+        ("payment_method_brand", "VARCHAR(20)"),
+        ("last_topup_at", "TIMESTAMP"),
+        ("extra_ops_expires_at", "TIMESTAMP"),
+    ]
+    try:
+        async with engine.begin() as conn:
+            if IS_SQLITE:
+                cols = await conn.exec_driver_sql("PRAGMA table_info(organizations)")
+                existing = {r[1] for r in cols.fetchall()}
+                for col_name, col_type in new_cols:
+                    if col_name not in existing:
+                        await conn.exec_driver_sql(
+                            f"ALTER TABLE organizations ADD COLUMN {col_name} {col_type}"
+                        )
+            else:
+                for col_name, col_type in new_cols:
+                    await conn.exec_driver_sql(
+                        f"ALTER TABLE organizations ADD COLUMN IF NOT EXISTS {col_name} {col_type}"
+                    )
+    except Exception as mig_err:
+        print(f"⚠️ No se pudo migrar organizations billing cols: {mig_err}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Eventos de ciclo de vida de la aplicación (Startup/Shutdown)"""
@@ -1113,6 +1143,7 @@ async def lifespan(app: FastAPI):
     await _migrate_create_organizations_table()
     await _migrate_add_user_organization_id()
     await _migrate_create_invitations_table()
+    await _migrate_add_org_billing_columns()
     await _check_expired_trials()
     
     # Montar Admin Router si no está montado
@@ -1532,6 +1563,20 @@ async def require_admin(user=Depends(get_current_user)):
     return user
 
 
+async def _get_billing_entity(db: AsyncSession, db_user: User):
+    """Si el user tiene organization_id, devuelve (Organization, True).
+    Sino devuelve (User, False). La entidad devuelta es la que tiene
+    los campos de billing (plan, billing_status, ops_used, extra_ops)."""
+    if db_user.organization_id:
+        result = await db.execute(
+            select(Organization).where(Organization.id == db_user.organization_id)
+        )
+        org = result.scalars().first()
+        if org:
+            return org, True
+    return db_user, False
+
+
 async def require_active_billing(
     request: Request,
     user=Depends(get_current_user),
@@ -1550,23 +1595,24 @@ async def require_active_billing(
             return User(username=user["username"], plan="premium", billing_status="active")
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
 
-    # Trial vencido -> past_due (misma lógica que /auth/current_user).
-    trial_end = db_user.trial_ends_at
+    # Trial vencido -> past_due. Chequear la entidad de billing (org o user).
+    billing_entity, is_org = await _get_billing_entity(db, db_user)
+    trial_end = billing_entity.trial_ends_at
     if trial_end is not None and trial_end.tzinfo is None:
         trial_end = trial_end.replace(tzinfo=timezone.utc)
     if (
-        db_user.billing_status == "trial"
+        billing_entity.billing_status == "trial"
         and trial_end is not None
         and trial_end < datetime.now(timezone.utc)
     ):
-        db_user.billing_status = "past_due"
+        billing_entity.billing_status = "past_due"
         try:
             await db.commit()
-            await db.refresh(db_user)
+            await db.refresh(billing_entity)
         except Exception:
             await db.rollback()
 
-    ok, reason = billing_service.can_create_operation(db_user)
+    ok, reason = billing_service.can_create_operation(billing_entity)
     if not ok:
         raise HTTPException(
             status_code=402,
@@ -2245,6 +2291,7 @@ async def dev_run_migrations(user=Depends(require_admin)):
         ("organizations_table", _migrate_create_organizations_table),
         ("user_organization_id", _migrate_add_user_organization_id),
         ("invitations_table", _migrate_create_invitations_table),
+        ("org_billing_columns", _migrate_add_org_billing_columns),
     ]
     for label, fn in migrations:
         try:
@@ -2613,17 +2660,17 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
         new_user.payment_method_brand = pm_meta["brand"]
 
     # Organizaciones: si vino invite_token, validar y linkear a la org
-    invite_org = None
+    invite_inv = None
     if request.invite_token:
-        inv = await db.execute(select(Invitation).where(Invitation.token == request.invite_token))
-        inv = inv.scalars().first()
-        if not inv:
+        invite_inv = await db.execute(select(Invitation).where(Invitation.token == request.invite_token))
+        invite_inv = invite_inv.scalars().first()
+        if not invite_inv:
             raise HTTPException(status_code=400, detail="Token de invitación inválido")
-        if inv.status == "accepted":
+        if invite_inv.status == "accepted":
             raise HTTPException(status_code=400, detail="Esta invitación ya fue usada")
-        if inv.expires_at and inv.expires_at < datetime.now(timezone.utc):
+        if invite_inv.expires_at and invite_inv.expires_at < datetime.now(timezone.utc):
             raise HTTPException(status_code=400, detail="Esta invitación expiró")
-        invite_org = await db.execute(select(Organization).where(Organization.id == inv.org_id))
+        invite_org = await db.execute(select(Organization).where(Organization.id == invite_inv.org_id))
         invite_org = invite_org.scalars().first()
         if not invite_org:
             raise HTTPException(status_code=400, detail="El estudio ya no existe")
@@ -2632,13 +2679,10 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
     db.add(new_user)
     await db.commit()
 
-    # Si vino por invitación, marcarla como accepted
-    if request.invite_token:
-        inv = await db.execute(select(Invitation).where(Invitation.token == request.invite_token))
-        inv = inv.scalars().first()
-        if inv and inv.status == "pending":
-            inv.status = "accepted"
-            await db.commit()
+    # Marcar invitación como accepted (reutiliza el objeto ya cargado)
+    if invite_inv and invite_inv.status == "pending":
+        invite_inv.status = "accepted"
+        await db.commit()
 
     # Email de verificacion (solo si el toggle esta on). Lo mandamos en
     # background para no frenar el response. Pasamos strings, no el ORM,
@@ -2792,30 +2836,33 @@ async def resend_verification(
 
 @app.get("/api/billing/me")
 async def billing_me(user=Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Devuelve el estado de billing del user actual."""
+    """Devuelve el estado de billing del user actual.
+    Si pertenece a una org, el billing se lee de la Organization."""
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    plan = billing_service.get_plan(db_user.plan or "premium")
+    billing_entity, is_org = await _get_billing_entity(db, db_user)
+    plan = billing_service.get_plan(billing_entity.plan or "premium")
     return {
-        "billing_status": db_user.billing_status or "none",
-        "trial_ends_at": db_user.trial_ends_at.isoformat() if db_user.trial_ends_at else None,
-        "payment_provider": db_user.payment_provider,
+        "billing_status": billing_entity.billing_status or "none",
+        "trial_ends_at": billing_entity.trial_ends_at.isoformat() if billing_entity.trial_ends_at else None,
+        "payment_provider": getattr(billing_entity, "payment_provider", None),
         "payment_method": (
             {
-                "last4": db_user.payment_method_last4,
-                "brand": db_user.payment_method_brand,
+                "last4": getattr(billing_entity, "payment_method_last4", None),
+                "brand": getattr(billing_entity, "payment_method_brand", None),
             }
-            if db_user.payment_method_last4 else None
+            if getattr(billing_entity, "payment_method_last4", None) else None
         ),
-        "plan": db_user.plan or "premium",
-        "ops_used_this_period": db_user.ops_used_this_period or 0,
+        "plan": billing_entity.plan or "premium",
+        "ops_used_this_period": billing_entity.ops_used_this_period or 0,
         "ops_limit": plan["ops"],
-        "extra_ops_remaining": db_user.extra_ops_remaining or 0,
+        "extra_ops_remaining": billing_entity.extra_ops_remaining or 0,
         "clients_limit": plan["clients"],
         "users_limit": plan["users"],
+        "organization_id": db_user.organization_id,
     }
 
 
@@ -2923,7 +2970,8 @@ async def create_manual_operation(
 
     await db.commit()
 
-    billing_service.record_operation_created(db_user)
+    billing_entity, _ = await _get_billing_entity(db, db_user)
+    billing_service.record_operation_created(billing_entity)
     await db.commit()
 
     return {
@@ -4801,7 +4849,8 @@ async def save_client_operation(
                 # No rompemos el save de la operacion si la memoria falla.
 
         await db.commit()
-        billing_service.record_operation_created(db_user)
+        billing_entity, _ = await _get_billing_entity(db, db_user)
+        billing_service.record_operation_created(billing_entity)
         await db.commit()
         return {"success": True, "operation_id": operation.id, "op_code": op_code}
     except HTTPException:
@@ -6244,6 +6293,8 @@ async def create_organization(
         raise HTTPException(status_code=400, detail="El nombre del estudio es obligatorio")
     if not re.match(r'^[a-zA-Z0-9_-]{3,30}$', req.username):
         raise HTTPException(status_code=400, detail="Username inválido (3-30 chars alfanuméricos)")
+    if len(req.password) < 8:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
 
     # Validar username duplicado
     existing = await db.execute(select(User).where(User.username == req.username))
@@ -6840,7 +6891,48 @@ async def mercadopago_webhook(request: Request):
                     logger.warning("Webhook MP: external_reference no reconocida: %s", external_ref)
                     raise HTTPException(status_code=400, detail="external_reference desconocida")
 
-            username = update["username"]
+            username = update.get("username")
+            org_id = update.get("org_id")
+
+            if org_id:
+                # Pago de organización: actualizar la org, no el user
+                result = await session.execute(select(Organization).where(Organization.id == org_id))
+                db_org = result.scalars().first()
+                if not db_org:
+                    logger.warning("Webhook MP: org '%s' no existe en DB", org_id)
+                    raise HTTPException(
+                        status_code=400,
+                        detail=f"Organización '{org_id}' no existe. MP reintentará."
+                    )
+
+                # Deduplicación
+                if db_org.last_payment_id == payment_id:
+                    logger.info("Webhook MP: payment_id=%s ya procesado para org %s", payment_id, org_id)
+                    return {"success": True, "skipped": "payment_id ya procesado"}
+
+                db_org.last_payment_id = payment_id
+                db_org.plan = update.get("plan", db_org.plan)
+                db_org.billing_status = update.get("billing_status", db_org.billing_status)
+                if "trial_ends_at" in update:
+                    db_org.trial_ends_at = update["trial_ends_at"]
+                if "ops_used_this_period" in update:
+                    db_org.ops_used_this_period = update["ops_used_this_period"]
+                if "extra_ops_remaining" in update:
+                    total = (db_org.extra_ops_remaining or 0) + update["extra_ops_remaining"]
+                    db_org.extra_ops_remaining = min(total, billing_service.EXTRA_OPS_MAX)
+                if "billing_period_started_at" in update:
+                    db_org.billing_period_started_at = update["billing_period_started_at"]
+                if "last_topup_at" in update:
+                    db_org.last_topup_at = update["last_topup_at"]
+                if "extra_ops_expires_at" in update:
+                    db_org.extra_ops_expires_at = update["extra_ops_expires_at"]
+
+                await session.commit()
+                logger.info("Webhook MP: pago sincronizado org=%s action=%s payment_id=%s",
+                            org_id, update.get("action"), payment_id)
+                break
+
+            # Pago individual: actualizar el user (flujo existente)
             result = await session.execute(select(User).where(User.username == username))
             db_user = result.scalars().first()
 
@@ -6987,8 +7079,9 @@ async def billing_topup(
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
+    org_id = db_user.organization_id or None
     try:
-        checkout = billing_service.create_topup_checkout(db_user)
+        checkout = billing_service.create_topup_checkout(db_user, org_id=org_id)
         return {"success": True, **checkout}
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -7016,6 +7109,8 @@ async def billing_checkout(
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
+    org_id = db_user.organization_id or None
+
     # Modo demo cuando no hay credenciales
     if not billing_service.is_configured():
         demo_id = f"demo_{uuid.uuid4().hex[:8]}"
@@ -7035,7 +7130,7 @@ async def billing_checkout(
         }
 
     try:
-        checkout = billing_service.create_checkout(db_user, plan_id)
+        checkout = billing_service.create_checkout(db_user, plan_id, org_id=org_id)
         # Guardamos el preapproval_id temporal hasta que el webhook confirme.
         if checkout.get("preapproval_id"):
             db_user.mp_preapproval_id = checkout["preapproval_id"]

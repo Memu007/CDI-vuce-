@@ -6,6 +6,16 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-21 · Organizaciones (estudios) — paso 3: billing por organización + fixes audit
+
+- **feat (backend):** billing ahora se lee de la `Organization` cuando el user tiene `organization_id`. Helper `_get_billing_entity` decide si usar org o user. `billing_me`, `require_active_billing`, `record_operation_created`, checkout y topup usan la entidad correcta.
+- **feat (billing):** `external_reference` de MP ahora soporta formato `org:{org_id}:{plan}` para pagos de organización. Webhook actualiza la org, no el user individual.
+- **feat (db):** 6 columnas nuevas en `organizations` (payment_provider, payment_customer_id, payment_method_last4/brand, last_topup_at, extra_ops_expires_at). Migración idempotente `_migrate_add_org_billing_columns`.
+- **fix (security):** `create_organization` valida mínimo 8 chars de password (observación 1 del audit).
+- **fix (qa):** registro con invite_token reutiliza el objeto invitation en lugar de hacer 2da query (observación 2 del audit).
+
+---
+
 ## 2026-06-21 · Organizaciones (estudios) — paso 2: endpoints de invite + registro
 
 - **feat (backend):** 5 endpoints nuevos para gestionar estudios: crear estudio (`POST /api/organizations/create`), ver mi org (`GET /api/organizations/mine`), invitar usuario (`POST /api/organizations/invite`), validar invitación (`GET /api/invitations/{token}`), remover miembro (`DELETE /api/organizations/members/{username}`). Registro existente acepta `invite_token` opcional para unirse a un estudio. Verificado end-to-end.
