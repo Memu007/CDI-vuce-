@@ -115,6 +115,25 @@
                 else selectedRows.delete(idx);
                 updateBatchBar();
             });
+            // Delegación de clicks para botones Asistente y pills de notas
+            tbody.addEventListener('click', (e) => {
+                const assist = e.target && e.target.closest && e.target.closest('[data-assist]');
+                if (assist) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const idx = parseInt(assist.getAttribute('data-assist'), 10);
+                    console.log('[ncm] click assist row', idx, assist);
+                    openSpotlight(idx);
+                    return;
+                }
+                const notePill = e.target && e.target.closest && e.target.closest('[data-note-pill]');
+                if (notePill) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onNotePillClick.call(notePill, e);
+                    return;
+                }
+            });
         }
         if (batchApplyQty) batchApplyQty.addEventListener('click', applyBatchMultiply);
         if (batchApplyNcm) batchApplyNcm.addEventListener('click', applyBatchNcm);
@@ -374,12 +393,6 @@
             inp.addEventListener('input', onFieldInput);
             inp.addEventListener('blur', onFieldBlur);
             inp.addEventListener('keydown', onFieldKeydown);
-        });
-        tbody.querySelectorAll('[data-assist]').forEach(btn => {
-            btn.addEventListener('click', () => {
-                const idx = parseInt(btn.getAttribute('data-assist'), 10);
-                openSpotlight(idx);
-            });
         });
         tbody.querySelectorAll('[data-note-pill]').forEach(btn => {
             btn.addEventListener('click', onNotePillClick);
