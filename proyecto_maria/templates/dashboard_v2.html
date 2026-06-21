@@ -446,6 +446,10 @@
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="10" y2="10"/><line x1="12" y1="10" x2="14" y2="10"/><line x1="16" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="10" y2="14"/><line x1="12" y1="14" x2="14" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/><line x1="8" y1="18" x2="10" y2="18"/><line x1="12" y1="18" x2="14" y2="18"/><line x1="16" y1="18" x2="16" y2="18"/></svg>
                             Calculadora
                         </button>
+                        <button type="button" class="btn btn-ghost" id="ncmImportMaestraBtn" title="Importar planilla maestra de NCMs desde CSV o Excel">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            Importar planilla NCM
+                        </button>
                         <button type="button" class="btn btn-ghost" id="ncmEnrichAllBtn" title="Consultar alícuotas de todos los items">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9"/><polyline points="3 4 3 12 11 12"/></svg>
                             Ver alícuotas de todos
@@ -1009,6 +1013,33 @@
                     <span class="kbd-hint"><kbd>Intro</kbd> asignar</span>
                 </div>
                 <span class="kbd-hint"><kbd>Esc</kbd> cerrar</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal importar planilla maestra NCM -->
+    <div class="tour-welcome" id="importNcmModal" hidden role="dialog" aria-modal="true" aria-labelledby="importNcmTitle">
+        <div class="tour-welcome-card manual-upload-card">
+            <div class="tour-welcome-head">
+                <span class="tour-welcome-kicker">Migración</span>
+                <h2 id="importNcmTitle">Importar planilla maestra de NCMs</h2>
+                <p>Subí un CSV o Excel con tus descripciones y códigos NCM. Lo usamos para autocompletar cuando asignás NCMs.</p>
+            </div>
+            <div class="manual-upload-body">
+                <div class="import-dropzone" id="importNcmDropzone">
+                    <input type="file" id="importNcmFileInput" accept=".csv,.xlsx,.xls" hidden>
+                    <button type="button" class="btn btn-ghost" id="importNcmPickBtn">Elegir archivo</button>
+                    <span class="import-filename" id="importNcmFilename">CSV · XLSX · XLS</span>
+                </div>
+                <div class="upload-progress" id="importNcmProgress" hidden>
+                    <div class="upload-progress-text">
+                        <p class="upload-progress-title">Importando…</p>
+                    </div>
+                </div>
+                <div class="import-result" id="importNcmResult" hidden></div>
+                <div class="manual-upload-actions">
+                    <button type="button" class="btn btn-ghost" id="importNcmCancel">Cancelar</button>
+                </div>
             </div>
         </div>
     </div>

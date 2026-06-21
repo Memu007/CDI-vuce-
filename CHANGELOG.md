@@ -190,6 +190,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-21 · Fix multi-tenant NCM + importar planilla maestra
+
+- **fix (backend):** historial NCM pasa de shared a por-owner — cada despachante tiene su propio `ncm_historial_{username}.json`. Elimina leak de knowledge entre despachantes.
+- **feat (backend):** endpoint `POST /api/ncm/import-historial` para importar planilla maestra "descripción → NCM" desde CSV/Excel.
+- **feat (frontend):** botón "Importar planilla NCM" + modal en pantalla NCM para subir planilla maestra.
+
 ## 2026-06-21 · Fix paywall NCM y banner de trial
 
 - **fix (frontend):** cálculo de días restantes de trial tenía un `* 60` extra → un trial de 14 días mostraba "1 día" y el banner desaparecía prematuramente.

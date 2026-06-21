@@ -5784,22 +5784,27 @@ async def delete_ncm_nota(
     return {"success": True}
 
 # === SUGERIR NCM CON IA ===
-NCM_HISTORIAL_FILE = os.path.join(DATA_DIR, 'ncm_historial.json')
 
-def load_ncm_historial():
-    """Carga historial de NCM usados por descripción"""
-    if os.path.exists(NCM_HISTORIAL_FILE):
+def _ncm_historial_path(owner_username: str) -> str:
+    safe = re.sub(r'[^a-zA-Z0-9_\-]', '_', owner_username)
+    return os.path.join(DATA_DIR, f'ncm_historial_{safe}.json')
+
+def load_ncm_historial(owner_username: str) -> dict:
+    """Carga historial de NCM por-owner (no compartido)."""
+    path = _ncm_historial_path(owner_username)
+    if os.path.exists(path):
         try:
-            with open(NCM_HISTORIAL_FILE, 'r', encoding='utf-8') as f:
+            with open(path, 'r', encoding='utf-8') as f:
                 return json.load(f)
         except (json.JSONDecodeError, IOError) as e:
-            logging.warning(f"Error loading NCM historial: {e}")
+            logging.warning(f"Error loading NCM historial for {owner_username}: {e}")
             return {}
     return {}
 
-def save_ncm_historial(data):
-    """Guarda historial de NCM"""
-    with open(NCM_HISTORIAL_FILE, 'w', encoding='utf-8') as f:
+def save_ncm_historial(owner_username: str, data: dict) -> None:
+    """Guarda historial de NCM por-owner."""
+    path = _ncm_historial_path(owner_username)
+    with open(path, 'w', encoding='utf-8') as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 def normalizar_desc(desc: str) -> str:
@@ -5809,10 +5814,9 @@ def normalizar_desc(desc: str) -> str:
 
 @app.post("/api/ncm/sugerir")
 async def sugerir_ncm(data: dict, user=Depends(get_current_user)):
-    """Sugiere NCM basado en descripción: primero historial, luego IA.
+    """Sugiere NCM basado en descripción: primero historial del owner, luego IA.
 
-    Requiere auth porque consume cuota de Gemini. El historial por ahora
-    es shared (no por owner); se podria filtrar a futuro.
+    Requiere auth porque consume cuota de Gemini. El historial es por-owner.
     """
     descripcion = data.get("descripcion", "").strip()
     if not descripcion or len(descripcion) < 3:
@@ -5822,7 +5826,7 @@ async def sugerir_ncm(data: dict, user=Depends(get_current_user)):
     desc_norm = normalizar_desc(descripcion)
     
     # 1. Buscar en historial
-    historial = load_ncm_historial()
+    historial = load_ncm_historial(user["username"])
     for desc_guardada, ncm_data in historial.items():
         if desc_norm in normalizar_desc(desc_guardada) or normalizar_desc(desc_guardada) in desc_norm:
             sugerencias.append({
@@ -5878,7 +5882,7 @@ async def guardar_uso_ncm(data: dict, user=Depends(get_current_user)):
     if not descripcion or not ncm:
         return {"success": False}
     
-    historial = load_ncm_historial()
+    historial = load_ncm_historial(user["username"])
     
     # Guardar o incrementar contador
     if descripcion in historial:
@@ -5887,10 +5891,100 @@ async def guardar_uso_ncm(data: dict, user=Depends(get_current_user)):
     else:
         historial[descripcion] = {"ncm": ncm, "count": 1}
     
-    save_ncm_historial(historial)
+    save_ncm_historial(user["username"], historial)
     return {"success": True}
 
-# (file-based backup/restore removed — DB version at lines ~722-759 is used instead)
+@app.post("/api/ncm/import-historial")
+async def import_ncm_historial(
+    request: Request,
+    file: UploadFile = File(...),
+    user=Depends(get_current_user),
+):
+    """Importa planilla maestra 'descripción → NCM' desde CSV/Excel.
+
+    Alimenta el historial NCM del despachante (por-owner, no compartido).
+    Columnas detectadas automático: descripcion/descripción/desc/producto + ncm/codigo_ncm/etc.
+    """
+    import io as _io
+
+    username = user["username"]
+    filename = (file.filename or "").lower()
+
+    try:
+        content = await file.read()
+        if filename.endswith(".csv"):
+            try:
+                df = pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False)
+            except Exception:
+                df = pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False, sep=";")
+        elif filename.endswith((".xlsx", ".xls")):
+            df = pd.read_excel(_io.BytesIO(content), dtype=str, keep_default_na=False)
+        else:
+            raise HTTPException(status_code=400, detail="Formato no soportado. Usá .csv, .xlsx o .xls")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo: {str(e)[:120]}")
+
+    if df.empty:
+        raise HTTPException(status_code=400, detail="El archivo está vacío")
+
+    cols_lower = {c.lower().strip(): c for c in df.columns}
+    desc_col = None
+    ncm_col = None
+    for alias in ("descripcion", "descripción", "desc", "producto", "detalle"):
+        if alias in cols_lower:
+            desc_col = cols_lower[alias]
+            break
+    for alias in ("ncm", "ncm_code", "codigo_ncm", "código_ncm", "cod_ncm"):
+        if alias in cols_lower:
+            ncm_col = cols_lower[alias]
+            break
+
+    if not desc_col or not ncm_col:
+        raise HTTPException(
+            status_code=400,
+            detail="No se detectaron las columnas. Necesitamos 'descripcion' y 'ncm'.",
+        )
+
+    historial = load_ncm_historial(username)
+    importados = 0
+    duplicados = 0
+    errores: list[dict] = []
+
+    for idx, row in df.iterrows():
+        try:
+            desc = str(row.get(desc_col, "") or "").strip()
+            ncm_raw = str(row.get(ncm_col, "") or "").strip()
+            ncm = re.sub(r"\D", "", ncm_raw)
+
+            if not desc or not ncm:
+                continue
+            if len(ncm) < 6:
+                errores.append({"fila": int(idx) + 2, "error": f"NCM muy corto: {ncm_raw}"})
+                continue
+
+            if desc in historial:
+                historial[desc]["ncm"] = ncm
+                duplicados += 1
+            else:
+                historial[desc] = {"ncm": ncm, "count": 1}
+                importados += 1
+        except Exception as exc:
+            errores.append({"fila": int(idx) + 2, "error": str(exc)[:120]})
+
+    try:
+        save_ncm_historial(username, historial)
+    except Exception as exc:
+        logging.exception("import_ncm_historial save failed")
+        raise HTTPException(status_code=500, detail=f"No se pudo guardar: {str(exc)[:120]}")
+
+    return {
+        "success": True,
+        "importados": importados,
+        "duplicados": duplicados,
+        "errores": errores,
+    }
 
 @app.get("/auth/me")
 async def get_auth_me(authorization: str = Header(None), db: AsyncSession = Depends(get_db)):

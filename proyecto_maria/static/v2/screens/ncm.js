@@ -1254,6 +1254,133 @@
         if (t) { e.preventDefault(); CDI.goTo('review'); }
     });
 
+    /* ---------- Importar planilla maestra NCM ---------- */
+    let ncmImportInitialized = false;
+    let ncmImportModal, ncmImportInput, ncmImportDropzone, ncmImportPickBtn, ncmImportFilenameEl;
+    let ncmImportProgress, ncmImportResult, ncmImportCancel;
+
+    function initNcmImport() {
+        if (ncmImportInitialized) return;
+        ncmImportModal     = document.getElementById('importNcmModal');
+        ncmImportInput     = document.getElementById('importNcmFileInput');
+        ncmImportDropzone  = document.getElementById('importNcmDropzone');
+        ncmImportPickBtn   = document.getElementById('importNcmPickBtn');
+        ncmImportFilenameEl = document.getElementById('importNcmFilename');
+        ncmImportProgress  = document.getElementById('importNcmProgress');
+        ncmImportResult    = document.getElementById('importNcmResult');
+        ncmImportCancel    = document.getElementById('importNcmCancel');
+        if (!ncmImportModal) return;
+
+        if (ncmImportPickBtn) ncmImportPickBtn.addEventListener('click', () => ncmImportInput.click());
+        if (ncmImportDropzone) {
+            ncmImportDropzone.addEventListener('click', (e) => {
+                if (e.target === ncmImportPickBtn) return;
+                ncmImportInput.click();
+            });
+            ['dragenter', 'dragover'].forEach(evt =>
+                ncmImportDropzone.addEventListener(evt, (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    ncmImportDropzone.classList.add('is-dragging');
+                })
+            );
+            ['dragleave', 'drop'].forEach(evt =>
+                ncmImportDropzone.addEventListener(evt, (e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    ncmImportDropzone.classList.remove('is-dragging');
+                })
+            );
+            ncmImportDropzone.addEventListener('drop', (e) => {
+                const file = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+                if (file) handleNcmImportFile(file);
+            });
+        }
+        if (ncmImportInput) {
+            ncmImportInput.addEventListener('change', (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (file) handleNcmImportFile(file);
+                ncmImportInput.value = '';
+            });
+        }
+        if (ncmImportCancel) ncmImportCancel.addEventListener('click', closeNcmImportModal);
+        ncmImportModal.addEventListener('click', (e) => {
+            if (e.target === ncmImportModal) closeNcmImportModal();
+        });
+        ncmImportInitialized = true;
+    }
+
+    function openNcmImportModal() {
+        initNcmImport();
+        if (!ncmImportModal) return;
+        if (ncmImportResult) { ncmImportResult.hidden = true; ncmImportResult.innerHTML = ''; ncmImportResult.classList.remove('is-error'); }
+        if (ncmImportFilenameEl) ncmImportFilenameEl.textContent = 'CSV · XLSX · XLS';
+        ncmImportModal.hidden = false;
+        requestAnimationFrame(() => ncmImportModal.classList.add('is-visible'));
+        CDI.track && CDI.track('import_ncm_maestra_open');
+    }
+
+    function closeNcmImportModal() {
+        if (!ncmImportModal) return;
+        ncmImportModal.classList.remove('is-visible');
+        setTimeout(() => { ncmImportModal.hidden = true; }, 220);
+    }
+
+    async function handleNcmImportFile(file) {
+        if (!file) return;
+        const name = file.name || '';
+        const ok = /\.(csv|xlsx|xls)$/i.test(name);
+        if (!ok) {
+            showNcmImportError('Formato no soportado. Usá CSV, XLSX o XLS.');
+            return;
+        }
+        if (ncmImportFilenameEl) ncmImportFilenameEl.textContent = name;
+        if (ncmImportProgress) ncmImportProgress.hidden = false;
+        if (ncmImportResult) { ncmImportResult.hidden = true; ncmImportResult.innerHTML = ''; ncmImportResult.classList.remove('is-error'); }
+
+        const form = new FormData();
+        form.append('file', file);
+
+        try {
+            const res = await CDI.api('/api/ncm/import-historial', { method: 'POST', body: form });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || ('Error ' + res.status));
+            renderNcmImportResult(data);
+            CDI.track && CDI.track('import_ncm_maestra_done', {
+                importados: data.importados, duplicados: data.duplicados
+            });
+        } catch (err) {
+            showNcmImportError(err.message || 'No se pudo importar');
+        } finally {
+            if (ncmImportProgress) ncmImportProgress.hidden = true;
+        }
+    }
+
+    function renderNcmImportResult(d) {
+        if (!ncmImportResult) return;
+        const errCount = (d.errores || []).length;
+        ncmImportResult.innerHTML =
+            '<div class="import-result-stat"><span>Importados</span><strong>' + (d.importados || 0) + '</strong></div>' +
+            '<div class="import-result-stat"><span>Duplicados actualizados</span><strong>' + (d.duplicados || 0) + '</strong></div>' +
+            '<div class="import-result-stat"><span>Filas con error</span><strong>' + errCount + '</strong></div>' +
+            (errCount ? '<div class="import-result-error">Primer error: fila ' +
+                d.errores[0].fila + ' — ' + d.errores[0].error + '</div>' : '');
+        ncmImportResult.hidden = false;
+        ncmImportResult.classList.remove('is-error');
+        if (CDI.toast) CDI.toast.success('Importación completa', (d.importados || 0) + ' NCMs cargados');
+    }
+
+    function showNcmImportError(msg) {
+        if (!ncmImportResult) return;
+        ncmImportResult.innerHTML = '<strong>Error:</strong> ' + CDI.escapeHtml(msg);
+        ncmImportResult.classList.add('is-error');
+        ncmImportResult.hidden = false;
+    }
+
+    // Listener del botón "Importar planilla NCM"
+    document.addEventListener('click', (e) => {
+        const btn = e.target.closest && e.target.closest('#ncmImportMaestraBtn');
+        if (btn) { e.preventDefault(); openNcmImportModal(); }
+    });
+
     CDI.registerScreen('ncm', {
         onEnter() { render(); },
         onLeave() {
