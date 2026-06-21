@@ -6446,7 +6446,7 @@ async def simulate_webhook(request: Request):
         "status": "approved",
         "external_reference": external_reference,
         "payer": {"id": "sim_payer_123"},
-        "transaction_amount": 30000.00 if action == "subscription" else 10000.00,
+        "transaction_amount": 45000.00 if action == "subscription" else 10000.00,
         "date_created": now.isoformat(),
         "payment_method_id": "simulated",
     }
