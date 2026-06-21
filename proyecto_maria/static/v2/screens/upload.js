@@ -396,12 +396,18 @@
                         }
                     } catch (_) {}
 
-                    // No se encontró por nombre: no forzar crear cliente.
-                    // El usuario puede asignar manualmente desde Review si quiere.
+                    // No se encontró por nombre: mostrar banner en Review para que el usuario decida.
                     CDI.track && CDI.track('importador_no_match', {
                         has_name: true,
                         has_cuit: false,
                     });
+                    try {
+                        sessionStorage.setItem('cdi.pending_create_client', JSON.stringify({
+                            cuit: '',
+                            nombre: compradorNombre,
+                            captured_at: new Date().toISOString(),
+                        }));
+                    } catch (_) {}
                 }
                 return;
             }
