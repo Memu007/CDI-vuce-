@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-21 · Fix observaciones audit paso 3
+
+- **fix (backend):** `require_active_billing` ahora devuelve `billing_entity.billing_status` (no `db_user.billing_status`) en el error 402. Antes, si la org estaba past_due, el frontend recibía el status del user.
+- **fix (backend):** webhook de MP ahora guarda `payment_provider`, `payment_customer_id`, `payment_method_last4/brand` en la org, igual que en el flujo de user individual.
+
+---
+
 ## 2026-06-21 · Organizaciones (estudios) — paso 3: billing por organización + fixes audit
 
 - **feat (backend):** billing ahora se lee de la `Organization` cuando el user tiene `organization_id`. Helper `_get_billing_entity` decide si usar org o user. `billing_me`, `require_active_billing`, `record_operation_created`, checkout y topup usan la entidad correcta.
