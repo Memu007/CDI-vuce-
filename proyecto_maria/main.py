@@ -1619,7 +1619,7 @@ async def require_active_billing(
             detail={
                 "message": reason,
                 "code": "PLAN_LIMIT_EXCEEDED",
-                "billing_status": db_user.billing_status,
+                "billing_status": billing_entity.billing_status,
             },
         )
     return db_user
@@ -6926,6 +6926,14 @@ async def mercadopago_webhook(request: Request):
                     db_org.last_topup_at = update["last_topup_at"]
                 if "extra_ops_expires_at" in update:
                     db_org.extra_ops_expires_at = update["extra_ops_expires_at"]
+                if "payment_provider" in update:
+                    db_org.payment_provider = update["payment_provider"]
+                if "payment_customer_id" in update:
+                    db_org.payment_customer_id = update["payment_customer_id"]
+                if "payment_method_last4" in update and update["payment_method_last4"]:
+                    db_org.payment_method_last4 = update["payment_method_last4"]
+                if "payment_method_brand" in update and update["payment_method_brand"]:
+                    db_org.payment_method_brand = update["payment_method_brand"]
 
                 await session.commit()
                 logger.info("Webhook MP: pago sincronizado org=%s action=%s payment_id=%s",
