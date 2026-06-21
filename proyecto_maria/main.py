@@ -295,7 +295,6 @@ class TokenResponse(BaseModel):
 
 def create_access_token(data: dict):
     """Crea un token JWT con expiración y jti único (anti session fixation)"""
-    import uuid
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode["exp"] = expire
