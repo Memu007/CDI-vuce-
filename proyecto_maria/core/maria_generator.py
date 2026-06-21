@@ -500,7 +500,10 @@ def validate_for_kit_maria(items: list) -> tuple[list, list]:
         las advertencias se incluyen en la respuesta pero no bloquean.
     """
     errores = []
-    advertencias = []
+    _warn_groups: dict[str, list[int]] = {}
+
+    def _track_warn(msg: str, idx: int):
+        _warn_groups.setdefault(msg, []).append(idx)
 
     for idx, item in enumerate(items, 1):
         ncm_raw = str(item.get("ncm") or item.get("pieza", "") or "").strip()
@@ -510,7 +513,7 @@ def validate_for_kit_maria(items: list) -> tuple[list, list]:
         if ncm_digits and len(ncm_digits) < 8:
             errores.append(f"Item {idx}: NCM con menos de 8 dígitos ({ncm_raw}). KIT Maria lo rechaza.")
         elif ncm_digits and len(ncm_digits) >= 8 and not any(c.isalpha() for c in ncm_raw):
-            advertencias.append(f"Item {idx}: NCM sin letra de control. KIT Maria puede pedirla.")
+            _track_warn("NCM sin letra de control. KIT Maria puede pedirla.", idx)
 
         # Descripción: mínimo 10 caracteres
         desc = str(item.get("descripcion", "") or "").strip()
@@ -531,5 +534,16 @@ def validate_for_kit_maria(items: list) -> tuple[list, list]:
         moneda = str(item.get("moneda", "") or "").strip().upper()
         if moneda and (len(moneda) != 3 or not moneda.isalpha()):
             errores.append(f"Item {idx}: Moneda '{moneda}' no válida. Debe ser código de 3 letras (DOL, EUR, etc.).")
+
+    # Agrupar advertencias: 1 item → "Item #5: ...", 2-3 → "Items #2, #7: ...", 4+ → conteo
+    advertencias = []
+    for msg, idxs in _warn_groups.items():
+        refs = [f"#{i}" for i in idxs]
+        if len(idxs) == 1:
+            advertencias.append(f"Item {refs[0]}: {msg}")
+        elif len(idxs) <= 3:
+            advertencias.append(f"Items {', '.join(refs)}: {msg}")
+        else:
+            advertencias.append(f"{msg} en {len(idxs)} ítems.")
 
     return errores, advertencias

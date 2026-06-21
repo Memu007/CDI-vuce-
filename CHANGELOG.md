@@ -190,6 +190,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-21 · Agrupar advertencias KIT Maria
+
+- **fix (backend):** `validate_for_kit_maria` ahora agrupa advertencias por tipo en vez de una línea por item. 1 item → "Item #5: ...", 2-3 → "Items #2, #7: ...", 4+ → "NCM sin letra... en 200 ítems." Evita ruido visual con operaciones grandes. Los errores siguen por item (necesita saber cuál corregir).
+
 ## 2026-06-21 · Guía KIT Maria + validación previa
 
 - **feat (frontend):** panel colapsable "¿Cómo cargar este archivo en KIT Maria?" en pantalla Ready, con 4 pasos y íconos SVG. Usa `<details>` nativo, sin JS extra.
