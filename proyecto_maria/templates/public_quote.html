@@ -231,7 +231,7 @@
                 if (estado && timeline) {
                     timeline.style.display = 'flex';
                     const steps = ['borrador', 'oficializada', 'canal', 'liberada'];
-                    const currentIdx = steps.indexOf(estado);
+                    let currentIdx = steps.indexOf(estado);
                     if (currentIdx === -1) currentIdx = 0;
 
                     timeline.querySelectorAll('.estado-step').forEach((step, idx) => {
