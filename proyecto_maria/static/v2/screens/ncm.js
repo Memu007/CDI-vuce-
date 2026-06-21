@@ -842,7 +842,12 @@
 
     function closeSpotlight() {
         const prevIdx = spotActiveIdx;
-        overlay.hidden = true;
+        if (overlay.hidden) return;
+        overlay.classList.add('is-closing');
+        setTimeout(() => {
+            overlay.hidden = true;
+            overlay.classList.remove('is-closing');
+        }, 160);
         spotActiveIdx = -1;
         hideVucePreview();
         clearTimeout(vuceDebounce);
