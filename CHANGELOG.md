@@ -15,6 +15,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix (landing):** placeholder del login cambiado de "emiliano" a "tu_usuario" — era un nombre de ejemplo demasiado específico.
 - **feat (landing):** sección "Cómo funciona" con 5 pasos (Subir, Revisar, NCM, Validar, Descargar). Explica el flujo que el mockup del hero solo muestra visualmente.
 - **fix (landing):** pricing card ahora menciona que se pueden recargar operaciones extra desde el dashboard.
+- **fix (landing):** link "Cómo funciona" agregado al topbar — antes la sección existía pero no se podía saltar directo desde arriba.
 - **fix (ux):** botón "Crear cliente" dejó de aparecer duplicado en revisión. Solo queda el banner azul de arriba.
 - **fix (ux):** banner "Este importador no está en tus clientes" ahora aparece también para importadores extranjeros sin CUIT argentino.
 - **feat (ux):** pill de usuario en topbar — unifica nombre + iniciales en azul en un botón visible con borde y hover. Antes era un círculo gris chico difícil de ver.
