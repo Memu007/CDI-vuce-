@@ -140,7 +140,7 @@
                 modal.hidden = true;
                 overlay.hidden = true;
             }
-        }, 220);
+        }, 130);
     }
 
     async function loadProfile() {
