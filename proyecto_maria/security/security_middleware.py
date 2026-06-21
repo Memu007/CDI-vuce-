@@ -37,10 +37,10 @@ class EnhancedSecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Allows scripts/styles from self and trusted CDNs only
         csp_directives = [
             "default-src 'self'",
-            "script-src 'self' https://cdnjs.cloudflare.com 'unsafe-inline'",  # unsafe-inline for inline scripts
-            "style-src 'self' https://cdnjs.cloudflare.com https://fonts.googleapis.com 'unsafe-inline'",
-            "img-src 'self' data: https:",
-            "font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com",
+            "script-src 'self'",
+            "style-src 'self' 'unsafe-inline'",
+            "img-src 'self' data:",
+            "font-src 'self'",
             "connect-src 'self'",
             "frame-ancestors 'none'",
             "base-uri 'self'",

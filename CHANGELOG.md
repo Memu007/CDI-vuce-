@@ -19,6 +19,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix (security):** Todos los uploads de Excel/CSV ahora usan `validate_file_upload` con magic bytes: `/upload_excel/`, `/upload_excel_v2/`, `/api/clientes/import`, `/api/ncm/import-historial`. Antes solo validaban extensión.
 - **fix (deps):** Librerías actualizadas por pip-audit: PyJWT 2.4→2.13, python-multipart 0.0.22→0.0.32, jinja2 3.1.2→3.1.6, FastAPI 0.135→0.138 + starlette 0.52→1.3.1, pydantic 2.7→2.13. Tapa ~20 CVEs conocidos. Smoke test OK.
 - **fix (security):** `file_security.py`: import de `python-magic` ahora es lazy (try/except) para que el fallback funcione cuando no está instalado. Agregado `python-magic>=0.4.27` a `requirements.txt`. Sin esto, todos los uploads crasheaban con 500.
+- **fix (security):** Password policy: `/auth/register` ahora valida mínimo 8 caracteres + al menos 1 número o símbolo antes de hashear. Antes aceptaba password de 1 char o vacío.
+- **fix (security):** Session fixation: `create_access_token` ahora agrega claim `jti` (UUID random) al JWT. Cada login genera un token único. Antes dos logins del mismo usuario devolvían el mismo token.
+- **fix (security):** Prompt injection en `/api/ncm/sugerir`: input del usuario ahora va entre delimitadores `<user_input>` y el prompt indica ignorar instrucciones dentro.
+- **fix (security):** CSP unificado: sacado `unsafe-inline` de `script-src` y CDNs no usados en `security_middleware.py`. Eliminado CSP duplicado de `main.py` que era pisado por el middleware. Ahora hay un solo CSP consistente.
 
 ---
 
