@@ -1951,6 +1951,24 @@ app.mount(
     name="static",
 )
 
+
+@app.get("/robots.txt")
+def robots_txt():
+    """Sirve robots.txt en la raíz para que Google lo encuentre."""
+    return FileResponse(
+        os.path.join(basedir, "proyecto_maria", "static", "robots.txt"),
+        media_type="text/plain",
+    )
+
+
+@app.get("/sitemap.xml")
+def sitemap_xml():
+    """Sirve sitemap.xml en la raíz para que Google lo encuentre."""
+    return FileResponse(
+        os.path.join(basedir, "proyecto_maria", "static", "sitemap.xml"),
+        media_type="application/xml",
+    )
+
 @app.get("/")
 def read_root():
     """Redirige a la landing page"""
