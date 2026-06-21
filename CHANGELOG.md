@@ -23,6 +23,8 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix (security):** Session fixation: `create_access_token` ahora agrega claim `jti` (UUID random) al JWT. Cada login genera un token único. Antes dos logins del mismo usuario devolvían el mismo token.
 - **fix (security):** Prompt injection en `/api/ncm/sugerir`: input del usuario ahora va entre delimitadores `<user_input>` y el prompt indica ignorar instrucciones dentro.
 - **fix (security):** CSP unificado: sacado `unsafe-inline` de `script-src` y CDNs no usados en `security_middleware.py`. Eliminado CSP duplicado de `main.py` que era pisado por el middleware. Ahora hay un solo CSP consistente.
+- **fix (security):** `unsafe-inline` restaurado temporalmente en `script-src` — 40+ handlers inline en 4 templates legacy. TODO fase 2: migrar a JS externo.
+- **test (security):** Re-pentest OWASP Top 10 v2 verificado independientemente por la PM: 14/14 tests confirmados. Password policy, session fixation (jti), CSRF, cookies, uploads, JWT alg:none, SQLi, CORS, CSP, HSTS, force browsing, email duplicado, rate limiting — todos PASS. 2 pendientes para Railway (prompt injection + XSS endpoint público). Session fixation parcial: token viejo sigue funcionando (fase 2: blacklist jti).
 
 ---
 
