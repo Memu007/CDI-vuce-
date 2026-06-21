@@ -296,9 +296,12 @@
 
         <form id="registerForm" class="auth-form" autocomplete="on" novalidate>
             <h2 class="auth-title">Creá tu cuenta.</h2>
-            <p class="auth-sub">Podés probar sin datos reales.</p>
+            <p class="auth-sub" id="registerSub">Podés probar sin datos reales.</p>
 
             <div class="auth-error" id="registerError" hidden></div>
+            <div id="inviteBanner" class="auth-hint" style="display:none; background: var(--c-surface-2, #f0f4f8); border: 1px solid var(--c-border, #ddd); border-radius: 8px; padding: 10px 12px; margin-bottom: 12px; color: var(--c-text-2, #555);">
+                <strong id="inviteOrgName">—</strong> te invitó a unirse a su estudio.
+            </div>
 
             <label class="field">
                 <span>Nombre</span>
@@ -322,6 +325,35 @@
 
             <button type="submit" class="btn-primary btn-lg btn-block">Empezar trial de 14 días</button>
             <p class="auth-hint">¿Ya tenés cuenta? <a href="#" data-tab="login" class="auth-link">Ingresar →</a></p>
+            <p class="auth-hint"><a href="#" data-tab="org" class="auth-link">Crear cuenta de estudio →</a></p>
+        </form>
+
+        <form id="orgForm" class="auth-form" autocomplete="on" novalidate>
+            <h2 class="auth-title">Crear cuenta de estudio.</h2>
+            <p class="auth-sub">Un estudio tiene varios usuarios y un solo pago compartido.</p>
+
+            <div class="auth-error" id="orgError" hidden></div>
+
+            <label class="field">
+                <span>Nombre del estudio</span>
+                <input name="name" type="text" placeholder="Estudio Pérez S.R.L." required />
+            </label>
+            <label class="field">
+                <span>Tu usuario (admin)</span>
+                <input name="username" type="text" autocomplete="username" placeholder="jperez" required />
+            </label>
+            <label class="field">
+                <span>Email</span>
+                <input name="email" type="email" autocomplete="email" required />
+            </label>
+            <label class="field">
+                <span>Contraseña</span>
+                <input name="password" type="password" autocomplete="new-password" minlength="8" required />
+            </label>
+
+            <button type="submit" class="btn-primary btn-lg btn-block">Crear estudio y empezar trial</button>
+            <p class="auth-hint">¿Ya tenés cuenta? <a href="#" data-tab="login" class="auth-link">Ingresar →</a></p>
+            <p class="auth-hint"><a href="#" data-tab="register" class="auth-link">Crear cuenta individual →</a></p>
         </form>
 
         <form id="forgotForm" class="auth-form" autocomplete="on" novalidate>
@@ -403,6 +435,7 @@
     const forms = {
         login:    document.getElementById('loginForm'),
         register: document.getElementById('registerForm'),
+        org:      document.getElementById('orgForm'),
         forgot:   document.getElementById('forgotForm'),
         verify:   document.getElementById('verifySent'),
     };
@@ -501,7 +534,7 @@
         return safeBase + '-' + suffix;
     }
 
-    async function submitAuth(form, endpoint, errorEl) {
+    async function submitAuth(form, endpoint, errorEl, inviteToken) {
         errorEl.hidden = true;
         errorEl.textContent = '';
         const btn = form.querySelector('button[type=submit]');
@@ -514,6 +547,10 @@
 
         if (form === forms.register && !payload.username) {
             payload.username = deriveUsernameFromEmail(payload.email);
+        }
+
+        if (inviteToken) {
+            payload.invite_token = inviteToken;
         }
 
         if (form === forms.register) {
@@ -611,7 +648,7 @@
             try { pwd.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (_) {}
             return;
         }
-        submitAuth(forms.register, '/auth/register', errorEl);
+        submitAuth(forms.register, '/auth/register', errorEl, inviteToken);
     });
 
     forms.forgot.addEventListener('submit', async (e) => {
@@ -664,9 +701,45 @@
     wireAuthErrorClear(forms.login, document.getElementById('loginError'));
     wireAuthErrorClear(forms.register, document.getElementById('registerError'));
 
+    /* ---------- Registro con invite_token ---------- */
+    const inviteBanner = document.getElementById('inviteBanner');
+    const inviteOrgName = document.getElementById('inviteOrgName');
+    const registerSub = document.getElementById('registerSub');
+    let inviteToken = null;
+    (async () => {
+        const params = new URLSearchParams(window.location.search);
+        const token = params.get('invite');
+        if (!token) return;
+        try {
+            const res = await fetch('/api/invitations/' + encodeURIComponent(token));
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.valid) {
+                inviteToken = token;
+                if (inviteBanner) inviteBanner.style.display = 'block';
+                if (inviteOrgName) inviteOrgName.textContent = data.org_name || 'Un estudio';
+                if (registerSub) registerSub.textContent = 'Completá tus datos para unirte al estudio.';
+                openAuth('register');
+            }
+        } catch (_) {}
+    })();
+
+    /* ---------- Crear estudio ---------- */
+    forms.org.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const errorEl = document.getElementById('orgError');
+        const pwd = forms.org.querySelector('input[name=password]');
+        if (pwd && pwd.value && pwd.value.length < 8) {
+            errorEl.textContent = 'La contraseña debe tener al menos 8 caracteres.';
+            errorEl.hidden = false;
+            return;
+        }
+        submitAuth(forms.org, '/api/organizations/create', errorEl);
+    });
+
     /* ---------- Deep link via hash ---------- */
     if (window.location.hash === '#auth' || window.location.hash === '#login') openAuth('login');
     if (window.location.hash === '#register') openAuth('register');
+    if (window.location.hash === '#org') openAuth('org');
 })();
 </script>
 </body>

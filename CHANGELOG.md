@@ -6,6 +6,15 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-21 · Organizaciones (estudios) — paso 4: UI
+
+- **feat (landing):** botón "Crear cuenta de estudio" en el popover de auth. Formulario con nombre del estudio, usuario admin, email y password. Envia a POST /api/organizations/create.
+- **feat (landing):** si la URL trae ?invite=TOKEN, muestra banner "Te invitó [estudio X]" y envía el token al registrar. Valida con GET /api/invitations/{token}.
+- **feat (dashboard):** sección "Mi estudio" en el modal de perfil. Muestra nombre del estudio, lista de miembros con badge admin, botón invitar (genera link copiable), y opción de remover miembros (solo admin).
+- **fix (backend):** endpoint GET /api/invitations/{token} comparaba fechas con y sin zona horaria (SQLite no guarda tz). Cambiado a datetime.utcnow() sin tz.
+
+---
+
 ## 2026-06-21 · Fix observaciones audit paso 3
 
 - **fix (backend):** `require_active_billing` ahora devuelve `billing_entity.billing_status` (no `db_user.billing_status`) en el error 402. Antes, si la org estaba past_due, el frontend recibía el status del user.

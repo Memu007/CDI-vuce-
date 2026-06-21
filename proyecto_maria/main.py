@@ -6504,7 +6504,7 @@ async def validate_invitation(
     if inv.status == "accepted":
         raise HTTPException(status_code=400, detail="Esta invitación ya fue usada")
 
-    if inv.expires_at and inv.expires_at < datetime.now(timezone.utc):
+    if inv.expires_at and inv.expires_at < datetime.utcnow():
         if inv.status != "expired":
             inv.status = "expired"
             await db.commit()

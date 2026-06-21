@@ -19,6 +19,8 @@
     let billingPmWrap, billingPmEl;
     let billingPlanWrap, billingPlanSelect, billingUsageWrap, billingUsageEl;
     let billingActivateBtn, billingReactivateBtn, billingCancelBtn, billingTopupBtn;
+    // Mi estudio (organización)
+    let orgBlock, orgSummaryEl, orgNameEl, orgMembersEl, orgInviteEmailEl, orgInviteBtn, orgInviteHintEl;
     let initialized = false;
     let loading = false;
 
@@ -97,6 +99,16 @@
         if (billingCancelBtn) billingCancelBtn.addEventListener('click', cancelBilling);
         if (billingTopupBtn) billingTopupBtn.addEventListener('click', openTopup);
 
+        // Mi estudio
+        orgBlock = $('pfOrgBlock');
+        orgSummaryEl = $('pfOrgSummary');
+        orgNameEl = $('pfOrgName');
+        orgMembersEl = $('pfOrgMembers');
+        orgInviteEmailEl = $('pfOrgInviteEmail');
+        orgInviteBtn = $('pfOrgInviteBtn');
+        orgInviteHintEl = $('pfOrgInviteHint');
+        if (orgInviteBtn) orgInviteBtn.addEventListener('click', inviteMember);
+
         initialized = true;
     }
 
@@ -114,7 +126,7 @@
         if (currentPwdInput) currentPwdInput.value = '';
         if (newPwdInput) newPwdInput.value = '';
         // Cargar valores actuales
-        await Promise.all([loadProfile(), loadBilling()]);
+        await Promise.all([loadProfile(), loadBilling(), loadOrg()]);
         setTimeout(() => cuitInput && cuitInput.focus(), 150);
         CDI.track('profile_modal_open');
     }
@@ -454,6 +466,100 @@
 
     CDI.openProfileModal = open;
     CDI.closeProfileModal = close;
+
+    /* ---------- Mi estudio (organización) ---------- */
+    async function loadOrg() {
+        if (!orgBlock) return;
+        try {
+            const res = await CDI.api('/api/organizations/mine');
+            const data = await res.json().catch(() => ({}));
+            const org = data.organization;
+            if (!org) { orgBlock.hidden = true; return; }
+            orgBlock.hidden = false;
+            orgSummaryEl.textContent = org.name || '—';
+            orgNameEl.textContent = org.name || '—';
+            // Renderizar miembros
+            const members = org.members || [];
+            orgMembersEl.innerHTML = '';
+            members.forEach(m => {
+                const row = document.createElement('div');
+                row.style.cssText = 'display:flex; align-items:center; justify-content:space-between; padding:6px 8px; border:1px solid var(--c-border,#ddd); border-radius:6px;';
+                const info = document.createElement('span');
+                info.style.cssText = 'font-size:13px;';
+                const name = m.name || m.username;
+                info.textContent = name + (m.is_owner ? ' · admin' : '');
+                row.appendChild(info);
+                if (!m.is_owner) {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = 'btn btn-ghost btn-sm';
+                    btn.textContent = 'Remover';
+                    btn.style.cssText = 'font-size:12px; padding:2px 8px;';
+                    btn.addEventListener('click', () => removeMember(m.username, btn));
+                    row.appendChild(btn);
+                }
+                orgMembersEl.appendChild(row);
+            });
+            // Mostrar invitación solo si es owner
+            const inviteWrap = $('pfOrgInviteWrap');
+            if (inviteWrap) inviteWrap.hidden = !org.is_owner;
+        } catch (err) {
+            orgBlock.hidden = true;
+        }
+    }
+
+    async function inviteMember() {
+        const email = (orgInviteEmailEl && orgInviteEmailEl.value || '').trim();
+        if (!email) return;
+        orgInviteBtn.disabled = true;
+        orgInviteBtn.textContent = 'Enviando...';
+        orgInviteHintEl.textContent = '';
+        try {
+            const res = await CDI.api('/api/organizations/invite', {
+                method: 'POST',
+                body: JSON.stringify({ email })
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) throw new Error((data && data.detail) || 'No se pudo invitar');
+            const link = data.invite_link || (window.location.origin + '/?invite=' + (data.token || ''));
+            orgInviteHintEl.innerHTML = 'Link de invitación: <a href="' + link + '" target="_blank">' + link + '</a>';
+            orgInviteEmailEl.value = '';
+            // Copiar al portapapeles
+            try { navigator.clipboard.writeText(link); orgInviteHintEl.textContent = 'Link copiado: ' + link; } catch (_) {}
+            CDI.toast('Invitación creada', 'El link se copió al portapapeles.', 'success');
+            await loadOrg();
+        } catch (err) {
+            orgInviteHintEl.textContent = String(err.message || err);
+        } finally {
+            orgInviteBtn.disabled = false;
+            orgInviteBtn.textContent = 'Invitar';
+        }
+    }
+
+    async function removeMember(username, btn) {
+        const ok = await CDI.confirm({
+            title: 'Remover miembro',
+            lead: '¿Sacar a ' + username + ' del estudio?',
+            text: 'Va a seguir teniendo su cuenta pero como cuenta individual.',
+            acceptText: 'Sí, remover',
+            cancelText: 'Cancelar'
+        });
+        if (!ok) return;
+        btn.disabled = true;
+        btn.textContent = '...';
+        try {
+            const res = await CDI.api('/api/organizations/members/' + encodeURIComponent(username), { method: 'DELETE' });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok || !data.success) throw new Error((data && data.detail) || 'No se pudo remover');
+            CDI.toast('Miembro removido', username + ' fue sacado del estudio.', 'success');
+            await loadOrg();
+        } catch (err) {
+            CDI.toast('Error', String(err.message || err), 'error');
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Remover';
+        }
+    }
 
     document.addEventListener('DOMContentLoaded', init);
 })();
