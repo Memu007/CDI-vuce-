@@ -169,7 +169,7 @@ def create_checkout(user, plan_id: str) -> dict[str, Any]:
 
     external_reference = f"{username}:{plan_id}"
     base_url = get_frontend_url()
-    back_url = f"{base_url}/v2?billing=success"
+    back_url = f"{base_url}/dashboard?billing=success"
 
     mp_preapproval_plan_id = _preapproval_plan_id(plan_id)
     sdk = _get_sdk()
@@ -179,7 +179,7 @@ def create_checkout(user, plan_id: str) -> dict[str, Any]:
             "preapproval_plan_id": mp_preapproval_plan_id,
             "payer_email": email,
             "external_reference": external_reference,
-            "back_url": f"{base_url}/v2?billing=success_preapproval",
+            "back_url": f"{base_url}/dashboard?billing=success_preapproval",
             "status": "authorized",
         }
         if base_url.startswith("https://"):
@@ -211,8 +211,8 @@ def create_checkout(user, plan_id: str) -> dict[str, Any]:
         "external_reference": external_reference,
         "back_urls": {
             "success": back_url,
-            "failure": f"{base_url}/v2?billing=failure",
-            "pending": f"{base_url}/v2?billing=pending",
+            "failure": f"{base_url}/dashboard?billing=failure",
+            "pending": f"{base_url}/dashboard?billing=pending",
         },
     }
     if email:
@@ -254,9 +254,9 @@ def create_topup_checkout(user) -> dict[str, Any]:
         ],
         "external_reference": external_reference,
         "back_urls": {
-            "success": f"{base_url}/v2?billing=topup_success",
-            "failure": f"{base_url}/v2?billing=failure",
-            "pending": f"{base_url}/v2?billing=pending",
+            "success": f"{base_url}/dashboard?billing=topup_success",
+            "failure": f"{base_url}/dashboard?billing=failure",
+            "pending": f"{base_url}/dashboard?billing=pending",
         },
         "auto_return": "approved",
     }
