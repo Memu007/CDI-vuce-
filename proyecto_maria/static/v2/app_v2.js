@@ -330,9 +330,11 @@
             };
             const avatar = document.getElementById('userAvatar');
             const name = document.getElementById('userName');
+            const initialsEl = document.getElementById('userAvatarInitials');
             const initials = ((user.name || user.username || '?')
                 .split(/\s+/).map(s => s[0]).slice(0, 2).join('') || '?').toUpperCase();
-            if (avatar) avatar.textContent = initials;
+            if (initialsEl) initialsEl.textContent = initials;
+            else if (avatar) avatar.textContent = initials;
             if (name) name.textContent = user.name || user.username || '';
         } catch (err) {
             console.warn('[CDI v2] no se pudo cargar usuario:', err);

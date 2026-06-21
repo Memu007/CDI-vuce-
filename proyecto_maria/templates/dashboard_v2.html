@@ -47,8 +47,10 @@
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                     <span class="cliente-pill-label">Cliente</span>
                 </button>
-                <span id="userName" class="caption"></span>
-                <button type="button" class="avatar" id="userAvatar" title="Mi perfil" aria-label="Mi perfil">?</button>
+                <button type="button" class="user-pill" id="userAvatar" title="Ver mi perfil" aria-label="Mi perfil">
+                    <span id="userName" class="user-pill-name"></span>
+                    <span class="user-pill-initials" id="userAvatarInitials">?</span>
+                </button>
                 <button type="button" class="topbar-logout" id="logoutBtn" title="Cerrar sesión" aria-label="Cerrar sesión" onclick="CDI.logout()">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                 </button>
