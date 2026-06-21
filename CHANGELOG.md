@@ -12,6 +12,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **feat (landing):** si la URL trae ?invite=TOKEN, muestra banner "Te invitó [estudio X]" y envía el token al registrar. Valida con GET /api/invitations/{token}.
 - **feat (dashboard):** sección "Mi estudio" en el modal de perfil. Muestra nombre del estudio, lista de miembros con badge admin, botón invitar (genera link copiable), y opción de remover miembros (solo admin).
 - **fix (backend):** endpoint GET /api/invitations/{token} comparaba fechas con y sin zona horaria (SQLite no guarda tz). Cambiado a datetime.utcnow() sin tz.
+- **fix (security):** link de invitación en profile.js se insertaba con innerHTML sin sanitizar (XSS potencial). Cambiado a createElement + textContent + validación de esquema http/https.
 
 ---
 

@@ -522,10 +522,21 @@
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success) throw new Error((data && data.detail) || 'No se pudo invitar');
             const link = data.invite_link || (window.location.origin + '/?invite=' + (data.token || ''));
-            orgInviteHintEl.innerHTML = 'Link de invitación: <a href="' + link + '" target="_blank">' + link + '</a>';
+            // Sanitizar: solo permitir links http/https (evita javascript: y otros esquemas)
+            const safeLink = /^https?:\/\//i.test(link) ? link : '';
+            orgInviteHintEl.textContent = '';
+            if (safeLink) {
+                const a = document.createElement('a');
+                a.href = safeLink;
+                a.target = '_blank';
+                a.textContent = 'Link de invitación: ' + safeLink;
+                orgInviteHintEl.appendChild(a);
+            } else {
+                orgInviteHintEl.textContent = 'Link generado (formato no válido)';
+            }
             orgInviteEmailEl.value = '';
             // Copiar al portapapeles
-            try { navigator.clipboard.writeText(link); orgInviteHintEl.textContent = 'Link copiado: ' + link; } catch (_) {}
+            try { navigator.clipboard.writeText(safeLink || link); } catch (_) {}
             CDI.toast('Invitación creada', 'El link se copió al portapapeles.', 'success');
             await loadOrg();
         } catch (err) {
