@@ -102,7 +102,7 @@
                     <span class="key key-out">TXT al Kit SIM.</span>
                 </div>
                 <div class="hero-ctas">
-                    <a href="#precio" class="btn-primary btn-lg">Empezar 14 días gratis</a>
+                    <button type="button" class="btn-primary btn-lg" id="btnHeroCta">Empezar 14 días gratis</button>
                     <a href="#caps" class="btn-ghost btn-lg">Ver de qué se trata</a>
                 </div>
             </div>
@@ -285,7 +285,7 @@
 
             <label class="field">
                 <span>Usuario o email</span>
-                <input name="username" type="text" autocomplete="username" placeholder="emiliano  o  vos@empresa.com" required />
+                <input name="username" type="text" autocomplete="username" placeholder="tu_usuario  o  vos@empresa.com" required />
             </label>
             <label class="field">
                 <span>Contraseña</span>
@@ -480,6 +480,14 @@
     if (btnPriceCta) {
         btnPriceCta.addEventListener('click', () => {
             try { landingUiTelemetry({ action: 'pricing_cta_clicked', screen: 'landing_pricing' }); } catch (_) {}
+            openAuth('register');
+        });
+    }
+    // CTA del hero: abre registro directo (igual que el de precio).
+    const btnHeroCta = document.getElementById('btnHeroCta');
+    if (btnHeroCta) {
+        btnHeroCta.addEventListener('click', () => {
+            try { landingUiTelemetry({ action: 'hero_cta_clicked', screen: 'landing_hero' }); } catch (_) {}
             openAuth('register');
         });
     }
