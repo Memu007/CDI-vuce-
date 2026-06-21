@@ -126,6 +126,7 @@ CDI-app/
 - **Landing (2026-06-21):** CTA en el hero abre registro directo (no solo scroll a precio). Sección "Cómo funciona" con 5 pasos. Sacada jerga "Gemini Vision". Credenciales demo solo visibles en localhost. Placeholder de login genérico. Pricing menciona recarga de operaciones extra.
 - **Página pública de estado (2026-06-21):** el link público que se comparte con el cliente ahora muestra un timeline con el estado en vivo de la operación (Borrador → Oficializada → Canal → Liberada). El estado se lee en vivo de la tabla Operation, no del snapshot congelado. El presupuesto (ítems, alícuotas, total) sigue siendo foto fija.
 - **Auditoría de seguridad pre-producción (2026-06-21):** 9 fixes aplicados: CSRF enforce en prod, upload PDF + Excel/CSV con magic bytes (`validate_file_upload` en `/upload_pdf/public`, `/upload_excel/`, `/upload_excel_v2/`, `/api/clientes/import`, `/api/ncm/import-historial`), mock email sin body en logs, CSP header, XSS en página pública y clientes.js, defense-in-depth en ClientService, log de filename sanitizado. JWT secret guard ya existía (falso positivo). Pendiente fase 2: reset password, refresh token, PDF bomb limit, pip-audit, sacar `unsafe-inline` de CSP `style-src`.
+- **Librerías actualizadas por pip-audit (2026-06-21):** PyJWT 2.4→2.13, python-multipart 0.0.22→0.0.32, jinja2 3.1.2→3.1.6, FastAPI 0.135→0.138 + starlette 0.52→1.3.1, pydantic 2.7→2.13. ~20 CVEs tapados. Smoke test OK. Pendiente: aiohttp, pillow, pyopenssl (menos críticas, no bloquean prod).
 
 ### Pendiente / frágil
 
