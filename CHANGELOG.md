@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-21 · Organizaciones (estudios) — paso 2: endpoints de invite + registro
+
+- **feat (backend):** 5 endpoints nuevos para gestionar estudios: crear estudio (`POST /api/organizations/create`), ver mi org (`GET /api/organizations/mine`), invitar usuario (`POST /api/organizations/invite`), validar invitación (`GET /api/invitations/{token}`), remover miembro (`DELETE /api/organizations/members/{username}`). Registro existente acepta `invite_token` opcional para unirse a un estudio. Verificado end-to-end.
+
+---
+
 ## 2026-06-21 · Organizaciones (estudios) — paso 1: modelos + migraciones
 
 - **feat (backend):** nuevos modelos `Organization` (estudio con billing propio) e `Invitation` (token para invitar usuarios). Campo `organization_id` en `User` (nullable). 3 migraciones idempotentes que corren en startup. No cambia comportamiento existente.
