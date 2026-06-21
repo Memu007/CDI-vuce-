@@ -1698,6 +1698,13 @@ async def update_user_profile(
                 )
             u.cuit = digits
 
+    # Email editable para contacto/login
+    if "email" in body:
+        raw_email = str(body.get("email") or "").strip().lower()
+        if raw_email and not re.match(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", raw_email):
+            raise HTTPException(status_code=400, detail="Email no válido")
+        u.email = raw_email or None
+
     # Defaults del despachante: solo letras/numeros, max 10. Vacio = limpiar.
     def _sanitize_op_default(raw, max_len=10):
         s = str(raw or "").strip().upper()

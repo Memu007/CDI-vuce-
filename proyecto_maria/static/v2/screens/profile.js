@@ -153,7 +153,7 @@
             const p = data.profile || {};
             nameInput.value = p.name || '';
             cuitInput.value = p.cuit ? CDI.formatCuit(p.cuit) : '';
-            emailEl.textContent = p.email || '—';
+            emailEl.value = p.email || '';
             if (pfDefaultAduana) pfDefaultAduana.value = p.default_aduana_codigo || '';
             if (pfDefaultPuerto) pfDefaultPuerto.value = p.default_puerto_destino || '';
             if (pfDefaultTipoDest) pfDefaultTipoDest.value = p.default_tipo_destinacion || '';
@@ -192,8 +192,13 @@
         const name = String(nameInput.value || '').trim();
         const cuitRaw = String(cuitInput.value || '').trim();
         const cuitNorm = CDI.normalizeCuit(cuitRaw);
+        const emailVal = String(emailEl.value || '').trim().toLowerCase();
         if (cuitRaw && cuitNorm.length !== 11) {
             showError('El CUIT debe tener 11 digitos.');
+            return;
+        }
+        if (emailVal && !emailVal.match(/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/)) {
+            if (CDI.toast) CDI.toast('Email no válido', 'Revisá el formato.', 'error');
             return;
         }
 
@@ -209,6 +214,7 @@
                 body: JSON.stringify({
                     name,
                     cuit: cuitNorm,
+                    email: emailVal,
                     default_aduana_codigo: aduanaVal,
                     default_puerto_destino: puertoVal,
                     default_tipo_destinacion: tipoVal

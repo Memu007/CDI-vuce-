@@ -2737,8 +2737,8 @@ select.input {
     z-index: 210;
     opacity: 0;
     transition: opacity 120ms ease-out, transform 120ms ease-out;
-    display: flex;
-    flex-direction: column;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
     max-height: 90vh;
 }
 .modal.is-open {
@@ -2763,7 +2763,6 @@ select.input {
     flex-direction: column;
     gap: var(--s-4);
     overflow-y: auto;
-    flex: 1 1 auto;
     min-height: 0;
 }
 .modal-footer {
