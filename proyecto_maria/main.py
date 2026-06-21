@@ -1703,6 +1703,10 @@ async def update_user_profile(
         raw_email = str(body.get("email") or "").strip().lower()
         if raw_email and not re.match(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", raw_email):
             raise HTTPException(status_code=400, detail="Email no válido")
+        if raw_email:
+            dup = await db.execute(select(User).where(User.email == raw_email, User.username != u.username))
+            if dup.scalars().first():
+                raise HTTPException(status_code=400, detail="Ese email ya está en uso por otro usuario")
         u.email = raw_email or None
 
     # Defaults del despachante: solo letras/numeros, max 10. Vacio = limpiar.
