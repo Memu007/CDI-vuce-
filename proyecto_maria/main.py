@@ -42,7 +42,7 @@ PROJECT_VERSION = datetime.now().strftime("%Y%m%d%H%M%S")
 from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, pais_reconocido
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido
 from proyecto_maria.pdf_extractor import process_pdf  # Importar el extractor
 import pandas as pd
 from proyecto_maria.core.vuce_connector import get_ncm_data  # VUCE activo en modo mock
@@ -3099,11 +3099,16 @@ async def generate_maria_endpoint(
     Devuelve: archivo TXT descargable
     """
     try:
-        # Validar items
+        # Validar items (validación mínima)
         valid, errors = validate_items_for_maria(request.items)
         if not valid:
             raise HTTPException(status_code=400, detail={"errors": errors})
-        
+
+        # Validación específica de KIT Maria (complementa la anterior)
+        kit_errors, kit_warnings = validate_for_kit_maria(request.items)
+        if kit_errors:
+            raise HTTPException(status_code=400, detail={"errors": [*errors, *kit_errors]})
+
         # Si el user tiene CUIT en su perfil y la request no manda cuit_agr,
         # usamos el del perfil (para que el despachante no tenga que re-escribir
         # su propio CUIT en cada operacion).
@@ -3160,7 +3165,8 @@ async def generate_maria_endpoint(
             "success": True,
             "filename": filename,
             "download_url": f"/download/{filename}",
-            "content": txt_content  # También devolver contenido para preview
+            "content": txt_content,  # También devolver contenido para preview
+            "warnings": kit_warnings,
         }
         
     except HTTPException:

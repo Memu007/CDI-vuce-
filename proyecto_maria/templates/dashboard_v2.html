@@ -589,6 +589,39 @@
                             <pre class="ready-preview-body" id="readyPreview"></pre>
                         </div>
 
+                        <details class="ready-kit-guide" id="readyKitGuide">
+                            <summary class="ready-kit-guide-summary">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                                ¿Cómo cargar este archivo en KIT Maria?
+                            </summary>
+                            <ol class="ready-kit-guide-steps">
+                                <li>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+                                    <span>Abrí KIT Maria en tu PC. Si no lo tenés instalado, descargalo de <strong>afip.gob.ar/aplicativos/kitMaria</strong>.</span>
+                                </li>
+                                <li>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                    <span>Ir a <strong>Archivo → Importar</strong> (o Ctrl+I) y seleccioná el archivo .TXT que descargaste.</span>
+                                </li>
+                                <li>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                    <span>Validá los datos importados. KIT Maria va a marcar errores en rojo si algún campo no cumple. Corregí y volvé a importar.</span>
+                                </li>
+                                <li>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="20 6 9 17 4 12"/></svg>
+                                    <span>Oficializá la declaración cuando todo esté validado. Listo.</span>
+                                </li>
+                            </ol>
+                        </details>
+
+                        <div id="readyWarningsPanel" class="issue-group is-warning" hidden>
+                            <header class="issue-group-header">
+                                <strong>Advertencias de KIT Maria</strong>
+                                <span class="caption" id="readyWarningsCount"></span>
+                            </header>
+                            <ul class="issue-list" id="readyWarningsList"></ul>
+                        </div>
+
                         <div id="readyOrphanPanel" class="ready-orphan-panel" hidden>
                             <div class="ready-orphan-header">
                                 <h3 class="ready-orphan-title">No reconocimos este cliente</h3>

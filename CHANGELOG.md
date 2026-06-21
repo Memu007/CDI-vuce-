@@ -190,6 +190,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-21 · Guía KIT Maria + validación previa
+
+- **feat (frontend):** panel colapsable "¿Cómo cargar este archivo en KIT Maria?" en pantalla Ready, con 4 pasos y íconos SVG. Usa `<details>` nativo, sin JS extra.
+- **feat (backend):** `validate_for_kit_maria()` en `maria_generator.py` — valida reglas específicas de KIT Maria que `validate_items_for_maria` no cubre: NCM mínimo 8 dígitos, descripción mínimo 10 chars, peso > 0, incoterm válido, moneda válida. Devuelve errores (bloquean) y advertencias (no bloquean).
+- **feat (backend):** endpoint `/generate_maria` ahora llama `validate_for_kit_maria` antes de generar. Si hay errores → 400. Si hay solo advertencias → 200 con `warnings` en la respuesta.
+- **feat (frontend):** `finalize.js` muestra advertencias de KIT Maria en un panel sutil debajo del preview del TXT. No bloquea la descarga.
+
 ## 2026-06-21 · Fix multi-tenant NCM + importar planilla maestra
 
 - **fix (backend):** historial NCM pasa de shared a por-owner — cada despachante tiene su propio `ncm_historial_{username}.json`. Elimina leak de knowledge entre despachantes.

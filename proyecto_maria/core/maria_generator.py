@@ -1,6 +1,7 @@
 """
 Generador de archivos TXT en formato MARIA para Sistema SIM de AFIP.
 """
+import re
 import unicodedata
 from datetime import datetime
 
@@ -486,3 +487,49 @@ def validate_items_for_maria(items: list) -> tuple[bool, list]:
             errors.append(f"Item {idx}: Origen no reconocido '{origen}'. Debe indicar un país válido.")
     
     return len(errors) == 0, errors
+
+
+INCOTERMS_VALIDOS = {"FOB", "CIF", "DDP", "EXW", "FCA", "CFR", "CPT", "CIP", "DAP", "DPU"}
+
+
+def validate_for_kit_maria(items: list) -> tuple[list, list]:
+    """Valida reglas específicas de KIT Maria que validate_items_for_maria no cubre.
+
+    Returns:
+        (errores, advertencias) — los errores bloquean la generación,
+        las advertencias se incluyen en la respuesta pero no bloquean.
+    """
+    errores = []
+    advertencias = []
+
+    for idx, item in enumerate(items, 1):
+        ncm_raw = str(item.get("ncm") or item.get("pieza", "") or "").strip()
+        ncm_digits = re.sub(r"\D", "", ncm_raw)
+
+        # NCM: mínimo 8 dígitos
+        if ncm_digits and len(ncm_digits) < 8:
+            errores.append(f"Item {idx}: NCM con menos de 8 dígitos ({ncm_raw}). KIT Maria lo rechaza.")
+        elif ncm_digits and len(ncm_digits) >= 8 and not any(c.isalpha() for c in ncm_raw):
+            advertencias.append(f"Item {idx}: NCM sin letra de control. KIT Maria puede pedirla.")
+
+        # Descripción: mínimo 10 caracteres
+        desc = str(item.get("descripcion", "") or "").strip()
+        if len(desc) < 10:
+            errores.append(f"Item {idx}: Descripción muy corta ({len(desc)} chars). KIT Maria requiere mínimo 10.")
+
+        # Peso > 0
+        peso = float(item.get("peso_kg", item.get("peso_unitario", 0)) or 0)
+        if peso <= 0:
+            errores.append(f"Item {idx}: Peso inválido (≤0). KIT Maria lo rechaza.")
+
+        # Incoterm válido
+        incoterm = str(item.get("incoterm", "") or "").strip().upper()
+        if incoterm and incoterm not in INCOTERMS_VALIDOS:
+            errores.append(f"Item {idx}: Incoterm '{incoterm}' no válido. Debe ser uno de: {', '.join(sorted(INCOTERMS_VALIDOS))}.")
+
+        # Moneda: código de 3 letras
+        moneda = str(item.get("moneda", "") or "").strip().upper()
+        if moneda and (len(moneda) != 3 or not moneda.isalpha()):
+            errores.append(f"Item {idx}: Moneda '{moneda}' no válida. Debe ser código de 3 letras (DOL, EUR, etc.).")
+
+    return errores, advertencias

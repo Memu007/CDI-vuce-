@@ -291,7 +291,8 @@
             lastMaria = {
                 filename: data.filename,
                 download_url: data.download_url,
-                content: data.content || ''
+                content: data.content || '',
+                warnings: data.warnings || []
             };
             CDI.track('maria_generated', {
                 items: items.length,
@@ -396,9 +397,35 @@
         rFilename.textContent = lastMaria.filename || 'MARIA.TXT';
         rPreview.textContent = trimPreview(lastMaria.content || '', 60);
 
+        // Render de advertencias de KIT Maria (no bloquean la descarga)
+        renderReadyWarnings(lastMaria.warnings || []);
+
         // Render del panel "operación huérfana": aparece solo si no hay
         // cliente activo y el user no hizo "Más tarde" en esta operación.
         renderOrphanPanel();
+    }
+
+    /* ---------- Advertencias de KIT Maria ---------- */
+    function renderReadyWarnings(warnings) {
+        const panel = document.getElementById('readyWarningsPanel');
+        const list = document.getElementById('readyWarningsList');
+        const count = document.getElementById('readyWarningsCount');
+        if (!panel || !list) return;
+        if (!warnings || !warnings.length) {
+            panel.hidden = true;
+            list.innerHTML = '';
+            return;
+        }
+        panel.hidden = false;
+        if (count) count.textContent = '· ' + warnings.length;
+        list.innerHTML = warnings.map(function (msg) {
+            var clean = stripLeadingIcon(String(msg));
+            var ref = extractItemRef(clean);
+            return '<li>' +
+                (ref ? '<span class="issue-row">' + CDI.escapeHtml(ref) + '</span>' : '<span class="issue-row"></span>') +
+                '<span class="issue-msg">' + CDI.escapeHtml(clean) + '</span>' +
+                '</li>';
+        }).join('');
     }
 
     /* ---------- Panel "operación huérfana" ---------- */
