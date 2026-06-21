@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-06-21 · Espacio del banner de trial
 
-- **fix (ui):** el banner azul de "15 días de prueba" tenía el margen inferior en 0 y quedaba pegado al botón/card de "Nueva operación". Ahora tiene margen inferior de 0.75rem, igual que arriba.
+- **fix (ui):** ajuste fino del banner azul de "15 días de prueba": margen inferior en 0 lo dejaba pegado al contenido de abajo; ahora tiene 0.5rem de separación abajo, 0.25rem arriba y padding interno más compacto.
 
 ---
 
