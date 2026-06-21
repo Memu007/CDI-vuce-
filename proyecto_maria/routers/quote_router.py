@@ -145,8 +145,22 @@ async def get_public_quote(request: Request, hash: str, db: AsyncSession = Depen
         await db.commit()
         raise HTTPException(status_code=410, detail="El presupuesto ha expirado")
 
+    # Leer estado y canal en vivo de la operación
+    live_estado = None
+    live_canal = None
+    if quote.operation_id:
+        op_res = await db.execute(
+            select(Operation).where(Operation.id == quote.operation_id)
+        )
+        op_live = op_res.scalars().first()
+        if op_live:
+            live_estado = op_live.estado
+            live_canal = op_live.canal
+
     return {
         "success": True,
         "snapshot": quote.snapshot_data,
-        "expires_at": quote.expires_at.isoformat()
+        "expires_at": quote.expires_at.isoformat(),
+        "live_estado": live_estado,
+        "live_canal": live_canal
     }

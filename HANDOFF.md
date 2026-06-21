@@ -124,6 +124,7 @@ CDI-app/
 - **Modal de perfil (2026-06-21):** scroll arreglado con `overflow-y: auto` en el modal + `position: sticky` en header/footer. Antes las secciones expandibles (defaults, seguridad, plan) tapaban los campos de abajo. Email ahora es editable con validación backend.
 - **Tour de bienvenida (2026-06-21):** 7 slides (antes 6). Slide nuevo 6 explica que en el perfil se configuran CUIT y defaults de operación, y que se aplican solos a cada operación nueva.
 - **Landing (2026-06-21):** CTA en el hero abre registro directo (no solo scroll a precio). Sección "Cómo funciona" con 5 pasos. Sacada jerga "Gemini Vision". Credenciales demo solo visibles en localhost. Placeholder de login genérico. Pricing menciona recarga de operaciones extra.
+- **Página pública de estado (2026-06-21):** el link público que se comparte con el cliente ahora muestra un timeline con el estado en vivo de la operación (Borrador → Oficializada → Canal → Liberada). El estado se lee en vivo de la tabla Operation, no del snapshot congelado. El presupuesto (ítems, alícuotas, total) sigue siendo foto fija.
 
 ### Pendiente / frágil
 

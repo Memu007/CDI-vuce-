@@ -79,6 +79,81 @@
             font-size: 0.75rem;
             color: var(--cdi-text-muted);
         }
+        .estado-timeline {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 28px;
+            padding: 16px 0;
+            border-bottom: 1px solid var(--cdi-border);
+        }
+        .estado-step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            flex: 1;
+            position: relative;
+        }
+        .estado-step::before {
+            content: '';
+            position: absolute;
+            top: 14px;
+            left: -50%;
+            width: 100%;
+            height: 2px;
+            background: var(--cdi-border);
+        }
+        .estado-step:first-child::before { display: none; }
+        .estado-step.done::before,
+        .estado-step.active::before {
+            background: var(--cdi-primary);
+        }
+        .estado-dot {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--cdi-bg);
+            border: 2px solid var(--cdi-border);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--cdi-text-muted);
+            z-index: 1;
+        }
+        .estado-step.done .estado-dot {
+            background: var(--cdi-primary);
+            border-color: var(--cdi-primary);
+            color: white;
+        }
+        .estado-step.active .estado-dot {
+            background: var(--cdi-primary);
+            border-color: var(--cdi-primary);
+            color: white;
+            box-shadow: 0 0 0 4px rgba(16,185,129,0.2);
+        }
+        .estado-label {
+            font-size: 0.7rem;
+            margin-top: 6px;
+            text-align: center;
+            color: var(--cdi-text-muted);
+        }
+        .estado-step.done .estado-label,
+        .estado-step.active .estado-label {
+            color: var(--cdi-text);
+            font-weight: 600;
+        }
+        .canal-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-top: 8px;
+        }
+        .canal-verde { background: #dcfce7; color: #166534; }
+        .canal-naranja { background: #fed7aa; color: #9a3412; }
+        .canal-rojo { background: #fecaca; color: #991b1b; }
     </style>
 </head>
 <body>
@@ -92,6 +167,26 @@
             <span id="opCode">--</span>
             <span id="expiresAt">Expira: --</span>
         </div>
+
+        <div id="estadoTimeline" class="estado-timeline" style="display:none">
+            <div class="estado-step" data-step="borrador">
+                <div class="estado-dot">1</div>
+                <span class="estado-label">Borrador</span>
+            </div>
+            <div class="estado-step" data-step="oficializada">
+                <div class="estado-dot">2</div>
+                <span class="estado-label">Oficializada</span>
+            </div>
+            <div class="estado-step" data-step="canal">
+                <div class="estado-dot">3</div>
+                <span class="estado-label">Canal asignado</span>
+            </div>
+            <div class="estado-step" data-step="liberada">
+                <div class="estado-dot">4</div>
+                <span class="estado-label">Liberada</span>
+            </div>
+        </div>
+        <div id="canalInfo" style="text-align:center; display:none; margin-bottom:20px;"></div>
 
         <div id="itemsContainer">
             <!-- Items rendered here -->
@@ -126,6 +221,30 @@
 
                 const snap = data.snapshot;
                 const op = snap.operation;
+
+                // Estado en vivo
+                const estado = data.live_estado;
+                const canal = data.live_canal;
+                const timeline = document.getElementById('estadoTimeline');
+                const canalInfo = document.getElementById('canalInfo');
+
+                if (estado && timeline) {
+                    timeline.style.display = 'flex';
+                    const steps = ['borrador', 'oficializada', 'canal', 'liberada'];
+                    const currentIdx = steps.indexOf(estado);
+                    if (currentIdx === -1) currentIdx = 0;
+
+                    timeline.querySelectorAll('.estado-step').forEach((step, idx) => {
+                        step.classList.remove('done', 'active');
+                        if (idx < currentIdx) step.classList.add('done');
+                        if (idx === currentIdx) step.classList.add('active');
+                    });
+
+                    if (canal && (estado === 'canal' || estado === 'liberada')) {
+                        canalInfo.style.display = 'block';
+                        canalInfo.innerHTML = '<span class="canal-badge canal-' + canal + '">Canal ' + canal + '</span>';
+                    }
+                }
                 
                 document.getElementById('brandingName').textContent = snap.branding.company_name;
                 document.getElementById('opCode').textContent = `Ref: ${op.op_code || op.id.split('-')[0]}`;
