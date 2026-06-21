@@ -894,9 +894,7 @@
                     <div class="upload-progress-text">
                         <p class="upload-progress-title">Importando…</p>
                     </div>
-                </div>
-
-                <div class="import-result" id="importResult" hidden></div>
+                        <div class="import-result" id="importResult" hidden></div>
             </div>
 
             <div class="tour-welcome-actions manual-upload-actions">
@@ -907,46 +905,87 @@
 
 
 
-    <!-- Tour de bienvenida: wizard con slides explicativas -->
+    <!-- Tour de bienvenida: wizard con slides explicativas (MEJORADO v2) -->
     <div class="tour-welcome" id="tourWelcomeModal" hidden role="dialog" aria-modal="true" aria-labelledby="tourSlideTitle">
         <div class="tour-welcome-card">
+            <!-- Barra de progreso superior -->
+            <div class="tour-welcome-progress" id="tourWelcomeProgress">
+                <div class="tour-welcome-progress-fill" id="tourWelcomeProgressFill"></div>
+            </div>
             <div class="tour-welcome-head">
-                <span class="tour-welcome-kicker">Bienvenida</span>
-                <p class="tour-welcome-intro">De la factura del proveedor al archivo MARIA.TXT en minutos. Sin tipear formularios.</p>
+                <div class="tour-welcome-head-row">
+                    <span class="tour-welcome-kicker" id="tourWelcomeKicker">Bienvenida</span>
+                    <button type="button" class="tour-welcome-skip-btn" id="tourWelcomeSkip" aria-label="Saltar tour">Saltar ×</button>
+                </div>
+                <p class="tour-welcome-intro">De la factura del proveedor al archivo MARIA.TXT en minutos.</p>
                 <div class="tour-welcome-dots" id="tourWelcomeDots" aria-hidden="true"></div>
             </div>
             <div class="tour-welcome-slides" id="tourWelcomeSlides">
-                <article class="tour-welcome-slide is-active" data-slide="0">
-                    <span class="tour-welcome-step-num">1</span>
-                    <h2 id="tourSlideTitle">Subí la factura</h2>
-                    <p>PDF o Excel. CDI lee solo los productos, cantidades, precios y NCM. Vos no tipeás nada.</p>
-                </article>
-                <article class="tour-welcome-slide" data-slide="1">
-                    <span class="tour-welcome-step-num">2</span>
-                    <h2>Revisá y corregí</h2>
-                    <p>Te mostramos todo en una tabla simple. Editás lo que falta y seguís.</p>
-                </article>
-                <article class="tour-welcome-slide" data-slide="2">
-                    <span class="tour-welcome-step-num">3</span>
-                    <h2>El cliente aparece solo</h2>
-                    <p>Si el importador ya está cargado, CDI lo reconoce por el CUIT y trae su historial.</p>
-                </article>
-                <article class="tour-welcome-slide" data-slide="3">
-                    <span class="tour-welcome-step-num">4</span>
-                    <h2>CDI recuerda por vos</h2>
-                    <p>Cada producto que cargás queda guardado. La próxima vez te sugiere el NCM.</p>
-                </article>
-                <article class="tour-welcome-slide" data-slide="4">
-                    <span class="tour-welcome-step-num">5</span>
-                    <h2>Descargá y listo</h2>
-                    <p>Apretás un botón y tenés el MARIA.TXT para presentar en aduana.</p>
-                </article>
+                <div class="tour-welcome-track" id="tourWelcomeTrack">
+                    <article class="tour-welcome-slide is-active" data-slide="0" data-accent="#10b981">
+                        <div class="tour-welcome-icon-wrap">
+                            <svg class="tour-welcome-icon" viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2h9l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h4"/></svg>
+                        </div>
+                        <span class="tour-welcome-step-num">1</span>
+                        <h2 id="tourSlideTitle">Subí la factura del proveedor</h2>
+                        <p>PDF o Excel. Nuestra IA lee productos, cantidades, precios y NCM. Vos no tipeás nada, vos solo revisás.</p>
+                    </article>
+                    <article class="tour-welcome-slide" data-slide="1" data-accent="#3b82f6">
+                        <div class="tour-welcome-icon-wrap">
+                            <svg class="tour-welcome-icon" viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+                        </div>
+                        <span class="tour-welcome-step-num">2</span>
+                        <h2>Revisá y corregí en una tabla</h2>
+                        <p>Todo lo que la IA detectó queda en una grilla editable. Cambiás lo que esté mal, agregás lo que falte y avanzás.</p>
+                    </article>
+                    <article class="tour-welcome-slide" data-slide="2" data-accent="#8b5cf6">
+                        <div class="tour-welcome-icon-wrap">
+                            <svg class="tour-welcome-icon" viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                        </div>
+                        <span class="tour-welcome-step-num">3</span>
+                        <h2>El cliente aparece solo</h2>
+                        <p>Si el nombre del importador ya está en tu base, CDI lo reconoce y trae su historial. Si no existe, lo creás en 2 clics sin salir del flujo. Funciona con o sin CUIT (importadores extranjeros).</p>
+                    </article>
+                    <article class="tour-welcome-slide is-featured" data-slide="3" data-accent="#f97316">
+                        <div class="tour-welcome-icon-wrap is-pulse">
+                            <svg class="tour-welcome-icon" viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>
+                        </div>
+                        <span class="tour-welcome-step-num">4</span>
+                        <h2>Tu catálogo se aprende solo</h2>
+                        <p>Cada producto que corregís se guarda automáticamente en el catálogo del cliente. La próxima factura con ese producto se autocompleta solo: NCM, origen y peso unitario.</p>
+                        <div class="tour-welcome-callout">
+                            <div class="tour-welcome-callout-label"><span>⭐</span> Lo que nos diferencia</div>
+                            <div class="tour-welcome-callout-text">Otros sistemas te hacen tipear lo mismo cada vez. CDI no.</div>
+                        </div>
+                    </article>
+                    <article class="tour-welcome-slide is-notes" data-slide="4" data-accent="#ec4899">
+                        <div class="tour-welcome-icon-wrap">
+                            <svg class="tour-welcome-icon" viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
+                        </div>
+                        <span class="tour-welcome-step-num">5</span>
+                        <h2>Dejá notas por cliente</h2>
+                        <p>Anotá lo que necesites recordar para la próxima: "este proveedor exige declaración jurada", "falta certificado ANMAT", "pedir packing list". Las notas se reabren solas cuando subís otra factura del mismo cliente.</p>
+                        <div class="tour-welcome-callout tour-welcome-callout-notes">
+                            <div class="tour-welcome-callout-label"><span>📌</span> Tu memoria institucional</div>
+                            <div class="tour-welcome-callout-text">No dependés de tu memoria ni de un cuaderno. CDI recuerda por vos.</div>
+                        </div>
+                    </article>
+                    <article class="tour-welcome-slide" data-slide="5" data-accent="#0f172a">
+                        <div class="tour-welcome-icon-wrap">
+                            <svg class="tour-welcome-icon" viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        </div>
+                        <span class="tour-welcome-step-num">6</span>
+                        <h2>Descargá el MARIA.TXT</h2>
+                        <p>Apretás un botón y tenés el archivo listo para pegar en tu Kit SIM 7.0 (ARCA · Malvina). Sin copiar ni pegar a mano. Sin errores.</p>
+                    </article>
+                </div>
             </div>
             <div class="tour-welcome-actions">
-                <button type="button" class="btn btn-ghost btn-sm" id="tourWelcomeSkip">Saltar</button>
-                <button type="button" class="btn btn-ghost btn-sm" id="tourWelcomePrev" hidden>Anterior</button>
-                <button type="button" class="btn btn-primary btn-sm" id="tourWelcomeNext">Siguiente</button>
-                <button type="button" class="btn btn-primary btn-sm" id="tourWelcomeStart" hidden>Empezar operación</button>
+                <button type="button" class="btn btn-ghost btn-sm" id="tourWelcomePrev" hidden>← Anterior</button>
+                <span class="tour-welcome-counter" id="tourWelcomeCounter">1 / 6</span>
+                <span class="tour-welcome-actions-spacer"></span>
+                <button type="button" class="btn btn-primary btn-sm" id="tourWelcomeNext">Siguiente →</button>
+                <button type="button" class="btn btn-primary btn-sm tour-welcome-btn-start" id="tourWelcomeStart" hidden>▶ Empezar a operar</button>
             </div>
         </div>
     </div>

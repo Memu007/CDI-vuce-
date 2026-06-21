@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-20 · Tour Mejorado v2
+
+- **feat (ui):** Rediseño completo del tour de bienvenida a v2 con 6 slides, iconos SVG, barra de progreso interactiva, track deslizante, animaciones sutiles optimizadas y callouts para diferenciar el producto.
+
+---
+
 ## 2026-06-20 · Iteración C: Bug Fixes & UX
 
 - **fix (admin):** Reemplazo de `func.strftime` (SQLite-only) por `sqlalchemy.extract` en `/api/admin/cohort-retention` para compatibilidad con PostgreSQL en producción.

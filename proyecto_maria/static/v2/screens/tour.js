@@ -1,5 +1,5 @@
 /* ============================================================
-   CDI v2 — Wizard de bienvenida (5 slides)
+   CDI v2 — Wizard de bienvenida (6 slides, MEJORADO v2)
    ============================================================ */
 (function () {
     'use strict';
@@ -8,7 +8,7 @@
     const KEY = 'cdi_tour_v2';
     const FORCE_KEY = 'cdi_tour_forced_after_signup';
     const SIGNUP_SESSION_KEY = 'cdi_force_tour_after_signup';
-    const WELCOME_SLIDES_COUNT = 5;
+    const WELCOME_SLIDES_COUNT = 6;
     let welcomeCurrent = 0;
 
     function getState() {
@@ -72,7 +72,60 @@
         slides.forEach((s, i) => {
             s.classList.toggle('is-active', i === idx);
         });
+        // Forzar reflow en el slide activo para que las animaciones
+        // de entrada (icon-pop, num-pop, text-rise, callout-rise, shimmer)
+        // vuelvan a dispararse desde 0 cada vez que se entra al slide.
+        const active = slides[idx];
+        if (active) {
+            const elements = active.querySelectorAll('.tour-welcome-icon-wrap, .tour-welcome-step-num, h2, p, .tour-welcome-callout');
+            elements.forEach(el => {
+                // Reset: quitar y volver a aplicar la animación
+                el.style.animation = 'none';
+                // Forzar reflow
+                void el.offsetWidth;
+                el.style.animation = '';
+            });
+        }
         renderWelcomeDots();
+
+        // Track deslizante: transladar el track al slide activo
+        const track = document.getElementById('tourWelcomeTrack');
+        if (track) {
+            track.style.transform = `translateX(-${idx * 100}%)`;
+        }
+
+        // Actualizar barra de progreso
+        const progressFill = document.getElementById('tourWelcomeProgressFill');
+        if (progressFill) {
+            const pct = ((idx + 1) / WELCOME_SLIDES_COUNT) * 100;
+            progressFill.style.width = pct + '%';
+        }
+
+        // Actualizar counter
+        const counter = document.getElementById('tourWelcomeCounter');
+        if (counter) {
+            counter.textContent = `${idx + 1} / ${WELCOME_SLIDES_COUNT}`;
+        }
+
+        // Actualizar kicker + accent dinámico por slide
+        const slide = slides[idx];
+        if (slide) {
+            const accent = slide.dataset.accent || '#0f766e';
+            const modal = document.getElementById('tourWelcomeModal');
+            if (modal) modal.style.setProperty('--c-accent', accent);
+            const isFeatured = slide.classList.contains('is-featured');
+            const isNotes = slide.classList.contains('is-notes');
+            const kicker = document.getElementById('tourWelcomeKicker');
+            if (kicker) {
+                let label = `Paso ${idx + 1}`;
+                if (isFeatured) label = '⭐ Diferencial CDI';
+                else if (isNotes) label = '📌 Memoria del cliente';
+                else if (idx === 0) label = 'Bienvenida';
+                else if (idx === WELCOME_SLIDES_COUNT - 1) label = 'Cierre';
+                kicker.textContent = label;
+            }
+        }
+
         const btnPrev = document.getElementById('tourWelcomePrev');
         const btnNext = document.getElementById('tourWelcomeNext');
         const btnStart = document.getElementById('tourWelcomeStart');
@@ -124,7 +177,37 @@
         track('tour_welcome_skipped');
     }
 
-    function init() {
+    // Demo user: siempre dispara el tour una vez por sesión (para testing/demo).
+    // Llamado por init() antes que cualquier otra check.
+    const DEMO_SESSION_KEY = 'cdi_tour_demo_session_shown';
+    async function checkDemoForceTour() {
+        try {
+            const r = await fetch('/auth/current_user', { credentials: 'include' });
+            if (!r.ok) return false;
+            const u = await r.json();
+            if (u.username !== 'demo') return false;
+            // Una vez por sesión: si ya se mostró en esta sesión, no repetir.
+            try {
+                if (sessionStorage.getItem(DEMO_SESSION_KEY) === '1') return false;
+                sessionStorage.setItem(DEMO_SESSION_KEY, '1');
+            } catch (_) {}
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    async function init() {
+        // Demo user: forzar tour una vez por sesión (override de cualquier estado previo)
+        if (await checkDemoForceTour()) {
+            setState('pending'); // reset por si estaba 'completed' o 'dismissed'
+            setTimeout(() => {
+                try { CDI.goTo && CDI.goTo('upload'); } catch (_) {}
+                showWelcome();
+            }, 700);
+            track('tour_forced_demo_user');
+            return;
+        }
         if (shouldForceAfterSignup()) {
             markForcedAfterSignup();
             setState('welcome_seen');
