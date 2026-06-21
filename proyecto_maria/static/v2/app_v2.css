@@ -2763,7 +2763,7 @@ select.input {
     flex-direction: column;
     gap: var(--s-4);
     overflow-y: auto;
-    flex: 1 1 0;
+    flex: 1 1 auto;
     min-height: 0;
 }
 .modal-footer {
