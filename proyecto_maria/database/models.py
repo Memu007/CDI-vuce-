@@ -51,6 +51,15 @@ class User(Base):
         index=True,
     )
 
+    # Organización (estudio). Si tiene valor, el user es miembro de un estudio
+    # y su billing se lee de la Organization, no de su propio User.
+    organization_id = Column(
+        String,
+        ForeignKey("organizations.id"),
+        nullable=True,
+        index=True,
+    )
+
     # --- Billing (simulated / stripe / mercadopago) ---
     # none=sin pm cargado, trial=prueba gratis, active=cobrando, past_due=trial
     # vencido sin cobro exitoso, canceled=dado de baja.
@@ -432,3 +441,48 @@ class PublicQuote(Base):
     expires_at = Column(DateTime(timezone=True), nullable=False)
     
     operation = relationship("Operation")
+
+
+class Organization(Base):
+    """Estudio de despachantes: un admin paga, varios usuarios operan."""
+    __tablename__ = "organizations"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String(200), nullable=False)
+    owner_username = Column(
+        String(50),
+        ForeignKey("users.username"),
+        nullable=False,
+        index=True,
+    )
+
+    # Billing de la org (espeja los campos de User)
+    plan = Column(String(20), default="premium")
+    billing_status = Column(String(20), default="none")
+    trial_ends_at = Column(DateTime(timezone=True), nullable=True)
+    ops_used_this_period = Column(Integer, default=0)
+    extra_ops_remaining = Column(Integer, default=0)
+    mp_preapproval_id = Column(String(100), nullable=True)
+    mp_plan_id = Column(String(100), nullable=True)
+    billing_period_started_at = Column(DateTime(timezone=True), nullable=True)
+    last_payment_id = Column(String(100), nullable=True)
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    members = relationship("User", foreign_keys="User.organization_id", backref="organization")
+    invitations = relationship("Invitation", back_populates="org")
+
+
+class Invitation(Base):
+    """Invitación a unirse a una organización."""
+    __tablename__ = "invitations"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    org_id = Column(String, ForeignKey("organizations.id"), nullable=False, index=True)
+    email = Column(String(100), nullable=False)
+    token = Column(String(100), unique=True, nullable=False)
+    status = Column(String(20), default="pending")  # pending / accepted / expired
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    expires_at = Column(DateTime(timezone=True), nullable=False)
+
+    org = relationship("Organization", back_populates="invitations")

@@ -965,6 +965,130 @@ async def _migrate_clients_email_nullable():
         print(f"⚠️ No se pudo migrar clients: {mig_err}")
 
 
+async def _migrate_create_organizations_table():
+    """Crea la tabla `organizations` si no existe (idempotente)."""
+    from proyecto_maria.database.connection import engine, IS_SQLITE
+    try:
+        async with engine.begin() as conn:
+            if IS_SQLITE:
+                await conn.exec_driver_sql("""
+                    CREATE TABLE IF NOT EXISTS organizations (
+                        id VARCHAR PRIMARY KEY,
+                        name VARCHAR(200) NOT NULL,
+                        owner_username VARCHAR(50) NOT NULL
+                            REFERENCES users(username),
+                        plan VARCHAR(20) DEFAULT 'premium',
+                        billing_status VARCHAR(20) DEFAULT 'none',
+                        trial_ends_at TIMESTAMP NULL,
+                        ops_used_this_period INTEGER DEFAULT 0,
+                        extra_ops_remaining INTEGER DEFAULT 0,
+                        mp_preapproval_id VARCHAR(100) NULL,
+                        mp_plan_id VARCHAR(100) NULL,
+                        billing_period_started_at TIMESTAMP NULL,
+                        last_payment_id VARCHAR(100) NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                """)
+                await conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS ix_organizations_owner ON organizations (owner_username)"
+                )
+            else:
+                await conn.exec_driver_sql("""
+                    CREATE TABLE IF NOT EXISTS organizations (
+                        id VARCHAR PRIMARY KEY,
+                        name VARCHAR(200) NOT NULL,
+                        owner_username VARCHAR(50) NOT NULL
+                            REFERENCES users(username),
+                        plan VARCHAR(20) DEFAULT 'premium',
+                        billing_status VARCHAR(20) DEFAULT 'none',
+                        trial_ends_at TIMESTAMP NULL,
+                        ops_used_this_period INTEGER DEFAULT 0,
+                        extra_ops_remaining INTEGER DEFAULT 0,
+                        mp_preapproval_id VARCHAR(100) NULL,
+                        mp_plan_id VARCHAR(100) NULL,
+                        billing_period_started_at TIMESTAMP NULL,
+                        last_payment_id VARCHAR(100) NULL,
+                        created_at TIMESTAMP DEFAULT now()
+                    )
+                """)
+                await conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS ix_organizations_owner ON organizations (owner_username)"
+                )
+    except Exception as mig_err:
+        print(f"⚠️ No se pudo crear organizations: {mig_err}")
+
+
+async def _migrate_add_user_organization_id():
+    """Agrega `users.organization_id` (FK a organizations.id) si no existe."""
+    from proyecto_maria.database.connection import engine, IS_SQLITE
+    try:
+        async with engine.begin() as conn:
+            if IS_SQLITE:
+                cols = await conn.exec_driver_sql("PRAGMA table_info(users)")
+                col_names = {r[1] for r in cols.fetchall()}
+                if "organization_id" not in col_names:
+                    await conn.exec_driver_sql(
+                        "ALTER TABLE users ADD COLUMN organization_id VARCHAR REFERENCES organizations(id)"
+                    )
+                    await conn.exec_driver_sql(
+                        "CREATE INDEX IF NOT EXISTS ix_users_organization_id ON users (organization_id)"
+                    )
+            else:
+                await conn.exec_driver_sql("""
+                    DO $$ BEGIN
+                        ALTER TABLE users ADD COLUMN IF NOT EXISTS organization_id VARCHAR;
+                        IF NOT EXISTS (
+                            SELECT 1 FROM pg_constraint WHERE conname = 'users_organization_id_fkey'
+                        ) THEN
+                            ALTER TABLE users
+                                ADD CONSTRAINT users_organization_id_fkey
+                                FOREIGN KEY (organization_id) REFERENCES organizations(id);
+                        END IF;
+                    END $$;
+                """)
+                await conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS ix_users_organization_id ON users (organization_id)"
+                )
+    except Exception as mig_err:
+        print(f"⚠️ No se pudo migrar users.organization_id: {mig_err}")
+
+
+async def _migrate_create_invitations_table():
+    """Crea la tabla `invitations` si no existe (idempotente)."""
+    from proyecto_maria.database.connection import engine, IS_SQLITE
+    try:
+        async with engine.begin() as conn:
+            if IS_SQLITE:
+                await conn.exec_driver_sql("""
+                    CREATE TABLE IF NOT EXISTS invitations (
+                        id VARCHAR PRIMARY KEY,
+                        org_id VARCHAR NOT NULL REFERENCES organizations(id),
+                        email VARCHAR(100) NOT NULL,
+                        token VARCHAR(100) UNIQUE NOT NULL,
+                        status VARCHAR(20) DEFAULT 'pending',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        expires_at TIMESTAMP NOT NULL
+                    )
+                """)
+            else:
+                await conn.exec_driver_sql("""
+                    CREATE TABLE IF NOT EXISTS invitations (
+                        id VARCHAR PRIMARY KEY,
+                        org_id VARCHAR NOT NULL REFERENCES organizations(id),
+                        email VARCHAR(100) NOT NULL,
+                        token VARCHAR(100) UNIQUE NOT NULL,
+                        status VARCHAR(20) DEFAULT 'pending',
+                        created_at TIMESTAMP DEFAULT now(),
+                        expires_at TIMESTAMP NOT NULL
+                    )
+                """)
+            await conn.exec_driver_sql(
+                "CREATE INDEX IF NOT EXISTS ix_invitations_org_id ON invitations (org_id)"
+            )
+    except Exception as mig_err:
+        print(f"⚠️ No se pudo crear invitations: {mig_err}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Eventos de ciclo de vida de la aplicación (Startup/Shutdown)"""
@@ -983,6 +1107,10 @@ async def lifespan(app: FastAPI):
     await _migrate_add_client_fecha_inic_activ()
     await _migrate_sync_operations_columns()
     await _migrate_create_telemetry_events_table()
+    # Organizaciones: crear tabla orgs primero, luego FK en users, luego invitations
+    await _migrate_create_organizations_table()
+    await _migrate_add_user_organization_id()
+    await _migrate_create_invitations_table()
     await _check_expired_trials()
     
     # Montar Admin Router si no está montado
@@ -2094,6 +2222,9 @@ async def dev_run_migrations(user=Depends(require_admin)):
         ("client_fecha_inic_activ", _migrate_add_client_fecha_inic_activ),
         ("sync_operations_columns", _migrate_sync_operations_columns),
         ("telemetry_events", _migrate_create_telemetry_events_table),
+        ("organizations_table", _migrate_create_organizations_table),
+        ("user_organization_id", _migrate_add_user_organization_id),
+        ("invitations_table", _migrate_create_invitations_table),
     ]
     for label, fn in migrations:
         try:
