@@ -123,14 +123,22 @@
                     e.stopPropagation();
                     const idx = parseInt(assist.getAttribute('data-assist'), 10);
                     console.log('[ncm] click assist row', idx, assist);
-                    openSpotlight(idx);
+                    try {
+                        openSpotlight(idx);
+                    } catch (err) {
+                        console.error('[ncm] ERROR opening spotlight', err);
+                    }
                     return;
                 }
                 const notePill = e.target && e.target.closest && e.target.closest('[data-note-pill]');
                 if (notePill) {
                     e.preventDefault();
                     e.stopPropagation();
-                    onNotePillClick.call(notePill, e);
+                    try {
+                        onNotePillClick.call(notePill, e);
+                    } catch (err) {
+                        console.error('[ncm] ERROR on note pill click', err);
+                    }
                     return;
                 }
             });
