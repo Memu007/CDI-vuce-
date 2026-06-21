@@ -16,6 +16,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix (security):** `clientes.js` escapa mensaje de error del backend antes de inyectarlo en el DOM.
 - **fix (security):** `ClientService` ahora acepta `owner_username` en get/get_clients/update/delete/detect (defense in depth — los endpoints de main.py ya filtraban con `_get_owned_client`).
 - **fix (security):** Log de upload PDF usa `sanitize_filename` en vez de imprimir el nombre crudo del archivo.
+- **fix (security):** Todos los uploads de Excel/CSV ahora usan `validate_file_upload` con magic bytes: `/upload_excel/`, `/upload_excel_v2/`, `/api/clientes/import`, `/api/ncm/import-historial`. Antes solo validaban extensión.
 
 ---
 

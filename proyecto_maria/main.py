@@ -3099,23 +3099,13 @@ async def upload_excel(
     Requiere sesión activa.
     """
     try:
-        # Validar tipo de archivo
-        if not file.filename.lower().endswith(('.xlsx', '.xls')):
-            raise HTTPException(status_code=400, detail="Solo se permiten archivos Excel (.xlsx, .xls)")
-
-        # Leer el archivo Excel
-        contents = await file.read()
-
+        from proyecto_maria.security.file_security import validate_file_upload, sanitize_filename
         max_upload_bytes = _get_max_upload_bytes()
-        if len(contents) > max_upload_bytes:
-            max_mb = max_upload_bytes / 1024 / 1024
-            raise HTTPException(
-                status_code=413,
-                detail=f"El archivo excede el tamaño máximo permitido ({max_mb:.0f} MB)"
-            )
+        contents = await validate_file_upload(file, 'excel', max_size=max_upload_bytes)
+
         # Sanitizar nombre de archivo (OWASP A1 - Path Traversal)
         import tempfile
-        safe_name = os.path.basename(file.filename).replace('..', '_')
+        safe_name = sanitize_filename(file.filename or 'upload.xlsx')
         temp_fd, temp_filename = tempfile.mkstemp(suffix=os.path.splitext(safe_name)[1])
 
         # Guardar temporalmente
@@ -4249,9 +4239,17 @@ async def import_clientes(
     username = user["username"]
     filename = (file.filename or "").lower()
 
-    # Leer archivo
+    # Validar archivo: magic bytes + tamaño + contenido
+    from proyecto_maria.security.file_security import validate_file_upload
+    file_type = 'csv' if filename.endswith('.csv') else 'excel'
     try:
-        content = await file.read()
+        content = await validate_file_upload(file, file_type, max_size=10 * 1024 * 1024)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo: {str(e)[:120]}")
+
+    try:
         if filename.endswith(".csv"):
             try:
                 df = pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False)
@@ -5422,17 +5420,9 @@ async def upload_excel_v2(
     Review de v2. Si el usuario elige un cliente con `column_mapping`, las
     columnas se renombran a los canónicos antes de extraer.
     """
-    if not file.filename.lower().endswith((".xlsx", ".xls")):
-        raise HTTPException(status_code=400, detail="Solo .xlsx o .xls")
-
-    contents = await file.read()
+    from proyecto_maria.security.file_security import validate_file_upload, sanitize_filename
     max_upload_bytes = _get_max_upload_bytes()
-    if len(contents) > max_upload_bytes:
-        max_mb = max_upload_bytes / 1024 / 1024
-        raise HTTPException(
-            status_code=413,
-            detail=f"El archivo excede el tamaño máximo permitido ({max_mb:.0f} MB)",
-        )
+    contents = await validate_file_upload(file, 'excel', max_size=max_upload_bytes)
 
     mapping: dict = {}
     if cliente_id and use_mapping:
@@ -5444,7 +5434,7 @@ async def upload_excel_v2(
             pass
 
     import tempfile
-    safe_name = os.path.basename(file.filename).replace("..", "_")
+    safe_name = sanitize_filename(file.filename or 'upload.xlsx')
     temp_fd, temp_filename = tempfile.mkstemp(suffix=os.path.splitext(safe_name)[1])
     try:
         with os.fdopen(temp_fd, "wb") as f:
@@ -6170,8 +6160,17 @@ async def import_ncm_historial(
     username = user["username"]
     filename = (file.filename or "").lower()
 
+    # Validar archivo: magic bytes + tamaño + contenido
+    from proyecto_maria.security.file_security import validate_file_upload
+    file_type = 'csv' if filename.endswith('.csv') else 'excel'
     try:
-        content = await file.read()
+        content = await validate_file_upload(file, file_type, max_size=10 * 1024 * 1024)
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo: {str(e)[:120]}")
+
+    try:
         if filename.endswith(".csv"):
             try:
                 df = pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False)
