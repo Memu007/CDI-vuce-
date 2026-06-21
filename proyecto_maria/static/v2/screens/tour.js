@@ -8,7 +8,7 @@
     const KEY = 'cdi_tour_v2';
     const FORCE_KEY = 'cdi_tour_forced_after_signup';
     const SIGNUP_SESSION_KEY = 'cdi_force_tour_after_signup';
-    const WELCOME_SLIDES_COUNT = 6;
+    const WELCOME_SLIDES_COUNT = 7;
     let welcomeCurrent = 0;
 
     function getState() {
