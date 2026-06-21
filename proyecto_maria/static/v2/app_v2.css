@@ -2763,6 +2763,8 @@ select.input {
     flex-direction: column;
     gap: var(--s-4);
     overflow-y: auto;
+    flex: 1 1 0;
+    min-height: 0;
 }
 .modal-footer {
     padding: var(--s-3) var(--s-5) var(--s-4);
