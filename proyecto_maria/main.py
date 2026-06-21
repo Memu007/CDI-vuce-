@@ -2596,6 +2596,12 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
     if not re.match(r'^[a-zA-Z0-9_-]{3,30}$', request.username):
         raise HTTPException(status_code=400, detail="Username inválido. Solo se permiten letras, números, guiones y guiones bajos (3-30 caracteres)")
 
+    # Validar formato de email
+    clean_email = (request.email or "").strip().lower()
+    if not clean_email or not re.match(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$', clean_email):
+        raise HTTPException(status_code=400, detail="Email no válido. Debe tener formato usuario@dominio.com")
+    request.email = clean_email
+
     # Verificar si el username ya existe
     result = await db.execute(select(User).where(User.username == request.username))
     if result.scalars().first():

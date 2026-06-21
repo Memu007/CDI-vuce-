@@ -14,6 +14,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix (perf):** modal de perfil más rápido: animación reducida a 120ms, `backdrop-filter: blur` eliminado del overlay (era costoso en GPU).
 - **fix (ux):** modal de perfil: al expandir secciones (defaults, cambiar contraseña, plan) el contenido de abajo quedaba tapado. Reestructurado con CSS Grid + `overflow:hidden` en `.modal` para que el body scrollee de verdad y el footer quede fijo.
 - **feat (perfil):** email ahora es editable en el modal de perfil. El backend valida formato y chequea que no esté en uso por otro usuario antes de guardar.
+- **fix (backend):** registro `/auth/register` no validaba formato de email — aceptaba cualquier texto. Ahora valida con regex antes de crear el usuario. Frontend también valida antes de enviar.
 
 ---
 

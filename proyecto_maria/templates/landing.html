@@ -546,6 +546,18 @@
         const payload = {};
         new FormData(form).forEach((v, k) => { payload[k] = v; });
 
+        // Validar email en frontend antes de mandar al backend
+        if (payload.email) {
+            payload.email = payload.email.trim().toLowerCase();
+            if (!payload.email.match(/^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/)) {
+                errorEl.textContent = 'Email no válido. Debe tener formato usuario@dominio.com';
+                errorEl.hidden = false;
+                btn.disabled = false;
+                btn.textContent = original;
+                return;
+            }
+        }
+
         if (form === forms.register && !payload.username) {
             payload.username = deriveUsernameFromEmail(payload.email);
         }
