@@ -49,6 +49,7 @@ python-dotenv                # .env file support
 # SECURITY (Required)
 # ==========================================
 slowapi==0.1.9               # Rate limiting
+python-magic>=0.4.27         # Magic bytes validation for file uploads
 python-jose==3.5.0           # JWT tokens
 PyJWT>=2.13.0                # JWT tokens — PYSEC-2026-120 y otros
 

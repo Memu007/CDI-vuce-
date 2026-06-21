@@ -13,7 +13,10 @@ import io
 from pathlib import Path
 from typing import Optional
 from fastapi import HTTPException, UploadFile
-import magic  # python-magic
+try:
+    import magic  # python-magic
+except ImportError:
+    magic = None
 
 # Allowed file extensions
 ALLOWED_EXTENSIONS = {
@@ -174,11 +177,13 @@ async def validate_file_upload(
         raise HTTPException(400, "File is empty")
 
     # Validate MIME type using magic bytes
-    try:
-        mime = magic.from_buffer(contents, mime=True)
-    except Exception:
-        # Fallback: If python-magic not installed, skip MIME check
+    if magic is None:
         mime = None
+    else:
+        try:
+            mime = magic.from_buffer(contents, mime=True)
+        except Exception:
+            mime = None
 
     if mime and mime not in ALLOWED_MIME_TYPES.get(file_type, []):
         raise HTTPException(
