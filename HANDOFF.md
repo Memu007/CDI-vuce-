@@ -123,7 +123,7 @@ CDI-app/
 - Smoke local: `./scripts/testing/smoke_friccion.sh` y `./scripts/testing/smoke_quotes.sh` (con server arriba).
 - **Modal de perfil (2026-06-21):** scroll arreglado con `overflow-y: auto` en el modal + `position: sticky` en header/footer. Antes las secciones expandibles (defaults, seguridad, plan) tapaban los campos de abajo. Email ahora es editable con validación backend.
 - **Tour de bienvenida (2026-06-21):** 7 slides (antes 6). Slide nuevo 6 explica que en el perfil se configuran CUIT y defaults de operación, y que se aplican solos a cada operación nueva.
-- **Landing (2026-06-21):** CTA en el hero abre registro directo (no solo scroll a precio). Sacada jerga "Gemini Vision". Credenciales demo solo visibles en localhost. Placeholder de login genérico.
+- **Landing (2026-06-21):** CTA en el hero abre registro directo (no solo scroll a precio). Sección "Cómo funciona" con 5 pasos. Sacada jerga "Gemini Vision". Credenciales demo solo visibles en localhost. Placeholder de login genérico. Pricing menciona recarga de operaciones extra.
 
 ### Pendiente / frágil
 
