@@ -9,12 +9,12 @@
 # ==========================================
 # WEB FRAMEWORK (Required)
 # ==========================================
-fastapi>=0.115.0              # Modern web framework (mantiene Starlette >= 0.47.2)
+fastapi>=0.138.0              # Modern web framework (mantiene Starlette >= 1.3.1)
 uvicorn[standard]>=0.29.0     # ASGI server
 gunicorn>=22.0.0
-python-multipart>=0.0.18
-starlette>=0.47.2             # CVE-2024-47874, CVE-2025-54121
-jinja2>=3.1.0                 # Required for Jinja2Templates (HTML rendering)
+python-multipart>=0.0.31     # GHSA-5rvq-cxj2-64vf y otros
+starlette>=1.3.1              # CVE-2024-47874, CVE-2025-54121 y otros
+jinja2>=3.1.6                 # GHSA-cpwx-vrp4-4pq7 y otros
 
 # ==========================================
 # HTTP CLIENT / SECURITY (Required)
@@ -41,7 +41,7 @@ pdfplumber>=0.11.5           # Advanced PDF processing
 # ==========================================
 # CONFIGURATION (Required)
 # ==========================================
-pydantic==2.7.1              # Data validation
+pydantic>=2.13.0             # Data validation
 pydantic-settings==2.11.0    # Settings management
 python-dotenv                # .env file support
 
@@ -50,7 +50,7 @@ python-dotenv                # .env file support
 # ==========================================
 slowapi==0.1.9               # Rate limiting
 python-jose==3.5.0           # JWT tokens
-PyJWT>=2.8.0                 # JWT tokens (import jwt)
+PyJWT>=2.13.0                # JWT tokens — PYSEC-2026-120 y otros
 
 # ==========================================
 # MONITORING (Recommended for production)
