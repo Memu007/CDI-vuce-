@@ -12,7 +12,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix (ux):** banner "Este importador no está en tus clientes" ahora aparece también para importadores extranjeros sin CUIT argentino.
 - **feat (ux):** pill de usuario en topbar — unifica nombre + iniciales en azul en un botón visible con borde y hover. Antes era un círculo gris chico difícil de ver.
 - **fix (perf):** modal de perfil más rápido: animación reducida a 120ms, `backdrop-filter: blur` eliminado del overlay (era costoso en GPU).
-- **fix (ux):** modal de perfil: al expandir "Mis defaults para MARIA" el botón Guardar quedaba fuera de pantalla. Reestructurado con CSS Grid para que el body scrollee y el footer quede fijo.
+- **fix (ux):** modal de perfil: al expandir secciones (defaults, cambiar contraseña, plan) el contenido de abajo quedaba tapado. Reestructurado con CSS Grid + `overflow:hidden` en `.modal` para que el body scrollee de verdad y el footer quede fijo.
 - **feat (perfil):** email ahora es editable en el modal de perfil. El backend lo valida y guarda.
 
 ---

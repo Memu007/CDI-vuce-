@@ -2740,6 +2740,7 @@ select.input {
     display: grid;
     grid-template-rows: auto 1fr auto;
     max-height: 90vh;
+    overflow: hidden;
 }
 .modal.is-open {
     opacity: 1;
