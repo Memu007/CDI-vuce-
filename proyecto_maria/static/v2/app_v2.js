@@ -44,9 +44,9 @@
                     title: 'Tu plan venció',
                     lead: 'Necesitás renovar tu suscripción para seguir usando CDI.',
                     text: 'Después de pagar podés volver a usar todas las funciones.',
-                    confirmText: 'Ir a pagar',
+                    acceptText: 'Ir a pagar',
                     cancelText: 'Volver',
-                    icon: '💳',
+                    kind: 'warning',
                 }).then(ok => {
                     if (ok) {
                         if (typeof CDI.openProfileModal === 'function') {

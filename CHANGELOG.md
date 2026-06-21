@@ -188,6 +188,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **docs:** actualizado `docs/maintenance/vulnerabilidades_pendientes.md` con estado resuelto/pendiente.
 - **test + qa:** `pip-audit` sobre `requirements.txt` ya no reporta vulnerabilidades de producción. Queda `pytest 8.4.2` (dev-only). Suite completa **250 passed, 102 skipped**; smokes `smoke_friccion.sh`, Plan 04 y Plan 04 e2e pasan.
 
+---
+
+## 2026-06-21 · Fix paywall NCM y banner de trial
+
+- **fix (frontend):** cálculo de días restantes de trial tenía un `* 60` extra → un trial de 14 días mostraba "1 día" y el banner desaparecía prematuramente.
+- **fix (frontend):** modal de "plan vencido" (HTTP 402) pasaba `confirmText`/`icon` en vez de `acceptText`/`kind` → el botón decía "Aceptar" en vez de "Ir a pagar".
+
 - **docs:** creado `docs/maintenance/vulnerabilidades_pendientes.md` con dependencias vulnerables detectadas (`requests`, `pdfminer.six`, `starlette`) y plan de ataque.
 - **tag:** `v0.2-wave2` apunta al cierre de Plan 02 y Plan 03.
 
