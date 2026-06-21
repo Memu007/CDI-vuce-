@@ -1,5 +1,5 @@
 /* ============================================================
-   CDI v2 — Wizard de bienvenida (6 slides, MEJORADO v2)
+   CDI v2 — Wizard de bienvenida (7 slides, MEJORADO v2)
    ============================================================ */
 (function () {
     'use strict';
