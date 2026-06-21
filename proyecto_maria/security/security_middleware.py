@@ -37,7 +37,7 @@ class EnhancedSecurityHeadersMiddleware(BaseHTTPMiddleware):
         # Allows scripts/styles from self and trusted CDNs only
         csp_directives = [
             "default-src 'self'",
-            "script-src 'self'",
+            "script-src 'self' 'unsafe-inline'",  # TODO fase 2: migrar inline scripts a .js externos y sacar unsafe-inline
             "style-src 'self' 'unsafe-inline'",
             "img-src 'self' data:",
             "font-src 'self'",
