@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-21 · Organizaciones (estudios) — paso 1: modelos + migraciones
+
+- **feat (backend):** nuevos modelos `Organization` (estudio con billing propio) e `Invitation` (token para invitar usuarios). Campo `organization_id` en `User` (nullable). 3 migraciones idempotentes que corren en startup. No cambia comportamiento existente.
+- **chore (pricing):** precio actualizado de $30.000 a $45.000/mes en landing, dashboard y simulador de pagos. Trial unificado a 14 días.
+
+---
+
 ## 2026-06-21 · Select de plan en landing
 
 - **fix (ui):** el texto del plan en el modal de registro quedaba cortado ("Premium — 14 días gratis - luego $30.000/mes - 10..."). Se acortó a "Premium — 14 días gratis, luego $30.000/mes", se estilizó el select igual que los inputs y se amplió el modal de 380px a 400px.
