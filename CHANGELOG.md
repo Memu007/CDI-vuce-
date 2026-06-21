@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-21 · Espacio del banner de trial
+
+- **fix (ui):** el banner azul de "15 días de prueba" tenía el margen inferior en 0 y quedaba pegado al botón/card de "Nueva operación". Ahora tiene margen inferior de 0.75rem, igual que arriba.
+
+---
+
 ## 2026-06-20 · Tour Mejorado v2
 
 - **feat (ui):** Rediseño completo del tour de bienvenida a v2 con 6 slides, iconos SVG, barra de progreso interactiva, track deslizante, animaciones sutiles optimizadas y callouts para diferenciar el producto.
