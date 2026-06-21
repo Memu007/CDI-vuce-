@@ -6,6 +6,16 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-21 · Fixes UX: revisión, perfil y topbar
+
+- **fix (ux):** botón "Crear cliente" dejó de aparecer duplicado en revisión. Solo queda el banner azul de arriba.
+- **fix (ux):** banner "Este importador no está en tus clientes" ahora aparece también para importadores extranjeros sin CUIT argentino.
+- **feat (ux):** pill de usuario en topbar — unifica nombre + iniciales en azul en un botón visible con borde y hover. Antes era un círculo gris chico difícil de ver.
+- **fix (perf):** modal de perfil más rápido: animación reducida a 120ms, `backdrop-filter: blur` eliminado del overlay (era costoso en GPU).
+- **fix (ux):** modal de perfil: al expandir "Mis defaults para MARIA" el botón Guardar quedaba fuera de pantalla. Fix: `flex:1 1 0 + min-height:0` en `.modal-body` para que scrollee correctamente.
+
+---
+
 ## 2026-06-21 · Organizaciones (estudios) — paso 4: UI
 
 - **feat (landing):** botón "Crear cuenta de estudio" en el popover de auth. Formulario con nombre del estudio, usuario admin, email y password. Envia a POST /api/organizations/create.
