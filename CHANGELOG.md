@@ -6,6 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-22 · Fase 2 seguridad — blacklist jti + password policy en reset/change
+
+- **feat (security):** Blacklist de tokens JWT via `active_jti` en tabla `users`. Al re-loguear o resetear/cambiar password, los tokens anteriores se invalidan inmediatamente (antes seguían funcionando 24hs). Backward compat: `active_jti=NULL` no bloquea usuarios pre-migración.
+- **fix (security):** `/auth/reset-password` y `/api/user/change-password` ahora validan password policy (min 8 + número/símbolo). Antes aceptaban cualquier password.
+- **test (security):** Pentest Railway: 8/8 PASS. Token viejo → 401, token nuevo → 200. Password débil en reset/change → 400.
+
+---
+
 ## 2026-06-21 · Fixes de seguridad pre-producción
 
 - **fix (security):** CSRF enforce ahora bloquea por defecto en producción (antes solo logueaba). En dev/test sigue en modo report-only.
