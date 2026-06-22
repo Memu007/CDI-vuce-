@@ -40,6 +40,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **SEGURIDAD CERRADA (2026-06-21):** Score 8/10. 36 tests locales + 17 tests Railway + 3 prompt injection + verificación visual = todos PASS. Fase 2 documentada en HANDOFF.
 - **feat (security):** Blacklist jti: columna `active_jti` en `users` + migración idempotente. `create_access_token` ahora devuelve `(token, jti)`. En cada login/register/verify, se guarda el jti activo. En `get_current_user`, si `active_jti` no es NULL y no coincide con el jti del token → 401 "Token revocado". Reset/change password setean `active_jti = None` (invalida todos los tokens viejos). Backward compat: NULL = no bloquear usuarios pre-migración.
 - **fix (security):** Password policy aplicada también en `/auth/reset-password` y `/api/user/change-password` (min 8 + número/símbolo). Antes solo validaba en `/auth/register`.
+- **fix (security):** Actualizadas deps transitivas con CVEs pendientes: `aiohttp>=3.9.0`, `Pillow>=10.3.0`, `pyOpenSSL>=24.0.0`. Pinneadas explícitamente en requirements.txt. Smoke OK, sin breaking changes.
 
 ---
 

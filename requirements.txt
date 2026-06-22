@@ -53,6 +53,11 @@ python-magic>=0.4.27         # Magic bytes validation for file uploads
 python-jose==3.5.0           # JWT tokens
 PyJWT>=2.13.0                # JWT tokens — PYSEC-2026-120 y otros
 
+# Deps transitivas con CVEs — pinneadas para forzar versión segura
+aiohttp>=3.9.0               # CVE-2024-30251, CVE-2024-23334 y otros
+Pillow>=10.3.0               # GHSA-3f63-hfp8-52jq y otros (10.3 evita breaking changes de 11)
+pyOpenSSL>=24.0.0            # CVE-2023-50782 y otros
+
 # ==========================================
 # MONITORING (Recommended for production)
 # ==========================================
