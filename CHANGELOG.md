@@ -25,6 +25,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix (security):** CSP unificado: sacado `unsafe-inline` de `script-src` y CDNs no usados en `security_middleware.py`. Eliminado CSP duplicado de `main.py` que era pisado por el middleware. Ahora hay un solo CSP consistente.
 - **fix (security):** `unsafe-inline` restaurado temporalmente en `script-src` — 40+ handlers inline en 4 templates legacy. TODO fase 2: migrar a JS externo.
 - **test (security):** Re-pentest OWASP Top 10 v2 verificado independientemente por la PM: 14/14 tests confirmados. Password policy, session fixation (jti), CSRF, cookies, uploads, JWT alg:none, SQLi, CORS, CSP, HSTS, force browsing, email duplicado, rate limiting — todos PASS. 2 pendientes para Railway (prompt injection + XSS endpoint público). Session fixation parcial: token viejo sigue funcionando (fase 2: blacklist jti).
+- **fix (security):** Rate limiting en Railway: `_get_forwarded_address` lee `X-Forwarded-For` (commit 75667cb). Gunicorn workers 4→1 en Dockerfile para que MemoryStorage funcione (commit 2c0cb37). Si se necesitan más workers, setear `REDIS_URL` en Railway.
+- **test (security):** Pentest Railway final: 17/17 PASS. `/docs` 404, `/openapi.json` 404, HSTS, CSP, cookies Secure+HttpOnly+SameSite, CSRF 403, auth bypass 401, JWT alg:none 401, SQLi 401, IDOR 404, uploads 400, CORS bloqueado, force browsing 404, password policy 400, rate limiting 429, session fixation jti — todos verificados en Railway real.
+- **test (security):** Prompt injection NCM verificado en Railway: 3/3 PASS (inyección clásica, jailbreak con cierre de delimitador, data exfiltration — todos ignorados por la IA). XSS endpoint público verificado a nivel código: `escapeHtml()` escapa todos los campos dinámicos. Test end-to-end pendiente por Tarifar 503.
+- **test (security):** Verificación visual en Railway (Puppeteer): landing, login, registro, quote público — todos cargan sin violaciones CSP. Password policy verificado desde navegador. Headers de seguridad confirmados.
+- **SEGURIDAD CERRADA (2026-06-21):** Score 8/10. 36 tests locales + 17 tests Railway + 3 prompt injection + verificación visual = todos PASS. Fase 2 documentada en HANDOFF.
 
 ---
 
