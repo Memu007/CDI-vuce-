@@ -1909,9 +1909,8 @@ async def reactivate_billing(
 # --- DEV DASHBOARD ENDPOINTS ---
 
 @app.get("/dev/dashboard")
-def dev_dashboard(request: Request):
+def dev_dashboard(request: Request, user=Depends(require_admin)):
     """Panel de control para desarrolladores (Admin only)"""
-    # TODO: Agregar verificación de rol admin real
     return FileResponse(os.path.join(basedir, "proyecto_maria", "templates", "dev_dashboard.html"), media_type="text/html")
 
 @app.get("/api/dev/stats")
@@ -2949,7 +2948,14 @@ async def simulate_charge(user=Depends(get_current_user), db: AsyncSession = Dep
 
     No llama a ningun gateway. Sirve para demos y tests. Cuando se integre
     Stripe/MP real, este endpoint se reemplaza por el webhook de pago exitoso.
+
+    SEGURIDAD: en producción está deshabilitado por default para evitar que
+    un usuario se auto-active sin pago real. Habilitar solo con
+    ENABLE_SIMULATE_CHARGE=true (dev/demo).
     """
+    if IS_PRODUCTION and os.getenv("ENABLE_SIMULATE_CHARGE", "false").lower() != "true":
+        raise HTTPException(status_code=404, detail="Not Found")
+
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
     if not db_user:
