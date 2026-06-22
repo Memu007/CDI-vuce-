@@ -30,6 +30,8 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **test (security):** Prompt injection NCM verificado en Railway: 3/3 PASS (inyección clásica, jailbreak con cierre de delimitador, data exfiltration — todos ignorados por la IA). XSS endpoint público verificado a nivel código: `escapeHtml()` escapa todos los campos dinámicos. Test end-to-end pendiente por Tarifar 503.
 - **test (security):** Verificación visual en Railway (Puppeteer): landing, login, registro, quote público — todos cargan sin violaciones CSP. Password policy verificado desde navegador. Headers de seguridad confirmados.
 - **SEGURIDAD CERRADA (2026-06-21):** Score 8/10. 36 tests locales + 17 tests Railway + 3 prompt injection + verificación visual = todos PASS. Fase 2 documentada en HANDOFF.
+- **feat (security):** Blacklist jti: columna `active_jti` en `users` + migración idempotente. `create_access_token` ahora devuelve `(token, jti)`. En cada login/register/verify, se guarda el jti activo. En `get_current_user`, si `active_jti` no es NULL y no coincide con el jti del token → 401 "Token revocado". Reset/change password setean `active_jti = None` (invalida todos los tokens viejos). Backward compat: NULL = no bloquear usuarios pre-migración.
+- **fix (security):** Password policy aplicada también en `/auth/reset-password` y `/api/user/change-password` (min 8 + número/símbolo). Antes solo validaba en `/auth/register`.
 
 ---
 

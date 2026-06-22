@@ -88,6 +88,12 @@ async def get_current_user(request: Request, response: Response, db: AsyncSessio
     if user is None:
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
 
+    # Validar jti contra active_jti (blacklist de tokens)
+    # NULL = backward compat: no bloquear usuarios pre-migración
+    token_jti = payload.get("jti")
+    if user.active_jti is not None and token_jti != user.active_jti:
+        raise HTTPException(status_code=401, detail="Token revocado")
+
     trial_end = user.trial_ends_at
     if trial_end is not None and trial_end.tzinfo is None:
         trial_end = trial_end.replace(tzinfo=timezone.utc)

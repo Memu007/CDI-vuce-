@@ -294,13 +294,15 @@ class TokenResponse(BaseModel):
     user: dict
 
 def create_access_token(data: dict):
-    """Crea un token JWT con expiración y jti único (anti session fixation)"""
+    """Crea un token JWT con expiración y jti único (anti session fixation).
+    Devuelve (token, jti) para que el llamador pueda persistir el jti activo."""
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode["exp"] = expire
-    to_encode["jti"] = uuid.uuid4().hex
+    jti = uuid.uuid4().hex
+    to_encode["jti"] = jti
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return encoded_jwt, jti
 
 app = FastAPI(
     title="Optimizador de Carga para Sistema MARIA",
@@ -731,6 +733,35 @@ async def _migrate_add_user_team_owner_column():
         print(f"⚠️ No se pudo migrar columna team_owner_username: {mig_err}")
 
 
+async def _migrate_add_user_active_jti():
+    """Agrega `users.active_jti` (VARCHAR(32), nullable) si no existe.
+
+    Blacklist de tokens JWT: guarda el jti del último token emitido.
+    Si el jti del token presentado no coincide, se rechaza.
+    NULL = backward compat (no bloquear usuarios pre-migración).
+
+    Idempotente, corre en cada startup.
+    """
+    from proyecto_maria.database.connection import engine, IS_SQLITE
+    try:
+        async with engine.begin() as conn:
+            if IS_SQLITE:
+                res = await conn.exec_driver_sql("PRAGMA table_info(users)")
+                existing = {row[1] for row in res.fetchall()}
+                if "active_jti" not in existing:
+                    await conn.exec_driver_sql(
+                        "ALTER TABLE users ADD COLUMN active_jti VARCHAR(32)"
+                    )
+                    print("✅ Migracion: agregada columna users.active_jti (SQLite)")
+            else:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS active_jti VARCHAR(32)"
+                )
+                print("✅ Migracion: verificada columna users.active_jti (Postgres)")
+    except Exception as mig_err:
+        print(f"⚠️ No se pudo migrar columna active_jti: {mig_err}")
+
+
 async def _migrate_add_client_column_mapping():
     """Agrega `clients.column_mapping` (JSON/TEXT) si no existe.
 
@@ -1133,6 +1164,7 @@ async def lifespan(app: FastAPI):
     await _migrate_add_user_cuit_column()
     await _migrate_add_user_billing_columns()
     await _migrate_add_user_team_owner_column()
+    await _migrate_add_user_active_jti()
     await _migrate_add_user_op_defaults_columns()
     # IMPORTANTE: _migrate_sync_clients_columns() debe correr ANTES de las
     # otras de clientes, porque agrega notes/address/favorite que las otras
@@ -1369,10 +1401,18 @@ async def reset_password(request: Request, data: PasswordResetConfirm, db: Async
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
         
-    # 3. Actualizar contraseña
+    # 3. Validar password policy
+    if not data.new_password or len(data.new_password) < 8:
+        raise HTTPException(status_code=400, detail="La contraseña debe tener al menos 8 caracteres")
+    if not re.search(r'[\d\W_]', data.new_password):
+        raise HTTPException(status_code=400, detail="La contraseña debe incluir al menos un número o símbolo")
+
+    # 4. Actualizar contraseña
     user.password = hash_password(data.new_password)
-    
-    # 4. Marcar token como usado
+    # Invalidar todos los tokens anteriores
+    user.active_jti = None
+
+    # 5. Marcar token como usado
     reset_token.is_used = True
     
     await db.commit()
@@ -1767,6 +1807,8 @@ async def change_password(
     """
     if not body.new_password or len(body.new_password) < 8:
         raise HTTPException(status_code=400, detail="La nueva contraseña debe tener al menos 8 caracteres")
+    if not re.search(r'[\d\W_]', body.new_password):
+        raise HTTPException(status_code=400, detail="La contraseña debe incluir al menos un número o símbolo")
     if body.new_password == body.current_password:
         raise HTTPException(status_code=400, detail="La nueva contraseña no puede ser igual a la actual")
 
@@ -1780,6 +1822,7 @@ async def change_password(
         raise HTTPException(status_code=401, detail="La contraseña actual es incorrecta")
 
     db_user.password = await run_in_threadpool(hash_password, body.new_password)
+    db_user.active_jti = None
     await db.commit()
     print(f"🔒 Password cambiada por el propio user: {db_user.username}")
     return {"success": True, "message": "Contraseña actualizada"}
@@ -2296,6 +2339,7 @@ async def dev_run_migrations(user=Depends(require_admin)):
         ("user_cuit", _migrate_add_user_cuit_column),
         ("user_billing", _migrate_add_user_billing_columns),
         ("user_team_owner", _migrate_add_user_team_owner_column),
+        ("user_active_jti", _migrate_add_user_active_jti),
         ("user_op_defaults", _migrate_add_user_op_defaults_columns),
         ("sync_clients_columns", _migrate_sync_clients_columns),
         ("clients_email_nullable", _migrate_clients_email_nullable),
@@ -2487,8 +2531,10 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
     if client_ip in login_attempts:
         del login_attempts[client_ip]
     
-    token = create_access_token({"sub": user.username, "plan": user.plan})
-    
+    token, jti = create_access_token({"sub": user.username, "plan": user.plan})
+    user.active_jti = jti
+    await db.commit()
+
     # Set HttpOnly Cookie (Strict CSRF Protection)
     response.set_cookie(
         key="access_token",
@@ -2750,11 +2796,13 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
 
     # Modo sin verificacion: devolvemos token y cookie igual que antes para
     # no frenar demos/beta (EMAIL_VERIFICATION_REQUIRED=false).
-    access_token = create_access_token({
+    access_token, jti = create_access_token({
         "sub": request.username,
         "plan": request.plan,
         "roles": ["operador"],
     })
+    new_user.active_jti = jti
+    await db.commit()
 
     response.set_cookie(
         key="access_token",
@@ -2803,11 +2851,13 @@ async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
         user.is_verified = True
         await db.commit()
 
-        access_token = create_access_token({
+        access_token, jti = create_access_token({
             "sub": user.username,
             "plan": user.plan,
             "roles": ["operador"],
         })
+        user.active_jti = jti
+        await db.commit()
 
         # Redirect a la UI real via FRONTEND_URL. En dev apunta al mismo server,
         # en prod al dominio publico del frontend.
@@ -6377,9 +6427,11 @@ async def create_organization(
             "org_name": org.name,
         }
 
-    access_token = create_access_token({
+    access_token, jti = create_access_token({
         "sub": req.username, "plan": "premium", "roles": ["operador"],
     })
+    new_user.active_jti = jti
+    await db.commit()
     response.set_cookie(
         key="access_token", value=f"Bearer {access_token}",
         httponly=True, secure=IS_PRODUCTION, samesite="strict",

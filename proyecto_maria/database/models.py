@@ -39,6 +39,11 @@ class User(Base):
     roles = Column(JSON, default=[])
     is_verified = Column(Boolean, default=False)
 
+    # JTI activo del último token emitido. Si no coincide con el jti del token
+    # presentado, el token se rechaza (invalidación inmediata al re-loguear o
+    # resetear password). NULL = backward compat (no bloquear usuarios pre-migración).
+    active_jti = Column(String(32), nullable=True)
+
     # Multi-puesto / equipo (T5-lite, Sprint 25 Día 2):
     # Si NULL, el user es su propio "team" (comportamiento por defecto).
     # Si tiene valor, sus queries de tenant deben filtrar por team_owner_username
