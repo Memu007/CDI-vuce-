@@ -6,7 +6,7 @@ Soporta dos modos:
 2. Checkout API (preference mensual) como fallback.
 
 Plan CDI (Ola 4 MVP):
-- premium: $45.000 ARS/mes, 10 ops/mes, clientes ilimitados, 3 usuarios.
+- premium: $45.000 ARS/mes, 15 ops/mes, clientes ilimitados, 3 usuarios.
 
 Top-up: $10.000 ARS por 10 ops adicionales (vencen a 30 días, máx 100 acumulados).
 """
@@ -47,12 +47,12 @@ TOPUP_OPS = int(os.environ.get("MP_TOPUP_OPS", "10"))
 
 
 # Planes internos. Precios y límites deben coincidir con lo configurado en MP.
-# Ola 4 MVP: se ofrece un único plan Premium de $45.000 ARS/mes, 10 ops/mes.
+# Ola 4 MVP: se ofrece un único plan Premium de $45.000 ARS/mes, 15 ops/mes.
 PLANS: dict[str, dict[str, Any]] = {
     "premium": {
         "name": "Premium",
         "price": 45000,
-        "ops": 10,
+        "ops": 15,
         "clients": None,  # ilimitados
         "users": 3,
     },

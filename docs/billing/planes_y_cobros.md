@@ -6,7 +6,7 @@
 
 | Plan | Precio/mes | Ops/mes | Clientes | Usuarios |
 |------|-----------|---------|----------|----------|
-| **Premium** | $30.000 ARS | 10 | Ilimitados | 3 |
+| **Premium** | $45.000 ARS | 15 | Ilimitados | 3 |
 
 No hay plan Básico activo. El sistema rechaza `"basic"` con error claro.
 

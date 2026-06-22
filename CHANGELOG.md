@@ -42,6 +42,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix (security):** Password policy aplicada también en `/auth/reset-password` y `/api/user/change-password` (min 8 + número/símbolo). Antes solo validaba en `/auth/register`.
 - **fix (security):** Actualizadas deps transitivas con CVEs pendientes: `aiohttp>=3.9.0`, `Pillow>=10.3.0`, `pyOpenSSL>=24.0.0`. Pinneadas explícitamente en requirements.txt. Smoke OK, sin breaking changes.
 - **fix (security):** Pentest externo (Opus 4.8) — 0 críticos/0 altos/1 medio/2 bajos. M1: `/api/billing/simulate-charge` gateado en prod (404 salvo `ENABLE_SIMULATE_CHARGE=true`) — cierra bypass de billing. L1: `/dev/dashboard` HTML ahora exige `require_admin` (401/403 sin admin); los datos `/api/dev/*` ya estaban protegidos. L2 (enumeration en register) se deja como trade-off de UX.
+- **chore (billing):** Plan Premium actualizado a 15 ops/mes (antes 10). Precio sigue en $45.000 ARS. Actualizado en `billing_service.py`, landing, dashboard y doc de planes. Endpoint `/api/billing/plans` confirma price:45000, ops:15.
 
 ---
 
