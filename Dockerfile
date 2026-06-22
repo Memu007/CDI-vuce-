@@ -62,11 +62,11 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
     CMD curl -f http://localhost:${PORT}/health || exit 1
 
-# Comando de inicio con Gunicorn + 4 Uvicorn workers
+# Comando de inicio con Gunicorn + 1 Uvicorn worker (rate limiting con MemoryStorage requiere 1 solo proceso)
 # Usa la variable PORT de Cloud Run
 CMD exec gunicorn proyecto_maria.main:app \
     --bind 0.0.0.0:${PORT} \
-    --workers 4 \
+    --workers 1 \
     --worker-class uvicorn.workers.UvicornWorker \
     --timeout 120 \
     --max-requests 1000 \
