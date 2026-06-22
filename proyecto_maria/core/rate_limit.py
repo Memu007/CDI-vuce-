@@ -27,9 +27,15 @@ def _get_storage():
     
     return MemoryStorage()
 
+def _get_forwarded_address(request):
+    """Lee la IP real del cliente respetando X-Forwarded-For (Railway/Cloudflare)."""
+    if "x-forwarded-for" in request.headers:
+        return request.headers["x-forwarded-for"].split(",")[0].strip()
+    return request.client.host if request.client else "127.0.0.1"
+
 # Initialize the global limiter
 limiter = Limiter(
-    key_func=get_remote_address,
+    key_func=_get_forwarded_address,
     storage_uri=_get_storage().storage_url if isinstance(_get_storage(), RedisStorage) else "memory://",
     # Fallback to defaults; actual limits applied per route
 )

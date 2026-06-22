@@ -102,7 +102,7 @@ import logging
 from sqlalchemy.exc import IntegrityError
 from passlib.context import CryptContext
 
-from proyecto_maria.core.rate_limit import limiter, get_dynamic_rate_limit
+from proyecto_maria.core.rate_limit import limiter, get_dynamic_rate_limit, get_client_ip
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -1248,7 +1248,7 @@ class PasswordResetConfirm(BaseModel):
 @app.post("/auth/request-password-reset")
 async def request_password_reset(request: PasswordResetRequest, req: Request, db: AsyncSession = Depends(get_db)):
     """Solicita un link de recuperación de contraseña"""
-    client_ip = req.client.host
+    client_ip = get_client_ip(req)
     now = datetime.now(timezone.utc).timestamp()
     
     # Rate limiting: máximo 5 intentos por IP cada 15 minutos
@@ -2404,7 +2404,7 @@ reset_attempts = {} # {ip: {"count": 0, "block_until": timestamp}} - Para reset 
 @limiter.limit("5/minute")
 async def login(request: Request, login_request: LoginRequest, response: Response, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     """Endpoint de login con HttpOnly Cookie y Rate Limiting"""
-    client_ip = request.client.host if request.client else "unknown"
+    client_ip = get_client_ip(request)
     now = datetime.now(timezone.utc).timestamp()
     
     # Verificar bloqueo
