@@ -222,6 +222,9 @@ class OperationItem(Base):
     modelo = Column(String(100), nullable=True)
     observaciones = Column(Text, nullable=True)
 
+    grupo_id = Column(Integer, nullable=True)  # ítems con mismo grupo_id se exportan como 1 solo [ART]
+    unidad = Column(String(10), nullable=True)  # código de unidad MARIA (ej: "07"=UNIDAD, "01"=kg)
+
     is_valid = Column(Boolean, default=True)
     validation_errors = Column(JSON, nullable=True)
 

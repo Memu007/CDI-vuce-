@@ -1186,6 +1186,58 @@ async def _migrate_widen_pieza_column():
         print(f"⚠️ Migracion widen_pieza (no critica): {mig_err!r}")
 
 
+async def _migrate_add_grupo_id_column():
+    """Agrega columna grupo_id a operation_items para agrupar ítems (unidades clasificatorias)."""
+    from proyecto_maria.database.connection import engine, IS_SQLITE
+
+    try:
+        async with engine.begin() as conn:
+            if IS_SQLITE:
+                res = await conn.exec_driver_sql("PRAGMA table_info(operation_items)")
+                existing = {row[1] for row in res.fetchall()}
+            else:
+                res = await conn.exec_driver_sql(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'operation_items'"
+                )
+                existing = {row[0] for row in res.fetchall()}
+            if not existing:
+                return
+            if "grupo_id" not in existing:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE operation_items ADD COLUMN grupo_id INTEGER"
+                )
+                print("✅ Migracion: agregada columna operation_items.grupo_id")
+    except Exception as mig_err:
+        print(f"⚠️ Migracion grupo_id (no critica): {mig_err!r}")
+
+
+async def _migrate_add_unidad_column():
+    """Agrega columna unidad a operation_items para guardar código de unidad MARIA."""
+    from proyecto_maria.database.connection import engine, IS_SQLITE
+
+    try:
+        async with engine.begin() as conn:
+            if IS_SQLITE:
+                res = await conn.exec_driver_sql("PRAGMA table_info(operation_items)")
+                existing = {row[1] for row in res.fetchall()}
+            else:
+                res = await conn.exec_driver_sql(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'operation_items'"
+                )
+                existing = {row[0] for row in res.fetchall()}
+            if not existing:
+                return
+            if "unidad" not in existing:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE operation_items ADD COLUMN unidad VARCHAR(10)"
+                )
+                print("✅ Migracion: agregada columna operation_items.unidad")
+    except Exception as mig_err:
+        print(f"⚠️ Migracion unidad (no critica): {mig_err!r}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Eventos de ciclo de vida de la aplicación (Startup/Shutdown)"""
@@ -1205,6 +1257,8 @@ async def lifespan(app: FastAPI):
     await _migrate_add_client_fecha_inic_activ()
     await _migrate_sync_operations_columns()
     await _migrate_widen_pieza_column()
+    await _migrate_add_grupo_id_column()
+    await _migrate_add_unidad_column()
     await _migrate_create_telemetry_events_table()
     # Organizaciones: crear tabla orgs primero, luego FK en users, luego invitations
     await _migrate_create_organizations_table()
@@ -4966,6 +5020,124 @@ async def save_client_operation(
             status_code=500,
             detail=f"No se pudo guardar la operación al cliente: {str(e)[:200]}",
         )
+
+
+@app.post("/api/operacion/{operation_id}/agrupar")
+async def agrupar_items(
+    operation_id: str,
+    request: Request,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Asocia ítems de una operación como unidad clasificatoria.
+
+    Recibe: {"item_ids": ["id1", "id2", ...]}
+    Valida que todos tengan mismo NCM, origen y unidad.
+    Asigna un grupo_id nuevo a todos.
+    """
+    username = user["username"]
+    data = await request.json()
+    item_ids = data.get("item_ids", [])
+
+    if not item_ids or len(item_ids) < 2:
+        raise HTTPException(status_code=400, detail="Se necesitan al menos 2 ítems para agrupar.")
+
+    # Traer los ítems de la operación que pertenecen al usuario
+    from sqlalchemy import select as sa_select
+    result = await db.execute(
+        sa_select(OperationItemModel)
+        .join(OperationModel, OperationItemModel.operation_id == OperationModel.id)
+        .where(
+            OperationItemModel.operation_id == operation_id,
+            OperationModel.owner_username == username,
+            OperationItemModel.id.in_(item_ids),
+        )
+    )
+    items = result.scalars().all()
+
+    if len(items) != len(item_ids):
+        raise HTTPException(status_code=404, detail="Algunos ítems no se encontraron o no pertenecen a la operación.")
+
+    # Validar mismo NCM, origen y unidad
+    ncms = {it.pieza for it in items}
+    origenes = {it.origen for it in items}
+    unidades = {(it.unidad if hasattr(it, 'unidad') else None) for it in items}
+
+    if len(ncms) > 1:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Los ítems tienen NCM distintos: {', '.join(sorted(ncms))}. Todos deben tener el mismo NCM para agrupar.",
+        )
+    if len(origenes) > 1:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Los ítems tienen orígenes distintos: {', '.join(sorted(origenes))}. Todos deben tener el mismo origen.",
+        )
+    if len(unidades) > 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Los ítems tienen unidades de medida distintas. Todos deben tener la misma unidad.",
+        )
+
+    # Generar grupo_id nuevo (máximo + 1)
+    max_grupo_result = await db.execute(
+        sa_select(func.max(OperationItemModel.grupo_id))
+        .join(OperationModel, OperationItemModel.operation_id == OperationModel.id)
+        .where(OperationModel.owner_username == username)
+    )
+    max_grupo = max_grupo_result.scalar()
+    nuevo_grupo_id = (max_grupo or 0) + 1
+
+    for it in items:
+        it.grupo_id = nuevo_grupo_id
+
+    await db.commit()
+
+    return {
+        "success": True,
+        "grupo_id": nuevo_grupo_id,
+        "items_agrupados": len(items),
+        "ncm": items[0].pieza,
+        "origen": items[0].origen,
+    }
+
+
+@app.post("/api/operacion/{operation_id}/desagrupar")
+async def desagrupar_items(
+    operation_id: str,
+    request: Request,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Quita la agrupación de ítems (setea grupo_id = NULL)."""
+    username = user["username"]
+    data = await request.json()
+    grupo_id = data.get("grupo_id")
+
+    if grupo_id is None:
+        raise HTTPException(status_code=400, detail="Se requiere grupo_id.")
+
+    from sqlalchemy import select as sa_select
+    result = await db.execute(
+        sa_select(OperationItemModel)
+        .join(OperationModel, OperationItemModel.operation_id == OperationModel.id)
+        .where(
+            OperationItemModel.operation_id == operation_id,
+            OperationModel.owner_username == username,
+            OperationItemModel.grupo_id == grupo_id,
+        )
+    )
+    items = result.scalars().all()
+
+    if not items:
+        raise HTTPException(status_code=404, detail="No se encontraron ítems con ese grupo_id.")
+
+    for it in items:
+        it.grupo_id = None
+
+    await db.commit()
+
+    return {"success": True, "items_desagrupados": len(items)}
 
 
 @app.get("/api/clientes/{client_id}/metricas")

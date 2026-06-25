@@ -4589,6 +4589,25 @@ tr:hover .ncm-note-pill.is-empty {
     color: var(--c-primary, #2c6fff);
 }
 
+.ncm-grupo-chip {
+    display: inline-flex;
+    align-items: center;
+    height: 20px;
+    padding: 0 8px;
+    margin-right: 4px;
+    border-radius: var(--r-pill, 999px);
+    font-size: 10px;
+    font-weight: var(--w-semibold, 600);
+    background: var(--c-warning-soft, #fff4e0);
+    color: var(--c-warning, #b8860b);
+    border: 1px solid var(--c-warning, #b8860b);
+    cursor: pointer;
+    flex-shrink: 0;
+}
+.ncm-grupo-chip:hover {
+    opacity: 0.8;
+}
+
 /* ──────────────── Tour de bienvenida (wizard con slides) — MEJORADO v2 ──────────────── */
 
 .tour-welcome {

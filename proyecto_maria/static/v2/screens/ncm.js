@@ -99,6 +99,7 @@
         batchApplyOrigin = $('ncmBatchApplyOrigin');
         batchClear = $('ncmBatchClear');
         selectAllBox = $('ncmSelectAll');
+        const batchAgrupar = $('ncmBatchAgrupar');
 
         if (batchNcm && CDI.maskNcm) CDI.maskNcm(batchNcm);
 
@@ -140,11 +141,20 @@
                     }
                     return;
                 }
+                const grupoChip = e.target && e.target.closest && e.target.closest('.ncm-grupo-chip');
+                if (grupoChip) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const gid = parseInt(grupoChip.getAttribute('data-grupo'), 10);
+                    if (isFinite(gid)) desagrupar(gid);
+                    return;
+                }
             });
         }
         if (batchApplyQty) batchApplyQty.addEventListener('click', applyBatchMultiply);
         if (batchApplyNcm) batchApplyNcm.addEventListener('click', applyBatchNcm);
         if (batchApplyOrigin) batchApplyOrigin.addEventListener('click', applyBatchOrigin);
+        if (batchAgrupar) batchAgrupar.addEventListener('click', agruparSeleccionados);
         if (batchClear) batchClear.addEventListener('click', () => {
             selectedRows.clear();
             if (selectAllBox) selectAllBox.checked = false;
@@ -472,6 +482,7 @@
         const notesPill = renderNotesPill(pieza, i);
         const checked = selectedRows.has(i) ? ' checked' : '';
         const autofillChip = renderAutofillChip(it);
+        const grupoChip = renderGrupoChip(it);
         const fmtMoney = (v) => v ? '$' + v.toLocaleString('es-AR', { maximumFractionDigits: 2 }) : '';
         const fmtPeso = (v) => v ? v.toLocaleString('es-AR', { maximumFractionDigits: 2 }) : '';
         const cantVal = cantidad === '' ? '' : cantidad;
@@ -497,12 +508,78 @@
                 '</td>' +
                 '<td class="col-actions">' +
                     (isOk ? '<span class="check" aria-label="asignado">✓</span> ' : '') +
+                    grupoChip +
                     '<button type="button" class="btn-assist" data-assist="' + i + '">' +
                         assistText +
                     '</button>' +
                 '</td>' +
             '</tr>'
         );
+    }
+
+    function agruparSeleccionados() {
+        const items = (CDI.state && CDI.state.items) || [];
+        if (selectedRows.size < 2) {
+            if (CDI.toast) CDI.toast('Seleccioná 2+ ítems', 'Marcá los checkboxes de los ítems a asociar.', 'info');
+            return;
+        }
+        const selected = Array.from(selectedRows).map(i => items[i]).filter(Boolean);
+        if (selected.length < 2) return;
+
+        // Validar mismo NCM
+        const ncms = new Set(selected.map(it => (it.pieza || '').trim()).filter(Boolean));
+        if (ncms.size > 1) {
+            if (CDI.toast) CDI.toast('NCM distinto', 'Todos los ítems deben tener el mismo NCM para asociarlos.', 'error');
+            return;
+        }
+        if (ncms.size === 0) {
+            if (CDI.toast) CDI.toast('Falta NCM', 'Asigná NCM a todos los ítems antes de asociarlos.', 'error');
+            return;
+        }
+
+        // Validar mismo origen
+        const origenes = new Set(selected.map(it => (it.origen || '').trim()).filter(Boolean));
+        if (origenes.size > 1) {
+            if (CDI.toast) CDI.toast('Origen distinto', 'Todos los ítems deben tener el mismo origen para asociarlos.', 'error');
+            return;
+        }
+
+        // Generar grupo_id nuevo (máximo + 1)
+        const maxGrupo = items.reduce((mx, it) => Math.max(mx, it.grupo_id || 0), 0);
+        const nuevoGrupo = maxGrupo + 1;
+
+        // Asignar grupo_id a los seleccionados
+        selectedRows.forEach(i => {
+            if (items[i]) items[i].grupo_id = nuevoGrupo;
+        });
+
+        CDI.track && CDI.track('ncm_agrupar', { grupo_id: nuevoGrupo, items: selected.length });
+        if (CDI.toast) CDI.toast('Ítems asociados', selected.length + ' ítems → 1 unidad clasificatoria (grupo ' + nuevoGrupo + ')', 'success');
+
+        selectedRows.clear();
+        if (selectAllBox) selectAllBox.checked = false;
+        render();
+        updateBatchBar();
+    }
+
+    function desagrupar(grupoId) {
+        const items = (CDI.state && CDI.state.items) || [];
+        let count = 0;
+        items.forEach(it => {
+            if (it.grupo_id === grupoId) { it.grupo_id = null; count++; }
+        });
+        if (count > 0) {
+            CDI.track && CDI.track('ncm_desagrupar', { grupo_id: grupoId, items: count });
+            if (CDI.toast) CDI.toast('Desagrupado', count + ' ítems liberados del grupo ' + grupoId, 'info');
+            render();
+            updateBatchBar();
+        }
+    }
+
+    function renderGrupoChip(it) {
+        if (!it || !it.grupo_id) return '';
+        return '<button type="button" class="ncm-grupo-chip" data-grupo="' + it.grupo_id + '"' +
+            ' title="Clic para desagrupar">Grupo ' + it.grupo_id + '</button>';
     }
 
     function renderAutofillBanner() {

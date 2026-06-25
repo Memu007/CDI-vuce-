@@ -360,8 +360,43 @@ def generate_maria_txt(operation_id: str, items: list,
     lines.append(f"LDVDREFDOC={ref_factura:<28}")
     lines.append("")
     
-    # === [ART] Por cada item ===
-    for idx, item in enumerate(items, 1):
+    # === [ART] Por cada item (con agrupación por grupo_id) ===
+    # Si varios items tienen el mismo grupo_id, se exportan como un solo [ART]:
+    # NCM del primero, descripción concatenada, cantidad/valor/peso sumados.
+
+    # Separar items con grupo_id de los que no tienen
+    items_con_grupo = [it for it in items if it.get('grupo_id') is not None]
+    items_sin_grupo = [it for it in items if it.get('grupo_id') is None]
+
+    # Agrupar por grupo_id
+    grupos_dict = {}
+    for it in items_con_grupo:
+        gid = it['grupo_id']
+        grupos_dict.setdefault(gid, []).append(it)
+
+    # Construir lista final de items a exportar
+    items_export = list(items_sin_grupo)
+    for gid, grupo_items in grupos_dict.items():
+        # Combinar los items del grupo en uno solo
+        primero = grupo_items[0]
+        combined = dict(primero)
+        combined['descripcion'] = ' + '.join(
+            str(it.get('descripcion', '')).strip() for it in grupo_items
+        )
+        combined['cantidad'] = sum(float(it.get('cantidad', 1)) for it in grupo_items)
+        combined['valor_total'] = sum(
+            float(it.get('valor_total') or float(it.get('cantidad', 1)) * float(it.get('valor_unitario', 0)))
+            for it in grupo_items
+        )
+        combined['peso_kg'] = sum(
+            float(it.get('peso_kg', it.get('peso_unitario', 0)) or 0) for it in grupo_items
+        )
+        # valor_unitario promedio del grupo
+        total_cant = combined['cantidad']
+        combined['valor_unitario'] = combined['valor_total'] / total_cant if total_cant > 0 else 0
+        items_export.append(combined)
+
+    for idx, item in enumerate(items_export, 1):
         # Obtener valores
         ncm_raw = str(item.get('ncm') or item.get('pieza', '')).strip()
         # Formatear NCM con puntos: 84798999900H -> 8479.89.99.900H
