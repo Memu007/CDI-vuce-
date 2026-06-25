@@ -674,11 +674,11 @@
             const digits = String(val).replace(/\D/g, '').length;
             let detail;
             if (digits < 8) {
-                detail = 'Te faltan dígitos: el NCM tiene 8 (ej. 8471.30.00).';
-            } else if (digits === 9 || digits > 10) {
-                detail = 'Sobran dígitos: el NCM es de 8 (o 10 con sufijo SIM).';
+                detail = 'Te faltan dígitos: el NCM tiene 8 (ej. 8471.30.00) + 3 SIM + letra (ej. 8471.30.00.900 R).';
+            } else if (digits === 9 || digits > 11) {
+                detail = 'Sobran dígitos: el NCM es de 8 (o 10 con sufijo SIM) + letra opcional.';
             } else {
-                detail = 'Solo números. Formato: 8 dígitos (ej. 8471.30.00).';
+                detail = 'Formato: 8 dígitos (ej. 8471.30.00) o 10 + SIM + letra (ej. 8471.30.00.900 R).';
             }
             if (CDI.toast) CDI.toast('NCM inválido', detail, 'error');
             return;
@@ -796,17 +796,17 @@
     }
 
     function isValidNcm(v) {
-        // Argentina usa NCM de 8 digitos (formato XXXX.XX.XX), o 10 con sufijo
-        // SIM. Aceptamos cualquiera de los dos para considerar valido un codigo.
+        // Argentina usa NCM de 8 digitos (formato XXXX.XX.XX), 10 con sufijo
+        // SIM, o 11 (8+3 SIM). Letra de control opcional al final (ej: 8471.30.00.900 R).
         const norm = String(v || '').replace(/[.\s]/g, '');
-        return /^\d{8}$|^\d{10}$/.test(norm);
+        return /^\d{8}$|^\d{8}[A-Za-z]$|^\d{10}$|^\d{10}[A-Za-z]$|^\d{11}$|^\d{11}[A-Za-z]$/.test(norm);
     }
 
     // Tolerancia para mientras el usuario tipea en el spotlight (todavia
     // no termino de escribir el codigo): 4-10 digitos.
     function isPartialNcm(v) {
         const norm = String(v || '').replace(/[.\s]/g, '');
-        return /^\d{4,10}$/.test(norm);
+        return /^\d{4,11}[A-Za-z]?$/.test(norm);
     }
 
     /* ---------- Spotlight ---------- */

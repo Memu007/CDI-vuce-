@@ -6,7 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
-## 2026-06-22 · Fase 2 seguridad — blacklist jti + password policy en reset/change
+## 2026-06-25 · fix: NCM acepta posición arancelaria completa con letra
+
+- **fix (backend):** `validate_ncm` ahora acepta 6, 8, 10 u 11 dígitos + letra de control opcional (ej: `84713010900R`). Antes rechazaba la letra y solo aceptaba 6 u 8 dígitos.
+- **fix (db):** Columna `operation_items.pieza` ampliada de `VARCHAR(10)` a `VARCHAR(20)`. Migración `_migrate_widen_pieza_column` para PostgreSQL. Antes se truncaba el NCM al guardar (`[:10]`).
+- **fix (frontend):** `formatNcm` preserva letra sufijo. `isValidNcm` acepta 8/10/11 dígitos + letra. `maskNcm` usa `inputmode=text` y `maxlength=17`. Mensajes de error actualizados.
+- **fix (maria_gen):** Normaliza espacios en NCM con puntos (`8471.30.00.900 R` → `8471.30.00.900R`).
+
+---
 
 - **feat (security):** Blacklist de tokens JWT via `active_jti` en tabla `users`. Al re-loguear o resetear/cambiar password, los tokens anteriores se invalidan inmediatamente (antes seguían funcionando 24hs). Backward compat: `active_jti=NULL` no bloquea usuarios pre-migración.
 - **fix (security):** `/auth/reset-password` y `/api/user/change-password` ahora validan password policy (min 8 + número/símbolo). Antes aceptaban cualquier password.

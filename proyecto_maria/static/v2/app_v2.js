@@ -525,13 +525,19 @@
     CDI.maskDate = maskDate;
 
     // Formato canonico de NCM: XXXX.XX.XX (8 digitos). Si vienen mas (SIM),
-    // respetamos hasta XXXX.XX.XX.XXX. Si vienen menos, formateamos parcial.
+    // respetamos hasta XXXX.XX.XX.XXX. Letra de control opcional al final.
     function formatNcm(raw) {
-        const d = String(raw == null ? '' : raw).replace(/\D/g, '').slice(0, 11);
-        if (d.length <= 4) return d;
-        if (d.length <= 6) return d.slice(0, 4) + '.' + d.slice(4);
-        if (d.length <= 8) return d.slice(0, 4) + '.' + d.slice(4, 6) + '.' + d.slice(6);
-        return d.slice(0, 4) + '.' + d.slice(4, 6) + '.' + d.slice(6, 8) + '.' + d.slice(8);
+        const s = String(raw == null ? '' : raw).trim();
+        // Extraer letra sufijo (A-Z, mayuscula)
+        const letterMatch = s.match(/[A-Za-z]$/);
+        const letter = letterMatch ? letterMatch[0].toUpperCase() : '';
+        const d = s.replace(/[^0-9]/g, '').slice(0, 11);
+        let base;
+        if (d.length <= 4) base = d;
+        else if (d.length <= 6) base = d.slice(0, 4) + '.' + d.slice(4);
+        else if (d.length <= 8) base = d.slice(0, 4) + '.' + d.slice(4, 6) + '.' + d.slice(6);
+        else base = d.slice(0, 4) + '.' + d.slice(4, 6) + '.' + d.slice(6, 8) + '.' + d.slice(8);
+        return base + (letter ? ' ' + letter : '');
     }
     CDI.formatNcm = formatNcm;
 
@@ -540,8 +546,8 @@
     function maskNcm(input) {
         if (!input || input.__cdiMaskNcmApplied) return;
         input.__cdiMaskNcmApplied = true;
-        input.setAttribute('inputmode', 'numeric');
-        input.setAttribute('maxlength', '14');
+        input.setAttribute('inputmode', 'text');
+        input.setAttribute('maxlength', '17');
 
         function applyFormat() {
             const prev = input.value;

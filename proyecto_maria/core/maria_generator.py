@@ -365,6 +365,7 @@ def generate_maria_txt(operation_id: str, items: list,
         # Obtener valores
         ncm_raw = str(item.get('ncm') or item.get('pieza', '')).strip()
         # Formatear NCM con puntos: 84798999900H -> 8479.89.99.900H
+        # Preservar letra de control si existe
         ncm = ncm_raw
         if len(ncm_raw) >= 8 and '.' not in ncm_raw:
              # Basic formatting logic
@@ -375,6 +376,9 @@ def generate_maria_txt(operation_id: str, items: list,
                  ncm = f"{formatted_base}.{suffix}"
              else:
                  ncm = formatted_base
+        elif '.' in ncm_raw:
+             # Ya viene con puntos (ej: "8471.30.00.900 R") — normalizar espacios
+             ncm = ncm_raw.replace(' ', '')
         
         descripcion = str(item.get('descripcion', '')).strip()
         cantidad = float(item.get('cantidad', 1))

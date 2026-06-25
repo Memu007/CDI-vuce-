@@ -539,7 +539,7 @@ async def _migrate_sync_operations_columns():
     ]
     operation_items_expected = [
         ("operation_id", "VARCHAR"),
-        ("pieza", "VARCHAR(10)"),
+        ("pieza", "VARCHAR(20)"),
         ("descripcion", "TEXT"),
         ("origen", "VARCHAR(3)"),
         ("cantidad", "FLOAT DEFAULT 1.0"),
@@ -1156,6 +1156,36 @@ async def _migrate_add_org_billing_columns():
         print(f"⚠️ No se pudo migrar organizations billing cols: {mig_err}")
 
 
+async def _migrate_widen_pieza_column():
+    """Amplía columna operation_items.pieza de VARCHAR(10) a VARCHAR(20).
+
+    Necesario para guardar NCM completo: 8 dígitos + 3 SIM + letra (ej: 84713010900R).
+    En SQLite el VARCHAR no enforcea ancho, pero en PostgreSQL sí.
+    Idempotente: solo ejecuta si la columna existe y tiene width < 20.
+    """
+    import traceback
+    from proyecto_maria.database.connection import engine, IS_SQLITE
+
+    if IS_SQLITE:
+        # SQLite no enforcea VARCHAR width, no necesita migración
+        return
+
+    try:
+        async with engine.begin() as conn:
+            res = await conn.exec_driver_sql(
+                "SELECT character_maximum_length FROM information_schema.columns "
+                "WHERE table_name = 'operation_items' AND column_name = 'pieza'"
+            )
+            row = res.fetchone()
+            if row and row[0] is not None and int(row[0]) < 20:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE operation_items ALTER COLUMN pieza TYPE VARCHAR(20)"
+                )
+                print("✅ Migracion: operation_items.pieza ampliada a VARCHAR(20)")
+    except Exception as mig_err:
+        print(f"⚠️ Migracion widen_pieza (no critica): {mig_err!r}")
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Eventos de ciclo de vida de la aplicación (Startup/Shutdown)"""
@@ -1174,6 +1204,7 @@ async def lifespan(app: FastAPI):
     await _migrate_add_client_column_mapping()
     await _migrate_add_client_fecha_inic_activ()
     await _migrate_sync_operations_columns()
+    await _migrate_widen_pieza_column()
     await _migrate_create_telemetry_events_table()
     # Organizaciones: crear tabla orgs primero, luego FK en users, luego invitations
     await _migrate_create_organizations_table()
@@ -4880,7 +4911,7 @@ async def save_client_operation(
                 OperationItemModel(
                     id=str(uuid.uuid4()),
                     operation_id=operation.id,
-                    pieza=str(item.get("pieza") or item.get("ncm") or "")[:10],
+                    pieza=str(item.get("pieza") or item.get("ncm") or "")[:20],
                     descripcion=str(item.get("descripcion") or ""),
                     origen=str(item.get("origen") or "XX")[:3],
                     cantidad=float(item.get("cantidad") or 1),

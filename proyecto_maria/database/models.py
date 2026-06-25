@@ -211,7 +211,7 @@ class OperationItem(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     operation_id = Column(String, ForeignKey("operations.id"), nullable=False)
 
-    pieza = Column(String(10), nullable=False)  # NCM code
+    pieza = Column(String(20), nullable=False)  # NCM code (8 digitos + 3 SIM + letra)
     descripcion = Column(Text, nullable=False)
     origen = Column(String(3), nullable=False)
     cantidad = Column(Float, nullable=False)

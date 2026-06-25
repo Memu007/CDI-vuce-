@@ -123,12 +123,13 @@ def validate_cuit(cuit: str) -> str:
 def validate_ncm(ncm: str) -> str:
     """
     Validate NCM code format.
+    Acepta 6, 8 o 10 dígitos, con letra de control opcional al final.
 
     Args:
-        ncm: NCM code
+        ncm: NCM code (ej: "84713010", "84713010900R", "8471.30.00.900 R")
 
     Returns:
-        Validated NCM
+        Validated NCM normalizado (dígitos + letra si existe)
 
     Raises:
         ValueError: If NCM format is invalid
@@ -136,21 +137,25 @@ def validate_ncm(ncm: str) -> str:
     Example:
         >>> validate_ncm("84713010")
         '84713010'
+        >>> validate_ncm("84713010900R")
+        '84713010900R'
         >>> validate_ncm("invalid")
-        ValueError: NCM must contain only digits
+        ValueError: NCM must be 6, 8 or 10 digits
     """
-    # Remove non-digits
-    digits_only = re.sub(r'[^0-9]', '', ncm)
+    s = str(ncm or '').strip()
+    # Extraer letra sufijo opcional
+    letter_match = re.search(r'[A-Za-z]$', s)
+    letter = letter_match.group(0).upper() if letter_match else ''
+    # Solo dígitos
+    digits_only = re.sub(r'[^0-9]', '', s)
 
-    # NCM must be 6 or 8 digits
-    if len(digits_only) not in [6, 8]:
-        raise ValueError("NCM must be 6 or 8 digits")
+    if len(digits_only) not in [6, 8, 10, 11]:
+        raise ValueError("NCM must be 6, 8, 10 or 11 digits")
 
-    # Only digits allowed
     if not digits_only.isdigit():
-        raise ValueError("NCM must contain only digits")
+        raise ValueError("NCM must contain only digits (and optional letter)")
 
-    return digits_only
+    return digits_only + letter
 
 
 def sanitize_html(text: str) -> str:
