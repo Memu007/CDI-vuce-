@@ -15,7 +15,7 @@
 
     // Batch selection / acciones en lote
     const selectedRows = new Set();
-    let batchBar, batchCount, batchFactor, batchApplyQty, batchNcm, batchApplyNcm, batchOrigin, batchApplyOrigin, batchClear, selectAllBox;
+    let batchBar, batchCount, batchFactor, batchApplyQty, batchNcm, batchApplyNcm, batchOrigin, batchApplyOrigin, batchClear, batchAgrupar, selectAllBox;
     let lastSnapshot = null;   // { items: [...], label: 'x2 a 3 items', ts: ms }
     let undoTimer = null;
 
@@ -98,8 +98,8 @@
         batchOrigin = $('ncmBatchOrigin');
         batchApplyOrigin = $('ncmBatchApplyOrigin');
         batchClear = $('ncmBatchClear');
+        batchAgrupar = $('ncmBatchAgrupar');
         selectAllBox = $('ncmSelectAll');
-        const batchAgrupar = $('ncmBatchAgrupar');
 
         if (batchNcm && CDI.maskNcm) CDI.maskNcm(batchNcm);
 
@@ -263,6 +263,7 @@
         if (n === 0) {
             batchBar.hidden = true;
             if (selectAllBox) selectAllBox.indeterminate = false;
+            if (batchAgrupar) batchAgrupar.disabled = true;
             return;
         }
         batchBar.hidden = false;
@@ -272,6 +273,7 @@
             selectAllBox.checked = n === total;
             selectAllBox.indeterminate = n > 0 && n < total;
         }
+        if (batchAgrupar) batchAgrupar.disabled = n < 2;
     }
 
     function snapshotItems() {
