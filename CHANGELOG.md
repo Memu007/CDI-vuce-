@@ -13,6 +13,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix (frontend):** `formatNcm` preserva letra sufijo. `isValidNcm` acepta 8/10/11 dígitos + letra. `maskNcm` usa `inputmode=text` y `maxlength=17`. Mensajes de error actualizados.
 - **fix (maria_gen):** Normaliza espacios en NCM con puntos (`8471.30.00.900 R` → `8471.30.00.900R`).
 - **feat (agrupación):** Unidades clasificatorias — se pueden asociar 2+ ítems con mismo NCM y origen en un solo grupo. En el TXT MARÍA se exportan como un solo [ART] con valores sumados y descripción concatenada. Nuevo campo `grupo_id` en `OperationItem`, endpoints `/api/operacion/{id}/agrupar` y `/desagrupar`, botón "Asociar ítems" en barra de batch de NCM, chip "Grupo N" en cada ítem agrupado (clic para desagrupar).
+- **fix (agrupación):** `buildMariaRequest` en finalize.js ahora envía `grupo_id` y `unidad` al generador. `save_client_operation` y upload persisten `grupo_id` y `unidad` en DB. Test: 3 items (2 agrupados) → 2 [ART], MARTFOB=140, QARTKGRNET=4, QARTUNTDCL=4.
 
 ---
 

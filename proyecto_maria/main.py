@@ -3133,6 +3133,8 @@ async def create_manual_operation(
             cantidad=float(it.get("cantidad", 0) or 0),
             valor_unitario=float(it.get("valor_unitario", 0) or 0),
             peso_unitario=float(it.get("peso_unitario", 0) or 0),
+            grupo_id=it.get("grupo_id"),
+            unidad=str(it.get("unidad") or "")[:10] or None,
         )
         db.add(item)
 
@@ -4971,6 +4973,8 @@ async def save_client_operation(
                     cantidad=float(item.get("cantidad") or 1),
                     valor_unitario=float(item.get("valor_unitario") or 0),
                     peso_unitario=float(item.get("peso_unitario") or 0.5),
+                    grupo_id=item.get("grupo_id"),
+                    unidad=str(item.get("unidad") or "")[:10] or None,
                 )
             )
 

@@ -335,7 +335,9 @@
             cantidad: toNumber(it.cantidad, 1),
             valor_unitario: toNumber(it.valor_unitario, 0),
             peso_unitario: toNumber(it.peso_unitario, 0),
-            codigo_parte: String(it.codigo_parte || '').trim()
+            codigo_parte: String(it.codigo_parte || '').trim(),
+            grupo_id: it.grupo_id || null,
+            unidad: it.unidad || null
         }));
 
         // Cliente activo propaga domicilio + fecha inicio actividad del importador
@@ -717,7 +719,9 @@
                 origen: String(it.origen || 'XX').trim().toUpperCase() || 'XX',
                 cantidad: toNumber(it.cantidad, 1),
                 valor_unitario: toNumber(it.valor_unitario, 0),
-                peso_unitario: toNumber(it.peso_unitario, 0)
+                peso_unitario: toNumber(it.peso_unitario, 0),
+                grupo_id: it.grupo_id || null,
+                unidad: it.unidad || null
             }))
         };
         try {

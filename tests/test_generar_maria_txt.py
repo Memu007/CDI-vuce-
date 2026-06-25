@@ -498,3 +498,43 @@ def test_validations_smart_country_warning():
     res_bad = run_smart_validations([item_bad])
     assert any("no reconocido por el sistema MARIA" in w for w in res_bad["advertencias"])
 
+
+# ====================================================================
+# AGRUPACIÓN — unidades clasificatorias (grupo_id)
+# ====================================================================
+
+def test_agrupacion_2_items_mismo_grupo_genera_2_art():
+    """3 items donde 2 tienen mismo grupo_id → 2 [ART] (no 3).
+
+    Items:
+    - Silla (grupo 1): cant=2, valor=50, peso=3
+    - Mesa (grupo 1): cant=2, valor=20, peso=1
+    - Lámpara (sin grupo): cant=5, valor=10, peso=0.5
+
+    Grupo 1 combinado: cant=4, valor_total=140, peso=4
+    """
+    items = [
+        {"pieza": "94037000", "descripcion": "Silla de madera de roble", "cantidad": 2,
+         "valor_unitario": 50, "peso_unitario": 3, "origen": "CN", "grupo_id": 1},
+        {"pieza": "94037000", "descripcion": "Mesa de madera de roble", "cantidad": 2,
+         "valor_unitario": 20, "peso_unitario": 1, "origen": "CN", "grupo_id": 1},
+        {"pieza": "94051000", "descripcion": "Lámpara de mesa LED", "cantidad": 5,
+         "valor_unitario": 10, "peso_unitario": 0.5, "origen": "CN"},
+    ]
+    txt = generate_maria_txt("OP_AGRUP", items)
+
+    # 2 [ART]: grupo combinado + lámpara sola
+    assert txt.count("[ART]") == 2, f"Esperaba 2 [ART], got {txt.count('[ART]')}"
+
+    # Grupo combinado: MARTFOB = 2*50 + 2*20 = 140
+    assert "MARTFOB=140.00" in txt, f"Falta MARTFOB=140.00 en txt"
+
+    # Grupo combinado: QARTKGRNET = 3+1 = 4 (peso sumado)
+    assert "QARTKGRNET=4.000" in txt, f"Falta QARTKGRNET=4.000 en txt"
+
+    # Grupo combinado: QARTUNTDCL = 2+2 = 4 (cantidad sumada)
+    assert "QARTUNTDCL=4.00" in txt, f"Falta QARTUNTDCL=4.00 en txt"
+
+    # Lámpara sola: MARTFOB = 5*10 = 50
+    assert "MARTFOB=50.00" in txt, f"Falta MARTFOB=50.00 de lámpara sola"
+
