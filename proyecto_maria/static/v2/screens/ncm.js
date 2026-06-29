@@ -293,7 +293,15 @@
         }
         batchBar.hidden = false;
         batchCount.textContent = n + (n === 1 ? ' ítem seleccionado' : ' ítems seleccionados');
-        const total = ((CDI.state && CDI.state.items) || []).length;
+        const allItems = ((CDI.state && CDI.state.items) || []);
+        const grupos = new Set();
+        let realTotal = 0;
+        allItems.forEach(it => {
+            if (it.grupo_id) {
+                if (!grupos.has(it.grupo_id)) { grupos.add(it.grupo_id); realTotal++; }
+            } else realTotal++;
+        });
+        const total = realTotal;
         if (selectAllBox) {
             selectAllBox.checked = n === total;
             selectAllBox.indeterminate = n > 0 && n < total;
@@ -949,7 +957,7 @@
     // listado debería venir del backend, pero mantenemos uno mínimo para
     // validación rápida en el cliente.
     const PAIS_RECONOCIDOS = new Set([
-        'AR','BO','BR','CA','CL','CN','CO','CR','DE','EC','ES','FR','GB','GT','HK','IN','ID','IT','JP','KR','MX','MY','NI','NL','PA','PE','PY','SV','TH','TW','US','UY','VN','ZA'
+        'AR','BF','DZ','BW','BI','CM','CF','CG','CD','CI','TD','BJ','EG','GA','GM','GH','GN','GQ','KE','LS','LR','LY','MG','MW','ML','MA','MU','MR','NE','NG','ZW','RW','SN','SL','SO','SZ','SD','TZ','TG','TN','UG','ZM','AO','MZ','SC','DJ','KM','GW','ST','NA','ZA','ER','ET','BB','BO','BR','CA','CO','CR','CU','CL','DO','EC','SV','US','GT','GY','HT','HN','JM','MX','NI','PA','PY','PE','TT','UY','VE','SR','DM','LC','VC','BZ','AG','KN','BS','GD','AF','SA','BH','MM','BT','KH','LK','KP','KR','CN','CY','PH','TW','IN','ID','IQ','IR','IL','JP','JO','QA','KW','LA','LB','MY','MV','OM','MN','NP','AE','PK','SG','SY','TH','TR','VN','HK','MO','BD','BN','YE','AM','AZ','GE','KZ','KG','TJ','TM','UZ','AL','AD','AT','BE','BG','DK','ES','FI','FR','GR','HU','IE','IS','IT','LI','LU','MT','MC','NO','NL','PL','PT','GB','RO','SM','SE','CH','DE','BY','EE','LV','LT','MD','RU','UA','BA','HR','SK','SI','MK','CZ','ME','RS','AU','NR','NZ','VU','WS','FJ','PG','KI','FM','PW','TV','SB','TO','MH','MP'
     ]);
 
     function setItemField(idx, field, raw) {
