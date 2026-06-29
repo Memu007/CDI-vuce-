@@ -4608,6 +4608,40 @@ tr:hover .ncm-note-pill.is-empty {
     opacity: 0.8;
 }
 
+/* ── Filas agrupadas y sub-filas ── */
+tr.row-grouped {
+    background: var(--c-warning-soft, #fff4e0);
+    border-left: 3px solid var(--c-warning, #b8860b);
+}
+tr.row-grouped + tr.row-sub {
+    background: var(--c-bg-elevated, #fafafa);
+}
+tr.row-sub td {
+    padding: 4px 8px;
+    font-size: 12px;
+    color: var(--c-text-muted, #888);
+    border-top: 1px dashed var(--c-border, #eee);
+}
+tr.row-sub .col-desc {
+    padding-left: 24px;
+}
+.ncm-sub-val {
+    color: var(--c-text-muted, #888);
+    font-size: 12px;
+}
+.ncm-expand-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+    color: var(--c-text-secondary, #555);
+    padding: 2px 4px;
+    line-height: 1;
+}
+.ncm-expand-btn:hover {
+    color: var(--c-accent, #2c6fff);
+}
+
 /* ──────────────── Tour de bienvenida (wizard con slides) — MEJORADO v2 ──────────────── */
 
 .tour-welcome {

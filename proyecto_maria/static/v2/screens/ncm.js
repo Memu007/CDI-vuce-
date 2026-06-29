@@ -15,6 +15,7 @@
 
     // Batch selection / acciones en lote
     const selectedRows = new Set();
+    const expandedGroups = new Set();
     let batchBar, batchCount, batchFactor, batchApplyQty, batchNcm, batchApplyNcm, batchOrigin, batchApplyOrigin, batchClear, batchAgrupar, selectAllBox;
     let lastSnapshot = null;   // { items: [...], label: 'x2 a 3 items', ts: ms }
     let undoTimer = null;
@@ -110,10 +111,22 @@
             tbody.addEventListener('change', (e) => {
                 const cb = e.target && e.target.matches && e.target.matches('[data-row-check]');
                 if (!cb) return;
-                const idx = parseInt(e.target.getAttribute('data-row-check'), 10);
-                if (!isFinite(idx)) return;
-                if (e.target.checked) selectedRows.add(idx);
-                else selectedRows.delete(idx);
+                const gidAttr = e.target.getAttribute('data-group-check');
+                if (gidAttr) {
+                    const gid = parseInt(gidAttr, 10);
+                    const items = (CDI.state && CDI.state.items) || [];
+                    items.forEach((it, i) => {
+                        if (it.grupo_id === gid) {
+                            if (e.target.checked) selectedRows.add(i);
+                            else selectedRows.delete(i);
+                        }
+                    });
+                } else {
+                    const idx = parseInt(e.target.getAttribute('data-row-check'), 10);
+                    if (!isFinite(idx)) return;
+                    if (e.target.checked) selectedRows.add(idx);
+                    else selectedRows.delete(idx);
+                }
                 updateBatchBar();
             });
             // Delegación de clicks para botones Asistente y pills de notas
@@ -147,6 +160,18 @@
                     e.stopPropagation();
                     const gid = parseInt(grupoChip.getAttribute('data-grupo'), 10);
                     if (isFinite(gid)) desagrupar(gid);
+                    return;
+                }
+                const expandBtn = e.target && e.target.closest && e.target.closest('[data-expand-grupo]');
+                if (expandBtn) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    const gid = parseInt(expandBtn.getAttribute('data-expand-grupo'), 10);
+                    if (isFinite(gid)) {
+                        if (expandedGroups.has(gid)) expandedGroups.delete(gid);
+                        else expandedGroups.add(gid);
+                        render();
+                    }
                     return;
                 }
             });
@@ -253,7 +278,7 @@
         const items = (CDI.state && CDI.state.items) || [];
         selectedRows.clear();
         if (checked) items.forEach((_, i) => selectedRows.add(i));
-        tbody.querySelectorAll('[data-row-check]').forEach(cb => { cb.checked = checked; });
+        tbody.querySelectorAll('[data-row-check], [data-group-check]').forEach(cb => { cb.checked = checked; });
         updateBatchBar();
     }
 
@@ -398,7 +423,8 @@
         const items = (CDI.state && CDI.state.items) || [];
         // Limpia selecciones que quedaron fuera de rango (si cambiaron los items)
         Array.from(selectedRows).forEach(i => { if (i >= items.length) selectedRows.delete(i); });
-        tbody.innerHTML = items.map((it, i) => renderRow(it, i)).join('');
+        const renderRows = buildRenderRows(items);
+        tbody.innerHTML = renderRows.map(r => r.type === 'group' ? renderGroupedRow(r) : renderRow(r.item, r.index)).join('');
         renderAutofillBanner();
 
         // Listeners inline por fila
@@ -517,6 +543,108 @@
                 '</td>' +
             '</tr>'
         );
+    }
+
+    function buildRenderRows(items) {
+        const used = new Set();
+        const rows = [];
+        items.forEach((it, i) => {
+            if (used.has(i)) return;
+            if (it.grupo_id) {
+                const indices = [];
+                const groupItems = [];
+                items.forEach((other, j) => {
+                    if (other.grupo_id === it.grupo_id) {
+                        indices.push(j);
+                        groupItems.push(other);
+                        used.add(j);
+                    }
+                });
+                const totalCant = groupItems.reduce((s, x) => s + Number(x.cantidad || 0), 0);
+                const totalValue = groupItems.reduce((s, x) => s + Number(x.valor_unitario || 0) * Number(x.cantidad || 0), 0);
+                const totalPeso = groupItems.reduce((s, x) => s + Number(x.peso_unitario || 0) * Number(x.cantidad || 0), 0);
+                const avgValor = totalCant > 0 ? Math.round((totalValue / totalCant) * 100) / 100 : 0;
+                const avgPeso = totalCant > 0 ? Math.round((totalPeso / totalCant) * 100) / 100 : 0;
+                const descs = [...new Set(groupItems.map(x => (x.descripcion || '').trim()).filter(Boolean))];
+                const desc = descs.length === 1 ? descs[0] : descs.join(' · ').slice(0, 80);
+                rows.push({
+                    type: 'group', grupo_id: it.grupo_id, indices, items: groupItems,
+                    aggregated: {
+                        descripcion: desc, origen: it.origen || '',
+                        cantidad: totalCant, valor_unitario: avgValor,
+                        peso_unitario: avgPeso, pieza: it.pieza || '',
+                        codigo_parte: it.codigo_parte || '',
+                    }
+                });
+            } else {
+                rows.push({ type: 'single', index: i, item: it });
+            }
+        });
+        return rows;
+    }
+
+    function renderGroupedRow(r) {
+        const it = r.aggregated;
+        const gid = r.grupo_id;
+        const pieza = (it.pieza || '').trim();
+        const isValid = isValidNcm(pieza);
+        const isOk = !!pieza && isValid;
+        const rowClass = isOk ? 'row-ok' : 'row-pending';
+        const desc = CDI.escapeHtml(it.descripcion || '');
+        const ref = CDI.escapeHtml(it.codigo_parte || '—');
+        const origen = CDI.escapeHtml(it.origen || '');
+        const cantVal = it.cantidad != null ? Number(it.cantidad) : '';
+        const valorUnitario = Number(it.valor_unitario || 0);
+        const pesoUnitario = Number(it.peso_unitario || 0);
+        const piezaFmt = CDI.formatNcm ? CDI.formatNcm(pieza) : pieza;
+        const ncmValue = CDI.escapeHtml(piezaFmt);
+        const notesPill = renderNotesPill(pieza, r.indices[0]);
+        const allSelected = r.indices.every(i => selectedRows.has(i));
+        const checked = allSelected ? ' checked' : '';
+        const isExpanded = expandedGroups.has(gid);
+        const expandIcon = isExpanded ? '▾' : '▸';
+        const grupoLabel = 'Grupo ' + gid + ' (' + r.items.length + ' ítems)';
+        const inputClass = 'ncm-input ncm-group-input';
+        let html = '<tr class="' + rowClass + ' row-grouped" data-grupo-id="' + gid + '">' +
+            '<td class="col-check"><input type="checkbox" class="ncm-row-check" data-group-check="' + gid + '"' + checked + ' aria-label="Seleccionar grupo ' + gid + '"></td>' +
+            '<td class="col-num"><button type="button" class="ncm-expand-btn" data-expand-grupo="' + gid + '" aria-label="Expandir grupo">' + expandIcon + '</button></td>' +
+            '<td class="col-ref">' + ref + '</td>' +
+            '<td class="col-desc">' + desc + '</td>' +
+            '<td class="col-pais"><input class="ncm-edit ncm-edit-pais input input-sm" type="text" maxlength="2" value="' + origen + '" data-grupo-id="' + gid + '" data-field="origen" aria-label="Origen grupo ' + gid + '"></td>' +
+            '<td class="col-cant"><input class="ncm-edit ncm-edit-cant input input-sm" type="number" min="1" step="1" value="' + cantVal + '" data-grupo-id="' + gid + '" data-field="cantidad" aria-label="Cantidad grupo ' + gid + '"></td>' +
+            '<td class="col-valor"><input class="ncm-edit ncm-edit-valor input input-sm" type="number" min="0" step="0.01" value="' + (valorUnitario || '') + '" data-grupo-id="' + gid + '" data-field="valor_unitario" aria-label="Valor grupo ' + gid + '"></td>' +
+            '<td class="col-peso"><input class="ncm-edit ncm-edit-peso input input-sm" type="number" min="0" step="0.01" value="' + (pesoUnitario || '') + '" data-grupo-id="' + gid + '" data-field="peso_unitario" aria-label="Peso grupo ' + gid + '"></td>' +
+            '<td class="col-ncm"><div class="ncm-cell"><input class="' + inputClass + '" type="text" value="' + ncmValue + '" data-grupo-id="' + gid + '" data-field="pieza" aria-label="NCM grupo ' + gid + '">' + notesPill + '</div></td>' +
+            '<td class="col-actions">' + (isOk ? '<span class="check" aria-label="asignado">✓</span> ' : '') +
+            '<button type="button" class="ncm-grupo-chip" data-grupo="' + gid + '" title="Clic para desagrupar">' + grupoLabel + '</button></td>' +
+        '</tr>';
+        if (isExpanded) {
+            html += r.items.map((subIt, j) => renderSubRow(subIt, r.indices[j], gid)).join('');
+        }
+        return html;
+    }
+
+    function renderSubRow(it, idx, gid) {
+        const desc = CDI.escapeHtml(it.descripcion || it.codigo_parte || '');
+        const ref = CDI.escapeHtml(it.codigo_parte || '—');
+        const origen = CDI.escapeHtml(it.origen || '');
+        const cantidad = it.cantidad != null ? Number(it.cantidad) : '';
+        const valorUnitario = Number(it.valor_unitario || 0);
+        const pesoUnitario = Number(it.peso_unitario || 0);
+        const fmtMoney = (v) => v ? '$' + v.toLocaleString('es-AR', { maximumFractionDigits: 2 }) : '';
+        const fmtPeso = (v) => v ? v.toLocaleString('es-AR', { maximumFractionDigits: 2 }) : '';
+        return '<tr class="row-sub" data-grupo-id="' + gid + '">' +
+            '<td class="col-check"></td>' +
+            '<td class="col-num"></td>' +
+            '<td class="col-ref">' + ref + '</td>' +
+            '<td class="col-desc">' + desc + '</td>' +
+            '<td class="col-pais"><span class="ncm-sub-val">' + origen + '</span></td>' +
+            '<td class="col-cant"><span class="ncm-sub-val">' + cantidad + '</span></td>' +
+            '<td class="col-valor"><span class="ncm-sub-val">' + fmtMoney(valorUnitario) + '</span></td>' +
+            '<td class="col-peso"><span class="ncm-sub-val">' + fmtPeso(pesoUnitario) + '</span></td>' +
+            '<td class="col-ncm"></td>' +
+            '<td class="col-actions"></td>' +
+        '</tr>';
     }
 
     function agruparSeleccionados() {
@@ -695,15 +823,31 @@
 
     function updateSummary() {
         const items = (CDI.state && CDI.state.items) || [];
-        const total = items.length;
+        // Contar grupos como 1 ítem cada uno
+        const grupos = new Set();
+        let realTotal = 0;
+        items.forEach(it => {
+            if (it.grupo_id) {
+                if (!grupos.has(it.grupo_id)) {
+                    grupos.add(it.grupo_id);
+                    realTotal++;
+                }
+            } else {
+                realTotal++;
+            }
+        });
+        const total = realTotal;
         // Un item esta "listo" solo si su NCM cumple el formato (8 o 10 digitos).
-        // Antes contabamos cualquier texto y eso permitia avanzar con codigos
-        // mal formados o incompletos.
-        const done = items.filter(it => isValidNcm(it.pieza)).length;
-        const incomplete = items.filter(it => {
-            const v = String(it.pieza || '').trim();
-            return v && !isValidNcm(v);
-        }).length;
+        const seenGrupos = new Set();
+        let done = 0, incomplete = 0;
+        items.forEach(it => {
+            if (it.grupo_id) {
+                if (seenGrupos.has(it.grupo_id)) return;
+                seenGrupos.add(it.grupo_id);
+            }
+            if (isValidNcm(it.pieza)) done++;
+            else if (String(it.pieza || '').trim()) incomplete++;
+        });
         const empty = total - done - incomplete;
         const missing = empty + incomplete;
         if (summaryEl) {
@@ -729,27 +873,38 @@
 
     function onNcmInput(ev) {
         const inp = ev.target;
-        const idx = parseInt(inp.getAttribute('data-row'), 10);
+        const gidAttr = inp.getAttribute('data-grupo-id');
         const items = CDI.state.items || [];
-        if (!items[idx]) return;
-        // Invalidamos el deshacer si el usuario edita a mano
         lastSnapshot = null;
-        // La mascara ya insertó los puntos; guardamos el valor formateado.
         const val = (inp.value || '').trim();
-        items[idx].pieza = val;
+        if (gidAttr) {
+            const gid = parseInt(gidAttr, 10);
+            items.forEach(it => { if (it.grupo_id === gid) it.pieza = val; });
+        } else {
+            const idx = parseInt(inp.getAttribute('data-row'), 10);
+            if (!items[idx]) return;
+            items[idx].pieza = val;
+        }
         inp.classList.remove('is-error');
     }
 
     function onNcmBlur(ev) {
         const inp = ev.target;
         let val = (inp.value || '').trim();
-        const idx = parseInt(inp.getAttribute('data-row'), 10);
+        const gidAttr = inp.getAttribute('data-grupo-id');
         const items = CDI.state.items || [];
-        if (!items[idx]) return;
+        let targetItems = [];
+        if (gidAttr) {
+            const gid = parseInt(gidAttr, 10);
+            targetItems = items.filter(it => it.grupo_id === gid);
+        } else {
+            const idx = parseInt(inp.getAttribute('data-row'), 10);
+            if (!items[idx]) return;
+            targetItems = [items[idx]];
+        }
+        if (!targetItems.length) return;
         if (val && !isValidNcm(val)) {
             inp.classList.add('is-error');
-            // Toast con mensaje explicativo: antes solo se ponia rojo y el
-            // usuario no entendia que estaba mal.
             const digits = String(val).replace(/\D/g, '').length;
             let detail;
             if (digits < 8) {
@@ -763,29 +918,28 @@
             return;
         }
         inp.classList.remove('is-error');
-        // Canonizar a XXXX.XX.XX al salir del input
         if (val && CDI.formatNcm) {
             val = CDI.formatNcm(val);
             inp.value = val;
-            items[idx].pieza = val;
         }
-        if (val && isValidNcm(val) && items[idx].descripcion) {
-            saveNcmUsage(items[idx].descripcion, val);
+        targetItems.forEach(it => { it.pieza = val; });
+        if (val && isValidNcm(val) && targetItems[0].descripcion) {
+            saveNcmUsage(targetItems[0].descripcion, val);
         }
-        // Repintar row class (row-ok vs row-pending) y summary
         const tr = inp.closest('tr');
         if (tr) {
             tr.classList.toggle('row-ok', !!val);
             tr.classList.toggle('row-pending', !val);
         }
         updateSummary();
-        // Re-render para que el pill de notas apunte al nuevo NCM
         if (val && isValidNcm(val)) render();
     }
 
     function onNcmKeydown(ev) {
         if (ev.key === 'Enter') {
             ev.preventDefault();
+            const gidAttr = ev.target.getAttribute('data-grupo-id');
+            if (gidAttr) return;
             const idx = parseInt(ev.target.getAttribute('data-row'), 10);
             openSpotlight(idx);
         }
@@ -813,6 +967,24 @@
         return value;
     }
 
+    function setGroupField(gid, field, raw) {
+        const items = CDI.state && CDI.state.items;
+        if (!items) return;
+        let value = raw;
+        if (field === 'origen') {
+            value = String(raw || '').trim().toUpperCase().slice(0, 2);
+        } else if (field === 'pieza') {
+            value = String(raw || '').trim();
+        } else {
+            const n = Number(raw);
+            value = Number.isFinite(n) ? n : 0;
+        }
+        items.forEach(it => {
+            if (it.grupo_id === gid) it[field] = value;
+        });
+        return value;
+    }
+
     function markFieldError(inp, isError) {
         if (isError) inp.classList.add('is-error');
         else inp.classList.remove('is-error');
@@ -821,32 +993,46 @@
     function onFieldInput(ev) {
         const inp = ev.target;
         if (!inp) return;
-        const idx = parseInt(inp.getAttribute('data-row'), 10);
         const field = inp.getAttribute('data-field');
-        if (isNaN(idx) || !field) return;
+        if (!field) return;
+        const gidAttr = inp.getAttribute('data-grupo-id');
 
-        // Invalidamos el deshacer si el usuario edita a mano
         lastSnapshot = null;
 
         if (field === 'origen') {
-            // Forzar mayúsculas mientras tipea
             inp.value = (inp.value || '').toUpperCase();
             const val = inp.value.trim();
             const ok = val.length === 2 && PAIS_RECONOCIDOS.has(val);
             markFieldError(inp, val.length === 2 && !ok);
         }
-        setItemField(idx, field, inp.value);
+
+        if (gidAttr) {
+            const gid = parseInt(gidAttr, 10);
+            setGroupField(gid, field, inp.value);
+        } else {
+            const idx = parseInt(inp.getAttribute('data-row'), 10);
+            if (isNaN(idx)) return;
+            setItemField(idx, field, inp.value);
+        }
         updateSummary();
     }
 
     function onFieldBlur(ev) {
         const inp = ev.target;
         if (!inp) return;
-        const idx = parseInt(inp.getAttribute('data-row'), 10);
         const field = inp.getAttribute('data-field');
-        if (isNaN(idx) || !field) return;
+        if (!field) return;
+        const gidAttr = inp.getAttribute('data-grupo-id');
 
-        const finalValue = setItemField(idx, field, inp.value);
+        let finalValue;
+        if (gidAttr) {
+            const gid = parseInt(gidAttr, 10);
+            finalValue = setGroupField(gid, field, inp.value);
+        } else {
+            const idx = parseInt(inp.getAttribute('data-row'), 10);
+            if (isNaN(idx)) return;
+            finalValue = setItemField(idx, field, inp.value);
+        }
         if (field === 'origen') {
             inp.value = finalValue || '';
             const ok = finalValue.length === 2 && PAIS_RECONOCIDOS.has(finalValue);
