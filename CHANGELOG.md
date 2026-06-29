@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-29 · feat: colapsar ítems agrupados en una sola fila en pantalla NCM
+
+- Ítems con mismo grupo_id se muestran como 1 fila fusionada con totales sumados y promedio ponderado de valor/peso.
+- Botón expandir/contraer para ver sub-filas individuales (read-only).
+- Editar cualquier campo de la fila fusionada aplica el cambio a todos los ítems del grupo.
+- Resumen de pantalla cuenta cada grupo como 1 ítem.
+
 ## 2026-06-25 · fix: NCM acepta posición arancelaria completa con letra
 
 - **fix (backend):** `validate_ncm` ahora acepta 6, 8, 10 u 11 dígitos + letra de control opcional (ej: `84713010900R`). Antes rechazaba la letra y solo aceptaba 6 u 8 dígitos.
