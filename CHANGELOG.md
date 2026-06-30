@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-30 · feat: propagar codigo_sim y sim_alternativas a la UI (integración VUCE CI)
+
+`ncm_service.py` ahora incluye `codigo_sim` y `sim_alternativas` en `merge_datos_inteligente` y en la respuesta final de `get_ncm_completo`. `ncm.js` (`renderVucePreview`) muestra el `codigo_sim` (11 dígitos + letra) cuando está disponible, en vez del NCM de 8 dígitos. Verificado con NCM 3926.90.90: llega `3926.90.90.100H` + 32 alternativas, source `vuce_ci_oficial`.
+
 ## 2026-06-30 · feat: cliente VUCE CI oficial (NCM con SIM completo + letra, sin certificado)
 
 Nuevo `proyecto_maria/core/vuce_ci_client.py`: usa la API pública interna de www.vuce.gob.ar (token anónimo, sin CUIT/certificado) para traer el código SIM completo (11 dígitos + letra), aranceles e intervenciones reales. Conectado a `vuce_connector.py` detrás del flag `VUCE_CI_ENABLED` (default `false`, sin cambios en prod hasta activarlo). Bug fixeado en `fetch_intervenciones`: ahora respeta `regimen.opcional` de VUCE en vez de marcar todo como obligatorio.

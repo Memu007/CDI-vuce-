@@ -237,6 +237,8 @@ async def get_ncm_completo(ncm: str, valor_fob: float = 100.0, refresh: bool = F
         "descripcion": datos_completos["descripcion"],
         "descripcion_tarifar": datos_completos.get("descripcion_tarifar"),
         "descripcion_vuce": datos_completos.get("descripcion_vuce"),
+        "codigo_sim": datos_completos.get("codigo_sim"),
+        "sim_alternativas": datos_completos.get("sim_alternativas", []),
 
         # Fuente efectiva de los datos (para chip de UI)
         "source": source_label,
@@ -374,6 +376,8 @@ def merge_datos_inteligente(ncm: str, tarifar: Dict, vuce: Dict) -> Dict[str, An
         "descripcion": descripcion_final,
         "descripcion_vuce": descripcion_vuce,
         "descripcion_tarifar": descripcion_tarifar,
+        "codigo_sim": vuce.get("codigo_sim"),
+        "sim_alternativas": vuce.get("sim_alternativas", []),
         "alicuotas": alicuotas,
         "licencias": licencias,
         "intervenciones": vuce.get("intervenciones_previas", []),

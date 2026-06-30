@@ -1471,7 +1471,7 @@
         spotVuce.innerHTML =
             '<div class="spotlight-vuce-head">' +
                 '<span class="spotlight-vuce-tag">VUCE</span>' +
-                '<span class="spotlight-vuce-ncm">' + CDI.escapeHtml(ncm) + '</span>' +
+                '<span class="spotlight-vuce-ncm">' + CDI.escapeHtml(data.codigo_sim ? data.codigo_sim : ncm) + '</span>' +
                 '<span class="source-chip ' + meta.cls + '" title="' + CDI.escapeHtml(meta.title) + '">' + CDI.escapeHtml(meta.label) + '</span>' +
             '</div>' +
             '<div class="spotlight-vuce-desc">' + CDI.escapeHtml(desc) + '</div>' +
