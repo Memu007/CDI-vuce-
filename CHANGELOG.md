@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-06-30 · feat: cliente VUCE CI oficial (NCM con SIM completo + letra, sin certificado)
+
+Nuevo `proyecto_maria/core/vuce_ci_client.py`: usa la API pública interna de www.vuce.gob.ar (token anónimo, sin CUIT/certificado) para traer el código SIM completo (11 dígitos + letra), aranceles e intervenciones reales. Conectado a `vuce_connector.py` detrás del flag `VUCE_CI_ENABLED` (default `false`, sin cambios en prod hasta activarlo). Bug fixeado en `fetch_intervenciones`: ahora respeta `regimen.opcional` de VUCE en vez de marcar todo como obligatorio.
+
 ## 2026-06-29 · feat: colapsar ítems agrupados en una sola fila en pantalla NCM
 
 - Ítems con mismo grupo_id se muestran como 1 fila fusionada con totales sumados y promedio ponderado de valor/peso.

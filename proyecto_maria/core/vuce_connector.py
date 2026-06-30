@@ -82,9 +82,20 @@ class VuceClient:
         return self._real_request(path, params)
 
     def _scrape_response(self, path: str, params: Optional[dict]) -> Optional[Dict[str, Any]]:
-        """Consulta al scraper publico (tarifar/arancel) unificado."""
-        from .ncm_scraper import fetch_ncm_scrape  # import tardio para evitar ciclos
+        """Consulta fuentes publicas. Orden:
+        1. VUCE CI (oficial, da codigo SIM completo) si `VUCE_CI_ENABLED=true`.
+        2. tarifar.com / arancel.com.ar (scraper HTML existente, default hoy).
+        """
         ncm = path.split("/")[-1]
+        if os.getenv("VUCE_CI_ENABLED", "false").strip().lower() == "true":
+            from .vuce_ci_client import fetch_ncm_completo  # import tardio para evitar ciclos
+            try:
+                data = fetch_ncm_completo(ncm)
+                if data:
+                    return data
+            except Exception as err:
+                logger.warning("[vuce] VUCE CI fallo, sigo con scraper HTML: %s", err)
+        from .ncm_scraper import fetch_ncm_scrape  # import tardio para evitar ciclos
         return fetch_ncm_scrape(ncm)
 
     def _real_request(self, path: str, params: Optional[dict]) -> Dict[str, Any]:
