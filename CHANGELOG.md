@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-06 · feat: IA extrae domicilio del importador desde la factura
+
+`pdf_extractor.py`: agregado campo `comprador_domicilio` a ambos prompts de extracción (vision y directo) y a ambos dicts `operacion_data`. La IA intenta leer el domicilio del importador desde la factura; si no lo ve claro, devuelve vacío (no inventa). Prioridad: si el cliente activo tiene domicilio en su ficha, ese gana sobre el del PDF (lógica ya existente en `applyClienteActivo`).
+
 ## 2026-07-06 · fix: campo fecha inicio actividades en Revisión ahora usa type="date"
 
 Cambiado input de `comprador_fecha_inic_activ` de `type="text"` (placeholder DD/MM/AAAA) a `type="date"` para coincidir con la ficha de cliente que guarda en formato ISO. Sin conversión necesaria.

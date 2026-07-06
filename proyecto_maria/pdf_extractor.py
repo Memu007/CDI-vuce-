@@ -2015,6 +2015,7 @@ Busca esta información en el encabezado de la factura:
 10. incoterm: Términos de entrega (FOB, CIF, DDP, EXW, etc.). Si viene con ciudad/puerto al lado (ej: "FOB Genova", "CIF Buenos Aires"), devolver SOLO las 3 letras del codigo.
 11. flete: Valor del flete/freight (número, 0 si no aparece)
 12. seguro: Valor del seguro/insurance (número, 0 si no aparece)
+13. comprador_domicilio: Domicilio/dirección del comprador/importador argentino (la que figura junto al nombre del importador/buyer). Si no aparece claramente, devolver "". No inventar ni usar la dirección del vendedor.
 
 ═══════════════════════════════════════════════════════════════════
 SECCIÓN 2: ITEMS (buscar en la tabla de productos)
@@ -2063,7 +2064,8 @@ FORMATO DE RESPUESTA (JSON estricto)
     "moneda": "DOL",
     "incoterm": "FOB",
     "flete": 0.00,
-    "seguro": 0.00
+    "seguro": 0.00,
+    "comprador_domicilio": "..."
   },
   "items": [
     {"codigo_parte": "77655-KK010", "pieza": "802730", "descripcion": "Stamping Die-3", "cantidad": 1, "valor_unitario": 31283.33, "peso_kg": 4704, "origen": "CN"}
@@ -2139,6 +2141,7 @@ IMPORTANTE:
                         'incoterm': str(operacion.get('incoterm', 'FOB'))[:3].upper(),
                         'flete': float(operacion.get('flete', 0) or 0),
                         'seguro': float(operacion.get('seguro', 0) or 0),
+                        'comprador_domicilio': str(operacion.get('comprador_domicilio', '')),
                     }
                     
                     # Extraer items
@@ -2259,6 +2262,7 @@ Busca esta información en el encabezado de la factura:
 10. incoterm: Términos de entrega (FOB, CIF, DDP, EXW, etc.). Si viene con ciudad/puerto al lado (ej: "FOB Genova", "CIF Buenos Aires"), devolver SOLO las 3 letras del codigo.
 11. flete: Valor del flete/freight (número, 0 si no aparece)
 12. seguro: Valor del seguro/insurance (número, 0 si no aparece)
+13. comprador_domicilio: Domicilio/dirección del comprador/importador argentino (la que figura junto al nombre del importador/buyer). Si no aparece claramente, devolver "". No inventar ni usar la dirección del vendedor.
 
 ═══════════════════════════════════════════════════════════════════
 SECCIÓN 2: ITEMS (buscar en la tabla de productos)
@@ -2289,7 +2293,8 @@ FORMATO DE RESPUESTA (JSON estricto)
     "moneda": "DOL",
     "incoterm": "FOB",
     "flete": 0.00,
-    "seguro": 0.00
+    "seguro": 0.00,
+    "comprador_domicilio": "..."
   },
   "items": [
     {"descripcion": "...", "cantidad": 10, "valor_unitario": 5.50, "peso_kg": 0.5, "origen": "CN"}
@@ -2339,6 +2344,7 @@ IMPORTANTE:
                             'incoterm': str(operacion.get('incoterm', 'FOB'))[:3].upper(),
                             'flete': float(operacion.get('flete', 0) or 0),
                             'seguro': float(operacion.get('seguro', 0) or 0),
+                            'comprador_domicilio': str(operacion.get('comprador_domicilio', '')),
                         }
                         
                         # Extraer items
