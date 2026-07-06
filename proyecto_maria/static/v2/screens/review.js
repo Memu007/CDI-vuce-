@@ -12,10 +12,10 @@
     // para el hint verde. Los que esten vacios se marcan como "faltan".
     const FIELDS = [
         'vendedor_nombre', 'vendedor_id', 'vendedor_pais', 'vendedor_direccion',
-        'comprador_nombre', 'comprador_cuit',
+        'comprador_nombre', 'comprador_cuit', 'comprador_domicilio', 'comprador_fecha_inic_activ',
         'numero_factura', 'fecha_emision',
         'moneda', 'incoterm',
-        'flete', 'seguro',
+        'flete', 'seguro', 'gastos_anteriores_fob',
         // Transporte opcional: si vienen en el PDF los precargamos
         'transporte_medio', 'bl', 'buque',
         'puerto_origen', 'puerto_destino', 'fecha_embarque',
@@ -121,6 +121,13 @@
             return null;
         },
         seguro: (v) => {
+            if (v === '' || v === null || v === undefined) return null;
+            const n = parseNumberAR(v);
+            if (!isFinite(n)) return 'Debe ser un numero.';
+            if (n < 0) return 'No puede ser negativo.';
+            return null;
+        },
+        gastos_anteriores_fob: (v) => {
             if (v === '' || v === null || v === undefined) return null;
             const n = parseNumberAR(v);
             if (!isFinite(n)) return 'Debe ser un numero.';
@@ -385,15 +392,23 @@
             op.comprador_fecha_inic_activ = activo.fecha_inic_activ || '';
             setField('comprador_nombre', op.comprador_nombre);
             setField('comprador_cuit', CDI.formatCuit(op.comprador_cuit));
+            setField('comprador_domicilio', op.comprador_domicilio);
+            setField('comprador_fecha_inic_activ', op.comprador_fecha_inic_activ);
             markHintAsCliente('comprador_nombre');
             markHintAsCliente('comprador_cuit');
+            markHintAsCliente('comprador_domicilio');
+            markHintAsCliente('comprador_fecha_inic_activ');
             return;
         }
 
         if (clienteCuit && pdfCuit && clienteCuit === pdfCuit) {
             if (activo.direccion) op.comprador_domicilio = activo.direccion;
             if (activo.fecha_inic_activ) op.comprador_fecha_inic_activ = activo.fecha_inic_activ;
+            setField('comprador_domicilio', op.comprador_domicilio || '');
+            setField('comprador_fecha_inic_activ', op.comprador_fecha_inic_activ || '');
             markHintAsCliente('comprador_cuit');
+            markHintAsCliente('comprador_domicilio');
+            markHintAsCliente('comprador_fecha_inic_activ');
             return;
         }
 

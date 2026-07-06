@@ -253,6 +253,16 @@
                                         <span class="field-hint" data-hint-for="comprador_cuit">Ejemplo: 30-71490128-6</span>
                                         <span class="field-error" data-error-for="comprador_cuit" hidden></span>
                                     </div>
+                                    <div class="field field-col-2">
+                                        <label class="field-label" for="f_comprador_domicilio">Domicilio del establecimiento</label>
+                                        <input class="input" type="text" id="f_comprador_domicilio" name="comprador_domicilio" autocomplete="off">
+                                        <span class="field-hint" data-hint-for="comprador_domicilio"></span>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_comprador_fecha_inic_activ">Fecha inicio de actividades</label>
+                                        <input class="input" type="text" id="f_comprador_fecha_inic_activ" name="comprador_fecha_inic_activ" placeholder="DD/MM/AAAA" autocomplete="off">
+                                        <span class="field-hint" data-hint-for="comprador_fecha_inic_activ"></span>
+                                    </div>
                                 </div>
                             </fieldset>
 
@@ -321,6 +331,11 @@
                                         <label class="field-label" for="f_seguro">Seguro (USD)</label>
                                         <input class="input" type="number" step="0.01" min="0" id="f_seguro" name="seguro" autocomplete="off">
                                         <span class="field-hint">Dejar en 0 si no aplica.</span>
+                                    </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_gastos_anteriores_fob">Gastos anteriores a FOB (USD)</label>
+                                        <input class="input" type="number" step="0.01" min="0" id="f_gastos_anteriores_fob" name="gastos_anteriores_fob" autocomplete="off">
+                                        <span class="field-hint">Comisiones, embalaje, etc. Dejar en 0 si no aplica.</span>
                                     </div>
                                 </div>
                                 <div class="cx-incoterm-warning" id="reviewIncotermWarning" hidden role="alert"></div>

@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-06 · feat: datos de carátula fase 1 (domicilio, fecha inicio actividades, gastos anteriores a FOB)
+
+Pantalla Revisión: agregados inputs visibles para "Domicilio del establecimiento" y "Fecha inicio de actividades" en sección Importador — se auto-pueblan desde la ficha del cliente al elegir importador, con hint verde "Desde cliente activo". Agregado campo "Gastos anteriores a FOB (USD)" en sección Costos adicionales (numérico, opcional, validado). Sin cambios en DB ni modelo de cliente. Solo 2 archivos: `dashboard_v2.html` y `review.js`.
+
 ## 2026-06-30 · feat: propagar codigo_sim y sim_alternativas a la UI (integración VUCE CI)
 
 `ncm_service.py` ahora incluye `codigo_sim` y `sim_alternativas` en `merge_datos_inteligente` y en la respuesta final de `get_ncm_completo`. `ncm.js` (`renderVucePreview`) muestra el `codigo_sim` (11 dígitos + letra) cuando está disponible, en vez del NCM de 8 dígitos. Verificado con NCM 3926.90.90: llega `3926.90.90.100H` + 32 alternativas, source `vuce_ci_oficial`.
