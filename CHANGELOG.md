@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-06 · fix: campo fecha inicio actividades en Revisión ahora usa type="date"
+
+Cambiado input de `comprador_fecha_inic_activ` de `type="text"` (placeholder DD/MM/AAAA) a `type="date"` para coincidir con la ficha de cliente que guarda en formato ISO. Sin conversión necesaria.
+
 ## 2026-07-06 · feat: datos de carátula fase 1 (domicilio, fecha inicio actividades, gastos anteriores a FOB)
 
 Pantalla Revisión: agregados inputs visibles para "Domicilio del establecimiento" y "Fecha inicio de actividades" en sección Importador — se auto-pueblan desde la ficha del cliente al elegir importador, con hint verde "Desde cliente activo". Agregado campo "Gastos anteriores a FOB (USD)" en sección Costos adicionales (numérico, opcional, validado). Sin cambios en DB ni modelo de cliente. Solo 2 archivos: `dashboard_v2.html` y `review.js`.
