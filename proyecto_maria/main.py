@@ -3111,10 +3111,13 @@ async def create_manual_operation(
     total_weight = sum(float(it.get("peso_unitario", 0) or 0) * float(it.get("cantidad", 0) or 0) for it in items_raw)
 
     # Crear operación
+    op_code = await _next_op_code(db, username)
+
     operation = OperationModel(
         id=operation_id,
         owner_username=username,
         client_id=client_id,
+        op_code=op_code,
         source="manual",
         total_items=total_items,
         total_value=total_value,
@@ -4051,6 +4054,30 @@ async def _wave1_compute_kpis(db: AsyncSession, days: int = 14) -> dict:
     }
 
 
+async def _next_op_code(db: AsyncSession, owner_username: str) -> str:
+    """Genera el próximo op_code correlativo por despachante (OP-000001)."""
+    import re
+    from proyecto_maria.database.connection import IS_SQLITE
+    # Traer todos los op_code del owner que empiecen con OP- y filtrar en Python
+    result = await db.execute(
+        sa_select(OperationModel.op_code)
+        .where(
+            OperationModel.owner_username == owner_username,
+            OperationModel.op_code.like("OP-%"),
+        )
+        .order_by(OperationModel.op_code.desc())
+        .limit(50)
+    )
+    rows = result.scalars().all()
+    max_num = 0
+    for row in rows:
+        m = re.match(r"^OP-(\d{6})$", str(row))
+        if m:
+            max_num = max(max_num, int(m.group(1)))
+            break  # están ordenados desc, el primero que matchea es el mayor
+    return f"OP-{max_num + 1:06d}"
+
+
 async def _get_owned_client(
     db: AsyncSession, client_id: str, username: str
 ) -> ClientModel:
@@ -4944,9 +4971,10 @@ async def save_client_operation(
 
     try:
         data = await request.json()
-        op_code = data.get("operation_id") or f"OP_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         resumen = data.get("resumen", {}) or {}
         items = data.get("items", []) or []
+
+        op_code = await _next_op_code(db, username)
 
         operation = OperationModel(
             id=str(uuid.uuid4()),
