@@ -704,6 +704,8 @@
             operation_id: opCode,
             source: 'pdf_v2',
             currency: (op.moneda || 'USD').toString().toUpperCase(),
+            comprador_domicilio: op.comprador_domicilio || '',
+            comprador_fecha_inic_activ: op.comprador_fecha_inic_activ || '',
             resumen: {
                 items: items.length,
                 valor_total: total_valor,

@@ -4966,7 +4966,7 @@ async def save_client_operation(
 ):
     """Guarda una operación en el historial del cliente."""
     username = user["username"]
-    await _get_owned_client(db, client_id, username)
+    client = await _get_owned_client(db, client_id, username)
 
     try:
         data = await request.json()
@@ -4988,6 +4988,18 @@ async def save_client_operation(
         )
         db.add(operation)
         await db.flush()  # para tener operation.id
+
+        # Fill-if-empty: rellenar ficha del cliente con datos de carátula
+        # que estén vacíos. Nunca pisa valores existentes.
+        try:
+            domicilio_op = str(data.get("comprador_domicilio") or "").strip()
+            fecha_op = str(data.get("comprador_fecha_inic_activ") or "").strip()
+            if domicilio_op and not (client.address or "").strip():
+                client.address = domicilio_op
+            if fecha_op and not (client.fecha_inic_activ or "").strip():
+                client.fecha_inic_activ = fecha_op
+        except Exception as fill_err:
+            logger.warning("[fill-if-empty] No se pudo rellenar ficha: %s", fill_err)
 
         for item in items:
             db.add(

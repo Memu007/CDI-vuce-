@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-07 · feat: ficha del cliente se auto-completa (fill-if-empty) al guardar operación
+
+Al guardar una operación, si la ficha del cliente tiene `address` o `fecha_inic_activ` vacíos y la carátula trae esos datos, se rellenan. Nunca pisa valores existentes. Datos por-embarque (flete, seguro, gastos FOB, factura, etc.) no se guardan en la ficha. Excepción atrapada: si falla el fill, no rompe el guardado de la operación.
+
 ## 2026-07-07 · feat: identificador correlativo OP-000001 por despachante
 
 Operaciones nuevas reciben `op_code` correlativo por despachante (OP-000001, OP-000002, etc.) vía helper `_next_op_code` en `main.py`. Aplica a los 2 caminos de creación: `create_manual_operation` y `save_client_operation`. Operaciones viejas conservan su código actual. Limitación conocida: sin lock de concurrencia (riesgo bajo para uso individual).
