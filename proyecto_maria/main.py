@@ -4057,7 +4057,6 @@ async def _wave1_compute_kpis(db: AsyncSession, days: int = 14) -> dict:
 async def _next_op_code(db: AsyncSession, owner_username: str) -> str:
     """Genera el próximo op_code correlativo por despachante (OP-000001)."""
     import re
-    from proyecto_maria.database.connection import IS_SQLITE
     # Traer todos los op_code del owner que empiecen con OP- y filtrar en Python
     result = await db.execute(
         sa_select(OperationModel.op_code)
