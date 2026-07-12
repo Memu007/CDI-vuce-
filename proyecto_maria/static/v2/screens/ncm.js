@@ -16,7 +16,7 @@
     // Batch selection / acciones en lote
     const selectedRows = new Set();
     const expandedGroups = new Set();
-    let batchBar, batchCount, batchFactor, batchApplyQty, batchNcm, batchApplyNcm, batchOrigin, batchApplyOrigin, batchClear, batchAgrupar, selectAllBox;
+    let batchBar, batchCount, batchFactor, batchApplyQty, batchNcm, batchDc, batchApplyNcm, batchOrigin, batchApplyOrigin, batchClear, batchAgrupar, selectAllBox;
     let lastSnapshot = null;   // { items: [...], label: 'x2 a 3 items', ts: ms }
     let undoTimer = null;
 
@@ -46,6 +46,36 @@
     function getOriginLabel(value) {
         const catalog = getCountryCatalog();
         return catalog ? (catalog.label(value) || String(value || '').trim()) : String(value || '').trim();
+    }
+
+    function splitSimPosition(value) {
+        const raw = String(value || '').trim();
+        const letterMatch = raw.match(/([A-Za-z])\s*$/);
+        return {
+            digits: raw.replace(/\D/g, '').slice(0, 11),
+            dc: letterMatch ? letterMatch[1].toUpperCase() : ''
+        };
+    }
+
+    function buildSimPosition(digits, dc) {
+        const cleanDigits = String(digits || '').replace(/\D/g, '').slice(0, 11);
+        const cleanDc = String(dc || '').replace(/[^A-Za-z]/g, '').slice(0, 1).toUpperCase();
+        const formatted = CDI.formatNcm ? CDI.formatNcm(cleanDigits) : cleanDigits;
+        return formatted + (cleanDc ? ' ' + cleanDc : '');
+    }
+
+    function simErrorDetail(value) {
+        const parts = splitSimPosition(value);
+        if (parts.digits.length === 8) {
+            return 'La NCM está identificada, pero faltan los 3 dígitos SIM y la letra de control (DC).';
+        }
+        if (parts.digits.length < 11) {
+            return 'La posición SIM debe tener 11 dígitos: NCM (8) + detalle SIM (3).';
+        }
+        if (!parts.dc) {
+            return 'Falta la letra de control. Completala en el campo DC.';
+        }
+        return 'Usá 11 dígitos y una única letra de control (DC). Ejemplo: 8471.30.00.900 · R.';
     }
 
     function ensureCountryDatalist() {
@@ -99,6 +129,7 @@
         spotSearch.addEventListener('input', onSpotInput);
         spotSearch.addEventListener('keydown', onSpotKeydown);
         spotResults.addEventListener('click', onSpotResultClick);
+        if (spotVuce) spotVuce.addEventListener('click', onVuceSimClick);
 
         // Keyboard global: ESC cierra overlay
         document.addEventListener('keydown', (e) => {
@@ -119,6 +150,7 @@
         batchFactor = $('ncmBatchFactor');
         batchApplyQty = $('ncmBatchApplyQty');
         batchNcm = $('ncmBatchNcm');
+        batchDc = $('ncmBatchDc');
         batchApplyNcm = $('ncmBatchApplyNcm');
         batchOrigin = $('ncmBatchOrigin');
         batchApplyOrigin = $('ncmBatchApplyOrigin');
@@ -127,6 +159,8 @@
         selectAllBox = $('ncmSelectAll');
 
         if (batchNcm && CDI.maskNcm) CDI.maskNcm(batchNcm);
+        if (batchNcm) batchNcm.addEventListener('input', onBatchSimInput);
+        if (batchDc) batchDc.addEventListener('input', onBatchDcInput);
 
         if (selectAllBox) {
             selectAllBox.addEventListener('change', (e) => onSelectAll(e.target.checked));
@@ -387,12 +421,27 @@
         updateBatchBar();
     }
 
+    function onBatchSimInput() {
+        const parts = splitSimPosition(batchNcm && batchNcm.value);
+        if (batchNcm) batchNcm.value = CDI.formatNcm ? CDI.formatNcm(parts.digits) : parts.digits;
+        if (parts.dc && batchDc) batchDc.value = parts.dc;
+    }
+
+    function onBatchDcInput() {
+        if (!batchDc) return;
+        batchDc.value = String(batchDc.value || '').replace(/[^A-Za-z]/g, '').slice(0, 1).toUpperCase();
+    }
+
+    function batchSimValue() {
+        return buildSimPosition(batchNcm && batchNcm.value, batchDc && batchDc.value);
+    }
+
     function applyBatchNcm() {
         const items = (CDI.state && CDI.state.items) || [];
         if (selectedRows.size === 0 || !items.length) return;
-        const formatted = normalizeBatchNcm(batchNcm && batchNcm.value);
+        const formatted = normalizeBatchNcm(batchSimValue());
         if (!formatted) {
-            if (CDI.toast) CDI.toast('NCM inválido', 'Usá 8 dígitos o el SIM completo de 10/11 dígitos, con letra opcional.', 'error');
+            if (CDI.toast) CDI.toast('Posición SIM incompleta', simErrorDetail(batchSimValue()), 'error');
             return;
         }
         lastSnapshot = { items: snapshotItems(), ts: Date.now() };
@@ -467,6 +516,11 @@
             inp.addEventListener('blur', onNcmBlur);
             inp.addEventListener('keydown', onNcmKeydown);
         });
+        tbody.querySelectorAll('.sim-dc-input').forEach(inp => {
+            inp.addEventListener('input', onSimDcInput);
+            inp.addEventListener('blur', onNcmBlur);
+            inp.addEventListener('keydown', onNcmKeydown);
+        });
         tbody.querySelectorAll('.ncm-edit').forEach(inp => {
             inp.addEventListener('input', onFieldInput);
             inp.addEventListener('blur', onFieldBlur);
@@ -537,8 +591,9 @@
         const cantidad = it.cantidad != null ? Number(it.cantidad) : '';
         const valorUnitario = Number(it.valor_unitario || 0);
         const pesoUnitario = Number(it.peso_unitario || 0);
-        const piezaFmt = (CDI.formatNcm ? CDI.formatNcm(pieza) : pieza);
-        const ncmValue = CDI.escapeHtml(piezaFmt);
+        const simParts = splitSimPosition(pieza);
+        const simValue = CDI.escapeHtml(CDI.formatNcm ? CDI.formatNcm(simParts.digits) : simParts.digits);
+        const dcValue = CDI.escapeHtml(simParts.dc);
         const assistText = isOk ? 'Cambiar' : 'Asistente';
         const notesPill = renderNotesPill(pieza, i);
         const checked = selectedRows.has(i) ? ' checked' : '';
@@ -560,9 +615,15 @@
                 '<td class="col-peso"><input class="ncm-edit ncm-edit-peso input input-sm" type="number" min="0" step="0.01" value="' + (pesoUnitario || '') + '" data-row="' + i + '" data-field="peso_unitario" aria-label="Peso unitario item ' + (i + 1) + '"></td>' +
                 '<td class="col-ncm">' +
                     '<div class="ncm-cell">' +
-                        '<input class="' + inputClass + '" type="text" placeholder="- - - -"' +
-                        ' data-row="' + i + '" aria-label="NCM item ' + (i + 1) + '"' +
-                        ' value="' + ncmValue + '">' +
+                        '<div class="sim-position-fields">' +
+                            '<input class="' + inputClass + '" type="text" placeholder="0000.00.00.000"' +
+                            ' data-row="' + i + '" aria-label="Posición SIM item ' + (i + 1) + '"' +
+                            ' value="' + simValue + '">' +
+                            '<label class="sim-dc-field"><span>DC</span>' +
+                                '<input class="sim-dc-input' + (isError ? ' is-error' : '') + '" type="text" maxlength="1"' +
+                                ' data-row="' + i + '" aria-label="Letra de control item ' + (i + 1) + '" value="' + dcValue + '">' +
+                            '</label>' +
+                        '</div>' +
                         notesPill +
                         autofillChip +
                     '</div>' +
@@ -629,15 +690,16 @@
         const cantVal = it.cantidad != null ? Number(it.cantidad) : '';
         const valorUnitario = Number(it.valor_unitario || 0);
         const pesoUnitario = Number(it.peso_unitario || 0);
-        const piezaFmt = CDI.formatNcm ? CDI.formatNcm(pieza) : pieza;
-        const ncmValue = CDI.escapeHtml(piezaFmt);
+        const simParts = splitSimPosition(pieza);
+        const simValue = CDI.escapeHtml(CDI.formatNcm ? CDI.formatNcm(simParts.digits) : simParts.digits);
+        const dcValue = CDI.escapeHtml(simParts.dc);
         const notesPill = renderNotesPill(pieza, r.indices[0]);
         const allSelected = r.indices.every(i => selectedRows.has(i));
         const checked = allSelected ? ' checked' : '';
         const isExpanded = expandedGroups.has(gid);
         const expandIcon = isExpanded ? '▾' : '▸';
         const grupoLabel = 'Grupo ' + gid + ' (' + r.items.length + ' ítems)';
-        const inputClass = 'ncm-input ncm-group-input';
+        const inputClass = 'ncm-input ncm-group-input' + (pieza && !isValid ? ' is-error' : '');
         let html = '<tr class="' + rowClass + ' row-grouped" data-grupo-id="' + gid + '">' +
             '<td class="col-check"><input type="checkbox" class="ncm-row-check" data-group-check="' + gid + '"' + checked + ' aria-label="Seleccionar grupo ' + gid + '"></td>' +
             '<td class="col-num"><button type="button" class="ncm-expand-btn" data-expand-grupo="' + gid + '" aria-label="Expandir grupo">' + expandIcon + '</button></td>' +
@@ -647,7 +709,10 @@
             '<td class="col-cant"><input class="ncm-edit ncm-edit-cant input input-sm" type="number" min="1" step="1" value="' + cantVal + '" data-grupo-id="' + gid + '" data-field="cantidad" aria-label="Cantidad grupo ' + gid + '"></td>' +
             '<td class="col-valor"><input class="ncm-edit ncm-edit-valor input input-sm" type="number" min="0" step="0.01" value="' + (valorUnitario || '') + '" data-grupo-id="' + gid + '" data-field="valor_unitario" aria-label="Valor grupo ' + gid + '"></td>' +
             '<td class="col-peso"><input class="ncm-edit ncm-edit-peso input input-sm" type="number" min="0" step="0.01" value="' + (pesoUnitario || '') + '" data-grupo-id="' + gid + '" data-field="peso_unitario" aria-label="Peso grupo ' + gid + '"></td>' +
-            '<td class="col-ncm"><div class="ncm-cell"><input class="' + inputClass + '" type="text" value="' + ncmValue + '" data-grupo-id="' + gid + '" data-field="pieza" aria-label="NCM grupo ' + gid + '">' + notesPill + '</div></td>' +
+            '<td class="col-ncm"><div class="ncm-cell"><div class="sim-position-fields">' +
+                '<input class="' + inputClass + '" type="text" placeholder="0000.00.00.000" value="' + simValue + '" data-grupo-id="' + gid + '" data-field="pieza" aria-label="Posición SIM grupo ' + gid + '">' +
+                '<label class="sim-dc-field"><span>DC</span><input class="sim-dc-input' + (pieza && !isValid ? ' is-error' : '') + '" type="text" maxlength="1" value="' + dcValue + '" data-grupo-id="' + gid + '" aria-label="Letra de control grupo ' + gid + '"></label>' +
+            '</div>' + notesPill + '</div></td>' +
             '<td class="col-actions">' + (isOk ? '<span class="check" aria-label="asignado">✓</span> ' : '') +
             '<button type="button" class="ncm-grupo-chip" data-grupo="' + gid + '" title="Clic para desagrupar">' + grupoLabel + '</button></td>' +
         '</tr>';
@@ -695,13 +760,13 @@
         const selected = selectedIndices.map(i => items[i]);
         const requestedNcm = normalizeBatchNcm(rawNcm);
         if (String(rawNcm || '').trim() && !requestedNcm) {
-            return { ok: false, title: 'NCM inválido', message: 'Usá 8 dígitos o el SIM completo de 10/11 dígitos, con letra opcional.' };
+            return { ok: false, title: 'Posición SIM incompleta', message: simErrorDetail(rawNcm) };
         }
 
         const existingNcms = new Set(selected.map(it => normalizeBatchNcm(it.pieza)).filter(Boolean));
         const targetNcm = requestedNcm || (existingNcms.size === 1 ? Array.from(existingNcms)[0] : '');
         if (!targetNcm) {
-            return { ok: false, title: 'Indicá una NCM', message: 'Escribí una sola NCM arriba: se asignará a todos y se unirán en el mismo paso.' };
+            return { ok: false, title: 'Indicá la posición SIM', message: 'Escribí los 11 dígitos y la letra DC: se asignarán a todos y se unirán en el mismo paso.' };
         }
 
         // CN, China y 310 son el mismo país: los normalizamos antes de decidir
@@ -728,12 +793,13 @@
     // API pequeña y determinística para probar la acción masiva sin navegador.
     CDI.ncmBatch = CDI.ncmBatch || {};
     CDI.ncmBatch.applyNcmAndGroup = applyNcmAndGroup;
+    CDI.ncmBatch.isValidSimPosition = isValidNcm;
 
     function agruparSeleccionados() {
         const items = (CDI.state && CDI.state.items) || [];
         if (!items.length) return;
         const before = snapshotItems();
-        const result = applyNcmAndGroup(items, selectedRows, batchNcm && batchNcm.value);
+        const result = applyNcmAndGroup(items, selectedRows, batchSimValue());
         if (!result.ok) {
             if (CDI.toast) CDI.toast(result.title, result.message, 'error');
             return;
@@ -744,6 +810,7 @@
 
         selectedRows.clear();
         if (batchNcm) batchNcm.value = '';
+        if (batchDc) batchDc.value = '';
         if (selectAllBox) selectAllBox.checked = false;
         render();
         updateBatchBar();
@@ -911,7 +978,7 @@
             if (missing === 0) {
                 summaryEl.innerHTML = total + ' productos · <strong style="color: var(--c-success);">todos listos</strong>';
             } else {
-                let breakdown = '<strong style="color: var(--c-warning);">' + missing + ' sin NCM válido</strong>';
+                let breakdown = '<strong style="color: var(--c-warning);">' + missing + ' sin posición SIM completa</strong>';
                 if (incomplete > 0 && empty > 0) {
                     breakdown += ' (' + empty + ' vacíos · ' + incomplete + ' incompletos)';
                 } else if (incomplete > 0) {
@@ -924,16 +991,21 @@
             continueBtn.disabled = missing > 0 || total === 0;
             continueBtn.firstChild.nodeValue = missing === 0
                 ? 'Continuar a validar '
-                : 'Asignar ' + missing + ' NCM ';
+                : 'Completar ' + missing + ' posición' + (missing > 1 ? 'es SIM ' : ' SIM ');
         }
     }
 
     function onNcmInput(ev) {
         const inp = ev.target;
+        const fields = inp.closest('.sim-position-fields');
+        const dcInput = fields && fields.querySelector('.sim-dc-input');
+        const parts = splitSimPosition(inp.value);
+        inp.value = CDI.formatNcm ? CDI.formatNcm(parts.digits) : parts.digits;
+        if (parts.dc && dcInput) dcInput.value = parts.dc;
+        const val = buildSimPosition(parts.digits, dcInput && dcInput.value);
         const gidAttr = inp.getAttribute('data-grupo-id');
         const items = CDI.state.items || [];
         lastSnapshot = null;
-        const val = (inp.value || '').trim();
         if (gidAttr) {
             const gid = parseInt(gidAttr, 10);
             items.forEach(it => { if (it.grupo_id === gid) it.pieza = val; });
@@ -943,11 +1015,39 @@
             items[idx].pieza = val;
         }
         inp.classList.remove('is-error');
+        if (dcInput) dcInput.classList.remove('is-error');
+        updateSummary();
+    }
+
+    function onSimDcInput(ev) {
+        const inp = ev.target;
+        inp.value = String(inp.value || '').replace(/[^A-Za-z]/g, '').slice(0, 1).toUpperCase();
+        const fields = inp.closest('.sim-position-fields');
+        const simInput = fields && fields.querySelector('.ncm-input');
+        if (!simInput) return;
+        const val = buildSimPosition(simInput.value, inp.value);
+        const items = CDI.state.items || [];
+        const gidAttr = inp.getAttribute('data-grupo-id');
+        if (gidAttr) {
+            const gid = parseInt(gidAttr, 10);
+            items.forEach(it => { if (it.grupo_id === gid) it.pieza = val; });
+        } else {
+            const idx = parseInt(inp.getAttribute('data-row'), 10);
+            if (!items[idx]) return;
+            items[idx].pieza = val;
+        }
+        inp.classList.remove('is-error');
+        simInput.classList.remove('is-error');
+        updateSummary();
     }
 
     function onNcmBlur(ev) {
         const inp = ev.target;
-        let val = (inp.value || '').trim();
+        const fields = inp.closest('.sim-position-fields');
+        const simInput = fields && fields.querySelector('.ncm-input');
+        const dcInput = fields && fields.querySelector('.sim-dc-input');
+        if (!simInput || !dcInput) return;
+        const val = buildSimPosition(simInput.value, dcInput.value);
         const gidAttr = inp.getAttribute('data-grupo-id');
         const items = CDI.state.items || [];
         let targetItems = [];
@@ -961,32 +1061,21 @@
         }
         if (!targetItems.length) return;
         if (val && !isValidNcm(val)) {
-            inp.classList.add('is-error');
-            const digits = String(val).replace(/\D/g, '').length;
-            let detail;
-            if (digits < 8) {
-                detail = 'Te faltan dígitos: el NCM tiene 8 (ej. 8471.30.00) + 3 SIM + letra (ej. 8471.30.00.900 R).';
-            } else if (digits === 9 || digits > 11) {
-                detail = 'Sobran dígitos: el NCM es de 8 (o 10 con sufijo SIM) + letra opcional.';
-            } else {
-                detail = 'Formato: 8 dígitos (ej. 8471.30.00) o 10 + SIM + letra (ej. 8471.30.00.900 R).';
-            }
-            if (CDI.toast) CDI.toast('NCM inválido', detail, 'error');
+            simInput.classList.add('is-error');
+            dcInput.classList.add('is-error');
+            if (CDI.toast) CDI.toast('Posición SIM incompleta', simErrorDetail(val), 'error');
             return;
         }
-        inp.classList.remove('is-error');
-        if (val && CDI.formatNcm) {
-            val = CDI.formatNcm(val);
-            inp.value = val;
-        }
+        simInput.classList.remove('is-error');
+        dcInput.classList.remove('is-error');
         targetItems.forEach(it => { it.pieza = val; });
         if (val && isValidNcm(val) && targetItems[0].descripcion) {
             saveNcmUsage(targetItems[0].descripcion, val);
         }
         const tr = inp.closest('tr');
         if (tr) {
-            tr.classList.toggle('row-ok', !!val);
-            tr.classList.toggle('row-pending', !val);
+            tr.classList.toggle('row-ok', isValidNcm(val));
+            tr.classList.toggle('row-pending', !isValidNcm(val));
         }
         updateSummary();
         if (val && isValidNcm(val)) render();
@@ -1107,14 +1196,14 @@
     }
 
     function isValidNcm(v) {
-        // Argentina usa NCM de 8 digitos (formato XXXX.XX.XX), 10 con sufijo
-        // SIM, o 11 (8+3 SIM). Letra de control opcional al final (ej: 8471.30.00.900 R).
-        const norm = String(v || '').replace(/[.\s]/g, '');
-        return /^\d{8}$|^\d{8}[A-Za-z]$|^\d{10}$|^\d{10}[A-Za-z]$|^\d{11}$|^\d{11}[A-Za-z]$/.test(norm);
+        // Para generar MARIA no alcanza con la NCM de 8 dígitos: se exige
+        // posición SIM completa (NCM 8 + detalle SIM 3) y DC de una letra.
+        const norm = String(v || '').replace(/[.\s]/g, '').toUpperCase();
+        return /^\d{11}[A-Z]$/.test(norm);
     }
 
     // Tolerancia para mientras el usuario tipea en el spotlight (todavia
-    // no termino de escribir el codigo): 4-10 digitos.
+    // no termino de escribir el codigo): 4-11 digitos y DC opcional.
     function isPartialNcm(v) {
         const norm = String(v || '').replace(/[.\s]/g, '');
         return /^\d{4,11}[A-Za-z]?$/.test(norm);
@@ -1143,7 +1232,7 @@
         fetchSuggestions(it.descripcion || '', /* initial */ true);
         // Si ya hay un NCM asignado, mostrar preview VUCE de ese codigo
         const initialNcm = String(it.pieza || '').replace(/\D/g, '');
-        if (initialNcm.length >= 6) scheduleVucePreview(initialNcm);
+        if (initialNcm.length >= 6) scheduleVucePreview(initialNcm.slice(0, 8));
         setTimeout(() => {
             spotSearch.focus();
             try { spotSearch.select(); } catch (_) {}
@@ -1193,7 +1282,7 @@
                 renderDirectCode(q);
                 // Si tiene 6+ digitos, consultar VUCE para mostrar descripcion oficial y alicuotas
                 const clean = String(q).replace(/\D/g, '');
-                if (clean.length >= 6) scheduleVucePreview(clean);
+                if (clean.length >= 6) scheduleVucePreview(clean.slice(0, 8));
                 else hideVucePreview();
             } else {
                 renderSpotEmpty('Escribí al menos 3 caracteres o un código NCM.');
@@ -1258,12 +1347,22 @@
         const it = items[spotActiveIdx];
         if (!it || !sugg || !sugg.ncm) return;
         const ncmFmt = CDI.formatNcm ? CDI.formatNcm(sugg.ncm) : sugg.ncm;
+        if (!isValidNcm(ncmFmt)) {
+            spotSearch.value = ncmFmt;
+            const clean = String(ncmFmt).replace(/\D/g, '');
+            if (clean.length >= 8) scheduleVucePreview(clean.slice(0, 8));
+            if (CDI.toast) CDI.toast('Falta la posición SIM', 'La sugerencia identifica la NCM de 8 dígitos. Elegí abajo la posición SIM completa con su DC.', 'info');
+            return;
+        }
         it.pieza = ncmFmt;
         // Guardamos la fuente del dato enriquecido si ya la tenemos cacheada.
         // Sirve para el banner "Datos de muestra" y para mostrar chips por fila.
-        const cached = vuceCache && vuceCache.get(ncmFmt);
+        const cacheKey = String(ncmFmt).replace(/\D/g, '').slice(0, 8);
+        const cached = vuceCache && vuceCache.get(cacheKey);
         if (cached) {
             it.ncm_source = sourceOf(cached);
+        } else if (sugg.source) {
+            it.ncm_source = sugg.source;
         }
         CDI.track('ncm_assigned', {
             row: spotActiveIdx,
@@ -1349,6 +1448,10 @@
     }
     function renderDirectCode(code) {
         const fmt = CDI.formatNcm ? CDI.formatNcm(code) : code;
+        if (!isValidNcm(fmt)) {
+            renderSpotEmpty('NCM identificada. Falta elegir la posición SIM completa (11 dígitos + DC).');
+            return;
+        }
         spotSuggestions = [{ ncm: fmt, desc: 'Asignar este código manualmente', source: 'manual' }];
         spotSelectedSugIdx = 0;
         renderSpotResults(false);
@@ -1505,6 +1608,28 @@
             ? '<div class="spotlight-vuce-lic">⚠️ ' + licencias.length + ' licencia' + (licencias.length > 1 ? 's' : '') + ' requerida' + (licencias.length > 1 ? 's' : '') + '</div>'
             : '';
         const staleBanner = renderStaleBanner(data);
+        const simOptions = [];
+        if (data.codigo_sim && isValidNcm(data.codigo_sim)) {
+            simOptions.push({ codigo_sim: data.codigo_sim, descripcion: desc });
+        }
+        (Array.isArray(data.sim_alternativas) ? data.sim_alternativas : []).forEach(pos => {
+            const code = typeof pos === 'string' ? pos : pos && pos.codigo_sim;
+            if (code && isValidNcm(code) && !simOptions.some(x => x.codigo_sim === code)) {
+                simOptions.push({ codigo_sim: code, descripcion: (pos && pos.descripcion) || '' });
+            }
+        });
+        const simChooser = simOptions.length ?
+            '<div class="spotlight-sim-chooser">' +
+                '<label for="spotSimSelect">Posición SIM completa <span>11 dígitos + DC</span></label>' +
+                '<div class="spotlight-sim-controls">' +
+                    '<select id="spotSimSelect" class="input input-sm">' + simOptions.map(pos => {
+                        const formatted = CDI.formatNcm ? CDI.formatNcm(pos.codigo_sim) : pos.codigo_sim;
+                        const optionText = formatted + (pos.descripcion ? ' — ' + pos.descripcion : '');
+                        return '<option value="' + CDI.escapeHtml(pos.codigo_sim) + '">' + CDI.escapeHtml(optionText) + '</option>';
+                    }).join('') + '</select>' +
+                    '<button type="button" class="btn btn-primary btn-sm" data-use-sim>Usar esta posición</button>' +
+                '</div>' +
+            '</div>' : '';
         spotVuce.hidden = false;
         spotVuce.innerHTML =
             '<div class="spotlight-vuce-head">' +
@@ -1513,9 +1638,19 @@
                 '<span class="source-chip ' + meta.cls + '" title="' + CDI.escapeHtml(meta.title) + '">' + CDI.escapeHtml(meta.label) + '</span>' +
             '</div>' +
             '<div class="spotlight-vuce-desc">' + CDI.escapeHtml(desc) + '</div>' +
+            simChooser +
             (alicuotaChips.length ? '<div class="spotlight-vuce-chips">' + alicuotaChips.join('') + '</div>' : '') +
             staleBanner +
             licBlock;
+    }
+
+    function onVuceSimClick(ev) {
+        const button = ev.target && ev.target.closest && ev.target.closest('[data-use-sim]');
+        if (!button) return;
+        const select = spotVuce && spotVuce.querySelector('#spotSimSelect');
+        const codigo = select && select.value;
+        if (!codigo || !isValidNcm(codigo)) return;
+        applyNcmToActiveRow({ ncm: codigo, desc: '', source: 'vuce_oficial' });
     }
 
     // Renderiza un aviso "Datos con latencia de N" si el backend indica que

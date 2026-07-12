@@ -617,6 +617,20 @@ def generate_maria_txt(operation_id: str, items: list,
     return "\r\n".join(lines)
 
 
+def _sim_position_error(ncm_raw: str) -> str | None:
+    """Devuelve el motivo si no es una posición SIM de 11 dígitos + DC."""
+    raw = str(ncm_raw or "").strip()
+    compact = re.sub(r"[.\s]", "", raw).upper()
+    if re.fullmatch(r"\d{11}[A-Z]", compact):
+        return None
+    digits = re.sub(r"\D", "", raw)
+    if len(digits) == 8:
+        return "la NCM tiene 8 dígitos, pero faltan los 3 dígitos SIM y la letra de control (DC)"
+    if len(digits) == 11 and not re.search(r"[A-Za-z]", raw):
+        return "falta la letra de control (DC)"
+    return "debe tener 11 dígitos (NCM 8 + SIM 3) y una letra de control (DC)"
+
+
 def validate_items_for_maria(items: list) -> tuple[bool, list]:
     """
     Valida que los items tengan los campos necesarios para generar MARIA.
@@ -630,6 +644,10 @@ def validate_items_for_maria(items: list) -> tuple[bool, list]:
         ncm = item.get('ncm') or item.get('pieza', '')
         if not ncm:
             errors.append(f"Item {idx}: Falta NCM/Pieza")
+        else:
+            sim_error = _sim_position_error(ncm)
+            if sim_error:
+                errors.append(f"Item {idx}: Posición SIM incompleta: {sim_error}.")
         
         cantidad = item.get('cantidad')
         if not cantidad or float(cantidad) <= 0:
@@ -666,13 +684,9 @@ def validate_for_kit_maria(items: list) -> tuple[list, list]:
 
     for idx, item in enumerate(items, 1):
         ncm_raw = str(item.get("ncm") or item.get("pieza", "") or "").strip()
-        ncm_digits = re.sub(r"\D", "", ncm_raw)
-
-        # NCM: mínimo 8 dígitos
-        if ncm_digits and len(ncm_digits) < 8:
-            errores.append(f"Item {idx}: NCM con menos de 8 dígitos ({ncm_raw}). KIT Maria lo rechaza.")
-        elif ncm_digits and len(ncm_digits) >= 8 and not any(c.isalpha() for c in ncm_raw):
-            _track_warn("NCM sin letra de control. KIT Maria puede pedirla.", idx)
+        sim_error = _sim_position_error(ncm_raw) if ncm_raw else None
+        if sim_error:
+            errores.append(f"Item {idx}: Posición SIM incompleta: {sim_error}.")
 
         # Descripción: mínimo 10 caracteres
         desc = str(item.get("descripcion", "") or "").strip()

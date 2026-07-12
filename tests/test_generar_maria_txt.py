@@ -29,9 +29,9 @@ from proyecto_maria.main import app  # noqa: E402
 # ====================================================================
 
 ITEMS_OK = [
-    {"pieza": "84713010", "descripcion": "Laptop Pro X1", "cantidad": 10,
+    {"pieza": "84713000900R", "descripcion": "Laptop Pro X1", "cantidad": 10,
      "valor_unitario": 500, "peso_unitario": 2.5, "origen": "CN"},
-    {"pieza": "85171200", "descripcion": "Celular Samsung", "cantidad": 20,
+    {"pieza": "85171200900A", "descripcion": "Celular Samsung", "cantidad": 20,
      "valor_unitario": 300, "peso_unitario": 0.2, "origen": "US"},
 ]
 
@@ -352,6 +352,23 @@ def test_validate_items_sin_ncm():
     assert any("ncm" in e.lower() or "pieza" in e.lower() for e in errores)
 
 
+@pytest.mark.parametrize("pieza", ["84713000", "8471.30.00 R", "84713000900"])
+def test_validate_items_rechaza_ncm_sin_posicion_sim_y_dc(pieza):
+    items = [{"pieza": pieza, "descripcion": "Laptop", "cantidad": 1,
+              "valor_unitario": 10, "peso_unitario": 1, "origen": "CN"}]
+    valido, errores = validate_items_for_maria(items)
+    assert valido is False
+    assert any("posición sim incompleta" in e.lower() for e in errores)
+
+
+def test_validate_items_acepta_posicion_sim_formateada_con_dc():
+    items = [{"pieza": "8471.30.00.900 R", "descripcion": "Laptop", "cantidad": 1,
+              "valor_unitario": 10, "peso_unitario": 1, "origen": "CN"}]
+    valido, errores = validate_items_for_maria(items)
+    assert valido is True
+    assert errores == []
+
+
 def test_validate_items_cantidad_cero():
     items = [{"pieza": "84713010", "descripcion": "X", "cantidad": 0, "valor_unitario": 10}]
     valido, errores = validate_items_for_maria(items)
@@ -419,6 +436,23 @@ def test_generate_maria_happy_path(client):
     assert "[DDT]" in data["content"]
     assert "[ART]" in data["content"]
     assert "CSBTSVL=AA(DEMO)-AB(DEMO)-CA00-" in data["content"]
+
+
+def test_generate_maria_rechaza_ncm_de_8_digitos_sin_sim_dc(client):
+    """El endpoint no debe generar un TXT con solo la NCM base."""
+    _register(client, "maria_sim_incompleta")
+    resp = client.post("/generate_maria", json={
+        "operation_id": "OP_SIM_INCOMPLETA",
+        "items": [{
+            "pieza": "8471.30.00", "descripcion": "Laptop completa",
+            "cantidad": 1, "valor_unitario": 500, "peso_unitario": 2.5,
+            "origen": "CN",
+        }],
+        "sbt_sufijo_valor": "AA(DEMO)-AB(DEMO)-CA00-",
+    })
+    assert resp.status_code == 400, resp.text
+    errors = resp.json()["detail"]["errors"]
+    assert any("posición sim incompleta" in error.lower() for error in errors)
 
 
 def test_generate_maria_requires_auth(client, monkeypatch):

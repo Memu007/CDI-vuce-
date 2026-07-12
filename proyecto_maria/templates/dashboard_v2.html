@@ -456,8 +456,9 @@
             <section class="screen" data-screen="ncm">
                 <div class="ncm-header">
                     <div>
-                        <h1 class="title-2">Asigná los códigos NCM</h1>
+                        <h1 class="title-2">Completá las posiciones SIM</h1>
                         <p class="subtitle" id="ncmSummary"></p>
+                        <p class="caption ncm-format-help">La NCM tiene 8 dígitos. Para declarar en MARIA completá 3 dígitos SIM y la letra DC.</p>
                     </div>
                     <div class="row-3">
                         <button type="button" class="btn btn-ghost" data-action="go-review">Volver</button>
@@ -497,10 +498,12 @@
                             <button type="button" class="btn btn-ghost btn-sm" id="ncmBatchApplyQty">Aplicar</button>
                             <span class="ncm-batch-sep">·</span>
                             <label class="ncm-batch-field">
-                                <span class="caption">NCM para todos</span>
-                                <input type="text" class="input input-sm" id="ncmBatchNcm" placeholder="0000.00.00" inputmode="numeric">
+                                <span class="caption">Posición SIM para todos</span>
+                                <input type="text" class="input input-sm ncm-batch-sim" id="ncmBatchNcm" placeholder="0000.00.00.000" inputmode="numeric" aria-label="Posición SIM de 11 dígitos para todos">
+                                <span class="caption">DC</span>
+                                <input type="text" class="input input-sm ncm-batch-dc" id="ncmBatchDc" placeholder="A" maxlength="1" aria-label="Letra de control para todos">
                             </label>
-                            <button type="button" class="btn btn-ghost btn-sm" id="ncmBatchApplyNcm">Solo asignar</button>
+                            <button type="button" class="btn btn-ghost btn-sm" id="ncmBatchApplyNcm">Solo asignar SIM</button>
                             <span class="ncm-batch-sep">·</span>
                             <label class="ncm-batch-field">
                                 <span class="caption">Origen para todos</span>
@@ -508,7 +511,7 @@
                             </label>
                             <button type="button" class="btn btn-ghost btn-sm" id="ncmBatchApplyOrigin">Aplicar Origen</button>
                             <span class="ncm-batch-sep">·</span>
-                            <button type="button" class="btn btn-primary btn-sm" id="ncmBatchAgrupar" disabled>Asignar NCM y unir</button>
+                            <button type="button" class="btn btn-primary btn-sm" id="ncmBatchAgrupar" disabled>Asignar SIM y unir</button>
                             <button type="button" class="btn btn-ghost btn-sm" id="ncmBatchClear">Deseleccionar</button>
                         </div>
                     </div>
@@ -524,7 +527,7 @@
                                     <th class="col-cant">Cant</th>
                                     <th class="col-valor">Valor unit.</th>
                                     <th class="col-peso">Peso unit.</th>
-                                    <th class="col-ncm">Código NCM</th>
+                                    <th class="col-ncm"><span>Posición SIM</span><small>NCM 8 + SIM 3 + DC</small></th>
                                     <th class="col-actions"></th>
                                 </tr>
                             </thead>

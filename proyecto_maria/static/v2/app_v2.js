@@ -524,8 +524,8 @@
     }
     CDI.maskDate = maskDate;
 
-    // Formato canonico de NCM: XXXX.XX.XX (8 digitos). Si vienen mas (SIM),
-    // respetamos hasta XXXX.XX.XX.XXX. Letra de control opcional al final.
+    // Formato de NCM/posición SIM. La pantalla de declaración valida por
+    // separado que existan 11 dígitos y la letra de control (DC).
     function formatNcm(raw) {
         const s = String(raw == null ? '' : raw).trim();
         // Extraer letra sufijo (A-Z, mayuscula)
@@ -541,8 +541,8 @@
     }
     CDI.formatNcm = formatNcm;
 
-    // Mascara NCM: inserta los puntos solos mientras se tipea, respeta backspace
-    // y acepta pegar "85444200" o "8544.42.00".
+    // Máscara: inserta los puntos mientras se tipea y permite pegar tanto una
+    // NCM de búsqueda como una posición SIM completa con DC.
     function maskNcm(input) {
         if (!input || input.__cdiMaskNcmApplied) return;
         input.__cdiMaskNcmApplied = true;

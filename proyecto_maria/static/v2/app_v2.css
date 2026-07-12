@@ -1398,6 +1398,7 @@ body {
 }
 .ncm-header .title-2 { margin-bottom: var(--s-2); }
 .ncm-header .subtitle { font-size: var(--t-15); }
+.ncm-format-help { max-width: 430px; margin-top: var(--s-1); line-height: 1.35; }
 .ncm-card { overflow: hidden; }
 .ncm-table-scroll { overflow-x: auto; }
 
@@ -1453,7 +1454,17 @@ body.cdi-dragging-row { cursor: grabbing; }
 .ncm-table .col-cant    { width: 60px; text-align: right; font-variant-numeric: tabular-nums; }
 .ncm-table .col-valor   { width: 100px; text-align: right; font-variant-numeric: tabular-nums; }
 .ncm-table .col-peso    { width: 100px; text-align: right; font-variant-numeric: tabular-nums; }
-.ncm-table .col-ncm     { width: 150px; font-family: var(--font-mono); }
+.ncm-table .col-ncm     { width: 220px; min-width: 220px; font-family: var(--font-mono); }
+.ncm-table th.col-ncm { white-space: normal; }
+.ncm-table th.col-ncm small {
+    display: block;
+    margin-top: 2px;
+    color: var(--c-text-3);
+    font-size: 9px;
+    font-weight: var(--w-regular);
+    letter-spacing: 0;
+    text-transform: none;
+}
 .ncm-table .col-actions {
     width: 150px;
     min-width: 150px;
@@ -1505,6 +1516,8 @@ body.cdi-dragging-row { cursor: grabbing; }
     width: 110px;
 }
 .ncm-batch-field .input-sm[type="number"] { width: 70px; }
+.ncm-batch-field .ncm-batch-sim { width: 138px; font-family: var(--font-mono); }
+.ncm-batch-field .ncm-batch-dc { width: 34px; padding: 0; text-align: center; font-family: var(--font-mono); font-weight: var(--w-semibold); }
 .ncm-batch-field .ncm-batch-origin { width: 11rem; }
 .ncm-batch-sep { color: var(--c-border); }
 .btn.btn-sm {
@@ -1532,6 +1545,50 @@ body.cdi-dragging-row { cursor: grabbing; }
     box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15);
 }
 .ncm-input.is-error {
+    border-color: var(--c-error);
+    background: var(--c-error-soft);
+}
+.sim-position-fields {
+    display: flex;
+    align-items: flex-end;
+    gap: 5px;
+    min-width: 0;
+    flex: 1;
+}
+.sim-position-fields .ncm-input {
+    width: 150px;
+    flex: 1;
+    min-width: 132px;
+}
+.sim-dc-field {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    flex: 0 0 34px;
+    color: var(--c-text-3);
+    font: var(--w-semibold) 9px/1 var(--font-sans);
+    letter-spacing: 0.04em;
+}
+.sim-dc-input {
+    width: 34px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+    background: var(--c-surface-2);
+    color: var(--c-text);
+    text-align: center;
+    text-transform: uppercase;
+    font: var(--w-semibold) var(--t-13)/1 var(--font-mono);
+}
+.sim-dc-input:focus {
+    outline: none;
+    background: var(--c-surface);
+    border-color: var(--c-accent);
+    box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.15);
+}
+.sim-dc-input.is-error {
     border-color: var(--c-error);
     background: var(--c-error-soft);
 }
@@ -1752,6 +1809,36 @@ body.cdi-dragging-row { cursor: grabbing; }
     line-height: 1.4;
     font-size: var(--t-13);
 }
+.spotlight-sim-chooser {
+    display: flex;
+    flex-direction: column;
+    gap: var(--s-2);
+    margin: var(--s-1) 0;
+    padding: var(--s-3);
+    border: 1px solid var(--c-accent);
+    border-radius: var(--r-sm);
+    background: var(--c-surface);
+}
+.spotlight-sim-chooser > label {
+    color: var(--c-text);
+    font-size: var(--t-12);
+    font-weight: var(--w-semibold);
+}
+.spotlight-sim-chooser > label span {
+    color: var(--c-text-3);
+    font-weight: var(--w-regular);
+}
+.spotlight-sim-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--s-2);
+}
+.spotlight-sim-controls select {
+    min-width: 0;
+    flex: 1;
+    font-family: var(--font-mono);
+}
+.spotlight-sim-controls .btn { flex: 0 0 auto; }
 .spotlight-vuce-chips {
     display: flex;
     flex-wrap: wrap;

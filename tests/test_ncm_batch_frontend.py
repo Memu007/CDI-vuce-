@@ -57,7 +57,7 @@ const items = [
   {pieza:'', origen:'CN', unidad:'07', grupo_id:null},
   {pieza:'', origen:'US', unidad:'07', grupo_id:null}
 ];
-const result = window.CDI.ncmBatch.applyNcmAndGroup(items, [0, 1], '84713000');
+const result = window.CDI.ncmBatch.applyNcmAndGroup(items, [0, 1], '84713000900R');
 console.log(JSON.stringify({ result, items }));
 """)
     assert result["result"]["ok"] is False
@@ -71,8 +71,25 @@ const items = [
   {pieza:'', origen:'CN', unidad:'07', grupo_id:null},
   {pieza:'', origen:'China', unidad:'07', grupo_id:null}
 ];
-const result = window.CDI.ncmBatch.applyNcmAndGroup(items, [0, 1], '84713000');
+const result = window.CDI.ncmBatch.applyNcmAndGroup(items, [0, 1], '84713000900R');
 console.log(JSON.stringify({ result, items }));
 """)
     assert result["result"]["ok"] is True
     assert [item["origen"] for item in result["items"]] == ["310", "310"]
+
+
+def test_solo_posicion_sim_11_mas_dc_queda_lista():
+    result = _run_node("""
+console.log(JSON.stringify({
+  ncm8: window.CDI.ncmBatch.isValidSimPosition('8471.30.00'),
+  ncm8dc: window.CDI.ncmBatch.isValidSimPosition('8471.30.00 R'),
+  simSinDc: window.CDI.ncmBatch.isValidSimPosition('8471.30.00.900'),
+  simCompleta: window.CDI.ncmBatch.isValidSimPosition('8471.30.00.900 R')
+}));
+""")
+    assert result == {
+        "ncm8": False,
+        "ncm8dc": False,
+        "simSinDc": False,
+        "simCompleta": True,
+    }

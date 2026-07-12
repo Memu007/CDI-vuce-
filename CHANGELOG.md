@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-12 · fix: posición SIM de 11 dígitos + DC obligatorio
+
+- **fix (MARIA):** una NCM de 8 dígitos ya no queda marcada como lista; para generar se exige posición SIM completa (NCM 8 + SIM 3) y una letra de control DC.
+- **feat (UX):** la posición de 11 dígitos y el DC se cargan en campos separados; pegar el código completo distribuye ambos. El asistente permite elegir el `codigo_sim` oficial y sus alternativas cuando VUCE CI los devuelve.
+- **test:** 64 pruebas focalizadas en verde (incluye endpoint, 8 dígitos, 8 + letra, 11 sin DC y 11 + DC). La suite global quedó detenida por un timeout histórico en `test_billing_autoservicio.py`, fuera de este cambio.
+
 ## 2026-07-12 · feat: origen NCM con tabla MARIA visible
 
 - **feat (NCM):** el origen muestra y permite elegir código + denominación de las 309 opciones de la tabla MARIA, por ejemplo `310 · CHINA`; acepta también los valores anteriores `CN` o `China`.

@@ -1,7 +1,7 @@
 # HANDOFF — CDI (vuce / CDI-app)
 
 > Estado vivo del proyecto. **La próxima AI o persona que entre lo lee primero.**
-> Última actualización: 2026-07-12 · NCM masiva + agrupación en un paso.
+> Última actualización: 2026-07-12 · Posición SIM completa + DC explícito.
 
 ---
 
@@ -117,7 +117,7 @@ CDI-app/
 - Telemetría: eventos UI persistidos en SQL (`telemetry_events`) + JSONL; el frontend usa `/api/session/state` para reducir bloqueos por extensiones.
 - Seguridad Wave 1: fallback de auth en `proyecto_maria/auth/jwt_utils.py` solo entrega usuario fake si `ENVIRONMENT=testing` Y hay `PYTEST_CURRENT_TEST`. El fake user tiene `roles=["operador"]/plan=premium`. CORS prod falla cerrado sin `ALLOWED_ORIGINS`. `/upload_*/public` requieren auth.
 - Seguridad Wave 2: `pdf_extractor.py` encierra el texto del PDF en `<<<DOCUMENTO>>>` y le dice al modelo que ignore instrucciones dentro. Cap de input al LLM (`PDF_LLM_MAX_INPUT_CHARS=60000`) y de items (≤2000). Sanitización estricta de cada item antes de persistir (NCM acepta dígitos + letra de control, origen ISO, strings sin chars de control). Multi-tenant verificado: 71 referencias a `owner_username` con helper `_get_owned_client`.
-- NCM completo: el campo de posición arancelaria ahora acepta 8 dígitos NCM + 3 SIM + letra (ej: `8471.30.00.900 R`). Columna DB ampliada a VARCHAR(20), migración `_migrate_widen_pieza_column` para PostgreSQL. `formatNcm` y `isValidNcm` actualizados en frontend.
+- **Posición SIM completa y DC explícito (2026-07-12):** la pantalla distingue la NCM de 8 dígitos de la posición declarable en MARIA: exige NCM 8 + detalle SIM 3 + una letra DC (ej. `8471.30.00.900 R`). Los 11 dígitos y el DC tienen campos separados, pero pegar el código completo también los distribuye. Una NCM de 8 dígitos sirve para buscar en el asistente, pero ya no muestra tilde ni permite continuar/generar. Si VUCE CI devuelve `codigo_sim` y alternativas, el despachante puede elegir y aplicar la posición oficial completa desde el preview. Backend y frontend bloquean 8 dígitos solos, 8 + letra o 11 sin DC. Columna DB `pieza` continúa en VARCHAR(20).
 - Agrupación de ítems (unidades clasificatorias): se pueden asociar 2+ ítems con mismo NCM y origen en un grupo. En el TXT MARÍA se exportan como un solo [ART] (valores sumados, descripción concatenada). Campos nuevos `grupo_id` (Integer) y `unidad` (String(10)) en `OperationItem`. Endpoints `/api/operacion/{id}/agrupar` y `/desagrupar`. Botón "Asociar ítems" en barra de batch de pantalla NCM. Chip "Grupo N" para desagrupar con clic.
 - **NCM masiva + agrupación en un paso (2026-07-12):** en pantalla NCM, seleccionar varias filas, escribir una única NCM y pulsar “Asignar NCM y unir” asigna el código a todas y las convierte en una unidad clasificatoria atómicamente. Mantiene separados los productos no seleccionados, permite deshacer con Ctrl/Cmd+Z y bloquea mezclas con distinto origen o unidad. El generador conserva la posición visual del grupo y vuelve a validar NCM/origen/unidad. Caso 45 agrupados + 5 separados verificado: 6 bloques `[ART]`. El chip “Grupo N (X ítems)” no se corta y el encabezado permite que sus acciones pasen de línea sin comprimir el título.
 - **Origen NCM con tabla MARIA (2026-07-12):** la pantalla NCM usa las 309 opciones de `TABLA PAISES V.0 25082010.xlsx`; muestra código y denominación (ej. `310 · CHINA`) por fila, grupo y acción masiva. Acepta valores existentes como `CN`, `China` o `310`, los normaliza al código oficial y permite agruparlos sin falso conflicto de origen.
