@@ -1,0 +1,9 @@
+{
+  "source": "ARCA",
+  "source_url": "https://www.arca.gob.ar/aduana/arancelintegrado/",
+  "download_url": "https://www.arca.gob.ar/aduana/arancelintegrado/archivos/arancel.zip",
+  "updated_at": "2026-07-12",
+  "archive_sha256": "d14605c9b34c40738fb1f80c84b0aa8858bb1a2a455b8f60e79fb1b64c6c390f",
+  "source_file": "nomenclador_19122018.txt",
+  "ncm_count": 10226
+}

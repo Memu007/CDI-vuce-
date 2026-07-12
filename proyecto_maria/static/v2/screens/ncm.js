@@ -1070,7 +1070,7 @@
         dcInput.classList.remove('is-error');
         targetItems.forEach(it => { it.pieza = val; });
         if (val && isValidNcm(val) && targetItems[0].descripcion) {
-            saveNcmUsage(targetItems[0].descripcion, val);
+            saveNcmUsage(targetItems[0].descripcion, val, targetItems[0].origen);
         }
         const tr = inp.closest('tr');
         if (tr) {
@@ -1370,7 +1370,7 @@
             source: sugg.source || 'manual',
             data_source: it.ncm_source || 'unknown'
         });
-        if (it.descripcion) saveNcmUsage(it.descripcion, ncmFmt);
+        if (it.descripcion) saveNcmUsage(it.descripcion, ncmFmt, it.origen);
 
         // Hint contextual: la primera vez que el user asigna un NCM,
         // le contamos que se va a guardar para [cliente] + [proveedor].
@@ -1409,9 +1409,15 @@
         }
         renderSpotLoading();
         try {
+            const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
+            const operacion = (CDI.state && CDI.state.operacion) || {};
             const res = await CDI.api('/api/ncm/sugerir', {
                 method: 'POST',
-                body: JSON.stringify({ descripcion: descripcion })
+                body: JSON.stringify({
+                    descripcion: descripcion,
+                    client_id: (cliente && cliente.id) || null,
+                    vendor_name: String(operacion.vendedor_nombre || '').trim() || null
+                })
             });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) {
@@ -1427,11 +1433,19 @@
         }
     }
 
-    async function saveNcmUsage(descripcion, ncm) {
+    async function saveNcmUsage(descripcion, ncm, origen) {
         try {
+            const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
+            const operacion = (CDI.state && CDI.state.operacion) || {};
             await CDI.api('/api/ncm/guardar-uso', {
                 method: 'POST',
-                body: JSON.stringify({ descripcion: descripcion, ncm: ncm })
+                body: JSON.stringify({
+                    descripcion: descripcion,
+                    ncm: ncm,
+                    origen: origen || '',
+                    client_id: (cliente && cliente.id) || null,
+                    vendor_name: String(operacion.vendedor_nombre || '').trim() || null
+                })
             });
         } catch (_) { /* best effort */ }
     }
@@ -1464,18 +1478,26 @@
             );
             return;
         }
-        const groups = { historial: [], ia: [], manual: [] };
+        const groups = { historial: [], proveedor: [], arca: [], ia: [], manual: [] };
         spotSuggestions.forEach((s, i) => {
             const key = groups[s.source] ? s.source : 'ia';
             groups[key].push({ sug: s, idx: i });
         });
         const chunks = [];
         if (groups.historial.length) {
-            chunks.push('<div class="spotlight-section-label">Tu historial</div>');
+            chunks.push('<div class="spotlight-section-label">Historial confirmado</div>');
             groups.historial.forEach(e => chunks.push(renderSpotItem(e)));
         }
+        if (groups.proveedor.length) {
+            chunks.push('<div class="spotlight-section-label">Catálogo del proveedor</div>');
+            groups.proveedor.forEach(e => chunks.push(renderSpotItem(e)));
+        }
+        if (groups.arca.length) {
+            chunks.push('<div class="spotlight-section-label">Nomenclador ARCA</div>');
+            groups.arca.forEach(e => chunks.push(renderSpotItem(e)));
+        }
         if (groups.ia.length) {
-            chunks.push('<div class="spotlight-section-label">Sugerencias de IA</div>');
+            chunks.push('<div class="spotlight-section-label">IA orientativa</div>');
             // Disclaimer: las sugerencias son orientativas. La responsabilidad
             // final del NCM es del despachante. Aparece solo cuando hay IA en
             // pantalla para no inflar la UI.
@@ -1496,9 +1518,13 @@
     function renderSpotItem(entry) {
         const s = entry.sug;
         const selected = entry.idx === spotSelectedSugIdx ? ' is-selected' : '';
-        const meta = s.source === 'historial' && s.count
-            ? 'Usado ' + s.count + ' vez' + (s.count > 1 ? 'es' : '') + ' en el historial'
-            : (s.source === 'ia' ? 'Sugerencia IA' : (s.source === 'manual' ? 'Código ingresado' : ''));
+        const meta = s.source === 'historial'
+            ? (s.count ? 'Historial · usado ' + s.count + ' vez' + (s.count > 1 ? 'es' : '') : 'Historial confirmado')
+            : (s.source === 'proveedor'
+                ? 'Historial confirmado del proveedor'
+                : (s.source === 'arca'
+                    ? 'ARCA' + (s.updated_at ? ' · actualizado ' + s.updated_at : '')
+                    : (s.source === 'ia' ? 'IA orientativa' : (s.source === 'manual' ? 'Código ingresado' : ''))));
         return (
             '<button type="button" class="spotlight-item' + selected + '"' +
                 ' data-idx="' + entry.idx + '" role="option" tabindex="-1">' +
