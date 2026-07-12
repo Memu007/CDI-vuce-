@@ -1383,9 +1383,18 @@ body {
 .ncm-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-end;
+    align-items: flex-start;
     gap: var(--s-4);
+    flex-wrap: wrap;
     margin-bottom: var(--s-6);
+}
+.ncm-header > :first-child { flex: 0 0 auto; min-width: 260px; }
+.ncm-header > .row-3 {
+    flex: 1 1 640px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-items: center;
+    row-gap: var(--s-2);
 }
 .ncm-header .title-2 { margin-bottom: var(--s-2); }
 .ncm-header .subtitle { font-size: var(--t-15); }
@@ -1445,7 +1454,12 @@ body.cdi-dragging-row { cursor: grabbing; }
 .ncm-table .col-valor   { width: 100px; text-align: right; font-variant-numeric: tabular-nums; }
 .ncm-table .col-peso    { width: 100px; text-align: right; font-variant-numeric: tabular-nums; }
 .ncm-table .col-ncm     { width: 150px; font-family: var(--font-mono); }
-.ncm-table .col-actions { width: 90px; text-align: right; }
+.ncm-table .col-actions {
+    width: 150px;
+    min-width: 150px;
+    text-align: right;
+    white-space: nowrap;
+}
 
 /* Batch actions bar en NCM */
 .ncm-batch-bar {
@@ -4402,6 +4416,8 @@ tr:hover .ncm-note-pill.is-empty {
     .field-col-2 { grid-column: auto; }
     .review-card { padding: var(--s-6); }
     .ncm-header { flex-direction: column; align-items: stretch; }
+    .ncm-header > :first-child { min-width: 0; }
+    .ncm-header > .row-3 { justify-content: flex-start; }
     .ncm-table .col-ref { width: auto; }
     .spotlight-item-code { width: 90px; font-size: var(--t-13); }
     .drawer { width: 100vw; }
@@ -4592,12 +4608,16 @@ tr:hover .ncm-note-pill.is-empty {
 .ncm-grupo-chip {
     display: inline-flex;
     align-items: center;
-    height: 20px;
+    justify-content: center;
+    box-sizing: border-box;
+    height: 24px;
     padding: 0 8px;
     margin-right: 4px;
     border-radius: var(--r-pill, 999px);
     font-size: 10px;
     font-weight: var(--w-semibold, 600);
+    line-height: 1;
+    white-space: nowrap;
     background: var(--c-warning-soft, #fff4e0);
     color: var(--c-warning, #b8860b);
     border: 1px solid var(--c-warning, #b8860b);

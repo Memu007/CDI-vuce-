@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-12 · fix: chip de grupos NCM sin corte
+
+- **fix (NCM):** el botón “Grupo N (X ítems)” ahora conserva una sola línea, tiene más alto y dispone de una columna de acciones suficiente; ya no se ve cortado al agrupar.
+- **fix (NCM):** el encabezado de esta pantalla permite que los comandos se reacomoden antes de comprimir el título.
+
 ## 2026-07-12 · feat: asignar una NCM y unir ítems en un solo paso
 
 - **feat (NCM):** la selección masiva ahora permite escribir una NCM y usar “Asignar NCM y unir”; aplica el código a todas las filas elegidas y crea una sola unidad clasificatoria, con deshacer disponible.
