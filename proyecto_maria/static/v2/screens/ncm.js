@@ -373,12 +373,27 @@
         if (batchAgrupar) batchAgrupar.disabled = n < 2;
     }
 
-    function inferSelectedSim(items, indices) {
+    function readVisibleSim(index) {
+        if (!tbody) return '';
+        const row = tbody.querySelector('tr[data-row="' + index + '"]');
+        if (!row) return '';
+        const simInput = row.querySelector('.ncm-input');
+        const dcInput = row.querySelector('.sim-dc-input');
+        if (!simInput || !dcInput) return '';
+        return buildSimPosition(simInput.value, dcInput.value);
+    }
+
+    function inferSelectedSim(items, indices, visibleReader) {
         const complete = new Set();
+        const reader = typeof visibleReader === 'function' ? visibleReader : readVisibleSim;
         Array.from(indices || []).forEach(i => {
             const item = items && items[i];
             if (!item) return;
-            const normalized = normalizeBatchNcm(item.pieza);
+            // La UI puede tener el valor más nuevo todavía enfocado. Si es
+            // completo, gana sobre el snapshot del estado; si no, usamos el
+            // valor persistido en el item.
+            const visible = normalizeBatchNcm(reader(i));
+            const normalized = visible || normalizeBatchNcm(item.pieza);
             if (normalized) complete.add(normalized);
         });
         return {
@@ -810,7 +825,7 @@
         return isValidNcm(formatted) ? formatted : '';
     }
 
-    function applyNcmAndGroup(items, indices, rawNcm) {
+    function applyNcmAndGroup(items, indices, rawNcm, visibleReader) {
         const selectedIndices = Array.from(indices || []).filter(i => items[i]);
         if (selectedIndices.length < 2) {
             return { ok: false, title: 'Seleccioná 2+ ítems', message: 'Marcá los productos que forman una sola unidad clasificatoria.' };
@@ -821,7 +836,7 @@
             return { ok: false, title: 'Posición SIM incompleta', message: simErrorDetail(rawNcm) };
         }
 
-        const inferred = inferSelectedSim(items, selectedIndices);
+        const inferred = inferSelectedSim(items, selectedIndices, visibleReader);
         if (!requestedNcm && inferred.count > 1) {
             return { ok: false, title: 'Hay posiciones SIM distintas', message: 'Los seleccionados tienen más de una posición completa. Indicá arriba cuál querés copiar antes de unir.' };
         }

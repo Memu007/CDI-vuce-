@@ -100,6 +100,24 @@ console.log(JSON.stringify({ result, items }));
     assert all(item["grupo_id"] is None for item in result["items"])
 
 
+def test_toma_la_sim_visible_aunque_el_estado_aun_no_se_haya_sincronizado():
+    result = _run_node("""
+const items = [
+  {pieza:'', origen:'310', unidad:'07', grupo_id:null},
+  {pieza:'', origen:'310', unidad:'07', grupo_id:null},
+  {pieza:'', origen:'310', unidad:'07', grupo_id:null},
+  {pieza:'', origen:'310', unidad:'07', grupo_id:null}
+];
+const visibleReader = (idx) => idx === 0 ? '4410.12.10.000 E' : '';
+const result = window.CDI.ncmBatch.applyNcmAndGroup(items, [0, 1, 2, 3], '', visibleReader);
+console.log(JSON.stringify({ result, items }));
+""")
+
+    assert result["result"]["ok"] is True
+    assert all(item["pieza"] == "4410.12.10.000 E" for item in result["items"])
+    assert len({item["grupo_id"] for item in result["items"]}) == 1
+
+
 def test_unir_normaliza_aliases_de_origen_al_codigo_maria():
     result = _run_node("""
 const items = [

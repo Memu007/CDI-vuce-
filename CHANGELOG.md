@@ -9,6 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-07-12 · fix: copiar la única SIM seleccionada al unir
 
 - **fix (agrupación):** si entre los ítems seleccionados hay una sola posición SIM completa, la barra la toma automáticamente, muestra sus 11 dígitos + DC, la copia a los faltantes y los une en un paso.
+- **fix (sincronización):** la inferencia también lee la SIM y el DC visibles de la fila; cubre el caso en que el campo ya cambió en pantalla pero el estado interno todavía conserva el valor anterior.
 - **seguridad:** si hay dos SIM completas distintas no adivina: bloquea la unión y pide indicar cuál copiar.
 
 ## 2026-07-12 · fix: selección NCM → SIM sin error intermedio
