@@ -34,6 +34,29 @@
 
     function $(id) { return document.getElementById(id); }
 
+    function getCountryCatalog() {
+        return CDI.paisesMaria || null;
+    }
+
+    function getOriginCode(value) {
+        const catalog = getCountryCatalog();
+        return catalog ? catalog.resolve(value) : '';
+    }
+
+    function getOriginLabel(value) {
+        const catalog = getCountryCatalog();
+        return catalog ? (catalog.label(value) || String(value || '').trim()) : String(value || '').trim();
+    }
+
+    function ensureCountryDatalist() {
+        const catalog = getCountryCatalog();
+        if (!catalog || document.getElementById('ncmCountries')) return;
+        const list = document.createElement('datalist');
+        list.id = 'ncmCountries';
+        list.innerHTML = catalog.optionMarkup();
+        document.body.appendChild(list);
+    }
+
     function init() {
         if (initialized) return;
         tbody = $('ncmTbody');
@@ -48,6 +71,7 @@
         spotVuce = $('spotVuce');
         const ncmAddRowBtn = $('ncmAddRowBtn');
         if (!tbody) return;
+        ensureCountryDatalist();
 
         if (ncmAddRowBtn) {
             ncmAddRowBtn.addEventListener('click', () => {
@@ -388,9 +412,10 @@
     function applyBatchOrigin() {
         const items = (CDI.state && CDI.state.items) || [];
         if (selectedRows.size === 0 || !items.length) return;
-        const raw = (batchOrigin && batchOrigin.value || '').toUpperCase().trim();
-        if (raw.length !== 2 || !/^[A-Z]{2}$/.test(raw)) {
-            if (CDI.toast) CDI.toast('Origen inválido', 'Debe ser un código ISO de 2 letras (ej: CN, US)', 'error');
+        const raw = (batchOrigin && batchOrigin.value || '').trim();
+        const origin = getOriginCode(raw);
+        if (!origin) {
+            if (CDI.toast) CDI.toast('Origen inválido', 'Elegí un país de la tabla MARIA, por ejemplo 310 · CHINA.', 'error');
             return;
         }
         lastSnapshot = { items: snapshotItems(), ts: Date.now() };
@@ -398,11 +423,12 @@
         selectedRows.forEach(i => {
             const it = items[i];
             if (!it) return;
-            it.origen = raw;
+            it.origen = origin;
             touched++;
         });
-        try { CDI.track && CDI.track('ncm_batch_origin_applied', { count: touched, origin: raw }); } catch (_) {}
-        scheduleUndoClear('Origen ' + raw + ' a ' + touched + (touched === 1 ? ' item' : ' items'));
+        if (batchOrigin) batchOrigin.value = getOriginLabel(origin);
+        try { CDI.track && CDI.track('ncm_batch_origin_applied', { count: touched, origin: origin }); } catch (_) {}
+        scheduleUndoClear('Origen ' + getOriginLabel(origin) + ' a ' + touched + (touched === 1 ? ' item' : ' items'));
         render();
         updateBatchBar();
     }
@@ -507,7 +533,7 @@
         const rowClass = isOk ? 'row-ok' : 'row-pending';
         const desc = CDI.escapeHtml(it.descripcion || it.codigo_parte || '');
         const ref = CDI.escapeHtml(it.codigo_parte || '—');
-        const origen = CDI.escapeHtml(it.origen || '');
+        const origen = CDI.escapeHtml(getOriginLabel(it.origen));
         const cantidad = it.cantidad != null ? Number(it.cantidad) : '';
         const valorUnitario = Number(it.valor_unitario || 0);
         const pesoUnitario = Number(it.peso_unitario || 0);
@@ -528,7 +554,7 @@
                 '<td class="col-num" title="Arrastrar para reordenar"><span class="drag-grip" aria-hidden="true">⋮⋮</span>' + (i + 1) + '</td>' +
                 '<td class="col-ref">' + ref + '</td>' +
                 '<td class="col-desc">' + desc + '</td>' +
-                '<td class="col-pais"><input class="ncm-edit ncm-edit-pais input input-sm" type="text" maxlength="2" value="' + origen + '" data-row="' + i + '" data-field="origen" aria-label="Origen item ' + (i + 1) + '"></td>' +
+                '<td class="col-pais"><input class="ncm-edit ncm-edit-pais input input-sm" type="text" list="ncmCountries" value="' + origen + '" data-row="' + i + '" data-field="origen" aria-label="Origen item ' + (i + 1) + '"></td>' +
                 '<td class="col-cant"><input class="ncm-edit ncm-edit-cant input input-sm" type="number" min="1" step="1" value="' + cantVal + '" data-row="' + i + '" data-field="cantidad" aria-label="Cantidad item ' + (i + 1) + '"></td>' +
                 '<td class="col-valor"><input class="ncm-edit ncm-edit-valor input input-sm" type="number" min="0" step="0.01" value="' + (valorUnitario || '') + '" data-row="' + i + '" data-field="valor_unitario" aria-label="Valor unitario item ' + (i + 1) + '"></td>' +
                 '<td class="col-peso"><input class="ncm-edit ncm-edit-peso input input-sm" type="number" min="0" step="0.01" value="' + (pesoUnitario || '') + '" data-row="' + i + '" data-field="peso_unitario" aria-label="Peso unitario item ' + (i + 1) + '"></td>' +
@@ -599,7 +625,7 @@
         const rowClass = isOk ? 'row-ok' : 'row-pending';
         const desc = CDI.escapeHtml(it.descripcion || '');
         const ref = CDI.escapeHtml(it.codigo_parte || '—');
-        const origen = CDI.escapeHtml(it.origen || '');
+        const origen = CDI.escapeHtml(getOriginLabel(it.origen));
         const cantVal = it.cantidad != null ? Number(it.cantidad) : '';
         const valorUnitario = Number(it.valor_unitario || 0);
         const pesoUnitario = Number(it.peso_unitario || 0);
@@ -617,7 +643,7 @@
             '<td class="col-num"><button type="button" class="ncm-expand-btn" data-expand-grupo="' + gid + '" aria-label="Expandir grupo">' + expandIcon + '</button></td>' +
             '<td class="col-ref">' + ref + '</td>' +
             '<td class="col-desc">' + desc + '</td>' +
-            '<td class="col-pais"><input class="ncm-edit ncm-edit-pais input input-sm" type="text" maxlength="2" value="' + origen + '" data-grupo-id="' + gid + '" data-field="origen" aria-label="Origen grupo ' + gid + '"></td>' +
+            '<td class="col-pais"><input class="ncm-edit ncm-edit-pais input input-sm" type="text" list="ncmCountries" value="' + origen + '" data-grupo-id="' + gid + '" data-field="origen" aria-label="Origen grupo ' + gid + '"></td>' +
             '<td class="col-cant"><input class="ncm-edit ncm-edit-cant input input-sm" type="number" min="1" step="1" value="' + cantVal + '" data-grupo-id="' + gid + '" data-field="cantidad" aria-label="Cantidad grupo ' + gid + '"></td>' +
             '<td class="col-valor"><input class="ncm-edit ncm-edit-valor input input-sm" type="number" min="0" step="0.01" value="' + (valorUnitario || '') + '" data-grupo-id="' + gid + '" data-field="valor_unitario" aria-label="Valor grupo ' + gid + '"></td>' +
             '<td class="col-peso"><input class="ncm-edit ncm-edit-peso input input-sm" type="number" min="0" step="0.01" value="' + (pesoUnitario || '') + '" data-grupo-id="' + gid + '" data-field="peso_unitario" aria-label="Peso grupo ' + gid + '"></td>' +
@@ -634,7 +660,7 @@
     function renderSubRow(it, idx, gid) {
         const desc = CDI.escapeHtml(it.descripcion || it.codigo_parte || '');
         const ref = CDI.escapeHtml(it.codigo_parte || '—');
-        const origen = CDI.escapeHtml(it.origen || '');
+        const origen = CDI.escapeHtml(getOriginLabel(it.origen));
         const cantidad = it.cantidad != null ? Number(it.cantidad) : '';
         const valorUnitario = Number(it.valor_unitario || 0);
         const pesoUnitario = Number(it.peso_unitario || 0);
@@ -678,7 +704,9 @@
             return { ok: false, title: 'Indicá una NCM', message: 'Escribí una sola NCM arriba: se asignará a todos y se unirán en el mismo paso.' };
         }
 
-        const origenes = new Set(selected.map(it => String(it.origen || '').trim().toUpperCase()));
+        // CN, China y 310 son el mismo país: los normalizamos antes de decidir
+        // si se pueden unir y persistimos el código MARIA en el nuevo grupo.
+        const origenes = new Set(selected.map(it => getOriginCode(it.origen) || String(it.origen || '').trim().toUpperCase()));
         if (origenes.size > 1) {
             return { ok: false, title: 'Origen distinto', message: 'Para unirlos deben tener el mismo origen. Corregilo o usá “Origen para todos”.' };
         }
@@ -691,6 +719,7 @@
         const nuevoGrupo = maxGrupo + 1;
         selectedIndices.forEach(i => {
             items[i].pieza = targetNcm;
+            items[i].origen = Array.from(origenes)[0];
             items[i].grupo_id = nuevoGrupo;
         });
         return { ok: true, grupo_id: nuevoGrupo, count: selectedIndices.length, ncm: targetNcm };
@@ -973,20 +1002,13 @@
         }
     }
 
-    // Países reconocidos por MARIA/AFIP (ISO 3166-1 alpha-2). En prod este
-    // listado debería venir del backend, pero mantenemos uno mínimo para
-    // validación rápida en el cliente.
-    const PAIS_RECONOCIDOS = new Set([
-        'AR','BF','DZ','BW','BI','CM','CF','CG','CD','CI','TD','BJ','EG','GA','GM','GH','GN','GQ','KE','LS','LR','LY','MG','MW','ML','MA','MU','MR','NE','NG','ZW','RW','SN','SL','SO','SZ','SD','TZ','TG','TN','UG','ZM','AO','MZ','SC','DJ','KM','GW','ST','NA','ZA','ER','ET','BB','BO','BR','CA','CO','CR','CU','CL','DO','EC','SV','US','GT','GY','HT','HN','JM','MX','NI','PA','PY','PE','TT','UY','VE','SR','DM','LC','VC','BZ','AG','KN','BS','GD','AF','SA','BH','MM','BT','KH','LK','KP','KR','CN','CY','PH','TW','IN','ID','IQ','IR','IL','JP','JO','QA','KW','LA','LB','MY','MV','OM','MN','NP','AE','PK','SG','SY','TH','TR','VN','HK','MO','BD','BN','YE','AM','AZ','GE','KZ','KG','TJ','TM','UZ','AL','AD','AT','BE','BG','DK','ES','FI','FR','GR','HU','IE','IS','IT','LI','LU','MT','MC','NO','NL','PL','PT','GB','RO','SM','SE','CH','DE','BY','EE','LV','LT','MD','RU','UA','BA','HR','SK','SI','MK','CZ','ME','RS','AU','NR','NZ','VU','WS','FJ','PG','KI','FM','PW','TV','SB','TO','MH','MP'
-    ]);
-
     function setItemField(idx, field, raw) {
         const items = CDI.state && CDI.state.items;
         if (!items || !items[idx]) return;
         const it = items[idx];
         let value = raw;
         if (field === 'origen') {
-            value = String(raw || '').trim().toUpperCase().slice(0, 2);
+            value = getOriginCode(raw) || String(raw || '').trim();
         } else {
             const n = Number(raw);
             value = Number.isFinite(n) ? n : 0;
@@ -1000,7 +1022,7 @@
         if (!items) return;
         let value = raw;
         if (field === 'origen') {
-            value = String(raw || '').trim().toUpperCase().slice(0, 2);
+            value = getOriginCode(raw) || String(raw || '').trim();
         } else if (field === 'pieza') {
             value = String(raw || '').trim();
         } else {
@@ -1028,10 +1050,8 @@
         lastSnapshot = null;
 
         if (field === 'origen') {
-            inp.value = (inp.value || '').toUpperCase();
             const val = inp.value.trim();
-            const ok = val.length === 2 && PAIS_RECONOCIDOS.has(val);
-            markFieldError(inp, val.length === 2 && !ok);
+            markFieldError(inp, val.length >= 2 && !getOriginCode(val));
         }
 
         if (gidAttr) {
@@ -1062,13 +1082,11 @@
             finalValue = setItemField(idx, field, inp.value);
         }
         if (field === 'origen') {
-            inp.value = finalValue || '';
-            const ok = finalValue.length === 2 && PAIS_RECONOCIDOS.has(finalValue);
-            markFieldError(inp, !ok && finalValue.length > 0);
-            if (finalValue === 'XX') {
-                if (CDI.toast) CDI.toast('Origen no válido', '«XX» no es un país reconocido por AFIP. Usá el código ISO de dos letras (ej: CN, BR, US).', 'error');
-            } else if (!ok && finalValue.length > 0) {
-                if (CDI.toast) CDI.toast('Origen no reconocido', 'Código "' + finalValue + '" no está en la lista de países válidos.', 'warning');
+            const countryCode = getOriginCode(finalValue);
+            inp.value = countryCode ? getOriginLabel(countryCode) : (finalValue || '');
+            markFieldError(inp, !countryCode && finalValue.length > 0);
+            if (!countryCode && finalValue.length > 0) {
+                if (CDI.toast) CDI.toast('Origen no reconocido', 'Elegí un país de la tabla MARIA, por ejemplo 310 · CHINA.', 'warning');
             }
         }
         updateSummary();

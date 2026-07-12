@@ -1449,7 +1449,7 @@ body {
 body.cdi-dragging-row { cursor: grabbing; }
 .ncm-table .col-ref     { width: 110px; font-family: var(--font-mono); }
 .ncm-table .col-desc    { color: var(--c-text); }
-.ncm-table .col-pais    { width: 55px; text-align: center; }
+.ncm-table .col-pais    { width: 150px; min-width: 150px; text-align: left; }
 .ncm-table .col-cant    { width: 60px; text-align: right; font-variant-numeric: tabular-nums; }
 .ncm-table .col-valor   { width: 100px; text-align: right; font-variant-numeric: tabular-nums; }
 .ncm-table .col-peso    { width: 100px; text-align: right; font-variant-numeric: tabular-nums; }
@@ -1505,6 +1505,7 @@ body.cdi-dragging-row { cursor: grabbing; }
     width: 110px;
 }
 .ncm-batch-field .input-sm[type="number"] { width: 70px; }
+.ncm-batch-field .ncm-batch-origin { width: 11rem; }
 .ncm-batch-sep { color: var(--c-border); }
 .btn.btn-sm {
     height: 28px;
@@ -5651,7 +5652,7 @@ tr.row-sub .col-desc {
     font-size: 13px;
     text-align: right;
 }
-.ncm-edit-pais { text-align: center; text-transform: uppercase; }
+.ncm-edit-pais { text-align: left; }
 .ncm-edit-cant { min-width: 56px; }
 .ncm-edit-valor,
 .ncm-edit-peso { min-width: 80px; }
@@ -5661,4 +5662,3 @@ tr.row-sub .col-desc {
 .ncm-table td.col-cant,
 .ncm-table td.col-valor,
 .ncm-table td.col-peso { padding: 4px; }
-

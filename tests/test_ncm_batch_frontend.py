@@ -6,6 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 NCM_JS = ROOT / "proyecto_maria" / "static" / "v2" / "screens" / "ncm.js"
+COUNTRIES_JS = ROOT / "proyecto_maria" / "static" / "v2" / "paises_maria.js"
 
 
 def _run_node(case_js: str) -> dict:
@@ -24,6 +25,7 @@ global.window = {{ CDI: {{
 }} }};
 global.document = {{ getElementById: () => null, addEventListener: () => {{}}, querySelector: () => null }};
 global.requestAnimationFrame = (fn) => fn();
+require({json.dumps(str(COUNTRIES_JS))});
 require({json.dumps(str(NCM_JS))});
 {case_js}
 """
@@ -61,3 +63,16 @@ console.log(JSON.stringify({ result, items }));
     assert result["result"]["ok"] is False
     assert result["result"]["title"] == "Origen distinto"
     assert all(item["grupo_id"] is None for item in result["items"])
+
+
+def test_unir_normaliza_aliases_de_origen_al_codigo_maria():
+    result = _run_node("""
+const items = [
+  {pieza:'', origen:'CN', unidad:'07', grupo_id:null},
+  {pieza:'', origen:'China', unidad:'07', grupo_id:null}
+];
+const result = window.CDI.ncmBatch.applyNcmAndGroup(items, [0, 1], '84713000');
+console.log(JSON.stringify({ result, items }));
+""")
+    assert result["result"]["ok"] is True
+    assert [item["origen"] for item in result["items"]] == ["310", "310"]

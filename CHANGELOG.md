@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-12 · feat: origen NCM con tabla MARIA visible
+
+- **feat (NCM):** el origen muestra y permite elegir código + denominación de las 309 opciones de la tabla MARIA, por ejemplo `310 · CHINA`; acepta también los valores anteriores `CN` o `China`.
+- **fix (NCM):** al agrupar, alias equivalentes de país se normalizan al mismo código MARIA para no bloquear una unidad clasificatoria válida.
+
 ## 2026-07-12 · fix: chip de grupos NCM sin corte
 
 - **fix (NCM):** el botón “Grupo N (X ítems)” ahora conserva una sola línea, tiene más alto y dispone de una columna de acciones suficiente; ya no se ve cortado al agrupar.
