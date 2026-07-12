@@ -6,6 +6,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 NCM_JS = ROOT / "proyecto_maria" / "static" / "v2" / "screens" / "ncm.js"
+APP_CSS = ROOT / "proyecto_maria" / "static" / "v2" / "app_v2.css"
 COUNTRIES_JS = ROOT / "proyecto_maria" / "static" / "v2" / "paises_maria.js"
 
 
@@ -163,3 +164,14 @@ def test_varias_posiciones_sim_exigen_eleccion_explicita():
     assert "Elegí una de las ' + simOptions.length + ' posiciones SIM" in source
     assert "hasSeveralSim ? ' disabled' : ''" in source
     assert "button.disabled = !select.value" in source
+
+
+def test_grupo_completo_no_parece_una_advertencia_amarilla():
+    source = APP_CSS.read_text(encoding="utf-8")
+    grouped_block = source.split("tr.row-grouped {", 1)[1].split("}", 1)[0]
+    chip_block = source.split(".ncm-grupo-chip {", 1)[1].split("}", 1)[0]
+
+    assert "--c-accent" in grouped_block
+    assert "--c-warning" not in grouped_block
+    assert "--c-accent" in chip_block
+    assert "--c-warning" not in chip_block

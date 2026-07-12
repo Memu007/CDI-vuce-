@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-12 · fix: grupo NCM con señal visual neutra
+
+- **fix (visual):** las unidades agrupadas dejan de usar amarillo de advertencia; ahora tienen fondo azul casi imperceptible, borde azul y chip azul. El tilde verde sigue indicando que la SIM está completa.
+
 ## 2026-07-12 · fix: copiar la única SIM seleccionada al unir
 
 - **fix (agrupación):** si entre los ítems seleccionados hay una sola posición SIM completa, la barra la toma automáticamente, muestra sus 11 dígitos + DC, la copia a los faltantes y los une en un paso.

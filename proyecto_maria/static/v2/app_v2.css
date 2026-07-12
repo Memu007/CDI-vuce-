@@ -4719,9 +4719,9 @@ tr:hover .ncm-note-pill.is-empty {
     font-weight: var(--w-semibold, 600);
     line-height: 1;
     white-space: nowrap;
-    background: var(--c-warning-soft, #fff4e0);
-    color: var(--c-warning, #b8860b);
-    border: 1px solid var(--c-warning, #b8860b);
+    background: var(--c-accent-soft, #eaf3ff);
+    color: var(--c-accent, #0066cc);
+    border: 1px solid var(--c-accent, #0066cc);
     cursor: pointer;
     flex-shrink: 0;
 }
@@ -4731,9 +4731,10 @@ tr:hover .ncm-note-pill.is-empty {
 
 /* ── Filas agrupadas y sub-filas ── */
 tr.row-grouped {
-    background: var(--c-warning-soft, #fff4e0);
-    border-left: 3px solid var(--c-warning, #b8860b);
+    background: rgba(0, 102, 204, 0.035);
+    border-left: 3px solid var(--c-accent, #0066cc);
 }
+tr.row-grouped:hover { background: rgba(0, 102, 204, 0.06) !important; }
 tr.row-grouped + tr.row-sub {
     background: var(--c-bg-elevated, #fafafa);
 }
