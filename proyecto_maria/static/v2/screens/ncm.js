@@ -17,6 +17,7 @@
     const selectedRows = new Set();
     const expandedGroups = new Set();
     let batchBar, batchCount, batchFactor, batchApplyQty, batchNcm, batchDc, batchApplyNcm, batchOrigin, batchApplyOrigin, batchClear, batchAgrupar, selectAllBox;
+    let batchSimAutofilled = false;
     let lastSnapshot = null;   // { items: [...], label: 'x2 a 3 items', ts: ms }
     let undoTimer = null;
 
@@ -348,6 +349,7 @@
         const n = selectedRows.size;
         if (n === 0) {
             batchBar.hidden = true;
+            clearAutofilledBatchSim(true);
             if (selectAllBox) selectAllBox.indeterminate = false;
             if (batchAgrupar) batchAgrupar.disabled = true;
             return;
@@ -367,7 +369,54 @@
             selectAllBox.checked = n === total;
             selectAllBox.indeterminate = n > 0 && n < total;
         }
+        syncBatchSimFromSelection(allItems);
         if (batchAgrupar) batchAgrupar.disabled = n < 2;
+    }
+
+    function inferSelectedSim(items, indices) {
+        const complete = new Set();
+        Array.from(indices || []).forEach(i => {
+            const item = items && items[i];
+            if (!item) return;
+            const normalized = normalizeBatchNcm(item.pieza);
+            if (normalized) complete.add(normalized);
+        });
+        return {
+            value: complete.size === 1 ? Array.from(complete)[0] : '',
+            count: complete.size,
+        };
+    }
+
+    function clearAutofilledBatchSim(force) {
+        if (!batchSimAutofilled && !force) return;
+        if (batchNcm) batchNcm.value = '';
+        if (batchDc) batchDc.value = '';
+        if (batchNcm) batchNcm.removeAttribute('title');
+        if (batchDc) batchDc.removeAttribute('title');
+        batchSimAutofilled = false;
+    }
+
+    function syncBatchSimFromSelection(items) {
+        const inferred = inferSelectedSim(items, selectedRows);
+        const hasManualValue = !batchSimAutofilled && Boolean(
+            String(batchNcm && batchNcm.value || '').trim() ||
+            String(batchDc && batchDc.value || '').trim()
+        );
+        if (hasManualValue) return;
+        if (!inferred.value) {
+            clearAutofilledBatchSim();
+            return;
+        }
+        const parts = splitSimPosition(inferred.value);
+        if (batchNcm) {
+            batchNcm.value = CDI.formatNcm ? CDI.formatNcm(parts.digits) : parts.digits;
+            batchNcm.title = 'Tomada automáticamente de los ítems seleccionados';
+        }
+        if (batchDc) {
+            batchDc.value = parts.dc;
+            batchDc.title = 'Tomada automáticamente de los ítems seleccionados';
+        }
+        batchSimAutofilled = true;
     }
 
     function snapshotItems() {
@@ -425,6 +474,9 @@
     }
 
     function onBatchSimInput() {
+        batchSimAutofilled = false;
+        if (batchNcm) batchNcm.removeAttribute('title');
+        if (batchDc) batchDc.removeAttribute('title');
         const parts = splitSimPosition(batchNcm && batchNcm.value);
         if (batchNcm) batchNcm.value = CDI.formatNcm ? CDI.formatNcm(parts.digits) : parts.digits;
         if (parts.dc && batchDc) batchDc.value = parts.dc;
@@ -432,6 +484,9 @@
 
     function onBatchDcInput() {
         if (!batchDc) return;
+        batchSimAutofilled = false;
+        if (batchNcm) batchNcm.removeAttribute('title');
+        batchDc.removeAttribute('title');
         batchDc.value = String(batchDc.value || '').replace(/[^A-Za-z]/g, '').slice(0, 1).toUpperCase();
     }
 
@@ -766,8 +821,11 @@
             return { ok: false, title: 'Posición SIM incompleta', message: simErrorDetail(rawNcm) };
         }
 
-        const existingNcms = new Set(selected.map(it => normalizeBatchNcm(it.pieza)).filter(Boolean));
-        const targetNcm = requestedNcm || (existingNcms.size === 1 ? Array.from(existingNcms)[0] : '');
+        const inferred = inferSelectedSim(items, selectedIndices);
+        if (!requestedNcm && inferred.count > 1) {
+            return { ok: false, title: 'Hay posiciones SIM distintas', message: 'Los seleccionados tienen más de una posición completa. Indicá arriba cuál querés copiar antes de unir.' };
+        }
+        const targetNcm = requestedNcm || inferred.value;
         if (!targetNcm) {
             return { ok: false, title: 'Indicá la posición SIM', message: 'Escribí los 11 dígitos y la letra DC: se asignarán a todos y se unirán en el mismo paso.' };
         }
@@ -797,6 +855,7 @@
     CDI.ncmBatch = CDI.ncmBatch || {};
     CDI.ncmBatch.applyNcmAndGroup = applyNcmAndGroup;
     CDI.ncmBatch.isValidSimPosition = isValidNcm;
+    CDI.ncmBatch.inferSelectedSim = inferSelectedSim;
 
     function agruparSeleccionados() {
         const items = (CDI.state && CDI.state.items) || [];

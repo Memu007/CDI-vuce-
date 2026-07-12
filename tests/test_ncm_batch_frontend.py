@@ -65,6 +65,41 @@ console.log(JSON.stringify({ result, items }));
     assert all(item["grupo_id"] is None for item in result["items"])
 
 
+def test_una_sim_existente_se_copia_a_los_demas_y_los_une():
+    result = _run_node("""
+const items = [
+  {pieza:'4410.11.21.000 K', origen:'310', unidad:'07', grupo_id:null},
+  {pieza:'', origen:'310', unidad:'07', grupo_id:null},
+  {pieza:'', origen:'310', unidad:'07', grupo_id:null},
+  {pieza:'', origen:'310', unidad:'07', grupo_id:null}
+];
+const selected = [0, 1, 2, 3];
+const inferred = window.CDI.ncmBatch.inferSelectedSim(items, selected);
+const result = window.CDI.ncmBatch.applyNcmAndGroup(items, selected, '');
+console.log(JSON.stringify({ inferred, result, items }));
+""")
+
+    assert result["inferred"] == {"value": "4410.11.21.000 K", "count": 1}
+    assert result["result"]["ok"] is True
+    assert all(item["pieza"] == "4410.11.21.000 K" for item in result["items"])
+    assert len({item["grupo_id"] for item in result["items"]}) == 1
+
+
+def test_dos_sim_distintas_no_se_unen_sin_elegir_una():
+    result = _run_node("""
+const items = [
+  {pieza:'4410.11.21.000 K', origen:'310', unidad:'07', grupo_id:null},
+  {pieza:'4410.11.10.100 Y', origen:'310', unidad:'07', grupo_id:null}
+];
+const result = window.CDI.ncmBatch.applyNcmAndGroup(items, [0, 1], '');
+console.log(JSON.stringify({ result, items }));
+""")
+
+    assert result["result"]["ok"] is False
+    assert result["result"]["title"] == "Hay posiciones SIM distintas"
+    assert all(item["grupo_id"] is None for item in result["items"])
+
+
 def test_unir_normaliza_aliases_de_origen_al_codigo_maria():
     result = _run_node("""
 const items = [
