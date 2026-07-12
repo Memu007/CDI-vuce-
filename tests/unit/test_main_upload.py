@@ -33,7 +33,7 @@ def test_upload_excel_rejects_large_files(main_client):
 
     assert response.status_code == 413
     body = response.json()
-    assert "excede" in body["detail"] or "excede" in body["detail"].lower()
+    assert "too large" in body["detail"].lower() or "excede" in body["detail"].lower()
 
 
 def test_upload_excel_rejects_invalid_extension(main_client):
@@ -44,13 +44,22 @@ def test_upload_excel_rejects_invalid_extension(main_client):
     response = main_client.post("/upload_excel/", files=files)
 
     assert response.status_code == 400
-    assert "Solo se permiten archivos Excel" in response.json()["detail"]
+    assert "invalid file extension" in response.json()["detail"].lower() or "Solo se permiten" in response.json()["detail"]
 
 
 def test_upload_excel_success_flow(monkeypatch, main_client):
     """Exercise main flow by stubbing heavy dependencies."""
     # Allow bigger uploads for this test
     monkeypatch.setenv("MAX_UPLOAD_MB", "5")
+
+    # Bypass file content validation (openpyxl check)
+    from proyecto_maria.security import file_security
+    async def _fake_validate(file, ftype, max_size=None):
+        return await file.read()
+    monkeypatch.setattr(file_security, "validate_file_upload", _fake_validate)
+    # Also patch the import in main module
+    import proyecto_maria.main as main_mod
+    monkeypatch.setattr(main_mod, "validate_file_upload", _fake_validate, raising=False)
 
     # Fake DataFrame returned by pandas
     df = pd.DataFrame(

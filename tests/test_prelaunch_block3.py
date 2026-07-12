@@ -29,7 +29,7 @@ os.environ.setdefault("EMAIL_VERIFICATION_REQUIRED", "false")
 from proyecto_maria.main import app, CustomStaticFiles  # noqa: E402
 import proyecto_maria.main as main_mod  # noqa: E402
 from proyecto_maria.core.rate_limit import limiter  # noqa: E402
-from proyecto_maria.database.connection import get_async_session  # noqa: E402
+from proyecto_maria.database.connection import get_async_session, AsyncSessionLocal  # noqa: E402
 from proyecto_maria.database.models import User  # noqa: E402
 from sqlalchemy.future import select  # noqa: E402
 
@@ -65,11 +65,13 @@ def _unique(prefix="b3"):
 
 
 def _register_and_login(client, username):
-    client.post("/auth/register", json={
+    resp = client.post("/auth/register", json={
         "username": username,
         "password": "SecureP@ss1",
-        "email": f"{username}@test.b3",
+        "email": f"{username}@test.com",
+        "name": f"User {username}",
     })
+    assert resp.status_code == 200, f"Register falló: {resp.text}"
     return client
 
 
@@ -78,7 +80,7 @@ def _set_user(username: str, **kwargs):
         async for db in get_async_session():
             res = await db.execute(select(User).where(User.username == username))
             u = res.scalars().first()
-            assert u is not None
+            assert u is not None, f"Usuario {username} no encontrado en DB"
             for k, v in kwargs.items():
                 setattr(u, k, v)
             await db.commit()
@@ -759,11 +761,7 @@ class TestJWTSecretUnificado:
         """Un token emitido por /auth/login puede ser verificado por jwt_utils.decode_token."""
         from proyecto_maria.auth.jwt_utils import decode_token
         uname = _unique("jwt_uni")
-        client.post("/auth/register", json={
-            "username": uname,
-            "password": "SecureP@ss1",
-            "email": f"{uname}@test.b3",
-        })
+        _register_and_login(client, uname)
         login = client.post("/auth/login", json={
             "username": uname,
             "password": "SecureP@ss1",

@@ -278,9 +278,7 @@ def generate_maria_txt(operation_id: str, items: list,
                        viaje_numero: str = "",
                        fecha_embarque: str = "",
                        fecha_emision: str = "",
-                       # Sufijo de valor [SBT]. Default = valor legacy del sample
-                       # (VOWYNNS). OJO: es especifico de ese cliente; la regla real
-                       # por importador esta pendiente de confirmar con el despachante.
+                       # Sufijo de valor [SBT]. OBLIGATORIO: específico de cada importador.
                        sbt_sufijo_valor: str = "",
                        # Container data
                        contenedor_numero: str = "",
@@ -579,15 +577,20 @@ def generate_maria_txt(operation_id: str, items: list,
         lines.append("")
         
         # [SBT] Subitems (Sufijos de valor)
+        # Sufijo de valor: OBLIGATORIO. Sin este dato no se puede generar el TXT
+        # porque es específico de cada importador (regla del despachante).
+        sufijo_sbt = (sbt_sufijo_valor or "").strip()
+        if not sufijo_sbt:
+            raise ValueError(
+                "Falta el sufijo de valor SBT (CSBTSVL). "
+                "Este dato es obligatorio y depende del importador. "
+                "Contactá al despachante para obtenerlo."
+            )
         lines.append("[SBT]")
         lines.append(f"IDDT={operation_id}")
         lines.append(f"NART={idx:04d}")
         lines.append("ISBT=0000")
-        lines.append(f"IEXT={idx}-1") # Referencia dummy
-        # Sufijo de valor: usa el parametro si viene; sino el legacy del sample.
-        # El default contiene "VOWYNNS" (cliente del sample) -> es un leak para
-        # otros clientes; la regla real por importador esta pendiente de despachante.
-        sufijo_sbt = sbt_sufijo_valor.strip() or "AA(VOWYNNS)-AB(VITTO)-CA00-"
+        lines.append(f"IEXT={idx}-1")
         lines.append(f"CSBTSVL={sufijo_sbt}")
         lines.append("")
 

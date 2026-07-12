@@ -359,7 +359,7 @@ class TestExtraValidations:
         assert "ncm" in errors[0].lower() or "dígitos" in errors[0].lower()
 
     def test_ncm_too_long_warning(self):
-        """Test: NCM mayor a 8 dígitos genera warning."""
+        """Test: NCM con 9 dígitos (no válido) genera warning."""
         from proyecto_maria.core.validations import run_extra_validations
         from proyecto_maria.models.operations import Item
 
@@ -633,21 +633,21 @@ class TestNCMValidation:
         """Test: NCM con menos de 6 dígitos falla."""
         from proyecto_maria.security.input_validation import validate_ncm
 
-        with pytest.raises(ValueError, match="6 or 8 digits"):
+        with pytest.raises(ValueError, match="6, 8, 10 or 11 digits"):
             validate_ncm("8471")
 
     def test_invalid_ncm_7_digits(self):
         """Test: NCM con 7 dígitos falla."""
         from proyecto_maria.security.input_validation import validate_ncm
 
-        with pytest.raises(ValueError, match="6 or 8 digits"):
+        with pytest.raises(ValueError, match="6, 8, 10 or 11 digits"):
             validate_ncm("8471301")
 
     def test_invalid_ncm_too_long(self):
-        """Test: NCM con más de 8 dígitos falla."""
+        """Test: NCM con 9 dígitos (no está en [6,8,10,11]) falla."""
         from proyecto_maria.security.input_validation import validate_ncm
 
-        with pytest.raises(ValueError, match="6 or 8 digits"):
+        with pytest.raises(ValueError, match="6, 8, 10 or 11 digits"):
             validate_ncm("847130109")
 
     def test_invalid_ncm_empty(self):

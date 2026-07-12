@@ -287,6 +287,7 @@ class TestGenerateMaria:
             }],
             "moneda": "DOL",
             "incoterm": "FOB",
+            "sbt_sufijo_valor": "AA(DEMO)-AB(DEMO)-CA00-",
         })
         assert res.status_code == 200, res.text
         data = res.json()
@@ -468,15 +469,15 @@ class FakeUser:
 
 class TestLimiteOps:
 
-    def test_trial_permite_hasta_10_ops(self):
-        """Trial con 9 ops usadas puede crear una más."""
-        u = FakeUser(used=9)
+    def test_trial_permite_hasta_15_ops(self):
+        """Trial con 14 ops usadas puede crear una más."""
+        u = FakeUser(used=14)
         ok, reason = billing_service.can_create_operation(u)
         assert ok is True
 
-    def test_trial_bloquea_en_11(self):
-        """Trial con 10 ops usadas es bloqueado."""
-        u = FakeUser(used=10)
+    def test_trial_bloquea_en_16(self):
+        """Trial con 15 ops usadas es bloqueado."""
+        u = FakeUser(used=15)
         ok, reason = billing_service.can_create_operation(u)
         assert ok is False
         assert "límite" in reason.lower()
@@ -494,15 +495,15 @@ class TestLimiteOps:
         assert ok is False
 
     def test_extra_credits_salvan_del_limite(self):
-        """Con 10 ops usadas pero créditos extra, puede seguir."""
-        u = FakeUser(used=10, extra=5)
+        """Con 15 ops usadas pero créditos extra, puede seguir."""
+        u = FakeUser(used=15, extra=5)
         ok, reason = billing_service.can_create_operation(u)
         assert ok is True
 
     def test_extra_credits_vencidos_no_cuentan(self):
         """Créditos expirados no salvan el límite."""
         u = FakeUser(
-            used=10,
+            used=15,
             extra=5,
             extra_ops_expires_at=datetime.now(timezone.utc) - timedelta(days=1),
         )
@@ -518,14 +519,14 @@ class TestLimiteOps:
 
     def test_record_operation_consume_extra(self):
         """Al superar el límite, consume créditos extra."""
-        u = FakeUser(used=10, extra=3)
+        u = FakeUser(used=15, extra=3)
         billing_service.record_operation_created(u)
-        assert u.ops_used_this_period == 11
+        assert u.ops_used_this_period == 16
         assert u.extra_ops_remaining == 2
 
     def test_record_operation_sin_margen_explota(self):
         """Sin créditos ni margen, RuntimeError."""
-        u = FakeUser(used=10, extra=0)
+        u = FakeUser(used=15, extra=0)
         with pytest.raises(RuntimeError, match="Límite"):
             billing_service.record_operation_created(u)
 
@@ -549,10 +550,10 @@ class TestErrorMessages:
 
     def test_billing_limit_detalle_claro(self):
         """El mensaje de límite incluye información útil."""
-        u = FakeUser(used=10, extra=0)
+        u = FakeUser(used=15, extra=0)
         ok, reason = billing_service.can_create_operation(u)
         assert not ok
-        assert "10" in reason  # menciona el límite numérico
+        assert "15" in reason  # menciona el límite numérico
         assert "top-up" in reason.lower() or "premium" in reason.lower()
 
     def test_plan_inexistente_detalle(self):

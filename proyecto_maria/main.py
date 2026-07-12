@@ -3463,6 +3463,8 @@ class MariaRequest(BaseModel):
     # Aduana / tipo destinacion (antes hardcodeado a 001 / IC04)
     aduana_codigo: str = "001"
     tipo_destinacion: str = "IC04"
+    # Sufijo de valor SBT — obligatorio, específico de cada importador
+    sbt_sufijo_valor: str = ""
 
 
 @app.post("/generate_maria")
@@ -3525,6 +3527,7 @@ async def generate_maria_endpoint(
             contenedor_peso=request.contenedor_peso,
             aduana_codigo=request.aduana_codigo,
             tipo_destinacion=request.tipo_destinacion,
+            sbt_sufijo_valor=request.sbt_sufijo_valor,
         )
         
         # Sanitizar operation_id para filename (prevenir path traversal)
@@ -3550,6 +3553,8 @@ async def generate_maria_endpoint(
         
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         print(f"Error generando MARIA TXT: {e}")
         raise HTTPException(status_code=500, detail=f"Error generando archivo MARIA: {str(e)}")

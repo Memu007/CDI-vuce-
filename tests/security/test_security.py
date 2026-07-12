@@ -31,11 +31,11 @@ client = TestClient(app)
 
 @pytest.fixture(autouse=True, scope="function")
 async def setup_db():
+    # create_all es idempotente: si las tablas ya existen (creadas por conftest),
+    # no hace nada. NO hacemos drop_all porque destruye la base compartida.
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
 
 
 # =============================================================================

@@ -64,8 +64,8 @@ def test_checkout_sandbox_incluye_back_urls(client, monkeypatch):
 
     pref = _FakeSDK.captured["preference_data"]
     assert pref["external_reference"] == "test_user:premium"
-    assert pref["back_urls"]["success"].endswith("/v2?billing=success")
-    assert pref["back_urls"]["failure"].endswith("/v2?billing=failure")
+    assert pref["back_urls"]["success"].endswith("/dashboard?billing=success")
+    assert pref["back_urls"]["failure"].endswith("/dashboard?billing=failure")
     # Sin https publica NO se manda auto_return (MP rechaza localhost)
     assert "auto_return" not in pref
     assert "notification_url" not in pref
@@ -87,4 +87,4 @@ def test_checkout_prod_https_agrega_auto_return(client, monkeypatch):
     pref = _FakeSDK.captured["preference_data"]
     assert pref["auto_return"] == "approved"
     assert pref["notification_url"] == "https://cdi.example.com/api/payments/webhook"
-    assert pref["back_urls"]["success"] == "https://cdi.example.com/v2?billing=success"
+    assert pref["back_urls"]["success"] == "https://cdi.example.com/dashboard?billing=success"

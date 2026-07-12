@@ -29,35 +29,43 @@ from proyecto_maria.main import app  # noqa: E402
 # ====================================================================
 
 ITEMS_OK = [
-    {"pieza": "84713010", "descripcion": "Laptop", "cantidad": 10,
+    {"pieza": "84713010", "descripcion": "Laptop Pro X1", "cantidad": 10,
      "valor_unitario": 500, "peso_unitario": 2.5, "origen": "CN"},
-    {"pieza": "85171200", "descripcion": "Celular", "cantidad": 20,
+    {"pieza": "85171200", "descripcion": "Celular Samsung", "cantidad": 20,
      "valor_unitario": 300, "peso_unitario": 0.2, "origen": "US"},
 ]
+
+_SBT_TEST = "AA(DEMO)-AB(DEMO)-CA00-"
+
+
+def _gen(*args, **kwargs):
+    """Wrapper que inyecta sbt_sufijo_valor por defecto en todos los tests."""
+    kwargs.setdefault("sbt_sufijo_valor", _SBT_TEST)
+    return generate_maria_txt(*args, **kwargs)
 
 
 def test_txt_tiene_secciones_obligatorias():
     """El TXT debe contener las secciones que el Kit SIM espera."""
-    txt = generate_maria_txt("OP123456", ITEMS_OK)
+    txt = _gen("OP123456", ITEMS_OK)
     for seccion in ("[DDT]", "[CPL]", "[DVD]", "[ART]", "[SBT]"):
         assert seccion in txt, f"Falta la sección {seccion}"
 
 
 def test_txt_usa_crlf():
     """MARIA/Windows espera saltos de línea CRLF, no solo LF."""
-    txt = generate_maria_txt("OP123456", ITEMS_OK)
+    txt = _gen("OP123456", ITEMS_OK)
     assert "\r\n" in txt, "El TXT debe usar CRLF"
 
 
 def test_txt_un_art_por_item():
     """Debe haber exactamente un bloque [ART] por item."""
-    txt = generate_maria_txt("OP123456", ITEMS_OK)
+    txt = _gen("OP123456", ITEMS_OK)
     assert txt.count("[ART]") == len(ITEMS_OK)
 
 
 def test_txt_total_fob_correcto():
     """MDDTFOB debe ser la suma de cantidad*valor_unitario de todos los items."""
-    txt = generate_maria_txt("OP123456", ITEMS_OK)
+    txt = _gen("OP123456", ITEMS_OK)
     # 10*500 + 20*300 = 5000 + 6000 = 11000
     assert "MDDTFOB=11000.00" in txt
 
@@ -66,7 +74,7 @@ def test_txt_usa_valor_total_si_viene():
     """Si el item trae valor_total explícito, se usa ese en vez de calcular."""
     items = [{"pieza": "84713010", "descripcion": "X", "cantidad": 3,
               "valor_unitario": 100, "valor_total": 999, "origen": "CN"}]
-    txt = generate_maria_txt("OP1", items)
+    txt = _gen("OP1", items)
     assert "MDDTFOB=999.00" in txt
 
 
@@ -74,40 +82,40 @@ def test_txt_formatea_ncm_con_puntos():
     """NCM de 8+ dígitos se formatea con puntos para el Kit SIM."""
     items = [{"pieza": "84798999900H", "descripcion": "X", "cantidad": 1,
               "valor_unitario": 10, "origen": "CN"}]
-    txt = generate_maria_txt("OP1", items)
+    txt = _gen("OP1", items)
     # 8479.89.99 + sufijo
     assert "IESPNCE=8479.89.99" in txt
 
 
 def test_txt_incluye_cuit_agr():
     """El CUIT del despachante debe aparecer como CDDTAGR en la cabecera."""
-    txt = generate_maria_txt("OP1", ITEMS_OK, cuit_agr="20304050607")
+    txt = _gen("OP1", ITEMS_OK, cuit_agr="20304050607")
     assert "CDDTAGR=20304050607" in txt
 
 
 def test_txt_sin_cuit_agr_no_emite_linea():
     """Si no hay CUIT del despachante, no se emite la línea CDDTAGR."""
-    txt = generate_maria_txt("OP1", ITEMS_OK, cuit_agr="")
+    txt = _gen("OP1", ITEMS_OK, cuit_agr="")
     assert "CDDTAGR=" not in txt
 
 
 def test_txt_defaults_aduana_destinacion():
     """Sin config, usa defaults seguros (001 / IC04)."""
-    txt = generate_maria_txt("OP1", ITEMS_OK)
+    txt = _gen("OP1", ITEMS_OK)
     assert "CDDTBUR=001" in txt
     assert "CDDTTYPDEC=IC04" in txt
 
 
 def test_txt_respeta_aduana_destinacion_custom():
     """Config custom de aduana/destinación se respeta."""
-    txt = generate_maria_txt("OP1", ITEMS_OK, aduana_codigo="073", tipo_destinacion="IC05")
+    txt = _gen("OP1", ITEMS_OK, aduana_codigo="073", tipo_destinacion="IC05")
     assert "CDDTBUR=073" in txt
     assert "CDDTTYPDEC=IC05" in txt
 
 
 def test_txt_incoterm_y_moneda():
     """Incoterm y moneda se reflejan en la cabecera."""
-    txt = generate_maria_txt("OP1", ITEMS_OK, moneda="DOL", incoterm="CIF")
+    txt = _gen("OP1", ITEMS_OK, moneda="DOL", incoterm="CIF")
     assert "CDDTINCOTE=CIF" in txt
     assert "CDDTDEVFOB=DOL" in txt
 
@@ -117,7 +125,7 @@ def test_txt_proporcional_flete_seguro():
     # 1 item con todo el FOB → recibe el 100% del flete.
     items = [{"pieza": "84713010", "descripcion": "X", "cantidad": 1,
               "valor_unitario": 1000, "origen": "CN"}]
-    txt = generate_maria_txt("OP1", items, flete=100, seguro=50)
+    txt = _gen("OP1", items, flete=100, seguro=50)
     assert "MARTFLE=100.00" in txt
     assert "MARTASS=50.00" in txt
 
@@ -154,7 +162,7 @@ def test_txt_no_filtra_datos_de_otro_cliente():
     """Regresión: sin domicilio/fecha del cliente NO deben aparecer los datos
     hardcodeados del sample (otro cliente) en la declaración aduanera.
     """
-    txt = generate_maria_txt("OP1", ITEMS_OK)
+    txt = _gen("OP1", ITEMS_OK)
     assert "DR. SALVADOR MAZZA 1996" not in txt
     assert "13/07/2016" not in txt
     # Sin dato, el bloque [CPL] correspondiente directamente no se emite.
@@ -164,7 +172,7 @@ def test_txt_no_filtra_datos_de_otro_cliente():
 
 def test_txt_usa_datos_reales_del_cliente():
     """Cuando vienen domicilio y fecha del cliente, se emiten esos valores."""
-    txt = generate_maria_txt(
+    txt = _gen(
         "OP1", ITEMS_OK,
         comprador_domicilio="AV. CORRIENTES 1234",
         comprador_fecha_inic_activ="01/03/2020",
@@ -181,7 +189,7 @@ def test_txt_procedencia_default_es_origen():
     """
     items = [{"pieza": "84713010", "descripcion": "X", "cantidad": 1,
               "valor_unitario": 100, "origen": "China"}]
-    txt = generate_maria_txt("OP1", items)
+    txt = _gen("OP1", items)
     assert "CARTPAYORI=310" in txt   # China oficial
     assert "CARTPAYPRC=310" in txt   # procedencia = origen
     assert "CARTPAYPRC=222" not in txt
@@ -192,7 +200,7 @@ def test_txt_procedencia_explicita():
     items = [{"pieza": "84713010", "descripcion": "X", "cantidad": 1,
               "valor_unitario": 100, "origen": "China",
               "pais_procedencia": "Uruguay"}]
-    txt = generate_maria_txt("OP1", items)
+    txt = _gen("OP1", items)
     assert "CARTPAYORI=310" in txt   # origen China
     assert "CARTPAYPRC=225" in txt   # procedencia Uruguay oficial
 
@@ -201,7 +209,7 @@ def test_txt_unidad_default_es_unidad():
     """Sin unidad explícita, CARTUNTDCL debe ser 07 (UNIDAD)."""
     items = [{"pieza": "84713010", "descripcion": "X", "cantidad": 5,
               "valor_unitario": 100, "origen": "China"}]
-    txt = generate_maria_txt("OP1", items)
+    txt = _gen("OP1", items)
     assert "CARTUNTDCL=07" in txt
     assert "CARTUNTEST=07" in txt
 
@@ -210,25 +218,25 @@ def test_txt_unidad_kg_y_par():
     """La unidad del item se mapea al código oficial: kg=01, par=08."""
     items = [{"pieza": "84713010", "descripcion": "A", "cantidad": 10,
               "valor_unitario": 100, "origen": "China", "unidad": "kg"}]
-    txt = generate_maria_txt("OP1", items)
+    txt = _gen("OP1", items)
     assert "CARTUNTDCL=01" in txt   # kilogramo oficial
     assert "CARTUNTDCL=07" not in txt
 
     items2 = [{"pieza": "64041100", "descripcion": "Zapatillas", "cantidad": 20,
                "valor_unitario": 50, "origen": "China", "unidad_medida": "pares"}]
-    txt2 = generate_maria_txt("OP2", items2)
+    txt2 = _gen("OP2", items2)
     assert "CARTUNTDCL=08" in txt2   # par oficial
 
 
 def test_txt_fecha_embarque_no_se_inventa():
     """Sin fecha de embarque, NO debe emitirse DDDTVENEMB (antes inventaba hoy+365)."""
-    txt = generate_maria_txt("OP1", ITEMS_OK)
+    txt = _gen("OP1", ITEMS_OK)
     assert "DDDTVENEMB" not in txt
 
 
 def test_txt_fecha_embarque_real_se_usa():
     """Con fecha de embarque real, se emite tal cual."""
-    txt = generate_maria_txt("OP1", ITEMS_OK, fecha_embarque="15/08/2026")
+    txt = _gen("OP1", ITEMS_OK, fecha_embarque="15/08/2026")
     assert "DDDTVENEMB=15/08/2026" in txt
 
 
@@ -277,7 +285,7 @@ def test_golden_reproduce_estructura_real():
 
 def test_golden_calculos_clave():
     """Valida los cálculos contra los números reales conocidos de la operación."""
-    txt = generate_maria_txt(**GOLDEN_INPUTS)
+    txt = _gen(**GOLDEN_INPUTS)
     assert "MARTBASIMP=8271.66" in txt          # FOB 5000 + flete 3221.66 + seg 50
     assert "MCPL=3271.66" in txt                # GTOS-POS-FOB = flete + seguro
     assert "IESPNCE=8479.89.99.900H" in txt     # NCM con sufijo SIM preservado
@@ -292,6 +300,40 @@ def test_golden_no_filtra_datos_reales():
     for prohibido in ("VOWYNNS", "VITTO", "ARDEN", "SALVADOR MAZZA",
                        "30715958844", "20324717073", "20613363263"):
         assert prohibido.upper() not in contenido
+
+
+# ---------- Hotfix SBT: sin sufijo de valor, no se genera ----------
+
+
+def test_sbt_sin_sufijo_bloquea_generacion():
+    """Sin sbt_sufijo_valor, generate_maria_txt lanza ValueError con mensaje claro."""
+    with pytest.raises(ValueError, match="sufijo de valor SBT"):
+        generate_maria_txt("OP1", ITEMS_OK)
+
+
+def test_sbt_sin_sufijo_endpoint_devuelve_400(client):
+    """Sin sbt_sufijo_valor en el endpoint → 400 controlado (no 500)."""
+    _register(client, "maria_sbt")
+    resp = client.post("/generate_maria", json={
+        "operation_id": "OP_SBT",
+        "items": ITEMS_OK,
+    })
+    assert resp.status_code == 400, resp.text
+    detail = resp.json().get("detail", "")
+    assert "sufijo de valor SBT" in detail
+
+
+def test_sbt_con_sufijo_explicito_genera():
+    """Con sbt_sufijo_valor explícito, el TXT se genera normalmente."""
+    txt = generate_maria_txt("OP1", ITEMS_OK, sbt_sufijo_valor="AA(MICLIENTE)-AB(OTRO)-CA00-")
+    assert "CSBTSVL=AA(MICLIENTE)-AB(OTRO)-CA00-" in txt
+
+
+def test_sbt_no_contiene_vowynns_ni_vitto():
+    """Ningún TXT generado con sufijo explícito contiene VOWYNNS ni VITTO."""
+    txt = generate_maria_txt("OP1", ITEMS_OK, sbt_sufijo_valor="AA(CLIENTE1)-AB(CLIENTE2)-CA00-")
+    assert "VOWYNNS" not in txt
+    assert "VITTO" not in txt
 
 
 # ---------- validate_items_for_maria ----------
@@ -361,13 +403,14 @@ def _register(client, username, cuit=None):
 
 
 def test_generate_maria_happy_path(client):
-    """Items válidos + auth → 200 + filename + content con secciones MARIA."""
+    """Items válidos + auth + SBT explícito → 200 + filename + content con secciones MARIA."""
     _register(client, "maria1")
     resp = client.post("/generate_maria", json={
         "operation_id": "OP777",
         "items": ITEMS_OK,
         "moneda": "DOL",
         "incoterm": "FOB",
+        "sbt_sufijo_valor": "AA(DEMO)-AB(DEMO)-CA00-",
     })
     assert resp.status_code == 200, resp.text
     data = resp.json()
@@ -375,6 +418,7 @@ def test_generate_maria_happy_path(client):
     assert data["filename"].endswith(".TXT")
     assert "[DDT]" in data["content"]
     assert "[ART]" in data["content"]
+    assert "CSBTSVL=AA(DEMO)-AB(DEMO)-CA00-" in data["content"]
 
 
 def test_generate_maria_requires_auth(client):
@@ -398,11 +442,12 @@ def test_generate_maria_items_invalidos_devuelve_400(client):
 
 
 def test_generate_maria_usa_cuit_del_perfil(client):
-    """Si la request no manda cuit_agr pero el user lo tiene en perfil, se usa."""
+    """Con SBT explícito + CUIT en perfil → 200 y el TXT usa el CUIT del perfil."""
     _register(client, "maria3", cuit="20111222333")
     resp = client.post("/generate_maria", json={
         "operation_id": "OP3",
         "items": ITEMS_OK,
+        "sbt_sufijo_valor": "AA(DEMO)-AB(DEMO)-CA00-",
         # sin cuit_agr a propósito
     })
     assert resp.status_code == 200, resp.text
@@ -521,7 +566,7 @@ def test_agrupacion_2_items_mismo_grupo_genera_2_art():
         {"pieza": "94051000", "descripcion": "Lámpara de mesa LED", "cantidad": 5,
          "valor_unitario": 10, "peso_unitario": 0.5, "origen": "CN"},
     ]
-    txt = generate_maria_txt("OP_AGRUP", items)
+    txt = _gen("OP_AGRUP", items)
 
     # 2 [ART]: grupo combinado + lámpara sola
     assert txt.count("[ART]") == 2, f"Esperaba 2 [ART], got {txt.count('[ART]')}"

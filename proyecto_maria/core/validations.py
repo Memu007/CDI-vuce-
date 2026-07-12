@@ -2,6 +2,7 @@
 # Este módulo implementa las reglas específicas del negocio aduanero
 # que deben cumplir todos los items antes de generar el Excel AVG.
 
+import re
 from proyecto_maria.models.operations import Item  # Modelo Pydantic de items
 from proyecto_maria.core.maria_generator import pais_reconocido
 from typing import List, Tuple  # Type hints para mejor documentación
@@ -70,15 +71,17 @@ def run_pre_maria_validations(items: List[Item]) -> Tuple[List[Item], List[str]]
 
 def run_extra_validations(items: List[Item]) -> List[str]:
     """Validaciones opcionales (activables por toggle) de carácter suave.
-    - NCM 6–8 dígitos
+    - NCM 6, 8, 10 u 11 dígitos (con letra opcional)
     - Guardas de valores razonables (cantidad y valor_unitario límites altos)
     Devuelve lista de errores adicionales sin filtrar items válidos.
     """
     errors: List[str] = []
     for i, item in enumerate(items, start=1):
         pieza = (item.pieza or '').strip()
-        if pieza and not (6 <= len(pieza) <= 8):
-            errors.append(f"Error en ítem {i} (Pieza {pieza}): NCM debería tener 6–8 dígitos. Ej: 84713010.")
+        # Validar NCM: extraer solo dígitos y verificar longitud permitida
+        digits_only = re.sub(r'[^0-9]', '', pieza)
+        if pieza and len(digits_only) not in [6, 8, 10, 11]:
+            errors.append(f"Error en ítem {i} (Pieza {pieza}): NCM debería tener 6, 8, 10 u 11 dígitos. Ej: 84713010.")
         try:
             if item.cantidad and item.cantidad > 1_000_000:
                 errors.append(f"Error en ítem {i} (Pieza {pieza or '----'}): cantidad parece inválida (> 1,000,000). Revisá unidades y separadores.")

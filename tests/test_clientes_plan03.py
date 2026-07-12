@@ -35,13 +35,44 @@ def test_search_clientes_requires_auth(client):
 
 
 def test_search_clientes_isolated_by_owner(auth_override, client):
-    # El auth_override usa 'test_user'. Creamos un cliente asociado.
-    client.post("/api/clientes", json={"nombre": "Cliente Propio", "cuit": "30444444444"})
+    """Cada usuario ve solo sus propios clientes, no los de otros."""
+    from proyecto_maria.main import app, get_current_user
+    import uuid
 
-    # Simulamos otro usuario cambiando la dependencia momentáneamente no es trivial,
-    # así que verificamos al menos que la búsqueda no devuelva clientes ajenos
-    # usando el hecho de que el fixture client no tiene otros clientes previos.
-    r = client.get("/api/clientes/search?q=cliente")
+    # Usuario A (test_user del fixture) crea un cliente con nombre único
+    suffix = uuid.uuid4().hex[:8]
+    nombre_a = f"AcmeAislado_{suffix}"
+    client.post("/api/clientes", json={"nombre": nombre_a, "cuit": f"30{suffix[:8]}01"})
+
+    # Usuario B: cambiar el override temporalmente
+    fake_b = dict(auth_override)
+    fake_b["username"] = f"other_user_{suffix}"
+    fake_b["effective_owner"] = f"other_user_{suffix}"
+
+    # Crear cliente como usuario B
+    app.dependency_overrides[get_current_user] = lambda: fake_b
+    nombre_b = f"BetaAislado_{suffix}"
+    client.post("/api/clientes", json={"nombre": nombre_b, "cuit": f"30{suffix[:8]}02"})
+
+    # Restaurar usuario A
+    app.dependency_overrides[get_current_user] = lambda: auth_override
+
+    # Usuario A busca por el sufijo único — solo debe ver su cliente
+    r = client.get(f"/api/clientes/search?q={suffix}")
+    assert r.status_code == 200
     data = r.json()
-    assert len(data["clientes"]) == 1
-    assert data["clientes"][0]["nombre"] == "Cliente Propio"
+    nombres = [c["nombre"] for c in data["clientes"]]
+    assert nombre_a in nombres
+    assert nombre_b not in nombres
+
+    # Usuario B busca — solo debe ver su cliente
+    app.dependency_overrides[get_current_user] = lambda: fake_b
+    r2 = client.get(f"/api/clientes/search?q={suffix}")
+    assert r2.status_code == 200
+    data2 = r2.json()
+    nombres2 = [c["nombre"] for c in data2["clientes"]]
+    assert nombre_b in nombres2
+    assert nombre_a not in nombres2
+
+    # Restaurar override original
+    app.dependency_overrides[get_current_user] = lambda: auth_override

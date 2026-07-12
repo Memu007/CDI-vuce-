@@ -14,29 +14,29 @@ class FakeUser:
 
 
 def test_premium_plan_limit_enforced():
-    u = FakeUser(plan="premium", used=10)
+    u = FakeUser(plan="premium", used=15)
     ok, reason = billing_service.can_create_operation(u)
     assert not ok
     assert "límite" in reason.lower()
 
 
 def test_premium_with_extra_credit_allows():
-    u = FakeUser(plan="premium", used=10, extra=1)
+    u = FakeUser(plan="premium", used=15, extra=1)
     ok, reason = billing_service.can_create_operation(u)
     assert ok is True
     assert reason is None
 
 
 def test_premium_within_limit_allows():
-    u = FakeUser(plan="premium", used=9)
+    u = FakeUser(plan="premium", used=14)
     ok, reason = billing_service.can_create_operation(u)
     assert ok is True
 
 
 def test_record_operation_consumed_extra_credit():
-    u = FakeUser(plan="premium", used=10, extra=2)
+    u = FakeUser(plan="premium", used=15, extra=2)
     billing_service.record_operation_created(u)
-    assert u.ops_used_this_period == 11
+    assert u.ops_used_this_period == 16
     assert u.extra_ops_remaining == 1
 
 

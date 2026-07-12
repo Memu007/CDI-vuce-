@@ -432,13 +432,13 @@ class TestWebhook:
 
 class TestLimiteOpsActivo:
 
-    def test_plan_activo_permite_10_ops_y_bloquea_11(self, client):
-        """Plan activo con 10 ops usadas → 402 en la siguiente."""
+    def test_plan_activo_permite_15_ops_y_bloquea_16(self, client):
+        """Plan activo con 15 ops usadas → 402 en la siguiente."""
         uname = _unique("lim")
         _register(client, uname)
         _set_user(uname,
                   billing_status="active",
-                  ops_used_this_period=10,
+                  ops_used_this_period=15,
                   extra_ops_remaining=0)
 
         # Crear cliente para la operación
@@ -661,7 +661,7 @@ class TestBillingMe:
         assert data["billing_status"] == "trial"
         assert data["trial_ends_at"] is not None
         assert data["ops_used_this_period"] == 0
-        assert data["ops_limit"] == 10
+        assert data["ops_limit"] == 15
         assert data["plan"] == "premium"
 
     def test_billing_me_sin_auth_401(self, client):
@@ -687,15 +687,15 @@ class TestPlanLimites:
         plan = billing_service.get_plan("premium")
         assert plan["users"] == 3
 
-    def test_plan_premium_ops_limit_10(self):
-        """Plan premium tiene límite de 10 ops/mes."""
+    def test_plan_premium_ops_limit_15(self):
+        """Plan premium tiene límite de 15 ops/mes."""
         plan = billing_service.get_plan("premium")
-        assert plan["ops"] == 10
+        assert plan["ops"] == 15
 
-    def test_plan_premium_precio_30k_ars(self):
-        """Plan premium cuesta $30.000 ARS/mes."""
+    def test_plan_premium_precio_45k_ars(self):
+        """Plan premium cuesta $45.000 ARS/mes."""
         plan = billing_service.get_plan("premium")
-        assert plan["price"] == 30000
+        assert plan["price"] == 45000
 
     def test_billing_me_clients_limit_none(self, client):
         """GET /api/billing/me devuelve clients_limit=None (ilimitado)."""
