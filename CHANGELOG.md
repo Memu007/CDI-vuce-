@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-12 · fix: campo SBT en frontend + validación backend anti-inyección
+
+El dashboard v2 ahora tiene un campo "Sufijo de valor SBT" en la pantalla de revisión (antes de generar). Es obligatorio, con texto de ayuda "Dato obligatorio y específico del importador. Consultar al despachante." El backend valida: trim, máximo 120 caracteres, rechaza saltos de línea (`\r`, `\n`) y caracteres de control para impedir inyección de líneas en el TXT. Si el backend devuelve error de SBT, se muestra junto al campo (no como error genérico). Sin fallback VOWYNNS/VITTO. Cobertura: 39.05%, 547 tests, 0 failures.
+
 ## 2026-07-07 · feat: ficha del cliente se auto-completa (fill-if-empty) al guardar operación
 
 Al guardar una operación, si la ficha del cliente tiene `address` o `fecha_inic_activ` vacíos y la carátula trae esos datos, se rellenan. Nunca pisa valores existentes. Datos por-embarque (flete, seguro, gastos FOB, factura, etc.) no se guardan en la ficha. Excepción atrapada: si falla el fill, no rompe el guardado de la operación.

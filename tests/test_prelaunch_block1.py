@@ -300,6 +300,7 @@ class TestGenerateMaria:
         res = client.post("/generate_maria", json={
             "operation_id": "TEST002",
             "items": [],
+            "sbt_sufijo_valor": "AA(DEMO)-AB(DEMO)-CA00-",
         })
         # El generador acepta listas vacías y produce un TXT sin bloques de ítem.
         assert res.status_code == 200

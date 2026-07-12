@@ -3487,6 +3487,24 @@ async def generate_maria_endpoint(
 
         # Validación específica de KIT Maria (complementa la anterior)
         kit_errors, kit_warnings = validate_for_kit_maria(request.items)
+
+        # Validar sbt_sufijo_valor: obligatorio, sin caracteres de control
+        sbt_raw = (request.sbt_sufijo_valor or "").strip()
+        if not sbt_raw:
+            raise HTTPException(
+                status_code=400,
+                detail="Falta el sufijo de valor SBT. Es un dato obligatorio y específico del importador. Consultar al despachante.",
+            )
+        if len(sbt_raw) > 120:
+            raise HTTPException(
+                status_code=400,
+                detail="El sufijo de valor SBT no puede superar los 120 caracteres.",
+            )
+        if any(ord(c) < 32 for c in sbt_raw):
+            raise HTTPException(
+                status_code=400,
+                detail="El sufijo de valor SBT no puede contener saltos de línea ni caracteres de control.",
+            )
         if kit_errors:
             raise HTTPException(status_code=400, detail={"errors": [*errors, *kit_errors]})
 
@@ -3527,7 +3545,7 @@ async def generate_maria_endpoint(
             contenedor_peso=request.contenedor_peso,
             aduana_codigo=request.aduana_codigo,
             tipo_destinacion=request.tipo_destinacion,
-            sbt_sufijo_valor=request.sbt_sufijo_valor,
+            sbt_sufijo_valor=sbt_raw,
         )
         
         # Sanitizar operation_id para filename (prevenir path traversal)

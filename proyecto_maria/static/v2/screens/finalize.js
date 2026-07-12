@@ -13,6 +13,7 @@
     /* ---------- shared refs ---------- */
     let vLoading, vResults, vStatus, vTitle, vSubtitle, vStats, vIssues, vRerun, vGenerate;
     let rGenerating, rDone, rSubtitle, rDownload, rCopy, rFilename, rPreview, rError;
+    let sbtInput, sbtError;
     let initialized = false;
 
     let lastValidation = null;    // { errores, advertencias, sugerencias, estadisticas }
@@ -47,6 +48,8 @@
         rFilename   = $('readyFilename');
         rPreview    = $('readyPreview');
         rError      = $('readyError');
+        sbtInput    = $('sbtSufijoValor');
+        sbtError    = $('sbtFieldError');
 
         if (!vLoading || !rGenerating) return;
 
@@ -252,6 +255,24 @@
     function onGenerate() {
         if (generateInFlight) return;
         if (lastValidation && (lastValidation.errores || []).length > 0) return;
+
+        // Guardar SBT del input al estado antes de generar
+        CDI.state = CDI.state || {};
+        CDI.state.operacion = CDI.state.operacion || {};
+        if (sbtInput) {
+            CDI.state.operacion.sbt_sufijo_valor = sbtInput.value.trim();
+        }
+        // Validación frontend: si está vacío, mostrar error junto al campo
+        if (!CDI.state.operacion.sbt_sufijo_valor) {
+            if (sbtError) {
+                sbtError.textContent = 'Ingresá el sufijo de valor SBT. Es obligatorio.';
+                sbtError.hidden = false;
+            }
+            if (sbtInput) sbtInput.focus();
+            return;
+        }
+        if (sbtError) sbtError.hidden = true;
+
         CDI.goTo('ready', { fromValidating: true });
     }
 
@@ -286,6 +307,15 @@
             const dur = Date.now() - startedAt;
             if (!res.ok || !data || data.success === false) {
                 const detail = (data && (data.detail || data.message)) || res.statusText;
+                // Si el error es de SBT, mostrar junto al campo y volver a validación
+                if (typeof detail === 'string' && detail.toLowerCase().includes('sbt')) {
+                    if (sbtError) {
+                        sbtError.textContent = detail;
+                        sbtError.hidden = false;
+                    }
+                    CDI.goTo('validating');
+                    throw new Error(detail);
+                }
                 throw new Error(detail || 'No se pudo generar el archivo');
             }
             lastMaria = {
@@ -380,7 +410,8 @@
             contenedor_tipo: String(op.contenedor_tipo || '').trim(),
             contenedor_peso: toNumber(op.contenedor_peso, 0),
             aduana_codigo: String(op.aduana_codigo || '001').trim() || '001',
-            tipo_destinacion: String(op.tipo_destinacion || 'IC04').trim().toUpperCase() || 'IC04'
+            tipo_destinacion: String(op.tipo_destinacion || 'IC04').trim().toUpperCase() || 'IC04',
+            sbt_sufijo_valor: String(op.sbt_sufijo_valor || '').trim()
         };
     }
 

@@ -558,6 +558,19 @@
 
                         <div class="validating-issues" id="validatingIssues"></div>
 
+                        <div class="card card-body" id="sbtFieldWrap" style="margin-bottom:1rem">
+                            <label for="sbtSufijoValor" class="form-label" style="font-weight:600">Sufijo de valor SBT</label>
+                            <input type="text" id="sbtSufijoValor" class="form-input"
+                                   placeholder="Ej: AA(000123)-AB(000456)-CA00"
+                                   maxlength="120" autocomplete="off"
+                                   style="width:100%;padding:.5rem .75rem;border:1px solid var(--border,#ccc);border-radius:8px;font-size:.95rem" />
+                            <p class="caption" style="margin-top:.4rem;color:var(--muted,#666);font-size:.85rem">
+                                Dato obligatorio y específico del importador. Consultar al despachante.
+                            </p>
+                            <p id="sbtFieldError" hidden
+                               style="margin-top:.4rem;color:var(--danger,#c0392b);font-size:.85rem"></p>
+                        </div>
+
                         <footer class="validating-actions">
                             <button type="button" class="btn btn-ghost" data-action="go-ncm-from-validating">Volver a NCM</button>
                             <div class="row-3">

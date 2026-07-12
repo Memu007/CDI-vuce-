@@ -583,3 +583,100 @@ def test_agrupacion_2_items_mismo_grupo_genera_2_art():
     # Lámpara sola: MARTFOB = 5*10 = 50
     assert "MARTFOB=50.00" in txt, f"Falta MARTFOB=50.00 de lámpara sola"
 
+
+# ---------- Hotfix SBT: validación de caracteres de control ----------
+
+
+def test_sbt_con_salto_de_linea_devuelve_400(client):
+    """SBT con \\n → 400 (inyección de líneas prohibida)."""
+    _register(client, "maria_sbt_nl")
+    resp = client.post("/generate_maria", json={
+        "operation_id": "OP_NL",
+        "items": ITEMS_OK,
+        "sbt_sufijo_valor": "AA(OK)-AB(OK)\nCA00-",
+    })
+    assert resp.status_code == 400, resp.text
+    detail = resp.json().get("detail", "")
+    assert "salto" in detail.lower() or "control" in detail.lower()
+
+
+def test_sbt_con_carriage_return_devuelve_400(client):
+    """SBT con \\r → 400."""
+    _register(client, "maria_sbt_cr")
+    resp = client.post("/generate_maria", json={
+        "operation_id": "OP_CR",
+        "items": ITEMS_OK,
+        "sbt_sufijo_valor": "AA(OK)\r-AB(OK)-CA00-",
+    })
+    assert resp.status_code == 400, resp.text
+
+
+def test_sbt_excede_120_chars_devuelve_400(client):
+    """SBT con más de 120 caracteres → 400."""
+    _register(client, "maria_sbt_long")
+    resp = client.post("/generate_maria", json={
+        "operation_id": "OP_LONG",
+        "items": ITEMS_OK,
+        "sbt_sufijo_valor": "A" * 121,
+    })
+    assert resp.status_code == 400, resp.text
+    detail = resp.json().get("detail", "")
+    assert "120" in detail
+
+
+def test_sbt_endpoint_genera_seccion_sbt(client):
+    """Con SBT válido, el endpoint genera 200 y el TXT contiene [SBT]."""
+    _register(client, "maria_sbt_ok")
+    resp = client.post("/generate_maria", json={
+        "operation_id": "OP_SBT_OK",
+        "items": ITEMS_OK,
+        "sbt_sufijo_valor": "AA(CLIENTE)-AB(OTRO)-CA00-",
+    })
+    assert resp.status_code == 200, resp.text
+    content = resp.json()["content"]
+    assert "[SBT]" in content
+    assert "CSBTSVL=AA(CLIENTE)-AB(OTRO)-CA00-" in content
+
+
+def test_sbt_trim_aplicado(client):
+    """El backend aplica trim al SBT: espacios al final no rompen."""
+    _register(client, "maria_sbt_trim")
+    resp = client.post("/generate_maria", json={
+        "operation_id": "OP_TRIM",
+        "items": ITEMS_OK,
+        "sbt_sufijo_valor": "  AA(TRIM)-AB(TRIM)-CA00-  ",
+    })
+    assert resp.status_code == 200, resp.text
+    content = resp.json()["content"]
+    assert "CSBTSVL=AA(TRIM)-AB(TRIM)-CA00-" in content
+
+
+def test_sbt_request_frontend_contiene_campo():
+    """El contrato del endpoint incluye sbt_sufijo_valor en MariaRequest."""
+    from proyecto_maria.main import MariaRequest
+    req = MariaRequest(
+        operation_id="OP_FRONTEND",
+        items=ITEMS_OK,
+        sbt_sufijo_valor="AA(FRONT)-AB(FRONT)-CA00-",
+    )
+    assert req.sbt_sufijo_valor == "AA(FRONT)-AB(FRONT)-CA00-"
+
+
+def test_sbt_flujo_completo_desde_dashboard(client):
+    """Flujo completo: registrar, validar, generar con SBT → 200 + [SBT] en TXT."""
+    _register(client, "maria_e2e_sbt")
+    # Paso 1: validar items
+    val = client.post("/api/validate/smart", json={"items": ITEMS_OK})
+    assert val.status_code == 200
+    # Paso 2: generar con SBT
+    resp = client.post("/generate_maria", json={
+        "operation_id": "OP_E2E_SBT",
+        "items": ITEMS_OK,
+        "sbt_sufijo_valor": "AA(E2E)-AB(E2E)-CA00-",
+    })
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["success"] is True
+    assert "[SBT]" in data["content"]
+    assert "CSBTSVL=AA(E2E)-AB(E2E)-CA00-" in data["content"]
+    assert data["filename"].endswith(".TXT")
