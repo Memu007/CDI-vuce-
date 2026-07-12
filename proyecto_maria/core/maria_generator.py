@@ -459,19 +459,39 @@ def generate_maria_txt(operation_id: str, items: list,
     # Si varios items tienen el mismo grupo_id, se exportan como un solo [ART]:
     # NCM del primero, descripción concatenada, cantidad/valor/peso sumados.
 
-    # Separar items con grupo_id de los que no tienen
-    items_con_grupo = [it for it in items if it.get('grupo_id') is not None]
-    items_sin_grupo = [it for it in items if it.get('grupo_id') is None]
-
-    # Agrupar por grupo_id
+    # Indexar grupos y conservar la posición de su primera fila. Antes los
+    # grupos se agregaban al final del TXT, distinto de lo aprobado en pantalla.
     grupos_dict = {}
-    for it in items_con_grupo:
+    for it in items:
+        if it.get('grupo_id') is None:
+            continue
         gid = it['grupo_id']
         grupos_dict.setdefault(gid, []).append(it)
 
-    # Construir lista final de items a exportar
-    items_export = list(items_sin_grupo)
-    for gid, grupo_items in grupos_dict.items():
+    items_export = []
+    grupos_emitidos = set()
+    for item in items:
+        gid = item.get('grupo_id')
+        if gid is None:
+            items_export.append(item)
+            continue
+        if gid in grupos_emitidos:
+            continue
+        grupos_emitidos.add(gid)
+        grupo_items = grupos_dict[gid]
+
+        # Defensa en profundidad: el frontend lo valida, pero el endpoint de
+        # generación también puede llamarse directamente.
+        ncms = {str(it.get('ncm') or it.get('pieza') or '').replace('.', '').replace(' ', '').upper() for it in grupo_items}
+        origenes = {str(it.get('pais_origen') or it.get('origen') or '').strip().upper() for it in grupo_items}
+        unidades = {str(it.get('unidad') or it.get('unidad_medida') or it.get('um') or '').strip().upper() for it in grupo_items}
+        if len(ncms) != 1:
+            raise ValueError(f"Grupo {gid}: todos los ítems deben tener la misma NCM")
+        if len(origenes) != 1:
+            raise ValueError(f"Grupo {gid}: todos los ítems deben tener el mismo origen")
+        if len(unidades) != 1:
+            raise ValueError(f"Grupo {gid}: todos los ítems deben tener la misma unidad de medida")
+
         # Combinar los items del grupo en uno solo
         primero = grupo_items[0]
         combined = dict(primero)

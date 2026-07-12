@@ -366,12 +366,11 @@
     function applyBatchNcm() {
         const items = (CDI.state && CDI.state.items) || [];
         if (selectedRows.size === 0 || !items.length) return;
-        const raw = (batchNcm && batchNcm.value || '').replace(/\D/g, '');
-        if (raw.length !== 8 && raw.length !== 10) {
-            if (CDI.toast) CDI.toast('NCM inválido', 'Necesita 8 dígitos (o 10 con sufijo SIM)', 'error');
+        const formatted = normalizeBatchNcm(batchNcm && batchNcm.value);
+        if (!formatted) {
+            if (CDI.toast) CDI.toast('NCM inválido', 'Usá 8 dígitos o el SIM completo de 10/11 dígitos, con letra opcional.', 'error');
             return;
         }
-        const formatted = CDI.formatNcm ? CDI.formatNcm(raw) : raw;
         lastSnapshot = { items: snapshotItems(), ts: Date.now() };
         let touched = 0;
         selectedRows.forEach(i => {
@@ -655,46 +654,67 @@
         '</tr>';
     }
 
+    function normalizeBatchNcm(rawValue) {
+        const raw = String(rawValue || '').trim();
+        if (!raw) return '';
+        const formatted = CDI.formatNcm ? CDI.formatNcm(raw) : raw;
+        return isValidNcm(formatted) ? formatted : '';
+    }
+
+    function applyNcmAndGroup(items, indices, rawNcm) {
+        const selectedIndices = Array.from(indices || []).filter(i => items[i]);
+        if (selectedIndices.length < 2) {
+            return { ok: false, title: 'Seleccioná 2+ ítems', message: 'Marcá los productos que forman una sola unidad clasificatoria.' };
+        }
+        const selected = selectedIndices.map(i => items[i]);
+        const requestedNcm = normalizeBatchNcm(rawNcm);
+        if (String(rawNcm || '').trim() && !requestedNcm) {
+            return { ok: false, title: 'NCM inválido', message: 'Usá 8 dígitos o el SIM completo de 10/11 dígitos, con letra opcional.' };
+        }
+
+        const existingNcms = new Set(selected.map(it => normalizeBatchNcm(it.pieza)).filter(Boolean));
+        const targetNcm = requestedNcm || (existingNcms.size === 1 ? Array.from(existingNcms)[0] : '');
+        if (!targetNcm) {
+            return { ok: false, title: 'Indicá una NCM', message: 'Escribí una sola NCM arriba: se asignará a todos y se unirán en el mismo paso.' };
+        }
+
+        const origenes = new Set(selected.map(it => String(it.origen || '').trim().toUpperCase()));
+        if (origenes.size > 1) {
+            return { ok: false, title: 'Origen distinto', message: 'Para unirlos deben tener el mismo origen. Corregilo o usá “Origen para todos”.' };
+        }
+        const unidades = new Set(selected.map(it => String(it.unidad || '').trim().toUpperCase()));
+        if (unidades.size > 1) {
+            return { ok: false, title: 'Unidad distinta', message: 'No se pueden unir productos con unidades de medida diferentes.' };
+        }
+
+        const maxGrupo = items.reduce((mx, it) => Math.max(mx, Number(it.grupo_id) || 0), 0);
+        const nuevoGrupo = maxGrupo + 1;
+        selectedIndices.forEach(i => {
+            items[i].pieza = targetNcm;
+            items[i].grupo_id = nuevoGrupo;
+        });
+        return { ok: true, grupo_id: nuevoGrupo, count: selectedIndices.length, ncm: targetNcm };
+    }
+
+    // API pequeña y determinística para probar la acción masiva sin navegador.
+    CDI.ncmBatch = CDI.ncmBatch || {};
+    CDI.ncmBatch.applyNcmAndGroup = applyNcmAndGroup;
+
     function agruparSeleccionados() {
         const items = (CDI.state && CDI.state.items) || [];
-        if (selectedRows.size < 2) {
-            if (CDI.toast) CDI.toast('Seleccioná 2+ ítems', 'Marcá los checkboxes de los ítems a asociar.', 'info');
+        if (!items.length) return;
+        const before = snapshotItems();
+        const result = applyNcmAndGroup(items, selectedRows, batchNcm && batchNcm.value);
+        if (!result.ok) {
+            if (CDI.toast) CDI.toast(result.title, result.message, 'error');
             return;
         }
-        const selected = Array.from(selectedRows).map(i => items[i]).filter(Boolean);
-        if (selected.length < 2) return;
-
-        // Validar mismo NCM
-        const ncms = new Set(selected.map(it => (it.pieza || '').trim()).filter(Boolean));
-        if (ncms.size > 1) {
-            if (CDI.toast) CDI.toast('NCM distinto', 'Todos los ítems deben tener el mismo NCM para asociarlos.', 'error');
-            return;
-        }
-        if (ncms.size === 0) {
-            if (CDI.toast) CDI.toast('Falta NCM', 'Asigná NCM a todos los ítems antes de asociarlos.', 'error');
-            return;
-        }
-
-        // Validar mismo origen
-        const origenes = new Set(selected.map(it => (it.origen || '').trim()).filter(Boolean));
-        if (origenes.size > 1) {
-            if (CDI.toast) CDI.toast('Origen distinto', 'Todos los ítems deben tener el mismo origen para asociarlos.', 'error');
-            return;
-        }
-
-        // Generar grupo_id nuevo (máximo + 1)
-        const maxGrupo = items.reduce((mx, it) => Math.max(mx, it.grupo_id || 0), 0);
-        const nuevoGrupo = maxGrupo + 1;
-
-        // Asignar grupo_id a los seleccionados
-        selectedRows.forEach(i => {
-            if (items[i]) items[i].grupo_id = nuevoGrupo;
-        });
-
-        CDI.track && CDI.track('ncm_agrupar', { grupo_id: nuevoGrupo, items: selected.length });
-        if (CDI.toast) CDI.toast('Ítems asociados', selected.length + ' ítems → 1 unidad clasificatoria (grupo ' + nuevoGrupo + ')', 'success');
+        lastSnapshot = { items: before, ts: Date.now() };
+        CDI.track && CDI.track('ncm_agrupar', { grupo_id: result.grupo_id, items: result.count, ncm: result.ncm, batch: true });
+        scheduleUndoClear('NCM ' + result.ncm + ' · ' + result.count + ' ítems → 1 unidad clasificatoria');
 
         selectedRows.clear();
+        if (batchNcm) batchNcm.value = '';
         if (selectAllBox) selectAllBox.checked = false;
         render();
         updateBatchBar();

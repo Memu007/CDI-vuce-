@@ -421,8 +421,10 @@ def test_generate_maria_happy_path(client):
     assert "CSBTSVL=AA(DEMO)-AB(DEMO)-CA00-" in data["content"]
 
 
-def test_generate_maria_requires_auth(client):
+def test_generate_maria_requires_auth(client, monkeypatch):
     """Sin cookie → 401 (no se genera TXT para anónimos)."""
+    # Desactivar el usuario automático del runner para probar auth real.
+    monkeypatch.setenv("ENVIRONMENT", "development")
     client.cookies.clear()
     resp = client.post("/generate_maria", json={
         "operation_id": "OP1",
@@ -582,6 +584,51 @@ def test_agrupacion_2_items_mismo_grupo_genera_2_art():
 
     # Lámpara sola: MARTFOB = 5*10 = 50
     assert "MARTFOB=50.00" in txt, f"Falta MARTFOB=50.00 de lámpara sola"
+
+
+def test_factura_50_items_45_agrupados_genera_6_art():
+    """Caso real: 45 líneas bajo una NCM + 5 líneas separadas → 6 ART."""
+    agrupados = [
+        {
+            "pieza": "84713000900R", "descripcion": f"Componente agrupado {i}",
+            "cantidad": 1, "valor_unitario": 10, "peso_unitario": 1,
+            "origen": "CN", "unidad": "07", "grupo_id": 1,
+        }
+        for i in range(45)
+    ]
+    separados = [
+        {
+            "pieza": f"9405100{i}", "descripcion": f"Producto separado {i}",
+            "cantidad": 1, "valor_unitario": 20, "peso_unitario": 0.5,
+            "origen": "CN", "unidad": "07",
+        }
+        for i in range(5)
+    ]
+
+    txt = _gen("OP_45_MAS_5", agrupados + separados)
+
+    assert txt.count("[ART]") == 6
+    assert "QARTUNTDCL=45.00" in txt
+    assert "QARTKGRNET=45.000" in txt
+    assert "MARTFOB=450.00" in txt
+    assert txt.index("IESPNCE=8471.30.00.900R") < txt.index("IESPNCE=9405.10.00")
+
+
+@pytest.mark.parametrize("field,second_value,error_text", [
+    ("pieza", "94051000", "misma NCM"),
+    ("origen", "US", "mismo origen"),
+    ("unidad", "01", "misma unidad"),
+])
+def test_grupo_inconsistente_no_genera_txt(field, second_value, error_text):
+    items = [
+        {"pieza": "84713000", "descripcion": "Producto agrupado uno", "cantidad": 1,
+         "valor_unitario": 10, "peso_unitario": 1, "origen": "CN", "unidad": "07", "grupo_id": 1},
+        {"pieza": "84713000", "descripcion": "Producto agrupado dos", "cantidad": 1,
+         "valor_unitario": 10, "peso_unitario": 1, "origen": "CN", "unidad": "07", "grupo_id": 1},
+    ]
+    items[1][field] = second_value
+    with pytest.raises(ValueError, match=error_text):
+        _gen("OP_GRUPO_INVALIDO", items)
 
 
 # ---------- Hotfix SBT: validación de caracteres de control ----------

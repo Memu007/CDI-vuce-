@@ -1,0 +1,63 @@
+"""Contrato del flujo masivo NCM: una NCM + unir seleccionados."""
+import json
+import subprocess
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+NCM_JS = ROOT / "proyecto_maria" / "static" / "v2" / "screens" / "ncm.js"
+
+
+def _run_node(case_js: str) -> dict:
+    bootstrap = f"""
+global.window = {{ CDI: {{
+  registerScreen: function() {{}},
+  formatNcm: function(raw) {{
+    const s = String(raw || '').trim();
+    const m = s.match(/[A-Za-z]$/); const letter = m ? m[0].toUpperCase() : '';
+    const d = s.replace(/[^0-9]/g, '').slice(0, 11);
+    let base = d.length <= 4 ? d : d.length <= 6 ? d.slice(0,4)+'.'+d.slice(4) :
+      d.length <= 8 ? d.slice(0,4)+'.'+d.slice(4,6)+'.'+d.slice(6) :
+      d.slice(0,4)+'.'+d.slice(4,6)+'.'+d.slice(6,8)+'.'+d.slice(8);
+    return base + (letter ? ' ' + letter : '');
+  }}
+}} }};
+global.document = {{ getElementById: () => null, addEventListener: () => {{}}, querySelector: () => null }};
+global.requestAnimationFrame = (fn) => fn();
+require({json.dumps(str(NCM_JS))});
+{case_js}
+"""
+    completed = subprocess.run(
+        ["node", "-e", bootstrap], check=True, capture_output=True, text=True
+    )
+    return json.loads(completed.stdout)
+
+
+def test_seleccionar_45_asigna_una_ncm_y_un_grupo_en_un_paso():
+    result = _run_node("""
+const items = Array.from({length: 50}, (_, i) => ({
+  pieza: i < 45 ? '' : '9405.10.00', origen: 'CN', unidad: '07', grupo_id: null
+}));
+const selected = Array.from({length: 45}, (_, i) => i);
+const result = window.CDI.ncmBatch.applyNcmAndGroup(items, selected, '84713000900R');
+console.log(JSON.stringify({ result, items }));
+""")
+    assert result["result"]["ok"] is True
+    assert result["result"]["count"] == 45
+    assert len({item["grupo_id"] for item in result["items"][:45]}) == 1
+    assert all(item["pieza"] == "8471.30.00.900 R" for item in result["items"][:45])
+    assert all(item["grupo_id"] is None for item in result["items"][45:])
+
+
+def test_no_sobrescribe_origenes_distintos_al_unir():
+    result = _run_node("""
+const items = [
+  {pieza:'', origen:'CN', unidad:'07', grupo_id:null},
+  {pieza:'', origen:'US', unidad:'07', grupo_id:null}
+];
+const result = window.CDI.ncmBatch.applyNcmAndGroup(items, [0, 1], '84713000');
+console.log(JSON.stringify({ result, items }));
+""")
+    assert result["result"]["ok"] is False
+    assert result["result"]["title"] == "Origen distinto"
+    assert all(item["grupo_id"] is None for item in result["items"])
