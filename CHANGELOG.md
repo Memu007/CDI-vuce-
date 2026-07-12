@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-12 · fix: selección NCM → SIM sin error intermedio
+
+- **fix (UX NCM):** elegir una NCM ARCA de 8 dígitos ya no intenta asignarla ni muestra “Falta la posición SIM”; pasa inmediatamente a “Buscando posiciones SIM completas…” y sólo permite confirmar 11 dígitos + DC.
+- **seguridad:** si VUCE devuelve varias posiciones, el selector empieza vacío y exige una elección explícita; nunca toma la primera automáticamente. Si VUCE falla, muestra estado claro y botón Reintentar.
+- **fix (visual):** fuente `vuce_ci_oficial` se muestra como “Oficial”, el resultado seleccionado conserva contraste y los textos distinguen “continuar” de “asignar”.
+
 ## 2026-07-12 · feat: asistente NCM local con nomenclador oficial ARCA
 
 - **feat (NCM):** el asistente consulta primero historial confirmado de cliente/proveedor y después un catálogo local de **10.226 NCM de ARCA**; muestra como máximo 5 alternativas con fuente visible (`Historial confirmado`, `ARCA` o `IA orientativa`) y fecha de actualización.

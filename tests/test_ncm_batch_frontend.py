@@ -93,3 +93,20 @@ console.log(JSON.stringify({
         "simSinDc": False,
         "simCompleta": True,
     }
+
+
+def test_elegir_ncm_8_continua_a_vuce_sin_error_intermedio():
+    source = NCM_JS.read_text(encoding="utf-8")
+
+    assert "CDI.toast('Falta la posición SIM'" not in source
+    assert "scheduleVucePreview(clean.slice(0, 8), true)" in source
+    assert "Buscando posiciones SIM completas…" in source
+    assert "Elegir para ver posiciones SIM + DC" in source
+
+
+def test_varias_posiciones_sim_exigen_eleccion_explicita():
+    source = NCM_JS.read_text(encoding="utf-8")
+
+    assert "Elegí una de las ' + simOptions.length + ' posiciones SIM" in source
+    assert "hasSeveralSim ? ' disabled' : ''" in source
+    assert "button.disabled = !select.value" in source

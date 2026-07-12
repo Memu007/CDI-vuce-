@@ -129,7 +129,10 @@
         spotSearch.addEventListener('input', onSpotInput);
         spotSearch.addEventListener('keydown', onSpotKeydown);
         spotResults.addEventListener('click', onSpotResultClick);
-        if (spotVuce) spotVuce.addEventListener('click', onVuceSimClick);
+        if (spotVuce) {
+            spotVuce.addEventListener('click', onVuceSimClick);
+            spotVuce.addEventListener('change', onVuceSimChange);
+        }
 
         // Keyboard global: ESC cierra overlay
         document.addEventListener('keydown', (e) => {
@@ -1350,8 +1353,17 @@
         if (!isValidNcm(ncmFmt)) {
             spotSearch.value = ncmFmt;
             const clean = String(ncmFmt).replace(/\D/g, '');
-            if (clean.length >= 8) scheduleVucePreview(clean.slice(0, 8));
-            if (CDI.toast) CDI.toast('Falta la posición SIM', 'La sugerencia identifica la NCM de 8 dígitos. Elegí abajo la posición SIM completa con su DC.', 'info');
+            if (clean.length >= 8) {
+                // Una NCM ARCA de 8 dígitos es el primer paso, no un error ni
+                // un valor asignable. Continuamos enseguida con VUCE para que
+                // el despachante elija una posición SIM completa + DC.
+                scheduleVucePreview(clean.slice(0, 8), true);
+                CDI.track('ncm_sim_lookup_started', {
+                    row: spotActiveIdx,
+                    ncm: clean.slice(0, 8),
+                    source: sugg.source || 'unknown'
+                });
+            }
             return;
         }
         it.pieza = ncmFmt;
@@ -1518,13 +1530,17 @@
     function renderSpotItem(entry) {
         const s = entry.sug;
         const selected = entry.idx === spotSelectedSugIdx ? ' is-selected' : '';
-        const meta = s.source === 'historial'
+        const sourceMeta = s.source === 'historial'
             ? (s.count ? 'Historial · usado ' + s.count + ' vez' + (s.count > 1 ? 'es' : '') : 'Historial confirmado')
             : (s.source === 'proveedor'
                 ? 'Historial confirmado del proveedor'
                 : (s.source === 'arca'
                     ? 'ARCA' + (s.updated_at ? ' · actualizado ' + s.updated_at : '')
                     : (s.source === 'ia' ? 'IA orientativa' : (s.source === 'manual' ? 'Código ingresado' : ''))));
+        const actionMeta = isValidNcm(s.ncm)
+            ? 'Lista para asignar'
+            : 'Elegir para ver posiciones SIM + DC';
+        const meta = sourceMeta ? sourceMeta + ' · ' + actionMeta : actionMeta;
         return (
             '<button type="button" class="spotlight-item' + selected + '"' +
                 ' data-idx="' + entry.idx + '" role="option" tabindex="-1">' +
@@ -1538,14 +1554,14 @@
     }
 
     /* ---------- Preview VUCE en el spotlight ---------- */
-    function scheduleVucePreview(ncm) {
+    function scheduleVucePreview(ncm, immediate) {
         clearTimeout(vuceDebounce);
         if (vuceCache.has(ncm)) {
             renderVucePreview(vuceCache.get(ncm));
             return;
         }
         showVuceLoading(ncm);
-        vuceDebounce = setTimeout(() => fetchVucePreview(ncm), 320);
+        vuceDebounce = setTimeout(() => fetchVucePreview(ncm), immediate ? 0 : 320);
     }
 
     async function fetchVucePreview(ncm) {
@@ -1553,8 +1569,7 @@
         try {
             const res = await CDI.api('/api/ncm/' + encodeURIComponent(ncm) + '/completo');
             if (!res.ok) {
-                // 404 u otro: ocultamos sin ruido
-                if (vuceLastNcm === ncm) hideVucePreview();
+                if (vuceLastNcm === ncm) renderVuceUnavailable(ncm);
                 return;
             }
             const data = await res.json();
@@ -1569,7 +1584,7 @@
                 }));
             }
         } catch (_) {
-            if (vuceLastNcm === ncm) hideVucePreview();
+            if (vuceLastNcm === ncm) renderVuceUnavailable(ncm);
         }
     }
 
@@ -1584,7 +1599,7 @@
 
     function sourceChipMeta(src) {
         const s = String(src || '').toLowerCase();
-        if (s.startsWith('api:') || s === 'oficial' || s.indexOf('api_real') >= 0) {
+        if (s.startsWith('api:') || s === 'oficial' || s.indexOf('api_real') >= 0 || s.indexOf('oficial') >= 0) {
             return { label: 'Oficial', cls: 'is-official', title: 'Datos oficiales VUCE' };
         }
         if (s.startsWith('scrape:')) {
@@ -1602,12 +1617,33 @@
 
     function showVuceLoading(ncm) {
         if (!spotVuce) return;
+        const formatted = CDI.formatNcm ? CDI.formatNcm(ncm) : ncm;
         spotVuce.hidden = false;
         spotVuce.innerHTML =
             '<div class="spotlight-vuce-head">' +
                 '<span class="spotlight-vuce-tag">VUCE</span>' +
-                '<span class="spotlight-vuce-ncm">' + CDI.escapeHtml(ncm) + '</span>' +
+                '<span class="spotlight-vuce-ncm">NCM ' + CDI.escapeHtml(formatted) + '</span>' +
                 '<span class="spotlight-vuce-status">Consultando…</span>' +
+            '</div>' +
+            '<div class="spotlight-vuce-step">' +
+                '<strong>Buscando posiciones SIM completas…</strong>' +
+                '<span>Esperá un momento: vas a elegir 11 dígitos + la letra DC.</span>' +
+            '</div>';
+    }
+
+    function renderVuceUnavailable(ncm) {
+        if (!spotVuce) return;
+        const formatted = CDI.formatNcm ? CDI.formatNcm(ncm) : ncm;
+        spotVuce.hidden = false;
+        spotVuce.innerHTML =
+            '<div class="spotlight-vuce-head">' +
+                '<span class="spotlight-vuce-tag">VUCE</span>' +
+                '<span class="spotlight-vuce-ncm">NCM ' + CDI.escapeHtml(formatted) + '</span>' +
+            '</div>' +
+            '<div class="spotlight-vuce-step is-error">' +
+                '<strong>No pudimos traer las posiciones SIM.</strong>' +
+                '<span>La NCM de 8 dígitos todavía no fue asignada.</span>' +
+                '<button type="button" class="btn btn-secondary btn-sm" data-retry-vuce="' + CDI.escapeHtml(ncm) + '">Reintentar</button>' +
             '</div>';
     }
 
@@ -1644,23 +1680,33 @@
                 simOptions.push({ codigo_sim: code, descripcion: (pos && pos.descripcion) || '' });
             }
         });
+        const hasSeveralSim = simOptions.length > 1;
+        const promptOption = hasSeveralSim
+            ? '<option value="" selected>Elegí una de las ' + simOptions.length + ' posiciones SIM…</option>'
+            : '';
         const simChooser = simOptions.length ?
             '<div class="spotlight-sim-chooser">' +
-                '<label for="spotSimSelect">Posición SIM completa <span>11 dígitos + DC</span></label>' +
+                '<label for="spotSimSelect">' + (hasSeveralSim ? 'Elegí la posición SIM correcta' : 'Posición SIM disponible') + ' <span>11 dígitos + DC</span></label>' +
                 '<div class="spotlight-sim-controls">' +
-                    '<select id="spotSimSelect" class="input input-sm">' + simOptions.map(pos => {
+                    '<select id="spotSimSelect" class="input input-sm">' + promptOption + simOptions.map(pos => {
                         const formatted = CDI.formatNcm ? CDI.formatNcm(pos.codigo_sim) : pos.codigo_sim;
                         const optionText = formatted + (pos.descripcion ? ' — ' + pos.descripcion : '');
                         return '<option value="' + CDI.escapeHtml(pos.codigo_sim) + '">' + CDI.escapeHtml(optionText) + '</option>';
                     }).join('') + '</select>' +
-                    '<button type="button" class="btn btn-primary btn-sm" data-use-sim>Usar esta posición</button>' +
+                    '<button type="button" class="btn btn-primary btn-sm" data-use-sim' + (hasSeveralSim ? ' disabled' : '') + '>Usar esta posición</button>' +
                 '</div>' +
-            '</div>' : '';
+            '</div>' :
+            '<div class="spotlight-vuce-step is-error">' +
+                '<strong>VUCE no devolvió una posición SIM completa.</strong>' +
+                '<span>Probá otra NCM o reintentá la consulta.</span>' +
+                '<button type="button" class="btn btn-secondary btn-sm" data-retry-vuce="' + CDI.escapeHtml(ncm) + '">Reintentar</button>' +
+            '</div>';
+        const formattedBaseNcm = CDI.formatNcm ? CDI.formatNcm(ncm) : ncm;
         spotVuce.hidden = false;
         spotVuce.innerHTML =
             '<div class="spotlight-vuce-head">' +
                 '<span class="spotlight-vuce-tag">VUCE</span>' +
-                '<span class="spotlight-vuce-ncm">' + CDI.escapeHtml(data.codigo_sim ? data.codigo_sim : ncm) + '</span>' +
+                '<span class="spotlight-vuce-ncm">NCM ' + CDI.escapeHtml(formattedBaseNcm) + '</span>' +
                 '<span class="source-chip ' + meta.cls + '" title="' + CDI.escapeHtml(meta.title) + '">' + CDI.escapeHtml(meta.label) + '</span>' +
             '</div>' +
             '<div class="spotlight-vuce-desc">' + CDI.escapeHtml(desc) + '</div>' +
@@ -1671,12 +1717,28 @@
     }
 
     function onVuceSimClick(ev) {
+        const retry = ev.target && ev.target.closest && ev.target.closest('[data-retry-vuce]');
+        if (retry) {
+            const ncm = retry.getAttribute('data-retry-vuce');
+            if (ncm) {
+                vuceCache.delete(ncm);
+                scheduleVucePreview(ncm, true);
+            }
+            return;
+        }
         const button = ev.target && ev.target.closest && ev.target.closest('[data-use-sim]');
         if (!button) return;
         const select = spotVuce && spotVuce.querySelector('#spotSimSelect');
         const codigo = select && select.value;
         if (!codigo || !isValidNcm(codigo)) return;
         applyNcmToActiveRow({ ncm: codigo, desc: '', source: 'vuce_oficial' });
+    }
+
+    function onVuceSimChange(ev) {
+        const select = ev.target && ev.target.closest && ev.target.closest('#spotSimSelect');
+        if (!select || !spotVuce) return;
+        const button = spotVuce.querySelector('[data-use-sim]');
+        if (button) button.disabled = !select.value;
     }
 
     // Renderiza un aviso "Datos con latencia de N" si el backend indica que
