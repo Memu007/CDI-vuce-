@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-13 · fix: sacar buscador lexical ARCA como clasificador NCM
+
+- **fix (NCM):** regresión sistémica detectada — `ncm_catalog.search_term` usaba coincidencia de palabras contra el nomenclador ARCA (contexto legal de capítulos/partidas), devolviendo resultados irrelevantes: "TABLE" → tableros, "botella de acero inoxidable" → acero en lingotes, "silla de plástico" → juguetes, "cable USB" → radiodifusión, entre otros. No se agregaron excepciones por producto/capítulo.
+- **feat (NCM):** `POST /api/ncm/sugerir` prioriza memoria confirmada (cliente → proveedor → historial), luego código NCM exacto/parcial (lookup directo en ARCA), y solo sin memoria usa Gemini para interpretación semántica — cada candidato de Gemini se valida contra el catálogo ARCA (`_validate_ia_ncm_candidates`) antes de mostrarse; códigos inventados se descartan. Sin memoria, sin código y sin Gemini disponible: `[]` + mensaje "Sin coincidencia segura. Agregá material, uso o tipo de producto."
+- **test:** `tests/test_ncm_sugerir_catalog.py` reescrito (24 tests) cubriendo TABLE/acero inoxidable sin memoria, Gemini mockeado validado contra ARCA, descarte de código inventado, y detección de código vs. descripción comercial. Suite completa: 625 passed, 0 failed, cobertura 39.46%.
+
 ## 2026-07-13 · test: arreglar happy path MARIA con posición SIM completa
 
 - **test:** `test_generate_maria_txt_happy_path` usaba NCM de 8 dígitos (`84713000`), que la validación de posición SIM completa (commit `452364b`) ahora rechaza con 400. Actualizado a `84713000900R` (8 dígitos + 3 SIM + letra DC). Suite: 616 passed, 0 failures, cobertura 39.22%.

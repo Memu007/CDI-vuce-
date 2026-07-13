@@ -1512,6 +1512,10 @@
             }
             spotSuggestions = (data && data.sugerencias) || [];
             spotSelectedSugIdx = spotSuggestions.length ? 0 : -1;
+            if (!spotSuggestions.length && data && data.message) {
+                renderSpotEmpty(data.message);
+                return;
+            }
             renderSpotResults(isInitial);
         } catch (err) {
             console.error('[ncm.sugerir]', err);

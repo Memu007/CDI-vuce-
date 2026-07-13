@@ -1,4 +1,11 @@
-"""Contrato del asistente NCM local: catálogo ARCA antes que IA."""
+"""Contrato del asistente NCM: memoria confirmada > código exacto > IA validada.
+
+El buscador lexical de ARCA (search_term) ya NO se usa como clasificador
+comercial: el nomenclador acumula contexto legal de capítulos/partidas y
+compartir una palabra no significa pertenecer al producto correcto. Sin
+memoria confirmada ni código exacto, sólo Gemini (validado contra ARCA)
+puede proponer candidatos; si no hay Gemini disponible, se devuelve [].
+"""
 
 from __future__ import annotations
 
@@ -20,22 +27,70 @@ from proyecto_maria.database.models import Client
         "motor eléctrico",
         "remera de algodón",
         "tornillo de acero",
+        "TABLE",
+        "botella de acero inoxidable",
     ],
 )
-def test_sugerir_usa_catalogo_arca_local_para_busquedas_comerciales(
+def test_sugerir_sin_memoria_ni_gemini_no_usa_arca_lexical(
     client, auth_override, monkeypatch, query
 ):
-    """No requiere Gemini, internet ni historial para tener candidatos."""
+    """Sin historial, sin código exacto y sin Gemini: cero resultados y mensaje claro."""
     monkeypatch.setenv("NCM_GEMINI_FALLBACK", "false")
 
     response = client.post("/api/ncm/sugerir", json={"descripcion": query})
 
     assert response.status_code == 200, response.text
     data = response.json()
-    assert 1 <= len(data["sugerencias"]) <= 5
-    assert all(item["source"] == "arca" for item in data["sugerencias"])
-    assert data["catalogo"]["source"] == "ARCA"
-    assert data["catalogo"]["updated_at"] == "2026-07-12"
+    assert data["sugerencias"] == []
+    assert data["message"] == "Sin coincidencia segura. Agregá material, uso o tipo de producto."
+
+
+def test_sugerir_usa_gemini_validado_contra_arca_cuando_no_hay_memoria(
+    client, auth_override, monkeypatch
+):
+    """Gemini propone candidatos; sólo se devuelven los que existen en ARCA."""
+    monkeypatch.setenv("GEMINI_API_KEY", "fake-key-test")
+    monkeypatch.setenv("NCM_GEMINI_FALLBACK", "true")
+    monkeypatch.setattr(
+        main,
+        "_suggest_ncm_with_gemini",
+        lambda descripcion, limit=5: [
+            {"ncm": "84713011", "desc": "Notebook", "source": "ia", "updated_at": "2026-07-12"},
+        ],
+    )
+
+    response = client.post("/api/ncm/sugerir", json={"descripcion": "notebook gamer"})
+
+    assert response.status_code == 200, response.text
+    data = response.json()
+    assert len(data["sugerencias"]) == 1
+    assert data["sugerencias"][0]["ncm"] == "84713011"
+    assert data["sugerencias"][0]["source"] == "ia"
+
+
+def test_validate_ia_ncm_candidates_descarta_codigos_inexistentes():
+    """Un código inventado por la IA nunca llega al usuario."""
+    candidates = [
+        {"ncm": "99999999", "desc": "código inexistente"},
+        {"ncm": "84713011", "desc": "notebook"},
+    ]
+
+    validated = main._validate_ia_ncm_candidates(candidates, limit=5)
+
+    assert len(validated) == 1
+    assert validated[0]["ncm"] == "84713011"
+    assert validated[0]["source"] == "ia"
+
+
+@pytest.mark.parametrize("query,expected", [
+    ("TABLE", False),
+    ("84713011", True),
+    ("8471.30.11", True),
+    ("8471 30 11", True),
+    ("mesa de madera", False),
+])
+def test_looks_like_ncm_code_query(query, expected):
+    assert main._looks_like_ncm_code_query(query) is expected
 
 
 @pytest.mark.parametrize("query", ["8471.30.11", "84713011", "8471 30 11"])
