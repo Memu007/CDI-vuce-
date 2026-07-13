@@ -1,7 +1,7 @@
 # HANDOFF — CDI (vuce / CDI-app)
 
 > Estado vivo del proyecto. **La próxima AI o persona que entre lo lee primero.**
-> Última actualización: 2026-07-12 · Migración segura de clientes + asistente NCM local ARCA/SIM.
+> Última actualización: 2026-07-13 · Tour de ingreso V3 (4 pasos) + suite verde (616 passed, cobertura 39.22%).
 
 ---
 
