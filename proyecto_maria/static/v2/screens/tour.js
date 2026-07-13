@@ -1,15 +1,17 @@
 /* ============================================================
-   CDI v2 — Wizard de bienvenida (7 slides, MEJORADO v2)
+   CDI v2 — Tour de ingreso (4 pasos)
    ============================================================ */
 (function () {
     'use strict';
     const CDI = window.CDI = window.CDI || {};
 
-    const KEY = 'cdi_tour_v2';
+    const KEY = 'cdi_tour_v3';
+    const LEGACY_KEY = 'cdi_tour_v2';
     const FORCE_KEY = 'cdi_tour_forced_after_signup';
     const SIGNUP_SESSION_KEY = 'cdi_force_tour_after_signup';
-    const WELCOME_SLIDES_COUNT = 7;
+    const WELCOME_SLIDES_COUNT = 4;
     let welcomeCurrent = 0;
+    let welcomeReturnFocus = null;
 
     function getState() {
         try { return localStorage.getItem(KEY) || 'pending'; }
@@ -17,6 +19,16 @@
     }
     function setState(s) {
         try { localStorage.setItem(KEY, s); } catch (_) {}
+    }
+
+    function migrateLegacyState() {
+        try {
+            if (localStorage.getItem(KEY)) return;
+            const legacy = localStorage.getItem(LEGACY_KEY);
+            if (legacy === 'completed' || legacy === 'dismissed') {
+                localStorage.setItem(KEY, legacy);
+            }
+        } catch (_) {}
     }
 
     function hasSignupSignal() {
@@ -61,9 +73,14 @@
         let html = '';
         for (let i = 0; i < WELCOME_SLIDES_COUNT; i++) {
             const cls = i === welcomeCurrent ? 'dot is-active' : 'dot';
-            html += '<span class="' + cls + '"></span>';
+            const current = i === welcomeCurrent ? ' aria-current="step"' : '';
+            html += '<button type="button" class="' + cls + '" data-tour-slide="' + i + '"' +
+                current + ' aria-label="Ir al paso ' + (i + 1) + '"></button>';
         }
         host.innerHTML = html;
+        host.querySelectorAll('[data-tour-slide]').forEach((dot) => {
+            dot.addEventListener('click', () => showWelcomeSlide(Number(dot.dataset.tourSlide)));
+        });
     }
 
     function showWelcomeSlide(idx) {
@@ -114,12 +131,10 @@
             const modal = document.getElementById('tourWelcomeModal');
             if (modal) modal.style.setProperty('--c-accent', accent);
             const isFeatured = slide.classList.contains('is-featured');
-            const isNotes = slide.classList.contains('is-notes');
             const kicker = document.getElementById('tourWelcomeKicker');
             if (kicker) {
                 let label = `Paso ${idx + 1}`;
-                if (isFeatured) label = '⭐ Diferencial CDI';
-                else if (isNotes) label = '📌 Memoria del cliente';
+                if (isFeatured) label = 'Memoria CDI';
                 else if (idx === 0) label = 'Bienvenida';
                 else if (idx === WELCOME_SLIDES_COUNT - 1) label = 'Cierre';
                 kicker.textContent = label;
@@ -138,18 +153,28 @@
         closeOpenOverlays();
         const modal = document.getElementById('tourWelcomeModal');
         if (!modal) return;
+        welcomeReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         welcomeCurrent = 0;
         showWelcomeSlide(0);
         modal.hidden = false;
-        requestAnimationFrame(() => modal.classList.add('is-visible'));
+        requestAnimationFrame(() => {
+            modal.classList.add('is-visible');
+            const skip = document.getElementById('tourWelcomeSkip');
+            if (skip) skip.focus();
+        });
         track('tour_welcome_shown');
     }
 
-    function hideWelcome() {
+    function hideWelcome(restoreFocus) {
         const modal = document.getElementById('tourWelcomeModal');
         if (!modal) return;
         modal.classList.remove('is-visible');
-        setTimeout(() => { modal.hidden = true; }, 180);
+        setTimeout(() => {
+            modal.hidden = true;
+            if (restoreFocus && welcomeReturnFocus && document.contains(welcomeReturnFocus)) {
+                welcomeReturnFocus.focus();
+            }
+        }, 180);
     }
 
     function welcomeNext() {
@@ -165,16 +190,49 @@
     }
 
     function startFromWelcome() {
-        hideWelcome();
+        hideWelcome(false);
         setState('completed');
         track('tour_welcome_start_operation');
         try { CDI.goTo && CDI.goTo('upload'); } catch (_) {}
+        setTimeout(() => {
+            const upload = document.getElementById('uploadPickBtn');
+            if (upload) upload.focus();
+        }, 240);
     }
 
     function skipWelcome() {
-        hideWelcome();
+        hideWelcome(true);
         setState('dismissed');
         track('tour_welcome_skipped');
+    }
+
+    function onWelcomeKeydown(event) {
+        const modal = document.getElementById('tourWelcomeModal');
+        if (!modal || modal.hidden) return;
+        if (event.key === 'Tab') {
+            const focusable = Array.from(modal.querySelectorAll(
+                'button:not([hidden]):not([disabled]), [href], input:not([disabled]), [tabindex]:not([tabindex="-1"])'
+            )).filter((el) => el.offsetParent !== null);
+            if (!focusable.length) return;
+            const first = focusable[0];
+            const last = focusable[focusable.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault();
+                last.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault();
+                first.focus();
+            }
+        } else if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            welcomeNext();
+        } else if (event.key === 'ArrowLeft') {
+            event.preventDefault();
+            welcomePrev();
+        } else if (event.key === 'Escape') {
+            event.preventDefault();
+            skipWelcome();
+        }
     }
 
     // Demo user: siempre dispara el tour una vez por sesión (para testing/demo).
@@ -198,6 +256,7 @@
     }
 
     async function init() {
+        migrateLegacyState();
         // Demo user: forzar tour una vez por sesión (override de cualquier estado previo)
         if (await checkDemoForceTour()) {
             setState('pending'); // reset por si estaba 'completed' o 'dismissed'
@@ -231,6 +290,7 @@
         if (btnWelcomeNext) btnWelcomeNext.addEventListener('click', welcomeNext);
         if (btnWelcomePrev) btnWelcomePrev.addEventListener('click', welcomePrev);
         if (btnWelcomeSkip) btnWelcomeSkip.addEventListener('click', skipWelcome);
+        document.addEventListener('keydown', onWelcomeKeydown);
     }
 
     CDI.openTour = function () {

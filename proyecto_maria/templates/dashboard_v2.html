@@ -71,17 +71,6 @@
                 <span class="fake-banner-text">Algunos NCMs usan <strong>datos de muestra</strong> porque la fuente oficial no respondi&oacute;. Revis&aacute; los valores antes de generar el TXT.</span>
                 <button type="button" class="fake-banner-close" id="fakeSourceBannerClose" aria-label="Cerrar aviso">&times;</button>
             </div>
-            <aside class="welcome-card" id="welcomeCard" role="region" aria-label="Bienvenida" hidden>
-                <button type="button" class="welcome-close" id="welcomeClose" aria-label="Cerrar bienvenida">×</button>
-                <h2 class="welcome-title">Bienvenido a CDI · Despachos</h2>
-                <p class="welcome-sub">3 pasos para tu primera operación. Después esto desaparece.</p>
-                <ol class="welcome-steps">
-                    <li><strong>Subí el PDF de la factura</strong> del proveedor (acá abajo, arrastrar o clickear).</li>
-                    <li><strong>Revisá los items</strong>: el sistema sugiere NCM, vos confirmás o corregís.</li>
-                    <li><strong>Generá el TXT</strong> y cargalo en tu Kit SIM 7.0 (ARCA / Malvina).</li>
-                </ol>
-                <button type="button" class="btn btn-primary welcome-cta" id="welcomeCta">Listo, lo tengo</button>
-            </aside>
             <nav class="progress" aria-label="Progreso">
                 <div class="progress-step" data-step="upload"><span class="num">1</span> Subir</div>
                 <span class="progress-line"></span>
@@ -104,7 +93,7 @@
                         </svg>
                     </div>
                     <h1 class="title-1 upload-title">Nueva operación</h1>
-                    <p class="subtitle upload-subtitle">Cargá el PDF del proveedor o una planilla Excel para generar el archivo MARIA.</p>
+                    <p class="subtitle upload-subtitle">Cargá el PDF del proveedor o una planilla Excel. CDI prepara los datos para que los revises antes de generar MARIA.</p>
 
                     <div class="upload-format-toggle" role="tablist" aria-label="Formato de archivo">
                         <button type="button" class="upload-format-opt is-active" role="tab" aria-selected="true" data-format="pdf" id="uploadFormatPdf">PDF</button>
@@ -1017,7 +1006,7 @@
 
 
 
-    <!-- Tour de bienvenida: wizard con slides explicativas (MEJORADO v2) -->
+    <!-- Tour de ingreso: un único recorrido, corto y fiel al flujo real. -->
     <div class="tour-welcome" id="tourWelcomeModal" hidden role="dialog" aria-modal="true" aria-labelledby="tourSlideTitle">
         <div class="tour-welcome-card">
             <!-- Barra de progreso superior -->
@@ -1027,10 +1016,10 @@
             <div class="tour-welcome-head">
                 <div class="tour-welcome-head-row">
                     <span class="tour-welcome-kicker" id="tourWelcomeKicker">Bienvenida</span>
-                    <button type="button" class="tour-welcome-skip-btn" id="tourWelcomeSkip" aria-label="Saltar tour">Saltar ×</button>
+                    <button type="button" class="tour-welcome-skip-btn" id="tourWelcomeSkip">Saltar por ahora</button>
                 </div>
-                <p class="tour-welcome-intro">De la factura del proveedor al archivo MARIA.TXT en minutos.</p>
-                <div class="tour-welcome-dots" id="tourWelcomeDots" aria-hidden="true"></div>
+                <p class="tour-welcome-intro">De la factura al MARIA.TXT, con control del despachante en cada paso.</p>
+                <div class="tour-welcome-dots" id="tourWelcomeDots" aria-label="Pasos del tour"></div>
             </div>
             <div class="tour-welcome-slides" id="tourWelcomeSlides">
                 <div class="tour-welcome-track" id="tourWelcomeTrack">
@@ -1039,73 +1028,53 @@
                             <svg class="tour-welcome-icon" viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 2h9l5 5v15a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M14 2v6h6"/><path d="M9 13h6M9 17h4"/></svg>
                         </div>
                         <span class="tour-welcome-step-num">1</span>
-                        <h2 id="tourSlideTitle">Subí la factura del proveedor</h2>
-                        <p>PDF o Excel. Nuestra IA lee productos, cantidades, precios y NCM. Vos no tipeás nada, vos solo revisás.</p>
+                        <h2 id="tourSlideTitle">Subí la factura</h2>
+                        <p>Con un PDF o Excel, CDI prepara los datos visibles de la factura, proveedor, importador y productos. Lo que no encuentre queda marcado para revisar.</p>
+                        <div class="tour-welcome-callout tour-welcome-callout-info">
+                            <div class="tour-welcome-callout-label">Primero prepara</div>
+                            <div class="tour-welcome-callout-text">Subir todavía no confirma ni oficializa datos. Algunos pesos pueden venir estimados: revisalos.</div>
+                        </div>
                     </article>
                     <article class="tour-welcome-slide" data-slide="1" data-accent="#3b82f6">
                         <div class="tour-welcome-icon-wrap">
                             <svg class="tour-welcome-icon" viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
                         </div>
                         <span class="tour-welcome-step-num">2</span>
-                        <h2>Revisá y corregí en una tabla</h2>
-                        <p>Todo lo que la IA detectó queda en una grilla editable. Cambiás lo que esté mal, agregás lo que falte y avanzás.</p>
+                        <h2>Revisá lo importante</h2>
+                        <p>Confirmá carátula, cantidades, valores, origen y peso. Para cada producto elegí la posición SIM completa: NCM 8 + SIM 3 + letra DC.</p>
+                        <div class="tour-welcome-callout tour-welcome-callout-info">
+                            <div class="tour-welcome-callout-label">Vos confirmás</div>
+                            <div class="tour-welcome-callout-text">CDI puede sugerir, pero nunca oficializa una clasificación por su cuenta.</div>
+                        </div>
                     </article>
-                    <article class="tour-welcome-slide" data-slide="2" data-accent="#8b5cf6">
+                    <article class="tour-welcome-slide is-featured" data-slide="2" data-accent="#8b5cf6">
                         <div class="tour-welcome-icon-wrap">
                             <svg class="tour-welcome-icon" viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
                         </div>
                         <span class="tour-welcome-step-num">3</span>
-                        <h2>El cliente aparece solo</h2>
-                        <p>Si el nombre del importador ya está en tu base, CDI lo reconoce y trae su historial. Si no existe, lo creás en 2 clics sin salir del flujo. Funciona con o sin CUIT (importadores extranjeros).</p>
-                    </article>
-                    <article class="tour-welcome-slide is-featured" data-slide="3" data-accent="#f97316">
-                        <div class="tour-welcome-icon-wrap is-pulse">
-                            <svg class="tour-welcome-icon" viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.6"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 1v3M15 1v3M9 20v3M15 20v3M20 9h3M20 14h3M1 9h3M1 14h3"/></svg>
-                        </div>
-                        <span class="tour-welcome-step-num">4</span>
-                        <h2>Tu catálogo se aprende solo</h2>
-                        <p>Cada producto que corregís se guarda automáticamente en el catálogo del cliente. La próxima factura con ese producto se autocompleta solo: NCM, origen y peso unitario.</p>
+                        <h2>CDI recuerda lo confirmado</h2>
+                        <p>Si asignás un cliente, CDI reutiliza sus datos. Al generar el TXT guarda la operación y sus valores y pesos corregidos; además recuerda los NCM y orígenes confirmados.</p>
                         <div class="tour-welcome-callout">
-                            <div class="tour-welcome-callout-label"><span>⭐</span> Lo que nos diferencia</div>
-                            <div class="tour-welcome-callout-text">Otros sistemas te hacen tipear lo mismo cada vez. CDI no.</div>
+                            <div class="tour-welcome-callout-label">Mejora con el uso</div>
+                            <div class="tour-welcome-callout-text">La memoria se alimenta con decisiones confirmadas, no con datos sin revisar.</div>
                         </div>
                     </article>
-                    <article class="tour-welcome-slide is-notes" data-slide="4" data-accent="#ec4899">
-                        <div class="tour-welcome-icon-wrap">
-                            <svg class="tour-welcome-icon" viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>
-                        </div>
-                        <span class="tour-welcome-step-num">5</span>
-                        <h2>Dejá notas por cliente</h2>
-                        <p>Anotá lo que necesites recordar para la próxima: "este proveedor exige declaración jurada", "falta certificado ANMAT", "pedir packing list". Las notas se reabren solas cuando subís otra factura del mismo cliente.</p>
-                        <div class="tour-welcome-callout tour-welcome-callout-notes">
-                            <div class="tour-welcome-callout-label"><span>📌</span> Tu memoria institucional</div>
-                            <div class="tour-welcome-callout-text">No dependés de tu memoria ni de un cuaderno. CDI recuerda por vos.</div>
-                        </div>
-                    </article>
-                    <article class="tour-welcome-slide" data-slide="5" data-accent="#0ea5e9">
-                        <div class="tour-welcome-icon-wrap">
-                            <svg class="tour-welcome-icon" viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="8" r="4"/><path d="M4 21v-1a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v1"/></svg>
-                        </div>
-                        <span class="tour-welcome-step-num">6</span>
-                        <h2>Configurá tu perfil una vez</h2>
-                        <p>Arriba a la derecha está tu perfil. Ahí cargás tu CUIT de despachante y tus datos habituales (aduana, puerto, tipo de destinación). Se aplican solos en cada operación nueva — no tipeás lo mismo cada vez.</p>
-                    </article>
-                    <article class="tour-welcome-slide" data-slide="6" data-accent="#0f172a">
+                    <article class="tour-welcome-slide" data-slide="3" data-accent="#0f172a">
                         <div class="tour-welcome-icon-wrap">
                             <svg class="tour-welcome-icon" viewBox="0 0 24 24" width="56" height="56" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         </div>
-                        <span class="tour-welcome-step-num">7</span>
-                        <h2>Descargá el MARIA.TXT</h2>
-                        <p>Apretás un botón y tenés el archivo listo para pegar en tu Kit SIM 7.0 (ARCA · Malvina). Sin copiar ni pegar a mano. Sin errores.</p>
+                        <span class="tour-welcome-step-num">4</span>
+                        <h2>Validá y descargá</h2>
+                        <p>CDI separa errores de avisos. Completá el SBT, corregí lo necesario, generá MARIA.TXT y validalo en Kit MARIA antes de oficializar.</p>
                     </article>
                 </div>
             </div>
             <div class="tour-welcome-actions">
                 <button type="button" class="btn btn-ghost btn-sm" id="tourWelcomePrev" hidden>← Anterior</button>
-                <span class="tour-welcome-counter" id="tourWelcomeCounter">1 / 7</span>
+                <span class="tour-welcome-counter" id="tourWelcomeCounter">1 / 4</span>
                 <span class="tour-welcome-actions-spacer"></span>
                 <button type="button" class="btn btn-primary btn-sm" id="tourWelcomeNext">Siguiente →</button>
-                <button type="button" class="btn btn-primary btn-sm tour-welcome-btn-start" id="tourWelcomeStart" hidden>▶ Empezar a operar</button>
+                <button type="button" class="btn btn-primary btn-sm tour-welcome-btn-start" id="tourWelcomeStart" hidden>Subir mi primera factura</button>
             </div>
         </div>
     </div>

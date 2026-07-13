@@ -965,7 +965,7 @@
                 CDI.hint('banner_autofill', {
                     target: div,
                     title: '✨ Auto-catálogo en acción',
-                    text: 'Reconocimos al proveedor de este PDF y te sugerimos los NCM que ya usó antes. Revisalos: vos confirmás, la AI propone.',
+                    text: 'Reconocimos al proveedor de este PDF y te sugerimos los NCM que ya usó antes. Revisalos: CDI propone y vos confirmás.',
                     cta: 'Entendido',
                     ttl: 12000,
                 });

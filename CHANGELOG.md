@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-13 · feat: tour de ingreso corto y fiel al flujo real
+
+- **feat (onboarding):** se reemplazaron dos bienvenidas superpuestas por un único tour de 4 pasos: subir, revisar, recordar lo confirmado y generar MARIA.TXT.
+- **fix (confianza):** el recorrido ya no promete que subir guarda la operación, que la IA clasifica NCM ni que el TXT sale “sin errores”; aclara SIM 11 + DC, pesos a revisar, SBT y validación final del despachante.
+- **a11y/UX:** navegación por botones, flechas y Escape, foco en “Seleccionar archivo” al terminar, estado versionado y modal desplazable en pantallas chicas.
+
 ## 2026-07-12 · feat: migración segura “Traer mis clientes”
 
 - **feat (clientes):** nuevo flujo CSV/XLS/XLSX multihoja con análisis previo, confirmación explícita, deduplicación por CUIT válido, completar-solo-vacíos y opción de deshacer.
