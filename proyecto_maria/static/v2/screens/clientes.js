@@ -157,9 +157,11 @@
         const emptyCreateBtn = $('cxEmptyCreateBtn');
         if (emptyCreateBtn) emptyCreateBtn.addEventListener('click', () => openForm());
 
-        // Importador clientes
+        // Migracion desde el archivo que el despachante ya usa
         const importBtn = $('cxImportBtn');
         if (importBtn) importBtn.addEventListener('click', openImportModal);
+        const emptyImportBtn = $('cxEmptyImportBtn');
+        if (emptyImportBtn) emptyImportBtn.addEventListener('click', openImportModal);
         initImportModal();
 
         // Tabs
@@ -250,25 +252,51 @@
         entered = false;
         // Cerrar modal si quedo abierto
         closeForm();
+        closeImportModal();
     }
 
     /* ==========================================================
-       Importador clientes (CSV/Excel)
+       Traer mis clientes (analizar -> vista previa -> confirmar)
        ========================================================== */
     let importInitialized = false;
     let importModalEl, importInput, importDropzone, importPickBtn, importFilenameEl;
-    let importProgress, importResult, importCancel;
+    let importProgress, importProgressTitle, importResult, importCancel, importClose;
+    let importUploadStep, importPreviewStep, importDoneStep, importConfirm, importTryInvoice;
+    let importPreviewFilename, importPreviewSummary, importPreviewDoubts, importPreviewDoubtsList, importPreviewOmitted;
+    let importDoneSummary, importDoneMessage, importUndoBtn, importChooseAnother;
+    let importBatchId = null;
+    let importSelectedFilename = '';
+    let importBusy = false;
+    let importRequestSeq = 0;
+    let importPreviousFocus = null;
+    let importCloseTimer = null;
 
     function initImportModal() {
         if (importInitialized) return;
-        importModalEl   = $('importClientesModal');
-        importInput     = $('importFileInput');
-        importDropzone  = $('importDropzone');
-        importPickBtn   = $('importPickBtn');
+        importModalEl = $('importClientesModal');
+        importInput = $('importFileInput');
+        importDropzone = $('importDropzone');
+        importPickBtn = $('importPickBtn');
         importFilenameEl = $('importFilename');
-        importProgress  = $('importProgress');
-        importResult    = $('importResult');
-        importCancel    = $('importCancel');
+        importProgress = $('importProgress');
+        importProgressTitle = $('importProgressTitle');
+        importResult = $('importResult');
+        importCancel = $('importCancel');
+        importClose = $('importClose');
+        importUploadStep = $('importUploadStep');
+        importPreviewStep = $('importPreviewStep');
+        importDoneStep = $('importDoneStep');
+        importConfirm = $('importConfirm');
+        importTryInvoice = $('importTryInvoice');
+        importPreviewFilename = $('importPreviewFilename');
+        importPreviewSummary = $('importPreviewSummary');
+        importPreviewDoubts = $('importPreviewDoubts');
+        importPreviewDoubtsList = $('importPreviewDoubtsList');
+        importPreviewOmitted = $('importPreviewOmitted');
+        importDoneSummary = $('importDoneSummary');
+        importDoneMessage = $('importDoneMessage');
+        importUndoBtn = $('importUndoBtn');
+        importChooseAnother = $('importChooseAnother');
         if (!importModalEl) return;
 
         if (importPickBtn) importPickBtn.addEventListener('click', () => importInput.click());
@@ -276,6 +304,12 @@
             importDropzone.addEventListener('click', (e) => {
                 if (e.target === importPickBtn) return;
                 importInput.click();
+            });
+            importDropzone.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    importInput.click();
+                }
             });
             ['dragenter', 'dragover'].forEach(evt =>
                 importDropzone.addEventListener(evt, (e) => {
@@ -302,6 +336,18 @@
             });
         }
         if (importCancel) importCancel.addEventListener('click', closeImportModal);
+        if (importClose) importClose.addEventListener('click', closeImportModal);
+        if (importConfirm) importConfirm.addEventListener('click', confirmImport);
+        if (importUndoBtn) importUndoBtn.addEventListener('click', undoImport);
+        if (importChooseAnother) importChooseAnother.addEventListener('click', resetImportFlow);
+        if (importTryInvoice) importTryInvoice.addEventListener('click', () => {
+            closeImportModal();
+            CDI.goTo && CDI.goTo('upload');
+            setTimeout(() => {
+                const pdfOption = $('uploadFormatPdf');
+                if (pdfOption) pdfOption.click();
+            }, 0);
+        });
         importModalEl.addEventListener('click', (e) => {
             if (e.target === importModalEl) closeImportModal();
         });
@@ -311,69 +357,314 @@
     function openImportModal() {
         initImportModal();
         if (!importModalEl) return;
-        if (importResult) { importResult.hidden = true; importResult.innerHTML = ''; importResult.classList.remove('is-error'); }
-        if (importFilenameEl) importFilenameEl.textContent = 'CSV · XLSX · XLS';
+        if (importCloseTimer) { clearTimeout(importCloseTimer); importCloseTimer = null; }
+        importPreviousFocus = document.activeElement;
+        resetImportFlow();
         importModalEl.hidden = false;
         requestAnimationFrame(() => importModalEl.classList.add('is-visible'));
-        CDI.track && CDI.track('import_clientes_open');
+        setTimeout(() => { if (importPickBtn) importPickBtn.focus(); }, 60);
+        CDI.track && CDI.track('migration_open');
     }
 
     function closeImportModal() {
-        if (!importModalEl) return;
+        if (!importModalEl || importModalEl.hidden) return;
+        importRequestSeq += 1;
         importModalEl.classList.remove('is-visible');
-        setTimeout(() => { importModalEl.hidden = true; }, 220);
+        importCloseTimer = setTimeout(() => {
+            importModalEl.hidden = true;
+            importCloseTimer = null;
+        }, 220);
+        if (entered && importPreviousFocus && typeof importPreviousFocus.focus === 'function') importPreviousFocus.focus();
+    }
+
+    function resetImportFlow() {
+        importBatchId = null;
+        importSelectedFilename = '';
+        setImportBusy(false);
+        if (importInput) importInput.value = '';
+        if (importFilenameEl) importFilenameEl.textContent = 'CSV · XLSX · XLS';
+        if (importUploadStep) importUploadStep.hidden = false;
+        if (importPreviewStep) importPreviewStep.hidden = true;
+        if (importDoneStep) importDoneStep.hidden = true;
+        if (importProgress) importProgress.hidden = true;
+        if (importConfirm) importConfirm.hidden = true;
+        if (importTryInvoice) importTryInvoice.hidden = true;
+        if (importCancel) importCancel.textContent = 'Cerrar';
+        clearImportError();
+        if (importPickBtn && importModalEl && !importModalEl.hidden) importPickBtn.focus();
+    }
+
+    function setImportBusy(flag, title) {
+        importBusy = Boolean(flag);
+        if (importProgress) importProgress.hidden = !importBusy;
+        if (importProgressTitle && title) importProgressTitle.textContent = title;
+        if (importDropzone) importDropzone.classList.toggle('is-disabled', importBusy);
+        if (importConfirm) importConfirm.disabled = importBusy;
+        if (importUndoBtn) importUndoBtn.disabled = importBusy;
+    }
+
+    function clearImportError() {
+        if (!importResult) return;
+        importResult.hidden = true;
+        importResult.textContent = '';
+        importResult.classList.remove('is-error');
     }
 
     async function handleImportFile(file) {
         if (!file) return;
         const name = file.name || '';
-        const ok = /\.(csv|xlsx|xls)$/i.test(name);
-        if (!ok) {
+        if (!/\.(csv|xlsx|xls)$/i.test(name)) {
             showImportError('Formato no soportado. Usá CSV, XLSX o XLS.');
             return;
         }
+        clearImportError();
+        importSelectedFilename = name;
         if (importFilenameEl) importFilenameEl.textContent = name;
-        if (importProgress) importProgress.hidden = false;
-        if (importResult) { importResult.hidden = true; importResult.innerHTML = ''; importResult.classList.remove('is-error'); }
+        if (importUploadStep) importUploadStep.hidden = true;
+        setImportBusy(true, 'Estamos leyendo tu archivo…');
 
         const form = new FormData();
         form.append('file', file);
-
+        const requestSeq = ++importRequestSeq;
         try {
-            const res = await CDI.api('/api/clientes/import', { method: 'POST', body: form });
+            const res = await CDI.api('/api/migrations/analyze', { method: 'POST', body: form });
             const data = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(data.detail || ('Error ' + res.status));
-            renderImportResult(data);
-            // Refrescar lista
-            refresh();
-            CDI.track && CDI.track('import_clientes_done', {
-                creados: data.creados, duplicados: data.duplicados, productos: data.productos_aprendidos
+            if (requestSeq !== importRequestSeq) return;
+            if (!data.batch_id || !data.preview) throw new Error('No pudimos preparar la vista previa. Probá otra vez.');
+            importBatchId = data.batch_id;
+            renderImportPreview(data.preview);
+            CDI.track && CDI.track('migration_preview_ready', {
+                conflicts: collectionCount(data.preview.conflicts),
+                omitted: collectionCount(data.preview.omitted)
             });
         } catch (err) {
-            showImportError(err.message || 'No se pudo importar');
+            if (requestSeq !== importRequestSeq) return;
+            if (importUploadStep) importUploadStep.hidden = false;
+            showImportError(err.message || 'No pudimos analizar el archivo. Probá otra vez.');
         } finally {
-            if (importProgress) importProgress.hidden = true;
+            if (requestSeq === importRequestSeq) {
+                setImportBusy(false);
+                if (importPreviewStep && !importPreviewStep.hidden && importConfirm) importConfirm.focus();
+            }
         }
     }
 
-    function renderImportResult(d) {
-        if (!importResult) return;
-        const errCount = (d.errores || []).length;
-        importResult.innerHTML =
-            '<div class="import-result-stat"><span>Clientes creados</span><strong>' + (d.creados || 0) + '</strong></div>' +
-            '<div class="import-result-stat"><span>Duplicados saltados</span><strong>' + (d.duplicados || 0) + '</strong></div>' +
-            '<div class="import-result-stat"><span>Productos aprendidos</span><strong>' + (d.productos_aprendidos || 0) + '</strong></div>' +
-            '<div class="import-result-stat"><span>Filas con error</span><strong>' + errCount + '</strong></div>' +
-            (errCount ? '<div class="import-result-error">Primer error: fila ' +
-                d.errores[0].fila + ' — ' + d.errores[0].error + '</div>' : '');
-        importResult.hidden = false;
-        importResult.classList.remove('is-error');
-        if (CDI.toast) CDI.toast.success('Importación completa', (d.creados || 0) + ' clientes creados');
+    function collectionCount(value) {
+        if (Array.isArray(value)) return value.length;
+        if (typeof value === 'number' && Number.isFinite(value)) return value;
+        if (!value || typeof value !== 'object') return 0;
+        return Object.keys(value).reduce((sum, key) => sum + collectionCount(value[key]), 0);
+    }
+
+    function labelForCounter(key) {
+        const normalized = String(key || '').toLowerCase();
+        const labels = {
+            clients: 'Clientes', clientes: 'Clientes', suppliers: 'Proveedores', proveedores: 'Proveedores',
+            products: 'Productos', productos: 'Productos', items: 'Productos', operations: 'Operaciones', operaciones: 'Operaciones',
+            rows: 'Filas leídas', filas: 'Filas leídas', created: 'Nuevos', creados: 'Nuevos', new: 'Nuevos', nuevos: 'Nuevos',
+            updated: 'Completados', actualizados: 'Completados', existing: 'Ya estaban', existentes: 'Ya estaban', matches: 'Ya estaban',
+            conflicts: 'Dudas', conflictos: 'Dudas', omitted: 'No se importan', omitidos: 'No se importan'
+        };
+        return labels[normalized] || String(key || '').replace(/_/g, ' ').replace(/^./, c => c.toUpperCase());
+    }
+
+    function numericCounters(source) {
+        if (!source || typeof source !== 'object' || Array.isArray(source)) return [];
+        return Object.keys(source).reduce((acc, key) => {
+            const value = source[key];
+            if (typeof value === 'number' && Number.isFinite(value)) acc.push([labelForCounter(key), value]);
+            return acc;
+        }, []);
+    }
+
+    function appendSummary(container, counters) {
+        if (!container) return;
+        container.replaceChildren();
+        counters.slice(0, 8).forEach(([label, value]) => {
+            const card = document.createElement('div');
+            card.className = 'migration-summary-card';
+            const strong = document.createElement('strong');
+            strong.textContent = String(value);
+            const span = document.createElement('span');
+            span.textContent = label;
+            card.append(strong, span);
+            container.appendChild(card);
+        });
+    }
+
+    function getPreviewCounters(preview) {
+        const summary = (preview && (preview.summary || preview.totals)) || {};
+        const value = (primary, legacy, collection) => {
+            if (typeof summary[primary] === 'number') return summary[primary];
+            if (typeof summary[legacy] === 'number') return summary[legacy];
+            return collectionCount(collection);
+        };
+        return [
+            ['Nuevos', value('new_clients', 'new', preview && (preview.new_clients || preview.new))],
+            ['Ya estaban', value('existing_clients', 'existing', preview && (preview.existing_clients || preview.existing))],
+            ['Dudas', value('conflicts', 'conflicts', preview && preview.conflicts)],
+            ['No se importan', value('omitted', 'omitted', preview && preview.omitted)]
+        ];
+    }
+
+    function doubtText(item, index) {
+        if (typeof item === 'string') return item;
+        item = item && typeof item === 'object' ? item : {};
+        const place = item.row || item.fila || item.sheet || item.hoja;
+        const subject = item.name || item.nombre || item.value || item.valor || item.field || item.campo;
+        const rawReason = item.reason || item.razon || item.message || item.mensaje || item.detail || item.detalle;
+        const reasonLabels = {
+            existing_data_differs: 'hay datos distintos y no los vamos a reemplazar',
+            conflicting_upload_rows: 'el mismo CUIT aparece con datos diferentes',
+            multiple_existing_clients: 'hay más de un cliente existente con ese CUIT',
+            invalid_fields: 'hay datos con formato inválido',
+            missing_cuit_column: 'no encontramos una columna de CUIT',
+            missing_or_invalid_cuit: 'falta un CUIT argentino válido'
+        };
+        const reason = reasonLabels[String(rawReason || '')] || rawReason;
+        const parts = [];
+        if (place) parts.push('Fila ' + place);
+        if (subject) parts.push(String(subject));
+        if (reason) parts.push(String(reason));
+        return parts.length ? parts.join(' · ') : 'Dato sin identificar ' + (index + 1);
+    }
+
+    function flattenCollection(value) {
+        if (Array.isArray(value)) return value;
+        if (!value || typeof value !== 'object') return [];
+        return Object.keys(value).reduce((all, key) => all.concat(flattenCollection(value[key])), []);
+    }
+
+    function renderImportPreview(preview) {
+        clearImportError();
+        if (importUploadStep) importUploadStep.hidden = true;
+        if (importDoneStep) importDoneStep.hidden = true;
+        if (importPreviewStep) importPreviewStep.hidden = false;
+        if (importPreviewFilename) importPreviewFilename.textContent = importSelectedFilename;
+        appendSummary(importPreviewSummary, getPreviewCounters(preview));
+
+        const conflicts = flattenCollection(preview && preview.conflicts);
+        if (importPreviewDoubts) importPreviewDoubts.hidden = conflicts.length === 0;
+        if (importPreviewDoubtsList) {
+            importPreviewDoubtsList.replaceChildren();
+            conflicts.slice(0, 8).forEach((item, index) => {
+                const li = document.createElement('li');
+                li.textContent = doubtText(item, index);
+                importPreviewDoubtsList.appendChild(li);
+            });
+            if (conflicts.length > 8) {
+                const li = document.createElement('li');
+                li.textContent = 'Y ' + (conflicts.length - 8) + ' dudas más.';
+                importPreviewDoubtsList.appendChild(li);
+            }
+        }
+
+        const omitted = collectionCount(preview && preview.omitted);
+        if (importPreviewOmitted) {
+            importPreviewOmitted.hidden = omitted === 0;
+            importPreviewOmitted.textContent = omitted ? omitted + ' ' + (omitted === 1 ? 'fila queda' : 'filas quedan') + ' afuera para evitar datos incorrectos.' : '';
+        }
+        const newCount = collectionCount(preview && preview.new_clients);
+        const fillCount = [
+            ...flattenCollection(preview && preview.existing_clients),
+            ...flattenCollection(preview && preview.conflicts)
+        ].filter(item => item && (
+            item.action === 'fill_empty'
+            || (item.existing_id && Array.isArray(item.fillable_fields) && item.fillable_fields.length)
+        )).length;
+        const safeCount = newCount + fillCount;
+        if (importConfirm) {
+            importConfirm.hidden = safeCount === 0;
+            const actions = [];
+            if (newCount) actions.push('crear ' + newCount);
+            if (fillCount) actions.push('completar ' + fillCount);
+            importConfirm.textContent = actions.length
+                ? actions.join(' y ').replace(/^./, c => c.toUpperCase()) + (safeCount === 1 ? ' cliente' : ' clientes')
+                : 'No hay clientes seguros para guardar';
+        }
+        if (importTryInvoice) importTryInvoice.hidden = true;
+        if (importCancel) importCancel.textContent = 'Cancelar';
+    }
+
+    async function confirmImport() {
+        if (!importBatchId || importBusy) return;
+        clearImportError();
+        setImportBusy(true, 'Estamos guardando lo que confirmaste…');
+        const requestSeq = ++importRequestSeq;
+        try {
+            const res = await CDI.api('/api/migrations/' + encodeURIComponent(importBatchId) + '/confirm', { method: 'POST' });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || ('Error ' + res.status));
+            if (requestSeq !== importRequestSeq) return;
+            renderImportDone(data);
+            refresh();
+            CDI.track && CDI.track('migration_confirmed');
+        } catch (err) {
+            if (requestSeq !== importRequestSeq) return;
+            showImportError(err.message || 'No pudimos guardar los datos. Probá otra vez.');
+        } finally {
+            if (requestSeq === importRequestSeq) setImportBusy(false);
+        }
+    }
+
+    function renderImportDone(data) {
+        if (importPreviewStep) importPreviewStep.hidden = true;
+        if (importUploadStep) importUploadStep.hidden = true;
+        if (importDoneStep) importDoneStep.hidden = false;
+        const source = data.counters || data.totals || data.result || data;
+        let counters = numericCounters(source).filter(([label]) => label !== 'Batch id');
+        if (!counters.length) counters = [['Datos guardados', collectionCount(source)]];
+        appendSummary(importDoneSummary, counters);
+        if (importDoneMessage) importDoneMessage.textContent = 'CDI va a reconocer estos clientes en tus próximas operaciones.';
+        if (importConfirm) importConfirm.hidden = true;
+        if (importTryInvoice) { importTryInvoice.hidden = false; importTryInvoice.focus(); }
+        if (importCancel) importCancel.textContent = 'Cerrar';
+        if (importUndoBtn) { importUndoBtn.hidden = false; importUndoBtn.textContent = 'Deshacer esta importación'; }
+        if (CDI.toast) CDI.toast.success('Clientes listos', 'La importación se confirmó correctamente.');
+    }
+
+    async function undoImport() {
+        if (!importBatchId || importBusy) return;
+        clearImportError();
+        setImportBusy(true, 'Estamos deshaciendo la importación…');
+        const requestSeq = ++importRequestSeq;
+        try {
+            const res = await CDI.api('/api/migrations/' + encodeURIComponent(importBatchId) + '/undo', { method: 'POST' });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.detail || ('Error ' + res.status));
+            if (requestSeq !== importRequestSeq) return;
+            const skipped = Number(data.skipped || 0);
+            if (importDoneMessage) {
+                importDoneMessage.textContent = skipped
+                    ? 'Deshicimos lo posible sin tocar clientes que cambiaron o ya tienen operaciones. ' + skipped + ' quedaron sin modificar.'
+                    : 'La importación se deshizo. Tus datos anteriores no cambiaron.';
+            }
+            appendSummary(importDoneSummary, [
+                ['Clientes eliminados', Number(data.deleted || 0)],
+                ['Clientes restaurados', Number(data.restored || 0)],
+                ['Sin modificar', skipped]
+            ]);
+            if (importUndoBtn) importUndoBtn.hidden = true;
+            if (importTryInvoice) importTryInvoice.hidden = true;
+            if (importCancel) { importCancel.textContent = 'Cerrar'; importCancel.focus(); }
+            refresh();
+            CDI.track && CDI.track('migration_undone');
+            if (CDI.toast) {
+                if (skipped) CDI.toast.info('Deshacer parcial', 'Protegimos ' + skipped + ' clientes que ya habían cambiado.');
+                else CDI.toast.success('Importación deshecha', 'Volvimos al estado anterior.');
+            }
+        } catch (err) {
+            if (requestSeq !== importRequestSeq) return;
+            showImportError(err.message || 'No pudimos deshacer la importación. Probá otra vez.');
+        } finally {
+            if (requestSeq === importRequestSeq) setImportBusy(false);
+        }
     }
 
     function showImportError(msg) {
         if (!importResult) return;
-        importResult.innerHTML = '<strong>Error:</strong> ' + CDI.escapeHtml(msg);
+        importResult.textContent = msg;
         importResult.classList.add('is-error');
         importResult.hidden = false;
     }
@@ -1493,6 +1784,25 @@
 
     function onGlobalKeydown(ev) {
         if (!entered) return;
+
+        if (importModalEl && !importModalEl.hidden) {
+            if (ev.key === 'Escape' && !importBusy) {
+                ev.preventDefault();
+                closeImportModal();
+            }
+            if (ev.key === 'Tab') {
+                const focusable = Array.from(importModalEl.querySelectorAll(
+                    'button:not([disabled]):not([hidden]), [href], input:not([disabled]):not(.sr-only), [tabindex]:not([tabindex="-1"])'
+                )).filter(el => !el.closest('[hidden]'));
+                if (focusable.length) {
+                    const first = focusable[0];
+                    const last = focusable[focusable.length - 1];
+                    if (ev.shiftKey && document.activeElement === first) { ev.preventDefault(); last.focus(); }
+                    if (!ev.shiftKey && document.activeElement === last) { ev.preventDefault(); first.focus(); }
+                }
+            }
+            return;
+        }
 
         // Mientras el modal esta abierto, solo manejamos Escape; el resto queda al browser.
         if (formModal && formModal.open) {

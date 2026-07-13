@@ -1,7 +1,7 @@
 # HANDOFF — CDI (vuce / CDI-app)
 
 > Estado vivo del proyecto. **La próxima AI o persona que entre lo lee primero.**
-> Última actualización: 2026-07-12 · Asistente NCM local con ARCA + posición SIM/DC explícita.
+> Última actualización: 2026-07-12 · Migración segura de clientes + asistente NCM local ARCA/SIM.
 
 ---
 
@@ -112,6 +112,7 @@ CDI-app/
 
 ## 6. Estado actual (qué está vivo, qué no)
 
+- **Migración “Traer mis clientes” (2026-07-12):** disponible en Clientes y en su estado vacío. CSV/XLS/XLSX se analizan sin escribir; la vista previa separa nuevos, existentes, conflictos y omitidos. Al confirmar une únicamente por CUIT argentino válido, completa campos vacíos sin pisar valores, es idempotente y puede deshacerse mientras los clientes creados no tengan operaciones. Lee varias hojas y fecha de inicio de actividades. Gemini es fallback opcional (`MIGRATION_GEMINI_ENABLED`, máximo `AI_DAILY_MIGRATION_LIMIT`) solo para mapear encabezados ambiguos; recibe muestras enmascaradas y su salida pasa por allowlist. Las columnas de peso están bloqueadas.
 - Popups v2: las confirmaciones usan el modal visual de CDI (`CDI.confirm`) en vez de carteles nativos del navegador.
 - Eliminación de clientes: borra operaciones, ítems, notas NCM e historial de productos del cliente manteniendo aislamiento por usuario.
 - Telemetría: eventos UI persistidos en SQL (`telemetry_events`) + JSONL; el frontend usa `/api/session/state` para reducir bloqueos por extensiones.
@@ -151,9 +152,13 @@ CDI-app/
 - **Extracción de domicilio desde PDF (2026-07-06):** la IA ahora extrae `comprador_domicilio` desde la factura (ambos prompts de Gemini en `pdf_extractor.py`). `comprador_fecha_inic_activ` y `gastos_anteriores_fob` NO se extraen del PDF — no figuran en facturas reales; el primero viene de la ficha del cliente / ARCA a futuro; el segundo es campo manual. Prioridad: si el cliente activo tiene domicilio en su ficha, gana sobre el del PDF (`applyClienteActivo` en `review.js`).
 - **Identificador correlativo de operación (2026-07-07):** las operaciones nuevas usan `op_code` correlativo `OP-NNNNNN` por despachante, generado por `_next_op_code` en `main.py`. Aplica a `create_manual_operation` y `save_client_operation`. Las viejas conservan su código actual (MANUAL_..., OP_..., NULL). Limitación conocida: sin lock de concurrencia — si dos ops del mismo owner se crean en el mismo instante podrían repetir número (riesgo bajo para uso individual).
 - **Auto-completar ficha del cliente (fill-if-empty) (2026-07-07):** `save_client_operation` ahora rellena `Client.address` y `Client.fecha_inic_activ` si están vacíos y la carátula trae `comprador_domicilio` o `comprador_fecha_inic_activ`. Nunca pisa valores existentes. Datos por-embarque (flete, seguro, gastos FOB, factura, fechas, ítems) NO se guardan en la ficha. Si el fill falla, no rompe el guardado de la operación (excepción atrapada, igual que la memoria NCM). Frontend (`finalize.js`) ahora envía esos 2 campos en el body del POST.
+- **Fuga `[SBT]` corregida (2026-07-12):** se eliminó el fallback `AA(VOWYNNS)-AB(VITTO)-CA00-`. `generate_maria` exige `sbt_sufijo_valor`, aplica trim, máximo 120 caracteres y rechaza controles/saltos de línea; sin ese dato no genera el TXT. Prueba de regresión incluida.
+- **CI crítico (2026-07-12):** `.github/workflows/ci.yml` instala el proyecto desde cero, compila Python y ejecuta las suites estables de MARIA, regresión y migración (83 passed, 1 skipped en la verificación local). La suite histórica completa mantiene tests con rutas absolutas y expectativas antiguas; no se usa como barrera hasta sanearla.
 - **Cliente VUCE CI oficial (2026-06-30):** `proyecto_maria/core/vuce_ci_client.py` consulta la API pública interna de `www.vuce.gob.ar` (Central de Información), sin CUIT ni certificado digital — el propio sitio genera un token anónimo (`POST /auth/generate`) que se reusa. Devuelve el código SIM completo (11 dígitos + letra, ej. `3926.90.90.100H`), aranceles reales (AEC/DII/TE/IVA) e intervenciones reales (SENASA, ANMAT, etc. con flag `opcional` tal cual lo define VUCE, sin filtrar por palabras clave). Conectado a `vuce_connector.py` como fuente prioritaria cuando `VUCE_CI_ENABLED=true` (default `false`, comportamiento actual sin cambios). `_BASE_URL` apunta hoy a `qa.ci.vuce.gob.ar` porque es lo que usa la propia www.vuce.gob.ar en producción — no se encontró un dominio "prod" distinto. Campo "DIE" del endpoint de tributos NO se mapea (valor distinto a AEC en una prueba real, significado no confirmado — ver comentario en el código). **Propagación a UI (2026-06-30):** `ncm_service.py` (`merge_datos_inteligente` + `get_ncm_completo`) ahora propagan `codigo_sim` y `sim_alternativas` al response final. `ncm.js` (`renderVucePreview`) muestra el `codigo_sim` cuando está disponible, en vez del NCM de 8 dígitos. Verificado con NCM 3926.90.90: llega `3926.90.90.100H` + 32 alternativas.
 
 ### Pendiente / frágil
+
+- **Migración fase 2:** importar operaciones históricas, proveedores/productos y carátula completa requiere antes separar peso total/unitario y persistir un snapshot versionado de carátula. Los históricos no deben consumir cupo, alterar correlativos ni alimentar memoria NCM como confirmada.
 
 - VUCE en `modo_fake=true` por default. Para prod real hay que conectar API real o cliente HTTP a Tarifar.
 - Sin `GEMINI_API_KEY` la subida de PDF falla.
@@ -212,7 +217,7 @@ CDI-app/
 - **Fix reciente:** corregido `exportClientCsv is not defined` que rompía la apertura del drawer al hacer click en Exportar CSV (`clientes.js`).
 - **Tests:** suite completa **280 passed, 102 skipped**; 24 errores preexistentes por compatibilidad de `pytest-asyncio` en `tests/security/test_security.py` y `tests/test_seo.py` (no relacionados con cambios recientes). Smoke `smoke_friccion.sh` pasa local.
 - **Ola 1 cerrada:** Cockpit + S1/S3 + upload.js race fix + Novedades ARCA + UX Plan 01.
-- **Leak conocido `[SBT]`:** el sufijo `CSBTSVL` por default trae `AA(VOWYNNS)` (cliente del sample). Para otros clientes sale ese dato ajeno. Ya es parámetro (`sbt_sufijo_valor`) pero falta la regla real por importador (qué son `AB(...)` y `CA00`) → pendiente de confirmar con el despachante.
+- **Regla real `[SBT]` pendiente del despachante:** la fuga del sample ya está cerrada; falta confirmar cómo obtener `AA(...)`, `AB(...)` y `CA00`. El dashboard exige que el despachante cargue y confirme el sufijo antes de generar.
 - Pendiente despachante: confirmar si `DDDTVENEMB` (fecha embarque) es obligatorio para el Kit SIM.
 
 ---

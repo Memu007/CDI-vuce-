@@ -34,6 +34,7 @@ google-api-python-client==2.161.0  # Google APIs client
 pandas==2.3.2                 # Data manipulation
 numpy<2.0.0                   # Fix crash with pandas 2.x
 openpyxl==3.1.5              # Excel files (.xlsx)
+xlrd>=2.0.1                  # Legacy Excel files (.xls)
 PyPDF2==3.0.1                # PDF extraction
 pdfminer.six>=20251107       # GHSA-wf5f-4jwr-ppcp
 pdfplumber>=0.11.5           # Advanced PDF processing
@@ -104,4 +105,5 @@ passlib[bcrypt]==1.7.4    # Password hashing
 pytest>=9.1.0
 pytest-asyncio>=1.4.0
 pytest-timeout==2.4.0    # mata tests colgados (red de seguridad anti-hang)
+pytest-cov>=7.0.0        # requerido por las opciones --cov de pytest.ini
 psutil

@@ -8,6 +8,7 @@ contra abuso obvio; cuando haya Redis se migra el storage.
 
 Variables:
 - `AI_DAILY_PDF_LIMIT`: PDFs por usuario por dia (default 50).
+- `AI_DAILY_MIGRATION_LIMIT`: archivos ambiguos por usuario por dia (default 10).
 
 Uso:
     from proyecto_maria.core.ai_quota import enforce_pdf_quota
@@ -37,6 +38,13 @@ def _get_limit() -> int:
         return 50
 
 
+def _get_migration_limit() -> int:
+    try:
+        return max(1, int(os.getenv("AI_DAILY_MIGRATION_LIMIT", "10")))
+    except (TypeError, ValueError):
+        return 10
+
+
 def enforce_pdf_quota(username: str | None) -> None:
     """Suma 1 al contador del usuario para hoy. Si excede, levanta 429.
 
@@ -54,6 +62,26 @@ def enforce_pdf_quota(username: str | None) -> None:
                 detail=(
                     f"Limite diario de procesamiento de PDFs alcanzado "
                     f"({limit}/dia). Probá mañana o pedí ampliación."
+                ),
+            )
+        _counter[key] = current + 1
+
+
+def enforce_migration_quota(username: str | None) -> None:
+    """Limita el fallback Gemini del migrador sin mezclarlo con PDFs."""
+
+    if not username:
+        return
+    limit = _get_migration_limit()
+    key = (f"migration:{username}", _today_key())
+    with _lock:
+        current = _counter.get(key, 0)
+        if current >= limit:
+            raise HTTPException(
+                status_code=429,
+                detail=(
+                    f"Limite diario de analisis inteligente de migraciones "
+                    f"alcanzado ({limit}/dia)."
                 ),
             )
         _counter[key] = current + 1

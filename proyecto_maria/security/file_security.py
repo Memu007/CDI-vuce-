@@ -213,12 +213,19 @@ async def validate_file_upload(
     # Additional validation for Excel
     if file_type == 'excel':
         try:
-            import openpyxl
-            wb = openpyxl.load_workbook(io.BytesIO(contents))
-
-            # Check if has sheets
-            if len(wb.sheetnames) == 0:
-                raise HTTPException(400, "Excel file has no sheets")
+            if file_ext == '.xlsx':
+                import openpyxl
+                wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True)
+                if len(wb.sheetnames) == 0:
+                    raise HTTPException(400, "Excel file has no sheets")
+                wb.close()
+            else:
+                # El formato binario .xls no puede abrirse con openpyxl.
+                # Pandas usa xlrd y alcanza con validar que exista alguna hoja.
+                import pandas as pd
+                xls = pd.ExcelFile(io.BytesIO(contents), engine='xlrd')
+                if len(xls.sheet_names) == 0:
+                    raise HTTPException(400, "Excel file has no sheets")
 
         except HTTPException:
             raise

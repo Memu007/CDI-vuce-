@@ -765,9 +765,9 @@
                             <button type="button" class="cx-search-help" id="cxHelpBtn" aria-label="Atajos de teclado" title="Atajos: / buscar, ↑↓ navegar, Enter abrir, U usar, F favorito, E editar, N nuevo, Esc volver">?</button>
                         </div>
                         <div class="cx-header-actions">
-                            <button type="button" class="btn btn-secondary" id="cxImportBtn" title="Importar clientes desde CSV o Excel">
+                            <button type="button" class="btn btn-secondary" id="cxImportBtn" title="Traer clientes desde CSV o Excel">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                Importar
+                                Traer mis clientes
                             </button>
                             <button type="button" class="btn btn-primary" id="cxNewBtn">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -803,10 +803,13 @@
                                     <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M2 21v-1a6 6 0 016-6h2a6 6 0 016 6v1"/><path d="M19 8v6"/><path d="M22 11h-6"/></svg>
                                 </div>
                                 <h3 class="cx-empty-state-title">Todavía no tenés clientes</h3>
-                                <p class="cx-empty-state-sub">Creá tu primer cliente importador para empezar a cargar operaciones.</p>
-                                <button type="button" class="btn btn-primary cx-empty-state-cta" id="cxEmptyCreateBtn">
+                                <p class="cx-empty-state-sub">Traé tus clientes desde la planilla que ya usás o creá uno manualmente.</p>
+                                <button type="button" class="btn btn-secondary cx-empty-state-cta" id="cxEmptyCreateBtn">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                    Crear tu primer cliente
+                                    Crear un cliente
+                                </button>
+                                <button type="button" class="btn btn-primary cx-empty-state-cta" id="cxEmptyImportBtn">
+                                    Traerlos desde un Excel
                                 </button>
                             </div>
                             <ul class="cx-list" id="cxList" role="listbox" aria-label="Clientes" hidden></ul>
@@ -941,41 +944,73 @@
 
     <div id="toastHost"></div>
 
-    <!-- Modal importar clientes -->
+    <!-- Migracion segura: analizar -> vista previa -> confirmar -> resultado -->
     <div class="tour-welcome" id="importClientesModal" hidden role="dialog" aria-modal="true" aria-labelledby="importClientesTitle">
-        <div class="tour-welcome-card manual-upload-card">
+        <div class="tour-welcome-card manual-upload-card migration-card" tabindex="-1">
             <div class="tour-welcome-head">
-                <span class="tour-welcome-kicker">Migración</span>
-                <h2 id="importClientesTitle">Importar clientes desde CSV o Excel</h2>
-                <p>Subí una planilla con tus clientes (de PreMaría o cualquier app). Detectamos las columnas solos.</p>
+                <div class="tour-welcome-head-row">
+                    <span class="tour-welcome-kicker">Traer mis clientes</span>
+                    <button type="button" class="migration-close" id="importClose" aria-label="Cerrar">×</button>
+                </div>
+                <h2 id="importClientesTitle">Subí el Excel que ya usás</h2>
+                <p id="importClientesIntro">CDI busca clientes y sus datos básicos, y te muestra el resultado antes de guardar. Las operaciones no se modifican.</p>
             </div>
 
-            <div class="manual-form">
-                <div class="import-hint">
-                    <strong>Columnas reconocidas:</strong>
-                    <code>nombre / razón social</code>, <code>cuit</code>, <code>dirección</code>, <code>email</code>, <code>teléfono</code>.
-                    <br>
-                    <small>Bonus: si tu archivo trae <code>descripción</code> + <code>ncm</code>, el autocatálogo arranca entrenado.</small>
-                </div>
+            <div class="manual-form migration-body">
+                <section id="importUploadStep" aria-labelledby="importClientesTitle">
+                    <div class="import-hint migration-privacy-note">
+                        Buscamos clientes y sus datos básicos aunque estén en distintas hojas. <strong>Nada se guarda al subir el archivo.</strong>
+                    </div>
+                    <input type="file" id="importFileInput" accept=".csv,.xlsx,.xls" class="sr-only">
+                    <div class="dropzone migration-dropzone" id="importDropzone" role="button" tabindex="0" aria-label="Seleccionar un archivo CSV o Excel">
+                        <div class="dropzone-hint">Arrastrá tu archivo acá</div>
+                        <button type="button" class="btn btn-primary" id="importPickBtn">Elegir CSV o Excel</button>
+                        <div class="dropzone-meta" id="importFilename">CSV · XLSX · XLS</div>
+                    </div>
+                </section>
 
-                <input type="file" id="importFileInput" accept=".csv,.xlsx,.xls" class="sr-only">
-                <div class="dropzone" id="importDropzone">
-                    <div class="dropzone-hint">Arrastrá tu CSV o Excel aquí</div>
-                    <button type="button" class="btn btn-primary btn-sm" id="importPickBtn">Seleccionar archivo</button>
-                    <div class="dropzone-meta" id="importFilename">CSV · XLSX · XLS</div>
-                </div>
-
-                <div class="upload-progress" id="importProgress" hidden>
+                <div class="upload-progress migration-progress" id="importProgress" hidden role="status" aria-live="polite">
                     <div class="spinner" aria-hidden="true"></div>
                     <div class="upload-progress-text">
-                        <p class="upload-progress-title">Importando…</p>
+                        <p class="upload-progress-title" id="importProgressTitle">Estamos leyendo tu archivo…</p>
+                        <p class="upload-progress-sub">Todavía no se guardó nada.</p>
                     </div>
-                    <div class="import-result" id="importResult" hidden></div>
                 </div>
+
+                <section class="migration-preview" id="importPreviewStep" hidden aria-labelledby="importPreviewTitle">
+                    <div class="migration-step-heading">
+                        <div>
+                            <span class="migration-step-ok" aria-hidden="true">✓</span>
+                            <h3 id="importPreviewTitle">Esto es lo que encontramos</h3>
+                        </div>
+                        <button type="button" class="btn btn-ghost btn-sm" id="importChooseAnother">Usar otro archivo</button>
+                    </div>
+                    <p class="migration-file-name" id="importPreviewFilename"></p>
+                    <div class="migration-summary" id="importPreviewSummary"></div>
+                    <div class="migration-doubts" id="importPreviewDoubts" hidden>
+                        <h4>No tenés que resolver estas diferencias ahora</h4>
+                        <p>Nunca reemplazamos esos valores. Si el cliente ya existe, solo completamos sus campos vacíos; lo dudoso queda afuera.</p>
+                        <ul id="importPreviewDoubtsList"></ul>
+                    </div>
+                    <div class="migration-omitted" id="importPreviewOmitted" hidden></div>
+                    <p class="migration-safe-note">Nada se guarda hasta que confirmes.</p>
+                </section>
+
+                <section class="migration-result" id="importDoneStep" hidden aria-labelledby="importDoneTitle" aria-live="polite">
+                    <div class="migration-success-icon" aria-hidden="true">✓</div>
+                    <h3 id="importDoneTitle">Tus clientes ya están listos</h3>
+                    <p id="importDoneMessage">CDI va a reconocerlos en tus próximas operaciones.</p>
+                    <div class="migration-summary" id="importDoneSummary"></div>
+                    <button type="button" class="btn btn-ghost btn-sm migration-undo" id="importUndoBtn">Deshacer esta importación</button>
+                </section>
+
+                <div class="import-result" id="importResult" hidden role="alert"></div>
             </div>
 
             <div class="tour-welcome-actions manual-upload-actions">
                 <button type="button" class="btn btn-ghost btn-sm" id="importCancel">Cerrar</button>
+                <button type="button" class="btn btn-primary" id="importConfirm" hidden>Guardar clientes seguros</button>
+                <button type="button" class="btn btn-primary" id="importTryInvoice" hidden>Subir una factura</button>
             </div>
         </div>
     </div>
