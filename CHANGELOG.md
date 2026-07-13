@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-13 · test: arreglar happy path MARIA con posición SIM completa
+
+- **test:** `test_generate_maria_txt_happy_path` usaba NCM de 8 dígitos (`84713000`), que la validación de posición SIM completa (commit `452364b`) ahora rechaza con 400. Actualizado a `84713000900R` (8 dígitos + 3 SIM + letra DC). Suite: 616 passed, 0 failures, cobertura 39.22%.
+
 ## 2026-07-13 · feat: tour de ingreso corto y fiel al flujo real
 
 - **feat (onboarding):** se reemplazaron dos bienvenidas superpuestas por un único tour de 4 pasos: subir, revisar, recordar lo confirmado y generar MARIA.TXT.

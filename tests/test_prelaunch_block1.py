@@ -278,7 +278,7 @@ class TestGenerateMaria:
         res = client.post("/generate_maria", json={
             "operation_id": "TEST001",
             "items": [{
-                "pieza": "84713000",
+                "pieza": "84713000900R",
                 "descripcion": "Laptop importada",
                 "origen": "CN",
                 "cantidad": 5,
