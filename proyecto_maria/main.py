@@ -24,7 +24,10 @@ basedir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(basedir, '.env'))
 
 # Archivos de datos
-DATA_DIR = os.path.join(basedir, 'data')
+# El directorio persistente puede aislarse por entorno (por ejemplo, para una
+# ejecución local de E2E). En producción y desarrollo mantiene el directorio
+# histórico dentro del proyecto si no se declara la variable.
+DATA_DIR = os.getenv("CDI_DATA_DIR") or os.path.join(basedir, 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 BACKUP_FILE = os.path.join(DATA_DIR, 'localStorage_backup.json')
 
@@ -8131,7 +8134,6 @@ async def catalog_lookup(
                         "ncm": mem["ncm"],
                         "origen": mem.get("origen") or None,
                         "veces_usado": mem.get("veces_usado"),
-                        "peso_unitario_avg": mem.get("peso_unitario_avg"),
                         "valor_unitario_avg": mem.get("valor_unitario_avg"),
                         "ultima_vez": mem.get("ultima_vez"),
                     })

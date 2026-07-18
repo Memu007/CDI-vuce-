@@ -76,7 +76,7 @@
         const nombre = escapeHtml(c.nombre || c.name || '—');
         const cuit = c.cuit ? '<span class="cp-row-cuit">' + escapeHtml(fmtCuit(c.cuit)) + '</span>' : '';
         return (
-            '<button type="button" class="cp-row" data-idx="' + idx + '" role="option">' +
+            '<button type="button" class="cp-row" data-testid="client-picker-row" data-idx="' + idx + '" role="option">' +
                 '<span class="cp-row-name">' + nombre + '</span>' +
                 cuit +
             '</button>'

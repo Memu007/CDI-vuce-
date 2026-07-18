@@ -43,3 +43,54 @@ jobs:
           tests/test_generar_maria_txt.py
           tests/test_regression_phase0.py
           tests/test_migration_import.py
+          tests/test_smart_validation_gates.py
+
+  e2e-maria:
+    needs: tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: config/package-lock.json
+
+      - name: Caché de Chromium
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/puppeteer
+          key: puppeteer-${{ runner.os }}-${{ hashFiles('config/package-lock.json') }}
+
+      - name: Dependencias del sistema
+        run: sudo apt-get update && sudo apt-get install -y libmagic1 libnss3 libgbm1 libxss1
+
+      - name: Dependencias Python
+        run: python -m pip install --upgrade pip && pip install -r requirements.txt
+
+      - name: Dependencias del E2E
+        run: npm ci --prefix config
+
+      - name: E2E MARIA aislado
+        env:
+          E2E_ARTIFACTS: ${{ runner.temp }}/cdi-e2e-maria-artifacts
+        run: ./scripts/testing/e2e_maria.sh
+
+      - name: Evidencia de fallo E2E
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-maria-failure
+          path: ${{ runner.temp }}/cdi-e2e-maria-artifacts
+          if-no-files-found: ignore

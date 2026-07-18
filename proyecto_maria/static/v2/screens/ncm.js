@@ -682,19 +682,19 @@
                 '<td class="col-num" title="Arrastrar para reordenar"><span class="drag-grip" aria-hidden="true">⋮⋮</span>' + (i + 1) + '</td>' +
                 '<td class="col-ref">' + ref + '</td>' +
                 '<td class="col-desc">' + desc + '</td>' +
-                '<td class="col-pais"><input class="ncm-edit ncm-edit-pais input input-sm" type="text" list="ncmCountries" value="' + origen + '" data-row="' + i + '" data-field="origen" aria-label="Origen item ' + (i + 1) + '"></td>' +
-                '<td class="col-cant"><input class="ncm-edit ncm-edit-cant input input-sm" type="number" min="1" step="1" value="' + cantVal + '" data-row="' + i + '" data-field="cantidad" aria-label="Cantidad item ' + (i + 1) + '"></td>' +
-                '<td class="col-valor"><input class="ncm-edit ncm-edit-valor input input-sm" type="number" min="0" step="0.01" value="' + (valorUnitario || '') + '" data-row="' + i + '" data-field="valor_unitario" aria-label="Valor unitario item ' + (i + 1) + '"></td>' +
-                '<td class="col-peso"><input class="ncm-edit ncm-edit-peso input input-sm" type="number" min="0" step="0.01" value="' + (pesoUnitario || '') + '" data-row="' + i + '" data-field="peso_unitario" aria-label="Peso unitario item ' + (i + 1) + '"></td>' +
+                '<td class="col-pais"><input class="ncm-edit ncm-edit-pais input input-sm" type="text" list="ncmCountries" value="' + origen + '" data-testid="ncm-origin-input" data-row="' + i + '" data-field="origen" aria-label="Origen item ' + (i + 1) + '"></td>' +
+                '<td class="col-cant"><input class="ncm-edit ncm-edit-cant input input-sm" type="number" min="1" step="1" value="' + cantVal + '" data-testid="ncm-quantity-input" data-row="' + i + '" data-field="cantidad" aria-label="Cantidad item ' + (i + 1) + '"></td>' +
+                '<td class="col-valor"><input class="ncm-edit ncm-edit-valor input input-sm" type="number" min="0" step="0.01" value="' + (valorUnitario || '') + '" data-testid="ncm-value-input" data-row="' + i + '" data-field="valor_unitario" aria-label="Valor unitario item ' + (i + 1) + '"></td>' +
+                '<td class="col-peso"><input class="ncm-edit ncm-edit-peso input input-sm" type="number" min="0" step="0.01" value="' + (pesoUnitario || '') + '" data-testid="ncm-weight-input" data-row="' + i + '" data-field="peso_unitario" aria-label="Peso unitario item ' + (i + 1) + '"></td>' +
                 '<td class="col-ncm">' +
                     '<div class="ncm-cell">' +
                         '<div class="sim-position-fields">' +
                             '<input class="' + inputClass + '" type="text" placeholder="0000.00.00.000"' +
-                            ' data-row="' + i + '" aria-label="Posición SIM item ' + (i + 1) + '"' +
+                            ' data-testid="ncm-sim-input" data-row="' + i + '" aria-label="Posición SIM item ' + (i + 1) + '"' +
                             ' value="' + simValue + '">' +
                             '<label class="sim-dc-field"><span>DC</span>' +
                                 '<input class="sim-dc-input' + (isError ? ' is-error' : '') + '" type="text" maxlength="1"' +
-                                ' data-row="' + i + '" aria-label="Letra de control item ' + (i + 1) + '" value="' + dcValue + '">' +
+                                ' data-testid="ncm-dc-input" data-row="' + i + '" aria-label="Letra de control item ' + (i + 1) + '" value="' + dcValue + '">' +
                             '</label>' +
                         '</div>' +
                         notesPill +
@@ -778,13 +778,13 @@
             '<td class="col-num"><button type="button" class="ncm-expand-btn" data-expand-grupo="' + gid + '" aria-label="Expandir grupo">' + expandIcon + '</button></td>' +
             '<td class="col-ref">' + ref + '</td>' +
             '<td class="col-desc">' + desc + '</td>' +
-            '<td class="col-pais"><input class="ncm-edit ncm-edit-pais input input-sm" type="text" list="ncmCountries" value="' + origen + '" data-grupo-id="' + gid + '" data-field="origen" aria-label="Origen grupo ' + gid + '"></td>' +
-            '<td class="col-cant"><input class="ncm-edit ncm-edit-cant input input-sm" type="number" min="1" step="1" value="' + cantVal + '" data-grupo-id="' + gid + '" data-field="cantidad" aria-label="Cantidad grupo ' + gid + '"></td>' +
-            '<td class="col-valor"><input class="ncm-edit ncm-edit-valor input input-sm" type="number" min="0" step="0.01" value="' + (valorUnitario || '') + '" data-grupo-id="' + gid + '" data-field="valor_unitario" aria-label="Valor grupo ' + gid + '"></td>' +
-            '<td class="col-peso"><input class="ncm-edit ncm-edit-peso input input-sm" type="number" min="0" step="0.01" value="' + (pesoUnitario || '') + '" data-grupo-id="' + gid + '" data-field="peso_unitario" aria-label="Peso grupo ' + gid + '"></td>' +
+            '<td class="col-pais"><input class="ncm-edit ncm-edit-pais input input-sm" type="text" list="ncmCountries" value="' + origen + '" data-testid="ncm-origin-input" data-grupo-id="' + gid + '" data-field="origen" aria-label="Origen grupo ' + gid + '"></td>' +
+            '<td class="col-cant"><input class="ncm-edit ncm-edit-cant input input-sm" type="number" min="1" step="1" value="' + cantVal + '" data-testid="ncm-quantity-input" data-grupo-id="' + gid + '" data-field="cantidad" aria-label="Cantidad grupo ' + gid + '"></td>' +
+            '<td class="col-valor"><input class="ncm-edit ncm-edit-valor input input-sm" type="number" min="0" step="0.01" value="' + (valorUnitario || '') + '" data-testid="ncm-value-input" data-grupo-id="' + gid + '" data-field="valor_unitario" aria-label="Valor grupo ' + gid + '"></td>' +
+            '<td class="col-peso"><input class="ncm-edit ncm-edit-peso input input-sm" type="number" min="0" step="0.01" value="' + (pesoUnitario || '') + '" data-testid="ncm-weight-input" data-grupo-id="' + gid + '" data-field="peso_unitario" aria-label="Peso grupo ' + gid + '"></td>' +
             '<td class="col-ncm"><div class="ncm-cell"><div class="sim-position-fields">' +
-                '<input class="' + inputClass + '" type="text" placeholder="0000.00.00.000" value="' + simValue + '" data-grupo-id="' + gid + '" data-field="pieza" aria-label="Posición SIM grupo ' + gid + '">' +
-                '<label class="sim-dc-field"><span>DC</span><input class="sim-dc-input' + (pieza && !isValid ? ' is-error' : '') + '" type="text" maxlength="1" value="' + dcValue + '" data-grupo-id="' + gid + '" aria-label="Letra de control grupo ' + gid + '"></label>' +
+                '<input class="' + inputClass + '" type="text" placeholder="0000.00.00.000" value="' + simValue + '" data-testid="ncm-sim-input" data-grupo-id="' + gid + '" data-field="pieza" aria-label="Posición SIM grupo ' + gid + '">' +
+                '<label class="sim-dc-field"><span>DC</span><input class="sim-dc-input' + (pieza && !isValid ? ' is-error' : '') + '" type="text" maxlength="1" value="' + dcValue + '" data-testid="ncm-dc-input" data-grupo-id="' + gid + '" aria-label="Letra de control grupo ' + gid + '"></label>' +
             '</div>' + notesPill + '</div></td>' +
             '<td class="col-actions">' + (isOk ? '<span class="check" aria-label="asignado">✓</span> ' : '') +
             '<button type="button" class="ncm-grupo-chip" data-grupo="' + gid + '" title="Clic para desagrupar">' + grupoLabel + '</button></td>' +

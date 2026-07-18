@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-18 · test: E2E aislado del flujo MARIA
+
+- **test (E2E):** nuevo comando `./scripts/testing/e2e_maria.sh` ejecuta con navegador el recorrido real registro → cliente → Excel → revisión → SIM 11 + DC → agrupación → validación → SBT → descarga de MARIA.TXT → operación e historial. Usa DB, archivos y XLSX temporales; no necesita servicios externos ni secretos. Ante fallo deja screenshot, HTML y trace; CI publica esa evidencia en el job `e2e-maria` después de las pruebas críticas.
+- **fix (validación):** cantidad, valor unitario y peso nulos, cero o negativos ahora son errores visibles y bloqueantes en la etapa Validar, coherentes con el generador. La advertencia de 8471 sigue permitiendo generar después de revisarla.
+- **fix (control humano):** la memoria de cliente vuelve a ofrecer NCM y origen confirmados, pero ya no expone ni completa peso en una factura posterior.
+
 ## 2026-07-13 · fix: sacar buscador lexical ARCA como clasificador NCM
 
 - **fix (NCM):** regresión sistémica detectada — `ncm_catalog.search_term` usaba coincidencia de palabras contra el nomenclador ARCA (contexto legal de capítulos/partidas), devolviendo resultados irrelevantes: "TABLE" → tableros, "botella de acero inoxidable" → acero en lingotes, "silla de plástico" → juguetes, "cable USB" → radiodifusión, entre otros. No se agregaron excepciones por producto/capítulo.

@@ -158,6 +158,24 @@ def run_smart_validations(items: List[Item]) -> dict:
     for i, item in enumerate(items, start=1):
         pieza = (item.pieza or '').strip()
         ncm_4 = pieza[:4] if len(pieza) >= 4 else ""
+
+        # Estas tres reglas ya son obligatorias para generar MARIA. Las
+        # mostramos también en Validación para que el despachante no llegue a
+        # "Generar" con un dato que el backend necesariamente rechazará.
+        # Las advertencias siguen reservadas para datos plausibles pero que
+        # conviene revisar; los ceros o negativos sí bloquean.
+        if item.cantidad is None or item.cantidad <= 0:
+            errores.append(
+                f"❌ Ítem {i} ({pieza or 'sin posición'}): La cantidad debe ser mayor a cero."
+            )
+        if item.valor_unitario is None or item.valor_unitario <= 0:
+            errores.append(
+                f"❌ Ítem {i} ({pieza or 'sin posición'}): El valor unitario debe ser mayor a cero."
+            )
+        if item.peso_unitario is None or item.peso_unitario <= 0:
+            errores.append(
+                f"❌ Ítem {i} ({pieza or 'sin posición'}): El peso unitario debe ser mayor a cero."
+            )
         
         # === VALIDACIONES DE PESO ===
         if item.peso_unitario and item.cantidad:

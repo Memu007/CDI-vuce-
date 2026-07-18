@@ -1,7 +1,7 @@
 # HANDOFF — CDI (vuce / CDI-app)
 
 > Estado vivo del proyecto. **La próxima AI o persona que entre lo lee primero.**
-> Última actualización: 2026-07-13 · Fix NCM: sacado buscador lexical ARCA como clasificador, Gemini validado contra ARCA + suite verde (625 passed, cobertura 39.46%).
+> Última actualización: 2026-07-18 · E2E real y aislado para el flujo MARIA, con validación de pesos y memoria de cliente sin autocompletar peso.
 
 ---
 
@@ -112,6 +112,8 @@ CDI-app/
 
 ## 6. Estado actual (qué está vivo, qué no)
 
+- **E2E MARIA real y mantenible (2026-07-18):** `./scripts/testing/e2e_maria.sh` crea SQLite, `CDI_DATA_DIR`, usuario, cliente y XLSX exclusivamente temporales; usa Puppeteer ya declarado en `config/`. Recorre registro, tour, Excel, revisión, corrección explícita de origen/cantidad/valor/peso, SIM 11 + DC, agrupación, validación, SBT, descarga y persistencia. No usa Gemini, VUCE CI, MercadoPago ni Internet durante el escenario (feed editorial ARCA y cotizaciones se bloquean en el navegador). En fallo conserva screenshot, HTML y trace fuera del repo. CI agrega el job `e2e-maria` después de las pruebas críticas y publica la evidencia si falla. Documento: `docs/testing/E2E_MARIA.md`.
+- **Peso requiere confirmación humana (2026-07-18):** Validación convierte cantidad, valor unitario o peso nulos/cero/negativos en errores que bloquean generar; los avisos (por ejemplo 8471) siguen sin bloquear. La memoria del cliente continúa aportando NCM y origen para una factura posterior, pero ya no expone ni autocompleta pesos.
 - **Migración “Traer mis clientes” (2026-07-12):** disponible en Clientes y en su estado vacío. CSV/XLS/XLSX se analizan sin escribir; la vista previa separa nuevos, existentes, conflictos y omitidos. Al confirmar une únicamente por CUIT argentino válido, completa campos vacíos sin pisar valores, es idempotente y puede deshacerse mientras los clientes creados no tengan operaciones. Lee varias hojas y fecha de inicio de actividades. Gemini es fallback opcional (`MIGRATION_GEMINI_ENABLED`, máximo `AI_DAILY_MIGRATION_LIMIT`) solo para mapear encabezados ambiguos; recibe muestras enmascaradas y su salida pasa por allowlist. Las columnas de peso están bloqueadas.
 - Popups v2: las confirmaciones usan el modal visual de CDI (`CDI.confirm`) en vez de carteles nativos del navegador.
 - Eliminación de clientes: borra operaciones, ítems, notas NCM e historial de productos del cliente manteniendo aislamiento por usuario.

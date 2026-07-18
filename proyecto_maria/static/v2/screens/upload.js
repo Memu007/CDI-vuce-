@@ -511,11 +511,6 @@
                     it.origen = m.origen;
                     changed = true;
                 }
-                // Autofill silencioso de peso unitario desde memoria del cliente.
-                if (m.source === 'cliente' && m.peso_unitario_avg && !(it.peso_unitario > 0)) {
-                    it.peso_unitario = Number(m.peso_unitario_avg);
-                    changed = true;
-                }
                 if (changed) {
                     it.__autofillSource = m.source; // 'cliente' | 'proveedor'
                     it.__autofillConfidence = m.confidence || 0;
