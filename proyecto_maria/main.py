@@ -70,7 +70,7 @@ PROJECT_VERSION = datetime.now().strftime("%Y%m%d%H%M%S")
 from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, supuestos_declarados
 from proyecto_maria.pdf_extractor import process_pdf  # Importar el extractor
 import pandas as pd
 from proyecto_maria.core.vuce_connector import get_ncm_data  # VUCE activo en modo mock
@@ -3623,14 +3623,26 @@ async def generate_maria_endpoint(
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(txt_content)
         
+        # Campos que el sistema declaró sin preguntar. No bloquean, pero el
+        # despachante los tiene que ver antes de pegar el TXT en el Kit: un
+        # valor asumido en silencio se descubre recién en la aduana.
+        supuestos = supuestos_declarados(
+            request.items,
+            incoterm=request.incoterm,
+            gastos_fob=request.gastos_fob,
+            flete=request.flete,
+            seguro=request.seguro,
+        )
+
         return {
             "success": True,
             "filename": filename,
             "download_url": f"/download/{filename}",
             "content": txt_content,  # También devolver contenido para preview
-            "warnings": kit_warnings,
+            "warnings": kit_warnings + supuestos,
+            "supuestos": supuestos,
         }
-        
+
     except HTTPException:
         raise
     except ValueError as e:

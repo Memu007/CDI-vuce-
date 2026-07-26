@@ -6,6 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-26 · feat(MARIA): los supuestos se muestran, no se adivinan
+
+- **feat (confianza):** nueva función `supuestos_declarados()` — antes de generar, el sistema lista en castellano llano **todo campo que declaró sin preguntar**: gastos a FOB calculados u omitidos, procedencia igualada al origen (con el número de ítem), `CARTUSO=3` fijo, `IVAADICIONAL1=IVAAD1` fijo y unidad `07` por defecto. Aparecen junto a los avisos que el frontend ya mostraba. No bloquean.
+- **por qué:** esta sesión encontró cuatro campos que el generador elegía solo y nadie veía (año del `IEXT`, procedencia, `CARTUSO`, `IVAADICIONAL1`). Los cuatro producían un TXT que pasa todas nuestras validaciones y falla recién en la aduana. Arreglarlos de a uno no evita el quinto; que ningún supuesto quede invisible, sí. Coincide con la premisa del producto: la IA recomienda, el humano confirma.
+- **decisión de PM documentada, con el ataque adversarial contra ella misma:** `docs/features/DECISION_SUPUESTOS_MARIA.md`. Incluye el reproche más justo — el cambio de gastos a FOB en operaciones EXW alteró la salida sin aprobación previa del dueño — y cómo revertirlo en un solo lugar si el despachante dice que estaba bien antes.
+- **no se tocaron** `CARTUSO` ni `IVAADICIONAL1`: no hay evidencia de cuándo va cada valor, y elegir uno sería inventar. Se declara el de siempre y se avisa.
+- **test:** `tests/test_maria_supuestos.py` (12 pruebas). Total pruebas críticas de CI: 126 passed, 1 skipped.
+
 ## 2026-07-26 · docs: de dónde sale cada dato del MARIA.TXT
 
 - **docs:** `docs/features/ORIGEN_DE_LOS_DATOS_MARIA.md` clasifica los **71 campos** de los dos archivos reales según su origen: qué sale de la factura (~18, casi todo ya se extrae), qué es fijo del formato (~13), qué se carga una vez por despachante o cliente (~8), qué decide el despachante en cada operación (~10) y qué calcula el sistema (~12).

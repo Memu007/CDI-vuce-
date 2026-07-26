@@ -589,6 +589,9 @@ def generate_maria_txt(operation_id: str, items: list,
         # Procedencia: pais desde donde se despacha. Si no viene, se asume el
         # mismo que el origen (caso mas comun) en vez de un hardcode (antes 222,
         # que ademas con la tabla oficial es PERU, no EEUU como decia el sample).
+        # El fallback se avisa en `supuestos_declarados()`: en el archivo real
+        # de referencia origen y procedencia difieren (200 vs 222), asi que
+        # asumirlos iguales en silencio no es gratis.
         pais_proc = (item.get('pais_procedencia') or item.get('procedencia') or pais)
         pais_proc_codigo = get_pais_codigo(pais_proc)
         # Unidad de medida del item (con fallback a 07=UNIDAD si no viene).
@@ -772,6 +775,85 @@ def validate_items_for_maria(items: list) -> tuple[bool, list]:
 
 
 INCOTERMS_VALIDOS = {"FOB", "CIF", "DDP", "EXW", "FCA", "CFR", "CPT", "CIP", "DAP", "DPU"}
+
+
+def supuestos_declarados(
+    items: list,
+    incoterm: str = "FOB",
+    gastos_fob: float | None = None,
+    flete: float = 0,
+    seguro: float = 0,
+) -> list:
+    """Lista los campos que el sistema declaró SIN preguntarle al despachante.
+
+    Por qué existe: el generador tiene valores que elige solo (por defecto,
+    heredados o calculados). Cuando alguno no corresponde, el TXT sale igual
+    de válido a la vista, ninguna validación se queja, y el error aparece
+    recién en la aduana. Ya pasó con el año del `IEXT`, que estuvo escrito a
+    mano como "25".
+
+    La premisa del producto es "la IA recomienda, el humano confirma". Un
+    valor asumido en silencio la rompe igual que uno inventado. Esto los
+    pone a la vista antes de generar, sin bloquear.
+
+    Devuelve mensajes en castellano llano, listos para mostrar.
+    """
+    avisos = []
+
+    # --- Gastos respecto del FOB -----------------------------------------
+    incoterm_norm = str(incoterm or "").strip().upper()
+    grupo_cd = incoterm_norm in _INCOTERMS_GRUPO_C_D
+    if gastos_fob is None:
+        if grupo_cd:
+            avisos.append(
+                f"Gastos a FOB: se declaró {flete + seguro:.2f} (flete + seguro) en "
+                f"GTOS-POS-FOB. Si la diferencia contra la condición {incoterm_norm} "
+                f"pactada es otra, cargala a mano."
+            )
+        elif incoterm_norm and incoterm_norm != "FOB":
+            avisos.append(
+                f"Gastos a FOB: no se declararon. Con condición {incoterm_norm} el "
+                f"importe no se puede calcular del flete y el seguro; si "
+                f"corresponde declararlo, cargalo a mano."
+            )
+
+    # --- Defaults a nivel ítem -------------------------------------------
+    sin_procedencia = []
+    sin_unidad = []
+    for idx, item in enumerate(items or [], start=1):
+        if not isinstance(item, dict):
+            continue
+        origen = item.get("origen") or item.get("pais_origen")
+        proc = item.get("procedencia") or item.get("pais_procedencia")
+        if origen and not proc:
+            sin_procedencia.append(str(idx))
+        if not (item.get("unidad") or item.get("unidad_medida") or item.get("um")):
+            sin_unidad.append(str(idx))
+
+    if sin_procedencia:
+        avisos.append(
+            f"Procedencia: en el/los ítem(s) {', '.join(sin_procedencia)} se declaró "
+            f"la misma que el origen. Si la mercadería se embarcó desde otro país, "
+            f"corregila: son campos distintos."
+        )
+    if sin_unidad:
+        avisos.append(
+            f"Unidad de medida: en el/los ítem(s) {', '.join(sin_unidad)} se declaró "
+            f"07 (unidad) por defecto."
+        )
+
+    # --- Constantes que hoy van fijas y el archivo real muestra variando --
+    if items:
+        avisos.append(
+            "Uso de la mercadería (CARTUSO): se declaró 3 por defecto, siempre. "
+            "Todavía no se puede elegir."
+        )
+        avisos.append(
+            "IVA adicional: se declaró IVAAD1 por defecto, siempre. "
+            "Todavía no se puede elegir."
+        )
+
+    return avisos
 
 
 def validate_for_kit_maria(items: list) -> tuple[list, list]:
