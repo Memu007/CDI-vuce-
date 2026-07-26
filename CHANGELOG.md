@@ -6,6 +6,15 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-26 · docs: análisis de competencia, precio y valuación
+
+- **docs:** `docs/features/ANALISIS_COMPETENCIA_Y_PRECIO.md`. Mapa de competidores (Report System desde 1989, Gruposoft, Darsys, DATACDA/PSM), propuesta de precios y rango de valuación, con el ataque adversarial contra las propias conclusiones.
+- **hallazgo incómodo:** la descripción pública de Report System dice que su módulo PRE-MARIA ya hace *"lectura automatizada de planillas y archivos PDF"* y *"armado de ítems y subítems"*. Leer el PDF **no es diferencial de venta**, aunque `IDEAS_PREMIUM_FEATURES.md` lo presente como tal.
+- **precio:** el problema no es el monto ($45.000 ARS/mes) sino **el tope de 15 operaciones**: nos limita justo con los mejores clientes y hace que el precio por operación se vea 10-30% de lo que el despachante factura. Propuesta: cobrar por tamaño de estudio sin tope, tres tramos desde $60.000.
+- **valuación:** con 5 usuarios y ~$150 USD/mes, el rango honesto hoy es **$10.000-18.000 USD** a comprador estratégico, no los $50.000 del `goldenplan.md` — que requieren 30-50 clientes pagando. El activo más difícil de copiar no es el scraping sino **el formato del TXT validado contra archivos reales**, porque la especificación de la Interfaz Despachantes no es pública.
+- **⚠️ para revisar ya:** el **Pilar B** (presupuestos compartibles), uno de los tres con los que el goldenplan justifica los $50.000 USD, **tiene 6 pruebas en rojo** — estaban tapadas por el cuelgue de la suite.
+- **límite del análisis:** ningún competidor publica precios y no se pudo abrir ninguna de sus webs desde el entorno (403). Todo lo referido a precios de la competencia es inferencia, no dato verificado.
+
 ## 2026-07-26 · fix(tests): la suite completa corre por primera vez
 
 - **fix (raíz):** `pytest` sobre todo el repo se colgaba para siempre. Causa: `TestClient`, usado sin `with`, abre un **event loop nuevo por request**, y el `StaticPool` del `conftest` reusaba **la misma conexión de aiosqlite** entre loops distintos. Al cerrarla desde un loop que ya murió, el cierre queda a medias (`CancelledError`) y el hilo que la atiende espera para siempre. Se cambió a `NullPool`: cada request abre y cierra su conexión en su propio loop. El `database is locked` que motivó el `StaticPool` lo cubre `busy_timeout=30000`.
