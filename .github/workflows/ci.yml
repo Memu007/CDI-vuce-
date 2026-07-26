@@ -44,6 +44,7 @@ jobs:
           tests/test_regression_phase0.py
           tests/test_migration_import.py
           tests/test_smart_validation_gates.py
+          tests/test_download_aislamiento.py
 
   e2e-maria:
     needs: tests

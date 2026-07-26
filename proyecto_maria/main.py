@@ -31,6 +31,31 @@ DATA_DIR = os.getenv("CDI_DATA_DIR") or os.path.join(basedir, 'data')
 os.makedirs(DATA_DIR, exist_ok=True)
 BACKUP_FILE = os.path.join(DATA_DIR, 'localStorage_backup.json')
 
+# Los archivos que el usuario se descarga (MARIA.TXT y similares) viven en una
+# carpeta por usuario, NO sueltos en DATA_DIR.
+#
+# Por que: el nombre del MARIA.TXT sale del numero de factura
+# (`MARIA_FAC_0001-00012345.TXT`), que es corto y adivinable. Con los archivos
+# sueltos en DATA_DIR, cualquier usuario logueado podia bajarse la declaracion
+# de otro despachante -- con CUIT del importador, NCM y valores -- probando
+# numeros de factura. Tambien quedaban expuestos `ncm_historial_<usuario>.json`
+# y el resto de los archivos internos de DATA_DIR.
+DOWNLOADS_DIR = os.path.join(DATA_DIR, 'descargas')
+
+
+def _user_downloads_dir(username: str) -> str:
+    """Carpeta de descargas propia de un usuario. La crea si no existe.
+
+    Se usa un hash del nombre de usuario en vez del nombre en claro para no
+    filtrar quien tiene cuenta a traves del filesystem ni depender de que el
+    username sea un nombre de carpeta valido.
+    """
+    import hashlib
+    clave = hashlib.sha256((username or "").encode("utf-8")).hexdigest()[:32]
+    ruta = os.path.join(DOWNLOADS_DIR, clave)
+    os.makedirs(ruta, exist_ok=True)
+    return ruta
+
 # Configuración de Templates
 templates = Jinja2Templates(directory=os.path.join(basedir, "proyecto_maria", "templates"))
 
@@ -3204,7 +3229,10 @@ async def process_operation(
 
     # --- Generación del Excel ---
     try:
-        filename = create_maria_excel(valid_items, payload.operation_id)
+        filename = create_maria_excel(
+            valid_items, payload.operation_id,
+            output_dir=_user_downloads_dir(user["username"]),
+        )
         print(f"Archivo generado exitosamente: {filename}")
         response_data = {
             "message": "Operación procesada y Excel generado exitosamente.",
@@ -3272,7 +3300,10 @@ async def upload_excel(
                 raise HTTPException(status_code=400, detail={"errors": errors, "items_extraidos": len(items)})
 
             # Generar Excel en formato AVG
-            filename = create_maria_excel(valid_items, operation_id)
+            filename = create_maria_excel(
+                valid_items, operation_id,
+                output_dir=_user_downloads_dir(user["username"]),
+            )
 
             return {
                 "message": "Archivo Excel procesado exitosamente",
@@ -3558,10 +3589,11 @@ async def generate_maria_endpoint(
         if not safe_id:
             safe_id = f"OP_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
-        # Guardar archivo temporal
+        # Guardar archivo temporal en la carpeta propia del usuario, no suelto
+        # en DATA_DIR: el nombre sale del nro de factura y es adivinable.
         filename = f"MARIA_{safe_id}.TXT"
-        filepath = os.path.join(DATA_DIR, filename)
-        
+        filepath = os.path.join(_user_downloads_dir(user["username"]), filename)
+
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(txt_content)
         
@@ -3652,10 +3684,11 @@ async def generate_maria_export_endpoint(
         if not safe_id:
             safe_id = f"EXP_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
-        # Guardar archivo temporal
+        # Guardar archivo temporal en la carpeta propia del usuario (ver
+        # _user_downloads_dir): el nombre sale del nro de factura y es adivinable.
         filename = f"MARIA_EXPORT_{safe_id}.TXT"
-        filepath = os.path.join(DATA_DIR, filename)
-        
+        filepath = os.path.join(_user_downloads_dir(user["username"]), filename)
+
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(txt_content)
         
@@ -3777,19 +3810,25 @@ def find_column(columns, possible_names):
 @app.get("/download/{filename}")
 async def download_file(filename: str, user=Depends(get_current_user)):
     """
-    Descarga un archivo generado (Excel o TXT). Requiere autenticación.
+    Descarga un archivo generado (Excel o TXT).
+
+    Solo devuelve archivos de la carpeta propia del usuario. Antes buscaba
+    directo en DATA_DIR, asi que cualquier usuario logueado podia bajarse el
+    MARIA.TXT de otro despachante adivinando el numero de factura (el nombre
+    del archivo sale de ahi), y de paso cualquier archivo interno de DATA_DIR.
     """
     # Path traversal protection
     safe_filename = os.path.basename(filename)
-    file_path = os.path.join(DATA_DIR, safe_filename)
-    
-    # Verify file is within DATA_DIR
-    if not os.path.realpath(file_path).startswith(os.path.realpath(DATA_DIR)):
+    user_dir = _user_downloads_dir(user["username"])
+    file_path = os.path.join(user_dir, safe_filename)
+
+    # Verificar que el archivo cae dentro de la carpeta del usuario
+    if not os.path.realpath(file_path).startswith(os.path.realpath(user_dir)):
         raise HTTPException(status_code=403, detail="Acceso denegado")
-    
+
     if not os.path.exists(file_path):
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
-        
+
     media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     if filename.lower().endswith('.txt'):
         media_type = "text/plain"

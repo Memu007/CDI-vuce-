@@ -12,7 +12,8 @@ from openpyxl.utils import get_column_letter  # Utilidades
 import os
 
 def create_maria_excel(items: List[Item], operation_id: str, user_plan: str = 'basic',
-                        user_email: Optional[str] = None, client_name: Optional[str] = None) -> str:
+                        user_email: Optional[str] = None, client_name: Optional[str] = None,
+                        output_dir: Optional[str] = None) -> str:
     """
     🏭 GENERADOR PRINCIPAL DE EXCEL AVG
 
@@ -88,9 +89,19 @@ def create_maria_excel(items: List[Item], operation_id: str, user_plan: str = 'b
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename = f"AVG_{operation_id.replace(' ', '_')}_{timestamp}.xlsx"
 
-    # Guardar en DATA_DIR (/CDI/data/) para que el endpoint /download/ pueda encontrarlo
-    # Path: core/excel_generator.py -> proyecto_maria/ -> CDI/ -> CDI/data/
-    data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'data')
+    # Guardar donde el endpoint /download/ lo pueda encontrar.
+    #
+    # `output_dir` es la carpeta propia del usuario (ver `_user_downloads_dir`
+    # en main.py): los archivos descargables NO van sueltos en un directorio
+    # compartido, porque ahi cualquier usuario logueado podia bajarse los de
+    # otro. El fallback historico queda para llamadas sueltas (scripts, tests).
+    if output_dir:
+        data_dir = output_dir
+    else:
+        # Path: core/excel_generator.py -> proyecto_maria/ -> CDI/ -> CDI/data/
+        data_dir = os.getenv("CDI_DATA_DIR") or os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'data'
+        )
     os.makedirs(data_dir, exist_ok=True)
     filepath = os.path.join(data_dir, filename)
 

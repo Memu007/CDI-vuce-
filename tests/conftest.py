@@ -53,6 +53,22 @@ def pytest_sessionstart(session):
     asyncio.run(init_db())
 
 
+def pytest_sessionfinish(session, exitstatus):
+    """Cerrar el engine al terminar.
+
+    `aiosqlite` atiende cada conexión con un hilo propio que NO es daemon. Con
+    StaticPool esa conexión queda abierta toda la sesión, y si no se cierra el
+    intérprete se queda esperando ese hilo para siempre: los tests terminan en
+    verde pero el proceso nunca sale. Se veía al correr un archivo suelto.
+    """
+    try:
+        asyncio.run(_test_engine.dispose())
+    except Exception:
+        # Si ya está cerrado o el loop murió, no hay nada que hacer acá: no
+        # queremos convertir una limpieza en un fallo de la suite.
+        pass
+
+
 @pytest.fixture(scope="session")
 def event_loop():
     """Create an instance of the default event loop for each test case."""

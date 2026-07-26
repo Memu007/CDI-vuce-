@@ -6,6 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-26 · fix(seguridad): un despachante podía bajarse el MARIA.TXT de otro
+
+- **security (crítico):** `/download/{archivo}` pedía sesión iniciada pero **no chequeaba de quién era el archivo**. Como el nombre del MARIA.TXT sale del número de factura (`MARIA_FAC_0001-00012345.TXT`), corto y adivinable, cualquier usuario registrado podía bajarse la declaración de otro despachante —con CUIT del importador, NCM y valores— probando números. Lo mismo con cualquier archivo interno del directorio de datos, como `ncm_historial_<usuario>.json`. Encontrado atacando la app, no leyendo el código.
+- **fix:** los archivos descargables ahora viven en una carpeta por usuario (`_user_downloads_dir`, hash del nombre de usuario) y `/download` resuelve únicamente dentro de la del que pide. Alcanza a `/generate_maria`, `/generate_maria_export` y los Excel AVG. Verificado que el dueño sí sigue bajando el suyo.
+- **test:** `tests/test_download_aislamiento.py` (5 pruebas) cubre el caso feliz, el ataque original, los archivos internos, path traversal y que dos usuarios no compartan carpeta.
+- **test (G3):** nuevo `./scripts/testing/ataque_aislamiento.sh` — crea dos despachantes, uno carga un cliente con CUIT y genera su MARIA.TXT, y el otro intenta verlo, modificarlo, borrarlo y descargarlo. Segunda corrida con el arreglo: **22 bloqueados, 0 fugas**.
+- **fix (tests):** `conftest.py` no cerraba el engine async de SQLite al terminar. `aiosqlite` atiende cada conexión con un hilo no-daemon, así que correr un archivo suelto terminaba en verde pero el proceso no salía nunca. Agregado `pytest_sessionfinish` que hace `dispose()`. (El cuelgue *dentro* de los tests de billing/trial sigue abierto: es otro problema.)
+
 ## 2026-07-26 · test: ronda G2 ejecutada — 16 ataques, 16 resistidos
 
 - **test (G2):** `ataque_imagen.sh` ahora tiene dos modos. El completo construye la imagen Docker y la ataca; el nuevo `--sin-docker` levanta la app directo contra un Postgres descartable y tira los mismos ataques. Si no hay Postgres, cae a SQLite avisando que la prueba de persistencia queda más débil.

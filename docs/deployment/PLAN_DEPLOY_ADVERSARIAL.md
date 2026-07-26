@@ -210,6 +210,50 @@ automática nueva, para que no vuelva.
 **Puerta G3:** cero fugas entre usuarios. Cada intento cerrado con una prueba
 en `tests/`.
 
+**Automatizada en `scripts/testing/ataque_aislamiento.sh`** (no necesita
+Docker): crea dos despachantes, uno carga un cliente con CUIT y genera su
+MARIA.TXT, y el otro intenta verlo, modificarlo, borrarlo y descargarlo.
+
+### Evidencia G3 · 2026-07-26 · PASADA con 1 fuga encontrada y arreglada
+
+**Primera corrida: 1 fuga real.**
+
+> Beto se descargó el MARIA.TXT de Ana —la declaración completa, con el CUIT
+> del importador adentro— simplemente pidiendo
+> `/download/MARIA_FAC_0001-00012345.TXT`.
+>
+> Por qué pasaba: el nombre del archivo sale del **número de factura**, que es
+> corto y adivinable, y `/download` solo chequeaba que hubiera sesión iniciada,
+> no de quién era el archivo. Con los archivos sueltos en una carpeta
+> compartida, alcanzaba con probar números de factura. Lo mismo aplicaba a
+> cualquier archivo interno de esa carpeta, como `ncm_historial_<usuario>.json`.
+>
+> Arreglo: los descargables ahora viven en una carpeta por usuario y
+> `/download` resuelve únicamente dentro de la del que pide. Cubierto por
+> `tests/test_download_aislamiento.py`.
+
+**Segunda corrida, con el arreglo: 22 bloqueados, 0 fugas.**
+
+```
+OK    | Ver cliente de Ana por ID (404)
+OK    | Buscar el cliente de Ana por CUIT (sin datos)
+OK    | Ver operaciones / métricas / export.csv / catálogo / plantilla (404)
+OK    | Modificar / favorito / cargar operación / borrar cliente de Ana (404)
+OK    | Descargar el MARIA.TXT de Ana (404)      ← era la fuga
+OK    | Ana baja su propio MARIA.TXT (200)       ← el arreglo no rompió nada
+OK    | El listado y el buscador de Beto no ven lo de Ana
+OK    | Sin login, todo 401 (incluido el TXT)
+OK    | Los datos de Ana quedaron intactos
+----------------------------------------
+Bloqueado: 22   ·   Fugas: 0
+```
+
+Reproducir: `./scripts/testing/ataque_aislamiento.sh`
+
+> Lo que sí estaba bien de entrada: los IDs de cliente son UUID (no se pueden
+> enumerar), hay protección CSRF activa, y los 21 accesos restantes ya daban
+> 404 o 401. La fuga era una sola, pero era la más cara.
+
 ---
 
 ### Ronda 4 · El producto, atacado 🟡 *importante*
@@ -312,9 +356,9 @@ una tarde.
 | **G0 · Secretos** | 🟡 Escaneado el historial completo (53 commits): la única clave viva es la `GEMINI_API_KEY` en `docs/audits/`. **Falta rotarla.** | Vos, en Google AI Studio |
 | **G1 · Configuración** | 🟢 Destino decidido: **Railway**. `firebase.json` y el script de Cloud Run duplicado, borrados. Preflight funcionando. | Hecho |
 | **G2 · Imagen real** | 🟡 Corrida en modo reducido contra Postgres real: **16 chequeos, 16 resistidos, 0 caídos**. Falta el modo completo (con la imagen Docker). | Vos, un comando |
-| **G3 · Aislamiento** | ⚪ Sin empezar | Después de G2 |
+| **G3 · Aislamiento** | 🟢 **Pasada.** Se encontró y arregló una fuga real (un despachante podía bajarse el MARIA.TXT de otro adivinando el nro de factura). Segunda corrida: 22 bloqueados, 0 fugas. | Hecho |
 | **G4 · Producto** | ⚪ Sin empezar | Después de G3 |
-| **G5 · Pruebas** | ⚪ Deuda anotada, va después del deploy | — |
+| **G5 · Pruebas** | 🟡 Arreglado el cuelgue **al salir** (`conftest` no cerraba el engine de SQLite: los tests terminaban en verde y el proceso no salía nunca). Sigue abierto el cuelgue **dentro** de los tests de billing/trial/402. | Deuda, después del deploy |
 | **G6 · Rollback** | ⚪ Sin empezar | Al deployar |
 
 ### Lo que te toca a vos (dos cosas, ninguna requiere programar)
