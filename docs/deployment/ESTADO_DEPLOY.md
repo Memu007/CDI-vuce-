@@ -67,18 +67,21 @@ También había un fragmento del DSN de Sentry en el checklist de deploy. Ya lo
 saqué. El DSN de Sentry es menos grave (sirve para mandar errores, no para
 leerlos), pero conviene rotarlo también si es fácil.
 
-### 🟡 Elegir un solo destino de deploy — decisión tuya
-
-Hoy el repo tiene configurados tres, y eso es una fuente de errores:
+### ✅ Destino de deploy: Railway — decidido el 2026-07-26
 
 | Destino | Archivos | Estado |
 |---|---|---|
-| **Railway** | `railway.json`, `Dockerfile` | Es el que `HANDOFF.md` marca como producción. La guía `RAILWAY_SETUP.md` está completa y correcta. **Recomendado.** |
-| **Google Cloud Run** | `cloudbuild.yaml`, `deploy_cloudrun.sh`, `scripts/deployment/deploy-cloud-run.sh` | Funciona, pero son **dos servicios distintos** (`cdi-maria` y `cdi-backend`). Si corrés los dos scripts quedan dos apps vivas con bases separadas. |
-| **Firebase Hosting** | `firebase.json` | **No usar.** Apunta a una función `api` que no existe en este repo. Es configuración vieja que quedó dando vueltas. |
+| **Railway** | `railway.json`, `Dockerfile` | **El camino oficial.** Guía: `RAILWAY_SETUP.md`. |
+| Google Cloud Run | `cloudbuild.yaml`, `scripts/deployment/deploy-cloud-run.sh` | Se deja como alternativa, arreglada y con un solo script. No es el camino actual. |
+| ~~Firebase Hosting~~ | ~~`firebase.json`~~ | **Borrado.** Apuntaba a una función `api` que no existe en este repo. Si algún día hace falta, está en el historial de git. |
 
-Recomendación: quedarse con **Railway** y archivar lo demás. Si preferís Cloud
-Run, usar **un solo** script y borrar el otro.
+También se borró `deploy_cloudrun.sh` de la raíz, que deployaba un servicio
+distinto (`cdi-maria`) al del otro script (`cdi-backend`): correr los dos
+dejaba dos apps vivas con bases separadas.
+
+> Nota: se dejó **una** vía de Cloud Run en vez de borrar las dos. Cuesta cero
+> mantenerla y evita rehacer todo desde cero si Railway no convence. La
+> confusión venía de tener dos scripts peleados, no de que exista la opción.
 
 ### 🟡 Cargar las variables de producción
 

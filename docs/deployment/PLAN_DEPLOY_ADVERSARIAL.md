@@ -118,13 +118,22 @@ llega a producir un servicio vivo y mal configurado.
 
 ### Ronda 2 · La imagen real, atacada 🔴 *bloqueante*
 
-⚠️ **Esta ronda necesita Docker o un entorno de staging.** En el entorno donde
-hice la revisión no había Docker: todo lo que verifiqué fue con la app corriendo
-directo, **no con la imagen que realmente se deploya**. Es un hueco real.
+⚠️ **Esta ronda necesita Docker.** En el entorno donde corre la IA no hay
+Docker (es un contenedor descartable en la nube, aislado de tu máquina — no
+cambia según desde qué aparato escribas). Todo lo verificado hasta ahora fue
+con la app corriendo directo, **no con la imagen que realmente se deploya**.
 
-**Azul-Deploy** buildea la imagen y la levanta con variables de producción.
+**Ya está automatizada.** Un solo comando en tu máquina, no hay que programar:
 
-**Rojo-Intruso** ataca el contenedor:
+```bash
+./scripts/testing/ataque_imagen.sh
+```
+
+Construye la imagen, levanta un Postgres descartable, corre los 14 ataques de
+abajo, imprime cuáles resistió y cuáles no, y borra todo al terminar. No toca
+tu base real ni necesita claves. Después se manda la salida completa.
+
+Los ataques que tira:
 
 - `/docs`, `/redoc`, `/openapi.json` → tienen que dar 404
 - Login con `demo`/`demo123`, `premium`/`premium123` → tiene que fallar
@@ -258,9 +267,26 @@ una tarde.
 
 ---
 
-## Para empezar
+## Estado de las rondas
 
-Decime dos cosas y arranco:
+| Ronda | Estado | Quién sigue |
+|---|---|---|
+| **G0 · Secretos** | 🟡 Escaneado el historial completo (53 commits): la única clave viva es la `GEMINI_API_KEY` en `docs/audits/`. **Falta rotarla.** | Vos, en Google AI Studio |
+| **G1 · Configuración** | 🟢 Destino decidido: **Railway**. `firebase.json` y el script de Cloud Run duplicado, borrados. Preflight funcionando. | Hecho |
+| **G2 · Imagen real** | 🟡 Automatizada en `scripts/testing/ataque_imagen.sh`. Falta correrla. | Vos, un comando |
+| **G3 · Aislamiento** | ⚪ Sin empezar | Después de G2 |
+| **G4 · Producto** | ⚪ Sin empezar | Después de G3 |
+| **G5 · Pruebas** | ⚪ Deuda anotada, va después del deploy | — |
+| **G6 · Rollback** | ⚪ Sin empezar | Al deployar |
 
-1. ¿Railway o Cloud Run? (recomiendo Railway)
-2. ¿Tenés dónde correr Docker, o vamos directo a un staging para la Ronda 2?
+### Lo que te toca a vos (dos cosas, ninguna requiere programar)
+
+1. **Rotar la clave de Gemini** en Google AI Studio: borrar la vieja, crear
+   una nueva, y cargarla en las variables de Railway.
+2. **Correr un comando** y mandarme la salida:
+
+   ```bash
+   ./scripts/testing/ataque_imagen.sh
+   ```
+
+Con eso cerramos G0 y G2, y sigo con G3 y G4.

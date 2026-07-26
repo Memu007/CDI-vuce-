@@ -53,7 +53,10 @@ services:
       # Seguridad
       - ENVIRONMENT=production
       - ENABLE_HSTS=false
-      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-default-secret-change-in-production}
+      # Sin valor por defecto a propósito: la app rechaza claves con "default"
+      # o "secret" adentro, así que un default falso sólo genera un error
+      # confuso. Sin JWT_SECRET_KEY el arranque falla diciendo exactamente eso.
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:?falta JWT_SECRET_KEY - generala con: python3 -c "import secrets; print(secrets.token_urlsafe(48))"}
     depends_on:
       postgres:
         condition: service_healthy

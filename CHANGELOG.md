@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-26 · chore: Railway como único camino + ataque automatizado a la imagen
+
+- **chore (deploy):** destino decidido: **Railway**. Se borró `firebase.json` (apuntaba a una función `api` que no existe en este repo) y `deploy_cloudrun.sh` de la raíz, que deployaba el servicio `cdi-maria` mientras el otro script deploya `cdi-backend`: correr los dos dejaba dos apps vivas con bases separadas. Queda `scripts/deployment/deploy-cloud-run.sh` como alternativa arreglada.
+- **test (G2):** nuevo `./scripts/testing/ataque_imagen.sh` — un solo comando que construye la imagen Docker de producción, la levanta contra un Postgres descartable y le tira 14 ataques (documentación técnica expuesta, usuarios demo, cookies sin `Secure`, CORS abierto, admin sin login, archivos internos, cabeceras, rate limit y pérdida de datos al reiniciar). Imprime qué resistió y qué cayó, y borra todo al terminar.
+- **security (G0):** escaneo del historial completo de git (53 commits): la única clave viva es la `GEMINI_API_KEY` de `docs/audits/`. Sigue pendiente rotarla.
+- **fix (compose):** `docker-compose.yml` tenía `JWT_SECRET_KEY` con default `default-secret-change-in-production`, que la app rechaza por débil. Ahora falla pidiendo la variable, con el comando para generarla.
+
 ## 2026-07-26 · docs: plan adversarial para llegar a deploy
 
 - **docs:** `docs/deployment/PLAN_DEPLOY_ADVERSARIAL.md` — 7 rondas con equipos enfrentados (uno construye, otro rompe y lo demuestra) y una puerta por ronda que hay que pasar para avanzar. Ordenadas por riesgo: secretos, configuración de deploy, la imagen Docker real atacada, aislamiento entre despachantes, validez del MARIA.TXT, suite de tests y rollback probado.
