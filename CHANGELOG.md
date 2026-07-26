@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-26 · docs: de dónde sale cada dato del MARIA.TXT
+
+- **docs:** `docs/features/ORIGEN_DE_LOS_DATOS_MARIA.md` clasifica los **71 campos** de los dos archivos reales según su origen: qué sale de la factura (~18, casi todo ya se extrae), qué es fijo del formato (~13), qué se carga una vez por despachante o cliente (~8), qué decide el despachante en cada operación (~10) y qué calcula el sistema (~12).
+- **hallazgo:** `CARTPAYORI` (origen) y `CARTPAYPRC` (procedencia) son cosas distintas y en la referencia vieja **difieren** (200 vs 222): la mercadería puede ser de un país y embarcarse desde otro. Hoy los igualamos por defecto, así que cuando no coinciden el TXT sale con la procedencia equivocada y ninguna validación se queja — mismo patrón silencioso que el año del `IEXT`. Candidato al próximo arreglo.
+- **producto:** el grupo "se carga una vez" (código de proveedor, `ARDIG-CUIT-PSAD`, CUIT del despachante) es la mejor oportunidad: cada campo que falta es una corrección a mano en cada operación.
+
 ## 2026-07-26 · fix(MARIA): gastos a FOB — el campo depende de la condición de venta
 
 - **fix (MARIA):** se emitía siempre `GTOS-POS-FOB` con flete + seguro. En una operación **EXW eso es el campo equivocado con el número equivocado**. La regla (información complementaria del SIM, convenio AFIP-BCRA): EXW → `GTOS-ANT-FOB` (gastos hasta el FOB); grupos C y D → `GTOS-POS-FOB` (diferencia entre la condición pactada y el FOB). Coincide con las dos referencias reales.
