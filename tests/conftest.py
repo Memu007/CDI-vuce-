@@ -20,18 +20,25 @@ os.environ['DATABASE_URL'] = f'sqlite+aiosqlite:///{_test_db_path}'
 from proyecto_maria.main import app  # noqa: E402
 from sqlalchemy import event  # noqa: E402
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession  # noqa: E402
-from sqlalchemy.pool import StaticPool  # noqa: E402
+from sqlalchemy.pool import NullPool  # noqa: E402
 import proyecto_maria.database.connection as _conn  # noqa: E402
 from proyecto_maria.database.connection import init_db  # noqa: E402
 
-# Reemplazar el engine por uno con StaticPool: una sola conexión compartida
-# para todo el proceso de tests. Razón: SQLite con múltiples conexiones async
-# escribiendo en paralelo (p.ej. bcrypt ~300ms + registros concurrentes)
-# dispara "database is locked". StaticPool serializa el acceso y lo elimina.
+# Engine sin pool (NullPool): una conexión nueva por uso, cerrada al terminar.
+#
+# Antes se usaba StaticPool —una sola conexión compartida por todo el proceso—
+# para evitar "database is locked". El problema: `TestClient`, usado sin
+# `with`, abre un event loop NUEVO en cada request. Una conexión de aiosqlite
+# queda atada al loop donde nació, así que al reusarla desde otro loop su
+# cierre queda colgado (`CancelledError` al cerrar) y el proceso no termina
+# nunca. Eso era el cuelgue de los tests de billing/trial.
+#
+# Con NullPool cada request abre y cierra su conexión dentro de su propio
+# loop. El "database is locked" lo cubre `busy_timeout=30000` (abajo).
 _test_engine = create_async_engine(
     os.environ['DATABASE_URL'],
     future=True,
-    poolclass=StaticPool,
+    poolclass=NullPool,
     connect_args={"check_same_thread": False, "timeout": 30},
 )
 _conn.engine = _test_engine
@@ -46,6 +53,7 @@ def _set_sqlite_pragma(dbapi_connection, _):
     cursor.execute("PRAGMA busy_timeout=30000")  # 30s: esperar el lock, no fallar
     cursor.close()
 import asyncio  # noqa: E402
+import threading  # noqa: E402
 
 
 def pytest_sessionstart(session):
@@ -66,6 +74,39 @@ def pytest_sessionfinish(session, exitstatus):
     except Exception:
         # Si ya está cerrado o el loop murió, no hay nada que hacer acá: no
         # queremos convertir una limpieza en un fallo de la suite.
+        pass
+
+    # Apagar las conexiones de aiosqlite que quedaron huérfanas.
+    #
+    # `TestClient`, usado sin `with`, abre un event loop nuevo por request. Si
+    # una conexión sigue abierta cuando ese loop muere, su cierre queda a
+    # medias y el hilo que la atiende se queda esperando trabajo para siempre.
+    # Como no es daemon, el intérprete no termina: los tests dan verde y el
+    # proceso nunca sale. (Daemonizarlos no sirve: Python no deja cambiar eso
+    # en un hilo ya arrancado.)
+    #
+    # El hilo sí corta solo si recibe el centinela de parada de aiosqlite, así
+    # que se lo mandamos a mano. Es limpieza de test: en producción la app no
+    # usa TestClient ni cambia de event loop.
+    try:
+        import gc
+        import aiosqlite
+        from aiosqlite.core import _STOP_RUNNING_SENTINEL
+
+        huerfanas = [
+            o for o in gc.get_objects()
+            if isinstance(o, aiosqlite.Connection)
+            and getattr(o, "_thread", None) is not None
+            and o._thread.is_alive()
+        ]
+        for conexion in huerfanas:
+            try:
+                conexion._tx.put_nowait((None, lambda: _STOP_RUNNING_SENTINEL))
+            except Exception:
+                pass
+        for conexion in huerfanas:
+            conexion._thread.join(timeout=2)
+    except Exception:
         pass
 
 
@@ -89,6 +130,47 @@ def client(monkeypatch):
     limiter.enabled = False
     
     return TestClient(app)
+
+@pytest.fixture(autouse=True)
+def _apagar_bypass_en_tests_de_auth(request, monkeypatch):
+    """Los tests que prueban "sin sesión → 401" corren sin el atajo de pytest.
+
+    La app, bajo pytest, autentica sola cuando no hay token (ver
+    `auth/dependencies.py`). Cómodo para el resto de la suite, pero convierte
+    en imposible cualquier test de "esto exige login": el pedido entra igual.
+
+    Hasta 2026-07-26 había **23 tests así** que nunca podían pasar, y no se
+    notaba porque los archivos que los contenían se colgaban antes de llegar.
+    Toda la cobertura de "este endpoint pide autenticación" era humo.
+
+    En vez de tocar los 23 a mano, se apaga el atajo automáticamente en
+    cualquier test cuyo nombre hable de falta de sesión. Los que se escriban
+    de acá en adelante quedan cubiertos solos.
+    """
+    nombre = request.node.name.lower()
+    if any(p in nombre for p in ("sin_auth", "sin_token", "sin_sesion",
+                                 "requires_auth", "requiere_auth", "_401")):
+        import proyecto_maria.auth.dependencies as deps
+        monkeypatch.setattr(deps, "_is_testing_runtime", lambda: False)
+
+
+@pytest.fixture
+def sin_bypass_de_test(monkeypatch):
+    """Apaga el atajo de autenticación que la app usa cuando corre bajo pytest.
+
+    `get_current_user` devuelve un usuario falso si no hay token y estamos en
+    pytest (ver `auth/dependencies.py`). Eso es cómodo para el resto de los
+    tests, pero hace **imposible** probar que un pedido sin sesión se rechaza:
+    siempre entra. Con esta fixture el endpoint pasa por el camino real y
+    devuelve 401.
+
+    El atajo exige `ENVIRONMENT=testing` **y** `PYTEST_CURRENT_TEST`, así que
+    en producción no existe (verificado atacando la imagen: sin login todo
+    responde 401).
+    """
+    import proyecto_maria.auth.dependencies as deps
+    monkeypatch.setattr(deps, "_is_testing_runtime", lambda: False)
+
 
 @pytest.fixture
 def auth_headers():

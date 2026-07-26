@@ -6,6 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-26 · fix(tests): la suite completa corre por primera vez
+
+- **fix (raíz):** `pytest` sobre todo el repo se colgaba para siempre. Causa: `TestClient`, usado sin `with`, abre un **event loop nuevo por request**, y el `StaticPool` del `conftest` reusaba **la misma conexión de aiosqlite** entre loops distintos. Al cerrarla desde un loop que ya murió, el cierre queda a medias (`CancelledError`) y el hilo que la atiende espera para siempre. Se cambió a `NullPool`: cada request abre y cierra su conexión en su propio loop. El `database is locked` que motivó el `StaticPool` lo cubre `busy_timeout=30000`.
+- **fix (salida):** aun terminando en verde, el proceso no salía: quedaban hilos de conexión huérfanos, y no se pueden daemonizar una vez arrancados. `pytest_sessionfinish` ahora los apaga mandándoles el centinela de parada de aiosqlite.
+- **hallazgo grave:** al destrabarse aparecieron **23 tests de "sin sesión → 401" que nunca podían pasar**. La app, bajo pytest, autentica sola si no hay token; toda la cobertura de "este endpoint pide login" era humo, y no se notaba porque los archivos se colgaban antes de llegar. Nueva fixture autouse apaga ese atajo en cualquier test cuyo nombre hable de falta de sesión — los futuros quedan cubiertos solos. (El atajo exige `ENVIRONMENT=testing` + pytest: en producción no existe, verificado atacando la imagen.)
+- **resultado:** de *no poder correr* a **658 passed, 102 skipped, 41 segundos**. CI pasa de 9 archivos elegidos a mano a **la suite entera**, con 10 fallas viejas deseleccionadas una por una (6 de `test_pilar_b_quotes`, 3 de botones NCM en HTML/JS, 1 de CSRF con Bearer) para sacarlas a medida que se arreglen.
+- **fix (tests propios):** 3 tests verificaban el contrato viejo de descargas y de `create_maria_excel`; actualizados al nuevo, que aísla los archivos por usuario.
+
 ## 2026-07-26 · feat(MARIA): los supuestos se muestran, no se adivinan
 
 - **feat (confianza):** nueva función `supuestos_declarados()` — antes de generar, el sistema lista en castellano llano **todo campo que declaró sin preguntar**: gastos a FOB calculados u omitidos, procedencia igualada al origen (con el número de ítem), `CARTUSO=3` fijo, `IVAADICIONAL1=IVAAD1` fijo y unidad `07` por defecto. Aparecen junto a los avisos que el frontend ya mostraba. No bloquean.

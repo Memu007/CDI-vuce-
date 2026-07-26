@@ -233,8 +233,14 @@ def test_reactivate_after_period_expired_returns_past_due_and_needs_checkout(cli
 # ---------- Auth obligatoria en todos los endpoints ----------
 
 
-def test_change_password_requires_auth(client):
-    """Sin cookie → 401 (no se filtra info de hash)."""
+def test_change_password_requires_auth(client, sin_bypass_de_test):
+    """Sin cookie → 401 (no se filtra info de hash).
+
+    Necesita `sin_bypass_de_test`: bajo pytest la app autentica sola cuando no
+    hay token, así que sin apagar ese atajo este test nunca puede dar 401.
+    Estuvo dando falso verde hasta 2026-07-26 — en realidad ni se ejecutaba,
+    porque el archivo se colgaba antes de llegar acá.
+    """
     client.cookies.clear()
     resp = client.post("/api/user/change-password", json={
         "current_password": "x",
@@ -243,13 +249,13 @@ def test_change_password_requires_auth(client):
     assert resp.status_code == 401
 
 
-def test_cancel_requires_auth(client):
+def test_cancel_requires_auth(client, sin_bypass_de_test):
     client.cookies.clear()
     resp = client.post("/api/billing/cancel")
     assert resp.status_code == 401
 
 
-def test_reactivate_requires_auth(client):
+def test_reactivate_requires_auth(client, sin_bypass_de_test):
     client.cookies.clear()
     resp = client.post("/api/billing/reactivate")
     assert resp.status_code == 401

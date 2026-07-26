@@ -33,22 +33,30 @@ jobs:
       - name: Sintaxis Python
         run: python -m compileall -q proyecto_maria tests
 
-      - name: Pruebas críticas estables
+      # La suite entera. Hasta 2026-07-26 no se podia correr: se colgaba para
+      # siempre en los tests de billing/trial, asi que CI miraba solo 9
+      # archivos elegidos a mano y el resto no lo revisaba nadie.
+      #
+      # Los 10 que quedan en rojo son fallas viejas que estaban tapadas por el
+      # cuelgue; se deseleccionan de a una, con su motivo, para que el resto
+      # este protegido desde ya. Sacar de esta lista a medida que se arreglen.
+      - name: Suite completa
         env:
           ENVIRONMENT: testing
           JWT_SECRET_KEY: ci-only-key-material-with-more-than-32-characters
           EMAIL_VERIFICATION_REQUIRED: "false"
         run: >-
           python -m pytest --no-cov
-          tests/test_generar_maria_txt.py
-          tests/test_regression_phase0.py
-          tests/test_migration_import.py
-          tests/test_smart_validation_gates.py
-          tests/test_download_aislamiento.py
-          tests/test_maria_iext_anio.py
-          tests/test_maria_subitems.py
-          tests/test_maria_gastos_fob.py
-          tests/test_maria_supuestos.py
+          --deselect tests/test_csrf.py::test_enforce_no_afecta_bearer_sin_cookie
+          --deselect tests/test_pdf_avg_functional.py::TestAutoNCMButtonRemoval::test_auto_ncm_button_not_in_html
+          --deselect tests/test_recent_changes_validation.py::TestAutoNCMButtonRemovalValidation::test_no_auto_ncm_button_in_main_html
+          --deselect tests/test_recent_changes_validation.py::TestAutoNCMButtonRemovalValidation::test_no_auto_ncm_functions_in_javascript
+          --deselect tests/test_pilar_b_quotes.py::test_share_quote_valid
+          --deselect tests/test_pilar_b_quotes.py::test_get_public_quote_valid
+          --deselect tests/test_pilar_b_quotes.py::test_get_public_quote_expired
+          --deselect tests/test_pilar_b_quotes.py::test_get_public_quote_rate_limit
+          --deselect tests/test_pilar_b_quotes.py::test_share_quote_tarifar_returns_reordered_items
+          --deselect tests/test_pilar_b_quotes.py::test_share_quote_tarifar_fails_returns_503
 
   e2e-maria:
     needs: tests

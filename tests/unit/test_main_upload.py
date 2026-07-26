@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 
 import pandas as pd
 import pytest
@@ -76,7 +77,9 @@ def test_upload_excel_success_flow(monkeypatch, main_client):
 
     created_filename = "generated.xlsx"
     monkeypatch.setattr(main, "run_pre_maria_validations", lambda items: (items, []))
-    monkeypatch.setattr(main, "create_maria_excel", lambda items, op_id: created_filename)
+    # `output_dir` es el parametro que aisla las descargas por usuario.
+    monkeypatch.setattr(main, "create_maria_excel",
+                        lambda items, op_id, **kw: created_filename)
 
     files = {
         "file": (
@@ -121,12 +124,16 @@ def test_extract_items_from_excel_standard_mapping():
 
 @pytest.mark.asyncio
 async def test_download_file_success_and_missing(tmp_path, monkeypatch):
-    existing = tmp_path / "generated.xlsx"
-    existing.write_text("dummy")
-
-    # Ensure function looks at tmp directory
+    # Las descargas viven en la carpeta propia de cada usuario, no sueltas en
+    # DATA_DIR: antes cualquier usuario logueado podia bajarse el MARIA.TXT de
+    # otro adivinando el numero de factura. Ver tests/test_download_aislamiento.py.
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(main, "DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(main, "DOWNLOADS_DIR", str(tmp_path / "descargas"))
+
+    carpeta_del_usuario = main._user_downloads_dir("test")
+    existing = Path(carpeta_del_usuario) / "generated.xlsx"
+    existing.write_text("dummy")
 
     response = await main.download_file(existing.name, user={"username": "test"})
     assert response.path == str(existing.absolute())

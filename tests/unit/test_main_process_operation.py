@@ -26,7 +26,8 @@ def test_process_operation_success_main(monkeypatch, main_client):
     }
 
     monkeypatch.setattr(main, "run_pre_maria_validations", lambda items: (items, []))
-    monkeypatch.setattr(main, "create_maria_excel", lambda items, op_id: "AVG_TEST.xlsx")
+    monkeypatch.setattr(main, "create_maria_excel",
+                        lambda items, op_id, **kw: "AVG_TEST.xlsx")
 
     response = main_client.post("/process_operation/", json=payload)
 
