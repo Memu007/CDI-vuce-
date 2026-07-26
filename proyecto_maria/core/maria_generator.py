@@ -568,7 +568,10 @@ def generate_maria_txt(operation_id: str, items: list,
         lines.append(f"IESPNCE={ncm}")
         lines.append(f"IDDT={operation_id}")
         lines.append(f"IARTESPAPU={operation_id}{idx:04d}")
-        lines.append("CARTSBITEM=N") # Ojo: sample dice N pero tiene [SBT]
+        # S cuando el ítem se declara partido en sub-ítems, N cuando va entero.
+        # Los dos archivos de referencia lo confirman: el que tiene un solo
+        # [SBT] dice N, el que tiene dos dice S.
+        lines.append("CARTSBITEM=S" if item.get("subitems") else "CARTSBITEM=N")
         lines.append("CARTUSO=3")
         lines.append(f"QARTKGRNET={peso_kg:.3f}")
         lines.append(f"CARTPAYORI={pais_codigo}")
@@ -605,23 +608,76 @@ def generate_maria_txt(operation_id: str, items: list,
         lines.append(f"MCPL={'IVAAD1':<40}")
         lines.append("")
         
-        # [SBT] Subitems (Sufijos de valor)
-        # Sufijo de valor: OBLIGATORIO. Sin este dato no se puede generar el TXT
-        # porque es específico de cada importador (regla del despachante).
+        # [SBT] Sufijos de valor.
+        #
+        # Un ítem puede declararse entero (un solo [SBT]) o partido en varios
+        # sub-ítems, uno por modelo/marca, cada uno con su cantidad y su FOB.
+        # El manual de PreDespacho lo llama "separar en Ítem o no": es una
+        # decisión del despachante, no algo que se deduzca solo.
+        #
+        # Referencia real con dos sub-ítems:
+        # `tests/fixtures/maria_golden_subitems_anon.TXT`.
         sufijo_sbt = (sbt_sufijo_valor or "").strip()
-        if not sufijo_sbt:
+        subitems = item.get("subitems") or []
+
+        if not subitems and not sufijo_sbt:
             raise ValueError(
                 "Falta el sufijo de valor SBT (CSBTSVL). "
                 "Este dato es obligatorio y depende del importador. "
                 "Contactá al despachante para obtenerlo."
             )
-        lines.append("[SBT]")
-        lines.append(f"IDDT={operation_id}")
-        lines.append(f"NART={idx:04d}")
-        lines.append("ISBT=0000")
-        lines.append(f"IEXT={idx}-1")
-        lines.append(f"CSBTSVL={sufijo_sbt}")
-        lines.append("")
+
+        if not subitems:
+            # Ítem entero: un solo bloque, sin montos (numeración desde 0000).
+            lines.append("[SBT]")
+            lines.append(f"IDDT={operation_id}")
+            lines.append(f"NART={idx:04d}")
+            lines.append("ISBT=0000")
+            lines.append(f"IEXT={idx}-1")
+            lines.append(f"CSBTSVL={sufijo_sbt}")
+            lines.append("")
+        else:
+            # Partido en sub-ítems: numeración desde 0001, cada uno con su
+            # cantidad, unitario y FOB.
+            #
+            # Las cuentas tienen que cerrar contra el ítem, si no la aduana
+            # rechaza la declaración. Se valida acá y se corta: mejor un error
+            # en pantalla que un TXT que no cuadra.
+            suma_cant = sum(float(s.get("cantidad", 0) or 0) for s in subitems)
+            suma_fob = sum(
+                float(s.get("cantidad", 0) or 0) * float(s.get("valor_unitario", valor_unit) or 0)
+                for s in subitems
+            )
+            if abs(suma_cant - cantidad) > 0.001:
+                raise ValueError(
+                    f"Item {idx}: las cantidades de los sub-ítems suman {suma_cant:g} "
+                    f"pero el ítem declara {cantidad:g}. Tienen que coincidir."
+                )
+            if abs(suma_fob - valor_total) > 0.01:
+                raise ValueError(
+                    f"Item {idx}: los valores de los sub-ítems suman {suma_fob:.2f} "
+                    f"pero el ítem declara {valor_total:.2f}. Tienen que coincidir."
+                )
+
+            for n, sub in enumerate(subitems, start=1):
+                sufijo = (sub.get("sufijo") or sufijo_sbt or "").strip()
+                if not sufijo:
+                    raise ValueError(
+                        f"Item {idx}, sub-ítem {n}: falta el sufijo de valor (CSBTSVL)."
+                    )
+                sub_cant = float(sub.get("cantidad", 0) or 0)
+                sub_unit = float(sub.get("valor_unitario", valor_unit) or 0)
+                lines.append("[SBT]")
+                lines.append(f"IDDT={operation_id}")
+                lines.append(f"NART={idx:04d}")
+                lines.append(f"ISBT={n:04d}")
+                lines.append(f"MSBTFOB={sub_cant * sub_unit:.2f}")
+                lines.append(f"QSBTUNTDCL={sub_cant:.2f}")
+                lines.append(f"MSBTUNITAR={sub_unit:.4f}")
+                lines.append(f"IEXT={idx}-{n}")
+                lines.append(f"CSBTSVL={sufijo}")
+                lines.append(f"QSBTUNTEST={sub_cant:.2f}")
+                lines.append("")
 
     return "\r\n".join(lines)
 

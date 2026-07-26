@@ -3523,23 +3523,43 @@ async def generate_maria_endpoint(
         # Validación específica de KIT Maria (complementa la anterior)
         kit_errors, kit_warnings = validate_for_kit_maria(request.items)
 
-        # Validar sbt_sufijo_valor: obligatorio, sin caracteres de control
+        # Validar sbt_sufijo_valor: obligatorio, sin caracteres de control.
+        #
+        # Cuando un ítem se declara partido en sub-ítems, cada sub-ítem trae su
+        # propio sufijo (un modelo por sufijo), así que el sufijo general deja
+        # de ser obligatorio. El generador igual exige que ningún sub-ítem
+        # quede sin sufijo.
         sbt_raw = (request.sbt_sufijo_valor or "").strip()
-        if not sbt_raw:
+        _hay_subitems = any(
+            (it.get("subitems") if isinstance(it, dict) else None)
+            for it in (request.items or [])
+        )
+        if not sbt_raw and not _hay_subitems:
             raise HTTPException(
                 status_code=400,
                 detail="Falta el sufijo de valor SBT. Es un dato obligatorio y específico del importador. Consultar al despachante.",
             )
-        if len(sbt_raw) > 120:
-            raise HTTPException(
-                status_code=400,
-                detail="El sufijo de valor SBT no puede superar los 120 caracteres.",
-            )
-        if any(ord(c) < 32 for c in sbt_raw):
-            raise HTTPException(
-                status_code=400,
-                detail="El sufijo de valor SBT no puede contener saltos de línea ni caracteres de control.",
-            )
+
+        # Los sufijos que se validan son el general y los de cada sub-ítem.
+        _sufijos = [sbt_raw] if sbt_raw else []
+        for it in (request.items or []):
+            if not isinstance(it, dict):
+                continue
+            for sub in (it.get("subitems") or []):
+                if isinstance(sub, dict) and (sub.get("sufijo") or "").strip():
+                    _sufijos.append(sub["sufijo"].strip())
+
+        for _suf in _sufijos:
+            if len(_suf) > 120:
+                raise HTTPException(
+                    status_code=400,
+                    detail="El sufijo de valor SBT no puede superar los 120 caracteres.",
+                )
+            if any(ord(c) < 32 for c in _suf):
+                raise HTTPException(
+                    status_code=400,
+                    detail="El sufijo de valor SBT no puede contener saltos de línea ni caracteres de control.",
+                )
         if kit_errors:
             raise HTTPException(status_code=400, detail={"errors": [*errors, *kit_errors]})
 

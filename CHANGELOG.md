@@ -6,6 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-26 · feat(MARIA): sub-ítems, para facturas con varios modelos bajo una NCM
+
+- **feat (MARIA):** el generador acepta `subitems` dentro de cada ítem: cada uno con su cantidad, valor unitario y sufijo de valor. Emite un `[SBT]` por sub-ítem con `MSBTFOB`, `QSBTUNTDCL`, `MSBTUNITAR` y `QSBTUNTEST`, y marca `CARTSBITEM=S`. Los bloques salen **idénticos a los de un MARIA.TXT real**. Antes se emitía siempre un solo `[SBT]` sin montos, así que una factura con dos modelos bajo la misma NCM no se podía declarar bien.
+- **seguridad (aritmética):** si las cantidades o los valores de los sub-ítems no suman exactamente lo del ítem, se corta con un error claro en vez de generar un TXT que no cuadra. `/generate_maria` deja de exigir el sufijo general cuando cada sub-ítem trae el suyo.
+- **compatibilidad:** sin sub-ítems no cambia nada — mismo `[SBT]` único, mismo `CARTSBITEM=N`, mismo error si falta el sufijo.
+- **test:** `tests/test_maria_subitems.py` (8 pruebas), incluida una que compara los bloques generados contra la referencia real. Agregado a CI. Total pruebas críticas: 105 passed, 1 skipped.
+- **nota:** el backend ya soporta sub-ítems, falta la pantalla para que el despachante parta un ítem desde la app. Los manuales de PreDespacho y Courier no traen el diseño de registro, pero el de PreDespacho confirmó que partir en ítems es decisión del operador (pág. 17) y que los gastos a FOB se cargan aparte (pág. 12).
+
 ## 2026-07-26 · fix(MARIA): el año del IEXT estaba escrito a mano como "25"
 
 - **fix (MARIA):** el campo `IEXT` de cada ítem se armaba con el año fijo en el código (`IEXT=00272-01/25`). Toda declaración generada de 2026 en adelante salía con el año equivocado — y el TXT no falla ninguna validación nuestra, así que el error aparecía recién en la aduana. Ahora el año sale de la fecha de la factura, con el año actual como respaldo.

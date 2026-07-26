@@ -296,17 +296,45 @@ sin que ninguna validación se quejara. Cubierto por
 **Diferencias que necesitan definición del despachante** (no se tocaron: son
 criterio aduanero, no bugs de programación):
 
-| Campo | El archivo real | Lo que generamos |
+| Campo | El archivo real | Estado |
 |---|---|---|
-| `LDDTNOMFOD` | `(00272) PROVEEDOR...` — el nombre lleva el **código de proveedor** entre paréntesis | Solo el nombre. El código no se pide en ningún lado. |
-| `[SBT]` | **2 sub-ítems** con su propio FOB, cantidad y unitario (2 de un modelo + 4 de otro) | Un solo `[SBT]`, sin montos |
-| `CARTSBITEM` | `S` (tiene sub-ítems) | Siempre `N` |
-| `GTOS-ANT-FOB` | `150.00` — gastos **anteriores** al FOB, y es un importe propio | `GTOS-POS-FOB` calculado como flete + seguro |
-| `CARTUSO` | `2` | Siempre `3` |
-| `BANCOSARGENTINA` | `191` | No se emite |
+| `[SBT]` | **2 sub-ítems** con su propio FOB, cantidad y unitario (2 de un modelo + 4 de otro) | ✅ **Implementado** — ver abajo |
+| `CARTSBITEM` | `S` (tiene sub-ítems) | ✅ **Implementado** — `S` si hay sub-ítems, `N` si no |
+| `LDDTNOMFOD` | `(00272) PROVEEDOR...` — el nombre lleva el **código de proveedor** entre paréntesis | ⚪ Abierto: el código no se pide en ninguna pantalla |
+| `GTOS-ANT-FOB` | `150.00` — gastos **anteriores** al FOB, importe propio | ⚪ Abierto: hoy emitimos `GTOS-POS-FOB` = flete + seguro |
+| `CARTUSO` | `2` | ⚪ Abierto: hoy fijo en `3` |
+| `BANCOSARGENTINA` | `191` | ⚪ Abierto: no se emite |
 
-Los dos primeros son los que más pesan: sin sub-ítems, una factura con varios
-modelos bajo la misma NCM no se puede declarar como en el archivo real.
+### Sub-ítems, implementados el 2026-07-26
+
+Los dos manuales que aportó el dueño (PreDespacho y Courier) no traen el diseño
+de registro, pero el de **PreDespacho confirmó dos cosas** que estaban en duda:
+
+- **Pág. 17** — al cerrar la operación el sistema pregunta si se quiere
+  *"separar en Ítem o no"*. O sea: partir un ítem en sub-ítems es una
+  **decisión del despachante**, no algo que se deduzca solo. Por eso quedó
+  opcional: sin sub-ítems el generador emite exactamente lo de antes.
+- **Pág. 12** — el operador carga *"el valor FOB de dicha factura junto a los
+  **Gastos a FOB**, si es que existen"* y aparte indica *"Gastos a Deducir o
+  Gastos a Incluir"*. Confirma que los gastos son un **importe que se ingresa
+  aparte**, no flete + seguro como calculamos hoy, y que ANT/POS sale de si son
+  a incluir o a deducir. Queda abierto hasta que el dueño confirme el criterio.
+- **Págs. 19-20** — el TXT se carga en Sistema María por *Acciones → Interfaz
+  Despachantes → Lectura de Archivos*. Confirma que el formato que apuntamos
+  (bloques `[DDT]` / `[ART]` / `[SBT]`) es el correcto.
+
+El generador ahora acepta `subitems` dentro de cada ítem, con cantidad, valor
+unitario y sufijo propios. Valida que las cuentas cierren contra el ítem
+(cantidades y valores) y corta con un error claro si no. Los bloques `[SBT]`
+que produce son **idénticos a los del archivo real**, verificado en
+`tests/test_maria_subitems.py`.
+
+> El manual de **Courier** es de otro régimen (Destinación Simplificada, se
+> transmite vía AIDA y su formato vive en un "Anexo I" que no viene en ese
+> PDF). No aplica a las declaraciones IC04 de importación que genera CDI.
+
+> ⚠️ Falta la pantalla: el backend ya soporta sub-ítems, pero el despachante
+> todavía no tiene dónde partir un ítem desde la app.
 
 Reproducir la comparación: ver `tests/test_maria_iext_anio.py` y las dos
 referencias en `tests/fixtures/`.
