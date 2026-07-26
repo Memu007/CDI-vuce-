@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-26 · test: ronda G2 ejecutada — 16 ataques, 16 resistidos
+
+- **test (G2):** `ataque_imagen.sh` ahora tiene dos modos. El completo construye la imagen Docker y la ataca; el nuevo `--sin-docker` levanta la app directo contra un Postgres descartable y tira los mismos ataques. Si no hay Postgres, cae a SQLite avisando que la prueba de persistencia queda más débil.
+- **resultado:** corrida en modo `--sin-docker` contra Postgres real: **16 chequeos, 16 resistidos, 0 caídos** — `/docs` cerrado, sin usuarios demo, cookie con `Secure` y `HttpOnly`, CORS rechazando orígenes ajenos, admin y panel interno pidiendo login, sin archivos internos accesibles, cabeceras completas, rate limit cortando en 429 y datos sobreviviendo al reinicio. Evidencia pegada en `PLAN_DEPLOY_ADVERSARIAL.md`.
+- **pendiente:** el modo completo (contra la imagen) no se pudo correr donde vive la IA: hay Docker, pero la política de red bloquea la descarga de imágenes base (403 desde el CDN de Docker Hub). Queda para una máquina con salida normal a internet.
+
 ## 2026-07-26 · chore: Railway como único camino + ataque automatizado a la imagen
 
 - **chore (deploy):** destino decidido: **Railway**. Se borró `firebase.json` (apuntaba a una función `api` que no existe en este repo) y `deploy_cloudrun.sh` de la raíz, que deployaba el servicio `cdi-maria` mientras el otro script deploya `cdi-backend`: correr los dos dejaba dos apps vivas con bases separadas. Queda `scripts/deployment/deploy-cloud-run.sh` como alternativa arreglada.

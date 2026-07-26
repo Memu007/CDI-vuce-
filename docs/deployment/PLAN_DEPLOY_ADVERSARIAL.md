@@ -118,20 +118,31 @@ llega a producir un servicio vivo y mal configurado.
 
 ### Ronda 2 · La imagen real, atacada 🔴 *bloqueante*
 
-⚠️ **Esta ronda necesita Docker.** En el entorno donde corre la IA no hay
-Docker (es un contenedor descartable en la nube, aislado de tu máquina — no
-cambia según desde qué aparato escribas). Todo lo verificado hasta ahora fue
-con la app corriendo directo, **no con la imagen que realmente se deploya**.
-
-**Ya está automatizada.** Un solo comando en tu máquina, no hay que programar:
+**Automatizada en `scripts/testing/ataque_imagen.sh`.** Tiene dos modos:
 
 ```bash
-./scripts/testing/ataque_imagen.sh
+./scripts/testing/ataque_imagen.sh              # completo: construye la imagen y la ataca
+./scripts/testing/ataque_imagen.sh --sin-docker # reducido: ataca la app, no la imagen
 ```
 
-Construye la imagen, levanta un Postgres descartable, corre los 14 ataques de
-abajo, imprime cuáles resistió y cuáles no, y borra todo al terminar. No toca
-tu base real ni necesita claves. Después se manda la salida completa.
+Los dos levantan un Postgres descartable, corren la misma tanda de ataques,
+imprimen qué resistió y qué cayó, y borran todo al terminar. No tocan ninguna
+base real ni necesitan claves.
+
+### Estado: modo reducido ✅ · modo completo ⏳
+
+**Ejecutado el 2026-07-26 en modo `--sin-docker` (contra Postgres real):
+16 chequeos, 16 resistidos, 0 caídos.** Salida abajo, en "Evidencia G2".
+
+Falta el modo completo, y no es un detalle: el reducido prueba **la app**, no
+**la imagen que se sube**. Si el `Dockerfile` copia mal un archivo o arranca
+con el comando equivocado, este modo no lo ve.
+
+> Por qué no se corrió el modo completo: el entorno donde corre la IA tiene
+> Docker, pero la política de red bloquea la descarga de imágenes base
+> (`python:3.12-slim` y `postgres:16-alpine` dan `403 Forbidden` desde el CDN
+> de Docker Hub). No es un problema del proyecto. En una máquina con Docker y
+> salida a internet normal, corre sin cambios.
 
 Los ataques que tira:
 
@@ -147,8 +158,35 @@ Los ataques que tira:
   (si no siguen, `DATABASE_URL` está mal y lo vas a descubrir acá y no con
   clientes adentro)
 
-**Puerta G2:** los diez ataques, todos rechazados, con la salida pegada como
-evidencia.
+**Puerta G2:** todos los ataques rechazados **en modo completo** (con la
+imagen), con la salida pegada como evidencia.
+
+### Evidencia G2 · 2026-07-26 · modo reducido
+
+```
+Resultado de la Ronda G2 (modo: sin-docker)
+========================================
+OK    | Health check reporta base conectada
+OK    | /docs cerrado (404)
+OK    | /redoc cerrado (404)
+OK    | /openapi.json cerrado (404)
+OK    | Usuario demo 'demo' no existe (401)
+OK    | Usuario demo 'premium' no existe (401)
+OK    | Usuario demo 'basico' no existe (401)
+OK    | Cookie con Secure y HttpOnly
+OK    | CORS rechaza orígenes no autorizados
+OK    | /api/admin/health/detailed protegido (401)
+OK    | /api/admin/metrics/prometheus protegido (401)
+OK    | /dev/dashboard protegido (401)
+OK    | Ningún archivo interno se puede bajar
+OK    | Todas las cabeceras de seguridad presentes
+OK    | El rate limit corta (429)
+OK    | El usuario creado sigue existiendo después de reiniciar
+----------------------------------------
+Resistió: 16   ·   Cayó: 0
+```
+
+Reproducir: `./scripts/testing/ataque_imagen.sh --sin-docker`
 
 ---
 
@@ -273,7 +311,7 @@ una tarde.
 |---|---|---|
 | **G0 · Secretos** | 🟡 Escaneado el historial completo (53 commits): la única clave viva es la `GEMINI_API_KEY` en `docs/audits/`. **Falta rotarla.** | Vos, en Google AI Studio |
 | **G1 · Configuración** | 🟢 Destino decidido: **Railway**. `firebase.json` y el script de Cloud Run duplicado, borrados. Preflight funcionando. | Hecho |
-| **G2 · Imagen real** | 🟡 Automatizada en `scripts/testing/ataque_imagen.sh`. Falta correrla. | Vos, un comando |
+| **G2 · Imagen real** | 🟡 Corrida en modo reducido contra Postgres real: **16 chequeos, 16 resistidos, 0 caídos**. Falta el modo completo (con la imagen Docker). | Vos, un comando |
 | **G3 · Aislamiento** | ⚪ Sin empezar | Después de G2 |
 | **G4 · Producto** | ⚪ Sin empezar | Después de G3 |
 | **G5 · Pruebas** | ⚪ Deuda anotada, va después del deploy | — |
@@ -283,10 +321,13 @@ una tarde.
 
 1. **Rotar la clave de Gemini** en Google AI Studio: borrar la vieja, crear
    una nueva, y cargarla en las variables de Railway.
-2. **Correr un comando** y mandarme la salida:
+2. **Correr un comando** en tu PC (la que tiene Docker) y mandarme la salida:
 
    ```bash
    ./scripts/testing/ataque_imagen.sh
    ```
+
+   Los mismos ataques ya pasaron 16 de 16 en modo reducido. Esto los repite
+   contra **la imagen que realmente se sube**, que es lo único que falta.
 
 Con eso cerramos G0 y G2, y sigo con G3 y G4.
