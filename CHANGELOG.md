@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-26 · docs: plan adversarial para llegar a deploy
+
+- **docs:** `docs/deployment/PLAN_DEPLOY_ADVERSARIAL.md` — 7 rondas con equipos enfrentados (uno construye, otro rompe y lo demuestra) y una puerta por ronda que hay que pasar para avanzar. Ordenadas por riesgo: secretos, configuración de deploy, la imagen Docker real atacada, aislamiento entre despachantes, validez del MARIA.TXT, suite de tests y rollback probado.
+- **aviso:** la ronda de la imagen Docker es un hueco real de la revisión anterior — se verificó la app corriendo directo, no la imagen que se deploya. Necesita Docker o un staging.
+
 ## 2026-07-26 · fix: dejar el deploy en condiciones (revisión de PM)
 
 - **fix (deploy):** los dos scripts de Cloud Run no pasaban las variables que la app necesita para arrancar. `scripts/deployment/deploy-cloud-run.sh` además no seteaba `ENVIRONMENT=production`: habría deployado con usuarios demo (`demo`/`demo123`), `/docs` público y cookies de sesión sin flag `Secure`. Ahora los dos leen del `.env` o del shell, validan y pasan `JWT_SECRET_KEY`, `ALLOWED_ORIGINS` y `DATABASE_URL`. `cloudbuild.yaml` también manda `ALLOWED_ORIGINS`.

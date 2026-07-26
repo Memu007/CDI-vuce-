@@ -161,6 +161,10 @@ para que corra la suite entera.
 
 ## 5. Orden sugerido para salir
 
+> Versión detallada, con equipos enfrentados y puertas de control:
+> `docs/deployment/PLAN_DEPLOY_ADVERSARIAL.md`.
+
+
 1. Rotar la clave de Gemini.
 2. Elegir destino (recomendado: Railway) y archivar los otros.
 3. Cargar las variables y correr `./scripts/deployment/preflight_env.sh`.
