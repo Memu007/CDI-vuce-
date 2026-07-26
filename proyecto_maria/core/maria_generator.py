@@ -379,6 +379,15 @@ def generate_maria_txt(operation_id: str, items: list,
     # 2. Fecha Emision Factura (se usa la del PDF si viene; sino hoy como fallback)
     fecha_factura = (str(fecha_emision or "").strip()
                      or datetime.now().strftime("%d/%m/%Y"))
+
+    # Año de dos dígitos para el IEXT de cada ítem (`00272-01/26`). Sale del
+    # año de la factura; si no se puede leer, del año actual.
+    #
+    # Antes estaba escrito a mano como "25". Silenciosamente iba a poner /25 en
+    # toda declaración generada de 2026 en adelante: el TXT sale igual, no
+    # falla nada, y el error aparece recién en la aduana.
+    _m_anio = re.search(r"/(\d{2}|\d{4})\s*$", fecha_factura)
+    anio_iext = _m_anio.group(1)[-2:] if _m_anio else datetime.now().strftime("%y")
     lines.append("[CPL]")
     lines.append("NART=0000")
     lines.append("ICPLDIF=D")
@@ -578,7 +587,7 @@ def generate_maria_txt(operation_id: str, items: list,
         # IEXT es vital para relacionar con SBT
         # Formato: primeros 5 chars del operation_id + guion + numero item/año
         iext_prefix = operation_id[:5] if len(operation_id) >= 5 else operation_id.zfill(5)
-        lines.append(f"IEXT={iext_prefix}-{idx:02d}/25") 
+        lines.append(f"IEXT={iext_prefix}-{idx:02d}/{anio_iext}")
         lines.append("")
         
         # [CPL] Items

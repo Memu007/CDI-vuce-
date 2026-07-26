@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-26 · fix(MARIA): el año del IEXT estaba escrito a mano como "25"
+
+- **fix (MARIA):** el campo `IEXT` de cada ítem se armaba con el año fijo en el código (`IEXT=00272-01/25`). Toda declaración generada de 2026 en adelante salía con el año equivocado — y el TXT no falla ninguna validación nuestra, así que el error aparecía recién en la aduana. Ahora el año sale de la fecha de la factura, con el año actual como respaldo.
+- **test:** `tests/test_maria_iext_anio.py` (5 pruebas) + nueva referencia real anonimizada `tests/fixtures/maria_golden_subitems_anon.TXT` (factura 2026, incoterm EXW, con sub-ítems). Agregado a las pruebas críticas de CI.
+- **hallazgo:** comparando el generador contra un MARIA.TXT real de 2026 aparecieron 5 diferencias más que necesitan definición del despachante: el código del proveedor entre paréntesis en `LDDTNOMFOD`, los sub-ítems múltiples en `[SBT]`, `GTOS-ANT-FOB` vs `GTOS-POS-FOB` según incoterm, `CARTUSO` fijo en 3, y el `[CPL]` de banco. Detalle en `docs/deployment/PLAN_DEPLOY_ADVERSARIAL.md` (ronda G4).
+
 ## 2026-07-26 · fix(seguridad): un despachante podía bajarse el MARIA.TXT de otro
 
 - **security (crítico):** `/download/{archivo}` pedía sesión iniciada pero **no chequeaba de quién era el archivo**. Como el nombre del MARIA.TXT sale del número de factura (`MARIA_FAC_0001-00012345.TXT`), corto y adivinable, cualquier usuario registrado podía bajarse la declaración de otro despachante —con CUIT del importador, NCM y valores— probando números. Lo mismo con cualquier archivo interno del directorio de datos, como `ncm_historial_<usuario>.json`. Encontrado atacando la app, no leyendo el código.

@@ -277,6 +277,40 @@ el usuario aprobó en pantalla"*.
 **Puerta G4:** ningún camino produce un TXT que el despachante no aprobó
 explícitamente. Con Gemini caído, el sistema dice que no sabe — no adivina.
 
+### Evidencia G4 · 2026-07-26 · comparación contra un MARIA.TXT real
+
+Se comparó lo que genera el sistema contra un archivo real de 2026 (aportado
+por el dueño, guardado anonimizado en
+`tests/fixtures/maria_golden_subitems_anon.TXT`).
+
+**Lo que salió bien:** la cabecera `[DDT]` y el bloque `[ART]` salen
+prácticamente idénticos, y **toda la aritmética cierra** — base imponible =
+FOB + seguro + flete, cantidad × unitario = FOB, y en el archivo real la suma
+de los sub-ítems da exactamente el total del ítem.
+
+**Bug encontrado y arreglado:** el año del campo `IEXT` estaba escrito a mano
+como `"25"`. Toda declaración de 2026 en adelante salía con el año equivocado,
+sin que ninguna validación se quejara. Cubierto por
+`tests/test_maria_iext_anio.py`.
+
+**Diferencias que necesitan definición del despachante** (no se tocaron: son
+criterio aduanero, no bugs de programación):
+
+| Campo | El archivo real | Lo que generamos |
+|---|---|---|
+| `LDDTNOMFOD` | `(00272) PROVEEDOR...` — el nombre lleva el **código de proveedor** entre paréntesis | Solo el nombre. El código no se pide en ningún lado. |
+| `[SBT]` | **2 sub-ítems** con su propio FOB, cantidad y unitario (2 de un modelo + 4 de otro) | Un solo `[SBT]`, sin montos |
+| `CARTSBITEM` | `S` (tiene sub-ítems) | Siempre `N` |
+| `GTOS-ANT-FOB` | `150.00` — gastos **anteriores** al FOB, y es un importe propio | `GTOS-POS-FOB` calculado como flete + seguro |
+| `CARTUSO` | `2` | Siempre `3` |
+| `BANCOSARGENTINA` | `191` | No se emite |
+
+Los dos primeros son los que más pesan: sin sub-ítems, una factura con varios
+modelos bajo la misma NCM no se puede declarar como en el archivo real.
+
+Reproducir la comparación: ver `tests/test_maria_iext_anio.py` y las dos
+referencias en `tests/fixtures/`.
+
 > Esta ronda es la que un equipo normal se saltea, porque "no es un bug de
 > seguridad". Es la que más te puede costar: un TXT mal generado lo rebota
 > aduana con el nombre de tu cliente encima.
@@ -357,7 +391,7 @@ una tarde.
 | **G1 · Configuración** | 🟢 Destino decidido: **Railway**. `firebase.json` y el script de Cloud Run duplicado, borrados. Preflight funcionando. | Hecho |
 | **G2 · Imagen real** | 🟡 Corrida en modo reducido contra Postgres real: **16 chequeos, 16 resistidos, 0 caídos**. Falta el modo completo (con la imagen Docker). | Vos, un comando |
 | **G3 · Aislamiento** | 🟢 **Pasada.** Se encontró y arregló una fuga real (un despachante podía bajarse el MARIA.TXT de otro adivinando el nro de factura). Segunda corrida: 22 bloqueados, 0 fugas. | Hecho |
-| **G4 · Producto** | ⚪ Sin empezar | Después de G3 |
+| **G4 · Producto** | 🟡 Comparado contra un MARIA.TXT real de 2026: aritmética OK, **1 bug arreglado** (año del `IEXT` escrito a mano). Quedan 6 diferencias que necesitan criterio del despachante. | Definición del dueño |
 | **G5 · Pruebas** | 🟡 Arreglado el cuelgue **al salir** (`conftest` no cerraba el engine de SQLite: los tests terminaban en verde y el proceso no salía nunca). Sigue abierto el cuelgue **dentro** de los tests de billing/trial/402. | Deuda, después del deploy |
 | **G6 · Rollback** | ⚪ Sin empezar | Al deployar |
 
