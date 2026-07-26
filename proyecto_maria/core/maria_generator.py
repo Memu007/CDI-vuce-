@@ -5,6 +5,13 @@ import re
 import unicodedata
 from datetime import datetime
 
+# Condiciones de venta de los grupos C y D de Incoterms. En estas, la
+# informacion complementaria del SIM pide `GTOS-POS-FOB` (diferencia entre la
+# condicion pactada y el FOB declarado). En EXW pide `GTOS-ANT-FOB` (gastos
+# hasta el FOB). Los grupos E y F quedan afuera de la regla explicita, asi que
+# ahi el importe se toma solo si el despachante lo declara.
+_INCOTERMS_GRUPO_C_D = {"CFR", "CIF", "CPT", "CIP", "DAP", "DPU", "DDP", "DAT", "DAF", "DES", "DEQ", "DDU"}
+
 # Códigos de país oficiales del Sistema MARIA (AFIP - "Códigos María").
 # Fuente: TABLA PAISES V.0 25082010.xlsx (tabla oficial VUCE).
 # Tabla anterior tenia ~30 países; ahora 207 + alias ISO 2 letras + inglés.
@@ -270,6 +277,9 @@ def generate_maria_txt(operation_id: str, items: list,
                        comprador_fecha_inic_activ: str = "",
                        flete: float = 0,
                        seguro: float = 0,
+                       # Gastos respecto del FOB (ver bloque [CPL] mas abajo).
+                       # None = calcular/omitir segun la condicion de venta.
+                       gastos_fob: float | None = None,
                        # Transport data
                        bl_numero: str = "",
                        puerto_origen: str = "",
@@ -395,15 +405,45 @@ def generate_maria_txt(operation_id: str, items: list,
     lines.append(f"MCPL={fecha_factura:<40}")
     lines.append("")
     
-    # 3. Gastos Post FOB (Total Flete + Seguro). Formato 2 decimales para evitar
-    # artefactos float (str(3221.66+50) podia dar "3271.6600000000003").
-    gastos_post_fob = f"{flete + seguro:.2f}"
-    lines.append("[CPL]")
-    lines.append("NART=0000")
-    lines.append("ICPLDIF=D")
-    lines.append("CCPL=GTOS-POS-FOB    ")
-    lines.append(f"MCPL={gastos_post_fob:<40}")
-    lines.append("")
+    # 3. Gastos respecto del FOB.
+    #
+    # Cual de los dos campos va depende de la condicion de venta (convenio
+    # AFIP-BCRA, informacion complementaria a nivel caratula):
+    #
+    #   - Condicion EXW  -> `GTOS-ANT-FOB`: los gastos hasta el FOB.
+    #   - Grupos C y D   -> `GTOS-POS-FOB`: la diferencia entre la condicion de
+    #     venta pactada y el FOB declarado.
+    #
+    # El importe NO es flete + seguro por definicion: es la diferencia entre el
+    # valor en la condicion pactada y el FOB. Para CIF coinciden, para EXW no.
+    # Por eso se acepta `gastos_fob` explicito y solo se cae al calculo viejo
+    # en los grupos C/D, donde la equivalencia se sostiene.
+    #
+    # Antes se emitia siempre `GTOS-POS-FOB` con flete + seguro: en una
+    # operacion EXW eso era el campo equivocado con el numero equivocado.
+    incoterm_norm = str(incoterm or "").strip().upper()
+    grupo_cd = incoterm_norm in _INCOTERMS_GRUPO_C_D
+    campo_gastos = "GTOS-POS-FOB    " if grupo_cd else "GTOS-ANT-FOB    "
+
+    if gastos_fob is not None:
+        importe_gastos = f"{float(gastos_fob):.2f}"
+    elif grupo_cd:
+        # Formato 2 decimales para evitar artefactos float
+        # (str(3221.66+50) podia dar "3271.6600000000003").
+        importe_gastos = f"{flete + seguro:.2f}"
+    else:
+        # Fuera de los grupos C/D no se puede deducir de flete + seguro y no se
+        # inventa un numero: se omite el bloque. El dato es complementario e
+        # informativo; el despachante lo carga si corresponde.
+        importe_gastos = None
+
+    if importe_gastos is not None:
+        lines.append("[CPL]")
+        lines.append("NART=0000")
+        lines.append("ICPLDIF=D")
+        lines.append(f"CCPL={campo_gastos}")
+        lines.append(f"MCPL={importe_gastos:<40}")
+        lines.append("")
     
     # 4. Defaults PSAD (Hardcoded por ahora, configurable a futuro)
     lines.append("[CPL]")

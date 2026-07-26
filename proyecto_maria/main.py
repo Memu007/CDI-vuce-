@@ -3500,6 +3500,11 @@ class MariaRequest(BaseModel):
     tipo_destinacion: str = "IC04"
     # Sufijo de valor SBT — obligatorio, específico de cada importador
     sbt_sufijo_valor: str = ""
+    # Gastos respecto del FOB: diferencia entre el valor en la condición de
+    # venta pactada y el FOB declarado. El campo del TXT sale del incoterm
+    # (EXW → GTOS-ANT-FOB, grupos C/D → GTOS-POS-FOB). Si no viene, en los
+    # grupos C/D se usa flete + seguro y fuera de ellos no se declara nada.
+    gastos_fob: float | None = None
 
 
 @app.post("/generate_maria")
@@ -3601,6 +3606,7 @@ async def generate_maria_endpoint(
             aduana_codigo=request.aduana_codigo,
             tipo_destinacion=request.tipo_destinacion,
             sbt_sufijo_valor=sbt_raw,
+            gastos_fob=request.gastos_fob,
         )
         
         # Sanitizar operation_id para filename (prevenir path traversal)

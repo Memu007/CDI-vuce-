@@ -47,6 +47,7 @@ jobs:
           tests/test_download_aislamiento.py
           tests/test_maria_iext_anio.py
           tests/test_maria_subitems.py
+          tests/test_maria_gastos_fob.py
 
   e2e-maria:
     needs: tests

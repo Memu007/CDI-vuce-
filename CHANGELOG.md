@@ -6,6 +6,13 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-26 · fix(MARIA): gastos a FOB — el campo depende de la condición de venta
+
+- **fix (MARIA):** se emitía siempre `GTOS-POS-FOB` con flete + seguro. En una operación **EXW eso es el campo equivocado con el número equivocado**. La regla (información complementaria del SIM, convenio AFIP-BCRA): EXW → `GTOS-ANT-FOB` (gastos hasta el FOB); grupos C y D → `GTOS-POS-FOB` (diferencia entre la condición pactada y el FOB). Coincide con las dos referencias reales.
+- **fix (importe):** el monto es esa diferencia, no flete + seguro — en CIF coinciden, en la operación EXW real da 150.00 contra 440.47. Nuevo parámetro `gastos_fob` (y campo homónimo en `/generate_maria`). Sin él, en los grupos C/D se sigue calculando flete + seguro y **fuera de ellos no se declara nada**, en vez de inventar un número.
+- **test:** `tests/test_maria_gastos_fob.py` (9 pruebas). Total pruebas críticas de CI: 114 passed, 1 skipped.
+- **pendiente:** falta la pantalla para cargar ese importe. Las fuentes consultadas son secundarias (los sitios de AFIP, CDA e Infoleg no se pudieron abrir desde el entorno); conviene que el despachante lo confirme.
+
 ## 2026-07-26 · feat(MARIA): sub-ítems, para facturas con varios modelos bajo una NCM
 
 - **feat (MARIA):** el generador acepta `subitems` dentro de cada ítem: cada uno con su cantidad, valor unitario y sufijo de valor. Emite un `[SBT]` por sub-ítem con `MSBTFOB`, `QSBTUNTDCL`, `MSBTUNITAR` y `QSBTUNTEST`, y marca `CARTSBITEM=S`. Los bloques salen **idénticos a los de un MARIA.TXT real**. Antes se emitía siempre un solo `[SBT]` sin montos, así que una factura con dos modelos bajo la misma NCM no se podía declarar bien.

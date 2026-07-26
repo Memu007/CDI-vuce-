@@ -301,7 +301,7 @@ criterio aduanero, no bugs de programación):
 | `[SBT]` | **2 sub-ítems** con su propio FOB, cantidad y unitario (2 de un modelo + 4 de otro) | ✅ **Implementado** — ver abajo |
 | `CARTSBITEM` | `S` (tiene sub-ítems) | ✅ **Implementado** — `S` si hay sub-ítems, `N` si no |
 | `LDDTNOMFOD` | `(00272) PROVEEDOR...` — el nombre lleva el **código de proveedor** entre paréntesis | ⚪ Abierto: el código no se pide en ninguna pantalla |
-| `GTOS-ANT-FOB` | `150.00` — gastos **anteriores** al FOB, importe propio | ⚪ Abierto: hoy emitimos `GTOS-POS-FOB` = flete + seguro |
+| `GTOS-ANT-FOB` | `150.00` — gastos **anteriores** al FOB, importe propio | ✅ **Resuelto** — ver abajo |
 | `CARTUSO` | `2` | ⚪ Abierto: hoy fijo en `3` |
 | `BANCOSARGENTINA` | `191` | ⚪ Abierto: no se emite |
 
@@ -335,6 +335,42 @@ que produce son **idénticos a los del archivo real**, verificado en
 
 > ⚠️ Falta la pantalla: el backend ya soporta sub-ítems, pero el despachante
 > todavía no tiene dónde partir un ítem desde la app.
+
+### Gastos respecto del FOB, resuelto el 2026-07-26
+
+Búsqueda en fuentes públicas (ver más abajo). La regla, que sale del convenio
+AFIP-BCRA para intercambio de información:
+
+- Condición **EXW** → `GTOS-ANT-FOB`: los gastos hasta el FOB.
+- Grupos **C y D** (CFR, CIF, CPT, CIP, DAP, DPU, DDP) → `GTOS-POS-FOB`: la
+  **diferencia entre la condición de venta pactada y el FOB declarado**.
+
+Coincide con las dos referencias reales: la EXW usa ANT, la DDP usa POS.
+
+Y explica el número que no cerraba: el importe es esa diferencia, **no flete +
+seguro**. En CIF coinciden; en la operación EXW real da `150.00` mientras que
+flete + seguro da `440.47`.
+
+Implementado: el campo se elige por incoterm y el importe se acepta explícito
+(`gastos_fob`). Sin importe explícito, en los grupos C/D se sigue calculando
+flete + seguro —donde la equivalencia se sostiene— y **fuera de ellos no se
+declara nada**, en vez de inventar un número. Cubierto por
+`tests/test_maria_gastos_fob.py`.
+
+> ⚠️ Falta la pantalla: hoy no hay dónde cargar ese importe desde la app.
+>
+> Las fuentes son secundarias (foros y resúmenes de comercio exterior), no la
+> especificación oficial: los sitios de AFIP, CDA e Infoleg no se pudieron
+> abrir desde el entorno de la IA. Conviene que el despachante lo confirme
+> antes de considerarlo cerrado.
+
+### Lo que no se pudo responder buscando
+
+`CARTUSO`, el código de proveedor entre paréntesis de `LDDTNOMFOD` y el
+`[CPL]` de `BANCOSARGENTINA` no aparecen documentados públicamente. Los
+nombres de campo del TXT (`CARTUSO`, `CARTSBITEM`, `LDDTNOMFOD`) pertenecen a
+la especificación de la *Interfaz Despachantes* del Kit María, que no es
+pública. Quedan para que los defina el despachante.
 
 Reproducir la comparación: ver `tests/test_maria_iext_anio.py` y las dos
 referencias en `tests/fixtures/`.
