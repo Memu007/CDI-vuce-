@@ -120,14 +120,16 @@ Para chequearlas sin deployar nada:
 ### Las pruebas completas no terminan
 
 `pytest` sobre todo el repo **se cuelga**, no falla: se queda esperando para
-siempre. Aparecieron tres puntos de cuelgue, uno detrás del otro:
+siempre. Al sacar un test que cuelga aparece el siguiente, así que **hoy no se
+puede sacar un número de "cuántas pruebas pasan"**. Los que se identificaron:
 
 - `tests/test_billing_autoservicio.py::test_change_password_wrong_current_returns_401`
 - `tests/test_prelaunch_block2.py::test_trial_vencido_bloquea_operaciones_con_402`
 - `tests/test_prelaunch_block3.py::test_past_due_rechaza_operacion_con_402`
+- y al menos uno más en `test_billing_autoservicio.py`, después de esos tres.
 
-Los tres son de la misma familia (facturación / trial vencido / rechazo con
-402), así que lo más probable es que sea **un solo problema**, no tres.
+Todos son de la misma familia (facturación / trial vencido / rechazo con 402),
+así que lo más probable es que sea **un solo problema de base**, no cuatro.
 
 `HANDOFF.md` §11 lo describe como "flaky". Es más que eso: es un cuelgue
 reproducible, y el `--timeout` configurado no lo mata porque usa el método
