@@ -455,9 +455,14 @@ El testing será considerado exitoso si:
 
 1. **ENV.example** (1 línea)
    ```diff
-   - GEMINI_API_KEY=AIzaSyBq1BD0ZSFBblbCmg_mHdrgoI8dWCgCEZg
+   - GEMINI_API_KEY=<REDACTADO>
    + GEMINI_API_KEY=your_gemini_api_key_here
    ```
+
+   > ⚠️ **Nota de seguridad (2026-07-26):** este documento tenía escrita la clave
+   > real de Gemini que se sacó de `ENV.example`. Quedó redactada. La clave que
+   > estaba acá se considera **comprometida** (estuvo en el historial de git) y
+   > hay que **rotarla en Google AI Studio** antes de deployar.
 
 2. **index.html** (2 cambios)
    ```diff

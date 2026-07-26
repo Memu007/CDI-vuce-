@@ -12,10 +12,11 @@
 - [x] **.env en .gitignore** (verificado)
 
 ### 📦 Archivos de Deployment
-- [x] **Dockerfile** - Multi-stage, Python 3.12-slim, 4 workers, PORT 8080
+- [x] **Dockerfile** - Multi-stage, Python 3.12-slim, 1 worker, PORT 8080
 - [x] **.dockerignore** - Excluye tests, cache, logs
 - [x] **cloudbuild.yaml** - Build + Deploy a Cloud Run
-- [x] **deploy-cloud-run.sh** - Script automatizado (ejecutable)
+- [x] **scripts/deployment/deploy-cloud-run.sh** - Script automatizado (ejecutable)
+- [x] **scripts/deployment/preflight_env.sh** - Valida variables antes de deployar
 - [x] **.env.example** - Template sin secrets reales
 - [x] **DEPLOYMENT_QUICK_START.md** - Guía paso a paso
 
@@ -33,7 +34,10 @@
 - [x] **Secrets management** - No hardcoded, solo env vars
 
 ### ⚡ Performance
-- [x] **Multi-worker** - Gunicorn con 4 workers Uvicorn
+- [x] **Workers** - Gunicorn con **1** worker Uvicorn. Es a propósito: sin
+      `REDIS_URL` el rate limiting cuenta en memoria del proceso, así que con
+      N workers el límite real sería N veces el configurado. Para escalar a
+      varios workers hay que agregar Redis primero.
 - [x] **GZip compression** - Activo (500 bytes min)
 - [x] **Rate limits** - Dimensionado para 2000 usuarios
 - [x] **Docker optimizado** - Multi-stage build, slim image
@@ -56,8 +60,15 @@ gcloud services enable run.googleapis.com cloudbuild.googleapis.com
 
 ### Paso 2: Deploy (10 min)
 ```bash
-./deploy-cloud-run.sh
-# Ingresa GEMINI_API_KEY cuando lo pida
+# Las variables se leen del .env local (o del shell) y se validan antes de
+# buildear. Si falta alguna crítica el script corta y te dice cuál.
+./scripts/deployment/deploy-cloud-run.sh
+```
+
+Para chequear las variables sin deployar nada:
+
+```bash
+./scripts/deployment/preflight_env.sh
 ```
 
 ### Paso 3: Verificar (2 min)
@@ -76,18 +87,30 @@ gcloud run logs tail cdi-backend --region us-central1
 
 ## 📝 Variables a Configurar en Cloud Run
 
-**Obligatorias:**
-- `GEMINI_API_KEY` - Get from https://makersuite.google.com/app/apikey
-- `SENTRY_DSN` - Ya en .env: https://8719fd4a82ee072fc2e1576e34219fb9@...
+### Sin estas la app NO arranca (aborta y el servicio queda reiniciándose)
 
-**Opcionales:**
-- `ENVIRONMENT=production`
+| Variable | Por qué |
+|---|---|
+| `ENVIRONMENT=production` | Sin esto se crean usuarios demo (`demo`/`demo123`), `/docs` queda público y las cookies de sesión viajan sin flag `Secure`. |
+| `JWT_SECRET_KEY` | ≥32 caracteres, sin palabras obvias (`secret`, `changeme`, `default`, `12345`). Generala con `python3 -c "import secrets; print(secrets.token_urlsafe(48))"`. |
+| `ALLOWED_ORIGINS` | La URL real del frontend, ej. `https://cdi.tu-dominio.com`. No puede ser `*` ni quedar vacía: la app usa cookies. |
+
+### Sin esta se pierden los datos
+
+| Variable | Por qué |
+|---|---|
+| `DATABASE_URL` | Postgres. Si falta, la app cae a SQLite **dentro del contenedor**: en Cloud Run el disco es efímero, así que usuarios, clientes y operaciones se borran en cada deploy o reinicio. |
+
+### Recomendadas
+
+- `GEMINI_API_KEY` — sin esto `/upload_pdf` devuelve 503 (no se puede leer la factura). El resto funciona.
+- `SENTRY_DSN` — tomarlo del `.env` local (nunca escribirlo en docs ni en git).
+- `EMAIL_VERIFICATION_REQUIRED=false` — en beta cerrada queda así.
 - `LOG_LEVEL=INFO`
 
-**El script `deploy-cloud-run.sh` configura automáticamente:**
-- PORT=8080
-- SENTRY_DSN desde .env
-- ENVIRONMENT=production
+**El script `scripts/deployment/deploy-cloud-run.sh` toma todas del `.env` o
+del shell, las valida con `preflight_env.sh` y corta antes de buildear si
+falta alguna crítica.**
 
 ---
 

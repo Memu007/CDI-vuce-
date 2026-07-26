@@ -65,8 +65,12 @@ steps:
       - "120s"
       - "--set-secrets"
       - "GEMINI_API_KEY=gemini-api-key:latest,DATABASE_URL=database-url:latest,JWT_SECRET_KEY=jwt-secret-key:latest"
+      # ALLOWED_ORIGINS es obligatoria: sin ella la app aborta el arranque en
+      # producción (usa cookies, no puede aceptar "*"). Se pasa como
+      # substitución para no hardcodear el dominio acá.
+      # Separador ";" (delimitador "^;^") porque puede llevar varias URLs.
       - "--set-env-vars"
-      - "ENVIRONMENT=production,ENABLE_HSTS=true"
+      - "^;^ENVIRONMENT=production;ENABLE_HSTS=true;EMAIL_VERIFICATION_REQUIRED=false;ALLOWED_ORIGINS=${_ALLOWED_ORIGINS}"
 
 # Images to store in Container Registry
 images:
@@ -82,6 +86,15 @@ options:
   logging: CLOUD_LOGGING_ONLY
 
 # Substituciones (variables que se pasan al build)
+#
+# GEMINI_API_KEY, DATABASE_URL y JWT_SECRET_KEY NO van acá: se inyectan desde
+# Secret Manager con --set-secrets (ver Step 3).
+#
+# _ALLOWED_ORIGINS sí va acá porque es un dominio público, no un secreto.
+# Hay que pasarlo en cada build:
+#   gcloud builds submit --config=cloudbuild.yaml \
+#     --substitutions=_ALLOWED_ORIGINS=https://cdi.tu-dominio.com
+# Si queda vacío, la app aborta el arranque con un error explícito (usa
+# cookies y CORS no puede ser "*").
 substitutions:
-  _GEMINI_API_KEY: "your-gemini-api-key-here"
-  _DATABASE_URL: "postgresql://user:pass@host/db"
+  _ALLOWED_ORIGINS: ""

@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-07-26 · fix: dejar el deploy en condiciones (revisión de PM)
+
+- **fix (deploy):** los dos scripts de Cloud Run no pasaban las variables que la app necesita para arrancar. `scripts/deployment/deploy-cloud-run.sh` además no seteaba `ENVIRONMENT=production`: habría deployado con usuarios demo (`demo`/`demo123`), `/docs` público y cookies de sesión sin flag `Secure`. Ahora los dos leen del `.env` o del shell, validan y pasan `JWT_SECRET_KEY`, `ALLOWED_ORIGINS` y `DATABASE_URL`. `cloudbuild.yaml` también manda `ALLOWED_ORIGINS`.
+- **feat (deploy):** nuevo `./scripts/deployment/preflight_env.sh` — chequea en castellano llano las variables de producción antes de buildear y corta si falta alguna crítica. `gunicorn_conf.py` apaga el auto-reload en producción y fija 1 worker (con más de uno el rate limit se multiplica, porque cuenta en memoria de cada proceso). `railway.json` codifica el healthcheck `/health`.
+- **security:** se tachó una `GEMINI_API_KEY` real que estaba escrita en `docs/audits/` y un fragmento del DSN de Sentry en el checklist de deploy. **La clave de Gemini quedó en el historial de git: hay que rotarla.** Informe completo para el dueño en `docs/deployment/ESTADO_DEPLOY.md`.
+
 ## 2026-07-18 · test: E2E aislado del flujo MARIA
 
 - **test (E2E):** nuevo comando `./scripts/testing/e2e_maria.sh` ejecuta con navegador el recorrido real registro → cliente → Excel → revisión → SIM 11 + DC → agrupación → validación → SBT → descarga de MARIA.TXT → operación e historial. Usa DB, archivos y XLSX temporales; no necesita servicios externos ni secretos. Ante fallo deja screenshot, HTML y trace; CI publica esa evidencia en el job `e2e-maria` después de las pruebas críticas.

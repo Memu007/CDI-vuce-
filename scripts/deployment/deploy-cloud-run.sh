@@ -9,12 +9,21 @@
 #   - gcloud CLI instalado y configurado
 #   - Proyecto GCP creado
 #   - APIs habilitadas (run, cloudbuild, firestore)
+#   - Variables de producción en el shell o en el `.env` de la raíz
 #
 # Uso:
-#   ./deploy-cloud-run.sh
+#   ./scripts/deployment/deploy-cloud-run.sh
+#
+# OJO: este script deploya el servicio `cdi-backend`. En la raíz del repo hay
+# otro (`deploy_cloudrun.sh`) que deploya `cdi-maria`. Son dos servicios
+# distintos: usá siempre el mismo o vas a tener dos apps vivas con bases
+# distintas. Según HANDOFF.md el entorno productivo actual es Railway.
 # ========================================================================
 
-set -e  # Exit on error
+set -euo pipefail  # Exit on error
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
+cd "$REPO_ROOT"
 
 # Colores
 GREEN='\033[0;32m'
@@ -41,6 +50,25 @@ echo -e "   Proyecto: ${PROJECT_ID}"
 echo -e "   Región: ${REGION}"
 echo -e "   Servicio: ${SERVICE_NAME}"
 echo -e "${BLUE}========================================${NC}\n"
+
+# ========================================================================
+# Variables de producción + validación previa
+# ========================================================================
+# Se valida ANTES de buildear: si falta JWT_SECRET_KEY o ALLOWED_ORIGINS la
+# app aborta el arranque y el servicio queda reiniciándose en loop.
+
+if [ -f .env ]; then
+    echo -e "${YELLOW}📦 Leyendo variables de .env${NC}"
+    set -a
+    # shellcheck disable=SC1091
+    source .env
+    set +a
+fi
+
+# Un deploy siempre va a producción, aunque el .env local diga otra cosa.
+export ENVIRONMENT=production
+
+./scripts/deployment/preflight_env.sh
 
 # ========================================================================
 # Verificar gcloud
@@ -100,16 +128,19 @@ echo -e "${GREEN}✅ Imagen Docker creada${NC}"
 
 echo -e "${YELLOW}🚀 Deploying a Cloud Run...${NC}"
 
-# Prompt para variables de entorno
-read -p "Ingresá tu GEMINI_API_KEY (Enter para skip): " GEMINI_KEY
-read -p "Ingresá DATABASE_URL (Enter para usar in-memory): " DB_URL
-
+# Separador ";" (delimitador custom "^;^" de gcloud): ALLOWED_ORIGINS puede
+# tener varias URLs separadas por coma y la coma es el separador por defecto.
 ENV_VARS="PORT=8080"
-if [ ! -z "$GEMINI_KEY" ]; then
-    ENV_VARS="${ENV_VARS},GEMINI_API_KEY=${GEMINI_KEY}"
+ENV_VARS="${ENV_VARS};ENVIRONMENT=production"
+ENV_VARS="${ENV_VARS};ALLOWED_ORIGINS=${ALLOWED_ORIGINS}"
+ENV_VARS="${ENV_VARS};JWT_SECRET_KEY=${JWT_SECRET_KEY:-${SECRET_KEY:-}}"
+ENV_VARS="${ENV_VARS};DATABASE_URL=${DATABASE_URL}"
+ENV_VARS="${ENV_VARS};EMAIL_VERIFICATION_REQUIRED=${EMAIL_VERIFICATION_REQUIRED:-false}"
+if [ -n "${GEMINI_API_KEY:-}" ]; then
+    ENV_VARS="${ENV_VARS};GEMINI_API_KEY=${GEMINI_API_KEY}"
 fi
-if [ ! -z "$DB_URL" ]; then
-    ENV_VARS="${ENV_VARS},DATABASE_URL=${DB_URL}"
+if [ -n "${SENTRY_DSN:-}" ]; then
+    ENV_VARS="${ENV_VARS};SENTRY_DSN=${SENTRY_DSN}"
 fi
 
 gcloud run deploy ${SERVICE_NAME} \
@@ -123,7 +154,7 @@ gcloud run deploy ${SERVICE_NAME} \
   --min-instances 0 \
   --concurrency 80 \
   --timeout 120s \
-  --set-env-vars "${ENV_VARS}"
+  --set-env-vars "^;^${ENV_VARS}"
 
 # ========================================================================
 # Obtener URL del servicio
