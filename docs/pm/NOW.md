@@ -30,7 +30,7 @@ G1 pasó a verde). Hay **50 estudios esperando para pagar**. Ya dijeron que sí.
 | **G3 · Aislamiento** | 🟢 | 22 bloqueados, 0 fugas. Abierto: no se corrió contra el servicio desplegado | Hecho |
 | **G4 · Producto** | 🟡 | Pantallas + 4 preguntas al despachante + 1 bug | Producto |
 | **G5 · Pruebas** | 🟡 | `4 failed, 670 passed, 102 skipped`. Los 6 de quotes se cerraron en VUCE-1 | Deuda acotada |
-| **G6 · Rollback** | ⚪ | Sin empezar | Al deployar |
+| **G6 · Rollback** | ⚪ | Railway conserva los deploys: volver atrás es un clic. Queda **demostrarlo y escribir el procedimiento**, no construir | Al deployar |
 | **G7 · Cobro** | 🟡 | **7.1/7.2/7.4 demostradas en VUCE-2.** Falta decidir 7.3 (señal de impago) | Semana 2 |
 
 ---
@@ -38,9 +38,9 @@ G1 pasó a verde). Hay **50 estudios esperando para pagar**. Ya dijeron que sí.
 ## Pendiente de Emi
 
 1. **Rotar la `GEMINI_API_KEY`.** Cierra G0.
-2. **¿Qué branch deploya Railway?** Dato del dashboard (Settings → Deploy). Define
-   si mergear los 14 commits varados es un deploy. Hasta saberlo: no se mergea y
-   `main` es de Emi.
+2. **Elegir la ventana para mergear los 14 commits.** Confirmado (2026-09-17):
+   Railway deploya de `main` con auto-deploy y «Wait for CI» apagado, así que el
+   merge es un **deploy inmediato**. No se mergea hasta que Emi elija la ventana.
 3. **Conseguir al despachante.** Cuatro preguntas —`CARTUSO`, `IVAADICIONAL1`,
    código de banco, procedencia—, media hora.
 4. **Decidir G7.3** (corte por impago) con el costo que estimó la Dev en VUCE-2.
@@ -52,8 +52,9 @@ G1 pasó a verde). Hay **50 estudios esperando para pagar**. Ya dijeron que sí.
 
 1. **G7.3** — según lo decida Emi: implementar la señal de impago de MP o
    descartarla por escrito.
-2. **G6 · Rollback** y el bug de procedencia ≠ origen.
-3. **Mergear los 14 commits varados** — bloqueado por el punto 2 de Emi (Railway).
+2. **G6 · Rollback** (demostrar el clic de Railway y escribir el procedimiento, no
+   construir) y el bug de procedencia ≠ origen.
+3. **Mergear los 14 commits varados** — es un deploy; espera la ventana de Emi.
 4. **Recorrido de producto propio** — el `recorrido.py` de `CDI` no se mudó (era
    específico de aquella línea). Falta un equivalente o apoyarse en
    `scripts/testing/smoke_friccion.sh`.
@@ -62,7 +63,8 @@ G1 pasó a verde). Hay **50 estudios esperando para pagar**. Ya dijeron que sí.
 
 ## Lo que no se toca
 
-- `main` de `CDI-vuce-`: no se mergea ni se pushea hasta saber qué deploya Railway.
+- `main` de `CDI-vuce-`: no se mergea ni se pushea. Railway deploya de `main`, así
+  que hacerlo es un deploy — decisión de Emi.
 - `Memu007/CDI` (las dos ramas): ya no es el producto. Es archivo histórico.
 - Integraciones AFIP/WSAA y VUCE: excluidas por decisión de producto.
 - Carpetas read-only de este repo: `viejo/`, `venv/`, `docs/archive/`.

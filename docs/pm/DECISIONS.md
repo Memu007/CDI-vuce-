@@ -19,7 +19,7 @@ repositorio.
 | **Los términos comerciales no se versionan** | 2026-09-04 | Montos, márgenes y datos de clientes no entran al repositorio |
 | **`CDI-vuce-` es la línea del producto** | 2026-09-16 | `Memu007/CDI` deja de trabajarse. Rama de trabajo: `claude/project-deploy-review-4nct96` |
 | **Los dos procesos conviven** | 2026-09-17 | `AGENTS.md` de `CDI-vuce-` sigue siendo la puerta de entrada de cualquier asistente —Cursor, Antigravity, Cascade apuntan ahí—. Se le suma el canal PM/Dev en `docs/pm/` para el trabajo planificado. Ni se archiva su proceso ni se copia el nuestro entero. Ver `AGENTS.md` §2.ter |
-| **`main` es de Emi hasta que se sepa qué deploya** | 2026-09-17 | Excepción escrita a la regla «push a `main` tras cada cambio» de `CDI-vuce-`: se escribió cuando no había un servicio vivo atrás. El trabajo va a rama. Sale de vigencia cuando se confirme el branch de deploy en Railway |
+| **`main` es de Emi — excepción permanente al push** | 2026-09-17 | Railway deploya de `main` con auto-deploy y «Wait for CI» apagado (verificado por Emi en el dashboard). Un push a `main` es un deploy inmediato. La excepción a la regla «push a `main` tras cada cambio» de `CDI-vuce-` es **permanente**, sin condición de salida. El trabajo del canal va a rama |
 
 ---
 
@@ -27,7 +27,7 @@ repositorio.
 
 | Tema | Por qué hay que decidirlo | Impacto |
 |---|---|---|
-| **¿Qué branch deploya Railway?** | Si es `main`, mergear los 14 commits varados es un deploy | Destraba el merge y la excepción del push. Dato del dashboard de Railway, no del repo |
+| **Ventana para mergear los 14 commits** | Confirmado: Railway deploya de `main` sin esperar CI, así que el merge es un deploy inmediato | Lo elige Emi. La Dev no mergea ni deploya |
 | **Rotación de la `GEMINI_API_KEY`** | Cierra G0 | Lo ejecuta Emi; la Dev no puede |
 | **Alcance comercial del catálogo NCM** | 22 posiciones de las ~9.500 del Nomenclador Mercosur | Define qué se le promete a los 50 estudios |
 | **Las cuatro preguntas del despachante** | `CARTUSO`, `IVAADICIONAL1`, código de banco, procedencia | Cierra parte de G4. Media hora con un despachante |

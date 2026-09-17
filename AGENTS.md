@@ -68,15 +68,16 @@ Ese trabajo sigue las reglas del canal —adversarial antes de construir, rojo p
 antes del verde, producto e informe en commits separados, cada afirmación con el
 comando que la produjo—. El resto del repo sigue las reglas de las secciones 1 y 2.
 
-**Excepción vigente al push a `main`.** La regla `persistencia-github-al-dia.mdc`
-manda `git push origin main` tras cada cambio. Mientras no se sepa qué branch
-deploya Railway, el trabajo del canal va **a rama** y `main` es de Emi.
+**Excepción permanente al push a `main`.** La regla `persistencia-github-al-dia.mdc`
+manda `git push origin main` tras cada cambio. Para el trabajo del canal **no
+aplica**: va **a rama**, y `main` es de Emi.
 
-- *Motivo:* esa regla se escribió cuando no había un servicio vivo atrás. Hoy hay
-  uno desplegado (`cdi-production.up.railway.app`) y un push a `main` podría ser un
-  deploy —y desplegar no es de la PM ni de la Dev—.
-- *Condición de salida:* cuando se confirme el branch que deploya Railway (dato del
-  dashboard, no del repo). Si deploya otro branch, la regla vuelve a valer tal cual.
+- *Motivo:* Railway está configurado con `main` como branch de producción,
+  auto-deploy activado y «Wait for CI» **apagado** (verificado por Emi en el
+  dashboard, 2026-09-17). Un push a `main` es un **deploy inmediato, sin siquiera
+  esperar los tests** —y desplegar no es de la PM ni de la Dev—.
+- *Sin condición de salida:* el branch de deploy ya está confirmado. La excepción es
+  permanente mientras `main` siga siendo el branch de producción de Railway.
 
 No es una tachadura de la regla: es una excepción acotada al trabajo del canal.
 
