@@ -25,6 +25,13 @@ Commits en `CDI-vuce-` (rama `claude/project-deploy-review-4nct96`):
 Y en `Memu007/CDI`: el README-puntero de mudanza (rama
 `claude/review-project-011CUK6vjo4ui6MfAg5Q3ztA`).
 
+**Adenda incorporada.** Mientras cerraba esto entró tu confirmación de que Railway
+deploya de `main` (auto-deploy, «Wait for CI» apagado). Actualicé la excepción del
+push **de provisoria a permanente** —ya sin condición de salida, con el motivo
+correcto— en `AGENTS.md` §2.ter, la regla de Cursor, `DECISIONS.md` y `NOW.md`. G6
+lo dejé anotado como «demostrar el clic y escribir, no construir», sin tocarlo
+(tocar deploys no es nuestro).
+
 ---
 
 ### Punto 1 — La convivencia (camino 3)
