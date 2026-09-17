@@ -46,3 +46,12 @@ Si falla, no declarar la tarea cerrada. Documentar el error y avisar al USER.
 ## Tags / hitos
 
 Para cierres de feature, fin de Wave o fix grande: **proponer un tag al USER** (no crearlo unilateralmente). Sin tags borrados sin avisar.
+
+## Excepción vigente (canal PM/Dev) — 2026-09-17
+
+El paso 5 (`git push origin main`) **no aplica al trabajo que entra por el canal PM/Dev** (`docs/pm/PARA-DEV.md`). Mientras no se sepa qué branch deploya Railway, ese trabajo va **a rama**, no a `main`, y `main` es de Emi.
+
+- **Motivo:** esta regla se escribió sin un servicio vivo atrás. Hoy hay uno desplegado (`cdi-production.up.railway.app`) y un push a `main` podría ser un deploy.
+- **Condición de salida:** cuando se confirme el branch de deploy de Railway (dato del dashboard). Si no es `main`, el paso 5 vuelve a valer tal cual.
+
+Detalle en `AGENTS.md` §2.ter. Para el resto del repo, la regla sigue como está.

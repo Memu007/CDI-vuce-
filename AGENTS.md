@@ -56,6 +56,30 @@ Roles disponibles:
 
 Para ediciones triviales (typo, color, texto de 1-2 líneas) NO usar el equipo, responder directo.
 
+## 2.ter. Canal PM/Dev (trabajo planificado por la PM)
+
+Existe un canal PM/Dev en `docs/pm/`, separado del equipo virtual de arriba. La PM
+escribe en `PARA-DEV.md`; la Dev responde **sólo** en `PARA-PM.md` y no edita el
+archivo de la PM. El onboarding de los dos roles, `NOW.md` y `DECISIONS.md` viven
+ahí. No se duplica acá.
+
+**Cuándo aplica:** al trabajo que entra por `PARA-DEV.md` (planificado por la PM).
+Ese trabajo sigue las reglas del canal —adversarial antes de construir, rojo previo
+antes del verde, producto e informe en commits separados, cada afirmación con el
+comando que la produjo—. El resto del repo sigue las reglas de las secciones 1 y 2.
+
+**Excepción vigente al push a `main`.** La regla `persistencia-github-al-dia.mdc`
+manda `git push origin main` tras cada cambio. Mientras no se sepa qué branch
+deploya Railway, el trabajo del canal va **a rama** y `main` es de Emi.
+
+- *Motivo:* esa regla se escribió cuando no había un servicio vivo atrás. Hoy hay
+  uno desplegado (`cdi-production.up.railway.app`) y un push a `main` podría ser un
+  deploy —y desplegar no es de la PM ni de la Dev—.
+- *Condición de salida:* cuando se confirme el branch que deploya Railway (dato del
+  dashboard, no del repo). Si deploya otro branch, la regla vuelve a valer tal cual.
+
+No es una tachadura de la regla: es una excepción acotada al trabajo del canal.
+
 ## 3. Qué tenés permitido
 
 - Editar código en cualquier carpeta del repo **excepto** las marcadas como "no tocar" abajo.

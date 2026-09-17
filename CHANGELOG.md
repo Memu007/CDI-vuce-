@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-09-17 · docs+test: canal PM/Dev mudado acá + evidencia de G7 (VUCE-2)
+
+- **docs (convivencia):** se sumó el canal PM/Dev en `docs/pm/` (onboardings, `NOW.md`, `DECISIONS.md`, `PARA-DEV.md`, `PARA-PM.md`). `AGENTS.md` §2.ter lo describe; el push a `main` queda exceptuado para ese trabajo mientras no se sepa qué branch deploya Railway (ver `.cursor/rules/persistencia-github-al-dia.mdc`). Nada del proceso propio del repo se pisó, sólo se agregó.
+- **test:** `tests/test_g7_cobro.py` — demuestra G7.1 (cobro→active), G7.2 (corte por vencimiento→402) y G7.4 (reactivación tras corte), con SDK de MP mockeado. `4 failed, 671 passed, 102 skipped` (los 4 rojos son preexistentes).
+- **hallazgo (no arreglado, reportado):** el corte por calendario sólo pasa a `past_due` a los usuarios en `trial`. Un `active` cuya renovación falla no se corta nunca (cron `main.py:719`, gate `main.py:1762`). Relevante para decidir G7.3.
+
 ## 2026-07-26 · docs: análisis de competencia, precio y valuación
 
 - **docs:** `docs/features/ANALISIS_COMPETENCIA_Y_PRECIO.md`. Mapa de competidores (Report System desde 1989, Gruposoft, Darsys, DATACDA/PSM), propuesta de precios y rango de valuación, con el ataque adversarial contra las propias conclusiones.
