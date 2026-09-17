@@ -1,4 +1,5 @@
 import secrets
+import logging
 from datetime import datetime, timedelta, timezone
 import asyncio
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -41,9 +42,18 @@ async def share_quote(
     )
     items = items_res.scalars().all()
 
-    # Get TC
-    tc = await get_dolar_snapshot()
-    tc_usd = tc.get("oficial", {}).get("venta", 1000.0)
+    # Tipo de cambio, con fallback: get_dolar_snapshot() pega a dolarapi.com y
+    # devuelve {"oficial": None, ...} cuando la API no responde. El default {}
+    # del .get no captura ese None (la clave existe), así que sin este try/except
+    # el endpoint devuelve 500 cada vez que dolarapi tiene un mal día. Mismo
+    # patrón que la calculadora en main.py:6588.
+    try:
+        tc = await get_dolar_snapshot()
+        oficial = tc.get("oficial") or {}
+        tc_usd = float(oficial.get("venta", 1000.0) or 1000.0)
+    except Exception as err:
+        logging.warning("[quotes] tipo de cambio no disponible, uso fallback: %s", err)
+        tc_usd = 1000.0
 
     # Prepare items for tarifar_connector
     calc_items = [

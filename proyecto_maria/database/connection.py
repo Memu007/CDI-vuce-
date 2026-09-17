@@ -18,10 +18,20 @@ logger = logging.getLogger(__name__)
 # Configuración de la base de datos
 DATABASE_URL = os.getenv("DATABASE_URL")
 if not DATABASE_URL:
-    # Fallback a SQLite para desarrollo local
+    # En producción, NUNCA caer a SQLite: el disco del contenedor (Railway) es
+    # efímero y se perdería la base de todos los estudios en cada deploy, con un
+    # warning que nadie mira. Se corta ruidosamente y temprano.
+    if os.getenv("ENVIRONMENT", "development") == "production":
+        raise RuntimeError(
+            "DATABASE_URL no está definida y ENVIRONMENT=production. La app no "
+            "arranca sin base persistente: en Railway el disco es efímero y caer "
+            "a SQLite perdería los datos en cada deploy. Definí DATABASE_URL "
+            "(postgresql://...)."
+        )
+    # Fallback a SQLite sólo para desarrollo local.
     basedir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     DATABASE_URL = f"sqlite+aiosqlite:///{os.path.join(basedir, 'maria_data.db')}"
-    logger.warning(f"DATABASE_URL not set, using SQLite: {DATABASE_URL}")
+    logger.warning(f"DATABASE_URL not set, using SQLite (dev): {DATABASE_URL}")
 
 # Railway/Heroku dan postgresql:// pero SQLAlchemy async necesita postgresql+asyncpg://
 if DATABASE_URL.startswith("postgres://"):
