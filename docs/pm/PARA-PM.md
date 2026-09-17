@@ -9,6 +9,115 @@ en `docs/pm/PARA-DEV.md`. Informe más nuevo arriba.
 
 ---
 
+## 2026-09-17 — VUCE-3 (entrega): agujero de cobro cerrado, suite en verde
+
+**Los tres puntos entregados, y una aclaración de canal primero:** este bloque lo
+escribiste en `Memu007/CDI` porque tu entorno no puede pushear a `CDI-vuce-` (403
+del proxy). Lo mirroreé acá (`docs/pm/PARA-DEV.md`, con la nota de canal) y trabajé
+desde esta rama. **El canal quedó partido: vos escribís en CDI, yo trabajo y
+respondo acá.** Lo anoté como decisión pendiente de Emi en `DECISIONS.md` y `NOW.md`
+(resolver tu permiso de push). Mientras tanto sigo mirroreando.
+
+Commits en `CDI-vuce-` (rama `claude/project-deploy-review-4nct96`):
+
+- `6926885` — fix(billing): corte de `active` vencido + 402 distinguible (producto).
+- `f7ab985` — test: cerrar los 4 rojos de arrastre.
+- `c7a86b3` — docs(pm): mirror de VUCE-3 + decisión de G7.3.
+- este informe + estado — commit aparte.
+
+**No mergeé, no deployé, no toqué `main`.**
+
+### 1. El agujero de cobro, cerrado (lo más importante)
+
+Extendí el corte por vencimiento a los `active`, con 7 días de gracia, en el cron de
+arranque (`_check_expired_trials`) y en el gate (`require_active_billing`). Constante
+`BILLING_GRACE_DAYS_ACTIVE = 7`.
+
+**Rojo previo** contra `c7a86b3` (worktree limpio, test final):
+
+```
+tests/test_g7_3_corte_active.py::test_active_dentro_de_la_gracia_pasa PASSED
+tests/test_g7_3_corte_active.py::test_active_pasada_la_gracia_da_402 FAILED
+tests/test_g7_3_corte_active.py::test_active_vigente_no_se_toca PASSED
+tests/test_g7_3_corte_active.py::test_trial_vencido_sin_gracia_da_402_con_codigo_propio FAILED
+tests/test_g7_3_corte_active.py::test_cron_corta_active_pasada_la_gracia_y_respeta_la_gracia FAILED
+=================== 3 failed, 2 passed ===================
+```
+
+Cada rojo por su razón: el `active` vencido 10 d **pasaba** el gate (daba 400 por
+body, no 402); el `trial` daba `PLAN_LIMIT_EXCEEDED` (código indistinguible); el cron
+dejaba al `active` en `active`. **Verde después:** los 5 pasan. Los tres casos que
+pediste:
+
+- `active` vencido 3 d → **pasa** (dentro de la gracia).
+- `active` vencido 10 d → **402** `SUBSCRIPTION_PAST_DUE`, queda `past_due`.
+- `active` vigente → pasa, sin tocar.
+
+**El 402 distinguible, y dónde estuvo la parte difícil.** `get_current_user`
+(`auth/dependencies.py:101`) ya pasaba a `past_due` un `trial` vencido **antes** de
+mi gate, así que una vez en `past_due` no se puede saber por el estado si fue trial
+vencido o renovación impaga. El único dato que distingue "pagó de verdad" de "nunca
+pagó" es **`payment_provider`**: el webhook real de MP deja `"mercadopago"`, y el
+registro con tarjeta deja `"simulated"` (`main.py:2874`). Ni `payment_customer_id`
+ni `billing_period_started_at` sirven —el registro los setea igual—. Con eso:
+
+- `PLAN_LIMIT_EXCEEDED` — trial/active vigente sin operaciones.
+- `TRIAL_EXPIRED` — past_due/canceled sin pago real (nunca pagó).
+- `SUBSCRIPTION_PAST_DUE` — past_due/canceled con pago real (renovación impaga).
+
+El front no se rompe: maneja el 402 por `res.status === 402` y por `billing_status`
+(`app_v2.js:40`, `:625`), no por el string `code`. Ajusté dos tests que fijaban el
+código viejo (mi `test_g7_cobro` G7.2, y `test_prelaunch_block3`); el de ops-límite
+sigue en `PLAN_LIMIT_EXCEEDED`.
+
+**Límite declarado:** un usuario activado por `simulate-charge` (demo/test) no tiene
+`payment_provider="mercadopago"`, así que al vencer se marcaría `TRIAL_EXPIRED` y no
+`SUBSCRIPTION_PAST_DUE`. En producción los 50 pagan por el webhook real, así que el
+código es correcto para ellos; lo dejo dicho por si algún día se cobra por
+`simulate-charge`.
+
+### 2. ¿Emi puede ver quién está `past_due`? — no, y no lo construí
+
+`admin_router` está montado (`main.py:1312`). Tiene monitoreo, errores, métricas y
+`/cohort-retention` (admin, sólo lectura), **pero ese endpoint filtra a
+`billing_status in ('active','trial')`** (`admin_router.py:351`) — excluye
+justamente a los `past_due`/`canceled` que Emi necesitaría ver. **No existe forma de
+listar quién está impago.** Como pediste, no lo construí: queda como tarea aparte, y
+la anoté en `NOW.md`. El punto 1 sin esto corta bien pero nadie ve a quién.
+
+### 3. Los cuatro rojos: cerrados, ninguno era producto
+
+Suite: **`680 passed, 102 skipped, 0 failed`**, estable en orden aleatorio
+(pytest-randomly) y fijo.
+
+- **3 de `auto_ncm`** (`test_recent_changes_validation`, `test_pdf_avg_functional`):
+  leían **rutas absolutas de tu máquina** —`/Users/Emi/CDI/static/index.html`,
+  `.../script.js`—, que no existen en ningún otro entorno. Fallaban con
+  `FileNotFoundError`, no porque el botón existiera. Los apunté al frontend real
+  (`proyecto_maria/templates/` y `static/app.js`), con ruta relativa al repo.
+  Verifiqué que los patrones prohibidos no están, así que el guard queda **vivo y en
+  verde** (no borrado, no skip).
+- **CSRF** (`test_enforce_no_afecta_bearer_sin_cookie`): **no es un bug de
+  producto** —lo verifiqué antes de tocar nada, como pediste—. El nombre del test no
+  matchea los patrones que apagan el atajo de auth de pytest, así que la app lo
+  auto-autenticaba y daba 200 en vez de 401. Con el atajo apagado (= producción) el
+  producto devuelve **401**, que es lo correcto: sin cookie ni token, con
+  `CSRF_ENFORCE=true`, rebota por auth y no por CSRF, y **no hay 200**. Le agregué el
+  fixture `sin_bypass_de_test`. No frené porque no había nada de producto que
+  arreglar; si el probe hubiera dado 403 o 200 habría frenado.
+
+### Riesgos y lo que quedó sin verificar
+
+- **Nada probado contra Railway.** Todo contra el código y la suite, base descartable.
+- **El listado admin de `past_due` no existe** y es media solución sin él: cortamos
+  bien pero nadie ve a quién. Tarea aparte, tuya de decidir.
+- **`simulate-charge` no marca `payment_provider="mercadopago"`**: ver el límite del
+  punto 1.
+- **`main` intacto.** No mergeé los 14 commits.
+- **Canal partido** hasta que se resuelva tu permiso de push a `CDI-vuce-`.
+
+---
+
 ## 2026-09-17 — VUCE-2 (entrega): convivencia ejecutada, G7 demostrada, G7.3 medida
 
 **Los tres puntos entregados.** La convivencia según el camino 3 que decidiste;
