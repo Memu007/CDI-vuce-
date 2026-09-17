@@ -700,32 +700,43 @@ async def _migrate_add_user_billing_columns():
         print(f"⚠️ No se pudo migrar columnas de billing: {mig_err}")
 
 
-async def _check_expired_trials():
-    """Al iniciar la app, pasa a 'past_due' los usuarios cuyo trial venció.
+# Días de gracia antes de cortar a un usuario `active` cuyo período venció sin
+# renovación. El corte es por calendario (no por señal de impago de MP, ver G7.3);
+# la gracia evita cortar por un webhook de renovación que llegó tarde o un reintento
+# de MP. `trial` no lleva gracia: ahí nadie pagó todavía.
+BILLING_GRACE_DAYS_ACTIVE = 7
 
-    Evita que un usuario que nunca volvió a entrar quede eternamente en trial.
-    Idempotente: solo afecta usuarios con billing_status='trial' y
-    trial_ends_at en el pasado.
+
+async def _check_expired_trials():
+    """Al iniciar la app, pasa a 'past_due' los usuarios cuyo período venció.
+
+    - `trial` vencido: sin gracia (nadie pagó todavía).
+    - `active` vencido: con BILLING_GRACE_DAYS_ACTIVE días de gracia. Sin esto un
+      estudio que dejó de pagar quedaba con servicio ilimitado para siempre (G7.3).
+    Idempotente.
     """
     from proyecto_maria.database.connection import engine
     from proyecto_maria.database.models import User
-    from sqlalchemy import update
+    from sqlalchemy import update, or_, and_
     try:
         async with engine.begin() as conn:
             now = datetime.now(timezone.utc)
+            gracia = now - timedelta(days=BILLING_GRACE_DAYS_ACTIVE)
             stmt = (
                 update(User)
                 .where(
-                    User.billing_status == "trial",
-                    User.trial_ends_at < now,
+                    or_(
+                        and_(User.billing_status == "trial", User.trial_ends_at < now),
+                        and_(User.billing_status == "active", User.trial_ends_at < gracia),
+                    )
                 )
                 .values(billing_status="past_due")
             )
             result = await conn.execute(stmt)
             if result.rowcount:
-                print(f"✅ Trial cron: {result.rowcount} usuario(s) pasados a past_due")
+                print(f"✅ Billing cron: {result.rowcount} usuario(s) pasados a past_due")
     except Exception as e:
-        print(f"⚠️ Trial cron error: {e}")
+        print(f"⚠️ Billing cron error: {e}")
 
 
 async def _migrate_add_user_team_owner_column():
@@ -1753,30 +1764,51 @@ async def require_active_billing(
             return User(username=user["username"], plan="premium", billing_status="active")
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
 
-    # Trial vencido -> past_due. Chequear la entidad de billing (org o user).
+    # Corte por vencimiento. Chequear la entidad de billing (org o user).
+    #  - trial vencido: sin gracia (nadie pagó todavía).
+    #  - active vencido: con BILLING_GRACE_DAYS_ACTIVE días de gracia (G7.3), para no
+    #    cortar por un webhook de renovación que llegó tarde.
     billing_entity, is_org = await _get_billing_entity(db, db_user)
+    now = datetime.now(timezone.utc)
     trial_end = billing_entity.trial_ends_at
     if trial_end is not None and trial_end.tzinfo is None:
         trial_end = trial_end.replace(tzinfo=timezone.utc)
-    if (
-        billing_entity.billing_status == "trial"
-        and trial_end is not None
-        and trial_end < datetime.now(timezone.utc)
-    ):
-        billing_entity.billing_status = "past_due"
-        try:
-            await db.commit()
-            await db.refresh(billing_entity)
-        except Exception:
-            await db.rollback()
+
+    # get_current_user ya pasa a past_due un `trial` vencido. Acá cubrimos al
+    # `active` vencido pasada la gracia (y al `trial` por si se llega sin pasar por
+    # get_current_user, p. ej. billing por organización).
+    if trial_end is not None:
+        vencido_trial = billing_entity.billing_status == "trial" and trial_end < now
+        vencido_active = (
+            billing_entity.billing_status == "active"
+            and trial_end < now - timedelta(days=BILLING_GRACE_DAYS_ACTIVE)
+        )
+        if vencido_trial or vencido_active:
+            billing_entity.billing_status = "past_due"
+            try:
+                await db.commit()
+                await db.refresh(billing_entity)
+            except Exception:
+                await db.rollback()
 
     ok, reason = billing_service.can_create_operation(billing_entity)
     if not ok:
+        # 402 distinguible, para que Emi sepa la causa de un vistazo:
+        #  - past_due/canceled y pagó de verdad (payment_provider=="mercadopago",
+        #    lo setea el webhook real de MP; el registro con tarjeta deja
+        #    "simulated") → renovación impaga.
+        #  - past_due/canceled sin pago real → trial vencido (nunca pagó).
+        #  - trial/active vigente sin ops → límite del plan.
+        if billing_entity.billing_status in ("past_due", "canceled"):
+            pago_real = getattr(billing_entity, "payment_provider", None) == "mercadopago"
+            code = "SUBSCRIPTION_PAST_DUE" if pago_real else "TRIAL_EXPIRED"
+        else:
+            code = "PLAN_LIMIT_EXCEEDED"
         raise HTTPException(
             status_code=402,
             detail={
                 "message": reason,
-                "code": "PLAN_LIMIT_EXCEEDED",
+                "code": code,
                 "billing_status": billing_entity.billing_status,
             },
         )

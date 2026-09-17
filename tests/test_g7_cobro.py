@@ -151,7 +151,8 @@ def test_g7_2_corte_por_vencimiento_devuelve_402(client):
     resp = client.post("/api/operations/manual", json={"client_id": "x", "items": []})
     assert resp.status_code == 402, resp.text
     detail = resp.json()["detail"]
-    assert detail["code"] == "PLAN_LIMIT_EXCEEDED", detail
+    # Desde VUCE-3 la razón del 402 es distinguible: trial vencido -> TRIAL_EXPIRED.
+    assert detail["code"] == "TRIAL_EXPIRED", detail
     assert detail["billing_status"] == "past_due", detail
 
 

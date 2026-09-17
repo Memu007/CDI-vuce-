@@ -656,7 +656,12 @@ class TestPastDue402:
         assert resp.status_code == 200
 
     def test_402_devuelve_json_con_code(self, client):
-        """La respuesta 402 incluye detail.code = PLAN_LIMIT_EXCEEDED."""
+        """La respuesta 402 incluye un detail.code distinguible.
+
+        Desde VUCE-3 (G7.3) el código del 402 distingue la causa: past_due sin
+        pago previo (payment_customer_id) → TRIAL_EXPIRED; con pago previo →
+        SUBSCRIPTION_PAST_DUE; trial/active con ops agotadas → PLAN_LIMIT_EXCEEDED.
+        Este user es past_due y nunca pagó → TRIAL_EXPIRED."""
         uname = _unique("pd_code")
         _register_and_login(client, uname)
         _set_user(uname, billing_status="past_due")
@@ -671,7 +676,7 @@ class TestPastDue402:
         assert resp.status_code == 402
         body = resp.json()
         assert "detail" in body
-        assert body["detail"]["code"] == "PLAN_LIMIT_EXCEEDED"
+        assert body["detail"]["code"] == "TRIAL_EXPIRED"
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
