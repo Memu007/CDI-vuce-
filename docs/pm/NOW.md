@@ -29,7 +29,7 @@ G1 pasó a verde). Hay **50 estudios esperando para pagar**. Ya dijeron que sí.
 | **G2 · Imagen real** | 🟢 | Cerrada 2026-09-17: 16/16 en modo Docker | Hecho |
 | **G3 · Aislamiento** | 🟢 | 22 bloqueados, 0 fugas. Abierto: no se corrió contra el servicio desplegado | Hecho |
 | **G4 · Producto** | 🟡 | Pantallas + 4 preguntas al despachante + 1 bug | Producto |
-| **G5 · Pruebas** | 🟡 | `4 failed, 671 passed, 102 skipped`. Los 4 rojos se diagnostican y limpian en VUCE-3 | Deuda acotada |
+| **G5 · Pruebas** | 🟢 | **VUCE-3: suite en verde, `680 passed, 102 skipped, 0 failed`** (estable en orden aleatorio). Los 4 rojos de arrastre eran tests, no producto | Hecho |
 | **G6 · Rollback** | ⚪ | Railway conserva los deploys: volver atrás es un clic. Queda **demostrarlo y escribir el procedimiento**, no construir | Al deployar |
 | **G7 · Cobro** | 🟡 | **7.1/7.2/7.4 demostradas en VUCE-2.** 7.3 decidido (corte por calendario + 7 días de gracia); se implementa en VUCE-3 | Semana 2 |
 
@@ -51,9 +51,9 @@ G1 pasó a verde). Hay **50 estudios esperando para pagar**. Ya dijeron que sí.
 
 ## Lo próximo del lado técnico
 
-1. **VUCE-3 (en curso):** cerrar el agujero de cobro (corte de `active` vencido con
-   7 días de gracia), averiguar el listado admin por estado de cobro, y limpiar los
-   4 rojos de la suite.
+1. **Listado admin por estado de cobro** (VUCE-3.2 lo dejó pendiente): hoy no hay
+   forma de que Emi vea quién está `past_due`. `/cohort-retention` filtra a
+   active/trial y los excluye. Tarea aparte para la PM.
 2. **G6 · Rollback** (demostrar el clic de Railway y escribir el procedimiento, no
    construir) y el bug de procedencia ≠ origen.
 3. **Mergear los 14 commits varados** — es un deploy; espera la ventana de Emi.

@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-09-17 · fix+test: cerrar el agujero de cobro y suite en verde (VUCE-3)
+
+- **fix(billing):** el corte por vencimiento sólo pasaba a `past_due` a los `trial`; un `active` cuya renovación fallaba quedaba con servicio ilimitado para siempre. Ahora el cron de arranque y el gate cortan también a los `active` vencidos, con 7 días de gracia (0 para trial). El 402 pasa a ser distinguible: `PLAN_LIMIT_EXCEEDED` / `TRIAL_EXPIRED` / `SUBSCRIPTION_PAST_DUE` (según `payment_provider`).
+- **test:** los 4 rojos de arrastre cerrados (ninguno era bug de producto): 3 leían rutas absolutas de la máquina de un dev (`/Users/Emi/CDI/...`), 1 de CSRF chocaba con el atajo de auth de pytest. Suite: `680 passed, 102 skipped, 0 failed`.
+- **hallazgo (reportado, no construido):** no hay forma de que un admin liste usuarios `past_due` (`/cohort-retention` los excluye). Tarea aparte.
+
 ## 2026-09-17 · docs+test: canal PM/Dev mudado acá + evidencia de G7 (VUCE-2)
 
 - **docs (convivencia):** se sumó el canal PM/Dev en `docs/pm/` (onboardings, `NOW.md`, `DECISIONS.md`, `PARA-DEV.md`, `PARA-PM.md`). `AGENTS.md` §2.ter lo describe; el push a `main` queda exceptuado para ese trabajo mientras no se sepa qué branch deploya Railway (ver `.cursor/rules/persistencia-github-al-dia.mdc`). Nada del proceso propio del repo se pisó, sólo se agregó.
