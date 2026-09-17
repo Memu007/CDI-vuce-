@@ -294,24 +294,29 @@ class TestAutoNCMButtonRemoval:
     """Test that Auto NCM button has been removed from frontend."""
     
     def test_auto_ncm_button_not_in_html(self):
-        """Test that Auto NCM button is not present in the HTML."""
-        html_path = "/Users/Emi/CDI/static/index.html"
-        
-        with open(html_path, 'r') as f:
-            html_content = f.read()
-        
-        # Check that auto NCM button references are not present
+        """El botón de Auto NCM no está en el HTML real.
+
+        VUCE-3: la ruta original (`/Users/Emi/CDI/static/index.html`) era de la
+        máquina de un desarrollador y no existe en otro entorno (fallaba con
+        FileNotFoundError). Se apunta al frontend real: `proyecto_maria/templates/`.
+        """
+        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        templates_dir = os.path.join(repo, "proyecto_maria", "templates")
+        html_content = ""
+        for name in os.listdir(templates_dir):
+            if name.endswith(".html"):
+                with open(os.path.join(templates_dir, name), encoding="utf-8") as f:
+                    html_content += f.read() + "\n"
+
         auto_ncm_terms = [
             "auto-ncm",
-            "autoNcm", 
+            "autoNcm",
             "Auto NCM",
             "auto_assign_ncm",
-            "assignAutoNcm"
+            "assignAutoNcm",
         ]
-        
         for term in auto_ncm_terms:
-            # Should not find these terms in button or function context
-            lines_with_term = [line for line in html_content.split('\n') if term in line.lower()]
+            lines_with_term = [line for line in html_content.split('\n') if term.lower() in line.lower()]
             button_lines = [line for line in lines_with_term if 'button' in line.lower() or 'btn' in line.lower()]
             assert len(button_lines) == 0, f"Found Auto NCM button reference: {term}"
 

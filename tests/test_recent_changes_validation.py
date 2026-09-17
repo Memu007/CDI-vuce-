@@ -217,46 +217,57 @@ class TestAutoNCMButtonRemovalValidation:
     """Validate that Auto NCM button has been completely removed."""
     
     def test_no_auto_ncm_button_in_main_html(self):
-        """Test main HTML file doesn't contain Auto NCM button."""
-        html_path = "/Users/Emi/CDI/static/index.html"
-        
-        with open(html_path, 'r') as f:
-            html_content = f.read()
-        
-        # Check for auto NCM button patterns
+        """El frontend real no contiene el botón de Auto NCM.
+
+        VUCE-3: la ruta original apuntaba a `/Users/Emi/CDI/static/index.html`,
+        una ruta de la máquina de un desarrollador que no existe en ningún otro
+        entorno (fallaba con FileNotFoundError, no por el botón). Se apunta al
+        frontend real de esta línea: los templates de `proyecto_maria/templates/`.
+        """
+        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        templates_dir = os.path.join(repo, "proyecto_maria", "templates")
+        html_content = ""
+        for name in os.listdir(templates_dir):
+            if name.endswith(".html"):
+                with open(os.path.join(templates_dir, name), encoding="utf-8") as f:
+                    html_content += f.read() + "\n"
+
         forbidden_patterns = [
             'auto-ncm-btn',
             'btnAutoNcm',
             'autoAssignNcm',
             'Auto NCM',
             'assignar NCM automático',
-            'asignar NCM automático'
+            'asignar NCM automático',
         ]
-        
         for pattern in forbidden_patterns:
             assert pattern.lower() not in html_content.lower(), \
                 f"Auto NCM button pattern found: {pattern}"
-    
+
     def test_no_auto_ncm_functions_in_javascript(self):
-        """Test JavaScript doesn't contain auto NCM functions."""
-        js_path = "/Users/Emi/CDI/static/script.js"
-        
-        with open(js_path, 'r') as f:
+        """El JS real no contiene funciones de Auto NCM.
+
+        VUCE-3: la ruta original (`/Users/Emi/CDI/static/script.js`) era de la
+        máquina de un desarrollador. Se apunta al JS real: `static/app.js`. El flag
+        de settings `autoNcmEnabled` no cuenta como función y no matchea estos
+        patrones (que exigen definición o llamada con paréntesis).
+        """
+        repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        js_path = os.path.join(repo, "proyecto_maria", "static", "app.js")
+        with open(js_path, encoding="utf-8") as f:
             js_content = f.read()
-        
-        # Check for auto NCM function patterns
+
         forbidden_function_patterns = [
             'function.*autoNcm',
             'function.*assignAutoNcm',
             'autoNcm()',
             'assignAutoNcm()',
             '.click.*auto.*ncm',
-            'addEventListener.*auto.*ncm'
+            'addEventListener.*auto.*ncm',
         ]
-        
         for pattern in forbidden_function_patterns:
-            lines_with_pattern = [line.strip() for line in js_content.split('\n') 
-                                if pattern.lower() in line.lower()]
+            lines_with_pattern = [line.strip() for line in js_content.split('\n')
+                                  if pattern.lower() in line.lower()]
             assert len(lines_with_pattern) == 0, \
                 f"Auto NCM function found: {pattern} in {lines_with_pattern}"
     

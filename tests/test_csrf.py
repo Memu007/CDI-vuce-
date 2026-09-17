@@ -73,8 +73,12 @@ def test_enforce_bloquea_header_invalido(cookie_client, monkeypatch):
     assert resp.status_code == 403
 
 
-def test_enforce_no_afecta_bearer_sin_cookie(monkeypatch):
+def test_enforce_no_afecta_bearer_sin_cookie(monkeypatch, sin_bypass_de_test):
     # Sin cookie de sesion el middleware no aplica (no es atacable via CSRF).
+    # Necesita `sin_bypass_de_test`: bajo pytest la app autentica sola cuando no
+    # hay token, y el nombre de este test no matchea los patrones que apagan ese
+    # atajo (VUCE-3). Sin apagarlo, el pedido entra igual y da 200 en vez de 401.
+    # Verificado con el atajo apagado (= producción): el producto devuelve 401.
     monkeypatch.setenv("CSRF_ENFORCE", "true")
     client = TestClient(app)
     resp = client.post("/api/backup/localStorage", json={"x": 1})
