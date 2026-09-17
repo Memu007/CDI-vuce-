@@ -20,6 +20,8 @@ repositorio.
 | **`CDI-vuce-` es la línea del producto** | 2026-09-16 | `Memu007/CDI` deja de trabajarse. Rama de trabajo: `claude/project-deploy-review-4nct96` |
 | **Los dos procesos conviven** | 2026-09-17 | `AGENTS.md` de `CDI-vuce-` sigue siendo la puerta de entrada de cualquier asistente —Cursor, Antigravity, Cascade apuntan ahí—. Se le suma el canal PM/Dev en `docs/pm/` para el trabajo planificado. Ni se archiva su proceso ni se copia el nuestro entero. Ver `AGENTS.md` §2.ter |
 | **`main` es de Emi — excepción permanente al push** | 2026-09-17 | Railway deploya de `main` con auto-deploy y «Wait for CI» apagado (verificado por Emi en el dashboard). Un push a `main` es un deploy inmediato. La excepción a la regla «push a `main` tras cada cambio» de `CDI-vuce-` es **permanente**, sin condición de salida. El trabajo del canal va a rama |
+| **G7.3 — corte por calendario, no señal de impago** | 2026-09-17 | Para el MVP se descarta la señal de impago de MP (rama A). Se extiende el corte por vencimiento a los `active` con **7 días de gracia** (0 para `trial`). Motivo: con 50 estudios contratados un corte falso es peor que un mes gratis de más. Implementado en VUCE-3 |
+| **El canal PM/Dev está partido** | 2026-09-17 | La PM no tiene push a `Memu007/CDI-vuce-` (403 del proxy). Escribe los bloques en `Memu007/CDI` y la Dev los mirrorea acá. Provisorio hasta resolver el permiso |
 
 ---
 
@@ -32,4 +34,3 @@ repositorio.
 | **Alcance comercial del catálogo NCM** | 22 posiciones de las ~9.500 del Nomenclador Mercosur | Define qué se le promete a los 50 estudios |
 | **Las cuatro preguntas del despachante** | `CARTUSO`, `IVAADICIONAL1`, código de banco, procedencia | Cierra parte de G4. Media hora con un despachante |
 | **Precio y fecha de arranque de los 50** | El producto está cerca de poder cobrarse con alcance acotado | Comercial |
-| **G7.3 — señal de impago** | El corte hoy es por calendario, no por señal de MP | Se decide con el costo que estima la Dev (VUCE-2). Descartarla es válido; dejarla sin decidir no |

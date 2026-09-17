@@ -29,9 +29,9 @@ G1 pasó a verde). Hay **50 estudios esperando para pagar**. Ya dijeron que sí.
 | **G2 · Imagen real** | 🟢 | Cerrada 2026-09-17: 16/16 en modo Docker | Hecho |
 | **G3 · Aislamiento** | 🟢 | 22 bloqueados, 0 fugas. Abierto: no se corrió contra el servicio desplegado | Hecho |
 | **G4 · Producto** | 🟡 | Pantallas + 4 preguntas al despachante + 1 bug | Producto |
-| **G5 · Pruebas** | 🟡 | `4 failed, 670 passed, 102 skipped`. Los 6 de quotes se cerraron en VUCE-1 | Deuda acotada |
+| **G5 · Pruebas** | 🟡 | `4 failed, 671 passed, 102 skipped`. Los 4 rojos se diagnostican y limpian en VUCE-3 | Deuda acotada |
 | **G6 · Rollback** | ⚪ | Railway conserva los deploys: volver atrás es un clic. Queda **demostrarlo y escribir el procedimiento**, no construir | Al deployar |
-| **G7 · Cobro** | 🟡 | **7.1/7.2/7.4 demostradas en VUCE-2.** Falta decidir 7.3 (señal de impago) | Semana 2 |
+| **G7 · Cobro** | 🟡 | **7.1/7.2/7.4 demostradas en VUCE-2.** 7.3 decidido (corte por calendario + 7 días de gracia); se implementa en VUCE-3 | Semana 2 |
 
 ---
 
@@ -43,15 +43,17 @@ G1 pasó a verde). Hay **50 estudios esperando para pagar**. Ya dijeron que sí.
    merge es un **deploy inmediato**. No se mergea hasta que Emi elija la ventana.
 3. **Conseguir al despachante.** Cuatro preguntas —`CARTUSO`, `IVAADICIONAL1`,
    código de banco, procedencia—, media hora.
-4. **Decidir G7.3** (corte por impago) con el costo que estimó la Dev en VUCE-2.
+4. **Resolver el permiso de push de la PM a `CDI-vuce-`** (hoy da 403). Mientras
+   tanto la PM escribe en `CDI` y la Dev mirrorea.
 5. **Decidir el alcance del catálogo NCM** y **confirmar el precio**.
 
 ---
 
 ## Lo próximo del lado técnico
 
-1. **G7.3** — según lo decida Emi: implementar la señal de impago de MP o
-   descartarla por escrito.
+1. **VUCE-3 (en curso):** cerrar el agujero de cobro (corte de `active` vencido con
+   7 días de gracia), averiguar el listado admin por estado de cobro, y limpiar los
+   4 rojos de la suite.
 2. **G6 · Rollback** (demostrar el clic de Railway y escribir el procedimiento, no
    construir) y el bug de procedencia ≠ origen.
 3. **Mergear los 14 commits varados** — es un deploy; espera la ventana de Emi.
