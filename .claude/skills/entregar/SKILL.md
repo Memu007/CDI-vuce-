@@ -42,7 +42,8 @@ comandos.
 
 ```bash
 # desde el worktree que dejó levantar.sh, con su entorno virtual
-export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test
+export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
+       VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
 python -m pytest -q --no-cov --timeout=120    # base 2026-10-06 en e8344d0: 680 passed, 102 skipped, 0 failed
 python -m compileall -q proyecto_maria
 BASE_URL=http://127.0.0.1:<puerto> ./scripts/testing/smoke_friccion.sh   # si tocaste backend
