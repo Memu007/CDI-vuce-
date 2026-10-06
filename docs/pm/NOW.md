@@ -68,6 +68,7 @@ Estado medido el 2026-10-06 (`AUDITORIA-2026-10-06.md`). Las de septiembre
 | G5 · Pruebas | 🟢 | 680 passed, 102 skipped, 0 failed (re-verificado) |
 | G6 · Volver atrás | 🟡 | El esquema aguanta ir y volver (probado en local). Falta: backup de la base y contar los `active` vencidos antes de publicar |
 | G7 · Cobro | 🔴 | El corte por impago cubre 2 de 73 funciones; cancelar no cancela en Mercado Pago; aviso de pago sin firma y repetible; doble suscripción; invitaciones con error en Postgres |
+| G8 · Piloto | ⚪ | Tres estudios presentan de verdad un MARIA de CDI (`ROADMAP.md`, bloque 4) |
 
 ## Publicado
 
