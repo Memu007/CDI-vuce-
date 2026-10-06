@@ -1,31 +1,12 @@
-# GitHub Copilot — instrucciones del proyecto CDI/VUCE
+# GitHub Copilot — CDI
 
-Este repo tiene UNA fuente de verdad para las reglas que aplican a CUALQUIER asistente (Cursor, Antigravity, Cascade, Claude Code, Codex, Copilot, Aider).
+Este repositorio tiene **una sola fuente de reglas** para cualquier asistente: **`AGENTS.md`**, en la raíz. Leelo antes de tocar nada. Si vas a tocar código, leé también `CLAUDE.md`: sus reglas valen para cualquier asistente.
 
-## Antes de sugerir código
+Lo crítico, por si no seguís el enlace:
 
-Leer:
+- **Nunca empujes ni fusiones a `main`.** Railway publica cada push a `main` sin esperar los tests. Trabajá en una rama; `main` sólo con el «dale» de Emi.
+- **Nada sin plan aprobado:** ninguna tarea, arreglo «de paso» ni refactor que no haya pedido Emi o que no esté en `docs/pm/PARA-DEV.md`. Proponé; no hagas.
+- Ningún secreto (`.env*`) ni dato real de clientes en el repositorio. Nada contra producción ni contra servicios de terceros desde una prueba.
+- Emi no programa: conclusión arriba, castellano llano, versión chica primero, sin dar la razón para quedar bien.
 
-1. **`AGENTS.md`** (raíz) — instrucciones generales para asistentes IA.
-2. **`HANDOFF.md`** — estado actual, stack, qué funciona.
-3. **`.cursor/rules/`** — rules detalladas (equipo virtual, persistencia, comunicación).
-
-## Reglas críticas
-
-- El usuario es **dueño del producto, no programador**. Castellano llano, sin jerga innecesaria.
-- Para tareas no-triviales, asumir un **equipo virtual de 6 roles** (PM, Tech Lead, Backend, Frontend, QA, Security/DevOps) y mostrar al inicio entre corchetes los roles consultados, ej: `[PM + Backend + QA]`.
-- Después de cada cambio significativo: `HANDOFF.md` §6 + `CHANGELOG.md` + commit + push (sin `--force`).
-
-## Stack del proyecto
-
-- Backend: FastAPI + SQLAlchemy + PostgreSQL (Railway) / SQLite (local).
-- Frontend v2: HTML + CSS + JS vanilla en `proyecto_maria/static/v2/`.
-- Pantallas: `screens/*.js` con patrón módulo + `CDI.registerScreen()`.
-- Auth: JWT por cookie.
-- Telemetría: `CDI.track()` → `/api/ui/event` → tabla `telemetry_events`.
-
-## NO tocar
-
-- `.env`, `.env.afip` (gitignored, contienen secrets).
-- `docs/archive/` (referencias históricas read-only).
-- `viejo/`, `venv/`.
+Este archivo no lleva reglas propias: si querés cambiar una, se cambia en `AGENTS.md`.

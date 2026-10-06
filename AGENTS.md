@@ -1,138 +1,104 @@
-# AGENTS.md — instrucciones para asistentes de IA
+# AGENTS.md — la puerta de entrada de cualquier asistente
 
-> **Esta es la fuente de verdad para CUALQUIER asistente** (Cursor, Antigravity, Cascade/Windsurf, Claude Code, Codex, GitHub Copilot, Aider, etc.) que tome este repo. Lo lee este archivo primero, después `HANDOFF.md`.
->
-> Cada IDE tiene su propio archivo wrapper que apunta acá:
->
-> - Cursor → `.cursor/rules/*.mdc`
-> - Cascade/Windsurf → `.windsurf/rules/leeme-primero.md`
-> - Claude Code → `CLAUDE.md`
-> - GitHub Copilot → `.github/copilot-instructions.md`
-> - Aider y otros → `CONVENTIONS.md`
->
-> **Si modificás reglas, modificalas acá o en `.cursor/rules/`. Los wrappers son cortos y no duplican contenido.**
+Vale para cualquier asistente que tome este repositorio: Claude Code, Cursor,
+Antigravity, Cascade/Windsurf, Devin, Codex, Copilot o Aider. Las reglas viven
+en los documentos enlazados y no se copian. Una regla escrita en dos lugares
+envejece en uno.
 
-## 1. Antes de tocar nada
+**Reglas congeladas** desde el 2026-10-06 (`docs/pm/NOW.md`, «Reglas»). Sólo
+cambian antes si algo se rompe, y siempre con una decisión anotada en
+`docs/pm/DECISIONS.md`.
 
-Leer en este orden:
+## Lo que vale para todos, siempre
 
-1. `HANDOFF.md` — estado actual, stack, qué está vivo, qué es frágil.
-2. `CHANGELOG.md` — últimas 2–3 entradas para saber qué cambió recientemente.
-3. `.cursor/rules/` (si está) — preferencias del usuario para esta tarea.
+1. **`main` es de Emi.** Railway publica cada push a `main` sin esperar los
+   tests: empujar a `main` es publicar. Todo trabajo va a una rama. A `main`
+   se llega sólo con el «dale» de Emi para ese SHA (`docs/pm/ONBOARDING-PM.md`,
+   «Publicar»). Nunca `git push --force`.
+2. **Nada sin plan aprobado.** Ninguna tarea nueva, arreglo «de paso» ni
+   refactor sin que esté en `docs/pm/PARA-DEV.md` o lo pida Emi en ese
+   momento. Si ves algo que conviene hacer, proponelo con su costo y su
+   riesgo; no lo hagas.
+3. **Los límites que no se negocian** tienen una sola copia:
+   `docs/pm/ONBOARDING-PM.md`, «Límites que no se negocian». Incluyen: ningún
+   secreto ni dato real de clientes en el repositorio, nada contra producción
+   ni contra terceros desde una prueba y nada publicado sin «dale».
+4. **El estado vigente** (qué está hecho, qué sigue, qué espera a Emi) está en
+   `docs/pm/NOW.md`. Las decisiones tomadas, en `docs/pm/DECISIONS.md`.
+   `HANDOFF.md` describe cómo funciona el producto, pero está desactualizado
+   desde julio: ante una contradicción, mandan Git y `NOW.md`.
 
-Si el pedido del humano contradice algo de `HANDOFF.md`, **avisar antes de implementar** y pedir confirmación.
+## Hablar con Emi
 
-## 2. Principios de trabajo
+Emi es dueño del producto y no programa. Lo usa desde el teléfono.
 
-El usuario es **dueño del producto, no programador**. Prioridad: producto claro, seguro y usable.
+- **La conclusión, arriba y en castellano llano.** Cada término técnico se
+  traduce la primera vez que aparece. Después: qué cambió, qué probar y qué
+  riesgo hay.
+- **La versión chica, primero.** Si un plan tiene más de cinco o seis pasos,
+  se propone primero el mínimo útil.
+- **Las opciones, con lo que cuestan en el negocio** («más rápido pero…»), y
+  con una recomendación.
+- **Sin dar la razón para quedar bien.** Si un pedido choca con la seguridad,
+  los datos de los clientes, el cobro o una decisión tomada, se dice antes de
+  hacerlo, con una alternativa.
+- **Lo que toca clientes, CUIT, el archivo MARIA, PDFs, pagos o publicación**
+  lleva una recomendación clara y no se asume.
+- Entre reglas, gana lo que Emi pida en el mensaje actual, salvo que choque con
+  un límite que no se negocia: eso se le dice.
 
-1. **Modo tranquilo:** calidad sobre velocidad. Cambios chicos, revisar y probar antes de seguir.
-2. **Copiloto de producto:** explicar impacto en negocio; no dar clases de código salvo que se pida.
-3. **Conclusión arriba:** qué cambió, qué probar, riesgo si aplica. Sin relleno ni diff largo.
-4. **No asumir negocio sensible:** cliente, CUIT, historial, MARIA, PDF, pagos o deploy requieren recomendación clara y cuidado.
-5. **Versión chica primero:** evitar over-engineering; fase 2 solo si aporta.
-6. **Sin yes-man:** si algo complica o mete riesgo, decirlo claro y proponer alternativa.
+## Según tu rol
 
-Detalles ampliados viven en `.cursor/rules/`:
+**PM principal.** Leé completo `docs/pm/ONBOARDING-PM.md`. Hay una sola PM
+principal, la sesión anotada en `NOW.md`, «Quién hace qué».
 
-- `copiloto-producto.mdc`
-- `modo-tranquilo-calidad.mdc`
-- `utilidad-ahorro-tokens.mdc`
-- `equipo-virtual.mdc`
-- `persistencia-github-al-dia.mdc`
+**PM visual** (si se suma). Leé `docs/pm/ARRANQUE-PM-VISUAL.md` y hacé lo que
+dice.
 
-## 2.bis. Equipo virtual de 6 roles
+**Dev del canal.** Leé `CLAUDE.md` y, una vez, `docs/pm/ONBOARDING-DEV.md`.
+Después, tu canal: la Dev 1 lee `docs/pm/PARA-DEV.md` y responde en
+`docs/pm/PARA-PM.md`; la Dev 2, si se suma, `PARA-DEV-2.md` y `PARA-PM-2.md`.
 
-Para tareas no-triviales, asumir un equipo y consultar SOLO los roles relevantes + PM. Indicar al inicio de la respuesta entre corchetes los roles consultados. Detalle completo en `.cursor/rules/equipo-virtual.mdc`.
+**Otro asistente en un chat suelto con Emi** (Cursor, Copilot, etc., fuera
+del canal):
+- Antes de tocar código, leé `CLAUDE.md`. Sus reglas de trabajo valen para
+  vos también.
+- Trabajá en una rama. Al terminar, dejá una a tres líneas en `CHANGELOG.md` y
+  avisale a Emi qué rama revisar.
+- Si la tarea no es trivial, podés responder como un equipo de especialistas:
+  PM, Tech Lead, Backend, Frontend, QA y Seguridad. Consultá sólo los roles
+  que sirvan y nombralos entre corchetes al principio, por ejemplo
+  `[PM + Backend + QA]`. Las sesiones PM y Dev no lo usan: tienen subagentes
+  de verdad (`docs/pm/ONBOARDING-PM.md`, «Subagentes»).
 
-Roles disponibles:
+**Auditoría externa.** Lee, cuestiona y propone. Su informe no cambia
+prioridad, alcance ni aceptación por sí solo: la PM decide qué adopta.
 
-- **PM** (siempre): prioriza, traduce a negocio, corta over-engineering.
-- **Tech Lead**: arquitectura y decisiones grandes.
-- **Backend**: FastAPI, SQLAlchemy, AFIP, VUCE, Python.
-- **Frontend**: HTML/CSS/JS vanilla en `proyecto_maria/static/v2`.
-- **QA**: smoke tests, edge cases, riesgo a prod.
-- **Security/DevOps**: secrets, validación, CUIT, Railway, deploy.
+## Lo único que este archivo afirma
 
-Para ediciones triviales (typo, color, texto de 1-2 líneas) NO usar el equipo, responder directo.
+- Si la entrega pendiente vive en una rama de Dev sin integrar, `PARA-PM.md` se
+  lee **desde esa rama**.
+- Si un documento y Git se contradicen sobre qué está implementado, manda Git y
+  se corrige el documento.
+- **No son reglas:** `.specify/`, `.windsurf/plans/`, `.devin/plans/`, `plans/`,
+  `docs/archive/` y los informes viejos de `docs/`. Son notas o historia.
+- Los archivos de cada herramienta (`.cursor/rules/`, `.github/`,
+  `CONVENTIONS.md`, `.devin/rules/`, `.agent/rules/`, `.windsurf/rules/`) sólo
+  apuntan acá. No llevan reglas propias.
 
-## 2.ter. Canal PM/Dev (trabajo planificado por la PM)
+## Eficiencia de chats
 
-Existe un canal PM/Dev en `docs/pm/`, separado del equipo virtual de arriba. La PM
-escribe en `PARA-DEV.md`; la Dev responde **sólo** en `PARA-PM.md` y no edita el
-archivo de la PM. El onboarding de los dos roles, `NOW.md` y `DECISIONS.md` viven
-ahí. No se duplica acá.
+Vale para PMs y Devs; esta es su única copia.
 
-**Cuándo aplica:** al trabajo que entra por `PARA-DEV.md` (planificado por la PM).
-Ese trabajo sigue las reglas del canal —adversarial antes de construir, rojo previo
-antes del verde, producto e informe en commits separados, cada afirmación con el
-comando que la produjo—. El resto del repo sigue las reglas de las secciones 1 y 2.
-
-**Excepción permanente al push a `main`.** La regla `persistencia-github-al-dia.mdc`
-manda `git push origin main` tras cada cambio. Para el trabajo del canal **no
-aplica**: va **a rama**, y `main` es de Emi.
-
-- *Motivo:* Railway está configurado con `main` como branch de producción,
-  auto-deploy activado y «Wait for CI» **apagado** (verificado por Emi en el
-  dashboard, 2026-09-17). Un push a `main` es un **deploy inmediato, sin siquiera
-  esperar los tests** —y desplegar no es de la PM ni de la Dev—.
-- *Sin condición de salida:* el branch de deploy ya está confirmado. La excepción es
-  permanente mientras `main` siga siendo el branch de producción de Railway.
-
-No es una tachadura de la regla: es una excepción acotada al trabajo del canal.
-
-## 3. Qué tenés permitido
-
-- Editar código en cualquier carpeta del repo **excepto** las marcadas como "no tocar" abajo.
-- Crear nuevos endpoints / pantallas / migraciones siguiendo el patrón existente.
-- Agregar tests en `tests/`.
-- Actualizar `HANDOFF.md`, `CHANGELOG.md`, `docs/`.
-
-## 4. Qué NO tenés permitido (sin confirmación explícita del humano)
-
-- **Forzar push** (`git push --force`) a `main`.
-- Tocar `.env`, `.env.afip` o cualquier secret. Esos archivos no están en git por algo.
-- Borrar archivos en `docs/archive/` — son referencias históricas para auditoría.
-- Cambiar `.gitignore` para incluir secrets, bases de datos o PDFs de clientes.
-- Hacer commits sin mensaje claro o sin prefijo (`feat:` / `fix:` / `chore:` / `docs:` / `refactor:` / `test:`).
-- Borrar tags. Si hay que sacar uno, avisar.
-- Mergear branches sin que el humano lo apruebe.
-
-## 5. Carpetas que NO se tocan (read-only para IAs)
-
-- `viejo/` — material legacy, no se sube a git, no se usa como fuente de verdad.
-- `venv/` — entorno Python local, no commitear.
-- `docs/archive/` — handoffs y docs viejos. Solo lectura.
-- `.git/` — obvio.
-
-## 6. Cómo dejar el repo después de tu sesión
-
-Antes de declararte "listo":
-
-1. ¿Tocaste código? Hacé commit con prefijo.
-2. ¿Cambiaste comportamiento del producto? Actualizá `HANDOFF.md` sección 6 ("Estado actual").
-3. ¿Agregaste / sacaste un endpoint o columna de DB? Actualizá `HANDOFF.md` sección 5 (Estructura) o 6 (Estado).
-4. **Siempre**: agregar 1–3 líneas en `CHANGELOG.md` con la fecha.
-5. Si hubo un hito (cierre de feature, fin de Wave, fix grande): proponer un tag al humano (no lo crees vos sin avisar).
-6. `git push` (sin force).
-
-## 7. Si la sesión queda incompleta
-
-Documentá en `HANDOFF.md` sección "## TODO siguiente sesión" (creala si no existe), o en `CHANGELOG.md` debajo de la entrada parcial, qué quedó pendiente. Sé explícito: archivo, función, qué falta, por qué.
-
-## 8. Smoke test rápido
-
-Si tocaste backend, antes de declarar "listo":
-
-```bash
-PYTHONPATH=. uvicorn proyecto_maria.main:app --host 127.0.0.1 --port 8000 &
-sleep 4
-BASE_URL=http://127.0.0.1:8000 ./scripts/testing/smoke_friccion.sh
-kill %1
-```
-
-Si falla, no declares la tarea cerrada.
-
-## 9. Cuando hay duda
-
-Preguntá al humano. Mejor 1 pregunta corta ahora que un cambio que hay que rehacer.
+- **Cuándo compactar:** cerca del 50 % de contexto las Devs y del 60 % las
+  PMs, en un corte natural (después de una entrega o de un veredicto). Nunca en
+  medio de una corrida.
+- **Lo mide la PM principal:** en cada vuelta, `get_session` de cada sesión da
+  `context_usage.used_tokens`. Pasado el umbral, le da a Emi el
+  `/compact conservar: …` listo para pegar en esa sesión.
+- **Ninguna sesión se compacta sola, y `/compact` no viaja por mensaje entre
+  sesiones:** lo pega Emi en cada chat.
+- Cada sesión deja al final de su informe «Contexto: ~X %» y, desde el umbral,
+  su propio `/compact conservar: …`.
+- **Antes de compactar o cambiar de chat,** el estado vigente queda subido al
+  repositorio.

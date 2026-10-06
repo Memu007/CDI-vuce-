@@ -1,202 +1,112 @@
-# Arranque para la Dev
+# Arranque para una Dev nueva
 
-Leé este archivo entero **una vez**. Después tu día a día pasa por `NOW.md` y los
-dos canales.
+Leé este archivo completo una vez. Después tu día a día pasa por tu canal
+(`PARA-DEV.md` la Dev 1, `PARA-DEV-2.md` la Dev 2) y, cuando haga falta,
+`NOW.md` y los documentos que la tarea cite.
 
-Adaptado el **2026-09-17** para `Memu007/CDI-vuce-`, la línea real del producto.
-El proceso PM/Dev nació en `Memu007/CDI` (otra línea, hoy archivo histórico) y
-**se mudó acá con VUCE-2**. Lo que sigue es el proceso; las trampas de aquel
-repositorio no se copiaron porque allá no existen (ver §6).
+La tarea activa, Git y la evidencia reproducible mandan. Los límites que no se
+negocian están en `ONBOARDING-PM.md` y valen también para vos.
 
----
+## Rol
 
-## 0. Lo primero, porque es lo que más cuesta caro
+- **Dev:** implementa la tarea activa, prueba y entrega evidencia. No amplía
+  alcance ni decide prioridades.
+- **PM:** define el problema, la prioridad, los límites y la aceptación.
+- **Emi:** decisiones reservadas, comerciales y de producción. No le
+  hablás: lo que haya que decidir va como D a tu PM.
 
-**Se verifica contra el código y contra una corrida, nunca contra un informe.**
+Si una instrucción contradice el contrato, una decisión vigente o la
+evidencia, frená y reportá la contradicción antes de construir sobre ella.
 
-Es la regla que gobierna todo lo demás, y viene de un hecho medido en la línea
-anterior: los informes afirmaban «262 tests, 236 pasando» y la corrida real dio
-137 verdes sobre 371, con 16 tests de seguridad **sin ninguna assertion** —el que
-debía detectar que un cliente viera los datos de otro era un `pass`—. Si algo dice
-que funciona y no tiene la salida del comando pegada, tratalo como no hecho. Vale
-para lo que leas, para lo que te entreguen y para lo que escribas vos.
+## Antes de cada tarea
 
-En esta línea el mismo patrón ya mordió: hasta el 2026-07-26 había **23 tests de
-«esto exige login» que nunca se ejecutaban** porque el archivo se colgaba antes de
-llegar (ver `CHANGELOG.md`). Un verde no visto no es un verde.
+Trabajá en la rama de tu sesión, no sobre `main`. Antes de cada tarea traé
+con `merge` la rama de la PM (`claude/practical-shannon-szpwkn`): lo aceptado y sin publicar vive
+ahí. Después leé tu canal desde esa rama.
 
----
+1. confirmá rama y SHA base contra la tarea;
+2. leé sólo lo que la tarea cita;
+3. inspeccioná el flujo real antes de editar;
+4. no pises cambios ajenos;
+5. una tarea a la vez (la que dejaste en revisión no cuenta).
 
-## 1. Quién es quién
+## Desarrollo local
 
-**Vos sos la Dev.** Escribís el código, corrés las pruebas e informás. Decidís
-**el cómo técnico**: arquitectura de la solución, estructura, nombres, qué
-archivos tocar.
+Stack: FastAPI (Python 3.12) + JavaScript sin framework
+(`proyecto_maria/static/v2`), SQLAlchemy async (PostgreSQL en Railway, SQLite en
+local), Gemini para leer PDFs y sugerir NCM. Todo el backend vive en
+`proyecto_maria/main.py` (8.4k líneas); pruebas en `tests/`.
 
-**La PM** define **qué** se construye, **por qué ahora**, **qué límites** tiene y
-**cómo se demuestra** que está hecho. No escribe código de producto: sólo edita
-`docs/pm/`. Si la PM toca el código, el proyecto pierde la única revisión
-independiente que tiene.
+- Python 3.12 (las versiones fijadas no compilan con 3.13).
+- `docs/pm/herramientas/levantar.sh <SHA> [puerto]` deja un worktree en ese
+  SHA con entorno virtual, `.env` inventado sin terceros, SQLite nueva y la API
+  en `http://127.0.0.1:<puerto>` (`/health`, `/dashboard`). Para no pisar a
+  otro, cada sesión usa su propio `PM_DIR` y su puerto.
+- `docs/pm/herramientas/chequeo-previo.sh <SHA> [puerto]` antes de una corrida
+  larga.
+- Con `ENVIRONMENT=production` el modo simulado de VUCE detiene la app: para
+  probar el modo producción se apaga lo que lo necesita.
+- `scripts/testing/e2e_maria.sh` no corre en la nube (necesita npm y
+  Puppeteer).
 
-**Emi es el dueño.** Habla con los clientes y toma las decisiones comerciales.
-Todo lo que dependa de un cliente, de rotar una credencial o de tocar producción
-va por él.
+## Calidad mínima de una entrega
 
----
+1. reproducí el defecto o la propiedad discriminante (rojo antes que verde);
+2. implementá sólo lo pedido;
+3. auto-revisá el diff completo contra el SHA base;
+4. corré focales y puertas proporcionales;
+5. si la tarea o el riesgo lo piden, suite completa desde base limpia;
+6. informá SHA exacto, qué corriste, resultado, rojos, qué no corriste y
+   riesgos.
 
-## 2. Somos adversariales, en las dos direcciones
+Si un caso nuevo podría dar verde sin mirar el estado real, entregá también su
+**negativo discriminante**: el sabotaje que lo pone rojo por la razón
+correcta. Los sabotajes viejos que tocan archivos que cambiaste se corren de
+nuevo; si uno ya no encuentra su patrón, el script está roto y se arregla.
 
-Esto es cómo trabajamos, no una advertencia.
+No repitas una prueba hasta que dé verde sin explicar por qué falló.
 
-**Si te piden algo técnicamente mal, decilo antes de hacerlo.** No lo implementes
-porque lo pidió la PM. Y esperá lo mismo al revés. La forma correcta de
-contradecir es una reproducción, no una opinión: «corrí esto, respondió esto otro,
-tu premisa no se sostiene». Si tenés razón, cambia la tarea y queda registrado. Si
-la PM te corrige con evidencia, se acepta sin adornos y se sigue.
+**Subagentes antes de entregar:** cuáles, con qué modelo y esfuerzo, en la
+tabla de `ONBOARDING-PM.md`, «Subagentes»; el orden, en `/entregar`. Lo que
+encuentran lo reproducís. Es autorrevisión: no reemplaza la de la PM.
 
-**Cuando la decisión ya está tomada y tu objeción quedó registrada, se ejecuta
-completa.** Adversarial es antes de construir, no un freno permanente.
+## Informe Dev → PM
 
----
+Breve y autosuficiente:
 
-## 3. El proyecto, en un minuto
+1. resultado: terminado, parcial o bloqueado;
+2. commit exacto y alcance real;
+3. evidencia reproducible y resultado;
+4. qué no se corrió;
+5. desvíos o riesgos;
+6. lo que decide la PM, numerado D1, D2…, con opciones y recomendación.
 
-**Sistema MARÍA** es software para **despachantes de aduana argentinos**. Lee la
-factura del proveedor en PDF, ofrece autocomplete de NCM contra VUCE y devuelve un
-archivo MARIA listo para pegar en el sistema aduanero. La premisa de producto: el
-despachante mantiene el control; la IA recomienda, el humano confirma; el TXT es
-100 % trazable a lo que el usuario aprobó en pantalla.
+Reemplazá todo el cuerpo anterior de `PARA-PM.md`. Al final: «Última vuelta:
+<hora>» y «Contexto: ~X %» (y desde ~50 %, tu `/compact conservar: …`).
 
-**Stack:** Python 3.11 · FastAPI · SQLAlchemy async · PostgreSQL/SQLite ·
-Google Gemini · **desplegado en Railway** (`cdi-production.up.railway.app`).
+Al terminar una pieza: commit, push, comprobar que el remoto tiene tu HEAD y
+después el informe. Nada terminado queda sólo en local.
 
-**Rama de trabajo:** `claude/project-deploy-review-4nct96`. Tiene 14 commits que
-**no están mergeados a `main`** — y no se mergean hasta que Emi lo decida (ver §6).
+## Cuándo frenar
 
----
+- un criterio no se puede cumplir sin cambiar alcance;
+- hay que tocar algo fuera de la tarea;
+- haría falta decidir arquitectura, datos, permisos, dinero o una migración
+  no autorizada;
+- una regresión previa aparece roja;
+- la tarea es ambigua de una forma que cambia el resultado;
+- necesitarías un secreto, una credencial real o una acción externa.
 
-## 4. Por qué esto es urgente y por qué igual no se apura
+No improvises para «destrabar».
 
-**Hay 50 estudios de despachantes esperando para pagar.** Ya dijeron que sí. Es
-plata real esperando que el producto esté en condiciones de cobrarse.
+## Producción
 
-El deploy se organiza por **siete puertas** (`G0`–`G7`): secretos, configuración,
-imagen, aislamiento, producto, pruebas, rollback y cobro. El estado vivo de cada
-una está en `NOW.md`. El orden de trabajo no es «lo que más se nota» sino «lo que
-impide cobrar sin romper algo».
+No desplegás ni tocás producción salvo tarea explícita que cite el «dale» de
+Emi para ese SHA. Mientras `main` publique solo, cualquier push que
+toque producto se trata como una acción de producción.
 
-Los documentos que suben estos estudios son confidenciales y de empresas que
-compiten entre sí. A diferencia de la línea anterior, **acá el aislamiento entre
-clientes ya está hecho** (`owner_username` y `team_owner_username` en los modelos,
-`test_multitenant.py`, `docs/AUDIT_MULTITENANT.md`). Eso no es motivo para bajar la
-guardia: es motivo para no rehacerlo.
+Toda lista o catálogo que el producto necesita en producción llega por una
+migración idempotente (inserta lo que falta, no pisa lo editado), no sólo por
+datos de prueba. El informe dice cómo llega a producción.
 
----
-
-## 5. Cómo nos comunicamos
-
-**No hay chat entre la Dev y la PM. Hablamos por archivos, en el repositorio.**
-
-| Archivo | Quién escribe | Para qué |
-|---|---|---|
-| `docs/pm/PARA-DEV.md` | **Sólo la PM** | Tu tarea actual y sus criterios |
-| `docs/pm/PARA-PM.md` | **Sólo la Dev** | Tus informes |
-
-Ninguna de las dos edita el archivo de la otra. Antes de empezar:
-
-```bash
-git pull origin claude/project-deploy-review-4nct96
-cat docs/pm/PARA-DEV.md
-```
-
-**Lo que esté en `PARA-DEV.md` está aprobado: arrancá sin pedir permiso.** Cuando
-termines, tu informe queda completo en `PARA-PM.md` y empujado. **Si el informe no
-está en el repositorio, la entrega todavía no ocurrió.**
-
-### Palabra gatillo
-
-- **«revisá»** → `git pull`, leé `PARA-DEV.md` y arrancá la tarea nueva, o aplicá
-  la corrección si fue un rechazo.
-
-### Qué tiene que tener tu informe
-
-1. **Qué cambiaste**, una línea por pieza.
-2. **Evidencia**: el comando y su salida pegada. Rojo previo y verde posterior
-   cuando corresponda.
-3. **Riesgos y lo que quedó sin verificar.** Explícito.
-4. **Los commits**, separados: producto/regresión por un lado, informe por otro.
-
----
-
-## 6. La convivencia con el proceso de este repositorio — leé esto antes de tocar nada
-
-`CDI-vuce-` **ya tenía su propio proceso** antes de que llegara el canal PM/Dev, y
-convive con él por decisión de la PM (ver `DECISIONS.md`, 2026-09-17):
-
-- **`AGENTS.md` es la puerta de entrada de cualquier asistente** (Cursor,
-  Antigravity, Cascade, Claude Code…). No se archiva ni se reemplaza. Léelo, más
-  `HANDOFF.md` y `CHANGELOG.md`, antes de tocar código. El canal PM/Dev está
-  descripto en `AGENTS.md` §2.ter.
-- **El trabajo que entra por `PARA-DEV.md` sigue estas reglas** (adversarial,
-  rojo previo, producto e informe en commits separados, cada afirmación con su
-  comando). El resto del repo sigue las reglas de `AGENTS.md`.
-- **Carpetas read-only:** `viejo/`, `venv/`, `docs/archive/`. No se tocan.
-- **Excepción vigente al push a `main`:** la regla
-  `.cursor/rules/persistencia-github-al-dia.mdc` manda `git push origin main` tras
-  cada cambio. **Para el trabajo del canal no aplica:** va a rama, y `main` es de
-  Emi hasta que se confirme qué branch deploya Railway. Detalle en `AGENTS.md`
-  §2.ter y en `DECISIONS.md`.
-- **Restricciones firmes de esta etapa: no mergees, no deployes, no toques
-  `main`.**
-
-Si encontrás otra regla de este repositorio que choque con una del canal, **no
-elijas**: listala con las dos versiones en tu informe y la decide la PM.
-
-### Entorno que funciona
-
-```bash
-python3 -m venv venv && ./venv/bin/pip install -r requirements.txt
-export PYTHONPATH=/home/user/cdi-vuce-
-./venv/bin/python -m pytest tests/ -q --no-cov
-```
-
-Corré la suite **con `--no-cov`**. Sin eso la corrida puede comportarse distinto; y
-la suite completa se colgaba para siempre hasta que se arregló el pool de
-conexiones (`CHANGELOG.md`, `5917ae0`). Baseline medida al 2026-09-17 tras VUCE-2:
-`4 failed, 670 passed, 102 skipped`. Los 4 rojos son preexistentes (3 del botón
-auto_ncm, 1 de CSRF sobre Bearer) y están fuera de alcance salvo que se asignen.
-
----
-
-## 7. Cómo trabajás vos, en concreto
-
-- **Una sola tarea activa.** No mezclás piezas independientes.
-- Por defecto, cada tarea es un **bloque vertical de 1–2 días** con un resultado
-  demostrable de punta a punta.
-- **Pagos, seguridad y datos se separan** en tareas propias: riesgo independiente.
-- **Inspeccioná el flujo real antes de editar** y verificá después.
-- **Si encontrás una mejora que no pidieron, proponela** con beneficio, esfuerzo,
-  riesgo y cuándo conviene. No la implementes.
-- **Frená y consultá** cuando: la premisa no se sostiene, el arreglo exige tocar
-  algo fuera de alcance, o aparece riesgo para dinero, datos de clientes,
-  seguridad, el servicio vivo o los 50 estudios. Ante la duda, **frená**.
-
-### Verificación proporcional al riesgo
-
-- **En cada entrega de producto:** conservás el rojo previo, agregás la regresión
-  que discrimina, ejecutás los casos focales y **una** suite completa desde base
-  limpia, y entregás SHA, salida y riesgos.
-- **Cambio visual o de texto aislado:** caso focal + `compileall`.
-- **Dinero, autenticación, permisos, migraciones, datos o cambio transversal:**
-  suite completa sí o sí, y la revisa la PM aparte.
-- Si toca backend, existe además el smoke de este repo
-  (`scripts/testing/smoke_friccion.sh`, ver `AGENTS.md` §8). **Nunca afirmes que
-  corriste una suite completa que no corriste.**
-
----
-
-## 8. Tu primera tarea
-
-Está en `docs/pm/PARA-DEV.md`. El historial del canal previo a la mudanza vive en
-`Memu007/CDI`, `docs/pm/` (archivo histórico). **No necesitás permiso para
-arrancar.**
+Después de una migración de esquema no se hace rollback ciego de código.
