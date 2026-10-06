@@ -1,4 +1,4 @@
-# Preguntas al despachante — versión final 2026-10-06
+# Preguntas al despachante — 2026-10-06 (versión simple)
 
 Revisión de la consulta de julio (`docs/features/CONSULTA_AL_DESPACHANTE.md`
 de `CDI-vuce-`). Se sumaron dos investigaciones en la web, hechas por
@@ -23,42 +23,52 @@ respuesta del despachante.
 
 ## El mensaje para mandar
 
-> Hola. Estoy terminando un sistema que arma el TXT para la Lectura de
-> Archivos del Kit María. Me quedan diez confirmaciones cortas. Casi todas son
-> de sí o no:
+Emi (2026-10-06): la versión anterior era demasiado técnica. Tenía los
+nombres de los campos del archivo (`CARTUSO`, `NO_VALIDA`), que el
+despachante no usa. Esta versión pregunta por su trabajo de todos los días. La
+traducción a cada campo es tarea de la PM (tabla de abajo). Lo que se puede
+ver en un archivo real no se pregunta: se pide el archivo.
+
+> Hola. Estoy armando un sistema que prepara el archivo para cargar las
+> importaciones en el Kit María. Para no equivocarme te pido dos favores y
+> seis preguntas cortas, de cómo lo hacés vos normalmente.
 >
-> 1. **`CARTUSO`**: ¿es el estado de la mercadería? Para mercadería nueva de
->    origen extranjero, ¿va `2` («nuevo sin uso importado»)? ¿Cuándo va `3`?
-> 2. **`IVAADICIONAL1`**: para mercadería que el importador va a revender,
->    ¿va `NO_VALIDA`? ¿`IVAAD1` es sólo para uso o consumo particular del
->    importador y `IVAAD2` para bienes de uso? ¿Se decide ítem por ítem?
-> 3. **Peso (`QARTKGRNET`)**: ¿es el peso neto **total** del ítem (cantidad
->    por peso unitario), no el de una unidad?
-> 4. **`BANCOSARGENTINA`**: ¿es el banco que el importador designó para el
->    seguimiento del pago de la importación? ¿Se completa sólo cuando hay
->    pago por el mercado de cambios?
-> 5. **Código de proveedor** (`(00272) NOMBRE`): ¿la Lectura de Archivos lo
->    controla contra tu tabla del Kit María, o sólo usa el nombre y el ID
->    tributario?
-> 6. **FCA y FAS**: ¿la diferencia con el FOB va en `GTOS-ANT-FOB`, igual que
->    con EXW?
-> 7. **Identificadores** (`IDSO`, `NDDTIMMTRN`, `IEXT`, la referencia
->    `LDVDREFDOC` del tipo `E001-1`): ¿qué ponés vos en cada uno, o el Kit los
->    reemplaza al leer el archivo?
-> 8. **`ARDIG-CUIT-PSAD`**: en un archivo vino `PSAD06` y en otro `PSAD01`.
->    ¿De qué depende?
-> 9. **Sufijos de valor (SBT)**: ¿van uno por modelo o ítem, o puede ir el
->    mismo para toda la operación?
-> 10. **Redondeo**: si la suma de los ítems difiere del total por un centavo,
->     ¿el Kit lo rechaza?
+> **Los dos favores:**
+> 1. ¿Me pasás dos o tres despachos que hayas cargado, con nombres, CUIT y
+>    montos tapados? Mejor si son distintos: uno EXW, uno CIF y uno con
+>    varios productos.
+> 2. ¿Podés probar en tu Kit María un archivo nuestro? Sólo cargarlo para ver
+>    si lo acepta, sin oficializar nada.
 >
-> Y dos pedidos, si se puede:
-> - **Dos o tres TXT reales**, con nombres, CUIT y montos tapados, de casos
->   distintos (EXW, CIF, varios ítems).
-> - **Probar en tu Kit María un TXT que te mandemos**, sólo leerlo y sin
->   oficializar, para ver si lo acepta.
+> **Las preguntas:**
+> 1. En una importación común de mercadería nueva para revender, ¿qué estado
+>    de la mercadería marcás? ¿Alguna vez marcás otro?
+> 2. La percepción de IVA adicional, ¿cuándo se cobra completa y cuándo no
+>    (por ejemplo, si es para uso propio o un bien de uso)? ¿Lo decidís por
+>    despacho o por producto?
+> 3. El peso de cada producto, ¿lo cargás por el total de unidades, no por
+>    una sola?
+> 4. ¿Qué banco ponés en el despacho? ¿Es el banco por el que el importador
+>    le paga al exterior? ¿Es siempre el mismo para cada cliente?
+> 5. ¿Con qué empresa de digitalización de documentación (PSAD) trabajás?
+>    ¿Es siempre la misma?
+> 6. Cuando la compra es FCA o FAS, ¿declarás los gastos hasta poner la
+>    mercadería a bordo, igual que con EXW?
 >
-> Gracias.
+> ¡Gracias!
+
+## Qué campo resuelve cada respuesta (para la PM)
+
+| Pregunta o favor | Campo del archivo |
+|---|---|
+| Pregunta 1 | `CARTUSO` (hoy 3 fijo; la investigación dice que 2 es «nuevo sin uso importado») |
+| Pregunta 2 | `IVAADICIONAL1` (hoy `IVAAD1` fijo, que sería «uso particular») |
+| Pregunta 3 | `QARTKGRNET` (hoy sale el peso de una unidad) |
+| Pregunta 4 | `BANCOSARGENTINA` (hoy no se emite; 191 = Credicoop) |
+| Pregunta 5 | `ARDIG-CUIT-PSAD` (hoy `PSAD06` fijo; un archivo real tenía `PSAD01`) |
+| Pregunta 6 | `GTOS-ANT-FOB` con FCA y FAS |
+| Favor 1 (archivos reales) | identificadores (`IDSO`, `IEXT`, `NDDTIMMTRN`, `LDVDREFDOC`), sufijos de valor por producto, número de proveedor y formato del archivo |
+| Favor 2 (probar en su Kit) | si acepta el número de proveedor, el redondeo y el formato; es la prueba de la puerta G4 |
 
 ## Qué cambia con cada respuesta
 
@@ -68,8 +78,7 @@ respuesta del despachante.
 | 2 | `IVAADICIONAL1` según el destino del ítem; por defecto reventa |
 | 3 | El peso del TXT pasa a ser el total de la línea, igual al que muestra la pantalla de validación |
 | 4 | `BANCOSARGENTINA` en la ficha del cliente y en la operación |
-| 5 | Campo «código en tu Kit María» en la ficha del proveedor |
+| 5 | `PSAD` en la configuración del despachante |
 | 6 | Se completa la regla del FOB y se cablea el campo de pantalla, que hoy no llega al TXT |
-| 7 y 8 | Identificadores y `PSAD` según lo que diga; hoy se arman con el número de factura y un valor fijo |
-| 9 | Sufijos por ítem (hoy: uno para toda la operación) |
-| 10 | Aritmética con redondeo controlado (hoy usa decimales binarios y a veces no cierra) |
+| Favor 1 | Identificadores, sufijos por ítem y número de proveedor según los archivos reales |
+| Favor 2 | Redondeo y formato según lo que acepte su Kit |
