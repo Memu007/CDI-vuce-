@@ -45,7 +45,10 @@ Archivos abiertos por Dev: (ninguno).
 
 ## En curso
 
-- PM: roadmap propuesto, esperando a Emi.
+- PM: **pedido de Emi (2026-10-06): armar un roadmap de todo lo que se puede
+  hacer mientras llegan las respuestas del despachante**, para que lo apruebe.
+  Base: `ROADMAP.md` (bloques 1 y 3 y MARIA-1 a MARIA-3 no lo esperan).
+- Emi le manda al despachante la versión simple de `PREGUNTAS-DESPACHANTE.md`.
 - Dev 1: sin tarea (en espera).
 
 ## Cola
@@ -101,7 +104,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-06: mudanza del método a este repositorio y auditoría.
+2026-10-06: mudanza del método a este repositorio, auditoría y preguntas
+simples al despachante. La PM compacta su chat (54 %).
 
 ## Medición
 
