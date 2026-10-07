@@ -4,6 +4,7 @@ Standalone PDF extraction module for testing
 
 import re
 from collections import OrderedDict
+import functools
 import math
 import os
 import json
@@ -1942,6 +1943,7 @@ def lectura_automatica_disponible() -> bool:
 # Un dato que no se puede leer con certeza queda vacío: nada adivinado. El
 # semáforo de la pantalla avisa lo que falta (origen, cantidad, peso).
 
+@functools.lru_cache(maxsize=1)
 def _iso2_por_codigo_maria() -> dict:
     from proyecto_maria.core.maria_generator import PAISES_INDEC
     from proyecto_maria.core.paises_iso3 import ISO3_A_ISO2
@@ -1976,6 +1978,13 @@ def _origen_desde_factura(raw) -> str:
     return ''
 
 
+_MONEDAS = r"(?:U\$S|US\$|R\$|USD|EUR|DOL|ARS|BRL|CNY|[$€£¥])"
+_MONEDA_ADELANTE = re.compile(r"^" + _MONEDAS + r"\s*", re.IGNORECASE)
+# Atrás: moneda o unidad de cuenta. No g ni lb: el peso va en kg.
+_MONEDA_O_CUENTA_ATRAS = re.compile(
+    r"\s*(?:" + _MONEDAS + r"|PCS|PC|UNITS?|UNID|UND|UN|EA|KGS?)\.?$", re.IGNORECASE)
+
+
 def _separador_decimal(texto: str):
     """'.' o ',' si el número muestra sin dudas su separador decimal; None si
     no (sin separador, o un único separador seguido de tres dígitos)."""
@@ -2007,18 +2016,27 @@ def _numero_factura(raw, decimal: str | None):
     if isinstance(raw, bool) or raw is None:
         return None
     if isinstance(raw, (int, float)):
-        valor = float(raw)
+        try:
+            valor = float(raw)
+        except OverflowError:
+            return None
         return valor if math.isfinite(valor) and valor >= 0 else None
-    # Sólo un número limpio, con moneda adelante si la hay: «12x3», «1/2»,
-    # «500 g» o «2.5e3» no se adivinan. Mejor vacío que equivocado.
-    t = re.sub(r"^\s*(?:[A-Za-z]{1,3}\s*)?[$€£¥]?\s*", '', str(raw)).strip()
+    # Sólo un número limpio, con moneda o unidad de cuenta al lado si la hay:
+    # «12x3», «1/2», «500 g», «lb 5» o «2.5e3» no se adivinan. Mejor vacío
+    # que equivocado.
+    t = _MONEDA_ADELANTE.sub('', str(raw).strip())
+    t = _MONEDA_O_CUENTA_ATRAS.sub('', t).strip()
     if not re.fullmatch(r"\d{1,3}(?:[ '\u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d[\d.,]*", t):
         return None
     t = re.sub(r"[ '\u00a0\u202f]", '', t)
     propio = _separador_decimal(t)
     if '.' in t and ',' in t:
         miles = ',' if propio == '.' else '.'
-        t = t.replace(miles, '').replace(propio, '.')
+        entero, _, decimales = t.rpartition(propio)
+        grupos = entero.split(miles)
+        if propio in entero or not grupos[0] or any(len(g) != 3 for g in grupos[1:]):
+            return None  # «1.2,3» o «1,5.00»: separadores que no cierran
+        t = ''.join(grupos) + '.' + decimales
     elif '.' in t or ',' in t:
         sep = '.' if '.' in t else ','
         partes = t.split(sep)
@@ -2033,9 +2051,10 @@ def _numero_factura(raw, decimal: str | None):
         else:
             t = t.replace(sep, '.') if decimal == sep else t.replace(sep, '')
     try:
-        return float(t)
+        valor = float(t)
     except ValueError:
         return None
+    return valor if math.isfinite(valor) else None
 
 
 def _valores_numericos(result: dict) -> list:
@@ -2303,7 +2322,7 @@ IMPORTANTE:
                             }
                             items.append(item)
                             
-                        except ValueError as e:
+                        except Exception as e:
                             print(f"⚠️ Skipping item due to parsing error: {e}")
                             continue
                     
