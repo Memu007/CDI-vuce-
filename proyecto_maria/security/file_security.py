@@ -123,6 +123,24 @@ def _abrir_pdf(contents: bytes) -> tuple:
     return False, len(pdf.pages)
 
 
+def partes_del_xlsx(z) -> tuple:
+    """(libro, sus relaciones, textos compartidos o None): las rutas que usa
+    openpyxl, que las busca por [Content_Types].xml y no por nombre fijo
+    (renombrar sharedStrings.xml o poner un xl/workbook.xml señuelo no saltea
+    los topes; revisión de EXCEL-2)."""
+    from xml.etree import ElementTree as ET
+    from openpyxl.packaging.manifest import Manifest
+    from openpyxl.packaging.relationship import get_rels_path
+    from openpyxl.reader.excel import _find_workbook_part
+    from openpyxl.xml.constants import SHARED_STRINGS
+    if z.getinfo("[Content_Types].xml").file_size > 2**20:
+        raise ExcelDemasiadoGrande("El índice del Excel es demasiado grande.")
+    manifiesto = Manifest.from_tree(ET.fromstring(z.read("[Content_Types].xml")))
+    libro = _find_workbook_part(manifiesto).PartName[1:]
+    textos = manifiesto.find(SHARED_STRINGS)
+    return libro, get_rels_path(libro), (textos.PartName[1:] if textos is not None else None)
+
+
 def hojas_del_xlsx(z) -> list:
     """[(nombre, ruta dentro del zip)] de las hojas de cálculo de un .xlsx
     abierto con zipfile, en el orden del libro, sin abrirlo con openpyxl.
@@ -131,18 +149,20 @@ def hojas_del_xlsx(z) -> list:
     from xml.etree import ElementTree as ET
     ns_main = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
     ns_rel = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
-    for parte in ("xl/workbook.xml", "xl/_rels/workbook.xml.rels"):
+    libro, relaciones, _ = partes_del_xlsx(z)
+    for parte in (libro, relaciones):
         if z.getinfo(parte).file_size > 2**20:
             raise ExcelDemasiadoGrande("El índice del Excel es demasiado grande.")
+    carpeta = posixpath.dirname(libro)
     destinos = {}
-    for r in ET.fromstring(z.read("xl/_rels/workbook.xml.rels")):
+    for r in ET.fromstring(z.read(relaciones)):
         if not (r.get("Type") or "").endswith("/worksheet"):
             continue
         destino = r.get("Target") or ""
-        destino = destino.lstrip("/") if destino.startswith("/") else posixpath.normpath(posixpath.join("xl", destino))
+        destino = destino.lstrip("/") if destino.startswith("/") else posixpath.normpath(posixpath.join(carpeta, destino))
         destinos[r.get("Id")] = destino
     hojas = []
-    for h in ET.fromstring(z.read("xl/workbook.xml")).iter(f"{ns_main}sheet"):
+    for h in ET.fromstring(z.read(libro)).iter(f"{ns_main}sheet"):
         if h.get(f"{ns_rel}id") in destinos:
             hojas.append((h.get("name") or "", destinos[h.get(f"{ns_rel}id")]))
     return hojas
@@ -165,16 +185,26 @@ def _contar_hojas_xlsx(contents: bytes) -> int:
     enteros al abrir, y un libro armado (millones de textos vacíos, una hoja
     enorme) tardaba minutos y usaba gigas de memoria (D26 a, EXCEL-2)."""
     import zipfile
+    from openpyxl.xml.constants import ARC_CORE, ARC_CUSTOM, ARC_STYLE
     with zipfile.ZipFile(io.BytesIO(contents)) as z:
         hojas = hojas_del_xlsx(z)
+        _, _, textos = partes_del_xlsx(z)
         nombres = set(z.namelist())
         tope_textos = _mb_de_entorno("EXCEL_MAX_TEXTOS_MB", 10)
-        if "xl/sharedStrings.xml" in nombres and z.getinfo("xl/sharedStrings.xml").file_size > tope_textos:
+        if textos and textos in nombres and z.getinfo(textos).file_size > tope_textos:
             raise ExcelDemasiadoGrande(
                 f"El Excel tiene demasiados textos (más de {tope_textos // 2**20} MB). "
                 "Dejá sólo la hoja de la factura o cargá los productos a mano.")
+        # Lo demás que openpyxl lee entero al abrir, con el mismo tope.
+        for parte in (ARC_STYLE, ARC_CORE, ARC_CUSTOM):
+            if parte in nombres and z.getinfo(parte).file_size > tope_textos:
+                raise ExcelDemasiadoGrande(
+                    "Una parte del Excel es demasiado grande. Guardalo de nuevo desde Excel o "
+                    "cargá los productos a mano.")
+        if hojas and hojas[0][1] not in nombres:
+            raise ValueError("falta la primera hoja dentro del archivo")
         tope_hoja = _mb_de_entorno("EXCEL_MAX_PRIMERA_HOJA_MB", 30)
-        if hojas and hojas[0][1] in nombres and z.getinfo(hojas[0][1]).file_size > tope_hoja:
+        if hojas and z.getinfo(hojas[0][1]).file_size > tope_hoja:
             raise ExcelDemasiadoGrande(
                 f"La primera hoja del Excel es demasiado grande (más de {tope_hoja // 2**20} MB). "
                 "Dejá sólo los productos de la factura.")
