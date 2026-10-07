@@ -181,9 +181,10 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 11:35 UTC: EXCEL-1 y MARIA-3 aceptadas con sus devoluciones (un
-subagente repitió cada punto). Activas: MARIA-1b (Dev 1) y MARIA-1d (Dev 2).
-D21 (catálogo NCM de 2018) para Emi. PM ~53 %.
+2026-10-07 12:00 UTC (rutina): por revisar, MARIA-1b (Dev 1, `02c11c3`) y la
+reentrega de MARIA-1d (Dev 2, `e28be2f`): van después del ensayo. Ensayo
+listo: el producto de la rama no cambió desde `321f34b`; la suite se corre
+sobre el SHA exacto. PM ~55 %: compacta antes de publicar.
 
 ## Medición
 
