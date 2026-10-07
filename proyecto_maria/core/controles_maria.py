@@ -247,7 +247,7 @@ def controles_antes_de_generar(items, cabecera: dict) -> tuple[list, list]:
             f"({', '.join(sorted(INCOTERMS_ACEPTADOS))})."
         )
 
-    for campo, nombre in (("cuit_agr", "CUIT del despachante"), ("vendedor_id", "identificador del vendedor")):
+    for campo, nombre in (("vendedor_id", "identificador del vendedor"),):
         if digitos_raros(cabecera.get(campo)):
             errores.append(f"El {nombre} «{cabecera.get(campo)}» tiene dígitos que no son 0-9.")
 

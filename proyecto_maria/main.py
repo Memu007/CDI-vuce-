@@ -3385,7 +3385,7 @@ def _xlsx_solo_primera_hoja(ruta) -> tuple:
     import re as _re
     import zipfile
     from xml.etree import ElementTree as ET
-    from proyecto_maria.security.file_security import hojas_del_xlsx
+    from proyecto_maria.security.file_security import hojas_del_xlsx, partes_del_xlsx
     ns_main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
     def _col(letras):
         n = 0
@@ -3411,7 +3411,8 @@ def _xlsx_solo_primera_hoja(ruta) -> tuple:
         afuera = {parte for _, parte in hojas[1:]}
         ET.register_namespace("", ns_main)
         ET.register_namespace("r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships")
-        libro = ET.fromstring(z.read("xl/workbook.xml"))
+        parte_libro = partes_del_xlsx(z)[0]
+        libro = ET.fromstring(z.read(parte_libro))
         primera = hojas[0][0]
         sheets = libro.find(f"{{{ns_main}}}sheets")
         for h in list(sheets):
@@ -3426,43 +3427,57 @@ def _xlsx_solo_primera_hoja(ruta) -> tuple:
             for info in z.infolist():
                 if info.filename in afuera:
                     continue
-                if info.filename == "xl/workbook.xml":
+                if info.filename == parte_libro:
                     nuevo.writestr(info, ET.tostring(libro, xml_declaration=True, encoding="UTF-8"))
                 else:
                     nuevo.writestr(info, z.read(info.filename))
         return salida.getvalue(), combinadas
 
 
-def _rellenar_combinadas(df, combinadas):
-    """El valor de una celda combinada vale para todas sus filas, sólo en su
+def _rellenar_combinadas(df, combinadas, desde_fila: int = 2):
+    """El texto de una celda combinada vale para todas sus filas, sólo en su
     propia columna: «China» combinada en C4:C5 es el origen de las dos filas;
     una descripción combinada hacia el costado no se copia a otra columna
-    (D18, EXCEL-2). El índice de df es la fila de la planilla menos 2."""
+    (D18, EXCEL-2). Los números no se copian: una cantidad o un precio
+    combinados sobre la fila que sigue la descripción duplicaban el FOB
+    (revisión de EXCEL-2). Sólo debajo del encabezado (`desde_fila`, fila de
+    la planilla). El índice de df es la fila de la planilla menos 2."""
+    import re as _re
     columnas = list(df.columns)
     for f1, c1, f2, _c2 in combinadas:
-        if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < 2:
+        if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < max(2, desde_fila):
             continue
         col = columnas[c1 - 1]
         ancla = f1 - 2
         if ancla not in df.index:
             continue
         valor = df.at[ancla, col]
+        if not isinstance(valor, str) or not valor.strip() or _re.fullmatch(r"[\d\s.,+\-]+", valor.strip()):
+            continue
         for fila in range(f1 + 1, f2 + 1):
             if fila - 2 in df.index:
                 df.at[fila - 2, col] = valor
     return df
 
 
-def _con_encabezado(df):
+def _con_encabezado(df, conocidas=()):
     """Si el encabezado no está en la fila 1 (logo, título o datos del
     vendedor arriba), lo busca en las primeras 30 filas: la primera donde se
-    reconocen al menos 3 columnas. El índice sigue siendo la fila de la
-    planilla menos 2, así los avisos nombran la fila correcta (D18, EXCEL-2)."""
-    if len(_detect_item_columns(list(df.columns))) >= 3:
+    reconocen al menos 3 columnas. Las columnas del mapeo guardado del cliente
+    cuentan como reconocidas: con ellas en la fila 1 no se busca (un pie con
+    «Peso Neto | Valor» no pasa a ser el encabezado). El índice sigue siendo la
+    fila de la planilla menos 2, así los avisos nombran la fila correcta, y la
+    fila del encabezado queda en df.attrs["fila_encabezado"] (D18, EXCEL-2)."""
+    conocidas = set(conocidas or ())
+    actuales = list(df.columns)
+    if len(_detect_item_columns(actuales)) + sum(1 for c in actuales if c in conocidas) >= 3:
+        df.attrs["fila_encabezado"] = 1
         return df
     for k in range(min(30, len(df))):
         valores = list(df.iloc[k].values)
-        nombres = [_texto_de_celda(v) for v in valores]
+        # Un encabezado es corto: un texto enorme no se mira (cada celda que
+        # apunta a un texto de megas costaba segundos; revisión de EXCEL-2).
+        nombres = [("" if isinstance(v, str) and len(v) > 200 else _texto_de_celda(v)) for v in valores]
         if len(_detect_item_columns(nombres)) < 3:
             continue
         vistos: dict = {}
@@ -3477,11 +3492,13 @@ def _con_encabezado(df):
             columnas.append(nombre)
         nuevo = df.iloc[k + 1:].copy()
         nuevo.columns = columnas
+        nuevo.attrs["fila_encabezado"] = int(df.index[k]) + 2
         return nuevo
+    df.attrs["fila_encabezado"] = 1
     return df
 
 
-def _leer_excel_ruta(ruta: str, engine: str):
+def _leer_excel_ruta(ruta: str, engine: str, conocidas=()):
     # dtype=object: cada celda como viene. Sin eso pandas convierte el texto
     # «1.500» en 1,5 y la NCM 84713000 en 84713000.0 (EXCEL-1).
     # Las filas vacías se sacan acá, en el hilo de lectura: una celda suelta en
@@ -3491,9 +3508,9 @@ def _leer_excel_ruta(ruta: str, engine: str):
         import io as _io
         contenido, combinadas = _xlsx_solo_primera_hoja(ruta)
         origen = _io.BytesIO(contenido)
-    df = pd.read_excel(origen, engine=engine, dtype=object)
-    df = _rellenar_combinadas(df, combinadas).dropna(how="all")
-    return _con_encabezado(df)
+    df = _con_encabezado(pd.read_excel(origen, engine=engine, dtype=object), conocidas)
+    fila_encabezado = df.attrs.get("fila_encabezado", 1)
+    return _rellenar_combinadas(df, combinadas, desde_fila=fila_encabezado + 1).dropna(how="all")
 
 
 # Mirar las otras hojas es sólo un aviso, y tiene su propio presupuesto que
@@ -3676,13 +3693,20 @@ def _leer_tabla(content: bytes, filename: str):
         # guarda Excel en castellano. El separador es el que más aparece en el
         # encabezado: el «;» de Excel en castellano antes se leía como una sola
         # columna (EXCEL-2).
-        for codificacion in ("utf-8-sig", "cp1252", "latin-1"):
-            try:
-                texto = content.decode(codificacion)
-                break
-            except UnicodeDecodeError:
-                continue
-        encabezado = texto.split("\n", 1)[0]
+        # Un archivo UTF-8 con algún byte suelto de otra codificación se lee
+        # como UTF-8 (ese byte queda como «�»): pasarlo entero a cp1252
+        # rompía todas las tildes (revisión de EXCEL-2).
+        import re as _re
+        crudo = content[3:] if content.startswith(b"\xef\xbb\xbf") else content
+        try:
+            texto = crudo.decode("utf-8")
+        except UnicodeDecodeError:
+            if _re.search(rb"[\xc2-\xf4][\x80-\xbf]", crudo):
+                texto = crudo.decode("utf-8", errors="replace")
+            else:
+                texto = crudo.decode("cp1252", errors="replace")
+        # Lo que va entre comillas no cuenta para elegir el separador.
+        encabezado = _re.sub(r'"[^"]*"', "", texto.split("\n", 1)[0])
         separador = max((",", ";", "\t"), key=encabezado.count)
         return pd.read_csv(_io.StringIO(texto), dtype=str, keep_default_na=False, sep=separador)
     if filename.endswith(".xlsx"):
@@ -4094,6 +4118,15 @@ async def generate_maria_endpoint(
         # NCM en el nomenclador, moneda, incoterm, CUIT del importador y
         # montos de la cabecera: lo que impide un TXT válido no deja generar
         # (MARIA-1b). Se juntan con los demás errores para mostrarlos todos.
+        # Productos que no son productos (una lista, un texto, subítems que no
+        # son una lista de subítems): 400, no 500 (revisión de EXCEL-2).
+        for _n, _it in enumerate(request.items or [], start=1):
+            _subs = _it.get("subitems") if isinstance(_it, dict) else None
+            if not isinstance(_it, dict) or (
+                _subs is not None and not (isinstance(_subs, list) and all(isinstance(x, dict) for x in _subs))
+            ):
+                raise HTTPException(status_code=400, detail={"errors": [
+                    f"Item {_n}: no tiene la forma de un producto."]})
         errores_1b, avisos_1b = controles_antes_de_generar(request.items, request.model_dump())
         # Un monto que no es un número (lista, entero enorme) frena acá: lo que
         # sigue hace cuentas con él y daba 500 (EXCEL-2, de paso).
@@ -4184,11 +4217,15 @@ async def generate_maria_endpoint(
                 effective_cuit_agr = str(user["cuit"]).strip()
         except Exception:
             pass
-        from proyecto_maria.core.controles_maria import digitos_raros
-        if digitos_raros(effective_cuit_agr):
-            raise HTTPException(status_code=400, detail={"errors": [
-                f"El CUIT del despachante «{effective_cuit_agr}» tiene dígitos que no son 0-9: "
-                "corregilo en tu perfil."]})
+        # El CUIT del despachante, sólo 11 dígitos 0-9 (sin guiones ni
+        # espacios), también el que viene del perfil (EXCEL-2, de paso).
+        if effective_cuit_agr:
+            effective_cuit_agr = "".join(str(effective_cuit_agr).replace("-", "").split())
+            import re as _re_cuit  # la función importa «re» más abajo
+            if not _re_cuit.fullmatch(r"[0-9]{11}", effective_cuit_agr):
+                raise HTTPException(status_code=400, detail={"errors": [
+                    f"El CUIT del despachante «{effective_cuit_agr}» tiene que tener 11 dígitos (0-9). "
+                    "Corregilo en la operación o en tu perfil."]})
 
         # Sin número de factura, el de la operación: el mismo en el TXT y en
         # el nombre del archivo.
@@ -5202,6 +5239,9 @@ def _detect_item_columns(headers: list) -> dict:
     # busca por el nombre entero y nunca se elige una por el orden.
     norm_to_orig: dict = {}
     sin_parentesis: dict = {}
+    # Un encabezado es corto: uno de megas no se normaliza (corre en el hilo
+    # del servidor y trababa a todos; revisión de EXCEL-2).
+    headers = [h for h in headers if len(str(h or "")) <= 200]
     for h in headers:
         norm_to_orig.setdefault(_normalize_header(str(h or "")), h)
         # «Peso (neto)» se busca también como «pesoneto».
@@ -7087,7 +7127,7 @@ async def upload_excel_v2(
         engine = "openpyxl" if temp_filename.lower().endswith(".xlsx") else "xlrd"
         # En otro hilo y con tiempo máximo: no frena al resto (EXCEL-1).
         df = await _leer_pdf_aparte(
-            _leer_excel_ruta, temp_filename, engine,
+            _leer_excel_ruta, temp_filename, engine, tuple(mapping or {}),
             limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
         )
 
