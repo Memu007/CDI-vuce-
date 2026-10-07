@@ -3434,30 +3434,51 @@ def _xlsx_solo_primera_hoja(ruta) -> tuple:
         return salida.getvalue(), combinadas
 
 
-def _rellenar_combinadas(df, combinadas):
+# Las columnas donde el texto de una combinada vale para todas sus filas. En
+# cantidad, valor y peso no se copia nada, sea número o texto («5 UN», «USD
+# 100»): duplicaba el FOB (devolución de EXCEL-2).
+_COMBINADAS_SE_COPIAN = {"descripcion", "origen", "pieza"}
+
+
+def _rellenar_combinadas(df, combinadas, mapeo=None):
     """El texto de una celda combinada vale para todas sus filas, sólo en su
     propia columna: «China» combinada en C4:C5 es el origen de las dos filas;
     una descripción combinada hacia el costado no se copia a otra columna
-    (D18, EXCEL-2). Los números no se copian: una cantidad o un precio
-    combinados sobre la fila que sigue la descripción duplicaban el FOB
-    (revisión de EXCEL-2). Se llama después de buscar el encabezado: su fila
-    y las de arriba ya no están en df, así que un encabezado combinado no se
-    copia a los datos. El índice de df es la fila de la planilla menos 2."""
+    (D18, EXCEL-2). Sólo en las columnas de descripción, origen y NCM
+    (detectadas o del mapeo guardado del cliente), y sin copiar números puros.
+    Se llama después de buscar el encabezado: su fila y las de arriba ya no
+    están en df, así que un encabezado combinado no se copia a los datos. El
+    índice de df es la fila de la planilla menos 2.
+
+    El trabajo es proporcional a las filas de la tabla, no al tamaño de las
+    combinadas: cada una se recorta a las filas que hay, y en una columna no
+    se pisan (Excel no deja que se superpongan; un libro armado con
+    C2:C1048576 repetida trababa la lectura; devolución de EXCEL-2)."""
     import re as _re
+    if df.empty or not combinadas:
+        return df
     columnas = list(df.columns)
-    for f1, c1, f2, _c2 in combinadas:
+    campos = dict(_detect_item_columns(columnas))
+    campos.update(dict(mapeo or {}))
+    primera, ultima = int(df.index.min()) + 2, int(df.index.max()) + 2
+    hasta_donde = {}
+    for f1, c1, f2, _c2 in sorted(set(combinadas)):
         if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < 2:
             continue
         col = columnas[c1 - 1]
+        if campos.get(col) not in _COMBINADAS_SE_COPIAN or f1 <= hasta_donde.get(c1, 0):
+            continue
+        hasta_donde[c1] = f2
         ancla = f1 - 2
-        if ancla not in df.index:
+        if ancla not in df.index or f1 >= ultima:
             continue
         valor = df.at[ancla, col]
         if not isinstance(valor, str) or not valor.strip() or _re.fullmatch(r"[\d\s.,+\-]+", valor.strip()):
             continue
-        for fila in range(f1 + 1, f2 + 1):
-            if fila - 2 in df.index:
-                df.at[fila - 2, col] = valor
+        desde, hasta = max(f1 + 1, primera) - 2, min(f2, ultima) - 2
+        if desde <= hasta:
+            filas = df.index[(df.index >= desde) & (df.index <= hasta)]
+            df.loc[filas, col] = valor
     return df
 
 
@@ -3497,6 +3518,8 @@ def _con_encabezado(df, conocidas=()):
 
 
 def _leer_excel_ruta(ruta: str, engine: str, conocidas=()):
+    # conocidas: el mapeo guardado del cliente, como pares (columna, campo) o
+    # sólo los nombres de las columnas.
     # dtype=object: cada celda como viene. Sin eso pandas convierte el texto
     # «1.500» en 1,5 y la NCM 84713000 en 84713000.0 (EXCEL-1).
     # Las filas vacías se sacan acá, en el hilo de lectura: una celda suelta en
@@ -3506,8 +3529,14 @@ def _leer_excel_ruta(ruta: str, engine: str, conocidas=()):
         import io as _io
         contenido, combinadas = _xlsx_solo_primera_hoja(ruta)
         origen = _io.BytesIO(contenido)
-    df = _con_encabezado(pd.read_excel(origen, engine=engine, dtype=object), conocidas)
-    return _rellenar_combinadas(df, combinadas).dropna(how="all")
+    mapeo = dict(c for c in conocidas if isinstance(c, tuple) and len(c) == 2)
+    nombres = set(mapeo) or {c for c in conocidas if isinstance(c, str)}
+    df = _con_encabezado(pd.read_excel(origen, engine=engine, dtype=object), nombres)
+    # Las filas vacías se sacan según lo que había antes de rellenar: una
+    # fila vacía dentro de una combinada no es una «fila sin leer»
+    # (devolución de EXCEL-2).
+    vacias = df.isna().all(axis=1)
+    return _rellenar_combinadas(df, combinadas, mapeo)[~vacias]
 
 
 # Mirar las otras hojas es sólo un aviso, y tiene su propio presupuesto que
@@ -3690,22 +3719,33 @@ def _leer_tabla(content: bytes, filename: str):
         # guarda Excel en castellano. El separador es el que más aparece en el
         # encabezado: el «;» de Excel en castellano antes se leía como una sola
         # columna (EXCEL-2).
-        # Un archivo UTF-8 con algún byte suelto de otra codificación se lee
-        # como UTF-8 (ese byte queda como «�»): pasarlo entero a cp1252
-        # rompía todas las tildes (revisión de EXCEL-2).
+        # Si no es UTF-8 limpio, gana la que explica más caracteres: las
+        # secuencias UTF-8 válidas contra los bytes sueltos. Un UTF-8 con algún
+        # byte suelto sigue siendo UTF-8, y un cp1252 con un par que parece
+        # UTF-8 («é®») sigue siendo cp1252 (revisión y devolución de EXCEL-2).
+        # Si hay de las dos, se avisa: alguna tilde puede haberse perdido.
         import re as _re
         crudo = content[3:] if content.startswith(b"\xef\xbb\xbf") else content
+        aviso = None
         try:
             texto = crudo.decode("utf-8")
         except UnicodeDecodeError:
-            if _re.search(rb"[\xc2-\xf4][\x80-\xbf]", crudo):
+            validas = _re.findall(rb"[\xc2-\xdf][\x80-\xbf]|[\xe0-\xef][\x80-\xbf]{2}|[\xf0-\xf4][\x80-\xbf]{3}", crudo)
+            sueltos = sum(1 for b in crudo if b >= 0x80) - sum(len(v) for v in validas)
+            if validas and len(validas) >= sueltos:
                 texto = crudo.decode("utf-8", errors="replace")
             else:
                 texto = crudo.decode("cp1252", errors="replace")
+            if validas and sueltos:
+                aviso = ("El archivo mezcla codificaciones (UTF-8 y Windows-1252): revisá las tildes "
+                         "y las eñes de lo importado.")
         # Lo que va entre comillas no cuenta para elegir el separador.
         encabezado = _re.sub(r'"[^"]*"', "", texto.split("\n", 1)[0])
         separador = max((",", ";", "\t"), key=encabezado.count)
-        return pd.read_csv(_io.StringIO(texto), dtype=str, keep_default_na=False, sep=separador)
+        df = pd.read_csv(_io.StringIO(texto), dtype=str, keep_default_na=False, sep=separador)
+        if aviso:
+            df.attrs["aviso_codificacion"] = aviso
+        return df
     if filename.endswith(".xlsx"):
         # Sólo la primera hoja, que es la que se lee: un libro armado con
         # muchas hojas sin <dimension> no traba (D26 a, EXCEL-2).
@@ -7124,7 +7164,7 @@ async def upload_excel_v2(
         engine = "openpyxl" if temp_filename.lower().endswith(".xlsx") else "xlrd"
         # En otro hilo y con tiempo máximo: no frena al resto (EXCEL-1).
         df = await _leer_pdf_aparte(
-            _leer_excel_ruta, temp_filename, engine, tuple(mapping or {}),
+            _leer_excel_ruta, temp_filename, engine, tuple((mapping or {}).items()),
             limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
         )
 
@@ -8213,12 +8253,15 @@ async def import_ncm_historial(
         logging.exception("import_ncm_historial save failed")
         raise HTTPException(status_code=500, detail=f"No se pudo guardar: {str(exc)[:120]}")
 
-    return {
+    respuesta = {
         "success": True,
         "importados": importados,
         "duplicados": duplicados,
         "errores": errores,
     }
+    if df.attrs.get("aviso_codificacion"):
+        respuesta["aviso"] = df.attrs["aviso_codificacion"]
+    return respuesta
 
 @app.get("/auth/me")
 async def get_auth_me(authorization: str = Header(None), db: AsyncSession = Depends(get_db)):
