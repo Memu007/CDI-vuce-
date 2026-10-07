@@ -2083,6 +2083,11 @@ def _extract_with_gemini_vision(data: bytes) -> list[dict]:
         print("⚠️ Gemini Vision disabled or missing API key - lectura automática no disponible")
         raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)
 
+    # Si la llamada a Gemini falla (clave inválida, caído, respuesta
+    # ilegible), la pantalla ofrece la carga manual en vez de decir que no
+    # hay tabla de productos (MARIA-2b).
+    gemini_fallo = False
+
     
     # Try PyMuPDF (fitz) first - faster than pdf2image
     try:
@@ -2334,6 +2339,7 @@ IMPORTANTE:
                         continue  # Try next model
                 
             except Exception as e:
+                gemini_fallo = True
                 print(f"❌ {model_name} Vision error: {e}")
                 if model_idx < len(models_to_try) - 1:
                     print(f"🔄 Trying next model...")
@@ -2503,21 +2509,28 @@ IMPORTANTE:
                             # Retornar como dict con operacion e items
                             return {'operacion': operacion_data, 'items': items}
                 except Exception as model_err:
+                    gemini_fallo = True
                     print(f"❌ {model_name} error: {model_err}")
                     continue
             
             print("❌ All direct PDF models failed")
+            if gemini_fallo:
+                raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)
             return _fallback_image_extraction(data)
             
+        except LecturaAutomaticaNoDisponible:
+            raise
         except Exception as direct_err:
             print(f"❌ Direct PDF extraction failed: {direct_err}")
-            return _fallback_image_extraction(data)
+            raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)
             
     except Exception as e:
         print(f"❌ Error converting PDF to image: {e}")
         return _fallback_image_extraction(data)
     
     print("❌ Gemini Vision failed, returning empty")
+    if gemini_fallo:
+        raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)
     return []
 
 

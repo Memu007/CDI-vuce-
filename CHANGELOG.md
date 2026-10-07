@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · fix: Gemini caído o con clave inválida ofrece la carga manual (MARIA-2b)
+
+- **fix(pdf):** si hay clave pero la llamada a Gemini falla (clave inválida, servicio caído o respuesta ilegible), subir un PDF responde el mismo 503 con `code: lectura_automatica_no_disponible` y la pantalla ofrece «Cargar los productos a mano», en vez del engañoso «No se encontró tabla de items». Si Gemini responde sin productos, sigue el 400 de siempre. Las dos copias del lector.
+
 ## 2026-10-07 · fix: la factura bien leída (MARIA-1a)
 
 - **fix(pdf):** el país de origen ya no se corta a dos letras (`CHN` salía Suiza y `MEX` Montenegro): se reconocen dos letras, tres letras (tabla ISO 3166-1 generada contra la tabla oficial VUCE) y el nombre; lo que no se reconoce queda vacío. Cantidades, precios, pesos, flete y seguro con coma bien leídos (`1,500` sólo es mil quinientos si la factura usa el punto como decimal). Lo que falta queda vacío: nada de peso 0,5, cantidad 1 ni origen del vendedor. Las dos copias del lector.
