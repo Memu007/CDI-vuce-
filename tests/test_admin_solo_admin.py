@@ -71,6 +71,21 @@ def rutas():
     return rutas
 
 
+class _RegistroFalso:
+    """Si un control fallara, borrar errores no toca el registro real."""
+    def clear_old_notes(self, days):
+        return 0
+
+    def get_error_insights(self):
+        return {"summary": {}, "top_errors": [], "suggested_improvements": []}
+
+
+@pytest.fixture(autouse=True)
+def _sin_efectos(monkeypatch):
+    import proyecto_maria.core.error_notes_tracker as tracker
+    monkeypatch.setattr(tracker, "get_error_tracker", lambda: _RegistroFalso())
+
+
 def _con_usuario(usuario):
     main.app.dependency_overrides[main.get_current_user] = lambda: dict(usuario)
 
@@ -137,15 +152,8 @@ def test_admin_por_admin_usernames_entra(rutas, monkeypatch):
     assert r.status_code == 200, r.text[:200]
 
 
-def test_admin_borra_errores_viejos(rutas, monkeypatch):
-    """El admin sigue pudiendo limpiar el registro (sin tocar el real)."""
-    import proyecto_maria.core.error_notes_tracker as tracker
-
-    class _Falso:
-        def clear_old_notes(self, days):
-            return 0
-
-    monkeypatch.setattr(tracker, "get_error_tracker", lambda: _Falso())
+def test_admin_borra_errores_viejos(rutas):
+    """El admin sigue pudiendo limpiar el registro (el falso de _sin_efectos)."""
     _con_usuario(USUARIO_ADMIN)
     try:
         r = TestClient(main.app).post("/api/admin/errors/clear-old")
