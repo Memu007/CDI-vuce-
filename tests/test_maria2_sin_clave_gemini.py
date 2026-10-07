@@ -115,3 +115,16 @@ def test_con_clave_inventada_sigue_leyendo_con_el_modelo(client, auth_override, 
     items = r.json()["items"]
     assert [i["descripcion"] for i in items] == ["Tornillo M6"]
     _sin_demo(r.text)
+
+
+def test_sin_lector_no_gasta_cuota_diaria(client, auth_override, monkeypatch):
+    """Una subida que no se puede leer no descuenta un PDF de la cuota."""
+    from proyecto_maria.core import ai_quota
+
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    clave = (auth_override["username"], ai_quota._today_key())
+    antes = ai_quota._counter.get(clave, 0)
+
+    assert _subir(client).status_code == 503
+
+    assert ai_quota._counter.get(clave, 0) == antes
