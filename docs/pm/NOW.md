@@ -69,7 +69,11 @@ Archivos abiertos por Dev:
 
 - Dev 1: ADMIN-1 (`PARA-DEV.md`). Después, COBRO-CORTE-1.
 - Dev 2: MARIA-2 (`PARA-DEV-2.md`). Después, MARIA-1a.
-- PM: publicación de ensayo (espera el «dale» de Emi para el SHA, de día).
+- PM: publicación de ensayo. Candidato: `cb8f509` (código idéntico a
+  `e8344d0`; sólo cambian documentos y reglas). Suite sobre `cb8f509`:
+  `680 passed, 102 skipped, 10 warnings in 65.29s`. Espera los chequeos de
+  Railway y el «dale» de Emi para el SHA, de día. Si se publica un commit
+  posterior de la rama de PM, sólo con documentos de diferencia.
 - Emi le manda al despachante la versión simple de `PREGUNTAS-DESPACHANTE.md`.
 
 ## Cola
@@ -125,10 +129,9 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 (madrugada, vuelta horaria): roadmap nuevo con dos auditores
-(tamaño y choque de piezas; lo que la auditoría no había mirado: seis
-hallazgos X1 a X6 en `AUDITORIA-2026-10-06.md`). Dev sin cambios en su rama
-(`e8344d0`). PM al 10 % de contexto.
+2026-10-07 00:30 UTC: Emi aprobó el roadmap, dos Devs y la publicación de
+ensayo. Abiertas la Dev 1 (ADMIN-1) y la Dev 2 (MARIA-2), con sus rutinas.
+Suite sobre el candidato del ensayo en verde. PM al ~16 % de contexto.
 
 ## Medición
 
