@@ -2091,6 +2091,18 @@ def _texto(raw) -> str:
 _TEXTO_VACIO = {'NONE', 'NULL', 'N/A'}
 
 
+def _texto_del_producto(item_data: dict) -> tuple[str, str]:
+    """La descripción (con la versión sumada) y el código de parte de un
+    producto, igual en las dos copias del lector (MARIA-5)."""
+    descripcion = _texto(item_data.get('descripcion'))
+    version = _texto(item_data.get('version'))
+    if descripcion and version:
+        descripcion = f"{descripcion} {version}"
+    elif not descripcion:
+        descripcion = version
+    return descripcion[:100], _texto(item_data.get('codigo_parte'))[:20]
+
+
 def _no_aplica(raw, palabras) -> bool:
     return str(raw).strip().rstrip('.').strip().upper() in palabras
 
@@ -2336,15 +2348,8 @@ IMPORTANTE:
                             precio = _numero_factura(item_data.get('valor_unitario'), decimal) or 0.0
                             peso = _numero_factura(item_data.get('peso_kg'), decimal) or 0.0
                             
-                            # Extract description
-                            descripcion = _texto(item_data.get('descripcion'))
-                            version = _texto(item_data.get('version'))
-                            
-                            if descripcion and version:
-                                descripcion = f"{descripcion} {version}"
-                            elif not descripcion:
-                                descripcion = version or ""
-                            
+                            descripcion, codigo_parte = _texto_del_producto(item_data)
+
                             # Extract HS Code (pieza)
                             pieza = str(item_data.get('pieza', '') or '').strip()
                             # Clean HS Code - remove "HS Code:" prefix if present
@@ -2353,13 +2358,10 @@ IMPORTANTE:
                             # Keep only digits
                             pieza = ''.join(c for c in pieza if c.isdigit())
                             
-                            # Extract codigo_parte (SKU del proveedor)
-                            codigo_parte = str(item_data.get('codigo_parte', '') or '').strip()
-                            
                             item = {
-                                'codigo_parte': codigo_parte[:20] if codigo_parte else "",
+                                'codigo_parte': codigo_parte,
                                 'pieza': "",  # NCM siempre vacío - el despachante lo completa manualmente
-                                'descripcion': descripcion[:100],
+                                'descripcion': descripcion,
                                 'origen': _origen_desde_factura(item_data.get('origen')),
                                 'cantidad': cantidad,
                                 'valor_unitario': precio,
@@ -2536,9 +2538,11 @@ IMPORTANTE:
                                 precio = _numero_factura(item_data.get('valor_unitario'), decimal) or 0.0
                                 peso = _numero_factura(item_data.get('peso_kg'), decimal) or 0.0
                                 
+                                descripcion, codigo_parte = _texto_del_producto(item_data)
                                 item = {
+                                    'codigo_parte': codigo_parte,
                                     'pieza': "",
-                                    'descripcion': str(item_data.get('descripcion') or '')[:100],
+                                    'descripcion': descripcion,
                                     'origen': _origen_desde_factura(item_data.get('origen')),
                                     'cantidad': cantidad if cantidad > 0 else 0.0,
                                     'valor_unitario': precio,

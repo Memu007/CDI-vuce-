@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from datetime import datetime, timedelta, timezone
 import jwt
 import json
@@ -3577,6 +3577,26 @@ class MariaRequest(BaseModel):
     empresa_digitalizacion: str | None = None
     iva_adicional: str | None = None
 
+    # MARIA-5 (revisión de MARIA-1d). Un campo de texto que es entero «None»,
+    # «null» o «N/A» (operaciones guardadas con el lector viejo) o que llega
+    # nulo cuenta como vacío: sale el aviso y nunca llega al TXT.
+    @field_validator(
+        "operation_id", "moneda", "incoterm", "cuit_agr", "vendedor_nombre", "vendedor_id",
+        "comprador_nombre", "comprador_cuit", "comprador_domicilio", "comprador_fecha_inic_activ",
+        "bl_numero", "puerto_origen", "puerto_destino", "buque_nombre", "viaje_numero",
+        "fecha_embarque", "fecha_emision", "contenedor_numero", "contenedor_tipo",
+        "aduana_codigo", "tipo_destinacion", "sbt_sufijo_valor", "procedencia", "banco_bcra",
+        mode="before",
+    )
+    @classmethod
+    def _vacio_escrito(cls, valor):
+        if valor is None or (isinstance(valor, str) and valor.strip().upper() in _VACIO_ESCRITO):
+            return ""
+        return valor
+
+
+_VACIO_ESCRITO = {"NONE", "NULL", "N/A"}
+
 
 def _items_con_procedencia(request: MariaRequest) -> list:
     """Los productos con la procedencia de la operación en los que no traen la
@@ -3715,9 +3735,13 @@ async def generate_maria_endpoint(
         except Exception:
             pass
 
+        # Sin número de factura, el de la operación: el mismo en el TXT y en
+        # el nombre del archivo.
+        operation_id = request.operation_id.strip() or f"OP_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
         # Generar TXT
         txt_content = generate_maria_txt(
-            operation_id=request.operation_id,
+            operation_id=operation_id,
             items=items,
             moneda=request.moneda,
             incoterm=request.incoterm,
@@ -3751,7 +3775,7 @@ async def generate_maria_endpoint(
         
         # Sanitizar operation_id para filename (prevenir path traversal)
         import re
-        safe_id = re.sub(r'[^a-zA-Z0-9_-]', '', request.operation_id)[:50]
+        safe_id = re.sub(r'[^a-zA-Z0-9_-]', '', operation_id)[:50]
         if not safe_id:
             safe_id = f"OP_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         

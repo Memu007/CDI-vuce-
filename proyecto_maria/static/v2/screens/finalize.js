@@ -420,7 +420,10 @@
         const moneda = (op.moneda || 'DOL').toString().toUpperCase();
         const incoterm = (op.incoterm || 'FOB').toString().toUpperCase();
 
-        const factura = String(op.numero_factura || '').trim();
+        // «None», «null» o «N/A» de una operación guardada con el lector viejo
+        // no son un número de factura (MARIA-5).
+        const leida = String(op.numero_factura || '').trim();
+        const factura = /^(none|null|n\/a)$/i.test(leida) ? '' : leida;
         const operation_id = factura ? ('FAC_' + factura.replace(/[^a-zA-Z0-9_-]/g, '')) :
             ('OP_' + new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14));
 
