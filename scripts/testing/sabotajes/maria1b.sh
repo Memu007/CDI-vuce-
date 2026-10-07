@@ -142,10 +142,34 @@ sabotaje $M "una hoja vacía se avisa como hoja con datos" \
     return True' \
   "FAILED $T::test_el_excel_deja_en_la_operacion_lo_que_no_se_leyo"
 # Devolución de MARIA-1b
-sabotaje $C "NaN e inf vuelven a pasar en los productos" \
-  '            if any(_no_finito(item.get(c)) for c in campos):' \
+sabotaje $C "NaN e inf vuelven a pasar en la cantidad" \
+  '        if _fuera_de_rango(cantidad):' \
+  '        if False:' \
+  "FAILED $D::test_nan_o_inf_en_un_producto_no_dejan_generar[cantidad-"
+sabotaje $C "los subítems dejan de controlarse" \
+  '        for m, sub in enumerate(item.get("subitems") or [], start=1):' \
+  '        for m, sub in enumerate([], start=1):' \
+  "FAILED $D::test_nan_o_inf_en_un_subitem_no_dejan_generar"
+sabotaje $C "los montos que desbordan al multiplicar vuelven a pasar" \
+  '    return len(numeros) > 1 and (not math.isfinite(producto) or abs(producto) > IMPORTE_MAXIMO)' \
+  '    return False' \
+  "FAILED $D::test_montos_finitos_que_desbordan_no_dejan_generar[item0-"
+sabotaje $M "la validación previa vuelve a dar 500 con montos que desbordan" \
+  '        return _sin_no_finitos({' \
+  '        return ({' \
+  "FAILED $D::test_la_validacion_previa_con_montos_que_desbordan_no_da_500"
+sabotaje $M "la exportación vuelve a escribir NaN" \
+  '        if _montos:' \
+  '        if False:' \
+  "FAILED $D::test_la_exportacion_no_escribe_nan_ni_inf"
+sabotaje $M "una fórmula sin valor guardado deja de ser un dato" \
+  '            if formula is not None and (formula.text or "").strip():' \
   '            if False:' \
-  "FAILED $D::test_nan_o_inf_en_un_producto_no_dejan_generar"
+  "FAILED $D::test_una_hoja_con_formulas_sin_valor_guardado_se_avisa"
+sabotaje $M "una hoja de gráfico vuelve a contar como hoja" \
+  '        if not (r.get("Type") or "").endswith("/worksheet"):' \
+  '        if False:' \
+  "FAILED $D::test_una_hoja_de_grafico_primero_no_corre_las_hojas"
 sabotaje $M "la validación previa vuelve a dar 500 con un NaN" \
   '                item_dict = {k: (0.0 if k in numericos and _no_finito(v) else v)' \
   '                item_dict = {k: v' \
