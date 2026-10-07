@@ -25,14 +25,12 @@ despertás a ella con el de la suya al entregar o al dejar una D que te frena
 
 ## Último veredicto
 
-**MARIA-1b aceptada sobre `beea9eb`** (2026-10-07, con la devolución). La PM
-reprodujo el rojo antes sobre `a443cc2` (`42 failed, 11 passed`), la focal
-(`393 passed`) y la suite (`1224 passed, 102 skipped, 1 xfailed`), que
-coincide con tus 1214 más los 10 que deselecciona la CI. Su subagente probó
-los cinco puntos y se sostienen. Tampoco se perdió nada de la Dev 2 en tu
-merge. Detalle en `REPRODUCCION-MARIA-1b-2026-10-07.md`. **EXCEL-1 y
-MARIA-1b ya están integradas en la rama de la PM**, con tus pruebas de
-PUNTA-A-PUNTA-1 en curso (sólo pruebas).
+**PUNTA-A-PUNTA-1 aceptada sobre `3b52bc9`** (2026-10-07) e integrada. La PM
+corrió la prueba (`7 passed, 3 xfailed`), tus 9 sabotajes (todos en rojo,
+«con falla: 0») y la suite (`1226 passed, 102 skipped, 3 xfailed`). Detalle
+en `REPRODUCCION-PUNTA-A-PUNTA-1-2026-10-07.md`. El caso del peso con más de
+una unidad lo suma la Dev 2 con MARIA-5. Antes: MARIA-1b aceptada sobre
+`beea9eb` (en Git).
 
 ## Respuestas a tus D (2026-10-07, 15:20 UTC)
 
@@ -56,26 +54,7 @@ del commit `62b1d14`):
 - **D6: (a)** ahora. El índice único (b), pieza aparte más adelante, después
   de mirar si producción ya tiene códigos repetidos.
 
-## Tarea activa — PUNTA-A-PUNTA-1: una prueba de todo el camino
-
-Escrita el 2026-10-07, 13:15 UTC. Ya está en curso; lo que falta está en tu
-«Sigo con».
-
-**Base:** tu rama (con MARIA-1b).
-
-**Alcance:** una prueba automática, sin red y dentro de la suite, que hace el
-recorrido de Emi por las rutas HTTP que usa la pantalla v2, con el pedido
-armado como lo arma ella: login, subir un PDF (Gemini simulado que devuelve
-los datos del archivo real), revisar, generar y descargar el TXT. Lo compara
-byte a byte con `tests/fixtures/maria_golden_anon.TXT` y con el de subítems.
-Lo mismo con un Excel armado con los datos del archivo real. Es una pieza de
-pruebas: si encontrás un defecto del producto, D; no se arregla acá.
-
-**Criterios:** rojo con sabotajes en el lector, en el mapeo del Excel y en el
-generador (una línea cada uno); la prueba corre en la CI (`ci.yml` deselecciona
-algunas: comprobá que ésta no); suite completa en verde.
-
-## Después — EXCEL-2
+## Tarea activa — EXCEL-2
 
 Del `ROADMAP.md`: lo que el Excel todavía no lee (encabezado fuera de la fila
 1, sin columna de origen, celdas combinadas: D18), CSV con `;`, latin-1 o BOM
@@ -89,4 +68,30 @@ Además:
 2. **De paso:** un monto que es un entero JSON gigante (`10**400`) o una lista
    da 400, no 500 (`OverflowError`), en `/generate_maria`, los subítems y la
    exportación; y `cuit_agr` y `vendedor_id`, sólo con dígitos 0-9.
+
+## Siguiente, apenas entregues EXCEL-2
+
+Escrito el 2026-10-07, 18:00 UTC, mientras la PM revisa EXCEL-2. Si el
+veredicto trae devolución, va primero.
+
+1. **GUARDAR-1, sólo si Emi dice que sí** (lo encontró el ataque a la
+   segunda publicación, `REPRODUCCION-PUBLICACION-2-2026-10-07.md`, #1).
+   En producción, guardar una operación cuyo producto lleva la SIM completa
+   (`84714900100D`) da 500 y no guarda nada, porque
+   `client_product_history.ncm` es `String(10)` y el error salta en el
+   `commit` de `save_client_operation`. En SQLite no se ve.
+   - **Alcance:** la operación se guarda siempre, aunque falle el historial
+     (el historial no puede tirar abajo el guardado), y el historial guarda la
+     posición completa o una forma que entre, sin perder la que usa la
+     sugerencia.
+   - **Sin migraciones a ciegas:** si hace falta cambiar la columna, D con
+     el plan para Postgres y cómo se vuelve atrás.
+   - **Criterios:** rojo antes y verde después contra Postgres (no
+     alcanza SQLite), y suite completa.
+2. **Si no, COBRO-MP-1** (Fase 2, `ROADMAP.md`): el aviso de pago de
+   Mercado Pago verificado y aplicado una sola vez aunque se reenvíe, con el
+   monto controlado (C3 de `AUDITORIA-2026-10-06.md`, tu D8). Además, que una
+   renovación de la suscripción extienda el período (hoy sólo se procesa
+   `type == "payment"`). Es plata: revisión fuerte (Opus y Sonnet, alto), y
+   nada contra Mercado Pago real.
 

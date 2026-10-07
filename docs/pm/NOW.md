@@ -73,7 +73,7 @@ Archivos abiertos por Dev:
 
 ## En curso
 
-- **Dev 1:** PUNTA-A-PUNTA-1. Sigue: EXCEL-2 (con la D26)
+- **Dev 1:** EXCEL-2 entregada (`3e6e63e`, D27), por revisar. Sigue: GUARDAR-1 si Emi dice que sí; si no, COBRO-MP-1.
   y EXCEL-2.
 - **Dev 2:** devolución de MARIA-5 (dos pesos para una línea, filas que desaparecen, guarda del peso, subítems, grupos, una sola cuenta). Sigue: CATALOGO-NCM-1; MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
@@ -153,12 +153,12 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 15:05 UTC (rutina): MARIA-5 devuelta (Dev 2 en la devolución; sigue
-CATALOGO-NCM-1). Devolución de MARIA-1b (Dev 1, `beea9eb`): la PM reprodujo
-`1224 passed, 102 skipped, 1 xfailed`; falta su subagente. Regla nueva de
-Emi: compactar a 60 % las Devs y 50 % las PMs, y las tres antes de dormir
-(textos a Emi a eso de las 20:30). Contexto: PM 37 %, Dev 1 38 %, Dev 2
-recién compactada.
+2026-10-07 18:00 UTC (rutina): PUNTA-A-PUNTA-1 aceptada e integrada. Dev 1
+entregó EXCEL-2 (`3e6e63e`, con D27), por revisar; sigue GUARDAR-1 si Emi dice
+que sí, si no COBRO-MP-1. Dev 2: integra EXCEL-1 con la regla del peso y
+reentrega MARIA-5 y CATALOGO-NCM-1. Esperan a Emi: «dale 6ea8ca9»,
+GUARDAR-1, reventa, subítems en la pantalla. Contexto: PM 48 % y Dev 1 62 %
+(`/compact` pedido a Emi), Dev 2 9 %.
 
 ## Medición
 

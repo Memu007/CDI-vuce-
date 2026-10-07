@@ -89,29 +89,24 @@ por `_leer`, con Gemini falso, hasta el TXT: (25, 25) con cantidad 10 da
 `QARTKGRNET=25.000` y el aviso. Los dos archivos reales siguen idénticos.
 Suite completa en verde.
 
-## Respuestas a tus D (2026-10-07, 13:05 UTC)
+## Respuestas a tus D (2026-10-07, 16:05 UTC)
 
-- **D22 (peso del lector y del Excel): (a), con dos precisiones.** Decidido
-  por la PM (está dentro de MARIA-5).
-  - Lector: pide `peso_unitario` y `peso_total_linea`; si viene sólo el total,
-    lo divide por la cantidad. La revisión muestra el unitario y el total de
-    cada línea, para que Emi lo vea antes de generar.
-  - Excel: «peso total» y «peso neto» se dividen por la cantidad; «peso» y
-    «weight», de una unidad, como dice la plantilla. **«Peso bruto» no
-    entra como neto en silencio:** si es la única columna de peso, se usa
-    dividida por la cantidad y sale un aviso («el TXT pide peso neto; se usó
-    el bruto»).
-  - El Excel es terreno de la Dev 1 (`main.py`, las cargas): tocá sólo el
-    mapeo del peso. MARIA-5 no se publica sin esta parte (si no, el «peso
-    total» del Excel saldría multiplicado).
-- **Lo encontrado de paso:**
-  - El 0,5 inventado al guardar ya lo saca MARIA-1b (Dev 1). Al integrar
-    vas a tener que resolver ese pedazo de `main.py`: la PM integra MARIA-1b
-    y EXCEL-1 apenas cierre su revisión, y vos traés la rama antes de
-    entregar.
-  - `setGroupField` en `ncm.js` (el total del grupo copiado a cada
-    producto, el TXT suma de más): **entra en MARIA-5**, punto 4.
-- MARIA-1d no dejó D. Anteriores (D5 a D21): en Git.
+- **D23 («Peso neto» por unidad o de la línea): la regla de MARIA-5.**
+  Decidido por la PM: es la de la respuesta 3 del despachante y la de tu D22
+  (a). El orden es neto > total > de una unidad > bruto, y el neto es de la
+  línea.
+  - EXCEL-1 y MARIA-1b ya están en la rama de la PM (`6ea8ca9` en adelante).
+    Traela con `merge` y resolvé vos los choques de `main.py` y `upload.js`
+    con esa regla.
+  - Las pruebas de EXCEL-1 que esperan «Peso neto» por unidad se corrigen
+    citando la respuesta 3 y esta D. Las de MARIA-1b (controles, NaN, otras
+    hojas) no se tocan.
+  - Después corré `sabotaje_maria3.sh` con MARIA-1b adentro, y reentregá
+    MARIA-5 y CATALOGO-NCM-1 sobre esa base.
+  - Sumá a `tests/test_punta_a_punta1.py` (de la Dev 1, ya en la rama) un
+    producto con más de una unidad: el peso de la línea en `QARTKGRNET`.
+- La Dev 1 sabe que en EXCEL-2 no toca los nombres de columnas de peso.
+- Anteriores (D5 a D22): en Git.
 
 ## Tarea activa — MARIA-5: peso total por producto y cuentas al centavo
 
