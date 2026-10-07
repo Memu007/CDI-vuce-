@@ -78,7 +78,7 @@ Archivos abiertos por Dev:
   puntos; tres rompen: una combinada gigante traba la lectura, una
   combinada con texto duplica el FOB, el tope de estilos no protege la
   memoria; D27 (a)). Después, COBRO-MP-1, en pausa en `18a1850`.
-- **Dev 2:** MARIA-5 y CATALOGO-NCM-1 devueltas sobre `6854f34` (19:30 UTC) por seis puntos chicos: una columna «Peso por caja» le gana a «Peso», el bruto «unitario» se lee como neto, aviso de dos pesos sin números, una pantalla en rojo, la baja con aviso doble y sin catálogo errores inventados. Sigue: SUBITEMS-1 (Emi: sus facturas traen subítems) y MARIA-6 cuando lleguen los archivos reales del despachante.
+- **Dev 2:** MARIA-5 y CATALOGO-NCM-1 devueltas sobre `6854f34` (19:30 UTC) por seis puntos chicos: una columna «Peso por caja» le gana a «Peso», el bruto «unitario» se lee como neto, aviso de dos pesos sin números, una pantalla en rojo, la baja con aviso doble y sin catálogo errores inventados. SUBITEMS-1 entregada (`88564ec`) y revisada: se sostiene, con cuatro arreglos chicos que van en la misma reentrega. Después: (Emi: sus facturas traen subítems) y MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
   RENDIMIENTO-1 y 1b (`ec3d793`), MARIA-1a, 2b, 1c, 4, 3 y 1d (`9679e21`).
   Suite sobre la rama integrada (`7b42556`, venv armado sólo con el
@@ -156,14 +156,14 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 19:50 UTC: las dos entregas, devueltas. MARIA-5 y CATALOGO-NCM-1
-(`6854f34`) por seis puntos chicos; la peor: una columna «Peso por caja» le
-gana a «Peso» (×16 en el TXT). EXCEL-2 (`3e6e63e`) por seis, tres que rompen
-(combinada gigante, combinada con texto que duplica el FOB, estilos que
-llegan a 1,4 GB); D27 (a). Dev 1: GUARDAR-1, después EXCEL-2, después
-COBRO-MP-1. Dev 2: su devolución, después SUBITEMS-1. Hoy rige 30/40 (la
-cuenta tocó su límite a las ~18:34). Esperan a Emi: «dale 6ea8ca9» escrito
-y el `/compact` de la Dev 2.
+2026-10-07 19:58 UTC (rutina; las horas de las dos vueltas anteriores estaban
+adelantadas, los commits dicen 19:23). SUBITEMS-1 revisada: se sostiene, con
+cuatro arreglos chicos que van en la reentrega de MARIA-5. Dev 1: GUARDAR-1
+hecha hasta `d6fe25f` (con Postgres), pero se quedó quieta a las 19:27 sin
+el informe; despertada para cerrar `/entregar`. Dev 2: segunda devolución de
+MARIA-5 en curso (`135ff27`). Contexto: Dev 1 32 % y Dev 2 55 %, las dos
+sobre el 30 % de hoy: `/compact` pedidos a Emi. Espera a Emi: «dale 6ea8ca9»
+escrito.
 
 ## Medición
 
