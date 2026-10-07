@@ -146,7 +146,7 @@ caso subitems_sin_reparto "${T}centavos.py::test_los_subitems_cierran_sin_rechaz
 
 # 16. sin tope: un importe enorme llega al cálculo
 reemplazar $G "    if not numero.is_finite() or abs(numero) > IMPORTE_MAXIMO:" "    if not numero.is_finite():"
-caso sin_tope "${T}centavos.py::test_un_importe_imposible_da_error_y_no_500[extra"
+caso sin_tope "${T}devolucion.py::test_un_importe_enorme_no_llega_al_txt_desde_el_generador["
 
 # 17. el lector no divide el peso de la línea
 reemplazar $X "        unitario = total / cantidad" "        unitario = total"
@@ -222,7 +222,7 @@ caso peso_sin_guarda "${D}test_un_peso_imposible_no_llega_al_txt["
 
 # 33. la guarda existe pero el TXT no la usa
 reemplazar $G 'QARTKGRNET={peso_valido(peso_kg, idx):.3f}' 'QARTKGRNET={peso_kg:.3f}'
-caso guarda_sin_usar "${D}test_un_peso_imposible_da_400["
+caso guarda_sin_usar "${D}test_un_peso_imposible_no_llega_al_txt["
 
 # 34. sin tope en el peso
 reemplazar $G "    if not math.isfinite(kilos) or kilos > IMPORTE_MAXIMO:" "    if not math.isfinite(kilos):"

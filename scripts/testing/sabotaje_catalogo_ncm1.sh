@@ -106,7 +106,9 @@ reemplazar $V '            advertencias.append(f"⚠️ Ítem {i} ({pieza}): {av
 caso baja_frena "${T}test_la_validacion_avisa_la_baja_sin_frenar"
 
 # 7. la sugerencia del historial no dice que se dio de baja
-reemplazar $M "        if ncm_catalog.ncm_de_baja(ncm_key):" "        if False:"
+reemplazar $M "        aviso = ncm_catalog.aviso_de_ncm(ncm_key)
+        if aviso:" "        aviso = ncm_catalog.aviso_de_ncm(ncm_key)
+        if False:"
 caso sugerencia_sin_aviso "${T}test_la_sugerencia_del_historial_marca_la_baja"
 
 # 8. el código escrito dado de baja no lo dice

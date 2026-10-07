@@ -305,3 +305,11 @@ def test_un_peso_con_coma_se_lee_como_el_resto(auth_override, client, columna, e
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
     assert r.status_code == 200, r.text
     assert r.json()["items"][0]["peso_unitario"] == pytest.approx(esperado)
+
+
+@pytest.mark.parametrize("extra", [{"valor_unitario": 1e27}, {"valor_total": 1e30}])
+def test_un_importe_enorme_no_llega_al_txt_desde_el_generador(extra):
+    """El control del pedido de MARIA-1b lo frena antes en el endpoint; el
+    generador tiene su propia guarda (son capas distintas)."""
+    with pytest.raises(ValueError, match="no válido"):
+        _gen("OP_TOPE", [_item(10, **extra)])
