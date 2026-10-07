@@ -288,7 +288,8 @@ class _Pantalla:
         return {k: p[k] for k in ("moneda", "incoterm", "comprador_cuit", "flete", "seguro")}
 
     def pedido(self) -> dict:
-        """buildMariaRequest (finalize.js), campo por campo."""
+        """buildMariaRequest (finalize.js), campo por campo. Es una copia: si
+        finalize.js cambia y esto no, la prueba no lo ve."""
         op = self.operacion
         factura = str(op.get("numero_factura") or "").strip()
         assert factura, "sin número de factura la pantalla usa la hora: OP_<fecha>"
