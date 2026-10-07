@@ -118,7 +118,16 @@ def _abrir_pdf(contents: bytes) -> tuple:
     """(¿encriptado?, cantidad de páginas). Con pypdf, sucesor de PyPDF2."""
     from pypdf import PdfReader
     pdf = PdfReader(io.BytesIO(contents))
-    return pdf.is_encrypted, len(pdf.pages)
+    if pdf.is_encrypted:
+        return True, 0  # contar páginas de uno encriptado ya falla
+    return False, len(pdf.pages)
+
+
+def _pdf_validate_timeout_s() -> float:
+    try:
+        return float(os.getenv("PDF_VALIDATE_TIMEOUT_S", "30"))
+    except (TypeError, ValueError):
+        return 30.0
 
 
 async def validate_file_upload(
@@ -207,7 +216,7 @@ async def validate_file_upload(
             try:
                 encriptado, paginas = await asyncio.wait_for(
                     asyncio.to_thread(_abrir_pdf, contents),
-                    timeout=float(os.getenv("PDF_VALIDATE_TIMEOUT_S", "30")),
+                    timeout=_pdf_validate_timeout_s(),
                 )
             except asyncio.TimeoutError:
                 raise HTTPException(

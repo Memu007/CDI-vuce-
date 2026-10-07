@@ -3302,20 +3302,47 @@ class LecturaPdfDemasiadoLarga(Exception):
     """La lectura del PDF pasó de PDF_READ_TIMEOUT_S."""
 
 
+# Las lecturas de PDF tienen su propio grupo de hilos. Una lectura que pasa
+# del tiempo máximo sigue corriendo hasta terminar (un hilo no se corta desde
+# afuera): así, aunque varias lentas lo llenen, no le quitan hilos al resto
+# (validar archivos, sugerir NCM), que usa el grupo por defecto.
+_POOL_LECTURA_PDF = None
+
+
+def _pool_lectura_pdf():
+    global _POOL_LECTURA_PDF
+    if _POOL_LECTURA_PDF is None:
+        from concurrent.futures import ThreadPoolExecutor
+        try:
+            hilos = max(1, int(os.getenv("PDF_READ_WORKERS", "4")))
+        except (TypeError, ValueError):
+            hilos = 4
+        _POOL_LECTURA_PDF = ThreadPoolExecutor(hilos, thread_name_prefix="lectura-pdf")
+    return _POOL_LECTURA_PDF
+
+
+def _correr_lectura(funcion, *args):
+    # Un TimeoutError del propio lector (p. ej. de una conexión) no es «el PDF
+    # tardó demasiado»: se informa como cualquier otro error.
+    try:
+        return funcion(*args)
+    except TimeoutError as e:
+        raise RuntimeError(f"error de tiempo dentro del lector: {e}") from e
+
+
 async def _leer_pdf_aparte(funcion, *args):
     """Corre una lectura sincrónica de PDF en otro hilo, con tiempo máximo.
 
     Así el servidor sigue atendiendo a los demás mientras se lee un PDF
     (RENDIMIENTO-1). Si la lectura pasa de PDF_READ_TIMEOUT_S, levanta
-    LecturaPdfDemasiadoLarga. El hilo no se puede cortar desde afuera:
-    termina solo, pero ya nadie lo espera.
+    LecturaPdfDemasiadoLarga.
     """
     import asyncio
+    loop = asyncio.get_running_loop()
+    futuro = loop.run_in_executor(_pool_lectura_pdf(), _correr_lectura, funcion, *args)
     try:
-        return await asyncio.wait_for(
-            asyncio.to_thread(funcion, *args), timeout=_pdf_read_timeout_s()
-        )
-    except asyncio.TimeoutError:
+        return await asyncio.wait_for(futuro, timeout=_pdf_read_timeout_s())
+    except TimeoutError:
         raise LecturaPdfDemasiadoLarga(
             "Leer el PDF tardó demasiado. Probá de nuevo o cargá los productos a mano."
         )
@@ -7088,11 +7115,22 @@ async def sugerir_ncm(
     # validada contra ARCA. Sin Gemini disponible → sin resultados (no se
     # usa el buscador lexical como clasificador).
     if len(sugerencias) < 5 and not _looks_like_ncm_code_query(descripcion):
-        # En otro hilo: la llamada a Gemini es sincrónica (RENDIMIENTO-1).
+        # En otro hilo y con tiempo máximo: la llamada a Gemini es sincrónica
+        # (RENDIMIENTO-1). Si no contesta a tiempo, se sigue sin sus sugerencias.
         import asyncio
-        for sug in await asyncio.to_thread(
-            _suggest_ncm_with_gemini, descripcion, 5 - len(sugerencias)
-        ):
+        try:
+            limite = float(os.getenv("NCM_GEMINI_TIMEOUT_S", "30"))
+        except (TypeError, ValueError):
+            limite = 30.0
+        try:
+            de_gemini = await asyncio.wait_for(
+                asyncio.to_thread(_suggest_ncm_with_gemini, descripcion, 5 - len(sugerencias)),
+                timeout=limite,
+            )
+        except TimeoutError:
+            logging.warning("[ncm sugerir] Gemini no contestó a tiempo; sin sus sugerencias")
+            de_gemini = []
+        for sug in de_gemini:
             add_suggestion(sug)
 
     metadata = ncm_catalog.get_catalog_metadata()
