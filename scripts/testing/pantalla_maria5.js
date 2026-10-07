@@ -32,10 +32,13 @@ const centavos = s => Math.round(parseFloat(s) * 100);
     ];
     CDI.goTo('ncm');
   });
+  // SOLO_GRUPO=1 saltea el peso de la línea (para ver el rojo del grupo antes de la pieza).
+  if (!process.env.SOLO_GRUPO) {
   await page.locator('[data-peso-total="0"]', { hasText: '25 kg' }).waitFor({ timeout: 10000 }).catch(() => falla('no se ve el peso de la línea (25 kg) debajo del unitario'));
   await page.fill('input[data-row="0"][data-field="cantidad"]', '4');
   await page.locator('[data-peso-total="0"]', { hasText: '10 kg' }).waitFor({ timeout: 5000 }).catch(() => falla('el peso de la línea no se actualiza al cambiar la cantidad'));
   console.log('OK la pantalla de NCM muestra el peso de la línea y lo actualiza');
+  }
   const grupo = async (campo, valor) => {
     await page.fill('input[data-grupo-id="1"][data-field="' + campo + '"]', valor);
     await page.locator('input[data-grupo-id="1"][data-field="' + campo + '"]').blur();
