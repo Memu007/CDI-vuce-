@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · fix: el peso es el de la línea y las cuentas del TXT cierran al centavo (MARIA-5)
+
+- **fix(maria):** `QARTKGRNET` declara el peso neto de toda la línea (10 × 2,5 kg = 25 kg, lo que ya mostraba la validación), también en los grupos. El lector pide el peso de una unidad y el de la línea; el Excel divide «Peso total» y «Peso neto» por la cantidad y avisa si sólo trae el bruto. Editar un grupo en la pantalla de NCM reparte entre sus productos en vez de copiar el total.
+- **fix(maria):** importes al centavo con la mitad hacia arriba; el flete y el seguro se reparten para que la suma de los ítems dé exactamente la carátula (antes 10,01 contra 10,00), igual el FOB y los sub-ítems. En el servidor, «None», «null» o «N/A» en la carátula cuentan como vacíos y nunca llegan al TXT ni al nombre del archivo.
+
 ## 2026-10-07 · fix: un campo vacío de la factura no llega al TXT como «None» (MARIA-1d)
 
 - **fix(maria):** el lector deja vacíos el número de factura, el vendedor, el comprador, el domicilio, la moneda y el incoterm que Gemini devuelve nulos o escritos como «None», «null» o «N/A» (antes «None» y «NON», que llegaban al TXT como `IDSO=FAC_None` o `CDDTINCOTE=NON`); el lector ya no inventa DOL ni FOB, y el prompt no pide adivinar la moneda. Lo que falta de la carátula se avisa antes de generar.
