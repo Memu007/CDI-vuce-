@@ -2165,12 +2165,28 @@ def _no_aplica(raw, palabras) -> bool:
     return str(raw).strip().rstrip('.').strip().upper() in palabras
 
 
+def _peso_del_producto(item_data: dict, cantidad: float, decimal) -> tuple[float, float]:
+    """El peso neto de una unidad y el de la línea (MARIA-5, D22). Gemini
+    devuelve el que trae la factura; si trae sólo el de la línea, se divide
+    por la cantidad, porque el TXT multiplica el unitario por la cantidad.
+    `peso_kg` es el nombre viejo: se lee como unitario, como antes."""
+    unitario = _numero_factura(item_data.get('peso_unitario'), decimal) or 0.0
+    total = _numero_factura(item_data.get('peso_total_linea'), decimal) or 0.0
+    if unitario <= 0 and total > 0 and cantidad > 0:
+        unitario = total / cantidad
+    if unitario <= 0:
+        unitario = _numero_factura(item_data.get('peso_kg'), decimal) or 0.0
+    unitario = unitario if unitario > 0 else 0.0
+    return unitario, round(unitario * cantidad, 3) if unitario and cantidad > 0 else 0.0
+
+
 def _valores_numericos(result: dict) -> list:
     operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
     valores = [operacion.get('flete'), operacion.get('seguro')]
     for it in result.get('items') or []:
         if isinstance(it, dict):
-            valores += [it.get('cantidad'), it.get('valor_unitario'), it.get('peso_kg')]
+            valores += [it.get('cantidad'), it.get('valor_unitario'), it.get('peso_unitario'),
+                        it.get('peso_total_linea'), it.get('peso_kg')]
     return valores
 
 
@@ -2274,7 +2290,8 @@ Para CADA línea de la tabla de productos, extrae:
 - descripcion: Nombre del producto (2-5 palabras, SIN medidas, SIN códigos)
 - cantidad: Número de unidades, copiado tal como aparece en la factura
 - valor_unitario: Precio por unidad, copiado tal como aparece en la factura
-- peso_kg: Peso en kg (0 si no aparece; no estimar)
+- peso_unitario: Peso neto de UNA unidad en kg (0 si la factura no lo dice; no estimar ni calcular)
+- peso_total_linea: Peso neto de TODA la línea en kg, todas las unidades juntas (0 si la factura no lo dice; no estimar ni calcular)
 - origen: Código país origen (CN, BR, US, etc.)
 
 🔍 EXTRACCIÓN DE CÓDIGOS (IMPORTANTE):
@@ -2314,7 +2331,7 @@ FORMATO DE RESPUESTA (JSON estricto)
     "comprador_domicilio": "..."
   },
   "items": [
-    {"codigo_parte": "77655-KK010", "pieza": "802730", "descripcion": "Stamping Die-3", "cantidad": 1, "valor_unitario": 31283.33, "peso_kg": 4704, "origen": "CN"}
+    {"codigo_parte": "77655-KK010", "pieza": "802730", "descripcion": "Stamping Die-3", "cantidad": 1, "valor_unitario": 31283.33, "peso_unitario": 0, "peso_total_linea": 4704, "origen": "CN"}
   ]
 }
 
@@ -2404,7 +2421,7 @@ IMPORTANTE:
                         try:
                             cantidad = _numero_factura(item_data.get('cantidad'), decimal) or 0.0
                             precio = _numero_factura(item_data.get('valor_unitario'), decimal) or 0.0
-                            peso = _numero_factura(item_data.get('peso_kg'), decimal) or 0.0
+                            peso, peso_total = _peso_del_producto(item_data, cantidad, decimal)
                             
                             descripcion, codigo_parte = _texto_del_producto(item_data)
 
@@ -2424,6 +2441,7 @@ IMPORTANTE:
                                 'cantidad': cantidad,
                                 'valor_unitario': precio,
                                 'peso_unitario': peso if peso > 0 else 0.0,
+                                'peso_total': peso_total,
                                 'order_index': len(items),
                                 'tariff_group': '',  # Vacío porque no hay NCM
                                 'vision_model': model_name
@@ -2506,7 +2524,8 @@ Para CADA línea de la tabla de productos, extrae:
 - descripcion: Nombre del producto (2-5 palabras, SIN medidas)
 - cantidad: Número de unidades
 - valor_unitario: Precio por unidad
-- peso_kg: Peso en kg (0 si no aparece; no estimar)
+- peso_unitario: Peso neto de UNA unidad en kg (0 si la factura no lo dice; no estimar ni calcular)
+- peso_total_linea: Peso neto de TODA la línea en kg, todas las unidades juntas (0 si la factura no lo dice; no estimar ni calcular)
 - origen: Código país origen (CN, BR, US, etc.)
 
 ═══════════════════════════════════════════════════════════════════
@@ -2530,7 +2549,7 @@ FORMATO DE RESPUESTA (JSON estricto)
     "comprador_domicilio": "..."
   },
   "items": [
-    {"descripcion": "...", "cantidad": 10, "valor_unitario": 5.50, "peso_kg": 0.5, "origen": "CN"}
+    {"descripcion": "...", "cantidad": 10, "valor_unitario": 5.50, "peso_unitario": 0.5, "peso_total_linea": 0, "origen": "CN"}
   ]
 }
 
@@ -2594,7 +2613,7 @@ IMPORTANTE:
                                 # (0): el semáforo lo marca (MARIA-1a).
                                 cantidad = _numero_factura(item_data.get('cantidad'), decimal) or 0.0
                                 precio = _numero_factura(item_data.get('valor_unitario'), decimal) or 0.0
-                                peso = _numero_factura(item_data.get('peso_kg'), decimal) or 0.0
+                                peso, peso_total = _peso_del_producto(item_data, cantidad, decimal)
                                 
                                 descripcion, codigo_parte = _texto_del_producto(item_data)
                                 item = {
@@ -2605,6 +2624,7 @@ IMPORTANTE:
                                     'cantidad': cantidad if cantidad > 0 else 0.0,
                                     'valor_unitario': precio,
                                     'peso_unitario': peso if peso > 0 else 0.0,
+                                    'peso_total': peso_total,
                                     'order_index': len(items),
                                     'vision_model': model_name
                                 }
