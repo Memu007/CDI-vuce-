@@ -57,7 +57,7 @@ sabotaje "/dev/dashboard sin require_admin" \
   'GET /dev/dashboard → 200'
 sabotaje "cache/refresh pierde la marca admin (la prueba dejaría de verla)" \
   '@app.post("/api/ncm/cache/refresh", tags=["admin"])' '@app.post("/api/ncm/cache/refresh")' \
-  "assert ('POST', '/api/ncm/cache/refresh') in rutas"
+  "assert ('POST', '/api/ncm/cache/refresh') in ["
 
 git checkout -q -- proyecto_maria/main.py
 echo "sabotajes con falla: $FALLAS"
