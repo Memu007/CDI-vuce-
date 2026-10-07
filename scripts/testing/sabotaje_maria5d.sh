@@ -78,7 +78,7 @@ caso peso_u "${T}test_las_que_dicen_por_unidad_no_son_dudosas[Peso U.]"
 reemplazar $M '    if "total" in normal or "linea" in normal or "unidades" in normal or "units" in normal:
         return False' '    if False:
         return False'
-caso bruto_total_unidades "${T}test_un_bruto_de_la_linea_que_menciona_unidades_se_divide[Peso bruto total unidades]"
+caso bruto_total_unidades "${T}test_un_bruto_de_la_linea_que_menciona_unidades_se_divide[Peso Bruto Total/U]"
 
 # 7. «Peso Bruto Unid.» vuelve a dividirse
 reemplazar $M 'xunidad|unitweight|(unit|unid|/u|brutou)$' 'xunidad|unitweight|(unit|/u|brutou)$'
