@@ -128,14 +128,14 @@ reemplazar $M '        if isinstance(it, dict) and not (it.get("pais_procedencia
 caso procedencia_pisa_la_del_producto "${T}test_la_procedencia_del_producto_gana_sobre_la_de_la_operacion"
 
 # 12. una procedencia que no se reconoce pasa
-reemplazar $M "    if not pais_reconocido(procedencia):
+reemplazar $M "    if not pais_de_la_tabla(procedencia):
         raise HTTPException(
             status_code=400,
             detail=f\"Procedencia" "    if False:
         raise HTTPException(
             status_code=400,
             detail=f\"Procedencia"
-caso procedencia_sin_validar "${T}test_procedencia_no_reconocida_se_rechaza"
+caso procedencia_sin_validar "${T}test_procedencia_no_reconocida_se_rechaza[Narnia]"
 
 # 13. los avisos previos sin sesión
 reemplazar $M "async def avisos_maria_endpoint(
@@ -161,5 +161,14 @@ reemplazar_primero $X "'fecha_emision': str(operacion.get('fecha_emision') or ''
   "'fecha_emision': str(operacion.get('fecha_emision', '')),"
 caso fecha_none "${T}test_la_fecha_que_no_vino_queda_vacia[None-"
 
+# 17. con la fecha vacía, el año del IEXT pasa al de hoy
+reemplazar $G '    _m_anio = re.search(r"/(\d{2}|\d{4})\s*$", fecha_factura or str(fecha_emision or "").strip())' \
+  '    _m_anio = re.search(r"/(\d{2}|\d{4})\s*$", fecha_factura)'
+caso iext_del_anio_de_hoy "${T}test_una_fecha_que_no_se_acepta_no_cambia_el_anio_del_iext[Fecha 18/07/2025]"
+
+# 18. una procedencia numérica que no está en la tabla pasa
+reemplazar $M "    if not pais_de_la_tabla(procedencia):" "    if not pais_reconocido(procedencia):"
+caso procedencia_fuera_de_la_tabla "${T}test_procedencia_no_reconocida_se_rechaza[99999]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 16 sabotajes dan rojo por la razón esperada"
+echo "OK: los 18 sabotajes dan rojo por la razón esperada"
