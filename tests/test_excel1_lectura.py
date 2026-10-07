@@ -56,15 +56,16 @@ def test_peso_neto_gana_sobre_bruto():
     r = _subir([["NCM", "Descripcion", "Origen", "Cantidad", "Precio Unitario", "Peso Bruto", "Peso Neto"],
                 ["84713000", "Laptop 14 pulgadas", "CN", 10, 350, 25, 15]])
     assert r.status_code == 200, r.text[:300]
-    # Integración con MARIA-5 (D22 y su devolución): el neto y el total son de
-    # la línea y se dividen por la cantidad; neto > total > de una unidad > bruto.
+    # Respuesta 3 del despachante y D23 de la Dev 2 (regla de MARIA-5): el neto
+    # y el total son de la línea y se dividen por la cantidad; neto > total > de
+    # una unidad > bruto.
     assert r.json()["items"][0]["peso_unitario"] == 1.5, r.json()["items"][0]
 
 
 def test_peso_bruto_o_total_no_se_toma_como_peso_unitario():
     """El bruto o el total no entran como peso de una unidad: se dividen por la
-    cantidad, y el bruto, con aviso (D22 de MARIA-5, que reemplaza lo de
-    EXCEL-1: quedaba vacío)."""
+    cantidad, y el bruto, con aviso (respuesta 3 del despachante y D23 de la
+    Dev 2, que reemplazan lo de EXCEL-1: quedaba vacío)."""
     for col in ("Peso Bruto", "Peso Total"):
         r = _subir([["NCM", "Descripcion", "Origen", "Cantidad", "Precio Unitario", col],
                     ["84713000", "Laptop 14 pulgadas", "CN", 10, 350, 25]])
@@ -94,8 +95,9 @@ def test_encabezados_con_unidades_entre_parentesis():
                 ["84713000", "Laptop 14 pulgadas", "CN", 10, 350, 1.5]])
     assert r.status_code == 200, r.text[:300]
     item = r.json()["items"][0]
-    # Integración con MARIA-5 (D22 y su devolución): el neto y el total son de
-    # la línea y se dividen por la cantidad; neto > total > de una unidad > bruto.
+    # Respuesta 3 del despachante y D23 de la Dev 2 (regla de MARIA-5): el neto
+    # y el total son de la línea y se dividen por la cantidad; neto > total > de
+    # una unidad > bruto.
     assert (item["cantidad"], item["valor_unitario"], item["peso_unitario"]) == (10, 350, 0.15), item
 
 
@@ -189,8 +191,9 @@ def test_mapeo_guardado_no_deja_afuera_encabezados_nuevos():
                 ["84713000", "Laptop 14 pulgadas", "CN", 10, 350, 1.5]], cliente_id=cid)
     assert r.status_code == 200, r.text[:300]
     item = r.json()["items"][0]
-    # Integración con MARIA-5 (D22 y su devolución): el neto y el total son de
-    # la línea y se dividen por la cantidad; neto > total > de una unidad > bruto.
+    # Respuesta 3 del despachante y D23 de la Dev 2 (regla de MARIA-5): el neto
+    # y el total son de la línea y se dividen por la cantidad; neto > total > de
+    # una unidad > bruto.
     assert (item["cantidad"], item["peso_unitario"]) == (10, 0.15), item
 
 
@@ -352,8 +355,9 @@ def test_peso_neto_y_bruto_entre_parentesis_no_se_confunden():
     r = _subir([["NCM", "Descripcion", "Origen", "Cantidad", "Precio Unitario", "Peso (neto)", "Peso (bruto)"],
                 ["84713000", "Laptop", "CN", 10, 350, 1.5, 2.2]])
     assert r.status_code == 200, r.text[:300]
-    # Integración con MARIA-5 (D22 y su devolución): el neto y el total son de
-    # la línea y se dividen por la cantidad; neto > total > de una unidad > bruto.
+    # Respuesta 3 del despachante y D23 de la Dev 2 (regla de MARIA-5): el neto
+    # y el total son de la línea y se dividen por la cantidad; neto > total > de
+    # una unidad > bruto.
     assert r.json()["items"][0]["peso_unitario"] == 0.15, r.json()["items"]
 
 
@@ -378,7 +382,7 @@ def test_el_indice_del_xlsx_se_mira_fuera_del_hilo_del_servidor(monkeypatch):
 
 def test_peso_ambiguo_entre_parentesis_queda_vacio_y_no_se_adivina():
     """«Peso (kg)» y «Peso (bruto)»: no se elige por el orden de las columnas.
-    Con la regla de MARIA-5 (devolución: de una unidad > bruto) se usa
+    Con la regla de MARIA-5 (respuesta 3 y D23: de una unidad > bruto) se usa
     «Peso (kg)» y el aviso nombra el bruto ignorado (antes quedaba vacío)."""
     r = _subir([["NCM", "Descripcion", "Origen", "Cantidad", "Precio Unitario", "Peso (bruto)", "Peso (kg)"],
                 ["84713000", "Laptop", "CN", 10, 350, 2.2, 1.5]])
@@ -398,8 +402,9 @@ def test_mapeo_aprendido_no_pisa_el_precio_unitario_ni_el_peso_neto():
                 ["84713000", "Laptop", "CN", 10, 350, 3500, 25, 15]], cliente_id=cid)
     assert r.status_code == 200, r.text[:300]
     item = r.json()["items"][0]
-    # Integración con MARIA-5 (D22 y su devolución): el neto y el total son de
-    # la línea y se dividen por la cantidad; neto > total > de una unidad > bruto.
+    # Respuesta 3 del despachante y D23 de la Dev 2 (regla de MARIA-5): el neto
+    # y el total son de la línea y se dividen por la cantidad; neto > total > de
+    # una unidad > bruto.
     assert (item["valor_unitario"], item["peso_unitario"]) == (350, 1.5), item
 
 

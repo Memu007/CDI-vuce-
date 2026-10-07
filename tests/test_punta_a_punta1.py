@@ -445,7 +445,7 @@ def test_una_factura_con_coma_decimal_da_el_mismo_archivo(monkeypatch):
     «1.220» solo es ambiguo: es 1220 kg porque la factura usa la coma."""
     factura = {**FACTURA, "gemini": {
         "operacion": {**FACTURA["gemini"]["operacion"], "flete": "3.221,66", "seguro": "50,00"},
-        "items": [{**FACTURA["gemini"]["items"][0], "valor_unitario": "5.000,00", "peso_kg": "1.220"}],
+        "items": [{**FACTURA["gemini"]["items"][0], "valor_unitario": "5.000,00", "peso_total_linea": "1.220"}],
     }}
     txt, operation_id = _por_pdf(monkeypatch, factura).generar_y_descargar()
     assert txt == _como_sale_por_la_pantalla(_leer(_GOLDEN_PATH), "000999001", operation_id)
@@ -468,9 +468,9 @@ def test_dos_productos_reparten_flete_y_seguro_por_su_fob(monkeypatch):
         "operacion": FACTURA["gemini"]["operacion"],
         "items": [
             {"descripcion": "MAQUINA DEMO GRANDE", "cantidad": "1", "valor_unitario": "3000.00",
-             "peso_kg": "700", "origen": "Argentina"},
+             "peso_total_linea": "700", "origen": "Argentina"},
             {"descripcion": "MAQUINA DEMO CHICA", "cantidad": "2", "valor_unitario": "1000.00",
-             "peso_kg": "260", "origen": "Argentina"},
+             "peso_total_linea": "260", "origen": "Argentina"},
         ],
     }, "estados": ["3", "3"]}
     txt, _ = _por_pdf(monkeypatch, factura).generar_y_descargar()
@@ -478,8 +478,10 @@ def test_dos_productos_reparten_flete_y_seguro_por_su_fob(monkeypatch):
     arts = _bloques(txt, "ART")
     assert ddt["MDDTFOB"] == "5000.00" and len(arts) == 2, (ddt, arts)
     assert [a["MARTFOB"] for a in arts] == ["3000.00", "2000.00"]
-    # El peso con más de una unidad no se mira acá: si «peso_unitario» es de una
-    # unidad o de la línea lo está cambiando MARIA-5 (Dev 2).
+    # El peso: QARTKGRNET es el neto de toda la línea (respuesta 3 del
+    # despachante y D23 de la Dev 2). La máquina chica son 2 unidades con 260 kg
+    # la línea: se declaran 260 kg, no 520.
+    assert [a["QARTKGRNET"] for a in arts] == ["700.000", "260.000"], arts
     # Flete y seguro, en proporción al FOB de cada producto.
     for a, parte in zip(arts, (0.6, 0.4)):
         assert abs(float(a["MARTFLE"]) - 3221.66 * parte) <= 0.01, a
