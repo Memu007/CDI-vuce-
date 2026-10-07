@@ -133,7 +133,7 @@ Archivos abiertos por Dev:
   `REPRODUCCION-PUBLICACION-2-2026-10-07.md`. Suite sobre el mismo SHA:
   `1224 passed, 102 skipped, 1 xfailed`. Avance directo de `5cb03ab`, sin
   merge. «dale 6ea8ca9» de Emi a las ~16:58 ARG (antes, «dale a todo», que el
-  sistema de permisos no tomó). CI: en curso. Emi generó un TXT con una factura real y «se ve bien» (2026-10-07, ~17:05 ARG).
+  sistema de permisos no tomó). CI: en curso. Emi generó un TXT con una factura real y «se ve bien» (19:59 UTC, un minuto después del push: falta confirmar que ya corría la versión nueva; con ella el TXT dice `IVAADICIONAL1=NO_VALIDA` y `CARTUSO=2`).
 
 ## Reglas
 
