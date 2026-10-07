@@ -624,3 +624,48 @@ def test_un_sub_item_con_la_cantidad_mala_nombra_solo_la_cantidad():
     errores = montos_fuera_de_rango([{"cantidad": 1, "valor_unitario": 1,
                                       "subitems": [{"cantidad": ENORME, "valor_unitario": 5}]}], {})
     assert errores == ["Item 1, sub-ítem 1: Cantidad inválida"], errores
+
+
+def _con_estilos(contenido: bytes, elemento: str, n: int) -> bytes:
+    import re
+    import zipfile
+    entrada = zipfile.ZipFile(io.BytesIO(contenido))
+    contenedor = {"xf": "cellXfs", "font": "fonts", "dxf": "dxfs"}[elemento]
+    salida = io.BytesIO()
+    with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as z:
+        for info in entrada.infolist():
+            datos = entrada.read(info.filename)
+            if info.filename == "xl/styles.xml":
+                xml = datos.decode()
+                if f"<{contenedor}" in xml:
+                    xml = re.sub(rf"(<{contenedor}[^>]*?)(/>|>)",
+                                 lambda m: m.group(1) + ">" + f"<{elemento}/>" * n
+                                 + ("" if m.group(2) == ">" else f"</{contenedor}>"), xml, count=1)
+                else:
+                    xml = xml.replace("</styleSheet>", f"<{contenedor}>" + f"<{elemento}/>" * n
+                                      + f"</{contenedor}></styleSheet>")
+                datos = xml.encode()
+            z.writestr(info, datos)
+    return salida.getvalue()
+
+
+@pytest.mark.parametrize("elemento", ["xf", "font", "dxf"])
+def test_estilos_con_millones_de_elementos_se_rechazan_antes_de_abrir(elemento, monkeypatch):
+    """Devolución 3: 10 MB de <xf/> (17 KB comprimido) pasaba la validación y
+    llegaba a 1,4 GB. El tope es por elementos, no por MB: cada uno ocupa
+    medio KB en memoria."""
+    import openpyxl
+    from proyecto_maria.security.file_security import ExcelDemasiadoGrande, _contar_hojas_xlsx
+    monkeypatch.setattr(openpyxl, "load_workbook", lambda *a, **k: pytest.fail("abrió el libro"))
+    contenido = _con_estilos(_libro([ENCABEZADO, ["84713000", "X", "China", 1, 2, 3]]), elemento,
+                             (10 * 2**20 - 20_000) // (len(elemento) + 3))  # justo bajo el tope de MB
+    with pytest.raises(ExcelDemasiadoGrande):
+        _contar_hojas_xlsx(contenido)
+    r = _subir(contenido)
+    assert r.status_code == 400 and "Excel" in r.text, r.text[:300]
+
+
+def test_estilos_de_un_libro_normal_grande_siguen_pasando():
+    """Un libro con estilos de sobra (50.000 formatos) sigue entrando."""
+    from proyecto_maria.security.file_security import _contar_hojas_xlsx
+    assert _contar_hojas_xlsx(_con_estilos(_libro([ENCABEZADO]), "xf", 50_000)) == 1
