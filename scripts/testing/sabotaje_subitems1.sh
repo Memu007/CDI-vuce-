@@ -37,7 +37,7 @@ caso() {
   local nombre="$1" espera="$2" salida
   salida="$(correr)"
   git checkout -q -- .
-  if grep -q "passed" <<<"$salida" && ! grep -q "failed" <<<"$salida"; then
+  if grep -q "passed" <<<"$salida" && ! grep -qE "[0-9]+ failed" <<<"$salida"; then
     echo "FALLA  $nombre: quedó verde"; FALLAS=$((FALLAS+1)); return
   fi
   if grep -qF -- "$espera" <<<"$salida"; then
@@ -48,7 +48,7 @@ caso() {
 }
 
 base="$(correr)"
-if grep -q "failed" <<<"$base" || ! grep -qE "[0-9]+ passed" <<<"$base"; then
+if grep -qE "[0-9]+ failed" <<<"$base" || ! grep -qE "[0-9]+ passed" <<<"$base"; then
   echo "FALLA: la prueba no está verde sin sabotaje"; tail -20 <<<"$base"; exit 1
 fi
 echo "VERDE  sin sabotaje: $(grep -E 'passed' <<<"$base" | tail -1)"
