@@ -32,62 +32,91 @@ tienen que seguir saliendo idénticos, salvo que la tarea diga otra cosa.
 
 ## Último veredicto
 
-**MARIA-5 devuelta sobre `6d59893`** (2026-10-07) por seis puntos. La PM
-reprodujo el rojo antes sobre `8e819dd` (`101 failed, 31 passed`), la focal
-(`432 passed`) y la suite (`1199 passed, 102 skipped`): coincide con tu
-informe. Lo central se sostiene. Por la v2, la v1, grupos y subítems el peso
-sale siempre el de la línea. En ~11.000 pedidos al azar las cuentas cierran
-al centavo. Los dos archivos reales salen idénticos. Detalle en
-`REPRODUCCION-MARIA-5-2026-10-07.md`.
+**MARIA-5 y CATALOGO-NCM-1 devueltas sobre `6854f34`** (2026-10-07,
+19:30 UTC) por seis puntos chicos.
 
-**La devolución va antes que CATALOGO-NCM-1.**
+**Lo que corrió la PM:**
+- Rojo antes, tus pruebas nuevas con el producto de `ce88c01`:
+  `171 failed, 156 passed, 28 errors`.
+- Suite: `1459 passed, 102 skipped, 3 xfailed`. Coincide con tu informe.
 
-1. **Dos pesos para la misma línea: gana el total neto, con aviso.** Lector
-   y Excel usan una sola regla. Si unitario × cantidad no da el total de la
-   línea, gana el total neto, y un aviso muestra los dos números.
-   - **Lector:** hoy `_peso_del_producto({'peso_unitario':25,
-     'peso_total_linea':25}, 10, '.')` devuelve `(25.0, 250.0)`. Si Gemini
-     copia el total en los dos campos, el TXT declara 250 kg. Con 2,5 y 26
-     gana el unitario sin aviso.
-   - **Excel:** hoy con «Peso»=30 y «Peso neto»=25 en 10 unidades gana
-     «Peso» como unitario (300 kg, sin aviso), y «Peso total» le gana a
-     «Peso neto». Con varias columnas, el orden es neto > total >
-     peso/weight (de una unidad) > bruto. El aviso nombra la columna usada y
-     las que se ignoraron.
-2. **Un peso que no es número nunca hace desaparecer una fila,** en ninguna
-   columna de peso: la fila se conserva con aviso. Hoy, en «Peso unitario»,
-   «2,5» como texto saca la fila del FOB sin decir nada; con «Peso total» ya
-   avisa.
-3. **El peso, con la misma guarda que los importes en el generador:** no
-   finito, por encima del tope o que redondea a `0.000` da 400. Hoy `NaN`,
-   `inf` y `1e300` llegan al TXT, y `0,0004` sale `0.000`. El control del
-   pedido de MARIA-1b (Dev 1) es otra capa: no se pisan.
-4. **Subítems: la tolerancia compara lo mismo con lo mismo** (redondeado con
-   redondeado, o exacto con exacto). Hoy un ítem de 7 × 2,675 con subítems
-   (2 × 2,675), (2,5 × 2,6722) y (2,5 × 2,675) da 400 («suman 18.72 pero el
-   ítem declara 18.73»), y antes generaba. Criterio: ningún pedido que
-   generaba en `8e819dd` da 400 por esto (sirve un lote al azar, como el del
-   subagente).
-5. **Grupo en la v2: editar la cantidad nunca deja un producto en 0.** Si el
-   total nuevo es menor que la cantidad de productos del grupo, se rechaza
-   con el mensaje que ya existe. Hoy 1/1/1 bajado a 2 queda `[1,1,0]` y
-   «Generar» se bloquea.
-6. **Una sola cuenta.** La validación y el aviso «Gastos a FOB» redondean
-   igual que el TXT. Hoy, con grupos, la validación muestra 20,02 y el TXT
-   dice 20,01; y el aviso dice 11,01 cuando el TXT trae 11,02.
+**Lo que se sostiene:**
+- Los seis puntos de la devolución anterior. Con 9000 pedidos al azar las
+  cuentas cierran al centavo, y la validación da el mismo FOB que el TXT en
+  6000 de 6000.
+- En los subítems, ningún pedido que generaba deja de generar (26.000
+  pedidos al azar).
+- El catálogo es idéntico al ZIP: 10.504 NCM y 522 bajas exactas. No hay
+  avisos falsos en las 33.037 SIM completas vigentes.
+- Los frenos de MARIA-1b siguen igual.
+- Los dos archivos reales salen idénticos.
+
+Detalle en `REPRODUCCION-MARIA-5-2026-10-07.md`, sección «La reentrega con
+CATALOGO-NCM-1».
+
+**La devolución va antes que SUBITEMS-1.**
+
+1. **Una columna de peso desconocida no le gana a una reconocida.**
+   - Hoy cualquier encabezado que empiece con «Peso» cuenta como peso de una
+     unidad, y entre dos desempata el orden de las columnas.
+   - Ejemplo: con «Peso por caja» = 40 antes de «Peso» = 2,5 en 10
+     unidades, el TXT declara 400 kg en vez de 25. En `ce88c01` daba 2,5.
+   - Cómo tiene que quedar:
+     - Una columna de la que no se sabe si es de una unidad o de la línea
+       (por caja, por bulto) nunca le gana a una reconocida.
+     - Si es la única columna de peso, se usa con un aviso que pide
+       revisarla.
+2. **El bruto es bruto, aunque diga «unitario».**
+   - Hoy «Peso bruto unitario» y «Gross weight per unit» se leen como neto
+     de una unidad, sin aviso. En `ce88c01` quedaban vacías.
+   - Por la regla (`D23`), el bruto va último y con aviso.
+3. **Dos pesos de la línea que no coinciden: el aviso muestra los dos
+   números.**
+   - Con «Peso neto» = 25 y «Peso total» = 27, el aviso hoy sólo nombra las
+     columnas.
+   - Con un peso de una unidad ya los muestra.
+4. **`pantalla_maria5.js` en rojo en `6854f34`.**
+   - El script no manda el CUIT del importador, MARIA-1b frena y nunca se
+     pide el TXT: `page.waitForResponse: Timeout 15000ms exceeded`.
+   - Tu «OK» era de `7b4f651`, antes de integrar. Es el script, no el
+     producto: con CUIT, vendedor y comprador, pasa.
+   - Ponelo al día y corré las pantallas sobre el SHA que entregás
+     (`CLAUDE.md` §4).
+5. **Una NCM dada de baja: un solo aviso, y que sea cierto.**
+   - En `/api/validate/smart` con `operacion`, 8517.12.31 sale dos veces: tu
+     aviso de baja, y el de `_control_ncm` (`core/controles_maria.py`), que
+     dice «no está en el nomenclador que tenemos (el de 2018)». Ese texto
+     ahora es falso: el catálogo es de 2026. Corregilo.
+   - En `/generate_maria/avisos` la baja no aparece: que aparezca ahí
+     también. Sigue siendo aviso, no freno.
+6. **Sin el archivo del catálogo no se inventan errores.**
+   - Al sacar `ncm_mercosur.csv`, si falta `ncm_arca.csv.gz`,
+     `_en_el_nomenclador` devuelve verdadero. Entonces toda NCM de 7 o 10
+     dígitos da el error «perdió el 0 inicial» (también 9999999), y las de 8
+     u 11 dígitos pasan sin aviso.
+   - Sin catálogo, el control no frena por eso: avisa una vez que falta el
+     catálogo.
+   - Probalo apuntando a un archivo que no existe.
+
+**De paso** (en la misma función, sin agrandar la pieza): los mensajes del
+peso dicen la razón real.
+- NaN o infinito no «pasan el tope».
+- Un negativo no es «no es un número».
+- 0,0004 no se muestra como «0 kg».
 
 **Se deja, anotado:**
-- El flete con un FOB total que redondea a 0,00 (hallazgo 6).
-- El unitario promedio del grupo (hallazgo 9).
-- Aduana o tipo de destinación «N/A» que salen por defecto (hallazgo 13).
-- La v1 y `/generate_maria_export` divergen del TXT de la v2 en peso y
-  centavos (hallazgos 10 y 14). Eso queda en `DECISIONS.md`, para que decida
-  Emi.
+- La primera validación de cada proceso carga el catálogo en el bucle de
+  eventos y traba el servidor ~3,9 s. Ya pasaba con MARIA-1b, y tu pieza no
+  lo empeora. Va a Fase 3.
+- `test_celda_en_la_ultima_fila_no_recorre_un_millon_de_filas` dio rojo una
+  vez bajo carga (4,3 s contra un tope de 8 s). Es de entorno: sola pasa.
 
-**Criterios:** rojo antes y verde después en cada punto. El punto 1 se prueba
-por `_leer`, con Gemini falso, hasta el TXT: (25, 25) con cantidad 10 da
-`QARTKGRNET=25.000` y el aviso. Los dos archivos reales siguen idénticos.
-Suite completa en verde.
+**Criterios:**
+- Rojo antes y verde después en cada punto.
+- Los dos archivos reales, idénticos.
+- `pantalla_maria5.js` y `pantalla_catalogo_ncm1.js` dan OK en el SHA que
+  entregás.
+- Suite completa en verde.
 
 ## Respuestas a tus D (2026-10-07, 16:05 UTC)
 

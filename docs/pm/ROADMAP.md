@@ -53,7 +53,7 @@ necesita prueba: la ley, un archivo real o la respuesta del despachante
 | ✅ | MARIA-3 | Avisos antes de generar (y sin avisos de más: «N/A», «FREE», «included» no son ilegibles); la fecha de emisión sale de la factura, no de hoy (D15 de la Dev 1); gastos anteriores al FOB en EXW, FCA y FAS; procedencia en pantalla (M6, M8) | respuesta 6, Código Aduanero art. 15, nota del SIM, archivo real de 2025 |
 | ✅ | MARIA-1d | Un campo vacío no llega al TXT como «None» o «NON» (D12 de la Dev 2) | no cambia el TXT de una factura bien leída |
 | ⏳ | MARIA-5 | Peso total por producto; cuentas exactas al centavo (M1, M9); «None» escrito en la carátula cuenta como vacío (revisión de MARIA-1d) | peso: respuesta 3 y archivo real de 2026; cuentas: la prueba en el Kit |
-| 1 | CATALOGO-NCM-1 | El catálogo NCM vigente (el de hoy es de 2018: le faltan 8517.13.00, 8524, 8549); una NCM dada de baja se avisa como tal (D21 de la Dev 1; archivo de Emi del 2026-10-07) | el nomenclador de ARCA del 07/10/2026 |
+| ⏳ | CATALOGO-NCM-1 | El catálogo NCM vigente (el de hoy es de 2018: le faltan 8517.13.00, 8524, 8549); una NCM dada de baja se avisa como tal (D21 de la Dev 1; archivo de Emi del 2026-10-07) | el nomenclador de ARCA del 07/10/2026 |
 | 2 | SUBITEMS-1 | La pantalla v2 deja cargar, editar y ver los subítems de cada producto, con el formato que ya recibe `/generate_maria` (D24 de la Dev 1; Emi: sus facturas traen subítems, 2026-10-07) | `maria_golden_subitems_anon.TXT`: la prueba de punta a punta deja de agregarlos a mano |
 | 3 | MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11); el número de operación y la referencia de la factura que hoy arma la pantalla (D23 y D25 de la Dev 1) | sus archivos reales |
 
