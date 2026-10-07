@@ -124,10 +124,15 @@ def test_la_procedencia_del_producto_gana_sobre_la_de_la_operacion(client, auth_
     assert "CARTPAYPRC=222" in data["content"]
 
 
-def test_procedencia_no_reconocida_se_rechaza(client, auth_override):
-    r = client.post("/generate_maria", json=_cuerpo(procedencia="Narnia"))
+@pytest.mark.parametrize("procedencia", ["Narnia", "99999", "12"])
+def test_procedencia_no_reconocida_se_rechaza(client, auth_override, procedencia):
+    r = client.post("/generate_maria", json=_cuerpo(procedencia=procedencia))
     assert r.status_code == 400, r.text
-    assert "Procedencia" in r.text and "Narnia" in r.text
+    assert "Procedencia" in r.text and procedencia in r.text
+
+
+def test_procedencia_por_codigo_de_la_tabla(client, auth_override):
+    assert "CARTPAYPRC=222" in _generar(client, procedencia="222")["content"]
 
 
 def test_sin_procedencia_sigue_igual_al_origen_y_se_avisa(client, auth_override):
@@ -158,7 +163,7 @@ def _hoy_o_ayer():
     return {d.strftime("%d/%m/%Y") for d in (hoy, hoy - timedelta(days=1))}
 
 
-@pytest.mark.parametrize("fecha", ["", "   ", "None", "DD/MM/YYYY", "32/13/2025", "mañana", "1/7/2025", "18/07/202"])
+@pytest.mark.parametrize("fecha", ["", "   ", "None", "DD/MM/YYYY", "32/13/2025", "mañana", "18/07/202", "18-07-2025"])
 def test_sin_fecha_leida_sale_vacia_nunca_la_de_hoy(fecha):
     txt = generate_maria_txt(items=[dict(ITEM_BASE)], **{**COMUN, "fecha_emision": fecha,
                                                           "sbt_sufijo_valor": SUF_A})
@@ -172,11 +177,23 @@ def test_sin_fecha_leida_sale_vacia_nunca_la_de_hoy(fecha):
     ("2026-06-22", "22/06/2026"),
     (" 18/07/2025 ", "18/07/2025"),
     ("18/07/25", "18/07/2025"),
+    ("1/7/2025", "01/07/2025"),
 ])
 def test_la_fecha_de_la_factura_sale_en_el_txt(fecha, sale):
     txt = generate_maria_txt(items=[dict(ITEM_BASE)], **{**COMUN, "fecha_emision": fecha,
                                                           "sbt_sufijo_valor": SUF_A})
     assert _fecha_txt(txt) == [sale]
+
+
+@pytest.mark.parametrize("fecha", ["Fecha 18/07/2025", "Jul/18/2025"])
+def test_una_fecha_que_no_se_acepta_no_cambia_el_anio_del_iext(fecha):
+    """Revisión: el año del IEXT se seguía leyendo de la factura aunque el
+    formato no fuera DD/MM/AAAA; con la fecha vacía no tiene que pasar al año
+    de hoy."""
+    txt = generate_maria_txt(items=[dict(ITEM_BASE)], **{**COMUN, "fecha_emision": fecha,
+                                                          "sbt_sufijo_valor": SUF_A})
+    iext = [ln for ln in txt.split("\r\n") if ln.startswith("IEXT=") and "/" in ln]
+    assert iext and all(ln.endswith("/25") for ln in iext), iext
 
 
 def test_sin_fecha_se_avisa(client, auth_override):

@@ -18,7 +18,7 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   const avisosPedidos = [];
   page.on('request', r => { if (r.url().endsWith('/generate_maria/avisos')) avisosPedidos.push(JSON.parse(r.postData())); });
   let generado = null;
-  page.on('response', async r => { if (r.url().endsWith('/generate_maria') && r.request().method() === 'POST') generado = await r.json().catch(() => null); });
+  page.on('request', r => { if (r.url().endsWith('/generate_maria') && r.method() === 'POST') generado = 'pedido'; });
 
   await page.goto(base + '/dashboard');
   await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.despachante && CDI.paisesMaria);
@@ -63,8 +63,9 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 
   // Se genera contra el servidor local.
   await page.fill('#sbtSufijoValor', 'AA(1)-CA00');
+  const respuesta = page.waitForResponse(r => r.url().endsWith('/generate_maria') && r.request().method() === 'POST', { timeout: 15000 });
   await page.click('#validatingGenerate');
-  for (let i = 0; i < 100 && !generado; i++) await page.waitForTimeout(100);
+  generado = await (await respuesta.catch(() => falla('no se pidió el TXT'))).json().catch(() => null);
   if (!generado || !generado.content) falla('no se generó el TXT: ' + JSON.stringify(generado));
   const txt = generado.content.replace(/\r\n/g, '\n');
   if (!/CCPL=GTOS-ANT-FOB\s*\nMCPL=150\.00/.test(txt)) falla('el TXT no trae GTOS-ANT-FOB=150.00');
