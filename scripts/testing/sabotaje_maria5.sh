@@ -19,7 +19,7 @@ cd "$WT"
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
        VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
 unset ENABLE_PDF_LLM_FALLBACK || true
-PRUEBA="tests/test_maria5_peso.py tests/test_maria5_centavos.py tests/test_maria5_caratula_vacia.py tests/test_maria5_lector_productos.py"
+PRUEBA="tests/test_maria5_peso.py tests/test_maria5_centavos.py tests/test_maria5_caratula_vacia.py tests/test_maria5_lector_productos.py tests/test_maria5_peso_lector.py tests/test_maria5_peso_excel.py"
 T="FAILED tests/test_maria5_"
 G=proyecto_maria/core/maria_generator.py
 M=proyecto_maria/main.py
@@ -148,5 +148,29 @@ caso subitems_sin_reparto "${T}centavos.py::test_los_subitems_cierran_sin_rechaz
 reemplazar $G "    if not numero.is_finite() or abs(numero) > IMPORTE_MAXIMO:" "    if not numero.is_finite():"
 caso sin_tope "${T}centavos.py::test_un_importe_imposible_da_error_y_no_500[extra"
 
+# 17. el lector no divide el peso de la línea
+reemplazar $X "    if unitario <= 0 and total > 0 and cantidad > 0:
+        unitario = total / cantidad" "    if unitario <= 0 and total > 0 and cantidad > 0:
+        unitario = total"
+caso lector_sin_dividir "${T}peso_lector.py::test_el_peso_que_venga_queda_por_unidad["
+
+# 18. el prompt vuelve a pedir un peso sin decir de qué
+reemplazar_primero $X "- peso_total_linea: Peso neto de TODA la línea" "- peso_kg: Peso en kg de TODA la línea"
+caso prompt_ambiguo "${T}peso_lector.py::test_el_prompt_pide_las_dos_cosas_en_las_dos_copias"
+
+# 19. el Excel no divide el peso total
+reemplazar $M '    df["peso_unitario"] = (peso / cantidad).where(cantidad > 0)' '    df["peso_unitario"] = peso'
+caso excel_sin_dividir "${T}peso_excel.py::test_el_peso_de_la_linea_se_divide[Peso total-25-2.5]"
+
+# 20. el bruto entra en silencio
+reemplazar $M '    if normal in _PESO_BRUTO:
+        avisos.append(' '    if False:
+        avisos.append('
+caso bruto_en_silencio "${T}peso_excel.py::test_el_bruto_solo_se_usa_dividido_y_con_aviso"
+
+# 21. el bruto vuelve a ganarle al neto
+reemplazar $M '        "pesoneto", "pesobruto",' '        "pesobruto", "pesoneto",'
+caso bruto_antes_que_neto "${T}peso_excel.py::test_con_neto_y_bruto_se_usa_el_neto"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 16 sabotajes dan rojo por la razón esperada"
+echo "OK: los 21 sabotajes dan rojo por la razón esperada"
