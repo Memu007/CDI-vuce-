@@ -3371,22 +3371,41 @@ def _respuesta_excel_demasiado_largo(e: Exception) -> JSONResponse:
     )
 
 
-def _xlsx_solo_primera_hoja(ruta: str) -> bytes:
+def _xlsx_solo_primera_hoja(ruta: str) -> tuple:
     """El .xlsx con sólo su primera hoja de cálculo. openpyxl, al abrir un
     libro, recorre entera cada hoja que no declara su medida (<dimension>), y
     un libro armado con muchas hojas así tardaba minutos aunque se lea sólo la
     primera (D26 a, EXCEL-2). Las demás hojas se miran aparte, con su propio
-    presupuesto (_otras_hojas_con_datos)."""
+    presupuesto (_otras_hojas_con_datos).
+
+    Devuelve (bytes del libro, celdas combinadas de la primera hoja como
+    [(fila1, col1, fila2, col2)]): pandas sólo ve el valor en la primera celda
+    de una combinada (D18, EXCEL-2)."""
     import io as _io
+    import re as _re
     import zipfile
     from xml.etree import ElementTree as ET
     from proyecto_maria.security.file_security import hojas_del_xlsx
     ns_main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    def _col(letras):
+        n = 0
+        for letra in letras:
+            n = n * 26 + ord(letra) - 64
+        return n
+
     with zipfile.ZipFile(ruta) as z:
         hojas = hojas_del_xlsx(z)
+        combinadas = []
+        if hojas and hojas[0][1] in z.namelist():
+            xml = z.read(hojas[0][1])
+            for m in _re.finditer(rb'<(?:\w+:)?mergeCell\b[^>]*?\bref="([A-Z]+)(\d+):([A-Z]+)(\d+)"', xml):
+                combinadas.append((int(m.group(2)), _col(m.group(1).decode()),
+                                   int(m.group(4)), _col(m.group(3).decode())))
+                if len(combinadas) >= 10_000:
+                    break
         if len(hojas) <= 1:
             with open(ruta, "rb") as f:
-                return f.read()
+                return f.read(), combinadas
         afuera = {parte for _, parte in hojas[1:]}
         ET.register_namespace("", ns_main)
         ET.register_namespace("r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships")
@@ -3409,7 +3428,55 @@ def _xlsx_solo_primera_hoja(ruta: str) -> bytes:
                     nuevo.writestr(info, ET.tostring(libro, xml_declaration=True, encoding="UTF-8"))
                 else:
                     nuevo.writestr(info, z.read(info.filename))
-        return salida.getvalue()
+        return salida.getvalue(), combinadas
+
+
+def _rellenar_combinadas(df, combinadas):
+    """El valor de una celda combinada vale para todas sus filas, sólo en su
+    propia columna: «China» combinada en C4:C5 es el origen de las dos filas;
+    una descripción combinada hacia el costado no se copia a otra columna
+    (D18, EXCEL-2). El índice de df es la fila de la planilla menos 2."""
+    columnas = list(df.columns)
+    for f1, c1, f2, _c2 in combinadas:
+        if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < 2:
+            continue
+        col = columnas[c1 - 1]
+        ancla = f1 - 2
+        if ancla not in df.index:
+            continue
+        valor = df.at[ancla, col]
+        for fila in range(f1 + 1, f2 + 1):
+            if fila - 2 in df.index:
+                df.at[fila - 2, col] = valor
+    return df
+
+
+def _con_encabezado(df):
+    """Si el encabezado no está en la fila 1 (logo, título o datos del
+    vendedor arriba), lo busca en las primeras 30 filas: la primera donde se
+    reconocen al menos 3 columnas. El índice sigue siendo la fila de la
+    planilla menos 2, así los avisos nombran la fila correcta (D18, EXCEL-2)."""
+    if len(_detect_item_columns(list(df.columns))) >= 3:
+        return df
+    for k in range(min(30, len(df))):
+        valores = list(df.iloc[k].values)
+        nombres = [_texto_de_celda(v) for v in valores]
+        if len(_detect_item_columns(nombres)) < 3:
+            continue
+        vistos: dict = {}
+        columnas = []
+        for j, nombre in enumerate(nombres):
+            nombre = nombre or f"Unnamed: {j}"
+            if nombre in vistos:
+                vistos[nombre] += 1
+                nombre = f"{nombre}.{vistos[nombre]}"
+            else:
+                vistos[nombre] = 0
+            columnas.append(nombre)
+        nuevo = df.iloc[k + 1:].copy()
+        nuevo.columns = columnas
+        return nuevo
+    return df
 
 
 def _leer_excel_ruta(ruta: str, engine: str):
@@ -3417,11 +3484,14 @@ def _leer_excel_ruta(ruta: str, engine: str):
     # «1.500» en 1,5 y la NCM 84713000 en 84713000.0 (EXCEL-1).
     # Las filas vacías se sacan acá, en el hilo de lectura: una celda suelta en
     # la fila 1.048.576 no obliga a recorrer un millón de filas (EXCEL-1).
-    origen = ruta
+    origen, combinadas = ruta, []
     if engine == "openpyxl":
         import io as _io
-        origen = _io.BytesIO(_xlsx_solo_primera_hoja(ruta))
-    return pd.read_excel(origen, engine=engine, dtype=object).dropna(how="all")
+        contenido, combinadas = _xlsx_solo_primera_hoja(ruta)
+        origen = _io.BytesIO(contenido)
+    df = pd.read_excel(origen, engine=engine, dtype=object)
+    df = _rellenar_combinadas(df, combinadas).dropna(how="all")
+    return _con_encabezado(df)
 
 
 # Mirar las otras hojas es sólo un aviso, y tiene su propio presupuesto que
@@ -4345,14 +4415,16 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
     )
 
     # Buscar columnas que coincidan con el mapeo. Sin las obligatorias, este
-    # mapeo no sirve y se prueba otro. El peso no es obligatorio (EXCEL-1).
+    # mapeo no sirve y se prueba otro. El peso no es obligatorio (EXCEL-1), ni
+    # el origen: sin esa columna los productos entran con el origen vacío y
+    # la subida lo avisa (D18, EXCEL-2).
     pieza_col = find_column(df.columns, mapping['pieza'])
     desc_col = find_column(df.columns, mapping['descripcion'])
     origen_col = find_column(df.columns, mapping['origen'])
     peso_col = find_column(df.columns, mapping['peso_unitario'])
     cant_col = find_column(df.columns, mapping['cantidad'])
     valor_col = find_column(df.columns, mapping['valor_unitario'])
-    if not all([pieza_col, desc_col, origen_col, cant_col, valor_col]):
+    if not all([pieza_col, desc_col, cant_col, valor_col]):
         return items
 
     # Separador decimal de la planilla, mirando los números escritos como
@@ -4393,10 +4465,11 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
 
             # Lo que falta o no se puede leer queda vacío (0 o ""), nunca
             # inventado; el semáforo de la revisión lo marca (MARIA-1a, EXCEL-1).
-            candidatos.append((_ + 2, bool(pieza or _texto_de_celda(row[origen_col])), Item(
+            celda_origen = row[origen_col] if origen_col else None
+            candidatos.append((_ + 2, bool(pieza or _texto_de_celda(celda_origen)), Item(
                 pieza=pieza,
                 descripcion=descripcion,
-                origen=_origen_desde_factura(row[origen_col]) or "XX",
+                origen=_origen_desde_factura(celda_origen) or "XX",
                 peso_unitario=_numero(peso_col),
                 cantidad=cantidad,
                 valor_unitario=valor_unitario,
@@ -5085,6 +5158,12 @@ def _rango_de_alias(encabezado, canon: str):
     return None
 
 
+_NOMBRE_DEL_CAMPO = {
+    "pieza": "NCM", "descripcion": "descripción", "origen": "país de origen",
+    "peso_unitario": "peso", "cantidad": "cantidad", "valor_unitario": "precio unitario",
+}
+
+
 def _mapeo_efectivo(guardado: dict, detectado: dict, columnas: list) -> tuple:
     """({columna: campo}, avisos) para leer este archivo, un campo por columna.
 
@@ -5118,6 +5197,14 @@ def _mapeo_efectivo(guardado: dict, detectado: dict, columnas: list) -> tuple:
             rg, rd = _rango_de_alias(g, canon), _rango_de_alias(d, canon)
             if rg is not None and rd is not None and rd < rg:
                 elegido = d
+            # Que no sea una elección en silencio: el aviso nombra la columna
+            # que se usó y la que no (EXCEL-2).
+            otra = d if elegido == g else g
+            avisos.append(
+                f"Para «{_NOMBRE_DEL_CAMPO.get(canon, canon)}» se usó la columna «{elegido}» "
+                + ("del catálogo del cliente" if elegido == g else "del archivo")
+                + f", no «{otra}». Revisalo en la revisión o en el catálogo."
+            )
         if elegido and elegido not in efectivo:
             efectivo[elegido] = canon
     return efectivo, avisos
@@ -6760,6 +6847,11 @@ async def upload_excel_v2(
             raise HTTPException(
                 status_code=400,
                 detail="No se pudieron extraer items. Verificá el archivo o el mapeo de columnas.",
+            )
+        if not find_column(df.columns, ["origen", "Origen", "pais", "País", "country", "Country"]):
+            avisos_mapeo.append(
+                "El Excel no tiene una columna de país de origen: los productos entran "
+                "sin origen. Completalo en la revisión."
             )
 
         # Persistir/mergear columnas detectadas en el cliente (Fase 0 Plan 04)
