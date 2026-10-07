@@ -25,40 +25,17 @@ despertás a ella con el de la suya al entregar o al dejar una D que te frena
 
 ## Último veredicto
 
-**EXCEL-1 devuelta** (2026-10-07, sobre `9cc321e`). La PM reprodujo el rojo
-antes (`46 failed, 8 errors` sobre `ec3d793`), la focal con los archivos
-reales (`116 passed`) y la suite (`897 passed, 102 skipped`). Su subagente
-Sonnet alto: el aislamiento entre cuentas y los números se sostienen. Detalle
-en `REPRODUCCION-EXCEL-1-2026-10-07.md`.
-
-**Devolución** (cada punto con rojo antes y verde después; la devolución va
-antes que MARIA-1b):
-1. **El mapeo aprendido no pisa una columna reconocida.** Con `cliente_id`
-   (la pantalla lo manda siempre), «Valor» aprendido como precio unitario hace
-   que «Precio Unitario» 350 salga 3500; igual «Peso» contra «Peso Neto». Las
-   pruebas tienen que mandar `cliente_id`, como la pantalla.
-2. **Validar un Excel no usa los hilos compartidos:** 12 subidas de un
-   `.xlsx` de 8 MB llevaron una consulta de NCM de 0,4 s a 49 y 62 s. Grupo
-   propio también para validar, y el tamaño descomprimido se mira antes de
-   abrirlo.
-3. **La fila de ejemplo de la plantilla** («Laptop 14 pulgadas modelo X») no
-   entra como producto.
-4. **Un mapeo con dos columnas para el mismo campo** no da 500: se rechaza al
-   guardarlo, o se avisa al subir.
-5. **Lo que llamaba a las rutas borradas:** la pantalla vieja
-   (`static/app.js:939`) dice claro que el Excel se sube en la pantalla nueva;
-   `scripts/testing/smoke_test.sh:269` espera lo que corresponde.
-
-Las filas de total que entran sin NCM ni origen las frena el control antes de
-generar: quedan para MARIA-1b. El CSV con `;` de `/api/ncm/import-historial`
-va a EXCEL-2.
-
-**Tu contexto está en ~80 %:** si no compactaste, pedile a Emi el `/compact`
-antes de seguir.
+**EXCEL-1 aceptada sobre `7b119b6`** (2026-10-07, con la devolución). La PM
+reprodujo el rojo antes sobre `cb0f886` (`7 failed`), la focal (`115 passed`)
+y la suite (`932 passed, 102 skipped`). Su subagente repitió los cinco puntos
+con login real y los cinco quedaron arreglados (la consulta de NCM, 1,64 s
+como máximo con 12 subidas pesadas). Detalle en
+`REPRODUCCION-EXCEL-1-2026-10-07.md`. Como debajo están tus commits de
+MARIA-1b, EXCEL-1 se integra junto con MARIA-1b.
 
 ## Respuestas a tus D (2026-10-07, 11:10 UTC)
 
-- **EXCEL-1 (devolución):** en revisión de la PM. Seguí con MARIA-1b.
+- **EXCEL-1:** aceptada (arriba). Seguí con MARIA-1b.
 - **D20: (a).** El CUIT del importador vacío frena, y la pantalla deja de
   decir «opcional»: el TXT sin él no sirve para presentar. En MARIA-1b.
 - **D21:** pendiente de Emi (`DECISIONS.md`): hace falta el nomenclador
