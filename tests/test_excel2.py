@@ -743,3 +743,43 @@ def test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_
     r, dt = asyncio.run(_todo())
     print(f"subida normal: {r.status_code} en {dt:.1f} s")
     assert r.status_code == 200, f"la subida normal dio {r.status_code} a los {dt:.1f} s: {r.text[:200]}"
+
+
+def test_la_pantalla_muestra_el_aviso_del_csv():
+    """El aviso de codificación llegaba en el JSON y la pantalla no lo leía."""
+    from pathlib import Path
+    js = (Path(__file__).resolve().parents[1] / "proyecto_maria/static/v2/screens/ncm.js").read_text()
+    cuerpo = js[js.index("function renderNcmImportResult"):]
+    cuerpo = cuerpo[:cuerpo.index("\n    }\n")]
+    assert "d.aviso" in cuerpo and "textContent = d.aviso" in cuerpo, cuerpo
+
+
+def _con_celdas_en_la_ultima_columna(filas: int) -> bytes:
+    """Un libro normal con `filas` filas de una celda en XFD (la columna
+    16.384), sin <dimension>: pandas rellena cada fila hasta ahí."""
+    import zipfile
+    entrada = zipfile.ZipFile(io.BytesIO(_libro([ENCABEZADO, ["84713000", "X", "China", 1, 2, 3]])))
+    salida = io.BytesIO()
+    with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as z:
+        for info in entrada.infolist():
+            datos = entrada.read(info.filename)
+            if info.filename == "xl/worksheets/sheet1.xml":
+                extra = "".join(f'<row r="{k}"><c r="XFD{k}"><v>1</v></c></row>' for k in range(3, filas + 3))
+                datos = datos.replace(b"</sheetData>", extra.encode() + b"</sheetData>", 1)
+            z.writestr(info, datos)
+    return salida.getvalue()
+
+
+def test_una_celda_en_la_ultima_columna_se_rechaza_antes_de_abrir(monkeypatch):
+    """2.000 filas con una celda en XFD (15 KB comprimido) llegaban a 943 MB
+    al leer; 8.000, a 4,2 GB (revisión de la devolución de EXCEL-2)."""
+    import openpyxl
+    from proyecto_maria.security.file_security import ExcelDemasiadoGrande, _contar_hojas_xlsx
+    monkeypatch.setattr(openpyxl, "load_workbook", lambda *a, **k: pytest.fail("abrió el libro"))
+    with pytest.raises(ExcelDemasiadoGrande, match="columna"):
+        _contar_hojas_xlsx(_con_celdas_en_la_ultima_columna(3))
+
+
+def test_una_factura_ancha_sigue_entrando():
+    from proyecto_maria.security.file_security import _contar_hojas_xlsx
+    assert _contar_hojas_xlsx(_libro([[f"col{c}" for c in range(200)]])) == 1
