@@ -79,11 +79,19 @@ los chequeos hechos.
 - **Gana:** cierra la fuga de MARIA.TXT que hoy está en producción, lleva las
   reglas nuevas a `main` y ensaya publicar y volver atrás cuando nadie más usa
   el sitio.
-- **Cuesta:** una hora de Emi (los chequeos de Railway y el «dale»). Antes,
-  la PM cuenta qué cuentas pasarían a impagas al arrancar (hoy, sólo la de
-  Emi). Si algo
-  falla, se vuelve a `a771693`: el esquema de la base es el mismo, probado en
-  local.
+- **Cuesta:** una hora de Emi: los chequeos de Railway, mirar en la pestaña
+  de datos de la base qué cuentas hay, y el «dale». Al arrancar, toda cuenta
+  activa con el período vencido hace más de 7 días pasa a impaga, y no vuelve
+  sola si se vuelve atrás. La PM no ve la base de producción: eso lo confirma
+  Emi.
+- **Volver atrás:** en Railway, «Redeploy» de la publicación anterior (se hace
+  desde el teléfono). Si hiciera falta tocar `main`, un commit que deshace el
+  cambio, con su propio «dale». El esquema de la base es el mismo en las dos
+  versiones (probado en local).
+- **Sí cambia el archivo MARIA** en cuatro puntos que ya están en la rama con
+  sus pruebas: varios modelos bajo una misma NCM (sacado de un archivo real),
+  el año de un identificador que estaba escrito a mano, los gastos hasta el
+  FOB según la condición de venta y la lista de supuestos.
 - **No arregla** el resto de los agujeros: eso es la cola técnica.
 
 ### Cola técnica (Dev 1)
@@ -103,7 +111,7 @@ reproduce cada hallazgo antes de aceptarla.
 | 8 | RENDIMIENTO-1 | Leer un PDF no frena el sitio para todos, y tiene un tiempo máximo | D3 | chico |
 | 9 | DEPENDENCIAS-1 | Cambiar el lector de PDF viejo, que se cuelga con un PDF armado, por su sucesor; sacar o actualizar las librerías con avisos de seguridad | X3 | medio |
 | 10 | AISLAMIENTO-2 | La prueba de aislamiento ataca **todas** las funciones con datos de un estudio, no sólo clientes y descargas | G3 | medio |
-| 11 | PUBLICAR-1 | Contar antes cuántas cuentas pasan a impagas, copia de la base, publicar con el «dale» y probar volver atrás | C10, G6 | chico |
+| 11 | PUBLICAR-1 | Emi confirma antes qué cuentas pasan a impagas; copia de la base, publicar con el «dale» y probar volver atrás | C10, G6 | chico |
 | 12 | COBRO-MP-1 | El aviso de pago de Mercado Pago, verificado; cada pago se aplica una vez; se controla el monto | C3 | medio |
 | 13 | COBRO-MP-2 | Cancelar también cancela en Mercado Pago, con servicio hasta el fin del período pagado; una sola suscripción; no se pierden días pagados; reactivar exige pagar | C2, C4, C8 | grande |
 | 14 | BACKUP-1 | Copia de la base programada fuera de Railway y una restauración probada | D1 | medio |
