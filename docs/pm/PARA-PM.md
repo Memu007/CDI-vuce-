@@ -139,10 +139,101 @@ PY=<venv>/bin/python scripts/testing/sabotajes/excel2.sh 3e6e63e        # «sabo
 - **Libros armados, ya existía antes:** con nombres de hoja repetidos, uno
   que antes daba 400 ahora da 200.
 
+## COBRO-MP-1 — plan (todavía sin código)
+
+Lo arranco porque Emi no contestó GUARDAR-1; si la aprueba, paso a esa.
+Leí el webhook (`main.py:8444-8692`), `billing_service.process_payment` y las
+pruebas que lo cubren. Esto es lo que hay hoy:
+
+- **El aviso IPN se acepta sin firma**, aunque esté el secreto y también en
+  producción (`?topic=payment&id=…`). Lo único que lo frena es que después
+  se le pregunta el pago a Mercado Pago con nuestro token.
+- **Para no repetir, sólo se mira el último pago** (`last_payment_id`).
+  Cualquiera, sin sesión, alterna dos pagos viejos reales y cada vez deja la
+  cuenta `active` 30 días con el contador en 0 (C3, tu D8).
+- **El monto no se mira:** ni `transaction_amount` ni `currency_id`. Las
+  pruebas pagan 30 000 un plan de 45 000 y pasan.
+- **Cada pago fija 30 días desde hoy:** no extiende desde el fin del período
+  actual.
+- **Lo que no es `type=payment` se saltea**, también las renovaciones de una
+  suscripción (preapproval).
+- **Las altas de tablas no usan alembic:** las hace `create_all` al arrancar,
+  y los cambios de columnas, funciones `_migrate_*` a mano.
+
+**Plan, en este orden, cada paso con rojo antes y verde después:**
+
+1. **Cada pago se aplica una sola vez.** Una tabla nueva,
+   `mp_pagos_aplicados`, guarda el `payment_id` (único), la cuenta, el tipo,
+   el monto, la moneda, la fecha de aprobación y cuándo se aplicó. El registro
+   y el cambio de la cuenta van en la misma transacción; si el id ya está, se
+   responde `skipped` y no se toca nada. Prueba: el ataque de D8, alternar A
+   y B, no renueva nada.
+2. **El monto se controla:**
+   - un plan exige moneda `ARS` y un monto igual o mayor al precio de
+     `PLANS`;
+   - una recarga, igual o mayor a `TOPUP_PRICE_ARS`;
+   - un pago que no alcanza no se aplica: queda registrado como rechazado,
+     con su motivo, y se loguea.
+3. **El período se extiende:** el nuevo fin es el mayor entre hoy y el fin
+   actual (si la cuenta está activa), más 30 días. Una renovación pagada
+   antes de tiempo no pierde días.
+4. **Renovaciones de la suscripción:** procesar
+   `subscription_authorized_payment`. Se busca el cobro autorizado, de ahí el
+   pago, y se aplica como un pago del `external_reference` de la suscripción,
+   con la misma tabla y el mismo control de monto.
+5. **Las pruebas viejas que dan por bueno el comportamiento de antes se
+   ajustan, y cada cambio va en su commit:**
+   - `test_webhook_ipn.py` y `test_g7_cobro.py` pagan 30 000;
+   - las que asignan `main.MP_WEBHOOK_SECRET` directo, sin monkeypatch, y lo
+     dejan puesto para las demás pruebas.
+6. **Todo con el SDK de Mercado Pago simulado**, como `test_prelaunch_block2`.
+   Nada contra Mercado Pago real. Revisión con Opus y con Sonnet, en esfuerzo
+   alto.
+
+**Lo que tenés que decidir antes del paso que toca:**
+
+- **D28 — El aviso IPN sin firma (paso 1).**
+  - Opciones:
+    - (a) seguir aceptándolo: con la tabla, reenviar un pago ya aplicado no
+      hace nada, y el pago se le pregunta igual a Mercado Pago con nuestro
+      token;
+    - (b) rechazarlo cuando hay secreto.
+  - Mercado Pago no firma el IPN. Si la cuenta tiene el IPN configurado en
+    el panel y no los webhooks firmados, con (b) dejan de llegar los pagos.
+  - **Recomiendo (a):** la tabla cierra el ataque, y (b) puede cortar cobros
+    reales por una configuración que desde acá no puedo ver.
+- **D29 — Cuánto tiene que valer un pago (paso 2).**
+  - Opciones:
+    - (a) igual o más que el precio de hoy;
+    - (b) igual o más que el precio que tenía el plan cuando se armó el link
+      de pago, guardándolo en `metadata`.
+  - Con (a), si Emi sube el precio, un link viejo que se pague tarde se
+    rechaza y hay que devolverlo a mano.
+  - **Recomiendo (b):** es más trabajo, pero no rechaza pagos legítimos.
+- **D30 — Las renovaciones no se pueden verificar desde acá (paso 4).**
+  - El SDK (`mercadopago` 2.2.0) no tiene una función para los cobros
+    autorizados. Habría que llamar a mano a `/authorized_payments/{id}`, y
+    no tengo cómo confirmar el formato real sin Mercado Pago.
+  - Opciones:
+    - (a) implementarlo según la documentación pública, con el formato
+      simulado, y que Emi lo pruebe en el sandbox antes de publicar;
+    - (b) dejar el paso 4 hasta tener un aviso real anonimizado de una
+      renovación.
+  - **Recomiendo (a), con el paso 4 aparte:** no frena los pasos 1 a 3, y
+    queda la prueba en el sandbox como condición para publicar.
+- **D31 — La tabla nueva (paso 1).** No cambia ninguna tabla que ya existe:
+  la crea `create_all` al arrancar, en Postgres y en SQLite. Para volver
+  atrás alcanza con publicar el código anterior: la tabla sobra, no estorba,
+  y se puede borrar con `DROP TABLE mp_pagos_aplicados`.
+  - **Pido el visto bueno** antes de publicar, como pide «sin migraciones a
+    ciegas».
+
+**Mientras tanto:** arranco por los pasos 1 y 3, que no dependen de ninguna D.
+
 ## Sigo con
 
-Nada asignado después de EXCEL-2 en el canal. Si EXCEL-2 vuelve con
-devolución, eso va primero.
+COBRO-MP-1, pasos 1 y 3 (el plan de arriba). Si Emi aprueba GUARDAR-1, paso a
+esa. Si EXCEL-2 vuelve con devolución, eso va primero.
 
 Última vuelta: 2026-10-07
 Contexto: el que mide la PM con get_session.
