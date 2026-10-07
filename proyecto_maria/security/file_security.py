@@ -114,6 +114,13 @@ def validate_file_path(base_dir: str, filename: str) -> Path:
     return requested
 
 
+def _abrir_pdf(contents: bytes) -> tuple:
+    """(¿encriptado?, cantidad de páginas). Con pypdf, sucesor de PyPDF2."""
+    from pypdf import PdfReader
+    pdf = PdfReader(io.BytesIO(contents))
+    return pdf.is_encrypted, len(pdf.pages)
+
+
 async def validate_file_upload(
     file: UploadFile,
     file_type: str,
@@ -194,15 +201,26 @@ async def validate_file_upload(
     # Additional validation for PDFs
     if file_type == 'pdf':
         try:
-            import PyPDF2
-            pdf = PyPDF2.PdfReader(io.BytesIO(contents))
+            # Abrir el PDF es sincrónico: va en otro hilo y con tiempo máximo,
+            # para que un PDF pesado o armado no frene al resto (RENDIMIENTO-1).
+            import asyncio
+            try:
+                encriptado, paginas = await asyncio.wait_for(
+                    asyncio.to_thread(_abrir_pdf, contents),
+                    timeout=float(os.getenv("PDF_VALIDATE_TIMEOUT_S", "30")),
+                )
+            except asyncio.TimeoutError:
+                raise HTTPException(
+                    400,
+                    "No pudimos abrir el PDF: tardó demasiado. Probá con otro archivo.",
+                )
 
             # Check if encrypted
-            if pdf.is_encrypted:
+            if encriptado:
                 raise HTTPException(400, "Encrypted PDFs are not allowed")
 
             # Check if valid PDF (has pages)
-            if len(pdf.pages) == 0:
+            if paginas == 0:
                 raise HTTPException(400, "PDF has no pages")
 
         except HTTPException:

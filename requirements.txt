@@ -35,7 +35,7 @@ pandas==2.3.2                 # Data manipulation
 numpy<2.0.0                   # Fix crash with pandas 2.x
 openpyxl==3.1.5              # Excel files (.xlsx)
 xlrd>=2.0.1                  # Legacy Excel files (.xls)
-PyPDF2==3.0.1                # PDF extraction
+pypdf>=6.19.0                # PDF; sucesor de PyPDF2 (X3: se colgaba con un PDF armado)
 pdfminer.six>=20251107       # GHSA-wf5f-4jwr-ppcp
 pdfplumber>=0.11.5           # Advanced PDF processing
 
@@ -51,7 +51,6 @@ python-dotenv                # .env file support
 # ==========================================
 slowapi==0.1.9               # Rate limiting
 python-magic>=0.4.27         # Magic bytes validation for file uploads
-python-jose==3.5.0           # JWT tokens
 PyJWT>=2.13.0                # JWT tokens — PYSEC-2026-120 y otros
 
 # Deps transitivas con CVEs — pinneadas para forzar versión segura

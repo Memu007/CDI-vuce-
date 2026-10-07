@@ -3291,6 +3291,36 @@ async def process_operation(
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def _pdf_read_timeout_s() -> float:
+    try:
+        return float(os.getenv("PDF_READ_TIMEOUT_S", "120"))
+    except (TypeError, ValueError):
+        return 120.0
+
+
+async def _leer_pdf_aparte(funcion, *args):
+    """Corre una lectura sincrónica de PDF en otro hilo, con tiempo máximo.
+
+    Así el servidor sigue atendiendo a los demás mientras se lee un PDF
+    (RENDIMIENTO-1). Si la lectura pasa de PDF_READ_TIMEOUT_S, responde 504
+    con un error propio. El hilo no se puede cortar desde afuera: termina
+    solo, pero ya nadie lo espera.
+    """
+    import asyncio
+    try:
+        return await asyncio.wait_for(
+            asyncio.to_thread(funcion, *args), timeout=_pdf_read_timeout_s()
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "code": "PDF_READ_TIMEOUT",
+                "message": "Leer el PDF tardó demasiado. Probá de nuevo o cargá los productos a mano.",
+            },
+        )
+
+
 def _get_max_upload_bytes() -> int:
     try:
         max_mb = float(os.getenv("MAX_UPLOAD_MB", "10"))
@@ -3469,7 +3499,7 @@ async def upload_pdf_public(
         safe_name = sanitize_filename(file.filename or 'upload.pdf')
         logging.info("Procesando PDF: %s (%d bytes)", safe_name, len(contents))
         try:
-            result = process_pdf(contents)
+            result = await _leer_pdf_aparte(process_pdf, contents)
         except LecturaAutomaticaNoDisponible as e:
             return _respuesta_sin_lector(str(e))
         
@@ -3495,7 +3525,7 @@ async def upload_pdf_public(
                     _extract_pdf_text,
                     detect_vendor_from_text,
                 )
-                pdf_text = _extract_pdf_text(contents)
+                pdf_text = await _leer_pdf_aparte(_extract_pdf_text, contents)
                 detected = detect_vendor_from_text(pdf_text)
                 if detected:
                     operacion_data['vendedor_nombre'] = detected
@@ -7053,7 +7083,11 @@ async def sugerir_ncm(
     # validada contra ARCA. Sin Gemini disponible → sin resultados (no se
     # usa el buscador lexical como clasificador).
     if len(sugerencias) < 5 and not _looks_like_ncm_code_query(descripcion):
-        for sug in _suggest_ncm_with_gemini(descripcion, limit=5 - len(sugerencias)):
+        # En otro hilo: la llamada a Gemini es sincrónica (RENDIMIENTO-1).
+        import asyncio
+        for sug in await asyncio.to_thread(
+            _suggest_ncm_with_gemini, descripcion, 5 - len(sugerencias)
+        ):
             add_suggestion(sug)
 
     metadata = ncm_catalog.get_catalog_metadata()

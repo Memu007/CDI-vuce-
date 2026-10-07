@@ -777,7 +777,7 @@ def _to_number_any(raw, default=0.0):
         return default
 
 def _extract_pdf_text(data: bytes) -> str:
-    # Try pdfminer first (best accuracy), fallback to PyPDF2, then OCR
+    # Try pdfminer first (best accuracy), fallback to pypdf, then OCR
     text = ''
     try:
         # Try pdfminer.six first
@@ -797,8 +797,9 @@ def _extract_pdf_text(data: bytes) -> str:
 
     if not text.strip():
         try:
-            import PyPDF2
-            reader = PyPDF2.PdfReader(io.BytesIO(data))
+            # pypdf, sucesor de PyPDF2 (que se colgaba con un PDF armado: X3)
+            from pypdf import PdfReader
+            reader = PdfReader(io.BytesIO(data))
             pages = []
             for p in reader.pages:
                 try:
