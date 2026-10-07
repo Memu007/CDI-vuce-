@@ -60,7 +60,13 @@ antes de cerrar la Fase 3.
    facturación de Google.
 3. **Despachante:** recordarle los archivos reales (favor 1). Ya respondió
    todas las preguntas.
-4. **Hasta la primera publicación:** en `main` sigue la regla vieja que manda
+4. **Límite de uso de la cuenta:** el 2026-10-07 entre las ~02:05 y las
+   03:40 UTC las Devs quedaron paradas porque la cuenta llegó a su límite de
+   5 horas («You've hit your session limit»). Lo más barato para que no se
+   repita: pegar el `/compact` de cada Dev apenas se pueda (están en ~38 % y
+   ~41 %; cada paso relee todo el contexto). Si vuelve a pasar, Emi decide
+   entre aceptar las pausas o bajar el ritmo.
+5. **Hasta la primera publicación:** en `main` sigue la regla vieja que manda
    «push a `main`» a otros asistentes. No pedirle a ningún asistente cambios
    sobre `main`.
 
@@ -161,12 +167,12 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 02:00 UTC (rutina): sin entregas nuevas. Las dos Devs estaban
-paradas esperando que Emi pegue su `/compact` (Dev 1 ~35 %, Dev 2 ~33 %); la
-Dev 1 no tomó el `fire_trigger` de las 01:28. La PM les escribió directo:
-siguen sin esperarlo (Dev 1 con RENDIMIENTO-1, Dev 2 con MARIA-1a) y les
-marcó qué partes de `pdf_extractor.py` toca cada una. La lista de Railway y el
-ataque al ensayo, listos para las 9 (ARG).
+2026-10-07 04:00 UTC (rutina; la de las 02:55 no corrió): las dos Devs
+subieron código (Dev 1: RENDIMIENTO-1 hasta `450f2d5`; Dev 2: MARIA-1a hasta
+`4b8fc49`), sin informe todavía. Desde ~02:05 quedaron paradas por el límite
+de uso de la cuenta, que se reinició a las 03:40; sus rutinas las retoman
+(:15 y :35). Contexto: Dev 1 ~41 %, Dev 2 ~38 %. Suite sobre `321f34b`
+corriendo para el ensayo.
 
 ## Medición
 
