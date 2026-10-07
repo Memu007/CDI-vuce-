@@ -54,7 +54,7 @@ necesita prueba: la ley, un archivo real o la respuesta del despachante
 | ✅ | MARIA-1d | Un campo vacío no llega al TXT como «None» o «NON» (D12 de la Dev 2) | no cambia el TXT de una factura bien leída |
 | ⏳ | MARIA-5 | Peso total por producto; cuentas exactas al centavo (M1, M9); «None» escrito en la carátula cuenta como vacío (revisión de MARIA-1d) | peso: respuesta 3 y archivo real de 2026; cuentas: la prueba en el Kit |
 | 1 | CATALOGO-NCM-1 | El catálogo NCM vigente (el de hoy es de 2018: le faltan 8517.13.00, 8524, 8549); una NCM dada de baja se avisa como tal (D21 de la Dev 1; archivo de Emi del 2026-10-07) | el nomenclador de ARCA del 07/10/2026 |
-| 2 | MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11) | sus archivos reales |
+| 2 | MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11); el número de operación y la referencia de la factura que hoy arma la pantalla (D23 y D25 de la Dev 1) | sus archivos reales |
 
 MARIA-4, MARIA-3 y MARIA-5 tocan el mismo generador: van en ese orden.
 MARIA-6 arranca cuando lleguen sus archivos reales.
@@ -68,9 +68,9 @@ MARIA-6 arranca cuando lleguen sus archivos reales.
 | ✅ | RENDIMIENTO-1 | Leer un PDF no frena el sitio y tiene un tiempo máximo; el lector de PDF viejo, que se cuelga con un PDF armado, se cambia por su sucesor (D3, X3) |
 | ✅ | RENDIMIENTO-1b | Un PDF armado no deja a nadie sin lectura: la adivinanza del vendedor usa sólo `pypdf`; tiempos en 0 o negativos caen al valor por defecto (D10 b de la Dev 1). Se publica junto con RENDIMIENTO-1 |
 | ✅ | EXCEL-1 | Revisar la carga por Excel de punta a punta (nunca se auditó) y arreglar lo que falle; leer un Excel tampoco frena el sitio (D12 de la Dev 1) |
-| 1 | MARIA-1b | Controles antes de generar: NCM del catálogo, moneda, incoterm, CUIT, montos; ningún texto mete líneas en el TXT; las filas de total o de flete no pasan como productos; al guardar la operación no se inventan cantidad 1 ni peso 0,5 (M10, D6 de la Dev 2) |
-| 2 | PUNTA-A-PUNTA-1 | Prueba automática: sube un PDF y un Excel (Gemini simulado) y compara el TXT con los archivos reales |
-| 3 | EXCEL-2 | Lo que el Excel todavía no lee: encabezado fuera de la fila 1, sin columna de origen, celdas combinadas (D18 de la Dev 1); CSV con `;`, latin-1 o BOM en el historial de NCM; el aviso de mapeo nombra la columna que se usó |
+| ✅ | MARIA-1b | Controles antes de generar: NCM del catálogo, moneda, incoterm, CUIT, montos; ningún texto mete líneas en el TXT; las filas de total o de flete no pasan como productos; al guardar la operación no se inventan cantidad 1 ni peso 0,5 (M10, D6 de la Dev 2) |
+| 1 | PUNTA-A-PUNTA-1 | Prueba automática: sube un PDF y un Excel (Gemini simulado) y compara el TXT con los archivos reales |
+| 2 | EXCEL-2 | Abrir un libro armado no traba la lectura (D26 de la Dev 1); lo que el Excel todavía no lee: encabezado fuera de la fila 1, sin columna de origen, celdas combinadas (D18 de la Dev 1); CSV con `;`, latin-1 o BOM en el historial de NCM; el aviso de mapeo nombra la columna que se usó |
 
 **Cierre:** publicar con el «dale»; Emi prueba con facturas reales; el
 despachante carga un archivo en su Kit (cierra G4).
