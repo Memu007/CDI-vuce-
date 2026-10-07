@@ -3371,7 +3371,7 @@ def _respuesta_excel_demasiado_largo(e: Exception) -> JSONResponse:
     )
 
 
-def _xlsx_solo_primera_hoja(ruta: str) -> tuple:
+def _xlsx_solo_primera_hoja(ruta) -> tuple:
     """El .xlsx con sólo su primera hoja de cálculo. openpyxl, al abrir un
     libro, recorre entera cada hoja que no declara su medida (<dimension>), y
     un libro armado con muchas hojas así tardaba minutos aunque se lea sólo la
@@ -3393,7 +3393,7 @@ def _xlsx_solo_primera_hoja(ruta: str) -> tuple:
             n = n * 26 + ord(letra) - 64
         return n
 
-    with zipfile.ZipFile(ruta) as z:
+    with zipfile.ZipFile(_io.BytesIO(ruta) if isinstance(ruta, (bytes, bytearray)) else ruta) as z:
         hojas = hojas_del_xlsx(z)
         combinadas = []
         if hojas and hojas[0][1] in z.namelist():
@@ -3404,6 +3404,8 @@ def _xlsx_solo_primera_hoja(ruta: str) -> tuple:
                 if len(combinadas) >= 10_000:
                     break
         if len(hojas) <= 1:
+            if isinstance(ruta, (bytes, bytearray)):
+                return bytes(ruta), combinadas
             with open(ruta, "rb") as f:
                 return f.read(), combinadas
         afuera = {parte for _, parte in hojas[1:]}
@@ -3670,11 +3672,25 @@ def _leer_tabla(content: bytes, filename: str):
     """CSV o Excel a un DataFrame de texto (para correr en otro hilo)."""
     import io as _io
     if filename.endswith(".csv"):
-        try:
-            return pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False)
-        except Exception:
-            return pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False, sep=";")
-    if filename.endswith((".xlsx", ".xls")):
+        # UTF-8 (con o sin BOM) o, si no, Windows-1252/latin-1: el CSV que
+        # guarda Excel en castellano. El separador es el que más aparece en el
+        # encabezado: el «;» de Excel en castellano antes se leía como una sola
+        # columna (EXCEL-2).
+        for codificacion in ("utf-8-sig", "cp1252", "latin-1"):
+            try:
+                texto = content.decode(codificacion)
+                break
+            except UnicodeDecodeError:
+                continue
+        encabezado = texto.split("\n", 1)[0]
+        separador = max((",", ";", "\t"), key=encabezado.count)
+        return pd.read_csv(_io.StringIO(texto), dtype=str, keep_default_na=False, sep=separador)
+    if filename.endswith(".xlsx"):
+        # Sólo la primera hoja, que es la que se lee: un libro armado con
+        # muchas hojas sin <dimension> no traba (D26 a, EXCEL-2).
+        contenido, _ = _xlsx_solo_primera_hoja(content)
+        return pd.read_excel(_io.BytesIO(contenido), dtype=str, keep_default_na=False)
+    if filename.endswith(".xls"):
         return pd.read_excel(_io.BytesIO(content), dtype=str, keep_default_na=False)
     raise HTTPException(status_code=400, detail="Formato no soportado. Usá .csv, .xlsx o .xls")
 
