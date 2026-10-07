@@ -84,3 +84,37 @@ def test_la_validacion_muestra_el_fob_del_txt():
                   valor_unitario=f["valor_unitario"], peso_unitario=1) for f in filas]
     total = run_smart_validations(items)["estadisticas"]["total_valor_usd"]
     assert Decimal(str(total)) == _campo(txt, "MDDTFOB")[0] == Decimal("3.36")
+
+
+@pytest.mark.parametrize("cantidad, unitario, fob", [(3, 3.335, "10.01"), (5, 1.787, "8.94"),
+                                                     (25, 9.0498, "226.25"), (5, 4.821, "24.11")])
+def test_cantidad_por_unitario_en_decimal_exacto(cantidad, unitario, fob):
+    """Revisión adversaria: 3 × 3,335 en binario es 10,00499…; el exacto, 10,005."""
+    txt = _gen("OP_EXACTO", [_item(1, cantidad=cantidad, valor_unitario=unitario)])
+    assert _campo(txt, "MARTFOB") == _campo(txt, "MDDTFOB") == [Decimal(fob)]
+
+
+@pytest.mark.parametrize("cantidad, unitario, partes", [(100, 0.0149, [50, 50]), (3, 3.335, [1, 1, 1])])
+def test_los_subitems_cierran_sin_rechazar_un_pedido_valido(cantidad, unitario, partes):
+    """Revisión adversaria: con MSBTFOB redondeados por separado, un pedido que
+    antes salía pasaba a error. El MARTFOB se reparte al centavo."""
+    item = _item(1, cantidad=cantidad, valor_unitario=unitario,
+                 subitems=[{"cantidad": c, "valor_unitario": unitario, "sufijo": "AA(1)-CA00"} for c in partes])
+    txt = _gen("OP_SUB", [item])
+    assert sum(_campo(txt, "MSBTFOB")) == _campo(txt, "MARTFOB")[0]
+
+
+@pytest.mark.parametrize("extra", [{"valor_unitario": 1e27}, {"valor_total": 1e30}, {"valor_total": -2}])
+def test_un_importe_imposible_da_error_y_no_500(client, auth_override, extra):
+    from tests.test_maria_subitems import ITEM_BASE, SUF_A
+    item = {k: v for k, v in ITEM_BASE.items() if k != "subitems"}
+    item.update(estado=2, **extra)
+    r = client.post("/generate_maria", json={"operation_id": "OP1", "items": [item],
+                                             "fecha_emision": "22/06/2026", "sbt_sufijo_valor": SUF_A})
+    assert r.status_code == 400, r.text
+
+
+def test_repartir_no_acepta_negativos():
+    from proyecto_maria.core.maria_generator import repartir
+    with pytest.raises(ValueError):
+        repartir(Decimal("0.10"), [7, -2, -2])
