@@ -2069,10 +2069,9 @@ async def get_dev_stats(
     user=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
-    """Estadísticas en tiempo real para el dashboard (requiere auth).
+    """Estadísticas en tiempo real para el dashboard (sólo admin).
 
-    TODO: restringir a rol admin. Por ahora cualquier user logueado ve
-    los logs agregados (no filtra por owner).
+    Los logs son agregados de todo el sistema (no filtra por owner).
     """
     
     # 1. Total Requests (Últimas 24h)
@@ -2124,7 +2123,7 @@ async def get_dev_wave1_kpis(
 ):
     """KPIs Wave 1 sobre tabla `telemetry_events` (14 días por defecto).
 
-    Mismo acceso que `/api/dev/stats` (usuario logueado; admin TBD).
+    Mismo acceso que `/api/dev/stats` (sólo admin).
     """
     d = max(1, min(days, 120))
     return await _wave1_compute_kpis(db, days=d)
