@@ -1740,7 +1740,7 @@ body.cdi-dragging-row { cursor: grabbing; }
     margin-top: 2px;
 }
 /* Una NCM dada de baja se propone diciéndolo (CATALOGO-NCM-1). */
-.spotlight-item.is-baja .spotlight-item-meta { color: var(--c-warning); }
+.spotlight-item.is-baja:not(.is-selected):not(:hover) .spotlight-item-meta { color: var(--c-warning); }
 .spotlight-empty {
     padding: var(--s-5);
     color: var(--c-text-3);
