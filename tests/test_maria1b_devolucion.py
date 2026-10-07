@@ -310,6 +310,7 @@ def test_nan_o_inf_en_un_subitem_no_dejan_generar(sub):
 @pytest.mark.parametrize("item, mensaje", [
     ({"cantidad": 1e200, "valor_unitario": 1e200}, "Valor inválido"),
     ({"cantidad": 10, "valor_unitario": 1e308}, "Valor inválido"),
+    ({"cantidad": 1e7, "valor_unitario": 1e6}, "Valor inválido"),   # cada uno pasa; el FOB no
     ({"cantidad": 1e13}, "Cantidad inválida"),
     ({"peso_kg": 1e300}, "Peso inválido"),
 ])

@@ -153,11 +153,11 @@ sabotaje $C "los subítems dejan de controlarse" \
 sabotaje $C "los montos que desbordan al multiplicar vuelven a pasar" \
   '    return len(numeros) > 1 and (not math.isfinite(producto) or abs(producto) > IMPORTE_MAXIMO)' \
   '    return False' \
-  "FAILED $D::test_montos_finitos_que_desbordan_no_dejan_generar[item0-"
-sabotaje $M "la validación previa vuelve a dar 500 con montos que desbordan" \
+  "FAILED $D::test_montos_finitos_que_desbordan_no_dejan_generar[item2-"
+sabotaje $M "la validación previa vuelve a dar 500 con NaN o montos que desbordan" \
   '        return _sin_no_finitos({' \
   '        return ({' \
-  "FAILED $D::test_la_validacion_previa_con_montos_que_desbordan_no_da_500"
+  "FAILED $D::test_la_validacion_previa_con_nan_o_inf_no_da_500"
 sabotaje $M "la exportación vuelve a escribir NaN" \
   '        if _montos:' \
   '        if False:' \
@@ -170,10 +170,6 @@ sabotaje $M "una hoja de gráfico vuelve a contar como hoja" \
   '        if not (r.get("Type") or "").endswith("/worksheet"):' \
   '        if False:' \
   "FAILED $D::test_una_hoja_de_grafico_primero_no_corre_las_hojas"
-sabotaje $M "la validación previa vuelve a dar 500 con un NaN" \
-  '                item_dict = {k: (0.0 if k in numericos and _no_finito(v) else v)' \
-  '                item_dict = {k: v' \
-  "FAILED $D::test_la_validacion_previa_con_nan_o_inf_no_da_500"
 sabotaje $C "el CUIT vuelve a aceptar dígitos de otros alfabetos" \
   'if not re.fullmatch(r"[0-9]{11}", norm):' \
   'if not re.fullmatch(r"\d{11}", norm):' \
