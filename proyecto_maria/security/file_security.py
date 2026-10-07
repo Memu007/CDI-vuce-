@@ -179,6 +179,38 @@ def _mb_de_entorno(nombre: str, defecto: float) -> int:
     return int(valor * 1024 * 1024)
 
 
+def _elementos_de_entorno() -> int:
+    """EXCEL_MAX_ELEMENTOS_ESTILOS, 200.000 por defecto: unos 120 MB y 2,5 s
+    al abrir. Excel no deja más de 64.000 formatos de celda."""
+    import math
+    try:
+        valor = float(os.getenv("EXCEL_MAX_ELEMENTOS_ESTILOS", "") or 200_000)
+    except (TypeError, ValueError):
+        valor = 200_000.0
+    return int(valor) if math.isfinite(valor) and valor > 0 else 200_000
+
+
+def _mas_elementos_que(z, parte: str, tope: int) -> bool:
+    """Cuenta las etiquetas que abren («<» y una letra) leyendo de a 1 MB, sin
+    armar el árbol, y corta apenas pasa el tope. Puede contar de más (un «<x»
+    dentro de un CDATA), nunca de menos."""
+    import re
+    abre = re.compile(rb"<[A-Za-z_]")
+    n, cola = 0, b""
+    with z.open(parte) as f:
+        while True:
+            bloque = f.read(2**20)
+            if not bloque:
+                return False
+            trozo = cola + bloque
+            n += len(abre.findall(trozo))
+            if n > tope:
+                return True
+            # El último byte puede ser un «<» cuya letra viene en el bloque
+            # que sigue: se guarda sólo si es «<», para no contarlo dos veces.
+            cola = trozo[-1:] if trozo.endswith(b"<") else b""
+
+
 def _contar_hojas_xlsx(contents: bytes) -> int:
     """Cuenta las hojas desde xl/workbook.xml y mira, antes de abrir el libro,
     cuánto pesan los textos compartidos y la primera hoja: openpyxl los lee
@@ -195,9 +227,13 @@ def _contar_hojas_xlsx(contents: bytes) -> int:
             raise ExcelDemasiadoGrande(
                 f"El Excel tiene demasiados textos (más de {tope_textos // 2**20} MB). "
                 "Dejá sólo la hoja de la factura o cargá los productos a mano.")
-        # Lo demás que openpyxl lee entero al abrir, con el mismo tope.
+        # Lo demás que openpyxl lee entero al abrir, con el mismo tope en MB y
+        # otro en elementos: cada uno ocupa medio KB en memoria, y 10 MB de
+        # <xf/> (17 KB comprimido) llegaban a 1,4 GB (devolución de EXCEL-2).
+        tope_elementos = _elementos_de_entorno()
         for parte in (ARC_STYLE, ARC_CORE, ARC_CUSTOM):
-            if parte in nombres and z.getinfo(parte).file_size > tope_textos:
+            if parte in nombres and (z.getinfo(parte).file_size > tope_textos
+                                     or _mas_elementos_que(z, parte, tope_elementos)):
                 raise ExcelDemasiadoGrande(
                     "Una parte del Excel es demasiado grande. Guardalo de nuevo desde Excel o "
                     "cargá los productos a mano.")
