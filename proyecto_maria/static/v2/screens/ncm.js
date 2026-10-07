@@ -1284,6 +1284,31 @@
         let finalValue;
         if (gidAttr) {
             const gid = parseInt(gidAttr, 10);
+            if (field === 'cantidad' || field === 'valor_unitario' || field === 'peso_unitario') {
+                // MARIA-5. La fila muestra el total y promedios redondeados:
+                // pasar por el campo sin cambiarlo no reescribe nada, y un 0,
+                // un negativo o el campo vacío no borran la proporción entre
+                // los productos (vuelve lo que estaba).
+                if (inp.value === inp.defaultValue) return;
+                const n = Number(inp.value);
+                if (inp.value.trim() === '' || !Number.isFinite(n) || n <= 0) {
+                    inp.value = inp.defaultValue;
+                    if (CDI.toast) CDI.toast('Grupo sin cambios', 'En un grupo, cargá un número mayor que 0. Para cambiar un producto solo, desagrupalo.', 'warning');
+                    return;
+                }
+                setGroupField(gid, field, inp.value);
+                // Lo que quedó en cada producto, a la vista (fila y sub-filas),
+                // sin perder el campo al que se pasó con Tab o con el mouse.
+                const destino = ev.relatedTarget;
+                const sel = destino && destino.getAttribute && destino.getAttribute('data-field')
+                    ? '[data-field="' + destino.getAttribute('data-field') + '"]' +
+                      (destino.hasAttribute('data-row') ? '[data-row="' + destino.getAttribute('data-row') + '"]' : '') +
+                      (destino.hasAttribute('data-grupo-id') ? '[data-grupo-id="' + destino.getAttribute('data-grupo-id') + '"]' : '')
+                    : null;
+                render();
+                if (sel) { const otro = document.querySelector('#ncmTableBody ' + sel) || document.querySelector(sel); if (otro) otro.focus(); }
+                return;
+            }
             finalValue = setGroupField(gid, field, inp.value);
         } else {
             const idx = parseInt(inp.getAttribute('data-row'), 10);

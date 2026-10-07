@@ -4674,8 +4674,10 @@ _ITEM_COL_ALIASES = {
     "peso_unitario": [
         # Primero los de una unidad; después los de la línea; el bruto, último
         # (MARIA-5, D22: el TXT pide peso neto).
-        "pesounitario", "peso", "weight", "pesounit", "unitweight", "pesototal",
-        "pesoneto", "pesobruto",
+        "pesounitario", "peso", "weight", "pesounit", "unitweight", "pesounitariokg",
+        "pesokg", "pesototal", "pesoneto", "pesonetototal", "pesototalneto", "pesototalkg",
+        "pesonetokg", "totalweight",
+        "netweight", "pesobruto", "pesobrutokg", "grossweight",
     ],
 }
 
@@ -4709,9 +4711,16 @@ def _detect_item_columns(headers: list) -> dict:
 
 
 # MARIA-5 (D22). Columnas de peso que no son de una unidad: el TXT multiplica
-# el peso unitario por la cantidad, así que se dividen por la cantidad.
-_PESO_DE_LA_LINEA = {"pesototal", "pesoneto"}
-_PESO_BRUTO = {"pesobruto"}
+# el peso unitario por la cantidad, así que se dividen por la cantidad. Se
+# mira el nombre de la columna, también la de un mapeo guardado del cliente.
+def _clase_de_peso(normal: str) -> str:
+    if "unit" in normal or "unidad" in normal:
+        return "unidad"
+    if "bruto" in normal or "gross" in normal:
+        return "bruto"
+    if any(p in normal for p in ("total", "neto", "net", "linea")):
+        return "linea"
+    return "unidad"
 
 
 def _peso_por_unidad(df: pd.DataFrame, rename: dict) -> list[str]:
@@ -4720,8 +4729,8 @@ def _peso_por_unidad(df: pd.DataFrame, rename: dict) -> list[str]:
     El bruto se usa sólo si es la única columna de peso, y se avisa.
     Devuelve los avisos para la pantalla."""
     origen = next((src for src, canon in rename.items() if canon == "peso_unitario"), None)
-    normal = _normalize_header(origen) if origen is not None else ""
-    if normal not in _PESO_DE_LA_LINEA | _PESO_BRUTO or "peso_unitario" not in df.columns:
+    clase = _clase_de_peso(_normalize_header(origen)) if origen is not None else "unidad"
+    if clase == "unidad" or "peso_unitario" not in df.columns:
         return []
     col_cant = find_column(df.columns, ["cantidad", "Cantidad", "qty", "Qty", "quantity", "Quantity", "cant"])
     if col_cant is None:
@@ -4729,9 +4738,14 @@ def _peso_por_unidad(df: pd.DataFrame, rename: dict) -> list[str]:
                 "dividirla. Cargá el peso de una unidad en la revisión."]
     peso = pd.to_numeric(df["peso_unitario"], errors="coerce")
     cantidad = pd.to_numeric(df[col_cant], errors="coerce")
+    escrito = df["peso_unitario"].notna() & (df["peso_unitario"].astype(str).str.strip() != "")
     df["peso_unitario"] = (peso / cantidad).where(cantidad > 0)
     avisos = [f"Peso: la columna «{origen}» es de toda la línea; se dividió por la cantidad."]
-    if normal in _PESO_BRUTO:
+    sin_numero = int((escrito & peso.isna()).sum())
+    if sin_numero:
+        avisos.append(f"Peso: {sin_numero} fila(s) con un peso que no es un número quedaron sin peso; "
+                      "cargalo en la revisión.")
+    if clase == "bruto":
         avisos.append(f"Peso: el TXT pide peso neto y la planilla trae sólo «{origen}» (bruto); "
                       "se usó el bruto dividido por la cantidad. Corregilo si tenés el neto.")
     return avisos
