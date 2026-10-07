@@ -132,9 +132,9 @@ sabotaje $M "una combinada vuelve a copiar números hacia abajo" \
   $'        if not isinstance(valor, str) or not valor.strip() or _re.fullmatch(r"[\\d\\s.,+\\-]+", valor.strip()):\n            continue' \
   $'        if False:\n            continue' \
   "FAILED $T::test_una_combinada_con_cantidad_y_precio_no_duplica_el_producto"
-sabotaje $M "las combinadas vuelven a copiarse desde el encabezado" \
-  '    return _rellenar_combinadas(df, combinadas, desde_fila=fila_encabezado + 1).dropna(how="all")' \
-  '    return _rellenar_combinadas(df, combinadas, desde_fila=2).dropna(how="all")' \
+sabotaje $M "las combinadas vuelven a copiarse antes de buscar el encabezado" \
+  $'    df = _con_encabezado(pd.read_excel(origen, engine=engine, dtype=object), conocidas)\n    return _rellenar_combinadas(df, combinadas).dropna(how="all")' \
+  $'    df = _rellenar_combinadas(pd.read_excel(origen, engine=engine, dtype=object), combinadas)\n    return _con_encabezado(df, conocidas).dropna(how="all")' \
   "FAILED $T::test_un_encabezado_en_dos_filas_combinadas_no_da_un_producto_fantasma"
 sabotaje $F "el libro vuelve a buscarse en xl/workbook.xml" \
   '    libro = _find_workbook_part(manifiesto).PartName[1:]' \
