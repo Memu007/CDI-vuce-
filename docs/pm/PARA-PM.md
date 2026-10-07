@@ -2,6 +2,70 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## COBRO-CORTE-1 — frenada antes de codear: D4, D5 y D6
+
+ADMIN-1 sigue entregada más abajo, sin cambios. Empecé COBRO-CORTE-1
+leyendo el flujo real, y hay tres cosas de dinero y datos que cambian el
+resultado. No escribí código.
+
+**Lo que encontré.**
+- `/generate_maria` no mira ninguna operación guardada. Recibe los ítems y
+  un `operation_id` que inventa el navegador: `FAC_<factura>` o
+  `OP_<fecha y hora>` (`static/v2/screens/finalize.js:358`). Después del
+  TXT, la pantalla guarda la operación con `POST /api/clientes/{id}/operaciones`,
+  que es la que cuenta (`main.py:5527`), y **sólo si hay un cliente activo**.
+  Con la pantalla de «operación sin cliente» el MARIA sale y nunca se cuenta.
+- La operación guardada recibe un id nuevo cada vez (`uuid4`, `main.py:5452`).
+  No hay nada que una el TXT generado con la operación contada. Volver a
+  guardar la misma operación la cuenta de nuevo. Hoy lo evita sólo el
+  navegador.
+- Sólo dos lugares crean operaciones, y los dos cuentan: `main.py:3181`
+  (manual) y `:5451`.
+
+- **D4 — Cómo sabe `/generate_maria` si la operación «ya se contó».**
+  (a) Sólo cortar por estado de cobro (402 si está vencido o impago) y
+  seguir contando únicamente al guardar. Es lo mínimo, pero el MARIA sin
+  cliente sigue saliendo gratis.
+  (b) La primera vez que se genera un `operation_id` del usuario, crear la
+  operación (sin cliente, `source="maria"`) y contarla. Las descargas
+  siguientes con el mismo id no cuentan, y el guardado posterior usa esa
+  operación en vez de crear y contar otra. No hace falta cambiar el
+  esquema: `client_id` ya acepta vacío. Sí hay que tocar `finalize.js`
+  para que guarde con el id del MARIA. Hueco: quien reuse siempre el mismo
+  id genera MARIAs distintos pagando una.
+  (c) Como (b), pero con el id calculado por el servidor a partir del
+  contenido (ítems y sufijo). Cierra el hueco de (b), pero corregir un
+  ítem y volver a generar cuenta otra vez.
+  **Recomiendo (b)**: cumple «se cuenta una vez» sin migración. Al hueco le
+  pongo un límite: un mismo `operation_id` no puede pasar de N regeneraciones
+  con contenido distinto. El N lo decidís vos; propongo 10.
+- **D5 — Qué corte va en las rutas que gastan Gemini o generan valor**
+  (`/upload_pdf/public`, `/upload_excel`, `/api/validate/smart`,
+  `/api/ncm/sugerir`, `/api/migrations/*`). `require_active_billing` corta
+  por estado **y** por tope del plan. Con eso, quien pagó y usó sus 15
+  operaciones tampoco podría subir un PDF ni validar una operación ya
+  contada.
+  (a) Sólo por estado: vencido o impago → 402. El tope se mira sólo donde
+  se cuenta una operación.
+  (b) Estado y tope en todas.
+  **Recomiendo (a)**: «quien no paga no genera valor», sin trabar al que pagó.
+- **D6 — Carreras (C6) sin migración de esquema.**
+  (a) Bloquear la fila de la cuenta (`SELECT … FOR UPDATE` del usuario o de
+  la organización) mientras se mira el tope, se cuenta y se calcula el
+  `op_code`, todo en una transacción. Serializa por cuenta y no cambia el
+  esquema. Lo pruebo con pedidos al mismo tiempo en un Postgres local:
+  está instalado el 16.
+  (b) Además, un índice único `(owner_username, op_code)`. Es una migración,
+  y fallaría si producción ya tiene códigos repetidos; habría que mirar
+  antes.
+  **Recomiendo (a)** ahora y (b) como pieza aparte, si querés la garantía en
+  la base.
+
+Mientras no contestes, no avanzo con COBRO-CORTE-1: las tres D cambian el
+código.
+
+---
+
 ## ADMIN-1 — entregada, terminada
 
 | | SHA |
@@ -224,7 +288,7 @@ de `/api/dev/stats` y `wave1-kpis`, y `/api/ncm/cache/refresh`. También
 
 ## Sigo con
 
-COBRO-CORTE-1, como dice tu canal. Si contestás D1–D3 antes, van primero.
+COBRO-CORTE-1, frenada en D4–D6 (arriba).
 
-Última vuelta: 2026-10-07 00:45 UTC
-Contexto: ~23 %
+Última vuelta: 2026-10-07 00:55 UTC
+Contexto: ~26 %
