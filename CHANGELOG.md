@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · feat: lo que decide el despachante sale en el TXT (MARIA-4)
+
+- **feat(maria):** estado de la mercadería (seis, por producto), IVA adicional (reventa o uso particular, por operación con cambio por producto), banco (código BCRA, por operación) y empresa de digitalización (Modoc o Lakaut) se eligen antes de generar; CDI propone el último banco del cliente y la última empresa del usuario. **Cambio a propósito en el TXT con los valores por defecto:** `CARTUSO=2` con origen extranjero (antes 3 fijo) e `IVAADICIONAL1=NO_VALIDA` (antes IVAAD1 fijo); con origen argentino no hay estado por defecto y sin banco la línea no sale. Los dos archivos reales salen como el original cargando sus valores.
+
 ## 2026-10-07 · fix: lo que no se pudo leer de la factura se avisa (MARIA-1c)
 
 - **fix(pdf):** si la factura trae un flete, un seguro o el país del vendedor que no se pudo leer, el lector lo marca (`campos_sin_leer`), la pantalla de subida lo nombra y el semáforo lo sigue mostrando («No pudimos leer el flete de la factura: completalo») hasta que se completa. La pantalla vieja ya no repone cantidad 1 ni origen China.
