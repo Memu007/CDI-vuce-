@@ -73,7 +73,7 @@ Archivos abiertos por Dev:
 
 ## En curso
 
-- **Dev 1:** PUNTA-A-PUNTA-1. Sigue: EXCEL-2 (con la D26)
+- **Dev 1:** EXCEL-2 (con la D26). PUNTA-A-PUNTA-1 aceptada e integrada (sólo pruebas).
   y EXCEL-2.
 - **Dev 2:** devolución de MARIA-5 (dos pesos para una línea, filas que desaparecen, guarda del peso, subítems, grupos, una sola cuenta). Sigue: CATALOGO-NCM-1; MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
