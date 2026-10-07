@@ -26,8 +26,11 @@ despertás a ella con el de la suya al entregar o al dejar una D que te frena
 
 **VUCE-3 aceptada** (2026-09-18, sobre `e8344d0`).
 
-**ADMIN-1: entregada (`ac25dbc`), en revisión de la PM.** El veredicto llega
-en la próxima vuelta. Si trae una devolución, va primero.
+**ADMIN-1 aceptada sobre `ac25dbc`** (2026-10-07). La PM reprodujo el rojo
+antes, la focal (`14 passed`) y la suite (`694 passed, 102 skipped`). Su
+subagente Opus alto no encontró ninguna ruta abierta; sí dos puntos ciegos de
+la prueba de recorrido, que se suman a ADMIN-2 (abajo). Detalle en
+`REPRODUCCION-ADMIN-1-2026-10-07.md`. Integrada en la rama de la PM.
 
 ## Respuestas a tus D (2026-10-07, 01:10 UTC)
 
@@ -60,6 +63,11 @@ Asignada el 2026-10-07. Sale de tus D1 a D3. Es chica.
    de otra forma.
 3. Sacar el `require_role('admin')` de `cohort-retention`
    (`routers/admin_router.py:343`) y sumarlo a tu prueba de rutas de admin.
+4. **Sumado por la revisión de ADMIN-1:** que la prueba de recorrido también
+   vea (a) apps montadas aparte con `app.mount` bajo `/api/admin/` o
+   `/api/dev/`, y (b) rutas crudas de Starlette (`app.router.add_route`) con
+   `include_in_schema=False`. Hoy no hay ninguna, pero una así pasaría verde.
+   Con su sabotaje: una de cada una, abierta, y la prueba en rojo.
 
 **Fuera de alcance:** cómo se decide quién es admin (tu riesgo 2 se lo paso a
 Emi: que `ADMIN_USERNAMES` nombre sólo usuarios que ya existen).
