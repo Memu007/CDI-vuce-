@@ -91,6 +91,44 @@ menos grave):
 En `/api/clientes/import`, que no tiene llamador: inventa «Cliente
 <CUIT>» cuando falta la razón social y acepta CUIT sin dígito verificador.
 
+### Avance desde el primer parcial (sin esperar las D)
+
+Arreglado en `/upload_excel_v2/` (producto `7e804e5`, pruebas `1df55b0`,
+sabotajes en `scripts/testing/sabotajes/excel1.sh`):
+- el precio unitario gana sobre «Valor» (defecto 2);
+- peso neto o unitario; sin uno de ellos, el peso queda vacío en vez de
+  tomar el bruto o el total, y el TXT lo frena con «Peso inválido» hasta
+  que se complete (defecto 4);
+- las filas de total o subtotal no entran (defecto 5);
+- «.XLSX» en mayúsculas (defecto 8);
+- encabezados con la unidad entre paréntesis, y el mapeo guardado del
+  cliente se completa con los encabezados nuevos (defecto 10);
+- la respuesta trae `filas_descartadas` y sus números de fila, y la pantalla
+  avisa «N fila(s) del Excel no se pudieron leer (filas …). Revisalas y
+  cargalas a mano» (el aviso del defecto 1; leer esas filas espera D14).
+
+Rojo antes y verde después:
+
+```
+E   assert 3500.0 == 350                       (unitario sobre total)
+E   assert 25.0 == 15                          (neto sobre bruto)
+E   assert 25.0 in (0, None)                   (bruto o total como unitario)
+E   ['Laptop 14 pulgadas', 'Subtotal 8471.30.00']   (subtotal como ítem)
+E   assert 500 == 200  ... "Excel xlsx file; not supported"   (.XLSX)
+E   assert 400 == 200  ... "No se pudieron extraer items"     (paréntesis; mapeo guardado)
+E   assert None == 2                           (filas descartadas sin aviso)
+→ después: 8 passed
+```
+
+Sabotajes de `excel1.sh`: 10 en ROJO, `sabotajes con falla: 0`. Uno de la
+parte 2 primero daba verde porque mi prueba medía mal: la segunda lectura
+lenta pisaba la hora de inicio de la primera. Ya está arreglada.
+
+**La moneda «USD» inventada (defecto 9) no se arregla en el Excel:** sale
+de `Client.preferred_currency`, que vale «USD» por defecto en el modelo.
+No hay forma de distinguir «el cliente eligió USD» de «nadie eligió». Va
+como D16.
+
 ## Decisiones
 
 - **D13 — Rutas sin llamador vivo (tu punto 3).** `/upload_excel/` no la
@@ -122,6 +160,15 @@ En `/api/clientes/import`, que no tiene llamador: inventa «Cliente
   **Recomiendo** que vaya a MARIA-1b o a la pieza de la Dev 2 que toque el
   generador. No la toco.
 
+- **D16 — Moneda por defecto del cliente.** `Client.preferred_currency`
+  vale «USD» por defecto (`models.py:141`), así que una operación por Excel
+  con cliente sale siempre con moneda USD aunque nadie la haya elegido.
+  Opciones: (a) migración que deje la columna sin valor por defecto, y que
+  la pantalla del cliente pida la moneda; (b) dejarlo así: USD es lo común y
+  el usuario la ve en la revisión.
+  **Recomiendo (b) por ahora** y anotarlo para PUNTA-A-PUNTA-1: cambiarlo
+  pide una migración, y la moneda se ve en pantalla antes del TXT.
+
 Lo de `dev_detail` (el manejador global muestra detalles internos) es de
 seguridad: **recomiendo** la Fase 3, junto con ABUSO-1.
 
@@ -142,11 +189,13 @@ condición), `CHANGELOG.md`.
 
 ## Sigo con
 
-Los defectos de la parte 1 que no dependen de D13 ni de D14 (lista en D14),
-salvo que me digas otra cosa.
+Espero D13, D14 y D16. Sin D14 no puedo leer las filas que hoy se descartan
+(defectos 1, 3, 6 y 7). La prueba del TXT (Excel contra PDF con los datos
+de los dos archivos reales) también depende de ella. Con las respuestas:
+eso, la suite final, los revisores, humo y aislamiento, y la entrega.
 
-Última vuelta: 2026-10-07 07:40 UTC
-Contexto: ~56 %
+Última vuelta: 2026-10-07 08:10 UTC
+Contexto: ~60 %
 
 `/compact conservar: Dev 1 de CDI en la rama claude/dev1-tecnica.
 RENDIMIENTO-1b aceptada (ec3d793). EXCEL-1 en curso: parte 2 (leer Excel en
@@ -156,8 +205,10 @@ passed; faltan sabotajes (scripts/testing/sabotajes/excel1.sh), revisores,
 humo y aislamiento. Parte 1: el relevamiento del auditor está en PARA-PM.md
 (10 defectos en /upload_excel_v2/). D13 (borrar /upload_excel/, su alias
 public y /api/clientes/import), D14 (reglas de MARIA-1a de la Dev 2) y D15
-(fecha de hoy en maria_generator) abiertas. Sigo con los defectos 2, 4, 5,
-8, 10, la moneda «USD» inventada y el aviso de filas descartadas. Después:
+(fecha de hoy en maria_generator) abiertas. Hechos además (7e804e5, 1df55b0, excel1.sh): defectos 2, 4, 5,
+8, 10 y el aviso de filas descartadas; D16 (moneda USD por defecto del
+cliente) abierta. Faltan, después de D13/D14: defectos 1, 3, 6, 7, la
+prueba del TXT contra el PDF, la suite final, los revisores, humo y aislamiento. Después:
 MARIA-1b (con la D6 de la Dev 2) y PUNTA-A-PUNTA-1. Entorno: PM_DIR=/tmp/cdi-dev1,
 levantar.sh <SHA> 8811, venv /tmp/cdi-dev1/venv y venv-limpio; sabotajes en
 scripts/testing/sabotajes/. Rutina de la PM: trig_01TvMmGfSLDfbcJrf66ZZ7YK.`
