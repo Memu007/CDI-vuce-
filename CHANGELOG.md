@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-10-07 · fix: sin clave de Gemini no se inventan productos (MARIA-2)
 
-- **fix(pdf):** sin clave de Gemini o con el lector con IA apagado, subir un PDF ya no devuelve los dos «ITEM DEMOSTRACION»: responde 503 con `codigo: lectura_automatica_no_disponible` y cero productos, y la pantalla ofrece «Cargar los productos a mano».
+- **fix(pdf):** sin clave de Gemini o con el lector con IA apagado, subir un PDF ya no devuelve los dos «ITEM DEMOSTRACION»: responde 503 con `code: lectura_automatica_no_disponible`, cero productos y sin descontar la cuota diaria de PDFs; la pantalla ofrece «Cargar los productos a mano».
 
 ## 2026-09-17 · fix+test: cerrar el agujero de cobro y suite en verde (VUCE-3)
 

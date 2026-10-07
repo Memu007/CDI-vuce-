@@ -3427,7 +3427,7 @@ async def smart_validation(body: dict, user=Depends(get_current_user)):
 def _respuesta_sin_lector(mensaje: str) -> JSONResponse:
     return JSONResponse(
         status_code=503,
-        content={"detail": mensaje, "codigo": "lectura_automatica_no_disponible"},
+        content={"detail": mensaje, "code": "lectura_automatica_no_disponible"},
     )
 
 
@@ -3442,19 +3442,21 @@ async def upload_pdf_public(
     Sube y procesa un archivo PDF para extraer items y datos de operación.
     Requiere sesión activa (Gemini Vision consume créditos).
     """
-    if not lectura_automatica_disponible():
-        # Sin lector con IA: cero productos, sin descontar cuota, y un código
-        # que la pantalla distingue para ofrecer la carga manual (MARIA-2).
-        return _respuesta_sin_lector(MENSAJE_LECTURA_NO_DISPONIBLE)
     try:
+        from proyecto_maria.security.file_security import validate_file_upload, sanitize_filename
+        max_upload_bytes = _get_max_upload_bytes()
+        contents = await validate_file_upload(file, 'pdf', max_size=max_upload_bytes)
+
+        if not lectura_automatica_disponible():
+            # Sin lector con IA: cero productos, sin descontar cuota, y un
+            # código que la pantalla distingue para ofrecer la carga manual
+            # (MARIA-2).
+            return _respuesta_sin_lector(MENSAJE_LECTURA_NO_DISPONIBLE)
+
         # Cuota diaria de IA por usuario: corta abuso / facturazo de tokens.
         # Configurable via AI_DAILY_PDF_LIMIT (default 50/dia/usuario).
         from proyecto_maria.core.ai_quota import enforce_pdf_quota
         enforce_pdf_quota(user.get("username") if isinstance(user, dict) else None)
-
-        from proyecto_maria.security.file_security import validate_file_upload, sanitize_filename
-        max_upload_bytes = _get_max_upload_bytes()
-        contents = await validate_file_upload(file, 'pdf', max_size=max_upload_bytes)
 
         # Procesar PDF con el extractor
         safe_name = sanitize_filename(file.filename or 'upload.pdf')

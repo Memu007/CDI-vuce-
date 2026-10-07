@@ -1932,11 +1932,10 @@ class LecturaAutomaticaNoDisponible(RuntimeError):
 
 
 def lectura_automatica_disponible() -> bool:
-    """Hay lector con IA: el interruptor está prendido y hay clave de Gemini."""
-    import os
-
+    """Hay lector con IA: el interruptor está prendido y hay clave de Gemini
+    (una clave hecha sólo de espacios cuenta como que falta)."""
     flag_raw = str(os.environ.get('ENABLE_PDF_LLM_FALLBACK') or 'true').lower()
-    return flag_raw in ('1', 'true', 'yes', 'on') and bool(os.environ.get('GEMINI_API_KEY'))
+    return flag_raw in ('1', 'true', 'yes', 'on') and bool((os.environ.get('GEMINI_API_KEY') or '').strip())
 
 
 def _extract_with_gemini_vision(data: bytes) -> list[dict]:

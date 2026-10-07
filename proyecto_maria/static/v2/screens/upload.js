@@ -305,7 +305,7 @@
             if (!res.ok) {
                 const detail = (data && (data.detail || data.message)) || ('Error ' + res.status);
                 const e = new Error(detail);
-                e.codigo = data && data.codigo;
+                e.code = data && data.code;
                 throw e;
             }
 
@@ -375,7 +375,7 @@
             if (msg === 'payment_required') return;
             // Sin lector automático (MARIA-2): ningún producto, se ofrece
             // seguir con la carga manual.
-            if (err && err.codigo === 'lectura_automatica_no_disponible') {
+            if (err && err.code === 'lectura_automatica_no_disponible') {
                 showError(msg, { manual: true });
                 return;
             }
