@@ -66,7 +66,7 @@ Archivos abiertos por Dev:
 
 ## En curso
 
-- **Dev 1:** devolución de MARIA-1b (NaN e inf, escaneo de hojas que traba, CUIT, monedas; D22). Sigue: PUNTA-A-PUNTA-1
+- **Dev 1:** PUNTA-A-PUNTA-1. Sigue: EXCEL-2 (con la D26)
   y EXCEL-2.
 - **Dev 2:** devolución de MARIA-5 (dos pesos para una línea, filas que desaparecen, guarda del peso, subítems, grupos, una sola cuenta). Sigue: CATALOGO-NCM-1; MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
@@ -75,7 +75,7 @@ Archivos abiertos por Dev:
   `requirements.txt` nuevo): `1067 passed, 102 skipped, 0 failed`. Al
   integrar, dos pruebas de MARIA armaban su PDF con PyPDF2, que salió en
   RENDIMIENTO-1: pasan a `pypdf` (`7b42556`).
-- **Aceptada sin integrar:** EXCEL-1 (`7b119b6`), que entra con MARIA-1b.
+- **Integradas a las 15:20 UTC:** EXCEL-1 y MARIA-1b con su devolución (`beea9eb`). Suite sobre `6ea8ca9`: `1224 passed, 102 skipped, 1 xfailed`.
 - **Aceptadas el 2026-10-07 e integradas:** ADMIN-1 (`ac25dbc`), MARIA-2
   (`65ea6f3`) y ADMIN-2 (`f9f8393`). Suite sobre `f9f8393`, que tiene el
   mismo producto y las mismas pruebas que la rama de PM:
@@ -104,7 +104,7 @@ Archivos abiertos por Dev:
 | G2 · Imagen real | 🟢 | Cerrada el 2026-09-17 | — |
 | G3 · Aislamiento | 🟡 | La fuga de MARIA.TXT, cerrada en producción con el ensayo (sin cuentas ajenas: nadie vio facturas de Emi). Admin cerrado en la rama (ADMIN-1 y ADMIN-2). Abiertos: sesiones que reviven, límite de intentos burlable, prueba de aislamiento parcial | Fase 3 |
 | G4 · Producto (MARIA) | 🔴 | Origen mal leído, estado e IVA adicional fijos, peso por unidad, avisos tarde, gastos FOB sin cablear, banco, identificadores. Sin productos inventados (MARIA-2) | Fase 1 y la prueba en el Kit |
-| G5 · Pruebas | 🟢 | `1067 passed, 102 skipped, 0 failed` en la rama integrada (2026-10-07) | — |
+| G5 · Pruebas | 🟢 | `1224 passed, 102 skipped, 1 xfailed, 0 failed` en la rama integrada (`6ea8ca9`, 2026-10-07) | — |
 | G6 · Volver atrás | 🟡 | Esquema probado en local; falta la copia de la base | Fase 3 (y el ensayo lo ensaya) |
 | G7 · Cobro | 🔴 | El corte por impago cubre 2 funciones; cancelar no cancela en Mercado Pago; aviso de pago sin firma; doble suscripción; invitaciones | Fase 2 |
 | G8 · Piloto | ⚪ | Tres estudios presentan de verdad un MARIA de CDI | Fase 4 |
