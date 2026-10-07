@@ -5,8 +5,8 @@ este producto (NCM + descripcion parecida) = X". La proxima vez que aparezca
 un producto parecido de ese mismo cliente, lo sugerimos con alta confianza.
 
 Principios:
-- Se usa la misma sesion de DB que `save_client_operation` para que todo quede
-  en la misma transaccion (si la op se hace rollback, la memoria tambien).
+- `save_client_operation` guarda primero la operacion y despues, en otro
+  commit, la memoria: si la memoria falla, la operacion queda (GUARDAR-1).
 - Match por NCM exacto primero, despues fuzzy por descripcion normalizada
   (Jaccard >= 0.80). El umbral es el mismo que el catalogo de proveedores.
 - Promedios incrementales (media movil simple) para peso, valor unitario y
@@ -76,7 +76,7 @@ async def upsert_client_product_history(
         La entrada (nueva o actualizada). None si faltan campos obligatorios.
     """
     ncm = ncm_para_historial(ncm) or ""
-    descripcion = (descripcion or "").strip()
+    descripcion = (descripcion or "").replace("\x00", "").strip()
 
     if not ncm or not descripcion or not client_id or not owner_username:
         return None
