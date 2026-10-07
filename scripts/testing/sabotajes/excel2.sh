@@ -169,5 +169,47 @@ sabotaje $M "un producto mal formado vuelve a dar 500" \
   '            if False and (' \
   "FAILED $T::test_productos_mal_formados_dan_400"
 
+# Devolución (veredicto 2034b85)
+sabotaje $M "una combinada vuelve a recorrerse hasta su última fila" \
+  $'            filas = df.index[(df.index >= desde) & (df.index <= hasta)]\n            df.loc[filas, col] = valor' \
+  $'            for fila in range(f1 - 1, f2 - 1):\n                if fila in df.index:\n                    df.at[fila, col] = valor' \
+  "FAILED $T::test_una_combinada_gigante_repetida_no_traba_la_lectura"
+sabotaje $M "cantidad y precio combinados vuelven a copiarse" \
+  '_COMBINADAS_SE_COPIAN = {"descripcion", "origen", "pieza"}' \
+  '_COMBINADAS_SE_COPIAN = {"descripcion", "origen", "pieza", "cantidad", "valor_unitario", "peso_unitario"}' \
+  "FAILED $T::test_una_combinada_en_cantidad_o_precio_con_texto_no_se_copia[5 UN-USD 100]"
+sabotaje $M "el mapeo del cliente deja de contar para las combinadas" \
+  '    campos.update(dict(mapeo or {}))' \
+  '    pass' \
+  "FAILED $T::test_una_combinada_en_la_columna_de_cantidad_del_mapeo_del_cliente_tampoco_se_copia"
+sabotaje $M "una fila vacía dentro de una combinada vuelve a ser «sin leer»" \
+  '    return _rellenar_combinadas(df, combinadas, mapeo)[~vacias]' \
+  '    return _rellenar_combinadas(df, combinadas, mapeo).dropna(how="all")' \
+  "FAILED $T::test_una_fila_vacia_dentro_de_una_combinada_no_es_una_fila_sin_leer"
+sabotaje $M "el CSV vuelve a ir a UTF-8 por un solo par" \
+  '            if validas and len(validas) >= sueltos:' \
+  '            if validas:' \
+  "FAILED $T::test_un_csv_cp1252_con_un_par_que_parece_utf8_no_pierde_las_tildes"
+sabotaje $M "el CSV mezclado deja de avisar" \
+  '            if validas and sueltos:' \
+  '            if False:' \
+  "FAILED $T::test_un_csv_con_codificacion_dudosa_avisa"
+sabotaje $C "con la cantidad mala vuelve a nombrar valor y peso" \
+  '        por = None if cantidad_mala else cantidad' \
+  '        por = cantidad' \
+  "FAILED $T::test_una_cantidad_mala_nombra_solo_la_cantidad"
+sabotaje $F "los estilos vuelven a tener sólo tope de MB" \
+  '                                     or _mas_elementos_que(z, parte, tope_elementos)):' \
+  '                                     or False):' \
+  "FAILED $T::test_estilos_con_millones_de_elementos_se_rechazan_antes_de_abrir[xf]"
+sabotaje $F "una relación de Type raro vuelve a no ser hoja" \
+  '        if "chartsheet" in (r.get("Type") or ""):' \
+  '        if not (r.get("Type") or "").endswith("/worksheet"):' \
+  "FAILED $T::test_una_hoja_con_una_relacion_rara_cuenta_y_sale_de_la_copia"
+sabotaje $F "la primera hoja vuelve a tener tope de 30 MB" \
+  '        tope_hoja = _mb_de_entorno("EXCEL_MAX_PRIMERA_HOJA_MB", 10)' \
+  '        tope_hoja = _mb_de_entorno("EXCEL_MAX_PRIMERA_HOJA_MB", 30)' \
+  "FAILED $T::test_una_primera_hoja_de_27_mb_se_rechaza"
+
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]

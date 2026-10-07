@@ -546,9 +546,15 @@ def test_una_combinada_gigante_repetida_no_traba_la_lectura():
         ["84798999900H", "MAQUINA DEMO", "China", 1, 5000, 1220],
         ["84714900100D", "EQUIPO DEMO", None, 6, 1197, 33],
     ]), ["C2:C1048576"] * 2000)
+    import threading
+    salida = {}
+    hilo = threading.Thread(target=lambda: salida.update(r=_subir(contenido)), daemon=True)
     inicio = time.monotonic()
-    r = _subir(contenido)
+    hilo.start()
+    hilo.join(10)
     tardo = time.monotonic() - inicio
+    assert not hilo.is_alive(), "la lectura sigue trabada a los 10 s"
+    r = salida["r"]
     assert r.status_code == 200, r.text[:300]
     assert [i["origen"] for i in r.json()["items"]] == ["CN", "CN"]
     assert tardo < 1.5, f"tardó {tardo:.1f} s"

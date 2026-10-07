@@ -167,7 +167,7 @@ sabotaje $M "una fórmula sin valor guardado deja de ser un dato" \
   '            if False:' \
   "FAILED $D::test_una_hoja_con_formulas_sin_valor_guardado_se_avisa"
 sabotaje $M "una hoja de gráfico vuelve a contar como hoja" \
-  '        if not (r.get("Type") or "").endswith("/worksheet"):' \
+  '        if "chartsheet" in (r.get("Type") or ""):' \
   '        if False:' \
   "FAILED $D::test_una_hoja_de_grafico_primero_no_corre_las_hojas"
 sabotaje $C "el CUIT vuelve a aceptar dígitos de otros alfabetos" \
