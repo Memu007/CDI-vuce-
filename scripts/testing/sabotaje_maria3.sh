@@ -161,7 +161,7 @@ reemplazar $X "    return str(raw).strip().rstrip('.').strip().upper() in palabr
 caso no_aplica_se_marca "${T}test_no_aplica_no_es_un_dato_sin_leer[na_guion-pymupdf]"
 
 # 16. el lector vuelve a poner «None» en la fecha que no vino (una copia)
-reemplazar_primero $X "'fecha_emision': str(operacion.get('fecha_emision') or '')," \
+reemplazar_primero $X "'fecha_emision': _texto(operacion.get('fecha_emision'))," \
   "'fecha_emision': str(operacion.get('fecha_emision', '')),"
 caso fecha_none "${T}test_la_fecha_que_no_vino_queda_vacia[None-"
 

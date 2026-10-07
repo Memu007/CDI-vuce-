@@ -53,7 +53,10 @@ def _pedido_como_la_pantalla(op, items):
     factura = (op.get("numero_factura") or "").strip()
     return {
         "operation_id": ("FAC_" + factura) if factura else "OP_20261007120000",
-        "items": [dict(ITEM_BASE, descripcion=it["descripcion"] + " para prueba", estado=2) for it in items],
+        # Lo que el lector leyó de cada producto, con la NCM y el resto que se
+        # cargan en NCM.
+        "items": [dict(ITEM_BASE, estado=2, descripcion=it["descripcion"], origen=it["origen"],
+                       codigo_parte=it.get("codigo_parte", "")) for it in items],
         "moneda": op.get("moneda") or "DOL",
         "incoterm": op.get("incoterm") or "FOB",
         "vendedor_nombre": op.get("vendedor_nombre", ""),
@@ -99,3 +102,25 @@ def test_con_la_caratula_completa_no_avisa():
 def test_sin_los_datos_de_la_caratula_no_se_evaluan():
     """Quien no pasa esos datos (llamadas viejas) no recibe el aviso."""
     assert "carátula" not in " | ".join(supuestos_declarados([dict(ITEM_BASE)])).lower()
+
+
+@pytest.mark.parametrize("copia", COPIAS)
+@pytest.mark.parametrize("vacio", ["None", "null", "N/A", " none "])
+def test_el_vacio_escrito_como_texto_queda_vacio(monkeypatch, copia, vacio):
+    factura = {"operacion": {"numero_factura": vacio, "moneda": vacio, "incoterm": vacio,
+                             "vendedor_nombre": vacio}, "items": VACIA["items"]}
+    op = _leer(monkeypatch, copia, factura)["operacion"]
+    assert (op["numero_factura"], op["moneda"], op["incoterm"], op["vendedor_nombre"]) == ("", "", "", "")
+
+
+@pytest.mark.parametrize("copia", COPIAS)
+def test_una_descripcion_que_no_es_texto_no_tira_el_producto(monkeypatch, copia):
+    factura = {"operacion": {}, "items": [dict(VACIA["items"][0], descripcion=4521)]}
+    items = _leer(monkeypatch, copia, factura)["items"]
+    assert [i["descripcion"] for i in items] == ["4521"]
+
+
+def test_el_prompt_no_pide_adivinar_la_moneda():
+    import pathlib
+    texto = (pathlib.Path(__file__).resolve().parents[1] / "proyecto_maria" / "pdf_extractor.py").read_text()
+    assert "Ante duda, DOL" not in texto

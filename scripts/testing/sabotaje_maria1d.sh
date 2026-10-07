@@ -81,7 +81,7 @@ echo "VERDE  sin sabotaje: $(grep -E 'passed' <<<"$base" | tail -1)"
 
 
 # 1. vuelve el «None»
-reemplazar $X '    return "" if raw is None else str(raw).strip()' '    return str(raw).strip()'
+reemplazar $X '    texto = "" if raw is None else str(raw).strip()' '    texto = str(raw).strip()'
 caso vuelve_el_none "${T}test_campo_nulo_queda_vacio[vendedor_nombre-pdf_directo]"
 
 # 2. una copia vuelve a inventar la moneda
@@ -101,8 +101,16 @@ reemplazar $M "        vendedor_nombre=request.vendedor_nombre,
 caso endpoint_sin_caratula "${T}test_ningun_none_en_el_txt_de_una_factura_vacia[pdf_directo]"
 
 # 5. lo leído llega con espacios
-reemplazar $X '    return "" if raw is None else str(raw).strip()' '    return "" if raw is None else str(raw)'
+reemplazar $X '    texto = "" if raw is None else str(raw).strip()' '    texto = "" if raw is None else str(raw)'
 caso sin_limpiar "${T}test_lo_que_se_leyo_llega_limpio[pdf_directo]"
 
+# 6. el vacío escrito como texto pasa
+reemplazar $X "_TEXTO_VACIO = {'NONE', 'NULL', 'N/A'}" "_TEXTO_VACIO = set()"
+caso vacio_como_texto "${T}test_el_vacio_escrito_como_texto_queda_vacio[None-pdf_directo]"
+
+# 7. una descripción que no es texto tira el producto
+reemplazar $X "                            descripcion = _texto(item_data.get('descripcion'))" "                            descripcion = item_data.get('descripcion', '')"
+caso descripcion_numero "${T}test_una_descripcion_que_no_es_texto_no_tira_el_producto[pymupdf]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 5 sabotajes dan rojo por la razón esperada"
+echo "OK: los 7 sabotajes dan rojo por la razón esperada"
