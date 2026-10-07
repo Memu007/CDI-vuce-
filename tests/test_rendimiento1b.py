@@ -193,3 +193,62 @@ def test_tiempos_infinitos_o_raros_usan_el_de_siempre(monkeypatch, valor):
     assert main._pdf_vendor_timeout_s() == 15.0
     assert main._segundos_de_entorno("NCM_GEMINI_TIMEOUT_S", 30.0) == 30.0
     assert file_security._pdf_validate_timeout_s() == 30.0
+
+
+def _pdf_con_textos_ubicados(textos) -> bytes:
+    """Un PDF de una página con textos en (x, y): para armar columnas."""
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+    w = PdfWriter()
+    pagina = w.add_blank_page(600, 800)
+    fuente = DictionaryObject({NameObject("/Type"): NameObject("/Font"),
+                               NameObject("/Subtype"): NameObject("/Type1"),
+                               NameObject("/BaseFont"): NameObject("/Helvetica")})
+    pagina[NameObject("/Resources")] = DictionaryObject({
+        NameObject("/Font"): DictionaryObject({NameObject("/F1"): w._add_object(fuente)})})
+    cuerpo = "".join(f"BT /F1 11 Tf {x} {y} Td ({t}) Tj ET\n" for x, y, t in textos)
+    contenido = DecodedStreamObject()
+    contenido.set_data(cuerpo.encode("latin-1"))
+    pagina[NameObject("/Contents")] = w._add_object(contenido)
+    buf = io.BytesIO()
+    w.write(buf)
+    return buf.getvalue()
+
+
+ETIQUETAS = {"BUYER", "CONSIGNEE", "SELLER", "SHIPPER", "VENDOR", "SUPPLIER",
+             "EXPORTER", "IMPORTER", "NOTIFY", "NOTIFY PARTY", "SOLD TO", "BILL TO",
+             "SHIP TO", "COMPRADOR", "VENDEDOR", "PROVEEDOR", "FORNECEDOR",
+             "CONSIGNATARIO", "DESTINATARIO", "REMITENTE", "CLIENTE", "CUSTOMER"}
+
+
+def _vendedor(datos):
+    from proyecto_maria.pdf_extractor import extraer_texto_pdf_seguro, detect_vendor_from_text
+    return detect_vendor_from_text(extraer_texto_pdf_seguro(datos))
+
+
+def test_dos_columnas_el_vendedor_no_es_una_etiqueta():
+    """«SELLER:» y «BUYER:» en la misma fila y los nombres debajo: pypdf junta
+    las columnas. El vendedor tiene que ser el nombre o quedar vacío, nunca
+    «BUYER» (devolución de la PM sobre RENDIMIENTO-1b)."""
+    datos = _pdf_con_textos_ubicados([
+        (50, 750, "COMMERCIAL INVOICE"),
+        (50, 720, "SELLER:"), (320, 720, "BUYER:"),
+        (50, 705, "ACME TRADING LTD"), (320, 705, "GLOBEX IMPORT SA"),
+    ])
+    vendedor = _vendedor(datos)
+    assert vendedor.upper().strip(" :") not in ETIQUETAS, vendedor
+    assert vendedor in ("ACME TRADING LTD", ""), vendedor
+
+
+@pytest.mark.parametrize("texto,esperado", [
+    ("SELLER: BUYER:\nACME TRADING LTD GLOBEX IMPORT SA", ""),
+    ("SHIPPER: CONSIGNEE:\nACME", ""),
+    ("VENDOR: ACME TRADING LTD BUYER: GLOBEX IMPORT SA", "ACME TRADING LTD"),
+    ("EXPORTER - ACME TRADING LTD   CONSIGNEE: GLOBEX", "ACME TRADING LTD"),
+    ("SELLER: NOTIFY PARTY", ""),
+    ("SUPPLIER: Toyota Tsusho Corp", "Toyota Tsusho Corp"),
+    ("VENDOR: ACME TRADING CO LTD", "ACME TRADING CO LTD"),
+])
+def test_el_vendedor_nunca_es_una_etiqueta(texto, esperado):
+    from proyecto_maria.pdf_extractor import detect_vendor_from_text
+    assert detect_vendor_from_text(texto) == esperado

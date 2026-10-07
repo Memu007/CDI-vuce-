@@ -74,6 +74,16 @@ sabotaje $M "un tiempo infinito vuelve a apagar el tiempo máximo" \
   '    return valor if math.isfinite(valor) and valor > 0 else defecto' \
   '    return valor if valor > 0 else defecto' \
   'FAILED tests/test_rendimiento1b.py::test_tiempos_infinitos_o_raros_usan_el_de_siempre[inf]'
+sabotaje $E "el vendedor vuelve a poder ser una etiqueta" \
+  '    if _VENDOR_ES_ETIQUETA_RE.match(candidate):
+        return ""' \
+  '    if False:
+        return ""' \
+  'FAILED tests/test_rendimiento1b.py::test_dos_columnas_el_vendedor_no_es_una_etiqueta'
+sabotaje $E "el vendedor ya no se corta antes de otra etiqueta" \
+  '    candidate = _VENDOR_CORTE_EN_ETIQUETA_RE.split(candidate, maxsplit=1)[0].strip(' \
+  '    candidate = [candidate][0].strip(' \
+  'FAILED tests/test_rendimiento1b.py::test_el_vendedor_nunca_es_una_etiqueta[VENDOR'
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"
