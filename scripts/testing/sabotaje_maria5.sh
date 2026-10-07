@@ -208,7 +208,9 @@ reemplazar $M "            rename = {src: canon for src, canon in rename.items()
 caso mapeo_manda "${D}test_excel_el_mapeo_guardado_no_le_gana_al_neto"
 
 # 30. Excel: la diferencia entre los dos pesos no se avisa
-reemplazar $M "        if distinto.any():" "        if False:"
+reemplazar $M "            (unidad * cantidad - peso).abs() > (peso / 100).clip(lower=0.001))
+        if distinto.any():" "            (unidad * cantidad - peso).abs() > (peso / 100).clip(lower=0.001))
+        if False:"
 caso excel_sin_aviso_de_diferencia "${D}test_excel_con_dos_pesos_gana_el_de_la_linea[Weight-Net Weight]"
 
 # 31. el peso vuelve a leerse sin el separador de la planilla

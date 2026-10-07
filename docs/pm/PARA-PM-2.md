@@ -2,6 +2,50 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## MARIA-5 y CATALOGO-NCM-1 — segunda devolución: **`61cf88f`**
+
+**Resultado: los seis puntos de `b2bb20c`, con rojo antes y verde después.
+Para decidir: nada nuevo; la D27 de SUBITEMS-1 sigue abierta.** Base: tu rama
+hasta `b2bb20c` integrada, con SUBITEMS-1 (`88564ec`) adentro. SUBITEMS-1 ya
+estaba entregada en un corte limpio cuando llegó el veredicto.
+
+| # | Qué hace ahora | Prueba (`tests/test_devolucion2_maria5_ncm.py`) |
+|---|---|---|
+| 1 | Una columna de peso que no dice de qué es («Peso por caja», «Peso por bulto») es «dudosa». Nunca le gana a una reconocida: «Peso por caja» = 40 y «Peso» = 2,5 da 2,5, en cualquier orden. Sola, se usa como de una unidad, con el aviso «no dice si es el peso de una unidad o el de toda la línea… Revisala». Orden: neto > total > de una unidad > dudosa > bruto | rojo antes: 400 kg |
+| 2 | El bruto es bruto aunque diga «unitario» («Peso bruto unitario», «Gross weight per unit»): va último y con aviso | rojo antes: leído como neto |
+| 3 | Dos pesos de la línea que no coinciden: «en 1 fila(s) «Peso total» no da lo mismo que «Peso neto» (por ejemplo, 27 kg y 25 kg)» | rojo antes: sólo los nombres |
+| 4 | `pantalla_maria5.js` manda CUIT, vendedor y comprador (MARIA-1b) | las tres pantallas dan OK en `135ff27`, el producto de `61cf88f` |
+| 5 | La NCM tiene **un solo aviso**: el de `_control_ncm`, con el texto del catálogo vigente («se dio de baja en el nomenclador vigente de ARCA (2026-10-07)… buscá la nueva»; ya no «el de 2018»). Sale en `/api/validate/smart` con cabecera o sin ella, en `/generate_maria` y **en `/generate_maria/avisos`**. Sigue siendo aviso, no freno. `run_smart_validations` ya no lo agrega por su cuenta. `test_maria1b_controles.py` espera el texto nuevo | rojo antes: dos avisos, y ninguno en los avisos de antes de generar |
+| 6 | Sin el archivo del catálogo (la prueba apunta a uno que no existe) no se inventa «perdió el 0 inicial»: un solo aviso por operación, «No está el catálogo de NCM…» | rojo antes: el error con 9999999 y 1012100000A |
+| De paso | Los mensajes del peso dicen la razón: «no es un número válido» (NaN, infinito), «es negativo», «pasa el tope», «al menos 0.001 kg». En los avisos del Excel, 0,0004 kg no sale «0 kg» | rojo antes: NaN decía «tope» y -1, «no es un número» |
+
+Las pruebas nuevas contra la base (`dd5e851`, la rama con SUBITEMS-1 e
+integrada) dan `15 failed, 5 passed` (corrido).
+
+| Puerta (sobre `61cf88f`) | Resultado |
+|---|---|
+| Suite completa, worktree limpio, venv sólo con `requirements.txt` | `1495 passed, 102 skipped, 2 xfailed, 25 warnings in 153.80s`, 0 failed |
+| `pantalla_maria5.js`, `pantalla_catalogo_ncm1.js` y `pantalla_subitems1.js` (servidor local en `135ff27`, el mismo producto) | `OK: pantalla MARIA-5`, `OK: pantalla CATALOGO-NCM-1`, `OK: pantalla SUBITEMS-1` |
+| Sabotajes | RESULTADOS_SAB |
+
+No hice autorrevisión con subagente en esta vuelta: son seis puntos chicos y
+el contexto está alto. Para que la mires: la regla de la columna «dudosa» es
+nueva. Hoy cuentan como de una unidad sólo «Peso», «Weight», «Peso kg» y
+«Kg» (con o sin paréntesis), y las que dicen «unit»/«unidad»; cualquier otro
+nombre que empiece con «Peso» o contenga «weight» es dudoso.
+
+Para reproducir:
+```
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 61cf88f 8890
+for s in maria5 catalogo_ncm1 subitems1; do BASE_URL=http://127.0.0.1:8890 node scripts/testing/pantalla_$s.js; done
+python -m pytest -q tests/test_devolucion2_maria5_ncm.py tests/test_maria1b_controles.py
+```
+
+Última vuelta: 2026-10-07 20:20 UTC
+Contexto: ~62 % (a compactar)
+
+---
+
 ## SUBITEMS-1 — entregada: **`88564ec`**
 
 **Resultado: terminada. Para decidir: la D27 (guardar los subítems con la
