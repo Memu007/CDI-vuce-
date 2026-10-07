@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Negativos de PUNTA-A-PUNTA-1: cada sabotaje rompe una línea del lector del
-# PDF, del mapeo del Excel o del generador, y la prueba de todo el recorrido
+# PDF, del mapeo del Excel, de la ruta o del generador, y la prueba de todo el recorrido
 # (tests/test_punta_a_punta1.py) tiene que ponerse roja por ese motivo.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/punta_a_punta1.sh [SHA]
@@ -65,7 +65,14 @@ sabotaje $G "el generador deja el seguro fuera de la base imponible" \
 sabotaje $G "el generador calcula el FOB del subítem sin la cantidad" \
   '                lines.append(f"MSBTFOB={sub_cant * sub_unit:.2f}")' \
   '                lines.append(f"MSBTFOB={sub_unit:.2f}")' \
-  'FAILED tests/test_punta_a_punta1.py::test_subitems_de_punta_a_punta_dan_los_del_archivo_real[pdf]'
+  'FAILED tests/test_punta_a_punta1.py::test_subitems_de_punta_a_punta_dan_el_archivo_real[pdf]'
+# Ruta /generate_maria: la procedencia de la operación (MARIA-3) no llega a los productos.
+sabotaje $M "la procedencia de la operación no llega a los productos" \
+  '    procedencia = str(request.procedencia or "").strip()
+    if not procedencia:' \
+  '    procedencia = ""
+    if not procedencia:' \
+  'FAILED tests/test_punta_a_punta1.py::test_pdf_de_punta_a_punta_da_el_archivo_real'
 
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]
