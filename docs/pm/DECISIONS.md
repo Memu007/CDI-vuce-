@@ -32,6 +32,7 @@ repositorio.
 | **Roadmap aprobado** | 2026-10-07 | Emi: «apruebo». `ROADMAP.md` del 2026-10-07: Fase A sin esperar al despachante, Fase B con sus respuestas. Las semanas se cuentan desde hoy |
 | **Dos Devs** | 2026-10-07 | Emi: «dale 2 devs, lo que haga mejor el proyecto». Dev 1 con la cola técnica, Dev 2 con la cola MARIA. Sin PM visual: a las dos las revisa la PM principal |
 | **Lo que pueden usar las Devs** | 2026-10-07 | Emi: «que las devs tengan acceso a todo menos el advisor, que es tuyo, y subagentes nunca pueden usar fable, y cada dev fijate que max de esfuerzo sea alto». Las Devs: todas las herramientas, sin consejero; su sesión y sus subagentes, hasta esfuerzo alto. **Nadie** lanza un subagente con Fable, tampoco la PM |
+| **Compactar antes: 30 % las Devs, 40 % las PMs** | 2026-10-07 | Emi: «dale 30/40» (antes, 50 y 60, sin razón escrita). Cada paso relee toda la memoria del chat y las tres sesiones comparten el plan. Excepción al congelamiento de reglas, por decisión de Emi. Se revisa el 2026-10-27 con lo que usa cada pieza |
 | **Publicación de ensayo** | 2026-10-07 | Emi: «dale». Se publica la rama de trabajo más las reglas nuevas. El «dale» final va para el SHA exacto, de día y con los chequeos de Railway hechos |
 
 ---
