@@ -1929,7 +1929,8 @@ MENSAJE_LECTURA_NO_DISPONIBLE = (
 
 
 class LecturaAutomaticaNoDisponible(RuntimeError):
-    """El lector con IA está apagado o falta la clave: no hay ítems leídos."""
+    """No hay lectura automática: el lector con IA está apagado, falta la
+    clave (MARIA-2) o la llamada a Gemini falló (MARIA-2b). No hay ítems."""
 
 
 def lectura_automatica_disponible() -> bool:
@@ -2121,7 +2122,11 @@ def _extract_with_gemini_vision(data: bytes) -> list[dict]:
         
         # Import and configure Gemini
         import google.generativeai as genai
-        genai.configure(api_key=api_key)
+        try:
+            genai.configure(api_key=api_key)
+        except Exception as conf_err:
+            print(f"❌ Gemini configure error: {conf_err}")
+            raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)
         
         # Use all page images (up to 10 pages to avoid token limits)
         images_to_process = page_images[:10]  # Limit to first 10 pages
@@ -2336,7 +2341,10 @@ IMPORTANTE:
                         return {'operacion': operacion_data, 'items': items}
                     else:
                         print(f"⚠️ {model_name} returned no valid items")
+                        gemini_fallo = False  # respondió, sin productos
                         continue  # Try next model
+                else:
+                    gemini_fallo = True  # respuesta vacía o bloqueada
                 
             except Exception as e:
                 gemini_fallo = True
@@ -2508,6 +2516,9 @@ IMPORTANTE:
                             print(f"✅ Direct PDF extraction: {len(items)} items + operacion with {model_name}")
                             # Retornar como dict con operacion e items
                             return {'operacion': operacion_data, 'items': items}
+                        gemini_fallo = False  # respondió, sin productos
+                    else:
+                        gemini_fallo = True  # respuesta vacía o bloqueada
                 except Exception as model_err:
                     gemini_fallo = True
                     print(f"❌ {model_name} error: {model_err}")
@@ -2524,6 +2535,8 @@ IMPORTANTE:
             print(f"❌ Direct PDF extraction failed: {direct_err}")
             raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)
             
+    except LecturaAutomaticaNoDisponible:
+        raise
     except Exception as e:
         print(f"❌ Error converting PDF to image: {e}")
         return _fallback_image_extraction(data)
