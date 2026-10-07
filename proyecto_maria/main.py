@@ -3298,13 +3298,17 @@ def _pdf_read_timeout_s() -> float:
         return 120.0
 
 
+class LecturaPdfDemasiadoLarga(Exception):
+    """La lectura del PDF pasó de PDF_READ_TIMEOUT_S."""
+
+
 async def _leer_pdf_aparte(funcion, *args):
     """Corre una lectura sincrónica de PDF en otro hilo, con tiempo máximo.
 
     Así el servidor sigue atendiendo a los demás mientras se lee un PDF
-    (RENDIMIENTO-1). Si la lectura pasa de PDF_READ_TIMEOUT_S, responde 504
-    con un error propio. El hilo no se puede cortar desde afuera: termina
-    solo, pero ya nadie lo espera.
+    (RENDIMIENTO-1). Si la lectura pasa de PDF_READ_TIMEOUT_S, levanta
+    LecturaPdfDemasiadoLarga. El hilo no se puede cortar desde afuera:
+    termina solo, pero ya nadie lo espera.
     """
     import asyncio
     try:
@@ -3312,12 +3316,8 @@ async def _leer_pdf_aparte(funcion, *args):
             asyncio.to_thread(funcion, *args), timeout=_pdf_read_timeout_s()
         )
     except asyncio.TimeoutError:
-        raise HTTPException(
-            status_code=504,
-            detail={
-                "code": "PDF_READ_TIMEOUT",
-                "message": "Leer el PDF tardó demasiado. Probá de nuevo o cargá los productos a mano.",
-            },
+        raise LecturaPdfDemasiadoLarga(
+            "Leer el PDF tardó demasiado. Probá de nuevo o cargá los productos a mano."
         )
 
 
@@ -3502,6 +3502,11 @@ async def upload_pdf_public(
             result = await _leer_pdf_aparte(process_pdf, contents)
         except LecturaAutomaticaNoDisponible as e:
             return _respuesta_sin_lector(str(e))
+        except LecturaPdfDemasiadoLarga as e:
+            return JSONResponse(
+                status_code=504,
+                content={"detail": str(e), "code": "PDF_READ_TIMEOUT"},
+            )
         
         # Manejar tanto formato nuevo (dict) como viejo (lista)
         if isinstance(result, dict) and 'items' in result:
