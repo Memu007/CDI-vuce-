@@ -23,6 +23,8 @@
         ['5', 'Usado argentino (incluye reacondicionado)'],
         ['6', 'Usado importado (incluye reacondicionado)'],
     ];
+    // El estado corresponde al origen: 1, 3 y 5 argentinos; 2, 4 y 6 importados.
+    const ESTADOS_ARGENTINOS = ['1', '3', '5'];
     const IVA = [['NO_VALIDA', 'Reventa'], ['IVAAD1', 'Uso particular']];
     const EMPRESAS = [['PSAD06', 'Modoc'], ['PSAD01', 'Lakaut']];
 
@@ -31,6 +33,20 @@
     function esArgentino(origen) {
         const o = String(origen || '').trim().toUpperCase().replace(/\./g, '');
         return o === 'AR' || o === '200' || o === 'ARGENTINA';
+    }
+    function claseOrigen(origen) { return esArgentino(origen) ? 'AR' : 'EXT'; }
+    function estadosPara(origen) {
+        const arg = esArgentino(origen);
+        return ESTADOS.filter(([v]) => ESTADOS_ARGENTINOS.includes(v) === arg);
+    }
+    // Un estado elegido para otra clase de origen ya no vale: se vuelve a pedir.
+    function limpiarEstadosViejos(items) {
+        items.forEach(it => {
+            if (it.estado != null && it.estado !== '' && it.estado_origen !== claseOrigen(it.origen)) {
+                it.estado = null;
+                it.estado_origen = null;
+            }
+        });
     }
     function opciones(lista, elegido, vacio) {
         const html = vacio ? ['<option value="">' + CDI.escapeHtml(vacio) + '</option>'] : [];
@@ -79,6 +95,7 @@
         if (!wrap) return;
         const e = elegidos();
         const items = CDI.state.items || [];
+        limpiarEstadosViejos(items);
         const banco = $('despachanteBanco');
         if (document.activeElement !== banco) {
             banco.value = e.banco_bcra != null ? e.banco_bcra : (propuesta.banco_bcra || '');
@@ -91,7 +108,7 @@
             return '<tr>' +
                 '<td>' + (i + 1) + '. ' + CDI.escapeHtml(String(it.descripcion || '').slice(0, 60)) + '</td>' +
                 '<td><select class="form-input despachante-estado" data-row="' + i + '">' +
-                opciones(ESTADOS, estado, 'Elegí el estado') + '</select></td>' +
+                opciones(estadosPara(it.origen), estado, 'Elegí el estado') + '</select></td>' +
                 '<td><select class="form-input despachante-iva" data-row="' + i + '">' +
                 opciones(IVA, it.iva_adicional || '', 'Igual que la operación') + '</select></td>' +
                 '</tr>';
@@ -109,7 +126,10 @@
         else if (t.id === 'despachanteIva') e.iva_adicional = t.value;
         else if (t.classList.contains('despachante-estado')) {
             const it = items[Number(t.dataset.row)];
-            if (it) it.estado = t.value || null;
+            if (it) {
+                it.estado = t.value || null;
+                it.estado_origen = t.value ? claseOrigen(it.origen) : null;
+            }
         } else if (t.classList.contains('despachante-iva')) {
             const it = items[Number(t.dataset.row)];
             if (it) it.iva_adicional = t.value || null;
@@ -146,6 +166,7 @@
     // ¿Se puede generar? Muestra los errores y avisos al lado.
     function leer() {
         const items = CDI.state.items || [];
+        limpiarEstadosViejos(items);
         const v = valores();
         const errores = [];
         if (v.banco_bcra && !/^[0-9]{3}$/.test(v.banco_bcra)) {

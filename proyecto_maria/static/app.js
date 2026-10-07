@@ -3392,6 +3392,13 @@ async function generateMariaTxt() {
             throw new Error(data.detail?.errors?.join(', ') || data.detail || 'Error generando MARIA');
         }
 
+        // MARIA-4: lo que el sistema declaró por defecto y los avisos del
+        // generador se muestran antes de pegar el TXT en el Kit.
+        const avisosMaria = [...(data.warnings || []), ...(data.supuestos || [])];
+        if (avisosMaria.length) {
+            alert('Revisá antes de pegar el TXT en el Kit:\n\n- ' + avisosMaria.join('\n- '));
+        }
+
         // Éxito - descargar archivo
         btn.innerHTML = '<i class="fas fa-check-circle"></i> ¡Generado!';
         btn.classList.add('state-success');

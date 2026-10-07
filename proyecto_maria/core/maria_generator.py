@@ -236,6 +236,10 @@ ESTADOS_MERCADERIA = {
     6: "Usado importado (incluye reacondicionado)",
 }
 ESTADO_POR_DEFECTO_IMPORTADO = 2
+# Los nombres dicen si la mercadería es argentina o importada: el estado
+# tiene que corresponder al origen (devolución de la PM sobre MARIA-4).
+ESTADOS_ARGENTINOS = {1, 3, 5}
+ESTADOS_IMPORTADOS = {2, 4, 6}
 
 # IVA adicional (IVAADICIONAL1): reventa o uso particular (respuesta 2,
 # 21:34; archivo de 2026). La reducción o exclusión es una «ventaja» que se
@@ -270,6 +274,12 @@ def _estado_item(item: dict, idx, pais_codigo: int) -> int:
         estado = 0
     if estado not in ESTADOS_MERCADERIA:
         raise ValueError(f"Ítem {idx}: estado de la mercadería «{raw}» no válido (1 a 6).")
+    argentino = pais_codigo == PAIS_ARGENTINA
+    if (argentino and estado in ESTADOS_IMPORTADOS) or (not argentino and estado in ESTADOS_ARGENTINOS):
+        raise ValueError(
+            f"Ítem {idx}: el estado «{ESTADOS_MERCADERIA[estado]}» no corresponde al origen "
+            f"({'argentino' if argentino else 'extranjero'}); elegí otro."
+        )
     return estado
 
 
@@ -924,7 +934,8 @@ def supuestos_declarados(
     for idx, item in enumerate(items or [], start=1):
         if not isinstance(item, dict):
             continue
-        origen = item.get("origen") or item.get("pais_origen")
+        # Mismo orden que el generador: pais_origen primero.
+        origen = item.get("pais_origen") or item.get("origen")
         proc = item.get("procedencia") or item.get("pais_procedencia")
         if origen and not proc:
             sin_procedencia.append(str(idx))
@@ -947,7 +958,7 @@ def supuestos_declarados(
     sin_estado = [
         str(idx) for idx, item in enumerate(items or [], start=1)
         if isinstance(item, dict) and item.get("estado") in (None, "")
-        and get_pais_codigo(item.get("origen") or item.get("pais_origen")) != PAIS_ARGENTINA
+        and get_pais_codigo(item.get("pais_origen") or item.get("origen")) != PAIS_ARGENTINA
     ]
     if sin_estado:
         avisos.append(
