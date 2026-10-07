@@ -111,12 +111,62 @@ peso dicen la razón real.
 - `test_celda_en_la_ultima_fila_no_recorre_un_millon_de_filas` dio rojo una
   vez bajo carga (4,3 s contra un tope de 8 s). Es de entorno: sola pasa.
 
+**SUBITEMS-1 (`88564ec`): se sostiene.** Se integra junto con esta
+reentrega, porque está arriba de ella.
+
+**Lo que corrió la PM:**
+- Rojo antes con el producto de `db2bc04`: `14 failed, 9 passed`.
+- Suite: `1475 passed, 102 skipped, 2 xfailed`.
+
+**El subagente:**
+- En 3600 pedidos al azar, los `MSBTFOB` suman el `MARTFOB` y no hay líneas
+  inyectadas.
+- Los 400 nuevos son sólo los que la pieza rechaza a propósito.
+- No hay XSS.
+
+Detalle en `REPRODUCCION-SUBITEMS-1-2026-10-07.md`. Sumá a la misma
+reentrega estos cuatro arreglos chicos:
+
+7. **`subitems` con un número o `true` da 500.** Con `5`, `True` o `3.5` el
+   servidor da 500: `controles_antes_de_generar` revienta en
+   `controles_maria.py:106` antes de tu chequeo de forma. Tiene que dar 400.
+8. **La pantalla y el servidor, la misma cuenta.** El panel compara en
+   float y el servidor en decimal exacto, y en el borde de 0,01 discrepan.
+   - Con 19 × 0,333 contra 6,32, la pantalla muestra «✓» y el servidor da
+     400.
+   - En el caso inverso, la pantalla muestra «⚠» y el servidor genera.
+9. **El texto de la suma muestra las cantidades con sus decimales.** Hoy
+   1,5 + 1,4 contra 3 dice «Suman 3 de 3 unidades», y el aviso no dice qué
+   falla.
+10. **Un error de sufijo de un subítem sale bajo su subítem**, no bajo el
+    campo del sufijo general (`finalize.js` busca «sbt» en el mensaje).
+
+**Se deja:**
+- Deshacer una acción masiva cierra los paneles abiertos; los datos quedan.
+- La prueba de punta a punta usa una copia en Python de la pantalla: el JS
+  real lo cubre `pantalla_subitems1.js`.
+
 **Criterios:**
 - Rojo antes y verde después en cada punto.
 - Los dos archivos reales, idénticos.
-- `pantalla_maria5.js` y `pantalla_catalogo_ncm1.js` dan OK en el SHA que
-  entregás.
+- `pantalla_maria5.js`, `pantalla_catalogo_ncm1.js` y `pantalla_subitems1.js`
+  dan OK en el SHA que entregás.
+- La e2e de la CI (`scripts/testing/e2e_maria.sh`) da «E2E MARIA OK» en el SHA
+  que entregás. Cómo se corre en la nube está en `ONBOARDING-DEV.md`.
+  - Hoy está en rojo en `main` porque no completa la fecha de emisión.
+  - La línea que falta la suma la Dev 1 con GUARDAR-1. Si tu pieza cambia el
+    recorrido (subítems, pesos), ponela al día vos.
 - Suite completa en verde.
+
+## Respuestas a tus D (2026-10-07, 19:40 UTC)
+
+- **D27 (guardar los subítems con la operación): (a).** Sin migración ahora.
+  Hoy ningún camino de la v2 reabre una operación del historial, así que no
+  se pierde nada a la vista. Si algún día entra «reabrir una operación»,
+  esa pieza lleva la columna y la migración, también para el estado de
+  MARIA-4. Queda en `DECISIONS.md`.
+- **SUBITEMS-1 (`88564ec`):** revisada, se sostiene. Cuatro arreglos chicos
+  van con la reentrega de MARIA-5 (puntos 7 a 10 del veredicto).
 
 ## Respuestas a tus D (2026-10-07, 16:05 UTC)
 

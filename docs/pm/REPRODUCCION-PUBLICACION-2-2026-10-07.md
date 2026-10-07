@@ -44,3 +44,17 @@ armada con `5cb03ab` (lo publicado hoy) y el candidato arrancado encima con
 
 El `Dockerfile` tal cual (apt bloqueado), Gemini real, PyMuPDF, OCR,
 Railway, `.xls`.
+
+## Después de publicar (2026-10-07, 19:58 UTC)
+
+- **CI de `main` en `6ea8ca9`:** las pruebas dan verde, pero `e2e-maria` da
+  rojo: `TimeoutError` en `confirmReview` (`config/e2e_maria.js:131`).
+- **La PM lo reprodujo en local** (Puppeteer con
+  `/opt/pw-browsers/chromium`). La captura muestra «Falta: Fecha de
+  emisión»: MARIA-3 la volvió obligatoria y la e2e no la completa.
+- **Con esa línea agregada, el recorrido entero pasa:** `E2E MARIA OK:
+  carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria
+  verificadas.` El producto está bien; la prueba quedó vieja.
+- **Falla de método:** este ataque no corrió la e2e de la CI. Desde ahora es
+  puerta antes de publicar (`ONBOARDING-PM.md`, «Publicar») y de toda pieza
+  que toque el recorrido (`ONBOARDING-DEV.md`).

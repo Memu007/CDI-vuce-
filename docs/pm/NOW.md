@@ -3,7 +3,7 @@
 Actualizado: 2026-10-07. Estado vigente; la historia está en Git.
 
 **Producto:** `Memu007/CDI-vuce-` (privado desde el 2026-10-06).
-**Publicado:** `main` = `5cb03ab` (2026-10-07, publicación de ensayo) en Railway,
+**Publicado:** `main` = `6ea8ca9` (2026-10-07 19:58 UTC, segunda publicación) en Railway,
 `cdi-production.up.railway.app`. Railway publica cada push a `main` sin
 esperar los tests.
 **En producción:** la usa sólo Emi, con facturas reales (Emi, 2026-10-07).
@@ -16,14 +16,13 @@ antes de cerrar la Fase 3.
 
 ## Para Emi
 
-1. **Segunda publicación, candidato `6ea8ca9`** (atacado en
-   `REPRODUCCION-PUBLICACION-2-2026-10-07.md`): arregla el país de origen,
-   suma los controles antes de generar, el Excel y lo del despachante. Falta
-   que Emi escriba «dale 6ea8ca9»: su «dale a todo» (~15:27 ARG) lo frenó el
-   sistema de permisos de la sesión, que pide la autorización explícita.
-   Reventa confirmada (el IVA adicional pasa a `NO_VALIDA`).
-   Después de publicar: Emi genera un TXT con una factura real y lo revisa.
-   La línea «Billing cron» no aparece si nadie pasa a impago.
+1. **Segunda publicación, hecha:** `6ea8ca9`, 2026-10-07 19:58 UTC («dale
+   6ea8ca9» de Emi). Emi genera un TXT con una factura real, lo descarga
+   enseguida y mira: fecha DD/MM/AAAA, CUIT sin guiones, IVA adicional
+   `NO_VALIDA`, `CARTUSO` 2, banco y empresa de digitalización. Ahora pide
+   fecha de emisión, moneda, incoterm, CUIT válido y estado si el origen es
+   argentino: un error que pide eso no es una falla. Guardar con la SIM
+   completa sigue dando error hasta GUARDAR-1.
 1b. **Sin volumen** (Emi, 2026-10-07): cada publicación o reinicio borra los
    TXT generados y el historial de NCM aprendido; las operaciones quedan en
    la base. Descargar el TXT apenas se genera. Lo arregla DISCO-1 (Fase 3).
@@ -78,7 +77,7 @@ Archivos abiertos por Dev:
   puntos; tres rompen: una combinada gigante traba la lectura, una
   combinada con texto duplica el FOB, el tope de estilos no protege la
   memoria; D27 (a)). Después, COBRO-MP-1, en pausa en `18a1850`.
-- **Dev 2:** MARIA-5 y CATALOGO-NCM-1 devueltas sobre `6854f34` (19:30 UTC) por seis puntos chicos: una columna «Peso por caja» le gana a «Peso», el bruto «unitario» se lee como neto, aviso de dos pesos sin números, una pantalla en rojo, la baja con aviso doble y sin catálogo errores inventados. Sigue: SUBITEMS-1 (Emi: sus facturas traen subítems) y MARIA-6 cuando lleguen los archivos reales del despachante.
+- **Dev 2:** MARIA-5 y CATALOGO-NCM-1 devueltas sobre `6854f34` (19:30 UTC) por seis puntos chicos: una columna «Peso por caja» le gana a «Peso», el bruto «unitario» se lee como neto, aviso de dos pesos sin números, una pantalla en rojo, la baja con aviso doble y sin catálogo errores inventados. SUBITEMS-1 entregada (`88564ec`) y revisada: se sostiene, con cuatro arreglos chicos que van en la misma reentrega. Después: (Emi: sus facturas traen subítems) y MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
   RENDIMIENTO-1 y 1b (`ec3d793`), MARIA-1a, 2b, 1c, 4, 3 y 1d (`9679e21`).
   Suite sobre la rama integrada (`7b42556`, venv armado sólo con el
@@ -129,6 +128,12 @@ Archivos abiertos por Dev:
   `716 passed, 102 skipped`. Avance directo de `a771693`, sin merge. Emi:
   hizo la lista de Railway antes del «dale»; después verificó «Billing cron» con 0
   y guardó una operación (2026-10-07, ~10:20 ARG). CI de GitHub en verde.
+- `6ea8ca9` (2026-10-07 19:58 UTC), segunda publicación: MARIA-1a, 2b, 1c, 4,
+  3 y 1d, RENDIMIENTO-1 y 1b, EXCEL-1 y MARIA-1b, atacado en
+  `REPRODUCCION-PUBLICACION-2-2026-10-07.md`. Suite sobre el mismo SHA:
+  `1224 passed, 102 skipped, 1 xfailed`. Avance directo de `5cb03ab`, sin
+  merge. «dale 6ea8ca9» de Emi a las ~16:58 ARG (antes, «dale a todo», que el
+  sistema de permisos no tomó). CI: pruebas en verde y `e2e-maria` en rojo. La e2e no completa la fecha de emisión que pide MARIA-3; la PM lo reprodujo y, con esa línea, pasa entero («E2E MARIA OK»). El producto está bien, la prueba quedó vieja; la arregla la Dev 1 con GUARDAR-1. Emi generó un TXT con una factura real y «se ve bien» (19:59 UTC, un minuto después del push: falta confirmar que ya corría la versión nueva; con ella el TXT dice `IVAADICIONAL1=NO_VALIDA` y `CARTUSO=2`).
 
 ## Reglas
 
@@ -156,14 +161,15 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 19:50 UTC: las dos entregas, devueltas. MARIA-5 y CATALOGO-NCM-1
-(`6854f34`) por seis puntos chicos; la peor: una columna «Peso por caja» le
-gana a «Peso» (×16 en el TXT). EXCEL-2 (`3e6e63e`) por seis, tres que rompen
-(combinada gigante, combinada con texto que duplica el FOB, estilos que
-llegan a 1,4 GB); D27 (a). Dev 1: GUARDAR-1, después EXCEL-2, después
-COBRO-MP-1. Dev 2: su devolución, después SUBITEMS-1. Hoy rige 30/40 (la
-cuenta tocó su límite a las ~18:34). Esperan a Emi: «dale 6ea8ca9» escrito
-y el `/compact` de la Dev 2.
+2026-10-07 20:58 UTC (rutina): publicada `6ea8ca9` con el «dale» de Emi
+(19:58 UTC); la e2e de la CI dio rojo porque la prueba no completa la fecha de
+emisión (el producto está bien, reproducido). Dev 1 entregó GUARDAR-1, con la
+línea de la e2e (`aec4f15`), pero sobre una rama con EXCEL-2 y COBRO-MP-1: la
+PM la aisló con `cherry-pick` sobre su rama (`2621c3b`, local) y la revisa
+(suite, e2e y un subagente Sonnet alto contra Postgres 16). D32 abierta
+(agrandar la columna). Dev 1 sigue con la devolución de EXCEL-2; Dev 2, con
+la de MARIA-5, CATALOGO-NCM-1 y SUBITEMS-1. Contexto: PM 37 %, Dev 1 45 %, Dev 2
+55 %; los `/compact` de las Devs los pegó Emi y corren cuando terminen su turno.
 
 ## Medición
 
