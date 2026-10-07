@@ -3662,14 +3662,19 @@ async def smart_validation(body: dict, user=Depends(get_current_user)):
         if isinstance(operacion, dict):
             from proyecto_maria.core.controles_maria import controles_antes_de_generar
             errores_1b, avisos_1b = controles_antes_de_generar(items_data, operacion)
-            resultado["errores"] = [*resultado.get("errores", []), *errores_1b]
-            resultado["advertencias"] = [*resultado.get("advertencias", []), *avisos_1b]
-            if errores_1b or avisos_1b:
-                resultado["resumen"] = (
-                    f"🔍 Análisis de {len(items)} ítems: {len(resultado['errores'])} errores, "
-                    f"{len(resultado['advertencias'])} advertencias, "
-                    f"{len(resultado.get('sugerencias', []))} sugerencias."
-                )
+        else:
+            # Sin cabecera, igual el aviso de la NCM (vigente, dada de baja o
+            # sin catálogo), del mismo control: uno solo (CATALOGO-NCM-1).
+            from proyecto_maria.core.controles_maria import avisos_de_ncm
+            errores_1b, avisos_1b = [], avisos_de_ncm(items_data)
+        resultado["errores"] = [*resultado.get("errores", []), *errores_1b]
+        resultado["advertencias"] = [*resultado.get("advertencias", []), *avisos_1b]
+        if errores_1b or avisos_1b:
+            resultado["resumen"] = (
+                f"🔍 Análisis de {len(items)} ítems: {len(resultado['errores'])} errores, "
+                f"{len(resultado['advertencias'])} advertencias, "
+                f"{len(resultado.get('sugerencias', []))} sugerencias."
+            )
         
         # Con NaN, infinito o un monto que desborda, las estadísticas dan
         # infinito y la respuesta no se podría escribir (500): esos números
@@ -3934,7 +3939,11 @@ async def avisos_maria_endpoint(
         kit_warnings = []
     supuestos = _supuestos_maria(request, items, gastos)
     # Lo que al generar es un error de procedencia, acá se avisa con el mismo texto.
-    return {"avisos": errores_de_procedencia(items) + kit_warnings + supuestos, "supuestos": supuestos}
+    # La NCM dada de baja o que no está en el vigente, como en la validación
+    # (CATALOGO-NCM-1): aviso, no freno.
+    from proyecto_maria.core.controles_maria import avisos_de_ncm
+    avisos_ncm = avisos_de_ncm(items)
+    return {"avisos": errores_de_procedencia(items) + kit_warnings + avisos_ncm + supuestos, "supuestos": supuestos}
 
 
 @app.post("/generate_maria")
@@ -5088,22 +5097,38 @@ def _detect_item_columns(headers: list) -> dict:
 # MARIA-5 (D22). Columnas de peso que no son de una unidad: el TXT multiplica
 # el peso unitario por la cantidad, así que se dividen por la cantidad. Se
 # mira el nombre de la columna, también la de un mapeo guardado del cliente.
+# Nombres de peso de una unidad sin la palabra «unitario» (la plantilla dice
+# «Peso»). Otro nombre que no dice de qué es («Peso por caja», «Peso por
+# bulto») queda «dudoso» (segunda devolución de MARIA-5).
+_PESO_DE_UNA_UNIDAD = {"peso", "weight", "pesokg", "pesokgs", "pesoenkg", "kg", "kgs"}
+
+
 def _clase_de_peso(normal: str) -> str:
-    if "unit" in normal or "unidad" in normal:
-        return "unidad"
+    # El bruto es bruto aunque diga «unitario» (segunda devolución de MARIA-5).
     if "bruto" in normal or "gross" in normal:
         return "bruto"
+    if "unit" in normal or "unidad" in normal:
+        return "unidad"
     if "neto" in normal or "net" in normal:
         return "neto"
     if "total" in normal or "linea" in normal:
         return "linea"
-    return "unidad"
+    # «Peso (kg)»: la unidad entre paréntesis no cuenta.
+    if re.sub(r"\(.*?\)", "", normal) in _PESO_DE_UNA_UNIDAD:
+        return "unidad"
+    return "dudosa"
+
+
+def _clase_de_columna(columna, rename: dict) -> str:
+    """La clase de una columna de peso, por su nombre. Una dudosa avisa
+    siempre, aunque la haya elegido un mapeo (detectado o guardado)."""
+    return _clase_de_peso(_normalize_header(columna))
 
 
 # Con varias columnas de peso manda el neto de la línea, después el total de
 # la línea, después el de una unidad y al final el bruto (devolución de
 # MARIA-5: el TXT pide el peso neto de la línea).
-_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "bruto": 3}
+_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "dudosa": 3, "bruto": 4}
 
 
 def _es_nombre_de_peso(normal: str) -> bool:
@@ -5126,17 +5151,20 @@ def _columnas_de_peso(columnas: list, rename: dict) -> list:
 
     def orden(c):
         normal = _normalize_header(c)
-        return (_RANGO_DE_PESO[_clase_de_peso(normal)], "net" not in normal,
+        return (_RANGO_DE_PESO[_clase_de_columna(c, rename)], "net" not in normal,
                 rename.get(c) != "peso_unitario")
 
     return sorted([c for c in columnas if c not in otras and es_peso(c)], key=orden)
 
 
 def _kg(numero: float) -> str:
+    if 0 < abs(numero) < 0.001:
+        return f"{numero:g}"  # 0,0004 no es «0 kg»
     return f"{numero:.3f}".rstrip("0").rstrip(".")
 
 
-def _peso_por_unidad(df: pd.DataFrame, pesos: list, columna_de: dict | None = None) -> list[str]:
+def _peso_por_unidad(df: pd.DataFrame, pesos: list, columna_de: dict | None = None,
+                     clases: dict | None = None) -> list[str]:
     """Después de renombrar `pesos[0]` a `peso_unitario`: si es el peso de la
     línea (neto o total) o el bruto, lo divide por la cantidad. Un peso que no
     es número queda vacío, con aviso, y la fila se conserva. Si una columna de
@@ -5147,8 +5175,13 @@ def _peso_por_unidad(df: pd.DataFrame, pesos: list, columna_de: dict | None = No
     if not pesos or "peso_unitario" not in df.columns:
         return []
     columna_de = columna_de or {}
+    clases = clases or {}
+
+    def clase_de(c):
+        return clases.get(c) or _clase_de_peso(_normalize_header(c))
+
     origen, ignoradas = pesos[0], pesos[1:]
-    clase = _clase_de_peso(_normalize_header(origen))
+    clase = clase_de(origen)
     avisos = []
     if ignoradas:
         avisos.append(f"Peso: se usó «{origen}»; se ignoraron "
@@ -5172,7 +5205,10 @@ def _peso_por_unidad(df: pd.DataFrame, pesos: list, columna_de: dict | None = No
     if sin_numero:
         avisos.append(f"Peso: {sin_numero} fila(s) con un peso que no es un número quedaron sin peso; "
                       "cargalo en la revisión.")
-    if clase == "unidad":
+    if clase == "dudosa":
+        avisos.append(f"Peso: la columna «{origen}» no dice si es el peso de una unidad o el de toda la "
+                      "línea; se usó como de una unidad. Revisala.")
+    if clase in ("unidad", "dudosa"):
         # La columna queda como vino: la lectura de la planilla la interpreta
         # con el mismo separador decimal que la cantidad y el precio.
         return avisos
@@ -5188,7 +5224,17 @@ def _peso_por_unidad(df: pd.DataFrame, pesos: list, columna_de: dict | None = No
                       "se usó el bruto dividido por la cantidad. Corregilo si tenés el neto.")
         return avisos
     for col in ignoradas:
-        if _clase_de_peso(_normalize_header(col)) != "unidad":
+        if clase_de(col) in ("neto", "linea"):
+            # Otro peso de la línea: si no coincide, los dos números.
+            otra = numeros(df[columna_de.get(col, col)])
+            distinto = (otra > 0) & (peso > 0) & ((otra - peso).abs() > (peso / 100).clip(lower=0.001))
+            if distinto.any():
+                fila = distinto.idxmax()
+                avisos.append(f"Peso: en {int(distinto.sum())} fila(s) «{col}» no da lo mismo que «{origen}» "
+                              f"(por ejemplo, {_kg(float(otra[fila]))} kg y {_kg(float(peso[fila]))} kg); "
+                              f"se usó «{origen}». Revisalo.")
+            continue
+        if clase_de(col) != "unidad":
             continue
         unidad = numeros(df[columna_de.get(col, col)])
         distinto = (unidad > 0) & (peso > 0) & (cantidad > 0) & (
@@ -6877,6 +6923,7 @@ async def upload_excel_v2(
         # El peso: la columna que manda, aunque el mapeo guardado diga otra
         # (devolución de MARIA-5).
         pesos = _columnas_de_peso(list(df.columns), rename)
+        clases = {c: _clase_de_columna(c, rename) for c in pesos}
         if pesos:
             rename = {src: canon for src, canon in rename.items() if canon != "peso_unitario"}
             rename[pesos[0]] = "peso_unitario"
@@ -6892,7 +6939,7 @@ async def upload_excel_v2(
             # columnas con el mismo nombre (daba 500) (EXCEL-1).
             df = df.drop(columns=[c for c in df.columns if c in rename.values() and c not in rename])
             df = df.rename(columns=rename)
-            avisos = _peso_por_unidad(df, pesos, columna_de)
+            avisos = _peso_por_unidad(df, pesos, columna_de, clases)
 
         descartes: list = []
         items = await _leer_pdf_aparte(

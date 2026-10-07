@@ -531,11 +531,15 @@ def peso_valido(peso, donde) -> float:
         kilos = float(peso)
     except (TypeError, ValueError):
         raise ValueError(f"Item {donde}: el peso «{str(peso)[:20]}» no es un número.")
-    if not math.isfinite(kilos) or kilos > IMPORTE_MAXIMO:
+    if not math.isfinite(kilos):
+        raise ValueError(f"Item {donde}: el peso «{str(peso)[:20]}» no es un número válido.")
+    if kilos > IMPORTE_MAXIMO:
         raise ValueError(
             f"Item {donde}: el peso «{str(peso)[:20]}» no es válido: pasa el tope de "
             f"{IMPORTE_MAXIMO:,} kg (revisá el peso y la cantidad).".replace(",", ".")
         )
+    if kilos < 0:
+        raise ValueError(f"Item {donde}: el peso «{str(peso)[:20]}» es negativo.")
     if round(kilos, 3) <= 0:
         raise ValueError(
             f"Item {donde}: el peso «{str(peso)[:20]}» no es válido: tiene que ser "

@@ -5,7 +5,6 @@
 import re
 from proyecto_maria.models.operations import Item  # Modelo Pydantic de items
 from proyecto_maria.core.maria_generator import fob_total_del_txt, pais_reconocido
-from proyecto_maria.core.ncm_catalog import aviso_de_ncm
 from typing import List, Tuple  # Type hints para mejor documentación
 
 def run_pre_maria_validations(items: List[Item]) -> Tuple[List[Item], List[str]]:
@@ -159,12 +158,6 @@ def run_smart_validations(items: List[Item], grupos: list | None = None) -> dict
     for i, item in enumerate(items, start=1):
         pieza = (item.pieza or '').strip()
         ncm_4 = pieza[:4] if len(pieza) >= 4 else ""
-
-        # Una NCM que no está en el nomenclador vigente (por ejemplo, dada de
-        # baja): aviso, no freno (CATALOGO-NCM-1).
-        aviso_ncm = aviso_de_ncm(pieza)
-        if aviso_ncm:
-            advertencias.append(f"⚠️ Ítem {i} ({pieza}): {aviso_ncm[0].upper()}{aviso_ncm[1:]}")
 
         # Estas tres reglas ya son obligatorias para generar MARIA. Las
         # mostramos también en Validación para que el despachante no llegue a
