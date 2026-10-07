@@ -2,6 +2,37 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## MARIA-4 — reentrega con la devolución: **`2461939`**
+
+Producto `dbf8848`; pruebas y sabotajes `dbf8848`…`2461939`. La entrega
+anterior (`6149ef3`, abajo) sigue valiendo para todo lo demás.
+
+| Punto devuelto | Qué hice | Rojo antes → verde |
+|---|---|---|
+| 1. Estado contra origen | El generador rechaza un estado argentino (1, 3, 5) con origen extranjero y uno importado (2, 4, 6) con origen argentino: 400 «Ítem N (descripción): el estado «…» no corresponde al origen (…); elegí otro.». Los nombres y la regla están en un solo lugar, `ESTADOS_ARGENTINOS` / `ESTADOS_IMPORTADOS`. En la pantalla, cada producto ofrece sólo los estados de su origen, y el estado elegido queda atado a la clase de origen: si el origen cambia, se borra y se vuelve a pedir | `test_estado_que_no_corresponde_al_origen_se_rechaza`: 7 failed → passed. Pantalla contra `6149ef3`: `FALLA: al pasar a origen extranjero queda el estado argentino elegido antes`; con `2461939`: `OK al cambiar el origen el estado elegido se vuelve a pedir y sólo se ofrecen los que corresponden` |
+| 2. La pantalla vieja muestra los avisos | Después de generar, `static/app.js` muestra los `warnings` y los `supuestos` de `/generate_maria` en un `alert` («Revisá antes de pegar el TXT en el Kit»), antes de bajar el archivo | `test_la_pantalla_vieja_muestra_los_avisos_de_generate_maria`: failed → passed. Es una prueba sobre el código: no corrí la v1 en el navegador |
+| 3. `origen` y `pais_origen` | Los supuestos leen `pais_origen` primero, como el generador, en sus dos lugares | `test_supuestos_leen_el_origen_como_el_generador`: failed → passed |
+
+Tuve que corregir dos pruebas que usaban combinaciones que ahora no valen.
+Una pedía estado 5 con origen chino: la pasé a 6. La otra probaba un grupo
+con estados distintos usando 2 y 6: la pasé a 2 y 4.
+
+| Puerta (sobre `2461939`) | Resultado |
+|---|---|
+| Suite completa | `846 passed, 102 skipped, 25 warnings in 60.34s`, 0 failed |
+| MARIA-4 + archivos reales + sub-ítems + supuestos | `122 passed` |
+| `pantalla_maria4.js` | 7 líneas `OK`, `OK: pantalla MARIA-4` |
+| `sabotaje_maria4.sh` (6 de antes + estado contra origen, orden del origen, pantalla vieja sin avisos) | `OK: los 9 sabotajes dan rojo por la razón esperada` |
+| `sabotaje_maria1c` / `2b` / `2` / `1a` | `OK: los 4 …` / `OK: los 6 …` / `OK: los 8 …` / `OK: los 10 …` |
+| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
+
+No hubo autorrevisión con subagentes en esta vuelta: los tres puntos son
+chicos y tienen cada uno su rojo antes y su sabotaje. Nada para decidir.
+
+Contexto: ~88 %. Hace falta el `/compact` antes de MARIA-3.
+
+---
+
 ## MARIA-4 — entregada: lo que decide el despachante sale en el TXT
 
 | Qué | SHA |
