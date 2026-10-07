@@ -114,8 +114,9 @@ Archivos abiertos por Dev:
   productos inventados, pero pide `ADMIN_USERNAMES`. La PM
   recomienda (b) si la variable está; si no, (a). Un subagente Opus alto
   atacó `81bcaba` y repitió sobre `7f1dd2c` (con ADMIN-2): se puede publicar
-  si Emi hace antes la lista de arriba. La suite se corre otra vez sobre el
-  SHA exacto.
+  si Emi hace antes la lista de arriba. Suite sobre `321f34b` (04:05 UTC):
+  `716 passed, 102 skipped`; de ahí a la cabeza sólo cambian documentos. Si
+  entra producto antes del «dale», se corre otra vez sobre el SHA exacto.
 - **Despachante:** respondió las seis preguntas y las dos cortas el
   2026-10-06 (`PREGUNTAS-DESPACHANTE.md`): la empresa de digitalización se
   elige por operación (Modoc = `PSAD06`, Lakaut = `PSAD01`) y la reducción del
@@ -171,8 +172,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 subieron código (Dev 1: RENDIMIENTO-1 hasta `450f2d5`; Dev 2: MARIA-1a hasta
 `4b8fc49`), sin informe todavía. Desde ~02:05 quedaron paradas por el límite
 de uso de la cuenta, que se reinició a las 03:40; sus rutinas las retoman
-(:15 y :35). Contexto: Dev 1 ~41 %, Dev 2 ~38 %. Suite sobre `321f34b`
-corriendo para el ensayo.
+(:15 y :35). Contexto: Dev 1 ~41 %, Dev 2 ~38 %. Suite sobre `321f34b`, para
+el ensayo: `716 passed, 102 skipped`.
 
 ## Medición
 
