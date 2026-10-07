@@ -2,6 +2,29 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## MARIA-1d — reentrega con el punto sumado: **`9679e21`**
+
+**Resultado: terminada. No hay nada para decidir.** La entrega de MARIA-1d
+(más abajo, sobre `c60dc3a`) sigue valiendo, y la rama incluye MARIA-3
+aceptada.
+
+| Punto sumado | Qué hice | Rojo antes → verde |
+|---|---|---|
+| Procedencia rara en un producto (`²`, `99999`, `٢٢٢`, «Narnia», en `pais_procedencia` o `procedencia`) | Una sola función, `errores_de_procedencia`, arma el texto. Al generar es el error 400 de siempre; en `/generate_maria/avisos` aparece el mismo texto, primero en la lista | `test_procedencia_rara_de_un_producto_avisa_igual_antes_y_al_generar`: `8 failed` → `8 passed` |
+
+| Puerta (sobre `8a036bf`, mismo producto y pruebas que `9679e21`; el último commit sólo arregla el patrón de un sabotaje) | Resultado |
+|---|---|
+| Suite completa, worktree limpio | `1029 passed, 102 skipped, 25 warnings in 64.36s`, 0 failed |
+| `sabotaje_maria1d.sh` | `OK: los 8 sabotajes dan rojo por la razón esperada` (el 8 es el punto sumado) |
+| `sabotaje_maria3` / `4` / `1c` / `2b` / `2` / `1a` | `OK: los 30 …` (sobre `9679e21`) / `9` / `4` / `6` / `8` / `10` |
+| `pantalla_maria3.js` | `OK: pantalla MARIA-3` |
+| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
+
+Última vuelta: 2026-10-07 11:30 UTC
+Contexto: ~63 % (pasado el umbral: compactar en este corte)
+
+---
+
 ## MARIA-3 — reentrega con la devolución: **`0d6cb3e`**
 
 **Resultado: los cinco puntos, cada uno con su rojo antes y verde después. No
