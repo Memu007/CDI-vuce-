@@ -158,3 +158,24 @@ def test_endpoint_pasa_los_valores_y_avisa_lo_que_falta(client, auth_override):
     r = client.post("/generate_maria", json=sin)
     assert r.status_code == 400, r.text
     assert "origen es argentino" in r.text
+
+
+def test_lo_elegido_se_guarda_con_la_operacion_y_vuelve_en_los_listados(client, auth_override):
+    """La pantalla propone el último banco del cliente y la última empresa del
+    usuario leyendo `maria` de sus operaciones guardadas."""
+    r = client.post("/api/clientes", json={"nombre": "Cliente MARIA-4", "cuit": "30712345678"})
+    assert r.status_code in (200, 201), r.text
+    cid = (r.json().get("cliente") or r.json()).get("id")
+    elegido = {"banco_bcra": "191", "empresa_digitalizacion": "PSAD01", "iva_adicional": "IVAAD1"}
+    r = client.post(f"/api/clientes/{cid}/operaciones", json={
+        "operation_id": "M4-1", "source": "pdf_v2", "currency": "USD",
+        "resumen": {"items": 1, "valor_total": 10, "peso_total": 1, "maria": elegido},
+        "items": [{"pieza": "84714900100D", "descripcion": "Equipo", "origen": "CN",
+                   "cantidad": 1, "valor_unitario": 10, "peso_unitario": 1}],
+    })
+    assert r.status_code in (200, 201), r.text
+
+    ops = client.get(f"/api/clientes/{cid}/operaciones").json()["operaciones"]
+    assert ops[0]["maria"] == elegido
+    ops = client.get("/api/operations").json()["operaciones"]
+    assert any(o.get("maria") == elegido for o in ops)
