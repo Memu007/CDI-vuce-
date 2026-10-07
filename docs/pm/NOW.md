@@ -60,16 +60,20 @@ antes de cerrar la Fase 3.
    facturación de Google.
 3. **Despachante:** recordarle los archivos reales (favor 1). Ya respondió
    todas las preguntas.
-4. **Hasta publicar MARIA-1a: revisar el país de origen de cada TXT** antes
+4. **Catálogo NCM de 2018** (D21 de la Dev 1): le falta la enmienda de 2022
+   (por ejemplo, 8517.13.00, teléfonos). Para actualizarlo hace falta el
+   nomenclador vigente de ARCA, que desde acá no se puede bajar: ¿lo bajás vos
+   o se lo pedís al despachante?
+5. **Hasta publicar MARIA-1a: revisar el país de origen de cada TXT** antes
    de mandárselo al despachante. El código publicado corta el país a dos
    letras: si la lectura devuelve «CHN» o «China», sale Suiza.
-5. **Límite de uso de la cuenta:** el 2026-10-07 entre las ~02:05 y las
+6. **Límite de uso de la cuenta:** el 2026-10-07 entre las ~02:05 y las
    03:40 UTC las Devs quedaron paradas porque la cuenta llegó a su límite de
    5 horas («You've hit your session limit»). Lo más barato para que no se
    repita: pegar el `/compact` de cada Dev apenas se pueda (están en ~38 % y
    ~41 %; cada paso relee todo el contexto). Si vuelve a pasar, Emi decide
    entre aceptar las pausas o bajar el ritmo.
-6. **Hasta la primera publicación:** en `main` sigue la regla vieja que manda
+7. **Hasta la primera publicación:** en `main` sigue la regla vieja que manda
    «push a `main`» a otros asistentes. No pedirle a ningún asistente cambios
    sobre `main`.
 
@@ -100,18 +104,18 @@ Archivos abiertos por Dev:
 
 ## En curso
 
-- **Dev 1:** EXCEL-1, devuelta por cinco puntos (el más grave: el mapeo
-  aprendido pisa «Precio Unitario» y el FOB sale multiplicado). Sigue:
-  MARIA-1b, PUNTA-A-PUNTA-1 y EXCEL-2.
-- **Dev 2:** MARIA-3, devuelta por cinco puntos (procedencia, año del `IEXT`
-  sin fecha, fechas raras, procedencia rara, gastos sin tope). Sigue: MARIA-1d
-  («None» en campos vacíos) y MARIA-5; MARIA-6 cuando lleguen los archivos reales del despachante.
+- **Dev 1:** MARIA-1b (controles antes de generar). Sigue: PUNTA-A-PUNTA-1
+  y EXCEL-2.
+- **Dev 2:** MARIA-1d («None» en campos vacíos). Sigue: MARIA-5; MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas el 2026-10-07 y sin integrar todavía** (se integran después de
   publicar el ensayo, para que el ensayo sea exactamente lo atacado):
   RENDIMIENTO-1 (`8fd801d`, suite `730 passed, 102 skipped` con un venv nuevo)
   y RENDIMIENTO-1b (`ec3d793`, `754 passed`),
   MARIA-1a (`0a1775f`, `777 passed`), MARIA-2b (`c3bef51`, `791 passed`),
-  MARIA-1c (`448b54d`, `804 passed`) y MARIA-4 (`2461939`, `846 passed`).
+  MARIA-1c (`448b54d`, `804 passed`), MARIA-4 (`2461939`, `846 passed`),
+  MARIA-3 (`0d6cb3e`, `1021 passed`) y EXCEL-1 (`7b119b6`, `932 passed`).
+  EXCEL-1 entra con MARIA-1b y MARIA-3 con MARIA-1d (tienen sus commits
+  debajo).
   RENDIMIENTO-1 sale con RENDIMIENTO-1b y MARIA-1a con MARIA-1c.
 - **Aceptadas el 2026-10-07 e integradas:** ADMIN-1 (`ac25dbc`), MARIA-2
   (`65ea6f3`) y ADMIN-2 (`f9f8393`). Suite sobre `f9f8393`, que tiene el
@@ -177,10 +181,9 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 10:45 UTC (rutina): EXCEL-1 y MARIA-3 devueltas (cinco puntos cada
-una; el más grave, el FOB multiplicado por un mapeo aprendido). MARIA-1b y
-MARIA-1d escritas. Contexto: Dev 1 ~80 %, Dev 2 ~40 % (compactó), PM ~50 %.
-A las 9 (ARG): los `/compact`, la lista de Railway y el SHA del ensayo.
+2026-10-07 11:35 UTC: EXCEL-1 y MARIA-3 aceptadas con sus devoluciones (un
+subagente repitió cada punto). Activas: MARIA-1b (Dev 1) y MARIA-1d (Dev 2).
+D21 (catálogo NCM de 2018) para Emi. PM ~53 %.
 
 ## Medición
 

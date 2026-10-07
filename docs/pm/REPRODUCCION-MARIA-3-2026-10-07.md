@@ -38,3 +38,17 @@ Los sabotajes de la Dev (`sabotaje_maria3.sh`), su comprobación de pantalla y
 el Kit real.
 
 Contexto de la Dev 2 al entregar: ~40 % (después de compactar).
+
+## Devolución — aceptada sobre `0d6cb3e` (2026-10-07)
+
+PM: rojo antes sobre `088577f` (`75 failed`), focal `243 passed`, suite
+`1021 passed, 102 skipped` (igual al informe). Ojo: trae pruebas de MARIA-1d
+en curso; MARIA-3 se integra junto con MARIA-1d.
+
+Subagente Sonnet medio: los 309 códigos de la pantalla dan 200 como
+procedencia; sin fecha válida, 400 con mensaje; `01/01/69` → 2069 con aviso
+de futura; fechas de 2099 o 1950 con aviso; `²` → 400 propio; procedencia de
+ítem en blanco no pisa la de la operación; `1e308`, `nan`, `inf`, `-5`,
+`1e15` → 400; 2025 idéntico, 2026 sólo `LDVDREFDOC` (MARIA-6). Nuevo, menor:
+procedencia `²` en un ítem da 200 sin aviso en `/avisos` y 400 al generar →
+MARIA-1d.

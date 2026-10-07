@@ -30,7 +30,7 @@ que estar resuelto antes del primer estudio.
 | G1: la app no arranca con configuración mala | ✅ G1.1–G1.4 (sub) y G1.5 sin `DATABASE_URL` (PM: `RuntimeError`, salida 1) |
 | G3: «22 bloqueados, 0 fugas» | ✅ sub en la rama. Pero el script cubre sólo clientes y descargas |
 | Publicar no rompe el esquema de la base | ✅ sub: `models.py` idéntico. Ir y volver entre versiones funciona en SQLite |
-| Catálogo NCM: «22 posiciones de ~9.500» | ❌ quedó viejo: hoy hay **10.226** posiciones de ARCA (julio de 2026) |
+| Catálogo NCM: «22 posiciones de ~9.500» | ❌ quedó viejo: hoy hay **10.226** posiciones (cargadas en julio de 2026 desde el nomenclador de ARCA del 19/12/2018: le falta la enmienda de 2022; D21 de la Dev 1) |
 | «Agujero de cobro cerrado» (VUCE-3) | ❌ cerró el vencimiento de los `active`, no el corte en lo que genera valor (ver Cobro) |
 
 ## Hallazgos

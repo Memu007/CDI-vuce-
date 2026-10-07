@@ -49,6 +49,7 @@ repositorio.
 | **Rotar las claves de Gemini** | Una estuvo en un repositorio público. Cierra G0 | Lo hace Emi en Google AI Studio y Railway |
 | **«Dale» para el SHA de la publicación de ensayo** | Emi aprobó el ensayo el 2026-10-07; falta el «dale» para el SHA exacto | Antes, Emi revisa en Railway las variables y las cuentas que pasarían a impagas |
 | **Prender «Wait for CI» en Railway** | Hoy Railway publica aunque las pruebas fallen | Es un ajuste de Railway; no cuesta nada |
-| **Qué se promete del catálogo NCM** | Hoy hay 10.226 posiciones de ARCA (julio de 2026), no 22 | Cambia el discurso comercial de septiembre |
+| **Qué se promete del catálogo NCM** | Hoy hay 10.226 posiciones (cargadas en julio de 2026 desde el nomenclador de ARCA del 19/12/2018: le falta la enmienda de 2022; D21 de la Dev 1), no 22 | Cambia el discurso comercial de septiembre |
+| **Actualizar el catálogo NCM al nomenclador vigente** | El de CDI es de 2018 (sin la enmienda de 2022: 8517.13.00, 8524, 8549). Por eso «no está en el catálogo» avisa en vez de frenar | Hace falta el archivo vigente de ARCA (desde acá la red bloquea los sitios oficiales): Emi decide si lo baja él o el despachante, y si entra como pieza |
 | **Los dos favores del despachante** | Respondió las seis preguntas y las dos cortas el 2026-10-06 (`PREGUNTAS-DESPACHANTE.md`). Faltan sus archivos reales y, al cerrar la Fase 1, la prueba en su Kit | MARIA-6 y la prueba en el Kit, que cierra G4 |
 | **Precio y fecha de arranque** | Vencidos | Comercial; no se escriben acá |
