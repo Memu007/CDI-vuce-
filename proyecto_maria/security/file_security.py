@@ -114,6 +114,25 @@ def validate_file_path(base_dir: str, filename: str) -> Path:
     return requested
 
 
+def _abrir_pdf(contents: bytes) -> tuple:
+    """(¿encriptado?, cantidad de páginas). Con pypdf, sucesor de PyPDF2."""
+    from pypdf import PdfReader
+    pdf = PdfReader(io.BytesIO(contents))
+    if pdf.is_encrypted:
+        return True, 0  # contar páginas de uno encriptado ya falla
+    return False, len(pdf.pages)
+
+
+def _pdf_validate_timeout_s() -> float:
+    """Mal escrito, en 0 o negativo, vale 30 s (RENDIMIENTO-1b)."""
+    import math
+    try:
+        valor = float(os.getenv("PDF_VALIDATE_TIMEOUT_S", "") or 30)
+    except (TypeError, ValueError):
+        return 30.0
+    return valor if math.isfinite(valor) and valor > 0 else 30.0
+
+
 async def validate_file_upload(
     file: UploadFile,
     file_type: str,
@@ -194,15 +213,26 @@ async def validate_file_upload(
     # Additional validation for PDFs
     if file_type == 'pdf':
         try:
-            import PyPDF2
-            pdf = PyPDF2.PdfReader(io.BytesIO(contents))
+            # Abrir el PDF es sincrónico: va en otro hilo y con tiempo máximo,
+            # para que un PDF pesado o armado no frene al resto (RENDIMIENTO-1).
+            import asyncio
+            try:
+                encriptado, paginas = await asyncio.wait_for(
+                    asyncio.to_thread(_abrir_pdf, contents),
+                    timeout=_pdf_validate_timeout_s(),
+                )
+            except asyncio.TimeoutError:
+                raise HTTPException(
+                    400,
+                    "No pudimos abrir el PDF: tardó demasiado. Probá con otro archivo.",
+                )
 
             # Check if encrypted
-            if pdf.is_encrypted:
+            if encriptado:
                 raise HTTPException(400, "Encrypted PDFs are not allowed")
 
             # Check if valid PDF (has pages)
-            if len(pdf.pages) == 0:
+            if paginas == 0:
                 raise HTTPException(400, "PDF has no pages")
 
         except HTTPException:

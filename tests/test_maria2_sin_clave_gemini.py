@@ -47,7 +47,7 @@ def _sin_gemini_real(monkeypatch):
 
 
 def _pdf_en_blanco() -> bytes:
-    from PyPDF2 import PdfWriter
+    from pypdf import PdfWriter
 
     w = PdfWriter()
     w.add_blank_page(width=595, height=842)

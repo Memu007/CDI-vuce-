@@ -3,7 +3,7 @@
 Actualizado: 2026-10-07. Estado vigente; la historia está en Git.
 
 **Producto:** `Memu007/CDI-vuce-` (privado desde el 2026-10-06).
-**Publicado:** `main` = `a771693` (2026-07-18) en Railway,
+**Publicado:** `main` = `5cb03ab` (2026-10-07, publicación de ensayo) en Railway,
 `cdi-production.up.railway.app`. Railway publica cada push a `main` sin
 esperar los tests.
 **En producción:** la usa sólo Emi, con facturas reales (Emi, 2026-10-07).
@@ -16,45 +16,9 @@ antes de cerrar la Fase 3.
 
 ## Para Emi
 
-1. **Mañana, de día: publicación de ensayo** (aprobada el 2026-10-07; falta
-   el «dale» para el SHA exacto, que le pasa la PM con la suite corrida sobre
-   él). Antes, en Railway, en este orden (probado en local con Postgres y una
-   base armada con el código de julio: `REPRODUCCION-ENSAYO-2026-10-07.md`):
-   1. **Copia de la base** (pestaña de copias de seguridad), antes de tocar
-      nada.
-   2. **Tabla `users`:**
-      - **¿Existen `demo`, `premium` o `basico`?** Borrar esas filas. El
-        código publicado los crea con contraseñas escritas en el código, y
-        `demo` tiene guardado el rol de admin: entra al panel aunque no esté
-        en `ADMIN_USERNAMES`. Si Railway no deja borrarlos (tienen datos), no
-        seguir y avisar a la PM.
-      - **Tu fila:** `billing_status` = `active` y `trial_ends_at` = una fecha
-        del año que viene (por ejemplo, 2027-10-31). Si no, al arrancar la
-        versión nueva tu cuenta pasa a impaga: seguís generando el TXT, pero
-        no guardás operaciones nuevas, y volver a la versión vieja no lo
-        deshace. Hacen falta las dos cosas: con la fecha sola no alcanza.
-      - **Cuentas que no sean tuyas,** o filas en la tabla `organizations`:
-        avisar a la PM. Sin cuentas ajenas, nadie pudo ver tus facturas con
-        la fuga de MARIA.TXT.
-   3. **Variables del servicio:**
-      - que existan `ALLOWED_ORIGINS`, `JWT_SECRET_KEY` y `DATABASE_URL` (sin
-        ellas la versión nueva no arranca y Railway deja andando la vieja);
-      - `ADMIN_USERNAMES` = tu usuario, escrito exactamente igual (si nombra un
-        usuario que no existe, el primero que se registre con ese nombre es
-        admin);
-      - **`ENVIRONMENT` = `production`, exactamente así, en minúsculas.** Con
-        «Production» la versión nueva crea los tres usuarios de prueba en la
-        base real y `demo` entra como admin.
-   4. ¿El servicio tiene un volumen conectado? Una línea a la PM (sin
-      volumen, al publicar se borran los TXT generados y el historial de NCM;
-      las operaciones en la base quedan).
-   5. Recomendado: prender «Wait for CI» y apagar la red pública de la base.
-   6. **Después de publicar:** en los registros del arranque, la línea
-      «Billing cron» tiene que decir 0 usuarios pasados a `past_due`; y
-      guardar una operación de prueba.
-
-   El TXT cambia a propósito en dos cosas: desaparece el bloque de gastos
-   posteriores al FOB en 0 y el año del `IEXT` pasa a 26.
+1. **Publicación de ensayo: hecha y verificada** (`5cb03ab`). Faltan dos
+   líneas a la PM: ¿el servicio tiene volumen? ¿Hay cuentas ajenas u
+   organizaciones?
 2. **Rotar las claves de Gemini** (G0). En Google AI Studio: borrar las que
    aparecieron, crear una nueva y ponerla sólo en Railway. Mirar la
    facturación de Google.
@@ -76,9 +40,8 @@ antes de cerrar la Fase 3.
    repita: pegar el `/compact` de cada Dev apenas se pueda (están en ~38 % y
    ~41 %; cada paso relee todo el contexto). Si vuelve a pasar, Emi decide
    entre aceptar las pausas o bajar el ritmo.
-7. **Hasta la primera publicación:** en `main` sigue la regla vieja que manda
-   «push a `main`» a otros asistentes. No pedirle a ningún asistente cambios
-   sobre `main`.
+7. **No pedirle a ningún asistente cambios sobre `main`:** desde el
+   2026-10-07 `main` tiene las reglas nuevas, pero cada push publica.
 
 ## Quién hace qué
 
@@ -110,17 +73,13 @@ Archivos abiertos por Dev:
 - **Dev 1:** MARIA-1b (controles antes de generar). Sigue: PUNTA-A-PUNTA-1
   y EXCEL-2.
 - **Dev 2:** MARIA-5 (peso total y cuentas al centavo). Sigue: MARIA-6 cuando lleguen los archivos reales del despachante.
-- **Aceptadas el 2026-10-07 y sin integrar todavía** (se integran después de
-  publicar el ensayo, para que el ensayo sea exactamente lo atacado):
-  RENDIMIENTO-1 (`8fd801d`, suite `730 passed, 102 skipped` con un venv nuevo)
-  y RENDIMIENTO-1b (`ec3d793`, `754 passed`),
-  MARIA-1a (`0a1775f`, `777 passed`), MARIA-2b (`c3bef51`, `791 passed`),
-  MARIA-1c (`448b54d`, `804 passed`), MARIA-4 (`2461939`, `846 passed`),
-  MARIA-3 (`0d6cb3e`, `1021 passed`), MARIA-1d (`9679e21`, `1029 passed`) y
-  EXCEL-1 (`7b119b6`, `932 passed`).
-  EXCEL-1 entra con MARIA-1b y MARIA-3 con MARIA-1d (tienen sus commits
-  debajo).
-  RENDIMIENTO-1 sale con RENDIMIENTO-1b y MARIA-1a con MARIA-1c.
+- **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
+  RENDIMIENTO-1 y 1b (`ec3d793`), MARIA-1a, 2b, 1c, 4, 3 y 1d (`9679e21`).
+  Suite sobre la rama integrada (`7b42556`, venv armado sólo con el
+  `requirements.txt` nuevo): `1067 passed, 102 skipped, 0 failed`. Al
+  integrar, dos pruebas de MARIA armaban su PDF con PyPDF2, que salió en
+  RENDIMIENTO-1: pasan a `pypdf` (`7b42556`).
+- **Aceptada sin integrar:** EXCEL-1 (`7b119b6`), que entra con MARIA-1b.
 - **Aceptadas el 2026-10-07 e integradas:** ADMIN-1 (`ac25dbc`), MARIA-2
   (`65ea6f3`) y ADMIN-2 (`f9f8393`). Suite sobre `f9f8393`, que tiene el
   mismo producto y las mismas pruebas que la rama de PM:
@@ -149,7 +108,7 @@ Archivos abiertos por Dev:
 | G2 · Imagen real | 🟢 | Cerrada el 2026-09-17 | — |
 | G3 · Aislamiento | 🟡 | En producción, la fuga de MARIA.TXT (se arregla con el ensayo). Admin cerrado en la rama (ADMIN-1 y ADMIN-2). Abiertos: sesiones que reviven, límite de intentos burlable, prueba de aislamiento parcial | Fase 3 |
 | G4 · Producto (MARIA) | 🔴 | Origen mal leído, estado e IVA adicional fijos, peso por unidad, avisos tarde, gastos FOB sin cablear, banco, identificadores. Sin productos inventados (MARIA-2) | Fase 1 y la prueba en el Kit |
-| G5 · Pruebas | 🟢 | `716 passed, 102 skipped, 0 failed` en la rama integrada | — |
+| G5 · Pruebas | 🟢 | `1067 passed, 102 skipped, 0 failed` en la rama integrada (2026-10-07) | — |
 | G6 · Volver atrás | 🟡 | Esquema probado en local; falta la copia de la base | Fase 3 (y el ensayo lo ensaya) |
 | G7 · Cobro | 🔴 | El corte por impago cubre 2 funciones; cancelar no cancela en Mercado Pago; aviso de pago sin firma; doble suscripción; invitaciones | Fase 2 |
 | G8 · Piloto | ⚪ | Tres estudios presentan de verdad un MARIA de CDI | Fase 4 |
@@ -158,6 +117,12 @@ Archivos abiertos por Dev:
 
 - `a771693` (2026-07-18), anterior a este método. Cada publicación nueva: una
   línea con fecha, SHA y qué verificó Emi.
+- `5cb03ab` (2026-10-07 12:53 UTC), publicación de ensayo: el producto atacado
+  en `REPRODUCCION-ENSAYO-2026-10-07.md` (ADMIN-1, ADMIN-2, MARIA-2 y los 25
+  commits de `e8344d0`). Suite sobre el mismo producto (`1ad3226`):
+  `716 passed, 102 skipped`. Avance directo de `a771693`, sin merge. Emi:
+  hizo la lista de Railway antes del «dale»; después verificó «Billing cron» con 0
+  y guardó una operación (2026-10-07, ~10:20 ARG). CI de GitHub en verde.
 
 ## Reglas
 
@@ -185,10 +150,11 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 12:40 UTC (Emi en línea): falta la lista de Railway y el «dale
-8a4661f». La PM compactó; la Dev 2 también; la Dev 1 espera su `/compact`
-(441 mil tokens) y el veredicto de MARIA-1b. Por revisar: MARIA-1b (Dev 1,
-`02c11c3`) y la reentrega de MARIA-1d (Dev 2, `e28be2f`). D21: ver «Para Emi» 4.
+2026-10-07 13:05 UTC (rutina): ensayo publicado (`5cb03ab`, CI de GitHub en
+verde sobre ese SHA); falta la verificación de Emi. MARIA-1d aceptada; Dev 2
+en MARIA-5 (D22: (a)). MARIA-1b (Dev 1): la PM reprodujo `941 passed`; falta
+su subagente. Contexto: PM 21 %, Dev 1 44 % (espera su `/compact`), Dev 2
+10 %. Lo aceptado se integra después de que Emi verifique el ensayo.
 
 ## Medición
 

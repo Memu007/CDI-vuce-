@@ -31,6 +31,16 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(pdf):** el país de origen ya no se corta a dos letras (`CHN` salía Suiza y `MEX` Montenegro): se reconocen dos letras, tres letras (tabla ISO 3166-1 generada contra la tabla oficial VUCE) y el nombre; lo que no se reconoce queda vacío. Cantidades, precios, pesos, flete y seguro con coma bien leídos (`1,500` sólo es mil quinientos si la factura usa el punto como decimal). Lo que falta queda vacío: nada de peso 0,5, cantidad 1 ni origen del vendedor. Las dos copias del lector.
 
+## 2026-10-07 · fix: un PDF armado no deja a nadie sin lectura (RENDIMIENTO-1b)
+
+- **fix(rendimiento):** la adivinanza del vendedor lee el texto del PDF sólo con `pypdf`: `pdfminer` se colgaba para siempre con un PDF armado y, con cuatro de esos, nadie más podía leer un PDF hasta reiniciar. Los tiempos máximos en 0 o negativos valen el de siempre.
+- **fix(vendedor):** el vendedor adivinado nunca es una etiqueta («BUYER», «CONSIGNEE», etc.): con «SELLER:» y «BUYER:» en la misma fila queda el nombre o nada.
+
+## 2026-10-07 · fix: leer un PDF no frena el sitio (RENDIMIENTO-1)
+
+- **fix(rendimiento):** leer el PDF, sacarle el texto, abrirlo para validarlo y pedirle a Gemini un NCM corren en otro hilo: mientras tanto el servidor sigue atendiendo a los demás. La lectura tiene un tiempo máximo (`PDF_READ_TIMEOUT_S`, 120 s) con un error propio (`lectura_pdf_demasiado_larga`) y la pantalla ofrece cargar los productos a mano; la adivinanza del vendedor tiene su tiempo propio (`PDF_VENDOR_TIMEOUT_S`, 15 s) y Gemini el suyo (`NCM_GEMINI_TIMEOUT_S`, 30 s). Las lecturas de PDF usan su propio grupo de hilos (`PDF_READ_WORKERS`, 4).
+- **fix(dependencias):** `PyPDF2` 3.0.1, que se colgaba con un PDF armado, se cambia por su sucesor `pypdf`. Se saca `python-jose` (y con ella `ecdsa`), que nadie usaba: el token de sesión usa `PyJWT`.
+
 ## 2026-10-07 · fix: lo que quedó de ADMIN-1 (ADMIN-2)
 
 - **fix(permisos):** `/api/system/connectors` le da al usuario común sólo el modo de cada conector (lo que usa el chip «Sistema/Demo»); direcciones, claves, CUIT y certificado, sólo al admin. `cohort-retention` deja de pedir además el rol: entra el admin por `ADMIN_USERNAMES`.

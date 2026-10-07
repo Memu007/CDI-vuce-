@@ -3291,6 +3291,78 @@ async def process_operation(
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+def _segundos_de_entorno(variable: str, defecto: float) -> float:
+    """Segundos de una variable de entorno. Mal escrita, en 0 o negativa,
+    vale el defecto (RENDIMIENTO-1b)."""
+    import math
+    try:
+        valor = float(os.getenv(variable, "") or defecto)
+    except (TypeError, ValueError):
+        return defecto
+    # inf o 1e309 apagarían el tiempo máximo: también valen el defecto.
+    return valor if math.isfinite(valor) and valor > 0 else defecto
+
+
+def _pdf_read_timeout_s() -> float:
+    return _segundos_de_entorno("PDF_READ_TIMEOUT_S", 120.0)
+
+
+class LecturaPdfDemasiadoLarga(Exception):
+    """La lectura del PDF pasó de PDF_READ_TIMEOUT_S."""
+
+
+# Las lecturas de PDF tienen su propio grupo de hilos. Una lectura que pasa
+# del tiempo máximo sigue corriendo hasta terminar (un hilo no se corta desde
+# afuera): así, aunque varias lentas lo llenen, no le quitan hilos al resto
+# (validar archivos, sugerir NCM), que usa el grupo por defecto.
+_POOL_LECTURA_PDF = None
+
+
+def _pool_lectura_pdf():
+    global _POOL_LECTURA_PDF
+    if _POOL_LECTURA_PDF is None:
+        from concurrent.futures import ThreadPoolExecutor
+        try:
+            hilos = max(1, int(os.getenv("PDF_READ_WORKERS", "4")))
+        except (TypeError, ValueError):
+            hilos = 4
+        _POOL_LECTURA_PDF = ThreadPoolExecutor(hilos, thread_name_prefix="lectura-pdf")
+    return _POOL_LECTURA_PDF
+
+
+def _correr_lectura(funcion, *args):
+    # Un TimeoutError del propio lector (p. ej. de una conexión) no es «el PDF
+    # tardó demasiado»: se informa como cualquier otro error.
+    try:
+        return funcion(*args)
+    except TimeoutError as e:
+        raise RuntimeError(f"error de tiempo dentro del lector: {e}") from e
+
+
+def _pdf_vendor_timeout_s() -> float:
+    return _segundos_de_entorno("PDF_VENDOR_TIMEOUT_S", 15.0)
+
+
+async def _leer_pdf_aparte(funcion, *args, limite=None):
+    """Corre una lectura sincrónica de PDF en otro hilo, con tiempo máximo.
+
+    Así el servidor sigue atendiendo a los demás mientras se lee un PDF
+    (RENDIMIENTO-1). Si la lectura pasa de PDF_READ_TIMEOUT_S, levanta
+    LecturaPdfDemasiadoLarga.
+    """
+    import asyncio
+    loop = asyncio.get_running_loop()
+    futuro = loop.run_in_executor(_pool_lectura_pdf(), _correr_lectura, funcion, *args)
+    try:
+        return await asyncio.wait_for(
+            futuro, timeout=_pdf_read_timeout_s() if limite is None else limite
+        )
+    except TimeoutError:
+        raise LecturaPdfDemasiadoLarga(
+            "Leer el PDF tardó demasiado. Probá de nuevo o cargá los productos a mano."
+        )
+
+
 def _get_max_upload_bytes() -> int:
     try:
         max_mb = float(os.getenv("MAX_UPLOAD_MB", "10"))
@@ -3469,9 +3541,14 @@ async def upload_pdf_public(
         safe_name = sanitize_filename(file.filename or 'upload.pdf')
         logging.info("Procesando PDF: %s (%d bytes)", safe_name, len(contents))
         try:
-            result = process_pdf(contents)
+            result = await _leer_pdf_aparte(process_pdf, contents)
         except LecturaAutomaticaNoDisponible as e:
             return _respuesta_sin_lector(str(e))
+        except LecturaPdfDemasiadoLarga as e:
+            return JSONResponse(
+                status_code=504,
+                content={"detail": str(e), "code": "lectura_pdf_demasiado_larga"},
+            )
         
         # Manejar tanto formato nuevo (dict) como viejo (lista)
         if isinstance(result, dict) and 'items' in result:
@@ -3492,10 +3569,14 @@ async def upload_pdf_public(
         if not operacion_data.get('vendedor_nombre'):
             try:
                 from proyecto_maria.pdf_extractor import (
-                    _extract_pdf_text,
+                    extraer_texto_pdf_seguro,
                     detect_vendor_from_text,
                 )
-                pdf_text = _extract_pdf_text(contents)
+                # Es opcional: con un tiempo propio, más corto, y sólo con pypdf
+                # (pdfminer se cuelga con un PDF armado, RENDIMIENTO-1b).
+                pdf_text = await _leer_pdf_aparte(
+                    extraer_texto_pdf_seguro, contents, limite=_pdf_vendor_timeout_s()
+                )
                 detected = detect_vendor_from_text(pdf_text)
                 if detected:
                     operacion_data['vendedor_nombre'] = detected
@@ -7166,7 +7247,19 @@ async def sugerir_ncm(
     # validada contra ARCA. Sin Gemini disponible → sin resultados (no se
     # usa el buscador lexical como clasificador).
     if len(sugerencias) < 5 and not _looks_like_ncm_code_query(descripcion):
-        for sug in _suggest_ncm_with_gemini(descripcion, limit=5 - len(sugerencias)):
+        # En otro hilo y con tiempo máximo: la llamada a Gemini es sincrónica
+        # (RENDIMIENTO-1). Si no contesta a tiempo, se sigue sin sus sugerencias.
+        import asyncio
+        limite = _segundos_de_entorno("NCM_GEMINI_TIMEOUT_S", 30.0)
+        try:
+            de_gemini = await asyncio.wait_for(
+                asyncio.to_thread(_suggest_ncm_with_gemini, descripcion, 5 - len(sugerencias)),
+                timeout=limite,
+            )
+        except TimeoutError:
+            logging.warning("[ncm sugerir] Gemini no contestó a tiempo; sin sus sugerencias")
+            de_gemini = []
+        for sug in de_gemini:
             add_suggestion(sug)
 
     metadata = ncm_catalog.get_catalog_metadata()
