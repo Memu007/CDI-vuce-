@@ -62,8 +62,60 @@
     }
     CDI.camposSinLeer = camposSinLeer;
 
+    // Lo que no se leyó del Excel (MARIA-1b, D17 y D18): filas y otras hojas
+    // con datos. Queda en el semáforo hasta que la persona lo descarta.
+    function avisosDelExcel() {
+        var op = (CDI.state && CDI.state.operacion) || {};
+        var descartados = Array.isArray(op.avisos_descartados) ? op.avisos_descartados : [];
+        var avisos = [];
+        var filas = Array.isArray(op.filas_excel_sin_leer) ? op.filas_excel_sin_leer : [];
+        var total = Number(op.filas_excel_sin_leer_total) || filas.length;
+        if (total > 0 && descartados.indexOf('filas_excel') === -1) {
+            avisos.push({
+                clave: 'filas_excel',
+                texto: total + ' fila(s) del Excel no se pudieron leer' +
+                    (filas.length ? ' (filas ' + filas.join(', ') + ')' : '') +
+                    '. Revisalas y cargalas a mano.'
+            });
+        }
+        var hojas = Array.isArray(op.hojas_excel_sin_leer) ? op.hojas_excel_sin_leer : [];
+        if (hojas.length && descartados.indexOf('hojas_excel') === -1) {
+            avisos.push({
+                clave: 'hojas_excel',
+                texto: 'El Excel tiene otras hojas con datos que no se leyeron (' +
+                    hojas.join(', ') + '). Sólo se lee la primera: si hay productos ahí, cargalos a mano.'
+            });
+        }
+        return avisos;
+    }
+    CDI.avisosDelExcel = function () {
+        return avisosDelExcel().map(function (a) { return a.texto; });
+    };
+    function descartarAviso(clave) {
+        var op = CDI.state && CDI.state.operacion;
+        if (!op) return;
+        if (!Array.isArray(op.avisos_descartados)) op.avisos_descartados = [];
+        if (op.avisos_descartados.indexOf(clave) === -1) op.avisos_descartados.push(clave);
+    }
+
+    // La cabecera que el servidor controla antes de generar (MARIA-1b).
+    function cabeceraPayload() {
+        var op = (CDI.state && CDI.state.operacion) || {};
+        return {
+            moneda: String(op.moneda || '').trim().toUpperCase(),
+            incoterm: String(op.incoterm || '').trim().toUpperCase(),
+            comprador_cuit: String(op.comprador_cuit || '').replace(/[-\s]/g, ''),
+            flete: op.flete,
+            seguro: op.seguro
+        };
+    }
+
+    var descartables = {};
     function conAvisosLocales(data) {
-        var locales = camposSinLeer();
+        var delExcel = avisosDelExcel();
+        descartables = {};
+        delExcel.forEach(function (a) { descartables[a.texto] = a.clave; });
+        var locales = delExcel.map(function (a) { return a.texto; }).concat(camposSinLeer());
         var warns = locales.concat(data.advertencias || []);
         var errs = data.errores || [];
         var tips = data.sugerencias || [];
@@ -151,7 +203,10 @@
             html.push('<h4 class="semaforo-section-title is-warning">Advertencias (' + warns.length + ')</h4>');
             html.push('<ul class="semaforo-list">');
             warns.forEach(function (msg) {
-                html.push('<li class="semaforo-item is-warning" data-msg="' + CDI.escapeHtml(msg) + '">' + CDI.escapeHtml(stripEmojis(msg)) + '</li>');
+                var clave = descartables[msg];
+                html.push('<li class="semaforo-item is-warning" data-msg="' + CDI.escapeHtml(msg) + '">' + CDI.escapeHtml(stripEmojis(msg)) +
+                    (clave ? ' <button type="button" class="semaforo-descartar" data-clave="' + CDI.escapeHtml(clave) + '">Descartar</button>' : '') +
+                    '</li>');
             });
             html.push('</ul></div>');
         }
@@ -188,7 +243,7 @@
         try {
             var resp = await CDI.api('/api/validate/smart', {
                 method: 'POST',
-                body: JSON.stringify({ items: items })
+                body: JSON.stringify({ items: items, operacion: cabeceraPayload() })
             });
             if (!resp.ok) throw new Error('HTTP ' + resp.status);
             var data = await resp.json();
@@ -240,6 +295,13 @@
     }
 
     function onItemClick(e) {
+        var boton = e.target.closest && e.target.closest('.semaforo-descartar');
+        if (boton) {
+            descartarAviso(boton.getAttribute('data-clave'));
+            try { CDI.track && CDI.track('semaforo_aviso_descartado', { clave: boton.getAttribute('data-clave') }); } catch (_) {}
+            refrescarLocales();
+            return;
+        }
         var li = e.target.closest && e.target.closest('.semaforo-item');
         if (!li) return;
         var msg = li.getAttribute('data-msg') || '';

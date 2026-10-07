@@ -95,7 +95,7 @@
             const startedAt = Date.now();
             const res = await CDI.api('/api/validate/smart', {
                 method: 'POST',
-                body: JSON.stringify({ items })
+                body: JSON.stringify({ items, operacion: cabeceraParaValidar() })
             });
             const data = await res.json();
             const dur = Date.now() - startedAt;
@@ -133,7 +133,7 @@
             pieza: String(it.pieza || '').trim(),
             descripcion: String(it.descripcion || '').trim(),
             origen: String(it.origen || 'XX').trim().toUpperCase() || 'XX',
-            cantidad: toNumber(it.cantidad, 1),
+            cantidad: toNumber(it.cantidad, 0),
             valor_unitario: toNumber(it.valor_unitario, 0),
             peso_unitario: toNumber(it.peso_unitario, 0)
         }));
@@ -347,12 +347,24 @@
         }
     }
 
+    // La cabecera que controla el servidor antes de generar (MARIA-1b), tal
+    // como saldría en /generate_maria.
+    function cabeceraParaValidar() {
+        const req = buildMariaRequest();
+        return {
+            moneda: req.moneda, incoterm: req.incoterm, comprador_cuit: req.comprador_cuit,
+            flete: req.flete, seguro: req.seguro,
+        };
+    }
+
     function buildMariaRequest() {
         const op = (CDI.state && CDI.state.operacion) || {};
         const stats = (lastValidation && lastValidation.estadisticas) || {};
 
-        const moneda = (op.moneda || 'DOL').toString().toUpperCase();
-        const incoterm = (op.incoterm || 'FOB').toString().toUpperCase();
+        // Sin moneda o incoterm no se inventan DOL ni FOB: el control de antes
+        // de generar lo marca (MARIA-1b).
+        const moneda = (op.moneda || '').toString().trim().toUpperCase();
+        const incoterm = (op.incoterm || '').toString().trim().toUpperCase();
 
         const factura = String(op.numero_factura || '').trim();
         const operation_id = factura ? ('FAC_' + factura.replace(/[^a-zA-Z0-9_-]/g, '')) :
@@ -362,7 +374,7 @@
             pieza: String(it.pieza || '').trim(),
             descripcion: String(it.descripcion || '').trim(),
             origen: String(it.origen || 'XX').trim().toUpperCase() || 'XX',
-            cantidad: toNumber(it.cantidad, 1),
+            cantidad: toNumber(it.cantidad, 0),
             valor_unitario: toNumber(it.valor_unitario, 0),
             peso_unitario: toNumber(it.peso_unitario, 0),
             codigo_parte: String(it.codigo_parte || '').trim(),
@@ -750,7 +762,7 @@
                 ncm: String(it.pieza || '').trim(),
                 descripcion: String(it.descripcion || '').trim(),
                 origen: String(it.origen || 'XX').trim().toUpperCase() || 'XX',
-                cantidad: toNumber(it.cantidad, 1),
+                cantidad: toNumber(it.cantidad, 0),
                 valor_unitario: toNumber(it.valor_unitario, 0),
                 peso_unitario: toNumber(it.peso_unitario, 0),
                 grupo_id: it.grupo_id || null,

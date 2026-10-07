@@ -3379,6 +3379,35 @@ def _leer_excel_ruta(ruta: str, engine: str):
     return pd.read_excel(ruta, engine=engine, dtype=object).dropna(how="all")
 
 
+def _otras_hojas_con_datos(ruta: str, engine: str) -> list:
+    """Nombres de las hojas, después de la primera, que tienen algún dato en
+    sus primeras 1000 filas. Sólo se lee la primera: las demás se avisan
+    (MARIA-1b, D18)."""
+    nombres = []
+    if engine == "openpyxl":
+        import openpyxl
+        wb = openpyxl.load_workbook(ruta, read_only=True)
+        try:
+            for ws in wb.worksheets[1:]:
+                for fila in ws.iter_rows(max_row=1000, values_only=True):
+                    if any(v is not None and str(v).strip() for v in fila):
+                        nombres.append(ws.title)
+                        break
+        finally:
+            wb.close()
+        return nombres
+    import xlrd
+    libro = xlrd.open_workbook(ruta, on_demand=True)
+    try:
+        for i in range(1, libro.nsheets):
+            hoja = libro.sheet_by_index(i)
+            if any(str(v).strip() for f in range(min(hoja.nrows, 1000)) for v in hoja.row_values(f)):
+                nombres.append(hoja.name)
+    finally:
+        libro.release_resources()
+    return nombres
+
+
 # Una factura no trae miles de productos: más filas que esto se rechaza con un
 # mensaje claro en vez de trabar la pantalla de revisión (EXCEL-1).
 _MAX_FILAS_EXCEL = 5000
@@ -3463,13 +3492,30 @@ async def smart_validation(body: dict, user=Depends(get_current_user)):
                     pieza=item_dict.get("pieza", ""),
                     descripcion=item_dict.get("descripcion", ""),
                     origen=item_dict.get("origen", "XX"),
-                    cantidad=float(item_dict.get("cantidad", 1)),
+                    # Sin cantidad, 0: el control la marca (nada de 1 inventado).
+                    cantidad=float(item_dict.get("cantidad") or 0),
                     valor_unitario=float(item_dict.get("valor_unitario", 0)),
                     peso_unitario=float(item_dict.get("peso_unitario", 0))
                 ))
         
         # Ejecutar validación inteligente
         resultado = run_smart_validations(items)
+
+        # Los controles de antes de generar (MARIA-1b), con la cabecera si la
+        # pantalla la manda: así el semáforo y la pantalla de generar los
+        # muestran antes de que /generate_maria los frene.
+        operacion = body.get("operacion")
+        if isinstance(operacion, dict):
+            from proyecto_maria.core.controles_maria import controles_antes_de_generar
+            errores_1b, avisos_1b = controles_antes_de_generar(items_data, operacion)
+            resultado["errores"] = [*resultado.get("errores", []), *errores_1b]
+            resultado["advertencias"] = [*resultado.get("advertencias", []), *avisos_1b]
+            if errores_1b or avisos_1b:
+                resultado["resumen"] = (
+                    f"🔍 Análisis de {len(items)} ítems: {len(resultado['errores'])} errores, "
+                    f"{len(resultado['advertencias'])} advertencias, "
+                    f"{len(resultado.get('sugerencias', []))} sugerencias."
+                )
         
         return {
             "success": True,
@@ -3637,10 +3683,26 @@ async def generate_maria_endpoint(
     Devuelve: archivo TXT descargable
     """
     try:
+        from proyecto_maria.core.controles_maria import (
+            CAMPOS_DE_TEXTO, CAMPOS_DE_TEXTO_DEL_ITEM, controles_antes_de_generar, limpiar_texto,
+        )
+        # Ningún texto mete saltos de línea ni «=» en el TXT (MARIA-1b, M10).
+        for _campo in CAMPOS_DE_TEXTO:
+            setattr(request, _campo, limpiar_texto(getattr(request, _campo)))
+        request.items = [
+            {k: (limpiar_texto(v) if k in CAMPOS_DE_TEXTO_DEL_ITEM else v) for k, v in it.items()}
+            if isinstance(it, dict) else it
+            for it in (request.items or [])
+        ]
+        # NCM en el nomenclador, moneda, incoterm, CUIT del importador y
+        # montos de la cabecera: lo que impide un TXT válido no deja generar
+        # (MARIA-1b). Se juntan con los demás errores para mostrarlos todos.
+        errores_1b, avisos_1b = controles_antes_de_generar(request.items, request.model_dump())
+
         # Validar items (validación mínima)
         valid, errors = validate_items_for_maria(request.items)
         if not valid:
-            raise HTTPException(status_code=400, detail={"errors": errors})
+            raise HTTPException(status_code=400, detail={"errors": [*errors, *errores_1b]})
 
         # Validación específica de KIT Maria (complementa la anterior)
         kit_errors, kit_warnings = validate_for_kit_maria(request.items)
@@ -3682,8 +3744,8 @@ async def generate_maria_endpoint(
                     status_code=400,
                     detail="El sufijo de valor SBT no puede contener saltos de línea ni caracteres de control.",
                 )
-        if kit_errors:
-            raise HTTPException(status_code=400, detail={"errors": [*errors, *kit_errors]})
+        if kit_errors or errores_1b:
+            raise HTTPException(status_code=400, detail={"errors": [*errors, *kit_errors, *errores_1b]})
 
         # Si el user tiene CUIT en su perfil y la request no manda cuit_agr,
         # usamos el del perfil (para que el despachante no tenga que re-escribir
@@ -3756,7 +3818,7 @@ async def generate_maria_endpoint(
             "filename": filename,
             "download_url": f"/download/{filename}",
             "content": txt_content,  # También devolver contenido para preview
-            "warnings": kit_warnings + supuestos,
+            "warnings": kit_warnings + avisos_1b + supuestos,
             "supuestos": supuestos,
         }
 
@@ -5527,10 +5589,12 @@ async def save_client_operation(
                     operation_id=operation.id,
                     pieza=str(item.get("pieza") or item.get("ncm") or "")[:20],
                     descripcion=str(item.get("descripcion") or ""),
-                    origen=str(item.get("origen") or "XX")[:3],
-                    cantidad=float(item.get("cantidad") or 1),
+                    # Lo que falta queda vacío (0 o ""): nada de cantidad 1,
+                    # peso 0,5 ni origen «XX» inventados (MARIA-1b, D6 Dev 2).
+                    origen=str(item.get("origen") or "")[:3],
+                    cantidad=float(item.get("cantidad") or 0),
                     valor_unitario=float(item.get("valor_unitario") or 0),
-                    peso_unitario=float(item.get("peso_unitario") or 0.5),
+                    peso_unitario=float(item.get("peso_unitario") or 0),
                     grupo_id=item.get("grupo_id"),
                     unidad=str(item.get("unidad") or "")[:10] or None,
                 )
@@ -6258,6 +6322,11 @@ async def upload_excel_v2(
             limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
         )
 
+        otras_hojas = await _leer_pdf_aparte(
+            _otras_hojas_con_datos, temp_filename, engine,
+            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
+        )
+
         if len(df) > _MAX_FILAS_EXCEL:
             raise HTTPException(
                 status_code=400,
@@ -6348,6 +6417,14 @@ async def upload_excel_v2(
                 }
             except HTTPException:
                 operacion = {}
+
+        # Lo que no se leyó del libro queda en la operación: el semáforo lo
+        # muestra hasta que la persona lo descarta (MARIA-1b, D17 y D18).
+        if descartes:
+            operacion["filas_excel_sin_leer"] = descartes[:50]
+            operacion["filas_excel_sin_leer_total"] = len(descartes)
+        if otras_hojas:
+            operacion["hojas_excel_sin_leer"] = otras_hojas[:20]
 
         return {
             "message": "Excel procesado exitosamente",

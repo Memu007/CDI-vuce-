@@ -367,14 +367,11 @@
             // Lo que la factura traía pero no se pudo leer (MARIA-1c). Al
             // final, para que otro aviso de la subida no lo tape.
             const sinLeer = CDI.camposSinLeer ? CDI.camposSinLeer() : [];
-            // Filas del Excel que no se pudieron leer: que el usuario lo sepa,
-            // así no declara menos de lo que trae la factura. Va en este mismo
-            // aviso final: la pantalla muestra un aviso a la vez (EXCEL-1).
-            if (currentFormat === 'excel' && data && data.filas_descartadas > 0) {
-                const nums = (data.filas_descartadas_numeros || []).join(', ');
-                sinLeer.unshift(data.filas_descartadas + ' fila(s) del Excel no se pudieron leer' +
-                    (nums ? ' (filas ' + nums + ')' : '') + '. Revisalas y cargalas a mano.');
-            }
+            // Lo que no se leyó del Excel (filas y otras hojas): que el usuario
+            // lo sepa, así no declara menos de lo que trae la factura. Va en
+            // este mismo aviso final (la pantalla muestra uno a la vez) y queda
+            // en el semáforo hasta que lo descarta (EXCEL-1, MARIA-1b).
+            if (CDI.avisosDelExcel) sinLeer.unshift.apply(sinLeer, CDI.avisosDelExcel());
             if (sinLeer.length && CDI.toast) {
                 CDI.toast('Revisá la factura', sinLeer.join(' '), 'warning');
             }
@@ -624,7 +621,7 @@
             vendedor_pais: 'CN',
             vendedor_direccion: '12F, Tower B, Huamei Plaza, Shenzhen, Guangdong, China',
             comprador_nombre: 'Importadora del Sur SRL',
-            comprador_cuit: '30-71234567-8',
+            comprador_cuit: '30-71234567-1',  // inventado, con dígito verificador válido (MARIA-1b)
             comprador_domicilio: 'Av. Corrientes 1234, CABA, Argentina',
         };
         const items = [
