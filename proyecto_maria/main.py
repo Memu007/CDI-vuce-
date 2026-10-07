@@ -3434,18 +3434,19 @@ def _xlsx_solo_primera_hoja(ruta) -> tuple:
         return salida.getvalue(), combinadas
 
 
-def _rellenar_combinadas(df, combinadas, desde_fila: int = 2):
+def _rellenar_combinadas(df, combinadas):
     """El texto de una celda combinada vale para todas sus filas, sólo en su
     propia columna: «China» combinada en C4:C5 es el origen de las dos filas;
     una descripción combinada hacia el costado no se copia a otra columna
     (D18, EXCEL-2). Los números no se copian: una cantidad o un precio
     combinados sobre la fila que sigue la descripción duplicaban el FOB
-    (revisión de EXCEL-2). Sólo debajo del encabezado (`desde_fila`, fila de
-    la planilla). El índice de df es la fila de la planilla menos 2."""
+    (revisión de EXCEL-2). Se llama después de buscar el encabezado: su fila
+    y las de arriba ya no están en df, así que un encabezado combinado no se
+    copia a los datos. El índice de df es la fila de la planilla menos 2."""
     import re as _re
     columnas = list(df.columns)
     for f1, c1, f2, _c2 in combinadas:
-        if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < max(2, desde_fila):
+        if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < 2:
             continue
         col = columnas[c1 - 1]
         ancla = f1 - 2
@@ -3466,12 +3467,11 @@ def _con_encabezado(df, conocidas=()):
     reconocen al menos 3 columnas. Las columnas del mapeo guardado del cliente
     cuentan como reconocidas: con ellas en la fila 1 no se busca (un pie con
     «Peso Neto | Valor» no pasa a ser el encabezado). El índice sigue siendo la
-    fila de la planilla menos 2, así los avisos nombran la fila correcta, y la
-    fila del encabezado queda en df.attrs["fila_encabezado"] (D18, EXCEL-2)."""
+    fila de la planilla menos 2, así los avisos nombran la fila correcta
+    (D18, EXCEL-2)."""
     conocidas = set(conocidas or ())
     actuales = list(df.columns)
     if len(_detect_item_columns(actuales)) + sum(1 for c in actuales if c in conocidas) >= 3:
-        df.attrs["fila_encabezado"] = 1
         return df
     for k in range(min(30, len(df))):
         valores = list(df.iloc[k].values)
@@ -3492,9 +3492,7 @@ def _con_encabezado(df, conocidas=()):
             columnas.append(nombre)
         nuevo = df.iloc[k + 1:].copy()
         nuevo.columns = columnas
-        nuevo.attrs["fila_encabezado"] = int(df.index[k]) + 2
         return nuevo
-    df.attrs["fila_encabezado"] = 1
     return df
 
 
@@ -3509,8 +3507,7 @@ def _leer_excel_ruta(ruta: str, engine: str, conocidas=()):
         contenido, combinadas = _xlsx_solo_primera_hoja(ruta)
         origen = _io.BytesIO(contenido)
     df = _con_encabezado(pd.read_excel(origen, engine=engine, dtype=object), conocidas)
-    fila_encabezado = df.attrs.get("fila_encabezado", 1)
-    return _rellenar_combinadas(df, combinadas, desde_fila=fila_encabezado + 1).dropna(how="all")
+    return _rellenar_combinadas(df, combinadas).dropna(how="all")
 
 
 # Mirar las otras hojas es sólo un aviso, y tiene su propio presupuesto que
