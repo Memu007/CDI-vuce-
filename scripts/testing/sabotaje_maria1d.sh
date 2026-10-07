@@ -110,7 +110,7 @@ reemplazar $X "_TEXTO_VACIO = {'NONE', 'NULL', 'N/A'}" "_TEXTO_VACIO = set()"
 caso vacio_como_texto "${T}test_el_vacio_escrito_como_texto_queda_vacio[None-pdf_directo]"
 
 # 7. una descripción que no es texto tira el producto
-reemplazar $X "                            descripcion = _texto(item_data.get('descripcion'))" "                            descripcion = item_data.get('descripcion', '')"
+reemplazar $X "    descripcion = _texto(item_data.get('descripcion'))" "    descripcion = item_data.get('descripcion', '')"
 caso descripcion_numero "${T}test_una_descripcion_que_no_es_texto_no_tira_el_producto[pymupdf]"
 
 # 8. los avisos previos no dicen la procedencia rara de un producto
