@@ -97,8 +97,14 @@ def test_incoterm_que_impide_el_txt(incoterm, mensaje):
     assert mensaje in _errores(_generar(incoterm=incoterm))
 
 
+def test_cuit_del_importador_vacio_avisa():
+    """La pantalla lo deja opcional («extranjeros sin CUIT»): vacío avisa (D20)."""
+    r = _generar(comprador_cuit="")
+    assert r.status_code == 200, r.text[:300]
+    assert any("Falta el CUIT del importador" in w for w in r.json()["warnings"]), r.json()
+
+
 @pytest.mark.parametrize("cuit,mensaje", [
-    ("", "Falta el CUIT del importador"),
     ("30999999991", "no es válido"),      # dígito verificador mal
     ("3099999999", "no es válido"),       # 10 dígitos
 ])
@@ -121,8 +127,8 @@ def test_montos_vacios_negativos_o_en_0_no_dejan_generar(cambio):
 
 
 def test_todos_los_errores_juntos():
-    errores = _errores(_generar(moneda="", comprador_cuit="", item={"pieza": "1012100000A"}))
-    for parte in ("Falta la moneda", "Falta el CUIT", "0 inicial"):
+    errores = _errores(_generar(moneda="", comprador_cuit="30999999991", item={"pieza": "1012100000A"}))
+    for parte in ("Falta la moneda", "CUIT del importador", "0 inicial"):
         assert parte in errores, errores
 
 
