@@ -32,7 +32,7 @@ open(p, "w").write(s.replace(viejo, nuevo))
 PYEOF
   then echo "ROTO  | $nombre: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1)); return; fi
   local salida codigo
-  salida="$("$PY" -m pytest -q --no-cov -p no:cacheprovider tests/test_maria1b_controles.py 2>&1)"; codigo=$?
+  salida="$("$PY" -m pytest -q --no-cov -p no:cacheprovider tests/test_maria1b_controles.py tests/test_maria1b_devolucion.py 2>&1)"; codigo=$?
   if [ "$codigo" -eq 0 ]; then
     echo "VERDE | $nombre: la prueba no lo vio"; FALLAS=$((FALLAS+1))
   elif grep -qF -- "$esperado" <<<"$salida"; then
@@ -45,6 +45,13 @@ PYEOF
 M=proyecto_maria/main.py
 C=proyecto_maria/core/controles_maria.py
 T=tests/test_maria1b_controles.py
+D=tests/test_maria1b_devolucion.py
+
+# Sin sabotaje tiene que estar en verde: si no, cualquier «ROJO» de abajo
+# sería del rojo que ya había.
+if ! "$PY" -m pytest -q --no-cov -p no:cacheprovider $T $D >/dev/null 2>&1; then
+  echo "BASE  | las pruebas ya están en rojo sin sabotaje: no se puede medir nada"; exit 1
+fi
 sabotaje $M "/generate_maria deja de usar los controles" \
   '        if kit_errors or errores_1b:' \
   '        if kit_errors:' \
@@ -70,8 +77,8 @@ sabotaje $C "el dígito verificador del CUIT deja de mirarse" \
   '    return True' \
   "FAILED $T::test_cuit_del_importador[30999999991-"
 sabotaje $C "el flete negativo vuelve a pasar" \
-  '        if valor is not None and valor < 0:' \
-  '        if False:' \
+  '            importe_valido(valor, nombre)' \
+  '            pass' \
   "FAILED $T::test_flete_o_seguro_negativo_no_deja_generar[flete]"
 sabotaje $C "la NCM sin el 0 inicial deja de proponerse" \
   '    if len(digitos) in (10, 7) and _en_el_nomenclador("0" + digitos[:7]):' \
@@ -129,9 +136,47 @@ sabotaje $M "las otras hojas dejan de avisarse" \
   '            pass' \
   "FAILED $T::test_el_excel_deja_en_la_operacion_lo_que_no_se_leyo"
 sabotaje $M "una hoja vacía se avisa como hoja con datos" \
-  '                    if any(v is not None and str(v).strip() for v in fila):' \
-  '                    if True:' \
+  '                return True
+    return False' \
+  '                return True
+    return True' \
   "FAILED $T::test_el_excel_deja_en_la_operacion_lo_que_no_se_leyo"
+# Devolución de MARIA-1b
+sabotaje $C "NaN e inf vuelven a pasar en los productos" \
+  '            if any(_no_finito(item.get(c)) for c in campos):' \
+  '            if False:' \
+  "FAILED $D::test_nan_o_inf_en_un_producto_no_dejan_generar"
+sabotaje $M "la validación previa vuelve a dar 500 con un NaN" \
+  '                item_dict = {k: (0.0 if k in numericos and _no_finito(v) else v)' \
+  '                item_dict = {k: v' \
+  "FAILED $D::test_la_validacion_previa_con_nan_o_inf_no_da_500"
+sabotaje $C "el CUIT vuelve a aceptar dígitos de otros alfabetos" \
+  'if not re.fullmatch(r"[0-9]{11}", norm):' \
+  'if not re.fullmatch(r"\d{11}", norm):' \
+  "FAILED $D::test_cuit_con_digitos_que_no_son_0_a_9_no_deja_generar"
+sabotaje $C "las monedas habituales vuelven a pasar sin aviso" \
+  '    elif moneda not in MONEDAS_CONFIRMADAS:' \
+  '    elif moneda not in MONEDAS_CONFIRMADAS | {"EUR", "BRL", "CNY"}:' \
+  "FAILED $D::test_toda_moneda_que_no_es_dol_avisa_y_deja_generar[EUR]"
+sabotaje $M "la exportación vuelve a escribir los textos sin limpiar" \
+  '                setattr(request, _campo, limpiar_texto(_valor))' \
+  '                pass' \
+  "FAILED $D::test_la_exportacion_tampoco_mete_lineas_ni_igual[exportador_nombre]"
+sabotaje $M "mirar las otras hojas vuelve a no tener presupuesto" \
+  '    def read(self, n: int = -1) -> bytes:
+        import time as _time' \
+  '    def read(self, n: int = -1) -> bytes:
+        return self._archivo.read(n)
+        import time as _time' \
+  "FAILED $D::test_mirar_las_otras_hojas_de_un_libro_armado_corta_solo"
+sabotaje $M "un texto compartido en blanco cuenta como dato" \
+  '                    lleno = lista[i]' \
+  '                    lleno = True' \
+  "FAILED $D::test_mirar_las_otras_hojas_de_un_libro_armado_corta_solo"
+sabotaje $M "el semáforo deja de decir que no se revisaron todas las hojas" \
+  '            operacion["hojas_excel_sin_revisar"] = True' \
+  '            pass' \
+  "FAILED $D::test_un_libro_armado_dice_que_no_se_revisaron_todas_las_hojas"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"
