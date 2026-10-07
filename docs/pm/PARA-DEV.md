@@ -32,6 +32,42 @@ en `REPRODUCCION-PUNTA-A-PUNTA-1-2026-10-07.md`. El caso del peso con más de
 una unidad lo suma la Dev 2 con MARIA-5. Antes: MARIA-1b aceptada sobre
 `beea9eb` (en Git).
 
+## Respuestas a D28 a D31, COBRO-MP-1 (2026-10-07, 18:35 UTC)
+
+- **D28: (a)**, seguir aceptando el aviso IPN sin firma. En tus riesgos
+  queda escrito lo que sigue abierto: cualquiera, sin firma, hace que el
+  servidor le pregunte a Mercado Pago por ids al azar con nuestro token. La
+  tabla frena las repeticiones, no las consultas.
+- **D29: (b)**, el precio del link cuando se armó, con tres condiciones:
+  1. **Links viejos sin ese dato:** se compara contra el precio de hoy. Que
+     quede escrito y probado.
+  2. **Suscripción (preapproval):** `create_checkout`
+     (`billing_service.py:161-190`) usa la suscripción cuando hay
+     `MP_PREAPPROVAL_PLAN_ID_*`. Ahí el precio está en el panel de Mercado
+     Pago, no en `PLANS`. Para esos pagos y sus renovaciones, el monto
+     esperado sale de la suscripción leída en Mercado Pago. Si no, una
+     diferencia entre el panel y el código rechaza todas las renovaciones.
+  3. **Un pago rechazado es un cliente que pagó y no recibió nada.** No
+     alcanza con el log: Emi tiene que poder verlo (en el admin que ya
+     existe, o proponé dónde). Es criterio, no nota.
+- **D30: (a)**, con el paso 4 en commits aparte.
+  - Criterio: **si la respuesta de `/authorized_payments/{id}` no tiene la
+    forma esperada, no se aplica nada** y se loguea.
+  - La prueba en el sandbox es de la puerta G7, no una condición para
+    publicar esta pieza: hoy no se le cobra a ningún estudio.
+  - Le pregunto a Emi si `MP_PREAPPROVAL_PLAN_ID_*` está en Railway. Si no
+    está, el paso 4 no corre en producción.
+- **D31: visto bueno**, con condiciones:
+  - Que no se aplique dos veces depende del índice único de la base, no de
+    mirar antes de insertar.
+  - Si el insert choca (`IntegrityError`), se responde `skipped` sin tocar
+    la cuenta.
+  - Una prueba con nombre manda dos avisos del mismo `payment_id` a la vez
+    (`asyncio.gather`) y muestra que se aplica uno solo.
+  - El `create_all` de la tabla, contra un Postgres de verdad si podés
+    levantar uno local. Si no podés, lo declarás «no corrido»: SQLite no lo
+    cubre.
+
 ## Respuestas a tus D (2026-10-07, 15:20 UTC)
 
 - **D26: (a)**, en EXCEL-2 (abajo). El subagente lo confirmó: con 8 libros
