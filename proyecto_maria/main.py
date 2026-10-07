@@ -3385,7 +3385,7 @@ def _xlsx_solo_primera_hoja(ruta) -> tuple:
     import re as _re
     import zipfile
     from xml.etree import ElementTree as ET
-    from proyecto_maria.security.file_security import hojas_del_xlsx, partes_del_xlsx
+    from proyecto_maria.security.file_security import _sin_dtd, partes_del_xlsx, sheets_del_libro
     ns_main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
     def _col(letras):
         n = 0
@@ -3394,7 +3394,11 @@ def _xlsx_solo_primera_hoja(ruta) -> tuple:
         return n
 
     with zipfile.ZipFile(_io.BytesIO(ruta) if isinstance(ruta, (bytes, bytearray)) else ruta) as z:
-        hojas = hojas_del_xlsx(z)
+        # Sin DTD: también se lee así el historial, que no pasa por la
+        # validación de la subida (revisión de la devolución de EXCEL-2).
+        _sin_dtd(z)
+        todas = sheets_del_libro(z)
+        hojas = [(nombre, ruta_hoja) for nombre, _rid, ruta_hoja, grafico in todas if not grafico]
         combinadas = []
         if hojas and hojas[0][1] in z.namelist():
             xml = z.read(hojas[0][1])
@@ -3403,20 +3407,24 @@ def _xlsx_solo_primera_hoja(ruta) -> tuple:
                                    int(m.group(4)), _col(m.group(3).decode())))
                 if len(combinadas) >= 10_000:
                     break
-        if len(hojas) <= 1:
+        # Se queda sólo la primera hoja de cálculo, por su r:id: openpyxl lee
+        # entera una hoja de gráfico aun en read_only, y otra hoja con el
+        # mismo nombre que la primera quedaba (revisión de la devolución).
+        rid_primera = next((rid for _n, rid, _r, grafico in todas if not grafico), None)
+        if len(todas) <= 1:
             if isinstance(ruta, (bytes, bytearray)):
                 return bytes(ruta), combinadas
             with open(ruta, "rb") as f:
                 return f.read(), combinadas
-        afuera = {parte for _, parte in hojas[1:]}
+        afuera = {ruta_hoja for _n, rid, ruta_hoja, _g in todas if rid != rid_primera}
         ET.register_namespace("", ns_main)
         ET.register_namespace("r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships")
         parte_libro = partes_del_xlsx(z)[0]
         libro = ET.fromstring(z.read(parte_libro))
-        primera = hojas[0][0]
+        ns_rel = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
         sheets = libro.find(f"{{{ns_main}}}sheets")
         for h in list(sheets):
-            if h.get("name") != primera:
+            if h.get(f"{ns_rel}id") != rid_primera:
                 sheets.remove(h)
         # Los nombres definidos pueden apuntar a hojas que ya no están.
         definidos = libro.find(f"{{{ns_main}}}definedNames")
@@ -3458,8 +3466,17 @@ def _rellenar_combinadas(df, combinadas, mapeo=None):
     if df.empty or not combinadas:
         return df
     columnas = list(df.columns)
-    campos = dict(_detect_item_columns(columnas))
-    campos.update(dict(mapeo or {}))
+    detectados = dict(_detect_item_columns(columnas))
+    mapeados = dict(mapeo or {})
+    # Una columna se rellena sólo si lo que se sabe de ella es texto: si se
+    # detecta como cantidad, valor o peso no se rellena aunque el mapeo diga
+    # otra cosa (con dos columnas para descripción en el mapeo, «Quantity» se
+    # usaba como cantidad y se rellenaba; revisión de la devolución).
+    campos = {}
+    for col in columnas:
+        lo_que_es = {detectados.get(col), mapeados.get(col)} - {None}
+        if lo_que_es and lo_que_es <= _COMBINADAS_SE_COPIAN:
+            campos[col] = next(iter(lo_que_es))
     primera, ultima = int(df.index.min()) + 2, int(df.index.max()) + 2
     hasta_donde = {}
     for f1, c1, f2, _c2 in sorted(set(combinadas)):
@@ -3730,7 +3747,15 @@ def _leer_tabla(content: bytes, filename: str):
         try:
             texto = crudo.decode("utf-8")
         except UnicodeDecodeError:
-            validas = _re.findall(rb"[\xc2-\xdf][\x80-\xbf]|[\xe0-\xef][\x80-\xbf]{2}|[\xf0-\xf4][\x80-\xbf]{3}", crudo)
+            secuencias = _re.findall(rb"[\xc2-\xdf][\x80-\xbf]|[\xe0-\xef][\x80-\xbf]{2}|[\xf0-\xf4][\x80-\xbf]{3}", crudo)
+            # Una secuencia UTF-8 válida cuenta sólo si da una letra que se usa
+            # en castellano (tildes, eñe, «¿», comillas tipográficas, «€»):
+            # «É» y un espacio duro en cp1252 arman «ɠ», que no es UTF-8 de
+            # verdad (revisión de la devolución de EXCEL-2).
+            def _plausible(seq):
+                cp = ord(seq.decode("utf-8"))
+                return 0xA0 <= cp <= 0x17F or 0x2010 <= cp <= 0x203A or cp in (0x20AC, 0x2122)
+            validas = [q for q in secuencias if _plausible(q)]
             sueltos = sum(1 for b in crudo if b >= 0x80) - sum(len(v) for v in validas)
             if validas and len(validas) >= sueltos:
                 texto = crudo.decode("utf-8", errors="replace")
