@@ -669,3 +669,71 @@ def test_estilos_de_un_libro_normal_grande_siguen_pasando():
     """Un libro con estilos de sobra (50.000 formatos) sigue entrando."""
     from proyecto_maria.security.file_security import _contar_hojas_xlsx
     assert _contar_hojas_xlsx(_con_estilos(_libro([ENCABEZADO]), "xf", 50_000)) == 1
+
+
+def _con_hoja_escondida(filas: int) -> bytes:
+    """Devolución 4 (a): la primera hoja chica y una segunda grande, sin
+    <dimension>, con el mismo nombre y una relación de Type raro. openpyxl la
+    abre igual (abre como hoja todo lo que no es de gráfico)."""
+    import zipfile
+    grande = zipfile.ZipFile(io.BytesIO(_libro_con(filas_primera=filas)))
+    chica = zipfile.ZipFile(io.BytesIO(_libro_con(filas_primera=1)))
+    salida = io.BytesIO()
+    with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as z:
+        for info in chica.infolist():
+            datos = chica.read(info.filename)
+            if info.filename == "xl/workbook.xml":
+                datos = datos.replace(b"</sheets>", b'<sheet name="Hoja1" sheetId="2" r:id="rId9"/></sheets>')
+            if info.filename == "xl/_rels/workbook.xml.rels":
+                datos = datos.replace(b"</Relationships>", b'<Relationship Id="rId9" Type="http://example.com/'
+                                      b'relationships/rara" Target="worksheets/sheet2.xml"/></Relationships>')
+            z.writestr(info, datos)
+        z.writestr("xl/worksheets/sheet2.xml", grande.read("xl/worksheets/sheet1.xml"))
+    return salida.getvalue()
+
+
+def test_una_hoja_con_una_relacion_rara_cuenta_y_sale_de_la_copia():
+    import zipfile
+    from proyecto_maria.security.file_security import hojas_del_xlsx
+    contenido = _con_hoja_escondida(3)
+    assert [p for _, p in hojas_del_xlsx(zipfile.ZipFile(io.BytesIO(contenido)))] == \
+        ["xl/worksheets/sheet1.xml", "xl/worksheets/sheet2.xml"]
+    copia, _ = main._xlsx_solo_primera_hoja(contenido)
+    assert "xl/worksheets/sheet2.xml" not in zipfile.ZipFile(io.BytesIO(copia)).namelist()
+
+
+def test_una_primera_hoja_de_27_mb_se_rechaza():
+    """Devolución 4 (b): 27 MB sin <dimension> pasaban el tope de 30 MB y,
+    con 8 así delante, la subida normal daba 504. El tope baja a 10 MB."""
+    from proyecto_maria.security.file_security import ExcelDemasiadoGrande, _contar_hojas_xlsx
+    with pytest.raises(ExcelDemasiadoGrande):
+        _contar_hojas_xlsx(_libro_con(filas_primera=int(27 * 2**20 / 1500)))
+    assert _contar_hojas_xlsx(_libro_con(filas_primera=int(9.5 * 2**20 / 1500))) == 1
+
+
+def test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_a_una_subida_normal():
+    """El criterio de D26 con el tope nuevo: 8 libros con la primera hoja al
+    borde de los 10 MB, sin <dimension>, delante, y la subida normal da 200.
+    Con 27 MB (el tope de antes dejaba pasar hasta 30) daba 504 a los 60 s."""
+    import asyncio
+    import httpx
+
+    armado = _libro_con(filas_primera=int(9.8 * 2**20 / 1500))
+    normal = _libro_normal({"Factura": FILAS})
+
+    async def _todo():
+        transporte = httpx.ASGITransport(app=main.app)
+        async with httpx.AsyncClient(transport=transporte, base_url="http://test", timeout=600) as c:
+            def subir(contenido):
+                return c.post("/upload_excel_v2/", files={"file": ("factura.xlsx", contenido)})
+            pesadas = [asyncio.create_task(subir(armado)) for _ in range(8)]
+            await asyncio.sleep(0.5)
+            t0 = time.monotonic()
+            r = await subir(normal)
+            dt = time.monotonic() - t0
+            await asyncio.gather(*pesadas)
+            return r, dt
+
+    r, dt = asyncio.run(_todo())
+    print(f"subida normal: {r.status_code} en {dt:.1f} s")
+    assert r.status_code == 200, f"la subida normal dio {r.status_code} a los {dt:.1f} s: {r.text[:200]}"
