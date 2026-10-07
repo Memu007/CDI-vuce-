@@ -74,8 +74,8 @@ despachante carga un archivo en su Kit (cierra G4).
 
 | Pieza | Quién | Qué arregla |
 |---|---|---|
-| COBRO-MP-1 | Dev 1 | Aviso de pago verificado, aplicado una vez aunque se reenvíe, con el monto controlado (C3, D8 de la Dev 1). Va primero: es el único camino que hoy activa sin pagar |
-| COBRO-CORTE-1 | Dev 1 | Quien no paga no genera valor ni gasta Gemini; se cuenta una vez por operación; sin pasarse del tope (C1, C5, C6). Ya decidido: D4 (b, N = 10), D5 (a), D6 (a) de la Dev 1 (`PARA-DEV.md`) |
+| COBRO-MP-1 | Dev 1 | Aviso de pago verificado, aplicado una vez aunque se reenvíe, con el monto controlado (C3, D8 de la Dev 1). Va primero: es el único camino que hoy activa sin pagar. Además, que las renovaciones de la suscripción extiendan el período (hoy sólo se procesa `type=payment`; leído en el ataque al ensayo, sin verificar) |
+| COBRO-CORTE-1 | Dev 1 | Quien no paga no genera valor ni gasta Gemini; se cuenta una vez por operación; sin pasarse del tope; el aviso del corte dice la razón real (hoy una cuenta que fue activa recibe «prueba vencida») (C1, C5, C6). Ya decidido: D4 (b, N = 10), D5 (a), D6 (a) de la Dev 1 (`PARA-DEV.md`) |
 | COBRO-MP-2 | Dev 1 | Cancelar también en Mercado Pago, sin perder días pagados, una sola suscripción, reactivar pagando (una prueba gratuita no pasa a activa); sin token de Mercado Pago, no decir «activada» (C2, C4, C8, D9 de la Dev 1) |
 | ORG-1 | Dev 2 | Invitaciones que funcionan, tope de usuarios del plan, atadas al email (C7) |
 | LEGAL-1 | Dev 2 | Términos y privacidad con el texto de Emi, y cómo pedir el borrado de datos (X5) |
@@ -92,7 +92,7 @@ despachante carga un archivo en su Kit (cierra G4).
 | LIMPIEZA-1 | Dev 1 | Las 10 pruebas excluidas vuelven a la CI; se borra el camino viejo a Google Cloud; fuera las cadenas que pueden tener contraseñas (X2, X4) |
 | DATOS-1 | Dev 2 | Borrar un cliente siempre funciona; la salud dice la verdad; los errores no muestran detalles internos (D2, D5, D6) |
 | BACKUP-1 | Dev 2 | Copia de la base fuera de Railway, con una restauración probada (D1) |
-| DISCO-1 | Dev 2 | El historial de NCM y los TXT pasan a la base (hoy se borran al publicar) (D4) |
+| DISCO-1 | Dev 2 | El historial de NCM y los TXT pasan a la base (hoy se borran al publicar; si el servicio tuviera un volumen, los TXT viejos quedan donde `/download` ya no los busca) (D4) |
 | AUDITORIA-FINAL | PM | Auditoría completa nueva (Opus alto y Sonnet alto) y una vuelta de arreglos |
 
 **Cierre:** publicar y probar volver atrás (cierra G3 y G6). Recién ahí entra
