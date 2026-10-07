@@ -102,7 +102,7 @@ reemplazar $G "key=lambda i: (-(partes[i] - enteras[i]), -pesos[i], i)" "key=lam
 caso desempate "${T}centavos.py::test_el_flete_de_diez_suma_diez"
 
 # 6. el redondeo vuelve a ser el del binario
-reemplazar $G "    return Decimal(repr(numero)).quantize(Decimal(\"0.01\"), ROUND_HALF_UP)" "    return Decimal(numero).quantize(Decimal(\"0.01\"), ROUND_HALF_UP)"
+reemplazar $G "        numero = Decimal(repr(crudo))" "        numero = Decimal(crudo)"
 caso redondeo_binario "${T}centavos.py::test_el_redondeo_es_mitad_hacia_arriba"
 
 # 7. el FOB de la carátula vuelve a sumarse sin redondear las líneas
@@ -110,7 +110,8 @@ reemplazar $G "    lines[linea_fob_total] = f\"MDDTFOB={sum(fobs, Decimal('0.00'
 caso fob_carátula "${T}centavos.py::test_cualquier_reparto_cierra["
 
 # 8. NaN vuelve a llegar al TXT
-reemplazar $G "    if not math.isfinite(numero):" "    if False:"
+reemplazar $G "        if not math.isfinite(crudo):" "        if False:"
+reemplazar $G "    if not numero.is_finite() or abs(numero) > IMPORTE_MAXIMO:" "    if False:"
 caso nan_en_el_txt "${T}centavos.py::test_un_importe_que_no_es_numero_no_llega_al_txt["
 
 # 9. la validación vuelve a redondear el total

@@ -215,7 +215,7 @@ reemplazar $M '        importe_valido(request.seguro, "Seguro")
 caso avisos_gastos_500 "${T}test_gastos_que_no_son_un_importe_dan_400[/generate_maria/avisos-gastos_anteriores_fob-EXW-inf]"
 
 # 28. el flete no se valida (con CIF llega a GTOS-POS-FOB)
-reemplazar $G '    flete = importe_valido(flete or 0, "Flete")' '    flete = float(flete or 0)'
+reemplazar $G '    flete = centavos(importe_valido(flete or 0, "Flete"))' '    flete = Decimal(repr(float(flete or 0)))'
 caso flete_sin_validar "${T}test_flete_o_seguro_que_no_son_un_importe_dan_400[/generate_maria-flete-inf]"
 
 # 29. una procedencia de producto no reconocida pasa
