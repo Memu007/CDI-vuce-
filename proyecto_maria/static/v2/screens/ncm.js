@@ -1635,11 +1635,31 @@
         const fmt = CDI.formatNcm ? CDI.formatNcm(code) : code;
         if (!isValidNcm(fmt)) {
             renderSpotEmpty('NCM identificada. Falta elegir la posición SIM completa (11 dígitos + DC).');
-            return;
+        } else {
+            spotSuggestions = [{ ncm: fmt, desc: 'Asignar este código manualmente', source: 'manual' }];
+            spotSelectedSugIdx = 0;
+            renderSpotResults(false);
         }
-        spotSuggestions = [{ ncm: fmt, desc: 'Asignar este código manualmente', source: 'manual' }];
-        spotSelectedSugIdx = 0;
-        renderSpotResults(false);
+        avisarCodigoEscrito(code);
+    }
+    // Un código escrito que se dio de baja (o que no está en el nomenclador
+    // vigente) lo dice mientras se escribe (CATALOGO-NCM-1). Es aviso: se
+    // puede asignar igual.
+    async function avisarCodigoEscrito(code) {
+        const consulta = spotLastQuery;
+        let data;
+        try {
+            const res = await CDI.api('/api/ncm/aviso?codigo=' + encodeURIComponent(code));
+            data = res.ok ? await res.json() : null;
+        } catch (_) { data = null; }
+        if (!data || !data.aviso || consulta !== spotLastQuery) return;
+        const fmt = CDI.formatNcm ? CDI.formatNcm(code) : code;
+        if (isValidNcm(fmt) && spotSuggestions.length && spotSuggestions[0].source === 'manual') {
+            spotSuggestions[0] = Object.assign({}, spotSuggestions[0], { aviso: data.aviso, baja: true });
+            renderSpotResults(false);
+        } else if (!isValidNcm(fmt)) {
+            renderSpotEmpty('⚠ ' + data.aviso);
+        }
     }
     function renderSpotResults(initial) {
         if (!spotSuggestions.length) {
@@ -1700,11 +1720,11 @@
             ? 'Lista para asignar'
             : 'Elegir para ver posiciones SIM + DC';
         // Una posición dada de baja se propone diciéndolo (CATALOGO-NCM-1).
-        const meta = s.baja && s.aviso
+        const meta = s.aviso
             ? '⚠ ' + s.aviso.charAt(0).toUpperCase() + s.aviso.slice(1) + (sourceMeta ? ' · ' + sourceMeta : '')
             : (sourceMeta ? sourceMeta + ' · ' + actionMeta : actionMeta);
         return (
-            '<button type="button" class="spotlight-item' + selected + (s.baja ? ' is-baja' : '') + '"' +
+            '<button type="button" class="spotlight-item' + selected + (s.aviso ? ' is-baja' : '') + '"' +
                 ' data-idx="' + entry.idx + '" role="option" tabindex="-1">' +
                 '<span class="spotlight-item-code">' + CDI.escapeHtml((CDI.formatNcm ? CDI.formatNcm(s.ncm || '') : (s.ncm || ''))) + '</span>' +
                 '<div class="spotlight-item-body">' +

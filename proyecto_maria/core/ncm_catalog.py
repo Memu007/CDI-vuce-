@@ -233,6 +233,25 @@ def aviso_de_ncm(code: str) -> str:
     return f"la NCM {_con_puntos(codigo)} no está en el nomenclador vigente de ARCA. Revisala."
 
 
+def aviso_de_codigo_escrito(code: str) -> str:
+    """El aviso para lo que se escribe en el asistente: de 8 dígitos en
+    adelante, el de la NCM; de 4 a 7, si ninguna vigente empieza así y alguna
+    dada de baja sí, que esas posiciones se dieron de baja."""
+    digitos = re.sub(r"\D", "", code or "")
+    if len(digitos) >= 8:
+        return aviso_de_ncm(digitos)
+    if len(digitos) < 4:
+        return ""
+    vigentes = _codigos_vigentes()
+    if not vigentes or any(c.startswith(digitos) for c in vigentes):
+        return ""
+    if any(c.startswith(digitos) for c in _bajas()):
+        partes = [digitos[:4], digitos[4:6], digitos[6:8]]
+        return (f"las posiciones {'.'.join(p for p in partes if p)}… se dieron de baja en el nomenclador "
+                "vigente de ARCA: buscá la nueva.")
+    return ""
+
+
 @lru_cache(maxsize=1)
 def _codigos_vigentes() -> frozenset:
     return frozenset(item.codigo for item in load_catalog())
@@ -262,6 +281,11 @@ def search_term(term: str, limit: int = 5, catalog: list[NCMItem] | None = None)
     if len(code_query) >= 8:
         exact = next((item for item in items if item.codigo == code_query[:8]), None)
         return [exact] if exact else []
+    # Un código parcial («8471.30») se busca sólo por prefijo: por palabras
+    # sueltas devolvía cualquier cosa si la partida se había dado de baja
+    # (CATALOGO-NCM-1).
+    if len(code_query) >= 4 and re.fullmatch(r"[\d.\s-]+", raw):
+        return [item for item in items if item.codigo.startswith(code_query)][:limit]
     ranked: list[tuple[int, NCMItem]] = []
 
     for item in items:

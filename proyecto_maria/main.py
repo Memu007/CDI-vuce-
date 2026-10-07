@@ -7618,6 +7618,17 @@ def _suggest_ncm_with_gemini(descripcion: str, limit: int = 5) -> list[dict]:
         return []
 
 
+@app.get("/api/ncm/aviso")
+async def aviso_de_ncm_escrita(codigo: str = "", user=Depends(get_current_user)):
+    """Lo que el asistente muestra mientras se escribe un código: si la NCM (o
+    la partida) se dio de baja o no está en el nomenclador vigente
+    (CATALOGO-NCM-1). Vacío si está o si todavía es corto."""
+    aviso = ncm_catalog.aviso_de_codigo_escrito(codigo[:40])
+    digitos = re.sub(r"\D", "", codigo)[:8]
+    return {"aviso": aviso[:1].upper() + aviso[1:],
+            "baja": bool(aviso) and (len(digitos) < 8 or bool(ncm_catalog.ncm_de_baja(digitos)))}
+
+
 @app.post("/api/ncm/sugerir")
 async def sugerir_ncm(
     data: dict,
@@ -7648,8 +7659,9 @@ async def sugerir_ncm(
         seen_ncms.add(ncm_key)
         # Una posición dada de baja (del historial o del proveedor) se
         # propone diciéndolo (CATALOGO-NCM-1).
-        if ncm_catalog.ncm_de_baja(ncm_key):
-            suggestion = {**suggestion, "baja": True, "aviso": ncm_catalog.aviso_de_ncm(ncm_key)}
+        aviso = ncm_catalog.aviso_de_ncm(ncm_key)
+        if aviso:
+            suggestion = {**suggestion, "aviso": aviso, "baja": bool(ncm_catalog.ncm_de_baja(ncm_key))}
         sugerencias.append(suggestion)
         return True
 
@@ -7741,8 +7753,8 @@ async def sugerir_ncm(
     if not sugerencias:
         payload["message"] = no_match_msg
         # Un código escrito que se dio de baja: decirlo (CATALOGO-NCM-1).
-        if _looks_like_ncm_code_query(descripcion) and ncm_catalog.ncm_de_baja(descripcion):
-            aviso = ncm_catalog.aviso_de_ncm(descripcion)
+        aviso = ncm_catalog.aviso_de_codigo_escrito(descripcion) if _looks_like_ncm_code_query(descripcion) else ""
+        if aviso:
             payload["message"] = aviso[0].upper() + aviso[1:]
     return payload
 
