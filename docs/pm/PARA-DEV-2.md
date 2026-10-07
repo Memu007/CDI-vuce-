@@ -32,38 +32,18 @@ tienen que seguir saliendo idénticos, salvo que la tarea diga otra cosa.
 
 ## Último veredicto
 
-**MARIA-3 devuelta** (2026-10-07, sobre `088577f`). La PM reprodujo el rojo
-antes (`54 failed`) y la focal (`183 passed`). Su subagente Sonnet alto: los
-gastos FOB, los avisos antes de generar (672 combinaciones sin diferencias) y
-el archivo de 2025 se sostienen; el de 2026 difiere sólo en `LDVDREFDOC`
-(MARIA-6) y una línea en blanco. Detalle en
-`REPRODUCCION-MARIA-3-2026-10-07.md`.
+**MARIA-3 aceptada sobre `0d6cb3e`** (2026-10-07, con la devolución). La PM
+reprodujo el rojo antes sobre `088577f` (`75 failed`), la focal (`243
+passed`) y la suite (`1021 passed, 102 skipped`). Su subagente repitió los
+cinco puntos y los cinco quedaron arreglados; 2025 sale idéntico. Detalle en
+`REPRODUCCION-MARIA-3-2026-10-07.md`. Se integra junto con MARIA-1d.
 
-**Devolución, cinco puntos** (cada uno con su rojo antes y verde después):
-1. **Procedencia:** se rechazan 129 de los 309 países que ofrece la pantalla
-   (`pais_de_la_tabla` compara contra `PAISES_INDEC`, que no tiene 668 Hong
-   Kong, 436 Turquía, 435 Chipre, 223 Puerto Rico, 150, 242, 254, 358…).
-   La pantalla y la validación usan una sola tabla oficial; decí cuál y de
-   dónde sale.
-2. **Año del `IEXT` sin fecha:** con la fecha vacía o ilegible, el año sale de
-   hoy o de texto suelto (`/26`, `/07`, `/99`, `/٢٥`). Sin una fecha de
-   emisión válida no se genera: se pide la fecha, como con el estado.
-3. **Fechas que salen equivocadas como válidas:** año de dos dígitos
-   (`01/01/69` → 1969: tiene que ser 2069 o pedirse); fecha futura o de hace
-   más de dos años → aviso antes de generar. El d/m contra m/d ambiguo queda
-   anotado como riesgo.
-4. **Procedencia rara** (`²`): 400 con un mensaje propio, nunca el texto de
-   Python ni un 500 en `/generate_maria/avisos`. Una procedencia de ítem en
-   blanco no pisa la de la operación.
-5. **Gastos:** un importe no finito, negativo o absurdo (`1e308`, `nan`,
-   `inf`, `-5`) no llega al TXT, tampoco por `gastos_fob`: 400 con mensaje.
-
-Suite completa en verde. MARIA-1d sigue en curso: entregá primero la
-devolución.
+**Sumado a MARIA-1d:** una procedencia rara en un producto (`²`) da 200 sin
+aviso en `/generate_maria/avisos` y 400 al generar: que avise igual en los dos.
 
 ## Respuestas a tus D (2026-10-07, 10:15 UTC)
 
-- **MARIA-3:** devuelta (arriba); va antes que MARIA-1d.
+- **MARIA-3:** aceptada (arriba). Seguí con MARIA-1d.
 - **D12: (a), como MARIA-1d**, antes de MARIA-5.
 - Anteriores (D5 a D11): en Git.
 

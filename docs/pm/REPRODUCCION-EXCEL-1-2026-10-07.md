@@ -38,3 +38,18 @@ Los sabotajes de la Dev, su comprobación de pantalla y Railway con varios
 procesos.
 
 Contexto de la Dev 1 al entregar: ~80 %.
+
+## Devolución — aceptada sobre `7b119b6` (2026-10-07)
+
+PM: rojo antes sobre `cb0f886` (`7 failed`: fila de ejemplo, mapeos dobles,
+rutas borradas…), focal `115 passed`, suite `932 passed, 102 skipped`. Ojo:
+debajo de la devolución están los commits de MARIA-1b sin terminar
+(`dbc745e`…`cb0f886`); EXCEL-1 se integra junto con MARIA-1b.
+
+Subagente Sonnet medio, con login real: con `cliente_id`, «Precio Unitario»
+350 sale 350 (antes 3500), también «Peso Neto» contra «Peso»; 12 subidas de
+8 MB llevan la consulta de NCM a 1,64 s como máximo (antes 49-62 s); la
+plantilla sola no carga productos; mapeo doble → 400 al guardarlo y aviso al
+subir, nunca 500. Nuevo, menor: una subida chica espera detrás de las
+pesadas (8,5 y 55 s, grupo de validación de 2 hilos) → ABUSO-1; el aviso de
+mapeo nombra una columna y usa otra → EXCEL-2.

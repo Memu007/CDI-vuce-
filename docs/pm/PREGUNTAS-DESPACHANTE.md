@@ -19,7 +19,7 @@ respuesta del despachante.
 | Los 150 del archivo EXW | Son la diferencia entre EXW y FOB (gastos en origen). No tienen por qué coincidir con el flete y el seguro internacionales, que van por otra vía | inferencia de la cita anterior | media |
 | `GANANCIASOP3` | Para reventa va `COMERC`, que es lo que el sistema declara hoy. Desde el 24/08/2026 el SIM suprimió `NO_VALIDA` en este campo | cda.org.ar, noticia 42706 (resumen) | media-alta |
 | Banco 191 | Banco Credicoop Cooperativo Limitado | tabla de entidades del BCRA (sitio no oficial) | alta |
-| Catálogo NCM | Ya tiene 10.226 posiciones de ARCA (julio de 2026). El «22 de 9.500» de septiembre quedó viejo | medido en el código | alta |
+| Catálogo NCM | Ya tiene 10.226 posiciones (cargadas en julio de 2026 desde el nomenclador de ARCA del 19/12/2018: le falta la enmienda de 2022; D21 de la Dev 1). El «22 de 9.500» de septiembre quedó viejo | medido en el código | alta |
 
 ## Respuestas del despachante
 
