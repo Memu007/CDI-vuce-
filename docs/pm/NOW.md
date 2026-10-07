@@ -61,9 +61,12 @@ antes de cerrar la Fase 3.
 3. **Despachante:** recordarle los archivos reales (favor 1). Ya respondió
    todas las preguntas.
 4. **Catálogo NCM de 2018** (D21 de la Dev 1): le falta la enmienda de 2022
-   (por ejemplo, 8517.13.00, teléfonos). Para actualizarlo hace falta el
-   nomenclador vigente de ARCA, que desde acá no se puede bajar: ¿lo bajás vos
-   o se lo pedís al despachante?
+   (por ejemplo, 8517.13.00, teléfonos). Emi: «lo baja la PM». Desde acá la
+   red bloquea `www.arca.gob.ar`; además, el ZIP oficial de ARCA de julio ya
+   traía el archivo de 2018. Falta que Emi elija: habilitar
+   `www.arca.gob.ar` en el entorno (Edit → Network access → Allowed domains)
+   o adjuntar el archivo; y si entra como pieza (propuesta: Dev 1, después de
+   MARIA-1b).
 5. **Hasta publicar MARIA-1a: revisar el país de origen de cada TXT** antes
    de mandárselo al despachante. El código publicado corta el país a dos
    letras: si la lectura devuelve «CHN» o «China», sale Suiza.
@@ -106,14 +109,15 @@ Archivos abiertos por Dev:
 
 - **Dev 1:** MARIA-1b (controles antes de generar). Sigue: PUNTA-A-PUNTA-1
   y EXCEL-2.
-- **Dev 2:** MARIA-1d («None» en campos vacíos). Sigue: MARIA-5; MARIA-6 cuando lleguen los archivos reales del despachante.
+- **Dev 2:** MARIA-5 (peso total y cuentas al centavo). Sigue: MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas el 2026-10-07 y sin integrar todavía** (se integran después de
   publicar el ensayo, para que el ensayo sea exactamente lo atacado):
   RENDIMIENTO-1 (`8fd801d`, suite `730 passed, 102 skipped` con un venv nuevo)
   y RENDIMIENTO-1b (`ec3d793`, `754 passed`),
   MARIA-1a (`0a1775f`, `777 passed`), MARIA-2b (`c3bef51`, `791 passed`),
   MARIA-1c (`448b54d`, `804 passed`), MARIA-4 (`2461939`, `846 passed`),
-  MARIA-3 (`0d6cb3e`, `1021 passed`) y EXCEL-1 (`7b119b6`, `932 passed`).
+  MARIA-3 (`0d6cb3e`, `1021 passed`), MARIA-1d (`9679e21`, `1029 passed`) y
+  EXCEL-1 (`7b119b6`, `932 passed`).
   EXCEL-1 entra con MARIA-1b y MARIA-3 con MARIA-1d (tienen sus commits
   debajo).
   RENDIMIENTO-1 sale con RENDIMIENTO-1b y MARIA-1a con MARIA-1c.
@@ -181,10 +185,10 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 12:00 UTC (rutina): por revisar, MARIA-1b (Dev 1, `02c11c3`) y la
-reentrega de MARIA-1d (Dev 2, `e28be2f`): van después del ensayo. Ensayo
-listo: el producto de la rama no cambió desde `321f34b`; la suite se corre
-sobre el SHA exacto. PM ~55 %: compacta antes de publicar.
+2026-10-07 12:40 UTC (Emi en línea): falta la lista de Railway y el «dale
+8a4661f». La PM compactó; la Dev 2 también; la Dev 1 espera su `/compact`
+(441 mil tokens) y el veredicto de MARIA-1b. Por revisar: MARIA-1b (Dev 1,
+`02c11c3`) y la reentrega de MARIA-1d (Dev 2, `e28be2f`). D21: ver «Para Emi» 4.
 
 ## Medición
 

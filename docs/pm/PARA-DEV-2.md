@@ -32,45 +32,55 @@ tienen que seguir saliendo idénticos, salvo que la tarea diga otra cosa.
 
 ## Último veredicto
 
-**MARIA-3 aceptada sobre `0d6cb3e`** (2026-10-07, con la devolución). La PM
-reprodujo el rojo antes sobre `088577f` (`75 failed`), la focal (`243
-passed`) y la suite (`1021 passed, 102 skipped`). Su subagente repitió los
-cinco puntos y los cinco quedaron arreglados; 2025 sale idéntico. Detalle en
-`REPRODUCCION-MARIA-3-2026-10-07.md`. Se integra junto con MARIA-1d.
+**MARIA-1d aceptada sobre `9679e21`** (2026-10-07, con el punto sumado). La
+PM reprodujo el rojo antes sobre `8770925` (`44 failed, 4 passed`) y el del
+punto sumado sobre `0d6cb3e` (`8 failed`), la focal (`264 passed`) y la suite
+(`1029 passed, 102 skipped`). Su subagente confirmó que la regla es por campo
+entero y que `/avisos` y `/generate_maria` coinciden en 26 procedencias; los
+dos archivos reales salen idénticos. Detalle en
+`REPRODUCCION-MARIA-1d-2026-10-07.md`. MARIA-3 y MARIA-1d se integran a la
+rama de la PM después de la publicación de ensayo.
 
-**Sumado a MARIA-1d:** una procedencia rara en un producto (`²`) da 200 sin
-aviso en `/generate_maria/avisos` y 400 al generar: que avise igual en los dos.
+Lo que encontró y ya pasaba antes: moneda e incoterm mal escritos por la API
+y el DOL/FOB por defecto los cubre MARIA-1b (Dev 1); el `NaN` en un ítem se
+mira en esa revisión. Dos cosas se suman a MARIA-5 (abajo, punto 3).
 
-## Respuestas a tus D (2026-10-07, 10:15 UTC)
+## Respuestas a tus D (2026-10-07, 13:00 UTC)
 
-- **MARIA-3:** aceptada (arriba). Seguí con MARIA-1d.
-- **D12: (a), como MARIA-1d**, antes de MARIA-5.
-- Anteriores (D5 a D11): en Git.
+- MARIA-1d no dejó D. Seguí con MARIA-5.
+- Anteriores (D5 a D12): en Git.
 
-## Tarea activa — MARIA-1d: un campo vacío no llega al TXT como «None»
+## Tarea activa — MARIA-5: peso total por producto y cuentas al centavo
 
-Asignada el 2026-10-07. Sale de tu D12. Es chica.
+Asignada el 2026-10-07 (M1 y M9 de `AUDITORIA-2026-10-06.md`).
 
-**Base:** tu rama (con MARIA-3).
+**Base:** tu rama (con MARIA-1d).
 
-**Alcance:** en las dos copias del lector, un campo que Gemini devuelve
-vacío queda vacío: nada de «None» ni «NON» (número de factura, vendedor,
-comprador, domicilio, moneda, incoterm y cualquier otro que encuentres con el
-mismo defecto). Lo que queda vacío y el TXT necesita, se avisa antes de
-generar.
+**Alcance:**
+1. **Peso (M1).** `QARTKGRNET` de cada ítem o subítem es el peso neto total
+   de la línea, no el de una unidad: 10 notebooks de 2,5 kg declaran 25 kg,
+   lo mismo que ya muestra la pantalla de validación. Prueba: respuesta 3 del
+   despachante (`PREGUNTAS-DESPACHANTE.md`) y el archivo real de 2026 (un
+   ítem de 6 unidades en tres subítems con un solo peso de 33 kg). **Antes de
+   cambiar nada,** mirá en cada camino (lector, Excel, carga a mano, subítems,
+   operación guardada) si `peso_kg` llega por unidad o por total, para no
+   multiplicar dos veces. Si un camino es ambiguo, D.
+2. **Cuentas al centavo (M9).** Las cuentas del TXT con decimales exactos, y
+   el reparto de flete y seguro entre los ítems tal que la suma de los ítems
+   dé exactamente el total de la carátula (hoy 10,01 contra 10,00). El mismo
+   redondeo en todos lados. La prueba final es la del Kit del despachante; si
+   el cambio mueve un centavo de un archivo real, D antes de seguir.
+3. **De la revisión de MARIA-1d:**
+   - En el servidor, un campo de la carátula que sea entero «None», «null» o
+     «N/A» (sin importar mayúsculas ni espacios) cuenta como vacío: sale el
+     aviso de carátula y nunca llega al TXT ni al nombre del archivo
+     (`MARIA_None.TXT`, `IDSO=None`). Pasa con operaciones guardadas con el
+     lector viejo.
+   - La copia del lector de PDF directo (la que usa producción) trata la
+     descripción, la versión y el código de parte como la de PyMuPDF.
 
-**Criterios:** rojo antes y verde después con cada campo (hoy
-`IDSO=FAC_None`, `CDDTINCOTE=NON`); una prueba que busque «None» en todo el
-TXT generado con una factura de campos vacíos; los dos archivos reales salen
-idénticos; suite completa en verde.
+**Criterios:** rojo antes y verde después en cada punto; 10 × 2,5 kg da 25 kg
+en `QARTKGRNET`; un caso que hoy suma 10,01 da 10,00; los dos archivos reales
+salen idénticos; suite completa en verde.
 
-**Después:** MARIA-5; MARIA-6 cuando lleguen los archivos reales del
-despachante.
-
-**Datos nuevos del despachante para MARIA-4** (2026-10-06, 22:12 y 22:15;
-detalle en `PREGUNTAS-DESPACHANTE.md`):
-- **Empresa de digitalización:** se elige en cada operación, como el banco
-  (CDI propone la última usada). Modoc = `PSAD06`, Lakaut = `PSAD01`.
-- **Reducción o exclusión del IVA adicional:** es una «ventaja» que el
-  despachante elige en el Kit (`IVAADREDUCCION`). No va en el TXT (ningún
-  archivo real trae ventajas): sólo un aviso de que se elige ahí.
+**Después:** MARIA-6 cuando lleguen los archivos reales del despachante.
