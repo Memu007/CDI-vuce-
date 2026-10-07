@@ -296,3 +296,72 @@ def test_dos_libros_armados_no_dejan_sin_lectura_a_una_subida_normal():
     assert r.status_code == 200, f"la subida normal dio {r.status_code} a los {dt:.1f} s: {r.text[:200]}"
     for o in otras:
         assert o.status_code == 200, o.text[:300]
+
+
+# ------------------------------------------- revisión propia de la devolución
+
+@pytest.mark.parametrize("sub", [{"cantidad": float("nan")}, {"valor_unitario": "nan"},
+                                 {"cantidad": float("inf")}])
+def test_nan_o_inf_en_un_subitem_no_dejan_generar(sub):
+    subitems = [{"cantidad": 1, "valor_unitario": 5000, "sufijo": "AA(DEMO)-CA00-", **sub}]
+    assert "sub-ítem 1" in _errores(_generar(item={"subitems": subitems}))
+
+
+@pytest.mark.parametrize("item, mensaje", [
+    ({"cantidad": 1e200, "valor_unitario": 1e200}, "Valor inválido"),
+    ({"cantidad": 10, "valor_unitario": 1e308}, "Valor inválido"),
+    ({"cantidad": 1e13}, "Cantidad inválida"),
+    ({"peso_kg": 1e300}, "Peso inválido"),
+])
+def test_montos_finitos_que_desbordan_no_dejan_generar(item, mensaje):
+    """Finitos, pero al multiplicar dan infinito y el TXT salía con «inf»."""
+    assert mensaje in _errores(_generar(item=item))
+
+
+def test_la_validacion_previa_con_montos_que_desbordan_no_da_500():
+    items = [{"pieza": "84798999900H", "descripcion": "MAQUINA DEMO", "origen": "AR",
+              "cantidad": 10, "valor_unitario": 1e308, "peso_unitario": 1e-308}]
+    r = TestClient(main.app).post("/api/validate/smart", json={
+        "items": items, "operacion": {"moneda": "DOL", "incoterm": "FOB", "comprador_cuit": CUIT_VALIDO}})
+    assert r.status_code == 200, r.text[:300]
+    assert "Item 1: Valor inválido" in r.json()["errores"], r.json()["errores"]
+
+
+@pytest.mark.parametrize("cambio", [{"cantidad": float("nan")}, {"valor_unitario": float("inf")},
+                                    {"flete": float("inf")}])
+def test_la_exportacion_no_escribe_nan_ni_inf(cambio):
+    pedido = {**EXPORT, "items": [dict(EXPORT["items"][0])]}
+    if "flete" in cambio:
+        pedido.update(cambio)
+    else:
+        pedido["items"][0].update(cambio)
+    r = TestClient(main.app).post("/generate_maria_export", json=pedido)
+    assert r.status_code == 400, r.text[:300]
+
+
+def test_una_hoja_con_formulas_sin_valor_guardado_se_avisa():
+    r = _subir(_libro_normal({"Factura": FILAS, "Formula": [["=1+1"]]}))
+    assert r.status_code == 200, r.text[:300]
+    assert r.json()["operacion"].get("hojas_excel_sin_leer") == ["Formula"], r.json()["operacion"]
+
+
+def test_una_hoja_de_grafico_primero_no_corre_las_hojas():
+    """pandas lee la primera hoja de cálculo aunque antes haya un gráfico: esa
+    hoja no se avisa como «sin leer»."""
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Datos"
+    for fila in FILAS:
+        ws.append(fila)
+    otra = wb.create_sheet("Otra")
+    otra.append(["algo"])
+    from openpyxl.chart import BarChart, Reference
+    grafico = BarChart()
+    grafico.add_data(Reference(ws, min_col=5, min_row=1, max_row=2), titles_from_data=True)
+    wb.create_chartsheet("Grafico", 0).add_chart(grafico)
+    buf = io.BytesIO()
+    wb.save(buf)
+    r = _subir(buf.getvalue())
+    assert r.status_code == 200, r.text[:300]
+    assert r.json()["operacion"].get("hojas_excel_sin_leer") == ["Otra"], r.json()["operacion"]
