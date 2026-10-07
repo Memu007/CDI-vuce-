@@ -16,13 +16,9 @@ antes de cerrar la Fase 3.
 
 ## Para Emi
 
-1. **Publicación de ensayo, hecha** (2026-10-07 12:53 UTC, `5cb03ab`, con
-   el «dale» de Emi para ese SHA). Falta que Emi mire: la versión nueva
-   «Active» en Railway; «Billing cron» con 0 usuarios (si no, su fila otra
-   vez `active` y `trial_ends_at` 2027-10-31, y reiniciar); guardar una
-   operación de prueba. Y dos líneas a la PM: ¿hay volumen? ¿cuentas ajenas?
-   El TXT cambia a propósito: sin el bloque de gastos posteriores al FOB en 0
-   y el `IEXT` con /26.
+1. **Publicación de ensayo: hecha y verificada** (`5cb03ab`). Faltan dos
+   líneas a la PM: ¿el servicio tiene volumen? ¿Hay cuentas ajenas u
+   organizaciones?
 2. **Rotar las claves de Gemini** (G0). En Google AI Studio: borrar las que
    aparecieron, crear una nueva y ponerla sólo en Railway. Mirar la
    facturación de Google.
@@ -129,7 +125,8 @@ Archivos abiertos por Dev:
   en `REPRODUCCION-ENSAYO-2026-10-07.md` (ADMIN-1, ADMIN-2, MARIA-2 y los 25
   commits de `e8344d0`). Suite sobre el mismo producto (`1ad3226`):
   `716 passed, 102 skipped`. Avance directo de `a771693`, sin merge. Emi:
-  hizo la lista de Railway antes del «dale»; verificación después: pendiente.
+  hizo la lista de Railway antes del «dale»; después verificó «Billing cron» con 0
+  y guardó una operación (2026-10-07, ~10:20 ARG). CI de GitHub en verde.
 
 ## Reglas
 
