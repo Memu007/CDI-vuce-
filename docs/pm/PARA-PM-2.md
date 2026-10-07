@@ -34,7 +34,7 @@ abajo). D27: tomada (a).
 | Suite completa, worktree limpio, en `df4de22` | `1526 passed, 102 skipped, 2 xfailed, 25 warnings in 150.27s`, 0 failed |
 | Pantallas en `df4de22` (y en `4446571`) | `OK: pantalla MARIA-5`, `OK: pantalla CATALOGO-NCM-1`, `OK: pantalla SUBITEMS-1` |
 | `e2e_maria.sh` en `df4de22` (y en `4446571` y `fe79a0e`) | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.` |
-| Sabotajes | SUBITEMS-1: 9 de 9 (dos nuevos: el control que revienta con `5` y el número de línea); `sabotajes/maria1b.sh`: 0 fallas (un patrón al día). MARIA-5: 49 de 49 en `fe79a0e`; CATALOGO-NCM-1, MARIA-3 y 1d: corriendo al escribir esto (los agrego en cuanto terminen). |
+| Sabotajes | SUBITEMS-1: 9 de 9 (dos nuevos: el control que revienta con `5` y el número de línea); `sabotajes/maria1b.sh`: 0 fallas (un patrón al día). En `fe79a0e` (el producto Python es el mismo de `df4de22` salvo GUARDAR-1): MARIA-5 49 de 49, CATALOGO-NCM-1 16 de 16, MARIA-3 30 de 30, 1d 8 de 8. SUBITEMS-1 9 de 9 también en `df4de22`. |
 
 **Autorrevisión** (adversario Sonnet alto, sobre `fe79a0e`): el TXT no
 cambia (3000 pedidos al azar, los 949 que salen, idénticos byte a byte entre
