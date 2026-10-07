@@ -32,8 +32,12 @@ tienen que seguir saliendo idénticos, salvo que la tarea diga otra cosa.
 
 ## Último veredicto
 
-**MARIA-2: entregada (`65ea6f3`), en revisión de la PM.** El veredicto llega
-en la próxima vuelta. Si trae una devolución, va primero.
+**MARIA-2 aceptada sobre `65ea6f3`** (2026-10-07). La PM reprodujo el rojo
+antes (vuelve `ITEM DEMOSTRACION` con el producto de la base), las focales
+(`91 passed`) y la suite (`689 passed, 102 skipped`). Su subagente no encontró
+otro camino que invente productos. Tu supuesto 1 (validar antes de la cuota)
+queda aceptado. Detalle en `REPRODUCCION-MARIA-2-2026-10-07.md`. Integrada en
+la rama de la PM.
 
 ## Respuestas a tus D (2026-10-07, 01:10 UTC)
 
