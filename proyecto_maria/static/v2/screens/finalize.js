@@ -316,7 +316,9 @@
                     CDI.goTo('validating');
                     throw new Error(detail);
                 }
-                throw new Error(detail || 'No se pudo generar el archivo');
+                // Los controles de antes de generar llegan como {errors: [...]}.
+                const texto = (detail && Array.isArray(detail.errors)) ? detail.errors.join(' ') : detail;
+                throw new Error(texto || 'No se pudo generar el archivo');
             }
             lastMaria = {
                 filename: data.filename,

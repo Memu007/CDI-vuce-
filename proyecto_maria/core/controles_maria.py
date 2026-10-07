@@ -75,7 +75,10 @@ def _en_el_nomenclador(codigo8: str) -> bool:
     global _CODIGOS
     if _CODIGOS is None:
         from proyecto_maria.core.ncm_catalog import load_catalog
-        _CODIGOS = frozenset(i.codigo for i in load_catalog())
+        codigos = frozenset(i.codigo for i in load_catalog())
+        if not codigos:
+            return True  # sin catálogo no se puede mirar: no se avisa en falso
+        _CODIGOS = codigos
     return codigo8 in _CODIGOS
 
 

@@ -25,8 +25,8 @@
     ];
 
     // Campos obligatorios para pasar a NCM (los demas son "nice to have")
-    // CUIT no es obligatorio: clientes extranjeros no tienen CUIT argentino.
-    let REQUIRED = ['moneda', 'incoterm'];
+    // El CUIT del importador es obligatorio: sin él el TXT no sirve (D20).
+    let REQUIRED = ['moneda', 'incoterm', 'comprador_cuit'];
 
     // Whitelist de monedas habituales en despachos (ISO4217 + alias MARIA)
     const MONEDA_WHITELIST = ['DOL', 'EUR', 'BRL', 'ARS', 'CLP', 'UYU', 'GBP', 'JPY', 'CNY'];
@@ -1154,8 +1154,8 @@
             if (!initialized) init();
             const isManual = CDI.state.sourceFormat === 'manual';
             REQUIRED = isManual 
-                ? ['vendedor_nombre', 'comprador_nombre', 'numero_factura', 'fecha_emision', 'moneda', 'incoterm']
-                : ['moneda', 'incoterm'];
+                ? ['vendedor_nombre', 'comprador_nombre', 'numero_factura', 'fecha_emision', 'moneda', 'incoterm', 'comprador_cuit']
+                : ['moneda', 'incoterm', 'comprador_cuit'];
                 
             if (form) {
                 FIELDS.forEach(name => {

@@ -3747,9 +3747,14 @@ async def generate_maria_endpoint(
                     status_code=400,
                     detail="El sufijo de valor SBT no puede superar los 120 caracteres.",
                 )
-            # Ni controles (\x7f incluido) ni «=»: partirían o inventarían una
+            # Ni «=» ni controles (\x7f incluido): partirían o inventarían una
             # línea del TXT. El sufijo es un código: no se corrige, se rechaza.
-            if any(ord(c) < 32 or 0x7f <= ord(c) <= 0x9f or c in "\u2028\u2029=" for c in _suf):
+            if "=" in _suf:
+                raise HTTPException(
+                    status_code=400,
+                    detail="El sufijo de valor SBT no puede contener «=»: va sólo el código, sin «CSBTSVL=».",
+                )
+            if any(ord(c) < 32 or 0x7f <= ord(c) <= 0x9f or c in "\u2028\u2029" for c in _suf):
                 raise HTTPException(
                     status_code=400,
                     detail="El sufijo de valor SBT no puede contener saltos de línea ni caracteres de control.",
