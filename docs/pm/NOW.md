@@ -18,26 +18,43 @@ antes de cerrar la Fase 3.
 
 1. **Mañana, de día: publicación de ensayo** (aprobada el 2026-10-07; falta
    el «dale» para el SHA exacto, que le pasa la PM con la suite corrida sobre
-   él). Antes, en Railway:
-   - **lo primero, en la tabla de usuarios de la base: ¿existen `demo`,
-     `premium` o `basico`?** El código publicado los crea con contraseñas
-     escritas en el código (`demo` además es admin) cuando `ENVIRONMENT` no es
-     `production`, y no los borra después. Si existen, cualquiera puede entrar
-     con ellos y, con la fuga de MARIA.TXT, ver las facturas reales: borrarlos
-     o cambiarles la contraseña antes que nada;
-   - **si hay cuentas que no sean de Emi:** la fuga pedía sesión iniciada; sin
-     cuentas ajenas, nadie pudo ver las facturas;
-   - en las variables del servicio: `ENVIRONMENT` = `production`, que exista
-     `DATABASE_URL` (la versión nueva no arranca sin ella; si faltara, Railway
-     deja andando la vieja) y que `ADMIN_USERNAMES` tenga el usuario de Emi y
-     sólo usuarios que ya existen (con ADMIN-1, sólo ellos entran al admin);
-   - toda cuenta activa con el período vencido hace más de 7 días pasa a
-     impaga al arrancar;
-   - en la base: una copia (pestaña de copias de seguridad), si el plan lo
-     permite;
-   - al publicar se borran los TXT generados y el historial de NCM que viven
-     en el disco del servidor (las operaciones en la base quedan);
-   - recomendado: prender «Wait for CI» y apagar la red pública de la base.
+   él). Antes, en Railway, en este orden (probado en local con Postgres y una
+   base armada con el código de julio: `REPRODUCCION-ENSAYO-2026-10-07.md`):
+   1. **Copia de la base** (pestaña de copias de seguridad), antes de tocar
+      nada.
+   2. **Tabla `users`:**
+      - **¿Existen `demo`, `premium` o `basico`?** Borrar esas filas. El
+        código publicado los crea con contraseñas escritas en el código, y
+        `demo` tiene guardado el rol de admin: entra al panel aunque no esté
+        en `ADMIN_USERNAMES`. Si Railway no deja borrarlos (tienen datos), no
+        seguir y avisar a la PM.
+      - **Tu fila:** `billing_status` = `active` y `trial_ends_at` = una fecha
+        del año que viene (por ejemplo, 2027-10-31). Si no, al arrancar la
+        versión nueva tu cuenta pasa a impaga: seguís generando el TXT, pero
+        no guardás operaciones nuevas, y volver a la versión vieja no lo
+        deshace. Hacen falta las dos cosas: con la fecha sola no alcanza.
+      - **Cuentas que no sean tuyas,** o filas en la tabla `organizations`:
+        avisar a la PM. Sin cuentas ajenas, nadie pudo ver tus facturas con
+        la fuga de MARIA.TXT.
+   3. **Variables del servicio:**
+      - que existan `ALLOWED_ORIGINS`, `JWT_SECRET_KEY` y `DATABASE_URL` (sin
+        ellas la versión nueva no arranca y Railway deja andando la vieja);
+      - `ADMIN_USERNAMES` = tu usuario, escrito exactamente igual (si nombra un
+        usuario que no existe, el primero que se registre con ese nombre es
+        admin);
+      - **`ENVIRONMENT` = `production`, exactamente así, en minúsculas.** Con
+        «Production» la versión nueva crea los tres usuarios de prueba en la
+        base real y `demo` entra como admin.
+   4. ¿El servicio tiene un volumen conectado? Una línea a la PM (sin
+      volumen, al publicar se borran los TXT generados y el historial de NCM;
+      las operaciones en la base quedan).
+   5. Recomendado: prender «Wait for CI» y apagar la red pública de la base.
+   6. **Después de publicar:** en los registros del arranque, la línea
+      «Billing cron» tiene que decir 0 usuarios pasados a `past_due`; y
+      guardar una operación de prueba.
+
+   El TXT cambia a propósito en dos cosas: desaparece el bloque de gastos
+   posteriores al FOB en 0 y el año del `IEXT` pasa a 26.
 2. **Rotar las claves de Gemini** (G0). En Google AI Studio: borrar las que
    aparecieron, crear una nueva y ponerla sólo en Railway. Mirar la
    facturación de Google.
@@ -89,8 +106,10 @@ Archivos abiertos por Dev:
   `e8344d0` tal cual; (b) la cabeza de la rama de PM, que además cierra el
   admin, borra el atajo que activaba una suscripción sin pagar y saca los
   productos inventados, pero pide `ADMIN_USERNAMES`. La PM
-  recomienda (b) si la variable está; si no, (a). La suite se corre otra vez
-  sobre el SHA exacto.
+  recomienda (b) si la variable está; si no, (a). Un subagente Opus alto
+  atacó `81bcaba` y repitió sobre `7f1dd2c` (con ADMIN-2): se puede publicar
+  si Emi hace antes la lista de arriba. La suite se corre otra vez sobre el
+  SHA exacto.
 - **Despachante:** respondió las seis preguntas y las dos cortas el
   2026-10-06 (`PREGUNTAS-DESPACHANTE.md`): la empresa de digitalización se
   elige por operación (Modoc = `PSAD06`, Lakaut = `PSAD01`) y la reducción del
@@ -142,11 +161,11 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 01:50 UTC: ADMIN-2 aceptada e integrada (subagente Sonnet alto: se
-sostiene; dos puntos ciegos de la prueba a AISLAMIENTO-2). Dev 1 sigue con
-RENDIMIENTO-1. Dev 2 en MARIA-1a, sin entrega. Las dos esperan que Emi pegue
-su `/compact` (Dev 1 ~35 %, Dev 2 ~28 %). Sigue corriendo el subagente Opus
-alto que ataca el candidato del ensayo; se lee antes de pasarle el SHA a Emi.
+2026-10-07 01:40 UTC: ataque al ensayo terminado y su remedio probado
+(`REPRODUCCION-ENSAYO-2026-10-07.md`); la lista de Railway quedó en el orden
+en que Emi la hace. ADMIN-2 aceptada; Dev 1 despertada con RENDIMIENTO-1. Dev
+2 en MARIA-1a, sin entrega. A las 9 (ARG): pasarle a Emi la lista y el SHA con
+la suite corrida. PM al ~30 % de contexto.
 
 ## Medición
 

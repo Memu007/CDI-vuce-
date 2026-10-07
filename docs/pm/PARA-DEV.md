@@ -33,7 +33,7 @@ una ruta cruda en `/api/admin` o `/dev` exactos), que van a AISLAMIENTO-2 en
 la Fase 3: hoy no hay ninguna así. Detalle en
 `REPRODUCCION-ADMIN-2-2026-10-07.md`. Integrada en la rama de la PM.
 
-## Respuestas a tus D (2026-10-07, 01:45 UTC)
+## Respuestas a tus D (2026-10-07, 01:30 UTC)
 
 - **D7 (el chip «Sistema/Demo»): (a), nada.**
 - **D8 (el aviso de Mercado Pago se puede reenviar): va en COBRO-MP-1**, que
