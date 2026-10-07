@@ -131,15 +131,17 @@ con PUBLICAR-2 y el cobro chico de Emi: alta, cobro, renovación, cancelación
 |---|---|---|---|---|---|---|
 | 1 | MARIA-2 | Sin clave de Gemini no se inventan productos: error claro | M4 | chico | no (evita productos falsos) | con PUBLICAR-1 |
 | 2 | MARIA-1a | Lectura de la factura: el país de origen bien leído (hoy China sale como Suiza; está en **dos** copias del lector), cantidades con coma, nada de peso inventado | M5 | medio | sí, donde hoy está mal | con PUBLICAR-1 o 2. Prueba: la tabla oficial de países, que ya está en el código |
-| 3 | MARIA-1b | Controles antes de generar: NCM que exista en el catálogo, moneda, incoterm, CUIT, montos; ningún texto puede meter líneas en el archivo | M10 | medio | no, con datos correctos | con PUBLICAR-1 o 2 |
-| 4 | MARIA-3 | Los avisos se muestran **antes** de generar y completos; los gastos anteriores al FOB llegan al archivo en EXW; la procedencia se carga en pantalla | M6, M8 | grande | sí | con PUBLICAR-2. Prueba: la ley (Código Aduanero, art. 15), la nota del SIM y un archivo real con procedencia distinta del origen |
-| 5 | MARIA-4 | Estado de la mercadería, IVA adicional, banco y empresa de digitalización pasan a ser **editables**, con el valor de hoy por defecto | M2, M3 | medio | no (el valor por defecto no cambia) | con PUBLICAR-2. Prueba de que no es fijo: los dos archivos reales traen estados distintos (3 y 2) |
+| 3 | MARIA-4 | **Estado de la mercadería e IVA adicional, como respondió el despachante:** el estado se elige entre seis, por producto (por defecto, nuevo sin uso importado si el origen es extranjero). El IVA adicional se paga completo en reventa: deja de declararse siempre «uso particular». Banco y empresa de digitalización, editables con el valor de hoy | M2, M3 | medio | **sí** | con PUBLICAR-2. Prueba: las respuestas 1 y 2 del despachante y el archivo real de 2026 (`PREGUNTAS-DESPACHANTE.md`, «Respuestas») |
+| 4 | MARIA-1b | Controles antes de generar: NCM que exista en el catálogo, moneda, incoterm, CUIT, montos; ningún texto puede meter líneas en el archivo | M10 | medio | no, con datos correctos | con PUBLICAR-1 o 2 |
+| 5 | MARIA-3 | Los avisos se muestran **antes** de generar y completos; los gastos anteriores al FOB llegan al archivo en EXW; la procedencia se carga en pantalla | M6, M8 | grande | sí | con PUBLICAR-2. Prueba: la ley (Código Aduanero, art. 15), la nota del SIM y un archivo real con procedencia distinta del origen |
 | 6 | MARIA-5 | Peso total por producto y cuentas exactas (hoy a veces no cierran por un centavo). Queda hecho y aparte | M1, M9 | medio | **sí** | **Fase B**: con la respuesta 3 y la prueba en su Kit. Los dos archivos reales tienen que salir idénticos |
 
 MARIA-1b y MARIA-3 tocan la misma función que COBRO-CORTE-1: arrancan después
 de que esa pieza esté aceptada. RENDIMIENTO-1 va después de MARIA-2 (tocan la
-misma línea). MARIA-3, MARIA-4 y MARIA-5 tocan las mismas cuentas del
-generador: van en ese orden, una después de la otra.
+misma línea). MARIA-4, MARIA-3 y MARIA-5 tocan las mismas cuentas del
+generador: van en ese orden, una después de la otra. MARIA-4 subió al tercer
+lugar el 2026-10-07: el despachante ya respondió y hoy CDI declara el IVA
+adicional como si toda la mercadería fuera de uso particular.
 
 **Se miró y está bien** (no hace falta pieza): orígenes permitidos, cookies y
 CSRF, cabeceras de seguridad y topes de subida de archivos.
@@ -158,7 +160,7 @@ CSRF, cabeceras de seguridad y topes de subida de archivos.
 
 | Pieza | Qué hace | Espera |
 |---|---|---|
-| MARIA-6 | Valores por defecto según sus respuestas: estado, IVA adicional, banco, empresa de digitalización, gastos en FCA y FAS | preguntas 1, 2, 4, 5 y 6 |
+| MARIA-6 | Valores por defecto según sus respuestas: banco, empresa de digitalización, gastos en FCA y FAS; cómo va en el archivo una reducción o exclusión del IVA adicional | preguntas 4, 5 y 6, y la de reducción o exclusión (1 y 2 ya respondidas) |
 | MARIA-7 | Identificadores, sufijos de valor por producto y código de proveedor como en sus archivos reales | favor 1 (los archivos) |
 | MARIA-5 | Se publica el peso total y las cuentas exactas | pregunta 3 y favor 2 |
 | PRUEBA-KIT | El despachante carga en su Kit un archivo de CDI, sin oficializar | favor 2. **Cierra G4** |
@@ -183,7 +185,7 @@ estudios presentaron de verdad un MARIA generado por CDI. Luego, oleadas de
 | S2 | ADMIN-1 |
 | S3 | SESION-1 |
 | M1, M9 | MARIA-5 |
-| M2, M3 | MARIA-4 y MARIA-6 |
+| M2, M3 | MARIA-4 (con las respuestas 1 y 2) |
 | M4 | MARIA-2 |
 | M5 | MARIA-1a |
 | M6, M8 | MARIA-3 |

@@ -74,7 +74,10 @@ Archivos abiertos por Dev:
   `680 passed, 102 skipped, 10 warnings in 65.29s`. Espera los chequeos de
   Railway y el «dale» de Emi para el SHA, de día. Si se publica un commit
   posterior de la rama de PM, sólo con documentos de diferencia.
-- Emi le manda al despachante la versión simple de `PREGUNTAS-DESPACHANTE.md`.
+- Despachante: respondió las preguntas 1 y 2 (estado e IVA adicional) el
+  2026-10-06. Faltan la 3 a la 6, los dos favores y una corta nueva (cómo se
+  carga una reducción o exclusión del IVA adicional). MARIA-4 pasó al tercer
+  lugar de la cola MARIA.
 
 ## Cola
 
@@ -92,7 +95,7 @@ Estado medido el 2026-10-06 (`AUDITORIA-2026-10-06.md`). Las de septiembre
 | G1 · Configuración | 🟢 | G1.1 a G1.5 cortan (re-verificado). G1.6 y G1.7 sin medir |
 | G2 · Imagen real | 🟢 | Cerrada el 2026-09-17. El código no cambió desde entonces |
 | G3 · Aislamiento | 🟡 | En la rama, 22/0 y sin fugas en lo atacado. **En producción sigue la fuga de MARIA.TXT** (se arregla al publicar). Abiertos: admin para cualquiera, sesiones que reviven al cambiar la contraseña, límite de intentos burlable |
-| G4 · Producto (MARIA) | 🔴 | Peso por unidad en vez de total, `CARTUSO` e `IVAADICIONAL1` fijos, identificadores, ítems de demostración sin clave, avisos después de generar, redondeos |
+| G4 · Producto (MARIA) | 🔴 | Peso por unidad en vez de total, `CARTUSO` e `IVAADICIONAL1` fijos (el despachante ya dijo cómo van: MARIA-4), el IVA adicional declarado siempre como uso particular, identificadores, ítems de demostración sin clave, avisos después de generar, redondeos |
 | G5 · Pruebas | 🟢 | 680 passed, 102 skipped, 0 failed (re-verificado) |
 | G6 · Volver atrás | 🟡 | El esquema aguanta ir y volver (probado en local). Falta: backup de la base y contar los `active` vencidos antes de publicar |
 | G7 · Cobro | 🔴 | El corte por impago cubre 2 de 73 funciones; cancelar no cancela en Mercado Pago; aviso de pago sin firma y repetible; doble suscripción; invitaciones con error en Postgres |
