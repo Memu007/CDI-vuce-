@@ -66,8 +66,10 @@ sabotaje proyecto_maria/security/file_security.py "validar el PDF vuelve al hilo
   'asyncio.sleep(0, _abrir_pdf(contents)),' \
   'FAILED tests/test_rendimiento1.py::test_health_responde_mientras_se_valida_el_pdf'
 sabotaje proyecto_maria/security/file_security.py "validar el PDF pierde el tiempo máximo" \
-  'timeout=_pdf_validate_timeout_s(),' \
-  'timeout=None,' \
+  'asyncio.to_thread(_abrir_pdf, contents),
+                    timeout=_pdf_validate_timeout_s(),' \
+  'asyncio.to_thread(_abrir_pdf, contents),
+                    timeout=None,' \
   'FAILED tests/test_rendimiento1.py::test_validar_el_pdf_tiene_tiempo_maximo'
 sabotaje proyecto_maria/security/file_security.py "vuelve a contar páginas antes de mirar si está encriptado" \
   '    if pdf.is_encrypted:
@@ -80,8 +82,8 @@ sabotaje $M "el texto del vendedor sin tiempo máximo" \
   'extraer_texto_pdf_seguro, contents' \
   'FAILED tests/test_rendimiento1.py::test_texto_del_vendedor_tiene_tiempo_maximo'
 sabotaje $M "las lecturas de PDF vuelven al grupo de hilos compartido" \
-  'futuro = loop.run_in_executor(_pool_lectura_pdf(), _correr_lectura, funcion, *args)' \
-  'futuro = loop.run_in_executor(None, _correr_lectura, funcion, *args)' \
+  'futuro = loop.run_in_executor(pool or _pool_lectura_pdf(), _correr_lectura, funcion, *args)' \
+  'futuro = loop.run_in_executor(pool, _correr_lectura, funcion, *args)' \
   'FAILED tests/test_rendimiento1.py::test_pdfs_lentos_no_traban_a_ncm_ni_a_la_validacion'
 sabotaje $M "un error de tiempo del lector pasa por lectura lenta" \
   '    except TimeoutError as e:
