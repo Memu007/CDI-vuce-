@@ -2,93 +2,154 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## PUNTA-A-PUNTA-1 — entregada sobre `3b52bc9`
+## EXCEL-2 — entregada sobre `3e6e63e`
 
-**Resultado:** la prueba hace el recorrido de Emi por HTTP, como la pantalla
-v2:
-- login de verdad, con cookie y CSRF;
-- la factura en PDF (Gemini simulado con los datos del archivo real) y en
-  Excel;
-- la NCM con el formato que guarda la pantalla;
-- `/api/validate/smart`, la tarjeta del despachante, `/generate_maria` con
-  el pedido de `buildMariaRequest`, y la descarga.
+**Resultado:** están todos los puntos del canal, cada uno con rojo antes y
+verde después:
+- lo que el Excel no leía (D18);
+- el CSV del historial de NCM;
+- el aviso de mapeo;
+- D26 (a), con sus dos criterios medidos;
+- lo de paso.
 
-El archivo real de 2025 sale **igual byte a byte salvo el número de
-operación** (D23). El de subítems sale igual línea por línea salvo D23, D24
-y D25. Es una pieza de pruebas: no toqué el producto.
+Un subagente (Opus, esfuerzo alto) atacó la pieza y encontró tres defectos
+graves en mi primera versión. Están arreglados:
+- un FOB duplicado con celdas combinadas;
+- los topes de D26 se salteaban renombrando partes del libro;
+- la búsqueda del encabezado se trababa con un texto enorme.
 
-**Lo que decidís vos:** nada nuevo. D23, D24 y D25 quedaron como `xfail`
-estrictos con la D en el motivo (`3b52bc9`).
+No toqué los nombres de las columnas de peso (MARIA-5).
+
+**Lo que decidís vos:** D27, el tope de los textos compartidos (abajo).
 
 | | SHA |
 |---|---|
-| Prueba y sabotajes | `9610f6d`, `a443cc2`, `1c2656e`, `3170aa7`, `dff7be1` (docstring), `3b52bc9` (xfail de D23 a D25) |
+| Base | `3b52bc9` (PUNTA-A-PUNTA-1 aceptada) |
+| Producto | `e8f0891`, `0a39909`, `c6c1c23`, `c5ceae9`, `252a5c9`, `b17a59b`, `9314720` |
+| Pruebas y sabotajes | `caefdb2`, `eaecaab`, `8cfdcdb`, `6c31dac`, `295c3b7`, `9a54355`, `48646ca`, `1a36a6d` |
+| CHANGELOG | `3e6e63e` |
 
-### Qué prueba (`tests/test_punta_a_punta1.py`, corre en la CI: no está entre los `--deselect`)
+### Qué cambió
 
-- **PDF y Excel → archivo real de 2025:** igual salvo las líneas de D23,
-  nombradas una por una. El archivo sin cambios queda como `xfail`
-  estricto: el día que la pantalla lo produzca, la prueba avisa.
-- **Subítems, por PDF y por Excel** → el archivo real entero, línea por
-  línea. Ese archivo se guardó con LF y sin completar los campos.
-- **Factura con coma decimal** («5.000,00», peso «1.220») → el mismo
-  archivo.
-- **Dos productos:** el flete y el seguro se reparten por el FOB, y la base
-  imponible cierra.
-- **Sin el token CSRF da 403, y sin sesión 401:** el recorrido no usa
-  atajos.
+1. **D26 (a): abrir un libro armado.**
+   - Validar un `.xlsx` ya no lo abre con openpyxl. Cuenta las hojas desde el
+     índice del libro y lo rechaza antes de abrirlo si se pasa de alguno de
+     estos topes:
+     - textos compartidos: 10 MB (`EXCEL_MAX_TEXTOS_MB`);
+     - estilos y propiedades: 10 MB;
+     - primera hoja: 30 MB (`EXCEL_MAX_PRIMERA_HOJA_MB`).
+   - Las partes del libro se buscan como las busca openpyxl, por
+     `[Content_Types].xml`: renombrarlas o poner un índice señuelo no saltea
+     los topes.
+   - Al leer la factura se abre una copia del libro con sólo la primera hoja,
+     así openpyxl no recorre las otras hojas que no declaran su medida. El
+     historial de NCM también lee sólo la primera.
+2. **D18: lo que el Excel no leía.**
+   - El encabezado se busca en las primeras 30 filas: la primera fila con 3
+     columnas reconocidas. Las columnas del mapeo guardado del cliente
+     cuentan como reconocidas, así un pie de página no pasa a ser el
+     encabezado.
+   - Las filas sin leer siguen nombrándose con su número real en la
+     planilla.
+   - Sin columna de país de origen, los productos entran con el origen vacío
+     y la subida lo avisa.
+   - El texto de una celda combinada hacia abajo vale para todas sus filas,
+     sólo en su columna y sólo debajo del encabezado. Los números no se
+     copian, así que la cantidad y el precio no se duplican.
+3. **El CSV del historial de NCM:**
+   - Se leen UTF-8, con o sin BOM, y Windows-1252 (latin-1). Un UTF-8 con
+     algún byte suelto sigue leyéndose como UTF-8.
+   - El separador es el que más aparece en el encabezado, sin contar lo que
+     va entre comillas.
+4. **El aviso de mapeo nombra la columna.** Cuando el catálogo del cliente y
+   el archivo no coinciden, dice: «Para «precio unitario» se usó la columna
+   «Precio Unitario» del archivo, no «Valor»».
+5. **De paso:**
+   - Una lista o un entero enorme (`10**400`) como monto dan 400 y no 500,
+     en los productos, los subítems y la exportación. También un producto
+     mal formado.
+   - El CUIT del despachante (también el del perfil) va con 11 dígitos 0-9,
+     sin guiones ni espacios.
+   - El identificador del vendedor no puede tener dígitos de otros
+     alfabetos. Las letras siguen pasando, porque hay identificaciones
+     extranjeras.
+
+### Rojo antes y verde después
+
+```
+tests/test_excel2.py sobre 3b52bc9 (antes de EXCEL-2): 23 failed, 6 passed
+  (las 6 que pasan ya andaban: CSV con coma y con BOM, libro normal, id extranjero con letras, combinada hacia el costado)
+  la subida normal detrás de 8 libros armados sin <dimension>: «400 en 30.4 s» → ahora 200 en 13 s
+lo que encontró el subagente, sobre 295c3b7: 19 failed → verde
+  (FOB 10120 en vez de 5120; topes salteados con xl/strings.xml o un índice señuelo; 262 s con un texto
+   enorme arriba; el pie tomado como encabezado; CSV con «CafÃ©»; CUIT del despachante; 500)
+sharedStrings con 19 millones de entradas vacías: se rechaza en 0,0 s, sin memoria extra
+  (antes: 93 s y 1,9 GB al abrirlo)
+```
 
 ### Corrido, con su salida
 
 ```
-pytest tests/test_punta_a_punta1.py: 7 passed, 3 xfailed (D23, D24, D25)
-sabotajes (scripts/testing/sabotajes/punta_a_punta1.sh 3b52bc9): base en verde y 9 en ROJO, «sabotajes con falla: 0»
-  lector (flete perdido; la coma decimal), mapeo del Excel (precio y peso cruzados), ruta (procedencia),
-  generador (seguro fuera de la base, FOB del subítem, espacio de la NCM, flete sin repartir, FOB total = el mayor)
-suite como la CI (venv-limpio, ENVIRONMENT=testing, sus --deselect), worktree limpio en 3b52bc9
-(con tu integración 6ea8ca9): 1216 passed, 102 skipped, 10 deselected, 3 xfailed · fin: 0
+suite como la CI (venv-limpio, ENVIRONMENT=testing, sus --deselect), worktree limpio en 1a36a6d:
+  1267 passed, 102 skipped, 10 deselected, 3 xfailed · fin: 0
+sabotajes (scripts/testing/sabotajes/excel2.sh 1a36a6d): base en verde y 27 en ROJO, «sabotajes con falla: 0»
 ```
 
-### Lo que vale la pena saber
+`3e6e63e` sólo agrega el CHANGELOG sobre `1a36a6d`. Después traje tu rama:
+son sólo documentos.
 
-- Lo encontró su revisión (Opus, esfuerzo alto) y está corregido:
-  - La NCM iba sin el formato de la pantalla, y un generador que dejara el
-    espacio de «8479.89.99.900 H» pasaba en verde.
-  - Con un solo producto no se veía el prorrateo.
-  - Ninguna factura traía coma decimal.
-  - El script de sabotajes no comprobaba que la base estuviera en verde.
-- **El peso de un producto con más de una unidad no se mira.**
-  - Hoy el generador toma `peso_unitario` como el peso de la línea:
-    2 unidades de 260 kg salen `QARTKGRNET=260.000`.
-  - La semántica del peso la está cambiando MARIA-5 (Dev 2). Cuando entre,
-    hay que sumar ese caso.
-- Copiar el pedido de la pantalla en Python tiene un riesgo: si
-  `finalize.js` cambia y la copia no, la prueba no lo ve. Lo dice el
-  docstring de `pedido()`.
+### Comandos para vos
+
+```bash
+git fetch origin claude/dev1-tecnica && git checkout 3e6e63e
+<venv>/bin/python -m pytest -q --no-cov tests/test_excel2.py          # 51 passed
+PY=<venv>/bin/python scripts/testing/sabotajes/excel2.sh 3e6e63e        # «sabotajes con falla: 0»
+```
 
 ## Decisiones
 
-No hay D nuevas. D23 y D25 quedaron como `xfail` estrictos, con la D en el
-motivo, como pediste, y D24 también, mientras lo decide Emi.
+- **D27 — El tope de 10 MB para los textos compartidos.**
+  - Esos textos son comunes a todas las hojas. Un libro con la factura en la
+    hoja 1 y un catálogo grande en la hoja 2 se rechaza aunque esa hoja no
+    se lea: el tope se cruza con unas 57 mil filas de catálogo.
+  - El subagente probó un catálogo de 120 mil filas guardado por
+    LibreOffice: 4,4 MB comprimido y 20,5 MB de textos. Antes entraba en
+    7,9 s; ahora da 400 con un mensaje claro.
+  - El tope no puede ser mucho más alto: textos vacíos armados, cerca de
+    10 MB, ya cuestan unos 330 MB de memoria al abrirlos, y el criterio era
+    1 GB.
+  - Opciones:
+    - (a) dejar 10 MB (`EXCEL_MAX_TEXTOS_MB` se puede cambiar sin tocar
+      código);
+    - (b) subirlo a 20 MB;
+    - (c) una pieza que lea la primera hoja sin openpyxl.
+
+  **Recomiendo (a):** una factura real no tiene 57 mil filas, y el mensaje
+  pide dejar sólo la hoja de la factura.
 
 ## Qué no corrí y riesgos
 
-- El peso con más de una unidad (lo cambia MARIA-5).
-- La prueba copia el pedido de la pantalla: si `finalize.js` cambia, hay
-  que actualizarla.
+- **`.xls` (xlrd):** el encabezado se busca igual, pero las celdas
+  combinadas no se rellenan, porque xlrd no las da sin el formato.
+- **El aviso de mapeo se repite en cada subida** mientras el archivo traiga
+  las dos columnas (la del catálogo y la reconocida). Es una sola línea en
+  el aviso del final.
+- **La migración (`migration_service.py`) sigue leyendo todas las hojas con
+  pandas.** Es otra pantalla y tiene su propio tope; no la toqué.
+- **Libros armados, ya existía antes:** con nombres de hoja repetidos, uno
+  que antes daba 400 ahora da 200.
 
 ## Sigo con
 
-EXCEL-2, como está en el canal (con D26 (a) y lo de paso). Si
-PUNTA-A-PUNTA-1 vuelve con devolución, eso va primero.
+Nada asignado después de EXCEL-2 en el canal. Si EXCEL-2 vuelve con
+devolución, eso va primero.
 
 Última vuelta: 2026-10-07
-Contexto: el que mide la PM con get_session (al entregar MARIA-1b eran 38 %).
+Contexto: el que mide la PM con get_session.
 
-`/compact conservar: Dev 1 de CDI, rama claude/dev1-tecnica. MARIA-1b y
-EXCEL-1 aceptadas e integradas (6ea8ca9). PUNTA-A-PUNTA-1 entregada sobre
-3b52bc9 (suite 1216, 3 xfail D23-D25). Sigue EXCEL-2 (canal: D18, CSV, aviso
-de mapeo, D26 (a) con 8 libros sin <dimension> y sharedStrings de 19 M < 1 GB,
-y de paso 10**400 → 400 y cuit_agr/vendedor_id sólo 0-9). Entorno:
+`/compact conservar: Dev 1 de CDI, rama claude/dev1-tecnica. Aceptadas e
+integradas: MARIA-1b, EXCEL-1, PUNTA-A-PUNTA-1. EXCEL-2 entregada sobre
+3e6e63e (suite 1267 en 1a36a6d, 27 sabotajes en scripts/testing/sabotajes/excel2.sh,
+tests/test_excel2.py); D27 (tope de textos compartidos) abierta. Entorno:
 PM_DIR=/tmp/cdi-dev1, levantar.sh <SHA> <puerto>, venv /tmp/cdi-dev1/venv y
 venv-limpio; rutina de la PM trig_01TvMmGfSLDfbcJrf66ZZ7YK.`
