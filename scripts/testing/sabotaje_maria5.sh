@@ -19,7 +19,7 @@ cd "$WT"
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
        VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
 unset ENABLE_PDF_LLM_FALLBACK || true
-PRUEBA="tests/test_maria5_peso.py tests/test_maria5_centavos.py tests/test_maria5_caratula_vacia.py tests/test_maria5_lector_productos.py tests/test_maria5_peso_lector.py tests/test_maria5_peso_excel.py"
+PRUEBA="tests/test_maria5_devolucion.py tests/test_maria5_peso.py tests/test_maria5_centavos.py tests/test_maria5_caratula_vacia.py tests/test_maria5_lector_productos.py tests/test_maria5_peso_lector.py tests/test_maria5_peso_excel.py"
 T="FAILED tests/test_maria5_"
 G=proyecto_maria/core/maria_generator.py
 M=proyecto_maria/main.py
@@ -149,9 +149,7 @@ reemplazar $G "    if not numero.is_finite() or abs(numero) > IMPORTE_MAXIMO:" "
 caso sin_tope "${T}centavos.py::test_un_importe_imposible_da_error_y_no_500[extra"
 
 # 17. el lector no divide el peso de la línea
-reemplazar $X "    if unitario <= 0 and total > 0 and cantidad > 0:
-        unitario = total / cantidad" "    if unitario <= 0 and total > 0 and cantidad > 0:
-        unitario = total"
+reemplazar $X "        unitario = total / cantidad" "        unitario = total"
 caso lector_sin_dividir "${T}peso_lector.py::test_el_peso_que_venga_queda_por_unidad["
 
 # 18. el prompt vuelve a pedir un peso sin decir de qué
@@ -169,16 +167,83 @@ reemplazar $M '    if clase == "bruto":
 caso bruto_en_silencio "${T}peso_excel.py::test_el_bruto_solo_se_usa_dividido_y_con_aviso"
 
 # 21. el bruto vuelve a ganarle al neto
-reemplazar $M '        "pesokg", "pesototal", "pesoneto",' '        "pesokg", "pesobruto", "pesototal", "pesoneto",'
+reemplazar $M '_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "bruto": 3}' '_RANGO_DE_PESO = {"neto": 3, "linea": 1, "unidad": 2, "bruto": 0}'
 caso bruto_antes_que_neto "${T}peso_excel.py::test_con_neto_y_bruto_se_usa_el_neto"
 
 # 22. la columna de peso vuelve a mirarse sólo por nombre exacto
-reemplazar $M '    if any(p in normal for p in ("total", "neto", "net", "linea")):' '    if normal in ("pesototal", "pesoneto"):'
+reemplazar $M '    if "total" in normal or "linea" in normal:' '    if normal == "pesototal":'
 caso nombre_exacto "${T}peso_excel.py::test_un_mapeo_guardado_con_otro_nombre_tambien_divide"
 
 # 23. un peso que no es número queda en 0 en silencio
 reemplazar $M '    if sin_numero:' '    if False:'
 caso texto_en_silencio "${T}peso_excel.py::test_un_peso_que_no_es_numero_se_avisa"
+
+# --- Devolución de la PM (2026-10-07) ---
+D="FAILED tests/test_maria5_devolucion.py::"
+
+# 24. lector: con los dos pesos vuelve a ganar el de una unidad
+reemplazar $X "    if total > 0 and cantidad > 0:" "    if total > 0 and cantidad > 0 and unitario <= 0:"
+caso lector_gana_la_unidad "${D}test_el_total_copiado_en_los_dos_campos_gana_el_de_la_linea[pdf_directo]"
+
+# 25. lector: la diferencia no se avisa
+reemplazar $X "    if aviso:" "    if False:"
+caso lector_sin_aviso "${D}test_si_no_coinciden_gana_el_de_la_linea_con_aviso[pymupdf]"
+
+# 26. el aviso del lector no llega a la pantalla
+reemplazar $M "        avisos = operacion_data.pop('avisos_peso', []) if isinstance(operacion_data, dict) else []" "        avisos = []"
+caso aviso_del_lector_perdido "${D}test_el_aviso_del_lector_llega_a_la_pantalla"
+
+# 27. Excel: el total le gana al neto
+reemplazar $M '_RANGO_DE_PESO = {"neto": 0, "linea": 1,' '_RANGO_DE_PESO = {"neto": 1, "linea": 0,'
+caso total_antes_que_neto "${D}test_excel_el_neto_le_gana_al_total"
+
+# 28. Excel: el de una unidad le gana al de la línea
+reemplazar $M '"unidad": 2, "bruto": 3}' '"unidad": -1, "bruto": 3}'
+caso unidad_antes_que_linea "${D}test_excel_con_dos_pesos_gana_el_de_la_linea[Peso-Peso neto]"
+
+# 29. Excel: el mapeo guardado manda sobre el neto
+reemplazar $M "            rename = {src: canon for src, canon in rename.items() if canon != \"peso_unitario\"}
+            rename[pesos[0]] = \"peso_unitario\"" "            pesos = [next((s for s, c in rename.items() if c == \"peso_unitario\"), pesos[0])] + [c for c in pesos if rename.get(c) != \"peso_unitario\"]
+            rename[pesos[0]] = \"peso_unitario\""
+caso mapeo_manda "${D}test_excel_el_mapeo_guardado_no_le_gana_al_neto"
+
+# 30. Excel: la diferencia entre los dos pesos no se avisa
+reemplazar $M "        if distinto.any():" "        if False:"
+caso excel_sin_aviso_de_diferencia "${D}test_excel_con_dos_pesos_gana_el_de_la_linea[Weight-Net Weight]"
+
+# 31. Excel: un peso en texto en una columna de una unidad saca la fila
+reemplazar $M '    df["peso_unitario"] = peso
+' '    df["peso_unitario"] = df["peso_unitario"]
+'
+caso texto_saca_la_fila "${D}test_un_peso_en_texto_no_saca_la_fila[Peso unitario]"
+
+# 32. el generador sin la guarda del peso
+reemplazar $G "    if not math.isfinite(kilos) or kilos > IMPORTE_MAXIMO or round(kilos, 3) <= 0:" "    if kilos < 0:"
+caso peso_sin_guarda "${D}test_un_peso_imposible_no_llega_al_txt["
+
+# 33. la guarda existe pero el TXT no la usa
+reemplazar $G 'QARTKGRNET={peso_valido(peso_kg, idx):.3f}' 'QARTKGRNET={peso_kg:.3f}'
+caso guarda_sin_usar "${D}test_un_peso_imposible_da_400["
+
+# 34. sin tope en el peso
+reemplazar $G "    if not math.isfinite(kilos) or kilos > IMPORTE_MAXIMO or round(kilos, 3) <= 0:" "    if not math.isfinite(kilos) or round(kilos, 3) <= 0:"
+caso peso_sin_tope "${D}test_un_peso_imposible_no_llega_al_txt[peso2]"
+
+# 35. sub-ítems: la suma exacta contra el MARTFOB redondeado
+reemplazar $G "            if abs(suma_fob - valor_exacto) > Decimal(\"0.01\"):" "            if abs(suma_fob - valor_total) > Decimal(\"0.01\"):"
+caso subitems_redondeado_contra_exacto "${D}test_el_caso_de_la_pm_genera"
+
+# 36. la validación no recibe los grupos
+reemplazar $M '        resultado = run_smart_validations(items, grupos=[d.get("grupo_id") if isinstance(d, dict) else None' '        resultado = run_smart_validations(items, grupos=[None if isinstance(d, dict) else None'
+caso validacion_sin_grupos "${D}test_la_validacion_con_grupos_muestra_el_fob_del_txt"
+
+# 37. la cuenta de la validación redondea cada producto del grupo
+reemplazar $G "        clave = ('grupo', gid) if gid is not None else ('item', n)" "        clave = ('item', n)"
+caso grupo_redondeado_por_producto "${D}test_la_validacion_y_el_txt_dan_lo_mismo_al_azar["
+
+# 38. el aviso de gastos suma sin redondear
+reemplazar $G '{_dos_decimales(flete) + _dos_decimales(seguro):.2f}' '{float(flete) + float(seguro):.2f}'
+caso aviso_de_gastos_sin_redondear "${D}test_el_aviso_de_gastos_dice_lo_que_dice_el_txt"
 
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
 echo "OK: los 23 sabotajes dan rojo por la razón esperada"

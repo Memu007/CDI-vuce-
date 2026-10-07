@@ -71,6 +71,30 @@ const centavos = s => Math.round(parseFloat(s) * 100);
   const fila = [await page.inputValue(sel('cantidad')), await page.inputValue(sel('valor_unitario')), await page.inputValue(sel('peso_unitario'))];
   if (fila.join('|') !== '8|40|4') falla('la fila del grupo muestra ' + fila.join(' | ') + ' y no lo guardado');
   console.log('OK editar el grupo reparte: cantidad 8, FOB 320, peso 32; la silla sigue valiendo más que la mesa y la fila muestra lo guardado');
+  // Devolución de MARIA-5 (5): bajar la cantidad de un grupo nunca deja un
+  // producto en 0 (antes 1/1/1 bajado a 2 quedaba [1,1,0] y «Generar» se
+  // bloqueaba). Menos que un producto cada uno se rechaza; si alcanza, el
+  // que no llega a uno lo toma del que más tiene.
+  // SIN_CERO=1 saltea este paso (para ver el rojo de la validación antes de la devolución).
+  if (!process.env.SIN_CERO) {
+  const grupoNuevo = async cants => {
+    await page.evaluate(cs => {
+      CDI.state.items = cs.map((c, i) => ({ pieza: '94037000000X', descripcion: 'Mueble de madera de prueba ' + i,
+        origen: 'CN', cantidad: c, valor_unitario: 10, peso_unitario: 1, grupo_id: 1 }));
+      CDI.goTo('review'); CDI.goTo('ncm');
+    }, cants);
+    await page.locator(sel('cantidad')).waitFor({ timeout: 5000 });
+  };
+  await grupoNuevo([1, 1, 1]);
+  await grupo('cantidad', '2');
+  if ((await estado()).map(x => x.c).join(',') !== '1,1,1') falla('1/1/1 bajado a 2 quedó ' + JSON.stringify(await estado()));
+  if ((await page.inputValue(sel('cantidad'))) !== '3') falla('la fila del grupo quedó en ' + await page.inputValue(sel('cantidad')));
+  await grupoNuevo([1, 1, 100]);
+  await grupo('cantidad', '5');
+  const cinco = (await estado()).map(x => x.c);
+  if (cinco.reduce((a, c) => a + c, 0) !== 5 || cinco.some(c => c < 1)) falla('1/1/100 bajado a 5 quedó ' + cinco.join('/'));
+  console.log('OK el grupo no deja productos en 0: 1/1/1 a 2 se rechaza; 1/1/100 a 5 queda ' + cinco.join('/'));
+  }
   await page.evaluate(() => {
     CDI.state = CDI.state || {};
     CDI.state.operacion = { numero_factura: 'None', moneda: 'DOL', incoterm: 'CIF', fecha_emision: '22/06/2026',
@@ -79,6 +103,9 @@ const centavos = s => Math.round(parseFloat(s) * 100);
       { pieza: '84713012100F', descripcion: 'Notebook importada de prueba', origen: 'CN', cantidad: 10, valor_unitario: 10, peso_unitario: 2.5 },
       { pieza: '84713012100F', descripcion: 'Notebook importada de prueba B', origen: 'CN', cantidad: 1, valor_unitario: 100, peso_unitario: 1 },
       { pieza: '84714900100D', descripcion: 'Equipo importado de prueba', origen: 'CN', cantidad: 4, valor_unitario: 100, peso_unitario: 0.5 },
+      // Un grupo de tres de 6,675: el TXT declara una línea de 20,03.
+      ...[1, 2, 3].map(n => ({ pieza: '84714900100D', descripcion: 'Accesorio importado de prueba ' + n, origen: 'CN',
+                               cantidad: 1, valor_unitario: 6.675, peso_unitario: 0.5, grupo_id: 3 })),
     ];
     CDI.goTo('validating');
   });
@@ -86,8 +113,9 @@ const centavos = s => Math.round(parseFloat(s) * 100);
   await page.locator('#validatingGenerate').waitFor({ state: 'visible', timeout: 10000 }).catch(() => falla('no aparece la validación'));
   await page.locator('text=Peso total').first().waitFor({ timeout: 10000 }).catch(() => falla('no aparece el peso total en la validación'));
   const tarjetas = await page.evaluate(() => document.body.innerText);
-  if (!/28[.,]0?0? kg/.test(tarjetas.replace(/\s+/g, ' ')) && !/\b28 kg/.test(tarjetas)) falla('la validación no muestra 28 kg de peso total');
-  console.log('OK la validación muestra el peso total: 25 + 1 + 2 = 28 kg');
+  if (!/29[.,]50? kg/.test(tarjetas.replace(/\s+/g, ' '))) falla('la validación no muestra 29,5 kg de peso total');
+  console.log('OK la validación muestra el peso total: 25 + 1 + 2 + 1,5 = 29,5 kg');
+  const fobValidacion = (tarjetas.replace(/\s+/g, ' ').match(/\$\s?([\d.,]+)/) || [])[1] || '';
   if (process.argv[2]) await page.screenshot({ path: process.argv[2], fullPage: true });
 
   await page.fill('#sbtSufijoValor', 'AA(1)-CA00');
@@ -109,6 +137,12 @@ const centavos = s => Math.round(parseFloat(s) * 100);
     if (suma !== centavos(campo(cab)[0])) falla(item + ' suma ' + suma / 100 + ' y ' + cab + ' es ' + campo(cab)[0]);
   }
   if (campo('MDDTFLE')[0] !== '10.00') falla('el flete de la carátula es ' + campo('MDDTFLE')[0]);
+  // Devolución de MARIA-5 (6): una sola cuenta. Antes la validación sumaba
+  // 6,68 × 3 y mostraba 620,04; el TXT dice 620,03.
+  if (campo('MDDTFOB')[0] !== '620.03') falla('el FOB del TXT es ' + campo('MDDTFOB')[0]);
+  if (fobValidacion.replace(/\./g, '').replace(',', '.') !== '620.03' && fobValidacion.replace(/,/g, '') !== '620.03')
+    falla('la validación muestra $' + fobValidacion + ' y el TXT ' + campo('MDDTFOB')[0]);
+  console.log('OK la validación y el TXT dicen el mismo FOB: $' + fobValidacion + ' = ' + campo('MDDTFOB')[0]);
   console.log('OK las cuentas cierran al centavo: flete por ítem ' + campo('MARTFLE').join(' + ') + ' = 10.00');
   await b.close();
   console.log('OK: pantalla MARIA-5');

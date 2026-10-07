@@ -46,7 +46,8 @@ def test_el_bruto_solo_se_usa_dividido_y_con_aviso(auth_override, client):
 def test_con_neto_y_bruto_se_usa_el_neto(auth_override, client):
     data = _subir(client, ["Peso bruto", "Peso neto"], [30, 25])
     assert data["items"][0]["peso_unitario"] == pytest.approx(2.5)
-    assert not any("bruto" in a for a in data.get("avisos", []))
+    # El bruto se nombra como ignorado (devolución de MARIA-5), no se usa.
+    assert not any("bruto dividido" in a for a in data.get("avisos", []))
 
 
 def test_con_unitario_y_total_se_usa_el_unitario(auth_override, client):
