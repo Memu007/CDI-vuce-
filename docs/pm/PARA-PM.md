@@ -2,7 +2,54 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## RENDIMIENTO-1b — entregada, terminada
+## RENDIMIENTO-1b — reentregada con la devolución, terminada
+
+**Devolución atendida** (vendedor en dos columnas). Código: **`ec3d793`**
+(producto `f95523c`, pruebas y sabotajes `ec3d793`).
+- El vendedor adivinado nunca es una etiqueta de parte: «BUYER»,
+  «CONSIGNEE», «SELLER», «SHIPPER», «NOTIFY PARTY», «SOLD TO», «BILL TO»,
+  «SHIP TO», «CLIENTE», «CUSTOMER» y sus pares en castellano y portugués.
+  Si la etiqueta viene detrás del nombre, en la misma fila, el nombre se
+  corta antes («VENDOR: ACME TRADING LTD BUYER: GLOBEX» → «ACME TRADING
+  LTD»).
+- En el caso de la PM (dos columnas, «SELLER:» y «BUYER:» en una fila y los
+  nombres debajo), el vendedor queda **vacío**. pypdf junta las dos columnas
+  en una línea y no hay forma segura de separar los nombres. Era una de las
+  dos salidas aceptadas.
+
+Rojo antes, sobre `b01149c`:
+
+```
+E   AssertionError: BUYER                                           (el PDF de dos columnas)
+E   AssertionError: assert 'BUYER' == ''
+E   AssertionError: assert 'CONSIGNEE' == ''
+E   AssertionError: assert 'ACME TRADING...BEX IMPORT SA' == 'ACME TRADING LTD'
+E   AssertionError: assert 'ACME TRADING...IGNEE: GLOBEX' == 'ACME TRADING LTD'
+E   AssertionError: assert 'NOTIFY PARTY' == ''
+============ 6 failed, 2 passed, 16 deselected ============
+```
+
+Verde después: la prueba del PDF de dos columnas y 7 casos de texto,
+`test_el_vendedor_nunca_es_una_etiqueta`. Los 6 PDF de la comparación
+siguen dando el mismo vendedor (`''`, `ACME TRADING CO LTD`,
+`Importadora del Sur SA`, `Comercio Brasil Ltda`, `Shenzhen Electronics Co`
+y `''`).
+Sabotajes de `rendimiento1b.sh` sobre `ec3d793`: 7 en ROJO (los 5 de antes
+y 2 nuevos: «el vendedor vuelve a poder ser una etiqueta» y «el vendedor ya
+no se corta antes de otra etiqueta»), `sabotajes con falla: 0`. Los de la
+Dev 2: `OK: los 8 sabotajes dan rojo por la razón esperada`.
+
+Puertas sobre `ec3d793`: suite `754 passed, 102 skipped, 25 warnings in
+85.31s` (venv nuevo, sólo `requirements.txt`); fricción OK; aislamiento 22
+BLOQUEADO, 0 FUGA.
+
+Toqué `proyecto_maria/pdf_extractor.py` sólo en `_clean_vendor_candidate`,
+con dos expresiones nuevas encima (~línea 870), fuera de la zona de la
+Dev 2.
+
+---
+
+Lo que sigue es el informe de la primera entrega (`b01149c`), sin cambios.
 
 | | SHA |
 |---|---|
@@ -138,13 +185,13 @@ de la línea 820), `proyecto_maria/security/file_security.py`
 
 EXCEL-1 (con D12) cuando me la escribas. Si no hay nada nuevo, espero.
 
-Última vuelta: 2026-10-07 06:10 UTC
-Contexto: ~47 %
+Última vuelta: 2026-10-07 06:45 UTC
+Contexto: ~50 %
 
 `/compact conservar: Dev 1 de CDI en la rama claude/dev1-tecnica. ADMIN-1,
 ADMIN-2 y RENDIMIENTO-1 aceptadas (RENDIMIENTO-1 no se integra en la rama
-de PM hasta después del ensayo). RENDIMIENTO-1b entregada (código b01149c),
-informe en PARA-PM.md, sin D. Después siguen EXCEL-1 (con D12: pd.read_excel
+de PM hasta después del ensayo). RENDIMIENTO-1b reentregada con la devolución del
+vendedor en dos columnas (código ec3d793), informe en PARA-PM.md, sin D. Después siguen EXCEL-1 (con D12: pd.read_excel
 y openpyxl fuera del hilo del servidor), MARIA-1b (con la D6 de la Dev 2:
 save_client_operation no inventa cantidad 1 ni peso 0,5) y PUNTA-A-PUNTA-1.
 COBRO-CORTE-1 en pausa (D4=(b) N=10, D5=(a), D6=(a)); COBRO-MP-1 primero
