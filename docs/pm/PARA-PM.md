@@ -13,6 +13,18 @@ después contra un Postgres 16 local, y suite completa en verde. Sin migración.
 | producto | `01d5723`, `3135802`, `e08c920` |
 | pruebas, script de Postgres y sabotajes | `191db69`, `6d918d8`, `d6fe25f` |
 | CHANGELOG | `cabf090` |
+| e2e de la CI (agregado del canal) | `aec4f15`: sólo `config/e2e_maria.js`. Va encima de `d6fe25f` con `cherry-pick`, sin nada de la devolución de EXCEL-2 |
+
+**Agregado — la e2e de la CI (`aec4f15`).** `confirmReview` completa
+`#f_fecha_emision` con `01/10/2026`. Sin esa línea, en mi rama: `E2E falló` en
+`confirmReview` (`e2e_maria.js:131`). Con ella, `E2E MARIA OK: carga,
+revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria
+verificadas.` Lo corrí dos veces: en mi rama y en `d6fe25f` más `aec4f15`
+(`git cherry-pick -n`), que es lo que se publicaría.
+
+**Ojo al publicar:** mi rama ya tiene, después de `d6fe25f`, commits de la
+devolución de EXCEL-2 que todavía no entregué. Para GUARDAR-1 van `d6fe25f` y
+`aec4f15`, no la punta de la rama.
 
 **Qué cambia:**
 - **La operación primero:** la operación, sus ítems y el contador del plan se
