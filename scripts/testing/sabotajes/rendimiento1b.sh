@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Negativos de RENDIMIENTO-1b: cada sabotaje deshace un punto de la pieza y
-# la prueba tiene que ponerse roja por ese motivo.
+# la prueba tiene que ponerse roja por ese motivo. Corre con -x: con pdfminer
+# de vuelta, el PDF de 3 MB de otra prueba agota la memoria y el proceso
+# muere sin decir por qué; la primera falla es la que cuenta.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/rendimiento1b.sh [SHA]
 # Trabaja en un worktree descartable: no toca tu copia ni datos compartidos.
@@ -32,7 +34,7 @@ open(p, "w").write(s.replace(viejo, nuevo))
 PYEOF
   then echo "ROTO  | $nombre: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1)); return; fi
   local salida codigo
-  salida="$("$PY" -m pytest -q --no-cov -p no:cacheprovider tests/test_rendimiento1b.py 2>&1)"; codigo=$?
+  salida="$("$PY" -m pytest -q -x --no-cov -p no:cacheprovider tests/test_rendimiento1b.py 2>&1)"; codigo=$?
   if [ "$codigo" -eq 0 ]; then
     echo "VERDE | $nombre: la prueba no lo vio"; FALLAS=$((FALLAS+1))
   elif grep -qF -- "$esperado" <<<"$salida"; then
@@ -53,7 +55,7 @@ sabotaje $E "el vendedor vuelve a leer con pdfminer" \
         from pypdf import PdfReader
         reader = PdfReader(io.BytesIO(data))
         paginas = []' \
-  'FAILED tests/test_rendimiento1b.py::test_el_vendedor_se_adivina_sin_pdfminer_ni_pdfplumber'
+  'FAILED tests/test_rendimiento1b.py::test_pdfs_armados_en_paralelo_y_despues_uno_bueno_se_lee'
 sabotaje $M "los tiempos en 0 o negativos ya no caen al defecto" \
   '    return valor if math.isfinite(valor) and valor > 0 else defecto' \
   '    return valor' \
@@ -61,7 +63,7 @@ sabotaje $M "los tiempos en 0 o negativos ya no caen al defecto" \
 sabotaje $F "el tiempo de validación en 0 o negativo ya no cae al defecto" \
   '    return valor if math.isfinite(valor) and valor > 0 else 30.0' \
   '    return valor' \
-  'FAILED tests/test_rendimiento1b.py::test_tiempo_de_validacion_en_cero_o_negativo_usa_el_de_siempre[-5]'
+  'FAILED tests/test_rendimiento1b.py::test_tiempo_de_validacion_en_cero_o_negativo_usa_el_de_siempre[0]'
 sabotaje $E "el vendedor vuelve a leer páginas de contenido enorme" \
   '                    continue
                 paginas.append(p.extract_text() or '"''"')' \
