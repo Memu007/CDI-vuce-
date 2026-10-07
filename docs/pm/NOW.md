@@ -95,22 +95,21 @@ la PM principal.
 
 Archivos abiertos por Dev:
 - Dev 1 (EXCEL-1): `proyecto_maria/main.py` (las cargas por Excel).
-- Dev 2 (MARIA-4): `proyecto_maria/core/maria_generator.py` y las pantallas
+- Dev 2 (MARIA-3): `proyecto_maria/core/maria_generator.py` y las pantallas
   v2 de revisión.
 
 ## En curso
 
 - **Dev 1:** EXCEL-1 (la carga por Excel, de punta a punta). Sigue: MARIA-1b
   y PUNTA-A-PUNTA-1.
-- **Dev 2:** MARIA-4 (estado, IVA adicional, banco y empresa de
-  digitalización), devuelta por tres puntos (estado contra origen, avisos en
-  la pantalla vieja, `origen` contra `pais_origen`). Sigue: MARIA-3 y MARIA-5; MARIA-6 cuando lleguen los archivos reales del despachante.
+- **Dev 2:** MARIA-3 (avisos, gastos FOB, procedencia y fecha de emisión),
+  después de su `/compact` (está en ~88 %). Sigue: MARIA-5; MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas el 2026-10-07 y sin integrar todavía** (se integran después de
   publicar el ensayo, para que el ensayo sea exactamente lo atacado):
   RENDIMIENTO-1 (`8fd801d`, suite `730 passed, 102 skipped` con un venv nuevo)
   y RENDIMIENTO-1b (`ec3d793`, `754 passed`),
-  MARIA-1a (`0a1775f`, `777 passed`), MARIA-2b (`c3bef51`, `791 passed`) y
-  MARIA-1c (`448b54d`, `804 passed`).
+  MARIA-1a (`0a1775f`, `777 passed`), MARIA-2b (`c3bef51`, `791 passed`),
+  MARIA-1c (`448b54d`, `804 passed`) y MARIA-4 (`2461939`, `846 passed`).
   RENDIMIENTO-1 sale con RENDIMIENTO-1b y MARIA-1a con MARIA-1c.
 - **Aceptadas el 2026-10-07 e integradas:** ADMIN-1 (`ac25dbc`), MARIA-2
   (`65ea6f3`) y ADMIN-2 (`f9f8393`). Suite sobre `f9f8393`, que tiene el
@@ -176,9 +175,9 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 07:30 UTC (rutina): RENDIMIENTO-1b aceptada (con la devolución) y
-EXCEL-1 activa para la Dev 1; MARIA-4 devuelta por tres puntos. Contexto: Dev 1
-~55 %, Dev 2 ~58 %, PM ~40 %: a las 9 (ARG), Emi pega los tres `/compact`.
+2026-10-07 09:00 UTC (rutina): sin entregas nuevas. Dev 1 sigue con EXCEL-1
+(arreglos de sus revisores, `2759c84`); Dev 2 avanzó con MARIA-3 (`a3f2df9`).
+A las 9 (ARG): los tres `/compact`, la lista de Railway y el SHA del ensayo.
 
 ## Medición
 
