@@ -6389,13 +6389,7 @@ async def system_connectors(user=Depends(get_current_user)):
     afip_mode = (os.getenv("AFIP_MODE", "") or "").strip().lower() or (
         "api" if os.getenv("AFIP_CUIT") and os.getenv("AFIP_CERT_PATH") else "fake"
     )
-    if not _es_admin(user):
-        return {
-            "vuce": {"mode": VUCE_CFG.mode},
-            "tarifar": {"mode": tarifar_cfg.mode},
-            "afip": {"mode": afip_mode},
-        }
-    return {
+    detalle = {
         "vuce": {
             "mode": VUCE_CFG.mode,
             "has_api_key": bool(VUCE_CFG.api_key),
@@ -6422,6 +6416,9 @@ async def system_connectors(user=Depends(get_current_user)):
             "cache_ttl_hours": int(os.getenv("NCM_CACHE_TTL_HOURS", "168")),
         },
     }
+    if _es_admin(user):
+        return detalle
+    return {k: {"mode": v["mode"]} for k, v in detalle.items() if "mode" in v}
 
 
 @app.post("/api/ncm/cache/refresh", tags=["admin"])
