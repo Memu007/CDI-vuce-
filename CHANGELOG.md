@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · fix: la sugerencia de NCM no pierde la SIM completa del proveedor (GUARDAR-2, D32 b)
+
+- **fix(sugerencia):** si el historial del cliente tiene el NCM de 8 dígitos y el catálogo del proveedor tiene, para el mismo producto, la SIM completa que empieza con esos 8, el autorrelleno (`/api/catalog/lookup`) y `/api/ncm/sugerir` traen la del proveedor. Desde GUARDAR-1 llegaba `84714900` y la pantalla marcaba incompleto lo que antes llegaba listo. Sin migración.
+
 ## 2026-10-07 · fix: guardar una operación con la SIM completa no da 500 (GUARDAR-1)
 
 - **fix(operaciones):** la operación (con el contador del plan) se guarda en su propio commit y el historial del cliente después, cada producto en su savepoint: si el historial falla, la operación queda y la respuesta lo dice (`historial_guardado`). Antes, en Postgres, la SIM completa (`84714900100D`) no entraba en `client_product_history.ncm` (String(10)) y no se guardaba nada.
