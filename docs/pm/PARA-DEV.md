@@ -25,21 +25,59 @@ despertás a ella con el de la suya al entregar o al dejar una D que te frena
 
 ## Último veredicto
 
-**EXCEL-1 aceptada sobre `7b119b6`** (2026-10-07, con la devolución). La PM
-reprodujo el rojo antes sobre `cb0f886` (`7 failed`), la focal (`115 passed`)
-y la suite (`932 passed, 102 skipped`). Su subagente repitió los cinco puntos
-con login real y los cinco quedaron arreglados (la consulta de NCM, 1,64 s
-como máximo con 12 subidas pesadas). Detalle en
-`REPRODUCCION-EXCEL-1-2026-10-07.md`. Como debajo están tus commits de
-MARIA-1b, EXCEL-1 se integra junto con MARIA-1b.
+**MARIA-1b devuelta sobre `21a7a7e`** (2026-10-07) por cuatro puntos, más la
+D22. La PM reprodujo el rojo antes sobre `c0bae0e` (`27 failed, 10 passed`),
+la focal (`158 passed`) y la suite (`941 passed, 102 skipped`): coincide con
+tu informe. Lo central se sostiene: tu CUIT acepta 12 reales y frena 3
+inválidos, el archivo real sale idéntico en 25 casos y guardar sin inventar
+no rompe nada. Lo que encontró el subagente, con su reproducción, está en
+`REPRODUCCION-MARIA-1b-2026-10-07.md`. EXCEL-1 sigue aceptada y entra con
+MARIA-1b.
 
-## Respuestas a tus D (2026-10-07, 11:10 UTC)
+**La devolución va antes que PUNTA-A-PUNTA-1.**
 
-- **EXCEL-1:** aceptada (arriba). Seguí con MARIA-1b.
-- **D20: (a).** El CUIT del importador vacío frena, y la pantalla deja de
-  decir «opcional»: el TXT sin él no sirve para presentar. En MARIA-1b.
-- **D21:** pendiente de Emi (`DECISIONS.md`): hace falta el nomenclador
-  vigente de ARCA, que desde acá no se puede bajar. Mientras, «no está en el
+1. **`NaN` e `inf` no dejan generar.** Hoy, en cantidad, valor, peso, flete,
+   seguro y gastos FOB, dan 200 y el TXT sale con `nan` o `inf`
+   (`QARTUNTDCL=nan`, `MDDTFLE=inf`, `MCPL=nan`), porque `nan <= 0` es falso.
+   Que frenen con el mismo error que un monto inválido, y que
+   `/api/validate/smart` con la cabecera no dé 500 (hoy da 500 con un `NaN`
+   en un ítem).
+2. **Mirar las otras hojas no puede trabar la lectura.** El tope de 10 s
+   corta la espera, pero no el hilo: con 2 hilos, dos libros armados (50
+   hojas con celdas de 32 000 espacios, 90 MB descomprimido) dejan cualquier
+   subida en 504 durante ~3 minutos. El escaneo necesita un presupuesto que
+   corte de verdad, por ejemplo saltar las hojas cuyo XML dentro del ZIP pasa
+   de un tamaño, o cortar por bytes o celdas leídas. Y si no se pudo mirar
+   todo, el semáforo lo dice («No se revisaron todas las hojas del libro»),
+   en vez de quedar sólo en el log.
+3. **El CUIT, sólo con dígitos 0-9.** Hoy `\d` acepta dígitos de ancho
+   completo y arábigos, y el TXT los escribe tal cual.
+4. **Toda moneda que no sea DOL avisa** (no frena) hasta que el despachante
+   confirme los códigos: el único archivo real usa DOL. El texto del aviso
+   dice eso.
+5. **D22: (a).** `/generate_maria_export` usa la misma limpieza de textos que
+   `/generate_maria`: es el mismo defecto (M10) en otra ruta que escribe el
+   TXT. Borrar la pantalla vieja no está en el roadmap.
+
+**Criterios:** rojo antes y verde después en cada punto; el libro armado del
+punto 2 (o uno equivalente, generado en la prueba) más una subida normal
+detrás: la normal no da 504; los dos archivos reales siguen idénticos;
+suite completa en verde.
+
+**Antes de entregar,** traé la rama de la PM: ahí están integradas
+RENDIMIENTO-1 y 1b y las piezas MARIA de la Dev 2 (`8e819dd` en adelante).
+MARIA-1d ya saca el DOL y el FOB que inventaba el lector de PDF (el hallazgo
+6 del subagente). Va a haber choques en `main.py` (guardar la operación) y en
+`finalize.js`: la regla es que no se invente nada y que el TXT salga
+idéntico.
+
+## Respuestas a tus D (2026-10-07, 13:40 UTC)
+
+- **D22: (a)**, en la devolución (punto 5).
+- **D20: (a)**, ya hecha en MARIA-1b.
+- **D21:** Emi dice que el nomenclador lo baja la PM. Desde acá la red bloquea
+  `www.arca.gob.ar`, y el ZIP de julio ya traía el archivo de 2018. Se espera
+  que Emi habilite el sitio o mande el archivo. Mientras tanto, «no está en el
   catálogo» sigue como aviso.
 - Anteriores (D13 a D19): en Git.
 
@@ -51,7 +89,7 @@ del commit `62b1d14`):
 - **D6: (a)** ahora. El índice único (b), pieza aparte más adelante, después
   de mirar si producción ya tiene códigos repetidos.
 
-## Tarea activa — MARIA-1b: controles antes de generar
+## Tarea activa — MARIA-1b: controles antes de generar (devuelta: arriba)
 
 Asignada el 2026-10-07. Fase 1 (`ROADMAP.md`). Cambia cuándo se puede
 generar el TXT, no lo que sale en él.
