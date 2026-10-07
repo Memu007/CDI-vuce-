@@ -205,8 +205,9 @@ def test_los_avisos_se_piden_antes_de_generar(client, auth_override):
     assert "procedencia" in texto
 
 
-def test_los_avisos_previos_son_los_mismos_que_al_generar(client, auth_override):
-    cuerpo = _cuerpo(fecha_emision="", procedencia="", gastos_anteriores_fob=None,
+@pytest.mark.parametrize("gastos, procedencia", [(None, ""), (150, "PE")])
+def test_los_avisos_previos_son_los_mismos_que_al_generar(client, auth_override, gastos, procedencia):
+    cuerpo = _cuerpo(fecha_emision="", procedencia=procedencia, gastos_anteriores_fob=gastos,
                      iva_adicional=None, banco_bcra="")
     antes = client.post("/generate_maria/avisos", json=cuerpo).json()["avisos"]
     despues = client.post("/generate_maria", json=cuerpo).json()["warnings"]

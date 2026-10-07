@@ -23,6 +23,7 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   await page.goto(base + '/dashboard');
   await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.despachante && CDI.paisesMaria);
   await page.evaluate(() => {
+    CDI.state = CDI.state || {};
     CDI.state.operacion = { numero_factura: 'F-M3', moneda: 'DOL', incoterm: 'EXW', fecha_emision: '', sbt_sufijo_valor: 'AA(1)-CA00' };
     CDI.state.items = [
       { pieza: '84714900100D', descripcion: 'Equipo importado de prueba', origen: 'CN', cantidad: 2, valor_unitario: 10, peso_unitario: 1 },
@@ -61,6 +62,7 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   console.log('OK al cargar el banco el aviso se actualiza');
 
   // Se genera contra el servidor local.
+  await page.fill('#sbtSufijoValor', 'AA(1)-CA00');
   await page.click('#validatingGenerate');
   for (let i = 0; i < 100 && !generado; i++) await page.waitForTimeout(100);
   if (!generado || !generado.content) falla('no se generó el TXT: ' + JSON.stringify(generado));
