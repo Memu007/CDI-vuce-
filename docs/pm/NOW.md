@@ -28,6 +28,9 @@ antes de cerrar la Fase 3.
    Dev 2 frenó en `d22ff1a` (subido, verificado): MARIA-5d con código,
    pruebas, suite y pantallas listos; le falta el informe, y un sabotaje de
    `excel1.sh` dio rojo por otra prueba (a mirar al retomar).
+   Dev 1 frenó en `dfb6d24` (subido, verificado; wip, sin entregar):
+   EXCEL-2 aislada en `c2f8063` y GUARDAR-2 aislada en `2d930c5`, las dos
+   sobre `1cdfe49`.
 
 1. **Segunda publicación, hecha:** `6ea8ca9`, 2026-10-07 19:58 UTC («dale
    6ea8ca9» de Emi). Emi genera un TXT con una factura real, lo descarga
