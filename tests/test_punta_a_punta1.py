@@ -56,7 +56,7 @@ FACTURA = {
             "moneda": "DOL", "incoterm": "DDP", "flete": "3221.66", "seguro": "50.00",
         },
         "items": [{"descripcion": "MAQUINA DEMO", "cantidad": "1", "valor_unitario": "5000.00",
-                   "peso_kg": "1220", "origen": "Argentina"}],
+                   "peso_total_linea": "1220", "origen": "Argentina"}],
     },
     "ncm": "84798999900H",
     # Lo que la persona escribe en la revisión (review.js; la procedencia se
@@ -82,7 +82,7 @@ FACTURA_SUBITEMS = {
             "moneda": "DOL", "incoterm": "EXW", "flete": "365.00", "seguro": "75.47",
         },
         "items": [{"descripcion": "Equipo de demostracion para prueba", "cantidad": "6",
-                   "valor_unitario": "1197.00", "peso_kg": "33", "origen": "China"}],
+                   "valor_unitario": "1197.00", "peso_total_linea": "33", "origen": "China"}],
     },
     "ncm": "84714900100D",
     "revision": {"fecha_embarque": "12/08/2026", "comprador_fecha_inic_activ": "15/04/2004",
@@ -331,7 +331,7 @@ def _excel_de(factura: dict) -> bytes:
     ws.append(["NCM", "Descripcion", "Pais de origen", "Cantidad", "Precio Unitario", "Peso Neto"])
     for it in factura["gemini"]["items"]:
         ws.append([factura["ncm"], it["descripcion"], it["origen"], float(it["cantidad"]),
-                   float(it["valor_unitario"]), float(it["peso_kg"])])
+                   float(it["valor_unitario"]), float(it["peso_total_linea"])])
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()

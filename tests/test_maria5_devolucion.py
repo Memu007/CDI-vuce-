@@ -120,7 +120,8 @@ def test_excel_el_mapeo_guardado_no_le_gana_al_neto(auth_override, client):
 
 @pytest.mark.parametrize("columna", ["Peso unitario", "Peso", "Weight", "Peso total", "Peso bruto"])
 def test_un_peso_en_texto_no_saca_la_fila(auth_override, client, columna):
-    excel = _make_excel_bytes(COLUMNAS + [columna], [["84713000", "Notebook", "CN", 4, 350.0, "2,5"],
+    # «2,5» ya se lee como número (EXCEL-1); «dos kilos», no.
+    excel = _make_excel_bytes(COLUMNAS + [columna], [["84713000", "Notebook", "CN", 4, 350.0, "dos kilos"],
                                                     ["84713001", "Monitor", "CN", 2, 100.0, 6]])
     r = client.post("/upload_excel_v2/", files={"file": ("p.xlsx", io.BytesIO(excel),
                     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
@@ -294,3 +295,13 @@ def test_el_aviso_nombra_la_columna_como_viene(auth_override, client):
 def test_un_peso_enorme_dice_que_es_enorme():
     with pytest.raises(ValueError, match="tope"):
         _gen("OP_PESO", [_item(10, peso_kg=1e300)])
+
+
+@pytest.mark.parametrize("columna, esperado", [("Peso unitario", 2.5), ("Peso total", 0.625)])
+def test_un_peso_con_coma_se_lee_como_el_resto(auth_override, client, columna, esperado):
+    """Con EXCEL-1 integrado: «2,5» es 2,5 también en la columna de peso."""
+    excel = _make_excel_bytes(COLUMNAS + [columna], [["84713000", "Notebook", "CN", 4, "350,00", "2,5"]])
+    r = client.post("/upload_excel_v2/", files={"file": ("p.xlsx", io.BytesIO(excel),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert r.status_code == 200, r.text
+    assert r.json()["items"][0]["peso_unitario"] == pytest.approx(esperado)

@@ -18,13 +18,18 @@ def _pedido(**campos):
     base = {"operation_id": "OP1", "items": [dict(ITEM_BASE, estado=2)],
             "fecha_emision": "22/06/2026", "sbt_sufijo_valor": SUF_A,
             "vendedor_nombre": "Proveedor", "comprador_nombre": "Importadora",
-            "comprador_cuit": "30999999990", "moneda": "DOL", "incoterm": "FOB"}
+            "comprador_cuit": "30999999995", "moneda": "DOL", "incoterm": "FOB"}
     return dict(base, **campos)
+
+
+# Sin moneda, incoterm ni CUIT del importador no se genera (MARIA-1b): esos
+# tres se prueban aparte, abajo.
+OBLIGATORIOS = ("moneda", "incoterm", "comprador_cuit")
 
 
 @pytest.mark.parametrize("vacio", ["None", "null", "N/A", " none ", "NULL", None])
 def test_ningun_vacio_escrito_llega_al_txt(client, auth_override, vacio):
-    pedido = _pedido(operation_id=vacio, **{c: vacio for c in CAMPOS})
+    pedido = _pedido(operation_id=vacio, **{c: vacio for c in CAMPOS if c not in OBLIGATORIOS})
     r = client.post("/generate_maria", json=pedido)
     assert r.status_code == 200, r.text
     data = r.json()
@@ -33,8 +38,18 @@ def test_ningun_vacio_escrito_llega_al_txt(client, auth_override, vacio):
         assert basura.lower() not in data["filename"].lower()
     assert re.search(r"^IDSO=OP_\d+", data["content"], re.M), "sin número, el de la operación"
     avisos = " | ".join(data["supuestos"]).lower()
-    for palabra in ("vendedor", "nombre del importador", "cuit del importador", "moneda", "incoterm"):
+    for palabra in ("vendedor", "nombre del importador"):
         assert palabra in avisos, palabra
+
+
+@pytest.mark.parametrize("campo, falta", [("moneda", "Falta la moneda"), ("incoterm", "Falta el incoterm"),
+                                          ("comprador_cuit", "Falta el CUIT del importador")])
+@pytest.mark.parametrize("vacio", ["None", "n/a", " NULL "])
+def test_un_obligatorio_escrito_vacio_falta(client, auth_override, campo, falta, vacio):
+    """Con MARIA-1b, el vacío escrito de un obligatorio es «falta», no «None»."""
+    r = client.post("/generate_maria", json=_pedido(**{campo: vacio}))
+    assert r.status_code == 400, r.text
+    assert falta in r.text and "None" not in r.text.replace(vacio, "")
 
 
 @pytest.mark.parametrize("vacio", ["None", "n/a"])
