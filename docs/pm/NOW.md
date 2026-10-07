@@ -156,14 +156,14 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 19:50 UTC: las dos entregas, devueltas. MARIA-5 y CATALOGO-NCM-1
-(`6854f34`) por seis puntos chicos; la peor: una columna «Peso por caja» le
-gana a «Peso» (×16 en el TXT). EXCEL-2 (`3e6e63e`) por seis, tres que rompen
-(combinada gigante, combinada con texto que duplica el FOB, estilos que
-llegan a 1,4 GB); D27 (a). Dev 1: GUARDAR-1, después EXCEL-2, después
-COBRO-MP-1. Dev 2: su devolución, después SUBITEMS-1. Hoy rige 30/40 (la
-cuenta tocó su límite a las ~18:34). Esperan a Emi: «dale 6ea8ca9» escrito
-y el `/compact` de la Dev 2.
+2026-10-07 19:58 UTC (rutina; las horas de las dos vueltas anteriores estaban
+adelantadas, los commits dicen 19:23). SUBITEMS-1 revisada: se sostiene, con
+cuatro arreglos chicos que van en la reentrega de MARIA-5. Dev 1: GUARDAR-1
+hecha hasta `d6fe25f` (con Postgres), pero se quedó quieta a las 19:27 sin
+el informe; despertada para cerrar `/entregar`. Dev 2: segunda devolución de
+MARIA-5 en curso (`135ff27`). Contexto: Dev 1 32 % y Dev 2 55 %, las dos
+sobre el 30 % de hoy: `/compact` pedidos a Emi. Espera a Emi: «dale 6ea8ca9»
+escrito.
 
 ## Medición
 
