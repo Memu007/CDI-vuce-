@@ -1963,7 +1963,8 @@ def _origen_desde_factura(raw) -> str:
     from proyecto_maria.core.paises_iso3 import ISO3_A_ISO2
 
     texto = str(raw or '').strip()
-    if not texto or texto.isdigit():
+    # «NA» en una factura casi siempre es «no aplica», no Namibia.
+    if not texto or texto.isdigit() or texto.upper() in ('NA', 'N/A'):
         return ''
     mayus = texto.upper()
     if len(mayus) == 2 and mayus.isalpha():
@@ -2006,10 +2007,14 @@ def _numero_factura(raw, decimal: str | None):
     if isinstance(raw, bool) or raw is None:
         return None
     if isinstance(raw, (int, float)):
-        return float(raw)
-    t = re.sub(r'[^0-9.,\-]', '', str(raw))
-    if not re.search(r'\d', t):
+        valor = float(raw)
+        return valor if math.isfinite(valor) and valor >= 0 else None
+    # Sólo un número limpio, con moneda adelante si la hay: «12x3», «1/2»,
+    # «500 g» o «2.5e3» no se adivinan. Mejor vacío que equivocado.
+    t = re.sub(r"^\s*(?:[A-Za-z]{1,3}\s*)?[$€£¥]?\s*", '', str(raw)).strip()
+    if not re.fullmatch(r"\d{1,3}(?:[ '\u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d[\d.,]*", t):
         return None
+    t = re.sub(r"[ '\u00a0\u202f]", '', t)
     propio = _separador_decimal(t)
     if '.' in t and ',' in t:
         miles = ',' if propio == '.' else '.'
@@ -2034,10 +2039,11 @@ def _numero_factura(raw, decimal: str | None):
 
 
 def _valores_numericos(result: dict) -> list:
-    operacion = result.get('operacion') or {}
+    operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
     valores = [operacion.get('flete'), operacion.get('seguro')]
     for it in result.get('items') or []:
-        valores += [it.get('cantidad'), it.get('valor_unitario'), it.get('peso_kg')]
+        if isinstance(it, dict):
+            valores += [it.get('cantidad'), it.get('valor_unitario'), it.get('peso_kg')]
     return valores
 
 
@@ -2130,8 +2136,8 @@ Para CADA línea de la tabla de productos, extrae:
 - codigo_parte: Código de parte/SKU del proveedor (ej: "77655-KK010", "51672-KK010")
 - pieza: Código HS/NCM (buscar "HS Code:" debajo de la descripción, ej: "HS Code:802730" → "802730")
 - descripcion: Nombre del producto (2-5 palabras, SIN medidas, SIN códigos)
-- cantidad: Número de unidades (fix formato brasileño: 1.000 -> 1000)
-- valor_unitario: Precio por unidad (fix: 0,50 -> 0.50)
+- cantidad: Número de unidades, copiado tal como aparece en la factura
+- valor_unitario: Precio por unidad, copiado tal como aparece en la factura
 - peso_kg: Peso en kg (0 si no aparece; no estimar)
 - origen: Código país origen (CN, BR, US, etc.)
 
@@ -2234,7 +2240,7 @@ IMPORTANTE:
                     decimal = _decimal_de_la_factura(_valores_numericos(result))
 
                     # Extraer datos de operación
-                    operacion = result.get('operacion', {})
+                    operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
                     operacion_data = {
                         'numero_factura': str(operacion.get('numero_factura', '')),
                         'fecha_emision': str(operacion.get('fecha_emision', '')),
@@ -2254,6 +2260,8 @@ IMPORTANTE:
                     # Extraer items
                     items = []
                     for item_data in result.get('items', []):
+                        if not isinstance(item_data, dict):
+                            continue
                         # Lo que falta o no se puede saber queda vacío (0):
                         # el semáforo lo marca. Nada de 1 ni de 0,5 (MARIA-1a).
                         try:
@@ -2427,7 +2435,7 @@ IMPORTANTE:
                         decimal = _decimal_de_la_factura(_valores_numericos(result))
 
                         # Extraer datos de operación
-                        operacion = result.get('operacion', {})
+                        operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
                         operacion_data = {
                             'numero_factura': str(operacion.get('numero_factura', '')),
                             'fecha_emision': str(operacion.get('fecha_emision', '')),
@@ -2447,6 +2455,8 @@ IMPORTANTE:
                         # Extraer items
                         items = []
                         for item_data in result.get('items', []):
+                            if not isinstance(item_data, dict):
+                                continue
                             try:
                                 # Lo que falta o no se puede saber queda vacío
                                 # (0): el semáforo lo marca (MARIA-1a).
