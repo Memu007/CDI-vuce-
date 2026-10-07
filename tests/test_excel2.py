@@ -66,7 +66,8 @@ import zipfile  # noqa: E402
 from tests.test_maria1b_devolucion import FILAS, _libro_armado, _libro_normal  # noqa: E402
 
 
-def _libro_con(textos_compartidos: int = 0, filas_primera: int = 0) -> bytes:
+def _libro_con(textos_compartidos: int = 0, filas_primera: int = 0,
+               nombre_textos: str = "xl/sharedStrings.xml") -> bytes:
     """Un .xlsx a mano: `textos_compartidos` entradas vacías en
     sharedStrings.xml y una primera hoja con `filas_primera` filas de 60
     celdas (sin <dimension>), como los de la reproducción de la PM."""
@@ -80,7 +81,7 @@ def _libro_con(textos_compartidos: int = 0, filas_primera: int = 0) -> bytes:
                    '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>'
                    '<Default Extension="xml" ContentType="application/xml"/>'
                    '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>'
-                   '<Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>'
+                   f'<Override PartName="/{nombre_textos}" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/>'
                    '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>'
                    '</Types>')
         z.writestr("_rels/.rels",
@@ -94,9 +95,9 @@ def _libro_con(textos_compartidos: int = 0, filas_primera: int = 0) -> bytes:
                    '<?xml version="1.0" encoding="UTF-8"?>'
                    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
                    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>'
-                   '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/>'
+                   f'<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="/{nombre_textos}"/>'
                    '</Relationships>')
-        z.writestr("xl/sharedStrings.xml", f'<?xml version="1.0" encoding="UTF-8"?><sst {ns}>'
+        z.writestr(nombre_textos, f'<?xml version="1.0" encoding="UTF-8"?><sst {ns}>'
                    + "<si/>" * textos_compartidos + '<si><t>NCM</t></si></sst>')
         celdas = "".join(f'<c r="{chr(65 + c // 26) if c >= 26 else ""}{chr(65 + c % 26)}{{f}}"><v>1</v></c>'
                          for c in range(60))
@@ -333,3 +334,161 @@ def test_el_historial_en_excel_lee_solo_la_primera_hoja(monkeypatch):
     r = TestClient(main.app).post("/api/ncm/import-historial", files={"file": ("historial.xlsx", contenido)})
     assert r.status_code == 200, r.text[:300]
     assert r.json()["importados"] == 1 and leidos == ["bytes"], (r.json(), leidos)
+
+
+# ------------------------------------------- lo que encontró la revisión
+
+def test_textos_compartidos_con_otro_nombre_tambien_se_rechazan(monkeypatch):
+    """openpyxl encuentra las partes por [Content_Types].xml: el tope no se
+    saltea renombrando sharedStrings.xml."""
+    import openpyxl
+
+    def _no(*a, **k):
+        raise AssertionError("se abrió el libro")
+    monkeypatch.setattr(openpyxl, "load_workbook", _no)
+    r = _subir(_libro_con(textos_compartidos=3_000_000, nombre_textos="xl/strings.xml"))
+    assert r.status_code == 400, r.text[:300]
+    assert "textos" in r.json()["detail"], r.json()
+
+
+def _con_libro_senuelo(contenido: bytes) -> bytes:
+    """El libro real pasa a xl/real.xml (Content_Types y _rels/.rels apuntan
+    ahí) y queda un xl/workbook.xml señuelo con una sola hoja."""
+    entrada = zipfile.ZipFile(io.BytesIO(contenido))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for info in entrada.infolist():
+            datos = entrada.read(info.filename)
+            nombre = info.filename
+            if nombre == "xl/workbook.xml":
+                nombre = "xl/real.xml"
+            elif nombre == "xl/_rels/workbook.xml.rels":
+                nombre = "xl/_rels/real.xml.rels"
+            elif nombre in ("[Content_Types].xml", "_rels/.rels"):
+                datos = datos.replace(b"/xl/workbook.xml", b"/xl/real.xml").replace(
+                    b'Target="xl/workbook.xml"', b'Target="xl/real.xml"')
+            z.writestr(nombre, datos)
+        # El señuelo: el mismo índice con una sola hoja.
+        import re as _re
+        senuelo = entrada.read("xl/workbook.xml").decode()
+        hojas = _re.findall(r"<sheet [^>]*/>", senuelo)
+        for h in hojas[1:]:
+            senuelo = senuelo.replace(h, "")
+        z.writestr("xl/workbook.xml", senuelo)
+        z.writestr("xl/_rels/workbook.xml.rels", entrada.read("xl/_rels/workbook.xml.rels"))
+    return buf.getvalue()
+
+
+def test_un_libro_senuelo_no_engana_a_la_validacion_ni_a_la_lectura():
+    import openpyxl
+    from proyecto_maria.security import file_security
+
+    libro = _con_libro_senuelo(_libro_normal({"Factura": FILAS, "B": [["x"]], "C": [["y"]]}))
+    # openpyxl abre el libro real (3 hojas); la validación cuenta las mismas.
+    assert len(openpyxl.load_workbook(io.BytesIO(libro), read_only=True).sheetnames) == 3
+    assert file_security._abrir_excel(libro, ".xlsx") == 3
+    # La copia para leer deja una sola hoja en el libro que openpyxl abre.
+    copia, _ = main._xlsx_solo_primera_hoja(libro)
+    assert openpyxl.load_workbook(io.BytesIO(copia), read_only=True).sheetnames == ["Factura"]
+
+
+def test_una_combinada_con_cantidad_y_precio_no_duplica_el_producto():
+    """Proforma china: un producto en dos filas (la segunda sigue la
+    descripción) con NCM, origen, cantidad, precio y peso combinados. El FOB
+    no se duplica: los números no se copian hacia abajo."""
+    r = _subir(_libro([
+        ENCABEZADO,
+        ["84713000", "Notebook 14 pulgadas", "China", 10, 500, 20],
+        [None, "con cargador y funda", None, None, None, None],
+        ["84714900100D", "Equipo", "China", 1, 120, 1],
+    ], combinar=("A2:A3", "C2:C3", "D2:D3", "E2:E3", "F2:F3")))
+    assert r.status_code == 200, r.text[:300]
+    items = r.json()["items"]
+    fob = sum(i["cantidad"] * i["valor_unitario"] for i in items)
+    assert fob == 5120, items
+
+
+def test_un_encabezado_en_dos_filas_combinadas_no_da_un_producto_fantasma():
+    r = _subir(_libro([
+        ["FACTURA"],
+        [],
+        ["NCM", "Descripción", "Pais de origen", "Cantidad", "Precio Unitario", "Peso Neto"],
+        [None, None, None, None, "USD", "kg"],
+        ["84798999900H", "MAQUINA DEMO", "Argentina", 1, 5000, 1220],
+    ], combinar=("A3:A4", "B3:B4", "C3:C4", "D3:D4")))
+    assert r.status_code == 200, r.text[:300]
+    assert [i["descripcion"] for i in r.json()["items"]] == ["MAQUINA DEMO"], r.json()["items"]
+
+
+def test_un_texto_enorme_arriba_no_traba_la_busqueda_del_encabezado():
+    """Celdas de las primeras filas que apuntan a un texto de casi 10 MB: la
+    búsqueda del encabezado no las mira (antes, ~2 s por celda)."""
+    enorme = "x" * 9_000_000
+    filas = [[enorme] * 4 for _ in range(31)] + [ENCABEZADO, ["84798999900H", "MAQUINA", "Argentina", 1, 5, 1]]
+    t0 = time.monotonic()
+    import pandas as pd
+    df = main._con_encabezado(pd.DataFrame(filas[1:], columns=filas[0] + [None] * 2))
+    assert time.monotonic() - t0 < 3
+    assert df is not None
+
+
+def test_con_mapeo_del_cliente_el_pie_no_se_toma_como_encabezado():
+    """El encabezado del cliente no tiene nombres conocidos («Part, Goods»)
+    pero su mapeo guardado sí los reconoce: no se busca otra fila, y un pie
+    con «Peso Neto | Valor» no pasa a ser el encabezado."""
+    import pandas as pd
+    df = pd.DataFrame(
+        [["84798999900H", "MAQUINA", 1, 5000, "AR"], ["84714900100D", "EQUIPO", 2, 10, "CN"],
+         ["Bultos", "Peso Neto", "Valor", None, None]],
+        columns=["Part", "Goods", "Qty", "Unit USD", "Made"])
+    conocidas = {"Part", "Goods", "Qty", "Unit USD", "Made"}
+    assert list(main._con_encabezado(df, conocidas).columns) == list(df.columns)
+
+
+@pytest.mark.parametrize("nombre, texto, crudo, esperado", [
+    ("utf-8 con un byte latin-1", "descripcion,ncm\nCafé {m},0901.21.00\n", "\xe9", "Café"),
+    ("BOM y un byte latin-1", "﻿descripcion,ncm\nCafé {m},0901.21.00\n", "\xe9", "Café"),
+])
+def test_un_csv_utf8_con_un_byte_raro_no_se_rompe_entero(nombre, texto, crudo, esperado):
+    marca = uuid.uuid4().hex[:8]
+    contenido = texto.format(m=marca).encode("utf-8") + f"Té {marca}x,0902.10.00\n".replace("é", crudo).encode("latin-1")
+    df = main._leer_tabla(contenido, "historial.csv")
+    assert list(df.columns) == ["descripcion", "ncm"], (nombre, list(df.columns))
+    assert df["descripcion"][0] == f"{esperado} {marca}", (nombre, df["descripcion"][0])
+
+
+def test_el_separador_no_cuenta_lo_que_va_entre_comillas():
+    df = main._leer_tabla('"desc, larga";ncm\n"Cafe, molido";0901.21.00\n'.encode(), "historial.csv")
+    assert list(df.columns) == ["desc, larga", "ncm"], list(df.columns)
+
+
+@pytest.mark.parametrize("cuit", ["2O111111112", "abc", "20111111112​", "2011111111"])
+def test_el_cuit_del_despachante_va_solo_con_11_digitos(cuit):
+    assert "CUIT del despachante" in _errores(_generar(cuit_agr=cuit))
+
+
+def test_el_cuit_del_despachante_con_guiones_se_normaliza():
+    r = _generar(cuit_agr="20-11111111-2")
+    assert r.status_code == 200, r.text[:300]
+    assert "CDDTAGR=20111111112" in r.json()["content"]
+
+
+@pytest.mark.parametrize("cambio", [
+    {"items": [[1]]}, {"items": ["x"]}, {"items": [None]},
+    {"item": {"subitems": 5}}, {"item": {"subitems": "abc"}}, {"item": {"subitems": [[1, 2]]}},
+])
+def test_productos_mal_formados_dan_400(cambio):
+    r = _generar(**cambio)
+    assert r.status_code == 400, r.text[:300]
+
+
+def test_una_hoja_que_falta_en_el_archivo_da_400():
+    entrada = zipfile.ZipFile(io.BytesIO(_libro_normal({"Factura": FILAS})))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        for info in entrada.infolist():
+            if info.filename != "xl/worksheets/sheet1.xml":
+                z.writestr(info.filename, entrada.read(info.filename))
+    r = _subir(buf.getvalue())
+    assert r.status_code == 400, r.text[:300]
+    assert "dev_detail" not in r.json()
