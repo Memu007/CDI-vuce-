@@ -110,20 +110,25 @@ def montos_fuera_de_rango(items, cabecera: dict) -> list:
         total = _numero_o_none(item.get("valor_total"))
         peso_kg = _numero_o_none(item.get("peso_kg"))
         peso_unitario = _numero_o_none(item.get("peso_unitario"))
-        if _fuera_de_rango(cantidad):
+        # Con la cantidad mala, valor y peso se miran solos: si no, el error
+        # nombraba también los que estaban bien (devolución de EXCEL-2).
+        cantidad_mala = _fuera_de_rango(cantidad)
+        por = None if cantidad_mala else cantidad
+        if cantidad_mala:
             errores.append(f"Item {n}: Cantidad inválida")
-        if _fuera_de_rango(cantidad, valor) or _fuera_de_rango(total):
+        if _fuera_de_rango(por, valor) or _fuera_de_rango(total):
             errores.append(f"Item {n}: Valor inválido")
-        if _fuera_de_rango(peso_kg) or _fuera_de_rango(cantidad, peso_unitario):
+        if _fuera_de_rango(peso_kg) or _fuera_de_rango(por, peso_unitario):
             errores.append(f"Item {n}: Peso inválido")
         for m, sub in enumerate(item.get("subitems") or [], start=1):
             if not isinstance(sub, dict):
                 continue
             sub_cant = _numero_o_none(sub.get("cantidad"))
             sub_valor = _numero_o_none(sub.get("valor_unitario"))
-            if _fuera_de_rango(sub_cant):
+            sub_mala = _fuera_de_rango(sub_cant)
+            if sub_mala:
                 errores.append(f"Item {n}, sub-ítem {m}: Cantidad inválida")
-            if _fuera_de_rango(sub_cant, sub_valor):
+            if _fuera_de_rango(None if sub_mala else sub_cant, sub_valor):
                 errores.append(f"Item {n}, sub-ítem {m}: Valor inválido")
     for campo, nombre in _IMPORTES_DE_LA_CABECERA:
         valor = cabecera.get(campo)
