@@ -107,3 +107,39 @@ en `QARTKGRNET`; un caso que hoy suma 10,01 da 10,00; los dos archivos reales
 salen idénticos; suite completa en verde.
 
 **Después:** MARIA-6 cuando lleguen los archivos reales del despachante.
+
+## Siguiente, apenas entregues — CATALOGO-NCM-1: el catálogo NCM vigente
+
+Escrita el 2026-10-07, 14:05 UTC, mientras la PM revisa MARIA-5. Si el
+veredicto de MARIA-5 trae devolución, la devolución va primero. Sale de la D21
+de la Dev 1: Emi trajo el archivo.
+
+**Base:** tu rama (con MARIA-5).
+
+**Datos:** `docs/pm/datos/arancel_ARCA_07102026.zip` (procedencia y SHA-256 en
+`docs/pm/datos/LEEME.md`). Adentro está `nomenclador_07102026.txt`: 10.504 NCM
+contra los 10.226 de hoy, con 800 altas y 522 bajas (la PM lo leyó con
+`parse_arca_nomenclador`). Ya trae 8517.13.00, 8524 y 8549, y saca 8517.12.31.
+
+**Alcance:**
+1. Regenerar `proyecto_maria/data/ncm_arca.csv.gz` y su metadata con
+   `scripts/import_arancel_nomenclador.py --archive
+   docs/pm/datos/arancel_ARCA_07102026.zip --updated-at 2026-10-07`. La
+   metadata dice de dónde vino (Emi, por el chat; `source_url` de ARCA) y
+   el SHA-256.
+2. **Una NCM dada de baja** (estaba en el de 2018 y no está en el vigente:
+   operaciones viejas, historial, productos aprendidos) no avisa sólo «no
+   está en el catálogo»: dice que esa posición ya no existe y que hay que
+   buscar la nueva. Sigue siendo aviso, no freno.
+3. `proyecto_maria/data/ncm_mercosur.csv` (`LEGACY_CSV`): 11 de sus 22
+   códigos no existen en el vigente (por ejemplo 84713010, 85171200,
+   85176990). Mirá para qué se usa y corregilo o sacalo; si no es obvio, D.
+
+**Fuera de alcance:** los sufijos (`sufijos_07102026.txt`) son para MARIA-6.
+
+**Criterios:** rojo antes y verde después (8517.13.00 está; 8517.12.31 avisa
+que se dio de baja); `test_ncm_catalog.py` al día; los dos archivos reales
+siguen idénticos (sus NCM, 8471.49.00 y 8479.89.99, están en el vigente); la
+sugerencia de NCM no propone posiciones dadas de baja sin decirlo; suite
+completa en verde.
+
