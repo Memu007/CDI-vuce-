@@ -22,7 +22,7 @@ function falla(msg) { console.error('FALLA: ' + msg); process.exit(1); }
   await page.waitForSelector('#uploadFileInput', { state: 'attached' });
   await page.setInputFiles('#uploadFileInput', process.argv[2]);
 
-  await page.locator('#toastHost', { hasText: FLETE }).waitFor({ timeout: 10000 }).catch(() => falla('el aviso de la subida no nombra el flete'));
+  await page.locator('#toastHost .toast', { hasText: FLETE }).waitFor({ timeout: 10000 }).catch(() => falla('el aviso de la subida no nombra el flete'));
   console.log('OK aviso de la subida');
 
   const lista = page.locator('.semaforo-list');
