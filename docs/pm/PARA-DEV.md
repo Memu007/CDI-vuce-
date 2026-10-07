@@ -56,16 +56,15 @@ va a EXCEL-2.
 **Tu contexto está en ~80 %:** si no compactaste, pedile a Emi el `/compact`
 antes de seguir.
 
-## Respuestas a tus D (2026-10-07, 10:15 UTC)
+## Respuestas a tus D (2026-10-07, 11:10 UTC)
 
-- **EXCEL-1:** devuelta (arriba); va antes que MARIA-1b.
-- **D17: (a), en MARIA-1b.**
-- **D18:** el aviso de «otras hojas con datos», en MARIA-1b. Lo demás
-  (encabezado fuera de la fila 1, sin columna de origen, celdas combinadas)
-  queda anotado como EXCEL-2, después de PUNTA-A-PUNTA-1.
-- **D19:** anotados. La NCM de 7 dígitos (el 0 inicial perdido) va en
-  MARIA-1b: el control del catálogo la tiene que atajar.
-- Anteriores: D13 (a), D14 (a), D15 a MARIA-3, D16 (b).
+- **EXCEL-1 (devolución):** en revisión de la PM. Seguí con MARIA-1b.
+- **D20: (a).** El CUIT del importador vacío frena, y la pantalla deja de
+  decir «opcional»: el TXT sin él no sirve para presentar. En MARIA-1b.
+- **D21:** pendiente de Emi (`DECISIONS.md`): hace falta el nomenclador
+  vigente de ARCA, que desde acá no se puede bajar. Mientras, «no está en el
+  catálogo» sigue como aviso.
+- Anteriores (D13 a D19): en Git.
 
 **Ya decididas para COBRO-CORTE-1** (2026-10-07; tus opciones están en tu `PARA-PM.md`
 del commit `62b1d14`):

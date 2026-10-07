@@ -60,16 +60,20 @@ antes de cerrar la Fase 3.
    facturación de Google.
 3. **Despachante:** recordarle los archivos reales (favor 1). Ya respondió
    todas las preguntas.
-4. **Hasta publicar MARIA-1a: revisar el país de origen de cada TXT** antes
+4. **Catálogo NCM de 2018** (D21 de la Dev 1): le falta la enmienda de 2022
+   (por ejemplo, 8517.13.00, teléfonos). Para actualizarlo hace falta el
+   nomenclador vigente de ARCA, que desde acá no se puede bajar: ¿lo bajás vos
+   o se lo pedís al despachante?
+5. **Hasta publicar MARIA-1a: revisar el país de origen de cada TXT** antes
    de mandárselo al despachante. El código publicado corta el país a dos
    letras: si la lectura devuelve «CHN» o «China», sale Suiza.
-5. **Límite de uso de la cuenta:** el 2026-10-07 entre las ~02:05 y las
+6. **Límite de uso de la cuenta:** el 2026-10-07 entre las ~02:05 y las
    03:40 UTC las Devs quedaron paradas porque la cuenta llegó a su límite de
    5 horas («You've hit your session limit»). Lo más barato para que no se
    repita: pegar el `/compact` de cada Dev apenas se pueda (están en ~38 % y
    ~41 %; cada paso relee todo el contexto). Si vuelve a pasar, Emi decide
    entre aceptar las pausas o bajar el ritmo.
-6. **Hasta la primera publicación:** en `main` sigue la regla vieja que manda
+7. **Hasta la primera publicación:** en `main` sigue la regla vieja que manda
    «push a `main`» a otros asistentes. No pedirle a ningún asistente cambios
    sobre `main`.
 
