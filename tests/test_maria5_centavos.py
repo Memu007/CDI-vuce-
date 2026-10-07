@@ -39,8 +39,11 @@ def test_el_flete_de_diez_suma_diez():
 @pytest.mark.parametrize("semilla", range(40))
 def test_cualquier_reparto_cierra(semilla):
     azar = random.Random(semilla)
-    items = [_item(round(azar.uniform(0.01, 5000), 2), cantidad=azar.randint(1, 7))
-             for _ in range(azar.randint(1, 9))]
+    # Unitarios con tres decimales: líneas con fracciones de centavo.
+    items = []
+    for _ in range(azar.randint(1, 9)):
+        cantidad = azar.randint(1, 7)
+        items.append(_item(1, cantidad=cantidad, valor_unitario=round(azar.uniform(0.001, 900), 3)))
     txt = _gen("OP_AZAR", items, flete=round(azar.uniform(0, 999), 2), seguro=round(azar.uniform(0, 99), 2))
     _cierra(txt)
 
