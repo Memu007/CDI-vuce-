@@ -73,10 +73,11 @@ Archivos abiertos por Dev:
 
 ## En curso
 
-- **Dev 1:** EXCEL-2 entregada (`3e6e63e`, D27), en revisión: rojo antes
-  (`43 failed, 8 passed`) y suite (`1277 passed, 102 skipped, 3 xfailed`)
-  hechos; falta el subagente. Ahora GUARDAR-1 (Emi dijo que sí). COBRO-MP-1,
-  en pausa en `83b4ec1` con D28 a D31 contestadas (`074a50b`).
+- **Dev 1:** GUARDAR-1 (Emi dijo que sí; está en producción). Después, la
+  devolución de EXCEL-2 (devuelta sobre `3e6e63e` a las 19:45 UTC por seis
+  puntos; tres rompen: una combinada gigante traba la lectura, una
+  combinada con texto duplica el FOB, el tope de estilos no protege la
+  memoria; D27 (a)). Después, COBRO-MP-1, en pausa en `18a1850`.
 - **Dev 2:** MARIA-5 y CATALOGO-NCM-1 devueltas sobre `6854f34` (19:30 UTC) por seis puntos chicos: una columna «Peso por caja» le gana a «Peso», el bruto «unitario» se lee como neto, aviso de dos pesos sin números, una pantalla en rojo, la baja con aviso doble y sin catálogo errores inventados. Sigue: SUBITEMS-1 (Emi: sus facturas traen subítems) y MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
   RENDIMIENTO-1 y 1b (`ec3d793`), MARIA-1a, 2b, 1c, 4, 3 y 1d (`9679e21`).
