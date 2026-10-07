@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · fix: la factura bien leída (MARIA-1a)
+
+- **fix(pdf):** el país de origen ya no se corta a dos letras (`CHN` salía Suiza y `MEX` Montenegro): se reconocen dos letras, tres letras (tabla ISO 3166-1 generada contra la tabla oficial VUCE) y el nombre; lo que no se reconoce queda vacío. Cantidades, precios, pesos, flete y seguro con coma bien leídos (`1,500` sólo es mil quinientos si la factura usa el punto como decimal). Lo que falta queda vacío: nada de peso 0,5, cantidad 1 ni origen del vendedor. Las dos copias del lector.
+
 ## 2026-10-07 · fix: lo que quedó de ADMIN-1 (ADMIN-2)
 
 - **fix(permisos):** `/api/system/connectors` le da al usuario común sólo el modo de cada conector (lo que usa el chip «Sistema/Demo»); direcciones, claves, CUIT y certificado, sólo al admin. `cohort-retention` deja de pedir además el rol: entra el admin por `ADMIN_USERNAMES`.

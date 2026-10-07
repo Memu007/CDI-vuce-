@@ -1938,6 +1938,109 @@ def lectura_automatica_disponible() -> bool:
     return flag_raw in ('1', 'true', 'yes', 'on') and bool((os.environ.get('GEMINI_API_KEY') or '').strip())
 
 
+# --- Lectura de datos de la factura (MARIA-1a) ---------------------------
+# Un dato que no se puede leer con certeza queda vacío: nada adivinado. El
+# semáforo de la pantalla avisa lo que falta (origen, cantidad, peso).
+
+def _iso2_por_codigo_maria() -> dict:
+    from proyecto_maria.core.maria_generator import PAISES_INDEC
+    from proyecto_maria.core.paises_iso3 import ISO3_A_ISO2
+
+    iso = set(ISO3_A_ISO2.values())
+    por_codigo = {}
+    for clave, codigo in PAISES_INDEC.items():
+        if len(clave) == 2 and clave.isalpha() and clave.isupper():
+            if codigo not in por_codigo or clave in iso:
+                por_codigo[codigo] = clave
+    return por_codigo
+
+
+def _origen_desde_factura(raw) -> str:
+    """País leído de la factura → código de dos letras de la tabla oficial
+    VUCE, o "" si no se reconoce. Acepta dos letras, tres letras (ISO 3166-1)
+    y el nombre ("China", "P.R. China")."""
+    from proyecto_maria.core.maria_generator import get_pais_codigo, pais_reconocido
+    from proyecto_maria.core.paises_iso3 import ISO3_A_ISO2
+
+    texto = str(raw or '').strip()
+    if not texto or texto.isdigit():
+        return ''
+    mayus = texto.upper()
+    if len(mayus) == 2 and mayus.isalpha():
+        return mayus if pais_reconocido(mayus) else ''
+    if len(mayus) == 3 and mayus in ISO3_A_ISO2:
+        return ISO3_A_ISO2[mayus]
+    if pais_reconocido(texto):
+        return _iso2_por_codigo_maria().get(get_pais_codigo(texto), '')
+    return ''
+
+
+def _separador_decimal(texto: str):
+    """'.' o ',' si el número muestra sin dudas su separador decimal; None si
+    no (sin separador, o un único separador seguido de tres dígitos)."""
+    t = re.sub(r'[^0-9.,]', '', texto)
+    if '.' in t and ',' in t:
+        return '.' if t.rfind('.') > t.rfind(',') else ','
+    for sep in ('.', ','):
+        partes = t.split(sep)
+        if len(partes) == 2 and partes[0] and len(partes[1]) not in (0, 3):
+            return sep
+        if len(partes) == 2 and partes[0].strip('0') == '' and partes[1]:
+            return sep  # 0,125 / 0.125: no hay miles que separar
+        if len(partes) > 2:
+            return ',' if sep == '.' else '.'  # 1.234.567 → el punto separa miles
+    return None
+
+
+def _decimal_de_la_factura(valores) -> str | None:
+    """Separador decimal que usa la factura, mirando todos sus números escritos
+    como texto. None si no hay pistas o se contradicen."""
+    vistos = {_separador_decimal(v) for v in valores if isinstance(v, str)}
+    vistos.discard(None)
+    return vistos.pop() if len(vistos) == 1 else None
+
+
+def _numero_factura(raw, decimal: str | None):
+    """Número leído de la factura, o None si falta o no se puede saber.
+    `decimal` es el separador decimal de la factura ('.', ',' o None)."""
+    if isinstance(raw, bool) or raw is None:
+        return None
+    if isinstance(raw, (int, float)):
+        return float(raw)
+    t = re.sub(r'[^0-9.,\-]', '', str(raw))
+    if not re.search(r'\d', t):
+        return None
+    propio = _separador_decimal(t)
+    if '.' in t and ',' in t:
+        miles = ',' if propio == '.' else '.'
+        t = t.replace(miles, '').replace(propio, '.')
+    elif '.' in t or ',' in t:
+        sep = '.' if '.' in t else ','
+        partes = t.split(sep)
+        if len(partes) > 2:
+            if not all(len(p) == 3 for p in partes[1:]):
+                return None
+            t = ''.join(partes)
+        elif propio == sep:
+            t = t.replace(sep, '.')
+        elif decimal is None:
+            return None  # «1,500» o «1.500» sin otra pista: no se adivina
+        else:
+            t = t.replace(sep, '.') if decimal == sep else t.replace(sep, '')
+    try:
+        return float(t)
+    except ValueError:
+        return None
+
+
+def _valores_numericos(result: dict) -> list:
+    operacion = result.get('operacion') or {}
+    valores = [operacion.get('flete'), operacion.get('seguro')]
+    for it in result.get('items') or []:
+        valores += [it.get('cantidad'), it.get('valor_unitario'), it.get('peso_kg')]
+    return valores
+
+
 def _extract_with_gemini_vision(data: bytes) -> list[dict]:
     """
     Extract PDF items using Gemini API for image-based PDFs with fallback cascade.
@@ -2029,7 +2132,7 @@ Para CADA línea de la tabla de productos, extrae:
 - descripcion: Nombre del producto (2-5 palabras, SIN medidas, SIN códigos)
 - cantidad: Número de unidades (fix formato brasileño: 1.000 -> 1000)
 - valor_unitario: Precio por unidad (fix: 0,50 -> 0.50)
-- peso_kg: Peso en kg (estimar 0.5 si no aparece)
+- peso_kg: Peso en kg (0 si no aparece; no estimar)
 - origen: Código país origen (CN, BR, US, etc.)
 
 🔍 EXTRACCIÓN DE CÓDIGOS (IMPORTANTE):
@@ -2127,6 +2230,9 @@ IMPORTANTE:
                     
                     result = json.loads(response_text)
                     
+                    # Separador decimal que usa la factura (MARIA-1a)
+                    decimal = _decimal_de_la_factura(_valores_numericos(result))
+
                     # Extraer datos de operación
                     operacion = result.get('operacion', {})
                     operacion_data = {
@@ -2134,39 +2240,26 @@ IMPORTANTE:
                         'fecha_emision': str(operacion.get('fecha_emision', '')),
                         'vendedor_nombre': str(operacion.get('vendedor_nombre', '')),
                         'vendedor_id': str(operacion.get('vendedor_id', '')),
-                        'vendedor_pais': str(operacion.get('vendedor_pais', 'BR'))[:2].upper(),
+                        'vendedor_pais': _origen_desde_factura(operacion.get('vendedor_pais')),
                         'vendedor_direccion': str(operacion.get('vendedor_direccion', '')),
                         'comprador_nombre': str(operacion.get('comprador_nombre', '')),
                         'comprador_cuit': _normalize_argentine_cuit(operacion.get('comprador_cuit', '')),
                         'moneda': str(operacion.get('moneda', 'DOL'))[:3].upper(),
                         'incoterm': str(operacion.get('incoterm', 'FOB'))[:3].upper(),
-                        'flete': float(operacion.get('flete', 0) or 0),
-                        'seguro': float(operacion.get('seguro', 0) or 0),
+                        'flete': _numero_factura(operacion.get('flete'), decimal) or 0.0,
+                        'seguro': _numero_factura(operacion.get('seguro'), decimal) or 0.0,
                         'comprador_domicilio': str(operacion.get('comprador_domicilio', '')),
                     }
                     
                     # Extraer items
                     items = []
                     for item_data in result.get('items', []):
-                        # Clean and validate quantities and prices
-                        raw_cantidad = str(item_data.get('cantidad', '1'))
-                        raw_precio = str(item_data.get('valor_unitario', '0'))
-                        raw_peso = str(item_data.get('peso_kg', '0.5'))
-                        
-                        # Clean Brazilian format: remove dots, convert commas to dots
-                        cantidad_clean = raw_cantidad.replace('.', '').replace(',', '.')
-                        precio_clean = raw_precio.replace('.', '').replace(',', '.')
-                        
+                        # Lo que falta o no se puede saber queda vacío (0):
+                        # el semáforo lo marca. Nada de 1 ni de 0,5 (MARIA-1a).
                         try:
-                            cantidad = float(cantidad_clean) if cantidad_clean.replace('.', '').isdigit() else 1.0
-                            precio = float(precio_clean) if precio_clean else 0.0
-                            peso = float(raw_peso) if raw_peso else 0.5
-                            
-                            # Validate reasonable ranges
-                            if cantidad > 99999:
-                                cantidad = cantidad / 1000
-                            if precio > 999999:
-                                precio = precio / 1000
+                            cantidad = _numero_factura(item_data.get('cantidad'), decimal) or 0.0
+                            precio = _numero_factura(item_data.get('valor_unitario'), decimal) or 0.0
+                            peso = _numero_factura(item_data.get('peso_kg'), decimal) or 0.0
                             
                             # Extract description
                             descripcion = item_data.get('descripcion', '')
@@ -2175,7 +2268,7 @@ IMPORTANTE:
                             if descripcion and version:
                                 descripcion = f"{descripcion} {version}"
                             elif not descripcion:
-                                descripcion = version or "Producto"
+                                descripcion = version or ""
                             
                             # Extract HS Code (pieza)
                             pieza = str(item_data.get('pieza', '') or '').strip()
@@ -2192,10 +2285,10 @@ IMPORTANTE:
                                 'codigo_parte': codigo_parte[:20] if codigo_parte else "",
                                 'pieza': "",  # NCM siempre vacío - el despachante lo completa manualmente
                                 'descripcion': descripcion[:100],
-                                'origen': str(item_data.get('origen', operacion_data['vendedor_pais']))[:2].upper(),
+                                'origen': _origen_desde_factura(item_data.get('origen')),
                                 'cantidad': cantidad,
                                 'valor_unitario': precio,
-                                'peso_unitario': peso if peso > 0 else 0.5,
+                                'peso_unitario': peso if peso > 0 else 0.0,
                                 'order_index': len(items),
                                 'tariff_group': '',  # Vacío porque no hay NCM
                                 'vision_model': model_name
@@ -2274,7 +2367,7 @@ Para CADA línea de la tabla de productos, extrae:
 - descripcion: Nombre del producto (2-5 palabras, SIN medidas)
 - cantidad: Número de unidades
 - valor_unitario: Precio por unidad
-- peso_kg: Peso en kg (estimar 0.5 si no aparece)
+- peso_kg: Peso en kg (0 si no aparece; no estimar)
 - origen: Código país origen (CN, BR, US, etc.)
 
 ═══════════════════════════════════════════════════════════════════
@@ -2330,6 +2423,9 @@ IMPORTANTE:
                         import json
                         result = json.loads(response_text)
                         
+                        # Separador decimal que usa la factura (MARIA-1a)
+                        decimal = _decimal_de_la_factura(_valores_numericos(result))
+
                         # Extraer datos de operación
                         operacion = result.get('operacion', {})
                         operacion_data = {
@@ -2337,14 +2433,14 @@ IMPORTANTE:
                             'fecha_emision': str(operacion.get('fecha_emision', '')),
                             'vendedor_nombre': str(operacion.get('vendedor_nombre', '')),
                             'vendedor_id': str(operacion.get('vendedor_id', '')),
-                            'vendedor_pais': str(operacion.get('vendedor_pais', 'CN'))[:2].upper(),
+                            'vendedor_pais': _origen_desde_factura(operacion.get('vendedor_pais')),
                             'vendedor_direccion': str(operacion.get('vendedor_direccion', '')),
                             'comprador_nombre': str(operacion.get('comprador_nombre', '')),
                             'comprador_cuit': _normalize_argentine_cuit(operacion.get('comprador_cuit', '')),
                             'moneda': str(operacion.get('moneda', 'DOL'))[:3].upper(),
                             'incoterm': str(operacion.get('incoterm', 'FOB'))[:3].upper(),
-                            'flete': float(operacion.get('flete', 0) or 0),
-                            'seguro': float(operacion.get('seguro', 0) or 0),
+                            'flete': _numero_factura(operacion.get('flete'), decimal) or 0.0,
+                            'seguro': _numero_factura(operacion.get('seguro'), decimal) or 0.0,
                             'comprador_domicilio': str(operacion.get('comprador_domicilio', '')),
                         }
                         
@@ -2352,17 +2448,19 @@ IMPORTANTE:
                         items = []
                         for item_data in result.get('items', []):
                             try:
-                                cantidad = float(item_data.get('cantidad', 1) or 1)
-                                precio = float(item_data.get('valor_unitario', 0) or 0)
-                                peso = float(item_data.get('peso_kg', 0.5) or 0.5)
+                                # Lo que falta o no se puede saber queda vacío
+                                # (0): el semáforo lo marca (MARIA-1a).
+                                cantidad = _numero_factura(item_data.get('cantidad'), decimal) or 0.0
+                                precio = _numero_factura(item_data.get('valor_unitario'), decimal) or 0.0
+                                peso = _numero_factura(item_data.get('peso_kg'), decimal) or 0.0
                                 
                                 item = {
                                     'pieza': "",
-                                    'descripcion': str(item_data.get('descripcion', 'Producto'))[:100],
-                                    'origen': str(item_data.get('origen', operacion_data['vendedor_pais']))[:2].upper(),
-                                    'cantidad': cantidad if cantidad > 0 else 1,
+                                    'descripcion': str(item_data.get('descripcion') or '')[:100],
+                                    'origen': _origen_desde_factura(item_data.get('origen')),
+                                    'cantidad': cantidad if cantidad > 0 else 0.0,
                                     'valor_unitario': precio,
-                                    'peso_unitario': peso if peso > 0 else 0.5,
+                                    'peso_unitario': peso if peso > 0 else 0.0,
                                     'order_index': len(items),
                                     'vision_model': model_name
                                 }
