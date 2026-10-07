@@ -20,6 +20,17 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(rendimiento):** leer el PDF, sacarle el texto, abrirlo para validarlo y pedirle a Gemini un NCM corren en otro hilo: mientras tanto el servidor sigue atendiendo a los demás. La lectura tiene un tiempo máximo (`PDF_READ_TIMEOUT_S`, 120 s) con un error propio (`lectura_pdf_demasiado_larga`) y la pantalla ofrece cargar los productos a mano; la adivinanza del vendedor tiene su tiempo propio (`PDF_VENDOR_TIMEOUT_S`, 15 s) y Gemini el suyo (`NCM_GEMINI_TIMEOUT_S`, 30 s). Las lecturas de PDF usan su propio grupo de hilos (`PDF_READ_WORKERS`, 4).
 - **fix(dependencias):** `PyPDF2` 3.0.1, que se colgaba con un PDF armado, se cambia por su sucesor `pypdf`. Se saca `python-jose` (y con ella `ecdsa`), que nadie usaba: el token de sesión usa `PyJWT`.
+## 2026-10-07 · fix: lo que no se pudo leer de la factura se avisa (MARIA-1c)
+
+- **fix(pdf):** si la factura trae un flete, un seguro o el país del vendedor que no se pudo leer, el lector lo marca (`campos_sin_leer`), la pantalla de subida lo nombra y el semáforo lo sigue mostrando («No pudimos leer el flete de la factura: completalo») hasta que se completa. La pantalla vieja ya no repone cantidad 1 ni origen China.
+
+## 2026-10-07 · fix: Gemini caído o con clave inválida ofrece la carga manual (MARIA-2b)
+
+- **fix(pdf):** si hay clave pero la llamada a Gemini falla (clave inválida, servicio caído o respuesta ilegible), subir un PDF responde el mismo 503 con `code: lectura_automatica_no_disponible` y la pantalla ofrece «Cargar los productos a mano», en vez del engañoso «No se encontró tabla de items». Si Gemini responde sin productos, sigue el 400 de siempre. Las dos copias del lector.
+
+## 2026-10-07 · fix: la factura bien leída (MARIA-1a)
+
+- **fix(pdf):** el país de origen ya no se corta a dos letras (`CHN` salía Suiza y `MEX` Montenegro): se reconocen dos letras, tres letras (tabla ISO 3166-1 generada contra la tabla oficial VUCE) y el nombre; lo que no se reconoce queda vacío. Cantidades, precios, pesos, flete y seguro con coma bien leídos (`1,500` sólo es mil quinientos si la factura usa el punto como decimal). Lo que falta queda vacío: nada de peso 0,5, cantidad 1 ni origen del vendedor. Las dos copias del lector.
 
 ## 2026-10-07 · fix: lo que quedó de ADMIN-1 (ADMIN-2)
 

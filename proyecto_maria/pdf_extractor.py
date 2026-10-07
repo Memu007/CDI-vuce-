@@ -4,6 +4,7 @@ Standalone PDF extraction module for testing
 
 import re
 from collections import OrderedDict
+import functools
 import math
 import os
 import json
@@ -1986,7 +1987,8 @@ MENSAJE_LECTURA_NO_DISPONIBLE = (
 
 
 class LecturaAutomaticaNoDisponible(RuntimeError):
-    """El lector con IA está apagado o falta la clave: no hay ítems leídos."""
+    """No hay lectura automática: el lector con IA está apagado, falta la
+    clave (MARIA-2) o la llamada a Gemini falló (MARIA-2b). No hay ítems."""
 
 
 def lectura_automatica_disponible() -> bool:
@@ -1994,6 +1996,148 @@ def lectura_automatica_disponible() -> bool:
     (una clave hecha sólo de espacios cuenta como que falta)."""
     flag_raw = str(os.environ.get('ENABLE_PDF_LLM_FALLBACK') or 'true').lower()
     return flag_raw in ('1', 'true', 'yes', 'on') and bool((os.environ.get('GEMINI_API_KEY') or '').strip())
+
+
+# --- Lectura de datos de la factura (MARIA-1a) ---------------------------
+# Un dato que no se puede leer con certeza queda vacío: nada adivinado. El
+# semáforo de la pantalla avisa lo que falta (origen, cantidad, peso).
+
+@functools.lru_cache(maxsize=1)
+def _iso2_por_codigo_maria() -> dict:
+    from proyecto_maria.core.maria_generator import PAISES_INDEC
+    from proyecto_maria.core.paises_iso3 import ISO3_A_ISO2
+
+    iso = set(ISO3_A_ISO2.values())
+    por_codigo = {}
+    for clave, codigo in PAISES_INDEC.items():
+        if len(clave) == 2 and clave.isalpha() and clave.isupper():
+            if codigo not in por_codigo or clave in iso:
+                por_codigo[codigo] = clave
+    return por_codigo
+
+
+def _origen_desde_factura(raw) -> str:
+    """País leído de la factura → código de dos letras de la tabla oficial
+    VUCE, o "" si no se reconoce. Acepta dos letras, tres letras (ISO 3166-1)
+    y el nombre ("China", "P.R. China")."""
+    from proyecto_maria.core.maria_generator import get_pais_codigo, pais_reconocido
+    from proyecto_maria.core.paises_iso3 import ISO3_A_ISO2
+
+    texto = str(raw or '').strip()
+    # «NA» en una factura casi siempre es «no aplica», no Namibia.
+    if not texto or texto.isdigit() or texto.upper() in ('NA', 'N/A'):
+        return ''
+    mayus = texto.upper()
+    if len(mayus) == 2 and mayus.isalpha():
+        return mayus if pais_reconocido(mayus) else ''
+    if len(mayus) == 3 and mayus in ISO3_A_ISO2:
+        return ISO3_A_ISO2[mayus]
+    if pais_reconocido(texto):
+        return _iso2_por_codigo_maria().get(get_pais_codigo(texto), '')
+    return ''
+
+
+_MONEDAS = r"(?:U\$S|US\$|R\$|USD|EUR|DOL|ARS|BRL|CNY|[$€£¥])"
+_MONEDA_ADELANTE = re.compile(r"^" + _MONEDAS + r"\s*", re.IGNORECASE)
+# Atrás: moneda o unidad de cuenta. No g ni lb: el peso va en kg.
+_MONEDA_O_CUENTA_ATRAS = re.compile(
+    r"\s*(?:" + _MONEDAS + r"|PCS|PC|UNITS?|UNID|UND|UN|EA|KGS?)\.?$", re.IGNORECASE)
+
+
+def _separador_decimal(texto: str):
+    """'.' o ',' si el número muestra sin dudas su separador decimal; None si
+    no (sin separador, o un único separador seguido de tres dígitos)."""
+    t = re.sub(r'[^0-9.,]', '', texto)
+    if '.' in t and ',' in t:
+        return '.' if t.rfind('.') > t.rfind(',') else ','
+    for sep in ('.', ','):
+        partes = t.split(sep)
+        if len(partes) == 2 and partes[0] and len(partes[1]) not in (0, 3):
+            return sep
+        if len(partes) == 2 and partes[0].strip('0') == '' and partes[1]:
+            return sep  # 0,125 / 0.125: no hay miles que separar
+        if len(partes) > 2:
+            return ',' if sep == '.' else '.'  # 1.234.567 → el punto separa miles
+    return None
+
+
+def _decimal_de_la_factura(valores) -> str | None:
+    """Separador decimal que usa la factura, mirando todos sus números escritos
+    como texto. None si no hay pistas o se contradicen."""
+    vistos = {_separador_decimal(v) for v in valores if isinstance(v, str)}
+    vistos.discard(None)
+    return vistos.pop() if len(vistos) == 1 else None
+
+
+def _numero_factura(raw, decimal: str | None):
+    """Número leído de la factura, o None si falta o no se puede saber.
+    `decimal` es el separador decimal de la factura ('.', ',' o None)."""
+    if isinstance(raw, bool) or raw is None:
+        return None
+    if isinstance(raw, (int, float)):
+        try:
+            valor = float(raw)
+        except OverflowError:
+            return None
+        return valor if math.isfinite(valor) and valor >= 0 else None
+    # Sólo un número limpio, con moneda o unidad de cuenta al lado si la hay:
+    # «12x3», «1/2», «500 g», «lb 5» o «2.5e3» no se adivinan. Mejor vacío
+    # que equivocado.
+    t = _MONEDA_ADELANTE.sub('', str(raw).strip())
+    t = _MONEDA_O_CUENTA_ATRAS.sub('', t).strip()
+    if not re.fullmatch(r"\d{1,3}(?:[ '\u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d[\d.,]*", t):
+        return None
+    t = re.sub(r"[ '\u00a0\u202f]", '', t)
+    propio = _separador_decimal(t)
+    if '.' in t and ',' in t:
+        miles = ',' if propio == '.' else '.'
+        entero, _, decimales = t.rpartition(propio)
+        grupos = entero.split(miles)
+        if propio in entero or not grupos[0] or any(len(g) != 3 for g in grupos[1:]):
+            return None  # «1.2,3» o «1,5.00»: separadores que no cierran
+        t = ''.join(grupos) + '.' + decimales
+    elif '.' in t or ',' in t:
+        sep = '.' if '.' in t else ','
+        partes = t.split(sep)
+        if len(partes) > 2:
+            if not all(len(p) == 3 for p in partes[1:]):
+                return None
+            t = ''.join(partes)
+        elif propio == sep:
+            t = t.replace(sep, '.')
+        elif decimal is None:
+            return None  # «1,500» o «1.500» sin otra pista: no se adivina
+        else:
+            t = t.replace(sep, '.') if decimal == sep else t.replace(sep, '')
+    try:
+        valor = float(t)
+    except ValueError:
+        return None
+    return valor if math.isfinite(valor) else None
+
+
+def _campos_sin_leer(operacion: dict, decimal) -> list:
+    """Campos de la operación que la factura traía pero no se pudieron leer
+    (quedaron en 0 o vacíos). La pantalla los nombra (MARIA-1c). Un dato que
+    no estaba en la factura no se marca."""
+    sin_leer = []
+    for campo in ('flete', 'seguro'):
+        raw = operacion.get(campo)
+        if raw not in (None, '') and _numero_factura(raw, decimal) is None:
+            sin_leer.append(campo)
+    pais = str(operacion.get('vendedor_pais') or '').strip()
+    if pais and pais.upper() not in ('NA', 'N/A') and not _origen_desde_factura(pais):
+        sin_leer.append('vendedor_pais')
+    return sin_leer
+
+
+def _valores_numericos(result: dict) -> list:
+    operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
+    valores = [operacion.get('flete'), operacion.get('seguro')]
+    for it in result.get('items') or []:
+        if isinstance(it, dict):
+            valores += [it.get('cantidad'), it.get('valor_unitario'), it.get('peso_kg')]
+    return valores
 
 
 def _extract_with_gemini_vision(data: bytes) -> list[dict]:
@@ -2012,6 +2156,11 @@ def _extract_with_gemini_vision(data: bytes) -> list[dict]:
         # persona carga los productos a mano (MARIA-2).
         print("⚠️ Gemini Vision disabled or missing API key - lectura automática no disponible")
         raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)
+
+    # Si la llamada a Gemini falla (clave inválida, caído, respuesta
+    # ilegible), la pantalla ofrece la carga manual en vez de decir que no
+    # hay tabla de productos (MARIA-2b).
+    gemini_fallo = False
 
     
     # Try PyMuPDF (fitz) first - faster than pdf2image
@@ -2046,7 +2195,11 @@ def _extract_with_gemini_vision(data: bytes) -> list[dict]:
         
         # Import and configure Gemini
         import google.generativeai as genai
-        genai.configure(api_key=api_key)
+        try:
+            genai.configure(api_key=api_key)
+        except Exception as conf_err:
+            print(f"❌ Gemini configure error: {conf_err}")
+            raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)
         
         # Use all page images (up to 10 pages to avoid token limits)
         images_to_process = page_images[:10]  # Limit to first 10 pages
@@ -2085,9 +2238,9 @@ Para CADA línea de la tabla de productos, extrae:
 - codigo_parte: Código de parte/SKU del proveedor (ej: "77655-KK010", "51672-KK010")
 - pieza: Código HS/NCM (buscar "HS Code:" debajo de la descripción, ej: "HS Code:802730" → "802730")
 - descripcion: Nombre del producto (2-5 palabras, SIN medidas, SIN códigos)
-- cantidad: Número de unidades (fix formato brasileño: 1.000 -> 1000)
-- valor_unitario: Precio por unidad (fix: 0,50 -> 0.50)
-- peso_kg: Peso en kg (estimar 0.5 si no aparece)
+- cantidad: Número de unidades, copiado tal como aparece en la factura
+- valor_unitario: Precio por unidad, copiado tal como aparece en la factura
+- peso_kg: Peso en kg (0 si no aparece; no estimar)
 - origen: Código país origen (CN, BR, US, etc.)
 
 🔍 EXTRACCIÓN DE CÓDIGOS (IMPORTANTE):
@@ -2185,46 +2338,39 @@ IMPORTANTE:
                     
                     result = json.loads(response_text)
                     
+                    # Separador decimal que usa la factura (MARIA-1a)
+                    decimal = _decimal_de_la_factura(_valores_numericos(result))
+
                     # Extraer datos de operación
-                    operacion = result.get('operacion', {})
+                    operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
                     operacion_data = {
                         'numero_factura': str(operacion.get('numero_factura', '')),
                         'fecha_emision': str(operacion.get('fecha_emision', '')),
                         'vendedor_nombre': str(operacion.get('vendedor_nombre', '')),
                         'vendedor_id': str(operacion.get('vendedor_id', '')),
-                        'vendedor_pais': str(operacion.get('vendedor_pais', 'BR'))[:2].upper(),
+                        'vendedor_pais': _origen_desde_factura(operacion.get('vendedor_pais')),
                         'vendedor_direccion': str(operacion.get('vendedor_direccion', '')),
                         'comprador_nombre': str(operacion.get('comprador_nombre', '')),
                         'comprador_cuit': _normalize_argentine_cuit(operacion.get('comprador_cuit', '')),
                         'moneda': str(operacion.get('moneda', 'DOL'))[:3].upper(),
                         'incoterm': str(operacion.get('incoterm', 'FOB'))[:3].upper(),
-                        'flete': float(operacion.get('flete', 0) or 0),
-                        'seguro': float(operacion.get('seguro', 0) or 0),
+                        'flete': _numero_factura(operacion.get('flete'), decimal) or 0.0,
+                        'seguro': _numero_factura(operacion.get('seguro'), decimal) or 0.0,
                         'comprador_domicilio': str(operacion.get('comprador_domicilio', '')),
                     }
+                    operacion_data['campos_sin_leer'] = _campos_sin_leer(operacion, decimal)
                     
                     # Extraer items
                     items = []
                     for item_data in result.get('items', []):
-                        # Clean and validate quantities and prices
-                        raw_cantidad = str(item_data.get('cantidad', '1'))
-                        raw_precio = str(item_data.get('valor_unitario', '0'))
-                        raw_peso = str(item_data.get('peso_kg', '0.5'))
-                        
-                        # Clean Brazilian format: remove dots, convert commas to dots
-                        cantidad_clean = raw_cantidad.replace('.', '').replace(',', '.')
-                        precio_clean = raw_precio.replace('.', '').replace(',', '.')
-                        
+                        if not isinstance(item_data, dict):
+                            continue
+                        # Lo que falta o no se puede saber queda vacío (0):
+                        # el semáforo lo marca. Nada de 1 ni de 0,5 (MARIA-1a).
                         try:
-                            cantidad = float(cantidad_clean) if cantidad_clean.replace('.', '').isdigit() else 1.0
-                            precio = float(precio_clean) if precio_clean else 0.0
-                            peso = float(raw_peso) if raw_peso else 0.5
-                            
-                            # Validate reasonable ranges
-                            if cantidad > 99999:
-                                cantidad = cantidad / 1000
-                            if precio > 999999:
-                                precio = precio / 1000
+                            cantidad = _numero_factura(item_data.get('cantidad'), decimal) or 0.0
+                            precio = _numero_factura(item_data.get('valor_unitario'), decimal) or 0.0
+                            peso = _numero_factura(item_data.get('peso_kg'), decimal) or 0.0
                             
                             # Extract description
                             descripcion = item_data.get('descripcion', '')
@@ -2233,7 +2379,7 @@ IMPORTANTE:
                             if descripcion and version:
                                 descripcion = f"{descripcion} {version}"
                             elif not descripcion:
-                                descripcion = version or "Producto"
+                                descripcion = version or ""
                             
                             # Extract HS Code (pieza)
                             pieza = str(item_data.get('pieza', '') or '').strip()
@@ -2250,17 +2396,17 @@ IMPORTANTE:
                                 'codigo_parte': codigo_parte[:20] if codigo_parte else "",
                                 'pieza': "",  # NCM siempre vacío - el despachante lo completa manualmente
                                 'descripcion': descripcion[:100],
-                                'origen': str(item_data.get('origen', operacion_data['vendedor_pais']))[:2].upper(),
+                                'origen': _origen_desde_factura(item_data.get('origen')),
                                 'cantidad': cantidad,
                                 'valor_unitario': precio,
-                                'peso_unitario': peso if peso > 0 else 0.5,
+                                'peso_unitario': peso if peso > 0 else 0.0,
                                 'order_index': len(items),
                                 'tariff_group': '',  # Vacío porque no hay NCM
                                 'vision_model': model_name
                             }
                             items.append(item)
                             
-                        except ValueError as e:
+                        except Exception as e:
                             print(f"⚠️ Skipping item due to parsing error: {e}")
                             continue
                     
@@ -2269,9 +2415,13 @@ IMPORTANTE:
                         return {'operacion': operacion_data, 'items': items}
                     else:
                         print(f"⚠️ {model_name} returned no valid items")
+                        gemini_fallo = False  # respondió, sin productos
                         continue  # Try next model
+                else:
+                    gemini_fallo = True  # respuesta vacía o bloqueada
                 
             except Exception as e:
+                gemini_fallo = True
                 print(f"❌ {model_name} Vision error: {e}")
                 if model_idx < len(models_to_try) - 1:
                     print(f"🔄 Trying next model...")
@@ -2332,7 +2482,7 @@ Para CADA línea de la tabla de productos, extrae:
 - descripcion: Nombre del producto (2-5 palabras, SIN medidas)
 - cantidad: Número de unidades
 - valor_unitario: Precio por unidad
-- peso_kg: Peso en kg (estimar 0.5 si no aparece)
+- peso_kg: Peso en kg (0 si no aparece; no estimar)
 - origen: Código país origen (CN, BR, US, etc.)
 
 ═══════════════════════════════════════════════════════════════════
@@ -2388,39 +2538,47 @@ IMPORTANTE:
                         import json
                         result = json.loads(response_text)
                         
+                        # Separador decimal que usa la factura (MARIA-1a)
+                        decimal = _decimal_de_la_factura(_valores_numericos(result))
+
                         # Extraer datos de operación
-                        operacion = result.get('operacion', {})
+                        operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
                         operacion_data = {
                             'numero_factura': str(operacion.get('numero_factura', '')),
                             'fecha_emision': str(operacion.get('fecha_emision', '')),
                             'vendedor_nombre': str(operacion.get('vendedor_nombre', '')),
                             'vendedor_id': str(operacion.get('vendedor_id', '')),
-                            'vendedor_pais': str(operacion.get('vendedor_pais', 'CN'))[:2].upper(),
+                            'vendedor_pais': _origen_desde_factura(operacion.get('vendedor_pais')),
                             'vendedor_direccion': str(operacion.get('vendedor_direccion', '')),
                             'comprador_nombre': str(operacion.get('comprador_nombre', '')),
                             'comprador_cuit': _normalize_argentine_cuit(operacion.get('comprador_cuit', '')),
                             'moneda': str(operacion.get('moneda', 'DOL'))[:3].upper(),
                             'incoterm': str(operacion.get('incoterm', 'FOB'))[:3].upper(),
-                            'flete': float(operacion.get('flete', 0) or 0),
-                            'seguro': float(operacion.get('seguro', 0) or 0),
+                            'flete': _numero_factura(operacion.get('flete'), decimal) or 0.0,
+                            'seguro': _numero_factura(operacion.get('seguro'), decimal) or 0.0,
                             'comprador_domicilio': str(operacion.get('comprador_domicilio', '')),
                         }
+                        operacion_data['campos_sin_leer'] = _campos_sin_leer(operacion, decimal)
                         
                         # Extraer items
                         items = []
                         for item_data in result.get('items', []):
+                            if not isinstance(item_data, dict):
+                                continue
                             try:
-                                cantidad = float(item_data.get('cantidad', 1) or 1)
-                                precio = float(item_data.get('valor_unitario', 0) or 0)
-                                peso = float(item_data.get('peso_kg', 0.5) or 0.5)
+                                # Lo que falta o no se puede saber queda vacío
+                                # (0): el semáforo lo marca (MARIA-1a).
+                                cantidad = _numero_factura(item_data.get('cantidad'), decimal) or 0.0
+                                precio = _numero_factura(item_data.get('valor_unitario'), decimal) or 0.0
+                                peso = _numero_factura(item_data.get('peso_kg'), decimal) or 0.0
                                 
                                 item = {
                                     'pieza': "",
-                                    'descripcion': str(item_data.get('descripcion', 'Producto'))[:100],
-                                    'origen': str(item_data.get('origen', operacion_data['vendedor_pais']))[:2].upper(),
-                                    'cantidad': cantidad if cantidad > 0 else 1,
+                                    'descripcion': str(item_data.get('descripcion') or '')[:100],
+                                    'origen': _origen_desde_factura(item_data.get('origen')),
+                                    'cantidad': cantidad if cantidad > 0 else 0.0,
                                     'valor_unitario': precio,
-                                    'peso_unitario': peso if peso > 0 else 0.5,
+                                    'peso_unitario': peso if peso > 0 else 0.0,
                                     'order_index': len(items),
                                     'vision_model': model_name
                                 }
@@ -2433,22 +2591,34 @@ IMPORTANTE:
                             print(f"✅ Direct PDF extraction: {len(items)} items + operacion with {model_name}")
                             # Retornar como dict con operacion e items
                             return {'operacion': operacion_data, 'items': items}
+                        gemini_fallo = False  # respondió, sin productos
+                    else:
+                        gemini_fallo = True  # respuesta vacía o bloqueada
                 except Exception as model_err:
+                    gemini_fallo = True
                     print(f"❌ {model_name} error: {model_err}")
                     continue
             
             print("❌ All direct PDF models failed")
+            if gemini_fallo:
+                raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)
             return _fallback_image_extraction(data)
             
+        except LecturaAutomaticaNoDisponible:
+            raise
         except Exception as direct_err:
             print(f"❌ Direct PDF extraction failed: {direct_err}")
-            return _fallback_image_extraction(data)
+            raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)
             
+    except LecturaAutomaticaNoDisponible:
+        raise
     except Exception as e:
         print(f"❌ Error converting PDF to image: {e}")
         return _fallback_image_extraction(data)
     
     print("❌ Gemini Vision failed, returning empty")
+    if gemini_fallo:
+        raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)
     return []
 
 

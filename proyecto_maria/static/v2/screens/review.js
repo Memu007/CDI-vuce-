@@ -657,6 +657,15 @@
             value = value.trim();
         }
         op[el.name] = value;
+        // MARIA-1c: un campo que la factura traía sin poder leerse deja de
+        // avisarse cuando la persona escribe un valor (0 incluido) y vuelve a
+        // avisarse si lo borra. La lista del lector no se toca.
+        if (Array.isArray(op.campos_sin_leer) && op.campos_sin_leer.includes(el.name)) {
+            const completados = new Set(op.campos_completados || []);
+            if (String(el.value).trim() !== '') completados.add(el.name);
+            else completados.delete(el.name);
+            op.campos_completados = Array.from(completados);
+        }
 
         // Solo este campo: actualizar hint + error
         updateFieldHint(el.name);
