@@ -37,9 +37,12 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 
   // Escribir el código en el asistente también lo dice (revisión adversaria):
   // la SIM completa se puede asignar, con el aviso; la partida sola, el aviso.
-  for (const [escrito, dice] of [['8517.12.31.000X', /se dio de baja/], ['8517.12', /se dieron de baja/]]) {
+  // Se mira el resultado del código escrito, no la sugerencia de antes.
+  const manual = page.locator('#spotResults .spotlight-item', { hasText: 'Asignar este código manualmente' });
+  const vacio = page.locator('#spotResults .spotlight-empty');
+  for (const [escrito, dice, donde] of [['8517.12.31.000X', /se dio de baja/, manual], ['8517.12', /se dieron de baja/, vacio]]) {
     await page.fill('#spotSearch', escrito);
-    await page.locator('#spotResults', { hasText: dice }).waitFor({ timeout: 10000 })
+    await donde.filter({ hasText: dice }).first().waitFor({ timeout: 10000 })
       .catch(async () => falla('escribir ' + escrito + ' no avisa la baja: ' + await page.locator('#spotResults').innerText()));
   }
   const respuesta = page.waitForResponse(r => r.url().includes('/api/ncm/aviso') && r.url().includes('8471'), { timeout: 10000 });

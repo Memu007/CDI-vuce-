@@ -211,11 +211,9 @@ caso mapeo_manda "${D}test_excel_el_mapeo_guardado_no_le_gana_al_neto"
 reemplazar $M "        if distinto.any():" "        if False:"
 caso excel_sin_aviso_de_diferencia "${D}test_excel_con_dos_pesos_gana_el_de_la_linea[Weight-Net Weight]"
 
-# 31. Excel: un peso en texto en una columna de una unidad saca la fila
-reemplazar $M '    df["peso_unitario"] = peso
-' '    df["peso_unitario"] = df["peso_unitario"]
-'
-caso texto_saca_la_fila "${D}test_un_peso_en_texto_no_saca_la_fila[Peso unitario]"
+# 31. el peso vuelve a leerse sin el separador de la planilla
+reemplazar $M '    peso = numeros(df["peso_unitario"])' '    peso = pd.to_numeric(df["peso_unitario"], errors="coerce")'
+caso peso_sin_separador "${D}test_un_peso_con_coma_se_lee_como_el_resto[Peso total-0.625]"
 
 # 32. el generador sin la guarda del peso
 reemplazar $G "    if not math.isfinite(kilos) or kilos > IMPORTE_MAXIMO:" "    if False:"
@@ -257,7 +255,7 @@ reemplazar $M ' and not normal.startswith("pesos")) or' ') or'
 caso pesos_moneda "${D}test_una_columna_de_pesos_argentinos_no_es_peso"
 
 # 41. «inf» escrito llega a la respuesta
-reemplazar $M '    peso = peso.where(peso.abs() != float("inf"))' '    pass'
+reemplazar $M '        return pd.Series([_numero_factura(v, decimal) for v in serie], index=serie.index, dtype=float)' '        return pd.to_numeric(serie, errors="coerce")'
 caso inf_en_texto "${D}test_un_peso_infinito_en_texto_no_da_500["
 
 # 42. entre dos de una unidad, el mapeo guardado no manda

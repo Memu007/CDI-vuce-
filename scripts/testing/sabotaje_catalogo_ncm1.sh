@@ -125,5 +125,25 @@ rm -f proyecto_maria/data/ncm_mercosur.csv
 reemplazar $C "        return json.loads(path.read_text(encoding=\"utf-8\")).get(\"codigos\") or {}" "        return {}"
 caso sin_bajas "${T}test_una_ncm_dada_de_baja_se_reconoce"
 
+# --- Revisión adversaria ---
+
+# 11. un código parcial vuelve a buscarse por palabras
+reemplazar $C '    if len(code_query) >= 4 and re.fullmatch(r"[\d.\s-]+", raw):' '    if False:'
+caso parcial_por_palabras "${T}test_un_codigo_parcial_busca_por_prefijo_y_no_por_palabras"
+
+# 12. la partida dada de baja no avisa
+reemplazar $C "    if any(c.startswith(digitos) for c in _bajas()):" "    if False:"
+caso partida_sin_aviso "${T}test_el_aviso_de_un_codigo_escrito[8517.12-"
+
+# 13. la partida vigente avisa en falso
+reemplazar $C "    if not vigentes or any(c.startswith(digitos) for c in vigentes):" "    if not vigentes:"
+caso partida_vigente_avisa "${T}test_el_aviso_de_un_codigo_escrito[8471.30-"
+
+# 14. la sugerencia avisa sólo las bajas
+reemplazar $M "        aviso = ncm_catalog.aviso_de_ncm(ncm_key)
+        if aviso:" "        aviso = ncm_catalog.aviso_de_ncm(ncm_key)
+        if ncm_catalog.ncm_de_baja(ncm_key):"
+caso sugerencia_desconocida_sin_aviso "${T}test_una_sugerencia_que_no_esta_en_el_vigente_avisa"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 10 sabotajes dan rojo por la razón esperada"
+echo "OK: los 14 sabotajes dan rojo por la razón esperada"
