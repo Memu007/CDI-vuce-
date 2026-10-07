@@ -25,7 +25,7 @@ USUARIO = {"username": "exc1t", "roles": ["operador"], "effective_owner": "exc1t
 # proveedor: el país por nombre.
 FACTURAS = {
     "maria_golden_anon": dict(
-        ncm="84798999900H",
+        ncm="84798999900H", estado=3,
         items=[dict(descripcion="MAQUINA DEMO", cantidad=1, precio=5000, peso=1220, pais="Argentina")],
         cabecera=dict(operation_id="000999001", moneda="DOL", incoterm="DDP",
                       cuit_agr="20111111112", vendedor_nombre="(00999) PROVEEDOR DEMO S.A.",
@@ -37,7 +37,7 @@ FACTURAS = {
                       aduana_codigo="001", tipo_destinacion="IC04"),
     ),
     "maria_golden_subitems_anon": dict(
-        ncm="84714900100D",
+        ncm="84714900100D", estado=2,
         items=[dict(descripcion="Equipo de demostracion para prueba", cantidad=6,
                     precio=1197.00, peso=33.0, pais="China")],
         cabecera=dict(operation_id="002720126", moneda="DOL", incoterm="EXW",
@@ -83,9 +83,10 @@ def _por_pdf(monkeypatch, factura) -> list:
     return _leer(monkeypatch, "pdf_directo", respuesta)["items"]
 
 
-def _como_la_pantalla(items, ncm) -> list:
-    """buildMariaRequest de finalize.js, después del paso de NCM."""
-    return [dict(pieza=ncm, descripcion=str(it.get("descripcion") or "").strip(),
+def _como_la_pantalla(items, ncm, estado) -> list:
+    """buildMariaRequest de finalize.js, después del paso de NCM y de elegir el
+    estado de la mercadería (MARIA-4)."""
+    return [dict(pieza=ncm, estado=estado, descripcion=str(it.get("descripcion") or "").strip(),
                  origen=(str(it.get("origen") or "").strip().upper() or "XX"),
                  cantidad=float(it["cantidad"]), valor_unitario=float(it["valor_unitario"]),
                  peso_unitario=float(it["peso_unitario"]),
@@ -96,8 +97,8 @@ def _como_la_pantalla(items, ncm) -> list:
 @pytest.mark.parametrize("nombre", sorted(FACTURAS))
 def test_excel_y_pdf_dan_el_mismo_txt(monkeypatch, nombre):
     factura = FACTURAS[nombre]
-    excel = _como_la_pantalla(_por_excel(factura), factura["ncm"])
-    pdf = _como_la_pantalla(_por_pdf(monkeypatch, factura), factura["ncm"])
+    excel = _como_la_pantalla(_por_excel(factura), factura["ncm"], factura["estado"])
+    pdf = _como_la_pantalla(_por_pdf(monkeypatch, factura), factura["ncm"], factura["estado"])
     assert excel == pdf, (excel, pdf)
     txt_excel = generate_maria_txt(items=excel, **factura["cabecera"])
     txt_pdf = generate_maria_txt(items=pdf, **factura["cabecera"])
