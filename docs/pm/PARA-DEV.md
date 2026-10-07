@@ -25,19 +25,40 @@ despertás a ella con el de la suya al entregar o al dejar una D que te frena
 
 ## Último veredicto
 
-**RENDIMIENTO-1b aceptada sobre `ec3d793`** (2026-10-07, con la devolución).
-La PM reprodujo el rojo antes de la devolución sobre `b01149c` (`6 failed`:
-`BUYER`, `CONSIGNEE`, `NOTIFY PARTY`, el nombre sin cortar), la focal con
-RENDIMIENTO-1 (`38 passed`) y la suite con el venv armado sólo desde
-`requirements.txt` (`754 passed, 102 skipped`). La primera revisión ya había
-atacado los PDF armados (`REPRODUCCION-RENDIMIENTO-1b-MARIA-1c-2026-10-07.md`).
-Con dos columnas el vendedor queda vacío: es una de las dos salidas aceptadas.
+**EXCEL-1 devuelta** (2026-10-07, sobre `9cc321e`). La PM reprodujo el rojo
+antes (`46 failed, 8 errors` sobre `ec3d793`), la focal con los archivos
+reales (`116 passed`) y la suite (`897 passed, 102 skipped`). Su subagente
+Sonnet alto: el aislamiento entre cuentas y los números se sostienen. Detalle
+en `REPRODUCCION-EXCEL-1-2026-10-07.md`.
 
-RENDIMIENTO-1 y 1b se integran en la rama de PM después del ensayo, juntas.
+**Devolución** (cada punto con rojo antes y verde después; la devolución va
+antes que MARIA-1b):
+1. **El mapeo aprendido no pisa una columna reconocida.** Con `cliente_id`
+   (la pantalla lo manda siempre), «Valor» aprendido como precio unitario hace
+   que «Precio Unitario» 350 salga 3500; igual «Peso» contra «Peso Neto». Las
+   pruebas tienen que mandar `cliente_id`, como la pantalla.
+2. **Validar un Excel no usa los hilos compartidos:** 12 subidas de un
+   `.xlsx` de 8 MB llevaron una consulta de NCM de 0,4 s a 49 y 62 s. Grupo
+   propio también para validar, y el tamaño descomprimido se mira antes de
+   abrirlo.
+3. **La fila de ejemplo de la plantilla** («Laptop 14 pulgadas modelo X») no
+   entra como producto.
+4. **Un mapeo con dos columnas para el mismo campo** no da 500: se rechaza al
+   guardarlo, o se avisa al subir.
+5. **Lo que llamaba a las rutas borradas:** la pantalla vieja
+   (`static/app.js:939`) dice claro que el Excel se sube en la pantalla nueva;
+   `scripts/testing/smoke_test.sh:269` espera lo que corresponde.
+
+Las filas de total que entran sin NCM ni origen las frena el control antes de
+generar: quedan para MARIA-1b. El CSV con `;` de `/api/ncm/import-historial`
+va a EXCEL-2.
+
+**Tu contexto está en ~80 %:** si no compactaste, pedile a Emi el `/compact`
+antes de seguir.
 
 ## Respuestas a tus D (2026-10-07, 10:15 UTC)
 
-- **EXCEL-1:** en revisión de la PM. Mientras, arrancá MARIA-1b (abajo).
+- **EXCEL-1:** devuelta (arriba); va antes que MARIA-1b.
 - **D17: (a), en MARIA-1b.**
 - **D18:** el aviso de «otras hojas con datos», en MARIA-1b. Lo demás
   (encabezado fuera de la fila 1, sin columna de origen, celdas combinadas)
