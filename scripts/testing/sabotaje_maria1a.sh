@@ -64,9 +64,9 @@ T=tests/test_maria1a_lectura_factura.py
 
 # 1. el país vuelve a cortarse a dos letras (CHN → CH, Suiza)
 reemplazar $F "    texto = str(raw or '').strip()
-    if not texto or texto.isdigit():" "    return str(raw or '')[:2].upper()
+    # «NA» en una" "    return str(raw or '')[:2].upper()
     texto = str(raw or '').strip()
-    if not texto or texto.isdigit():"
+    # «NA» en una"
 caso "corta_a_dos_letras" "'CH', 'ME'"
 
 # 2. sin la tabla de tres letras
@@ -103,5 +103,14 @@ reemplazar $F "- valor_unitario: Precio por unidad
 - peso_kg: Peso en kg (estimar 0.5 si no aparece)"
 caso "prompt_estima_peso" "FAILED $T::test_instrucciones_a_gemini_no_piden_estimar_el_peso"
 
+# 9. vuelve a pegar los dígitos de «12x3» o «500 g»
+reemplazar $F "    if not re.fullmatch(" "    t = re.sub(r'[^0-9.,]', '', t)
+    if not re.fullmatch("
+caso "numero_sucio" "FAILED $T::test_lo_que_no_es_un_numero_limpio_queda_vacio[500 g]"
+
+# 10. «NA» vuelve a ser Namibia
+reemplazar $F "texto.upper() in ('NA', 'N/A')" "texto.upper() in ('N/A',)"
+caso "na_namibia" "FAILED $T::test_na_no_es_namibia"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 8 sabotajes dan rojo por la razón esperada"
+echo "OK: los 10 sabotajes dan rojo por la razón esperada"
