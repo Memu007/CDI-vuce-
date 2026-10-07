@@ -685,7 +685,8 @@
                 '<td class="col-pais"><input class="ncm-edit ncm-edit-pais input input-sm" type="text" list="ncmCountries" value="' + origen + '" data-testid="ncm-origin-input" data-row="' + i + '" data-field="origen" aria-label="Origen item ' + (i + 1) + '"></td>' +
                 '<td class="col-cant"><input class="ncm-edit ncm-edit-cant input input-sm" type="number" min="1" step="1" value="' + cantVal + '" data-testid="ncm-quantity-input" data-row="' + i + '" data-field="cantidad" aria-label="Cantidad item ' + (i + 1) + '"></td>' +
                 '<td class="col-valor"><input class="ncm-edit ncm-edit-valor input input-sm" type="number" min="0" step="0.01" value="' + (valorUnitario || '') + '" data-testid="ncm-value-input" data-row="' + i + '" data-field="valor_unitario" aria-label="Valor unitario item ' + (i + 1) + '"></td>' +
-                '<td class="col-peso"><input class="ncm-edit ncm-edit-peso input input-sm" type="number" min="0" step="0.01" value="' + (pesoUnitario || '') + '" data-testid="ncm-weight-input" data-row="' + i + '" data-field="peso_unitario" aria-label="Peso unitario item ' + (i + 1) + '"></td>' +
+                '<td class="col-peso"><input class="ncm-edit ncm-edit-peso input input-sm" type="number" min="0" step="0.01" value="' + (pesoUnitario || '') + '" data-testid="ncm-weight-input" data-row="' + i + '" data-field="peso_unitario" aria-label="Peso unitario item ' + (i + 1) + '">' +
+                    '<small class="ncm-peso-total" data-testid="ncm-weight-total" data-peso-total="' + i + '">' + textoPesoTotal(it) + '</small></td>' +
                 '<td class="col-ncm">' +
                     '<div class="ncm-cell">' +
                         '<div class="sim-position-fields">' +
@@ -1168,6 +1169,13 @@
         }
     }
 
+    // MARIA-5 (D22): el peso del campo es el de una unidad; abajo, el de la
+    // línea, que es el que sale en el TXT.
+    function textoPesoTotal(it) {
+        const total = Number(it.peso_unitario || 0) * Number(it.cantidad || 0);
+        return total > 0 ? 'línea: ' + total.toLocaleString('es-AR', { maximumFractionDigits: 3 }) + ' kg' : '';
+    }
+
     function setItemField(idx, field, raw) {
         const items = CDI.state && CDI.state.items;
         if (!items || !items[idx]) return;
@@ -1195,10 +1203,40 @@
             const n = Number(raw);
             value = Number.isFinite(n) ? n : 0;
         }
-        items.forEach(it => {
-            if (it.grupo_id === gid) it[field] = value;
-        });
+        const miembros = items.filter(it => it.grupo_id === gid);
+        if (field === 'cantidad' || field === 'valor_unitario' || field === 'peso_unitario') {
+            repartirEnGrupo(miembros, field, value);
+        } else {
+            miembros.forEach(it => { it[field] = value; });
+        }
         return value;
+    }
+
+    // MARIA-5. La fila del grupo muestra la cantidad total y el valor y el
+    // peso promedio por unidad. Antes, editarla copiaba ese número a cada
+    // producto y el TXT sumaba de más. Ahora la suma de los productos da lo
+    // que muestra la fila: la cantidad se reparte en enteros (resto mayor) y
+    // el valor y el peso escalan los de cada producto, sin perder la
+    // proporción entre ellos.
+    function repartirEnGrupo(miembros, field, value) {
+        if (!miembros.length) return;
+        const cant = it => Number(it.cantidad || 0);
+        const total = miembros.reduce((s, it) => s + cant(it), 0);
+        if (field === 'cantidad') {
+            const nuevo = Math.max(0, Math.round(value));
+            const partes = miembros.map(it => total > 0 ? nuevo * cant(it) / total : (it === miembros[0] ? nuevo : 0));
+            const enteras = partes.map(Math.floor);
+            const orden = partes.map((p, i) => i).sort((a, b) => (partes[b] - enteras[b]) - (partes[a] - enteras[a]) || a - b);
+            let faltan = nuevo - enteras.reduce((s, n) => s + n, 0);
+            for (const i of orden) { if (faltan <= 0) break; enteras[i] += 1; faltan -= 1; }
+            miembros.forEach((it, i) => { it.cantidad = enteras[i]; });
+            return;
+        }
+        const suma = miembros.reduce((s, it) => s + Number(it[field] || 0) * cant(it), 0);
+        const promedio = total > 0 ? suma / total : 0;
+        miembros.forEach(it => {
+            it[field] = promedio > 0 ? Number(it[field] || 0) * (value / promedio) : value;
+        });
     }
 
     function markFieldError(inp, isError) {
@@ -1221,12 +1259,17 @@
         }
 
         if (gidAttr) {
+            // Los números de un grupo se reparten al salir del campo, no a
+            // cada tecla: un 0 a medio escribir borraría la proporción.
+            if (field === 'cantidad' || field === 'valor_unitario' || field === 'peso_unitario') return;
             const gid = parseInt(gidAttr, 10);
             setGroupField(gid, field, inp.value);
         } else {
             const idx = parseInt(inp.getAttribute('data-row'), 10);
             if (isNaN(idx)) return;
             setItemField(idx, field, inp.value);
+            const totalEl = document.querySelector('[data-peso-total="' + idx + '"]');
+            if (totalEl && (field === 'cantidad' || field === 'peso_unitario')) totalEl.textContent = textoPesoTotal(CDI.state.items[idx]);
         }
         updateSummary();
     }

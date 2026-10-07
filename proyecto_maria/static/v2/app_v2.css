@@ -5927,3 +5927,6 @@ tr.row-sub .col-desc {
 .ncm-table td.col-cant,
 .ncm-table td.col-valor,
 .ncm-table td.col-peso { padding: 4px; }
+
+/* MARIA-5: el peso de la línea, debajo del peso unitario */
+.ncm-table .ncm-peso-total { display: block; margin-top: 2px; font-size: 11px; color: var(--c-text-3); white-space: nowrap; }
