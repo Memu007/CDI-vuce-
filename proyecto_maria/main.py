@@ -3330,6 +3330,23 @@ def _pool_lectura_pdf():
     return _POOL_LECTURA_PDF
 
 
+# El Excel tiene su propio grupo (EXCEL-1): varias planillas lentas no dejan
+# sin hilos a la lectura de PDF, ni al revés.
+_POOL_LECTURA_EXCEL = None
+
+
+def _pool_lectura_excel():
+    global _POOL_LECTURA_EXCEL
+    if _POOL_LECTURA_EXCEL is None:
+        from concurrent.futures import ThreadPoolExecutor
+        try:
+            hilos = max(1, int(os.getenv("EXCEL_READ_WORKERS", "2")))
+        except (TypeError, ValueError):
+            hilos = 2
+        _POOL_LECTURA_EXCEL = ThreadPoolExecutor(hilos, thread_name_prefix="lectura-excel")
+    return _POOL_LECTURA_EXCEL
+
+
 def _correr_lectura(funcion, *args):
     # Un TimeoutError del propio lector (p. ej. de una conexión) no es «el PDF
     # tardó demasiado»: se informa como cualquier otro error.
@@ -3357,7 +3374,14 @@ def _respuesta_excel_demasiado_largo(e: Exception) -> JSONResponse:
 def _leer_excel_ruta(ruta: str, engine: str):
     # dtype=object: cada celda como viene. Sin eso pandas convierte el texto
     # «1.500» en 1,5 y la NCM 84713000 en 84713000.0 (EXCEL-1).
-    return pd.read_excel(ruta, engine=engine, dtype=object)
+    # Las filas vacías se sacan acá, en el hilo de lectura: una celda suelta en
+    # la fila 1.048.576 no obliga a recorrer un millón de filas (EXCEL-1).
+    return pd.read_excel(ruta, engine=engine, dtype=object).dropna(how="all")
+
+
+# Una factura no trae miles de productos: más filas que esto se rechaza con un
+# mensaje claro en vez de trabar la pantalla de revisión (EXCEL-1).
+_MAX_FILAS_EXCEL = 5000
 
 
 def _leer_tabla(content: bytes, filename: str):
@@ -3373,7 +3397,7 @@ def _leer_tabla(content: bytes, filename: str):
     raise HTTPException(status_code=400, detail="Formato no soportado. Usá .csv, .xlsx o .xls")
 
 
-async def _leer_pdf_aparte(funcion, *args, limite=None, que="el PDF"):
+async def _leer_pdf_aparte(funcion, *args, limite=None, que="el PDF", pool=None):
     """Corre una lectura sincrónica de PDF en otro hilo, con tiempo máximo.
 
     Así el servidor sigue atendiendo a los demás mientras se lee un PDF
@@ -3382,7 +3406,7 @@ async def _leer_pdf_aparte(funcion, *args, limite=None, que="el PDF"):
     """
     import asyncio
     loop = asyncio.get_running_loop()
-    futuro = loop.run_in_executor(_pool_lectura_pdf(), _correr_lectura, funcion, *args)
+    futuro = loop.run_in_executor(pool or _pool_lectura_pdf(), _correr_lectura, funcion, *args)
     try:
         return await asyncio.wait_for(
             futuro, timeout=_pdf_read_timeout_s() if limite is None else limite
@@ -3837,8 +3861,13 @@ async def generate_maria_export_endpoint(
         print(f"Error generando MARIA EXPORT TXT: {e}")
         raise HTTPException(status_code=500, detail=f"Error generando archivo MARIA export: {str(e)}")
 
+# Una fila de total dice sólo eso: «TOTAL», «Subtotal 8471.30.00», «Total
+# general:». Un producto que empieza con «Total» («TOTAL QUARTZ 9000», «Total
+# Station») sigue de largo (EXCEL-1).
 _FILA_DE_TOTAL_RE = re.compile(
-    r"^\s*(?:sub\s*-?\s*total|total(?:es)?|grand\s+total)\b", re.IGNORECASE
+    r"^\s*(?:sub\s*-?\s*total(?:es)?|total(?:es)?(?:\s+general)?|grand\s+total)"
+    r"[\s\d.,:;/-]*$",
+    re.IGNORECASE,
 )
 
 
@@ -3927,6 +3956,8 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
         for v in df[col].tolist() if isinstance(v, str)
     ])
 
+    # (número de fila, ¿trae NCM u origen?, ítem)
+    candidatos = []
     for _, row in df.iterrows():
         try:
             if all((not pd.notna(v)) or str(v).strip() == "" for v in row.values):
@@ -3935,7 +3966,7 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             pieza = _texto_de_celda(row[pieza_col])
             descripcion = _texto_de_celda(row[desc_col])
 
-            if _FILA_DE_TOTAL_RE.match(descripcion) or _FILA_DE_TOTAL_RE.match(pieza):
+            if _FILA_DE_TOTAL_RE.match(descripcion or pieza):
                 continue  # fila de total o subtotal: no es un ítem
 
             # Sin descripción ni NCM no hay ítem que mostrar: se avisa.
@@ -3954,19 +3985,30 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
 
             # Lo que falta o no se puede leer queda vacío (0 o ""), nunca
             # inventado; el semáforo de la revisión lo marca (MARIA-1a, EXCEL-1).
-            items.append(Item(
+            candidatos.append((_ + 2, bool(pieza or _texto_de_celda(row[origen_col])), Item(
                 pieza=pieza,
                 descripcion=descripcion,
                 origen=_origen_desde_factura(row[origen_col]) or "XX",
                 peso_unitario=_numero(peso_col),
                 cantidad=cantidad,
                 valor_unitario=valor_unitario,
-            ))
+            )))
 
         except Exception as e:
             print(f"⚠️  Error procesando fila: {e}")
             descartes.append(_ + 2)
             continue
+
+    # Si la planilla trae NCM u origen en sus productos, una fila sin ninguno
+    # de los dos («FOB TOTAL», «Freight», «Payment terms») no es un producto:
+    # sumarla duplicaría el FOB. No entra y se avisa (EXCEL-1).
+    usa_ncm_u_origen = any(trae for _fila, trae, _item in candidatos)
+    for fila, trae, item in candidatos:
+        if usa_ncm_u_origen and not trae:
+            descartes.append(fila)
+        else:
+            items.append(item)
+    descartes.sort()
 
     return items
 
@@ -6177,24 +6219,34 @@ async def upload_excel_v2(
         # En otro hilo y con tiempo máximo: no frena al resto (EXCEL-1).
         df = await _leer_pdf_aparte(
             _leer_excel_ruta, temp_filename, engine,
-            limite=_excel_read_timeout_s(), que="el Excel",
+            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
         )
+
+        if len(df) > _MAX_FILAS_EXCEL:
+            raise HTTPException(
+                status_code=400,
+                detail=(f"La planilla tiene {len(df)} filas con datos y el máximo es "
+                        f"{_MAX_FILAS_EXCEL}. Dejá sólo los productos de la factura."),
+            )
 
         # Detectar columnas del Excel (independientemente de si el cliente ya tiene mapping)
         detected_mapping = _detect_item_columns(list(df.columns))
 
         # Aplicar mapping renombrando columnas a canonicas antes de extraer
-        # El mapeo guardado del cliente manda en las columnas que el archivo
-        # trae; lo que no cubre (encabezados nuevos) lo completa lo detectado
-        # (EXCEL-1).
+        # Lo detectado en este archivo manda: elige la mejor columna de cada
+        # dato (Precio Unitario antes que Valor, Peso Neto y nunca el bruto).
+        # El mapeo guardado del cliente completa lo que no se detectó, con
+        # columnas que el archivo trae. Así un mapeo guardado con la lista de
+        # nombres vieja no gana sobre el precio unitario (EXCEL-1).
         presentes = set(df.columns)
         effective_mapping: dict = {
-            src: canon for src, canon in (mapping or {}).items()
-            if canon in _CANON_COLUMNS and src in presentes
+            src: canon for src, canon in (detected_mapping or {}).items()
+            if canon in _CANON_COLUMNS
         }
         cubiertos = set(effective_mapping.values())
-        for src, canon in (detected_mapping or {}).items():
-            if canon not in cubiertos and src not in effective_mapping:
+        for src, canon in (mapping or {}).items():
+            if (canon in _CANON_COLUMNS and canon not in cubiertos
+                    and src in presentes and src not in effective_mapping):
                 effective_mapping[src] = canon
                 cubiertos.add(canon)
 
@@ -6205,7 +6257,7 @@ async def upload_excel_v2(
         descartes: list = []
         items = await _leer_pdf_aparte(
             extract_items_from_excel, df, file.filename, descartes,
-            limite=_excel_read_timeout_s(), que="el Excel",
+            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
         )
         if not items:
             raise HTTPException(
@@ -7136,7 +7188,8 @@ async def import_ncm_historial(
     try:
         # En otro hilo y con tiempo máximo: no frena al resto (EXCEL-1).
         df = await _leer_pdf_aparte(
-            _leer_tabla, content, filename, limite=_excel_read_timeout_s(), que="el archivo"
+            _leer_tabla, content, filename, limite=_excel_read_timeout_s(), que="el archivo",
+            pool=_pool_lectura_excel(),
         )
     except LecturaPdfDemasiadoLarga as e:
         return _respuesta_excel_demasiado_largo(e)

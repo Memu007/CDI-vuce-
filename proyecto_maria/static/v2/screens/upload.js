@@ -329,16 +329,6 @@
             CDI.state.operationSavedFor = null;
             CDI.state.orphanDismissedFor = null;
 
-            // Filas del Excel que no se pudieron leer: que el usuario lo sepa,
-            // así no declara menos de lo que trae la factura (EXCEL-1).
-            if (currentFormat === 'excel' && data && data.filas_descartadas > 0 && CDI.toast) {
-                const nums = (data.filas_descartadas_numeros || []).join(', ');
-                CDI.toast('Filas sin leer',
-                    data.filas_descartadas + ' fila(s) del Excel no se pudieron leer' +
-                    (nums ? ' (filas ' + nums + ')' : '') + '. Revisalas y cargalas a mano.',
-                    'warning');
-            }
-
             // Toast sutil si el backend aprendió/actualizó columnas del cliente.
             const catalogo = data && data.catalogo;
             if (currentFormat === 'excel' && catalogo && catalogo.columnas_detectadas > 0 && CDI.toast) {
@@ -377,6 +367,14 @@
             // Lo que la factura traía pero no se pudo leer (MARIA-1c). Al
             // final, para que otro aviso de la subida no lo tape.
             const sinLeer = CDI.camposSinLeer ? CDI.camposSinLeer() : [];
+            // Filas del Excel que no se pudieron leer: que el usuario lo sepa,
+            // así no declara menos de lo que trae la factura. Va en este mismo
+            // aviso final: la pantalla muestra un aviso a la vez (EXCEL-1).
+            if (currentFormat === 'excel' && data && data.filas_descartadas > 0) {
+                const nums = (data.filas_descartadas_numeros || []).join(', ');
+                sinLeer.unshift(data.filas_descartadas + ' fila(s) del Excel no se pudieron leer' +
+                    (nums ? ' (filas ' + nums + ')' : '') + '. Revisalas y cargalas a mano.');
+            }
             if (sinLeer.length && CDI.toast) {
                 CDI.toast('Revisá la factura', sinLeer.join(' '), 'warning');
             }

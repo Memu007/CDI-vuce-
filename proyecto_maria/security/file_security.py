@@ -137,6 +137,30 @@ def _contar_hojas_excel(contents: bytes, file_ext: str) -> int:
     return len(pd.ExcelFile(io.BytesIO(contents), engine='xlrd').sheet_names)
 
 
+def _excel_max_descomprimido_bytes() -> int:
+    """EXCEL_MAX_DESCOMPRIMIDO_MB, 100 por defecto (EXCEL-1)."""
+    import math
+    try:
+        valor = float(os.getenv("EXCEL_MAX_DESCOMPRIMIDO_MB", "") or 100)
+    except (TypeError, ValueError):
+        valor = 100.0
+    if not math.isfinite(valor) or valor <= 0:
+        valor = 100.0
+    return int(valor * 1024 * 1024)
+
+
+def _excel_descomprimido_bytes(contents: bytes) -> int:
+    """Cuánto ocupa un .xlsx descomprimido, leyendo sólo el índice del zip.
+
+    Un .xlsx de 1 MB puede descomprimirse a gigas y llenar la memoria al
+    abrirlo. zipfile no entrega más bytes que los que declara el índice, así
+    que el índice no puede mentir para abajo (EXCEL-1).
+    """
+    import zipfile
+    with zipfile.ZipFile(io.BytesIO(contents)) as z:
+        return sum(info.file_size for info in z.infolist())
+
+
 def _pdf_validate_timeout_s() -> float:
     """Mal escrito, en 0 o negativo, vale 30 s (RENDIMIENTO-1b)."""
     import math
@@ -260,6 +284,12 @@ async def validate_file_upload(
             # Abrir el Excel es sincrónico: va en otro hilo y con tiempo máximo,
             # para que un archivo pesado no frene al resto (EXCEL-1).
             import asyncio
+            if file_ext == '.xlsx' and _excel_descomprimido_bytes(contents) > _excel_max_descomprimido_bytes():
+                raise HTTPException(
+                    400,
+                    "El Excel es demasiado grande descomprimido. Probá con una planilla "
+                    "con menos datos o cargá los productos a mano.",
+                )
             try:
                 hojas = await asyncio.wait_for(
                     asyncio.to_thread(_contar_hojas_excel, contents, file_ext),
