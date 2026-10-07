@@ -2,233 +2,115 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## EXCEL-2 — entregada sobre `3e6e63e`
+## GUARDAR-1 — entregada sobre `d6fe25f` (informe en el commit que sigue)
 
-**Resultado:** están todos los puntos del canal, cada uno con rojo antes y
-verde después:
-- lo que el Excel no leía (D18);
-- el CSV del historial de NCM;
-- el aviso de mapeo;
-- D26 (a), con sus dos criterios medidos;
-- lo de paso.
-
-Un subagente (Opus, esfuerzo alto) atacó la pieza y encontró tres defectos
-graves en mi primera versión. Están arreglados:
-- un FOB duplicado con celdas combinadas;
-- los topes de D26 se salteaban renombrando partes del libro;
-- la búsqueda del encabezado se trababa con un texto enorme.
-
-No toqué los nombres de las columnas de peso (MARIA-5).
-
-**Lo que decidís vos:** D27, el tope de los textos compartidos (abajo).
+**Resultado:** guardar una operación con la SIM completa ya no da 500 en
+Postgres, y el historial no puede tirar abajo el guardado. Rojo antes y verde
+después contra un Postgres 16 local, y suite completa en verde. Sin migración.
 
 | | SHA |
 |---|---|
-| Base | `3b52bc9` (PUNTA-A-PUNTA-1 aceptada) |
-| Producto | `e8f0891`, `0a39909`, `c6c1c23`, `c5ceae9`, `252a5c9`, `b17a59b`, `9314720` |
-| Pruebas y sabotajes | `caefdb2`, `eaecaab`, `8cfdcdb`, `6c31dac`, `295c3b7`, `9a54355`, `48646ca`, `1a36a6d` |
-| CHANGELOG | `3e6e63e` |
+| producto | `01d5723`, `3135802`, `e08c920` |
+| pruebas, script de Postgres y sabotajes | `191db69`, `6d918d8`, `d6fe25f` |
+| CHANGELOG | `cabf090` |
 
-### Qué cambió
-
-1. **D26 (a): abrir un libro armado.**
-   - Validar un `.xlsx` ya no lo abre con openpyxl. Cuenta las hojas desde el
-     índice del libro y lo rechaza antes de abrirlo si se pasa de alguno de
-     estos topes:
-     - textos compartidos: 10 MB (`EXCEL_MAX_TEXTOS_MB`);
-     - estilos y propiedades: 10 MB;
-     - primera hoja: 30 MB (`EXCEL_MAX_PRIMERA_HOJA_MB`).
-   - Las partes del libro se buscan como las busca openpyxl, por
-     `[Content_Types].xml`: renombrarlas o poner un índice señuelo no saltea
-     los topes.
-   - Al leer la factura se abre una copia del libro con sólo la primera hoja,
-     así openpyxl no recorre las otras hojas que no declaran su medida. El
-     historial de NCM también lee sólo la primera.
-2. **D18: lo que el Excel no leía.**
-   - El encabezado se busca en las primeras 30 filas: la primera fila con 3
-     columnas reconocidas. Las columnas del mapeo guardado del cliente
-     cuentan como reconocidas, así un pie de página no pasa a ser el
-     encabezado.
-   - Las filas sin leer siguen nombrándose con su número real en la
-     planilla.
-   - Sin columna de país de origen, los productos entran con el origen vacío
-     y la subida lo avisa.
-   - El texto de una celda combinada hacia abajo vale para todas sus filas,
-     sólo en su columna y sólo debajo del encabezado. Los números no se
-     copian, así que la cantidad y el precio no se duplican.
-3. **El CSV del historial de NCM:**
-   - Se leen UTF-8, con o sin BOM, y Windows-1252 (latin-1). Un UTF-8 con
-     algún byte suelto sigue leyéndose como UTF-8.
-   - El separador es el que más aparece en el encabezado, sin contar lo que
-     va entre comillas.
-4. **El aviso de mapeo nombra la columna.** Cuando el catálogo del cliente y
-   el archivo no coinciden, dice: «Para «precio unitario» se usó la columna
-   «Precio Unitario» del archivo, no «Valor»».
-5. **De paso:**
-   - Una lista o un entero enorme (`10**400`) como monto dan 400 y no 500,
-     en los productos, los subítems y la exportación. También un producto
-     mal formado.
-   - El CUIT del despachante (también el del perfil) va con 11 dígitos 0-9,
-     sin guiones ni espacios.
-   - El identificador del vendedor no puede tener dígitos de otros
-     alfabetos. Las letras siguen pasando, porque hay identificaciones
-     extranjeras.
-
-### Rojo antes y verde después
-
-```
-tests/test_excel2.py sobre 3b52bc9 (antes de EXCEL-2): 23 failed, 6 passed
-  (las 6 que pasan ya andaban: CSV con coma y con BOM, libro normal, id extranjero con letras, combinada hacia el costado)
-  la subida normal detrás de 8 libros armados sin <dimension>: «400 en 30.4 s» → ahora 200 en 13 s
-lo que encontró el subagente, sobre 295c3b7: 19 failed → verde
-  (FOB 10120 en vez de 5120; topes salteados con xl/strings.xml o un índice señuelo; 262 s con un texto
-   enorme arriba; el pie tomado como encabezado; CSV con «CafÃ©»; CUIT del despachante; 500)
-sharedStrings con 19 millones de entradas vacías: se rechaza en 0,0 s, sin memoria extra
-  (antes: 93 s y 1,9 GB al abrirlo)
-```
-
-### Corrido, con su salida
-
-```
-suite como la CI (venv-limpio, ENVIRONMENT=testing, sus --deselect), worktree limpio en 1a36a6d:
-  1267 passed, 102 skipped, 10 deselected, 3 xfailed · fin: 0
-sabotajes (scripts/testing/sabotajes/excel2.sh 1a36a6d): base en verde y 27 en ROJO, «sabotajes con falla: 0»
-```
-
-`3e6e63e` sólo agrega el CHANGELOG sobre `1a36a6d`. Después traje tu rama:
-son sólo documentos.
-
-### Comandos para vos
-
-```bash
-git fetch origin claude/dev1-tecnica && git checkout 3e6e63e
-<venv>/bin/python -m pytest -q --no-cov tests/test_excel2.py          # 51 passed
-PY=<venv>/bin/python scripts/testing/sabotajes/excel2.sh 3e6e63e        # «sabotajes con falla: 0»
-```
+**Qué cambia:**
+- **La operación primero:** la operación, sus ítems y el contador del plan se
+  guardan en un commit. El historial del cliente va después, cada producto en
+  su savepoint. Si un producto falla, se pierde sólo ese; si falla todo el
+  historial, la operación ya quedó. La respuesta trae `historial_guardado`.
+- **La forma que guarda el historial** (`ncm_para_historial`): lo que entra en
+  la columna (10) queda igual. De la SIM completa se guarda el NCM de 8
+  dígitos, que es lo mismo que ya guardaba «confirmar NCM» (`guardar-uso`).
+- **Editar un producto** del cliente ya no corta la SIM a 10 caracteres (dejaba
+  `8471490010`, que no existe): guarda los 8 dígitos y rechaza con 400 lo que
+  no los tiene.
+- **`/catalogo/productos/learn`** usa la misma forma, no da 500 por un
+  producto malo y no cuenta lo que no guardó.
+- **Otros datos del mismo guardado** que en Postgres también daban 500 y no
+  guardaban nada: moneda de más de 3, origen de más de 50, fecha de inicio
+  del cliente de más de 10, `grupo_id` que no es entero o se pasa de Integer, y
+  el carácter NUL en cualquier texto. Los encontraron las revisiones.
 
 ## Decisiones
 
-- **D27 — El tope de 10 MB para los textos compartidos.**
-  - Esos textos son comunes a todas las hojas. Un libro con la factura en la
-    hoja 1 y un catálogo grande en la hoja 2 se rechaza aunque esa hoja no
-    se lea: el tope se cruza con unas 57 mil filas de catálogo.
-  - El subagente probó un catálogo de 120 mil filas guardado por
-    LibreOffice: 4,4 MB comprimido y 20,5 MB de textos. Antes entraba en
-    7,9 s; ahora da 400 con un mensaje claro.
-  - El tope no puede ser mucho más alto: textos vacíos armados, cerca de
-    10 MB, ya cuestan unos 330 MB de memoria al abrirlos, y el criterio era
-    1 GB.
+- **D32 — La sugerencia del cliente con 8 dígitos tapa la SIM del proveedor.**
+  - Lo encontró la revisión Sonnet y lo reproduje con su camino. Antes de
+    este arreglo, en producción la operación daba 500 y el historial quedaba
+    vacío, así que la sugerencia salía del catálogo del proveedor, que guarda
+    la SIM completa (String(20)). Ahora el historial del cliente tiene
+    `84714900` y gana por prioridad (`/api/catalog/lookup`, `/api/ncm/sugerir`).
+    La pantalla lo marca incompleto y hay que tipear la SIM.
   - Opciones:
-    - (a) dejar 10 MB (`EXCEL_MAX_TEXTOS_MB` se puede cambiar sin tocar
-      código);
-    - (b) subirlo a 20 MB;
-    - (c) una pieza que lea la primera hoja sin openpyxl.
+    - (a) agrandar `client_product_history.ncm` a `VARCHAR(20)` y guardar la
+      SIM completa. En Postgres agrandar un varchar no reescribe la tabla.
+      Iría como función `_migrate_*` al arrancar, con su prueba contra
+      Postgres. Para volver atrás alcanza con publicar el código anterior: la
+      columna más ancha no lo molesta.
+    - (b) dejar los 8 dígitos y que, si el proveedor tiene una SIM que empieza
+      con esos 8, gane la del proveedor.
+    - (c) dejarlo como está.
+  - **Recomiendo (a):** es la única que guarda «la posición completa», como
+    pedía el alcance. Es una migración: necesita tu visto bueno.
 
-  **Recomiendo (a):** una factura real no tiene 57 mil filas, y el mensaje
-  pide dejar sólo la hoja de la factura.
+## Cómo reproducirlo
+
+```bash
+# Postgres local descartable (no el de producción); sale «fallas: 0»
+python scripts/testing/guardar1_postgres.py postgresql://cdi@127.0.0.1:55432/<base vacía>
+# con el código de antes (857d062) el mismo script da 6 FALLA (500, operación vacía)
+PY=<venv>/bin/python scripts/testing/sabotajes/guardar1.sh d6fe25f   # «sabotajes con falla: 0» (12)
+python -m pytest -q --no-cov tests/test_guardar1.py                  # 21 passed
+```
+
+## Puertas, sobre `d6fe25f`
+
+| Puerta | Resultado |
+|---|---|
+| Suite tipo CI (venv limpio, deselects de ci.yml) | `1324 passed, 102 skipped, 10 deselected, 3 xfailed` |
+| `guardar1_postgres.py` contra Postgres 16 local | 13 OK, `fallas: 0`; en `857d062`, `fallas: 6` |
+| `sabotajes/guardar1.sh` | 12 de 12 en ROJO, `sabotajes con falla: 0` |
+| `smoke_friccion.sh` | `OK · telemetría + alias session/state + by-cuit protegido` |
+| `ataque_aislamiento.sh` | `Bloqueado: 22 · Fugas: 0`, «PUERTA G3 PASADA» |
+| Sabotajes de piezas anteriores | admin1, admin2 y excel2: 0 con falla. excel1: 5 patrones viejos (ROTO), que vienen de EXCEL-2 y no de esta pieza: los arreglo en la devolución de EXCEL-2. El resto (maria1b, punta_a_punta1, rendimiento, cobro_mp1) seguía corriendo cuando subí esto. |
+
+**Revisiones:**
+
+| Quién | Modelo y esfuerzo | Encontró | Qué hice |
+|---|---|---|---|
+| Adversario | Sonnet, alto | La sugerencia de 8 dígitos tapa la SIM del proveedor; contador del plan en otro commit (500 con la operación guardada); otros datos que dan 500; nadie se entera si falla el historial | D32; lo demás, arreglado con su rojo |
+| Adversario | Opus, alto | Lo mismo del contador; la prueba no veía mover el contador al historial; `grupo_id`; editar aceptaba «ABC»; `learn` contaba lo que no guardaba | Arreglado con su rojo y sabotaje |
+| `/code-review` | alto | Un producto malo se llevaba el historial de toda la operación; `learn` daba 500 por uno; `grupo_id` fuera de Integer; NUL en otros textos | Arreglado (savepoint por producto) con su rojo y sabotaje |
+| `/security-review` | Sonnet, alto | Nada con confianza ≥ 8 (propiedad del cliente, origen de `client_id` y del dueño, SQL, datos expuestos) | — |
 
 ## Qué no corrí y riesgos
 
-- **`.xls` (xlrd):** el encabezado se busca igual, pero las celdas
-  combinadas no se rellenan, porque xlrd no las da sin el formato.
-- **El aviso de mapeo se repite en cada subida** mientras el archivo traiga
-  las dos columnas (la del catálogo y la reconocida). Es una sola línea en
-  el aviso del final.
-- **La migración (`migration_service.py`) sigue leyendo todas las hojas con
-  pandas.** Es otra pantalla y tiene su propio tope; no la toqué.
-- **Libros armados, ya existía antes:** con nombres de hoja repetidos, uno
-  que antes daba 400 ahora da 200.
+- **La pantalla no lee `historial_guardado`:** el aviso está en la respuesta,
+  pero nadie lo muestra. Es de la pantalla (¿Dev 2?): lo dejo propuesto.
+- **Siguen dando 500, como antes (no lo agrega esta pieza):**
+  - números mal escritos en la operación (`"1,5"`, `"abc"`, `resumen.items: null`);
+  - el límite del plan bajo dos guardados a la vez sale como 500 y no 402;
+  - el catálogo del proveedor (`/api/catalog/{vendor}/productos`) con una
+    descripción de más de 300 caracteres: pierde el lote entero, y la
+    pantalla lo ignora;
+  - `/api/ncm/guardar-uso` con un `vendor_name` muy largo responde `success`
+    sin guardar.
 
-## COBRO-MP-1 — plan (todavía sin código)
+  Son de otras rutas: si querés, tarea aparte.
+- **Formas mezcladas en el historial:** las de 10 o menos quedan tal cual
+  (`8471.49.00`) y `guardar-uso` guarda `84714900`. No rompe la sugerencia,
+  que busca por descripción; sí parte el «NCM más usado» del cliente en dos.
+  Venía de antes, y la D32 (a) lo puede ordenar.
+- **`ClientService.update_product_history`** (`client_service.py`) no tiene
+  quién la llame y escribe la columna sin la forma nueva: código muerto.
+- **No corrí:** contra el Postgres de producción, nunca. La concurrencia sólo
+  la cubre el contador; dos guardados a la vez del mismo cliente no los probé.
 
-Lo arranco porque Emi no contestó GUARDAR-1; si la aprueba, paso a esa.
-Leí el webhook (`main.py:8444-8692`), `billing_service.process_payment` y las
-pruebas que lo cubren. Esto es lo que hay hoy:
-
-- **El aviso IPN se acepta sin firma**, aunque esté el secreto y también en
-  producción (`?topic=payment&id=…`). Lo único que lo frena es que después
-  se le pregunta el pago a Mercado Pago con nuestro token.
-- **Para no repetir, sólo se mira el último pago** (`last_payment_id`).
-  Cualquiera, sin sesión, alterna dos pagos viejos reales y cada vez deja la
-  cuenta `active` 30 días con el contador en 0 (C3, tu D8).
-- **El monto no se mira:** ni `transaction_amount` ni `currency_id`. Las
-  pruebas pagan 30 000 un plan de 45 000 y pasan.
-- **Cada pago fija 30 días desde hoy:** no extiende desde el fin del período
-  actual.
-- **Lo que no es `type=payment` se saltea**, también las renovaciones de una
-  suscripción (preapproval).
-- **Las altas de tablas no usan alembic:** las hace `create_all` al arrancar,
-  y los cambios de columnas, funciones `_migrate_*` a mano.
-
-**Plan, en este orden, cada paso con rojo antes y verde después:**
-
-1. **Cada pago se aplica una sola vez.** Una tabla nueva,
-   `mp_pagos_aplicados`, guarda el `payment_id` (único), la cuenta, el tipo,
-   el monto, la moneda, la fecha de aprobación y cuándo se aplicó. El registro
-   y el cambio de la cuenta van en la misma transacción; si el id ya está, se
-   responde `skipped` y no se toca nada. Prueba: el ataque de D8, alternar A
-   y B, no renueva nada.
-2. **El monto se controla:**
-   - un plan exige moneda `ARS` y un monto igual o mayor al precio de
-     `PLANS`;
-   - una recarga, igual o mayor a `TOPUP_PRICE_ARS`;
-   - un pago que no alcanza no se aplica: queda registrado como rechazado,
-     con su motivo, y se loguea.
-3. **El período se extiende:** el nuevo fin es el mayor entre hoy y el fin
-   actual (si la cuenta está activa), más 30 días. Una renovación pagada
-   antes de tiempo no pierde días.
-4. **Renovaciones de la suscripción:** procesar
-   `subscription_authorized_payment`. Se busca el cobro autorizado, de ahí el
-   pago, y se aplica como un pago del `external_reference` de la suscripción,
-   con la misma tabla y el mismo control de monto.
-5. **Las pruebas viejas que dan por bueno el comportamiento de antes se
-   ajustan, y cada cambio va en su commit:**
-   - `test_webhook_ipn.py` y `test_g7_cobro.py` pagan 30 000;
-   - las que asignan `main.MP_WEBHOOK_SECRET` directo, sin monkeypatch, y lo
-     dejan puesto para las demás pruebas.
-6. **Todo con el SDK de Mercado Pago simulado**, como `test_prelaunch_block2`.
-   Nada contra Mercado Pago real. Revisión con Opus y con Sonnet, en esfuerzo
-   alto.
-
-**Lo que tenés que decidir antes del paso que toca:**
-
-- **D28 — El aviso IPN sin firma (paso 1).**
-  - Opciones:
-    - (a) seguir aceptándolo: con la tabla, reenviar un pago ya aplicado no
-      hace nada, y el pago se le pregunta igual a Mercado Pago con nuestro
-      token;
-    - (b) rechazarlo cuando hay secreto.
-  - Mercado Pago no firma el IPN. Si la cuenta tiene el IPN configurado en
-    el panel y no los webhooks firmados, con (b) dejan de llegar los pagos.
-  - **Recomiendo (a):** la tabla cierra el ataque, y (b) puede cortar cobros
-    reales por una configuración que desde acá no puedo ver.
-- **D29 — Cuánto tiene que valer un pago (paso 2).**
-  - Opciones:
-    - (a) igual o más que el precio de hoy;
-    - (b) igual o más que el precio que tenía el plan cuando se armó el link
-      de pago, guardándolo en `metadata`.
-  - Con (a), si Emi sube el precio, un link viejo que se pague tarde se
-    rechaza y hay que devolverlo a mano.
-  - **Recomiendo (b):** es más trabajo, pero no rechaza pagos legítimos.
-- **D30 — Las renovaciones no se pueden verificar desde acá (paso 4).**
-  - El SDK (`mercadopago` 2.2.0) no tiene una función para los cobros
-    autorizados. Habría que llamar a mano a `/authorized_payments/{id}`, y
-    no tengo cómo confirmar el formato real sin Mercado Pago.
-  - Opciones:
-    - (a) implementarlo según la documentación pública, con el formato
-      simulado, y que Emi lo pruebe en el sandbox antes de publicar;
-    - (b) dejar el paso 4 hasta tener un aviso real anonimizado de una
-      renovación.
-  - **Recomiendo (a), con el paso 4 aparte:** no frena los pasos 1 a 3, y
-    queda la prueba en el sandbox como condición para publicar.
-- **D31 — La tabla nueva (paso 1).** No cambia ninguna tabla que ya existe:
-  la crea `create_all` al arrancar, en Postgres y en SQLite. Para volver
-  atrás alcanza con publicar el código anterior: la tabla sobra, no estorba,
-  y se puede borrar con `DROP TABLE mp_pagos_aplicados`.
-  - **Pido el visto bueno** antes de publicar, como pide «sin migraciones a
-    ciegas».
-
-**Mientras tanto:** arranco por los pasos 1 y 3, que no dependen de ninguna D.
+**Archivos de producto que toqué:**
+- `proyecto_maria/main.py`: `save_client_operation`,
+  `learn_client_catalogo_productos`, `update_client_catalogo_producto` y sus
+  ayudantes;
+- `proyecto_maria/services/client_memory.py`.
 
 ## COBRO-MP-1 — en pausa en `37d0efe` (sin entregar)
 
@@ -253,18 +135,22 @@ cerrarla:
   informe con los riesgos (D28: consultas a Mercado Pago con ids al azar;
   formato del cobro autorizado sin confirmar contra un aviso real).
 
+
 ## Sigo con
 
-GUARDAR-1. Si EXCEL-2 vuelve con devolución, eso va primero.
+La devolución de EXCEL-2 (veredicto en `2034b85`, D27 a), sobre `3e6e63e` más
+lo de ahora. Después, COBRO-MP-1.
 
 Última vuelta: 2026-10-07
 Contexto: el que mide la PM con get_session.
 
-`/compact conservar: Dev 1 de CDI, rama claude/dev1-tecnica. Aceptadas e
-integradas: MARIA-1b, EXCEL-1, PUNTA-A-PUNTA-1. EXCEL-2 entregada sobre
-3e6e63e; D27 abierta. Ahora GUARDAR-1 (ncm String(10) en
-client_product_history, 500 en Postgres). COBRO-MP-1 en pausa en 37d0efe (ver
-PARA-PM.md). Postgres local: /usr/lib/postgresql/16/bin, datos en
-/tmp/cdi-dev1/pg, puerto 55432, usuario cdi. Entorno: PM_DIR=/tmp/cdi-dev1,
-venv /tmp/cdi-dev1/venv y venv-limpio; rutina de la PM
-trig_01TvMmGfSLDfbcJrf66ZZ7YK. Compactar desde el 30 %.`
+`/compact conservar: Dev 1 de CDI, rama claude/dev1-tecnica, PM principal
+session_01B7FVQspcEHF7PqNv797wNM. GUARDAR-1 entregada sobre d6fe25f (D32 abierta:
+agrandar client_product_history.ncm). Ahora: devolución de EXCEL-2 (6 puntos en
+PARA-DEV.md, veredicto 2034b85, D27 a; arreglar también los patrones viejos de
+scripts/testing/sabotajes/excel1.sh). Después COBRO-MP-1, en pausa en 37d0efe
+(ver PARA-PM.md). Postgres local: /usr/lib/postgresql/16/bin, datos
+/tmp/cdi-dev1/pg, puerto 55432, usuario cdi. venv /tmp/cdi-dev1/venv y venv-limpio;
+suite con /tmp/cdi-dev1/suite8.sh (sed del SHA). Rutina de la PM
+trig_01TvMmGfSLDfbcJrf66ZZ7YK. Compactar desde el 30 %. Hasta esfuerzo alto, sin
+Fable; nunca main.`
