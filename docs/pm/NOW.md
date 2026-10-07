@@ -38,12 +38,11 @@ antes de cerrar la Fase 3.
 5. **Hasta publicar MARIA-1a: revisar el país de origen de cada TXT** antes
    de mandárselo al despachante. El código publicado corta el país a dos
    letras: si la lectura devuelve «CHN» o «China», sale Suiza.
-6. **Límite de uso de la cuenta:** el 2026-10-07 entre las ~02:05 y las
-   03:40 UTC las Devs quedaron paradas porque la cuenta llegó a su límite de
-   5 horas («You've hit your session limit»). Lo más barato para que no se
-   repita: pegar el `/compact` de cada Dev apenas se pueda (están en ~38 % y
-   ~41 %; cada paso relee todo el contexto). Si vuelve a pasar, Emi decide
-   entre aceptar las pausas o bajar el ritmo.
+6. **Límite de uso de la cuenta:** lo tocó dos veces el 2026-10-07: entre
+   las ~02:05 y las 03:40 UTC, y entre las ~18:34 y las 18:50 UTC (las dos
+   Devs quedaron paradas; la PM las despertó a las 18:56). Por la regla de
+   Emi (`DECISIONS.md`), **hoy se compacta desde el 30 % las Devs y el 40 %
+   las PMs**; mañana vuelve a 60 y 50.
 7. **No pedirle a ningún asistente cambios sobre `main`:** desde el
    2026-10-07 `main` tiene las reglas nuevas, pero cada push publica.
 
@@ -74,11 +73,12 @@ Archivos abiertos por Dev:
 
 ## En curso
 
-- **Dev 1:** EXCEL-2 entregada (`3e6e63e`, D27), en revisión: rojo antes
-  (`43 failed, 8 passed`) y suite (`1277 passed, 102 skipped, 3 xfailed`)
-  hechos; falta el subagente. Ahora GUARDAR-1 (Emi dijo que sí). COBRO-MP-1,
-  en pausa en `83b4ec1` con D28 a D31 contestadas (`074a50b`).
-- **Dev 2:** devolución de MARIA-5 (dos pesos para una línea, filas que desaparecen, guarda del peso, subítems, grupos, una sola cuenta). Sigue: CATALOGO-NCM-1, SUBITEMS-1 (Emi: sus facturas traen subítems) y MARIA-6 cuando lleguen los archivos reales del despachante.
+- **Dev 1:** GUARDAR-1 (Emi dijo que sí; está en producción). Después, la
+  devolución de EXCEL-2 (devuelta sobre `3e6e63e` a las 19:45 UTC por seis
+  puntos; tres rompen: una combinada gigante traba la lectura, una
+  combinada con texto duplica el FOB, el tope de estilos no protege la
+  memoria; D27 (a)). Después, COBRO-MP-1, en pausa en `18a1850`.
+- **Dev 2:** MARIA-5 y CATALOGO-NCM-1 devueltas sobre `6854f34` (19:30 UTC) por seis puntos chicos: una columna «Peso por caja» le gana a «Peso», el bruto «unitario» se lee como neto, aviso de dos pesos sin números, una pantalla en rojo, la baja con aviso doble y sin catálogo errores inventados. Sigue: SUBITEMS-1 (Emi: sus facturas traen subítems) y MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
   RENDIMIENTO-1 y 1b (`ec3d793`), MARIA-1a, 2b, 1c, 4, 3 y 1d (`9679e21`).
   Suite sobre la rama integrada (`7b42556`, venv armado sólo con el
@@ -156,12 +156,14 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 18:45 UTC: Emi contestó «dale a todo» y que la suscripción está en
-Railway. GUARDAR-1 entra (Dev 1, antes que COBRO-MP-1); reventa confirmada;
-SUBITEMS-1 entra (Dev 2). El push de `6ea8ca9` a `main` lo frenó el sistema
-de permisos: falta «dale 6ea8ca9» escrito. EXCEL-2: falta el subagente
-(después de las 18:50 UTC, cuando se renueva el límite de 5 horas). Dev 1
-compactada (11 %).
+2026-10-07 19:50 UTC: las dos entregas, devueltas. MARIA-5 y CATALOGO-NCM-1
+(`6854f34`) por seis puntos chicos; la peor: una columna «Peso por caja» le
+gana a «Peso» (×16 en el TXT). EXCEL-2 (`3e6e63e`) por seis, tres que rompen
+(combinada gigante, combinada con texto que duplica el FOB, estilos que
+llegan a 1,4 GB); D27 (a). Dev 1: GUARDAR-1, después EXCEL-2, después
+COBRO-MP-1. Dev 2: su devolución, después SUBITEMS-1. Hoy rige 30/40 (la
+cuenta tocó su límite a las ~18:34). Esperan a Emi: «dale 6ea8ca9» escrito
+y el `/compact` de la Dev 2.
 
 ## Medición
 
