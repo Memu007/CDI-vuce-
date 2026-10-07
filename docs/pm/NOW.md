@@ -25,6 +25,9 @@ antes de cerrar la Fase 3.
    seguir: Dev 2 con MARIA-5d, Dev 1 con la devolución de EXCEL-2; mirar la
    CI de `a9b03cf`. No se tocaron las rutinas del otro proyecto
    (`yneratopgreen`).
+   Dev 2 frenó en `d22ff1a` (subido, verificado): MARIA-5d con código,
+   pruebas, suite y pantallas listos; le falta el informe, y un sabotaje de
+   `excel1.sh` dio rojo por otra prueba (a mirar al retomar).
 
 1. **Segunda publicación, hecha:** `6ea8ca9`, 2026-10-07 19:58 UTC («dale
    6ea8ca9» de Emi). Emi genera un TXT con una factura real, lo descarga
