@@ -2,201 +2,162 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## RENDIMIENTO-1b — reentregada con la devolución, terminada
-
-**Devolución atendida** (vendedor en dos columnas). Código: **`ec3d793`**
-(producto `f95523c`, pruebas y sabotajes `ec3d793`).
-- El vendedor adivinado nunca es una etiqueta de parte: «BUYER»,
-  «CONSIGNEE», «SELLER», «SHIPPER», «NOTIFY PARTY», «SOLD TO», «BILL TO»,
-  «SHIP TO», «CLIENTE», «CUSTOMER» y sus pares en castellano y portugués.
-  Si la etiqueta viene detrás del nombre, en la misma fila, el nombre se
-  corta antes («VENDOR: ACME TRADING LTD BUYER: GLOBEX» → «ACME TRADING
-  LTD»).
-- En el caso de la PM (dos columnas, «SELLER:» y «BUYER:» en una fila y los
-  nombres debajo), el vendedor queda **vacío**. pypdf junta las dos columnas
-  en una línea y no hay forma segura de separar los nombres. Era una de las
-  dos salidas aceptadas.
-
-Rojo antes, sobre `b01149c`:
-
-```
-E   AssertionError: BUYER                                           (el PDF de dos columnas)
-E   AssertionError: assert 'BUYER' == ''
-E   AssertionError: assert 'CONSIGNEE' == ''
-E   AssertionError: assert 'ACME TRADING...BEX IMPORT SA' == 'ACME TRADING LTD'
-E   AssertionError: assert 'ACME TRADING...IGNEE: GLOBEX' == 'ACME TRADING LTD'
-E   AssertionError: assert 'NOTIFY PARTY' == ''
-============ 6 failed, 2 passed, 16 deselected ============
-```
-
-Verde después: la prueba del PDF de dos columnas y 7 casos de texto,
-`test_el_vendedor_nunca_es_una_etiqueta`. Los 6 PDF de la comparación
-siguen dando el mismo vendedor (`''`, `ACME TRADING CO LTD`,
-`Importadora del Sur SA`, `Comercio Brasil Ltda`, `Shenzhen Electronics Co`
-y `''`).
-Sabotajes de `rendimiento1b.sh` sobre `ec3d793`: 7 en ROJO (los 5 de antes
-y 2 nuevos: «el vendedor vuelve a poder ser una etiqueta» y «el vendedor ya
-no se corta antes de otra etiqueta»), `sabotajes con falla: 0`. Los de la
-Dev 2: `OK: los 8 sabotajes dan rojo por la razón esperada`.
-
-Puertas sobre `ec3d793`: suite `754 passed, 102 skipped, 25 warnings in
-85.31s` (venv nuevo, sólo `requirements.txt`); fricción OK; aislamiento 22
-BLOQUEADO, 0 FUGA.
-
-Toqué `proyecto_maria/pdf_extractor.py` sólo en `_clean_vendor_candidate`,
-con dos expresiones nuevas encima (~línea 870), fuera de la zona de la
-Dev 2.
-
----
-
-Lo que sigue es el informe de la primera entrega (`b01149c`), sin cambios.
+## EXCEL-1 — parcial: la parte 2 hecha, la parte 1 frenada en D13–D15
 
 | | SHA |
 |---|---|
-| Base (RENDIMIENTO-1 aceptada, con tu rama traída) | `8fd801d` |
-| Producto | `ef49d8e`, `24530dd` |
-| Pruebas y sabotajes | `de4bf0c`, `df4adb0`, `b01149c` |
-| **Entrego (código)** | **`b01149c`** |
+| Base (RENDIMIENTO-1b aceptada, con tu rama traída) | `ec3606e` |
+| Parte 2, producto | `3393c2f` |
+| Parte 2, pruebas | `b5ddaf3` |
 
-Resultado:
-1. **La adivinanza del vendedor lee sólo con `pypdf`** (`extraer_texto_pdf_seguro`
-   en `pdf_extractor.py`, fuera de la zona de la Dev 2). El escenario del
-   revisor ya no deja a nadie sin lectura: 4 PDF armados en paralelo y
-   después uno bueno, que se lee enseguida.
-2. **Sólo las 2 primeras páginas, y salta una página con más de 512 KB de
-   contenido.** Lo agregó el revisor (abajo): pypdf también se pone lento
-   con un contenido enorme. Una página de 3 MB tardaba 6 s, 9 MB más de 60 s,
-   y todo ese tiempo ocupaba un hilo de lectura.
-3. **Tiempos máximos:** en `0`, negativos, `inf`, `1e309`, `nan`, mal
-   escritos o en blanco valen el de siempre. Vale para los cuatro:
-   `PDF_READ_TIMEOUT_S` (120), `PDF_VALIDATE_TIMEOUT_S` (30),
-   `PDF_VENDOR_TIMEOUT_S` (15) y `NCM_GEMINI_TIMEOUT_S` (30).
-4. **Otros caminos hacia pdfminer o pdfplumber: no hay.** Lo confirmé yo y
-   también el revisor. `process_pdf` va directo a Gemini Vision: usa PyMuPDF,
-   y si no está, manda el PDF a Gemini. La validación sólo cuenta páginas con
-   pypdf. `_extract_pdf_text`, `robust_extract_pdf_items`,
-   `_extract_items_per_page` y el OCR no tienen ningún llamador vivo en
-   `main.py` ni en los routers. Sin D.
+RENDIMIENTO-1b aceptada: gracias. Su informe está en el commit `ec3606e` de
+este archivo.
 
-Nada para decidir.
+### Parte 2 (tu D12): leer un Excel no frena el sitio — hecha
 
-## Comandos copiables
+Leer un Excel o un CSV pasa a otro hilo, con tiempo máximo
+(`EXCEL_READ_TIMEOUT_S`, 60 s), en las cinco rutas que leen uno:
+`/upload_excel/`, `/upload_excel_v2/`, `/api/clientes/import`,
+`/api/ncm/import-historial` y `/api/migrations/analyze`. Lo mismo la
+validación del archivo al subirlo. Al vencerse el tiempo: 504
+`{"detail": texto, "code": "lectura_excel_demasiado_larga"}`, y la pantalla
+ofrece la carga a mano, como con el PDF.
 
-```bash
-git fetch origin claude/dev1-tecnica && git checkout b01149c
-PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh b01149c 8080
-# desde el worktree:
-export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
-       VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-python -m pytest -q --no-cov tests/test_rendimiento1b.py tests/test_rendimiento1.py   # 30 passed
-PY=$(which python) scripts/testing/sabotajes/rendimiento1b.sh b01149c   # 5 «ROJO», «sabotajes con falla: 0»
-```
-
-El escenario de los PDF armados corre en un proceso aparte con 60 s de
-límite (`tests/escenario_pdf_armado.py`). Si la lectura se vuelve a colgar,
-la prueba falla diciéndolo en vez de colgar la suite.
-
-## Evidencia (salida exacta)
-
-**Rojo antes**, con las pruebas nuevas sobre el código de `8fd801d`:
+Rojo antes (`ec3606e`) y verde después (`b5ddaf3`):
 
 ```
-E   AssertionError: {'armados': [200, 200, 200, 200], 'armados_s': 1.28, 'bueno': 504, 'bueno_s': 3.42}
-E   AssertionError: {"detail":"Leer el PDF tardó demasiado. ...","code":"lectura_pdf_demasiado_larga"}   (PDF_READ_TIMEOUT_S=0 y -5)
-E   AssertionError: {"detail":"No pudimos abrir el PDF: tardó demasiado. Probá con otro archivo."}       (PDF_VALIDATE_TIMEOUT_S=0 y -5)
-E   AssertionError: {}  assert None == 'ACME TRADING CO LTD'                                         (PDF_VENDOR_TIMEOUT_S=0 y -5)
-E   AssertionError: {'sugerencias': [], ...}                                                         (NCM_GEMINI_TIMEOUT_S=0 y -5)
-E   AssertionError: la adivinanza del vendedor le pasó el PDF a pdfminer o pdfplumber
+E   AssertionError: clientes_import: /health tardó 1.58 s mientras se leía un Excel
+E   AssertionError: migraciones_analyze: /health tardó 1.52 s mientras se leía un Excel
+E   AssertionError: ncm_import_historial: /health tardó 1.52 s mientras se leía un Excel
+E   AssertionError: upload_excel: /health tardó 1.52 s mientras se leía un Excel
+E   AssertionError: upload_excel_v2: /health tardó 1.52 s mientras se leía un Excel
+E   AssertionError: /health tardó 1.51 s mientras se validaba un Excel
+E   AssertionError: clientes_import: 200 {...}   assert 200 == 504     (y lo mismo en las otras 4 rutas)
+→ después: 11 passed
 ```
 
-Segunda tanda, por el revisor, sobre `de4bf0c`:
+Suite completa sobre `b5ddaf3`, venv nuevo armado sólo desde
+`requirements.txt`: `765 passed, 102 skipped, 25 warnings in 97.18s`.
+Faltan, para la entrega final: los sabotajes de esta parte, los revisores, y
+humo y aislamiento.
 
-```
-E   AssertionError: sacar el texto de una página de 3 MB tardó 6.01 s
-E   assert inf == 120.0                                                                            (inf y 1e309)
-```
+Lo midió el auditor antes del arreglo: un .xlsx de 5 KB, con una celda en la
+fila 1.048.576, congelaba el sitio 54 s.
 
-Mi primera prueba de «sin pdfminer» daba verde con el código viejo: el error
-que yo simulaba se lo tragaba un `except` y el código seguía con pypdf. Ahora
-anota si pdfminer se llamó. Mi primer PDF «enorme» tampoco distinguía nada
-porque no declaraba la fuente; con la fuente, sí.
+### Parte 1: el relevamiento (un subagente Opus alto, con evidencia)
 
-**Mismo vendedor que antes**, comparando con el lector viejo
-(`_extract_pdf_text`) contra el nuevo, en `tests/test_factura.pdf` y en 5
-PDF de texto con «VENDOR:», «PROVEEDOR:», «FORNECEDOR:», «SHIPPER -» y sin
-vendedor: `iguales 6 / 6`.
+**Caminos y quién los llama:**
 
-**Sabotajes** sobre `b01149c` (`rendimiento1b.sh`):
+| Ruta | ¿La llama una pantalla? | ¿Llega al TXT? |
+|---|---|---|
+| `/upload_excel_v2/` | sí (v2, `upload.js`) | **sí, el único** |
+| `/upload_excel/` | **no**: sólo `static/script.js` de la raíz, que no se sirve | no (devuelve un AVG .xlsx) |
+| `/upload_excel/public` | sólo el dashboard viejo (`?v=1`), que muestra «No se detectaron ítems» | no |
+| `/api/clientes/import` | **no** | indirecto (crea clientes que prellenan la operación) |
+| `/api/migrations/analyze` | sí (v2, `clientes.js`) | indirecto; es el más sólido (valida CUIT y límites) |
+| `/api/ncm/import-historial` | sí (v2, `ncm.js`) | indirecto (sugiere NCM) |
 
-```
-ROJO  | el vendedor vuelve a leer con pdfminer: dice «FAILED tests/test_rendimiento1b.py::test_pdfs_armados_en_paralelo_y_despues_uno_bueno_se_lee»
-ROJO  | los tiempos en 0 o negativos ya no caen al defecto: dice «FAILED tests/test_rendimiento1b.py::test_tiempo_de_lectura_en_cero_o_negativo_usa_el_de_siempre[0]»
-ROJO  | el tiempo de validación en 0 o negativo ya no cae al defecto: dice «FAILED tests/test_rendimiento1b.py::test_tiempo_de_validacion_en_cero_o_negativo_usa_el_de_siempre[0]»
-ROJO  | el vendedor vuelve a leer páginas de contenido enorme: dice «FAILED tests/test_rendimiento1b.py::test_texto_del_vendedor_no_se_traba_con_un_contenido_enorme»
-ROJO  | un tiempo infinito vuelve a apagar el tiempo máximo: dice «FAILED tests/test_rendimiento1b.py::test_tiempos_infinitos_o_raros_usan_el_de_siempre[inf]»
-sabotajes con falla: 0
-```
+**Defectos en `/upload_excel_v2/`, con el TXT que sale** (del más grave al
+menos grave):
+1. **Filas perdidas sin aviso:** el TXT declara menos FOB. Se descarta
+   cualquier fila sin NCM, sin origen o con un número en texto («1.234,56»,
+   «10 pcs»), y no se avisa. En el ejemplo, 3 filas → 1 ítem: `MDDTFOB=3500.00`
+   de una factura de 6.000. Una factura sin columna NCM da 400 entera, aunque
+   v2 tiene un paso para clasificar NCM. Además, sólo lee la primera hoja.
+2. **«Valor» (el total) gana sobre «Precio Unitario»:** `MARTUNITAR=3500`,
+   `MDDTFOB=35000` en vez de 350 y 3500.
+3. **Separador de miles leído como decimal:** «1.500» → cantidad 1,5.
+4. **Peso bruto o total tomado como peso unitario neto**, y queda guardado
+   en el mapeo del cliente y en su plantilla.
+5. **Una fila de subtotal entra como ítem** y suma FOB (`MDDTFOB=38500`, era
+   3500).
+6. **NCM numérica mal leída:** con una fila vacía en el medio sale
+   «84713000.0». En el historial NCM y en clientes se pierde el 0 de
+   «01012100».
+7. **El país se corta a 3 letras** (`models/operations.py:60`): «China» y
+   «Chile» dan «CHI», «Argentina» da «ARG». El TXT lo frena con «Origen no
+   reconocido».
+8. **«.XLSX» en mayúsculas da 500.**
+9. **Valores inventados en la operación:** la moneda queda «USD» si el
+   cliente no tiene otra (`main.py`, `upload_excel_v2`); la fecha de
+   emisión sale como la de hoy (`maria_generator.py:392`, también con PDF),
+   sin aviso.
+10. **Un mapeo guardado del cliente deja afuera encabezados nuevos**; tampoco
+    se reconocen «Cant.», «Precio Unitario (USD)», «Peso Neto (kg)» ni
+    «Posición Arancelaria».
+11. Menores: el manejador global muestra `dev_detail` (rutas del servidor,
+    SQL); `upload.js` acepta 15 MB y el servidor, 10 MB.
 
-El script corre con `-x`. Con pdfminer de vuelta, el PDF de 3 MB de otra
-prueba agotaba la memoria: el proceso moría (salida 137) sin decir por qué.
+En `/api/clientes/import`, que no tiene llamador: inventa «Cliente
+<CUIT>» cuando falta la razón social y acepta CUIT sin dígito verificador.
 
-Los sabotajes vigentes que tocan los mismos archivos siguen en rojo:
-`rendimiento1.sh`, `admin1.sh` y `admin2.sh` (`sabotajes con falla: 0`), y
-`sabotaje_maria2.sh` de la Dev 2 (`OK: los 8 sabotajes dan rojo por la razón
-esperada`).
+## Decisiones
 
-## Puertas sobre `b01149c`
+- **D13 — Rutas sin llamador vivo (tu punto 3).** `/upload_excel/` no la
+  llama nada que se sirva. `/upload_excel/public` sólo la llama el dashboard
+  viejo, y ahí no anda. `/api/clientes/import` no tiene llamador e inventa
+  nombres de cliente.
+  Opciones: (a) borrarlas en esta pieza; (b) no arreglarlas y borrarlas en
+  una pieza de limpieza; (c) arreglarlas igual.
+  **Recomiendo (a) para `/upload_excel/` y su alias `public`, y para
+  `/api/clientes/import`.** Ninguna llega al TXT desde una pantalla, y
+  borrarlas saca superficie. Así arreglo sólo `/upload_excel_v2/`. La parte
+  2 ya las dejó sin frenar el sitio, por si preferís (b).
+- **D14 — Las reglas de lectura de MARIA-1a están en la rama de la Dev 2.**
+  Los defectos 1, 3, 6 y 7 piden su regla: el número con coma o con punto
+  de miles, el país por nombre, el dato vacío con aviso. Según el auditor,
+  en `claude/dev2-maria` el camino del Excel sigue con `upper()[:3]` y
+  `float(...)`, así que MARIA-1a no lo cubre. Pero sus funciones existen, y
+  no están en mi rama: no se integra nada hasta después del ensayo.
+  Opciones: (a) traer MARIA-1a a mi rama con `merge` desde la tuya, cuando
+  la integres, y usar sus funciones; (b) escribir las mías para el Excel
+  (dos reglas que pueden divergir); (c) que la Dev 2 haga esos cuatro, ya que
+  son de lectura.
+  **Recomiendo (a).** Mientras tanto avanzo con los que no dependen de ella:
+  2 (unitario sobre total), 4 (neto sobre bruto), 5 (subtotales), 8
+  (mayúsculas), 10 (encabezados y mapeo), la moneda inventada del 9 y el
+  aviso de filas descartadas del 1.
+- **D15 — La fecha de emisión de hoy (`maria_generator.py:392`).** Afecta
+  también al PDF y es del generador del TXT, que es zona de la Dev 2.
+  **Recomiendo** que vaya a MARIA-1b o a la pieza de la Dev 2 que toque el
+  generador. No la toco.
 
-| Puerta | Resultado |
-|---|---|
-| Suite completa, worktree limpio, venv nuevo sólo desde `requirements.txt` | `746 passed, 102 skipped, 24 warnings in 78.23s` |
-| `compileall` | sin errores |
-| `smoke_friccion.sh` contra :8811 | `OK · telemetría + alias session/state + by-cuit protegido` |
-| `ataque_aislamiento.sh` | 22 BLOQUEADO, 0 FUGA |
-
-En la suite de `de4bf0c`, el mismo venv dio `pip check` limpio y no tenía
-instalados PyPDF2, python-jose ni ecdsa.
-
-## Autorrevisión
-
-Un subagente Opus alto, porque la pieza es chica.
-
-| Hallazgo | Qué hice |
-|---|---|
-| Alto: pypdf tarda más que lineal con un contenido de página enorme (9 MB, más de 60 s) y ocupa un hilo de lectura | sólo 2 páginas y salto de páginas de más de 512 KB (`24530dd`), con prueba y sabotaje |
-| Bajo-medio: `inf` o `1e309` apagaban el tiempo máximo | sólo valen números finitos, con prueba y sabotaje |
-| Confirmado: ningún otro camino vivo hacia pdfminer o pdfplumber | — |
-| Confirmado: la bomba de descompresión no traba a pypdf (0,5 s, 177 MB) | — |
+Lo de `dev_detail` (el manejador global muestra detalles internos) es de
+seguridad: **recomiendo** la Fase 3, junto con ABUSO-1.
 
 ## Qué no corrí
 
-- Nada contra producción ni terceros. Gemini real tampoco: está simulado.
-- `/code-review` y `/security-review` aparte: no, por la cuenta y porque la
-  pieza es chica. El revisor Opus tuvo el foco de seguridad.
+- Todavía no: sabotajes de la parte 2, revisores, humo y aislamiento. Van
+  con la entrega final.
+- El auditor no probó la pantalla en un navegador, ni Railway con varios
+  procesos.
 
 ## Archivos de producto que toqué
 
-`proyecto_maria/main.py` (adivinanza del vendedor y lectura de tiempos),
-`proyecto_maria/pdf_extractor.py` (nueva `extraer_texto_pdf_seguro`, cerca
-de la línea 820), `proyecto_maria/security/file_security.py`
-(`_pdf_validate_timeout_s`), `CHANGELOG.md`.
+`proyecto_maria/main.py` (las cinco rutas de Excel), 
+`proyecto_maria/services/migration_service.py`
+(`analyze_migration_file_async`), `proyecto_maria/security/file_security.py`
+(validación del Excel), `proyecto_maria/static/v2/screens/upload.js` (una
+condición), `CHANGELOG.md`.
 
 ## Sigo con
 
-EXCEL-1 (con D12) cuando me la escribas. Si no hay nada nuevo, espero.
+Los defectos de la parte 1 que no dependen de D13 ni de D14 (lista en D14),
+salvo que me digas otra cosa.
 
-Última vuelta: 2026-10-07 06:45 UTC
-Contexto: ~50 %
+Última vuelta: 2026-10-07 07:40 UTC
+Contexto: ~56 %
 
-`/compact conservar: Dev 1 de CDI en la rama claude/dev1-tecnica. ADMIN-1,
-ADMIN-2 y RENDIMIENTO-1 aceptadas (RENDIMIENTO-1 no se integra en la rama
-de PM hasta después del ensayo). RENDIMIENTO-1b reentregada con la devolución del
-vendedor en dos columnas (código ec3d793), informe en PARA-PM.md, sin D. Después siguen EXCEL-1 (con D12: pd.read_excel
-y openpyxl fuera del hilo del servidor), MARIA-1b (con la D6 de la Dev 2:
-save_client_operation no inventa cantidad 1 ni peso 0,5) y PUNTA-A-PUNTA-1.
-COBRO-CORTE-1 en pausa (D4=(b) N=10, D5=(a), D6=(a)); COBRO-MP-1 primero
-en la Fase 2 (D8: no aplicar dos veces un mismo pago). Entorno:
-PM_DIR=/tmp/cdi-dev1, levantar.sh <SHA> 8811, venv /tmp/cdi-dev1/venv y
-venv-limpio; sabotajes en scripts/testing/sabotajes/ (admin1, admin2,
-rendimiento1, rendimiento1b) y scripts/testing/sabotaje_maria2.sh. Rutina de
-la PM: trig_01TvMmGfSLDfbcJrf66ZZ7YK.`
+`/compact conservar: Dev 1 de CDI en la rama claude/dev1-tecnica.
+RENDIMIENTO-1b aceptada (ec3d793). EXCEL-1 en curso: parte 2 (leer Excel en
+otro hilo con EXCEL_READ_TIMEOUT_S, 504 lectura_excel_demasiado_larga) hecha
+en 3393c2f + pruebas b5ddaf3 (tests/test_excel1_rendimiento.py), suite 765
+passed; faltan sabotajes (scripts/testing/sabotajes/excel1.sh), revisores,
+humo y aislamiento. Parte 1: el relevamiento del auditor está en PARA-PM.md
+(10 defectos en /upload_excel_v2/). D13 (borrar /upload_excel/, su alias
+public y /api/clientes/import), D14 (reglas de MARIA-1a de la Dev 2) y D15
+(fecha de hoy en maria_generator) abiertas. Sigo con los defectos 2, 4, 5,
+8, 10, la moneda «USD» inventada y el aviso de filas descartadas. Después:
+MARIA-1b (con la D6 de la Dev 2) y PUNTA-A-PUNTA-1. Entorno: PM_DIR=/tmp/cdi-dev1,
+levantar.sh <SHA> 8811, venv /tmp/cdi-dev1/venv y venv-limpio; sabotajes en
+scripts/testing/sabotajes/. Rutina de la PM: trig_01TvMmGfSLDfbcJrf66ZZ7YK.`
