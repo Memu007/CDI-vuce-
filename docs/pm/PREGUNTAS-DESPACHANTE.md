@@ -65,11 +65,10 @@ no. Hoy CDI no lo emite. Agregado (21:40): **no siempre es el mismo; el
 cliente elige el que quiera para cada operación.**
 
 **Pregunta 5, empresa de digitalización (PSAD)** (21:42). Trabaja 95 % con
-Modoc y 5 % con Lakaut. Los dos archivos reales traen `PSAD06` (2025) y
-`PSAD01` (2026); CDI pone siempre `PSAD06`. **No se sabe qué código es cada
-empresa:** una búsqueda en la web no lo encontró (los sitios oficiales están
-bloqueados desde acá). Pregunta corta para la próxima: qué número o código
-aparece en el Kit al lado de cada una.
+Modoc y 5 % con Lakaut. Agregado (22:15): **se elige en cada operación;
+Lakaut = `PSAD01`, Modoc = `PSAD06`.** Coincide con los dos archivos reales
+(`PSAD06` en 2025, `PSAD01` en 2026). CDI pone siempre `PSAD06` (Modoc): hoy
+acierta en la mayoría de sus despachos, pero no se puede cambiar.
 
 **Pregunta 6, FCA y FAS** (2026-10-06). FCA y EXW no son lo mismo, pero en
 los dos casos se declara «gastos anteriores a FOB». Coincide con la regla que
@@ -79,9 +78,14 @@ SIM (la diferencia entre el FOB y la condición pactada) también es anterior al
 FOB. Ojo: FAS no está en la lista de condiciones válidas del generador
 (`maria_generator.py:777`).
 
-- **Falta saber:** cómo se carga en el Kit una reducción o una exclusión
-  (¿una opción de una lista o un número de certificado?). Pregunta corta para
-  la próxima.
+**Reducción o exclusión del IVA adicional** (22:12). En el Kit hay un menú
+«Ventajas» con decenas de opciones; una es `IVAADREDUCCION`, que el
+despachante elige cuando sabe que el importador tiene una reducción. No es
+automática: elegirla cuando no corresponde es una infracción grave. Ninguno
+de los dos archivos reales trae ventajas, así que no hay prueba de cómo iría
+en el TXT. **Lectura de la PM:** CDI no la pone en el archivo; avisa que, si
+hay reducción o exclusión, se elige en «Ventajas» del Kit. La exclusión no la
+nombró: es el mismo menú, con una ventaja que no se sabe.
 
 ## Sus respuestas, tal cual (2026-10-06, por mensaje a Emi)
 
@@ -111,23 +115,32 @@ Sin nombres: la fuente es «el despachante de Emi».
 >
 > **(después)** — FCA y EXW no son lo mismo, pero para hacer el despacho en
 > ambos casos se declara el dato «gastos anteriores a FOB».
+>
+> **22:12** — (a «¿cómo cargás una reducción o una exclusión del IVA
+> adicional?») En el kit hay un menú que se llama «Ventajas». En ese menú hay
+> decenas de opciones disponibles para elegir para que el sistema, por
+> ejemplo, no liquide un impuesto o no pida la presentación de algún
+> certificado, etc. Ahí hay una ventaja que se llama IVAADREDUCCION. El
+> despachante la selecciona cuando sabe que el importador tiene una reducción
+> del impuesto. Si bien el sistema tiene cargada la reducción del impuesto
+> para cada CUIT puede pasar que haya un error sistémico y que el despachante
+> esté dándole un beneficio al importador que no le corresponde (cometiendo
+> una infracción grave); por eso no es algo automático sino que hay que saber
+> cuándo seleccionarla y cuándo no.
+>
+> **22:15** — Selección de la empresa de digitalización: se selecciona en
+> cada operación. Códigos: Lakaut = PSAD01; Modoc = PSAD06.
 
 ## Lo que falta pedirle (para que Emi lo mande)
 
-Las preguntas 1 y 2 de abajo, Emi ya se las mandó (2026-10-07). Faltan sus
-respuestas y los dos favores.
+Las dos preguntas cortas ya están respondidas (2026-10-06, 22:12 y 22:15).
+Quedan los dos favores:
 
-> 1. Cuando hay una reducción o una exclusión del IVA adicional, ¿cómo lo
->    cargás en el Kit? ¿Elegís una opción de una lista o cargás un número de
->    certificado?
-> 2. En el Kit, cuando elegís Modoc o Lakaut como empresa de digitalización,
->    ¿qué número o código aparece al lado de cada una?
-> 3. (Favor) ¿Me pasás dos o tres despachos que hayas cargado, con nombres,
->    CUIT y montos tapados? Mejor si son distintos: uno EXW, uno CIF y uno con
+> 1. ¿Me pasás dos o tres despachos que hayas cargado, con nombres, CUIT y
+>    montos tapados? Mejor si son distintos: uno EXW, uno CIF y uno con
 >    varios productos.
-> 4. (Favor) ¿Podés probar en tu Kit María un archivo nuestro? Sólo cargarlo
->    para ver si lo acepta, sin oficializar nada. (Se manda cuando la cola
->    MARIA esté lista.)
+> 2. ¿Podés probar en tu Kit María un archivo nuestro? Sólo cargarlo para ver
+>    si lo acepta, sin oficializar nada. (Se manda al cerrar la Fase 1.)
 
 ## El mensaje que se mandó (2026-10-06)
 
@@ -173,7 +186,7 @@ ver en un archivo real no se pregunta: se pide el archivo.
 | Pregunta 2 | `IVAADICIONAL1` (hoy `IVAAD1` fijo, que sería «uso particular») |
 | Pregunta 3 | `QARTKGRNET` (hoy sale el peso de una unidad) |
 | Pregunta 4 | `BANCOSARGENTINA` (hoy no se emite; 191 = Credicoop) |
-| Pregunta 5 | `ARDIG-CUIT-PSAD` (hoy `PSAD06` fijo; un archivo real tenía `PSAD01`) |
+| Pregunta 5 | `ARDIG-CUIT-PSAD` (hoy `PSAD06` fijo; Modoc = `PSAD06`, Lakaut = `PSAD01`) |
 | Pregunta 6 | `GTOS-ANT-FOB` con FCA y FAS |
 | Favor 1 (archivos reales) | identificadores (`IDSO`, `IEXT`, `NDDTIMMTRN`, `LDVDREFDOC`), sufijos de valor por producto, número de proveedor y formato del archivo |
 | Favor 2 (probar en su Kit) | si acepta el número de proveedor, el redondeo y el formato; es la prueba de la puerta G4 |
@@ -183,10 +196,10 @@ ver en un archivo real no se pregunta: se pide el archivo.
 | Pregunta | Cambio en el producto |
 |---|---|
 | 1 | **Respondida.** `CARTUSO` deja de ser 3 fijo: se elige entre los seis estados, por ítem. Por defecto, «nuevo sin uso importado» (2) si el origen es extranjero; si es argentino, se pide elegir |
-| 2 | **Respondida.** `IVAADICIONAL1` por operación, con cambio por ítem. Por defecto, reventa sin beneficio (`NO_VALIDA`). `IVAAD1` sólo si se marca uso particular. Reducción o exclusión: aviso para cargarla en el Kit hasta saber cómo va en el archivo |
+| 2 | **Respondida.** `IVAADICIONAL1` por operación, con cambio por ítem. Por defecto, reventa sin beneficio (`NO_VALIDA`). `IVAAD1` sólo si se marca uso particular. Reducción o exclusión: no va en el TXT; aviso de que se elige en «Ventajas» del Kit |
 | 3 | **Respondida.** El peso del TXT pasa a ser el total de la línea (ítem o subítem), igual al que muestra la pantalla de validación |
 | 4 | **Respondida.** `BANCOSARGENTINA`: lo elige el cliente en cada operación. Se carga en la operación (se puede proponer el último que usó ese cliente) y se emite en el archivo; si falta, aviso |
-| 5 | **Respondida en parte.** `PSAD` en la configuración del estudio (cada despachante usa la suya, con cambio por operación). Falta qué código es Modoc y cuál Lakaut |
+| 5 | **Respondida.** `ARDIG-CUIT-PSAD` se elige en cada operación, como el banco (CDI propone la última usada): Modoc = `PSAD06`, Lakaut = `PSAD01` |
 | 6 | **Respondida.** La regla del FOB ya estaba bien. Falta cablear el campo de pantalla, que hoy no llega al TXT, y sumar FAS a las condiciones válidas (MARIA-3) |
 | Favor 1 | Identificadores, sufijos por ítem y número de proveedor según los archivos reales |
 | Favor 2 | Redondeo y formato según lo que acepte su Kit |

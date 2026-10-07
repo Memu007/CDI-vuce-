@@ -88,6 +88,16 @@ MARIA-4 (estado, IVA adicional, banco y empresa de digitalización, en una
 sola pieza), MARIA-3 y MARIA-5; MARIA-6 cuando llegue lo del despachante.
 MARIA-1b pasó a la Dev 1.
 
+**Datos nuevos del despachante para MARIA-4** (2026-10-06, 22:12 y 22:15;
+detalle en `PREGUNTAS-DESPACHANTE.md`):
+- **Empresa de digitalización:** se elige en cada operación, como el banco
+  (CDI propone la última usada). Modoc = `PSAD06`, Lakaut = `PSAD01`.
+- **Reducción o exclusión del IVA adicional:** es una «ventaja» que el
+  despachante elige en el Kit (`IVAADREDUCCION`). No va en el TXT (ningún
+  archivo real trae ventajas): sólo un aviso de que se elige ahí.
+
+MARIA-6 queda en identificadores y sufijos, con los archivos reales.
+
 ## Después — MARIA-2b (apenas entregues MARIA-1a)
 
 Tu D2: con clave, pero Gemini caído o con clave inválida, el mismo 503 con su

@@ -41,8 +41,8 @@ antes de cerrar la Fase 3.
 2. **Rotar las claves de Gemini** (G0). En Google AI Studio: borrar las que
    aparecieron, crear una nueva y ponerla sólo en Railway. Mirar la
    facturación de Google.
-3. **Despachante:** recordarle los archivos reales (favor 1). Las dos
-   preguntas cortas ya se las mandó Emi el 2026-10-07.
+3. **Despachante:** recordarle los archivos reales (favor 1). Ya respondió
+   todas las preguntas.
 4. **Hasta la primera publicación:** en `main` sigue la regla vieja que manda
    «push a `main`» a otros asistentes. No pedirle a ningún asistente cambios
    sobre `main`.
@@ -80,7 +80,7 @@ Archivos abiertos por Dev:
   lector de PDF viejo), EXCEL-1, MARIA-1b y PUNTA-A-PUNTA-1.
 - **Dev 2:** MARIA-1a. Sigue: MARIA-2b, MARIA-4 (estado, IVA adicional,
   banco y empresa de digitalización), MARIA-3 y MARIA-5; MARIA-6 cuando
-  llegue lo del despachante.
+  lleguen los archivos reales del despachante.
 - **Aceptadas el 2026-10-07 e integradas:** ADMIN-1 (`ac25dbc`) y MARIA-2
   (`65ea6f3`). Suite sobre la rama integrada (`78b60c8`):
   `703 passed, 102 skipped`.
@@ -89,9 +89,11 @@ Archivos abiertos por Dev:
   admin y saca los productos inventados, pero pide `ADMIN_USERNAMES`. La PM
   recomienda (b) si la variable está; si no, (a). La suite se corre otra vez
   sobre el SHA exacto.
-- **Despachante:** respondió las seis preguntas el 2026-10-06
-  (`PREGUNTAS-DESPACHANTE.md`). Faltan las dos cortas, los archivos reales y,
-  al cerrar la Fase 1, la prueba en su Kit.
+- **Despachante:** respondió las seis preguntas y las dos cortas el
+  2026-10-06 (`PREGUNTAS-DESPACHANTE.md`): la empresa de digitalización se
+  elige por operación (Modoc = `PSAD06`, Lakaut = `PSAD01`) y la reducción del
+  IVA adicional es una «ventaja» que elige él en el Kit, no va en el TXT.
+  Faltan los archivos reales y, al cerrar la Fase 1, la prueba en su Kit.
 
 ## Puertas para cobrarle a un estudio
 
@@ -138,9 +140,10 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 02:15 UTC: roadmap simplificado a pedido de Emi (una pantalla
-para Emi con «está lista cuando…», el detalle abajo; tres fusiones de
-piezas). PM al ~40 % de contexto: compacta en este corte.
+2026-10-07 01:20 UTC: las dos respuestas cortas del despachante, guardadas y
+llevadas a MARIA-4 y MARIA-6. Un subagente Opus alto ataca el candidato del
+ensayo (la cabeza de esta rama) en local; su informe se lee antes de pasarle
+el SHA a Emi.
 
 ## Medición
 

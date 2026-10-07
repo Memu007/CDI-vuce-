@@ -37,6 +37,8 @@ repositorio.
 | **CDI no usa Google Cloud** | 2026-10-07 | Emi: «no podemos rearmar esas cosas, es un proyecto muy viejo». `cloudbuild.yaml` se borra en LIMPIEZA-1. El sitio es sólo Railway |
 | **Producción tiene datos reales** | 2026-10-07 | Emi cargó facturas reales en el sitio publicado. La fuga de MARIA.TXT (S1) pedía sesión iniciada: si en producción no hay cuentas de otras personas, nadie pudo usarla. Lo confirma Emi en Railway antes del ensayo |
 | **Publicación de ensayo** | 2026-10-07 | Emi: «dale». Se publica la rama de trabajo más las reglas nuevas. El «dale» final va para el SHA exacto, de día y con los chequeos de Railway hechos |
+| **Empresa de digitalización, por operación** | 2026-10-07 | El despachante (2026-10-06, 22:15): «se selecciona en cada operación»; Lakaut = `PSAD01`, Modoc = `PSAD06`, como en los dos archivos reales. Se elige como el banco: en cada operación, con la última usada propuesta. Va en MARIA-4 |
+| **La reducción del IVA adicional no va en el TXT** | 2026-10-07 | El despachante (2026-10-06, 22:12): es la ventaja `IVAADREDUCCION` del menú «Ventajas» del Kit, que elige él cuando sabe que corresponde; elegirla mal es una infracción grave. Ningún archivo real trae ventajas. CDI no la pone: avisa que se elige en el Kit. Va en MARIA-4 |
 
 ---
 
@@ -48,5 +50,5 @@ repositorio.
 | **«Dale» para el SHA de la publicación de ensayo** | Emi aprobó el ensayo el 2026-10-07; falta el «dale» para el SHA exacto | Antes, Emi revisa en Railway las variables y las cuentas que pasarían a impagas |
 | **Prender «Wait for CI» en Railway** | Hoy Railway publica aunque las pruebas fallen | Es un ajuste de Railway; no cuesta nada |
 | **Qué se promete del catálogo NCM** | Hoy hay 10.226 posiciones de ARCA (julio de 2026), no 22 | Cambia el discurso comercial de septiembre |
-| **Las preguntas al despachante** | Seis preguntas y dos favores (`PREGUNTAS-DESPACHANTE.md`, versión simple). Respondió las seis el 2026-10-06. Faltan los dos favores y las dos preguntas cortas (enviadas el 2026-10-07) | MARIA-6 y la prueba en el Kit, que cierra G4 |
+| **Los dos favores del despachante** | Respondió las seis preguntas y las dos cortas el 2026-10-06 (`PREGUNTAS-DESPACHANTE.md`). Faltan sus archivos reales y, al cerrar la Fase 1, la prueba en su Kit | MARIA-6 y la prueba en el Kit, que cierra G4 |
 | **Precio y fecha de arranque** | Vencidos | Comercial; no se escriben acá |
