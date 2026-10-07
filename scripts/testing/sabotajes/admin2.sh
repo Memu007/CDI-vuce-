@@ -45,20 +45,16 @@ PYEOF
 M=proyecto_maria/main.py
 R=proyecto_maria/routers/admin_router.py
 sabotaje $M "conectores: el usuario común vuelve a ver el detalle" \
-  '    if not _es_admin(user):
-        return {
-            "vuce": {"mode": VUCE_CFG.mode},' \
-  '    if False:
-        return {
-            "vuce": {"mode": VUCE_CFG.mode},' \
+  '    if _es_admin(user):
+        return detalle' \
+  '    if True:
+        return detalle' \
   'FAILED tests/test_admin2.py::test_conectores_usuario_comun_sin_detalle'
 sabotaje $M "conectores: el admin pierde el detalle" \
-  '    if not _es_admin(user):
-        return {
-            "vuce": {"mode": VUCE_CFG.mode},' \
-  '    if True:
-        return {
-            "vuce": {"mode": VUCE_CFG.mode},' \
+  '    if _es_admin(user):
+        return detalle' \
+  '    if False:
+        return detalle' \
   'FAILED tests/test_admin2.py::test_conectores_admin_con_detalle'
 sabotaje $M "simulate-webhook vuelve a existir" \
   '@app.get("/api/billing/plans")' \
@@ -69,6 +65,20 @@ async def _simulate_webhook_de_vuelta():
 
 @app.get("/api/billing/plans")' \
   'assert 200 in (404, 405)'
+sabotaje $M "simulate-webhook vuelve: activa la cuenta y responde 404" \
+  '@app.get("/api/billing/plans")' \
+  '@app.post("/api/payments/simulate-webhook")
+async def _simulate_webhook_de_vuelta(request: Request):
+    body = await request.json()
+    async for session in get_async_session():
+        u = (await session.execute(select(User).where(User.username == body["username"]))).scalars().first()
+        u.billing_status = "active"
+        await session.commit()
+    raise HTTPException(status_code=404)
+
+
+@app.get("/api/billing/plans")' \
+  "assert 'active' == 'trial'"
 sabotaje $R "cohort-retention vuelve a pedir el rol" \
   '    db: AsyncSession = Depends(get_db),
 ) -> Dict[str, Any]:
