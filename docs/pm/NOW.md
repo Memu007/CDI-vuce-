@@ -9,7 +9,7 @@ Railway publica cada push a `main` sin esperar los tests.
 commits sin publicar, antes en `claude/project-deploy-review-4nct96`, que
 queda como historia) más las reglas y documentos. **Ramas de las Devs:**
 `claude/dev1-tecnica` y `claude/dev2-maria`.
-**Usuarios reales en producción:** ninguno; la usa sólo Emi.
+**Usuarios reales en producción:** ninguno; la usa sólo Emi, **con facturas reales** (Emi, 2026-10-07).
 
 ## Para Emi
 
@@ -25,13 +25,20 @@ queda como historia) más las reglas y documentos. **Ramas de las Devs:**
    - en la base: hacer una copia (pestaña de copias de seguridad) si el plan
      lo permite;
    - mirar qué cuentas hay: toda cuenta activa con el período vencido hace
-     más de 7 días pasa a impaga al arrancar;
-   - recomendado: prender «Wait for CI» y apagar la red pública de la base.
+     más de 7 días pasa a impaga al arrancar. **Y si hay alguna cuenta que no
+     sea de Emi:** la fuga de MARIA.TXT pedía sesión iniciada, así que si no
+     hay cuentas ajenas, nadie pudo ver sus facturas reales;
+   - saber que al publicar se borran los TXT generados y el historial de NCM
+     que viven en el disco del servidor (pasa en cada publicación; las
+     operaciones en la base quedan; DISCO-1 lo arregla);
+   - recomendado: prender «Wait for CI» y apagar la red pública de la base;
+   - de paso, para más adelante (PUBLICAR-1): ver si existe la variable
+     `ADMIN_USERNAMES` con el usuario de Emi. Después de ADMIN-1, sólo los
+     usuarios de esa lista entran al admin.
    La PM le pasa el SHA exacto con la suite corrida sobre él.
 3. **Mandar las preguntas al despachante** (`PREGUNTAS-DESPACHANTE.md`).
-4. **Decir si CDI usa Google Cloud** (hay un segundo camino de publicación en
-   el repositorio; si no, se borra en LIMPIEZA-1) y **si alguna vez subió
-   datos reales** al sitio publicado.
+4. Respondido el 2026-10-07: CDI no usa Google Cloud, y Emi cargó facturas
+   reales en el sitio publicado.
 5. **Decidido por la PM, se puede revertir:** los límites del proyecto
    (`ONBOARDING-PM.md`) y que las reglas nuevas lleguen a `main` con la
    primera publicación. Hasta entonces, en `main` sigue la regla vieja que
@@ -74,9 +81,9 @@ Archivos abiertos por Dev:
   `680 passed, 102 skipped, 10 warnings in 65.29s`. Espera los chequeos de
   Railway y el «dale» de Emi para el SHA, de día. Si se publica un commit
   posterior de la rama de PM, sólo con documentos de diferencia.
-- Despachante: respondió las preguntas 1 y 2 (estado e IVA adicional) el
-  2026-10-06. Faltan la 3 a la 6, los dos favores y una corta nueva (cómo se
-  carga una reducción o exclusión del IVA adicional). MARIA-4 pasó al tercer
+- Despachante: respondió las seis preguntas el 2026-10-06. Faltan los dos
+  favores y dos cortas nuevas (cómo se carga una reducción o exclusión del IVA
+  adicional; qué código tiene en el Kit cada empresa de digitalización). MARIA-4 pasó al tercer
   lugar de la cola MARIA.
 
 ## Cola
@@ -132,9 +139,12 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 00:30 UTC: Emi aprobó el roadmap, dos Devs y la publicación de
-ensayo. Abiertas la Dev 1 (ADMIN-1) y la Dev 2 (MARIA-2), con sus rutinas.
-Suite sobre el candidato del ensayo en verde. PM al ~16 % de contexto.
+2026-10-07 01:00 UTC: el despachante respondió las seis preguntas (texto tal
+cual en `PREGUNTAS-DESPACHANTE.md`); la cola MARIA se ajustó (MARIA-4 sube,
+MARIA-4b nueva, el peso total sale en la Fase A). Emi: CDI no usa Google
+Cloud; producción tiene facturas reales. Dev 1 en ADMIN-1, Dev 2 en MARIA-2.
+**Mañana desde las 9:** pasarle a Emi el SHA del ensayo y la lista de Railway
+(«Para Emi», punto 2). PM al ~23 % de contexto.
 
 ## Medición
 

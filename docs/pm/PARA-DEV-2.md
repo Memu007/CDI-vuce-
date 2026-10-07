@@ -32,54 +32,26 @@ tienen que seguir saliendo idénticos, salvo que la tarea diga otra cosa.
 
 ## Último veredicto
 
-(ninguno todavía)
+**MARIA-2: entregada (`65ea6f3`), en revisión de la PM.** El veredicto llega
+en la próxima vuelta. Si trae una devolución, va primero.
 
-## Tarea activa — MARIA-2: sin clave de Gemini no se inventan productos
+## Respuestas a tus D (2026-10-07, 01:10 UTC)
 
-Asignada el 2026-10-07. Roadmap aprobado por Emi (`ROADMAP.md`, cola MARIA,
-pieza 1). Hallazgo M4 de `AUDITORIA-2026-10-06.md`.
+- **D1 (sin clave, leer igual los PDF con texto): (a).** Nada de lector viejo
+  sin probar.
+- **D2 (Gemini caído o clave inválida): (b), pieza chica aparte, MARIA-2b.**
+  Va **después** de MARIA-1a (abajo).
+- **D3 (códigos de tres letras): (a).** La tabla «tres letras → dos letras»
+  se genera una vez desde ISO 3166-1, con la prueba de que cada destino existe
+  en la tabla oficial. `pycountry` sólo para generarla, no como dependencia.
+  Prueba para el cambio en el TXT: la norma ISO y la tabla oficial VUCE.
+- **D4 (producto sin origen): (a), vacío y con el aviso del semáforo.**
+- **Tu plan de MARIA-1a, aprobado:** una sola función de origen para las dos
+  copias del lector, una sola función para los números (con la regla de la
+  coma que propusiste), nada de 0,5 ni 1 inventados, y el arreglo del precio
+  `2.45` → `245` en la copia de PyMuPDF.
 
-**Base:** la cabeza de `claude/practical-shannon-szpwkn` al arrancar. Su
-código es idéntico a `e8344d0`.
-
-**Problema.** Si falta la clave de Gemini (o el lector con IA está apagado),
-el lector de PDF devuelve dos productos de demostración
-(`proyecto_maria/pdf_extractor.py:1933-1960`, «ITEM DEMOSTRACION»). Llegan a
-la pantalla y al TXT sin ninguna marca: un despachante podría declarar
-productos que no existen.
-
-**Alcance.**
-1. Sin clave o con el lector apagado: ningún producto inventado. Error claro
-   en castellano («no se pudo leer la factura automáticamente; cargá los
-   productos a mano»), con un código de estado que el frontend distinga
-   (`main.py:3446`, `upload_pdf_public`).
-2. La pantalla muestra ese mensaje y deja seguir con carga manual.
-3. Revisá si hay otros caminos que devuelvan datos inventados cuando falla
-   Gemini (por ejemplo, el «fallback» del mismo lector) y listalos. Los que
-   inventen datos, mismo arreglo; los que sólo leen el texto del PDF, quedan.
-
-**Fuera de alcance:** el país de origen, las cantidades y el peso (MARIA-1a);
-que leer un PDF frene el sitio (RENDIMIENTO-1, de la Dev 1); cambiar el
-modelo de Gemini.
-
-**Criterios de aceptación** (con la salida pegada):
-- Rojo antes: sin clave, subir un PDF devuelve los productos de
-  demostración. Verde después: error claro y cero productos.
-- Con clave inventada (`test-key`) las pruebas siguen como antes: ni Gemini
-  real ni internet desde las pruebas.
-- Los dos archivos reales siguen saliendo idénticos.
-- Suite completa en verde sobre el SHA que entregás, desde base limpia.
-- Una captura de la pantalla con el mensaje (navegador local).
-
-**Leé:** `AUDITORIA-2026-10-06.md` (M4) y `ROADMAP.md` (cola MARIA).
-
-**Cuándo frenar y consultar (D):** si quitar el modo demostración rompe una
-pantalla de bienvenida o una demo comercial que dependa de él.
-
-**Entrega:** con `/entregar`. Producto, pruebas e informe en commits
-separados. Autorrevisión con un subagente Sonnet medio o alto.
-
-## Después — MARIA-1a: la factura bien leída (apenas entregues MARIA-2)
+## Tarea activa — MARIA-1a: la factura bien leída
 
 Hallazgo M5. El lector corta el país de origen a dos letras: `CHN` → `CH`,
 que es **Suiza**; `MEX` → Montenegro. El corte está en **dos copias** del
@@ -103,3 +75,9 @@ despachante) y las validaciones antes de generar (MARIA-1b).
 `P.R. China`, y con cantidades `1,5` (coma decimal) y `1,500` (separador de
 miles en una factura en inglés). Si no se puede saber cuál es, aviso y nada
 adivinado. Suite completa en verde.
+
+## Después — MARIA-2b (apenas entregues MARIA-1a)
+
+Tu D2: con clave, pero Gemini caído o con clave inválida, el mismo 503 con su
+`code` y el botón de carga manual, en vez del 400 «No se encontró tabla de
+items…». Con un Gemini falso que falla; ni Gemini real ni internet.

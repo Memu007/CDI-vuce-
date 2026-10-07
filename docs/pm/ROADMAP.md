@@ -93,6 +93,12 @@ los chequeos hechos.
   el año de un identificador que estaba escrito a mano, los gastos hasta el
   FOB según la condición de venta y la lista de supuestos.
 - **No arregla** el resto de los agujeros: eso es la cola técnica.
+- **Importa más de lo que parecía:** Emi cargó facturas reales en el sitio
+  (2026-10-07). Antes, Emi mira en Railway si hay cuentas que no sean suyas:
+  la fuga pedía sesión iniciada.
+- **Se borra** lo que vive en el disco del servidor: los TXT generados y el
+  historial de NCM. Pasa en cada publicación (DISCO-1 lo arregla); las
+  operaciones en la base quedan.
 
 ### Cola técnica (Dev 1)
 
@@ -103,7 +109,7 @@ reproduce cada hallazgo antes de aceptarla.
 |---|---|---|---|---|
 | 1 | ADMIN-1 | Las pantallas de administración, sólo para Emi. Lista cerrada de funciones globales | S2 | chico |
 | 2 | COBRO-CORTE-1 | Quien no paga no genera el MARIA ni gasta Gemini. Las operaciones se cuentan una vez por operación y sin pasarse del tope con pedidos al mismo tiempo | C1, C5, C6 | medio |
-| 3 | LIMPIEZA-1 | Las 10 pruebas excluidas a mano vuelven a la CI; se borra el segundo camino de publicación si Emi no lo usa; se sacan de los archivos las cadenas que pueden tener contraseñas | X2, X4, secretos | chico |
+| 3 | LIMPIEZA-1 | Las 10 pruebas excluidas a mano vuelven a la CI; se borra el segundo camino de publicación (Emi confirmó que no se usa); se sacan de los archivos las cadenas que pueden tener contraseñas | X2, X4, secretos | chico |
 | 4 | SESION-1 | Cambiar o resetear la contraseña y cerrar sesión revocan de verdad; cambiar el email pide la contraseña | S3 | medio |
 | 5 | ABUSO-1 | Límite de intentos con la IP real; topes en registro, recuperar usuario, eventos de pantalla y sugerencias de NCM; no revelar qué emails existen | S4, S5, S6, C9, X1 | medio |
 | 6 | ORG-1 | Invitaciones que funcionan en la base de producción, tope de usuarios del plan, invitación atada al email | C7 | medio |
@@ -131,15 +137,16 @@ con PUBLICAR-2 y el cobro chico de Emi: alta, cobro, renovación, cancelación
 |---|---|---|---|---|---|---|
 | 1 | MARIA-2 | Sin clave de Gemini no se inventan productos: error claro | M4 | chico | no (evita productos falsos) | con PUBLICAR-1 |
 | 2 | MARIA-1a | Lectura de la factura: el país de origen bien leído (hoy China sale como Suiza; está en **dos** copias del lector), cantidades con coma, nada de peso inventado | M5 | medio | sí, donde hoy está mal | con PUBLICAR-1 o 2. Prueba: la tabla oficial de países, que ya está en el código |
-| 3 | MARIA-4 | **Estado de la mercadería e IVA adicional, como respondió el despachante:** el estado se elige entre seis, por producto (por defecto, nuevo sin uso importado si el origen es extranjero). El IVA adicional se paga completo en reventa: deja de declararse siempre «uso particular». Banco y empresa de digitalización, editables con el valor de hoy | M2, M3 | medio | **sí** | con PUBLICAR-2. Prueba: las respuestas 1 y 2 del despachante y el archivo real de 2026 (`PREGUNTAS-DESPACHANTE.md`, «Respuestas») |
+| 3 | MARIA-4 | **Estado de la mercadería e IVA adicional, como respondió el despachante:** el estado se elige entre seis, por producto (por defecto, nuevo sin uso importado si el origen es extranjero). El IVA adicional se paga completo en reventa: deja de declararse siempre «uso particular» | M2, M3 | medio | **sí** | con PUBLICAR-2. Prueba: las respuestas 1 y 2 del despachante y el archivo real de 2026 (`PREGUNTAS-DESPACHANTE.md`, «Respuestas») |
 | 4 | MARIA-1b | Controles antes de generar: NCM que exista en el catálogo, moneda, incoterm, CUIT, montos; ningún texto puede meter líneas en el archivo | M10 | medio | no, con datos correctos | con PUBLICAR-1 o 2 |
-| 5 | MARIA-3 | Los avisos se muestran **antes** de generar y completos; los gastos anteriores al FOB llegan al archivo en EXW; la procedencia se carga en pantalla | M6, M8 | grande | sí | con PUBLICAR-2. Prueba: la ley (Código Aduanero, art. 15), la nota del SIM y un archivo real con procedencia distinta del origen |
-| 6 | MARIA-5 | Peso total por producto y cuentas exactas (hoy a veces no cierran por un centavo). Queda hecho y aparte | M1, M9 | medio | **sí** | **Fase B**: con la respuesta 3 y la prueba en su Kit. Los dos archivos reales tienen que salir idénticos |
+| 5 | MARIA-3 | Los avisos se muestran **antes** de generar y completos; los gastos anteriores al FOB llegan al archivo en EXW, FCA y FAS (FAS se suma a las condiciones válidas); la procedencia se carga en pantalla | M6, M8 | grande | sí | con PUBLICAR-2. Prueba: la respuesta 6 del despachante, la ley (Código Aduanero, art. 15), la nota del SIM y un archivo real con procedencia distinta del origen |
+| 6 | MARIA-4b | El banco lo elige el cliente en cada operación: se carga en la operación (con el último que usó ese cliente como propuesta) y sale en el archivo (hoy no sale). La empresa de digitalización pasa a la configuración del estudio, con cambio por operación; por defecto, la de hoy hasta saber los códigos | — | medio | **sí** (el banco) | con PUBLICAR-2. Prueba: las respuestas 4 y 5 y el archivo real de 2026 |
+| 7 | MARIA-5 | Peso total por producto (hoy sale el de una unidad) y cuentas exactas (hoy a veces no cierran por un centavo) | M1, M9 | medio | **sí** | El peso, con PUBLICAR-2. Prueba: la respuesta 3 y el archivo real de 2026. Las cuentas exactas, en la **Fase B**, con la prueba en su Kit. Los dos archivos reales tienen que salir idénticos |
 
 MARIA-1b y MARIA-3 tocan la misma función que COBRO-CORTE-1: arrancan después
 de que esa pieza esté aceptada. RENDIMIENTO-1 va después de MARIA-2 (tocan la
-misma línea). MARIA-4, MARIA-3 y MARIA-5 tocan las mismas cuentas del
-generador: van en ese orden, una después de la otra. MARIA-4 subió al tercer
+misma línea). MARIA-4, MARIA-3, MARIA-4b y MARIA-5 tocan el mismo generador: van en ese
+orden, una después de la otra. MARIA-4 subió al tercer
 lugar el 2026-10-07: el despachante ya respondió y hoy CDI declara el IVA
 adicional como si toda la mercadería fuera de uso particular.
 
@@ -160,9 +167,9 @@ CSRF, cabeceras de seguridad y topes de subida de archivos.
 
 | Pieza | Qué hace | Espera |
 |---|---|---|
-| MARIA-6 | Valores por defecto según sus respuestas: banco, empresa de digitalización, gastos en FCA y FAS; cómo va en el archivo una reducción o exclusión del IVA adicional | preguntas 4, 5 y 6, y la de reducción o exclusión (1 y 2 ya respondidas) |
+| MARIA-6 | El código de cada empresa de digitalización y cómo va en el archivo una reducción o exclusión del IVA adicional | dos preguntas cortas nuevas (las seis primeras, ya respondidas) |
 | MARIA-7 | Identificadores, sufijos de valor por producto y código de proveedor como en sus archivos reales | favor 1 (los archivos) |
-| MARIA-5 | Se publica el peso total y las cuentas exactas | pregunta 3 y favor 2 |
+| MARIA-5 | Se publican las cuentas exactas (el peso sale antes) | favor 2 |
 | PRUEBA-KIT | El despachante carga en su Kit un archivo de CDI, sin oficializar | favor 2. **Cierra G4** |
 | PUBLICAR-3 | Con el «dale» de Emi | — |
 
