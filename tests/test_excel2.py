@@ -210,3 +210,88 @@ def test_leer_solo_la_primera_hoja_da_lo_mismo_que_el_libro_entero(tmp_path):
     entero = pd.read_excel(ruta, engine="openpyxl", dtype=object).dropna(how="all")
     solo = main._leer_excel_ruta(str(ruta), "openpyxl")
     pd.testing.assert_frame_equal(entero, solo)
+
+
+# ------------------------------------------- D18: lo que el Excel no leía
+
+def _libro(filas: list, combinar: tuple = ()) -> bytes:
+    import openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    for fila in filas:
+        ws.append(fila)
+    for rango in combinar:
+        ws.merge_cells(rango)
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+ENCABEZADO = ["NCM", "Descripcion", "Pais de origen", "Cantidad", "Precio Unitario", "Peso Neto"]
+
+
+def test_el_encabezado_no_tiene_que_estar_en_la_fila_1():
+    """Logo o datos del vendedor arriba: antes, 400 con el archivo entero."""
+    r = _subir(_libro([
+        ["FACTURA COMERCIAL"],
+        ["Proveedor: DEMO S.A.", None, None, "Fecha:", "18/07/2025"],
+        [],
+        ENCABEZADO,
+        ["84798999900H", "MAQUINA DEMO", "Argentina", 1, 5000, 1220],
+        ["84714900100D", None, None, None, None, None],
+    ]))
+    assert r.status_code == 200, r.text[:300]
+    data = r.json()
+    assert [i["descripcion"] for i in data["items"]] == ["MAQUINA DEMO"]
+    assert data["items"][0]["valor_unitario"] == 5000 and data["items"][0]["origen"] == "AR"
+    # La fila que no se pudo leer se nombra con su número en la planilla.
+    assert data["operacion"].get("filas_excel_sin_leer") == [6], data["operacion"]
+
+
+def test_sin_columna_de_origen_entra_con_el_origen_vacio_y_avisa():
+    r = _subir(_libro([
+        ["NCM", "Descripcion", "Cantidad", "Precio Unitario", "Peso Neto"],
+        ["84798999900H", "MAQUINA DEMO", 1, 5000, 1220],
+    ]))
+    assert r.status_code == 200, r.text[:300]
+    data = r.json()
+    assert data["items"][0]["origen"] == "" and data["items"][0]["valor_unitario"] == 5000
+    assert any("origen" in a for a in data["avisos_mapeo"]), data["avisos_mapeo"]
+
+
+def test_una_celda_combinada_hacia_abajo_vale_para_todas_sus_filas():
+    r = _subir(_libro([
+        ENCABEZADO,
+        ["84798999900H", "MAQUINA DEMO", "China", 1, 5000, 1220],
+        ["84714900100D", "EQUIPO DEMO", None, 6, 1197, 33],
+        ["84714900100D", "OTRO EQUIPO", "Brasil", 2, 10, 1],
+    ], combinar=("C2:C3",)))
+    assert r.status_code == 200, r.text[:300]
+    assert [i["origen"] for i in r.json()["items"]] == ["CN", "CN", "BR"]
+
+
+def test_una_celda_combinada_hacia_el_costado_no_pisa_otra_columna():
+    """Una descripción larga combinada sobre la columna del origen no es un
+    origen: sólo se copia hacia abajo, en su propia columna."""
+    r = _subir(_libro([
+        ENCABEZADO,
+        ["84798999900H", "MAQUINA DEMO", None, 1, 5000, 1220],
+    ], combinar=("B2:C2",)))
+    assert r.status_code == 200, r.text[:300]
+    assert r.json()["items"][0]["origen"] == "", r.json()["items"]
+
+
+# ------------------------------------------- el aviso de mapeo nombra la columna
+
+def test_el_aviso_de_mapeo_nombra_la_columna_que_se_uso():
+    # El catálogo del cliente guardó «Valor» para el precio y el archivo trae
+    # «Precio Unitario»: gana la del archivo, y el aviso dice cuál se usó.
+    efectivo, avisos = main._mapeo_efectivo(
+        {"Valor": "valor_unitario", "Glosa": "descripcion"},
+        {"Precio Unitario": "valor_unitario", "Descripcion": "descripcion"},
+        ["Valor", "Precio Unitario", "Glosa", "Descripcion"],
+    )
+    assert efectivo["Precio Unitario"] == "valor_unitario" and efectivo["Glosa"] == "descripcion"
+    texto = " | ".join(avisos)
+    assert "«Precio Unitario»" in texto and "«Valor»" in texto, avisos
+    assert "«Glosa»" in texto and "«Descripcion»" in texto, avisos
