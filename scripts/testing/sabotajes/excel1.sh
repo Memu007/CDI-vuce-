@@ -73,7 +73,7 @@ sabotaje $M "«Valor» vuelve a ganar sobre el precio unitario" \
 # último; el sabotaje lo vuelve de una unidad.
 sabotaje $M "el peso bruto vuelve a usarse como peso unitario" \
   '    if "bruto" in normal or "gross" in normal:
-        return "bruto_unidad" if _dice_de_una_unidad(normal) else "bruto"' \
+        return "bruto_unidad" if _bruto_de_una_unidad(normal) else "bruto"' \
   '    if False:
         return "bruto"' \
   "FAILED $L::test_peso_bruto_o_total_no_se_toma_como_peso_unitario"

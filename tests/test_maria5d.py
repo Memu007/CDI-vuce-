@@ -13,7 +13,8 @@ import pytest
 from tests.test_maria5_peso_excel import COLUMNAS, _make_excel_bytes, _subir
 
 BRUTOS_DE_UNA_UNIDAD = ["Peso bruto unitario", "Gross weight per unit", "Peso bruto por unidad",
-                        "Gross unit weight", "Peso Bruto Unit."]
+                        "Gross unit weight", "Peso Bruto Unit.", "Peso Bruto Unid.", "Peso bruto (kg/u)",
+                        "Peso bruto c/u"]
 
 
 @pytest.mark.parametrize("columna", BRUTOS_DE_UNA_UNIDAD)
@@ -60,3 +61,14 @@ def test_las_que_dicen_por_unidad_no_son_dudosas(auth_override, client, columna)
     data = _subir(client, [columna], [2.5])
     assert data["items"][0]["peso_unitario"] == pytest.approx(2.5), data
     assert not any("Revisala" in a for a in data["avisos"]), data["avisos"]
+
+
+@pytest.mark.parametrize("columna", ["Peso bruto total unidades", "Gross weight (units)", "Peso Bruto Total/U",
+                                     "Peso bruto total (unidad de venta)", "Peso bruto (unidades)",
+                                     "Peso bruto total unitario"])
+def test_un_bruto_de_la_linea_que_menciona_unidades_se_divide(auth_override, client, columna):
+    """Revisión adversaria: el bruto va último y nada lo compara; si no dice
+    sin dudas que es de una unidad, es de la línea (30 kg en 10 → 3 kg)."""
+    data = _subir(client, [columna], [30])
+    assert data["items"][0]["peso_unitario"] == pytest.approx(3.0), data
+    assert any("bruto" in a for a in data["avisos"]), data["avisos"]

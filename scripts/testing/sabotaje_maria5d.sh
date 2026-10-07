@@ -53,7 +53,7 @@ fi
 echo "VERDE  sin sabotaje: $(grep -E 'passed' <<<"$base" | tail -1)"
 
 # 1. el bruto de una unidad vuelve a ser bruto de la línea (se divide)
-reemplazar $M '        return "bruto_unidad" if _dice_de_una_unidad(normal) else "bruto"' '        return "bruto"'
+reemplazar $M '        return "bruto_unidad" if _bruto_de_una_unidad(normal) else "bruto"' '        return "bruto"'
 caso bruto_dividido "${T}test_el_bruto_de_una_unidad_no_se_divide[Peso bruto unitario]"
 
 # 2. el bruto de una unidad le gana a un peso de una unidad
@@ -74,5 +74,15 @@ caso barra_u "${T}test_las_que_dicen_por_unidad_no_son_dudosas[Peso c/u]"
 reemplazar $M '            or sin_parentesis in ("pesou", "pesobrutou"))' '            )'
 caso peso_u "${T}test_las_que_dicen_por_unidad_no_son_dudosas[Peso U.]"
 
+# 6. un bruto de la línea que menciona unidades deja de dividirse
+reemplazar $M '    if "total" in normal or "linea" in normal or "unidades" in normal or "units" in normal:
+        return False' '    if False:
+        return False'
+caso bruto_total_unidades "${T}test_un_bruto_de_la_linea_que_menciona_unidades_se_divide[Peso bruto total unidades]"
+
+# 7. «Peso Bruto Unid.» vuelve a dividirse
+reemplazar $M 'xunidad|unitweight|(unit|unid|/u|brutou)$' 'xunidad|unitweight|(unit|/u|brutou)$'
+caso bruto_unid "${T}test_el_bruto_de_una_unidad_no_se_divide[Peso Bruto Unid.]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 5 sabotajes dan rojo por la razón esperada"
+echo "OK: los 7 sabotajes dan rojo por la razón esperada"

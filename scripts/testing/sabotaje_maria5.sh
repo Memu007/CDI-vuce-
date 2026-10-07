@@ -288,7 +288,7 @@ caso dudosa_sin_aviso "${E}test_una_columna_desconocida_sola_se_usa_con_aviso"
 
 # 47. «Peso bruto unitario» vuelve a leerse como de una unidad
 reemplazar $M '    if "bruto" in normal or "gross" in normal:
-        return "bruto_unidad" if _dice_de_una_unidad(normal) else "bruto"' '    if ("bruto" in normal or "gross" in normal) and not _dice_de_una_unidad(normal):
+        return "bruto_unidad" if _bruto_de_una_unidad(normal) else "bruto"' '    if ("bruto" in normal or "gross" in normal) and not _bruto_de_una_unidad(normal):
         return "bruto"'
 caso bruto_unitario "${E}test_el_bruto_unitario_es_bruto["
 
