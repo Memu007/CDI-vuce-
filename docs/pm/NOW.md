@@ -175,10 +175,9 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 08:20 UTC (rutina): MARIA-4 aceptada con su devolución; MARIA-3
-escrita para la Dev 2, que espera su `/compact` (~88 %). Dev 1 en EXCEL-1 con
-sus D13 a D16 contestadas. PM ~43 %. A las 9 (ARG): los tres `/compact`, la
-lista de Railway y el SHA del ensayo.
+2026-10-07 09:00 UTC (rutina): sin entregas nuevas. Dev 1 sigue con EXCEL-1
+(arreglos de sus revisores, `2759c84`); Dev 2 avanzó con MARIA-3 (`a3f2df9`).
+A las 9 (ARG): los tres `/compact`, la lista de Railway y el SHA del ensayo.
 
 ## Medición
 
