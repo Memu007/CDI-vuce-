@@ -112,7 +112,7 @@ reemplazar $M "        aviso = ncm_catalog.aviso_de_ncm(ncm_key)
 caso sugerencia_sin_aviso "${T}test_la_sugerencia_del_historial_marca_la_baja"
 
 # 8. el código escrito dado de baja no lo dice
-reemplazar $M "        if _looks_like_ncm_code_query(descripcion) and ncm_catalog.ncm_de_baja(descripcion):" "        if False:"
+reemplazar $M '        aviso = ncm_catalog.aviso_de_codigo_escrito(descripcion) if _looks_like_ncm_code_query(descripcion) else ""' '        aviso = ""'
 caso codigo_escrito_sin_aviso "${T}test_un_codigo_dado_de_baja_escrito_lo_dice"
 
 # 9. vuelve el respaldo con códigos que no existen
