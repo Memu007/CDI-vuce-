@@ -62,14 +62,18 @@ echo "VERDE  sin sabotaje: $(grep -E 'passed' <<<"$base" | tail -1)"
 
 # 1. vuelve el modo demostración
 reemplazar proyecto_maria/pdf_extractor.py \
-  "raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)" \
-  'return [{"pieza": "", "descripcion": "ITEM DEMOSTRACION (Falta API Key)", "cantidad": 10.0, "valor_unitario": 150.0, "origen": "CN", "peso_unitario": 1.0}]'
+  "lectura automática no disponible\")
+        raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)" \
+  'lectura automática no disponible")
+        return [{"pieza": "", "descripcion": "ITEM DEMOSTRACION (Falta API Key)", "cantidad": 10.0, "valor_unitario": 150.0, "origen": "CN", "peso_unitario": 1.0}]'
 caso "vuelve_la_demo" "ITEM DEMOSTRACION"
 
 # 1b. vuelve la demo y el endpoint no pregunta antes: llega a la pantalla
 reemplazar proyecto_maria/pdf_extractor.py \
-  "raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)" \
-  'return [{"pieza": "", "descripcion": "ITEM DEMOSTRACION (Falta API Key)", "cantidad": 10.0, "valor_unitario": 150.0, "origen": "CN", "peso_unitario": 1.0}]'
+  "lectura automática no disponible\")
+        raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)" \
+  'lectura automática no disponible")
+        return [{"pieza": "", "descripcion": "ITEM DEMOSTRACION (Falta API Key)", "cantidad": 10.0, "valor_unitario": 150.0, "origen": "CN", "peso_unitario": 1.0}]'
 reemplazar proyecto_maria/main.py \
   "        if not lectura_automatica_disponible():
             # Sin lector con IA: cero productos, sin descontar" \

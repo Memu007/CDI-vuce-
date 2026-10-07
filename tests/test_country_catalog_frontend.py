@@ -38,3 +38,11 @@ console.log(JSON.stringify(result));
         "label": "310 · CHINA",
         "invalid": "",
     }
+
+
+def test_la_revision_valida_fechas_reales():
+    """Devolución de MARIA-3: la fecha es obligatoria; la revisión no deja
+    pasar una imposible (31/02) y acepta día y mes de una cifra, como el
+    servidor."""
+    js = (ROOT / "proyecto_maria" / "static" / "v2" / "screens" / "review.js").read_text(encoding="utf-8")
+    assert "fechaValida(" in js

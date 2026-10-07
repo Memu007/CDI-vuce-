@@ -364,6 +364,12 @@
             });
 
             setBusy(false);
+            // Lo que la factura traía pero no se pudo leer (MARIA-1c). Al
+            // final, para que otro aviso de la subida no lo tape.
+            const sinLeer = CDI.camposSinLeer ? CDI.camposSinLeer() : [];
+            if (sinLeer.length && CDI.toast) {
+                CDI.toast('Revisá la factura', sinLeer.join(' '), 'warning');
+            }
             console.log('[upload] items listos:', items.length, '→ goTo review');
             CDI.goTo('review', { fromUpload: true });
         } catch (err) {

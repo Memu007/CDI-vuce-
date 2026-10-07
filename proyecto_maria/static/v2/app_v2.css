@@ -786,6 +786,7 @@ body {
 .toast-text  { font-size: var(--t-13); color: var(--c-text-2); margin: 0; }
 .toast.is-error   .toast-icon { background: var(--c-error-soft); color: var(--c-error); }
 .toast.is-success .toast-icon { background: rgba(52, 199, 89, 0.15); color: #1f7a3a; }
+.toast.is-warning .toast-icon { background: var(--c-warning-soft); color: var(--c-warning); }
 
 /* Overlay modal */
 .overlay {

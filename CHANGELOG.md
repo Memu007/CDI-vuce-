@@ -6,6 +6,31 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · fix: un campo vacío de la factura no llega al TXT como «None» (MARIA-1d)
+
+- **fix(maria):** el lector deja vacíos el número de factura, el vendedor, el comprador, el domicilio, la moneda y el incoterm que Gemini devuelve nulos o escritos como «None», «null» o «N/A» (antes «None» y «NON», que llegaban al TXT como `IDSO=FAC_None` o `CDDTINCOTE=NON`); el lector ya no inventa DOL ni FOB, y el prompt no pide adivinar la moneda. Lo que falta de la carátula se avisa antes de generar.
+
+## 2026-10-07 · feat: avisos antes de generar, gastos anteriores al FOB, procedencia y fecha (MARIA-3)
+
+- **feat(maria):** los avisos del TXT se ven en la validación, antes del botón de generar. Los gastos anteriores al FOB de la pantalla llegan al TXT (`GTOS-ANT-FOB`) con EXW, FCA o FAS (FAS pasa a ser condición válida); con otra condición no van y se avisa. La procedencia se carga por operación (art. 15 del Código Aduanero); vacía, sigue igual al origen con aviso.
+- **fix(maria):** la fecha de emisión ya no sale con la de hoy: si la factura no la trae o no es una fecha, no se genera el TXT y la revisión la pide (el año del IEXT sale de esa fecha); una fecha futura o de hace más de dos años se avisa. La procedencia usa la misma tabla de países que la pantalla; un importe de gastos no finito, negativo o absurdo da error. El lector deja de marcar como «sin leer» un flete o seguro «N/A», «-», «FREE», «included» o «Prepaid» y un país «Unknown» o «?».
+
+## 2026-10-07 · feat: lo que decide el despachante sale en el TXT (MARIA-4)
+
+- **feat(maria):** estado de la mercadería (seis, por producto), IVA adicional (reventa o uso particular, por operación con cambio por producto), banco (código BCRA, por operación) y empresa de digitalización (Modoc o Lakaut) se eligen antes de generar; CDI propone el último banco del cliente y la última empresa del usuario. **Cambio a propósito en el TXT con los valores por defecto:** `CARTUSO=2` con origen extranjero (antes 3 fijo) e `IVAADICIONAL1=NO_VALIDA` (antes IVAAD1 fijo); con origen argentino no hay estado por defecto y sin banco la línea no sale. Los dos archivos reales salen como el original cargando sus valores.
+
+## 2026-10-07 · fix: lo que no se pudo leer de la factura se avisa (MARIA-1c)
+
+- **fix(pdf):** si la factura trae un flete, un seguro o el país del vendedor que no se pudo leer, el lector lo marca (`campos_sin_leer`), la pantalla de subida lo nombra y el semáforo lo sigue mostrando («No pudimos leer el flete de la factura: completalo») hasta que se completa. La pantalla vieja ya no repone cantidad 1 ni origen China.
+
+## 2026-10-07 · fix: Gemini caído o con clave inválida ofrece la carga manual (MARIA-2b)
+
+- **fix(pdf):** si hay clave pero la llamada a Gemini falla (clave inválida, servicio caído o respuesta ilegible), subir un PDF responde el mismo 503 con `code: lectura_automatica_no_disponible` y la pantalla ofrece «Cargar los productos a mano», en vez del engañoso «No se encontró tabla de items». Si Gemini responde sin productos, sigue el 400 de siempre. Las dos copias del lector.
+
+## 2026-10-07 · fix: la factura bien leída (MARIA-1a)
+
+- **fix(pdf):** el país de origen ya no se corta a dos letras (`CHN` salía Suiza y `MEX` Montenegro): se reconocen dos letras, tres letras (tabla ISO 3166-1 generada contra la tabla oficial VUCE) y el nombre; lo que no se reconoce queda vacío. Cantidades, precios, pesos, flete y seguro con coma bien leídos (`1,500` sólo es mil quinientos si la factura usa el punto como decimal). Lo que falta queda vacío: nada de peso 0,5, cantidad 1 ni origen del vendedor. Las dos copias del lector.
+
 ## 2026-10-07 · fix: un PDF armado no deja a nadie sin lectura (RENDIMIENTO-1b)
 
 - **fix(rendimiento):** la adivinanza del vendedor lee el texto del PDF sólo con `pypdf`: `pdfminer` se colgaba para siempre con un PDF armado y, con cuatro de esos, nadie más podía leer un PDF hasta reiniciar. Los tiempos máximos en 0 o negativos valen el de siempre.

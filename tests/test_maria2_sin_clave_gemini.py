@@ -29,14 +29,19 @@ def _instalar_gemini_falso(monkeypatch, modelo):
     monkeypatch.setitem(sys.modules, "google.generativeai", falso)
 
 
+LLAMADAS_PROHIBIDAS = []
+
+
 class _GeminiProhibido:
     def __init__(self, nombre):
+        LLAMADAS_PROHIBIDAS.append(nombre)
         raise AssertionError("la prueba intentó llamar a Gemini")
 
 
 @pytest.fixture(autouse=True)
 def _sin_gemini_real(monkeypatch):
     """Ninguna prueba de este archivo puede llegar a Gemini ni a internet."""
+    LLAMADAS_PROHIBIDAS.clear()
     _instalar_gemini_falso(monkeypatch, _GeminiProhibido)
     monkeypatch.setattr("time.sleep", lambda s: None)
 
@@ -88,12 +93,16 @@ def test_endpoint_sin_lector_no_inventa_productos(client, auth_override, monkeyp
     assert "cargá los productos a mano" in body.get("detail", "")
     assert not body.get("items")
     _sin_demo(r.text)
+    # Sin lector no se intenta llamar a Gemini (con MARIA-2b, una llamada
+    # fallida también da 503: esto distingue el control de la clave).
+    assert LLAMADAS_PROHIBIDAS == []
 
 
 def test_lector_sin_clave_levanta_error_propio(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     with pytest.raises(pdf_extractor.LecturaAutomaticaNoDisponible):
         pdf_extractor.process_pdf(_pdf_en_blanco())
+    assert LLAMADAS_PROHIBIDAS == []
 
 
 def test_robust_extract_sin_clave_devuelve_cero_items(monkeypatch):
@@ -101,6 +110,7 @@ def test_robust_extract_sin_clave_devuelve_cero_items(monkeypatch):
     Sin clave no inventa nada."""
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     assert pdf_extractor.robust_extract_pdf_items(_pdf_en_blanco()) == []
+    assert LLAMADAS_PROHIBIDAS == []
 
 
 def test_con_clave_inventada_sigue_leyendo_con_el_modelo(client, auth_override, monkeypatch):

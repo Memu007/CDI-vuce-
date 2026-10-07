@@ -59,17 +59,19 @@ def test_factura_de_otro_anio_no_arrastra_el_anterior():
     assert _iext_del_art(txt) == "00099-01/25"
 
 
-def test_sin_fecha_de_factura_usa_el_anio_actual():
-    txt = generate_maria_txt(operation_id="002720126", **BASE)
-    esperado = datetime.now().strftime("%y")
-    assert _iext_del_art(txt) == f"00272-01/{esperado}"
+def test_sin_fecha_de_factura_no_se_genera():
+    """Devolución de MARIA-3: sin fecha válida el año del IEXT no se saca de
+    hoy: no se genera y se pide la fecha."""
+    import pytest
+    with pytest.raises(ValueError, match="fecha de emisión"):
+        generate_maria_txt(operation_id="002720126", **BASE)
 
 
-def test_fecha_rara_no_rompe_la_generacion():
-    """Si la fecha viene ilegible, cae al año actual en vez de explotar."""
-    txt = generate_maria_txt(operation_id="002720126",
-                             fecha_emision="fecha ilegible", **BASE)
-    assert _iext_del_art(txt).endswith("/" + datetime.now().strftime("%y"))
+def test_fecha_rara_no_genera_con_el_anio_de_hoy():
+    """Si la fecha viene ilegible, se pide (antes caía al año actual)."""
+    import pytest
+    with pytest.raises(ValueError, match="fecha ilegible"):
+        generate_maria_txt(operation_id="002720126", fecha_emision="fecha ilegible", **BASE)
 
 
 def test_las_referencias_reales_son_coherentes():

@@ -3283,10 +3283,11 @@ async function generateMariaTxt() {
             const pieza = row.querySelector('[data-field="pieza"]')?.value?.trim() || '';
             const codigo_parte = row.querySelector('[data-field="codigo_parte"]')?.value?.trim() || originalItem.codigo_parte || '';
             const descripcion = row.querySelector('[data-field="descripcion"]')?.value?.trim() || '';
-            const cantidad = parseFloat(row.querySelector('[data-field="cantidad"]')?.value) || 1;
+            // Vacío queda vacío (MARIA-1c): el control de /generate_maria avisa.
+            const cantidad = parseFloat(row.querySelector('[data-field="cantidad"]')?.value) || 0;
             const valor_unitario = parseFloat(row.querySelector('[data-field="valor_unitario"]')?.value) || 0;
             const peso_unitario = parseFloat(row.querySelector('[data-field="peso_unitario"]')?.value) || 0;
-            const origen = row.querySelector('[data-field="origen"]')?.value?.trim() || 'CN';
+            const origen = row.querySelector('[data-field="origen"]')?.value?.trim() || '';
             
             items.push({
                 ncm: pieza,
@@ -3391,6 +3392,13 @@ async function generateMariaTxt() {
             throw new Error(data.detail?.errors?.join(', ') || data.detail || 'Error generando MARIA');
         }
 
+        // MARIA-4: lo que el sistema declaró por defecto y los avisos del
+        // generador se muestran antes de pegar el TXT en el Kit.
+        const avisosMaria = [...(data.warnings || []), ...(data.supuestos || [])];
+        if (avisosMaria.length) {
+            alert('Revisá antes de pegar el TXT en el Kit:\n\n- ' + avisosMaria.join('\n- '));
+        }
+
         // Éxito - descargar archivo
         btn.innerHTML = '<i class="fas fa-check-circle"></i> ¡Generado!';
         btn.classList.add('state-success');
@@ -3477,7 +3485,7 @@ function populateOperacionPanel(operacion) {
         'op_fecha_emision': operacion.fecha_emision || '',
         'op_vendedor_nombre': operacion.vendedor_nombre || '',
         'op_vendedor_id': operacion.vendedor_id || '',
-        'op_vendedor_pais': operacion.vendedor_pais || 'CN',
+        'op_vendedor_pais': operacion.vendedor_pais || '',
         'op_comprador_nombre': operacion.comprador_nombre || '',
         'op_comprador_cuit': operacion.comprador_cuit || '',
         'op_moneda': operacion.moneda || 'DOL',
@@ -3531,7 +3539,7 @@ function getOperacionData() {
         fecha_emision: document.getElementById('op_fecha_emision')?.value || '',
         vendedor_nombre: document.getElementById('op_vendedor_nombre')?.value || '',
         vendedor_id: document.getElementById('op_vendedor_id')?.value || '',
-        vendedor_pais: document.getElementById('op_vendedor_pais')?.value || 'CN',
+        vendedor_pais: document.getElementById('op_vendedor_pais')?.value || '',
         comprador_nombre: document.getElementById('op_comprador_nombre')?.value || '',
         comprador_cuit: document.getElementById('op_comprador_cuit')?.value || '',
         moneda: document.getElementById('op_moneda')?.value || 'DOL',

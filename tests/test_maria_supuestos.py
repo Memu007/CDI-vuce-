@@ -84,10 +84,26 @@ def test_fob_puro_no_genera_aviso_de_gastos():
 # Constantes que hoy no se pueden elegir
 # ====================================================================
 
-def test_avisa_los_campos_que_van_fijos():
+def test_avisa_los_valores_por_defecto_de_lo_que_decide_el_despachante():
+    """MARIA-4: estado, IVA adicional, banco y empresa se eligen; si se usó el
+    valor por defecto, el despachante lo ve."""
     texto = _texto(supuestos_declarados([ITEM], incoterm="FOB"))
-    assert "cartuso" in texto, "el uso va fijo en 3 y el despachante debe saberlo"
-    assert "iva" in texto, "IVAADICIONAL1 va fijo en IVAAD1"
+    assert "estado de la mercadería" in texto
+    assert "reventa (no_valida) por defecto" in texto
+    assert "ventajas" in texto
+    assert "banco" in texto
+    assert "modoc (psad06) por defecto" in texto
+
+
+def test_lo_elegido_no_se_avisa_como_supuesto():
+    item = dict(ITEM, estado=2)
+    texto = _texto(supuestos_declarados(
+        [item], incoterm="FOB", iva_adicional="IVAAD1", banco_bcra="191",
+        empresa_digitalizacion="PSAD01"))
+    assert "estado de la mercadería" not in texto
+    assert "por defecto. si la mercadería" not in texto
+    assert "banco: no se declaró" not in texto
+    assert "modoc" not in texto
 
 
 def test_avisa_la_unidad_por_defecto():

@@ -43,6 +43,53 @@
         });
     }
 
+    // Lo que la factura traía pero no se pudo leer (MARIA-1c): se avisa hasta
+    // que la persona lo completa en la pantalla de revisión.
+    var NOMBRES_SIN_LEER = {
+        flete: 'el flete',
+        seguro: 'el seguro',
+        vendedor_pais: 'el país del vendedor'
+    };
+    function camposSinLeer() {
+        var op = (CDI.state && CDI.state.operacion) || {};
+        var campos = Array.isArray(op.campos_sin_leer) ? op.campos_sin_leer : [];
+        var completados = Array.isArray(op.campos_completados) ? op.campos_completados : [];
+        return campos.filter(function (c) {
+            return completados.indexOf(c) === -1;
+        }).map(function (c) {
+            return 'No pudimos leer ' + (NOMBRES_SIN_LEER[c] || c) + ' de la factura: completalo.';
+        });
+    }
+    CDI.camposSinLeer = camposSinLeer;
+
+    function conAvisosLocales(data) {
+        var locales = camposSinLeer();
+        var warns = locales.concat(data.advertencias || []);
+        var errs = data.errores || [];
+        var tips = data.sugerencias || [];
+        return {
+            errores: errs, advertencias: warns, sugerencias: tips, resumen: data.resumen,
+            total: errs.length + warns.length + tips.length
+        };
+    }
+
+    // Última respuesta del servidor: los avisos locales se recalculan aunque
+    // no se pida una validación nueva (en vuelo, o muy seguido).
+    var ultimoServidor = {};
+    function refrescarLocales() {
+        lastIssues = conAvisosLocales(ultimoServidor);
+        if (lastIssues.total) mostrar(lastIssues);
+        else { setState('empty', 0); renderPopover(lastIssues); }
+    }
+
+    function mostrar(data) {
+        var kind = 'ok';
+        if (data.errores.length > 0) kind = 'error';
+        else if (data.advertencias.length > 0) kind = 'warning';
+        setState(kind, data.errores.length + data.advertencias.length);
+        renderPopover(data);
+    }
+
     function hasEnoughData(items) {
         if (!items.length) return false;
         // Al menos 1 item con descripcion o pieza para que el backend valide algo util
@@ -122,15 +169,17 @@
 
     async function runValidation() {
         if (!fab || fab.hidden) return;
-        if (inFlight) return;
+        if (inFlight || Date.now() - lastRequestMs < MIN_INTERVAL_MS) {
+            refrescarLocales();
+            if (!inFlight) scheduleValidation();
+            return;
+        }
         var now = Date.now();
-        if (now - lastRequestMs < MIN_INTERVAL_MS) return;
 
         var items = itemsPayload();
         if (!hasEnoughData(items)) {
-            setState('empty', 0);
-            lastIssues = { errores: [], advertencias: [], sugerencias: [], total: 0 };
-            renderPopover(lastIssues);
+            ultimoServidor = {};
+            refrescarLocales();
             return;
         }
 
@@ -143,31 +192,12 @@
             });
             if (!resp.ok) throw new Error('HTTP ' + resp.status);
             var data = await resp.json();
-            if (!data || data.success === false) {
-                setState('empty', 0);
-                return;
-            }
-            var errs = data.errores || [];
-            var warns = data.advertencias || [];
-            var tips = data.sugerencias || [];
-            lastIssues = {
-                errores: errs,
-                advertencias: warns,
-                sugerencias: tips,
-                resumen: data.resumen,
-                total: errs.length + warns.length + tips.length
-            };
-
-            var kind = 'ok';
-            if (errs.length > 0) kind = 'error';
-            else if (warns.length > 0) kind = 'warning';
-
-            var visibleCount = errs.length + warns.length;
-            setState(kind, visibleCount);
-            renderPopover(lastIssues);
+            ultimoServidor = (!data || data.success === false) ? {} : data;
+            refrescarLocales();
         } catch (err) {
-            // Fallo silencioso; mantenemos el ultimo estado.
-            setState('empty', 0);
+            // Fallo silencioso; los avisos locales siguen a la vista.
+            ultimoServidor = {};
+            refrescarLocales();
         } finally {
             inFlight = false;
         }
