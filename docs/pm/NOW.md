@@ -43,8 +43,8 @@ queda como historia) más las reglas y documentos. **Ramas de las Devs:**
 | Rol | Sesión | Rutina | Rama |
 |---|---|---|---|
 | PM principal | session_01B7FVQspcEHF7PqNv797wNM | trig_01TvMmGfSLDfbcJrf66ZZ7YK (min 55) | claude/practical-shannon-szpwkn |
-| Dev 1 (técnica) | PENDIENTE | PENDIENTE | claude/dev1-tecnica |
-| Dev 2 (MARIA) | PENDIENTE | PENDIENTE | claude/dev2-maria |
+| Dev 1 (técnica) | session_01VV5RVDA64AuzLaPBDnwH39 | trig_016zR6giZB8Mq9ZdfaerVh2D (min 15) | claude/dev1-tecnica |
+| Dev 2 (MARIA) | session_01JssJQ6CQvEBZ7yjJp3hHQx | trig_019ehV8P48FzbNwYQGZjgYcW (min 35) | claude/dev2-maria |
 
 **Sin PM visual:** la PM principal revisa a las dos Devs, y las dos la
 despiertan con su rutina (donde los comandos dicen «PM visual», acá es la
