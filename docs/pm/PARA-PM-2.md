@@ -2,7 +2,7 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## MARIA-5 — en cierre (faltan los números de la suite y los sabotajes): **`6661dbf`**
+## MARIA-5 — entregada: **`6d59893`**
 
 **Resultado: terminada, con la D22 (a) y el punto 4. Para decidir: nada
 nuevo; dos riesgos abajo para que los mires (el «Peso neto» de un cliente que
@@ -23,11 +23,11 @@ idénticos.
 Las pruebas nuevas contra la base `9679e21` (los cuatro primeros archivos):
 `64 failed, 25 passed`.
 
-| Puerta (sobre `6661dbf`; el producto es el de `4c2231c`) | Resultado |
+| Puerta (sobre `6661dbf`, mismas pruebas y producto que `6d59893`, cuyo último commit sólo arregla patrones de sabotajes; el producto es el de `4c2231c`) | Resultado |
 |---|---|
-| Suite completa, worktree limpio, venv **sólo con `requirements.txt`** (sin PyPDF2) | SUITE |
-| `sabotaje_maria5.sh` (23) | S5 |
-| `sabotaje_maria3` / `1d` / `4` / `1c` / `2b` / `2` / `1a` | SOTROS |
+| Suite completa, worktree limpio, venv **sólo con `requirements.txt`** (sin PyPDF2) | `1199 passed, 102 skipped, 25 warnings in 75.30s`, 0 failed |
+| `sabotaje_maria5.sh` (23) | `OK: los 23 sabotajes dan rojo por la razón esperada` (con los patrones de `6d59893`) |
+| `sabotaje_maria3` / `1d` / `4` / `1c` / `2b` / `2` / `1a` | `OK: los 30` / `8` / `9` / `4` / `6` / `8` / `10` (el de 1a con los patrones de `6d59893`: el peso y el prompt se movieron a `_peso_del_producto`) |
 | `pantalla_maria5.js` (servidor local en `4c2231c`) | `OK: pantalla MARIA-5` (captura `docs/pm/capturas/maria5-validacion.png`) |
 | `pantalla_maria3.js` | `OK: pantalla MARIA-3` |
 | `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
@@ -57,14 +57,14 @@ Las pruebas nuevas contra la base `9679e21` (los cuatro primeros archivos):
 
 Para reproducir:
 ```
-PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 6661dbf 8890
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 6d59893 8890
 BASE_URL=http://127.0.0.1:8890 node scripts/testing/pantalla_maria5.js   # termina en «OK: pantalla MARIA-5»
-VENV=/tmp/cdi-pm/venv scripts/testing/sabotaje_maria5.sh 6661dbf          # «OK: los 23 sabotajes …»
+VENV=/tmp/cdi-pm/venv scripts/testing/sabotaje_maria5.sh 6d59893          # «OK: los 23 sabotajes …»
 python -m pytest -q tests/test_maria5_*.py                                # todo passed
 ```
 
-Última vuelta: 2026-10-07 HORA UTC
-Contexto: ~38 % (pasado el umbral: compactar en este corte)
+Última vuelta: 2026-10-07 13:45 UTC
+Contexto: ~40 % (pasado el umbral: compactar en este corte)
 
 ---
 
