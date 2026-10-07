@@ -102,8 +102,9 @@ Archivos abiertos por Dev:
 
 - **Dev 1:** EXCEL-1 (la carga por Excel, de punta a punta). Sigue: MARIA-1b
   y PUNTA-A-PUNTA-1.
-- **Dev 2:** MARIA-3 (avisos, gastos FOB, procedencia y fecha de emisión),
-  después de su `/compact` (está en ~88 %). Sigue: MARIA-5; MARIA-6 cuando lleguen los archivos reales del despachante.
+- **Dev 2:** MARIA-3, devuelta por cinco puntos (procedencia, año del `IEXT`
+  sin fecha, fechas raras, procedencia rara, gastos sin tope). Sigue: MARIA-1d
+  («None» en campos vacíos) y MARIA-5; MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas el 2026-10-07 y sin integrar todavía** (se integran después de
   publicar el ensayo, para que el ensayo sea exactamente lo atacado):
   RENDIMIENTO-1 (`8fd801d`, suite `730 passed, 102 skipped` con un venv nuevo)
