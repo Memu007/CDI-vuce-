@@ -68,7 +68,7 @@ Archivos abiertos por Dev:
 
 - **Dev 1:** devolución de MARIA-1b (NaN e inf, escaneo de hojas que traba, CUIT, monedas; D22). Sigue: PUNTA-A-PUNTA-1
   y EXCEL-2.
-- **Dev 2:** MARIA-5 (peso total y cuentas al centavo). Sigue: MARIA-6 cuando lleguen los archivos reales del despachante.
+- **Dev 2:** devolución de MARIA-5 (dos pesos para una línea, filas que desaparecen, guarda del peso, subítems, grupos, una sola cuenta). Sigue: CATALOGO-NCM-1; MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
   RENDIMIENTO-1 y 1b (`ec3d793`), MARIA-1a, 2b, 1c, 4, 3 y 1d (`9679e21`).
   Suite sobre la rama integrada (`7b42556`, venv armado sólo con el
