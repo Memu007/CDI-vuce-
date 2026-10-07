@@ -5881,6 +5881,16 @@ async def update_operation_estado(
     }
 
 
+def _grupo_id_o_none(valor):
+    """grupo_id es un entero: otra cosa daba 500 en Postgres (GUARDAR-1)."""
+    if isinstance(valor, bool):
+        return None
+    try:
+        return int(valor) if valor is not None and str(valor).strip() != "" else None
+    except (TypeError, ValueError, OverflowError):
+        return None
+
+
 @app.post("/api/clientes/{client_id}/operaciones")
 async def save_client_operation(
     client_id: str,
@@ -5905,10 +5915,12 @@ async def save_client_operation(
             owner_username=username,
             client_id=client_id,
             op_code=op_code,
-            source=data.get("source") or "manual",
+            # Lo que viene de afuera se recorta al largo de la columna: en
+            # Postgres un dato más largo tira abajo el guardado (GUARDAR-1).
+            source=str(data.get("source") or "manual")[:50],
             total_items=int(resumen.get("items", len(items))),
             total_value=float(resumen.get("valor_total", 0) or 0),
-            currency=data.get("currency") or "USD",
+            currency=str(data.get("currency") or "USD")[:3],
             extra={"resumen": resumen},
         )
         db.add(operation)
@@ -5922,7 +5934,7 @@ async def save_client_operation(
             if domicilio_op and not (client.address or "").strip():
                 client.address = domicilio_op
             if fecha_op and not (client.fecha_inic_activ or "").strip():
-                client.fecha_inic_activ = fecha_op
+                client.fecha_inic_activ = fecha_op[:10]
         except Exception as fill_err:
             logger.warning("[fill-if-empty] No se pudo rellenar ficha: %s", fill_err)
 
@@ -5932,14 +5944,14 @@ async def save_client_operation(
                     id=str(uuid.uuid4()),
                     operation_id=operation.id,
                     pieza=str(item.get("pieza") or item.get("ncm") or "")[:20],
-                    descripcion=str(item.get("descripcion") or ""),
+                    descripcion=str(item.get("descripcion") or "").replace("\x00", ""),
                     # Lo que falta queda vacío (0 o ""): nada de cantidad 1,
                     # peso 0,5 ni origen «XX» inventados (MARIA-1b, D6 Dev 2).
                     origen=str(item.get("origen") or "")[:3],
                     cantidad=float(item.get("cantidad") or 0),
                     valor_unitario=float(item.get("valor_unitario") or 0),
                     peso_unitario=float(item.get("peso_unitario") or 0),
-                    grupo_id=item.get("grupo_id"),
+                    grupo_id=_grupo_id_o_none(item.get("grupo_id")),
                     unidad=str(item.get("unidad") or "")[:10] or None,
                 )
             )
@@ -5948,11 +5960,12 @@ async def save_client_operation(
         # abajo. Antes iba en el mismo commit y un NCM que no entraba en la
         # columna del historial (la SIM completa, en Postgres) daba 500 y no
         # guardaba nada (GUARDAR-1).
-        await db.commit()
-        operation_id = operation.id
+        # El contador del plan va en el mismo commit que la operación: si
+        # falla, no queda una operación guardada sin contar y con un 500.
         billing_entity, _ = await _get_billing_entity(db, db_user)
         billing_service.record_operation_created(billing_entity)
         await db.commit()
+        operation_id = operation.id
     except HTTPException:
         raise
     except Exception as e:
@@ -5966,7 +5979,9 @@ async def save_client_operation(
     # Alimentar la memoria de NCM del cliente: cada item con NCM +
     # descripcion se guarda (o actualiza) en ClientProductHistory. Esto
     # hace que la proxima op de este cliente sugiera NCMs automaticamente.
-    # Si falla, se pierde sólo el aprendizaje de esta operación.
+    # Si falla, se pierde sólo el aprendizaje de esta operación, y la
+    # respuesta lo dice (historial_guardado).
+    historial_guardado = True
     try:
         from proyecto_maria.services.client_memory import upsert_client_product_history
 
@@ -5988,15 +6003,18 @@ async def save_client_operation(
                     peso_unitario=float(item.get("peso_unitario") or 0) or None,
                 )
             except Exception:
+                historial_guardado = False
                 logging.exception(
                     "client_memory upsert fallo para client_id=%s ncm=%s",
                     client_id, ncm_raw,
                 )
         await db.commit()
     except Exception:
+        historial_guardado = False
         await db.rollback()
         logging.exception("save_client_operation: no se guardó el historial de client_id=%s", client_id)
-    return {"success": True, "operation_id": operation_id, "op_code": op_code}
+    return {"success": True, "operation_id": operation_id, "op_code": op_code,
+            "historial_guardado": historial_guardado}
 
 
 @app.post("/api/operacion/{operation_id}/agrupar")
@@ -6466,7 +6484,7 @@ async def learn_client_catalogo_productos(
         if not ncm or not desc:
             continue
         try:
-            await upsert_client_product_history(
+            aprendido = await upsert_client_product_history(
                 db,
                 owner_username=username,
                 client_id=client_id,
@@ -6477,7 +6495,7 @@ async def learn_client_catalogo_productos(
                 cantidad=float(item.get("cantidad") or 0) or None,
                 peso_unitario=float(item.get("peso_unitario") or 0) or None,
             )
-            updated += 1
+            updated += aprendido is not None
         except Exception:
             logging.exception("learn_client_catalogo_productos fallo para client_id=%s", client_id)
 
@@ -6515,9 +6533,9 @@ async def update_client_catalogo_producto(
         # 10 caracteres y quedaba un código que no existe (GUARDAR-1).
         from proyecto_maria.services.client_memory import ncm_para_historial
         ncm_nuevo = ncm_para_historial(body["ncm"])
-        if ncm_nuevo is None and str(body["ncm"] or "").strip():
-            raise HTTPException(status_code=400, detail="El NCM no es válido.")
-        row.ncm = ncm_nuevo or ""
+        if ncm_nuevo is None or len(re.sub(r"\D", "", ncm_nuevo)) < 8:
+            raise HTTPException(status_code=400, detail="El NCM no es válido: tiene que tener sus 8 dígitos.")
+        row.ncm = ncm_nuevo
     if "origen" in body:
         row.origen_frecuente = str(body["origen"]).strip()[:3] or "XX"
     if "peso_unitario_avg" in body:
