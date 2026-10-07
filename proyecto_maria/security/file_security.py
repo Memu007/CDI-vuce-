@@ -144,7 +144,10 @@ def partes_del_xlsx(z) -> tuple:
 def hojas_del_xlsx(z) -> list:
     """[(nombre, ruta dentro del zip)] de las hojas de cálculo de un .xlsx
     abierto con zipfile, en el orden del libro, sin abrirlo con openpyxl.
-    Las hojas de gráfico no cuentan: pandas lee la primera hoja de cálculo."""
+    Las hojas de gráfico no cuentan: pandas lee la primera hoja de cálculo.
+    Como openpyxl, es hoja toda relación de una <sheet> que no sea de
+    gráfico, sea cual sea su Type: una con un Type raro no se medía ni se
+    sacaba de la copia (devolución de EXCEL-2)."""
     import posixpath
     from xml.etree import ElementTree as ET
     ns_main = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
@@ -156,7 +159,7 @@ def hojas_del_xlsx(z) -> list:
     carpeta = posixpath.dirname(libro)
     destinos = {}
     for r in ET.fromstring(z.read(relaciones)):
-        if not (r.get("Type") or "").endswith("/worksheet"):
+        if "chartsheet" in (r.get("Type") or ""):
             continue
         destino = r.get("Target") or ""
         destino = destino.lstrip("/") if destino.startswith("/") else posixpath.normpath(posixpath.join(carpeta, destino))
@@ -239,7 +242,10 @@ def _contar_hojas_xlsx(contents: bytes) -> int:
                     "cargá los productos a mano.")
         if hojas and hojas[0][1] not in nombres:
             raise ValueError("falta la primera hoja dentro del archivo")
-        tope_hoja = _mb_de_entorno("EXCEL_MAX_PRIMERA_HOJA_MB", 30)
+        # 10 MB son unas 8.000 filas de 60 columnas. Con 27 MB sin
+        # <dimension>, 8 subidas así delante dejaban a una normal en 504; con
+        # 10 MB, la normal da 200 en ~20 s (devolución de EXCEL-2).
+        tope_hoja = _mb_de_entorno("EXCEL_MAX_PRIMERA_HOJA_MB", 10)
         if hojas and z.getinfo(hojas[0][1]).file_size > tope_hoja:
             raise ExcelDemasiadoGrande(
                 f"La primera hoja del Excel es demasiado grande (más de {tope_hoja // 2**20} MB). "
