@@ -161,11 +161,12 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 01:40 UTC: ataque al ensayo terminado y su remedio probado
-(`REPRODUCCION-ENSAYO-2026-10-07.md`); la lista de Railway quedó en el orden
-en que Emi la hace. ADMIN-2 aceptada; Dev 1 despertada con RENDIMIENTO-1. Dev
-2 en MARIA-1a, sin entrega. A las 9 (ARG): pasarle a Emi la lista y el SHA con
-la suite corrida. PM al ~30 % de contexto.
+2026-10-07 02:00 UTC (rutina): sin entregas nuevas. Las dos Devs estaban
+paradas esperando que Emi pegue su `/compact` (Dev 1 ~35 %, Dev 2 ~33 %); la
+Dev 1 no tomó el `fire_trigger` de las 01:28. La PM les escribió directo:
+siguen sin esperarlo (Dev 1 con RENDIMIENTO-1, Dev 2 con MARIA-1a) y les
+marcó qué partes de `pdf_extractor.py` toca cada una. La lista de Railway y el
+ataque al ensayo, listos para las 9 (ARG).
 
 ## Medición
 
