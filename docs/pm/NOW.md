@@ -16,6 +16,16 @@ antes de cerrar la Fase 3.
 
 ## Para Emi
 
+0. **En pausa desde 2026-10-07 22:45 UTC** («frena por ahora todo y mañana
+   continuamos», Emi). Las tres rutinas de CDI están apagadas (PM
+   trig_01TvMmGfSLDfbcJrf66ZZ7YK, Dev 1 trig_016zR6giZB8Mq9ZdfaerVh2D, Dev 2
+   trig_019ehV8P48FzbNwYQGZjgYcW). Las Devs dejan lo que tenían como «wip» en
+   su rama. **Al retomar:** cuando Emi escriba, prender las tres con
+   update_trigger enabled=true, despertar a las Devs con send_message y
+   seguir: Dev 2 con MARIA-5d, Dev 1 con la devolución de EXCEL-2; mirar la
+   CI de `a9b03cf`. No se tocaron las rutinas del otro proyecto
+   (`yneratopgreen`).
+
 1. **Segunda publicación, hecha:** `6ea8ca9`, 2026-10-07 19:58 UTC («dale
    6ea8ca9» de Emi). Emi genera un TXT con una factura real, lo descarga
    enseguida y mira: fecha DD/MM/AAAA, CUIT sin guiones, IVA adicional
@@ -168,6 +178,9 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+
+2026-10-07 22:45 UTC: pausa pedida por Emi hasta mañana; rutinas de CDI
+apagadas y Devs avisadas (ver «Para Emi» 0).
 
 2026-10-07 22:08 UTC: MARIA-5, CATALOGO-NCM-1 y SUBITEMS-1 aceptadas e
 integradas (`0e57f70`). Antes de la próxima publicación falta MARIA-5d (el
