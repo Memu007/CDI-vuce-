@@ -51,11 +51,11 @@ if ! "$PY" -m pytest -q --no-cov -p no:cacheprovider $T >/dev/null 2>&1; then
 fi
 
 sabotaje $M "el autorrelleno vuelve a traer los 8 dígitos del cliente" \
-  '                        "ncm": _ncm_del_cliente_o_sim_del_proveedor(mem["ncm"], vm and vm["ncm"]),' \
+  '                        "ncm": _ncm_recordado_con_sim_del_proveedor(mem, vm),' \
   '                        "ncm": mem["ncm"],' \
   "FAILED $T::test_el_autorrelleno_trae_la_sim_del_proveedor"
 sabotaje $M "la sugerencia vuelve a traer los 8 dígitos del cliente" \
-  $'                    sugerencias[0]["ncm"] = _ncm_del_cliente_o_sim_del_proveedor(\n                        sugerencias[0]["ncm"], vendor_item["ncm"])' \
+  '                    sugerencias[0]["ncm"] = _ncm_recordado_con_sim_del_proveedor(recordado, vendor_item)' \
   '                    pass' \
   "FAILED $T::test_la_sugerencia_trae_la_sim_del_proveedor"
 sabotaje $M "gana el proveedor aunque sea otra NCM" \
@@ -70,6 +70,15 @@ sabotaje $M "gana el proveedor aunque el cliente no tenga 8 dígitos" \
   '    if not re.fullmatch(r"[\d.]+", cliente) or len(re.sub(r"\D", "", cliente)) != 8:' \
   '    if not cliente:' \
   "FAILED $T::test_cual_gana[8471490010-84714900100D-8471490010]"
+
+sabotaje $M "gana la SIM de otro producto parecido del proveedor" \
+  '            or del_proveedor["producto_key"] != catalog_svc._normalize(recordado.get("descripcion") or "")):' \
+  '            ):' \
+  "FAILED $T::test_la_sim_de_otro_producto_parecido_no_gana"
+sabotaje $M "la SIM del proveedor sale tal como está guardada" \
+  '        return re.sub(r"[.\s]", "", proveedor).upper()' \
+  '        return proveedor' \
+  "FAILED $T::test_la_sim_del_proveedor_sale_en_la_forma_de_siempre"
 
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]
