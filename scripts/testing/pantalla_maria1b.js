@@ -8,6 +8,7 @@
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
 const FILAS = '2 fila(s) del Excel no se pudieron leer (filas 7, 9)';
 const HOJAS = 'El Excel tiene otras hojas con datos que no se leyeron (Hoja2)';
+const SIN_REVISAR = 'No se revisaron todas las hojas del libro';
 const CUIT = 'El CUIT del importador';
 const MONEDA = 'Falta la moneda de la operación.';
 function falla(msg) { console.error('FALLA: ' + msg); process.exit(1); }
@@ -20,7 +21,8 @@ function falla(msg) { console.error('FALLA: ' + msg); process.exit(1); }
   await page.route('**/upload_excel_v2/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
     message: 'ok', filename: 'factura.xlsx', items_count: 1, applied_mapping: true,
     operacion: { comprador_cuit: '30712345670', incoterm: 'FOB',
-                 filas_excel_sin_leer: [7, 9], filas_excel_sin_leer_total: 2, hojas_excel_sin_leer: ['Hoja2'] },
+                 filas_excel_sin_leer: [7, 9], filas_excel_sin_leer_total: 2, hojas_excel_sin_leer: ['Hoja2'],
+                 hojas_excel_sin_revisar: true },
     catalogo: { columnas_detectadas: 6, columnas_faltantes: [], total: 6, completo: true },
     items: [{ descripcion: 'Tornillo de acero inoxidable M6', cantidad: 2, valor_unitario: 3, peso_unitario: 1, origen: 'CN', pieza: '84713000' }] }) }));
   await page.goto(base + '/dashboard');
@@ -43,10 +45,11 @@ function falla(msg) { console.error('FALLA: ' + msg); process.exit(1); }
   };
   await esperar(FILAS, true, 'el semáforo no muestra las filas sin leer');
   await esperar(HOJAS, true, 'el semáforo no muestra la otra hoja con datos');
+  await esperar(SIN_REVISAR, true, 'el semáforo no dice que no se revisaron todas las hojas');
   await esperar(CUIT, true, 'el semáforo no muestra el CUIT inválido');
   await esperar(MONEDA, true, 'el semáforo no muestra la moneda que falta');
   if (process.argv[3]) await page.screenshot({ path: process.argv[3] });
-  console.log('OK semáforo: filas, hoja, CUIT y moneda');
+  console.log('OK semáforo: filas, hoja, hojas sin revisar, CUIT y moneda');
 
   // Otra validación (cambia un dato) no se lleva el aviso.
   await page.evaluate(() => { CDI.state.items[0].cantidad = 3; CDI.semaforo && CDI.semaforo.refresh && CDI.semaforo.refresh(); });
