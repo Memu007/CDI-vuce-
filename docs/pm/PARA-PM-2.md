@@ -2,6 +2,65 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## SUBITEMS-1 (puntos 7 a 10) y la e2e — reentrega con MARIA-5: **`4446571`**
+
+**Resultado: los cuatro puntos de `5170016`, con rojo antes y verde después, y
+`e2e_maria.sh` en «E2E MARIA OK». Para decidir: nada; dos cosas para que
+mires (abajo).** Base: tu rama hasta `4c6f2d4` integrada (`a123b93`), arriba
+de la segunda devolución de MARIA-5 y CATALOGO-NCM-1 (`a8a83f3`, ya informada
+abajo). D27: tomada (a).
+
+| # | Qué hace ahora | Rojo antes |
+|---|---|---|
+| 7 | `subitems` = `5`, `true`, `3.5` o un objeto: 400 «Item 1: los sub-ítems no tienen el formato esperado». `controles_antes_de_generar` ya no recorre lo que no es una lista | `3 failed` (500) en `tests/test_subitems1.py` |
+| 8 | El panel compara el valor en decimal exacto (enteros grandes, los mismos dígitos que `Decimal(repr())` del servidor), con 0,01 de tolerancia | `pantalla_subitems1.js` en `a123b93`: «1 × 0,04 contra 1 × 0,03» daba «⚠» y el servidor generaba |
+| 9 | «Suman 2,9 de 3 unidades…» y dice qué no cierra: «Las cantidades de los subítems no suman la del producto» / «Los valores… (se admite 0,01 de diferencia)» | en `a123b93`: «Suman 3 de 3 unidades» |
+| 10 | El error de un subítem (`Item N, sub-ítem M: …`, el del sufijo incluido) vuelve al paso de NCM, abre el panel y sale bajo ese subítem; se va al corregir, agregar o borrar uno. Para que «Item N» sea el producto de la pantalla, el generador numera los errores de sub-ítems por su lugar en el pedido (antes, con un grupo antes, decía la línea del TXT y no coincidía con el de `main.py`) | en `a123b93`: «no sale bajo el subítem 2»; `3 failed` en Python por el número |
+
+**La e2e** (`config/e2e_maria.js`), puesta al día:
+- Completa la fecha de emisión (la línea de GUARDAR-1 de la Dev 1; sin ella
+  no hay OK posible en mi SHA; si la Dev 1 suma la misma, el merge es trivial).
+- Mi pieza cambió el recorrido: desde MARIA-5, un 0 en el peso de un grupo no
+  se acepta (vuelve el valor). La e2e ahora prueba eso, desagrupa, pone 0 en
+  un producto solo (Validación lo frena) y vuelve a agrupar.
+- Espera la respuesta de la revalidación. Una corrida dio rojo ahí («Generar»
+  seguía apagado con el resultado viejo en pantalla); no confirmé la causa,
+  creo que leyó el resultado de la visita anterior. Después de esperar la
+  respuesta: 5 de 5 OK.
+
+| Puerta | Resultado |
+|---|---|
+| Suite completa, worktree limpio (`fe79a0e`; después sólo cambió `ncm.js` y el script de pantalla) | `1505 passed, 102 skipped, 2 xfailed, 25 warnings in 149.09s`, 0 failed |
+| Pantallas en `4446571` | `OK: pantalla MARIA-5`, `OK: pantalla CATALOGO-NCM-1`, `OK: pantalla SUBITEMS-1` |
+| `e2e_maria.sh` en `4446571` (y en `fe79a0e`) | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.` |
+| Sabotajes | SUBITEMS-1: 9 de 9 (dos nuevos: el control que revienta con `5` y el número de línea); `sabotajes/maria1b.sh`: 0 fallas (un patrón al día). MARIA-5: 49 de 49 en `fe79a0e`; CATALOGO-NCM-1, MARIA-3 y 1d: corriendo al escribir esto (los agrego en cuanto terminen). |
+
+**Autorrevisión** (adversario Sonnet alto, sobre `fe79a0e`): el TXT no
+cambia (3000 pedidos al azar, los 949 que salen, idénticos byte a byte entre
+`a123b93` y `fe79a0e`), sin XSS, sin 500, y el panel coincide con el servidor
+en ~20.000 casos del borde. Encontró:
+- **Media, corregido en `4446571`:** el error quedaba en la posición; al
+  borrar o agregar un subítem caía sobre otra fila. Rojo antes en la pantalla.
+- **Para que mires (no lo toqué):** con un grupo antes, el mismo producto
+  dice «Item 3, sub-ítem 2» en sus subítems pero «Item 2» en el peso y el
+  estado (esos siguen con la línea del TXT, como antes). Unificar todo a la
+  posición de la pantalla toca mensajes de otras piezas; lo dejo a tu criterio.
+- **Para que mires (no lo toqué):** los errores de subítems de los controles
+  de MARIA-1b (`{errors: [...]}`, p. ej. cantidad NaN) siguen saliendo en la
+  pantalla final, no bajo el subítem; el panel ya los marca antes.
+- Muy baja, no tocado: con valores absurdos (1e-300 junto a 1e11) el
+  `Decimal` de 28 dígitos del servidor redondea y el panel no; con 200.000
+  subítems el panel desborda la pila. Ninguno se alcanza desde la pantalla.
+
+Para reproducir:
+```
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 4446571 8890
+for s in maria5 catalogo_ncm1 subitems1; do BASE_URL=http://127.0.0.1:8890 node scripts/testing/pantalla_$s.js; done   # tres «OK: pantalla …»
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh a123b93 8891
+BASE_URL=http://127.0.0.1:8891 node scripts/testing/pantalla_subitems1.js   # FALLA: el error del sufijo no sale bajo el subítem 2
+scripts/testing/sabotaje_subitems1.sh 4446571 <venv>                     # OK: los 9 sabotajes…
+```
+
 ## MARIA-5 y CATALOGO-NCM-1 — segunda devolución: **`a8a83f3`** (producto en `135ff27`)
 
 **Resultado: los seis puntos de `b2bb20c`, con rojo antes y verde después.
