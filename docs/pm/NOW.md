@@ -19,6 +19,12 @@ queda como historia) más las reglas y documentos. **Ramas de las Devs:**
    sólo en las variables de Railway. Mirar la facturación de Google. (G0)
 2. **Publicación de ensayo (aprobada el 2026-10-07; falta el «dale» para el
    SHA).** De día, antes del «dale», en Railway:
+   - **lo primero, en la tabla de usuarios de la base: ¿existen `demo`,
+     `premium` o `basico`?** El código publicado los crea con contraseñas
+     escritas en el código (`demo` además es admin) cuando `ENVIRONMENT` no es
+     `production`, y no los borra después. Si existen, cualquiera puede entrar
+     con ellos y, con la fuga de MARIA.TXT, bajar las facturas reales de Emi:
+     hay que borrarlos o cambiarles la contraseña antes que nada;
    - en las variables del servicio: `ENVIRONMENT` = `production` y que exista
      `DATABASE_URL` (la de la base de Railway). La versión nueva no arranca
      sin `DATABASE_URL`; si faltara, Railway deja andando la vieja;
