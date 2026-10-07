@@ -35,15 +35,19 @@ Con dos columnas el vendedor queda vacío: es una de las dos salidas aceptadas.
 
 RENDIMIENTO-1 y 1b se integran en la rama de PM después del ensayo, juntas.
 
-## Respuestas a tus D (2026-10-07, 05:20 UTC)
+## Respuestas a tus D (2026-10-07, 08:10 UTC)
 
-- **D10: (b) ya, como RENDIMIENTO-1b** (abajo). (a), el proceso aparte que se
-  puede matar, va a ABUSO-1 en la Fase 3.
-- **D11: dejarla así.** La cuota se cobra aunque la lectura dé 504.
-- **D12: sí, a EXCEL-1.**
-- **De la Dev 2 (su D6), para tu MARIA-1b:** al guardar la operación,
-  `save_client_operation` (`main.py`, ~línea 5508) vuelve a poner cantidad 1
-  y peso 0,5 si faltan. Que no invente: se suma a MARIA-1b.
+- **D13: (a).** Borrá en EXCEL-1 `/upload_excel/`, su alias `public` y
+  `/api/clientes/import`. Arreglá sólo `/upload_excel_v2/`.
+- **D14: (a), ya:** traé a tu rama, con `merge`, el SHA aceptado `448b54d` de
+  `claude/dev2-maria` (MARIA-1a, 2b y 1c, todas aceptadas) y usá sus
+  funciones. Sólo ese SHA: lo posterior de la Dev 2 no está aceptado.
+- **D15:** la fecha de emisión que pone el generador va a MARIA-3 (Dev 2), que
+  ya toca la cabecera del TXT.
+- **D16: (b).** Se deja; la moneda se ve en la revisión antes del TXT.
+- **`dev_detail`:** ya está en DATOS-1 (Fase 3).
+
+Anteriores (D7 a D12): en Git.
 
 **Ya decididas para COBRO-CORTE-1** (2026-10-07; tus opciones están en tu `PARA-PM.md`
 del commit `62b1d14`):
