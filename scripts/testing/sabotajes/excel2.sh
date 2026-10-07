@@ -74,31 +74,31 @@ sabotaje $M "la exportación vuelve a validar antes los montos" \
 sabotaje $C "los otros CUIT vuelven a aceptar dígitos raros" \
   '    return any(c.isdigit() and not ("0" <= c <= "9") for c in str(valor or ""))' \
   '    return False' \
-  "FAILED $T::test_cuit_del_despachante_o_id_del_vendedor_con_digitos_raros_no_deja_generar"
+  "FAILED $T::test_cuit_del_despachante_o_id_del_vendedor_con_digitos_raros_no_deja_generar[vendedor_id-"
 # D26 (a)
 sabotaje $F "validar vuelve a abrir el libro con openpyxl" \
   '        return _contar_hojas_xlsx(contents)' \
   '        import openpyxl; return len(openpyxl.load_workbook(io.BytesIO(contents), read_only=True).sheetnames)' \
   "FAILED $T::test_validar_un_xlsx_no_lo_abre_con_openpyxl"
 sabotaje $F "los textos compartidos enormes vuelven a pasar" \
-  '        if "xl/sharedStrings.xml" in nombres and z.getinfo("xl/sharedStrings.xml").file_size > tope_textos:' \
+  '        if textos and textos in nombres and z.getinfo(textos).file_size > tope_textos:' \
   '        if False:' \
   "FAILED $T::test_textos_compartidos_enormes_se_rechazan_antes_de_abrir"
 sabotaje $F "una primera hoja enorme vuelve a pasar" \
-  '        if hojas and hojas[0][1] in nombres and z.getinfo(hojas[0][1]).file_size > tope_hoja:' \
+  '        if hojas and z.getinfo(hojas[0][1]).file_size > tope_hoja:' \
   '        if False:' \
   "FAILED $T::test_una_primera_hoja_enorme_se_rechaza_antes_de_abrir"
 sabotaje $M "leer la factura vuelve a abrir el libro entero" \
   $'        contenido, combinadas = _xlsx_solo_primera_hoja(ruta)\n        origen = _io.BytesIO(contenido)' \
   $'        contenido, combinadas = _xlsx_solo_primera_hoja(ruta)\n        origen = ruta' \
-  "FAILED $T::test_ocho_libros_armados_sin_medida_no_dejan_sin_lectura_a_una_subida_normal"
+  "FAILED $T::test_leer_la_factura_abre_un_libro_con_una_sola_hoja"
 sabotaje $M "el historial vuelve a abrir el libro entero" \
   '        contenido, _ = _xlsx_solo_primera_hoja(content)' \
   '        contenido = content' \
   "FAILED $T::test_el_historial_en_excel_lee_solo_la_primera_hoja"
 # D18
 sabotaje $M "el encabezado vuelve a buscarse sólo en la fila 1" \
-  '    if len(_detect_item_columns(list(df.columns))) >= 3:' \
+  '    if len(_detect_item_columns(actuales)) + sum(1 for c in actuales if c in conocidas) >= 3:' \
   '    if True:' \
   "FAILED $T::test_el_encabezado_no_tiene_que_estar_en_la_fila_1"
 sabotaje $M "la columna de origen vuelve a ser obligatoria" \
@@ -120,13 +120,54 @@ sabotaje $M "el aviso de mapeo deja de nombrar la columna" \
   "FAILED $T::test_el_aviso_de_mapeo_nombra_la_columna_que_se_uso"
 # CSV del historial
 sabotaje $M "el CSV vuelve a leerse sólo como UTF-8" \
-  '        for codificacion in ("utf-8-sig", "cp1252", "latin-1"):' \
-  '        for codificacion in ("utf-8-sig",):' \
+  '                texto = crudo.decode("cp1252", errors="replace")' \
+  '                texto = crudo.decode("utf-8", errors="replace")' \
   "FAILED $T::test_el_csv_del_historial_se_lee_con_coma_punto_y_coma_latin1_o_bom[latin-1-"
 sabotaje $M "el CSV vuelve a leerse siempre con coma" \
   $'        separador = max((",", ";", "\\t"), key=encabezado.count)' \
   $'        separador = ","' \
   "FAILED $T::test_el_csv_del_historial_se_lee_con_coma_punto_y_coma_latin1_o_bom[punto y coma-"
+# Lo que encontró la revisión
+sabotaje $M "una combinada vuelve a copiar números hacia abajo" \
+  $'        if not isinstance(valor, str) or not valor.strip() or _re.fullmatch(r"[\\d\\s.,+\\-]+", valor.strip()):\n            continue' \
+  $'        if False:\n            continue' \
+  "FAILED $T::test_una_combinada_con_cantidad_y_precio_no_duplica_el_producto"
+sabotaje $M "las combinadas vuelven a copiarse desde el encabezado" \
+  '    return _rellenar_combinadas(df, combinadas, desde_fila=fila_encabezado + 1).dropna(how="all")' \
+  '    return _rellenar_combinadas(df, combinadas, desde_fila=2).dropna(how="all")' \
+  "FAILED $T::test_un_encabezado_en_dos_filas_combinadas_no_da_un_producto_fantasma"
+sabotaje $F "el libro vuelve a buscarse en xl/workbook.xml" \
+  '    libro = _find_workbook_part(manifiesto).PartName[1:]' \
+  '    libro = "xl/workbook.xml"' \
+  "FAILED $T::test_un_libro_senuelo_no_engana_a_la_validacion_ni_a_la_lectura"
+sabotaje $F "los textos compartidos vuelven a buscarse por nombre" \
+  '    return libro, get_rels_path(libro), (textos.PartName[1:] if textos is not None else None)' \
+  '    return libro, get_rels_path(libro), "xl/sharedStrings.xml"' \
+  "FAILED $T::test_textos_compartidos_con_otro_nombre_tambien_se_rechazan"
+sabotaje $M "un encabezado enorme vuelve a normalizarse" \
+  '    headers = [h for h in headers if len(str(h or "")) <= 200]' \
+  '    pass' \
+  "FAILED $T::test_un_texto_enorme_arriba_no_traba_la_busqueda_del_encabezado"
+sabotaje $M "el mapeo del cliente deja de contar para el encabezado" \
+  '    if len(_detect_item_columns(actuales)) + sum(1 for c in actuales if c in conocidas) >= 3:' \
+  '    if len(_detect_item_columns(actuales)) >= 3:' \
+  "FAILED $T::test_con_mapeo_del_cliente_el_pie_no_se_toma_como_encabezado"
+sabotaje $M "un CSV UTF-8 con un byte raro vuelve a leerse como cp1252" \
+  $'            if _re.search(rb"[\\xc2-\\xf4][\\x80-\\xbf]", crudo):' \
+  $'            if False:' \
+  "FAILED $T::test_un_csv_utf8_con_un_byte_raro_no_se_rompe_entero"
+sabotaje $M "el separador vuelve a contar lo que va entre comillas" \
+  $'        encabezado = _re.sub(r\'"[^"]*"\', "", texto.split("\\n", 1)[0])' \
+  $'        encabezado = texto.split("\\n", 1)[0]' \
+  "FAILED $T::test_el_separador_no_cuenta_lo_que_va_entre_comillas"
+sabotaje $M "el CUIT del despachante vuelve a aceptar cualquier cosa" \
+  '            if not _re_cuit.fullmatch(r"[0-9]{11}", effective_cuit_agr):' \
+  '            if False:' \
+  "FAILED $T::test_el_cuit_del_despachante_va_solo_con_11_digitos"
+sabotaje $M "un producto mal formado vuelve a dar 500" \
+  '            if not isinstance(_it, dict) or (' \
+  '            if False and (' \
+  "FAILED $T::test_productos_mal_formados_dan_400"
 
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]
