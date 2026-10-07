@@ -52,10 +52,8 @@ sabotaje $M "el texto del PDF se vuelve a leer en el hilo del servidor" \
   'pdf_text = _extract_pdf_text(contents)' \
   'FAILED tests/test_rendimiento1.py::test_health_responde_mientras_se_lee_el_texto_del_pdf'
 sabotaje $M "Gemini vuelve a correr en el hilo del servidor" \
-  '        for sug in await asyncio.to_thread(
-            _suggest_ncm_with_gemini, descripcion, 5 - len(sugerencias)
-        ):' \
-  '        for sug in _suggest_ncm_with_gemini(descripcion, 5 - len(sugerencias)):' \
+  '                asyncio.to_thread(_suggest_ncm_with_gemini, descripcion, 5 - len(sugerencias)),' \
+  '                asyncio.sleep(0, _suggest_ncm_with_gemini(descripcion, 5 - len(sugerencias))),' \
   'FAILED tests/test_rendimiento1.py::test_health_responde_mientras_gemini_sugiere_ncm'
 sabotaje $M "la lectura pierde el tiempo máximo" \
   'asyncio.to_thread(funcion, *args), timeout=_pdf_read_timeout_s()' \
@@ -65,6 +63,34 @@ sabotaje proyecto_maria/security/file_security.py "validar el PDF vuelve al hilo
   'asyncio.to_thread(_abrir_pdf, contents),' \
   'asyncio.sleep(0, _abrir_pdf(contents)),' \
   'FAILED tests/test_rendimiento1.py::test_health_responde_mientras_se_valida_el_pdf'
+sabotaje proyecto_maria/security/file_security.py "validar el PDF pierde el tiempo máximo" \
+  'timeout=_pdf_validate_timeout_s(),' \
+  'timeout=None,' \
+  'FAILED tests/test_rendimiento1.py::test_validar_el_pdf_tiene_tiempo_maximo'
+sabotaje proyecto_maria/security/file_security.py "vuelve a contar páginas antes de mirar si está encriptado" \
+  '    if pdf.is_encrypted:
+        return True, 0' \
+  '    if len(pdf.pages) < 0:
+        return True, 0' \
+  'FAILED tests/test_rendimiento1.py::test_pdf_encriptado_dice_que_esta_encriptado'
+sabotaje $M "el texto del vendedor sin tiempo máximo" \
+  'pdf_text = await _leer_pdf_aparte(_extract_pdf_text, contents)' \
+  'pdf_text = await asyncio.to_thread(_extract_pdf_text, contents)' \
+  'FAILED tests/test_rendimiento1.py::test_texto_del_vendedor_tiene_tiempo_maximo'
+sabotaje $M "las lecturas de PDF vuelven al grupo de hilos compartido" \
+  'futuro = loop.run_in_executor(_pool_lectura_pdf(), _correr_lectura, funcion, *args)' \
+  'futuro = loop.run_in_executor(None, _correr_lectura, funcion, *args)' \
+  'FAILED tests/test_rendimiento1.py::test_pdfs_lentos_no_traban_a_ncm_ni_a_la_validacion'
+sabotaje $M "un error de tiempo del lector pasa por lectura lenta" \
+  '    except TimeoutError as e:
+        raise RuntimeError(f"error de tiempo dentro del lector: {e}") from e' \
+  '    except ZeroDivisionError as e:
+        raise RuntimeError(f"error de tiempo dentro del lector: {e}") from e' \
+  'FAILED tests/test_rendimiento1.py::test_error_de_tiempo_adentro_del_lector_no_es_lectura_lenta'
+sabotaje $M "Gemini sin tiempo máximo" \
+  '                timeout=limite,' \
+  '                timeout=None,' \
+  'FAILED tests/test_rendimiento1.py::test_gemini_sin_respuesta_no_cuelga_la_sugerencia'
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"
