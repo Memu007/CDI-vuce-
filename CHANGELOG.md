@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · fix: guardar una operación con la SIM completa no da 500 (GUARDAR-1)
+
+- **fix(operaciones):** la operación (con el contador del plan) se guarda en su propio commit y el historial del cliente después, cada producto en su savepoint: si el historial falla, la operación queda y la respuesta lo dice (`historial_guardado`). Antes, en Postgres, la SIM completa (`84714900100D`) no entraba en `client_product_history.ncm` (String(10)) y no se guardaba nada.
+- **fix(historial):** guarda lo que entra y, de la SIM completa, el NCM de 8 dígitos; editar un producto exige los 8 dígitos (antes cortaba a 10 caracteres). Moneda, origen, fecha de inicio del cliente, grupo fuera de rango y el carácter NUL ya no tiran abajo el guardado. Sin migración.
+
 ## 2026-10-07 · feat: el catálogo NCM es el vigente de ARCA (CATALOGO-NCM-1)
 
 - **feat(ncm):** el catálogo pasa al nomenclador vigente de ARCA (10.504 NCM, con la enmienda de 2022: 8517.13.00, 8524, 8549). Una NCM dada de baja (522, como 8517.12.31) avisa que esa posición ya no existe y que hay que buscar la nueva, en la validación y en el asistente de NCM; es aviso, no freno. Se saca el CSV de respaldo con códigos que ya no existen.

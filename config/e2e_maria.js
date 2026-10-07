@@ -128,7 +128,8 @@ async function confirmReview(page) {
     expect(summary.includes('2 items detectados'), 'La revisión no mostró los dos ítems extraídos de la planilla.');
     assert.equal(await page.$eval('#f_comprador_nombre', (el) => el.value), 'Importadora E2E SA');
     await replaceInput(page, '#f_incoterm', 'FOB');
-    await replaceInput(page, '#f_fecha_emision', '22/06/2026');
+    // MARIA-3 pide la fecha de emisión de la factura (ni futura ni de hace más de dos años).
+    await replaceInput(page, '#f_fecha_emision', '01/10/2026');
     await page.waitForFunction(() => !document.getElementById('reviewContinueBtn').disabled);
     await page.click('#reviewContinueBtn');
     await page.waitForSelector('[data-screen="ncm"].is-active');
