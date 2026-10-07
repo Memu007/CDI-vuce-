@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · fix: controles antes de generar el TXT (MARIA-1b)
+
+- **fix(maria):** no se puede generar sin moneda, con «USD» (en MARIA es «DOL»), sin incoterm o con uno inválido, sin el CUIT del importador o con uno mal escrito, con flete o seguro negativos, ni con una NCM que perdió el 0 inicial (se propone con el 0). Una moneda poco habitual o una NCM que no está en el nomenclador (es el de 2018) avisan. El semáforo y la pantalla de generar muestran lo mismo antes.
+- **fix(maria):** ningún texto ni el sufijo SBT meten saltos de línea ni «=» en el TXT; el servidor no inventa DOL ni FOB, y al guardar la operación no se inventan cantidad 1, peso 0,5 ni origen «XX».
+- **fix(excel):** las filas del Excel sin leer y las otras hojas con datos quedan en el semáforo hasta que la persona las descarta.
+
 ## 2026-10-07 · fix: la carga por Excel (EXCEL-1)
 
 - **fix(rendimiento):** leer un Excel o un CSV (`/upload_excel_v2/`, importar historial NCM, analizar una migración) y validarlo al subirlo corren en otro hilo: el sitio sigue atendiendo a los demás. Tienen tiempo máximo (`EXCEL_READ_TIMEOUT_S`, 60 s) con un error propio (`lectura_excel_demasiado_larga`); la pantalla ofrece la carga a mano.
