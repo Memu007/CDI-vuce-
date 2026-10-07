@@ -5882,13 +5882,41 @@ async def update_operation_estado(
 
 
 def _grupo_id_o_none(valor):
-    """grupo_id es un entero: otra cosa daba 500 en Postgres (GUARDAR-1)."""
+    """grupo_id es un Integer de 32 bits: otra cosa daba 500 en Postgres
+    (GUARDAR-1)."""
     if isinstance(valor, bool):
         return None
     try:
-        return int(valor) if valor is not None and str(valor).strip() != "" else None
+        numero = int(valor) if valor is not None and str(valor).strip() != "" else None
     except (TypeError, ValueError, OverflowError):
         return None
+    return numero if numero is not None and -2**31 <= numero < 2**31 else None
+
+
+def _sin_nul(valor):
+    """Saca el carácter NUL de todos los textos de un JSON: Postgres no lo
+    acepta en un texto y tiraba abajo el guardado entero (GUARDAR-1)."""
+    if isinstance(valor, str):
+        return valor.replace("\x00", "")
+    if isinstance(valor, list):
+        return [_sin_nul(v) for v in valor]
+    if isinstance(valor, dict):
+        return {_sin_nul(k): _sin_nul(v) for k, v in valor.items()}
+    return valor
+
+
+async def _historial_de_un_producto(db, upsert, **campos) -> bool:
+    """Un producto al historial, en su propio savepoint: si la base lo
+    rechaza, se pierde sólo ese y no los demás de la operación."""
+    try:
+        async with db.begin_nested():
+            entrada = await upsert(db, **campos)
+            await db.flush()
+        return entrada is not None
+    except Exception:
+        logging.exception("historial del cliente: no se guardó client_id=%s ncm=%s",
+                          campos.get("client_id"), campos.get("ncm"))
+        return False
 
 
 @app.post("/api/clientes/{client_id}/operaciones")
@@ -5904,7 +5932,7 @@ async def save_client_operation(
     client = await _get_owned_client(db, client_id, username)
 
     try:
-        data = await request.json()
+        data = _sin_nul(await request.json())
         resumen = data.get("resumen", {}) or {}
         items = data.get("items", []) or []
 
@@ -5944,7 +5972,7 @@ async def save_client_operation(
                     id=str(uuid.uuid4()),
                     operation_id=operation.id,
                     pieza=str(item.get("pieza") or item.get("ncm") or "")[:20],
-                    descripcion=str(item.get("descripcion") or "").replace("\x00", ""),
+                    descripcion=str(item.get("descripcion") or ""),
                     # Lo que falta queda vacío (0 o ""): nada de cantidad 1,
                     # peso 0,5 ni origen «XX» inventados (MARIA-1b, D6 Dev 2).
                     origen=str(item.get("origen") or "")[:3],
@@ -5991,8 +6019,7 @@ async def save_client_operation(
             if not ncm_raw or not desc_raw:
                 continue
             try:
-                await upsert_client_product_history(
-                    db,
+                campos = dict(
                     owner_username=username,
                     client_id=client_id,
                     ncm=ncm_raw,
@@ -6002,12 +6029,11 @@ async def save_client_operation(
                     cantidad=float(item.get("cantidad") or 0) or None,
                     peso_unitario=float(item.get("peso_unitario") or 0) or None,
                 )
-            except Exception:
+            except (TypeError, ValueError):
                 historial_guardado = False
-                logging.exception(
-                    "client_memory upsert fallo para client_id=%s ncm=%s",
-                    client_id, ncm_raw,
-                )
+                continue
+            if not await _historial_de_un_producto(db, upsert_client_product_history, **campos):
+                historial_guardado = False
         await db.commit()
     except Exception:
         historial_guardado = False
@@ -6471,7 +6497,7 @@ async def learn_client_catalogo_productos(
     username = user["username"]
     await _get_owned_client(db, client_id, username)
 
-    items = body.get("items") if isinstance(body, dict) else None
+    items = _sin_nul(body.get("items")) if isinstance(body, dict) else None
     if not isinstance(items, list):
         raise HTTPException(status_code=400, detail="Se requiere body.items como lista")
 
@@ -6484,8 +6510,7 @@ async def learn_client_catalogo_productos(
         if not ncm or not desc:
             continue
         try:
-            aprendido = await upsert_client_product_history(
-                db,
+            campos = dict(
                 owner_username=username,
                 client_id=client_id,
                 ncm=ncm,
@@ -6495,9 +6520,9 @@ async def learn_client_catalogo_productos(
                 cantidad=float(item.get("cantidad") or 0) or None,
                 peso_unitario=float(item.get("peso_unitario") or 0) or None,
             )
-            updated += aprendido is not None
-        except Exception:
-            logging.exception("learn_client_catalogo_productos fallo para client_id=%s", client_id)
+        except (TypeError, ValueError):
+            continue
+        updated += await _historial_de_un_producto(db, upsert_client_product_history, **campos)
 
     await db.commit()
     return {"success": True, "cliente_id": client_id, "aprendidos": updated}
