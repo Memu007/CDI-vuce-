@@ -783,3 +783,137 @@ def test_una_celda_en_la_ultima_columna_se_rechaza_antes_de_abrir(monkeypatch):
 def test_una_factura_ancha_sigue_entrando():
     from proyecto_maria.security.file_security import _contar_hojas_xlsx
     assert _contar_hojas_xlsx(_libro([[f"col{c}" for c in range(200)]])) == 1
+
+
+# ------------------------------------------- revisión Opus de la devolución
+
+def _cambiar_parte(contenido: bytes, parte: str, cambio) -> bytes:
+    import zipfile
+    entrada = zipfile.ZipFile(io.BytesIO(contenido))
+    salida = io.BytesIO()
+    with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as z:
+        for info in entrada.infolist():
+            datos = entrada.read(info.filename)
+            z.writestr(info, cambio(datos) if info.filename == parte else datos)
+    return salida.getvalue()
+
+
+def _con_entidad(datos: bytes) -> bytes:
+    """Una entidad interna que se expande a etiquetas, como el ataque."""
+    raiz = datos.index(b"?>") + 2 if datos.startswith(b"<?xml") else 0
+    return datos[:raiz] + b'<!DOCTYPE x [<!ENTITY a "<b/>">]>' + datos[raiz:]
+
+
+@pytest.mark.parametrize("parte", ["xl/styles.xml", "xl/workbook.xml", "xl/worksheets/sheet1.xml"])
+def test_un_libro_con_entidades_xml_se_rechaza_antes_de_abrir(parte, monkeypatch):
+    """Revisión Opus: 5 KB con entidades se expandían a millones de <xf/> y
+    llegaban a 1,9 GB; un .xlsx de verdad nunca trae DTD."""
+    import openpyxl
+    from proyecto_maria.security.file_security import ExcelDemasiadoGrande, _contar_hojas_xlsx
+    monkeypatch.setattr(openpyxl, "load_workbook", lambda *a, **k: pytest.fail("abrió el libro"))
+    contenido = _cambiar_parte(_libro([ENCABEZADO, ["84713000", "X", "China", 1, 2, 3]]), parte, _con_entidad)
+    with pytest.raises((ExcelDemasiadoGrande, ValueError)):
+        _contar_hojas_xlsx(contenido)
+    assert _subir(contenido).status_code == 400
+
+
+def test_estilos_con_un_prefijo_no_ascii_tambien_se_cuentan():
+    """Revisión Opus: <ñ:xf/> no lo contaba el patrón y 10 MB llegaban a
+    948 MB."""
+    from proyecto_maria.security.file_security import ExcelDemasiadoGrande, _contar_hojas_xlsx
+    ns = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    xml = (f'<?xml version="1.0" encoding="UTF-8"?><ñ:styleSheet xmlns:ñ="{ns}"><ñ:cellXfs>'
+           + "<ñ:xf/>" * 600_000 + "</ñ:cellXfs></ñ:styleSheet>").encode()
+    contenido = _cambiar_parte(_libro([ENCABEZADO]), "xl/styles.xml", lambda _: xml)
+    with pytest.raises(ExcelDemasiadoGrande):
+        _contar_hojas_xlsx(contenido)
+
+
+def test_estilos_de_un_libro_real_con_muchos_formatos_siguen_pasando():
+    """Revisión Opus: 40.000 formatos con su alineación y 10.000 fuentes
+    (220.000 etiquetas, dentro de lo que deja Excel) se rechazaban."""
+    from proyecto_maria.security.file_security import _contar_hojas_xlsx
+    assert _contar_hojas_xlsx(_con_estilos(_libro([ENCABEZADO]), "xf", 230_000)) == 1
+
+
+def _con_hoja_de_grafico(contenido: bytes, tam: int) -> bytes:
+    """El libro con una hoja de gráfico de `tam` bytes y su .rels."""
+    import zipfile
+    entrada = zipfile.ZipFile(io.BytesIO(contenido))
+    salida = io.BytesIO()
+    ns = 'xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"'
+    with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as z:
+        for info in entrada.infolist():
+            datos = entrada.read(info.filename)
+            if info.filename == "xl/workbook.xml":
+                datos = datos.replace(b"</sheets>", b'<sheet name="Grafico" sheetId="9" r:id="rId99"/></sheets>')
+            if info.filename == "xl/_rels/workbook.xml.rels":
+                datos = datos.replace(b"</Relationships>", b'<Relationship Id="rId99" Type="http://schemas.'
+                                      b'openxmlformats.org/officeDocument/2006/relationships/chartsheet" '
+                                      b'Target="chartsheets/sheet1.xml"/></Relationships>')
+            z.writestr(info, datos)
+        z.writestr("xl/chartsheets/sheet1.xml", f'<chartsheet {ns}>'.encode() + b"<a/>" * (tam // 4) + b"</chartsheet>")
+        z.writestr("xl/chartsheets/_rels/sheet1.xml.rels",
+                   '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>')
+    return salida.getvalue()
+
+
+def test_la_copia_de_la_primera_hoja_saca_las_hojas_de_grafico():
+    """Revisión Opus: openpyxl lee entera una hoja de gráfico aun en
+    read_only; una de 80 MB llegaba a 2,1 GB. Con una sola hoja de cálculo
+    la copia devolvía el libro sin tocar."""
+    import zipfile
+    contenido = _con_hoja_de_grafico(_libro([ENCABEZADO, ["84713000", "X", "China", 1, 2, 3]]), 1000)
+    copia, _ = main._xlsx_solo_primera_hoja(contenido)
+    nombres = zipfile.ZipFile(io.BytesIO(copia)).namelist()
+    assert "xl/chartsheets/sheet1.xml" not in nombres, nombres
+    assert b"Grafico" not in zipfile.ZipFile(io.BytesIO(copia)).read("xl/workbook.xml")
+    r = _subir(contenido)
+    assert r.status_code == 200 and len(r.json()["items"]) == 1, r.text[:300]
+
+
+def test_la_copia_deja_solo_la_primera_hoja_aunque_otra_se_llame_igual():
+    import zipfile
+    contenido = _con_hoja_escondida(3)
+    copia, _ = main._xlsx_solo_primera_hoja(contenido)
+    libro = zipfile.ZipFile(io.BytesIO(copia)).read("xl/workbook.xml")
+    assert libro.count(b"<sheet ") == 1, libro
+
+
+def test_un_rels_de_hoja_enorme_se_rechaza():
+    """Revisión Opus: el .rels de la primera hoja (90 MB) se lee entero."""
+    from proyecto_maria.security.file_security import ExcelDemasiadoGrande, _contar_hojas_xlsx
+    rels = (b'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            + b"<x/>" * (2 * 2**20 // 4) + b"</Relationships>")
+    import zipfile
+    contenido = _libro([ENCABEZADO])
+    salida = io.BytesIO()
+    with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as z:
+        for info in zipfile.ZipFile(io.BytesIO(contenido)).infolist():
+            z.writestr(info, zipfile.ZipFile(io.BytesIO(contenido)).read(info.filename))
+        z.writestr("xl/worksheets/_rels/sheet1.xml.rels", rels)
+    with pytest.raises(ExcelDemasiadoGrande):
+        _contar_hojas_xlsx(salida.getvalue())
+
+
+def test_una_columna_detectada_como_cantidad_no_se_rellena_aunque_el_mapeo_diga_otra_cosa():
+    """Revisión Opus: con «Quantity» guardada como descripción en el mapeo
+    (dos columnas para descripción), «5 UN» se copiaba y el FOB se duplicaba."""
+    df = pd.DataFrame([["Notebook", "5 UN", "100"], ["Funda", None, None]],
+                      columns=["Producto", "Quantity", "Unit Price"])
+    salida = main._rellenar_combinadas(df.copy(), [(2, 2, 3, 2)],
+                                       mapeo={"Producto": "descripcion", "Quantity": "descripcion"})
+    assert pd.isna(salida.at[1, "Quantity"]), salida
+
+
+@pytest.mark.parametrize("texto, esperado", [
+    ("descripcion;ncm\nCAFÉ\xa0TOSTADO;0901\nMANÍ\xa0PELADO;1202\nTÉ VERDE;0902\n",
+     ["CAFÉ\xa0TOSTADO", "MANÍ\xa0PELADO", "TÉ VERDE"]),
+    ("descripcion;ncm\n“CAFÉ”;0901\nPURÉ;2005\n", ["“CAFÉ”", "PURÉ"]),
+])
+def test_un_csv_cp1252_con_letras_que_arman_utf8_raro_se_lee_bien(texto, esperado):
+    """Revisión Opus: «É» seguida de un espacio duro arma «ɠ» en UTF-8; eso
+    no es castellano y no cuenta como UTF-8."""
+    df = main._leer_tabla(texto.encode("cp1252"), "historial.csv")
+    assert list(df["descripcion"]) == esperado, list(df["descripcion"])
+    assert not df.attrs.get("aviso_codificacion"), df.attrs
