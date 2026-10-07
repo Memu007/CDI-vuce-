@@ -80,3 +80,53 @@ def test_el_error_del_sufijo_dice_que_subitem(client, auth_override, sufijo):
 def test_un_pedido_mal_armado_da_400_y_no_500(client, auth_override, subitems):
     r = _pedir(client, subitems)
     assert r.status_code == 400, r.text
+
+
+# --- Devolución (PARA-DEV-2.md, punto 7) -----------------------------------
+
+@pytest.mark.parametrize("subitems", [5, True, 3.5, {"cantidad": 6}])
+def test_subitems_que_no_son_una_lista_dan_400_y_no_500(client, auth_override, subitems):
+    """Los controles de antes de generar corren primero y no pueden reventar
+    con la forma del pedido: el control de forma dice qué ítem está mal."""
+    r = _pedir(client, subitems)
+    assert r.status_code == 400, r.text
+    assert "Item 1" in r.text and "sub-ítems" in r.text, r.text
+
+
+@pytest.mark.parametrize("subitems", [5, True])
+def test_la_validacion_no_revienta_con_subitems_raros(client, auth_override, subitems):
+    item = dict(ITEM_BASE, estado=2, subitems=subitems)
+    r = client.post("/api/validate/smart", json={
+        "items": [item], "operacion": {"moneda": "DOL", "incoterm": "EXW", "comprador_cuit": "30999999995"}})
+    assert r.status_code == 200, r.text
+
+
+# --- Devolución (punto 10): el error cae bajo su sub-ítem ------------------
+
+def _con_un_grupo_antes(subitems):
+    """Dos productos agrupados (una línea del TXT) y, tercero en la
+    pantalla, el producto partido en sub-ítems: segunda línea del TXT."""
+    a = dict(ITEM_BASE, descripcion="Equipo agrupado uno", cantidad=1, valor_unitario=10, grupo_id=1)
+    b = dict(ITEM_BASE, descripcion="Equipo agrupado dos", cantidad=1, valor_unitario=10, grupo_id=1)
+    return [a, b, dict(ITEM_BASE, subitems=subitems)]
+
+
+@pytest.mark.parametrize("pares", [((7, 1197), (-1, 1197)), ((2, 1197), (4, 0)), ((2, 1197), (3.996, 1197))])
+def test_el_error_del_subitem_dice_el_numero_de_la_pantalla(pares):
+    """Con un grupo antes, «Item 3» es el producto de la pantalla, no la
+    línea 2 del TXT: la pantalla lo pone bajo ese sub-ítem."""
+    from tests.test_maria_subitems import COMUN
+    from proyecto_maria.core.maria_generator import generate_maria_txt
+    with pytest.raises(ValueError) as e:
+        generate_maria_txt(items=_con_un_grupo_antes(_subs(*pares)), **COMUN, sbt_sufijo_valor=SUF_A)
+    assert str(e.value).startswith("Item 3, sub-ítem 2: "), str(e.value)
+
+
+def test_el_error_del_sufijo_del_endpoint_usa_el_mismo_numero(client, auth_override):
+    subs = _subs((2, 1197), (4, 1197))
+    subs[1]["sufijo"] = "CSBTSVL=S2"
+    items = [dict(it, estado=2) for it in _con_un_grupo_antes(subs)]
+    r = client.post("/generate_maria", json={
+        "operation_id": "OP1", "items": items, "fecha_emision": "22/06/2026", "sbt_sufijo_valor": SUF_A,
+        "moneda": "DOL", "incoterm": "EXW", "comprador_cuit": "30999999995"})
+    assert r.status_code == 400 and r.json()["detail"].startswith("Item 3, sub-ítem 2: "), r.text
