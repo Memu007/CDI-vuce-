@@ -23,8 +23,8 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(maria):** no se puede generar sin moneda, con «USD» (en MARIA es «DOL»), sin incoterm o con uno inválido, sin el CUIT del importador o con uno mal escrito, con flete o seguro negativos, ni con una NCM que perdió el 0 inicial (se propone con el 0). Una moneda poco habitual o una NCM que no está en el nomenclador (es el de 2018) avisan. El semáforo y la pantalla de generar muestran lo mismo antes.
 - **fix(maria):** ningún texto ni el sufijo SBT meten saltos de línea ni «=» en el TXT; el servidor no inventa DOL ni FOB, y al guardar la operación no se inventan cantidad 1, peso 0,5 ni origen «XX».
-- **fix(excel):** las filas del Excel sin leer y las otras hojas con datos quedan en el semáforo hasta que la persona las descarta. Mirar las otras hojas tiene su propio presupuesto de bytes y tiempo que corta la lectura (un libro armado ya no traba la carga de Excel); si no se pudieron mirar todas, el semáforo lo dice.
-- **fix(maria):** NaN o infinito en cantidad, valor, peso, flete, seguro o gastos no dejan generar; el CUIT va sólo con dígitos 0-9; toda moneda que no sea DOL avisa hasta que el despachante confirme los códigos; `/generate_maria_export` limpia los textos como `/generate_maria`.
+- **fix(excel):** las filas del Excel sin leer y las otras hojas con datos quedan en el semáforo hasta que la persona las descarta. Mirar las otras hojas tiene su propio presupuesto de bytes y tiempo que corta la lectura misma (ya no deja el hilo trabado minutos con un libro armado); si no se pudieron mirar todas, el semáforo lo dice.
+- **fix(maria):** NaN, infinito o montos que desbordan en cantidad, valor, peso (también de los subítems), flete, seguro o gastos no dejan generar ni exportar; el CUIT va sólo con dígitos 0-9; toda moneda que no sea DOL avisa hasta que el despachante confirme los códigos; `/generate_maria_export` limpia los textos como `/generate_maria`.
 
 ## 2026-10-07 · fix: la carga por Excel (EXCEL-1)
 
