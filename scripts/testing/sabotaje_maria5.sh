@@ -172,5 +172,13 @@ caso bruto_en_silencio "${T}peso_excel.py::test_el_bruto_solo_se_usa_dividido_y_
 reemplazar $M '        "pesoneto", "pesobruto",' '        "pesobruto", "pesoneto",'
 caso bruto_antes_que_neto "${T}peso_excel.py::test_con_neto_y_bruto_se_usa_el_neto"
 
+# 22. la columna de peso vuelve a mirarse sólo por nombre exacto
+reemplazar $M '    if any(p in normal for p in ("total", "neto", "net", "linea")):' '    if normal in ("pesototal", "pesoneto"):'
+caso nombre_exacto "${T}peso_excel.py::test_un_mapeo_guardado_con_otro_nombre_tambien_divide"
+
+# 23. un peso que no es número queda en 0 en silencio
+reemplazar $M '    if sin_numero:' '    if False:'
+caso texto_en_silencio "${T}peso_excel.py::test_un_peso_que_no_es_numero_se_avisa"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 21 sabotajes dan rojo por la razón esperada"
+echo "OK: los 23 sabotajes dan rojo por la razón esperada"
