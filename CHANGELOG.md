@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · fix: un campo vacío de la factura no llega al TXT como «None» (MARIA-1d)
+
+- **fix(maria):** el lector deja vacíos el número de factura, el vendedor, el comprador, el domicilio, la moneda y el incoterm que Gemini devuelve nulos (antes «None» y «NON», que llegaban al TXT como `IDSO=FAC_None` o `CDDTINCOTE=NON`); sin moneda ni incoterm ya no se inventan DOL ni FOB. Lo que falta de la carátula se avisa antes de generar.
+
 ## 2026-10-07 · feat: avisos antes de generar, gastos anteriores al FOB, procedencia y fecha (MARIA-3)
 
 - **feat(maria):** los avisos del TXT se ven en la validación, antes del botón de generar. Los gastos anteriores al FOB de la pantalla llegan al TXT (`GTOS-ANT-FOB`) con EXW, FCA o FAS (FAS pasa a ser condición válida); con otra condición no van y se avisa. La procedencia se carga por operación (art. 15 del Código Aduanero); vacía, sigue igual al origen con aviso.

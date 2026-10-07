@@ -2080,6 +2080,12 @@ _FLETE_NO_APLICA = {'N/A', 'NA', '-', 'FREE', 'INCLUDED', 'PREPAID'}
 _PAIS_NO_APLICA = {'N/A', 'NA', 'UNKNOWN', '?'}
 
 
+def _texto(raw) -> str:
+    """Un campo de texto de la factura: vacío si Gemini lo devolvió nulo o no
+    lo devolvió. Nunca «None» ni un valor por defecto (MARIA-1d)."""
+    return "" if raw is None else str(raw).strip()
+
+
 def _no_aplica(raw, palabras) -> bool:
     return str(raw).strip().rstrip('.').strip().upper() in palabras
 
@@ -2297,19 +2303,19 @@ IMPORTANTE:
                     # Extraer datos de operación
                     operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
                     operacion_data = {
-                        'numero_factura': str(operacion.get('numero_factura', '')),
-                        'fecha_emision': str(operacion.get('fecha_emision') or ''),
-                        'vendedor_nombre': str(operacion.get('vendedor_nombre', '')),
-                        'vendedor_id': str(operacion.get('vendedor_id', '')),
+                        'numero_factura': _texto(operacion.get('numero_factura')),
+                        'fecha_emision': _texto(operacion.get('fecha_emision')),
+                        'vendedor_nombre': _texto(operacion.get('vendedor_nombre')),
+                        'vendedor_id': _texto(operacion.get('vendedor_id')),
                         'vendedor_pais': _origen_desde_factura(operacion.get('vendedor_pais')),
-                        'vendedor_direccion': str(operacion.get('vendedor_direccion', '')),
-                        'comprador_nombre': str(operacion.get('comprador_nombre', '')),
+                        'vendedor_direccion': _texto(operacion.get('vendedor_direccion')),
+                        'comprador_nombre': _texto(operacion.get('comprador_nombre')),
                         'comprador_cuit': _normalize_argentine_cuit(operacion.get('comprador_cuit', '')),
-                        'moneda': str(operacion.get('moneda', 'DOL'))[:3].upper(),
-                        'incoterm': str(operacion.get('incoterm', 'FOB'))[:3].upper(),
+                        'moneda': _texto(operacion.get('moneda'))[:3].upper(),
+                        'incoterm': _texto(operacion.get('incoterm'))[:3].upper(),
                         'flete': _numero_factura(operacion.get('flete'), decimal) or 0.0,
                         'seguro': _numero_factura(operacion.get('seguro'), decimal) or 0.0,
-                        'comprador_domicilio': str(operacion.get('comprador_domicilio', '')),
+                        'comprador_domicilio': _texto(operacion.get('comprador_domicilio')),
                     }
                     operacion_data['campos_sin_leer'] = _campos_sin_leer(operacion, decimal)
                     
@@ -2497,19 +2503,19 @@ IMPORTANTE:
                         # Extraer datos de operación
                         operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
                         operacion_data = {
-                            'numero_factura': str(operacion.get('numero_factura', '')),
-                            'fecha_emision': str(operacion.get('fecha_emision') or ''),
-                            'vendedor_nombre': str(operacion.get('vendedor_nombre', '')),
-                            'vendedor_id': str(operacion.get('vendedor_id', '')),
+                            'numero_factura': _texto(operacion.get('numero_factura')),
+                            'fecha_emision': _texto(operacion.get('fecha_emision')),
+                            'vendedor_nombre': _texto(operacion.get('vendedor_nombre')),
+                            'vendedor_id': _texto(operacion.get('vendedor_id')),
                             'vendedor_pais': _origen_desde_factura(operacion.get('vendedor_pais')),
-                            'vendedor_direccion': str(operacion.get('vendedor_direccion', '')),
-                            'comprador_nombre': str(operacion.get('comprador_nombre', '')),
+                            'vendedor_direccion': _texto(operacion.get('vendedor_direccion')),
+                            'comprador_nombre': _texto(operacion.get('comprador_nombre')),
                             'comprador_cuit': _normalize_argentine_cuit(operacion.get('comprador_cuit', '')),
-                            'moneda': str(operacion.get('moneda', 'DOL'))[:3].upper(),
-                            'incoterm': str(operacion.get('incoterm', 'FOB'))[:3].upper(),
+                            'moneda': _texto(operacion.get('moneda'))[:3].upper(),
+                            'incoterm': _texto(operacion.get('incoterm'))[:3].upper(),
                             'flete': _numero_factura(operacion.get('flete'), decimal) or 0.0,
                             'seguro': _numero_factura(operacion.get('seguro'), decimal) or 0.0,
-                            'comprador_domicilio': str(operacion.get('comprador_domicilio', '')),
+                            'comprador_domicilio': _texto(operacion.get('comprador_domicilio')),
                         }
                         operacion_data['campos_sin_leer'] = _campos_sin_leer(operacion, decimal)
                         

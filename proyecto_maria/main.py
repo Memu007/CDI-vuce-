@@ -3609,6 +3609,10 @@ def _supuestos_maria(request: MariaRequest, items: list, gastos_fob) -> list:
         empresa_digitalizacion=request.empresa_digitalizacion,
         gastos_anteriores_fob=request.gastos_anteriores_fob,
         fecha_emision=request.fecha_emision,
+        vendedor_nombre=request.vendedor_nombre,
+        comprador_nombre=request.comprador_nombre,
+        comprador_cuit=request.comprador_cuit,
+        moneda=request.moneda,
     )
 
 

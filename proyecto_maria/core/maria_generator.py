@@ -952,6 +952,10 @@ def supuestos_declarados(
     empresa_digitalizacion: str | None = None,
     gastos_anteriores_fob: float | None = None,
     fecha_emision: str = "",
+    vendedor_nombre: str | None = None,
+    comprador_nombre: str | None = None,
+    comprador_cuit: str | None = None,
+    moneda: str | None = None,
 ) -> list:
     """Lista los campos que el sistema declaró SIN preguntarle al despachante.
 
@@ -1000,6 +1004,23 @@ def supuestos_declarados(
             f"Gastos anteriores a FOB: cargaste {anteriores:.2f}, pero con condición "
             f"{incoterm_norm or 'sin elegir'} no van al TXT (sólo con EXW, FCA o FAS)."
         )
+
+    # --- Carátula vacía (MARIA-1d) ----------------------------------------
+    # Sólo si quien llama pasa estos datos (el endpoint): None = no evaluar.
+    caratula = (vendedor_nombre, comprador_nombre, comprador_cuit, moneda)
+    if items and any(v is not None for v in caratula):
+        faltan = [nombre for nombre, valor in (
+            ("vendedor (LDDTNOMFOD)", vendedor_nombre),
+            ("nombre del importador (LDDTNOMIOE)", comprador_nombre),
+            ("CUIT del importador (NDDTIMMIOE)", comprador_cuit),
+            ("moneda (CDDTDEVFOB)", moneda),
+            ("incoterm (CDDTINCOTE)", incoterm),
+        ) if not str(valor or "").strip()]
+        if faltan:
+            avisos.append(
+                "Datos de la carátula vacíos: " + ", ".join(faltan) + ". Esas líneas salen "
+                "vacías o no salen; cargalos en la revisión antes de pegar el archivo en el Kit."
+            )
 
     # --- Fecha de emisión (MARIA-3) ----------------------------------------
     if items and not fecha_de_la_factura(fecha_emision):
