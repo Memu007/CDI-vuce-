@@ -111,7 +111,7 @@
             const startedAt = Date.now();
             const res = await CDI.api('/api/validate/smart', {
                 method: 'POST',
-                body: JSON.stringify({ items })
+                body: JSON.stringify({ items, operacion: cabeceraParaValidar() })
             });
             const data = await res.json();
             const dur = Date.now() - startedAt;
@@ -149,7 +149,7 @@
             pieza: String(it.pieza || '').trim(),
             descripcion: String(it.descripcion || '').trim(),
             origen: String(it.origen || 'XX').trim().toUpperCase() || 'XX',
-            cantidad: toNumber(it.cantidad, 1),
+            cantidad: toNumber(it.cantidad, 0),
             valor_unitario: toNumber(it.valor_unitario, 0),
             peso_unitario: toNumber(it.peso_unitario, 0),
             // El grupo va en una línea del TXT: la validación cuenta igual.
@@ -390,7 +390,9 @@
                     CDI.goTo('validating');
                     throw new Error(detail);
                 }
-                throw new Error(detail || 'No se pudo generar el archivo');
+                // Los controles de antes de generar llegan como {errors: [...]}.
+                const texto = (detail && Array.isArray(detail.errors)) ? detail.errors.join(' ') : detail;
+                throw new Error(texto || 'No se pudo generar el archivo');
             }
             lastMaria = {
                 filename: data.filename,
@@ -421,12 +423,24 @@
         }
     }
 
+    // La cabecera que controla el servidor antes de generar (MARIA-1b), tal
+    // como saldría en /generate_maria.
+    function cabeceraParaValidar() {
+        const req = buildMariaRequest();
+        return {
+            moneda: req.moneda, incoterm: req.incoterm, comprador_cuit: req.comprador_cuit,
+            flete: req.flete, seguro: req.seguro,
+        };
+    }
+
     function buildMariaRequest() {
         const op = (CDI.state && CDI.state.operacion) || {};
         const stats = (lastValidation && lastValidation.estadisticas) || {};
 
-        const moneda = (op.moneda || 'DOL').toString().toUpperCase();
-        const incoterm = (op.incoterm || 'FOB').toString().toUpperCase();
+        // Sin moneda o incoterm no se inventan DOL ni FOB: el control de antes
+        // de generar lo marca (MARIA-1b).
+        const moneda = (op.moneda || '').toString().trim().toUpperCase();
+        const incoterm = (op.incoterm || '').toString().trim().toUpperCase();
 
         const factura = numeroDeFactura(op);
         const operation_id = factura ? ('FAC_' + factura.replace(/[^a-zA-Z0-9_-]/g, '')) :
@@ -436,7 +450,7 @@
             pieza: String(it.pieza || '').trim(),
             descripcion: String(it.descripcion || '').trim(),
             origen: String(it.origen || 'XX').trim().toUpperCase() || 'XX',
-            cantidad: toNumber(it.cantidad, 1),
+            cantidad: toNumber(it.cantidad, 0),
             valor_unitario: toNumber(it.valor_unitario, 0),
             peso_unitario: toNumber(it.peso_unitario, 0),
             codigo_parte: String(it.codigo_parte || '').trim(),
@@ -839,8 +853,8 @@
                 pieza: String(it.pieza || '').trim(),
                 ncm: String(it.pieza || '').trim(),
                 descripcion: String(it.descripcion || '').trim(),
-                origen: String(it.origen || 'XX').trim().toUpperCase() || 'XX',
-                cantidad: toNumber(it.cantidad, 1),
+                origen: String(it.origen || '').trim().toUpperCase(),  // sin «XX» inventado (MARIA-1b)
+                cantidad: toNumber(it.cantidad, 0),
                 valor_unitario: toNumber(it.valor_unitario, 0),
                 peso_unitario: toNumber(it.peso_unitario, 0),
                 grupo_id: it.grupo_id || null,

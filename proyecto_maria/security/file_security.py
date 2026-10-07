@@ -123,6 +123,73 @@ def _abrir_pdf(contents: bytes) -> tuple:
     return False, len(pdf.pages)
 
 
+def _contar_hojas_excel(contents: bytes, file_ext: str) -> int:
+    if file_ext == '.xlsx':
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True)
+        try:
+            return len(wb.sheetnames)
+        finally:
+            wb.close()
+    # El formato binario .xls no puede abrirse con openpyxl.
+    # Pandas usa xlrd y alcanza con validar que exista alguna hoja.
+    import pandas as pd
+    return len(pd.ExcelFile(io.BytesIO(contents), engine='xlrd').sheet_names)
+
+
+def _excel_max_descomprimido_bytes() -> int:
+    """EXCEL_MAX_DESCOMPRIMIDO_MB, 100 por defecto (EXCEL-1)."""
+    import math
+    try:
+        valor = float(os.getenv("EXCEL_MAX_DESCOMPRIMIDO_MB", "") or 100)
+    except (TypeError, ValueError):
+        valor = 100.0
+    if not math.isfinite(valor) or valor <= 0:
+        valor = 100.0
+    return int(valor * 1024 * 1024)
+
+
+def _excel_descomprimido_bytes(contents: bytes) -> int:
+    """Cuánto ocupa un .xlsx descomprimido, leyendo sólo el índice del zip.
+
+    Un .xlsx de 1 MB puede descomprimirse a gigas y llenar la memoria al
+    abrirlo. zipfile no entrega más bytes que los que declara el índice, así
+    que el índice no puede mentir para abajo (EXCEL-1).
+    """
+    import zipfile
+    with zipfile.ZipFile(io.BytesIO(contents)) as z:
+        return sum(info.file_size for info in z.infolist())
+
+
+class ExcelDemasiadoGrande(Exception):
+    """El .xlsx descomprimido pasa de EXCEL_MAX_DESCOMPRIMIDO_MB."""
+
+
+# Validar un Excel usa su propio grupo de hilos: muchas subidas pesadas no le
+# quitan los hilos compartidos al resto (sugerir NCM, validar PDF) (EXCEL-1).
+_POOL_VALIDAR_EXCEL = None
+
+
+def _pool_validar_excel():
+    global _POOL_VALIDAR_EXCEL
+    if _POOL_VALIDAR_EXCEL is None:
+        from concurrent.futures import ThreadPoolExecutor
+        try:
+            hilos = max(1, int(os.getenv("EXCEL_VALIDATE_WORKERS", "2")))
+        except (TypeError, ValueError):
+            hilos = 2
+        _POOL_VALIDAR_EXCEL = ThreadPoolExecutor(hilos, thread_name_prefix="validar-excel")
+    return _POOL_VALIDAR_EXCEL
+
+
+def _abrir_excel(contents: bytes, file_ext: str) -> int:
+    """Mira cuánto ocupa descomprimido y recién entonces cuenta las hojas.
+    Corre en otro hilo: un zip con miles de entradas también tarda (EXCEL-1)."""
+    if file_ext == '.xlsx' and _excel_descomprimido_bytes(contents) > _excel_max_descomprimido_bytes():
+        raise ExcelDemasiadoGrande()
+    return _contar_hojas_excel(contents, file_ext)
+
+
 def _pdf_validate_timeout_s() -> float:
     """Mal escrito, en 0 o negativo, vale 30 s (RENDIMIENTO-1b)."""
     import math
@@ -243,19 +310,29 @@ async def validate_file_upload(
     # Additional validation for Excel
     if file_type == 'excel':
         try:
-            if file_ext == '.xlsx':
-                import openpyxl
-                wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True)
-                if len(wb.sheetnames) == 0:
-                    raise HTTPException(400, "Excel file has no sheets")
-                wb.close()
-            else:
-                # El formato binario .xls no puede abrirse con openpyxl.
-                # Pandas usa xlrd y alcanza con validar que exista alguna hoja.
-                import pandas as pd
-                xls = pd.ExcelFile(io.BytesIO(contents), engine='xlrd')
-                if len(xls.sheet_names) == 0:
-                    raise HTTPException(400, "Excel file has no sheets")
+            # Abrir el Excel es sincrónico: va en otro hilo y con tiempo máximo,
+            # para que un archivo pesado no frene al resto (EXCEL-1).
+            import asyncio
+            try:
+                hojas = await asyncio.wait_for(
+                    asyncio.get_running_loop().run_in_executor(
+                        _pool_validar_excel(), _abrir_excel, contents, file_ext
+                    ),
+                    timeout=_pdf_validate_timeout_s(),
+                )
+            except ExcelDemasiadoGrande:
+                raise HTTPException(
+                    400,
+                    "El Excel es demasiado grande descomprimido. Probá con una planilla "
+                    "con menos datos o cargá los productos a mano.",
+                )
+            except asyncio.TimeoutError:
+                raise HTTPException(
+                    400,
+                    "No pudimos abrir el Excel: tardó demasiado. Probá con otro archivo.",
+                )
+            if hojas == 0:
+                raise HTTPException(400, "Excel file has no sheets")
 
         except HTTPException:
             raise

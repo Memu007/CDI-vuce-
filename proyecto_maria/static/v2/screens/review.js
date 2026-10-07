@@ -25,8 +25,8 @@
     ];
 
     // Campos obligatorios para pasar a NCM (los demas son "nice to have")
-    // CUIT no es obligatorio: clientes extranjeros no tienen CUIT argentino.
-    let REQUIRED = ['moneda', 'incoterm'];
+    // El CUIT del importador es obligatorio: sin él el TXT no sirve (D20).
+    let REQUIRED = ['moneda', 'incoterm', 'comprador_cuit'];
 
     // Whitelist de monedas habituales en despachos (ISO4217 + alias MARIA)
     const MONEDA_WHITELIST = ['DOL', 'EUR', 'BRL', 'ARS', 'CLP', 'UYU', 'GBP', 'JPY', 'CNY'];
@@ -86,8 +86,8 @@
     // Validacion por campo: retorna string con error o null si OK
     const VALIDATORS = {
         comprador_cuit: (v) => {
-            // Opcional: solo validar formato si el usuario lo completa.
-            if (!v) return null;
+            // Obligatorio: sin el CUIT del importador el TXT no sirve (D20).
+            if (!v) return 'Falta el CUIT del importador.';
             return validateCuitAR(v);
         },
         vendedor_id: (v) => {
@@ -1174,9 +1174,10 @@
             if (!initialized) init();
             const isManual = CDI.state.sourceFormat === 'manual';
             REQUIRED = isManual 
-                ? ['vendedor_nombre', 'comprador_nombre', 'numero_factura', 'fecha_emision', 'moneda', 'incoterm']
-                // Sin fecha de emisión no se genera el TXT (devolución de MARIA-3).
-                : ['fecha_emision', 'moneda', 'incoterm'];
+                ? ['vendedor_nombre', 'comprador_nombre', 'numero_factura', 'fecha_emision', 'moneda', 'incoterm', 'comprador_cuit']
+                // Sin fecha de emisión (devolución de MARIA-3) ni CUIT del
+                // importador (MARIA-1b, D20) no se genera el TXT.
+                : ['fecha_emision', 'moneda', 'incoterm', 'comprador_cuit'];
                 
             if (form) {
                 FIELDS.forEach(name => {

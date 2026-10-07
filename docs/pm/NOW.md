@@ -16,7 +16,14 @@ antes de cerrar la Fase 3.
 
 ## Para Emi
 
-1. **Sin volumen** (Emi, 2026-10-07): cada publicación o reinicio borra los
+1. **Segunda publicación, candidato `6ea8ca9`** (atacado en
+   `REPRODUCCION-PUBLICACION-2-2026-10-07.md`): arregla el país de origen,
+   suma los controles antes de generar, el Excel y lo del despachante. Falta
+   el «dale» de Emi para ese SHA. Emi tiene que confirmar que su caso
+   habitual es reventa (el IVA adicional pasa a `NO_VALIDA`).
+   Después de publicar: Emi genera un TXT con una factura real y lo revisa.
+   La línea «Billing cron» no aparece si nadie pasa a impago.
+1b. **Sin volumen** (Emi, 2026-10-07): cada publicación o reinicio borra los
    TXT generados y el historial de NCM aprendido; las operaciones quedan en
    la base. Descargar el TXT apenas se genera. Lo arregla DISCO-1 (Fase 3).
 2. **Rotar las claves de Gemini** (G0). En Google AI Studio: borrar las que
@@ -66,7 +73,7 @@ Archivos abiertos por Dev:
 
 ## En curso
 
-- **Dev 1:** devolución de MARIA-1b (NaN e inf, escaneo de hojas que traba, CUIT, monedas; D22). Sigue: PUNTA-A-PUNTA-1
+- **Dev 1:** PUNTA-A-PUNTA-1. Sigue: EXCEL-2 (con la D26)
   y EXCEL-2.
 - **Dev 2:** devolución de MARIA-5 (dos pesos para una línea, filas que desaparecen, guarda del peso, subítems, grupos, una sola cuenta). Sigue: CATALOGO-NCM-1; MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
@@ -75,7 +82,7 @@ Archivos abiertos por Dev:
   `requirements.txt` nuevo): `1067 passed, 102 skipped, 0 failed`. Al
   integrar, dos pruebas de MARIA armaban su PDF con PyPDF2, que salió en
   RENDIMIENTO-1: pasan a `pypdf` (`7b42556`).
-- **Aceptada sin integrar:** EXCEL-1 (`7b119b6`), que entra con MARIA-1b.
+- **Integradas a las 15:20 UTC:** EXCEL-1 y MARIA-1b con su devolución (`beea9eb`). Suite sobre `6ea8ca9`: `1224 passed, 102 skipped, 1 xfailed`.
 - **Aceptadas el 2026-10-07 e integradas:** ADMIN-1 (`ac25dbc`), MARIA-2
   (`65ea6f3`) y ADMIN-2 (`f9f8393`). Suite sobre `f9f8393`, que tiene el
   mismo producto y las mismas pruebas que la rama de PM:
@@ -104,7 +111,7 @@ Archivos abiertos por Dev:
 | G2 · Imagen real | 🟢 | Cerrada el 2026-09-17 | — |
 | G3 · Aislamiento | 🟡 | La fuga de MARIA.TXT, cerrada en producción con el ensayo (sin cuentas ajenas: nadie vio facturas de Emi). Admin cerrado en la rama (ADMIN-1 y ADMIN-2). Abiertos: sesiones que reviven, límite de intentos burlable, prueba de aislamiento parcial | Fase 3 |
 | G4 · Producto (MARIA) | 🔴 | Origen mal leído, estado e IVA adicional fijos, peso por unidad, avisos tarde, gastos FOB sin cablear, banco, identificadores. Sin productos inventados (MARIA-2) | Fase 1 y la prueba en el Kit |
-| G5 · Pruebas | 🟢 | `1067 passed, 102 skipped, 0 failed` en la rama integrada (2026-10-07) | — |
+| G5 · Pruebas | 🟢 | `1224 passed, 102 skipped, 1 xfailed, 0 failed` en la rama integrada (`6ea8ca9`, 2026-10-07) | — |
 | G6 · Volver atrás | 🟡 | Esquema probado en local; falta la copia de la base | Fase 3 (y el ensayo lo ensaya) |
 | G7 · Cobro | 🔴 | El corte por impago cubre 2 funciones; cancelar no cancela en Mercado Pago; aviso de pago sin firma; doble suscripción; invitaciones | Fase 2 |
 | G8 · Piloto | ⚪ | Tres estudios presentan de verdad un MARIA de CDI | Fase 4 |
@@ -146,12 +153,12 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 14:05 UTC (rutina): ensayo publicado y verificado por Emi. Integradas
-RENDIMIENTO-1/1b y MARIA-1a a 1d, 3 y 4 (`1067 passed`). MARIA-1b devuelta;
-la Dev 1 está entregando la devolución. MARIA-5 (Dev 2): la PM reprodujo
-`1199 passed`, falta su subagente. Nomenclador vigente de Emi en
-`docs/pm/datos/`; CATALOGO-NCM-1 escrita para la Dev 2. Contexto: PM ~25 %,
-Dev 1 33 % (compacta al entregar), Dev 2 36 % (`/compact` pedido a Emi).
+2026-10-07 15:05 UTC (rutina): MARIA-5 devuelta (Dev 2 en la devolución; sigue
+CATALOGO-NCM-1). Devolución de MARIA-1b (Dev 1, `beea9eb`): la PM reprodujo
+`1224 passed, 102 skipped, 1 xfailed`; falta su subagente. Regla nueva de
+Emi: compactar a 60 % las Devs y 50 % las PMs, y las tres antes de dormir
+(textos a Emi a eso de las 20:30). Contexto: PM 37 %, Dev 1 38 %, Dev 2
+recién compactada.
 
 ## Medición
 

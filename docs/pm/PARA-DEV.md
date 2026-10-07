@@ -25,61 +25,28 @@ despertás a ella con el de la suya al entregar o al dejar una D que te frena
 
 ## Último veredicto
 
-**MARIA-1b devuelta sobre `21a7a7e`** (2026-10-07) por cuatro puntos, más la
-D22. La PM reprodujo el rojo antes sobre `c0bae0e` (`27 failed, 10 passed`),
-la focal (`158 passed`) y la suite (`941 passed, 102 skipped`): coincide con
-tu informe. Lo central se sostiene: tu CUIT acepta 12 reales y frena 3
-inválidos, el archivo real sale idéntico en 25 casos y guardar sin inventar
-no rompe nada. Lo que encontró el subagente, con su reproducción, está en
-`REPRODUCCION-MARIA-1b-2026-10-07.md`. EXCEL-1 sigue aceptada y entra con
-MARIA-1b.
+**MARIA-1b aceptada sobre `beea9eb`** (2026-10-07, con la devolución). La PM
+reprodujo el rojo antes sobre `a443cc2` (`42 failed, 11 passed`), la focal
+(`393 passed`) y la suite (`1224 passed, 102 skipped, 1 xfailed`), que
+coincide con tus 1214 más los 10 que deselecciona la CI. Su subagente probó
+los cinco puntos y se sostienen. Tampoco se perdió nada de la Dev 2 en tu
+merge. Detalle en `REPRODUCCION-MARIA-1b-2026-10-07.md`. **EXCEL-1 y
+MARIA-1b ya están integradas en la rama de la PM**, con tus pruebas de
+PUNTA-A-PUNTA-1 en curso (sólo pruebas).
 
-**La devolución va antes que PUNTA-A-PUNTA-1.**
+## Respuestas a tus D (2026-10-07, 15:20 UTC)
 
-1. **`NaN` e `inf` no dejan generar.** Hoy, en cantidad, valor, peso, flete,
-   seguro y gastos FOB, dan 200 y el TXT sale con `nan` o `inf`
-   (`QARTUNTDCL=nan`, `MDDTFLE=inf`, `MCPL=nan`), porque `nan <= 0` es falso.
-   Que frenen con el mismo error que un monto inválido, y que
-   `/api/validate/smart` con la cabecera no dé 500 (hoy da 500 con un `NaN`
-   en un ítem).
-2. **Mirar las otras hojas no puede trabar la lectura.** El tope de 10 s
-   corta la espera, pero no el hilo: con 2 hilos, dos libros armados (50
-   hojas con celdas de 32 000 espacios, 90 MB descomprimido) dejan cualquier
-   subida en 504 durante ~3 minutos. El escaneo necesita un presupuesto que
-   corte de verdad, por ejemplo saltar las hojas cuyo XML dentro del ZIP pasa
-   de un tamaño, o cortar por bytes o celdas leídas. Y si no se pudo mirar
-   todo, el semáforo lo dice («No se revisaron todas las hojas del libro»),
-   en vez de quedar sólo en el log.
-3. **El CUIT, sólo con dígitos 0-9.** Hoy `\d` acepta dígitos de ancho
-   completo y arábigos, y el TXT los escribe tal cual.
-4. **Toda moneda que no sea DOL avisa** (no frena) hasta que el despachante
-   confirme los códigos: el único archivo real usa DOL. El texto del aviso
-   dice eso.
-5. **D22: (a).** `/generate_maria_export` usa la misma limpieza de textos que
-   `/generate_maria`: es el mismo defecto (M10) en otra ruta que escribe el
-   TXT. Borrar la pantalla vieja no está en el roadmap.
-
-**Criterios:** rojo antes y verde después en cada punto; el libro armado del
-punto 2 (o uno equivalente, generado en la prueba) más una subida normal
-detrás: la normal no da 504; los dos archivos reales siguen idénticos;
-suite completa en verde.
-
-**Antes de entregar,** traé la rama de la PM: ahí están integradas
-RENDIMIENTO-1 y 1b y las piezas MARIA de la Dev 2 (`8e819dd` en adelante).
-MARIA-1d ya saca el DOL y el FOB que inventaba el lector de PDF (el hallazgo
-6 del subagente). Va a haber choques en `main.py` (guardar la operación) y en
-`finalize.js`: la regla es que no se invente nada y que el TXT salga
-idéntico.
-
-## Respuestas a tus D (2026-10-07, 13:40 UTC)
-
-- **D22: (a)**, en la devolución (punto 5).
-- **D20: (a)**, ya hecha en MARIA-1b.
-- **D21:** Emi dice que el nomenclador lo baja la PM. Desde acá la red bloquea
-  `www.arca.gob.ar`, y el ZIP de julio ya traía el archivo de 2018. Se espera
-  que Emi habilite el sitio o mande el archivo. Mientras tanto, «no está en el
-  catálogo» sigue como aviso.
-- Anteriores (D13 a D19): en Git.
+- **D26: (a)**, en EXCEL-2 (abajo). El subagente lo confirmó: con 8 libros
+  armados sin `<dimension>`, la subida normal da 400 a los 30 s.
+- **D23 y D25** (el número de operación «FAC_…» y la referencia de la
+  factura): son identificadores del TXT y van a **MARIA-6** (Dev 2). Mientras
+  tanto, en PUNTA-A-PUNTA-1 marcalos como diferencias conocidas
+  (`xfail` con la D en el motivo), no los arregles.
+- **D24** (la pantalla no tiene dónde cargar subítems): se la pregunto a
+  Emi. Por ahora, igual que D23.
+- **`cuit_agr` y `vendedor_id` con dígitos de ancho completo:** la línea que
+  ofreciste va en EXCEL-2, como «de paso».
+- Anteriores (D13 a D22): en Git.
 
 **Ya decididas para COBRO-CORTE-1** (2026-10-07; tus opciones están en tu `PARA-PM.md`
 del commit `62b1d14`):
@@ -89,38 +56,10 @@ del commit `62b1d14`):
 - **D6: (a)** ahora. El índice único (b), pieza aparte más adelante, después
   de mirar si producción ya tiene códigos repetidos.
 
-## Tarea activa — MARIA-1b: controles antes de generar (devuelta: arriba)
+## Tarea activa — PUNTA-A-PUNTA-1: una prueba de todo el camino
 
-Asignada el 2026-10-07. Fase 1 (`ROADMAP.md`). Cambia cuándo se puede
-generar el TXT, no lo que sale en él.
-
-**Base:** tu rama (con EXCEL-1).
-
-**Alcance:**
-1. Antes de generar, con un aviso claro por producto u operación: NCM que no
-   está en el catálogo (si tiene 7 dígitos, proponer el 0 inicial), moneda,
-   incoterm, CUIT del importador y montos (vacíos, negativos, en 0). Lo que
-   impide un TXT válido no deja generar; lo dudoso avisa.
-2. Ningún texto (descripción, nombres, domicilio) mete saltos de línea ni
-   `=` que rompan el TXT (M10).
-3. Al guardar la operación no se inventan cantidad 1 ni peso 0,5
-   (`save_client_operation`, D6 de la Dev 2).
-4. El aviso de filas del Excel sin leer queda en el semáforo hasta que la
-   persona lo descarte (tu D17), y se avisa si el libro tiene otras hojas con
-   datos (tu D18).
-
-**Fuera de alcance:** lo que el generador decide (Dev 2) y el resto de D18
-(EXCEL-2).
-
-**Criterios:** rojo antes y verde después por cada control; los dos archivos
-reales siguen saliendo idénticos; suite completa en verde.
-
-**Después:** PUNTA-A-PUNTA-1 (abajo) y EXCEL-2.
-
-## Siguiente, apenas entregues — PUNTA-A-PUNTA-1: una prueba de todo el camino
-
-Escrita el 2026-10-07, 13:15 UTC, mientras la PM revisa MARIA-1b. Si el
-veredicto de MARIA-1b trae devolución, la devolución va primero.
+Escrita el 2026-10-07, 13:15 UTC. Ya está en curso; lo que falta está en tu
+«Sigo con».
 
 **Base:** tu rama (con MARIA-1b).
 
@@ -135,3 +74,19 @@ pruebas: si encontrás un defecto del producto, D; no se arregla acá.
 **Criterios:** rojo con sabotajes en el lector, en el mapeo del Excel y en el
 generador (una línea cada uno); la prueba corre en la CI (`ci.yml` deselecciona
 algunas: comprobá que ésta no); suite completa en verde.
+
+## Después — EXCEL-2
+
+Del `ROADMAP.md`: lo que el Excel todavía no lee (encabezado fuera de la fila
+1, sin columna de origen, celdas combinadas: D18), CSV con `;`, latin-1 o BOM
+en el historial de NCM, y que el aviso de mapeo nombre la columna usada.
+Además:
+1. **D26 (a):** las hojas se cuentan desde `xl/workbook.xml`, sin abrir el
+   libro; se rechaza antes de abrirlo un libro cuyos textos compartidos o
+   cuya primera hoja pasen de un tamaño. Criterio: con 8 libros armados sin
+   `<dimension>` delante, la subida normal da 200, y un `sharedStrings` de
+   19 millones de entradas vacías no pasa de 1 GB de memoria.
+2. **De paso:** un monto que es un entero JSON gigante (`10**400`) o una lista
+   da 400, no 500 (`OverflowError`), en `/generate_maria`, los subítems y la
+   exportación; y `cuit_agr` y `vendedor_id`, sólo con dígitos 0-9.
+

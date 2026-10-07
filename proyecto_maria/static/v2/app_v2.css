@@ -4630,6 +4630,10 @@ tr:hover .ncm-note-pill.is-empty {
     transition: background var(--transition);
 }
 .semaforo-item:hover { background: var(--c-border-soft); }
+.semaforo-descartar {
+    margin-left: 6px; padding: 1px 8px; font: inherit; font-size: 12px;
+    border: 1px solid var(--c-border-soft); border-radius: 6px; background: transparent; cursor: pointer;
+}
 .semaforo-item.is-error { border-left-color: var(--c-error); }
 .semaforo-item.is-warning { border-left-color: var(--c-warning); }
 

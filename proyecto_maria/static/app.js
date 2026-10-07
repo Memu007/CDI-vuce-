@@ -936,7 +936,11 @@ async function handleUpload(e) {
 
         // Elegir endpoint según extensión
         const isPdf = file.name.toLowerCase().endsWith('.pdf');
-        const endpoint = isPdf ? '/upload_pdf/public' : '/upload_excel/public';
+        // El Excel se sube sólo en la pantalla nueva (EXCEL-1: se borró la ruta vieja).
+        if (!isPdf) {
+            throw new Error('El Excel se sube en la pantalla nueva: entrá a /dashboard y elegí «Excel».');
+        }
+        const endpoint = '/upload_pdf/public';
 
         const response = await fetch(endpoint, { method: 'POST', body: formData });
         const data = await response.json();

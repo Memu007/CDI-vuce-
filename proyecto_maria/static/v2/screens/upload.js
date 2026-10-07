@@ -372,6 +372,14 @@
             // Lo que la factura traía pero no se pudo leer (MARIA-1c). Al
             // final, para que otro aviso de la subida no lo tape.
             const sinLeer = CDI.camposSinLeer ? CDI.camposSinLeer() : [];
+            // Lo que no se leyó del Excel (filas y otras hojas): que el usuario
+            // lo sepa, así no declara menos de lo que trae la factura. Va en
+            // este mismo aviso final (la pantalla muestra uno a la vez) y queda
+            // en el semáforo hasta que lo descarta (EXCEL-1, MARIA-1b).
+            if (CDI.avisosDelExcel) sinLeer.unshift.apply(sinLeer, CDI.avisosDelExcel());
+            if (currentFormat === 'excel' && data && Array.isArray(data.avisos_mapeo)) {
+                sinLeer.unshift.apply(sinLeer, data.avisos_mapeo);
+            }
             const revisar = sinLeer.concat(avisosPeso);
             if (revisar.length && CDI.toast) {
                 CDI.toast(sinLeer.length ? 'Revisá la factura' : 'Revisá el peso', revisar.join(' '), 'warning');
@@ -388,7 +396,8 @@
             // Sin lector automático (MARIA-2): ningún producto, se ofrece
             // seguir con la carga manual.
             if (err && (err.code === 'lectura_automatica_no_disponible'
-                        || err.code === 'lectura_pdf_demasiado_larga')) {
+                        || err.code === 'lectura_pdf_demasiado_larga'
+                        || err.code === 'lectura_excel_demasiado_larga')) {
                 showError(msg, { manual: true });
                 return;
             }
@@ -621,7 +630,7 @@
             vendedor_pais: 'CN',
             vendedor_direccion: '12F, Tower B, Huamei Plaza, Shenzhen, Guangdong, China',
             comprador_nombre: 'Importadora del Sur SRL',
-            comprador_cuit: '30-71234567-8',
+            comprador_cuit: '30-71234567-1',  // inventado, con dígito verificador válido (MARIA-1b)
             comprador_domicilio: 'Av. Corrientes 1234, CABA, Argentina',
         };
         const items = [

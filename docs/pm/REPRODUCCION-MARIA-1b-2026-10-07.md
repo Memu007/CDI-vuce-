@@ -1,6 +1,6 @@
 # Reproducción de MARIA-1b — 2026-10-07
 
-**Veredicto: devuelta** sobre `21a7a7e` (base `c0bae0e`; `7b119b6` es EXCEL-1,
+**Veredicto: aceptada sobre `beea9eb`** con la devolución (abajo). Primero, **devuelta** sobre `21a7a7e` (base `c0bae0e`; `7b119b6` es EXCEL-1,
 ya aceptada) por cuatro puntos, más la D22. EXCEL-1 sigue esperando: entra
 con MARIA-1b.
 
@@ -50,3 +50,40 @@ Coincide con el informe (941).
 
 Contexto de la Dev 1 al entregar: ~44 % (441 mil tokens); Emi la compactó
 después.
+
+## La devolución — aceptada sobre `beea9eb`
+
+Base `a443cc2` (la pieza devuelta con la rama de la PM integrada). Venv armado
+sólo con el `requirements.txt` de la rama.
+
+| Qué | Salida |
+|---|---|
+| Rojo antes: `test_maria1b_devolucion.py` con el producto de `a443cc2` | `42 failed, 11 passed` (las 11 ya estaban cubiertas) |
+| Focal (devolución, controles, archivos reales, subítems, EXCEL-1, MARIA-3 y 1d) | `393 passed, 5 warnings in 38.82s` |
+| Suite | `1224 passed, 102 skipped, 1 xfailed, 23 warnings in 133.91s` (la Dev: 1214 con los 10 que deselecciona la CI) |
+
+**Subagente de la PM (Sonnet medio): los cinco puntos se sostienen.**
+- **NaN e infinito:** `nan`, `-nan`, `1e999`, `Infinity` e `inf`, como
+  texto o como número, dan 400 en ítems, subítems, flete, seguro, gastos y
+  desbordes al multiplicar. `/api/validate/smart` con la cabecera ya no da
+  500.
+- **CUIT:** con dígitos de ancho completo o arábigos, 400.
+- **Monedas:** «dol», « DOL » y «DOL\n» se normalizan; las otras monedas
+  avisan.
+- **Exportación:** con 9 tipos de salto y control en cada campo, ninguno
+  parte una línea.
+- **Presupuesto de las otras hojas:** corta en ~3 s y el semáforo lo dice.
+  Con dos libros armados delante, la subida normal da 200 en 3,6 s.
+- **Merge:** los dos archivos reales siguen idénticos y no se perdió nada de
+  la Dev 2 (guardar sin inventar, procedencia rara en `/avisos`).
+
+| # | Hallazgo | Cómo quedó |
+|---|---|---|
+| 1 | Con libros armados **sin** `<dimension>`, lo lento es abrir el libro (validar y leer la primera hoja con openpyxl), que no se corta: con 8 delante, la normal da 400 a los 30 s. Es la D26 de la Dev | D26 (a), a EXCEL-2 |
+| 2 | Un entero JSON gigante (`10**400`) o una lista en un monto da 500 (`OverflowError` no se atrapa). Ya pasaba | A EXCEL-2, como «de paso» |
+| 3 | `/api/validate/smart` **sin** la cabecera da verde con `NaN`. La pantalla manda la cabecera y `/generate_maria` lo frena | Se deja |
+| 4 | Un `.rels` con la hoja en `%32` (armado a mano) se toma por vacía y no avisa | Se deja |
+| 5–7 | `1_0` y `１２` como número; 5000 ítems de 9e11 sin tope total; la pantalla manda «XX» como origen (el mensaje dice «no reconocido») | Se dejan; ya pasaban |
+
+Al integrar entraron también las pruebas de PUNTA-A-PUNTA-1 en curso
+(`9610f6d`, `a443cc2`): son sólo pruebas y se revisan cuando se entreguen.
