@@ -251,6 +251,8 @@ GOLDEN_INPUTS = dict(
         "pieza": "84798999900H", "descripcion": "MAQUINA DEMO",
         "cantidad": 1, "valor_unitario": 5000, "valor_total": 5000,
         "peso_kg": 1220, "origen": "AR", "pais_procedencia": "PE",
+        # MARIA-4: lo que trae el archivo real de 2025 (estado 3).
+        "estado": 3,
     }],
     moneda="DOL", incoterm="DDP",
     cuit_agr="20111111112",
@@ -264,6 +266,8 @@ GOLDEN_INPUTS = dict(
     fecha_embarque="02/01/2026", fecha_emision="18/07/2025",
     sbt_sufijo_valor="AA(DEMO)-AB(DEMO)-CA00-",
     aduana_codigo="001", tipo_destinacion="IC04",
+    # MARIA-4: el archivo real de 2025 trae uso particular, sin banco y Modoc.
+    iva_adicional="IVAAD1", banco_bcra="", empresa_digitalizacion="PSAD06",
 )
 
 _GOLDEN_PATH = os.path.join(os.path.dirname(__file__), "fixtures",
