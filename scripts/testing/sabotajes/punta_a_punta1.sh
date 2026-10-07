@@ -46,6 +46,13 @@ PYEOF
 M=proyecto_maria/main.py
 E=proyecto_maria/pdf_extractor.py
 G=proyecto_maria/core/maria_generator.py
+P=tests/test_punta_a_punta1.py
+
+# Sin sabotaje tiene que estar en verde: si no, cualquier «ROJO» de abajo
+# sería del rojo que ya había.
+if ! "$PY" -m pytest -q --no-cov -p no:cacheprovider $P >/dev/null 2>&1; then
+  echo "BASE  | la prueba ya está en rojo sin sabotaje: no se puede medir nada"; exit 1
+fi
 # Lector del PDF, la copia «pdf_directo» (la de producción): el flete leído se pierde.
 sabotaje $E "el lector pierde el flete de la factura" \
   "                            'flete': _numero_factura(operacion.get('flete'), decimal) or 0.0," \
@@ -73,6 +80,26 @@ sabotaje $M "la procedencia de la operación no llega a los productos" \
   '    procedencia = ""
     if not procedencia:' \
   'FAILED tests/test_punta_a_punta1.py::test_pdf_de_punta_a_punta_da_el_archivo_real'
+# Generador: la NCM con el formato de la pantalla («8479.89.99.900 H») llega con el espacio.
+sabotaje $G "el generador deja el espacio de la NCM de la pantalla" \
+  "             ncm = ncm_raw.replace(' ', '')" \
+  "             ncm = ncm_raw" \
+  'FAILED tests/test_punta_a_punta1.py::test_pdf_de_punta_a_punta_da_el_archivo_real'
+# Generador: el flete y el seguro, enteros a cada producto.
+sabotaje $G "el generador no reparte el flete por el FOB" \
+  '        proporcion = valor_total / fob_total if fob_total > 0 else 0' \
+  '        proporcion = 1' \
+  'FAILED tests/test_punta_a_punta1.py::test_dos_productos_reparten_flete_y_seguro_por_su_fob'
+# Generador: el FOB total sólo del producto mayor.
+sabotaje $G "el generador toma como FOB total el del producto mayor" \
+  '    fob_total = sum(' \
+  '    fob_total = max(' \
+  'FAILED tests/test_punta_a_punta1.py::test_dos_productos_reparten_flete_y_seguro_por_su_fob'
+# Lector: la coma decimal deja de reconocerse.
+sabotaje $E "el lector lee siempre el punto como decimal" \
+  "    vistos = {_separador_decimal(v) for v in valores if isinstance(v, str)}" \
+  "    vistos = {'.'}" \
+  'FAILED tests/test_punta_a_punta1.py::test_una_factura_con_coma_decimal_da_el_mismo_archivo'
 
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]
