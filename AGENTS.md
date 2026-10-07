@@ -93,7 +93,8 @@ Vale para PMs y Devs; esta es su única copia.
 - **Cuándo compactar:** desde el 60 % de contexto las Devs y el 50 % las
   PMs, en el primer corte natural (después de una entrega o de un veredicto).
   Nunca en medio de una corrida. Además, **Emi compacta las tres antes de
-  dormir:** a eso de las 20:30 (Argentina) la PM principal le pasa los tres
+  dormir:** a las 20:55 (Argentina, la vuelta de las 23:55 UTC) la PM
+  principal le pasa los tres
   `/compact conservar: …`, sin mirar el porcentaje. (Emi, 2026-10-07, tarde:
   con 30 % una Dev compactaba después de cada pieza. Si la cuenta vuelve a
   llegar a su límite, ese mismo día se vuelve a 30 y 40.)
