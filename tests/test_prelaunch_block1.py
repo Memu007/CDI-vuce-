@@ -277,6 +277,7 @@ class TestGenerateMaria:
         """Generar MARIA TXT con items válidos devuelve contenido TXT."""
         res = client.post("/generate_maria", json={
             "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
+            "moneda": "DOL", "incoterm": "FOB",  # MARIA-1b: el servidor ya no los inventa
             "operation_id": "TEST001",
             "items": [{
                 "pieza": "84713000900R",
@@ -300,6 +301,7 @@ class TestGenerateMaria:
         """Generar MARIA sin items devuelve 200 con TXT vacío (sin bloques de ítem)."""
         res = client.post("/generate_maria", json={
             "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
+            "moneda": "DOL", "incoterm": "FOB",  # MARIA-1b: el servidor ya no los inventa
             "operation_id": "TEST002",
             "items": [],
             "sbt_sufijo_valor": "AA(DEMO)-AB(DEMO)-CA00-",

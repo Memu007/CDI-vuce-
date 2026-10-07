@@ -81,10 +81,33 @@ sabotaje $C "la NCM fuera del nomenclador deja de avisarse" \
   '        if find_by_code(digitos[:8]) is None:' \
   '        if False:' \
   "FAILED $T::test_ncm_que_no_esta_en_el_nomenclador_avisa_pero_deja_generar"
-sabotaje $C "el CUIT vacío deja de avisarse" \
-  '            "Falta el CUIT del importador: completalo acá o en el Kit SIM antes de presentar."' \
-  '            ""' \
-  "FAILED $T::test_cuit_del_importador_vacio_avisa"
+sabotaje $C "el CUIT vacío vuelve a dejar generar" \
+  '        errores.append("Falta el CUIT del importador.")' \
+  '        pass' \
+  "FAILED $T::test_cuit_del_importador_vacio_no_deja_generar"
+sabotaje $C "los saltos de línea Unicode vuelven a pasar" \
+  '_SALTOS_Y_CONTROLES = r"[\x00-\x1f\x7f-\x9f\u2028\u2029]"' \
+  '_SALTOS_Y_CONTROLES = r"[\x00-\x1f\x7f]"' \
+  "FAILED $T::test_un_texto_no_mete_lineas_ni_igual_en_el_txt"
+sabotaje $M "el «=» vuelve a pasar en el sufijo SBT" \
+  "            if any(ord(c) < 32 or 0x7f <= ord(c) <= 0x9f or c in \"\\u2028\\u2029=\" for c in _suf):" \
+  "            if any(ord(c) < 32 for c in _suf):" \
+  "FAILED $T::test_sufijo_sbt_con_igual_o_control_no_deja_generar"
+sabotaje $M "el servidor vuelve a inventar DOL y FOB" \
+  '    moneda: str = ""
+    incoterm: str = ""' \
+  '    moneda: str = "DOL"
+    incoterm: str = "FOB"' \
+  "FAILED $T::test_sin_moneda_ni_incoterm_el_servidor_no_inventa_dol_ni_fob"
+sabotaje $M "el TXT vuelve a llevar el valor sin normalizar" \
+  '        request.incoterm = (request.incoterm or "").strip().upper()' \
+  '        pass' \
+  "FAILED $T::test_el_txt_lleva_lo_que_se_controla_normalizado"
+sabotaje $C "la NCM vuelve a buscarse recorriendo el catálogo" \
+  '    return codigo8 in _CODIGOS' \
+  '    from proyecto_maria.core.ncm_catalog import find_by_code
+    return find_by_code(codigo8) is not None' \
+  "FAILED $T::test_los_controles_con_miles_de_items_no_traban"
 sabotaje $M "la validación previa deja de mirar la cabecera" \
   '        if isinstance(operacion, dict):' \
   '        if False:' \

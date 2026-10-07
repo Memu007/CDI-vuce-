@@ -424,6 +424,7 @@ def test_generate_maria_happy_path(client):
     _register(client, "maria1")
     resp = client.post("/generate_maria", json={
         "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
+        "moneda": "DOL", "incoterm": "FOB",  # MARIA-1b: el servidor ya no los inventa
         "operation_id": "OP777",
         "items": ITEMS_OK,
         "moneda": "DOL",
@@ -483,6 +484,7 @@ def test_generate_maria_usa_cuit_del_perfil(client):
     _register(client, "maria3", cuit="20111222333")
     resp = client.post("/generate_maria", json={
         "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
+        "moneda": "DOL", "incoterm": "FOB",  # MARIA-1b: el servidor ya no los inventa
         "operation_id": "OP3",
         "items": ITEMS_OK,
         "sbt_sufijo_valor": "AA(DEMO)-AB(DEMO)-CA00-",
@@ -712,6 +714,7 @@ def test_sbt_endpoint_genera_seccion_sbt(client):
     _register(client, "maria_sbt_ok")
     resp = client.post("/generate_maria", json={
         "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
+        "moneda": "DOL", "incoterm": "FOB",  # MARIA-1b: el servidor ya no los inventa
         "operation_id": "OP_SBT_OK",
         "items": ITEMS_OK,
         "sbt_sufijo_valor": "AA(CLIENTE)-AB(OTRO)-CA00-",
@@ -727,6 +730,7 @@ def test_sbt_trim_aplicado(client):
     _register(client, "maria_sbt_trim")
     resp = client.post("/generate_maria", json={
         "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
+        "moneda": "DOL", "incoterm": "FOB",  # MARIA-1b: el servidor ya no los inventa
         "operation_id": "OP_TRIM",
         "items": ITEMS_OK,
         "sbt_sufijo_valor": "  AA(TRIM)-AB(TRIM)-CA00-  ",
@@ -756,6 +760,7 @@ def test_sbt_flujo_completo_desde_dashboard(client):
     # Paso 2: generar con SBT
     resp = client.post("/generate_maria", json={
         "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
+        "moneda": "DOL", "incoterm": "FOB",  # MARIA-1b: el servidor ya no los inventa
         "operation_id": "OP_E2E_SBT",
         "items": ITEMS_OK,
         "sbt_sufijo_valor": "AA(E2E)-AB(E2E)-CA00-",

@@ -56,6 +56,9 @@ function falla(msg) { console.error('FALLA: ' + msg); process.exit(1); }
 
   await page.locator('.semaforo-item', { hasText: FILAS }).locator('.semaforo-descartar').click()
     .catch(() => falla('el aviso de filas no tiene «Descartar»'));
+  // Sin volver a abrirlo: «Descartar» no cierra el semáforo.
+  await page.waitForTimeout(300);
+  if (!(await lista.first().isVisible().catch(() => false))) falla('«Descartar» cerró el semáforo');
   await esperar(FILAS, false, '«Descartar» no saca el aviso de filas');
   await esperar(HOJAS, true, 'descartar las filas se llevó también el de la hoja');
   console.log('OK «Descartar» saca sólo ese aviso');

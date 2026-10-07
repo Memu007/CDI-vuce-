@@ -143,7 +143,7 @@ FACTURA="0001-00012345"
 OP_ID="FAC_${FACTURA}"
 GEN=$(curl -s -m 20 -b "$COOKIE_A" -c "$COOKIE_A" -H "X-CSRF-Token: $(csrf "$COOKIE_A")" \
     -X POST "${BASE}/generate_maria" -H 'Content-Type: application/json' \
-    -d "{\"operation_id\":\"${OP_ID}\",\"comprador_nombre\":\"Importadora Privada de Ana SA\",\"comprador_cuit\":\"${CUIT_ANA}\",\"sbt_sufijo_valor\":\"01\",\"items\":[{\"pieza\":\"1\",\"descripcion\":\"MERCADERIA CONFIDENCIAL DE ANA\",\"ncm\":\"84713000900R\",\"cantidad\":10,\"valor_unitario\":100,\"peso_kg\":5,\"origen\":\"310\",\"unidad\":\"01\"}]}")
+    -d "{\"operation_id\":\"${OP_ID}\",\"comprador_nombre\":\"Importadora Privada de Ana SA\",\"comprador_cuit\":\"${CUIT_ANA}\",\"moneda\":\"DOL\",\"incoterm\":\"FOB\",\"sbt_sufijo_valor\":\"01\",\"items\":[{\"pieza\":\"1\",\"descripcion\":\"MERCADERIA CONFIDENCIAL DE ANA\",\"ncm\":\"84713000900R\",\"cantidad\":10,\"valor_unitario\":100,\"peso_kg\":5,\"origen\":\"310\",\"unidad\":\"01\"}]}")
 ARCHIVO=$(echo "$GEN" | grep -oE '"filename"[: ]*"[^"]+"' | head -1 | sed 's/.*"filename"[: ]*"//;s/"//')
 if [ -n "$ARCHIVO" ]; then
     echo -e "   MARIA.TXT de Ana: ${ARCHIVO}"

@@ -97,11 +97,9 @@ def test_incoterm_que_impide_el_txt(incoterm, mensaje):
     assert mensaje in _errores(_generar(incoterm=incoterm))
 
 
-def test_cuit_del_importador_vacio_avisa():
-    """La pantalla lo deja opcional («extranjeros sin CUIT»): vacío avisa (D20)."""
-    r = _generar(comprador_cuit="")
-    assert r.status_code == 200, r.text[:300]
-    assert any("Falta el CUIT del importador" in w for w in r.json()["warnings"]), r.json()
+def test_cuit_del_importador_vacio_no_deja_generar():
+    """D20 (a): sin el CUIT del importador el TXT no sirve para presentar."""
+    assert "Falta el CUIT del importador" in _errores(_generar(comprador_cuit=""))
 
 
 @pytest.mark.parametrize("cuit,mensaje", [
@@ -137,13 +135,14 @@ def test_todos_los_errores_juntos():
 def test_un_texto_no_mete_lineas_ni_igual_en_el_txt(campo):
     """M10: un salto de línea con «CLAVE=valor» detrás inventaría una línea."""
     original = GOLDEN_INPUTS.get(campo) or "X"
-    r = _generar(**{campo: original + "\r\nNDDTIMMIOE=20111111112\nX=1"})
+    r = _generar(**{campo: original + "\r\nNDDTIMMIOE=20111111112\nX=1\u2028Y\x85Z\u2029W"})
     assert r.status_code == 200, r.text[:300]
     txt = r.json()["content"]
     lineas = txt.split("\r\n")
     assert "NDDTIMMIOE=20111111112" not in lineas
     assert not any(l.startswith("X=") for l in lineas)
     assert all("\n" not in l and "\r" not in l for l in lineas)
+    assert not any(c in txt for c in "\u2028\u2029\x85"), "salto de línea Unicode en el TXT"
     # Cada línea es «CLAVE=valor» con un solo «=» (M10).
     assert all(l.count("=") <= 1 for l in lineas), [l for l in lineas if l.count("=") > 1]
     assert len(lineas) == len(_esperado().split("\r\n"))
@@ -254,3 +253,34 @@ def test_si_mirar_las_otras_hojas_falla_la_subida_sigue(monkeypatch):
                       "Hoja2": [H, ["85171300", "Telefono", "CN", 5, 100, 0.2]]})
     assert r.status_code == 200, r.text[:300]
     assert len(r.json()["items"]) == 1
+
+
+@pytest.mark.parametrize("sufijo", ["AA(X)-AB(MOD=1)-", "AA(X)-AB(Y\x7f)-"])
+def test_sufijo_sbt_con_igual_o_control_no_deja_generar(sufijo):
+    r = _generar(sbt_sufijo_valor=sufijo)
+    assert r.status_code == 400, r.text[:300]
+    assert "sufijo" in str(r.json()["detail"]).lower(), r.json()
+
+
+def test_sin_moneda_ni_incoterm_el_servidor_no_inventa_dol_ni_fob():
+    pedido = {**GOLDEN_INPUTS, "comprador_cuit": CUIT_VALIDO}
+    pedido.pop("moneda"); pedido.pop("incoterm")
+    r = TestClient(main.app).post("/generate_maria", json=pedido)
+    errores = _errores(r)
+    assert "Falta la moneda" in errores and "Falta el incoterm" in errores, errores
+
+
+def test_el_txt_lleva_lo_que_se_controla_normalizado():
+    r = _generar(moneda=" dol ", incoterm=" ddp ", comprador_cuit="30-99999999-5")
+    assert r.status_code == 200, r.text[:300]
+    assert r.json()["content"] == _esperado()
+
+
+def test_los_controles_con_miles_de_items_no_traban():
+    import time
+    from proyecto_maria.core.controles_maria import controles_antes_de_generar
+    items = [{"pieza": "84798999900H"}] * 5000
+    controles_antes_de_generar(items[:1], {})  # carga el catálogo
+    t0 = time.monotonic()
+    controles_antes_de_generar(items, {"moneda": "DOL", "incoterm": "FOB", "comprador_cuit": CUIT_VALIDO})
+    assert time.monotonic() - t0 < 0.5
