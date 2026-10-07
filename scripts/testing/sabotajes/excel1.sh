@@ -48,11 +48,11 @@ T=tests/test_excel1_rendimiento.py
 L=tests/test_excel1_lectura.py
 sabotaje $M "el Excel v2 se vuelve a leer en el hilo del servidor" \
   '        df = await _leer_pdf_aparte(
-            _leer_excel_ruta, temp_filename, engine,
+            _leer_excel_ruta, temp_filename, engine, tuple((mapping or {}).items()),
             limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
         )
 ' \
-  '        df = _leer_excel_ruta(temp_filename, engine)
+  '        df = _leer_excel_ruta(temp_filename, engine, tuple((mapping or {}).items()))
 ' \
   "FAILED $T::test_health_responde_mientras_se_lee_un_excel[upload_excel_v2]"
 sabotaje $M "leer un Excel pierde el tiempo máximo" \
@@ -163,8 +163,8 @@ sabotaje $F "un .xlsx que se descomprime a gigas vuelve a abrirse" \
   "    if False:" \
   "FAILED $L::test_xlsx_que_se_descomprime_a_gigas_se_rechaza_antes_de_abrirlo"
 sabotaje $M "las filas vacías vuelven a recorrerse una por una" \
-  '    return pd.read_excel(ruta, engine=engine, dtype=object).dropna(how="all")' \
-  '    return pd.read_excel(ruta, engine=engine, dtype=object)' \
+  '    return _rellenar_combinadas(df, combinadas, mapeo)[~vacias]' \
+  '    return _rellenar_combinadas(df, combinadas, mapeo)' \
   "FAILED $L::test_celda_en_la_ultima_fila_no_recorre_un_millon_de_filas"
 sabotaje $F "el índice del .xlsx vuelve a mirarse en el hilo del servidor" \
   "            try:
@@ -197,8 +197,8 @@ sabotaje $M "los números en texto vuelven a leerse con float" \
   '                return float(row[col]) if col else 0.0' \
   "FAILED $L::test_numeros_escritos_como_texto"
 sabotaje $M "pandas vuelve a convertir el texto de las celdas" \
-  '    return pd.read_excel(ruta, engine=engine, dtype=object).dropna(how="all")' \
-  '    return pd.read_excel(ruta, engine=engine).dropna(how="all")' \
+  '    df = _con_encabezado(pd.read_excel(origen, engine=engine, dtype=object), nombres)' \
+  '    df = _con_encabezado(pd.read_excel(origen, engine=engine), nombres)' \
   "FAILED $L::test_numeros_escritos_como_texto[1.500-0]"
 sabotaje $M "la NCM numérica vuelve a salir con .0" \
   '    if isinstance(valor, float) and valor.is_integer():
@@ -207,8 +207,8 @@ sabotaje $M "la NCM numérica vuelve a salir con .0" \
         return str(int(valor))' \
   "FAILED $L::test_extraccion_con_ncm_leida_como_numero_decimal"
 sabotaje $M "el país vuelve a cortarse a tres letras" \
-  '                origen=_origen_desde_factura(row[origen_col]) or "XX",' \
-  '                origen=str(row[origen_col]).upper()[:3] or "XX",' \
+  '                origen=_origen_desde_factura(celda_origen) or "XX",' \
+  '                origen=str(celda_origen).upper()[:3] or "XX",' \
   "FAILED $L::test_pais_por_nombre_no_se_corta"
 sabotaje $M "«País de origen» deja de reconocerse" \
   '        "paisdeorigen", "countryoforigin", "origin", "madein",' \
