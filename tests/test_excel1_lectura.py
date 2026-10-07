@@ -372,3 +372,77 @@ def test_peso_ambiguo_entre_parentesis_queda_vacio_y_no_se_adivina():
                 ["84713000", "Laptop", "CN", 10, 350, 1.5, 2.2]])
     assert r.status_code == 200, r.text[:300]
     assert r.json()["items"][0]["peso_unitario"] == 0, r.json()["items"]
+
+
+# ---- Devolución de la PM (2026-10-07) ----
+
+def test_mapeo_aprendido_no_pisa_el_precio_unitario_ni_el_peso_neto():
+    """Con cliente_id, como manda la pantalla: «Valor» y «Peso» aprendidos con
+    la lista vieja no pisan «Precio Unitario» ni «Peso Neto»."""
+    cid = _cliente_con_mapeo({"NCM": "pieza", "Descripcion": "descripcion", "Origen": "origen",
+                              "Cantidad": "cantidad", "Valor": "valor_unitario", "Peso": "peso_unitario"})
+    r = _subir([["NCM", "Descripcion", "Origen", "Cantidad", "Precio Unitario", "Valor", "Peso", "Peso Neto"],
+                ["84713000", "Laptop", "CN", 10, 350, 3500, 25, 15]], cliente_id=cid)
+    assert r.status_code == 200, r.text[:300]
+    item = r.json()["items"][0]
+    assert (item["valor_unitario"], item["peso_unitario"]) == (350, 15), item
+
+
+def test_validar_el_excel_usa_su_propio_grupo_de_hilos(monkeypatch):
+    import threading
+    from proyecto_maria.security import file_security
+    hilos = []
+    original = file_security._abrir_excel
+
+    def _espia(*a):
+        hilos.append(threading.current_thread().name)
+        return original(*a)
+    monkeypatch.setattr(file_security, "_abrir_excel", _espia)
+    r = _subir([H, ["84713000", "Laptop", "CN", 10, 350, 1.5]])
+    assert r.status_code == 200, r.text[:300]
+    assert len(hilos) == 1 and hilos[0].startswith("validar-excel"), hilos
+
+
+def test_la_fila_de_ejemplo_de_la_plantilla_no_entra():
+    r = _subir([H,
+                ["84713000", "Laptop 14 pulgadas modelo X", "CN", 10, 350.0, 1.5],
+                ["85171300", "Telefono", "CN", 5, 100, 0.2]])
+    assert r.status_code == 200, r.text[:300]
+    assert [i["descripcion"] for i in r.json()["items"]] == ["Telefono"], r.json()["items"]
+
+
+def test_catalogo_con_dos_columnas_para_el_mismo_campo_no_se_guarda():
+    cid = _cliente_con_mapeo({})
+    r = TestClient(main.app).put(f"/api/clientes/{cid}/catalogo/columnas",
+                                 json={"columnas": {"Precio": "valor_unitario", "Valor": "valor_unitario"}})
+    assert r.status_code == 400, r.text[:300]
+    assert "Dos columnas" in r.json()["detail"], r.json()
+
+
+def test_mapeo_viejo_con_dos_columnas_para_el_mismo_campo_avisa_y_no_da_500():
+    cid = _cliente_con_mapeo({"Precio": "valor_unitario", "Importe": "valor_unitario"})
+    r = _subir([["NCM", "Descripcion", "Origen", "Cantidad", "Precio", "Importe", "Peso Neto"],
+                ["84713000", "Laptop", "CN", 10, 350, 3500, 1.5]], cliente_id=cid)
+    assert r.status_code == 200, r.text[:300]
+    assert r.json()["items"][0]["valor_unitario"] == 350, r.json()["items"]
+    assert any("dos columnas" in a for a in r.json()["avisos_mapeo"]), r.json()
+
+
+def test_columna_con_el_nombre_del_campo_y_mapeo_a_otra_no_da_500():
+    """Corrección a mano con un nombre propio («Unidades pedidas») y el
+    archivo trae además una columna «cantidad»: manda la corrección."""
+    cid = _cliente_con_mapeo({"Unidades pedidas": "cantidad"})
+    r = _subir([["NCM", "Descripcion", "Origen", "cantidad", "Unidades pedidas", "Precio Unitario", "Peso Neto"],
+                ["84713000", "Laptop", "CN", 1, 10, 350, 1.5]], cliente_id=cid)
+    assert r.status_code == 200, r.text[:300]
+    assert r.json()["items"][0]["cantidad"] == 10, r.json()["items"]
+
+
+def test_lo_que_llamaba_a_las_rutas_borradas():
+    import pathlib
+    raiz = pathlib.Path(main.__file__).resolve().parent.parent
+    app_js = (raiz / "proyecto_maria/static/app.js").read_text(encoding="utf-8")
+    assert "/upload_excel/public" not in app_js
+    assert "El Excel se sube en la pantalla nueva" in app_js
+    smoke = (raiz / "scripts/testing/smoke_test.sh").read_text(encoding="utf-8")
+    assert '/upload_excel"' not in smoke and "/upload_excel_v2/" in smoke
