@@ -3945,6 +3945,11 @@ async def generate_maria_endpoint(
         # montos de la cabecera: lo que impide un TXT válido no deja generar
         # (MARIA-1b). Se juntan con los demás errores para mostrarlos todos.
         errores_1b, avisos_1b = controles_antes_de_generar(request.items, request.model_dump())
+        # Un monto que no es un número (lista, entero enorme) frena acá: lo que
+        # sigue hace cuentas con él y daba 500 (EXCEL-2, de paso).
+        from proyecto_maria.core.controles_maria import montos_fuera_de_rango
+        if montos_fuera_de_rango(request.items, {}):
+            raise HTTPException(status_code=400, detail={"errors": errores_1b})
 
         # Validar items (validación mínima)
         valid, errors = validate_items_for_maria(request.items)
@@ -4014,6 +4019,11 @@ async def generate_maria_endpoint(
                 effective_cuit_agr = str(user["cuit"]).strip()
         except Exception:
             pass
+        from proyecto_maria.core.controles_maria import digitos_raros
+        if digitos_raros(effective_cuit_agr):
+            raise HTTPException(status_code=400, detail={"errors": [
+                f"El CUIT del despachante «{effective_cuit_agr}» tiene dígitos que no son 0-9: "
+                "corregilo en tu perfil."]})
 
         # Generar TXT
         txt_content = generate_maria_txt(
@@ -4136,11 +4146,12 @@ async def generate_maria_export_endpoint(
         # Validar items. NaN, infinito o montos que desbordan no llegan al TXT
         # (revisión de la devolución de MARIA-1b).
         from proyecto_maria.core.controles_maria import montos_fuera_de_rango
-        valid, errors = validate_items_for_export(request.items)
+        # Primero los montos: con uno que no es un número (lista, entero
+        # enorme) la validación de abajo daba 500 (EXCEL-2, de paso).
         _montos = montos_fuera_de_rango(request.items, {"flete": request.flete, "seguro": request.seguro})
         if _montos:
-            errors = list(dict.fromkeys([*errors, *_montos]))
-            valid = False
+            raise HTTPException(status_code=400, detail={"errors": _montos})
+        valid, errors = validate_items_for_export(request.items)
         
         # Validar país de destino
         if request.comprador_pais and not pais_reconocido(request.comprador_pais):
