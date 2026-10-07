@@ -71,6 +71,14 @@ empresa:** una búsqueda en la web no lo encontró (los sitios oficiales están
 bloqueados desde acá). Pregunta corta para la próxima: qué número o código
 aparece en el Kit al lado de cada una.
 
+**Pregunta 6, FCA y FAS** (2026-10-06). FCA y EXW no son lo mismo, pero en
+los dos casos se declara «gastos anteriores a FOB». Coincide con la regla que
+ya tiene el generador (`maria_generator.py:413-426`: todo lo que no es grupo C
+o D va a `GTOS-ANT-FOB`). FAS no lo nombró; por la misma regla de la nota del
+SIM (la diferencia entre el FOB y la condición pactada) también es anterior al
+FOB. Ojo: FAS no está en la lista de condiciones válidas del generador
+(`maria_generator.py:777`).
+
 - **Falta saber:** cómo se carga en el Kit una reducción o una exclusión
   (¿una opción de una lista o un número de certificado?). Pregunta corta para
   la próxima.
@@ -133,6 +141,6 @@ ver en un archivo real no se pregunta: se pide el archivo.
 | 3 | **Respondida.** El peso del TXT pasa a ser el total de la línea (ítem o subítem), igual al que muestra la pantalla de validación |
 | 4 | **Respondida.** `BANCOSARGENTINA`: lo elige el cliente en cada operación. Se carga en la operación (se puede proponer el último que usó ese cliente) y se emite en el archivo; si falta, aviso |
 | 5 | **Respondida en parte.** `PSAD` en la configuración del estudio (cada despachante usa la suya, con cambio por operación). Falta qué código es Modoc y cuál Lakaut |
-| 6 | Se completa la regla del FOB y se cablea el campo de pantalla, que hoy no llega al TXT |
+| 6 | **Respondida.** La regla del FOB ya estaba bien. Falta cablear el campo de pantalla, que hoy no llega al TXT, y sumar FAS a las condiciones válidas (MARIA-3) |
 | Favor 1 | Identificadores, sufijos por ítem y número de proveedor según los archivos reales |
 | Favor 2 | Redondeo y formato según lo que acepte su Kit |
