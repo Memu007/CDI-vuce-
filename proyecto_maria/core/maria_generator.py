@@ -222,6 +222,62 @@ def get_unidad_codigo(unidad: str) -> str:
 PAIS_DEFAULT_IMPORT = 310  # China (codigo oficial MARIA) cuando no se reconoce
 
 
+# --- Lo que decide el despachante (MARIA-4) ------------------------------
+# Estado de la mercadería (CARTUSO), por producto. Nombres del despachante
+# (respuesta 1, 2026-10-06 21:20); el orden → código 1 a 6 lo confirma la
+# prueba en su Kit. Los archivos reales: el de 2026 trae 2 con origen China y
+# el de 2025, 3 con origen Argentina. Única copia de esta tabla.
+ESTADOS_MERCADERIA = {
+    1: "Nuevo sin uso argentino",
+    2: "Nuevo sin uso importado",
+    3: "Sin uso argentino",
+    4: "Sin uso importado",
+    5: "Usado argentino (incluye reacondicionado)",
+    6: "Usado importado (incluye reacondicionado)",
+}
+ESTADO_POR_DEFECTO_IMPORTADO = 2
+
+# IVA adicional (IVAADICIONAL1): reventa o uso particular (respuesta 2,
+# 21:34; archivo de 2026). La reducción o exclusión es una «ventaja» que se
+# elige en el Kit (22:12): no va en el TXT.
+IVA_ADICIONAL = {"NO_VALIDA": "Reventa", "IVAAD1": "Uso particular"}
+IVA_ADICIONAL_POR_DEFECTO = "NO_VALIDA"
+
+# Empresa de digitalización (ARDIG-CUIT-PSAD), por operación (respuesta 5,
+# 21:42 y 22:15; los dos archivos reales).
+EMPRESAS_DIGITALIZACION = {"PSAD06": "Modoc", "PSAD01": "Lakaut"}
+EMPRESA_DIGITALIZACION_POR_DEFECTO = "PSAD06"
+
+PAIS_ARGENTINA = 200
+
+
+def _estado_item(item: dict, idx: int, pais_codigo: int) -> int:
+    """Estado (CARTUSO) del ítem: el elegido, o 2 si el origen es extranjero.
+    Con origen argentino no hay valor por defecto: no se inventa."""
+    raw = item.get("estado")
+    if raw in (None, ""):
+        if pais_codigo == PAIS_ARGENTINA:
+            raise ValueError(
+                f"Ítem {idx}: el origen es argentino; elegí el estado de la mercadería "
+                f"(no hay uno por defecto)."
+            )
+        return ESTADO_POR_DEFECTO_IMPORTADO
+    try:
+        estado = int(str(raw).strip())
+    except ValueError:
+        estado = 0
+    if estado not in ESTADOS_MERCADERIA:
+        raise ValueError(f"Ítem {idx}: estado de la mercadería «{raw}» no válido (1 a 6).")
+    return estado
+
+
+def _iva_adicional(valor, donde: str) -> str:
+    codigo = str(valor or "").strip().upper()
+    if codigo not in IVA_ADICIONAL:
+        raise ValueError(f"{donde}: IVA adicional «{valor}» no válido (NO_VALIDA o IVAAD1).")
+    return codigo
+
+
 def pais_reconocido(pais) -> bool:
     """True si el país se reconoce con certeza (código numérico o match exacto
     en la tabla verificada). NO cuenta el fallback por prefijo ni el default,
@@ -296,7 +352,11 @@ def generate_maria_txt(operation_id: str, items: list,
                        contenedor_peso: float = 0,
                        # Aduana config
                        aduana_codigo: str = "001",
-                       tipo_destinacion: str = "IC04") -> str:
+                       tipo_destinacion: str = "IC04",
+                       # Lo que decide el despachante (MARIA-4)
+                       banco_bcra: str = "",
+                       empresa_digitalizacion: str = EMPRESA_DIGITALIZACION_POR_DEFECTO,
+                       iva_adicional: str = IVA_ADICIONAL_POR_DEFECTO) -> str:
     """
     Genera archivo TXT en formato MARIA.
     
@@ -323,7 +383,18 @@ def generate_maria_txt(operation_id: str, items: list,
         String con contenido del archivo TXT (CRLF line endings)
     """
     lines = []
-    
+
+    # MARIA-4: validar lo que decide el despachante antes de armar nada.
+    banco_bcra = str(banco_bcra or "").strip()
+    if banco_bcra and not (len(banco_bcra) == 3 and banco_bcra.isdigit()):
+        raise ValueError(f"Banco «{banco_bcra}» no válido: va el código de entidad del BCRA (3 dígitos).")
+    empresa_digitalizacion = str(empresa_digitalizacion or EMPRESA_DIGITALIZACION_POR_DEFECTO).strip().upper()
+    if empresa_digitalizacion not in EMPRESAS_DIGITALIZACION:
+        raise ValueError(
+            f"Empresa de digitalización «{empresa_digitalizacion}» no válida (PSAD06 Modoc o PSAD01 Lakaut)."
+        )
+    iva_adicional = _iva_adicional(iva_adicional or IVA_ADICIONAL_POR_DEFECTO, "Operación")
+
     # Calcular totales
     fob_total = sum(
         float(item.get('valor_total') or 
@@ -445,7 +516,17 @@ def generate_maria_txt(operation_id: str, items: list,
         lines.append(f"MCPL={importe_gastos:<40}")
         lines.append("")
     
-    # 4. Defaults PSAD (Hardcoded por ahora, configurable a futuro)
+    # 4. Banco (por operación). Sin banco no se emite: así viene el archivo
+    # real de 2025; el de 2026 lo trae acá, antes de ARDIG-SETI-OPC.
+    if banco_bcra:
+        lines.append("[CPL]")
+        lines.append("NART=0000")
+        lines.append("ICPLDIF=S")
+        lines.append("CCPL=BANCOSARGENTINA ")
+        lines.append(f"MCPL={banco_bcra:<40}")
+        lines.append("")
+
+    # Digitalización
     lines.append("[CPL]")
     lines.append("NART=0000")
     lines.append("ICPLDIF=S")
@@ -457,7 +538,7 @@ def generate_maria_txt(operation_id: str, items: list,
     lines.append("NART=0000")
     lines.append("ICPLDIF=S")
     lines.append("CCPL=ARDIG-CUIT-PSAD ")
-    lines.append(f"MCPL={'PSAD06':<40}")
+    lines.append(f"MCPL={empresa_digitalizacion:<40}")
     lines.append("")
     
     # 5. Proveedor
@@ -540,6 +621,12 @@ def generate_maria_txt(operation_id: str, items: list,
             raise ValueError(f"Grupo {gid}: todos los ítems deben tener el mismo origen")
         if len(unidades) != 1:
             raise ValueError(f"Grupo {gid}: todos los ítems deben tener la misma unidad de medida")
+        estados = {str(it.get('estado') or '').strip() for it in grupo_items}
+        ivas = {str(it.get('iva_adicional') or '').strip().upper() for it in grupo_items}
+        if len(estados) != 1:
+            raise ValueError(f"Grupo {gid}: todos los ítems deben tener el mismo estado de la mercadería")
+        if len(ivas) != 1:
+            raise ValueError(f"Grupo {gid}: todos los ítems deben tener el mismo IVA adicional")
 
         # Combinar los items del grupo en uno solo
         primero = grupo_items[0]
@@ -615,7 +702,7 @@ def generate_maria_txt(operation_id: str, items: list,
         # Los dos archivos de referencia lo confirman: el que tiene un solo
         # [SBT] dice N, el que tiene dos dice S.
         lines.append("CARTSBITEM=S" if item.get("subitems") else "CARTSBITEM=N")
-        lines.append("CARTUSO=3")
+        lines.append(f"CARTUSO={_estado_item(item, idx, pais_codigo)}")
         lines.append(f"QARTKGRNET={peso_kg:.3f}")
         lines.append(f"CARTPAYORI={pais_codigo}")
         lines.append(f"CARTPAYPRC={pais_proc_codigo}") # Procedencia (default = origen)
@@ -648,7 +735,11 @@ def generate_maria_txt(operation_id: str, items: list,
         lines.append(f"NART={idx:04d}")
         lines.append("ICPLDIF=S")
         lines.append("CCPL=IVAADICIONAL1   ")
-        lines.append(f"MCPL={'IVAAD1':<40}")
+        iva_item = (
+            _iva_adicional(item.get("iva_adicional"), f"Ítem {idx}")
+            if item.get("iva_adicional") else iva_adicional
+        )
+        lines.append(f"MCPL={iva_item:<40}")
         lines.append("")
         
         # [SBT] Sufijos de valor.
@@ -783,6 +874,9 @@ def supuestos_declarados(
     gastos_fob: float | None = None,
     flete: float = 0,
     seguro: float = 0,
+    iva_adicional: str | None = None,
+    banco_bcra: str = "",
+    empresa_digitalizacion: str | None = None,
 ) -> list:
     """Lista los campos que el sistema declaró SIN preguntarle al despachante.
 
@@ -842,15 +936,36 @@ def supuestos_declarados(
             f"07 (unidad) por defecto."
         )
 
-    # --- Constantes que hoy van fijas y el archivo real muestra variando --
+    # --- Lo que decide el despachante (MARIA-4) ---------------------------
+    sin_estado = [
+        str(idx) for idx, item in enumerate(items or [], start=1)
+        if isinstance(item, dict) and item.get("estado") in (None, "")
+        and get_pais_codigo(item.get("origen") or item.get("pais_origen")) != PAIS_ARGENTINA
+    ]
+    if sin_estado:
+        avisos.append(
+            f"Estado de la mercadería: en el/los ítem(s) {', '.join(sin_estado)} se declaró "
+            f"{ESTADO_POR_DEFECTO_IMPORTADO} ({ESTADOS_MERCADERIA[ESTADO_POR_DEFECTO_IMPORTADO].lower()}) "
+            f"por defecto."
+        )
+    if items and not iva_adicional:
+        avisos.append(
+            "IVA adicional: se declaró reventa (NO_VALIDA) por defecto. Si la mercadería "
+            "es para uso particular, cambialo."
+        )
     if items:
         avisos.append(
-            "Uso de la mercadería (CARTUSO): se declaró 3 por defecto, siempre. "
-            "Todavía no se puede elegir."
+            "IVA adicional: si corresponde reducción o exclusión, se elige en «Ventajas» "
+            "del Kit; no va en el TXT."
         )
+    if items and not str(banco_bcra or "").strip():
         avisos.append(
-            "IVA adicional: se declaró IVAAD1 por defecto, siempre. "
-            "Todavía no se puede elegir."
+            "Banco: no se declaró (la línea BANCOSARGENTINA no sale). Cargá el banco del "
+            "cliente si corresponde."
+        )
+    if items and not empresa_digitalizacion:
+        avisos.append(
+            "Empresa de digitalización: se declaró Modoc (PSAD06) por defecto."
         )
 
     return avisos

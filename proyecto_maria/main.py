@@ -3565,6 +3565,11 @@ class MariaRequest(BaseModel):
     # (EXW → GTOS-ANT-FOB, grupos C/D → GTOS-POS-FOB). Si no viene, en los
     # grupos C/D se usa flete + seguro y fuera de ellos no se declara nada.
     gastos_fob: float | None = None
+    # Lo que decide el despachante (MARIA-4). None = valor por defecto, que
+    # entra en los supuestos. El estado y el IVA por producto van en items.
+    banco_bcra: str = ""
+    empresa_digitalizacion: str | None = None
+    iva_adicional: str | None = None
 
 
 @app.post("/generate_maria")
@@ -3667,6 +3672,9 @@ async def generate_maria_endpoint(
             tipo_destinacion=request.tipo_destinacion,
             sbt_sufijo_valor=sbt_raw,
             gastos_fob=request.gastos_fob,
+            banco_bcra=request.banco_bcra,
+            empresa_digitalizacion=request.empresa_digitalizacion or "PSAD06",
+            iva_adicional=request.iva_adicional or "NO_VALIDA",
         )
         
         # Sanitizar operation_id para filename (prevenir path traversal)
@@ -3692,6 +3700,9 @@ async def generate_maria_endpoint(
             gastos_fob=request.gastos_fob,
             flete=request.flete,
             seguro=request.seguro,
+            iva_adicional=request.iva_adicional,
+            banco_bcra=request.banco_bcra,
+            empresa_digitalizacion=request.empresa_digitalizacion,
         )
 
         return {
