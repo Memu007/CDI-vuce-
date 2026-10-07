@@ -140,7 +140,7 @@ con PUBLICAR-2 y el cobro chico de Emi: alta, cobro, renovación, cancelación
 | 3 | MARIA-4 | **Estado de la mercadería e IVA adicional, como respondió el despachante:** el estado se elige entre seis, por producto (por defecto, nuevo sin uso importado si el origen es extranjero). El IVA adicional se paga completo en reventa: deja de declararse siempre «uso particular» | M2, M3 | medio | **sí** | con PUBLICAR-2. Prueba: las respuestas 1 y 2 del despachante y el archivo real de 2026 (`PREGUNTAS-DESPACHANTE.md`, «Respuestas») |
 | 4 | MARIA-1b | Controles antes de generar: NCM que exista en el catálogo, moneda, incoterm, CUIT, montos; ningún texto puede meter líneas en el archivo | M10 | medio | no, con datos correctos | con PUBLICAR-1 o 2 |
 | 5 | MARIA-3 | Los avisos se muestran **antes** de generar y completos; los gastos anteriores al FOB llegan al archivo en EXW; la procedencia se carga en pantalla | M6, M8 | grande | sí | con PUBLICAR-2. Prueba: la ley (Código Aduanero, art. 15), la nota del SIM y un archivo real con procedencia distinta del origen |
-| 6 | MARIA-4b | El banco lo elige el cliente: va en su ficha, se cambia por operación y sale en el archivo (hoy no sale). La empresa de digitalización, editable con el valor de hoy | — | medio | **sí** (el banco) | con PUBLICAR-2. Prueba: la respuesta 4 y el archivo real de 2026 |
+| 6 | MARIA-4b | El banco lo elige el cliente en cada operación: se carga en la operación (con el último que usó ese cliente como propuesta) y sale en el archivo (hoy no sale). La empresa de digitalización pasa a la configuración del estudio, con cambio por operación; por defecto, la de hoy hasta saber los códigos | — | medio | **sí** (el banco) | con PUBLICAR-2. Prueba: las respuestas 4 y 5 y el archivo real de 2026 |
 | 7 | MARIA-5 | Peso total por producto (hoy sale el de una unidad) y cuentas exactas (hoy a veces no cierran por un centavo) | M1, M9 | medio | **sí** | El peso, con PUBLICAR-2. Prueba: la respuesta 3 y el archivo real de 2026. Las cuentas exactas, en la **Fase B**, con la prueba en su Kit. Los dos archivos reales tienen que salir idénticos |
 
 MARIA-1b y MARIA-3 tocan la misma función que COBRO-CORTE-1: arrancan después
@@ -167,7 +167,7 @@ CSRF, cabeceras de seguridad y topes de subida de archivos.
 
 | Pieza | Qué hace | Espera |
 |---|---|---|
-| MARIA-6 | Según sus respuestas: empresa de digitalización, gastos en FCA y FAS, y cómo va en el archivo una reducción o exclusión del IVA adicional | preguntas 5 y 6, y la de reducción o exclusión (1 a 4 ya respondidas) |
+| MARIA-6 | Según sus respuestas: el código de cada empresa de digitalización, gastos en FCA y FAS, y cómo va en el archivo una reducción o exclusión del IVA adicional | la pregunta 6 y dos cortas nuevas (1 a 5 ya respondidas) |
 | MARIA-7 | Identificadores, sufijos de valor por producto y código de proveedor como en sus archivos reales | favor 1 (los archivos) |
 | MARIA-5 | Se publican las cuentas exactas (el peso sale antes) | favor 2 |
 | PRUEBA-KIT | El despachante carga en su Kit un archivo de CDI, sin oficializar | favor 2. **Cierra G4** |

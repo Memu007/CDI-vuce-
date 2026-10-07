@@ -47,5 +47,5 @@ repositorio.
 | **«Dale» para el SHA de la publicación de ensayo** | Emi aprobó el ensayo el 2026-10-07; falta el «dale» para el SHA exacto | Antes, Emi revisa en Railway las variables y las cuentas que pasarían a impagas |
 | **Prender «Wait for CI» en Railway** | Hoy Railway publica aunque las pruebas fallen | Es un ajuste de Railway; no cuesta nada |
 | **Qué se promete del catálogo NCM** | Hoy hay 10.226 posiciones de ARCA (julio de 2026), no 22 | Cambia el discurso comercial de septiembre |
-| **Las preguntas al despachante** | Seis preguntas y dos favores (`PREGUNTAS-DESPACHANTE.md`, versión simple). Respondió de la 1 a la 4 el 2026-10-06 | Destraban la Fase B y cierran el archivo MARIA (G4) |
+| **Las preguntas al despachante** | Seis preguntas y dos favores (`PREGUNTAS-DESPACHANTE.md`, versión simple). Respondió de la 1 a la 5 el 2026-10-06 | Destraban la Fase B y cierran el archivo MARIA (G4) |
 | **Precio y fecha de arranque** | Vencidos | Comercial; no se escriben acá |
