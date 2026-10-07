@@ -124,10 +124,12 @@ def _abrir_pdf(contents: bytes) -> tuple:
 
 
 def _pdf_validate_timeout_s() -> float:
+    """Mal escrito, en 0 o negativo, vale 30 s (RENDIMIENTO-1b)."""
     try:
-        return float(os.getenv("PDF_VALIDATE_TIMEOUT_S", "30"))
+        valor = float(os.getenv("PDF_VALIDATE_TIMEOUT_S", "") or 30)
     except (TypeError, ValueError):
         return 30.0
+    return valor if valor > 0 else 30.0
 
 
 async def validate_file_upload(

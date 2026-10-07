@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · fix: un PDF armado no deja a nadie sin lectura (RENDIMIENTO-1b)
+
+- **fix(rendimiento):** la adivinanza del vendedor lee el texto del PDF sólo con `pypdf`: `pdfminer` se colgaba para siempre con un PDF armado y, con cuatro de esos, nadie más podía leer un PDF hasta reiniciar. Los tiempos máximos en 0 o negativos valen el de siempre.
+
 ## 2026-10-07 · fix: leer un PDF no frena el sitio (RENDIMIENTO-1)
 
 - **fix(rendimiento):** leer el PDF, sacarle el texto, abrirlo para validarlo y pedirle a Gemini un NCM corren en otro hilo: mientras tanto el servidor sigue atendiendo a los demás. La lectura tiene un tiempo máximo (`PDF_READ_TIMEOUT_S`, 120 s) con un error propio (`lectura_pdf_demasiado_larga`) y la pantalla ofrece cargar los productos a mano; la adivinanza del vendedor tiene su tiempo propio (`PDF_VENDOR_TIMEOUT_S`, 15 s) y Gemini el suyo (`NCM_GEMINI_TIMEOUT_S`, 30 s). Las lecturas de PDF usan su propio grupo de hilos (`PDF_READ_WORKERS`, 4).

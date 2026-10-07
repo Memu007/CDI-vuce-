@@ -817,6 +817,28 @@ def _extract_pdf_text(data: bytes) -> str:
     return text
 
 
+def extraer_texto_pdf_seguro(data: bytes) -> str:
+    """Texto del PDF sólo con pypdf, para PDFs que sube el usuario.
+
+    pdfminer y pdfplumber se cuelgan para siempre con un PDF armado (por
+    ejemplo, un /Length que se apunta a sí mismo), y un hilo colgado no se
+    puede cortar. pypdf aguanta esos casos (RENDIMIENTO-1b). Sin OCR.
+    """
+    import io
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(data))
+        paginas = []
+        for p in reader.pages:
+            try:
+                paginas.append(p.extract_text() or '')
+            except Exception:
+                pass
+        return '\n'.join(paginas)
+    except Exception:
+        return ''
+
+
 # ─────────────────────────────────────────────────────────────
 # Detección heurística de vendor (fallback cuando Vision no aplica)
 # ─────────────────────────────────────────────────────────────

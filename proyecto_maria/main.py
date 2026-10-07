@@ -3291,11 +3291,18 @@ async def process_operation(
     except ValueError as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-def _pdf_read_timeout_s() -> float:
+def _segundos_de_entorno(variable: str, defecto: float) -> float:
+    """Segundos de una variable de entorno. Mal escrita, en 0 o negativa,
+    vale el defecto (RENDIMIENTO-1b)."""
     try:
-        return float(os.getenv("PDF_READ_TIMEOUT_S", "120"))
+        valor = float(os.getenv(variable, "") or defecto)
     except (TypeError, ValueError):
-        return 120.0
+        return defecto
+    return valor if valor > 0 else defecto
+
+
+def _pdf_read_timeout_s() -> float:
+    return _segundos_de_entorno("PDF_READ_TIMEOUT_S", 120.0)
 
 
 class LecturaPdfDemasiadoLarga(Exception):
@@ -3331,10 +3338,7 @@ def _correr_lectura(funcion, *args):
 
 
 def _pdf_vendor_timeout_s() -> float:
-    try:
-        return float(os.getenv("PDF_VENDOR_TIMEOUT_S", "15"))
-    except (TypeError, ValueError):
-        return 15.0
+    return _segundos_de_entorno("PDF_VENDOR_TIMEOUT_S", 15.0)
 
 
 async def _leer_pdf_aparte(funcion, *args, limite=None):
@@ -3563,12 +3567,13 @@ async def upload_pdf_public(
         if not operacion_data.get('vendedor_nombre'):
             try:
                 from proyecto_maria.pdf_extractor import (
-                    _extract_pdf_text,
+                    extraer_texto_pdf_seguro,
                     detect_vendor_from_text,
                 )
-                # Es opcional: con un tiempo propio, más corto.
+                # Es opcional: con un tiempo propio, más corto, y sólo con pypdf
+                # (pdfminer se cuelga con un PDF armado, RENDIMIENTO-1b).
                 pdf_text = await _leer_pdf_aparte(
-                    _extract_pdf_text, contents, limite=_pdf_vendor_timeout_s()
+                    extraer_texto_pdf_seguro, contents, limite=_pdf_vendor_timeout_s()
                 )
                 detected = detect_vendor_from_text(pdf_text)
                 if detected:
@@ -7130,10 +7135,7 @@ async def sugerir_ncm(
         # En otro hilo y con tiempo máximo: la llamada a Gemini es sincrónica
         # (RENDIMIENTO-1). Si no contesta a tiempo, se sigue sin sus sugerencias.
         import asyncio
-        try:
-            limite = float(os.getenv("NCM_GEMINI_TIMEOUT_S", "30"))
-        except (TypeError, ValueError):
-            limite = 30.0
+        limite = _segundos_de_entorno("NCM_GEMINI_TIMEOUT_S", 30.0)
         try:
             de_gemini = await asyncio.wait_for(
                 asyncio.to_thread(_suggest_ncm_with_gemini, descripcion, 5 - len(sugerencias)),
