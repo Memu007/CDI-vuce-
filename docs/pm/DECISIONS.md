@@ -41,6 +41,7 @@ repositorio.
 | **El caso habitual de Emi es reventa** | 2026-10-07, ~15:27 ARG | Emi, ídem. El IVA adicional por defecto, `NO_VALIDA` (MARIA-4), es el que corresponde; se cambia por operación o por producto |
 | **Subítems en la pantalla (D24)** | 2026-10-07, ~15:27 ARG | Emi, ídem: sus facturas traen subítems. Entra SUBITEMS-1 (Dev 2), después de CATALOGO-NCM-1 y antes de MARIA-6 |
 | **La suscripción de Mercado Pago está configurada** | 2026-10-07, ~15:27 ARG | Emi: las variables `MP_PREAPPROVAL_PLAN_ID_*` están en Railway. Las renovaciones de COBRO-MP-1 corren en producción |
+| **Los subítems no se guardan con la operación, por ahora** | 2026-10-07 | La PM, por la D27 de la Dev 2: hoy la v2 no reabre operaciones del historial, así que no se pierde nada a la vista. Si entra «reabrir una operación», esa pieza lleva la columna y la migración (también para el estado de MARIA-4) |
 | **Empresa de digitalización, por operación** | 2026-10-07 | El despachante (2026-10-06, 22:15): «se selecciona en cada operación»; Lakaut = `PSAD01`, Modoc = `PSAD06`, como en los dos archivos reales. Se elige como el banco: en cada operación, con la última usada propuesta. Va en MARIA-4 |
 | **La reducción del IVA adicional no va en el TXT** | 2026-10-07 | El despachante (2026-10-06, 22:12): es la ventaja `IVAADREDUCCION` del menú «Ventajas» del Kit, que elige él cuando sabe que corresponde; elegirla mal es una infracción grave. Ningún archivo real trae ventajas. CDI no la pone: avisa que se elige en el Kit. Va en MARIA-4 |
 

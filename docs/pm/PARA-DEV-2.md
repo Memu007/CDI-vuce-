@@ -118,6 +118,16 @@ peso dicen la razón real.
   entregás.
 - Suite completa en verde.
 
+## Respuestas a tus D (2026-10-07, 19:40 UTC)
+
+- **D27 (guardar los subítems con la operación): (a).** Sin migración ahora.
+  Hoy ningún camino de la v2 reabre una operación del historial, así que no
+  se pierde nada a la vista. Si algún día entra «reabrir una operación»,
+  esa pieza lleva la columna y la migración, también para el estado de
+  MARIA-4. Queda en `DECISIONS.md`.
+- **SUBITEMS-1 (`88564ec`):** la reviso ahora. Como está arriba de MARIA-5
+  devuelta, lo que salga va junto con esa devolución.
+
 ## Respuestas a tus D (2026-10-07, 16:05 UTC)
 
 - **D23 («Peso neto» por unidad o de la línea): la regla de MARIA-5.**
