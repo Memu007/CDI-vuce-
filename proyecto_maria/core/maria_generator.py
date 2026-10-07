@@ -6,6 +6,8 @@ import math
 import re
 import unicodedata
 from datetime import datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal
+from fractions import Fraction
 from functools import lru_cache
 from pathlib import Path
 
@@ -450,6 +452,39 @@ def get_pais_codigo(pais: str) -> int:
     return PAIS_DEFAULT_IMPORT
 
 
+def centavos(valor) -> Decimal:
+    """Un importe del TXT al centavo, con la mitad hacia arriba (MARIA-5). Se
+    redondea el número escrito, no su aproximación binaria: 2,675 da 2,68."""
+    numero = float(valor or 0)
+    if not math.isfinite(numero):
+        raise ValueError(f"Importe «{valor}» no válido: revisá cantidades y valores.")
+    return Decimal(repr(numero)).quantize(Decimal("0.01"), ROUND_HALF_UP)
+
+
+def repartir(total: Decimal, pesos: list) -> list:
+    """Reparte `total` (al centavo) en proporción a `pesos`, de modo que la
+    suma dé exactamente `total` (MARIA-5). Cada parte se trunca al centavo y
+    los centavos que faltan van a las de mayor resto; si empatan, a la de
+    mayor peso y después a la primera."""
+    pesos = [Fraction(Decimal(str(p))) for p in pesos]
+    suma = sum(pesos)
+    if suma <= 0 or not pesos:
+        return [Decimal("0.00")] * len(pesos)
+    total_c = int(total * 100)
+    partes = [total_c * p / suma for p in pesos]
+    enteras = [int(x) for x in partes]
+    orden = sorted(range(len(pesos)), key=lambda i: (-(partes[i] - enteras[i]), -pesos[i], i))
+    for i in orden[:total_c - sum(enteras)]:
+        enteras[i] += 1
+    return [Decimal(c) / 100 for c in enteras]
+
+
+def _fob_de(item: dict) -> Decimal:
+    """El FOB de una línea al centavo: el valor total, o cantidad × unitario."""
+    return centavos(item.get('valor_total')
+                    or float(item.get('cantidad', 1)) * float(item.get('valor_unitario', 0)))
+
+
 def peso_de_la_linea(item: dict) -> float:
     """El peso neto total de la línea, que va en QARTKGRNET (MARIA-5; respuesta
     3 del despachante). `peso_kg`, si viene, ya es el total (así lo mandan la
@@ -535,16 +570,9 @@ def generate_maria_txt(operation_id: str, items: list,
     iva_adicional = _iva_adicional(iva_adicional or IVA_ADICIONAL_POR_DEFECTO, "Operación")
     # Con C y D los gastos salen de flete + seguro: un importe inválido no
     # llega al TXT por ese camino (revisión de la devolución de MARIA-3).
-    flete = importe_valido(flete or 0, "Flete")
-    seguro = importe_valido(seguro or 0, "Seguro")
+    flete = centavos(importe_valido(flete or 0, "Flete"))
+    seguro = centavos(importe_valido(seguro or 0, "Seguro"))
 
-    # Calcular totales
-    fob_total = sum(
-        float(item.get('valor_total') or 
-              float(item.get('cantidad', 1)) * float(item.get('valor_unitario', 0)))
-        for item in items
-    )
-    
     # === [DDT] Cabecera ===
     # Normalizamos config de aduana/destinacion con defaults seguros (Ezeiza IC04)
     aduana_codigo = (str(aduana_codigo or "").strip() or "001")[:3]
@@ -575,7 +603,10 @@ def generate_maria_txt(operation_id: str, items: list,
     
     lines.append(f"MDDTASS={seguro:.2f}")
     lines.append(f"MDDTFLE={flete:.2f}")
-    lines.append(f"MDDTFOB={fob_total:.2f}")
+    # El FOB de la carátula es la suma de los ítems ya agrupados: se escribe
+    # al final, cuando se conocen.
+    linea_fob_total = len(lines)
+    lines.append("MDDTFOB=")
     
     # Transit ID (si existe, usar operation_id prefix)
     lines.append(f"NDDTIMMTRN={operation_id[:5] if len(operation_id)>=5 else '00000'}")
@@ -646,7 +677,7 @@ def generate_maria_txt(operation_id: str, items: list,
     campo_gastos = "GTOS-POS-FOB    " if grupo_cd else "GTOS-ANT-FOB    "
 
     if gastos_fob is not None:
-        importe_gastos = f"{_importe_de_gastos(gastos_fob, 'gastos_fob'):.2f}"
+        importe_gastos = f"{centavos(_importe_de_gastos(gastos_fob, 'gastos_fob')):.2f}"
     elif grupo_cd:
         # Formato 2 decimales para evitar artefactos float
         # (str(3221.66+50) podia dar "3271.6600000000003").
@@ -799,6 +830,13 @@ def generate_maria_txt(operation_id: str, items: list,
         combined['valor_unitario'] = combined['valor_total'] / total_cant if total_cant > 0 else 0
         items_export.append(combined)
 
+    # Las cuentas al centavo (MARIA-5): la suma de los ítems da exactamente
+    # el FOB, el flete y el seguro de la carátula.
+    fobs = [_fob_de(it) for it in items_export]
+    fletes = repartir(flete, fobs)
+    seguros = repartir(seguro, fobs)
+    lines[linea_fob_total] = f"MDDTFOB={sum(fobs, Decimal('0.00')):.2f}"
+
     for idx, item in enumerate(items_export, 1):
         # Obtener valores
         ncm_raw = str(item.get('ncm') or item.get('pieza', '')).strip()
@@ -821,7 +859,7 @@ def generate_maria_txt(operation_id: str, items: list,
         descripcion = str(item.get('descripcion', '')).strip()
         cantidad = float(item.get('cantidad', 1))
         valor_unit = float(item.get('valor_unitario', 0))
-        valor_total = float(item.get('valor_total') or cantidad * valor_unit)
+        valor_total = fobs[idx - 1]
         peso_kg = peso_de_la_linea(item)
         pais = item.get('pais_origen') or item.get('origen', 'CN')
         pais_codigo = get_pais_codigo(pais)
@@ -837,10 +875,8 @@ def generate_maria_txt(operation_id: str, items: list,
         unidad_codigo = get_unidad_codigo(
             item.get('unidad') or item.get('unidad_medida') or item.get('um'))
         
-        # Calcular proporcional de flete y seguro
-        proporcion = valor_total / fob_total if fob_total > 0 else 0
-        flete_item = flete * proporcion
-        seguro_item = seguro * proporcion
+        flete_item = fletes[idx - 1]
+        seguro_item = seguros[idx - 1]
         base_imponible = valor_total + flete_item + seguro_item
         
         lines.append("[ART]")
@@ -930,16 +966,19 @@ def generate_maria_txt(operation_id: str, items: list,
             # rechaza la declaración. Se valida acá y se corta: mejor un error
             # en pantalla que un TXT que no cuadra.
             suma_cant = sum(float(s.get("cantidad", 0) or 0) for s in subitems)
-            suma_fob = sum(
-                float(s.get("cantidad", 0) or 0) * float(s.get("valor_unitario", valor_unit) or 0)
+            # Cada MSBTFOB al centavo, como sale en el TXT: su suma tiene que
+            # dar exactamente el MARTFOB (MARIA-5).
+            fobs_sub = [
+                centavos(float(s.get("cantidad", 0) or 0) * float(s.get("valor_unitario", valor_unit) or 0))
                 for s in subitems
-            )
+            ]
+            suma_fob = sum(fobs_sub, Decimal("0.00"))
             if abs(suma_cant - cantidad) > 0.001:
                 raise ValueError(
                     f"Item {idx}: las cantidades de los sub-ítems suman {suma_cant:g} "
                     f"pero el ítem declara {cantidad:g}. Tienen que coincidir."
                 )
-            if abs(suma_fob - valor_total) > 0.01:
+            if suma_fob != valor_total:
                 raise ValueError(
                     f"Item {idx}: los valores de los sub-ítems suman {suma_fob:.2f} "
                     f"pero el ítem declara {valor_total:.2f}. Tienen que coincidir."
@@ -957,7 +996,7 @@ def generate_maria_txt(operation_id: str, items: list,
                 lines.append(f"IDDT={operation_id}")
                 lines.append(f"NART={idx:04d}")
                 lines.append(f"ISBT={n:04d}")
-                lines.append(f"MSBTFOB={sub_cant * sub_unit:.2f}")
+                lines.append(f"MSBTFOB={fobs_sub[n - 1]:.2f}")
                 lines.append(f"QSBTUNTDCL={sub_cant:.2f}")
                 lines.append(f"MSBTUNITAR={sub_unit:.4f}")
                 lines.append(f"IEXT={idx}-{n}")

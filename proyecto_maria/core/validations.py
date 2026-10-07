@@ -4,7 +4,7 @@
 
 import re
 from proyecto_maria.models.operations import Item  # Modelo Pydantic de items
-from proyecto_maria.core.maria_generator import pais_reconocido
+from proyecto_maria.core.maria_generator import centavos, pais_reconocido
 from typing import List, Tuple  # Type hints para mejor documentación
 
 def run_pre_maria_validations(items: List[Item]) -> Tuple[List[Item], List[str]]:
@@ -152,6 +152,8 @@ def run_smart_validations(items: List[Item]) -> dict:
     sugerencias = []
     
     total_valor = 0
+    # El FOB como sale en el TXT: cada línea al centavo (MARIA-5).
+    total_valor_txt = 0
     total_peso = 0
     ncms_usados = set()
     
@@ -214,6 +216,7 @@ def run_smart_validations(items: List[Item]) -> dict:
         if item.valor_unitario and item.cantidad:
             valor_total_item = item.valor_unitario * item.cantidad
             total_valor += valor_total_item
+            total_valor_txt += centavos(valor_total_item)
             
             # Valor unitario sospechosamente bajo (menos de 1 centavo)
             if item.valor_unitario < 0.01:
@@ -312,7 +315,7 @@ def run_smart_validations(items: List[Item]) -> dict:
         "resumen": resumen,
         "estadisticas": {
             "total_items": len(items),
-            "total_valor_usd": round(total_valor, 2),
+            "total_valor_usd": float(total_valor_txt),
             "total_peso_kg": round(total_peso, 2),
             "ncms_unicos": len(ncms_usados)
         }
