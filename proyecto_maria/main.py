@@ -1729,10 +1729,13 @@ def _admin_usernames() -> set:
     return {u.strip() for u in raw.split(",") if u.strip()}
 
 
+def _es_admin(user) -> bool:
+    return user["username"] in _admin_usernames() or "admin" in (user.get("roles") or [])
+
+
 async def require_admin(user=Depends(get_current_user)):
     """Dependencia: exige que el user autenticado sea admin. 403 si no."""
-    is_admin = user["username"] in _admin_usernames() or "admin" in (user.get("roles") or [])
-    if not is_admin:
+    if not _es_admin(user):
         raise HTTPException(status_code=403, detail="Requiere permisos de administrador")
     return user
 
@@ -6376,6 +6379,8 @@ async def system_connectors(user=Depends(get_current_user)):
 
     Devuelve el modo efectivo y si las credenciales requeridas estan presentes.
     Util para QA, ops y un futuro panel de administracion. No expone las keys.
+    El usuario común sólo recibe el `mode` de cada conector (lo usa el chip
+    «Sistema/Demo» de la barra superior); el detalle es del admin (ADMIN-2).
     """
     from proyecto_maria.core.vuce_connector import CONFIG as VUCE_CFG
     from proyecto_maria.core.tarifar_connector import TarifarConfig
@@ -6384,6 +6389,12 @@ async def system_connectors(user=Depends(get_current_user)):
     afip_mode = (os.getenv("AFIP_MODE", "") or "").strip().lower() or (
         "api" if os.getenv("AFIP_CUIT") and os.getenv("AFIP_CERT_PATH") else "fake"
     )
+    if not _es_admin(user):
+        return {
+            "vuce": {"mode": VUCE_CFG.mode},
+            "tarifar": {"mode": tarifar_cfg.mode},
+            "afip": {"mode": afip_mode},
+        }
     return {
         "vuce": {
             "mode": VUCE_CFG.mode,
@@ -7978,80 +7989,6 @@ async def mercadopago_webhook(request: Request):
     except Exception as e:
         logger.exception("Webhook MP: error inesperado: %s", e)
         raise HTTPException(status_code=500, detail="Error interno, MP reintentará")
-
-
-@app.post("/api/payments/simulate-webhook")
-async def simulate_webhook(request: Request):
-    """ Endpoint temporal para probar el procesamiento de webhooks de MP
-    sin depender de un pago real. Requiere el header X-Webhook-Secret con
-    el mismo valor que MP_WEBHOOK_SECRET. Solo usar en staging/validación.
-    """
-    secret_header = request.headers.get("x-webhook-secret", "")
-    if not MP_WEBHOOK_SECRET or secret_header != MP_WEBHOOK_SECRET:
-        raise HTTPException(status_code=401, detail="Secret inválido o no configurado")
-
-    body = await request.json()
-    username = body.get("username")
-    action = body.get("action", "subscription")
-    if not username:
-        raise HTTPException(status_code=400, detail="Falta username")
-
-    # Construir un pay_resp mínimo similar al de MercadoPago.
-    now = datetime.now(timezone.utc)
-    payment_id = "sim_" + uuid.uuid4().hex[:16]
-    # Para subscription usamos siempre el plan premium (único plan activo).
-    external_reference = f"{username}:premium" if action == "subscription" else f"{username}:topup"
-
-    pay_resp = {
-        "id": payment_id,
-        "status": "approved",
-        "external_reference": external_reference,
-        "payer": {"id": "sim_payer_123"},
-        "transaction_amount": 45000.00 if action == "subscription" else 10000.00,
-        "date_created": now.isoformat(),
-        "payment_method_id": "simulated",
-    }
-
-    update = billing_service.process_payment(pay_resp)
-    if update is None:
-        raise HTTPException(status_code=400, detail="external_reference inválida")
-
-    async for session in get_async_session():
-        result = await session.execute(select(User).where(User.username == username))
-        db_user = result.scalars().first()
-        if not db_user:
-            raise HTTPException(status_code=400, detail="Usuario no existe")
-
-        db_user.last_payment_id = payment_id
-        db_user.plan = update.get("plan", db_user.plan)
-        db_user.billing_status = update.get("billing_status", db_user.billing_status)
-        if "trial_ends_at" in update:
-            db_user.trial_ends_at = update["trial_ends_at"]
-        if "payment_provider" in update:
-            db_user.payment_provider = update["payment_provider"]
-        if "payment_customer_id" in update:
-            db_user.payment_customer_id = update["payment_customer_id"]
-        if "ops_used_this_period" in update:
-            db_user.ops_used_this_period = update["ops_used_this_period"]
-        if "extra_ops_remaining" in update:
-            total = (db_user.extra_ops_remaining or 0) + update["extra_ops_remaining"]
-            db_user.extra_ops_remaining = min(total, billing_service.EXTRA_OPS_MAX)
-        if "extra_ops_expires_at" in update:
-            db_user.extra_ops_expires_at = update["extra_ops_expires_at"]
-        if "last_topup_at" in update:
-            db_user.last_topup_at = update["last_topup_at"]
-        if "billing_period_started_at" in update:
-            db_user.billing_period_started_at = update["billing_period_started_at"]
-
-        await session.commit()
-        await session.refresh(db_user)
-        return {
-            "success": True,
-            "payment_id": payment_id,
-            "billing_status": db_user.billing_status,
-            "trial_ends_at": db_user.trial_ends_at.isoformat() if db_user.trial_ends_at else None,
-            "extra_ops_remaining": db_user.extra_ops_remaining,
-        }
 
 
 @app.get("/api/billing/plans")

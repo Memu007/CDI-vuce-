@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · fix: lo que quedó de ADMIN-1 (ADMIN-2)
+
+- **fix(permisos):** `/api/system/connectors` le da al usuario común sólo el modo de cada conector (lo que usa el chip «Sistema/Demo»); direcciones, claves, CUIT y certificado, sólo al admin. `cohort-retention` deja de pedir además el rol: entra el admin por `ADMIN_USERNAMES`.
+- **fix(cobro):** se borra `/api/payments/simulate-webhook`, que con el secreto del webhook activaba el plan de cualquier usuario sin pagar.
+
 ## 2026-10-07 · fix: lo de administración, sólo para el admin (ADMIN-1)
 
 - **fix(permisos):** `/api/admin/*` (salud del servidor, errores, métricas, borrar el registro de errores) pasa a exigir admin; antes entraba cualquier usuario logueado. También `/api/ncm/cache/refresh`, que borra y recarga el cache de NCM que comparten todos los estudios.
