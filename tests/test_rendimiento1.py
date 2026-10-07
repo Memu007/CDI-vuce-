@@ -161,3 +161,14 @@ def test_ya_no_se_usa_pyPDF2_ni_python_jose():
             continue
         texto = archivo.read_text(encoding="utf-8", errors="ignore")
         assert "import PyPDF2" not in texto and "from jose" not in texto, archivo
+
+
+def test_health_responde_mientras_se_valida_el_pdf(monkeypatch):
+    """Abrir el PDF para validarlo (antes de leerlo) también va aparte."""
+    from proyecto_maria.security import file_security
+    monkeypatch.setattr(file_security, "_abrir_pdf", lambda *_: (_bloquear(), (False, 1))[1])
+    monkeypatch.setattr(main, "process_pdf",
+                        lambda *_: {"items": [{"descripcion": "x"}], "operacion": {"vendedor_nombre": "P"}})
+    demora, r = asyncio.run(_health_mientras(_subir))
+    assert r.status_code == 200, r.text[:200]
+    assert demora < 0.5, f"/health tardó {demora:.2f} s mientras se validaba el PDF"

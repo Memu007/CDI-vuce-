@@ -61,6 +61,10 @@ sabotaje $M "la lectura pierde el tiempo máximo" \
   'asyncio.to_thread(funcion, *args), timeout=_pdf_read_timeout_s()' \
   'asyncio.to_thread(funcion, *args), timeout=None' \
   'FAILED tests/test_rendimiento1.py::test_lectura_con_tiempo_maximo_y_error_claro'
+sabotaje proyecto_maria/security/file_security.py "validar el PDF vuelve al hilo del servidor" \
+  'asyncio.to_thread(_abrir_pdf, contents),' \
+  'asyncio.sleep(0, _abrir_pdf(contents)),' \
+  'FAILED tests/test_rendimiento1.py::test_health_responde_mientras_se_valida_el_pdf'
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"
