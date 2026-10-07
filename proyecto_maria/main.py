@@ -7650,8 +7650,19 @@ def _ncm_del_cliente_o_sim_del_proveedor(ncm_cliente, ncm_proveedor):
     proveedor = str(ncm_proveedor or "").strip()
     if (proveedor and _sim_position_error(proveedor) is None
             and _ncm_suggestion_key(proveedor) == _ncm_suggestion_key(cliente)):
-        return proveedor
+        return re.sub(r"[.\s]", "", proveedor).upper()
     return ncm_cliente
+
+
+def _ncm_recordado_con_sim_del_proveedor(recordado: dict, del_proveedor) -> str:
+    """El NCM del historial del cliente, con la SIM del proveedor si es el
+    mismo producto: la misma descripción guardada, no sólo una parecida a la
+    de la factura (cada memoria busca por parecido por su lado)."""
+    from proyecto_maria.core import catalog_service as catalog_svc
+    if (not del_proveedor or not del_proveedor.get("producto_key")
+            or del_proveedor["producto_key"] != catalog_svc._normalize(recordado.get("descripcion") or "")):
+        return recordado["ncm"]
+    return _ncm_del_cliente_o_sim_del_proveedor(recordado["ncm"], del_proveedor.get("ncm"))
 
 
 def _catalog_suggestion(item: ncm_catalog.NCMItem) -> dict:
@@ -7802,6 +7813,7 @@ async def sugerir_ncm(
         return True
 
     # 1) Memoria confirmada del cliente activo (aislada por despachante).
+    recordado = None
     if client_id:
         try:
             from proyecto_maria.services.client_memory import lookup_client_memory
@@ -7814,6 +7826,7 @@ async def sugerir_ncm(
                     "count": remembered.get("veces_usado", 1),
                     "scope": "cliente",
                 })
+                recordado = remembered
         except Exception as err:
             logging.warning("ncm suggestion client memory unavailable: %s", err)
 
@@ -7830,9 +7843,8 @@ async def sugerir_ncm(
             if vendor_item and vendor_item.get("ncm") and vendor_item.get("match_type") != "none":
                 # Si tiene la SIM completa del NCM que recuerda el cliente, la
                 # sugerencia del cliente la usa (D32 b).
-                if sugerencias and sugerencias[0].get("scope") == "cliente":
-                    sugerencias[0]["ncm"] = _ncm_del_cliente_o_sim_del_proveedor(
-                        sugerencias[0]["ncm"], vendor_item["ncm"])
+                if recordado and sugerencias and sugerencias[0].get("scope") == "cliente":
+                    sugerencias[0]["ncm"] = _ncm_recordado_con_sim_del_proveedor(recordado, vendor_item)
                 add_suggestion({
                     "ncm": vendor_item["ncm"],
                     "desc": descripcion,
@@ -9034,7 +9046,7 @@ async def catalog_lookup(
                     out.update({
                         "source": "cliente",
                         "confidence": mem["confidence"],
-                        "ncm": _ncm_del_cliente_o_sim_del_proveedor(mem["ncm"], vm and vm["ncm"]),
+                        "ncm": _ncm_recordado_con_sim_del_proveedor(mem, vm),
                         "origen": mem.get("origen") or None,
                         "veces_usado": mem.get("veces_usado"),
                         "valor_unitario_avg": mem.get("valor_unitario_avg"),
