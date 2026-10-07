@@ -213,6 +213,10 @@ def create_checkout(user, plan_id: str, org_id: str | None = None) -> dict[str, 
             }
         ],
         "external_reference": external_reference,
+        # El webhook controla el pago contra este precio, el de cuando se
+        # armó el link: si el precio sube después, el pago sigue valiendo
+        # (COBRO-MP-1, D29).
+        "metadata": {"precio_esperado": plan["price"]},
         "back_urls": {
             "success": back_url,
             "failure": f"{base_url}/dashboard?billing=failure",
@@ -260,6 +264,7 @@ def create_topup_checkout(user, org_id: str | None = None) -> dict[str, Any]:
             }
         ],
         "external_reference": external_reference,
+        "metadata": {"precio_esperado": TOPUP_PRICE_ARS},
         "back_urls": {
             "success": f"{base_url}/dashboard?billing=topup_success",
             "failure": f"{base_url}/dashboard?billing=failure",

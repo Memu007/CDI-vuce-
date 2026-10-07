@@ -9,6 +9,7 @@ from pydantic import BaseModel
 from datetime import datetime, timedelta, timezone
 import jwt
 import json
+import math
 import os
 import re
 import csv
@@ -2135,6 +2136,29 @@ async def get_dev_wave1_kpis(
     """
     d = max(1, min(days, 120))
     return await _wave1_compute_kpis(db, days=d)
+
+
+@app.get("/api/dev/pagos-mp-rechazados", tags=["admin"])
+async def get_dev_pagos_mp_rechazados(
+    user=Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pagos de Mercado Pago aprobados que no se aplicaron porque no
+    alcanzaban (COBRO-MP-1): cada uno es un cliente que pagó y no recibió
+    nada. Los últimos 200, sólo admin."""
+    from proyecto_maria.database.models import PagoMercadoPagoAplicado as _Pago
+    filas = (await db.execute(
+        select(_Pago).where(_Pago.estado == "rechazado")
+        .order_by(desc(_Pago.aplicado_en)).limit(200)
+    )).scalars().all()
+    return {"pagos": [
+        {
+            "payment_id": f.payment_id, "cuenta": f.cuenta, "tipo": f.tipo,
+            "monto": f.monto, "moneda": f.moneda, "monto_esperado": f.monto_esperado,
+            "motivo": f.motivo, "aprobado_en": f.aprobado_en,
+            "registrado_en": f.aplicado_en.isoformat() if f.aplicado_en else None,
+        } for f in filas
+    ]}
 
 
 # --- FINANCIALS & STATUS API (Quick Win) ---
@@ -8441,26 +8465,92 @@ async def payment_pending():
     """
     return HTMLResponse(content=html)
 
-async def _registrar_pago_mp(session, payment_id: str, cuenta: str, update: dict, pay_resp: dict) -> bool:
+class _SuscripcionMPIlegible(Exception):
+    """No se pudo leer la suscripción en Mercado Pago: se responde 503 y
+    Mercado Pago reintenta; el pago no queda rechazado para siempre."""
+
+
+def _monto_mp(valor) -> float | None:
+    try:
+        monto = float(valor)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return monto if math.isfinite(monto) and monto > 0 else None
+
+
+def _control_de_monto_mp(sdk, pay_resp: dict, update: dict, external_ref: str) -> tuple:
+    """(monto esperado, motivo del rechazo o None) de un pago aprobado
+    (COBRO-MP-1, D29):
+    - de una suscripción: el monto de la suscripción leída en Mercado Pago,
+      que es el del panel y no el de PLANS;
+    - de un link de pago: el precio guardado cuando se armó el link;
+    - de un link armado antes de guardar el precio: el precio de hoy.
+    """
+    meta = pay_resp.get("metadata") if isinstance(pay_resp.get("metadata"), dict) else {}
+    interaccion = pay_resp.get("point_of_interaction") if isinstance(pay_resp.get("point_of_interaction"), dict) else {}
+    datos = interaccion.get("transaction_data") if isinstance(interaccion.get("transaction_data"), dict) else {}
+    suscripcion_id = meta.get("preapproval_id") or pay_resp.get("preapproval_id") or datos.get("subscription_id")
+
+    if suscripcion_id:
+        resp = sdk.preapproval().get(str(suscripcion_id))
+        if not isinstance(resp, dict) or resp.get("status") != 200 or not isinstance(resp.get("response"), dict):
+            raise _SuscripcionMPIlegible(str(suscripcion_id))
+        suscripcion = resp["response"]
+        if suscripcion.get("external_reference") != external_ref:
+            return None, f"la suscripción {suscripcion_id} es de otra cuenta"
+        recurrente = suscripcion.get("auto_recurring") if isinstance(suscripcion.get("auto_recurring"), dict) else {}
+        esperado = _monto_mp(recurrente.get("transaction_amount"))
+        if esperado is None:
+            return None, f"la suscripción {suscripcion_id} no tiene monto"
+    else:
+        esperado = _monto_mp(meta.get("precio_esperado"))
+        if esperado is None:
+            if update.get("action") == "topup":
+                esperado = float(billing_service.TOPUP_PRICE_ARS)
+            else:
+                esperado = float(billing_service.PLANS.get(update.get("plan"), {}).get("price") or 0) or None
+            if esperado is None:
+                return None, f"el plan {update.get('plan')!r} no tiene precio"
+
+    moneda = pay_resp.get("currency_id")
+    if moneda != "ARS":
+        return esperado, f"se pagó en {moneda!r}, no en ARS"
+    pagado = _monto_mp(pay_resp.get("transaction_amount"))
+    if pagado is None or pagado + 0.005 < esperado:
+        return esperado, f"se pagaron {pay_resp.get('transaction_amount')} y el precio es {esperado:g}"
+    return esperado, None
+
+
+async def _registrar_pago_mp(session, payment_id: str, cuenta: str, update: dict, pay_resp: dict,
+                             control: tuple) -> str | None:
     """Anota el pago en mp_pagos_aplicados, en la misma transacción que el
-    cambio de la cuenta. False si ya se había aplicado: antes sólo se miraba
-    el último pago y alternando dos pagos viejos se renovaba gratis
-    (COBRO-MP-1, D8)."""
+    cambio de la cuenta. Devuelve «aplicado» o «rechazado» (según el control
+    del monto), o None si ya había llegado: antes sólo se miraba el último
+    pago y alternando dos pagos viejos se renovaba gratis (COBRO-MP-1, D8).
+    Lo que garantiza que no se aplique dos veces es la clave primaria, al
+    guardar (_guardar_pago_mp); mirar antes sólo evita el trabajo."""
     from proyecto_maria.database.models import PagoMercadoPagoAplicado
     if await session.get(PagoMercadoPagoAplicado, str(payment_id)) is not None:
-        return False
-    monto = pay_resp.get("transaction_amount")
-    try:
-        monto = float(monto) if monto is not None else None
-    except (TypeError, ValueError):
-        monto = None
+        return None
+    esperado, motivo = control
+    estado = "rechazado" if motivo else "aplicado"
     session.add(PagoMercadoPagoAplicado(
         payment_id=str(payment_id), cuenta=cuenta,
         tipo="topup" if update.get("action") == "topup" else str(update.get("plan") or ""),
-        monto=monto, moneda=str(pay_resp.get("currency_id") or "") or None,
-        aprobado_en=str(pay_resp.get("date_approved") or "") or None,
+        monto=_monto_mp(pay_resp.get("transaction_amount")),
+        moneda=str(pay_resp.get("currency_id") or "")[:10] or None,
+        aprobado_en=str(pay_resp.get("date_approved") or "")[:40] or None,
+        estado=estado, monto_esperado=esperado, motivo=(motivo or None) and motivo[:300],
     ))
-    return True
+    return estado
+
+
+async def _rechazar_pago_mp(session, payment_id: str, cuenta: str, motivo: str) -> dict:
+    """Guarda el rechazo sin tocar la cuenta. Responde 200 para que Mercado
+    Pago no reintente: el pago no va a alcanzar la próxima vez tampoco."""
+    if await _guardar_pago_mp(session):
+        logging.getLogger("mp_webhook").warning("Webhook MP: pago %s de %s RECHAZADO: %s", payment_id, cuenta, motivo)
+    return {"success": True, "skipped": f"pago rechazado: {motivo}"}
 
 
 async def _guardar_pago_mp(session) -> bool:
@@ -8637,6 +8727,11 @@ async def mercadopago_webhook(request: Request):
 
             username = update.get("username")
             org_id = update.get("org_id")
+            try:
+                control = _control_de_monto_mp(sdk, pay_resp, update, external_ref)
+            except _SuscripcionMPIlegible as e:
+                logger.warning("Webhook MP: no se pudo leer la suscripción %s del pago %s", e, payment_id)
+                raise HTTPException(status_code=503, detail="No se pudo leer la suscripción. MP reintentará.")
 
             if org_id:
                 # Pago de organización: actualizar la org, no el user
@@ -8650,9 +8745,12 @@ async def mercadopago_webhook(request: Request):
                     )
 
                 # Cada pago se aplica una sola vez (COBRO-MP-1).
-                if not await _registrar_pago_mp(session, payment_id, f"org:{org_id}", update, pay_resp):
+                estado = await _registrar_pago_mp(session, payment_id, f"org:{org_id}", update, pay_resp, control)
+                if estado is None:
                     logger.info("Webhook MP: payment_id=%s ya procesado para org %s", payment_id, org_id)
                     return {"success": True, "skipped": "payment_id ya procesado"}
+                if estado == "rechazado":
+                    return await _rechazar_pago_mp(session, payment_id, f"org:{org_id}", control[1])
                 _extender_periodo(db_org, update)
 
                 db_org.last_payment_id = payment_id
@@ -8698,9 +8796,12 @@ async def mercadopago_webhook(request: Request):
                 )
 
             # Cada pago se aplica una sola vez (COBRO-MP-1).
-            if not await _registrar_pago_mp(session, payment_id, username, update, pay_resp):
+            estado = await _registrar_pago_mp(session, payment_id, username, update, pay_resp, control)
+            if estado is None:
                 logger.info("Webhook MP: payment_id=%s ya procesado para %s", payment_id, username)
                 return {"success": True, "skipped": "payment_id ya procesado"}
+            if estado == "rechazado":
+                return await _rechazar_pago_mp(session, payment_id, username, control[1])
             _extender_periodo(db_user, update)
 
             db_user.last_payment_id = payment_id
