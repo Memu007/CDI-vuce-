@@ -114,6 +114,9 @@ Sin nombres: la fuente es «el despachante de Emi».
 
 ## Lo que falta pedirle (para que Emi lo mande)
 
+Las preguntas 1 y 2 de abajo, Emi ya se las mandó (2026-10-07). Faltan sus
+respuestas y los dos favores.
+
 > 1. Cuando hay una reducción o una exclusión del IVA adicional, ¿cómo lo
 >    cargás en el Kit? ¿Elegís una opción de una lista o cargás un número de
 >    certificado?

@@ -31,7 +31,10 @@ queda como historia) más las reglas y documentos. **Ramas de las Devs:**
    - saber que al publicar se borran los TXT generados y el historial de NCM
      que viven en el disco del servidor (pasa en cada publicación; las
      operaciones en la base quedan; DISCO-1 lo arregla);
-   - recomendado: prender «Wait for CI» y apagar la red pública de la base.
+   - recomendado: prender «Wait for CI» y apagar la red pública de la base;
+   - de paso, para más adelante (PUBLICAR-1): ver si existe la variable
+     `ADMIN_USERNAMES` con el usuario de Emi. Después de ADMIN-1, sólo los
+     usuarios de esa lista entran al admin.
    La PM le pasa el SHA exacto con la suite corrida sobre él.
 3. **Mandar las preguntas al despachante** (`PREGUNTAS-DESPACHANTE.md`).
 4. Respondido el 2026-10-07: CDI no usa Google Cloud, y Emi cargó facturas
