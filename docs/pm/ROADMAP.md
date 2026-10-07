@@ -67,9 +67,9 @@ MARIA-6 arranca cuando lleguen sus archivos reales.
 | ✅ | RENDIMIENTO-1 | Leer un PDF no frena el sitio y tiene un tiempo máximo; el lector de PDF viejo, que se cuelga con un PDF armado, se cambia por su sucesor (D3, X3) |
 | ✅ | RENDIMIENTO-1b | Un PDF armado no deja a nadie sin lectura: la adivinanza del vendedor usa sólo `pypdf`; tiempos en 0 o negativos caen al valor por defecto (D10 b de la Dev 1). Se publica junto con RENDIMIENTO-1 |
 | 1 | EXCEL-1 | Revisar la carga por Excel de punta a punta (nunca se auditó) y arreglar lo que falle; leer un Excel tampoco frena el sitio (D12 de la Dev 1) |
-| 2 | MARIA-1b | Controles antes de generar: NCM del catálogo, moneda, incoterm, CUIT, montos; ningún texto mete líneas en el TXT; al guardar la operación no se inventan cantidad 1 ni peso 0,5 (M10, D6 de la Dev 2) |
+| 2 | MARIA-1b | Controles antes de generar: NCM del catálogo, moneda, incoterm, CUIT, montos; ningún texto mete líneas en el TXT; las filas de total o de flete no pasan como productos; al guardar la operación no se inventan cantidad 1 ni peso 0,5 (M10, D6 de la Dev 2) |
 | 3 | PUNTA-A-PUNTA-1 | Prueba automática: sube un PDF y un Excel (Gemini simulado) y compara el TXT con los archivos reales |
-| 4 | EXCEL-2 | Lo que el Excel todavía no lee: encabezado fuera de la fila 1, sin columna de origen, celdas combinadas (D18 de la Dev 1) |
+| 4 | EXCEL-2 | Lo que el Excel todavía no lee: encabezado fuera de la fila 1, sin columna de origen, celdas combinadas (D18 de la Dev 1); CSV con `;`, latin-1 o BOM en el historial de NCM |
 
 **Cierre:** publicar con el «dale»; Emi prueba con facturas reales; el
 despachante carga un archivo en su Kit (cierra G4).
