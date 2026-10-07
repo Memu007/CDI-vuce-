@@ -46,12 +46,13 @@ necesita prueba: la ley, un archivo real o la respuesta del despachante
 | Orden | Pieza | Qué arregla | Prueba para el TXT |
 |---|---|---|---|
 | ✅ | MARIA-2 | Sin clave de Gemini no se inventan productos (M4) | no cambia el TXT |
-| 1 | MARIA-1a | País de origen bien leído (China salía Suiza), cantidades y precios con coma, nada inventado si falta un dato (M5) | tabla oficial de países (VUCE) e ISO 3166-1 |
-| 2 | MARIA-2b | Con Gemini caído o la clave inválida, el mismo error claro y la carga manual | no cambia el TXT |
-| 3 | MARIA-4 | Lo que decide el despachante: estado de la mercadería (seis, por producto), IVA adicional (completo en reventa; si hay reducción o exclusión, aviso de que se elige en «Ventajas» del Kit, no va en el TXT), banco y empresa de digitalización (las dos por operación; Modoc = `PSAD06`, Lakaut = `PSAD01`) (M2, M3) | respuestas 1, 2, 4 y 5, las dos cortas y el archivo real de 2026 |
-| 4 | MARIA-3 | Avisos antes de generar; gastos anteriores al FOB en EXW, FCA y FAS; procedencia en pantalla (M6, M8) | respuesta 6, Código Aduanero art. 15, nota del SIM, archivo real de 2025 |
-| 5 | MARIA-5 | Peso total por producto; cuentas exactas al centavo (M1, M9) | peso: respuesta 3 y archivo real de 2026; cuentas: la prueba en el Kit |
-| 6 | MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11) | sus archivos reales |
+| ✅ | MARIA-1a | País de origen bien leído (China salía Suiza), cantidades y precios con coma, nada inventado si falta un dato (M5) | tabla oficial de países (VUCE) e ISO 3166-1 |
+| ✅ | MARIA-2b | Con Gemini caído o la clave inválida, el mismo error claro y la carga manual | no cambia el TXT |
+| 1 | MARIA-1c | Lo que el lector encontró pero no pudo leer (flete, seguro) se avisa en vez de salir 0; la pantalla vieja no repone cantidad 1 ni origen China (D5 de la Dev 2). Se publica junto con MARIA-1a | no cambia el TXT de una factura bien leída |
+| 2 | MARIA-4 | Lo que decide el despachante: estado de la mercadería (seis, por producto), IVA adicional (completo en reventa; si hay reducción o exclusión, aviso de que se elige en «Ventajas» del Kit, no va en el TXT), banco y empresa de digitalización (las dos por operación; Modoc = `PSAD06`, Lakaut = `PSAD01`) (M2, M3) | respuestas 1, 2, 4 y 5, las dos cortas y el archivo real de 2026 |
+| 3 | MARIA-3 | Avisos antes de generar; gastos anteriores al FOB en EXW, FCA y FAS; procedencia en pantalla (M6, M8) | respuesta 6, Código Aduanero art. 15, nota del SIM, archivo real de 2025 |
+| 4 | MARIA-5 | Peso total por producto; cuentas exactas al centavo (M1, M9) | peso: respuesta 3 y archivo real de 2026; cuentas: la prueba en el Kit |
+| 5 | MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11) | sus archivos reales |
 
 MARIA-4, MARIA-3 y MARIA-5 tocan el mismo generador: van en ese orden.
 MARIA-6 arranca cuando lleguen sus archivos reales.
@@ -62,9 +63,10 @@ MARIA-6 arranca cuando lleguen sus archivos reales.
 |---|---|---|
 | ✅ | ADMIN-1 | Lo de administración, sólo para el admin (S2) |
 | ✅ | ADMIN-2 | Lo que encontró en ADMIN-1 (activar una suscripción sin pagar, configuración del sistema a la vista, dos puntos ciegos de la prueba) |
-| 1 | RENDIMIENTO-1 | Leer un PDF no frena el sitio y tiene un tiempo máximo; el lector de PDF viejo, que se cuelga con un PDF armado, se cambia por su sucesor (D3, X3) |
-| 2 | EXCEL-1 | Revisar la carga por Excel de punta a punta (nunca se auditó) y arreglar lo que falle |
-| 3 | MARIA-1b | Controles antes de generar: NCM del catálogo, moneda, incoterm, CUIT, montos; ningún texto mete líneas en el TXT (M10) |
+| ✅ | RENDIMIENTO-1 | Leer un PDF no frena el sitio y tiene un tiempo máximo; el lector de PDF viejo, que se cuelga con un PDF armado, se cambia por su sucesor (D3, X3) |
+| 1 | RENDIMIENTO-1b | Un PDF armado no deja a nadie sin lectura: la adivinanza del vendedor usa sólo `pypdf`; tiempos en 0 o negativos caen al valor por defecto (D10 b de la Dev 1). Se publica junto con RENDIMIENTO-1 |
+| 2 | EXCEL-1 | Revisar la carga por Excel de punta a punta (nunca se auditó) y arreglar lo que falle; leer un Excel tampoco frena el sitio (D12 de la Dev 1) |
+| 3 | MARIA-1b | Controles antes de generar: NCM del catálogo, moneda, incoterm, CUIT, montos; ningún texto mete líneas en el TXT; al guardar la operación no se inventan cantidad 1 ni peso 0,5 (M10, D6 de la Dev 2) |
 | 4 | PUNTA-A-PUNTA-1 | Prueba automática: sube un PDF y un Excel (Gemini simulado) y compara el TXT con los archivos reales |
 
 **Cierre:** publicar con el «dale»; Emi prueba con facturas reales; el
@@ -87,7 +89,7 @@ despachante carga un archivo en su Kit (cierra G4).
 | Pieza | Quién | Qué arregla |
 |---|---|---|
 | SESION-1 | Dev 1 | Cambiar o resetear la contraseña y cerrar sesión revocan de verdad; cambiar el email pide la contraseña (S3) |
-| ABUSO-1 | Dev 1 | Límite de intentos con la IP real; topes en registro, recuperar usuario, telemetría y sugerencias de NCM; no revelar qué emails existen (S4, S5, S6, C9, X1) |
+| ABUSO-1 | Dev 1 | Leer un PDF en un proceso aparte, con tiempo y memoria máximos, que se pueda matar (D10 a de la Dev 1); límite de intentos con la IP real; topes en registro, recuperar usuario, telemetría y sugerencias de NCM; no revelar qué emails existen (S4, S5, S6, C9, X1) |
 | AISLAMIENTO-2 | Dev 1 | La prueba de aislamiento ataca todas las funciones con datos de un estudio; la de admin también ve WebSockets y las rutas `/api/admin` y `/dev` exactas, y `roles` siempre es lista (revisión de ADMIN-2) |
 | LIMPIEZA-1 | Dev 1 | Las 10 pruebas excluidas vuelven a la CI; se borra el camino viejo a Google Cloud; fuera las cadenas que pueden tener contraseñas (X2, X4) |
 | DATOS-1 | Dev 2 | Borrar un cliente siempre funciona; la salud dice la verdad; los errores no muestran detalles internos (D2, D5, D6) |
