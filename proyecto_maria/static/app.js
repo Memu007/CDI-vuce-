@@ -3283,10 +3283,11 @@ async function generateMariaTxt() {
             const pieza = row.querySelector('[data-field="pieza"]')?.value?.trim() || '';
             const codigo_parte = row.querySelector('[data-field="codigo_parte"]')?.value?.trim() || originalItem.codigo_parte || '';
             const descripcion = row.querySelector('[data-field="descripcion"]')?.value?.trim() || '';
-            const cantidad = parseFloat(row.querySelector('[data-field="cantidad"]')?.value) || 1;
+            // Vacío queda vacío (MARIA-1c): el control de /generate_maria avisa.
+            const cantidad = parseFloat(row.querySelector('[data-field="cantidad"]')?.value) || 0;
             const valor_unitario = parseFloat(row.querySelector('[data-field="valor_unitario"]')?.value) || 0;
             const peso_unitario = parseFloat(row.querySelector('[data-field="peso_unitario"]')?.value) || 0;
-            const origen = row.querySelector('[data-field="origen"]')?.value?.trim() || 'CN';
+            const origen = row.querySelector('[data-field="origen"]')?.value?.trim() || '';
             
             items.push({
                 ncm: pieza,

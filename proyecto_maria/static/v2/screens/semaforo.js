@@ -43,6 +43,41 @@
         });
     }
 
+    // Lo que la factura traía pero no se pudo leer (MARIA-1c): se avisa hasta
+    // que la persona lo completa en la pantalla de revisión.
+    var NOMBRES_SIN_LEER = {
+        flete: 'el flete',
+        seguro: 'el seguro',
+        vendedor_pais: 'el país del vendedor'
+    };
+    function camposSinLeer() {
+        var op = (CDI.state && CDI.state.operacion) || {};
+        var campos = Array.isArray(op.campos_sin_leer) ? op.campos_sin_leer : [];
+        return campos.map(function (c) {
+            return 'No pudimos leer ' + (NOMBRES_SIN_LEER[c] || c) + ' de la factura: completalo.';
+        });
+    }
+    CDI.camposSinLeer = camposSinLeer;
+
+    function conAvisosLocales(data) {
+        var locales = camposSinLeer();
+        var warns = locales.concat(data.advertencias || []);
+        var errs = data.errores || [];
+        var tips = data.sugerencias || [];
+        return {
+            errores: errs, advertencias: warns, sugerencias: tips, resumen: data.resumen,
+            total: errs.length + warns.length + tips.length
+        };
+    }
+
+    function mostrar(data) {
+        var kind = 'ok';
+        if (data.errores.length > 0) kind = 'error';
+        else if (data.advertencias.length > 0) kind = 'warning';
+        setState(kind, data.errores.length + data.advertencias.length);
+        renderPopover(data);
+    }
+
     function hasEnoughData(items) {
         if (!items.length) return false;
         // Al menos 1 item con descripcion o pieza para que el backend valide algo util
@@ -128,9 +163,9 @@
 
         var items = itemsPayload();
         if (!hasEnoughData(items)) {
-            setState('empty', 0);
-            lastIssues = { errores: [], advertencias: [], sugerencias: [], total: 0 };
-            renderPopover(lastIssues);
+            lastIssues = conAvisosLocales({});
+            if (lastIssues.total) mostrar(lastIssues);
+            else { setState('empty', 0); renderPopover(lastIssues); }
             return;
         }
 
@@ -147,27 +182,13 @@
                 setState('empty', 0);
                 return;
             }
-            var errs = data.errores || [];
-            var warns = data.advertencias || [];
-            var tips = data.sugerencias || [];
-            lastIssues = {
-                errores: errs,
-                advertencias: warns,
-                sugerencias: tips,
-                resumen: data.resumen,
-                total: errs.length + warns.length + tips.length
-            };
-
-            var kind = 'ok';
-            if (errs.length > 0) kind = 'error';
-            else if (warns.length > 0) kind = 'warning';
-
-            var visibleCount = errs.length + warns.length;
-            setState(kind, visibleCount);
-            renderPopover(lastIssues);
+            lastIssues = conAvisosLocales(data);
+            mostrar(lastIssues);
         } catch (err) {
-            // Fallo silencioso; mantenemos el ultimo estado.
-            setState('empty', 0);
+            // Fallo silencioso; los avisos locales siguen a la vista.
+            lastIssues = conAvisosLocales({});
+            if (lastIssues.total) mostrar(lastIssues);
+            else setState('empty', 0);
         } finally {
             inFlight = false;
         }

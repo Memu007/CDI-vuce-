@@ -657,6 +657,10 @@
             value = value.trim();
         }
         op[el.name] = value;
+        // Completado a mano: deja de avisarse como «no se pudo leer» (MARIA-1c).
+        if (Array.isArray(op.campos_sin_leer) && value !== '' && value !== 0) {
+            op.campos_sin_leer = op.campos_sin_leer.filter(c => c !== el.name);
+        }
 
         // Solo este campo: actualizar hint + error
         updateFieldHint(el.name);

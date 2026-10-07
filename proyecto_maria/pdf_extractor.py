@@ -2058,6 +2058,21 @@ def _numero_factura(raw, decimal: str | None):
     return valor if math.isfinite(valor) else None
 
 
+def _campos_sin_leer(operacion: dict, decimal) -> list:
+    """Campos de la operación que la factura traía pero no se pudieron leer
+    (quedaron en 0 o vacíos). La pantalla los nombra (MARIA-1c). Un dato que
+    no estaba en la factura no se marca."""
+    sin_leer = []
+    for campo in ('flete', 'seguro'):
+        raw = operacion.get(campo)
+        if raw not in (None, '') and _numero_factura(raw, decimal) is None:
+            sin_leer.append(campo)
+    pais = str(operacion.get('vendedor_pais') or '').strip()
+    if pais and pais.upper() not in ('NA', 'N/A') and not _origen_desde_factura(pais):
+        sin_leer.append('vendedor_pais')
+    return sin_leer
+
+
 def _valores_numericos(result: dict) -> list:
     operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
     valores = [operacion.get('flete'), operacion.get('seguro')]
@@ -2285,6 +2300,7 @@ IMPORTANTE:
                         'seguro': _numero_factura(operacion.get('seguro'), decimal) or 0.0,
                         'comprador_domicilio': str(operacion.get('comprador_domicilio', '')),
                     }
+                    operacion_data['campos_sin_leer'] = _campos_sin_leer(operacion, decimal)
                     
                     # Extraer items
                     items = []
@@ -2484,6 +2500,7 @@ IMPORTANTE:
                             'seguro': _numero_factura(operacion.get('seguro'), decimal) or 0.0,
                             'comprador_domicilio': str(operacion.get('comprador_domicilio', '')),
                         }
+                        operacion_data['campos_sin_leer'] = _campos_sin_leer(operacion, decimal)
                         
                         # Extraer items
                         items = []

@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · fix: lo que no se pudo leer de la factura se avisa (MARIA-1c)
+
+- **fix(pdf):** si la factura trae un flete, un seguro o el país del vendedor que no se pudo leer, el lector lo marca (`campos_sin_leer`), la pantalla de subida lo nombra y el semáforo lo sigue mostrando («No pudimos leer el flete de la factura: completalo») hasta que se completa. La pantalla vieja ya no repone cantidad 1 ni origen China.
+
 ## 2026-10-07 · fix: Gemini caído o con clave inválida ofrece la carga manual (MARIA-2b)
 
 - **fix(pdf):** si hay clave pero la llamada a Gemini falla (clave inválida, servicio caído o respuesta ilegible), subir un PDF responde el mismo 503 con `code: lectura_automatica_no_disponible` y la pantalla ofrece «Cargar los productos a mano», en vez del engañoso «No se encontró tabla de items». Si Gemini responde sin productos, sigue el 400 de siempre. Las dos copias del lector.
