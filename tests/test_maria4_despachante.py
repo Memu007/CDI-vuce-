@@ -58,10 +58,39 @@ def test_por_defecto_estado_2_reventa_modoc_y_sin_banco():
 
 # --- Cada campo, elegido ----------------------------------------------------
 
-@pytest.mark.parametrize("estado", [1, 2, 3, 4, 5, 6, "4"])
-def test_estado_elegido_por_producto(estado):
-    txt = _gen([dict(ITEM_BASE, estado=estado)])
+@pytest.mark.parametrize("origen, estado", [("CN", 2), ("CN", 4), ("CN", 6), ("CN", "4"),
+                                            ("AR", 1), ("AR", 3), ("AR", 5)])
+def test_estado_elegido_por_producto(origen, estado):
+    txt = _gen([dict(ITEM_BASE, origen=origen, estado=estado)])
     assert _cartuso(txt) == [str(estado)]
+
+
+@pytest.mark.parametrize("origen, estado", [("CN", 1), ("CN", 3), ("CN", 5),
+                                            ("AR", 2), ("AR", 4), ("AR", 6), ("200", "2")])
+def test_estado_que_no_corresponde_al_origen_se_rechaza(origen, estado):
+    """Devolución de la PM: un estado argentino con origen extranjero, o uno
+    importado con origen argentino, no se genera."""
+    with pytest.raises(ValueError, match="no corresponde al origen"):
+        _gen([dict(ITEM_BASE, origen=origen, estado=estado)])
+
+
+def test_supuestos_leen_el_origen_como_el_generador():
+    """Devolución de la PM: con pais_origen y origen distintos, el generador
+    usa pais_origen; los supuestos también."""
+    from proyecto_maria.core.maria_generator import supuestos_declarados
+    item = dict(ITEM_BASE, pais_origen="CN", origen="AR")
+    assert _cartuso(_gen([item])) == ["2"]          # el generador lo toma como China
+    texto = " | ".join(supuestos_declarados([item])).lower()
+    assert "estado de la mercadería: en el/los ítem(s) 1" in texto
+
+
+def test_la_pantalla_vieja_muestra_los_avisos_de_generate_maria():
+    """Devolución de la PM: la v1 muestra warnings y supuestos de la respuesta."""
+    import pathlib
+    fuente = (pathlib.Path(__file__).resolve().parents[1] / "proyecto_maria" / "static" / "app.js").read_text(encoding="utf-8")
+    tramo = fuente[fuente.index("endpoint = '/generate_maria';"):]
+    tramo = tramo[:tramo.index("window.location.href = data.download_url")]
+    assert "data.supuestos" in tramo and "data.warnings" in tramo
 
 
 def test_estado_distinto_en_cada_producto():
@@ -106,7 +135,7 @@ def test_banco_y_lakaut():
 
 def test_grupo_con_estados_distintos_se_rechaza():
     items = [dict(ITEM_BASE, grupo_id=1, estado=2),
-             dict(ITEM_BASE, grupo_id=1, estado=6)]
+             dict(ITEM_BASE, grupo_id=1, estado=4)]
     with pytest.raises(ValueError, match="mismo estado"):
         _gen(items)
 
@@ -143,7 +172,7 @@ def test_archivo_real_2026_cuatro_campos_y_su_orden():
 
 def test_endpoint_pasa_los_valores_y_avisa_lo_que_falta(client, auth_override):
     cuerpo = dict(
-        operation_id="002720126", items=[dict(ITEM_BASE, estado=5)],
+        operation_id="002720126", items=[dict(ITEM_BASE, estado=6)],
         incoterm="EXW", flete=365.0, seguro=75.47, fecha_emision="22/06/2026",
         aduana_codigo="073", sbt_sufijo_valor=SUF_A,
         banco_bcra="191", empresa_digitalizacion="PSAD01", iva_adicional="IVAAD1",

@@ -63,7 +63,13 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   // Se vuelve atrás y el importado pasa a argentino: el 2 por defecto no quedó
   // guardado, así que se vuelve a pedir el estado.
   pedido = null;
-  await page.evaluate(() => { CDI.state.items[0].origen = 'AR'; CDI.goTo('validating'); });
+  // Y el que tenía «Sin uso argentino» (3) pasa a China: ese estado ya no vale.
+  await page.evaluate(() => { CDI.state.items[0].origen = 'AR'; CDI.state.items[1].origen = 'CN'; CDI.goTo('validating'); });
+  await page.waitForFunction(() => { const s = document.querySelector('.despachante-estado[data-row="1"]'); return s && s.value === '2'; }, null, { timeout: 8000 })
+    .catch(() => falla('al pasar a origen extranjero queda el estado argentino elegido antes'));
+  const opcionesAr = await page.$$eval('.despachante-estado[data-row="0"] option', o => o.map(x => x.value).filter(Boolean));
+  if (opcionesAr.join() !== '1,3,5') falla('con origen argentino se ofrecen estados importados: ' + opcionesAr.join());
+  console.log('OK al cambiar el origen el estado elegido se vuelve a pedir y sólo se ofrecen los que corresponden');
   await page.waitForFunction(() => document.querySelector('.despachante-estado[data-row="0"]') && document.querySelector('.despachante-estado[data-row="0"]').value === '', null, { timeout: 8000 })
     .catch(() => falla('al pasar a origen argentino el estado sigue en el valor por defecto'));
   await page.click('#validatingGenerate');
