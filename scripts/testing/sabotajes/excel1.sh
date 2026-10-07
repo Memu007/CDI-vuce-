@@ -60,7 +60,9 @@ sabotaje $M "leer un Excel pierde el tiempo máximo" \
   '    return 1e9' \
   "FAILED $T::test_leer_un_excel_tiene_tiempo_maximo[ncm_import_historial]"
 sabotaje $F "validar el Excel vuelve al hilo del servidor" \
-  'asyncio.to_thread(_abrir_excel, contents, file_ext),' \
+  'asyncio.get_running_loop().run_in_executor(
+                        _pool_validar_excel(), _abrir_excel, contents, file_ext
+                    ),' \
   'asyncio.sleep(0, _abrir_excel(contents, file_ext)),' \
   "FAILED $T::test_health_responde_mientras_se_valida_un_excel"
 sabotaje $M "«Valor» vuelve a ganar sobre el precio unitario" \
@@ -86,20 +88,37 @@ sabotaje $M "la unidad entre paréntesis vuelve a romper el encabezado" \
   '_normalize_header(str(h or ""))' \
   "FAILED $L::test_encabezados_con_unidades_entre_parentesis"
 sabotaje $M "el mapeo guardado vuelve a dejar afuera lo detectado" \
-  '            if canon not in cubiertos and src not in effective_mapping:' \
-  '            if False:' \
+  '        elegido = g or d' \
+  '        elegido = g' \
   "FAILED $L::test_mapeo_guardado_no_deja_afuera_encabezados_nuevos"
 sabotaje $M "lo detectado vuelve a pisar el mapeo corregido a mano" \
-  '            src: canon for src, canon in (mapping or {}).items()
-            if canon in _CANON_COLUMNS and src in presentes
-        }' \
-  '            src: canon for src, canon in (detected_mapping or {}).items()
-            if canon in _CANON_COLUMNS
-        }
-        for src, canon in (mapping or {}).items():
-            if canon in _CANON_COLUMNS and src in presentes and canon not in set(effective_mapping.values()):
-                effective_mapping[src] = canon' \
+  '            if rg is not None and rd is not None and rd < rg:' \
+  '            if rd is not None:' \
   "FAILED $L::test_mapeo_corregido_a_mano_gana_sobre_lo_detectado"
+sabotaje $M "el mapeo aprendido vuelve a pisar el precio unitario" \
+  '            if rg is not None and rd is not None and rd < rg:' \
+  '            if False:' \
+  "FAILED $L::test_mapeo_aprendido_no_pisa_el_precio_unitario_ni_el_peso_neto"
+sabotaje $F "validar el Excel vuelve a los hilos compartidos" \
+  '                        _pool_validar_excel(), _abrir_excel, contents, file_ext' \
+  '                        None, _abrir_excel, contents, file_ext' \
+  "FAILED $L::test_validar_el_excel_usa_su_propio_grupo_de_hilos"
+sabotaje $M "la fila de ejemplo de la plantilla vuelve a entrar" \
+  '            if descripcion.strip().lower() == _FILA_DE_EJEMPLO_PLANTILLA.lower():' \
+  '            if False:' \
+  "FAILED $L::test_la_fila_de_ejemplo_de_la_plantilla_no_entra"
+sabotaje $M "el catálogo vuelve a guardar dos columnas para un campo" \
+  '        if canon in vistos:' \
+  '        if False:' \
+  "FAILED $L::test_catalogo_con_dos_columnas_para_el_mismo_campo_no_se_guarda"
+sabotaje $M "dos columnas guardadas para un campo vuelven a pasar sin aviso" \
+  '        if canon in guardado_por_campo:' \
+  '        if False:' \
+  "FAILED $L::test_mapeo_viejo_con_dos_columnas_para_el_mismo_campo_avisa_y_no_da_500"
+sabotaje $M "vuelven las dos columnas con el mismo nombre (500)" \
+  '            df = df.drop(columns=[c for c in df.columns if c in rename.values() and c not in rename])' \
+  '            pass' \
+  "FAILED $L::test_columna_con_el_nombre_del_campo_y_mapeo_a_otra_no_da_500"
 sabotaje $M "vuelve a saltearse cualquier producto que empiece con «Total»" \
   '            and all(p in _PALABRAS_DE_TOTAL or p in _PALABRAS_DE_MONTO for p in palabras))' \
   '            and palabras[0] in _PALABRAS_DE_TOTAL)' \
