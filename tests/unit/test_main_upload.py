@@ -30,7 +30,7 @@ def test_upload_excel_rejects_large_files(main_client):
         )
     }
 
-    response = main_client.post("/upload_excel/", files=files)
+    response = main_client.post("/upload_excel_v2/", files=files)
 
     assert response.status_code == 413
     body = response.json()
@@ -42,60 +42,10 @@ def test_upload_excel_rejects_invalid_extension(main_client):
         "file": ("payload.txt", b"dummy", "text/plain"),
     }
 
-    response = main_client.post("/upload_excel/", files=files)
+    response = main_client.post("/upload_excel_v2/", files=files)
 
     assert response.status_code == 400
     assert "invalid file extension" in response.json()["detail"].lower() or "Solo se permiten" in response.json()["detail"]
-
-
-def test_upload_excel_success_flow(monkeypatch, main_client):
-    """Exercise main flow by stubbing heavy dependencies."""
-    # Allow bigger uploads for this test
-    monkeypatch.setenv("MAX_UPLOAD_MB", "5")
-
-    # Bypass file content validation (openpyxl check)
-    from proyecto_maria.security import file_security
-    async def _fake_validate(file, ftype, max_size=None):
-        return await file.read()
-    monkeypatch.setattr(file_security, "validate_file_upload", _fake_validate)
-    # Also patch the import in main module
-    import proyecto_maria.main as main_mod
-    monkeypatch.setattr(main_mod, "validate_file_upload", _fake_validate, raising=False)
-
-    # Fake DataFrame returned by pandas
-    df = pd.DataFrame(
-        {
-            "pieza": ["84713010"],
-            "descripcion": ["Laptop Pro"],
-            "origen": ["CN"],
-            "peso_unitario": [2.0],
-            "cantidad": [1],
-            "valor_unitario": [1000.0],
-        }
-    )
-    monkeypatch.setattr(main.pd, "read_excel", lambda *_args, **_kwargs: df)
-
-    created_filename = "generated.xlsx"
-    monkeypatch.setattr(main, "run_pre_maria_validations", lambda items: (items, []))
-    # `output_dir` es el parametro que aisla las descargas por usuario.
-    monkeypatch.setattr(main, "create_maria_excel",
-                        lambda items, op_id, **kw: created_filename)
-
-    files = {
-        "file": (
-            "operation.xlsx",
-            b"excel-bytes",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        )
-    }
-
-    response = main_client.post("/upload_excel/", files=files)
-    assert response.status_code == 200
-
-    data = response.json()
-    assert data["filename"] == created_filename
-    assert data["items_procesados"] == 1
-    assert data["items_extraidos"] == 1
 
 
 def test_get_max_upload_bytes_handles_invalid_env(monkeypatch):

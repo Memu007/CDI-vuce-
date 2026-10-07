@@ -49,7 +49,8 @@ def test_lo_que_se_leyo_llega_limpio(monkeypatch, copia):
 
 def _pedido_como_la_pantalla(op, items):
     """Arma el pedido como `finalize.js`, `buildMariaRequest` (con los valores
-    que la revisión exige: fecha, moneda, incoterm y el sufijo)."""
+    que la revisión exige: fecha, moneda, incoterm, CUIT del importador y el
+    sufijo)."""
     factura = (op.get("numero_factura") or "").strip()
     return {
         "operation_id": ("FAC_" + factura) if factura else "OP_20261007120000",
@@ -62,7 +63,8 @@ def _pedido_como_la_pantalla(op, items):
         "vendedor_nombre": op.get("vendedor_nombre", ""),
         "vendedor_id": op.get("vendedor_id", ""),
         "comprador_nombre": op.get("comprador_nombre", ""),
-        "comprador_cuit": op.get("comprador_cuit", ""),
+        # La revisión también exige el CUIT del importador (MARIA-1b, D20).
+        "comprador_cuit": op.get("comprador_cuit") or "30999999995",
         "comprador_domicilio": op.get("comprador_domicilio", ""),
         # La revisión exige la fecha (devolución de MARIA-3).
         "fecha_emision": op.get("fecha_emision") or "22/06/2026",

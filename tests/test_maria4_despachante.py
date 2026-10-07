@@ -173,6 +173,7 @@ def test_archivo_real_2026_cuatro_campos_y_su_orden():
 def test_endpoint_pasa_los_valores_y_avisa_lo_que_falta(client, auth_override):
     cuerpo = dict(
         operation_id="002720126", items=[dict(ITEM_BASE, estado=6)],
+        moneda="DOL", comprador_cuit="30999999995",  # MARIA-1b
         incoterm="EXW", flete=365.0, seguro=75.47, fecha_emision="22/06/2026",
         aduana_codigo="073", sbt_sufijo_valor=SUF_A,
         banco_bcra="191", empresa_digitalizacion="PSAD01", iva_adicional="IVAAD1",

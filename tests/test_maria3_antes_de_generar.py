@@ -32,6 +32,7 @@ from tests.test_maria_subitems import COMUN, ITEM_BASE, REFERENCIA, SUF_A, SUF_B
 def _cuerpo(**kw):
     base = dict(
         operation_id="002720126", items=[dict(ITEM_BASE, estado=2)],
+        moneda="DOL", comprador_cuit="30999999995",  # MARIA-1b
         incoterm="EXW", flete=365.0, seguro=75.47, fecha_emision="22/06/2026",
         aduana_codigo="073", sbt_sufijo_valor=SUF_A,
         banco_bcra="191", empresa_digitalizacion="PSAD01", iva_adicional="NO_VALIDA",
@@ -178,11 +179,14 @@ def test_el_archivo_real_de_2025_sale_identico_con_la_procedencia_de_la_pantalla
     """Origen 200 y procedencia 222 (Perú) cargada por operación: el archivo
     sale entero igual al real."""
     item = {k: v for k, v in GOLDEN_INPUTS["items"][0].items() if k != "pais_procedencia"}
-    cuerpo = dict(GOLDEN_INPUTS, items=[item], procedencia="PE")
+    # El CUIT anonimizado tiene mal el dígito verificador y desde MARIA-1b
+    # no deja generar: va uno válido y se cambia sólo esa línea.
+    cuerpo = dict(GOLDEN_INPUTS, items=[item], procedencia="PE", comprador_cuit="30999999995")
     r = client.post("/generate_maria", json=cuerpo)
     assert r.status_code == 200, r.text
     with open(_GOLDEN_PATH, "r", newline="") as f:
-        assert r.json()["content"] == f.read()
+        esperado = f.read().replace("NDDTIMMIOE=30999999990", "NDDTIMMIOE=30999999995")
+    assert r.json()["content"] == esperado
 
 
 # --- Fecha de emisión ------------------------------------------------------------
@@ -389,7 +393,8 @@ def test_flete_o_seguro_que_no_son_un_importe_dan_400(client, auth_override, cam
     llega al TXT por ese camino."""
     r = client.post(ruta, json=_cuerpo(incoterm="CIF", **{campo: valor}))
     assert r.status_code == 400, r.text
-    assert campo.capitalize() in r.json()["detail"]
+    # Un negativo lo frena antes el control de MARIA-1b, con la lista de errores.
+    assert campo in str(r.json()["detail"]).lower()
 
 
 @pytest.mark.parametrize("campo", ["pais_procedencia", "origen"])

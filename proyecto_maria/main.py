@@ -3330,6 +3330,23 @@ def _pool_lectura_pdf():
     return _POOL_LECTURA_PDF
 
 
+# El Excel tiene su propio grupo (EXCEL-1): varias planillas lentas no dejan
+# sin hilos a la lectura de PDF, ni al revés.
+_POOL_LECTURA_EXCEL = None
+
+
+def _pool_lectura_excel():
+    global _POOL_LECTURA_EXCEL
+    if _POOL_LECTURA_EXCEL is None:
+        from concurrent.futures import ThreadPoolExecutor
+        try:
+            hilos = max(1, int(os.getenv("EXCEL_READ_WORKERS", "2")))
+        except (TypeError, ValueError):
+            hilos = 2
+        _POOL_LECTURA_EXCEL = ThreadPoolExecutor(hilos, thread_name_prefix="lectura-excel")
+    return _POOL_LECTURA_EXCEL
+
+
 def _correr_lectura(funcion, *args):
     # Un TimeoutError del propio lector (p. ej. de una conexión) no es «el PDF
     # tardó demasiado»: se informa como cualquier otro error.
@@ -3343,7 +3360,226 @@ def _pdf_vendor_timeout_s() -> float:
     return _segundos_de_entorno("PDF_VENDOR_TIMEOUT_S", 15.0)
 
 
-async def _leer_pdf_aparte(funcion, *args, limite=None):
+def _excel_read_timeout_s() -> float:
+    return _segundos_de_entorno("EXCEL_READ_TIMEOUT_S", 60.0)
+
+
+def _respuesta_excel_demasiado_largo(e: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=504,
+        content={"detail": str(e), "code": "lectura_excel_demasiado_larga"},
+    )
+
+
+def _leer_excel_ruta(ruta: str, engine: str):
+    # dtype=object: cada celda como viene. Sin eso pandas convierte el texto
+    # «1.500» en 1,5 y la NCM 84713000 en 84713000.0 (EXCEL-1).
+    # Las filas vacías se sacan acá, en el hilo de lectura: una celda suelta en
+    # la fila 1.048.576 no obliga a recorrer un millón de filas (EXCEL-1).
+    return pd.read_excel(ruta, engine=engine, dtype=object).dropna(how="all")
+
+
+# Mirar las otras hojas es sólo un aviso, y tiene su propio presupuesto que
+# corta la lectura misma, no sólo la espera: un libro armado (miles de celdas
+# que apuntan a un texto enorme en blanco) trababa el hilo minutos aunque la
+# subida ya hubiera seguido (devolución de MARIA-1b). Se lee el XML de cada
+# hoja directo del .xlsx, contando bytes y tiempo.
+_HOJAS_MAX = 50
+_HOJAS_FILAS = 1000
+_HOJAS_COLUMNAS = 60
+_HOJAS_BYTES_POR_HOJA = 4 * 2**20
+_HOJAS_BYTES_TOTAL = 16 * 2**20
+_HOJAS_SEGUNDOS = 3.0
+
+
+class _SeAcaboElPresupuesto(Exception):
+    pass
+
+
+class _LecturaMedida:
+    """Un archivo del .xlsx que corta la lectura al pasarse de bytes o de
+    tiempo: el que lo lee (iterparse) se frena en la próxima lectura."""
+
+    def __init__(self, archivo, presupuesto: dict, tope_propio: int):
+        self._archivo = archivo
+        self._presupuesto = presupuesto
+        self._tope_propio = tope_propio
+        self._leidos = 0
+
+    def read(self, n: int = -1) -> bytes:
+        import time as _time
+        if _time.monotonic() > self._presupuesto["hasta"]:
+            raise _SeAcaboElPresupuesto("tiempo")
+        trozo = self._archivo.read(64 * 1024 if n is None or n < 0 else min(n, 64 * 1024))
+        self._leidos += len(trozo)
+        self._presupuesto["bytes"] += len(trozo)
+        if self._leidos > self._tope_propio or self._presupuesto["bytes"] > _HOJAS_BYTES_TOTAL:
+            raise _SeAcaboElPresupuesto("bytes")
+        return trozo
+
+
+def _hojas_del_xlsx(z) -> list:
+    """[(nombre, ruta dentro del zip)] de las hojas de cálculo, en el orden
+    del libro. Las hojas de gráfico no cuentan: pandas lee la primera hoja de
+    cálculo, aunque haya un gráfico antes."""
+    import posixpath
+    from xml.etree import ElementTree as ET
+    ns_main = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    ns_rel = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+    for parte in ("xl/workbook.xml", "xl/_rels/workbook.xml.rels"):
+        if z.getinfo(parte).file_size > 2**20:
+            raise _SeAcaboElPresupuesto("índice del libro")
+    destinos = {}
+    for r in ET.fromstring(z.read("xl/_rels/workbook.xml.rels")):
+        if not (r.get("Type") or "").endswith("/worksheet"):
+            continue
+        destino = r.get("Target") or ""
+        destino = destino.lstrip("/") if destino.startswith("/") else posixpath.normpath(posixpath.join("xl", destino))
+        destinos[r.get("Id")] = destino
+    hojas = []
+    for h in ET.fromstring(z.read("xl/workbook.xml")).iter(f"{ns_main}sheet"):
+        if h.get(f"{ns_rel}id") in destinos:
+            hojas.append((h.get("name") or "", destinos[h.get(f"{ns_rel}id")]))
+    return hojas
+
+
+def _textos_compartidos(z, presupuesto: dict) -> list:
+    """Por cada texto compartido del libro, si tiene algo que no sea blanco.
+    Si el presupuesto no alcanza, la lista queda corta."""
+    from xml.etree import ElementTree as ET
+    ns = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    llenos: list = []
+    if "xl/sharedStrings.xml" not in z.namelist():
+        return llenos
+    try:
+        with z.open("xl/sharedStrings.xml") as f:
+            medido = _LecturaMedida(f, presupuesto, _HOJAS_BYTES_TOTAL)
+            for _, el in ET.iterparse(medido, events=("end",)):
+                if el.tag == f"{ns}si":
+                    llenos.append(any((t.text or "").strip() for t in el.iter(f"{ns}t")))
+                    el.clear()
+    except _SeAcaboElPresupuesto:
+        pass
+    return llenos
+
+
+def _hoja_xlsx_tiene_datos(z, ruta: str, presupuesto: dict, compartidos) -> bool:
+    """Si la hoja tiene algún dato en sus primeras filas y columnas. Levanta
+    _SeAcaboElPresupuesto si no se pudo terminar de mirar."""
+    import re as _re
+    from xml.etree import ElementTree as ET
+    ns = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    with z.open(ruta) as f:
+        medido = _LecturaMedida(f, presupuesto, _HOJAS_BYTES_POR_HOJA)
+        for _, el in ET.iterparse(medido, events=("end",)):
+            if el.tag == f"{ns}row":
+                el.clear()
+                continue
+            if el.tag != f"{ns}c":
+                continue
+            m = _re.match(r"([A-Z]+)(\d+)$", el.get("r") or "")
+            if m:
+                columna = 0
+                for letra in m.group(1):
+                    columna = columna * 26 + ord(letra) - 64
+                if int(m.group(2)) > _HOJAS_FILAS:
+                    return False
+                if columna > _HOJAS_COLUMNAS:
+                    el.clear()
+                    continue
+            tipo = el.get("t")
+            formula = el.find(f"{ns}f")
+            if formula is not None and (formula.text or "").strip():
+                # Una fórmula sin valor guardado (así escribe openpyxl) es un dato.
+                lleno = True
+            elif tipo == "inlineStr":
+                lleno = any((t.text or "").strip() for t in el.iter(f"{ns}t"))
+            else:
+                v = el.find(f"{ns}v")
+                texto = (v.text or "").strip() if v is not None else ""
+                if tipo == "s" and texto:
+                    lista = compartidos()
+                    i = int(texto) if texto.isdigit() else -1
+                    if not 0 <= i < len(lista):
+                        raise _SeAcaboElPresupuesto("textos compartidos")
+                    lleno = lista[i]
+                else:
+                    lleno = bool(texto)
+            el.clear()
+            if lleno:
+                return True
+    return False
+
+
+def _otras_hojas_con_datos(ruta: str, engine: str) -> tuple[list, bool]:
+    """(nombres de las hojas, después de la primera, que tienen algún dato en
+    sus primeras 1000 filas y 60 columnas; si se pudieron mirar todas). Sólo
+    se lee la primera: las demás se avisan (MARIA-1b, D18)."""
+    import time as _time
+    presupuesto = {"hasta": _time.monotonic() + _HOJAS_SEGUNDOS, "bytes": 0}
+    nombres: list = []
+    if engine == "openpyxl":
+        import zipfile
+        with zipfile.ZipFile(ruta) as z:
+            try:
+                hojas = _hojas_del_xlsx(z)
+            except (_SeAcaboElPresupuesto, KeyError):
+                return nombres, False
+            completo = len(hojas) <= _HOJAS_MAX + 1
+            cache: list = []
+
+            def compartidos():
+                if not cache:
+                    cache.append(_textos_compartidos(z, presupuesto))
+                return cache[0]
+
+            for nombre, parte in hojas[1:_HOJAS_MAX + 1]:
+                try:
+                    if parte in z.namelist() and _hoja_xlsx_tiene_datos(z, parte, presupuesto, compartidos):
+                        nombres.append(nombre)
+                except _SeAcaboElPresupuesto:
+                    completo = False
+                    if _time.monotonic() > presupuesto["hasta"] or presupuesto["bytes"] > _HOJAS_BYTES_TOTAL:
+                        break
+        return nombres, completo
+    import xlrd
+    libro = xlrd.open_workbook(ruta, on_demand=True)
+    completo = libro.nsheets <= _HOJAS_MAX + 1
+    try:
+        for i in range(1, min(libro.nsheets, _HOJAS_MAX + 1)):
+            if _time.monotonic() > presupuesto["hasta"]:
+                return nombres, False
+            hoja = libro.sheet_by_index(i)
+            for f in range(min(hoja.nrows, _HOJAS_FILAS)):
+                if _time.monotonic() > presupuesto["hasta"]:
+                    return nombres, False
+                if any(str(v).strip() for v in hoja.row_values(f, end_colx=min(hoja.ncols, _HOJAS_COLUMNAS))):
+                    nombres.append(hoja.name)
+                    break
+    finally:
+        libro.release_resources()
+    return nombres, completo
+
+
+# Una factura no trae miles de productos: más filas que esto se rechaza con un
+# mensaje claro en vez de trabar la pantalla de revisión (EXCEL-1).
+_MAX_FILAS_EXCEL = 5000
+
+
+def _leer_tabla(content: bytes, filename: str):
+    """CSV o Excel a un DataFrame de texto (para correr en otro hilo)."""
+    import io as _io
+    if filename.endswith(".csv"):
+        try:
+            return pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False)
+        except Exception:
+            return pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False, sep=";")
+    if filename.endswith((".xlsx", ".xls")):
+        return pd.read_excel(_io.BytesIO(content), dtype=str, keep_default_na=False)
+    raise HTTPException(status_code=400, detail="Formato no soportado. Usá .csv, .xlsx o .xls")
+
+
+async def _leer_pdf_aparte(funcion, *args, limite=None, que="el PDF", pool=None):
     """Corre una lectura sincrónica de PDF en otro hilo, con tiempo máximo.
 
     Así el servidor sigue atendiendo a los demás mientras se lee un PDF
@@ -3352,14 +3588,14 @@ async def _leer_pdf_aparte(funcion, *args, limite=None):
     """
     import asyncio
     loop = asyncio.get_running_loop()
-    futuro = loop.run_in_executor(_pool_lectura_pdf(), _correr_lectura, funcion, *args)
+    futuro = loop.run_in_executor(pool or _pool_lectura_pdf(), _correr_lectura, funcion, *args)
     try:
         return await asyncio.wait_for(
             futuro, timeout=_pdf_read_timeout_s() if limite is None else limite
         )
     except TimeoutError:
         raise LecturaPdfDemasiadoLarga(
-            "Leer el PDF tardó demasiado. Probá de nuevo o cargá los productos a mano."
+            f"Leer {que} tardó demasiado. Probá de nuevo o cargá los productos a mano."
         )
 
 
@@ -3371,86 +3607,8 @@ def _get_max_upload_bytes() -> int:
     return int(max_mb * 1024 * 1024)
 
 
-@app.post("/upload_excel/")
-@limiter.limit(get_dynamic_rate_limit)
-async def upload_excel(
-    request: Request,
-    file: UploadFile = File(...),
-    user=Depends(get_current_user),
-):
-    """
-    Sube un archivo Excel y lo procesa para generar un archivo en formato AVG válido.
-    Requiere sesión activa.
-    """
-    try:
-        from proyecto_maria.security.file_security import validate_file_upload, sanitize_filename
-        max_upload_bytes = _get_max_upload_bytes()
-        contents = await validate_file_upload(file, 'excel', max_size=max_upload_bytes)
-
-        # Sanitizar nombre de archivo (OWASP A1 - Path Traversal)
-        import tempfile
-        safe_name = sanitize_filename(file.filename or 'upload.xlsx')
-        temp_fd, temp_filename = tempfile.mkstemp(suffix=os.path.splitext(safe_name)[1])
-
-        # Guardar temporalmente
-        with os.fdopen(temp_fd, "wb") as f:
-            f.write(contents)
-
-        try:
-            # Leer el Excel con pandas
-            df = pd.read_excel(temp_filename, engine='openpyxl' if temp_filename.endswith('.xlsx') else 'xlrd')
-
-            # Intentar extraer datos de diferentes formatos posibles
-            items = extract_items_from_excel(df, file.filename)
-
-            if not items:
-                raise HTTPException(status_code=400, detail="No se pudieron extraer datos válidos del archivo Excel")
-
-            # Generar operación ID basado en el nombre del archivo
-            operation_id = file.filename.replace('.xlsx', '').replace('.xls', '').replace(' ', '_')
-
-            # Validar items
-            valid_items, errors = run_pre_maria_validations(items)
-
-            if errors:
-                raise HTTPException(status_code=400, detail={"errors": errors, "items_extraidos": len(items)})
-
-            # Generar Excel en formato AVG
-            filename = create_maria_excel(
-                valid_items, operation_id,
-                output_dir=_user_downloads_dir(user["username"]),
-            )
-
-            return {
-                "message": "Archivo Excel procesado exitosamente",
-                "filename": filename,
-                "items_procesados": len(valid_items),
-                "items_extraidos": len(items)
-            }
-
-        finally:
-            # Limpiar archivo temporal
-            if os.path.exists(temp_filename):
-                os.remove(temp_filename)
-
-    except pd.errors.EmptyDataError:
-        raise HTTPException(status_code=400, detail="El archivo Excel está vacío")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error procesando archivo: {str(e)}")
 
 
-@app.post("/upload_excel/public")
-@limiter.limit(get_dynamic_rate_limit)
-async def upload_excel_public(
-    request: Request,
-    file: UploadFile = File(...),
-    user=Depends(get_current_user),
-):
-    """Alias legacy de /upload_excel/. Mantiene el path 'public' solo para
-    compatibilidad con el frontend actual, pero YA requiere auth."""
-    return await upload_excel(request, file, user)
 
 
 @app.post("/api/validate/smart")
@@ -3487,21 +3645,52 @@ async def smart_validation(body: dict, user=Depends(get_current_user)):
                     pieza=item_dict.get("pieza", ""),
                     descripcion=item_dict.get("descripcion", ""),
                     origen=item_dict.get("origen", "XX"),
-                    cantidad=float(item_dict.get("cantidad", 1)),
+                    # Sin cantidad, 0: el control la marca (nada de 1 inventado).
+                    cantidad=float(item_dict.get("cantidad") or 0),
                     valor_unitario=float(item_dict.get("valor_unitario", 0)),
                     peso_unitario=float(item_dict.get("peso_unitario", 0))
                 ))
         
         # Ejecutar validación inteligente
         resultado = run_smart_validations(items)
+
+        # Los controles de antes de generar (MARIA-1b), con la cabecera si la
+        # pantalla la manda: así el semáforo y la pantalla de generar los
+        # muestran antes de que /generate_maria los frene.
+        operacion = body.get("operacion")
+        if isinstance(operacion, dict):
+            from proyecto_maria.core.controles_maria import controles_antes_de_generar
+            errores_1b, avisos_1b = controles_antes_de_generar(items_data, operacion)
+            resultado["errores"] = [*resultado.get("errores", []), *errores_1b]
+            resultado["advertencias"] = [*resultado.get("advertencias", []), *avisos_1b]
+            if errores_1b or avisos_1b:
+                resultado["resumen"] = (
+                    f"🔍 Análisis de {len(items)} ítems: {len(resultado['errores'])} errores, "
+                    f"{len(resultado['advertencias'])} advertencias, "
+                    f"{len(resultado.get('sugerencias', []))} sugerencias."
+                )
         
-        return {
+        # Con NaN, infinito o un monto que desborda, las estadísticas dan
+        # infinito y la respuesta no se podría escribir (500): esos números
+        # van vacíos; el control de arriba ya marca el monto como error.
+        return _sin_no_finitos({
             "success": True,
             **resultado
-        }
+        })
         
     except Exception as e:
         return {"success": False, "detail": str(e)}
+
+
+def _sin_no_finitos(dato):
+    import math
+    if isinstance(dato, float) and not math.isfinite(dato):
+        return None
+    if isinstance(dato, dict):
+        return {k: _sin_no_finitos(v) for k, v in dato.items()}
+    if isinstance(dato, (list, tuple)):
+        return [_sin_no_finitos(v) for v in dato]
+    return dato
 
 def _respuesta_sin_lector(mensaje: str) -> JSONResponse:
     return JSONResponse(
@@ -3609,8 +3798,10 @@ class MariaRequest(BaseModel):
     """Request para generar archivo MARIA TXT."""
     operation_id: str
     items: list
-    moneda: str = "DOL"
-    incoterm: str = "FOB"
+    # Sin moneda ni incoterm no se inventan DOL ni FOB: el control lo marca
+    # (MARIA-1b).
+    moneda: str = ""
+    incoterm: str = ""
     cuit_agr: str = ""
     vendedor_nombre: str = ""
     vendedor_id: str = ""
@@ -3734,10 +3925,31 @@ async def generate_maria_endpoint(
     Devuelve: archivo TXT descargable
     """
     try:
+        from proyecto_maria.core.controles_maria import (
+            CAMPOS_DE_TEXTO, CAMPOS_DE_TEXTO_DEL_ITEM, controles_antes_de_generar, limpiar_texto,
+        )
+        # Ningún texto mete saltos de línea ni «=» en el TXT (MARIA-1b, M10).
+        for _campo in CAMPOS_DE_TEXTO:
+            setattr(request, _campo, limpiar_texto(getattr(request, _campo)))
+        # El TXT lleva lo mismo que se controla: moneda e incoterm en
+        # mayúsculas y sin espacios, el CUIT sin guiones (MARIA-1b).
+        request.moneda = (request.moneda or "").strip().upper()
+        request.incoterm = (request.incoterm or "").strip().upper()
+        request.comprador_cuit = "".join((request.comprador_cuit or "").replace("-", "").split())
+        request.items = [
+            {k: (limpiar_texto(v) if k in CAMPOS_DE_TEXTO_DEL_ITEM else v) for k, v in it.items()}
+            if isinstance(it, dict) else it
+            for it in (request.items or [])
+        ]
+        # NCM en el nomenclador, moneda, incoterm, CUIT del importador y
+        # montos de la cabecera: lo que impide un TXT válido no deja generar
+        # (MARIA-1b). Se juntan con los demás errores para mostrarlos todos.
+        errores_1b, avisos_1b = controles_antes_de_generar(request.items, request.model_dump())
+
         # Validar items (validación mínima)
         valid, errors = validate_items_for_maria(request.items)
         if not valid:
-            raise HTTPException(status_code=400, detail={"errors": errors})
+            raise HTTPException(status_code=400, detail={"errors": list(dict.fromkeys([*errors, *errores_1b]))})
 
         # Procedencia de la operación y gastos de la pantalla (MARIA-3)
         items = _items_con_procedencia(request)
@@ -3778,13 +3990,20 @@ async def generate_maria_endpoint(
                     status_code=400,
                     detail="El sufijo de valor SBT no puede superar los 120 caracteres.",
                 )
-            if any(ord(c) < 32 for c in _suf):
+            # Ni «=» ni controles (\x7f incluido): partirían o inventarían una
+            # línea del TXT. El sufijo es un código: no se corrige, se rechaza.
+            if "=" in _suf:
+                raise HTTPException(
+                    status_code=400,
+                    detail="El sufijo de valor SBT no puede contener «=»: va sólo el código, sin «CSBTSVL=».",
+                )
+            if any(ord(c) < 32 or 0x7f <= ord(c) <= 0x9f or c in "\u2028\u2029" for c in _suf):
                 raise HTTPException(
                     status_code=400,
                     detail="El sufijo de valor SBT no puede contener saltos de línea ni caracteres de control.",
                 )
-        if kit_errors:
-            raise HTTPException(status_code=400, detail={"errors": [*errors, *kit_errors]})
+        if kit_errors or errores_1b:
+            raise HTTPException(status_code=400, detail={"errors": list(dict.fromkeys([*errors, *kit_errors, *errores_1b]))})
 
         # Si el user tiene CUIT en su perfil y la request no manda cuit_agr,
         # usamos el del perfil (para que el despachante no tenga que re-escribir
@@ -3854,7 +4073,7 @@ async def generate_maria_endpoint(
             "filename": filename,
             "download_url": f"/download/{filename}",
             "content": txt_content,  # También devolver contenido para preview
-            "warnings": kit_warnings + supuestos,
+            "warnings": kit_warnings + avisos_1b + supuestos,
             "supuestos": supuestos,
         }
 
@@ -3901,9 +4120,27 @@ async def generate_maria_export_endpoint(
             generate_maria_export_txt,
             validate_items_for_export,
         )
-        
-        # Validar items
+        from proyecto_maria.core.controles_maria import CAMPOS_DE_TEXTO_DEL_ITEM, limpiar_texto
+
+        # Ningún texto mete saltos de línea ni «=» en el TXT, como en
+        # /generate_maria (M10; D22 de MARIA-1b).
+        for _campo, _valor in request.model_dump().items():
+            if isinstance(_valor, str):
+                setattr(request, _campo, limpiar_texto(_valor))
+        request.items = [
+            {k: (limpiar_texto(v) if k in CAMPOS_DE_TEXTO_DEL_ITEM else v) for k, v in it.items()}
+            if isinstance(it, dict) else it
+            for it in (request.items or [])
+        ]
+
+        # Validar items. NaN, infinito o montos que desbordan no llegan al TXT
+        # (revisión de la devolución de MARIA-1b).
+        from proyecto_maria.core.controles_maria import montos_fuera_de_rango
         valid, errors = validate_items_for_export(request.items)
+        _montos = montos_fuera_de_rango(request.items, {"flete": request.flete, "seguro": request.seguro})
+        if _montos:
+            errors = list(dict.fromkeys([*errors, *_montos]))
+            valid = False
         
         # Validar país de destino
         if request.comprador_pais and not pais_reconocido(request.comprador_pais):
@@ -3959,7 +4196,47 @@ async def generate_maria_export_endpoint(
         print(f"Error generando MARIA EXPORT TXT: {e}")
         raise HTTPException(status_code=500, detail=f"Error generando archivo MARIA export: {str(e)}")
 
-def extract_items_from_excel(df: pd.DataFrame, filename: str) -> list[Item]:
+# Una fila de total dice sólo eso: una palabra de total («TOTAL», «Subtotal»,
+# «Totale», «Summe», «Gesamt», «合计») y, como mucho, palabras de monto,
+# moneda o incoterm y números: «TOTAL USD», «Total FOB», «TOTAL (USD)»,
+# «TOTAL AMOUNT», «Subtotal 8471.30.00». Un producto que empieza con «Total»
+# («TOTAL QUARTZ 9000», «Total Station») sigue de largo (EXCEL-1). Se parte
+# en palabras y no con una expresión regular: un texto armado no la traba.
+_PALABRAS_DE_TOTAL = {
+    "total", "totales", "totale", "subtotal", "subtotales", "grandtotal",
+    "summe", "gesamt", "gesamtbetrag", "gesamtsumme",
+    "合计", "合計", "总计", "總計", "小计", "小計",
+}
+_PALABRAS_DE_MONTO = {
+    "sub", "grand", "general", "amount", "value", "valor", "importe", "monto",
+    "sum", "invoice", "factura", "price", "precio",
+    "fob", "cif", "cfr", "cpt", "cip", "exw", "fca", "fas", "dap", "dpu", "ddp",
+    "usd", "us$", "u$s", "eur", "cny", "rmb", "ars", "$", "€", "¥",
+    "de", "del", "la", "el", "the", "of", "in", "en",
+}
+
+
+def _es_fila_de_total(texto: str) -> bool:
+    palabras = [p for p in re.split(r"[\s\d.,:;/()\[\]\-]+", (texto or "").lower()) if p]
+    return (any(p in _PALABRAS_DE_TOTAL for p in palabras)
+            and all(p in _PALABRAS_DE_TOTAL or p in _PALABRAS_DE_MONTO for p in palabras))
+
+
+# Renglones de la factura que no son mercadería: flete, seguro, condiciones de
+# pago, gastos. Sin NCM ni origen no entran como producto (sumarían al FOB) y
+# se cuentan en el aviso de filas sin leer (EXCEL-1).
+_FILA_QUE_NO_ES_MERCADERIA_RE = re.compile(
+    r"^\s*(?:freight|flete|insurance|seguro|payment|pago|bank\s+charges?|gastos"
+    r"|handling|shipping\s+(?:cost|charges?)|incoterm|delivery\s+terms?)\b",
+    re.IGNORECASE,
+)
+
+
+# La fila de ejemplo de la plantilla en blanco no es un producto (EXCEL-1).
+_FILA_DE_EJEMPLO_PLANTILLA = "Laptop 14 pulgadas modelo X"
+
+
+def extract_items_from_excel(df: pd.DataFrame, filename: str, descartes: list | None = None) -> list[Item]:
     """
     Extrae items de un DataFrame de Excel intentando diferentes formatos.
     """
@@ -3988,61 +4265,116 @@ def extract_items_from_excel(df: pd.DataFrame, filename: str) -> list[Item]:
     ]
 
     for mapping in possible_mappings:
-        items = try_extract_with_mapping(df, mapping)
+        de_este = []
+        items = try_extract_with_mapping(df, mapping, de_este)
         if items:
+            if descartes is not None:
+                descartes.extend(de_este)
             print(f"✅ Extraídos {len(items)} items usando mapeo: {list(mapping.keys())}")
             break
 
     return items
 
-def try_extract_with_mapping(df: pd.DataFrame, mapping: dict) -> list[Item]:
+def _texto_de_celda(valor) -> str:
+    """Texto de una celda: vacío si no hay nada, y un número entero sin «.0»
+    (con una fila vacía en el medio pandas lee la NCM 84713000 como 84713000.0)."""
+    if valor is None or not pd.notna(valor):
+        return ""
+    if isinstance(valor, float) and valor.is_integer():
+        return str(int(valor))
+    return str(valor).strip()
+
+
+def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | None = None) -> list[Item]:
     """
     Intenta extraer items usando un mapeo específico de columnas.
+
+    Las filas con datos que no se pudieron leer se anotan en `descartes` (su
+    número de fila en la planilla) para avisarle al usuario; las filas vacías y
+    las de total o subtotal no cuentan (EXCEL-1).
     """
     items = []
+    if descartes is None:
+        descartes = []
 
+    from proyecto_maria.pdf_extractor import (
+        _decimal_de_la_factura,
+        _numero_factura,
+        _origen_desde_factura,
+    )
+
+    # Buscar columnas que coincidan con el mapeo. Sin las obligatorias, este
+    # mapeo no sirve y se prueba otro. El peso no es obligatorio (EXCEL-1).
+    pieza_col = find_column(df.columns, mapping['pieza'])
+    desc_col = find_column(df.columns, mapping['descripcion'])
+    origen_col = find_column(df.columns, mapping['origen'])
+    peso_col = find_column(df.columns, mapping['peso_unitario'])
+    cant_col = find_column(df.columns, mapping['cantidad'])
+    valor_col = find_column(df.columns, mapping['valor_unitario'])
+    if not all([pieza_col, desc_col, origen_col, cant_col, valor_col]):
+        return items
+
+    # Separador decimal de la planilla, mirando los números escritos como
+    # texto (la regla de MARIA-1a): «1.500» con miles, «1,5» con coma.
+    decimal = _decimal_de_la_factura([
+        v for col in (cant_col, valor_col, peso_col) if col
+        for v in df[col].tolist() if isinstance(v, str)
+    ])
+
+    # (número de fila, ¿trae NCM u origen?, ítem)
+    candidatos = []
     for _, row in df.iterrows():
         try:
-            # Buscar columnas que coincidan con el mapeo
-            pieza_col = find_column(df.columns, mapping['pieza'])
-            desc_col = find_column(df.columns, mapping['descripcion'])
-            origen_col = find_column(df.columns, mapping['origen'])
-            peso_col = find_column(df.columns, mapping['peso_unitario'])
-            cant_col = find_column(df.columns, mapping['cantidad'])
-            valor_col = find_column(df.columns, mapping['valor_unitario'])
+            if all((not pd.notna(v)) or str(v).strip() == "" for v in row.values):
+                continue  # fila vacía
 
-            # Si no encuentra todas las columnas obligatorias, continuar con otro mapeo
-            if not all([pieza_col, desc_col, origen_col, peso_col, cant_col, valor_col]):
+            pieza = _texto_de_celda(row[pieza_col])
+            descripcion = _texto_de_celda(row[desc_col])
+
+            if _es_fila_de_total(descripcion or pieza):
+                continue  # fila de total o subtotal: no es un ítem
+            if descripcion.strip().lower() == _FILA_DE_EJEMPLO_PLANTILLA.lower():
+                continue  # la fila de ejemplo de la plantilla
+
+            # Sin descripción ni NCM no hay ítem que mostrar: se avisa.
+            if not pieza and not descripcion:
+                descartes.append(_ + 2)
                 continue
 
-            # Extraer valores
-            pieza = str(row[pieza_col]).strip() if pd.notna(row[pieza_col]) else ""
-            descripcion = str(row[desc_col]).strip() if pd.notna(row[desc_col]) else ""
-            origen = str(row[origen_col]).strip() if pd.notna(row[origen_col]) else ""
+            def _numero(col):
+                return (_numero_factura(row[col], decimal) or 0.0) if col else 0.0
 
-            try:
-                peso_unitario = float(row[peso_col]) if pd.notna(row[peso_col]) else 0
-                cantidad = float(row[cant_col]) if pd.notna(row[cant_col]) else 0
-                valor_unitario = float(row[valor_col]) if pd.notna(row[valor_col]) else 0
-            except (ValueError, TypeError):
-                continue  # Saltar fila si no puede convertir números
+            cantidad, valor_unitario = _numero(cant_col), _numero(valor_col)
+            # Sin descripción y sin cantidad ni precio, no hay ítem: se avisa.
+            if not descripcion and not cantidad and not valor_unitario:
+                descartes.append(_ + 2)
+                continue
 
-            # Solo agregar si tiene datos básicos. El peso puede venir en 0
-            # para que el autofill del catálogo del cliente lo complete después.
-            if pieza and descripcion and origen and cantidad > 0 and valor_unitario > 0:
-                item = Item(
-                    pieza=pieza,
-                    descripcion=descripcion,
-                    origen=origen,
-                    peso_unitario=peso_unitario,
-                    cantidad=cantidad,
-                    valor_unitario=valor_unitario
-                )
-                items.append(item)
+            # Lo que falta o no se puede leer queda vacío (0 o ""), nunca
+            # inventado; el semáforo de la revisión lo marca (MARIA-1a, EXCEL-1).
+            candidatos.append((_ + 2, bool(pieza or _texto_de_celda(row[origen_col])), Item(
+                pieza=pieza,
+                descripcion=descripcion,
+                origen=_origen_desde_factura(row[origen_col]) or "XX",
+                peso_unitario=_numero(peso_col),
+                cantidad=cantidad,
+                valor_unitario=valor_unitario,
+            )))
 
         except Exception as e:
             print(f"⚠️  Error procesando fila: {e}")
+            descartes.append(_ + 2)
             continue
+
+    # Flete, seguro o condiciones de pago sin NCM ni origen no son mercadería:
+    # no entran (sumarían al FOB) y se avisan. Cualquier otra fila sin NCM ni
+    # origen sí entra, con lo que falta vacío (EXCEL-1).
+    for fila, trae, item in candidatos:
+        if not trae and _FILA_QUE_NO_ES_MERCADERIA_RE.match(item.descripcion or ""):
+            descartes.append(fila)
+        else:
+            items.append(item)
+    descartes.sort()
 
     return items
 
@@ -4639,17 +4971,22 @@ _ITEM_COL_ALIASES = {
     ],
     "origen": [
         "origen", "pais", "país", "country", "procedencia", "paisorigen", "paísorigen",
+        "paisdeorigen", "countryoforigin", "origin", "madein",
     ],
     "cantidad": [
         "cantidad", "qty", "quantity", "cant", "unidades", "piezas", "bultos",
     ],
+    # Primero los nombres de precio por unidad: «Valor» suele ser el total
+    # de la fila y sólo se usa si no hay otro (EXCEL-1).
     "valor_unitario": [
-        "valorunitario", "valor", "precio", "price", "unitprice", "preciounitario",
-        "valorunit", "preciounit", "unitvalue", "costounitario",
+        "valorunitario", "preciounitario", "unitprice", "valorunit", "preciounit",
+        "unitvalue", "costounitario", "precio", "price", "valor",
     ],
+    # El peso bruto o total no es el peso neto por unidad: sin una de estas
+    # columnas, el peso queda vacío y el TXT pide completarlo (EXCEL-1).
     "peso_unitario": [
-        "pesounitario", "peso", "weight", "pesounit", "unitweight", "pesototal",
-        "pesobruto", "pesoneto",
+        "pesounitario", "pesoneto", "pesounit", "unitweight", "netweight",
+        "peso", "weight",
     ],
 }
 
@@ -4672,7 +5009,20 @@ def _detect_item_columns(headers: list) -> dict:
     El formato es {source: canon} para ser compatible con `Client.column_mapping`
     y con `upload_excel_v2`.
     """
-    norm_to_orig = {_normalize_header(h): h for h in headers}
+    # «Precio Unitario (USD)» o «Peso Neto (kg)»: la unidad entre paréntesis
+    # no es parte del nombre de la columna (EXCEL-1). Pero si sin paréntesis
+    # dos columnas se llaman igual («Peso (neto)» y «Peso (bruto)»), se las
+    # busca por el nombre entero y nunca se elige una por el orden.
+    norm_to_orig: dict = {}
+    sin_parentesis: dict = {}
+    for h in headers:
+        norm_to_orig.setdefault(_normalize_header(str(h or "")), h)
+        # «Peso (neto)» se busca también como «pesoneto».
+        norm_to_orig.setdefault(_normalize_header(re.sub(r"[()]", "", str(h or ""))), h)
+        sin_parentesis.setdefault(_normalize_header(re.sub(r"\(.*?\)", "", str(h or ""))), []).append(h)
+    for norm, originales in sin_parentesis.items():
+        if len(originales) == 1:
+            norm_to_orig.setdefault(norm, originales[0])
     mapping: dict[str, str] = {}
     for canon, aliases in _ITEM_COL_ALIASES.items():
         for alias in aliases:
@@ -4680,6 +5030,56 @@ def _detect_item_columns(headers: list) -> dict:
                 mapping[norm_to_orig[alias]] = canon
                 break
     return mapping
+
+
+def _rango_de_alias(encabezado, canon: str):
+    """Lugar del encabezado en la lista de nombres conocidos de ese campo
+    (0 es el mejor), o None si no es un nombre conocido."""
+    texto = str(encabezado or "")
+    alias = _ITEM_COL_ALIASES.get(canon, [])
+    for forma in (texto, re.sub(r"[()]", "", texto), re.sub(r"\(.*?\)", "", texto)):
+        norm = _normalize_header(forma)
+        if norm in alias:
+            return alias.index(norm)
+    return None
+
+
+def _mapeo_efectivo(guardado: dict, detectado: dict, columnas: list) -> tuple:
+    """({columna: campo}, avisos) para leer este archivo, un campo por columna.
+
+    El mapeo guardado del cliente manda, salvo cuando su columna es un nombre
+    conocido de menor prioridad que la que se reconoció en el archivo: eso es
+    un mapeo aprendido con la lista vieja («Valor», «Peso»), no una corrección
+    («Precio Unit. USD», «Glosa»), y no pisa «Precio Unitario» ni «Peso Neto».
+    Dos columnas guardadas para el mismo campo no se adivinan por el orden:
+    queda la primera y se avisa (EXCEL-1).
+    """
+    presentes = set(columnas)
+    avisos: list = []
+    guardado_por_campo: dict = {}
+    for src, canon in (guardado or {}).items():
+        if canon not in _CANON_COLUMNS or src not in presentes:
+            continue
+        if canon in guardado_por_campo:
+            avisos.append(
+                f"El catálogo del cliente tiene dos columnas para «{canon}» "
+                f"(«{guardado_por_campo[canon]}» y «{src}»): se usó «{guardado_por_campo[canon]}». "
+                "Revisalo en el catálogo."
+            )
+            continue
+        guardado_por_campo[canon] = src
+    detectado_por_campo = {canon: src for src, canon in (detectado or {}).items()}
+    efectivo: dict = {}
+    for canon in _CANON_COLUMNS:
+        g, d = guardado_por_campo.get(canon), detectado_por_campo.get(canon)
+        elegido = g or d
+        if g and d and g != d:
+            rg, rd = _rango_de_alias(g, canon), _rango_de_alias(d, canon)
+            if rg is not None and rd is not None and rd < rg:
+                elegido = d
+        if elegido and elegido not in efectivo:
+            efectivo[elegido] = canon
+    return efectivo, avisos
 
 
 def _merge_column_mapping(existing: dict, detected: dict) -> dict:
@@ -4698,157 +5098,6 @@ def _merge_column_mapping(existing: dict, detected: dict) -> dict:
     return merged
 
 
-@app.post("/api/clientes/import")
-async def import_clientes(
-    request: Request,
-    file: UploadFile = File(...),
-    user=Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-):
-    """Importa clientes (y opcionalmente productos+NCM) desde CSV/Excel.
-
-    Detecta automáticamente formato común o de PreMaría por nombres de columnas.
-    Salta duplicados por CUIT (mismo owner). Si vienen columnas `descripcion`+`ncm`,
-    alimenta el autocatálogo del cliente.
-    """
-    import io as _io
-    from proyecto_maria.services.client_memory import upsert_client_product_history
-
-    username = user["username"]
-    filename = (file.filename or "").lower()
-
-    # Validar archivo: magic bytes + tamaño + contenido
-    from proyecto_maria.security.file_security import validate_file_upload
-    file_type = 'csv' if filename.endswith('.csv') else 'excel'
-    try:
-        content = await validate_file_upload(file, file_type, max_size=10 * 1024 * 1024)
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo: {str(e)[:120]}")
-
-    try:
-        if filename.endswith(".csv"):
-            try:
-                df = pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False)
-            except Exception:
-                df = pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False, sep=";")
-        elif filename.endswith((".xlsx", ".xls")):
-            df = pd.read_excel(_io.BytesIO(content), dtype=str, keep_default_na=False)
-        else:
-            raise HTTPException(status_code=400, detail="Formato no soportado. Usá .csv, .xlsx o .xls")
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo: {str(e)[:120]}")
-
-    if df.empty:
-        raise HTTPException(status_code=400, detail="El archivo está vacío")
-
-    # Detectar columnas
-    cols = _detect_columns(list(df.columns))
-    if "nombre" not in cols and "cuit" not in cols:
-        raise HTTPException(
-            status_code=400,
-            detail="No se detectaron columnas reconocibles. Necesitamos al menos 'nombre' o 'cuit'.",
-        )
-
-    # Buscar clientes existentes del usuario por CUIT para evitar duplicados
-    existing_cuits = set()
-    existing_by_cuit: dict[str, ClientModel] = {}
-    res = await db.execute(
-        sa_select(ClientModel).where(
-            ClientModel.owner_username == username,
-            ClientModel.is_active == True,  # noqa: E712
-        )
-    )
-    for c in res.scalars().all():
-        if c.cuit:
-            cuit_clean = re.sub(r"\D", "", c.cuit)
-            if cuit_clean:
-                existing_cuits.add(cuit_clean)
-                existing_by_cuit[cuit_clean] = c
-
-    creados = 0
-    duplicados = 0
-    errores: list[dict] = []
-    productos_aprendidos = 0
-
-    # Procesar filas
-    for idx, row in df.iterrows():
-        try:
-            nombre = str(row.get(cols.get("nombre", ""), "") or "").strip()[:200]
-            cuit_raw = str(row.get(cols.get("cuit", ""), "") or "").strip()
-            cuit_clean = re.sub(r"\D", "", cuit_raw)[:11] if cuit_raw else ""
-            direccion = str(row.get(cols.get("direccion", ""), "") or "").strip()
-            email = str(row.get(cols.get("email", ""), "") or "").strip()[:100]
-            telefono = str(row.get(cols.get("telefono", ""), "") or "").strip()[:50]
-
-            # Sin nombre y sin CUIT, saltar
-            if not nombre and not cuit_clean:
-                continue
-            if not nombre:
-                nombre = f"Cliente {cuit_clean}"
-
-            # Duplicado por CUIT
-            if cuit_clean and cuit_clean in existing_cuits:
-                duplicados += 1
-                target_client = existing_by_cuit.get(cuit_clean)
-            else:
-                # Crear cliente
-                target_client = ClientModel(
-                    id=str(uuid.uuid4()),
-                    owner_username=username,
-                    name=nombre,
-                    email=email or None,
-                    phone=telefono or None,
-                    cuit=cuit_clean or None,
-                    address=direccion or None,
-                    is_active=True,
-                )
-                db.add(target_client)
-                await db.flush()
-                if cuit_clean:
-                    existing_cuits.add(cuit_clean)
-                    existing_by_cuit[cuit_clean] = target_client
-                creados += 1
-
-            # Si hay producto + NCM, alimentar autocatálogo del cliente
-            if "descripcion" in cols and "ncm" in cols and target_client:
-                desc = str(row.get(cols["descripcion"], "") or "").strip()
-                ncm = str(row.get(cols["ncm"], "") or "").strip()
-                # Limpiar puntos del NCM (8471.30 -> 847130)
-                ncm = re.sub(r"\D", "", ncm)
-                if desc and ncm and len(ncm) >= 6:
-                    res_h = await upsert_client_product_history(
-                        db,
-                        owner_username=username,
-                        client_id=target_client.id,
-                        ncm=ncm,
-                        descripcion=desc,
-                    )
-                    if res_h:
-                        productos_aprendidos += 1
-
-        except Exception as exc:
-            errores.append({"fila": int(idx) + 2, "error": str(exc)[:120]})
-
-    try:
-        await db.commit()
-    except Exception as exc:
-        await db.rollback()
-        logging.exception("import_clientes commit failed")
-        raise HTTPException(status_code=500, detail=f"No se pudo guardar la importación: {str(exc)[:120]}")
-
-    return {
-        "success": True,
-        "creados": creados,
-        "duplicados": duplicados,
-        "productos_aprendidos": productos_aprendidos,
-        "errores": errores,
-        "columnas_detectadas": cols,
-        "total_filas": int(len(df)),
-    }
 
 
 # === MIGRACION ASISTIDA DE CLIENTES ===
@@ -4921,12 +5170,21 @@ async def analyze_client_migration(
     existing_clients = existing_result.scalars().all()
     mapper = GeminiMigrationHeaderMapper(username=user["username"])
     try:
-        preview = await analyze_migration_file_async(
-            content,
-            filename,
-            existing_clients=existing_clients,
-            header_mapper=mapper,
+        # Con tiempo máximo, como leer un PDF (EXCEL-1).
+        import asyncio
+        preview = await asyncio.wait_for(
+            analyze_migration_file_async(
+                content,
+                filename,
+                existing_clients=existing_clients,
+                header_mapper=mapper,
+            ),
+            timeout=_excel_read_timeout_s(),
         )
+    except TimeoutError:
+        return _respuesta_excel_demasiado_largo(LecturaPdfDemasiadoLarga(
+            "Leer el archivo tardó demasiado. Probá de nuevo o con un archivo más chico."
+        ))
     except MigrationInputError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -5675,10 +5933,12 @@ async def save_client_operation(
                     operation_id=operation.id,
                     pieza=str(item.get("pieza") or item.get("ncm") or "")[:20],
                     descripcion=str(item.get("descripcion") or ""),
-                    origen=str(item.get("origen") or "XX")[:3],
-                    cantidad=float(item.get("cantidad") or 1),
+                    # Lo que falta queda vacío (0 o ""): nada de cantidad 1,
+                    # peso 0,5 ni origen «XX» inventados (MARIA-1b, D6 Dev 2).
+                    origen=str(item.get("origen") or "")[:3],
+                    cantidad=float(item.get("cantidad") or 0),
                     valor_unitario=float(item.get("valor_unitario") or 0),
-                    peso_unitario=float(item.get("peso_unitario") or 0.5),
+                    peso_unitario=float(item.get("peso_unitario") or 0),
                     grupo_id=item.get("grupo_id"),
                     unidad=str(item.get("unidad") or "")[:10] or None,
                 )
@@ -6105,6 +6365,15 @@ async def set_client_catalogo_columnas(
     client = await _get_owned_client(db, client_id, user["username"])
     raw = body.get("columnas") if isinstance(body, dict) else None
     clean = _sanitize_column_mapping(raw or {})
+    # Dos columnas para el mismo campo no se guardan (EXCEL-1).
+    vistos: dict = {}
+    for src, canon in clean.items():
+        if canon in vistos:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Dos columnas para «{canon}»: «{vistos[canon]}» y «{src}». Dejá una sola.",
+            )
+        vistos[canon] = src
     client.column_mapping = clean or None
     await db.commit()
     await db.refresh(client)
@@ -6305,7 +6574,7 @@ async def download_client_template(
     # Fila de ejemplo para guiar al cliente
     sample_row = {
         headers[0]: "84713000",
-        headers[1]: "Laptop 14 pulgadas modelo X",
+        headers[1]: _FILA_DE_EJEMPLO_PLANTILLA,
         headers[2]: "CN",
         headers[3]: 10,
         headers[4]: 350.0,
@@ -6399,24 +6668,53 @@ async def upload_excel_v2(
         with os.fdopen(temp_fd, "wb") as f:
             f.write(contents)
 
-        engine = "openpyxl" if temp_filename.endswith(".xlsx") else "xlrd"
-        df = pd.read_excel(temp_filename, engine=engine)
+        engine = "openpyxl" if temp_filename.lower().endswith(".xlsx") else "xlrd"
+        # En otro hilo y con tiempo máximo: no frena al resto (EXCEL-1).
+        df = await _leer_pdf_aparte(
+            _leer_excel_ruta, temp_filename, engine,
+            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
+        )
+
+        # Mirar las otras hojas es sólo un aviso: si no alcanza su presupuesto
+        # o falla, la subida sigue y el semáforo dice que no se revisaron
+        # todas (MARIA-1b y su devolución).
+        try:
+            otras_hojas, hojas_revisadas = await _leer_pdf_aparte(
+                _otras_hojas_con_datos, temp_filename, engine,
+                limite=min(10.0, _excel_read_timeout_s()), que="el Excel", pool=_pool_lectura_excel(),
+            )
+        except Exception as e:
+            logging.warning("upload_excel_v2: no se pudieron mirar las otras hojas: %s", e)
+            otras_hojas, hojas_revisadas = [], False
+
+        if len(df) > _MAX_FILAS_EXCEL:
+            raise HTTPException(
+                status_code=400,
+                detail=(f"La planilla tiene {len(df)} filas con datos y el máximo es "
+                        f"{_MAX_FILAS_EXCEL}. Dejá sólo los productos de la factura."),
+            )
 
         # Detectar columnas del Excel (independientemente de si el cliente ya tiene mapping)
         detected_mapping = _detect_item_columns(list(df.columns))
 
         # Aplicar mapping renombrando columnas a canonicas antes de extraer
-        effective_mapping: dict = {}
-        if mapping:
-            effective_mapping = {src: canon for src, canon in mapping.items() if canon in _CANON_COLUMNS}
-        elif detected_mapping:
-            effective_mapping = detected_mapping
+        effective_mapping, avisos_mapeo = _mapeo_efectivo(
+            mapping or {}, detected_mapping or {}, list(df.columns)
+        )
 
         if effective_mapping:
             rename = {src: canon for src, canon in effective_mapping.items() if canon in _CANON_COLUMNS}
+            # Si el archivo ya traía una columna con el nombre del campo y el
+            # mapeo eligió otra, esa sale antes de renombrar: no quedan dos
+            # columnas con el mismo nombre (daba 500) (EXCEL-1).
+            df = df.drop(columns=[c for c in df.columns if c in rename.values() and c not in rename])
             df = df.rename(columns=rename)
 
-        items = extract_items_from_excel(df, file.filename)
+        descartes: list = []
+        items = await _leer_pdf_aparte(
+            extract_items_from_excel, df, file.filename, descartes,
+            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
+        )
         if not items:
             raise HTTPException(
                 status_code=400,
@@ -6449,8 +6747,10 @@ async def upload_excel_v2(
             {
                 "pieza": str(getattr(it, "pieza", "") or ""),
                 "descripcion": str(getattr(it, "descripcion", "") or ""),
-                "origen": str(getattr(it, "origen", "XX") or "XX"),
-                "cantidad": float(getattr(it, "cantidad", 1) or 1),
+                # Origen sin reconocer o cantidad faltante quedan vacíos:
+                # nada de «XX» ni de cantidad 1 (EXCEL-1, criterio MARIA-1a).
+                "origen": "" if str(getattr(it, "origen", "") or "") in ("", "XX") else str(it.origen),
+                "cantidad": float(getattr(it, "cantidad", 0) or 0),
                 "valor_unitario": float(getattr(it, "valor_unitario", 0) or 0),
                 "peso_unitario": float(getattr(it, "peso_unitario", 0) or 0),
                 "codigo_parte": str(getattr(it, "codigo_parte", "") or ""),
@@ -6472,15 +6772,32 @@ async def upload_excel_v2(
             except HTTPException:
                 operacion = {}
 
+        # Lo que no se leyó del libro queda en la operación: el semáforo lo
+        # muestra hasta que la persona lo descarta (MARIA-1b, D17 y D18).
+        if descartes:
+            operacion["filas_excel_sin_leer"] = descartes[:50]
+            operacion["filas_excel_sin_leer_total"] = len(descartes)
+        if otras_hojas:
+            operacion["hojas_excel_sin_leer"] = otras_hojas[:20]
+        if not hojas_revisadas:
+            # Que no quede sólo en el log: el semáforo lo dice (devolución).
+            operacion["hojas_excel_sin_revisar"] = True
+
         return {
             "message": "Excel procesado exitosamente",
             "filename": file.filename,
             "items": items_data,
             "items_count": len(items_data),
+            # Filas con datos que no se pudieron leer: la pantalla avisa (EXCEL-1).
+            "filas_descartadas": len(descartes),
+            "filas_descartadas_numeros": descartes[:50],
             "operacion": operacion,
             "applied_mapping": bool(effective_mapping),
+            "avisos_mapeo": avisos_mapeo,
             "catalogo": catalogo_info,
         }
+    except LecturaPdfDemasiadoLarga as e:
+        return _respuesta_excel_demasiado_largo(e)
     except HTTPException:
         raise
     except pd.errors.EmptyDataError:
@@ -7337,15 +7654,13 @@ async def import_ncm_historial(
         raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo: {str(e)[:120]}")
 
     try:
-        if filename.endswith(".csv"):
-            try:
-                df = pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False)
-            except Exception:
-                df = pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False, sep=";")
-        elif filename.endswith((".xlsx", ".xls")):
-            df = pd.read_excel(_io.BytesIO(content), dtype=str, keep_default_na=False)
-        else:
-            raise HTTPException(status_code=400, detail="Formato no soportado. Usá .csv, .xlsx o .xls")
+        # En otro hilo y con tiempo máximo: no frena al resto (EXCEL-1).
+        df = await _leer_pdf_aparte(
+            _leer_tabla, content, filename, limite=_excel_read_timeout_s(), que="el archivo",
+            pool=_pool_lectura_excel(),
+        )
+    except LecturaPdfDemasiadoLarga as e:
+        return _respuesta_excel_demasiado_largo(e)
     except HTTPException:
         raise
     except Exception as e:
