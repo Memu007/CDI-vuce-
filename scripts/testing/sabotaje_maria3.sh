@@ -152,8 +152,8 @@ caso avisos_sin_sesion "${T}test_los_avisos_previos_sin_sesion_dan_401"
 
 # 14. los avisos previos no usan los gastos de la pantalla
 reemplazar $M "    supuestos = _supuestos_maria(request, items, gastos)
-    return {\"avisos\"" "    supuestos = _supuestos_maria(request, items, request.gastos_fob)
-    return {\"avisos\""
+    # Lo que al generar" "    supuestos = _supuestos_maria(request, items, request.gastos_fob)
+    # Lo que al generar"
 caso avisos_previos_distintos "${T}test_los_avisos_previos_son_los_mismos_que_al_generar"
 
 # 15. «N/A», «FREE», «Unknown»… se marcan como sin leer
