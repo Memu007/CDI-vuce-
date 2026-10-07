@@ -3632,8 +3632,10 @@ class MariaRequest(BaseModel):
     """Request para generar archivo MARIA TXT."""
     operation_id: str
     items: list
-    moneda: str = "DOL"
-    incoterm: str = "FOB"
+    # Sin moneda ni incoterm no se inventan DOL ni FOB: el control lo marca
+    # (MARIA-1b).
+    moneda: str = ""
+    incoterm: str = ""
     cuit_agr: str = ""
     vendedor_nombre: str = ""
     vendedor_id: str = ""
@@ -3690,6 +3692,11 @@ async def generate_maria_endpoint(
         # Ningún texto mete saltos de línea ni «=» en el TXT (MARIA-1b, M10).
         for _campo in CAMPOS_DE_TEXTO:
             setattr(request, _campo, limpiar_texto(getattr(request, _campo)))
+        # El TXT lleva lo mismo que se controla: moneda e incoterm en
+        # mayúsculas y sin espacios, el CUIT sin guiones (MARIA-1b).
+        request.moneda = (request.moneda or "").strip().upper()
+        request.incoterm = (request.incoterm or "").strip().upper()
+        request.comprador_cuit = "".join((request.comprador_cuit or "").replace("-", "").split())
         request.items = [
             {k: (limpiar_texto(v) if k in CAMPOS_DE_TEXTO_DEL_ITEM else v) for k, v in it.items()}
             if isinstance(it, dict) else it
@@ -3740,7 +3747,9 @@ async def generate_maria_endpoint(
                     status_code=400,
                     detail="El sufijo de valor SBT no puede superar los 120 caracteres.",
                 )
-            if any(ord(c) < 32 for c in _suf):
+            # Ni controles (\x7f incluido) ni «=»: partirían o inventarían una
+            # línea del TXT. El sufijo es un código: no se corrige, se rechaza.
+            if any(ord(c) < 32 or 0x7f <= ord(c) <= 0x9f or c in "\u2028\u2029=" for c in _suf):
                 raise HTTPException(
                     status_code=400,
                     detail="El sufijo de valor SBT no puede contener saltos de línea ni caracteres de control.",

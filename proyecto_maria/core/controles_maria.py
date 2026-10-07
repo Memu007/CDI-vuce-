@@ -29,7 +29,10 @@ CAMPOS_DE_TEXTO_DEL_ITEM = (
     "pais_procedencia", "unidad", "unidad_medida", "um", "codigo_parte",
 )
 
-_CONTROL_O_IGUAL = re.compile(r"[\x00-\x1f\x7f=]")
+# Controles C0 y C1 (\x85 es «nueva línea»), y los separadores de línea y de
+# párrafo de Unicode: cualquiera puede leerse como fin de línea.
+_SALTOS_Y_CONTROLES = r"[\x00-\x1f\x7f-\x9f\u2028\u2029]"
+_CONTROL_O_IGUAL = re.compile(_SALTOS_Y_CONTROLES[:-1] + "=]")
 
 
 def limpiar_texto(valor):
@@ -38,7 +41,7 @@ def limpiar_texto(valor):
     «=», un guion. Lo que no es texto vuelve igual."""
     if not isinstance(valor, str) or not _CONTROL_O_IGUAL.search(valor):
         return valor
-    limpio = re.sub(r"[\x00-\x1f\x7f]+", " ", valor).replace("=", "-")
+    limpio = re.sub(_SALTOS_Y_CONTROLES + "+", " ", valor).replace("=", "-")
     return re.sub(r" {2,}", " ", limpio).strip()
 
 
@@ -63,13 +66,24 @@ def _numero(valor):
         return None
 
 
+_CODIGOS = None
+
+
+def _en_el_nomenclador(codigo8: str) -> bool:
+    """Búsqueda directa: find_by_code recorre el catálogo entero por cada
+    ítem, y con miles de ítems trababa el servidor."""
+    global _CODIGOS
+    if _CODIGOS is None:
+        from proyecto_maria.core.ncm_catalog import load_catalog
+        _CODIGOS = frozenset(i.codigo for i in load_catalog())
+    return codigo8 in _CODIGOS
+
+
 def _control_ncm(pieza, n: int, errores: list, advertencias: list) -> None:
     """Si la NCM perdió el 0 inicial (Excel guarda 01012100 como 1012100), es
     un error y se propone con el 0. Si no está en el nomenclador, se avisa:
     el que tenemos es el de 2018 (`nomenclador_19122018.txt`) y le faltan las
     posiciones de la enmienda de 2022 (p. ej. 8517.13.00), así que no frena."""
-    from proyecto_maria.core.ncm_catalog import find_by_code
-
     texto = re.sub(r"[\s.]", "", str(pieza or "")).upper()
     if not texto:
         return  # la falta de NCM ya la marca la validación de siempre
@@ -79,14 +93,14 @@ def _control_ncm(pieza, n: int, errores: list, advertencias: list) -> None:
     digitos, letra = m.groups()
     # SIM completa (11 dígitos y letra) o NCM sola (8 dígitos).
     if len(digitos) in (11, 8):
-        if find_by_code(digitos[:8]) is None:
+        if not _en_el_nomenclador(digitos[:8]):
             advertencias.append(
                 f"Item {n}: la NCM {digitos[:8]} no está en el nomenclador que tenemos "
                 "(el de 2018). Revisá que esté vigente."
             )
         return
     # Le falta el 0 inicial: 10 dígitos y letra, o 7 dígitos.
-    if len(digitos) in (10, 7) and find_by_code("0" + digitos[:7]) is not None:
+    if len(digitos) in (10, 7) and _en_el_nomenclador("0" + digitos[:7]):
         propuesta = "0" + digitos + letra
         errores.append(
             f"Item {n}: la NCM {texto} parece haber perdido el 0 inicial "
@@ -128,11 +142,8 @@ def controles_antes_de_generar(items, cabecera: dict) -> tuple[list, list]:
 
     cuit = str(cabecera.get("comprador_cuit") or "").strip()
     if not cuit:
-        # La pantalla de revisión lo deja opcional («extranjeros sin CUIT»):
-        # vacío avisa; si exigirlo es una decisión de la PM (MARIA-1b, D20).
-        advertencias.append(
-            "Falta el CUIT del importador: completalo acá o en el Kit SIM antes de presentar."
-        )
+        # Sin el CUIT del importador el TXT no sirve para presentar (D20).
+        errores.append("Falta el CUIT del importador.")
     elif not cuit_valido(cuit):
         errores.append(
             f"El CUIT del importador «{cuit}» no es válido: tiene que tener 11 "

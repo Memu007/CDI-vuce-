@@ -761,7 +761,7 @@
                 pieza: String(it.pieza || '').trim(),
                 ncm: String(it.pieza || '').trim(),
                 descripcion: String(it.descripcion || '').trim(),
-                origen: String(it.origen || 'XX').trim().toUpperCase() || 'XX',
+                origen: String(it.origen || '').trim().toUpperCase(),  // sin «XX» inventado (MARIA-1b)
                 cantidad: toNumber(it.cantidad, 0),
                 valor_unitario: toNumber(it.valor_unitario, 0),
                 peso_unitario: toNumber(it.peso_unitario, 0),

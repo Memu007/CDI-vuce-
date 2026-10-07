@@ -297,6 +297,9 @@
     function onItemClick(e) {
         var boton = e.target.closest && e.target.closest('.semaforo-descartar');
         if (boton) {
+            // Que no llegue al clic de afuera: al redibujar, el botón ya no
+            // está en el semáforo y lo cerraría.
+            e.stopPropagation();
             descartarAviso(boton.getAttribute('data-clave'));
             try { CDI.track && CDI.track('semaforo_aviso_descartado', { clave: boton.getAttribute('data-clave') }); } catch (_) {}
             refrescarLocales();

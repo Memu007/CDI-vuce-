@@ -75,8 +75,8 @@
     // Validacion por campo: retorna string con error o null si OK
     const VALIDATORS = {
         comprador_cuit: (v) => {
-            // Opcional: solo validar formato si el usuario lo completa.
-            if (!v) return null;
+            // Obligatorio: sin el CUIT del importador el TXT no sirve (D20).
+            if (!v) return 'Falta el CUIT del importador.';
             return validateCuitAR(v);
         },
         vendedor_id: (v) => {
