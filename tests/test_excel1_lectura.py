@@ -92,16 +92,65 @@ def test_encabezados_con_unidades_entre_parentesis():
     assert (item["cantidad"], item["valor_unitario"], item["peso_unitario"]) == (10, 350, 1.5), item
 
 
-def test_filas_descartadas_se_avisan():
+def test_filas_con_datos_faltantes_entran_vacias_y_no_inventadas():
+    """Criterio de MARIA-1a: lo que falta o no se puede leer queda vacío (0 o
+    ""), la fila no se pierde y no se inventa nada (ni cantidad 1 ni «XX»).
+    El semáforo de la revisión marca lo vacío."""
     r = _subir([H,
                 ["84713000", "Laptop 14 pulgadas", "CN", 10, 350, 1.5],
                 ["85171300", "Telefono celular", "", 20, 100, 0.2],
                 ["85176200", "Router", "CN", "diez", 50, 0.3],
+                [None, "Mouse (sin NCM aun)", "CN", 100, 5, 0.1],
                 [None, None, None, None, None, None]])
     assert r.status_code == 200, r.text[:300]
-    cuerpo = r.json()
-    assert len(cuerpo["items"]) == 1
-    assert cuerpo.get("filas_descartadas") == 2, cuerpo
+    items = r.json()["items"]
+    assert [i["descripcion"] for i in items] == [
+        "Laptop 14 pulgadas", "Telefono celular", "Router", "Mouse (sin NCM aun)"], items
+    assert items[1]["origen"] == "", items[1]
+    assert items[2]["cantidad"] == 0, items[2]
+    assert items[3]["pieza"] == "", items[3]
+    assert r.json().get("filas_descartadas") == 0, r.json()
+
+
+def test_filas_sin_descripcion_ni_ncm_se_avisan():
+    r = _subir([H,
+                ["84713000", "Laptop 14 pulgadas", "CN", 10, 350, 1.5],
+                [None, None, "CN", 5, 20, 0.1]])
+    assert r.status_code == 200, r.text[:300]
+    assert len(r.json()["items"]) == 1
+    assert r.json().get("filas_descartadas") == 1, r.json()
+    assert r.json().get("filas_descartadas_numeros") == [3], r.json()
+
+
+@pytest.mark.parametrize("texto,esperado", [
+    ("1.500", 0), ("1.234,56", 1234.56), ("1,5", 1.5), ("10 pcs", 10), ("USD 350", 350),
+])
+def test_numeros_escritos_como_texto(texto, esperado):
+    """Con la regla de MARIA-1a: separador de miles, coma decimal, unidad de
+    cuenta al lado. «1.500» sin otra pista en la planilla puede ser mil
+    quinientos o uno y medio: queda vacío (0) en vez de adivinarse; antes
+    salía 1,5."""
+    r = _subir([H, ["84713000", "Laptop 14 pulgadas", "CN", texto, 350, 1.5]])
+    assert r.status_code == 200, r.text[:300]
+    assert r.json()["items"][0]["cantidad"] == esperado, r.json()["items"][0]
+
+
+def test_ncm_numerica_no_sale_con_punto_cero():
+    r = _subir([H,
+                [84713000, "Laptop 14 pulgadas", "CN", 10, 350, 1.5],
+                [None, None, None, None, None, None],
+                [85171300, "Telefono celular", "CN", 20, 100, 0.2]])
+    assert r.status_code == 200, r.text[:300]
+    assert [i["pieza"] for i in r.json()["items"]] == ["84713000", "85171300"], r.json()["items"]
+
+
+@pytest.mark.parametrize("pais,codigo", [
+    ("China", "CN"), ("Chile", "CL"), ("Argentina", "AR"), ("CHN", "CN"), ("Narnia", ""),
+])
+def test_pais_por_nombre_no_se_corta(pais, codigo):
+    r = _subir([H, ["84713000", "Laptop 14 pulgadas", pais, 10, 350, 1.5]])
+    assert r.status_code == 200, r.text[:300]
+    assert r.json()["items"][0]["origen"] == codigo, r.json()["items"][0]
 
 
 def _cliente_con_mapeo(mapeo) -> str:
@@ -134,3 +183,12 @@ def test_mapeo_guardado_no_deja_afuera_encabezados_nuevos():
     assert r.status_code == 200, r.text[:300]
     item = r.json()["items"][0]
     assert (item["cantidad"], item["peso_unitario"]) == (10, 1.5), item
+
+
+def test_miles_con_pista_en_la_planilla():
+    """Si otro número de la planilla muestra la coma decimal («350,00»), el
+    «1.500» es mil quinientos."""
+    r = _subir([H, ["84713000", "Laptop 14 pulgadas", "CN", "1.500", "350,00", "1,5"]])
+    assert r.status_code == 200, r.text[:300]
+    item = r.json()["items"][0]
+    assert (item["cantidad"], item["valor_unitario"], item["peso_unitario"]) == (1500, 350, 1.5), item
