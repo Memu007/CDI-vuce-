@@ -46,6 +46,7 @@ def _entorno(monkeypatch):
     from proyecto_maria.core.rate_limit import limiter
     monkeypatch.setattr(limiter, "enabled", False)
     monkeypatch.setattr(main, "_POOL_LECTURA_PDF", None)
+    monkeypatch.setattr(main, "_POOL_LECTURA_EXCEL", None)
     main.app.dependency_overrides[main.get_current_user] = lambda: dict(USUARIO)
     yield
     main.app.dependency_overrides.pop(main.get_current_user, None)
@@ -125,3 +126,8 @@ def test_leer_un_excel_tiene_tiempo_maximo(excel_lento, monkeypatch, ruta):
     assert cuerpo.get("code") == "lectura_excel_demasiado_larga", cuerpo
     assert "tardó demasiado" in str(cuerpo.get("detail")), cuerpo
     assert demora < LENTO_S, f"{ruta}: esperó toda la lectura ({demora:.2f} s)"
+
+
+def test_excel_y_pdf_no_comparten_los_hilos_de_lectura():
+    main._pool_lectura_pdf()
+    assert main._pool_lectura_excel() is not main._pool_lectura_pdf()

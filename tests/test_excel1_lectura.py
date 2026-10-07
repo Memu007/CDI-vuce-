@@ -212,3 +212,91 @@ def test_extraccion_con_ncm_leida_como_numero_decimal():
                        "valor_unitario": [10.0, None, 20.0], "peso_unitario": [1.0, None, 2.0]})
     items = main.extract_items_from_excel(df, "x.xlsx")
     assert [i.pieza for i in items] == ["84713000", "85171300"]
+
+
+def test_productos_que_empiezan_con_total_no_se_pierden():
+    r = _subir([H,
+                ["84713000", "Laptop", "CN", 10, 350, 1.5],
+                ["27101932", "TOTAL QUARTZ 9000 5W40 4L", "FR", 200, 12.5, 3.6],
+                ["90158090", "Total Station Leica TS07", "CH", 1, 9800, 5],
+                ["TOTAL-XL", "Camiseta total fit", "CN", 5, 10, 0.2],
+                ["", "Subtotal 8471.30.00", "", 10, 3500, 15],
+                ["", "TOTAL", "", 10, 3500, 15]])
+    assert r.status_code == 200, r.text[:300]
+    descripciones = [i["descripcion"] for i in r.json()["items"]]
+    assert descripciones == ["Laptop", "TOTAL QUARTZ 9000 5W40 4L", "Total Station Leica TS07",
+                             "Camiseta total fit"], descripciones
+
+
+def test_filas_sin_ncm_ni_origen_no_son_productos_y_se_avisan():
+    """«FOB TOTAL», «Freight», «Payment terms»: sin NCM ni origen no entran
+    como producto (duplicarían el FOB), pero se cuentan en el aviso."""
+    r = _subir([H,
+                ["84713000", "Laptop", "CN", 10, 350, 1.5],
+                ["", "FOB TOTAL", "", 10, 3500, 15],
+                ["", "Freight", "", 1, 500, None],
+                ["", "Payment terms: T/T 30 days", "", None, None, None]])
+    assert r.status_code == 200, r.text[:300]
+    assert [i["descripcion"] for i in r.json()["items"]] == ["Laptop"], r.json()["items"]
+    assert r.json()["filas_descartadas"] == 3, r.json()
+
+
+def test_mapeo_guardado_viejo_no_gana_sobre_el_precio_unitario():
+    """Un cliente que guardó «Valor» y «Peso Bruto» con la lista de alias vieja:
+    en un archivo que también trae «Precio Unitario» y «Peso Neto», ganan
+    éstos."""
+    cid = _cliente_con_mapeo({"NCM": "pieza", "Descripcion": "descripcion", "Origen": "origen",
+                              "Cantidad": "cantidad", "Valor": "valor_unitario",
+                              "Peso Bruto": "peso_unitario"})
+    r = _subir([["NCM", "Descripcion", "Origen", "Cantidad", "Precio Unitario", "Valor", "Peso Bruto", "Peso Neto"],
+                ["84713000", "Laptop", "CN", 10, 350, 3500, 25, 15]], cliente_id=cid)
+    assert r.status_code == 200, r.text[:300]
+    item = r.json()["items"][0]
+    assert (item["valor_unitario"], item["peso_unitario"]) == (350, 15), item
+
+
+def test_celda_en_la_ultima_fila_no_recorre_un_millon_de_filas():
+    import openpyxl, time as _t
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.append(H)
+    ws.append(["84713000", "Laptop", "CN", 10, 350, 1.5])
+    ws.cell(row=1048576, column=7, value="x")
+    buf = io.BytesIO()
+    wb.save(buf)
+    t0 = _t.monotonic()
+    r = TestClient(main.app).post("/upload_excel_v2/", files={"file": ("p.xlsx", buf.getvalue(), "application/octet-stream")})
+    demora = _t.monotonic() - t0
+    assert r.status_code == 200, r.text[:300]
+    assert len(r.json()["items"]) == 1
+    assert demora < 8, f"tardó {demora:.1f} s"
+
+
+def test_demasiadas_filas_se_rechazan_con_mensaje_claro(monkeypatch):
+    monkeypatch.setattr(main, "_MAX_FILAS_EXCEL", 3)
+    filas = [H] + [["84713000", f"Laptop {i}", "CN", 1, 10, 1] for i in range(5)]
+    r = _subir(filas)
+    assert r.status_code == 400, r.text[:300]
+    assert "filas" in r.json()["detail"], r.json()
+
+
+def test_xlsx_que_se_descomprime_a_gigas_se_rechaza_antes_de_abrirlo(monkeypatch):
+    import zipfile
+    from proyecto_maria.security import file_security
+    abrir = []
+    monkeypatch.setattr(file_security, "_contar_hojas_excel", lambda *a: abrir.append(1) or 1)
+    # Un .xlsx de verdad (pasa el control de tipo) con un relleno que
+    # descomprimido ocupa 150 MB.
+    import openpyxl
+    sano = io.BytesIO()
+    openpyxl.Workbook().save(sano)
+    original = zipfile.ZipFile(io.BytesIO(sano.getvalue()))
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for nombre in original.namelist():
+            z.writestr(nombre, original.read(nombre))
+        z.writestr("xl/relleno.xml", " " * (150 * 1024 * 1024))
+    r = TestClient(main.app).post("/upload_excel_v2/", files={"file": ("bomba.xlsx", buf.getvalue(), "application/octet-stream")})
+    assert r.status_code == 400, r.text[:300]
+    assert "descomprimido" in r.json()["detail"], r.json()
+    assert not abrir, "se abrió el Excel antes de mirar cuánto pesa descomprimido"
