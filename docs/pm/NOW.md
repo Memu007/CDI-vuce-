@@ -91,19 +91,23 @@ también sus subagentes (Emi confirmó las dos sesiones en alto). Ningún subage
 la PM principal.
 
 Archivos abiertos por Dev:
-- Dev 1 (RENDIMIENTO-1): `proyecto_maria/main.py` (`upload_pdf_public`,
-  `_suggest_ncm_with_gemini`), `proyecto_maria/pdf_extractor.py` (sólo el
-  lector, ~línea 800) y `requirements.txt`.
-- Dev 2 (MARIA-1a): `proyecto_maria/pdf_extractor.py` (las dos copias del
-  lector) y, si hace falta, la tabla de países de `core/maria_generator.py`.
+- Dev 1 (RENDIMIENTO-1b): `proyecto_maria/main.py` (la adivinanza del
+  vendedor y los tiempos máximos), `security/file_security.py`.
+- Dev 2 (MARIA-1c): `proyecto_maria/pdf_extractor.py` (las dos copias del
+  lector), `static/v2/screens/upload.js` y `static/app.js`.
 
 ## En curso
 
-- **Dev 1:** RENDIMIENTO-1 (incluye cambiar el lector de PDF viejo). Sigue:
-  EXCEL-1, MARIA-1b y PUNTA-A-PUNTA-1.
-- **Dev 2:** MARIA-1a. Sigue: MARIA-2b, MARIA-4 (estado, IVA adicional,
-  banco y empresa de digitalización), MARIA-3 y MARIA-5; MARIA-6 cuando
-  lleguen los archivos reales del despachante.
+- **Dev 1:** RENDIMIENTO-1b (un PDF armado no deja a nadie sin lectura).
+  Sigue: EXCEL-1, MARIA-1b y PUNTA-A-PUNTA-1.
+- **Dev 2:** MARIA-1c (lo que no se pudo leer se avisa). Sigue: MARIA-4
+  (estado, IVA adicional, banco y empresa de digitalización), MARIA-3 y
+  MARIA-5; MARIA-6 cuando lleguen los archivos reales del despachante.
+- **Aceptadas el 2026-10-07 y sin integrar todavía** (se integran después de
+  publicar el ensayo, para que el ensayo sea exactamente lo atacado):
+  RENDIMIENTO-1 (`8fd801d`, suite `730 passed, 102 skipped` con un venv nuevo),
+  MARIA-1a (`0a1775f`, `777 passed`) y MARIA-2b (`c3bef51`, `791 passed`).
+  RENDIMIENTO-1 sale con RENDIMIENTO-1b y MARIA-1a con MARIA-1c.
 - **Aceptadas el 2026-10-07 e integradas:** ADMIN-1 (`ac25dbc`), MARIA-2
   (`65ea6f3`) y ADMIN-2 (`f9f8393`). Suite sobre `f9f8393`, que tiene el
   mismo producto y las mismas pruebas que la rama de PM:
