@@ -90,9 +90,9 @@ sabotaje $C "los saltos de línea Unicode vuelven a pasar" \
   '_SALTOS_Y_CONTROLES = r"[\x00-\x1f\x7f]"' \
   "FAILED $T::test_un_texto_no_mete_lineas_ni_igual_en_el_txt"
 sabotaje $M "el «=» vuelve a pasar en el sufijo SBT" \
-  "            if any(ord(c) < 32 or 0x7f <= ord(c) <= 0x9f or c in \"\\u2028\\u2029=\" for c in _suf):" \
-  "            if any(ord(c) < 32 for c in _suf):" \
-  "FAILED $T::test_sufijo_sbt_con_igual_o_control_no_deja_generar"
+  '            if "=" in _suf:' \
+  '            if False:' \
+  "FAILED $T::test_sufijo_sbt_con_igual_o_control_no_deja_generar[AA(X)-AB(MOD=1)-]"
 sabotaje $M "el servidor vuelve a inventar DOL y FOB" \
   '    moneda: str = ""
     incoterm: str = ""' \

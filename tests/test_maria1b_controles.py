@@ -260,6 +260,8 @@ def test_sufijo_sbt_con_igual_o_control_no_deja_generar(sufijo):
     r = _generar(sbt_sufijo_valor=sufijo)
     assert r.status_code == 400, r.text[:300]
     assert "sufijo" in str(r.json()["detail"]).lower(), r.json()
+    if "=" in sufijo:
+        assert "«=»" in r.json()["detail"], r.json()
 
 
 def test_sin_moneda_ni_incoterm_el_servidor_no_inventa_dol_ni_fob():
