@@ -62,7 +62,7 @@ sabotaje $C "USD vuelve a pasar como moneda" \
   '    elif moneda == "XXX-NUNCA":' \
   "FAILED $T::test_moneda_que_impide_el_txt[USD-"
 sabotaje $C "el incoterm deja de controlarse" \
-  '    elif incoterm not in INCOTERMS_VALIDOS:' \
+  '    elif incoterm not in INCOTERMS_ACEPTADOS:' \
   '    elif False:' \
   "FAILED $T::test_incoterm_que_impide_el_txt[FOX-"
 sabotaje $C "el dígito verificador del CUIT deja de mirarse" \
