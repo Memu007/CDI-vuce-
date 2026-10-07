@@ -32,36 +32,40 @@ tienen que seguir saliendo idénticos, salvo que la tarea diga otra cosa.
 
 ## Último veredicto
 
-**MARIA-4 aceptada sobre `2461939`** (2026-10-07, con la devolución). La PM
-reprodujo el rojo antes de la devolución sobre `6149ef3` (`9 failed`: estado
-contra origen en `CN-1/3/5`, `AR-2/4/6` y `200-2`; supuestos con el orden del
-origen; avisos en la pantalla vieja), la focal con los archivos reales (`122
-passed`) y la suite (`846 passed, 102 skipped`). La primera revisión ya había
-atacado lo central (`REPRODUCCION-MARIA-4-2026-10-07.md`). No corrido por la
-PM: tu comprobación de pantalla de la v2.
+**MARIA-3 devuelta** (2026-10-07, sobre `088577f`). La PM reprodujo el rojo
+antes (`54 failed`) y la focal (`183 passed`). Su subagente Sonnet alto: los
+gastos FOB, los avisos antes de generar (672 combinaciones sin diferencias) y
+el archivo de 2025 se sostienen; el de 2026 difiere sólo en `LDVDREFDOC`
+(MARIA-6) y una línea en blanco. Detalle en
+`REPRODUCCION-MARIA-3-2026-10-07.md`.
 
-Aceptadas y sin integrar hasta después del ensayo: MARIA-1a, 2b, 1c y 4.
+**Devolución, cinco puntos** (cada uno con su rojo antes y verde después):
+1. **Procedencia:** se rechazan 129 de los 309 países que ofrece la pantalla
+   (`pais_de_la_tabla` compara contra `PAISES_INDEC`, que no tiene 668 Hong
+   Kong, 436 Turquía, 435 Chipre, 223 Puerto Rico, 150, 242, 254, 358…).
+   La pantalla y la validación usan una sola tabla oficial; decí cuál y de
+   dónde sale.
+2. **Año del `IEXT` sin fecha:** con la fecha vacía o ilegible, el año sale de
+   hoy o de texto suelto (`/26`, `/07`, `/99`, `/٢٥`). Sin una fecha de
+   emisión válida no se genera: se pide la fecha, como con el estado.
+3. **Fechas que salen equivocadas como válidas:** año de dos dígitos
+   (`01/01/69` → 1969: tiene que ser 2069 o pedirse); fecha futura o de hace
+   más de dos años → aviso antes de generar. El d/m contra m/d ambiguo queda
+   anotado como riesgo.
+4. **Procedencia rara** (`²`): 400 con un mensaje propio, nunca el texto de
+   Python ni un 500 en `/generate_maria/avisos`. Una procedencia de ítem en
+   blanco no pisa la de la operación.
+5. **Gastos:** un importe no finito, negativo o absurdo (`1e308`, `nan`,
+   `inf`, `-5`) no llega al TXT, tampoco por `gastos_fob`: 400 con mensaje.
 
-**Tu contexto está en ~88 %: no arranques MARIA-3 hasta que Emi pegue tu
-`/compact`** (a la mañana). Todo lo que necesitás está abajo.
-
-## Respuestas a tus D (2026-10-07, 05:30 UTC)
-
-- **D5: (a), como MARIA-1c** (abajo), antes de MARIA-4.
-- **D6: a la Dev 1, en MARIA-1b.**
-- **D7: (a).** Se mide con facturas reales cuando Emi pruebe.
-- **D8: (a), dejarlo.** Lo mismo decidió la Dev 1 con su lectura lenta (D11).
-
-## Respuestas a tus D (2026-10-07, 06:10 UTC)
-
-- **D9: (a), hecho por la PM** en `docs/pm/herramientas/levantar.sh`: las
-  novedades de ARCA apuntan a un puerto local cerrado.
-- **D10:** tenés razón. MARIA-4 queda escrita abajo.
+Suite completa en verde. MARIA-1d sigue en curso: entregá primero la
+devolución.
 
 ## Respuestas a tus D (2026-10-07, 10:15 UTC)
 
-- **MARIA-3:** en revisión de la PM. Mientras, arrancá MARIA-1d (abajo).
+- **MARIA-3:** devuelta (arriba); va antes que MARIA-1d.
 - **D12: (a), como MARIA-1d**, antes de MARIA-5.
+- Anteriores (D5 a D11): en Git.
 
 ## Tarea activa — MARIA-1d: un campo vacío no llega al TXT como «None»
 
