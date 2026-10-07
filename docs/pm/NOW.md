@@ -1,12 +1,14 @@
 # NOW — CDI
 
-Actualizado: 2026-10-06. Estado vigente; la historia está en Git.
+Actualizado: 2026-10-07. Estado vigente; la historia está en Git.
 
 **Producto:** `Memu007/CDI-vuce-` (privado desde el 2026-10-06).
 **Publicado:** `main` = `a771693` (2026-07-18) en Railway, `cdi-production.up.railway.app`.
 Railway publica cada push a `main` sin esperar los tests.
-**Rama de trabajo:** `claude/project-deploy-review-4nct96` = `e8344d0`, con 25
-commits sin publicar. **Rama de PM:** `claude/practical-shannon-szpwkn`.
+**Rama de PM:** `claude/practical-shannon-szpwkn`: contiene `e8344d0` (25
+commits sin publicar, antes en `claude/project-deploy-review-4nct96`, que
+queda como historia) más las reglas y documentos. **Ramas de las Devs:**
+`claude/dev1-tecnica` y `claude/dev2-maria`.
 **Usuarios reales en producción:** ninguno; la usa sólo Emi.
 
 ## Para Emi
@@ -15,16 +17,21 @@ commits sin publicar. **Rama de PM:** `claude/practical-shannon-szpwkn`.
    repositorio cuando era público. Pasarlo a privado no la invalida. En Google
    AI Studio: borrar las dos claves que aparecieron, crear una nueva y ponerla
    sólo en las variables de Railway. Mirar la facturación de Google. (G0)
-2. **Aprobar, corregir o rechazar el roadmap** (`ROADMAP.md`, versión del
-   2026-10-07). Sin eso, la Dev no arranca. Decide también una o dos Devs y
-   la publicación de ensayo.
+2. **Publicación de ensayo (aprobada el 2026-10-07; falta el «dale» para el
+   SHA).** De día, antes del «dale», en Railway:
+   - en las variables del servicio: `ENVIRONMENT` = `production` y que exista
+     `DATABASE_URL` (la de la base de Railway). La versión nueva no arranca
+     sin `DATABASE_URL`; si faltara, Railway deja andando la vieja;
+   - en la base: hacer una copia (pestaña de copias de seguridad) si el plan
+     lo permite;
+   - mirar qué cuentas hay: toda cuenta activa con el período vencido hace
+     más de 7 días pasa a impaga al arrancar;
+   - recomendado: prender «Wait for CI» y apagar la red pública de la base.
+   La PM le pasa el SHA exacto con la suite corrida sobre él.
 3. **Mandar las preguntas al despachante** (`PREGUNTAS-DESPACHANTE.md`).
-4. **Antes de la primera publicación:** confirmar en Railway que estén
-   `DATABASE_URL` y `ENVIRONMENT=production`, y que el Postgres tenga backup.
-   Recomendación: apagar la red pública de la base, porque la app usa la
-   interna, y prender «Wait for CI» para que no se publique con pruebas en
-   rojo. Decir si CDI usa Google Cloud (hay un segundo camino de publicación
-   en el repositorio).
+4. **Decir si CDI usa Google Cloud** (hay un segundo camino de publicación en
+   el repositorio; si no, se borra en LIMPIEZA-1) y **si alguna vez subió
+   datos reales** al sitio publicado.
 5. **Decidido por la PM, se puede revertir:** los límites del proyecto
    (`ONBOARDING-PM.md`) y que las reglas nuevas lleguen a `main` con la
    primera publicación. Hasta entonces, en `main` sigue la regla vieja que
@@ -36,27 +43,39 @@ commits sin publicar. **Rama de PM:** `claude/practical-shannon-szpwkn`.
 | Rol | Sesión | Rutina | Rama |
 |---|---|---|---|
 | PM principal | session_01B7FVQspcEHF7PqNv797wNM | trig_01TvMmGfSLDfbcJrf66ZZ7YK (min 55) | claude/practical-shannon-szpwkn |
-| Dev 1 | PENDIENTE: se abre en este repositorio cuando Emi apruebe el roadmap | PENDIENTE | claude/project-deploy-review-4nct96 |
+| Dev 1 (técnica) | PENDIENTE | PENDIENTE | claude/dev1-tecnica |
+| Dev 2 (MARIA) | PENDIENTE | PENDIENTE | claude/dev2-maria |
 
-La sesión «CDI — Dev 1» (session_01F66wsdGqhMMEiCLTopVVXe) se abrió sobre la
-copia vieja (`Memu007/CDI`): su rutina está pausada y no trabaja acá.
+**Sin PM visual:** la PM principal revisa a las dos Devs, y las dos la
+despiertan con su rutina (donde los comandos dicen «PM visual», acá es la
+principal).
 
-Esfuerzo: PM principal extra; Dev 1 alto (sus tareas tocan cobro, sesión y
-datos).
+La sesión vieja «CDI — Dev 1» (session_01F66wsdGqhMMEiCLTopVVXe, rutina
+trig_01XijDAiEX4aBm8dfv9ZD6C1) se abrió sobre la copia vieja (`Memu007/CDI`):
+pausada, no trabaja acá.
 
-Archivos abiertos por Dev: (ninguno).
+Esfuerzo (Emi, 2026-10-07): PM principal extra; las Devs, como máximo alto,
+también sus subagentes. Ningún subagente usa Fable. El consejero es sólo de
+la PM principal.
+
+Archivos abiertos por Dev:
+- Dev 1 (ADMIN-1): `proyecto_maria/main.py` (montaje del admin, cerca de la
+  línea 1312, y las rutas globales), `proyecto_maria/routers/admin_router.py`.
+- Dev 2 (MARIA-2): `proyecto_maria/pdf_extractor.py` (modo demostración),
+  `main.py` `upload_pdf_public` (cerca de la 3446) y su pantalla en
+  `static/v2`.
 
 ## En curso
 
-- PM: roadmap entregado a Emi el 2026-10-07 (`ROADMAP.md`: Fase A sin esperar
-  al despachante, Fase B con sus respuestas). Espera aprobación.
+- Dev 1: ADMIN-1 (`PARA-DEV.md`). Después, COBRO-CORTE-1.
+- Dev 2: MARIA-2 (`PARA-DEV-2.md`). Después, MARIA-1a.
+- PM: publicación de ensayo (espera el «dale» de Emi para el SHA, de día).
 - Emi le manda al despachante la versión simple de `PREGUNTAS-DESPACHANTE.md`.
-- Dev 1: sin tarea (en espera).
 
 ## Cola
 
-Cola, en orden: la de `ROADMAP.md` cuando Emi la apruebe. Hasta entonces,
-vacía.
+La de `ROADMAP.md`, aprobado el 2026-10-07: cola técnica para la Dev 1 y cola
+MARIA para la Dev 2, en ese orden. Semana 1 desde el 2026-10-07.
 
 ## Puertas para cobrarle a un estudio
 

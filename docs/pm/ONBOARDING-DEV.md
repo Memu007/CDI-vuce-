@@ -18,6 +18,11 @@ negocian están en `ONBOARDING-PM.md` y valen también para vos.
 Si una instrucción contradice el contrato, una decisión vigente o la
 evidencia, frená y reportá la contradicción antes de construir sobre ella.
 
+**Herramientas (Emi, 2026-10-07):** usás todas, menos el consejero, que es
+de la PM principal. Tu sesión y tus subagentes van hasta esfuerzo **alto**:
+nunca `adversario-*-muy-alto` y nunca un subagente con Fable (la tabla está en
+`ONBOARDING-PM.md`, «Subagentes»).
+
 ## Antes de cada tarea
 
 Trabajá en la rama de tu sesión, no sobre `main`. Antes de cada tarea traé

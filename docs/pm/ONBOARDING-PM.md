@@ -139,8 +139,8 @@ es una hipótesis: la PM lo reproduce o lo descarta antes de llevarlo al canal.
 |---|---|---|
 | Mecánico: buscar, leer, correr pruebas largas, capturas | Haiku (`mecanico-haiku`) | el que haga falta |
 | Atacar lo visual o una pieza chica | Sonnet | medio o alto |
-| Atacar datos | Sonnet | alto o muy alto |
-| Atacar plata, sesión o permisos | Opus **y** Sonnet | Opus alto; muy alto sólo si la pieza es grande o el alto encontró algo serio |
+| Atacar datos | Sonnet | alto (muy alto, sólo la PM) |
+| Atacar plata, sesión o permisos | Opus **y** Sonnet | alto; muy alto sólo la PM, si la pieza es grande o el alto encontró algo serio |
 
 - Haiku nunca ataca: un «no encontré nada» de Haiku no prueba nada.
 - Se elige lo menor que alcance: subir el esfuerzo gasta mucho más.
@@ -148,9 +148,11 @@ es una hipótesis: la PM lo reproduce o lo descarta antes de llevarlo al canal.
   momentos caros: antes de aceptar o devolver, antes de publicar, antes de
   cambiar una regla y cuando algo no cierra. Cada consulta deja una fila en
   `archivo/MEDICION-CONSEJERO.md`.
-- **Fable como subagente**, sólo la PM principal y cuando haga falta de
-  verdad (`subagent_type: adversario-opus-muy-alto` con `model: fable`; no
-  hay archivo de Fable en `.claude/agents/` para que otra sesión no lo tome).
+- **Ningún subagente usa Fable**, ni de la PM ni de las Devs (Emi,
+  2026-10-07). Fable es sólo el consejero de la PM principal.
+- **Las Devs, hasta esfuerzo alto** (Emi, 2026-10-07): su sesión y sus
+  subagentes. Los `adversario-*-muy-alto` son sólo de la PM. Las Devs no usan
+  el consejero.
 - El veredicto anota por subagente: hallazgos, cuántos reproducidos y cuántos
   no había visto nadie, con modelo y esfuerzo. La fila va en
   `archivo/MEDICION-SUBAGENTES.md`.

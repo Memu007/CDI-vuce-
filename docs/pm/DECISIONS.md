@@ -29,6 +29,10 @@ repositorio.
 | **Límites propios del proyecto** | 2026-10-06 | Decidido por la PM (Emi puede revertirlo): los de `ONBOARDING-PM.md`, «Límites que no se negocian», que juntan los de septiembre (`ALCANCE-Y-LIMITES.md` de `CDI`) con los de la instalación |
 | **`Memu007/CDI` queda como archivo** | 2026-10-06 | La instalación del método que se hizo ahí por error (copia de abril) se descarta, incluido el trabajo a medias de CI-PUERTA-1. Su `docs/pm` apunta acá |
 | **Fechas y precio de septiembre, vencidos** | 2026-10-06 | Emi: las fechas del plan se rehacen y el precio quedó viejo (no se escribe acá). Producción la usa sólo Emi: no hay estudios reales adentro |
+| **Roadmap aprobado** | 2026-10-07 | Emi: «apruebo». `ROADMAP.md` del 2026-10-07: Fase A sin esperar al despachante, Fase B con sus respuestas. Las semanas se cuentan desde hoy |
+| **Dos Devs** | 2026-10-07 | Emi: «dale 2 devs, lo que haga mejor el proyecto». Dev 1 con la cola técnica, Dev 2 con la cola MARIA. Sin PM visual: a las dos las revisa la PM principal |
+| **Lo que pueden usar las Devs** | 2026-10-07 | Emi: «que las devs tengan acceso a todo menos el advisor, que es tuyo, y subagentes nunca pueden usar fable, y cada dev fijate que max de esfuerzo sea alto». Las Devs: todas las herramientas, sin consejero; su sesión y sus subagentes, hasta esfuerzo alto. **Nadie** lanza un subagente con Fable, tampoco la PM |
+| **Publicación de ensayo** | 2026-10-07 | Emi: «dale». Se publica la rama de trabajo más las reglas nuevas. El «dale» final va para el SHA exacto, de día y con los chequeos de Railway hechos |
 
 ---
 
@@ -36,10 +40,8 @@ repositorio.
 
 | Tema | Por qué hay que decidirlo | Impacto |
 |---|---|---|
-| **Aprobar el roadmap** | `ROADMAP.md` es una propuesta (versión del 2026-10-07: Fase A sin esperar al despachante y Fase B con sus respuestas) | Sin eso, la Dev no arranca |
-| **Una Dev o dos** | Dos colas que casi no se pisan (medido en `ROADMAP.md`) | Con dos, el piloto puede arrancar unas dos semanas antes; gasta más del plan de uso |
 | **Rotar las claves de Gemini** | Una estuvo en un repositorio público. Cierra G0 | Lo hace Emi en Google AI Studio y Railway |
-| **Publicación de ensayo** (antes: «cuándo publicar los 25 commits») | Recomendada para la semana 1: la rama de trabajo más las reglas nuevas. Arregla la fuga de MARIA.TXT entre estudios que hoy está en producción y ensaya volver atrás | Antes, contar los `active` con período vencido (el arranque los corta) y confirmar `DATABASE_URL` y `ENVIRONMENT` en Railway |
+| **«Dale» para el SHA de la publicación de ensayo** | Emi aprobó el ensayo el 2026-10-07; falta el «dale» para el SHA exacto | Antes, Emi revisa en Railway las variables y las cuentas que pasarían a impagas |
 | **¿CDI usa Google Cloud?** | `cloudbuild.yaml` es un segundo camino de publicación | Si no se usa, se borra en LIMPIEZA-1 |
 | **Prender «Wait for CI» en Railway** | Hoy Railway publica aunque las pruebas fallen | Es un ajuste de Railway; no cuesta nada |
 | **Qué se promete del catálogo NCM** | Hoy hay 10.226 posiciones de ARCA (julio de 2026), no 22 | Cambia el discurso comercial de septiembre |

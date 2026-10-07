@@ -26,7 +26,8 @@ from datetime import datetime, timedelta, timezone
 HORAS_UTC = -3                   # UTC-3: la zona del proyecto
 ZONA = timezone(timedelta(hours=HORAS_UTC))
 RAMAS = {"pm": "claude/practical-shannon-szpwkn",
-         "dev1": "claude/project-deploy-review-4nct96"}   # al sumar la Dev 2: "dev2": "<su rama>"
+         "dev1": "claude/dev1-tecnica",
+         "dev2": "claude/dev2-maria"}
 CANAL_DEL_ROL = {"docs/pm/PARA-PM.md": "Dev 1", "docs/pm/PARA-PM-2.md": "Dev 2",
                  "docs/pm/NOW.md": "PM principal", "docs/pm/VISUAL.md": "PM visual"}   # los que no existan no cuentan
 # ------------------------------------------------------------------
