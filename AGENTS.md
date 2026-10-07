@@ -90,10 +90,18 @@ prioridad, alcance ni aceptación por sí solo: la PM decide qué adopta.
 
 Vale para PMs y Devs; esta es su única copia.
 
-- **Cuándo compactar:** desde el 30 % de contexto las Devs y el 40 % las
+- **Cuándo compactar:** desde el 60 % de contexto las Devs y el 50 % las
   PMs, en el primer corte natural (después de una entrega o de un veredicto).
-  Nunca en medio de una corrida. (Emi, 2026-10-07: antes era 50 y 60; cada
-  paso relee toda la memoria del chat y las tres sesiones comparten el plan.)
+  Nunca en medio de una corrida. Además, **Emi compacta las tres antes de
+  dormir:** a eso de las 20:30 (Argentina) la PM principal le pasa los tres
+  `/compact conservar: …`, sin mirar el porcentaje. (Emi, 2026-10-07, tarde:
+  con 30 % una Dev compactaba después de cada pieza. Si la cuenta vuelve a
+  llegar a su límite, ese mismo día se vuelve a 30 y 40.)
+- **Nadie se frena esperando el `/compact`:** la sesión deja el texto en su
+  informe y sigue con lo que tiene escrito en su canal; Emi lo pega cuando la
+  ve quieta.
+- **El porcentaje que vale es el de la PM** (`get_session`). El «~X %» que
+  anota cada sesión es una estimación y nunca alcanza para frenarse.
 - **Se mide:** en cada veredicto, la PM anota cuánto contexto usó la Dev en
   la pieza. El 2026-10-27 se revisa el número con esos datos.
 - **Lo mide la PM principal:** en cada vuelta, `get_session` de cada sesión da
