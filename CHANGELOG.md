@@ -9,6 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-10-07 · fix: un PDF armado no deja a nadie sin lectura (RENDIMIENTO-1b)
 
 - **fix(rendimiento):** la adivinanza del vendedor lee el texto del PDF sólo con `pypdf`: `pdfminer` se colgaba para siempre con un PDF armado y, con cuatro de esos, nadie más podía leer un PDF hasta reiniciar. Los tiempos máximos en 0 o negativos valen el de siempre.
+- **fix(vendedor):** el vendedor adivinado nunca es una etiqueta («BUYER», «CONSIGNEE», etc.): con «SELLER:» y «BUYER:» en la misma fila queda el nombre o nada.
 
 ## 2026-10-07 · fix: leer un PDF no frena el sitio (RENDIMIENTO-1)
 

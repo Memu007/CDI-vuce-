@@ -897,6 +897,25 @@ _VENDOR_LINE_PREFIX_REJECT_RE = re.compile(
 )
 
 
+# Etiquetas de las partes de una factura. Con dos columnas («SELLER:» y
+# «BUYER:» en la misma fila), el lector de texto las junta y lo que sigue a
+# «SELLER:» es otra etiqueta: el vendedor nunca es una etiqueta. Si la
+# etiqueta aparece después del nombre, el nombre se corta ahí
+# (RENDIMIENTO-1b, devolución de la PM).
+_ETIQUETAS_PARTES = (
+    r'(?:BUYER|CONSIGNEE|SELLER|SHIPPER|VENDOR|VENDEDOR|SUPPLIER|PROVEEDOR'
+    r'|EXPORTER|EXPORTADOR|IMPORTER|IMPORTADOR|COMPRADOR|FORNECEDOR'
+    r'|CONSIGNATARIO|DESTINATARIO|REMITENTE|NOTIFY(?:\s+PARTY)?'
+    r'|SOLD\s+TO|BILL\s+TO|SHIP\s+TO|CLIENTE|CUSTOMER)'
+)
+_VENDOR_ES_ETIQUETA_RE = re.compile(
+    r'^' + _ETIQUETAS_PARTES + r'\s*(?:[:\-]|$)', re.IGNORECASE
+)
+_VENDOR_CORTE_EN_ETIQUETA_RE = re.compile(
+    r'\s+' + _ETIQUETAS_PARTES + r'\s*[:\-]', re.IGNORECASE
+)
+
+
 def _clean_vendor_candidate(raw: str) -> str:
     """Normaliza una captura de vendor: strip, colapsa espacios, recorta basura."""
     if not raw:
@@ -907,6 +926,11 @@ def _clean_vendor_candidate(raw: str) -> str:
     candidate = candidate.split('\n')[0].strip()
     # Si trae paréntesis con tax id al final, quitarlos
     candidate = re.sub(r'\s*\([^)]{0,40}\)\s*$', '', candidate).strip()
+    # El vendedor nunca es una etiqueta; si otra etiqueta viene detrás del
+    # nombre (dos columnas en una fila), se corta antes de ella.
+    if _VENDOR_ES_ETIQUETA_RE.match(candidate):
+        return ""
+    candidate = _VENDOR_CORTE_EN_ETIQUETA_RE.split(candidate, maxsplit=1)[0].strip(' :\-,;')
     return candidate
 
 
