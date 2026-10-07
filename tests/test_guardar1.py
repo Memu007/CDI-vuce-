@@ -85,16 +85,18 @@ def test_la_sugerencia_del_cliente_devuelve_el_ncm_de_la_sim(client):
 
 
 def test_si_el_historial_falla_la_operacion_igual_se_guarda(client, monkeypatch):
-    """El historial no puede tirar abajo el guardado: una fila que la base
-    rechaza al guardar (acá, sin cliente) no se lleva la operación."""
-    import proyecto_maria.services.client_memory as memoria
+    """El historial no puede tirar abajo el guardado: si falla hasta su
+    commit (acá, una fila sin cliente que se cuela fuera del savepoint), la
+    operación ya quedó guardada y contada."""
+    import proyecto_maria.main as main_mod
     from proyecto_maria.database.models import ClientProductHistory
 
-    async def _fila_que_la_base_rechaza(db, **kwargs):
+    async def _fila_que_la_base_rechaza(db, upsert, **kwargs):
         db.add(ClientProductHistory(owner_username=kwargs["owner_username"], client_id=None,
                                     ncm="1", descripcion="x"))
+        return True
 
-    monkeypatch.setattr(memoria, "upsert_client_product_history", _fila_que_la_base_rechaza)
+    monkeypatch.setattr(main_mod, "_historial_de_un_producto", _fila_que_la_base_rechaza)
     cid = _cliente(client)
     usuario = _sql("select owner_username from clients where id=:c", c=cid)[0][0]
     antes = _sql("select coalesce(ops_used_this_period, 0) from users where username=:u", u=usuario)[0][0]
@@ -197,3 +199,52 @@ def test_datos_largos_de_la_operacion_no_impiden_guardarla(client):
     assert _sql("select currency, length(source) from operations where id=:o", o=op) == [("DOL", 50)]
     assert _sql("select descripcion from operation_items where operation_id=:o", o=op) == [("COMPUTADORA",)]
     assert _sql("select fecha_inic_activ from clients where id=:c", c=cid) == [("2020-01-15",)]
+
+
+def _con_un_producto_que_la_base_rechaza(monkeypatch):
+    """El producto «MALO» deja una fila que la base rechaza al escribirla; los
+    demás pasan por el historial de verdad."""
+    import proyecto_maria.services.client_memory as memoria
+    from proyecto_maria.database.models import ClientProductHistory
+    real = memoria.upsert_client_product_history
+
+    async def _upsert(db, *args, **kwargs):
+        if kwargs.get("descripcion") == "MALO":
+            db.add(ClientProductHistory(owner_username=kwargs["owner_username"], client_id=None,
+                                        ncm="1", descripcion="x"))
+            return None
+        return await real(db, *args, **kwargs)
+    monkeypatch.setattr(memoria, "upsert_client_product_history", _upsert)
+
+
+def test_un_producto_malo_no_se_lleva_el_historial_de_los_demas(client, monkeypatch):
+    _con_un_producto_que_la_base_rechaza(monkeypatch)
+    cid = _cliente(client)
+    r = _guardar(client, cid, [{"pieza": "84713012", "descripcion": "TABLETA"},
+                               {"pieza": "84714900", "descripcion": "MALO"},
+                               {"pieza": SIM, "descripcion": "COMPUTADORA PORTATIL"}])
+    assert r.status_code == 200 and r.json()["historial_guardado"] is False, r.text
+    assert _historial(cid) == {"TABLETA": "84713012", "COMPUTADORA PORTATIL": "84714900"}
+
+
+def test_aprender_con_un_producto_malo_guarda_los_demas(client, monkeypatch):
+    _con_un_producto_que_la_base_rechaza(monkeypatch)
+    cid = _cliente(client)
+    r = client.post(f"/api/clientes/{cid}/catalogo/productos/learn", json={"items": [
+        {"ncm": "84714900", "descripcion": "MALO"}, {"ncm": SIM, "descripcion": "COMPUTADORA PORTATIL"}]})
+    assert r.status_code == 200 and r.json()["aprendidos"] == 1, r.text
+    assert _historial(cid) == {"COMPUTADORA PORTATIL": "84714900"}
+
+
+def test_un_grupo_fuera_de_rango_y_el_nul_en_otros_textos_no_impiden_guardar(client):
+    """Postgres: Integer de 32 bits y ningún texto con NUL."""
+    cid = _cliente(client)
+    r = client.post(f"/api/clientes/{cid}/operaciones", json={
+        "comprador_domicilio": "CALLE\x00 1",
+        "items": [{"pieza": "8471\x004900", "descripcion": "TABLETA", "origen": "C\x00HN",
+                   "unidad": "u\x00", "grupo_id": 2 ** 31}]})
+    assert r.status_code == 200, r.text
+    op = r.json()["operation_id"]
+    assert _sql("select pieza, origen, unidad, grupo_id from operation_items where operation_id=:o", o=op) \
+        == [("84714900", "CHN", "u", None)]
+    assert _sql("select address from clients where id=:c", c=cid) == [("CALLE 1",)]
