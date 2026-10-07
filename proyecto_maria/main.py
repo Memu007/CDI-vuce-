@@ -1309,12 +1309,14 @@ async def lifespan(app: FastAPI):
     
     # Montar Admin Router si no está montado
     # FastAPI lifespan se ejecuta antes de empezar a servir peticiones
+    # /api/admin/* es del admin: salud, errores, métricas y borrar el registro
+    # de errores actúan sobre todo el sistema (ADMIN-1).
     app.include_router(
         admin_router.router,
-        dependencies=[Depends(get_current_user)]
+        dependencies=[Depends(require_admin)]
     )
     app.include_router(quote_router.router)
-    print("🔒 Admin Router mounted with Authentication enabled.")
+    print("🔒 Admin Router mounted: requires admin.")
 
     async for session in get_async_session():
         try:
@@ -1718,7 +1720,10 @@ async def current_user_info(user=Depends(get_current_user)):
 
 # --- ADMIN DEPENDENCY ---
 # Un user es admin si su username esta en ADMIN_USERNAMES (env, separado por
-# comas) o si tiene "admin" en roles. Protege endpoints sensibles /api/dev/*.
+# comas) o si tiene "admin" en roles. Protege /api/dev/*, /dev/*, /api/admin/*
+# y las funciones globales (las que no actúan sobre un estudio), que además
+# llevan tags=["admin"]. tests/test_admin_solo_admin.py recorre las rutas y
+# falla si alguna de esas deja pasar a un usuario común.
 def _admin_usernames() -> set:
     raw = os.getenv("ADMIN_USERNAMES", "")
     return {u.strip() for u in raw.split(",") if u.strip()}
@@ -6409,17 +6414,18 @@ async def system_connectors(user=Depends(get_current_user)):
     }
 
 
-@app.post("/api/ncm/cache/refresh")
+@app.post("/api/ncm/cache/refresh", tags=["admin"])
 async def refresh_ncm_cache(
     request_data: NCMCacheRefreshRequest,
-    user=Depends(get_current_user),
+    user=Depends(require_admin),
     db: AsyncSession = Depends(get_db),
 ):
     """Fuerza un re-fetch del NCM ignorando el cache DB + memoria.
 
-    Util para despachante/admin cuando sospecha que el cache tiene un valor
-    desactualizado (p. ej. hubo un decreto que cambio alicuotas). No requiere
-    rol admin en la beta; cualquier usuario autenticado puede refrescar.
+    Util para el admin cuando sospecha que el cache tiene un valor
+    desactualizado (p. ej. hubo un decreto que cambio alicuotas). El cache es
+    global (lo comparten todos los estudios), por eso exige admin (ADMIN-1).
+    El tag "admin" lo marca para la prueba que recorre las rutas.
     """
     ncm_clean = re.sub(r"[^0-9]", "", request_data.ncm or "")[:8]
     if len(ncm_clean) < 6:
