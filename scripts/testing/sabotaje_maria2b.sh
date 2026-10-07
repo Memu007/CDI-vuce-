@@ -80,5 +80,23 @@ reemplazar $F "    print(\"❌ Gemini Vision failed, returning empty\")
     if True:"
 caso "sin_productos_503" "FAILED $T::test_gemini_responde_sin_productos_sigue_el_400[pymupdf]"
 
+# 4. la copia de producción vuelve a tragarse la falla al configurar Gemini
+reemplazar $F "            print(f\"❌ Direct PDF extraction failed: {direct_err}\")
+            raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)" "            print(f\"❌ Direct PDF extraction failed: {direct_err}\")
+            return _fallback_image_extraction(data)"
+caso "directo_configure" "FAILED $T::test_configurar_gemini_falla_da_el_503[pdf_directo]"
+
+# 5. una respuesta vacía de Gemini no cuenta como falla (copia de producción)
+reemplazar $F "                    else:
+                        gemini_fallo = True  # respuesta vacía o bloqueada" "                    else:
+                        gemini_fallo = False  # respuesta vacía o bloqueada"
+caso "respuesta_vacia" "FAILED $T::test_respuesta_vacia_de_gemini_da_el_503[texto_vacio-pdf_directo]"
+
+# 6. arreglo de más en la copia de producción: sin productos también da 503
+reemplazar $F "            if gemini_fallo:
+                raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)
+            return _fallback_image_extraction(data)" "            raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)"
+caso "directo_sin_productos_503" "FAILED $T::test_gemini_responde_sin_productos_sigue_el_400[pdf_directo]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 3 sabotajes dan rojo por la razón esperada"
+echo "OK: los 6 sabotajes dan rojo por la razón esperada"

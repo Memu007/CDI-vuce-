@@ -102,6 +102,7 @@ def test_lector_sin_clave_levanta_error_propio(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     with pytest.raises(pdf_extractor.LecturaAutomaticaNoDisponible):
         pdf_extractor.process_pdf(_pdf_en_blanco())
+    assert LLAMADAS_PROHIBIDAS == []
 
 
 def test_robust_extract_sin_clave_devuelve_cero_items(monkeypatch):
@@ -109,6 +110,7 @@ def test_robust_extract_sin_clave_devuelve_cero_items(monkeypatch):
     Sin clave no inventa nada."""
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     assert pdf_extractor.robust_extract_pdf_items(_pdf_en_blanco()) == []
+    assert LLAMADAS_PROHIBIDAS == []
 
 
 def test_con_clave_inventada_sigue_leyendo_con_el_modelo(client, auth_override, monkeypatch):

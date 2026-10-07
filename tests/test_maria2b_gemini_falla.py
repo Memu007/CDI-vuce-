@@ -106,3 +106,25 @@ def test_gemini_responde_sin_productos_sigue_el_400(client, auth_override, monke
 
     assert r.status_code == 400, r.text
     assert r.json().get("code") != CODIGO
+
+
+@pytest.mark.parametrize("copia", COPIAS)
+@pytest.mark.parametrize("respuesta", [types.SimpleNamespace(text=""), None], ids=["texto_vacio", "sin_respuesta"])
+def test_respuesta_vacia_de_gemini_da_el_503(client, auth_override, monkeypatch, copia, respuesta):
+    _gemini(monkeypatch, copia, lambda: respuesta)
+    r = _subir(client)
+    assert r.status_code == 503, r.text
+    assert r.json().get("code") == CODIGO
+
+
+@pytest.mark.parametrize("copia", COPIAS)
+def test_configurar_gemini_falla_da_el_503(client, auth_override, monkeypatch, copia):
+    _gemini(monkeypatch, copia, _ilegible)
+
+    def _configure_rompe(**kw):
+        raise ValueError("credenciales mal formadas")
+
+    monkeypatch.setattr(sys.modules["google.generativeai"], "configure", _configure_rompe)
+    r = _subir(client)
+    assert r.status_code == 503, r.text
+    assert r.json().get("code") == CODIGO
