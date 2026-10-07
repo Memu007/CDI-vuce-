@@ -72,6 +72,17 @@
         return Number(s);
     }
 
+    // Fecha de emisión válida, con las mismas reglas que el servidor
+    // (`fecha_de_la_factura`): sin ella no se genera el TXT (MARIA-3).
+    function fechaValida(raw) {
+        const m = String(raw || '').trim().match(/^([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{4}|[0-9]{2})$/);
+        if (!m) return false;
+        const dia = Number(m[1]), mes = Number(m[2]);
+        const anio = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+        const f = new Date(anio, mes - 1, dia);
+        return anio >= 1900 && f.getFullYear() === anio && f.getMonth() === mes - 1 && f.getDate() === dia;
+    }
+
     // Validacion por campo: retorna string con error o null si OK
     const VALIDATORS = {
         comprador_cuit: (v) => {
@@ -141,9 +152,8 @@
         },
         fecha_emision: (v) => {
             if (!v) return null;
-            if (!/^\d{2}\/\d{2}\/(\d{2}|\d{4})$/.test(String(v).trim())) {
-                return 'Formato esperado: DD/MM/AAAA';
-            }
+            // Como el servidor: d/m de una o dos cifras, AA = 20AA, fecha real.
+            if (!fechaValida(v)) return 'Fecha no válida. Formato esperado: DD/MM/AAAA';
             return null;
         },
         fecha_embarque: (v) => {

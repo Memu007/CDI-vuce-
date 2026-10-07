@@ -70,7 +70,7 @@ PROJECT_VERSION = datetime.now().strftime("%Y%m%d%H%M%S")
 from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, supuestos_declarados, gastos_fob_para_el_txt
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, importe_valido, supuestos_declarados, gastos_fob_para_el_txt
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
     LecturaAutomaticaNoDisponible,
@@ -3591,8 +3591,7 @@ def _items_con_procedencia(request: MariaRequest) -> list:
         )
     return [
         {**it, "pais_procedencia": procedencia}
-        if isinstance(it, dict)
-        and not str(it.get("pais_procedencia") or it.get("procedencia") or "").strip()
+        if isinstance(it, dict) and not procedencia_de(it)
         else it
         for it in (request.items or [])
     ]
@@ -3627,6 +3626,8 @@ async def avisos_maria_endpoint(
     items = _items_con_procedencia(request)
     try:
         gastos = gastos_fob_para_el_txt(request.incoterm, request.gastos_fob, request.gastos_anteriores_fob)
+        importe_valido(request.flete, "Flete")
+        importe_valido(request.seguro, "Seguro")
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     try:

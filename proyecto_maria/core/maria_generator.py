@@ -265,26 +265,31 @@ PAIS_ARGENTINA = 200
 INCOTERMS_GASTOS_ANTERIORES = {"EXW", "FCA", "FAS"}
 
 
-# Tope de un importe de gastos: más que esto no es un gasto, es un error de
-# carga (devolución de MARIA-3: «1e308» llegaba al TXT).
-GASTOS_MAXIMO = 1_000_000_000
+# Tope de un importe (gastos, flete, seguro): más que esto no es un importe,
+# es un error de carga (devolución de MARIA-3: «1e308» llegaba al TXT). Un
+# billón deja pasar montos reales en monedas de poco valor (CLP, JPY).
+IMPORTE_MAXIMO = 1_000_000_000_000
 
 
-def _importe_de_gastos(valor, campo: str):
-    """El importe de gastos como número, o None si no vino. Un importe no
-    finito, negativo o absurdo es un error con mensaje propio (400)."""
+def importe_valido(valor, nombre: str):
+    """El importe como número, o None si no vino. Un importe no finito,
+    negativo o absurdo es un error con mensaje propio (400)."""
     if valor is None:
         return None
     try:
         importe = float(valor)
     except (TypeError, ValueError):
-        raise ValueError(f"Gastos ({campo}): «{str(valor)[:20]}» no es un importe.")
-    if not math.isfinite(importe) or importe < 0 or importe > GASTOS_MAXIMO:
+        raise ValueError(f"{nombre}: «{str(valor)[:20]}» no es un importe.")
+    if not math.isfinite(importe) or importe < 0 or importe > IMPORTE_MAXIMO:
         raise ValueError(
-            f"Gastos ({campo}): «{str(valor)[:20]}» no es un importe válido "
-            f"(entre 0 y {GASTOS_MAXIMO:,}).".replace(",", ".")
+            f"{nombre}: «{str(valor)[:20]}» no es un importe válido "
+            f"(entre 0 y {IMPORTE_MAXIMO:,}).".replace(",", ".")
         )
     return importe
+
+
+def _importe_de_gastos(valor, campo: str):
+    return importe_valido(valor, f"Gastos ({campo})")
 
 
 def gastos_fob_para_el_txt(incoterm, gastos_fob=None, gastos_anteriores_fob=None):
@@ -338,8 +343,26 @@ def codigos_tabla_oficial() -> frozenset:
     """Los códigos de país de la tabla oficial MARIA (TABLA PAISES V.0
     25082010.xlsx, 309 países). Una sola copia: la que usa la pantalla."""
     js = _PAISES_PANTALLA.read_text(encoding="utf-8")
-    paises = json.loads(re.search(r"const COUNTRIES = (\[.*?\]);", js).group(1))
-    return frozenset(int(p["code"]) for p in paises)
+    m = re.search(r"const COUNTRIES = (\[.*?\]);", js)
+    if not m:
+        raise RuntimeError(f"No se encontró la tabla de países (const COUNTRIES) en {_PAISES_PANTALLA}")
+    return frozenset(int(p["code"]) for p in json.loads(m.group(1)))
+
+
+def _codigo_de_la_tabla(texto: str) -> bool:
+    """Un código de país: sólo cifras 0-9 y en la tabla oficial («²», «٢٢٢» o
+    «99999» no son países)."""
+    return bool(re.fullmatch(r"[0-9]+", texto)) and int(texto) in codigos_tabla_oficial()
+
+
+def procedencia_de(item: dict) -> str:
+    """La procedencia propia del producto: la primera no vacía entre
+    `pais_procedencia` y `procedencia` (una en blanco no tapa la otra)."""
+    for clave in ("pais_procedencia", "procedencia"):
+        valor = str(item.get(clave) or "").strip()
+        if valor:
+            return valor
+    return ""
 
 
 def _estado_item(item: dict, idx, pais_codigo: int) -> int:
@@ -385,20 +408,16 @@ def pais_reconocido(pais) -> bool:
     """
     if pais is None or str(pais).strip() == "":
         return False
-    if str(pais).strip().isdigit():
-        return True
+    texto = str(pais).strip()
+    if any(c.isdigit() for c in texto):
+        return _codigo_de_la_tabla(texto)
     return _normalizar_pais(pais) in _PAISES_NORM
 
 
 def pais_de_la_tabla(pais) -> bool:
     """Como `pais_reconocido`, pero un código numérico tiene que estar en la
     tabla oficial de la pantalla (MARIA-3, procedencia: «99999» no es un país)."""
-    texto = str(pais or "").strip()
-    if any(c.isdigit() for c in texto):
-        # Sólo un código de cifras 0-9 que esté en la tabla oficial («²» o
-        # «٢٢٢» no son códigos).
-        return bool(re.fullmatch(r"[0-9]+", texto)) and int(texto) in codigos_tabla_oficial()
-    return pais_reconocido(texto)
+    return pais_reconocido(pais)
 
 
 def get_pais_codigo(pais: str) -> int:
@@ -414,7 +433,7 @@ def get_pais_codigo(pais: str) -> int:
         return PAIS_DEFAULT_IMPORT
 
     # Si ya es un número, devolverlo
-    if str(pais).strip().isdigit():
+    if re.fullmatch(r"[0-9]+", str(pais).strip()):
         return int(str(pais).strip())
 
     norm = _normalizar_pais(pais)
@@ -504,6 +523,10 @@ def generate_maria_txt(operation_id: str, items: list,
             f"Empresa de digitalización «{empresa_digitalizacion}» no válida (PSAD06 Modoc o PSAD01 Lakaut)."
         )
     iva_adicional = _iva_adicional(iva_adicional or IVA_ADICIONAL_POR_DEFECTO, "Operación")
+    # Con C y D los gastos salen de flete + seguro: un importe inválido no
+    # llega al TXT por ese camino (revisión de la devolución de MARIA-3).
+    flete = importe_valido(flete or 0, "Flete")
+    seguro = importe_valido(seguro or 0, "Seguro")
 
     # Calcular totales
     fob_total = sum(
@@ -567,8 +590,8 @@ def generate_maria_txt(operation_id: str, items: list,
     lines.append(f"MCPL={operation_id:<40}")
     lines.append("")
     
-    # 2. Fecha de emisión de la factura. Si no se leyó, el campo sale vacío y
-    # los supuestos lo avisan: antes salía la fecha de hoy (MARIA-3, D15).
+    # 2. Fecha de emisión de la factura. Sin una fecha válida no se genera
+    # (devolución de MARIA-3): antes salía la fecha de hoy (D15).
     fecha_factura = fecha_de_la_factura(fecha_emision)
     if not fecha_factura:
         leida = str(fecha_emision or "").strip()[:20]
@@ -579,7 +602,7 @@ def generate_maria_txt(operation_id: str, items: list,
         )
 
     # Año de dos dígitos para el IEXT de cada ítem (`00272-01/26`). Sale del
-    # año de la factura; si no se puede leer, del año actual.
+    # año de la factura, que a esta altura es válida.
     #
     # Antes estaba escrito a mano como "25". Silenciosamente iba a poner /25 en
     # toda declaración generada de 2026 en adelante: el TXT sale igual, no
@@ -800,7 +823,7 @@ def generate_maria_txt(operation_id: str, items: list,
         # El fallback se avisa en `supuestos_declarados()`: en el archivo real
         # de referencia origen y procedencia difieren (200 vs 222), asi que
         # asumirlos iguales en silencio no es gratis.
-        pais_proc = (str(item.get('pais_procedencia') or item.get('procedencia') or '').strip() or pais)
+        pais_proc = procedencia_de(item) or pais
         pais_proc_codigo = get_pais_codigo(pais_proc)
         # Unidad de medida del item (con fallback a 07=UNIDAD si no viene).
         unidad_codigo = get_unidad_codigo(
@@ -982,6 +1005,9 @@ def validate_items_for_maria(items: list) -> tuple[bool, list]:
             errors.append(f"Item {idx}: Falta origen/país de origen")
         elif not pais_reconocido(origen):
             errors.append(f"Item {idx}: Origen no reconocido '{origen}'. Debe indicar un país válido.")
+        procedencia = procedencia_de(item)
+        if procedencia and not pais_reconocido(procedencia):
+            errors.append(f"Item {idx}: Procedencia no reconocida '{procedencia}'. Debe indicar un país válido.")
     
     return len(errors) == 0, errors
 
@@ -1072,14 +1098,14 @@ def supuestos_declarados(
 
     # --- Fecha de emisión (MARIA-3) ----------------------------------------
     fecha_ok = fecha_de_la_factura(fecha_emision)
-    if items and not fecha_ok:
+    if not fecha_ok:
         leida = str(fecha_emision or "").strip()
         avisos.append(
             "Fecha de emisión: " + (f"«{leida[:20]}» no es una fecha (DD/MM/AAAA); "
                                     if leida else "no se leyó de la factura; ")
             + "sin una fecha válida no se genera el TXT. Cargala en la revisión."
         )
-    elif items:
+    else:
         fecha = datetime.strptime(fecha_ok, "%d/%m/%Y")
         hoy = datetime.now()
         if fecha > hoy + timedelta(days=1):
@@ -1097,7 +1123,7 @@ def supuestos_declarados(
             continue
         # Mismo orden que el generador: pais_origen primero.
         origen = item.get("pais_origen") or item.get("origen")
-        proc = str(item.get("procedencia") or item.get("pais_procedencia") or "").strip()
+        proc = procedencia_de(item)
         if origen and not proc:
             sin_procedencia.append(str(idx))
         if not (item.get("unidad") or item.get("unidad_medida") or item.get("um")):
