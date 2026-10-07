@@ -9,6 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-10-07 · fix: la carga por Excel (EXCEL-1)
 
 - **fix(rendimiento):** leer un Excel o un CSV (`/upload_excel/`, `/upload_excel_v2/`, importar clientes, importar historial NCM, analizar una migración) y validarlo al subirlo corren en otro hilo: el sitio sigue atendiendo a los demás. Tienen tiempo máximo (`EXCEL_READ_TIMEOUT_S`, 60 s) con un error propio (`lectura_excel_demasiado_larga`); la pantalla ofrece la carga a mano.
+- **fix(excel):** en `/upload_excel_v2/`, el precio unitario gana sobre una columna «Valor» (total); el peso neto o unitario gana sobre el bruto, y sin uno de ellos el peso queda vacío en vez de tomar el bruto o el total; las filas de total o subtotal no entran como ítem; «.XLSX» en mayúsculas ya no da error; se reconocen encabezados con la unidad entre paréntesis; el mapeo guardado del cliente se completa con los encabezados nuevos; y la pantalla avisa cuántas filas no se pudieron leer.
 
 ## 2026-10-07 · fix: un PDF armado no deja a nadie sin lectura (RENDIMIENTO-1b)
 

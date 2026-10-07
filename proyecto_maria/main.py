@@ -3428,7 +3428,7 @@ async def upload_excel(
             # Leer el Excel y extraer los datos, en otro hilo y con tiempo
             # máximo: no frena al resto (EXCEL-1).
             def _leer_excel():
-                df = pd.read_excel(temp_filename, engine='openpyxl' if temp_filename.endswith('.xlsx') else 'xlrd')
+                df = pd.read_excel(temp_filename, engine='openpyxl' if temp_filename.lower().endswith('.xlsx') else 'xlrd')
                 return extract_items_from_excel(df, file.filename)
 
             try:
@@ -3920,7 +3920,12 @@ async def generate_maria_export_endpoint(
         print(f"Error generando MARIA EXPORT TXT: {e}")
         raise HTTPException(status_code=500, detail=f"Error generando archivo MARIA export: {str(e)}")
 
-def extract_items_from_excel(df: pd.DataFrame, filename: str) -> list[Item]:
+_FILA_DE_TOTAL_RE = re.compile(
+    r"^\s*(?:sub\s*-?\s*total|totales?|grand\s+total)\b", re.IGNORECASE
+)
+
+
+def extract_items_from_excel(df: pd.DataFrame, filename: str, descartes: list | None = None) -> list[Item]:
     """
     Extrae items de un DataFrame de Excel intentando diferentes formatos.
     """
@@ -3949,18 +3954,27 @@ def extract_items_from_excel(df: pd.DataFrame, filename: str) -> list[Item]:
     ]
 
     for mapping in possible_mappings:
-        items = try_extract_with_mapping(df, mapping)
+        de_este = []
+        items = try_extract_with_mapping(df, mapping, de_este)
         if items:
+            if descartes is not None:
+                descartes.extend(de_este)
             print(f"✅ Extraídos {len(items)} items usando mapeo: {list(mapping.keys())}")
             break
 
     return items
 
-def try_extract_with_mapping(df: pd.DataFrame, mapping: dict) -> list[Item]:
+def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | None = None) -> list[Item]:
     """
     Intenta extraer items usando un mapeo específico de columnas.
+
+    Las filas con datos que no se pudieron leer se anotan en `descartes` (su
+    número de fila en la planilla) para avisarle al usuario; las filas vacías y
+    las de total o subtotal no cuentan (EXCEL-1).
     """
     items = []
+    if descartes is None:
+        descartes = []
 
     for _, row in df.iterrows():
         try:
@@ -3972,20 +3986,28 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict) -> list[Item]:
             cant_col = find_column(df.columns, mapping['cantidad'])
             valor_col = find_column(df.columns, mapping['valor_unitario'])
 
-            # Si no encuentra todas las columnas obligatorias, continuar con otro mapeo
-            if not all([pieza_col, desc_col, origen_col, peso_col, cant_col, valor_col]):
+            # Si no encuentra todas las columnas obligatorias, continuar con otro
+            # mapeo. El peso no es obligatorio: sin columna queda vacío (EXCEL-1).
+            if not all([pieza_col, desc_col, origen_col, cant_col, valor_col]):
                 continue
+
+            if all((not pd.notna(v)) or str(v).strip() == "" for v in row.values):
+                continue  # fila vacía
 
             # Extraer valores
             pieza = str(row[pieza_col]).strip() if pd.notna(row[pieza_col]) else ""
             descripcion = str(row[desc_col]).strip() if pd.notna(row[desc_col]) else ""
             origen = str(row[origen_col]).strip() if pd.notna(row[origen_col]) else ""
 
+            if _FILA_DE_TOTAL_RE.match(descripcion) or _FILA_DE_TOTAL_RE.match(pieza):
+                continue  # fila de total o subtotal: no es un ítem
+
             try:
-                peso_unitario = float(row[peso_col]) if pd.notna(row[peso_col]) else 0
+                peso_unitario = float(row[peso_col]) if peso_col and pd.notna(row[peso_col]) else 0
                 cantidad = float(row[cant_col]) if pd.notna(row[cant_col]) else 0
                 valor_unitario = float(row[valor_col]) if pd.notna(row[valor_col]) else 0
             except (ValueError, TypeError):
+                descartes.append(_ + 2)
                 continue  # Saltar fila si no puede convertir números
 
             # Solo agregar si tiene datos básicos. El peso puede venir en 0
@@ -4000,9 +4022,12 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict) -> list[Item]:
                     valor_unitario=valor_unitario
                 )
                 items.append(item)
+            else:
+                descartes.append(_ + 2)
 
         except Exception as e:
             print(f"⚠️  Error procesando fila: {e}")
+            descartes.append(_ + 2)
             continue
 
     return items
@@ -4604,13 +4629,17 @@ _ITEM_COL_ALIASES = {
     "cantidad": [
         "cantidad", "qty", "quantity", "cant", "unidades", "piezas", "bultos",
     ],
+    # Primero los nombres de precio por unidad: «Valor» suele ser el total
+    # de la fila y sólo se usa si no hay otro (EXCEL-1).
     "valor_unitario": [
-        "valorunitario", "valor", "precio", "price", "unitprice", "preciounitario",
-        "valorunit", "preciounit", "unitvalue", "costounitario",
+        "valorunitario", "preciounitario", "unitprice", "valorunit", "preciounit",
+        "unitvalue", "costounitario", "precio", "price", "valor",
     ],
+    # El peso bruto o total no es el peso neto por unidad: sin una de estas
+    # columnas, el peso queda vacío y el TXT pide completarlo (EXCEL-1).
     "peso_unitario": [
-        "pesounitario", "peso", "weight", "pesounit", "unitweight", "pesototal",
-        "pesobruto", "pesoneto",
+        "pesounitario", "pesoneto", "pesounit", "unitweight", "netweight",
+        "peso", "weight",
     ],
 }
 
@@ -4633,7 +4662,9 @@ def _detect_item_columns(headers: list) -> dict:
     El formato es {source: canon} para ser compatible con `Client.column_mapping`
     y con `upload_excel_v2`.
     """
-    norm_to_orig = {_normalize_header(h): h for h in headers}
+    # «Precio Unitario (USD)» o «Peso Neto (kg)»: la unidad entre paréntesis
+    # no es parte del nombre de la columna (EXCEL-1).
+    norm_to_orig = {_normalize_header(re.sub(r"\(.*?\)", "", str(h or ""))): h for h in headers}
     mapping: dict[str, str] = {}
     for canon, aliases in _ITEM_COL_ALIASES.items():
         for alias in aliases:
@@ -6351,7 +6382,7 @@ async def upload_excel_v2(
         with os.fdopen(temp_fd, "wb") as f:
             f.write(contents)
 
-        engine = "openpyxl" if temp_filename.endswith(".xlsx") else "xlrd"
+        engine = "openpyxl" if temp_filename.lower().endswith(".xlsx") else "xlrd"
         # En otro hilo y con tiempo máximo: no frena al resto (EXCEL-1).
         df = await _leer_pdf_aparte(
             _leer_excel_ruta, temp_filename, engine,
@@ -6362,18 +6393,27 @@ async def upload_excel_v2(
         detected_mapping = _detect_item_columns(list(df.columns))
 
         # Aplicar mapping renombrando columnas a canonicas antes de extraer
-        effective_mapping: dict = {}
-        if mapping:
-            effective_mapping = {src: canon for src, canon in mapping.items() if canon in _CANON_COLUMNS}
-        elif detected_mapping:
-            effective_mapping = detected_mapping
+        # El mapeo guardado del cliente manda en las columnas que el archivo
+        # trae; lo que no cubre (encabezados nuevos) lo completa lo detectado
+        # (EXCEL-1).
+        presentes = set(df.columns)
+        effective_mapping: dict = {
+            src: canon for src, canon in (mapping or {}).items()
+            if canon in _CANON_COLUMNS and src in presentes
+        }
+        cubiertos = set(effective_mapping.values())
+        for src, canon in (detected_mapping or {}).items():
+            if canon not in cubiertos and src not in effective_mapping:
+                effective_mapping[src] = canon
+                cubiertos.add(canon)
 
         if effective_mapping:
             rename = {src: canon for src, canon in effective_mapping.items() if canon in _CANON_COLUMNS}
             df = df.rename(columns=rename)
 
+        descartes: list = []
         items = await _leer_pdf_aparte(
-            extract_items_from_excel, df, file.filename,
+            extract_items_from_excel, df, file.filename, descartes,
             limite=_excel_read_timeout_s(), que="el Excel",
         )
         if not items:
@@ -6436,6 +6476,9 @@ async def upload_excel_v2(
             "filename": file.filename,
             "items": items_data,
             "items_count": len(items_data),
+            # Filas con datos que no se pudieron leer: la pantalla avisa (EXCEL-1).
+            "filas_descartadas": len(descartes),
+            "filas_descartadas_numeros": descartes[:50],
             "operacion": operacion,
             "applied_mapping": bool(effective_mapping),
             "catalogo": catalogo_info,
