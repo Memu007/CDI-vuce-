@@ -69,8 +69,8 @@ MARIA-6 arranca cuando lleguen sus archivos reales.
 | ✅ | RENDIMIENTO-1b | Un PDF armado no deja a nadie sin lectura: la adivinanza del vendedor usa sólo `pypdf`; tiempos en 0 o negativos caen al valor por defecto (D10 b de la Dev 1). Se publica junto con RENDIMIENTO-1 |
 | ✅ | EXCEL-1 | Revisar la carga por Excel de punta a punta (nunca se auditó) y arreglar lo que falle; leer un Excel tampoco frena el sitio (D12 de la Dev 1) |
 | ✅ | MARIA-1b | Controles antes de generar: NCM del catálogo, moneda, incoterm, CUIT, montos; ningún texto mete líneas en el TXT; las filas de total o de flete no pasan como productos; al guardar la operación no se inventan cantidad 1 ni peso 0,5 (M10, D6 de la Dev 2) |
-| 1 | PUNTA-A-PUNTA-1 | Prueba automática: sube un PDF y un Excel (Gemini simulado) y compara el TXT con los archivos reales |
-| 2 | EXCEL-2 | Abrir un libro armado no traba la lectura (D26 de la Dev 1); lo que el Excel todavía no lee: encabezado fuera de la fila 1, sin columna de origen, celdas combinadas (D18 de la Dev 1); CSV con `;`, latin-1 o BOM en el historial de NCM; el aviso de mapeo nombra la columna que se usó |
+| ✅ | PUNTA-A-PUNTA-1 | Prueba automática: sube un PDF y un Excel (Gemini simulado) y compara el TXT con los archivos reales |
+| 1 | EXCEL-2 | Abrir un libro armado no traba la lectura (D26 de la Dev 1); lo que el Excel todavía no lee: encabezado fuera de la fila 1, sin columna de origen, celdas combinadas (D18 de la Dev 1); CSV con `;`, latin-1 o BOM en el historial de NCM; el aviso de mapeo nombra la columna que se usó |
 
 **Cierre:** publicar con el «dale»; Emi prueba con facturas reales; el
 despachante carga un archivo en su Kit (cierra G4).

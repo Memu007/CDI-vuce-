@@ -103,6 +103,8 @@ Suite completa en verde.
     hojas) no se tocan.
   - Después corré `sabotaje_maria3.sh` con MARIA-1b adentro, y reentregá
     MARIA-5 y CATALOGO-NCM-1 sobre esa base.
+  - Sumá a `tests/test_punta_a_punta1.py` (de la Dev 1, ya en la rama) un
+    producto con más de una unidad: el peso de la línea en `QARTKGRNET`.
 - La Dev 1 sabe que en EXCEL-2 no toca los nombres de columnas de peso.
 - Anteriores (D5 a D22): en Git.
 
