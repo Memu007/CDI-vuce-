@@ -90,5 +90,17 @@ caso "argentino_inventado" "FAILED $T::test_origen_argentino_sin_estado_no_se_in
 reemplazar proyecto_maria/main.py '    return {k: (maria.get(k) if isinstance(maria.get(k), str) else "")[:12]' '    return {k: ""'
 caso "listados_sin_maria" "FAILED $T::test_lo_elegido_se_guarda_con_la_operacion_y_vuelve_en_los_listados"
 
+# 7. (devolución) un estado que no corresponde al origen pasa
+reemplazar $F "    if (argentino and estado in ESTADOS_IMPORTADOS) or (not argentino and estado in ESTADOS_ARGENTINOS):" "    if False:"
+caso "estado_contra_origen" "FAILED $T::test_estado_que_no_corresponde_al_origen_se_rechaza"
+
+# 8. (devolución) los supuestos vuelven a leer origen antes que pais_origen
+reemplazar $F '        and get_pais_codigo(item.get("pais_origen") or item.get("origen")) != PAIS_ARGENTINA' '        and get_pais_codigo(item.get("origen") or item.get("pais_origen")) != PAIS_ARGENTINA'
+caso "orden_del_origen" "FAILED $T::test_supuestos_leen_el_origen_como_el_generador"
+
+# 9. (devolución) la pantalla vieja deja de mostrar los supuestos
+reemplazar proyecto_maria/static/app.js "const avisosMaria = [...(data.warnings || []), ...(data.supuestos || [])];" "const avisosMaria = [];"
+caso "vieja_sin_avisos" "FAILED $T::test_la_pantalla_vieja_muestra_los_avisos_de_generate_maria"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 6 sabotajes dan rojo por la razón esperada"
+echo "OK: los 9 sabotajes dan rojo por la razón esperada"
