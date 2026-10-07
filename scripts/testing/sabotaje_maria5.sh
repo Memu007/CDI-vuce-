@@ -270,7 +270,7 @@ reemplazar $M '"net" not in normal,' 'False,'
 caso neta_entre_iguales "${D}test_el_peso_neto_de_una_unidad_con_otro_nombre[columnas3-pesos3]"
 
 # 44. el aviso nombra la columna con el nombre interno
-reemplazar $M '            avisos = _peso_por_unidad(df, pesos, columna_de)' '            avisos = _peso_por_unidad(df, [columna_de.get(c, c) for c in pesos], columna_de)'
+reemplazar $M '            avisos = _peso_por_unidad(df, pesos, columna_de, clases)' '            avisos = _peso_por_unidad(df, [columna_de.get(c, c) for c in pesos], columna_de, clases)'
 caso nombre_interno "${D}test_el_aviso_nombra_la_columna_como_viene"
 
 # --- Segunda devolución de la PM ---
