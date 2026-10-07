@@ -577,11 +577,15 @@ def test_una_combinada_en_cantidad_o_precio_con_texto_no_se_copia(cantidad, prec
 
 
 def test_una_combinada_en_la_columna_de_cantidad_del_mapeo_del_cliente_tampoco_se_copia():
-    df = pd.DataFrame([["Notebook", "5 UN", "China"], ["Funda", None, None]],
-                      columns=["Goods", "Qty", "Made"])
+    """Columnas que sólo el mapeo guardado del cliente conoce: la de cantidad
+    no se rellena y la de origen sí."""
+    columnas = ["Articulo X", "Bul", "Hecho en"]
+    assert not main._detect_item_columns(columnas)  # sin el mapeo no se sabe qué son
+    df = pd.DataFrame([["Notebook", "5 UN", "China"], ["Funda", None, None]], columns=columnas)
     salida = main._rellenar_combinadas(df.copy(), [(2, 2, 3, 2), (2, 3, 3, 3)],
-                                       mapeo={"Goods": "descripcion", "Qty": "cantidad", "Made": "origen"})
-    assert pd.isna(salida.at[1, "Qty"]) and salida.at[1, "Made"] == "China"
+                                       mapeo={"Articulo X": "descripcion", "Bul": "cantidad",
+                                              "Hecho en": "origen"})
+    assert pd.isna(salida.at[1, "Bul"]) and salida.at[1, "Hecho en"] == "China", salida
 
 
 def test_una_fila_vacia_dentro_de_una_combinada_no_es_una_fila_sin_leer():
@@ -598,7 +602,7 @@ def test_una_fila_vacia_dentro_de_una_combinada_no_es_una_fila_sin_leer():
     assert not data["operacion"].get("filas_excel_sin_leer"), data["operacion"]
 
 
-@pytest.mark.parametrize("par", ["é®", "ñ\xa0", "ó¿"])
+@pytest.mark.parametrize("par", ["é®", "ñ\xa0", "ó¿", "Â°"])
 def test_un_csv_cp1252_con_un_par_que_parece_utf8_no_pierde_las_tildes(par):
     """Devolución 5: un par cp1252 que parece UTF-8 mandaba todo el archivo
     a UTF-8 con reemplazo («Acci�n»)."""

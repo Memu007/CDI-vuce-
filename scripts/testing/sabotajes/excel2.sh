@@ -110,8 +110,8 @@ sabotaje $M "sin columna de origen deja de avisarse" \
   '        if False:' \
   "FAILED $T::test_sin_columna_de_origen_entra_con_el_origen_vacio_y_avisa"
 sabotaje $M "una celda combinada vuelve a valer sólo en su primera fila" \
-  '                df.at[fila - 2, col] = valor' \
-  '                pass' \
+  '            df.loc[filas, col] = valor' \
+  '            pass' \
   "FAILED $T::test_una_celda_combinada_hacia_abajo_vale_para_todas_sus_filas"
 # Aviso de mapeo
 sabotaje $M "el aviso de mapeo deja de nombrar la columna" \
@@ -129,12 +129,12 @@ sabotaje $M "el CSV vuelve a leerse siempre con coma" \
   "FAILED $T::test_el_csv_del_historial_se_lee_con_coma_punto_y_coma_latin1_o_bom[punto y coma-"
 # Lo que encontró la revisión
 sabotaje $M "una combinada vuelve a copiar números hacia abajo" \
-  $'        if not isinstance(valor, str) or not valor.strip() or _re.fullmatch(r"[\\d\\s.,+\\-]+", valor.strip()):\n            continue' \
-  $'        if False:\n            continue' \
+  $'        if lo_que_es and lo_que_es <= _COMBINADAS_SE_COPIAN:' \
+  $'        if True:\n            lo_que_es = lo_que_es or {"descripcion"}' \
   "FAILED $T::test_una_combinada_con_cantidad_y_precio_no_duplica_el_producto"
 sabotaje $M "las combinadas vuelven a copiarse antes de buscar el encabezado" \
-  $'    df = _con_encabezado(pd.read_excel(origen, engine=engine, dtype=object), conocidas)\n    return _rellenar_combinadas(df, combinadas).dropna(how="all")' \
-  $'    df = _rellenar_combinadas(pd.read_excel(origen, engine=engine, dtype=object), combinadas)\n    return _con_encabezado(df, conocidas).dropna(how="all")' \
+  '    df = _con_encabezado(pd.read_excel(origen, engine=engine, dtype=object), nombres)' \
+  '    df = _con_encabezado(_rellenar_combinadas(pd.read_excel(origen, engine=engine, dtype=object), combinadas, mapeo), nombres)' \
   "FAILED $T::test_un_encabezado_en_dos_filas_combinadas_no_da_un_producto_fantasma"
 sabotaje $F "el libro vuelve a buscarse en xl/workbook.xml" \
   '    libro = _find_workbook_part(manifiesto).PartName[1:]' \
@@ -153,8 +153,8 @@ sabotaje $M "el mapeo del cliente deja de contar para el encabezado" \
   '    if len(_detect_item_columns(actuales)) >= 3:' \
   "FAILED $T::test_con_mapeo_del_cliente_el_pie_no_se_toma_como_encabezado"
 sabotaje $M "un CSV UTF-8 con un byte raro vuelve a leerse como cp1252" \
-  $'            if _re.search(rb"[\\xc2-\\xf4][\\x80-\\xbf]", crudo):' \
-  $'            if False:' \
+  '            if validas and len(validas) >= sueltos:' \
+  '            if False:' \
   "FAILED $T::test_un_csv_utf8_con_un_byte_raro_no_se_rompe_entero"
 sabotaje $M "el separador vuelve a contar lo que va entre comillas" \
   $'        encabezado = _re.sub(r\'"[^"]*"\', "", texto.split("\\n", 1)[0])' \
@@ -179,8 +179,8 @@ sabotaje $M "cantidad y precio combinados vuelven a copiarse" \
   '_COMBINADAS_SE_COPIAN = {"descripcion", "origen", "pieza", "cantidad", "valor_unitario", "peso_unitario"}' \
   "FAILED $T::test_una_combinada_en_cantidad_o_precio_con_texto_no_se_copia[5 UN-USD 100]"
 sabotaje $M "el mapeo del cliente deja de contar para las combinadas" \
-  '    campos.update(dict(mapeo or {}))' \
-  '    pass' \
+  '    mapeados = dict(mapeo or {})' \
+  '    mapeados = {}' \
   "FAILED $T::test_una_combinada_en_la_columna_de_cantidad_del_mapeo_del_cliente_tampoco_se_copia"
 sabotaje $M "una fila vacía dentro de una combinada vuelve a ser «sin leer»" \
   '    return _rellenar_combinadas(df, combinadas, mapeo)[~vacias]' \
@@ -189,7 +189,11 @@ sabotaje $M "una fila vacía dentro de una combinada vuelve a ser «sin leer»" 
 sabotaje $M "el CSV vuelve a ir a UTF-8 por un solo par" \
   '            if validas and len(validas) >= sueltos:' \
   '            if validas:' \
-  "FAILED $T::test_un_csv_cp1252_con_un_par_que_parece_utf8_no_pierde_las_tildes"
+  "FAILED $T::test_un_csv_cp1252_con_un_par_que_parece_utf8_no_pierde_las_tildes[\xc2\xb0]"
+sabotaje $M "en el CSV vuelve a contar cualquier secuencia UTF-8" \
+  '            validas = [q for q in secuencias if _plausible(q)]' \
+  '            validas = secuencias' \
+  "FAILED $T::test_un_csv_cp1252_con_letras_que_arman_utf8_raro_se_lee_bien"
 sabotaje $M "el CSV mezclado deja de avisar" \
   '            if validas and sueltos:' \
   '            if False:' \
@@ -210,6 +214,26 @@ sabotaje $F "la primera hoja vuelve a tener tope de 30 MB" \
   '        tope_hoja = _mb_de_entorno("EXCEL_MAX_PRIMERA_HOJA_MB", 10)' \
   '        tope_hoja = _mb_de_entorno("EXCEL_MAX_PRIMERA_HOJA_MB", 30)' \
   "FAILED $T::test_una_primera_hoja_de_27_mb_se_rechaza"
+sabotaje $F "un libro con entidades vuelve a pasar" \
+  '                if b"<!DOCTYPE" in trozo or b"<!ENTITY" in trozo:' \
+  '                if False:' \
+  "FAILED $T::test_un_libro_con_entidades_xml_se_rechaza_antes_de_abrir[xl/styles.xml]"
+sabotaje $F "los estilos vuelven a contar sólo prefijos ASCII" \
+  '    abre = re.compile(rb"<[^/!?\s>]")' \
+  '    abre = re.compile(rb"<[A-Za-z_]")' \
+  "FAILED $T::test_estilos_con_un_prefijo_no_ascii_tambien_se_cuentan"
+sabotaje $M "la copia vuelve a dejar las hojas de gráfico" \
+  '        afuera = {ruta_hoja for _n, rid, ruta_hoja, _g in todas if rid != rid_primera}' \
+  '        afuera = {ruta_hoja for _n, rid, ruta_hoja, g in todas if rid != rid_primera and not g}' \
+  "FAILED $T::test_la_copia_de_la_primera_hoja_saca_las_hojas_de_grafico"
+sabotaje $F "los .rels vuelven a no tener tope" \
+  '            if nombre.lower().endswith(".rels") and z.getinfo(nombre).file_size > 2**20:' \
+  '            if False:' \
+  "FAILED $T::test_un_rels_de_hoja_enorme_se_rechaza"
+sabotaje $F "una celda en la columna XFD vuelve a pasar" \
+  '        if hojas and _ultima_columna(z.read(hojas[0][1])) > _EXCEL_MAX_COLUMNAS:' \
+  '        if False:' \
+  "FAILED $T::test_una_celda_en_la_ultima_columna_se_rechaza_antes_de_abrir"
 
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]
