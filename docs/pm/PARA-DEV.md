@@ -25,22 +25,15 @@ despertás a ella con el de la suya al entregar o al dejar una D que te frena
 
 ## Último veredicto
 
-**RENDIMIENTO-1b devuelta** (2026-10-07, sobre `b01149c`), por un solo punto.
-La PM reprodujo el rojo antes (`16 failed`), la focal (`30 passed`) y la suite
-(`746 passed, 102 skipped`). Su subagente Sonnet medio no colgó los hilos con
-ningún PDF armado (bombas, bucles, árboles cíclicos, 20 mil páginas). Pero
-encontró un dato equivocado: con «SELLER:» y «BUYER:» en la misma fila y los
-nombres debajo (dos columnas), el vendedor pasa de `ACME TRADING LTD` a
-`BUYER`, porque `pypdf` junta las columnas. Detalle en
-`REPRODUCCION-RENDIMIENTO-1b-MARIA-1c-2026-10-07.md`.
+**RENDIMIENTO-1b aceptada sobre `ec3d793`** (2026-10-07, con la devolución).
+La PM reprodujo el rojo antes de la devolución sobre `b01149c` (`6 failed`:
+`BUYER`, `CONSIGNEE`, `NOTIFY PARTY`, el nombre sin cortar), la focal con
+RENDIMIENTO-1 (`38 passed`) y la suite con el venv armado sólo desde
+`requirements.txt` (`754 passed, 102 skipped`). La primera revisión ya había
+atacado los PDF armados (`REPRODUCCION-RENDIMIENTO-1b-MARIA-1c-2026-10-07.md`).
+Con dos columnas el vendedor queda vacío: es una de las dos salidas aceptadas.
 
-**Devolución:** el vendedor nunca es una etiqueta («BUYER», «CONSIGNEE»,
-«SELLER», «SHIPPER» y parecidas), y el caso de dos columnas vuelve a dar el
-nombre o queda vacío. Rojo antes con ese PDF, verde después; los PDF de las
-pruebas dan el mismo vendedor. Después, EXCEL-1.
-
-**RENDIMIENTO-1 sigue aceptada** (`8fd801d`). Nada se integra en la rama de
-PM hasta después del ensayo.
+RENDIMIENTO-1 y 1b se integran en la rama de PM después del ensayo, juntas.
 
 ## Respuestas a tus D (2026-10-07, 05:20 UTC)
 
@@ -60,25 +53,32 @@ del commit `62b1d14`):
 - **D6: (a)** ahora. El índice único (b), pieza aparte más adelante, después
   de mirar si producción ya tiene códigos repetidos.
 
-## Tarea activa — RENDIMIENTO-1b (devuelta, arriba): un PDF armado no deja a nadie sin lectura
+## Tarea activa — EXCEL-1: la carga por Excel, de punta a punta
 
-Asignada el 2026-10-07. Sale de tu D10 (b). Es chica.
+Asignada el 2026-10-07. Fase 1 (`ROADMAP.md`). La carga por Excel nunca se
+auditó.
 
-**Base:** tu rama (con RENDIMIENTO-1).
+**Base:** tu rama (con RENDIMIENTO-1 y 1b).
 
 **Alcance:**
-1. La adivinanza del vendedor, que es el único camino vivo que le pasa un PDF
-   del usuario a pdfminer (`main.py` → `_extract_pdf_text`), usa sólo `pypdf`.
-   Si en el producto aparece otro camino vivo hacia pdfminer o pdfplumber con
-   un PDF del usuario, dejá una D.
-2. Un tiempo máximo en `0` o negativo cae al valor por defecto, igual que uno
-   mal escrito (`PDF_READ_TIMEOUT_S`, `PDF_VALIDATE_TIMEOUT_S`,
-   `PDF_VENDOR_TIMEOUT_S`, `NCM_GEMINI_TIMEOUT_S`).
+1. Recorré cada camino vivo que lee un Excel y llega al TXT: `/upload_excel/`,
+   `/upload_excel/public`, `/upload_excel_v2/` y los que lean con
+   `pd.read_excel` (hoy cerca de las líneas 3401, 4663, 6314 y 7257 de
+   `main.py`), con la plantilla que ofrece la pantalla y con Excel reales de
+   distinto formato (columnas en otro orden, números con coma, celdas vacías,
+   filas de totales, `.xls` y `.xlsx`). Lo que inventa, pierde o lee mal un
+   dato se arregla con el mismo criterio que MARIA-1a: un dato que falta
+   queda vacío y con aviso, nunca inventado.
+2. Leer un Excel no frena el sitio (tu D12): aparte, con tiempo máximo, como
+   el PDF.
+3. Si un camino no tiene llamador vivo desde las pantallas, decilo en una D
+   antes de arreglarlo.
 
-**Criterios:** rojo antes y verde después con el PDF armado del revisor (4
-subidas en paralelo y después un PDF bueno se lee bien) y con los tiempos en
-`0` y `-5`. Los PDF de las pruebas siguen dando el mismo vendedor. Suite
-completa en verde, con el venv armado sólo desde `requirements.txt`.
+**Prueba para el TXT:** un Excel armado con los datos de los dos archivos
+reales tiene que dar el mismo TXT que la carga por PDF con esos datos.
 
-**Después:** EXCEL-1 (con tu D12), MARIA-1b (con la D6 de la Dev 2) y
-PUNTA-A-PUNTA-1. Cada una se te escribe acá cuando arranque.
+**Criterios:** rojo antes y verde después por cada defecto; una prueba con
+`/health` respondiendo mientras se lee un Excel pesado; la suite completa en
+verde. Lo que encuentres fuera de esto, en una D.
+
+**Después:** MARIA-1b (con la D6 de la Dev 2) y PUNTA-A-PUNTA-1.

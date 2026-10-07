@@ -94,20 +94,20 @@ también sus subagentes (Emi confirmó las dos sesiones en alto). Ningún subage
 la PM principal.
 
 Archivos abiertos por Dev:
-- Dev 1 (RENDIMIENTO-1b): `proyecto_maria/main.py` (la adivinanza del
-  vendedor y los tiempos máximos), `security/file_security.py`.
+- Dev 1 (EXCEL-1): `proyecto_maria/main.py` (las cargas por Excel).
 - Dev 2 (MARIA-4): `proyecto_maria/core/maria_generator.py` y las pantallas
   v2 de revisión.
 
 ## En curso
 
-- **Dev 1:** RENDIMIENTO-1b, devuelta por un punto (el vendedor con dos
-  columnas salía «BUYER»). Sigue: EXCEL-1, MARIA-1b y PUNTA-A-PUNTA-1.
+- **Dev 1:** EXCEL-1 (la carga por Excel, de punta a punta). Sigue: MARIA-1b
+  y PUNTA-A-PUNTA-1.
 - **Dev 2:** MARIA-4 (estado, IVA adicional, banco y empresa de
   digitalización). Sigue: MARIA-3 y MARIA-5; MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas el 2026-10-07 y sin integrar todavía** (se integran después de
   publicar el ensayo, para que el ensayo sea exactamente lo atacado):
-  RENDIMIENTO-1 (`8fd801d`, suite `730 passed, 102 skipped` con un venv nuevo),
+  RENDIMIENTO-1 (`8fd801d`, suite `730 passed, 102 skipped` con un venv nuevo)
+  y RENDIMIENTO-1b (`ec3d793`, `754 passed`),
   MARIA-1a (`0a1775f`, `777 passed`), MARIA-2b (`c3bef51`, `791 passed`) y
   MARIA-1c (`448b54d`, `804 passed`).
   RENDIMIENTO-1 sale con RENDIMIENTO-1b y MARIA-1a con MARIA-1c.
