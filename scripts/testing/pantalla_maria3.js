@@ -73,6 +73,16 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   const fecha = txt.match(/CCPL=FECHAEMISIONFACT\nMCPL=(.*)/);
   if (!fecha || fecha[1].trim() !== '') falla('la fecha de emisión no sale vacía: ' + (fecha && fecha[1]));
   console.log('OK el TXT sale con GTOS-ANT-FOB=150.00, procedencia 222 y la fecha vacía');
+
+  // Otra operación con la respuesta de avisos demorada: mientras tanto no se
+  // ven los avisos de la anterior.
+  await page.route('**/generate_maria/avisos', async r => { await new Promise(ok => setTimeout(ok, 3000)); await r.continue(); });
+  await page.evaluate(() => { CDI.state.operacion = { numero_factura: 'F-M3B', moneda: 'DOL', incoterm: 'FOB', fecha_emision: '01/02/2026' }; CDI.goTo('validating'); });
+  await page.waitForTimeout(300);  // dentro de la demora de 3 s: es el momento que se prueba
+  if (await page.isVisible('#validatingAvisosPanel')) falla('mientras llega la respuesta se ven los avisos de la operación anterior');
+  await page.waitForFunction(() => !document.getElementById('validatingAvisosPanel').hidden, null, { timeout: 10000 }).catch(() => falla('no llegan los avisos de la operación nueva'));
+  if (/Fecha de emisión/.test(await page.textContent('#validatingAvisosList'))) falla('quedó el aviso de fecha de la operación anterior');
+  console.log('OK con la respuesta demorada no se ven los avisos de la operación anterior');
   await b.close();
   console.log('OK: pantalla MARIA-3');
 })().catch(e => falla(e.message));

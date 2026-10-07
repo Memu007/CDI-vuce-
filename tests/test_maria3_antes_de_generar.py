@@ -163,7 +163,8 @@ def _hoy_o_ayer():
     return {d.strftime("%d/%m/%Y") for d in (hoy, hoy - timedelta(days=1))}
 
 
-@pytest.mark.parametrize("fecha", ["", "   ", "None", "DD/MM/YYYY", "32/13/2025", "mañana", "18/07/202", "18-07-2025"])
+@pytest.mark.parametrize("fecha", ["", "   ", "None", "DD/MM/YYYY", "32/13/2025", "mañana", "18/07/202", "18-07-2025",
+                                   "05/03/0026", "01/01/0001"])
 def test_sin_fecha_leida_sale_vacia_nunca_la_de_hoy(fecha):
     txt = generate_maria_txt(items=[dict(ITEM_BASE)], **{**COMUN, "fecha_emision": fecha,
                                                           "sbt_sufijo_valor": SUF_A})
@@ -288,3 +289,10 @@ def test_la_fecha_que_no_vino_queda_vacia(monkeypatch, copia, fecha):
 
     r = _leer(monkeypatch, copia, _factura(fecha_emision=fecha))
     assert r["operacion"]["fecha_emision"] == ""
+
+
+@pytest.mark.parametrize("gastos", [float("inf"), float("nan"), 0.004, -5])
+def test_gastos_que_no_son_un_importe_no_van(gastos):
+    """Revisión adversarial: infinito, NaN o menos de un centavo no se declaran."""
+    from proyecto_maria.core.maria_generator import gastos_fob_para_el_txt
+    assert gastos_fob_para_el_txt("EXW", None, gastos) is None
