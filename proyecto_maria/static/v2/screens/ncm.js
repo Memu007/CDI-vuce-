@@ -861,6 +861,9 @@
             subs.push({ cantidad: falta > 0 ? Math.round(falta * 100) / 100 : '', valor_unitario: it.valor_unitario, sufijo: '' });
             it.subitems = subs;
             lastSnapshot = null;  // deshacer una acción masiva no pisa los subítems
+            // El error del servidor era de un subítem en su lugar: al agregar o
+            // borrar, ese lugar ya es otro.
+            if (errorDeSubitem && errorDeSubitem.it === it) errorDeSubitem = null;
             render();
             const nuevo = tbody.querySelector('[data-sub-row="' + btn.getAttribute('data-sub-agregar') + '"][data-sub-idx="' +
                 (subs.length - 1) + '"][data-sub-field="cantidad"]');
@@ -873,6 +876,9 @@
             subs.splice(parseInt(btn.getAttribute('data-sub-idx'), 10), 1);
             if (subs.length) it.subitems = subs; else delete it.subitems;
             lastSnapshot = null;
+            // El error del servidor era de un subítem en su lugar: al agregar o
+            // borrar, ese lugar ya es otro.
+            if (errorDeSubitem && errorDeSubitem.it === it) errorDeSubitem = null;
             render();
         }));
         tbody.querySelectorAll('[data-sub-field]').forEach(inp => inp.addEventListener('input', () => {
