@@ -138,6 +138,23 @@ const bloquesSbt = txt => txt.replace(/\r\n/g, '\n').split('\n\n').filter(b => b
     falla('el error del subítem sale bajo el sufijo general');
   await page.fill(campo(1, 'sufijo'), SUF_B);
   if (await bajoElSubitem.count()) falla('corregir el sufijo no saca el error');
+  // Revisión adversaria: el error es de un subítem en su lugar; borrar o
+  // agregar uno lo saca (si no, quedaba sobre otra fila).
+  await page.evaluate(() => CDI.ncmBatch.marcarErrorDeSubitem(0, 1, 'Item 1, sub-ítem 2: error de prueba'));
+  await page.evaluate(() => { CDI.goTo('validating'); CDI.goTo('ncm'); });
+  await bajoElSubitem.waitFor({ state: 'visible', timeout: 5000 });
+  await page.click('[data-sub-agregar="0"]');
+  if (await page.locator('[data-sub-error="0"]').count()) falla('agregar un subítem deja el error sobre otra fila');
+  await page.click('[data-sub-borrar="0"][data-sub-idx="2"]');
+  await page.evaluate(() => CDI.ncmBatch.marcarErrorDeSubitem(0, 1, 'Item 1, sub-ítem 2: error de prueba'));
+  await page.evaluate(() => { CDI.goTo('validating'); CDI.goTo('ncm'); });
+  await page.click('[data-sub-borrar="0"][data-sub-idx="0"]');
+  if (await page.locator('[data-sub-error="0"]').count()) falla('borrar un subítem deja el error sobre otra fila');
+  await page.click('[data-sub-agregar="0"]');
+  await page.fill(campo(0, 'cantidad'), '2');
+  await page.fill(campo(1, 'cantidad'), '4');
+  await page.fill(campo(0, 'sufijo'), SUF_A);
+  await page.fill(campo(1, 'sufijo'), SUF_B);
   console.log('OK el error del sufijo de un subítem sale bajo el subítem 2 y se va al corregirlo');
 
   // Devolución, puntos 8 y 9: el panel hace la misma cuenta que el servidor
