@@ -103,7 +103,8 @@ Archivos abiertos por Dev:
 - **Dev 1:** EXCEL-1 (la carga por Excel, de punta a punta). Sigue: MARIA-1b
   y PUNTA-A-PUNTA-1.
 - **Dev 2:** MARIA-4 (estado, IVA adicional, banco y empresa de
-  digitalización). Sigue: MARIA-3 y MARIA-5; MARIA-6 cuando lleguen los archivos reales del despachante.
+  digitalización), devuelta por tres puntos (estado contra origen, avisos en
+  la pantalla vieja, `origen` contra `pais_origen`). Sigue: MARIA-3 y MARIA-5; MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas el 2026-10-07 y sin integrar todavía** (se integran después de
   publicar el ensayo, para que el ensayo sea exactamente lo atacado):
   RENDIMIENTO-1 (`8fd801d`, suite `730 passed, 102 skipped` con un venv nuevo)
@@ -175,10 +176,9 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 06:25 UTC (rutina): MARIA-1c aceptada; RENDIMIENTO-1b devuelta por
-un punto (el vendedor con dos columnas). MARIA-4 escrita para la Dev 2 (su
-D10) y `levantar.sh` sin llamar a ARCA (su D9). Contexto: Dev 1 ~55 %, Dev 2
-~58 %: Emi pega sus `/compact` a la mañana. PM ~34 %.
+2026-10-07 07:30 UTC (rutina): RENDIMIENTO-1b aceptada (con la devolución) y
+EXCEL-1 activa para la Dev 1; MARIA-4 devuelta por tres puntos. Contexto: Dev 1
+~55 %, Dev 2 ~58 %, PM ~40 %: a las 9 (ARG), Emi pega los tres `/compact`.
 
 ## Medición
 
