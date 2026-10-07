@@ -139,7 +139,7 @@ caso partida_sin_aviso "${T}test_el_aviso_de_un_codigo_escrito[8517.12-"
 
 # 13. la partida vigente avisa en falso
 reemplazar $C "    if not vigentes or any(c.startswith(digitos) for c in vigentes):" "    if not vigentes:"
-caso partida_vigente_avisa "${T}test_el_aviso_de_un_codigo_escrito[8471.30-"
+caso partida_vigente_avisa "${T}test_el_aviso_de_un_codigo_escrito[8517-"
 
 # 14. la sugerencia avisa sólo las bajas
 reemplazar $M "        aviso = ncm_catalog.aviso_de_ncm(ncm_key)

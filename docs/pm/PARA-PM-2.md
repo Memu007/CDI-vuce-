@@ -2,6 +2,107 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## CATALOGO-NCM-1 — entregada, con tu rama integrada: **`8f151a0`**
+
+**Resultado: terminada.** También integré tu rama (`9488dd8`, con EXCEL-1 y
+MARIA-1b) sobre MARIA-5. **Para decidir: la D23 sigue abierta.** En la
+integración apliqué la regla de MARIA-5 en las siete pruebas de EXCEL-1 que
+la contradecían, con un archivo real como prueba (abajo). Las D23 a D26 que
+contestaste en `f009a07` son de la Dev 1: la numeración se pisó, y la mía es
+la de `72e6f23`.
+
+### La pieza
+
+| # | Qué hace | Rojo antes → verde |
+|---|---|---|
+| 1. Catálogo | Regenerado con el importador desde `docs/pm/datos/arancel_ARCA_07102026.zip`: 10.504 NCM, idéntico fila por fila a `parse_arca_nomenclador` del ZIP. Metadata: `updated_at` 2026-10-07, SHA-256 `0fb407ce…`, `nomenclador_07102026.txt` y un campo nuevo, `obtenido` («Lo bajó Emi… por el chat»). El importador pide `--obtenido` | `tests/test_catalogo_ncm1.py` contra `07fb085`: 16 en rojo, de 16 |
+| 2. Bajas | El importador guarda en `ncm_bajas.json` lo que estaba en el catálogo anterior y no en el nuevo: **522** códigos, con su descripción y de qué archivo venían (222 KB). `aviso_de_ncm` dice «la NCM 8517.12.31 se dio de baja en el nomenclador vigente de ARCA (2026-10-07): esa posición ya no existe; buscá la nueva» o «no está en el nomenclador vigente». Sale en la validación como advertencia, sin frenar. En el asistente aparece en la sugerencia del historial o del proveedor (marcada `is-baja`), al escribir una SIM o una partida dada de baja («las posiciones 8517.12… se dieron de baja»), y en el mensaje de `/api/ncm/sugerir` | pantalla contra `7b4f651` (antes de la revisión): `FALLA: escribir 8517.12.31.000X no avisa la baja`; contra `07fb085`: `FALLA: la sugerencia dada de baja no lo dice` |
+| 3. `ncm_mercosur.csv` | **Lo saqué.** Sólo se usaba como respaldo cuando faltaba el catálogo, y 11 de sus 22 códigos no existen. Sin el catálogo, ahora el catálogo queda vacío y no se avisa en falso | `test_el_respaldo_con_codigos_viejos_no_se_usa` |
+
+Los dos archivos reales siguen idénticos: 8471.49.00 y 8479.89.99 están en el
+vigente. 8517.13.00, 8524 y 8549 están; 8517.12.31 avisa.
+
+**Autorrevisión (Sonnet alto).** El catálogo, las bajas y el importador se
+sostienen. Corrió el importador desde el catálogo viejo y salió igual byte a
+byte. No hay avisos en falso con SIM completas. Arreglé, en `4d9b7f5` y su
+prueba:
+- Escribir un código en el asistente no avisaba la baja: la pantalla no
+  consultaba al servidor. Ahora pide `GET /api/ncm/aviso`.
+- «8517.12» devolvía basura (bulbos de tulipanes): sin prefijo vigente caía
+  al ranking por palabras. Un código parcial ahora se busca sólo por prefijo.
+- Una sugerencia con una NCM que no está en el vigente (no sólo las bajas)
+  no avisaba.
+
+**No lo hice:**
+- `/api/ncm/enrich-items`, `/calcular` y `/{ncm}/completo` (la vista previa
+  de VUCE) no avisan la baja: no son la sugerencia, y la validación sí avisa.
+- La validación ahora carga el catálogo la primera vez en cada proceso
+  (~1,6 s y ~70 MB, una sola vez). No lo precargo al arrancar.
+- `proyecto_maria/data/ncm_metadata.csv` también tiene códigos viejos y nada
+  lo lee. No lo toqué porque no está en la tarea.
+- `proyecto_maria/tests/test_ncm_catalog.py` no está en `testpaths`, así que
+  la suite no lo corre. Pasa (5 passed). Mis pruebas nuevas están en
+  `tests/`.
+
+### La integración de tu rama (`3134480`, pruebas en `dd88e89`)
+
+- **Conflictos** en `main.py` (cuatro) y `upload.js` (uno):
+  - Conservé lo de EXCEL-1: `_mapeo_efectivo` y que una columna con el
+    nombre del campo salga antes de renombrar.
+  - Conservé lo de MARIA-1b: los controles dentro de la validación previa.
+  - Del peso, manda la regla de MARIA-5.
+  - En `upload.js`, los avisos van en un solo cartel.
+- **Regresión mía que apareció al integrar:** `_peso_por_unidad` leía el peso
+  con `pd.to_numeric` antes del lector de EXCEL-1, y «1,5» con miles en la
+  planilla daba 0. Ahora usa `_numero_factura` con el separador de la
+  planilla, y una columna de una unidad queda como vino
+  (`test_miles_con_pista_en_la_planilla` pasa).
+- **Prueba con el archivo real para la D23.** En `test_excel1_txt.py` y
+  `test_punta_a_punta1.py` la factura de subítems trae «Peso Neto» = 33 para
+  la línea de 6 unidades. El archivo real declara `QARTKGRNET=33.000`. Con la
+  regla de MARIA-5 (neto de la línea ÷ cantidad) el Excel da exactamente el
+  archivo real; con la de EXCEL-1 (neto de una unidad) daría 198 kg. En el
+  PDF, el Gemini falso pasó de `peso_kg` a `peso_total_linea`, que es lo que
+  pide el prompt.
+- **Siete pruebas de `test_excel1_lectura.py`** pasan a la regla de tu canal
+  (D22 y la devolución de MARIA-5):
+  - neto y total, de la línea;
+  - el bruto solo, dividido y con aviso;
+  - de una unidad > bruto. `«Peso (kg)»` con `«Peso (bruto)»` usa la de una
+    unidad y nombra el bruto ignorado; antes quedaba vacío.
+  
+  Están todas en `dd88e89`. **Si decidís otra cosa en la D23, se revierte ese
+  commit** y se cambia la regla en `_clase_de_peso` y `_RANGO_DE_PESO`.
+- **Pruebas de MARIA-5** que MARIA-1b ahora frena (sin moneda, incoterm ni
+  CUIT): las completé. El vacío escrito de esos tres da «Falta …», y lo
+  prueba un caso nuevo.
+- **Tope de los importes:** MARIA-1b lo frena antes en el endpoint. Le sumé
+  una prueba directa al generador para que su guarda siga cubierta (sabotaje
+  16).
+
+| Puerta (sobre `8f151a0`) | Resultado |
+|---|---|
+| Suite completa, worktree limpio en `fa4ed0b`, venv sólo con `requirements.txt` (`8f151a0` sólo suma dos pruebas, que pasan) | `1454 passed, 102 skipped, 1 xfailed, 25 warnings in 145.68s`, 0 failed |
+| `sabotaje_catalogo_ncm1.sh` (14), `sabotaje_maria5.sh` (44) y los de MARIA-3, 1d, 4, 1c, 2b, 2 y 1a; los de la Dev 1 (`sabotajes/excel1.sh`, `maria1b.sh`, `punta_a_punta1.sh`) | RESULTADO_SABOTAJES |
+| `pantalla_catalogo_ncm1.js` (local, `4d9b7f5`) | `OK: pantalla CATALOGO-NCM-1`; captura en `docs/pm/capturas/catalogo-ncm1-baja.png` |
+| `pantalla_maria5.js` y `smoke_friccion.sh` (local, `7b4f651`) | `OK: pantalla MARIA-5` y `==> OK · telemetría…` |
+
+No corrido: Gemini real, VUCE y Tarifar reales, el Kit. Nada contra
+producción ni terceros.
+
+Para reproducir:
+```
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 8f151a0 8890
+BASE_URL=http://127.0.0.1:8890 node scripts/testing/pantalla_catalogo_ncm1.js   # «OK: pantalla CATALOGO-NCM-1»
+scripts/testing/sabotaje_catalogo_ncm1.sh 8f151a0 /tmp/cdi-pm/venv              # «OK: los 14 sabotajes …»
+python -m pytest -q tests/test_catalogo_ncm1.py tests/test_excel1_lectura.py tests/test_maria5_*.py
+```
+
+Última vuelta: 2026-10-07 16:45 UTC
+Contexto: CONTEXTO
+
+---
+
 ## MARIA-5 — reentrega con la devolución: **`07fb085`**
 
 **Resultado: los seis puntos, con rojo antes y verde después. Para decidir:

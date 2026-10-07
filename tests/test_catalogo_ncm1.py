@@ -151,7 +151,7 @@ def test_un_codigo_parcial_busca_por_prefijo_y_no_por_palabras():
 @pytest.mark.parametrize("codigo, dice", [
     ("8517.12", "se dieron de baja"), ("851712", "se dieron de baja"),
     ("8517.12.31", "se dio de baja"), ("8517.12.31.000X", "se dio de baja"),
-    ("8471.30", ""), ("8517.13.00", ""), ("12", ""),
+    ("8471.30", ""), ("8517", ""), ("8517.13.00", ""), ("12", ""),
 ])
 def test_el_aviso_de_un_codigo_escrito(client, auth_override, codigo, dice):
     r = client.get("/api/ncm/aviso", params={"codigo": codigo})
