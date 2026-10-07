@@ -7636,6 +7636,24 @@ def _ncm_suggestion_key(ncm: str) -> str:
     return re.sub(r"\D", "", str(ncm or ""))[:8]
 
 
+def _ncm_del_cliente_o_sim_del_proveedor(ncm_cliente, ncm_proveedor):
+    """El NCM que se sugiere cuando el historial del cliente lo conoce (D32 b).
+
+    El historial guarda 8 dígitos (GUARDAR-1). Si el catálogo del proveedor
+    tiene, para el mismo producto, la posición SIM completa que empieza con
+    esos 8, gana la del proveedor: no se pierde la SIM ya confirmada.
+    """
+    cliente = str(ncm_cliente or "").strip()
+    if not re.fullmatch(r"[\d.]+", cliente) or len(re.sub(r"\D", "", cliente)) != 8:
+        return ncm_cliente
+    from proyecto_maria.core.maria_generator import _sim_position_error
+    proveedor = str(ncm_proveedor or "").strip()
+    if (proveedor and _sim_position_error(proveedor) is None
+            and _ncm_suggestion_key(proveedor) == _ncm_suggestion_key(cliente)):
+        return proveedor
+    return ncm_cliente
+
+
 def _catalog_suggestion(item: ncm_catalog.NCMItem) -> dict:
     return {
         "ncm": item.codigo,
@@ -7783,6 +7801,22 @@ async def sugerir_ncm(
         sugerencias.append(suggestion)
         return True
 
+    # El catálogo del proveedor se lee primero: si tiene la SIM completa del
+    # NCM que recuerda el cliente, la sugerencia del cliente la usa (D32 b).
+    vendor_item = None
+    if vendor_name:
+        try:
+            from proyecto_maria.core import catalog_service as catalog_svc
+            vendor_match = await catalog_svc.match_items(
+                db, [{"descripcion": descripcion}], vendor_name, owner_username=user["username"]
+            )
+            matches = vendor_match.get("items_matched") or []
+            vendor_item = matches[0] if matches else None
+            if not (vendor_item and vendor_item.get("ncm") and vendor_item.get("match_type") != "none"):
+                vendor_item = None
+        except Exception as err:
+            logging.warning("ncm suggestion vendor catalog unavailable: %s", err)
+
     # 1) Memoria confirmada del cliente activo (aislada por despachante).
     if client_id:
         try:
@@ -7790,7 +7824,8 @@ async def sugerir_ncm(
             remembered = await lookup_client_memory(db, user["username"], client_id, descripcion)
             if remembered and remembered.get("ncm"):
                 add_suggestion({
-                    "ncm": remembered["ncm"],
+                    "ncm": _ncm_del_cliente_o_sim_del_proveedor(
+                        remembered["ncm"], vendor_item and vendor_item["ncm"]),
                     "desc": remembered.get("descripcion") or descripcion,
                     "source": "historial",
                     "count": remembered.get("veces_usado", 1),
@@ -7800,23 +7835,13 @@ async def sugerir_ncm(
             logging.warning("ncm suggestion client memory unavailable: %s", err)
 
     # 2) Catálogo confirmado para el proveedor activo.
-    if vendor_name and len(sugerencias) < 5:
-        try:
-            from proyecto_maria.core import catalog_service as catalog_svc
-            vendor_match = await catalog_svc.match_items(
-                db, [{"descripcion": descripcion}], vendor_name, owner_username=user["username"]
-            )
-            matches = vendor_match.get("items_matched") or []
-            vendor_item = matches[0] if matches else None
-            if vendor_item and vendor_item.get("ncm") and vendor_item.get("match_type") != "none":
-                add_suggestion({
-                    "ncm": vendor_item["ncm"],
-                    "desc": descripcion,
-                    "source": "proveedor",
-                    "scope": "proveedor",
-                })
-        except Exception as err:
-            logging.warning("ncm suggestion vendor catalog unavailable: %s", err)
+    if vendor_item:
+        add_suggestion({
+            "ncm": vendor_item["ncm"],
+            "desc": descripcion,
+            "source": "proveedor",
+            "scope": "proveedor",
+        })
 
     # 3) Historial liviano de asignaciones de este despachante.
     desc_norm = normalizar_desc(descripcion)
@@ -8998,14 +9023,19 @@ async def catalog_lookup(
                 "origen": None,
             }
 
-            # 1) memoria del cliente
+            vm = vendor_matches_by_idx.get(idx)
+            if not (vm and vm.get("ncm") and vm.get("match_type") != "none"):
+                vm = None
+
+            # 1) memoria del cliente (con la SIM completa del proveedor, si
+            # la tiene para ese NCM: D32 b)
             if client_id and desc:
                 mem = await lookup_client_memory(db, user["username"], client_id, desc)
                 if mem and mem.get("ncm"):
                     out.update({
                         "source": "cliente",
                         "confidence": mem["confidence"],
-                        "ncm": mem["ncm"],
+                        "ncm": _ncm_del_cliente_o_sim_del_proveedor(mem["ncm"], vm and vm["ncm"]),
                         "origen": mem.get("origen") or None,
                         "veces_usado": mem.get("veces_usado"),
                         "valor_unitario_avg": mem.get("valor_unitario_avg"),
@@ -9016,8 +9046,7 @@ async def catalog_lookup(
                     continue
 
             # 2) catalogo del proveedor
-            vm = vendor_matches_by_idx.get(idx)
-            if vm and vm.get("ncm") and vm.get("match_type") != "none":
+            if vm:
                 out.update({
                     "source": "proveedor",
                     "confidence": float(vm.get("match_score") or 0.0),
