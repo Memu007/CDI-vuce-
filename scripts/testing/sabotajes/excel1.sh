@@ -73,7 +73,7 @@ sabotaje $M "«Valor» vuelve a ganar sobre el precio unitario" \
 # último; el sabotaje lo vuelve de una unidad.
 sabotaje $M "el peso bruto vuelve a usarse como peso unitario" \
   '    if "bruto" in normal or "gross" in normal:
-        return "bruto"' \
+        return "bruto_unidad" if _dice_de_una_unidad(normal) else "bruto"' \
   '    if False:
         return "bruto"' \
   "FAILED $L::test_peso_bruto_o_total_no_se_toma_como_peso_unitario"
@@ -148,8 +148,8 @@ sabotaje $M "vuelve a descartarse todo producto sin NCM ni origen" \
 # Con MARIA-5 integrada (D23): entre «Peso (kg)» y «Peso (bruto)» decide el
 # rango del peso, no el orden de las columnas.
 sabotaje $M "«Peso (neto)» y «Peso (bruto)» vuelven a confundirse" \
-  '_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "dudosa": 3, "bruto": 4}' \
-  '_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 4, "dudosa": 3, "bruto": 2}' \
+  '_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "dudosa": 3, "bruto": 4, "bruto_unidad": 4}' \
+  '_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 4, "dudosa": 3, "bruto": 2, "bruto_unidad": 4}' \
   "FAILED $L::test_peso_ambiguo_entre_parentesis_queda_vacio_y_no_se_adivina"
 sabotaje $M "el Excel vuelve a usar los hilos del PDF" \
   'def _pool_lectura_excel():
