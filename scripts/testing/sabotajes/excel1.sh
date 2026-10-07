@@ -56,7 +56,7 @@ sabotaje $M "el Excel v2 se vuelve a leer en el hilo del servidor" \
 sabotaje $M "leer un Excel pierde el tiempo máximo" \
   '    return _segundos_de_entorno("EXCEL_READ_TIMEOUT_S", 60.0)' \
   '    return 1e9' \
-  "FAILED $T::test_leer_un_excel_tiene_tiempo_maximo[clientes_import]"
+  "FAILED $T::test_leer_un_excel_tiene_tiempo_maximo[ncm_import_historial]"
 sabotaje $F "validar el Excel vuelve al hilo del servidor" \
   'asyncio.to_thread(_contar_hojas_excel, contents, file_ext),' \
   'asyncio.sleep(0, _contar_hojas_excel(contents, file_ext)),' \

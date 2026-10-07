@@ -234,7 +234,7 @@ class TestUploadExcel:
             [["84713000", "Laptop", "CN", 10, 350.0, 1.5]],
         )
         res = client.post(
-            "/upload_excel/",
+            "/upload_excel_v2/",
             files={"file": ("test.xlsx", io.BytesIO(excel),
                             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
         )
@@ -251,7 +251,7 @@ class TestUploadExcel:
             [["84713000", "Laptop", "CN", 10, 350.0]],
         )
         res = anon_client.post(
-            "/upload_excel/",
+            "/upload_excel_v2/",
             files={"file": ("test.xlsx", io.BytesIO(excel),
                             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
         )
@@ -260,7 +260,7 @@ class TestUploadExcel:
     def test_upload_archivo_invalido_400(self, client):
         """Subir un archivo que no es Excel/PDF devuelve error."""
         res = client.post(
-            "/upload_excel/",
+            "/upload_excel_v2/",
             files={"file": ("test.txt", io.BytesIO(b"esto no es excel"), "text/plain")},
         )
         # Puede ser 400 o 500 dependiendo del manejo; lo importante es que no sea 200

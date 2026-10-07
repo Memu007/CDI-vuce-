@@ -192,3 +192,10 @@ def test_miles_con_pista_en_la_planilla():
     assert r.status_code == 200, r.text[:300]
     item = r.json()["items"][0]
     assert (item["cantidad"], item["valor_unitario"], item["peso_unitario"]) == (1500, 350, 1.5), item
+
+
+@pytest.mark.parametrize("ruta", ["/upload_excel/", "/upload_excel/public", "/api/clientes/import"])
+def test_rutas_de_excel_sin_llamador_ya_no_existen(ruta):
+    """D13: sin pantalla que las use, se borran (no llegaban al TXT)."""
+    r = TestClient(main.app).post(ruta, files={"file": ("a.xlsx", _xlsx([H]), "application/octet-stream")})
+    assert r.status_code in (404, 405), f"{ruta}: {r.status_code}"

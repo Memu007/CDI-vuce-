@@ -82,9 +82,7 @@ def _archivo(nombre="planilla.xlsx"):
 
 
 RUTAS = {
-    "upload_excel": lambda c: c.post("/upload_excel/", files=_archivo()),
     "upload_excel_v2": lambda c: c.post("/upload_excel_v2/", files=_archivo()),
-    "clientes_import": lambda c: c.post("/api/clientes/import", files=_archivo()),
     "ncm_import_historial": lambda c: c.post("/api/ncm/import-historial", files=_archivo()),
     "migraciones_analyze": lambda c: c.post("/api/migrations/analyze", files=_archivo()),
 }

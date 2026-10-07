@@ -408,7 +408,7 @@ class TestAutenticacionRequerida:
         ("POST", "/api/billing/reactivate"),
         ("POST", "/api/operations/manual"),
         ("POST", "/upload_pdf/public"),
-        ("POST", "/upload_excel/"),
+        ("POST", "/upload_excel_v2/"),
         ("GET",  "/auth/current_user"),
     ]
 
