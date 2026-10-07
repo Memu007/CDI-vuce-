@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · fix: lo que el Excel no leía y abrir un libro armado (EXCEL-2)
+
+- **fix(excel):** el encabezado se busca en las primeras 30 filas (logo o datos del vendedor arriba); sin columna de país de origen los productos entran con el origen vacío y se avisa; el texto de una celda combinada hacia abajo vale para todas sus filas (los números no se copian); el aviso de mapeo nombra la columna que se usó.
+- **fix(excel, seguridad):** validar un .xlsx no lo abre: cuenta las hojas desde el índice y rechaza antes de abrir un libro con textos compartidos (10 MB), estilos o primera hoja (30 MB) de más; leer la factura abre sólo la primera hoja. Con 8 libros armados delante, una subida normal ya no falla.
+- **fix(ncm):** el historial de NCM lee CSV con «;», latin-1 o BOM. **fix(maria):** un monto que es una lista o un entero enorme, o un producto mal formado, da 400 y no 500; el CUIT del despachante va con 11 dígitos 0-9 y el identificador del vendedor sin dígitos de otros alfabetos.
 ## 2026-10-07 · fix: guardar una operación con la SIM completa no da 500 (GUARDAR-1)
 
 - **fix(operaciones):** la operación (con el contador del plan) se guarda en su propio commit y el historial del cliente después, cada producto en su savepoint: si el historial falla, la operación queda y la respuesta lo dice (`historial_guardado`). Antes, en Postgres, la SIM completa (`84714900100D`) no entraba en `client_product_history.ncm` (String(10)) y no se guardaba nada.
