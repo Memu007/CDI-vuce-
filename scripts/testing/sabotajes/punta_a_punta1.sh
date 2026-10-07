@@ -61,10 +61,11 @@ sabotaje $G "el generador deja el seguro fuera de la base imponible" \
   '        base_imponible = valor_total + flete_item + seguro_item' \
   '        base_imponible = valor_total + flete_item' \
   'FAILED tests/test_punta_a_punta1.py::test_pdf_de_punta_a_punta_da_el_archivo_real'
-# Generador: el FOB de cada subítem sin la cantidad.
+# Generador: el FOB de cada subítem sin la cantidad (con MARIA-5, el valor
+# exacto de cada subítem, del que se reparte el MARTFOB).
 sabotaje $G "el generador calcula el FOB del subítem sin la cantidad" \
-  '                lines.append(f"MSBTFOB={sub_cant * sub_unit:.2f}")' \
-  '                lines.append(f"MSBTFOB={sub_unit:.2f}")' \
+  '                valor_de_la_linea({"cantidad": s.get("cantidad", 0) or 0,' \
+  '                valor_de_la_linea({"cantidad": 1,' \
   'FAILED tests/test_punta_a_punta1.py::test_subitems_de_punta_a_punta_dan_el_archivo_real[pdf]'
 # Ruta /generate_maria: la procedencia de la operación (MARIA-3) no llega a los productos.
 sabotaje $M "la procedencia de la operación no llega a los productos" \
