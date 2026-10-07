@@ -4563,6 +4563,7 @@ _ITEM_COL_ALIASES = {
     ],
     "origen": [
         "origen", "pais", "país", "country", "procedencia", "paisorigen", "paísorigen",
+        "paisdeorigen", "countryoforigin", "origin", "madein",
     ],
     "cantidad": [
         "cantidad", "qty", "quantity", "cant", "unidades", "piezas", "bultos",
