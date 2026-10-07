@@ -2,6 +2,49 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## MARIA-5 — en curso: una D sobre el peso que cargan el lector y el Excel
+
+**D22. ¿El peso que traen el lector de PDF y el Excel es de una unidad o de
+la línea?** Revisé cada camino antes de cambiar nada:
+
+| Camino | Qué llega hoy | Claro |
+|---|---|---|
+| Carga a mano (v2, `ncm.js:688`) | «Peso unitario»; `buildMariaRequest` manda `peso_unitario` | sí, una unidad |
+| Validación (v2) | muestra unitario × cantidad | sí, total |
+| v1 (`app.js:3300`) | manda `peso_kg = peso_unitario × cantidad` | sí, total |
+| Archivos reales en las pruebas | `peso_kg = 33` para 6 unidades | sí, total |
+| Operación guardada (`main.py:5600`) | guarda `peso_unitario`; **si viene 0, inventa 0,5** | unidad |
+| **Lector PDF, las dos copias** | el prompt pide `peso_kg: Peso en kg` sin decir de qué; se guarda como `peso_unitario`. Ejemplo de PyMuPDF con cantidad 1; el de PDF directo, 10 unidades con 0,5 kg | **ambiguo** |
+| **Excel** (`main.py:4594`) | las columnas «peso», «weight», pero también «peso total», «peso neto» y «peso bruto», van a `peso_unitario` sin dividir | **ambiguo** |
+
+Lo que hago sin esperar, porque no depende de la D: en el generador,
+`peso_kg`, si viene, es el total de la línea (como lo mandan la v1 y los
+archivos reales); si no viene, se usa `peso_unitario` × cantidad (lo que
+mandan la v2 y la pantalla de validación). Los grupos suman esos totales
+(hoy suman unitarios). Así ningún camino se multiplica dos veces y los dos
+archivos reales no se mueven.
+
+Lo que espera la D es qué escriben en `peso_unitario` el lector y el Excel:
+si hoy Gemini o el Excel ponen el total de la línea, después del cambio el
+TXT saldría multiplicado otra vez (como ya sale hoy en la pantalla de
+validación).
+
+- **(a) Recomendada.** El lector le pide a Gemini las dos cosas,
+  `peso_unitario` y `peso_total_linea`, y usa la que venga (si viene sólo el
+  total, lo divide por la cantidad). En el Excel, las columnas «peso total»,
+  «peso neto» y «peso bruto» se dividen por la cantidad, y «peso» o «weight»
+  quedan como peso de una unidad, como dice la plantilla.
+- (b) El lector y el Excel quedan como están; se avisa en la revisión que el
+  peso es por unidad. Más barato, pero el error queda en manos del despachante.
+
+Sin la D, entrego el generador y dejo el lector y el Excel como están, con
+el riesgo escrito.
+
+Encontrados de paso, fuera del alcance (los propongo, no los toco): al
+guardar, un peso 0 se guarda como 0,5 (`main.py:5600`); en `ncm.js`, editar
+la cantidad o el valor de un grupo copia el total del grupo a cada producto
+(`setGroupField`) y el TXT suma de más; «peso bruto» del Excel entra como neto.
+
 ## MARIA-1d — reentrega con el punto sumado: **`9679e21`**
 
 **Resultado: terminada. No hay nada para decidir.** La entrega de MARIA-1d
