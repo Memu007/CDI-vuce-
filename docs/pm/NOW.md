@@ -146,12 +146,12 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 14:05 UTC (rutina): ensayo publicado y verificado por Emi. Integradas
-RENDIMIENTO-1/1b y MARIA-1a a 1d, 3 y 4 (`1067 passed`). MARIA-1b devuelta;
-la Dev 1 está entregando la devolución. MARIA-5 (Dev 2): la PM reprodujo
-`1199 passed`, falta su subagente. Nomenclador vigente de Emi en
-`docs/pm/datos/`; CATALOGO-NCM-1 escrita para la Dev 2. Contexto: PM ~25 %,
-Dev 1 33 % (compacta al entregar), Dev 2 36 % (`/compact` pedido a Emi).
+2026-10-07 15:05 UTC (rutina): MARIA-5 devuelta (Dev 2 en la devolución; sigue
+CATALOGO-NCM-1). Devolución de MARIA-1b (Dev 1, `beea9eb`): la PM reprodujo
+`1224 passed, 102 skipped, 1 xfailed`; falta su subagente. Regla nueva de
+Emi: compactar a 60 % las Devs y 50 % las PMs, y las tres antes de dormir
+(textos a Emi a eso de las 20:30). Contexto: PM 37 %, Dev 1 38 %, Dev 2
+recién compactada.
 
 ## Medición
 
