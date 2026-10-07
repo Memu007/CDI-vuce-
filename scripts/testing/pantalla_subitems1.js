@@ -52,6 +52,19 @@ const bloquesSbt = txt => txt.replace(/\r\n/g, '\n').split('\n\n').filter(b => b
   if (!/✓ Suman 6 de 6 unidades y 7\.182,00 de 7\.182,00/.test(await suma.innerText())) falla('la suma no cierra: ' + await suma.innerText());
   console.log('OK el panel carga 2 + 4 subítems y dice que suman: ' + await suma.innerText());
 
+  // Revisión adversaria: la suma sigue al producto, y una cantidad con más
+  // de dos decimales se marca (el TXT la declara con dos).
+  await page.fill('input[data-row="0"][data-field="cantidad"]', '10');
+  if (!/⚠ Suman 6 de 10/.test(await suma.innerText())) falla('cambiar la cantidad del producto no actualiza la suma: ' + await suma.innerText());
+  await page.fill('input[data-row="0"][data-field="cantidad"]', '6');
+  await page.locator('input[data-row="0"][data-field="cantidad"]').blur();
+  await page.fill(campo(0, 'cantidad'), '1.996');
+  await page.fill(campo(1, 'cantidad'), '4.004');
+  if (!/⚠/.test(await suma.innerText()) || !/dos decimales/.test(await suma.innerText())) falla('una cantidad de tres decimales no se marca: ' + await suma.innerText());
+  await page.fill(campo(0, 'cantidad'), '2');
+  await page.fill(campo(1, 'cantidad'), '4');
+  console.log('OK la suma sigue a la cantidad del producto y marca una cantidad de tres decimales');
+
   // Un subítem en 0 se ve en el panel.
   await page.fill(campo(1, 'cantidad'), '0');
   if (!/⚠/.test(await suma.innerText()) || !(await suma.evaluate(el => el.classList.contains('is-error')))) falla('un subítem en 0 no se marca: ' + await suma.innerText());
@@ -64,9 +77,17 @@ const bloquesSbt = txt => txt.replace(/\r\n/g, '\n').split('\n\n').filter(b => b
   if (grupo.ok || !/subítems/.test(grupo.title)) falla('un producto con subítems se agrupó: ' + JSON.stringify(grupo));
   console.log('OK un producto con subítems no se agrupa: ' + grupo.title);
 
-  // Borrar y volver a cargar deja lo mismo.
+  // Borrar y volver a cargar deja lo mismo. Antes, una acción masiva
+  // (×2 en el otro producto): deshacerla no resucita el subítem borrado.
+  await page.check('[data-row-check="1"]');
+  await page.fill('#ncmBatchFactor', '2');
+  await page.click('#ncmBatchApplyQty');
   await page.click('[data-sub-borrar="0"][data-sub-idx="1"]');
   if ((await page.evaluate(() => CDI.state.items[0].subitems.length)) !== 1) falla('borrar no saca el subítem');
+  await page.locator('body').click({ position: { x: 5, y: 300 } });
+  await page.keyboard.press('Control+z');
+  if ((await page.evaluate(() => CDI.state.items[0].subitems.length)) !== 1) falla('deshacer la acción masiva resucitó el subítem borrado');
+  console.log('OK deshacer una acción masiva no pisa los subítems');
   await page.click('[data-sub-agregar="0"]');
   await page.fill(campo(1, 'sufijo'), SUF_B);
   await page.evaluate(() => { CDI.state.items.splice(1, 1); });
@@ -74,7 +95,8 @@ const bloquesSbt = txt => txt.replace(/\r\n/g, '\n').split('\n\n').filter(b => b
   // Generar desde la pantalla.
   await page.evaluate(() => CDI.goTo('validating'));
   await page.locator('#validatingGenerate').waitFor({ state: 'visible', timeout: 10000 }).catch(() => falla('no aparece la validación'));
-  await page.fill('#sbtSufijoValor', 'AA(DemoPouchs)-CA00-');
+  // Todos los subítems traen su sufijo: el general puede quedar vacío.
+  await page.fill('#sbtSufijoValor', '');
   const generar = async () => {
     const resp = page.waitForResponse(r => r.url().endsWith('/generate_maria') && r.request().method() === 'POST', { timeout: 15000 });
     await page.click('#validatingGenerate');

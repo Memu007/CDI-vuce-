@@ -69,5 +69,20 @@ caso sin_numero_de_subitem "${T}test_el_error_llega_a_la_pantalla"
 reemplazar $G "        if any(it.get('subitems') for it in grupo_items):" "        if False:"
 caso grupo_con_subitems "${T}test_un_producto_agrupado_no_lleva_subitems"
 
+# --- Revisión adversaria ---
+M=proyecto_maria/main.py
+
+# 5. una cantidad con más de dos decimales sale redondeada en el TXT
+reemplazar $G "                if abs(cant_sub - round(cant_sub, 2)) > 1e-9:" "                if False:"
+caso tres_decimales "${T}test_una_cantidad_con_mas_de_dos_decimales_no_sale_redondeada["
+
+# 6. el error del sufijo de un subítem no dice cuál
+reemplazar $M '                    _sufijos.append((f"Item {_n}, sub-ítem {_m}: ", sub["sufijo"].strip()))' '                    _sufijos.append(("", sub["sufijo"].strip()))'
+caso sufijo_sin_subitem "${T}test_el_error_del_sufijo_dice_que_subitem["
+
+# 7. sub-ítems con otra forma vuelven a dar 500
+reemplazar $M "            if not isinstance(_subs, list) or not all(isinstance(_s, dict) for _s in _subs):" "            if False:"
+caso forma_500 "${T}test_un_pedido_mal_armado_da_400_y_no_500[subitems0]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 4 sabotajes dan rojo por la razón esperada"
+echo "OK: los 7 sabotajes dan rojo por la razón esperada"

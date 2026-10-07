@@ -47,3 +47,36 @@ def test_un_producto_agrupado_no_lleva_subitems():
 def test_los_subitems_validos_siguen_generando():
     txt = _generar({"subitems": _subs((2, 1197), (4, 1197))})
     assert "CARTSBITEM=S" in txt and txt.count("[SBT]") == 2
+
+
+# --- Revisión adversaria ---------------------------------------------------
+
+@pytest.mark.parametrize("pares", [((9.996, 1), (0.004, 1)), ((0.3333, 3), (0.3333, 3), (0.3334, 3))])
+def test_una_cantidad_con_mas_de_dos_decimales_no_sale_redondeada(pares):
+    """El TXT declara la cantidad del subítem con dos decimales: 0,004 saldría
+    0,00 y tres de 0,3333 sumarían 0,99 contra 1,00."""
+    cantidad = round(sum(c for c, _ in pares), 6)
+    with pytest.raises(ValueError, match="sub-ítem .*dos decimales"):
+        _generar({"cantidad": cantidad, "valor_unitario": pares[0][1], "subitems": _subs(*pares)})
+
+
+def _pedir(client, subitems, **extra):
+    item = dict(ITEM_BASE, estado=2, subitems=subitems)
+    return client.post("/generate_maria", json={
+        "operation_id": "OP1", "items": [item], "fecha_emision": "22/06/2026", "sbt_sufijo_valor": SUF_A,
+        "moneda": "DOL", "incoterm": "EXW", "comprador_cuit": "30999999995", **extra})
+
+
+@pytest.mark.parametrize("sufijo", ["CSBTSVL=S2", "S2\nX", "A" * 121])
+def test_el_error_del_sufijo_dice_que_subitem(client, auth_override, sufijo):
+    subs = _subs((2, 1197), (4, 1197))
+    subs[1]["sufijo"] = sufijo
+    r = _pedir(client, subs)
+    assert r.status_code == 400, r.text
+    assert "sub-ítem 2" in r.text, r.text
+
+
+@pytest.mark.parametrize("subitems", [[1], "abc", [{"cantidad": 6, "valor_unitario": 1197, "sufijo": 5}]])
+def test_un_pedido_mal_armado_da_400_y_no_500(client, auth_override, subitems):
+    r = _pedir(client, subitems)
+    assert r.status_code == 400, r.text
