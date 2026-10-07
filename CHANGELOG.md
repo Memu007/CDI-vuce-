@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · fix: lo que el Excel no leía y abrir un libro armado (EXCEL-2)
+
+- **fix(excel):** el encabezado se busca en las primeras 30 filas (logo o datos del vendedor arriba); sin columna de país de origen los productos entran con el origen vacío y se avisa; el texto de una celda combinada hacia abajo vale para todas sus filas (los números no se copian); el aviso de mapeo nombra la columna que se usó.
+- **fix(excel, seguridad):** validar un .xlsx no lo abre: cuenta las hojas desde el índice y rechaza antes de abrir un libro con textos compartidos (10 MB), estilos o primera hoja (30 MB) de más; leer la factura abre sólo la primera hoja. Con 8 libros armados delante, una subida normal ya no falla.
+- **fix(ncm):** el historial de NCM lee CSV con «;», latin-1 o BOM. **fix(maria):** un monto que es una lista o un entero enorme, o un producto mal formado, da 400 y no 500; el CUIT del despachante va con 11 dígitos 0-9 y el identificador del vendedor sin dígitos de otros alfabetos.
+
 ## 2026-10-07 · fix: un campo vacío de la factura no llega al TXT como «None» (MARIA-1d)
 
 - **fix(maria):** el lector deja vacíos el número de factura, el vendedor, el comprador, el domicilio, la moneda y el incoterm que Gemini devuelve nulos o escritos como «None», «null» o «N/A» (antes «None» y «NON», que llegaban al TXT como `IDSO=FAC_None` o `CDDTINCOTE=NON`); el lector ya no inventa DOL ni FOB, y el prompt no pide adivinar la moneda. Lo que falta de la carátula se avisa antes de generar.
