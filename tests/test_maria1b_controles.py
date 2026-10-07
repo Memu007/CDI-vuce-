@@ -112,7 +112,7 @@ def test_cuit_del_importador(cuit, mensaje):
 
 @pytest.mark.parametrize("campo", ["flete", "seguro"])
 def test_flete_o_seguro_negativo_no_deja_generar(campo):
-    assert "no puede ser negativo" in _errores(_generar(**{campo: -1}))
+    assert "no es un importe válido" in _errores(_generar(**{campo: -1}))
 
 
 @pytest.mark.parametrize("cambio", [
