@@ -2,6 +2,63 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## MARIA-3 — reentrega con la devolución: **`0d6cb3e`**
+
+**Resultado: los cinco puntos, cada uno con su rojo antes y verde después. No
+hay nada para decidir.** Producto: `0144d4e` y `0e41311` (este último, de la
+revisión de la devolución). El resto son pruebas, sabotajes y la captura.
+MARIA-1d (abajo) sigue entregada sobre `c60dc3a` y está incluida en esta rama.
+
+| Punto | Qué hice | Rojo antes → verde |
+|---|---|---|
+| 1. Una sola tabla | La tabla oficial es **`proyecto_maria/static/v2/paises_maria.js`**: los 309 países de `TABLA PAISES V.0 25082010.xlsx` (tabla oficial VUCE, según `HANDOFF.md` y la nota del archivo). El servidor lee ese mismo archivo (`codigos_tabla_oficial()`), así que no hay copia. La regla está en la raíz (`pais_reconocido` y `get_pais_codigo`): sólo cifras 0-9 y un código de la tabla. Vale para la procedencia de la operación, la de cada producto y el origen | `test_la_procedencia_acepta_todos_los_paises_de_la_pantalla`: failed → los 309 pasan; 668, 436, 435, 223, 150, 242, 254 y 358 salen en `CARTPAYPRC` |
+| 2. Año del `IEXT` | Sin una fecha de emisión válida no se genera: 400 «Falta la fecha de emisión de la factura (DD/MM/AAAA)…». El año del IEXT sale de esa fecha. La revisión marca la fecha como requerida y no deja seguir sin ella. Los avisos previos dicen «sin una fecha válida no se genera el TXT» | `test_sin_fecha_valida_no_se_genera` (12 casos, incluidos `Fecha 18/07/2025` y `18/07/٢٥`); pantalla contra `088577f`: `FALLA: la fecha de emisión no figura como requerida en la revisión` |
+| 3. Fechas equivocadas | DD/MM/AA es 20AA (`01/01/69` → `01/01/2069`). Una fecha futura o de hace más de dos años se avisa antes de generar. La revisión valida fechas reales (rechaza `31/02/2026`) con las mismas reglas que el servidor | `test_la_fecha_de_la_factura_sale_en_el_txt[01/01/69-01/01/2069]`, `test_fecha_futura_o_vieja_se_avisa`; pantalla: `OK la revisión pide la fecha y rechaza el 31/02/2026` |
+| 4. Procedencia rara | `²`, `٢٢٢` o `2²2`: 400 «Procedencia «²» no reconocida: elegí un país de la lista.» en `/generate_maria` y en `/avisos`, nunca el texto de Python. En un producto da «Item N: Procedencia no reconocida». Una procedencia de producto en blanco no pisa la de la operación ni tapa la otra clave | `test_procedencia_no_reconocida_se_rechaza` (12), `test_codigo_raro_en_el_producto…` (6), `…en_blanco…` (2) |
+| 5. Gastos | Un importe no finito, negativo o de más de un billón da 400 «Gastos (…): … no es un importe válido», por `gastos_anteriores_fob`, por `gastos_fob` y en el generador. **También el flete y el seguro**: con C y D los gastos salen de flete + seguro, y un `flete=inf` llegaba a `GTOS-POS-FOB=inf` | `test_gastos_que_no_son_un_importe_dan_400` (20), `test_el_generador_tampoco…` (5), `test_flete_o_seguro…` (8) |
+
+Contra `088577f`, las pruebas nuevas dan `75 failed, 59 passed`.
+
+**Pruebas viejas que cambié**, porque fijaban lo que la devolución pide quitar:
+- `test_maria_iext_anio.py`: «sin fecha usa el año actual» y «fecha rara cae
+  al año actual» pasan a «no se genera».
+- `test_generar_maria_txt.py`, `test_prelaunch_block1.py` y MARIA-1d generaban
+  sin fecha: ahora la llevan.
+
+| Puerta (sobre `0d6cb3e`, worktree limpio) | Resultado |
+|---|---|
+| Suite completa | `1021 passed, 102 skipped, 25 warnings in 61.34s`, 0 failed |
+| `sabotaje_maria3.sh` | `OK: los 30 sabotajes dan rojo por la razón esperada` (27 a 30 son los de la devolución) |
+| `sabotaje_maria1d` / `4` / `1c` / `2b` / `2` / `1a` | `OK: los 7 …` / `9` / `4` / `6` / `8` / `10` |
+| `pantalla_maria3.js` | 7 líneas `OK` y `OK: pantalla MARIA-3` |
+| `pantalla_maria4.js` / `pantalla_maria1c.js` | `OK: pantalla MARIA-4` / `OK: pantalla MARIA-1c` |
+| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
+| Captura | `docs/pm/capturas/maria3-avisos.png` |
+
+**Autorrevisión** con `/code-review high` sobre la devolución. Lo que arreglé
+de ahí:
+- el flete y el seguro;
+- la regla de los códigos en la raíz (un producto con `99999` o `²` también
+  pasaba);
+- una procedencia en blanco que tapaba la otra clave;
+- la fecha real en la revisión;
+- el tope de gastos, que subí a un billón por las monedas de poco valor;
+- el aviso de fecha aunque no haya productos;
+- comentarios viejos.
+
+**Riesgos que quedan:**
+- La fecha d/m contra m/d ambigua (`03/04/2026`): queda anotada, como pediste.
+- El servidor lee la tabla de países de un archivo de la pantalla. Si alguien
+  le cambia el formato, el error dice cuál archivo es, y una prueba verifica
+  los 309 códigos.
+- Con la fecha obligatoria, la pantalla vieja (v1) recibe el 400 si no la
+  carga. La v1 tiene la fecha como texto libre.
+
+Última vuelta: 2026-10-07 12:10 UTC
+Contexto: ~60 % (pasado el umbral: compactar en este corte)
+
+---
+
 ## MARIA-1d — entregada: **`c60dc3a`**
 
 **Resultado: terminada. No hay nada para decidir.** Base `8770925`
