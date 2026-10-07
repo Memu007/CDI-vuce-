@@ -90,9 +90,12 @@ prioridad, alcance ni aceptación por sí solo: la PM decide qué adopta.
 
 Vale para PMs y Devs; esta es su única copia.
 
-- **Cuándo compactar:** cerca del 50 % de contexto las Devs y del 60 % las
-  PMs, en un corte natural (después de una entrega o de un veredicto). Nunca en
-  medio de una corrida.
+- **Cuándo compactar:** desde el 30 % de contexto las Devs y el 40 % las
+  PMs, en el primer corte natural (después de una entrega o de un veredicto).
+  Nunca en medio de una corrida. (Emi, 2026-10-07: antes era 50 y 60; cada
+  paso relee toda la memoria del chat y las tres sesiones comparten el plan.)
+- **Se mide:** en cada veredicto, la PM anota cuánto contexto usó la Dev en
+  la pieza. El 2026-10-27 se revisa el número con esos datos.
 - **Lo mide la PM principal:** en cada vuelta, `get_session` de cada sesión da
   `context_usage.used_tokens`. Pasado el umbral, le da a Emi el
   `/compact conservar: …` listo para pegar en esa sesión.
