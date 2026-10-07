@@ -124,7 +124,11 @@ def controles_antes_de_generar(items, cabecera: dict) -> tuple[list, list]:
 
     cuit = str(cabecera.get("comprador_cuit") or "").strip()
     if not cuit:
-        errores.append("Falta el CUIT del importador.")
+        # La pantalla de revisión lo deja opcional («extranjeros sin CUIT»):
+        # vacío avisa; si exigirlo es una decisión de la PM (MARIA-1b, D20).
+        advertencias.append(
+            "Falta el CUIT del importador: completalo acá o en el Kit SIM antes de presentar."
+        )
     elif not cuit_valido(cuit):
         errores.append(
             f"El CUIT del importador «{cuit}» no es válido: tiene que tener 11 "
