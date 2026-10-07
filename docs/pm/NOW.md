@@ -169,11 +169,14 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 21:08 UTC: GUARDAR-1 aceptada. Se aisló con `cherry-pick` y se
-integró en `a9b03cf`, el candidato a la tercera publicación: espera «dale
-a9b03cf». D32: (b), va como GUARDAR-2 (Dev 1, después de la devolución de
-EXCEL-2). Dev 2 entregó los seis puntos (`a8a83f3`), pero sin los cuatro de
-SUBITEMS-1 ni la e2e: se lo pedí para revisar todo junto.
+2026-10-07 21:58 UTC (rutina): publicada `a9b03cf` (GUARDAR-1) a las 21:35.
+La CI de `main` está trabada desde las 21:36 en «Dependencias del sistema»
+(apt del runner de GitHub; no llegó a correr pruebas). Dev 2 reentregó todo
+junto (`df4de22`): rojo antes `21 failed`, suite `1526 passed`, e2e OK. Un
+subagente Sonnet medio reverifica los diez puntos. Dev 1 quieta desde las
+21:16 con la devolución de EXCEL-2 casi cerrada: despertada. Contexto: PM 46 %
+y Dev 1 51 %, sobre el 30/40 de hoy: `/compact` pedidos a Emi. Dev 2 23 %
+(compactó).
 
 ## Medición
 
