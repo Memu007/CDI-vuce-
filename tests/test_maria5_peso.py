@@ -27,7 +27,7 @@ def test_diez_notebooks_de_dos_kilos_y_medio_declaran_25():
 def test_el_peso_total_que_ya_viene_no_se_multiplica():
     """La v1 manda peso_kg = unitario × cantidad: no se multiplica otra vez."""
     txt = _gen("OP_PESO", [{"pieza": "84713012", "descripcion": "Notebook de prueba", "cantidad": 10,
-                            "valor_unitario": 500, "peso_kg": 25, "peso_unitario": 2.5, "origen": "CN"}])
+                            "valor_unitario": 500, "peso_kg": 25, "origen": "CN"}])
     assert _pesos(txt) == ["25.000"]
 
 
@@ -44,7 +44,7 @@ def test_un_grupo_suma_el_total_de_cada_linea():
 @pytest.mark.parametrize("item, total", [
     ({"cantidad": 10, "peso_unitario": 2.5}, 25.0),
     ({"cantidad": 6, "peso_kg": 33}, 33.0),
-    ({"cantidad": 6, "peso_kg": 33, "peso_unitario": 5.5}, 33.0),
+    ({"cantidad": 6, "peso_kg": 33, "peso_unitario": 5}, 33.0),
     ({"cantidad": 3, "peso_kg": None, "peso_unitario": 2}, 6.0),
     ({"cantidad": 3, "peso_kg": "", "peso_unitario": 2}, 6.0),
     ({"cantidad": 3}, 0.0),
