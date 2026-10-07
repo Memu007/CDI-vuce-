@@ -90,7 +90,7 @@ sabotaje $M "el mapeo guardado vuelve a dejar afuera lo detectado" \
 sabotaje $M "las filas descartadas dejan de avisarse" \
   '            "filas_descartadas": len(descartes),' \
   '            "filas_descartadas": 0,' \
-  "FAILED $L::test_filas_descartadas_se_avisan"
+  "FAILED $L::test_filas_sin_descripcion_ni_ncm_se_avisan"
 sabotaje $M "las filas con datos faltantes vuelven a perderse" \
   '            # Sin descripción ni NCM no hay ítem que mostrar: se avisa.
             if not pieza and not descripcion:' \
@@ -114,7 +114,7 @@ sabotaje $M "la NCM numérica vuelve a salir con .0" \
         return str(int(valor))' \
   '    if False:
         return str(int(valor))' \
-  "FAILED $L::test_ncm_numerica_no_sale_con_punto_cero"
+  "FAILED $L::test_extraccion_con_ncm_leida_como_numero_decimal"
 sabotaje $M "el país vuelve a cortarse a tres letras" \
   '                origen=_origen_desde_factura(row[origen_col]) or "XX",' \
   '                origen=str(row[origen_col]).upper()[:3] or "XX",' \

@@ -199,3 +199,16 @@ def test_rutas_de_excel_sin_llamador_ya_no_existen(ruta):
     """D13: sin pantalla que las use, se borran (no llegaban al TXT)."""
     r = TestClient(main.app).post(ruta, files={"file": ("a.xlsx", _xlsx([H]), "application/octet-stream")})
     assert r.status_code in (404, 405), f"{ruta}: {r.status_code}"
+
+
+def test_extraccion_con_ncm_leida_como_numero_decimal():
+    """Si la planilla llega con la NCM como número decimal (84713000.0, lo que
+    hace pandas con una fila vacía en el medio si no se lee como texto), sale
+    sin «.0»."""
+    import pandas as pd
+    df = pd.DataFrame({"pieza": [84713000.0, float("nan"), 85171300.0],
+                       "descripcion": ["Laptop", None, "Telefono"],
+                       "origen": ["CN", None, "CN"], "cantidad": [1.0, None, 2.0],
+                       "valor_unitario": [10.0, None, 20.0], "peso_unitario": [1.0, None, 2.0]})
+    items = main.extract_items_from_excel(df, "x.xlsx")
+    assert [i.pieza for i in items] == ["84713000", "85171300"]
