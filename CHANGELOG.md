@@ -13,7 +13,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-10-07 · feat: avisos antes de generar, gastos anteriores al FOB, procedencia y fecha (MARIA-3)
 
 - **feat(maria):** los avisos del TXT se ven en la validación, antes del botón de generar. Los gastos anteriores al FOB de la pantalla llegan al TXT (`GTOS-ANT-FOB`) con EXW, FCA o FAS (FAS pasa a ser condición válida); con otra condición no van y se avisa. La procedencia se carga por operación (art. 15 del Código Aduanero); vacía, sigue igual al origen con aviso.
-- **fix(maria):** la fecha de emisión ya no sale con la de hoy: si la factura no la trae o no es una fecha, `FECHAEMISIONFACT` sale vacía y se avisa. El lector deja de marcar como «sin leer» un flete o seguro «N/A», «-», «FREE», «included» o «Prepaid» y un país «Unknown» o «?».
+- **fix(maria):** la fecha de emisión ya no sale con la de hoy: si la factura no la trae o no es una fecha, no se genera el TXT y la revisión la pide (el año del IEXT sale de esa fecha); una fecha futura o de hace más de dos años se avisa. La procedencia usa la misma tabla de países que la pantalla; un importe de gastos no finito, negativo o absurdo da error. El lector deja de marcar como «sin leer» un flete o seguro «N/A», «-», «FREE», «included» o «Prepaid» y un país «Unknown» o «?».
 
 ## 2026-10-07 · feat: lo que decide el despachante sale en el TXT (MARIA-4)
 

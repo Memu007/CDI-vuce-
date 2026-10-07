@@ -1165,7 +1165,8 @@
             const isManual = CDI.state.sourceFormat === 'manual';
             REQUIRED = isManual 
                 ? ['vendedor_nombre', 'comprador_nombre', 'numero_factura', 'fecha_emision', 'moneda', 'incoterm']
-                : ['moneda', 'incoterm'];
+                // Sin fecha de emisión no se genera el TXT (devolución de MARIA-3).
+                : ['fecha_emision', 'moneda', 'incoterm'];
                 
             if (form) {
                 FIELDS.forEach(name => {

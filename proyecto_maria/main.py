@@ -3591,7 +3591,8 @@ def _items_con_procedencia(request: MariaRequest) -> list:
         )
     return [
         {**it, "pais_procedencia": procedencia}
-        if isinstance(it, dict) and not (it.get("pais_procedencia") or it.get("procedencia"))
+        if isinstance(it, dict)
+        and not str(it.get("pais_procedencia") or it.get("procedencia") or "").strip()
         else it
         for it in (request.items or [])
     ]
@@ -3624,7 +3625,10 @@ async def avisos_maria_endpoint(
     """Los avisos de `/generate_maria`, antes de generar (MARIA-3): la
     pantalla los muestra junto al botón. No genera ni guarda nada."""
     items = _items_con_procedencia(request)
-    gastos = gastos_fob_para_el_txt(request.incoterm, request.gastos_fob, request.gastos_anteriores_fob)
+    try:
+        gastos = gastos_fob_para_el_txt(request.incoterm, request.gastos_fob, request.gastos_anteriores_fob)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     try:
         _, kit_warnings = validate_for_kit_maria(items)
     except Exception:

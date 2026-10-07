@@ -1,10 +1,13 @@
 """
 Generador de archivos TXT en formato MARIA para Sistema SIM de AFIP.
 """
+import json
 import math
 import re
 import unicodedata
-from datetime import datetime
+from datetime import datetime, timedelta
+from functools import lru_cache
+from pathlib import Path
 
 # Condiciones de venta de los grupos C y D de Incoterms. En estas, la
 # informacion complementaria del SIM pide `GTOS-POS-FOB` (diferencia entre la
@@ -262,43 +265,81 @@ PAIS_ARGENTINA = 200
 INCOTERMS_GASTOS_ANTERIORES = {"EXW", "FCA", "FAS"}
 
 
+# Tope de un importe de gastos: más que esto no es un gasto, es un error de
+# carga (devolución de MARIA-3: «1e308» llegaba al TXT).
+GASTOS_MAXIMO = 1_000_000_000
+
+
+def _importe_de_gastos(valor, campo: str):
+    """El importe de gastos como número, o None si no vino. Un importe no
+    finito, negativo o absurdo es un error con mensaje propio (400)."""
+    if valor is None:
+        return None
+    try:
+        importe = float(valor)
+    except (TypeError, ValueError):
+        raise ValueError(f"Gastos ({campo}): «{str(valor)[:20]}» no es un importe.")
+    if not math.isfinite(importe) or importe < 0 or importe > GASTOS_MAXIMO:
+        raise ValueError(
+            f"Gastos ({campo}): «{str(valor)[:20]}» no es un importe válido "
+            f"(entre 0 y {GASTOS_MAXIMO:,}).".replace(",", ".")
+        )
+    return importe
+
+
 def gastos_fob_para_el_txt(incoterm, gastos_fob=None, gastos_anteriores_fob=None):
     """Importe de gastos respecto del FOB que va al TXT, o None.
 
     `gastos_fob` explícito manda (como antes). Si no, los gastos anteriores al
-    FOB de la pantalla van sólo con EXW, FCA o FAS, y sólo si son más que 0:
-    un 0 o un campo vacío no se declara (se avisa en los supuestos)."""
-    if gastos_fob is not None:
-        return gastos_fob
+    FOB de la pantalla van sólo con EXW, FCA o FAS, y sólo desde un centavo:
+    un 0 o un campo vacío no se declara (se avisa en los supuestos). Un
+    importe inválido en cualquiera de los dos es un error."""
+    explicito = _importe_de_gastos(gastos_fob, "gastos_fob")
+    anteriores = _importe_de_gastos(gastos_anteriores_fob, "gastos anteriores a FOB")
+    if explicito is not None:
+        return explicito
     if str(incoterm or "").strip().upper() not in INCOTERMS_GASTOS_ANTERIORES:
         return None
-    try:
-        importe = float(gastos_anteriores_fob)
-    except (TypeError, ValueError):
+    if anteriores is None or round(anteriores, 2) <= 0:
         return None
-    # Infinito, NaN o menos de un centavo no son un importe que declarar.
-    if not math.isfinite(importe) or round(importe, 2) <= 0:
-        return None
-    return importe
+    return anteriores
 
 
 def fecha_de_la_factura(raw) -> str:
     """Fecha de emisión en DD/MM/AAAA, o "" si no es una fecha.
 
-    Acepta DD/MM/AAAA (día y mes de una o dos cifras), DD/MM/AA y AAAA-MM-DD. Lo que no se puede leer queda
-    vacío (y se avisa): nunca se pone la fecha de hoy (MARIA-3, D15)."""
+    Acepta DD/MM/AAAA (día y mes de una o dos cifras), DD/MM/AA (año 20AA) y
+    AAAA-MM-DD, sólo con cifras 0-9. Sin una fecha válida no se genera
+    (devolución de MARIA-3): nunca se pone la de hoy."""
     texto = str(raw or "").strip()
-    formatos = ((r"\d{1,2}/\d{1,2}/\d{4}", "%d/%m/%Y"), (r"\d{1,2}/\d{1,2}/\d{2}", "%d/%m/%y"),
-                (r"\d{4}-\d{2}-\d{2}", "%Y-%m-%d"))
-    for patron, formato in formatos:
-        if re.fullmatch(patron, texto):
-            try:
-                fecha = datetime.strptime(texto, formato)
-            except ValueError:
-                return ""
-            # Un año como 0026 no es una fecha de factura.
-            return fecha.strftime("%d/%m/%Y") if fecha.year >= 1900 else ""
-    return ""
+    m = (re.fullmatch(r"([0-9]{1,2})/([0-9]{1,2})/([0-9]{4}|[0-9]{2})", texto)
+         or re.fullmatch(r"([0-9]{4})-([0-9]{2})-([0-9]{2})", texto))
+    if not m:
+        return ""
+    if "-" in texto:
+        anio, mes, dia = (int(g) for g in m.groups())
+    else:
+        dia, mes, anio = (int(g) for g in m.groups())
+        if len(m.group(3)) == 2:
+            anio += 2000          # una factura de «69» es de 2069, no de 1969
+    try:
+        fecha = datetime(anio, mes, dia)
+    except ValueError:
+        return ""
+    # Un año como 0026 no es una fecha de factura.
+    return fecha.strftime("%d/%m/%Y") if fecha.year >= 1900 else ""
+
+
+_PAISES_PANTALLA = Path(__file__).resolve().parents[1] / "static" / "v2" / "paises_maria.js"
+
+
+@lru_cache(maxsize=1)
+def codigos_tabla_oficial() -> frozenset:
+    """Los códigos de país de la tabla oficial MARIA (TABLA PAISES V.0
+    25082010.xlsx, 309 países). Una sola copia: la que usa la pantalla."""
+    js = _PAISES_PANTALLA.read_text(encoding="utf-8")
+    paises = json.loads(re.search(r"const COUNTRIES = (\[.*?\]);", js).group(1))
+    return frozenset(int(p["code"]) for p in paises)
 
 
 def _estado_item(item: dict, idx, pais_codigo: int) -> int:
@@ -351,10 +392,12 @@ def pais_reconocido(pais) -> bool:
 
 def pais_de_la_tabla(pais) -> bool:
     """Como `pais_reconocido`, pero un código numérico tiene que estar en la
-    tabla oficial (MARIA-3, procedencia: «99999» no es un país)."""
+    tabla oficial de la pantalla (MARIA-3, procedencia: «99999» no es un país)."""
     texto = str(pais or "").strip()
-    if texto.isdigit():
-        return int(texto) in set(PAISES_INDEC.values())
+    if any(c.isdigit() for c in texto):
+        # Sólo un código de cifras 0-9 que esté en la tabla oficial («²» o
+        # «٢٢٢» no son códigos).
+        return bool(re.fullmatch(r"[0-9]+", texto)) and int(texto) in codigos_tabla_oficial()
     return pais_reconocido(texto)
 
 
@@ -527,6 +570,13 @@ def generate_maria_txt(operation_id: str, items: list,
     # 2. Fecha de emisión de la factura. Si no se leyó, el campo sale vacío y
     # los supuestos lo avisan: antes salía la fecha de hoy (MARIA-3, D15).
     fecha_factura = fecha_de_la_factura(fecha_emision)
+    if not fecha_factura:
+        leida = str(fecha_emision or "").strip()[:20]
+        raise ValueError(
+            "Falta la fecha de emisión de la factura (DD/MM/AAAA)"
+            + (f": «{leida}» no es una fecha" if leida else "")
+            + ". Sin ella no se genera el TXT."
+        )
 
     # Año de dos dígitos para el IEXT de cada ítem (`00272-01/26`). Sale del
     # año de la factura; si no se puede leer, del año actual.
@@ -534,9 +584,7 @@ def generate_maria_txt(operation_id: str, items: list,
     # Antes estaba escrito a mano como "25". Silenciosamente iba a poner /25 en
     # toda declaración generada de 2026 en adelante: el TXT sale igual, no
     # falla nada, y el error aparece recién en la aduana.
-    # Con la fecha vacía, el año se sigue buscando en lo que vino escrito.
-    _m_anio = re.search(r"/(\d{2}|\d{4})\s*$", fecha_factura or str(fecha_emision or "").strip())
-    anio_iext = _m_anio.group(1)[-2:] if _m_anio else datetime.now().strftime("%y")
+    anio_iext = fecha_factura[-2:]
     lines.append("[CPL]")
     lines.append("NART=0000")
     lines.append("ICPLDIF=D")
@@ -565,7 +613,7 @@ def generate_maria_txt(operation_id: str, items: list,
     campo_gastos = "GTOS-POS-FOB    " if grupo_cd else "GTOS-ANT-FOB    "
 
     if gastos_fob is not None:
-        importe_gastos = f"{float(gastos_fob):.2f}"
+        importe_gastos = f"{_importe_de_gastos(gastos_fob, 'gastos_fob'):.2f}"
     elif grupo_cd:
         # Formato 2 decimales para evitar artefactos float
         # (str(3221.66+50) podia dar "3271.6600000000003").
@@ -752,7 +800,7 @@ def generate_maria_txt(operation_id: str, items: list,
         # El fallback se avisa en `supuestos_declarados()`: en el archivo real
         # de referencia origen y procedencia difieren (200 vs 222), asi que
         # asumirlos iguales en silencio no es gratis.
-        pais_proc = (item.get('pais_procedencia') or item.get('procedencia') or pais)
+        pais_proc = (str(item.get('pais_procedencia') or item.get('procedencia') or '').strip() or pais)
         pais_proc_codigo = get_pais_codigo(pais_proc)
         # Unidad de medida del item (con fallback a 07=UNIDAD si no viene).
         unidad_codigo = get_unidad_codigo(
@@ -1023,13 +1071,23 @@ def supuestos_declarados(
             )
 
     # --- Fecha de emisión (MARIA-3) ----------------------------------------
-    if items and not fecha_de_la_factura(fecha_emision):
+    fecha_ok = fecha_de_la_factura(fecha_emision)
+    if items and not fecha_ok:
         leida = str(fecha_emision or "").strip()
         avisos.append(
             "Fecha de emisión: " + (f"«{leida[:20]}» no es una fecha (DD/MM/AAAA); "
                                     if leida else "no se leyó de la factura; ")
-            + "en el TXT sale vacía. Cargala antes de pegar el archivo en el Kit."
+            + "sin una fecha válida no se genera el TXT. Cargala en la revisión."
         )
+    elif items:
+        fecha = datetime.strptime(fecha_ok, "%d/%m/%Y")
+        hoy = datetime.now()
+        if fecha > hoy + timedelta(days=1):
+            avisos.append(f"Fecha de emisión: {fecha_ok} es futura; revisá que sea la de la factura.")
+        elif fecha < hoy - timedelta(days=730):
+            avisos.append(
+                f"Fecha de emisión: {fecha_ok} es de hace más de dos años; revisá que sea la de la factura."
+            )
 
     # --- Defaults a nivel ítem -------------------------------------------
     sin_procedencia = []
@@ -1039,7 +1097,7 @@ def supuestos_declarados(
             continue
         # Mismo orden que el generador: pais_origen primero.
         origen = item.get("pais_origen") or item.get("origen")
-        proc = item.get("procedencia") or item.get("pais_procedencia")
+        proc = str(item.get("procedencia") or item.get("pais_procedencia") or "").strip()
         if origen and not proc:
             sin_procedencia.append(str(idx))
         if not (item.get("unidad") or item.get("unidad_medida") or item.get("um")):
