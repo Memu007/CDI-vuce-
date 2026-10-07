@@ -423,6 +423,7 @@ def test_generate_maria_happy_path(client):
     """Items válidos + auth + SBT explícito → 200 + filename + content con secciones MARIA."""
     _register(client, "maria1")
     resp = client.post("/generate_maria", json={
+        "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
         "operation_id": "OP777",
         "items": ITEMS_OK,
         "moneda": "DOL",
@@ -481,6 +482,7 @@ def test_generate_maria_usa_cuit_del_perfil(client):
     """Con SBT explícito + CUIT en perfil → 200 y el TXT usa el CUIT del perfil."""
     _register(client, "maria3", cuit="20111222333")
     resp = client.post("/generate_maria", json={
+        "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
         "operation_id": "OP3",
         "items": ITEMS_OK,
         "sbt_sufijo_valor": "AA(DEMO)-AB(DEMO)-CA00-",
@@ -709,6 +711,7 @@ def test_sbt_endpoint_genera_seccion_sbt(client):
     """Con SBT válido, el endpoint genera 200 y el TXT contiene [SBT]."""
     _register(client, "maria_sbt_ok")
     resp = client.post("/generate_maria", json={
+        "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
         "operation_id": "OP_SBT_OK",
         "items": ITEMS_OK,
         "sbt_sufijo_valor": "AA(CLIENTE)-AB(OTRO)-CA00-",
@@ -723,6 +726,7 @@ def test_sbt_trim_aplicado(client):
     """El backend aplica trim al SBT: espacios al final no rompen."""
     _register(client, "maria_sbt_trim")
     resp = client.post("/generate_maria", json={
+        "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
         "operation_id": "OP_TRIM",
         "items": ITEMS_OK,
         "sbt_sufijo_valor": "  AA(TRIM)-AB(TRIM)-CA00-  ",
@@ -751,6 +755,7 @@ def test_sbt_flujo_completo_desde_dashboard(client):
     assert val.status_code == 200
     # Paso 2: generar con SBT
     resp = client.post("/generate_maria", json={
+        "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
         "operation_id": "OP_E2E_SBT",
         "items": ITEMS_OK,
         "sbt_sufijo_valor": "AA(E2E)-AB(E2E)-CA00-",

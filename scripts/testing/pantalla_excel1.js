@@ -14,7 +14,8 @@ function falla(msg) { console.error('FALLA: ' + msg); process.exit(1); }
   const id = Date.now();
   await page.request.post(base + '/auth/register', { data: { username: 'prueba_' + id, password: 'Clave-Inventada-123', email: 'p' + id + '@ejemplo.test' } });
   await page.route('**/upload_excel_v2/**', r => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({
-    message: 'ok', filename: 'factura.xlsx', items_count: 1, operacion: {},
+    message: 'ok', filename: 'factura.xlsx', items_count: 1,
+    operacion: { filas_excel_sin_leer: [7, 9], filas_excel_sin_leer_total: 2 },
     filas_descartadas: 2, filas_descartadas_numeros: [7, 9], applied_mapping: true,
     catalogo: { columnas_detectadas: 6, columnas_faltantes: [], total: 6, completo: true },
     items: [{ descripcion: 'Tornillo de acero inoxidable M6', cantidad: 2, valor_unitario: 3, peso_unitario: 1, origen: 'CN', pieza: '84713000' }] }) }));

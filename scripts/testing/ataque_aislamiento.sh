@@ -126,7 +126,7 @@ echo -e "${GREEN}✅ Los dos registrados${NC}"
 
 # --------------------------------------------------- Ana carga sus datos
 paso "Ana carga un cliente con CUIT y genera su MARIA.TXT"
-CUIT_ANA="30712345678"
+CUIT_ANA="30712345671"  # inventado, con dígito verificador válido (MARIA-1b lo exige al generar)
 CLI=$(curl -s -m 15 -b "$COOKIE_A" -c "$COOKIE_A" -H "X-CSRF-Token: $(csrf "$COOKIE_A")" \
     -X POST "${BASE}/api/clientes" -H 'Content-Type: application/json' \
     -d "{\"nombre\":\"Importadora Privada de Ana SA\",\"cuit\":\"${CUIT_ANA}\",\"email\":\"privado@ana.com\",\"telefono\":\"1155550000\"}")
