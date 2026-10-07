@@ -2,6 +2,100 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## MARIA-3 — entregada: **`088577f`**
+
+**Resultado: terminada, con una D (D12) que no frena.** Base `06e4ac3`
+(MARIA-4 aceptada). Producto: `341a429`, `1b1a95a`, `1e915f2`. El resto son
+pruebas, sabotajes y la captura.
+
+Lo que cambia en el TXT, punto por punto:
+
+| Punto | Ahora | Prueba | Rojo antes → verde |
+|---|---|---|---|
+| Avisos antes de generar (M6) | `POST /generate_maria/avisos` devuelve los mismos avisos que `/generate_maria`, sin generar ni guardar. En validación, el panel «Revisá antes de generar» va arriba del botón y se actualiza al cambiar la tarjeta del despachante | pantalla | `pantalla_maria3.js` contra `06e4ac3`: `FALLA: no aparece el campo de procedencia`; con la pieza: `OK: pantalla MARIA-3` |
+| Gastos anteriores al FOB (M8) | El campo de la pantalla va a `GTOS-ANT-FOB` con EXW, FCA o FAS, y sólo si es más de 0. Con otra condición no va y se avisa. Vacío o 0 con EXW, FCA o FAS: no sale y se avisa. FAS entra en `INCOTERMS_VALIDOS`. El `gastos_fob` explícito sigue mandando, como antes | respuesta 6; nota del SIM; el archivo real de 2026: los 150 cargados en la pantalla salen igual que en el real, y los bloques de productos también | antes: `assert [] == ['150.00']` |
+| Procedencia | Campo por operación en la revisión, con la lista de países. Va a cada producto que no trae la suya. Si no se reconoce, o es un número que no está en la tabla, da 400. Vacía: igual al origen, con aviso, como antes | art. 15 del CA; el archivo real de 2025 sale **entero idéntico** por `/generate_maria` cargando la procedencia «PE» por operación | antes: 404 en el endpoint y procedencia sin aplicar |
+| Fecha de emisión | La de la factura en DD/MM/AAAA. Se aceptan también d/m/AAAA, DD/MM/AA y AAAA-MM-DD, y se normalizan al formato de los archivos reales. Si no hay fecha o no se puede leer, `FECHAEMISIONFACT` sale **vacía** y se avisa. El año del IEXT se sigue leyendo de lo escrito | D15 | antes: `assert ['07/10/2026'] == ['']`: salía la fecha de hoy |
+| Sin avisos de más | Flete o seguro «N/A», «NA», «-», «FREE», «included», «Prepaid» (con o sin punto, sin importar mayúsculas), y país «Unknown», «?», «N/A»: no se marcan como sin leer. «N/A 30» o «Unknown land» sí se marcan. Una fecha que no vino queda `""` (antes `"None"`) | — | 16 failed → passed, en las dos copias del lector |
+
+Contra `06e4ac3`, las pruebas nuevas dan `44 failed, 9 passed`. Los 9 que
+pasan son resguardos de lo que ya andaba.
+
+| Puerta (worktree limpio) | Resultado |
+|---|---|
+| Suite completa sobre `fa4b096` (mismo producto y pruebas que `088577f`; el último commit sólo toca scripts y la captura) | `911 passed, 102 skipped, 25 warnings in 62.36s`, 0 failed |
+| `tests/test_maria3_antes_de_generar.py` | `65 passed` |
+| `sabotaje_maria3.sh` | `OK: los 20 sabotajes dan rojo por la razón esperada` |
+| `sabotaje_maria4` / `1c` / `2b` / `2` / `1a` | `OK: los 9 …` / `OK: los 4 …` (patrón puesto al día) / `OK: los 6 …` / `OK: los 8 …` / `OK: los 10 …` |
+| `pantalla_maria3.js` | 5 líneas `OK` y `OK: pantalla MARIA-3`. Incluye la respuesta de avisos demorada: contra `a3f2df9` daba `FALLA: mientras llega la respuesta se ven los avisos de la operación anterior` |
+| `pantalla_maria4.js` / `pantalla_maria1c.js` | `OK: pantalla MARIA-4` / `OK: pantalla MARIA-1c` |
+| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
+| Captura | `docs/pm/capturas/maria3-avisos.png` |
+
+**Autorrevisión** (`/code-review high` y un adversario Sonnet alto, que
+comparó los avisos previos con los de generar en 1512 combinaciones: 0
+diferencias). Arreglado, cada uno con su prueba y su sabotaje:
+- con una fecha no aceptada, el año del IEXT pasaba al de hoy;
+- «1/7/2025» quedaba vacía;
+- una procedencia numérica fuera de la tabla («99999») llegaba al TXT;
+- gastos infinitos o de menos de un centavo se declaraban (`MCPL=inf`, `0.00`);
+- un año 0026 salía como `05/03/26`;
+- al entrar a validar con otra operación, el panel mostraba un momento los
+  avisos de la anterior.
+
+**Supuestos que podés rechazar:**
+- Sin fecha, la línea `FECHAEMISIONFACT` sale con el valor vacío; no se
+  omite. Así leí «vacía».
+- Un 0 en gastos anteriores no se declara: el campo de la pantalla vale 0
+  cuando está vacío.
+- Una fecha DD/MM/AA se escribe con cuatro cifras, como en los archivos reales.
+
+**Riesgos que quedan:**
+- «included» o «Prepaid» en un CIF deja el flete en 0 sin aviso. Lo pediste
+  así, pero en ese caso el flete viene dentro del precio.
+- El campo de gastos es numérico: en Chromium, «1,5» queda 15. Es lo que se
+  ve en el campo, pero no lo probé con un Chrome real en es-AR.
+- La lista de países de la pantalla trae alias que no son países, por ejemplo
+  «Islas» → 150 Cabo Verde o «Córdoba» → 256 ZF Córdoba. Es la tabla de
+  MARIA-4, y la procedencia los acepta.
+- Los avisos previos no incluyen los errores que bloquean (SBT, NCM). Esos
+  siguen saliendo al generar o en la tarjeta del despachante.
+- Sin fecha, el año del IEXT es el de hoy. Los identificadores son MARIA-6.
+- La pantalla vieja (v1) recibe los avisos nuevos (gastos, procedencia), pero
+  no tiene esos campos.
+
+## Decisiones
+
+**D12. El lector escribe «None» en los demás campos que Gemini devuelve
+vacíos.** Lo encontró el revisor: número de factura, vendedor, comprador,
+domicilio, y «NON» en moneda e incoterm. Llegan al TXT, por ejemplo
+`IDSO=FAC_None` y `CDDTINCOTE=NON`. Es el mismo defecto que arreglé sólo en la
+fecha, que era la que pedía MARIA-3.
+- (a) Pieza chica aparte: `str(x or "")` en las dos copias, con la moneda y el
+  incoterm vacíos en vez de «NON». **Recomiendo (a), antes de MARIA-5.**
+- (b) Sumarlo a MARIA-5.
+
+No me frena: sigo con MARIA-5 cuando la escribas.
+
+## Para reproducir
+
+```bash
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 088577f 8080
+<venv>/bin/python -m pytest -q --no-cov tests/test_maria3_antes_de_generar.py tests/test_generar_maria_txt.py tests/test_maria_subitems.py tests/test_maria4_despachante.py   # 174 passed
+BASE_URL=http://127.0.0.1:8080 node scripts/testing/pantalla_maria3.js     # «OK: pantalla MARIA-3»
+VENV=<venv> scripts/testing/sabotaje_maria3.sh 088577f                      # «OK: los 20 …»
+```
+
+## No corrido
+
+- La procedencia y la fecha en el Kit real.
+- El campo de gastos con un Chrome real en español.
+
+Última vuelta: 2026-10-07 09:30 UTC
+Contexto: ~40 %
+
+---
+
 ## MARIA-4 — reentrega con la devolución: **`2461939`**
 
 Producto `dbf8848`; pruebas y sabotajes `dbf8848`…`2461939`. La entrega
