@@ -3294,11 +3294,13 @@ async def process_operation(
 def _segundos_de_entorno(variable: str, defecto: float) -> float:
     """Segundos de una variable de entorno. Mal escrita, en 0 o negativa,
     vale el defecto (RENDIMIENTO-1b)."""
+    import math
     try:
         valor = float(os.getenv(variable, "") or defecto)
     except (TypeError, ValueError):
         return defecto
-    return valor if valor > 0 else defecto
+    # inf o 1e309 apagarían el tiempo máximo: también valen el defecto.
+    return valor if math.isfinite(valor) and valor > 0 else defecto
 
 
 def _pdf_read_timeout_s() -> float:

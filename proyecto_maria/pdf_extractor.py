@@ -817,20 +817,31 @@ def _extract_pdf_text(data: bytes) -> str:
     return text
 
 
+_PAGINAS_VENDEDOR = 2
+_MAX_CONTENIDO_PAGINA = 512 * 1024
+
+
 def extraer_texto_pdf_seguro(data: bytes) -> str:
     """Texto del PDF sólo con pypdf, para PDFs que sube el usuario.
 
     pdfminer y pdfplumber se cuelgan para siempre con un PDF armado (por
     ejemplo, un /Length que se apunta a sí mismo), y un hilo colgado no se
     puede cortar. pypdf aguanta esos casos (RENDIMIENTO-1b). Sin OCR.
+
+    Sólo mira las primeras páginas (el vendedor está arriba de la factura) y
+    salta una página cuyo contenido pase de _MAX_CONTENIDO_PAGINA: pypdf tarda
+    más que lineal en sacarle el texto a un contenido enorme (3 MB, 6 s).
     """
     import io
     try:
         from pypdf import PdfReader
         reader = PdfReader(io.BytesIO(data))
         paginas = []
-        for p in reader.pages:
+        for p in list(reader.pages)[:_PAGINAS_VENDEDOR]:
             try:
+                contenido = p.get_contents()
+                if contenido is not None and len(contenido.get_data()) > _MAX_CONTENIDO_PAGINA:
+                    continue
                 paginas.append(p.extract_text() or '')
             except Exception:
                 pass
