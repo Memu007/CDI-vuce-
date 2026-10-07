@@ -3475,9 +3475,9 @@ def _con_encabezado(df, conocidas=()):
         return df
     for k in range(min(30, len(df))):
         valores = list(df.iloc[k].values)
-        # Un encabezado es corto: un texto enorme no se mira (cada celda que
-        # apunta a un texto de megas costaba segundos; revisión de EXCEL-2).
-        nombres = [("" if isinstance(v, str) and len(v) > 200 else _texto_de_celda(v)) for v in valores]
+        # Un texto de más de 200 caracteres no es un encabezado: lo descarta
+        # _detect_item_columns, sin normalizarlo (revisión de EXCEL-2).
+        nombres = [_texto_de_celda(v) for v in valores]
         if len(_detect_item_columns(nombres)) < 3:
             continue
         vistos: dict = {}
