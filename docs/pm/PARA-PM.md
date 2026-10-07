@@ -99,7 +99,7 @@ pantalla_maria1b.js: c0bae0e → FALLA: el semáforo no muestra las filas sin le
 
 ```
 suite completa, worktree limpio en 21a7a7e, venv-limpio: 941 passed, 102 skipped, 25 warnings in 100.17s · fin: 0
-sabotajes en 21a7a7e (excel1, maria1b, rendimiento1, 1b, admin1, admin2, maria2): corriendo; actualizo esta línea al terminar
+sabotajes en 21a7a7e: excel1, rendimiento1, rendimiento1b, admin1, admin2 → «sabotajes con falla: 0»; maria2 → «OK: los 8 sabotajes dan rojo»; maria1b → 3 ROTO (patrones viejos), arreglados en 7ee054f → 21 en ROJO, «sabotajes con falla: 0»
 smoke_friccion.sh (levantar.sh 21a7a7e)          → ==> OK · telemetría + alias session/state + by-cuit protegido
 pantalla_excel1.js / pantalla_maria1b.js / pantalla_maria1c.js (con un PDF) → OK / OK / OK
 ataque_aislamiento.sh                            → MARIA.TXT de Ana generado · Bloqueado: 22 · Fugas: 0
