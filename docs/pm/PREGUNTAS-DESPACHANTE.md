@@ -83,7 +83,50 @@ FOB. Ojo: FAS no está en la lista de condiciones válidas del generador
   (¿una opción de una lista o un número de certificado?). Pregunta corta para
   la próxima.
 
-## El mensaje para mandar
+## Sus respuestas, tal cual (2026-10-06, por mensaje a Emi)
+
+Sin nombres: la fuente es «el despachante de Emi».
+
+> **21:20** — Los estados que se pueden seleccionar, independientemente si es
+> para revender o no son: Nuevo sin uso argentino; Nuevo sin uso importado;
+> Sin uso argentino; Sin uso importado; Usado argentino, Incl. Reacond; Usado
+> importado, Incl. Reacond.
+>
+> **21:34** — Percepción de IVA adicional: se paga cuando la mercadería es para
+> revender. Se paga completo salvo que se den alguna de las siguientes
+> situaciones: por normativa del estado, para determinada mercadería, el
+> impuesto tiene una reducción de X porcentaje, por un plazo determinado; la
+> DGI le otorgó al importador una exclusión del impuesto de X porcentaje, por
+> un plazo determinado. Es decir que el despachante lo decide por operación y
+> por mercadería.
+>
+> **21:35** — El peso se declara por cada ítem o subítem.
+>
+> **21:35** — Banco: se declara el que decida el cliente.
+>
+> **21:40** — No siempre es el mismo banco, el cliente puede elegir el que
+> quiera para cada operación.
+>
+> **21:42** — PSAD: yo trabajo 95 % con Modoc y 5 % con Lakaut.
+>
+> **(después)** — FCA y EXW no son lo mismo, pero para hacer el despacho en
+> ambos casos se declara el dato «gastos anteriores a FOB».
+
+## Lo que falta pedirle (para que Emi lo mande)
+
+> 1. Cuando hay una reducción o una exclusión del IVA adicional, ¿cómo lo
+>    cargás en el Kit? ¿Elegís una opción de una lista o cargás un número de
+>    certificado?
+> 2. En el Kit, cuando elegís Modoc o Lakaut como empresa de digitalización,
+>    ¿qué número o código aparece al lado de cada una?
+> 3. (Favor) ¿Me pasás dos o tres despachos que hayas cargado, con nombres,
+>    CUIT y montos tapados? Mejor si son distintos: uno EXW, uno CIF y uno con
+>    varios productos.
+> 4. (Favor) ¿Podés probar en tu Kit María un archivo nuestro? Sólo cargarlo
+>    para ver si lo acepta, sin oficializar nada. (Se manda cuando la cola
+>    MARIA esté lista.)
+
+## El mensaje que se mandó (2026-10-06)
 
 Emi (2026-10-06): la versión anterior era demasiado técnica. Tenía los
 nombres de los campos del archivo (`CARTUSO`, `NO_VALIDA`), que el

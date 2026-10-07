@@ -136,9 +136,12 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 00:30 UTC: Emi aprobó el roadmap, dos Devs y la publicación de
-ensayo. Abiertas la Dev 1 (ADMIN-1) y la Dev 2 (MARIA-2), con sus rutinas.
-Suite sobre el candidato del ensayo en verde. PM al ~16 % de contexto.
+2026-10-07 01:00 UTC: el despachante respondió las seis preguntas (texto tal
+cual en `PREGUNTAS-DESPACHANTE.md`); la cola MARIA se ajustó (MARIA-4 sube,
+MARIA-4b nueva, el peso total sale en la Fase A). Emi: CDI no usa Google
+Cloud; producción tiene facturas reales. Dev 1 en ADMIN-1, Dev 2 en MARIA-2.
+**Mañana desde las 9:** pasarle a Emi el SHA del ensayo y la lista de Railway
+(«Para Emi», punto 2). PM al ~23 % de contexto.
 
 ## Medición
 
