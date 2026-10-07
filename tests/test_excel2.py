@@ -59,6 +59,7 @@ def test_un_id_del_vendedor_extranjero_con_letras_sigue_pasando():
 # ------------------------------------------- D26 (a): abrir un libro armado
 
 import io  # noqa: E402
+import uuid  # noqa: E402
 import time  # noqa: E402
 import zipfile  # noqa: E402
 
@@ -295,3 +296,40 @@ def test_el_aviso_de_mapeo_nombra_la_columna_que_se_uso():
     texto = " | ".join(avisos)
     assert "«Precio Unitario»" in texto and "«Valor»" in texto, avisos
     assert "«Glosa»" in texto and "«Descripcion»" in texto, avisos
+
+
+# ------------------------------------------- el CSV del historial de NCM
+
+def _importar(contenido: bytes):
+    return TestClient(main.app).post("/api/ncm/import-historial",
+                                     files={"file": ("historial.csv", contenido, "text/csv")})
+
+
+@pytest.mark.parametrize("nombre, texto, codificacion", [
+    ("coma", "descripcion,ncm\nCafé {m},0901.21.00\nTé {m},0902.10.00\n", "utf-8"),
+    ("punto y coma", "descripcion;ncm\nCafé tostado, molido {m};0901.21.00\nTé {m};0902.10.00\n", "utf-8"),
+    ("latin-1", "descripción;ncm\nCafé {m};0901.21.00\nTé {m};0902.10.00\n", "latin-1"),
+    ("BOM", "\ufeffNCM,Descripcion\n0901.21.00,Café {m}\n0902.10.00,Té {m}\n", "utf-8"),
+])
+def test_el_csv_del_historial_se_lee_con_coma_punto_y_coma_latin1_o_bom(nombre, texto, codificacion):
+    # Productos distintos en cada caso: el historial es del mismo usuario.
+    r = _importar(texto.format(m=uuid.uuid4().hex[:8]).encode(codificacion))
+    assert r.status_code == 200, f"{nombre}: {r.text[:300]}"
+    assert r.json()["importados"] == 2, f"{nombre}: {r.json()}"
+
+
+def test_el_historial_en_excel_lee_solo_la_primera_hoja(monkeypatch):
+    """Importar el historial desde un .xlsx también abre sólo la primera hoja."""
+    leidos = []
+    original = main._xlsx_solo_primera_hoja
+
+    def _espia(origen):
+        leidos.append(type(origen).__name__)
+        return original(origen)
+    monkeypatch.setattr(main, "_xlsx_solo_primera_hoja", _espia)
+    marca = uuid.uuid4().hex[:8]
+    contenido = _libro_normal({"Historial": [["descripcion", "ncm"], [f"Cafe {marca}", "0901.21.00"]],
+                               "Otra": [["x"]]})
+    r = TestClient(main.app).post("/api/ncm/import-historial", files={"file": ("historial.xlsx", contenido)})
+    assert r.status_code == 200, r.text[:300]
+    assert r.json()["importados"] == 1 and leidos == ["bytes"], (r.json(), leidos)
