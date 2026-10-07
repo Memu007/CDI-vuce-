@@ -2,213 +2,235 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## EXCEL-1 — parcial: la parte 2 hecha, la parte 1 frenada en D13–D15
+## EXCEL-1 — entregada sobre `9cc321e`
+
+**Resultado:** los tres puntos están hechos. Una planilla con los datos de
+los dos archivos reales da el mismo TXT que la carga por PDF. Leer o validar
+un Excel no frena el sitio. Las rutas sin llamador se borraron (D13). Dos
+rondas de revisión adversarial encontraron 7 + 7 cosas: las arreglé con una
+prueba cada una o quedan abajo como D o riesgo.
+
+**Lo que decidís vos:** D17 (aviso de filas sin leer: hoy es un aviso de 4 s
+y no queda en el semáforo), D18 (las otras hojas del libro, y un encabezado
+que no está en la fila 1) y D19 (riesgos anotados). Ninguna frena la
+entrega.
 
 | | SHA |
 |---|---|
-| Base (RENDIMIENTO-1b aceptada, con tu rama traída) | `ec3606e` |
-| Parte 2, producto | `3393c2f` |
-| Parte 2, pruebas | `b5ddaf3` |
+| Base (RENDIMIENTO-1b aceptada) | `ec3606e` |
+| Producto | `3393c2f`, `7e804e5`, `a5bf254`, `2db5080` (borrado, D13), `1a3b7b5`, `42acd4a`, `7500bc5` |
+| Pruebas y sabotajes | `b5ddaf3`, `60ec3b1`, `1df55b0`, `028a3ad`, `d47014f`, `052de35`, `86e3aaa`, `d051ebb`, `80776e8`, `b268bb6`, `2759c84`, `fb16ef0`, `72daa42`, `8fb81c2`, `9cc321e` |
+| D14: MARIA-1a traída con `merge` desde la rama de la Dev 2 | `448b54d` |
+| Tu rama traída con `merge` (sólo `docs/pm/`) | `7f16807` |
+| CHANGELOG y este informe | los dos commits `docs:` de arriba |
 
-RENDIMIENTO-1b aceptada: gracias. Su informe está en el commit `ec3606e` de
-este archivo.
+### Qué cambia para el usuario
 
-### Parte 2 (tu D12): leer un Excel no frena el sitio — hecha
+**Parte 1: del Excel al TXT** (sólo queda `/upload_excel_v2/`):
+- **Nada se inventa.** Si falta un dato o no se puede leer, queda vacío
+  (nada de cantidad 1 ni origen «XX») y el semáforo lo marca. Es la regla de
+  MARIA-1a, con las funciones de la Dev 2 (D14).
+- **Números.** «1.234,56» y «1,5» se leen bien. «1.500» sin otra pista
+  queda vacío. La NCM numérica ya no sale con «.0».
+- **País.** Se reconoce por el nombre: «China» ya no se corta a «CHI».
+  También se reconoce la columna «País de origen».
+- **Columnas.** El precio unitario gana sobre «Valor» (el total). El peso
+  neto gana sobre el bruto, y si sólo hay bruto el peso queda vacío. Se
+  aceptan encabezados con la unidad entre paréntesis, pero si sin
+  paréntesis dos se llaman igual («Peso (kg)» y «Peso (bruto)») no se elige
+  ninguna por el orden. El mapeo guardado del cliente manda (se corrige a
+  mano en el catálogo) y lo detectado completa lo que falta.
+- **Filas.** No entran las de total: «TOTAL», «Subtotal 8471.30.00»,
+  «TOTAL USD», «Total FOB», «TOTAL AMOUNT» en la columna de código,
+  «Totale», «合计», «Summe». Un producto que empieza con «Total» («TOTAL
+  QUARTZ 9000») sí entra. Flete, seguro, pago o gastos sin NCM ni origen no
+  entran como producto (sumarían al FOB) y se avisan. Cualquier otra fila
+  sin NCM ni origen entra, con lo que le falta vacío.
+- **Aviso.** «N fila(s) del Excel no se pudieron leer (filas …)» va dentro
+  del aviso final de la subida, así otro aviso no lo tapa.
+- «.XLSX» en mayúsculas ya no da error.
 
-Leer un Excel o un CSV pasa a otro hilo, con tiempo máximo
-(`EXCEL_READ_TIMEOUT_S`, 60 s), en las cinco rutas que leen uno:
-`/upload_excel/`, `/upload_excel_v2/`, `/api/clientes/import`,
-`/api/ncm/import-historial` y `/api/migrations/analyze`. Lo mismo la
-validación del archivo al subirlo. Al vencerse el tiempo: 504
-`{"detail": texto, "code": "lectura_excel_demasiado_larga"}`, y la pantalla
-ofrece la carga a mano, como con el PDF.
+**Parte 2: no frena el sitio.** Leer y validar el Excel (y el CSV del
+historial NCM, y el análisis de migración) corre en otro hilo, con tiempo
+máximo `EXCEL_READ_TIMEOUT_S` (60 s) y un 504
+`lectura_excel_demasiado_larga`; la pantalla ofrece la carga a mano. Además:
+- el Excel tiene su propio grupo de hilos (`EXCEL_READ_WORKERS`, 2),
+  separado del PDF;
+- un .xlsx que descomprimido pasa de `EXCEL_MAX_DESCOMPRIMIDO_MB` (100) se
+  rechaza antes de abrirlo, y ese chequeo también corre en otro hilo;
+- las filas vacías no se recorren: una celda suelta en la fila 1.048.576
+  tardaba 28 s y ahora menos de 8;
+- más de 5000 filas con datos dan 400 con un mensaje claro.
 
-Rojo antes (`ec3606e`) y verde después (`b5ddaf3`):
+**Parte 3 (D13):** se borraron `/upload_excel/`, `/upload_excel/public` y
+`/api/clientes/import`. La pantalla vieja (`?v=1`) ya no carga Excel.
 
-```
-E   AssertionError: clientes_import: /health tardó 1.58 s mientras se leía un Excel
-E   AssertionError: migraciones_analyze: /health tardó 1.52 s mientras se leía un Excel
-E   AssertionError: ncm_import_historial: /health tardó 1.52 s mientras se leía un Excel
-E   AssertionError: upload_excel: /health tardó 1.52 s mientras se leía un Excel
-E   AssertionError: upload_excel_v2: /health tardó 1.52 s mientras se leía un Excel
-E   AssertionError: /health tardó 1.51 s mientras se validaba un Excel
-E   AssertionError: clientes_import: 200 {...}   assert 200 == 504     (y lo mismo en las otras 4 rutas)
-→ después: 11 passed
-```
+### Prueba del TXT (la que pediste)
 
-Suite completa sobre `b5ddaf3`, venv nuevo armado sólo desde
-`requirements.txt`: `765 passed, 102 skipped, 25 warnings in 97.18s`.
-Faltan, para la entrega final: los sabotajes de esta parte, los revisores, y
-humo y aislamiento.
+En `tests/test_excel1_txt.py`, por cada archivo real anonimizado
+(`maria_golden_anon`, `maria_golden_subitems_anon`), la misma factura entra
+dos veces: como planilla y como PDF (con el Gemini falso de MARIA-1a). Cada
+lado se completa como en la pantalla y se arma el TXT. Los dos TXT son
+iguales y traen el FOB de la factura (`MDDTFOB=5000.00` y `7182.00`). Antes
+de `1a3b7b5` daba rojo, porque «País de origen» no se reconocía, y ahora da
+verde. El sabotaje «“País de origen” deja de reconocerse» la vuelve a poner
+en rojo.
 
-Lo midió el auditor antes del arreglo: un .xlsx de 5 KB, con una celda en la
-fila 1.048.576, congelaba el sitio 54 s.
+### Revisores
 
-### Parte 1: el relevamiento (un subagente Opus alto, con evidencia)
-
-**Caminos y quién los llama:**
-
-| Ruta | ¿La llama una pantalla? | ¿Llega al TXT? |
-|---|---|---|
-| `/upload_excel_v2/` | sí (v2, `upload.js`) | **sí, el único** |
-| `/upload_excel/` | **no**: sólo `static/script.js` de la raíz, que no se sirve | no (devuelve un AVG .xlsx) |
-| `/upload_excel/public` | sólo el dashboard viejo (`?v=1`), que muestra «No se detectaron ítems» | no |
-| `/api/clientes/import` | **no** | indirecto (crea clientes que prellenan la operación) |
-| `/api/migrations/analyze` | sí (v2, `clientes.js`) | indirecto; es el más sólido (valida CUIT y límites) |
-| `/api/ncm/import-historial` | sí (v2, `ncm.js`) | indirecto (sugiere NCM) |
-
-**Defectos en `/upload_excel_v2/`, con el TXT que sale** (del más grave al
-menos grave):
-1. **Filas perdidas sin aviso:** el TXT declara menos FOB. Se descarta
-   cualquier fila sin NCM, sin origen o con un número en texto («1.234,56»,
-   «10 pcs»), y no se avisa. En el ejemplo, 3 filas → 1 ítem: `MDDTFOB=3500.00`
-   de una factura de 6.000. Una factura sin columna NCM da 400 entera, aunque
-   v2 tiene un paso para clasificar NCM. Además, sólo lee la primera hoja.
-2. **«Valor» (el total) gana sobre «Precio Unitario»:** `MARTUNITAR=3500`,
-   `MDDTFOB=35000` en vez de 350 y 3500.
-3. **Separador de miles leído como decimal:** «1.500» → cantidad 1,5.
-4. **Peso bruto o total tomado como peso unitario neto**, y queda guardado
-   en el mapeo del cliente y en su plantilla.
-5. **Una fila de subtotal entra como ítem** y suma FOB (`MDDTFOB=38500`, era
-   3500).
-6. **NCM numérica mal leída:** con una fila vacía en el medio sale
-   «84713000.0». En el historial NCM y en clientes se pierde el 0 de
-   «01012100».
-7. **El país se corta a 3 letras** (`models/operations.py:60`): «China» y
-   «Chile» dan «CHI», «Argentina» da «ARG». El TXT lo frena con «Origen no
-   reconocido».
-8. **«.XLSX» en mayúsculas da 500.**
-9. **Valores inventados en la operación:** la moneda queda «USD» si el
-   cliente no tiene otra (`main.py`, `upload_excel_v2`); la fecha de
-   emisión sale como la de hoy (`maria_generator.py:392`, también con PDF),
-   sin aviso.
-10. **Un mapeo guardado del cliente deja afuera encabezados nuevos**; tampoco
-    se reconocen «Cant.», «Precio Unitario (USD)», «Peso Neto (kg)» ni
-    «Posición Arancelaria».
-11. Menores: el manejador global muestra `dev_detail` (rutas del servidor,
-    SQL); `upload.js` acepta 15 MB y el servidor, 10 MB.
-
-En `/api/clientes/import`, que no tiene llamador: inventa «Cliente
-<CUIT>» cuando falta la razón social y acepta CUIT sin dígito verificador.
-
-### Avance desde el primer parcial (sin esperar las D)
-
-Arreglado en `/upload_excel_v2/` (producto `7e804e5`, pruebas `1df55b0`,
-sabotajes en `scripts/testing/sabotajes/excel1.sh`):
-- el precio unitario gana sobre «Valor» (defecto 2);
-- peso neto o unitario; sin uno de ellos, el peso queda vacío en vez de
-  tomar el bruto o el total, y el TXT lo frena con «Peso inválido» hasta
-  que se complete (defecto 4);
-- las filas de total o subtotal no entran (defecto 5);
-- «.XLSX» en mayúsculas (defecto 8);
-- encabezados con la unidad entre paréntesis, y el mapeo guardado del
-  cliente se completa con los encabezados nuevos (defecto 10);
-- la respuesta trae `filas_descartadas` y sus números de fila, y la pantalla
-  avisa «N fila(s) del Excel no se pudieron leer (filas …). Revisalas y
-  cargalas a mano» (el aviso del defecto 1; leer esas filas espera D14).
-
-Rojo antes y verde después:
+Primera ronda (Sonnet alto y Opus alto, sobre `80776e8`). Lo que arreglé en
+`42acd4a`, rojo en `80776e8`:
 
 ```
-E   assert 3500.0 == 350                       (unitario sobre total)
-E   assert 25.0 == 15                          (neto sobre bruto)
-E   assert 25.0 in (0, None)                   (bruto o total como unitario)
-E   ['Laptop 14 pulgadas', 'Subtotal 8471.30.00']   (subtotal como ítem)
-E   assert 500 == 200  ... "Excel xlsx file; not supported"   (.XLSX)
-E   assert 400 == 200  ... "No se pudieron extraer items"     (paréntesis; mapeo guardado)
-E   assert None == 2                           (filas descartadas sin aviso)
-→ después: 8 passed
+E   AssertionError: ['Laptop']                                   (TOTAL QUARTZ/Total Station se perdían)
+E   assert ['Laptop', 'F... T/T 30 days'] == ['Laptop']           (FOB TOTAL, Freight entraban)
+E   AssertionError: tardó 27.7 s                                  (celda en la fila 1.048.576)
+E   ... has no attribute '_MAX_FILAS_EXCEL'                       (sin tope de filas)
+E   ... has no attribute '_POOL_LECTURA_EXCEL'                    (Excel y PDF compartían hilos)
+E   assert 'descomprimido' in 'No se pudieron extraer items...'   (.xlsx de 150 MB descomprimido se abría)
+pantalla_excel1.js: FALLA: el aviso en pantalla no nombra las filas sin leer: «Catálogo aprendido 6/6…»
 ```
 
-Sabotajes de `excel1.sh`: 10 en ROJO, `sabotajes con falla: 0`. Uno de la
-parte 2 primero daba verde porque mi prueba medía mal: la segunda lectura
-lenta pisaba la hora de inicio de la primera. Ya está arreglada.
+Segunda ronda (Opus alto, sobre `2759c84`). Encontró que dos de mis
+arreglos de la primera ronda rompían otras cosas, y tenía razón:
+- dar prioridad a lo detectado pisaba el mapeo que el usuario había
+  corregido a mano (FOB ×10);
+- descartar las filas sin NCM ni origen perdía productos legítimos: una
+  factura china con la NCM vacía y «CHINA» en una celda combinada pasaba de
+  4 productos a 1;
+- la regla del total, más estricta, dejaba entrar «TOTAL USD» y «TOTAL
+  AMOUNT».
 
-**La moneda «USD» inventada (defecto 9) no se arregla en el Excel:** sale
-de `Client.preferred_currency`, que vale «USD» por defecto en el modelo.
-No hay forma de distinguir «el cliente eligió USD» de «nadie eligió». Va
-como D16.
+Lo corregí en `7500bc5`: el mapeo guardado vuelve a mandar; el total se
+reconoce por sus palabras (sin una expresión regular que un texto armado
+pueda trabar); y la regla de descarte quedó sólo para flete, seguro, pago y
+gastos. Rojo en `2759c84`:
+
+```
+FAILED test_mapeo_corregido_a_mano_gana_sobre_lo_detectado
+FAILED test_productos_sin_ncm_ni_origen_entran_aunque_otra_fila_los_traiga
+FAILED test_filas_de_total_con_moneda_o_idioma_no_entran[TOTAL USD|Total FOB|TOTAL (USD)|Totale|合计|Summe|Gesamt|TOTAL DE LA FACTURA]
+FAILED test_total_en_la_columna_de_codigo_no_entra
+FAILED test_peso_neto_y_bruto_entre_parentesis_no_se_confunden
+FAILED test_total_flete_y_condiciones_no_son_productos
+E   assert [True] == [False]        (el índice del .xlsx se miraba en el bucle del servidor)
+```
+
+Sus 10 sondas contra `9cc321e`: las 9 que eran defecto salen bien. La
+décima («Freight to Buenos Aires» con origen CN entra como producto) ya
+pasaba antes; va en D19.
+
+Me equivoqué dos veces en pruebas, y lo detectaron los sabotajes o la
+corrida contra la base, no la suite:
+- la de la «Excel-bomba» pasaba antes del arreglo, porque el zip no parecía
+  un .xlsx y lo frenaba el control de tipo. Ahora es un .xlsx de verdad con
+  relleno;
+- la del índice en otro hilo miraba el hilo principal, pero con TestClient
+  el servidor no corre ahí. Ahora mira si corre dentro del bucle del
+  servidor.
+
+Y un sabotaje («Peso (neto)/(bruto) vuelven a confundirse») dio verde: con
+«neto» el nombre entero ya resuelve la columna. Agregué el caso ambiguo
+«Peso (kg)» + «Peso (bruto)», que sí lo distingue.
+
+### Corrido, con su salida
+
+```
+suite completa, worktree limpio en 9cc321e, venv-limpio (sólo requirements.txt):
+  897 passed, 102 skipped, 25 warnings in 99.53s · fin: 0
+scripts/testing/sabotajes/excel1.sh 9cc321e     → 30 ROJO, sabotajes con falla: 0
+scripts/testing/sabotajes/rendimiento1.sh HEAD  → 11 ROJO, sabotajes con falla: 0
+  (dos patrones habían quedado viejos por EXCEL-1: arreglados en fb16ef0)
+rendimiento1b.sh, admin1.sh, admin2.sh          → sabotajes con falla: 0
+scripts/testing/sabotaje_maria2.sh HEAD         → OK: los 8 sabotajes dan rojo por la razón esperada
+smoke_friccion.sh (levantar.sh 9cc321e)         → ==> OK · telemetría + alias session/state + by-cuit protegido
+ataque_aislamiento.sh                           → Bloqueado: 22 · Fugas: 0 · PUERTA G3 PASADA
+pantalla_excel1.js (9cc321e)                    → OK: pantalla EXCEL-1   (en 80776e8: FALLA, ver arriba)
+```
+
+### Comandos para vos
+
+```bash
+git fetch origin claude/dev1-tecnica && git checkout 9cc321e
+# 1) Sabotajes de EXCEL-1: cada línea dice ROJO y al final «sabotajes con falla: 0» (tarda ~15 min)
+PY=<venv>/bin/python scripts/testing/sabotajes/excel1.sh 9cc321e
+# 2) Las pruebas de la pieza: 61 passed
+<venv>/bin/python -m pytest -q --no-cov tests/test_excel1_lectura.py tests/test_excel1_rendimiento.py tests/test_excel1_txt.py tests/unit/test_main_upload.py
+# 3) Aviso en pantalla: «OK: pantalla EXCEL-1» (en 80776e8, FALLA)
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 9cc321e 8080
+BASE_URL=http://127.0.0.1:8080 node scripts/testing/pantalla_excel1.js <cualquier .xlsx>
+```
 
 ## Decisiones
 
-- **D13 — Rutas sin llamador vivo (tu punto 3).** `/upload_excel/` no la
-  llama nada que se sirva. `/upload_excel/public` sólo la llama el dashboard
-  viejo, y ahí no anda. `/api/clientes/import` no tiene llamador e inventa
-  nombres de cliente.
-  Opciones: (a) borrarlas en esta pieza; (b) no arreglarlas y borrarlas en
-  una pieza de limpieza; (c) arreglarlas igual.
-  **Recomiendo (a) para `/upload_excel/` y su alias `public`, y para
-  `/api/clientes/import`.** Ninguna llega al TXT desde una pantalla, y
-  borrarlas saca superficie. Así arreglo sólo `/upload_excel_v2/`. La parte
-  2 ya las dejó sin frenar el sitio, por si preferís (b).
-- **D14 — Las reglas de lectura de MARIA-1a están en la rama de la Dev 2.**
-  Los defectos 1, 3, 6 y 7 piden su regla: el número con coma o con punto
-  de miles, el país por nombre, el dato vacío con aviso. Según el auditor,
-  en `claude/dev2-maria` el camino del Excel sigue con `upper()[:3]` y
-  `float(...)`, así que MARIA-1a no lo cubre. Pero sus funciones existen, y
-  no están en mi rama: no se integra nada hasta después del ensayo.
-  Opciones: (a) traer MARIA-1a a mi rama con `merge` desde la tuya, cuando
-  la integres, y usar sus funciones; (b) escribir las mías para el Excel
-  (dos reglas que pueden divergir); (c) que la Dev 2 haga esos cuatro, ya que
-  son de lectura.
-  **Recomiendo (a).** Mientras tanto avanzo con los que no dependen de ella:
-  2 (unitario sobre total), 4 (neto sobre bruto), 5 (subtotales), 8
-  (mayúsculas), 10 (encabezados y mapeo), la moneda inventada del 9 y el
-  aviso de filas descartadas del 1.
-- **D15 — La fecha de emisión de hoy (`maria_generator.py:392`).** Afecta
-  también al PDF y es del generador del TXT, que es zona de la Dev 2.
-  **Recomiendo** que vaya a MARIA-1b o a la pieza de la Dev 2 que toque el
-  generador. No la toco.
+- **D17 — El aviso de las filas sin leer dura 4 s.** Está dentro del aviso
+  final de la subida, así que ya nada lo tapa. Pero es un aviso pasajero: no
+  queda en el semáforo ni en la revisión. Opciones: (a) que el semáforo
+  también lo muestre hasta que el usuario lo descarte, como hace con los
+  «campos sin leer» de MARIA-1c (toca `semaforo.js` y el estado de la
+  operación); (b) dejarlo así.
+  **Recomiendo (a)**, en esta pieza o en MARIA-1b: es la única señal de que
+  falta un producto.
+- **D18 — Lo que el Excel no lee y no avisa.** Sólo se lee la primera hoja.
+  Si el encabezado no está en la fila 1 (logo o datos del vendedor arriba),
+  el archivo entero da 400. Sin columna de origen, también 400. Y en una
+  celda combinada, sólo la primera fila recibe el valor. Opciones: (a)
+  arreglarlo ahora: buscar la fila del encabezado, avisar si hay otras hojas
+  con datos y aceptar que falte la columna de origen; (b) pieza aparte,
+  después de PUNTA-A-PUNTA-1.
+  **Recomiendo (b)**, salvo el aviso de «otras hojas con datos», que es
+  barato y evita perder productos en silencio.
+- **D19 — Riesgos que dejo anotados.**
+  - «Freight to Buenos Aires» con origen CN entra como producto. Ya pasaba
+    antes. Descartarlo pide adivinar, y con origen puede ser mercadería.
+  - El tope de 5000 filas se mira después de leer todo el archivo. Un .xlsx
+    de 8 MB, que descomprimido ocupa 96 MB, tarda unos 24 s en leerse antes
+    de dar el 400. Con 2 hilos, dos subidas así demoran el Excel de los
+    demás hasta 60 s, pero el PDF y el resto del sitio siguen andando. Para
+    hacerlo hace falta tener sesión.
+  - Los tiempos máximos se suman por etapa: validar (30 s), leer (60 s) y
+    extraer (60 s).
+  - La validación da 400 sin código propio.
+  - Un descuento negativo queda en 0.
+  - La NCM de «01012100» escrita como número pierde el 0 inicial (Excel ya
+    la guarda así).
+  - Un mapeo guardado que el sistema aprendió con la lista de nombres
+    vieja («Valor» o «Peso Bruto») sigue mandando para ese cliente hasta que
+    se corrija en su catálogo. Decidí que mande porque no se puede
+    distinguir de una corrección del usuario.
 
-- **D16 — Moneda por defecto del cliente.** `Client.preferred_currency`
-  vale «USD» por defecto (`models.py:141`), así que una operación por Excel
-  con cliente sale siempre con moneda USD aunque nadie la haya elegido.
-  Opciones: (a) migración que deje la columna sin valor por defecto, y que
-  la pantalla del cliente pida la moneda; (b) dejarlo así: USD es lo común y
-  el usuario la ve en la revisión.
-  **Recomiendo (b) por ahora** y anotarlo para PUNTA-A-PUNTA-1: cambiarlo
-  pide una migración, y la moneda se ve en pantalla antes del TXT.
-
-Lo de `dev_detail` (el manejador global muestra detalles internos) es de
-seguridad: **recomiendo** la Fase 3, junto con ABUSO-1.
+  **Recomiendo** que vayan a PUNTA-A-PUNTA-1 como cosas a mirar, no como
+  piezas.
 
 ## Qué no corrí
 
-- Todavía no: sabotajes de la parte 2, revisores, humo y aislamiento. Van
-  con la entrega final.
-- El auditor no probó la pantalla en un navegador, ni Railway con varios
-  procesos.
+- No probé la pantalla con un Excel real de punta a punta: la prueba de
+  pantalla simula la respuesta del servidor. El camino del servidor sí está
+  probado de punta a punta en pytest.
+- No probé Railway con varios procesos, ni medí la memoria con muchas
+  subidas a la vez.
 
 ## Archivos de producto que toqué
 
-`proyecto_maria/main.py` (las cinco rutas de Excel), 
-`proyecto_maria/services/migration_service.py`
-(`analyze_migration_file_async`), `proyecto_maria/security/file_security.py`
-(validación del Excel), `proyecto_maria/static/v2/screens/upload.js` (una
-condición), `CHANGELOG.md`.
+`proyecto_maria/main.py`, `proyecto_maria/security/file_security.py`,
+`proyecto_maria/services/migration_service.py`,
+`proyecto_maria/static/v2/screens/upload.js`, `CHANGELOG.md`. Del lado de
+las pruebas: `tests/test_excel1_*.py`, `scripts/testing/pantalla_excel1.js`
+y `scripts/testing/sabotajes/{excel1,rendimiento1}.sh`.
 
 ## Sigo con
 
-Espero D13, D14 y D16. Sin D14 no puedo leer las filas que hoy se descartan
-(defectos 1, 3, 6 y 7). La prueba del TXT (Excel contra PDF con los datos
-de los dos archivos reales) también depende de ella. Con las respuestas:
-eso, la suite final, los revisores, humo y aislamiento, y la entrega.
+MARIA-1b (con la D6 de la Dev 2) apenas esté en el canal. Si D17 sale (a),
+la hago primero.
 
-Última vuelta: 2026-10-07 08:10 UTC
-Contexto: ~60 %
+Última vuelta: 2026-10-07
+Contexto: ~80 %
 
-`/compact conservar: Dev 1 de CDI en la rama claude/dev1-tecnica.
-RENDIMIENTO-1b aceptada (ec3d793). EXCEL-1 en curso: parte 2 (leer Excel en
-otro hilo con EXCEL_READ_TIMEOUT_S, 504 lectura_excel_demasiado_larga) hecha
-en 3393c2f + pruebas b5ddaf3 (tests/test_excel1_rendimiento.py), suite 765
-passed; faltan sabotajes (scripts/testing/sabotajes/excel1.sh), revisores,
-humo y aislamiento. Parte 1: el relevamiento del auditor está en PARA-PM.md
-(10 defectos en /upload_excel_v2/). D13 (borrar /upload_excel/, su alias
-public y /api/clientes/import), D14 (reglas de MARIA-1a de la Dev 2) y D15
-(fecha de hoy en maria_generator) abiertas. Hechos además (7e804e5, 1df55b0, excel1.sh): defectos 2, 4, 5,
-8, 10 y el aviso de filas descartadas; D16 (moneda USD por defecto del
-cliente) abierta. Faltan, después de D13/D14: defectos 1, 3, 6, 7, la
-prueba del TXT contra el PDF, la suite final, los revisores, humo y aislamiento. Después:
-MARIA-1b (con la D6 de la Dev 2) y PUNTA-A-PUNTA-1. Entorno: PM_DIR=/tmp/cdi-dev1,
-levantar.sh <SHA> 8811, venv /tmp/cdi-dev1/venv y venv-limpio; sabotajes en
-scripts/testing/sabotajes/. Rutina de la PM: trig_01TvMmGfSLDfbcJrf66ZZ7YK.`
+`/compact conservar: Dev 1 de CDI, rama claude/dev1-tecnica. EXCEL-1
+entregada sobre 9cc321e (suite 897 passed; sabotajes excel1/rendimiento1/1b/
+admin1/2/maria2 en 0; humo, aislamiento y pantalla_excel1.js OK). D17
+(semáforo para filas sin leer), D18 (otras hojas, encabezado fuera de fila 1)
+y D19 (riesgos) abiertas. Sigue: MARIA-1b con la D6 de la Dev 2, luego
+PUNTA-A-PUNTA-1. Entorno: PM_DIR=/tmp/cdi-dev1, levantar.sh <SHA> <puerto>,
+venv /tmp/cdi-dev1/venv y venv-limpio; rutina de la PM
+trig_01TvMmGfSLDfbcJrf66ZZ7YK.`
