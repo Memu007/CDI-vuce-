@@ -62,15 +62,6 @@ def cuit_valido(cuit) -> bool:
     return esperado == int(norm[10])
 
 
-def _no_finito(valor) -> bool:
-    """NaN o infinito: `nan <= 0` es falso, así que pasaba el control de
-    siempre y llegaba al TXT como «nan» (devolución de MARIA-1b)."""
-    try:
-        return not math.isfinite(float(valor))
-    except (TypeError, ValueError):
-        return False
-
-
 def _numero_o_none(valor):
     if valor is None or isinstance(valor, bool) or (isinstance(valor, str) and not valor.strip()):
         return None

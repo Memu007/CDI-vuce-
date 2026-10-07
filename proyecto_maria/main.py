@@ -3634,16 +3634,9 @@ async def smart_validation(body: dict, user=Depends(get_current_user)):
         if not items_data:
             return {"success": False, "detail": "No hay items para validar"}
         
-        # Convertir a objetos Item. NaN o infinito pasan a 0 para el análisis
-        # (si no, la respuesta no se puede escribir y da 500); el control de
-        # MARIA-1b los marca como error con los valores que vinieron.
-        from proyecto_maria.core.controles_maria import _no_finito
-        numericos = ("cantidad", "valor_unitario", "valor_total", "peso_unitario", "peso_kg")
+        # Convertir a objetos Item
         items = []
         for item_dict in items_data:
-            if isinstance(item_dict, dict):
-                item_dict = {k: (0.0 if k in numericos and _no_finito(v) else v)
-                             for k, v in item_dict.items()}
             try:
                 items.append(Item(**item_dict))
             except Exception as e:
@@ -3677,9 +3670,9 @@ async def smart_validation(body: dict, user=Depends(get_current_user)):
                     f"{len(resultado.get('sugerencias', []))} sugerencias."
                 )
         
-        # Un monto enorme pero finito hace que las estadísticas den infinito,
-        # y la respuesta no se podría escribir (500): esos números van vacíos;
-        # el control de arriba ya marca el monto como error.
+        # Con NaN, infinito o un monto que desborda, las estadísticas dan
+        # infinito y la respuesta no se podría escribir (500): esos números
+        # van vacíos; el control de arriba ya marca el monto como error.
         return _sin_no_finitos({
             "success": True,
             **resultado
