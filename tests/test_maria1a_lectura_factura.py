@@ -245,3 +245,30 @@ def test_la_copia_pymupdf_pide_los_numeros_tal_cual():
 
     fuente = inspect.getsource(pdf_extractor._extract_with_gemini_vision)
     assert "fix formato" not in fuente and "fix: 0,50" not in fuente
+
+
+@pytest.mark.parametrize(
+    "texto, esperado",
+    [("12 PCS", 12), ("100 USD", 100), ("1.234,56 €", 1234.56), ("U$S 1.234,56", 1234.56),
+     ("US$ 2.45", 2.45), ("5 kg", 5)],
+)
+def test_moneda_o_unidades_de_cuenta_al_lado_se_leen(texto, esperado):
+    assert pdf_extractor._numero_factura(texto, None) == esperado
+
+
+@pytest.mark.parametrize("texto", ["lb 5", "g 500", "No 5", "9" * 400, "1.2,3", "1,5.00", "1.50,00"])
+def test_otros_numeros_sucios_quedan_vacios(texto):
+    assert pdf_extractor._numero_factura(texto, None) is None
+
+
+def test_entero_gigante_del_json_queda_vacio():
+    assert pdf_extractor._numero_factura(10 ** 400, None) is None
+
+
+@pytest.mark.parametrize("copia", COPIAS)
+def test_descripcion_rara_no_tira_la_factura(monkeypatch, copia):
+    factura = {"operacion": {}, "items": [
+        {"descripcion": 12345, "cantidad": 1, "valor_unitario": 1, "origen": "CN"},
+        {"descripcion": "b", "cantidad": 2, "valor_unitario": 1, "origen": "CN"}]}
+    r = _leer(monkeypatch, copia, factura)
+    assert [i["cantidad"] for i in r["items"]][-1] == 2
