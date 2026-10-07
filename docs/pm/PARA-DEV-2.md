@@ -45,10 +45,29 @@ Lo que encontró y ya pasaba antes: moneda e incoterm mal escritos por la API
 y el DOL/FOB por defecto los cubre MARIA-1b (Dev 1); el `NaN` en un ítem se
 mira en esa revisión. Dos cosas se suman a MARIA-5 (abajo, punto 3).
 
-## Respuestas a tus D (2026-10-07, 13:00 UTC)
+## Respuestas a tus D (2026-10-07, 13:05 UTC)
 
-- MARIA-1d no dejó D. Seguí con MARIA-5.
-- Anteriores (D5 a D12): en Git.
+- **D22 (peso del lector y del Excel): (a), con dos precisiones.** Decidido
+  por la PM (está dentro de MARIA-5).
+  - Lector: pide `peso_unitario` y `peso_total_linea`; si viene sólo el total,
+    lo divide por la cantidad. La revisión muestra el unitario y el total de
+    cada línea, para que Emi lo vea antes de generar.
+  - Excel: «peso total» y «peso neto» se dividen por la cantidad; «peso» y
+    «weight», de una unidad, como dice la plantilla. **«Peso bruto» no
+    entra como neto en silencio:** si es la única columna de peso, se usa
+    dividida por la cantidad y sale un aviso («el TXT pide peso neto; se usó
+    el bruto»).
+  - El Excel es terreno de la Dev 1 (`main.py`, las cargas): tocá sólo el
+    mapeo del peso. MARIA-5 no se publica sin esta parte (si no, el «peso
+    total» del Excel saldría multiplicado).
+- **Lo encontrado de paso:**
+  - El 0,5 inventado al guardar ya lo saca MARIA-1b (Dev 1). Al integrar
+    vas a tener que resolver ese pedazo de `main.py`: la PM integra MARIA-1b
+    y EXCEL-1 apenas cierre su revisión, y vos traés la rama antes de
+    entregar.
+  - `setGroupField` en `ncm.js` (el total del grupo copiado a cada
+    producto, el TXT suma de más): **entra en MARIA-5**, punto 4.
+- MARIA-1d no dejó D. Anteriores (D5 a D21): en Git.
 
 ## Tarea activa — MARIA-5: peso total por producto y cuentas al centavo
 
@@ -78,6 +97,10 @@ Asignada el 2026-10-07 (M1 y M9 de `AUDITORIA-2026-10-06.md`).
      lector viejo.
    - La copia del lector de PDF directo (la que usa producción) trata la
      descripción, la versión y el código de parte como la de PyMuPDF.
+
+4. **Grupos en la pantalla v2:** editar la cantidad o el valor de un grupo
+   no copia el total del grupo a cada producto (`setGroupField`, `ncm.js`);
+   el TXT suma lo que muestra la pantalla.
 
 **Criterios:** rojo antes y verde después en cada punto; 10 × 2,5 kg da 25 kg
 en `QARTKGRNET`; un caso que hoy suma 10,01 da 10,00; los dos archivos reales
