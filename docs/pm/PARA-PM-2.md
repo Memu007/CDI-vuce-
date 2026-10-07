@@ -2,7 +2,7 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## MARIA-5 y CATALOGO-NCM-1 — segunda devolución: **`61cf88f`**
+## MARIA-5 y CATALOGO-NCM-1 — segunda devolución: **`a8a83f3`** (producto en `135ff27`)
 
 **Resultado: los seis puntos de `b2bb20c`, con rojo antes y verde después.
 Para decidir: nada nuevo; la D27 de SUBITEMS-1 sigue abierta.** Base: tu rama
@@ -22,11 +22,11 @@ estaba entregada en un corte limpio cuando llegó el veredicto.
 Las pruebas nuevas contra la base (`dd5e851`, la rama con SUBITEMS-1 e
 integrada) dan `15 failed, 5 passed` (corrido).
 
-| Puerta (sobre `61cf88f`) | Resultado |
+| Puerta (sobre `61cf88f`; después sólo cambian patrones de sabotaje) | Resultado |
 |---|---|
 | Suite completa, worktree limpio, venv sólo con `requirements.txt` | `1495 passed, 102 skipped, 2 xfailed, 25 warnings in 153.80s`, 0 failed |
 | `pantalla_maria5.js`, `pantalla_catalogo_ncm1.js` y `pantalla_subitems1.js` (servidor local en `135ff27`, el mismo producto) | `OK: pantalla MARIA-5`, `OK: pantalla CATALOGO-NCM-1`, `OK: pantalla SUBITEMS-1` |
-| Sabotajes | RESULTADOS_SAB |
+| Sabotajes | Todos `OK` en `a8a83f3`: MARIA-5 (49), CATALOGO-NCM-1 (16), SUBITEMS-1 (7), MARIA-3 (30), 1d (8), 4 (9), 1c (4), 2b (6), 2 (8) y 1a (10). De la Dev 1: `maria1b.sh` y `punta_a_punta1.sh` con 0 fallas. `excel1.sh`: sigue la del «mapeo guardado», ya informada, que da rojo en otras pruebas. Puse al día los patrones que movió esta vuelta (dos de `maria1b.sh`, uno de `maria1d`, el de la clase «dudosa» en `excel1.sh` y cuatro de MARIA-5) |
 
 No hice autorrevisión con subagente en esta vuelta: son seis puntos chicos y
 el contexto está alto. Para que la mires: la regla de la columna «dudosa» es
