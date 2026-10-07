@@ -161,7 +161,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 21:05 UTC (rutina): publicada `6ea8ca9` con el «dale» de Emi
+2026-10-07 20:58 UTC (rutina): publicada `6ea8ca9` con el «dale» de Emi
 (19:58 UTC); la e2e de la CI dio rojo porque la prueba no completa la fecha de
 emisión (el producto está bien, reproducido). Dev 1 entregó GUARDAR-1, con la
 línea de la e2e (`aec4f15`), pero sobre una rama con EXCEL-2 y COBRO-MP-1: la
