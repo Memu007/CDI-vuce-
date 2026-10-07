@@ -144,12 +144,26 @@ def _pdf_armado() -> bytes:
     return buf.getvalue()
 
 
-def test_pdf_armado_se_lee_sin_colgarse():
+def test_pdf_armado_se_lee_sin_colgarse(monkeypatch):
+    """Por el camino de pypdf: pdfminer y OCR no sacan texto, así que el
+    lector de respaldo tiene que abrirlo (con PyPDF2 3.0.1 no terminaba)."""
     import concurrent.futures
-    from proyecto_maria.pdf_extractor import _extract_pdf_text
+    import pdfminer.high_level
+    import pypdf
+    import proyecto_maria.pdf_extractor as ext
+    usado = []
+    original = pypdf.PdfReader
+    monkeypatch.setattr(pypdf, "PdfReader", lambda *a, **k: (usado.append(1), original(*a, **k))[1])
+    monkeypatch.setattr(pdfminer.high_level, "extract_text", lambda *a, **k: "")
+    monkeypatch.setattr(ext, "_ocr_pdf_text", lambda *_: "")
     with concurrent.futures.ThreadPoolExecutor(1) as ex:
-        texto = ex.submit(_extract_pdf_text, _pdf_armado()).result(timeout=20)
+        texto = ex.submit(ext._extract_pdf_text, _pdf_armado()).result(timeout=20)
     assert isinstance(texto, str)
+    assert usado, "el PDF armado no pasó por pypdf"
+    # Y validarlo (abrirlo y contar páginas) también termina.
+    from proyecto_maria.security.file_security import _abrir_pdf
+    with concurrent.futures.ThreadPoolExecutor(1) as ex:
+        assert ex.submit(_abrir_pdf, _pdf_armado()).result(timeout=20) == (False, 1)
 
 
 def test_ya_no_se_usa_pyPDF2_ni_python_jose():
@@ -162,7 +176,10 @@ def test_ya_no_se_usa_pyPDF2_ni_python_jose():
         if "tests" in archivo.parts:
             continue
         texto = archivo.read_text(encoding="utf-8", errors="ignore")
-        assert "import PyPDF2" not in texto and "from jose" not in texto, archivo
+        import re
+        usa = re.search(r"^\s*(?:from|import)\s+(?:PyPDF2|jose)\b|__import__\(['\"](?:PyPDF2|jose)",
+                        texto, re.MULTILINE)
+        assert not usa, (archivo, usa and usa.group(0))
 
 
 def test_health_responde_mientras_se_valida_el_pdf(monkeypatch):
@@ -174,3 +191,129 @@ def test_health_responde_mientras_se_valida_el_pdf(monkeypatch):
     demora, r = asyncio.run(_health_mientras(_subir))
     assert r.status_code == 200, r.text[:200]
     assert demora < 0.5, f"/health tardó {demora:.2f} s mientras se validaba el PDF"
+
+
+def _subir_y_medir():
+    """(respuesta, segundos hasta la respuesta), medidos adentro del loop: al
+    cerrarse, el loop espera a los hilos que siguen corriendo y eso no es
+    tiempo de respuesta."""
+    async def _ir():
+        transport = httpx.ASGITransport(app=main.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+            t0 = time.monotonic()
+            r = await _subir(c)
+            return r, time.monotonic() - t0
+    return asyncio.run(_ir())
+
+
+def _subir_sincronico(monkeypatch):
+    return _subir_y_medir()[0]
+
+
+def test_validar_el_pdf_tiene_tiempo_maximo(monkeypatch):
+    from proyecto_maria.security import file_security
+    monkeypatch.setenv("PDF_VALIDATE_TIMEOUT_S", "0.3")
+    monkeypatch.setattr(file_security, "_abrir_pdf", lambda *_: (_bloquear(), (False, 1))[1])
+    r, demora = _subir_y_medir()
+    assert r.status_code == 400, r.text[:200]
+    assert "tardó demasiado" in r.json()["detail"]
+    assert demora < LENTO_S, f"respondió a los {demora:.2f} s"
+
+
+def test_tiempo_de_validacion_mal_escrito_no_rechaza_todo(monkeypatch):
+    monkeypatch.setenv("PDF_VALIDATE_TIMEOUT_S", "30s")
+    monkeypatch.setattr(main, "process_pdf",
+                        lambda *_: {"items": [{"descripcion": "x"}], "operacion": {"vendedor_nombre": "P"}})
+    r = _subir_sincronico(monkeypatch)
+    assert r.status_code == 200, r.text[:200]
+
+
+def test_texto_del_vendedor_tiene_tiempo_maximo(monkeypatch):
+    """La adivinanza del vendedor es opcional: si tarda, se sigue sin ella."""
+    import proyecto_maria.pdf_extractor as ext
+    monkeypatch.setenv("PDF_READ_TIMEOUT_S", "0.3")
+    monkeypatch.setattr(main, "process_pdf",
+                        lambda *_: {"items": [{"descripcion": "x"}], "operacion": {}})
+    monkeypatch.setattr(ext, "_extract_pdf_text", lambda *_: (_bloquear(), "")[1])
+    r, demora = _subir_y_medir()
+    assert r.status_code == 200, r.text[:200]
+    assert demora < LENTO_S, f"respondió a los {demora:.2f} s"
+
+
+def test_error_de_tiempo_adentro_del_lector_no_es_lectura_lenta(monkeypatch):
+    def _falla(*_):
+        raise TimeoutError("se cortó la conexión")
+    monkeypatch.setattr(main, "process_pdf", _falla)
+    r = _subir_sincronico(monkeypatch)
+    assert r.status_code == 500, r.text[:200]
+    assert "PDF_READ_TIMEOUT" not in r.text
+
+
+def test_pdf_encriptado_dice_que_esta_encriptado():
+    import io
+    from pypdf import PdfWriter
+    from fastapi.testclient import TestClient
+    w = PdfWriter()
+    w.add_blank_page(200, 200)
+    w.encrypt("una-clave")
+    buf = io.BytesIO()
+    w.write(buf)
+    r = TestClient(main.app).post(
+        "/upload_pdf/public", files={"file": ("x.pdf", buf.getvalue(), "application/pdf")})
+    assert r.status_code == 400, r.text[:200]
+    assert "Encrypted PDFs are not allowed" in r.json()["detail"]
+
+
+def test_pdfs_lentos_no_traban_a_ncm_ni_a_la_validacion(monkeypatch):
+    """Las lecturas de PDF tienen su propio grupo de hilos. Aunque las
+    lentas lo llenen (y sigan corriendo después del 504), sugerir un NCM y
+    validar otro PDF no hacen cola detrás de ellas."""
+    import concurrent.futures
+    from proyecto_maria.security.file_security import validate_file_upload
+    from starlette.datastructures import UploadFile
+    monkeypatch.setenv("PDF_READ_TIMEOUT_S", "0.3")
+    monkeypatch.setenv("PDF_READ_WORKERS", "2")
+    monkeypatch.setattr(main, "_POOL_LECTURA_PDF", None, raising=False)
+    monkeypatch.setattr(main, "process_pdf", lambda *_: (time.sleep(3), {})[1])
+    monkeypatch.setattr(main, "_suggest_ncm_with_gemini", lambda *_a, **_k: [])
+
+    async def _escenario():
+        # El grupo de hilos por defecto, chico como en un servidor de 1 CPU.
+        asyncio.get_running_loop().set_default_executor(
+            concurrent.futures.ThreadPoolExecutor(2))
+        transport = httpx.ASGITransport(app=main.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+            lentos = await asyncio.gather(*[_subir(c) for _ in range(4)])
+            assert {r.status_code for r in lentos} == {504}
+            t0 = time.monotonic()
+            r = await c.post("/api/ncm/sugerir",
+                             json={"descripcion": "artefacto inventado para la prueba qwz"})
+            demora_ncm = time.monotonic() - t0
+            assert r.status_code == 200, r.text[:200]
+            t0 = time.monotonic()
+            await validate_file_upload(
+                UploadFile(file=__import__("io").BytesIO(PDF), filename="otro.pdf"), "pdf")
+            demora_validar = time.monotonic() - t0
+            return demora_ncm, demora_validar
+
+    demora_ncm, demora_validar = asyncio.run(_escenario())
+    assert demora_ncm < 1.0, f"/api/ncm/sugerir esperó {demora_ncm:.2f} s detrás de los PDFs lentos"
+    assert demora_validar < 1.0, f"validar otro PDF esperó {demora_validar:.2f} s"
+
+
+def test_gemini_sin_respuesta_no_cuelga_la_sugerencia(monkeypatch):
+    monkeypatch.setenv("NCM_GEMINI_TIMEOUT_S", "0.3")
+    monkeypatch.setattr(main, "_suggest_ncm_with_gemini",
+                        lambda *_a, **_k: (_bloquear(), [{"ncm": "x"}])[1])
+
+    async def _ir():
+        transport = httpx.ASGITransport(app=main.app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+            t0 = time.monotonic()
+            r = await c.post("/api/ncm/sugerir",
+                             json={"descripcion": "artefacto inventado para la prueba qwz"})
+            return r, time.monotonic() - t0
+
+    r, demora = asyncio.run(_ir())
+    assert r.status_code == 200, r.text[:200]
+    assert demora < LENTO_S, f"esperó a Gemini {demora:.2f} s"
