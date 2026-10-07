@@ -82,6 +82,7 @@ echo "VERDE  sin sabotaje: $(grep -E 'passed' <<<"$base" | tail -1)"
 
 # 1. vuelve el «None»
 reemplazar $X '    texto = "" if raw is None else str(raw).strip()' '    texto = str(raw).strip()'
+reemplazar $X '    return "" if texto.upper() in _TEXTO_VACIO else texto' '    return texto'
 caso vuelve_el_none "${T}test_campo_nulo_queda_vacio[vendedor_nombre-pdf_directo]"
 
 # 2. una copia vuelve a inventar la moneda
