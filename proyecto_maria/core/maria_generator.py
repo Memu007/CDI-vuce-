@@ -281,10 +281,10 @@ def gastos_fob_para_el_txt(incoterm, gastos_fob=None, gastos_anteriores_fob=None
 def fecha_de_la_factura(raw) -> str:
     """Fecha de emisión en DD/MM/AAAA, o "" si no es una fecha.
 
-    Acepta DD/MM/AAAA, DD/MM/AA y AAAA-MM-DD. Lo que no se puede leer queda
+    Acepta DD/MM/AAAA (día y mes de una o dos cifras), DD/MM/AA y AAAA-MM-DD. Lo que no se puede leer queda
     vacío (y se avisa): nunca se pone la fecha de hoy (MARIA-3, D15)."""
     texto = str(raw or "").strip()
-    formatos = ((r"\d{2}/\d{2}/\d{4}", "%d/%m/%Y"), (r"\d{2}/\d{2}/\d{2}", "%d/%m/%y"),
+    formatos = ((r"\d{1,2}/\d{1,2}/\d{4}", "%d/%m/%Y"), (r"\d{1,2}/\d{1,2}/\d{2}", "%d/%m/%y"),
                 (r"\d{4}-\d{2}-\d{2}", "%Y-%m-%d"))
     for patron, formato in formatos:
         if re.fullmatch(patron, texto):
@@ -341,6 +341,15 @@ def pais_reconocido(pais) -> bool:
     if str(pais).strip().isdigit():
         return True
     return _normalizar_pais(pais) in _PAISES_NORM
+
+
+def pais_de_la_tabla(pais) -> bool:
+    """Como `pais_reconocido`, pero un código numérico tiene que estar en la
+    tabla oficial (MARIA-3, procedencia: «99999» no es un país)."""
+    texto = str(pais or "").strip()
+    if texto.isdigit():
+        return int(texto) in set(PAISES_INDEC.values())
+    return pais_reconocido(texto)
 
 
 def get_pais_codigo(pais: str) -> int:
@@ -519,7 +528,8 @@ def generate_maria_txt(operation_id: str, items: list,
     # Antes estaba escrito a mano como "25". Silenciosamente iba a poner /25 en
     # toda declaración generada de 2026 en adelante: el TXT sale igual, no
     # falla nada, y el error aparece recién en la aduana.
-    _m_anio = re.search(r"/(\d{2}|\d{4})\s*$", fecha_factura)
+    # Con la fecha vacía, el año se sigue buscando en lo que vino escrito.
+    _m_anio = re.search(r"/(\d{2}|\d{4})\s*$", fecha_factura or str(fecha_emision or "").strip())
     anio_iext = _m_anio.group(1)[-2:] if _m_anio else datetime.now().strftime("%y")
     lines.append("[CPL]")
     lines.append("NART=0000")

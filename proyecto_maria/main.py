@@ -70,7 +70,7 @@ PROJECT_VERSION = datetime.now().strftime("%Y%m%d%H%M%S")
 from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, supuestos_declarados, gastos_fob_para_el_txt
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, supuestos_declarados, gastos_fob_para_el_txt
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
     LecturaAutomaticaNoDisponible,
@@ -3584,7 +3584,7 @@ def _items_con_procedencia(request: MariaRequest) -> list:
     procedencia = str(request.procedencia or "").strip()
     if not procedencia:
         return request.items
-    if not pais_reconocido(procedencia):
+    if not pais_de_la_tabla(procedencia):
         raise HTTPException(
             status_code=400,
             detail=f"Procedencia «{procedencia[:40]}» no reconocida: elegí un país de la lista.",

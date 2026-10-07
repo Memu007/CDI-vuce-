@@ -167,8 +167,9 @@
         const panel = document.getElementById('validatingAvisosPanel');
         const list = document.getElementById('validatingAvisosList');
         const count = document.getElementById('validatingAvisosCount');
-        if (!panel || !list || !(CDI.state && (CDI.state.items || []).length)) return;
         const seq = ++avisosSeq;
+        if (!panel || !list) return;
+        if (!(CDI.state && (CDI.state.items || []).length)) { panel.hidden = true; return; }
         let avisos;
         try {
             const res = await CDI.api('/generate_maria/avisos', {
