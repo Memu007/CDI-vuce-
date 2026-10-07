@@ -3419,7 +3419,9 @@ class _LecturaMedida:
 
 
 def _hojas_del_xlsx(z) -> list:
-    """[(nombre, ruta dentro del zip)] en el orden del libro."""
+    """[(nombre, ruta dentro del zip)] de las hojas de cálculo, en el orden
+    del libro. Las hojas de gráfico no cuentan: pandas lee la primera hoja de
+    cálculo, aunque haya un gráfico antes."""
     import posixpath
     from xml.etree import ElementTree as ET
     ns_main = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
@@ -3429,12 +3431,15 @@ def _hojas_del_xlsx(z) -> list:
             raise _SeAcaboElPresupuesto("índice del libro")
     destinos = {}
     for r in ET.fromstring(z.read("xl/_rels/workbook.xml.rels")):
+        if not (r.get("Type") or "").endswith("/worksheet"):
+            continue
         destino = r.get("Target") or ""
         destino = destino.lstrip("/") if destino.startswith("/") else posixpath.normpath(posixpath.join("xl", destino))
         destinos[r.get("Id")] = destino
     hojas = []
     for h in ET.fromstring(z.read("xl/workbook.xml")).iter(f"{ns_main}sheet"):
-        hojas.append((h.get("name") or "", destinos.get(h.get(f"{ns_rel}id"), "")))
+        if h.get(f"{ns_rel}id") in destinos:
+            hojas.append((h.get("name") or "", destinos[h.get(f"{ns_rel}id")]))
     return hojas
 
 
@@ -3483,7 +3488,11 @@ def _hoja_xlsx_tiene_datos(z, ruta: str, presupuesto: dict, compartidos) -> bool
                     el.clear()
                     continue
             tipo = el.get("t")
-            if tipo == "inlineStr":
+            formula = el.find(f"{ns}f")
+            if formula is not None and (formula.text or "").strip():
+                # Una fórmula sin valor guardado (así escribe openpyxl) es un dato.
+                lleno = True
+            elif tipo == "inlineStr":
                 lleno = any((t.text or "").strip() for t in el.iter(f"{ns}t"))
             else:
                 v = el.find(f"{ns}v")
@@ -3668,13 +3677,27 @@ async def smart_validation(body: dict, user=Depends(get_current_user)):
                     f"{len(resultado.get('sugerencias', []))} sugerencias."
                 )
         
-        return {
+        # Un monto enorme pero finito hace que las estadísticas den infinito,
+        # y la respuesta no se podría escribir (500): esos números van vacíos;
+        # el control de arriba ya marca el monto como error.
+        return _sin_no_finitos({
             "success": True,
             **resultado
-        }
+        })
         
     except Exception as e:
         return {"success": False, "detail": str(e)}
+
+
+def _sin_no_finitos(dato):
+    import math
+    if isinstance(dato, float) and not math.isfinite(dato):
+        return None
+    if isinstance(dato, dict):
+        return {k: _sin_no_finitos(v) for k, v in dato.items()}
+    if isinstance(dato, (list, tuple)):
+        return [_sin_no_finitos(v) for v in dato]
+    return dato
 
 def _respuesta_sin_lector(mensaje: str) -> JSONResponse:
     return JSONResponse(
@@ -3933,7 +3956,7 @@ async def generate_maria_endpoint(
         # Validar items (validación mínima)
         valid, errors = validate_items_for_maria(request.items)
         if not valid:
-            raise HTTPException(status_code=400, detail={"errors": [*errors, *errores_1b]})
+            raise HTTPException(status_code=400, detail={"errors": list(dict.fromkeys([*errors, *errores_1b]))})
 
         # Procedencia de la operación y gastos de la pantalla (MARIA-3)
         items = _items_con_procedencia(request)
@@ -3987,7 +4010,7 @@ async def generate_maria_endpoint(
                     detail="El sufijo de valor SBT no puede contener saltos de línea ni caracteres de control.",
                 )
         if kit_errors or errores_1b:
-            raise HTTPException(status_code=400, detail={"errors": [*errors, *kit_errors, *errores_1b]})
+            raise HTTPException(status_code=400, detail={"errors": list(dict.fromkeys([*errors, *kit_errors, *errores_1b]))})
 
         # Si el user tiene CUIT en su perfil y la request no manda cuit_agr,
         # usamos el del perfil (para que el despachante no tenga que re-escribir
@@ -4117,8 +4140,14 @@ async def generate_maria_export_endpoint(
             for it in (request.items or [])
         ]
 
-        # Validar items
+        # Validar items. NaN, infinito o montos que desbordan no llegan al TXT
+        # (revisión de la devolución de MARIA-1b).
+        from proyecto_maria.core.controles_maria import montos_fuera_de_rango
         valid, errors = validate_items_for_export(request.items)
+        _montos = montos_fuera_de_rango(request.items, {"flete": request.flete, "seguro": request.seguro})
+        if _montos:
+            errors = list(dict.fromkeys([*errors, *_montos]))
+            valid = False
         
         # Validar país de destino
         if request.comprador_pais and not pais_reconocido(request.comprador_pais):

@@ -8,7 +8,9 @@ semáforo y la pantalla de generar los muestran antes).
 import math
 import re
 
-from proyecto_maria.core.maria_generator import _INCOTERMS_GRUPO_C_D, INCOTERMS_VALIDOS, importe_valido
+from proyecto_maria.core.maria_generator import (
+    _INCOTERMS_GRUPO_C_D, IMPORTE_MAXIMO, INCOTERMS_VALIDOS, importe_valido,
+)
 
 # Los que acepta el generador, más FAS (la pantalla lo ofrece) y los de 2000
 # y 2010 que el generador todavía reconoce (DAT, DAF, DES, DEQ, DDU).
@@ -69,12 +71,66 @@ def _no_finito(valor) -> bool:
         return False
 
 
-# Mismo texto que el control de siempre (validate_items_for_maria).
-_MONTOS_DEL_ITEM = (
-    (("cantidad",), "Cantidad inválida"),
-    (("valor_unitario", "valor_total"), "Valor inválido"),
-    (("peso_kg", "peso_unitario"), "Peso inválido"),
-)
+def _numero_o_none(valor):
+    if valor is None or isinstance(valor, bool) or (isinstance(valor, str) and not valor.strip()):
+        return None
+    try:
+        return float(valor)
+    except (TypeError, ValueError):
+        return None
+
+
+def _fuera_de_rango(*valores) -> bool:
+    """NaN, infinito o más que un billón, solo o multiplicado por la cantidad:
+    un número así, aunque sea finito, llega al TXT como «inf» o «nan» al
+    hacer las cuentas (revisión de la devolución de MARIA-1b)."""
+    numeros = [v for v in valores if v is not None]
+    if any(not math.isfinite(v) or abs(v) > IMPORTE_MAXIMO for v in numeros):
+        return True
+    producto = 1.0
+    for v in numeros:
+        producto *= v
+    return len(numeros) > 1 and (not math.isfinite(producto) or abs(producto) > IMPORTE_MAXIMO)
+
+
+def montos_fuera_de_rango(items, cabecera: dict) -> list:
+    """Errores por montos que no son números de verdad, en los productos, sus
+    subítems y la cabecera. Mismo texto que el control de siempre
+    (validate_items_for_maria) y que el generador (importe_valido)."""
+    errores: list = []
+    for n, item in enumerate(items or [], start=1):
+        if not isinstance(item, dict):
+            continue
+        cantidad = _numero_o_none(item.get("cantidad"))
+        valor = _numero_o_none(item.get("valor_unitario"))
+        total = _numero_o_none(item.get("valor_total"))
+        peso_kg = _numero_o_none(item.get("peso_kg"))
+        peso_unitario = _numero_o_none(item.get("peso_unitario"))
+        if _fuera_de_rango(cantidad):
+            errores.append(f"Item {n}: Cantidad inválida")
+        if _fuera_de_rango(cantidad, valor) or _fuera_de_rango(total):
+            errores.append(f"Item {n}: Valor inválido")
+        if _fuera_de_rango(peso_kg) or _fuera_de_rango(cantidad, peso_unitario):
+            errores.append(f"Item {n}: Peso inválido")
+        for m, sub in enumerate(item.get("subitems") or [], start=1):
+            if not isinstance(sub, dict):
+                continue
+            sub_cant = _numero_o_none(sub.get("cantidad"))
+            sub_valor = _numero_o_none(sub.get("valor_unitario"))
+            if _fuera_de_rango(sub_cant):
+                errores.append(f"Item {n}, sub-ítem {m}: Cantidad inválida")
+            if _fuera_de_rango(sub_cant, sub_valor):
+                errores.append(f"Item {n}, sub-ítem {m}: Valor inválido")
+    for campo, nombre in _IMPORTES_DE_LA_CABECERA:
+        valor = cabecera.get(campo)
+        if valor is None or (isinstance(valor, str) and not valor.strip()):
+            continue
+        try:
+            importe_valido(valor, nombre)
+        except ValueError as e:
+            errores.append(str(e))
+    return errores
+
 _IMPORTES_DE_LA_CABECERA = (
     ("flete", "Flete"), ("seguro", "Seguro"),
     ("gastos_fob", "Gastos (gastos_fob)"), ("gastos_anteriores_fob", "Gastos (gastos_anteriores_fob)"),
@@ -135,9 +191,7 @@ def controles_antes_de_generar(items, cabecera: dict) -> tuple[list, list]:
         if not isinstance(item, dict):
             continue
         _control_ncm(item.get("ncm") or item.get("pieza"), n, errores, advertencias)
-        for campos, mensaje in _MONTOS_DEL_ITEM:
-            if any(_no_finito(item.get(c)) for c in campos):
-                errores.append(f"Item {n}: {mensaje}")
+    errores.extend(montos_fuera_de_rango(items, cabecera))
 
     moneda = str(cabecera.get("moneda") or "").strip().upper()
     if not moneda:
@@ -170,15 +224,5 @@ def controles_antes_de_generar(items, cabecera: dict) -> tuple[list, list]:
             f"El CUIT del importador «{cuit}» no es válido: tiene que tener 11 "
             "dígitos y el dígito verificador correcto."
         )
-
-    # Negativos, NaN, infinitos o absurdos: el mismo error que el generador.
-    for campo, nombre in _IMPORTES_DE_LA_CABECERA:
-        valor = cabecera.get(campo)
-        if valor is None or (isinstance(valor, str) and not valor.strip()):
-            continue
-        try:
-            importe_valido(valor, nombre)
-        except ValueError as e:
-            errores.append(str(e))
 
     return errores, advertencias
