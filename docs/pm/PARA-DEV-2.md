@@ -58,29 +58,27 @@ Aceptadas y sin integrar hasta después del ensayo: MARIA-1a, 2b, 1c y 4.
   novedades de ARCA apuntan a un puerto local cerrado.
 - **D10:** tenés razón. MARIA-4 queda escrita abajo.
 
-## Tarea activa — MARIA-3: avisos, gastos FOB, procedencia y fecha
+## Respuestas a tus D (2026-10-07, 10:15 UTC)
 
-Asignada el 2026-10-07. Cambia lo que sale en el TXT. Arrancá después del
-`/compact`.
+- **MARIA-3:** en revisión de la PM. Mientras, arrancá MARIA-1d (abajo).
+- **D12: (a), como MARIA-1d**, antes de MARIA-5.
 
-**Base:** tu rama (con MARIA-4).
+## Tarea activa — MARIA-1d: un campo vacío no llega al TXT como «None»
 
-**Alcance, con su prueba:**
+Asignada el 2026-10-07. Sale de tu D12. Es chica.
 
-| Qué | Hoy | Prueba |
-|---|---|---|
-| **Avisos antes de generar** (M6) | Algunos avisos aparecen recién después de generar | — (pantalla) |
-| **Gastos anteriores al FOB** en EXW, FCA y FAS (M8) | La regla del generador ya está bien (`maria_generator.py:413-426`), pero el campo de la pantalla no llega al TXT; FAS no está en `INCOTERMS_VALIDOS` (`:777`) | Respuesta 6 del despachante; nota del SIM; el archivo real de 2026 (`GTOS-ANT-FOB=150.00`, EXW) |
-| **Procedencia** por operación, en pantalla | Se iguala al origen y se avisa (`:595`, `:821-833`) | Código Aduanero, art. 15 (sale del documento de transporte); el archivo de 2025 trae origen 200 y procedencia 222 |
-| **Fecha de emisión** de la factura (`FECHAEMISIONFACT`, `:404`) | Sale la de hoy (D15 de la Dev 1) | La fecha de la factura; si no se leyó, vacía y con aviso, nunca la de hoy |
-| **Sin avisos de más** (revisión de MARIA-1c) | Flete o seguro «N/A», «-», «FREE», «included», «Prepaid» y país «Unknown» o «?» se marcan como no leídos | — |
+**Base:** tu rama (con MARIA-3).
 
-**Criterios:** los dos archivos reales siguen saliendo idénticos cargando sus
-valores (2025 con procedencia 222; 2026 con los 150 de gastos anteriores al
-FOB); rojo antes y verde después por punto; sabotajes; comprobación de
-pantalla con captura; suite completa en verde.
+**Alcance:** en las dos copias del lector, un campo que Gemini devuelve
+vacío queda vacío: nada de «None» ni «NON» (número de factura, vendedor,
+comprador, domicilio, moneda, incoterm y cualquier otro que encuentres con el
+mismo defecto). Lo que queda vacío y el TXT necesita, se avisa antes de
+generar.
 
-**Fuera de alcance:** el peso (MARIA-5) y los identificadores (MARIA-6).
+**Criterios:** rojo antes y verde después con cada campo (hoy
+`IDSO=FAC_None`, `CDDTINCOTE=NON`); una prueba que busque «None» en todo el
+TXT generado con una factura de campos vacíos; los dos archivos reales salen
+idénticos; suite completa en verde.
 
 **Después:** MARIA-5; MARIA-6 cuando lleguen los archivos reales del
 despachante.

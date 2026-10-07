@@ -35,19 +35,16 @@ Con dos columnas el vendedor queda vacío: es una de las dos salidas aceptadas.
 
 RENDIMIENTO-1 y 1b se integran en la rama de PM después del ensayo, juntas.
 
-## Respuestas a tus D (2026-10-07, 08:10 UTC)
+## Respuestas a tus D (2026-10-07, 10:15 UTC)
 
-- **D13: (a).** Borrá en EXCEL-1 `/upload_excel/`, su alias `public` y
-  `/api/clientes/import`. Arreglá sólo `/upload_excel_v2/`.
-- **D14: (a), ya:** traé a tu rama, con `merge`, el SHA aceptado `448b54d` de
-  `claude/dev2-maria` (MARIA-1a, 2b y 1c, todas aceptadas) y usá sus
-  funciones. Sólo ese SHA: lo posterior de la Dev 2 no está aceptado.
-- **D15:** la fecha de emisión que pone el generador va a MARIA-3 (Dev 2), que
-  ya toca la cabecera del TXT.
-- **D16: (b).** Se deja; la moneda se ve en la revisión antes del TXT.
-- **`dev_detail`:** ya está en DATOS-1 (Fase 3).
-
-Anteriores (D7 a D12): en Git.
+- **EXCEL-1:** en revisión de la PM. Mientras, arrancá MARIA-1b (abajo).
+- **D17: (a), en MARIA-1b.**
+- **D18:** el aviso de «otras hojas con datos», en MARIA-1b. Lo demás
+  (encabezado fuera de la fila 1, sin columna de origen, celdas combinadas)
+  queda anotado como EXCEL-2, después de PUNTA-A-PUNTA-1.
+- **D19:** anotados. La NCM de 7 dígitos (el 0 inicial perdido) va en
+  MARIA-1b: el control del catálogo la tiene que atajar.
+- Anteriores: D13 (a), D14 (a), D15 a MARIA-3, D16 (b).
 
 **Ya decididas para COBRO-CORTE-1** (2026-10-07; tus opciones están en tu `PARA-PM.md`
 del commit `62b1d14`):
@@ -57,32 +54,30 @@ del commit `62b1d14`):
 - **D6: (a)** ahora. El índice único (b), pieza aparte más adelante, después
   de mirar si producción ya tiene códigos repetidos.
 
-## Tarea activa — EXCEL-1: la carga por Excel, de punta a punta
+## Tarea activa — MARIA-1b: controles antes de generar
 
-Asignada el 2026-10-07. Fase 1 (`ROADMAP.md`). La carga por Excel nunca se
-auditó.
+Asignada el 2026-10-07. Fase 1 (`ROADMAP.md`). Cambia cuándo se puede
+generar el TXT, no lo que sale en él.
 
-**Base:** tu rama (con RENDIMIENTO-1 y 1b).
+**Base:** tu rama (con EXCEL-1).
 
 **Alcance:**
-1. Recorré cada camino vivo que lee un Excel y llega al TXT: `/upload_excel/`,
-   `/upload_excel/public`, `/upload_excel_v2/` y los que lean con
-   `pd.read_excel` (hoy cerca de las líneas 3401, 4663, 6314 y 7257 de
-   `main.py`), con la plantilla que ofrece la pantalla y con Excel reales de
-   distinto formato (columnas en otro orden, números con coma, celdas vacías,
-   filas de totales, `.xls` y `.xlsx`). Lo que inventa, pierde o lee mal un
-   dato se arregla con el mismo criterio que MARIA-1a: un dato que falta
-   queda vacío y con aviso, nunca inventado.
-2. Leer un Excel no frena el sitio (tu D12): aparte, con tiempo máximo, como
-   el PDF.
-3. Si un camino no tiene llamador vivo desde las pantallas, decilo en una D
-   antes de arreglarlo.
+1. Antes de generar, con un aviso claro por producto u operación: NCM que no
+   está en el catálogo (si tiene 7 dígitos, proponer el 0 inicial), moneda,
+   incoterm, CUIT del importador y montos (vacíos, negativos, en 0). Lo que
+   impide un TXT válido no deja generar; lo dudoso avisa.
+2. Ningún texto (descripción, nombres, domicilio) mete saltos de línea ni
+   `=` que rompan el TXT (M10).
+3. Al guardar la operación no se inventan cantidad 1 ni peso 0,5
+   (`save_client_operation`, D6 de la Dev 2).
+4. El aviso de filas del Excel sin leer queda en el semáforo hasta que la
+   persona lo descarte (tu D17), y se avisa si el libro tiene otras hojas con
+   datos (tu D18).
 
-**Prueba para el TXT:** un Excel armado con los datos de los dos archivos
-reales tiene que dar el mismo TXT que la carga por PDF con esos datos.
+**Fuera de alcance:** lo que el generador decide (Dev 2) y el resto de D18
+(EXCEL-2).
 
-**Criterios:** rojo antes y verde después por cada defecto; una prueba con
-`/health` respondiendo mientras se lee un Excel pesado; la suite completa en
-verde. Lo que encuentres fuera de esto, en una D.
+**Criterios:** rojo antes y verde después por cada control; los dos archivos
+reales siguen saliendo idénticos; suite completa en verde.
 
-**Después:** MARIA-1b (con la D6 de la Dev 2) y PUNTA-A-PUNTA-1.
+**Después:** PUNTA-A-PUNTA-1 y EXCEL-2.
