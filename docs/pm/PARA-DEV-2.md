@@ -32,19 +32,32 @@ tienen que seguir saliendo idénticos, salvo que la tarea diga otra cosa.
 
 ## Último veredicto
 
-**MARIA-1c aceptada sobre `448b54d`** (2026-10-07). La PM reprodujo el rojo
-antes (`13 failed`), la focal con MARIA-1a y los archivos reales (`142
-passed`) y la suite (`804 passed, 102 skipped`). Su subagente Sonnet medio no
-encontró un dato que estaba y no se avisa, ni cambios en el TXT, ni valores
-inventados en la pantalla vieja. Sólo avisos de más: flete o seguro «N/A»,
-«-», «FREE», «included», «Prepaid» y país «Unknown» o «?» se marcan como no
-leídos; va a MARIA-3. Detalle en
-`REPRODUCCION-RENDIMIENTO-1b-MARIA-1c-2026-10-07.md`. Tu supuesto del país del
-vendedor queda aceptado.
+**MARIA-4 devuelta** (2026-10-07, sobre `6149ef3`). La PM reprodujo el rojo
+antes (`30 failed`), la focal con los archivos reales (`127 passed`) y la
+suite (`837 passed, 102 skipped`). Su subagente Sonnet alto: lo central se
+sostiene (valores raros rechazados, 2025 idéntico byte a byte, 2026 sin
+diferencias en los cuatro campos, sin fugas entre usuarios ni clientes).
+Detalle en `REPRODUCCION-MARIA-4-2026-10-07.md`.
 
-**Antes:** MARIA-1a (`0a1775f`) y MARIA-2b (`c3bef51`) aceptadas
-(`REPRODUCCION-MARIA-1a-2b-2026-10-07.md`). Ninguna se integra en la rama de
-PM hasta después del ensayo; MARIA-1a sale con MARIA-1c.
+**Devolución, tres puntos:**
+1. **Estado contra origen.** Un estado «argentino» (1, 3, 5) con origen
+   extranjero, o «importado» (2, 4, 6) con origen argentino, no se genera:
+   400 con un mensaje claro, como el del argentino sin estado. En la pantalla,
+   si el origen cambia entre argentino y extranjero, el estado elegido se
+   vuelve a pedir (hoy queda `['CN','3']`).
+2. **Pantalla vieja:** muestra los `warnings` y `supuestos` que devuelve
+   `/generate_maria`, como pedía la tarea («genera con los valores por defecto
+   y su aviso»).
+3. **`origen` y `pais_origen`:** el generador y los supuestos los leen en el
+   mismo orden (hoy uno usa `pais_origen or origen` y el otro al revés).
+
+Rojo antes y verde después en cada punto; suite completa en verde.
+
+**Tu D11: (a).** Tu supuesto del banco propuesto que va al TXT si nadie lo
+toca, con el aviso en pantalla: aceptado.
+
+**Antes:** MARIA-1a, 2b y 1c aceptadas. Nada se integra en la rama de PM
+hasta después del ensayo.
 
 ## Respuestas a tus D (2026-10-07, 05:30 UTC)
 
