@@ -230,33 +230,41 @@ pruebas que lo cubren. Esto es lo que hay hoy:
 
 **Mientras tanto:** arranco por los pasos 1 y 3, que no dependen de ninguna D.
 
+## COBRO-MP-1 — en pausa en `37d0efe` (sin entregar)
+
+Pausada por GUARDAR-1. Los cuatro pasos tienen código y pruebas; falta
+cerrarla:
+
+- **Hecho:** pasos 1 y 3 (`3d3f712`), paso 2 con D29 b y sus tres
+  condiciones (`2d51448`: suscripción contra el monto leído en Mercado Pago,
+  links viejos contra el precio de hoy, rechazados visibles en
+  `/dev/dashboard` → «Pagos de Mercado Pago no aplicados»), paso 4 con D30 a
+  (`f5f06ee`: si el cobro o la suscripción no tienen la forma esperada, no se
+  aplica nada y se loguea). Pruebas viejas que pagaban 30 000, en su commit
+  (`90eff1f`).
+- **D31:** la prueba con nombre de dos avisos a la vez está
+  (`test_dos_avisos_del_mismo_pago_a_la_vez_se_aplican_una_sola_vez`), y
+  `scripts/testing/cobro_mp1_postgres.py` lo mismo contra un Postgres 16
+  local: 8 de 8 OK en `18a1850`; con el `IntegrityError` saboteado, FALLA.
+- **Pruebas:** `tests/test_cobro_mp1.py`, 36 en verde en `37d0efe`.
+- **Falta para entregar:** sabotajes de los pasos 2 y 4 en
+  `scripts/testing/sabotajes/cobro_mp1.sh`, suite completa, revisión Opus y
+  Sonnet (alto), CHANGELOG, el script de Postgres sobre el SHA final, e
+  informe con los riesgos (D28: consultas a Mercado Pago con ids al azar;
+  formato del cobro autorizado sin confirmar contra un aviso real).
+
 ## Sigo con
 
-COBRO-MP-1. **Pasos 1 y 3 hechos, sin entregar** (no es una entrega: falta
-el paso 2, que espera D28 y D29, y el 4, que espera D30):
-
-- Producto `3d3f712`; pruebas `83b4ec1` y `a3099c0` (`tests/test_cobro_mp1.py`,
-  7 casos; 6 en rojo sobre el código anterior, el que queda verde es el de
-  la cuenta vencida, que ya contaba desde hoy).
-- Sabotajes: `PY=/tmp/cdi-dev1/venv/bin/python scripts/testing/sabotajes/cobro_mp1.sh a3099c0`
-  → 7 de 7 en ROJO, «sabotajes con falla: 0».
-- Suite tipo CI sobre `a3099c0`: `1274 passed, 102 skipped, 10 deselected, 3 xfailed`.
-- Falta todavía: revisión adversarial (Opus y Sonnet, alto) y CHANGELOG, que
-  hago al entregar la pieza entera. La carrera de dos avisos simultáneos del
-  mismo pago la frena la clave primaria (`_guardar_pago_mp`), pero no tiene
-  prueba: con SQLite no se reproduce la concurrencia.
-
-Si Emi aprueba GUARDAR-1, paso a esa. Si EXCEL-2 vuelve con devolución, eso
-va primero. Si preferís recibir los pasos 1 y 3 ya, como entrega parcial,
-decímelo y la cierro con /entregar.
+GUARDAR-1. Si EXCEL-2 vuelve con devolución, eso va primero.
 
 Última vuelta: 2026-10-07
 Contexto: el que mide la PM con get_session.
 
 `/compact conservar: Dev 1 de CDI, rama claude/dev1-tecnica. Aceptadas e
 integradas: MARIA-1b, EXCEL-1, PUNTA-A-PUNTA-1. EXCEL-2 entregada sobre
-3e6e63e (suite 1267 en 1a36a6d, 27 sabotajes en scripts/testing/sabotajes/excel2.sh,
-tests/test_excel2.py); D27 (tope de textos compartidos) abierta. Entorno:
-PM_DIR=/tmp/cdi-dev1, levantar.sh <SHA> <puerto>, venv /tmp/cdi-dev1/venv y
-venv-limpio; rutina de la PM trig_01TvMmGfSLDfbcJrf66ZZ7YK. COBRO-MP-1: pasos 1 y 3
-en a3099c0 (sin entregar), paso 2 espera D28/D29, paso 4 espera D30, tabla D31.`
+3e6e63e; D27 abierta. Ahora GUARDAR-1 (ncm String(10) en
+client_product_history, 500 en Postgres). COBRO-MP-1 en pausa en 37d0efe (ver
+PARA-PM.md). Postgres local: /usr/lib/postgresql/16/bin, datos en
+/tmp/cdi-dev1/pg, puerto 55432, usuario cdi. Entorno: PM_DIR=/tmp/cdi-dev1,
+venv /tmp/cdi-dev1/venv y venv-limpio; rutina de la PM
+trig_01TvMmGfSLDfbcJrf66ZZ7YK. Compactar desde el 30 %.`
