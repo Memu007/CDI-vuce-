@@ -856,6 +856,9 @@ def generate_maria_txt(operation_id: str, items: list,
         ncms = {str(it.get('ncm') or it.get('pieza') or '').replace('.', '').replace(' ', '').upper() for it in grupo_items}
         origenes = {str(it.get('pais_origen') or it.get('origen') or '').strip().upper() for it in grupo_items}
         unidades = {str(it.get('unidad') or it.get('unidad_medida') or it.get('um') or '').strip().upper() for it in grupo_items}
+        if any(it.get('subitems') for it in grupo_items):
+            raise ValueError(f"Grupo {gid}: un producto agrupado no lleva sub-ítems; "
+                             f"desagrupalo para cargarlos.")
         if len(ncms) != 1:
             raise ValueError(f"Grupo {gid}: todos los ítems deben tener la misma NCM")
         if len(origenes) != 1:
@@ -1023,6 +1026,22 @@ def generate_maria_txt(operation_id: str, items: list,
             # Las cuentas tienen que cerrar contra el ítem, si no la aduana
             # rechaza la declaración. Se valida acá y se corta: mejor un error
             # en pantalla que un TXT que no cuadra.
+            # Cada sub-ítem con su cantidad y su valor: el error dice cuál
+            # falla (SUBITEMS-1). Una cantidad negativa compensada por otra
+            # haría cerrar la suma.
+            for n, sub in enumerate(subitems, start=1):
+                for campo, nombre, defecto in (("cantidad", "la cantidad", 0),
+                                               ("valor_unitario", "el valor unitario", valor_unit)):
+                    crudo = sub.get(campo, defecto)
+                    try:
+                        numero = float(crudo or 0)
+                    except (TypeError, ValueError):
+                        numero = float("nan")
+                    if not math.isfinite(numero) or numero <= 0:
+                        raise ValueError(
+                            f"Item {idx}, sub-ítem {n}: {nombre} «{str(crudo)[:20]}» tiene que ser "
+                            f"un número mayor que 0."
+                        )
             suma_cant = sum(float(s.get("cantidad", 0) or 0) for s in subitems)
             # El valor de cada sub-ítem sin redondear; el MARTFOB se reparte
             # entre ellos al centavo, así los MSBTFOB suman exactamente el

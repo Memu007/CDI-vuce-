@@ -211,6 +211,17 @@
         }).join('');
     }
 
+    function subitemsDelPedido(it) {
+        const subs = Array.isArray(it.subitems) ? it.subitems : [];
+        if (!subs.length) return undefined;
+        return subs.map(s => {
+            const sub = { cantidad: toNumber(s.cantidad, 0), valor_unitario: toNumber(s.valor_unitario, 0) };
+            const sufijo = String(s.sufijo || '').trim();
+            if (sufijo) sub.sufijo = sufijo;
+            return sub;
+        });
+    }
+
     function toNumber(v, fallback) {
         const n = Number(v);
         return isFinite(n) ? n : fallback;
@@ -457,7 +468,9 @@
             grupo_id: it.grupo_id || null,
             unidad: it.unidad || null,
             estado: it.estado || null,
-            iva_adicional: it.iva_adicional || null
+            iva_adicional: it.iva_adicional || null,
+            // Partido en subítems (SUBITEMS-1); sin subítems no va el campo.
+            subitems: subitemsDelPedido(it)
         }));
 
         // Cliente activo propaga domicilio + fecha inicio actividad del importador

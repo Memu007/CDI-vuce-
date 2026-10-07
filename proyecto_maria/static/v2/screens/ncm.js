@@ -15,6 +15,9 @@
 
     // Batch selection / acciones en lote
     const selectedRows = new Set();
+    // Productos con el panel de subítems abierto (por objeto: sobrevive a
+    // reordenar las filas).
+    let subitemsAbiertos = new WeakSet();
     const expandedGroups = new Set();
     let batchBar, batchCount, batchFactor, batchApplyQty, batchNcm, batchDc, batchApplyNcm, batchOrigin, batchApplyOrigin, batchClear, batchAgrupar, selectAllBox;
     let batchSimAutofilled = false;
@@ -602,6 +605,7 @@
         tbody.querySelectorAll('[data-note-pill]').forEach(btn => {
             btn.addEventListener('click', onNotePillClick);
         });
+        enlazarSubitems();
         updateSummary();
         updateBatchBar();
         prefetchAllNotes();
@@ -708,9 +712,138 @@
                     '<button type="button" class="btn-assist" data-assist="' + i + '">' +
                         assistText +
                     '</button>' +
+                    botonSubitems(it, i) +
+                '</td>' +
+            '</tr>' +
+            (subitemsAbiertos.has(it) ? renderSubitemsPanel(it, i) : '')
+        );
+    }
+
+    /* ---------- Subítems (SUBITEMS-1) ----------
+     * Un producto puede ir partido en subítems ([SBT] del TXT): cada uno con
+     * su cantidad, su valor unitario y su sufijo de valor. Las cantidades y
+     * los valores tienen que sumar lo del producto; el servidor lo controla
+     * al generar y acá se ve mientras se carga. Un producto agrupado no lleva
+     * subítems. Van en it.subitems, con el formato que recibe /generate_maria.
+     */
+    function subitemsDe(it) {
+        return Array.isArray(it && it.subitems) ? it.subitems : [];
+    }
+    function botonSubitems(it, i) {
+        const n = subitemsDe(it).length;
+        const abierto = subitemsAbiertos.has(it);
+        return ' <button type="button" class="btn-subitems' + (n ? ' has-subitems' : '') + '" data-subitems="' + i + '"' +
+            ' data-testid="ncm-subitems-toggle" aria-expanded="' + (abierto ? 'true' : 'false') + '">' +
+            (n ? 'Subítems (' + n + ')' : 'Subítems') + '</button>';
+    }
+    function numeroDe(v) {
+        const n = Number(String(v == null ? '' : v).replace(',', '.'));
+        return Number.isFinite(n) ? n : NaN;
+    }
+    // ¿Las partes suman lo del producto? Misma tolerancia que el servidor:
+    // cantidades a 0,001 y valores a 0,01.
+    function sumaSubitems(it) {
+        const subs = subitemsDe(it);
+        const cant = subs.reduce((t, s) => t + (numeroDe(s.cantidad) || 0), 0);
+        const valor = subs.reduce((t, s) => t + (numeroDe(s.cantidad) || 0) * (numeroDe(s.valor_unitario) || 0), 0);
+        const cantItem = numeroDe(it.cantidad) || 0;
+        const valorItem = cantItem * (numeroDe(it.valor_unitario) || 0);
+        const malos = subs.map((s, k) => (numeroDe(s.cantidad) > 0 && numeroDe(s.valor_unitario) > 0) ? 0 : k + 1).filter(Boolean);
+        const ok = subs.length > 0 && !malos.length && Math.abs(cant - cantItem) <= 0.001 && Math.abs(valor - valorItem) <= 0.01;
+        return { cant, valor, cantItem, valorItem, malos, ok };
+    }
+    function textoSumaSubitems(it) {
+        if (!subitemsDe(it).length) return '';
+        const r = sumaSubitems(it);
+        const n = (v, d) => v.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d });
+        let texto = 'Suman ' + n(r.cant, 0) + ' de ' + n(r.cantItem, 0) + ' unidades y ' +
+            n(r.valor, 2) + ' de ' + n(r.valorItem, 2) + ' de valor.';
+        if (r.malos.length) texto += ' Revisá el subítem ' + r.malos.join(', ') + ': cantidad y valor mayores que 0.';
+        return (r.ok ? '✓ ' : '⚠ ') + texto;
+    }
+    function actualizarSumaSubitems(i) {
+        const it = ((CDI.state && CDI.state.items) || [])[i];
+        const el = tbody && tbody.querySelector('[data-sub-suma="' + i + '"]');
+        if (!it || !el) return;
+        el.textContent = textoSumaSubitems(it);
+        el.classList.toggle('is-error', !sumaSubitems(it).ok);
+    }
+    function renderSubitemsPanel(it, i) {
+        const subs = subitemsDe(it);
+        const esc = v => CDI.escapeHtml(v == null ? '' : String(v));
+        const campo = (k, nombre, tipo, valor, etiqueta, extra) =>
+            '<input class="input input-sm" type="' + tipo + '"' + (extra || '') + ' value="' + esc(valor) + '"' +
+            ' data-sub-row="' + i + '" data-sub-idx="' + k + '" data-sub-field="' + nombre + '"' +
+            ' aria-label="' + etiqueta + ' del subítem ' + (k + 1) + '">';
+        const filas = subs.map((s, k) =>
+            '<tr>' +
+                '<td class="ncm-sub-num">' + (k + 1) + '</td>' +
+                '<td>' + campo(k, 'cantidad', 'number', s.cantidad, 'Cantidad', ' min="0" step="any"') + '</td>' +
+                '<td>' + campo(k, 'valor_unitario', 'number', s.valor_unitario, 'Valor unitario', ' min="0" step="any"') + '</td>' +
+                '<td>' + campo(k, 'sufijo', 'text', s.sufijo, 'Sufijo de valor', ' placeholder="El general de la operación"') + '</td>' +
+                '<td><button type="button" class="btn-link" data-sub-borrar="' + i + '" data-sub-idx="' + k + '"' +
+                    ' aria-label="Borrar el subítem ' + (k + 1) + '">Borrar</button></td>' +
+            '</tr>').join('');
+        const r = subs.length ? sumaSubitems(it) : { ok: true };
+        return (
+            '<tr class="row-subitems" data-subitems-panel="' + i + '">' +
+                '<td colspan="10">' +
+                    '<div class="ncm-subitems">' +
+                        '<p class="ncm-subitems-ayuda">Subítems del ítem ' + (i + 1) + ': cada uno es una parte del producto ' +
+                            'con su cantidad, su valor unitario y su sufijo de valor. Tienen que sumar la cantidad y el valor del producto.</p>' +
+                        (subs.length
+                            ? '<table class="ncm-subitems-tabla"><thead><tr><th>#</th><th>Cantidad</th><th>Valor unit.</th>' +
+                              '<th>Sufijo de valor</th><th></th></tr></thead><tbody>' + filas + '</tbody></table>'
+                            : '<p class="ncm-subitems-vacio">Sin subítems: el producto va entero.</p>') +
+                        '<div class="ncm-subitems-pie">' +
+                            '<button type="button" class="btn btn-sm btn-secondary" data-sub-agregar="' + i + '">+ Agregar subítem</button>' +
+                            '<span class="ncm-subitems-suma' + (r.ok ? '' : ' is-error') + '" data-sub-suma="' + i + '" aria-live="polite">' +
+                                esc(textoSumaSubitems(it)) + '</span>' +
+                        '</div>' +
+                    '</div>' +
                 '</td>' +
             '</tr>'
         );
+    }
+    function enlazarSubitems() {
+        const items = (CDI.state && CDI.state.items) || [];
+        tbody.querySelectorAll('[data-subitems]').forEach(btn => btn.addEventListener('click', () => {
+            const it = items[parseInt(btn.getAttribute('data-subitems'), 10)];
+            if (!it) return;
+            if (subitemsAbiertos.has(it)) subitemsAbiertos.delete(it); else subitemsAbiertos.add(it);
+            render();
+        }));
+        tbody.querySelectorAll('[data-sub-agregar]').forEach(btn => btn.addEventListener('click', () => {
+            const it = items[parseInt(btn.getAttribute('data-sub-agregar'), 10)];
+            if (!it) return;
+            const subs = subitemsDe(it).slice();
+            // La cantidad que falta, para no tener que hacer la cuenta.
+            const falta = (numeroDe(it.cantidad) || 0) - subs.reduce((t, s) => t + (numeroDe(s.cantidad) || 0), 0);
+            subs.push({ cantidad: falta > 0 ? Math.round(falta * 1000) / 1000 : '', valor_unitario: it.valor_unitario, sufijo: '' });
+            it.subitems = subs;
+            render();
+            const nuevo = tbody.querySelector('[data-sub-row="' + btn.getAttribute('data-sub-agregar') + '"][data-sub-idx="' +
+                (subs.length - 1) + '"][data-sub-field="cantidad"]');
+            if (nuevo) nuevo.focus();
+        }));
+        tbody.querySelectorAll('[data-sub-borrar]').forEach(btn => btn.addEventListener('click', () => {
+            const it = items[parseInt(btn.getAttribute('data-sub-borrar'), 10)];
+            if (!it) return;
+            const subs = subitemsDe(it).slice();
+            subs.splice(parseInt(btn.getAttribute('data-sub-idx'), 10), 1);
+            if (subs.length) it.subitems = subs; else delete it.subitems;
+            render();
+        }));
+        tbody.querySelectorAll('[data-sub-field]').forEach(inp => inp.addEventListener('input', () => {
+            const i = parseInt(inp.getAttribute('data-sub-row'), 10);
+            const it = items[i];
+            const sub = it && subitemsDe(it)[parseInt(inp.getAttribute('data-sub-idx'), 10)];
+            if (!sub) return;
+            const campoSub = inp.getAttribute('data-sub-field');
+            sub[campoSub] = campoSub === 'sufijo' ? inp.value : (inp.value === '' ? '' : numeroDe(inp.value));
+            actualizarSumaSubitems(i);
+            updateSummary();
+        }));
     }
 
     function buildRenderRows(items) {
@@ -832,6 +965,9 @@
             return { ok: false, title: 'Seleccioná 2+ ítems', message: 'Marcá los productos que forman una sola unidad clasificatoria.' };
         }
         const selected = selectedIndices.map(i => items[i]);
+        if (selected.some(it => Array.isArray(it.subitems) && it.subitems.length)) {
+            return { ok: false, title: 'Hay productos con subítems', message: 'Un producto partido en subítems no se agrupa: borrá sus subítems o dejalo afuera del grupo.' };
+        }
         const requestedNcm = normalizeBatchNcm(rawNcm);
         if (String(rawNcm || '').trim() && !requestedNcm) {
             return { ok: false, title: 'Posición SIM incompleta', message: simErrorDetail(rawNcm) };

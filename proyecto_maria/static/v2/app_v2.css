@@ -1613,6 +1613,32 @@ body.cdi-dragging-row { cursor: grabbing; }
 }
 .btn-assist:hover { background: var(--c-accent-soft); }
 
+/* Subítems de un producto (SUBITEMS-1) */
+.btn-subitems {
+    height: 28px;
+    padding: 0 var(--s-3);
+    font-size: var(--t-13);
+    color: var(--c-text-3);
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--r-sm);
+}
+.btn-subitems:hover { background: var(--c-accent-soft); color: var(--c-accent); }
+.btn-subitems.has-subitems { color: var(--c-accent); }
+.row-subitems > td { background: var(--c-surface-2, rgba(0, 0, 0, 0.02)); padding: var(--s-3) var(--s-4); }
+.ncm-subitems { display: flex; flex-direction: column; gap: var(--s-2); }
+.ncm-subitems-ayuda, .ncm-subitems-vacio { margin: 0; font-size: var(--t-13); color: var(--c-text-3); }
+.ncm-subitems-tabla { width: auto; border-collapse: collapse; }
+.ncm-subitems-tabla th { font-size: var(--t-13); font-weight: 500; color: var(--c-text-3); text-align: left; padding: 2px var(--s-2); }
+.ncm-subitems-tabla td { padding: 2px var(--s-2); }
+.ncm-subitems-tabla input[type="number"] { width: 110px; }
+.ncm-subitems-tabla input[type="text"] { width: 320px; max-width: 40vw; }
+.ncm-subitems-tabla .btn-link { background: none; border: 0; color: var(--c-accent); cursor: pointer; font-size: var(--t-13); }
+.ncm-sub-num { color: var(--c-text-3); font-size: var(--t-13); }
+.ncm-subitems-pie { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; }
+.ncm-subitems-suma { font-size: var(--t-13); color: var(--c-text-3); }
+.ncm-subitems-suma.is-error { color: var(--c-warning); }
+
 .ncm-help { margin-top: var(--s-6); }
 .ncm-help kbd {
     background: var(--c-surface);
