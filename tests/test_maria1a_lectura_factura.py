@@ -197,3 +197,51 @@ def test_tabla_tres_letras_apunta_a_la_tabla_oficial():
         assert dos in PAISES_INDEC and pais_reconocido(dos), (tres, dos)
     assert ISO3_A_ISO2["CHN"] == "CN" and ISO3_A_ISO2["MEX"] == "MX"
     assert ISO3_A_ISO2["CHE"] == "CH" and ISO3_A_ISO2["MNE"] == "ME"
+
+
+@pytest.mark.parametrize(
+    "texto",
+    ["12x3", "10 x 20", "1/2", "1 1/2", "3 5", "5 kg 200 g", "500 g", "5 lb", "2.5e3",
+     "1e999", "(1,500.00)", "1,500.00-", "-3", "nan", "-1.5"],
+)
+def test_lo_que_no_es_un_numero_limpio_queda_vacio(texto):
+    """Mejor vacío que un valor equivocado: «12x3» no es 123 ni «500 g» 500 kg."""
+    for decimal in (None, ".", ","):
+        assert pdf_extractor._numero_factura(texto, decimal) is None, (texto, decimal)
+
+
+@pytest.mark.parametrize("valor", [float("nan"), float("inf"), -5, -0.5])
+def test_numeros_del_json_invalidos_quedan_vacios(valor):
+    assert pdf_extractor._numero_factura(valor, None) is None
+
+
+@pytest.mark.parametrize(
+    "texto, esperado",
+    [("1.500,00", 1500), ("1,500.00", 1500), ("1'500.00", 1500), ("1 500,00", 1500),
+     ("€ 1.500,00", 1500), ("USD 2.45", 2.45), ("0,125", 0.125), ("12,5", 12.5)],
+)
+def test_numeros_limpios_se_siguen_leyendo(texto, esperado):
+    assert pdf_extractor._numero_factura(texto, None) == esperado
+
+
+def test_na_no_es_namibia():
+    """«NA» en una factura casi siempre es «no aplica»: no se adivina Namibia."""
+    assert pdf_extractor._origen_desde_factura("NA") == ""
+    assert pdf_extractor._origen_desde_factura("N/A") == ""
+
+
+@pytest.mark.parametrize("copia", COPIAS)
+def test_un_item_raro_no_tira_la_factura(monkeypatch, copia):
+    factura = {"operacion": None,
+               "items": ["basura", {"descripcion": "a", "cantidad": 2, "valor_unitario": 1, "origen": "CN"}]}
+    r = _leer(monkeypatch, copia, factura)
+    assert [i["descripcion"] for i in r["items"]] == ["a"]
+
+
+def test_la_copia_pymupdf_pide_los_numeros_tal_cual():
+    """Si se le pide a Gemini «arreglar» 1.000 → 1000 y 0,50 → 0.50, mezcla
+    formatos y la pista decimal de la factura sale falsa."""
+    import inspect
+
+    fuente = inspect.getsource(pdf_extractor._extract_with_gemini_vision)
+    assert "fix formato" not in fuente and "fix: 0,50" not in fuente
