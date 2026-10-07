@@ -5,7 +5,9 @@ En Postgres el historial del cliente guarda el NCM de 8 dígitos de la SIM
 SIM completa en el catálogo del proveedor:
 1. el autorrelleno (`/api/catalog/lookup`) trae la SIM del proveedor;
 2. `/api/ncm/sugerir` la trae primero;
-3. con otra NCM en el proveedor, queda la del cliente.
+3. con otra NCM en el proveedor, queda la del cliente;
+4. si la consulta al catálogo del proveedor falla en la base, la del cliente
+   no se pierde.
 
 uso (con un Postgres local y descartable, nunca el de producción):
   python scripts/testing/guardar2_postgres.py postgresql://cdi@127.0.0.1:55432/<base vacía>
@@ -86,6 +88,27 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
     autorrelleno, sug = caso("84713012100K")
     chequear(autorrelleno == ("cliente", "84714900"), f"con otra NCM en el proveedor queda la del cliente ({autorrelleno})")
     chequear([n for _, n in sug][:2] == ["84714900", "84713012100K"], f"y la sugerencia trae las dos ({sug})")
+
+    # Si la consulta al catálogo del proveedor falla en la base, la sugerencia
+    # del cliente no se pierde (en Postgres la transacción queda abortada).
+    from sqlalchemy import text as sa_text
+    from proyecto_maria.core import catalog_service as catalog_svc
+    match_real = catalog_svc.match_items
+
+    async def _match_que_falla(db, *a, **k):
+        await db.execute(sa_text("select * from tabla_que_no_existe"))
+
+    r = c.post("/api/clientes", json={"nombre": "Cliente de prueba", "cuit": "30999999995"})
+    cid = r.json()["cliente"]["id"]
+    c.post(f"/api/clientes/{cid}/operaciones", json={"items": [{"pieza": SIM, "descripcion": "COMPUTADORA PORTATIL"}]})
+    catalog_svc.match_items = _match_que_falla
+    try:
+        r = c.post("/api/ncm/sugerir", json={"descripcion": "COMPUTADORA PORTATIL",
+                                             "client_id": cid, "vendor_name": "Proveedor roto"})
+    finally:
+        catalog_svc.match_items = match_real
+    sug = [(s["source"], s["ncm"]) for s in r.json().get("sugerencias", [])] if r.status_code == 200 else []
+    chequear(sug == [("historial", "84714900")], f"si falla el catálogo del proveedor, queda la del cliente ({r.status_code} {sug})")
 
 print(f"fallas: {len(FALLAS)}")
 sys.exit(1 if FALLAS else 0)

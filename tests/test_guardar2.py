@@ -83,3 +83,14 @@ def test_sin_proveedor_queda_el_ncm_del_cliente(client, monkeypatch):
     monkeypatch.setattr(main_mod, "_suggest_ncm_with_gemini", lambda *a, **k: [])
     r = client.post("/api/ncm/sugerir", json={"descripcion": DESC, "client_id": cid})
     assert r.json()["sugerencias"][0]["ncm"] == "84714900"
+
+
+def test_si_falla_el_catalogo_del_proveedor_queda_la_sugerencia_del_cliente(client, monkeypatch):
+    cid = _con_proveedor(client, SIM)
+    from proyecto_maria.core import catalog_service as catalog_svc
+
+    async def _falla(*a, **k):
+        raise RuntimeError("catálogo caído")
+
+    monkeypatch.setattr(catalog_svc, "match_items", _falla)
+    assert [(s["source"], s["ncm"]) for s in _sugerir(client, cid, monkeypatch)] == [("historial", "84714900")]

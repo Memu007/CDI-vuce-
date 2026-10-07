@@ -55,8 +55,8 @@ sabotaje $M "el autorrelleno vuelve a traer los 8 dígitos del cliente" \
   '                        "ncm": mem["ncm"],' \
   "FAILED $T::test_el_autorrelleno_trae_la_sim_del_proveedor"
 sabotaje $M "la sugerencia vuelve a traer los 8 dígitos del cliente" \
-  $'                    "ncm": _ncm_del_cliente_o_sim_del_proveedor(\n                        remembered["ncm"], vendor_item and vendor_item["ncm"]),' \
-  '                    "ncm": remembered["ncm"],' \
+  $'                    sugerencias[0]["ncm"] = _ncm_del_cliente_o_sim_del_proveedor(\n                        sugerencias[0]["ncm"], vendor_item["ncm"])' \
+  '                    pass' \
   "FAILED $T::test_la_sugerencia_trae_la_sim_del_proveedor"
 sabotaje $M "gana el proveedor aunque sea otra NCM" \
   '            and _ncm_suggestion_key(proveedor) == _ncm_suggestion_key(cliente)):' \
