@@ -19,8 +19,9 @@ antes de cerrar la Fase 3.
 1. **Segunda publicación, candidato `6ea8ca9`** (atacado en
    `REPRODUCCION-PUBLICACION-2-2026-10-07.md`): arregla el país de origen,
    suma los controles antes de generar, el Excel y lo del despachante. Falta
-   el «dale» de Emi para ese SHA. Emi tiene que confirmar que su caso
-   habitual es reventa (el IVA adicional pasa a `NO_VALIDA`).
+   que Emi escriba «dale 6ea8ca9»: su «dale a todo» (~15:27 ARG) lo frenó el
+   sistema de permisos de la sesión, que pide la autorización explícita.
+   Reventa confirmada (el IVA adicional pasa a `NO_VALIDA`).
    Después de publicar: Emi genera un TXT con una factura real y lo revisa.
    La línea «Billing cron» no aparece si nadie pasa a impago.
 1b. **Sin volumen** (Emi, 2026-10-07): cada publicación o reinicio borra los
@@ -37,12 +38,11 @@ antes de cerrar la Fase 3.
 5. **Hasta publicar MARIA-1a: revisar el país de origen de cada TXT** antes
    de mandárselo al despachante. El código publicado corta el país a dos
    letras: si la lectura devuelve «CHN» o «China», sale Suiza.
-6. **Límite de uso de la cuenta:** el 2026-10-07 entre las ~02:05 y las
-   03:40 UTC las Devs quedaron paradas porque la cuenta llegó a su límite de
-   5 horas («You've hit your session limit»). Lo más barato para que no se
-   repita: pegar el `/compact` de cada Dev apenas se pueda (están en ~38 % y
-   ~41 %; cada paso relee todo el contexto). Si vuelve a pasar, Emi decide
-   entre aceptar las pausas o bajar el ritmo.
+6. **Límite de uso de la cuenta:** lo tocó dos veces el 2026-10-07: entre
+   las ~02:05 y las 03:40 UTC, y entre las ~18:34 y las 18:50 UTC (las dos
+   Devs quedaron paradas; la PM las despertó a las 18:56). Por la regla de
+   Emi (`DECISIONS.md`), **hoy se compacta desde el 30 % las Devs y el 40 %
+   las PMs**; mañana vuelve a 60 y 50.
 7. **No pedirle a ningún asistente cambios sobre `main`:** desde el
    2026-10-07 `main` tiene las reglas nuevas, pero cada push publica.
 
@@ -73,9 +73,11 @@ Archivos abiertos por Dev:
 
 ## En curso
 
-- **Dev 1:** EXCEL-2 entregada (`3e6e63e`, D27), por revisar. Sigue: GUARDAR-1 si Emi dice que sí; si no, COBRO-MP-1.
-  y EXCEL-2.
-- **Dev 2:** devolución de MARIA-5 (dos pesos para una línea, filas que desaparecen, guarda del peso, subítems, grupos, una sola cuenta). Sigue: CATALOGO-NCM-1; MARIA-6 cuando lleguen los archivos reales del despachante.
+- **Dev 1:** EXCEL-2 entregada (`3e6e63e`, D27), en revisión: rojo antes
+  (`43 failed, 8 passed`) y suite (`1277 passed, 102 skipped, 3 xfailed`)
+  hechos; falta el subagente. Ahora GUARDAR-1 (Emi dijo que sí). COBRO-MP-1,
+  en pausa en `83b4ec1` con D28 a D31 contestadas (`074a50b`).
+- **Dev 2:** devolución de MARIA-5 (dos pesos para una línea, filas que desaparecen, guarda del peso, subítems, grupos, una sola cuenta). Sigue: CATALOGO-NCM-1, SUBITEMS-1 (Emi: sus facturas traen subítems) y MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
   RENDIMIENTO-1 y 1b (`ec3d793`), MARIA-1a, 2b, 1c, 4, 3 y 1d (`9679e21`).
   Suite sobre la rama integrada (`7b42556`, venv armado sólo con el
@@ -153,12 +155,13 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 18:00 UTC (rutina): PUNTA-A-PUNTA-1 aceptada e integrada. Dev 1
-entregó EXCEL-2 (`3e6e63e`, con D27), por revisar; sigue GUARDAR-1 si Emi dice
-que sí, si no COBRO-MP-1. Dev 2: integra EXCEL-1 con la regla del peso y
-reentrega MARIA-5 y CATALOGO-NCM-1. Esperan a Emi: «dale 6ea8ca9»,
-GUARDAR-1, reventa, subítems en la pantalla. Contexto: PM 48 % y Dev 1 62 %
-(`/compact` pedido a Emi), Dev 2 9 %.
+2026-10-07 19:00 UTC (rutina): la cuenta tocó su límite de 5 horas entre las
+~18:34 y las 18:50 UTC y cortó a las dos Devs; despertadas a las 18:56. Hoy
+rige 30/40. Dev 1: GUARDAR-1 (COBRO-MP-1 en pausa en `18a1850`). Dev 2:
+reentregó MARIA-5 y CATALOGO-NCM-1 (`6854f34`; rojo antes `171 failed`,
+suite `1459 passed, 0 failed`), sigue SUBITEMS-1. Dos subagentes Sonnet alto
+atacan EXCEL-2 y MARIA-5 con el catálogo. Esperan a Emi: «dale 6ea8ca9» escrito
+y el `/compact` de la Dev 2 (49 %). Contexto: PM 23 %, Dev 1 18 %.
 
 ## Medición
 

@@ -105,12 +105,20 @@ Además:
    da 400, no 500 (`OverflowError`), en `/generate_maria`, los subítems y la
    exportación; y `cuit_agr` y `vendedor_id`, sólo con dígitos 0-9.
 
-## Siguiente, apenas entregues EXCEL-2
+## Ahora: GUARDAR-1 (Emi dijo que sí)
 
-Escrito el 2026-10-07, 18:00 UTC, mientras la PM revisa EXCEL-2. Si el
-veredicto trae devolución, va primero.
+Escrito el 2026-10-07, 18:40 UTC. **Emi dijo que sí a GUARDAR-1**: es un error
+que ya está en producción, así que va antes que COBRO-MP-1.
+- **COBRO-MP-1 queda en pausa en `83b4ec1`** (pasos 1 y 3 hechos, sin
+  entregar). Anotá en tu `PARA-PM.md` dónde quedó; nada de `/entregar`.
+  La retomás después de GUARDAR-1, con D28 a D31 como están.
+- **Dato nuevo para COBRO-MP-1:** Emi confirmó que las variables
+  `MP_PREAPPROVAL_PLAN_ID_*` están en Railway. El paso 4 y la rama de la
+  suscripción de la D29 corren en producción: que no se aplique nada si la
+  respuesta no tiene la forma esperada es lo que protege la plata.
+- Si el veredicto de EXCEL-2 trae devolución, va primero.
 
-1. **GUARDAR-1, sólo si Emi dice que sí** (lo encontró el ataque a la
+1. **GUARDAR-1** (lo encontró el ataque a la
    segunda publicación, `REPRODUCCION-PUBLICACION-2-2026-10-07.md`, #1).
    En producción, guardar una operación cuyo producto lleva la SIM completa
    (`84714900100D`) da 500 y no guarda nada, porque
@@ -124,7 +132,7 @@ veredicto trae devolución, va primero.
      el plan para Postgres y cómo se vuelve atrás.
    - **Criterios:** rojo antes y verde después contra Postgres (no
      alcanza SQLite), y suite completa.
-2. **Si no, COBRO-MP-1** (Fase 2, `ROADMAP.md`): el aviso de pago de
+2. **Después, COBRO-MP-1** (Fase 2, `ROADMAP.md`): el aviso de pago de
    Mercado Pago verificado y aplicado una sola vez aunque se reenvíe, con el
    monto controlado (C3 de `AUDITORIA-2026-10-06.md`, tu D8). Además, que una
    renovación de la suscripción extienda el período (hoy sólo se procesa
