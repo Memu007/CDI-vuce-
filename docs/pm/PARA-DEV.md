@@ -25,12 +25,93 @@ despertás a ella con el de la suya al entregar o al dejar una D que te frena
 
 ## Último veredicto
 
-**PUNTA-A-PUNTA-1 aceptada sobre `3b52bc9`** (2026-10-07) e integrada. La PM
-corrió la prueba (`7 passed, 3 xfailed`), tus 9 sabotajes (todos en rojo,
-«con falla: 0») y la suite (`1226 passed, 102 skipped, 3 xfailed`). Detalle
-en `REPRODUCCION-PUNTA-A-PUNTA-1-2026-10-07.md`. El caso del peso con más de
-una unidad lo suma la Dev 2 con MARIA-5. Antes: MARIA-1b aceptada sobre
-`beea9eb` (en Git).
+**EXCEL-2 devuelta sobre `3e6e63e`** (2026-10-07, 19:45 UTC) por seis puntos.
+
+**Lo que corrió la PM:**
+- Rojo antes, `test_excel2.py` con el producto de `3b52bc9`:
+  `43 failed, 8 passed`.
+- Suite: `1277 passed, 102 skipped, 3 xfailed`. Coincide con tu informe
+  (1267 más los 10 que deselecciona la CI).
+
+**Lo que se sostiene:**
+- Las hojas con nombre repetido y una relación normal.
+- Los 19 millones de textos vacíos: 400 en 0,1 s y 153 MB.
+- Las entidades XML: expat 2.6.1 corta.
+- El orden de los topes.
+- Las combinadas con filas vacías de verdad arriba, y los números puros.
+- El cuerpo del 400 nunca sale vacío.
+- Coma, punto y coma, tab, comillas y BOM en el CSV.
+- Nueve libros normales dan lo mismo que en `3b52bc9`, y los archivos
+  reales salen idénticos.
+- El CUIT del despachante.
+
+Detalle en `REPRODUCCION-EXCEL-2-2026-10-07.md`. Los archivos de ataque no
+están en tu contenedor: abajo dice cómo armarlos.
+
+**Orden:** primero termina **GUARDAR-1**, porque es un error que ya está en
+producción y EXCEL-2 no está publicada. Después, esta devolución. Después,
+COBRO-MP-1.
+
+1. **Una combinada gigante no traba la lectura (rompe).**
+   - `_rellenar_combinadas` recorre cada combinada hasta su última fila, y
+     el corte de 10.000 combinadas no acota nada.
+   - Ejemplo: un libro de pocos KB con `<mergeCell ref="C2:C1048576"/>`
+     repetido 2000 veces ocupa un hilo unos 1000 s, y con dos así la subida
+     normal da 504. Con 10 combinadas, 5,6 s contra 0,1 s en `3b52bc9`.
+   - Criterio: el trabajo es proporcional a las filas de la tabla, no al
+     tamaño de las combinadas. El caso de 2000 tarda menos de 1 s.
+2. **Una combinada en cantidad, precio o peso nunca se copia (rompe:
+   plata).**
+   - La guarda sólo frena números puros. Con «5 UN» y «USD 100» combinados
+     en `D2:D3` y `E2:E3`, la fila de abajo pasa de 0/0 a 5/100: el FOB se
+     duplica. Con «$ 1.500,00» en el precio, copia 1500.
+   - Que la regla sea por columna, no por el valor: en las columnas de
+     cantidad, valor y peso, no se copia nada.
+3. **Los estilos con un tope que proteja de verdad (rompe).**
+   - Un `styles.xml` de 10 MB de `<xf/>` (el archivo pesa 17 KB) pasa la
+     validación, sube a 1,4 GB de memoria y tarda 52 s. Con dos así, la
+     subida normal da 504 y el proceso llega a 1,9 GB.
+   - Con `<font/>`, 884 MB; con `<dxf/>`, 870 MB.
+   - El tope de cada parte que openpyxl lee entera se elige midiendo la
+     memoria. Criterio: ningún libro que pasa la validación pasa de 1 GB.
+4. **Las hojas como las ve openpyxl, y el criterio de la D26 con otros
+   libros.**
+   - **La hoja escondida:** `hojas_del_xlsx` sólo cuenta relaciones con un
+     `Type` que termina en `/worksheet`. openpyxl abre como hoja cualquier
+     relación que no sea de gráfico. Una segunda hoja con el mismo nombre que
+     la primera y un `Type` raro no se mide ni se saca del zip: con 8 así
+     delante, la normal da 504.
+   - **La primera hoja grande:** una de 27 MB sin `<dimension>` queda bajo
+     el tope de 30 MB, y con 8 así delante la normal da 504.
+   - Criterio: con 8 libros de cada tipo delante, la normal da 200. Si para
+     eso el tope de la primera hoja tiene que bajar a un tamaño que una
+     factura real podría pasar, D con lo medido.
+5. **El CSV nunca pierde las tildes en silencio.**
+   - Un solo par de bytes cp1252 que parece UTF-8 manda todo el archivo a
+     UTF-8 con reemplazo: «Acci�n», «Beb�», «Ni�o».
+   - Los pares: «é» seguido de «®», «ñ» seguido de un espacio duro (0xA0),
+     «ó» seguido de «¿».
+   - En `3b52bc9` el archivo se rechazaba, y se veía.
+   - Criterio: esos cp1252 se leen bien. Si no se puede decidir la
+     codificación, sale un aviso.
+6. **Una fila vacía dentro de una combinada no es una «fila sin leer».**
+   - Con `C2:C4` sobre una fila vacía, la fila 3 sale en
+     `filas_excel_sin_leer`. Es por rellenar antes del `dropna`.
+
+**De paso:** con `cantidad: 10**400`, el 400 de `/generate_maria` trae
+también «Valor inválido» y «Peso inválido». Que nombre sólo el campo malo.
+
+**Se deja, anotado:**
+- Un perfil con un CUIT que no tiene 11 dígitos ahora da 400 con un mensaje
+  claro. Antes salía `CDDTAGR=123`.
+- 92 MB de medios en un libro de 2 hojas: 359 MB y 1,4 s, dentro del tope de
+  100 MB.
+
+**D27: (a)**, se dejan 10 MB. El subagente confirmó que el mensaje llega a
+la pantalla (`upload.js` muestra `detail`).
+
+**Criterios:** rojo antes y verde después en cada punto. Los archivos reales
+y los nueve libros normales dan lo mismo. Suite completa en verde.
 
 ## Respuestas a D28 a D31, COBRO-MP-1 (2026-10-07, 18:35 UTC)
 
@@ -116,7 +197,7 @@ que ya está en producción, así que va antes que COBRO-MP-1.
   `MP_PREAPPROVAL_PLAN_ID_*` están en Railway. El paso 4 y la rama de la
   suscripción de la D29 corren en producción: que no se aplique nada si la
   respuesta no tiene la forma esperada es lo que protege la plata.
-- Si el veredicto de EXCEL-2 trae devolución, va primero.
+- La devolución de EXCEL-2 va después de GUARDAR-1 (arriba).
 
 1. **GUARDAR-1** (lo encontró el ataque a la
    segunda publicación, `REPRODUCCION-PUBLICACION-2-2026-10-07.md`, #1).

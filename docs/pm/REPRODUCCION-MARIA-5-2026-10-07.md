@@ -1,6 +1,7 @@
 # Reproducción de MARIA-5 — 2026-10-07
 
-**Veredicto: devuelta** sobre `6d59893` (informe en `87fad88`; base: la rama de
+**Último veredicto: devuelta otra vez sobre `6854f34`**, la reentrega con
+CATALOGO-NCM-1, por seis puntos chicos (sección del final). Antes, **devuelta** sobre `6d59893` (informe en `87fad88`; base: la rama de
 la PM integrada, `8e819dd`) por seis puntos. Tres son nuevos de la pieza, y
 dos de ellos ponen un peso equivocado en el TXT sin aviso.
 
@@ -57,3 +58,58 @@ Coincide con el informe (1199).
 
 Contexto de la Dev 2 en la pieza: de ~97 mil a ~356 mil tokens (~26 puntos);
 espera su `/compact`.
+
+## La reentrega con CATALOGO-NCM-1 — devuelta sobre `6854f34`
+
+Base: la rama de la PM hasta `ce88c01`, con EXCEL-1, MARIA-1b y
+PUNTA-A-PUNTA-1. Informe en `cc6030b`. Venv armado sólo con el
+`requirements.txt` de la rama.
+
+| Qué | Salida |
+|---|---|
+| Rojo antes: `test_maria5_*.py`, `test_catalogo_ncm1.py`, `test_excel1_lectura.py`, `test_excel1_txt.py`, `test_punta_a_punta1.py` y `test_generar_maria_txt.py` con el producto de `ce88c01` | `171 failed, 156 passed, 3 xfailed, 28 errors` |
+| Suite | `1459 passed, 102 skipped, 3 xfailed, 25 warnings in 202.74s` (coincide con el informe) |
+| La PM, a mano, hallazgos 1, 2 y 5 (servidor en `6854f34`) | `Peso por caja`+`Peso`: `peso=[40.0]`; `Peso bruto unitario`: `peso=[3.0] avisos=[]`; validación de 8517.12.31: los dos avisos, uno con «(el de 2018)»; `/generate_maria/avisos`: `[]` |
+
+**Subagente de la PM (Sonnet alto).** La pieza se sostiene:
+- **Los seis puntos devueltos:**
+  - Dos pesos: con el lector, (25,25) en 10 unidades da 25 kg con aviso; en
+    el Excel gana el neto.
+  - Seis pesos en texto en 10 variantes de columna: todas las filas se
+    conservan.
+  - NaN, inf, 1e300 y 0,0004 dan 400.
+  - Subítems: en 26.000 pedidos al azar, 0 que antes generaban y ahora no.
+  - Grupos con Playwright: ningún producto queda en 0.
+  - Una sola cuenta.
+- **Centavos:** en 9000 pedidos al azar, `MDDTFOB` = Σ `MARTFOB`; flete y
+  seguro cierran; la validación da el mismo FOB que el TXT en 6000 de 6000;
+  «Gastos a FOB» es igual al TXT en 3653 de 3653.
+- **Catálogo:**
+  - Idéntico al ZIP (10.504 NCM) y las 522 bajas son exactas.
+  - Sin avisos falsos en las 33.037 SIM completas.
+  - `/api/ncm/aviso` y `/api/ncm/sugerir` piden sesión.
+  - No hay inyección en `ncm.js`.
+- **Frenos de MARIA-1b:** 24 casos, iguales a `ce88c01`.
+- **Archivos reales:** salen idénticos.
+
+| # | Hallazgo | ¿Antes? | Cómo quedó |
+|---|---|---|---|
+| 1 | Excel: «Peso por caja» (40) antes de «Peso» (2,5) gana: 400 kg en 10 unidades en vez de 25. Cualquier «Peso…» cuenta, y desempata el orden | Nuevo (en `ce88c01`, 2,5) | **Devolución 1** |
+| 2 | `pantalla_maria5.js` da rojo en `6854f34`: no manda el CUIT y MARIA-1b frena. El OK del informe era de `7b4f651`. Con CUIT, pasa | Nuevo (de la integración) | **Devolución 4** |
+| 3 | «Peso bruto unitario» y «Gross weight per unit» se leen como neto de una unidad, sin aviso | Nuevo (antes, vacío) | **Devolución 2** |
+| 4 | Sin `ncm_arca.csv.gz`: toda NCM de 7 o 10 dígitos da el error del 0 inicial, y las de 8 u 11 pasan sin aviso | Nuevo (se sacó el respaldo) | **Devolución 6** |
+| 5 | Una baja sale dos veces en la validación, una con el texto falso «(el de 2018)» de `_control_ncm`; en `/generate_maria/avisos` no sale | Nuevo | **Devolución 5** |
+| 6 | La primera validación carga el catálogo en el bucle de eventos: `/health` tarda 3,75 s | Ya pasaba (MARIA-1b) | Se deja, a Fase 3 |
+| 7 | Dos pesos de la línea distintos (neto 25, total 27): el aviso no muestra los números | Nuevo | **Devolución 3** |
+| 8 | Mensajes del peso: NaN «pasa el tope», un negativo «no es un número», 0,0004 se ve «0 kg» | Nuevo | De paso |
+| 9 | `test_celda_en_la_ultima_fila…` rojo una vez bajo carga (4,3 s contra 8 s) | Mismo margen | Se deja (entorno) |
+
+**No corrido por la PM:**
+- Los sabotajes de la Dev (`sabotaje_maria5.sh`, `sabotaje_catalogo_ncm1.sh`
+  y los demás).
+- `/upload_pdf/public` con un PDF (el lector se probó a nivel función).
+- El caso sin catálogo por HTTP (se probó en una copia).
+- Gemini real y el Kit.
+
+Contexto de la Dev 2: ~49 % al entregar (`get_session`, 18:56 UTC; su
+informe dice ~21 %).
