@@ -73,7 +73,7 @@ Archivos abiertos por Dev:
 
 ## En curso
 
-- **Dev 1:** EXCEL-2 (con la D26). PUNTA-A-PUNTA-1 aceptada e integrada (sólo pruebas).
+- **Dev 1:** EXCEL-2 entregada (`3e6e63e`, D27), por revisar. Sigue: GUARDAR-1 si Emi dice que sí; si no, COBRO-MP-1.
   y EXCEL-2.
 - **Dev 2:** devolución de MARIA-5 (dos pesos para una línea, filas que desaparecen, guarda del peso, subítems, grupos, una sola cuenta). Sigue: CATALOGO-NCM-1; MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
@@ -153,14 +153,12 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 16:00 UTC (rutina): integradas EXCEL-1 y MARIA-1b (`6ea8ca9`,
-`1224 passed`). Segunda publicación lista: candidato `6ea8ca9` atacado
-(Opus alto), falta el «dale» de Emi. Encontrado en producción: guardar con
-la SIM completa da 500 (GUARDAR-1, falta el sí de Emi). Dev 1: entregó
-PUNTA-A-PUNTA-1 (`3b52bc9`, por revisar) y sigue con EXCEL-2. Dev 2:
-reentrega MARIA-5 y CATALOGO-NCM-1 después de integrar EXCEL-1 con la regla
-del peso de MARIA-5 (su D23). Rutina de la PM al día con 60/50 y los tres
-`/compact` a las 23:55 UTC. Contexto: Dev 1 54 %, Dev 2 9 %.
+2026-10-07 18:00 UTC (rutina): PUNTA-A-PUNTA-1 aceptada e integrada. Dev 1
+entregó EXCEL-2 (`3e6e63e`, con D27), por revisar; sigue GUARDAR-1 si Emi dice
+que sí, si no COBRO-MP-1. Dev 2: integra EXCEL-1 con la regla del peso y
+reentrega MARIA-5 y CATALOGO-NCM-1. Esperan a Emi: «dale 6ea8ca9»,
+GUARDAR-1, reventa, subítems en la pantalla. Contexto: PM 48 % y Dev 1 62 %
+(`/compact` pedido a Emi), Dev 2 9 %.
 
 ## Medición
 
