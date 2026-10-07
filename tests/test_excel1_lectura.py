@@ -228,9 +228,9 @@ def test_productos_que_empiezan_con_total_no_se_pierden():
                              "Camiseta total fit"], descripciones
 
 
-def test_filas_sin_ncm_ni_origen_no_son_productos_y_se_avisan():
-    """«FOB TOTAL», «Freight», «Payment terms»: sin NCM ni origen no entran
-    como producto (duplicarían el FOB), pero se cuentan en el aviso."""
+def test_total_flete_y_condiciones_no_son_productos():
+    """«FOB TOTAL» es un total (no se cuenta); «Freight» y «Payment terms» sin
+    NCM ni origen no son mercadería: no entran (sumarían al FOB) y se avisan."""
     r = _subir([H,
                 ["84713000", "Laptop", "CN", 10, 350, 1.5],
                 ["", "FOB TOTAL", "", 10, 3500, 15],
@@ -238,21 +238,17 @@ def test_filas_sin_ncm_ni_origen_no_son_productos_y_se_avisan():
                 ["", "Payment terms: T/T 30 days", "", None, None, None]])
     assert r.status_code == 200, r.text[:300]
     assert [i["descripcion"] for i in r.json()["items"]] == ["Laptop"], r.json()["items"]
-    assert r.json()["filas_descartadas"] == 3, r.json()
+    assert r.json()["filas_descartadas_numeros"] == [4, 5], r.json()
 
 
-def test_mapeo_guardado_viejo_no_gana_sobre_el_precio_unitario():
-    """Un cliente que guardó «Valor» y «Peso Bruto» con la lista de alias vieja:
-    en un archivo que también trae «Precio Unitario» y «Peso Neto», ganan
-    éstos."""
-    cid = _cliente_con_mapeo({"NCM": "pieza", "Descripcion": "descripcion", "Origen": "origen",
-                              "Cantidad": "cantidad", "Valor": "valor_unitario",
-                              "Peso Bruto": "peso_unitario"})
-    r = _subir([["NCM", "Descripcion", "Origen", "Cantidad", "Precio Unitario", "Valor", "Peso Bruto", "Peso Neto"],
-                ["84713000", "Laptop", "CN", 10, 350, 3500, 25, 15]], cliente_id=cid)
+def test_mapeo_corregido_a_mano_gana_sobre_lo_detectado():
+    """El usuario corrigió en su catálogo que el precio unitario es «Precio
+    Unit. USD»; el archivo también trae «Valor» (el total de la fila)."""
+    cid = _cliente_con_mapeo({"Precio Unit. USD": "valor_unitario"})
+    r = _subir([["NCM", "Descripcion", "Origen", "Cantidad", "Precio Unit. USD", "Valor", "Peso Neto"],
+                ["84713000", "Laptop", "CN", 10, 350, 3500, 1.5]], cliente_id=cid)
     assert r.status_code == 200, r.text[:300]
-    item = r.json()["items"][0]
-    assert (item["valor_unitario"], item["peso_unitario"]) == (350, 15), item
+    assert r.json()["items"][0]["valor_unitario"] == 350, r.json()["items"]
 
 
 def test_celda_en_la_ultima_fila_no_recorre_un_millon_de_filas():
@@ -310,3 +306,56 @@ def test_mapeo_guardado_completa_lo_que_no_se_detecta():
                 ["84713000", "Laptop", "CN", 10, 350, 1.5]], cliente_id=cid)
     assert r.status_code == 200, r.text[:300]
     assert r.json()["items"][0]["descripcion"] == "Laptop", r.json()["items"]
+
+
+def test_productos_sin_ncm_ni_origen_entran_aunque_otra_fila_los_traiga():
+    """Factura con la NCM vacía (la completa el despachante) y el origen sólo
+    en una fila: entran todos, con lo que falta vacío."""
+    r = _subir([H,
+                ["", "Valvula esfera 1/2", "", 10, 12, 0.3],
+                ["", "Valvula esfera 3/4", "", 10, 15, 0.4],
+                ["", "Junta torica", "IN", 100, 0.2, 0.01]])
+    assert r.status_code == 200, r.text[:300]
+    assert [i["descripcion"] for i in r.json()["items"]] == [
+        "Valvula esfera 1/2", "Valvula esfera 3/4", "Junta torica"], r.json()["items"]
+    assert r.json()["filas_descartadas"] == 0, r.json()
+
+
+@pytest.mark.parametrize("total", ["TOTAL USD", "Total FOB", "TOTAL (USD)", "Totale", "合计",
+                                   "Summe", "Gesamt", "Grand Total:", "TOTAL DE LA FACTURA"])
+def test_filas_de_total_con_moneda_o_idioma_no_entran(total):
+    r = _subir([H,
+                ["", "Valvula esfera 1/2", "", 10, 12, 0.3],
+                ["", total, "", 10, 120, 3]])
+    assert r.status_code == 200, r.text[:300]
+    assert [i["descripcion"] for i in r.json()["items"]] == ["Valvula esfera 1/2"], r.json()["items"]
+
+
+def test_total_en_la_columna_de_codigo_no_entra():
+    r = _subir([H,
+                ["A-001", "LED panel 60x60", "CN", 100, 2.5, 0.5],
+                ["TOTAL AMOUNT", None, None, 100, None, 50]])
+    assert r.status_code == 200, r.text[:300]
+    assert [i["pieza"] for i in r.json()["items"]] == ["A-001"], r.json()["items"]
+
+
+def test_peso_neto_y_bruto_entre_parentesis_no_se_confunden():
+    r = _subir([["NCM", "Descripcion", "Origen", "Cantidad", "Precio Unitario", "Peso (neto)", "Peso (bruto)"],
+                ["84713000", "Laptop", "CN", 10, 350, 1.5, 2.2]])
+    assert r.status_code == 200, r.text[:300]
+    assert r.json()["items"][0]["peso_unitario"] == 1.5, r.json()["items"]
+
+
+def test_el_indice_del_xlsx_se_mira_fuera_del_hilo_del_servidor(monkeypatch):
+    import threading
+    from proyecto_maria.security import file_security
+    hilos = []
+    original = file_security._excel_descomprimido_bytes
+
+    def _espia(contents):
+        hilos.append(threading.current_thread() is threading.main_thread())
+        return original(contents)
+    monkeypatch.setattr(file_security, "_excel_descomprimido_bytes", _espia)
+    r = _subir([H, ["84713000", "Laptop", "CN", 10, 350, 1.5]])
+    assert r.status_code == 200, r.text[:300]
+    assert hilos == [False], hilos
