@@ -55,7 +55,7 @@ trig_01XijDAiEX4aBm8dfv9ZD6C1) se abrió sobre la copia vieja (`Memu007/CDI`):
 pausada, no trabaja acá.
 
 Esfuerzo (Emi, 2026-10-07): PM principal extra; las Devs, como máximo alto,
-también sus subagentes. Ningún subagente usa Fable. El consejero es sólo de
+también sus subagentes (Emi confirmó las dos sesiones en alto). Ningún subagente usa Fable. El consejero es sólo de
 la PM principal.
 
 Archivos abiertos por Dev:
