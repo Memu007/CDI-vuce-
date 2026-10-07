@@ -53,7 +53,10 @@
     function camposSinLeer() {
         var op = (CDI.state && CDI.state.operacion) || {};
         var campos = Array.isArray(op.campos_sin_leer) ? op.campos_sin_leer : [];
-        return campos.map(function (c) {
+        var completados = Array.isArray(op.campos_completados) ? op.campos_completados : [];
+        return campos.filter(function (c) {
+            return completados.indexOf(c) === -1;
+        }).map(function (c) {
             return 'No pudimos leer ' + (NOMBRES_SIN_LEER[c] || c) + ' de la factura: completalo.';
         });
     }
@@ -68,6 +71,15 @@
             errores: errs, advertencias: warns, sugerencias: tips, resumen: data.resumen,
             total: errs.length + warns.length + tips.length
         };
+    }
+
+    // Última respuesta del servidor: los avisos locales se recalculan aunque
+    // no se pida una validación nueva (en vuelo, o muy seguido).
+    var ultimoServidor = {};
+    function refrescarLocales() {
+        lastIssues = conAvisosLocales(ultimoServidor);
+        if (lastIssues.total) mostrar(lastIssues);
+        else { setState('empty', 0); renderPopover(lastIssues); }
     }
 
     function mostrar(data) {
@@ -157,15 +169,17 @@
 
     async function runValidation() {
         if (!fab || fab.hidden) return;
-        if (inFlight) return;
+        if (inFlight || Date.now() - lastRequestMs < MIN_INTERVAL_MS) {
+            refrescarLocales();
+            if (!inFlight) scheduleValidation();
+            return;
+        }
         var now = Date.now();
-        if (now - lastRequestMs < MIN_INTERVAL_MS) return;
 
         var items = itemsPayload();
         if (!hasEnoughData(items)) {
-            lastIssues = conAvisosLocales({});
-            if (lastIssues.total) mostrar(lastIssues);
-            else { setState('empty', 0); renderPopover(lastIssues); }
+            ultimoServidor = {};
+            refrescarLocales();
             return;
         }
 
@@ -178,17 +192,12 @@
             });
             if (!resp.ok) throw new Error('HTTP ' + resp.status);
             var data = await resp.json();
-            if (!data || data.success === false) {
-                setState('empty', 0);
-                return;
-            }
-            lastIssues = conAvisosLocales(data);
-            mostrar(lastIssues);
+            ultimoServidor = (!data || data.success === false) ? {} : data;
+            refrescarLocales();
         } catch (err) {
             // Fallo silencioso; los avisos locales siguen a la vista.
-            lastIssues = conAvisosLocales({});
-            if (lastIssues.total) mostrar(lastIssues);
-            else setState('empty', 0);
+            ultimoServidor = {};
+            refrescarLocales();
         } finally {
             inFlight = false;
         }

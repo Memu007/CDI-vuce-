@@ -348,12 +348,6 @@
                 });
             }
 
-            // Lo que la factura traía pero no se pudo leer (MARIA-1c).
-            const sinLeer = CDI.camposSinLeer ? CDI.camposSinLeer() : [];
-            if (sinLeer.length && CDI.toast) {
-                CDI.toast('Revisá la factura', sinLeer.join(' '), 'warning');
-            }
-
             // Auto-detectar importador: si falla, no frenar el flujo.
             try { await tryAutoMatchImportador(operacion); } catch (e) { console.warn('[upload] auto-match skip:', e && e.message); }
 
@@ -370,6 +364,12 @@
             });
 
             setBusy(false);
+            // Lo que la factura traía pero no se pudo leer (MARIA-1c). Al
+            // final, para que otro aviso de la subida no lo tape.
+            const sinLeer = CDI.camposSinLeer ? CDI.camposSinLeer() : [];
+            if (sinLeer.length && CDI.toast) {
+                CDI.toast('Revisá la factura', sinLeer.join(' '), 'warning');
+            }
             console.log('[upload] items listos:', items.length, '→ goTo review');
             CDI.goTo('review', { fromUpload: true });
         } catch (err) {
