@@ -16,7 +16,14 @@ antes de cerrar la Fase 3.
 
 ## Para Emi
 
-1. **Sin volumen** (Emi, 2026-10-07): cada publicación o reinicio borra los
+1. **Segunda publicación, candidato `6ea8ca9`** (atacado en
+   `REPRODUCCION-PUBLICACION-2-2026-10-07.md`): arregla el país de origen,
+   suma los controles antes de generar, el Excel y lo del despachante. Falta
+   el «dale» de Emi para ese SHA. Emi tiene que confirmar que su caso
+   habitual es reventa (el IVA adicional pasa a `NO_VALIDA`).
+   Después de publicar: Emi genera un TXT con una factura real y lo revisa.
+   La línea «Billing cron» no aparece si nadie pasa a impago.
+1b. **Sin volumen** (Emi, 2026-10-07): cada publicación o reinicio borra los
    TXT generados y el historial de NCM aprendido; las operaciones quedan en
    la base. Descargar el TXT apenas se genera. Lo arregla DISCO-1 (Fase 3).
 2. **Rotar las claves de Gemini** (G0). En Google AI Studio: borrar las que
