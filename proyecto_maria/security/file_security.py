@@ -135,10 +135,65 @@ def partes_del_xlsx(z) -> tuple:
     from openpyxl.xml.constants import SHARED_STRINGS
     if z.getinfo("[Content_Types].xml").file_size > 2**20:
         raise ExcelDemasiadoGrande("El índice del Excel es demasiado grande.")
+    _sin_dtd(z, ["[Content_Types].xml"])
     manifiesto = Manifest.from_tree(ET.fromstring(z.read("[Content_Types].xml")))
     libro = _find_workbook_part(manifiesto).PartName[1:]
     textos = manifiesto.find(SHARED_STRINGS)
     return libro, get_rels_path(libro), (textos.PartName[1:] if textos is not None else None)
+
+
+def sheets_del_libro(z) -> list:
+    """[(nombre, r:id, ruta dentro del zip, es_de_grafico)] de cada <sheet>
+    de xl/workbook.xml que tiene relación, en el orden del libro."""
+    import posixpath
+    from xml.etree import ElementTree as ET
+    ns_main = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    ns_rel = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+    libro, relaciones, _ = partes_del_xlsx(z)
+    for parte in (libro, relaciones):
+        if z.getinfo(parte).file_size > 2**20:
+            raise ExcelDemasiadoGrande("El índice del Excel es demasiado grande.")
+    _sin_dtd(z, (libro, relaciones))
+    carpeta = posixpath.dirname(libro)
+    destinos = {}
+    for r in ET.fromstring(z.read(relaciones)):
+        destino = r.get("Target") or ""
+        destino = destino.lstrip("/") if destino.startswith("/") else posixpath.normpath(posixpath.join(carpeta, destino))
+        destinos[r.get("Id")] = (destino, "chartsheet" in (r.get("Type") or ""))
+    hojas = []
+    for h in ET.fromstring(z.read(libro)).iter(f"{ns_main}sheet"):
+        rid = h.get(f"{ns_rel}id")
+        if rid in destinos:
+            hojas.append((h.get("name") or "", rid, destinos[rid][0], destinos[rid][1]))
+    return hojas
+
+
+def _sin_dtd(z, partes=None) -> None:
+    """Un .xlsx de verdad no trae DTD ni entidades. Con una entidad, 5 KB se
+    expandían a millones de etiquetas al abrir el libro y pasaban todos los
+    topes (revisión de la devolución de EXCEL-2). Tampoco UTF-16, donde el
+    «<!ENTITY» no se ve con bytes ASCII."""
+    nombres = partes if partes is not None else [
+        n for n in z.namelist() if n.lower().endswith((".xml", ".rels", ".vml"))]
+    for nombre in nombres:
+        with z.open(nombre) as f:
+            cola = b""
+            primero = True
+            while True:
+                bloque = f.read(2**20)
+                if not bloque:
+                    break
+                if primero:
+                    inicio = bloque.lstrip(b"\xef\xbb\xbf \t\r\n")[:4]
+                    if inicio.startswith((b"\xff\xfe", b"\xfe\xff")) or b"\x00" in inicio:
+                        raise ExcelDemasiadoGrande("El Excel tiene una parte en una codificación que no se lee. "
+                                                   "Guardalo de nuevo desde Excel.")
+                    primero = False
+                trozo = cola + bloque
+                if b"<!DOCTYPE" in trozo or b"<!ENTITY" in trozo:
+                    raise ExcelDemasiadoGrande("El Excel trae declaraciones que un libro de Excel no tiene. "
+                                               "Guardalo de nuevo desde Excel o cargá los productos a mano.")
+                cola = trozo[-9:]
 
 
 def hojas_del_xlsx(z) -> list:
@@ -148,27 +203,7 @@ def hojas_del_xlsx(z) -> list:
     Como openpyxl, es hoja toda relación de una <sheet> que no sea de
     gráfico, sea cual sea su Type: una con un Type raro no se medía ni se
     sacaba de la copia (devolución de EXCEL-2)."""
-    import posixpath
-    from xml.etree import ElementTree as ET
-    ns_main = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
-    ns_rel = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
-    libro, relaciones, _ = partes_del_xlsx(z)
-    for parte in (libro, relaciones):
-        if z.getinfo(parte).file_size > 2**20:
-            raise ExcelDemasiadoGrande("El índice del Excel es demasiado grande.")
-    carpeta = posixpath.dirname(libro)
-    destinos = {}
-    for r in ET.fromstring(z.read(relaciones)):
-        if "chartsheet" in (r.get("Type") or ""):
-            continue
-        destino = r.get("Target") or ""
-        destino = destino.lstrip("/") if destino.startswith("/") else posixpath.normpath(posixpath.join(carpeta, destino))
-        destinos[r.get("Id")] = destino
-    hojas = []
-    for h in ET.fromstring(z.read(libro)).iter(f"{ns_main}sheet"):
-        if h.get(f"{ns_rel}id") in destinos:
-            hojas.append((h.get("name") or "", destinos[h.get(f"{ns_rel}id")]))
-    return hojas
+    return [(nombre, ruta) for nombre, _rid, ruta, grafico in sheets_del_libro(z) if not grafico]
 
 
 def _mb_de_entorno(nombre: str, defecto: float) -> int:
@@ -183,22 +218,25 @@ def _mb_de_entorno(nombre: str, defecto: float) -> int:
 
 
 def _elementos_de_entorno() -> int:
-    """EXCEL_MAX_ELEMENTOS_ESTILOS, 200.000 por defecto: unos 120 MB y 2,5 s
-    al abrir. Excel no deja más de 64.000 formatos de celda."""
+    """EXCEL_MAX_ELEMENTOS_ESTILOS, 500.000 por defecto: unos 300 MB y 6 s
+    al abrir. Un libro real con 40.000 formatos y sus fuentes ya tiene
+    220.000 (revisión de la devolución de EXCEL-2)."""
     import math
     try:
-        valor = float(os.getenv("EXCEL_MAX_ELEMENTOS_ESTILOS", "") or 200_000)
+        valor = float(os.getenv("EXCEL_MAX_ELEMENTOS_ESTILOS", "") or 500_000)
     except (TypeError, ValueError):
-        valor = 200_000.0
-    return int(valor) if math.isfinite(valor) and valor > 0 else 200_000
+        valor = 500_000.0
+    return int(valor) if math.isfinite(valor) and valor > 0 else 500_000
 
 
 def _mas_elementos_que(z, parte: str, tope: int) -> bool:
-    """Cuenta las etiquetas que abren («<» y una letra) leyendo de a 1 MB, sin
+    """Cuenta las etiquetas que abren leyendo de a 1 MB, sin
     armar el árbol, y corta apenas pasa el tope. Puede contar de más (un «<x»
     dentro de un CDATA), nunca de menos."""
     import re
-    abre = re.compile(rb"<[A-Za-z_]")
+    # Cualquier etiqueta que abre, con el prefijo que sea: con «<ñ:xf/>» el
+    # patrón de sólo letras ASCII no contaba nada (revisión de la devolución).
+    abre = re.compile(rb"<[^/!?\s>]")
     n, cola = 0, b""
     with z.open(parte) as f:
         while True:
@@ -222,9 +260,16 @@ def _contar_hojas_xlsx(contents: bytes) -> int:
     import zipfile
     from openpyxl.xml.constants import ARC_CORE, ARC_CUSTOM, ARC_STYLE
     with zipfile.ZipFile(io.BytesIO(contents)) as z:
+        _sin_dtd(z)
         hojas = hojas_del_xlsx(z)
         _, _, textos = partes_del_xlsx(z)
         nombres = set(z.namelist())
+        # openpyxl lee entero el .rels de cada hoja, aun sin abrirla
+        # (revisión de la devolución de EXCEL-2): uno normal pesa bytes.
+        for nombre in nombres:
+            if nombre.lower().endswith(".rels") and z.getinfo(nombre).file_size > 2**20:
+                raise ExcelDemasiadoGrande("Una parte del Excel es demasiado grande. Guardalo de nuevo "
+                                           "desde Excel o cargá los productos a mano.")
         tope_textos = _mb_de_entorno("EXCEL_MAX_TEXTOS_MB", 10)
         if textos and textos in nombres and z.getinfo(textos).file_size > tope_textos:
             raise ExcelDemasiadoGrande(
