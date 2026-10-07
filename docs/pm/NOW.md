@@ -157,10 +157,11 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 12:40 UTC (Emi en línea): falta la lista de Railway y el «dale
-8a4661f». La PM compactó; la Dev 2 también; la Dev 1 espera su `/compact`
-(441 mil tokens) y el veredicto de MARIA-1b. Por revisar: MARIA-1b (Dev 1,
-`02c11c3`) y la reentrega de MARIA-1d (Dev 2, `e28be2f`). D21: ver «Para Emi» 4.
+2026-10-07 13:05 UTC (rutina): ensayo publicado (`5cb03ab`, CI de GitHub en
+verde sobre ese SHA); falta la verificación de Emi. MARIA-1d aceptada; Dev 2
+en MARIA-5 (D22: (a)). MARIA-1b (Dev 1): la PM reprodujo `941 passed`; falta
+su subagente. Contexto: PM 21 %, Dev 1 44 % (espera su `/compact`), Dev 2
+10 %. Lo aceptado se integra después de que Emi verifique el ensayo.
 
 ## Medición
 
