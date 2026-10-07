@@ -41,6 +41,8 @@ _SBT_TEST = "AA(DEMO)-AB(DEMO)-CA00-"
 def _gen(*args, **kwargs):
     """Wrapper que inyecta sbt_sufijo_valor por defecto en todos los tests."""
     kwargs.setdefault("sbt_sufijo_valor", _SBT_TEST)
+    # Sin fecha de emisión válida no se genera (devolución de MARIA-3).
+    kwargs.setdefault("fecha_emision", "18/07/2025")
     return generate_maria_txt(*args, **kwargs)
 
 
@@ -251,6 +253,8 @@ GOLDEN_INPUTS = dict(
         "pieza": "84798999900H", "descripcion": "MAQUINA DEMO",
         "cantidad": 1, "valor_unitario": 5000, "valor_total": 5000,
         "peso_kg": 1220, "origen": "AR", "pais_procedencia": "PE",
+        # MARIA-4: lo que trae el archivo real de 2025 (estado 3).
+        "estado": 3,
     }],
     moneda="DOL", incoterm="DDP",
     cuit_agr="20111111112",
@@ -264,6 +268,8 @@ GOLDEN_INPUTS = dict(
     fecha_embarque="02/01/2026", fecha_emision="18/07/2025",
     sbt_sufijo_valor="AA(DEMO)-AB(DEMO)-CA00-",
     aduana_codigo="001", tipo_destinacion="IC04",
+    # MARIA-4: el archivo real de 2025 trae uso particular, sin banco y Modoc.
+    iva_adicional="IVAAD1", banco_bcra="", empresa_digitalizacion="PSAD06",
 )
 
 _GOLDEN_PATH = os.path.join(os.path.dirname(__file__), "fixtures",
@@ -308,13 +314,14 @@ def test_golden_no_filtra_datos_reales():
 def test_sbt_sin_sufijo_bloquea_generacion():
     """Sin sbt_sufijo_valor, generate_maria_txt lanza ValueError con mensaje claro."""
     with pytest.raises(ValueError, match="sufijo de valor SBT"):
-        generate_maria_txt("OP1", ITEMS_OK)
+        generate_maria_txt("OP1", ITEMS_OK, fecha_emision="18/07/2025")
 
 
 def test_sbt_sin_sufijo_endpoint_devuelve_400(client):
     """Sin sbt_sufijo_valor en el endpoint → 400 controlado (no 500)."""
     _register(client, "maria_sbt")
     resp = client.post("/generate_maria", json={
+        "fecha_emision": "18/07/2025",
         "operation_id": "OP_SBT",
         "items": ITEMS_OK,
     })
@@ -325,13 +332,13 @@ def test_sbt_sin_sufijo_endpoint_devuelve_400(client):
 
 def test_sbt_con_sufijo_explicito_genera():
     """Con sbt_sufijo_valor explícito, el TXT se genera normalmente."""
-    txt = generate_maria_txt("OP1", ITEMS_OK, sbt_sufijo_valor="AA(MICLIENTE)-AB(OTRO)-CA00-")
+    txt = generate_maria_txt("OP1", ITEMS_OK, sbt_sufijo_valor="AA(MICLIENTE)-AB(OTRO)-CA00-", fecha_emision="18/07/2025")
     assert "CSBTSVL=AA(MICLIENTE)-AB(OTRO)-CA00-" in txt
 
 
 def test_sbt_no_contiene_vowynns_ni_vitto():
     """Ningún TXT generado con sufijo explícito contiene VOWYNNS ni VITTO."""
-    txt = generate_maria_txt("OP1", ITEMS_OK, sbt_sufijo_valor="AA(CLIENTE1)-AB(CLIENTE2)-CA00-")
+    txt = generate_maria_txt("OP1", ITEMS_OK, sbt_sufijo_valor="AA(CLIENTE1)-AB(CLIENTE2)-CA00-", fecha_emision="18/07/2025")
     assert "VOWYNNS" not in txt
     assert "VITTO" not in txt
 
@@ -425,6 +432,7 @@ def test_generate_maria_happy_path(client):
     resp = client.post("/generate_maria", json={
         "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
         "moneda": "DOL", "incoterm": "FOB",  # MARIA-1b: el servidor ya no los inventa
+        "fecha_emision": "18/07/2025",
         "operation_id": "OP777",
         "items": ITEMS_OK,
         "moneda": "DOL",
@@ -444,6 +452,7 @@ def test_generate_maria_rechaza_ncm_de_8_digitos_sin_sim_dc(client):
     """El endpoint no debe generar un TXT con solo la NCM base."""
     _register(client, "maria_sim_incompleta")
     resp = client.post("/generate_maria", json={
+        "fecha_emision": "18/07/2025",
         "operation_id": "OP_SIM_INCOMPLETA",
         "items": [{
             "pieza": "8471.30.00", "descripcion": "Laptop completa",
@@ -463,6 +472,7 @@ def test_generate_maria_requires_auth(client, monkeypatch):
     monkeypatch.setenv("ENVIRONMENT", "development")
     client.cookies.clear()
     resp = client.post("/generate_maria", json={
+        "fecha_emision": "18/07/2025",
         "operation_id": "OP1",
         "items": ITEMS_OK,
     })
@@ -473,6 +483,7 @@ def test_generate_maria_items_invalidos_devuelve_400(client):
     """Items sin NCM → 400 con errores de validación."""
     _register(client, "maria2")
     resp = client.post("/generate_maria", json={
+        "fecha_emision": "18/07/2025",
         "operation_id": "OP2",
         "items": [{"pieza": "", "descripcion": "X", "cantidad": 1, "valor_unitario": 10}],
     })
@@ -485,6 +496,7 @@ def test_generate_maria_usa_cuit_del_perfil(client):
     resp = client.post("/generate_maria", json={
         "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
         "moneda": "DOL", "incoterm": "FOB",  # MARIA-1b: el servidor ya no los inventa
+        "fecha_emision": "18/07/2025",
         "operation_id": "OP3",
         "items": ITEMS_OK,
         "sbt_sufijo_valor": "AA(DEMO)-AB(DEMO)-CA00-",
@@ -534,6 +546,7 @@ def test_validate_items_for_maria_unrecognized_origin():
 def test_generate_maria_unrecognized_origin_returns_400(client):
     _register(client, "maria4")
     resp = client.post("/generate_maria", json={
+        "fecha_emision": "18/07/2025",
         "operation_id": "OP_BAD_ORIGIN",
         "items": [
             {"pieza": "84713010", "descripcion": "Laptop", "cantidad": 10,
@@ -676,6 +689,7 @@ def test_sbt_con_salto_de_linea_devuelve_400(client):
     """SBT con \\n → 400 (inyección de líneas prohibida)."""
     _register(client, "maria_sbt_nl")
     resp = client.post("/generate_maria", json={
+        "fecha_emision": "18/07/2025",
         "operation_id": "OP_NL",
         "items": ITEMS_OK,
         "sbt_sufijo_valor": "AA(OK)-AB(OK)\nCA00-",
@@ -689,6 +703,7 @@ def test_sbt_con_carriage_return_devuelve_400(client):
     """SBT con \\r → 400."""
     _register(client, "maria_sbt_cr")
     resp = client.post("/generate_maria", json={
+        "fecha_emision": "18/07/2025",
         "operation_id": "OP_CR",
         "items": ITEMS_OK,
         "sbt_sufijo_valor": "AA(OK)\r-AB(OK)-CA00-",
@@ -700,6 +715,7 @@ def test_sbt_excede_120_chars_devuelve_400(client):
     """SBT con más de 120 caracteres → 400."""
     _register(client, "maria_sbt_long")
     resp = client.post("/generate_maria", json={
+        "fecha_emision": "18/07/2025",
         "operation_id": "OP_LONG",
         "items": ITEMS_OK,
         "sbt_sufijo_valor": "A" * 121,
@@ -715,6 +731,7 @@ def test_sbt_endpoint_genera_seccion_sbt(client):
     resp = client.post("/generate_maria", json={
         "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
         "moneda": "DOL", "incoterm": "FOB",  # MARIA-1b: el servidor ya no los inventa
+        "fecha_emision": "18/07/2025",
         "operation_id": "OP_SBT_OK",
         "items": ITEMS_OK,
         "sbt_sufijo_valor": "AA(CLIENTE)-AB(OTRO)-CA00-",
@@ -731,6 +748,7 @@ def test_sbt_trim_aplicado(client):
     resp = client.post("/generate_maria", json={
         "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
         "moneda": "DOL", "incoterm": "FOB",  # MARIA-1b: el servidor ya no los inventa
+        "fecha_emision": "18/07/2025",
         "operation_id": "OP_TRIM",
         "items": ITEMS_OK,
         "sbt_sufijo_valor": "  AA(TRIM)-AB(TRIM)-CA00-  ",
@@ -761,6 +779,7 @@ def test_sbt_flujo_completo_desde_dashboard(client):
     resp = client.post("/generate_maria", json={
         "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
         "moneda": "DOL", "incoterm": "FOB",  # MARIA-1b: el servidor ya no los inventa
+        "fecha_emision": "18/07/2025",
         "operation_id": "OP_E2E_SBT",
         "items": ITEMS_OK,
         "sbt_sufijo_valor": "AA(E2E)-AB(E2E)-CA00-",

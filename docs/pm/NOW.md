@@ -16,13 +16,9 @@ antes de cerrar la Fase 3.
 
 ## Para Emi
 
-1. **Publicación de ensayo, hecha** (2026-10-07 12:53 UTC, `5cb03ab`, con
-   el «dale» de Emi para ese SHA). Falta que Emi mire: la versión nueva
-   «Active» en Railway; «Billing cron» con 0 usuarios (si no, su fila otra
-   vez `active` y `trial_ends_at` 2027-10-31, y reiniciar); guardar una
-   operación de prueba. Y dos líneas a la PM: ¿hay volumen? ¿cuentas ajenas?
-   El TXT cambia a propósito: sin el bloque de gastos posteriores al FOB en 0
-   y el `IEXT` con /26.
+1. **Publicación de ensayo: hecha y verificada** (`5cb03ab`). Faltan dos
+   líneas a la PM: ¿el servicio tiene volumen? ¿Hay cuentas ajenas u
+   organizaciones?
 2. **Rotar las claves de Gemini** (G0). En Google AI Studio: borrar las que
    aparecieron, crear una nueva y ponerla sólo en Railway. Mirar la
    facturación de Google.
@@ -77,17 +73,13 @@ Archivos abiertos por Dev:
 - **Dev 1:** MARIA-1b (controles antes de generar). Sigue: PUNTA-A-PUNTA-1
   y EXCEL-2.
 - **Dev 2:** MARIA-5 (peso total y cuentas al centavo). Sigue: MARIA-6 cuando lleguen los archivos reales del despachante.
-- **Aceptadas el 2026-10-07 y sin integrar todavía** (se integran después de
-  publicar el ensayo, para que el ensayo sea exactamente lo atacado):
-  RENDIMIENTO-1 (`8fd801d`, suite `730 passed, 102 skipped` con un venv nuevo)
-  y RENDIMIENTO-1b (`ec3d793`, `754 passed`),
-  MARIA-1a (`0a1775f`, `777 passed`), MARIA-2b (`c3bef51`, `791 passed`),
-  MARIA-1c (`448b54d`, `804 passed`), MARIA-4 (`2461939`, `846 passed`),
-  MARIA-3 (`0d6cb3e`, `1021 passed`), MARIA-1d (`9679e21`, `1029 passed`) y
-  EXCEL-1 (`7b119b6`, `932 passed`).
-  EXCEL-1 entra con MARIA-1b y MARIA-3 con MARIA-1d (tienen sus commits
-  debajo).
-  RENDIMIENTO-1 sale con RENDIMIENTO-1b y MARIA-1a con MARIA-1c.
+- **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
+  RENDIMIENTO-1 y 1b (`ec3d793`), MARIA-1a, 2b, 1c, 4, 3 y 1d (`9679e21`).
+  Suite sobre la rama integrada (`7b42556`, venv armado sólo con el
+  `requirements.txt` nuevo): `1067 passed, 102 skipped, 0 failed`. Al
+  integrar, dos pruebas de MARIA armaban su PDF con PyPDF2, que salió en
+  RENDIMIENTO-1: pasan a `pypdf` (`7b42556`).
+- **Aceptada sin integrar:** EXCEL-1 (`7b119b6`), que entra con MARIA-1b.
 - **Aceptadas el 2026-10-07 e integradas:** ADMIN-1 (`ac25dbc`), MARIA-2
   (`65ea6f3`) y ADMIN-2 (`f9f8393`). Suite sobre `f9f8393`, que tiene el
   mismo producto y las mismas pruebas que la rama de PM:
@@ -116,7 +108,7 @@ Archivos abiertos por Dev:
 | G2 · Imagen real | 🟢 | Cerrada el 2026-09-17 | — |
 | G3 · Aislamiento | 🟡 | En producción, la fuga de MARIA.TXT (se arregla con el ensayo). Admin cerrado en la rama (ADMIN-1 y ADMIN-2). Abiertos: sesiones que reviven, límite de intentos burlable, prueba de aislamiento parcial | Fase 3 |
 | G4 · Producto (MARIA) | 🔴 | Origen mal leído, estado e IVA adicional fijos, peso por unidad, avisos tarde, gastos FOB sin cablear, banco, identificadores. Sin productos inventados (MARIA-2) | Fase 1 y la prueba en el Kit |
-| G5 · Pruebas | 🟢 | `716 passed, 102 skipped, 0 failed` en la rama integrada | — |
+| G5 · Pruebas | 🟢 | `1067 passed, 102 skipped, 0 failed` en la rama integrada (2026-10-07) | — |
 | G6 · Volver atrás | 🟡 | Esquema probado en local; falta la copia de la base | Fase 3 (y el ensayo lo ensaya) |
 | G7 · Cobro | 🔴 | El corte por impago cubre 2 funciones; cancelar no cancela en Mercado Pago; aviso de pago sin firma; doble suscripción; invitaciones | Fase 2 |
 | G8 · Piloto | ⚪ | Tres estudios presentan de verdad un MARIA de CDI | Fase 4 |
@@ -129,7 +121,8 @@ Archivos abiertos por Dev:
   en `REPRODUCCION-ENSAYO-2026-10-07.md` (ADMIN-1, ADMIN-2, MARIA-2 y los 25
   commits de `e8344d0`). Suite sobre el mismo producto (`1ad3226`):
   `716 passed, 102 skipped`. Avance directo de `a771693`, sin merge. Emi:
-  hizo la lista de Railway antes del «dale»; verificación después: pendiente.
+  hizo la lista de Railway antes del «dale»; después verificó «Billing cron» con 0
+  y guardó una operación (2026-10-07, ~10:20 ARG). CI de GitHub en verde.
 
 ## Reglas
 

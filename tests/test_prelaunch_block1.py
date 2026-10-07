@@ -278,6 +278,7 @@ class TestGenerateMaria:
         res = client.post("/generate_maria", json={
             "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
             "moneda": "DOL", "incoterm": "FOB",  # MARIA-1b: el servidor ya no los inventa
+            "fecha_emision": "18/07/2025",
             "operation_id": "TEST001",
             "items": [{
                 "pieza": "84713000900R",
@@ -302,6 +303,7 @@ class TestGenerateMaria:
         res = client.post("/generate_maria", json={
             "comprador_cuit": "30999999995",  # MARIA-1b: el CUIT del importador es obligatorio
             "moneda": "DOL", "incoterm": "FOB",  # MARIA-1b: el servidor ya no los inventa
+            "fecha_emision": "18/07/2025",
             "operation_id": "TEST002",
             "items": [],
             "sbt_sufijo_valor": "AA(DEMO)-AB(DEMO)-CA00-",
@@ -313,6 +315,7 @@ class TestGenerateMaria:
     def test_generate_maria_sin_auth_401(self, anon_client):
         """Generar MARIA sin sesión devuelve 401."""
         res = anon_client.post("/generate_maria", json={
+            "fecha_emision": "18/07/2025",
             "operation_id": "TEST003",
             "items": [{"pieza": "84713000", "descripcion": "X", "origen": "CN",
                         "cantidad": 1, "valor_unitario": 100, "peso_kg": 1}],

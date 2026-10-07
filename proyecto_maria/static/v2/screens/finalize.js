@@ -65,6 +65,16 @@
        Pantalla 4: validating
        ========================================================== */
     function onEnterValidating() {
+        // MARIA-4: lo que decide el despachante, antes de generar. MARIA-3:
+        // los avisos del TXT se piden con lo que hay y otra vez cuando llega
+        // la propuesta del cliente o la persona cambia algo en la tarjeta.
+        // Hasta que llegue la respuesta, nada de los avisos de otra operación.
+        const avisosPanel = document.getElementById('validatingAvisosPanel');
+        if (avisosPanel) avisosPanel.hidden = true;
+        Promise.resolve(CDI.despachante ? CDI.despachante.render() : null)
+            .catch(() => null).then(refrescarAvisos);
+        enlazarAvisos();
+        refrescarAvisos();
         init();
         if (!vLoading) return;
         const items = (CDI.state && CDI.state.items) || [];
@@ -137,6 +147,60 @@
             valor_unitario: toNumber(it.valor_unitario, 0),
             peso_unitario: toNumber(it.peso_unitario, 0)
         }));
+    }
+
+    /* ---------- Avisos antes de generar (MARIA-3) ---------- */
+    let avisosSeq = 0;
+    let avisosTimer = null;
+    let avisosEnlazados = false;
+
+    function enlazarAvisos() {
+        const wrap = document.getElementById('despachanteWrap');
+        if (avisosEnlazados || !wrap) return;
+        avisosEnlazados = true;
+        const programar = () => {
+            clearTimeout(avisosTimer);
+            avisosTimer = setTimeout(refrescarAvisos, 400);
+        };
+        wrap.addEventListener('change', programar);
+        wrap.addEventListener('input', programar);
+    }
+
+    async function refrescarAvisos() {
+        const panel = document.getElementById('validatingAvisosPanel');
+        const list = document.getElementById('validatingAvisosList');
+        const count = document.getElementById('validatingAvisosCount');
+        const seq = ++avisosSeq;
+        if (!panel || !list) return;
+        if (!(CDI.state && (CDI.state.items || []).length)) { panel.hidden = true; return; }
+        let avisos;
+        try {
+            const res = await CDI.api('/generate_maria/avisos', {
+                method: 'POST',
+                body: JSON.stringify(buildMariaRequest())
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                const detail = data && data.detail;
+                avisos = [typeof detail === 'string' ? detail : 'No se pudieron revisar los avisos.'];
+            } else {
+                avisos = (data && data.avisos) || [];
+            }
+        } catch (err) {
+            console.warn('[avisos] no se pudieron pedir', err);
+            avisos = ['No se pudieron revisar los avisos; aparecen al generar.'];
+        }
+        if (seq !== avisosSeq) return;   // llegó uno más nuevo
+        panel.hidden = !avisos.length;
+        if (count) count.textContent = avisos.length ? '· ' + avisos.length : '';
+        list.innerHTML = avisos.map(function (msg) {
+            const clean = stripLeadingIcon(String(msg));
+            const ref = extractItemRef(clean);
+            return '<li>' +
+                '<span class="issue-row">' + (ref ? CDI.escapeHtml(ref) : '') + '</span>' +
+                '<span class="issue-msg">' + CDI.escapeHtml(clean) + '</span>' +
+                '</li>';
+        }).join('');
     }
 
     function toNumber(v, fallback) {
@@ -272,6 +336,8 @@
             return;
         }
         if (sbtError) sbtError.hidden = true;
+        // MARIA-4: origen argentino sin estado no se genera (no se inventa).
+        if (CDI.despachante && !CDI.despachante.leer()) return;
 
         CDI.goTo('ready', { fromValidating: true });
     }
@@ -381,7 +447,9 @@
             peso_unitario: toNumber(it.peso_unitario, 0),
             codigo_parte: String(it.codigo_parte || '').trim(),
             grupo_id: it.grupo_id || null,
-            unidad: it.unidad || null
+            unidad: it.unidad || null,
+            estado: it.estado || null,
+            iva_adicional: it.iva_adicional || null
         }));
 
         // Cliente activo propaga domicilio + fecha inicio actividad del importador
@@ -396,6 +464,8 @@
         return {
             operation_id: operation_id,
             items: items,
+            ...(CDI.despachante ? CDI.despachante.valores()
+                : { banco_bcra: '', empresa_digitalizacion: null, iva_adicional: null }),
             moneda: moneda,
             incoterm: incoterm,
             cuit_agr: cuit_agr,
@@ -413,6 +483,12 @@
             ).trim(),
             flete: toNumber(op.flete, 0),
             seguro: toNumber(op.seguro, 0),
+            // MARIA-3: el servidor decide si van al TXT (sólo EXW, FCA o FAS).
+            gastos_anteriores_fob: toNumber(op.gastos_anteriores_fob, 0),
+            procedencia: (function () {
+                const raw = String(op.procedencia || '').trim();
+                return (raw && CDI.paisesMaria && CDI.paisesMaria.resolve(raw)) || raw;
+            })(),
             bl_numero: String(op.bl || op.bl_numero || '').trim(),
             puerto_origen: String(op.puerto_origen || '').trim(),
             puerto_destino: String(op.puerto_destino || 'ARBUE').trim() || 'ARBUE',
@@ -757,7 +833,13 @@
                 peso_total: total_peso,
                 ncms_unicos: stats.ncms_unicos || 0,
                 numero_factura: op.numero_factura || '',
-                fecha_emision: op.fecha_emision || ''
+                fecha_emision: op.fecha_emision || '',
+                // MARIA-4: para proponer el último banco y la última empresa.
+                maria: Object.assign(
+                    { banco_bcra: '', empresa_digitalizacion: '', iva_adicional: '' },
+                    CDI.despachante ? CDI.despachante.valores() : {},
+                    { items: items.map(it => ({ estado: it.estado || null, iva_adicional: it.iva_adicional || null })) }
+                )
             },
             items: items.map(it => ({
                 pieza: String(it.pieza || '').trim(),

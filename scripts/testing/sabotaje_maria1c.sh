@@ -67,7 +67,7 @@ reemplazar $F "    for campo in ('flete', 'seguro'):" "    for campo in ('seguro
 caso "flete_sin_marca" "FAILED $T::test_flete_y_seguro_ilegibles_se_marcan[pdf_directo]"
 
 # 2. se marca también lo que no estaba en la factura
-reemplazar $F "        if raw not in (None, '') and _numero_factura(raw, decimal) is None:" "        if _numero_factura(raw, decimal) is None:"
+reemplazar $F "        if (raw not in (None, '') and not _no_aplica(raw, _FLETE_NO_APLICA)" "        if (not _no_aplica(raw, _FLETE_NO_APLICA)"
 caso "marca_lo_ausente" "FAILED $T::test_lo_que_no_estaba_o_se_leyo_no_se_marca[ausentes-pdf_directo]"
 
 # 3. la copia de producción no manda la marca

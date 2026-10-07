@@ -14,7 +14,7 @@
         'vendedor_nombre', 'vendedor_id', 'vendedor_pais', 'vendedor_direccion',
         'comprador_nombre', 'comprador_cuit', 'comprador_domicilio', 'comprador_fecha_inic_activ',
         'numero_factura', 'fecha_emision',
-        'moneda', 'incoterm',
+        'moneda', 'incoterm', 'procedencia',
         'flete', 'seguro', 'gastos_anteriores_fob',
         // Transporte opcional: si vienen en el PDF los precargamos
         'transporte_medio', 'bl', 'buque',
@@ -70,6 +70,17 @@
             s = s.replace(',', '.');
         }
         return Number(s);
+    }
+
+    // Fecha de emisión válida, con las mismas reglas que el servidor
+    // (`fecha_de_la_factura`): sin ella no se genera el TXT (MARIA-3).
+    function fechaValida(raw) {
+        const m = String(raw || '').trim().match(/^([0-9]{1,2})\/([0-9]{1,2})\/([0-9]{4}|[0-9]{2})$/);
+        if (!m) return false;
+        const dia = Number(m[1]), mes = Number(m[2]);
+        const anio = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+        const f = new Date(anio, mes - 1, dia);
+        return anio >= 1900 && f.getFullYear() === anio && f.getMonth() === mes - 1 && f.getDate() === dia;
     }
 
     // Validacion por campo: retorna string con error o null si OK
@@ -134,11 +145,15 @@
             if (n < 0) return 'No puede ser negativo.';
             return null;
         },
+        procedencia: (v) => {
+            // MARIA-3: un país de la tabla MARIA; vacía = igual al origen.
+            if (!v || !CDI.paisesMaria) return null;
+            return CDI.paisesMaria.resolve(v) ? null : 'País no reconocido: elegí uno de la lista.';
+        },
         fecha_emision: (v) => {
             if (!v) return null;
-            if (!/^\d{2}\/\d{2}\/(\d{2}|\d{4})$/.test(String(v).trim())) {
-                return 'Formato esperado: DD/MM/AAAA';
-            }
+            // Como el servidor: d/m de una o dos cifras, AA = 20AA, fecha real.
+            if (!fechaValida(v)) return 'Fecha no válida. Formato esperado: DD/MM/AAAA';
             return null;
         },
         fecha_embarque: (v) => {
@@ -193,6 +208,11 @@
         prorrateoCaption = $('reviewProrrateoCaption');
         incotermWarningEl = $('reviewIncotermWarning');
         if (!form) return;
+
+        const procedenciaPaises = $('procedenciaPaises');
+        if (procedenciaPaises && CDI.paisesMaria && !procedenciaPaises.children.length) {
+            procedenciaPaises.innerHTML = CDI.paisesMaria.optionMarkup();
+        }
 
         form.addEventListener('input', onFieldChange);
         form.addEventListener('change', onFieldChange);
@@ -1155,7 +1175,9 @@
             const isManual = CDI.state.sourceFormat === 'manual';
             REQUIRED = isManual 
                 ? ['vendedor_nombre', 'comprador_nombre', 'numero_factura', 'fecha_emision', 'moneda', 'incoterm', 'comprador_cuit']
-                : ['moneda', 'incoterm', 'comprador_cuit'];
+                // Sin fecha de emisión (devolución de MARIA-3) ni CUIT del
+                // importador (MARIA-1b, D20) no se genera el TXT.
+                : ['fecha_emision', 'moneda', 'incoterm', 'comprador_cuit'];
                 
             if (form) {
                 FIELDS.forEach(name => {

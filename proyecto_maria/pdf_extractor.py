@@ -2123,12 +2123,34 @@ def _campos_sin_leer(operacion: dict, decimal) -> list:
     sin_leer = []
     for campo in ('flete', 'seguro'):
         raw = operacion.get(campo)
-        if raw not in (None, '') and _numero_factura(raw, decimal) is None:
+        if (raw not in (None, '') and not _no_aplica(raw, _FLETE_NO_APLICA)
+                and _numero_factura(raw, decimal) is None):
             sin_leer.append(campo)
     pais = str(operacion.get('vendedor_pais') or '').strip()
-    if pais and pais.upper() not in ('NA', 'N/A') and not _origen_desde_factura(pais):
+    if pais and not _no_aplica(pais, _PAIS_NO_APLICA) and not _origen_desde_factura(pais):
         sin_leer.append('vendedor_pais')
     return sin_leer
+
+
+# Lo que la factura escribe cuando el dato no aplica: no es un dato que no se
+# pudo leer (MARIA-3, revisión de MARIA-1c). El valor queda en 0 o vacío.
+_FLETE_NO_APLICA = {'N/A', 'NA', '-', 'FREE', 'INCLUDED', 'PREPAID'}
+_PAIS_NO_APLICA = {'N/A', 'NA', 'UNKNOWN', '?'}
+
+
+def _texto(raw) -> str:
+    """Un campo de texto de la factura: vacío si Gemini lo devolvió nulo o no
+    lo devolvió. Nunca «None» ni un valor por defecto (MARIA-1d)."""
+    texto = "" if raw is None else str(raw).strip()
+    # Gemini a veces escribe el vacío como texto.
+    return "" if texto.upper() in _TEXTO_VACIO else texto
+
+
+_TEXTO_VACIO = {'NONE', 'NULL', 'N/A'}
+
+
+def _no_aplica(raw, palabras) -> bool:
+    return str(raw).strip().rstrip('.').strip().upper() in palabras
 
 
 def _valores_numericos(result: dict) -> list:
@@ -2223,7 +2245,7 @@ Busca esta información en el encabezado de la factura:
 6. vendedor_direccion: Dirección del vendedor
 7. comprador_nombre: Nombre del comprador/importador/buyer
 8. comprador_cuit: CUIT del comprador argentino (si aparece). REGLA CRÍTICA: CUIT argentino tiene EXACTAMENTE 11 dígitos numéricos. Formato esperado: 30-61212382-01 o 306121238201. NO agregar prefijo país. Si el PDF dice "AR306121238201", devolver "306121238201" sin "AR". Si no hay 11 dígitos, devolver "".
-9. moneda: Moneda de la factura. Devolver SIEMPRE el codigo de 3 letras: DOL, EUR, BRL, ARS, CLP, UYU, GBP, JPY, CNY. Si no aparece la palabra "moneda" o "currency" pero hay simbolos en los valores, inferir asi: $ o "USD" o "U$S" -> DOL; "EUR" o EUR$ -> EUR; "R$" o "BRL" -> BRL; "AR$" o "ARS" -> ARS. Ante duda, DOL (es la moneda mas comun en facturas de importacion a Argentina).
+9. moneda: Moneda de la factura. Devolver SIEMPRE el codigo de 3 letras: DOL, EUR, BRL, ARS, CLP, UYU, GBP, JPY, CNY. Si no aparece la palabra "moneda" o "currency" pero hay simbolos en los valores, inferir asi: $ o "USD" o "U$S" -> DOL; "EUR" o EUR$ -> EUR; "R$" o "BRL" -> BRL; "AR$" o "ARS" -> ARS. Si no hay palabra ni simbolo de moneda, null (no adivinar).
 10. incoterm: Términos de entrega (FOB, CIF, DDP, EXW, etc.). Si viene con ciudad/puerto al lado (ej: "FOB Genova", "CIF Buenos Aires"), devolver SOLO las 3 letras del codigo.
 11. flete: Valor del flete/freight (número, 0 si no aparece)
 12. seguro: Valor del seguro/insurance (número, 0 si no aparece)
@@ -2344,19 +2366,19 @@ IMPORTANTE:
                     # Extraer datos de operación
                     operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
                     operacion_data = {
-                        'numero_factura': str(operacion.get('numero_factura', '')),
-                        'fecha_emision': str(operacion.get('fecha_emision', '')),
-                        'vendedor_nombre': str(operacion.get('vendedor_nombre', '')),
-                        'vendedor_id': str(operacion.get('vendedor_id', '')),
+                        'numero_factura': _texto(operacion.get('numero_factura')),
+                        'fecha_emision': _texto(operacion.get('fecha_emision')),
+                        'vendedor_nombre': _texto(operacion.get('vendedor_nombre')),
+                        'vendedor_id': _texto(operacion.get('vendedor_id')),
                         'vendedor_pais': _origen_desde_factura(operacion.get('vendedor_pais')),
-                        'vendedor_direccion': str(operacion.get('vendedor_direccion', '')),
-                        'comprador_nombre': str(operacion.get('comprador_nombre', '')),
+                        'vendedor_direccion': _texto(operacion.get('vendedor_direccion')),
+                        'comprador_nombre': _texto(operacion.get('comprador_nombre')),
                         'comprador_cuit': _normalize_argentine_cuit(operacion.get('comprador_cuit', '')),
-                        'moneda': str(operacion.get('moneda', 'DOL'))[:3].upper(),
-                        'incoterm': str(operacion.get('incoterm', 'FOB'))[:3].upper(),
+                        'moneda': _texto(operacion.get('moneda'))[:3].upper(),
+                        'incoterm': _texto(operacion.get('incoterm'))[:3].upper(),
                         'flete': _numero_factura(operacion.get('flete'), decimal) or 0.0,
                         'seguro': _numero_factura(operacion.get('seguro'), decimal) or 0.0,
-                        'comprador_domicilio': str(operacion.get('comprador_domicilio', '')),
+                        'comprador_domicilio': _texto(operacion.get('comprador_domicilio')),
                     }
                     operacion_data['campos_sin_leer'] = _campos_sin_leer(operacion, decimal)
                     
@@ -2373,8 +2395,8 @@ IMPORTANTE:
                             peso = _numero_factura(item_data.get('peso_kg'), decimal) or 0.0
                             
                             # Extract description
-                            descripcion = item_data.get('descripcion', '')
-                            version = item_data.get('version', '')
+                            descripcion = _texto(item_data.get('descripcion'))
+                            version = _texto(item_data.get('version'))
                             
                             if descripcion and version:
                                 descripcion = f"{descripcion} {version}"
@@ -2467,7 +2489,7 @@ Busca esta información en el encabezado de la factura:
 6. vendedor_direccion: Dirección del vendedor
 7. comprador_nombre: Nombre del comprador/importador/buyer
 8. comprador_cuit: CUIT del comprador argentino (si aparece). REGLA CRÍTICA: CUIT argentino tiene EXACTAMENTE 11 dígitos numéricos. Formato esperado: 30-61212382-01 o 306121238201. NO agregar prefijo país. Si el PDF dice "AR306121238201", devolver "306121238201" sin "AR". Si no hay 11 dígitos, devolver "".
-9. moneda: Moneda de la factura. Devolver SIEMPRE el codigo de 3 letras: DOL, EUR, BRL, ARS, CLP, UYU, GBP, JPY, CNY. Si no aparece la palabra "moneda" o "currency" pero hay simbolos en los valores, inferir asi: $ o "USD" o "U$S" -> DOL; "EUR" o EUR$ -> EUR; "R$" o "BRL" -> BRL; "AR$" o "ARS" -> ARS. Ante duda, DOL (es la moneda mas comun en facturas de importacion a Argentina).
+9. moneda: Moneda de la factura. Devolver SIEMPRE el codigo de 3 letras: DOL, EUR, BRL, ARS, CLP, UYU, GBP, JPY, CNY. Si no aparece la palabra "moneda" o "currency" pero hay simbolos en los valores, inferir asi: $ o "USD" o "U$S" -> DOL; "EUR" o EUR$ -> EUR; "R$" o "BRL" -> BRL; "AR$" o "ARS" -> ARS. Si no hay palabra ni simbolo de moneda, null (no adivinar).
 10. incoterm: Términos de entrega (FOB, CIF, DDP, EXW, etc.). Si viene con ciudad/puerto al lado (ej: "FOB Genova", "CIF Buenos Aires"), devolver SOLO las 3 letras del codigo.
 11. flete: Valor del flete/freight (número, 0 si no aparece)
 12. seguro: Valor del seguro/insurance (número, 0 si no aparece)
@@ -2544,19 +2566,19 @@ IMPORTANTE:
                         # Extraer datos de operación
                         operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
                         operacion_data = {
-                            'numero_factura': str(operacion.get('numero_factura', '')),
-                            'fecha_emision': str(operacion.get('fecha_emision', '')),
-                            'vendedor_nombre': str(operacion.get('vendedor_nombre', '')),
-                            'vendedor_id': str(operacion.get('vendedor_id', '')),
+                            'numero_factura': _texto(operacion.get('numero_factura')),
+                            'fecha_emision': _texto(operacion.get('fecha_emision')),
+                            'vendedor_nombre': _texto(operacion.get('vendedor_nombre')),
+                            'vendedor_id': _texto(operacion.get('vendedor_id')),
                             'vendedor_pais': _origen_desde_factura(operacion.get('vendedor_pais')),
-                            'vendedor_direccion': str(operacion.get('vendedor_direccion', '')),
-                            'comprador_nombre': str(operacion.get('comprador_nombre', '')),
+                            'vendedor_direccion': _texto(operacion.get('vendedor_direccion')),
+                            'comprador_nombre': _texto(operacion.get('comprador_nombre')),
                             'comprador_cuit': _normalize_argentine_cuit(operacion.get('comprador_cuit', '')),
-                            'moneda': str(operacion.get('moneda', 'DOL'))[:3].upper(),
-                            'incoterm': str(operacion.get('incoterm', 'FOB'))[:3].upper(),
+                            'moneda': _texto(operacion.get('moneda'))[:3].upper(),
+                            'incoterm': _texto(operacion.get('incoterm'))[:3].upper(),
                             'flete': _numero_factura(operacion.get('flete'), decimal) or 0.0,
                             'seguro': _numero_factura(operacion.get('seguro'), decimal) or 0.0,
-                            'comprador_domicilio': str(operacion.get('comprador_domicilio', '')),
+                            'comprador_domicilio': _texto(operacion.get('comprador_domicilio')),
                         }
                         operacion_data['campos_sin_leer'] = _campos_sin_leer(operacion, decimal)
                         

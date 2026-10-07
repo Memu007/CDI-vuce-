@@ -6,6 +6,19 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · fix: un campo vacío de la factura no llega al TXT como «None» (MARIA-1d)
+
+- **fix(maria):** el lector deja vacíos el número de factura, el vendedor, el comprador, el domicilio, la moneda y el incoterm que Gemini devuelve nulos o escritos como «None», «null» o «N/A» (antes «None» y «NON», que llegaban al TXT como `IDSO=FAC_None` o `CDDTINCOTE=NON`); el lector ya no inventa DOL ni FOB, y el prompt no pide adivinar la moneda. Lo que falta de la carátula se avisa antes de generar.
+
+## 2026-10-07 · feat: avisos antes de generar, gastos anteriores al FOB, procedencia y fecha (MARIA-3)
+
+- **feat(maria):** los avisos del TXT se ven en la validación, antes del botón de generar. Los gastos anteriores al FOB de la pantalla llegan al TXT (`GTOS-ANT-FOB`) con EXW, FCA o FAS (FAS pasa a ser condición válida); con otra condición no van y se avisa. La procedencia se carga por operación (art. 15 del Código Aduanero); vacía, sigue igual al origen con aviso.
+- **fix(maria):** la fecha de emisión ya no sale con la de hoy: si la factura no la trae o no es una fecha, no se genera el TXT y la revisión la pide (el año del IEXT sale de esa fecha); una fecha futura o de hace más de dos años se avisa. La procedencia usa la misma tabla de países que la pantalla; un importe de gastos no finito, negativo o absurdo da error. El lector deja de marcar como «sin leer» un flete o seguro «N/A», «-», «FREE», «included» o «Prepaid» y un país «Unknown» o «?».
+
+## 2026-10-07 · feat: lo que decide el despachante sale en el TXT (MARIA-4)
+
+- **feat(maria):** estado de la mercadería (seis, por producto), IVA adicional (reventa o uso particular, por operación con cambio por producto), banco (código BCRA, por operación) y empresa de digitalización (Modoc o Lakaut) se eligen antes de generar; CDI propone el último banco del cliente y la última empresa del usuario. **Cambio a propósito en el TXT con los valores por defecto:** `CARTUSO=2` con origen extranjero (antes 3 fijo) e `IVAADICIONAL1=NO_VALIDA` (antes IVAAD1 fijo); con origen argentino no hay estado por defecto y sin banco la línea no sale. Los dos archivos reales salen como el original cargando sus valores.
+
 ## 2026-10-07 · fix: controles antes de generar el TXT (MARIA-1b)
 
 - **fix(maria):** no se puede generar sin moneda, con «USD» (en MARIA es «DOL»), sin incoterm o con uno inválido, sin el CUIT del importador o con uno mal escrito, con flete o seguro negativos, ni con una NCM que perdió el 0 inicial (se propone con el 0). Una moneda poco habitual o una NCM que no está en el nomenclador (es el de 2018) avisan. El semáforo y la pantalla de generar muestran lo mismo antes.
@@ -21,15 +34,6 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix(excel, seguridad):** el Excel se lee en su propio grupo de hilos (`EXCEL_READ_WORKERS`, 2); un .xlsx que descomprimido pasa de `EXCEL_MAX_DESCOMPRIMIDO_MB` (100) se rechaza antes de abrirlo; las filas vacías no se recorren (una celda suelta en la última fila tardaba 28 s) y más de 5000 filas con datos se rechazan con un mensaje claro.
 - **chore(excel):** se borran `/upload_excel/`, su alias `/upload_excel/public` y `/api/clientes/import`: ninguna pantalla viva las usaba (la carga por Excel es `/upload_excel_v2/`; la importación de clientes, `/api/migrations/*`).
 
-## 2026-10-07 · fix: un PDF armado no deja a nadie sin lectura (RENDIMIENTO-1b)
-
-- **fix(rendimiento):** la adivinanza del vendedor lee el texto del PDF sólo con `pypdf`: `pdfminer` se colgaba para siempre con un PDF armado y, con cuatro de esos, nadie más podía leer un PDF hasta reiniciar. Los tiempos máximos en 0 o negativos valen el de siempre.
-- **fix(vendedor):** el vendedor adivinado nunca es una etiqueta («BUYER», «CONSIGNEE», etc.): con «SELLER:» y «BUYER:» en la misma fila queda el nombre o nada.
-
-## 2026-10-07 · fix: leer un PDF no frena el sitio (RENDIMIENTO-1)
-
-- **fix(rendimiento):** leer el PDF, sacarle el texto, abrirlo para validarlo y pedirle a Gemini un NCM corren en otro hilo: mientras tanto el servidor sigue atendiendo a los demás. La lectura tiene un tiempo máximo (`PDF_READ_TIMEOUT_S`, 120 s) con un error propio (`lectura_pdf_demasiado_larga`) y la pantalla ofrece cargar los productos a mano; la adivinanza del vendedor tiene su tiempo propio (`PDF_VENDOR_TIMEOUT_S`, 15 s) y Gemini el suyo (`NCM_GEMINI_TIMEOUT_S`, 30 s). Las lecturas de PDF usan su propio grupo de hilos (`PDF_READ_WORKERS`, 4).
-- **fix(dependencias):** `PyPDF2` 3.0.1, que se colgaba con un PDF armado, se cambia por su sucesor `pypdf`. Se saca `python-jose` (y con ella `ecdsa`), que nadie usaba: el token de sesión usa `PyJWT`.
 ## 2026-10-07 · fix: lo que no se pudo leer de la factura se avisa (MARIA-1c)
 
 - **fix(pdf):** si la factura trae un flete, un seguro o el país del vendedor que no se pudo leer, el lector lo marca (`campos_sin_leer`), la pantalla de subida lo nombra y el semáforo lo sigue mostrando («No pudimos leer el flete de la factura: completalo») hasta que se completa. La pantalla vieja ya no repone cantidad 1 ni origen China.
@@ -41,6 +45,16 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-10-07 · fix: la factura bien leída (MARIA-1a)
 
 - **fix(pdf):** el país de origen ya no se corta a dos letras (`CHN` salía Suiza y `MEX` Montenegro): se reconocen dos letras, tres letras (tabla ISO 3166-1 generada contra la tabla oficial VUCE) y el nombre; lo que no se reconoce queda vacío. Cantidades, precios, pesos, flete y seguro con coma bien leídos (`1,500` sólo es mil quinientos si la factura usa el punto como decimal). Lo que falta queda vacío: nada de peso 0,5, cantidad 1 ni origen del vendedor. Las dos copias del lector.
+
+## 2026-10-07 · fix: un PDF armado no deja a nadie sin lectura (RENDIMIENTO-1b)
+
+- **fix(rendimiento):** la adivinanza del vendedor lee el texto del PDF sólo con `pypdf`: `pdfminer` se colgaba para siempre con un PDF armado y, con cuatro de esos, nadie más podía leer un PDF hasta reiniciar. Los tiempos máximos en 0 o negativos valen el de siempre.
+- **fix(vendedor):** el vendedor adivinado nunca es una etiqueta («BUYER», «CONSIGNEE», etc.): con «SELLER:» y «BUYER:» en la misma fila queda el nombre o nada.
+
+## 2026-10-07 · fix: leer un PDF no frena el sitio (RENDIMIENTO-1)
+
+- **fix(rendimiento):** leer el PDF, sacarle el texto, abrirlo para validarlo y pedirle a Gemini un NCM corren en otro hilo: mientras tanto el servidor sigue atendiendo a los demás. La lectura tiene un tiempo máximo (`PDF_READ_TIMEOUT_S`, 120 s) con un error propio (`lectura_pdf_demasiado_larga`) y la pantalla ofrece cargar los productos a mano; la adivinanza del vendedor tiene su tiempo propio (`PDF_VENDOR_TIMEOUT_S`, 15 s) y Gemini el suyo (`NCM_GEMINI_TIMEOUT_S`, 30 s). Las lecturas de PDF usan su propio grupo de hilos (`PDF_READ_WORKERS`, 4).
+- **fix(dependencias):** `PyPDF2` 3.0.1, que se colgaba con un PDF armado, se cambia por su sucesor `pypdf`. Se saca `python-jose` (y con ella `ecdsa`), que nadie usaba: el token de sesión usa `PyJWT`.
 
 ## 2026-10-07 · fix: lo que quedó de ADMIN-1 (ADMIN-2)
 
