@@ -252,9 +252,9 @@ def test_el_peso_neto_de_una_unidad_con_otro_nombre(auth_override, client, colum
 
 
 def test_una_columna_de_pesos_argentinos_no_es_peso(auth_override, client):
-    data = _subir(client, ["Peso", "Precio en pesos"], [2.5, 1000])
+    data = _subir(client, ["Pesos ARS", "Peso"], [1000, 2.5])
     assert data["items"][0]["peso_unitario"] == pytest.approx(2.5)
-    assert not any("pesos" in a for a in data["avisos"]), data["avisos"]
+    assert not any("Pesos" in a for a in data["avisos"]), data["avisos"]
 
 
 @pytest.mark.parametrize("texto", ["inf", "Infinity", "-inf"])
