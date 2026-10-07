@@ -87,7 +87,7 @@ Breve y autosuficiente:
 6. lo que decide la PM, numerado D1, D2…, con opciones y recomendación.
 
 Reemplazá todo el cuerpo anterior de `PARA-PM.md`. Al final: «Última vuelta:
-<hora>» y «Contexto: ~X %» (y desde ~50 %, tu `/compact conservar: …`).
+<hora>» y «Contexto: ~X %» (y desde ~30 %, tu `/compact conservar: …`).
 
 Al terminar una pieza: commit, push, comprobar que el remoto tiene tu HEAD y
 después el informe. Nada terminado queda sólo en local.
