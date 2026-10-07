@@ -3,7 +3,12 @@
 
 Uso:
     python scripts/import_arancel_nomenclador.py \
-      --archive /tmp/arancel.zip --updated-at 2026-07-12
+      --archive /tmp/arancel.zip --updated-at 2026-07-12 \
+      --obtenido "quién lo bajó y cómo llegó"
+
+Las NCM que estaban en el catálogo anterior y no están en el nuevo se agregan
+a `ncm_bajas.json` (con su descripción vieja), para avisar que esa posición
+ya no existe (CATALOGO-NCM-1). Las bajas de antes que no volvieron siguen.
 
 El archivo descargable se publica en:
 https://www.arca.gob.ar/aduana/arancelintegrado/
@@ -26,6 +31,7 @@ SOURCE_URL = "https://www.arca.gob.ar/aduana/arancelintegrado/"
 DOWNLOAD_URL = SOURCE_URL + "archivos/arancel.zip"
 OUTPUT_PATH = DATA_DIR / "ncm_arca.csv.gz"
 METADATA_PATH = DATA_DIR / "ncm_arca_metadata.json"
+BAJAS_PATH = DATA_DIR / "ncm_bajas.json"
 
 
 def _find_nomenclador(archive: ZipFile) -> str:
@@ -35,10 +41,35 @@ def _find_nomenclador(archive: ZipFile) -> str:
     return matches[0]
 
 
+def _catalogo_actual() -> dict:
+    """{codigo: descripcion} del catálogo que se va a reemplazar."""
+    if not OUTPUT_PATH.exists():
+        return {}
+    with gzip.open(OUTPUT_PATH, "rt", encoding="utf-8", newline="") as fh:
+        return {row["codigo"]: row["descripcion"] for row in csv.DictReader(fh)}
+
+
+def _guardar_bajas(anterior: dict, anterior_meta: dict, nuevos: set, updated_at: str) -> None:
+    previas = json.loads(BAJAS_PATH.read_text(encoding="utf-8")) if BAJAS_PATH.exists() else {}
+    codigos = {c: v for c, v in (previas.get("codigos") or {}).items() if c not in nuevos}
+    for codigo, descripcion in anterior.items():
+        if codigo not in nuevos and codigo not in codigos:
+            codigos[codigo] = {
+                "descripcion": descripcion,
+                "baja": updated_at,
+                "estaba_en": anterior_meta.get("source_file", ""),
+            }
+    BAJAS_PATH.write_text(json.dumps({
+        "que_es": "NCM que estaban en un nomenclador anterior de ARCA y no están en el vigente",
+        "codigos": dict(sorted(codigos.items())),
+    }, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--archive", type=Path, required=True)
     parser.add_argument("--updated-at", required=True, help="Fecha publicada por ARCA (AAAA-MM-DD)")
+    parser.add_argument("--obtenido", required=True, help="Quién bajó el archivo y cómo llegó")
     args = parser.parse_args()
 
     archive_bytes = args.archive.read_bytes()
@@ -50,6 +81,10 @@ def main() -> None:
     rows = parse_arca_nomenclador(lines)
     if len(rows) < 1000:
         raise ValueError(f"Catálogo incompleto: sólo se encontraron {len(rows)} NCM")
+
+    anterior = _catalogo_actual()
+    anterior_meta = json.loads(METADATA_PATH.read_text(encoding="utf-8")) if METADATA_PATH.exists() else {}
+    _guardar_bajas(anterior, anterior_meta, {row["codigo"] for row in rows}, args.updated_at)
 
     with gzip.open(OUTPUT_PATH, "wt", encoding="utf-8", newline="") as fh:
         writer = csv.DictWriter(fh, fieldnames=["codigo", "descripcion", "search_text", "source", "updated_at"])
@@ -65,6 +100,7 @@ def main() -> None:
         "archive_sha256": hashlib.sha256(archive_bytes).hexdigest(),
         "source_file": filename,
         "ncm_count": len(rows),
+        "obtenido": args.obtenido,
     }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     print(f"OK: {len(rows)} NCM en {OUTPUT_PATH}")
 

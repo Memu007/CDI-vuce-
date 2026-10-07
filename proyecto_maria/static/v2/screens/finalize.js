@@ -25,6 +25,12 @@
     function $(id) { return document.getElementById(id); }
     function show(el) { if (el) el.hidden = false; }
     function hide(el) { if (el) el.hidden = true; }
+    // «None», «null» o «N/A» de una operación guardada con el lector viejo no
+    // son un número de factura (MARIA-5).
+    function numeroDeFactura(op) {
+        const leida = String((op && op.numero_factura) || '').trim();
+        return /^(none|null|n\/a)$/i.test(leida) ? '' : leida;
+    }
 
     function init() {
         if (initialized) return;
@@ -145,7 +151,9 @@
             origen: String(it.origen || 'XX').trim().toUpperCase() || 'XX',
             cantidad: toNumber(it.cantidad, 0),
             valor_unitario: toNumber(it.valor_unitario, 0),
-            peso_unitario: toNumber(it.peso_unitario, 0)
+            peso_unitario: toNumber(it.peso_unitario, 0),
+            // El grupo va en una línea del TXT: la validación cuenta igual.
+            grupo_id: it.grupo_id == null ? null : it.grupo_id
         }));
     }
 
@@ -201,6 +209,17 @@
                 '<span class="issue-msg">' + CDI.escapeHtml(clean) + '</span>' +
                 '</li>';
         }).join('');
+    }
+
+    function subitemsDelPedido(it) {
+        const subs = Array.isArray(it.subitems) ? it.subitems : [];
+        if (!subs.length) return undefined;
+        return subs.map(s => {
+            const sub = { cantidad: toNumber(s.cantidad, 0), valor_unitario: toNumber(s.valor_unitario, 0) };
+            const sufijo = String(s.sufijo || '').trim();
+            if (sufijo) sub.sufijo = sufijo;
+            return sub;
+        });
     }
 
     function toNumber(v, fallback) {
@@ -326,8 +345,13 @@
         if (sbtInput) {
             CDI.state.operacion.sbt_sufijo_valor = sbtInput.value.trim();
         }
-        // Validación frontend: si está vacío, mostrar error junto al campo
-        if (!CDI.state.operacion.sbt_sufijo_valor) {
+        // Validación frontend: si está vacío, mostrar error junto al campo.
+        // No hace falta si todos los productos van en subítems con sufijo
+        // propio (SUBITEMS-1; el servidor tampoco lo pide).
+        const itemsSufijo = CDI.state.items || [];
+        const todosConSufijoPropio = itemsSufijo.length > 0 && itemsSufijo.every(it =>
+            Array.isArray(it.subitems) && it.subitems.length && it.subitems.every(s => String(s.sufijo || '').trim()));
+        if (!CDI.state.operacion.sbt_sufijo_valor && !todosConSufijoPropio) {
             if (sbtError) {
                 sbtError.textContent = 'Ingresá el sufijo de valor SBT. Es obligatorio.';
                 sbtError.hidden = false;
@@ -373,6 +397,14 @@
             const dur = Date.now() - startedAt;
             if (!res.ok || !data || data.success === false) {
                 const detail = (data && (data.detail || data.message)) || res.statusText;
+                // El error de un subítem (su sufijo incluido) va bajo ese
+                // subítem, en el paso de NCM (SUBITEMS-1).
+                const sub = typeof detail === 'string' && /^Item (\d+), sub-ítem (\d+): /.exec(detail);
+                if (sub && CDI.ncmBatch && CDI.ncmBatch.marcarErrorDeSubitem &&
+                        CDI.ncmBatch.marcarErrorDeSubitem(parseInt(sub[1], 10) - 1, parseInt(sub[2], 10) - 1, detail)) {
+                    CDI.goTo('ncm');
+                    throw new Error(detail);
+                }
                 // Si el error es de SBT, mostrar junto al campo y volver a validación
                 if (typeof detail === 'string' && detail.toLowerCase().includes('sbt')) {
                     if (sbtError) {
@@ -434,7 +466,7 @@
         const moneda = (op.moneda || '').toString().trim().toUpperCase();
         const incoterm = (op.incoterm || '').toString().trim().toUpperCase();
 
-        const factura = String(op.numero_factura || '').trim();
+        const factura = numeroDeFactura(op);
         const operation_id = factura ? ('FAC_' + factura.replace(/[^a-zA-Z0-9_-]/g, '')) :
             ('OP_' + new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14));
 
@@ -449,7 +481,9 @@
             grupo_id: it.grupo_id || null,
             unidad: it.unidad || null,
             estado: it.estado || null,
-            iva_adicional: it.iva_adicional || null
+            iva_adicional: it.iva_adicional || null,
+            // Partido en subítems (SUBITEMS-1); sin subítems no va el campo.
+            subitems: subitemsDelPedido(it)
         }));
 
         // Cliente activo propaga domicilio + fecha inicio actividad del importador
@@ -621,7 +655,7 @@
         const rows = [
             ['Razón social', String(op.comprador_nombre || '').trim() || 'No detectado'],
             ['CUIT', formatDetectedCuit(op.comprador_cuit) || 'No detectado'],
-            ['Factura', String(op.numero_factura || '').trim()],
+            ['Factura', numeroDeFactura(op)],
             ['Fecha', String(op.fecha_emision || '').trim()],
         ].filter(row => row[1]);
         box.innerHTML = rows.map(row => (

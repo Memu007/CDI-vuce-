@@ -340,6 +340,11 @@
                     CDI.toast('Catálogo parcial', catalogo.columnas_detectadas + '/' + total + ' columnas reconocidas.', 'info');
                 }
             }
+            // MARIA-5 (D22): el peso de la planilla que no era de una unidad,
+            // o dos pesos de la misma línea que no coinciden (planilla o PDF).
+            // Se muestran al final, con lo que no se pudo leer (un aviso tapa
+            // al anterior).
+            const avisosPeso = (data && data.avisos) || [];
 
             if (currentFormat === 'pdf' && CDI.setClienteActivo) {
                 CDI.setClienteActivo(null);
@@ -375,8 +380,9 @@
             if (currentFormat === 'excel' && data && Array.isArray(data.avisos_mapeo)) {
                 sinLeer.unshift.apply(sinLeer, data.avisos_mapeo);
             }
-            if (sinLeer.length && CDI.toast) {
-                CDI.toast('Revisá la factura', sinLeer.join(' '), 'warning');
+            const revisar = sinLeer.concat(avisosPeso);
+            if (revisar.length && CDI.toast) {
+                CDI.toast(sinLeer.length ? 'Revisá la factura' : 'Revisá el peso', revisar.join(' '), 'warning');
             }
             console.log('[upload] items listos:', items.length, '→ goTo review');
             CDI.goTo('review', { fromUpload: true });

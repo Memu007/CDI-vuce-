@@ -2,6 +2,487 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## SUBITEMS-1 (puntos 7 a 10) y la e2e — reentrega con MARIA-5: **`4446571`**
+
+**Resultado: los cuatro puntos de `5170016`, con rojo antes y verde después, y
+`e2e_maria.sh` en «E2E MARIA OK». Para decidir: nada; dos cosas para que
+mires (abajo).** Base: tu rama hasta `4c6f2d4` integrada (`a123b93`), arriba
+de la segunda devolución de MARIA-5 y CATALOGO-NCM-1 (`a8a83f3`, ya informada
+abajo). D27: tomada (a).
+
+| # | Qué hace ahora | Rojo antes |
+|---|---|---|
+| 7 | `subitems` = `5`, `true`, `3.5` o un objeto: 400 «Item 1: los sub-ítems no tienen el formato esperado». `controles_antes_de_generar` ya no recorre lo que no es una lista | `3 failed` (500) en `tests/test_subitems1.py` |
+| 8 | El panel compara el valor en decimal exacto (enteros grandes, los mismos dígitos que `Decimal(repr())` del servidor), con 0,01 de tolerancia | `pantalla_subitems1.js` en `a123b93`: «1 × 0,04 contra 1 × 0,03» daba «⚠» y el servidor generaba |
+| 9 | «Suman 2,9 de 3 unidades…» y dice qué no cierra: «Las cantidades de los subítems no suman la del producto» / «Los valores… (se admite 0,01 de diferencia)» | en `a123b93`: «Suman 3 de 3 unidades» |
+| 10 | El error de un subítem (`Item N, sub-ítem M: …`, el del sufijo incluido) vuelve al paso de NCM, abre el panel y sale bajo ese subítem; se va al corregir, agregar o borrar uno. Para que «Item N» sea el producto de la pantalla, el generador numera los errores de sub-ítems por su lugar en el pedido (antes, con un grupo antes, decía la línea del TXT y no coincidía con el de `main.py`) | en `a123b93`: «no sale bajo el subítem 2»; `3 failed` en Python por el número |
+
+**La e2e** (`config/e2e_maria.js`), puesta al día:
+- Completa la fecha de emisión (la línea de GUARDAR-1 de la Dev 1; sin ella
+  no hay OK posible en mi SHA; si la Dev 1 suma la misma, el merge es trivial).
+- Mi pieza cambió el recorrido: desde MARIA-5, un 0 en el peso de un grupo no
+  se acepta (vuelve el valor). La e2e ahora prueba eso, desagrupa, pone 0 en
+  un producto solo (Validación lo frena) y vuelve a agrupar.
+- Espera la respuesta de la revalidación. Una corrida dio rojo ahí («Generar»
+  seguía apagado con el resultado viejo en pantalla); no confirmé la causa,
+  creo que leyó el resultado de la visita anterior. Después de esperar la
+  respuesta: 5 de 5 OK.
+
+| Puerta | Resultado |
+|---|---|
+| Suite completa, worktree limpio (`fe79a0e`; después sólo cambió `ncm.js` y el script de pantalla) | `1505 passed, 102 skipped, 2 xfailed, 25 warnings in 149.09s`, 0 failed |
+| Pantallas en `4446571` | `OK: pantalla MARIA-5`, `OK: pantalla CATALOGO-NCM-1`, `OK: pantalla SUBITEMS-1` |
+| `e2e_maria.sh` en `4446571` (y en `fe79a0e`) | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.` |
+| Sabotajes | SUBITEMS-1: 9 de 9 (dos nuevos: el control que revienta con `5` y el número de línea); `sabotajes/maria1b.sh`: 0 fallas (un patrón al día). MARIA-5: 49 de 49 en `fe79a0e`; CATALOGO-NCM-1, MARIA-3 y 1d: corriendo al escribir esto (los agrego en cuanto terminen). |
+
+**Autorrevisión** (adversario Sonnet alto, sobre `fe79a0e`): el TXT no
+cambia (3000 pedidos al azar, los 949 que salen, idénticos byte a byte entre
+`a123b93` y `fe79a0e`), sin XSS, sin 500, y el panel coincide con el servidor
+en ~20.000 casos del borde. Encontró:
+- **Media, corregido en `4446571`:** el error quedaba en la posición; al
+  borrar o agregar un subítem caía sobre otra fila. Rojo antes en la pantalla.
+- **Para que mires (no lo toqué):** con un grupo antes, el mismo producto
+  dice «Item 3, sub-ítem 2» en sus subítems pero «Item 2» en el peso y el
+  estado (esos siguen con la línea del TXT, como antes). Unificar todo a la
+  posición de la pantalla toca mensajes de otras piezas; lo dejo a tu criterio.
+- **Para que mires (no lo toqué):** los errores de subítems de los controles
+  de MARIA-1b (`{errors: [...]}`, p. ej. cantidad NaN) siguen saliendo en la
+  pantalla final, no bajo el subítem; el panel ya los marca antes.
+- Muy baja, no tocado: con valores absurdos (1e-300 junto a 1e11) el
+  `Decimal` de 28 dígitos del servidor redondea y el panel no; con 200.000
+  subítems el panel desborda la pila. Ninguno se alcanza desde la pantalla.
+
+Para reproducir:
+```
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 4446571 8890
+for s in maria5 catalogo_ncm1 subitems1; do BASE_URL=http://127.0.0.1:8890 node scripts/testing/pantalla_$s.js; done   # tres «OK: pantalla …»
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh a123b93 8891
+BASE_URL=http://127.0.0.1:8891 node scripts/testing/pantalla_subitems1.js   # FALLA: el error del sufijo no sale bajo el subítem 2
+scripts/testing/sabotaje_subitems1.sh 4446571 <venv>                     # OK: los 9 sabotajes…
+```
+
+## MARIA-5 y CATALOGO-NCM-1 — segunda devolución: **`a8a83f3`** (producto en `135ff27`)
+
+**Resultado: los seis puntos de `b2bb20c`, con rojo antes y verde después.
+Para decidir: nada nuevo; la D27 de SUBITEMS-1 sigue abierta.** Base: tu rama
+hasta `b2bb20c` integrada, con SUBITEMS-1 (`88564ec`) adentro. SUBITEMS-1 ya
+estaba entregada en un corte limpio cuando llegó el veredicto.
+
+| # | Qué hace ahora | Prueba (`tests/test_devolucion2_maria5_ncm.py`) |
+|---|---|---|
+| 1 | Una columna de peso que no dice de qué es («Peso por caja», «Peso por bulto») es «dudosa». Nunca le gana a una reconocida: «Peso por caja» = 40 y «Peso» = 2,5 da 2,5, en cualquier orden. Sola, se usa como de una unidad, con el aviso «no dice si es el peso de una unidad o el de toda la línea… Revisala». Orden: neto > total > de una unidad > dudosa > bruto | rojo antes: 400 kg |
+| 2 | El bruto es bruto aunque diga «unitario» («Peso bruto unitario», «Gross weight per unit»): va último y con aviso | rojo antes: leído como neto |
+| 3 | Dos pesos de la línea que no coinciden: «en 1 fila(s) «Peso total» no da lo mismo que «Peso neto» (por ejemplo, 27 kg y 25 kg)» | rojo antes: sólo los nombres |
+| 4 | `pantalla_maria5.js` manda CUIT, vendedor y comprador (MARIA-1b) | las tres pantallas dan OK en `135ff27`, el producto de `61cf88f` |
+| 5 | La NCM tiene **un solo aviso**: el de `_control_ncm`, con el texto del catálogo vigente («se dio de baja en el nomenclador vigente de ARCA (2026-10-07)… buscá la nueva»; ya no «el de 2018»). Sale en `/api/validate/smart` con cabecera o sin ella, en `/generate_maria` y **en `/generate_maria/avisos`**. Sigue siendo aviso, no freno. `run_smart_validations` ya no lo agrega por su cuenta. `test_maria1b_controles.py` espera el texto nuevo | rojo antes: dos avisos, y ninguno en los avisos de antes de generar |
+| 6 | Sin el archivo del catálogo (la prueba apunta a uno que no existe) no se inventa «perdió el 0 inicial»: un solo aviso por operación, «No está el catálogo de NCM…» | rojo antes: el error con 9999999 y 1012100000A |
+| De paso | Los mensajes del peso dicen la razón: «no es un número válido» (NaN, infinito), «es negativo», «pasa el tope», «al menos 0.001 kg». En los avisos del Excel, 0,0004 kg no sale «0 kg» | rojo antes: NaN decía «tope» y -1, «no es un número» |
+
+Las pruebas nuevas contra la base (`dd5e851`, la rama con SUBITEMS-1 e
+integrada) dan `15 failed, 5 passed` (corrido).
+
+| Puerta (sobre `61cf88f`; después sólo cambian patrones de sabotaje) | Resultado |
+|---|---|
+| Suite completa, worktree limpio, venv sólo con `requirements.txt` | `1495 passed, 102 skipped, 2 xfailed, 25 warnings in 153.80s`, 0 failed |
+| `pantalla_maria5.js`, `pantalla_catalogo_ncm1.js` y `pantalla_subitems1.js` (servidor local en `135ff27`, el mismo producto) | `OK: pantalla MARIA-5`, `OK: pantalla CATALOGO-NCM-1`, `OK: pantalla SUBITEMS-1` |
+| Sabotajes | Todos `OK` en `a8a83f3`: MARIA-5 (49), CATALOGO-NCM-1 (16), SUBITEMS-1 (7), MARIA-3 (30), 1d (8), 4 (9), 1c (4), 2b (6), 2 (8) y 1a (10). De la Dev 1: `maria1b.sh` y `punta_a_punta1.sh` con 0 fallas. `excel1.sh`: sigue la del «mapeo guardado», ya informada, que da rojo en otras pruebas. Puse al día los patrones que movió esta vuelta (dos de `maria1b.sh`, uno de `maria1d`, el de la clase «dudosa» en `excel1.sh` y cuatro de MARIA-5) |
+
+No hice autorrevisión con subagente en esta vuelta: son seis puntos chicos y
+el contexto está alto. Para que la mires: la regla de la columna «dudosa» es
+nueva. Hoy cuentan como de una unidad sólo «Peso», «Weight», «Peso kg» y
+«Kg» (con o sin paréntesis), y las que dicen «unit»/«unidad»; cualquier otro
+nombre que empiece con «Peso» o contenga «weight» es dudoso.
+
+Para reproducir:
+```
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 61cf88f 8890
+for s in maria5 catalogo_ncm1 subitems1; do BASE_URL=http://127.0.0.1:8890 node scripts/testing/pantalla_$s.js; done
+python -m pytest -q tests/test_devolucion2_maria5_ncm.py tests/test_maria1b_controles.py
+```
+
+Última vuelta: 2026-10-07 20:20 UTC
+Contexto: ~62 % (a compactar)
+
+---
+
+## SUBITEMS-1 — entregada: **`88564ec`**
+
+**Resultado: terminada. Para decidir: la D27 (guardar los subítems con la
+operación).** Base: tu rama hasta `8d87c47` (`db2bc04`), sobre la reentrega
+de MARIA-5 y CATALOGO-NCM-1, que está en revisión.
+
+| # | Qué hace | Rojo antes → verde |
+|---|---|---|
+| 1. Pantalla | En el paso de NCM (`ncm.js`), cada producto no agrupado tiene «Subítems»: un panel para cargar, editar y borrar subítems (cantidad, valor unitario y sufijo de valor). Propone la cantidad que falta y dice en vivo si suman lo del producto («✓ Suman 6 de 6 unidades y 7.182,00 de 7.182,00 de valor»; ⚠ si no). Un producto con subítems no se agrupa. `buildMariaRequest` los manda con el formato de `/generate_maria`. Si todos los productos van en subítems con sufijo propio, el sufijo general no se pide (el servidor tampoco lo pedía) | `pantalla_subitems1.js` contra `db2bc04`: `FALLA: no aparece el botón «Subítems» del producto`; con la pieza, `OK: pantalla SUBITEMS-1` |
+| 2. Controles | Generador: cada sub-ítem con cantidad y valor unitario > 0 y la cantidad con hasta dos decimales (el TXT la declara con dos). Un producto agrupado no lleva sub-ítems. `/generate_maria`: el error del sufijo de un sub-ítem dice cuál es, y un pedido con sub-ítems de otra forma da 400. Todos los errores dicen «Item N, sub-ítem M». Antes, una cantidad negativa compensada por otra cerraba la suma y generaba | `tests/test_subitems1.py` contra `db2bc04`: el error no nombraba el sub-ítem, o generaba |
+| 3. PUNTA-A-PUNTA-1 | Los subítems llegan por el panel: la prueba los carga como la pantalla y la copia de `buildMariaRequest` los manda. **La D24 sale del `xfail`** | — |
+
+**El archivo real con subítems, por la pantalla.** `pantalla_subitems1.js`
+lo carga en el navegador (6 × 1197, 2 + 4 con sus dos sufijos) y genera. Los
+dos `[SBT]` salen idénticos a `maria_golden_subitems_anon.TXT`, salvo el
+número de operación (D23 y D25 de la Dev 1). `QARTKGRNET=33.000` y
+`MARTFOB=7182.00` también coinciden. El archivo entero se compara en
+`test_punta_a_punta1.py`, con la copia en Python de la pantalla.
+
+**Autorrevisión (Sonnet alto).** XSS, reordenar filas, «Agregar producto»,
+desagrupar, comas y decimales se sostienen. Arreglé lo que encontró (en
+`ae6ff5f` y `88564ec`):
+- Un subítem de cantidad 0,004 salía `QSBTUNTDCL=0.00` y `MSBTFOB=0.00`, sin
+  error.
+- Deshacer una acción masiva resucitaba un subítem borrado. Lo comprobé
+  levantando una copia sin el arreglo: `FALLA: deshacer la acción masiva
+  resucitó el subítem borrado`.
+- La suma del panel no seguía a la cantidad del producto.
+- Los errores de sufijo no decían qué subítem.
+- El sufijo general se pedía igual.
+- Enter caía en el panel.
+- Unos pedidos fabricados daban 500.
+
+| Puerta | Resultado |
+|---|---|
+| Suite completa, worktree limpio en `88564ec`, venv sólo con `requirements.txt` | `1475 passed, 102 skipped, 2 xfailed, 25 warnings in 151.49s`, 0 failed |
+| `sabotaje_subitems1.sh 88564ec` (7) | `OK: los 7 sabotajes dan rojo por la razón esperada` |
+| Sabotajes vecinos en `88564ec` (MARIA-5, MARIA-3, `maria1b.sh` y `punta_a_punta1.sh` de la Dev 1) | `OK: los 44` (MARIA-5) y `OK: los 30` (MARIA-3); `maria1b.sh` y `punta_a_punta1.sh`: `sabotajes con falla: 0` |
+| `pantalla_subitems1.js` (local, `ae6ff5f`) | `OK: pantalla SUBITEMS-1`; captura en `docs/pm/capturas/subitems1-panel.png` |
+
+### D27 — Guardar los subítems con la operación
+
+`operation_items` no tiene dónde guardarlos, y `saveOperationToHistory` no
+los manda. Lo mismo pasa con el estado de MARIA-4. Hoy no se pierde nada a la
+vista: ningún camino de la v2 reabre una operación del historial en la
+pantalla. Lo en curso sobrevive a recargar la página (`cdi_v2_state`).
+
+Opciones:
+- **(a) Recomiendo:** dejarlo así hasta que exista «reabrir una operación».
+  Esa pieza lleva la columna (JSON) y la migración.
+- **(b)** Hacerlo ahora: una migración en `operation_items`.
+
+**Riesgos y lo que no hice:**
+- La cantidad de un **producto** con más de dos decimales tiene el mismo
+  redondeo en `QARTUNTDCL`. Ya pasaba antes y no lo toqué.
+- Un campo vacío del panel viaja como 0, y el error dice «la cantidad «0»…».
+  Es cosmético.
+- Ni el lector de PDF ni el Excel detectan subítems solos: no estaba en el
+  alcance.
+- No corrido: el Kit del despachante. Nada contra producción ni terceros.
+
+Para reproducir:
+```
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 88564ec 8890
+BASE_URL=http://127.0.0.1:8890 node scripts/testing/pantalla_subitems1.js   # «OK: pantalla SUBITEMS-1»
+scripts/testing/sabotaje_subitems1.sh 88564ec /tmp/cdi-pm/venv              # «OK: los 7 sabotajes …»
+python -m pytest -q tests/test_subitems1.py tests/test_punta_a_punta1.py tests/test_maria_subitems.py
+```
+
+Última vuelta: 2026-10-07 19:45 UTC
+Contexto: ~55 % (a compactar)
+
+---
+
+## MARIA-5 y CATALOGO-NCM-1 — reentrega conjunta sobre tu rama: **`6854f34`**
+
+**Resultado: hecho lo que pide la D23 (`7e263eb`). Para decidir: nada.**
+Base: tu rama hasta `ce88c01` integrada, con EXCEL-1, MARIA-1b y
+PUNTA-A-PUNTA-1. El detalle de cada pieza está en las dos secciones de abajo
+(MARIA-5 en `07fb085`, CATALOGO-NCM-1 y la primera integración en `fd8200a`).
+Desde entonces sólo cambiaron pruebas y scripts:
+
+| Lo que pide la D23 | Hecho |
+|---|---|
+| Choques de `main.py` y `upload.js` con la regla de MARIA-5 | `3134480`: la regla de MARIA-5 manda en el peso; de EXCEL-1 quedan `_mapeo_efectivo` y el `drop`, y de MARIA-1b, sus controles en la validación |
+| Pruebas de EXCEL-1 que esperan el neto por unidad | Siete, en `dd88e89`. Ahora citan la respuesta 3 y la D23 (`9d7c8a0`). No toqué las de MARIA-1b |
+| `sabotaje_maria3.sh` con MARIA-1b adentro | `ROJO flete_sin_validar: 2 failed, 132 passed`; `OK: los 30 sabotajes dan rojo por la razón esperada`. El sabotaje saca también el flete de `controles_maria.py` |
+| Un producto con más de una unidad en `test_punta_a_punta1.py` | `test_dos_productos_reparten_flete_y_seguro_por_su_fob` ahora pide `QARTKGRNET` 700.000 y 260.000 (la máquina chica son 2 unidades con 260 kg la línea). Con el TXT tomando el peso de una unidad da rojo |
+
+| Puerta | Resultado |
+|---|---|
+| Suite completa, worktree limpio en `9d7c8a0` (`6854f34` sólo cambia un script de sabotaje) | `1459 passed, 102 skipped, 3 xfailed, 25 warnings in 140.04s`, 0 failed |
+| Sabotajes de la Dev 1 sobre mi base | `punta_a_punta1.sh`: 0 fallas en `6854f34`. Puse al día tres patrones que movió MARIA-5: el FOB del subítem, el reparto del flete y el FOB total. `maria1b.sh`: 0 fallas. `excel1.sh`: lo de `fd8200a`, abajo |
+| Mis sabotajes | en `fd8200a` y `8f151a0`, abajo. Después sólo cambiaron pruebas que pasan |
+
+Última vuelta: 2026-10-07 18:40 UTC
+Contexto: ~21 %
+
+---
+
+## CATALOGO-NCM-1 — entregada, con tu rama integrada: **`fd8200a`**
+
+**Resultado: terminada.** También integré tu rama (`9488dd8`, con EXCEL-1 y
+MARIA-1b) sobre MARIA-5. **Para decidir: la D23 sigue abierta.** En la
+integración apliqué la regla de MARIA-5 en las siete pruebas de EXCEL-1 que
+la contradecían, con un archivo real como prueba (abajo). Las D23 a D26 que
+contestaste en `f009a07` son de la Dev 1: la numeración se pisó, y la mía es
+la de `72e6f23`.
+
+### La pieza
+
+| # | Qué hace | Rojo antes → verde |
+|---|---|---|
+| 1. Catálogo | Regenerado con el importador desde `docs/pm/datos/arancel_ARCA_07102026.zip`: 10.504 NCM, idéntico fila por fila a `parse_arca_nomenclador` del ZIP. Metadata: `updated_at` 2026-10-07, SHA-256 `0fb407ce…`, `nomenclador_07102026.txt` y un campo nuevo, `obtenido` («Lo bajó Emi… por el chat»). El importador pide `--obtenido` | `tests/test_catalogo_ncm1.py` contra `07fb085`: 16 en rojo, de 16 |
+| 2. Bajas | El importador guarda en `ncm_bajas.json` lo que estaba en el catálogo anterior y no en el nuevo: **522** códigos, con su descripción y de qué archivo venían (222 KB). `aviso_de_ncm` dice «la NCM 8517.12.31 se dio de baja en el nomenclador vigente de ARCA (2026-10-07): esa posición ya no existe; buscá la nueva» o «no está en el nomenclador vigente». Sale en la validación como advertencia, sin frenar. En el asistente aparece en la sugerencia del historial o del proveedor (marcada `is-baja`), al escribir una SIM o una partida dada de baja («las posiciones 8517.12… se dieron de baja»), y en el mensaje de `/api/ncm/sugerir` | pantalla contra `7b4f651` (antes de la revisión): `FALLA: escribir 8517.12.31.000X no avisa la baja`; contra `07fb085`: `FALLA: la sugerencia dada de baja no lo dice` |
+| 3. `ncm_mercosur.csv` | **Lo saqué.** Sólo se usaba como respaldo cuando faltaba el catálogo, y 11 de sus 22 códigos no existen. Sin el catálogo, ahora el catálogo queda vacío y no se avisa en falso | `test_el_respaldo_con_codigos_viejos_no_se_usa` |
+
+Los dos archivos reales siguen idénticos: 8471.49.00 y 8479.89.99 están en el
+vigente. 8517.13.00, 8524 y 8549 están; 8517.12.31 avisa.
+
+**Autorrevisión (Sonnet alto).** El catálogo, las bajas y el importador se
+sostienen. Corrió el importador desde el catálogo viejo y salió igual byte a
+byte. No hay avisos en falso con SIM completas. Arreglé, en `4d9b7f5` y su
+prueba:
+- Escribir un código en el asistente no avisaba la baja: la pantalla no
+  consultaba al servidor. Ahora pide `GET /api/ncm/aviso`.
+- «8517.12» devolvía basura (bulbos de tulipanes): sin prefijo vigente caía
+  al ranking por palabras. Un código parcial ahora se busca sólo por prefijo.
+- Una sugerencia con una NCM que no está en el vigente (no sólo las bajas)
+  no avisaba.
+
+**No lo hice:**
+- `/api/ncm/enrich-items`, `/calcular` y `/{ncm}/completo` (la vista previa
+  de VUCE) no avisan la baja: no son la sugerencia, y la validación sí avisa.
+- La validación ahora carga el catálogo la primera vez en cada proceso
+  (~1,6 s y ~70 MB, una sola vez). No lo precargo al arrancar.
+- `proyecto_maria/data/ncm_metadata.csv` también tiene códigos viejos y nada
+  lo lee. No lo toqué porque no está en la tarea.
+- `proyecto_maria/tests/test_ncm_catalog.py` no está en `testpaths`, así que
+  la suite no lo corre. Pasa (5 passed). Mis pruebas nuevas están en
+  `tests/`.
+
+### La integración de tu rama (`3134480`, pruebas en `dd88e89`)
+
+- **Conflictos** en `main.py` (cuatro) y `upload.js` (uno):
+  - Conservé lo de EXCEL-1: `_mapeo_efectivo` y que una columna con el
+    nombre del campo salga antes de renombrar.
+  - Conservé lo de MARIA-1b: los controles dentro de la validación previa.
+  - Del peso, manda la regla de MARIA-5.
+  - En `upload.js`, los avisos van en un solo cartel.
+- **Regresión mía que apareció al integrar:** `_peso_por_unidad` leía el peso
+  con `pd.to_numeric` antes del lector de EXCEL-1, y «1,5» con miles en la
+  planilla daba 0. Ahora usa `_numero_factura` con el separador de la
+  planilla, y una columna de una unidad queda como vino
+  (`test_miles_con_pista_en_la_planilla` pasa).
+- **Prueba con el archivo real para la D23.** En `test_excel1_txt.py` y
+  `test_punta_a_punta1.py` la factura de subítems trae «Peso Neto» = 33 para
+  la línea de 6 unidades. El archivo real declara `QARTKGRNET=33.000`. Con la
+  regla de MARIA-5 (neto de la línea ÷ cantidad) el Excel da exactamente el
+  archivo real; con la de EXCEL-1 (neto de una unidad) daría 198 kg. En el
+  PDF, el Gemini falso pasó de `peso_kg` a `peso_total_linea`, que es lo que
+  pide el prompt.
+- **Siete pruebas de `test_excel1_lectura.py`** pasan a la regla de tu canal
+  (D22 y la devolución de MARIA-5):
+  - neto y total, de la línea;
+  - el bruto solo, dividido y con aviso;
+  - de una unidad > bruto. `«Peso (kg)»` con `«Peso (bruto)»` usa la de una
+    unidad y nombra el bruto ignorado; antes quedaba vacío.
+  
+  Están todas en `dd88e89`. **Si decidís otra cosa en la D23, se revierte ese
+  commit** y se cambia la regla en `_clase_de_peso` y `_RANGO_DE_PESO`.
+- **Pruebas de MARIA-5** que MARIA-1b ahora frena (sin moneda, incoterm ni
+  CUIT): las completé. El vacío escrito de esos tres da «Falta …», y lo
+  prueba un caso nuevo.
+- **Tope de los importes:** MARIA-1b lo frena antes en el endpoint. Le sumé
+  una prueba directa al generador para que su guarda siga cubierta (sabotaje
+  16).
+
+| Puerta (sobre `fd8200a`; después de `8f151a0` sólo cambian pruebas y scripts de sabotaje) | Resultado |
+|---|---|
+| Suite completa, worktree limpio en `fa4ed0b`, venv sólo con `requirements.txt` (`8f151a0` sólo suma dos pruebas, que pasan) | `1454 passed, 102 skipped, 1 xfailed, 25 warnings in 145.68s`, 0 failed |
+| `sabotaje_catalogo_ncm1.sh` (14), `sabotaje_maria5.sh` (44) y los de MARIA-3, 1d, 4, 1c, 2b, 2 y 1a; los de la Dev 1 (`sabotajes/excel1.sh`, `maria1b.sh`, `punta_a_punta1.sh`) | Míos, todos `OK`: CATALOGO-NCM-1 (14, en `fd8200a`), MARIA-5 (44, en `8f151a0`), MARIA-3 (30), 1d (8), 4 (9), 1c (4), 2b (6), 2 (8), 1a (10). De la Dev 1: `maria1b.sh` con 0 fallas y `punta_a_punta1.sh` con 0 fallas. Para el segundo puse al día el patrón del FOB del subítem, que movió MARIA-5. En `excel1.sh`, en `fd8200a`, queda una: «el mapeo guardado vuelve a dejar afuera lo detectado» da rojo, pero en otras pruebas. Pasa porque el peso ahora se elige aparte del mapeo y la cantidad «Qty» la encuentra el lector igual. Dos sabotajes del peso de ese script, que la regla de MARIA-5 dejó viejos, apuntan ahora a `_clase_de_peso` y `_RANGO_DE_PESO`, y dan rojo |
+| `pantalla_catalogo_ncm1.js` (local, `4d9b7f5`) | `OK: pantalla CATALOGO-NCM-1`; captura en `docs/pm/capturas/catalogo-ncm1-baja.png` |
+| `pantalla_maria5.js` y `smoke_friccion.sh` (local, `7b4f651`) | `OK: pantalla MARIA-5` y `==> OK · telemetría…` |
+
+No corrido: Gemini real, VUCE y Tarifar reales, el Kit. Nada contra
+producción ni terceros.
+
+Para reproducir:
+```
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh fd8200a 8890
+BASE_URL=http://127.0.0.1:8890 node scripts/testing/pantalla_catalogo_ncm1.js   # «OK: pantalla CATALOGO-NCM-1»
+scripts/testing/sabotaje_catalogo_ncm1.sh fd8200a /tmp/cdi-pm/venv              # «OK: los 14 sabotajes …»
+python -m pytest -q tests/test_catalogo_ncm1.py tests/test_excel1_lectura.py tests/test_maria5_*.py
+```
+
+Última vuelta: 2026-10-07 18:15 UTC
+Contexto: ~20 %
+
+---
+
+## MARIA-5 — reentrega con la devolución: **`07fb085`**
+
+**Resultado: los seis puntos, con rojo antes y verde después. Para decidir:
+la D23. MARIA-5 y EXCEL-1 (Dev 1) dicen lo contrario sobre «Peso neto», y
+además chocan en `main.py` y `upload.js`.** Base: `c3f79f8`, más tu
+`453cb01` integrado. Los dos archivos reales salen idénticos: sus pruebas
+están en la suite.
+
+| # | Qué hace ahora | Rojo antes → verde |
+|---|---|---|
+| 1. Dos pesos | **Lector:** si viene el de la línea, manda: se divide por la cantidad. Si además viene el de una unidad y no da el de la línea (tolerancia: 1 % o 0,001 kg), un aviso muestra los dos números («25 kg por unidad (× 10 = 250 kg) y 25 kg la línea; se usó el de la línea»). El aviso llega a la pantalla (`avisos` de `/upload_pdf/public`, en el mismo cartel de «Revisá la factura»). (25, 25) con 10 unidades da `QARTKGRNET=25.000`. **Excel:** orden neto > total > de una unidad > bruto, aunque el mapeo guardado diga otra. El aviso nombra la columna usada y las ignoradas y, si el de una unidad × cantidad no da el de la línea, muestra los dos números. El mapeo que se aprende es el de la columna que manda | `test_maria5_devolucion.py`, secciones 1 |
+| 2. Peso en texto | En cualquier columna de peso queda vacío, con aviso; la fila se conserva. También «inf» (antes: 500) | sección 2 y revisión |
+| 3. Guarda del peso | `peso_valido` en el `[ART]`: no finito, sobre 10¹² o que redondea a 0,000 → 400 con mensaje propio. Un peso en 0 ya daba 400 por el control del Kit; ahora también el generador lo rechaza (en `test_generar_maria_txt.py`, 8 productos sin peso pasan a llevar 1 kg) | sección 3 |
+| 4. Subítems | Exacto con exacto: la suma sin redondear contra el valor del ítem sin redondear. Tu caso (7 × 2,675) genera 18,73. Lote al azar con el criterio de `8e819dd` (3 × 1500): todo lo que pasaba genera | sección 4 |
+| 5. Grupo | Una cantidad menor que la cantidad de productos se rechaza con el mismo cartel («…al menos uno por producto»). Si alcanza, el producto que queda en 0 toma una unidad del que más tiene. 1/1/100 bajado a 5 da 1/1/3 | `pantalla_maria5.js` contra `c3f79f8`: `FALLA: 1/1/1 bajado a 2 quedó […{"c":0…}]`; con la pieza, OK |
+| 6. Una sola cuenta | `fob_total_del_txt`: un grupo es una línea y se redondea una vez. La validación lo usa (la pantalla manda `grupo_id`). El aviso «Gastos a FOB» suma flete y seguro al centavo, como el TXT | sección 6; pantalla contra `c3f79f8`: `FALLA: la validación muestra $620,04 y el TXT 620.03`; con la pieza, `$620,03 = 620.03` |
+
+Las pruebas nuevas contra la base `c3f79f8` dan `43 failed, 17 passed`.
+
+**Autorrevisión (Sonnet alto).** No encontró nada grave. Corrí 8000 pedidos
+al azar contra `c3f79f8` y salieron idénticos, salvo los subítems del punto 4
+y los pesos en 0. En 4000 pedidos, la validación coincide con `MDDTFOB`.
+Arreglé lo que encontró, en `1179dfc` y `07fb085`:
+- «Peso neto unitario» y «Net weight per unit» no se reconocían. Con un bruto
+  al lado, el TXT declaraba el bruto con un aviso falso. Ahora cuenta como
+  peso cualquier columna «Peso…» o «…weight…», pero no «Pesos», la moneda.
+  Esto también resuelve el riesgo de «Peso total (kg)» que te informé.
+- Un «inf» escrito daba 500.
+- Entre dos columnas de una unidad, el resultado dependía del orden de las
+  columnas. Ahora va primero la que dice neto y después la del mapeo guardado.
+- El aviso decía «peso_unitario (ignorada)».
+- Un peso enorme daba el mensaje equivocado.
+
+**Mensaje de la Dev 1 por `sabotaje_maria3.sh`.** `flete_sin_validar` ahora
+saca también el flete de `_IMPORTES_DE_LA_CABECERA`
+(`core/controles_maria.py`), si ese archivo está. En mi rama todavía no
+está, así que no lo corrí con MARIA-1b integrada: ver la D23.
+
+| Puerta | Resultado |
+|---|---|
+| Suite completa, worktree limpio en `1179dfc`, venv **sólo con `requirements.txt`** (`07fb085` sólo cambia la columna de una prueba, que pasa) | `1259 passed, 102 skipped, 25 warnings in 77.96s`, 0 failed |
+| `sabotaje_maria5.sh 07fb085` (44) | `OK: los 44 sabotajes dan rojo por la razón esperada`. En `1179dfc`, `pesos_moneda` quedó verde: la prueba no distinguía el defecto y la corregí en `07fb085` |
+| `sabotaje_maria3` / `1d` / `4` / `1c` / `2b` / `2` / `1a` en `07fb085` | `OK: los 30` / `8` / `9` / `4` / `6` / `8` / `10` |
+| `pantalla_maria5.js` (servidor local en `07fb085`) | `OK: pantalla MARIA-5`; captura en `docs/pm/capturas/maria5-validacion.png` |
+| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
+
+### D23 — «Peso neto» por unidad (EXCEL-1) o de la línea (MARIA-5)
+
+Probé `merge` de `origin/claude/dev1-tecnica` sobre `f9f80c1`, en un
+worktree aparte, y lo deshice: no subí nada. Hay conflictos en
+`proyecto_maria/main.py` (cuatro bloques: `smart_validation`, la lista de
+alias del peso, `_peso_por_unidad` contra `_mapeo_efectivo`, y
+`upload_excel_v2`) y en `static/v2/screens/upload.js` (el cartel final).
+
+Lo de fondo: EXCEL-1 pone `pesoneto` y `netweight` entre los nombres **de
+una unidad**. Además saca «Peso total» y el bruto («sin una de estas
+columnas, el peso queda vacío»). Tu regla de MARIA-5 es la contraria: neto
+> total > de una unidad > bruto, y el neto es de la línea. Con «Peso neto»
+= 25 y 10 unidades, EXCEL-1 declara 250 kg y MARIA-5 declara 25 kg.
+- **Recomiendo** la de MARIA-5, que es la que pediste y la que dice la
+  respuesta 3 del despachante. Quien integre segunda resuelve los conflictos
+  con esa regla: las dos piezas tienen pruebas que van a marcar el lado
+  equivocado. Si preferís, la resuelvo yo cuando EXCEL-1 esté en tu rama.
+
+**Riesgos y lo que no hice:**
+- La tolerancia entre los dos pesos (1 % o 0,001 kg) sólo decide si hay
+  aviso. El número que sale es siempre el de la línea.
+- «2,5» escrito como texto en el Excel no se interpreta: queda vacío con
+  aviso. No adiviné la coma decimal.
+- La v1 (`extract_items_from_excel` por `/upload_excel/`) sigue sacando una
+  fila con un peso en texto. No la toqué: no es la pantalla v2 y diverge
+  igual (`DECISIONS.md`).
+- No corrido: el Kit del despachante, Gemini real y planillas reales de
+  clientes. Nada contra producción ni terceros.
+
+Para reproducir:
+```
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 07fb085 8890
+BASE_URL=http://127.0.0.1:8890 node scripts/testing/pantalla_maria5.js   # «OK: pantalla MARIA-5»
+VENV=/tmp/cdi-pm/venv scripts/testing/sabotaje_maria5.sh 07fb085          # «OK: los 44 sabotajes …»
+python -m pytest -q tests/test_maria5_*.py                                # todo passed
+```
+
+Última vuelta: 2026-10-07 15:40 UTC
+Contexto: ~9 %
+
+---
+
+## MARIA-5 — entregada: **`6d59893`**
+
+**Resultado: terminada, con la D22 (a) y el punto 4. Para decidir: nada
+nuevo; dos riesgos abajo para que los mires (el «Peso neto» de un cliente que
+era por unidad y el redondeo del grupo).** Base: mi rama con MARIA-1d y tu
+rama integrada (`8e819dd`, con pypdf). Los dos archivos reales salen
+idénticos.
+
+| Punto | Qué hace ahora | Prueba | Rojo antes → verde |
+|---|---|---|---|
+| 1. Peso (M1) | `QARTKGRNET` = peso neto de la línea: `peso_kg` si viene (ya es total: v1 y archivos reales), si no `peso_unitario` × cantidad (v2). Los grupos suman el total de cada línea. 10 × 2,5 kg = **25 kg** | respuesta 3; real de 2026 (6 u, 33 kg) sin cambios | `test_maria5_peso.py`: 10 failed → passed (la del grupo de `test_generar_maria_txt` pasa de 4 a 8 kg, citando la respuesta 3) |
+| D22 lector | Las dos copias piden `peso_unitario` y `peso_total_linea`; si viene sólo el total, se divide por la cantidad. `peso_kg` viejo se lee como unitario | — | `test_maria5_peso_lector.py`: 15 failed, 2 passed → 17 passed |
+| D22 Excel (sólo el mapeo del peso) | «Peso total», «Peso neto» (y variantes con total/neto/net/línea, también en un mapeo guardado del cliente) se dividen por la cantidad; «Peso»/«Weight», de una unidad. El bruto queda último y, si es la única columna, se usa dividido **con aviso**. Un peso que no es número se avisa. La pantalla muestra los avisos | — | `test_maria5_peso_excel.py`: 6 failed → passed; lo de la 2.ª revisión, 6 failed → passed |
+| 2. Centavos (M9) | Importes al centavo, mitad hacia arriba, sobre el número escrito; cantidad × unitario en decimal exacto (3 × 3,335 = 10,01). Flete y seguro por resto mayor: la suma de los ítems da **exactamente** la carátula (FOB 100/100/400 con flete 10: 1,67 + 1,66 + 6,67 = **10,00**; antes 10,01). `MDDTFOB` = Σ `MARTFOB`; base = FOB + flete + seguro; `MSBTFOB` reparte el `MARTFOB` (misma tolerancia de antes). NaN, infinito, negativo o > 10¹² → 400 (antes `MARTFOB=nan` o 500). La validación muestra el mismo FOB | Kit: no corrido (no tengo el Kit); real de 2025 y 2026 idénticos | `test_maria5_centavos.py`: 36 failed → passed; lo de la 1.ª revisión, 10 failed → passed |
+| 3a. Carátula «None» | En `MariaRequest`, un campo de texto entero «None», «null», «N/A» o nulo es vacío: sale el aviso de carátula y no llega al TXT ni al archivo; sin número, `IDSO` y el archivo usan `OP_<fecha>`. La pantalla no arma `FAC_None` ni muestra «None» en el resumen | — | `test_maria5_caratula_vacia.py`: 8 failed → passed |
+| 3b. Lector PDF directo | Descripción, versión y código de parte con la misma función que PyMuPDF (`_texto_del_producto`) | — | `test_maria5_lector_productos.py`: 10 failed → passed |
+| 4. Grupos en la pantalla | Editar la cantidad del grupo la reparte en enteros (resto mayor); el valor y el peso promedio escalan los de cada producto. Se aplica al salir del campo; pasar sin cambiar no toca nada; 0, negativo o vacío se rechazan (vuelve lo que estaba); después se redibuja. Debajo del peso unitario, el de la línea | pantalla | `pantalla_maria5.js` contra `57bb17e`: `FALLA: la cantidad del grupo quedó [{"c":6,…},{"c":6,…}]`; contra `aa7d9a3`: `FALLA: pasar por el grupo sin editar cambió los productos`; con la pieza: `OK: pantalla MARIA-5` |
+
+Las pruebas nuevas contra la base `9679e21` (los cuatro primeros archivos):
+`64 failed, 25 passed`.
+
+| Puerta (sobre `6661dbf`, mismas pruebas y producto que `6d59893`, cuyo último commit sólo arregla patrones de sabotajes; el producto es el de `4c2231c`) | Resultado |
+|---|---|
+| Suite completa, worktree limpio, venv **sólo con `requirements.txt`** (sin PyPDF2) | `1199 passed, 102 skipped, 25 warnings in 75.30s`, 0 failed |
+| `sabotaje_maria5.sh` (23) | `OK: los 23 sabotajes dan rojo por la razón esperada` (con los patrones de `6d59893`) |
+| `sabotaje_maria3` / `1d` / `4` / `1c` / `2b` / `2` / `1a` | `OK: los 30` / `8` / `9` / `4` / `6` / `8` / `10` (el de 1a con los patrones de `6d59893`: el peso y el prompt se movieron a `_peso_del_producto`) |
+| `pantalla_maria5.js` (servidor local en `4c2231c`) | `OK: pantalla MARIA-5` (captura `docs/pm/capturas/maria5-validacion.png`) |
+| `pantalla_maria3.js` | `OK: pantalla MARIA-3` |
+| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
+| Autorrevisión | dos adversarios Sonnet alto; lo que encontraron está arreglado (arriba) salvo lo de «Riesgos» |
+
+**Riesgos y lo que no hice:**
+- **«Peso neto» de un cliente que era por unidad:** con la D22 se divide por
+  la cantidad; si un cliente tenía guardada una columna «Peso neto» que en
+  su planilla era por unidad, ahora baja a 1/cantidad (con el aviso «es de
+  toda la línea; se dividió»). No lo probé con una planilla real.
+- **Grupo:** al cambiar la cantidad, cada producto conserva su precio, así
+  que el promedio que se ve después cambia (la fila se redibuja con lo
+  guardado); en un empate, la unidad extra va al primero.
+- Excel: «Peso total (kg)» (con paréntesis) no se detecta sin mapeo, como
+  pasaba con «Peso (kg)»: la normalización de encabezados es de todas las
+  columnas y no la toqué.
+- Lector: si la cantidad viene en 0, el peso de la línea no se puede
+  dividir y queda en 0 (el semáforo marca la cantidad).
+- Sin chequeo cruzado si Gemini copia el mismo número en los dos pesos.
+- Un ítem con FOB 0,00 y flete: el flete de la carátula no se reparte (ya
+  pasaba; la validación rechaza valor 0).
+- `moneda` o `incoterm` «None» salen como línea vacía en el TXT, con aviso
+  (lo de DOL/FOB por defecto es de MARIA-1b).
+- El 0,5 inventado al guardar: lo saca MARIA-1b; al integrar hay que
+  resolver ese pedazo de `main.py`.
+- No corrido: el Kit del despachante; nada contra producción ni terceros.
+
+Para reproducir:
+```
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 6d59893 8890
+BASE_URL=http://127.0.0.1:8890 node scripts/testing/pantalla_maria5.js   # termina en «OK: pantalla MARIA-5»
+VENV=/tmp/cdi-pm/venv scripts/testing/sabotaje_maria5.sh 6d59893          # «OK: los 23 sabotajes …»
+python -m pytest -q tests/test_maria5_*.py                                # todo passed
+```
+
+Última vuelta: 2026-10-07 13:45 UTC
+Contexto: ~40 % (pasado el umbral: compactar en este corte)
+
+---
+
+## MARIA-1d — reentrega con el punto sumado: **`9679e21`**
+
+**Resultado: terminada. No hay nada para decidir.** La entrega de MARIA-1d
+(más abajo, sobre `c60dc3a`) sigue valiendo, y la rama incluye MARIA-3
+aceptada.
+
+| Punto sumado | Qué hice | Rojo antes → verde |
+|---|---|---|
+| Procedencia rara en un producto (`²`, `99999`, `٢٢٢`, «Narnia», en `pais_procedencia` o `procedencia`) | Una sola función, `errores_de_procedencia`, arma el texto. Al generar es el error 400 de siempre; en `/generate_maria/avisos` aparece el mismo texto, primero en la lista | `test_procedencia_rara_de_un_producto_avisa_igual_antes_y_al_generar`: `8 failed` → `8 passed` |
+
+| Puerta (sobre `8a036bf`, mismo producto y pruebas que `9679e21`; el último commit sólo arregla el patrón de un sabotaje) | Resultado |
+|---|---|
+| Suite completa, worktree limpio | `1029 passed, 102 skipped, 25 warnings in 64.36s`, 0 failed |
+| `sabotaje_maria1d.sh` | `OK: los 8 sabotajes dan rojo por la razón esperada` (el 8 es el punto sumado) |
+| `sabotaje_maria3` / `4` / `1c` / `2b` / `2` / `1a` | `OK: los 30 …` (sobre `9679e21`) / `9` / `4` / `6` / `8` / `10` |
+| `pantalla_maria3.js` | `OK: pantalla MARIA-3` |
+| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
+
+Última vuelta: 2026-10-07 11:30 UTC
+Contexto: ~63 % (pasado el umbral: compactar en este corte)
+
+---
+
 ## MARIA-3 — reentrega con la devolución: **`0d6cb3e`**
 
 **Resultado: los cinco puntos, cada uno con su rojo antes y verde después. No

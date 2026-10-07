@@ -77,7 +77,7 @@ def _por_pdf(monkeypatch, factura) -> list:
     respuesta = {
         "operacion": {},
         "items": [dict(descripcion=it["descripcion"], cantidad=it["cantidad"],
-                       valor_unitario=it["precio"], peso_kg=it["peso"], origen=it["pais"])
+                       valor_unitario=it["precio"], peso_total_linea=it["peso"], origen=it["pais"])
                   for it in factura["items"]],
     }
     return _leer(monkeypatch, "pdf_directo", respuesta)["items"]
