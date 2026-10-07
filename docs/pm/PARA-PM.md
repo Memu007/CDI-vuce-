@@ -72,7 +72,7 @@ python -m pytest -q --no-cov tests/test_guardar1.py                  # 21 passed
 | `sabotajes/guardar1.sh` | 12 de 12 en ROJO, `sabotajes con falla: 0` |
 | `smoke_friccion.sh` | `OK · telemetría + alias session/state + by-cuit protegido` |
 | `ataque_aislamiento.sh` | `Bloqueado: 22 · Fugas: 0`, «PUERTA G3 PASADA» |
-| Sabotajes de piezas anteriores | admin1, admin2 y excel2: 0 con falla. excel1: 5 patrones viejos (ROTO), que vienen de EXCEL-2 y no de esta pieza: los arreglo en la devolución de EXCEL-2. El resto (maria1b, punta_a_punta1, rendimiento, cobro_mp1) seguía corriendo cuando subí esto. |
+| Sabotajes de piezas anteriores, sobre `d6fe25f` | 0 con falla: admin1, admin2, excel2, punta_a_punta1, rendimiento1 y 1b. Con patrones viejos (ROTO), que no son de esta pieza: excel1 (5) y maria1b (1), por los cambios de EXCEL-2, que arreglo en su devolución; cobro_mp1 (3), por el paso 2 de COBRO-MP-1, que arreglo al retomarla. |
 
 **Revisiones:**
 
