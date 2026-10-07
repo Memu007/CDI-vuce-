@@ -123,14 +123,67 @@ def _abrir_pdf(contents: bytes) -> tuple:
     return False, len(pdf.pages)
 
 
+def hojas_del_xlsx(z) -> list:
+    """[(nombre, ruta dentro del zip)] de las hojas de cálculo de un .xlsx
+    abierto con zipfile, en el orden del libro, sin abrirlo con openpyxl.
+    Las hojas de gráfico no cuentan: pandas lee la primera hoja de cálculo."""
+    import posixpath
+    from xml.etree import ElementTree as ET
+    ns_main = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    ns_rel = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+    for parte in ("xl/workbook.xml", "xl/_rels/workbook.xml.rels"):
+        if z.getinfo(parte).file_size > 2**20:
+            raise ExcelDemasiadoGrande("El índice del Excel es demasiado grande.")
+    destinos = {}
+    for r in ET.fromstring(z.read("xl/_rels/workbook.xml.rels")):
+        if not (r.get("Type") or "").endswith("/worksheet"):
+            continue
+        destino = r.get("Target") or ""
+        destino = destino.lstrip("/") if destino.startswith("/") else posixpath.normpath(posixpath.join("xl", destino))
+        destinos[r.get("Id")] = destino
+    hojas = []
+    for h in ET.fromstring(z.read("xl/workbook.xml")).iter(f"{ns_main}sheet"):
+        if h.get(f"{ns_rel}id") in destinos:
+            hojas.append((h.get("name") or "", destinos[h.get(f"{ns_rel}id")]))
+    return hojas
+
+
+def _mb_de_entorno(nombre: str, defecto: float) -> int:
+    import math
+    try:
+        valor = float(os.getenv(nombre, "") or defecto)
+    except (TypeError, ValueError):
+        valor = defecto
+    if not math.isfinite(valor) or valor <= 0:
+        valor = defecto
+    return int(valor * 1024 * 1024)
+
+
+def _contar_hojas_xlsx(contents: bytes) -> int:
+    """Cuenta las hojas desde xl/workbook.xml y mira, antes de abrir el libro,
+    cuánto pesan los textos compartidos y la primera hoja: openpyxl los lee
+    enteros al abrir, y un libro armado (millones de textos vacíos, una hoja
+    enorme) tardaba minutos y usaba gigas de memoria (D26 a, EXCEL-2)."""
+    import zipfile
+    with zipfile.ZipFile(io.BytesIO(contents)) as z:
+        hojas = hojas_del_xlsx(z)
+        nombres = set(z.namelist())
+        tope_textos = _mb_de_entorno("EXCEL_MAX_TEXTOS_MB", 10)
+        if "xl/sharedStrings.xml" in nombres and z.getinfo("xl/sharedStrings.xml").file_size > tope_textos:
+            raise ExcelDemasiadoGrande(
+                f"El Excel tiene demasiados textos (más de {tope_textos // 2**20} MB). "
+                "Dejá sólo la hoja de la factura o cargá los productos a mano.")
+        tope_hoja = _mb_de_entorno("EXCEL_MAX_PRIMERA_HOJA_MB", 30)
+        if hojas and hojas[0][1] in nombres and z.getinfo(hojas[0][1]).file_size > tope_hoja:
+            raise ExcelDemasiadoGrande(
+                f"La primera hoja del Excel es demasiado grande (más de {tope_hoja // 2**20} MB). "
+                "Dejá sólo los productos de la factura.")
+        return len(hojas)
+
+
 def _contar_hojas_excel(contents: bytes, file_ext: str) -> int:
     if file_ext == '.xlsx':
-        import openpyxl
-        wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True)
-        try:
-            return len(wb.sheetnames)
-        finally:
-            wb.close()
+        return _contar_hojas_xlsx(contents)
     # El formato binario .xls no puede abrirse con openpyxl.
     # Pandas usa xlrd y alcanza con validar que exista alguna hoja.
     import pandas as pd
@@ -162,7 +215,8 @@ def _excel_descomprimido_bytes(contents: bytes) -> int:
 
 
 class ExcelDemasiadoGrande(Exception):
-    """El .xlsx descomprimido pasa de EXCEL_MAX_DESCOMPRIMIDO_MB."""
+    """El .xlsx descomprimido pasa de EXCEL_MAX_DESCOMPRIMIDO_MB, o sus textos
+    o su primera hoja pasan de su tope (D26 a). El mensaje es para la persona."""
 
 
 # Validar un Excel usa su propio grupo de hilos: muchas subidas pesadas no le
@@ -320,11 +374,11 @@ async def validate_file_upload(
                     ),
                     timeout=_pdf_validate_timeout_s(),
                 )
-            except ExcelDemasiadoGrande:
+            except ExcelDemasiadoGrande as e:
                 raise HTTPException(
                     400,
-                    "El Excel es demasiado grande descomprimido. Probá con una planilla "
-                    "con menos datos o cargá los productos a mano.",
+                    str(e) or "El Excel es demasiado grande descomprimido. Probá con una "
+                    "planilla con menos datos o cargá los productos a mano.",
                 )
             except asyncio.TimeoutError:
                 raise HTTPException(

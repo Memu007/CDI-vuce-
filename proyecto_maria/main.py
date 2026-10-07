@@ -3371,12 +3371,57 @@ def _respuesta_excel_demasiado_largo(e: Exception) -> JSONResponse:
     )
 
 
+def _xlsx_solo_primera_hoja(ruta: str) -> bytes:
+    """El .xlsx con sólo su primera hoja de cálculo. openpyxl, al abrir un
+    libro, recorre entera cada hoja que no declara su medida (<dimension>), y
+    un libro armado con muchas hojas así tardaba minutos aunque se lea sólo la
+    primera (D26 a, EXCEL-2). Las demás hojas se miran aparte, con su propio
+    presupuesto (_otras_hojas_con_datos)."""
+    import io as _io
+    import zipfile
+    from xml.etree import ElementTree as ET
+    from proyecto_maria.security.file_security import hojas_del_xlsx
+    ns_main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    with zipfile.ZipFile(ruta) as z:
+        hojas = hojas_del_xlsx(z)
+        if len(hojas) <= 1:
+            with open(ruta, "rb") as f:
+                return f.read()
+        afuera = {parte for _, parte in hojas[1:]}
+        ET.register_namespace("", ns_main)
+        ET.register_namespace("r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships")
+        libro = ET.fromstring(z.read("xl/workbook.xml"))
+        primera = hojas[0][0]
+        sheets = libro.find(f"{{{ns_main}}}sheets")
+        for h in list(sheets):
+            if h.get("name") != primera:
+                sheets.remove(h)
+        # Los nombres definidos pueden apuntar a hojas que ya no están.
+        definidos = libro.find(f"{{{ns_main}}}definedNames")
+        if definidos is not None:
+            libro.remove(definidos)
+        salida = _io.BytesIO()
+        with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as nuevo:
+            for info in z.infolist():
+                if info.filename in afuera:
+                    continue
+                if info.filename == "xl/workbook.xml":
+                    nuevo.writestr(info, ET.tostring(libro, xml_declaration=True, encoding="UTF-8"))
+                else:
+                    nuevo.writestr(info, z.read(info.filename))
+        return salida.getvalue()
+
+
 def _leer_excel_ruta(ruta: str, engine: str):
     # dtype=object: cada celda como viene. Sin eso pandas convierte el texto
     # «1.500» en 1,5 y la NCM 84713000 en 84713000.0 (EXCEL-1).
     # Las filas vacías se sacan acá, en el hilo de lectura: una celda suelta en
     # la fila 1.048.576 no obliga a recorrer un millón de filas (EXCEL-1).
-    return pd.read_excel(ruta, engine=engine, dtype=object).dropna(how="all")
+    origen = ruta
+    if engine == "openpyxl":
+        import io as _io
+        origen = _io.BytesIO(_xlsx_solo_primera_hoja(ruta))
+    return pd.read_excel(origen, engine=engine, dtype=object).dropna(how="all")
 
 
 # Mirar las otras hojas es sólo un aviso, y tiene su propio presupuesto que
@@ -3420,27 +3465,12 @@ class _LecturaMedida:
 
 def _hojas_del_xlsx(z) -> list:
     """[(nombre, ruta dentro del zip)] de las hojas de cálculo, en el orden
-    del libro. Las hojas de gráfico no cuentan: pandas lee la primera hoja de
-    cálculo, aunque haya un gráfico antes."""
-    import posixpath
-    from xml.etree import ElementTree as ET
-    ns_main = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
-    ns_rel = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
-    for parte in ("xl/workbook.xml", "xl/_rels/workbook.xml.rels"):
-        if z.getinfo(parte).file_size > 2**20:
-            raise _SeAcaboElPresupuesto("índice del libro")
-    destinos = {}
-    for r in ET.fromstring(z.read("xl/_rels/workbook.xml.rels")):
-        if not (r.get("Type") or "").endswith("/worksheet"):
-            continue
-        destino = r.get("Target") or ""
-        destino = destino.lstrip("/") if destino.startswith("/") else posixpath.normpath(posixpath.join("xl", destino))
-        destinos[r.get("Id")] = destino
-    hojas = []
-    for h in ET.fromstring(z.read("xl/workbook.xml")).iter(f"{ns_main}sheet"):
-        if h.get(f"{ns_rel}id") in destinos:
-            hojas.append((h.get("name") or "", destinos[h.get(f"{ns_rel}id")]))
-    return hojas
+    del libro (la misma lectura que la validación, file_security)."""
+    from proyecto_maria.security.file_security import ExcelDemasiadoGrande, hojas_del_xlsx
+    try:
+        return hojas_del_xlsx(z)
+    except ExcelDemasiadoGrande:
+        raise _SeAcaboElPresupuesto("índice del libro")
 
 
 def _textos_compartidos(z, presupuesto: dict) -> list:
