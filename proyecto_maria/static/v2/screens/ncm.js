@@ -18,6 +18,9 @@
     // Productos con el panel de subítems abierto (por objeto: sobrevive a
     // reordenar las filas).
     let subitemsAbiertos = new WeakSet();
+    // El error del servidor de un subítem, para mostrarlo bajo ese subítem:
+    // { it, k, texto } (SUBITEMS-1).
+    let errorDeSubitem = null;
     const expandedGroups = new Set();
     let batchBar, batchCount, batchFactor, batchApplyQty, batchNcm, batchDc, batchApplyNcm, batchOrigin, batchApplyOrigin, batchClear, batchAgrupar, selectAllBox;
     let batchSimAutofilled = false;
@@ -740,8 +743,29 @@
         const n = Number(String(v == null ? '' : v).replace(',', '.'));
         return Number.isFinite(n) ? n : NaN;
     }
-    // ¿Las partes suman lo del producto? Misma tolerancia que el servidor:
-    // cantidades a 0,001 y valores a 0,01.
+    // El número escrito como entero y escala (6,33 = 633 y 2), como el
+    // decimal exacto del servidor: String() de JS y repr() de Python dan los
+    // mismos dígitos para el mismo número.
+    function exactoDe(n) {
+        const m = /^(-?)(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/.exec(String(n));
+        if (!m) return { v: 0n, e: 0 };
+        let digitos = m[2] + (m[3] || '');
+        let escala = (m[3] || '').length - parseInt(m[4] || '0', 10);
+        if (escala < 0) { digitos += '0'.repeat(-escala); escala = 0; }
+        return { v: BigInt(m[1] + digitos), e: escala };
+    }
+    // |a − b| ≤ 0,01 en decimal exacto; a y b son listas de productos [x, y].
+    function difiereHastaUnCentavo(a, b) {
+        const prod = ([x, y]) => { const p = exactoDe(x), q = exactoDe(y); return { v: p.v * q.v, e: p.e + q.e }; };
+        const pa = a.map(prod), pb = b.map(prod);
+        const E = Math.max(2, ...pa.map(x => x.e), ...pb.map(x => x.e));
+        const al = x => x.v * 10n ** BigInt(E - x.e);
+        let d = pa.reduce((t, x) => t + al(x), 0n) - pb.reduce((t, x) => t + al(x), 0n);
+        if (d < 0n) d = -d;
+        return d <= 10n ** BigInt(E - 2);
+    }
+    // ¿Las partes suman lo del producto? La misma cuenta que el servidor:
+    // cantidades a 0,001 y valores a 0,01 en decimal exacto.
     function sumaSubitems(it) {
         const subs = subitemsDe(it);
         const cant = subs.reduce((t, s) => t + (numeroDe(s.cantidad) || 0), 0);
@@ -752,16 +776,23 @@
         const dosDecimales = c => Math.abs(c - Math.round(c * 100) / 100) <= 1e-9;
         const malos = subs.map((s, k) => (numeroDe(s.cantidad) > 0 && dosDecimales(numeroDe(s.cantidad)) &&
             numeroDe(s.valor_unitario) > 0) ? 0 : k + 1).filter(Boolean);
-        const ok = subs.length > 0 && !malos.length && Math.abs(cant - cantItem) <= 0.001 && Math.abs(valor - valorItem) <= 0.01;
-        return { cant, valor, cantItem, valorItem, malos, ok };
+        const cantOk = Math.abs(cant - cantItem) <= 0.001;
+        const valorOk = !malos.length && difiereHastaUnCentavo(
+            subs.map(s => [numeroDe(s.cantidad) || 0, numeroDe(s.valor_unitario) || 0]),
+            [[cantItem, numeroDe(it.valor_unitario) || 0]]);
+        const ok = subs.length > 0 && !malos.length && cantOk && valorOk;
+        return { cant, valor, cantItem, valorItem, malos, cantOk, valorOk, ok };
     }
     function textoSumaSubitems(it) {
         if (!subitemsDe(it).length) return '';
         const r = sumaSubitems(it);
-        const n = (v, d) => v.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d });
-        let texto = 'Suman ' + n(r.cant, 0) + ' de ' + n(r.cantItem, 0) + ' unidades y ' +
-            n(r.valor, 2) + ' de ' + n(r.valorItem, 2) + ' de valor.';
+        const n = (v, min, max) => v.toLocaleString('es-AR', { minimumFractionDigits: min, maximumFractionDigits: max });
+        // Las cantidades con sus decimales: 1,5 + 1,4 suman 2,9, no 3.
+        let texto = 'Suman ' + n(r.cant, 0, 3) + ' de ' + n(r.cantItem, 0, 3) + ' unidades y ' +
+            n(r.valor, 2, 2) + ' de ' + n(r.valorItem, 2, 2) + ' de valor.';
         if (r.malos.length) texto += ' Revisá el subítem ' + r.malos.join(', ') + ': cantidad y valor mayores que 0, y la cantidad con hasta dos decimales.';
+        else if (!r.cantOk) texto += ' Las cantidades de los subítems no suman la del producto.';
+        else if (!r.valorOk) texto += ' Los valores de los subítems no suman el del producto (se admite 0,01 de diferencia).';
         return (r.ok ? '✓ ' : '⚠ ') + texto;
     }
     function actualizarSumaSubitems(i) {
@@ -778,6 +809,7 @@
             '<input class="input input-sm" type="' + tipo + '"' + (extra || '') + ' value="' + esc(valor) + '"' +
             ' data-sub-row="' + i + '" data-sub-idx="' + k + '" data-sub-field="' + nombre + '"' +
             ' aria-label="' + etiqueta + ' del subítem ' + (k + 1) + '">';
+        const conError = k => errorDeSubitem && errorDeSubitem.it === it && errorDeSubitem.k === k;
         const filas = subs.map((s, k) =>
             '<tr>' +
                 '<td class="ncm-sub-num">' + (k + 1) + '</td>' +
@@ -786,7 +818,11 @@
                 '<td>' + campo(k, 'sufijo', 'text', s.sufijo, 'Sufijo de valor', ' placeholder="El general de la operación"') + '</td>' +
                 '<td><button type="button" class="btn-link" data-sub-borrar="' + i + '" data-sub-idx="' + k + '"' +
                     ' aria-label="Borrar el subítem ' + (k + 1) + '">Borrar</button></td>' +
-            '</tr>').join('');
+            '</tr>' +
+            (conError(k)
+                ? '<tr class="ncm-sub-error"><td></td><td colspan="4"><p class="field-error" role="alert" data-sub-error="' + i +
+                  '" data-sub-idx="' + k + '">' + esc(errorDeSubitem.texto) + '</p></td></tr>'
+                : '')).join('');
         const r = subs.length ? sumaSubitems(it) : { ok: true };
         return (
             '<tr class="row-subitems" data-subitems-panel="' + i + '">' +
@@ -845,6 +881,11 @@
             const sub = it && subitemsDe(it)[parseInt(inp.getAttribute('data-sub-idx'), 10)];
             if (!sub) return;
             const campoSub = inp.getAttribute('data-sub-field');
+            // Al corregir el subítem, su error se va.
+            if (errorDeSubitem && errorDeSubitem.it === it) {
+                errorDeSubitem = null;
+                tbody.querySelectorAll('.ncm-sub-error').forEach(el => el.remove());
+            }
             sub[campoSub] = campoSub === 'sufijo' ? inp.value : (inp.value === '' ? '' : numeroDe(inp.value));
             lastSnapshot = null;
             actualizarSumaSubitems(i);
@@ -1012,6 +1053,15 @@
     // API pequeña y determinística para probar la acción masiva sin navegador.
     CDI.ncmBatch = CDI.ncmBatch || {};
     CDI.ncmBatch.applyNcmAndGroup = applyNcmAndGroup;
+    // Deja el error del servidor bajo el subítem k del producto i y abre su
+    // panel; se ve al volver al paso de NCM.
+    CDI.ncmBatch.marcarErrorDeSubitem = function (i, k, texto) {
+        const it = ((CDI.state && CDI.state.items) || [])[i];
+        if (!it || !subitemsDe(it)[k]) return false;
+        subitemsAbiertos.add(it);
+        errorDeSubitem = { it, k, texto };
+        return true;
+    };
     CDI.ncmBatch.isValidSimPosition = isValidNcm;
     CDI.ncmBatch.inferSelectedSim = inferSelectedSim;
 

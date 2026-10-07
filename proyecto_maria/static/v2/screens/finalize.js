@@ -397,6 +397,14 @@
             const dur = Date.now() - startedAt;
             if (!res.ok || !data || data.success === false) {
                 const detail = (data && (data.detail || data.message)) || res.statusText;
+                // El error de un subítem (su sufijo incluido) va bajo ese
+                // subítem, en el paso de NCM (SUBITEMS-1).
+                const sub = typeof detail === 'string' && /^Item (\d+), sub-ítem (\d+): /.exec(detail);
+                if (sub && CDI.ncmBatch && CDI.ncmBatch.marcarErrorDeSubitem &&
+                        CDI.ncmBatch.marcarErrorDeSubitem(parseInt(sub[1], 10) - 1, parseInt(sub[2], 10) - 1, detail)) {
+                    CDI.goTo('ncm');
+                    throw new Error(detail);
+                }
                 // Si el error es de SBT, mostrar junto al campo y volver a validación
                 if (typeof detail === 'string' && detail.toLowerCase().includes('sbt')) {
                     if (sbtError) {

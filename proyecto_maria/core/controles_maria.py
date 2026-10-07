@@ -103,7 +103,10 @@ def montos_fuera_de_rango(items, cabecera: dict) -> list:
             errores.append(f"Item {n}: Valor inválido")
         if _fuera_de_rango(peso_kg) or _fuera_de_rango(cantidad, peso_unitario):
             errores.append(f"Item {n}: Peso inválido")
-        for m, sub in enumerate(item.get("subitems") or [], start=1):
+        # Con otra forma que una lista, el control de forma de /generate_maria
+        # da el 400 con su mensaje; acá no se revienta (SUBITEMS-1).
+        subitems = item.get("subitems")
+        for m, sub in enumerate(subitems if isinstance(subitems, list) else [], start=1):
             if not isinstance(sub, dict):
                 continue
             sub_cant = _numero_o_none(sub.get("cantidad"))

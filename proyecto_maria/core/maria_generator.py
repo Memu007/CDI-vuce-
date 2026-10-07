@@ -843,6 +843,10 @@ def generate_maria_txt(operation_id: str, items: list,
         gid = it['grupo_id']
         grupos_dict.setdefault(gid, []).append(it)
 
+    # El número de un producto en la pantalla (su lugar en el pedido); con
+    # grupos antes, no es el de su línea del TXT. Los errores de los
+    # sub-ítems lo usan para caer bajo el sub-ítem que falla (SUBITEMS-1).
+    lugar_en_el_pedido = {id(it): k for k, it in enumerate(items, 1)}
     items_export = []
     grupos_emitidos = set()
     for item in items:
@@ -1024,6 +1028,7 @@ def generate_maria_txt(operation_id: str, items: list,
             lines.append(f"CSBTSVL={sufijo_sbt}")
             lines.append("")
         else:
+            n_item = lugar_en_el_pedido.get(id(item), idx)
             # Partido en sub-ítems: numeración desde 0001, cada uno con su
             # cantidad, unitario y FOB.
             #
@@ -1043,7 +1048,7 @@ def generate_maria_txt(operation_id: str, items: list,
                         numero = float("nan")
                     if not math.isfinite(numero) or numero <= 0:
                         raise ValueError(
-                            f"Item {idx}, sub-ítem {n}: {nombre} «{str(crudo)[:20]}» tiene que ser "
+                            f"Item {n_item}, sub-ítem {n}: {nombre} «{str(crudo)[:20]}» tiene que ser "
                             f"un número mayor que 0."
                         )
                 # QSBTUNTDCL va con dos decimales: 0,004 saldría 0,00 y tres
@@ -1051,7 +1056,7 @@ def generate_maria_txt(operation_id: str, items: list,
                 cant_sub = float(sub.get("cantidad") or 0)
                 if abs(cant_sub - round(cant_sub, 2)) > 1e-9:
                     raise ValueError(
-                        f"Item {idx}, sub-ítem {n}: la cantidad «{str(sub.get('cantidad'))[:20]}» tiene más "
+                        f"Item {n_item}, sub-ítem {n}: la cantidad «{str(sub.get('cantidad'))[:20]}» tiene más "
                         f"de dos decimales; el TXT la declara con dos."
                     )
             suma_cant = sum(float(s.get("cantidad", 0) or 0) for s in subitems)
@@ -1070,12 +1075,12 @@ def generate_maria_txt(operation_id: str, items: list,
             valor_exacto = valor_de_la_linea(item)
             if abs(suma_cant - cantidad) > 0.001:
                 raise ValueError(
-                    f"Item {idx}: las cantidades de los sub-ítems suman {suma_cant:g} "
+                    f"Item {n_item}: las cantidades de los sub-ítems suman {suma_cant:g} "
                     f"pero el ítem declara {cantidad:g}. Tienen que coincidir."
                 )
             if abs(suma_fob - valor_exacto) > Decimal("0.01"):
                 raise ValueError(
-                    f"Item {idx}: los valores de los sub-ítems suman {suma_fob:.2f} "
+                    f"Item {n_item}: los valores de los sub-ítems suman {suma_fob:.2f} "
                     f"pero el ítem declara {valor_total:.2f}. Tienen que coincidir."
                 )
 
@@ -1083,7 +1088,7 @@ def generate_maria_txt(operation_id: str, items: list,
                 sufijo = (sub.get("sufijo") or sufijo_sbt or "").strip()
                 if not sufijo:
                     raise ValueError(
-                        f"Item {idx}, sub-ítem {n}: falta el sufijo de valor (CSBTSVL)."
+                        f"Item {n_item}, sub-ítem {n}: falta el sufijo de valor (CSBTSVL)."
                     )
                 sub_cant = float(sub.get("cantidad", 0) or 0)
                 sub_unit = float(sub.get("valor_unitario", valor_unit) or 0)
