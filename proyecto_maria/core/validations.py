@@ -4,7 +4,7 @@
 
 import re
 from proyecto_maria.models.operations import Item  # Modelo Pydantic de items
-from proyecto_maria.core.maria_generator import pais_reconocido
+from proyecto_maria.core.maria_generator import fob_total_del_txt, pais_reconocido
 from typing import List, Tuple  # Type hints para mejor documentación
 
 def run_pre_maria_validations(items: List[Item]) -> Tuple[List[Item], List[str]]:
@@ -129,7 +129,7 @@ NCM_REQUIERE_PERMISO = {
     "3002": "Vacunas/sangre - Requiere ANMAT",
 }
 
-def run_smart_validations(items: List[Item]) -> dict:
+def run_smart_validations(items: List[Item], grupos: list | None = None) -> dict:
     """
     🧠 VALIDACIONES INTELIGENTES PREMIUM
     
@@ -305,6 +305,18 @@ def run_smart_validations(items: List[Item]) -> dict:
             f"{len(errores)} errores, {len(advertencias)} advertencias, {len(sugerencias)} sugerencias."
         )
     
+    # El FOB como sale en el TXT, con la misma cuenta que el generador: los
+    # productos de un grupo van en una línea (devolución de MARIA-5).
+    grupos = list(grupos) if grupos is not None else [None] * len(items)
+    con_valor = [(it, g) for it, g in zip(items, grupos)
+                 if (it.cantidad or 0) > 0 and (it.valor_unitario or 0) > 0]
+    try:
+        total_valor_txt = fob_total_del_txt(
+            [{'cantidad': it.cantidad, 'valor_unitario': it.valor_unitario} for it, _ in con_valor],
+            [g for _, g in con_valor])
+    except ValueError:  # un importe imposible: el TXT dará el error
+        total_valor_txt = round(total_valor, 2)
+
     return {
         "errores": errores,
         "advertencias": advertencias,
@@ -312,7 +324,7 @@ def run_smart_validations(items: List[Item]) -> dict:
         "resumen": resumen,
         "estadisticas": {
             "total_items": len(items),
-            "total_valor_usd": round(total_valor, 2),
+            "total_valor_usd": float(total_valor_txt),
             "total_peso_kg": round(total_peso, 2),
             "ncms_unicos": len(ncms_usados)
         }

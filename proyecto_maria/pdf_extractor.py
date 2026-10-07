@@ -2149,8 +2149,53 @@ def _texto(raw) -> str:
 _TEXTO_VACIO = {'NONE', 'NULL', 'N/A'}
 
 
+def _texto_del_producto(item_data: dict) -> tuple[str, str]:
+    """La descripción (con la versión sumada) y el código de parte de un
+    producto, igual en las dos copias del lector (MARIA-5)."""
+    descripcion = _texto(item_data.get('descripcion'))
+    version = _texto(item_data.get('version'))
+    if descripcion and version:
+        descripcion = f"{descripcion} {version}"
+    elif not descripcion:
+        descripcion = version
+    return descripcion[:100], _texto(item_data.get('codigo_parte'))[:20]
+
+
 def _no_aplica(raw, palabras) -> bool:
     return str(raw).strip().rstrip('.').strip().upper() in palabras
+
+
+def _kg(numero: float) -> str:
+    return f"{numero:.3f}".rstrip('0').rstrip('.')
+
+
+def _peso_del_producto(item_data: dict, cantidad: float, decimal) -> tuple[float, float, str]:
+    """El peso neto de una unidad, el de la línea y un aviso (MARIA-5, D22).
+    Gemini devuelve el que trae la factura. Si trae el de la línea, manda: se
+    divide por la cantidad, porque el TXT multiplica el unitario por la
+    cantidad. Si además trae el de una unidad y no da el de la línea (por
+    ejemplo, el total copiado en los dos campos), el aviso muestra los dos
+    números (devolución de MARIA-5). `peso_kg` es el nombre viejo: se lee
+    como unitario, como antes."""
+    unitario = _numero_factura(item_data.get('peso_unitario'), decimal) or 0.0
+    total = _numero_factura(item_data.get('peso_total_linea'), decimal) or 0.0
+    aviso = ""
+    if total > 0 and cantidad > 0:
+        if unitario > 0 and abs(unitario * cantidad - total) > max(0.001, total / 100):
+            aviso = (f"la factura dice {_kg(unitario)} kg por unidad (× {_kg(cantidad)} = "
+                     f"{_kg(unitario * cantidad)} kg) y {_kg(total)} kg la línea; se usó el de "
+                     f"la línea ({_kg(total)} kg). Revisalo.")
+        unitario = total / cantidad
+    if unitario <= 0:
+        unitario = _numero_factura(item_data.get('peso_kg'), decimal) or 0.0
+    unitario = unitario if unitario > 0 else 0.0
+    return unitario, round(unitario * cantidad, 3) if unitario and cantidad > 0 else 0.0, aviso
+
+
+def _avisar_peso(operacion_data: dict, descripcion: str, aviso: str) -> None:
+    if aviso:
+        operacion_data.setdefault('avisos_peso', []).append(
+            f"Peso de «{descripcion or 'un producto'}»: {aviso}")
 
 
 def _valores_numericos(result: dict) -> list:
@@ -2158,7 +2203,8 @@ def _valores_numericos(result: dict) -> list:
     valores = [operacion.get('flete'), operacion.get('seguro')]
     for it in result.get('items') or []:
         if isinstance(it, dict):
-            valores += [it.get('cantidad'), it.get('valor_unitario'), it.get('peso_kg')]
+            valores += [it.get('cantidad'), it.get('valor_unitario'), it.get('peso_unitario'),
+                        it.get('peso_total_linea'), it.get('peso_kg')]
     return valores
 
 
@@ -2262,7 +2308,8 @@ Para CADA línea de la tabla de productos, extrae:
 - descripcion: Nombre del producto (2-5 palabras, SIN medidas, SIN códigos)
 - cantidad: Número de unidades, copiado tal como aparece en la factura
 - valor_unitario: Precio por unidad, copiado tal como aparece en la factura
-- peso_kg: Peso en kg (0 si no aparece; no estimar)
+- peso_unitario: Peso neto de UNA unidad en kg (0 si la factura no lo dice; no estimar ni calcular)
+- peso_total_linea: Peso neto de TODA la línea en kg, todas las unidades juntas (0 si la factura no lo dice; no estimar ni calcular)
 - origen: Código país origen (CN, BR, US, etc.)
 
 🔍 EXTRACCIÓN DE CÓDIGOS (IMPORTANTE):
@@ -2302,7 +2349,7 @@ FORMATO DE RESPUESTA (JSON estricto)
     "comprador_domicilio": "..."
   },
   "items": [
-    {"codigo_parte": "77655-KK010", "pieza": "802730", "descripcion": "Stamping Die-3", "cantidad": 1, "valor_unitario": 31283.33, "peso_kg": 4704, "origen": "CN"}
+    {"codigo_parte": "77655-KK010", "pieza": "802730", "descripcion": "Stamping Die-3", "cantidad": 1, "valor_unitario": 31283.33, "peso_unitario": 0, "peso_total_linea": 4704, "origen": "CN"}
   ]
 }
 
@@ -2392,17 +2439,11 @@ IMPORTANTE:
                         try:
                             cantidad = _numero_factura(item_data.get('cantidad'), decimal) or 0.0
                             precio = _numero_factura(item_data.get('valor_unitario'), decimal) or 0.0
-                            peso = _numero_factura(item_data.get('peso_kg'), decimal) or 0.0
+                            peso, peso_total, aviso_peso = _peso_del_producto(item_data, cantidad, decimal)
                             
-                            # Extract description
-                            descripcion = _texto(item_data.get('descripcion'))
-                            version = _texto(item_data.get('version'))
-                            
-                            if descripcion and version:
-                                descripcion = f"{descripcion} {version}"
-                            elif not descripcion:
-                                descripcion = version or ""
-                            
+                            descripcion, codigo_parte = _texto_del_producto(item_data)
+                            _avisar_peso(operacion_data, descripcion, aviso_peso)
+
                             # Extract HS Code (pieza)
                             pieza = str(item_data.get('pieza', '') or '').strip()
                             # Clean HS Code - remove "HS Code:" prefix if present
@@ -2411,17 +2452,15 @@ IMPORTANTE:
                             # Keep only digits
                             pieza = ''.join(c for c in pieza if c.isdigit())
                             
-                            # Extract codigo_parte (SKU del proveedor)
-                            codigo_parte = str(item_data.get('codigo_parte', '') or '').strip()
-                            
                             item = {
-                                'codigo_parte': codigo_parte[:20] if codigo_parte else "",
+                                'codigo_parte': codigo_parte,
                                 'pieza': "",  # NCM siempre vacío - el despachante lo completa manualmente
-                                'descripcion': descripcion[:100],
+                                'descripcion': descripcion,
                                 'origen': _origen_desde_factura(item_data.get('origen')),
                                 'cantidad': cantidad,
                                 'valor_unitario': precio,
                                 'peso_unitario': peso if peso > 0 else 0.0,
+                                'peso_total': peso_total,
                                 'order_index': len(items),
                                 'tariff_group': '',  # Vacío porque no hay NCM
                                 'vision_model': model_name
@@ -2504,7 +2543,8 @@ Para CADA línea de la tabla de productos, extrae:
 - descripcion: Nombre del producto (2-5 palabras, SIN medidas)
 - cantidad: Número de unidades
 - valor_unitario: Precio por unidad
-- peso_kg: Peso en kg (0 si no aparece; no estimar)
+- peso_unitario: Peso neto de UNA unidad en kg (0 si la factura no lo dice; no estimar ni calcular)
+- peso_total_linea: Peso neto de TODA la línea en kg, todas las unidades juntas (0 si la factura no lo dice; no estimar ni calcular)
 - origen: Código país origen (CN, BR, US, etc.)
 
 ═══════════════════════════════════════════════════════════════════
@@ -2528,7 +2568,7 @@ FORMATO DE RESPUESTA (JSON estricto)
     "comprador_domicilio": "..."
   },
   "items": [
-    {"descripcion": "...", "cantidad": 10, "valor_unitario": 5.50, "peso_kg": 0.5, "origen": "CN"}
+    {"descripcion": "...", "cantidad": 10, "valor_unitario": 5.50, "peso_unitario": 0.5, "peso_total_linea": 0, "origen": "CN"}
   ]
 }
 
@@ -2592,15 +2632,19 @@ IMPORTANTE:
                                 # (0): el semáforo lo marca (MARIA-1a).
                                 cantidad = _numero_factura(item_data.get('cantidad'), decimal) or 0.0
                                 precio = _numero_factura(item_data.get('valor_unitario'), decimal) or 0.0
-                                peso = _numero_factura(item_data.get('peso_kg'), decimal) or 0.0
+                                peso, peso_total, aviso_peso = _peso_del_producto(item_data, cantidad, decimal)
                                 
+                                descripcion, codigo_parte = _texto_del_producto(item_data)
+                                _avisar_peso(operacion_data, descripcion, aviso_peso)
                                 item = {
+                                    'codigo_parte': codigo_parte,
                                     'pieza': "",
-                                    'descripcion': str(item_data.get('descripcion') or '')[:100],
+                                    'descripcion': descripcion,
                                     'origen': _origen_desde_factura(item_data.get('origen')),
                                     'cantidad': cantidad if cantidad > 0 else 0.0,
                                     'valor_unitario': precio,
                                     'peso_unitario': peso if peso > 0 else 0.0,
+                                    'peso_total': peso_total,
                                     'order_index': len(items),
                                     'vision_model': model_name
                                 }

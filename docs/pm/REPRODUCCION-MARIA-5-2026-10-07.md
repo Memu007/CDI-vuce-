@@ -1,7 +1,8 @@
 # Reproducción de MARIA-5 — 2026-10-07
 
-**Último veredicto: devuelta otra vez sobre `6854f34`**, la reentrega con
-CATALOGO-NCM-1, por seis puntos chicos (sección del final). Antes, **devuelta** sobre `6d59893` (informe en `87fad88`; base: la rama de
+**Último veredicto: aceptada sobre `df4de22`** con CATALOGO-NCM-1 y SUBITEMS-1
+(sección del final); falta MARIA-5d antes de publicar. Antes, devuelta sobre
+`6854f34` por seis puntos chicos. Antes, **devuelta** sobre `6d59893` (informe en `87fad88`; base: la rama de
 la PM integrada, `8e819dd`) por seis puntos. Tres son nuevos de la pieza, y
 dos de ellos ponen un peso equivocado en el TXT sin aviso.
 
@@ -113,3 +114,37 @@ PUNTA-A-PUNTA-1. Informe en `cc6030b`. Venv armado sólo con el
 
 Contexto de la Dev 2: ~49 % al entregar (`get_session`, 18:56 UTC; su
 informe dice ~21 %).
+
+## La reentrega completa — aceptada sobre `df4de22`
+
+Junta la segunda devolución (`a8a83f3`), los puntos 7 a 10 de SUBITEMS-1
+(`4446571`) y la rama de la PM hasta GUARDAR-1. Se integró en `0e57f70`.
+`git diff df4de22 0e57f70` sin documentos da vacío.
+
+| Qué | Salida |
+|---|---|
+| Rojo antes: `test_devolucion2_maria5_ncm.py` y `test_subitems1.py` con el producto de `88564ec` | `21 failed, 24 passed` |
+| Suite | `1526 passed, 102 skipped, 2 xfailed, 25 warnings in 207.04s` |
+| e2e | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.` |
+
+**Subagente de la PM (Sonnet medio):** repitió los scripts de las dos
+revisiones anteriores y los diez puntos dan OK.
+
+**Sin regresiones de dinero ni de datos:**
+- 5000 pedidos contra el generador y 1100 contra `/generate_maria` (contra
+  `88564ec` y `6854f34`): ningún TXT cambia, salvo el número de «Item» en los
+  errores de subítems con grupos.
+- Los archivos reales: `365 passed, 2 xfailed` en las pruebas que los
+  comparan.
+
+| # | Hallazgo | Cómo quedó |
+|---|---|---|
+| R1 | «Peso bruto unitario» = 3 en 10 unidades declara 0,3 kg por unidad, con el aviso «es de toda la línea». También «Gross weight per unit» y el mapeo guardado | **MARIA-5d**, antes de publicar |
+| R2 | «Peso kg/u», «Peso c/u» y «Peso U.» avisan como dudosas (mismo peso) | MARIA-5d, de paso |
+| R3 | La baja no avisa con formas raras (`8517-12-31-000-X`, `851712310`); generar las frena igual | Se deja |
+| R4 | Dos dudosas distintas no avisan; «Kg», «Net Wt» sin mapeo no se detectan (ya pasaba) | Se deja |
+
+**No corrido:** los sabotajes de la Dev, Postgres, filas reordenadas a
+mano, Gemini real y el Kit.
+
+Contexto de la Dev 2: ~65 % al entregar; compactó después (23 %).

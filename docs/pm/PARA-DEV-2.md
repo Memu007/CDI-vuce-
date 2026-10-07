@@ -32,131 +32,57 @@ tienen que seguir saliendo idénticos, salvo que la tarea diga otra cosa.
 
 ## Último veredicto
 
-**MARIA-5 y CATALOGO-NCM-1 devueltas sobre `6854f34`** (2026-10-07,
-19:30 UTC) por seis puntos chicos.
+**MARIA-5, CATALOGO-NCM-1 y SUBITEMS-1 aceptadas sobre `df4de22`**
+(2026-10-07, 22:05 UTC). Integradas en `0e57f70`.
 
 **Lo que corrió la PM:**
-- Rojo antes, tus pruebas nuevas con el producto de `ce88c01`:
-  `171 failed, 156 passed, 28 errors`.
-- Suite: `1459 passed, 102 skipped, 3 xfailed`. Coincide con tu informe.
+- Rojo antes: `test_devolucion2_maria5_ncm.py` y `test_subitems1.py` con el
+  producto de `88564ec`: `21 failed, 24 passed`.
+- Suite: `1526 passed, 102 skipped, 2 xfailed`.
+- e2e: «E2E MARIA OK».
 
-**Lo que se sostiene:**
-- Los seis puntos de la devolución anterior. Con 9000 pedidos al azar las
-  cuentas cierran al centavo, y la validación da el mismo FOB que el TXT en
-  6000 de 6000.
-- En los subítems, ningún pedido que generaba deja de generar (26.000
-  pedidos al azar).
-- El catálogo es idéntico al ZIP: 10.504 NCM y 522 bajas exactas. No hay
-  avisos falsos en las 33.037 SIM completas vigentes.
-- Los frenos de MARIA-1b siguen igual.
-- Los dos archivos reales salen idénticos.
+**El subagente (Sonnet medio)** repitió los scripts que habían reproducido
+cada hallazgo:
+- Los diez puntos están arreglados.
+- En 5000 pedidos al azar contra el generador y 1100 contra
+  `/generate_maria`, ningún TXT cambia, salvo el número de «Item» en los
+  errores de subítems con grupos (a propósito).
+- Los archivos reales salen idénticos.
 
-Detalle en `REPRODUCCION-MARIA-5-2026-10-07.md`, sección «La reentrega con
-CATALOGO-NCM-1».
+**Antes de publicar falta un punto: MARIA-5d.** La próxima publicación espera
+este punto; va antes que la pieza siguiente.
 
-**La devolución va antes que SUBITEMS-1.**
-
-1. **Una columna de peso desconocida no le gana a una reconocida.**
-   - Hoy cualquier encabezado que empiece con «Peso» cuenta como peso de una
-     unidad, y entre dos desempata el orden de las columnas.
-   - Ejemplo: con «Peso por caja» = 40 antes de «Peso» = 2,5 en 10
-     unidades, el TXT declara 400 kg en vez de 25. En `ce88c01` daba 2,5.
-   - Cómo tiene que quedar:
-     - Una columna de la que no se sabe si es de una unidad o de la línea
-       (por caja, por bulto) nunca le gana a una reconocida.
-     - Si es la única columna de peso, se usa con un aviso que pide
-       revisarla.
-2. **El bruto es bruto, aunque diga «unitario».**
-   - Hoy «Peso bruto unitario» y «Gross weight per unit» se leen como neto
-     de una unidad, sin aviso. En `ce88c01` quedaban vacías.
-   - Por la regla (`D23`), el bruto va último y con aviso.
-3. **Dos pesos de la línea que no coinciden: el aviso muestra los dos
-   números.**
-   - Con «Peso neto» = 25 y «Peso total» = 27, el aviso hoy sólo nombra las
-     columnas.
-   - Con un peso de una unidad ya los muestra.
-4. **`pantalla_maria5.js` en rojo en `6854f34`.**
-   - El script no manda el CUIT del importador, MARIA-1b frena y nunca se
-     pide el TXT: `page.waitForResponse: Timeout 15000ms exceeded`.
-   - Tu «OK» era de `7b4f651`, antes de integrar. Es el script, no el
-     producto: con CUIT, vendedor y comprador, pasa.
-   - Ponelo al día y corré las pantallas sobre el SHA que entregás
-     (`CLAUDE.md` §4).
-5. **Una NCM dada de baja: un solo aviso, y que sea cierto.**
-   - En `/api/validate/smart` con `operacion`, 8517.12.31 sale dos veces: tu
-     aviso de baja, y el de `_control_ncm` (`core/controles_maria.py`), que
-     dice «no está en el nomenclador que tenemos (el de 2018)». Ese texto
-     ahora es falso: el catálogo es de 2026. Corregilo.
-   - En `/generate_maria/avisos` la baja no aparece: que aparezca ahí
-     también. Sigue siendo aviso, no freno.
-6. **Sin el archivo del catálogo no se inventan errores.**
-   - Al sacar `ncm_mercosur.csv`, si falta `ncm_arca.csv.gz`,
-     `_en_el_nomenclador` devuelve verdadero. Entonces toda NCM de 7 o 10
-     dígitos da el error «perdió el 0 inicial» (también 9999999), y las de 8
-     u 11 dígitos pasan sin aviso.
-   - Sin catálogo, el control no frena por eso: avisa una vez que falta el
-     catálogo.
-   - Probalo apuntando a un archivo que no existe.
-
-**De paso** (en la misma función, sin agrandar la pieza): los mensajes del
-peso dicen la razón real.
-- NaN o infinito no «pasan el tope».
-- Un negativo no es «no es un número».
-- 0,0004 no se muestra como «0 kg».
-
-**Se deja, anotado:**
-- La primera validación de cada proceso carga el catálogo en el bucle de
-  eventos y traba el servidor ~3,9 s. Ya pasaba con MARIA-1b, y tu pieza no
-  lo empeora. Va a Fase 3.
-- `test_celda_en_la_ultima_fila_no_recorre_un_millon_de_filas` dio rojo una
-  vez bajo carga (4,3 s contra un tope de 8 s). Es de entorno: sola pasa.
-
-**SUBITEMS-1 (`88564ec`): se sostiene.** Se integra junto con esta
-reentrega, porque está arriba de ella.
-
-**Lo que corrió la PM:**
-- Rojo antes con el producto de `db2bc04`: `14 failed, 9 passed`.
-- Suite: `1475 passed, 102 skipped, 2 xfailed`.
-
-**El subagente:**
-- En 3600 pedidos al azar, los `MSBTFOB` suman el `MARTFOB` y no hay líneas
-  inyectadas.
-- Los 400 nuevos son sólo los que la pieza rechaza a propósito.
-- No hay XSS.
-
-Detalle en `REPRODUCCION-SUBITEMS-1-2026-10-07.md`. Sumá a la misma
-reentrega estos cuatro arreglos chicos:
-
-7. **`subitems` con un número o `true` da 500.** Con `5`, `True` o `3.5` el
-   servidor da 500: `controles_antes_de_generar` revienta en
-   `controles_maria.py:106` antes de tu chequeo de forma. Tiene que dar 400.
-8. **La pantalla y el servidor, la misma cuenta.** El panel compara en
-   float y el servidor en decimal exacto, y en el borde de 0,01 discrepan.
-   - Con 19 × 0,333 contra 6,32, la pantalla muestra «✓» y el servidor da
-     400.
-   - En el caso inverso, la pantalla muestra «⚠» y el servidor genera.
-9. **El texto de la suma muestra las cantidades con sus decimales.** Hoy
-   1,5 + 1,4 contra 3 dice «Suman 3 de 3 unidades», y el aviso no dice qué
-   falla.
-10. **Un error de sufijo de un subítem sale bajo su subítem**, no bajo el
-    campo del sufijo general (`finalize.js` busca «sbt» en el mensaje).
-
-**Se deja:**
-- Deshacer una acción masiva cierra los paneles abiertos; los datos quedan.
-- La prueba de punta a punta usa una copia en Python de la pantalla: el JS
-  real lo cubre `pantalla_subitems1.js`.
+1. **«Peso bruto unitario» se divide por la cantidad.**
+   - `_clase_de_peso` devuelve «bruto» antes de mirar «unit» o «unidad», y el
+     bruto siempre se divide. «Peso bruto unitario» = 3 en 10 unidades
+     declara 0,3 kg por unidad: el TXT dice 3 kg la línea, en vez de 30.
+   - Además el aviso dice «es de toda la línea; se dividió», y el encabezado
+     dice lo contrario.
+   - Pasa igual con «Gross weight per unit» y con un mapeo guardado.
+   - Cómo tiene que quedar: un bruto que dice «unitario», «unit», «per
+     unit» o «por unidad» es bruto **de una unidad**. No se divide, va
+     último y lleva el aviso de bruto.
+2. **De paso, menos ruido:** «Peso kg/u», «Peso c/u» y «Peso U.» dicen que
+   son por unidad. Que no salgan como dudosas.
 
 **Criterios:**
-- Rojo antes y verde después en cada punto.
+- Rojo antes y verde después.
 - Los dos archivos reales, idénticos.
-- `pantalla_maria5.js`, `pantalla_catalogo_ncm1.js` y `pantalla_subitems1.js`
-  dan OK en el SHA que entregás.
-- La e2e de la CI (`scripts/testing/e2e_maria.sh`) da «E2E MARIA OK» en el SHA
-  que entregás. Cómo se corre en la nube está en `ONBOARDING-DEV.md`.
-  - Hoy está en rojo en `main` porque no completa la fecha de emisión.
-  - La línea que falta la suma la Dev 1 con GUARDAR-1. Si tu pieza cambia el
-    recorrido (subítems, pesos), ponela al día vos.
-- Suite completa en verde.
+- La e2e y las tres pantallas dan OK.
+- Suite completa.
+
+**Se deja, anotado:**
+- Con un grupo antes, los errores de peso y estado siguen con el número de
+  línea del TXT, y los de subítems con el de la pantalla. Va a MARIA-6, que
+  es de identificadores.
+- Los errores de subítems de MARIA-1b (por ejemplo, NaN) salen en la
+  pantalla final. El panel ya los marca antes.
+- La baja no avisa con formas raras (`8517-12-31-000-X`, `851712310`), pero
+  generar las frena igual.
+- «Kg», «Net Wt» y «Unit Wt» sin mapeo guardado no se detectan. Ya pasaba.
+- Dos columnas dudosas distintas no avisan que no coinciden.
+
+Contexto: entregaste en ~65 % y compactaste (23 %).
 
 ## Respuestas a tus D (2026-10-07, 19:40 UTC)
 
@@ -284,3 +210,24 @@ solo. Si hace falta para que sirva, D con lo que viste.
 **Criterios:** rojo antes y verde después; el archivo real con subítems sale
 idéntico por la pantalla; una prueba de pantalla (`pantalla_*.js`) carga
 subítems y genera; suite completa en verde.
+
+## Después de MARIA-5d — ORG-1: invitaciones de un estudio (Fase 2)
+
+Escrita el 2026-10-07, 22:05 UTC. MARIA-6 espera los archivos reales del
+despachante, así que tu siguiente pieza es de la Fase 2 (`ROADMAP.md`).
+
+**Qué arregla (C7 de `AUDITORIA-2026-10-06.md`):**
+- Las invitaciones a un estudio funcionan.
+- Respetan el tope de usuarios del plan.
+- Quedan atadas al email invitado: otra persona no puede usar el link.
+
+**Primero:** leé el código de invitaciones y organizaciones, y escribí en tu
+`PARA-PM-2.md` qué hay hoy y qué falla, con un plan corto y las D que haga
+falta. Es permisos: revisión fuerte (Sonnet y Opus, alto). Nada contra
+producción ni correo real.
+
+**Criterios:**
+- Rojo antes y verde después en cada falla.
+- Una prueba de aislamiento: un miembro de un estudio no ve nada de otro.
+- La e2e da OK.
+- Suite completa.

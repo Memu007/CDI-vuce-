@@ -172,6 +172,12 @@ async function classifyAndGroup(page) {
 }
 
 async function verifyBlockingErrorsAndNonBlockingWarnings(page) {
+    // En un grupo, un 0 no se acepta: vuelve el peso que tenía (MARIA-5).
+    await replaceInput(page, '[data-testid="ncm-weight-input"]', '0');
+    await page.waitForFunction(() => document.querySelector('[data-testid="ncm-weight-input"]').value === '0.5');
+    // El peso en 0 de un producto solo llega a Validación y la frena.
+    await page.click('#ncmTbody .ncm-grupo-chip');
+    await page.waitForFunction(() => document.querySelectorAll('[data-testid="ncm-weight-input"]').length === 2);
     await replaceInput(page, '[data-testid="ncm-weight-input"]', '0');
     await page.click('#ncmContinueBtn');
     await page.waitForSelector('#validatingResults:not([hidden])');
@@ -184,9 +190,17 @@ async function verifyBlockingErrorsAndNonBlockingWarnings(page) {
     await page.click('[data-action="go-ncm-from-validating"]');
     await page.waitForSelector('[data-screen="ncm"].is-active');
     await replaceInput(page, '[data-testid="ncm-weight-input"]', '0.5');
+    await page.click('#ncmSelectAll');
+    await page.click('#ncmBatchAgrupar');
+    await page.waitForSelector('#ncmTbody .ncm-grupo-chip');
+    await page.waitForFunction(() => !document.getElementById('ncmContinueBtn').disabled);
     await page.click('#ncmContinueBtn');
     await page.waitForSelector('#validatingResults:not([hidden])');
+    // La validación de antes (con el 0) puede estar en pantalla: se espera
+    // la respuesta de la nueva.
+    const revalidada = page.waitForResponse((r) => r.url().endsWith('/api/validate/smart'));
     await page.click('#validatingRerun');
+    await revalidada;
     await page.waitForFunction(() => !document.getElementById('validatingGenerate').disabled);
     expect(
         (await page.$eval('#validatingIssues', (el) => el.textContent || '')).includes('Computadoras'),

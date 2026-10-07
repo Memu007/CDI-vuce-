@@ -3,7 +3,7 @@
 Actualizado: 2026-10-07. Estado vigente; la historia está en Git.
 
 **Producto:** `Memu007/CDI-vuce-` (privado desde el 2026-10-06).
-**Publicado:** `main` = `6ea8ca9` (2026-10-07 19:58 UTC, segunda publicación) en Railway,
+**Publicado:** `main` = `a9b03cf` (2026-10-07 21:35 UTC, tercera publicación: GUARDAR-1) en Railway,
 `cdi-production.up.railway.app`. Railway publica cada push a `main` sin
 esperar los tests.
 **En producción:** la usa sólo Emi, con facturas reales (Emi, 2026-10-07).
@@ -23,11 +23,9 @@ antes de cerrar la Fase 3.
    fecha de emisión, moneda, incoterm, CUIT válido y estado si el origen es
    argentino: un error que pide eso no es una falla. Guardar con la SIM
    completa sigue dando error hasta GUARDAR-1.
-1a. **Tercera publicación, candidato `a9b03cf`:** GUARDAR-1 (guardar con la
-   SIM completa deja de dar error; el historial no tira abajo el guardado) y
-   la línea de la e2e que deja la CI de `main` en verde. Probado contra
-   Postgres 16 (`REPRODUCCION-GUARDAR-1-2026-10-07.md`). Falta «dale
-   a9b03cf». Después: Emi guarda una operación con la SIM completa.
+1a. **Tercera publicación, hecha:** `a9b03cf`, 2026-10-07 21:35 UTC («dale
+   a9b03cf» de Emi). Emi espera unos minutos y guarda una operación con un
+   producto con la SIM completa: tiene que guardar sin error.
 1b. **Sin volumen** (Emi, 2026-10-07): cada publicación o reinicio borra los
    TXT generados y el historial de NCM aprendido; las operaciones quedan en
    la base. Descargar el TXT apenas se genera. Lo arregla DISCO-1 (Fase 3).
@@ -82,7 +80,7 @@ Archivos abiertos por Dev:
   puntos; tres rompen: una combinada gigante traba la lectura, una
   combinada con texto duplica el FOB, el tope de estilos no protege la
   memoria; D27 (a)). Después, COBRO-MP-1, en pausa en `18a1850`.
-- **Dev 2:** MARIA-5 y CATALOGO-NCM-1 devueltas sobre `6854f34` (19:30 UTC) por seis puntos chicos: una columna «Peso por caja» le gana a «Peso», el bruto «unitario» se lee como neto, aviso de dos pesos sin números, una pantalla en rojo, la baja con aviso doble y sin catálogo errores inventados. SUBITEMS-1 entregada (`88564ec`) y revisada: se sostiene, con cuatro arreglos chicos que van en la misma reentrega. Después: (Emi: sus facturas traen subítems) y MARIA-6 cuando lleguen los archivos reales del despachante.
+- **Dev 2:** MARIA-5, CATALOGO-NCM-1 y SUBITEMS-1 aceptadas sobre `df4de22` e integradas (`0e57f70`). Ahora MARIA-5d («Peso bruto unitario» no se divide), que va antes de la próxima publicación. Después ORG-1 (Fase 2); MARIA-6 espera los archivos del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
   RENDIMIENTO-1 y 1b (`ec3d793`), MARIA-1a, 2b, 1c, 4, 3 y 1d (`9679e21`).
   Suite sobre la rama integrada (`7b42556`, venv armado sólo con el
@@ -118,7 +116,7 @@ Archivos abiertos por Dev:
 | G2 · Imagen real | 🟢 | Cerrada el 2026-09-17 | — |
 | G3 · Aislamiento | 🟡 | La fuga de MARIA.TXT, cerrada en producción con el ensayo (sin cuentas ajenas: nadie vio facturas de Emi). Admin cerrado en la rama (ADMIN-1 y ADMIN-2). Abiertos: sesiones que reviven, límite de intentos burlable, prueba de aislamiento parcial | Fase 3 |
 | G4 · Producto (MARIA) | 🔴 | Origen mal leído, estado e IVA adicional fijos, peso por unidad, avisos tarde, gastos FOB sin cablear, banco, identificadores. Sin productos inventados (MARIA-2) | Fase 1 y la prueba en el Kit |
-| G5 · Pruebas | 🟢 | `1224 passed, 102 skipped, 1 xfailed, 0 failed` en la rama integrada (`6ea8ca9`, 2026-10-07) | — |
+| G5 · Pruebas | 🟢 | `1526 passed, 102 skipped, 2 xfailed, 0 failed` y e2e OK en la rama integrada (`df4de22` = `0e57f70` sin documentos, 2026-10-07) | — |
 | G6 · Volver atrás | 🟡 | Esquema probado en local; falta la copia de la base | Fase 3 (y el ensayo lo ensaya) |
 | G7 · Cobro | 🔴 | El corte por impago cubre 2 funciones; cancelar no cancela en Mercado Pago; aviso de pago sin firma; doble suscripción; invitaciones | Fase 2 |
 | G8 · Piloto | ⚪ | Tres estudios presentan de verdad un MARIA de CDI | Fase 4 |
@@ -139,6 +137,11 @@ Archivos abiertos por Dev:
   `1224 passed, 102 skipped, 1 xfailed`. Avance directo de `5cb03ab`, sin
   merge. «dale 6ea8ca9» de Emi a las ~16:58 ARG (antes, «dale a todo», que el
   sistema de permisos no tomó). CI: pruebas en verde y `e2e-maria` en rojo. La e2e no completa la fecha de emisión que pide MARIA-3; la PM lo reprodujo y, con esa línea, pasa entero («E2E MARIA OK»). El producto está bien, la prueba quedó vieja; la arregla la Dev 1 con GUARDAR-1. Emi generó un TXT con una factura real y «se ve bien» (19:59 UTC, un minuto después del push: falta confirmar que ya corría la versión nueva; con ella el TXT dice `IVAADICIONAL1=NO_VALIDA` y `CARTUSO=2`).
+- `a9b03cf` (2026-10-07 21:35 UTC), tercera publicación: GUARDAR-1, aislada
+  con `cherry-pick` (`REPRODUCCION-GUARDAR-1-2026-10-07.md`), y la línea de la
+  e2e de la CI. Suite sobre el mismo producto (`2621c3b`): `1247 passed, 102
+  skipped, 3 xfailed`; e2e «E2E MARIA OK»; Postgres 16 `fallas: 0`. Avance
+  directo de `6ea8ca9`, sin merge. CI: en curso. Falta lo que verifica Emi.
 
 ## Reglas
 
@@ -166,11 +169,11 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 21:08 UTC: GUARDAR-1 aceptada. Se aisló con `cherry-pick` y se
-integró en `a9b03cf`, el candidato a la tercera publicación: espera «dale
-a9b03cf». D32: (b), va como GUARDAR-2 (Dev 1, después de la devolución de
-EXCEL-2). Dev 2 entregó los seis puntos (`a8a83f3`), pero sin los cuatro de
-SUBITEMS-1 ni la e2e: se lo pedí para revisar todo junto.
+2026-10-07 22:08 UTC: MARIA-5, CATALOGO-NCM-1 y SUBITEMS-1 aceptadas e
+integradas (`0e57f70`). Antes de la próxima publicación falta MARIA-5d (el
+bruto «unitario» se divide). Dev 2: MARIA-5d y después ORG-1. Dev 1:
+despertada para entregar la devolución de EXCEL-2. CI de `a9b03cf`: trabada
+en el apt del runner de GitHub.
 
 ## Medición
 

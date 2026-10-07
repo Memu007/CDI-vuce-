@@ -5,7 +5,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from datetime import datetime, timedelta, timezone
 import jwt
 import json
@@ -3878,7 +3878,8 @@ async def smart_validation(body: dict, user=Depends(get_current_user)):
                 ))
         
         # Ejecutar validación inteligente
-        resultado = run_smart_validations(items)
+        resultado = run_smart_validations(items, grupos=[d.get("grupo_id") if isinstance(d, dict) else None
+                                                         for d in items_data])
 
         # Los controles de antes de generar (MARIA-1b), con la cabecera si la
         # pantalla la manda: así el semáforo y la pantalla de generar los
@@ -3887,14 +3888,19 @@ async def smart_validation(body: dict, user=Depends(get_current_user)):
         if isinstance(operacion, dict):
             from proyecto_maria.core.controles_maria import controles_antes_de_generar
             errores_1b, avisos_1b = controles_antes_de_generar(items_data, operacion)
-            resultado["errores"] = [*resultado.get("errores", []), *errores_1b]
-            resultado["advertencias"] = [*resultado.get("advertencias", []), *avisos_1b]
-            if errores_1b or avisos_1b:
-                resultado["resumen"] = (
-                    f"🔍 Análisis de {len(items)} ítems: {len(resultado['errores'])} errores, "
-                    f"{len(resultado['advertencias'])} advertencias, "
-                    f"{len(resultado.get('sugerencias', []))} sugerencias."
-                )
+        else:
+            # Sin cabecera, igual el aviso de la NCM (vigente, dada de baja o
+            # sin catálogo), del mismo control: uno solo (CATALOGO-NCM-1).
+            from proyecto_maria.core.controles_maria import avisos_de_ncm
+            errores_1b, avisos_1b = [], avisos_de_ncm(items_data)
+        resultado["errores"] = [*resultado.get("errores", []), *errores_1b]
+        resultado["advertencias"] = [*resultado.get("advertencias", []), *avisos_1b]
+        if errores_1b or avisos_1b:
+            resultado["resumen"] = (
+                f"🔍 Análisis de {len(items)} ítems: {len(resultado['errores'])} errores, "
+                f"{len(resultado['advertencias'])} advertencias, "
+                f"{len(resultado.get('sugerencias', []))} sugerencias."
+            )
         
         # Con NaN, infinito o un monto que desborda, las estadísticas dan
         # infinito y la respuesta no se podría escribir (500): esos números
@@ -4002,12 +4008,16 @@ async def upload_pdf_public(
         if not items_data:
              raise HTTPException(status_code=400, detail="No se encontró tabla de items en el PDF. Asegurate de que el PDF tenga una tabla con columnas como: Model/Description, Price, Quantity.")
 
+        # Los dos pesos de una línea que no coinciden (devolución de MARIA-5).
+        avisos = operacion_data.pop('avisos_peso', []) if isinstance(operacion_data, dict) else []
+
         return {
             "message": "PDF procesado exitosamente",
             "filename": file.filename,
             "operacion": operacion_data,  # Datos de la operación extraídos
             "items": items_data,  # Items extraídos
-            "items_count": len(items_data)
+            "items_count": len(items_data),
+            "avisos": avisos,
         }
 
     except HTTPException:
@@ -4075,6 +4085,26 @@ class MariaRequest(BaseModel):
     empresa_digitalizacion: str | None = None
     iva_adicional: str | None = None
 
+    # MARIA-5 (revisión de MARIA-1d). Un campo de texto que es entero «None»,
+    # «null» o «N/A» (operaciones guardadas con el lector viejo) o que llega
+    # nulo cuenta como vacío: sale el aviso y nunca llega al TXT.
+    @field_validator(
+        "operation_id", "moneda", "incoterm", "cuit_agr", "vendedor_nombre", "vendedor_id",
+        "comprador_nombre", "comprador_cuit", "comprador_domicilio", "comprador_fecha_inic_activ",
+        "bl_numero", "puerto_origen", "puerto_destino", "buque_nombre", "viaje_numero",
+        "fecha_embarque", "fecha_emision", "contenedor_numero", "contenedor_tipo",
+        "aduana_codigo", "tipo_destinacion", "sbt_sufijo_valor", "procedencia", "banco_bcra",
+        mode="before",
+    )
+    @classmethod
+    def _vacio_escrito(cls, valor):
+        if valor is None or (isinstance(valor, str) and valor.strip().upper() in _VACIO_ESCRITO):
+            return ""
+        return valor
+
+
+_VACIO_ESCRITO = {"NONE", "NULL", "N/A"}
+
 
 def _items_con_procedencia(request: MariaRequest) -> list:
     """Los productos con la procedencia de la operación en los que no traen la
@@ -4135,7 +4165,11 @@ async def avisos_maria_endpoint(
         kit_warnings = []
     supuestos = _supuestos_maria(request, items, gastos)
     # Lo que al generar es un error de procedencia, acá se avisa con el mismo texto.
-    return {"avisos": errores_de_procedencia(items) + kit_warnings + supuestos, "supuestos": supuestos}
+    # La NCM dada de baja o que no está en el vigente, como en la validación
+    # (CATALOGO-NCM-1): aviso, no freno.
+    from proyecto_maria.core.controles_maria import avisos_de_ncm
+    avisos_ncm = avisos_de_ncm(items)
+    return {"avisos": errores_de_procedencia(items) + kit_warnings + avisos_ncm + supuestos, "supuestos": supuestos}
 
 
 @app.post("/generate_maria")
@@ -4196,6 +4230,20 @@ async def generate_maria_endpoint(
         gastos = gastos_fob_para_el_txt(request.incoterm, request.gastos_fob, request.gastos_anteriores_fob)
 
         # Validación específica de KIT Maria (complementa la anterior)
+        # Los sub-ítems, con la forma que manda la pantalla: una lista de
+        # {cantidad, valor_unitario, sufijo} (SUBITEMS-1). Otra cosa es un
+        # error con mensaje, no un 500.
+        for _n, _it in enumerate(request.items or [], start=1):
+            _subs = _it.get("subitems") if isinstance(_it, dict) else None
+            if _subs is None:
+                continue
+            if not isinstance(_subs, list) or not all(isinstance(_s, dict) for _s in _subs):
+                raise HTTPException(status_code=400, detail=f"Item {_n}: los sub-ítems no tienen el formato esperado.")
+            for _m, _s in enumerate(_subs, start=1):
+                if _s.get("sufijo") is not None and not isinstance(_s.get("sufijo"), str):
+                    raise HTTPException(status_code=400,
+                                        detail=f"Item {_n}, sub-ítem {_m}: el sufijo de valor tiene que ser un texto.")
+
         kit_errors, kit_warnings = validate_for_kit_maria(items)
 
         # Validar sbt_sufijo_valor: obligatorio, sin caracteres de control.
@@ -4215,32 +4263,33 @@ async def generate_maria_endpoint(
                 detail="Falta el sufijo de valor SBT. Es un dato obligatorio y específico del importador. Consultar al despachante.",
             )
 
-        # Los sufijos que se validan son el general y los de cada sub-ítem.
-        _sufijos = [sbt_raw] if sbt_raw else []
-        for it in (request.items or []):
+        # Los sufijos que se validan son el general y los de cada sub-ítem; el
+        # de un sub-ítem dice cuál es (SUBITEMS-1).
+        _sufijos = [("", sbt_raw)] if sbt_raw else []
+        for _n, it in enumerate(request.items or [], start=1):
             if not isinstance(it, dict):
                 continue
-            for sub in (it.get("subitems") or []):
+            for _m, sub in enumerate(it.get("subitems") or [], start=1):
                 if isinstance(sub, dict) and (sub.get("sufijo") or "").strip():
-                    _sufijos.append(sub["sufijo"].strip())
+                    _sufijos.append((f"Item {_n}, sub-ítem {_m}: ", sub["sufijo"].strip()))
 
-        for _suf in _sufijos:
+        for _donde, _suf in _sufijos:
             if len(_suf) > 120:
                 raise HTTPException(
                     status_code=400,
-                    detail="El sufijo de valor SBT no puede superar los 120 caracteres.",
+                    detail=f"{_donde}El sufijo de valor SBT no puede superar los 120 caracteres.",
                 )
             # Ni «=» ni controles (\x7f incluido): partirían o inventarían una
             # línea del TXT. El sufijo es un código: no se corrige, se rechaza.
             if "=" in _suf:
                 raise HTTPException(
                     status_code=400,
-                    detail="El sufijo de valor SBT no puede contener «=»: va sólo el código, sin «CSBTSVL=».",
+                    detail=f"{_donde}El sufijo de valor SBT no puede contener «=»: va sólo el código, sin «CSBTSVL=».",
                 )
             if any(ord(c) < 32 or 0x7f <= ord(c) <= 0x9f or c in "\u2028\u2029" for c in _suf):
                 raise HTTPException(
                     status_code=400,
-                    detail="El sufijo de valor SBT no puede contener saltos de línea ni caracteres de control.",
+                    detail=f"{_donde}El sufijo de valor SBT no puede contener saltos de línea ni caracteres de control.",
                 )
         if kit_errors or errores_1b:
             raise HTTPException(status_code=400, detail={"errors": list(dict.fromkeys([*errors, *kit_errors, *errores_1b]))})
@@ -4264,9 +4313,13 @@ async def generate_maria_endpoint(
                     f"El CUIT del despachante «{effective_cuit_agr}» tiene que tener 11 dígitos (0-9). "
                     "Corregilo en la operación o en tu perfil."]})
 
+        # Sin número de factura, el de la operación: el mismo en el TXT y en
+        # el nombre del archivo.
+        operation_id = request.operation_id.strip() or f"OP_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+
         # Generar TXT
         txt_content = generate_maria_txt(
-            operation_id=request.operation_id,
+            operation_id=operation_id,
             items=items,
             moneda=request.moneda,
             incoterm=request.incoterm,
@@ -4300,7 +4353,7 @@ async def generate_maria_endpoint(
         
         # Sanitizar operation_id para filename (prevenir path traversal)
         import re
-        safe_id = re.sub(r'[^a-zA-Z0-9_-]', '', request.operation_id)[:50]
+        safe_id = re.sub(r'[^a-zA-Z0-9_-]', '', operation_id)[:50]
         if not safe_id:
             safe_id = f"OP_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
@@ -5238,8 +5291,12 @@ _ITEM_COL_ALIASES = {
     # El peso bruto o total no es el peso neto por unidad: sin una de estas
     # columnas, el peso queda vacío y el TXT pide completarlo (EXCEL-1).
     "peso_unitario": [
-        "pesounitario", "pesoneto", "pesounit", "unitweight", "netweight",
-        "peso", "weight",
+        # Primero los de una unidad; después los de la línea; el bruto, último
+        # (MARIA-5, D22: el TXT pide peso neto).
+        "pesounitario", "peso", "weight", "pesounit", "unitweight", "pesounitariokg",
+        "pesokg", "pesototal", "pesoneto", "pesonetototal", "pesototalneto", "pesototalkg",
+        "pesonetokg", "totalweight",
+        "netweight", "pesobruto", "pesobrutokg", "grossweight",
     ],
 }
 
@@ -5285,7 +5342,166 @@ def _detect_item_columns(headers: list) -> dict:
             if alias in norm_to_orig:
                 mapping[norm_to_orig[alias]] = canon
                 break
+    # El peso que se aprende es el que manda (devolución de MARIA-5).
+    pesos = _columnas_de_peso(list(norm_to_orig.values()), {})
+    if pesos and pesos[0] not in mapping:
+        mapping = {src: canon for src, canon in mapping.items() if canon != "peso_unitario"}
+        mapping[pesos[0]] = "peso_unitario"
     return mapping
+
+
+# MARIA-5 (D22). Columnas de peso que no son de una unidad: el TXT multiplica
+# el peso unitario por la cantidad, así que se dividen por la cantidad. Se
+# mira el nombre de la columna, también la de un mapeo guardado del cliente.
+# Nombres de peso de una unidad sin la palabra «unitario» (la plantilla dice
+# «Peso»). Otro nombre que no dice de qué es («Peso por caja», «Peso por
+# bulto») queda «dudoso» (segunda devolución de MARIA-5).
+_PESO_DE_UNA_UNIDAD = {"peso", "weight", "pesokg", "pesokgs", "pesoenkg", "kg", "kgs"}
+
+
+def _clase_de_peso(normal: str) -> str:
+    # El bruto es bruto aunque diga «unitario» (segunda devolución de MARIA-5).
+    if "bruto" in normal or "gross" in normal:
+        return "bruto"
+    if "unit" in normal or "unidad" in normal:
+        return "unidad"
+    if "neto" in normal or "net" in normal:
+        return "neto"
+    if "total" in normal or "linea" in normal:
+        return "linea"
+    # «Peso (kg)»: la unidad entre paréntesis no cuenta.
+    if re.sub(r"\(.*?\)", "", normal) in _PESO_DE_UNA_UNIDAD:
+        return "unidad"
+    return "dudosa"
+
+
+def _clase_de_columna(columna, rename: dict) -> str:
+    """La clase de una columna de peso, por su nombre. Una dudosa avisa
+    siempre, aunque la haya elegido un mapeo (detectado o guardado)."""
+    return _clase_de_peso(_normalize_header(columna))
+
+
+# Con varias columnas de peso manda el neto de la línea, después el total de
+# la línea, después el de una unidad y al final el bruto (devolución de
+# MARIA-5: el TXT pide el peso neto de la línea).
+_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "dudosa": 3, "bruto": 4}
+
+
+def _es_nombre_de_peso(normal: str) -> bool:
+    """«Peso…» o «…weight…» («Peso neto unitario», «Net weight per unit»),
+    pero no «Pesos» (la moneda)."""
+    return (normal.startswith("peso") and not normal.startswith("pesos")) or "weight" in normal
+
+
+def _columnas_de_peso(columnas: list, rename: dict) -> list:
+    """Las columnas de peso de la planilla, de la que se usa a la última. Entra
+    la que el mapeo guardado marca como peso y cualquiera con nombre de peso
+    que el mapeo no use para otra cosa. Entre dos de una unidad, primero la
+    que dice neto y después la del mapeo guardado."""
+    alias = set(_ITEM_COL_ALIASES["peso_unitario"])
+    otras = {src for src, canon in rename.items() if canon != "peso_unitario"}
+
+    def es_peso(c) -> bool:
+        normal = _normalize_header(c)
+        return rename.get(c) == "peso_unitario" or normal in alias or _es_nombre_de_peso(normal)
+
+    def orden(c):
+        normal = _normalize_header(c)
+        return (_RANGO_DE_PESO[_clase_de_columna(c, rename)], "net" not in normal,
+                rename.get(c) != "peso_unitario")
+
+    return sorted([c for c in columnas if c not in otras and es_peso(c)], key=orden)
+
+
+def _kg(numero: float) -> str:
+    if 0 < abs(numero) < 0.001:
+        return f"{numero:g}"  # 0,0004 no es «0 kg»
+    return f"{numero:.3f}".rstrip("0").rstrip(".")
+
+
+def _peso_por_unidad(df: pd.DataFrame, pesos: list, columna_de: dict | None = None,
+                     clases: dict | None = None) -> list[str]:
+    """Después de renombrar `pesos[0]` a `peso_unitario`: si es el peso de la
+    línea (neto o total) o el bruto, lo divide por la cantidad. Un peso que no
+    es número queda vacío, con aviso, y la fila se conserva. Si una columna de
+    una unidad no da el de la línea, se avisa con los dos números.
+    `columna_de` dice cómo quedó llamada una columna ignorada que hubo que
+    renombrar; los avisos la nombran como viene en la planilla.
+    Devuelve los avisos para la pantalla."""
+    if not pesos or "peso_unitario" not in df.columns:
+        return []
+    columna_de = columna_de or {}
+    clases = clases or {}
+
+    def clase_de(c):
+        return clases.get(c) or _clase_de_peso(_normalize_header(c))
+
+    origen, ignoradas = pesos[0], pesos[1:]
+    clase = clase_de(origen)
+    avisos = []
+    if ignoradas:
+        avisos.append(f"Peso: se usó «{origen}»; se ignoraron "
+                      + ", ".join(f"«{c}»" for c in ignoradas) + ".")
+    # Los números se leen como en el resto de la planilla (EXCEL-1, regla de
+    # MARIA-1a): «1,5» con coma, «1.500» con miles, «25 kg»; «inf» o «abc»
+    # no son un peso.
+    from proyecto_maria.pdf_extractor import _decimal_de_la_factura, _numero_factura
+    col_cant = find_column(df.columns, ["cantidad", "Cantidad", "qty", "Qty", "quantity", "Quantity", "cant"])
+    decimal = _decimal_de_la_factura([
+        v for c in (col_cant, "valor_unitario", "peso_unitario") if c in df.columns
+        for v in df[c].tolist() if isinstance(v, str)
+    ])
+
+    def numeros(serie):
+        return pd.Series([_numero_factura(v, decimal) for v in serie], index=serie.index, dtype=float)
+
+    escrito = df["peso_unitario"].notna() & (df["peso_unitario"].astype(str).str.strip() != "")
+    peso = numeros(df["peso_unitario"])
+    sin_numero = int((escrito & peso.isna()).sum())
+    if sin_numero:
+        avisos.append(f"Peso: {sin_numero} fila(s) con un peso que no es un número quedaron sin peso; "
+                      "cargalo en la revisión.")
+    if clase == "dudosa":
+        avisos.append(f"Peso: la columna «{origen}» no dice si es el peso de una unidad o el de toda la "
+                      "línea; se usó como de una unidad. Revisala.")
+    if clase in ("unidad", "dudosa"):
+        # La columna queda como vino: la lectura de la planilla la interpreta
+        # con el mismo separador decimal que la cantidad y el precio.
+        return avisos
+    if col_cant is None:
+        df["peso_unitario"] = peso
+        return avisos + [f"Peso: la columna «{origen}» es de toda la línea y no se encontró la cantidad para "
+                         "dividirla. Cargá el peso de una unidad en la revisión."]
+    cantidad = numeros(df[col_cant])
+    df["peso_unitario"] = (peso / cantidad).where(cantidad > 0)
+    avisos.append(f"Peso: la columna «{origen}» es de toda la línea; se dividió por la cantidad.")
+    if clase == "bruto":
+        avisos.append(f"Peso: el TXT pide peso neto y la planilla trae sólo «{origen}» (bruto); "
+                      "se usó el bruto dividido por la cantidad. Corregilo si tenés el neto.")
+        return avisos
+    for col in ignoradas:
+        if clase_de(col) in ("neto", "linea"):
+            # Otro peso de la línea: si no coincide, los dos números.
+            otra = numeros(df[columna_de.get(col, col)])
+            distinto = (otra > 0) & (peso > 0) & ((otra - peso).abs() > (peso / 100).clip(lower=0.001))
+            if distinto.any():
+                fila = distinto.idxmax()
+                avisos.append(f"Peso: en {int(distinto.sum())} fila(s) «{col}» no da lo mismo que «{origen}» "
+                              f"(por ejemplo, {_kg(float(otra[fila]))} kg y {_kg(float(peso[fila]))} kg); "
+                              f"se usó «{origen}». Revisalo.")
+            continue
+        if clase_de(col) != "unidad":
+            continue
+        unidad = numeros(df[columna_de.get(col, col)])
+        distinto = (unidad > 0) & (peso > 0) & (cantidad > 0) & (
+            (unidad * cantidad - peso).abs() > (peso / 100).clip(lower=0.001))
+        if distinto.any():
+            fila = distinto.idxmax()
+            u, c, t = float(unidad[fila]), float(cantidad[fila]), float(peso[fila])
+            avisos.append(f"Peso: en {int(distinto.sum())} fila(s) «{col}» × la cantidad no da «{origen}» "
+                          f"(por ejemplo, {_kg(u)} × {_kg(c)} = {_kg(u * c)} kg y {_kg(t)} kg); "
+                          f"se usó «{origen}», el peso de la línea. Revisalo.")
+    return avisos
 
 
 def _rango_de_alias(encabezado, canon: str):
@@ -7028,13 +7244,28 @@ async def upload_excel_v2(
             mapping or {}, detected_mapping or {}, list(df.columns)
         )
 
-        if effective_mapping:
-            rename = {src: canon for src, canon in effective_mapping.items() if canon in _CANON_COLUMNS}
+        avisos: list[str] = []
+        rename = {src: canon for src, canon in effective_mapping.items() if canon in _CANON_COLUMNS}
+        # El peso: la columna que manda, aunque el mapeo guardado diga otra
+        # (devolución de MARIA-5).
+        pesos = _columnas_de_peso(list(df.columns), rename)
+        clases = {c: _clase_de_columna(c, rename) for c in pesos}
+        if pesos:
+            rename = {src: canon for src, canon in rename.items() if canon != "peso_unitario"}
+            rename[pesos[0]] = "peso_unitario"
+            # Una columna ignorada que ya se llamaba «peso_unitario» cambia de
+            # nombre, para no quedar con dos columnas iguales.
+            columna_de = {c: f"{c} (ignorada)" for c in pesos[1:] if c == "peso_unitario"}
+            rename.update(columna_de)
+        else:
+            columna_de = {}
+        if rename:
             # Si el archivo ya traía una columna con el nombre del campo y el
             # mapeo eligió otra, esa sale antes de renombrar: no quedan dos
             # columnas con el mismo nombre (daba 500) (EXCEL-1).
             df = df.drop(columns=[c for c in df.columns if c in rename.values() and c not in rename])
             df = df.rename(columns=rename)
+            avisos = _peso_por_unidad(df, pesos, columna_de, clases)
 
         descartes: list = []
         items = await _leer_pdf_aparte(
@@ -7126,6 +7357,7 @@ async def upload_excel_v2(
             "applied_mapping": bool(effective_mapping),
             "avisos_mapeo": avisos_mapeo,
             "catalogo": catalogo_info,
+            "avisos": avisos,
         }
     except LecturaPdfDemasiadoLarga as e:
         return _respuesta_excel_demasiado_largo(e)
@@ -7679,6 +7911,35 @@ def _ncm_suggestion_key(ncm: str) -> str:
     return re.sub(r"\D", "", str(ncm or ""))[:8]
 
 
+def _ncm_del_cliente_o_sim_del_proveedor(ncm_cliente, ncm_proveedor):
+    """El NCM que se sugiere cuando el historial del cliente lo conoce (D32 b).
+
+    El historial guarda 8 dígitos (GUARDAR-1). Si el catálogo del proveedor
+    tiene, para el mismo producto, la posición SIM completa que empieza con
+    esos 8, gana la del proveedor: no se pierde la SIM ya confirmada.
+    """
+    cliente = str(ncm_cliente or "").strip()
+    if not re.fullmatch(r"[\d.]+", cliente) or len(re.sub(r"\D", "", cliente)) != 8:
+        return ncm_cliente
+    from proyecto_maria.core.maria_generator import _sim_position_error
+    proveedor = str(ncm_proveedor or "").strip()
+    if (proveedor and _sim_position_error(proveedor) is None
+            and _ncm_suggestion_key(proveedor) == _ncm_suggestion_key(cliente)):
+        return re.sub(r"[.\s]", "", proveedor).upper()
+    return ncm_cliente
+
+
+def _ncm_recordado_con_sim_del_proveedor(recordado: dict, del_proveedor) -> str:
+    """El NCM del historial del cliente, con la SIM del proveedor si es el
+    mismo producto: la misma descripción guardada, no sólo una parecida a la
+    de la factura (cada memoria busca por parecido por su lado)."""
+    from proyecto_maria.core import catalog_service as catalog_svc
+    if (not del_proveedor or not del_proveedor.get("producto_key")
+            or del_proveedor["producto_key"] != catalog_svc._normalize(recordado.get("descripcion") or "")):
+        return recordado["ncm"]
+    return _ncm_del_cliente_o_sim_del_proveedor(recordado["ncm"], del_proveedor.get("ncm"))
+
+
 def _catalog_suggestion(item: ncm_catalog.NCMItem) -> dict:
     return {
         "ncm": item.codigo,
@@ -7779,6 +8040,17 @@ def _suggest_ncm_with_gemini(descripcion: str, limit: int = 5) -> list[dict]:
         return []
 
 
+@app.get("/api/ncm/aviso")
+async def aviso_de_ncm_escrita(codigo: str = "", user=Depends(get_current_user)):
+    """Lo que el asistente muestra mientras se escribe un código: si la NCM (o
+    la partida) se dio de baja o no está en el nomenclador vigente
+    (CATALOGO-NCM-1). Vacío si está o si todavía es corto."""
+    aviso = ncm_catalog.aviso_de_codigo_escrito(codigo[:40])
+    digitos = re.sub(r"\D", "", codigo)[:8]
+    return {"aviso": aviso[:1].upper() + aviso[1:],
+            "baja": bool(aviso) and (len(digitos) < 8 or bool(ncm_catalog.ncm_de_baja(digitos)))}
+
+
 @app.post("/api/ncm/sugerir")
 async def sugerir_ncm(
     data: dict,
@@ -7807,10 +8079,16 @@ async def sugerir_ncm(
         if len(ncm_key) != 8 or ncm_key in seen_ncms or len(sugerencias) >= 5:
             return False
         seen_ncms.add(ncm_key)
+        # Una posición dada de baja (del historial o del proveedor) se
+        # propone diciéndolo (CATALOGO-NCM-1).
+        aviso = ncm_catalog.aviso_de_ncm(ncm_key)
+        if aviso:
+            suggestion = {**suggestion, "aviso": aviso, "baja": bool(ncm_catalog.ncm_de_baja(ncm_key))}
         sugerencias.append(suggestion)
         return True
 
     # 1) Memoria confirmada del cliente activo (aislada por despachante).
+    recordado = None
     if client_id:
         try:
             from proyecto_maria.services.client_memory import lookup_client_memory
@@ -7823,10 +8101,12 @@ async def sugerir_ncm(
                     "count": remembered.get("veces_usado", 1),
                     "scope": "cliente",
                 })
+                recordado = remembered
         except Exception as err:
             logging.warning("ncm suggestion client memory unavailable: %s", err)
 
-    # 2) Catálogo confirmado para el proveedor activo.
+    # 2) Catálogo confirmado para el proveedor activo. Va después del cliente:
+    # si su consulta falla, la sugerencia del cliente ya está.
     if vendor_name and len(sugerencias) < 5:
         try:
             from proyecto_maria.core import catalog_service as catalog_svc
@@ -7836,6 +8116,10 @@ async def sugerir_ncm(
             matches = vendor_match.get("items_matched") or []
             vendor_item = matches[0] if matches else None
             if vendor_item and vendor_item.get("ncm") and vendor_item.get("match_type") != "none":
+                # Si tiene la SIM completa del NCM que recuerda el cliente, la
+                # sugerencia del cliente la usa (D32 b).
+                if recordado and sugerencias and sugerencias[0].get("scope") == "cliente":
+                    sugerencias[0]["ncm"] = _ncm_recordado_con_sim_del_proveedor(recordado, vendor_item)
                 add_suggestion({
                     "ncm": vendor_item["ncm"],
                     "desc": descripcion,
@@ -7897,6 +8181,10 @@ async def sugerir_ncm(
     }
     if not sugerencias:
         payload["message"] = no_match_msg
+        # Un código escrito que se dio de baja: decirlo (CATALOGO-NCM-1).
+        aviso = ncm_catalog.aviso_de_codigo_escrito(descripcion) if _looks_like_ncm_code_query(descripcion) else ""
+        if aviso:
+            payload["message"] = aviso[0].upper() + aviso[1:]
     return payload
 
 @app.post("/api/ncm/guardar-uso")
@@ -9235,14 +9523,19 @@ async def catalog_lookup(
                 "origen": None,
             }
 
-            # 1) memoria del cliente
+            vm = vendor_matches_by_idx.get(idx)
+            if not (vm and vm.get("ncm") and vm.get("match_type") != "none"):
+                vm = None
+
+            # 1) memoria del cliente (con la SIM completa del proveedor, si
+            # la tiene para ese NCM: D32 b)
             if client_id and desc:
                 mem = await lookup_client_memory(db, user["username"], client_id, desc)
                 if mem and mem.get("ncm"):
                     out.update({
                         "source": "cliente",
                         "confidence": mem["confidence"],
-                        "ncm": mem["ncm"],
+                        "ncm": _ncm_recordado_con_sim_del_proveedor(mem, vm),
                         "origen": mem.get("origen") or None,
                         "veces_usado": mem.get("veces_usado"),
                         "valor_unitario_avg": mem.get("valor_unitario_avg"),
@@ -9253,8 +9546,7 @@ async def catalog_lookup(
                     continue
 
             # 2) catalogo del proveedor
-            vm = vendor_matches_by_idx.get(idx)
-            if vm and vm.get("ncm") and vm.get("match_type") != "none":
+            if vm:
                 out.update({
                     "source": "proveedor",
                     "confidence": float(vm.get("match_score") or 0.0),

@@ -85,8 +85,10 @@ sabotaje $C "la NCM sin el 0 inicial deja de proponerse" \
   '    if False:' \
   "FAILED $T::test_ncm_que_perdio_el_0_inicial_propone_el_0"
 sabotaje $C "la NCM fuera del nomenclador deja de avisarse" \
-  '        if not _en_el_nomenclador(digitos[:8]):' \
-  '        if False:' \
+  '        if aviso:
+            advertencias.append(f"Item {n}: {aviso}")' \
+  '        if False:
+            advertencias.append(f"Item {n}: {aviso}")' \
   "FAILED $T::test_ncm_que_no_esta_en_el_nomenclador_avisa_pero_deja_generar"
 sabotaje $C "el CUIT vacío vuelve a dejar generar" \
   '        errores.append("Falta el CUIT del importador.")' \
@@ -110,10 +112,11 @@ sabotaje $M "el TXT vuelve a llevar el valor sin normalizar" \
   '        request.incoterm = (request.incoterm or "").strip().upper()' \
   '        pass' \
   "FAILED $T::test_el_txt_lleva_lo_que_se_controla_normalizado"
-sabotaje $C "la NCM vuelve a buscarse recorriendo el catálogo" \
-  '    return codigo8 in _CODIGOS' \
-  '    from proyecto_maria.core.ncm_catalog import find_by_code
-    return find_by_code(codigo8) is not None' \
+# Con CATALOGO-NCM-1 el aviso sale de ncm_catalog.aviso_de_ncm: el sabotaje
+# le hace recorrer el catálogo entero por cada producto.
+sabotaje proyecto_maria/core/ncm_catalog.py "la NCM vuelve a buscarse recorriendo el catálogo" \
+  '    catalogo = _codigos_vigentes()' \
+  '    catalogo = [item.codigo for item in load_catalog()]' \
   "FAILED $T::test_los_controles_con_miles_de_items_no_traban"
 sabotaje $M "la validación previa deja de mirar la cabecera" \
   '        if isinstance(operacion, dict):' \
@@ -147,7 +150,7 @@ sabotaje $C "NaN e inf vuelven a pasar en la cantidad" \
   '        if False:' \
   "FAILED $D::test_nan_o_inf_en_un_producto_no_dejan_generar[cantidad-"
 sabotaje $C "los subítems dejan de controlarse" \
-  '        for m, sub in enumerate(item.get("subitems") or [], start=1):' \
+  '        for m, sub in enumerate(subitems if isinstance(subitems, list) else [], start=1):' \
   '        for m, sub in enumerate([], start=1):' \
   "FAILED $D::test_nan_o_inf_en_un_subitem_no_dejan_generar"
 sabotaje $C "los montos que desbordan al multiplicar vuelven a pasar" \

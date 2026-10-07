@@ -15,6 +15,12 @@
 
     // Batch selection / acciones en lote
     const selectedRows = new Set();
+    // Productos con el panel de subítems abierto (por objeto: sobrevive a
+    // reordenar las filas).
+    let subitemsAbiertos = new WeakSet();
+    // El error del servidor de un subítem, para mostrarlo bajo ese subítem:
+    // { it, k, texto } (SUBITEMS-1).
+    let errorDeSubitem = null;
     const expandedGroups = new Set();
     let batchBar, batchCount, batchFactor, batchApplyQty, batchNcm, batchDc, batchApplyNcm, batchOrigin, batchApplyOrigin, batchClear, batchAgrupar, selectAllBox;
     let batchSimAutofilled = false;
@@ -602,6 +608,7 @@
         tbody.querySelectorAll('[data-note-pill]').forEach(btn => {
             btn.addEventListener('click', onNotePillClick);
         });
+        enlazarSubitems();
         updateSummary();
         updateBatchBar();
         prefetchAllNotes();
@@ -685,7 +692,8 @@
                 '<td class="col-pais"><input class="ncm-edit ncm-edit-pais input input-sm" type="text" list="ncmCountries" value="' + origen + '" data-testid="ncm-origin-input" data-row="' + i + '" data-field="origen" aria-label="Origen item ' + (i + 1) + '"></td>' +
                 '<td class="col-cant"><input class="ncm-edit ncm-edit-cant input input-sm" type="number" min="1" step="1" value="' + cantVal + '" data-testid="ncm-quantity-input" data-row="' + i + '" data-field="cantidad" aria-label="Cantidad item ' + (i + 1) + '"></td>' +
                 '<td class="col-valor"><input class="ncm-edit ncm-edit-valor input input-sm" type="number" min="0" step="0.01" value="' + (valorUnitario || '') + '" data-testid="ncm-value-input" data-row="' + i + '" data-field="valor_unitario" aria-label="Valor unitario item ' + (i + 1) + '"></td>' +
-                '<td class="col-peso"><input class="ncm-edit ncm-edit-peso input input-sm" type="number" min="0" step="0.01" value="' + (pesoUnitario || '') + '" data-testid="ncm-weight-input" data-row="' + i + '" data-field="peso_unitario" aria-label="Peso unitario item ' + (i + 1) + '"></td>' +
+                '<td class="col-peso"><input class="ncm-edit ncm-edit-peso input input-sm" type="number" min="0" step="0.01" value="' + (pesoUnitario || '') + '" data-testid="ncm-weight-input" data-row="' + i + '" data-field="peso_unitario" aria-label="Peso unitario item ' + (i + 1) + '">' +
+                    '<small class="ncm-peso-total" data-testid="ncm-weight-total" data-peso-total="' + i + '">' + textoPesoTotal(it) + '</small></td>' +
                 '<td class="col-ncm">' +
                     '<div class="ncm-cell">' +
                         '<div class="sim-position-fields">' +
@@ -707,9 +715,188 @@
                     '<button type="button" class="btn-assist" data-assist="' + i + '">' +
                         assistText +
                     '</button>' +
+                    botonSubitems(it, i) +
+                '</td>' +
+            '</tr>' +
+            (subitemsAbiertos.has(it) ? renderSubitemsPanel(it, i) : '')
+        );
+    }
+
+    /* ---------- Subítems (SUBITEMS-1) ----------
+     * Un producto puede ir partido en subítems ([SBT] del TXT): cada uno con
+     * su cantidad, su valor unitario y su sufijo de valor. Las cantidades y
+     * los valores tienen que sumar lo del producto; el servidor lo controla
+     * al generar y acá se ve mientras se carga. Un producto agrupado no lleva
+     * subítems. Van en it.subitems, con el formato que recibe /generate_maria.
+     */
+    function subitemsDe(it) {
+        return Array.isArray(it && it.subitems) ? it.subitems : [];
+    }
+    function botonSubitems(it, i) {
+        const n = subitemsDe(it).length;
+        const abierto = subitemsAbiertos.has(it);
+        return ' <button type="button" class="btn-subitems' + (n ? ' has-subitems' : '') + '" data-subitems="' + i + '"' +
+            ' data-testid="ncm-subitems-toggle" aria-expanded="' + (abierto ? 'true' : 'false') + '">' +
+            (n ? 'Subítems (' + n + ')' : 'Subítems') + '</button>';
+    }
+    function numeroDe(v) {
+        const n = Number(String(v == null ? '' : v).replace(',', '.'));
+        return Number.isFinite(n) ? n : NaN;
+    }
+    // El número escrito como entero y escala (6,33 = 633 y 2), como el
+    // decimal exacto del servidor: String() de JS y repr() de Python dan los
+    // mismos dígitos para el mismo número.
+    function exactoDe(n) {
+        const m = /^(-?)(\d+)(?:\.(\d+))?(?:e([+-]?\d+))?$/.exec(String(n));
+        if (!m) return { v: 0n, e: 0 };
+        let digitos = m[2] + (m[3] || '');
+        let escala = (m[3] || '').length - parseInt(m[4] || '0', 10);
+        if (escala < 0) { digitos += '0'.repeat(-escala); escala = 0; }
+        return { v: BigInt(m[1] + digitos), e: escala };
+    }
+    // |a − b| ≤ 0,01 en decimal exacto; a y b son listas de productos [x, y].
+    function difiereHastaUnCentavo(a, b) {
+        const prod = ([x, y]) => { const p = exactoDe(x), q = exactoDe(y); return { v: p.v * q.v, e: p.e + q.e }; };
+        const pa = a.map(prod), pb = b.map(prod);
+        const E = Math.max(2, ...pa.map(x => x.e), ...pb.map(x => x.e));
+        const al = x => x.v * 10n ** BigInt(E - x.e);
+        let d = pa.reduce((t, x) => t + al(x), 0n) - pb.reduce((t, x) => t + al(x), 0n);
+        if (d < 0n) d = -d;
+        return d <= 10n ** BigInt(E - 2);
+    }
+    // ¿Las partes suman lo del producto? La misma cuenta que el servidor:
+    // cantidades a 0,001 y valores a 0,01 en decimal exacto.
+    function sumaSubitems(it) {
+        const subs = subitemsDe(it);
+        const cant = subs.reduce((t, s) => t + (numeroDe(s.cantidad) || 0), 0);
+        const valor = subs.reduce((t, s) => t + (numeroDe(s.cantidad) || 0) * (numeroDe(s.valor_unitario) || 0), 0);
+        const cantItem = numeroDe(it.cantidad) || 0;
+        const valorItem = cantItem * (numeroDe(it.valor_unitario) || 0);
+        // Cantidad con hasta dos decimales: el TXT la declara con dos.
+        const dosDecimales = c => Math.abs(c - Math.round(c * 100) / 100) <= 1e-9;
+        const malos = subs.map((s, k) => (numeroDe(s.cantidad) > 0 && dosDecimales(numeroDe(s.cantidad)) &&
+            numeroDe(s.valor_unitario) > 0) ? 0 : k + 1).filter(Boolean);
+        const cantOk = Math.abs(cant - cantItem) <= 0.001;
+        const valorOk = !malos.length && difiereHastaUnCentavo(
+            subs.map(s => [numeroDe(s.cantidad) || 0, numeroDe(s.valor_unitario) || 0]),
+            [[cantItem, numeroDe(it.valor_unitario) || 0]]);
+        const ok = subs.length > 0 && !malos.length && cantOk && valorOk;
+        return { cant, valor, cantItem, valorItem, malos, cantOk, valorOk, ok };
+    }
+    function textoSumaSubitems(it) {
+        if (!subitemsDe(it).length) return '';
+        const r = sumaSubitems(it);
+        const n = (v, min, max) => v.toLocaleString('es-AR', { minimumFractionDigits: min, maximumFractionDigits: max });
+        // Las cantidades con sus decimales: 1,5 + 1,4 suman 2,9, no 3.
+        let texto = 'Suman ' + n(r.cant, 0, 3) + ' de ' + n(r.cantItem, 0, 3) + ' unidades y ' +
+            n(r.valor, 2, 2) + ' de ' + n(r.valorItem, 2, 2) + ' de valor.';
+        if (r.malos.length) texto += ' Revisá el subítem ' + r.malos.join(', ') + ': cantidad y valor mayores que 0, y la cantidad con hasta dos decimales.';
+        else if (!r.cantOk) texto += ' Las cantidades de los subítems no suman la del producto.';
+        else if (!r.valorOk) texto += ' Los valores de los subítems no suman el del producto (se admite 0,01 de diferencia).';
+        return (r.ok ? '✓ ' : '⚠ ') + texto;
+    }
+    function actualizarSumaSubitems(i) {
+        const it = ((CDI.state && CDI.state.items) || [])[i];
+        const el = tbody && tbody.querySelector('[data-sub-suma="' + i + '"]');
+        if (!it || !el) return;
+        el.textContent = textoSumaSubitems(it);
+        el.classList.toggle('is-error', !sumaSubitems(it).ok);
+    }
+    function renderSubitemsPanel(it, i) {
+        const subs = subitemsDe(it);
+        const esc = v => CDI.escapeHtml(v == null ? '' : String(v));
+        const campo = (k, nombre, tipo, valor, etiqueta, extra) =>
+            '<input class="input input-sm" type="' + tipo + '"' + (extra || '') + ' value="' + esc(valor) + '"' +
+            ' data-sub-row="' + i + '" data-sub-idx="' + k + '" data-sub-field="' + nombre + '"' +
+            ' aria-label="' + etiqueta + ' del subítem ' + (k + 1) + '">';
+        const conError = k => errorDeSubitem && errorDeSubitem.it === it && errorDeSubitem.k === k;
+        const filas = subs.map((s, k) =>
+            '<tr>' +
+                '<td class="ncm-sub-num">' + (k + 1) + '</td>' +
+                '<td>' + campo(k, 'cantidad', 'number', s.cantidad, 'Cantidad', ' min="0" step="any"') + '</td>' +
+                '<td>' + campo(k, 'valor_unitario', 'number', s.valor_unitario, 'Valor unitario', ' min="0" step="any"') + '</td>' +
+                '<td>' + campo(k, 'sufijo', 'text', s.sufijo, 'Sufijo de valor', ' placeholder="El general de la operación"') + '</td>' +
+                '<td><button type="button" class="btn-link" data-sub-borrar="' + i + '" data-sub-idx="' + k + '"' +
+                    ' aria-label="Borrar el subítem ' + (k + 1) + '">Borrar</button></td>' +
+            '</tr>' +
+            (conError(k)
+                ? '<tr class="ncm-sub-error"><td></td><td colspan="4"><p class="field-error" role="alert" data-sub-error="' + i +
+                  '" data-sub-idx="' + k + '">' + esc(errorDeSubitem.texto) + '</p></td></tr>'
+                : '')).join('');
+        const r = subs.length ? sumaSubitems(it) : { ok: true };
+        return (
+            '<tr class="row-subitems" data-subitems-panel="' + i + '">' +
+                '<td colspan="10">' +
+                    '<div class="ncm-subitems">' +
+                        '<p class="ncm-subitems-ayuda">Subítems del ítem ' + (i + 1) + ': cada uno es una parte del producto ' +
+                            'con su cantidad, su valor unitario y su sufijo de valor. Tienen que sumar la cantidad y el valor del producto.</p>' +
+                        (subs.length
+                            ? '<table class="ncm-subitems-tabla"><thead><tr><th>#</th><th>Cantidad</th><th>Valor unit.</th>' +
+                              '<th>Sufijo de valor</th><th></th></tr></thead><tbody>' + filas + '</tbody></table>'
+                            : '<p class="ncm-subitems-vacio">Sin subítems: el producto va entero.</p>') +
+                        '<div class="ncm-subitems-pie">' +
+                            '<button type="button" class="btn btn-sm btn-secondary" data-sub-agregar="' + i + '">+ Agregar subítem</button>' +
+                            '<span class="ncm-subitems-suma' + (r.ok ? '' : ' is-error') + '" data-sub-suma="' + i + '" aria-live="polite">' +
+                                esc(textoSumaSubitems(it)) + '</span>' +
+                        '</div>' +
+                    '</div>' +
                 '</td>' +
             '</tr>'
         );
+    }
+    function enlazarSubitems() {
+        const items = (CDI.state && CDI.state.items) || [];
+        tbody.querySelectorAll('[data-subitems]').forEach(btn => btn.addEventListener('click', () => {
+            const it = items[parseInt(btn.getAttribute('data-subitems'), 10)];
+            if (!it) return;
+            if (subitemsAbiertos.has(it)) subitemsAbiertos.delete(it); else subitemsAbiertos.add(it);
+            render();
+        }));
+        tbody.querySelectorAll('[data-sub-agregar]').forEach(btn => btn.addEventListener('click', () => {
+            const it = items[parseInt(btn.getAttribute('data-sub-agregar'), 10)];
+            if (!it) return;
+            const subs = subitemsDe(it).slice();
+            // La cantidad que falta, para no tener que hacer la cuenta.
+            const falta = (numeroDe(it.cantidad) || 0) - subs.reduce((t, s) => t + (numeroDe(s.cantidad) || 0), 0);
+            subs.push({ cantidad: falta > 0 ? Math.round(falta * 100) / 100 : '', valor_unitario: it.valor_unitario, sufijo: '' });
+            it.subitems = subs;
+            lastSnapshot = null;  // deshacer una acción masiva no pisa los subítems
+            // El error del servidor era de un subítem en su lugar: al agregar o
+            // borrar, ese lugar ya es otro.
+            if (errorDeSubitem && errorDeSubitem.it === it) errorDeSubitem = null;
+            render();
+            const nuevo = tbody.querySelector('[data-sub-row="' + btn.getAttribute('data-sub-agregar') + '"][data-sub-idx="' +
+                (subs.length - 1) + '"][data-sub-field="cantidad"]');
+            if (nuevo) nuevo.focus();
+        }));
+        tbody.querySelectorAll('[data-sub-borrar]').forEach(btn => btn.addEventListener('click', () => {
+            const it = items[parseInt(btn.getAttribute('data-sub-borrar'), 10)];
+            if (!it) return;
+            const subs = subitemsDe(it).slice();
+            subs.splice(parseInt(btn.getAttribute('data-sub-idx'), 10), 1);
+            if (subs.length) it.subitems = subs; else delete it.subitems;
+            lastSnapshot = null;
+            // El error del servidor era de un subítem en su lugar: al agregar o
+            // borrar, ese lugar ya es otro.
+            if (errorDeSubitem && errorDeSubitem.it === it) errorDeSubitem = null;
+            render();
+        }));
+        tbody.querySelectorAll('[data-sub-field]').forEach(inp => inp.addEventListener('input', () => {
+            const i = parseInt(inp.getAttribute('data-sub-row'), 10);
+            const it = items[i];
+            const sub = it && subitemsDe(it)[parseInt(inp.getAttribute('data-sub-idx'), 10)];
+            if (!sub) return;
+            const campoSub = inp.getAttribute('data-sub-field');
+            // Al corregir el subítem, su error se va.
+            if (errorDeSubitem && errorDeSubitem.it === it) {
+                errorDeSubitem = null;
+                tbody.querySelectorAll('.ncm-sub-error').forEach(el => el.remove());
+            }
+            sub[campoSub] = campoSub === 'sufijo' ? inp.value : (inp.value === '' ? '' : numeroDe(inp.value));
+            lastSnapshot = null;
+            actualizarSumaSubitems(i);
+            updateSummary();
+        }));
     }
 
     function buildRenderRows(items) {
@@ -831,6 +1018,9 @@
             return { ok: false, title: 'Seleccioná 2+ ítems', message: 'Marcá los productos que forman una sola unidad clasificatoria.' };
         }
         const selected = selectedIndices.map(i => items[i]);
+        if (selected.some(it => Array.isArray(it.subitems) && it.subitems.length)) {
+            return { ok: false, title: 'Hay productos con subítems', message: 'Un producto partido en subítems no se agrupa: borrá sus subítems o dejalo afuera del grupo.' };
+        }
         const requestedNcm = normalizeBatchNcm(rawNcm);
         if (String(rawNcm || '').trim() && !requestedNcm) {
             return { ok: false, title: 'Posición SIM incompleta', message: simErrorDetail(rawNcm) };
@@ -869,6 +1059,15 @@
     // API pequeña y determinística para probar la acción masiva sin navegador.
     CDI.ncmBatch = CDI.ncmBatch || {};
     CDI.ncmBatch.applyNcmAndGroup = applyNcmAndGroup;
+    // Deja el error del servidor bajo el subítem k del producto i y abre su
+    // panel; se ve al volver al paso de NCM.
+    CDI.ncmBatch.marcarErrorDeSubitem = function (i, k, texto) {
+        const it = ((CDI.state && CDI.state.items) || [])[i];
+        if (!it || !subitemsDe(it)[k]) return false;
+        subitemsAbiertos.add(it);
+        errorDeSubitem = { it, k, texto };
+        return true;
+    };
     CDI.ncmBatch.isValidSimPosition = isValidNcm;
     CDI.ncmBatch.inferSelectedSim = inferSelectedSim;
 
@@ -1168,6 +1367,13 @@
         }
     }
 
+    // MARIA-5 (D22): el peso del campo es el de una unidad; abajo, el de la
+    // línea, que es el que sale en el TXT.
+    function textoPesoTotal(it) {
+        const total = Number(it.peso_unitario || 0) * Number(it.cantidad || 0);
+        return total > 0 ? 'línea: ' + total.toLocaleString('es-AR', { maximumFractionDigits: 3 }) + ' kg' : '';
+    }
+
     function setItemField(idx, field, raw) {
         const items = CDI.state && CDI.state.items;
         if (!items || !items[idx]) return;
@@ -1195,10 +1401,51 @@
             const n = Number(raw);
             value = Number.isFinite(n) ? n : 0;
         }
-        items.forEach(it => {
-            if (it.grupo_id === gid) it[field] = value;
-        });
+        const miembros = items.filter(it => it.grupo_id === gid);
+        if (field === 'cantidad' || field === 'valor_unitario' || field === 'peso_unitario') {
+            repartirEnGrupo(miembros, field, value);
+        } else {
+            miembros.forEach(it => { it[field] = value; });
+        }
         return value;
+    }
+
+    // MARIA-5. La fila del grupo muestra la cantidad total y el valor y el
+    // peso promedio por unidad. Antes, editarla copiaba ese número a cada
+    // producto y el TXT sumaba de más. Ahora la suma de los productos da lo
+    // que muestra la fila: la cantidad se reparte en enteros (resto mayor) y
+    // el valor y el peso escalan los de cada producto, sin perder la
+    // proporción entre ellos.
+    function repartirEnGrupo(miembros, field, value) {
+        if (!miembros.length) return;
+        const cant = it => Number(it.cantidad || 0);
+        const total = miembros.reduce((s, it) => s + cant(it), 0);
+        if (field === 'cantidad') {
+            const nuevo = Math.max(0, Math.round(value));
+            const partes = miembros.map(it => total > 0 ? nuevo * cant(it) / total : (it === miembros[0] ? nuevo : 0));
+            const enteras = partes.map(Math.floor);
+            const orden = partes.map((p, i) => i).sort((a, b) => (partes[b] - enteras[b]) - (partes[a] - enteras[a]) || a - b);
+            let faltan = nuevo - enteras.reduce((s, n) => s + n, 0);
+            for (const i of orden) { if (faltan <= 0) break; enteras[i] += 1; faltan -= 1; }
+            // Ningún producto queda en 0 (devolución de MARIA-5): el que no
+            // llegó a uno lo toma del que más tiene. onFieldBlur ya rechazó
+            // un total menor que la cantidad de productos.
+            enteras.forEach((n, i) => {
+                while (enteras[i] < 1) {
+                    const mayor = enteras.indexOf(Math.max(...enteras));
+                    if (enteras[mayor] <= 1) break;
+                    enteras[mayor] -= 1;
+                    enteras[i] += 1;
+                }
+            });
+            miembros.forEach((it, i) => { it.cantidad = enteras[i]; });
+            return;
+        }
+        const suma = miembros.reduce((s, it) => s + Number(it[field] || 0) * cant(it), 0);
+        const promedio = total > 0 ? suma / total : 0;
+        miembros.forEach(it => {
+            it[field] = promedio > 0 ? Number(it[field] || 0) * (value / promedio) : value;
+        });
     }
 
     function markFieldError(inp, isError) {
@@ -1221,12 +1468,18 @@
         }
 
         if (gidAttr) {
+            // Los números de un grupo se reparten al salir del campo, no a
+            // cada tecla: un 0 a medio escribir borraría la proporción.
+            if (field === 'cantidad' || field === 'valor_unitario' || field === 'peso_unitario') return;
             const gid = parseInt(gidAttr, 10);
             setGroupField(gid, field, inp.value);
         } else {
             const idx = parseInt(inp.getAttribute('data-row'), 10);
             if (isNaN(idx)) return;
             setItemField(idx, field, inp.value);
+            const totalEl = document.querySelector('[data-peso-total="' + idx + '"]');
+            if (totalEl && (field === 'cantidad' || field === 'peso_unitario')) totalEl.textContent = textoPesoTotal(CDI.state.items[idx]);
+            if (field === 'cantidad' || field === 'valor_unitario') actualizarSumaSubitems(idx);
         }
         updateSummary();
     }
@@ -1241,6 +1494,33 @@
         let finalValue;
         if (gidAttr) {
             const gid = parseInt(gidAttr, 10);
+            if (field === 'cantidad' || field === 'valor_unitario' || field === 'peso_unitario') {
+                // MARIA-5. La fila muestra el total y promedios redondeados:
+                // pasar por el campo sin cambiarlo no reescribe nada, y un 0,
+                // un negativo o el campo vacío no borran la proporción entre
+                // los productos (vuelve lo que estaba).
+                if (inp.value === inp.defaultValue) return;
+                const n = Number(inp.value);
+                const productos = (CDI.state.items || []).filter(it => it.grupo_id === gid).length;
+                if (inp.value.trim() === '' || !Number.isFinite(n) || n <= 0 ||
+                    (field === 'cantidad' && Math.round(n) < productos)) {
+                    inp.value = inp.defaultValue;
+                    if (CDI.toast) CDI.toast('Grupo sin cambios', 'En un grupo, cargá un número mayor que 0 (en la cantidad, al menos uno por producto). Para cambiar un producto solo, desagrupalo.', 'warning');
+                    return;
+                }
+                setGroupField(gid, field, inp.value);
+                // Lo que quedó en cada producto, a la vista (fila y sub-filas),
+                // sin perder el campo al que se pasó con Tab o con el mouse.
+                const destino = ev.relatedTarget;
+                const sel = destino && destino.getAttribute && destino.getAttribute('data-field')
+                    ? '[data-field="' + destino.getAttribute('data-field') + '"]' +
+                      (destino.hasAttribute('data-row') ? '[data-row="' + destino.getAttribute('data-row') + '"]' : '') +
+                      (destino.hasAttribute('data-grupo-id') ? '[data-grupo-id="' + destino.getAttribute('data-grupo-id') + '"]' : '')
+                    : null;
+                render();
+                if (sel) { const otro = document.querySelector('#ncmTableBody ' + sel) || document.querySelector(sel); if (otro) otro.focus(); }
+                return;
+            }
             finalValue = setGroupField(gid, field, inp.value);
         } else {
             const idx = parseInt(inp.getAttribute('data-row'), 10);
@@ -1264,7 +1544,8 @@
             ev.target.blur();
             const idx = parseInt(ev.target.getAttribute('data-row'), 10);
             const field = ev.target.getAttribute('data-field');
-            const next = ev.target.closest('tr') && ev.target.closest('tr').nextElementSibling;
+            let next = ev.target.closest('tr') && ev.target.closest('tr').nextElementSibling;
+            while (next && next.classList.contains('row-subitems')) next = next.nextElementSibling;
             if (next) {
                 const nextInput = next.querySelector('.ncm-edit[data-field="' + field + '"]');
                 if (nextInput) nextInput.focus();
@@ -1554,11 +1835,31 @@
         const fmt = CDI.formatNcm ? CDI.formatNcm(code) : code;
         if (!isValidNcm(fmt)) {
             renderSpotEmpty('NCM identificada. Falta elegir la posición SIM completa (11 dígitos + DC).');
-            return;
+        } else {
+            spotSuggestions = [{ ncm: fmt, desc: 'Asignar este código manualmente', source: 'manual' }];
+            spotSelectedSugIdx = 0;
+            renderSpotResults(false);
         }
-        spotSuggestions = [{ ncm: fmt, desc: 'Asignar este código manualmente', source: 'manual' }];
-        spotSelectedSugIdx = 0;
-        renderSpotResults(false);
+        avisarCodigoEscrito(code);
+    }
+    // Un código escrito que se dio de baja (o que no está en el nomenclador
+    // vigente) lo dice mientras se escribe (CATALOGO-NCM-1). Es aviso: se
+    // puede asignar igual.
+    async function avisarCodigoEscrito(code) {
+        const consulta = spotLastQuery;
+        let data;
+        try {
+            const res = await CDI.api('/api/ncm/aviso?codigo=' + encodeURIComponent(code));
+            data = res.ok ? await res.json() : null;
+        } catch (_) { data = null; }
+        if (!data || !data.aviso || consulta !== spotLastQuery) return;
+        const fmt = CDI.formatNcm ? CDI.formatNcm(code) : code;
+        if (isValidNcm(fmt) && spotSuggestions.length && spotSuggestions[0].source === 'manual') {
+            spotSuggestions[0] = Object.assign({}, spotSuggestions[0], { aviso: data.aviso, baja: true });
+            renderSpotResults(false);
+        } else if (!isValidNcm(fmt)) {
+            renderSpotEmpty('⚠ ' + data.aviso);
+        }
     }
     function renderSpotResults(initial) {
         if (!spotSuggestions.length) {
@@ -1618,9 +1919,12 @@
         const actionMeta = isValidNcm(s.ncm)
             ? 'Lista para asignar'
             : 'Elegir para ver posiciones SIM + DC';
-        const meta = sourceMeta ? sourceMeta + ' · ' + actionMeta : actionMeta;
+        // Una posición dada de baja se propone diciéndolo (CATALOGO-NCM-1).
+        const meta = s.aviso
+            ? '⚠ ' + s.aviso.charAt(0).toUpperCase() + s.aviso.slice(1) + (sourceMeta ? ' · ' + sourceMeta : '')
+            : (sourceMeta ? sourceMeta + ' · ' + actionMeta : actionMeta);
         return (
-            '<button type="button" class="spotlight-item' + selected + '"' +
+            '<button type="button" class="spotlight-item' + selected + (s.aviso ? ' is-baja' : '') + '"' +
                 ' data-idx="' + entry.idx + '" role="option" tabindex="-1">' +
                 '<span class="spotlight-item-code">' + CDI.escapeHtml((CDI.formatNcm ? CDI.formatNcm(s.ncm || '') : (s.ncm || ''))) + '</span>' +
                 '<div class="spotlight-item-body">' +

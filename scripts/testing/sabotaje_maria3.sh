@@ -56,6 +56,12 @@ open(p, "w", encoding="utf-8").write(s.replace(viejo, nuevo, 1))
 PY
 }
 
+# reemplazar_si_esta <archivo> <viejo> <nuevo>: como reemplazar, pero si el
+# patrón no está (todavía no se integró esa pieza) no hace nada
+reemplazar_si_esta() {
+  if grep -qF -- "$2" "$1"; then reemplazar "$@"; fi
+}
+
 FALLAS=0
 caso() {  # caso <nombre> <texto que el rojo tiene que mostrar>
   local nombre="$1" espera="$2" salida
@@ -204,7 +210,7 @@ reemplazar $G '        valor = str(item.get(clave) or "").strip()' '        valo
 caso procedencia_en_blanco "${T}test_procedencia_de_item_en_blanco_no_pisa_la_de_la_operacion"
 
 # 26. el generador no valida gastos_fob
-reemplazar $G "        importe_gastos = f\"{_importe_de_gastos(gastos_fob, 'gastos_fob'):.2f}\"" \
+reemplazar $G "        importe_gastos = f\"{centavos(_importe_de_gastos(gastos_fob, 'gastos_fob')):.2f}\"" \
   "        importe_gastos = f\"{float(gastos_fob):.2f}\""
 caso generador_sin_validar "${T}test_el_generador_tampoco_acepta_gastos_invalidos[inf]"
 
@@ -215,7 +221,10 @@ reemplazar $M '        importe_valido(request.seguro, "Seguro")
 caso avisos_gastos_500 "${T}test_gastos_que_no_son_un_importe_dan_400[/generate_maria/avisos-gastos_anteriores_fob-EXW-inf]"
 
 # 28. el flete no se valida (con CIF llega a GTOS-POS-FOB)
-reemplazar $G '    flete = importe_valido(flete or 0, "Flete")' '    flete = float(flete or 0)'
+reemplazar $G '    flete = centavos(importe_valido(flete or 0, "Flete"))' '    flete = Decimal(repr(float(flete or 0)))'
+# El control del pedido de MARIA-1b (Dev 1) también valida el flete antes de
+# generar: el sabotaje saca las dos validaciones, si está integrado.
+reemplazar_si_esta proyecto_maria/core/controles_maria.py '    ("flete", "Flete"), ("seguro", "Seguro"),' '    ("seguro", "Seguro"),'
 caso flete_sin_validar "${T}test_flete_o_seguro_que_no_son_un_importe_dan_400[/generate_maria-flete-inf]"
 
 # 29. una procedencia de producto no reconocida pasa

@@ -75,7 +75,7 @@ def test_txt_total_fob_correcto():
 def test_txt_usa_valor_total_si_viene():
     """Si el item trae valor_total explícito, se usa ese en vez de calcular."""
     items = [{"pieza": "84713010", "descripcion": "X", "cantidad": 3,
-              "valor_unitario": 100, "valor_total": 999, "origen": "CN"}]
+              "valor_unitario": 100, "valor_total": 999, "peso_kg": 1, "origen": "CN"}]
     txt = _gen("OP1", items)
     assert "MDDTFOB=999.00" in txt
 
@@ -83,7 +83,7 @@ def test_txt_usa_valor_total_si_viene():
 def test_txt_formatea_ncm_con_puntos():
     """NCM de 8+ dígitos se formatea con puntos para el Kit SIM."""
     items = [{"pieza": "84798999900H", "descripcion": "X", "cantidad": 1,
-              "valor_unitario": 10, "origen": "CN"}]
+              "valor_unitario": 10, "peso_kg": 1, "origen": "CN"}]
     txt = _gen("OP1", items)
     # 8479.89.99 + sufijo
     assert "IESPNCE=8479.89.99" in txt
@@ -126,7 +126,7 @@ def test_txt_proporcional_flete_seguro():
     """Flete y seguro se reparten proporcional al FOB de cada item."""
     # 1 item con todo el FOB → recibe el 100% del flete.
     items = [{"pieza": "84713010", "descripcion": "X", "cantidad": 1,
-              "valor_unitario": 1000, "origen": "CN"}]
+              "valor_unitario": 1000, "peso_kg": 1, "origen": "CN"}]
     txt = _gen("OP1", items, flete=100, seguro=50)
     assert "MARTFLE=100.00" in txt
     assert "MARTASS=50.00" in txt
@@ -190,7 +190,7 @@ def test_txt_procedencia_default_es_origen():
     no un hardcode. Antes era fijo 222 (que en la tabla oficial es Perú).
     """
     items = [{"pieza": "84713010", "descripcion": "X", "cantidad": 1,
-              "valor_unitario": 100, "origen": "China"}]
+              "valor_unitario": 100, "peso_kg": 1, "origen": "China"}]
     txt = _gen("OP1", items)
     assert "CARTPAYORI=310" in txt   # China oficial
     assert "CARTPAYPRC=310" in txt   # procedencia = origen
@@ -200,7 +200,7 @@ def test_txt_procedencia_default_es_origen():
 def test_txt_procedencia_explicita():
     """Si el item trae procedencia distinta al origen, se respeta."""
     items = [{"pieza": "84713010", "descripcion": "X", "cantidad": 1,
-              "valor_unitario": 100, "origen": "China",
+              "valor_unitario": 100, "peso_kg": 1, "origen": "China",
               "pais_procedencia": "Uruguay"}]
     txt = _gen("OP1", items)
     assert "CARTPAYORI=310" in txt   # origen China
@@ -210,7 +210,7 @@ def test_txt_procedencia_explicita():
 def test_txt_unidad_default_es_unidad():
     """Sin unidad explícita, CARTUNTDCL debe ser 07 (UNIDAD)."""
     items = [{"pieza": "84713010", "descripcion": "X", "cantidad": 5,
-              "valor_unitario": 100, "origen": "China"}]
+              "valor_unitario": 100, "peso_kg": 1, "origen": "China"}]
     txt = _gen("OP1", items)
     assert "CARTUNTDCL=07" in txt
     assert "CARTUNTEST=07" in txt
@@ -219,13 +219,13 @@ def test_txt_unidad_default_es_unidad():
 def test_txt_unidad_kg_y_par():
     """La unidad del item se mapea al código oficial: kg=01, par=08."""
     items = [{"pieza": "84713010", "descripcion": "A", "cantidad": 10,
-              "valor_unitario": 100, "origen": "China", "unidad": "kg"}]
+              "valor_unitario": 100, "peso_kg": 1, "origen": "China", "unidad": "kg"}]
     txt = _gen("OP1", items)
     assert "CARTUNTDCL=01" in txt   # kilogramo oficial
     assert "CARTUNTDCL=07" not in txt
 
     items2 = [{"pieza": "64041100", "descripcion": "Zapatillas", "cantidad": 20,
-               "valor_unitario": 50, "origen": "China", "unidad_medida": "pares"}]
+               "valor_unitario": 50, "peso_kg": 1, "origen": "China", "unidad_medida": "pares"}]
     txt2 = _gen("OP2", items2)
     assert "CARTUNTDCL=08" in txt2   # par oficial
 
@@ -609,7 +609,7 @@ def test_agrupacion_2_items_mismo_grupo_genera_2_art():
     - Mesa (grupo 1): cant=2, valor=20, peso=1
     - Lámpara (sin grupo): cant=5, valor=10, peso=0.5
 
-    Grupo 1 combinado: cant=4, valor_total=140, peso=4
+    Grupo 1 combinado: cant=4, valor_total=140, peso=2*3+2*1=8 (MARIA-5)
     """
     items = [
         {"pieza": "94037000", "descripcion": "Silla de madera de roble", "cantidad": 2,
@@ -627,8 +627,9 @@ def test_agrupacion_2_items_mismo_grupo_genera_2_art():
     # Grupo combinado: MARTFOB = 2*50 + 2*20 = 140
     assert "MARTFOB=140.00" in txt, f"Falta MARTFOB=140.00 en txt"
 
-    # Grupo combinado: QARTKGRNET = 3+1 = 4 (peso sumado)
-    assert "QARTKGRNET=4.000" in txt, f"Falta QARTKGRNET=4.000 en txt"
+    # Grupo combinado: QARTKGRNET = 2*3 + 2*1 = 8, el peso total de cada línea
+    # (MARIA-5, respuesta 3 del despachante; antes sumaba los unitarios: 4).
+    assert "QARTKGRNET=8.000" in txt, f"Falta QARTKGRNET=8.000 en txt"
 
     # Grupo combinado: QARTUNTDCL = 2+2 = 4 (cantidad sumada)
     assert "QARTUNTDCL=4.00" in txt, f"Falta QARTUNTDCL=4.00 en txt"

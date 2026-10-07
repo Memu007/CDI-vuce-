@@ -56,17 +56,23 @@ def test_peso_neto_gana_sobre_bruto():
     r = _subir([["NCM", "Descripcion", "Origen", "Cantidad", "Precio Unitario", "Peso Bruto", "Peso Neto"],
                 ["84713000", "Laptop 14 pulgadas", "CN", 10, 350, 25, 15]])
     assert r.status_code == 200, r.text[:300]
-    assert r.json()["items"][0]["peso_unitario"] == 15, r.json()["items"][0]
+    # Respuesta 3 del despachante y D23 de la Dev 2 (regla de MARIA-5): el neto
+    # y el total son de la línea y se dividen por la cantidad; neto > total > de
+    # una unidad > bruto.
+    assert r.json()["items"][0]["peso_unitario"] == 1.5, r.json()["items"][0]
 
 
 def test_peso_bruto_o_total_no_se_toma_como_peso_unitario():
-    """Sin peso neto ni unitario, el peso queda vacío (0) y la fila igual entra:
-    el TXT lo frena con «Peso inválido» y el usuario lo completa."""
+    """El bruto o el total no entran como peso de una unidad: se dividen por la
+    cantidad, y el bruto, con aviso (respuesta 3 del despachante y D23 de la
+    Dev 2, que reemplazan lo de EXCEL-1: quedaba vacío)."""
     for col in ("Peso Bruto", "Peso Total"):
         r = _subir([["NCM", "Descripcion", "Origen", "Cantidad", "Precio Unitario", col],
                     ["84713000", "Laptop 14 pulgadas", "CN", 10, 350, 25]])
         assert r.status_code == 200, (col, r.text[:300])
-        assert r.json()["items"][0]["peso_unitario"] in (0, None), (col, r.json()["items"][0])
+        assert r.json()["items"][0]["peso_unitario"] == 2.5, (col, r.json()["items"][0])
+        if col == "Peso Bruto":
+            assert any("bruto" in a for a in r.json()["avisos"]), r.json()["avisos"]
 
 
 def test_fila_de_subtotal_no_entra_como_item():
@@ -89,7 +95,10 @@ def test_encabezados_con_unidades_entre_parentesis():
                 ["84713000", "Laptop 14 pulgadas", "CN", 10, 350, 1.5]])
     assert r.status_code == 200, r.text[:300]
     item = r.json()["items"][0]
-    assert (item["cantidad"], item["valor_unitario"], item["peso_unitario"]) == (10, 350, 1.5), item
+    # Respuesta 3 del despachante y D23 de la Dev 2 (regla de MARIA-5): el neto
+    # y el total son de la línea y se dividen por la cantidad; neto > total > de
+    # una unidad > bruto.
+    assert (item["cantidad"], item["valor_unitario"], item["peso_unitario"]) == (10, 350, 0.15), item
 
 
 def test_filas_con_datos_faltantes_entran_vacias_y_no_inventadas():
@@ -182,7 +191,10 @@ def test_mapeo_guardado_no_deja_afuera_encabezados_nuevos():
                 ["84713000", "Laptop 14 pulgadas", "CN", 10, 350, 1.5]], cliente_id=cid)
     assert r.status_code == 200, r.text[:300]
     item = r.json()["items"][0]
-    assert (item["cantidad"], item["peso_unitario"]) == (10, 1.5), item
+    # Respuesta 3 del despachante y D23 de la Dev 2 (regla de MARIA-5): el neto
+    # y el total son de la línea y se dividen por la cantidad; neto > total > de
+    # una unidad > bruto.
+    assert (item["cantidad"], item["peso_unitario"]) == (10, 0.15), item
 
 
 def test_miles_con_pista_en_la_planilla():
@@ -343,7 +355,10 @@ def test_peso_neto_y_bruto_entre_parentesis_no_se_confunden():
     r = _subir([["NCM", "Descripcion", "Origen", "Cantidad", "Precio Unitario", "Peso (neto)", "Peso (bruto)"],
                 ["84713000", "Laptop", "CN", 10, 350, 1.5, 2.2]])
     assert r.status_code == 200, r.text[:300]
-    assert r.json()["items"][0]["peso_unitario"] == 1.5, r.json()["items"]
+    # Respuesta 3 del despachante y D23 de la Dev 2 (regla de MARIA-5): el neto
+    # y el total son de la línea y se dividen por la cantidad; neto > total > de
+    # una unidad > bruto.
+    assert r.json()["items"][0]["peso_unitario"] == 0.15, r.json()["items"]
 
 
 def test_el_indice_del_xlsx_se_mira_fuera_del_hilo_del_servidor(monkeypatch):
@@ -366,12 +381,14 @@ def test_el_indice_del_xlsx_se_mira_fuera_del_hilo_del_servidor(monkeypatch):
 
 
 def test_peso_ambiguo_entre_parentesis_queda_vacio_y_no_se_adivina():
-    """«Peso (kg)» y «Peso (bruto)»: sin paréntesis las dos son «Peso». No se
-    elige una por el orden: el peso queda vacío y el semáforo lo marca."""
-    r = _subir([["NCM", "Descripcion", "Origen", "Cantidad", "Precio Unitario", "Peso (kg)", "Peso (bruto)"],
-                ["84713000", "Laptop", "CN", 10, 350, 1.5, 2.2]])
+    """«Peso (kg)» y «Peso (bruto)»: no se elige por el orden de las columnas.
+    Con la regla de MARIA-5 (respuesta 3 y D23: de una unidad > bruto) se usa
+    «Peso (kg)» y el aviso nombra el bruto ignorado (antes quedaba vacío)."""
+    r = _subir([["NCM", "Descripcion", "Origen", "Cantidad", "Precio Unitario", "Peso (bruto)", "Peso (kg)"],
+                ["84713000", "Laptop", "CN", 10, 350, 2.2, 1.5]])
     assert r.status_code == 200, r.text[:300]
-    assert r.json()["items"][0]["peso_unitario"] == 0, r.json()["items"]
+    assert r.json()["items"][0]["peso_unitario"] == 1.5, r.json()["items"]
+    assert any("«Peso (bruto)»" in a for a in r.json()["avisos"]), r.json()["avisos"]
 
 
 # ---- Devolución de la PM (2026-10-07) ----
@@ -385,7 +402,10 @@ def test_mapeo_aprendido_no_pisa_el_precio_unitario_ni_el_peso_neto():
                 ["84713000", "Laptop", "CN", 10, 350, 3500, 25, 15]], cliente_id=cid)
     assert r.status_code == 200, r.text[:300]
     item = r.json()["items"][0]
-    assert (item["valor_unitario"], item["peso_unitario"]) == (350, 15), item
+    # Respuesta 3 del despachante y D23 de la Dev 2 (regla de MARIA-5): el neto
+    # y el total son de la línea y se dividen por la cantidad; neto > total > de
+    # una unidad > bruto.
+    assert (item["valor_unitario"], item["peso_unitario"]) == (350, 1.5), item
 
 
 def test_validar_el_excel_usa_su_propio_grupo_de_hilos(monkeypatch):

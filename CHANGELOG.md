@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · fix: la sugerencia de NCM no pierde la SIM completa del proveedor (GUARDAR-2, D32 b)
+
+- **fix(sugerencia):** si el historial del cliente tiene el NCM de 8 dígitos y el catálogo del proveedor tiene, para el mismo producto (la misma descripción, no una parecida), la SIM completa que empieza con esos 8, el autorrelleno (`/api/catalog/lookup`) y `/api/ncm/sugerir` traen la del proveedor. Desde GUARDAR-1 llegaba `84714900` y la pantalla marcaba incompleto lo que antes llegaba listo. Sin migración.
+
 ## 2026-10-07 · fix: guardar una operación con la SIM completa no da 500 (GUARDAR-1)
 
 - **fix(operaciones):** la operación (con el contador del plan) se guarda en su propio commit y el historial del cliente después, cada producto en su savepoint: si el historial falla, la operación queda y la respuesta lo dice (`historial_guardado`). Antes, en Postgres, la SIM completa (`84714900100D`) no entraba en `client_product_history.ncm` (String(10)) y no se guardaba nada.
@@ -17,6 +21,16 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix(excel, seguridad):** validar un .xlsx no lo abre: cuenta las hojas desde el índice (como openpyxl: toda relación que no sea de gráfico) y rechaza antes de abrir un libro con DTD o entidades XML, textos compartidos (10 MB), estilos de más (500.000 etiquetas), primera hoja de más de 10 MB o con celdas más allá de la columna 256, o un .rels de más de 1 MB; leer la factura abre sólo la primera hoja de cálculo. Con 8 libros armados delante, una subida normal ya no falla.
 - **fix(excel):** una celda combinada se rellena sólo en descripción, origen y NCM (nunca en cantidad, valor o peso, aunque sea texto como «5 UN») y sólo en las filas de la tabla; una fila vacía dentro de una combinada no sale como «sin leer».
 - **fix(ncm):** el historial de NCM lee CSV con «;», latin-1 o BOM, elige la codificación que explica más letras del castellano y avisa en la pantalla si el archivo las mezcla. **fix(maria):** un monto que es una lista o un entero enorme, o un producto mal formado, da 400 y no 500; el CUIT del despachante va con 11 dígitos 0-9 y el identificador del vendedor sin dígitos de otros alfabetos.
+
+## 2026-10-07 · feat: el catálogo NCM es el vigente de ARCA (CATALOGO-NCM-1)
+
+- **feat(ncm):** el catálogo pasa al nomenclador vigente de ARCA (10.504 NCM, con la enmienda de 2022: 8517.13.00, 8524, 8549). Una NCM dada de baja (522, como 8517.12.31) avisa que esa posición ya no existe y que hay que buscar la nueva, en la validación y en el asistente de NCM; es aviso, no freno. Se saca el CSV de respaldo con códigos que ya no existen.
+
+## 2026-10-07 · fix: el peso es el de la línea y las cuentas del TXT cierran al centavo (MARIA-5)
+
+- **fix(maria):** `QARTKGRNET` declara el peso neto de toda la línea (10 × 2,5 kg = 25 kg, lo que ya mostraba la validación), también en los grupos. El lector pide el peso de una unidad y el de la línea; el Excel divide «Peso total» y «Peso neto» por la cantidad y avisa si sólo trae el bruto. Editar un grupo en la pantalla de NCM reparte entre sus productos en vez de copiar el total.
+- **fix(maria):** importes al centavo con la mitad hacia arriba; el flete y el seguro se reparten para que la suma de los ítems dé exactamente la carátula (antes 10,01 contra 10,00), igual el FOB y los sub-ítems. En el servidor, «None», «null» o «N/A» en la carátula cuentan como vacíos y nunca llegan al TXT ni al nombre del archivo.
+- **fix(maria), devolución:** con dos pesos para la misma línea (lector o Excel) manda el neto de la línea, con un aviso que muestra los dos números; un peso en texto ya no saca la fila del Excel; un peso imposible (NaN, infinito, enorme o que redondea a 0,000) da error; los sub-ítems comparan exacto con exacto; un grupo nunca deja un producto en 0; la validación y el aviso de gastos dicen el mismo importe que el TXT.
 
 ## 2026-10-07 · fix: un campo vacío de la factura no llega al TXT como «None» (MARIA-1d)
 

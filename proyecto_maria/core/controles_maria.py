@@ -120,7 +120,10 @@ def montos_fuera_de_rango(items, cabecera: dict) -> list:
             errores.append(f"Item {n}: Valor inválido")
         if _fuera_de_rango(peso_kg) or _fuera_de_rango(por, peso_unitario):
             errores.append(f"Item {n}: Peso inválido")
-        for m, sub in enumerate(item.get("subitems") or [], start=1):
+        # Con otra forma que una lista, el control de forma de /generate_maria
+        # da el 400 con su mensaje; acá no se revienta (SUBITEMS-1).
+        subitems = item.get("subitems")
+        for m, sub in enumerate(subitems if isinstance(subitems, list) else [], start=1):
             if not isinstance(sub, dict):
                 continue
             sub_cant = _numero_o_none(sub.get("cantidad"))
@@ -149,24 +152,34 @@ _IMPORTES_DE_LA_CABECERA = (
 _CODIGOS = None
 
 
-def _en_el_nomenclador(codigo8: str) -> bool:
+def _codigos_del_nomenclador() -> frozenset:
     """Búsqueda directa: find_by_code recorre el catálogo entero por cada
-    ítem, y con miles de ítems trababa el servidor."""
+    ítem, y con miles de ítems trababa el servidor. Vacío si falta el
+    catálogo (y se vuelve a mirar la próxima vez)."""
     global _CODIGOS
     if _CODIGOS is None:
         from proyecto_maria.core.ncm_catalog import load_catalog
         codigos = frozenset(i.codigo for i in load_catalog())
         if not codigos:
-            return True  # sin catálogo no se puede mirar: no se avisa en falso
+            return codigos
         _CODIGOS = codigos
-    return codigo8 in _CODIGOS
+    return _CODIGOS
+
+
+def _en_el_nomenclador(codigo8: str) -> bool:
+    return codigo8 in _codigos_del_nomenclador()
+
+
+AVISO_SIN_CATALOGO = ("No está el catálogo de NCM: no se pudo revisar que las posiciones existan "
+                      "en el nomenclador vigente.")
 
 
 def _control_ncm(pieza, n: int, errores: list, advertencias: list) -> None:
     """Si la NCM perdió el 0 inicial (Excel guarda 01012100 como 1012100), es
-    un error y se propone con el 0. Si no está en el nomenclador, se avisa:
-    el que tenemos es el de 2018 (`nomenclador_19122018.txt`) y le faltan las
-    posiciones de la enmienda de 2022 (p. ej. 8517.13.00), así que no frena."""
+    un error y se propone con el 0. Si no está en el nomenclador vigente de
+    ARCA (dada de baja o desconocida), se avisa con el texto del catálogo
+    (CATALOGO-NCM-1); no frena. Sin el catálogo no se adivina nada: un aviso
+    para toda la operación."""
     texto = re.sub(r"[\s.]", "", str(pieza or "")).upper()
     if not texto:
         return  # la falta de NCM ya la marca la validación de siempre
@@ -174,13 +187,16 @@ def _control_ncm(pieza, n: int, errores: list, advertencias: list) -> None:
     if not m:
         return  # formato raro: lo marca la validación de la posición SIM
     digitos, letra = m.groups()
+    if not _codigos_del_nomenclador():
+        if AVISO_SIN_CATALOGO not in advertencias:
+            advertencias.append(AVISO_SIN_CATALOGO)
+        return
     # SIM completa (11 dígitos y letra) o NCM sola (8 dígitos).
     if len(digitos) in (11, 8):
-        if not _en_el_nomenclador(digitos[:8]):
-            advertencias.append(
-                f"Item {n}: la NCM {digitos[:8]} no está en el nomenclador que tenemos "
-                "(el de 2018). Revisá que esté vigente."
-            )
+        from proyecto_maria.core.ncm_catalog import aviso_de_ncm
+        aviso = aviso_de_ncm(digitos[:8])
+        if aviso:
+            advertencias.append(f"Item {n}: {aviso}")
         return
     # Le falta el 0 inicial: 10 dígitos y letra, o 7 dígitos.
     if len(digitos) in (10, 7) and _en_el_nomenclador("0" + digitos[:7]):
@@ -189,6 +205,18 @@ def _control_ncm(pieza, n: int, errores: list, advertencias: list) -> None:
             f"Item {n}: la NCM {texto} parece haber perdido el 0 inicial "
             f"(Excel lo borra en los números). ¿Es {propuesta}?"
         )
+
+
+def avisos_de_ncm(items) -> list:
+    """Sólo los avisos de la NCM de cada producto (vigente, dada de baja o
+    sin catálogo), para donde no se corren todos los controles: la
+    validación sin cabecera y los avisos antes de generar."""
+    errores: list = []
+    advertencias: list = []
+    for n, item in enumerate(items or [], start=1):
+        if isinstance(item, dict):
+            _control_ncm(item.get("ncm") or item.get("pieza"), n, errores, advertencias)
+    return advertencias
 
 
 def controles_antes_de_generar(items, cabecera: dict) -> tuple[list, list]:
