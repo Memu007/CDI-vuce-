@@ -106,9 +106,11 @@ def test_lectura_con_tiempo_maximo_y_error_claro(monkeypatch):
 
     r, demora = asyncio.run(_pedir())
     assert r.status_code == 504, f"{r.status_code} {r.text[:200]}"
-    detalle = r.json()["detail"]
-    assert detalle["code"] == "PDF_READ_TIMEOUT"
-    assert "tardó demasiado" in detalle["message"]
+    # Mismo formato que el resto de los errores de la subida (MARIA-2): la
+    # pantalla muestra `detail` como texto y distingue por `code`.
+    cuerpo = r.json()
+    assert cuerpo["code"] == "PDF_READ_TIMEOUT", cuerpo
+    assert isinstance(cuerpo["detail"], str) and "tardó demasiado" in cuerpo["detail"], cuerpo
     assert demora < LENTO_S, f"la respuesta esperó toda la lectura ({demora:.2f} s)"
 
 
