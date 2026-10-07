@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · fix: guardar una operación con la SIM completa no da 500 (GUARDAR-1)
+
+- **fix(operaciones):** la operación (con el contador del plan) se guarda en su propio commit y el historial del cliente después, cada producto en su savepoint: si el historial falla, la operación queda y la respuesta lo dice (`historial_guardado`). Antes, en Postgres, la SIM completa (`84714900100D`) no entraba en `client_product_history.ncm` (String(10)) y no se guardaba nada.
+- **fix(historial):** guarda lo que entra y, de la SIM completa, el NCM de 8 dígitos; editar un producto exige los 8 dígitos (antes cortaba a 10 caracteres). Moneda, origen, fecha de inicio del cliente, grupo fuera de rango y el carácter NUL ya no tiran abajo el guardado. Sin migración.
+
 ## 2026-10-07 · fix: lo que el Excel no leía y abrir un libro armado (EXCEL-2)
 
 - **fix(excel):** el encabezado se busca en las primeras 30 filas (logo o datos del vendedor arriba); sin columna de país de origen los productos entran con el origen vacío y se avisa; el texto de una celda combinada hacia abajo vale para todas sus filas (los números no se copian); el aviso de mapeo nombra la columna que se usó.
