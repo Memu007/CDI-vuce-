@@ -24,13 +24,9 @@ antes de cerrar la Fase 3.
    facturación de Google.
 3. **Despachante:** recordarle los archivos reales (favor 1). Ya respondió
    todas las preguntas.
-4. **Catálogo NCM de 2018** (D21 de la Dev 1): le falta la enmienda de 2022
-   (por ejemplo, 8517.13.00, teléfonos). Emi: «lo baja la PM». Desde acá la
-   red bloquea `www.arca.gob.ar`; además, el ZIP oficial de ARCA de julio ya
-   traía el archivo de 2018. Falta que Emi elija: habilitar
-   `www.arca.gob.ar` en el entorno (Edit → Network access → Allowed domains)
-   o adjuntar el archivo; y si entra como pieza (propuesta: Dev 1, después de
-   MARIA-1b).
+4. **Catálogo NCM:** Emi trajo el nomenclador vigente (2026-10-07). Lo
+   carga la Dev 2 en CATALOGO-NCM-1. Una línea de Emi: ¿lo bajó de
+   `arca.gob.ar`?
 5. **Hasta publicar MARIA-1a: revisar el país de origen de cada TXT** antes
    de mandárselo al despachante. El código publicado corta el país a dos
    letras: si la lectura devuelve «CHN» o «China», sale Suiza.
@@ -72,7 +68,7 @@ Archivos abiertos por Dev:
 
 - **Dev 1:** devolución de MARIA-1b (NaN e inf, escaneo de hojas que traba, CUIT, monedas; D22). Sigue: PUNTA-A-PUNTA-1
   y EXCEL-2.
-- **Dev 2:** MARIA-5 (peso total y cuentas al centavo). Sigue: MARIA-6 cuando lleguen los archivos reales del despachante.
+- **Dev 2:** devolución de MARIA-5 (dos pesos para una línea, filas que desaparecen, guarda del peso, subítems, grupos, una sola cuenta). Sigue: CATALOGO-NCM-1; MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
   RENDIMIENTO-1 y 1b (`ec3d793`), MARIA-1a, 2b, 1c, 4, 3 y 1d (`9679e21`).
   Suite sobre la rama integrada (`7b42556`, venv armado sólo con el
@@ -150,11 +146,12 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 13:05 UTC (rutina): ensayo publicado (`5cb03ab`, CI de GitHub en
-verde sobre ese SHA); falta la verificación de Emi. MARIA-1d aceptada; Dev 2
-en MARIA-5 (D22: (a)). MARIA-1b (Dev 1): la PM reprodujo `941 passed`; falta
-su subagente. Contexto: PM 21 %, Dev 1 44 % (espera su `/compact`), Dev 2
-10 %. Lo aceptado se integra después de que Emi verifique el ensayo.
+2026-10-07 14:05 UTC (rutina): ensayo publicado y verificado por Emi. Integradas
+RENDIMIENTO-1/1b y MARIA-1a a 1d, 3 y 4 (`1067 passed`). MARIA-1b devuelta;
+la Dev 1 está entregando la devolución. MARIA-5 (Dev 2): la PM reprodujo
+`1199 passed`, falta su subagente. Nomenclador vigente de Emi en
+`docs/pm/datos/`; CATALOGO-NCM-1 escrita para la Dev 2. Contexto: PM ~25 %,
+Dev 1 33 % (compacta al entregar), Dev 2 36 % (`/compact` pedido a Emi).
 
 ## Medición
 
