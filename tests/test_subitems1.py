@@ -1,0 +1,49 @@
+"""SUBITEMS-1: los controles de siempre valen para cada subítem, y el error
+dice qué subítem falla. Un producto agrupado no lleva subítems (el grupo es
+una sola línea del TXT y sus subítems no tendrían contra qué sumar).
+"""
+import pytest
+
+from tests.test_maria_subitems import ITEM_BASE, SUF_A, SUF_B, _generar
+
+
+def _subs(*pares):
+    sufijos = [SUF_A, SUF_B, SUF_A, SUF_B]
+    return [{"cantidad": c, "valor_unitario": v, "sufijo": sufijos[n]} for n, (c, v) in enumerate(pares)]
+
+
+@pytest.mark.parametrize("pares, subitem, dice", [
+    # La suma da 6 y 7182, pero un subítem tiene cantidad negativa o cero.
+    (((7, 1197), (-1, 1197)), 2, "cantidad"),
+    (((6, 1197), (0, 1197)), 2, "cantidad"),
+    # Un valor unitario en cero o negativo.
+    (((2, 0), (4, 1795.5)), 1, "valor unitario"),
+    (((2, -100), (4, 1845.5)), 1, "valor unitario"),
+])
+def test_el_error_dice_que_subitem_falla(pares, subitem, dice):
+    with pytest.raises(ValueError) as e:
+        _generar({"subitems": _subs(*pares)})
+    assert f"sub-ítem {subitem}" in str(e.value) and dice in str(e.value), str(e.value)
+
+
+def test_el_error_llega_a_la_pantalla(client, auth_override):
+    item = dict(ITEM_BASE, estado=2, subitems=_subs((7, 1197), (-1, 1197)))
+    r = client.post("/generate_maria", json={
+        "operation_id": "OP1", "items": [item], "fecha_emision": "22/06/2026", "sbt_sufijo_valor": SUF_A,
+        "moneda": "DOL", "incoterm": "EXW", "comprador_cuit": "30999999995"})
+    assert r.status_code == 400, r.text
+    assert "sub-ítem 2" in r.text, r.text
+
+
+def test_un_producto_agrupado_no_lleva_subitems():
+    otro = dict(ITEM_BASE, descripcion="Otro equipo de demostracion", cantidad=2, grupo_id=1)
+    with pytest.raises(ValueError, match="Grupo 1.*sub-ítems"):
+        from tests.test_maria_subitems import COMUN
+        from proyecto_maria.core.maria_generator import generate_maria_txt
+        generate_maria_txt(items=[dict(ITEM_BASE, grupo_id=1, subitems=_subs((2, 1197), (4, 1197))), otro],
+                           **COMUN, sbt_sufijo_valor=SUF_A)
+
+
+def test_los_subitems_validos_siguen_generando():
+    txt = _generar({"subitems": _subs((2, 1197), (4, 1197))})
+    assert "CARTSBITEM=S" in txt and txt.count("[SBT]") == 2

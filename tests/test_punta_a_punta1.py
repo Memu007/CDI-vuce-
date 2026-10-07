@@ -20,8 +20,9 @@ cambios queda como `xfail` estricto: el día que la pantalla lo produzca, avisa.
 
 El de subítems (maria_golden_subitems_anon.TXT) se compara entero, línea por
 línea: ese archivo se guardó con LF y sin completar los campos con espacios.
-Además de D23, la pantalla no tiene dónde cargar los subítems (D24) y la
-referencia de la factura sale del número de operación (D25).
+Además de D23, la referencia de la factura sale del número de operación
+(D25). Los subítems se cargan en el panel del paso de NCM (SUBITEMS-1;
+antes, D24).
 """
 import io
 import json
@@ -101,8 +102,8 @@ FACTURA_SUBITEMS = {
 # D23: la pantalla arma el número de operación como «FAC_» + número de
 #      factura (finalize.js, buildMariaRequest), no el número de 9 dígitos, y
 #      el generador saca de ahí NDDTIMMTRN e IEXT («FAC_0»).
-# D24: la pantalla no tiene dónde cargar subítems: se agregan al ítem que ella
-#      arma, como los recibe la ruta.
+# D24 (resuelta en SUBITEMS-1): los subítems se cargan en el panel del paso de
+#      NCM y viajan en el pedido de la pantalla.
 # D25: la referencia de la factura (LDVDREFDOC) sale del número de operación
 #      («E126-1»); el archivo real lleva el de la factura («110»).
 
@@ -307,6 +308,10 @@ class _Pantalla:
             "peso_unitario": numero(it.get("peso_unitario")), "codigo_parte": texto(it.get("codigo_parte")),
             "grupo_id": it.get("grupo_id") or None, "unidad": it.get("unidad") or None,
             "estado": it.get("estado") or None, "iva_adicional": it.get("iva_adicional") or None,
+            # subitemsDelPedido: sólo si el producto está partido (SUBITEMS-1).
+            **({"subitems": [{"cantidad": numero(s.get("cantidad")), "valor_unitario": numero(s.get("valor_unitario")),
+                              **({"sufijo": texto(s.get("sufijo"))} if texto(s.get("sufijo")) else {})}
+                             for s in it["subitems"]]} if it.get("subitems") else {}),
         } for it in self.items]
         # despachante.js, valores(): sin cliente activo no hay propuesta.
         elegidos = op.get("despachante") or {}
@@ -343,6 +348,11 @@ class _Pantalla:
             "tipo_destinacion": texto(op.get("tipo_destinacion") or "IC04").upper() or "IC04",
             "sbt_sufijo_valor": texto(op.get("sbt_sufijo_valor")),
         }
+
+    def cargar_subitems(self, indice: int, subitems: list):
+        """El panel de subítems del paso de NCM (ncm.js): lo que se escribe
+        queda en it.subitems."""
+        self.items[indice]["subitems"] = [dict(s) for s in subitems]
 
     def generar_y_descargar(self, pedido: dict | None = None) -> tuple[str, str]:
         pedido = pedido or self.pedido()
@@ -382,6 +392,8 @@ def _por_pdf(monkeypatch, factura: dict) -> _Pantalla:
     p.entrar()
     p.subir("factura.pdf", _pdf_en_blanco(), "/upload_pdf/public")
     p.revisar(factura["ncm"], factura["revision"], factura["despachante"], factura["estados"])
+    if factura.get("subitems"):
+        p.cargar_subitems(0, factura["subitems"])
     return p
 
 
@@ -394,6 +406,8 @@ def _por_excel(factura: dict) -> _Pantalla:
     cabecera = {k: v for k, v in factura["gemini"]["operacion"].items()}
     p.revisar(factura["ncm"], {**cabecera, **factura["revision"]}, factura["despachante"],
               factura["estados"])
+    if factura.get("subitems"):
+        p.cargar_subitems(0, factura["subitems"])
     return p
 
 
@@ -420,9 +434,7 @@ def test_pdf_de_punta_a_punta_da_el_archivo_real_sin_cambios(monkeypatch):
 @pytest.mark.parametrize("camino", ["pdf", "excel"])
 def test_subitems_de_punta_a_punta_dan_el_archivo_real(monkeypatch, camino):
     p = _por_pdf(monkeypatch, FACTURA_SUBITEMS) if camino == "pdf" else _por_excel(FACTURA_SUBITEMS)
-    pedido = p.pedido()
-    pedido["items"][0]["subitems"] = FACTURA_SUBITEMS["subitems"]  # D24
-    txt, operation_id = p.generar_y_descargar(pedido)
+    txt, operation_id = p.generar_y_descargar()
     esperado = _como_sale_por_la_pantalla(_leer(SUBITEMS_PATH), "002720126", operation_id)
     esperado = esperado.replace("LDVDREFDOC=110", f"LDVDREFDOC=E{operation_id[-3:]}-1")  # D25
     assert _sin_relleno(txt) == _sin_relleno(esperado)
@@ -495,15 +507,12 @@ def test_dos_productos_reparten_flete_y_seguro_por_su_fob(monkeypatch):
                    "operación («E126-1»), no la de la factura («110»); va a MARIA-6")
 def test_subitems_dan_la_referencia_de_la_factura_del_archivo_real(monkeypatch):
     p = _por_pdf(monkeypatch, FACTURA_SUBITEMS)
-    pedido = p.pedido()
-    pedido["items"][0]["subitems"] = FACTURA_SUBITEMS["subitems"]  # D24
-    txt, _ = p.generar_y_descargar(pedido)
+    txt, _ = p.generar_y_descargar()
     assert "LDVDREFDOC=110" in _sin_relleno(txt)
 
 
-@pytest.mark.xfail(strict=True, reason="D24: la pantalla no tiene dónde cargar subítems; "
-                   "lo decide Emi")
 def test_la_pantalla_sola_da_los_subitems_del_archivo_real(monkeypatch):
-    """Sin agregarle los subítems al pedido: lo que la pantalla manda hoy."""
+    """Sin agregarle los subítems al pedido: los carga el panel de subítems
+    del paso de NCM (SUBITEMS-1; antes, D24)."""
     txt, _ = _por_pdf(monkeypatch, FACTURA_SUBITEMS).generar_y_descargar()
     assert "CARTSBITEM=S" in _sin_relleno(txt)
