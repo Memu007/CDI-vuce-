@@ -410,7 +410,7 @@ def test_excel_de_punta_a_punta_da_el_archivo_real():
     assert txt == _como_sale_por_la_pantalla(_leer(_GOLDEN_PATH), "000999001", operation_id)
 
 
-@pytest.mark.xfail(strict=True, reason="D23: la pantalla manda «FAC_» + número de "
+@pytest.mark.xfail(strict=True, reason="D23 (va a MARIA-6): la pantalla manda «FAC_» + número de "
                    "factura como número de operación")
 def test_pdf_de_punta_a_punta_da_el_archivo_real_sin_cambios(monkeypatch):
     txt, _ = _por_pdf(monkeypatch, FACTURA).generar_y_descargar()
@@ -487,3 +487,21 @@ def test_dos_productos_reparten_flete_y_seguro_por_su_fob(monkeypatch):
         assert abs(float(a["MARTBASIMP"]) - (float(a["MARTFOB"]) + float(a["MARTFLE"])
                                              + float(a["MARTASS"]))) <= 0.01, a
     assert abs(sum(float(a["MARTFLE"]) for a in arts) - float(ddt["MDDTFLE"])) <= 0.01
+
+
+@pytest.mark.xfail(strict=True, reason="D25: la referencia de la factura sale del número de "
+                   "operación («E126-1»), no la de la factura («110»); va a MARIA-6")
+def test_subitems_dan_la_referencia_de_la_factura_del_archivo_real(monkeypatch):
+    p = _por_pdf(monkeypatch, FACTURA_SUBITEMS)
+    pedido = p.pedido()
+    pedido["items"][0]["subitems"] = FACTURA_SUBITEMS["subitems"]  # D24
+    txt, _ = p.generar_y_descargar(pedido)
+    assert "LDVDREFDOC=110" in _sin_relleno(txt)
+
+
+@pytest.mark.xfail(strict=True, reason="D24: la pantalla no tiene dónde cargar subítems; "
+                   "lo decide Emi")
+def test_la_pantalla_sola_da_los_subitems_del_archivo_real(monkeypatch):
+    """Sin agregarle los subítems al pedido: lo que la pantalla manda hoy."""
+    txt, _ = _por_pdf(monkeypatch, FACTURA_SUBITEMS).generar_y_descargar()
+    assert "CARTSBITEM=S" in _sin_relleno(txt)
