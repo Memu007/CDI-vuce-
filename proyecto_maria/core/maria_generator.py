@@ -251,10 +251,12 @@ EMPRESA_DIGITALIZACION_POR_DEFECTO = "PSAD06"
 PAIS_ARGENTINA = 200
 
 
-def _estado_item(item: dict, idx: int, pais_codigo: int) -> int:
+def _estado_item(item: dict, idx, pais_codigo: int) -> int:
     """Estado (CARTUSO) del ítem: el elegido, o 2 si el origen es extranjero.
     Con origen argentino no hay valor por defecto: no se inventa."""
     raw = item.get("estado")
+    desc = str(item.get("descripcion") or "").strip()[:40]
+    idx = f"{idx} ({desc})" if desc else idx
     if raw in (None, ""):
         if pais_codigo == PAIS_ARGENTINA:
             raise ValueError(
@@ -386,7 +388,7 @@ def generate_maria_txt(operation_id: str, items: list,
 
     # MARIA-4: validar lo que decide el despachante antes de armar nada.
     banco_bcra = str(banco_bcra or "").strip()
-    if banco_bcra and not (len(banco_bcra) == 3 and banco_bcra.isdigit()):
+    if banco_bcra and not re.fullmatch(r"[0-9]{3}", banco_bcra):
         raise ValueError(f"Banco «{banco_bcra}» no válido: va el código de entidad del BCRA (3 dígitos).")
     empresa_digitalizacion = str(empresa_digitalizacion or EMPRESA_DIGITALIZACION_POR_DEFECTO).strip().upper()
     if empresa_digitalizacion not in EMPRESAS_DIGITALIZACION:
@@ -621,8 +623,13 @@ def generate_maria_txt(operation_id: str, items: list,
             raise ValueError(f"Grupo {gid}: todos los ítems deben tener el mismo origen")
         if len(unidades) != 1:
             raise ValueError(f"Grupo {gid}: todos los ítems deben tener la misma unidad de medida")
-        estados = {str(it.get('estado') or '').strip() for it in grupo_items}
-        ivas = {str(it.get('iva_adicional') or '').strip().upper() for it in grupo_items}
+        # Se comparan los valores que salen en el TXT, no cómo se escribieron.
+        pais_grupo = get_pais_codigo(next(iter(origenes)))
+        estados = {_estado_item(it, f"del grupo {gid}", pais_grupo) for it in grupo_items}
+        ivas = {
+            _iva_adicional(it.get('iva_adicional'), f"Grupo {gid}") if it.get('iva_adicional') else iva_adicional
+            for it in grupo_items
+        }
         if len(estados) != 1:
             raise ValueError(f"Grupo {gid}: todos los ítems deben tener el mismo estado de la mercadería")
         if len(ivas) != 1:

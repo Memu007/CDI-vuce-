@@ -388,9 +388,8 @@
         return {
             operation_id: operation_id,
             items: items,
-            banco_bcra: String(op.banco_bcra || '').trim(),
-            empresa_digitalizacion: op.empresa_digitalizacion || null,
-            iva_adicional: op.iva_adicional || null,
+            ...(CDI.despachante ? CDI.despachante.valores()
+                : { banco_bcra: '', empresa_digitalizacion: null, iva_adicional: null }),
             moneda: moneda,
             incoterm: incoterm,
             cuit_agr: cuit_agr,
@@ -754,11 +753,11 @@
                 numero_factura: op.numero_factura || '',
                 fecha_emision: op.fecha_emision || '',
                 // MARIA-4: para proponer el último banco y la última empresa.
-                maria: {
-                    banco_bcra: String(op.banco_bcra || '').trim(),
-                    empresa_digitalizacion: op.empresa_digitalizacion || '',
-                    iva_adicional: op.iva_adicional || ''
-                }
+                maria: Object.assign(
+                    { banco_bcra: '', empresa_digitalizacion: '', iva_adicional: '' },
+                    CDI.despachante ? CDI.despachante.valores() : {},
+                    { items: items.map(it => ({ estado: it.estado || null, iva_adicional: it.iva_adicional || null })) }
+                )
             },
             items: items.map(it => ({
                 pieza: String(it.pieza || '').trim(),

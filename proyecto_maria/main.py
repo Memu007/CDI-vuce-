@@ -5291,7 +5291,9 @@ def _maria_de_operacion(op) -> dict:
     extra = op.extra if isinstance(op.extra, dict) else {}
     resumen = extra.get("resumen") if isinstance(extra.get("resumen"), dict) else {}
     maria = resumen.get("maria") if isinstance(resumen.get("maria"), dict) else {}
-    return {k: str(maria.get(k) or "") for k in ("banco_bcra", "empresa_digitalizacion", "iva_adicional")}
+    # Recortado: son códigos cortos; un valor sembrado no agranda el listado.
+    return {k: (maria.get(k) if isinstance(maria.get(k), str) else "")[:12]
+            for k in ("banco_bcra", "empresa_digitalizacion", "iva_adicional")}
 
 
 @app.get("/api/clientes/{client_id}/operaciones")

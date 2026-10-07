@@ -2,9 +2,14 @@
    CDI v2 — Lo que decide el despachante (MARIA-4)
    En la pantalla de validación, antes de generar: banco, empresa de
    digitalización e IVA adicional por operación; estado de la mercadería
-   (y cambio de IVA) por producto. Propone el último banco del cliente y la
-   última empresa del usuario (de sus operaciones guardadas).
-   Los códigos y nombres salen de core/maria_generator.py (única tabla).
+   (y cambio de IVA) por producto.
+
+   Sólo se guarda lo que la persona elige (al elegirlo). Los valores por
+   defecto se calculan cada vez con el origen actual y no se guardan: si el
+   origen pasa a argentino, el estado se vuelve a pedir, y el servidor avisa
+   lo que se usó por defecto. La propuesta (último banco del cliente, última
+   empresa del usuario) es del cliente activo y se vuelve a pedir si cambia.
+   Códigos y nombres: core/maria_generator.py (ESTADOS_MERCADERIA, etc.).
    ============================================================ */
 (function () {
     'use strict';
@@ -22,9 +27,10 @@
     const EMPRESAS = [['PSAD06', 'Modoc'], ['PSAD01', 'Lakaut']];
 
     function $(id) { return document.getElementById(id); }
+    // Igual que el servidor: Argentina es «AR», «200» o el nombre.
     function esArgentino(origen) {
-        const o = String(origen || '').trim().toUpperCase();
-        return o === 'AR' || o === 'ARG' || o === '200' || o === 'ARGENTINA';
+        const o = String(origen || '').trim().toUpperCase().replace(/\./g, '');
+        return o === 'AR' || o === '200' || o === 'ARGENTINA';
     }
     function opciones(lista, elegido, vacio) {
         const html = vacio ? ['<option value="">' + CDI.escapeHtml(vacio) + '</option>'] : [];
@@ -34,43 +40,52 @@
         });
         return html.join('');
     }
-
-    async function ultimos() {
-        // El último banco que usó este cliente y la última empresa del usuario.
-        const res = { banco_bcra: '', empresa_digitalizacion: '' };
-        try {
-            const cliente = CDI.getClienteActivo && CDI.getClienteActivo();
-            if (cliente && cliente.id) {
-                const r = await CDI.api('/api/clientes/' + encodeURIComponent(cliente.id) + '/operaciones');
-                const d = r && r.ok ? await r.json() : {};
-                const op = (d.operaciones || []).find(o => o.maria && o.maria.banco_bcra);
-                if (op) res.banco_bcra = op.maria.banco_bcra;
-            }
-            const r2 = await CDI.api('/api/operations');
-            const d2 = r2 && r2.ok ? await r2.json() : {};
-            const op2 = (d2.operaciones || []).find(o => o.maria && o.maria.empresa_digitalizacion);
-            if (op2) res.empresa_digitalizacion = op2.maria.empresa_digitalizacion;
-        } catch (e) {
-            console.warn('[despachante] sin últimos valores:', e && e.message);
-        }
-        return res;
+    function clienteId() {
+        const c = CDI.getClienteActivo && CDI.getClienteActivo();
+        return (c && c.id) || '';
+    }
+    function elegidos() {
+        const op = CDI.state.operacion = CDI.state.operacion || {};
+        return op.despachante = op.despachante || {};
     }
 
-    async function render() {
+    // Propuesta del cliente activo: último banco del cliente y última
+    // empresa del usuario. Se pide una vez por cliente; si falla, se reintenta.
+    let propuesta = { cliente: null, banco_bcra: '', empresa_digitalizacion: '' };
+    async function pedirPropuesta() {
+        const cid = clienteId();
+        if (propuesta.cliente === cid && propuesta.ok) return;
+        const nueva = { cliente: cid, banco_bcra: '', empresa_digitalizacion: '', ok: false };
+        try {
+            const [r1, r2] = await Promise.all([
+                cid ? CDI.api('/api/clientes/' + encodeURIComponent(cid) + '/operaciones') : null,
+                CDI.api('/api/operations'),
+            ]);
+            const d1 = r1 && r1.ok ? await r1.json() : {};
+            const d2 = r2 && r2.ok ? await r2.json() : {};
+            const op1 = (d1.operaciones || []).find(o => o.maria && o.maria.banco_bcra);
+            const op2 = (d2.operaciones || []).find(o => o.maria && o.maria.empresa_digitalizacion);
+            nueva.banco_bcra = op1 ? op1.maria.banco_bcra : '';
+            nueva.empresa_digitalizacion = op2 ? op2.maria.empresa_digitalizacion : '';
+            nueva.ok = (!cid || (r1 && r1.ok)) && r2 && r2.ok;
+        } catch (e) {
+            console.warn('[despachante] sin propuesta:', e && e.message);
+        }
+        if (clienteId() === cid) propuesta = nueva;
+    }
+
+    function pintar() {
         const wrap = $('despachanteWrap');
         if (!wrap) return;
-        const op = CDI.state.operacion = CDI.state.operacion || {};
+        const e = elegidos();
         const items = CDI.state.items || [];
-        if (!op.__despachantePropuesto) {
-            const u = await ultimos();
-            if (!op.banco_bcra && u.banco_bcra) op.banco_bcra = u.banco_bcra;
-            if (!op.empresa_digitalizacion && u.empresa_digitalizacion) op.empresa_digitalizacion = u.empresa_digitalizacion;
-            op.__despachantePropuesto = true;
+        const banco = $('despachanteBanco');
+        if (document.activeElement !== banco) {
+            banco.value = e.banco_bcra != null ? e.banco_bcra : (propuesta.banco_bcra || '');
         }
-        $('despachanteBanco').value = op.banco_bcra || '';
-        $('despachanteEmpresa').innerHTML = opciones(EMPRESAS, op.empresa_digitalizacion || 'PSAD06');
-        $('despachanteIva').innerHTML = opciones(IVA, op.iva_adicional || 'NO_VALIDA');
-        const filas = items.map((it, i) => {
+        $('despachanteEmpresa').innerHTML = opciones(EMPRESAS, e.empresa_digitalizacion || propuesta.empresa_digitalizacion || 'PSAD06');
+        $('despachanteIva').innerHTML = opciones(IVA, e.iva_adicional || 'NO_VALIDA');
+        $('despachanteItems').innerHTML = items.map((it, i) => {
             const porDefecto = esArgentino(it.origen) ? '' : '2';
             const estado = it.estado != null && it.estado !== '' ? String(it.estado) : porDefecto;
             return '<tr>' +
@@ -80,43 +95,76 @@
                 '<td><select class="form-input despachante-iva" data-row="' + i + '">' +
                 opciones(IVA, it.iva_adicional || '', 'Igual que la operación') + '</select></td>' +
                 '</tr>';
-        });
-        $('despachanteItems').innerHTML = filas.join('');
+        }).join('');
         $('despachanteError').hidden = true;
     }
 
-    // Pasa lo elegido al estado y dice si se puede generar.
-    function leer() {
-        const op = CDI.state.operacion = CDI.state.operacion || {};
+    // Lo que la persona toca se guarda en el momento.
+    function alElegir(ev) {
+        const t = ev.target;
+        const e = elegidos();
         const items = CDI.state.items || [];
+        if (t.id === 'despachanteBanco') e.banco_bcra = String(t.value || '').trim();
+        else if (t.id === 'despachanteEmpresa') e.empresa_digitalizacion = t.value;
+        else if (t.id === 'despachanteIva') e.iva_adicional = t.value;
+        else if (t.classList.contains('despachante-estado')) {
+            const it = items[Number(t.dataset.row)];
+            if (it) it.estado = t.value || null;
+        } else if (t.classList.contains('despachante-iva')) {
+            const it = items[Number(t.dataset.row)];
+            if (it) it.iva_adicional = t.value || null;
+        }
+    }
+
+    let enlazado = false;
+    async function render() {
+        const wrap = $('despachanteWrap');
+        if (!wrap) return;
+        if (!enlazado) {
+            wrap.addEventListener('change', alElegir);
+            wrap.addEventListener('input', alElegir);
+            enlazado = true;
+        }
+        pintar();                       // ya, con lo que hay
+        const antes = propuesta.cliente;
+        await pedirPropuesta();
+        if (propuesta.cliente !== antes || propuesta.ok) pintar();
+    }
+
+    // Lo que va al pedido: lo elegido; si no, la propuesta del cliente; si no,
+    // nada (el servidor usa su valor por defecto y lo avisa en los supuestos).
+    function valores() {
+        const e = elegidos();
+        return {
+            banco_bcra: e.banco_bcra != null ? e.banco_bcra : (propuesta.cliente === clienteId() ? propuesta.banco_bcra : ''),
+            empresa_digitalizacion: e.empresa_digitalizacion ||
+                (propuesta.cliente === clienteId() && propuesta.empresa_digitalizacion) || null,
+            iva_adicional: e.iva_adicional || null,
+        };
+    }
+
+    // ¿Se puede generar? Muestra los errores y avisos al lado.
+    function leer() {
+        const items = CDI.state.items || [];
+        const v = valores();
         const errores = [];
-        const banco = String($('despachanteBanco').value || '').trim();
-        if (banco && !/^\d{3}$/.test(banco)) {
+        if (v.banco_bcra && !/^[0-9]{3}$/.test(v.banco_bcra)) {
             errores.push('El banco va con el código de entidad del BCRA (3 dígitos).');
         }
-        op.banco_bcra = banco;
-        op.empresa_digitalizacion = $('despachanteEmpresa').value;
-        op.iva_adicional = $('despachanteIva').value;
-        document.querySelectorAll('.despachante-estado').forEach(sel => {
-            const it = items[Number(sel.dataset.row)];
-            if (!it) return;
-            it.estado = sel.value || null;
-            if (!sel.value) {
-                errores.push('Ítem ' + (Number(sel.dataset.row) + 1) +
-                    ': el origen es argentino; elegí el estado de la mercadería.');
+        items.forEach((it, i) => {
+            if (esArgentino(it.origen) && (it.estado == null || it.estado === '')) {
+                errores.push('Ítem ' + (i + 1) + ': el origen es argentino; elegí el estado de la mercadería.');
             }
         });
-        document.querySelectorAll('.despachante-iva').forEach(sel => {
-            const it = items[Number(sel.dataset.row)];
-            if (it) it.iva_adicional = sel.value || null;
-        });
+        const avisos = [];
+        if (!v.banco_bcra) avisos.push('Sin banco: la línea del banco no sale en el TXT.');
+        else if (elegidos().banco_bcra == null) avisos.push('Banco ' + v.banco_bcra + ': el último que usó este cliente.');
         const err = $('despachanteError');
-        const avisos = banco ? [] : ['Sin banco: la línea del banco no sale en el TXT.'];
         err.textContent = errores.concat(avisos).join(' ');
         err.hidden = !(errores.length || avisos.length);
         err.style.color = errores.length ? 'var(--danger,#c0392b)' : 'var(--c-warning,#b26b00)';
         return errores.length === 0;
     }
 
-    CDI.despachante = { render, leer };
+    CDI.despachante = { render, leer, valores };
 })();
