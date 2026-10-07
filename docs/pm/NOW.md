@@ -70,7 +70,7 @@ Archivos abiertos por Dev:
 
 ## En curso
 
-- **Dev 1:** MARIA-1b (controles antes de generar). Sigue: PUNTA-A-PUNTA-1
+- **Dev 1:** devolución de MARIA-1b (NaN e inf, escaneo de hojas que traba, CUIT, monedas; D22). Sigue: PUNTA-A-PUNTA-1
   y EXCEL-2.
 - **Dev 2:** MARIA-5 (peso total y cuentas al centavo). Sigue: MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
