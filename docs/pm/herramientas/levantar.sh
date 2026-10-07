@@ -30,11 +30,14 @@ GEMINI_API_KEY=test-key
 JWT_SECRET_KEY=clave-inventada-solo-local-0123456789abcdef
 EMAIL_VERIFICATION_REQUIRED=false
 # sin terceros: conectores simulados, dólar contra un puerto local cerrado,
-# sin Mercado Pago, SMTP ni Sentry
+# sin Mercado Pago, SMTP, Sentry ni ARCA
 VUCE_MODE=fake
 TARIFAR_MODE=fake
 AFIP_MODE=fake
 DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
+# las novedades de ARCA del tablero, contra un puerto local cerrado
+ARCA_NOVEDADES_XML_URL=http://127.0.0.1:9/x
+ARCA_NOVEDADES_WEB_URL=http://127.0.0.1:9/x
 PORT=$PUERTO
 ENV
 rm -f local.db

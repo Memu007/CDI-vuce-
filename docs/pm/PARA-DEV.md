@@ -25,17 +25,22 @@ despertás a ella con el de la suya al entregar o al dejar una D que te frena
 
 ## Último veredicto
 
-**RENDIMIENTO-1 aceptada sobre `8fd801d`** (2026-10-07). La PM reprodujo, con
-un venv nuevo armado sólo con tu `requirements.txt`, el rojo antes
-(`14 failed`), la focal (`14 passed`) y la suite (`730 passed, 102
-skipped`). Su subagente Sonnet alto confirmó tu D10 con números: con una
-cuenta de prueba, 4 subidas de un PDF armado de 442 bytes cuelgan los 4 hilos
-y después nadie lee un PDF hasta reiniciar. Detalle en
-`REPRODUCCION-RENDIMIENTO-1-2026-10-07.md`.
+**RENDIMIENTO-1b devuelta** (2026-10-07, sobre `b01149c`), por un solo punto.
+La PM reprodujo el rojo antes (`16 failed`), la focal (`30 passed`) y la suite
+(`746 passed, 102 skipped`). Su subagente Sonnet medio no colgó los hilos con
+ningún PDF armado (bombas, bucles, árboles cíclicos, 20 mil páginas). Pero
+encontró un dato equivocado: con «SELLER:» y «BUYER:» en la misma fila y los
+nombres debajo (dos columnas), el vendedor pasa de `ACME TRADING LTD` a
+`BUYER`, porque `pypdf` junta las columnas. Detalle en
+`REPRODUCCION-RENDIMIENTO-1b-MARIA-1c-2026-10-07.md`.
 
-**Todavía no se integra en la rama de PM:** el ensayo de mañana publica
-exactamente lo que se atacó (`7f1dd2c`). Se integra después de publicarlo,
-y RENDIMIENTO-1 no se publica sin RENDIMIENTO-1b. Seguí en tu rama.
+**Devolución:** el vendedor nunca es una etiqueta («BUYER», «CONSIGNEE»,
+«SELLER», «SHIPPER» y parecidas), y el caso de dos columnas vuelve a dar el
+nombre o queda vacío. Rojo antes con ese PDF, verde después; los PDF de las
+pruebas dan el mismo vendedor. Después, EXCEL-1.
+
+**RENDIMIENTO-1 sigue aceptada** (`8fd801d`). Nada se integra en la rama de
+PM hasta después del ensayo.
 
 ## Respuestas a tus D (2026-10-07, 05:20 UTC)
 
@@ -55,7 +60,7 @@ del commit `62b1d14`):
 - **D6: (a)** ahora. El índice único (b), pieza aparte más adelante, después
   de mirar si producción ya tiene códigos repetidos.
 
-## Tarea activa — RENDIMIENTO-1b: un PDF armado no deja a nadie sin lectura
+## Tarea activa — RENDIMIENTO-1b (devuelta, arriba): un PDF armado no deja a nadie sin lectura
 
 Asignada el 2026-10-07. Sale de tu D10 (b). Es chica.
 

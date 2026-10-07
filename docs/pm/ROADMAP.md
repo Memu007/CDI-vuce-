@@ -48,11 +48,11 @@ necesita prueba: la ley, un archivo real o la respuesta del despachante
 | ✅ | MARIA-2 | Sin clave de Gemini no se inventan productos (M4) | no cambia el TXT |
 | ✅ | MARIA-1a | País de origen bien leído (China salía Suiza), cantidades y precios con coma, nada inventado si falta un dato (M5) | tabla oficial de países (VUCE) e ISO 3166-1 |
 | ✅ | MARIA-2b | Con Gemini caído o la clave inválida, el mismo error claro y la carga manual | no cambia el TXT |
-| 1 | MARIA-1c | Lo que el lector encontró pero no pudo leer (flete, seguro) se avisa en vez de salir 0; la pantalla vieja no repone cantidad 1 ni origen China (D5 de la Dev 2). Se publica junto con MARIA-1a | no cambia el TXT de una factura bien leída |
-| 2 | MARIA-4 | Lo que decide el despachante: estado de la mercadería (seis, por producto), IVA adicional (completo en reventa; si hay reducción o exclusión, aviso de que se elige en «Ventajas» del Kit, no va en el TXT), banco y empresa de digitalización (las dos por operación; Modoc = `PSAD06`, Lakaut = `PSAD01`) (M2, M3) | respuestas 1, 2, 4 y 5, las dos cortas y el archivo real de 2026 |
-| 3 | MARIA-3 | Avisos antes de generar; gastos anteriores al FOB en EXW, FCA y FAS; procedencia en pantalla (M6, M8) | respuesta 6, Código Aduanero art. 15, nota del SIM, archivo real de 2025 |
-| 4 | MARIA-5 | Peso total por producto; cuentas exactas al centavo (M1, M9) | peso: respuesta 3 y archivo real de 2026; cuentas: la prueba en el Kit |
-| 5 | MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11) | sus archivos reales |
+| ✅ | MARIA-1c | Lo que el lector encontró pero no pudo leer (flete, seguro) se avisa en vez de salir 0; la pantalla vieja no repone cantidad 1 ni origen China (D5 de la Dev 2). Se publica junto con MARIA-1a | no cambia el TXT de una factura bien leída |
+| 1 | MARIA-4 | Lo que decide el despachante: estado de la mercadería (seis, por producto), IVA adicional (completo en reventa; si hay reducción o exclusión, aviso de que se elige en «Ventajas» del Kit, no va en el TXT), banco y empresa de digitalización (las dos por operación; Modoc = `PSAD06`, Lakaut = `PSAD01`) (M2, M3) | respuestas 1, 2, 4 y 5, las dos cortas y el archivo real de 2026 |
+| 2 | MARIA-3 | Avisos antes de generar (y sin avisos de más: «N/A», «FREE», «included» no son ilegibles); gastos anteriores al FOB en EXW, FCA y FAS; procedencia en pantalla (M6, M8) | respuesta 6, Código Aduanero art. 15, nota del SIM, archivo real de 2025 |
+| 3 | MARIA-5 | Peso total por producto; cuentas exactas al centavo (M1, M9) | peso: respuesta 3 y archivo real de 2026; cuentas: la prueba en el Kit |
+| 4 | MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11) | sus archivos reales |
 
 MARIA-4, MARIA-3 y MARIA-5 tocan el mismo generador: van en ese orden.
 MARIA-6 arranca cuando lleguen sus archivos reales.
