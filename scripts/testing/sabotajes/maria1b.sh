@@ -54,8 +54,8 @@ sabotaje $M "los textos vuelven a entrar sin limpiar" \
   '            pass' \
   "FAILED $T::test_un_texto_no_mete_lineas_ni_igual_en_el_txt[comprador_nombre]"
 sabotaje $C "el «=» vuelve a pasar" \
-  '    limpio = re.sub(r"[\x00-\x1f\x7f]+", " ", valor).replace("=", "-")' \
-  '    limpio = re.sub(r"[\x00-\x1f\x7f]+", " ", valor)' \
+  '    limpio = re.sub(_SALTOS_Y_CONTROLES + "+", " ", valor).replace("=", "-")' \
+  '    limpio = re.sub(_SALTOS_Y_CONTROLES + "+", " ", valor)' \
   "FAILED $T::test_un_texto_no_mete_lineas_ni_igual_en_el_txt"
 sabotaje $C "USD vuelve a pasar como moneda" \
   '    elif moneda == "USD":' \
@@ -74,11 +74,11 @@ sabotaje $C "el flete negativo vuelve a pasar" \
   '        if False:' \
   "FAILED $T::test_flete_o_seguro_negativo_no_deja_generar[flete]"
 sabotaje $C "la NCM sin el 0 inicial deja de proponerse" \
-  '    if len(digitos) in (10, 7) and find_by_code("0" + digitos[:7]) is not None:' \
+  '    if len(digitos) in (10, 7) and _en_el_nomenclador("0" + digitos[:7]):' \
   '    if False:' \
   "FAILED $T::test_ncm_que_perdio_el_0_inicial_propone_el_0"
 sabotaje $C "la NCM fuera del nomenclador deja de avisarse" \
-  '        if find_by_code(digitos[:8]) is None:' \
+  '        if not _en_el_nomenclador(digitos[:8]):' \
   '        if False:' \
   "FAILED $T::test_ncm_que_no_esta_en_el_nomenclador_avisa_pero_deja_generar"
 sabotaje $C "el CUIT vacío vuelve a dejar generar" \
