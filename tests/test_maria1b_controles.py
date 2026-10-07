@@ -144,6 +144,8 @@ def test_un_texto_no_mete_lineas_ni_igual_en_el_txt(campo):
     assert "NDDTIMMIOE=20111111112" not in lineas
     assert not any(l.startswith("X=") for l in lineas)
     assert all("\n" not in l and "\r" not in l for l in lineas)
+    # Cada línea es «CLAVE=valor» con un solo «=» (M10).
+    assert all(l.count("=") <= 1 for l in lineas), [l for l in lineas if l.count("=") > 1]
     assert len(lineas) == len(_esperado().split("\r\n"))
 
 
@@ -221,7 +223,7 @@ def test_el_excel_deja_en_la_operacion_lo_que_no_se_leyo():
         "Factura": [H, ["84713000", "Laptop", "CN", 10, 350, 1.5],
                     ["", "Freight", "", 1, 500, None]],
         "Hoja2": [H, ["85171300", "Telefono", "CN", 5, 100, 0.2]],
-        "Vacia": [],
+        "Vacia": [[" ", None, ""]],  # sólo espacios: no son datos
     })
     assert r.status_code == 200, r.text[:300]
     op = r.json()["operacion"]
