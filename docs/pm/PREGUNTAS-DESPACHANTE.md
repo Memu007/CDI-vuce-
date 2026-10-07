@@ -21,6 +21,41 @@ respuesta del despachante.
 | Banco 191 | Banco Credicoop Cooperativo Limitado | tabla de entidades del BCRA (sitio no oficial) | alta |
 | Catálogo NCM | Ya tiene 10.226 posiciones de ARCA (julio de 2026). El «22 de 9.500» de septiembre quedó viejo | medido en el código | alta |
 
+## Respuestas del despachante
+
+**2026-10-06 (noche), por mensaje a Emi.**
+
+**Pregunta 1, estado de la mercadería.** Se elige siempre entre seis, sea o no
+para revender: nuevo sin uso argentino, nuevo sin uso importado, sin uso
+argentino, sin uso importado, usado argentino (incluye reacondicionado) y
+usado importado (incluye reacondicionado).
+
+**Pregunta 2, percepción de IVA adicional.** Se paga cuando la mercadería es
+para revender, y completa, salvo dos casos: una reducción de un porcentaje
+por normativa, para cierta mercadería y por un plazo; o una exclusión de un
+porcentaje que la DGI le dio al importador, por un plazo. El despachante lo
+decide por operación y por mercadería.
+
+**Lo que muestran juntas con los dos archivos reales anonimizados** (lectura
+de la PM, 2026-10-07):
+
+| Archivo real | Origen | `CARTUSO` | `IVAADICIONAL1` |
+|---|---|---|---|
+| `maria_golden_subitems_anon.TXT` (EXW 2026) | 310, China | 2 | `NO_VALIDA` |
+| `maria_golden_anon.TXT` (DDP 2025) | 200, Argentina | 3 | `IVAAD1` |
+
+- **Estado:** el orden de la lista coincide con los códigos de los dos
+  archivos (2 = nuevo sin uso importado; 3 = sin uso argentino, para una
+  mercadería de origen argentino). Confianza media-alta; lo confirma la
+  prueba en su Kit (favor 2).
+- **IVA adicional:** para reventa sin reducción ni exclusión, el archivo de
+  2026 trae `NO_VALIDA` (ningún beneficio: percepción completa). `IVAAD1`
+  (uso particular, que exceptúa la percepción) **no corresponde para
+  reventa, y hoy CDI lo declara siempre.**
+- **Falta saber:** cómo se carga en el Kit una reducción o una exclusión
+  (¿una opción de una lista o un número de certificado?). Pregunta corta para
+  la próxima.
+
 ## El mensaje para mandar
 
 Emi (2026-10-06): la versión anterior era demasiado técnica. Tenía los
@@ -74,8 +109,8 @@ ver en un archivo real no se pregunta: se pide el archivo.
 
 | Pregunta | Cambio en el producto |
 |---|---|
-| 1 | `CARTUSO` deja de ser 3 fijo. Por defecto «nuevo importado», con aviso, editable por ítem |
-| 2 | `IVAADICIONAL1` según el destino del ítem; por defecto reventa |
+| 1 | **Respondida.** `CARTUSO` deja de ser 3 fijo: se elige entre los seis estados, por ítem. Por defecto, «nuevo sin uso importado» (2) si el origen es extranjero; si es argentino, se pide elegir |
+| 2 | **Respondida.** `IVAADICIONAL1` por operación, con cambio por ítem. Por defecto, reventa sin beneficio (`NO_VALIDA`). `IVAAD1` sólo si se marca uso particular. Reducción o exclusión: aviso para cargarla en el Kit hasta saber cómo va en el archivo |
 | 3 | El peso del TXT pasa a ser el total de la línea, igual al que muestra la pantalla de validación |
 | 4 | `BANCOSARGENTINA` en la ficha del cliente y en la operación |
 | 5 | `PSAD` en la configuración del despachante |
