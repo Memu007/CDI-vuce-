@@ -49,9 +49,9 @@ sabotaje $M "el PDF se vuelve a leer en el hilo del servidor" \
   'FAILED tests/test_rendimiento1.py::test_health_responde_mientras_se_lee_un_pdf'
 sabotaje $M "el texto del PDF se vuelve a leer en el hilo del servidor" \
   'pdf_text = await _leer_pdf_aparte(
-                    _extract_pdf_text, contents, limite=_pdf_vendor_timeout_s()
+                    extraer_texto_pdf_seguro, contents, limite=_pdf_vendor_timeout_s()
                 )' \
-  'pdf_text = _extract_pdf_text(contents)' \
+  'pdf_text = extraer_texto_pdf_seguro(contents)' \
   'FAILED tests/test_rendimiento1.py::test_health_responde_mientras_se_lee_el_texto_del_pdf'
 sabotaje $M "Gemini vuelve a correr en el hilo del servidor" \
   '                asyncio.to_thread(_suggest_ncm_with_gemini, descripcion, 5 - len(sugerencias)),' \
@@ -76,8 +76,8 @@ sabotaje proyecto_maria/security/file_security.py "vuelve a contar páginas ante
         return True, 0' \
   'FAILED tests/test_rendimiento1.py::test_pdf_encriptado_dice_que_esta_encriptado'
 sabotaje $M "el texto del vendedor sin tiempo máximo" \
-  '_extract_pdf_text, contents, limite=_pdf_vendor_timeout_s()' \
-  '_extract_pdf_text, contents' \
+  'extraer_texto_pdf_seguro, contents, limite=_pdf_vendor_timeout_s()' \
+  'extraer_texto_pdf_seguro, contents' \
   'FAILED tests/test_rendimiento1.py::test_texto_del_vendedor_tiene_tiempo_maximo'
 sabotaje $M "las lecturas de PDF vuelven al grupo de hilos compartido" \
   'futuro = loop.run_in_executor(_pool_lectura_pdf(), _correr_lectura, funcion, *args)' \

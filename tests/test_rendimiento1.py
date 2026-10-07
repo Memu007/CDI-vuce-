@@ -87,7 +87,7 @@ def test_health_responde_mientras_se_lee_el_texto_del_pdf(monkeypatch):
     import proyecto_maria.pdf_extractor as ext
     monkeypatch.setattr(main, "process_pdf",
                         lambda *_: {"items": [{"descripcion": "x"}], "operacion": {}})
-    monkeypatch.setattr(ext, "_extract_pdf_text", lambda *_: (_bloquear(), "")[1])
+    monkeypatch.setattr(ext, "extraer_texto_pdf_seguro", lambda *_: (_bloquear(), "")[1])
     demora, r = asyncio.run(_health_mientras(_subir))
     assert r.status_code == 200, r.text[:200]
     assert demora < 0.5, f"/health tardó {demora:.2f} s mientras se leía el texto"
@@ -236,7 +236,7 @@ def test_texto_del_vendedor_tiene_tiempo_maximo(monkeypatch):
     monkeypatch.setenv("PDF_VENDOR_TIMEOUT_S", "0.3")
     monkeypatch.setattr(main, "process_pdf",
                         lambda *_: {"items": [{"descripcion": "x"}], "operacion": {}})
-    monkeypatch.setattr(ext, "_extract_pdf_text", lambda *_: (_bloquear(), "")[1])
+    monkeypatch.setattr(ext, "extraer_texto_pdf_seguro", lambda *_: (_bloquear(), "")[1])
     r, demora = _subir_y_medir()
     assert r.status_code == 200, r.text[:200]
     assert demora < LENTO_S, f"respondió a los {demora:.2f} s"
