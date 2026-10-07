@@ -3981,6 +3981,20 @@ async def generate_maria_endpoint(
         gastos = gastos_fob_para_el_txt(request.incoterm, request.gastos_fob, request.gastos_anteriores_fob)
 
         # Validación específica de KIT Maria (complementa la anterior)
+        # Los sub-ítems, con la forma que manda la pantalla: una lista de
+        # {cantidad, valor_unitario, sufijo} (SUBITEMS-1). Otra cosa es un
+        # error con mensaje, no un 500.
+        for _n, _it in enumerate(request.items or [], start=1):
+            _subs = _it.get("subitems") if isinstance(_it, dict) else None
+            if _subs is None:
+                continue
+            if not isinstance(_subs, list) or not all(isinstance(_s, dict) for _s in _subs):
+                raise HTTPException(status_code=400, detail=f"Item {_n}: los sub-ítems no tienen el formato esperado.")
+            for _m, _s in enumerate(_subs, start=1):
+                if _s.get("sufijo") is not None and not isinstance(_s.get("sufijo"), str):
+                    raise HTTPException(status_code=400,
+                                        detail=f"Item {_n}, sub-ítem {_m}: el sufijo de valor tiene que ser un texto.")
+
         kit_errors, kit_warnings = validate_for_kit_maria(items)
 
         # Validar sbt_sufijo_valor: obligatorio, sin caracteres de control.
@@ -4000,32 +4014,33 @@ async def generate_maria_endpoint(
                 detail="Falta el sufijo de valor SBT. Es un dato obligatorio y específico del importador. Consultar al despachante.",
             )
 
-        # Los sufijos que se validan son el general y los de cada sub-ítem.
-        _sufijos = [sbt_raw] if sbt_raw else []
-        for it in (request.items or []):
+        # Los sufijos que se validan son el general y los de cada sub-ítem; el
+        # de un sub-ítem dice cuál es (SUBITEMS-1).
+        _sufijos = [("", sbt_raw)] if sbt_raw else []
+        for _n, it in enumerate(request.items or [], start=1):
             if not isinstance(it, dict):
                 continue
-            for sub in (it.get("subitems") or []):
+            for _m, sub in enumerate(it.get("subitems") or [], start=1):
                 if isinstance(sub, dict) and (sub.get("sufijo") or "").strip():
-                    _sufijos.append(sub["sufijo"].strip())
+                    _sufijos.append((f"Item {_n}, sub-ítem {_m}: ", sub["sufijo"].strip()))
 
-        for _suf in _sufijos:
+        for _donde, _suf in _sufijos:
             if len(_suf) > 120:
                 raise HTTPException(
                     status_code=400,
-                    detail="El sufijo de valor SBT no puede superar los 120 caracteres.",
+                    detail=f"{_donde}El sufijo de valor SBT no puede superar los 120 caracteres.",
                 )
             # Ni «=» ni controles (\x7f incluido): partirían o inventarían una
             # línea del TXT. El sufijo es un código: no se corrige, se rechaza.
             if "=" in _suf:
                 raise HTTPException(
                     status_code=400,
-                    detail="El sufijo de valor SBT no puede contener «=»: va sólo el código, sin «CSBTSVL=».",
+                    detail=f"{_donde}El sufijo de valor SBT no puede contener «=»: va sólo el código, sin «CSBTSVL=».",
                 )
             if any(ord(c) < 32 or 0x7f <= ord(c) <= 0x9f or c in "\u2028\u2029" for c in _suf):
                 raise HTTPException(
                     status_code=400,
-                    detail="El sufijo de valor SBT no puede contener saltos de línea ni caracteres de control.",
+                    detail=f"{_donde}El sufijo de valor SBT no puede contener saltos de línea ni caracteres de control.",
                 )
         if kit_errors or errores_1b:
             raise HTTPException(status_code=400, detail={"errors": list(dict.fromkeys([*errors, *kit_errors, *errores_1b]))})

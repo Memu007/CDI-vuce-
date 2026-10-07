@@ -748,7 +748,10 @@
         const valor = subs.reduce((t, s) => t + (numeroDe(s.cantidad) || 0) * (numeroDe(s.valor_unitario) || 0), 0);
         const cantItem = numeroDe(it.cantidad) || 0;
         const valorItem = cantItem * (numeroDe(it.valor_unitario) || 0);
-        const malos = subs.map((s, k) => (numeroDe(s.cantidad) > 0 && numeroDe(s.valor_unitario) > 0) ? 0 : k + 1).filter(Boolean);
+        // Cantidad con hasta dos decimales: el TXT la declara con dos.
+        const dosDecimales = c => Math.abs(c - Math.round(c * 100) / 100) <= 1e-9;
+        const malos = subs.map((s, k) => (numeroDe(s.cantidad) > 0 && dosDecimales(numeroDe(s.cantidad)) &&
+            numeroDe(s.valor_unitario) > 0) ? 0 : k + 1).filter(Boolean);
         const ok = subs.length > 0 && !malos.length && Math.abs(cant - cantItem) <= 0.001 && Math.abs(valor - valorItem) <= 0.01;
         return { cant, valor, cantItem, valorItem, malos, ok };
     }
@@ -758,7 +761,7 @@
         const n = (v, d) => v.toLocaleString('es-AR', { minimumFractionDigits: d, maximumFractionDigits: d });
         let texto = 'Suman ' + n(r.cant, 0) + ' de ' + n(r.cantItem, 0) + ' unidades y ' +
             n(r.valor, 2) + ' de ' + n(r.valorItem, 2) + ' de valor.';
-        if (r.malos.length) texto += ' Revisá el subítem ' + r.malos.join(', ') + ': cantidad y valor mayores que 0.';
+        if (r.malos.length) texto += ' Revisá el subítem ' + r.malos.join(', ') + ': cantidad y valor mayores que 0, y la cantidad con hasta dos decimales.';
         return (r.ok ? '✓ ' : '⚠ ') + texto;
     }
     function actualizarSumaSubitems(i) {
@@ -819,8 +822,9 @@
             const subs = subitemsDe(it).slice();
             // La cantidad que falta, para no tener que hacer la cuenta.
             const falta = (numeroDe(it.cantidad) || 0) - subs.reduce((t, s) => t + (numeroDe(s.cantidad) || 0), 0);
-            subs.push({ cantidad: falta > 0 ? Math.round(falta * 1000) / 1000 : '', valor_unitario: it.valor_unitario, sufijo: '' });
+            subs.push({ cantidad: falta > 0 ? Math.round(falta * 100) / 100 : '', valor_unitario: it.valor_unitario, sufijo: '' });
             it.subitems = subs;
+            lastSnapshot = null;  // deshacer una acción masiva no pisa los subítems
             render();
             const nuevo = tbody.querySelector('[data-sub-row="' + btn.getAttribute('data-sub-agregar') + '"][data-sub-idx="' +
                 (subs.length - 1) + '"][data-sub-field="cantidad"]');
@@ -832,6 +836,7 @@
             const subs = subitemsDe(it).slice();
             subs.splice(parseInt(btn.getAttribute('data-sub-idx'), 10), 1);
             if (subs.length) it.subitems = subs; else delete it.subitems;
+            lastSnapshot = null;
             render();
         }));
         tbody.querySelectorAll('[data-sub-field]').forEach(inp => inp.addEventListener('input', () => {
@@ -841,6 +846,7 @@
             if (!sub) return;
             const campoSub = inp.getAttribute('data-sub-field');
             sub[campoSub] = campoSub === 'sufijo' ? inp.value : (inp.value === '' ? '' : numeroDe(inp.value));
+            lastSnapshot = null;
             actualizarSumaSubitems(i);
             updateSummary();
         }));
@@ -1417,6 +1423,7 @@
             setItemField(idx, field, inp.value);
             const totalEl = document.querySelector('[data-peso-total="' + idx + '"]');
             if (totalEl && (field === 'cantidad' || field === 'peso_unitario')) totalEl.textContent = textoPesoTotal(CDI.state.items[idx]);
+            if (field === 'cantidad' || field === 'valor_unitario') actualizarSumaSubitems(idx);
         }
         updateSummary();
     }
@@ -1481,7 +1488,8 @@
             ev.target.blur();
             const idx = parseInt(ev.target.getAttribute('data-row'), 10);
             const field = ev.target.getAttribute('data-field');
-            const next = ev.target.closest('tr') && ev.target.closest('tr').nextElementSibling;
+            let next = ev.target.closest('tr') && ev.target.closest('tr').nextElementSibling;
+            while (next && next.classList.contains('row-subitems')) next = next.nextElementSibling;
             if (next) {
                 const nextInput = next.querySelector('.ncm-edit[data-field="' + field + '"]');
                 if (nextInput) nextInput.focus();

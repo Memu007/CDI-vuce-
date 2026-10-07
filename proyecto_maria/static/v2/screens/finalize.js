@@ -345,8 +345,13 @@
         if (sbtInput) {
             CDI.state.operacion.sbt_sufijo_valor = sbtInput.value.trim();
         }
-        // Validación frontend: si está vacío, mostrar error junto al campo
-        if (!CDI.state.operacion.sbt_sufijo_valor) {
+        // Validación frontend: si está vacío, mostrar error junto al campo.
+        // No hace falta si todos los productos van en subítems con sufijo
+        // propio (SUBITEMS-1; el servidor tampoco lo pide).
+        const itemsSufijo = CDI.state.items || [];
+        const todosConSufijoPropio = itemsSufijo.length > 0 && itemsSufijo.every(it =>
+            Array.isArray(it.subitems) && it.subitems.length && it.subitems.every(s => String(s.sufijo || '').trim()));
+        if (!CDI.state.operacion.sbt_sufijo_valor && !todosConSufijoPropio) {
             if (sbtError) {
                 sbtError.textContent = 'Ingresá el sufijo de valor SBT. Es obligatorio.';
                 sbtError.hidden = false;

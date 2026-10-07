@@ -1042,6 +1042,14 @@ def generate_maria_txt(operation_id: str, items: list,
                             f"Item {idx}, sub-ítem {n}: {nombre} «{str(crudo)[:20]}» tiene que ser "
                             f"un número mayor que 0."
                         )
+                # QSBTUNTDCL va con dos decimales: 0,004 saldría 0,00 y tres
+                # de 0,3333 sumarían 0,99 contra el 1,00 del ítem.
+                cant_sub = float(sub.get("cantidad") or 0)
+                if abs(cant_sub - round(cant_sub, 2)) > 1e-9:
+                    raise ValueError(
+                        f"Item {idx}, sub-ítem {n}: la cantidad «{str(sub.get('cantidad'))[:20]}» tiene más "
+                        f"de dos decimales; el TXT la declara con dos."
+                    )
             suma_cant = sum(float(s.get("cantidad", 0) or 0) for s in subitems)
             # El valor de cada sub-ítem sin redondear; el MARTFOB se reparte
             # entre ellos al centavo, así los MSBTFOB suman exactamente el
