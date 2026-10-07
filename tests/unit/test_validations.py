@@ -1037,9 +1037,9 @@ class TestValidateFileUpload:
         mock_file.read = AsyncMock(return_value=pdf_content)
         mock_file.seek = AsyncMock()
 
-        # PyPDF2 se importa dentro del bloque try de la función
+        # pypdf se importa dentro de la función que abre el PDF
         with patch('proyecto_maria.security.file_security.magic.from_buffer', return_value='application/pdf'):
-            with patch('PyPDF2.PdfReader') as mock_pdf:
+            with patch('pypdf.PdfReader') as mock_pdf:
                 mock_pdf_instance = Mock()
                 mock_pdf_instance.is_encrypted = False
                 mock_pdf_instance.pages = [Mock()]
