@@ -1931,6 +1931,14 @@ class LecturaAutomaticaNoDisponible(RuntimeError):
     """El lector con IA está apagado o falta la clave: no hay ítems leídos."""
 
 
+def lectura_automatica_disponible() -> bool:
+    """Hay lector con IA: el interruptor está prendido y hay clave de Gemini."""
+    import os
+
+    flag_raw = str(os.environ.get('ENABLE_PDF_LLM_FALLBACK') or 'true').lower()
+    return flag_raw in ('1', 'true', 'yes', 'on') and bool(os.environ.get('GEMINI_API_KEY'))
+
+
 def _extract_with_gemini_vision(data: bytes) -> list[dict]:
     """
     Extract PDF items using Gemini API for image-based PDFs with fallback cascade.
@@ -1940,11 +1948,9 @@ def _extract_with_gemini_vision(data: bytes) -> list[dict]:
     import io
     import base64
     
-    flag_raw = str(os.environ.get('ENABLE_PDF_LLM_FALLBACK') or 'true').lower()
-    enable_flag = flag_raw in ('1', 'true', 'yes', 'on')
     api_key = os.environ.get('GEMINI_API_KEY')
-    
-    if not (enable_flag and api_key):
+
+    if not lectura_automatica_disponible():
         # Sin lector con IA no se inventa nada: el endpoint avisa y la
         # persona carga los productos a mano (MARIA-2).
         print("⚠️ Gemini Vision disabled or missing API key - lectura automática no disponible")
