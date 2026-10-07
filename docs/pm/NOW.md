@@ -34,6 +34,9 @@ antes de cerrar la Fase 3.
 4. **Catálogo NCM:** Emi trajo el nomenclador vigente (2026-10-07). Lo
    carga la Dev 2 en CATALOGO-NCM-1. Una línea de Emi: ¿lo bajó de
    `arca.gob.ar`?
+4b. **Mercado Pago:** ¿están puestas en Railway las variables
+   `MP_PREAPPROVAL_PLAN_ID_…` (las de la suscripción)? Si no están, la
+   renovación de COBRO-MP-1 no corre en producción.
 5. **Hasta publicar MARIA-1a: revisar el país de origen de cada TXT** antes
    de mandárselo al despachante. El código publicado corta el país a dos
    letras: si la lectura devuelve «CHN» o «China», sale Suiza.
@@ -73,8 +76,11 @@ Archivos abiertos por Dev:
 
 ## En curso
 
-- **Dev 1:** EXCEL-2 entregada (`3e6e63e`, D27), por revisar. Sigue: GUARDAR-1 si Emi dice que sí; si no, COBRO-MP-1.
-  y EXCEL-2.
+- **Dev 1:** EXCEL-2 entregada (`3e6e63e`, D27), en revisión: rojo antes
+  (`43 failed, 8 passed`) y suite (`1277 passed, 102 skipped, 3 xfailed`)
+  hechos; falta el subagente. Mientras tanto, COBRO-MP-1 pasos 1 y 3, con
+  D28 a D31 contestadas (`074a50b`). Si Emi dice que sí a GUARDAR-1, pasa a
+  esa.
 - **Dev 2:** devolución de MARIA-5 (dos pesos para una línea, filas que desaparecen, guarda del peso, subítems, grupos, una sola cuenta). Sigue: CATALOGO-NCM-1; MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
   RENDIMIENTO-1 y 1b (`ec3d793`), MARIA-1a, 2b, 1c, 4, 3 y 1d (`9679e21`).
@@ -153,12 +159,12 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 18:00 UTC (rutina): PUNTA-A-PUNTA-1 aceptada e integrada. Dev 1
-entregó EXCEL-2 (`3e6e63e`, con D27), por revisar; sigue GUARDAR-1 si Emi dice
-que sí, si no COBRO-MP-1. Dev 2: integra EXCEL-1 con la regla del peso y
-reentrega MARIA-5 y CATALOGO-NCM-1. Esperan a Emi: «dale 6ea8ca9»,
-GUARDAR-1, reventa, subítems en la pantalla. Contexto: PM 48 % y Dev 1 62 %
-(`/compact` pedido a Emi), Dev 2 9 %.
+2026-10-07 18:35 UTC: Emi compactó a la PM. EXCEL-2 en revisión (falta el
+subagente, que va después de las 18:50 UTC, cuando se renueva el límite de
+5 horas de la cuenta; las tres sesiones estaban en aviso). D28 a D31 de la
+Dev 1 contestadas. La Dev 2 integra EXCEL-1 con la regla del peso (recibió la
+D23). Esperan a Emi: «dale 6ea8ca9», GUARDAR-1, reventa, subítems y las
+variables de la suscripción. Dev 1 en 68 %: falta su `/compact`.
 
 ## Medición
 
