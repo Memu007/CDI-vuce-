@@ -85,9 +85,22 @@ sabotaje $M "la moneda vuelve a no recortarse" \
   '            currency=data.get("currency") or "USD",' \
   "FAILED $T::test_datos_largos_de_la_operacion_no_impiden_guardarla"
 sabotaje $M "aprender vuelve a contar lo que no guardó" \
-  '            updated += aprendido is not None' \
-  '            updated += 1' \
+  '        return entrada is not None' \
+  '        return True' \
   "FAILED $T::test_aprender_no_cuenta_lo_que_no_guardo"
+
+sabotaje $M "el historial vuelve a ir sin savepoint por producto" \
+  $'        async with db.begin_nested():\n            entrada = await upsert(db, **campos)\n            await db.flush()' \
+  $'        if True:\n            entrada = await upsert(db, **campos)\n            await db.flush()' \
+  "FAILED $T::test_un_producto_malo_no_se_lleva_el_historial_de_los_demas"
+sabotaje $M "el NUL vuelve a llegar a la base" \
+  '        data = _sin_nul(await request.json())' \
+  '        data = await request.json()' \
+  "FAILED $T::test_un_grupo_fuera_de_rango_y_el_nul_en_otros_textos_no_impiden_guardar"
+sabotaje $M "un grupo fuera de rango vuelve a llegar a la base" \
+  '    return numero if numero is not None and -2**31 <= numero < 2**31 else None' \
+  '    return numero' \
+  "FAILED $T::test_un_grupo_fuera_de_rango_y_el_nul_en_otros_textos_no_impiden_guardar"
 
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]

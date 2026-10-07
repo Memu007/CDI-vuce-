@@ -113,5 +113,31 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
     hist = dict(sql("select descripcion, ncm from client_product_history where client_id=%s", cid))
     chequear("MONITOR DE PRUEBA" not in hist, f"y el historial de esa operación no queda a medias ({hist})")
 
+    # Un producto que la base rechaza no se lleva el historial de los demás
+    # (cada producto va en su savepoint).
+    from proyecto_maria.database.models import ClientProductHistory
+    upsert_real = memoria.upsert_client_product_history
+
+    async def _upsert_con_uno_malo(db, *args, **kwargs):
+        if kwargs.get("descripcion") == "MALO":
+            db.add(ClientProductHistory(owner_username=kwargs["owner_username"], client_id=None,
+                                        ncm="1", descripcion="x"))
+            return None
+        return await upsert_real(db, *args, **kwargs)
+
+    memoria.upsert_client_product_history = _upsert_con_uno_malo
+    try:
+        r = c.post("/api/clientes", json={"nombre": "Cliente con uno malo", "cuit": "30999999995"})
+        cid3 = r.json()["cliente"]["id"]
+        r = c.post(f"/api/clientes/{cid3}/operaciones", json={"items": [
+            {"pieza": "84713012", "descripcion": "TABLETA"}, {"pieza": "84714900", "descripcion": "MALO"},
+            {"pieza": "84714900100D", "descripcion": "COMPUTADORA PORTATIL"}]})
+    finally:
+        memoria.upsert_client_product_history = upsert_real
+    hist = dict(sql("select descripcion, ncm from client_product_history where client_id=%s", cid3))
+    chequear(r.status_code == 200 and r.json().get("historial_guardado") is False
+             and hist == {"TABLETA": "84713012", "COMPUTADORA PORTATIL": "84714900"},
+             f"un producto malo no se lleva el historial de los demás ({r.status_code}, {hist})")
+
 print(f"fallas: {len(FALLAS)}")
 sys.exit(1 if FALLAS else 0)
