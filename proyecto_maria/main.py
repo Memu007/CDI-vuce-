@@ -6149,13 +6149,31 @@ async def save_client_operation(
                 )
             )
 
-        # Alimentar la memoria de NCM del cliente: cada item con NCM +
-        # descripcion se guarda (o actualiza) en ClientProductHistory. Esto
-        # hace que la proxima op de este cliente sugiera NCMs automaticamente.
-        try:
-            from proyecto_maria.services.client_memory import upsert_client_product_history
-        except ImportError:
-            from services.client_memory import upsert_client_product_history
+        # La operación se guarda primero y sola: el historial no puede tirarla
+        # abajo. Antes iba en el mismo commit y un NCM que no entraba en la
+        # columna del historial (la SIM completa, en Postgres) daba 500 y no
+        # guardaba nada (GUARDAR-1).
+        await db.commit()
+        operation_id = operation.id
+        billing_entity, _ = await _get_billing_entity(db, db_user)
+        billing_service.record_operation_created(billing_entity)
+        await db.commit()
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
+        logging.exception("save_client_operation failed client_id=%s", client_id)
+        raise HTTPException(
+            status_code=500,
+            detail=f"No se pudo guardar la operación al cliente: {str(e)[:200]}",
+        )
+
+    # Alimentar la memoria de NCM del cliente: cada item con NCM +
+    # descripcion se guarda (o actualiza) en ClientProductHistory. Esto
+    # hace que la proxima op de este cliente sugiera NCMs automaticamente.
+    # Si falla, se pierde sólo el aprendizaje de esta operación.
+    try:
+        from proyecto_maria.services.client_memory import upsert_client_product_history
 
         for item in items:
             ncm_raw = str(item.get("ncm") or item.get("pieza") or "").strip()
@@ -6179,22 +6197,11 @@ async def save_client_operation(
                     "client_memory upsert fallo para client_id=%s ncm=%s",
                     client_id, ncm_raw,
                 )
-                # No rompemos el save de la operacion si la memoria falla.
-
         await db.commit()
-        billing_entity, _ = await _get_billing_entity(db, db_user)
-        billing_service.record_operation_created(billing_entity)
-        await db.commit()
-        return {"success": True, "operation_id": operation.id, "op_code": op_code}
-    except HTTPException:
-        raise
-    except Exception as e:
+    except Exception:
         await db.rollback()
-        logging.exception("save_client_operation failed client_id=%s", client_id)
-        raise HTTPException(
-            status_code=500,
-            detail=f"No se pudo guardar la operación al cliente: {str(e)[:200]}",
-        )
+        logging.exception("save_client_operation: no se guardó el historial de client_id=%s", client_id)
+    return {"success": True, "operation_id": operation_id, "op_code": op_code}
 
 
 @app.post("/api/operacion/{operation_id}/agrupar")
@@ -6709,7 +6716,13 @@ async def update_client_catalogo_producto(
     if not isinstance(body, dict):
         body = {}
     if "ncm" in body:
-        row.ncm = str(body["ncm"]).strip()[:10]
+        # La posición SIM completa no entra en la columna: antes se cortaba a
+        # 10 caracteres y quedaba un código que no existe (GUARDAR-1).
+        from proyecto_maria.services.client_memory import ncm_para_historial
+        ncm_nuevo = ncm_para_historial(body["ncm"])
+        if ncm_nuevo is None and str(body["ncm"] or "").strip():
+            raise HTTPException(status_code=400, detail="El NCM no es válido.")
+        row.ncm = ncm_nuevo or ""
     if "origen" in body:
         row.origen_frecuente = str(body["origen"]).strip()[:3] or "XX"
     if "peso_unitario_avg" in body:

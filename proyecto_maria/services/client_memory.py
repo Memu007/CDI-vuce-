@@ -38,6 +38,27 @@ def _norm_desc(desc: str) -> str:
     return _normalize(desc or "")[:200]
 
 
+# Largo de client_product_history.ncm (String(10)). En Postgres, guardar algo
+# más largo rompe el commit entero (GUARDAR-1).
+NCM_HISTORIAL_MAX = 10
+
+
+def ncm_para_historial(ncm) -> Optional[str]:
+    """La forma del NCM que guarda el historial del cliente.
+
+    Lo que entra queda igual. La posición SIM completa (`84714900100D`,
+    `8471.49.00.100D`) no entra: se guarda su NCM de 8 dígitos, que es lo que
+    se sugiere después y lo que guarda «confirmar NCM». None si no hay ni eso.
+    """
+    ncm = str(ncm or "").strip()
+    if not ncm:
+        return None
+    if len(ncm) <= NCM_HISTORIAL_MAX:
+        return ncm
+    digitos = re.sub(r"\D", "", ncm)
+    return digitos[:8] if len(digitos) >= 8 else None
+
+
 async def upsert_client_product_history(
     db: AsyncSession,
     owner_username: str,
@@ -54,7 +75,7 @@ async def upsert_client_product_history(
     Returns:
         La entrada (nueva o actualizada). None si faltan campos obligatorios.
     """
-    ncm = (ncm or "").strip()
+    ncm = ncm_para_historial(ncm) or ""
     descripcion = (descripcion or "").strip()
 
     if not ncm or not descripcion or not client_id or not owner_username:
