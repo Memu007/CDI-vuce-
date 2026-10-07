@@ -2,6 +2,7 @@
 de NCM, el aviso de mapeo, abrir un libro armado (D26 a) y, de paso, montos
 que no son números y los otros CUIT.
 """
+import pandas as pd
 import pytest
 from fastapi.testclient import TestClient
 
@@ -513,3 +514,113 @@ def test_leer_la_factura_abre_un_libro_con_una_sola_hoja(monkeypatch):
         f.write(_libro_normal({"Factura": FILAS, "B": [["x"]], "C": [["y"]]}))
     main._leer_excel_ruta(ruta, "openpyxl")
     assert vistos == [["Factura"]], vistos
+
+
+# ------------------------------------------- devolución de EXCEL-2 (veredicto 2034b85)
+
+def _con_combinadas_crudas(contenido: bytes, rangos: list) -> bytes:
+    """El libro con <mergeCell> escritos a mano en la primera hoja: openpyxl
+    no deja armar una combinada de un millón de filas sin crearlas."""
+    import re
+    import zipfile
+    entrada = zipfile.ZipFile(io.BytesIO(contenido))
+    salida = io.BytesIO()
+    with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as z:
+        for info in entrada.infolist():
+            datos = entrada.read(info.filename)
+            if info.filename == "xl/worksheets/sheet1.xml":
+                xml = re.sub(rb"<mergeCells\b.*?</mergeCells>", b"", datos.decode().encode(), flags=re.S)
+                extra = ("<mergeCells count=\"%d\">" % len(rangos)
+                         + "".join(f'<mergeCell ref="{r}"/>' for r in rangos) + "</mergeCells>").encode()
+                datos = xml.replace(b"</sheetData>", b"</sheetData>" + extra, 1)
+            z.writestr(info, datos)
+    return salida.getvalue()
+
+
+def test_una_combinada_gigante_repetida_no_traba_la_lectura():
+    """Devolución 1: C2:C1048576 repetida 2000 veces ocupaba un hilo ~1000 s.
+    El trabajo tiene que ser proporcional a las filas de la tabla."""
+    import time
+    contenido = _con_combinadas_crudas(_libro([
+        ENCABEZADO,
+        ["84798999900H", "MAQUINA DEMO", "China", 1, 5000, 1220],
+        ["84714900100D", "EQUIPO DEMO", None, 6, 1197, 33],
+    ]), ["C2:C1048576"] * 2000)
+    inicio = time.monotonic()
+    r = _subir(contenido)
+    tardo = time.monotonic() - inicio
+    assert r.status_code == 200, r.text[:300]
+    assert [i["origen"] for i in r.json()["items"]] == ["CN", "CN"]
+    assert tardo < 1.5, f"tardó {tardo:.1f} s"
+
+
+@pytest.mark.parametrize("cantidad, precio", [("5 UN", "USD 100"), ("5", "$ 1.500,00")])
+def test_una_combinada_en_cantidad_o_precio_con_texto_no_se_copia(cantidad, precio):
+    """Devolución 2: la regla es por columna; en cantidad, valor y peso no
+    se copia nada, aunque el valor sea texto («5 UN», «USD 100»)."""
+    r = _subir(_libro([
+        ENCABEZADO,
+        ["84713000", "Notebook", "China", cantidad, precio, "2 KG"],
+        ["84713000", "Notebook con funda", None, None, None, None],
+    ], combinar=("C2:C3", "D2:D3", "E2:E3", "F2:F3")))
+    assert r.status_code == 200, r.text[:300]
+    items = r.json()["items"]
+    segunda = next(i for i in items if i["descripcion"] == "Notebook con funda")
+    assert (segunda["cantidad"], segunda["valor_unitario"], segunda["peso_unitario"]) == (0, 0, 0), items
+    assert segunda["origen"] == "CN", items
+
+
+def test_una_combinada_en_la_columna_de_cantidad_del_mapeo_del_cliente_tampoco_se_copia():
+    df = pd.DataFrame([["Notebook", "5 UN", "China"], ["Funda", None, None]],
+                      columns=["Goods", "Qty", "Made"])
+    salida = main._rellenar_combinadas(df.copy(), [(2, 2, 3, 2), (2, 3, 3, 3)],
+                                       mapeo={"Goods": "descripcion", "Qty": "cantidad", "Made": "origen"})
+    assert pd.isna(salida.at[1, "Qty"]) and salida.at[1, "Made"] == "China"
+
+
+def test_una_fila_vacia_dentro_de_una_combinada_no_es_una_fila_sin_leer():
+    """Devolución 6: rellenar antes de sacar las filas vacías la marcaba."""
+    r = _subir(_libro([
+        ENCABEZADO,
+        ["84798999900H", "MAQUINA DEMO", "China", 1, 5000, 1220],
+        [None, None, None, None, None, None],
+        ["84714900100D", "EQUIPO DEMO", None, 6, 1197, 33],
+    ], combinar=("C2:C4",)))
+    assert r.status_code == 200, r.text[:300]
+    data = r.json()
+    assert [i["origen"] for i in data["items"]] == ["CN", "CN"]
+    assert not data["operacion"].get("filas_excel_sin_leer"), data["operacion"]
+
+
+@pytest.mark.parametrize("par", ["é®", "ñ\xa0", "ó¿"])
+def test_un_csv_cp1252_con_un_par_que_parece_utf8_no_pierde_las_tildes(par):
+    """Devolución 5: un par cp1252 que parece UTF-8 mandaba todo el archivo
+    a UTF-8 con reemplazo («Acci�n»)."""
+    texto = f"descripcion;ncm\nAcción {par};0901.21.00\nBebé;0902.10.00\nNiño;0903.00.00\n"
+    df = main._leer_tabla(texto.encode("cp1252"), "historial.csv")
+    assert list(df["descripcion"]) == [f"Acción {par}", "Bebé", "Niño"], list(df["descripcion"])
+
+
+def test_un_csv_con_codificacion_dudosa_avisa():
+    """Mitad UTF-8 y mitad cp1252: se lee como se puede, pero se avisa."""
+    contenido = "descripcion;ncm\nAcción;0901.21.00\n".encode("utf-8") + "Bebé;0902.10.00\n".encode("cp1252")
+    df = main._leer_tabla(contenido, "historial.csv")
+    assert df.attrs.get("aviso_codificacion"), df.attrs
+    r = _importar(contenido.replace(b"Acci", f"Acci{uuid.uuid4().hex[:6]}".encode()))
+    assert r.status_code == 200 and r.json().get("aviso"), r.json()
+
+
+@pytest.mark.parametrize("item", [{"cantidad": ENORME}, {"cantidad": [1]}])
+def test_una_cantidad_mala_nombra_solo_la_cantidad(item):
+    """De paso (devolución de EXCEL-2): con la cantidad mala, el 400 traía
+    también «Valor inválido» y «Peso inválido» con valor y peso buenos."""
+    errores = _errores(_generar(item=item))
+    assert "Cantidad inválida" in errores
+    assert "Valor inválido" not in errores and "Peso inválido" not in errores, errores
+
+
+def test_un_sub_item_con_la_cantidad_mala_nombra_solo_la_cantidad():
+    from proyecto_maria.core.controles_maria import montos_fuera_de_rango
+    errores = montos_fuera_de_rango([{"cantidad": 1, "valor_unitario": 1,
+                                      "subitems": [{"cantidad": ENORME, "valor_unitario": 5}]}], {})
+    assert errores == ["Item 1, sub-ítem 1: Cantidad inválida"], errores
