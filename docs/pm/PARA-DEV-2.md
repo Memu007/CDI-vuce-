@@ -84,8 +84,9 @@ adivinado. Suite completa en verde.
 
 Primero todo el camino «PDF o Excel → TXT MARIA», después el cobro, la
 seguridad al final (`ROADMAP.md`). Tu orden en la Fase 1: MARIA-1a, MARIA-2b,
-MARIA-4, MARIA-3, MARIA-4b y MARIA-5; MARIA-6 y MARIA-7 cuando llegue lo del
-despachante. MARIA-1b pasó a la Dev 1.
+MARIA-4 (estado, IVA adicional, banco y empresa de digitalización, en una
+sola pieza), MARIA-3 y MARIA-5; MARIA-6 cuando llegue lo del despachante.
+MARIA-1b pasó a la Dev 1.
 
 ## Después — MARIA-2b (apenas entregues MARIA-1a)
 
