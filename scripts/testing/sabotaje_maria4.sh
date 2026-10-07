@@ -87,7 +87,7 @@ reemplazar $F '        if pais_codigo == PAIS_ARGENTINA:
 caso "argentino_inventado" "FAILED $T::test_origen_argentino_sin_estado_no_se_inventa"
 
 # 6. los listados no devuelven lo elegido (la pantalla no puede proponerlo)
-reemplazar proyecto_maria/main.py '    return {k: str(maria.get(k) or "") for k in' '    return {k: "" for k in'
+reemplazar proyecto_maria/main.py '    return {k: (maria.get(k) if isinstance(maria.get(k), str) else "")[:12]' '    return {k: ""'
 caso "listados_sin_maria" "FAILED $T::test_lo_elegido_se_guarda_con_la_operacion_y_vuelve_en_los_listados"
 
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
