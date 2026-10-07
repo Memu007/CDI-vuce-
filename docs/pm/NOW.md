@@ -8,7 +8,7 @@ Actualizado: 2026-10-07. Estado vigente; la historia está en Git.
 esperar los tests.
 **En producción:** la usa sólo Emi, con facturas reales (Emi, 2026-10-07).
 **Rama de PM:** `claude/practical-shannon-szpwkn`: lo aceptado y sin publicar
-(incluye los 25 commits de `e8344d0`, ADMIN-1 y MARIA-2). **Ramas de las
+(incluye los 25 commits de `e8344d0`, ADMIN-1, ADMIN-2 y MARIA-2). **Ramas de las
 Devs:** `claude/dev1-tecnica` y `claude/dev2-maria`.
 **Plan:** `ROADMAP.md`, con el orden de Emi del 2026-10-07: primero el TXT,
 después el cobro, la seguridad al final y exhaustiva. Ningún estudio entra
@@ -68,25 +68,27 @@ también sus subagentes (Emi confirmó las dos sesiones en alto). Ningún subage
 la PM principal.
 
 Archivos abiertos por Dev:
-- Dev 1 (ADMIN-2): `proyecto_maria/main.py` (`/api/system/connectors`,
-  `/api/payments/simulate-webhook`), `routers/admin_router.py`,
-  `static/v2/topbar_financials.js`, `tests/test_admin_solo_admin.py`.
+- Dev 1 (RENDIMIENTO-1): `proyecto_maria/main.py` (`upload_pdf_public`,
+  `_suggest_ncm_with_gemini`), `proyecto_maria/pdf_extractor.py` (sólo el
+  lector, ~línea 800) y `requirements.txt`.
 - Dev 2 (MARIA-1a): `proyecto_maria/pdf_extractor.py` (las dos copias del
   lector) y, si hace falta, la tabla de países de `core/maria_generator.py`.
 
 ## En curso
 
-- **Dev 1:** ADMIN-2. Sigue la Fase 1: RENDIMIENTO-1 (incluye cambiar el
-  lector de PDF viejo), EXCEL-1, MARIA-1b y PUNTA-A-PUNTA-1.
+- **Dev 1:** RENDIMIENTO-1 (incluye cambiar el lector de PDF viejo). Sigue:
+  EXCEL-1, MARIA-1b y PUNTA-A-PUNTA-1.
 - **Dev 2:** MARIA-1a. Sigue: MARIA-2b, MARIA-4 (estado, IVA adicional,
   banco y empresa de digitalización), MARIA-3 y MARIA-5; MARIA-6 cuando
   lleguen los archivos reales del despachante.
-- **Aceptadas el 2026-10-07 e integradas:** ADMIN-1 (`ac25dbc`) y MARIA-2
-  (`65ea6f3`). Suite sobre la rama integrada (`78b60c8`):
-  `703 passed, 102 skipped`.
+- **Aceptadas el 2026-10-07 e integradas:** ADMIN-1 (`ac25dbc`), MARIA-2
+  (`65ea6f3`) y ADMIN-2 (`f9f8393`). Suite sobre `f9f8393`, que tiene el
+  mismo producto y las mismas pruebas que la rama de PM:
+  `716 passed, 102 skipped`.
 - **Publicación de ensayo:** dos candidatos. (a) `cb8f509`, el código de
   `e8344d0` tal cual; (b) la cabeza de la rama de PM, que además cierra el
-  admin y saca los productos inventados, pero pide `ADMIN_USERNAMES`. La PM
+  admin, borra el atajo que activaba una suscripción sin pagar y saca los
+  productos inventados, pero pide `ADMIN_USERNAMES`. La PM
   recomienda (b) si la variable está; si no, (a). La suite se corre otra vez
   sobre el SHA exacto.
 - **Despachante:** respondió las seis preguntas y las dos cortas el
@@ -102,9 +104,9 @@ Archivos abiertos por Dev:
 | G0 · Secretos | 🔴 | Rotar las claves de Gemini | Emi, esta semana |
 | G1 · Configuración | 🟢 | G1.1 a G1.5 cortan. G1.6 y G1.7 sin medir | — |
 | G2 · Imagen real | 🟢 | Cerrada el 2026-09-17 | — |
-| G3 · Aislamiento | 🟡 | En producción, la fuga de MARIA.TXT (se arregla con el ensayo). Admin cerrado en la rama (ADMIN-1). Abiertos: sesiones que reviven, límite de intentos burlable, prueba de aislamiento parcial | Fase 3 |
+| G3 · Aislamiento | 🟡 | En producción, la fuga de MARIA.TXT (se arregla con el ensayo). Admin cerrado en la rama (ADMIN-1 y ADMIN-2). Abiertos: sesiones que reviven, límite de intentos burlable, prueba de aislamiento parcial | Fase 3 |
 | G4 · Producto (MARIA) | 🔴 | Origen mal leído, estado e IVA adicional fijos, peso por unidad, avisos tarde, gastos FOB sin cablear, banco, identificadores. Sin productos inventados (MARIA-2) | Fase 1 y la prueba en el Kit |
-| G5 · Pruebas | 🟢 | `703 passed, 102 skipped, 0 failed` en la rama integrada | — |
+| G5 · Pruebas | 🟢 | `716 passed, 102 skipped, 0 failed` en la rama integrada | — |
 | G6 · Volver atrás | 🟡 | Esquema probado en local; falta la copia de la base | Fase 3 (y el ensayo lo ensaya) |
 | G7 · Cobro | 🔴 | El corte por impago cubre 2 funciones; cancelar no cancela en Mercado Pago; aviso de pago sin firma; doble suscripción; invitaciones | Fase 2 |
 | G8 · Piloto | ⚪ | Tres estudios presentan de verdad un MARIA de CDI | Fase 4 |
@@ -140,10 +142,11 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 01:20 UTC: las dos respuestas cortas del despachante, guardadas y
-llevadas a MARIA-4 y MARIA-6. Un subagente Opus alto ataca el candidato del
-ensayo (la cabeza de esta rama) en local; su informe se lee antes de pasarle
-el SHA a Emi.
+2026-10-07 01:50 UTC: ADMIN-2 aceptada e integrada (subagente Sonnet alto: se
+sostiene; dos puntos ciegos de la prueba a AISLAMIENTO-2). Dev 1 sigue con
+RENDIMIENTO-1. Dev 2 en MARIA-1a, sin entrega. Las dos esperan que Emi pegue
+su `/compact` (Dev 1 ~35 %, Dev 2 ~28 %). Sigue corriendo el subagente Opus
+alto que ataca el candidato del ensayo; se lee antes de pasarle el SHA a Emi.
 
 ## Medición
 

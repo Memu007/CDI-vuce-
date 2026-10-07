@@ -25,87 +25,63 @@ despertás a ella con el de la suya al entregar o al dejar una D que te frena
 
 ## Último veredicto
 
-**VUCE-3 aceptada** (2026-09-18, sobre `e8344d0`).
+**ADMIN-2 aceptada sobre `f9f8393`** (2026-10-07). La PM reprodujo el rojo
+antes (`3 failed`), la focal (`27 passed`) y la suite (`716 passed, 102
+skipped`). Su subagente Sonnet alto: los puntos 1 a 3 se sostienen; la prueba
+de recorrido tiene dos puntos ciegos más (un WebSocket bajo `/api/admin/` y
+una ruta cruda en `/api/admin` o `/dev` exactos), que van a AISLAMIENTO-2 en
+la Fase 3: hoy no hay ninguna así. Detalle en
+`REPRODUCCION-ADMIN-2-2026-10-07.md`. Integrada en la rama de la PM.
 
-**ADMIN-1 aceptada sobre `ac25dbc`** (2026-10-07). La PM reprodujo el rojo
-antes, la focal (`14 passed`) y la suite (`694 passed, 102 skipped`). Su
-subagente Opus alto no encontró ninguna ruta abierta; sí dos puntos ciegos de
-la prueba de recorrido, que se suman a ADMIN-2 (abajo). Detalle en
-`REPRODUCCION-ADMIN-1-2026-10-07.md`. Integrada en la rama de la PM.
+## Respuestas a tus D (2026-10-07, 01:45 UTC)
 
-## Respuestas a tus D (2026-10-07, 01:10 UTC)
+- **D7 (el chip «Sistema/Demo»): (a), nada.**
+- **D8 (el aviso de Mercado Pago se puede reenviar): va en COBRO-MP-1**, que
+  ya pide «aplicado una vez», y **COBRO-MP-1 pasa a ser la primera pieza de
+  la Fase 2**, delante de COBRO-CORTE-1, como recomendaste. Hoy no hay cobro
+  abierto a estudios: no cambia el orden de la Fase 1.
+- **D9:** el primero (cancelar y reactivar pasa una prueba gratuita a
+  `active`) y el tercero (sin `MP_ACCESS_TOKEN`, «Tu cuenta Premium ha sido
+  activada» sin cambiar nada) **van a COBRO-MP-2**. El segundo ya está en la
+  lista de Railway de Emi.
 
-- **D1 (ADMIN-1, `/api/system/connectors`): (b).** Al usuario común, sólo el
-  `mode` de cada conector; el detalle, sólo al admin. Va en ADMIN-2.
-- **D2 (`/api/payments/simulate-webhook`): (a), borrarla.** Activa cobro sin
-  pagar. Va en ADMIN-2.
-- **D3 (`cohort-retention` con `require_role`): (a).** Va en ADMIN-2.
-- **D4 (COBRO-CORTE-1, cuándo se cuenta): (b), con N = 10.**
+Anotado en `ROADMAP.md`.
+
+**Ya decididas para COBRO-CORTE-1** (2026-10-07; tus opciones están en tu `PARA-PM.md`
+del commit `62b1d14`):
+- **D4 (cuándo se cuenta): (b), con N = 10.**
 - **D5: (a).** Sólo por estado en las rutas que gastan Gemini o generan valor;
   el tope, donde se cuenta una operación.
 - **D6: (a)** ahora. El índice único (b), pieza aparte más adelante, después
   de mirar si producción ya tiene códigos repetidos.
 
-D4 a D6 quedan anotadas en `ROADMAP.md`, Fase 2, para cuando llegue COBRO-CORTE-1.
+## Tarea activa — RENDIMIENTO-1: leer un PDF no frena el sitio
 
-## Tarea activa — ADMIN-2: lo que encontraste en ADMIN-1
+Asignada el 2026-10-07. Fase 1 (`ROADMAP.md`). Después siguen EXCEL-1,
+MARIA-1b y PUNTA-A-PUNTA-1; cada una se te escribe acá cuando arranque.
 
-Asignada el 2026-10-07. Sale de tus D1 a D3. Es chica.
-
-**Base:** tu rama, con la de la PM traída con `merge`.
-
-**Alcance.**
-1. `GET /api/system/connectors` (`main.py:6373`): el usuario común recibe sólo
-   el `mode` de cada conector; `base_url`, claves, CUIT, certificado y
-   user-agent, sólo el admin. El chip «Sistema/Demo» de la barra superior
-   (`static/v2/topbar_financials.js:88`) sigue andando.
-2. Borrar `POST /api/payments/simulate-webhook` (`main.py:7983`) y lo que sólo
-   exista para ella. Si alguna prueba la usa para armar un estado, que lo arme
-   de otra forma.
-3. Sacar el `require_role('admin')` de `cohort-retention`
-   (`routers/admin_router.py:343`) y sumarlo a tu prueba de rutas de admin.
-4. **Sumado por la revisión de ADMIN-1:** que la prueba de recorrido también
-   vea (a) apps montadas aparte con `app.mount` bajo `/api/admin/` o
-   `/api/dev/`, y (b) rutas crudas de Starlette (`app.router.add_route`) con
-   `include_in_schema=False`. Hoy no hay ninguna, pero una así pasaría verde.
-   Con su sabotaje: una de cada una, abierta, y la prueba en rojo.
-
-**Fuera de alcance:** cómo se decide quién es admin (tu riesgo 2 se lo paso a
-Emi: que `ADMIN_USERNAMES` nombre sólo usuarios que ya existen).
-
-**Criterios:** rojo antes y verde después en cada punto (usuario común ve el
-detalle de los conectores; sin sesión y con el secreto, `simulate-webhook`
-pasa una cuenta a `active`; el admin por variable recibe 403 en
-`cohort-retention`). El chip anda en pantalla (captura). Suite completa en
-verde. Autorrevisión con Opus alto y Sonnet alto (es cobro y permisos).
-
-## Plan nuevo de Emi (2026-10-07)
-
-Emi cambió el orden: **primero todo el camino «PDF o Excel → TXT MARIA»,
-después el cobro, la seguridad al final y exhaustiva** (`ROADMAP.md`).
-Terminá ADMIN-2 y seguí con tu parte de la Fase 1, en este orden:
-RENDIMIENTO-1 (ahora incluye cambiar el lector de PDF viejo), EXCEL-1,
-MARIA-1b y PUNTA-A-PUNTA-1. Cada una
-se te escribe acá cuando arranque; la próxima es la de abajo.
-
-## Después — RENDIMIENTO-1 (apenas entregues ADMIN-2)
+**Base:** tu rama, con la de la PM traída con `merge` (trae ADMIN-2 integrada
+y MARIA-2).
 
 Leer un PDF no frena el sitio para todos (hallazgo D3). `upload_pdf_public`
-(`main.py:3428`) llama a `process_pdf(contents)` (`:3450`) y a
-`_extract_pdf_text(contents)` (`:3474`), que son sincrónicos, dentro de una
-función `async`; lo mismo `_suggest_ncm_with_gemini` (`:6905`, usada en
-`:7027`). Con un solo proceso, mientras se lee un PDF nadie más es atendido.
+(`main.py`) llama a `process_pdf(contents)` y a `_extract_pdf_text(contents)`,
+que son sincrónicos, dentro de una función `async`; lo mismo
+`_suggest_ncm_with_gemini`. Con un solo proceso, mientras se lee un PDF nadie
+más es atendido.
 
 **Alcance:**
 1. Que esas llamadas no bloqueen (por ejemplo, `asyncio.to_thread`) y que la
    lectura tenga un tiempo máximo con un error claro.
-2. Cambiar el lector de PDF viejo (`PyPDF2==3.0.1`, que se cuelga con un PDF
-   armado: X3 de la auditoría) por su sucesor (`pypdf`), y revisar si
-   `python-jose` y `ecdsa`, con avisos de seguridad, siguen haciendo falta
-   para el token de sesión. MARIA-2 (Dev 2) ya
-cambió `upload_pdf_public` y está integrada en la rama de la PM: traela con
-`merge` antes de arrancar.
+2. Cambiar el lector de PDF viejo (`PyPDF2==3.0.1`, `pdf_extractor.py:800`,
+   que se cuelga con un PDF armado: X3 de la auditoría) por su sucesor
+   (`pypdf`), y revisar si `python-jose` y `ecdsa`, con avisos de seguridad,
+   siguen haciendo falta para el token de sesión.
+
+**Ojo con la Dev 2:** está en MARIA-1a sobre el mismo `pdf_extractor.py`,
+pero en la lectura del país y las cantidades (líneas ~2130-2370). Tocá sólo
+lo tuyo; si necesitás cambiar algo de esas líneas, dejá una D.
 
 **Criterios:** una prueba con dos pedidos al mismo tiempo, uno con una lectura
 lenta simulada, donde `/health` responde mientras tanto (rojo antes, verde
-después); el tiempo máximo con su error. Suite completa en verde.
+después); el tiempo máximo con su error; los PDF de las pruebas actuales se
+leen igual con `pypdf`. Suite completa en verde.

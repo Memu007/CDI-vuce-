@@ -61,11 +61,11 @@ MARIA-6 arranca cuando lleguen sus archivos reales.
 | Orden | Pieza | Qué arregla |
 |---|---|---|
 | ✅ | ADMIN-1 | Lo de administración, sólo para el admin (S2) |
-| 1 | ADMIN-2 | Lo que encontró en ADMIN-1 (activar una suscripción sin pagar, configuración del sistema a la vista, dos puntos ciegos de la prueba). En curso |
-| 2 | RENDIMIENTO-1 | Leer un PDF no frena el sitio y tiene un tiempo máximo; el lector de PDF viejo, que se cuelga con un PDF armado, se cambia por su sucesor (D3, X3) |
-| 3 | EXCEL-1 | Revisar la carga por Excel de punta a punta (nunca se auditó) y arreglar lo que falle |
-| 4 | MARIA-1b | Controles antes de generar: NCM del catálogo, moneda, incoterm, CUIT, montos; ningún texto mete líneas en el TXT (M10) |
-| 5 | PUNTA-A-PUNTA-1 | Prueba automática: sube un PDF y un Excel (Gemini simulado) y compara el TXT con los archivos reales |
+| ✅ | ADMIN-2 | Lo que encontró en ADMIN-1 (activar una suscripción sin pagar, configuración del sistema a la vista, dos puntos ciegos de la prueba) |
+| 1 | RENDIMIENTO-1 | Leer un PDF no frena el sitio y tiene un tiempo máximo; el lector de PDF viejo, que se cuelga con un PDF armado, se cambia por su sucesor (D3, X3) |
+| 2 | EXCEL-1 | Revisar la carga por Excel de punta a punta (nunca se auditó) y arreglar lo que falle |
+| 3 | MARIA-1b | Controles antes de generar: NCM del catálogo, moneda, incoterm, CUIT, montos; ningún texto mete líneas en el TXT (M10) |
+| 4 | PUNTA-A-PUNTA-1 | Prueba automática: sube un PDF y un Excel (Gemini simulado) y compara el TXT con los archivos reales |
 
 **Cierre:** publicar con el «dale»; Emi prueba con facturas reales; el
 despachante carga un archivo en su Kit (cierra G4).
@@ -74,9 +74,9 @@ despachante carga un archivo en su Kit (cierra G4).
 
 | Pieza | Quién | Qué arregla |
 |---|---|---|
-| COBRO-CORTE-1 | Dev 1 | Quien no paga no genera valor ni gasta Gemini; se cuenta una vez por operación; sin pasarse del tope (C1, C5, C6). Ya decidido: D4 (b, N = 10), D5 (a), D6 (a) de la Dev 1, en `PARA-DEV.md` |
-| COBRO-MP-1 | Dev 1 | Aviso de pago verificado, aplicado una vez, con el monto controlado (C3) |
-| COBRO-MP-2 | Dev 1 | Cancelar también en Mercado Pago, sin perder días pagados, una sola suscripción, reactivar pagando (C2, C4, C8) |
+| COBRO-MP-1 | Dev 1 | Aviso de pago verificado, aplicado una vez aunque se reenvíe, con el monto controlado (C3, D8 de la Dev 1). Va primero: es el único camino que hoy activa sin pagar |
+| COBRO-CORTE-1 | Dev 1 | Quien no paga no genera valor ni gasta Gemini; se cuenta una vez por operación; sin pasarse del tope (C1, C5, C6). Ya decidido: D4 (b, N = 10), D5 (a), D6 (a) de la Dev 1 (`PARA-DEV.md`) |
+| COBRO-MP-2 | Dev 1 | Cancelar también en Mercado Pago, sin perder días pagados, una sola suscripción, reactivar pagando (una prueba gratuita no pasa a activa); sin token de Mercado Pago, no decir «activada» (C2, C4, C8, D9 de la Dev 1) |
 | ORG-1 | Dev 2 | Invitaciones que funcionan, tope de usuarios del plan, atadas al email (C7) |
 | LEGAL-1 | Dev 2 | Términos y privacidad con el texto de Emi, y cómo pedir el borrado de datos (X5) |
 
@@ -88,7 +88,7 @@ despachante carga un archivo en su Kit (cierra G4).
 |---|---|---|
 | SESION-1 | Dev 1 | Cambiar o resetear la contraseña y cerrar sesión revocan de verdad; cambiar el email pide la contraseña (S3) |
 | ABUSO-1 | Dev 1 | Límite de intentos con la IP real; topes en registro, recuperar usuario, telemetría y sugerencias de NCM; no revelar qué emails existen (S4, S5, S6, C9, X1) |
-| AISLAMIENTO-2 | Dev 1 | La prueba de aislamiento ataca todas las funciones con datos de un estudio |
+| AISLAMIENTO-2 | Dev 1 | La prueba de aislamiento ataca todas las funciones con datos de un estudio; la de admin también ve WebSockets y las rutas `/api/admin` y `/dev` exactas, y `roles` siempre es lista (revisión de ADMIN-2) |
 | LIMPIEZA-1 | Dev 1 | Las 10 pruebas excluidas vuelven a la CI; se borra el camino viejo a Google Cloud; fuera las cadenas que pueden tener contraseñas (X2, X4) |
 | DATOS-1 | Dev 2 | Borrar un cliente siempre funciona; la salud dice la verdad; los errores no muestran detalles internos (D2, D5, D6) |
 | BACKUP-1 | Dev 2 | Copia de la base fuera de Railway, con una restauración probada (D1) |
