@@ -3959,6 +3959,10 @@ _FILA_QUE_NO_ES_MERCADERIA_RE = re.compile(
 )
 
 
+# La fila de ejemplo de la plantilla en blanco no es un producto (EXCEL-1).
+_FILA_DE_EJEMPLO_PLANTILLA = "Laptop 14 pulgadas modelo X"
+
+
 def extract_items_from_excel(df: pd.DataFrame, filename: str, descartes: list | None = None) -> list[Item]:
     """
     Extrae items de un DataFrame de Excel intentando diferentes formatos.
@@ -4056,6 +4060,8 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
 
             if _es_fila_de_total(descripcion or pieza):
                 continue  # fila de total o subtotal: no es un ítem
+            if descripcion.strip().lower() == _FILA_DE_EJEMPLO_PLANTILLA.lower():
+                continue  # la fila de ejemplo de la plantilla
 
             # Sin descripción ni NCM no hay ítem que mostrar: se avisa.
             if not pieza and not descripcion:
@@ -4751,6 +4757,56 @@ def _detect_item_columns(headers: list) -> dict:
                 mapping[norm_to_orig[alias]] = canon
                 break
     return mapping
+
+
+def _rango_de_alias(encabezado, canon: str):
+    """Lugar del encabezado en la lista de nombres conocidos de ese campo
+    (0 es el mejor), o None si no es un nombre conocido."""
+    texto = str(encabezado or "")
+    alias = _ITEM_COL_ALIASES.get(canon, [])
+    for forma in (texto, re.sub(r"[()]", "", texto), re.sub(r"\(.*?\)", "", texto)):
+        norm = _normalize_header(forma)
+        if norm in alias:
+            return alias.index(norm)
+    return None
+
+
+def _mapeo_efectivo(guardado: dict, detectado: dict, columnas: list) -> tuple:
+    """({columna: campo}, avisos) para leer este archivo, un campo por columna.
+
+    El mapeo guardado del cliente manda, salvo cuando su columna es un nombre
+    conocido de menor prioridad que la que se reconoció en el archivo: eso es
+    un mapeo aprendido con la lista vieja («Valor», «Peso»), no una corrección
+    («Precio Unit. USD», «Glosa»), y no pisa «Precio Unitario» ni «Peso Neto».
+    Dos columnas guardadas para el mismo campo no se adivinan por el orden:
+    queda la primera y se avisa (EXCEL-1).
+    """
+    presentes = set(columnas)
+    avisos: list = []
+    guardado_por_campo: dict = {}
+    for src, canon in (guardado or {}).items():
+        if canon not in _CANON_COLUMNS or src not in presentes:
+            continue
+        if canon in guardado_por_campo:
+            avisos.append(
+                f"El catálogo del cliente tiene dos columnas para «{canon}» "
+                f"(«{guardado_por_campo[canon]}» y «{src}»): se usó «{guardado_por_campo[canon]}». "
+                "Revisalo en el catálogo."
+            )
+            continue
+        guardado_por_campo[canon] = src
+    detectado_por_campo = {canon: src for src, canon in (detectado or {}).items()}
+    efectivo: dict = {}
+    for canon in _CANON_COLUMNS:
+        g, d = guardado_por_campo.get(canon), detectado_por_campo.get(canon)
+        elegido = g or d
+        if g and d and g != d:
+            rg, rd = _rango_de_alias(g, canon), _rango_de_alias(d, canon)
+            if rg is not None and rd is not None and rd < rg:
+                elegido = d
+        if elegido and elegido not in efectivo:
+            efectivo[elegido] = canon
+    return efectivo, avisos
 
 
 def _merge_column_mapping(existing: dict, detected: dict) -> dict:
@@ -6021,6 +6077,15 @@ async def set_client_catalogo_columnas(
     client = await _get_owned_client(db, client_id, user["username"])
     raw = body.get("columnas") if isinstance(body, dict) else None
     clean = _sanitize_column_mapping(raw or {})
+    # Dos columnas para el mismo campo no se guardan (EXCEL-1).
+    vistos: dict = {}
+    for src, canon in clean.items():
+        if canon in vistos:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Dos columnas para «{canon}»: «{vistos[canon]}» y «{src}». Dejá una sola.",
+            )
+        vistos[canon] = src
     client.column_mapping = clean or None
     await db.commit()
     await db.refresh(client)
@@ -6221,7 +6286,7 @@ async def download_client_template(
     # Fila de ejemplo para guiar al cliente
     sample_row = {
         headers[0]: "84713000",
-        headers[1]: "Laptop 14 pulgadas modelo X",
+        headers[1]: _FILA_DE_EJEMPLO_PLANTILLA,
         headers[2]: "CN",
         headers[3]: 10,
         headers[4]: 350.0,
@@ -6338,22 +6403,16 @@ async def upload_excel_v2(
         detected_mapping = _detect_item_columns(list(df.columns))
 
         # Aplicar mapping renombrando columnas a canonicas antes de extraer
-        # El mapeo guardado del cliente manda en las columnas que el archivo
-        # trae: el usuario lo puede corregir a mano en su catálogo. Lo que no
-        # cubre (encabezados nuevos) lo completa lo detectado (EXCEL-1).
-        presentes = set(df.columns)
-        effective_mapping: dict = {
-            src: canon for src, canon in (mapping or {}).items()
-            if canon in _CANON_COLUMNS and src in presentes
-        }
-        cubiertos = set(effective_mapping.values())
-        for src, canon in (detected_mapping or {}).items():
-            if canon not in cubiertos and src not in effective_mapping:
-                effective_mapping[src] = canon
-                cubiertos.add(canon)
+        effective_mapping, avisos_mapeo = _mapeo_efectivo(
+            mapping or {}, detected_mapping or {}, list(df.columns)
+        )
 
         if effective_mapping:
             rename = {src: canon for src, canon in effective_mapping.items() if canon in _CANON_COLUMNS}
+            # Si el archivo ya traía una columna con el nombre del campo y el
+            # mapeo eligió otra, esa sale antes de renombrar: no quedan dos
+            # columnas con el mismo nombre (daba 500) (EXCEL-1).
+            df = df.drop(columns=[c for c in df.columns if c in rename.values() and c not in rename])
             df = df.rename(columns=rename)
 
         descartes: list = []
@@ -6436,6 +6495,7 @@ async def upload_excel_v2(
             "filas_descartadas_numeros": descartes[:50],
             "operacion": operacion,
             "applied_mapping": bool(effective_mapping),
+            "avisos_mapeo": avisos_mapeo,
             "catalogo": catalogo_info,
         }
     except LecturaPdfDemasiadoLarga as e:

@@ -266,7 +266,9 @@ test_excel_upload() {
     FAKE_EXCEL="${TEMP_DIR}/malicious.xlsx"
     echo "This is not a real Excel file" > "${FAKE_EXCEL}"
 
-    RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${BASE_URL}/upload_excel" \
+    # La única ruta de Excel es /upload_excel_v2/ (EXCEL-1 borró /upload_excel)
+    # y pide sesión: sin sesión se rechaza antes de mirar el archivo.
+    RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "${BASE_URL}/upload_excel_v2/" \
         -F "file=@${FAKE_EXCEL}" \
         -F "client_id=1")
 
@@ -274,7 +276,9 @@ test_excel_upload() {
     BODY=$(echo "$RESPONSE" | sed '$d')
 
     # Debe rechazar el archivo fake
-    if [ "$HTTP_CODE" = "400" ] || echo "$BODY" | grep -qi "invalid.*file"; then
+    if [ "$HTTP_CODE" = "401" ] || [ "$HTTP_CODE" = "403" ]; then
+        test_passed "Excel upload without session rejected ($HTTP_CODE)"
+    elif [ "$HTTP_CODE" = "400" ] || echo "$BODY" | grep -qi "invalid.*file"; then
         test_passed "Malicious Excel upload rejected (MIME validation)"
     elif [ "$HTTP_CODE" = "200" ] && echo "$BODY" | grep -q '"success".*false'; then
         test_passed "Malicious Excel upload rejected in response"

@@ -372,6 +372,9 @@
             // este mismo aviso final (la pantalla muestra uno a la vez) y queda
             // en el semáforo hasta que lo descarta (EXCEL-1, MARIA-1b).
             if (CDI.avisosDelExcel) sinLeer.unshift.apply(sinLeer, CDI.avisosDelExcel());
+            if (currentFormat === 'excel' && data && Array.isArray(data.avisos_mapeo)) {
+                sinLeer.unshift.apply(sinLeer, data.avisos_mapeo);
+            }
             if (sinLeer.length && CDI.toast) {
                 CDI.toast('Revisá la factura', sinLeer.join(' '), 'warning');
             }

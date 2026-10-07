@@ -165,6 +165,23 @@ class ExcelDemasiadoGrande(Exception):
     """El .xlsx descomprimido pasa de EXCEL_MAX_DESCOMPRIMIDO_MB."""
 
 
+# Validar un Excel usa su propio grupo de hilos: muchas subidas pesadas no le
+# quitan los hilos compartidos al resto (sugerir NCM, validar PDF) (EXCEL-1).
+_POOL_VALIDAR_EXCEL = None
+
+
+def _pool_validar_excel():
+    global _POOL_VALIDAR_EXCEL
+    if _POOL_VALIDAR_EXCEL is None:
+        from concurrent.futures import ThreadPoolExecutor
+        try:
+            hilos = max(1, int(os.getenv("EXCEL_VALIDATE_WORKERS", "2")))
+        except (TypeError, ValueError):
+            hilos = 2
+        _POOL_VALIDAR_EXCEL = ThreadPoolExecutor(hilos, thread_name_prefix="validar-excel")
+    return _POOL_VALIDAR_EXCEL
+
+
 def _abrir_excel(contents: bytes, file_ext: str) -> int:
     """Mira cuánto ocupa descomprimido y recién entonces cuenta las hojas.
     Corre en otro hilo: un zip con miles de entradas también tarda (EXCEL-1)."""
@@ -298,7 +315,9 @@ async def validate_file_upload(
             import asyncio
             try:
                 hojas = await asyncio.wait_for(
-                    asyncio.to_thread(_abrir_excel, contents, file_ext),
+                    asyncio.get_running_loop().run_in_executor(
+                        _pool_validar_excel(), _abrir_excel, contents, file_ext
+                    ),
                     timeout=_pdf_validate_timeout_s(),
                 )
             except ExcelDemasiadoGrande:
