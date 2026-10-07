@@ -3379,34 +3379,177 @@ def _leer_excel_ruta(ruta: str, engine: str):
     return pd.read_excel(ruta, engine=engine, dtype=object).dropna(how="all")
 
 
-def _otras_hojas_con_datos(ruta: str, engine: str) -> list:
-    """Nombres de las hojas, después de la primera, que tienen algún dato en
-    sus primeras 1000 filas. Sólo se lee la primera: las demás se avisan
-    (MARIA-1b, D18)."""
-    nombres = []
+# Mirar las otras hojas es sólo un aviso, y tiene su propio presupuesto que
+# corta la lectura misma, no sólo la espera: un libro armado (miles de celdas
+# que apuntan a un texto enorme en blanco) trababa el hilo minutos aunque la
+# subida ya hubiera seguido (devolución de MARIA-1b). Se lee el XML de cada
+# hoja directo del .xlsx, contando bytes y tiempo.
+_HOJAS_MAX = 50
+_HOJAS_FILAS = 1000
+_HOJAS_COLUMNAS = 60
+_HOJAS_BYTES_POR_HOJA = 4 * 2**20
+_HOJAS_BYTES_TOTAL = 16 * 2**20
+_HOJAS_SEGUNDOS = 3.0
+
+
+class _SeAcaboElPresupuesto(Exception):
+    pass
+
+
+class _LecturaMedida:
+    """Un archivo del .xlsx que corta la lectura al pasarse de bytes o de
+    tiempo: el que lo lee (iterparse) se frena en la próxima lectura."""
+
+    def __init__(self, archivo, presupuesto: dict, tope_propio: int):
+        self._archivo = archivo
+        self._presupuesto = presupuesto
+        self._tope_propio = tope_propio
+        self._leidos = 0
+
+    def read(self, n: int = -1) -> bytes:
+        import time as _time
+        if _time.monotonic() > self._presupuesto["hasta"]:
+            raise _SeAcaboElPresupuesto("tiempo")
+        trozo = self._archivo.read(64 * 1024 if n is None or n < 0 else min(n, 64 * 1024))
+        self._leidos += len(trozo)
+        self._presupuesto["bytes"] += len(trozo)
+        if self._leidos > self._tope_propio or self._presupuesto["bytes"] > _HOJAS_BYTES_TOTAL:
+            raise _SeAcaboElPresupuesto("bytes")
+        return trozo
+
+
+def _hojas_del_xlsx(z) -> list:
+    """[(nombre, ruta dentro del zip)] en el orden del libro."""
+    import posixpath
+    from xml.etree import ElementTree as ET
+    ns_main = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    ns_rel = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+    for parte in ("xl/workbook.xml", "xl/_rels/workbook.xml.rels"):
+        if z.getinfo(parte).file_size > 2**20:
+            raise _SeAcaboElPresupuesto("índice del libro")
+    destinos = {}
+    for r in ET.fromstring(z.read("xl/_rels/workbook.xml.rels")):
+        destino = r.get("Target") or ""
+        destino = destino.lstrip("/") if destino.startswith("/") else posixpath.normpath(posixpath.join("xl", destino))
+        destinos[r.get("Id")] = destino
+    hojas = []
+    for h in ET.fromstring(z.read("xl/workbook.xml")).iter(f"{ns_main}sheet"):
+        hojas.append((h.get("name") or "", destinos.get(h.get(f"{ns_rel}id"), "")))
+    return hojas
+
+
+def _textos_compartidos(z, presupuesto: dict) -> list:
+    """Por cada texto compartido del libro, si tiene algo que no sea blanco.
+    Si el presupuesto no alcanza, la lista queda corta."""
+    from xml.etree import ElementTree as ET
+    ns = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    llenos: list = []
+    if "xl/sharedStrings.xml" not in z.namelist():
+        return llenos
+    try:
+        with z.open("xl/sharedStrings.xml") as f:
+            medido = _LecturaMedida(f, presupuesto, _HOJAS_BYTES_TOTAL)
+            for _, el in ET.iterparse(medido, events=("end",)):
+                if el.tag == f"{ns}si":
+                    llenos.append(any((t.text or "").strip() for t in el.iter(f"{ns}t")))
+                    el.clear()
+    except _SeAcaboElPresupuesto:
+        pass
+    return llenos
+
+
+def _hoja_xlsx_tiene_datos(z, ruta: str, presupuesto: dict, compartidos) -> bool:
+    """Si la hoja tiene algún dato en sus primeras filas y columnas. Levanta
+    _SeAcaboElPresupuesto si no se pudo terminar de mirar."""
+    import re as _re
+    from xml.etree import ElementTree as ET
+    ns = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
+    with z.open(ruta) as f:
+        medido = _LecturaMedida(f, presupuesto, _HOJAS_BYTES_POR_HOJA)
+        for _, el in ET.iterparse(medido, events=("end",)):
+            if el.tag == f"{ns}row":
+                el.clear()
+                continue
+            if el.tag != f"{ns}c":
+                continue
+            m = _re.match(r"([A-Z]+)(\d+)$", el.get("r") or "")
+            if m:
+                columna = 0
+                for letra in m.group(1):
+                    columna = columna * 26 + ord(letra) - 64
+                if int(m.group(2)) > _HOJAS_FILAS:
+                    return False
+                if columna > _HOJAS_COLUMNAS:
+                    el.clear()
+                    continue
+            tipo = el.get("t")
+            if tipo == "inlineStr":
+                lleno = any((t.text or "").strip() for t in el.iter(f"{ns}t"))
+            else:
+                v = el.find(f"{ns}v")
+                texto = (v.text or "").strip() if v is not None else ""
+                if tipo == "s" and texto:
+                    lista = compartidos()
+                    i = int(texto) if texto.isdigit() else -1
+                    if not 0 <= i < len(lista):
+                        raise _SeAcaboElPresupuesto("textos compartidos")
+                    lleno = lista[i]
+                else:
+                    lleno = bool(texto)
+            el.clear()
+            if lleno:
+                return True
+    return False
+
+
+def _otras_hojas_con_datos(ruta: str, engine: str) -> tuple[list, bool]:
+    """(nombres de las hojas, después de la primera, que tienen algún dato en
+    sus primeras 1000 filas y 60 columnas; si se pudieron mirar todas). Sólo
+    se lee la primera: las demás se avisan (MARIA-1b, D18)."""
+    import time as _time
+    presupuesto = {"hasta": _time.monotonic() + _HOJAS_SEGUNDOS, "bytes": 0}
+    nombres: list = []
     if engine == "openpyxl":
-        import openpyxl
-        wb = openpyxl.load_workbook(ruta, read_only=True)
-        try:
-            for ws in wb.worksheets[1:51]:
-                for fila in ws.iter_rows(max_row=1000, max_col=60, values_only=True):
-                    if any(v is not None and str(v).strip() for v in fila):
-                        nombres.append(ws.title)
+        import zipfile
+        with zipfile.ZipFile(ruta) as z:
+            try:
+                hojas = _hojas_del_xlsx(z)
+            except (_SeAcaboElPresupuesto, KeyError):
+                return nombres, False
+            completo = len(hojas) <= _HOJAS_MAX + 1
+            cache: list = []
+
+            def compartidos():
+                if not cache:
+                    cache.append(_textos_compartidos(z, presupuesto))
+                return cache[0]
+
+            for nombre, parte in hojas[1:_HOJAS_MAX + 1]:
+                try:
+                    if parte in z.namelist() and _hoja_xlsx_tiene_datos(z, parte, presupuesto, compartidos):
+                        nombres.append(nombre)
+                except _SeAcaboElPresupuesto:
+                    completo = False
+                    if _time.monotonic() > presupuesto["hasta"] or presupuesto["bytes"] > _HOJAS_BYTES_TOTAL:
                         break
-        finally:
-            wb.close()
-        return nombres
+        return nombres, completo
     import xlrd
     libro = xlrd.open_workbook(ruta, on_demand=True)
+    completo = libro.nsheets <= _HOJAS_MAX + 1
     try:
-        for i in range(1, min(libro.nsheets, 51)):
+        for i in range(1, min(libro.nsheets, _HOJAS_MAX + 1)):
+            if _time.monotonic() > presupuesto["hasta"]:
+                return nombres, False
             hoja = libro.sheet_by_index(i)
-            if any(str(v).strip() for f in range(min(hoja.nrows, 1000))
-                   for v in hoja.row_values(f, end_colx=min(hoja.ncols, 60))):
-                nombres.append(hoja.name)
+            for f in range(min(hoja.nrows, _HOJAS_FILAS)):
+                if _time.monotonic() > presupuesto["hasta"]:
+                    return nombres, False
+                if any(str(v).strip() for v in hoja.row_values(f, end_colx=min(hoja.ncols, _HOJAS_COLUMNAS))):
+                    nombres.append(hoja.name)
+                    break
     finally:
         libro.release_resources()
-    return nombres
+    return nombres, completo
 
 
 # Una factura no trae miles de productos: más filas que esto se rechaza con un
@@ -3482,9 +3625,16 @@ async def smart_validation(body: dict, user=Depends(get_current_user)):
         if not items_data:
             return {"success": False, "detail": "No hay items para validar"}
         
-        # Convertir a objetos Item
+        # Convertir a objetos Item. NaN o infinito pasan a 0 para el análisis
+        # (si no, la respuesta no se puede escribir y da 500); el control de
+        # MARIA-1b los marca como error con los valores que vinieron.
+        from proyecto_maria.core.controles_maria import _no_finito
+        numericos = ("cantidad", "valor_unitario", "valor_total", "peso_unitario", "peso_kg")
         items = []
         for item_dict in items_data:
+            if isinstance(item_dict, dict):
+                item_dict = {k: (0.0 if k in numericos and _no_finito(v) else v)
+                             for k, v in item_dict.items()}
             try:
                 items.append(Item(**item_dict))
             except Exception as e:
@@ -3954,7 +4104,19 @@ async def generate_maria_export_endpoint(
             generate_maria_export_txt,
             validate_items_for_export,
         )
-        
+        from proyecto_maria.core.controles_maria import CAMPOS_DE_TEXTO_DEL_ITEM, limpiar_texto
+
+        # Ningún texto mete saltos de línea ni «=» en el TXT, como en
+        # /generate_maria (M10; D22 de MARIA-1b).
+        for _campo, _valor in request.model_dump().items():
+            if isinstance(_valor, str):
+                setattr(request, _campo, limpiar_texto(_valor))
+        request.items = [
+            {k: (limpiar_texto(v) if k in CAMPOS_DE_TEXTO_DEL_ITEM else v) for k, v in it.items()}
+            if isinstance(it, dict) else it
+            for it in (request.items or [])
+        ]
+
         # Validar items
         valid, errors = validate_items_for_export(request.items)
         
@@ -6491,17 +6653,17 @@ async def upload_excel_v2(
             limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
         )
 
-        # Mirar las otras hojas es sólo un aviso: si tarda o falla, la subida
-        # sigue sin él (MARIA-1b). Con 60 columnas y 1000 filas por hoja, y
-        # como mucho 50 hojas.
+        # Mirar las otras hojas es sólo un aviso: si no alcanza su presupuesto
+        # o falla, la subida sigue y el semáforo dice que no se revisaron
+        # todas (MARIA-1b y su devolución).
         try:
-            otras_hojas = await _leer_pdf_aparte(
+            otras_hojas, hojas_revisadas = await _leer_pdf_aparte(
                 _otras_hojas_con_datos, temp_filename, engine,
                 limite=min(10.0, _excel_read_timeout_s()), que="el Excel", pool=_pool_lectura_excel(),
             )
         except Exception as e:
             logging.warning("upload_excel_v2: no se pudieron mirar las otras hojas: %s", e)
-            otras_hojas = []
+            otras_hojas, hojas_revisadas = [], False
 
         if len(df) > _MAX_FILAS_EXCEL:
             raise HTTPException(
@@ -6595,6 +6757,9 @@ async def upload_excel_v2(
             operacion["filas_excel_sin_leer_total"] = len(descartes)
         if otras_hojas:
             operacion["hojas_excel_sin_leer"] = otras_hojas[:20]
+        if not hojas_revisadas:
+            # Que no quede sólo en el log: el semáforo lo dice (devolución).
+            operacion["hojas_excel_sin_revisar"] = True
 
         return {
             "message": "Excel procesado exitosamente",

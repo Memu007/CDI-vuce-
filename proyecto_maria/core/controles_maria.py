@@ -5,17 +5,18 @@ advertencia. No cambian lo que sale en el TXT: sólo cuándo se puede generar.
 Los usan `/generate_maria` (frena con 400) y `/api/validate/smart` (el
 semáforo y la pantalla de generar los muestran antes).
 """
+import math
 import re
 
-from proyecto_maria.core.maria_generator import _INCOTERMS_GRUPO_C_D, INCOTERMS_VALIDOS
+from proyecto_maria.core.maria_generator import _INCOTERMS_GRUPO_C_D, INCOTERMS_VALIDOS, importe_valido
 
 # Los que acepta el generador, más FAS (la pantalla lo ofrece) y los de 2000
 # y 2010 que el generador todavía reconoce (DAT, DAF, DES, DEQ, DDU).
 INCOTERMS_ACEPTADOS = INCOTERMS_VALIDOS | _INCOTERMS_GRUPO_C_D | {"FAS"}
 
-# Monedas habituales en despachos, con el código de MARIA (el dólar es DOL).
-# Es la misma lista que la pantalla de revisión (review.js, MONEDA_WHITELIST).
-MONEDAS_HABITUALES = {"DOL", "EUR", "BRL", "ARS", "CLP", "UYU", "GBP", "JPY", "CNY"}
+# La única moneda confirmada con un archivo real es DOL: las demás avisan
+# hasta que el despachante confirme sus códigos (devolución de MARIA-1b).
+MONEDAS_CONFIRMADAS = {"DOL"}
 
 # Campos de texto de la cabecera que van tal cual a una línea «CLAVE=valor».
 CAMPOS_DE_TEXTO = (
@@ -49,7 +50,9 @@ def cuit_valido(cuit) -> bool:
     """11 dígitos con el dígito verificador de ARCA (igual que la pantalla,
     review.js validateCuitAR)."""
     norm = re.sub(r"[-\s]", "", str(cuit or ""))
-    if not re.fullmatch(r"\d{11}", norm):
+    # Sólo 0-9: «\d» acepta dígitos de ancho completo o arábigos, y el TXT
+    # los escribiría tal cual (devolución de MARIA-1b).
+    if not re.fullmatch(r"[0-9]{11}", norm):
         return False
     pesos = (5, 4, 3, 2, 7, 6, 5, 4, 3, 2)
     resto = sum(int(d) * p for d, p in zip(norm[:10], pesos)) % 11
@@ -57,13 +60,25 @@ def cuit_valido(cuit) -> bool:
     return esperado == int(norm[10])
 
 
-def _numero(valor):
-    if valor is None or (isinstance(valor, str) and not valor.strip()):
-        return None
+def _no_finito(valor) -> bool:
+    """NaN o infinito: `nan <= 0` es falso, así que pasaba el control de
+    siempre y llegaba al TXT como «nan» (devolución de MARIA-1b)."""
     try:
-        return float(valor)
+        return not math.isfinite(float(valor))
     except (TypeError, ValueError):
-        return None
+        return False
+
+
+# Mismo texto que el control de siempre (validate_items_for_maria).
+_MONTOS_DEL_ITEM = (
+    (("cantidad",), "Cantidad inválida"),
+    (("valor_unitario", "valor_total"), "Valor inválido"),
+    (("peso_kg", "peso_unitario"), "Peso inválido"),
+)
+_IMPORTES_DE_LA_CABECERA = (
+    ("flete", "Flete"), ("seguro", "Seguro"),
+    ("gastos_fob", "Gastos (gastos_fob)"), ("gastos_anteriores_fob", "Gastos (gastos_anteriores_fob)"),
+)
 
 
 _CODIGOS = None
@@ -120,6 +135,9 @@ def controles_antes_de_generar(items, cabecera: dict) -> tuple[list, list]:
         if not isinstance(item, dict):
             continue
         _control_ncm(item.get("ncm") or item.get("pieza"), n, errores, advertencias)
+        for campos, mensaje in _MONTOS_DEL_ITEM:
+            if any(_no_finito(item.get(c)) for c in campos):
+                errores.append(f"Item {n}: {mensaje}")
 
     moneda = str(cabecera.get("moneda") or "").strip().upper()
     if not moneda:
@@ -128,10 +146,10 @@ def controles_antes_de_generar(items, cabecera: dict) -> tuple[list, list]:
         errores.append("La moneda «USD» en MARIA se escribe «DOL».")
     elif not re.fullmatch(r"[A-Z]{3}", moneda):
         errores.append(f"La moneda «{moneda}» no es un código de 3 letras.")
-    elif moneda not in MONEDAS_HABITUALES:
+    elif moneda not in MONEDAS_CONFIRMADAS:
         advertencias.append(
-            f"La moneda «{moneda}» no es una de las habituales "
-            f"({', '.join(sorted(MONEDAS_HABITUALES))}). Revisá el código."
+            f"La moneda «{moneda}»: sólo DOL está confirmada con un archivo real. "
+            "Confirmá con el despachante que ése es el código de MARIA."
         )
 
     incoterm = str(cabecera.get("incoterm") or "").strip().upper()
@@ -153,9 +171,14 @@ def controles_antes_de_generar(items, cabecera: dict) -> tuple[list, list]:
             "dígitos y el dígito verificador correcto."
         )
 
-    for campo, nombre in (("flete", "flete"), ("seguro", "seguro")):
-        valor = _numero(cabecera.get(campo))
-        if valor is not None and valor < 0:
-            errores.append(f"El {nombre} no puede ser negativo ({valor:g}).")
+    # Negativos, NaN, infinitos o absurdos: el mismo error que el generador.
+    for campo, nombre in _IMPORTES_DE_LA_CABECERA:
+        valor = cabecera.get(campo)
+        if valor is None or (isinstance(valor, str) and not valor.strip()):
+            continue
+        try:
+            importe_valido(valor, nombre)
+        except ValueError as e:
+            errores.append(str(e))
 
     return errores, advertencias

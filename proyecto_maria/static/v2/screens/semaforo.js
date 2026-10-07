@@ -86,6 +86,13 @@
                     hojas.join(', ') + '). Sólo se lee la primera: si hay productos ahí, cargalos a mano.'
             });
         }
+        if (op.hojas_excel_sin_revisar && descartados.indexOf('hojas_sin_revisar') === -1) {
+            avisos.push({
+                clave: 'hojas_sin_revisar',
+                texto: 'No se revisaron todas las hojas del libro. Sólo se lee la primera: ' +
+                    'si hay productos en otra hoja, cargalos a mano.'
+            });
+        }
         return avisos;
     }
     CDI.avisosDelExcel = function () {
