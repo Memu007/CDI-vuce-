@@ -113,5 +113,10 @@ caso vacio_como_texto "${T}test_el_vacio_escrito_como_texto_queda_vacio[None-pdf
 reemplazar $X "                            descripcion = _texto(item_data.get('descripcion'))" "                            descripcion = item_data.get('descripcion', '')"
 caso descripcion_numero "${T}test_una_descripcion_que_no_es_texto_no_tira_el_producto[pymupdf]"
 
+# 8. los avisos previos no dicen la procedencia rara de un producto
+reemplazar $M '    return {"avisos": errores_de_procedencia(items) + kit_warnings + supuestos, "supuestos": supuestos}' \
+  '    return {"avisos": kit_warnings + supuestos, "supuestos": supuestos}'
+caso procedencia_rara_sin_aviso "${T}test_procedencia_rara_de_un_producto_avisa_igual_antes_y_al_generar["
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 7 sabotajes dan rojo por la razón esperada"
+echo "OK: los 8 sabotajes dan rojo por la razón esperada"

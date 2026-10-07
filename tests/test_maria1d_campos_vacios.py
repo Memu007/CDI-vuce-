@@ -125,3 +125,20 @@ def test_el_prompt_no_pide_adivinar_la_moneda():
     import pathlib
     texto = (pathlib.Path(__file__).resolve().parents[1] / "proyecto_maria" / "pdf_extractor.py").read_text()
     assert "Ante duda, DOL" not in texto
+
+
+@pytest.mark.parametrize("valor", ["²", "99999", "٢٢٢", "Narnia"])
+@pytest.mark.parametrize("clave", ["pais_procedencia", "procedencia"])
+def test_procedencia_rara_de_un_producto_avisa_igual_antes_y_al_generar(client, auth_override, valor, clave):
+    """Veredicto de MARIA-3: antes daba 200 sin aviso en /avisos y 400 al
+    generar. El mismo texto en los dos."""
+    item = dict(ITEM_BASE, estado=2, **{clave: valor})
+    cuerpo = {"operation_id": "OP1", "items": [item], "fecha_emision": "22/06/2026",
+              "sbt_sufijo_valor": SUF_A, "comprador_cuit": "30999999990"}
+    r = client.post("/generate_maria", json=cuerpo)
+    assert r.status_code == 400, r.text
+    errores = r.json()["detail"]["errors"]
+    mensaje = [e for e in errores if "Procedencia" in e]
+    assert mensaje, errores
+    avisos = client.post("/generate_maria/avisos", json=cuerpo).json()["avisos"]
+    assert mensaje[0] in avisos, avisos
