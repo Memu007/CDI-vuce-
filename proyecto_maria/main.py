@@ -3861,12 +3861,38 @@ async def generate_maria_export_endpoint(
         print(f"Error generando MARIA EXPORT TXT: {e}")
         raise HTTPException(status_code=500, detail=f"Error generando archivo MARIA export: {str(e)}")
 
-# Una fila de total dice sólo eso: «TOTAL», «Subtotal 8471.30.00», «Total
-# general:». Un producto que empieza con «Total» («TOTAL QUARTZ 9000», «Total
-# Station») sigue de largo (EXCEL-1).
-_FILA_DE_TOTAL_RE = re.compile(
-    r"^\s*(?:sub\s*-?\s*total(?:es)?|total(?:es)?(?:\s+general)?|grand\s+total)"
-    r"[\s\d.,:;/-]*$",
+# Una fila de total dice sólo eso: una palabra de total («TOTAL», «Subtotal»,
+# «Totale», «Summe», «Gesamt», «合计») y, como mucho, palabras de monto,
+# moneda o incoterm y números: «TOTAL USD», «Total FOB», «TOTAL (USD)»,
+# «TOTAL AMOUNT», «Subtotal 8471.30.00». Un producto que empieza con «Total»
+# («TOTAL QUARTZ 9000», «Total Station») sigue de largo (EXCEL-1). Se parte
+# en palabras y no con una expresión regular: un texto armado no la traba.
+_PALABRAS_DE_TOTAL = {
+    "total", "totales", "totale", "subtotal", "subtotales", "grandtotal",
+    "summe", "gesamt", "gesamtbetrag", "gesamtsumme",
+    "合计", "合計", "总计", "總計", "小计", "小計",
+}
+_PALABRAS_DE_MONTO = {
+    "sub", "grand", "general", "amount", "value", "valor", "importe", "monto",
+    "sum", "invoice", "factura", "price", "precio",
+    "fob", "cif", "cfr", "cpt", "cip", "exw", "fca", "fas", "dap", "dpu", "ddp",
+    "usd", "us$", "u$s", "eur", "cny", "rmb", "ars", "$", "€", "¥",
+    "de", "del", "la", "el", "the", "of", "in", "en",
+}
+
+
+def _es_fila_de_total(texto: str) -> bool:
+    palabras = [p for p in re.split(r"[\s\d.,:;/()\[\]\-]+", (texto or "").lower()) if p]
+    return (any(p in _PALABRAS_DE_TOTAL for p in palabras)
+            and all(p in _PALABRAS_DE_TOTAL or p in _PALABRAS_DE_MONTO for p in palabras))
+
+
+# Renglones de la factura que no son mercadería: flete, seguro, condiciones de
+# pago, gastos. Sin NCM ni origen no entran como producto (sumarían al FOB) y
+# se cuentan en el aviso de filas sin leer (EXCEL-1).
+_FILA_QUE_NO_ES_MERCADERIA_RE = re.compile(
+    r"^\s*(?:freight|flete|insurance|seguro|payment|pago|bank\s+charges?|gastos"
+    r"|handling|shipping\s+(?:cost|charges?)|incoterm|delivery\s+terms?)\b",
     re.IGNORECASE,
 )
 
@@ -3966,7 +3992,7 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             pieza = _texto_de_celda(row[pieza_col])
             descripcion = _texto_de_celda(row[desc_col])
 
-            if _FILA_DE_TOTAL_RE.match(descripcion or pieza):
+            if _es_fila_de_total(descripcion or pieza):
                 continue  # fila de total o subtotal: no es un ítem
 
             # Sin descripción ni NCM no hay ítem que mostrar: se avisa.
@@ -3999,12 +4025,11 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             descartes.append(_ + 2)
             continue
 
-    # Si la planilla trae NCM u origen en sus productos, una fila sin ninguno
-    # de los dos («FOB TOTAL», «Freight», «Payment terms») no es un producto:
-    # sumarla duplicaría el FOB. No entra y se avisa (EXCEL-1).
-    usa_ncm_u_origen = any(trae for _fila, trae, _item in candidatos)
+    # Flete, seguro o condiciones de pago sin NCM ni origen no son mercadería:
+    # no entran (sumarían al FOB) y se avisan. Cualquier otra fila sin NCM ni
+    # origen sí entra, con lo que falta vacío (EXCEL-1).
     for fila, trae, item in candidatos:
-        if usa_ncm_u_origen and not trae:
+        if not trae and _FILA_QUE_NO_ES_MERCADERIA_RE.match(item.descripcion or ""):
             descartes.append(fila)
         else:
             items.append(item)
@@ -4644,8 +4669,19 @@ def _detect_item_columns(headers: list) -> dict:
     y con `upload_excel_v2`.
     """
     # «Precio Unitario (USD)» o «Peso Neto (kg)»: la unidad entre paréntesis
-    # no es parte del nombre de la columna (EXCEL-1).
-    norm_to_orig = {_normalize_header(re.sub(r"\(.*?\)", "", str(h or ""))): h for h in headers}
+    # no es parte del nombre de la columna (EXCEL-1). Pero si sin paréntesis
+    # dos columnas se llaman igual («Peso (neto)» y «Peso (bruto)»), se las
+    # busca por el nombre entero y nunca se elige una por el orden.
+    norm_to_orig: dict = {}
+    sin_parentesis: dict = {}
+    for h in headers:
+        norm_to_orig.setdefault(_normalize_header(str(h or "")), h)
+        # «Peso (neto)» se busca también como «pesoneto».
+        norm_to_orig.setdefault(_normalize_header(re.sub(r"[()]", "", str(h or ""))), h)
+        sin_parentesis.setdefault(_normalize_header(re.sub(r"\(.*?\)", "", str(h or ""))), []).append(h)
+    for norm, originales in sin_parentesis.items():
+        if len(originales) == 1:
+            norm_to_orig.setdefault(norm, originales[0])
     mapping: dict[str, str] = {}
     for canon, aliases in _ITEM_COL_ALIASES.items():
         for alias in aliases:
@@ -6233,20 +6269,17 @@ async def upload_excel_v2(
         detected_mapping = _detect_item_columns(list(df.columns))
 
         # Aplicar mapping renombrando columnas a canonicas antes de extraer
-        # Lo detectado en este archivo manda: elige la mejor columna de cada
-        # dato (Precio Unitario antes que Valor, Peso Neto y nunca el bruto).
-        # El mapeo guardado del cliente completa lo que no se detectó, con
-        # columnas que el archivo trae. Así un mapeo guardado con la lista de
-        # nombres vieja no gana sobre el precio unitario (EXCEL-1).
+        # El mapeo guardado del cliente manda en las columnas que el archivo
+        # trae: el usuario lo puede corregir a mano en su catálogo. Lo que no
+        # cubre (encabezados nuevos) lo completa lo detectado (EXCEL-1).
         presentes = set(df.columns)
         effective_mapping: dict = {
-            src: canon for src, canon in (detected_mapping or {}).items()
-            if canon in _CANON_COLUMNS
+            src: canon for src, canon in (mapping or {}).items()
+            if canon in _CANON_COLUMNS and src in presentes
         }
         cubiertos = set(effective_mapping.values())
-        for src, canon in (mapping or {}).items():
-            if (canon in _CANON_COLUMNS and canon not in cubiertos
-                    and src in presentes and src not in effective_mapping):
+        for src, canon in (detected_mapping or {}).items():
+            if canon not in cubiertos and src not in effective_mapping:
                 effective_mapping[src] = canon
                 cubiertos.add(canon)
 

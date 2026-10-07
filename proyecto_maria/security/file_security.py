@@ -161,6 +161,18 @@ def _excel_descomprimido_bytes(contents: bytes) -> int:
         return sum(info.file_size for info in z.infolist())
 
 
+class ExcelDemasiadoGrande(Exception):
+    """El .xlsx descomprimido pasa de EXCEL_MAX_DESCOMPRIMIDO_MB."""
+
+
+def _abrir_excel(contents: bytes, file_ext: str) -> int:
+    """Mira cuánto ocupa descomprimido y recién entonces cuenta las hojas.
+    Corre en otro hilo: un zip con miles de entradas también tarda (EXCEL-1)."""
+    if file_ext == '.xlsx' and _excel_descomprimido_bytes(contents) > _excel_max_descomprimido_bytes():
+        raise ExcelDemasiadoGrande()
+    return _contar_hojas_excel(contents, file_ext)
+
+
 def _pdf_validate_timeout_s() -> float:
     """Mal escrito, en 0 o negativo, vale 30 s (RENDIMIENTO-1b)."""
     import math
@@ -284,16 +296,16 @@ async def validate_file_upload(
             # Abrir el Excel es sincrónico: va en otro hilo y con tiempo máximo,
             # para que un archivo pesado no frene al resto (EXCEL-1).
             import asyncio
-            if file_ext == '.xlsx' and _excel_descomprimido_bytes(contents) > _excel_max_descomprimido_bytes():
+            try:
+                hojas = await asyncio.wait_for(
+                    asyncio.to_thread(_abrir_excel, contents, file_ext),
+                    timeout=_pdf_validate_timeout_s(),
+                )
+            except ExcelDemasiadoGrande:
                 raise HTTPException(
                     400,
                     "El Excel es demasiado grande descomprimido. Probá con una planilla "
                     "con menos datos o cargá los productos a mano.",
-                )
-            try:
-                hojas = await asyncio.wait_for(
-                    asyncio.to_thread(_contar_hojas_excel, contents, file_ext),
-                    timeout=_pdf_validate_timeout_s(),
                 )
             except asyncio.TimeoutError:
                 raise HTTPException(
