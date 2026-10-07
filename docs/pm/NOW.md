@@ -15,13 +15,16 @@ commits sin publicar. **Rama de PM:** `claude/practical-shannon-szpwkn`.
    repositorio cuando era público. Pasarlo a privado no la invalida. En Google
    AI Studio: borrar las dos claves que aparecieron, crear una nueva y ponerla
    sólo en las variables de Railway. Mirar la facturación de Google. (G0)
-2. **Aprobar, corregir o rechazar el roadmap** (`ROADMAP.md`). Sin eso, la Dev
-   no arranca.
+2. **Aprobar, corregir o rechazar el roadmap** (`ROADMAP.md`, versión del
+   2026-10-07). Sin eso, la Dev no arranca. Decide también una o dos Devs y
+   la publicación de ensayo.
 3. **Mandar las preguntas al despachante** (`PREGUNTAS-DESPACHANTE.md`).
 4. **Antes de la primera publicación:** confirmar en Railway que estén
    `DATABASE_URL` y `ENVIRONMENT=production`, y que el Postgres tenga backup.
    Recomendación: apagar la red pública de la base, porque la app usa la
-   interna.
+   interna, y prender «Wait for CI» para que no se publique con pruebas en
+   rojo. Decir si CDI usa Google Cloud (hay un segundo camino de publicación
+   en el repositorio).
 5. **Decidido por la PM, se puede revertir:** los límites del proyecto
    (`ONBOARDING-PM.md`) y que las reglas nuevas lleguen a `main` con la
    primera publicación. Hasta entonces, en `main` sigue la regla vieja que
@@ -45,9 +48,8 @@ Archivos abiertos por Dev: (ninguno).
 
 ## En curso
 
-- PM: **pedido de Emi (2026-10-06): armar un roadmap de todo lo que se puede
-  hacer mientras llegan las respuestas del despachante**, para que lo apruebe.
-  Base: `ROADMAP.md` (bloques 1 y 3 y MARIA-1 a MARIA-3 no lo esperan).
+- PM: roadmap entregado a Emi el 2026-10-07 (`ROADMAP.md`: Fase A sin esperar
+  al despachante, Fase B con sus respuestas). Espera aprobación.
 - Emi le manda al despachante la versión simple de `PREGUNTAS-DESPACHANTE.md`.
 - Dev 1: sin tarea (en espera).
 
@@ -104,8 +106,10 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-06: mudanza del método a este repositorio, auditoría y preguntas
-simples al despachante. La PM compacta su chat (54 %).
+2026-10-07 (madrugada, vuelta horaria): roadmap nuevo con dos auditores
+(tamaño y choque de piezas; lo que la auditoría no había mirado: seis
+hallazgos X1 a X6 en `AUDITORIA-2026-10-06.md`). Dev sin cambios en su rama
+(`e8344d0`). PM al 10 % de contexto.
 
 ## Medición
 

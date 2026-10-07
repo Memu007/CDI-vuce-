@@ -36,9 +36,12 @@ repositorio.
 
 | Tema | Por qué hay que decidirlo | Impacto |
 |---|---|---|
-| **Aprobar el roadmap** | `ROADMAP.md` es una propuesta | Sin eso, la Dev no arranca |
+| **Aprobar el roadmap** | `ROADMAP.md` es una propuesta (versión del 2026-10-07: Fase A sin esperar al despachante y Fase B con sus respuestas) | Sin eso, la Dev no arranca |
+| **Una Dev o dos** | Dos colas que casi no se pisan (medido en `ROADMAP.md`) | Con dos, el piloto puede arrancar unas dos semanas antes; gasta más del plan de uso |
 | **Rotar las claves de Gemini** | Una estuvo en un repositorio público. Cierra G0 | Lo hace Emi en Google AI Studio y Railway |
-| **Cuándo publicar los 25 commits de la rama de trabajo** | Publicar es fusionar a `main`. Arreglan la fuga de MARIA.TXT entre estudios que hoy está en producción | Antes, contar los `active` con período vencido (el arranque los corta) y confirmar `DATABASE_URL` y `ENVIRONMENT` en Railway |
+| **Publicación de ensayo** (antes: «cuándo publicar los 25 commits») | Recomendada para la semana 1: la rama de trabajo más las reglas nuevas. Arregla la fuga de MARIA.TXT entre estudios que hoy está en producción y ensaya volver atrás | Antes, contar los `active` con período vencido (el arranque los corta) y confirmar `DATABASE_URL` y `ENVIRONMENT` en Railway |
+| **¿CDI usa Google Cloud?** | `cloudbuild.yaml` es un segundo camino de publicación | Si no se usa, se borra en LIMPIEZA-1 |
+| **Prender «Wait for CI» en Railway** | Hoy Railway publica aunque las pruebas fallen | Es un ajuste de Railway; no cuesta nada |
 | **Qué se promete del catálogo NCM** | Hoy hay 10.226 posiciones de ARCA (julio de 2026), no 22 | Cambia el discurso comercial de septiembre |
-| **Las preguntas al despachante** | Diez confirmaciones y dos pedidos (`PREGUNTAS-DESPACHANTE.md`) | Cierra el archivo MARIA (G4) |
+| **Las preguntas al despachante** | Seis preguntas y dos favores (`PREGUNTAS-DESPACHANTE.md`, versión simple) | Destraban la Fase B y cierran el archivo MARIA (G4) |
 | **Precio y fecha de arranque** | Vencidos | Comercial; no se escriben acá |

@@ -1,98 +1,211 @@
-# Roadmap — PROPUESTA, sin aprobar (2026-10-06)
+# Roadmap — PROPUESTA, sin aprobar (2026-10-07)
 
 Hasta que Emi lo apruebe, nada de esto se le asigna a una Dev. Sale de
-`AUDITORIA-2026-10-06.md`. Las fechas son propuestas: Emi dijo que se rehacen.
-El precio no se escribe acá.
+`AUDITORIA-2026-10-06.md` (con su agregado del 2026-10-07) y de un auditor que
+midió el tamaño de cada pieza y qué piezas tocan el mismo código. Reemplaza la
+propuesta del 2026-10-06. Las fechas van en semanas desde que Emi apruebe,
+porque Emi dijo que se rehacen. El precio no se escribe acá.
 
-**Objetivo:** cobrarle a los estudios con un producto que no filtre datos, no
+**Objetivo:** cobrarles a los estudios con un producto que no filtre datos, no
 declare mal ante la aduana y no cobre mal.
 
 **Cómo se mide:** por puertas (G0 a G8, en `NOW.md`), no por porcentaje. Una
 puerta se cierra con la salida del comando pegada.
 
-## Dos ritmos posibles
+## En una mirada
 
-| | Con una Dev | Con dos Devs (recomendado) |
+**Casi todo se puede hacer sin esperar al despachante.** Se parte en dos fases:
+
+- **Fase A, ya:** seguridad, cobro, datos y casi todo el archivo MARIA. Lo que
+  cambia el archivo MARIA se hace en esta fase, pero **se publica sólo cuando
+  hay prueba**: la ley, un archivo real o la respuesta del despachante.
+- **Fase B, con sus respuestas:** se ajustan cinco datos y los
+  identificadores, se prueba un archivo en su Kit María y arranca el piloto.
+
+| Semana desde la aprobación | Con dos Devs (recomendado) | Con una Dev |
 |---|---|---|
-| Primera publicación (seguridad) | ~16 de octubre | ~16 de octubre |
-| Archivo MARIA confiable | ~28 de octubre | ~23 de octubre |
-| Cobro real de punta a punta | ~6 de noviembre | ~30 de octubre |
-| Piloto con 3 a 5 estudios | 9 al 20 de noviembre | 2 al 13 de noviembre |
-| Primeras oleadas | desde el ~23 de noviembre | desde el ~16 de noviembre |
+| 1 | Publicación de ensayo (cierra la fuga de hoy). Arrancan la cola técnica y la del MARIA | Publicación de ensayo. Arranca la cola técnica |
+| 3 | Primera publicación de seguridad | Primera publicación de seguridad |
+| 4 | MARIA listo, salvo lo que espera al despachante | Sigue el MARIA |
+| 5 | Cobro real publicado | MARIA listo |
+| 6 | Fase B y prueba en el Kit, si el despachante ya respondió | Cobro real (semanas 6 y 7) |
+| 7 y 8 | Piloto con 3 a 5 estudios | Fase B |
+| 9 en adelante | Oleadas | Piloto (semanas 9 y 10) |
 
-**Por qué dos:** hay dos colas que casi no se pisan. Una es técnica (cobro,
-sesión, permisos), para la Dev 1. La otra es el archivo MARIA y sus pantallas
-(`maria_generator.py`, el extractor, `static/v2`), para la Dev 2. Una sesión
-más gasta más del plan de uso compartido. **Decide Emi.**
+Son las fechas más tempranas: si el despachante tarda, se corren la Fase B y el
+piloto, no el resto.
 
-## Antes de empezar (Emi, esta semana)
+**Por qué dos Devs:** hay dos colas que casi no se pisan (medido archivo por
+archivo, más abajo). Una sesión más gasta más del plan de uso compartido.
+**Decide Emi.**
 
-1. Rotar las claves de Gemini (G0).
-2. Mandar las preguntas al despachante (`PREGUNTAS-DESPACHANTE.md`).
-3. En Railway: confirmar `DATABASE_URL` y `ENVIRONMENT=production`, ver si el
-   Postgres tiene backup y apagar su red pública.
-4. Aprobar este plan, decidir si hay Dev 2 y revisar las fechas.
+## Lo que decide o hace Emi
 
-## Bloque 1 — Seguro para publicar (Dev 1, del 7 al 16 de octubre)
+**Esta semana:**
 
-Primero lo que deja entrar a quien no debe. Cada pieza se puede revisar sola.
+1. **Rotar las claves de Gemini** (G0). Es lo más urgente.
+2. **Mandar las preguntas al despachante** (`PREGUNTAS-DESPACHANTE.md`).
+3. **En Railway** (donde está publicado el sitio):
+   - confirmar que estén `DATABASE_URL` y `ENVIRONMENT=production`;
+   - ver si la base tiene copia de seguridad;
+   - apagar la red pública de la base (la app usa la interna);
+   - **prender «Wait for CI»**: así Railway publica sólo si las pruebas
+     automáticas pasan. Hoy publica aunque fallen.
+4. **Decir si CDI usa Google Cloud.** En el repositorio hay un segundo camino
+   de publicación hacia Google Cloud. Si no lo usás, se borra (LIMPIEZA-1).
+5. **Decir si alguna vez subió datos reales** al sitio publicado. Define si la
+   fuga de hoy afectó a alguien.
+6. **Aprobar este plan**, decir si hay Dev 2 y si va la publicación de ensayo.
 
-| Pieza | Qué arregla | Hallazgos |
+**Más adelante** (antes del piloto):
+
+- crear los planes en Mercado Pago y hacer un cobro chico con su tarjeta;
+- conseguir, con su abogado o contador, el texto de los términos y de la
+  política de privacidad (LEGAL-1 los pone en el sitio);
+- confirmar en Railway que el correo esté configurado: sin eso, recuperar la
+  contraseña falla en silencio;
+- decidir quién atiende el soporte y elegir los estudios del piloto;
+- precio y fecha del primer cobro (no se escriben acá).
+
+## Fase A — sin esperar al despachante
+
+### Publicación de ensayo (semana 1, opcional, recomendada)
+
+Publicar **ya** la rama de trabajo tal como está (`e8344d0`, 25 cambios
+revisados, pruebas en verde) más las reglas nuevas, que son sólo documentos
+encima de ella. El «dale» de Emi va para ese SHA exacto, que la PM le pasa con
+los chequeos hechos.
+
+- **Gana:** cierra la fuga de MARIA.TXT que hoy está en producción, lleva las
+  reglas nuevas a `main` y ensaya publicar y volver atrás cuando nadie más usa
+  el sitio.
+- **Cuesta:** una hora de Emi (los chequeos de Railway y el «dale»). Antes,
+  la PM cuenta qué cuentas pasarían a impagas al arrancar (hoy, sólo la de
+  Emi). Si algo
+  falla, se vuelve a `a771693`: el esquema de la base es el mismo, probado en
+  local.
+- **No arregla** el resto de los agujeros: eso es la cola técnica.
+
+### Cola técnica (Dev 1)
+
+Primero lo que deja entrar a quien no debe. Cada pieza se revisa sola; la PM
+reproduce cada hallazgo antes de aceptarla.
+
+| Orden | Pieza | Qué arregla, en llano | Hallazgos | Tamaño |
+|---|---|---|---|---|
+| 1 | ADMIN-1 | Las pantallas de administración, sólo para Emi. Lista cerrada de funciones globales | S2 | chico |
+| 2 | COBRO-CORTE-1 | Quien no paga no genera el MARIA ni gasta Gemini. Las operaciones se cuentan una vez por operación y sin pasarse del tope con pedidos al mismo tiempo | C1, C5, C6 | medio |
+| 3 | LIMPIEZA-1 | Las 10 pruebas excluidas a mano vuelven a la CI; se borra el segundo camino de publicación si Emi no lo usa; se sacan de los archivos las cadenas que pueden tener contraseñas | X2, X4, secretos | chico |
+| 4 | SESION-1 | Cambiar o resetear la contraseña y cerrar sesión revocan de verdad; cambiar el email pide la contraseña | S3 | medio |
+| 5 | ABUSO-1 | Límite de intentos con la IP real; topes en registro, recuperar usuario, eventos de pantalla y sugerencias de NCM; no revelar qué emails existen | S4, S5, S6, C9, X1 | medio |
+| 6 | ORG-1 | Invitaciones que funcionan en la base de producción, tope de usuarios del plan, invitación atada al email | C7 | medio |
+| 7 | DATOS-1 | Borrar un cliente siempre funciona (pedido de borrado de datos); el chequeo de salud dice la verdad; los errores no muestran detalles internos | D2, D5, D6 | chico |
+| 8 | RENDIMIENTO-1 | Leer un PDF no frena el sitio para todos, y tiene un tiempo máximo | D3 | chico |
+| 9 | DEPENDENCIAS-1 | Cambiar el lector de PDF viejo, que se cuelga con un PDF armado, por su sucesor; sacar o actualizar las librerías con avisos de seguridad | X3 | medio |
+| 10 | AISLAMIENTO-2 | La prueba de aislamiento ataca **todas** las funciones con datos de un estudio, no sólo clientes y descargas | G3 | medio |
+| 11 | PUBLICAR-1 | Contar antes cuántas cuentas pasan a impagas, copia de la base, publicar con el «dale» y probar volver atrás | C10, G6 | chico |
+| 12 | COBRO-MP-1 | El aviso de pago de Mercado Pago, verificado; cada pago se aplica una vez; se controla el monto | C3 | medio |
+| 13 | COBRO-MP-2 | Cancelar también cancela en Mercado Pago, con servicio hasta el fin del período pagado; una sola suscripción; no se pierden días pagados; reactivar exige pagar | C2, C4, C8 | grande |
+| 14 | BACKUP-1 | Copia de la base programada fuera de Railway y una restauración probada | D1 | medio |
+| 15 | DISCO-1 | El historial de NCM y los TXT descargados pasan a la base (hoy se borran en cada publicación) | D4 | medio |
+| 16 | LEGAL-1 | Páginas de términos y de privacidad con el texto de Emi, y cómo pedir el borrado de los datos | X5 | chico |
+| 17 | PUBLICAR-2 | Con el «dale» de Emi | — | chico |
+
+Tamaño: chico = hasta medio día; medio = 1 a 2 días; grande = 3 días o más.
+
+**Puertas:** G3 (aislamiento) y G6 (volver atrás) con PUBLICAR-1. G7 (cobro)
+con PUBLICAR-2 y el cobro chico de Emi: alta, cobro, renovación, cancelación
+(también en Mercado Pago) y corte.
+
+### Cola MARIA (Dev 2, o Dev 1 después de PUBLICAR-1)
+
+| Orden | Pieza | Qué arregla, en llano | Hallazgos | Tamaño | ¿Cambia el archivo? | Se publica |
+|---|---|---|---|---|---|---|
+| 1 | MARIA-2 | Sin clave de Gemini no se inventan productos: error claro | M4 | chico | no (evita productos falsos) | con PUBLICAR-1 |
+| 2 | MARIA-1a | Lectura de la factura: el país de origen bien leído (hoy China sale como Suiza; está en **dos** copias del lector), cantidades con coma, nada de peso inventado | M5 | medio | sí, donde hoy está mal | con PUBLICAR-1 o 2. Prueba: la tabla oficial de países, que ya está en el código |
+| 3 | MARIA-1b | Controles antes de generar: NCM que exista en el catálogo, moneda, incoterm, CUIT, montos; ningún texto puede meter líneas en el archivo | M10 | medio | no, con datos correctos | con PUBLICAR-1 o 2 |
+| 4 | MARIA-3 | Los avisos se muestran **antes** de generar y completos; los gastos anteriores al FOB llegan al archivo en EXW; la procedencia se carga en pantalla | M6, M8 | grande | sí | con PUBLICAR-2. Prueba: la ley (Código Aduanero, art. 15), la nota del SIM y un archivo real con procedencia distinta del origen |
+| 5 | MARIA-4 | Estado de la mercadería, IVA adicional, banco y empresa de digitalización pasan a ser **editables**, con el valor de hoy por defecto | M2, M3 | medio | no (el valor por defecto no cambia) | con PUBLICAR-2. Prueba de que no es fijo: los dos archivos reales traen estados distintos (3 y 2) |
+| 6 | MARIA-5 | Peso total por producto y cuentas exactas (hoy a veces no cierran por un centavo). Queda hecho y aparte | M1, M9 | medio | **sí** | **Fase B**: con la respuesta 3 y la prueba en su Kit. Los dos archivos reales tienen que salir idénticos |
+
+MARIA-1b y MARIA-3 tocan la misma función que COBRO-CORTE-1: arrancan después
+de que esa pieza esté aceptada. RENDIMIENTO-1 va después de MARIA-2 (tocan la
+misma línea). MARIA-3, MARIA-4 y MARIA-5 tocan las mismas cuentas del
+generador: van en ese orden, una después de la otra.
+
+**Se miró y está bien** (no hace falta pieza): orígenes permitidos, cookies y
+CSRF, cabeceras de seguridad y topes de subida de archivos.
+
+### Lo que hace la PM mientras tanto
+
+- Revisar cada pieza y reproducir cada hallazgo (`/revisar-entrega`).
+- Escribir las herramientas que faltan: `suite-y-puertas.sh` (suite completa
+  y puertas en una sola corrida) y un recorrido en navegador del camino
+  principal (alta, cliente, PDF, validación, MARIA) para cada revisión.
+- Preparar tres casos inventados (EXW, CIF, varios productos) para el archivo
+  que se le manda al despachante a probar en su Kit.
+- Medir el uso del plan con `medir.py` la primera semana.
+
+## Fase B — con las respuestas del despachante
+
+| Pieza | Qué hace | Espera |
 |---|---|---|
-| ADMIN-1 | `/api/admin/*` y las funciones globales, sólo para admin | S2 |
-| SESION-1 | Cambiar o resetear la contraseña y cerrar sesión revocan de verdad; cambiar el email pide la contraseña | S3 |
-| COBRO-CORTE-1 | El corte por impago cubre todo lo que genera valor o gasta Gemini; generar el MARIA cuenta como operación | C1, C5 |
-| ORG-1 | Invitaciones que funcionan en Postgres, límite de usuarios del plan, invitación atada al email | C7 |
-| DATOS-1 | Borrar un cliente con presupuesto; `/health` honesto; sin detalles de error al público | D5, D2, D6 |
-| ABUSO-1 | IP real detrás del proxy, límites en registro, recuperar usuario y `/api/ui/event` | S4, S5, S6, C9 |
-| PUBLICAR-1 | Contar los `active` vencidos, backup, publicar con el «dale» de Emi y probar volver atrás | S1, C10, G6 |
+| MARIA-6 | Valores por defecto según sus respuestas: estado, IVA adicional, banco, empresa de digitalización, gastos en FCA y FAS | preguntas 1, 2, 4, 5 y 6 |
+| MARIA-7 | Identificadores, sufijos de valor por producto y código de proveedor como en sus archivos reales | favor 1 (los archivos) |
+| MARIA-5 | Se publica el peso total y las cuentas exactas | pregunta 3 y favor 2 |
+| PRUEBA-KIT | El despachante carga en su Kit un archivo de CDI, sin oficializar | favor 2. **Cierra G4** |
+| PUBLICAR-3 | Con el «dale» de Emi | — |
 
-**Puerta:** la PM reproduce cada arreglo. Al final, el ataque de aislamiento
-contra la imagen que se publica y la suite completa. **Publicar arregla la
-fuga de MARIA.TXT que hoy está en producción** (S1). Con la publicación llegan
-a `main` las reglas nuevas.
+**Después:** piloto con 3 a 5 estudios, dos semanas, con el kit que ya existe
+(`wave1_*`). Se eligen los más tolerantes, no los más grandes. **G8:** tres
+estudios presentaron de verdad un MARIA generado por CDI. Luego, oleadas de
+10 a 15 estudios con una semana entre una y otra.
 
-## Bloque 2 — Archivo MARIA confiable (Dev 2 en paralelo, o Dev 1 después)
+## Qué hallazgo va en qué pieza
 
-| Pieza | Qué arregla | ¿Espera al despachante? |
-|---|---|---|
-| MARIA-1 | Peso total por ítem; origen sin cortar a 2 letras; cantidades con coma; nada inventado si falta un dato; validar NCM contra el catálogo, moneda, incoterm, CUIT y montos; sin inyección de líneas | sólo confirmar el peso |
-| MARIA-2 | Sin clave de Gemini no se inventan ítems: error claro | no |
-| MARIA-3 | Avisos **antes** de generar y completos; gastos FOB de la pantalla al TXT; procedencia en pantalla (Código Aduanero, art. 15) | no |
-| MARIA-4 | `CARTUSO`, `IVAADICIONAL1`, banco, código de proveedor, identificadores, `PSAD`, sufijos SBT y redondeo, según las respuestas | **sí** |
-| MARIA-5 | Prueba en el Kit María del despachante (sólo leer, sin oficializar) | sí |
+| Hallazgos | Pieza |
+|---|---|
+| C1, C5, C6 | COBRO-CORTE-1 |
+| C2, C4, C8 | COBRO-MP-2 |
+| C3 | COBRO-MP-1 |
+| C7 | ORG-1 |
+| C9, S4, S5, S6, X1 | ABUSO-1 |
+| C10 | PUBLICAR-1 |
+| S1 | publicación de ensayo o PUBLICAR-1 (ya arreglada en la rama) |
+| S2 | ADMIN-1 |
+| S3 | SESION-1 |
+| M1, M9 | MARIA-5 |
+| M2, M3 | MARIA-4 y MARIA-6 |
+| M4 | MARIA-2 |
+| M5 | MARIA-1a |
+| M6, M8 | MARIA-3 |
+| M7, M11 | MARIA-7 |
+| M10 | MARIA-1b |
+| D1 | BACKUP-1 |
+| D2, D5, D6 | DATOS-1 |
+| D3 | RENDIMIENTO-1 |
+| D4 | DISCO-1 |
+| X2, X4 | LIMPIEZA-1 |
+| X3 | DEPENDENCIAS-1 |
+| X5 | LEGAL-1 |
+| X6 | Emi, en Railway |
+| Clave de Gemini | Emi la rota (G0). Sacarla del archivo no alcanza: sigue en la historia, y esa historia no se reescribe |
+| Otras cadenas con contraseña | LIMPIEZA-1 |
 
-**Puerta G4:** el despachante lee en su Kit un TXT de CDI sin corregirlo a mano.
+## Para decidir antes de que arranque cada pieza
 
-## Bloque 3 — Cobro real (Dev 1)
-
-| Pieza | Qué arregla | Hallazgos |
-|---|---|---|
-| COBRO-MP-1 | Aviso de pago con firma o verificado contra la suscripción; cada pago se procesa una sola vez; se controla el monto | C3, C6 |
-| COBRO-MP-2 | Cancelar también en Mercado Pago, servicio hasta el fin del período pagado; una sola suscripción; los días pagados no se pierden; reactivar exige pagar | C2, C4, C8 |
-| BACKUP-1 | Copia de la base programada fuera de Railway y una restauración probada | D1 |
-| DISCO-1 | El historial de NCM de cada estudio pasa a la base | D4 |
-| PUBLICAR-2 | Con el «dale» de Emi | — |
-
-**Puerta G7:** Emi crea los planes en Mercado Pago y hace un cobro real chico
-con su propia tarjeta. Se ve el ciclo entero: alta, cobro, renovación,
-cancelación (también en Mercado Pago) y corte.
-
-## Bloque 4 — Piloto (3 a 5 estudios, dos semanas)
-
-Con el kit que ya existe (`wave1_*`) y la telemetría. Se eligen los estudios
-más tolerantes, no los más grandes. Antes, Emi decide quién atiende el soporte.
-**Puerta G8:** tres estudios presentaron de verdad un MARIA generado por CDI.
-
-## Bloque 5 — Oleadas
-
-De a 10 o 15 estudios, con una semana de margen entre oleadas. Precio y fecha
-del primer cobro: los decide Emi y no se escriben acá.
+- **COBRO-CORTE-1:** hoy la operación ya se cuenta al crearla. Generar el
+  MARIA no tiene que cobrarse otra vez por cada descarga: cuenta una vez por
+  operación. Lo decide la PM salvo que Emi diga otra cosa.
+- **ORG-1:** no hay ninguna prueba de organizaciones. Primero se reproduce el
+  error de las invitaciones en Postgres local.
+- **MARIA-5 y MARIA-6:** el redondeo es una sola decisión, con la respuesta
+  del despachante.
 
 ## Fuera de este plan (propuesto para después)
 
 - Ordenar `HANDOFF.md`, que está desactualizado.
-- Partir `main.py` (8.4k líneas). No es urgente y toca todo.
+- Partir `main.py` (8.400 líneas). No es urgente y toca todo.
 - VUCE-4, el listado de cobro para el admin: va después de ADMIN-1.
 - AFIP/WSAA y VUCE reales: siguen simulados por decisión.
 
@@ -100,7 +213,8 @@ del primer cobro: los decide Emi y no se escriben acá.
 
 | Riesgo | Mitigación |
 |---|---|
-| Las respuestas del despachante tardan | MARIA-1 a MARIA-3 no lo esperan |
-| La normativa no se puede leer desde la nube | Cada cambio del TXT, con la fuente y la confirmación del despachante |
-| Mercado Pago se comporta distinto en producción que en pruebas | Cobro real chico a una cuenta propia antes del piloto |
+| Las respuestas del despachante tardan | Fase A no las espera. Lo único que queda frenado es MARIA-5 a MARIA-7 y el piloto |
+| La normativa no se puede leer desde la nube | Cada cambio del archivo, con su fuente y la confirmación del despachante |
+| Dos Devs se pisan en `main.py` | Orden fijado arriba: lo que comparte función va en secuencia |
+| Mercado Pago se comporta distinto en producción que en pruebas | Cobro real chico con la tarjeta de Emi antes del piloto |
 | El plan de uso compartido no alcanza con dos Devs | Medir con `medir.py` la primera semana; si no rinde, se cierra la Dev 2 |

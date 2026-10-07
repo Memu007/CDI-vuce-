@@ -14,7 +14,7 @@ respuesta del despachante.
 
 | Tema | Respuesta | Fuente | Confianza |
 |---|---|---|---|
-| Procedencia ≠ origen | Código Aduanero, art. 15: «la mercadería se considera procedente del lugar del cual hubiera sido expedida con destino final al lugar de importación». Sale del documento de transporte. El origen se acredita con el certificado de origen | leyes-ar.com/codigo_aduanero/15.htm (cita) | alta |
+| Procedencia ≠ origen | Código Aduanero, art. 15: «la mercadería se considera procedente del lugar del cual hubiera sido expedida con destino final al lugar de importación». Sale del documento de transporte. El origen se acredita con el certificado de origen | leyes-ar.com/codigo_aduanero/15.htm (cita). Además, el archivo real anonimizado `tests/fixtures/maria_golden_anon.TXT` trae procedencia distinta del origen | alta |
 | EXW y grupos C y D | Nota «Nueva pregunta del SIM en importación»: se declara a nivel carátula «el importe de la diferencia entre el valor FOB declarado y el valor en la condición de venta pactada». EXW va en `GTOS-ANT-FOB`; C y D en `GTOS-POS-FOB`. Es un dato informativo | pcram.net/post.php?mid=8451 (cita) | alta |
 | Los 150 del archivo EXW | Son la diferencia entre EXW y FOB (gastos en origen). No tienen por qué coincidir con el flete y el seguro internacionales, que van por otra vía | inferencia de la cita anterior | media |
 | `GANANCIASOP3` | Para reventa va `COMERC`, que es lo que el sistema declara hoy. Desde el 24/08/2026 el SIM suprimió `NO_VALIDA` en este campo | cda.org.ar, noticia 42706 (resumen) | media-alta |
@@ -61,7 +61,7 @@ ver en un archivo real no se pregunta: se pide el archivo.
 
 | Pregunta o favor | Campo del archivo |
 |---|---|
-| Pregunta 1 | `CARTUSO` (hoy 3 fijo; la investigación dice que 2 es «nuevo sin uso importado») |
+| Pregunta 1 | `CARTUSO` (hoy 3 fijo; la investigación dice que 2 es «nuevo sin uso importado»; los dos archivos reales anonimizados del proyecto traen 3 y 2, así que no es un valor fijo) |
 | Pregunta 2 | `IVAADICIONAL1` (hoy `IVAAD1` fijo, que sería «uso particular») |
 | Pregunta 3 | `QARTKGRNET` (hoy sale el peso de una unidad) |
 | Pregunta 4 | `BANCOSARGENTINA` (hoy no se emite; 191 = Credicoop) |

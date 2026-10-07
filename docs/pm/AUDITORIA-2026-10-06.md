@@ -105,6 +105,25 @@ borde), **Prueba** (no lo ve el usuario).
   `cloudbuild.yaml:87` (en `main`) y
   `docs/deployment/PLAN_DEPLOY_ADVERSARIAL.md:76`. La PM no las abrió.
 
+## Agregado del 2026-10-07: lo que la auditoría no había mirado
+
+Un auditor (Sonnet alto) sobre `e8344d0`. Marca: «sub» = lo corrió el
+subagente, con salida; «código» = leído; «PM» = la PM lo confirmó leyendo el
+archivo.
+
+| # | Qué pasa | Cat. | Marca | Esfuerzo |
+|---|---|---|---|---|
+| X1 | Las sugerencias de NCM llaman a Gemini sin ningún tope (ni por minuto ni por día). Es la única función con IA sin límite (`main.py:6930`) | Riesgo | código (PM: sin `@limiter` en la ruta) | chico |
+| X2 | La CI (las pruebas automáticas de GitHub) excluye a mano 10 pruebas desde julio, entre ellas las de presupuestos públicos y una de CSRF. Hoy las 10 pasan; si se rompen, la CI no lo ve (`.github/workflows/ci.yml:36-47`) | Riesgo | sub (10 + 4 passed; suite sin exclusiones: 680/102/0) | chico |
+| X3 | Librerías con fallas conocidas: el lector de PDF viejo (`PyPDF2 3.0.1`) se cuelga con un PDF armado; `python-jose` y `ecdsa` tienen avisos de seguridad | Riesgo | sub (`pip-audit`: 4 avisos en 3 librerías; el cuelgue, reproducido con un PDF hecho a mano) | medio |
+| X4 | `cloudbuild.yaml` es un segundo camino de publicación (Cloud Run, abierto al público). En el repositorio nada lo dispara; no se pudo ver si en Google Cloud hay un disparador armado | Riesgo | código (PM: no hay `deploy.yml` ni en `main` ni en la rama) | chico |
+| X5 | No hay páginas de términos ni de privacidad, ni una forma de pedir el borrado de datos | Riesgo | código (`templates/`) | chico (el texto lo pone Emi) |
+| X6 | Si el correo no está configurado en producción, recuperar la contraseña falla en silencio | Riesgo | código | — (lo revisa Emi en Railway) |
+
+**Se miró y está bien:** orígenes permitidos (CORS), cookies de sesión y CSRF,
+cabeceras de seguridad, y topes de tamaño y tipo en la subida de PDF, Excel y
+CSV.
+
 ## Lo que no se pudo ver
 
 Producción real (variables de Railway, si hay volumen o backups), Mercado Pago
