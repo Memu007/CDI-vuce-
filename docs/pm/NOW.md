@@ -9,7 +9,7 @@ Railway publica cada push a `main` sin esperar los tests.
 commits sin publicar, antes en `claude/project-deploy-review-4nct96`, que
 queda como historia) más las reglas y documentos. **Ramas de las Devs:**
 `claude/dev1-tecnica` y `claude/dev2-maria`.
-**Usuarios reales en producción:** ninguno; la usa sólo Emi.
+**Usuarios reales en producción:** ninguno; la usa sólo Emi, **con facturas reales** (Emi, 2026-10-07).
 
 ## Para Emi
 
@@ -25,13 +25,17 @@ queda como historia) más las reglas y documentos. **Ramas de las Devs:**
    - en la base: hacer una copia (pestaña de copias de seguridad) si el plan
      lo permite;
    - mirar qué cuentas hay: toda cuenta activa con el período vencido hace
-     más de 7 días pasa a impaga al arrancar;
+     más de 7 días pasa a impaga al arrancar. **Y si hay alguna cuenta que no
+     sea de Emi:** la fuga de MARIA.TXT pedía sesión iniciada, así que si no
+     hay cuentas ajenas, nadie pudo ver sus facturas reales;
+   - saber que al publicar se borran los TXT generados y el historial de NCM
+     que viven en el disco del servidor (pasa en cada publicación; las
+     operaciones en la base quedan; DISCO-1 lo arregla);
    - recomendado: prender «Wait for CI» y apagar la red pública de la base.
    La PM le pasa el SHA exacto con la suite corrida sobre él.
 3. **Mandar las preguntas al despachante** (`PREGUNTAS-DESPACHANTE.md`).
-4. **Decir si CDI usa Google Cloud** (hay un segundo camino de publicación en
-   el repositorio; si no, se borra en LIMPIEZA-1) y **si alguna vez subió
-   datos reales** al sitio publicado.
+4. Respondido el 2026-10-07: CDI no usa Google Cloud, y Emi cargó facturas
+   reales en el sitio publicado.
 5. **Decidido por la PM, se puede revertir:** los límites del proyecto
    (`ONBOARDING-PM.md`) y que las reglas nuevas lleguen a `main` con la
    primera publicación. Hasta entonces, en `main` sigue la regla vieja que

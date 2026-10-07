@@ -33,6 +33,8 @@ repositorio.
 | **Dos Devs** | 2026-10-07 | Emi: «dale 2 devs, lo que haga mejor el proyecto». Dev 1 con la cola técnica, Dev 2 con la cola MARIA. Sin PM visual: a las dos las revisa la PM principal |
 | **Lo que pueden usar las Devs** | 2026-10-07 | Emi: «que las devs tengan acceso a todo menos el advisor, que es tuyo, y subagentes nunca pueden usar fable, y cada dev fijate que max de esfuerzo sea alto». Las Devs: todas las herramientas, sin consejero; su sesión y sus subagentes, hasta esfuerzo alto. **Nadie** lanza un subagente con Fable, tampoco la PM |
 | **Compactar antes: 30 % las Devs, 40 % las PMs** | 2026-10-07 | Emi: «dale 30/40» (antes, 50 y 60, sin razón escrita). Cada paso relee toda la memoria del chat y las tres sesiones comparten el plan. Excepción al congelamiento de reglas, por decisión de Emi. Se revisa el 2026-10-27 con lo que usa cada pieza |
+| **CDI no usa Google Cloud** | 2026-10-07 | Emi: «no podemos rearmar esas cosas, es un proyecto muy viejo». `cloudbuild.yaml` se borra en LIMPIEZA-1. El sitio es sólo Railway |
+| **Producción tiene datos reales** | 2026-10-07 | Emi cargó facturas reales en el sitio publicado. La fuga de MARIA.TXT (S1) pedía sesión iniciada: si en producción no hay cuentas de otras personas, nadie pudo usarla. Lo confirma Emi en Railway antes del ensayo |
 | **Publicación de ensayo** | 2026-10-07 | Emi: «dale». Se publica la rama de trabajo más las reglas nuevas. El «dale» final va para el SHA exacto, de día y con los chequeos de Railway hechos |
 
 ---
@@ -43,7 +45,6 @@ repositorio.
 |---|---|---|
 | **Rotar las claves de Gemini** | Una estuvo en un repositorio público. Cierra G0 | Lo hace Emi en Google AI Studio y Railway |
 | **«Dale» para el SHA de la publicación de ensayo** | Emi aprobó el ensayo el 2026-10-07; falta el «dale» para el SHA exacto | Antes, Emi revisa en Railway las variables y las cuentas que pasarían a impagas |
-| **¿CDI usa Google Cloud?** | `cloudbuild.yaml` es un segundo camino de publicación | Si no se usa, se borra en LIMPIEZA-1 |
 | **Prender «Wait for CI» en Railway** | Hoy Railway publica aunque las pruebas fallen | Es un ajuste de Railway; no cuesta nada |
 | **Qué se promete del catálogo NCM** | Hoy hay 10.226 posiciones de ARCA (julio de 2026), no 22 | Cambia el discurso comercial de septiembre |
 | **Las preguntas al despachante** | Seis preguntas y dos favores (`PREGUNTAS-DESPACHANTE.md`, versión simple). Respondió de la 1 a la 4 el 2026-10-06 | Destraban la Fase B y cierran el archivo MARIA (G4) |
