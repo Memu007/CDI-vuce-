@@ -4,7 +4,7 @@
 
 import re
 from proyecto_maria.models.operations import Item  # Modelo Pydantic de items
-from proyecto_maria.core.maria_generator import centavos, pais_reconocido
+from proyecto_maria.core.maria_generator import centavos, pais_reconocido, valor_de_la_linea
 from typing import List, Tuple  # Type hints para mejor documentación
 
 def run_pre_maria_validations(items: List[Item]) -> Tuple[List[Item], List[str]]:
@@ -216,7 +216,8 @@ def run_smart_validations(items: List[Item]) -> dict:
         if item.valor_unitario and item.cantidad:
             valor_total_item = item.valor_unitario * item.cantidad
             total_valor += valor_total_item
-            total_valor_txt += centavos(valor_total_item)
+            total_valor_txt += centavos(valor_de_la_linea(
+                {'cantidad': item.cantidad, 'valor_unitario': item.valor_unitario}))
             
             # Valor unitario sospechosamente bajo (menos de 1 centavo)
             if item.valor_unitario < 0.01:

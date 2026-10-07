@@ -452,13 +452,36 @@ def get_pais_codigo(pais: str) -> int:
     return PAIS_DEFAULT_IMPORT
 
 
-def centavos(valor) -> Decimal:
-    """Un importe del TXT al centavo, con la mitad hacia arriba (MARIA-5). Se
-    redondea el número escrito, no su aproximación binaria: 2,675 da 2,68."""
-    numero = float(valor or 0)
-    if not math.isfinite(numero):
+def _exacto(valor) -> Decimal:
+    """El número escrito, en decimal exacto: 2,675 es 2,675 y no su
+    aproximación binaria. No finito o fuera del tope: ValueError (400)."""
+    if isinstance(valor, Decimal):
+        numero = valor
+    else:
+        crudo = float(valor or 0)
+        if not math.isfinite(crudo):
+            raise ValueError(f"Importe «{valor}» no válido: revisá cantidades y valores.")
+        numero = Decimal(repr(crudo))
+    if not numero.is_finite() or abs(numero) > IMPORTE_MAXIMO:
         raise ValueError(f"Importe «{valor}» no válido: revisá cantidades y valores.")
-    return Decimal(repr(numero)).quantize(Decimal("0.01"), ROUND_HALF_UP)
+    return numero
+
+
+def centavos(valor) -> Decimal:
+    """Un importe del TXT al centavo, con la mitad hacia arriba (MARIA-5)."""
+    return _exacto(valor).quantize(Decimal("0.01"), ROUND_HALF_UP)
+
+
+def valor_de_la_linea(item: dict) -> Decimal:
+    """El valor de una línea sin redondear: el valor total, o cantidad ×
+    unitario multiplicados en decimal exacto (3 × 3,335 = 10,005)."""
+    if item.get('valor_total'):
+        valor = _exacto(item['valor_total'])
+    else:
+        valor = _exacto(_exacto(item.get('cantidad', 1)) * _exacto(item.get('valor_unitario', 0)))
+    if valor < 0:
+        raise ValueError(f"Valor «{valor}» negativo: revisá cantidades y valores.")
+    return valor
 
 
 def repartir(total: Decimal, pesos: list) -> list:
@@ -467,6 +490,8 @@ def repartir(total: Decimal, pesos: list) -> list:
     los centavos que faltan van a las de mayor resto; si empatan, a la de
     mayor peso y después a la primera."""
     pesos = [Fraction(Decimal(str(p))) for p in pesos]
+    if any(p < 0 for p in pesos):
+        raise ValueError("No se puede repartir sobre un valor negativo.")
     suma = sum(pesos)
     if suma <= 0 or not pesos:
         return [Decimal("0.00")] * len(pesos)
@@ -480,9 +505,8 @@ def repartir(total: Decimal, pesos: list) -> list:
 
 
 def _fob_de(item: dict) -> Decimal:
-    """El FOB de una línea al centavo: el valor total, o cantidad × unitario."""
-    return centavos(item.get('valor_total')
-                    or float(item.get('cantidad', 1)) * float(item.get('valor_unitario', 0)))
+    """El FOB de una línea al centavo (MARIA-5)."""
+    return centavos(valor_de_la_linea(item))
 
 
 def peso_de_la_linea(item: dict) -> float:
@@ -820,14 +844,11 @@ def generate_maria_txt(operation_id: str, items: list,
             str(it.get('descripcion', '')).strip() for it in grupo_items
         )
         combined['cantidad'] = sum(float(it.get('cantidad', 1)) for it in grupo_items)
-        combined['valor_total'] = sum(
-            float(it.get('valor_total') or float(it.get('cantidad', 1)) * float(it.get('valor_unitario', 0)))
-            for it in grupo_items
-        )
+        combined['valor_total'] = sum((valor_de_la_linea(it) for it in grupo_items), Decimal(0))
         combined['peso_kg'] = sum(peso_de_la_linea(it) for it in grupo_items)
         # valor_unitario promedio del grupo
         total_cant = combined['cantidad']
-        combined['valor_unitario'] = combined['valor_total'] / total_cant if total_cant > 0 else 0
+        combined['valor_unitario'] = float(combined['valor_total']) / total_cant if total_cant > 0 else 0
         items_export.append(combined)
 
     # Las cuentas al centavo (MARIA-5): la suma de los ítems da exactamente
@@ -968,17 +989,22 @@ def generate_maria_txt(operation_id: str, items: list,
             suma_cant = sum(float(s.get("cantidad", 0) or 0) for s in subitems)
             # Cada MSBTFOB al centavo, como sale en el TXT: su suma tiene que
             # dar exactamente el MARTFOB (MARIA-5).
-            fobs_sub = [
-                centavos(float(s.get("cantidad", 0) or 0) * float(s.get("valor_unitario", valor_unit) or 0))
+            # El valor de cada sub-ítem sin redondear; el MARTFOB se reparte
+            # entre ellos al centavo, así los MSBTFOB suman exactamente el
+            # MARTFOB (MARIA-5). La tolerancia es la de antes.
+            crudos_sub = [
+                valor_de_la_linea({"cantidad": s.get("cantidad", 0) or 0,
+                                   "valor_unitario": s.get("valor_unitario", valor_unit) or 0})
                 for s in subitems
             ]
-            suma_fob = sum(fobs_sub, Decimal("0.00"))
+            suma_fob = sum(crudos_sub, Decimal(0))
+            fobs_sub = repartir(valor_total, crudos_sub)
             if abs(suma_cant - cantidad) > 0.001:
                 raise ValueError(
                     f"Item {idx}: las cantidades de los sub-ítems suman {suma_cant:g} "
                     f"pero el ítem declara {cantidad:g}. Tienen que coincidir."
                 )
-            if suma_fob != valor_total:
+            if abs(suma_fob - valor_total) > Decimal("0.01"):
                 raise ValueError(
                     f"Item {idx}: los valores de los sub-ítems suman {suma_fob:.2f} "
                     f"pero el ítem declara {valor_total:.2f}. Tienen que coincidir."

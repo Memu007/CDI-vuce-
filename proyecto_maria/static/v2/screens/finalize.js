@@ -25,6 +25,12 @@
     function $(id) { return document.getElementById(id); }
     function show(el) { if (el) el.hidden = false; }
     function hide(el) { if (el) el.hidden = true; }
+    // «None», «null» o «N/A» de una operación guardada con el lector viejo no
+    // son un número de factura (MARIA-5).
+    function numeroDeFactura(op) {
+        const leida = String((op && op.numero_factura) || '').trim();
+        return /^(none|null|n\/a)$/i.test(leida) ? '' : leida;
+    }
 
     function init() {
         if (initialized) return;
@@ -420,10 +426,7 @@
         const moneda = (op.moneda || 'DOL').toString().toUpperCase();
         const incoterm = (op.incoterm || 'FOB').toString().toUpperCase();
 
-        // «None», «null» o «N/A» de una operación guardada con el lector viejo
-        // no son un número de factura (MARIA-5).
-        const leida = String(op.numero_factura || '').trim();
-        const factura = /^(none|null|n\/a)$/i.test(leida) ? '' : leida;
+        const factura = numeroDeFactura(op);
         const operation_id = factura ? ('FAC_' + factura.replace(/[^a-zA-Z0-9_-]/g, '')) :
             ('OP_' + new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14));
 
@@ -610,7 +613,7 @@
         const rows = [
             ['Razón social', String(op.comprador_nombre || '').trim() || 'No detectado'],
             ['CUIT', formatDetectedCuit(op.comprador_cuit) || 'No detectado'],
-            ['Factura', String(op.numero_factura || '').trim()],
+            ['Factura', numeroDeFactura(op)],
             ['Fecha', String(op.fecha_emision || '').trim()],
         ].filter(row => row[1]);
         box.innerHTML = rows.map(row => (
