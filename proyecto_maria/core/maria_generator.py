@@ -974,6 +974,19 @@ def _sim_position_error(ncm_raw: str) -> str | None:
     return "debe tener 11 dígitos (NCM 8 + SIM 3) y una letra de control (DC)"
 
 
+def errores_de_procedencia(items: list, desde: int = 1) -> list:
+    """La procedencia propia de cada producto que no se reconoce. El mismo
+    texto sale como error al generar y como aviso antes (veredicto de MARIA-3)."""
+    errores = []
+    for idx, item in enumerate(items or [], start=desde):
+        if not isinstance(item, dict):
+            continue
+        procedencia = procedencia_de(item)
+        if procedencia and not pais_reconocido(procedencia):
+            errores.append(f"Item {idx}: Procedencia no reconocida '{procedencia}'. Debe indicar un país válido.")
+    return errores
+
+
 def validate_items_for_maria(items: list) -> tuple[bool, list]:
     """
     Valida que los items tengan los campos necesarios para generar MARIA.
@@ -1005,9 +1018,7 @@ def validate_items_for_maria(items: list) -> tuple[bool, list]:
             errors.append(f"Item {idx}: Falta origen/país de origen")
         elif not pais_reconocido(origen):
             errors.append(f"Item {idx}: Origen no reconocido '{origen}'. Debe indicar un país válido.")
-        procedencia = procedencia_de(item)
-        if procedencia and not pais_reconocido(procedencia):
-            errors.append(f"Item {idx}: Procedencia no reconocida '{procedencia}'. Debe indicar un país válido.")
+        errors.extend(errores_de_procedencia([item], desde=idx))
     
     return len(errors) == 0, errors
 

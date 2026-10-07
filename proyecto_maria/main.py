@@ -70,7 +70,7 @@ PROJECT_VERSION = datetime.now().strftime("%Y%m%d%H%M%S")
 from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, importe_valido, supuestos_declarados, gastos_fob_para_el_txt
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
     LecturaAutomaticaNoDisponible,
@@ -3636,7 +3636,8 @@ async def avisos_maria_endpoint(
         # Productos mal formados: el error sale al generar.
         kit_warnings = []
     supuestos = _supuestos_maria(request, items, gastos)
-    return {"avisos": kit_warnings + supuestos, "supuestos": supuestos}
+    # Lo que al generar es un error de procedencia, acá se avisa con el mismo texto.
+    return {"avisos": errores_de_procedencia(items) + kit_warnings + supuestos, "supuestos": supuestos}
 
 
 @app.post("/generate_maria")
