@@ -38,12 +38,11 @@ antes de cerrar la Fase 3.
 5. **Hasta publicar MARIA-1a: revisar el país de origen de cada TXT** antes
    de mandárselo al despachante. El código publicado corta el país a dos
    letras: si la lectura devuelve «CHN» o «China», sale Suiza.
-6. **Límite de uso de la cuenta:** el 2026-10-07 entre las ~02:05 y las
-   03:40 UTC las Devs quedaron paradas porque la cuenta llegó a su límite de
-   5 horas («You've hit your session limit»). Lo más barato para que no se
-   repita: pegar el `/compact` de cada Dev apenas se pueda (están en ~38 % y
-   ~41 %; cada paso relee todo el contexto). Si vuelve a pasar, Emi decide
-   entre aceptar las pausas o bajar el ritmo.
+6. **Límite de uso de la cuenta:** lo tocó dos veces el 2026-10-07: entre
+   las ~02:05 y las 03:40 UTC, y entre las ~18:34 y las 18:50 UTC (las dos
+   Devs quedaron paradas; la PM las despertó a las 18:56). Por la regla de
+   Emi (`DECISIONS.md`), **hoy se compacta desde el 30 % las Devs y el 40 %
+   las PMs**; mañana vuelve a 60 y 50.
 7. **No pedirle a ningún asistente cambios sobre `main`:** desde el
    2026-10-07 `main` tiene las reglas nuevas, pero cada push publica.
 
@@ -156,12 +155,13 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 18:45 UTC: Emi contestó «dale a todo» y que la suscripción está en
-Railway. GUARDAR-1 entra (Dev 1, antes que COBRO-MP-1); reventa confirmada;
-SUBITEMS-1 entra (Dev 2). El push de `6ea8ca9` a `main` lo frenó el sistema
-de permisos: falta «dale 6ea8ca9» escrito. EXCEL-2: falta el subagente
-(después de las 18:50 UTC, cuando se renueva el límite de 5 horas). Dev 1
-compactada (11 %).
+2026-10-07 19:00 UTC (rutina): la cuenta tocó su límite de 5 horas entre las
+~18:34 y las 18:50 UTC y cortó a las dos Devs; despertadas a las 18:56. Hoy
+rige 30/40. Dev 1: GUARDAR-1 (COBRO-MP-1 en pausa en `18a1850`). Dev 2:
+reentregó MARIA-5 y CATALOGO-NCM-1 (`6854f34`; rojo antes `171 failed`,
+suite `1459 passed, 0 failed`), sigue SUBITEMS-1. Dos subagentes Sonnet alto
+atacan EXCEL-2 y MARIA-5 con el catálogo. Esperan a Emi: «dale 6ea8ca9» escrito
+y el `/compact` de la Dev 2 (49 %). Contexto: PM 23 %, Dev 1 18 %.
 
 ## Medición
 
