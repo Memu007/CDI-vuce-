@@ -111,7 +111,17 @@ VENV=<venv> scripts/testing/sabotaje_maria1c.sh 448b54d                         
   prueba es sobre su código.
 - `ataque_aislamiento.sh`: la pieza no toca sesión ni permisos.
 
-Sigo con MARIA-4.
+**D10. MARIA-4 necesita su tarea escrita.** En mi canal figura sólo como
+«Después», sin criterios. Cambia lo que sale en el TXT: el estado de la
+mercadería por producto, el banco y la empresa de digitalización. Para
+arrancar necesito, en `PARA-DEV-2.md`:
+- los criterios de aceptación;
+- qué prueba vale para cada campo (respuestas del despachante y archivo
+  real de 2026);
+- si los dos archivos reales tienen que seguir idénticos con los valores
+  por defecto.
+
+Mientras tanto no toco el generador.
 
 Última vuelta: 2026-10-07 06:20 UTC
 Contexto: ~62 % (pasado el umbral; compactar cuando Emi pueda)
