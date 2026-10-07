@@ -2,193 +2,161 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## MARIA-2 — entregada: sin clave de Gemini no se inventan productos
+## MARIA-1a — entregada: la factura bien leída
 
 | Qué | SHA |
 |---|---|
-| Base (cabeza de `claude/practical-shannon-szpwkn`) | `cb8f509` |
-| Producto | `19e8a39`, `821f842`, `3184c10` |
-| Pruebas y sabotajes | `7dcef8a`, `d275389`, `65ea6f3` |
-| **SHA que se entrega (puertas corridas acá)** | **`65ea6f3`** |
-| Informe | el commit que trae este archivo |
+| Base (rama de la PM al arrancar) | `321f34b` |
+| Producto | `e0b119b`, `14fca41`, `c411128` |
+| Pruebas y sabotajes | `adb002f`, `4b8fc49`, `0f7b20f`, `509bdaa`, `0a1775f` |
+| **SHA que se entrega (puertas corridas acá)** | **`0a1775f`** |
+| Informe | el commit que trae este archivo (encima, sólo docs de la PM integrados) |
 
-**Resultado: terminada.** Sin clave de Gemini, con la clave en blanco o con
-el lector con IA apagado (`ENABLE_PDF_LLM_FALLBACK=false`), subir un PDF ya no
-devuelve los dos «ITEM DEMOSTRACION». Responde **503** con
-`{"detail": "No se pudo leer la factura automáticamente; cargá los productos a mano.", "code": "lectura_automatica_no_disponible"}`
-y cero productos. No descuenta la cuota diaria de PDFs. La pantalla muestra el
-mensaje con un botón «Cargar los productos a mano», que abre la carga manual.
-Con clave, todo sigue como antes.
+**Resultado: terminada.** Cambié las **dos** copias del lector con Gemini
+(`pdf_extractor.py`): la de PyMuPDF y la de «PDF directo», que es la que corre
+en producción.
+- **País:** reconoce dos letras, tres letras y el nombre, contra la tabla
+  oficial VUCE. `CHN`, `China` y `P.R. China` dan `CN`, código MARIA 310.
+  `MEX` da `MX`, código 218. Lo que no se reconoce queda vacío. Antes `CHN`
+  salía `CH`, Suiza; `MEX`, `ME`, Montenegro; y «Narnia», `NA`, Namibia.
+- **Números:** cantidad, precio, peso, flete y seguro con coma salen bien.
+  `1,500` es mil quinientos sólo si la misma factura usa el punto como
+  decimal, y uno coma cinco si usa la coma. Si no hay pista, queda vacío.
+  Todo lo que no es un número limpio también queda vacío: `12x3`, `1/2`,
+  `500 g`, `2.5e3`, negativos, infinitos.
+- **Lo que falta:** queda vacío (0 o `""`) y lo marca el semáforo. Se fueron
+  el peso de 0,5 kg, la cantidad 1, el origen copiado del vendedor (D4) y la
+  descripción «Producto».
+- **Instrucciones a Gemini:** ya no dicen «estimar 0.5» para el peso. La
+  copia PyMuPDF pide los números tal como aparecen en la factura.
+- **Tabla tres letras → dos letras:** `proyecto_maria/core/paises_iso3.py`,
+  194 países. Salió una sola vez de ISO 3166-1 con pycountry 26.2.16, que no
+  es dependencia. El script es `scripts/datos/generar_paises_iso3.py`. Una
+  prueba verifica que cada destino existe en la tabla oficial. El revisor la
+  cruzó además con `iso-codes` del sistema: 0 pares erróneos.
 
 ## Decisiones
 
-**D1. Sin clave, ¿leer igual los PDF que traen texto?** Ya existe un lector
-sin IA (`robust_extract_pdf_items`, tablas y líneas de texto), pero el camino
-vivo no lo usa, ni antes ni ahora. Sin clave, hoy toda subida pide carga
-manual.
-- (a) Dejarlo así: nada inventado y nada nuevo que probar. **Recomiendo (a).**
-  Ese lector viejo nunca se probó contra facturas reales, y con él vuelven las
-  dudas de MARIA-1a (país, cantidades y peso adivinados).
-- (b) Tarea aparte: usarlo sin clave sólo para PDF con texto y dejar el 503
-  para los escaneados.
+**D5. Un flete o seguro ilegible queda en 0 y nadie avisa.** Pasa con un
+`"1,500"` sin pista, o un `"350 USD/kg"`. Antes, eso hacía descartar la
+factura entera: un error visible. Ahora el valor CIF puede quedar más bajo sin
+que nadie lo note, porque el semáforo sólo mira los ítems.
+- (a) Pieza chica: el lector marca los campos ilegibles y la pantalla de
+  subida los nombra en un aviso, por ejemplo «No pudimos leer el flete:
+  completalo». **Recomiendo (a).** Si querés, va dentro de MARIA-2b, que toca
+  la misma pantalla.
+- (b) Dejarlo así hasta MARIA-1b, que es de la Dev 1.
 
-**D2. Con clave, pero Gemini caído o con clave inválida**, el lector devuelve
-cero productos y el endpoint responde el 400 de siempre: «No se encontró tabla
-de items en el PDF…». No inventa nada, pero el mensaje engaña y no ofrece la
-carga manual. La tarea habla de la clave que falta, no de Gemini caído.
-- (a) Lo dejo así (no está en el alcance).
-- (b) Lo sumo a esta pieza: el mismo 503 con su código cuando Gemini falla.
-  Es chico, pero hay que simular la falla.
-**Recomiendo (b) como pieza aparte y chica.** Si preferís que vaya acá, lo hago
-antes de MARIA-1a.
+**D6. Al guardar la operación vuelven el 1 y el 0,5.** `main.py`, alrededor
+de la línea 5508, `save_client_operation`, usa `cantidad … or 1` y
+`peso_unitario … or 0.5`. Lo leyó el revisor y no lo corrí. Si alguien guarda
+sin completar, el dato inventado llega a la base. Está fuera de MARIA-1a: no
+toqué `main.py` y lo tiene abierto la Dev 1.
+- (a) Asignarlo a la Dev 1 junto con MARIA-1b (controles antes de generar).
+  **Recomiendo (a).**
+- (b) Lo hago yo después de MARIA-2b, si la Dev 1 libera ese archivo.
 
-## Qué cambió (archivos de producto, para «archivos abiertos»)
+**D7. La copia que corre en producción sigue pidiendo números** («JSON
+estricto» con ejemplos numéricos). Puede que Gemini convierta solo un
+`1.500` brasileño en 1,5, y así nuestra regla nunca ve el texto original. No
+se puede comprobar sin Gemini real.
+- (a) Dejarlo así y medirlo con facturas reales cuando haya ensayo con clave.
+  **Recomiendo (a).**
+- (b) Pedirle los números como texto en las dos copias. Cambia lo que se le
+  pide a Gemini en producción sin poder probarlo.
 
-- `proyecto_maria/pdf_extractor.py`: el «modo DEMO» ahora es el error propio
-  `LecturaAutomaticaNoDisponible`. Hay una sola regla para saber si hay
-  lector, `lectura_automatica_disponible()`, y una clave hecha sólo de
-  espacios cuenta como que falta. Si `robust_extract_pdf_items` (que hoy usan
-  sólo las pruebas) recibe ese error, devuelve `[]`.
-- `proyecto_maria/main.py` (`upload_pdf_public`): valida el archivo, después
-  pregunta si hay lector (503 si no lo hay) y recién ahí descuenta la cuota.
-- `proyecto_maria/static/v2/screens/upload.js`: con ese `code`, muestra el
-  mensaje y el botón de carga manual.
-- `CHANGELOG.md`: una entrada.
+## Archivos de producto tocados (para «archivos abiertos»)
 
-**Supuestos que podés rechazar:**
-1. **La validación del archivo pasó antes de la cuota.** Antes se descontaba
-   la cuota y después se validaba. Ahora un archivo inválido no gasta cuota,
-   también con clave. Sin ese cambio, el control de lector quedaba antes de la
-   validación y tapaba sus errores (lo marcó `/code-review`).
-2. **Elegí 503 y la clave `code`**, que es la que ya usan los otros errores de
-   `main.py` (`internal_error`, `csrf_failed`).
-
-## Otros caminos que inventan datos si falla Gemini (punto 3 de la tarea)
-
-| Camino | ¿Vivo? | ¿Inventa? | Qué hice |
-|---|---|---|---|
-| `_extract_with_gemini_vision`, «modo DEMO» sin clave | sí, es el único que usa `/upload_pdf/public` | sí, 2 productos | **arreglado** |
-| `robust_extract_pdf_items` (PDF sin texto → IA) | no, sólo lo usan pruebas | heredaba la demo | arreglado (devuelve `[]`) |
-| `_llm_extract_pdf_items` sin clave | no | no, devuelve `[]` | nada |
-| `_fallback_image_extraction` | sí | no, devuelve `[]` | nada |
-| Con respuesta de Gemini, los campos que faltan se completan: descripción «Producto», cantidad 1, peso 0,5, origen `BR`/`CN` | sí | sí, **dato por dato** | **nada: es MARIA-1a** (un dato que falta queda vacío y con aviso) |
-| `detect_vendor_from_text` | sí | no, lee el texto del PDF | queda |
-| `simulateOperation()` en `upload.js` (5 productos de ejemplo) | no, el botón ya no está en `dashboard_v2.html` | sólo si alguien lo llama | nada, código muerto |
-| `pdf_extractor_wrapper.py` | no, nadie lo importa (además está roto) | no | nada |
-| Pantalla vieja `static/app.js` (`dashboard.html`) | sí | no: muestra el mensaje con el prefijo «Error procesando PDF:», sin botón | nada, fuera de alcance |
-
-La D del canal («si quitar el modo demostración rompe una pantalla de
-bienvenida o una demo comercial») **no aplica**. Ninguna pantalla depende del
-modo DEMO del servidor. El «simular operación» del frontend es independiente y
-ya no tiene botón.
+- `proyecto_maria/pdf_extractor.py`: funciones nuevas cerca de la línea 1950
+  y las dos copias del lector (~2130-2500). No toqué la zona de la línea 800,
+  que es de la Dev 1.
+- `proyecto_maria/core/paises_iso3.py` (nuevo) y
+  `scripts/datos/generar_paises_iso3.py` (nuevo).
+- `CHANGELOG.md`.
+- El generador del TXT (`core/maria_generator.py`) **no** se tocó.
 
 ## Evidencia
 
-**Rojo antes** (prueba nueva sobre el producto de la base, salida copiada):
+**Rojo antes** (pruebas nuevas contra el producto de la base, salida copiada):
 
 ```
-E   AssertionError: {"message":"PDF procesado exitosamente","filename":"factura.pdf","operacion":{},"items":[{"pieza":"","descripcion":"ITEM DEMOSTRACION (Falta API Key)","cantidad":10.0,"valor_unitario":150.0,"origen":"CN","peso_unitario":1.0},{"pieza":"","descripcion":"Configura GEMINI_API_KEY para usar IA real","cantidad":5.0,"valor_unitario":200.0,"origen":"US","peso_unitario":2.5}],"items_count":2}
-E   assert 200 == 503
-=================== 5 failed, 1 passed, 5 warnings in 0.41s ====================
+E   AssertionError: assert ['CH', 'ME', ...', 'NA', 'CH'] == ['CN', 'MX', ... 'CN', '', '']
+E   assert 1.0 == 0                      (cantidad que falta: antes 1)
+E   AssertionError: el lector no devolvió datos: []   (números en castellano: la copia de producción tiraba la factura)
 ```
 
-**Verde después:** `tests/test_maria2_sin_clave_gemini.py`, 9 passed. Todas las
-pruebas de ese archivo corren con un Gemini falso que falla si alguien lo
-llama: ni Gemini real ni internet.
+El revisor también corrió las pruebas contra la base: 13 failed y 1 passed.
+La que pasa es la de la tabla, que no depende del producto viejo.
 
-| Puerta (sobre `65ea6f3`, worktree limpio) | Resultado |
+| Puerta (sobre `0a1775f`, worktree limpio) | Resultado |
 |---|---|
-| Suite completa `pytest -q --no-cov --timeout=120` | `689 passed, 102 skipped, 9 warnings in 60.62s` (base: 680 passed; +9 nuevas; 0 failed) |
-| Archivos reales y TXT (`test_generar_maria_txt`, `test_maria_subitems`, `test_maria_iext_anio`, `test_maria_gastos_fob`) | `82 passed, 3 warnings in 5.64s`. El generador del TXT no se tocó. |
+| Suite completa `pytest -q --no-cov --timeout=120` | `777 passed, 102 skipped, 24 warnings in 56.72s`, 0 failed |
+| `tests/test_maria1a_lectura_factura.py` + `test_maria2_sin_clave_gemini.py` | `70 passed` |
+| Archivos reales (`test_generar_maria_txt.py`, `test_maria_subitems.py`) | `68 passed, 3 warnings in 4.97s` |
 | `python -m compileall -q proyecto_maria` | sin salida (ok) |
 | `smoke_friccion.sh` contra la API local | `==> OK · telemetría + alias session/state + by-cuit protegido` |
-| `scripts/testing/sabotaje_maria2.sh 65ea6f3` | `OK: los 8 sabotajes dan rojo por la razón esperada` |
-| Captura (Chromium local, API sin clave) | `docs/pm/capturas/maria2-sin-lector.png`. Después del clic en el botón, se ve la pantalla de revisión. |
+| `scripts/testing/sabotaje_maria1a.sh` | `OK: los 10 sabotajes dan rojo por la razón esperada` |
+| `scripts/testing/sabotaje_maria2.sh` (también toca este archivo) | `OK: los 8 sabotajes dan rojo por la razón esperada` |
 
-Sabotajes (cada uno, rojo y con su motivo): vuelve la demo; la demo llega a la
-pantalla si se saca el control; se gasta la cuota; el endpoint no atrapa el
-error (500); el lector corta también con clave; el camino viejo deja escapar el
-error; falta el `code`; una clave en blanco cuenta como clave. Ningún sabotaje
-anterior toca estos archivos: no había otros scripts.
+Los sabotajes de MARIA-1a son:
+1. el país se corta a dos letras;
+2. falta la tabla de tres letras;
+3. se arregla una sola copia;
+4. se adivina 1500 sin pista;
+5. la coma decimal se toma como separador de miles;
+6. vuelve el peso de 0,5;
+7. vuelve la cantidad 1;
+8. el pedido a Gemini vuelve a decir «estimar»;
+9. se pegan los dígitos de un número sucio;
+10. `NA` vuelve a ser Namibia.
 
 **Autorrevisión:**
 
 | Revisor | Modelo y esfuerzo | Hallazgo | Qué hice |
 |---|---|---|---|
-| adversario | Sonnet alto | Media: sin lector, igual se gastaba la cuota diaria | arreglado, con rojo antes (`assert 5 == 4`) |
-| adversario | Sonnet alto | Baja: con clave y Gemini caído, 400 engañoso | D2 |
-| adversario | Sonnet alto | Baja: `pdf_extractor_wrapper.py` muerto, `app.js` viejo sin botón | listados arriba |
-| `/code-review high` | — | El control de lector tapaba la validación del archivo | arreglado, con rojo antes (`assert 503 == 400`) |
-| `/code-review high` | — | Una clave con espacios contaba como clave | arreglado, con rojo antes. Primero intentó llamar a Gemini de verdad y la corté: por eso ahora el archivo prohíbe Gemini. |
-| `/code-review high` | — | `codigo` contra la convención `code` | arreglado |
-| `/code-review high` | — | Sin clave se podría leer el PDF de texto | D1 |
-| `/code-review high` | — | Con clave, un PDF ilegible por Gemini gasta cuota | riesgo bajo, comportamiento previo, fuera de alcance |
-| `/code-review high` | — | El 503 parece una caída para un monitor | riesgo bajo. Railway no reinicia por un 503 de una ruta. |
-| `/code-review high` | — | Hay tres copias de la regla «hay lector» (las otras dos, en caminos no vivos) | fuera de alcance: no las toqué |
-| `/code-review high` | — | El script de sabotajes dejaba una carpeta en /tmp; la demo no se probaba en pantalla | arreglados |
+| adversario | Sonnet alto | Alta: `12x3`, `1/2`, `500 g`, `2.5e3` daban un número equivocado | arreglado con rojo antes |
+| adversario | Sonnet alto | Alta/media: pista decimal falsa porque la copia PyMuPDF le pedía a Gemini «arreglar» los números | arreglado: pide los números tal cual |
+| adversario | Sonnet alto | Media: `NA` daba Namibia | arreglado: vacío |
+| adversario | Sonnet alto | Media: negativos distintos en cada copia; `(1,500.00)` salía positivo | arreglado: vacío |
+| adversario | Sonnet alto | Baja: un ítem raro descartaba la factura entera; `NaN` pasaba | arreglados |
+| adversario | Sonnet alto | Media: `main.py` repone 1 y 0,5 al guardar | D6 |
+| adversario | Sonnet alto | Media: el ejemplo de las instrucciones trae `peso_kg: 0.5` | riesgo (sin Gemini real no se reproduce) |
+| adversario | Sonnet alto | Baja: «Países Bajos» y «República de Sudáfrica» quedan vacíos (la tabla oficial no les da dos letras) | aceptable: vacío, no equivocado |
+| `/code-review high` | — | Flete o seguro ilegibles quedan en 0 sin aviso | D5 |
+| `/code-review high` | — | La regla estricta rechazaba `12 PCS`, `100 USD`, `U$S 1.234,56`; y aceptaba `lb 5` | arreglado: moneda y unidades de cuenta sólo de una lista; `g` y `lb` no |
+| `/code-review high` | — | `1.2,3` y `1,5.00` se leían; `9`×400 daba infinito; un entero gigante cortaba el lector | arreglados con rojo antes |
+| `/code-review high` | — | La copia PyMuPDF sólo atrapaba `ValueError` | arreglado |
+| `/code-review high` | — | La copia de producción sigue pidiendo números | D7 |
+| `/code-review high` | — | `static/app.js` (pantalla vieja) completa el país del vendedor con `CN` | fuera de alcance, pantalla vieja |
+| `/code-review high` | — | Las dos copias duplican el código | fuera de alcance: unificarlas es un refactor |
 
-`/security-review`: no se corrió. La pieza no toca dinero, sesión, permisos
-ni datos. Sólo mueve de lugar la cuota, que gasta menos.
+`/security-review`: no se corrió. La pieza no toca dinero, sesión, permisos ni
+datos guardados.
 
 ## Para reproducir
 
 ```bash
-git fetch origin claude/dev2-maria && git checkout 65ea6f3
-PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 65ea6f3 8080
-# rojo antes: la prueba nueva contra el producto de la base → «5 failed», con ITEM DEMOSTRACION
-git checkout cb8f509 -- proyecto_maria && <venv>/bin/python -m pytest -q --no-cov tests/test_maria2_sin_clave_gemini.py; git checkout 65ea6f3 -- proyecto_maria
-# verde → «9 passed»
-<venv>/bin/python -m pytest -q --no-cov tests/test_maria2_sin_clave_gemini.py
-# sabotajes → «OK: los 8 sabotajes dan rojo por la razón esperada»
-VENV=<venv> scripts/testing/sabotaje_maria2.sh 65ea6f3
+git fetch origin claude/dev2-maria && PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 0a1775f 8080
+# verde → «70 passed»
+<venv>/bin/python -m pytest -q --no-cov tests/test_maria1a_lectura_factura.py tests/test_maria2_sin_clave_gemini.py
+# rojo antes → muchos failed, con ['CH', 'ME', …]
+git checkout 321f34b -- proyecto_maria && <venv>/bin/python -m pytest -q --no-cov tests/test_maria1a_lectura_factura.py; git checkout 0a1775f -- proyecto_maria
+# sabotajes → «OK: los 10 …» y «OK: los 8 …»
+VENV=<venv> scripts/testing/sabotaje_maria1a.sh 0a1775f; VENV=<venv> scripts/testing/sabotaje_maria2.sh 0a1775f
 ```
 
-(Con el producto de la base, la prueba de la clave en blanco intenta llamar a
-Gemini. El Gemini falso de la prueba la corta y no sale a internet.)
+(Con el producto de la base, la prueba de la tabla de tres letras falla por
+`ModuleNotFoundError`. Es lo esperable.)
 
 ## No corrido
 
-- `ataque_aislamiento.sh`: la pieza no toca datos, sesión ni permisos.
+- Facturas reales con Gemini real: está prohibido desde las pruebas. Las dos
+  copias se prueban con un Gemini falso; la de PyMuPDF, además, con un
+  PyMuPDF falso.
+- `ataque_aislamiento.sh`: la pieza no toca sesión ni permisos.
 - `e2e_maria.sh`: no corre en la nube.
-- Una factura real con clave real: prohibido desde pruebas. El camino con
-  clave lo cubre un modelo falso.
 
-## En curso: MARIA-1a (arranqué; sin código todavía)
+Sigo con MARIA-2b.
 
-**D3. La tabla oficial de países no trae códigos de tres letras** (`CHN`,
-`MEX`). Sólo tiene los de dos letras, los nombres y `USA`, y en el repositorio
-no hay otra fuente. Para que `CHN` salga China hace falta una tabla «tres
-letras → dos letras», y eso cambia lo que sale en el TXT.
-- (a) Generarla una vez desde la norma ISO 3166-1 (paquete `pycountry`, sólo
-  para generarla, no como dependencia). Va con una prueba de que cada destino
-  existe en la tabla oficial; el código MARIA lo sigue dando la tabla oficial.
-  **Recomiendo (a).**
-- (b) Sin tabla nueva: `CHN` y `MEX` quedan vacíos y con aviso, nada
-  adivinado. No cumple el criterio «verde con `CHN` y `MEX`».
-
-Mientras no contestes, avanzo con todo lo demás y dejo los de tres letras
-vacíos y con aviso (b), que es lo seguro.
-
-**Plan (para que lo veas antes del código):**
-- Una sola función de origen para las **dos** copias del lector: dos letras
-  o nombre, contra la tabla oficial (`pais_reconocido`), y siempre se
-  devuelve el código de dos letras. Lo que no se reconoce queda vacío. El
-  aviso ya existe: el semáforo dice «Falta indicar el país de origen».
-- **D4.** Si un producto viene sin origen, hoy se completa con el país del
-  vendedor; si el vendedor falta, con `BR` o `CN` fijos. Propongo dejarlo
-  vacío, con el aviso del semáforo. (a) Vacío. **Recomiendo (a)**: el origen
-  no es el país del vendedor. (b) Tomar el del vendedor sólo si se leyó, con
-  un aviso propio.
-- Números: una sola función para cantidad, precio y peso. `1,5` da 1,5.
-  `1,500` da 1500 sólo si la misma factura muestra el punto como decimal (por
-  ejemplo, un precio `2.45`); si no se puede saber, queda vacío y con aviso.
-  El precio con coma también se descartaba en silencio y lo incluyo. Lo que
-  falta (peso, cantidad) queda en 0: la pantalla lo muestra vacío y el
-  semáforo lo marca en rojo. Nunca 0,5 ni 1.
-- Hallazgo de paso, dentro de MARIA-1a: en la copia del lector que se usa con
-  PyMuPDF instalado, `str(2.45).replace('.', '')` convierte un precio 2.45 en
-  245. Hoy PyMuPDF no está en `requirements.txt`, así que en producción corre
-  la otra copia. Lo arreglo con la misma función.
-
-Última vuelta: 2026-10-07
-Contexto: ~28 % (cerca del umbral del 30 %: corte natural acá)
+Última vuelta: 2026-10-07 04:40 UTC
+Contexto: ~45 % (pasado el umbral; compactar cuando Emi pueda)
