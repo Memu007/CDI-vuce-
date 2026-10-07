@@ -234,3 +234,63 @@ def test_el_aviso_de_gastos_dice_lo_que_dice_el_txt():
     assert "MCPL=11.02" in txt
     avisos = supuestos_declarados([_item(100)], incoterm="CIF", flete=5.005, seguro=6.005)
     assert any("11.02" in a for a in avisos) and not any("11.01" in a for a in avisos), avisos
+
+
+# --- Revisión adversaria de la devolución ----------------------------------
+
+@pytest.mark.parametrize("columnas, pesos", [
+    (["Peso neto unitario"], [2.5]),
+    (["Peso neto unitario", "Peso bruto"], [2.5, 30]),
+    (["Net weight per unit", "Gross weight"], [2.5, 30]),
+    (["Peso", "Peso neto unitario"], [3, 2.5]),
+    (["Peso neto unitario", "Peso neto total"], [2.5, 25]),
+])
+def test_el_peso_neto_de_una_unidad_con_otro_nombre(auth_override, client, columnas, pesos):
+    data = _subir(client, columnas, pesos)
+    assert data["items"][0]["peso_unitario"] == pytest.approx(2.5)
+    assert not any("trae sólo" in a for a in data["avisos"]), data["avisos"]
+
+
+def test_una_columna_de_pesos_argentinos_no_es_peso(auth_override, client):
+    data = _subir(client, ["Peso", "Precio en pesos"], [2.5, 1000])
+    assert data["items"][0]["peso_unitario"] == pytest.approx(2.5)
+    assert not any("pesos" in a for a in data["avisos"]), data["avisos"]
+
+
+@pytest.mark.parametrize("texto", ["inf", "Infinity", "-inf"])
+def test_un_peso_infinito_en_texto_no_da_500(auth_override, client, texto):
+    excel = _make_excel_bytes(COLUMNAS + ["Peso neto"], [["84713000", "Notebook", "CN", 4, 350.0, texto],
+                                                        ["84713001", "Monitor", "CN", 2, 100.0, 6]])
+    r = client.post("/upload_excel_v2/", files={"file": ("p.xlsx", io.BytesIO(excel),
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert r.status_code == 200, r.text
+    assert [it["peso_unitario"] for it in r.json()["items"]] == [0, 3]
+    assert any("no es un número" in a for a in r.json()["avisos"]), r.json()["avisos"]
+
+
+def test_el_mapeo_guardado_gana_entre_columnas_de_una_unidad(auth_override, client):
+    r = client.post("/api/clientes", json={"nombre": "Cliente Kg", "cuit": "30123456792"})
+    cid = r.json().get("id") or r.json().get("cliente", {}).get("id")
+    r = client.post(f"/api/clientes/{cid}/column_mapping",
+                    json={"mapping": {"Pieza": "pieza", "Descripcion": "descripcion", "Origen": "origen",
+                                      "Cantidad": "cantidad", "Valor Unitario": "valor_unitario",
+                                      "Kg": "peso_unitario"}})
+    assert r.status_code == 200, r.text
+    excel = _make_excel_bytes(COLUMNAS + ["Peso", "Kg"], [["84713000", "Notebook", "CN", 10, 350.0, 9, 2.5]])
+    r = client.post("/upload_excel_v2/", data={"cliente_id": cid, "use_mapping": "true"},
+                    files={"file": ("p.xlsx", io.BytesIO(excel),
+                           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert r.status_code == 200, r.text
+    assert r.json()["items"][0]["peso_unitario"] == pytest.approx(2.5)
+
+
+def test_el_aviso_nombra_la_columna_como_viene(auth_override, client):
+    data = _subir(client, ["peso_unitario", "Peso neto"], [3, 25])
+    assert data["items"][0]["peso_unitario"] == pytest.approx(2.5)
+    texto = " ".join(data["avisos"])
+    assert "«peso_unitario»" in texto and "(ignorada)" not in texto, data["avisos"]
+
+
+def test_un_peso_enorme_dice_que_es_enorme():
+    with pytest.raises(ValueError, match="tope"):
+        _gen("OP_PESO", [_item(10, peso_kg=1e300)])

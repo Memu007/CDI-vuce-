@@ -218,7 +218,8 @@ reemplazar $M '    df["peso_unitario"] = peso
 caso texto_saca_la_fila "${D}test_un_peso_en_texto_no_saca_la_fila[Peso unitario]"
 
 # 32. el generador sin la guarda del peso
-reemplazar $G "    if not math.isfinite(kilos) or kilos > IMPORTE_MAXIMO or round(kilos, 3) <= 0:" "    if kilos < 0:"
+reemplazar $G "    if not math.isfinite(kilos) or kilos > IMPORTE_MAXIMO:" "    if False:"
+reemplazar $G "    if round(kilos, 3) <= 0:" "    if kilos < 0:"
 caso peso_sin_guarda "${D}test_un_peso_imposible_no_llega_al_txt["
 
 # 33. la guarda existe pero el TXT no la usa
@@ -226,7 +227,7 @@ reemplazar $G 'QARTKGRNET={peso_valido(peso_kg, idx):.3f}' 'QARTKGRNET={peso_kg:
 caso guarda_sin_usar "${D}test_un_peso_imposible_da_400["
 
 # 34. sin tope en el peso
-reemplazar $G "    if not math.isfinite(kilos) or kilos > IMPORTE_MAXIMO or round(kilos, 3) <= 0:" "    if not math.isfinite(kilos) or round(kilos, 3) <= 0:"
+reemplazar $G "    if not math.isfinite(kilos) or kilos > IMPORTE_MAXIMO:" "    if not math.isfinite(kilos):"
 caso peso_sin_tope "${D}test_un_peso_imposible_no_llega_al_txt[peso2]"
 
 # 35. sub-ítems: la suma exacta contra el MARTFOB redondeado
@@ -245,5 +246,31 @@ caso grupo_redondeado_por_producto "${D}test_la_validacion_y_el_txt_dan_lo_mismo
 reemplazar $G '{_dos_decimales(flete) + _dos_decimales(seguro):.2f}' '{float(flete) + float(seguro):.2f}'
 caso aviso_de_gastos_sin_redondear "${D}test_el_aviso_de_gastos_dice_lo_que_dice_el_txt"
 
+# --- Revisión adversaria de la devolución ---
+
+# 39. «Peso neto unitario» o «Net weight per unit» no se reconocen
+reemplazar $M '    return (normal.startswith("peso") and not normal.startswith("pesos")) or "weight" in normal' '    return False'
+caso nombre_de_peso_desconocido "${D}test_el_peso_neto_de_una_unidad_con_otro_nombre["
+
+# 40. una columna de pesos argentinos pasa por peso
+reemplazar $M ' and not normal.startswith("pesos")) or' ') or'
+caso pesos_moneda "${D}test_una_columna_de_pesos_argentinos_no_es_peso"
+
+# 41. «inf» escrito llega a la respuesta
+reemplazar $M '    peso = peso.where(peso.abs() != float("inf"))' '    pass'
+caso inf_en_texto "${D}test_un_peso_infinito_en_texto_no_da_500["
+
+# 42. entre dos de una unidad, el mapeo guardado no manda
+reemplazar $M '                rename.get(c) != "peso_unitario")' '                False)'
+caso mapeo_entre_iguales "${D}test_el_mapeo_guardado_gana_entre_columnas_de_una_unidad"
+
+# 43. entre dos de una unidad, la neta no va primero
+reemplazar $M '"net" not in normal,' 'False,'
+caso neta_entre_iguales "${D}test_el_peso_neto_de_una_unidad_con_otro_nombre[columnas3-pesos3]"
+
+# 44. el aviso nombra la columna con el nombre interno
+reemplazar $M '            avisos = _peso_por_unidad(df, pesos, columna_de)' '            avisos = _peso_por_unidad(df, [columna_de.get(c, c) for c in pesos], columna_de)'
+caso nombre_interno "${D}test_el_aviso_nombra_la_columna_como_viene"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 23 sabotajes dan rojo por la razón esperada"
+echo "OK: los 44 sabotajes dan rojo por la razón esperada"
