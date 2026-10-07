@@ -18,7 +18,7 @@ cd "$WT"
 
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
        VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-PRUEBA="tests/test_catalogo_ncm1.py tests/test_ncm_sugerir_catalog.py"
+PRUEBA="tests/test_catalogo_ncm1.py tests/test_ncm_sugerir_catalog.py tests/test_devolucion2_maria5_ncm.py"
 T="FAILED tests/test_catalogo_ncm1.py::"
 C=proyecto_maria/core/ncm_catalog.py
 M=proyecto_maria/main.py
@@ -98,11 +98,13 @@ reemplazar $C "    if not catalogo or codigo in catalogo:" "    if not catalogo:
 caso aviso_en_falso "${T}test_sin_aviso_para_una_vigente_o_incompleta[85171300]"
 
 # 5. la validación no avisa la baja
-reemplazar $V "        if aviso_ncm:" "        if False:"
+reemplazar proyecto_maria/core/controles_maria.py '        if aviso:
+            advertencias.append(f"Item {n}: {aviso}")' '        if False:
+            advertencias.append(f"Item {n}: {aviso}")'
 caso validacion_sin_aviso "${T}test_la_validacion_avisa_la_baja_sin_frenar"
 
 # 6. la validación frena por la baja
-reemplazar $V '            advertencias.append(f"⚠️ Ítem {i} ({pieza}): {aviso_ncm[0].upper()}{aviso_ncm[1:]}")' '            errores.append(f"⚠️ Ítem {i} ({pieza}): {aviso_ncm[0].upper()}{aviso_ncm[1:]}")'
+reemplazar proyecto_maria/core/controles_maria.py '            advertencias.append(f"Item {n}: {aviso}")' '            errores.append(f"Item {n}: {aviso}")'
 caso baja_frena "${T}test_la_validacion_avisa_la_baja_sin_frenar"
 
 # 7. la sugerencia del historial no dice que se dio de baja
@@ -147,5 +149,18 @@ reemplazar $M "        aviso = ncm_catalog.aviso_de_ncm(ncm_key)
         if ncm_catalog.ncm_de_baja(ncm_key):"
 caso sugerencia_desconocida_sin_aviso "${T}test_una_sugerencia_que_no_esta_en_el_vigente_avisa"
 
+# --- Segunda devolución de la PM ---
+E="FAILED tests/test_devolucion2_maria5_ncm.py::"
+
+# 15. sin catálogo, sin el aviso que lo dice
+reemplazar proyecto_maria/core/controles_maria.py '    if not _codigos_del_nomenclador():
+        if AVISO_SIN_CATALOGO' '    if False:
+        if AVISO_SIN_CATALOGO'
+caso sin_catalogo_callado "${E}test_sin_catalogo_no_se_inventan_errores["
+
+# 16. la baja no sale en los avisos antes de generar
+reemplazar $M '    avisos_ncm = avisos_de_ncm(items)' '    avisos_ncm = []'
+caso baja_fuera_de_avisos "${E}test_la_baja_sale_en_los_avisos_antes_de_generar"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 14 sabotajes dan rojo por la razón esperada"
+echo "OK: los 16 sabotajes dan rojo por la razón esperada"

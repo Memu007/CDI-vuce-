@@ -148,8 +148,8 @@ sabotaje $M "vuelve a descartarse todo producto sin NCM ni origen" \
 # Con MARIA-5 integrada (D23): entre «Peso (kg)» y «Peso (bruto)» decide el
 # rango del peso, no el orden de las columnas.
 sabotaje $M "«Peso (neto)» y «Peso (bruto)» vuelven a confundirse" \
-  '_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "bruto": 3}' \
-  '_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 3, "bruto": 2}' \
+  '_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "dudosa": 3, "bruto": 4}' \
+  '_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 4, "dudosa": 3, "bruto": 2}' \
   "FAILED $L::test_peso_ambiguo_entre_parentesis_queda_vacio_y_no_se_adivina"
 sabotaje $M "el Excel vuelve a usar los hilos del PDF" \
   'def _pool_lectura_excel():

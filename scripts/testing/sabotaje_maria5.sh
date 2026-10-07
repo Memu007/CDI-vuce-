@@ -19,7 +19,7 @@ cd "$WT"
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
        VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
 unset ENABLE_PDF_LLM_FALLBACK || true
-PRUEBA="tests/test_maria5_devolucion.py tests/test_maria5_peso.py tests/test_maria5_centavos.py tests/test_maria5_caratula_vacia.py tests/test_maria5_lector_productos.py tests/test_maria5_peso_lector.py tests/test_maria5_peso_excel.py"
+PRUEBA="tests/test_devolucion2_maria5_ncm.py tests/test_maria5_devolucion.py tests/test_maria5_peso.py tests/test_maria5_centavos.py tests/test_maria5_caratula_vacia.py tests/test_maria5_lector_productos.py tests/test_maria5_peso_lector.py tests/test_maria5_peso_excel.py"
 T="FAILED tests/test_maria5_"
 G=proyecto_maria/core/maria_generator.py
 M=proyecto_maria/main.py
@@ -167,7 +167,7 @@ reemplazar $M '    if clase == "bruto":
 caso bruto_en_silencio "${T}peso_excel.py::test_el_bruto_solo_se_usa_dividido_y_con_aviso"
 
 # 21. el bruto vuelve a ganarle al neto
-reemplazar $M '_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "bruto": 3}' '_RANGO_DE_PESO = {"neto": 3, "linea": 1, "unidad": 2, "bruto": 0}'
+reemplazar $M '_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "dudosa": 3, "bruto": 4}' '_RANGO_DE_PESO = {"neto": 4, "linea": 1, "unidad": 2, "dudosa": 3, "bruto": 0}'
 caso bruto_antes_que_neto "${T}peso_excel.py::test_con_neto_y_bruto_se_usa_el_neto"
 
 # 22. la columna de peso vuelve a mirarse sólo por nombre exacto
@@ -198,7 +198,7 @@ reemplazar $M '_RANGO_DE_PESO = {"neto": 0, "linea": 1,' '_RANGO_DE_PESO = {"net
 caso total_antes_que_neto "${D}test_excel_el_neto_le_gana_al_total"
 
 # 28. Excel: el de una unidad le gana al de la línea
-reemplazar $M '"unidad": 2, "bruto": 3}' '"unidad": -1, "bruto": 3}'
+reemplazar $M '"unidad": 2, "dudosa": 3, "bruto": 4}' '"unidad": -1, "dudosa": 3, "bruto": 4}'
 caso unidad_antes_que_linea "${D}test_excel_con_dos_pesos_gana_el_de_la_linea[Peso-Peso neto]"
 
 # 29. Excel: el mapeo guardado manda sobre el neto
@@ -270,5 +270,37 @@ caso neta_entre_iguales "${D}test_el_peso_neto_de_una_unidad_con_otro_nombre[col
 reemplazar $M '            avisos = _peso_por_unidad(df, pesos, columna_de)' '            avisos = _peso_por_unidad(df, [columna_de.get(c, c) for c in pesos], columna_de)'
 caso nombre_interno "${D}test_el_aviso_nombra_la_columna_como_viene"
 
+# --- Segunda devolución de la PM ---
+E="FAILED tests/test_devolucion2_maria5_ncm.py::"
+
+# 45. una columna dudosa le gana a una reconocida
+reemplazar $M '"dudosa": 3, "bruto": 4}' '"dudosa": 1.5, "bruto": 4}'
+caso dudosa_gana "${E}test_una_columna_desconocida_no_le_gana_a_una_reconocida[columnas0-pesos0]"
+
+# 46. una columna dudosa sola, sin aviso
+reemplazar $M '    if clase == "dudosa":
+        avisos.append(' '    if False:
+        avisos.append('
+caso dudosa_sin_aviso "${E}test_una_columna_desconocida_sola_se_usa_con_aviso"
+
+# 47. «Peso bruto unitario» vuelve a leerse como de una unidad
+reemplazar $M '    if "bruto" in normal or "gross" in normal:
+        return "bruto"
+    if "unit" in normal or "unidad" in normal:
+        return "unidad"' '    if "unit" in normal or "unidad" in normal:
+        return "unidad"
+    if "bruto" in normal or "gross" in normal:
+        return "bruto"'
+caso bruto_unitario "${E}test_el_bruto_unitario_es_bruto["
+
+# 48. dos pesos de la línea que no coinciden, sin los números
+reemplazar $M '        if clase_de(col) in ("neto", "linea"):' '        if False:'
+caso dos_lineas_sin_numeros "${E}test_dos_pesos_de_la_linea_que_no_coinciden_muestran_los_numeros"
+
+# 49. un peso NaN pasa sin mensaje propio
+reemplazar $G '    if not math.isfinite(kilos):
+        raise ValueError(f"Item {donde}: el peso «{str(peso)[:20]}» no es un número válido.")' '    pass'
+caso nan_sin_mensaje "${E}test_los_mensajes_del_peso_dicen_la_razon["
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 44 sabotajes dan rojo por la razón esperada"
+echo "OK: los 49 sabotajes dan rojo por la razón esperada"
