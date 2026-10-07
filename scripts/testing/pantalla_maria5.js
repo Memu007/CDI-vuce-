@@ -1,5 +1,6 @@
 // MARIA-5 en el navegador local, contra el servidor local (sin terceros).
-// Una operación con 10 notebooks de 2,5 kg y dos productos más, flete 10 y
+// Primero, la pantalla de NCM (peso de la línea y grupos). Después, una
+// operación con 10 notebooks de 2,5 kg y dos productos más, flete 10 y
 // seguro 10. La validación muestra el peso total y el valor; el TXT que sale
 // de la pantalla declara el mismo peso (25 kg) y el mismo FOB, y sus cuentas
 // cierran al centavo (el flete de los ítems suma 10,00).
@@ -17,6 +18,41 @@ const centavos = s => Math.round(parseFloat(s) * 100);
 
   await page.goto(base + '/dashboard');
   await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.despachante);
+
+  // Pantalla de NCM: el peso de la línea debajo del unitario, y un grupo que
+  // se edita reparte entre sus productos lo que muestra (antes copiaba el
+  // total del grupo a cada producto y el TXT sumaba de más).
+  await page.evaluate(() => {
+    CDI.state = CDI.state || {};
+    CDI.state.operacion = { numero_factura: 'F-M5', moneda: 'DOL', incoterm: 'FOB', fecha_emision: '22/06/2026' };
+    CDI.state.items = [
+      { pieza: '84713012100F', descripcion: 'Notebook importada de prueba', origen: 'CN', cantidad: 10, valor_unitario: 10, peso_unitario: 2.5 },
+      { pieza: '94037000000X', descripcion: 'Silla de madera de prueba', origen: 'CN', cantidad: 2, valor_unitario: 50, peso_unitario: 3, grupo_id: 1 },
+      { pieza: '94037000000X', descripcion: 'Mesa de madera de prueba', origen: 'CN', cantidad: 2, valor_unitario: 20, peso_unitario: 1, grupo_id: 1 },
+    ];
+    CDI.goTo('ncm');
+  });
+  await page.locator('[data-peso-total="0"]', { hasText: '25 kg' }).waitFor({ timeout: 10000 }).catch(() => falla('no se ve el peso de la línea (25 kg) debajo del unitario'));
+  await page.fill('input[data-row="0"][data-field="cantidad"]', '4');
+  await page.locator('[data-peso-total="0"]', { hasText: '10 kg' }).waitFor({ timeout: 5000 }).catch(() => falla('el peso de la línea no se actualiza al cambiar la cantidad'));
+  console.log('OK la pantalla de NCM muestra el peso de la línea y lo actualiza');
+  const grupo = async (campo, valor) => {
+    await page.fill('input[data-grupo-id="1"][data-field="' + campo + '"]', valor);
+    await page.locator('input[data-grupo-id="1"][data-field="' + campo + '"]').blur();
+  };
+  await grupo('cantidad', '6');
+  await grupo('valor_unitario', '40');
+  await grupo('peso_unitario', '4');
+  const g = await page.evaluate(() => CDI.state.items.filter(it => it.grupo_id === 1)
+    .map(it => ({ c: it.cantidad, v: it.valor_unitario, p: it.peso_unitario })));
+  const cant = g.reduce((s, x) => s + x.c, 0);
+  const fob = g.reduce((s, x) => s + x.c * x.v, 0);
+  const peso = g.reduce((s, x) => s + x.c * x.p, 0);
+  if (cant !== 6 || g.some(x => !Number.isInteger(x.c))) falla('la cantidad del grupo quedó ' + JSON.stringify(g));
+  if (Math.abs(fob - 240) > 1e-6) falla('el FOB del grupo es ' + fob + ' y la fila muestra 6 × 40 = 240');
+  if (Math.abs(peso - 24) > 1e-6) falla('el peso del grupo es ' + peso + ' y la fila muestra 6 × 4 = 24');
+  if (!(g[0].v > g[1].v)) falla('se perdió la proporción de valores del grupo: ' + JSON.stringify(g));
+  console.log('OK editar el grupo reparte: cantidad 6, FOB 240, peso 24, y la silla sigue valiendo más que la mesa');
   await page.evaluate(() => {
     CDI.state = CDI.state || {};
     CDI.state.operacion = { numero_factura: 'None', moneda: 'DOL', incoterm: 'CIF', fecha_emision: '22/06/2026',
