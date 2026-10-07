@@ -2,6 +2,80 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## SUBITEMS-1 — entregada: **`88564ec`**
+
+**Resultado: terminada. Para decidir: la D27 (guardar los subítems con la
+operación).** Base: tu rama hasta `8d87c47` (`db2bc04`), sobre la reentrega
+de MARIA-5 y CATALOGO-NCM-1, que está en revisión.
+
+| # | Qué hace | Rojo antes → verde |
+|---|---|---|
+| 1. Pantalla | En el paso de NCM (`ncm.js`), cada producto no agrupado tiene «Subítems»: un panel para cargar, editar y borrar subítems (cantidad, valor unitario y sufijo de valor). Propone la cantidad que falta y dice en vivo si suman lo del producto («✓ Suman 6 de 6 unidades y 7.182,00 de 7.182,00 de valor»; ⚠ si no). Un producto con subítems no se agrupa. `buildMariaRequest` los manda con el formato de `/generate_maria`. Si todos los productos van en subítems con sufijo propio, el sufijo general no se pide (el servidor tampoco lo pedía) | `pantalla_subitems1.js` contra `db2bc04`: `FALLA: no aparece el botón «Subítems» del producto`; con la pieza, `OK: pantalla SUBITEMS-1` |
+| 2. Controles | Generador: cada sub-ítem con cantidad y valor unitario > 0 y la cantidad con hasta dos decimales (el TXT la declara con dos). Un producto agrupado no lleva sub-ítems. `/generate_maria`: el error del sufijo de un sub-ítem dice cuál es, y un pedido con sub-ítems de otra forma da 400. Todos los errores dicen «Item N, sub-ítem M». Antes, una cantidad negativa compensada por otra cerraba la suma y generaba | `tests/test_subitems1.py` contra `db2bc04`: el error no nombraba el sub-ítem, o generaba |
+| 3. PUNTA-A-PUNTA-1 | Los subítems llegan por el panel: la prueba los carga como la pantalla y la copia de `buildMariaRequest` los manda. **La D24 sale del `xfail`** | — |
+
+**El archivo real con subítems, por la pantalla.** `pantalla_subitems1.js`
+lo carga en el navegador (6 × 1197, 2 + 4 con sus dos sufijos) y genera. Los
+dos `[SBT]` salen idénticos a `maria_golden_subitems_anon.TXT`, salvo el
+número de operación (D23 y D25 de la Dev 1). `QARTKGRNET=33.000` y
+`MARTFOB=7182.00` también coinciden. El archivo entero se compara en
+`test_punta_a_punta1.py`, con la copia en Python de la pantalla.
+
+**Autorrevisión (Sonnet alto).** XSS, reordenar filas, «Agregar producto»,
+desagrupar, comas y decimales se sostienen. Arreglé lo que encontró (en
+`ae6ff5f` y `88564ec`):
+- Un subítem de cantidad 0,004 salía `QSBTUNTDCL=0.00` y `MSBTFOB=0.00`, sin
+  error.
+- Deshacer una acción masiva resucitaba un subítem borrado. Lo comprobé
+  levantando una copia sin el arreglo: `FALLA: deshacer la acción masiva
+  resucitó el subítem borrado`.
+- La suma del panel no seguía a la cantidad del producto.
+- Los errores de sufijo no decían qué subítem.
+- El sufijo general se pedía igual.
+- Enter caía en el panel.
+- Unos pedidos fabricados daban 500.
+
+| Puerta | Resultado |
+|---|---|
+| Suite completa, worktree limpio en `88564ec`, venv sólo con `requirements.txt` | `1475 passed, 102 skipped, 2 xfailed, 25 warnings in 151.49s`, 0 failed |
+| `sabotaje_subitems1.sh 88564ec` (7) | `OK: los 7 sabotajes dan rojo por la razón esperada` |
+| Sabotajes vecinos en `88564ec` (MARIA-5, MARIA-3, `maria1b.sh` y `punta_a_punta1.sh` de la Dev 1) | `OK: los 44` (MARIA-5) y `OK: los 30` (MARIA-3); `maria1b.sh` y `punta_a_punta1.sh`: `sabotajes con falla: 0` |
+| `pantalla_subitems1.js` (local, `ae6ff5f`) | `OK: pantalla SUBITEMS-1`; captura en `docs/pm/capturas/subitems1-panel.png` |
+
+### D27 — Guardar los subítems con la operación
+
+`operation_items` no tiene dónde guardarlos, y `saveOperationToHistory` no
+los manda. Lo mismo pasa con el estado de MARIA-4. Hoy no se pierde nada a la
+vista: ningún camino de la v2 reabre una operación del historial en la
+pantalla. Lo en curso sobrevive a recargar la página (`cdi_v2_state`).
+
+Opciones:
+- **(a) Recomiendo:** dejarlo así hasta que exista «reabrir una operación».
+  Esa pieza lleva la columna (JSON) y la migración.
+- **(b)** Hacerlo ahora: una migración en `operation_items`.
+
+**Riesgos y lo que no hice:**
+- La cantidad de un **producto** con más de dos decimales tiene el mismo
+  redondeo en `QARTUNTDCL`. Ya pasaba antes y no lo toqué.
+- Un campo vacío del panel viaja como 0, y el error dice «la cantidad «0»…».
+  Es cosmético.
+- Ni el lector de PDF ni el Excel detectan subítems solos: no estaba en el
+  alcance.
+- No corrido: el Kit del despachante. Nada contra producción ni terceros.
+
+Para reproducir:
+```
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 88564ec 8890
+BASE_URL=http://127.0.0.1:8890 node scripts/testing/pantalla_subitems1.js   # «OK: pantalla SUBITEMS-1»
+scripts/testing/sabotaje_subitems1.sh 88564ec /tmp/cdi-pm/venv              # «OK: los 7 sabotajes …»
+python -m pytest -q tests/test_subitems1.py tests/test_punta_a_punta1.py tests/test_maria_subitems.py
+```
+
+Última vuelta: 2026-10-07 19:45 UTC
+Contexto: ~55 % (a compactar)
+
+---
+
 ## MARIA-5 y CATALOGO-NCM-1 — reentrega conjunta sobre tu rama: **`6854f34`**
 
 **Resultado: hecho lo que pide la D23 (`7e263eb`). Para decidir: nada.**
