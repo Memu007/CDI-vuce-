@@ -440,10 +440,11 @@ def test_el_recorrido_pasa_por_el_login_y_el_csrf_de_verdad(monkeypatch):
 
 
 def test_una_factura_con_coma_decimal_da_el_mismo_archivo(monkeypatch):
-    """La misma factura escrita a la europea: «5.000,00», «3.221,66»."""
+    """La misma factura escrita a la europea: «5.000,00», «3.221,66». El peso
+    «1.220» solo es ambiguo: es 1220 kg porque la factura usa la coma."""
     factura = {**FACTURA, "gemini": {
         "operacion": {**FACTURA["gemini"]["operacion"], "flete": "3.221,66", "seguro": "50,00"},
-        "items": [{**FACTURA["gemini"]["items"][0], "valor_unitario": "5.000,00", "peso_kg": "1.220,00"}],
+        "items": [{**FACTURA["gemini"]["items"][0], "valor_unitario": "5.000,00", "peso_kg": "1.220"}],
     }}
     txt, operation_id = _por_pdf(monkeypatch, factura).generar_y_descargar()
     assert txt == _como_sale_por_la_pantalla(_leer(_GOLDEN_PATH), "000999001", operation_id)
