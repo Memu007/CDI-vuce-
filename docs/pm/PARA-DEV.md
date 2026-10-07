@@ -77,4 +77,23 @@ generar el TXT, no lo que sale en él.
 **Criterios:** rojo antes y verde después por cada control; los dos archivos
 reales siguen saliendo idénticos; suite completa en verde.
 
-**Después:** PUNTA-A-PUNTA-1 y EXCEL-2.
+**Después:** PUNTA-A-PUNTA-1 (abajo) y EXCEL-2.
+
+## Siguiente, apenas entregues — PUNTA-A-PUNTA-1: una prueba de todo el camino
+
+Escrita el 2026-10-07, 13:15 UTC, mientras la PM revisa MARIA-1b. Si el
+veredicto de MARIA-1b trae devolución, la devolución va primero.
+
+**Base:** tu rama (con MARIA-1b).
+
+**Alcance:** una prueba automática, sin red y dentro de la suite, que hace el
+recorrido de Emi por las rutas HTTP que usa la pantalla v2, con el pedido
+armado como lo arma ella: login, subir un PDF (Gemini simulado que devuelve
+los datos del archivo real), revisar, generar y descargar el TXT. Lo compara
+byte a byte con `tests/fixtures/maria_golden_anon.TXT` y con el de subítems.
+Lo mismo con un Excel armado con los datos del archivo real. Es una pieza de
+pruebas: si encontrás un defecto del producto, D; no se arregla acá.
+
+**Criterios:** rojo con sabotajes en el lector, en el mapeo del Excel y en el
+generador (una línea cada uno); la prueba corre en la CI (`ci.yml` deselecciona
+algunas: comprobá que ésta no); suite completa en verde.
