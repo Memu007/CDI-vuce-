@@ -61,17 +61,33 @@ sabotaje $C "la SIM se corta a 10 caracteres" \
   '    return ncm[:10]' \
   "FAILED $T::test_la_forma_del_ncm_que_guarda_el_historial[84714900100D-84714900]"
 sabotaje $M "el historial vuelve a ir en el mismo commit que la operación" \
-  $'        # guardaba nada (GUARDAR-1).\n        await db.commit()\n        operation_id = operation.id\n        billing_entity, _ = await _get_billing_entity(db, db_user)\n        billing_service.record_operation_created(billing_entity)\n        await db.commit()' \
-  $'        # guardaba nada (GUARDAR-1).\n        await db.flush()\n        operation_id = operation.id\n        billing_entity, _ = await _get_billing_entity(db, db_user)\n        billing_service.record_operation_created(billing_entity)\n        await db.flush()' \
+  $'        billing_service.record_operation_created(billing_entity)\n        await db.commit()\n        operation_id = operation.id' \
+  $'        billing_service.record_operation_created(billing_entity)\n        await db.flush()\n        operation_id = operation.id' \
   "FAILED $T::test_si_el_historial_falla_la_operacion_igual_se_guarda"
 sabotaje $M "editar vuelve a cortar a 10 caracteres" \
-  '        row.ncm = ncm_nuevo or ""' \
+  '        row.ncm = ncm_nuevo' \
   '        row.ncm = str(body["ncm"]).strip()[:10]' \
   "FAILED $T::test_editar_un_producto_con_la_sim_completa_no_deja_un_codigo_cortado"
 sabotaje $M "editar vuelve a aceptar cualquier cosa" \
-  '            raise HTTPException(status_code=400, detail="El NCM no es válido.")' \
+  '            raise HTTPException(status_code=400, detail="El NCM no es válido: tiene que tener sus 8 dígitos.")' \
   '            pass' \
   "FAILED $T::test_editar_un_producto_con_la_sim_completa_no_deja_un_codigo_cortado"
+sabotaje $M "el contador del plan vuelve a ir después de guardar la operación" \
+  $'        billing_service.record_operation_created(billing_entity)\n        await db.commit()\n        operation_id = operation.id' \
+  $'        await db.commit()\n        billing_service.record_operation_created(billing_entity)\n        await db.commit()\n        operation_id = operation.id' \
+  "FAILED $T::test_si_falla_el_contador_del_plan_no_queda_una_operacion_gratis"
+sabotaje $M "la respuesta vuelve a callar que el historial falló" \
+  $'    except Exception:\n        historial_guardado = False\n        await db.rollback()' \
+  $'    except Exception:\n        await db.rollback()' \
+  "FAILED $T::test_si_el_historial_falla_la_operacion_igual_se_guarda"
+sabotaje $M "la moneda vuelve a no recortarse" \
+  '            currency=str(data.get("currency") or "USD")[:3],' \
+  '            currency=data.get("currency") or "USD",' \
+  "FAILED $T::test_datos_largos_de_la_operacion_no_impiden_guardarla"
+sabotaje $M "aprender vuelve a contar lo que no guardó" \
+  '            updated += aprendido is not None' \
+  '            updated += 1' \
+  "FAILED $T::test_aprender_no_cuenta_lo_que_no_guardo"
 
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]

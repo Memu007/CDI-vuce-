@@ -86,6 +86,15 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
     hist = dict(sql("select descripcion, ncm from client_product_history where client_id=%s", cid))
     chequear(hist.get("TELEFONO DE PRUEBA") == "85171300", f"aprender guarda el NCM de la SIM ({hist})")
 
+    # Otros datos del mismo guardado con columnas de largo fijo o que
+    # Postgres no acepta: moneda, origen, fecha del cliente, grupo, NUL.
+    r = c.post("/api/clientes", json={"nombre": "Cliente sin fecha", "cuit": "30999999995"})
+    cid2 = r.json()["cliente"]["id"]
+    r = c.post(f"/api/clientes/{cid2}/operaciones", json={
+        "currency": "DOLARES", "source": "x" * 80, "comprador_fecha_inic_activ": "2020-01-15T00:00:00",
+        "items": [{"pieza": "84714900100D", "descripcion": "COMPU\x00TADORA", "origen": "CHN", "grupo_id": "g1"}]})
+    chequear(r.status_code == 200, f"datos largos de la operación no impiden guardarla ({r.status_code} {r.text[:160]})")
+
     # El historial no puede tirar abajo el guardado: aunque otro dato no
     # entre en su columna, la operación queda guardada.
     import proyecto_maria.services.client_memory as memoria
