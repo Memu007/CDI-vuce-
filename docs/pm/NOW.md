@@ -19,8 +19,9 @@ antes de cerrar la Fase 3.
 1. **Segunda publicación, candidato `6ea8ca9`** (atacado en
    `REPRODUCCION-PUBLICACION-2-2026-10-07.md`): arregla el país de origen,
    suma los controles antes de generar, el Excel y lo del despachante. Falta
-   el «dale» de Emi para ese SHA. Emi tiene que confirmar que su caso
-   habitual es reventa (el IVA adicional pasa a `NO_VALIDA`).
+   que Emi escriba «dale 6ea8ca9»: su «dale a todo» (~15:27 ARG) lo frenó el
+   sistema de permisos de la sesión, que pide la autorización explícita.
+   Reventa confirmada (el IVA adicional pasa a `NO_VALIDA`).
    Después de publicar: Emi genera un TXT con una factura real y lo revisa.
    La línea «Billing cron» no aparece si nadie pasa a impago.
 1b. **Sin volumen** (Emi, 2026-10-07): cada publicación o reinicio borra los
@@ -34,9 +35,6 @@ antes de cerrar la Fase 3.
 4. **Catálogo NCM:** Emi trajo el nomenclador vigente (2026-10-07). Lo
    carga la Dev 2 en CATALOGO-NCM-1. Una línea de Emi: ¿lo bajó de
    `arca.gob.ar`?
-4b. **Mercado Pago:** ¿están puestas en Railway las variables
-   `MP_PREAPPROVAL_PLAN_ID_…` (las de la suscripción)? Si no están, la
-   renovación de COBRO-MP-1 no corre en producción.
 5. **Hasta publicar MARIA-1a: revisar el país de origen de cada TXT** antes
    de mandárselo al despachante. El código publicado corta el país a dos
    letras: si la lectura devuelve «CHN» o «China», sale Suiza.
@@ -78,10 +76,9 @@ Archivos abiertos por Dev:
 
 - **Dev 1:** EXCEL-2 entregada (`3e6e63e`, D27), en revisión: rojo antes
   (`43 failed, 8 passed`) y suite (`1277 passed, 102 skipped, 3 xfailed`)
-  hechos; falta el subagente. Mientras tanto, COBRO-MP-1 pasos 1 y 3, con
-  D28 a D31 contestadas (`074a50b`). Si Emi dice que sí a GUARDAR-1, pasa a
-  esa.
-- **Dev 2:** devolución de MARIA-5 (dos pesos para una línea, filas que desaparecen, guarda del peso, subítems, grupos, una sola cuenta). Sigue: CATALOGO-NCM-1; MARIA-6 cuando lleguen los archivos reales del despachante.
+  hechos; falta el subagente. Ahora GUARDAR-1 (Emi dijo que sí). COBRO-MP-1,
+  en pausa en `83b4ec1` con D28 a D31 contestadas (`074a50b`).
+- **Dev 2:** devolución de MARIA-5 (dos pesos para una línea, filas que desaparecen, guarda del peso, subítems, grupos, una sola cuenta). Sigue: CATALOGO-NCM-1, SUBITEMS-1 (Emi: sus facturas traen subítems) y MARIA-6 cuando lleguen los archivos reales del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
   RENDIMIENTO-1 y 1b (`ec3d793`), MARIA-1a, 2b, 1c, 4, 3 y 1d (`9679e21`).
   Suite sobre la rama integrada (`7b42556`, venv armado sólo con el
@@ -159,12 +156,12 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 18:35 UTC: Emi compactó a la PM. EXCEL-2 en revisión (falta el
-subagente, que va después de las 18:50 UTC, cuando se renueva el límite de
-5 horas de la cuenta; las tres sesiones estaban en aviso). D28 a D31 de la
-Dev 1 contestadas. La Dev 2 integra EXCEL-1 con la regla del peso (recibió la
-D23). Esperan a Emi: «dale 6ea8ca9», GUARDAR-1, reventa, subítems y las
-variables de la suscripción. Dev 1 en 68 %: falta su `/compact`.
+2026-10-07 18:45 UTC: Emi contestó «dale a todo» y que la suscripción está en
+Railway. GUARDAR-1 entra (Dev 1, antes que COBRO-MP-1); reventa confirmada;
+SUBITEMS-1 entra (Dev 2). El push de `6ea8ca9` a `main` lo frenó el sistema
+de permisos: falta «dale 6ea8ca9» escrito. EXCEL-2: falta el subagente
+(después de las 18:50 UTC, cuando se renueva el límite de 5 horas). Dev 1
+compactada (11 %).
 
 ## Medición
 

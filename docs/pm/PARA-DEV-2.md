@@ -145,7 +145,8 @@ Asignada el 2026-10-07 (M1 y M9 de `AUDITORIA-2026-10-06.md`).
 en `QARTKGRNET`; un caso que hoy suma 10,01 da 10,00; los dos archivos reales
 salen idénticos; suite completa en verde.
 
-**Después:** MARIA-6 cuando lleguen los archivos reales del despachante.
+**Después:** SUBITEMS-1 (al final de este archivo) y MARIA-6 cuando lleguen
+los archivos reales del despachante.
 
 ## Siguiente, apenas entregues — CATALOGO-NCM-1: el catálogo NCM vigente
 
@@ -182,3 +183,25 @@ siguen idénticos (sus NCM, 8471.49.00 y 8479.89.99, están en el vigente); la
 sugerencia de NCM no propone posiciones dadas de baja sin decirlo; suite
 completa en verde.
 
+## Después de CATALOGO-NCM-1 — SUBITEMS-1: subítems en la pantalla
+
+Escrita el 2026-10-07, 18:40 UTC. Emi confirmó que sus facturas traen
+subítems. Hoy la pantalla v2 no tiene dónde cargarlos (D24 de la Dev 1): la
+prueba de punta a punta los agrega a mano al pedido.
+
+**Alcance:**
+1. En la revisión de la v2, cada producto puede llevar subítems: cargarlos,
+   editarlos, borrarlos y verlos, con el formato que ya recibe
+   `/generate_maria` (el de `maria_golden_subitems_anon.TXT`).
+2. Los controles de siempre valen para los subítems (montos, la suma contra
+   el producto con la tolerancia de MARIA-5), y el error dice qué subítem
+   falla.
+3. En `tests/test_punta_a_punta1.py`, los subítems llegan por el camino de la
+   pantalla y la D24 sale del `xfail`.
+
+**Fuera de alcance:** que el lector de PDF o de Excel detecte los subítems
+solo. Si hace falta para que sirva, D con lo que viste.
+
+**Criterios:** rojo antes y verde después; el archivo real con subítems sale
+idéntico por la pantalla; una prueba de pantalla (`pantalla_*.js`) carga
+subítems y genera; suite completa en verde.
