@@ -134,3 +134,71 @@ def test_pagar_con_la_cuenta_vencida_cuenta_desde_hoy(client):
     assert despues["billing_status"] == "active"
     falta = _fin(despues) - datetime.now(timezone.utc)
     assert timedelta(days=29) < falta <= timedelta(days=30), falta
+
+
+def _org(usuario: str, **campos) -> str:
+    """Una organización del usuario, escrita directo en la base."""
+    import asyncio
+    import uuid
+    from proyecto_maria.database.connection import get_async_session
+    from proyecto_maria.database.models import Organization
+    org_id = str(uuid.uuid4())
+
+    async def _crear():
+        async for db in get_async_session():
+            db.add(Organization(id=org_id, name=f"Estudio {usuario}", owner_username=usuario, **campos))
+            await db.commit()
+            return
+    asyncio.new_event_loop().run_until_complete(_crear())
+    return org_id
+
+
+def _leer_org(org_id: str, **cambios) -> dict:
+    import asyncio
+    from proyecto_maria.database.connection import get_async_session
+    from proyecto_maria.database.models import Organization
+    leido = {}
+
+    async def _run():
+        async for db in get_async_session():
+            org = await db.get(Organization, org_id)
+            for k, v in cambios.items():
+                setattr(org, k, v)
+            await db.commit()
+            leido.update(billing_status=org.billing_status, trial_ends_at=org.trial_ends_at,
+                         ops_used_this_period=org.ops_used_this_period,
+                         extra_ops_remaining=org.extra_ops_remaining)
+            return
+    asyncio.new_event_loop().run_until_complete(_run())
+    return leido
+
+
+def test_organizacion_alternar_dos_pagos_viejos_no_renueva(client):
+    usuario = _unique("mp1_org")
+    _register(client, usuario)
+    org_id = _org(usuario)
+    a = _pago(f"poa-{usuario}", f"org:{org_id}:premium")
+    b = _pago(f"pob-{usuario}", f"org:{org_id}:premium")
+    t = _pago(f"pot-{usuario}", f"org:{org_id}:topup", monto=10000.0)
+    for pid in (a, b, t):
+        assert _aviso_ipn(client, pid).status_code == 200
+    vencida = datetime.now(timezone.utc) - timedelta(days=40)
+    extra = _leer_org(org_id, billing_status="past_due", trial_ends_at=vencida,
+                      ops_used_this_period=999)["extra_ops_remaining"]
+    for pid in (a, b, t, a, b, t):
+        assert _aviso_ipn(client, pid).status_code == 200
+    despues = _leer_org(org_id)
+    assert despues["billing_status"] == "past_due", despues
+    assert despues["ops_used_this_period"] == 999, despues
+    assert despues["extra_ops_remaining"] == extra, despues
+
+
+def test_organizacion_pagar_activa_extiende_desde_el_fin(client):
+    usuario = _unique("mp1_orge")
+    _register(client, usuario)
+    fin_actual = datetime.now(timezone.utc) + timedelta(days=20)
+    org_id = _org(usuario, billing_status="active", plan="premium", trial_ends_at=fin_actual)
+    pid = _pago(f"poe-{usuario}", f"org:{org_id}:premium")
+    assert _aviso_ipn(client, pid).status_code == 200
+    nuevo = _fin(_leer_org(org_id))
+    assert abs((nuevo - (fin_actual + timedelta(days=30))).total_seconds()) < 120, nuevo
