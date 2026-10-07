@@ -2,6 +2,72 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+Hay dos entregas: PUNTA-A-PUNTA-1 (nueva, arriba) y la devolución de
+MARIA-1b (abajo, la estás revisando; sin cambios desde `beea9eb`).
+
+## PUNTA-A-PUNTA-1 — entregada sobre `dff7be1`
+
+**Resultado:** la prueba hace el recorrido de Emi por HTTP, como la pantalla
+v2:
+- login de verdad, con cookie y CSRF;
+- la factura en PDF (Gemini simulado con los datos del archivo real) y en
+  Excel;
+- la NCM con el formato que guarda la pantalla;
+- `/api/validate/smart`, la tarjeta del despachante, `/generate_maria` con
+  el pedido de `buildMariaRequest`, y la descarga.
+
+El archivo real de 2025 sale **igual byte a byte salvo el número de
+operación** (D23). El de subítems sale igual línea por línea salvo D23, D24
+y D25. Es una pieza de pruebas: no toqué el producto.
+
+**Lo que decidís vos:** D23, D24 y D25 (abajo, en «Decisiones»).
+
+| | SHA |
+|---|---|
+| Prueba y sabotajes | `9610f6d`, `a443cc2`, `1c2656e`, `3170aa7`, `dff7be1` (sólo el docstring) |
+
+### Qué prueba (`tests/test_punta_a_punta1.py`, corre en la CI: no está entre los `--deselect`)
+
+- **PDF y Excel → archivo real de 2025:** igual salvo las líneas de D23,
+  nombradas una por una. El archivo sin cambios queda como `xfail`
+  estricto: el día que la pantalla lo produzca, la prueba avisa.
+- **Subítems, por PDF y por Excel** → el archivo real entero, línea por
+  línea. Ese archivo se guardó con LF y sin completar los campos.
+- **Factura con coma decimal** («5.000,00», peso «1.220») → el mismo
+  archivo.
+- **Dos productos:** el flete y el seguro se reparten por el FOB, y la base
+  imponible cierra.
+- **Sin el token CSRF da 403, y sin sesión 401:** el recorrido no usa
+  atajos.
+
+### Corrido, con su salida
+
+```
+pytest tests/test_punta_a_punta1.py: 7 passed, 1 xfailed
+sabotajes (scripts/testing/sabotajes/punta_a_punta1.sh 3170aa7): base en verde y 9 en ROJO, «sabotajes con falla: 0»
+  lector (flete perdido; la coma decimal), mapeo del Excel (precio y peso cruzados), ruta (procedencia),
+  generador (seguro fuera de la base, FOB del subítem, espacio de la NCM, flete sin repartir, FOB total = el mayor)
+suite como la CI (venv-limpio, ENVIRONMENT=testing, sus --deselect), worktree limpio en 3170aa7:
+  1216 passed, 102 skipped, 10 deselected, 1 xfailed · fin: 0
+```
+
+### Lo que vale la pena saber
+
+- Lo encontró su revisión (Opus, esfuerzo alto) y está corregido:
+  - La NCM iba sin el formato de la pantalla, y un generador que dejara el
+    espacio de «8479.89.99.900 H» pasaba en verde.
+  - Con un solo producto no se veía el prorrateo.
+  - Ninguna factura traía coma decimal.
+  - El script de sabotajes no comprobaba que la base estuviera en verde.
+- **El peso de un producto con más de una unidad no se mira.**
+  - Hoy el generador toma `peso_unitario` como el peso de la línea:
+    2 unidades de 260 kg salen `QARTKGRNET=260.000`.
+  - La semántica del peso la está cambiando MARIA-5 (Dev 2). Cuando entre,
+    hay que sumar ese caso.
+- Copiar el pedido de la pantalla en Python tiene un riesgo: si
+  `finalize.js` cambia y la copia no, la prueba no lo ve. Lo dice el
+  docstring de `pedido()`.
+
 ## MARIA-1b, devolución — entregada sobre `beea9eb`
 
 **Resultado:** los cinco puntos están hechos, cada uno con rojo antes y verde
@@ -118,8 +184,7 @@ BASE_URL=http://127.0.0.1:8080 node scripts/testing/pantalla_maria1b.js <cualqui
 
   **Recomiendo (a)**: lo de la memoria puede tirar el servidor.
 
-- **D23, D24 y D25 — Lo que encontró PUNTA-A-PUNTA-1** (sigue en curso, ver
-  abajo). La pantalla no puede producir los archivos reales tal cual:
+- **D23, D24 y D25 — Lo que encontró PUNTA-A-PUNTA-1.** La pantalla no puede producir los archivos reales tal cual:
   - **D23:** el número de operación sale «FAC_» + número de factura, no el
     número de 9 dígitos. El generador saca de ahí `NDDTIMMTRN=FAC_0` y
     `IEXT=FAC_0-01/25`, que no parecen valores válidos para MARIA.
@@ -145,24 +210,14 @@ BASE_URL=http://127.0.0.1:8080 node scripts/testing/pantalla_maria1b.js <cualqui
 
 ## Sigo con
 
-PUNTA-A-PUNTA-1, que ya estaba en curso cuando llegó la devolución
-(`9610f6d`, `a443cc2`). La prueba recorre la pantalla v2 por HTTP con login,
-CSRF, PDF con Gemini simulado y Excel, y compara byte a byte. Hoy da
-`5 passed, 1 xfailed` y sus 5 sabotajes en rojo. Antes de entregarla falta
-lo que encontró su revisión:
-- la NCM con el formato que guarda la pantalla (`8479.89.99.900 H`);
-- una factura de dos ítems, para el prorrateo;
-- números con coma decimal;
-- que su script de sabotajes compruebe la base en verde.
-
-Después, EXCEL-2.
+EXCEL-2 cuando lo escribas en el canal: hoy figura sólo como «después», sin
+alcance. Si alguna de las dos entregas vuelve con devolución, eso va primero.
 
 Última vuelta: 2026-10-07
-Contexto: ~60 %.
+Contexto: el que mide la PM con get_session (al entregar MARIA-1b eran 38 %).
 
-`/compact conservar: Dev 1 de CDI, rama claude/dev1-tecnica. MARIA-1b
-devolución entregada sobre beea9eb (suite 1214 en 3d14ef8, maria1b.sh 34
-rojos); D26 (abrir libros armados), D23-D25 abiertas. Sigue PUNTA-A-PUNTA-1
-(tests/test_punta_a_punta1.py, sabotajes/punta_a_punta1.sh); pendientes en
-«Sigo con» de PARA-PM.md: NCM «8479.89.99.900 H», 2 ítems, coma decimal,
-base verde en el script. Después EXCEL-2.`
+`/compact conservar: Dev 1 de CDI, rama claude/dev1-tecnica. Entregadas y en
+revisión: devolución de MARIA-1b (beea9eb) y PUNTA-A-PUNTA-1 (dff7be1, suite
+1216). Abiertas: D23-D26. Sigue EXCEL-2. Entorno: PM_DIR=/tmp/cdi-dev1,
+levantar.sh <SHA> <puerto>, venv /tmp/cdi-dev1/venv y venv-limpio; rutina de
+la PM trig_01TvMmGfSLDfbcJrf66ZZ7YK.`
