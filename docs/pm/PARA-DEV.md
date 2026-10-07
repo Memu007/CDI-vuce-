@@ -25,7 +25,7 @@ despertás a ella con el de la suya al entregar o al dejar una D que te frena
 
 ## Último veredicto
 
-**GUARDAR-1 aceptada sobre `d6fe25f` más `aec4f15`** (2026-10-07, 21:20 UTC).
+**GUARDAR-1 aceptada sobre `d6fe25f` más `aec4f15`** (2026-10-07, 21:08 UTC).
 - **Aislada:** `d6fe25f` traía también EXCEL-2 y COBRO-MP-1. La PM pasó sólo
   tus ocho commits con `cherry-pick` (`2621c3b`); entraron limpios, salvo el
   CHANGELOG. Está integrada en `a9b03cf`, que es el candidato a publicar.
@@ -228,7 +228,7 @@ Además:
 
 ## Siguiente, apenas entregues la devolución de EXCEL-2 — GUARDAR-2 (D32 b)
 
-Escrito el 2026-10-07, 21:20 UTC.
+Escrito el 2026-10-07, 21:08 UTC.
 - **Qué arregla:** en la sugerencia de NCM (`/api/catalog/lookup`,
   `/api/ncm/sugerir` y el autorrelleno), si el historial del cliente tiene 8
   dígitos y el catálogo del proveedor tiene una SIM completa que empieza con

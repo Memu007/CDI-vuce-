@@ -23,6 +23,11 @@ antes de cerrar la Fase 3.
    fecha de emisión, moneda, incoterm, CUIT válido y estado si el origen es
    argentino: un error que pide eso no es una falla. Guardar con la SIM
    completa sigue dando error hasta GUARDAR-1.
+1a. **Tercera publicación, candidato `a9b03cf`:** GUARDAR-1 (guardar con la
+   SIM completa deja de dar error; el historial no tira abajo el guardado) y
+   la línea de la e2e que deja la CI de `main` en verde. Probado contra
+   Postgres 16 (`REPRODUCCION-GUARDAR-1-2026-10-07.md`). Falta «dale
+   a9b03cf». Después: Emi guarda una operación con la SIM completa.
 1b. **Sin volumen** (Emi, 2026-10-07): cada publicación o reinicio borra los
    TXT generados y el historial de NCM aprendido; las operaciones quedan en
    la base. Descargar el TXT apenas se genera. Lo arregla DISCO-1 (Fase 3).
@@ -161,15 +166,11 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 20:58 UTC (rutina): publicada `6ea8ca9` con el «dale» de Emi
-(19:58 UTC); la e2e de la CI dio rojo porque la prueba no completa la fecha de
-emisión (el producto está bien, reproducido). Dev 1 entregó GUARDAR-1, con la
-línea de la e2e (`aec4f15`), pero sobre una rama con EXCEL-2 y COBRO-MP-1: la
-PM la aisló con `cherry-pick` sobre su rama (`2621c3b`, local) y la revisa
-(suite, e2e y un subagente Sonnet alto contra Postgres 16). D32 abierta
-(agrandar la columna). Dev 1 sigue con la devolución de EXCEL-2; Dev 2, con
-la de MARIA-5, CATALOGO-NCM-1 y SUBITEMS-1. Contexto: PM 37 %, Dev 1 45 %, Dev 2
-55 %; los `/compact` de las Devs los pegó Emi y corren cuando terminen su turno.
+2026-10-07 21:08 UTC: GUARDAR-1 aceptada. Se aisló con `cherry-pick` y se
+integró en `a9b03cf`, el candidato a la tercera publicación: espera «dale
+a9b03cf». D32: (b), va como GUARDAR-2 (Dev 1, después de la devolución de
+EXCEL-2). Dev 2 entregó los seis puntos (`a8a83f3`), pero sin los cuatro de
+SUBITEMS-1 ni la e2e: se lo pedí para revisar todo junto.
 
 ## Medición
 
