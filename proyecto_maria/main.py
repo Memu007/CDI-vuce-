@@ -4741,29 +4741,47 @@ def _clase_de_peso(normal: str) -> str:
 _RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "bruto": 3}
 
 
+def _es_nombre_de_peso(normal: str) -> bool:
+    """«Peso…» o «…weight…» («Peso neto unitario», «Net weight per unit»),
+    pero no «Pesos» (la moneda)."""
+    return (normal.startswith("peso") and not normal.startswith("pesos")) or "weight" in normal
+
+
 def _columnas_de_peso(columnas: list, rename: dict) -> list:
     """Las columnas de peso de la planilla, de la que se usa a la última. Entra
     la que el mapeo guardado marca como peso y cualquiera con nombre de peso
-    que el mapeo no use para otra cosa."""
+    que el mapeo no use para otra cosa. Entre dos de una unidad, primero la
+    que dice neto y después la del mapeo guardado."""
     alias = set(_ITEM_COL_ALIASES["peso_unitario"])
     otras = {src for src, canon in rename.items() if canon != "peso_unitario"}
-    candidatas = [c for c in columnas if c not in otras
-                  and (rename.get(c) == "peso_unitario" or _normalize_header(c) in alias)]
-    return sorted(candidatas, key=lambda c: _RANGO_DE_PESO[_clase_de_peso(_normalize_header(c))])
+
+    def es_peso(c) -> bool:
+        normal = _normalize_header(c)
+        return rename.get(c) == "peso_unitario" or normal in alias or _es_nombre_de_peso(normal)
+
+    def orden(c):
+        normal = _normalize_header(c)
+        return (_RANGO_DE_PESO[_clase_de_peso(normal)], "net" not in normal,
+                rename.get(c) != "peso_unitario")
+
+    return sorted([c for c in columnas if c not in otras and es_peso(c)], key=orden)
 
 
 def _kg(numero: float) -> str:
     return f"{numero:.3f}".rstrip("0").rstrip(".")
 
 
-def _peso_por_unidad(df: pd.DataFrame, pesos: list) -> list[str]:
+def _peso_por_unidad(df: pd.DataFrame, pesos: list, columna_de: dict | None = None) -> list[str]:
     """Después de renombrar `pesos[0]` a `peso_unitario`: si es el peso de la
     línea (neto o total) o el bruto, lo divide por la cantidad. Un peso que no
     es número queda vacío, con aviso, y la fila se conserva. Si una columna de
     una unidad no da el de la línea, se avisa con los dos números.
+    `columna_de` dice cómo quedó llamada una columna ignorada que hubo que
+    renombrar; los avisos la nombran como viene en la planilla.
     Devuelve los avisos para la pantalla."""
     if not pesos or "peso_unitario" not in df.columns:
         return []
+    columna_de = columna_de or {}
     origen, ignoradas = pesos[0], pesos[1:]
     clase = _clase_de_peso(_normalize_header(origen))
     avisos = []
@@ -4772,6 +4790,8 @@ def _peso_por_unidad(df: pd.DataFrame, pesos: list) -> list[str]:
                       + ", ".join(f"«{c}»" for c in ignoradas) + ".")
     escrito = df["peso_unitario"].notna() & (df["peso_unitario"].astype(str).str.strip() != "")
     peso = pd.to_numeric(df["peso_unitario"], errors="coerce")
+    # «inf» escrito no es un peso (y no se puede mandar a la pantalla).
+    peso = peso.where(peso.abs() != float("inf"))
     df["peso_unitario"] = peso
     sin_numero = int((escrito & peso.isna()).sum())
     if sin_numero:
@@ -4793,7 +4813,7 @@ def _peso_por_unidad(df: pd.DataFrame, pesos: list) -> list[str]:
     for col in ignoradas:
         if _clase_de_peso(_normalize_header(col)) != "unidad":
             continue
-        unidad = pd.to_numeric(df[col], errors="coerce")
+        unidad = pd.to_numeric(df[columna_de.get(col, col)], errors="coerce")
         distinto = (unidad > 0) & (peso > 0) & (cantidad > 0) & (
             (unidad * cantidad - peso).abs() > (peso / 100).clip(lower=0.001))
         if distinto.any():
@@ -6543,11 +6563,15 @@ async def upload_excel_v2(
         if pesos:
             rename = {src: canon for src, canon in rename.items() if canon != "peso_unitario"}
             rename[pesos[0]] = "peso_unitario"
-            rename.update({c: f"{c} (ignorada)" for c in pesos[1:] if c == "peso_unitario"})
-            pesos = [rename.get(c, c) if i else c for i, c in enumerate(pesos)]
+            # Una columna ignorada que ya se llamaba «peso_unitario» cambia de
+            # nombre, para no quedar con dos columnas iguales.
+            columna_de = {c: f"{c} (ignorada)" for c in pesos[1:] if c == "peso_unitario"}
+            rename.update(columna_de)
+        else:
+            columna_de = {}
         if rename:
             df = df.rename(columns=rename)
-            avisos = _peso_por_unidad(df, pesos)
+            avisos = _peso_por_unidad(df, pesos, columna_de)
 
         items = extract_items_from_excel(df, file.filename)
         if not items:
