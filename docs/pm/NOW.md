@@ -161,14 +161,15 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 19:58 UTC (rutina; las horas de las dos vueltas anteriores estaban
-adelantadas, los commits dicen 19:23). SUBITEMS-1 revisada: se sostiene, con
-cuatro arreglos chicos que van en la reentrega de MARIA-5. Dev 1: GUARDAR-1
-hecha hasta `d6fe25f` (con Postgres), pero se quedó quieta a las 19:27 sin
-el informe; despertada para cerrar `/entregar`. Dev 2: segunda devolución de
-MARIA-5 en curso (`135ff27`). Contexto: Dev 1 32 % y Dev 2 55 %, las dos
-sobre el 30 % de hoy: `/compact` pedidos a Emi. Espera a Emi: «dale 6ea8ca9»
-escrito.
+2026-10-07 21:05 UTC (rutina): publicada `6ea8ca9` con el «dale» de Emi
+(19:58 UTC); la e2e de la CI dio rojo porque la prueba no completa la fecha de
+emisión (el producto está bien, reproducido). Dev 1 entregó GUARDAR-1, con la
+línea de la e2e (`aec4f15`), pero sobre una rama con EXCEL-2 y COBRO-MP-1: la
+PM la aisló con `cherry-pick` sobre su rama (`2621c3b`, local) y la revisa
+(suite, e2e y un subagente Sonnet alto contra Postgres 16). D32 abierta
+(agrandar la columna). Dev 1 sigue con la devolución de EXCEL-2; Dev 2, con
+la de MARIA-5, CATALOGO-NCM-1 y SUBITEMS-1. Contexto: PM 37 %, Dev 1 45 %, Dev 2
+55 %; los `/compact` de las Devs los pegó Emi y corren cuando terminen su turno.
 
 ## Medición
 
