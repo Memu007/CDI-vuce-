@@ -777,7 +777,7 @@ def _to_number_any(raw, default=0.0):
         return default
 
 def _extract_pdf_text(data: bytes) -> str:
-    # Try pdfminer first (best accuracy), fallback to PyPDF2, then OCR
+    # Try pdfminer first (best accuracy), fallback to pypdf, then OCR
     text = ''
     try:
         # Try pdfminer.six first
@@ -797,8 +797,9 @@ def _extract_pdf_text(data: bytes) -> str:
 
     if not text.strip():
         try:
-            import PyPDF2
-            reader = PyPDF2.PdfReader(io.BytesIO(data))
+            # pypdf, sucesor de PyPDF2 (que se colgaba con un PDF armado: X3)
+            from pypdf import PdfReader
+            reader = PdfReader(io.BytesIO(data))
             pages = []
             for p in reader.pages:
                 try:
@@ -814,6 +815,39 @@ def _extract_pdf_text(data: bytes) -> str:
         text = _ocr_pdf_text(data)
 
     return text
+
+
+_PAGINAS_VENDEDOR = 2
+_MAX_CONTENIDO_PAGINA = 512 * 1024
+
+
+def extraer_texto_pdf_seguro(data: bytes) -> str:
+    """Texto del PDF sólo con pypdf, para PDFs que sube el usuario.
+
+    pdfminer y pdfplumber se cuelgan para siempre con un PDF armado (por
+    ejemplo, un /Length que se apunta a sí mismo), y un hilo colgado no se
+    puede cortar. pypdf aguanta esos casos (RENDIMIENTO-1b). Sin OCR.
+
+    Sólo mira las primeras páginas (el vendedor está arriba de la factura) y
+    salta una página cuyo contenido pase de _MAX_CONTENIDO_PAGINA: pypdf tarda
+    más que lineal en sacarle el texto a un contenido enorme (3 MB, 6 s).
+    """
+    import io
+    try:
+        from pypdf import PdfReader
+        reader = PdfReader(io.BytesIO(data))
+        paginas = []
+        for p in list(reader.pages)[:_PAGINAS_VENDEDOR]:
+            try:
+                contenido = p.get_contents()
+                if contenido is not None and len(contenido.get_data()) > _MAX_CONTENIDO_PAGINA:
+                    continue
+                paginas.append(p.extract_text() or '')
+            except Exception:
+                pass
+        return '\n'.join(paginas)
+    except Exception:
+        return ''
 
 
 # ─────────────────────────────────────────────────────────────
@@ -863,6 +897,25 @@ _VENDOR_LINE_PREFIX_REJECT_RE = re.compile(
 )
 
 
+# Etiquetas de las partes de una factura. Con dos columnas («SELLER:» y
+# «BUYER:» en la misma fila), el lector de texto las junta y lo que sigue a
+# «SELLER:» es otra etiqueta: el vendedor nunca es una etiqueta. Si la
+# etiqueta aparece después del nombre, el nombre se corta ahí
+# (RENDIMIENTO-1b, devolución de la PM).
+_ETIQUETAS_PARTES = (
+    r'(?:BUYER|CONSIGNEE|SELLER|SHIPPER|VENDOR|VENDEDOR|SUPPLIER|PROVEEDOR'
+    r'|EXPORTER|EXPORTADOR|IMPORTER|IMPORTADOR|COMPRADOR|FORNECEDOR'
+    r'|CONSIGNATARIO|DESTINATARIO|REMITENTE|NOTIFY(?:\s+PARTY)?'
+    r'|SOLD\s+TO|BILL\s+TO|SHIP\s+TO|CLIENTE|CUSTOMER)'
+)
+_VENDOR_ES_ETIQUETA_RE = re.compile(
+    r'^' + _ETIQUETAS_PARTES + r'\s*(?:[:\-]|$)', re.IGNORECASE
+)
+_VENDOR_CORTE_EN_ETIQUETA_RE = re.compile(
+    r'\s+' + _ETIQUETAS_PARTES + r'\s*[:\-]', re.IGNORECASE
+)
+
+
 def _clean_vendor_candidate(raw: str) -> str:
     """Normaliza una captura de vendor: strip, colapsa espacios, recorta basura."""
     if not raw:
@@ -873,6 +926,11 @@ def _clean_vendor_candidate(raw: str) -> str:
     candidate = candidate.split('\n')[0].strip()
     # Si trae paréntesis con tax id al final, quitarlos
     candidate = re.sub(r'\s*\([^)]{0,40}\)\s*$', '', candidate).strip()
+    # El vendedor nunca es una etiqueta; si otra etiqueta viene detrás del
+    # nombre (dos columnas en una fila), se corta antes de ella.
+    if _VENDOR_ES_ETIQUETA_RE.match(candidate):
+        return ""
+    candidate = _VENDOR_CORTE_EN_ETIQUETA_RE.split(candidate, maxsplit=1)[0].strip(' :\-,;')
     return candidate
 
 
