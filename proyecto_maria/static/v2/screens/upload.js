@@ -214,9 +214,23 @@
         }
     }
 
-    function showError(msg) {
+    function showError(msg, opts) {
         if (!errorEl) return;
         errorEl.textContent = msg;
+        if (opts && opts.manual) {
+            const manualBtn = $('uploadManualBtn');
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'btn-link-inline';
+            btn.id = 'uploadErrorManualBtn';
+            btn.textContent = 'Cargar los productos a mano';
+            btn.addEventListener('click', (ev) => {
+                ev.preventDefault();
+                if (manualBtn) manualBtn.click();
+            });
+            errorEl.appendChild(document.createTextNode(' '));
+            errorEl.appendChild(btn);
+        }
         errorEl.hidden = false;
     }
     function hideError() {
@@ -290,7 +304,9 @@
 
             if (!res.ok) {
                 const detail = (data && (data.detail || data.message)) || ('Error ' + res.status);
-                throw new Error(detail);
+                const e = new Error(detail);
+                e.code = data && data.code;
+                throw e;
             }
 
             const durationMs = Date.now() - startTs;
@@ -357,6 +373,12 @@
             setBusy(false);
             // Si el error es payment_required, el modal ya se mostró via app_v2.js.
             if (msg === 'payment_required') return;
+            // Sin lector automático (MARIA-2): ningún producto, se ofrece
+            // seguir con la carga manual.
+            if (err && err.code === 'lectura_automatica_no_disponible') {
+                showError(msg, { manual: true });
+                return;
+            }
             showError(msg);
             // Toast visible para debug
             if (CDI.toast) CDI.toast.error('Error al subir', msg);

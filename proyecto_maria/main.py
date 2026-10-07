@@ -71,7 +71,12 @@ from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
 from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, supuestos_declarados
-from proyecto_maria.pdf_extractor import process_pdf  # Importar el extractor
+from proyecto_maria.pdf_extractor import (  # Importar el extractor
+    process_pdf,
+    LecturaAutomaticaNoDisponible,
+    MENSAJE_LECTURA_NO_DISPONIBLE,
+    lectura_automatica_disponible,
+)
 import pandas as pd
 from proyecto_maria.core.vuce_connector import get_ncm_data  # VUCE activo en modo mock
 from proyecto_maria.core import ncm_catalog
@@ -3426,6 +3431,13 @@ async def smart_validation(body: dict, user=Depends(get_current_user)):
     except Exception as e:
         return {"success": False, "detail": str(e)}
 
+def _respuesta_sin_lector(mensaje: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={"detail": mensaje, "code": "lectura_automatica_no_disponible"},
+    )
+
+
 @app.post("/upload_pdf/public")
 @limiter.limit(get_dynamic_rate_limit)
 async def upload_pdf_public(
@@ -3438,19 +3450,28 @@ async def upload_pdf_public(
     Requiere sesión activa (Gemini Vision consume créditos).
     """
     try:
+        from proyecto_maria.security.file_security import validate_file_upload, sanitize_filename
+        max_upload_bytes = _get_max_upload_bytes()
+        contents = await validate_file_upload(file, 'pdf', max_size=max_upload_bytes)
+
+        if not lectura_automatica_disponible():
+            # Sin lector con IA: cero productos, sin descontar cuota, y un
+            # código que la pantalla distingue para ofrecer la carga manual
+            # (MARIA-2).
+            return _respuesta_sin_lector(MENSAJE_LECTURA_NO_DISPONIBLE)
+
         # Cuota diaria de IA por usuario: corta abuso / facturazo de tokens.
         # Configurable via AI_DAILY_PDF_LIMIT (default 50/dia/usuario).
         from proyecto_maria.core.ai_quota import enforce_pdf_quota
         enforce_pdf_quota(user.get("username") if isinstance(user, dict) else None)
 
-        from proyecto_maria.security.file_security import validate_file_upload, sanitize_filename
-        max_upload_bytes = _get_max_upload_bytes()
-        contents = await validate_file_upload(file, 'pdf', max_size=max_upload_bytes)
-
         # Procesar PDF con el extractor
         safe_name = sanitize_filename(file.filename or 'upload.pdf')
         logging.info("Procesando PDF: %s (%d bytes)", safe_name, len(contents))
-        result = process_pdf(contents)
+        try:
+            result = process_pdf(contents)
+        except LecturaAutomaticaNoDisponible as e:
+            return _respuesta_sin_lector(str(e))
         
         # Manejar tanto formato nuevo (dict) como viejo (lista)
         if isinstance(result, dict) and 'items' in result:

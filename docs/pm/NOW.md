@@ -3,55 +3,57 @@
 Actualizado: 2026-10-07. Estado vigente; la historia está en Git.
 
 **Producto:** `Memu007/CDI-vuce-` (privado desde el 2026-10-06).
-**Publicado:** `main` = `a771693` (2026-07-18) en Railway, `cdi-production.up.railway.app`.
-Railway publica cada push a `main` sin esperar los tests.
-**Rama de PM:** `claude/practical-shannon-szpwkn`: contiene `e8344d0` (25
-commits sin publicar, antes en `claude/project-deploy-review-4nct96`, que
-queda como historia) más las reglas y documentos. **Ramas de las Devs:**
-`claude/dev1-tecnica` y `claude/dev2-maria`.
-**Usuarios reales en producción:** ninguno; la usa sólo Emi, **con facturas reales** (Emi, 2026-10-07).
+**Publicado:** `main` = `a771693` (2026-07-18) en Railway,
+`cdi-production.up.railway.app`. Railway publica cada push a `main` sin
+esperar los tests.
+**En producción:** la usa sólo Emi, con facturas reales (Emi, 2026-10-07).
+**Rama de PM:** `claude/practical-shannon-szpwkn`: lo aceptado y sin publicar
+(incluye los 25 commits de `e8344d0`, ADMIN-1 y MARIA-2). **Ramas de las
+Devs:** `claude/dev1-tecnica` y `claude/dev2-maria`.
+**Plan:** `ROADMAP.md`, con el orden de Emi del 2026-10-07: primero el TXT,
+después el cobro, la seguridad al final y exhaustiva. Ningún estudio entra
+antes de cerrar la Fase 3.
 
 ## Para Emi
 
-1. **URGENTE: rotar las claves de Gemini.** Una estuvo escrita en este
-   repositorio cuando era público. Pasarlo a privado no la invalida. En Google
-   AI Studio: borrar las dos claves que aparecieron, crear una nueva y ponerla
-   sólo en las variables de Railway. Mirar la facturación de Google. (G0)
-2. **Publicación de ensayo (aprobada el 2026-10-07; falta el «dale» para el
-   SHA).** De día, antes del «dale», en Railway:
-   - en las variables del servicio: `ENVIRONMENT` = `production` y que exista
-     `DATABASE_URL` (la de la base de Railway). La versión nueva no arranca
-     sin `DATABASE_URL`; si faltara, Railway deja andando la vieja;
-   - en la base: hacer una copia (pestaña de copias de seguridad) si el plan
-     lo permite;
-   - mirar qué cuentas hay: toda cuenta activa con el período vencido hace
-     más de 7 días pasa a impaga al arrancar. **Y si hay alguna cuenta que no
-     sea de Emi:** la fuga de MARIA.TXT pedía sesión iniciada, así que si no
-     hay cuentas ajenas, nadie pudo ver sus facturas reales;
-   - saber que al publicar se borran los TXT generados y el historial de NCM
-     que viven en el disco del servidor (pasa en cada publicación; las
-     operaciones en la base quedan; DISCO-1 lo arregla);
-   - recomendado: prender «Wait for CI» y apagar la red pública de la base;
-   - de paso, para más adelante (PUBLICAR-1): ver si existe la variable
-     `ADMIN_USERNAMES` con el usuario de Emi. Después de ADMIN-1, sólo los
-     usuarios de esa lista entran al admin.
-   La PM le pasa el SHA exacto con la suite corrida sobre él.
-3. **Mandar las preguntas al despachante** (`PREGUNTAS-DESPACHANTE.md`).
-4. Respondido el 2026-10-07: CDI no usa Google Cloud, y Emi cargó facturas
-   reales en el sitio publicado.
-5. **Decidido por la PM, se puede revertir:** los límites del proyecto
-   (`ONBOARDING-PM.md`) y que las reglas nuevas lleguen a `main` con la
-   primera publicación. Hasta entonces, en `main` sigue la regla vieja que
-   manda «push a `main`» a Cursor y compañía: **no le pidas a ningún asistente
-   cambios sobre `main`.**
+1. **Mañana, de día: publicación de ensayo** (aprobada el 2026-10-07; falta
+   el «dale» para el SHA exacto, que le pasa la PM con la suite corrida sobre
+   él). Antes, en Railway:
+   - **lo primero, en la tabla de usuarios de la base: ¿existen `demo`,
+     `premium` o `basico`?** El código publicado los crea con contraseñas
+     escritas en el código (`demo` además es admin) cuando `ENVIRONMENT` no es
+     `production`, y no los borra después. Si existen, cualquiera puede entrar
+     con ellos y, con la fuga de MARIA.TXT, ver las facturas reales: borrarlos
+     o cambiarles la contraseña antes que nada;
+   - **si hay cuentas que no sean de Emi:** la fuga pedía sesión iniciada; sin
+     cuentas ajenas, nadie pudo ver las facturas;
+   - en las variables del servicio: `ENVIRONMENT` = `production`, que exista
+     `DATABASE_URL` (la versión nueva no arranca sin ella; si faltara, Railway
+     deja andando la vieja) y que `ADMIN_USERNAMES` tenga el usuario de Emi y
+     sólo usuarios que ya existen (con ADMIN-1, sólo ellos entran al admin);
+   - toda cuenta activa con el período vencido hace más de 7 días pasa a
+     impaga al arrancar;
+   - en la base: una copia (pestaña de copias de seguridad), si el plan lo
+     permite;
+   - al publicar se borran los TXT generados y el historial de NCM que viven
+     en el disco del servidor (las operaciones en la base quedan);
+   - recomendado: prender «Wait for CI» y apagar la red pública de la base.
+2. **Rotar las claves de Gemini** (G0). En Google AI Studio: borrar las que
+   aparecieron, crear una nueva y ponerla sólo en Railway. Mirar la
+   facturación de Google.
+3. **Despachante:** recordarle los archivos reales (favor 1). Las dos
+   preguntas cortas ya se las mandó Emi el 2026-10-07.
+4. **Hasta la primera publicación:** en `main` sigue la regla vieja que manda
+   «push a `main`» a otros asistentes. No pedirle a ningún asistente cambios
+   sobre `main`.
 
 ## Quién hace qué
 
 | Rol | Sesión | Rutina | Rama |
 |---|---|---|---|
 | PM principal | session_01B7FVQspcEHF7PqNv797wNM | trig_01TvMmGfSLDfbcJrf66ZZ7YK (min 55) | claude/practical-shannon-szpwkn |
-| Dev 1 (técnica) | session_01VV5RVDA64AuzLaPBDnwH39 | trig_016zR6giZB8Mq9ZdfaerVh2D (min 15) | claude/dev1-tecnica |
-| Dev 2 (MARIA) | session_01JssJQ6CQvEBZ7yjJp3hHQx | trig_019ehV8P48FzbNwYQGZjgYcW (min 35) | claude/dev2-maria |
+| Dev 1 | session_01VV5RVDA64AuzLaPBDnwH39 | trig_016zR6giZB8Mq9ZdfaerVh2D (min 15) | claude/dev1-tecnica |
+| Dev 2 | session_01JssJQ6CQvEBZ7yjJp3hHQx | trig_019ehV8P48FzbNwYQGZjgYcW (min 35) | claude/dev2-maria |
 
 **Sin PM visual:** la PM principal revisa a las dos Devs, y las dos la
 despiertan con su rutina (donde los comandos dicen «PM visual», acá es la
@@ -66,47 +68,43 @@ también sus subagentes (Emi confirmó las dos sesiones en alto). Ningún subage
 la PM principal.
 
 Archivos abiertos por Dev:
-- Dev 1 (ADMIN-1): `proyecto_maria/main.py` (montaje del admin, cerca de la
-  línea 1312, y las rutas globales), `proyecto_maria/routers/admin_router.py`.
-- Dev 2 (MARIA-2): `proyecto_maria/pdf_extractor.py` (modo demostración),
-  `main.py` `upload_pdf_public` (cerca de la 3446) y su pantalla en
-  `static/v2`.
+- Dev 1 (ADMIN-2): `proyecto_maria/main.py` (`/api/system/connectors`,
+  `/api/payments/simulate-webhook`), `routers/admin_router.py`,
+  `static/v2/topbar_financials.js`, `tests/test_admin_solo_admin.py`.
+- Dev 2 (MARIA-1a): `proyecto_maria/pdf_extractor.py` (las dos copias del
+  lector) y, si hace falta, la tabla de países de `core/maria_generator.py`.
 
 ## En curso
 
-- Dev 1: ADMIN-1 (`PARA-DEV.md`). Después, COBRO-CORTE-1.
-- Dev 2: MARIA-2 (`PARA-DEV-2.md`). Después, MARIA-1a.
-- PM: publicación de ensayo. Candidato: `cb8f509` (código idéntico a
-  `e8344d0`; sólo cambian documentos y reglas). Suite sobre `cb8f509`:
-  `680 passed, 102 skipped, 10 warnings in 65.29s`. Espera los chequeos de
-  Railway y el «dale» de Emi para el SHA, de día. Si se publica un commit
-  posterior de la rama de PM, sólo con documentos de diferencia.
-- Despachante: respondió las seis preguntas el 2026-10-06. Faltan los dos
-  favores y dos cortas nuevas (cómo se carga una reducción o exclusión del IVA
-  adicional; qué código tiene en el Kit cada empresa de digitalización). MARIA-4 pasó al tercer
-  lugar de la cola MARIA.
-
-## Cola
-
-La de `ROADMAP.md`, aprobado el 2026-10-07: cola técnica para la Dev 1 y cola
-MARIA para la Dev 2, en ese orden. Semana 1 desde el 2026-10-07.
+- **Dev 1:** ADMIN-2. Sigue la Fase 1: RENDIMIENTO-1, DEPENDENCIAS-1,
+  EXCEL-1, MARIA-1b y PUNTA-A-PUNTA-1.
+- **Dev 2:** MARIA-1a. Sigue: MARIA-2b, MARIA-4, MARIA-3, MARIA-4b y
+  MARIA-5.
+- **Aceptadas el 2026-10-07 e integradas:** ADMIN-1 (`ac25dbc`) y MARIA-2
+  (`65ea6f3`). Suite sobre la rama integrada (`78b60c8`):
+  `703 passed, 102 skipped`.
+- **Publicación de ensayo:** dos candidatos. (a) `cb8f509`, el código de
+  `e8344d0` tal cual; (b) la cabeza de la rama de PM, que además cierra el
+  admin y saca los productos inventados, pero pide `ADMIN_USERNAMES`. La PM
+  recomienda (b) si la variable está; si no, (a). La suite se corre otra vez
+  sobre el SHA exacto.
+- **Despachante:** respondió las seis preguntas el 2026-10-06
+  (`PREGUNTAS-DESPACHANTE.md`). Faltan las dos cortas, los archivos reales y,
+  al cerrar la Fase 1, la prueba en su Kit.
 
 ## Puertas para cobrarle a un estudio
 
-Estado medido el 2026-10-06 (`AUDITORIA-2026-10-06.md`). Las de septiembre
-(G0 a G7) siguen, con lo nuevo.
-
-| Puerta | Estado | Qué falta |
-|---|---|---|
-| G0 · Secretos | 🔴 | Rotar las claves de Gemini (Emi) |
-| G1 · Configuración | 🟢 | G1.1 a G1.5 cortan (re-verificado). G1.6 y G1.7 sin medir |
-| G2 · Imagen real | 🟢 | Cerrada el 2026-09-17. El código no cambió desde entonces |
-| G3 · Aislamiento | 🟡 | En la rama, 22/0 y sin fugas en lo atacado. **En producción sigue la fuga de MARIA.TXT** (se arregla al publicar). Abiertos: admin para cualquiera, sesiones que reviven al cambiar la contraseña, límite de intentos burlable |
-| G4 · Producto (MARIA) | 🔴 | Peso por unidad en vez de total, `CARTUSO` e `IVAADICIONAL1` fijos (el despachante ya dijo cómo van: MARIA-4), el IVA adicional declarado siempre como uso particular, identificadores, ítems de demostración sin clave, avisos después de generar, redondeos |
-| G5 · Pruebas | 🟢 | 680 passed, 102 skipped, 0 failed (re-verificado) |
-| G6 · Volver atrás | 🟡 | El esquema aguanta ir y volver (probado en local). Falta: backup de la base y contar los `active` vencidos antes de publicar |
-| G7 · Cobro | 🔴 | El corte por impago cubre 2 de 73 funciones; cancelar no cancela en Mercado Pago; aviso de pago sin firma y repetible; doble suscripción; invitaciones con error en Postgres |
-| G8 · Piloto | ⚪ | Tres estudios presentan de verdad un MARIA de CDI (`ROADMAP.md`, bloque 4) |
+| Puerta | Estado | Qué falta | Se cierra en |
+|---|---|---|---|
+| G0 · Secretos | 🔴 | Rotar las claves de Gemini | Emi, esta semana |
+| G1 · Configuración | 🟢 | G1.1 a G1.5 cortan. G1.6 y G1.7 sin medir | — |
+| G2 · Imagen real | 🟢 | Cerrada el 2026-09-17 | — |
+| G3 · Aislamiento | 🟡 | En producción, la fuga de MARIA.TXT (se arregla con el ensayo). Admin cerrado en la rama (ADMIN-1). Abiertos: sesiones que reviven, límite de intentos burlable, prueba de aislamiento parcial | Fase 3 |
+| G4 · Producto (MARIA) | 🔴 | Origen mal leído, estado e IVA adicional fijos, peso por unidad, avisos tarde, gastos FOB sin cablear, banco, identificadores. Sin productos inventados (MARIA-2) | Fase 1 y la prueba en el Kit |
+| G5 · Pruebas | 🟢 | `703 passed, 102 skipped, 0 failed` en la rama integrada | — |
+| G6 · Volver atrás | 🟡 | Esquema probado en local; falta la copia de la base | Fase 3 (y el ensayo lo ensaya) |
+| G7 · Cobro | 🔴 | El corte por impago cubre 2 funciones; cancelar no cancela en Mercado Pago; aviso de pago sin firma; doble suscripción; invitaciones | Fase 2 |
+| G8 · Piloto | ⚪ | Tres estudios presentan de verdad un MARIA de CDI | Fase 4 |
 
 ## Publicado
 
@@ -139,12 +137,9 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 01:00 UTC: el despachante respondió las seis preguntas (texto tal
-cual en `PREGUNTAS-DESPACHANTE.md`); la cola MARIA se ajustó (MARIA-4 sube,
-MARIA-4b nueva, el peso total sale en la Fase A). Emi: CDI no usa Google
-Cloud; producción tiene facturas reales. Dev 1 en ADMIN-1, Dev 2 en MARIA-2.
-**Mañana desde las 9:** pasarle a Emi el SHA del ensayo y la lista de Railway
-(«Para Emi», punto 2). PM al ~23 % de contexto.
+2026-10-07 02:00 UTC: plan rehecho con el orden de Emi (TXT, cobro,
+seguridad al final). ADMIN-1 y MARIA-2 aceptadas e integradas. PM al ~37 %
+de contexto: compacta en este corte.
 
 ## Medición
 

@@ -16,6 +16,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix(permisos):** `/api/admin/*` (salud del servidor, errores, métricas, borrar el registro de errores) pasa a exigir admin; antes entraba cualquier usuario logueado. También `/api/ncm/cache/refresh`, que borra y recarga el cache de NCM que comparten todos los estudios.
 - **test:** una prueba recorre las rutas de la app y falla si una de admin o global (marcada `tags=["admin"]`) deja pasar a un usuario común.
 
+## 2026-10-07 · fix: sin clave de Gemini no se inventan productos (MARIA-2)
+
+- **fix(pdf):** sin clave de Gemini o con el lector con IA apagado, subir un PDF ya no devuelve los dos «ITEM DEMOSTRACION»: responde 503 con `code: lectura_automatica_no_disponible`, cero productos y sin descontar la cuota diaria de PDFs; la pantalla ofrece «Cargar los productos a mano».
+
 ## 2026-09-17 · fix+test: cerrar el agujero de cobro y suite en verde (VUCE-3)
 
 - **fix(billing):** el corte por vencimiento sólo pasaba a `past_due` a los `trial`; un `active` cuya renovación fallaba quedaba con servicio ilimitado para siempre. Ahora el cron de arranque y el gate cortan también a los `active` vencidos, con 7 días de gracia (0 para trial). El 402 pasa a ser distinguible: `PLAN_LIMIT_EXCEEDED` / `TRIAL_EXPIRED` / `SUBSCRIPTION_PAST_DUE` (según `payment_provider`).

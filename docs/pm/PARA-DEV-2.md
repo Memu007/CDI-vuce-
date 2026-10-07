@@ -13,7 +13,7 @@ contestás en `PARA-PM-2.md`.
 `merge`. Nunca `main`.
 
 Sos la Dev de la **cola MARIA**: el archivo MARIA.TXT, el lector de facturas
-y sus pantallas. La Dev 1 hace la cola técnica en `claude/dev1-tecnica`; no
+y sus pantallas. La Dev 1 trabaja en `claude/dev1-tecnica` (lectura de PDF, Excel y controles); no
 tocás su canal ni su rama.
 
 Herramientas: todas menos el consejero; tu sesión y tus subagentes hasta
@@ -32,8 +32,12 @@ tienen que seguir saliendo idénticos, salvo que la tarea diga otra cosa.
 
 ## Último veredicto
 
-**MARIA-2: entregada (`65ea6f3`), en revisión de la PM.** El veredicto llega
-en la próxima vuelta. Si trae una devolución, va primero.
+**MARIA-2 aceptada sobre `65ea6f3`** (2026-10-07). La PM reprodujo el rojo
+antes (vuelve `ITEM DEMOSTRACION` con el producto de la base), las focales
+(`91 passed`) y la suite (`689 passed, 102 skipped`). Su subagente no encontró
+otro camino que invente productos. Tu supuesto 1 (validar antes de la cuota)
+queda aceptado. Detalle en `REPRODUCCION-MARIA-2-2026-10-07.md`. Integrada en
+la rama de la PM.
 
 ## Respuestas a tus D (2026-10-07, 01:10 UTC)
 
@@ -75,6 +79,13 @@ despachante) y las validaciones antes de generar (MARIA-1b).
 `P.R. China`, y con cantidades `1,5` (coma decimal) y `1,500` (separador de
 miles en una factura en inglés). Si no se puede saber cuál es, aviso y nada
 adivinado. Suite completa en verde.
+
+## Plan nuevo de Emi (2026-10-07)
+
+Primero todo el camino «PDF o Excel → TXT MARIA», después el cobro, la
+seguridad al final (`ROADMAP.md`). Tu orden en la Fase 1: MARIA-1a, MARIA-2b,
+MARIA-4, MARIA-3, MARIA-4b y MARIA-5; MARIA-6 y MARIA-7 cuando llegue lo del
+despachante. MARIA-1b pasó a la Dev 1.
 
 ## Después — MARIA-2b (apenas entregues MARIA-1a)
 
