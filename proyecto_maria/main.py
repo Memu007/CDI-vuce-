@@ -7801,22 +7801,6 @@ async def sugerir_ncm(
         sugerencias.append(suggestion)
         return True
 
-    # El catálogo del proveedor se lee primero: si tiene la SIM completa del
-    # NCM que recuerda el cliente, la sugerencia del cliente la usa (D32 b).
-    vendor_item = None
-    if vendor_name:
-        try:
-            from proyecto_maria.core import catalog_service as catalog_svc
-            vendor_match = await catalog_svc.match_items(
-                db, [{"descripcion": descripcion}], vendor_name, owner_username=user["username"]
-            )
-            matches = vendor_match.get("items_matched") or []
-            vendor_item = matches[0] if matches else None
-            if not (vendor_item and vendor_item.get("ncm") and vendor_item.get("match_type") != "none"):
-                vendor_item = None
-        except Exception as err:
-            logging.warning("ncm suggestion vendor catalog unavailable: %s", err)
-
     # 1) Memoria confirmada del cliente activo (aislada por despachante).
     if client_id:
         try:
@@ -7824,8 +7808,7 @@ async def sugerir_ncm(
             remembered = await lookup_client_memory(db, user["username"], client_id, descripcion)
             if remembered and remembered.get("ncm"):
                 add_suggestion({
-                    "ncm": _ncm_del_cliente_o_sim_del_proveedor(
-                        remembered["ncm"], vendor_item and vendor_item["ncm"]),
+                    "ncm": remembered["ncm"],
                     "desc": remembered.get("descripcion") or descripcion,
                     "source": "historial",
                     "count": remembered.get("veces_usado", 1),
@@ -7834,14 +7817,30 @@ async def sugerir_ncm(
         except Exception as err:
             logging.warning("ncm suggestion client memory unavailable: %s", err)
 
-    # 2) Catálogo confirmado para el proveedor activo.
-    if vendor_item:
-        add_suggestion({
-            "ncm": vendor_item["ncm"],
-            "desc": descripcion,
-            "source": "proveedor",
-            "scope": "proveedor",
-        })
+    # 2) Catálogo confirmado para el proveedor activo. Va después del cliente:
+    # si su consulta falla, la sugerencia del cliente ya está.
+    if vendor_name and len(sugerencias) < 5:
+        try:
+            from proyecto_maria.core import catalog_service as catalog_svc
+            vendor_match = await catalog_svc.match_items(
+                db, [{"descripcion": descripcion}], vendor_name, owner_username=user["username"]
+            )
+            matches = vendor_match.get("items_matched") or []
+            vendor_item = matches[0] if matches else None
+            if vendor_item and vendor_item.get("ncm") and vendor_item.get("match_type") != "none":
+                # Si tiene la SIM completa del NCM que recuerda el cliente, la
+                # sugerencia del cliente la usa (D32 b).
+                if sugerencias and sugerencias[0].get("scope") == "cliente":
+                    sugerencias[0]["ncm"] = _ncm_del_cliente_o_sim_del_proveedor(
+                        sugerencias[0]["ncm"], vendor_item["ncm"])
+                add_suggestion({
+                    "ncm": vendor_item["ncm"],
+                    "desc": descripcion,
+                    "source": "proveedor",
+                    "scope": "proveedor",
+                })
+        except Exception as err:
+            logging.warning("ncm suggestion vendor catalog unavailable: %s", err)
 
     # 3) Historial liviano de asignaciones de este despachante.
     desc_norm = normalizar_desc(descripcion)
