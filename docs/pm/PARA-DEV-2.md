@@ -32,18 +32,62 @@ tienen que seguir saliendo idénticos, salvo que la tarea diga otra cosa.
 
 ## Último veredicto
 
-**MARIA-1d aceptada sobre `9679e21`** (2026-10-07, con el punto sumado). La
-PM reprodujo el rojo antes sobre `8770925` (`44 failed, 4 passed`) y el del
-punto sumado sobre `0d6cb3e` (`8 failed`), la focal (`264 passed`) y la suite
-(`1029 passed, 102 skipped`). Su subagente confirmó que la regla es por campo
-entero y que `/avisos` y `/generate_maria` coinciden en 26 procedencias; los
-dos archivos reales salen idénticos. Detalle en
-`REPRODUCCION-MARIA-1d-2026-10-07.md`. MARIA-3 y MARIA-1d se integran a la
-rama de la PM después de la publicación de ensayo.
+**MARIA-5 devuelta sobre `6d59893`** (2026-10-07) por seis puntos. La PM
+reprodujo el rojo antes sobre `8e819dd` (`101 failed, 31 passed`), la focal
+(`432 passed`) y la suite (`1199 passed, 102 skipped`): coincide con tu
+informe. Lo central se sostiene. Por la v2, la v1, grupos y subítems el peso
+sale siempre el de la línea. En ~11.000 pedidos al azar las cuentas cierran
+al centavo. Los dos archivos reales salen idénticos. Detalle en
+`REPRODUCCION-MARIA-5-2026-10-07.md`.
 
-Lo que encontró y ya pasaba antes: moneda e incoterm mal escritos por la API
-y el DOL/FOB por defecto los cubre MARIA-1b (Dev 1); el `NaN` en un ítem se
-mira en esa revisión. Dos cosas se suman a MARIA-5 (abajo, punto 3).
+**La devolución va antes que CATALOGO-NCM-1.**
+
+1. **Dos pesos para la misma línea: gana el total neto, con aviso.** Lector
+   y Excel usan una sola regla. Si unitario × cantidad no da el total de la
+   línea, gana el total neto, y un aviso muestra los dos números.
+   - **Lector:** hoy `_peso_del_producto({'peso_unitario':25,
+     'peso_total_linea':25}, 10, '.')` devuelve `(25.0, 250.0)`. Si Gemini
+     copia el total en los dos campos, el TXT declara 250 kg. Con 2,5 y 26
+     gana el unitario sin aviso.
+   - **Excel:** hoy con «Peso»=30 y «Peso neto»=25 en 10 unidades gana
+     «Peso» como unitario (300 kg, sin aviso), y «Peso total» le gana a
+     «Peso neto». Con varias columnas, el orden es neto > total >
+     peso/weight (de una unidad) > bruto. El aviso nombra la columna usada y
+     las que se ignoraron.
+2. **Un peso que no es número nunca hace desaparecer una fila,** en ninguna
+   columna de peso: la fila se conserva con aviso. Hoy, en «Peso unitario»,
+   «2,5» como texto saca la fila del FOB sin decir nada; con «Peso total» ya
+   avisa.
+3. **El peso, con la misma guarda que los importes en el generador:** no
+   finito, por encima del tope o que redondea a `0.000` da 400. Hoy `NaN`,
+   `inf` y `1e300` llegan al TXT, y `0,0004` sale `0.000`. El control del
+   pedido de MARIA-1b (Dev 1) es otra capa: no se pisan.
+4. **Subítems: la tolerancia compara lo mismo con lo mismo** (redondeado con
+   redondeado, o exacto con exacto). Hoy un ítem de 7 × 2,675 con subítems
+   (2 × 2,675), (2,5 × 2,6722) y (2,5 × 2,675) da 400 («suman 18.72 pero el
+   ítem declara 18.73»), y antes generaba. Criterio: ningún pedido que
+   generaba en `8e819dd` da 400 por esto (sirve un lote al azar, como el del
+   subagente).
+5. **Grupo en la v2: editar la cantidad nunca deja un producto en 0.** Si el
+   total nuevo es menor que la cantidad de productos del grupo, se rechaza
+   con el mensaje que ya existe. Hoy 1/1/1 bajado a 2 queda `[1,1,0]` y
+   «Generar» se bloquea.
+6. **Una sola cuenta.** La validación y el aviso «Gastos a FOB» redondean
+   igual que el TXT. Hoy, con grupos, la validación muestra 20,02 y el TXT
+   dice 20,01; y el aviso dice 11,01 cuando el TXT trae 11,02.
+
+**Se deja, anotado:**
+- El flete con un FOB total que redondea a 0,00 (hallazgo 6).
+- El unitario promedio del grupo (hallazgo 9).
+- Aduana o tipo de destinación «N/A» que salen por defecto (hallazgo 13).
+- La v1 y `/generate_maria_export` divergen del TXT de la v2 en peso y
+  centavos (hallazgos 10 y 14). Eso queda en `DECISIONS.md`, para que decida
+  Emi.
+
+**Criterios:** rojo antes y verde después en cada punto. El punto 1 se prueba
+por `_leer`, con Gemini falso, hasta el TXT: (25, 25) con cantidad 10 da
+`QARTKGRNET=25.000` y el aviso. Los dos archivos reales siguen idénticos.
+Suite completa en verde.
 
 ## Respuestas a tus D (2026-10-07, 13:05 UTC)
 
