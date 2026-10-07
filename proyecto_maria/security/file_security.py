@@ -242,15 +242,40 @@ def _contar_hojas_xlsx(contents: bytes) -> int:
                     "cargá los productos a mano.")
         if hojas and hojas[0][1] not in nombres:
             raise ValueError("falta la primera hoja dentro del archivo")
-        # 10 MB son unas 8.000 filas de 60 columnas. Con 27 MB sin
+        # 10 MB son unas 9.400 filas de 20 columnas con texto, o 3.100 de 60
+        # (lo midió la revisión). Con 27 MB sin
         # <dimension>, 8 subidas así delante dejaban a una normal en 504; con
         # 10 MB, la normal da 200 en ~20 s (devolución de EXCEL-2).
         tope_hoja = _mb_de_entorno("EXCEL_MAX_PRIMERA_HOJA_MB", 10)
         if hojas and z.getinfo(hojas[0][1]).file_size > tope_hoja:
             raise ExcelDemasiadoGrande(
-                f"La primera hoja del Excel es demasiado grande (más de {tope_hoja // 2**20} MB). "
-                "Dejá sólo los productos de la factura.")
+                f"La primera hoja del Excel es demasiado grande (más de {tope_hoja // 2**20} MB): "
+                "tiene muchas columnas o filas con formato aunque estén vacías. Dejá sólo los "
+                "productos de la factura.")
+        # Una celda en la última columna (XFD) hace que pandas rellene cada
+        # fila hasta 16.384 columnas: 2.000 filas así (15 KB comprimido)
+        # llegaban a 943 MB (revisión de la devolución de EXCEL-2).
+        if hojas and _ultima_columna(z.read(hojas[0][1])) > _EXCEL_MAX_COLUMNAS:
+            raise ExcelDemasiadoGrande(
+                f"La primera hoja del Excel usa una columna más allá de la {_EXCEL_MAX_COLUMNAS}. "
+                "Dejá sólo las columnas de los productos de la factura.")
         return len(hojas)
+
+
+# Las columnas que puede usar la primera hoja (IV, el límite del Excel viejo).
+_EXCEL_MAX_COLUMNAS = 256
+
+
+def _ultima_columna(xml: bytes) -> int:
+    """La columna más a la derecha que nombra una celda (<c r="AB12">)."""
+    import re
+    ultima = 0
+    for letras in set(re.findall(rb'<(?:\w+:)?c\b[^>]*?\br="([A-Za-z]{1,3})[0-9]', xml)):
+        n = 0
+        for letra in letras.upper():
+            n = n * 26 + letra - 64
+        ultima = max(ultima, n)
+    return ultima
 
 
 def _contar_hojas_excel(contents: bytes, file_ext: str) -> int:
