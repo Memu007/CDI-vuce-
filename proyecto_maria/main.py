@@ -3343,7 +3343,35 @@ def _pdf_vendor_timeout_s() -> float:
     return _segundos_de_entorno("PDF_VENDOR_TIMEOUT_S", 15.0)
 
 
-async def _leer_pdf_aparte(funcion, *args, limite=None):
+def _excel_read_timeout_s() -> float:
+    return _segundos_de_entorno("EXCEL_READ_TIMEOUT_S", 60.0)
+
+
+def _respuesta_excel_demasiado_largo(e: Exception) -> JSONResponse:
+    return JSONResponse(
+        status_code=504,
+        content={"detail": str(e), "code": "lectura_excel_demasiado_larga"},
+    )
+
+
+def _leer_excel_ruta(ruta: str, engine: str):
+    return pd.read_excel(ruta, engine=engine)
+
+
+def _leer_tabla(content: bytes, filename: str):
+    """CSV o Excel a un DataFrame de texto (para correr en otro hilo)."""
+    import io as _io
+    if filename.endswith(".csv"):
+        try:
+            return pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False)
+        except Exception:
+            return pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False, sep=";")
+    if filename.endswith((".xlsx", ".xls")):
+        return pd.read_excel(_io.BytesIO(content), dtype=str, keep_default_na=False)
+    raise HTTPException(status_code=400, detail="Formato no soportado. Usá .csv, .xlsx o .xls")
+
+
+async def _leer_pdf_aparte(funcion, *args, limite=None, que="el PDF"):
     """Corre una lectura sincrónica de PDF en otro hilo, con tiempo máximo.
 
     Así el servidor sigue atendiendo a los demás mientras se lee un PDF
@@ -3359,7 +3387,7 @@ async def _leer_pdf_aparte(funcion, *args, limite=None):
         )
     except TimeoutError:
         raise LecturaPdfDemasiadoLarga(
-            "Leer el PDF tardó demasiado. Probá de nuevo o cargá los productos a mano."
+            f"Leer {que} tardó demasiado. Probá de nuevo o cargá los productos a mano."
         )
 
 
@@ -3397,11 +3425,18 @@ async def upload_excel(
             f.write(contents)
 
         try:
-            # Leer el Excel con pandas
-            df = pd.read_excel(temp_filename, engine='openpyxl' if temp_filename.endswith('.xlsx') else 'xlrd')
+            # Leer el Excel y extraer los datos, en otro hilo y con tiempo
+            # máximo: no frena al resto (EXCEL-1).
+            def _leer_excel():
+                df = pd.read_excel(temp_filename, engine='openpyxl' if temp_filename.endswith('.xlsx') else 'xlrd')
+                return extract_items_from_excel(df, file.filename)
 
-            # Intentar extraer datos de diferentes formatos posibles
-            items = extract_items_from_excel(df, file.filename)
+            try:
+                items = await _leer_pdf_aparte(
+                    _leer_excel, limite=_excel_read_timeout_s(), que="el Excel"
+                )
+            except LecturaPdfDemasiadoLarga as e:
+                return _respuesta_excel_demasiado_largo(e)
 
             if not items:
                 raise HTTPException(status_code=400, detail="No se pudieron extraer datos válidos del archivo Excel")
@@ -4654,15 +4689,12 @@ async def import_clientes(
         raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo: {str(e)[:120]}")
 
     try:
-        if filename.endswith(".csv"):
-            try:
-                df = pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False)
-            except Exception:
-                df = pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False, sep=";")
-        elif filename.endswith((".xlsx", ".xls")):
-            df = pd.read_excel(_io.BytesIO(content), dtype=str, keep_default_na=False)
-        else:
-            raise HTTPException(status_code=400, detail="Formato no soportado. Usá .csv, .xlsx o .xls")
+        # En otro hilo y con tiempo máximo: no frena al resto (EXCEL-1).
+        df = await _leer_pdf_aparte(
+            _leer_tabla, content, filename, limite=_excel_read_timeout_s(), que="el archivo"
+        )
+    except LecturaPdfDemasiadoLarga as e:
+        return _respuesta_excel_demasiado_largo(e)
     except HTTPException:
         raise
     except Exception as e:
@@ -4847,12 +4879,21 @@ async def analyze_client_migration(
     existing_clients = existing_result.scalars().all()
     mapper = GeminiMigrationHeaderMapper(username=user["username"])
     try:
-        preview = await analyze_migration_file_async(
-            content,
-            filename,
-            existing_clients=existing_clients,
-            header_mapper=mapper,
+        # Con tiempo máximo, como leer un PDF (EXCEL-1).
+        import asyncio
+        preview = await asyncio.wait_for(
+            analyze_migration_file_async(
+                content,
+                filename,
+                existing_clients=existing_clients,
+                header_mapper=mapper,
+            ),
+            timeout=_excel_read_timeout_s(),
         )
+    except TimeoutError:
+        return _respuesta_excel_demasiado_largo(LecturaPdfDemasiadoLarga(
+            "Leer el archivo tardó demasiado. Probá de nuevo o con un archivo más chico."
+        ))
     except MigrationInputError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -6311,7 +6352,11 @@ async def upload_excel_v2(
             f.write(contents)
 
         engine = "openpyxl" if temp_filename.endswith(".xlsx") else "xlrd"
-        df = pd.read_excel(temp_filename, engine=engine)
+        # En otro hilo y con tiempo máximo: no frena al resto (EXCEL-1).
+        df = await _leer_pdf_aparte(
+            _leer_excel_ruta, temp_filename, engine,
+            limite=_excel_read_timeout_s(), que="el Excel",
+        )
 
         # Detectar columnas del Excel (independientemente de si el cliente ya tiene mapping)
         detected_mapping = _detect_item_columns(list(df.columns))
@@ -6327,7 +6372,10 @@ async def upload_excel_v2(
             rename = {src: canon for src, canon in effective_mapping.items() if canon in _CANON_COLUMNS}
             df = df.rename(columns=rename)
 
-        items = extract_items_from_excel(df, file.filename)
+        items = await _leer_pdf_aparte(
+            extract_items_from_excel, df, file.filename,
+            limite=_excel_read_timeout_s(), que="el Excel",
+        )
         if not items:
             raise HTTPException(
                 status_code=400,
@@ -6392,6 +6440,8 @@ async def upload_excel_v2(
             "applied_mapping": bool(effective_mapping),
             "catalogo": catalogo_info,
         }
+    except LecturaPdfDemasiadoLarga as e:
+        return _respuesta_excel_demasiado_largo(e)
     except HTTPException:
         raise
     except pd.errors.EmptyDataError:
@@ -7248,15 +7298,12 @@ async def import_ncm_historial(
         raise HTTPException(status_code=400, detail=f"No se pudo leer el archivo: {str(e)[:120]}")
 
     try:
-        if filename.endswith(".csv"):
-            try:
-                df = pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False)
-            except Exception:
-                df = pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False, sep=";")
-        elif filename.endswith((".xlsx", ".xls")):
-            df = pd.read_excel(_io.BytesIO(content), dtype=str, keep_default_na=False)
-        else:
-            raise HTTPException(status_code=400, detail="Formato no soportado. Usá .csv, .xlsx o .xls")
+        # En otro hilo y con tiempo máximo: no frena al resto (EXCEL-1).
+        df = await _leer_pdf_aparte(
+            _leer_tabla, content, filename, limite=_excel_read_timeout_s(), que="el archivo"
+        )
+    except LecturaPdfDemasiadoLarga as e:
+        return _respuesta_excel_demasiado_largo(e)
     except HTTPException:
         raise
     except Exception as e:

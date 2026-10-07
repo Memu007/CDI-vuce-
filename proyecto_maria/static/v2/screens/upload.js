@@ -376,7 +376,8 @@
             // Sin lector automático (MARIA-2): ningún producto, se ofrece
             // seguir con la carga manual.
             if (err && (err.code === 'lectura_automatica_no_disponible'
-                        || err.code === 'lectura_pdf_demasiado_larga')) {
+                        || err.code === 'lectura_pdf_demasiado_larga'
+                        || err.code === 'lectura_excel_demasiado_larga')) {
                 showError(msg, { manual: true });
                 return;
             }

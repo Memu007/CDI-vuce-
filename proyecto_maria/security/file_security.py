@@ -123,6 +123,20 @@ def _abrir_pdf(contents: bytes) -> tuple:
     return False, len(pdf.pages)
 
 
+def _contar_hojas_excel(contents: bytes, file_ext: str) -> int:
+    if file_ext == '.xlsx':
+        import openpyxl
+        wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True)
+        try:
+            return len(wb.sheetnames)
+        finally:
+            wb.close()
+    # El formato binario .xls no puede abrirse con openpyxl.
+    # Pandas usa xlrd y alcanza con validar que exista alguna hoja.
+    import pandas as pd
+    return len(pd.ExcelFile(io.BytesIO(contents), engine='xlrd').sheet_names)
+
+
 def _pdf_validate_timeout_s() -> float:
     """Mal escrito, en 0 o negativo, vale 30 s (RENDIMIENTO-1b)."""
     import math
@@ -243,19 +257,21 @@ async def validate_file_upload(
     # Additional validation for Excel
     if file_type == 'excel':
         try:
-            if file_ext == '.xlsx':
-                import openpyxl
-                wb = openpyxl.load_workbook(io.BytesIO(contents), read_only=True)
-                if len(wb.sheetnames) == 0:
-                    raise HTTPException(400, "Excel file has no sheets")
-                wb.close()
-            else:
-                # El formato binario .xls no puede abrirse con openpyxl.
-                # Pandas usa xlrd y alcanza con validar que exista alguna hoja.
-                import pandas as pd
-                xls = pd.ExcelFile(io.BytesIO(contents), engine='xlrd')
-                if len(xls.sheet_names) == 0:
-                    raise HTTPException(400, "Excel file has no sheets")
+            # Abrir el Excel es sincrónico: va en otro hilo y con tiempo máximo,
+            # para que un archivo pesado no frene al resto (EXCEL-1).
+            import asyncio
+            try:
+                hojas = await asyncio.wait_for(
+                    asyncio.to_thread(_contar_hojas_excel, contents, file_ext),
+                    timeout=_pdf_validate_timeout_s(),
+                )
+            except asyncio.TimeoutError:
+                raise HTTPException(
+                    400,
+                    "No pudimos abrir el Excel: tardó demasiado. Probá con otro archivo.",
+                )
+            if hojas == 0:
+                raise HTTPException(400, "Excel file has no sheets")
 
         except HTTPException:
             raise

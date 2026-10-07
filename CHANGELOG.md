@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · fix: la carga por Excel (EXCEL-1)
+
+- **fix(rendimiento):** leer un Excel o un CSV (`/upload_excel/`, `/upload_excel_v2/`, importar clientes, importar historial NCM, analizar una migración) y validarlo al subirlo corren en otro hilo: el sitio sigue atendiendo a los demás. Tienen tiempo máximo (`EXCEL_READ_TIMEOUT_S`, 60 s) con un error propio (`lectura_excel_demasiado_larga`); la pantalla ofrece la carga a mano.
+
 ## 2026-10-07 · fix: un PDF armado no deja a nadie sin lectura (RENDIMIENTO-1b)
 
 - **fix(rendimiento):** la adivinanza del vendedor lee el texto del PDF sólo con `pypdf`: `pdfminer` se colgaba para siempre con un PDF armado y, con cuatro de esos, nadie más podía leer un PDF hasta reiniciar. Los tiempos máximos en 0 o negativos valen el de siempre.

@@ -292,12 +292,21 @@ async def analyze_migration_file_async(
     existing_clients: Iterable[Any] = (),
     header_mapper: HeaderMapper | None = None,
 ) -> dict[str, Any]:
-    """Version async para FastAPI cuando el mapeador opcional llama a Gemini."""
+    """Version async para FastAPI cuando el mapeador opcional llama a Gemini.
 
+    Leer el archivo y analizarlo corre en otro hilo: no frena al resto del
+    servidor (EXCEL-1). Los clientes existentes se normalizan antes, acá, para
+    no tocar objetos de la base desde otro hilo.
+    """
+    import asyncio
+
+    existentes = [_existing_client(c) for c in (existing_clients or ())]
     if header_mapper is None:
-        return analyze_migration_file(content, filename, existing_clients=existing_clients)
+        return await asyncio.to_thread(
+            analyze_migration_file, content, filename, existing_clients=existentes
+        )
 
-    sheets = _read_sheets(content, filename)
+    sheets = await asyncio.to_thread(_read_sheets, content, filename)
     external_mappings: dict[tuple[str, ...], dict[str, str]] = {}
     for sheet in sheets:
         detected = detect_client_columns(sheet.frame.columns)
@@ -314,10 +323,11 @@ async def analyze_migration_file_async(
         # igualmente valido. Los encabezados de peso ya fueron excluidos.
         return external_mappings.get(tuple(headers), {})
 
-    return analyze_migration_file(
+    return await asyncio.to_thread(
+        analyze_migration_file,
         content,
         filename,
-        existing_clients=existing_clients,
+        existing_clients=existentes,
         header_mapper=cached_mapper,
     )
 
