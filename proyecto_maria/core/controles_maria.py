@@ -7,7 +7,11 @@ semáforo y la pantalla de generar los muestran antes).
 """
 import re
 
-from proyecto_maria.core.maria_generator import INCOTERMS_VALIDOS
+from proyecto_maria.core.maria_generator import _INCOTERMS_GRUPO_C_D, INCOTERMS_VALIDOS
+
+# Los que acepta el generador, más FAS (la pantalla lo ofrece) y los de 2000
+# y 2010 que el generador todavía reconoce (DAT, DAF, DES, DEQ, DDU).
+INCOTERMS_ACEPTADOS = INCOTERMS_VALIDOS | _INCOTERMS_GRUPO_C_D | {"FAS"}
 
 # Monedas habituales en despachos, con el código de MARIA (el dólar es DOL).
 # Es la misma lista que la pantalla de revisión (review.js, MONEDA_WHITELIST).
@@ -116,10 +120,10 @@ def controles_antes_de_generar(items, cabecera: dict) -> tuple[list, list]:
     incoterm = str(cabecera.get("incoterm") or "").strip().upper()
     if not incoterm:
         errores.append("Falta el incoterm de la operación.")
-    elif incoterm not in INCOTERMS_VALIDOS:
+    elif incoterm not in INCOTERMS_ACEPTADOS:
         errores.append(
             f"El incoterm «{incoterm}» no es válido "
-            f"({', '.join(sorted(INCOTERMS_VALIDOS))})."
+            f"({', '.join(sorted(INCOTERMS_ACEPTADOS))})."
         )
 
     cuit = str(cabecera.get("comprador_cuit") or "").strip()

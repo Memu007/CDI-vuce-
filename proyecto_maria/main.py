@@ -3388,8 +3388,8 @@ def _otras_hojas_con_datos(ruta: str, engine: str) -> list:
         import openpyxl
         wb = openpyxl.load_workbook(ruta, read_only=True)
         try:
-            for ws in wb.worksheets[1:]:
-                for fila in ws.iter_rows(max_row=1000, values_only=True):
+            for ws in wb.worksheets[1:51]:
+                for fila in ws.iter_rows(max_row=1000, max_col=60, values_only=True):
                     if any(v is not None and str(v).strip() for v in fila):
                         nombres.append(ws.title)
                         break
@@ -3399,9 +3399,10 @@ def _otras_hojas_con_datos(ruta: str, engine: str) -> list:
     import xlrd
     libro = xlrd.open_workbook(ruta, on_demand=True)
     try:
-        for i in range(1, libro.nsheets):
+        for i in range(1, min(libro.nsheets, 51)):
             hoja = libro.sheet_by_index(i)
-            if any(str(v).strip() for f in range(min(hoja.nrows, 1000)) for v in hoja.row_values(f)):
+            if any(str(v).strip() for f in range(min(hoja.nrows, 1000))
+                   for v in hoja.row_values(f, end_colx=min(hoja.ncols, 60))):
                 nombres.append(hoja.name)
     finally:
         libro.release_resources()
@@ -6387,10 +6388,17 @@ async def upload_excel_v2(
             limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
         )
 
-        otras_hojas = await _leer_pdf_aparte(
-            _otras_hojas_con_datos, temp_filename, engine,
-            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
-        )
+        # Mirar las otras hojas es sólo un aviso: si tarda o falla, la subida
+        # sigue sin él (MARIA-1b). Con 60 columnas y 1000 filas por hoja, y
+        # como mucho 50 hojas.
+        try:
+            otras_hojas = await _leer_pdf_aparte(
+                _otras_hojas_con_datos, temp_filename, engine,
+                limite=min(10.0, _excel_read_timeout_s()), que="el Excel", pool=_pool_lectura_excel(),
+            )
+        except Exception as e:
+            logging.warning("upload_excel_v2: no se pudieron mirar las otras hojas: %s", e)
+            otras_hojas = []
 
         if len(df) > _MAX_FILAS_EXCEL:
             raise HTTPException(
