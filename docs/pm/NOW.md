@@ -169,7 +169,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 21:58 UTC (rutina): publicada `a9b03cf` (GUARDAR-1) a las 21:35.
+2026-10-07 21:56 UTC (rutina): publicada `a9b03cf` (GUARDAR-1) a las 21:35.
 La CI de `main` está trabada desde las 21:36 en «Dependencias del sistema»
 (apt del runner de GitHub; no llegó a correr pruebas). Dev 2 reentregó todo
 junto (`df4de22`): rojo antes `21 failed`, suite `1526 passed`, e2e OK. Un
