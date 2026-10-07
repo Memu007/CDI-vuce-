@@ -24,13 +24,9 @@ antes de cerrar la Fase 3.
    facturación de Google.
 3. **Despachante:** recordarle los archivos reales (favor 1). Ya respondió
    todas las preguntas.
-4. **Catálogo NCM de 2018** (D21 de la Dev 1): le falta la enmienda de 2022
-   (por ejemplo, 8517.13.00, teléfonos). Emi: «lo baja la PM». Desde acá la
-   red bloquea `www.arca.gob.ar`; además, el ZIP oficial de ARCA de julio ya
-   traía el archivo de 2018. Falta que Emi elija: habilitar
-   `www.arca.gob.ar` en el entorno (Edit → Network access → Allowed domains)
-   o adjuntar el archivo; y si entra como pieza (propuesta: Dev 1, después de
-   MARIA-1b).
+4. **Catálogo NCM:** Emi trajo el nomenclador vigente (2026-10-07). Lo
+   carga la Dev 2 en CATALOGO-NCM-1. Una línea de Emi: ¿lo bajó de
+   `arca.gob.ar`?
 5. **Hasta publicar MARIA-1a: revisar el país de origen de cada TXT** antes
    de mandárselo al despachante. El código publicado corta el país a dos
    letras: si la lectura devuelve «CHN» o «China», sale Suiza.
