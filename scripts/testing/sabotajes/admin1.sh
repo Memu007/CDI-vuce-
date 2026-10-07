@@ -61,6 +61,10 @@ sabotaje "/api/dev/stats escondida del esquema y sin require_admin" \
   $'@app.get("/api/dev/stats")\nasync def get_dev_stats(\n    user=Depends(require_admin),' \
   $'@app.get("/api/dev/stats", include_in_schema=False)\nasync def get_dev_stats(\n    user=Depends(get_current_user),' \
   'GET /api/dev/stats → 200'
+sabotaje "cache/refresh niega también al admin" \
+  $'    request_data: NCMCacheRefreshRequest,\n    user=Depends(require_admin),' \
+  $'    request_data: NCMCacheRefreshRequest,\n    user=Depends(require_admin),\n    _niega=Depends(lambda: (_ for _ in ()).throw(HTTPException(status_code=403))),' \
+  'FAILED tests/test_admin_solo_admin.py::test_admin_refresca_cache_ncm'
 sabotaje "cache/refresh pierde la marca admin (la prueba dejaría de verla)" \
   '@app.post("/api/ncm/cache/refresh", tags=["admin"])' '@app.post("/api/ncm/cache/refresh")' \
   "assert ('POST', '/api/ncm/cache/refresh') in ["

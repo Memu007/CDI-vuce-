@@ -168,3 +168,20 @@ def test_admin_borra_errores_viejos(rutas):
         main.app.dependency_overrides.pop(main.get_current_user, None)
     assert r.status_code == 200, r.text[:200]
     assert r.json()["removed_count"] == 0
+
+
+def test_admin_refresca_cache_ncm(rutas, monkeypatch):
+    """El admin sigue refrescando el cache de NCM (fuente externa simulada)."""
+    import proyecto_maria.core.ncm_service as ncm_service
+
+    async def _falso(ncm, valor_fob=100.0, refresh=False):
+        return {"ncm": ncm, "source": "prueba", "refresh": refresh}
+
+    monkeypatch.setattr(ncm_service, "get_ncm_completo", _falso)
+    _con_usuario(USUARIO_ADMIN)
+    try:
+        r = TestClient(main.app).post("/api/ncm/cache/refresh", json={"ncm": "84713012"})
+    finally:
+        main.app.dependency_overrides.pop(main.get_current_user, None)
+    assert r.status_code == 200, r.text[:200]
+    assert r.json()["source"] == "prueba"
