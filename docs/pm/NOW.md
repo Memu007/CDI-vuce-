@@ -100,8 +100,9 @@ Archivos abiertos por Dev:
 
 ## En curso
 
-- **Dev 1:** EXCEL-1 (la carga por Excel, de punta a punta). Sigue: MARIA-1b
-  y PUNTA-A-PUNTA-1.
+- **Dev 1:** EXCEL-1, devuelta por cinco puntos (el más grave: el mapeo
+  aprendido pisa «Precio Unitario» y el FOB sale multiplicado). Sigue:
+  MARIA-1b, PUNTA-A-PUNTA-1 y EXCEL-2.
 - **Dev 2:** MARIA-3, devuelta por cinco puntos (procedencia, año del `IEXT`
   sin fecha, fechas raras, procedencia rara, gastos sin tope). Sigue: MARIA-1d
   («None» en campos vacíos) y MARIA-5; MARIA-6 cuando lleguen los archivos reales del despachante.
@@ -176,9 +177,10 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 09:00 UTC (rutina): sin entregas nuevas. Dev 1 sigue con EXCEL-1
-(arreglos de sus revisores, `2759c84`); Dev 2 avanzó con MARIA-3 (`a3f2df9`).
-A las 9 (ARG): los tres `/compact`, la lista de Railway y el SHA del ensayo.
+2026-10-07 10:45 UTC (rutina): EXCEL-1 y MARIA-3 devueltas (cinco puntos cada
+una; el más grave, el FOB multiplicado por un mapeo aprendido). MARIA-1b y
+MARIA-1d escritas. Contexto: Dev 1 ~80 %, Dev 2 ~40 % (compactó), PM ~50 %.
+A las 9 (ARG): los `/compact`, la lista de Railway y el SHA del ensayo.
 
 ## Medición
 
