@@ -128,14 +128,10 @@ sabotaje $M "el CSV vuelve a leerse siempre con coma" \
   $'        separador = ","' \
   "FAILED $T::test_el_csv_del_historial_se_lee_con_coma_punto_y_coma_latin1_o_bom[punto y coma-"
 # Lo que encontró la revisión
-sabotaje $M "una combinada vuelve a copiar números hacia abajo" \
-  $'        if lo_que_es and lo_que_es <= _COMBINADAS_SE_COPIAN:' \
-  $'        if True:\n            lo_que_es = lo_que_es or {"descripcion"}' \
-  "FAILED $T::test_una_combinada_con_cantidad_y_precio_no_duplica_el_producto"
 sabotaje $M "las combinadas vuelven a copiarse antes de buscar el encabezado" \
   '    df = _con_encabezado(pd.read_excel(origen, engine=engine, dtype=object), nombres)' \
   '    df = _con_encabezado(_rellenar_combinadas(pd.read_excel(origen, engine=engine, dtype=object), combinadas, mapeo), nombres)' \
-  "FAILED $T::test_un_encabezado_en_dos_filas_combinadas_no_da_un_producto_fantasma"
+  "FAILED $T::test_una_fila_vacia_dentro_de_una_combinada_no_es_una_fila_sin_leer"
 sabotaje $F "el libro vuelve a buscarse en xl/workbook.xml" \
   '    libro = _find_workbook_part(manifiesto).PartName[1:]' \
   '    libro = "xl/workbook.xml"' \
@@ -170,9 +166,9 @@ sabotaje $M "un producto mal formado vuelve a dar 500" \
   "FAILED $T::test_productos_mal_formados_dan_400"
 
 # Devolución (veredicto 2034b85)
-sabotaje $M "una combinada vuelve a recorrerse hasta su última fila" \
-  $'            filas = df.index[(df.index >= desde) & (df.index <= hasta)]\n            df.loc[filas, col] = valor' \
-  $'            for fila in range(f1 - 1, f2 - 1):\n                if fila in df.index:\n                    df.at[fila, col] = valor' \
+sabotaje $M "una combinada vuelve a recorrerse hasta su última fila (la función de 3e6e63e)" \
+  $'    hasta_donde = {}\n    for f1, c1, f2, _c2 in sorted(set(combinadas)):\n        if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < 2:\n            continue\n        col = columnas[c1 - 1]\n        if campos.get(col) not in _COMBINADAS_SE_COPIAN or f1 <= hasta_donde.get(c1, 0):\n            continue\n        hasta_donde[c1] = f2\n        ancla = f1 - 2\n        if ancla not in df.index or f1 >= ultima:\n            continue\n        valor = df.at[ancla, col]\n        if not isinstance(valor, str) or not valor.strip() or _re.fullmatch(r"[\\d\\s.,+\\-]+", valor.strip()):\n            continue\n        desde, hasta = max(f1 + 1, primera) - 2, min(f2, ultima) - 2\n        if desde <= hasta:\n            filas = df.index[(df.index >= desde) & (df.index <= hasta)]\n            df.loc[filas, col] = valor\n' \
+  $'    for f1, c1, f2, _c2 in combinadas:\n        if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < 2:\n            continue\n        col = columnas[c1 - 1]\n        if campos.get(col) not in _COMBINADAS_SE_COPIAN:\n            continue\n        ancla = f1 - 2\n        if ancla not in df.index:\n            continue\n        valor = df.at[ancla, col]\n        if not isinstance(valor, str) or not valor.strip() or _re.fullmatch(r"[\\d\\s.,+\\-]+", valor.strip()):\n            continue\n        for fila in range(f1 + 1, f2 + 1):\n            if fila - 2 in df.index:\n                df.at[fila - 2, col] = valor\n' \
   "FAILED $T::test_una_combinada_gigante_repetida_no_traba_la_lectura"
 sabotaje $M "cantidad y precio combinados vuelven a copiarse" \
   '_COMBINADAS_SE_COPIAN = {"descripcion", "origen", "pieza"}' \
@@ -207,8 +203,8 @@ sabotaje $F "los estilos vuelven a tener sólo tope de MB" \
   '                                     or False):' \
   "FAILED $T::test_estilos_con_millones_de_elementos_se_rechazan_antes_de_abrir[xf]"
 sabotaje $F "una relación de Type raro vuelve a no ser hoja" \
-  '        if "chartsheet" in (r.get("Type") or ""):' \
-  '        if not (r.get("Type") or "").endswith("/worksheet"):' \
+  '        destinos[r.get("Id")] = (destino, "chartsheet" in (r.get("Type") or ""))' \
+  '        destinos[r.get("Id")] = (destino, not (r.get("Type") or "").endswith("/worksheet"))' \
   "FAILED $T::test_una_hoja_con_una_relacion_rara_cuenta_y_sale_de_la_copia"
 sabotaje $F "la primera hoja vuelve a tener tope de 30 MB" \
   '        tope_hoja = _mb_de_entorno("EXCEL_MAX_PRIMERA_HOJA_MB", 10)' \

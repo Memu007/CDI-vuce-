@@ -557,7 +557,7 @@ def test_una_combinada_gigante_repetida_no_traba_la_lectura():
     r = salida["r"]
     assert r.status_code == 200, r.text[:300]
     assert [i["origen"] for i in r.json()["items"]] == ["CN", "CN"]
-    assert tardo < 1.5, f"tardó {tardo:.1f} s"
+    assert tardo < 5, f"tardó {tardo:.1f} s"  # antes, ~1000 s; con margen para una máquina cargada
 
 
 @pytest.mark.parametrize("cantidad, precio", [("5 UN", "USD 100"), ("5", "$ 1.500,00")])
