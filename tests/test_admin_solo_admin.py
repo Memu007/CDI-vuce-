@@ -13,6 +13,7 @@ cualquiera se le saca require_admin, el usuario común pasa el control y la
 prueba lo nombra.
 """
 import pytest
+from fastapi.routing import APIRoute
 from fastapi.testclient import TestClient
 
 from proyecto_maria import main
@@ -46,6 +47,12 @@ def _rutas_de_admin():
         for metodo, op in operaciones.items():
             if ruta.startswith(PREFIJOS_ADMIN) or "admin" in (op.get("tags") or []):
                 rutas.add((metodo.upper(), ruta))
+    # Las rutas propias de la app que se esconden del esquema
+    # (include_in_schema=False) no aparecen arriba: se suman acá.
+    for r in main.app.routes:
+        if isinstance(r, APIRoute) and not r.include_in_schema:
+            if r.path.startswith(PREFIJOS_ADMIN) or "admin" in (r.tags or []):
+                rutas.update((m, r.path) for m in r.methods if m != "HEAD")
     return sorted(rutas)
 
 
