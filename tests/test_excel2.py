@@ -421,9 +421,11 @@ def test_un_encabezado_en_dos_filas_combinadas_no_da_un_producto_fantasma():
 
 
 def test_un_texto_enorme_arriba_no_traba_la_busqueda_del_encabezado():
-    """Celdas de las primeras filas que apuntan a un texto de casi 10 MB: la
-    búsqueda del encabezado no las mira (antes, ~2 s por celda)."""
-    enorme = "x" * 9_000_000
+    """Celdas de las primeras filas que apuntan a un texto enorme: la búsqueda
+    del encabezado no las normaliza (con uno de casi 10 MB costaba ~2 s por
+    celda; acá 1 MB, para que sin el tope falle por tiempo y no por el
+    límite de la suite)."""
+    enorme = "x" * 1_000_000
     filas = [[enorme] * 4 for _ in range(31)] + [ENCABEZADO, ["84798999900H", "MAQUINA", "Argentina", 1, 5, 1]]
     t0 = time.monotonic()
     import pandas as pd
