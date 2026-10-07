@@ -51,8 +51,9 @@ necesita prueba: la ley, un archivo real o la respuesta del despachante
 | ✅ | MARIA-1c | Lo que el lector encontró pero no pudo leer (flete, seguro) se avisa en vez de salir 0; la pantalla vieja no repone cantidad 1 ni origen China (D5 de la Dev 2). Se publica junto con MARIA-1a | no cambia el TXT de una factura bien leída |
 | ✅ | MARIA-4 | Lo que decide el despachante: estado de la mercadería (seis, por producto), IVA adicional (completo en reventa; si hay reducción o exclusión, aviso de que se elige en «Ventajas» del Kit, no va en el TXT), banco y empresa de digitalización (las dos por operación; Modoc = `PSAD06`, Lakaut = `PSAD01`) (M2, M3) | respuestas 1, 2, 4 y 5, las dos cortas y el archivo real de 2026 |
 | 1 | MARIA-3 | Avisos antes de generar (y sin avisos de más: «N/A», «FREE», «included» no son ilegibles); la fecha de emisión sale de la factura, no de hoy (D15 de la Dev 1); gastos anteriores al FOB en EXW, FCA y FAS; procedencia en pantalla (M6, M8) | respuesta 6, Código Aduanero art. 15, nota del SIM, archivo real de 2025 |
-| 2 | MARIA-5 | Peso total por producto; cuentas exactas al centavo (M1, M9) | peso: respuesta 3 y archivo real de 2026; cuentas: la prueba en el Kit |
-| 3 | MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11) | sus archivos reales |
+| 2 | MARIA-1d | Un campo vacío no llega al TXT como «None» o «NON» (D12 de la Dev 2) | no cambia el TXT de una factura bien leída |
+| 3 | MARIA-5 | Peso total por producto; cuentas exactas al centavo (M1, M9) | peso: respuesta 3 y archivo real de 2026; cuentas: la prueba en el Kit |
+| 4 | MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11) | sus archivos reales |
 
 MARIA-4, MARIA-3 y MARIA-5 tocan el mismo generador: van en ese orden.
 MARIA-6 arranca cuando lleguen sus archivos reales.
@@ -68,6 +69,7 @@ MARIA-6 arranca cuando lleguen sus archivos reales.
 | 1 | EXCEL-1 | Revisar la carga por Excel de punta a punta (nunca se auditó) y arreglar lo que falle; leer un Excel tampoco frena el sitio (D12 de la Dev 1) |
 | 2 | MARIA-1b | Controles antes de generar: NCM del catálogo, moneda, incoterm, CUIT, montos; ningún texto mete líneas en el TXT; al guardar la operación no se inventan cantidad 1 ni peso 0,5 (M10, D6 de la Dev 2) |
 | 3 | PUNTA-A-PUNTA-1 | Prueba automática: sube un PDF y un Excel (Gemini simulado) y compara el TXT con los archivos reales |
+| 4 | EXCEL-2 | Lo que el Excel todavía no lee: encabezado fuera de la fila 1, sin columna de origen, celdas combinadas (D18 de la Dev 1) |
 
 **Cierre:** publicar con el «dale»; Emi prueba con facturas reales; el
 despachante carga un archivo en su Kit (cierra G4).
