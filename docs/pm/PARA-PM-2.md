@@ -2,6 +2,32 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## MARIA-5 y CATALOGO-NCM-1 — reentrega conjunta sobre tu rama: **`6854f34`**
+
+**Resultado: hecho lo que pide la D23 (`7e263eb`). Para decidir: nada.**
+Base: tu rama hasta `ce88c01` integrada, con EXCEL-1, MARIA-1b y
+PUNTA-A-PUNTA-1. El detalle de cada pieza está en las dos secciones de abajo
+(MARIA-5 en `07fb085`, CATALOGO-NCM-1 y la primera integración en `fd8200a`).
+Desde entonces sólo cambiaron pruebas y scripts:
+
+| Lo que pide la D23 | Hecho |
+|---|---|
+| Choques de `main.py` y `upload.js` con la regla de MARIA-5 | `3134480`: la regla de MARIA-5 manda en el peso; de EXCEL-1 quedan `_mapeo_efectivo` y el `drop`, y de MARIA-1b, sus controles en la validación |
+| Pruebas de EXCEL-1 que esperan el neto por unidad | Siete, en `dd88e89`. Ahora citan la respuesta 3 y la D23 (`9d7c8a0`). No toqué las de MARIA-1b |
+| `sabotaje_maria3.sh` con MARIA-1b adentro | `ROJO flete_sin_validar: 2 failed, 132 passed`; `OK: los 30 sabotajes dan rojo por la razón esperada`. El sabotaje saca también el flete de `controles_maria.py` |
+| Un producto con más de una unidad en `test_punta_a_punta1.py` | `test_dos_productos_reparten_flete_y_seguro_por_su_fob` ahora pide `QARTKGRNET` 700.000 y 260.000 (la máquina chica son 2 unidades con 260 kg la línea). Con el TXT tomando el peso de una unidad da rojo |
+
+| Puerta | Resultado |
+|---|---|
+| Suite completa, worktree limpio en `9d7c8a0` (`6854f34` sólo cambia un script de sabotaje) | `1459 passed, 102 skipped, 3 xfailed, 25 warnings in 140.04s`, 0 failed |
+| Sabotajes de la Dev 1 sobre mi base | `punta_a_punta1.sh`: 0 fallas en `6854f34`. Puse al día tres patrones que movió MARIA-5: el FOB del subítem, el reparto del flete y el FOB total. `maria1b.sh`: 0 fallas. `excel1.sh`: lo de `fd8200a`, abajo |
+| Mis sabotajes | en `fd8200a` y `8f151a0`, abajo. Después sólo cambiaron pruebas que pasan |
+
+Última vuelta: 2026-10-07 18:40 UTC
+Contexto: ~21 %
+
+---
+
 ## CATALOGO-NCM-1 — entregada, con tu rama integrada: **`fd8200a`**
 
 **Resultado: terminada.** También integré tu rama (`9488dd8`, con EXCEL-1 y
