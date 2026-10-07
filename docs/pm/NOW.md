@@ -156,13 +156,14 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 19:00 UTC (rutina): la cuenta tocó su límite de 5 horas entre las
-~18:34 y las 18:50 UTC y cortó a las dos Devs; despertadas a las 18:56. Hoy
-rige 30/40. Dev 1: GUARDAR-1 (COBRO-MP-1 en pausa en `18a1850`). Dev 2:
-reentregó MARIA-5 y CATALOGO-NCM-1 (`6854f34`; rojo antes `171 failed`,
-suite `1459 passed, 0 failed`), sigue SUBITEMS-1. Dos subagentes Sonnet alto
-atacan EXCEL-2 y MARIA-5 con el catálogo. Esperan a Emi: «dale 6ea8ca9» escrito
-y el `/compact` de la Dev 2 (49 %). Contexto: PM 23 %, Dev 1 18 %.
+2026-10-07 19:50 UTC: las dos entregas, devueltas. MARIA-5 y CATALOGO-NCM-1
+(`6854f34`) por seis puntos chicos; la peor: una columna «Peso por caja» le
+gana a «Peso» (×16 en el TXT). EXCEL-2 (`3e6e63e`) por seis, tres que rompen
+(combinada gigante, combinada con texto que duplica el FOB, estilos que
+llegan a 1,4 GB); D27 (a). Dev 1: GUARDAR-1, después EXCEL-2, después
+COBRO-MP-1. Dev 2: su devolución, después SUBITEMS-1. Hoy rige 30/40 (la
+cuenta tocó su límite a las ~18:34). Esperan a Emi: «dale 6ea8ca9» escrito
+y el `/compact` de la Dev 2.
 
 ## Medición
 
