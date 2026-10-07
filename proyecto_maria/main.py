@@ -3330,7 +3330,14 @@ def _correr_lectura(funcion, *args):
         raise RuntimeError(f"error de tiempo dentro del lector: {e}") from e
 
 
-async def _leer_pdf_aparte(funcion, *args):
+def _pdf_vendor_timeout_s() -> float:
+    try:
+        return float(os.getenv("PDF_VENDOR_TIMEOUT_S", "15"))
+    except (TypeError, ValueError):
+        return 15.0
+
+
+async def _leer_pdf_aparte(funcion, *args, limite=None):
     """Corre una lectura sincrónica de PDF en otro hilo, con tiempo máximo.
 
     Así el servidor sigue atendiendo a los demás mientras se lee un PDF
@@ -3341,7 +3348,9 @@ async def _leer_pdf_aparte(funcion, *args):
     loop = asyncio.get_running_loop()
     futuro = loop.run_in_executor(_pool_lectura_pdf(), _correr_lectura, funcion, *args)
     try:
-        return await asyncio.wait_for(futuro, timeout=_pdf_read_timeout_s())
+        return await asyncio.wait_for(
+            futuro, timeout=_pdf_read_timeout_s() if limite is None else limite
+        )
     except TimeoutError:
         raise LecturaPdfDemasiadoLarga(
             "Leer el PDF tardó demasiado. Probá de nuevo o cargá los productos a mano."
@@ -3532,7 +3541,7 @@ async def upload_pdf_public(
         except LecturaPdfDemasiadoLarga as e:
             return JSONResponse(
                 status_code=504,
-                content={"detail": str(e), "code": "PDF_READ_TIMEOUT"},
+                content={"detail": str(e), "code": "lectura_pdf_demasiado_larga"},
             )
         
         # Manejar tanto formato nuevo (dict) como viejo (lista)
@@ -3557,7 +3566,10 @@ async def upload_pdf_public(
                     _extract_pdf_text,
                     detect_vendor_from_text,
                 )
-                pdf_text = await _leer_pdf_aparte(_extract_pdf_text, contents)
+                # Es opcional: con un tiempo propio, más corto.
+                pdf_text = await _leer_pdf_aparte(
+                    _extract_pdf_text, contents, limite=_pdf_vendor_timeout_s()
+                )
                 detected = detect_vendor_from_text(pdf_text)
                 if detected:
                     operacion_data['vendedor_nombre'] = detected

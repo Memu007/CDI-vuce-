@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-10-07 · fix: leer un PDF no frena el sitio (RENDIMIENTO-1)
 
-- **fix(rendimiento):** leer el PDF, sacarle el texto, abrirlo para validarlo y pedirle a Gemini un NCM corren en otro hilo: mientras tanto el servidor sigue atendiendo a los demás. La lectura tiene un tiempo máximo (`PDF_READ_TIMEOUT_S`, 120 s) con un error propio (`PDF_READ_TIMEOUT`).
+- **fix(rendimiento):** leer el PDF, sacarle el texto, abrirlo para validarlo y pedirle a Gemini un NCM corren en otro hilo: mientras tanto el servidor sigue atendiendo a los demás. La lectura tiene un tiempo máximo (`PDF_READ_TIMEOUT_S`, 120 s) con un error propio (`lectura_pdf_demasiado_larga`) y la pantalla ofrece cargar los productos a mano; la adivinanza del vendedor tiene su tiempo propio (`PDF_VENDOR_TIMEOUT_S`, 15 s) y Gemini el suyo (`NCM_GEMINI_TIMEOUT_S`, 30 s). Las lecturas de PDF usan su propio grupo de hilos (`PDF_READ_WORKERS`, 4).
 - **fix(dependencias):** `PyPDF2` 3.0.1, que se colgaba con un PDF armado, se cambia por su sucesor `pypdf`. Se saca `python-jose` (y con ella `ecdsa`), que nadie usaba: el token de sesión usa `PyJWT`.
 
 ## 2026-10-07 · fix: lo que quedó de ADMIN-1 (ADMIN-2)
