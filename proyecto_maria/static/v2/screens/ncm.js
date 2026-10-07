@@ -1229,6 +1229,17 @@
             const orden = partes.map((p, i) => i).sort((a, b) => (partes[b] - enteras[b]) - (partes[a] - enteras[a]) || a - b);
             let faltan = nuevo - enteras.reduce((s, n) => s + n, 0);
             for (const i of orden) { if (faltan <= 0) break; enteras[i] += 1; faltan -= 1; }
+            // Ningún producto queda en 0 (devolución de MARIA-5): el que no
+            // llegó a uno lo toma del que más tiene. onFieldBlur ya rechazó
+            // un total menor que la cantidad de productos.
+            enteras.forEach((n, i) => {
+                while (enteras[i] < 1) {
+                    const mayor = enteras.indexOf(Math.max(...enteras));
+                    if (enteras[mayor] <= 1) break;
+                    enteras[mayor] -= 1;
+                    enteras[i] += 1;
+                }
+            });
             miembros.forEach((it, i) => { it.cantidad = enteras[i]; });
             return;
         }
@@ -1291,9 +1302,11 @@
                 // los productos (vuelve lo que estaba).
                 if (inp.value === inp.defaultValue) return;
                 const n = Number(inp.value);
-                if (inp.value.trim() === '' || !Number.isFinite(n) || n <= 0) {
+                const productos = (CDI.state.items || []).filter(it => it.grupo_id === gid).length;
+                if (inp.value.trim() === '' || !Number.isFinite(n) || n <= 0 ||
+                    (field === 'cantidad' && Math.round(n) < productos)) {
                     inp.value = inp.defaultValue;
-                    if (CDI.toast) CDI.toast('Grupo sin cambios', 'En un grupo, cargá un número mayor que 0. Para cambiar un producto solo, desagrupalo.', 'warning');
+                    if (CDI.toast) CDI.toast('Grupo sin cambios', 'En un grupo, cargá un número mayor que 0 (en la cantidad, al menos uno por producto). Para cambiar un producto solo, desagrupalo.', 'warning');
                     return;
                 }
                 setGroupField(gid, field, inp.value);

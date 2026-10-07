@@ -514,9 +514,41 @@ def peso_de_la_linea(item: dict) -> float:
     3 del despachante). `peso_kg`, si viene, ya es el total (así lo mandan la
     v1 y los archivos reales); si no, `peso_unitario` × cantidad (la v2)."""
     total = item.get('peso_kg')
-    if total not in (None, ''):
-        return float(total or 0)
-    return float(item.get('peso_unitario') or 0) * float(item.get('cantidad', 1) or 0)
+    try:
+        if total not in (None, ''):
+            return float(total or 0)
+        return float(item.get('peso_unitario') or 0) * float(item.get('cantidad', 1) or 0)
+    except (TypeError, ValueError):
+        raise ValueError(f"El peso «{str(total if total not in (None, '') else item.get('peso_unitario'))[:20]}» "
+                         f"de «{str(item.get('descripcion') or '')[:40]}» no es un número.")
+
+
+def peso_valido(peso, donde) -> float:
+    """El peso neto de la línea para QARTKGRNET, con la misma guarda que los
+    importes (devolución de MARIA-5): no finito, negativo, por encima del tope
+    o que redondea a 0.000 es un error con mensaje propio (400)."""
+    try:
+        kilos = float(peso)
+    except (TypeError, ValueError):
+        raise ValueError(f"Item {donde}: el peso «{str(peso)[:20]}» no es un número.")
+    if not math.isfinite(kilos) or kilos > IMPORTE_MAXIMO or round(kilos, 3) <= 0:
+        raise ValueError(
+            f"Item {donde}: el peso «{str(peso)[:20]}» no es válido: tiene que ser "
+            f"de al menos 0.001 kg (revisá el peso y la cantidad)."
+        )
+    return kilos
+
+
+def fob_total_del_txt(items: list, grupos: list | None = None) -> Decimal:
+    """El MDDTFOB que va a salir en el TXT: los productos de un grupo suman su
+    valor y la línea se redondea una vez; el resto, cada uno al centavo. La
+    validación muestra este número (devolución de MARIA-5: una sola cuenta)."""
+    grupos = grupos if grupos is not None else [it.get('grupo_id') for it in items]
+    lineas: dict = {}
+    for n, (item, gid) in enumerate(zip(items, grupos)):
+        clave = ('grupo', gid) if gid is not None else ('item', n)
+        lineas[clave] = lineas.get(clave, Decimal(0)) + valor_de_la_linea(item)
+    return sum((centavos(v) for v in lineas.values()), Decimal('0.00'))
 
 
 def generate_maria_txt(operation_id: str, items: list, 
@@ -912,7 +944,7 @@ def generate_maria_txt(operation_id: str, items: list,
         # [SBT] dice N, el que tiene dos dice S.
         lines.append("CARTSBITEM=S" if item.get("subitems") else "CARTSBITEM=N")
         lines.append(f"CARTUSO={_estado_item(item, idx, pais_codigo)}")
-        lines.append(f"QARTKGRNET={peso_kg:.3f}")
+        lines.append(f"QARTKGRNET={peso_valido(peso_kg, idx):.3f}")
         lines.append(f"CARTPAYORI={pais_codigo}")
         lines.append(f"CARTPAYPRC={pais_proc_codigo}") # Procedencia (default = origen)
         lines.append(f"CARTUNTDCL={unidad_codigo}") # Unidad declarada (oficial MARIA)
@@ -987,11 +1019,9 @@ def generate_maria_txt(operation_id: str, items: list,
             # rechaza la declaración. Se valida acá y se corta: mejor un error
             # en pantalla que un TXT que no cuadra.
             suma_cant = sum(float(s.get("cantidad", 0) or 0) for s in subitems)
-            # Cada MSBTFOB al centavo, como sale en el TXT: su suma tiene que
-            # dar exactamente el MARTFOB (MARIA-5).
             # El valor de cada sub-ítem sin redondear; el MARTFOB se reparte
             # entre ellos al centavo, así los MSBTFOB suman exactamente el
-            # MARTFOB (MARIA-5). La tolerancia es la de antes.
+            # MARTFOB (MARIA-5).
             crudos_sub = [
                 valor_de_la_linea({"cantidad": s.get("cantidad", 0) or 0,
                                    "valor_unitario": s.get("valor_unitario", valor_unit) or 0})
@@ -999,12 +1029,15 @@ def generate_maria_txt(operation_id: str, items: list,
             ]
             suma_fob = sum(crudos_sub, Decimal(0))
             fobs_sub = repartir(valor_total, crudos_sub)
+            # La tolerancia compara exacto con exacto (devolución de MARIA-5):
+            # la suma sin redondear contra el valor del ítem sin redondear.
+            valor_exacto = valor_de_la_linea(item)
             if abs(suma_cant - cantidad) > 0.001:
                 raise ValueError(
                     f"Item {idx}: las cantidades de los sub-ítems suman {suma_cant:g} "
                     f"pero el ítem declara {cantidad:g}. Tienen que coincidir."
                 )
-            if abs(suma_fob - valor_total) > Decimal("0.01"):
+            if abs(suma_fob - valor_exacto) > Decimal("0.01"):
                 raise ValueError(
                     f"Item {idx}: los valores de los sub-ítems suman {suma_fob:.2f} "
                     f"pero el ítem declara {valor_total:.2f}. Tienen que coincidir."
@@ -1099,6 +1132,18 @@ def validate_items_for_maria(items: list) -> tuple[bool, list]:
 INCOTERMS_VALIDOS = {"FOB", "CIF", "DDP", "EXW", "FCA", "FAS", "CFR", "CPT", "CIP", "DAP", "DPU"}
 
 
+def _dos_decimales(valor):
+    """Un importe como sale en el TXT (al centavo), para que el aviso diga el
+    mismo número; si no es un importe, como venga (el TXT dará el error)."""
+    try:
+        return centavos(valor or 0)
+    except (TypeError, ValueError, ArithmeticError):
+        try:
+            return float(valor or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+
 def supuestos_declarados(
     items: list,
     incoterm: str = "FOB",
@@ -1137,7 +1182,7 @@ def supuestos_declarados(
     if gastos_fob is None:
         if grupo_cd:
             avisos.append(
-                f"Gastos a FOB: se declaró {flete + seguro:.2f} (flete + seguro) en "
+                f"Gastos a FOB: se declaró {_dos_decimales(flete) + _dos_decimales(seguro):.2f} (flete + seguro) en "
                 f"GTOS-POS-FOB. Si la diferencia contra la condición {incoterm_norm} "
                 f"pactada es otra, cargala a mano."
             )

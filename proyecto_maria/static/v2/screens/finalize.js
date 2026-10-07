@@ -151,7 +151,9 @@
             origen: String(it.origen || 'XX').trim().toUpperCase() || 'XX',
             cantidad: toNumber(it.cantidad, 1),
             valor_unitario: toNumber(it.valor_unitario, 0),
-            peso_unitario: toNumber(it.peso_unitario, 0)
+            peso_unitario: toNumber(it.peso_unitario, 0),
+            // El grupo va en una línea del TXT: la validación cuenta igual.
+            grupo_id: it.grupo_id == null ? null : it.grupo_id
         }));
     }
 

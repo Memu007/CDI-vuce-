@@ -3493,7 +3493,8 @@ async def smart_validation(body: dict, user=Depends(get_current_user)):
                 ))
         
         # Ejecutar validación inteligente
-        resultado = run_smart_validations(items)
+        resultado = run_smart_validations(items, grupos=[d.get("grupo_id") if isinstance(d, dict) else None
+                                                         for d in items_data])
         
         return {
             "success": True,
@@ -3587,12 +3588,16 @@ async def upload_pdf_public(
         if not items_data:
              raise HTTPException(status_code=400, detail="No se encontró tabla de items en el PDF. Asegurate de que el PDF tenga una tabla con columnas como: Model/Description, Price, Quantity.")
 
+        # Los dos pesos de una línea que no coinciden (devolución de MARIA-5).
+        avisos = operacion_data.pop('avisos_peso', []) if isinstance(operacion_data, dict) else []
+
         return {
             "message": "PDF procesado exitosamente",
             "filename": file.filename,
             "operacion": operacion_data,  # Datos de la operación extraídos
             "items": items_data,  # Items extraídos
-            "items_count": len(items_data)
+            "items_count": len(items_data),
+            "avisos": avisos,
         }
 
     except HTTPException:
@@ -4707,6 +4712,11 @@ def _detect_item_columns(headers: list) -> dict:
             if alias in norm_to_orig:
                 mapping[norm_to_orig[alias]] = canon
                 break
+    # El peso que se aprende es el que manda (devolución de MARIA-5).
+    pesos = _columnas_de_peso(list(norm_to_orig.values()), {})
+    if pesos and pesos[0] not in mapping:
+        mapping = {src: canon for src, canon in mapping.items() if canon != "peso_unitario"}
+        mapping[pesos[0]] = "peso_unitario"
     return mapping
 
 
@@ -4718,36 +4728,80 @@ def _clase_de_peso(normal: str) -> str:
         return "unidad"
     if "bruto" in normal or "gross" in normal:
         return "bruto"
-    if any(p in normal for p in ("total", "neto", "net", "linea")):
+    if "neto" in normal or "net" in normal:
+        return "neto"
+    if "total" in normal or "linea" in normal:
         return "linea"
     return "unidad"
 
 
-def _peso_por_unidad(df: pd.DataFrame, rename: dict) -> list[str]:
-    """Después de renombrar: si la columna que quedó como `peso_unitario` es
-    el peso de la línea (total o neto) o el bruto, la divide por la cantidad.
-    El bruto se usa sólo si es la única columna de peso, y se avisa.
+# Con varias columnas de peso manda el neto de la línea, después el total de
+# la línea, después el de una unidad y al final el bruto (devolución de
+# MARIA-5: el TXT pide el peso neto de la línea).
+_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "bruto": 3}
+
+
+def _columnas_de_peso(columnas: list, rename: dict) -> list:
+    """Las columnas de peso de la planilla, de la que se usa a la última. Entra
+    la que el mapeo guardado marca como peso y cualquiera con nombre de peso
+    que el mapeo no use para otra cosa."""
+    alias = set(_ITEM_COL_ALIASES["peso_unitario"])
+    otras = {src for src, canon in rename.items() if canon != "peso_unitario"}
+    candidatas = [c for c in columnas if c not in otras
+                  and (rename.get(c) == "peso_unitario" or _normalize_header(c) in alias)]
+    return sorted(candidatas, key=lambda c: _RANGO_DE_PESO[_clase_de_peso(_normalize_header(c))])
+
+
+def _kg(numero: float) -> str:
+    return f"{numero:.3f}".rstrip("0").rstrip(".")
+
+
+def _peso_por_unidad(df: pd.DataFrame, pesos: list) -> list[str]:
+    """Después de renombrar `pesos[0]` a `peso_unitario`: si es el peso de la
+    línea (neto o total) o el bruto, lo divide por la cantidad. Un peso que no
+    es número queda vacío, con aviso, y la fila se conserva. Si una columna de
+    una unidad no da el de la línea, se avisa con los dos números.
     Devuelve los avisos para la pantalla."""
-    origen = next((src for src, canon in rename.items() if canon == "peso_unitario"), None)
-    clase = _clase_de_peso(_normalize_header(origen)) if origen is not None else "unidad"
-    if clase == "unidad" or "peso_unitario" not in df.columns:
+    if not pesos or "peso_unitario" not in df.columns:
         return []
-    col_cant = find_column(df.columns, ["cantidad", "Cantidad", "qty", "Qty", "quantity", "Quantity", "cant"])
-    if col_cant is None:
-        return [f"Peso: la columna «{origen}» es de toda la línea y no se encontró la cantidad para "
-                "dividirla. Cargá el peso de una unidad en la revisión."]
-    peso = pd.to_numeric(df["peso_unitario"], errors="coerce")
-    cantidad = pd.to_numeric(df[col_cant], errors="coerce")
+    origen, ignoradas = pesos[0], pesos[1:]
+    clase = _clase_de_peso(_normalize_header(origen))
+    avisos = []
+    if ignoradas:
+        avisos.append(f"Peso: se usó «{origen}»; se ignoraron "
+                      + ", ".join(f"«{c}»" for c in ignoradas) + ".")
     escrito = df["peso_unitario"].notna() & (df["peso_unitario"].astype(str).str.strip() != "")
-    df["peso_unitario"] = (peso / cantidad).where(cantidad > 0)
-    avisos = [f"Peso: la columna «{origen}» es de toda la línea; se dividió por la cantidad."]
+    peso = pd.to_numeric(df["peso_unitario"], errors="coerce")
+    df["peso_unitario"] = peso
     sin_numero = int((escrito & peso.isna()).sum())
     if sin_numero:
         avisos.append(f"Peso: {sin_numero} fila(s) con un peso que no es un número quedaron sin peso; "
                       "cargalo en la revisión.")
+    if clase == "unidad":
+        return avisos
+    col_cant = find_column(df.columns, ["cantidad", "Cantidad", "qty", "Qty", "quantity", "Quantity", "cant"])
+    if col_cant is None:
+        return avisos + [f"Peso: la columna «{origen}» es de toda la línea y no se encontró la cantidad para "
+                         "dividirla. Cargá el peso de una unidad en la revisión."]
+    cantidad = pd.to_numeric(df[col_cant], errors="coerce")
+    df["peso_unitario"] = (peso / cantidad).where(cantidad > 0)
+    avisos.append(f"Peso: la columna «{origen}» es de toda la línea; se dividió por la cantidad.")
     if clase == "bruto":
         avisos.append(f"Peso: el TXT pide peso neto y la planilla trae sólo «{origen}» (bruto); "
                       "se usó el bruto dividido por la cantidad. Corregilo si tenés el neto.")
+        return avisos
+    for col in ignoradas:
+        if _clase_de_peso(_normalize_header(col)) != "unidad":
+            continue
+        unidad = pd.to_numeric(df[col], errors="coerce")
+        distinto = (unidad > 0) & (peso > 0) & (cantidad > 0) & (
+            (unidad * cantidad - peso).abs() > (peso / 100).clip(lower=0.001))
+        if distinto.any():
+            fila = distinto.idxmax()
+            u, c, t = float(unidad[fila]), float(cantidad[fila]), float(peso[fila])
+            avisos.append(f"Peso: en {int(distinto.sum())} fila(s) «{col}» × la cantidad no da «{origen}» "
+                          f"(por ejemplo, {_kg(u)} × {_kg(c)} = {_kg(u * c)} kg y {_kg(t)} kg); "
+                          f"se usó «{origen}», el peso de la línea. Revisalo.")
     return avisos
 
 
@@ -6482,10 +6536,18 @@ async def upload_excel_v2(
             effective_mapping = detected_mapping
 
         avisos: list[str] = []
-        if effective_mapping:
-            rename = {src: canon for src, canon in effective_mapping.items() if canon in _CANON_COLUMNS}
+        rename = {src: canon for src, canon in effective_mapping.items() if canon in _CANON_COLUMNS}
+        # El peso: la columna que manda, aunque el mapeo guardado diga otra
+        # (devolución de MARIA-5).
+        pesos = _columnas_de_peso(list(df.columns), rename)
+        if pesos:
+            rename = {src: canon for src, canon in rename.items() if canon != "peso_unitario"}
+            rename[pesos[0]] = "peso_unitario"
+            rename.update({c: f"{c} (ignorada)" for c in pesos[1:] if c == "peso_unitario"})
+            pesos = [rename.get(c, c) if i else c for i, c in enumerate(pesos)]
+        if rename:
             df = df.rename(columns=rename)
-            avisos = _peso_por_unidad(df, rename)
+            avisos = _peso_por_unidad(df, pesos)
 
         items = extract_items_from_excel(df, file.filename)
         if not items:

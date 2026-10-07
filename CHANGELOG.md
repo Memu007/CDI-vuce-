@@ -10,6 +10,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(maria):** `QARTKGRNET` declara el peso neto de toda la línea (10 × 2,5 kg = 25 kg, lo que ya mostraba la validación), también en los grupos. El lector pide el peso de una unidad y el de la línea; el Excel divide «Peso total» y «Peso neto» por la cantidad y avisa si sólo trae el bruto. Editar un grupo en la pantalla de NCM reparte entre sus productos en vez de copiar el total.
 - **fix(maria):** importes al centavo con la mitad hacia arriba; el flete y el seguro se reparten para que la suma de los ítems dé exactamente la carátula (antes 10,01 contra 10,00), igual el FOB y los sub-ítems. En el servidor, «None», «null» o «N/A» en la carátula cuentan como vacíos y nunca llegan al TXT ni al nombre del archivo.
+- **fix(maria), devolución:** con dos pesos para la misma línea (lector o Excel) manda el neto de la línea, con un aviso que muestra los dos números; un peso en texto ya no saca la fila del Excel; un peso imposible (NaN, infinito, enorme o que redondea a 0,000) da error; los sub-ítems comparan exacto con exacto; un grupo nunca deja un producto en 0; la validación y el aviso de gastos dicen el mismo importe que el TXT.
 
 ## 2026-10-07 · fix: un campo vacío de la factura no llega al TXT como «None» (MARIA-1d)
 

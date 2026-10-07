@@ -2165,19 +2165,37 @@ def _no_aplica(raw, palabras) -> bool:
     return str(raw).strip().rstrip('.').strip().upper() in palabras
 
 
-def _peso_del_producto(item_data: dict, cantidad: float, decimal) -> tuple[float, float]:
-    """El peso neto de una unidad y el de la línea (MARIA-5, D22). Gemini
-    devuelve el que trae la factura; si trae sólo el de la línea, se divide
-    por la cantidad, porque el TXT multiplica el unitario por la cantidad.
-    `peso_kg` es el nombre viejo: se lee como unitario, como antes."""
+def _kg(numero: float) -> str:
+    return f"{numero:.3f}".rstrip('0').rstrip('.')
+
+
+def _peso_del_producto(item_data: dict, cantidad: float, decimal) -> tuple[float, float, str]:
+    """El peso neto de una unidad, el de la línea y un aviso (MARIA-5, D22).
+    Gemini devuelve el que trae la factura. Si trae el de la línea, manda: se
+    divide por la cantidad, porque el TXT multiplica el unitario por la
+    cantidad. Si además trae el de una unidad y no da el de la línea (por
+    ejemplo, el total copiado en los dos campos), el aviso muestra los dos
+    números (devolución de MARIA-5). `peso_kg` es el nombre viejo: se lee
+    como unitario, como antes."""
     unitario = _numero_factura(item_data.get('peso_unitario'), decimal) or 0.0
     total = _numero_factura(item_data.get('peso_total_linea'), decimal) or 0.0
-    if unitario <= 0 and total > 0 and cantidad > 0:
+    aviso = ""
+    if total > 0 and cantidad > 0:
+        if unitario > 0 and abs(unitario * cantidad - total) > max(0.001, total / 100):
+            aviso = (f"la factura dice {_kg(unitario)} kg por unidad (× {_kg(cantidad)} = "
+                     f"{_kg(unitario * cantidad)} kg) y {_kg(total)} kg la línea; se usó el de "
+                     f"la línea ({_kg(total)} kg). Revisalo.")
         unitario = total / cantidad
     if unitario <= 0:
         unitario = _numero_factura(item_data.get('peso_kg'), decimal) or 0.0
     unitario = unitario if unitario > 0 else 0.0
-    return unitario, round(unitario * cantidad, 3) if unitario and cantidad > 0 else 0.0
+    return unitario, round(unitario * cantidad, 3) if unitario and cantidad > 0 else 0.0, aviso
+
+
+def _avisar_peso(operacion_data: dict, descripcion: str, aviso: str) -> None:
+    if aviso:
+        operacion_data.setdefault('avisos_peso', []).append(
+            f"Peso de «{descripcion or 'un producto'}»: {aviso}")
 
 
 def _valores_numericos(result: dict) -> list:
@@ -2421,9 +2439,10 @@ IMPORTANTE:
                         try:
                             cantidad = _numero_factura(item_data.get('cantidad'), decimal) or 0.0
                             precio = _numero_factura(item_data.get('valor_unitario'), decimal) or 0.0
-                            peso, peso_total = _peso_del_producto(item_data, cantidad, decimal)
+                            peso, peso_total, aviso_peso = _peso_del_producto(item_data, cantidad, decimal)
                             
                             descripcion, codigo_parte = _texto_del_producto(item_data)
+                            _avisar_peso(operacion_data, descripcion, aviso_peso)
 
                             # Extract HS Code (pieza)
                             pieza = str(item_data.get('pieza', '') or '').strip()
@@ -2613,9 +2632,10 @@ IMPORTANTE:
                                 # (0): el semáforo lo marca (MARIA-1a).
                                 cantidad = _numero_factura(item_data.get('cantidad'), decimal) or 0.0
                                 precio = _numero_factura(item_data.get('valor_unitario'), decimal) or 0.0
-                                peso, peso_total = _peso_del_producto(item_data, cantidad, decimal)
+                                peso, peso_total, aviso_peso = _peso_del_producto(item_data, cantidad, decimal)
                                 
                                 descripcion, codigo_parte = _texto_del_producto(item_data)
+                                _avisar_peso(operacion_data, descripcion, aviso_peso)
                                 item = {
                                     'codigo_parte': codigo_parte,
                                     'pieza': "",
