@@ -2,6 +2,80 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+Hay **dos entregas pendientes**: MARIA-2b (arriba) y MARIA-1a (abajo, tal
+como la entregué). MARIA-2b va encima de MARIA-1a.
+
+## MARIA-2b — entregada: Gemini caído o con clave inválida ofrece la carga manual
+
+| Qué | SHA |
+|---|---|
+| Base (MARIA-1a entregada) | `0a1775f` |
+| Producto | `339eeb1`, `d4216df` |
+| Pruebas y sabotajes | `c3bef51`, `9c2a156`, `c3acf44`, `6f31cfc`, `3df0d30` |
+| **SHA que se entrega** | **`c3bef51`** |
+
+**Resultado: terminada.** Con clave, si la llamada a Gemini falla, en las
+**dos** copias del lector, el lector levanta el error propio de MARIA-2. El
+endpoint responde 503 con `code: lectura_automatica_no_disponible` y la
+pantalla muestra el botón «Cargar los productos a mano». Ya no aparece el
+engañoso «No se encontró tabla de items». Cuenta como falla:
+- la clave inválida o Gemini caído (la llamada lanza un error);
+- la respuesta ilegible (no es JSON);
+- la respuesta vacía o bloqueada;
+- la configuración de Gemini rota.
+
+Si Gemini responde bien pero sin productos, sigue el 400 de siempre. El texto
+interno del error nunca llega a la pantalla, porque el mensaje es fijo. La
+pantalla no cambió: ya manejaba ese `code` desde MARIA-2.
+
+**De paso, en las pruebas de MARIA-2:** con MARIA-2b, una llamada a Gemini que
+falla también termina en el 503. Por eso tres pruebas de MARIA-2 ya no
+distinguían si faltaba el control de la clave; el sabotaje «clave en blanco»
+quedaba verde. Ahora además verifican que no se intente llamar a Gemini, y el
+sabotaje vuelve a dar rojo.
+
+**D8. ¿Se descuenta el límite diario de PDFs cuando Gemini falla?** Hoy sí:
+se descuenta antes de llamar a Gemini. Sin clave (MARIA-2) no se descuenta.
+- (a) Dejarlo así: hubo una llamada a Gemini, que puede costar. **Recomiendo
+  (a).**
+- (b) Devolver el cupo cuando sale este 503. Hace falta una función nueva en
+  `core/ai_quota.py`.
+
+**Riesgo anotado:** un error de nuestro propio código al leer una respuesta
+de Gemini que llegó bien también termina en este 503, con el error impreso en
+el registro. Antes daba 400. Los dos revisores lo consideran defendible.
+
+| Puerta (sobre `c3bef51`, worktree limpio) | Resultado |
+|---|---|
+| Suite completa | `791 passed, 102 skipped, 24 warnings in 61.22s`, 0 failed |
+| `tests/test_maria2b_gemini_falla.py` (14 casos) + MARIA-2 + MARIA-1a | `84 passed` |
+| `compileall` | ok |
+| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
+| `scripts/testing/sabotaje_maria2b.sh` | `OK: los 6 sabotajes dan rojo por la razón esperada` |
+| `sabotaje_maria2.sh` / `sabotaje_maria1a.sh` (tocan el mismo archivo) | `OK: los 8 …` / `OK: los 10 …` |
+
+**Rojo antes:** `assert 400 == 503` en las dos copias, para clave inválida,
+Gemini caído, respuesta ilegible y respuesta vacía; en la copia PyMuPDF,
+también para la configuración rota.
+
+**Autorrevisión** (adversario Sonnet medio, más `/code-review high`):
+arreglados con su rojo antes:
+- la respuesta vacía o `None` daba 400;
+- en la copia PyMuPDF, la configuración rota daba 400;
+- si un modelo fallaba y otro respondía «sin productos», daba 503;
+- las pruebas de MARIA-2 ya no distinguían el control de la clave;
+- faltaban sabotajes de la copia de producción.
+
+Quedan como riesgo, fuera de alcance:
+- D8 (el cupo diario);
+- `robust_extract_pdf_items`, que no tiene llamadores vivos y convierte el
+  error en «sin productos»;
+- la duplicación del Gemini falso entre los archivos de prueba.
+
+Contexto: ~52 %. Sigo con MARIA-4 si no hay devolución.
+
+---
+
 ## MARIA-1a — entregada: la factura bien leída
 
 | Qué | SHA |
@@ -156,7 +230,7 @@ VENV=<venv> scripts/testing/sabotaje_maria1a.sh 0a1775f; VENV=<venv> scripts/tes
 - `ataque_aislamiento.sh`: la pieza no toca sesión ni permisos.
 - `e2e_maria.sh`: no corre en la nube.
 
-Sigo con MARIA-2b.
+MARIA-2b entregada encima (arriba).
 
 Última vuelta: 2026-10-07 04:40 UTC
 Contexto: ~45 % (pasado el umbral; compactar cuando Emi pueda)
