@@ -2,6 +2,94 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## MARIA-5 — reentrega con la devolución: **`07fb085`**
+
+**Resultado: los seis puntos, con rojo antes y verde después. Para decidir:
+la D23. MARIA-5 y EXCEL-1 (Dev 1) dicen lo contrario sobre «Peso neto», y
+además chocan en `main.py` y `upload.js`.** Base: `c3f79f8`, más tu
+`453cb01` integrado. Los dos archivos reales salen idénticos: sus pruebas
+están en la suite.
+
+| # | Qué hace ahora | Rojo antes → verde |
+|---|---|---|
+| 1. Dos pesos | **Lector:** si viene el de la línea, manda: se divide por la cantidad. Si además viene el de una unidad y no da el de la línea (tolerancia: 1 % o 0,001 kg), un aviso muestra los dos números («25 kg por unidad (× 10 = 250 kg) y 25 kg la línea; se usó el de la línea»). El aviso llega a la pantalla (`avisos` de `/upload_pdf/public`, en el mismo cartel de «Revisá la factura»). (25, 25) con 10 unidades da `QARTKGRNET=25.000`. **Excel:** orden neto > total > de una unidad > bruto, aunque el mapeo guardado diga otra. El aviso nombra la columna usada y las ignoradas y, si el de una unidad × cantidad no da el de la línea, muestra los dos números. El mapeo que se aprende es el de la columna que manda | `test_maria5_devolucion.py`, secciones 1 |
+| 2. Peso en texto | En cualquier columna de peso queda vacío, con aviso; la fila se conserva. También «inf» (antes: 500) | sección 2 y revisión |
+| 3. Guarda del peso | `peso_valido` en el `[ART]`: no finito, sobre 10¹² o que redondea a 0,000 → 400 con mensaje propio. Un peso en 0 ya daba 400 por el control del Kit; ahora también el generador lo rechaza (en `test_generar_maria_txt.py`, 8 productos sin peso pasan a llevar 1 kg) | sección 3 |
+| 4. Subítems | Exacto con exacto: la suma sin redondear contra el valor del ítem sin redondear. Tu caso (7 × 2,675) genera 18,73. Lote al azar con el criterio de `8e819dd` (3 × 1500): todo lo que pasaba genera | sección 4 |
+| 5. Grupo | Una cantidad menor que la cantidad de productos se rechaza con el mismo cartel («…al menos uno por producto»). Si alcanza, el producto que queda en 0 toma una unidad del que más tiene. 1/1/100 bajado a 5 da 1/1/3 | `pantalla_maria5.js` contra `c3f79f8`: `FALLA: 1/1/1 bajado a 2 quedó […{"c":0…}]`; con la pieza, OK |
+| 6. Una sola cuenta | `fob_total_del_txt`: un grupo es una línea y se redondea una vez. La validación lo usa (la pantalla manda `grupo_id`). El aviso «Gastos a FOB» suma flete y seguro al centavo, como el TXT | sección 6; pantalla contra `c3f79f8`: `FALLA: la validación muestra $620,04 y el TXT 620.03`; con la pieza, `$620,03 = 620.03` |
+
+Las pruebas nuevas contra la base `c3f79f8` dan `43 failed, 17 passed`.
+
+**Autorrevisión (Sonnet alto).** No encontró nada grave. Corrí 8000 pedidos
+al azar contra `c3f79f8` y salieron idénticos, salvo los subítems del punto 4
+y los pesos en 0. En 4000 pedidos, la validación coincide con `MDDTFOB`.
+Arreglé lo que encontró, en `1179dfc` y `07fb085`:
+- «Peso neto unitario» y «Net weight per unit» no se reconocían. Con un bruto
+  al lado, el TXT declaraba el bruto con un aviso falso. Ahora cuenta como
+  peso cualquier columna «Peso…» o «…weight…», pero no «Pesos», la moneda.
+  Esto también resuelve el riesgo de «Peso total (kg)» que te informé.
+- Un «inf» escrito daba 500.
+- Entre dos columnas de una unidad, el resultado dependía del orden de las
+  columnas. Ahora va primero la que dice neto y después la del mapeo guardado.
+- El aviso decía «peso_unitario (ignorada)».
+- Un peso enorme daba el mensaje equivocado.
+
+**Mensaje de la Dev 1 por `sabotaje_maria3.sh`.** `flete_sin_validar` ahora
+saca también el flete de `_IMPORTES_DE_LA_CABECERA`
+(`core/controles_maria.py`), si ese archivo está. En mi rama todavía no
+está, así que no lo corrí con MARIA-1b integrada: ver la D23.
+
+| Puerta | Resultado |
+|---|---|
+| Suite completa, worktree limpio en `1179dfc`, venv **sólo con `requirements.txt`** (`07fb085` sólo cambia la columna de una prueba, que pasa) | `1259 passed, 102 skipped, 25 warnings in 77.96s`, 0 failed |
+| `sabotaje_maria5.sh 07fb085` (44) | `OK: los 44 sabotajes dan rojo por la razón esperada`. En `1179dfc`, `pesos_moneda` quedó verde: la prueba no distinguía el defecto y la corregí en `07fb085` |
+| `sabotaje_maria3` / `1d` / `4` / `1c` / `2b` / `2` / `1a` en `07fb085` | `OK: los 30` / `8` / `9` / `4` / `6` / `8` / `10` |
+| `pantalla_maria5.js` (servidor local en `07fb085`) | `OK: pantalla MARIA-5`; captura en `docs/pm/capturas/maria5-validacion.png` |
+| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
+
+### D23 — «Peso neto» por unidad (EXCEL-1) o de la línea (MARIA-5)
+
+Probé `merge` de `origin/claude/dev1-tecnica` sobre `f9f80c1`, en un
+worktree aparte, y lo deshice: no subí nada. Hay conflictos en
+`proyecto_maria/main.py` (cuatro bloques: `smart_validation`, la lista de
+alias del peso, `_peso_por_unidad` contra `_mapeo_efectivo`, y
+`upload_excel_v2`) y en `static/v2/screens/upload.js` (el cartel final).
+
+Lo de fondo: EXCEL-1 pone `pesoneto` y `netweight` entre los nombres **de
+una unidad**. Además saca «Peso total» y el bruto («sin una de estas
+columnas, el peso queda vacío»). Tu regla de MARIA-5 es la contraria: neto
+> total > de una unidad > bruto, y el neto es de la línea. Con «Peso neto»
+= 25 y 10 unidades, EXCEL-1 declara 250 kg y MARIA-5 declara 25 kg.
+- **Recomiendo** la de MARIA-5, que es la que pediste y la que dice la
+  respuesta 3 del despachante. Quien integre segunda resuelve los conflictos
+  con esa regla: las dos piezas tienen pruebas que van a marcar el lado
+  equivocado. Si preferís, la resuelvo yo cuando EXCEL-1 esté en tu rama.
+
+**Riesgos y lo que no hice:**
+- La tolerancia entre los dos pesos (1 % o 0,001 kg) sólo decide si hay
+  aviso. El número que sale es siempre el de la línea.
+- «2,5» escrito como texto en el Excel no se interpreta: queda vacío con
+  aviso. No adiviné la coma decimal.
+- La v1 (`extract_items_from_excel` por `/upload_excel/`) sigue sacando una
+  fila con un peso en texto. No la toqué: no es la pantalla v2 y diverge
+  igual (`DECISIONS.md`).
+- No corrido: el Kit del despachante, Gemini real y planillas reales de
+  clientes. Nada contra producción ni terceros.
+
+Para reproducir:
+```
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 07fb085 8890
+BASE_URL=http://127.0.0.1:8890 node scripts/testing/pantalla_maria5.js   # «OK: pantalla MARIA-5»
+VENV=/tmp/cdi-pm/venv scripts/testing/sabotaje_maria5.sh 07fb085          # «OK: los 44 sabotajes …»
+python -m pytest -q tests/test_maria5_*.py                                # todo passed
+```
+
+Última vuelta: 2026-10-07 15:40 UTC
+Contexto: ~9 %
+
+---
+
 ## MARIA-5 — entregada: **`6d59893`**
 
 **Resultado: terminada, con la D22 (a) y el punto 4. Para decidir: nada
