@@ -2,178 +2,158 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## EXCEL-1 — devolución entregada sobre `29fc395`
+## MARIA-1b — entregada sobre `21a7a7e`
 
-**Resultado:** arreglé los cinco puntos, cada uno con rojo antes y verde
-después. MARIA-1b sigue en curso en la misma rama: estos SHA también traen
-sus commits. Para ver sólo la devolución: `git diff cb0f886 7b119b6`.
+**Resultado:** los cuatro puntos del alcance están hechos, con D20 (a). Los
+dos archivos reales salen idénticos por la ruta `/generate_maria`. Hubo dos
+revisores: el primero encontró 11 cosas, el segundo 5. Arreglé lo que
+cabía en la pieza; lo demás queda abajo, con lo que propongo.
 
-**Lo que decidís vos:**
-- **D20.** El CUIT del importador vacío, ¿frena la generación o sólo avisa?
-  Hoy avisa, porque la pantalla lo deja «opcional».
-- **D21.** El nomenclador está desactualizado: es el de 2018.
-
-Ninguna de las dos frena la devolución.
+**Lo que decidís vos:** D22, la ruta de exportación `/generate_maria_export`,
+que tampoco limpia los textos. Es fuera de alcance y no frena la entrega.
 
 | | SHA |
 |---|---|
-| Base (lo que revisaste) | `9cc321e` |
-| MARIA-1b en curso, antes de la devolución | `dbc745e` … `cb0f886` |
-| Devolución: producto | `15094d8` |
-| Devolución: pruebas y sabotajes | `2455418`, `7b119b6` |
-| MARIA-1b, dos arreglos del revisor que tocan la subida del Excel | `1041589` (producto), `29fc395` (pruebas) |
+| Base (EXCEL-1 aceptada) | `7b119b6` |
+| Producto | `dbc745e`, `cc01e5b`, `1041589`, `56c4697`, `bfd51e6` (y `15094d8`, de la devolución de EXCEL-1, ya aceptada) |
+| Pruebas y sabotajes | `c8e05dd`, `567b152`, `b3c0e83`, `763d3a9`, `cb0f886`, `29fc395`, `6755655`, `c1ef3a2`, `21a7a7e` |
+| CHANGELOG | `03717a8` |
 
-### Los cinco puntos
+### Qué cambia para el usuario
 
-1. **El mapeo aprendido no pisa una columna reconocida.** Es el problema
-   del FOB que salía ×10. Para cada campo comparo la columna guardada con
-   la que reconozco en el archivo:
-   - si la guardada es un nombre conocido de menor prioridad, gana la
-     reconocida. Así «Valor» o «Peso», aprendidos con la lista vieja, no
-     pisan «Precio Unitario» ni «Peso Neto»;
-   - si la guardada es un nombre que el sistema no conoce («Precio Unit.
-     USD», «Glosa»), es una corrección a mano y sigue mandando.
+1. **Controles antes de generar.** `/generate_maria` responde 400 con
+   todos los errores juntos. `/api/validate/smart` devuelve lo mismo si
+   recibe la cabecera; la pantalla de generar y el semáforo se la mandan,
+   así que el botón «Generar» ya queda deshabilitado antes.
+   - **Frenan:**
+     - moneda vacía, «USD» («en MARIA se escribe DOL») o que no tiene 3
+       letras;
+     - incoterm vacío o inválido. Se aceptan los del generador, FAS y DAT,
+       DAF, DES, DEQ y DDU;
+     - CUIT del importador vacío (D20) o con el dígito verificador mal: el
+       mismo algoritmo que la pantalla;
+     - flete o seguro negativos;
+     - NCM que perdió el 0 inicial: «¿Es 01012100000A?»;
+     - cantidad, valor o peso vacíos, negativos o en 0, que ya frenaban
+       antes.
+   - **Avisan:** una moneda poco habitual, y una NCM que no está en el
+     nomenclador, porque es el de 2018 (D21, pendiente de Emi).
+   - La pantalla de revisión pide el CUIT del importador: ya no dice
+     «opcional» y lo cuenta en «Falta: …» antes del clic.
+2. **Ningún texto rompe el TXT (M10).**
+   - En la cabecera y en los ítems, los saltos de línea (también los de
+     Unicode, ` `, ` ` y `\x85`) y los caracteres de control
+     pasan a ser un espacio, y el «=» un guion.
+   - El sufijo SBT es un código: con «=» o con controles se rechaza, con su
+     propio mensaje.
+   - El TXT lleva la moneda, el incoterm y el CUIT tal como se controlan:
+     en mayúsculas, sin espacios y sin guiones.
+3. **Nada inventado.**
+   - El servidor ya no pone DOL ni FOB si el pedido no los trae.
+   - La pantalla de generar tampoco inventa DOL, FOB ni cantidad 1.
+   - Al guardar la operación (`save_client_operation`, la D6 de la Dev 2)
+     no se inventan cantidad 1, peso 0,5 ni «XX», ni en el servidor ni en
+     la pantalla.
+4. **Avisos del Excel (D17 y D18).**
+   - Las filas sin leer y las otras hojas con datos van en `operacion` y
+     quedan en el semáforo con un botón «Descartar» propio.
+   - Siguen ahí después de otra validación, y «Descartar» no cierra el
+     semáforo.
+   - Mirar las otras hojas es sólo un aviso: como mucho 50 hojas, 60
+     columnas, 1000 filas y 10 s. Si falla, la subida sigue sin el aviso.
 
-   Esto concilia tu punto con lo que pidió la segunda revisión, que no se
-   pierda la corrección a mano. Las pruebas mandan `cliente_id`, como la
-   pantalla.
-2. **Validar el Excel tiene su propio grupo de hilos**
-   (`EXCEL_VALIDATE_WORKERS`, 2). El tamaño descomprimido ya se mira en ese
-   hilo, antes de abrir el libro.
-3. **La fila de ejemplo de la plantilla no entra.** La descripción viene de
-   una sola constante, la misma que usa la plantilla.
-4. **Dos columnas para el mismo campo:**
-   - el catálogo no las guarda: responde 400 «Dos columnas para…»;
-   - un catálogo viejo que ya las tiene usa la primera y avisa al subir
-     (`avisos_mapeo`, en el aviso final);
-   - si el archivo trae una columna con el nombre del campo y el mapeo
-     elige otra, ya no da 500.
-5. **Las rutas borradas.** La pantalla vieja dice «El Excel se sube en la
-   pantalla nueva: entrá a /dashboard y elegí «Excel»». En
-   `smoke_test.sh`, el test 7 apunta a `/upload_excel_v2/` y sin sesión
-   espera 401 o 403.
+### Lo que vale la pena saber
 
-Rojo en `cb0f886` (el código anterior a la devolución) con las pruebas
-nuevas:
+- **El CUIT anonimizado del archivo real (`30999999990`) no tiene un
+  dígito verificador válido.** Es inventado. La prueba por la ruta usa
+  `30999999995` y compara contra el archivo real cambiando sólo esa línea.
+  El archivo real no se tocó.
+- **Pruebas viejas y herramientas con datos inválidos.** Cinco pruebas de
+  `/generate_maria`, la operación simulada de la pantalla y
+  `ataque_aislamiento.sh` generaban sin CUIT del importador, sin moneda o
+  con un CUIT inválido. Les puse datos válidos. Si no, el ataque se quedaba
+  sin el TXT de Ana para robar, y la puerta pasaba por la razón
+  equivocada: ahora el TXT se genera y queda bloqueado.
+- **Dos pruebas mías no distinguían el defecto, y las corregí.**
+  - La de «no inventar cantidad 1 en la validación previa»: `Item` ya
+    acepta la cantidad vacía, así que ese 1 era casi inalcanzable. Saqué
+    la prueba; el cambio quedó por coherencia.
+  - El «=» y la hoja vacía: dos sabotajes daban verde. Las ajusté.
+
+### Rojo antes y verde después
 
 ```
-E   assert (3500.0, 25.0) == (350, 15)                    (mapeo aprendido, con cliente_id)
-E   AssertionError: ['asyncio_0']                          (validar usaba los hilos compartidos)
-E   assert ['Laptop 14 p...', 'Telefono'] == ['Telefono']   (fila de ejemplo)
-E   assert 200 == 400                                      (catálogo con dos columnas)
-E   "dev_detail":"... 'DataFrame' object has no attribute 'tolist'" assert 500 == 200   (x2)
-E   assert '/upload_excel/public' not in ...               (pantalla vieja)
-7 failed → después: verdes
+en c0bae0e (antes de MARIA-1b): 22 failed, 7 passed
+  (moneda, incoterm, CUIT, flete/seguro, NCM sin 0, textos x5, validación previa,
+   guardado sin inventar, filas y hojas del Excel; las 7 que pasan: archivo
+   idéntico, montos que ya frenaban, libro de una hoja)
+en 7b119b6: 4 failed (FAS, DAT, DDU; otras hojas que fallan)
+en fcd2fb7: 10 failed (CUIT vacío, saltos Unicode x4, sufijo SBT x2, DOL/FOB
+  inventados, TXT sin normalizar, 5000 ítems en más de 0,5 s)
+pantalla_maria1b.js: c0bae0e → FALLA: el semáforo no muestra las filas sin leer
+                     fcd2fb7 → FALLA: «Descartar» cerró el semáforo
+                     21a7a7e → OK: pantalla MARIA-1b
 ```
-
-Sabotajes nuevos en `excel1.sh`, uno por punto (actualicé además tres
-patrones viejos): ver «Corrido».
-
-### Lo de MARIA-1b que entró acá
-
-El revisor de MARIA-1b encontró dos cosas que tocan esta entrega. Las
-arreglé ya:
-- el incoterm **FAS**, que la pantalla ofrece, no dejaba generar. Tampoco
-  DAT ni DDU, que el generador reconoce;
-- mirar las otras hojas del libro podía hacer fallar entera una subida que
-  se lee bien. Un libro de 104 KB con 220 hojas vacías dio 504 a los 60 s.
-  Ahora es sólo un aviso: mira como mucho 50 hojas, 60 columnas y 1000
-  filas, tiene 10 s, y si falla o tarda la subida sigue sin el aviso.
-
-Rojo en `7b119b6`: `4 failed` (FAS, DAT, DDU y la otra hoja que falla).
 
 ### Corrido, con su salida
 
 ```
-suite completa, worktree limpio en 29fc395, venv-limpio: 936 passed, 102 skipped, 25 warnings in 97.98s · fin: 0
-sabotajes en 29fc395: excel1, rendimiento1, rendimiento1b, admin1, admin2 → «sabotajes con falla: 0»; maria2 → «OK: los 8 sabotajes dan rojo»; maria1b → 1 ROTO (patrón viejo del incoterm), arreglado en 6755655 → «sabotajes con falla: 0»
-smoke_friccion.sh (levantar.sh 29fc395)  → ==> OK · telemetría + alias session/state + by-cuit protegido
-ataque_aislamiento.sh                    → MARIA.TXT de Ana generado · Bloqueado: 22 · Fugas: 0
-pantalla_excel1.js / pantalla_maria1b.js → OK / OK
-smoke_test.sh: test 7 → «PASS: Excel upload without session rejected (401)»; total 6/11.
-  El de antes (9cc321e) daba 5/11 con el test 7 en FAIL. Los otros 5 FAIL
-  (crear cliente, XSS, PDF, email, CUIT) ya fallaban: el script llama sin
-  sesión a rutas que la piden. No los toqué: es otra pieza.
+suite completa, worktree limpio en 21a7a7e, venv-limpio: 941 passed, 102 skipped, 25 warnings in 100.17s · fin: 0
+sabotajes en 21a7a7e (excel1, maria1b, rendimiento1, 1b, admin1, admin2, maria2): corriendo; actualizo esta línea al terminar
+smoke_friccion.sh (levantar.sh 21a7a7e)          → ==> OK · telemetría + alias session/state + by-cuit protegido
+pantalla_excel1.js / pantalla_maria1b.js / pantalla_maria1c.js (con un PDF) → OK / OK / OK
+ataque_aislamiento.sh                            → MARIA.TXT de Ana generado · Bloqueado: 22 · Fugas: 0
 ```
 
-## MARIA-1b — en curso (no es entrega)
+### Comandos para vos
 
-Hecho en la rama:
-- `/generate_maria` responde 400 con todos los errores juntos, y
-  `/api/validate/smart` devuelve lo mismo si recibe la cabecera. La pantalla
-  de generar y el semáforo se la mandan. Los controles:
-  - frenan: moneda vacía, «USD» (en MARIA es «DOL») o que no tiene 3 letras;
-    incoterm vacío o inválido; CUIT del importador mal escrito; flete o
-    seguro negativos; NCM que perdió el 0 inicial (propone el código con el
-    0); y los montos en 0 o negativos, que ya frenaban antes;
-  - avisan: una moneda poco habitual, una NCM que no está en el nomenclador
-    y el CUIT del importador vacío.
-- Los textos no meten saltos de línea ni «=».
-- No se inventan DOL, FOB ni cantidad 1 en la pantalla. Al guardar la
-  operación tampoco se inventan cantidad 1, peso 0,5 ni «XX».
-- Las filas sin leer y las otras hojas quedan en el semáforo con
-  «Descartar» (D17 y D18).
-- Sabotajes en `maria1b.sh` y una prueba de pantalla,
-  `pantalla_maria1b.js`, que da rojo en el código anterior.
-
-Falta, del revisor (lo hago apenas entregue esta devolución):
-- el «=» y el `\x7f` en el sufijo SBT;
-- los saltos de línea Unicode (` `, `\u0085`);
-- «Descartar» cierra el semáforo;
-- el TXT escribe la moneda, el incoterm y el CUIT tal como llegan, no
-  normalizados;
-- el servidor todavía pone DOL y FOB por defecto si el pedido no los trae;
-- la búsqueda en el catálogo recorre todo por cada ítem (5000 ítems tardan
-  3 s);
-- `finalize.js` todavía manda «XX» al guardar;
-- monedas numéricas, a confirmar;
-- `/generate_maria_export` tampoco limpia los textos. Sólo la llama la
-  pantalla vieja: lo propongo aparte.
+```bash
+git fetch origin claude/dev1-tecnica && git checkout 21a7a7e
+# 1) pruebas de la pieza: todas pasan
+<venv>/bin/python -m pytest -q --no-cov tests/test_maria1b_controles.py tests/test_generar_maria_txt.py tests/test_maria_subitems.py tests/test_excel1_lectura.py
+# 2) sabotajes: «sabotajes con falla: 0»
+PY=<venv>/bin/python scripts/testing/sabotajes/maria1b.sh 21a7a7e
+# 3) semáforo en el navegador: «OK: pantalla MARIA-1b» (en c0bae0e y en fcd2fb7, FALLA)
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 21a7a7e 8080
+BASE_URL=http://127.0.0.1:8080 node scripts/testing/pantalla_maria1b.js <cualquier .xlsx>
+```
 
 ## Decisiones
 
-- **D20 — ¿El CUIT del importador vacío frena?** La pantalla de revisión lo
-  marca «opcional (extranjeros sin CUIT)», pero en una importación el
-  importador es argentino y la declaración lo necesita. Hoy: vacío avisa, y
-  mal escrito frena. Opciones: (a) que vacío también frene y la pantalla deje
-  de decir «opcional»; (b) dejarlo como aviso.
-  **Recomiendo (a).** El TXT sin el CUIT del importador no sirve para
-  presentar.
-- **D21 — El nomenclador es el de 2018.** `ncm_arca_metadata.json` dice
-  `source_file: nomenclador_19122018.txt`. Le falta la enmienda de 2022: por
-  ejemplo 8517.13.00 (teléfonos), 8524 (pantallas) y 8549 (desechos
-  eléctricos). Por eso «no está en el nomenclador» avisa en vez de frenar:
-  si frenara, trabaría operaciones válidas. También afecta al filtro de las
-  sugerencias de NCM de la IA, que descarta lo que no está en el catálogo.
-  Opciones: (a) pieza para actualizar el catálogo desde ARCA con el
-  nomenclador vigente, y después frenar; (b) dejarlo como aviso.
-  **Recomiendo (a)**, en la Fase 2 o antes si las sugerencias de NCM fallan
-  con teléfonos.
+- **D22 — `/generate_maria_export` tampoco limpia los textos.** Por
+  ejemplo, `exportador_nombre="ACME\r\nCDDTINCOTE=EXW"` mete una segunda
+  línea. Sólo la llama la pantalla vieja (`static/app.js:3328`).
+  Opciones: (a) aplicarle la misma limpieza en una pieza chica; (b)
+  borrarla junto con la pantalla vieja.
+  **Recomiendo (a)** si la exportación está en el roadmap; si no, (b).
 
-## Qué no corrí
+## Qué no corrí y riesgos
 
-- No pedí revisores independientes para la devolución: son cambios chicos y
-  cada uno tiene su prueba y su sabotaje.
-- No medí la carga de 12 subidas de un `.xlsx` de 8 MB que mediste vos. Mi
-  prueba comprueba que la validación corre en un hilo del grupo propio, no
-  el tiempo de la consulta de NCM.
+- **Monedas en código numérico** («060» para el euro en la tabla de AFIP):
+  hoy frenan, porque piden 3 letras. No pude confirmar si MARIA las usa. La
+  pantalla ofrece sólo códigos de letras.
+- Al generar, la pantalla todavía manda «XX» cuando falta el origen. Sigue
+  frenando, pero el error dice «Origen no reconocido 'XX'» en vez de «Falta
+  el origen». Es cosmético.
+- Un CUIT que se tipea en la revisión no vuelve a la ficha del cliente: hay
+  que tipearlo en cada operación de un cliente guardado sin CUIT.
+- La pantalla vieja (`app.js`) no manda el sufijo SBT, así que ya daba 400
+  siempre. Sigue igual.
 
 ## Sigo con
 
-MARIA-1b: los nueve puntos del revisor de arriba, su revisión y la entrega.
+PUNTA-A-PUNTA-1 apenas esté en el canal.
 
 Última vuelta: 2026-10-07
-Contexto: ~90 %. Emi: pedile a esta sesión el `/compact` cuando puedas.
+Contexto: ~95 %. Emi: hace falta el `/compact` de esta sesión antes de la
+próxima pieza.
 
-`/compact conservar: Dev 1 de CDI, rama claude/dev1-tecnica. EXCEL-1:
-devolución entregada sobre 29fc395 (5 puntos de la PM con prueba y sabotaje).
-MARIA-1b en curso: controles en proyecto_maria/core/controles_maria.py, usados
-en /generate_maria y /api/validate/smart; semáforo con avisos del Excel y
-Descartar; tests/test_maria1b_controles.py, scripts/testing/sabotajes/maria1b.sh,
-scripts/testing/pantalla_maria1b.js. Falta del revisor: «=» y \x7f en el sufijo
-SBT, saltos Unicode, Descartar cierra el semáforo, TXT con valores crudos vs
-normalizados, defaults DOL/FOB del servidor, find_by_code lineal, XX en
-finalize.js al guardar, monedas numéricas (confirmar), /generate_maria_export
-sin limpiar (proponer aparte). D20 (CUIT vacío) y D21 (nomenclador 2018)
-abiertas. Entorno: PM_DIR=/tmp/cdi-dev1, levantar.sh <SHA> <puerto>, venv
-/tmp/cdi-dev1/venv y venv-limpio; rutina de la PM trig_01TvMmGfSLDfbcJrf66ZZ7YK.`
+`/compact conservar: Dev 1 de CDI, rama claude/dev1-tecnica. EXCEL-1
+aceptada (7b119b6). MARIA-1b entregada sobre 21a7a7e: controles en
+proyecto_maria/core/controles_maria.py (usados en /generate_maria y
+/api/validate/smart), semáforo con avisos del Excel y Descartar,
+tests/test_maria1b_controles.py, scripts/testing/sabotajes/maria1b.sh,
+scripts/testing/pantalla_maria1b.js. D21 (nomenclador 2018) espera a Emi; D22
+(/generate_maria_export sin limpiar) abierta. Sigue PUNTA-A-PUNTA-1. Entorno:
+PM_DIR=/tmp/cdi-dev1, levantar.sh <SHA> <puerto>, venv /tmp/cdi-dev1/venv y
+venv-limpio; rutina de la PM trig_01TvMmGfSLDfbcJrf66ZZ7YK.`
