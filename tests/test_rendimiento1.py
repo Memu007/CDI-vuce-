@@ -109,7 +109,7 @@ def test_lectura_con_tiempo_maximo_y_error_claro(monkeypatch):
     # Mismo formato que el resto de los errores de la subida (MARIA-2): la
     # pantalla muestra `detail` como texto y distingue por `code`.
     cuerpo = r.json()
-    assert cuerpo["code"] == "PDF_READ_TIMEOUT", cuerpo
+    assert cuerpo["code"] == "lectura_pdf_demasiado_larga", cuerpo
     assert isinstance(cuerpo["detail"], str) and "tardó demasiado" in cuerpo["detail"], cuerpo
     assert demora < LENTO_S, f"la respuesta esperó toda la lectura ({demora:.2f} s)"
 
@@ -229,9 +229,11 @@ def test_tiempo_de_validacion_mal_escrito_no_rechaza_todo(monkeypatch):
 
 
 def test_texto_del_vendedor_tiene_tiempo_maximo(monkeypatch):
-    """La adivinanza del vendedor es opcional: si tarda, se sigue sin ella."""
+    """La adivinanza del vendedor es opcional: si tarda, se sigue sin ella, y
+    con un tiempo propio más corto que el de la lectura del PDF."""
     import proyecto_maria.pdf_extractor as ext
-    monkeypatch.setenv("PDF_READ_TIMEOUT_S", "0.3")
+    monkeypatch.setenv("PDF_READ_TIMEOUT_S", "30")
+    monkeypatch.setenv("PDF_VENDOR_TIMEOUT_S", "0.3")
     monkeypatch.setattr(main, "process_pdf",
                         lambda *_: {"items": [{"descripcion": "x"}], "operacion": {}})
     monkeypatch.setattr(ext, "_extract_pdf_text", lambda *_: (_bloquear(), "")[1])
@@ -246,7 +248,7 @@ def test_error_de_tiempo_adentro_del_lector_no_es_lectura_lenta(monkeypatch):
     monkeypatch.setattr(main, "process_pdf", _falla)
     r = _subir_sincronico(monkeypatch)
     assert r.status_code == 500, r.text[:200]
-    assert "PDF_READ_TIMEOUT" not in r.text
+    assert "lectura_pdf_demasiado_larga" not in r.text
 
 
 def test_pdf_encriptado_dice_que_esta_encriptado():
