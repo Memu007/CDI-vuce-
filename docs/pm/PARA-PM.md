@@ -8,11 +8,25 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 |---|---|
 | Base (mi rama con la tuya traída, `efef997`) | `6c3ba09` |
 | Producto | `8808ef8` (fix) + `c08ea3f` (refactor de los conectores) |
-| Pruebas y sabotajes | `d74a74f`, `50d3a0b` |
-| **Entrego (código)** | **`50d3a0b`** |
+| Pruebas y sabotajes | `d74a74f`, `50d3a0b`; agregado 4: `f9f8393` |
+| **Entrego (código)** | **`f9f8393`** (trae tu rama: ADMIN-1 aceptada y MARIA-2) |
 
-ADMIN-1 sigue en tu revisión (código `ac25dbc`). Su informe completo, con las
-D1 a D3 que ya contestaste, está en el commit `f413c45` de este archivo.
+ADMIN-1 aceptada: gracias. Su informe está en el commit `f413c45` de este
+archivo.
+
+**Agregado 4 (de tu revisión de ADMIN-1), hecho en `f9f8393`.** La prueba de
+recorrido ahora (a) falla si hay una app montada con `app.mount` sobre
+`/api/admin/`, `/api/dev/` o `/dev/` (o por encima de esas rutas, como
+`/api`), porque una app montada no hereda `require_admin` y no se puede
+recorrer desde afuera, y (b) suma las rutas crudas de Starlette bajo esos
+prefijos (`app.router.add_route`, aunque tengan `include_in_schema=False`) a
+las que el usuario común tiene que recibir 403. Sabotajes, en
+`admin1.sh`:
+
+```
+ROJO  | ruta cruda de Starlette en /api/dev, fuera del esquema y abierta: dice «GET /api/dev/cruda → 200»
+ROJO  | app montada aparte bajo /api/admin, abierta: dice «apps montadas sobre rutas de admin, sin require_admin: ['/api/admin/montada']»
+```
 
 Resultado, punto por punto:
 1. `/api/system/connectors`: el usuario común recibe sólo
@@ -66,14 +80,14 @@ Resultado, punto por punto:
 ## Comandos copiables
 
 ```bash
-git fetch origin claude/dev1-tecnica && git checkout 50d3a0b
-PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 50d3a0b 8080
+git fetch origin claude/dev1-tecnica && git checkout f9f8393
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh f9f8393 8080
 # desde el worktree:
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
        VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-python -m pytest -q --no-cov tests/test_admin2.py tests/test_admin_solo_admin.py  # 26 passed
-PY=$(which python) scripts/testing/sabotajes/admin2.sh 50d3a0b   # 5 «ROJO», «sabotajes con falla: 0»
-PY=$(which python) scripts/testing/sabotajes/admin1.sh 50d3a0b   # 7 «ROJO», «sabotajes con falla: 0»
+python -m pytest -q --no-cov tests/test_admin2.py tests/test_admin_solo_admin.py  # 27 passed
+PY=$(which python) scripts/testing/sabotajes/admin2.sh f9f8393   # 5 «ROJO», «sabotajes con falla: 0»
+PY=$(which python) scripts/testing/sabotajes/admin1.sh f9f8393   # 9 «ROJO», «sabotajes con falla: 0»
 ```
 
 ## Evidencia (salida exacta)
@@ -117,13 +131,15 @@ ROJO  | cohort-retention vuelve a pedir el rol: dice «FAILED tests/test_admin_s
 sabotajes con falla: 0
 ```
 
-Los de ADMIN-1 sobre el mismo SHA: los 7 en ROJO, `sabotajes con falla: 0`.
+Sobre `f9f8393`, los de ADMIN-2 siguen igual y los 9 de ADMIN-1 (7 + los 2
+del agregado) dan ROJO: `sabotajes con falla: 0`.
 
 ## Puertas
 
 | Puerta | Resultado |
 |---|---|
-| Suite completa sobre `50d3a0b`, worktree limpio | `706 passed, 102 skipped, 25 warnings in 58.25s` (694 + 12 nuevas) |
+| Suite completa sobre `f9f8393` (con MARIA-2), worktree limpio | `716 passed, 102 skipped, 25 warnings in 59.15s` |
+| Suite completa sobre `50d3a0b` (sin MARIA-2) | `706 passed, 102 skipped, 25 warnings in 58.25s` (694 + 12 nuevas) |
 | `compileall` sobre `50d3a0b` | sin errores |
 | `smoke_friccion.sh` (`d74a74f`) | `OK · telemetría + alias session/state + by-cuit protegido` |
 | `ataque_aislamiento.sh` (`d74a74f`) | 22 BLOQUEADO, 0 FUGA |
@@ -159,15 +175,15 @@ Los de ADMIN-1 sobre el mismo SHA: los 7 en ROJO, `sabotajes con falla: 0`.
 
 RENDIMIENTO-1, como dice tu canal. Antes traigo tu rama por MARIA-2.
 
-Última vuelta: 2026-10-07 01:45 UTC
-Contexto: ~31 %
+Última vuelta: 2026-10-07 01:25 UTC
+Contexto: ~32 %
 
 `/compact conservar: Dev 1 de CDI en la rama claude/dev1-tecnica. ADMIN-1
-entregada (código ac25dbc, informe en el commit f413c45), en revisión.
-ADMIN-2 entregada (código 50d3a0b), informe en PARA-PM.md con D7–D9. Sigue
-RENDIMIENTO-1 (PARA-DEV.md): asyncio.to_thread para process_pdf,
-_extract_pdf_text y _suggest_ncm_with_gemini, con tiempo máximo; traer
-antes la rama de la PM por MARIA-2 de la Dev 2. COBRO-CORTE-1 en pausa, con
+aceptada (ac25dbc). ADMIN-2 entregada con el agregado 4 (código f9f8393), informe en PARA-PM.md con D7–D9. Sigue
+RENDIMIENTO-1 (PARA-DEV.md; después DEPENDENCIAS-1, EXCEL-1, MARIA-1b,
+PUNTA-A-PUNTA-1): asyncio.to_thread para process_pdf,
+_extract_pdf_text y _suggest_ncm_with_gemini, con tiempo máximo; MARIA-2 ya
+está integrada en mi rama. COBRO-CORTE-1 en pausa, con
 D4=(b) N=10, D5=(a), D6=(a). Entorno: PM_DIR=/tmp/cdi-dev1, levantar.sh
 <SHA> 8811; venv /tmp/cdi-dev1/venv; sabotajes en
 scripts/testing/sabotajes/admin1.sh y admin2.sh. Rutina de la PM:
