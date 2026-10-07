@@ -16,9 +16,9 @@ antes de cerrar la Fase 3.
 
 ## Para Emi
 
-1. **Publicación de ensayo: hecha y verificada** (`5cb03ab`). Faltan dos
-   líneas a la PM: ¿el servicio tiene volumen? ¿Hay cuentas ajenas u
-   organizaciones?
+1. **Sin volumen** (Emi, 2026-10-07): cada publicación o reinicio borra los
+   TXT generados y el historial de NCM aprendido; las operaciones quedan en
+   la base. Descargar el TXT apenas se genera. Lo arregla DISCO-1 (Fase 3).
 2. **Rotar las claves de Gemini** (G0). En Google AI Studio: borrar las que
    aparecieron, crear una nueva y ponerla sólo en Railway. Mirar la
    facturación de Google.
@@ -106,7 +106,7 @@ Archivos abiertos por Dev:
 | G0 · Secretos | 🔴 | Rotar las claves de Gemini | Emi, esta semana |
 | G1 · Configuración | 🟢 | G1.1 a G1.5 cortan. G1.6 y G1.7 sin medir | — |
 | G2 · Imagen real | 🟢 | Cerrada el 2026-09-17 | — |
-| G3 · Aislamiento | 🟡 | En producción, la fuga de MARIA.TXT (se arregla con el ensayo). Admin cerrado en la rama (ADMIN-1 y ADMIN-2). Abiertos: sesiones que reviven, límite de intentos burlable, prueba de aislamiento parcial | Fase 3 |
+| G3 · Aislamiento | 🟡 | La fuga de MARIA.TXT, cerrada en producción con el ensayo (sin cuentas ajenas: nadie vio facturas de Emi). Admin cerrado en la rama (ADMIN-1 y ADMIN-2). Abiertos: sesiones que reviven, límite de intentos burlable, prueba de aislamiento parcial | Fase 3 |
 | G4 · Producto (MARIA) | 🔴 | Origen mal leído, estado e IVA adicional fijos, peso por unidad, avisos tarde, gastos FOB sin cablear, banco, identificadores. Sin productos inventados (MARIA-2) | Fase 1 y la prueba en el Kit |
 | G5 · Pruebas | 🟢 | `1067 passed, 102 skipped, 0 failed` en la rama integrada (2026-10-07) | — |
 | G6 · Volver atrás | 🟡 | Esquema probado en local; falta la copia de la base | Fase 3 (y el ensayo lo ensaya) |
