@@ -2,6 +2,55 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## MARIA-1d — entregada: **`c60dc3a`**
+
+**Resultado: terminada. No hay nada para decidir.** Base `8770925`
+(MARIA-3 entregada más tu rama). Producto: `5faecad`, `83a0860`. El resto son
+pruebas y sabotajes.
+
+| Qué | Ahora | Rojo antes → verde |
+|---|---|---|
+| Campos nulos | En las dos copias del lector, el número de factura, el vendedor (nombre, identificador y dirección), el comprador, el domicilio, la fecha, la moneda y el incoterm quedan `""`, sin «None» ni «NON» | contra `8770925`: `26 failed, 3 passed` (por ejemplo `numero_factura = 'None'` y `moneda = 'NON'`) |
+| Moneda e incoterm ausentes | El lector no inventa `DOL` ni `FOB`. La revisión ya los exige | `assert 'DOL' == ''` → passed |
+| El vacío escrito como texto | «None», «null» o «N/A» (sin importar mayúsculas ni espacios) cuentan como vacío | 10 failed → passed (casos de la revisión) |
+| Una descripción que no es texto | En la copia PyMuPDF el producto se descartaba en silencio (`'int' object is not subscriptable`); ahora llega | failed → passed |
+| Prompt | Ya no dice «Ante duda, DOL»: si no hay palabra ni símbolo de moneda, `null` | prueba sobre el código; **no corrido con el Gemini real** |
+| Avisos de la carátula | Antes de generar (y al generar) se avisa qué falta: vendedor, nombre o CUIT del importador, moneda o incoterm, con la línea del TXT que queda vacía o no sale | failed → passed |
+| «None» en todo el TXT | Una factura con todos los campos nulos pasa por el lector (las dos copias) y por `/generate_maria`, con el pedido armado como la pantalla y los productos leídos: ni «None», ni «NON», ni «null» en el TXT ni en el nombre del archivo | antes: `«None» en el TXT` |
+
+| Puerta | Resultado |
+|---|---|
+| Suite completa sobre `83a0860` (mismo producto y pruebas que `c60dc3a`; el último commit sólo toca un sabotaje) | `951 passed, 102 skipped, 25 warnings in 60.93s`, 0 failed |
+| `tests/test_maria1d_campos_vacios.py` | `40 passed` |
+| `sabotaje_maria1d.sh` | `OK: los 7 sabotajes dan rojo por la razón esperada` |
+| `sabotaje_maria3` / `4` / `1c` / `2b` / `2` / `1a` | `OK: los 20 …` (el patrón de la fecha, al día) / `9` / `4` / `6` / `8` / `10` |
+| Archivos reales | `test_golden_reproduce_estructura_real` y el de 2025 por el endpoint, dentro de la suite: idénticos |
+| `pantalla_maria3.js` / `pantalla_maria4.js` | `OK: pantalla MARIA-3` / `OK: pantalla MARIA-4` |
+| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
+
+**Autorrevisión** con `/code-review high`. Los cuatro arreglos de la tabla
+(vacío escrito como texto, descripción no textual, prompt y prueba con los
+productos leídos) salieron de ahí.
+
+**Riesgos que quedan** (fuera de la pieza):
+- La pantalla vieja (v1) sigue poniendo `DOL` y `FOB` cuando están vacíos,
+  sin avisar. Es el mismo caso que D11.
+- La v2 también tiene ese relleno en `finalize.js`, pero la revisión no deja
+  seguir sin moneda ni incoterm, así que en la práctica no se usa. Por eso el
+  aviso de moneda o incoterm vacíos sólo salta si alguien llama a la API sin
+  ellos.
+- Un CUIT presente pero mal formado no se avisa: sólo se avisa el vacío.
+- Las dos copias del lector siguen duplicadas: cada arreglo se hace dos veces.
+
+## No corrido
+
+- El prompt nuevo con el Gemini real.
+
+Última vuelta: 2026-10-07 10:40 UTC
+Contexto: ~48 %
+
+---
+
 ## MARIA-3 — entregada: **`088577f`**
 
 **Resultado: terminada, con una D (D12) que no frena.** Base `06e4ac3`
