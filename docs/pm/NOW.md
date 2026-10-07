@@ -153,12 +153,14 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 15:05 UTC (rutina): MARIA-5 devuelta (Dev 2 en la devolución; sigue
-CATALOGO-NCM-1). Devolución de MARIA-1b (Dev 1, `beea9eb`): la PM reprodujo
-`1224 passed, 102 skipped, 1 xfailed`; falta su subagente. Regla nueva de
-Emi: compactar a 60 % las Devs y 50 % las PMs, y las tres antes de dormir
-(textos a Emi a eso de las 20:30). Contexto: PM 37 %, Dev 1 38 %, Dev 2
-recién compactada.
+2026-10-07 16:00 UTC (rutina): integradas EXCEL-1 y MARIA-1b (`6ea8ca9`,
+`1224 passed`). Segunda publicación lista: candidato `6ea8ca9` atacado
+(Opus alto), falta el «dale» de Emi. Encontrado en producción: guardar con
+la SIM completa da 500 (GUARDAR-1, falta el sí de Emi). Dev 1: entregó
+PUNTA-A-PUNTA-1 (`3b52bc9`, por revisar) y sigue con EXCEL-2. Dev 2:
+reentrega MARIA-5 y CATALOGO-NCM-1 después de integrar EXCEL-1 con la regla
+del peso de MARIA-5 (su D23). Rutina de la PM al día con 60/50 y los tres
+`/compact` a las 23:55 UTC. Contexto: Dev 1 54 %, Dev 2 9 %.
 
 ## Medición
 
