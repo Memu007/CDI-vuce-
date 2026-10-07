@@ -3,7 +3,7 @@
 Actualizado: 2026-10-07. Estado vigente; la historia está en Git.
 
 **Producto:** `Memu007/CDI-vuce-` (privado desde el 2026-10-06).
-**Publicado:** `main` = `5cb03ab` (2026-10-07, publicación de ensayo) en Railway,
+**Publicado:** `main` = `6ea8ca9` (2026-10-07 19:58 UTC, segunda publicación) en Railway,
 `cdi-production.up.railway.app`. Railway publica cada push a `main` sin
 esperar los tests.
 **En producción:** la usa sólo Emi, con facturas reales (Emi, 2026-10-07).
@@ -16,14 +16,13 @@ antes de cerrar la Fase 3.
 
 ## Para Emi
 
-1. **Segunda publicación, candidato `6ea8ca9`** (atacado en
-   `REPRODUCCION-PUBLICACION-2-2026-10-07.md`): arregla el país de origen,
-   suma los controles antes de generar, el Excel y lo del despachante. Falta
-   que Emi escriba «dale 6ea8ca9»: su «dale a todo» (~15:27 ARG) lo frenó el
-   sistema de permisos de la sesión, que pide la autorización explícita.
-   Reventa confirmada (el IVA adicional pasa a `NO_VALIDA`).
-   Después de publicar: Emi genera un TXT con una factura real y lo revisa.
-   La línea «Billing cron» no aparece si nadie pasa a impago.
+1. **Segunda publicación, hecha:** `6ea8ca9`, 2026-10-07 19:58 UTC («dale
+   6ea8ca9» de Emi). Emi genera un TXT con una factura real, lo descarga
+   enseguida y mira: fecha DD/MM/AAAA, CUIT sin guiones, IVA adicional
+   `NO_VALIDA`, `CARTUSO` 2, banco y empresa de digitalización. Ahora pide
+   fecha de emisión, moneda, incoterm, CUIT válido y estado si el origen es
+   argentino: un error que pide eso no es una falla. Guardar con la SIM
+   completa sigue dando error hasta GUARDAR-1.
 1b. **Sin volumen** (Emi, 2026-10-07): cada publicación o reinicio borra los
    TXT generados y el historial de NCM aprendido; las operaciones quedan en
    la base. Descargar el TXT apenas se genera. Lo arregla DISCO-1 (Fase 3).
@@ -129,6 +128,12 @@ Archivos abiertos por Dev:
   `716 passed, 102 skipped`. Avance directo de `a771693`, sin merge. Emi:
   hizo la lista de Railway antes del «dale»; después verificó «Billing cron» con 0
   y guardó una operación (2026-10-07, ~10:20 ARG). CI de GitHub en verde.
+- `6ea8ca9` (2026-10-07 19:58 UTC), segunda publicación: MARIA-1a, 2b, 1c, 4,
+  3 y 1d, RENDIMIENTO-1 y 1b, EXCEL-1 y MARIA-1b, atacado en
+  `REPRODUCCION-PUBLICACION-2-2026-10-07.md`. Suite sobre el mismo SHA:
+  `1224 passed, 102 skipped, 1 xfailed`. Avance directo de `5cb03ab`, sin
+  merge. «dale 6ea8ca9» de Emi a las ~16:58 ARG (antes, «dale a todo», que el
+  sistema de permisos no tomó). CI: pruebas en verde y `e2e-maria` en rojo. La e2e no completa la fecha de emisión que pide MARIA-3; la PM lo reprodujo y, con esa línea, pasa entero («E2E MARIA OK»). El producto está bien, la prueba quedó vieja; la arregla la Dev 1 con GUARDAR-1. Emi generó un TXT con una factura real y «se ve bien» (19:59 UTC, un minuto después del push: falta confirmar que ya corría la versión nueva; con ella el TXT dice `IVAADICIONAL1=NO_VALIDA` y `CARTUSO=2`).
 
 ## Reglas
 

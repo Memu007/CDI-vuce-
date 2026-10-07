@@ -290,7 +290,8 @@ se da la razón para quedar bien.
 
 ## Publicar
 
-1. Suite completa y puertas sobre el SHA exacto. Lo publicado puede ser un
+1. Suite completa, la e2e de la CI (`scripts/testing/e2e_maria.sh`, cómo
+   correrla en `ONBOARDING-DEV.md`) y puertas sobre el SHA exacto. Lo publicado puede ser un
    commit posterior si sólo cambian documentos y reglas:
    `git diff <probado> <publicado> -- . ':(exclude)docs/pm' ':(exclude).claude' ':(exclude)AGENTS.md' ':(exclude)CLAUDE.md'` vacío.
 2. Traer `main` a la rama de PM con `merge` y comprobar que el código no

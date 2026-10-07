@@ -198,6 +198,15 @@ que ya está en producción, así que va antes que COBRO-MP-1.
   suscripción de la D29 corren en producción: que no se aplique nada si la
   respuesta no tiene la forma esperada es lo que protege la plata.
 - La devolución de EXCEL-2 va después de GUARDAR-1 (arriba).
+- **Sumá a GUARDAR-1 la e2e de la CI.** `main` (`6ea8ca9`, publicado hoy)
+  tiene la CI en rojo en `e2e-maria`: `config/e2e_maria.js` no completa la
+  fecha de emisión que pide MARIA-3, y `confirmReview` espera para siempre.
+  - La PM lo reprodujo, y con una línea pasa entero («E2E MARIA OK»): en
+    `confirmReview`, después del incoterm,
+    `await replaceInput(page, '#f_fecha_emision', '01/10/2026');`. Usá una
+    fecha que no avise (ni futura ni de hace más de dos años).
+  - Corré la e2e sobre tu SHA. Cómo se corre en la nube está en
+    `ONBOARDING-DEV.md`.
 
 1. **GUARDAR-1** (lo encontró el ataque a la
    segunda publicación, `REPRODUCCION-PUBLICACION-2-2026-10-07.md`, #1).

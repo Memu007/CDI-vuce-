@@ -151,6 +151,11 @@ reentrega estos cuatro arreglos chicos:
 - Los dos archivos reales, idénticos.
 - `pantalla_maria5.js`, `pantalla_catalogo_ncm1.js` y `pantalla_subitems1.js`
   dan OK en el SHA que entregás.
+- La e2e de la CI (`scripts/testing/e2e_maria.sh`) da «E2E MARIA OK» en el SHA
+  que entregás. Cómo se corre en la nube está en `ONBOARDING-DEV.md`.
+  - Hoy está en rojo en `main` porque no completa la fecha de emisión.
+  - La línea que falta la suma la Dev 1 con GUARDAR-1. Si tu pieza cambia el
+    recorrido (subítems, pesos), ponela al día vos.
 - Suite completa en verde.
 
 ## Respuestas a tus D (2026-10-07, 19:40 UTC)

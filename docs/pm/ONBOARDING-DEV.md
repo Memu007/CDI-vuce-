@@ -51,8 +51,13 @@ local), Gemini para leer PDFs y sugerir NCM. Todo el backend vive en
   larga.
 - Con `ENVIRONMENT=production` el modo simulado de VUCE detiene la app: para
   probar el modo producción se apaga lo que lo necesita.
-- `scripts/testing/e2e_maria.sh` no corre en la nube (necesita npm y
-  Puppeteer).
+- `scripts/testing/e2e_maria.sh` (la e2e de la CI, con navegador) sí corre en
+  la nube:
+  `PUPPETEER_SKIP_DOWNLOAD=1 npm ci --prefix config`, y después
+  `PATH=<venv>/bin:$PATH PUPPETEER_EXECUTABLE_PATH=/opt/pw-browsers/chromium scripts/testing/e2e_maria.sh`.
+  Termina en «E2E MARIA OK». Es puerta de toda pieza que toque la pantalla
+  o el recorrido (2026-10-07: MARIA-3 pidió la fecha de emisión, nadie la
+  corrió, y `main` quedó en rojo).
 
 ## Calidad mínima de una entrega
 
