@@ -3355,7 +3355,9 @@ def _respuesta_excel_demasiado_largo(e: Exception) -> JSONResponse:
 
 
 def _leer_excel_ruta(ruta: str, engine: str):
-    return pd.read_excel(ruta, engine=engine)
+    # dtype=object: cada celda como viene. Sin eso pandas convierte el texto
+    # «1.500» en 1,5 y la NCM 84713000 en 84713000.0 (EXCEL-1).
+    return pd.read_excel(ruta, engine=engine, dtype=object)
 
 
 def _leer_tabla(content: bytes, filename: str):
@@ -3921,7 +3923,7 @@ async def generate_maria_export_endpoint(
         raise HTTPException(status_code=500, detail=f"Error generando archivo MARIA export: {str(e)}")
 
 _FILA_DE_TOTAL_RE = re.compile(
-    r"^\s*(?:sub\s*-?\s*total|totales?|grand\s+total)\b", re.IGNORECASE
+    r"^\s*(?:sub\s*-?\s*total|total(?:es)?|grand\s+total)\b", re.IGNORECASE
 )
 
 
@@ -3964,6 +3966,16 @@ def extract_items_from_excel(df: pd.DataFrame, filename: str, descartes: list | 
 
     return items
 
+def _texto_de_celda(valor) -> str:
+    """Texto de una celda: vacío si no hay nada, y un número entero sin «.0»
+    (con una fila vacía en el medio pandas lee la NCM 84713000 como 84713000.0)."""
+    if valor is None or not pd.notna(valor):
+        return ""
+    if isinstance(valor, float) and valor.is_integer():
+        return str(int(valor))
+    return str(valor).strip()
+
+
 def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | None = None) -> list[Item]:
     """
     Intenta extraer items usando un mapeo específico de columnas.
@@ -3976,54 +3988,65 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
     if descartes is None:
         descartes = []
 
+    from proyecto_maria.pdf_extractor import (
+        _decimal_de_la_factura,
+        _numero_factura,
+        _origen_desde_factura,
+    )
+
+    # Buscar columnas que coincidan con el mapeo. Sin las obligatorias, este
+    # mapeo no sirve y se prueba otro. El peso no es obligatorio (EXCEL-1).
+    pieza_col = find_column(df.columns, mapping['pieza'])
+    desc_col = find_column(df.columns, mapping['descripcion'])
+    origen_col = find_column(df.columns, mapping['origen'])
+    peso_col = find_column(df.columns, mapping['peso_unitario'])
+    cant_col = find_column(df.columns, mapping['cantidad'])
+    valor_col = find_column(df.columns, mapping['valor_unitario'])
+    if not all([pieza_col, desc_col, origen_col, cant_col, valor_col]):
+        return items
+
+    # Separador decimal de la planilla, mirando los números escritos como
+    # texto (la regla de MARIA-1a): «1.500» con miles, «1,5» con coma.
+    decimal = _decimal_de_la_factura([
+        v for col in (cant_col, valor_col, peso_col) if col
+        for v in df[col].tolist() if isinstance(v, str)
+    ])
+
     for _, row in df.iterrows():
         try:
-            # Buscar columnas que coincidan con el mapeo
-            pieza_col = find_column(df.columns, mapping['pieza'])
-            desc_col = find_column(df.columns, mapping['descripcion'])
-            origen_col = find_column(df.columns, mapping['origen'])
-            peso_col = find_column(df.columns, mapping['peso_unitario'])
-            cant_col = find_column(df.columns, mapping['cantidad'])
-            valor_col = find_column(df.columns, mapping['valor_unitario'])
-
-            # Si no encuentra todas las columnas obligatorias, continuar con otro
-            # mapeo. El peso no es obligatorio: sin columna queda vacío (EXCEL-1).
-            if not all([pieza_col, desc_col, origen_col, cant_col, valor_col]):
-                continue
-
             if all((not pd.notna(v)) or str(v).strip() == "" for v in row.values):
                 continue  # fila vacía
 
-            # Extraer valores
-            pieza = str(row[pieza_col]).strip() if pd.notna(row[pieza_col]) else ""
-            descripcion = str(row[desc_col]).strip() if pd.notna(row[desc_col]) else ""
-            origen = str(row[origen_col]).strip() if pd.notna(row[origen_col]) else ""
+            pieza = _texto_de_celda(row[pieza_col])
+            descripcion = _texto_de_celda(row[desc_col])
 
             if _FILA_DE_TOTAL_RE.match(descripcion) or _FILA_DE_TOTAL_RE.match(pieza):
                 continue  # fila de total o subtotal: no es un ítem
 
-            try:
-                peso_unitario = float(row[peso_col]) if peso_col and pd.notna(row[peso_col]) else 0
-                cantidad = float(row[cant_col]) if pd.notna(row[cant_col]) else 0
-                valor_unitario = float(row[valor_col]) if pd.notna(row[valor_col]) else 0
-            except (ValueError, TypeError):
+            # Sin descripción ni NCM no hay ítem que mostrar: se avisa.
+            if not pieza and not descripcion:
                 descartes.append(_ + 2)
-                continue  # Saltar fila si no puede convertir números
+                continue
 
-            # Solo agregar si tiene datos básicos. El peso puede venir en 0
-            # para que el autofill del catálogo del cliente lo complete después.
-            if pieza and descripcion and origen and cantidad > 0 and valor_unitario > 0:
-                item = Item(
-                    pieza=pieza,
-                    descripcion=descripcion,
-                    origen=origen,
-                    peso_unitario=peso_unitario,
-                    cantidad=cantidad,
-                    valor_unitario=valor_unitario
-                )
-                items.append(item)
-            else:
+            def _numero(col):
+                return (_numero_factura(row[col], decimal) or 0.0) if col else 0.0
+
+            cantidad, valor_unitario = _numero(cant_col), _numero(valor_col)
+            # Sin descripción y sin cantidad ni precio, no hay ítem: se avisa.
+            if not descripcion and not cantidad and not valor_unitario:
                 descartes.append(_ + 2)
+                continue
+
+            # Lo que falta o no se puede leer queda vacío (0 o ""), nunca
+            # inventado; el semáforo de la revisión lo marca (MARIA-1a, EXCEL-1).
+            items.append(Item(
+                pieza=pieza,
+                descripcion=descripcion,
+                origen=_origen_desde_factura(row[origen_col]) or "XX",
+                peso_unitario=_numero(peso_col),
+                cantidad=cantidad,
+                valor_unitario=valor_unitario,
+            ))
 
         except Exception as e:
             print(f"⚠️  Error procesando fila: {e}")
@@ -6448,8 +6471,10 @@ async def upload_excel_v2(
             {
                 "pieza": str(getattr(it, "pieza", "") or ""),
                 "descripcion": str(getattr(it, "descripcion", "") or ""),
-                "origen": str(getattr(it, "origen", "XX") or "XX"),
-                "cantidad": float(getattr(it, "cantidad", 1) or 1),
+                # Origen sin reconocer o cantidad faltante quedan vacíos:
+                # nada de «XX» ni de cantidad 1 (EXCEL-1, criterio MARIA-1a).
+                "origen": "" if str(getattr(it, "origen", "") or "") in ("", "XX") else str(it.origen),
+                "cantidad": float(getattr(it, "cantidad", 0) or 0),
                 "valor_unitario": float(getattr(it, "valor_unitario", 0) or 0),
                 "peso_unitario": float(getattr(it, "peso_unitario", 0) or 0),
                 "codigo_parte": str(getattr(it, "codigo_parte", "") or ""),
