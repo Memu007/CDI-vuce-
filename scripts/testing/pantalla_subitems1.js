@@ -145,6 +145,8 @@ const bloquesSbt = txt => txt.replace(/\r\n/g, '\n').split('\n\n').filter(b => b
   // decimales.
   const casos = [
     [1, 6.32, [[1, 6.33]]],                 // 0,01 justo: el servidor genera
+    [1, 0.03, [[1, 0.04]]],                 // 0,01 justo; en float, 0,010000000000000002
+    [2, 0.015, [[2, 0.02]]],
     [1, 6.32, [[1, 6.3301]]],               // 0,0101: el servidor da 400
     [1, 6.33, [[1, 6.32]]],
     [3, 3.335, [[1, 3.335], [2, 3.34]]],    // 10,005 contra 10,015
