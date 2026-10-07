@@ -124,11 +124,44 @@ def test_la_procedencia_del_producto_gana_sobre_la_de_la_operacion(client, auth_
     assert "CARTPAYPRC=222" in data["content"]
 
 
-@pytest.mark.parametrize("procedencia", ["Narnia", "99999", "12"])
-def test_procedencia_no_reconocida_se_rechaza(client, auth_override, procedencia):
-    r = client.post("/generate_maria", json=_cuerpo(procedencia=procedencia))
+@pytest.mark.parametrize("procedencia", ["Narnia", "99999", "12", "²", "٢٢٢", "2²2"])
+@pytest.mark.parametrize("ruta", ["/generate_maria", "/generate_maria/avisos"])
+def test_procedencia_no_reconocida_se_rechaza(client, auth_override, procedencia, ruta):
+    r = client.post(ruta, json=_cuerpo(procedencia=procedencia))
     assert r.status_code == 400, r.text
-    assert "Procedencia" in r.text and procedencia in r.text
+    detalle = r.json()["detail"]
+    assert detalle.startswith("Procedencia") and procedencia in detalle
+    assert "invalid literal" not in detalle
+
+
+def _codigos_de_la_pantalla():
+    import json
+    import pathlib
+    import re
+    js = (pathlib.Path(__file__).resolve().parents[1] / "proyecto_maria" / "static" / "v2"
+          / "paises_maria.js").read_text(encoding="utf-8")
+    return [c["code"] for c in json.loads(re.search(r"const COUNTRIES = (\[.*?\]);", js).group(1))]
+
+
+def test_la_procedencia_acepta_todos_los_paises_de_la_pantalla():
+    """Devolución: una sola tabla. Los 309 códigos que ofrece la pantalla
+    (TABLA PAISES V.0 25082010.xlsx) son procedencias válidas."""
+    from proyecto_maria.core.maria_generator import pais_de_la_tabla
+    codigos = _codigos_de_la_pantalla()
+    assert len(codigos) == 309
+    assert [c for c in codigos if not pais_de_la_tabla(c)] == []
+
+
+@pytest.mark.parametrize("codigo", ["668", "436", "435", "223", "150", "242", "254", "358"])
+def test_procedencias_que_antes_se_rechazaban(client, auth_override, codigo):
+    assert f"CARTPAYPRC={codigo}" in _generar(client, procedencia=codigo)["content"]
+
+
+def test_procedencia_de_item_en_blanco_no_pisa_la_de_la_operacion(client, auth_override):
+    items = [dict(ITEM_BASE, estado=2, pais_procedencia="  "), dict(ITEM_BASE, estado=2, procedencia=" ")]
+    data = _generar(client, procedencia="UY", items=items)
+    assert [ln for ln in data["content"].split("\r\n") if ln.startswith("CARTPAYPRC=")] == \
+        ["CARTPAYPRC=225", "CARTPAYPRC=225"]
 
 
 def test_procedencia_por_codigo_de_la_tabla(client, auth_override):
@@ -165,12 +198,20 @@ def _hoy_o_ayer():
 
 @pytest.mark.parametrize("fecha", ["", "   ", "None", "DD/MM/YYYY", "32/13/2025", "mañana", "18/07/202", "18-07-2025",
                                    "05/03/0026", "01/01/0001"])
-def test_sin_fecha_leida_sale_vacia_nunca_la_de_hoy(fecha):
-    txt = generate_maria_txt(items=[dict(ITEM_BASE)], **{**COMUN, "fecha_emision": fecha,
-                                                          "sbt_sufijo_valor": SUF_A})
-    assert _fecha_txt(txt) == [""]
+def test_sin_fecha_valida_no_se_genera(fecha):
+    """Devolución: sin una fecha de emisión válida no se genera (como con el
+    estado): ni la de hoy, ni vacía, ni el año del IEXT sacado de otro lado."""
+    with pytest.raises(ValueError, match="fecha de emisión"):
+        generate_maria_txt(items=[dict(ITEM_BASE)], **{**COMUN, "fecha_emision": fecha,
+                                                        "sbt_sufijo_valor": SUF_A})
+
+
+def test_sin_fecha_el_endpoint_da_400_y_no_genera(client, auth_override):
+    r = client.post("/generate_maria", json=_cuerpo(fecha_emision=""))
+    assert r.status_code == 400, r.text
+    assert "fecha de emisión" in r.text
     for hoy in _hoy_o_ayer():
-        assert hoy not in txt
+        assert hoy not in r.text
 
 
 @pytest.mark.parametrize("fecha, sale", [
@@ -179,6 +220,7 @@ def test_sin_fecha_leida_sale_vacia_nunca_la_de_hoy(fecha):
     (" 18/07/2025 ", "18/07/2025"),
     ("18/07/25", "18/07/2025"),
     ("1/7/2025", "01/07/2025"),
+    ("01/01/69", "01/01/2069"),
 ])
 def test_la_fecha_de_la_factura_sale_en_el_txt(fecha, sale):
     txt = generate_maria_txt(items=[dict(ITEM_BASE)], **{**COMUN, "fecha_emision": fecha,
@@ -186,22 +228,42 @@ def test_la_fecha_de_la_factura_sale_en_el_txt(fecha, sale):
     assert _fecha_txt(txt) == [sale]
 
 
-@pytest.mark.parametrize("fecha", ["Fecha 18/07/2025", "Jul/18/2025"])
-def test_una_fecha_que_no_se_acepta_no_cambia_el_anio_del_iext(fecha):
-    """Revisión: el año del IEXT se seguía leyendo de la factura aunque el
-    formato no fuera DD/MM/AAAA; con la fecha vacía no tiene que pasar al año
-    de hoy."""
+@pytest.mark.parametrize("fecha, anio", [("01/02/2024", "/24"), ("2023-12-31", "/23"), ("05/05/30", "/30")])
+def test_el_anio_del_iext_sale_de_la_fecha_valida(fecha, anio):
     txt = generate_maria_txt(items=[dict(ITEM_BASE)], **{**COMUN, "fecha_emision": fecha,
                                                           "sbt_sufijo_valor": SUF_A})
     iext = [ln for ln in txt.split("\r\n") if ln.startswith("IEXT=") and "/" in ln]
-    assert iext and all(ln.endswith("/25") for ln in iext), iext
+    assert iext and all(ln.endswith(anio) for ln in iext), iext
 
 
-def test_sin_fecha_se_avisa(client, auth_override):
-    data = _generar(client, fecha_emision="")
-    texto = _texto(data["supuestos"])
-    assert "fecha de emisión" in texto and "vacía" in texto
+@pytest.mark.parametrize("fecha", ["Fecha 18/07/2025", "Jul/18/2025", "18/07/٢٥"])
+def test_texto_suelto_con_barra_no_da_el_anio(fecha):
+    with pytest.raises(ValueError, match="fecha de emisión"):
+        generate_maria_txt(items=[dict(ITEM_BASE)], **{**COMUN, "fecha_emision": fecha,
+                                                        "sbt_sufijo_valor": SUF_A})
+
+
+def test_sin_fecha_los_avisos_previos_la_piden(client, auth_override):
+    r = client.post("/generate_maria/avisos", json=_cuerpo(fecha_emision=""))
+    assert r.status_code == 200, r.text
+    texto = _texto(r.json()["avisos"])
+    assert "fecha de emisión" in texto and "no se genera" in texto
     assert "fecha de emisión" not in _texto(_generar(client)["supuestos"])
+
+
+def _dias(n):
+    return (datetime.now() + timedelta(days=n)).strftime("%d/%m/%Y")
+
+
+@pytest.mark.parametrize("dias, dice", [(40, "futura"), (-3 * 366, "más de dos años")])
+def test_fecha_futura_o_vieja_se_avisa(dias, dice):
+    texto = _texto(supuestos_declarados([dict(ITEM_BASE)], fecha_emision=_dias(dias)))
+    assert "fecha de emisión" in texto and dice in texto
+
+
+@pytest.mark.parametrize("dias", [0, -30, -700])
+def test_fecha_reciente_no_se_avisa(dias):
+    assert "fecha de emisión" not in _texto(supuestos_declarados([dict(ITEM_BASE)], fecha_emision=_dias(dias)))
 
 
 def test_supuestos_avisan_una_fecha_que_no_es_fecha():
@@ -225,7 +287,7 @@ def test_los_avisos_se_piden_antes_de_generar(client, auth_override):
 
 @pytest.mark.parametrize("gastos, procedencia", [(None, ""), (150, "PE")])
 def test_los_avisos_previos_son_los_mismos_que_al_generar(client, auth_override, gastos, procedencia):
-    cuerpo = _cuerpo(fecha_emision="", procedencia=procedencia, gastos_anteriores_fob=gastos,
+    cuerpo = _cuerpo(fecha_emision="01/01/2020", procedencia=procedencia, gastos_anteriores_fob=gastos,
                      iva_adicional=None, banco_bcra="")
     antes = client.post("/generate_maria/avisos", json=cuerpo).json()["avisos"]
     despues = client.post("/generate_maria", json=cuerpo).json()["warnings"]
@@ -291,8 +353,27 @@ def test_la_fecha_que_no_vino_queda_vacia(monkeypatch, copia, fecha):
     assert r["operacion"]["fecha_emision"] == ""
 
 
-@pytest.mark.parametrize("gastos", [float("inf"), float("nan"), 0.004, -5])
-def test_gastos_que_no_son_un_importe_no_van(gastos):
-    """Revisión adversarial: infinito, NaN o menos de un centavo no se declaran."""
+def test_gastos_de_menos_de_un_centavo_no_se_declaran():
     from proyecto_maria.core.maria_generator import gastos_fob_para_el_txt
-    assert gastos_fob_para_el_txt("EXW", None, gastos) is None
+    assert gastos_fob_para_el_txt("EXW", None, 0.004) is None
+
+
+GASTOS_INVALIDOS = [float("inf"), float("nan"), -5, 1e308, -float("inf")]
+
+
+@pytest.mark.parametrize("gastos", GASTOS_INVALIDOS, ids=["inf", "nan", "negativo", "1e308", "-inf"])
+@pytest.mark.parametrize("campo, incoterm", [("gastos_anteriores_fob", "EXW"), ("gastos_fob", "DDP")])
+@pytest.mark.parametrize("ruta", ["/generate_maria", "/generate_maria/avisos"])
+def test_gastos_que_no_son_un_importe_dan_400(client, auth_override, gastos, campo, incoterm, ruta):
+    """Devolución: un importe no finito, negativo o absurdo no llega al TXT,
+    tampoco por `gastos_fob`: 400 con mensaje propio."""
+    r = client.post(ruta, json=_cuerpo(incoterm=incoterm, **{campo: gastos}))
+    assert r.status_code == 400, r.text
+    assert "Gastos" in r.json()["detail"]
+
+
+@pytest.mark.parametrize("gastos", GASTOS_INVALIDOS, ids=["inf", "nan", "negativo", "1e308", "-inf"])
+def test_el_generador_tampoco_acepta_gastos_invalidos(gastos):
+    with pytest.raises(ValueError, match="Gastos"):
+        generate_maria_txt(items=[dict(ITEM_BASE)], **{**COMUN, "gastos_fob": gastos,
+                                                        "sbt_sufijo_valor": SUF_A})
