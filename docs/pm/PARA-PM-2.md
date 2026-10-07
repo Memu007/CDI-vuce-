@@ -2,48 +2,71 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## MARIA-5 — en curso: una D sobre el peso que cargan el lector y el Excel
+## MARIA-5 — en cierre (faltan los números de la suite y los sabotajes): **`6661dbf`**
 
-**D22. ¿El peso que traen el lector de PDF y el Excel es de una unidad o de
-la línea?** Revisé cada camino antes de cambiar nada:
+**Resultado: terminada, con la D22 (a) y el punto 4. Para decidir: nada
+nuevo; dos riesgos abajo para que los mires (el «Peso neto» de un cliente que
+era por unidad y el redondeo del grupo).** Base: mi rama con MARIA-1d y tu
+rama integrada (`8e819dd`, con pypdf). Los dos archivos reales salen
+idénticos.
 
-| Camino | Qué llega hoy | Claro |
-|---|---|---|
-| Carga a mano (v2, `ncm.js:688`) | «Peso unitario»; `buildMariaRequest` manda `peso_unitario` | sí, una unidad |
-| Validación (v2) | muestra unitario × cantidad | sí, total |
-| v1 (`app.js:3300`) | manda `peso_kg = peso_unitario × cantidad` | sí, total |
-| Archivos reales en las pruebas | `peso_kg = 33` para 6 unidades | sí, total |
-| Operación guardada (`main.py:5600`) | guarda `peso_unitario`; **si viene 0, inventa 0,5** | unidad |
-| **Lector PDF, las dos copias** | el prompt pide `peso_kg: Peso en kg` sin decir de qué; se guarda como `peso_unitario`. Ejemplo de PyMuPDF con cantidad 1; el de PDF directo, 10 unidades con 0,5 kg | **ambiguo** |
-| **Excel** (`main.py:4594`) | las columnas «peso», «weight», pero también «peso total», «peso neto» y «peso bruto», van a `peso_unitario` sin dividir | **ambiguo** |
+| Punto | Qué hace ahora | Prueba | Rojo antes → verde |
+|---|---|---|---|
+| 1. Peso (M1) | `QARTKGRNET` = peso neto de la línea: `peso_kg` si viene (ya es total: v1 y archivos reales), si no `peso_unitario` × cantidad (v2). Los grupos suman el total de cada línea. 10 × 2,5 kg = **25 kg** | respuesta 3; real de 2026 (6 u, 33 kg) sin cambios | `test_maria5_peso.py`: 10 failed → passed (la del grupo de `test_generar_maria_txt` pasa de 4 a 8 kg, citando la respuesta 3) |
+| D22 lector | Las dos copias piden `peso_unitario` y `peso_total_linea`; si viene sólo el total, se divide por la cantidad. `peso_kg` viejo se lee como unitario | — | `test_maria5_peso_lector.py`: 15 failed, 2 passed → 17 passed |
+| D22 Excel (sólo el mapeo del peso) | «Peso total», «Peso neto» (y variantes con total/neto/net/línea, también en un mapeo guardado del cliente) se dividen por la cantidad; «Peso»/«Weight», de una unidad. El bruto queda último y, si es la única columna, se usa dividido **con aviso**. Un peso que no es número se avisa. La pantalla muestra los avisos | — | `test_maria5_peso_excel.py`: 6 failed → passed; lo de la 2.ª revisión, 6 failed → passed |
+| 2. Centavos (M9) | Importes al centavo, mitad hacia arriba, sobre el número escrito; cantidad × unitario en decimal exacto (3 × 3,335 = 10,01). Flete y seguro por resto mayor: la suma de los ítems da **exactamente** la carátula (FOB 100/100/400 con flete 10: 1,67 + 1,66 + 6,67 = **10,00**; antes 10,01). `MDDTFOB` = Σ `MARTFOB`; base = FOB + flete + seguro; `MSBTFOB` reparte el `MARTFOB` (misma tolerancia de antes). NaN, infinito, negativo o > 10¹² → 400 (antes `MARTFOB=nan` o 500). La validación muestra el mismo FOB | Kit: no corrido (no tengo el Kit); real de 2025 y 2026 idénticos | `test_maria5_centavos.py`: 36 failed → passed; lo de la 1.ª revisión, 10 failed → passed |
+| 3a. Carátula «None» | En `MariaRequest`, un campo de texto entero «None», «null», «N/A» o nulo es vacío: sale el aviso de carátula y no llega al TXT ni al archivo; sin número, `IDSO` y el archivo usan `OP_<fecha>`. La pantalla no arma `FAC_None` ni muestra «None» en el resumen | — | `test_maria5_caratula_vacia.py`: 8 failed → passed |
+| 3b. Lector PDF directo | Descripción, versión y código de parte con la misma función que PyMuPDF (`_texto_del_producto`) | — | `test_maria5_lector_productos.py`: 10 failed → passed |
+| 4. Grupos en la pantalla | Editar la cantidad del grupo la reparte en enteros (resto mayor); el valor y el peso promedio escalan los de cada producto. Se aplica al salir del campo; pasar sin cambiar no toca nada; 0, negativo o vacío se rechazan (vuelve lo que estaba); después se redibuja. Debajo del peso unitario, el de la línea | pantalla | `pantalla_maria5.js` contra `57bb17e`: `FALLA: la cantidad del grupo quedó [{"c":6,…},{"c":6,…}]`; contra `aa7d9a3`: `FALLA: pasar por el grupo sin editar cambió los productos`; con la pieza: `OK: pantalla MARIA-5` |
 
-Lo que hago sin esperar, porque no depende de la D: en el generador,
-`peso_kg`, si viene, es el total de la línea (como lo mandan la v1 y los
-archivos reales); si no viene, se usa `peso_unitario` × cantidad (lo que
-mandan la v2 y la pantalla de validación). Los grupos suman esos totales
-(hoy suman unitarios). Así ningún camino se multiplica dos veces y los dos
-archivos reales no se mueven.
+Las pruebas nuevas contra la base `9679e21` (los cuatro primeros archivos):
+`64 failed, 25 passed`.
 
-Lo que espera la D es qué escriben en `peso_unitario` el lector y el Excel:
-si hoy Gemini o el Excel ponen el total de la línea, después del cambio el
-TXT saldría multiplicado otra vez (como ya sale hoy en la pantalla de
-validación).
+| Puerta (sobre `6661dbf`; el producto es el de `4c2231c`) | Resultado |
+|---|---|
+| Suite completa, worktree limpio, venv **sólo con `requirements.txt`** (sin PyPDF2) | SUITE |
+| `sabotaje_maria5.sh` (23) | S5 |
+| `sabotaje_maria3` / `1d` / `4` / `1c` / `2b` / `2` / `1a` | SOTROS |
+| `pantalla_maria5.js` (servidor local en `4c2231c`) | `OK: pantalla MARIA-5` (captura `docs/pm/capturas/maria5-validacion.png`) |
+| `pantalla_maria3.js` | `OK: pantalla MARIA-3` |
+| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
+| Autorrevisión | dos adversarios Sonnet alto; lo que encontraron está arreglado (arriba) salvo lo de «Riesgos» |
 
-- **(a) Recomendada.** El lector le pide a Gemini las dos cosas,
-  `peso_unitario` y `peso_total_linea`, y usa la que venga (si viene sólo el
-  total, lo divide por la cantidad). En el Excel, las columnas «peso total»,
-  «peso neto» y «peso bruto» se dividen por la cantidad, y «peso» o «weight»
-  quedan como peso de una unidad, como dice la plantilla.
-- (b) El lector y el Excel quedan como están; se avisa en la revisión que el
-  peso es por unidad. Más barato, pero el error queda en manos del despachante.
+**Riesgos y lo que no hice:**
+- **«Peso neto» de un cliente que era por unidad:** con la D22 se divide por
+  la cantidad; si un cliente tenía guardada una columna «Peso neto» que en
+  su planilla era por unidad, ahora baja a 1/cantidad (con el aviso «es de
+  toda la línea; se dividió»). No lo probé con una planilla real.
+- **Grupo:** al cambiar la cantidad, cada producto conserva su precio, así
+  que el promedio que se ve después cambia (la fila se redibuja con lo
+  guardado); en un empate, la unidad extra va al primero.
+- Excel: «Peso total (kg)» (con paréntesis) no se detecta sin mapeo, como
+  pasaba con «Peso (kg)»: la normalización de encabezados es de todas las
+  columnas y no la toqué.
+- Lector: si la cantidad viene en 0, el peso de la línea no se puede
+  dividir y queda en 0 (el semáforo marca la cantidad).
+- Sin chequeo cruzado si Gemini copia el mismo número en los dos pesos.
+- Un ítem con FOB 0,00 y flete: el flete de la carátula no se reparte (ya
+  pasaba; la validación rechaza valor 0).
+- `moneda` o `incoterm` «None» salen como línea vacía en el TXT, con aviso
+  (lo de DOL/FOB por defecto es de MARIA-1b).
+- El 0,5 inventado al guardar: lo saca MARIA-1b; al integrar hay que
+  resolver ese pedazo de `main.py`.
+- No corrido: el Kit del despachante; nada contra producción ni terceros.
 
-Sin la D, entrego el generador y dejo el lector y el Excel como están, con
-el riesgo escrito.
+Para reproducir:
+```
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 6661dbf 8890
+BASE_URL=http://127.0.0.1:8890 node scripts/testing/pantalla_maria5.js   # termina en «OK: pantalla MARIA-5»
+VENV=/tmp/cdi-pm/venv scripts/testing/sabotaje_maria5.sh 6661dbf          # «OK: los 23 sabotajes …»
+python -m pytest -q tests/test_maria5_*.py                                # todo passed
+```
 
-Encontrados de paso, fuera del alcance (los propongo, no los toco): al
-guardar, un peso 0 se guarda como 0,5 (`main.py:5600`); en `ncm.js`, editar
-la cantidad o el valor de un grupo copia el total del grupo a cada producto
-(`setGroupField`) y el TXT suma de más; «peso bruto» del Excel entra como neto.
+Última vuelta: 2026-10-07 HORA UTC
+Contexto: ~38 % (pasado el umbral: compactar en este corte)
+
+---
 
 ## MARIA-1d — reentrega con el punto sumado: **`9679e21`**
 
