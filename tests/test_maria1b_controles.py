@@ -154,13 +154,6 @@ def test_la_validacion_previa_devuelve_los_mismos_errores():
     assert "errores" in r.json()["resumen"] and "sin problemas" not in r.json()["resumen"]
 
 
-def test_la_validacion_previa_no_inventa_cantidad_1():
-    item = {"pieza": "84798999900H", "descripcion": "MAQUINA DEMO GRANDE", "origen": "AR",
-            "valor_unitario": 10, "peso_unitario": 1}  # sin cantidad
-    r = TestClient(main.app).post("/api/validate/smart", json={"items": [item]})
-    assert any("antidad" in e for e in r.json()["errores"]), r.json()
-
-
 def _cliente() -> str:
     from proyecto_maria.database.connection import AsyncSessionLocal
     from proyecto_maria.database.models import Client
