@@ -347,13 +347,17 @@ def test_peso_neto_y_bruto_entre_parentesis_no_se_confunden():
 
 
 def test_el_indice_del_xlsx_se_mira_fuera_del_hilo_del_servidor(monkeypatch):
-    import threading
     from proyecto_maria.security import file_security
     hilos = []
     original = file_security._excel_descomprimido_bytes
 
     def _espia(contents):
-        hilos.append(threading.current_thread() is threading.main_thread())
+        # ¿Corre dentro del bucle que atiende los pedidos?
+        try:
+            asyncio.get_running_loop()
+            hilos.append(True)
+        except RuntimeError:
+            hilos.append(False)
         return original(contents)
     monkeypatch.setattr(file_security, "_excel_descomprimido_bytes", _espia)
     r = _subir([H, ["84713000", "Laptop", "CN", 10, 350, 1.5]])

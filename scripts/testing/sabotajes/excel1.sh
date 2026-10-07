@@ -60,8 +60,8 @@ sabotaje $M "leer un Excel pierde el tiempo máximo" \
   '    return 1e9' \
   "FAILED $T::test_leer_un_excel_tiene_tiempo_maximo[ncm_import_historial]"
 sabotaje $F "validar el Excel vuelve al hilo del servidor" \
-  'asyncio.to_thread(_contar_hojas_excel, contents, file_ext),' \
-  'asyncio.sleep(0, _contar_hojas_excel(contents, file_ext)),' \
+  'asyncio.to_thread(_abrir_excel, contents, file_ext),' \
+  'asyncio.sleep(0, _abrir_excel(contents, file_ext)),' \
   "FAILED $T::test_health_responde_mientras_se_valida_un_excel"
 sabotaje $M "«Valor» vuelve a ganar sobre el precio unitario" \
   '        "valorunitario", "preciounitario", "unitprice",' \
@@ -74,7 +74,7 @@ sabotaje $M "el peso bruto vuelve a usarse como peso unitario" \
     ],' \
   "FAILED $L::test_peso_bruto_o_total_no_se_toma_como_peso_unitario"
 sabotaje $M "las filas de subtotal vuelven a entrar" \
-  '            if _FILA_DE_TOTAL_RE.match(descripcion or pieza):' \
+  '            if _es_fila_de_total(descripcion or pieza):' \
   '            if False:' \
   "FAILED $L::test_fila_de_subtotal_no_entra_como_item"
 sabotaje $M "«.XLSX» en mayúsculas vuelve a fallar" \
@@ -85,29 +85,50 @@ sabotaje $M "la unidad entre paréntesis vuelve a romper el encabezado" \
   '_normalize_header(re.sub(r"\(.*?\)", "", str(h or "")))' \
   '_normalize_header(str(h or ""))' \
   "FAILED $L::test_encabezados_con_unidades_entre_parentesis"
-sabotaje $M "el mapeo guardado deja de completar lo que no se detecta" \
-  '            if (canon in _CANON_COLUMNS and canon not in cubiertos' \
-  '            if (False and canon not in cubiertos' \
-  "FAILED $L::test_mapeo_guardado_completa_lo_que_no_se_detecta"
-sabotaje $M "el mapeo guardado viejo vuelve a ganar sobre lo detectado" \
-  '            src: canon for src, canon in (detected_mapping or {}).items()
-            if canon in _CANON_COLUMNS
-        }' \
+sabotaje $M "el mapeo guardado vuelve a dejar afuera lo detectado" \
+  '            if canon not in cubiertos and src not in effective_mapping:' \
+  '            if False:' \
+  "FAILED $L::test_mapeo_guardado_no_deja_afuera_encabezados_nuevos"
+sabotaje $M "lo detectado vuelve a pisar el mapeo corregido a mano" \
   '            src: canon for src, canon in (mapping or {}).items()
             if canon in _CANON_COLUMNS and src in presentes
+        }' \
+  '            src: canon for src, canon in (detected_mapping or {}).items()
+            if canon in _CANON_COLUMNS
         }
-        for src, canon in (detected_mapping or {}).items():
-            if canon not in set(effective_mapping.values()) and src not in effective_mapping:
+        for src, canon in (mapping or {}).items():
+            if canon in _CANON_COLUMNS and src in presentes and canon not in set(effective_mapping.values()):
                 effective_mapping[src] = canon' \
-  "FAILED $L::test_mapeo_guardado_viejo_no_gana_sobre_el_precio_unitario"
+  "FAILED $L::test_mapeo_corregido_a_mano_gana_sobre_lo_detectado"
 sabotaje $M "vuelve a saltearse cualquier producto que empiece con «Total»" \
-  '    r"[\s\d.,:;/-]*$",' \
-  '    r"\b",' \
+  '            and all(p in _PALABRAS_DE_TOTAL or p in _PALABRAS_DE_MONTO for p in palabras))' \
+  '            and palabras[0] in _PALABRAS_DE_TOTAL)' \
   "FAILED $L::test_productos_que_empiezan_con_total_no_se_pierden"
-sabotaje $M "«FOB TOTAL» o «Freight» vuelven a entrar como producto" \
-  '        if usa_ncm_u_origen and not trae:' \
+sabotaje $M "los totales con moneda vuelven a entrar como producto" \
+  '    "usd", "us$", "u$s", "eur", "cny", "rmb", "ars", "$", "€", "¥",' \
+  '    "us$", "u$s", "eur", "cny", "rmb", "ars", "$", "€", "¥",' \
+  "FAILED $L::test_filas_de_total_con_moneda_o_idioma_no_entran[TOTAL USD]"
+sabotaje $M "los totales en otro idioma vuelven a entrar como producto" \
+  '    "合计", "合計", "总计", "總計", "小计", "小計",' \
+  '    "合計", "总计", "總計", "小计", "小計",' \
+  "FAILED $L::test_filas_de_total_con_moneda_o_idioma_no_entran["
+sabotaje $M "el total en la columna de código vuelve a entrar" \
+  '            if _es_fila_de_total(descripcion or pieza):' \
+  '            if _es_fila_de_total(descripcion):' \
+  "FAILED $L::test_total_en_la_columna_de_codigo_no_entra"
+sabotaje $M "el flete vuelve a entrar como producto" \
+  '        if not trae and _FILA_QUE_NO_ES_MERCADERIA_RE.match(item.descripcion or ""):' \
   '        if False:' \
-  "FAILED $L::test_filas_sin_ncm_ni_origen_no_son_productos_y_se_avisan"
+  "FAILED $L::test_total_flete_y_condiciones_no_son_productos"
+sabotaje $M "vuelve a descartarse todo producto sin NCM ni origen" \
+  '        if not trae and _FILA_QUE_NO_ES_MERCADERIA_RE.match(item.descripcion or ""):' \
+  '        if not trae and any(t for _f, t, _i in candidatos):' \
+  "FAILED $L::test_productos_sin_ncm_ni_origen_entran_aunque_otra_fila_los_traiga"
+sabotaje $M "«Peso (neto)» y «Peso (bruto)» vuelven a confundirse" \
+  '        if len(originales) == 1:
+            norm_to_orig.setdefault(norm, originales[0])' \
+  '        norm_to_orig[norm] = originales[-1]' \
+  "FAILED $L::test_peso_neto_y_bruto_entre_parentesis_no_se_confunden"
 sabotaje $M "el Excel vuelve a usar los hilos del PDF" \
   'def _pool_lectura_excel():
     global _POOL_LECTURA_EXCEL' \
@@ -116,13 +137,21 @@ sabotaje $M "el Excel vuelve a usar los hilos del PDF" \
     global _POOL_LECTURA_EXCEL' \
   "FAILED $T::test_excel_y_pdf_no_comparten_los_hilos_de_lectura"
 sabotaje $F "un .xlsx que se descomprime a gigas vuelve a abrirse" \
-  "            if file_ext == '.xlsx' and _excel_descomprimido_bytes(contents) > _excel_max_descomprimido_bytes():" \
-  "            if False:" \
+  "    if file_ext == '.xlsx' and _excel_descomprimido_bytes(contents) > _excel_max_descomprimido_bytes():" \
+  "    if False:" \
   "FAILED $L::test_xlsx_que_se_descomprime_a_gigas_se_rechaza_antes_de_abrirlo"
 sabotaje $M "las filas vacías vuelven a recorrerse una por una" \
   '    return pd.read_excel(ruta, engine=engine, dtype=object).dropna(how="all")' \
   '    return pd.read_excel(ruta, engine=engine, dtype=object)' \
   "FAILED $L::test_celda_en_la_ultima_fila_no_recorre_un_millon_de_filas"
+sabotaje $F "el índice del .xlsx vuelve a mirarse en el hilo del servidor" \
+  "            try:
+                hojas = await asyncio.wait_for(" \
+  "            if file_ext == '.xlsx' and _excel_descomprimido_bytes(contents) > _excel_max_descomprimido_bytes():
+                raise HTTPException(400, 'demasiado grande descomprimido')
+            try:
+                hojas = await asyncio.wait_for(" \
+  "FAILED $L::test_el_indice_del_xlsx_se_mira_fuera_del_hilo_del_servidor"
 sabotaje $M "deja de haber tope de filas" \
   '        if len(df) > _MAX_FILAS_EXCEL:' \
   '        if False:' \
