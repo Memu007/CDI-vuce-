@@ -340,6 +340,11 @@
                     CDI.toast('Catálogo parcial', catalogo.columnas_detectadas + '/' + total + ' columnas reconocidas.', 'info');
                 }
             }
+            // MARIA-5 (D22): el peso de la planilla que no era de una unidad.
+            const avisosExcel = (data && data.avisos) || [];
+            if (currentFormat === 'excel' && avisosExcel.length && CDI.toast) {
+                CDI.toast('Revisá el peso', avisosExcel.join(' '), 'warning');
+            }
 
             if (currentFormat === 'pdf' && CDI.setClienteActivo) {
                 CDI.setClienteActivo(null);

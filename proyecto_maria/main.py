@@ -4672,8 +4672,10 @@ _ITEM_COL_ALIASES = {
         "valorunit", "preciounit", "unitvalue", "costounitario",
     ],
     "peso_unitario": [
+        # Primero los de una unidad; después los de la línea; el bruto, último
+        # (MARIA-5, D22: el TXT pide peso neto).
         "pesounitario", "peso", "weight", "pesounit", "unitweight", "pesototal",
-        "pesobruto", "pesoneto",
+        "pesoneto", "pesobruto",
     ],
 }
 
@@ -4704,6 +4706,35 @@ def _detect_item_columns(headers: list) -> dict:
                 mapping[norm_to_orig[alias]] = canon
                 break
     return mapping
+
+
+# MARIA-5 (D22). Columnas de peso que no son de una unidad: el TXT multiplica
+# el peso unitario por la cantidad, así que se dividen por la cantidad.
+_PESO_DE_LA_LINEA = {"pesototal", "pesoneto"}
+_PESO_BRUTO = {"pesobruto"}
+
+
+def _peso_por_unidad(df: pd.DataFrame, rename: dict) -> list[str]:
+    """Después de renombrar: si la columna que quedó como `peso_unitario` es
+    el peso de la línea (total o neto) o el bruto, la divide por la cantidad.
+    El bruto se usa sólo si es la única columna de peso, y se avisa.
+    Devuelve los avisos para la pantalla."""
+    origen = next((src for src, canon in rename.items() if canon == "peso_unitario"), None)
+    normal = _normalize_header(origen) if origen is not None else ""
+    if normal not in _PESO_DE_LA_LINEA | _PESO_BRUTO or "peso_unitario" not in df.columns:
+        return []
+    col_cant = find_column(df.columns, ["cantidad", "Cantidad", "qty", "Qty", "quantity", "Quantity", "cant"])
+    if col_cant is None:
+        return [f"Peso: la columna «{origen}» es de toda la línea y no se encontró la cantidad para "
+                "dividirla. Cargá el peso de una unidad en la revisión."]
+    peso = pd.to_numeric(df["peso_unitario"], errors="coerce")
+    cantidad = pd.to_numeric(df[col_cant], errors="coerce")
+    df["peso_unitario"] = (peso / cantidad).where(cantidad > 0)
+    avisos = [f"Peso: la columna «{origen}» es de toda la línea; se dividió por la cantidad."]
+    if normal in _PESO_BRUTO:
+        avisos.append(f"Peso: el TXT pide peso neto y la planilla trae sólo «{origen}» (bruto); "
+                      "se usó el bruto dividido por la cantidad. Corregilo si tenés el neto.")
+    return avisos
 
 
 def _merge_column_mapping(existing: dict, detected: dict) -> dict:
@@ -6436,9 +6467,11 @@ async def upload_excel_v2(
         elif detected_mapping:
             effective_mapping = detected_mapping
 
+        avisos: list[str] = []
         if effective_mapping:
             rename = {src: canon for src, canon in effective_mapping.items() if canon in _CANON_COLUMNS}
             df = df.rename(columns=rename)
+            avisos = _peso_por_unidad(df, rename)
 
         items = extract_items_from_excel(df, file.filename)
         if not items:
@@ -6504,6 +6537,7 @@ async def upload_excel_v2(
             "operacion": operacion,
             "applied_mapping": bool(effective_mapping),
             "catalogo": catalogo_info,
+            "avisos": avisos,
         }
     except HTTPException:
         raise
