@@ -1,6 +1,7 @@
 """
 Generador de archivos TXT en formato MARIA para Sistema SIM de AFIP.
 """
+import math
 import re
 import unicodedata
 from datetime import datetime
@@ -275,7 +276,10 @@ def gastos_fob_para_el_txt(incoterm, gastos_fob=None, gastos_anteriores_fob=None
         importe = float(gastos_anteriores_fob)
     except (TypeError, ValueError):
         return None
-    return importe if importe > 0 else None
+    # Infinito, NaN o menos de un centavo no son un importe que declarar.
+    if not math.isfinite(importe) or round(importe, 2) <= 0:
+        return None
+    return importe
 
 
 def fecha_de_la_factura(raw) -> str:
@@ -289,9 +293,11 @@ def fecha_de_la_factura(raw) -> str:
     for patron, formato in formatos:
         if re.fullmatch(patron, texto):
             try:
-                return datetime.strptime(texto, formato).strftime("%d/%m/%Y")
+                fecha = datetime.strptime(texto, formato)
             except ValueError:
                 return ""
+            # Un año como 0026 no es una fecha de factura.
+            return fecha.strftime("%d/%m/%Y") if fecha.year >= 1900 else ""
     return ""
 
 

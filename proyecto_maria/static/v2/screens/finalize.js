@@ -68,6 +68,9 @@
         // MARIA-4: lo que decide el despachante, antes de generar. MARIA-3:
         // los avisos del TXT se piden con lo que hay y otra vez cuando llega
         // la propuesta del cliente o la persona cambia algo en la tarjeta.
+        // Hasta que llegue la respuesta, nada de los avisos de otra operación.
+        const avisosPanel = document.getElementById('validatingAvisosPanel');
+        if (avisosPanel) avisosPanel.hidden = true;
         Promise.resolve(CDI.despachante ? CDI.despachante.render() : null)
             .catch(() => null).then(refrescarAvisos);
         enlazarAvisos();
