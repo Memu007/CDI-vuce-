@@ -63,12 +63,25 @@ def cuit_valido(cuit) -> bool:
 
 
 def _numero_o_none(valor):
+    """El número, o None si falta o es un texto que no es número (eso lo marca
+    el control de siempre). Un entero enorme (10**400) es infinito y una lista
+    u objeto no es un número: los dos son un monto inválido (EXCEL-2)."""
     if valor is None or isinstance(valor, bool) or (isinstance(valor, str) and not valor.strip()):
         return None
+    if isinstance(valor, (list, dict)):
+        return math.nan
     try:
         return float(valor)
+    except OverflowError:
+        return math.inf
     except (TypeError, ValueError):
         return None
+
+
+def digitos_raros(valor) -> bool:
+    """Si el texto tiene dígitos que no son 0-9 (de ancho completo, arábigos):
+    el TXT los escribiría tal cual (EXCEL-2, de paso)."""
+    return any(c.isdigit() and not ("0" <= c <= "9") for c in str(valor or ""))
 
 
 def _fuera_de_rango(*valores) -> bool:
@@ -233,6 +246,10 @@ def controles_antes_de_generar(items, cabecera: dict) -> tuple[list, list]:
             f"El incoterm «{incoterm}» no es válido "
             f"({', '.join(sorted(INCOTERMS_ACEPTADOS))})."
         )
+
+    for campo, nombre in (("cuit_agr", "CUIT del despachante"), ("vendedor_id", "identificador del vendedor")):
+        if digitos_raros(cabecera.get(campo)):
+            errores.append(f"El {nombre} «{cabecera.get(campo)}» tiene dígitos que no son 0-9.")
 
     cuit = str(cabecera.get("comprador_cuit") or "").strip()
     if not cuit:
