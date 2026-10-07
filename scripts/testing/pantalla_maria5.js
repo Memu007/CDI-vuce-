@@ -97,8 +97,11 @@ const centavos = s => Math.round(parseFloat(s) * 100);
   }
   await page.evaluate(() => {
     CDI.state = CDI.state || {};
+    // Con MARIA-1b integrada no se genera sin CUIT del importador válido.
     CDI.state.operacion = { numero_factura: 'None', moneda: 'DOL', incoterm: 'CIF', fecha_emision: '22/06/2026',
-                            flete: 10, seguro: 10, sbt_sufijo_valor: 'AA(1)-CA00' };
+                            flete: 10, seguro: 10, sbt_sufijo_valor: 'AA(1)-CA00',
+                            comprador_cuit: '30999999995', comprador_nombre: 'IMPORTADORA DEMO S.A.',
+                            vendedor_nombre: 'PROVEEDOR DEMO' };
     CDI.state.items = [
       { pieza: '84713012100F', descripcion: 'Notebook importada de prueba', origen: 'CN', cantidad: 10, valor_unitario: 10, peso_unitario: 2.5 },
       { pieza: '84713012100F', descripcion: 'Notebook importada de prueba B', origen: 'CN', cantidad: 1, valor_unitario: 100, peso_unitario: 1 },
