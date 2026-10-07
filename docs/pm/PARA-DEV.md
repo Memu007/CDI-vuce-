@@ -25,27 +25,27 @@ despertás a ella con el de la suya al entregar o al dejar una D que te frena
 
 ## Último veredicto
 
-**ADMIN-2 aceptada sobre `f9f8393`** (2026-10-07). La PM reprodujo el rojo
-antes (`3 failed`), la focal (`27 passed`) y la suite (`716 passed, 102
-skipped`). Su subagente Sonnet alto: los puntos 1 a 3 se sostienen; la prueba
-de recorrido tiene dos puntos ciegos más (un WebSocket bajo `/api/admin/` y
-una ruta cruda en `/api/admin` o `/dev` exactos), que van a AISLAMIENTO-2 en
-la Fase 3: hoy no hay ninguna así. Detalle en
-`REPRODUCCION-ADMIN-2-2026-10-07.md`. Integrada en la rama de la PM.
+**RENDIMIENTO-1 aceptada sobre `8fd801d`** (2026-10-07). La PM reprodujo, con
+un venv nuevo armado sólo con tu `requirements.txt`, el rojo antes
+(`14 failed`), la focal (`14 passed`) y la suite (`730 passed, 102
+skipped`). Su subagente Sonnet alto confirmó tu D10 con números: con una
+cuenta de prueba, 4 subidas de un PDF armado de 442 bytes cuelgan los 4 hilos
+y después nadie lee un PDF hasta reiniciar. Detalle en
+`REPRODUCCION-RENDIMIENTO-1-2026-10-07.md`.
 
-## Respuestas a tus D (2026-10-07, 01:30 UTC)
+**Todavía no se integra en la rama de PM:** el ensayo de mañana publica
+exactamente lo que se atacó (`7f1dd2c`). Se integra después de publicarlo,
+y RENDIMIENTO-1 no se publica sin RENDIMIENTO-1b. Seguí en tu rama.
 
-- **D7 (el chip «Sistema/Demo»): (a), nada.**
-- **D8 (el aviso de Mercado Pago se puede reenviar): va en COBRO-MP-1**, que
-  ya pide «aplicado una vez», y **COBRO-MP-1 pasa a ser la primera pieza de
-  la Fase 2**, delante de COBRO-CORTE-1, como recomendaste. Hoy no hay cobro
-  abierto a estudios: no cambia el orden de la Fase 1.
-- **D9:** el primero (cancelar y reactivar pasa una prueba gratuita a
-  `active`) y el tercero (sin `MP_ACCESS_TOKEN`, «Tu cuenta Premium ha sido
-  activada» sin cambiar nada) **van a COBRO-MP-2**. El segundo ya está en la
-  lista de Railway de Emi.
+## Respuestas a tus D (2026-10-07, 05:20 UTC)
 
-Anotado en `ROADMAP.md`.
+- **D10: (b) ya, como RENDIMIENTO-1b** (abajo). (a), el proceso aparte que se
+  puede matar, va a ABUSO-1 en la Fase 3.
+- **D11: dejarla así.** La cuota se cobra aunque la lectura dé 504.
+- **D12: sí, a EXCEL-1.**
+- **De la Dev 2 (su D6), para tu MARIA-1b:** al guardar la operación,
+  `save_client_operation` (`main.py`, ~línea 5508) vuelve a poner cantidad 1
+  y peso 0,5 si faltan. Que no invente: se suma a MARIA-1b.
 
 **Ya decididas para COBRO-CORTE-1** (2026-10-07; tus opciones están en tu `PARA-PM.md`
 del commit `62b1d14`):
@@ -55,33 +55,25 @@ del commit `62b1d14`):
 - **D6: (a)** ahora. El índice único (b), pieza aparte más adelante, después
   de mirar si producción ya tiene códigos repetidos.
 
-## Tarea activa — RENDIMIENTO-1: leer un PDF no frena el sitio
+## Tarea activa — RENDIMIENTO-1b: un PDF armado no deja a nadie sin lectura
 
-Asignada el 2026-10-07. Fase 1 (`ROADMAP.md`). Después siguen EXCEL-1,
-MARIA-1b y PUNTA-A-PUNTA-1; cada una se te escribe acá cuando arranque.
+Asignada el 2026-10-07. Sale de tu D10 (b). Es chica.
 
-**Base:** tu rama, con la de la PM traída con `merge` (trae ADMIN-2 integrada
-y MARIA-2).
-
-Leer un PDF no frena el sitio para todos (hallazgo D3). `upload_pdf_public`
-(`main.py`) llama a `process_pdf(contents)` y a `_extract_pdf_text(contents)`,
-que son sincrónicos, dentro de una función `async`; lo mismo
-`_suggest_ncm_with_gemini`. Con un solo proceso, mientras se lee un PDF nadie
-más es atendido.
+**Base:** tu rama (con RENDIMIENTO-1).
 
 **Alcance:**
-1. Que esas llamadas no bloqueen (por ejemplo, `asyncio.to_thread`) y que la
-   lectura tenga un tiempo máximo con un error claro.
-2. Cambiar el lector de PDF viejo (`PyPDF2==3.0.1`, `pdf_extractor.py:800`,
-   que se cuelga con un PDF armado: X3 de la auditoría) por su sucesor
-   (`pypdf`), y revisar si `python-jose` y `ecdsa`, con avisos de seguridad,
-   siguen haciendo falta para el token de sesión.
+1. La adivinanza del vendedor, que es el único camino vivo que le pasa un PDF
+   del usuario a pdfminer (`main.py` → `_extract_pdf_text`), usa sólo `pypdf`.
+   Si en el producto aparece otro camino vivo hacia pdfminer o pdfplumber con
+   un PDF del usuario, dejá una D.
+2. Un tiempo máximo en `0` o negativo cae al valor por defecto, igual que uno
+   mal escrito (`PDF_READ_TIMEOUT_S`, `PDF_VALIDATE_TIMEOUT_S`,
+   `PDF_VENDOR_TIMEOUT_S`, `NCM_GEMINI_TIMEOUT_S`).
 
-**Ojo con la Dev 2:** está en MARIA-1a sobre el mismo `pdf_extractor.py`,
-pero en la lectura del país y las cantidades (líneas ~2130-2370). Tocá sólo
-lo tuyo; si necesitás cambiar algo de esas líneas, dejá una D.
+**Criterios:** rojo antes y verde después con el PDF armado del revisor (4
+subidas en paralelo y después un PDF bueno se lee bien) y con los tiempos en
+`0` y `-5`. Los PDF de las pruebas siguen dando el mismo vendedor. Suite
+completa en verde, con el venv armado sólo desde `requirements.txt`.
 
-**Criterios:** una prueba con dos pedidos al mismo tiempo, uno con una lectura
-lenta simulada, donde `/health` responde mientras tanto (rojo antes, verde
-después); el tiempo máximo con su error; los PDF de las pruebas actuales se
-leen igual con `pypdf`. Suite completa en verde.
+**Después:** EXCEL-1 (con tu D12), MARIA-1b (con la D6 de la Dev 2) y
+PUNTA-A-PUNTA-1. Cada una se te escribe acá cuando arranque.

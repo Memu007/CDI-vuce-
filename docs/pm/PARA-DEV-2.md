@@ -32,61 +32,54 @@ tienen que seguir saliendo idénticos, salvo que la tarea diga otra cosa.
 
 ## Último veredicto
 
-**MARIA-2 aceptada sobre `65ea6f3`** (2026-10-07). La PM reprodujo el rojo
-antes (vuelve `ITEM DEMOSTRACION` con el producto de la base), las focales
-(`91 passed`) y la suite (`689 passed, 102 skipped`). Su subagente no encontró
-otro camino que invente productos. Tu supuesto 1 (validar antes de la cuota)
-queda aceptado. Detalle en `REPRODUCCION-MARIA-2-2026-10-07.md`. Integrada en
-la rama de la PM.
+**MARIA-1a aceptada sobre `0a1775f` y MARIA-2b aceptada sobre `c3bef51`**
+(2026-10-07). La PM reprodujo los rojos antes (`59 failed` y `12 failed`,
+`assert 400 == 503`), las focales (`143 passed` con los archivos reales;
+`84 passed`) y las suites (`777 passed, 102 skipped` y `791 passed, 102
+skipped`). Su subagente Sonnet alto probó unos 300 países y los números
+difíciles: ningún código ni valor equivocado; los dos archivos reales salen
+idénticos. Confirmó tu D5 hasta el TXT (`MDDTFLE=0.00`, `MDDTASS=0.00`) y
+encontró que la pantalla vieja (`static/app.js:3289`, `/dashboard?v=1`) repone
+`cantidad || 1` y `origen || 'CN'`. Detalle en
+`REPRODUCCION-MARIA-1a-2b-2026-10-07.md`.
 
-## Respuestas a tus D (2026-10-07, 01:10 UTC)
+**Todavía no se integran en la rama de PM:** el ensayo de mañana publica
+exactamente lo que se atacó. Se integran después, y MARIA-1a no se publica sin
+MARIA-1c. Seguí en tu rama.
 
-- **D1 (sin clave, leer igual los PDF con texto): (a).** Nada de lector viejo
-  sin probar.
-- **D2 (Gemini caído o clave inválida): (b), pieza chica aparte, MARIA-2b.**
-  Va **después** de MARIA-1a (abajo).
-- **D3 (códigos de tres letras): (a).** La tabla «tres letras → dos letras»
-  se genera una vez desde ISO 3166-1, con la prueba de que cada destino existe
-  en la tabla oficial. `pycountry` sólo para generarla, no como dependencia.
-  Prueba para el cambio en el TXT: la norma ISO y la tabla oficial VUCE.
-- **D4 (producto sin origen): (a), vacío y con el aviso del semáforo.**
-- **Tu plan de MARIA-1a, aprobado:** una sola función de origen para las dos
-  copias del lector, una sola función para los números (con la regla de la
-  coma que propusiste), nada de 0,5 ni 1 inventados, y el arreglo del precio
-  `2.45` → `245` en la copia de PyMuPDF.
+## Respuestas a tus D (2026-10-07, 05:30 UTC)
 
-## Tarea activa — MARIA-1a: la factura bien leída
+- **D5: (a), como MARIA-1c** (abajo), antes de MARIA-4.
+- **D6: a la Dev 1, en MARIA-1b.**
+- **D7: (a).** Se mide con facturas reales cuando Emi pruebe.
+- **D8: (a), dejarlo.** Lo mismo decidió la Dev 1 con su lectura lenta (D11).
 
-Hallazgo M5. El lector corta el país de origen a dos letras: `CHN` → `CH`,
-que es **Suiza**; `MEX` → Montenegro. El corte está en **dos copias** del
-lector (`pdf_extractor.py:2136` y `:2194`, y `:2339` y `:2361`): si se
-arregla una sola, queda el error. Además, las cantidades con coma se
-descartan en silencio y un peso faltante se completa con 0,5 kg
-(`:2153-2162`, `:2197`, `:2356-2364`).
+## Tarea activa — MARIA-1c: lo que no se pudo leer se avisa
 
-**Alcance:** el país sale bien con los códigos de dos y de tres letras y con
-el nombre, contra la tabla oficial de países que ya está en el código
-(`core/maria_generator.py:16`, tabla VUCE); cantidades con coma bien leídas;
-un dato que falta queda vacío y con aviso, nunca inventado.
+Asignada el 2026-10-07. Sale de tu D5 y de la revisión de la PM. Es chica.
 
-**Prueba para el cambio en el TXT:** la tabla oficial de países (ya está en el
-código). Los dos archivos reales siguen saliendo idénticos.
+**Base:** tu rama (con MARIA-1a y MARIA-2b).
 
-**Fuera de alcance:** el peso total por producto (MARIA-5, espera al
-despachante) y las validaciones antes de generar (MARIA-1b).
+**Alcance:**
+1. Si el lector encontró un flete, un seguro u otro valor de la operación
+   pero no lo pudo leer, lo marca, y la pantalla de subida lo nombra
+   («No pudimos leer el flete: completalo»). Antes de generar, el aviso
+   sigue a la vista. Un dato que no estaba en la factura no se marca.
+2. La pantalla vieja (`static/app.js`, ~línea 3289) no repone cantidad 1 ni
+   origen China: manda lo que hay, y el control de `/generate_maria` avisa.
 
-**Criterios:** rojo antes y verde después con `CHN`, `MEX`, `China` y
-`P.R. China`, y con cantidades `1,5` (coma decimal) y `1,500` (separador de
-miles en una factura en inglés). Si no se puede saber cuál es, aviso y nada
-adivinado. Suite completa en verde.
+**Fuera de alcance:** guardar la operación (D6, Dev 1) y los controles antes
+de generar (MARIA-1b, Dev 1).
 
-## Plan nuevo de Emi (2026-10-07)
+**Criterios:** rojo antes y verde después con flete `"1,500"` sin pista y
+seguro `"350 USD/kg"` (hoy salen 0 sin aviso concreto) y con la pantalla vieja
+mandando cantidad y origen vacíos. Los dos archivos reales salen idénticos.
+Suite completa en verde.
 
-Primero todo el camino «PDF o Excel → TXT MARIA», después el cobro, la
-seguridad al final (`ROADMAP.md`). Tu orden en la Fase 1: MARIA-1a, MARIA-2b,
-MARIA-4 (estado, IVA adicional, banco y empresa de digitalización, en una
-sola pieza), MARIA-3 y MARIA-5; MARIA-6 cuando llegue lo del despachante.
-MARIA-1b pasó a la Dev 1.
+## Después
+
+MARIA-4, MARIA-3 y MARIA-5, en ese orden (`ROADMAP.md`); MARIA-6 cuando
+lleguen los archivos reales del despachante.
 
 **Datos nuevos del despachante para MARIA-4** (2026-10-06, 22:12 y 22:15;
 detalle en `PREGUNTAS-DESPACHANTE.md`):
@@ -95,11 +88,3 @@ detalle en `PREGUNTAS-DESPACHANTE.md`):
 - **Reducción o exclusión del IVA adicional:** es una «ventaja» que el
   despachante elige en el Kit (`IVAADREDUCCION`). No va en el TXT (ningún
   archivo real trae ventajas): sólo un aviso de que se elige ahí.
-
-MARIA-6 queda en identificadores y sufijos, con los archivos reales.
-
-## Después — MARIA-2b (apenas entregues MARIA-1a)
-
-Tu D2: con clave, pero Gemini caído o con clave inválida, el mismo 503 con su
-`code` y el botón de carga manual, en vez del 400 «No se encontró tabla de
-items…». Con un Gemini falso que falla; ni Gemini real ni internet.

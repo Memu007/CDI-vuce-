@@ -60,13 +60,16 @@ antes de cerrar la Fase 3.
    facturación de Google.
 3. **Despachante:** recordarle los archivos reales (favor 1). Ya respondió
    todas las preguntas.
-4. **Límite de uso de la cuenta:** el 2026-10-07 entre las ~02:05 y las
+4. **Hasta publicar MARIA-1a: revisar el país de origen de cada TXT** antes
+   de mandárselo al despachante. El código publicado corta el país a dos
+   letras: si la lectura devuelve «CHN» o «China», sale Suiza.
+5. **Límite de uso de la cuenta:** el 2026-10-07 entre las ~02:05 y las
    03:40 UTC las Devs quedaron paradas porque la cuenta llegó a su límite de
    5 horas («You've hit your session limit»). Lo más barato para que no se
    repita: pegar el `/compact` de cada Dev apenas se pueda (están en ~38 % y
    ~41 %; cada paso relee todo el contexto). Si vuelve a pasar, Emi decide
    entre aceptar las pausas o bajar el ritmo.
-5. **Hasta la primera publicación:** en `main` sigue la regla vieja que manda
+6. **Hasta la primera publicación:** en `main` sigue la regla vieja que manda
    «push a `main`» a otros asistentes. No pedirle a ningún asistente cambios
    sobre `main`.
 
@@ -91,19 +94,23 @@ también sus subagentes (Emi confirmó las dos sesiones en alto). Ningún subage
 la PM principal.
 
 Archivos abiertos por Dev:
-- Dev 1 (RENDIMIENTO-1): `proyecto_maria/main.py` (`upload_pdf_public`,
-  `_suggest_ncm_with_gemini`), `proyecto_maria/pdf_extractor.py` (sólo el
-  lector, ~línea 800) y `requirements.txt`.
-- Dev 2 (MARIA-1a): `proyecto_maria/pdf_extractor.py` (las dos copias del
-  lector) y, si hace falta, la tabla de países de `core/maria_generator.py`.
+- Dev 1 (RENDIMIENTO-1b): `proyecto_maria/main.py` (la adivinanza del
+  vendedor y los tiempos máximos), `security/file_security.py`.
+- Dev 2 (MARIA-1c): `proyecto_maria/pdf_extractor.py` (las dos copias del
+  lector), `static/v2/screens/upload.js` y `static/app.js`.
 
 ## En curso
 
-- **Dev 1:** RENDIMIENTO-1 (incluye cambiar el lector de PDF viejo). Sigue:
-  EXCEL-1, MARIA-1b y PUNTA-A-PUNTA-1.
-- **Dev 2:** MARIA-1a. Sigue: MARIA-2b, MARIA-4 (estado, IVA adicional,
-  banco y empresa de digitalización), MARIA-3 y MARIA-5; MARIA-6 cuando
-  lleguen los archivos reales del despachante.
+- **Dev 1:** RENDIMIENTO-1b (un PDF armado no deja a nadie sin lectura).
+  Sigue: EXCEL-1, MARIA-1b y PUNTA-A-PUNTA-1.
+- **Dev 2:** MARIA-1c (lo que no se pudo leer se avisa). Sigue: MARIA-4
+  (estado, IVA adicional, banco y empresa de digitalización), MARIA-3 y
+  MARIA-5; MARIA-6 cuando lleguen los archivos reales del despachante.
+- **Aceptadas el 2026-10-07 y sin integrar todavía** (se integran después de
+  publicar el ensayo, para que el ensayo sea exactamente lo atacado):
+  RENDIMIENTO-1 (`8fd801d`, suite `730 passed, 102 skipped` con un venv nuevo),
+  MARIA-1a (`0a1775f`, `777 passed`) y MARIA-2b (`c3bef51`, `791 passed`).
+  RENDIMIENTO-1 sale con RENDIMIENTO-1b y MARIA-1a con MARIA-1c.
 - **Aceptadas el 2026-10-07 e integradas:** ADMIN-1 (`ac25dbc`), MARIA-2
   (`65ea6f3`) y ADMIN-2 (`f9f8393`). Suite sobre `f9f8393`, que tiene el
   mismo producto y las mismas pruebas que la rama de PM:
@@ -168,12 +175,11 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 04:00 UTC (rutina; la de las 02:55 no corrió): las dos Devs
-subieron código (Dev 1: RENDIMIENTO-1 hasta `450f2d5`; Dev 2: MARIA-1a hasta
-`4b8fc49`), sin informe todavía. Desde ~02:05 quedaron paradas por el límite
-de uso de la cuenta, que se reinició a las 03:40; sus rutinas las retoman
-(:15 y :35). Contexto: Dev 1 ~41 %, Dev 2 ~38 %. Suite sobre `321f34b`, para
-el ensayo: `716 passed, 102 skipped`.
+2026-10-07 05:35 UTC (rutina): tres entregas revisadas y aceptadas
+(RENDIMIENTO-1, MARIA-1a, MARIA-2b), con su subagente Sonnet alto cada una;
+quedan en las ramas de las Devs hasta después del ensayo. Activas:
+RENDIMIENTO-1b (Dev 1) y MARIA-1c (Dev 2). Contexto: Dev 1 ~41 %, Dev 2 ~52 %
+(Emi pega sus `/compact` a la mañana); PM ~30 %.
 
 ## Medición
 
