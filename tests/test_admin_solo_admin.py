@@ -14,6 +14,7 @@ prueba lo nombra.
 """
 import pytest
 from fastapi.routing import APIRoute
+from starlette.routing import Mount, Route
 from fastapi.testclient import TestClient
 
 from proyecto_maria import main
@@ -49,11 +50,30 @@ def _rutas_de_admin():
                 rutas.add((metodo.upper(), ruta))
     # Las rutas propias de la app que se esconden del esquema
     # (include_in_schema=False) no aparecen arriba: se suman acá.
+    # Lo mismo con las rutas crudas de Starlette (app.router.add_route), que no
+    # pasan por las dependencias de FastAPI ni salen en el esquema (ADMIN-2).
     for r in main.app.routes:
         if isinstance(r, APIRoute) and not r.include_in_schema:
             if r.path.startswith(PREFIJOS_ADMIN) or "admin" in (r.tags or []):
                 rutas.update((m, r.path) for m in r.methods if m != "HEAD")
+        elif isinstance(r, Route) and not isinstance(r, APIRoute):
+            if r.path.startswith(PREFIJOS_ADMIN):
+                rutas.update((m, r.path) for m in (r.methods or {"GET"}) if m != "HEAD")
     return sorted(rutas)
+
+
+def _montajes_sobre_admin():
+    """Apps montadas aparte (app.mount) que cubren rutas de admin.
+
+    Una app montada no hereda require_admin ni se puede recorrer desde afuera:
+    bajo /api/admin/, /api/dev/ o /dev/ no tiene que haber ninguna."""
+    malas = []
+    for r in main.app.routes:
+        if isinstance(r, Mount):
+            base = r.path.rstrip("/") + "/"
+            if any(base.startswith(p) or p.startswith(base) for p in PREFIJOS_ADMIN):
+                malas.append(r.path or "/")
+    return malas
 
 
 def _concreta(ruta):
@@ -111,6 +131,11 @@ def test_usuario_comun_recibe_403_en_toda_ruta_de_admin(rutas):
     assert not abiertas, "rutas de admin abiertas a un usuario común:\n" + "\n".join(abiertas)
 
 
+def test_ninguna_app_montada_sobre_rutas_de_admin(rutas):
+    malas = _montajes_sobre_admin()
+    assert not malas, f"apps montadas sobre rutas de admin, sin require_admin: {malas}"
+
+
 def test_sin_sesion_recibe_401_en_toda_ruta_de_admin(rutas):
     # El nombre apaga el atajo de autenticación de pytest (conftest).
     client = TestClient(main.app)
@@ -148,15 +173,16 @@ def test_admin_sigue_entrando(rutas, ruta):
     assert r.status_code == 200, f"{ruta}: {r.status_code} {r.text[:200]}"
 
 
-def test_admin_por_admin_usernames_entra(rutas, monkeypatch):
-    """Quien es admin por ADMIN_USERNAMES (sin el rol) también entra."""
+@pytest.mark.parametrize("ruta", RUTAS_ADMIN_LECTURA)
+def test_admin_por_admin_usernames_entra(rutas, ruta, monkeypatch):
+    """Quien es admin por ADMIN_USERNAMES (sin el rol) entra a lo mismo (ADMIN-2)."""
     monkeypatch.setenv("ADMIN_USERNAMES", "jefe_admin1")
     _con_usuario({**USUARIO_COMUN, "username": "jefe_admin1", "effective_owner": "jefe_admin1"})
     try:
-        r = TestClient(main.app).get("/api/admin/stats/summary")
+        r = TestClient(main.app).get(ruta)
     finally:
         main.app.dependency_overrides.pop(main.get_current_user, None)
-    assert r.status_code == 200, r.text[:200]
+    assert r.status_code == 200, f"{ruta}: {r.status_code} {r.text[:200]}"
 
 
 def test_admin_borra_errores_viejos(rutas):

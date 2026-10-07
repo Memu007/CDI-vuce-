@@ -65,6 +65,26 @@ sabotaje "cache/refresh niega también al admin" \
   $'    request_data: NCMCacheRefreshRequest,\n    user=Depends(require_admin),' \
   $'    request_data: NCMCacheRefreshRequest,\n    user=Depends(require_admin),\n    _niega=Depends(lambda: (_ for _ in ()).throw(HTTPException(status_code=403))),' \
   'FAILED tests/test_admin_solo_admin.py::test_admin_refresca_cache_ncm'
+sabotaje "ruta cruda de Starlette en /api/dev, fuera del esquema y abierta" \
+  '@app.get("/api/dev/stats")' \
+  'async def _cruda_abierta(request):
+    from starlette.responses import JSONResponse
+    return JSONResponse({"abierta": True})
+
+
+app.router.add_route("/api/dev/cruda", _cruda_abierta, methods=["GET"], include_in_schema=False)
+
+
+@app.get("/api/dev/stats")' \
+  'GET /api/dev/cruda → 200'
+sabotaje "app montada aparte bajo /api/admin, abierta" \
+  '@app.get("/api/dev/stats")' \
+  'from starlette.applications import Starlette as _Starlette
+app.mount("/api/admin/montada", _Starlette())
+
+
+@app.get("/api/dev/stats")' \
+  "apps montadas sobre rutas de admin, sin require_admin: ['/api/admin/montada']"
 sabotaje "cache/refresh pierde la marca admin (la prueba dejaría de verla)" \
   '@app.post("/api/ncm/cache/refresh", tags=["admin"])' '@app.post("/api/ncm/cache/refresh")' \
   "assert ('POST', '/api/ncm/cache/refresh') in ["

@@ -12,7 +12,6 @@ from typing import Dict, Any, List
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, desc, text
 from proyecto_maria.auth.dependencies import get_db
-from proyecto_maria.auth.roles import require_role
 from proyecto_maria.database.models import User, Operation
 
 router = APIRouter(prefix='/api/admin', tags=['admin'])
@@ -340,10 +339,10 @@ async def test_sentry_integration() -> Dict[str, Any]:
 @router.get('/cohort-retention')
 async def get_cohort_retention(
     db: AsyncSession = Depends(get_db),
-    user: dict = Depends(require_role('admin'))
 ) -> Dict[str, Any]:
     """
     Extrae datos de retención de cohortes para los usuarios activos o en trial.
+    El control de admin lo pone el router al montarse (require_admin, ADMIN-2).
     SOLO LECTURA. No expone PII sensible ni tokens.
     """
     # 1. Obtener los usuarios relevantes
