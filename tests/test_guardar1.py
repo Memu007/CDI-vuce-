@@ -96,11 +96,15 @@ def test_si_el_historial_falla_la_operacion_igual_se_guarda(client, monkeypatch)
 
     monkeypatch.setattr(memoria, "upsert_client_product_history", _fila_que_la_base_rechaza)
     cid = _cliente(client)
+    usuario = _sql("select owner_username from clients where id=:c", c=cid)[0][0]
+    antes = _sql("select coalesce(ops_used_this_period, 0) from users where username=:u", u=usuario)[0][0]
     r = _guardar(client, cid, [{"pieza": SIM, "descripcion": "COMPUTADORA PORTATIL", "valor_unitario": 10}])
-    assert r.status_code == 200, r.text
+    assert r.status_code == 200 and r.json()["historial_guardado"] is False, r.text
     op = r.json()["operation_id"]
     assert [p for (p,) in _sql("select pieza from operation_items where operation_id=:o", o=op)] == [SIM]
     assert _historial(cid) == {}
+    # y la operación cuenta para el plan aunque el commit del historial falle
+    assert _sql("select ops_used_this_period from users where username=:u", u=usuario)[0][0] == antes + 1
 
 
 def test_la_operacion_cuenta_para_el_plan_aunque_falle_el_historial(client, monkeypatch):
@@ -134,6 +138,62 @@ def test_editar_un_producto_con_la_sim_completa_no_deja_un_codigo_cortado(client
     r = client.put(f"/api/clientes/{cid}/catalogo/productos/{pid}", json={"ncm": SIM})
     assert r.status_code == 200, r.text
     assert _historial(cid) == {"TABLETA": "84714900"}
-    r = client.put(f"/api/clientes/{cid}/catalogo/productos/{pid}", json={"ncm": "NO-ES-UN-NCM-VALIDO"})
-    assert r.status_code == 400, r.text
+    for malo in ("NO-ES-UN-NCM-VALIDO", "ABC", None, 0, ""):
+        r = client.put(f"/api/clientes/{cid}/catalogo/productos/{pid}", json={"ncm": malo})
+        assert r.status_code == 400, (malo, r.text)
     assert _historial(cid) == {"TABLETA": "84714900"}
+
+
+def test_aprender_no_cuenta_lo_que_no_guardo(client):
+    cid = _cliente(client)
+    r = client.post(f"/api/clientes/{cid}/catalogo/productos/learn",
+                    json={"items": [{"ncm": "SIN-CLASIFICAR", "descripcion": "ALGO"},
+                                    {"ncm": SIM, "descripcion": "COMPUTADORA PORTATIL"}]})
+    assert r.status_code == 200 and r.json()["aprendidos"] == 1, r.text
+    assert _historial(cid) == {"COMPUTADORA PORTATIL": "84714900"}
+
+
+def test_si_falla_el_contador_del_plan_no_queda_una_operacion_gratis(client, monkeypatch):
+    """La operación y el contador del plan van en el mismo commit: si el
+    contador falla, la operación no queda guardada con un 500 en pantalla
+    (el reintento la duplicaba sin contarla)."""
+    from proyecto_maria.services import billing_service
+
+    def _falla(entidad):
+        raise RuntimeError("simulado")
+
+    cid = _cliente(client)
+    monkeypatch.setattr(billing_service, "record_operation_created", _falla)
+    r = _guardar(client, cid, [{"pieza": SIM, "descripcion": "COMPUTADORA PORTATIL"}])
+    assert r.status_code == 500
+    assert _sql("select count(*) from operations where client_id=:c", c=cid)[0][0] == 0
+
+
+def test_la_respuesta_dice_si_el_historial_no_se_guardo(client, monkeypatch):
+    import proyecto_maria.services.client_memory as memoria
+    cid = _cliente(client)
+    r = _guardar(client, cid, [{"pieza": SIM, "descripcion": "COMPUTADORA PORTATIL"}])
+    assert r.json().get("historial_guardado") is True, r.json()
+
+    async def _falla(db, **kwargs):
+        raise RuntimeError("simulado")
+    monkeypatch.setattr(memoria, "upsert_client_product_history", _falla)
+    r = _guardar(client, cid, [{"pieza": SIM, "descripcion": "OTRA COSA"}])
+    assert r.status_code == 200 and r.json().get("historial_guardado") is False, r.json()
+
+
+def test_datos_largos_de_la_operacion_no_impiden_guardarla(client):
+    """Mismo defecto en otras columnas de largo fijo del mismo guardado
+    (Postgres): moneda String(3), origen String(50), fecha de inicio de
+    actividades del cliente String(10); y el carácter NUL, que Postgres no
+    acepta en un texto."""
+    cid = _cliente(client)
+    r = client.post(f"/api/clientes/{cid}/operaciones", json={
+        "currency": "DOLARES", "source": "x" * 80,
+        "comprador_fecha_inic_activ": "2020-01-15T00:00:00",
+        "items": [{"pieza": SIM, "descripcion": "COMPU\x00TADORA", "origen": "CHN", "grupo_id": "g1"}]})
+    assert r.status_code == 200, r.text
+    op = r.json()["operation_id"]
+    assert _sql("select currency, length(source) from operations where id=:o", o=op) == [("DOL", 50)]
+    assert _sql("select descripcion from operation_items where operation_id=:o", o=op) == [("COMPUTADORA",)]
+    assert _sql("select fecha_inic_activ from clients where id=:c", c=cid) == [("2020-01-15",)]
