@@ -377,3 +377,40 @@ def test_el_generador_tampoco_acepta_gastos_invalidos(gastos):
     with pytest.raises(ValueError, match="Gastos"):
         generate_maria_txt(items=[dict(ITEM_BASE)], **{**COMUN, "gastos_fob": gastos,
                                                         "sbt_sufijo_valor": SUF_A})
+
+
+# --- Revisión de la devolución ---------------------------------------------------
+
+@pytest.mark.parametrize("campo, valor", [("flete", float("inf")), ("flete", -500), ("seguro", float("nan")),
+                                          ("seguro", 1e308)])
+@pytest.mark.parametrize("ruta", ["/generate_maria", "/generate_maria/avisos"])
+def test_flete_o_seguro_que_no_son_un_importe_dan_400(client, auth_override, campo, valor, ruta):
+    """Con CIF los gastos salen de flete + seguro: un importe inválido no
+    llega al TXT por ese camino."""
+    r = client.post(ruta, json=_cuerpo(incoterm="CIF", **{campo: valor}))
+    assert r.status_code == 400, r.text
+    assert campo.capitalize() in r.json()["detail"]
+
+
+@pytest.mark.parametrize("campo", ["pais_procedencia", "origen"])
+@pytest.mark.parametrize("valor", ["99999", "²", "٢٢٢"])
+def test_codigo_raro_en_el_producto_da_400_con_mensaje_propio(client, auth_override, campo, valor):
+    r = client.post("/generate_maria", json=_cuerpo(items=[dict(ITEM_BASE, estado=2, **{campo: valor})]))
+    assert r.status_code == 400, r.text
+    assert "invalid literal" not in r.text and valor in r.text
+
+
+def test_procedencia_de_item_en_blanco_no_tapa_la_otra_clave(client, auth_override):
+    item = dict(ITEM_BASE, estado=2, pais_procedencia="  ", procedencia="PE")
+    assert "CARTPAYPRC=222" in _generar(client, procedencia="UY", items=[item])["content"]
+    assert "CARTPAYPRC=222" in _generar(client, items=[item])["content"]
+
+
+def test_gastos_grandes_en_moneda_de_poco_valor_pasan(client, auth_override):
+    data = _generar(client, incoterm="EXW", moneda="CLP", gastos_anteriores_fob=1_200_000_000)
+    assert _valor(data["content"], "GTOS-ANT-FOB") == ["1200000000.00"]
+
+
+def test_sin_productos_los_avisos_tambien_piden_la_fecha(client, auth_override):
+    r = client.post("/generate_maria/avisos", json=_cuerpo(items=[], fecha_emision=""))
+    assert "fecha de emisión" in _texto(r.json()["avisos"])

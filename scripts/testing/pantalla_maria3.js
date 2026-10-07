@@ -42,6 +42,10 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   await page.fill('#f_gastos_anteriores_fob', '150');
   const reqFecha = await page.textContent('label[for="f_fecha_emision"]');
   if (!/requerido/.test(reqFecha)) falla('la fecha de emisión no figura como requerida en la revisión');
+  await page.fill('#f_fecha_emision', '31/02/2026');
+  await page.locator('[data-error-for="fecha_emision"]', { hasText: 'no válida' }).waitFor({ timeout: 5000 }).catch(() => falla('la revisión acepta el 31/02/2026'));
+  await page.fill('#f_fecha_emision', '');
+  console.log('OK la revisión pide la fecha y rechaza el 31/02/2026');
   console.log('OK procedencia: rechaza «Narnia» y acepta Perú; gastos anteriores 150 cargados');
 
   // Validación: los avisos están antes de generar.
