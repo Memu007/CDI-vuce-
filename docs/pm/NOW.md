@@ -76,10 +76,11 @@ Archivos abiertos por Dev:
 
 ## En curso
 
-- **Dev 1:** ADMIN-2. Sigue la Fase 1: RENDIMIENTO-1, DEPENDENCIAS-1,
-  EXCEL-1, MARIA-1b y PUNTA-A-PUNTA-1.
-- **Dev 2:** MARIA-1a. Sigue: MARIA-2b, MARIA-4, MARIA-3, MARIA-4b y
-  MARIA-5.
+- **Dev 1:** ADMIN-2. Sigue la Fase 1: RENDIMIENTO-1 (incluye cambiar el
+  lector de PDF viejo), EXCEL-1, MARIA-1b y PUNTA-A-PUNTA-1.
+- **Dev 2:** MARIA-1a. Sigue: MARIA-2b, MARIA-4 (estado, IVA adicional,
+  banco y empresa de digitalización), MARIA-3 y MARIA-5; MARIA-6 cuando
+  llegue lo del despachante.
 - **Aceptadas el 2026-10-07 e integradas:** ADMIN-1 (`ac25dbc`) y MARIA-2
   (`65ea6f3`). Suite sobre la rama integrada (`78b60c8`):
   `703 passed, 102 skipped`.
@@ -137,9 +138,9 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 02:00 UTC: plan rehecho con el orden de Emi (TXT, cobro,
-seguridad al final). ADMIN-1 y MARIA-2 aceptadas e integradas. PM al ~37 %
-de contexto: compacta en este corte.
+2026-10-07 02:15 UTC: roadmap simplificado a pedido de Emi (una pantalla
+para Emi con «está lista cuando…», el detalle abajo; tres fusiones de
+piezas). PM al ~40 % de contexto: compacta en este corte.
 
 ## Medición
 

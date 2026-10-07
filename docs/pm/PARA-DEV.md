@@ -84,7 +84,8 @@ verde. Autorrevisión con Opus alto y Sonnet alto (es cobro y permisos).
 Emi cambió el orden: **primero todo el camino «PDF o Excel → TXT MARIA»,
 después el cobro, la seguridad al final y exhaustiva** (`ROADMAP.md`).
 Terminá ADMIN-2 y seguí con tu parte de la Fase 1, en este orden:
-RENDIMIENTO-1, DEPENDENCIAS-1, EXCEL-1, MARIA-1b y PUNTA-A-PUNTA-1. Cada una
+RENDIMIENTO-1 (ahora incluye cambiar el lector de PDF viejo), EXCEL-1,
+MARIA-1b y PUNTA-A-PUNTA-1. Cada una
 se te escribe acá cuando arranque; la próxima es la de abajo.
 
 ## Después — RENDIMIENTO-1 (apenas entregues ADMIN-2)
@@ -95,8 +96,13 @@ Leer un PDF no frena el sitio para todos (hallazgo D3). `upload_pdf_public`
 función `async`; lo mismo `_suggest_ncm_with_gemini` (`:6905`, usada en
 `:7027`). Con un solo proceso, mientras se lee un PDF nadie más es atendido.
 
-**Alcance:** que esas llamadas no bloqueen (por ejemplo, `asyncio.to_thread`)
-y que la lectura tenga un tiempo máximo con un error claro. MARIA-2 (Dev 2) ya
+**Alcance:**
+1. Que esas llamadas no bloqueen (por ejemplo, `asyncio.to_thread`) y que la
+   lectura tenga un tiempo máximo con un error claro.
+2. Cambiar el lector de PDF viejo (`PyPDF2==3.0.1`, que se cuelga con un PDF
+   armado: X3 de la auditoría) por su sucesor (`pypdf`), y revisar si
+   `python-jose` y `ecdsa`, con avisos de seguridad, siguen haciendo falta
+   para el token de sesión. MARIA-2 (Dev 2) ya
 cambió `upload_pdf_public` y está integrada en la rama de la PM: traela con
 `merge` antes de arrancar.
 
