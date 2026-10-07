@@ -91,7 +91,7 @@ caso baja_como_desconocida "${T}test_el_aviso_dice_que_paso[85171231-se dio de b
 
 # 3. sin aviso para lo que no está en el vigente
 reemplazar $C "    if not catalogo or codigo in catalogo:" "    if True:"
-caso sin_aviso "${T}test_el_aviso_dice_que_paso[99999999-no está en el nomenclador vigente]"
+caso sin_aviso "${T}test_el_aviso_dice_que_paso[99999999-"
 
 # 4. una NCM vigente avisa en falso
 reemplazar $C "    if not catalogo or codigo in catalogo:" "    if not catalogo:"
