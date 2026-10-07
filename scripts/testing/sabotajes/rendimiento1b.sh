@@ -55,13 +55,23 @@ sabotaje $E "el vendedor vuelve a leer con pdfminer" \
         paginas = []' \
   'FAILED tests/test_rendimiento1b.py::test_el_vendedor_se_adivina_sin_pdfminer_ni_pdfplumber'
 sabotaje $M "los tiempos en 0 o negativos ya no caen al defecto" \
-  '    return valor if valor > 0 else defecto' \
+  '    return valor if math.isfinite(valor) and valor > 0 else defecto' \
   '    return valor' \
   'FAILED tests/test_rendimiento1b.py::test_tiempo_de_lectura_en_cero_o_negativo_usa_el_de_siempre[0]'
 sabotaje $F "el tiempo de validación en 0 o negativo ya no cae al defecto" \
-  '    return valor if valor > 0 else 30.0' \
+  '    return valor if math.isfinite(valor) and valor > 0 else 30.0' \
   '    return valor' \
   'FAILED tests/test_rendimiento1b.py::test_tiempo_de_validacion_en_cero_o_negativo_usa_el_de_siempre[-5]'
+sabotaje $E "el vendedor vuelve a leer páginas de contenido enorme" \
+  '                    continue
+                paginas.append(p.extract_text() or '"''"')' \
+  '                    pass
+                paginas.append(p.extract_text() or '"''"')' \
+  'FAILED tests/test_rendimiento1b.py::test_texto_del_vendedor_no_se_traba_con_un_contenido_enorme'
+sabotaje $M "un tiempo infinito vuelve a apagar el tiempo máximo" \
+  '    return valor if math.isfinite(valor) and valor > 0 else defecto' \
+  '    return valor if valor > 0 else defecto' \
+  'FAILED tests/test_rendimiento1b.py::test_tiempos_infinitos_o_raros_usan_el_de_siempre[inf]'
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"

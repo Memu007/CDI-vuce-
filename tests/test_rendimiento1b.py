@@ -144,3 +144,52 @@ def test_tiempo_de_gemini_en_cero_o_negativo_usa_el_de_siempre(_entorno, monkeyp
     r = asyncio.run(_ir())
     assert r.status_code == 200, r.text[:200]
     assert r.json().get("sugerencias"), r.json()
+
+
+def _pdf_con_contenido_enorme(megas: float) -> bytes:
+    """Una página con un content stream de texto sin comprimir de ~megas MB:
+    pypdf tarda más que lineal en sacarle el texto (revisor de RENDIMIENTO-1b)."""
+    from pypdf import PdfWriter
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+    w = PdfWriter()
+    pagina = w.add_blank_page(600, 800)
+    fuente = DictionaryObject({NameObject("/Type"): NameObject("/Font"),
+                               NameObject("/Subtype"): NameObject("/Type1"),
+                               NameObject("/BaseFont"): NameObject("/Helvetica")})
+    pagina[NameObject("/Resources")] = DictionaryObject({
+        NameObject("/Font"): DictionaryObject({NameObject("/F1"): w._add_object(fuente)})})
+    linea = b"BT /F1 12 Tf 50 700 Td (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa) Tj ET\n"
+    contenido = DecodedStreamObject()
+    contenido.set_data(linea * int(megas * 1024 * 1024 / len(linea)))
+    pagina[NameObject("/Contents")] = w._add_object(contenido)
+    buf = io.BytesIO()
+    w.write(buf)
+    return buf.getvalue()
+
+
+def test_texto_del_vendedor_no_se_traba_con_un_contenido_enorme():
+    from proyecto_maria.pdf_extractor import extraer_texto_pdf_seguro
+    datos = _pdf_con_contenido_enorme(3)
+    t0 = time.monotonic()
+    extraer_texto_pdf_seguro(datos)
+    demora = time.monotonic() - t0
+    assert demora < 1.0, f"sacar el texto de una página de 3 MB tardó {demora:.2f} s"
+
+
+def test_el_vendedor_se_busca_en_las_primeras_paginas():
+    """Con un PDF normal de dos páginas, el texto de la primera sigue estando."""
+    from proyecto_maria.pdf_extractor import extraer_texto_pdf_seguro, detect_vendor_from_text
+    texto = extraer_texto_pdf_seguro(_pdf_con_texto(["VENDOR: ACME TRADING CO LTD", "Item 1"]))
+    assert detect_vendor_from_text(texto) == "ACME TRADING CO LTD"
+
+
+@pytest.mark.parametrize("valor", ["inf", "1e309", "nan", "  "])
+def test_tiempos_infinitos_o_raros_usan_el_de_siempre(monkeypatch, valor):
+    from proyecto_maria.security import file_security
+    for variable in ("PDF_READ_TIMEOUT_S", "PDF_VALIDATE_TIMEOUT_S",
+                     "PDF_VENDOR_TIMEOUT_S", "NCM_GEMINI_TIMEOUT_S"):
+        monkeypatch.setenv(variable, valor)
+    assert main._pdf_read_timeout_s() == 120.0
+    assert main._pdf_vendor_timeout_s() == 15.0
+    assert main._segundos_de_entorno("NCM_GEMINI_TIMEOUT_S", 30.0) == 30.0
+    assert file_security._pdf_validate_timeout_s() == 30.0
