@@ -236,3 +236,21 @@ def test_un_libro_de_una_hoja_no_avisa_hojas():
     r = _subir_libro({"Factura": [H, ["84713000", "Laptop", "CN", 10, 350, 1.5]]})
     assert r.status_code == 200, r.text[:300]
     assert "hojas_excel_sin_leer" not in r.json()["operacion"]
+
+
+@pytest.mark.parametrize("incoterm", ["FAS", "DAT", "DDU"])
+def test_incoterms_que_la_pantalla_ofrece_o_el_generador_reconoce_dejan_generar(incoterm):
+    """FAS está en la lista de la revisión; DAT y DDU los reconoce el generador."""
+    r = _generar(incoterm=incoterm)
+    assert r.status_code == 200, r.text[:300]
+
+
+def test_si_mirar_las_otras_hojas_falla_la_subida_sigue(monkeypatch):
+    """Es sólo un aviso: no tira abajo una subida que se lee bien."""
+    def _falla(*a):
+        raise RuntimeError("libro raro")
+    monkeypatch.setattr(main, "_otras_hojas_con_datos", _falla)
+    r = _subir_libro({"Factura": [H, ["84713000", "Laptop", "CN", 10, 350, 1.5]],
+                      "Hoja2": [H, ["85171300", "Telefono", "CN", 5, 100, 0.2]]})
+    assert r.status_code == 200, r.text[:300]
+    assert len(r.json()["items"]) == 1
