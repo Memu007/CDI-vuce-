@@ -25,6 +25,8 @@ referencia de la factura sale del número de operación (D25).
 """
 import io
 import json
+import math
+import os
 import re
 import sys
 import types
@@ -134,6 +136,41 @@ def _sin_relleno(txt: str) -> list:
     return [ln.rstrip() for ln in txt.replace("\r\n", "\n").rstrip("\n").split("\n")]
 
 
+def _numero_js(v) -> float:
+    """toNumber de finalize.js: Number(v) y, si no es finito, 0. Number()
+    acepta espacios alrededor, «0x10» y «1e3», y no «1_000» ni «inf»."""
+    if v is None or isinstance(v, bool):
+        return float(bool(v))
+    if isinstance(v, (int, float)):
+        return float(v) if math.isfinite(v) else 0.0
+    t = str(v).strip()
+    if t == "":
+        return 0.0
+    if re.fullmatch(r"0[xX][0-9a-fA-F]+", t):
+        return float(int(t, 16))
+    if not re.fullmatch(r"[+-]?(\d+\.?\d*|\.\d+)([eE][+-]?\d+)?", t):
+        return 0.0
+    n = float(t)
+    return n if math.isfinite(n) else 0.0
+
+
+def _formatear_ncm(raw: str) -> str:
+    """CDI.formatNcm (app_v2.js): lo que el paso de NCM guarda en it.pieza,
+    con puntos y la letra separada: «8479.89.99.900 H»."""
+    s = str(raw or "").strip()
+    letra = s[-1].upper() if s and s[-1].isascii() and s[-1].isalpha() else ""
+    d = re.sub(r"[^0-9]", "", s)[:11]
+    if len(d) <= 4:
+        base = d
+    elif len(d) <= 6:
+        base = d[:4] + "." + d[4:]
+    elif len(d) <= 8:
+        base = d[:4] + "." + d[4:6] + "." + d[6:]
+    else:
+        base = d[:4] + "." + d[4:6] + "." + d[6:8] + "." + d[8:]
+    return base + (" " + letra if letra else "")
+
+
 def _leer(path: str) -> str:
     with open(path, "r", newline="") as f:
         return f.read()
@@ -219,9 +256,10 @@ class _Pantalla:
         self.items = [dict(it) for it in data["items"]]
 
     def revisar(self, ncm: str, campos: dict, despachante: dict, estados: list):
-        # Paso de NCM: la NCM elegida queda en it.pieza (ncm.js).
+        # Paso de NCM: la NCM elegida queda en it.pieza con el formato de la
+        # pantalla (ncm.js, CDI.formatNcm).
         for it in self.items:
-            it["pieza"] = ncm
+            it["pieza"] = _formatear_ncm(ncm)
         # Revisión: lo que la persona escribe va a CDI.state.operacion.
         self.operacion.update(campos)
         # Tarjeta del despachante: lo elegido va a operacion.despachante y el
@@ -240,9 +278,9 @@ class _Pantalla:
         return [{"pieza": str(it.get("pieza") or "").strip(),
                  "descripcion": str(it.get("descripcion") or "").strip(),
                  "origen": str(it.get("origen") or "XX").strip().upper() or "XX",
-                 "cantidad": float(it.get("cantidad") or 0),
-                 "valor_unitario": float(it.get("valor_unitario") or 0),
-                 "peso_unitario": float(it.get("peso_unitario") or 0)} for it in self.items]
+                 "cantidad": _numero_js(it.get("cantidad")),
+                 "valor_unitario": _numero_js(it.get("valor_unitario")),
+                 "peso_unitario": _numero_js(it.get("peso_unitario"))} for it in self.items]
 
     def _cabecera(self):
         """cabeceraParaValidar (finalize.js)."""
@@ -254,16 +292,12 @@ class _Pantalla:
         op = self.operacion
         factura = str(op.get("numero_factura") or "").strip()
         assert factura, "sin número de factura la pantalla usa la hora: OP_<fecha>"
-        operation_id = "FAC_" + "".join(c for c in factura if c.isalnum() or c in "_-")
+        operation_id = "FAC_" + re.sub(r"[^a-zA-Z0-9_-]", "", factura)
 
         def texto(v):
             return str(v or "").strip()
 
-        def numero(v):
-            try:
-                return float(v)
-            except (TypeError, ValueError):
-                return 0.0
+        numero = _numero_js
 
         items = [{
             "pieza": texto(it.get("pieza")), "descripcion": texto(it.get("descripcion")),
@@ -286,10 +320,10 @@ class _Pantalla:
         return {
             "operation_id": operation_id, "items": items, **despachante,
             "moneda": texto(op.get("moneda")).upper(), "incoterm": texto(op.get("incoterm")).upper(),
-            "cuit_agr": str(op.get("cuit_agr") or self.usuario.get("cuit") or "").replace("-", "").replace(" ", ""),
+            "cuit_agr": re.sub(r"[-\s]", "", str(op.get("cuit_agr") or self.usuario.get("cuit") or "")),
             "vendedor_nombre": texto(op.get("vendedor_nombre")), "vendedor_id": texto(op.get("vendedor_id")),
             "comprador_nombre": texto(op.get("comprador_nombre")),
-            "comprador_cuit": str(op.get("comprador_cuit") or "").replace("-", "").replace(" ", ""),
+            "comprador_cuit": re.sub(r"[-\s]", "", str(op.get("comprador_cuit") or "")),
             "comprador_domicilio": texto(op.get("comprador_domicilio")),
             "comprador_fecha_inic_activ": texto(op.get("comprador_fecha_inic_activ")),
             "flete": numero(op.get("flete")), "seguro": numero(op.get("seguro")),
@@ -320,6 +354,10 @@ class _Pantalla:
         assert "attachment" in bajada.headers.get("content-disposition", "")
         txt = bajada.content.decode("utf-8")
         assert txt == data["content"], "lo descargado no es lo que mostró la pantalla"
+        # Que las corridas no dejen archivos en data/descargas.
+        archivo = os.path.join(main._user_downloads_dir(self.usuario["username"]), data["filename"])
+        if os.path.exists(archivo):
+            os.remove(archivo)
         return txt, pedido["operation_id"]
 
 
@@ -399,3 +437,51 @@ def test_el_recorrido_pasa_por_el_login_y_el_csrf_de_verdad(monkeypatch):
     monkeypatch.setattr("proyecto_maria.auth.dependencies._is_testing_runtime", lambda: False)
     sin_sesion = p.http.post("/generate_maria", json=p.pedido())
     assert sin_sesion.status_code == 401, sin_sesion.text[:200]
+
+
+def test_una_factura_con_coma_decimal_da_el_mismo_archivo(monkeypatch):
+    """La misma factura escrita a la europea: «5.000,00», «3.221,66»."""
+    factura = {**FACTURA, "gemini": {
+        "operacion": {**FACTURA["gemini"]["operacion"], "flete": "3.221,66", "seguro": "50,00"},
+        "items": [{**FACTURA["gemini"]["items"][0], "valor_unitario": "5.000,00", "peso_kg": "1.220,00"}],
+    }}
+    txt, operation_id = _por_pdf(monkeypatch, factura).generar_y_descargar()
+    assert txt == _como_sale_por_la_pantalla(_leer(_GOLDEN_PATH), "000999001", operation_id)
+
+
+def _bloques(txt: str, nombre: str) -> list:
+    """Los bloques [nombre] del TXT como diccionarios clave → valor."""
+    bloques = []
+    for parte in txt.replace("\r\n", "\n").split("\n\n"):
+        lineas = [l for l in parte.split("\n") if l]
+        if lineas and lineas[0] == f"[{nombre}]":
+            bloques.append(dict(l.split("=", 1) for l in lineas[1:]))
+    return bloques
+
+
+def test_dos_productos_reparten_flete_y_seguro_por_su_fob(monkeypatch):
+    """El archivo real tiene un solo producto: con dos se ve el prorrateo.
+    FOB 3000 y 2000 (5000 en total), flete 3221,66 y seguro 50."""
+    factura = {**FACTURA, "gemini": {
+        "operacion": FACTURA["gemini"]["operacion"],
+        "items": [
+            {"descripcion": "MAQUINA DEMO GRANDE", "cantidad": "1", "valor_unitario": "3000.00",
+             "peso_kg": "700", "origen": "Argentina"},
+            {"descripcion": "MAQUINA DEMO CHICA", "cantidad": "2", "valor_unitario": "1000.00",
+             "peso_kg": "260", "origen": "Argentina"},
+        ],
+    }, "estados": ["3", "3"]}
+    txt, _ = _por_pdf(monkeypatch, factura).generar_y_descargar()
+    ddt = _bloques(txt, "DDT")[0]
+    arts = _bloques(txt, "ART")
+    assert ddt["MDDTFOB"] == "5000.00" and len(arts) == 2, (ddt, arts)
+    assert [a["MARTFOB"] for a in arts] == ["3000.00", "2000.00"]
+    # El peso con más de una unidad no se mira acá: si «peso_unitario» es de una
+    # unidad o de la línea lo está cambiando MARIA-5 (Dev 2).
+    # Flete y seguro, en proporción al FOB de cada producto.
+    for a, parte in zip(arts, (0.6, 0.4)):
+        assert abs(float(a["MARTFLE"]) - 3221.66 * parte) <= 0.01, a
+        assert abs(float(a["MARTASS"]) - 50 * parte) <= 0.01, a
+        assert abs(float(a["MARTBASIMP"]) - (float(a["MARTFOB"]) + float(a["MARTFLE"])
+                                             + float(a["MARTASS"]))) <= 0.01, a
+    assert abs(sum(float(a["MARTFLE"]) for a in arts) - float(ddt["MDDTFLE"])) <= 0.01
