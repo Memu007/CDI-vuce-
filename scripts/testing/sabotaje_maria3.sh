@@ -80,7 +80,11 @@ fi
 echo "VERDE  sin sabotaje: $(grep -E 'passed' <<<"$base" | tail -1)"
 
 # 1. los gastos anteriores de la pantalla no llegan al TXT
-reemplazar $G "    return importe if importe > 0 else None" "    return None"
+reemplazar $G "        return None
+    return importe
+" "        return None
+    return None
+"
 caso gastos_no_llegan "${T}test_gastos_anteriores_de_la_pantalla_llegan_al_txt[EXW]"
 
 # 2. FAS sin gastos anteriores
@@ -98,7 +102,7 @@ reemplazar $G '    if str(incoterm or "").strip().upper() not in INCOTERMS_GASTO
 caso gastos_con_cualquier_condicion "${T}test_gastos_anteriores_con_otra_condicion_no_van_y_se_avisa[FOB]"
 
 # 5. un 0 se declara
-reemplazar $G "    return importe if importe > 0 else None" "    return importe if importe >= 0 else None"
+reemplazar $G "round(importe, 2) <= 0" "round(importe, 2) < 0"
 caso cero_se_declara "${T}test_exw_sin_gastos_anteriores_no_inventa_y_avisa[0]"
 
 # 6. no se avisa que los gastos cargados no van
@@ -170,5 +174,13 @@ caso iext_del_anio_de_hoy "${T}test_una_fecha_que_no_se_acepta_no_cambia_el_anio
 reemplazar $M "    if not pais_de_la_tabla(procedencia):" "    if not pais_reconocido(procedencia):"
 caso procedencia_fuera_de_la_tabla "${T}test_procedencia_no_reconocida_se_rechaza[99999]"
 
+# 19. un importe infinito se declara
+reemplazar $G "    if not math.isfinite(importe) or round(importe, 2) <= 0:" "    if round(importe, 2) <= 0:"
+caso gastos_infinitos "${T}test_gastos_que_no_son_un_importe_no_van[inf]"
+
+# 20. un año antes de 1900 sale en el TXT
+reemplazar $G '    return fecha.strftime("%d/%m/%Y") if fecha.year >= 1900 else ""' '    return fecha.strftime("%d/%m/%Y")'
+caso anio_0026 "${T}test_sin_fecha_leida_sale_vacia_nunca_la_de_hoy[05/03/0026]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 18 sabotajes dan rojo por la razón esperada"
+echo "OK: los 20 sabotajes dan rojo por la razón esperada"
