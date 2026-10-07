@@ -62,7 +62,7 @@ reemplazar $G '                                               ("valor_unitario",
 caso sin_valor "${T}test_el_error_dice_que_subitem_falla[pares2-1-valor unitario]"
 
 # 3. el error no dice qué subítem
-reemplazar $G '                            f"Item {idx}, sub-ítem {n}: {nombre} «{str(crudo)[:20]}» tiene que ser "' '                            f"Item {idx}: {nombre} «{str(crudo)[:20]}» tiene que ser "'
+reemplazar $G '                            f"Item {n_item}, sub-ítem {n}: {nombre} «{str(crudo)[:20]}» tiene que ser "' '                            f"Item {n_item}: {nombre} «{str(crudo)[:20]}» tiene que ser "'
 caso sin_numero_de_subitem "${T}test_el_error_llega_a_la_pantalla"
 
 # 4. un grupo con subítems pasa
@@ -84,5 +84,16 @@ caso sufijo_sin_subitem "${T}test_el_error_del_sufijo_dice_que_subitem["
 reemplazar $M "            if not isinstance(_subs, list) or not all(isinstance(_s, dict) for _s in _subs):" "            if False:"
 caso forma_500 "${T}test_un_pedido_mal_armado_da_400_y_no_500[subitems0]"
 
+# --- Devolución (puntos 7 y 10) ---
+C=proyecto_maria/core/controles_maria.py
+
+# 8. los controles de antes de generar revientan con subitems=5
+reemplazar $C "        for m, sub in enumerate(subitems if isinstance(subitems, list) else [], start=1):" "        for m, sub in enumerate(subitems or [], start=1):"
+caso controles_500 "${T}test_subitems_que_no_son_una_lista_dan_400_y_no_500[5]"
+
+# 9. el error del sub-ítem dice la línea del TXT y no el producto de la pantalla
+reemplazar $G "            n_item = lugar_en_el_pedido.get(id(item), idx)" "            n_item = idx"
+caso numero_de_linea "${T}test_el_error_del_subitem_dice_el_numero_de_la_pantalla["
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 7 sabotajes dan rojo por la razón esperada"
+echo "OK: los 9 sabotajes dan rojo por la razón esperada"

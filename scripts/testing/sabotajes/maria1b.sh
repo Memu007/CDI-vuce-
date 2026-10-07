@@ -150,7 +150,7 @@ sabotaje $C "NaN e inf vuelven a pasar en la cantidad" \
   '        if False:' \
   "FAILED $D::test_nan_o_inf_en_un_producto_no_dejan_generar[cantidad-"
 sabotaje $C "los subítems dejan de controlarse" \
-  '        for m, sub in enumerate(item.get("subitems") or [], start=1):' \
+  '        for m, sub in enumerate(subitems if isinstance(subitems, list) else [], start=1):' \
   '        for m, sub in enumerate([], start=1):' \
   "FAILED $D::test_nan_o_inf_en_un_subitem_no_dejan_generar"
 sabotaje $C "los montos que desbordan al multiplicar vuelven a pasar" \
