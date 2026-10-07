@@ -21,6 +21,26 @@ from proyecto_maria import pdf_extractor
 CODIGO = "lectura_automatica_no_disponible"
 
 
+def _instalar_gemini_falso(monkeypatch, modelo):
+    falso = types.SimpleNamespace(configure=lambda **kw: None, GenerativeModel=modelo)
+    google = sys.modules.get("google") or types.ModuleType("google")
+    monkeypatch.setitem(sys.modules, "google", google)
+    monkeypatch.setattr(google, "generativeai", falso, raising=False)
+    monkeypatch.setitem(sys.modules, "google.generativeai", falso)
+
+
+class _GeminiProhibido:
+    def __init__(self, nombre):
+        raise AssertionError("la prueba intentó llamar a Gemini")
+
+
+@pytest.fixture(autouse=True)
+def _sin_gemini_real(monkeypatch):
+    """Ninguna prueba de este archivo puede llegar a Gemini ni a internet."""
+    _instalar_gemini_falso(monkeypatch, _GeminiProhibido)
+    monkeypatch.setattr("time.sleep", lambda s: None)
+
+
 def _pdf_en_blanco() -> bytes:
     from PyPDF2 import PdfWriter
 
@@ -48,9 +68,10 @@ def _sin_demo(texto: str):
     [
         {"GEMINI_API_KEY": None},
         {"GEMINI_API_KEY": "", "ENABLE_PDF_LLM_FALLBACK": "true"},
+        {"GEMINI_API_KEY": "  \n", "ENABLE_PDF_LLM_FALLBACK": "true"},
         {"GEMINI_API_KEY": "test-key", "ENABLE_PDF_LLM_FALLBACK": "false"},
     ],
-    ids=["sin_clave", "clave_vacia", "lector_apagado"],
+    ids=["sin_clave", "clave_vacia", "clave_en_blanco", "lector_apagado"],
 )
 def test_endpoint_sin_lector_no_inventa_productos(client, auth_override, monkeypatch, entorno):
     for k, v in entorno.items():
@@ -63,7 +84,7 @@ def test_endpoint_sin_lector_no_inventa_productos(client, auth_override, monkeyp
 
     assert r.status_code == 503, r.text
     body = r.json()
-    assert body.get("codigo") == CODIGO
+    assert body.get("code") == CODIGO
     assert "cargá los productos a mano" in body.get("detail", "")
     assert not body.get("items")
     _sin_demo(r.text)
@@ -101,12 +122,7 @@ def test_con_clave_inventada_sigue_leyendo_con_el_modelo(client, auth_override, 
         def generate_content(self, partes):
             return types.SimpleNamespace(text=json.dumps(respuesta))
 
-    falso = types.SimpleNamespace(configure=lambda **kw: None, GenerativeModel=_Modelo)
-    google = sys.modules.get("google") or types.ModuleType("google")
-    monkeypatch.setitem(sys.modules, "google", google)
-    monkeypatch.setattr(google, "generativeai", falso, raising=False)
-    monkeypatch.setitem(sys.modules, "google.generativeai", falso)
-    monkeypatch.setattr("time.sleep", lambda s: None)
+    _instalar_gemini_falso(monkeypatch, _Modelo)
 
     r = _subir(client)
 
@@ -128,3 +144,15 @@ def test_sin_lector_no_gasta_cuota_diaria(client, auth_override, monkeypatch):
     assert _subir(client).status_code == 503
 
     assert ai_quota._counter.get(clave, 0) == antes
+
+
+def test_sin_lector_un_archivo_invalido_sigue_dando_error_de_validacion(client, auth_override, monkeypatch):
+    """Sin clave, un archivo que no es un PDF válido recibe el 400 de
+    siempre, no la invitación a cargar a mano."""
+    monkeypatch.delenv("GEMINI_API_KEY", raising=False)
+    r = client.post(
+        "/upload_pdf/public",
+        files={"file": ("factura.pdf", b"esto no es un pdf", "application/pdf")},
+    )
+    assert r.status_code == 400, r.text
+    assert r.json().get("code") != CODIGO

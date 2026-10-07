@@ -9,9 +9,10 @@ SHA="${1:-HEAD}"
 VENV="${2:-${VENV:-/tmp/cdi-dev2/venv}}"
 REPO="$(git rev-parse --show-toplevel)"
 SHA="$(git -C "$REPO" rev-parse "$SHA")"
-WT="$(mktemp -d)/sabotaje-maria2"
+TMP="$(mktemp -d)"
+WT="$TMP/sabotaje-maria2"
 git -C "$REPO" worktree add --detach "$WT" "$SHA" >/dev/null
-trap 'git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1 || true' EXIT
+trap 'git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1 || true; rm -rf "$TMP"' EXIT
 cd "$WT"
 
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
@@ -65,20 +66,31 @@ reemplazar proyecto_maria/pdf_extractor.py \
   'return [{"pieza": "", "descripcion": "ITEM DEMOSTRACION (Falta API Key)", "cantidad": 10.0, "valor_unitario": 150.0, "origen": "CN", "peso_unitario": 1.0}]'
 caso "vuelve_la_demo" "ITEM DEMOSTRACION"
 
+# 1b. vuelve la demo y el endpoint no pregunta antes: llega a la pantalla
+reemplazar proyecto_maria/pdf_extractor.py \
+  "raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)" \
+  'return [{"pieza": "", "descripcion": "ITEM DEMOSTRACION (Falta API Key)", "cantidad": 10.0, "valor_unitario": 150.0, "origen": "CN", "peso_unitario": 1.0}]'
+reemplazar proyecto_maria/main.py \
+  "        if not lectura_automatica_disponible():
+            # Sin lector con IA: cero productos, sin descontar" \
+  "        if False:
+            # Sin lector con IA: cero productos, sin descontar"
+caso "demo_en_pantalla" "FAILED tests/test_maria2_sin_clave_gemini.py::test_endpoint_sin_lector_no_inventa_productos[sin_clave]"
+
 # 2. el endpoint descuenta la cuota antes de saber si hay lector
 reemplazar proyecto_maria/main.py \
-  "    if not lectura_automatica_disponible():
-        # Sin lector con IA: cero productos, sin descontar" \
-  "    if False:
-        # Sin lector con IA: cero productos, sin descontar"
+  "        if not lectura_automatica_disponible():
+            # Sin lector con IA: cero productos, sin descontar" \
+  "        if False:
+            # Sin lector con IA: cero productos, sin descontar"
 caso "gasta_cuota" "FAILED tests/test_maria2_sin_clave_gemini.py::test_sin_lector_no_gasta_cuota_diaria"
 
 # 2b. además no atrapa el error propio (cae al 500 genérico)
 reemplazar proyecto_maria/main.py \
-  "    if not lectura_automatica_disponible():
-        # Sin lector con IA: cero productos, sin descontar" \
-  "    if False:
-        # Sin lector con IA: cero productos, sin descontar"
+  "        if not lectura_automatica_disponible():
+            # Sin lector con IA: cero productos, sin descontar" \
+  "        if False:
+            # Sin lector con IA: cero productos, sin descontar"
 reemplazar proyecto_maria/main.py \
   "        except LecturaAutomaticaNoDisponible as e:" \
   "        except ZeroDivisionError as e:"
@@ -102,9 +114,15 @@ caso "robust_sin_atrapar" "LecturaAutomaticaNoDisponible"
 
 # 5. el 503 sin el código que distingue la pantalla
 reemplazar proyecto_maria/main.py \
-  '"codigo": "lectura_automatica_no_disponible"' \
-  '"codigo": ""'
+  '"code": "lectura_automatica_no_disponible"' \
+  '"code": ""'
 caso "sin_codigo" "lectura_automatica_no_disponible"
 
+# 6. una clave hecha de espacios cuenta como clave
+reemplazar proyecto_maria/pdf_extractor.py \
+  "bool((os.environ.get('GEMINI_API_KEY') or '').strip())" \
+  "bool(os.environ.get('GEMINI_API_KEY'))"
+caso "clave_en_blanco" "FAILED tests/test_maria2_sin_clave_gemini.py::test_endpoint_sin_lector_no_inventa_productos[clave_en_blanco]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 6 sabotajes dan rojo por la razón esperada"
+echo "OK: los 8 sabotajes dan rojo por la razón esperada"
