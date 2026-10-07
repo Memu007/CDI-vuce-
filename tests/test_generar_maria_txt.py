@@ -605,7 +605,7 @@ def test_agrupacion_2_items_mismo_grupo_genera_2_art():
     - Mesa (grupo 1): cant=2, valor=20, peso=1
     - Lámpara (sin grupo): cant=5, valor=10, peso=0.5
 
-    Grupo 1 combinado: cant=4, valor_total=140, peso=4
+    Grupo 1 combinado: cant=4, valor_total=140, peso=2*3+2*1=8 (MARIA-5)
     """
     items = [
         {"pieza": "94037000", "descripcion": "Silla de madera de roble", "cantidad": 2,
@@ -623,8 +623,9 @@ def test_agrupacion_2_items_mismo_grupo_genera_2_art():
     # Grupo combinado: MARTFOB = 2*50 + 2*20 = 140
     assert "MARTFOB=140.00" in txt, f"Falta MARTFOB=140.00 en txt"
 
-    # Grupo combinado: QARTKGRNET = 3+1 = 4 (peso sumado)
-    assert "QARTKGRNET=4.000" in txt, f"Falta QARTKGRNET=4.000 en txt"
+    # Grupo combinado: QARTKGRNET = 2*3 + 2*1 = 8, el peso total de cada línea
+    # (MARIA-5, respuesta 3 del despachante; antes sumaba los unitarios: 4).
+    assert "QARTKGRNET=8.000" in txt, f"Falta QARTKGRNET=8.000 en txt"
 
     # Grupo combinado: QARTUNTDCL = 2+2 = 4 (cantidad sumada)
     assert "QARTUNTDCL=4.00" in txt, f"Falta QARTUNTDCL=4.00 en txt"
