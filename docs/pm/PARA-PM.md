@@ -2,293 +2,173 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## COBRO-CORTE-1 — frenada antes de codear: D4, D5 y D6
-
-ADMIN-1 sigue entregada más abajo, sin cambios. Empecé COBRO-CORTE-1
-leyendo el flujo real, y hay tres cosas de dinero y datos que cambian el
-resultado. No escribí código.
-
-**Lo que encontré.**
-- `/generate_maria` no mira ninguna operación guardada. Recibe los ítems y
-  un `operation_id` que inventa el navegador: `FAC_<factura>` o
-  `OP_<fecha y hora>` (`static/v2/screens/finalize.js:358`). Después del
-  TXT, la pantalla guarda la operación con `POST /api/clientes/{id}/operaciones`,
-  que es la que cuenta (`main.py:5527`), y **sólo si hay un cliente activo**.
-  Con la pantalla de «operación sin cliente» el MARIA sale y nunca se cuenta.
-- La operación guardada recibe un id nuevo cada vez (`uuid4`, `main.py:5452`).
-  No hay nada que una el TXT generado con la operación contada. Volver a
-  guardar la misma operación la cuenta de nuevo. Hoy lo evita sólo el
-  navegador.
-- Sólo dos lugares crean operaciones, y los dos cuentan: `main.py:3181`
-  (manual) y `:5451`.
-
-- **D4 — Cómo sabe `/generate_maria` si la operación «ya se contó».**
-  (a) Sólo cortar por estado de cobro (402 si está vencido o impago) y
-  seguir contando únicamente al guardar. Es lo mínimo, pero el MARIA sin
-  cliente sigue saliendo gratis.
-  (b) La primera vez que se genera un `operation_id` del usuario, crear la
-  operación (sin cliente, `source="maria"`) y contarla. Las descargas
-  siguientes con el mismo id no cuentan, y el guardado posterior usa esa
-  operación en vez de crear y contar otra. No hace falta cambiar el
-  esquema: `client_id` ya acepta vacío. Sí hay que tocar `finalize.js`
-  para que guarde con el id del MARIA. Hueco: quien reuse siempre el mismo
-  id genera MARIAs distintos pagando una.
-  (c) Como (b), pero con el id calculado por el servidor a partir del
-  contenido (ítems y sufijo). Cierra el hueco de (b), pero corregir un
-  ítem y volver a generar cuenta otra vez.
-  **Recomiendo (b)**: cumple «se cuenta una vez» sin migración. Al hueco le
-  pongo un límite: un mismo `operation_id` no puede pasar de N regeneraciones
-  con contenido distinto. El N lo decidís vos; propongo 10.
-- **D5 — Qué corte va en las rutas que gastan Gemini o generan valor**
-  (`/upload_pdf/public`, `/upload_excel`, `/api/validate/smart`,
-  `/api/ncm/sugerir`, `/api/migrations/*`). `require_active_billing` corta
-  por estado **y** por tope del plan. Con eso, quien pagó y usó sus 15
-  operaciones tampoco podría subir un PDF ni validar una operación ya
-  contada.
-  (a) Sólo por estado: vencido o impago → 402. El tope se mira sólo donde
-  se cuenta una operación.
-  (b) Estado y tope en todas.
-  **Recomiendo (a)**: «quien no paga no genera valor», sin trabar al que pagó.
-- **D6 — Carreras (C6) sin migración de esquema.**
-  (a) Bloquear la fila de la cuenta (`SELECT … FOR UPDATE` del usuario o de
-  la organización) mientras se mira el tope, se cuenta y se calcula el
-  `op_code`, todo en una transacción. Serializa por cuenta y no cambia el
-  esquema. Lo pruebo con pedidos al mismo tiempo en un Postgres local:
-  está instalado el 16.
-  (b) Además, un índice único `(owner_username, op_code)`. Es una migración,
-  y fallaría si producción ya tiene códigos repetidos; habría que mirar
-  antes.
-  **Recomiendo (a)** ahora y (b) como pieza aparte, si querés la garantía en
-  la base.
-
-Mientras no contestes, no avanzo con COBRO-CORTE-1: las tres D cambian el
-código.
-
----
-
-## ADMIN-1 — entregada, terminada
+## ADMIN-2 — entregada, terminada
 
 | | SHA |
 |---|---|
-| Base (tu rama al arrancar) | `cb8f509` |
-| Producto | `c7029e8` (fix) + `2d76015` (sólo docstrings) |
-| Pruebas y sabotajes | `2c1d195`, `06881d1`, `76a2b42`, `71118ee`, `ac25dbc` |
-| **Entrego (código)** | **`ac25dbc`**; encima, el merge de tu rama (sólo docs) y este informe |
+| Base (mi rama con la tuya traída, `efef997`) | `6c3ba09` |
+| Producto | `8808ef8` (fix) + `c08ea3f` (refactor de los conectores) |
+| Pruebas y sabotajes | `d74a74f`, `50d3a0b` |
+| **Entrego (código)** | **`50d3a0b`** |
 
-Resultado: `/api/admin/*` y `/api/ncm/cache/refresh` exigen admin. Un
-usuario común recibe 403 en cada ruta de admin y en la global; el admin
-entra igual que antes; el panel `/dev/dashboard` anda. Suite completa en
-verde sobre `ac25dbc`.
+ADMIN-1 sigue en tu revisión (código `ac25dbc`). Su informe completo, con las
+D1 a D3 que ya contestaste, está en el commit `f413c45` de este archivo.
+
+Resultado, punto por punto:
+1. `/api/system/connectors`: el usuario común recibe sólo
+   `{"vuce":{"mode":…},"tarifar":{"mode":…},"afip":{"mode":…}}`. El admin
+   (por rol o por `ADMIN_USERNAMES`) recibe el detalle de antes.
+2. `POST /api/payments/simulate-webhook` está borrada (404). Sólo la usaba
+   ella misma: ningún script, prueba ni pantalla la llamaba.
+3. `cohort-retention` ya no pide el rol aparte. El admin por variable entra.
+   La prueba de rutas de admin ahora recorre todas las de lectura también con
+   un admin por `ADMIN_USERNAMES`.
 
 ## Decisiones
 
-- **D1 — `GET /api/system/connectors` (global, la usa la pantalla común).**
-  Muestra a cualquier usuario logueado la configuración del sistema: modo y
-  `base_url` de VUCE y Tarifar, si hay clave, CUIT y certificado de AFIP, y
-  el user-agent del scraper. Lo consume la barra superior de todos
-  (`static/v2/topbar_financials.js:88`, el chip «Sistema/Demo»). Por la
-  regla de la tarea no la toqué.
-  Opciones: (a) dejarla como está; (b) al usuario común darle sólo el `mode`
-  de cada conector y el detalle completo sólo al admin (el chip sigue
-  andando); (c) `require_admin` (el chip queda en «unknown» para todos).
-  **Recomiendo (b)**: es chica y no cambia nada visible. Sería una pieza
-  aparte o un agregado a esta.
-- **D2 — `POST /api/payments/simulate-webhook` (global que activa cobro).**
-  Le activa premium a **cualquier** usuario del body, sin sesión: sólo pide
-  el header `X-Webhook-Secret` igual a `MP_WEBHOOK_SECRET`, el mismo secreto
-  que el webhook real de MP. Donde MP esté configurado, ese endpoint queda
-  vivo en producción, aunque su docstring diga «sólo staging». Lo reprodujo
-  el revisor Sonnet con un secreto local: sin sesión, `trial` → `active`. No
-  lo usa el frontend. No la toqué: es cobro y MP está fuera de alcance.
-  Opciones: (a) borrarla; (b) `require_admin` + 404 si `IS_PRODUCTION`;
-  (c) dejarla para COBRO-MP. **Recomiendo (a)** antes de publicar; si se
-  quiere conservar para staging, (b).
-- **D3 — `/api/admin/cohort-retention` pide además el rol `admin`.**
-  `require_role('admin')` (`routers/admin_router.py:343`) no mira
-  `ADMIN_USERNAMES`. Quien es admin sólo por la variable y se registró
-  después del último arranque entra a todo `/api/admin/*` menos esta (403,
-  reproducido). Ya pasaba antes; no es regresión. Opciones: (a) quitar ese
-  `require_role`, porque el router ya exige admin; (b) dejarlo.
-  **Recomiendo (a)**: una línea, y lo agrego a la prueba.
-
-## Lista cerrada de funciones globales
-
-Recorrí las 139 rutas (las dos de `routers/` incluidas). Global = no actúa
-sobre los datos de un estudio.
-
-| Ruta | Qué hace | Estado |
-|---|---|---|
-| `/api/admin/*` (9) | salud, errores, métricas, logs, borrar errores, cohortes | **ahora `require_admin`** |
-| `POST /api/ncm/cache/refresh` | borra y recarga el cache NCM que comparten todos | **ahora `require_admin`** + `tags=["admin"]` |
-| `/dev/dashboard`, `/api/dev/*` (5) | panel, stats, KPIs, migraciones, esquema | ya tenían `require_admin` (no se tocaron) |
-| `GET /api/system/connectors` | configuración de conectores | abierta a logueados → **D1** |
-| `POST /api/payments/simulate-webhook` | activa cobro de cualquier usuario | sólo secreto → **D2** |
-| `POST /api/payments/webhook` | webhook real de MP | firma HMAC; es de MP, se queda |
-| `/api/ui/event`, `/api/session/state` | telemetría sin sesión | es el S5 de la auditoría; la usa la landing |
-| `/api/dolar`, `/api/financials`, `/api/arca/novedades`, `/api/billing/plans`, `/health` | lecturas públicas | públicas a propósito (topbar, Railway) |
-
-Del estudio (filtran por dueño), revisadas por los dos revisores: catálogo,
-notas e historial NCM, clientes, operaciones, descargas, backups, billing
-propio, organizaciones, cotizaciones. `/api/ncm/{ncm}/completo`, `calcular`
-y `enrich-items` leen datos públicos de NCM y llenan el cache: no son admin.
-
-## Cómo marca la prueba qué es admin
-
-`tests/test_admin_solo_admin.py` no tiene lista de rutas. Lee las rutas de
-la app (esquema OpenAPI, que incluye los routers montados, más las rutas
-escondidas del esquema) y toma:
-
-- todo lo que cuelga de `/api/admin/`, `/api/dev/` o `/dev/`;
-- toda ruta con `tags=["admin"]` (la marca de «global», puesta en el
-  decorador de la ruta).
-
-Para cada una, usuario común → 403 y sin sesión → 401. Lo que **no** puede
-hacer: adivinar que una ruta nueva es global si nadie le pone el tag. Lo dejé
-escrito junto a `require_admin` (`main.py:1722`). No hay forma automática
-honesta de decidir «global» sin marca.
-
-## Riesgos (para antes de publicar)
-
-1. **Quién es admin en producción.** Después de publicar, `/api/admin/*`
-   sólo deja entrar a quien esté en `ADMIN_USERNAMES` o tenga el rol
-   `admin`. Si Railway no tiene la variable y nadie tiene el rol, nadie
-   entra al admin (el resto de la app no cambia). Que Emi lo confirme antes
-   del «dale».
-2. **`ADMIN_USERNAMES` se puede reclamar** (revisor Opus, reproducido en
-   local). Si la variable nombra un usuario o un email que todavía no está
-   registrado, quien se registre primero con ese nombre es admin. El email
-   da el rol en el siguiente reinicio y no se verifica, porque
-   `EMAIL_VERIFICATION_REQUIRED` viene apagado. Ya pasaba antes, pero con
-   ADMIN-1 ser admin vale más. Fuera de alcance («cómo se decide quién es
-   admin»).
-3. **Usuario `demo/demo123` con rol admin** (`main.py:1341`): se crea si
-   `ENVIRONMENT` no es `production`. No verifiqué qué tiene Railway.
-4. **El router de admin se monta en el arranque** (lifespan) y se vuelve a
-   montar en cada arranque. Eso ya existía. En producción arranca una vez; si
-   no arrancara, `/api/admin/*` da 404, cerrado y no abierto.
+- **D7 — El chip «Sistema/Demo» no existe en pantalla, ni antes ni ahora.**
+  `topbar_financials.js` pide los conectores y busca `#tfSystemChip`. Ninguna
+  plantilla lo tiene (`git log -S tfSystemChip -- proyecto_maria/templates`
+  está vacío), así que sale sin dibujar nada. Por eso no hay captura del chip.
+  Mandé la captura de la barra con un usuario común: carga bien, y el pedido
+  a los conectores da 200 con sólo los modos. El código del chip lee sólo el
+  `mode`, así que si algún día se dibuja, anda.
+  Opciones: (a) nada; (b) borrar ese código muerto en una pieza aparte.
+  **Recomiendo (a)** por ahora: no molesta y no es de esta cola.
+- **D8 — El webhook de MP se puede reenviar (alta, cobro).** Lo encontró el
+  revisor Sonnet y lo reprodujo con el SDK de MP simulado. El webhook real
+  acepta sin firma el aviso IPN (`?topic=payment&id=…`, `main.py:7810-7830`),
+  le pregunta a MP por ese pago, y para no repetir sólo mira el **último**
+  pago (`last_payment_id`). Con dos pagos reales viejos que se alternan,
+  cualquiera, sin sesión, vuelve a dejar una cuenta vencida en `active` por
+  30 días con el contador en 0, o suma `extra_ops` sin pagar.
+  En su prueba: `past_due`, 999 operaciones usadas → `active`, 0 usadas, y
+  `extra_ops_remaining` 40.
+  Opciones: (a) pieza nueva antes de publicar el cobro: guardar todos los
+  `payment_id` procesados y rechazar los repetidos; (b) sumarlo a COBRO-MP-1.
+  **Recomiendo (a), y que vaya delante de COBRO-CORTE-1** cuando vuelva el
+  cobro: es el único camino de esta lista que activa sin pagar en
+  producción.
+- **D9 — Otros caminos de cobro sin pago real** (Sonnet; ninguno es de
+  ADMIN-2):
+  - `/api/billing/cancel` y después `/reactivate` pasan una prueba
+    gratuita a `active` y le dan 7 días de gracia extra, una sola vez
+    (`main.py:2020-2057`).
+  - `simulate-charge` y el usuario `demo/demo123` admin quedan abiertos si
+    `ENVIRONMENT` no es exactamente `production` (`main.py:85`). Es lo que
+    Emi tiene que confirmar en Railway.
+  - Sin `MP_ACCESS_TOKEN`, `demo-confirm` y `/api/payments/success` le
+    muestran a cualquiera «Tu cuenta Premium ha sido activada», pero en el
+    servidor no cambia nada.
+  **Recomiendo** sumar el primero y el tercero a COBRO-MP-2. El segundo
+  queda como está: Emi ya lo tiene en la lista de Railway.
 
 ## Comandos copiables
 
 ```bash
-git fetch origin claude/dev1-tecnica && git checkout ac25dbc
-PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh ac25dbc 8080
-# desde el worktree que dejó levantar.sh:
+git fetch origin claude/dev1-tecnica && git checkout 50d3a0b
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 50d3a0b 8080
+# desde el worktree:
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
        VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-python -m pytest -q --no-cov tests/test_admin_solo_admin.py   # 14 passed
-PY=$(which python) scripts/testing/sabotajes/admin1.sh ac25dbc # 7 «ROJO», «sabotajes con falla: 0»
-python -m pytest -q --no-cov --timeout=120                    # 694 passed, 102 skipped
+python -m pytest -q --no-cov tests/test_admin2.py tests/test_admin_solo_admin.py  # 26 passed
+PY=$(which python) scripts/testing/sabotajes/admin2.sh 50d3a0b   # 5 «ROJO», «sabotajes con falla: 0»
+PY=$(which python) scripts/testing/sabotajes/admin1.sh 50d3a0b   # 7 «ROJO», «sabotajes con falla: 0»
 ```
 
 ## Evidencia (salida exacta)
 
-**Rojo antes** (API de la base `cb8f509` en :8810, usuario común `comun1`
-recién registrado):
+**Rojo antes:** las pruebas nuevas sobre el código de la base `6c3ba09`.
 
 ```
-POST /api/admin/errors/clear-old -> 200
-GET /api/admin/health/detailed -> 200
-GET /api/admin/stats/summary -> 200
-POST /api/ncm/cache/refresh -> 200
+E   AssertionError: {'vuce': {'mode': 'fake', 'has_api_key': False, 'base_url': 'https://sandbox.vuce.gob.ar/api'}, 'tarifar': {'mode': 'f...0 (+https://cdi.local; contacto: soporte@cdi.local)', 'min_interval_ms': 1000, 'timeout_s': 8, 'cache_ttl_hours': 168}}
+E   AssertionError: 200 {"success":true,"payment_id":"sim_69ec9f1c333247f1","billing_status":"active","trial_ends_at":"2026-11-06T00:58:34.011479","extra_ops_remaining":0}
+E   AssertionError: /api/admin/cohort-retention: 403 {"detail":"Permisos insuficientes"}
+FAILED tests/test_admin2.py::test_conectores_usuario_comun_sin_detalle - Asse...
+FAILED tests/test_admin2.py::test_simulate_webhook_ya_no_existe_sin_sesion - ...
+FAILED tests/test_admin_solo_admin.py::test_admin_por_admin_usernames_entra[/api/admin/cohort-retention]
+=================== 3 failed, 23 passed, 7 warnings in 2.25s ===================
 ```
 
-La prueba nueva sobre el `main.py` de la base (sólo con el tag puesto en
-cache/refresh para que la vea):
+El segundo rojo es el de la tarea: sin sesión, con el secreto, una cuenta
+`trial` pasó a `active`.
+
+**Verde después**, con la app en :8811 sobre `d74a74f` y un usuario común
+nuevo:
 
 ```
-E   AssertionError: rutas de admin abiertas a un usuario común:
-E     GET /api/admin/errors/insights → 200
-E     GET /api/admin/errors/top/{limit} → 200
-E     GET /api/admin/health/detailed → 200
-E     GET /api/admin/logs/recent/{limit} → 200
-E     GET /api/admin/metrics/prometheus → 200
-E     GET /api/admin/stats/summary → 200
-E     GET /api/admin/test/sentry → 500
-E     POST /api/admin/errors/clear-old → 200
-E     POST /api/ncm/cache/refresh → 422
-================== 1 failed, 12 passed, 11 warnings in 2.18s ===================
+8811: {"vuce":{"mode":"fake"},"tarifar":{"mode":"fake"},"afip":{"mode":"fake"}}
 ```
 
-**Verde después**, API de `76a2b42` en :8811 (el código de producto es el
-mismo que en `ac25dbc`, salvo dos docstrings). Usuario común `comun2`: 403 en
-las 9 de `/api/admin/*`, en `cache/refresh`, en `/dev/dashboard` y en
-`/api/dev/stats` y `wave1-kpis`. `/api/clientes` → 200, la app común sigue.
-Admin `jefe1`, admin sólo por `ADMIN_USERNAMES`, en :8812:
+El revisor Opus repitió en :8811: común → sólo modos, sin sesión → 401,
+admin → detalle completo, `simulate-webhook` → `{"detail":"Not Found"} 404`,
+`cohort-retention` → 403 común / 401 sin sesión / 200 admin. El detalle de
+los conectores no aparece en ninguna otra ruta (`/health`,
+`/api/financials`).
+
+**Sabotajes** sobre `50d3a0b`:
 
 ```
-POST /api/admin/errors/clear-old -> 200
-GET /api/admin/health/detailed -> 200
-GET /api/admin/errors/insights -> 200
-GET /api/admin/errors/top/5 -> 200
-GET /api/admin/metrics/prometheus -> 200
-GET /api/admin/logs/recent/5 -> 200
-GET /api/admin/stats/summary -> 200
-GET /api/admin/test/sentry -> 500      (error intencional, igual que antes)
-GET /api/admin/cohort-retention -> 403 (D3: pide además el rol)
-GET /dev/dashboard -> 200
-GET /api/dev/stats -> 200
-GET /api/dev/wave1-kpis -> 200
-```
-
-Panel en Chromium con `jefe1`: `dashboard 200`, `200 /api/dev/stats`,
-`200 /api/dev/wave1-kpis`; la captura muestra las métricas y el tráfico
-cargados.
-
-**Sabotajes** (`scripts/testing/sabotajes/admin1.sh ac25dbc`):
-
-```
-ROJO  | router de admin vuelve a get_current_user: dice «POST /api/admin/errors/clear-old → 200»
-ROJO  | cache/refresh sin require_admin: dice «POST /api/ncm/cache/refresh → 422»
-ROJO  | /api/dev/stats sin require_admin: dice «GET /api/dev/stats → 200»
-ROJO  | /dev/dashboard sin require_admin: dice «GET /dev/dashboard → 200»
-ROJO  | /api/dev/stats escondida del esquema y sin require_admin: dice «GET /api/dev/stats → 200»
-ROJO  | cache/refresh niega también al admin: dice «FAILED tests/test_admin_solo_admin.py::test_admin_refresca_cache_ncm»
-ROJO  | cache/refresh pierde la marca admin (la prueba dejaría de verla): dice «assert ('POST', '/api/ncm/cache/refresh') in [»
+ROJO  | conectores: el usuario común vuelve a ver el detalle: dice «FAILED tests/test_admin2.py::test_conectores_usuario_comun_sin_detalle»
+ROJO  | conectores: el admin pierde el detalle: dice «FAILED tests/test_admin2.py::test_conectores_admin_con_detalle»
+ROJO  | simulate-webhook vuelve a existir: dice «assert 200 in (404, 405)»
+ROJO  | simulate-webhook vuelve: activa la cuenta y responde 404: dice «assert 'active' == 'trial'»
+ROJO  | cohort-retention vuelve a pedir el rol: dice «FAILED tests/test_admin_solo_admin.py::test_admin_por_admin_usernames_entra[/api/admin/cohort-retention]»
 sabotajes con falla: 0
 ```
 
-## Puertas sobre `ac25dbc`
+Los de ADMIN-1 sobre el mismo SHA: los 7 en ROJO, `sabotajes con falla: 0`.
+
+## Puertas
 
 | Puerta | Resultado |
 |---|---|
-| Suite completa, worktree limpio | `694 passed, 102 skipped, 24 warnings in 54.66s` (base 680 + 14 nuevas) |
-| `compileall` | sin errores (sobre `71118ee`; desde ahí sólo cambió una prueba) |
-| `smoke_friccion.sh` contra :8811 (`76a2b42`) | `OK · telemetría + alias session/state + by-cuit protegido` |
-| `ataque_aislamiento.sh` (`76a2b42`) | 22 BLOQUEADO, 0 FUGA |
+| Suite completa sobre `50d3a0b`, worktree limpio | `706 passed, 102 skipped, 25 warnings in 58.25s` (694 + 12 nuevas) |
+| `compileall` sobre `50d3a0b` | sin errores |
+| `smoke_friccion.sh` (`d74a74f`) | `OK · telemetría + alias session/state + by-cuit protegido` |
+| `ataque_aislamiento.sh` (`d74a74f`) | 22 BLOQUEADO, 0 FUGA |
 
 ## Autorrevisión
 
 | Revisor | Hallazgo | Qué hice |
 |---|---|---|
-| Opus alto | la prueba no veía rutas con `include_in_schema=False` (reproducido) | arreglado en `71118ee`, con su sabotaje |
-| Opus alto | sin prueba positiva de admin en cache/refresh | `test_admin_refresca_cache_ncm` + sabotaje (`ac25dbc`) |
-| Opus alto | una global nueva sin tag no se detecta | límite de diseño, explicado arriba |
-| Opus alto / Sonnet alto | `simulate-webhook` activa cobro con sólo el secreto | D2 |
-| Opus alto / Sonnet alto | `system/connectors` abierta | D1 |
-| Opus alto / Sonnet alto / `/code-review` | `cohort-retention` y `ADMIN_USERNAMES` no coinciden | D3 |
-| Opus alto | `ADMIN_USERNAMES` se puede reclamar; `demo` admin | riesgos 2 y 3 |
-| Sonnet alto | `/api/dolar`, `/api/ncm/sugerir`, plantillas: llamadas a terceros sin cache del fallo, Gemini que bloquea el servidor y sin corte de cobro, disco | fuera de alcance; `ncm/sugerir` sin corte es de COBRO-CORTE-1 |
-| `/code-review high` | script de sabotajes frágil (`pipefail`, «passed» en el texto) | ahora mira el código de salida (`71118ee`) |
-| `/code-review high` | docstrings de `/api/dev/stats` y `wave1-kpis` decían «TODO admin» | corregidos (`2d76015`) |
-| `/code-review high` | el router se monta en cada arranque | riesgo 4; ya existía |
-| `/security-review` | nada ≥ 8/10 introducido por el diff | — |
+| Opus alto | nada dentro del alcance; la respuesta de conectores cambia según quién pide y no lleva `Cache-Control: private` (hoy no hay cache delante) | informativo, no lo agregué |
+| Sonnet alto | reenvío de pagos al webhook (alta) | D8 |
+| Sonnet alto | cancel/reactivate, `ENVIRONMENT`, cartel demo | D9 |
+| `/code-review high` | la vista común y la del admin eran dos listas a mano | ahora la común sale del detalle (`c08ea3f`) |
+| `/code-review high` | el chequeo del estado de la cuenta en la prueba de `simulate-webhook` nunca se vio rojo | sabotaje nuevo que activa y devuelve 404 (`50d3a0b`) |
+| `/code-review high` | `cohort-retention` queda sin control propio: depende de cómo se monta el router | lo cubre la prueba que recorre rutas; ponerle `require_admin` en el router trae un import circular con `main.py`, no lo hice |
+| `/code-review high` | `cohort-retention` hace 2 consultas por usuario; `admin2.sh` copia a `admin1.sh`; un ayudante de pruebas repetido | fuera de alcance, sin cambio |
 
 ## Qué no corrí
 
-- Nada contra producción ni contra terceros.
-- `ataque_aislamiento.sh` y `smoke_friccion.sh` corrieron sobre `76a2b42`,
-  no sobre `ac25dbc`. Entre los dos sólo cambian docstrings y pruebas.
-- El panel se probó en Chromium local, no en un teléfono.
+- Nada contra producción ni terceros.
+- Humo y aislamiento corrieron sobre `d74a74f`; `50d3a0b` sólo cambia cómo se
+  arma la respuesta de conectores (misma salida, la cubre la prueba) y un
+  sabotaje.
+- `/security-review`: no lo corrí en esta pieza. El revisor Sonnet tuvo el
+  foco de cobro y seguridad.
 
 ## Archivos de producto que toqué
 
-`proyecto_maria/main.py`: lifespan, comentario de `require_admin`, docstrings
-de `/api/dev/stats` y `wave1-kpis`, y `/api/ncm/cache/refresh`. También
-`CHANGELOG.md`.
+`proyecto_maria/main.py` (`_es_admin`, `/api/system/connectors`, borrado de
+`simulate-webhook`), `proyecto_maria/routers/admin_router.py`
+(`cohort-retention` y un import), `CHANGELOG.md`.
 
 ## Sigo con
 
-COBRO-CORTE-1, frenada en D4–D6 (arriba).
+RENDIMIENTO-1, como dice tu canal. Antes traigo tu rama por MARIA-2.
 
-Última vuelta: 2026-10-07 00:55 UTC
-Contexto: ~26 %
+Última vuelta: 2026-10-07 01:45 UTC
+Contexto: ~31 %
+
+`/compact conservar: Dev 1 de CDI en la rama claude/dev1-tecnica. ADMIN-1
+entregada (código ac25dbc, informe en el commit f413c45), en revisión.
+ADMIN-2 entregada (código 50d3a0b), informe en PARA-PM.md con D7–D9. Sigue
+RENDIMIENTO-1 (PARA-DEV.md): asyncio.to_thread para process_pdf,
+_extract_pdf_text y _suggest_ncm_with_gemini, con tiempo máximo; traer
+antes la rama de la PM por MARIA-2 de la Dev 2. COBRO-CORTE-1 en pausa, con
+D4=(b) N=10, D5=(a), D6=(a). Entorno: PM_DIR=/tmp/cdi-dev1, levantar.sh
+<SHA> 8811; venv /tmp/cdi-dev1/venv; sabotajes en
+scripts/testing/sabotajes/admin1.sh y admin2.sh. Rutina de la PM:
+trig_01TvMmGfSLDfbcJrf66ZZ7YK.`
