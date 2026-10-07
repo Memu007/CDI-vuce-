@@ -232,8 +232,23 @@ pruebas que lo cubren. Esto es lo que hay hoy:
 
 ## Sigo con
 
-COBRO-MP-1, pasos 1 y 3 (el plan de arriba). Si Emi aprueba GUARDAR-1, paso a
-esa. Si EXCEL-2 vuelve con devolución, eso va primero.
+COBRO-MP-1. **Pasos 1 y 3 hechos, sin entregar** (no es una entrega: falta
+el paso 2, que espera D28 y D29, y el 4, que espera D30):
+
+- Producto `3d3f712`; pruebas `83b4ec1` y `a3099c0` (`tests/test_cobro_mp1.py`,
+  7 casos; 6 en rojo sobre el código anterior, el que queda verde es el de
+  la cuenta vencida, que ya contaba desde hoy).
+- Sabotajes: `PY=/tmp/cdi-dev1/venv/bin/python scripts/testing/sabotajes/cobro_mp1.sh a3099c0`
+  → 7 de 7 en ROJO, «sabotajes con falla: 0».
+- Suite tipo CI sobre `a3099c0`: `1274 passed, 102 skipped, 10 deselected, 3 xfailed`.
+- Falta todavía: revisión adversarial (Opus y Sonnet, alto) y CHANGELOG, que
+  hago al entregar la pieza entera. La carrera de dos avisos simultáneos del
+  mismo pago la frena la clave primaria (`_guardar_pago_mp`), pero no tiene
+  prueba: con SQLite no se reproduce la concurrencia.
+
+Si Emi aprueba GUARDAR-1, paso a esa. Si EXCEL-2 vuelve con devolución, eso
+va primero. Si preferís recibir los pasos 1 y 3 ya, como entrega parcial,
+decímelo y la cierro con /entregar.
 
 Última vuelta: 2026-10-07
 Contexto: el que mide la PM con get_session.
@@ -243,4 +258,5 @@ integradas: MARIA-1b, EXCEL-1, PUNTA-A-PUNTA-1. EXCEL-2 entregada sobre
 3e6e63e (suite 1267 en 1a36a6d, 27 sabotajes en scripts/testing/sabotajes/excel2.sh,
 tests/test_excel2.py); D27 (tope de textos compartidos) abierta. Entorno:
 PM_DIR=/tmp/cdi-dev1, levantar.sh <SHA> <puerto>, venv /tmp/cdi-dev1/venv y
-venv-limpio; rutina de la PM trig_01TvMmGfSLDfbcJrf66ZZ7YK.`
+venv-limpio; rutina de la PM trig_01TvMmGfSLDfbcJrf66ZZ7YK. COBRO-MP-1: pasos 1 y 3
+en a3099c0 (sin entregar), paso 2 espera D28/D29, paso 4 espera D30, tabla D31.`
