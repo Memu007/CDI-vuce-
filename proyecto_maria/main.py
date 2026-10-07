@@ -5111,11 +5111,22 @@ def _dice_de_una_unidad(normal: str) -> bool:
             or sin_parentesis in ("pesou", "pesobrutou"))
 
 
+def _bruto_de_una_unidad(normal: str) -> bool:
+    """El bruto no tiene contra qué compararse (va último): es de una unidad
+    sólo si lo dice sin dudas («unitario», «per unit», «por unidad», «unit.»,
+    «unid.», «kg/u», «c/u»). «Total», «unidades» o «units» lo dejan de la
+    línea (revisión de MARIA-5d)."""
+    sin_parentesis = re.sub(r"[()]", "", normal)
+    if "total" in normal or "linea" in normal or "unidades" in normal or "units" in normal:
+        return False
+    return bool(re.search(r"unitari|perunit|porunidad|xunidad|unitweight|(unit|unid|/u|brutou)$", sin_parentesis))
+
+
 def _clase_de_peso(normal: str) -> str:
     # El bruto es bruto aunque diga «unitario» (segunda devolución de MARIA-5):
     # de una unidad si lo dice, si no de la línea (MARIA-5d).
     if "bruto" in normal or "gross" in normal:
-        return "bruto_unidad" if _dice_de_una_unidad(normal) else "bruto"
+        return "bruto_unidad" if _bruto_de_una_unidad(normal) else "bruto"
     if _dice_de_una_unidad(normal):
         return "unidad"
     if "neto" in normal or "net" in normal:
