@@ -153,7 +153,42 @@ Gemini. El Gemini falso de la prueba la corta y no sale a internet.)
 - Una factura real con clave real: prohibido desde pruebas. El camino con
   clave lo cubre un modelo falso.
 
-Sigo con MARIA-1a.
+## En curso: MARIA-1a (arranqué; sin código todavía)
+
+**D3. La tabla oficial de países no trae códigos de tres letras** (`CHN`,
+`MEX`). Sólo tiene los de dos letras, los nombres y `USA`, y en el repositorio
+no hay otra fuente. Para que `CHN` salga China hace falta una tabla «tres
+letras → dos letras», y eso cambia lo que sale en el TXT.
+- (a) Generarla una vez desde la norma ISO 3166-1 (paquete `pycountry`, sólo
+  para generarla, no como dependencia). Va con una prueba de que cada destino
+  existe en la tabla oficial; el código MARIA lo sigue dando la tabla oficial.
+  **Recomiendo (a).**
+- (b) Sin tabla nueva: `CHN` y `MEX` quedan vacíos y con aviso, nada
+  adivinado. No cumple el criterio «verde con `CHN` y `MEX`».
+
+Mientras no contestes, avanzo con todo lo demás y dejo los de tres letras
+vacíos y con aviso (b), que es lo seguro.
+
+**Plan (para que lo veas antes del código):**
+- Una sola función de origen para las **dos** copias del lector: dos letras
+  o nombre, contra la tabla oficial (`pais_reconocido`), y siempre se
+  devuelve el código de dos letras. Lo que no se reconoce queda vacío. El
+  aviso ya existe: el semáforo dice «Falta indicar el país de origen».
+- **D4.** Si un producto viene sin origen, hoy se completa con el país del
+  vendedor; si el vendedor falta, con `BR` o `CN` fijos. Propongo dejarlo
+  vacío, con el aviso del semáforo. (a) Vacío. **Recomiendo (a)**: el origen
+  no es el país del vendedor. (b) Tomar el del vendedor sólo si se leyó, con
+  un aviso propio.
+- Números: una sola función para cantidad, precio y peso. `1,5` da 1,5.
+  `1,500` da 1500 sólo si la misma factura muestra el punto como decimal (por
+  ejemplo, un precio `2.45`); si no se puede saber, queda vacío y con aviso.
+  El precio con coma también se descartaba en silencio y lo incluyo. Lo que
+  falta (peso, cantidad) queda en 0: la pantalla lo muestra vacío y el
+  semáforo lo marca en rojo. Nunca 0,5 ni 1.
+- Hallazgo de paso, dentro de MARIA-1a: en la copia del lector que se usa con
+  PyMuPDF instalado, `str(2.45).replace('.', '')` convierte un precio 2.45 en
+  245. Hoy PyMuPDF no está en `requirements.txt`, así que en producción corre
+  la otra copia. Lo arreglo con la misma función.
 
 Última vuelta: 2026-10-07
-Contexto: ~20 %
+Contexto: ~28 % (cerca del umbral del 30 %: corte natural acá)
