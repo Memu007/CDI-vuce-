@@ -138,3 +138,48 @@ def test_el_respaldo_con_codigos_viejos_no_se_usa(tmp_path):
     assert not (ncm_catalog.DATA_DIR / "ncm_mercosur.csv").exists()
     assert not hasattr(ncm_catalog, "LEGACY_CSV")
     assert ncm_catalog.load_catalog(tmp_path / "no_existe.csv.gz") == []
+
+
+# --- Revisión adversaria ---------------------------------------------------
+
+def test_un_codigo_parcial_busca_por_prefijo_y_no_por_palabras():
+    resultado = ncm_catalog.search_term("8471.30")
+    assert resultado and all(it.codigo.startswith("847130") for it in resultado)
+    assert ncm_catalog.search_term("8517.12") == []  # ninguna vigente empieza así
+
+
+@pytest.mark.parametrize("codigo, dice", [
+    ("8517.12", "se dieron de baja"), ("851712", "se dieron de baja"),
+    ("8517.12.31", "se dio de baja"), ("8517.12.31.000X", "se dio de baja"),
+    ("8471.30", ""), ("8517.13.00", ""), ("12", ""),
+])
+def test_el_aviso_de_un_codigo_escrito(client, auth_override, codigo, dice):
+    r = client.get("/api/ncm/aviso", params={"codigo": codigo})
+    assert r.status_code == 200, r.text
+    if dice:
+        assert dice in r.json()["aviso"] and "buscá la nueva" in r.json()["aviso"], r.json()
+    else:
+        assert r.json()["aviso"] == "", r.json()
+
+
+def test_la_sugerencia_parcial_dada_de_baja_lo_dice(client, auth_override, monkeypatch):
+    monkeypatch.setenv("NCM_GEMINI_FALLBACK", "false")
+    datos = client.post("/api/ncm/sugerir", json={"descripcion": "8517.12"}).json()
+    assert datos["sugerencias"] == [], datos
+    assert "se dieron de baja" in datos.get("message", ""), datos
+
+
+def test_una_sugerencia_que_no_esta_en_el_vigente_avisa(client, auth_override, monkeypatch):
+    from proyecto_maria import main
+    monkeypatch.setenv("NCM_GEMINI_FALLBACK", "false")
+    monkeypatch.setattr(main, "load_ncm_historial", lambda usuario: {
+        "pieza inventada de prueba": {"ncm": "99999999", "count": 1}})
+    sug = client.post("/api/ncm/sugerir", json={"descripcion": "pieza inventada de prueba"}).json()["sugerencias"]
+    assert sug and "no está en el nomenclador vigente" in sug[0]["aviso"] and not sug[0].get("baja"), sug
+
+
+def test_la_validacion_no_avisa_una_sim_vigente(client, auth_override):
+    items = [{"pieza": "8471.49.00.100D", "descripcion": "Equipo de prueba generico", "origen": "CN",
+              "cantidad": 1, "valor_unitario": 100, "peso_unitario": 1}]
+    datos = client.post("/api/validate/smart", json={"items": items}).json()
+    assert not any("nomenclador" in a for a in datos["advertencias"]), datos["advertencias"]

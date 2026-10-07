@@ -35,6 +35,21 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   console.log('OK el asistente propone 8517.12.31 diciendo que se dio de baja: ' + texto.replace(/\s+/g, ' '));
   if (process.argv[2]) await page.screenshot({ path: process.argv[2], fullPage: false });
 
+  // Escribir el código en el asistente también lo dice (revisión adversaria):
+  // la SIM completa se puede asignar, con el aviso; la partida sola, el aviso.
+  for (const [escrito, dice] of [['8517.12.31.000X', /se dio de baja/], ['8517.12', /se dieron de baja/]]) {
+    await page.fill('#spotSearch', escrito);
+    await page.locator('#spotResults', { hasText: dice }).waitFor({ timeout: 10000 })
+      .catch(async () => falla('escribir ' + escrito + ' no avisa la baja: ' + await page.locator('#spotResults').innerText()));
+  }
+  const respuesta = page.waitForResponse(r => r.url().includes('/api/ncm/aviso') && r.url().includes('8471'), { timeout: 10000 });
+  await page.fill('#spotSearch', '8471.49.00.100D');
+  const aviso = await (await respuesta.catch(() => falla('no se pidió el aviso de 8471.49.00.100D'))).json();
+  if (aviso.aviso) falla('el servidor avisa en falso: ' + aviso.aviso);
+  await page.locator('#spotResults', { hasText: 'Asignar este código manualmente' }).waitFor({ timeout: 10000 });
+  if (/baja|nomenclador/.test(await page.locator('#spotResults').innerText())) falla('una SIM vigente avisa en falso');
+  console.log('OK escribir 8517.12.31.000X o 8517.12 avisa la baja; 8471.49.00.100D, no');
+
   const v = await page.evaluate(d => CDI.api('/api/validate/smart', { method: 'POST', body: JSON.stringify({ items: [
     { pieza: '85171231000X', descripcion: d, origen: 'CN', cantidad: 2, valor_unitario: 100, peso_unitario: 0.2 }] }) })
     .then(x => x.json()), desc);
