@@ -254,6 +254,46 @@ EMPRESA_DIGITALIZACION_POR_DEFECTO = "PSAD06"
 
 PAIS_ARGENTINA = 200
 
+# MARIA-3. Condiciones en las que se declaran los gastos anteriores al FOB
+# (`GTOS-ANT-FOB`): EXW por la nota del SIM y el archivo real de 2026; FCA por
+# la respuesta 6 del despachante; FAS por la misma regla (la diferencia entre
+# el FOB y la condición pactada es anterior al FOB).
+INCOTERMS_GASTOS_ANTERIORES = {"EXW", "FCA", "FAS"}
+
+
+def gastos_fob_para_el_txt(incoterm, gastos_fob=None, gastos_anteriores_fob=None):
+    """Importe de gastos respecto del FOB que va al TXT, o None.
+
+    `gastos_fob` explícito manda (como antes). Si no, los gastos anteriores al
+    FOB de la pantalla van sólo con EXW, FCA o FAS, y sólo si son más que 0:
+    un 0 o un campo vacío no se declara (se avisa en los supuestos)."""
+    if gastos_fob is not None:
+        return gastos_fob
+    if str(incoterm or "").strip().upper() not in INCOTERMS_GASTOS_ANTERIORES:
+        return None
+    try:
+        importe = float(gastos_anteriores_fob)
+    except (TypeError, ValueError):
+        return None
+    return importe if importe > 0 else None
+
+
+def fecha_de_la_factura(raw) -> str:
+    """Fecha de emisión en DD/MM/AAAA, o "" si no es una fecha.
+
+    Acepta DD/MM/AAAA, DD/MM/AA y AAAA-MM-DD. Lo que no se puede leer queda
+    vacío (y se avisa): nunca se pone la fecha de hoy (MARIA-3, D15)."""
+    texto = str(raw or "").strip()
+    formatos = ((r"\d{2}/\d{2}/\d{4}", "%d/%m/%Y"), (r"\d{2}/\d{2}/\d{2}", "%d/%m/%y"),
+                (r"\d{4}-\d{2}-\d{2}", "%Y-%m-%d"))
+    for patron, formato in formatos:
+        if re.fullmatch(patron, texto):
+            try:
+                return datetime.strptime(texto, formato).strftime("%d/%m/%Y")
+            except ValueError:
+                return ""
+    return ""
+
 
 def _estado_item(item: dict, idx, pais_codigo: int) -> int:
     """Estado (CARTUSO) del ítem: el elegido, o 2 si el origen es extranjero.
@@ -469,9 +509,9 @@ def generate_maria_txt(operation_id: str, items: list,
     lines.append(f"MCPL={operation_id:<40}")
     lines.append("")
     
-    # 2. Fecha Emision Factura (se usa la del PDF si viene; sino hoy como fallback)
-    fecha_factura = (str(fecha_emision or "").strip()
-                     or datetime.now().strftime("%d/%m/%Y"))
+    # 2. Fecha de emisión de la factura. Si no se leyó, el campo sale vacío y
+    # los supuestos lo avisan: antes salía la fecha de hoy (MARIA-3, D15).
+    fecha_factura = fecha_de_la_factura(fecha_emision)
 
     # Año de dos dígitos para el IEXT de cada ítem (`00272-01/26`). Sale del
     # año de la factura; si no se puede leer, del año actual.
@@ -882,7 +922,7 @@ def validate_items_for_maria(items: list) -> tuple[bool, list]:
     return len(errors) == 0, errors
 
 
-INCOTERMS_VALIDOS = {"FOB", "CIF", "DDP", "EXW", "FCA", "CFR", "CPT", "CIP", "DAP", "DPU"}
+INCOTERMS_VALIDOS = {"FOB", "CIF", "DDP", "EXW", "FCA", "FAS", "CFR", "CPT", "CIP", "DAP", "DPU"}
 
 
 def supuestos_declarados(
@@ -894,6 +934,8 @@ def supuestos_declarados(
     iva_adicional: str | None = None,
     banco_bcra: str = "",
     empresa_digitalizacion: str | None = None,
+    gastos_anteriores_fob: float | None = None,
+    fecha_emision: str = "",
 ) -> list:
     """Lista los campos que el sistema declaró SIN preguntarle al despachante.
 
@@ -921,12 +963,36 @@ def supuestos_declarados(
                 f"GTOS-POS-FOB. Si la diferencia contra la condición {incoterm_norm} "
                 f"pactada es otra, cargala a mano."
             )
+        elif incoterm_norm in INCOTERMS_GASTOS_ANTERIORES:
+            avisos.append(
+                f"Gastos a FOB: no se declararon. Con condición {incoterm_norm} van los "
+                f"gastos anteriores a FOB (GTOS-ANT-FOB): cargalos en «Gastos anteriores "
+                f"a FOB» si los hubo."
+            )
         elif incoterm_norm and incoterm_norm != "FOB":
             avisos.append(
                 f"Gastos a FOB: no se declararon. Con condición {incoterm_norm} el "
                 f"importe no se puede calcular del flete y el seguro; si "
                 f"corresponde declararlo, cargalo a mano."
             )
+    try:
+        anteriores = float(gastos_anteriores_fob or 0)
+    except (TypeError, ValueError):
+        anteriores = 0
+    if anteriores > 0 and incoterm_norm not in INCOTERMS_GASTOS_ANTERIORES:
+        avisos.append(
+            f"Gastos anteriores a FOB: cargaste {anteriores:.2f}, pero con condición "
+            f"{incoterm_norm or 'sin elegir'} no van al TXT (sólo con EXW, FCA o FAS)."
+        )
+
+    # --- Fecha de emisión (MARIA-3) ----------------------------------------
+    if items and not fecha_de_la_factura(fecha_emision):
+        leida = str(fecha_emision or "").strip()
+        avisos.append(
+            "Fecha de emisión: " + (f"«{leida[:20]}» no es una fecha (DD/MM/AAAA); "
+                                    if leida else "no se leyó de la factura; ")
+            + "en el TXT sale vacía. Cargala antes de pegar el archivo en el Kit."
+        )
 
     # --- Defaults a nivel ítem -------------------------------------------
     sin_procedencia = []
@@ -946,7 +1012,7 @@ def supuestos_declarados(
         avisos.append(
             f"Procedencia: en el/los ítem(s) {', '.join(sin_procedencia)} se declaró "
             f"la misma que el origen. Si la mercadería se embarcó desde otro país, "
-            f"corregila: son campos distintos."
+            f"cargala en «Procedencia» (sale del documento de transporte): son campos distintos."
         )
     if sin_unidad:
         avisos.append(

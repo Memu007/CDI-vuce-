@@ -305,6 +305,13 @@
                                         <span class="field-hint" data-hint-for="incoterm"></span>
                                         <span class="field-error" data-error-for="incoterm" hidden></span>
                                     </div>
+                                    <div class="field">
+                                        <label class="field-label" for="f_procedencia">Procedencia</label>
+                                        <input class="input" type="text" id="f_procedencia" name="procedencia" list="procedenciaPaises" autocomplete="off" placeholder="País desde donde se embarcó">
+                                        <datalist id="procedenciaPaises"></datalist>
+                                        <span class="field-hint">Sale del documento de transporte. Si queda vacía, se declara igual al origen de cada producto.</span>
+                                        <span class="field-error" data-error-for="procedencia" hidden></span>
+                                    </div>
                                 </div>
                             </fieldset>
 
@@ -324,7 +331,7 @@
                                     <div class="field">
                                         <label class="field-label" for="f_gastos_anteriores_fob">Gastos anteriores a FOB (USD)</label>
                                         <input class="input" type="number" step="0.01" min="0" id="f_gastos_anteriores_fob" name="gastos_anteriores_fob" autocomplete="off">
-                                        <span class="field-hint">Comisiones, embalaje, etc. Dejar en 0 si no aplica.</span>
+                                        <span class="field-hint">Sólo con EXW, FCA o FAS: lo que costó llevar la mercadería hasta FOB. Va al TXT como GTOS-ANT-FOB.</span>
                                     </div>
                                 </div>
                                 <div class="cx-incoterm-warning" id="reviewIncotermWarning" hidden role="alert"></div>
@@ -584,6 +591,14 @@
                                 Reducción o exclusión del IVA adicional: se elige en «Ventajas» del Kit; no va en el TXT.
                             </p>
                             <p id="despachanteError" hidden role="alert" style="margin-top:.4rem;font-size:.85rem"></p>
+                        </div>
+
+                        <div id="validatingAvisosPanel" class="issue-group is-warning" hidden style="margin-bottom:1rem">
+                            <header class="issue-group-header">
+                                <strong>Revisá antes de generar</strong>
+                                <span class="caption" id="validatingAvisosCount"></span>
+                            </header>
+                            <ul class="issue-list" id="validatingAvisosList"></ul>
                         </div>
 
                         <footer class="validating-actions">

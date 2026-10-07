@@ -70,7 +70,7 @@ PROJECT_VERSION = datetime.now().strftime("%Y%m%d%H%M%S")
 from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, supuestos_declarados
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, supuestos_declarados, gastos_fob_para_el_txt
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
     LecturaAutomaticaNoDisponible,
@@ -3565,11 +3565,69 @@ class MariaRequest(BaseModel):
     # (EXW → GTOS-ANT-FOB, grupos C/D → GTOS-POS-FOB). Si no viene, en los
     # grupos C/D se usa flete + seguro y fuera de ellos no se declara nada.
     gastos_fob: float | None = None
+    # MARIA-3. Gastos anteriores al FOB del campo de la pantalla: van al TXT
+    # (GTOS-ANT-FOB) sólo con EXW, FCA o FAS. `gastos_fob` explícito manda.
+    gastos_anteriores_fob: float | None = None
+    # MARIA-3. Procedencia de la operación (país desde donde se embarca, art. 15
+    # del Código Aduanero). Va a cada producto que no traiga la suya.
+    procedencia: str = ""
     # Lo que decide el despachante (MARIA-4). None = valor por defecto, que
     # entra en los supuestos. El estado y el IVA por producto van en items.
     banco_bcra: str = ""
     empresa_digitalizacion: str | None = None
     iva_adicional: str | None = None
+
+
+def _items_con_procedencia(request: MariaRequest) -> list:
+    """Los productos con la procedencia de la operación en los que no traen la
+    suya (MARIA-3). Una procedencia que no se reconoce no se adivina: 400."""
+    procedencia = str(request.procedencia or "").strip()
+    if not procedencia:
+        return request.items
+    if not pais_reconocido(procedencia):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Procedencia «{procedencia[:40]}» no reconocida: elegí un país de la lista.",
+        )
+    return [
+        {**it, "pais_procedencia": procedencia}
+        if isinstance(it, dict) and not (it.get("pais_procedencia") or it.get("procedencia"))
+        else it
+        for it in (request.items or [])
+    ]
+
+
+def _supuestos_maria(request: MariaRequest, items: list, gastos_fob) -> list:
+    return supuestos_declarados(
+        items,
+        incoterm=request.incoterm,
+        gastos_fob=gastos_fob,
+        flete=request.flete,
+        seguro=request.seguro,
+        iva_adicional=request.iva_adicional,
+        banco_bcra=request.banco_bcra,
+        empresa_digitalizacion=request.empresa_digitalizacion,
+        gastos_anteriores_fob=request.gastos_anteriores_fob,
+        fecha_emision=request.fecha_emision,
+    )
+
+
+@app.post("/generate_maria/avisos")
+async def avisos_maria_endpoint(
+    request: MariaRequest,
+    user=Depends(get_current_user),
+):
+    """Los avisos de `/generate_maria`, antes de generar (MARIA-3): la
+    pantalla los muestra junto al botón. No genera ni guarda nada."""
+    items = _items_con_procedencia(request)
+    gastos = gastos_fob_para_el_txt(request.incoterm, request.gastos_fob, request.gastos_anteriores_fob)
+    try:
+        _, kit_warnings = validate_for_kit_maria(items)
+    except Exception:
+        # Productos mal formados: el error sale al generar.
+        kit_warnings = []
+    supuestos = _supuestos_maria(request, items, gastos)
+    return {"avisos": kit_warnings + supuestos, "supuestos": supuestos}
 
 
 @app.post("/generate_maria")
@@ -3590,8 +3648,12 @@ async def generate_maria_endpoint(
         if not valid:
             raise HTTPException(status_code=400, detail={"errors": errors})
 
+        # Procedencia de la operación y gastos de la pantalla (MARIA-3)
+        items = _items_con_procedencia(request)
+        gastos = gastos_fob_para_el_txt(request.incoterm, request.gastos_fob, request.gastos_anteriores_fob)
+
         # Validación específica de KIT Maria (complementa la anterior)
-        kit_errors, kit_warnings = validate_for_kit_maria(request.items)
+        kit_errors, kit_warnings = validate_for_kit_maria(items)
 
         # Validar sbt_sufijo_valor: obligatorio, sin caracteres de control.
         #
@@ -3646,7 +3708,7 @@ async def generate_maria_endpoint(
         # Generar TXT
         txt_content = generate_maria_txt(
             operation_id=request.operation_id,
-            items=request.items,
+            items=items,
             moneda=request.moneda,
             incoterm=request.incoterm,
             cuit_agr=effective_cuit_agr,
@@ -3671,7 +3733,7 @@ async def generate_maria_endpoint(
             aduana_codigo=request.aduana_codigo,
             tipo_destinacion=request.tipo_destinacion,
             sbt_sufijo_valor=sbt_raw,
-            gastos_fob=request.gastos_fob,
+            gastos_fob=gastos,
             banco_bcra=request.banco_bcra,
             empresa_digitalizacion=request.empresa_digitalizacion or "PSAD06",
             iva_adicional=request.iva_adicional or "NO_VALIDA",
@@ -3694,16 +3756,7 @@ async def generate_maria_endpoint(
         # Campos que el sistema declaró sin preguntar. No bloquean, pero el
         # despachante los tiene que ver antes de pegar el TXT en el Kit: un
         # valor asumido en silencio se descubre recién en la aduana.
-        supuestos = supuestos_declarados(
-            request.items,
-            incoterm=request.incoterm,
-            gastos_fob=request.gastos_fob,
-            flete=request.flete,
-            seguro=request.seguro,
-            iva_adicional=request.iva_adicional,
-            banco_bcra=request.banco_bcra,
-            empresa_digitalizacion=request.empresa_digitalizacion,
-        )
+        supuestos = _supuestos_maria(request, items, gastos)
 
         return {
             "success": True,

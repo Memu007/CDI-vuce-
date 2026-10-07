@@ -14,7 +14,7 @@
         'vendedor_nombre', 'vendedor_id', 'vendedor_pais', 'vendedor_direccion',
         'comprador_nombre', 'comprador_cuit', 'comprador_domicilio', 'comprador_fecha_inic_activ',
         'numero_factura', 'fecha_emision',
-        'moneda', 'incoterm',
+        'moneda', 'incoterm', 'procedencia',
         'flete', 'seguro', 'gastos_anteriores_fob',
         // Transporte opcional: si vienen en el PDF los precargamos
         'transporte_medio', 'bl', 'buque',
@@ -134,6 +134,11 @@
             if (n < 0) return 'No puede ser negativo.';
             return null;
         },
+        procedencia: (v) => {
+            // MARIA-3: un país de la tabla MARIA; vacía = igual al origen.
+            if (!v || !CDI.paisesMaria) return null;
+            return CDI.paisesMaria.resolve(v) ? null : 'País no reconocido: elegí uno de la lista.';
+        },
         fecha_emision: (v) => {
             if (!v) return null;
             if (!/^\d{2}\/\d{2}\/(\d{2}|\d{4})$/.test(String(v).trim())) {
@@ -193,6 +198,11 @@
         prorrateoCaption = $('reviewProrrateoCaption');
         incotermWarningEl = $('reviewIncotermWarning');
         if (!form) return;
+
+        const procedenciaPaises = $('procedenciaPaises');
+        if (procedenciaPaises && CDI.paisesMaria && !procedenciaPaises.children.length) {
+            procedenciaPaises.innerHTML = CDI.paisesMaria.optionMarkup();
+        }
 
         form.addEventListener('input', onFieldChange);
         form.addEventListener('change', onFieldChange);

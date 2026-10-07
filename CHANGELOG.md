@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · feat: avisos antes de generar, gastos anteriores al FOB, procedencia y fecha (MARIA-3)
+
+- **feat(maria):** los avisos del TXT se ven en la validación, antes del botón de generar. Los gastos anteriores al FOB de la pantalla llegan al TXT (`GTOS-ANT-FOB`) con EXW, FCA o FAS (FAS pasa a ser condición válida); con otra condición no van y se avisa. La procedencia se carga por operación (art. 15 del Código Aduanero); vacía, sigue igual al origen con aviso.
+- **fix(maria):** la fecha de emisión ya no sale con la de hoy: si la factura no la trae o no es una fecha, `FECHAEMISIONFACT` sale vacía y se avisa. El lector deja de marcar como «sin leer» un flete o seguro «N/A», «-», «FREE», «included» o «Prepaid» y un país «Unknown» o «?».
+
 ## 2026-10-07 · feat: lo que decide el despachante sale en el TXT (MARIA-4)
 
 - **feat(maria):** estado de la mercadería (seis, por producto), IVA adicional (reventa o uso particular, por operación con cambio por producto), banco (código BCRA, por operación) y empresa de digitalización (Modoc o Lakaut) se eligen antes de generar; CDI propone el último banco del cliente y la última empresa del usuario. **Cambio a propósito en el TXT con los valores por defecto:** `CARTUSO=2` con origen extranjero (antes 3 fijo) e `IVAADICIONAL1=NO_VALIDA` (antes IVAAD1 fijo); con origen argentino no hay estado por defecto y sin banco la línea no sale. Los dos archivos reales salen como el original cargando sus valores.

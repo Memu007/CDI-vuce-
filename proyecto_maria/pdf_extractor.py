@@ -2065,12 +2065,23 @@ def _campos_sin_leer(operacion: dict, decimal) -> list:
     sin_leer = []
     for campo in ('flete', 'seguro'):
         raw = operacion.get(campo)
-        if raw not in (None, '') and _numero_factura(raw, decimal) is None:
+        if (raw not in (None, '') and not _no_aplica(raw, _FLETE_NO_APLICA)
+                and _numero_factura(raw, decimal) is None):
             sin_leer.append(campo)
     pais = str(operacion.get('vendedor_pais') or '').strip()
-    if pais and pais.upper() not in ('NA', 'N/A') and not _origen_desde_factura(pais):
+    if pais and not _no_aplica(pais, _PAIS_NO_APLICA) and not _origen_desde_factura(pais):
         sin_leer.append('vendedor_pais')
     return sin_leer
+
+
+# Lo que la factura escribe cuando el dato no aplica: no es un dato que no se
+# pudo leer (MARIA-3, revisión de MARIA-1c). El valor queda en 0 o vacío.
+_FLETE_NO_APLICA = {'N/A', 'NA', '-', 'FREE', 'INCLUDED', 'PREPAID'}
+_PAIS_NO_APLICA = {'N/A', 'NA', 'UNKNOWN', '?'}
+
+
+def _no_aplica(raw, palabras) -> bool:
+    return str(raw).strip().rstrip('.').strip().upper() in palabras
 
 
 def _valores_numericos(result: dict) -> list:
@@ -2287,7 +2298,7 @@ IMPORTANTE:
                     operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
                     operacion_data = {
                         'numero_factura': str(operacion.get('numero_factura', '')),
-                        'fecha_emision': str(operacion.get('fecha_emision', '')),
+                        'fecha_emision': str(operacion.get('fecha_emision') or ''),
                         'vendedor_nombre': str(operacion.get('vendedor_nombre', '')),
                         'vendedor_id': str(operacion.get('vendedor_id', '')),
                         'vendedor_pais': _origen_desde_factura(operacion.get('vendedor_pais')),
@@ -2487,7 +2498,7 @@ IMPORTANTE:
                         operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
                         operacion_data = {
                             'numero_factura': str(operacion.get('numero_factura', '')),
-                            'fecha_emision': str(operacion.get('fecha_emision', '')),
+                            'fecha_emision': str(operacion.get('fecha_emision') or ''),
                             'vendedor_nombre': str(operacion.get('vendedor_nombre', '')),
                             'vendedor_id': str(operacion.get('vendedor_id', '')),
                             'vendedor_pais': _origen_desde_factura(operacion.get('vendedor_pais')),
