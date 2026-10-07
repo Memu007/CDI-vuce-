@@ -300,3 +300,13 @@ def test_xlsx_que_se_descomprime_a_gigas_se_rechaza_antes_de_abrirlo(monkeypatch
     assert r.status_code == 400, r.text[:300]
     assert "descomprimido" in r.json()["detail"], r.json()
     assert not abrir, "se abrió el Excel antes de mirar cuánto pesa descomprimido"
+
+
+def test_mapeo_guardado_completa_lo_que_no_se_detecta():
+    """Lo detectado gana, pero una columna que sólo el cliente sabe qué es
+    («Glosa» para la descripción) se sigue tomando de su mapeo guardado."""
+    cid = _cliente_con_mapeo({"Glosa": "descripcion"})
+    r = _subir([["NCM", "Glosa", "Origen", "Cantidad", "Precio Unitario", "Peso Neto"],
+                ["84713000", "Laptop", "CN", 10, 350, 1.5]], cliente_id=cid)
+    assert r.status_code == 200, r.text[:300]
+    assert r.json()["items"][0]["descripcion"] == "Laptop", r.json()["items"]

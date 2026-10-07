@@ -49,9 +49,11 @@ L=tests/test_excel1_lectura.py
 sabotaje $M "el Excel v2 se vuelve a leer en el hilo del servidor" \
   '        df = await _leer_pdf_aparte(
             _leer_excel_ruta, temp_filename, engine,
-            limite=_excel_read_timeout_s(), que="el Excel",
-        )' \
-  '        df = _leer_excel_ruta(temp_filename, engine)' \
+            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
+        )
+' \
+  '        df = _leer_excel_ruta(temp_filename, engine)
+' \
   "FAILED $T::test_health_responde_mientras_se_lee_un_excel[upload_excel_v2]"
 sabotaje $M "leer un Excel pierde el tiempo máximo" \
   '    return _segundos_de_entorno("EXCEL_READ_TIMEOUT_S", 60.0)' \
@@ -72,7 +74,7 @@ sabotaje $M "el peso bruto vuelve a usarse como peso unitario" \
     ],' \
   "FAILED $L::test_peso_bruto_o_total_no_se_toma_como_peso_unitario"
 sabotaje $M "las filas de subtotal vuelven a entrar" \
-  '            if _FILA_DE_TOTAL_RE.match(descripcion) or _FILA_DE_TOTAL_RE.match(pieza):' \
+  '            if _FILA_DE_TOTAL_RE.match(descripcion or pieza):' \
   '            if False:' \
   "FAILED $L::test_fila_de_subtotal_no_entra_como_item"
 sabotaje $M "«.XLSX» en mayúsculas vuelve a fallar" \
@@ -83,10 +85,48 @@ sabotaje $M "la unidad entre paréntesis vuelve a romper el encabezado" \
   '_normalize_header(re.sub(r"\(.*?\)", "", str(h or "")))' \
   '_normalize_header(str(h or ""))' \
   "FAILED $L::test_encabezados_con_unidades_entre_parentesis"
-sabotaje $M "el mapeo guardado vuelve a dejar afuera lo detectado" \
-  '            if canon not in cubiertos and src not in effective_mapping:' \
-  '            if False:' \
-  "FAILED $L::test_mapeo_guardado_no_deja_afuera_encabezados_nuevos"
+sabotaje $M "el mapeo guardado deja de completar lo que no se detecta" \
+  '            if (canon in _CANON_COLUMNS and canon not in cubiertos' \
+  '            if (False and canon not in cubiertos' \
+  "FAILED $L::test_mapeo_guardado_completa_lo_que_no_se_detecta"
+sabotaje $M "el mapeo guardado viejo vuelve a ganar sobre lo detectado" \
+  '            src: canon for src, canon in (detected_mapping or {}).items()
+            if canon in _CANON_COLUMNS
+        }' \
+  '            src: canon for src, canon in (mapping or {}).items()
+            if canon in _CANON_COLUMNS and src in presentes
+        }
+        for src, canon in (detected_mapping or {}).items():
+            if canon not in set(effective_mapping.values()) and src not in effective_mapping:
+                effective_mapping[src] = canon' \
+  "FAILED $L::test_mapeo_guardado_viejo_no_gana_sobre_el_precio_unitario"
+sabotaje $M "vuelve a saltearse cualquier producto que empiece con «Total»" \
+  '    r"[\s\d.,:;/-]*$",' \
+  '    r"\b",' \
+  "FAILED $L::test_productos_que_empiezan_con_total_no_se_pierden"
+sabotaje $M "«FOB TOTAL» o «Freight» vuelven a entrar como producto" \
+  '        if usa_ncm_u_origen and not trae:' \
+  '        if False:' \
+  "FAILED $L::test_filas_sin_ncm_ni_origen_no_son_productos_y_se_avisan"
+sabotaje $M "el Excel vuelve a usar los hilos del PDF" \
+  'def _pool_lectura_excel():
+    global _POOL_LECTURA_EXCEL' \
+  'def _pool_lectura_excel():
+    return _pool_lectura_pdf()
+    global _POOL_LECTURA_EXCEL' \
+  "FAILED $T::test_excel_y_pdf_no_comparten_los_hilos_de_lectura"
+sabotaje $F "un .xlsx que se descomprime a gigas vuelve a abrirse" \
+  "            if file_ext == '.xlsx' and _excel_descomprimido_bytes(contents) > _excel_max_descomprimido_bytes():" \
+  "            if False:" \
+  "FAILED $L::test_xlsx_que_se_descomprime_a_gigas_se_rechaza_antes_de_abrirlo"
+sabotaje $M "las filas vacías vuelven a recorrerse una por una" \
+  '    return pd.read_excel(ruta, engine=engine, dtype=object).dropna(how="all")' \
+  '    return pd.read_excel(ruta, engine=engine, dtype=object)' \
+  "FAILED $L::test_celda_en_la_ultima_fila_no_recorre_un_millon_de_filas"
+sabotaje $M "deja de haber tope de filas" \
+  '        if len(df) > _MAX_FILAS_EXCEL:' \
+  '        if False:' \
+  "FAILED $L::test_demasiadas_filas_se_rechazan_con_mensaje_claro"
 sabotaje $M "las filas descartadas dejan de avisarse" \
   '            "filas_descartadas": len(descartes),' \
   '            "filas_descartadas": 0,' \
@@ -106,8 +146,8 @@ sabotaje $M "los números en texto vuelven a leerse con float" \
   '                return float(row[col]) if col else 0.0' \
   "FAILED $L::test_numeros_escritos_como_texto"
 sabotaje $M "pandas vuelve a convertir el texto de las celdas" \
-  '    return pd.read_excel(ruta, engine=engine, dtype=object)' \
-  '    return pd.read_excel(ruta, engine=engine)' \
+  '    return pd.read_excel(ruta, engine=engine, dtype=object).dropna(how="all")' \
+  '    return pd.read_excel(ruta, engine=engine).dropna(how="all")' \
   "FAILED $L::test_numeros_escritos_como_texto[1.500-0]"
 sabotaje $M "la NCM numérica vuelve a salir con .0" \
   '    if isinstance(valor, float) and valor.is_integer():
