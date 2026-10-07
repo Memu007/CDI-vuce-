@@ -32,32 +32,18 @@ tienen que seguir saliendo idénticos, salvo que la tarea diga otra cosa.
 
 ## Último veredicto
 
-**MARIA-4 devuelta** (2026-10-07, sobre `6149ef3`). La PM reprodujo el rojo
-antes (`30 failed`), la focal con los archivos reales (`127 passed`) y la
-suite (`837 passed, 102 skipped`). Su subagente Sonnet alto: lo central se
-sostiene (valores raros rechazados, 2025 idéntico byte a byte, 2026 sin
-diferencias en los cuatro campos, sin fugas entre usuarios ni clientes).
-Detalle en `REPRODUCCION-MARIA-4-2026-10-07.md`.
+**MARIA-4 aceptada sobre `2461939`** (2026-10-07, con la devolución). La PM
+reprodujo el rojo antes de la devolución sobre `6149ef3` (`9 failed`: estado
+contra origen en `CN-1/3/5`, `AR-2/4/6` y `200-2`; supuestos con el orden del
+origen; avisos en la pantalla vieja), la focal con los archivos reales (`122
+passed`) y la suite (`846 passed, 102 skipped`). La primera revisión ya había
+atacado lo central (`REPRODUCCION-MARIA-4-2026-10-07.md`). No corrido por la
+PM: tu comprobación de pantalla de la v2.
 
-**Devolución, tres puntos:**
-1. **Estado contra origen.** Un estado «argentino» (1, 3, 5) con origen
-   extranjero, o «importado» (2, 4, 6) con origen argentino, no se genera:
-   400 con un mensaje claro, como el del argentino sin estado. En la pantalla,
-   si el origen cambia entre argentino y extranjero, el estado elegido se
-   vuelve a pedir (hoy queda `['CN','3']`).
-2. **Pantalla vieja:** muestra los `warnings` y `supuestos` que devuelve
-   `/generate_maria`, como pedía la tarea («genera con los valores por defecto
-   y su aviso»).
-3. **`origen` y `pais_origen`:** el generador y los supuestos los leen en el
-   mismo orden (hoy uno usa `pais_origen or origen` y el otro al revés).
+Aceptadas y sin integrar hasta después del ensayo: MARIA-1a, 2b, 1c y 4.
 
-Rojo antes y verde después en cada punto; suite completa en verde.
-
-**Tu D11: (a).** Tu supuesto del banco propuesto que va al TXT si nadie lo
-toca, con el aviso en pantalla: aceptado.
-
-**Antes:** MARIA-1a, 2b y 1c aceptadas. Nada se integra en la rama de PM
-hasta después del ensayo.
+**Tu contexto está en ~88 %: no arranques MARIA-3 hasta que Emi pegue tu
+`/compact`** (a la mañana). Todo lo que necesitás está abajo.
 
 ## Respuestas a tus D (2026-10-07, 05:30 UTC)
 
@@ -72,49 +58,32 @@ hasta después del ensayo.
   novedades de ARCA apuntan a un puerto local cerrado.
 - **D10:** tenés razón. MARIA-4 queda escrita abajo.
 
-## Tarea activa — MARIA-4: lo que decide el despachante
+## Tarea activa — MARIA-3: avisos, gastos FOB, procedencia y fecha
 
-Asignada el 2026-10-07. Cambia lo que sale en el TXT. Hoy el generador fija
-`CARTUSO=3` (`core/maria_generator.py:618`), `IVAADICIONAL1=IVAAD1` (`:650`) y
-`ARDIG-CUIT-PSAD=PSAD06` (`:459`), y no emite `BANCOSARGENTINA`.
+Asignada el 2026-10-07. Cambia lo que sale en el TXT. Arrancá después del
+`/compact`.
 
-**Base:** tu rama (con MARIA-1a, 2b y 1c).
+**Base:** tu rama (con MARIA-4).
 
-**Alcance, campo por campo, con su prueba:**
+**Alcance, con su prueba:**
 
-| Campo | Qué hace CDI | Por defecto | Prueba |
-|---|---|---|---|
-| `CARTUSO` (estado de la mercadería), por producto | Se elige entre los seis estados, con los nombres del despachante: nuevo sin uso argentino, nuevo sin uso importado, sin uso argentino, sin uso importado, usado argentino (incl. reacondicionado), usado importado (incl. reacondicionado). Códigos 1 a 6 en ese orden | Origen extranjero: 2 (nuevo sin uso importado). Origen argentino: no hay; se pide elegir | Respuesta 1 (21:20); el archivo de 2026 trae 2 con origen China y el de 2025 trae 3 con origen Argentina. El orden → código lo confirma la prueba en su Kit: dejalo en un solo lugar, con esta nota |
-| `IVAADICIONAL1`, por operación, con cambio por producto | «Reventa» (`NO_VALIDA`) o «uso particular» (`IVAAD1`) | Reventa (`NO_VALIDA`) | Respuesta 2 (21:34) y el archivo de 2026. Si hay reducción o exclusión: un aviso de que se elige en «Ventajas» del Kit (22:12); **no va en el TXT** |
-| `BANCOSARGENTINA`, por operación | El cliente elige el banco en cada operación; CDI propone el último que usó ese cliente. Se carga el código de entidad del BCRA (3 dígitos) | El último del cliente; si no hay, vacío: la línea no se emite (como en el archivo de 2025) y hay aviso | Respuestas 4 (21:35 y 21:40) y el archivo de 2026 (`191`). Si querés mostrar el nombre del banco, sólo con una tabla de fuente oficial citada; si no, sólo el código |
-| `ARDIG-CUIT-PSAD`, por operación | Modoc (`PSAD06`) o Lakaut (`PSAD01`); CDI propone la última que usó ese usuario | La última usada; si no hay, Modoc (`PSAD06`, lo de hoy), a la vista en la pantalla | Respuestas 5 (21:42 y 22:15) y los dos archivos reales |
+| Qué | Hoy | Prueba |
+|---|---|---|
+| **Avisos antes de generar** (M6) | Algunos avisos aparecen recién después de generar | — (pantalla) |
+| **Gastos anteriores al FOB** en EXW, FCA y FAS (M8) | La regla del generador ya está bien (`maria_generator.py:413-426`), pero el campo de la pantalla no llega al TXT; FAS no está en `INCOTERMS_VALIDOS` (`:777`) | Respuesta 6 del despachante; nota del SIM; el archivo real de 2026 (`GTOS-ANT-FOB=150.00`, EXW) |
+| **Procedencia** por operación, en pantalla | Se iguala al origen y se avisa (`:595`, `:821-833`) | Código Aduanero, art. 15 (sale del documento de transporte); el archivo de 2025 trae origen 200 y procedencia 222 |
+| **Fecha de emisión** de la factura (`FECHAEMISIONFACT`, `:404`) | Sale la de hoy (D15 de la Dev 1) | La fecha de la factura; si no se leyó, vacía y con aviso, nunca la de hoy |
+| **Sin avisos de más** (revisión de MARIA-1c) | Flete o seguro «N/A», «-», «FREE», «included», «Prepaid» y país «Unknown» o «?» se marcan como no leídos | — |
 
-**Pantalla:** en la v2, donde se revisa antes de generar: banco, empresa de
-digitalización y reventa o uso particular a nivel operación; estado (y el
-cambio de IVA) por producto. Lo que se usó por defecto entra en los
-«supuestos» que ya se muestran. La pantalla vieja (v1) sólo tiene que no
-romperse: genera con los valores por defecto y su aviso.
+**Criterios:** los dos archivos reales siguen saliendo idénticos cargando sus
+valores (2025 con procedencia 222; 2026 con los 150 de gastos anteriores al
+FOB); rojo antes y verde después por punto; sabotajes; comprobación de
+pantalla con captura; suite completa en verde.
 
-**Dónde se guarda:** con la operación. Si hace falta una columna nueva en la
-base, dejá una D antes de tocarla.
+**Fuera de alcance:** el peso (MARIA-5) y los identificadores (MARIA-6).
 
-**Criterios:**
-1. **Los dos archivos reales salen idénticos** cargando sus valores: 2025 con
-   estado 3, uso particular, sin banco y `PSAD06`; 2026 con estado 2,
-   reventa, banco `191` y `PSAD01`.
-2. **Con los valores por defecto el TXT cambia a propósito:** `CARTUSO=2` con
-   origen extranjero e `IVAADICIONAL1=NO_VALIDA`. Una prueba lo fija y el
-   CHANGELOG lo dice.
-3. Origen argentino sin estado elegido, o sin banco: aviso antes de generar.
-   No se inventa ninguno de los dos.
-4. Rojo antes y verde después por campo; sabotajes que devuelvan cada valor
-   fijo de hoy. Suite completa en verde. Comprobación de pantalla con captura.
-
-**Fuera de alcance:** procedencia, gastos FOB y avisos (MARIA-3); peso
-(MARIA-5); identificadores y sufijos (MARIA-6); las ventajas del Kit.
-
-**Después:** MARIA-3 y MARIA-5, en ese orden; MARIA-6 cuando lleguen los
-archivos reales del despachante.
+**Después:** MARIA-5; MARIA-6 cuando lleguen los archivos reales del
+despachante.
 
 **Datos nuevos del despachante para MARIA-4** (2026-10-06, 22:12 y 22:15;
 detalle en `PREGUNTAS-DESPACHANTE.md`):
