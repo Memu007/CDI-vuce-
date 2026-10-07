@@ -2,7 +2,7 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## SUBITEMS-1 (puntos 7 a 10) y la e2e — reentrega con MARIA-5: **`4446571`**
+## SUBITEMS-1 (puntos 7 a 10) y la e2e — reentrega con MARIA-5: **`df4de22`** (producto en `4446571`)
 
 **Resultado: los cuatro puntos de `5170016`, con rojo antes y verde después, y
 `e2e_maria.sh` en «E2E MARIA OK». Para decidir: nada; dos cosas para que
@@ -30,9 +30,10 @@ abajo). D27: tomada (a).
 
 | Puerta | Resultado |
 |---|---|
-| Suite completa, worktree limpio (`fe79a0e`; después sólo cambió `ncm.js` y el script de pantalla) | `1505 passed, 102 skipped, 2 xfailed, 25 warnings in 149.09s`, 0 failed |
-| Pantallas en `4446571` | `OK: pantalla MARIA-5`, `OK: pantalla CATALOGO-NCM-1`, `OK: pantalla SUBITEMS-1` |
-| `e2e_maria.sh` en `4446571` (y en `fe79a0e`) | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.` |
+| Integración: tu rama hasta `8a3e286` (GUARDAR-1) traída con `merge` en `df4de22`. Choques: la fecha de la e2e (quedó tu línea, `01/10/2026`) y `CHANGELOG.md` (quedan las dos entradas) | — |
+| Suite completa, worktree limpio, en `df4de22` | `1526 passed, 102 skipped, 2 xfailed, 25 warnings in 150.27s`, 0 failed |
+| Pantallas en `df4de22` (y en `4446571`) | `OK: pantalla MARIA-5`, `OK: pantalla CATALOGO-NCM-1`, `OK: pantalla SUBITEMS-1` |
+| `e2e_maria.sh` en `df4de22` (y en `4446571` y `fe79a0e`) | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.` |
 | Sabotajes | SUBITEMS-1: 9 de 9 (dos nuevos: el control que revienta con `5` y el número de línea); `sabotajes/maria1b.sh`: 0 fallas (un patrón al día). MARIA-5: 49 de 49 en `fe79a0e`; CATALOGO-NCM-1, MARIA-3 y 1d: corriendo al escribir esto (los agrego en cuanto terminen). |
 
 **Autorrevisión** (adversario Sonnet alto, sobre `fe79a0e`): el TXT no
@@ -54,11 +55,11 @@ en ~20.000 casos del borde. Encontró:
 
 Para reproducir:
 ```
-PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 4446571 8890
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh df4de22 8890
 for s in maria5 catalogo_ncm1 subitems1; do BASE_URL=http://127.0.0.1:8890 node scripts/testing/pantalla_$s.js; done   # tres «OK: pantalla …»
 PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh a123b93 8891
 BASE_URL=http://127.0.0.1:8891 node scripts/testing/pantalla_subitems1.js   # FALLA: el error del sufijo no sale bajo el subítem 2
-scripts/testing/sabotaje_subitems1.sh 4446571 <venv>                     # OK: los 9 sabotajes…
+scripts/testing/sabotaje_subitems1.sh df4de22 <venv>                     # OK: los 9 sabotajes…
 ```
 
 ## MARIA-5 y CATALOGO-NCM-1 — segunda devolución: **`a8a83f3`** (producto en `135ff27`)
