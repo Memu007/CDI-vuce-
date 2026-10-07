@@ -72,25 +72,29 @@ también sus subagentes (Emi confirmó las dos sesiones en alto). Ningún subage
 la PM principal.
 
 Archivos abiertos por Dev:
-- Dev 1 (ADMIN-1): `proyecto_maria/main.py` (montaje del admin, cerca de la
-  línea 1312, y las rutas globales), `proyecto_maria/routers/admin_router.py`.
-- Dev 2 (MARIA-2): `proyecto_maria/pdf_extractor.py` (modo demostración),
-  `main.py` `upload_pdf_public` (cerca de la 3446) y su pantalla en
-  `static/v2`.
+- Dev 1 (ADMIN-2): `proyecto_maria/main.py` (`/api/system/connectors`,
+  `/api/payments/simulate-webhook`), `routers/admin_router.py`,
+  `static/v2/topbar_financials.js`, `tests/test_admin_solo_admin.py`.
+- Dev 2 (MARIA-1a): `proyecto_maria/pdf_extractor.py` (las dos copias del
+  lector) y, si hace falta, la tabla de países de `core/maria_generator.py`.
 
 ## En curso
 
-- Dev 1: ADMIN-1 (`PARA-DEV.md`). Después, COBRO-CORTE-1.
-- Dev 2: MARIA-2 (`PARA-DEV-2.md`). Después, MARIA-1a.
-- PM: publicación de ensayo. Candidato: `cb8f509` (código idéntico a
-  `e8344d0`; sólo cambian documentos y reglas). Suite sobre `cb8f509`:
-  `680 passed, 102 skipped, 10 warnings in 65.29s`. Espera los chequeos de
-  Railway y el «dale» de Emi para el SHA, de día. Si se publica un commit
-  posterior de la rama de PM, sólo con documentos de diferencia.
+- **Aceptadas el 2026-10-07 e integradas en la rama de PM:** ADMIN-1
+  (`ac25dbc`) y MARIA-2 (`65ea6f3`). Suite sobre la rama integrada
+  (`78b60c8`): `703 passed, 102 skipped`.
+- Dev 1: ADMIN-2 (más dos puntos ciegos de la prueba). Después,
+  RENDIMIENTO-1. **COBRO-CORTE-1 en pausa:** Emi está decidiendo si primero
+  se termina todo el camino «PDF o Excel → TXT MARIA» (propuesta de la PM del
+  2026-10-07, sin respuesta todavía).
+- Dev 2: MARIA-1a. Después, MARIA-2b.
+- **Publicación de ensayo (mañana, de día):** dos candidatos. (a) `cb8f509`,
+  el código de `e8344d0` tal cual; (b) la rama integrada, que además cierra
+  el admin y saca los productos inventados, pero pide que `ADMIN_USERNAMES`
+  tenga el usuario de Emi. La PM recomienda (b) si la variable está; si no,
+  (a). La suite se corre otra vez sobre el SHA exacto que se publique.
 - Despachante: respondió las seis preguntas el 2026-10-06. Faltan los dos
-  favores y dos cortas nuevas (cómo se carga una reducción o exclusión del IVA
-  adicional; qué código tiene en el Kit cada empresa de digitalización). MARIA-4 pasó al tercer
-  lugar de la cola MARIA.
+  favores y dos cortas nuevas (ya enviadas por Emi el 2026-10-07).
 
 ## Cola
 
@@ -145,12 +149,11 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 01:00 UTC: el despachante respondió las seis preguntas (texto tal
-cual en `PREGUNTAS-DESPACHANTE.md`); la cola MARIA se ajustó (MARIA-4 sube,
-MARIA-4b nueva, el peso total sale en la Fase A). Emi: CDI no usa Google
-Cloud; producción tiene facturas reales. Dev 1 en ADMIN-1, Dev 2 en MARIA-2.
-**Mañana desde las 9:** pasarle a Emi el SHA del ensayo y la lista de Railway
-(«Para Emi», punto 2). PM al ~23 % de contexto.
+2026-10-07 01:45 UTC: ADMIN-1 y MARIA-2 aceptadas e integradas (subagentes
+de la PM: Opus alto y Sonnet medio). D de las dos Devs contestadas. Encontrado
+en el código publicado: usuarios de prueba con contraseña conocida si
+`ENVIRONMENT` no es `production` (en la lista de Railway de Emi). PM al ~33 %
+de contexto.
 
 ## Medición
 
