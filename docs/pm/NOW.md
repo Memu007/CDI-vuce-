@@ -60,13 +60,16 @@ antes de cerrar la Fase 3.
    facturación de Google.
 3. **Despachante:** recordarle los archivos reales (favor 1). Ya respondió
    todas las preguntas.
-4. **Límite de uso de la cuenta:** el 2026-10-07 entre las ~02:05 y las
+4. **Hasta publicar MARIA-1a: revisar el país de origen de cada TXT** antes
+   de mandárselo al despachante. El código publicado corta el país a dos
+   letras: si la lectura devuelve «CHN» o «China», sale Suiza.
+5. **Límite de uso de la cuenta:** el 2026-10-07 entre las ~02:05 y las
    03:40 UTC las Devs quedaron paradas porque la cuenta llegó a su límite de
    5 horas («You've hit your session limit»). Lo más barato para que no se
    repita: pegar el `/compact` de cada Dev apenas se pueda (están en ~38 % y
    ~41 %; cada paso relee todo el contexto). Si vuelve a pasar, Emi decide
    entre aceptar las pausas o bajar el ritmo.
-5. **Hasta la primera publicación:** en `main` sigue la regla vieja que manda
+6. **Hasta la primera publicación:** en `main` sigue la regla vieja que manda
    «push a `main`» a otros asistentes. No pedirle a ningún asistente cambios
    sobre `main`.
 
@@ -172,12 +175,11 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 04:00 UTC (rutina; la de las 02:55 no corrió): las dos Devs
-subieron código (Dev 1: RENDIMIENTO-1 hasta `450f2d5`; Dev 2: MARIA-1a hasta
-`4b8fc49`), sin informe todavía. Desde ~02:05 quedaron paradas por el límite
-de uso de la cuenta, que se reinició a las 03:40; sus rutinas las retoman
-(:15 y :35). Contexto: Dev 1 ~41 %, Dev 2 ~38 %. Suite sobre `321f34b`, para
-el ensayo: `716 passed, 102 skipped`.
+2026-10-07 05:35 UTC (rutina): tres entregas revisadas y aceptadas
+(RENDIMIENTO-1, MARIA-1a, MARIA-2b), con su subagente Sonnet alto cada una;
+quedan en las ramas de las Devs hasta después del ensayo. Activas:
+RENDIMIENTO-1b (Dev 1) y MARIA-1c (Dev 2). Contexto: Dev 1 ~41 %, Dev 2 ~52 %
+(Emi pega sus `/compact` a la mañana); PM ~30 %.
 
 ## Medición
 
