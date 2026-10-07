@@ -72,7 +72,8 @@ MARIA-6 arranca cuando lleguen sus archivos reales.
 | ✅ | MARIA-1b | Controles antes de generar: NCM del catálogo, moneda, incoterm, CUIT, montos; ningún texto mete líneas en el TXT; las filas de total o de flete no pasan como productos; al guardar la operación no se inventan cantidad 1 ni peso 0,5 (M10, D6 de la Dev 2) |
 | ✅ | PUNTA-A-PUNTA-1 | Prueba automática: sube un PDF y un Excel (Gemini simulado) y compara el TXT con los archivos reales |
 | ⏳ | EXCEL-2 | Abrir un libro armado no traba la lectura (D26 de la Dev 1); lo que el Excel todavía no lee: encabezado fuera de la fila 1, sin columna de origen, celdas combinadas (D18 de la Dev 1); CSV con `;`, latin-1 o BOM en el historial de NCM; el aviso de mapeo nombra la columna que se usó |
-| 1 | GUARDAR-1 | Guardar una operación con la posición SIM completa (`84714900100D`) da 500 en producción y no guarda nada: la operación se guarda siempre, y el historial de NCM también (Emi dijo que sí, 2026-10-07). Va antes que COBRO-MP-1 |
+| ✅ | GUARDAR-1 | Guardar una operación con la posición SIM completa (`84714900100D`) da 500 en producción y no guarda nada: la operación se guarda siempre, y el historial de NCM también (Emi dijo que sí, 2026-10-07). Va antes que COBRO-MP-1 |
+| 1 | GUARDAR-2 | La sugerencia de NCM: si el historial del cliente tiene 8 dígitos y el proveedor la SIM completa que empieza con esos 8, gana la del proveedor (D32 b de la Dev 1; sin migración) |
 
 **Cierre:** publicar con el «dale»; Emi prueba con facturas reales; el
 despachante carga un archivo en su Kit (cierra G4).
@@ -82,7 +83,7 @@ despachante carga un archivo en su Kit (cierra G4).
 | Pieza | Quién | Qué arregla |
 |---|---|---|
 | COBRO-MP-1 | Dev 1 | Aviso de pago verificado, aplicado una vez aunque se reenvíe, con el monto controlado (C3, D8 de la Dev 1). Va primero: es el único camino que hoy activa sin pagar. Además, que las renovaciones de la suscripción extiendan el período (hoy sólo se procesa `type=payment`; leído en el ataque al ensayo, sin verificar). La suscripción está configurada en Railway (Emi, 2026-10-07): las renovaciones corren en producción |
-| COBRO-CORTE-1 | Dev 1 | Quien no paga no genera valor ni gasta Gemini; se cuenta una vez por operación; sin pasarse del tope; el aviso del corte dice la razón real (hoy una cuenta que fue activa recibe «prueba vencida») (C1, C5, C6). Ya decidido: D4 (b, N = 10), D5 (a), D6 (a) de la Dev 1 (`PARA-DEV.md`) |
+| COBRO-CORTE-1 | Dev 1 | Quien no paga no genera valor ni gasta Gemini; se cuenta una vez por operación; sin pasarse del tope; el aviso del corte dice la razón real (hoy una cuenta que fue activa recibe «prueba vencida») (C1, C5, C6). Con guardados a la vez, hoy el contador cuenta de menos y se pasa del tope (revisión de GUARDAR-1). Ya decidido: D4 (b, N = 10), D5 (a), D6 (a) de la Dev 1 (`PARA-DEV.md`) |
 | COBRO-MP-2 | Dev 1 | Cancelar también en Mercado Pago, sin perder días pagados, una sola suscripción, reactivar pagando (una prueba gratuita no pasa a activa); sin token de Mercado Pago, no decir «activada» (C2, C4, C8, D9 de la Dev 1) |
 | ORG-1 | Dev 2 | Invitaciones que funcionan, tope de usuarios del plan, atadas al email (C7) |
 | LEGAL-1 | Dev 2 | Términos y privacidad con el texto de Emi, y cómo pedir el borrado de datos (X5) |
