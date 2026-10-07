@@ -218,7 +218,8 @@ reemplazar $M '    peso = numeros(df["peso_unitario"])' '    peso = pd.to_numeri
 caso peso_sin_separador "${D}test_un_peso_con_coma_se_lee_como_el_resto[Peso total-0.625]"
 
 # 32. el generador sin la guarda del peso
-reemplazar $G "    if not math.isfinite(kilos) or kilos > IMPORTE_MAXIMO:" "    if False:"
+reemplazar $G "    if not math.isfinite(kilos):" "    if False:"
+reemplazar $G "    if kilos > IMPORTE_MAXIMO:" "    if False:"
 reemplazar $G "    if round(kilos, 3) <= 0:" "    if kilos < 0:"
 caso peso_sin_guarda "${D}test_un_peso_imposible_no_llega_al_txt["
 
@@ -227,7 +228,7 @@ reemplazar $G 'QARTKGRNET={peso_valido(peso_kg, idx):.3f}' 'QARTKGRNET={peso_kg:
 caso guarda_sin_usar "${D}test_un_peso_imposible_no_llega_al_txt["
 
 # 34. sin tope en el peso
-reemplazar $G "    if not math.isfinite(kilos) or kilos > IMPORTE_MAXIMO:" "    if not math.isfinite(kilos):"
+reemplazar $G "    if kilos > IMPORTE_MAXIMO:" "    if False:"
 caso peso_sin_tope "${D}test_un_peso_imposible_no_llega_al_txt[peso2]"
 
 # 35. sub-ítems: la suma exacta contra el MARTFOB redondeado
