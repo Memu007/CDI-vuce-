@@ -12,8 +12,9 @@ Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`.
 `merge`. Nunca `main`. La rama vieja `claude/project-deploy-review-4nct96`
 queda como historia: todo lo suyo ya está en la de la PM.
 
-Sos la Dev de la **cola técnica** (permisos, cobro, sesión, datos). La Dev 2
-hace la cola MARIA en `claude/dev2-maria`; no tocás su canal ni su rama.
+Tus piezas están en `ROADMAP.md` (Dev 1): en la Fase 1, que la lectura de
+PDF no se trabe, el Excel y los controles; después, cobro y seguridad. La
+Dev 2 trabaja en `claude/dev2-maria`; no tocás su canal ni su rama.
 
 Herramientas: todas menos el consejero; tu sesión y tus subagentes hasta
 esfuerzo alto, nunca Fable (`ONBOARDING-DEV.md`, «Rol»).
@@ -45,7 +46,7 @@ la prueba de recorrido, que se suman a ADMIN-2 (abajo). Detalle en
 - **D6: (a)** ahora. El índice único (b), pieza aparte más adelante, después
   de mirar si producción ya tiene códigos repetidos.
 
-D4 a D6 quedan anotadas para cuando vuelva COBRO-CORTE-1 (ver abajo).
+D4 a D6 quedan anotadas en `ROADMAP.md`, Fase 2, para cuando llegue COBRO-CORTE-1.
 
 ## Tarea activa — ADMIN-2: lo que encontraste en ADMIN-1
 
@@ -78,6 +79,14 @@ pasa una cuenta a `active`; el admin por variable recibe 403 en
 `cohort-retention`). El chip anda en pantalla (captura). Suite completa en
 verde. Autorrevisión con Opus alto y Sonnet alto (es cobro y permisos).
 
+## Plan nuevo de Emi (2026-10-07)
+
+Emi cambió el orden: **primero todo el camino «PDF o Excel → TXT MARIA»,
+después el cobro, la seguridad al final y exhaustiva** (`ROADMAP.md`).
+Terminá ADMIN-2 y seguí con tu parte de la Fase 1, en este orden:
+RENDIMIENTO-1, DEPENDENCIAS-1, EXCEL-1, MARIA-1b y PUNTA-A-PUNTA-1. Cada una
+se te escribe acá cuando arranque; la próxima es la de abajo.
+
 ## Después — RENDIMIENTO-1 (apenas entregues ADMIN-2)
 
 Leer un PDF no frena el sitio para todos (hallazgo D3). `upload_pdf_public`
@@ -87,16 +96,10 @@ función `async`; lo mismo `_suggest_ncm_with_gemini` (`:6905`, usada en
 `:7027`). Con un solo proceso, mientras se lee un PDF nadie más es atendido.
 
 **Alcance:** que esas llamadas no bloqueen (por ejemplo, `asyncio.to_thread`)
-y que la lectura tenga un tiempo máximo con un error claro. Ojo: la Dev 2 ya
-cambió `upload_pdf_public` en MARIA-2; traé la rama de la PM antes de
-arrancar (la integro cuando la acepte).
+y que la lectura tenga un tiempo máximo con un error claro. MARIA-2 (Dev 2) ya
+cambió `upload_pdf_public` y está integrada en la rama de la PM: traela con
+`merge` antes de arrancar.
 
 **Criterios:** una prueba con dos pedidos al mismo tiempo, uno con una lectura
 lenta simulada, donde `/health` responde mientras tanto (rojo antes, verde
 después); el tiempo máximo con su error. Suite completa en verde.
-
-## En pausa — COBRO-CORTE-1
-
-Emi está decidiendo si primero se termina todo el camino «PDF o Excel →
-TXT MARIA» y el cobro se corre unas semanas. Hasta que decida, COBRO-CORTE-1
-no arranca. Tus D4 a D6 ya están contestadas arriba, para cuando vuelva.
