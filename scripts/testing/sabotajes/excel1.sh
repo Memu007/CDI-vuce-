@@ -32,7 +32,7 @@ open(p, "w").write(s.replace(viejo, nuevo))
 PYEOF
   then echo "ROTO  | $nombre: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1)); return; fi
   local salida codigo
-  salida="$("$PY" -m pytest -q --no-cov -p no:cacheprovider tests/test_excel1_rendimiento.py tests/test_excel1_lectura.py 2>&1)"; codigo=$?
+  salida="$("$PY" -m pytest -q --no-cov -p no:cacheprovider tests/test_excel1_rendimiento.py tests/test_excel1_lectura.py tests/test_excel1_txt.py 2>&1)"; codigo=$?
   if [ "$codigo" -eq 0 ]; then
     echo "VERDE | $nombre: la prueba no lo vio"; FALLAS=$((FALLAS+1))
   elif grep -qF -- "$esperado" <<<"$salida"; then
@@ -91,6 +91,38 @@ sabotaje $M "las filas descartadas dejan de avisarse" \
   '            "filas_descartadas": len(descartes),' \
   '            "filas_descartadas": 0,' \
   "FAILED $L::test_filas_descartadas_se_avisan"
+sabotaje $M "las filas con datos faltantes vuelven a perderse" \
+  '            # Sin descripción ni NCM no hay ítem que mostrar: se avisa.
+            if not pieza and not descripcion:' \
+  '            # Sin descripción ni NCM no hay ítem que mostrar: se avisa.
+            if not pieza or not descripcion:' \
+  "FAILED $L::test_filas_con_datos_faltantes_entran_vacias_y_no_inventadas"
+sabotaje $M "vuelve la cantidad 1 inventada" \
+  '                "cantidad": float(getattr(it, "cantidad", 0) or 0),' \
+  '                "cantidad": float(getattr(it, "cantidad", 1) or 1),' \
+  "FAILED $L::test_filas_con_datos_faltantes_entran_vacias_y_no_inventadas"
+sabotaje $M "los números en texto vuelven a leerse con float" \
+  '                return (_numero_factura(row[col], decimal) or 0.0) if col else 0.0' \
+  '                return float(row[col]) if col else 0.0' \
+  "FAILED $L::test_numeros_escritos_como_texto"
+sabotaje $M "pandas vuelve a convertir el texto de las celdas" \
+  '    return pd.read_excel(ruta, engine=engine, dtype=object)' \
+  '    return pd.read_excel(ruta, engine=engine)' \
+  "FAILED $L::test_numeros_escritos_como_texto[1.500-0]"
+sabotaje $M "la NCM numérica vuelve a salir con .0" \
+  '    if isinstance(valor, float) and valor.is_integer():
+        return str(int(valor))' \
+  '    if False:
+        return str(int(valor))' \
+  "FAILED $L::test_ncm_numerica_no_sale_con_punto_cero"
+sabotaje $M "el país vuelve a cortarse a tres letras" \
+  '                origen=_origen_desde_factura(row[origen_col]) or "XX",' \
+  '                origen=str(row[origen_col]).upper()[:3] or "XX",' \
+  "FAILED $L::test_pais_por_nombre_no_se_corta"
+sabotaje $M "«País de origen» deja de reconocerse" \
+  '        "paisdeorigen", "countryoforigin", "origin", "madein",' \
+  '        "countryoforigin", "origin", "madein",' \
+  "FAILED tests/test_excel1_txt.py::test_excel_y_pdf_dan_el_mismo_txt"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"
