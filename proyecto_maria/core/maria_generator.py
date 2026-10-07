@@ -450,6 +450,16 @@ def get_pais_codigo(pais: str) -> int:
     return PAIS_DEFAULT_IMPORT
 
 
+def peso_de_la_linea(item: dict) -> float:
+    """El peso neto total de la línea, que va en QARTKGRNET (MARIA-5; respuesta
+    3 del despachante). `peso_kg`, si viene, ya es el total (así lo mandan la
+    v1 y los archivos reales); si no, `peso_unitario` × cantidad (la v2)."""
+    total = item.get('peso_kg')
+    if total not in (None, ''):
+        return float(total or 0)
+    return float(item.get('peso_unitario') or 0) * float(item.get('cantidad', 1) or 0)
+
+
 def generate_maria_txt(operation_id: str, items: list, 
                        moneda: str = "DOL", 
                        incoterm: str = "FOB",
@@ -496,7 +506,7 @@ def generate_maria_txt(operation_id: str, items: list,
             - cantidad: Cantidad
             - valor_unitario: Precio unitario
             - valor_total: Precio total (opcional, se calcula)
-            - peso_kg: Peso en kg
+            - peso_kg: Peso neto total de la línea en kg (o peso_unitario)
             - pais_origen/origen: País de origen
         moneda: Código de moneda (DOL, EUR)
         incoterm: Término comercial (FOB, DDP, CIF, EXW)
@@ -783,9 +793,7 @@ def generate_maria_txt(operation_id: str, items: list,
             float(it.get('valor_total') or float(it.get('cantidad', 1)) * float(it.get('valor_unitario', 0)))
             for it in grupo_items
         )
-        combined['peso_kg'] = sum(
-            float(it.get('peso_kg', it.get('peso_unitario', 0)) or 0) for it in grupo_items
-        )
+        combined['peso_kg'] = sum(peso_de_la_linea(it) for it in grupo_items)
         # valor_unitario promedio del grupo
         total_cant = combined['cantidad']
         combined['valor_unitario'] = combined['valor_total'] / total_cant if total_cant > 0 else 0
@@ -814,7 +822,7 @@ def generate_maria_txt(operation_id: str, items: list,
         cantidad = float(item.get('cantidad', 1))
         valor_unit = float(item.get('valor_unitario', 0))
         valor_total = float(item.get('valor_total') or cantidad * valor_unit)
-        peso_kg = float(item.get('peso_kg', item.get('peso_unitario', 0)) or 0)
+        peso_kg = peso_de_la_linea(item)
         pais = item.get('pais_origen') or item.get('origen', 'CN')
         pais_codigo = get_pais_codigo(pais)
         # Procedencia: pais desde donde se despacha. Si no viene, se asume el
@@ -1212,7 +1220,7 @@ def validate_for_kit_maria(items: list) -> tuple[list, list]:
             errores.append(f"Item {idx}: Descripción muy corta ({len(desc)} chars). KIT Maria requiere mínimo 10.")
 
         # Peso > 0
-        peso = float(item.get("peso_kg", item.get("peso_unitario", 0)) or 0)
+        peso = peso_de_la_linea(item)
         if peso <= 0:
             errores.append(f"Item {idx}: Peso inválido (≤0). KIT Maria lo rechaza.")
 
