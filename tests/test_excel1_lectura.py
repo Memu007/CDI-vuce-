@@ -363,3 +363,12 @@ def test_el_indice_del_xlsx_se_mira_fuera_del_hilo_del_servidor(monkeypatch):
     r = _subir([H, ["84713000", "Laptop", "CN", 10, 350, 1.5]])
     assert r.status_code == 200, r.text[:300]
     assert hilos == [False], hilos
+
+
+def test_peso_ambiguo_entre_parentesis_queda_vacio_y_no_se_adivina():
+    """«Peso (kg)» y «Peso (bruto)»: sin paréntesis las dos son «Peso». No se
+    elige una por el orden: el peso queda vacío y el semáforo lo marca."""
+    r = _subir([["NCM", "Descripcion", "Origen", "Cantidad", "Precio Unitario", "Peso (kg)", "Peso (bruto)"],
+                ["84713000", "Laptop", "CN", 10, 350, 1.5, 2.2]])
+    assert r.status_code == 200, r.text[:300]
+    assert r.json()["items"][0]["peso_unitario"] == 0, r.json()["items"]

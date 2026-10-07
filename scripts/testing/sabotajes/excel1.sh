@@ -128,7 +128,7 @@ sabotaje $M "«Peso (neto)» y «Peso (bruto)» vuelven a confundirse" \
   '        if len(originales) == 1:
             norm_to_orig.setdefault(norm, originales[0])' \
   '        norm_to_orig[norm] = originales[-1]' \
-  "FAILED $L::test_peso_neto_y_bruto_entre_parentesis_no_se_confunden"
+  "FAILED $L::test_peso_ambiguo_entre_parentesis_queda_vacio_y_no_se_adivina"
 sabotaje $M "el Excel vuelve a usar los hilos del PDF" \
   'def _pool_lectura_excel():
     global _POOL_LECTURA_EXCEL' \
