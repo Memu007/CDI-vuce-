@@ -53,3 +53,5 @@ def test_la_pantalla_vieja_no_repone_cantidad_ni_origen():
     fuente = (V2 / "app.js").read_text(encoding="utf-8")
     assert not re.search(r'data-field="cantidad"\]\'\)\?\.value\)\s*\|\|\s*1\b', fuente)
     assert not re.search(r'data-field="origen"\]\'\)\?\.value\?\.trim\(\)\s*\|\|\s*\'CN\'', fuente)
+    # ni el país del vendedor
+    assert not re.search(r"vendedor_pais\b[^\n]*\|\|\s*'CN'", fuente)
