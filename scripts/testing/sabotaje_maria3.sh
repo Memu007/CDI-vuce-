@@ -204,7 +204,7 @@ reemplazar $G '        valor = str(item.get(clave) or "").strip()' '        valo
 caso procedencia_en_blanco "${T}test_procedencia_de_item_en_blanco_no_pisa_la_de_la_operacion"
 
 # 26. el generador no valida gastos_fob
-reemplazar $G "        importe_gastos = f\"{_importe_de_gastos(gastos_fob, 'gastos_fob'):.2f}\"" \
+reemplazar $G "        importe_gastos = f\"{centavos(_importe_de_gastos(gastos_fob, 'gastos_fob')):.2f}\"" \
   "        importe_gastos = f\"{float(gastos_fob):.2f}\""
 caso generador_sin_validar "${T}test_el_generador_tampoco_acepta_gastos_invalidos[inf]"
 

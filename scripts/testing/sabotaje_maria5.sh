@@ -135,5 +135,17 @@ caso pdf_directo_a_su_modo "${T}lector_productos.py::test_la_version_se_suma_a_l
 reemplazar $X "    return descripcion[:100], _texto(item_data.get('codigo_parte'))[:20]" "    return descripcion[:100], str(item_data.get('codigo_parte') or '')[:20]"
 caso codigo_parte_sin_limpiar "${T}lector_productos.py::test_el_vacio_no_queda_escrito["
 
+# 14. cantidad × unitario vuelve a multiplicarse en binario
+reemplazar $G "        valor = _exacto(_exacto(item.get('cantidad', 1)) * _exacto(item.get('valor_unitario', 0)))" "        valor = _exacto(float(item.get('cantidad', 1)) * float(item.get('valor_unitario', 0)))"
+caso producto_binario "${T}centavos.py::test_cantidad_por_unitario_en_decimal_exacto[3-3.335-10.01]"
+
+# 15. los sub-ítems se redondean cada uno por su cuenta
+reemplazar $G "            fobs_sub = repartir(valor_total, crudos_sub)" "            fobs_sub = [centavos(c) for c in crudos_sub]"
+caso subitems_sin_reparto "${T}centavos.py::test_los_subitems_cierran_sin_rechazar_un_pedido_valido["
+
+# 16. sin tope: un importe enorme llega al cálculo
+reemplazar $G "    if not numero.is_finite() or abs(numero) > IMPORTE_MAXIMO:" "    if not numero.is_finite():"
+caso sin_tope "${T}centavos.py::test_un_importe_imposible_da_error_y_no_500[extra"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 13 sabotajes dan rojo por la razón esperada"
+echo "OK: los 16 sabotajes dan rojo por la razón esperada"
