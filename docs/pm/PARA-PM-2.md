@@ -2,7 +2,7 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## CATALOGO-NCM-1 — entregada, con tu rama integrada: **`8f151a0`**
+## CATALOGO-NCM-1 — entregada, con tu rama integrada: **`fd8200a`**
 
 **Resultado: terminada.** También integré tu rama (`9488dd8`, con EXCEL-1 y
 MARIA-1b) sobre MARIA-5. **Para decidir: la D23 sigue abierta.** En la
@@ -80,10 +80,10 @@ prueba:
   una prueba directa al generador para que su guarda siga cubierta (sabotaje
   16).
 
-| Puerta (sobre `8f151a0`) | Resultado |
+| Puerta (sobre `fd8200a`; después de `8f151a0` sólo cambian pruebas y scripts de sabotaje) | Resultado |
 |---|---|
 | Suite completa, worktree limpio en `fa4ed0b`, venv sólo con `requirements.txt` (`8f151a0` sólo suma dos pruebas, que pasan) | `1454 passed, 102 skipped, 1 xfailed, 25 warnings in 145.68s`, 0 failed |
-| `sabotaje_catalogo_ncm1.sh` (14), `sabotaje_maria5.sh` (44) y los de MARIA-3, 1d, 4, 1c, 2b, 2 y 1a; los de la Dev 1 (`sabotajes/excel1.sh`, `maria1b.sh`, `punta_a_punta1.sh`) | RESULTADO_SABOTAJES |
+| `sabotaje_catalogo_ncm1.sh` (14), `sabotaje_maria5.sh` (44) y los de MARIA-3, 1d, 4, 1c, 2b, 2 y 1a; los de la Dev 1 (`sabotajes/excel1.sh`, `maria1b.sh`, `punta_a_punta1.sh`) | Míos, todos `OK`: CATALOGO-NCM-1 (14, en `fd8200a`), MARIA-5 (44, en `8f151a0`), MARIA-3 (30), 1d (8), 4 (9), 1c (4), 2b (6), 2 (8), 1a (10). De la Dev 1: `maria1b.sh` con 0 fallas y `punta_a_punta1.sh` con 0 fallas. Para el segundo puse al día el patrón del FOB del subítem, que movió MARIA-5. En `excel1.sh`, en `fd8200a`, queda una: «el mapeo guardado vuelve a dejar afuera lo detectado» da rojo, pero en otras pruebas. Pasa porque el peso ahora se elige aparte del mapeo y la cantidad «Qty» la encuentra el lector igual. Dos sabotajes del peso de ese script, que la regla de MARIA-5 dejó viejos, apuntan ahora a `_clase_de_peso` y `_RANGO_DE_PESO`, y dan rojo |
 | `pantalla_catalogo_ncm1.js` (local, `4d9b7f5`) | `OK: pantalla CATALOGO-NCM-1`; captura en `docs/pm/capturas/catalogo-ncm1-baja.png` |
 | `pantalla_maria5.js` y `smoke_friccion.sh` (local, `7b4f651`) | `OK: pantalla MARIA-5` y `==> OK · telemetría…` |
 
@@ -92,14 +92,14 @@ producción ni terceros.
 
 Para reproducir:
 ```
-PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh 8f151a0 8890
+PM_DIR=/tmp/cdi-pm docs/pm/herramientas/levantar.sh fd8200a 8890
 BASE_URL=http://127.0.0.1:8890 node scripts/testing/pantalla_catalogo_ncm1.js   # «OK: pantalla CATALOGO-NCM-1»
-scripts/testing/sabotaje_catalogo_ncm1.sh 8f151a0 /tmp/cdi-pm/venv              # «OK: los 14 sabotajes …»
+scripts/testing/sabotaje_catalogo_ncm1.sh fd8200a /tmp/cdi-pm/venv              # «OK: los 14 sabotajes …»
 python -m pytest -q tests/test_catalogo_ncm1.py tests/test_excel1_lectura.py tests/test_maria5_*.py
 ```
 
-Última vuelta: 2026-10-07 16:45 UTC
-Contexto: CONTEXTO
+Última vuelta: 2026-10-07 18:15 UTC
+Contexto: ~20 %
 
 ---
 
