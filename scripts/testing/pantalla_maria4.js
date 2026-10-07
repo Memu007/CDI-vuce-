@@ -56,8 +56,32 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   if (!pedido) falla('no se pidió el TXT');
   const p = pedido;
   if (p.banco_bcra !== '191' || p.empresa_digitalizacion !== 'PSAD01' || p.iva_adicional !== 'IVAAD1') falla('operación: ' + JSON.stringify([p.banco_bcra, p.empresa_digitalizacion, p.iva_adicional]));
-  if (String(p.items[0].estado) !== '2' || String(p.items[1].estado) !== '3') falla('estados: ' + JSON.stringify(p.items.map(i => i.estado)));
-  console.log('OK el pedido lleva banco 191, Lakaut, uso particular y estados 2 y 3');
+  // El importado no se eligió: no va (el servidor usa 2 y lo avisa).
+  if (p.items[0].estado != null || String(p.items[1].estado) !== '3') falla('estados: ' + JSON.stringify(p.items.map(i => i.estado)));
+  console.log('OK el pedido lleva banco 191, Lakaut, uso particular, el estado 3 elegido y el importado sin elegir');
+
+  // Se vuelve atrás y el importado pasa a argentino: el 2 por defecto no quedó
+  // guardado, así que se vuelve a pedir el estado.
+  pedido = null;
+  await page.evaluate(() => { CDI.state.items[0].origen = 'AR'; CDI.goTo('validating'); });
+  await page.waitForFunction(() => document.querySelector('.despachante-estado[data-row="0"]') && document.querySelector('.despachante-estado[data-row="0"]').value === '', null, { timeout: 8000 })
+    .catch(() => falla('al pasar a origen argentino el estado sigue en el valor por defecto'));
+  await page.click('#validatingGenerate');
+  await page.locator('#despachanteError', { hasText: 'Ítem 1: el origen es argentino' }).waitFor({ timeout: 5000 }).catch(() => falla('deja generar el ítem que pasó a argentino sin estado'));
+  if (pedido) falla('se pidió el TXT con el ítem argentino sin estado');
+  console.log('OK al volver y pasar a origen argentino se vuelve a pedir el estado');
+
+  // Otro cliente, con otro banco: se propone el suyo.
+  const rb = await page.request.post(base + '/api/clientes', { data: { nombre: 'Cliente M4 B', cuit: '30712345679' } });
+  const bj = await rb.json(); const clienteB = bj.cliente || bj;
+  await page.request.post(base + '/api/clientes/' + clienteB.id + '/operaciones', { data: {
+    operation_id: 'ANT-2', source: 'pdf_v2', currency: 'USD',
+    resumen: { items: 1, valor_total: 1, peso_total: 1, maria: { banco_bcra: '014', empresa_digitalizacion: 'PSAD06', iva_adicional: 'NO_VALIDA' } },
+    items: [{ pieza: '84714900100D', descripcion: 'Anterior B', origen: 'CN', cantidad: 1, valor_unitario: 1, peso_unitario: 1 }] } });
+  await page.evaluate((cl) => { CDI.state.operacion.despachante = {}; CDI.setClienteActivo(cl); CDI.goTo('validating'); }, clienteB);
+  await page.waitForFunction(() => document.getElementById('despachanteBanco').value === '014', null, { timeout: 8000 })
+    .catch(() => falla('al cambiar de cliente sigue el banco del anterior'));
+  console.log('OK otro cliente: se propone su banco (014)');
   await b.close();
   console.log('OK: pantalla MARIA-4');
 })().catch(e => falla(e.message));

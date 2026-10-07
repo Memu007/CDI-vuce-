@@ -179,3 +179,41 @@ def test_lo_elegido_se_guarda_con_la_operacion_y_vuelve_en_los_listados(client, 
     assert ops[0]["maria"] == elegido
     ops = client.get("/api/operations").json()["operaciones"]
     assert any(o.get("maria") == elegido for o in ops)
+
+
+def test_iva_en_minusculas_se_normaliza():
+    txt = _gen(iva_adicional="ivaad1")
+    assert _valor(txt, "IVAADICIONAL1", "0001") == ["IVAAD1"]
+
+
+def test_grupo_con_iva_distinto_se_rechaza():
+    items = [dict(ITEM_BASE, grupo_id=1, iva_adicional="IVAAD1"),
+             dict(ITEM_BASE, grupo_id=1, iva_adicional="NO_VALIDA")]
+    with pytest.raises(ValueError, match="mismo IVA"):
+        _gen(items)
+
+
+def test_grupo_con_el_mismo_valor_escrito_distinto_se_acepta():
+    """El valor por defecto y el mismo valor escrito salen igual en el TXT."""
+    items = [dict(ITEM_BASE, grupo_id=1), dict(ITEM_BASE, grupo_id=1, estado="2", iva_adicional="no_valida")]
+    txt = _gen(items)
+    assert _cartuso(txt) == ["2"]
+
+
+@pytest.mark.parametrize("banco", ["١٩١", "²³⁴", "１９１"])
+def test_banco_con_digitos_que_no_son_0_a_9_se_rechaza(banco):
+    with pytest.raises(ValueError, match="BCRA"):
+        _gen(banco_bcra=banco)
+
+
+def test_los_listados_recortan_lo_guardado(client, auth_override):
+    r = client.post("/api/clientes", json={"nombre": "Cliente largo", "cuit": "30712345670"})
+    cid = (r.json().get("cliente") or r.json()).get("id")
+    client.post(f"/api/clientes/{cid}/operaciones", json={
+        "operation_id": "M4-L", "source": "pdf_v2", "currency": "USD",
+        "resumen": {"items": 1, "maria": {"banco_bcra": "9" * 5000, "iva_adicional": {"a": [1]}}},
+        "items": [{"pieza": "84714900100D", "descripcion": "Equipo", "origen": "CN",
+                   "cantidad": 1, "valor_unitario": 10, "peso_unitario": 1}],
+    })
+    maria = client.get(f"/api/clientes/{cid}/operaciones").json()["operaciones"][0]["maria"]
+    assert len(maria["banco_bcra"]) <= 12 and maria["iva_adicional"] == ""
