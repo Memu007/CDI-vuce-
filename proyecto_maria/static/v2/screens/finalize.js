@@ -65,6 +65,8 @@
        Pantalla 4: validating
        ========================================================== */
     function onEnterValidating() {
+        // MARIA-4: lo que decide el despachante, antes de generar.
+        if (CDI.despachante) CDI.despachante.render();
         init();
         if (!vLoading) return;
         const items = (CDI.state && CDI.state.items) || [];
@@ -272,6 +274,8 @@
             return;
         }
         if (sbtError) sbtError.hidden = true;
+        // MARIA-4: origen argentino sin estado no se genera (no se inventa).
+        if (CDI.despachante && !CDI.despachante.leer()) return;
 
         CDI.goTo('ready', { fromValidating: true });
     }
@@ -367,7 +371,9 @@
             peso_unitario: toNumber(it.peso_unitario, 0),
             codigo_parte: String(it.codigo_parte || '').trim(),
             grupo_id: it.grupo_id || null,
-            unidad: it.unidad || null
+            unidad: it.unidad || null,
+            estado: it.estado || null,
+            iva_adicional: it.iva_adicional || null
         }));
 
         // Cliente activo propaga domicilio + fecha inicio actividad del importador
@@ -382,6 +388,9 @@
         return {
             operation_id: operation_id,
             items: items,
+            banco_bcra: String(op.banco_bcra || '').trim(),
+            empresa_digitalizacion: op.empresa_digitalizacion || null,
+            iva_adicional: op.iva_adicional || null,
             moneda: moneda,
             incoterm: incoterm,
             cuit_agr: cuit_agr,
@@ -743,7 +752,13 @@
                 peso_total: total_peso,
                 ncms_unicos: stats.ncms_unicos || 0,
                 numero_factura: op.numero_factura || '',
-                fecha_emision: op.fecha_emision || ''
+                fecha_emision: op.fecha_emision || '',
+                // MARIA-4: para proponer el último banco y la última empresa.
+                maria: {
+                    banco_bcra: String(op.banco_bcra || '').trim(),
+                    empresa_digitalizacion: op.empresa_digitalizacion || '',
+                    iva_adicional: op.iva_adicional || ''
+                }
             },
             items: items.map(it => ({
                 pieza: String(it.pieza || '').trim(),

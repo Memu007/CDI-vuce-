@@ -5283,6 +5283,17 @@ async def delete_cliente(
         )
 
 
+def _maria_de_operacion(op) -> dict:
+    """Lo que eligió el despachante en esa operación (MARIA-4): banco, empresa
+    de digitalización e IVA adicional. Vive en extra.resumen.maria; la
+    pantalla lo usa para proponer el último banco del cliente y la última
+    empresa del usuario."""
+    extra = op.extra if isinstance(op.extra, dict) else {}
+    resumen = extra.get("resumen") if isinstance(extra.get("resumen"), dict) else {}
+    maria = resumen.get("maria") if isinstance(resumen.get("maria"), dict) else {}
+    return {k: str(maria.get(k) or "") for k in ("banco_bcra", "empresa_digitalizacion", "iva_adicional")}
+
+
 @app.get("/api/clientes/{client_id}/operaciones")
 async def get_client_operations(
     client_id: str,
@@ -5317,6 +5328,7 @@ async def get_client_operations(
                     "total_weight": op.total_weight,
                     "generated_file": op.generated_file,
                     "currency": op.currency,
+                    "maria": _maria_de_operacion(op),
                 }
                 for op in operations
             ],
@@ -5396,6 +5408,7 @@ async def list_operations(
                     "total_value": op.total_value,
                     "currency": op.currency,
                     "generated_file": op.generated_file,
+                    "maria": _maria_de_operacion(op),
                 }
                 for op, client_name in rows
             ],

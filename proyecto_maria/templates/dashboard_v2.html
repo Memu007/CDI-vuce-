@@ -563,6 +563,29 @@
                                style="margin-top:.4rem;color:var(--danger,#c0392b);font-size:.85rem"></p>
                         </div>
 
+                        <div class="card card-body" id="despachanteWrap" style="margin-bottom:1rem">
+                            <p class="form-label" style="font-weight:600">Lo que decide el despachante</p>
+                            <div class="row-3" style="gap:.75rem;flex-wrap:wrap">
+                                <label class="form-label">Banco (código BCRA)
+                                    <input type="text" id="despachanteBanco" class="form-input" maxlength="3" inputmode="numeric" placeholder="Ej: 191" autocomplete="off">
+                                </label>
+                                <label class="form-label">Empresa de digitalización
+                                    <select id="despachanteEmpresa" class="form-input"></select>
+                                </label>
+                                <label class="form-label">IVA adicional
+                                    <select id="despachanteIva" class="form-input"></select>
+                                </label>
+                            </div>
+                            <table class="table" style="width:100%;margin-top:.75rem">
+                                <thead><tr><th>Producto</th><th>Estado de la mercadería</th><th>IVA adicional</th></tr></thead>
+                                <tbody id="despachanteItems"></tbody>
+                            </table>
+                            <p class="caption" style="margin-top:.4rem;color:var(--muted,#666);font-size:.85rem">
+                                Reducción o exclusión del IVA adicional: se elige en «Ventajas» del Kit; no va en el TXT.
+                            </p>
+                            <p id="despachanteError" hidden role="alert" style="margin-top:.4rem;font-size:.85rem"></p>
+                        </div>
+
                         <footer class="validating-actions">
                             <button type="button" class="btn btn-ghost" data-action="go-ncm-from-validating">Volver a NCM</button>
                             <div class="row-3">
@@ -1602,6 +1625,7 @@
     <script src="/static/v2/screens/review.js?v={{ version }}" defer></script>
     <script src="/static/v2/paises_maria.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/ncm.js?v={{ version }}" defer></script>
+    <script src="/static/v2/screens/despachante.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/finalize.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/calculadora.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/enrich.js?v={{ version }}" defer></script>
