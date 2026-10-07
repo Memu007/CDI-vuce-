@@ -3,7 +3,7 @@
 Actualizado: 2026-10-07. Estado vigente; la historia está en Git.
 
 **Producto:** `Memu007/CDI-vuce-` (privado desde el 2026-10-06).
-**Publicado:** `main` = `a771693` (2026-07-18) en Railway,
+**Publicado:** `main` = `5cb03ab` (2026-10-07, publicación de ensayo) en Railway,
 `cdi-production.up.railway.app`. Railway publica cada push a `main` sin
 esperar los tests.
 **En producción:** la usa sólo Emi, con facturas reales (Emi, 2026-10-07).
@@ -16,45 +16,13 @@ antes de cerrar la Fase 3.
 
 ## Para Emi
 
-1. **Mañana, de día: publicación de ensayo** (aprobada el 2026-10-07; falta
-   el «dale» para el SHA exacto, que le pasa la PM con la suite corrida sobre
-   él). Antes, en Railway, en este orden (probado en local con Postgres y una
-   base armada con el código de julio: `REPRODUCCION-ENSAYO-2026-10-07.md`):
-   1. **Copia de la base** (pestaña de copias de seguridad), antes de tocar
-      nada.
-   2. **Tabla `users`:**
-      - **¿Existen `demo`, `premium` o `basico`?** Borrar esas filas. El
-        código publicado los crea con contraseñas escritas en el código, y
-        `demo` tiene guardado el rol de admin: entra al panel aunque no esté
-        en `ADMIN_USERNAMES`. Si Railway no deja borrarlos (tienen datos), no
-        seguir y avisar a la PM.
-      - **Tu fila:** `billing_status` = `active` y `trial_ends_at` = una fecha
-        del año que viene (por ejemplo, 2027-10-31). Si no, al arrancar la
-        versión nueva tu cuenta pasa a impaga: seguís generando el TXT, pero
-        no guardás operaciones nuevas, y volver a la versión vieja no lo
-        deshace. Hacen falta las dos cosas: con la fecha sola no alcanza.
-      - **Cuentas que no sean tuyas,** o filas en la tabla `organizations`:
-        avisar a la PM. Sin cuentas ajenas, nadie pudo ver tus facturas con
-        la fuga de MARIA.TXT.
-   3. **Variables del servicio:**
-      - que existan `ALLOWED_ORIGINS`, `JWT_SECRET_KEY` y `DATABASE_URL` (sin
-        ellas la versión nueva no arranca y Railway deja andando la vieja);
-      - `ADMIN_USERNAMES` = tu usuario, escrito exactamente igual (si nombra un
-        usuario que no existe, el primero que se registre con ese nombre es
-        admin);
-      - **`ENVIRONMENT` = `production`, exactamente así, en minúsculas.** Con
-        «Production» la versión nueva crea los tres usuarios de prueba en la
-        base real y `demo` entra como admin.
-   4. ¿El servicio tiene un volumen conectado? Una línea a la PM (sin
-      volumen, al publicar se borran los TXT generados y el historial de NCM;
-      las operaciones en la base quedan).
-   5. Recomendado: prender «Wait for CI» y apagar la red pública de la base.
-   6. **Después de publicar:** en los registros del arranque, la línea
-      «Billing cron» tiene que decir 0 usuarios pasados a `past_due`; y
-      guardar una operación de prueba.
-
-   El TXT cambia a propósito en dos cosas: desaparece el bloque de gastos
-   posteriores al FOB en 0 y el año del `IEXT` pasa a 26.
+1. **Publicación de ensayo, hecha** (2026-10-07 12:53 UTC, `5cb03ab`, con
+   el «dale» de Emi para ese SHA). Falta que Emi mire: la versión nueva
+   «Active» en Railway; «Billing cron» con 0 usuarios (si no, su fila otra
+   vez `active` y `trial_ends_at` 2027-10-31, y reiniciar); guardar una
+   operación de prueba. Y dos líneas a la PM: ¿hay volumen? ¿cuentas ajenas?
+   El TXT cambia a propósito: sin el bloque de gastos posteriores al FOB en 0
+   y el `IEXT` con /26.
 2. **Rotar las claves de Gemini** (G0). En Google AI Studio: borrar las que
    aparecieron, crear una nueva y ponerla sólo en Railway. Mirar la
    facturación de Google.
@@ -76,9 +44,8 @@ antes de cerrar la Fase 3.
    repita: pegar el `/compact` de cada Dev apenas se pueda (están en ~38 % y
    ~41 %; cada paso relee todo el contexto). Si vuelve a pasar, Emi decide
    entre aceptar las pausas o bajar el ritmo.
-7. **Hasta la primera publicación:** en `main` sigue la regla vieja que manda
-   «push a `main`» a otros asistentes. No pedirle a ningún asistente cambios
-   sobre `main`.
+7. **No pedirle a ningún asistente cambios sobre `main`:** desde el
+   2026-10-07 `main` tiene las reglas nuevas, pero cada push publica.
 
 ## Quién hace qué
 
@@ -158,6 +125,11 @@ Archivos abiertos por Dev:
 
 - `a771693` (2026-07-18), anterior a este método. Cada publicación nueva: una
   línea con fecha, SHA y qué verificó Emi.
+- `5cb03ab` (2026-10-07 12:53 UTC), publicación de ensayo: el producto atacado
+  en `REPRODUCCION-ENSAYO-2026-10-07.md` (ADMIN-1, ADMIN-2, MARIA-2 y los 25
+  commits de `e8344d0`). Suite sobre el mismo producto (`1ad3226`):
+  `716 passed, 102 skipped`. Avance directo de `a771693`, sin merge. Emi:
+  hizo la lista de Railway antes del «dale»; verificación después: pendiente.
 
 ## Reglas
 
