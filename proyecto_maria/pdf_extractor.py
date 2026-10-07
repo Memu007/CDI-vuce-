@@ -1261,7 +1261,10 @@ def robust_extract_pdf_items(data: bytes) -> list[dict]:
     text = _extract_pdf_text(data)
     if not text.strip():
         # Try Gemini Vision for image-based PDFs
-        result = _extract_with_gemini_vision(data)
+        try:
+            result = _extract_with_gemini_vision(data)
+        except LecturaAutomaticaNoDisponible:
+            return []
         # Handle both dict format (with 'items' key) and list format
         if isinstance(result, dict):
             return result.get('items', [])
@@ -1919,6 +1922,15 @@ def _parse_simple_lines_to_items(lines: list[str], default_origin: str) -> list[
     return items
 
 
+MENSAJE_LECTURA_NO_DISPONIBLE = (
+    "No se pudo leer la factura automáticamente; cargá los productos a mano."
+)
+
+
+class LecturaAutomaticaNoDisponible(RuntimeError):
+    """El lector con IA está apagado o falta la clave: no hay ítems leídos."""
+
+
 def _extract_with_gemini_vision(data: bytes) -> list[dict]:
     """
     Extract PDF items using Gemini API for image-based PDFs with fallback cascade.
@@ -1933,26 +1945,10 @@ def _extract_with_gemini_vision(data: bytes) -> list[dict]:
     api_key = os.environ.get('GEMINI_API_KEY')
     
     if not (enable_flag and api_key):
-        print("⚠️ Gemini Vision disabled or missing API key - Usando modo DEMO")
-        # Retornar datos simulados para que el usuario vea el funcionamiento
-        return [
-            {
-                "pieza": "",
-                "descripcion": "ITEM DEMOSTRACION (Falta API Key)",
-                "cantidad": 10.0,
-                "valor_unitario": 150.0,
-                "origen": "CN",
-                "peso_unitario": 1.0
-            },
-            {
-                "pieza": "",
-                "descripcion": "Configura GEMINI_API_KEY para usar IA real",
-                "cantidad": 5.0,
-                "valor_unitario": 200.0,
-                "origen": "US",
-                "peso_unitario": 2.5
-            }
-        ]
+        # Sin lector con IA no se inventa nada: el endpoint avisa y la
+        # persona carga los productos a mano (MARIA-2).
+        print("⚠️ Gemini Vision disabled or missing API key - lectura automática no disponible")
+        raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)
 
     
     # Try PyMuPDF (fitz) first - faster than pdf2image

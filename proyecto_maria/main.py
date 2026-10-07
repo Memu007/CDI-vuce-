@@ -71,7 +71,7 @@ from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
 from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, supuestos_declarados
-from proyecto_maria.pdf_extractor import process_pdf  # Importar el extractor
+from proyecto_maria.pdf_extractor import process_pdf, LecturaAutomaticaNoDisponible  # Importar el extractor
 import pandas as pd
 from proyecto_maria.core.vuce_connector import get_ncm_data  # VUCE activo en modo mock
 from proyecto_maria.core import ncm_catalog
@@ -3443,7 +3443,15 @@ async def upload_pdf_public(
         # Procesar PDF con el extractor
         safe_name = sanitize_filename(file.filename or 'upload.pdf')
         logging.info("Procesando PDF: %s (%d bytes)", safe_name, len(contents))
-        result = process_pdf(contents)
+        try:
+            result = process_pdf(contents)
+        except LecturaAutomaticaNoDisponible as e:
+            # Sin lector con IA: cero productos y un código que la pantalla
+            # distingue para ofrecer la carga manual (MARIA-2).
+            return JSONResponse(
+                status_code=503,
+                content={"detail": str(e), "codigo": "lectura_automatica_no_disponible"},
+            )
         
         # Manejar tanto formato nuevo (dict) como viejo (lista)
         if isinstance(result, dict) and 'items' in result:
