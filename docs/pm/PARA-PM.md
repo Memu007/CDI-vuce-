@@ -86,7 +86,7 @@ Rojo en `7b119b6`: `4 failed` (FAS, DAT, DDU y la otra hoja que falla).
 
 ```
 suite completa, worktree limpio en 29fc395, venv-limpio: 936 passed, 102 skipped, 25 warnings in 97.98s · fin: 0
-sabotajes (excel1, maria1b, rendimiento1, 1b, admin1, admin2, maria2) en 29fc395: corriendo; actualizo esta línea al terminar
+sabotajes en 29fc395: excel1, rendimiento1, rendimiento1b, admin1, admin2 → «sabotajes con falla: 0»; maria2 → «OK: los 8 sabotajes dan rojo»; maria1b → 1 ROTO (patrón viejo del incoterm), arreglado en 6755655 → «sabotajes con falla: 0»
 smoke_friccion.sh (levantar.sh 29fc395)  → ==> OK · telemetría + alias session/state + by-cuit protegido
 ataque_aislamiento.sh                    → MARIA.TXT de Ana generado · Bloqueado: 22 · Fugas: 0
 pantalla_excel1.js / pantalla_maria1b.js → OK / OK
