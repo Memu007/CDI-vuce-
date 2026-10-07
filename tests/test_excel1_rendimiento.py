@@ -35,7 +35,9 @@ XLSX = _xlsx()
 
 
 def _bloquear():
-    INICIO["t"] = time.monotonic()
+    # La primera lectura lenta marca el inicio: si después viene otra (la
+    # validación y la lectura del mismo archivo), no lo pisa.
+    INICIO.setdefault("t", time.monotonic())
     time.sleep(LENTO_S)
 
 
