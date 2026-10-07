@@ -3,7 +3,7 @@
 Actualizado: 2026-10-07. Estado vigente; la historia está en Git.
 
 **Producto:** `Memu007/CDI-vuce-` (privado desde el 2026-10-06).
-**Publicado:** `main` = `6ea8ca9` (2026-10-07 19:58 UTC, segunda publicación) en Railway,
+**Publicado:** `main` = `a9b03cf` (2026-10-07 21:35 UTC, tercera publicación: GUARDAR-1) en Railway,
 `cdi-production.up.railway.app`. Railway publica cada push a `main` sin
 esperar los tests.
 **En producción:** la usa sólo Emi, con facturas reales (Emi, 2026-10-07).
@@ -23,11 +23,9 @@ antes de cerrar la Fase 3.
    fecha de emisión, moneda, incoterm, CUIT válido y estado si el origen es
    argentino: un error que pide eso no es una falla. Guardar con la SIM
    completa sigue dando error hasta GUARDAR-1.
-1a. **Tercera publicación, candidato `a9b03cf`:** GUARDAR-1 (guardar con la
-   SIM completa deja de dar error; el historial no tira abajo el guardado) y
-   la línea de la e2e que deja la CI de `main` en verde. Probado contra
-   Postgres 16 (`REPRODUCCION-GUARDAR-1-2026-10-07.md`). Falta «dale
-   a9b03cf». Después: Emi guarda una operación con la SIM completa.
+1a. **Tercera publicación, hecha:** `a9b03cf`, 2026-10-07 21:35 UTC («dale
+   a9b03cf» de Emi). Emi espera unos minutos y guarda una operación con un
+   producto con la SIM completa: tiene que guardar sin error.
 1b. **Sin volumen** (Emi, 2026-10-07): cada publicación o reinicio borra los
    TXT generados y el historial de NCM aprendido; las operaciones quedan en
    la base. Descargar el TXT apenas se genera. Lo arregla DISCO-1 (Fase 3).
@@ -139,6 +137,11 @@ Archivos abiertos por Dev:
   `1224 passed, 102 skipped, 1 xfailed`. Avance directo de `5cb03ab`, sin
   merge. «dale 6ea8ca9» de Emi a las ~16:58 ARG (antes, «dale a todo», que el
   sistema de permisos no tomó). CI: pruebas en verde y `e2e-maria` en rojo. La e2e no completa la fecha de emisión que pide MARIA-3; la PM lo reprodujo y, con esa línea, pasa entero («E2E MARIA OK»). El producto está bien, la prueba quedó vieja; la arregla la Dev 1 con GUARDAR-1. Emi generó un TXT con una factura real y «se ve bien» (19:59 UTC, un minuto después del push: falta confirmar que ya corría la versión nueva; con ella el TXT dice `IVAADICIONAL1=NO_VALIDA` y `CARTUSO=2`).
+- `a9b03cf` (2026-10-07 21:35 UTC), tercera publicación: GUARDAR-1, aislada
+  con `cherry-pick` (`REPRODUCCION-GUARDAR-1-2026-10-07.md`), y la línea de la
+  e2e de la CI. Suite sobre el mismo producto (`2621c3b`): `1247 passed, 102
+  skipped, 3 xfailed`; e2e «E2E MARIA OK»; Postgres 16 `fallas: 0`. Avance
+  directo de `6ea8ca9`, sin merge. CI: en curso. Falta lo que verifica Emi.
 
 ## Reglas
 
