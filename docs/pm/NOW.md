@@ -74,8 +74,8 @@ Archivos abiertos por Dev:
   `680 passed, 102 skipped, 10 warnings in 65.29s`. Espera los chequeos de
   Railway y el «dale» de Emi para el SHA, de día. Si se publica un commit
   posterior de la rama de PM, sólo con documentos de diferencia.
-- Despachante: respondió las preguntas 1 y 2 (estado e IVA adicional) el
-  2026-10-06. Faltan la 3 a la 6, los dos favores y una corta nueva (cómo se
+- Despachante: respondió las preguntas 1 a 4 (estado, IVA adicional, peso y
+  banco) el 2026-10-06. Faltan la 5 y la 6, los dos favores y una corta nueva (cómo se
   carga una reducción o exclusión del IVA adicional). MARIA-4 pasó al tercer
   lugar de la cola MARIA.
 

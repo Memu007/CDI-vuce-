@@ -52,6 +52,17 @@ de la PM, 2026-10-07):
   2026 trae `NO_VALIDA` (ningún beneficio: percepción completa). `IVAAD1`
   (uso particular, que exceptúa la percepción) **no corresponde para
   reventa, y hoy CDI lo declara siempre.**
+**Pregunta 3, peso** (2026-10-06, 21:35). Se declara por cada ítem o
+subítem. Con el archivo real de 2026: el ítem tiene 6 unidades repartidas en
+tres subítems de modelos distintos y un solo peso de ítem, 33 kg, sin peso por
+subítem. Con modelos distintos, el peso del ítem sólo puede ser el total de la
+línea, no el de una unidad. Confianza alta; lo termina de confirmar la prueba
+en su Kit.
+
+**Pregunta 4, banco** (2026-10-06, 21:35). Se declara el que decida el
+cliente. El archivo real de 2026 lo trae (`BANCOSARGENTINA` = 191); el de 2025
+no. Hoy CDI no lo emite.
+
 - **Falta saber:** cómo se carga en el Kit una reducción o una exclusión
   (¿una opción de una lista o un número de certificado?). Pregunta corta para
   la próxima.
@@ -111,8 +122,8 @@ ver en un archivo real no se pregunta: se pide el archivo.
 |---|---|
 | 1 | **Respondida.** `CARTUSO` deja de ser 3 fijo: se elige entre los seis estados, por ítem. Por defecto, «nuevo sin uso importado» (2) si el origen es extranjero; si es argentino, se pide elegir |
 | 2 | **Respondida.** `IVAADICIONAL1` por operación, con cambio por ítem. Por defecto, reventa sin beneficio (`NO_VALIDA`). `IVAAD1` sólo si se marca uso particular. Reducción o exclusión: aviso para cargarla en el Kit hasta saber cómo va en el archivo |
-| 3 | El peso del TXT pasa a ser el total de la línea, igual al que muestra la pantalla de validación |
-| 4 | `BANCOSARGENTINA` en la ficha del cliente y en la operación |
+| 3 | **Respondida.** El peso del TXT pasa a ser el total de la línea (ítem o subítem), igual al que muestra la pantalla de validación |
+| 4 | **Respondida.** `BANCOSARGENTINA`: lo elige el cliente. Va en su ficha, se puede cambiar por operación y se emite en el archivo; si falta, aviso |
 | 5 | `PSAD` en la configuración del despachante |
 | 6 | Se completa la regla del FOB y se cablea el campo de pantalla, que hoy no llega al TXT |
 | Favor 1 | Identificadores, sufijos por ítem y número de proveedor según los archivos reales |
