@@ -7317,6 +7317,10 @@ async def sugerir_ncm(
         if len(ncm_key) != 8 or ncm_key in seen_ncms or len(sugerencias) >= 5:
             return False
         seen_ncms.add(ncm_key)
+        # Una posición dada de baja (del historial o del proveedor) se
+        # propone diciéndolo (CATALOGO-NCM-1).
+        if ncm_catalog.ncm_de_baja(ncm_key):
+            suggestion = {**suggestion, "baja": True, "aviso": ncm_catalog.aviso_de_ncm(ncm_key)}
         sugerencias.append(suggestion)
         return True
 
@@ -7407,6 +7411,10 @@ async def sugerir_ncm(
     }
     if not sugerencias:
         payload["message"] = no_match_msg
+        # Un código escrito que se dio de baja: decirlo (CATALOGO-NCM-1).
+        if _looks_like_ncm_code_query(descripcion) and ncm_catalog.ncm_de_baja(descripcion):
+            aviso = ncm_catalog.aviso_de_ncm(descripcion)
+            payload["message"] = aviso[0].upper() + aviso[1:]
     return payload
 
 @app.post("/api/ncm/guardar-uso")

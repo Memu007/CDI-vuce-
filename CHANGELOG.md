@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-07 · feat: el catálogo NCM es el vigente de ARCA (CATALOGO-NCM-1)
+
+- **feat(ncm):** el catálogo pasa al nomenclador vigente de ARCA (10.504 NCM, con la enmienda de 2022: 8517.13.00, 8524, 8549). Una NCM dada de baja (522, como 8517.12.31) avisa que esa posición ya no existe y que hay que buscar la nueva, en la validación y en el asistente de NCM; es aviso, no freno. Se saca el CSV de respaldo con códigos que ya no existen.
+
 ## 2026-10-07 · fix: el peso es el de la línea y las cuentas del TXT cierran al centavo (MARIA-5)
 
 - **fix(maria):** `QARTKGRNET` declara el peso neto de toda la línea (10 × 2,5 kg = 25 kg, lo que ya mostraba la validación), también en los grupos. El lector pide el peso de una unidad y el de la línea; el Excel divide «Peso total» y «Peso neto» por la cantidad y avisa si sólo trae el bruto. Editar un grupo en la pantalla de NCM reparte entre sus productos en vez de copiar el total.

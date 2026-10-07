@@ -1739,6 +1739,8 @@ body.cdi-dragging-row { cursor: grabbing; }
     color: var(--c-text-3);
     margin-top: 2px;
 }
+/* Una NCM dada de baja se propone diciéndolo (CATALOGO-NCM-1). */
+.spotlight-item.is-baja .spotlight-item-meta { color: var(--c-warning); }
 .spotlight-empty {
     padding: var(--s-5);
     color: var(--c-text-3);

@@ -1699,9 +1699,12 @@
         const actionMeta = isValidNcm(s.ncm)
             ? 'Lista para asignar'
             : 'Elegir para ver posiciones SIM + DC';
-        const meta = sourceMeta ? sourceMeta + ' · ' + actionMeta : actionMeta;
+        // Una posición dada de baja se propone diciéndolo (CATALOGO-NCM-1).
+        const meta = s.baja && s.aviso
+            ? '⚠ ' + s.aviso.charAt(0).toUpperCase() + s.aviso.slice(1) + (sourceMeta ? ' · ' + sourceMeta : '')
+            : (sourceMeta ? sourceMeta + ' · ' + actionMeta : actionMeta);
         return (
-            '<button type="button" class="spotlight-item' + selected + '"' +
+            '<button type="button" class="spotlight-item' + selected + (s.baja ? ' is-baja' : '') + '"' +
                 ' data-idx="' + entry.idx + '" role="option" tabindex="-1">' +
                 '<span class="spotlight-item-code">' + CDI.escapeHtml((CDI.formatNcm ? CDI.formatNcm(s.ncm || '') : (s.ncm || ''))) + '</span>' +
                 '<div class="spotlight-item-body">' +

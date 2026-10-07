@@ -21,7 +21,7 @@ from typing import Iterable
 
 DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 DEFAULT_CSV = DATA_DIR / "ncm_arca.csv.gz"
-LEGACY_CSV = DATA_DIR / "ncm_mercosur.csv"
+BAJAS_JSON = DATA_DIR / "ncm_bajas.json"
 DEFAULT_METADATA = DATA_DIR / "ncm_arca_metadata.json"
 
 _STOPWORDS = frozenset({
@@ -148,8 +148,9 @@ def load_catalog(
     csv_path: Path = DEFAULT_CSV,
     notes_path: Path = DATA_DIR / "ncm_notas.json",
 ) -> list[NCMItem]:
-    """Carga el catálogo ARCA; conserva el CSV breve sólo como respaldo local."""
-    selected_path = csv_path if csv_path.exists() else LEGACY_CSV
+    """Carga el catálogo ARCA. Sin el archivo, el catálogo queda vacío: el CSV
+    breve de respaldo tenía códigos que ya no existen (CATALOGO-NCM-1)."""
+    selected_path = csv_path
     if not selected_path.exists():
         return []
 
@@ -186,6 +187,55 @@ def load_catalog(
                 ),
             ))
     return items
+
+
+@lru_cache(maxsize=1)
+def _bajas(path: Path = BAJAS_JSON) -> dict:
+    if not path.exists():
+        return {}
+    try:
+        return json.loads(path.read_text(encoding="utf-8")).get("codigos") or {}
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return {}
+
+
+def _ncm8(code: str) -> str:
+    return re.sub(r"\D", "", code or "")[:8]
+
+
+def _con_puntos(codigo8: str) -> str:
+    return f"{codigo8[:4]}.{codigo8[4:6]}.{codigo8[6:8]}"
+
+
+def ncm_de_baja(code: str) -> dict | None:
+    """La NCM, si estaba en un nomenclador anterior de ARCA y no está en el
+    vigente: {descripcion, baja, estaba_en}. Si no, None (CATALOGO-NCM-1)."""
+    codigo = _ncm8(code)
+    if len(codigo) != 8:
+        return None
+    return _bajas().get(codigo)
+
+
+def aviso_de_ncm(code: str) -> str:
+    """El aviso para una NCM que no está en el nomenclador vigente, o "" si
+    está (o si todavía no tiene 8 dígitos). Es aviso, no freno."""
+    codigo = _ncm8(code)
+    if len(codigo) != 8:
+        return ""
+    catalogo = _codigos_vigentes()
+    if not catalogo or codigo in catalogo:
+        return ""  # sin catálogo no se puede mirar: no se avisa en falso
+    baja = ncm_de_baja(codigo)
+    if baja:
+        return (f"la NCM {_con_puntos(codigo)} se dio de baja en el nomenclador vigente de ARCA "
+                f"({get_catalog_metadata().get('updated_at') or baja.get('baja', '')}): esa posición "
+                "ya no existe; buscá la nueva.")
+    return f"la NCM {_con_puntos(codigo)} no está en el nomenclador vigente de ARCA. Revisala."
+
+
+@lru_cache(maxsize=1)
+def _codigos_vigentes() -> frozenset:
+    return frozenset(item.codigo for item in load_catalog())
 
 
 def find_by_code(code: str, catalog: list[NCMItem] | None = None) -> NCMItem | None:
