@@ -163,13 +163,13 @@ reemplazar $M '    df["peso_unitario"] = (peso / cantidad).where(cantidad > 0)' 
 caso excel_sin_dividir "${T}peso_excel.py::test_el_peso_de_la_linea_se_divide[Peso total-25-2.5]"
 
 # 20. el bruto entra en silencio
-reemplazar $M '    if normal in _PESO_BRUTO:
+reemplazar $M '    if clase == "bruto":
         avisos.append(' '    if False:
         avisos.append('
 caso bruto_en_silencio "${T}peso_excel.py::test_el_bruto_solo_se_usa_dividido_y_con_aviso"
 
 # 21. el bruto vuelve a ganarle al neto
-reemplazar $M '        "pesoneto", "pesobruto",' '        "pesobruto", "pesoneto",'
+reemplazar $M '        "pesokg", "pesototal", "pesoneto",' '        "pesokg", "pesobruto", "pesototal", "pesoneto",'
 caso bruto_antes_que_neto "${T}peso_excel.py::test_con_neto_y_bruto_se_usa_el_neto"
 
 # 22. la columna de peso vuelve a mirarse sólo por nombre exacto
