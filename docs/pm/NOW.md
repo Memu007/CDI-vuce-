@@ -1,13 +1,14 @@
 # NOW — CDI
 
-Actualizado: 2026-10-07. Estado vigente; la historia está en Git.
+Actualizado: 2026-10-19. Estado vigente; la historia está en Git.
 
 **Producto:** `Memu007/CDI-vuce-` (privado desde el 2026-10-06).
 **Publicado:** `main` = `a9b03cf` (2026-10-07 21:35 UTC, tercera publicación: GUARDAR-1) en Railway,
 `cdi-production.up.railway.app`. Railway publica cada push a `main` sin
 esperar los tests.
 **En producción:** la usa sólo Emi, con facturas reales (Emi, 2026-10-07).
-**Rama de PM:** `claude/practical-shannon-szpwkn`: lo aceptado y sin publicar
+**Rama PM histórica:** `claude/practical-shannon-szpwkn` (`99f3625`); retoma
+en `codex/pm-retoma-txt`. La rama histórica contiene lo aceptado y sin publicar
 (incluye los 25 commits de `e8344d0`, ADMIN-1, ADMIN-2 y MARIA-2). **Ramas de las
 Devs:** `claude/dev1-tecnica` y `claude/dev2-maria`.
 **Plan:** `ROADMAP.md`, con el orden de Emi del 2026-10-07: primero el TXT,
@@ -16,21 +17,32 @@ antes de cerrar la Fase 3.
 
 ## Para Emi
 
-0. **En pausa desde 2026-10-07 22:45 UTC** («frena por ahora todo y mañana
-   continuamos», Emi). Las tres rutinas de CDI están apagadas (PM
-   trig_01TvMmGfSLDfbcJrf66ZZ7YK, Dev 1 trig_016zR6giZB8Mq9ZdfaerVh2D, Dev 2
-   trig_019ehV8P48FzbNwYQGZjgYcW). Las Devs dejan lo que tenían como «wip» en
-   su rama. **Al retomar:** cuando Emi escriba, prender las tres con
-   update_trigger enabled=true, despertar a las Devs con send_message y
-   seguir: Dev 2 con MARIA-5d, Dev 1 con la devolución de EXCEL-2; mirar la
-   CI de `a9b03cf`. No se tocaron las rutinas del otro proyecto
-   (`yneratopgreen`).
-   Dev 2 frenó en `d22ff1a` (subido, verificado): MARIA-5d con código,
-   pruebas, suite y pantallas listos; le falta el informe, y un sabotaje de
-   `excel1.sh` dio rojo por otra prueba (a mirar al retomar).
-   Dev 1 frenó en `dfb6d24` (subido, verificado; wip, sin entregar):
-   EXCEL-2 aislada en `c2f8063` y GUARDAR-2 aislada en `2d930c5`, las dos
-   sobre `1cdfe49`.
+0. **Retoma autorizada por Emi, 2026-10-19:** pidió actuar como PM con
+   subagentes y continuar el plan. Trabajo actual en `codex/pm-retoma-txt`
+   desde `99f3625`; `main` sigue en `a9b03cf`. Las sesiones y rutinas de
+   Claude de la tabla siguiente son históricas: Codex no tiene las
+   herramientas `update_trigger`, `get_session` ni el consejero Fable; no
+   se afirma que se reactivaron. Se trabaja con subagentes locales por esta
+   solicitud, sin nuevas automatizaciones ni publicación.
+   - **MARIA-5d:** revisión independiente sobre `d22ff1a`: 65 focales y 68
+     de generador/subítems verdes; tres variantes inequívocas de peso bruto
+     unitario fallan por HTTP local (3 kg / 10 unidades devuelve 0,3 kg por
+     unidad). PM reprodujo los tres rojos. Devolución y tarea cerrada en
+     `PARA-DEV-2.md`, antes de aceptar o publicar.
+   - **Dev 1:** Git conserva dos candidatos hermanos sobre `1cdfe49`:
+     EXCEL-2 en `c2f8063` y GUARDAR-2 en `2d930c5`. `dfb6d24` preserva
+     trabajo, no es una entrega única. El informe de su rama sigue viejo;
+     no se aceptan piezas por los verdes de GUARDAR-1. D32 ya es (b).
+   - **Incidente PDF/TXT:** la mezcla entre documentos sigue sin demostrar.
+     Se confirmó con datos sintéticos que la lectura pierde la
+     clasificación de despacho/EC02 y que la v2 usa la ruta de importación.
+     La generación de exportación sigue fuera del alcance vigente
+     (`DECISIONS.md`, pendiente v1/export). Registrar la brecha y sus
+     criterios antes de proponer ampliarla; ningún PDF/TXT privado se
+     incorpora al repositorio.
+   - **Entorno:** focales en Python 3.12 con paquetes instalados y SQLite
+     temporal, no un entorno limpio desde `requirements.txt`. Son revisión
+     parcial, no sustituyen suite, pantallas, Postgres ni prueba en el Kit.
 
 1. **Segunda publicación, hecha:** `6ea8ca9`, 2026-10-07 19:58 UTC («dale
    6ea8ca9» de Emi). Emi genera un TXT con una factura real, lo descarga
@@ -96,7 +108,7 @@ Archivos abiertos por Dev:
   puntos; tres rompen: una combinada gigante traba la lectura, una
   combinada con texto duplica el FOB, el tope de estilos no protege la
   memoria; D27 (a)). Después, COBRO-MP-1, en pausa en `18a1850`.
-- **Dev 2:** MARIA-5, CATALOGO-NCM-1 y SUBITEMS-1 aceptadas sobre `df4de22` e integradas (`0e57f70`). Ahora MARIA-5d («Peso bruto unitario» no se divide), que va antes de la próxima publicación. Después ORG-1 (Fase 2); MARIA-6 espera los archivos del despachante.
+- **Dev 2:** MARIA-5, CATALOGO-NCM-1 y SUBITEMS-1 aceptadas sobre `df4de22` e integradas (`0e57f70`). Ahora MARIA-5d: devolución del 2026-10-19 por variantes «unit (kg)»; va antes de la próxima publicación. Después ORG-1 (Fase 2); MARIA-6 espera los archivos del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
   RENDIMIENTO-1 y 1b (`ec3d793`), MARIA-1a, 2b, 1c, 4, 3 y 1d (`9679e21`).
   Suite sobre la rama integrada (`7b42556`, venv armado sólo con el
@@ -184,6 +196,11 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+
+2026-10-19: retoma en Codex autorizada por Emi. Reconciliadas ramas y
+entregas conservadas; MARIA-5d devuelta con tres rojos reproducidos por PM;
+revisión de GUARDAR-2 en curso. Sin aceptación nueva ni publicación.
+
 
 2026-10-07 22:45 UTC: pausa pedida por Emi hasta mañana; rutinas de CDI
 apagadas y Devs avisadas (ver «Para Emi» 0).

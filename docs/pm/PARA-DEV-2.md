@@ -30,6 +30,39 @@ despachante). Los dos archivos reales anonimizados
 (`tests/fixtures/maria_golden_anon.TXT` y `maria_golden_subitems_anon.TXT`)
 tienen que seguir saliendo idénticos, salvo que la tarea diga otra cosa.
 
+## Retoma 2026-10-19 — devolución MARIA-5d
+
+Emi pidió continuar el plan con PM y subagentes. Se retoma en
+`codex/pm-retoma-txt`, desde `99f3625`; no se publica ni se reactivan desde
+Codex las rutinas de las sesiones anteriores. La rama de Dev conservada es
+`origin/claude/dev2-maria`, `d22ff1a`.
+
+**Problema reproducido en `d22ff1a`:** con 10 unidades y una columna de
+peso bruto de una unidad de 3 kg, los encabezados `Peso bruto unit (kg)`,
+`Gross weight unit (kg)` y `Unit gross weight` devuelven `peso_unitario=0.3`,
+en vez de 3. El aviso afirma que se dividió el peso de toda la línea.
+Los 65 focales existentes pasan: no cubren este borde.
+
+**Tarea cerrada:** completar MARIA-5d sobre `d22ff1a` en una rama nueva.
+Reconocer esas variantes inequívocas de una unidad, también con mapeo
+guardado. Mantener la precedencia de neto sobre bruto y las guardas de total,
+línea y plurales. No ampliar a otro lector ni al generador de exportación.
+
+**Aceptación:** rojo antes y verde después por la ruta de subida Excel;
+con 10 unidades se conservan 3 kg por unidad y 30 kg por línea, con aviso de
+bruto y sin afirmar que se dividió. Un bruto de toda la línea con `total`,
+`unidades` o `units` sigue dividiéndose. Añadir al menos un negativo que
+falle si se convierte todo bruto en unitario. Focales MARIA-5d, peso Excel,
+devolución y archivos de referencia; suite completa y puertas de pantalla
+sólo cuentan si se ejecutaron sobre el SHA entregado. El fallo de sabotaje
+`excel1.sh` conservado al pausar se debe clasificar, no ocultar.
+
+**Entrega:** código, pruebas e informe por separado, SHA exacto, resultados
+y limitaciones del entorno. Cero documentos reales en pruebas o informes.
+Si el arreglo requiere cambiar el significado del peso o un archivo de
+referencia, devolver D a la PM antes de hacerlo. Después de entregar,
+esperar revisión independiente; ORG-1 conserva su orden posterior.
+
 ## Último veredicto
 
 **MARIA-5, CATALOGO-NCM-1 y SUBITEMS-1 aceptadas sobre `df4de22`**
