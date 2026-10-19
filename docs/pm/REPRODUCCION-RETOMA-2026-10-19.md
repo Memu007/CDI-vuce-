@@ -60,6 +60,35 @@ ruta de importación, sin generar TXT. Requiere delimitar la cobertura de
 clasificación y su criterio de ambigüedad; no hacer una detección por nombre
 de archivo. Exportación completa necesita referencia validada en Kit.
 
+## Reproducción PM del incidente
+
+La PM ejecutó los dos scripts de auditoría sintéticos fuera del repositorio,
+con código tomado de `a9b03cf` y `99f3625`. Ambos terminaron en 0 y confirmaron:
+
+- `process_pdf` pierde clase documental, destinación y aduana devueltas por
+  el doble local, y acepta fecha, rol y peso sin contraste documental.
+- El generador, con EC02 explícita, conserva `CDDTIMPEXP=I` en ambos SHA.
+- El lector no puede, con esa normalización, distinguir una fecha de
+  oficialización que el modelo asignó a factura, ni el rol del despachante.
+
+Esto prueba el tratamiento del resultado simulado, no atribuye a Gemini una
+respuesta concreta del archivo privado. No se usa la normativa de interfaz
+abrogada encontrada online como prueba de formato vigente.
+
+## GUARDAR-2: verificación exploratoria, no aceptación
+
+Sobre el candidato `2d930c5`, la revisión ejecutó 17 casos (16 de
+`test_guardar2.py` y la regresión de memoria cliente): todos verdes. Otra
+corrida de 18 casos agregó conservación de SIM completa del cliente y
+separación entre dos cuentas/catálogos con iguales nombres: todos verdes,
+con conexiones externas bloqueadas por socket. No se suman ambas corridas
+como si fueran casos distintos.
+
+Un harness manual fuera de pytest no terminó y se interrumpió; no se cuenta
+como verde. Las comprobaciones adicionales sí terminaron dentro de pytest
+con tope de 25 s. Faltan Postgres descartable, sabotajes, suite, e2e y cierre
+del informe Dev. No se integra GUARDAR-2 ni se reabre D32.
+
 ## Límites de esta revisión
 
 Python 3.12, entorno con paquetes heredados y pypdf añadido en venv local;

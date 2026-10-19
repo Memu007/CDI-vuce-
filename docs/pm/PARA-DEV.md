@@ -23,6 +23,29 @@ Tu PM principal te despierta con `fire_trigger` de tu rutina; vos la
 despertás a ella con el de la suya al entregar o al dejar una D que te frena
 (`/entregar` §5). Los ids están en `NOW.md`, «Quién hace qué».
 
+## Retoma 2026-10-19 — recepción pendiente
+
+Emi pidió continuar el plan. PM trabaja en `codex/pm-retoma-txt` desde
+`99f3625`. No reactivar cobro antes de cerrar lo pendiente de Fase 1.
+
+Git conserva EXCEL-2 `c2f8063` y GUARDAR-2 `2d930c5` como candidatos hermanos
+sobre `1cdfe49`; la punta `dfb6d24` no es una entrega conjunta. Tu
+`PARA-PM.md` todavía entrega GUARDAR-1: reemplazarlo al cerrar cada pieza,
+sin heredar pruebas de otra versión. D32 sigue (b), ya decidida.
+
+**Próximo paso cerrado:** entregar la devolución EXCEL-2 sobre `c2f8063`:
+seis criterios del veredicto de abajo, errores numéricos y sabotajes
+actualizados, regresiones sintéticas normales, suite y e2e sobre el SHA
+exacto; declarar lo no corrido. Después GUARDAR-2 por separado, con
+Postgres local descartable y los negativos de coincidencia de producto y
+separación de dueño. Si la actualización a la PM vigente genera conflictos,
+resolver en una rama nueva y volver a medir ese SHA, sin mezclar cobro.
+
+La revisión exploratoria de GUARDAR-2 ejecutó 17 focales verdes y otra
+corrida de 18 con bordes de aislamiento y SIM completa; entorno heredado y
+SQLite. No es aceptación ni sustituye Postgres/suite/e2e. Detalle en
+`REPRODUCCION-RETOMA-2026-10-19.md`.
+
 ## Último veredicto
 
 **GUARDAR-1 aceptada sobre `d6fe25f` más `aec4f15`** (2026-10-07, 21:08 UTC).
