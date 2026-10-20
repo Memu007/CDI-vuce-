@@ -197,6 +197,7 @@ def _entorno(monkeypatch):
 def _gemini_falso(monkeypatch, respuesta: dict) -> None:
     """Gemini falso que devuelve `respuesta`, en la copia «pdf_directo» (sin
     PyMuPDF, la de producción). Como tests/test_maria1a_lectura_factura.py."""
+    respuesta = dict(respuesta, documento={"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""})
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     monkeypatch.setenv("ENABLE_PDF_LLM_FALLBACK", "true")
     monkeypatch.setattr("time.sleep", lambda s: None)

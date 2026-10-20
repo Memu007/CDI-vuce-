@@ -42,7 +42,7 @@
     let hintEl, metaEl, excelHint, simulateBtn;
     let formatBtns = [];
     let currentFormat = 'pdf';
-    let startTs = 0;
+    let uploadTicket = 0;
     let busy = false;
     let initialized = false;
 
@@ -80,7 +80,8 @@
                 ev.preventDefault();
                 if (busy) return;
                 
-                CDI.state = CDI.state || {};
+                ++uploadTicket;
+                clearCurrentOperation();
                 CDI.state.filename = 'Carga Manual';
                 CDI.state.operacion = { comprador_nombre: '', comprador_cuit: '' };
                 // Pre-cargamos una fila vacía para que el usuario pueda empezar a tipear
@@ -239,19 +240,34 @@
         errorEl.textContent = '';
     }
 
+    function clearCurrentOperation() {
+        CDI.state = Object.assign({}, CDI.state, {
+            filename: null, operacion: {}, items: [], sourceFormat: null, documento: null,
+            uploadedAt: null, simulated: false, catalogAutofillBanner: null,
+            operationSavedFor: null, orphanDismissedFor: null,
+        });
+        try { sessionStorage.removeItem('cdi.pending_create_client'); } catch (_) {}
+        try { localStorage.removeItem('cdi_v2_state'); } catch (_) {}
+    }
+
     async function handleFile(file) {
+        const ticket = ++uploadTicket;
+        const format = currentFormat;
+        clearCurrentOperation();
+        setBusy(false);
         hideError();
-        const def = FORMATS[currentFormat];
+        const def = FORMATS[format];
         const err = validate(file, def);
         if (err) {
             showError(err);
-            CDI.track('upload_rejected', { format: currentFormat, reason: err, size: file.size });
+            CDI.track('upload_rejected', { format: format, reason: err, size: file.size });
             return;
         }
 
         let excelCliente = null;
-        if (currentFormat === 'excel') {
+        if (format === 'excel') {
             excelCliente = await pickClienteForExcel(file.name);
+            if (ticket !== uploadTicket) return;
             if (!excelCliente) {
                 const ok = await CDI.confirm({
                     title: 'Excel sin cliente',
@@ -261,6 +277,7 @@
                     cancelText: 'Elegir cliente',
                     kind: 'warning',
                 });
+                if (ticket !== uploadTicket) return;
                 if (!ok) {
                     CDI.track('upload_cancelled_no_cliente', { format: 'excel' });
                     return;
@@ -272,7 +289,7 @@
         const form = new FormData();
         form.append('file', file);
 
-        if (currentFormat === 'excel') {
+        if (format === 'excel') {
             const cid = (excelCliente && excelCliente.id) || '';
             if (cid) {
                 form.append('cliente_id', cid);
@@ -281,13 +298,14 @@
             }
         }
 
-        startTs = Date.now();
-        CDI.track('upload_start', { format: currentFormat, filename: file.name, size: file.size });
+        const startTs = Date.now();
+        let slowTimer;
+        CDI.track('upload_start', { format: format, filename: file.name, size: file.size });
         setBusy(true, 'Subiendo ' + file.name + '…', 'Puede tardar unos segundos.');
 
         try {
-            const slowTimer = setTimeout(() => {
-                if (busy) {
+            slowTimer = setTimeout(() => {
+                if (ticket === uploadTicket && busy) {
                     progressTitle.textContent = def.progressTitle;
                     progressSub.textContent = def.progressSub;
                 }
@@ -298,10 +316,12 @@
                 body: form,
             });
             clearTimeout(slowTimer);
+            if (ticket !== uploadTicket) return;
 
             let data;
             try { data = await res.json(); } catch (_) { data = null; }
 
+            if (ticket !== uploadTicket) return;
             if (!res.ok) {
                 const detail = (data && (data.detail || data.message)) || ('Error ' + res.status);
                 const e = new Error(detail);
@@ -313,7 +333,7 @@
             const operacion = (data && data.operacion) || {};
             const items = (data && data.items) || [];
 
-            if (currentFormat === 'excel' && !items.length) {
+            if (format === 'excel' && !items.length) {
                 throw new Error('No se detectaron ítems en la planilla. Revisá el mapeo del cliente.');
             }
 
@@ -321,7 +341,8 @@
             CDI.state.filename = data && data.filename;
             CDI.state.operacion = operacion;
             CDI.state.items = items;
-            CDI.state.sourceFormat = currentFormat;
+            CDI.state.documento = (data && data.documento) || null;
+            CDI.state.sourceFormat = format;
             CDI.state.uploadedAt = new Date().toISOString();
             // Reset flags de la operación anterior: cada PDF nuevo es una
             // operación nueva, el panel huérfana y la idempotencia de
@@ -331,7 +352,7 @@
 
             // Toast sutil si el backend aprendió/actualizó columnas del cliente.
             const catalogo = data && data.catalogo;
-            if (currentFormat === 'excel' && catalogo && catalogo.columnas_detectadas > 0 && CDI.toast) {
+            if (format === 'excel' && catalogo && catalogo.columnas_detectadas > 0 && CDI.toast) {
                 const total = catalogo.total || 6;
                 const faltan = (catalogo.columnas_faltantes || []).length;
                 if (faltan === 0) {
@@ -346,7 +367,7 @@
             // al anterior).
             const avisosPeso = (data && data.avisos) || [];
 
-            if (currentFormat === 'pdf' && CDI.setClienteActivo) {
+            if (format === 'pdf' && CDI.setClienteActivo) {
                 CDI.setClienteActivo(null);
                 CDI.track && CDI.track('cliente_activo_cleared_for_pdf', {
                     filename: data && data.filename,
@@ -354,15 +375,19 @@
             }
 
             // Auto-detectar importador: si falla, no frenar el flujo.
-            try { await tryAutoMatchImportador(operacion); } catch (e) { console.warn('[upload] auto-match skip:', e && e.message); }
+            try { await tryAutoMatchImportador(operacion, ticket); } catch (e) { console.warn('[upload] auto-match skip:', e && e.message); }
+
+            if (ticket !== uploadTicket) return;
 
             // Lookup combinado: memoria del cliente + catalogo del proveedor
             const vendorName = operacion && (operacion.vendedor_nombre || operacion.comprador_nombre_vendor);
             const clienteId = (CDI.state && CDI.state.clienteActivo && CDI.state.clienteActivo.id) || null;
-            try { await tryCatalogAutofill(CDI.state.items, vendorName, clienteId); } catch (e) { console.warn('[upload] catalog autofill skip:', e && e.message); }
+            try { await tryCatalogAutofill(items, vendorName, clienteId, ticket); } catch (e) { console.warn('[upload] catalog autofill skip:', e && e.message); }
+
+            if (ticket !== uploadTicket) return;
 
             CDI.track('pdf_uploaded', {
-                format: currentFormat,
+                format: format,
                 filename: data && data.filename,
                 items: items.length,
                 duration_ms: durationMs,
@@ -377,7 +402,7 @@
             // este mismo aviso final (la pantalla muestra uno a la vez) y queda
             // en el semáforo hasta que lo descarta (EXCEL-1, MARIA-1b).
             if (CDI.avisosDelExcel) sinLeer.unshift.apply(sinLeer, CDI.avisosDelExcel());
-            if (currentFormat === 'excel' && data && Array.isArray(data.avisos_mapeo)) {
+            if (format === 'excel' && data && Array.isArray(data.avisos_mapeo)) {
                 sinLeer.unshift.apply(sinLeer, data.avisos_mapeo);
             }
             const revisar = sinLeer.concat(avisosPeso);
@@ -387,10 +412,16 @@
             console.log('[upload] items listos:', items.length, '→ goTo review');
             CDI.goTo('review', { fromUpload: true });
         } catch (err) {
+            if (ticket !== uploadTicket) return;
+            clearCurrentOperation();
             const msg = (err && err.message) || 'No se pudo procesar el archivo.';
             console.error('[CDI v2 upload] ERROR:', msg, err);
-            CDI.track('upload_error', { format: currentFormat, message: msg });
+            CDI.track('upload_error', { format: format, message: msg });
             setBusy(false);
+            if (err && err.code === 'documento_no_admitido') {
+                showError(msg + ' Elegí otra factura comercial para empezar de nuevo.');
+                return;
+            }
             // Si el error es payment_required, el modal ya se mostró via app_v2.js.
             if (msg === 'payment_required') return;
             // Sin lector automático (MARIA-2): ningún producto, se ofrece
@@ -404,10 +435,12 @@
             showError(msg);
             // Toast visible para debug
             if (CDI.toast) CDI.toast.error('Error al subir', msg);
+        } finally {
+            clearTimeout(slowTimer);
         }
     }
 
-    async function tryAutoMatchImportador(operacion) {
+    async function tryAutoMatchImportador(operacion, ticket) {
         try {
             const pdfCuit = CDI.normalizeCuit && CDI.normalizeCuit(operacion && operacion.comprador_cuit);
             const compradorNombre = String((operacion && operacion.comprador_nombre) || '').trim();
@@ -424,6 +457,7 @@
                         const searchRes = await CDI.api('/api/clientes/search?q=' + encodeURIComponent(compradorNombre));
                         if (searchRes && searchRes.ok) {
                             const searchData = await searchRes.json().catch(() => ({}));
+                            if (ticket !== uploadTicket) return;
                             const results = searchData.clientes || searchData.results || [];
                             // Match exacto (case-insensitive) por nombre
                             const exact = results.find(c => (c.nombre || '').toLowerCase() === compradorNombre.toLowerCase());
@@ -440,6 +474,7 @@
                         }
                     } catch (_) {}
 
+                    if (ticket !== uploadTicket) return;
                     // No se encontró por nombre: mostrar banner en Review para que el usuario decida.
                     CDI.track && CDI.track('importador_no_match', {
                         has_name: true,
@@ -458,7 +493,7 @@
 
             const res = await CDI.api('/api/clientes/by-cuit/' + encodeURIComponent(pdfCuit));
             const data = await res.json().catch(() => ({}));
-            if (!res.ok) return;
+            if (ticket !== uploadTicket || !res.ok) return;
 
             if (data.match === 'exact' && data.cliente) {
                 CDI.setClienteActivo(data.cliente);
@@ -516,7 +551,7 @@
         });
     }
 
-    async function tryCatalogAutofill(items, vendorName, clienteId) {
+    async function tryCatalogAutofill(items, vendorName, clienteId, ticket) {
         if (!Array.isArray(items) || !items.length) return;
         const vn = String(vendorName || '').trim();
         const cid = String(clienteId || '').trim();
@@ -531,7 +566,7 @@
             });
             if (!res || !res.ok) return;
             const data = await res.json().catch(() => null);
-            if (!data) return;
+            if (ticket !== uploadTicket || !data) return;
 
             // Guardamos el valor previo de cada item para permitir "deshacer"
             const undoSnapshot = items.map(it => ({
@@ -618,6 +653,8 @@
     }
 
     function simulateOperation() {
+        ++uploadTicket;
+        clearCurrentOperation();
         const today = new Date();
         const iso = today.toISOString().slice(0, 10);
         const operacion = {
@@ -655,6 +692,7 @@
 
     CDI.registerScreen('upload', {
         onEnter() {
+            ++uploadTicket;
             // init() primero: asigna dz y demas refs. Evita el race donde
             // app_v2 dispara goTo('upload') antes de que corra el init propio.
             if (!dz || !dz.isConnected) init();

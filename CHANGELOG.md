@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-20 · fix: bloquear documentos no admitidos antes del TXT (DOC-1)
+
+- El lector conserva la clasificación documental y rechaza despachos, exportaciones y lecturas ambiguas. Una destinación EC* no entra al generador de importación; una nueva subida fallida no recupera los datos ni respuestas de la anterior.
+- Deshacer cambios de NCM queda atado a la operación actual y no puede restaurar productos de una anterior.
+
 ## 2026-10-19 · fix: el bruto unitario con kg conserva su valor (MARIA-5d)
 
 - **fix(excel):** «Peso bruto unit (kg)», «Gross weight unit (kg)» y «Unit gross weight» conservan el peso de una unidad, también con mapeo guardado: 10 × 3 kg declara 30 kg en el TXT. El neto sigue teniendo prioridad y el bruto total sigue dividiéndose.

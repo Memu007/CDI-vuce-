@@ -94,7 +94,7 @@ class TestRecentChangesValidation:
             
             mock_model_25 = Mock()
             mock_response = Mock()
-            mock_response.text = '{"items": [{"pieza": "", "descripcion": "Product A", "cantidad": 100, "valor_unitario": 10.50, "origen": "XX"}]}'
+            mock_response.text = '{"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "items": [{"pieza": "", "descripcion": "Product A", "cantidad": 100, "valor_unitario": 10.50, "origen": "XX"}]}'
             mock_model_25.generate_content.return_value = mock_response
             
             mock_genai.GenerativeModel.return_value = mock_model_25
@@ -122,7 +122,7 @@ class TestRecentChangesValidation:
             
             mock_model_20 = Mock()
             mock_response = Mock()
-            mock_response.text = '{"items": [{"pieza": "", "descripcion": "Product A", "cantidad": 100, "valor_unitario": 10.50, "origen": "XX"}]}'
+            mock_response.text = '{"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "items": [{"pieza": "", "descripcion": "Product A", "cantidad": 100, "valor_unitario": 10.50, "origen": "XX"}]}'
             mock_model_20.generate_content.return_value = mock_response
             
             mock_genai.GenerativeModel.return_value = mock_model_20
@@ -168,7 +168,7 @@ class TestRecentChangesValidation:
                 
                 mock_model_25 = Mock()
                 mock_response = Mock()
-                mock_response.text = '{"items": [{"pieza": "", "descripcion": "Test", "cantidad": 100, "valor_unitario": 10.50}]}'
+                mock_response.text = '{"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "items": [{"pieza": "", "descripcion": "Test", "cantidad": 100, "valor_unitario": 10.50}]}'
                 mock_model_25.generate_content.return_value = mock_response
                 
                 mock_genai.GenerativeModel.return_value = mock_model_25
@@ -380,7 +380,7 @@ class TestExtractionConsistency:
                 
                 mock_model = Mock()
                 mock_response = Mock()
-                mock_response.text = '{"items": [{"pieza": "", "descripcion": "Test Product", "cantidad": 100, "valor_unitario": 10.50, "origen": "XX"}]}'
+                mock_response.text = '{"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "items": [{"pieza": "", "descripcion": "Test Product", "cantidad": 100, "valor_unitario": 10.50, "origen": "XX"}]}'
                 mock_model.generate_content.return_value = mock_response
                 
                 mock_genai.GenerativeModel.return_value = mock_model
