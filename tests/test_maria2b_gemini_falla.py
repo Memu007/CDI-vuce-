@@ -101,7 +101,7 @@ def test_gemini_falla_da_el_503_de_carga_manual(client, auth_override, monkeypat
 @pytest.mark.parametrize("copia", COPIAS)
 def test_gemini_responde_sin_productos_sigue_el_400(client, auth_override, monkeypatch, copia):
     _gemini(monkeypatch, copia, lambda: types.SimpleNamespace(
-        text=json.dumps({"operacion": {}, "items": []})))
+        text=json.dumps({"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "operacion": {}, "items": []})))
     r = _subir(client)
 
     assert r.status_code == 400, r.text

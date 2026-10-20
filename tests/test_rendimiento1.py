@@ -45,7 +45,7 @@ def _bloquear():
 
 def _lectura_lenta(*_a, **_k):
     _bloquear()
-    return {"items": [{"descripcion": "x", "cantidad": 1}],
+    return {"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "items": [{"descripcion": "x", "cantidad": 1}],
             "operacion": {"vendedor_nombre": "Proveedor"}}
 
 
@@ -86,7 +86,7 @@ def test_health_responde_mientras_se_lee_el_texto_del_pdf(monkeypatch):
     """El texto crudo (para adivinar el vendedor) también se lee aparte."""
     import proyecto_maria.pdf_extractor as ext
     monkeypatch.setattr(main, "process_pdf",
-                        lambda *_: {"items": [{"descripcion": "x"}], "operacion": {}})
+                        lambda *_: {"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "items": [{"descripcion": "x"}], "operacion": {}})
     monkeypatch.setattr(ext, "extraer_texto_pdf_seguro", lambda *_: (_bloquear(), "")[1])
     demora, r = asyncio.run(_health_mientras(_subir))
     assert r.status_code == 200, r.text[:200]
@@ -187,7 +187,7 @@ def test_health_responde_mientras_se_valida_el_pdf(monkeypatch):
     from proyecto_maria.security import file_security
     monkeypatch.setattr(file_security, "_abrir_pdf", lambda *_: (_bloquear(), (False, 1))[1])
     monkeypatch.setattr(main, "process_pdf",
-                        lambda *_: {"items": [{"descripcion": "x"}], "operacion": {"vendedor_nombre": "P"}})
+                        lambda *_: {"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "items": [{"descripcion": "x"}], "operacion": {"vendedor_nombre": "P"}})
     demora, r = asyncio.run(_health_mientras(_subir))
     assert r.status_code == 200, r.text[:200]
     assert demora < 0.5, f"/health tardó {demora:.2f} s mientras se validaba el PDF"
@@ -223,7 +223,7 @@ def test_validar_el_pdf_tiene_tiempo_maximo(monkeypatch):
 def test_tiempo_de_validacion_mal_escrito_no_rechaza_todo(monkeypatch):
     monkeypatch.setenv("PDF_VALIDATE_TIMEOUT_S", "30s")
     monkeypatch.setattr(main, "process_pdf",
-                        lambda *_: {"items": [{"descripcion": "x"}], "operacion": {"vendedor_nombre": "P"}})
+                        lambda *_: {"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "items": [{"descripcion": "x"}], "operacion": {"vendedor_nombre": "P"}})
     r = _subir_sincronico(monkeypatch)
     assert r.status_code == 200, r.text[:200]
 
@@ -235,7 +235,7 @@ def test_texto_del_vendedor_tiene_tiempo_maximo(monkeypatch):
     monkeypatch.setenv("PDF_READ_TIMEOUT_S", "30")
     monkeypatch.setenv("PDF_VENDOR_TIMEOUT_S", "0.3")
     monkeypatch.setattr(main, "process_pdf",
-                        lambda *_: {"items": [{"descripcion": "x"}], "operacion": {}})
+                        lambda *_: {"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "items": [{"descripcion": "x"}], "operacion": {}})
     monkeypatch.setattr(ext, "extraer_texto_pdf_seguro", lambda *_: (_bloquear(), "")[1])
     r, demora = _subir_y_medir()
     assert r.status_code == 200, r.text[:200]

@@ -119,6 +119,7 @@ def test_con_clave_inventada_sigue_leyendo_con_el_modelo(client, auth_override, 
     monkeypatch.setenv("ENABLE_PDF_LLM_FALLBACK", "true")
 
     respuesta = {
+        "documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""},
         "operacion": {"numero_factura": "F-1", "vendedor_nombre": "Proveedor Inventado"},
         "items": [{"descripcion": "Tornillo M6", "cantidad": 3, "valor_unitario": 2.5,
                    "peso_kg": 0.1, "origen": "CN"}],
