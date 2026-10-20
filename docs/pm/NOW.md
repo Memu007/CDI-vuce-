@@ -292,3 +292,22 @@ ni asumir que hay sesiones de Claude trabajando.
 completas. No se demostró mezcla de dos PDFs: se confirmó clasificación
 perdida y ruta de importación aplicada a un despacho. No usar los TXT
 manuales de este chat como archivos de referencia aceptados por el Kit.
+
+## Guardado remoto confirmado — 2026-10-20
+
+Con la autorización de Emi ya se guardaron las tres ramas en GitHub. El
+push fue atómico, sin force, sin cambios a `main` y sin publicación.
+
+- [PR #1 — retoma PM y traspaso](https://github.com/Memu007/CDI-vuce-/pull/1):
+  `codex/pm-retoma-txt` hacia la PM histórica. Incluye esta autorización,
+  la evidencia y el próximo paso; las actualizaciones de cierre son documentos.
+- [PR #2 — pesos](https://github.com/Memu007/CDI-vuce-/pull/2):
+  `codex/maria5d-unit-kg`, cabeza `254531b`, hacia Dev 2.
+- [PR #3 — bloqueo DOC-1](https://github.com/Memu007/CDI-vuce-/pull/3):
+  `codex/doc1-block-invalid-pdf`, cabeza `fe0a101`, hacia la rama de retoma PM.
+
+Los tres están en **borrador, abiertos y sin fusionar**. Las descripciones
+incluyen los resultados finales y las puertas pendientes. La próxima PM no
+necesita volver a pedir permiso para este guardado: está hecho. Tampoco debe
+confundir borradores guardados con cambios publicados; el permiso para
+`main` sigue siendo específico del SHA final probado.
