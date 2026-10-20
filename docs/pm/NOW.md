@@ -33,12 +33,18 @@ antes de cerrar la Fase 3.
      EXCEL-2 en `c2f8063` y GUARDAR-2 en `2d930c5`. `dfb6d24` preserva
      trabajo, no es una entrega única. El informe de su rama sigue viejo;
      no se aceptan piezas por los verdes de GUARDAR-1. D32 ya es (b).
+   - **DOC-1 autorizada por Emi el 2026-10-19:** eligió bloquear el TXT
+     incorrecto antes que sumar exportación completa. Consigna en
+     `PARA-DEV-2.md`; implementación aislada en `codex/doc1-block-invalid-pdf`
+     desde `1469102`, con subagentes backend y UI. Clasificación documental,
+     rechazo EC* por importación y prevención de arrastre A→B. Va antes de
+     ORG-1. La publicación sigue esperando revisión y autorización por SHA.
    - **Incidente PDF/TXT:** la mezcla entre documentos sigue sin demostrar.
      Se confirmó con datos sintéticos que la lectura pierde la
      clasificación de despacho/EC02 y que la v2 usa la ruta de importación.
      La generación de exportación sigue fuera del alcance vigente
-     (`DECISIONS.md`, pendiente v1/export). Registrar la brecha y sus
-     criterios antes de proponer ampliarla; ningún PDF/TXT privado se
+     (`DECISIONS.md`, pendiente v1/export). DOC-1 bloquea la salida errónea;
+     no amplía a exportación completa. Ningún PDF/TXT privado se
      incorpora al repositorio.
    - **Entorno:** focales en Python 3.12 con paquetes instalados y SQLite
      temporal, no un entorno limpio desde `requirements.txt`. Son revisión
@@ -200,6 +206,11 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 2026-10-19: retoma en Codex autorizada por Emi. Reconciliadas ramas y
 entregas conservadas; MARIA-5d devuelta con tres rojos reproducidos por PM;
 revisión de GUARDAR-2 en curso. Sin aceptación nueva ni publicación.
+
+2026-10-19, continuación: MARIA-5d candidata `eff9dea`, 148 focales PM
+verdes y 11 sabotajes Dev; suite general en curso. Borradores de revisión:
+PM #1 y pesos #2, sin fusionar. Emi autorizó DOC-1; backend y UI trabajan
+en una entrega separada. Las rutinas históricas de Claude siguen sin tocarse.
 
 
 2026-10-07 22:45 UTC: pausa pedida por Emi hasta mañana; rutinas de CDI

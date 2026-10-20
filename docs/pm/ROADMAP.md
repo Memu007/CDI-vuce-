@@ -56,6 +56,7 @@ necesita prueba: la ley, un archivo real o la respuesta del despachante
 | ✅ | CATALOGO-NCM-1 | El catálogo NCM vigente (el de hoy es de 2018: le faltan 8517.13.00, 8524, 8549); una NCM dada de baja se avisa como tal (D21 de la Dev 1; archivo de Emi del 2026-10-07) | el nomenclador de ARCA del 07/10/2026 |
 | ✅ | SUBITEMS-1 | La pantalla v2 deja cargar, editar y ver los subítems de cada producto, con el formato que ya recibe `/generate_maria` (D24 de la Dev 1; Emi: sus facturas traen subítems, 2026-10-07) | `maria_golden_subitems_anon.TXT`: la prueba de punta a punta deja de agregarlos a mano |
 | 1 | MARIA-5d | «Peso bruto unitario» es bruto de una unidad: no se divide (revisión de la reentrega de MARIA-5). Antes de publicar | los archivos reales, idénticos |
+| 2 | DOC-1 | Bloquear documentos no admitidos/ambiguos y EC* en la ruta de importación; una subida nueva fallida no revive datos del documento anterior. Autorizada por Emi el 2026-10-19 | no cambia el TXT de una importación válida; casos sintéticos factura/despacho/ambigüedad y A→B |
 | 2 | MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11); el número de operación y la referencia de la factura que hoy arma la pantalla (D23 y D25 de la Dev 1) | sus archivos reales |
 
 MARIA-4, MARIA-3 y MARIA-5 tocan el mismo generador: van en ese orden.
@@ -86,7 +87,7 @@ despachante carga un archivo en su Kit (cierra G4).
 | COBRO-MP-1 | Dev 1 | Aviso de pago verificado, aplicado una vez aunque se reenvíe, con el monto controlado (C3, D8 de la Dev 1). Va primero: es el único camino que hoy activa sin pagar. Además, que las renovaciones de la suscripción extiendan el período (hoy sólo se procesa `type=payment`; leído en el ataque al ensayo, sin verificar). La suscripción está configurada en Railway (Emi, 2026-10-07): las renovaciones corren en producción |
 | COBRO-CORTE-1 | Dev 1 | Quien no paga no genera valor ni gasta Gemini; se cuenta una vez por operación; sin pasarse del tope; el aviso del corte dice la razón real (hoy una cuenta que fue activa recibe «prueba vencida») (C1, C5, C6). Con guardados a la vez, hoy el contador cuenta de menos y se pasa del tope (revisión de GUARDAR-1). Ya decidido: D4 (b, N = 10), D5 (a), D6 (a) de la Dev 1 (`PARA-DEV.md`) |
 | COBRO-MP-2 | Dev 1 | Cancelar también en Mercado Pago, sin perder días pagados, una sola suscripción, reactivar pagando (una prueba gratuita no pasa a activa); sin token de Mercado Pago, no decir «activada» (C2, C4, C8, D9 de la Dev 1) |
-| ORG-1 | Dev 2 (después de MARIA-5d; MARIA-6 espera los archivos) | Invitaciones que funcionan, tope de usuarios del plan, atadas al email (C7) |
+| ORG-1 | Dev 2 (después de MARIA-5d y DOC-1; MARIA-6 espera los archivos) | Invitaciones que funcionan, tope de usuarios del plan, atadas al email (C7) |
 | LEGAL-1 | Dev 2 | Términos y privacidad con el texto de Emi, y cómo pedir el borrado de datos (X5) |
 
 **Cierre:** publicar; el pago chico de Emi recorre todo el ciclo (cierra G7).
