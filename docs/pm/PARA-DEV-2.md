@@ -70,6 +70,48 @@ Si el arreglo requiere cambiar el significado del peso o un archivo de
 referencia, devolver D a la PM antes de hacerlo. Después de entregar,
 esperar revisión independiente; ORG-1 conserva su orden posterior.
 
+## Siguiente autorizada por Emi — DOC-1 (2026-10-19)
+
+Emi eligió primero bloquear el TXT incorrecto, sin sumar exportación
+completa. Base: rama de retoma PM después de la consigna, en una rama
+aislada de MARIA-5d. El cierre de pesos sigue primero y no se mezclan las
+entregas. Esta pieza es Fase 1, antes de ORG-1.
+
+**Problema demostrado:** el lector descarta tipo documental y destinación;
+la v2 siempre usa `/generate_maria`, y una EC02 puede salir con indicador
+de importación. No está demostrada una mezcla entre dos PDFs.
+
+**Alcance mínimo:**
+1. Pedir clasificación documental en la misma lectura (sin otra llamada
+   ni coste adicional), conservarla y distinguir una factura comercial
+   admitida de declaración/despacho, exportación u otro documento. Una
+   lectura ambigua no se presenta como factura válida. No inferir por
+   nombre de archivo ni inventar número/fecha.
+2. Rechazar documentos no admitidos con respuesta y mensaje claros antes
+   de ofrecer ítems para generar. No reintentar ni caer en un fallback
+   que elimine el rechazo. No tocar rutas de exportación.
+3. Guarda de servidor: una destinación EC* explícita nunca pasa por el
+   generador de importación, incluidos avisos y llamadas directas. No
+   cambiar el formato de TXT de una importación válida.
+4. Al fallar o rechazarse una nueva subida B, la pantalla no muestra la
+   operación A como resultado de B ni permite generarla por ese recorrido.
+   Una respuesta antigua de A no puede pisar la más nueva B. Dar un camino
+   claro para empezar de nuevo; no borrar operaciones guardadas del usuario.
+
+**Aceptación sintética:** factura de importación válida sigue funcionando;
+despacho EC02 rechazado sin TXT; clase desconocida/ausente no se acepta
+como factura; EC* enviada directamente al servidor rechazada; dos subidas
+A→B no arrastran operación/ítems/NCM y B rechazada no revive A. Rojo antes,
+verde después y negativo que detecte desactivar las guardas. Los mocks de
+lectura de facturas anteriores se actualizan sólo para incluir la nueva
+clasificación válida, sin debilitar sus aserciones.
+
+**Entrega:** SHA y diff separados de MARIA-5d, pruebas y reporte propios;
+suite proporcional y pantallas por herramientas permitidas. Declarar lo
+no ejecutado. Cero PDFs/TXTs/datos reales o llamadas a Gemini/terceros.
+Frenar con D si requiere cambiar contrato del Kit, formatos de archivo,
+clasificar con otra llamada pagada o implementar exportación completa.
+
 ## Último veredicto
 
 **MARIA-5, CATALOGO-NCM-1 y SUBITEMS-1 aceptadas sobre `df4de22`**
