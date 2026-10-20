@@ -48,6 +48,13 @@ Reconocer esas variantes inequívocas de una unidad, también con mapeo
 guardado. Mantener la precedencia de neto sobre bruto y las guardas de total,
 línea y plurales. No ampliar a otro lector ni al generador de exportación.
 
+**Segunda revisión:** `b3fd518` resuelve las tres variantes, pero introduce
+una regresión con `Unit gross weight per line` y `Unit gross weight line`:
+antes eran totales y pasan a unitarios. PM reprodujo por AST ambos cambios.
+Se adopta como bloqueo: una columna que dice por línea no se multiplica
+por la cantidad. Corregir en la misma función y conservar 30 kg de línea
+con 10 unidades, en vez de producir 300 kg. Sin cambiar otros clasificadores.
+
 **Aceptación:** rojo antes y verde después por la ruta de subida Excel;
 con 10 unidades se conservan 3 kg por unidad y 30 kg por línea, con aviso de
 bruto y sin afirmar que se dividió. Un bruto de toda la línea con `total`,
