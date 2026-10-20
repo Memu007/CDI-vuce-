@@ -73,6 +73,8 @@ from proyecto_maria.core.excel_generator import create_maria_excel
 from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
+    DocumentoNoAdmitido,
+    validar_documento_importacion,
     LecturaAutomaticaNoDisponible,
     MENSAJE_LECTURA_NO_DISPONIBLE,
     lectura_automatica_disponible,
@@ -3737,6 +3739,8 @@ async def upload_pdf_public(
         logging.info("Procesando PDF: %s (%d bytes)", safe_name, len(contents))
         try:
             result = await _leer_pdf_aparte(process_pdf, contents)
+        except DocumentoNoAdmitido as e:
+            return JSONResponse(status_code=422, content={"detail": str(e), "code": "documento_no_admitido"})
         except LecturaAutomaticaNoDisponible as e:
             return _respuesta_sin_lector(str(e))
         except LecturaPdfDemasiadoLarga as e:
@@ -3745,18 +3749,13 @@ async def upload_pdf_public(
                 content={"detail": str(e), "code": "lectura_pdf_demasiado_larga"},
             )
         
-        # Manejar tanto formato nuevo (dict) como viejo (lista)
-        if isinstance(result, dict) and 'items' in result:
-            # Nuevo formato con operacion + items
-            items_data = result.get('items', [])
-            operacion_data = result.get('operacion', {})
-        elif isinstance(result, list):
-            # Formato viejo: solo lista de items
-            items_data = result
-            operacion_data = {}
-        else:
-            items_data = []
-            operacion_data = {}
+        try:
+            documento = validar_documento_importacion(result)
+        except DocumentoNoAdmitido as e:
+            return JSONResponse(status_code=422, content={"detail": str(e), "code": "documento_no_admitido"})
+
+        items_data = result.get('items', [])
+        operacion_data = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
 
         # Fallback heurístico: si Vision no detectó vendedor (path no-LLM o
         # respuesta incompleta), intentar extraerlo del texto crudo del PDF.
@@ -3787,6 +3786,7 @@ async def upload_pdf_public(
 
         return {
             "message": "PDF procesado exitosamente",
+            "documento": documento,
             "filename": file.filename,
             "operacion": operacion_data,  # Datos de la operación extraídos
             "items": items_data,  # Items extraídos
@@ -3918,6 +3918,11 @@ def _supuestos_maria(request: MariaRequest, items: list, gastos_fob) -> list:
     )
 
 
+def _rechazar_exportacion_en_importacion(request: MariaRequest) -> None:
+    if (request.tipo_destinacion or "").strip().upper().startswith("EC"):
+        raise HTTPException(status_code=400, detail="Una destinación de exportación (EC*) no puede generar un TXT de importación.")
+
+
 @app.post("/generate_maria/avisos")
 async def avisos_maria_endpoint(
     request: MariaRequest,
@@ -3925,6 +3930,7 @@ async def avisos_maria_endpoint(
 ):
     """Los avisos de `/generate_maria`, antes de generar (MARIA-3): la
     pantalla los muestra junto al botón. No genera ni guarda nada."""
+    _rechazar_exportacion_en_importacion(request)
     items = _items_con_procedencia(request)
     try:
         gastos = gastos_fob_para_el_txt(request.incoterm, request.gastos_fob, request.gastos_anteriores_fob)
@@ -3958,6 +3964,7 @@ async def generate_maria_endpoint(
     Recibe los items con: ncm/pieza, cantidad, valor_unitario, peso_kg, origen
     Devuelve: archivo TXT descargable
     """
+    _rechazar_exportacion_en_importacion(request)
     try:
         from proyecto_maria.core.controles_maria import (
             CAMPOS_DE_TEXTO, CAMPOS_DE_TEXTO_DEL_ITEM, controles_antes_de_generar, limpiar_texto,

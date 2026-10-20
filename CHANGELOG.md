@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-20 · fix: bloquear documentos no admitidos antes del TXT (DOC-1)
+
+- El lector conserva la clasificación documental y rechaza despachos, exportaciones y lecturas ambiguas. Una destinación EC* no entra al generador de importación; una nueva subida fallida no recupera los datos ni respuestas de la anterior.
+
 ## 2026-10-07 · fix: guardar una operación con la SIM completa no da 500 (GUARDAR-1)
 
 - **fix(operaciones):** la operación (con el contador del plan) se guarda en su propio commit y el historial del cliente después, cada producto en su savepoint: si el historial falla, la operación queda y la respuesta lo dice (`historial_guardado`). Antes, en Postgres, la SIM completa (`84714900100D`) no entraba en `client_product_history.ncm` (String(10)) y no se guardaba nada.

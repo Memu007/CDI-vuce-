@@ -641,6 +641,8 @@ def generate_maria_txt(operation_id: str, items: list,
     # === [DDT] Cabecera ===
     # Normalizamos config de aduana/destinacion con defaults seguros (Ezeiza IC04)
     aduana_codigo = (str(aduana_codigo or "").strip() or "001")[:3]
+    if str(tipo_destinacion or "").strip().upper().startswith("EC"):
+        raise ValueError("Una destinación de exportación (EC*) no puede generar un TXT de importación.")
     tipo_destinacion = (str(tipo_destinacion or "").strip().upper() or "IC04")[:4]
 
     lines.append("[DDT]")
