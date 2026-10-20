@@ -63,7 +63,11 @@ de archivo. Exportación completa necesita referencia validada en Kit.
 ## Reproducción PM del incidente
 
 La PM ejecutó los dos scripts de auditoría sintéticos fuera del repositorio,
-con código tomado de `a9b03cf` y `99f3625`. Ambos terminaron en 0 y confirmaron:
+con código tomado de `a9b03cf` y `99f3625`. Quedaron conservados en
+`docs/pm/herramientas/auditoria_documentos_sinteticos.py` y
+`auditoria_generador_sintetico.py` (sólo dobles locales y datos inventados).
+Desde la raíz, `python3 docs/pm/herramientas/<script>.py .` repite la prueba.
+Ambos terminaron en 0 y confirmaron:
 
 - `process_pdf` pierde clase documental, destinación y aduana devueltas por
   el doble local, y acepta fecha, rol y peso sin contraste documental.
@@ -99,3 +103,25 @@ Postgres, suite completa ni pantallas en esta primera revisión.
 Subagentes con modelo heredado: Sonnet/Opus y consejero Fable no están
 expuestos en este entorno. No se afirma haberlos usado ni se rebaja por eso
 la puerta de publicación. No se reactivaron rutinas históricas de Claude.
+
+## Reentrega MARIA-5d, todavía candidata
+
+- Producto inicial `b3fd518`: 146 focales verdes en revisión PM independiente
+  sobre `000a74d`. Una segunda revisión encontró un borde nuevo con `Unit
+  gross weight per line` y `Unit gross weight line`: `d22ff1a` los trataba
+  como totales y el nuevo substring los convertía en unitarios.
+- La PM reprodujo por AST ambos cambios y devolvió la pieza. El arreglo
+  mínimo `8b8b789` conserva también las líneas en inglés. Pruebas `67d18a8`
+  y negativo discriminante `eff9dea`.
+- Sobre `eff9dea`, PM repitió las seis baterías focales: **148 passed,
+  3 warnings in 10.84s**, proceso terminado con 0. Incluyen subida automática,
+  mapeo guardado, generación HTTP, 10 × 3 = 30 kg, totales/plurales/línea,
+  precedencia neto y referencias del generador/subítems.
+- Otro subagente verificó por AST del SHA exacto 14 clasificaciones y 10
+  órdenes de selección, también con mapeo guardado. Sin otro defecto
+  concreto dentro del alcance. No reemplaza una prueba de pantalla.
+- La primera suite sobre `000a74d` fue interrumpida al devolver la pieza:
+  no cuenta como suite pasada. Estado final de suite/sabotajes y puertas
+  pendientes: se registra al recibir el informe Dev del candidato exacto.
+- No se acepta ni publica todavía. La modificación de peso es de Excel;
+  **no corrige el incidente del despacho EC02 ni certifica exportación**.

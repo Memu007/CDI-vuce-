@@ -43,3 +43,5 @@ qué modelo y esfuerzo rinden.
 | 2026-10-07 | Reentrega completa de MARIA-5, CATALOGO-NCM-1 y SUBITEMS-1 | PM | Sonnet medio | 4 | 4 por el subagente con salida (los scripts viejos de cada hallazgo, 5000 + 1100 pedidos al azar contra tres SHA, Playwright) | 1 media (el bruto «unitario» se divide: MARIA-5d antes de publicar) y 3 bajas |
 
 | 2026-10-19 | Codex PM, retoma | MARIA-5d `d22ff1a` | modelo heredado, esfuerzo heredado (Sonnet/Opus no disponibles) | 1 familia de defecto, 3 variantes HTTP | PM reprodujo las 3; borde nuevo frente a 65 focales verdes | vuelve, no publicación |
+
+| 2026-10-19 | Codex PM, segunda revisión MARIA-5d | b3fd518 → 8b8b789 | modelo y esfuerzo heredados | 1 regresión, 2 columnas por línea en inglés | PM reprodujo por AST las 2; corregidas y cubiertas en 148 focales | candidata; faltan puertas de publicación |
