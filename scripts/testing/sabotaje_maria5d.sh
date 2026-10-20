@@ -96,5 +96,9 @@ caso unit_gross_weight "FAILED tests/test_maria5d_unit_kg.py::test_bruto_unitari
 reemplazar $M '        return "bruto_unidad" if _bruto_de_una_unidad(normal) else "bruto"' '        return "bruto_unidad"'
 caso todo_bruto_unitario "FAILED tests/test_maria5d_unit_kg.py::test_bruto_total_o_plural_sigue_dividiendose[Peso bruto total unit (kg)]"
 
+# 11. «line» en inglés también conserva el bruto de toda la línea
+reemplazar $M 'or "line" in normal or "unidades"' 'or "linea" in normal or "unidades"'
+caso bruto_line_ingles "FAILED tests/test_maria5d_unit_kg.py::test_bruto_total_o_plural_sigue_dividiendose[Unit gross weight per line]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 10 sabotajes dan rojo por la razón esperada"
+echo "OK: los 11 sabotajes dan rojo por la razón esperada"
