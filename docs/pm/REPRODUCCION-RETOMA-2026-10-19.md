@@ -125,3 +125,44 @@ la puerta de publicación. No se reactivaron rutinas históricas de Claude.
   pendientes: se registra al recibir el informe Dev del candidato exacto.
 - No se acepta ni publica todavía. La modificación de peso es de Excel;
   **no corrige el incidente del despacho EC02 ni certifica exportación**.
+
+## Cierre de suite de pesos (2026-10-20)
+
+Suite Dev con chequeo previo sobre `eff9dea`: `1570 passed, 102 skipped,
+2 xfailed, 28 warnings in 378.14s`, cobertura 50,47 %, `FIN SUITE exit=0`.
+La PM leyó el final completo y el SHA del log. Informe `254531b`, sólo
+`PARA-PM-2.md`; Git demuestra que no cambió producto. No se repitió suite.
+Pantallas/e2e/Kit siguen sin ejecutar en esa entrega.
+
+## DOC-1, todavía en devolución (2026-10-20)
+
+Producto `b5b6dec`; pruebas `378288e` y negativos de lector actualizados
+`10bbe35`, con diff de producto vacío entre esos SHA. Focales Dev: 352
+passed/2 xfailed antes del último test; 38 DOC-1 finales. PM: 38 passed,
+3 warnings, 0,58 s y salida 0; Node: 11 escenarios sintéticos OK.
+
+Suite con chequeo previo sobre `378288e`: `1564 passed, 102 skipped,
+2 xfailed, 28 warnings in 393.02s`, cobertura 50,53 %, `FIN SUITE exit=0`.
+La corrida sin cobertura que arrancó antes se detuvo: no cuenta como puerta.
+
+Revisión independiente del primer candidato: 37 DOC-1 verdes; el comando
+salió 1 porque se impuso cobertura global a un focal (16,47 % contra 38 %).
+No es una falla de las aserciones ni se cuenta como una puerta completa.
+El subagente repitió también 11 escenarios Node, sin hallazgos nuevos.
+
+CUA PM contra una aplicación local en `378288e`: factura A sintética abrió
+Review con un ítem; Nueva operación y despacho B sintético mostró rechazo
+sin tabla ni generación; recargar conservó Nueva operación vacía. Harness
+fuera del repo sustituye lector y usuario; la validación del endpoint y
+los JS son reales. No se probó Gemini real ni se usaron PDFs privados.
+El marcador del primer fixture sintético estaba escapado por PdfWriter;
+se corrigió antes de repetir A. Ese primer rechazo no se atribuye al producto.
+Evidencia visual local entregable: `doc1-bloqueo-local.jpg` (sólo sintéticos).
+
+Autorrevisión encontró otro estado derivado: `lastSnapshot` en ncm.js
+sobrevive al borrador. Se reprodujo mediante ncm.js real y reloj controlado:
+batch A → salida → nueva operación con items[] → entrada NCM/Ctrl+Z restaura
+A. La navegación normal impide NCM sin ítems, pero una factura C válida
+puede alcanzarlo dentro de diez segundos. PM adoptó la guarda de snapshot
+atado al estado de operación, con prueba positiva de undo en la misma
+operación. Sigue en devolución, no en aceptación ni publicación.

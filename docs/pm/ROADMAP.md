@@ -57,7 +57,7 @@ necesita prueba: la ley, un archivo real o la respuesta del despachante
 | ✅ | SUBITEMS-1 | La pantalla v2 deja cargar, editar y ver los subítems de cada producto, con el formato que ya recibe `/generate_maria` (D24 de la Dev 1; Emi: sus facturas traen subítems, 2026-10-07) | `maria_golden_subitems_anon.TXT`: la prueba de punta a punta deja de agregarlos a mano |
 | 1 | MARIA-5d | «Peso bruto unitario» es bruto de una unidad: no se divide (revisión de la reentrega de MARIA-5). Antes de publicar | los archivos reales, idénticos |
 | 2 | DOC-1 | Bloquear documentos no admitidos/ambiguos y EC* en la ruta de importación; una subida nueva fallida no revive datos del documento anterior. Autorizada por Emi el 2026-10-19 | no cambia el TXT de una importación válida; casos sintéticos factura/despacho/ambigüedad y A→B |
-| 2 | MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11); el número de operación y la referencia de la factura que hoy arma la pantalla (D23 y D25 de la Dev 1) | sus archivos reales |
+| 3 | MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11); el número de operación y la referencia de la factura que hoy arma la pantalla (D23 y D25 de la Dev 1) | sus archivos reales |
 
 MARIA-4, MARIA-3 y MARIA-5 tocan el mismo generador: van en ese orden.
 MARIA-6 arranca cuando lleguen sus archivos reales.

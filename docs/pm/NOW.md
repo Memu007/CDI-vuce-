@@ -1,6 +1,6 @@
 # NOW — CDI
 
-Actualizado: 2026-10-19. Estado vigente; la historia está en Git.
+Actualizado: 2026-10-20. Estado vigente; la historia está en Git.
 
 **Producto:** `Memu007/CDI-vuce-` (privado desde el 2026-10-06).
 **Publicado:** `main` = `a9b03cf` (2026-10-07 21:35 UTC, tercera publicación: GUARDAR-1) en Railway,
@@ -225,3 +225,23 @@ en el apt del runner de GitHub.
 ## Medición
 
 `archivo/MEDICION-SUBAGENTES.md` y `archivo/MEDICION-CONSEJERO.md`.
+
+## Continuación 2026-10-20
+
+- **MARIA-5d:** informe Dev `254531b` (sólo documentos) sobre el producto
+  de `eff9dea`: suite completa `1570 passed, 102 skipped, 2 xfailed`,
+  cobertura 50,47 %, salida 0; 148 focales PM y 11 sabotajes. No se repite.
+  Falta cerrar las puertas de navegador/Kit antes de autorizar publicación.
+- **DOC-1:** producto `b5b6dec`, pruebas finales `378288e`, negativos
+  actualizados `10bbe35`; mismo producto Python. Suite con chequeo previo,
+  `1564 passed, 102 skipped, 2 xfailed`, cobertura 50,53 %, salida 0.
+  PM reprodujo 38 focales y 11 escenarios JS. CUA local, con lector y
+  usuario simulados: factura A válida → revisión; despacho B → rechazo
+  claro; recarga → operación vacía, sin A. No mide precisión de Gemini.
+- **Devolución DOC-1:** el botón Deshacer de NCM conserva un snapshot fuera
+  de `CDI.state` durante diez segundos. Tras una nueva operación puede
+  restaurar ítems anteriores al volver a NCM. Se requiere atarlo a la
+  referencia del estado de su operación y conservar undo en la misma
+  operación. Corrección aislada a cargo del subagente UI; sin aceptar aún.
+- Ningún cambio en producción. Las ramas de revisión siguen separadas;
+  datos privados y harness local de lectura no se versionan.
