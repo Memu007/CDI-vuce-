@@ -55,7 +55,7 @@ def test_bruto_unitario_con_unidad_de_medida(auth_override, client, columna, gua
 
 
 @pytest.mark.parametrize("columna", ["Peso bruto total unit (kg)", "Gross weight total units (kg)",
-                                     "Peso bruto unidades (kg)", "Unit gross weight linea"])
+                                     "Peso bruto unidades (kg)", "Unit gross weight linea", "Unit gross weight per line", "Unit gross weight line"])
 def test_bruto_total_o_plural_sigue_dividiendose(auth_override, client, columna):
     data = _subir(client, [columna], [30])
     assert data["items"][0]["peso_unitario"] == pytest.approx(3), data
