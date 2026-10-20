@@ -238,11 +238,11 @@ en el apt del runner de GitHub.
   PM reprodujo 38 focales y 11 escenarios JS. CUA local, con lector y
   usuario simulados: factura A válida → revisión; despacho B → rechazo
   claro; recarga → operación vacía, sin A. No mide precisión de Gemini.
-- **Devolución DOC-1:** el botón Deshacer de NCM conserva un snapshot fuera
+- **Devolución DOC-1, resuelta en `c2d41b4`:** el botón Deshacer de NCM conservaba un snapshot fuera
   de `CDI.state` durante diez segundos. Tras una nueva operación puede
   restaurar ítems anteriores al volver a NCM. Se requiere atarlo a la
   referencia del estado de su operación y conservar undo en la misma
-  operación. Corrección aislada a cargo del subagente UI; sin aceptar aún.
+  operación. Corrección integrada en `fe0a101`, con 4 escenarios undo y 11 de subida verdes; publicación pendiente.
 - Ningún cambio en producción. Las ramas de revisión siguen separadas;
   datos privados y harness local de lectura no se versionan.
 
@@ -259,10 +259,36 @@ Revisión técnica local satisfactoria; **sin publicación ni aceptación de
 precisión del lector real**. Pendientes: puerta oficial completa de
 navegador, instalación limpia y prueba permitida de Emi con el lector real.
 
-Guardar las actualizaciones remotas quedó bloqueado: la revisión automática
-rechazó push de `codex/maria5d-unit-kg` por falta de autorización explícita
-para enviar ramas a GitHub. No se reintentó ni se usó otro canal. El mismo
-límite se respeta para DOC-1 y la actualización PM: todo está commiteado
-localmente y se pide a Emi autorización para guardar esas ramas en
-`Memu007/CDI-vuce-`, sin tocar `main` ni Railway. Las PR #1 y #2 existentes
-son borradores anteriores; no incluyen todavía todos los cierres de hoy.
+El rechazo automático anterior de push quedó resuelto por autorización
+explícita de Emi el 2026-10-20: «dale. y. anotalo asi. la prox. pm sabe».
+Se autoriza guardar las tres ramas detalladas en `DECISIONS.md` y preparar
+sus borradores de revisión. **No es autorización para publicar**: no tocar
+`main` ni Railway. No pedir de nuevo permiso para este mismo guardado.
+
+## Traspaso a la próxima PM — 2026-10-20
+
+Leer primero este NOW, `DECISIONS.md` y
+`REPRODUCCION-RETOMA-2026-10-19.md`; leer cada informe desde su propia rama.
+
+| Rama de revisión | Entrega | Estado técnico |
+|---|---|---|
+| `codex/pm-retoma-txt` | Documentación de PM y autorización de guardado | Sin código de producto; retoma de `99f3625` |
+| `codex/maria5d-unit-kg` | `254531b`, informe sobre producto `eff9dea` | 1570 passed, 102 skipped, 2 xfailed; 148 focales PM y 11 negativos |
+| `codex/doc1-block-invalid-pdf` | `fe0a101` | 1564 passed, 102 skipped, 2 xfailed sobre el mismo Python; 38 focales y 15 escenarios JS tras integración |
+
+**Siguiente:** verificar las cabezas remotas y los borradores, completar la
+puerta oficial de navegador y el entorno limpio, integrar sólo en una rama
+candidata y verificar esa combinación. La prueba CUA local tuvo lector
+simulado: falta una prueba permitida con lector real; no afirmar precisión
+Gemini ni aceptación en Kit. Publicar requiere el «dale» de Emi para un
+SHA final probado, conforme a las reglas vigentes.
+
+**Después:** recibir EXCEL-2 `c2f8063` y GUARDAR-2 `2d930c5` por separado
+(no la punta completa de Dev 1), con sus pruebas pendientes. D32 ya es (b),
+sin migración. No reabrirla ni adelantar cobro. No reactivar rutinas antiguas
+ni asumir que hay sesiones de Claude trabajando.
+
+**Alcance DOC-1:** bloquear el TXT incorrecto, no generar exportaciones
+completas. No se demostró mezcla de dos PDFs: se confirmó clasificación
+perdida y ruta de importación aplicada a un despacho. No usar los TXT
+manuales de este chat como archivos de referencia aceptados por el Kit.
