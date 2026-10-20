@@ -9,6 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-10-20 · fix: bloquear documentos no admitidos antes del TXT (DOC-1)
 
 - El lector conserva la clasificación documental y rechaza despachos, exportaciones y lecturas ambiguas. Una destinación EC* no entra al generador de importación; una nueva subida fallida no recupera los datos ni respuestas de la anterior.
+- Deshacer cambios de NCM queda atado a la operación actual y no puede restaurar productos de una anterior.
 
 ## 2026-10-07 · fix: guardar una operación con la SIM completa no da 500 (GUARDAR-1)
 
