@@ -106,7 +106,7 @@ verde después y negativo que detecte desactivar las guardas. Los mocks de
 lectura de facturas anteriores se actualizan sólo para incluir la nueva
 clasificación válida, sin debilitar sus aserciones.
 
-**Devolución de revisión, 2026-10-20:** además del borrador, invalidar el
+**Devolución de revisión, 2026-10-20 (resuelta en `c2d41b4`):** además del borrador, invalidar el
 snapshot de Deshacer NCM al cambiar de operación. Se demostró con el JS
 real: batch A → nueva operación → NCM → Ctrl+Z restaura A, mientras
 `lastSnapshot` siga vivo (10 s). La ruta sin ítems está bloqueada en Review,

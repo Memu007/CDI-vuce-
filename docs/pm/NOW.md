@@ -245,3 +245,24 @@ en el apt del runner de GitHub.
   operación. Corrección aislada a cargo del subagente UI; sin aceptar aún.
 - Ningún cambio en producción. Las ramas de revisión siguen separadas;
   datos privados y harness local de lectura no se versionan.
+
+### Cierre de esta vuelta (2026-10-20)
+
+DOC-1 entregada en `fe0a101`, rama local `codex/doc1-block-invalid-pdf`.
+El snapshot NCM fue corregido en `c2d41b4` y probado en `637758c`:
+PM repitió 4 escenarios undo y 11 de subida sobre el candidato aislado;
+Dev repitió 38 focales y los 15 escenarios después de integrar. Diff Python
+vacío desde `378288e`: se conserva la evidencia de suite anterior, no se
+repite por JS ni se afirma que la suite Python prueba navegador.
+
+Revisión técnica local satisfactoria; **sin publicación ni aceptación de
+precisión del lector real**. Pendientes: puerta oficial completa de
+navegador, instalación limpia y prueba permitida de Emi con el lector real.
+
+Guardar las actualizaciones remotas quedó bloqueado: la revisión automática
+rechazó push de `codex/maria5d-unit-kg` por falta de autorización explícita
+para enviar ramas a GitHub. No se reintentó ni se usó otro canal. El mismo
+límite se respeta para DOC-1 y la actualización PM: todo está commiteado
+localmente y se pide a Emi autorización para guardar esas ramas en
+`Memu007/CDI-vuce-`, sin tocar `main` ni Railway. Las PR #1 y #2 existentes
+son borradores anteriores; no incluyen todavía todos los cierres de hoy.

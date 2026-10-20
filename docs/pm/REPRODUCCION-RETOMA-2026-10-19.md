@@ -166,3 +166,24 @@ A. La navegación normal impide NCM sin ítems, pero una factura C válida
 puede alcanzarlo dentro de diez segundos. PM adoptó la guarda de snapshot
 atado al estado de operación, con prueba positiva de undo en la misma
 operación. Sigue en devolución, no en aceptación ni publicación.
+
+## Reentrega final DOC-1 (2026-10-20)
+
+- Integración Dev final `fe0a101` (`c2d41b4` producto undo, `637758c` prueba,
+  `380bb95` changelog, resto informe). Checkout limpio.
+- PM leyó el diff del origen `565b6aa` y ejecutó sus dos arneses reales:
+  cuatro escenarios NCM undo y once de subida verdes. La guarda compara
+  el estado de la operación dueña antes de restaurar. Conserva undo al
+  navegar dentro de la misma operación; impide restaurar A en B vacía o C.
+- Dev reejecutó 38 focales y ambos arneses tras integrar; todos verdes.
+  `git diff 378288e..fe0a101 -- '*.py'` vacío. La suite normal ya corrida
+  aplica al mismo producto Python; la modificación JS está probada aparte.
+- No se ejecutó la e2e oficial completa de navegador ni se probó Gemini real.
+  El smoke CUA usa dobles explícitos y no reemplaza esas pruebas.
+
+La revisión automática rechazó el push del cierre de pesos a GitHub,
+indicando que no hay autorización explícita para exportar ramas al remoto.
+No se rodeó el bloqueo. La retoma PM y DOC-1 están también pendientes de
+permiso de Emi para guardar sus ramas, no para publicar. Se entregan resumen,
+parches y captura locales sin datos privados. PR #1/#2 ya creadas antes del
+rechazo quedan en borrador; main sigue en `a9b03cf`.
