@@ -2,12 +2,13 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## DOC-1 — entrega provisional, no aceptada (2026-10-20)
+## DOC-1 — implementación entregada a revisión PM (2026-10-20)
 
-Backend y subida implementados y probados; **sigue bloqueando la aceptación el
-borrador de deshacer NCM (`lastSnapshot`)**, que puede restaurar productos de
-otra operación al volver a esa pantalla. PM encargó su corrección a UI en un
-clon aislado. No integrar ni publicar esta entrega como cierre de DOC-1.
+Backend, subida y protección de deshacer NCM implementados y probados.
+**El bloqueante `lastSnapshot` quedó corregido**: cada borrador de deshacer
+pertenece a su estado de operación y no puede reemplazar otra operación.
+Sin bloqueante conocido de implementación; la aceptación independiente,
+integración y publicación siguen en manos de PM/Emi.
 
 | Pieza | SHA |
 |---|---|
@@ -17,11 +18,16 @@ clon aislado. No integrar ni publicar esta entrega como cierre de DOC-1.
 | Negativos DOC-1 aislados | `674379d` |
 | Caso de rechazo levantado en worker | `378288e` |
 | Adaptación de dos negativos MARIA-2b al retorno clasificado | `10bbe35` |
+| Informe provisional previo | `e148343` |
+| Protección de deshacer NCM (origen revisado `565b6aa`) | `c2d41b4` |
+| Casos NCM undo (origen revisado `e45e80e`) | `637758c` |
+| Registro del cambio de NCM en changelog | `380bb95` |
 
 Rama local `codex/doc1-block-invalid-pdf`, clon `/private/tmp/cdi-doc1-dev`.
-No push, merge a main ni publicación. Los cambios posteriores a `378288e`
-son sólo el script de negativos: `git diff 378288e..10bbe35 -- proyecto_maria`
-no muestra diferencias.
+No push, merge a main ni publicación. Después de `378288e` sólo cambiaron scripts/documentación y la protección JS
+de NCM. `git diff 378288e..380bb95 -- "*.py"` no muestra diferencias. Por eso
+no se repitió la suite Python completa; sí los 38 focales y los 15 escenarios JS
+sobre la integración final.
 
 ## Alcance real
 
@@ -39,6 +45,9 @@ no muestra diferencias.
 - Subir B invalida datos/borrador local de A inmediatamente. Respuestas viejas
   de subida, autoasignación, catálogo y confirmaciones Excel no pisan B.
   Se conserva historial y preferencias; el rechazo ofrece elegir otra factura.
+- Deshacer las cuatro acciones NCM masivas conserva la operación dueña: una
+  nueva subida, carga manual o simulada invalida el borrador previo, mientras
+  que deshacer dentro de la misma operación continúa funcionando.
 - UI fue construida por el subagente `dev_doc1_ui` con modelo/esfuerzo heredado;
   su arnés JS usa DOM/API falsos. Es autorrevisión, no aceptación independiente.
 
@@ -49,8 +58,8 @@ no muestra diferencias.
 | Rojo previo DOC-1 | `26 failed, 3 warnings in 2.90s` sobre producto base; falta conservación, rechazo y EC HTTP |
 | Rojo previo generador puro | `3 failed, 26 deselected, 3 warnings in 0.23s` antes de la guarda EC del core |
 | Focales lector, pesos, devolución, Gemini fallido, rendimiento, punta a punta, TXT y subítems | `352 passed, 2 xfailed, 10 warnings in 30.21s` |
-| DOC-1 final, incluye excepción worker | `38 passed, 3 warnings in 0.36s` sobre `378288e` |
-| UI sintética | `DOC-1 upload: 11 synthetic scenarios OK (state, rejection, races, client, catalog, draft, Excel).` |
+| DOC-1 final, incluye excepción worker | `38 passed, 3 warnings in 0.36s` sobre `378288e`; tras integrar JS: `38 passed, 3 warnings in 0.73s` sobre `637758c` |
+| UI sintética integrada | `DOC-1 upload: 11 synthetic scenarios OK (state, rejection, races, client, catalog, draft, Excel).`; `DOC-1 NCM undo: 4 synthetic scenarios OK.` sobre `637758c` |
 | Negativos DOC-1 aislados | 3/3 rojos esperados: clasificación, servidor HTTP y generador puro; cada mutante corre en snapshot temporal |
 | `compileall` y diff check | OK |
 | Preflight aislado `378288e` | OK: checkout limpio, Python 3.12 heredado, sin `.env`, claves inventadas, servicios fake/loopback9, API única `127.0.0.1:19001`, `/health` y frontend 200, tablas SQLite temporales |
@@ -64,7 +73,8 @@ no hay cierre del script en el log y **no cuenta completo**. MARIA-5 de esa
 cola no consta ejecutado. No se ejecutaron acá todos los sabotajes históricos
 ni la e2e oficial con navegador.
 
-PM comunicó revisión independiente de 38 casos DOC-1, 11 casos JS y recorrido
+PM comunicó revisión independiente de 38 casos DOC-1, 11 casos JS y los
+4 casos NCM undo del candidato aislado antes de autorizar la integración, y recorrido
 CUA sintético en `19002`: factura A admitida, despacho B rechazado, recarga sin
 revivir A. Es evidencia de PM, no una corrida Dev adicional.
 
@@ -97,13 +107,14 @@ inventadas (nunca ejecutar contra producción):
 ```bash
 rtk proxy /private/tmp/cdi-codex-pm-venv/bin/python -m pytest tests/test_doc1_documentos.py -o addopts= --timeout=120 -q
 rtk proxy node tests/test_doc1_upload.js
+rtk proxy node tests/test_doc1_ncm_undo.js
 rtk proxy /private/tmp/cdi-codex-pm-venv/bin/python scripts/testing/sabotaje_doc1.py
 rtk proxy bash scripts/testing/sabotaje_maria2b.sh 10bbe35 /private/tmp/cdi-codex-pm-venv
-rtk git diff 378288e..10bbe35 -- proyecto_maria
+rtk git diff 378288e..380bb95 -- "*.py"
 ```
 
 Logs externos, sin datos reales: `/private/tmp/doc1-focals2.txt`,
-`/private/tmp/doc1-focused-final.txt`, `/private/tmp/cdi-doc1-suite/suite.log`,
+`/private/tmp/doc1-focused-final.txt`, `/private/tmp/doc1-integrated-focused.txt`, `/private/tmp/cdi-doc1-suite/suite.log`,
 `/private/tmp/doc1-smoke.txt`, `/private/tmp/doc1-sabotaje-maria2b-final.txt` y
 `/private/tmp/doc1-sabotajes-lector.txt`. El arnés preflight reproducible quedó
 fuera del repo en `/private/tmp/cdi-doc1-suite/preflight_and_suite.py`; comprueba
@@ -112,9 +123,11 @@ explícitamente el SHA a verificar.
 
 ## Siguiente
 
-PM decide integración del arreglo aislado de `lastSnapshot` y su revisión.
-No hay una decisión comercial/de alcance nueva para Emi. DOC-1 permanece en
-revisión, sin autoaceptación y sin publicación.
+No quedan decisiones de alcance ni bloqueantes conocidos de implementación.
+PM revisa la entrega integrada y prepara la PR hacia su rama; esto no autoriza
+fusionar a main ni publicar. No se ejecutó la puerta oficial completa de
+navegador; la evidencia JS y CUA sintética descrita no la reemplaza. No se
+afirma aceptación ni precisión de Gemini real.
 
-Última vuelta: 2026-10-20, 13:45 Argentina.
-Contexto: ~55 %.
+Última vuelta: 2026-10-20, 13:48 Argentina.
+Contexto: ~58 %.
