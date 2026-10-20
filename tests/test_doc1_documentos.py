@@ -78,3 +78,16 @@ def test_clasificacion_contradictoria_se_rechaza(monkeypatch, copia, lugar, camp
     (respuesta if lugar == "raiz" else respuesta["operacion"])[campo] = valor
     with pytest.raises(ValueError, match="factura comercial de importación"):
         _leer(monkeypatch, copia, respuesta, clasificar=False)
+
+
+def test_rechazo_levantado_en_worker_llega_como_422(auth_override, client, monkeypatch):
+    import proyecto_maria.main as main
+    from proyecto_maria.pdf_extractor import DocumentoNoAdmitido, MENSAJE_DOCUMENTO_NO_ADMITIDO
+    monkeypatch.setattr(main, "lectura_automatica_disponible", lambda: True)
+    monkeypatch.setattr("proyecto_maria.core.ai_quota.enforce_pdf_quota", lambda _: None)
+    def rechazar(_):
+        raise DocumentoNoAdmitido(MENSAJE_DOCUMENTO_NO_ADMITIDO)
+    monkeypatch.setattr(main, "process_pdf", rechazar)
+    r = client.post("/upload_pdf/public", files={"file": ("comercial.pdf", io.BytesIO(_pdf_en_blanco()), "application/pdf")})
+    assert r.status_code == 422, r.text
+    assert r.json() == {"detail": MENSAJE_DOCUMENTO_NO_ADMITIDO, "code": "documento_no_admitido"}
