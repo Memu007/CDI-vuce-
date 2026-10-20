@@ -5117,9 +5117,11 @@ def _bruto_de_una_unidad(normal: str) -> bool:
     «unid.», «kg/u», «c/u»). «Total», «unidades» o «units» lo dejan de la
     línea (revisión de MARIA-5d)."""
     sin_parentesis = re.sub(r"[()]", "", normal)
-    if "total" in normal or "linea" in normal or "unidades" in normal or "units" in normal:
+    if "total" in normal or "line" in normal or "unidades" in normal or "units" in normal:
         return False
-    return bool(re.search(r"unitari|perunit|porunidad|xunidad|unitweight|(unit|unid|/u|brutou)$", sin_parentesis))
+    # «unit (kg)» conserva la indicación de una unidad; también «Unit gross weight».
+    return bool(re.search(r"unitari|perunit|porunidad|xunidad|unitweight|unitgrossweight|"
+                          r"(unit|unid|/u|brutou)(kgs?)?$", sin_parentesis))
 
 
 def _clase_de_peso(normal: str) -> str:
