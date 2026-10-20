@@ -5103,11 +5103,33 @@ def _detect_item_columns(headers: list) -> dict:
 _PESO_DE_UNA_UNIDAD = {"peso", "weight", "pesokg", "pesokgs", "pesoenkg", "kg", "kgs"}
 
 
+def _dice_de_una_unidad(normal: str) -> bool:
+    """«unitario», «unit», «per unit», «por unidad», «kg/u», «c/u» o «Peso U.»
+    (MARIA-5d)."""
+    sin_parentesis = re.sub(r"[()]", "", normal)
+    return ("unit" in normal or "unidad" in normal or sin_parentesis.endswith("/u")
+            or sin_parentesis in ("pesou", "pesobrutou"))
+
+
+def _bruto_de_una_unidad(normal: str) -> bool:
+    """El bruto no tiene contra qué compararse (va último): es de una unidad
+    sólo si lo dice sin dudas («unitario», «per unit», «por unidad», «unit.»,
+    «unid.», «kg/u», «c/u»). «Total», «unidades» o «units» lo dejan de la
+    línea (revisión de MARIA-5d)."""
+    sin_parentesis = re.sub(r"[()]", "", normal)
+    if "total" in normal or "line" in normal or "unidades" in normal or "units" in normal:
+        return False
+    # «unit (kg)» conserva la indicación de una unidad; también «Unit gross weight».
+    return bool(re.search(r"unitari|perunit|porunidad|xunidad|unitweight|unitgrossweight|"
+                          r"(unit|unid|/u|brutou)(kgs?)?$", sin_parentesis))
+
+
 def _clase_de_peso(normal: str) -> str:
-    # El bruto es bruto aunque diga «unitario» (segunda devolución de MARIA-5).
+    # El bruto es bruto aunque diga «unitario» (segunda devolución de MARIA-5):
+    # de una unidad si lo dice, si no de la línea (MARIA-5d).
     if "bruto" in normal or "gross" in normal:
-        return "bruto"
-    if "unit" in normal or "unidad" in normal:
+        return "bruto_unidad" if _bruto_de_una_unidad(normal) else "bruto"
+    if _dice_de_una_unidad(normal):
         return "unidad"
     if "neto" in normal or "net" in normal:
         return "neto"
@@ -5128,7 +5150,7 @@ def _clase_de_columna(columna, rename: dict) -> str:
 # Con varias columnas de peso manda el neto de la línea, después el total de
 # la línea, después el de una unidad y al final el bruto (devolución de
 # MARIA-5: el TXT pide el peso neto de la línea).
-_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "dudosa": 3, "bruto": 4}
+_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "dudosa": 3, "bruto": 4, "bruto_unidad": 4}
 
 
 def _es_nombre_de_peso(normal: str) -> bool:
@@ -5208,7 +5230,10 @@ def _peso_por_unidad(df: pd.DataFrame, pesos: list, columna_de: dict | None = No
     if clase == "dudosa":
         avisos.append(f"Peso: la columna «{origen}» no dice si es el peso de una unidad o el de toda la "
                       "línea; se usó como de una unidad. Revisala.")
-    if clase in ("unidad", "dudosa"):
+    if clase == "bruto_unidad":
+        avisos.append(f"Peso: el TXT pide peso neto y la planilla trae sólo «{origen}» (bruto de una "
+                      "unidad); se usó el bruto. Corregilo si tenés el neto.")
+    if clase in ("unidad", "dudosa", "bruto_unidad"):
         # La columna queda como vino: la lectura de la planilla la interpreta
         # con el mismo separador decimal que la cantidad y el precio.
         return avisos

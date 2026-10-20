@@ -167,7 +167,7 @@ reemplazar $M '    if clase == "bruto":
 caso bruto_en_silencio "${T}peso_excel.py::test_el_bruto_solo_se_usa_dividido_y_con_aviso"
 
 # 21. el bruto vuelve a ganarle al neto
-reemplazar $M '_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "dudosa": 3, "bruto": 4}' '_RANGO_DE_PESO = {"neto": 4, "linea": 1, "unidad": 2, "dudosa": 3, "bruto": 0}'
+reemplazar $M '_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "dudosa": 3, "bruto": 4, "bruto_unidad": 4}' '_RANGO_DE_PESO = {"neto": 4, "linea": 1, "unidad": 2, "dudosa": 3, "bruto": 0, "bruto_unidad": 4}'
 caso bruto_antes_que_neto "${T}peso_excel.py::test_con_neto_y_bruto_se_usa_el_neto"
 
 # 22. la columna de peso vuelve a mirarse sólo por nombre exacto
@@ -198,7 +198,7 @@ reemplazar $M '_RANGO_DE_PESO = {"neto": 0, "linea": 1,' '_RANGO_DE_PESO = {"net
 caso total_antes_que_neto "${D}test_excel_el_neto_le_gana_al_total"
 
 # 28. Excel: el de una unidad le gana al de la línea
-reemplazar $M '"unidad": 2, "dudosa": 3, "bruto": 4}' '"unidad": -1, "dudosa": 3, "bruto": 4}'
+reemplazar $M '"unidad": 2, "dudosa": 3, "bruto": 4, "bruto_unidad": 4}' '"unidad": -1, "dudosa": 3, "bruto": 4, "bruto_unidad": 4}'
 caso unidad_antes_que_linea "${D}test_excel_con_dos_pesos_gana_el_de_la_linea[Peso-Peso neto]"
 
 # 29. Excel: el mapeo guardado manda sobre el neto
@@ -277,7 +277,7 @@ caso nombre_interno "${D}test_el_aviso_nombra_la_columna_como_viene"
 E="FAILED tests/test_devolucion2_maria5_ncm.py::"
 
 # 45. una columna dudosa le gana a una reconocida
-reemplazar $M '"dudosa": 3, "bruto": 4}' '"dudosa": 1.5, "bruto": 4}'
+reemplazar $M '"dudosa": 3, "bruto": 4, "bruto_unidad": 4}' '"dudosa": 1.5, "bruto": 4, "bruto_unidad": 4}'
 caso dudosa_gana "${E}test_una_columna_desconocida_no_le_gana_a_una_reconocida[columnas0-pesos0]"
 
 # 46. una columna dudosa sola, sin aviso
@@ -288,11 +288,7 @@ caso dudosa_sin_aviso "${E}test_una_columna_desconocida_sola_se_usa_con_aviso"
 
 # 47. «Peso bruto unitario» vuelve a leerse como de una unidad
 reemplazar $M '    if "bruto" in normal or "gross" in normal:
-        return "bruto"
-    if "unit" in normal or "unidad" in normal:
-        return "unidad"' '    if "unit" in normal or "unidad" in normal:
-        return "unidad"
-    if "bruto" in normal or "gross" in normal:
+        return "bruto_unidad" if _bruto_de_una_unidad(normal) else "bruto"' '    if ("bruto" in normal or "gross" in normal) and not _bruto_de_una_unidad(normal):
         return "bruto"'
 caso bruto_unitario "${E}test_el_bruto_unitario_es_bruto["
 
