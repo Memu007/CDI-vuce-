@@ -24,7 +24,7 @@
     const expandedGroups = new Set();
     let batchBar, batchCount, batchFactor, batchApplyQty, batchNcm, batchDc, batchApplyNcm, batchOrigin, batchApplyOrigin, batchClear, batchAgrupar, selectAllBox;
     let batchSimAutofilled = false;
-    let lastSnapshot = null;   // { items: [...], label: 'x2 a 3 items', ts: ms }
+    let lastSnapshot = null;   // { state: operación dueña, items: [...], ts: ms }
     let undoTimer = null;
 
     // Estado spotlight
@@ -456,6 +456,7 @@
 
     function undoLastBatch() {
         if (!lastSnapshot) return false;
+        if (lastSnapshot.state !== CDI.state) { lastSnapshot = null; return false; }
         if (!CDI.state || !Array.isArray(CDI.state.items)) return false;
         CDI.state.items = lastSnapshot.items;
         lastSnapshot = null;
@@ -478,7 +479,7 @@
             if (CDI.toast) CDI.toast('Sin cambios', 'El factor es 1', 'info');
             return;
         }
-        lastSnapshot = { items: snapshotItems(), ts: Date.now() };
+        lastSnapshot = { state: CDI.state, items: snapshotItems(), ts: Date.now() };
         let touched = 0;
         selectedRows.forEach(i => {
             const it = items[i];
@@ -523,7 +524,7 @@
             if (CDI.toast) CDI.toast('Posición SIM incompleta', simErrorDetail(batchSimValue()), 'error');
             return;
         }
-        lastSnapshot = { items: snapshotItems(), ts: Date.now() };
+        lastSnapshot = { state: CDI.state, items: snapshotItems(), ts: Date.now() };
         let touched = 0;
         selectedRows.forEach(i => {
             const it = items[i];
@@ -546,7 +547,7 @@
             if (CDI.toast) CDI.toast('Origen inválido', 'Elegí un país de la tabla MARIA, por ejemplo 310 · CHINA.', 'error');
             return;
         }
-        lastSnapshot = { items: snapshotItems(), ts: Date.now() };
+        lastSnapshot = { state: CDI.state, items: snapshotItems(), ts: Date.now() };
         let touched = 0;
         selectedRows.forEach(i => {
             const it = items[i];
@@ -1080,7 +1081,7 @@
             if (CDI.toast) CDI.toast(result.title, result.message, 'error');
             return;
         }
-        lastSnapshot = { items: before, ts: Date.now() };
+        lastSnapshot = { state: CDI.state, items: before, ts: Date.now() };
         CDI.track && CDI.track('ncm_agrupar', { grupo_id: result.grupo_id, items: result.count, ncm: result.ncm, batch: true });
         scheduleUndoClear('NCM ' + result.ncm + ' · ' + result.count + ' ítems → 1 unidad clasificatoria');
 
