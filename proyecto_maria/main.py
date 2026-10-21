@@ -6956,6 +6956,11 @@ async def upload_excel_v2(
     max_upload_bytes = _get_max_upload_bytes()
     contents = await validate_file_upload(file, 'excel', max_size=max_upload_bytes)
 
+    # Es una opción de API: omitida conserva True, no un checkbox desmarcado
+    # (FastAPI >= 0.147 interpreta los bool Form ausentes como False).
+    if "use_mapping" not in await request.form():
+        use_mapping = True
+
     mapping: dict = {}
     if cliente_id and use_mapping:
         try:
