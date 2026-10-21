@@ -466,3 +466,20 @@ def test_lo_que_llamaba_a_las_rutas_borradas():
     assert "El Excel se sube en la pantalla nueva" in app_js
     smoke = (raiz / "scripts/testing/smoke_test.sh").read_text(encoding="utf-8")
     assert '/upload_excel"' not in smoke and "/upload_excel_v2/" in smoke
+
+
+@pytest.mark.parametrize("usar_mapeo,cantidad,estado", [
+    (None, 10, 200), ("true", 10, 200), ("false", 1, 200), ("invalido", None, 422),
+])
+def test_use_mapping_conserva_default_y_booleanos_explicitos(usar_mapeo, cantidad, estado):
+    cid = _cliente_con_mapeo({"Unidades pedidas": "cantidad"})
+    form = {"cliente_id": cid}
+    if usar_mapeo is not None:
+        form["use_mapping"] = usar_mapeo
+    r = _subir([["NCM", "Descripcion", "Origen", "cantidad", "Unidades pedidas", "Precio Unitario", "Peso Neto"],
+                ["84713000", "Laptop sintetica", "CN", 1, 10, 350, 1.5]], **form)
+    assert r.status_code == estado, r.text[:300]
+    if estado == 200:
+        assert r.json()["items"][0]["cantidad"] == cantidad, r.json()["items"]
+    else:
+        assert r.json()["detail"][0]["loc"] == ["body", "use_mapping"]
