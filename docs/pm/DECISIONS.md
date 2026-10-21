@@ -50,7 +50,34 @@ repositorio.
 
 ---
 
+## Compatibilidad necesaria de Excel — decidido por PM, 2026-10-21
+
+La suite limpia del candidato `8b19662` encontró cuatro fallos de mapeo:
+FastAPI 0.155 interpreta un booleano Form omitido como False aunque su
+default sea True (cambio documentado desde 0.147 en sus
+[notas oficiales](https://fastapi.tiangolo.com/release-notes/)). Por eso el
+endpoint ignoraba las columnas guardadas del cliente. Mismos casos pasan en
+entorno heredado y fallan en limpio; no es contaminación de orden.
+
+Dentro del cierre de Fase 1, se autoriza la corrección mínima para conservar
+el contrato de `/upload_excel_v2/`: omitido usa el mapeo, False explícito lo
+omite, valores válidos conservan su semántica e inválidos dan 422. No se
+cambian requisitos, otras rutas ni política comercial. Debe traer negativos,
+revisión PM y suite completa en limpio sobre el SHA corregido. No autoriza
+publicación; el candidato anterior queda rechazado para publicar.
+
 ## Pendientes de decisión de Emi
+
+### Publicación de la candidata Fase 1 autorizada — 2026-10-21
+
+Emi: «publica. y contonua», en respuesta al cierre de la candidata
+`166395f99c0011aa46f55f82afa3734c97576150` (1612 pruebas aprobadas).
+Autoriza subir la candidata, abrir su PR a main y publicarla después de las
+puertas pendientes. No volver a pedir permiso para ese mismo producto.
+Se permiten los commits posteriores de documentación según ONBOARDING-PM,
+demostrando diff de producto vacío. Si una puerta falla, corregir y verificar
+antes de fusionar; no dar por verde la prueba automática de navegador.
+La continuación sigue en Fase 1 con revisión separada de EXCEL-2/GUARDAR-2.
 
 | Tema | Por qué hay que decidirlo | Impacto |
 |---|---|---|
