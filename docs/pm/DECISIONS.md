@@ -68,6 +68,17 @@ publicación; el candidato anterior queda rechazado para publicar.
 
 ## Pendientes de decisión de Emi
 
+### Publicación de la candidata Fase 1 autorizada — 2026-10-21
+
+Emi: «publica. y contonua», en respuesta al cierre de la candidata
+`166395f99c0011aa46f55f82afa3734c97576150` (1612 pruebas aprobadas).
+Autoriza subir la candidata, abrir su PR a main y publicarla después de las
+puertas pendientes. No volver a pedir permiso para ese mismo producto.
+Se permiten los commits posteriores de documentación según ONBOARDING-PM,
+demostrando diff de producto vacío. Si una puerta falla, corregir y verificar
+antes de fusionar; no dar por verde la prueba automática de navegador.
+La continuación sigue en Fase 1 con revisión separada de EXCEL-2/GUARDAR-2.
+
 | Tema | Por qué hay que decidirlo | Impacto |
 |---|---|---|
 | **Rotar las claves de Gemini** | Una estuvo en un repositorio público. Cierra G0 | Lo hace Emi en Google AI Studio y Railway |
