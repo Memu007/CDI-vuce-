@@ -45,3 +45,8 @@ qué modelo y esfuerzo rinden.
 | 2026-10-19 | Codex PM, retoma | MARIA-5d `d22ff1a` | modelo heredado, esfuerzo heredado (Sonnet/Opus no disponibles) | 1 familia de defecto, 3 variantes HTTP | PM reprodujo las 3; borde nuevo frente a 65 focales verdes | vuelve, no publicación |
 
 | 2026-10-19 | Codex PM, segunda revisión MARIA-5d | b3fd518 → 8b8b789 | modelo y esfuerzo heredados | 1 regresión, 2 columnas por línea en inglés | PM reprodujo por AST las 2; corregidas y cubiertas en 148 focales | candidata; faltan puertas de publicación |
+
+| 2026-10-21 | Codex PM, combinación Fase 1 | candidate_integration, modelo/esfuerzo heredados | 8b19662 | sin conflicto de producto; 186 focales, 15 JS, 14 negativos | PM revisó diff y reprodujo 82 focales | candidato devuelto tras suite limpia |
+| 2026-10-21 | Codex PM, entorno limpio | clean_dependencies, modelo/esfuerzo heredados | 8b19662 | 4 fallos, una causa nueva: booleano Form omitido cambia a False con FastAPI nuevo | PM contrastó fuente oficial y reprodujo el rojo discriminante en copia previa | compatibilidad mínima autorizada, 166395f en revisión |
+| 2026-10-21 | Codex PM, navegador | candidate_browser, modelo/esfuerzo heredados | 8b19662 | registro y cliente correctos; adjunto bloqueado por permiso de Brave | PM completó en IAB carga Excel, controles, TXT y persistencia sin cambiar permisos | recorrido CUA sintético, no e2e CI ni Gemini real |
+| 2026-10-21 | Codex PM, cierre compatibilidad Excel | candidate_integration y clean_dependencies, modelo/esfuerzo heredados | 166395f | corrección mínima y suite limpia 1612 passed | PM reprodujo rojo anterior y 8 focales verdes, revisó diff y cierre del log completo | aceptada técnicamente en candidato local; faltan puertas de publicación |

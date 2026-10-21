@@ -1,6 +1,22 @@
 # NOW — CDI
 
-Actualizado: 2026-10-20. Estado vigente; la historia está en Git.
+Actualizado: 2026-10-21. Estado vigente; la historia está en Git.
+
+**Estado vigente de la retoma:** candidato local `166395f` (pesos + DOC-1 +
+compatibilidad Excel), rama `codex/phase1-form-default-compat`, preservada en
+el repo de trabajo. Suite completa en entorno limpio: **1612 passed, 102
+skipped, 2 xfailed**, cobertura 50.75 %, salida 0; chequeo previo aprobado.
+PM revisó el cambio y reprodujo el rojo previo y ocho focales verdes. La
+primera combinación `8b19662` había fallado cuatro casos: FastAPI nuevo
+interpretaba `use_mapping` omitido como False. Se corrigió sin cambiar requisitos.
+CUA sobre esa combinación llegó a descarga, controles y persistencia con datos
+sintéticos. **No publicado ni listo para declarar MVP terminado**: falta la
+puerta oficial de CI sobre el SHA final y la prueba real de Emi/despachante.
+Evidencia completa en `VERIFICACION-CANDIDATO-2026-10-21.md`.
+Siguiente cola: revisión separada EXCEL-2 y GUARDAR-2; no adelantar cobro.
+Los párrafos históricos de devolución anteriores no reabren los defectos
+de peso/DOC-1 ya corregidos. El candidato nuevo sigue local; el permiso
+anterior cubrió las tres ramas/PR existentes, no publicar a main.
 
 **Producto:** `Memu007/CDI-vuce-` (privado desde el 2026-10-06).
 **Publicado:** `main` = `a9b03cf` (2026-10-07 21:35 UTC, tercera publicación: GUARDAR-1) en Railway,

@@ -50,6 +50,22 @@ repositorio.
 
 ---
 
+## Compatibilidad necesaria de Excel — decidido por PM, 2026-10-21
+
+La suite limpia del candidato `8b19662` encontró cuatro fallos de mapeo:
+FastAPI 0.155 interpreta un booleano Form omitido como False aunque su
+default sea True (cambio documentado desde 0.147 en sus
+[notas oficiales](https://fastapi.tiangolo.com/release-notes/)). Por eso el
+endpoint ignoraba las columnas guardadas del cliente. Mismos casos pasan en
+entorno heredado y fallan en limpio; no es contaminación de orden.
+
+Dentro del cierre de Fase 1, se autoriza la corrección mínima para conservar
+el contrato de `/upload_excel_v2/`: omitido usa el mapeo, False explícito lo
+omite, valores válidos conservan su semántica e inválidos dan 422. No se
+cambian requisitos, otras rutas ni política comercial. Debe traer negativos,
+revisión PM y suite completa en limpio sobre el SHA corregido. No autoriza
+publicación; el candidato anterior queda rechazado para publicar.
+
 ## Pendientes de decisión de Emi
 
 | Tema | Por qué hay que decidirlo | Impacto |

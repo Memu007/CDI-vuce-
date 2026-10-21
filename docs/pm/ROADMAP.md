@@ -1,5 +1,13 @@
 # Roadmap — aprobado por Emi (orden del 2026-10-07)
 
+> Retoma del 2026-10-20: sigue vigente el orden de las cuatro fases. Las
+> semanas de abajo son la estimación histórica, no fechas de lanzamiento
+> confirmadas. Seguimos en Fase 1. Pesos MARIA-5d y bloqueo DOC-1 se están
+> verificando juntos en un candidato local; EXCEL-2 y GUARDAR-2 requieren
+> revisión separada. El cierre sigue necesitando facturas reales revisadas
+> por Emi y aceptación del TXT en el Kit del despachante. Estado y evidencia
+> exactos en `NOW.md`.
+
 ## Para Emi
 
 **Primero el TXT, después el cobro, la seguridad al final.** Ningún estudio
