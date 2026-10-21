@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-21 · fix: conservar el mapeo de Excel cuando se omite la opción
+
+- Con versiones nuevas de FastAPI, omitir use_mapping conserva el uso del catálogo del cliente. false lo desactiva y un valor inválido sigue rechazándose.
+
 ## 2026-10-20 · fix: bloquear documentos no admitidos antes del TXT (DOC-1)
 
 - El lector conserva la clasificación documental y rechaza despachos, exportaciones y lecturas ambiguas. Una destinación EC* no entra al generador de importación; una nueva subida fallida no recupera los datos ni respuestas de la anterior.
