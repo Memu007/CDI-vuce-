@@ -985,3 +985,56 @@ def test_xml_de_hoja_rechazado_devuelve_400_sin_abrir(celda, monkeypatch):
     r = TestClient(main.app).post("/upload_excel_v2/", files={"file": ("sintetico.xlsx", salida.getvalue(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
     assert r.status_code == 400, r.text[:300]
     assert r.json()["detail"]
+
+
+@pytest.mark.parametrize("ref", [b"ref='C2:C3'", b'ref = "C2:C3"', b"ref='&#67;2:C3'"])
+def test_combinada_xml_valido_conserva_origen(ref):
+    original = _con_combinadas_crudas(_libro([ENCABEZADO, ["84713000", "Equipo", "China", 1, 2, 3], ["84713000", "Otro", None, 1, 2, 3]]), ["C2:C3"])
+    salida = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(original)) as entrada, zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as z:
+        for info in entrada.infolist():
+            datos = entrada.read(info.filename)
+            if info.filename == "xl/worksheets/sheet1.xml":
+                datos = datos.replace(b'ref="C2:C3"', ref)
+            z.writestr(info, datos)
+    r = _subir(salida.getvalue())
+    assert r.status_code == 200, r.text[:300]
+    assert [item["origen"] for item in r.json()["items"]] == ["CN", "CN"]
+
+
+def test_filas_numericas_excesivas_se_rechazan_antes_de_pandas(monkeypatch, tmp_path):
+    filas = [ENCABEZADO] + [["84713000", "Equipo", "China", 1, 2, 3]] * 35
+    ruta = tmp_path / "sintetico.xlsx"
+    ruta.write_bytes(_libro(filas))
+    monkeypatch.setattr(main, "_MAX_FILAS_EXCEL", 3)
+    monkeypatch.setattr(main.pd, "read_excel", lambda *a, **k: pytest.fail("abrió pandas antes de rechazar las filas"))
+    from fastapi import HTTPException
+    with pytest.raises(HTTPException, match="máximo de 3 filas"):
+        main._leer_excel_ruta(str(ruta), "openpyxl")
+
+
+def test_guardia_filas_no_cuenta_huecos_ni_filas_sin_valores(tmp_path, monkeypatch):
+    filas = [[99]] * 29 + [ENCABEZADO]
+    for _ in range(3):
+        filas += [["84713000", "Equipo", "China", 1, 2, 3]] + [[None] * 6] * 40
+    ruta = tmp_path / "sintetico.xlsx"
+    ruta.write_bytes(_libro(filas))
+    monkeypatch.setattr(main, "_MAX_FILAS_EXCEL", 3)
+    df = main._leer_excel_ruta(str(ruta), "openpyxl")
+    assert len(df) == 3
+    assert list(df.index) == [29, 70, 111]
+
+
+
+def test_guardia_filas_ignora_extensiones_de_namespace_ajeno():
+    original = _libro([ENCABEZADO, ["84713000", "Equipo", "China", 1, 2, 3]])
+    salida = io.BytesIO()
+    extension = b"<extLst xmlns:q='urn:extension'><q:extra>" + b"<q:row><q:c><q:v>1</q:v></q:c></q:row>" * 40 + b"</q:extra></extLst>"
+    with zipfile.ZipFile(io.BytesIO(original)) as entrada, zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as z:
+        for info in entrada.infolist():
+            datos = entrada.read(info.filename)
+            if info.filename == "xl/worksheets/sheet1.xml":
+                datos = datos.replace(b"</worksheet>", extension + b"</worksheet>")
+            z.writestr(info, datos)
+    _, combinadas = main._xlsx_solo_primera_hoja(salida.getvalue(), max_filas=1)
+    assert combinadas == []
