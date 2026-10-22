@@ -2280,9 +2280,17 @@
             '<div class="import-result-stat"><span>Filas con error</span><strong>' + errCount + '</strong></div>' +
             (errCount ? '<div class="import-result-error">Primer error: fila ' +
                 d.errores[0].fila + ' — ' + d.errores[0].error + '</div>' : '');
+        if (d.aviso) {
+            // El CSV mezclaba codificaciones: alguna tilde puede haberse perdido (EXCEL-2).
+            const aviso = document.createElement('div');
+            aviso.className = 'import-result-error';
+            aviso.textContent = d.aviso;
+            ncmImportResult.appendChild(aviso);
+        }
         ncmImportResult.hidden = false;
         ncmImportResult.classList.remove('is-error');
-        if (CDI.toast) CDI.toast.success('Importación completa', (d.importados || 0) + ' NCMs cargados');
+        if (CDI.toast && d.aviso) CDI.toast.info('Importación con aviso', d.aviso);
+        else if (CDI.toast) CDI.toast.success('Importación completa', (d.importados || 0) + ' NCMs cargados');
     }
 
     function showNcmImportError(msg) {

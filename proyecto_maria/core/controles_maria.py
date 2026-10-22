@@ -63,12 +63,25 @@ def cuit_valido(cuit) -> bool:
 
 
 def _numero_o_none(valor):
+    """El número, o None si falta o es un texto que no es número (eso lo marca
+    el control de siempre). Un entero enorme (10**400) es infinito y una lista
+    u objeto no es un número: los dos son un monto inválido (EXCEL-2)."""
     if valor is None or isinstance(valor, bool) or (isinstance(valor, str) and not valor.strip()):
         return None
+    if isinstance(valor, (list, dict)):
+        return math.nan
     try:
         return float(valor)
+    except OverflowError:
+        return math.inf
     except (TypeError, ValueError):
         return None
+
+
+def digitos_raros(valor) -> bool:
+    """Si el texto tiene dígitos que no son 0-9 (de ancho completo, arábigos):
+    el TXT los escribiría tal cual (EXCEL-2, de paso)."""
+    return any(c.isdigit() and not ("0" <= c <= "9") for c in str(valor or ""))
 
 
 def _fuera_de_rango(*valores) -> bool:
@@ -97,11 +110,15 @@ def montos_fuera_de_rango(items, cabecera: dict) -> list:
         total = _numero_o_none(item.get("valor_total"))
         peso_kg = _numero_o_none(item.get("peso_kg"))
         peso_unitario = _numero_o_none(item.get("peso_unitario"))
-        if _fuera_de_rango(cantidad):
+        # Con la cantidad mala, valor y peso se miran solos: si no, el error
+        # nombraba también los que estaban bien (devolución de EXCEL-2).
+        cantidad_mala = _fuera_de_rango(cantidad)
+        por = None if cantidad_mala else cantidad
+        if cantidad_mala:
             errores.append(f"Item {n}: Cantidad inválida")
-        if _fuera_de_rango(cantidad, valor) or _fuera_de_rango(total):
+        if _fuera_de_rango(por, valor) or _fuera_de_rango(total):
             errores.append(f"Item {n}: Valor inválido")
-        if _fuera_de_rango(peso_kg) or _fuera_de_rango(cantidad, peso_unitario):
+        if _fuera_de_rango(peso_kg) or _fuera_de_rango(por, peso_unitario):
             errores.append(f"Item {n}: Peso inválido")
         # Con otra forma que una lista, el control de forma de /generate_maria
         # da el 400 con su mensaje; acá no se revienta (SUBITEMS-1).
@@ -111,9 +128,10 @@ def montos_fuera_de_rango(items, cabecera: dict) -> list:
                 continue
             sub_cant = _numero_o_none(sub.get("cantidad"))
             sub_valor = _numero_o_none(sub.get("valor_unitario"))
-            if _fuera_de_rango(sub_cant):
+            sub_mala = _fuera_de_rango(sub_cant)
+            if sub_mala:
                 errores.append(f"Item {n}, sub-ítem {m}: Cantidad inválida")
-            if _fuera_de_rango(sub_cant, sub_valor):
+            if _fuera_de_rango(None if sub_mala else sub_cant, sub_valor):
                 errores.append(f"Item {n}, sub-ítem {m}: Valor inválido")
     for campo, nombre in _IMPORTES_DE_LA_CABECERA:
         valor = cabecera.get(campo)
@@ -233,6 +251,10 @@ def controles_antes_de_generar(items, cabecera: dict) -> tuple[list, list]:
             f"El incoterm «{incoterm}» no es válido "
             f"({', '.join(sorted(INCOTERMS_ACEPTADOS))})."
         )
+
+    for campo, nombre in (("vendedor_id", "identificador del vendedor"),):
+        if digitos_raros(cabecera.get(campo)):
+            errores.append(f"El {nombre} «{cabecera.get(campo)}» tiene dígitos que no son 0-9.")
 
     cuit = str(cabecera.get("comprador_cuit") or "").strip()
     if not cuit:
