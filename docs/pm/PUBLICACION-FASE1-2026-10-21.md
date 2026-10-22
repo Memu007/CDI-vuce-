@@ -79,3 +79,18 @@ autoriza publicar automáticamente esta entrega posterior.
 
 Última comprobación pública a las 09:00 ARG del 22: salud ok y JS servido
 todavía anterior. Railway nuevo no confirmado; no registrar como completado.
+
+Seguimiento de la tarde, 2026-10-22: salud pública ok a las 16:11 ARG y JS
+upload aún distinto del probado. La interfaz, recargada al cierre, sigue
+mostrando ACTIVE GUARDAR-1. El estado oficial de las 19:06 UTC informa
+operación normal de Pro/Enterprise, otros planes aún pendientes; no se
+asume el plan de este workspace. Se intentó una sola vez el comando visible
+«Deploy latest commit» para la versión ya autorizada. No apareció un nuevo
+despliegue ni confirmación; no afirmar que quedó en cola ni repetirlo a ciegas.
+Captura local `outputs/railway-seguimiento-2026-10-22.jpg` del workspace.
+
+Continuación EXCEL-2: integración `d448033` devuelta con dos rojos nuevos de
+concurrencia y origen combinado. Ver `REVISION-EXCEL2-INTEGRADA-2026-10-22.md`;
+no publicar esa pieza ni atribuirle suite completa. Las comprobaciones PM
+se completaron aunque los agentes de implementación se interrumpieron por
+límite de uso. No hay corrección entregada de esos dos fallos todavía.

@@ -22,6 +22,20 @@ falta integrar aisladamente con main y verificar suite/CI, memoria/concurrencia
 y criterios históricos. `QA-EXCEL2-XML-2026-10-22.md` conserva los límites
 de lo medido. No entró en PR #4. GUARDAR-2 sigue separado; no adelantar cobro.
 
+**Último veredicto de EXCEL-2, manda sobre el párrafo anterior:** integración
+local `d448033` sobre main648cd2f, rama `codex/excel2-integration-648`,
+**devuelta**. Dev informó 356 focales y 15 JS verdes, pero PM reprodujo:
+normal 400 a los 30.26 s detrás de ocho libros con XML de 10282491 bytes
+(dentro de 10 MiB); y una combinada de origen con comillas simples pierde
+el país en el segundo producto. La prueba existente de ocho libros usaba
+una estimación incorrecta de tamaño y podía pasar por rechazo temprano.
+Nueve libros sintéticos normales sí devuelven los mismos datos JSON que
+la base, y 2000 combinadas dieron 200 en 0.166 s. No correr suite
+larga hasta corregir los dos rojos. Consigna en PARA-DEV e informe completo
+`REVISION-EXCEL2-INTEGRADA-2026-10-22.md`. Subagentes de implementación
+interrumpidos por límite de uso; PM completó QA y dejó devolución. No
+afirmar implementación ni negativos terminados; rama local preservada.
+
 **Verificación previa al merge (histórica):** candidato `166395f` (pesos + DOC-1 +
 compatibilidad Excel), rama `codex/phase1-form-default-compat`, preservada en
 el repo de trabajo. Suite completa en entorno limpio: **1612 passed, 102

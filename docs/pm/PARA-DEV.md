@@ -27,6 +27,21 @@ despertás a ella con el de la suya al entregar o al dejar una D que te frena
 
 ### Devolución vigente EXCEL-2 — 2026-10-22
 
+**Actualización que va primero:** integrada localmente en `d448033` sobre
+main648cd2f, rama `codex/excel2-integration-648`. PM devuelve por dos rojos:
+ocho libros de primera hoja realmente dentro de 10 MiB dejan la normal en
+400 a los 30.26 s, y XML válido `mergeCell ref='C2:C3'` pierde el país de
+origen del segundo producto (dobles comillas lo conservan). Reproducciones
+seguras, resultados y límites en `REVISION-EXCEL2-INTEGRADA-2026-10-22.md`.
+Corregir la integración manteniendo D27=10 MiB, pesos/Form/DOC-1. Medir el
+tamaño real del XML en el test de ocho libros: la estimación actual puede
+generar más de 10 MiB y pasar por rechazo temprano, sin probar lo requerido.
+Los dos lectores de atributos XML deben aceptar variantes válidas; no
+ampliar sólo regex. Rojo previo, verde y negativos pertinentes; después
+suite y CI del SHA exacto. No publicar esta pieza con el permiso de main648.
+La guarda de columnas de la devolución anterior sí fue verificada; los
+fallos actuales son concurrencia y lectura de combinadas.
+
 Base aislada `c2f8063`, sin GUARDAR-2 ni cobro. No integrar a la publicación
 `648cd2f` de producto ya autorizado. Las 93 focales verdes no cierran la pieza:
 PM reprodujo un escape del límite de ancho con una celda XML `r='XFD1'`.
