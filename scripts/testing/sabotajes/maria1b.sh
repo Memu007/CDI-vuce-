@@ -170,8 +170,8 @@ sabotaje $M "una fórmula sin valor guardado deja de ser un dato" \
   '            if False:' \
   "FAILED $D::test_una_hoja_con_formulas_sin_valor_guardado_se_avisa"
 sabotaje $M "una hoja de gráfico vuelve a contar como hoja" \
-  '        if not (r.get("Type") or "").endswith("/worksheet"):' \
-  '        if False:' \
+  '        destinos[r.get("Id")] = (destino, "chartsheet" in (r.get("Type") or ""))' \
+  '        destinos[r.get("Id")] = (destino, False)' \
   "FAILED $D::test_una_hoja_de_grafico_primero_no_corre_las_hojas"
 sabotaje $C "el CUIT vuelve a aceptar dígitos de otros alfabetos" \
   'if not re.fullmatch(r"[0-9]{11}", norm):' \

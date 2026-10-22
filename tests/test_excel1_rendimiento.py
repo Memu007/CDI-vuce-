@@ -97,13 +97,15 @@ def test_health_responde_mientras_se_lee_un_excel(excel_lento, ruta):
 
 
 def test_health_responde_mientras_se_valida_un_excel(monkeypatch):
-    import openpyxl
-    original = openpyxl.load_workbook
+    # Validar ya no abre el libro con openpyxl (D26 a, EXCEL-2): lo lento se
+    # simula en lo que sí corre al validar, contar las hojas.
+    from proyecto_maria.security import file_security
+    original = file_security._contar_hojas_xlsx
 
     def _lento(*a, **k):
         _bloquear()
         return original(*a, **k)
-    monkeypatch.setattr(openpyxl, "load_workbook", _lento)
+    monkeypatch.setattr(file_security, "_contar_hojas_xlsx", _lento)
     demora, r = asyncio.run(_health_mientras(RUTAS["upload_excel_v2"]))
     assert r.status_code < 500, r.text[:200]
     assert demora < 0.5, f"/health tardó {demora:.2f} s mientras se validaba un Excel"
