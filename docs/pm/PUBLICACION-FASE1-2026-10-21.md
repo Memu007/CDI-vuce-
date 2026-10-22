@@ -60,3 +60,22 @@ el mismo documento con comillas dobles se rechaza. PM reprodujo con una sola
 celda sintética, sin estrés. Dev corrige en copia aislada; no integrar antes
 de nueva revisión. No contar los 43 negativos como corridos: sólo cuatro
 resultados se recuperaron. CSV cp1252 malformado queda anotado como menor.
+
+Devolución XML local `04e1d003fce518a754909e8de5cf56ee22365ae2` lista en
+`codex/excel2-xml-quotes`, preservada en repo de trabajo sin publicación.
+Parser incremental de stdlib normaliza atributos, reconoce comillas/espacios/
+entidades y corta al superar 256 columnas. PM repitió la reproducción segura:
+ambas variantes rechazan. QA independiente: 32 focales verdes y comprobaciones
+propias de bordes/entidades/namespaces/salida temprana/cierre. Ver
+`QA-EXCEL2-XML-2026-10-22.md`.
+
+Precisión de evidencia: clear conserva nodos vacíos hasta cerrar su padre;
+no afirmar que nunca retiene árbol. Con XML de 3 MB y 500000 filas, el parser
+midió 38.69 MiB pico y 2.13 s; no se midió el máximo ni flujo concurrente.
+No demuestra el límite global 1 GB. La guarda concreta está verificada;
+EXCEL-2 completa sigue pendiente de integración aislada, suite/CI y las
+mediciones históricas. El permiso de publicar la candidata anterior no
+autoriza publicar automáticamente esta entrega posterior.
+
+Última comprobación pública a las 09:00 ARG del 22: salud ok y JS servido
+todavía anterior. Railway nuevo no confirmado; no registrar como completado.
