@@ -3373,7 +3373,7 @@ def _respuesta_excel_demasiado_largo(e: Exception) -> JSONResponse:
     )
 
 
-def _xlsx_solo_primera_hoja(ruta) -> tuple:
+def _xlsx_solo_primera_hoja(ruta, max_filas=None) -> tuple:
     """El .xlsx con sólo su primera hoja de cálculo. openpyxl, al abrir un
     libro, recorre entera cada hoja que no declara su medida (<dimension>), y
     un libro armado con muchas hojas así tardaba minutos aunque se lea sólo la
@@ -3385,6 +3385,7 @@ def _xlsx_solo_primera_hoja(ruta) -> tuple:
     de una combinada (D18, EXCEL-2)."""
     import io as _io
     import re as _re
+    import math
     import zipfile
     from xml.etree import ElementTree as ET
     from proyecto_maria.security.file_security import _sin_dtd, partes_del_xlsx, sheets_del_libro
@@ -3404,11 +3405,54 @@ def _xlsx_solo_primera_hoja(ruta) -> tuple:
         combinadas = []
         if hojas and hojas[0][1] in z.namelist():
             xml = z.read(hojas[0][1])
-            for m in _re.finditer(rb'<(?:\w+:)?mergeCell\b[^>]*?\bref="([A-Z]+)(\d+):([A-Z]+)(\d+)"', xml):
-                combinadas.append((int(m.group(2)), _col(m.group(1).decode()),
-                                   int(m.group(4)), _col(m.group(3).decode())))
-                if len(combinadas) >= 10_000:
-                    break
+            # Expat lee atributos XML reales (comillas, espacios y entidades),
+            # sin construir el árbol de las celdas. También evita abrir con
+            # pandas libros que ya exceden el límite vigente de filas.
+            from xml.parsers import expat
+            filas, fila_con_datos, en_valor, valor = 0, False, False, []
+            tipo_celda = None
+            def inicio(nombre, atributos):
+                nonlocal fila_con_datos, en_valor, valor, tipo_celda
+                if not nombre.startswith(ns_main + "}"):
+                    return
+                nombre = nombre.rsplit("}", 1)[-1]
+                if nombre == "row":
+                    fila_con_datos = False
+                elif nombre == "c":
+                    tipo_celda = atributos.get("t")
+                elif nombre == "v":
+                    en_valor = tipo_celda in (None, "n", "b")
+                    valor = []
+                elif nombre == "mergeCell" and len(combinadas) < 10_000:
+                    m = _re.fullmatch(r"([A-Za-z]+)([0-9]+):([A-Za-z]+)([0-9]+)", atributos.get("ref", ""))
+                    if m:
+                        combinadas.append((int(m[2]), _col(m[1].upper()), int(m[4]), _col(m[3].upper())))
+            def texto(datos):
+                if en_valor:
+                    valor.append(datos)
+            def fin(nombre):
+                nonlocal filas, fila_con_datos, en_valor
+                if not nombre.startswith(ns_main + "}"):
+                    return
+                nombre = nombre.rsplit("}", 1)[-1]
+                if nombre == "v":
+                    if en_valor:
+                        try:
+                            fila_con_datos |= not math.isnan(float("".join(valor)))
+                        except ValueError:
+                            pass
+                    en_valor = False
+                elif nombre == "row" and fila_con_datos:
+                    filas += 1
+                    # Como máximo se descartan 31 filas al buscar el encabezado.
+                    # Sólo cuentan filas con valores numéricos reales; las
+                    # vacías, estilos y sharedStrings no se adivinan acá.
+                    if max_filas is not None and filas > max_filas + 31:
+                        raise HTTPException(400, f"La planilla supera el máximo de {max_filas} filas con datos. "
+                                                 "Dejá sólo los productos de la factura.")
+            parser = expat.ParserCreate(namespace_separator="}")
+            parser.StartElementHandler, parser.CharacterDataHandler, parser.EndElementHandler = inicio, texto, fin
+            parser.Parse(xml, True)
         # Se queda sólo la primera hoja de cálculo, por su r:id: openpyxl lee
         # entera una hoja de gráfico aun en read_only, y otra hoja con el
         # mismo nombre que la primera quedaba (revisión de la devolución).
@@ -3546,7 +3590,7 @@ def _leer_excel_ruta(ruta: str, engine: str, conocidas=()):
     origen, combinadas = ruta, []
     if engine == "openpyxl":
         import io as _io
-        contenido, combinadas = _xlsx_solo_primera_hoja(ruta)
+        contenido, combinadas = _xlsx_solo_primera_hoja(ruta, max_filas=_MAX_FILAS_EXCEL)
         origen = _io.BytesIO(contenido)
     mapeo = dict(c for c in conocidas if isinstance(c, tuple) and len(c) == 2)
     nombres = set(mapeo) or {c for c in conocidas if isinstance(c, str)}
