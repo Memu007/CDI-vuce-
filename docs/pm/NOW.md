@@ -1,8 +1,23 @@
 # NOW — CDI
 
-Actualizado: 2026-10-21. Estado vigente; la historia está en Git.
+Actualizado: 2026-10-22. Estado vigente; la historia está en Git.
 
-**Estado vigente de la retoma:** candidato local `166395f` (pesos + DOC-1 +
+**Primero leer esto:** Emi autorizó publicar la candidata. PR #4 fusionado
+tras CI tests y e2e-maria verdes; main ahora `648cd2f` y su producto es
+idéntico a `166395f` (diff comprobado). **Railway todavía no confirmado:**
+su UI conserva ACTIVE `a9b03cf`, la salud pública responde ok y el JS servido
+aún era anterior a las 08:56 ARG. Fuente main/autodeploy correctos, pero
+Railway informa incidente y colas de despliegue. No repetir deploys ni
+afirmar que el sitio ya se actualizó. La autorización sigue vigente para
+terminar esta misma publicación, sin pedir otro «dale».
+Detalle: `PUBLICACION-FASE1-2026-10-21.md`.
+
+**Continuación activa:** EXCEL-2 `c2f8063` devuelta aunque 93 focales verdes:
+una referencia XML de celda con comillas simples evade el tope de 256
+columnas. PM reprodujo con una celda; Dev corrige en copia aislada. No entró
+en PR #4. GUARDAR-2 sigue separado; no adelantar cobro.
+
+**Verificación previa al merge (histórica):** candidato `166395f` (pesos + DOC-1 +
 compatibilidad Excel), rama `codex/phase1-form-default-compat`, preservada en
 el repo de trabajo. Suite completa en entorno limpio: **1612 passed, 102
 skipped, 2 xfailed**, cobertura 50.75 %, salida 0; chequeo previo aprobado.
@@ -19,7 +34,8 @@ de peso/DOC-1 ya corregidos. El candidato nuevo sigue local; el permiso
 anterior cubrió las tres ramas/PR existentes, no publicar a main.
 
 **Producto:** `Memu007/CDI-vuce-` (privado desde el 2026-10-06).
-**Publicado:** `main` = `a9b03cf` (2026-10-07 21:35 UTC, tercera publicación: GUARDAR-1) en Railway,
+**En GitHub:** `main` = `648cd2f` (PR #4, 2026-10-22). **Último activo confirmado
+en Railway:** `a9b03cf` (2026-10-07, GUARDAR-1); despliegue nuevo pendiente,
 `cdi-production.up.railway.app`. Railway publica cada push a `main` sin
 esperar los tests.
 **En producción:** la usa sólo Emi, con facturas reales (Emi, 2026-10-07).

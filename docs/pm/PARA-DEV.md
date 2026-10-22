@@ -25,6 +25,28 @@ despertás a ella con el de la suya al entregar o al dejar una D que te frena
 
 ## Retoma 2026-10-19 — recepción pendiente
 
+### Devolución vigente EXCEL-2 — 2026-10-22
+
+Base aislada `c2f8063`, sin GUARDAR-2 ni cobro. No integrar a la publicación
+`648cd2f` de producto ya autorizado. Las 93 focales verdes no cierran la pieza:
+PM reprodujo un escape del límite de ancho con una celda XML `r='XFD1'`.
+Con dobles comillas se rechaza; con simples openpyxl abre 16384 columnas.
+Reproducción sintética segura: `/private/tmp/excel2_comillas_repro.py`.
+
+Corregir la lectura de atributos XML de `_ultima_columna` en el control
+compartido, sin subir límites ni ampliar política. Cubrir ambas comillas,
+espacios válidos, entidades numéricas y bordes 256/257; rechazar antes de
+openpyxl. Parser incremental de stdlib ya disponible, salida temprana y sin
+retener todo el árbol; ampliar sólo regex no cubre entidades XML válidas.
+Conservar errores controlados y las seis condiciones anteriores de EXCEL-2.
+
+Entregar PARA-PM actualizado con SHA/base, rojo previo, focales y negativos
+realmente ejecutados, coste y límites. No afirmar 43 sabotajes: sólo cuatro
+resultados de la revisión se recuperaron. Suite/e2e/RSS/tiempos y libros
+normales se verifican en la reentrega e integración exactas. El CSV cp1252
+que produce UnicodeDecodeError se registra como menor (endpoint da 400),
+sin ampliarlo automáticamente. Después sigue GUARDAR-2 separado, D32 (b).
+
 Emi pidió continuar el plan. PM trabaja en `codex/pm-retoma-txt` desde
 `99f3625`. No reactivar cobro antes de cerrar lo pendiente de Fase 1.
 
