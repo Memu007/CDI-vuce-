@@ -10,6 +10,8 @@ repositorio.
 
 | Decisión | Fecha | En una línea |
 |---|---|---|
+| **Emi autoriza guardar las tres ramas de esta retoma en GitHub** | 2026-10-20 | Ante la pregunta explícita de guardar las ramas del resumen sin modificar el sitio, Emi respondió «dale. y. anotalo asi. la prox. pm sabe». Abarca `codex/pm-retoma-txt` (incluida esta nota y el cierre PM), `codex/maria5d-unit-kg` (`254531b`) y `codex/doc1-block-invalid-pdf` (`fe0a101`) en `Memu007/CDI-vuce-`, y sus borradores de revisión. No volver a pedir permiso para este guardado ya autorizado. No autoriza fusionar a main, desplegar en Railway ni aceptar precisión del lector real. |
+| **DOC-1: bloquear el TXT incorrecto; no sumar exportación completa** | 2026-10-19 | Emi eligió «Primero bloquear el TXT incorrecto» al decidir sobre EC02. Reconocer/rechazar documentos no admitidos y frenar destinaciones EC* en el flujo de importación. Sin generar exportaciones, inventar factura ni cambiar campos del formato MARIA. |
 | **AFIP/WSAA y VUCE quedan simulados** | 2026-09-04 | Excluidos del alcance por decisión de producto. No se auditan ni se trabajan |
 | **El proceso PM/Dev es por archivos** | 2026-09-04 | La PM escribe en `PARA-DEV.md`, la Dev en `PARA-PM.md`. Ninguna edita el archivo de la otra. Si el informe no está en el repositorio, la entrega no ocurrió |
 | **La PM no escribe código de producto** | 2026-09-04 | Sólo edita `docs/pm/`. Es la única revisión independiente que tiene el proyecto |
@@ -42,12 +44,40 @@ repositorio.
 | **Subítems en la pantalla (D24)** | 2026-10-07, ~15:27 ARG | Emi, ídem: sus facturas traen subítems. Entra SUBITEMS-1 (Dev 2), después de CATALOGO-NCM-1 y antes de MARIA-6 |
 | **La suscripción de Mercado Pago está configurada** | 2026-10-07, ~15:27 ARG | Emi: las variables `MP_PREAPPROVAL_PLAN_ID_*` están en Railway. Las renovaciones de COBRO-MP-1 corren en producción |
 | **Los subítems no se guardan con la operación, por ahora** | 2026-10-07 | La PM, por la D27 de la Dev 2: hoy la v2 no reabre operaciones del historial, así que no se pierde nada a la vista. Si entra «reabrir una operación», esa pieza lleva la columna y la migración (también para el estado de MARIA-4) |
+| **D32 de la Dev 1: (b), sin migración** | 2026-10-07 | La PM, con lo medido contra Postgres. Agrandar la columna no reescribe la tabla, pero necesita `lock_timeout`, da `InvalidCachedStatementError` en el solapamiento del despliegue y no alcanza solo (el upsert no actualiza el `ncm`). Gana la SIM del proveedor si empieza con los 8 dígitos del cliente: GUARDAR-2 |
 | **Empresa de digitalización, por operación** | 2026-10-07 | El despachante (2026-10-06, 22:15): «se selecciona en cada operación»; Lakaut = `PSAD01`, Modoc = `PSAD06`, como en los dos archivos reales. Se elige como el banco: en cada operación, con la última usada propuesta. Va en MARIA-4 |
 | **La reducción del IVA adicional no va en el TXT** | 2026-10-07 | El despachante (2026-10-06, 22:12): es la ventaja `IVAADREDUCCION` del menú «Ventajas» del Kit, que elige él cuando sabe que corresponde; elegirla mal es una infracción grave. Ningún archivo real trae ventajas. CDI no la pone: avisa que se elige en el Kit. Va en MARIA-4 |
 
 ---
 
+## Compatibilidad necesaria de Excel — decidido por PM, 2026-10-21
+
+La suite limpia del candidato `8b19662` encontró cuatro fallos de mapeo:
+FastAPI 0.155 interpreta un booleano Form omitido como False aunque su
+default sea True (cambio documentado desde 0.147 en sus
+[notas oficiales](https://fastapi.tiangolo.com/release-notes/)). Por eso el
+endpoint ignoraba las columnas guardadas del cliente. Mismos casos pasan en
+entorno heredado y fallan en limpio; no es contaminación de orden.
+
+Dentro del cierre de Fase 1, se autoriza la corrección mínima para conservar
+el contrato de `/upload_excel_v2/`: omitido usa el mapeo, False explícito lo
+omite, valores válidos conservan su semántica e inválidos dan 422. No se
+cambian requisitos, otras rutas ni política comercial. Debe traer negativos,
+revisión PM y suite completa en limpio sobre el SHA corregido. No autoriza
+publicación; el candidato anterior queda rechazado para publicar.
+
 ## Pendientes de decisión de Emi
+
+### Publicación de la candidata Fase 1 autorizada — 2026-10-21
+
+Emi: «publica. y contonua», en respuesta al cierre de la candidata
+`166395f99c0011aa46f55f82afa3734c97576150` (1612 pruebas aprobadas).
+Autoriza subir la candidata, abrir su PR a main y publicarla después de las
+puertas pendientes. No volver a pedir permiso para ese mismo producto.
+Se permiten los commits posteriores de documentación según ONBOARDING-PM,
+demostrando diff de producto vacío. Si una puerta falla, corregir y verificar
+antes de fusionar; no dar por verde la prueba automática de navegador.
+La continuación sigue en Fase 1 con revisión separada de EXCEL-2/GUARDAR-2.
 
 | Tema | Por qué hay que decidirlo | Impacto |
 |---|---|---|
@@ -59,4 +89,5 @@ repositorio.
 | **Los dos favores del despachante** | Respondió las seis preguntas y las dos cortas el 2026-10-06 (`PREGUNTAS-DESPACHANTE.md`). Faltan sus archivos reales y, al cerrar la Fase 1, la prueba en su Kit | MARIA-6 y la prueba en el Kit, que cierra G4 |
 | **La pantalla vieja (v1) y `/generate_maria_export`** | Desde MARIA-5, el TXT de la v2 calcula el peso por línea y los centavos con decimales exactos; la v1 manda el total en float (un centavo de diferencia) y la exportación (`core/maria_generator_export.py`, sólo la llama la v1) sigue con el reparto en float y el peso de una unidad. MARIA-1b (D22 a) sólo le suma la limpieza de textos | Emi decide más adelante si la v1 y la exportación se borran (no está en el roadmap). Mientras, el camino es la v2 |
 | **«Dale» para el SHA de la segunda publicación (`6ea8ca9`)** | Hecho: Emi, 2026-10-07 ~16:58 ARG, «dale 6ea8ca9»; publicado 19:58 UTC como avance directo de `main`. Antes, su «dale a todo» lo frenó el sistema de permisos de la sesión | Emi: un TXT real «se ve bien», generado un minuto después del push; falta confirmar que era la versión nueva |
+| **«Dale» para el SHA de la tercera publicación (`a9b03cf`)** | Hecho: Emi, 2026-10-07 ~18:35 ARG, «dale a9b03cf» (GUARDAR-1); publicado 21:35 UTC como avance directo de `main` | Falta que Emi guarde una operación con la SIM completa |
 | **Precio y fecha de arranque** | Vencidos | Comercial; no se escriben acá |

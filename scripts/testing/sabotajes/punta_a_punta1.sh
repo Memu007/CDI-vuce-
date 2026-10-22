@@ -68,10 +68,11 @@ sabotaje $G "el generador deja el seguro fuera de la base imponible" \
   '        base_imponible = valor_total + flete_item + seguro_item' \
   '        base_imponible = valor_total + flete_item' \
   'FAILED tests/test_punta_a_punta1.py::test_pdf_de_punta_a_punta_da_el_archivo_real'
-# Generador: el FOB de cada subítem sin la cantidad.
+# Generador: el FOB de cada subítem sin la cantidad (con MARIA-5, el valor
+# exacto de cada subítem, del que se reparte el MARTFOB).
 sabotaje $G "el generador calcula el FOB del subítem sin la cantidad" \
-  '                lines.append(f"MSBTFOB={sub_cant * sub_unit:.2f}")' \
-  '                lines.append(f"MSBTFOB={sub_unit:.2f}")' \
+  '                valor_de_la_linea({"cantidad": s.get("cantidad", 0) or 0,' \
+  '                valor_de_la_linea({"cantidad": 1,' \
   'FAILED tests/test_punta_a_punta1.py::test_subitems_de_punta_a_punta_dan_el_archivo_real[pdf]'
 # Ruta /generate_maria: la procedencia de la operación (MARIA-3) no llega a los productos.
 sabotaje $M "la procedencia de la operación no llega a los productos" \
@@ -87,13 +88,14 @@ sabotaje $G "el generador deja el espacio de la NCM de la pantalla" \
   'FAILED tests/test_punta_a_punta1.py::test_pdf_de_punta_a_punta_da_el_archivo_real'
 # Generador: el flete y el seguro, enteros a cada producto.
 sabotaje $G "el generador no reparte el flete por el FOB" \
-  '        proporcion = valor_total / fob_total if fob_total > 0 else 0' \
-  '        proporcion = 1' \
+  '    fletes = repartir(flete, fobs)' \
+  '    fletes = repartir(flete, [1] * len(fobs))' \
   'FAILED tests/test_punta_a_punta1.py::test_dos_productos_reparten_flete_y_seguro_por_su_fob'
-# Generador: el FOB total sólo del producto mayor.
+# Generador: el FOB total sólo del producto mayor (con MARIA-5, el MDDTFOB es la
+# suma de los MARTFOB y el flete se reparte con `repartir`).
 sabotaje $G "el generador toma como FOB total el del producto mayor" \
-  '    fob_total = sum(' \
-  '    fob_total = max(' \
+  "    lines[linea_fob_total] = f\"MDDTFOB={sum(fobs, Decimal('0.00')):.2f}\"" \
+  "    lines[linea_fob_total] = f\"MDDTFOB={max(fobs):.2f}\"" \
   'FAILED tests/test_punta_a_punta1.py::test_dos_productos_reparten_flete_y_seguro_por_su_fob'
 # Lector: la coma decimal deja de reconocerse.
 sabotaje $E "el lector lee siempre el punto como decimal" \

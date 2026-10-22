@@ -2,8 +2,9 @@
   "source": "ARCA",
   "source_url": "https://www.arca.gob.ar/aduana/arancelintegrado/",
   "download_url": "https://www.arca.gob.ar/aduana/arancelintegrado/archivos/arancel.zip",
-  "updated_at": "2026-07-12",
-  "archive_sha256": "d14605c9b34c40738fb1f80c84b0aa8858bb1a2a455b8f60e79fb1b64c6c390f",
-  "source_file": "nomenclador_19122018.txt",
-  "ncm_count": 10226
+  "updated_at": "2026-10-07",
+  "archive_sha256": "0fb407ceebd3db6ef4b9314ba51c204383db9c5d5c707eb34ce6ced85f2b5d44",
+  "source_file": "nomenclador_07102026.txt",
+  "ncm_count": 10504,
+  "obtenido": "Lo bajó Emi del Arancel Integrado de ARCA y lo pasó por el chat el 2026-10-07"
 }

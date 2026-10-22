@@ -1,13 +1,30 @@
 # NOW — CDI
 
-Actualizado: 2026-10-07. Estado vigente; la historia está en Git.
+Actualizado: 2026-10-21. Estado vigente; la historia está en Git.
+
+**Estado vigente de la retoma:** candidato local `166395f` (pesos + DOC-1 +
+compatibilidad Excel), rama `codex/phase1-form-default-compat`, preservada en
+el repo de trabajo. Suite completa en entorno limpio: **1612 passed, 102
+skipped, 2 xfailed**, cobertura 50.75 %, salida 0; chequeo previo aprobado.
+PM revisó el cambio y reprodujo el rojo previo y ocho focales verdes. La
+primera combinación `8b19662` había fallado cuatro casos: FastAPI nuevo
+interpretaba `use_mapping` omitido como False. Se corrigió sin cambiar requisitos.
+CUA sobre esa combinación llegó a descarga, controles y persistencia con datos
+sintéticos. **No publicado ni listo para declarar MVP terminado**: falta la
+puerta oficial de CI sobre el SHA final y la prueba real de Emi/despachante.
+Evidencia completa en `VERIFICACION-CANDIDATO-2026-10-21.md`.
+Siguiente cola: revisión separada EXCEL-2 y GUARDAR-2; no adelantar cobro.
+Los párrafos históricos de devolución anteriores no reabren los defectos
+de peso/DOC-1 ya corregidos. El candidato nuevo sigue local; el permiso
+anterior cubrió las tres ramas/PR existentes, no publicar a main.
 
 **Producto:** `Memu007/CDI-vuce-` (privado desde el 2026-10-06).
-**Publicado:** `main` = `6ea8ca9` (2026-10-07 19:58 UTC, segunda publicación) en Railway,
+**Publicado:** `main` = `a9b03cf` (2026-10-07 21:35 UTC, tercera publicación: GUARDAR-1) en Railway,
 `cdi-production.up.railway.app`. Railway publica cada push a `main` sin
 esperar los tests.
 **En producción:** la usa sólo Emi, con facturas reales (Emi, 2026-10-07).
-**Rama de PM:** `claude/practical-shannon-szpwkn`: lo aceptado y sin publicar
+**Rama PM histórica:** `claude/practical-shannon-szpwkn` (`99f3625`); retoma
+en `codex/pm-retoma-txt`. La rama histórica contiene lo aceptado y sin publicar
 (incluye los 25 commits de `e8344d0`, ADMIN-1, ADMIN-2 y MARIA-2). **Ramas de las
 Devs:** `claude/dev1-tecnica` y `claude/dev2-maria`.
 **Plan:** `ROADMAP.md`, con el orden de Emi del 2026-10-07: primero el TXT,
@@ -16,6 +33,39 @@ antes de cerrar la Fase 3.
 
 ## Para Emi
 
+0. **Retoma autorizada por Emi, 2026-10-19:** pidió actuar como PM con
+   subagentes y continuar el plan. Trabajo actual en `codex/pm-retoma-txt`
+   desde `99f3625`; `main` sigue en `a9b03cf`. Las sesiones y rutinas de
+   Claude de la tabla siguiente son históricas: Codex no tiene las
+   herramientas `update_trigger`, `get_session` ni el consejero Fable; no
+   se afirma que se reactivaron. Se trabaja con subagentes locales por esta
+   solicitud, sin nuevas automatizaciones ni publicación.
+   - **MARIA-5d:** revisión independiente sobre `d22ff1a`: 65 focales y 68
+     de generador/subítems verdes; tres variantes inequívocas de peso bruto
+     unitario fallan por HTTP local (3 kg / 10 unidades devuelve 0,3 kg por
+     unidad). PM reprodujo los tres rojos. Devolución y tarea cerrada en
+     `PARA-DEV-2.md`, antes de aceptar o publicar.
+   - **Dev 1:** Git conserva dos candidatos hermanos sobre `1cdfe49`:
+     EXCEL-2 en `c2f8063` y GUARDAR-2 en `2d930c5`. `dfb6d24` preserva
+     trabajo, no es una entrega única. El informe de su rama sigue viejo;
+     no se aceptan piezas por los verdes de GUARDAR-1. D32 ya es (b).
+   - **DOC-1 autorizada por Emi el 2026-10-19:** eligió bloquear el TXT
+     incorrecto antes que sumar exportación completa. Consigna en
+     `PARA-DEV-2.md`; implementación aislada en `codex/doc1-block-invalid-pdf`
+     desde `1469102`, con subagentes backend y UI. Clasificación documental,
+     rechazo EC* por importación y prevención de arrastre A→B. Va antes de
+     ORG-1. La publicación sigue esperando revisión y autorización por SHA.
+   - **Incidente PDF/TXT:** la mezcla entre documentos sigue sin demostrar.
+     Se confirmó con datos sintéticos que la lectura pierde la
+     clasificación de despacho/EC02 y que la v2 usa la ruta de importación.
+     La generación de exportación sigue fuera del alcance vigente
+     (`DECISIONS.md`, pendiente v1/export). DOC-1 bloquea la salida errónea;
+     no amplía a exportación completa. Ningún PDF/TXT privado se
+     incorpora al repositorio.
+   - **Entorno:** focales en Python 3.12 con paquetes instalados y SQLite
+     temporal, no un entorno limpio desde `requirements.txt`. Son revisión
+     parcial, no sustituyen suite, pantallas, Postgres ni prueba en el Kit.
+
 1. **Segunda publicación, hecha:** `6ea8ca9`, 2026-10-07 19:58 UTC («dale
    6ea8ca9» de Emi). Emi genera un TXT con una factura real, lo descarga
    enseguida y mira: fecha DD/MM/AAAA, CUIT sin guiones, IVA adicional
@@ -23,6 +73,9 @@ antes de cerrar la Fase 3.
    fecha de emisión, moneda, incoterm, CUIT válido y estado si el origen es
    argentino: un error que pide eso no es una falla. Guardar con la SIM
    completa sigue dando error hasta GUARDAR-1.
+1a. **Tercera publicación, hecha:** `a9b03cf`, 2026-10-07 21:35 UTC («dale
+   a9b03cf» de Emi). Emi espera unos minutos y guarda una operación con un
+   producto con la SIM completa: tiene que guardar sin error.
 1b. **Sin volumen** (Emi, 2026-10-07): cada publicación o reinicio borra los
    TXT generados y el historial de NCM aprendido; las operaciones quedan en
    la base. Descargar el TXT apenas se genera. Lo arregla DISCO-1 (Fase 3).
@@ -77,7 +130,7 @@ Archivos abiertos por Dev:
   puntos; tres rompen: una combinada gigante traba la lectura, una
   combinada con texto duplica el FOB, el tope de estilos no protege la
   memoria; D27 (a)). Después, COBRO-MP-1, en pausa en `18a1850`.
-- **Dev 2:** MARIA-5 y CATALOGO-NCM-1 devueltas sobre `6854f34` (19:30 UTC) por seis puntos chicos: una columna «Peso por caja» le gana a «Peso», el bruto «unitario» se lee como neto, aviso de dos pesos sin números, una pantalla en rojo, la baja con aviso doble y sin catálogo errores inventados. SUBITEMS-1 entregada (`88564ec`) y revisada: se sostiene, con cuatro arreglos chicos que van en la misma reentrega. Después: (Emi: sus facturas traen subítems) y MARIA-6 cuando lleguen los archivos reales del despachante.
+- **Dev 2:** MARIA-5, CATALOGO-NCM-1 y SUBITEMS-1 aceptadas sobre `df4de22` e integradas (`0e57f70`). Ahora MARIA-5d: devolución del 2026-10-19 por variantes «unit (kg)»; va antes de la próxima publicación. Después ORG-1 (Fase 2); MARIA-6 espera los archivos del despachante.
 - **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
   RENDIMIENTO-1 y 1b (`ec3d793`), MARIA-1a, 2b, 1c, 4, 3 y 1d (`9679e21`).
   Suite sobre la rama integrada (`7b42556`, venv armado sólo con el
@@ -113,7 +166,7 @@ Archivos abiertos por Dev:
 | G2 · Imagen real | 🟢 | Cerrada el 2026-09-17 | — |
 | G3 · Aislamiento | 🟡 | La fuga de MARIA.TXT, cerrada en producción con el ensayo (sin cuentas ajenas: nadie vio facturas de Emi). Admin cerrado en la rama (ADMIN-1 y ADMIN-2). Abiertos: sesiones que reviven, límite de intentos burlable, prueba de aislamiento parcial | Fase 3 |
 | G4 · Producto (MARIA) | 🔴 | Origen mal leído, estado e IVA adicional fijos, peso por unidad, avisos tarde, gastos FOB sin cablear, banco, identificadores. Sin productos inventados (MARIA-2) | Fase 1 y la prueba en el Kit |
-| G5 · Pruebas | 🟢 | `1224 passed, 102 skipped, 1 xfailed, 0 failed` en la rama integrada (`6ea8ca9`, 2026-10-07) | — |
+| G5 · Pruebas | 🟢 | `1526 passed, 102 skipped, 2 xfailed, 0 failed` y e2e OK en la rama integrada (`df4de22` = `0e57f70` sin documentos, 2026-10-07) | — |
 | G6 · Volver atrás | 🟡 | Esquema probado en local; falta la copia de la base | Fase 3 (y el ensayo lo ensaya) |
 | G7 · Cobro | 🔴 | El corte por impago cubre 2 funciones; cancelar no cancela en Mercado Pago; aviso de pago sin firma; doble suscripción; invitaciones | Fase 2 |
 | G8 · Piloto | ⚪ | Tres estudios presentan de verdad un MARIA de CDI | Fase 4 |
@@ -134,6 +187,11 @@ Archivos abiertos por Dev:
   `1224 passed, 102 skipped, 1 xfailed`. Avance directo de `5cb03ab`, sin
   merge. «dale 6ea8ca9» de Emi a las ~16:58 ARG (antes, «dale a todo», que el
   sistema de permisos no tomó). CI: pruebas en verde y `e2e-maria` en rojo. La e2e no completa la fecha de emisión que pide MARIA-3; la PM lo reprodujo y, con esa línea, pasa entero («E2E MARIA OK»). El producto está bien, la prueba quedó vieja; la arregla la Dev 1 con GUARDAR-1. Emi generó un TXT con una factura real y «se ve bien» (19:59 UTC, un minuto después del push: falta confirmar que ya corría la versión nueva; con ella el TXT dice `IVAADICIONAL1=NO_VALIDA` y `CARTUSO=2`).
+- `a9b03cf` (2026-10-07 21:35 UTC), tercera publicación: GUARDAR-1, aislada
+  con `cherry-pick` (`REPRODUCCION-GUARDAR-1-2026-10-07.md`), y la línea de la
+  e2e de la CI. Suite sobre el mismo producto (`2621c3b`): `1247 passed, 102
+  skipped, 3 xfailed`; e2e «E2E MARIA OK»; Postgres 16 `fallas: 0`. Avance
+  directo de `6ea8ca9`, sin merge. CI: en curso. Falta lo que verifica Emi.
 
 ## Reglas
 
@@ -161,16 +219,111 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-07 20:58 UTC (rutina): publicada `6ea8ca9` con el «dale» de Emi
-(19:58 UTC); la e2e de la CI dio rojo porque la prueba no completa la fecha de
-emisión (el producto está bien, reproducido). Dev 1 entregó GUARDAR-1, con la
-línea de la e2e (`aec4f15`), pero sobre una rama con EXCEL-2 y COBRO-MP-1: la
-PM la aisló con `cherry-pick` sobre su rama (`2621c3b`, local) y la revisa
-(suite, e2e y un subagente Sonnet alto contra Postgres 16). D32 abierta
-(agrandar la columna). Dev 1 sigue con la devolución de EXCEL-2; Dev 2, con
-la de MARIA-5, CATALOGO-NCM-1 y SUBITEMS-1. Contexto: PM 37 %, Dev 1 45 %, Dev 2
-55 %; los `/compact` de las Devs los pegó Emi y corren cuando terminen su turno.
+2026-10-19: retoma en Codex autorizada por Emi. Reconciliadas ramas y
+entregas conservadas; MARIA-5d devuelta con tres rojos reproducidos por PM;
+revisión de GUARDAR-2 en curso. Sin aceptación nueva ni publicación.
+
+2026-10-19, continuación: MARIA-5d candidata `eff9dea`, 148 focales PM
+verdes y 11 sabotajes Dev; suite general en curso. Borradores de revisión:
+PM #1 y pesos #2, sin fusionar. Emi autorizó DOC-1; backend y UI trabajan
+en una entrega separada. Las rutinas históricas de Claude siguen sin tocarse.
+
+
+2026-10-07 22:45 UTC: pausa pedida por Emi hasta mañana; rutinas de CDI
+apagadas y Devs avisadas (ver «Para Emi» 0).
+
+2026-10-07 22:08 UTC: MARIA-5, CATALOGO-NCM-1 y SUBITEMS-1 aceptadas e
+integradas (`0e57f70`). Antes de la próxima publicación falta MARIA-5d (el
+bruto «unitario» se divide). Dev 2: MARIA-5d y después ORG-1. Dev 1:
+despertada para entregar la devolución de EXCEL-2. CI de `a9b03cf`: trabada
+en el apt del runner de GitHub.
 
 ## Medición
 
 `archivo/MEDICION-SUBAGENTES.md` y `archivo/MEDICION-CONSEJERO.md`.
+
+## Continuación 2026-10-20
+
+- **MARIA-5d:** informe Dev `254531b` (sólo documentos) sobre el producto
+  de `eff9dea`: suite completa `1570 passed, 102 skipped, 2 xfailed`,
+  cobertura 50,47 %, salida 0; 148 focales PM y 11 sabotajes. No se repite.
+  Falta cerrar las puertas de navegador/Kit antes de autorizar publicación.
+- **DOC-1:** producto `b5b6dec`, pruebas finales `378288e`, negativos
+  actualizados `10bbe35`; mismo producto Python. Suite con chequeo previo,
+  `1564 passed, 102 skipped, 2 xfailed`, cobertura 50,53 %, salida 0.
+  PM reprodujo 38 focales y 11 escenarios JS. CUA local, con lector y
+  usuario simulados: factura A válida → revisión; despacho B → rechazo
+  claro; recarga → operación vacía, sin A. No mide precisión de Gemini.
+- **Devolución DOC-1, resuelta en `c2d41b4`:** el botón Deshacer de NCM conservaba un snapshot fuera
+  de `CDI.state` durante diez segundos. Tras una nueva operación puede
+  restaurar ítems anteriores al volver a NCM. Se requiere atarlo a la
+  referencia del estado de su operación y conservar undo en la misma
+  operación. Corrección integrada en `fe0a101`, con 4 escenarios undo y 11 de subida verdes; publicación pendiente.
+- Ningún cambio en producción. Las ramas de revisión siguen separadas;
+  datos privados y harness local de lectura no se versionan.
+
+### Cierre de esta vuelta (2026-10-20)
+
+DOC-1 entregada en `fe0a101`, rama local `codex/doc1-block-invalid-pdf`.
+El snapshot NCM fue corregido en `c2d41b4` y probado en `637758c`:
+PM repitió 4 escenarios undo y 11 de subida sobre el candidato aislado;
+Dev repitió 38 focales y los 15 escenarios después de integrar. Diff Python
+vacío desde `378288e`: se conserva la evidencia de suite anterior, no se
+repite por JS ni se afirma que la suite Python prueba navegador.
+
+Revisión técnica local satisfactoria; **sin publicación ni aceptación de
+precisión del lector real**. Pendientes: puerta oficial completa de
+navegador, instalación limpia y prueba permitida de Emi con el lector real.
+
+El rechazo automático anterior de push quedó resuelto por autorización
+explícita de Emi el 2026-10-20: «dale. y. anotalo asi. la prox. pm sabe».
+Se autoriza guardar las tres ramas detalladas en `DECISIONS.md` y preparar
+sus borradores de revisión. **No es autorización para publicar**: no tocar
+`main` ni Railway. No pedir de nuevo permiso para este mismo guardado.
+
+## Traspaso a la próxima PM — 2026-10-20
+
+Leer primero este NOW, `DECISIONS.md` y
+`REPRODUCCION-RETOMA-2026-10-19.md`; leer cada informe desde su propia rama.
+
+| Rama de revisión | Entrega | Estado técnico |
+|---|---|---|
+| `codex/pm-retoma-txt` | Documentación de PM y autorización de guardado | Sin código de producto; retoma de `99f3625` |
+| `codex/maria5d-unit-kg` | `254531b`, informe sobre producto `eff9dea` | 1570 passed, 102 skipped, 2 xfailed; 148 focales PM y 11 negativos |
+| `codex/doc1-block-invalid-pdf` | `fe0a101` | 1564 passed, 102 skipped, 2 xfailed sobre el mismo Python; 38 focales y 15 escenarios JS tras integración |
+
+**Siguiente:** verificar las cabezas remotas y los borradores, completar la
+puerta oficial de navegador y el entorno limpio, integrar sólo en una rama
+candidata y verificar esa combinación. La prueba CUA local tuvo lector
+simulado: falta una prueba permitida con lector real; no afirmar precisión
+Gemini ni aceptación en Kit. Publicar requiere el «dale» de Emi para un
+SHA final probado, conforme a las reglas vigentes.
+
+**Después:** recibir EXCEL-2 `c2f8063` y GUARDAR-2 `2d930c5` por separado
+(no la punta completa de Dev 1), con sus pruebas pendientes. D32 ya es (b),
+sin migración. No reabrirla ni adelantar cobro. No reactivar rutinas antiguas
+ni asumir que hay sesiones de Claude trabajando.
+
+**Alcance DOC-1:** bloquear el TXT incorrecto, no generar exportaciones
+completas. No se demostró mezcla de dos PDFs: se confirmó clasificación
+perdida y ruta de importación aplicada a un despacho. No usar los TXT
+manuales de este chat como archivos de referencia aceptados por el Kit.
+
+## Guardado remoto confirmado — 2026-10-20
+
+Con la autorización de Emi ya se guardaron las tres ramas en GitHub. El
+push fue atómico, sin force, sin cambios a `main` y sin publicación.
+
+- [PR #1 — retoma PM y traspaso](https://github.com/Memu007/CDI-vuce-/pull/1):
+  `codex/pm-retoma-txt` hacia la PM histórica. Incluye esta autorización,
+  la evidencia y el próximo paso; las actualizaciones de cierre son documentos.
+- [PR #2 — pesos](https://github.com/Memu007/CDI-vuce-/pull/2):
+  `codex/maria5d-unit-kg`, cabeza `254531b`, hacia Dev 2.
+- [PR #3 — bloqueo DOC-1](https://github.com/Memu007/CDI-vuce-/pull/3):
+  `codex/doc1-block-invalid-pdf`, cabeza `fe0a101`, hacia la rama de retoma PM.
+
+Los tres están en **borrador, abiertos y sin fusionar**. Las descripciones
+incluyen los resultados finales y las puertas pendientes. La próxima PM no
+necesita volver a pedir permiso para este guardado: está hecho. Tampoco debe
+confundir borradores guardados con cambios publicados; el permiso para
+`main` sigue siendo específico del SHA final probado.

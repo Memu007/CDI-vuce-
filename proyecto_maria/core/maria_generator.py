@@ -6,6 +6,8 @@ import math
 import re
 import unicodedata
 from datetime import datetime, timedelta
+from decimal import ROUND_HALF_UP, Decimal
+from fractions import Fraction
 from functools import lru_cache
 from pathlib import Path
 
@@ -450,6 +452,114 @@ def get_pais_codigo(pais: str) -> int:
     return PAIS_DEFAULT_IMPORT
 
 
+def _exacto(valor) -> Decimal:
+    """El número escrito, en decimal exacto: 2,675 es 2,675 y no su
+    aproximación binaria. No finito o fuera del tope: ValueError (400)."""
+    if isinstance(valor, Decimal):
+        numero = valor
+    else:
+        crudo = float(valor or 0)
+        if not math.isfinite(crudo):
+            raise ValueError(f"Importe «{valor}» no válido: revisá cantidades y valores.")
+        numero = Decimal(repr(crudo))
+    if not numero.is_finite() or abs(numero) > IMPORTE_MAXIMO:
+        raise ValueError(f"Importe «{valor}» no válido: revisá cantidades y valores.")
+    return numero
+
+
+def centavos(valor) -> Decimal:
+    """Un importe del TXT al centavo, con la mitad hacia arriba (MARIA-5)."""
+    return _exacto(valor).quantize(Decimal("0.01"), ROUND_HALF_UP)
+
+
+def valor_de_la_linea(item: dict) -> Decimal:
+    """El valor de una línea sin redondear: el valor total, o cantidad ×
+    unitario multiplicados en decimal exacto (3 × 3,335 = 10,005)."""
+    if item.get('valor_total'):
+        valor = _exacto(item['valor_total'])
+    else:
+        valor = _exacto(_exacto(item.get('cantidad', 1)) * _exacto(item.get('valor_unitario', 0)))
+    if valor < 0:
+        raise ValueError(f"Valor «{valor}» negativo: revisá cantidades y valores.")
+    return valor
+
+
+def repartir(total: Decimal, pesos: list) -> list:
+    """Reparte `total` (al centavo) en proporción a `pesos`, de modo que la
+    suma dé exactamente `total` (MARIA-5). Cada parte se trunca al centavo y
+    los centavos que faltan van a las de mayor resto; si empatan, a la de
+    mayor peso y después a la primera."""
+    pesos = [Fraction(Decimal(str(p))) for p in pesos]
+    if any(p < 0 for p in pesos):
+        raise ValueError("No se puede repartir sobre un valor negativo.")
+    suma = sum(pesos)
+    if suma <= 0 or not pesos:
+        return [Decimal("0.00")] * len(pesos)
+    total_c = int(total * 100)
+    partes = [total_c * p / suma for p in pesos]
+    enteras = [int(x) for x in partes]
+    orden = sorted(range(len(pesos)), key=lambda i: (-(partes[i] - enteras[i]), -pesos[i], i))
+    for i in orden[:total_c - sum(enteras)]:
+        enteras[i] += 1
+    return [Decimal(c) / 100 for c in enteras]
+
+
+def _fob_de(item: dict) -> Decimal:
+    """El FOB de una línea al centavo (MARIA-5)."""
+    return centavos(valor_de_la_linea(item))
+
+
+def peso_de_la_linea(item: dict) -> float:
+    """El peso neto total de la línea, que va en QARTKGRNET (MARIA-5; respuesta
+    3 del despachante). `peso_kg`, si viene, ya es el total (así lo mandan la
+    v1 y los archivos reales); si no, `peso_unitario` × cantidad (la v2)."""
+    total = item.get('peso_kg')
+    try:
+        if total not in (None, ''):
+            return float(total or 0)
+        return float(item.get('peso_unitario') or 0) * float(item.get('cantidad', 1) or 0)
+    except (TypeError, ValueError):
+        raise ValueError(f"El peso «{str(total if total not in (None, '') else item.get('peso_unitario'))[:20]}» "
+                         f"de «{str(item.get('descripcion') or '')[:40]}» no es un número.")
+
+
+def peso_valido(peso, donde) -> float:
+    """El peso neto de la línea para QARTKGRNET, con la misma guarda que los
+    importes (devolución de MARIA-5): no finito, negativo, por encima del tope
+    o que redondea a 0.000 es un error con mensaje propio (400)."""
+    try:
+        kilos = float(peso)
+    except (TypeError, ValueError):
+        raise ValueError(f"Item {donde}: el peso «{str(peso)[:20]}» no es un número.")
+    if not math.isfinite(kilos):
+        raise ValueError(f"Item {donde}: el peso «{str(peso)[:20]}» no es un número válido.")
+    if kilos > IMPORTE_MAXIMO:
+        raise ValueError(
+            f"Item {donde}: el peso «{str(peso)[:20]}» no es válido: pasa el tope de "
+            f"{IMPORTE_MAXIMO:,} kg (revisá el peso y la cantidad).".replace(",", ".")
+        )
+    if kilos < 0:
+        raise ValueError(f"Item {donde}: el peso «{str(peso)[:20]}» es negativo.")
+    if round(kilos, 3) <= 0:
+        raise ValueError(
+            f"Item {donde}: el peso «{str(peso)[:20]}» no es válido: tiene que ser "
+            f"de al menos 0.001 kg (revisá el peso y la cantidad)."
+        )
+    return kilos
+
+
+def fob_total_del_txt(items: list, grupos: list | None = None) -> Decimal:
+    """El MDDTFOB que va a salir en el TXT: los productos de un grupo suman su
+    valor y la línea se redondea una vez; el resto, cada uno al centavo. La
+    validación muestra este número (devolución de MARIA-5: una sola cuenta)."""
+    grupos = grupos if grupos is not None else [it.get('grupo_id') for it in items]
+    lineas: dict = {}
+    for n, (item, gid) in enumerate(zip(items, grupos)):
+        clave = ('grupo', gid) if gid is not None else ('item', n)
+        lineas[clave] = lineas.get(clave, Decimal(0)) + valor_de_la_linea(item)
+    return sum((centavos(v) for v in lineas.values()), Decimal('0.00'))
+
+
 def generate_maria_txt(operation_id: str, items: list, 
                        moneda: str = "DOL", 
                        incoterm: str = "FOB",
@@ -496,7 +606,7 @@ def generate_maria_txt(operation_id: str, items: list,
             - cantidad: Cantidad
             - valor_unitario: Precio unitario
             - valor_total: Precio total (opcional, se calcula)
-            - peso_kg: Peso en kg
+            - peso_kg: Peso neto total de la línea en kg (o peso_unitario)
             - pais_origen/origen: País de origen
         moneda: Código de moneda (DOL, EUR)
         incoterm: Término comercial (FOB, DDP, CIF, EXW)
@@ -525,19 +635,14 @@ def generate_maria_txt(operation_id: str, items: list,
     iva_adicional = _iva_adicional(iva_adicional or IVA_ADICIONAL_POR_DEFECTO, "Operación")
     # Con C y D los gastos salen de flete + seguro: un importe inválido no
     # llega al TXT por ese camino (revisión de la devolución de MARIA-3).
-    flete = importe_valido(flete or 0, "Flete")
-    seguro = importe_valido(seguro or 0, "Seguro")
+    flete = centavos(importe_valido(flete or 0, "Flete"))
+    seguro = centavos(importe_valido(seguro or 0, "Seguro"))
 
-    # Calcular totales
-    fob_total = sum(
-        float(item.get('valor_total') or 
-              float(item.get('cantidad', 1)) * float(item.get('valor_unitario', 0)))
-        for item in items
-    )
-    
     # === [DDT] Cabecera ===
     # Normalizamos config de aduana/destinacion con defaults seguros (Ezeiza IC04)
     aduana_codigo = (str(aduana_codigo or "").strip() or "001")[:3]
+    if str(tipo_destinacion or "").strip().upper().startswith("EC"):
+        raise ValueError("Una destinación de exportación (EC*) no puede generar un TXT de importación.")
     tipo_destinacion = (str(tipo_destinacion or "").strip().upper() or "IC04")[:4]
 
     lines.append("[DDT]")
@@ -565,7 +670,10 @@ def generate_maria_txt(operation_id: str, items: list,
     
     lines.append(f"MDDTASS={seguro:.2f}")
     lines.append(f"MDDTFLE={flete:.2f}")
-    lines.append(f"MDDTFOB={fob_total:.2f}")
+    # El FOB de la carátula es la suma de los ítems ya agrupados: se escribe
+    # al final, cuando se conocen.
+    linea_fob_total = len(lines)
+    lines.append("MDDTFOB=")
     
     # Transit ID (si existe, usar operation_id prefix)
     lines.append(f"NDDTIMMTRN={operation_id[:5] if len(operation_id)>=5 else '00000'}")
@@ -636,7 +744,7 @@ def generate_maria_txt(operation_id: str, items: list,
     campo_gastos = "GTOS-POS-FOB    " if grupo_cd else "GTOS-ANT-FOB    "
 
     if gastos_fob is not None:
-        importe_gastos = f"{_importe_de_gastos(gastos_fob, 'gastos_fob'):.2f}"
+        importe_gastos = f"{centavos(_importe_de_gastos(gastos_fob, 'gastos_fob')):.2f}"
     elif grupo_cd:
         # Formato 2 decimales para evitar artefactos float
         # (str(3221.66+50) podia dar "3271.6600000000003").
@@ -737,6 +845,10 @@ def generate_maria_txt(operation_id: str, items: list,
         gid = it['grupo_id']
         grupos_dict.setdefault(gid, []).append(it)
 
+    # El número de un producto en la pantalla (su lugar en el pedido); con
+    # grupos antes, no es el de su línea del TXT. Los errores de los
+    # sub-ítems lo usan para caer bajo el sub-ítem que falla (SUBITEMS-1).
+    lugar_en_el_pedido = {id(it): k for k, it in enumerate(items, 1)}
     items_export = []
     grupos_emitidos = set()
     for item in items:
@@ -754,6 +866,9 @@ def generate_maria_txt(operation_id: str, items: list,
         ncms = {str(it.get('ncm') or it.get('pieza') or '').replace('.', '').replace(' ', '').upper() for it in grupo_items}
         origenes = {str(it.get('pais_origen') or it.get('origen') or '').strip().upper() for it in grupo_items}
         unidades = {str(it.get('unidad') or it.get('unidad_medida') or it.get('um') or '').strip().upper() for it in grupo_items}
+        if any(it.get('subitems') for it in grupo_items):
+            raise ValueError(f"Grupo {gid}: un producto agrupado no lleva sub-ítems; "
+                             f"desagrupalo para cargarlos.")
         if len(ncms) != 1:
             raise ValueError(f"Grupo {gid}: todos los ítems deben tener la misma NCM")
         if len(origenes) != 1:
@@ -779,17 +894,19 @@ def generate_maria_txt(operation_id: str, items: list,
             str(it.get('descripcion', '')).strip() for it in grupo_items
         )
         combined['cantidad'] = sum(float(it.get('cantidad', 1)) for it in grupo_items)
-        combined['valor_total'] = sum(
-            float(it.get('valor_total') or float(it.get('cantidad', 1)) * float(it.get('valor_unitario', 0)))
-            for it in grupo_items
-        )
-        combined['peso_kg'] = sum(
-            float(it.get('peso_kg', it.get('peso_unitario', 0)) or 0) for it in grupo_items
-        )
+        combined['valor_total'] = sum((valor_de_la_linea(it) for it in grupo_items), Decimal(0))
+        combined['peso_kg'] = sum(peso_de_la_linea(it) for it in grupo_items)
         # valor_unitario promedio del grupo
         total_cant = combined['cantidad']
-        combined['valor_unitario'] = combined['valor_total'] / total_cant if total_cant > 0 else 0
+        combined['valor_unitario'] = float(combined['valor_total']) / total_cant if total_cant > 0 else 0
         items_export.append(combined)
+
+    # Las cuentas al centavo (MARIA-5): la suma de los ítems da exactamente
+    # el FOB, el flete y el seguro de la carátula.
+    fobs = [_fob_de(it) for it in items_export]
+    fletes = repartir(flete, fobs)
+    seguros = repartir(seguro, fobs)
+    lines[linea_fob_total] = f"MDDTFOB={sum(fobs, Decimal('0.00')):.2f}"
 
     for idx, item in enumerate(items_export, 1):
         # Obtener valores
@@ -813,8 +930,8 @@ def generate_maria_txt(operation_id: str, items: list,
         descripcion = str(item.get('descripcion', '')).strip()
         cantidad = float(item.get('cantidad', 1))
         valor_unit = float(item.get('valor_unitario', 0))
-        valor_total = float(item.get('valor_total') or cantidad * valor_unit)
-        peso_kg = float(item.get('peso_kg', item.get('peso_unitario', 0)) or 0)
+        valor_total = fobs[idx - 1]
+        peso_kg = peso_de_la_linea(item)
         pais = item.get('pais_origen') or item.get('origen', 'CN')
         pais_codigo = get_pais_codigo(pais)
         # Procedencia: pais desde donde se despacha. Si no viene, se asume el
@@ -829,10 +946,8 @@ def generate_maria_txt(operation_id: str, items: list,
         unidad_codigo = get_unidad_codigo(
             item.get('unidad') or item.get('unidad_medida') or item.get('um'))
         
-        # Calcular proporcional de flete y seguro
-        proporcion = valor_total / fob_total if fob_total > 0 else 0
-        flete_item = flete * proporcion
-        seguro_item = seguro * proporcion
+        flete_item = fletes[idx - 1]
+        seguro_item = seguros[idx - 1]
         base_imponible = valor_total + flete_item + seguro_item
         
         lines.append("[ART]")
@@ -847,7 +962,7 @@ def generate_maria_txt(operation_id: str, items: list,
         # [SBT] dice N, el que tiene dos dice S.
         lines.append("CARTSBITEM=S" if item.get("subitems") else "CARTSBITEM=N")
         lines.append(f"CARTUSO={_estado_item(item, idx, pais_codigo)}")
-        lines.append(f"QARTKGRNET={peso_kg:.3f}")
+        lines.append(f"QARTKGRNET={peso_valido(peso_kg, idx):.3f}")
         lines.append(f"CARTPAYORI={pais_codigo}")
         lines.append(f"CARTPAYPRC={pais_proc_codigo}") # Procedencia (default = origen)
         lines.append(f"CARTUNTDCL={unidad_codigo}") # Unidad declarada (oficial MARIA)
@@ -915,25 +1030,59 @@ def generate_maria_txt(operation_id: str, items: list,
             lines.append(f"CSBTSVL={sufijo_sbt}")
             lines.append("")
         else:
+            n_item = lugar_en_el_pedido.get(id(item), idx)
             # Partido en sub-ítems: numeración desde 0001, cada uno con su
             # cantidad, unitario y FOB.
             #
             # Las cuentas tienen que cerrar contra el ítem, si no la aduana
             # rechaza la declaración. Se valida acá y se corta: mejor un error
             # en pantalla que un TXT que no cuadra.
+            # Cada sub-ítem con su cantidad y su valor: el error dice cuál
+            # falla (SUBITEMS-1). Una cantidad negativa compensada por otra
+            # haría cerrar la suma.
+            for n, sub in enumerate(subitems, start=1):
+                for campo, nombre, defecto in (("cantidad", "la cantidad", 0),
+                                               ("valor_unitario", "el valor unitario", valor_unit)):
+                    crudo = sub.get(campo, defecto)
+                    try:
+                        numero = float(crudo or 0)
+                    except (TypeError, ValueError):
+                        numero = float("nan")
+                    if not math.isfinite(numero) or numero <= 0:
+                        raise ValueError(
+                            f"Item {n_item}, sub-ítem {n}: {nombre} «{str(crudo)[:20]}» tiene que ser "
+                            f"un número mayor que 0."
+                        )
+                # QSBTUNTDCL va con dos decimales: 0,004 saldría 0,00 y tres
+                # de 0,3333 sumarían 0,99 contra el 1,00 del ítem.
+                cant_sub = float(sub.get("cantidad") or 0)
+                if abs(cant_sub - round(cant_sub, 2)) > 1e-9:
+                    raise ValueError(
+                        f"Item {n_item}, sub-ítem {n}: la cantidad «{str(sub.get('cantidad'))[:20]}» tiene más "
+                        f"de dos decimales; el TXT la declara con dos."
+                    )
             suma_cant = sum(float(s.get("cantidad", 0) or 0) for s in subitems)
-            suma_fob = sum(
-                float(s.get("cantidad", 0) or 0) * float(s.get("valor_unitario", valor_unit) or 0)
+            # El valor de cada sub-ítem sin redondear; el MARTFOB se reparte
+            # entre ellos al centavo, así los MSBTFOB suman exactamente el
+            # MARTFOB (MARIA-5).
+            crudos_sub = [
+                valor_de_la_linea({"cantidad": s.get("cantidad", 0) or 0,
+                                   "valor_unitario": s.get("valor_unitario", valor_unit) or 0})
                 for s in subitems
-            )
+            ]
+            suma_fob = sum(crudos_sub, Decimal(0))
+            fobs_sub = repartir(valor_total, crudos_sub)
+            # La tolerancia compara exacto con exacto (devolución de MARIA-5):
+            # la suma sin redondear contra el valor del ítem sin redondear.
+            valor_exacto = valor_de_la_linea(item)
             if abs(suma_cant - cantidad) > 0.001:
                 raise ValueError(
-                    f"Item {idx}: las cantidades de los sub-ítems suman {suma_cant:g} "
+                    f"Item {n_item}: las cantidades de los sub-ítems suman {suma_cant:g} "
                     f"pero el ítem declara {cantidad:g}. Tienen que coincidir."
                 )
-            if abs(suma_fob - valor_total) > 0.01:
+            if abs(suma_fob - valor_exacto) > Decimal("0.01"):
                 raise ValueError(
-                    f"Item {idx}: los valores de los sub-ítems suman {suma_fob:.2f} "
+                    f"Item {n_item}: los valores de los sub-ítems suman {suma_fob:.2f} "
                     f"pero el ítem declara {valor_total:.2f}. Tienen que coincidir."
                 )
 
@@ -941,7 +1090,7 @@ def generate_maria_txt(operation_id: str, items: list,
                 sufijo = (sub.get("sufijo") or sufijo_sbt or "").strip()
                 if not sufijo:
                     raise ValueError(
-                        f"Item {idx}, sub-ítem {n}: falta el sufijo de valor (CSBTSVL)."
+                        f"Item {n_item}, sub-ítem {n}: falta el sufijo de valor (CSBTSVL)."
                     )
                 sub_cant = float(sub.get("cantidad", 0) or 0)
                 sub_unit = float(sub.get("valor_unitario", valor_unit) or 0)
@@ -949,7 +1098,7 @@ def generate_maria_txt(operation_id: str, items: list,
                 lines.append(f"IDDT={operation_id}")
                 lines.append(f"NART={idx:04d}")
                 lines.append(f"ISBT={n:04d}")
-                lines.append(f"MSBTFOB={sub_cant * sub_unit:.2f}")
+                lines.append(f"MSBTFOB={fobs_sub[n - 1]:.2f}")
                 lines.append(f"QSBTUNTDCL={sub_cant:.2f}")
                 lines.append(f"MSBTUNITAR={sub_unit:.4f}")
                 lines.append(f"IEXT={idx}-{n}")
@@ -1026,6 +1175,18 @@ def validate_items_for_maria(items: list) -> tuple[bool, list]:
 INCOTERMS_VALIDOS = {"FOB", "CIF", "DDP", "EXW", "FCA", "FAS", "CFR", "CPT", "CIP", "DAP", "DPU"}
 
 
+def _dos_decimales(valor):
+    """Un importe como sale en el TXT (al centavo), para que el aviso diga el
+    mismo número; si no es un importe, como venga (el TXT dará el error)."""
+    try:
+        return centavos(valor or 0)
+    except (TypeError, ValueError, ArithmeticError):
+        try:
+            return float(valor or 0)
+        except (TypeError, ValueError):
+            return 0.0
+
+
 def supuestos_declarados(
     items: list,
     incoterm: str = "FOB",
@@ -1064,7 +1225,7 @@ def supuestos_declarados(
     if gastos_fob is None:
         if grupo_cd:
             avisos.append(
-                f"Gastos a FOB: se declaró {flete + seguro:.2f} (flete + seguro) en "
+                f"Gastos a FOB: se declaró {_dos_decimales(flete) + _dos_decimales(seguro):.2f} (flete + seguro) en "
                 f"GTOS-POS-FOB. Si la diferencia contra la condición {incoterm_norm} "
                 f"pactada es otra, cargala a mano."
             )
@@ -1212,7 +1373,7 @@ def validate_for_kit_maria(items: list) -> tuple[list, list]:
             errores.append(f"Item {idx}: Descripción muy corta ({len(desc)} chars). KIT Maria requiere mínimo 10.")
 
         # Peso > 0
-        peso = float(item.get("peso_kg", item.get("peso_unitario", 0)) or 0)
+        peso = peso_de_la_linea(item)
         if peso <= 0:
             errores.append(f"Item {idx}: Peso inválido (≤0). KIT Maria lo rechaza.")
 

@@ -20,8 +20,9 @@ cambios queda como `xfail` estricto: el día que la pantalla lo produzca, avisa.
 
 El de subítems (maria_golden_subitems_anon.TXT) se compara entero, línea por
 línea: ese archivo se guardó con LF y sin completar los campos con espacios.
-Además de D23, la pantalla no tiene dónde cargar los subítems (D24) y la
-referencia de la factura sale del número de operación (D25).
+Además de D23, la referencia de la factura sale del número de operación
+(D25). Los subítems se cargan en el panel del paso de NCM (SUBITEMS-1;
+antes, D24).
 """
 import io
 import json
@@ -58,7 +59,7 @@ FACTURA = {
             "moneda": "DOL", "incoterm": "DDP", "flete": "3221.66", "seguro": "50.00",
         },
         "items": [{"descripcion": "MAQUINA DEMO", "cantidad": "1", "valor_unitario": "5000.00",
-                   "peso_kg": "1220", "origen": "Argentina"}],
+                   "peso_total_linea": "1220", "origen": "Argentina"}],
     },
     "ncm": "84798999900H",
     # Lo que la persona escribe en la revisión (review.js; la procedencia se
@@ -84,7 +85,7 @@ FACTURA_SUBITEMS = {
             "moneda": "DOL", "incoterm": "EXW", "flete": "365.00", "seguro": "75.47",
         },
         "items": [{"descripcion": "Equipo de demostracion para prueba", "cantidad": "6",
-                   "valor_unitario": "1197.00", "peso_kg": "33", "origen": "China"}],
+                   "valor_unitario": "1197.00", "peso_total_linea": "33", "origen": "China"}],
     },
     "ncm": "84714900100D",
     "revision": {"fecha_embarque": "12/08/2026", "comprador_fecha_inic_activ": "15/04/2004",
@@ -101,8 +102,8 @@ FACTURA_SUBITEMS = {
 # D23: la pantalla arma el número de operación como «FAC_» + número de
 #      factura (finalize.js, buildMariaRequest), no el número de 9 dígitos, y
 #      el generador saca de ahí NDDTIMMTRN e IEXT («FAC_0»).
-# D24: la pantalla no tiene dónde cargar subítems: se agregan al ítem que ella
-#      arma, como los recibe la ruta.
+# D24 (resuelta en SUBITEMS-1): los subítems se cargan en el panel del paso de
+#      NCM y viajan en el pedido de la pantalla.
 # D25: la referencia de la factura (LDVDREFDOC) sale del número de operación
 #      («E126-1»); el archivo real lleva el de la factura («110»).
 
@@ -196,6 +197,7 @@ def _entorno(monkeypatch):
 def _gemini_falso(monkeypatch, respuesta: dict) -> None:
     """Gemini falso que devuelve `respuesta`, en la copia «pdf_directo» (sin
     PyMuPDF, la de producción). Como tests/test_maria1a_lectura_factura.py."""
+    respuesta = dict(respuesta, documento={"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""})
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     monkeypatch.setenv("ENABLE_PDF_LLM_FALLBACK", "true")
     monkeypatch.setattr("time.sleep", lambda s: None)
@@ -307,6 +309,10 @@ class _Pantalla:
             "peso_unitario": numero(it.get("peso_unitario")), "codigo_parte": texto(it.get("codigo_parte")),
             "grupo_id": it.get("grupo_id") or None, "unidad": it.get("unidad") or None,
             "estado": it.get("estado") or None, "iva_adicional": it.get("iva_adicional") or None,
+            # subitemsDelPedido: sólo si el producto está partido (SUBITEMS-1).
+            **({"subitems": [{"cantidad": numero(s.get("cantidad")), "valor_unitario": numero(s.get("valor_unitario")),
+                              **({"sufijo": texto(s.get("sufijo"))} if texto(s.get("sufijo")) else {})}
+                             for s in it["subitems"]]} if it.get("subitems") else {}),
         } for it in self.items]
         # despachante.js, valores(): sin cliente activo no hay propuesta.
         elegidos = op.get("despachante") or {}
@@ -344,6 +350,11 @@ class _Pantalla:
             "sbt_sufijo_valor": texto(op.get("sbt_sufijo_valor")),
         }
 
+    def cargar_subitems(self, indice: int, subitems: list):
+        """El panel de subítems del paso de NCM (ncm.js): lo que se escribe
+        queda en it.subitems."""
+        self.items[indice]["subitems"] = [dict(s) for s in subitems]
+
     def generar_y_descargar(self, pedido: dict | None = None) -> tuple[str, str]:
         pedido = pedido or self.pedido()
         r = self._post("/generate_maria", json=pedido)
@@ -370,7 +381,7 @@ def _excel_de(factura: dict) -> bytes:
     ws.append(["NCM", "Descripcion", "Pais de origen", "Cantidad", "Precio Unitario", "Peso Neto"])
     for it in factura["gemini"]["items"]:
         ws.append([factura["ncm"], it["descripcion"], it["origen"], float(it["cantidad"]),
-                   float(it["valor_unitario"]), float(it["peso_kg"])])
+                   float(it["valor_unitario"]), float(it["peso_total_linea"])])
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()
@@ -382,6 +393,8 @@ def _por_pdf(monkeypatch, factura: dict) -> _Pantalla:
     p.entrar()
     p.subir("factura.pdf", _pdf_en_blanco(), "/upload_pdf/public")
     p.revisar(factura["ncm"], factura["revision"], factura["despachante"], factura["estados"])
+    if factura.get("subitems"):
+        p.cargar_subitems(0, factura["subitems"])
     return p
 
 
@@ -394,6 +407,8 @@ def _por_excel(factura: dict) -> _Pantalla:
     cabecera = {k: v for k, v in factura["gemini"]["operacion"].items()}
     p.revisar(factura["ncm"], {**cabecera, **factura["revision"]}, factura["despachante"],
               factura["estados"])
+    if factura.get("subitems"):
+        p.cargar_subitems(0, factura["subitems"])
     return p
 
 
@@ -420,9 +435,7 @@ def test_pdf_de_punta_a_punta_da_el_archivo_real_sin_cambios(monkeypatch):
 @pytest.mark.parametrize("camino", ["pdf", "excel"])
 def test_subitems_de_punta_a_punta_dan_el_archivo_real(monkeypatch, camino):
     p = _por_pdf(monkeypatch, FACTURA_SUBITEMS) if camino == "pdf" else _por_excel(FACTURA_SUBITEMS)
-    pedido = p.pedido()
-    pedido["items"][0]["subitems"] = FACTURA_SUBITEMS["subitems"]  # D24
-    txt, operation_id = p.generar_y_descargar(pedido)
+    txt, operation_id = p.generar_y_descargar()
     esperado = _como_sale_por_la_pantalla(_leer(SUBITEMS_PATH), "002720126", operation_id)
     esperado = esperado.replace("LDVDREFDOC=110", f"LDVDREFDOC=E{operation_id[-3:]}-1")  # D25
     assert _sin_relleno(txt) == _sin_relleno(esperado)
@@ -445,7 +458,7 @@ def test_una_factura_con_coma_decimal_da_el_mismo_archivo(monkeypatch):
     «1.220» solo es ambiguo: es 1220 kg porque la factura usa la coma."""
     factura = {**FACTURA, "gemini": {
         "operacion": {**FACTURA["gemini"]["operacion"], "flete": "3.221,66", "seguro": "50,00"},
-        "items": [{**FACTURA["gemini"]["items"][0], "valor_unitario": "5.000,00", "peso_kg": "1.220"}],
+        "items": [{**FACTURA["gemini"]["items"][0], "valor_unitario": "5.000,00", "peso_total_linea": "1.220"}],
     }}
     txt, operation_id = _por_pdf(monkeypatch, factura).generar_y_descargar()
     assert txt == _como_sale_por_la_pantalla(_leer(_GOLDEN_PATH), "000999001", operation_id)
@@ -468,9 +481,9 @@ def test_dos_productos_reparten_flete_y_seguro_por_su_fob(monkeypatch):
         "operacion": FACTURA["gemini"]["operacion"],
         "items": [
             {"descripcion": "MAQUINA DEMO GRANDE", "cantidad": "1", "valor_unitario": "3000.00",
-             "peso_kg": "700", "origen": "Argentina"},
+             "peso_total_linea": "700", "origen": "Argentina"},
             {"descripcion": "MAQUINA DEMO CHICA", "cantidad": "2", "valor_unitario": "1000.00",
-             "peso_kg": "260", "origen": "Argentina"},
+             "peso_total_linea": "260", "origen": "Argentina"},
         ],
     }, "estados": ["3", "3"]}
     txt, _ = _por_pdf(monkeypatch, factura).generar_y_descargar()
@@ -478,8 +491,10 @@ def test_dos_productos_reparten_flete_y_seguro_por_su_fob(monkeypatch):
     arts = _bloques(txt, "ART")
     assert ddt["MDDTFOB"] == "5000.00" and len(arts) == 2, (ddt, arts)
     assert [a["MARTFOB"] for a in arts] == ["3000.00", "2000.00"]
-    # El peso con más de una unidad no se mira acá: si «peso_unitario» es de una
-    # unidad o de la línea lo está cambiando MARIA-5 (Dev 2).
+    # El peso: QARTKGRNET es el neto de toda la línea (respuesta 3 del
+    # despachante y D23 de la Dev 2). La máquina chica son 2 unidades con 260 kg
+    # la línea: se declaran 260 kg, no 520.
+    assert [a["QARTKGRNET"] for a in arts] == ["700.000", "260.000"], arts
     # Flete y seguro, en proporción al FOB de cada producto.
     for a, parte in zip(arts, (0.6, 0.4)):
         assert abs(float(a["MARTFLE"]) - 3221.66 * parte) <= 0.01, a
@@ -493,15 +508,12 @@ def test_dos_productos_reparten_flete_y_seguro_por_su_fob(monkeypatch):
                    "operación («E126-1»), no la de la factura («110»); va a MARIA-6")
 def test_subitems_dan_la_referencia_de_la_factura_del_archivo_real(monkeypatch):
     p = _por_pdf(monkeypatch, FACTURA_SUBITEMS)
-    pedido = p.pedido()
-    pedido["items"][0]["subitems"] = FACTURA_SUBITEMS["subitems"]  # D24
-    txt, _ = p.generar_y_descargar(pedido)
+    txt, _ = p.generar_y_descargar()
     assert "LDVDREFDOC=110" in _sin_relleno(txt)
 
 
-@pytest.mark.xfail(strict=True, reason="D24: la pantalla no tiene dónde cargar subítems; "
-                   "lo decide Emi")
 def test_la_pantalla_sola_da_los_subitems_del_archivo_real(monkeypatch):
-    """Sin agregarle los subítems al pedido: lo que la pantalla manda hoy."""
+    """Sin agregarle los subítems al pedido: los carga el panel de subítems
+    del paso de NCM (SUBITEMS-1; antes, D24)."""
     txt, _ = _por_pdf(monkeypatch, FACTURA_SUBITEMS).generar_y_descargar()
     assert "CARTSBITEM=S" in _sin_relleno(txt)

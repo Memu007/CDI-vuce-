@@ -88,7 +88,7 @@ reemplazar $F "        elif propio == sep:
 caso "coma_como_miles" "FAILED $T::test_numeros_de_una_factura_en_castellano[pdf_directo]"
 
 # 6. vuelve el peso inventado de 0,5 kg (copia de producción)
-reemplazar $F "                                peso = _numero_factura(item_data.get('peso_kg'), decimal) or 0.0" "                                peso = _numero_factura(item_data.get('peso_kg'), decimal) or 0.5"
+reemplazar $F "    unitario = unitario if unitario > 0 else 0.0" "    unitario = unitario if unitario > 0 else 0.5"
 caso "peso_0_5" "FAILED $T::test_lo_que_falta_no_se_inventa[pdf_directo]"
 
 # 7. vuelve la cantidad inventada de 1 (copia PyMuPDF)
@@ -99,8 +99,8 @@ caso "cantidad_1" "FAILED $T::test_cantidad_que_falta_queda_vacia[pymupdf]"
 
 # 8. vuelve el pedido a Gemini de estimar el peso
 reemplazar $F "- valor_unitario: Precio por unidad
-- peso_kg: Peso en kg (0 si no aparece; no estimar)" "- valor_unitario: Precio por unidad
-- peso_kg: Peso en kg (estimar 0.5 si no aparece)"
+- peso_unitario: Peso neto de UNA unidad en kg (0 si la factura no lo dice; no estimar ni calcular)" "- valor_unitario: Precio por unidad
+- peso_unitario: Peso neto de UNA unidad en kg (estimar 0.5 si no aparece)"
 caso "prompt_estima_peso" "FAILED $T::test_instrucciones_a_gemini_no_piden_estimar_el_peso"
 
 # 9. vuelve a pegar los dígitos de «12x3» o «500 g»

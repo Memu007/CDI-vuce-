@@ -69,11 +69,13 @@ sabotaje $M "«Valor» vuelve a ganar sobre el precio unitario" \
   '        "valorunitario", "preciounitario", "unitprice",' \
   '        "valorunitario", "valor", "preciounitario", "unitprice",' \
   "FAILED $L::test_precio_unitario_gana_sobre_valor_total"
+# Con MARIA-5 integrada (D23): el bruto se reconoce por el nombre y va
+# último; el sabotaje lo vuelve de una unidad.
 sabotaje $M "el peso bruto vuelve a usarse como peso unitario" \
-  '        "peso", "weight",
-    ],' \
-  '        "peso", "weight", "pesobruto", "pesototal",
-    ],' \
+  '    if "bruto" in normal or "gross" in normal:
+        return "bruto_unidad" if _bruto_de_una_unidad(normal) else "bruto"' \
+  '    if False:
+        return "bruto"' \
   "FAILED $L::test_peso_bruto_o_total_no_se_toma_como_peso_unitario"
 sabotaje $M "las filas de subtotal vuelven a entrar" \
   '            if _es_fila_de_total(descripcion or pieza):' \
@@ -143,10 +145,11 @@ sabotaje $M "vuelve a descartarse todo producto sin NCM ni origen" \
   '        if not trae and _FILA_QUE_NO_ES_MERCADERIA_RE.match(item.descripcion or ""):' \
   '        if not trae and any(t for _f, t, _i in candidatos):' \
   "FAILED $L::test_productos_sin_ncm_ni_origen_entran_aunque_otra_fila_los_traiga"
+# Con MARIA-5 integrada (D23): entre «Peso (kg)» y «Peso (bruto)» decide el
+# rango del peso, no el orden de las columnas.
 sabotaje $M "«Peso (neto)» y «Peso (bruto)» vuelven a confundirse" \
-  '        if len(originales) == 1:
-            norm_to_orig.setdefault(norm, originales[0])' \
-  '        norm_to_orig[norm] = originales[-1]' \
+  '_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "dudosa": 3, "bruto": 4, "bruto_unidad": 4}' \
+  '_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 4, "dudosa": 3, "bruto": 2, "bruto_unidad": 4}' \
   "FAILED $L::test_peso_ambiguo_entre_parentesis_queda_vacio_y_no_se_adivina"
 sabotaje $M "el Excel vuelve a usar los hilos del PDF" \
   'def _pool_lectura_excel():

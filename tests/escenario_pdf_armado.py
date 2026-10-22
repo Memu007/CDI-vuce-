@@ -67,7 +67,7 @@ def preparar():
         "plan": "premium", "billing_status": "active"}
     # La lectura con IA, simulada: devuelve ítems sin vendedor, así la
     # adivinanza del vendedor lee el texto del PDF.
-    main.process_pdf = lambda *_: {"items": [{"descripcion": "x"}], "operacion": {}}
+    main.process_pdf = lambda *_: {"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "items": [{"descripcion": "x"}], "operacion": {}}
 
 
 async def correr():

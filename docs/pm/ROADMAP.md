@@ -1,5 +1,13 @@
 # Roadmap — aprobado por Emi (orden del 2026-10-07)
 
+> Retoma del 2026-10-20: sigue vigente el orden de las cuatro fases. Las
+> semanas de abajo son la estimación histórica, no fechas de lanzamiento
+> confirmadas. Seguimos en Fase 1. Pesos MARIA-5d y bloqueo DOC-1 se están
+> verificando juntos en un candidato local; EXCEL-2 y GUARDAR-2 requieren
+> revisión separada. El cierre sigue necesitando facturas reales revisadas
+> por Emi y aceptación del TXT en el Kit del despachante. Estado y evidencia
+> exactos en `NOW.md`.
+
 ## Para Emi
 
 **Primero el TXT, después el cobro, la seguridad al final.** Ningún estudio
@@ -52,9 +60,11 @@ necesita prueba: la ley, un archivo real o la respuesta del despachante
 | ✅ | MARIA-4 | Lo que decide el despachante: estado de la mercadería (seis, por producto), IVA adicional (completo en reventa; si hay reducción o exclusión, aviso de que se elige en «Ventajas» del Kit, no va en el TXT), banco y empresa de digitalización (las dos por operación; Modoc = `PSAD06`, Lakaut = `PSAD01`) (M2, M3) | respuestas 1, 2, 4 y 5, las dos cortas y el archivo real de 2026 |
 | ✅ | MARIA-3 | Avisos antes de generar (y sin avisos de más: «N/A», «FREE», «included» no son ilegibles); la fecha de emisión sale de la factura, no de hoy (D15 de la Dev 1); gastos anteriores al FOB en EXW, FCA y FAS; procedencia en pantalla (M6, M8) | respuesta 6, Código Aduanero art. 15, nota del SIM, archivo real de 2025 |
 | ✅ | MARIA-1d | Un campo vacío no llega al TXT como «None» o «NON» (D12 de la Dev 2) | no cambia el TXT de una factura bien leída |
-| ⏳ | MARIA-5 | Peso total por producto; cuentas exactas al centavo (M1, M9); «None» escrito en la carátula cuenta como vacío (revisión de MARIA-1d) | peso: respuesta 3 y archivo real de 2026; cuentas: la prueba en el Kit |
-| ⏳ | CATALOGO-NCM-1 | El catálogo NCM vigente (el de hoy es de 2018: le faltan 8517.13.00, 8524, 8549); una NCM dada de baja se avisa como tal (D21 de la Dev 1; archivo de Emi del 2026-10-07) | el nomenclador de ARCA del 07/10/2026 |
-| ⏳ | SUBITEMS-1 | La pantalla v2 deja cargar, editar y ver los subítems de cada producto, con el formato que ya recibe `/generate_maria` (D24 de la Dev 1; Emi: sus facturas traen subítems, 2026-10-07) | `maria_golden_subitems_anon.TXT`: la prueba de punta a punta deja de agregarlos a mano |
+| ✅ | MARIA-5 | Peso total por producto; cuentas exactas al centavo (M1, M9); «None» escrito en la carátula cuenta como vacío (revisión de MARIA-1d) | peso: respuesta 3 y archivo real de 2026; cuentas: la prueba en el Kit |
+| ✅ | CATALOGO-NCM-1 | El catálogo NCM vigente (el de hoy es de 2018: le faltan 8517.13.00, 8524, 8549); una NCM dada de baja se avisa como tal (D21 de la Dev 1; archivo de Emi del 2026-10-07) | el nomenclador de ARCA del 07/10/2026 |
+| ✅ | SUBITEMS-1 | La pantalla v2 deja cargar, editar y ver los subítems de cada producto, con el formato que ya recibe `/generate_maria` (D24 de la Dev 1; Emi: sus facturas traen subítems, 2026-10-07) | `maria_golden_subitems_anon.TXT`: la prueba de punta a punta deja de agregarlos a mano |
+| 1 | MARIA-5d | «Peso bruto unitario» es bruto de una unidad: no se divide (revisión de la reentrega de MARIA-5). Antes de publicar | los archivos reales, idénticos |
+| 2 | DOC-1 | Bloquear documentos no admitidos/ambiguos y EC* en la ruta de importación; una subida nueva fallida no revive datos del documento anterior. Autorizada por Emi el 2026-10-19 | no cambia el TXT de una importación válida; casos sintéticos factura/despacho/ambigüedad y A→B |
 | 3 | MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11); el número de operación y la referencia de la factura que hoy arma la pantalla (D23 y D25 de la Dev 1) | sus archivos reales |
 
 MARIA-4, MARIA-3 y MARIA-5 tocan el mismo generador: van en ese orden.
@@ -72,7 +82,8 @@ MARIA-6 arranca cuando lleguen sus archivos reales.
 | ✅ | MARIA-1b | Controles antes de generar: NCM del catálogo, moneda, incoterm, CUIT, montos; ningún texto mete líneas en el TXT; las filas de total o de flete no pasan como productos; al guardar la operación no se inventan cantidad 1 ni peso 0,5 (M10, D6 de la Dev 2) |
 | ✅ | PUNTA-A-PUNTA-1 | Prueba automática: sube un PDF y un Excel (Gemini simulado) y compara el TXT con los archivos reales |
 | ⏳ | EXCEL-2 | Abrir un libro armado no traba la lectura (D26 de la Dev 1); lo que el Excel todavía no lee: encabezado fuera de la fila 1, sin columna de origen, celdas combinadas (D18 de la Dev 1); CSV con `;`, latin-1 o BOM en el historial de NCM; el aviso de mapeo nombra la columna que se usó |
-| 1 | GUARDAR-1 | Guardar una operación con la posición SIM completa (`84714900100D`) da 500 en producción y no guarda nada: la operación se guarda siempre, y el historial de NCM también (Emi dijo que sí, 2026-10-07). Va antes que COBRO-MP-1 |
+| ✅ | GUARDAR-1 | Guardar una operación con la posición SIM completa (`84714900100D`) da 500 en producción y no guarda nada: la operación se guarda siempre, y el historial de NCM también (Emi dijo que sí, 2026-10-07). Va antes que COBRO-MP-1 |
+| 1 | GUARDAR-2 | La sugerencia de NCM: si el historial del cliente tiene 8 dígitos y el proveedor la SIM completa que empieza con esos 8, gana la del proveedor (D32 b de la Dev 1; sin migración) |
 
 **Cierre:** publicar con el «dale»; Emi prueba con facturas reales; el
 despachante carga un archivo en su Kit (cierra G4).
@@ -82,9 +93,9 @@ despachante carga un archivo en su Kit (cierra G4).
 | Pieza | Quién | Qué arregla |
 |---|---|---|
 | COBRO-MP-1 | Dev 1 | Aviso de pago verificado, aplicado una vez aunque se reenvíe, con el monto controlado (C3, D8 de la Dev 1). Va primero: es el único camino que hoy activa sin pagar. Además, que las renovaciones de la suscripción extiendan el período (hoy sólo se procesa `type=payment`; leído en el ataque al ensayo, sin verificar). La suscripción está configurada en Railway (Emi, 2026-10-07): las renovaciones corren en producción |
-| COBRO-CORTE-1 | Dev 1 | Quien no paga no genera valor ni gasta Gemini; se cuenta una vez por operación; sin pasarse del tope; el aviso del corte dice la razón real (hoy una cuenta que fue activa recibe «prueba vencida») (C1, C5, C6). Ya decidido: D4 (b, N = 10), D5 (a), D6 (a) de la Dev 1 (`PARA-DEV.md`) |
+| COBRO-CORTE-1 | Dev 1 | Quien no paga no genera valor ni gasta Gemini; se cuenta una vez por operación; sin pasarse del tope; el aviso del corte dice la razón real (hoy una cuenta que fue activa recibe «prueba vencida») (C1, C5, C6). Con guardados a la vez, hoy el contador cuenta de menos y se pasa del tope (revisión de GUARDAR-1). Ya decidido: D4 (b, N = 10), D5 (a), D6 (a) de la Dev 1 (`PARA-DEV.md`) |
 | COBRO-MP-2 | Dev 1 | Cancelar también en Mercado Pago, sin perder días pagados, una sola suscripción, reactivar pagando (una prueba gratuita no pasa a activa); sin token de Mercado Pago, no decir «activada» (C2, C4, C8, D9 de la Dev 1) |
-| ORG-1 | Dev 2 | Invitaciones que funcionan, tope de usuarios del plan, atadas al email (C7) |
+| ORG-1 | Dev 2 (después de MARIA-5d y DOC-1; MARIA-6 espera los archivos) | Invitaciones que funcionan, tope de usuarios del plan, atadas al email (C7) |
 | LEGAL-1 | Dev 2 | Términos y privacidad con el texto de Emi, y cómo pedir el borrado de datos (X5) |
 
 **Cierre:** publicar; el pago chico de Emi recorre todo el ciclo (cierra G7).

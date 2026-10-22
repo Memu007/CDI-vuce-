@@ -6,10 +6,33 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-21 · fix: conservar el mapeo de Excel cuando se omite la opción
+
+- Con versiones nuevas de FastAPI, omitir use_mapping conserva el uso del catálogo del cliente. false lo desactiva y un valor inválido sigue rechazándose.
+
+## 2026-10-20 · fix: bloquear documentos no admitidos antes del TXT (DOC-1)
+
+- El lector conserva la clasificación documental y rechaza despachos, exportaciones y lecturas ambiguas. Una destinación EC* no entra al generador de importación; una nueva subida fallida no recupera los datos ni respuestas de la anterior.
+- Deshacer cambios de NCM queda atado a la operación actual y no puede restaurar productos de una anterior.
+
+## 2026-10-19 · fix: el bruto unitario con kg conserva su valor (MARIA-5d)
+
+- **fix(excel):** «Peso bruto unit (kg)», «Gross weight unit (kg)» y «Unit gross weight» conservan el peso de una unidad, también con mapeo guardado: 10 × 3 kg declara 30 kg en el TXT. El neto sigue teniendo prioridad y el bruto total sigue dividiéndose.
+
 ## 2026-10-07 · fix: guardar una operación con la SIM completa no da 500 (GUARDAR-1)
 
 - **fix(operaciones):** la operación (con el contador del plan) se guarda en su propio commit y el historial del cliente después, cada producto en su savepoint: si el historial falla, la operación queda y la respuesta lo dice (`historial_guardado`). Antes, en Postgres, la SIM completa (`84714900100D`) no entraba en `client_product_history.ncm` (String(10)) y no se guardaba nada.
 - **fix(historial):** guarda lo que entra y, de la SIM completa, el NCM de 8 dígitos; editar un producto exige los 8 dígitos (antes cortaba a 10 caracteres). Moneda, origen, fecha de inicio del cliente, grupo fuera de rango y el carácter NUL ya no tiran abajo el guardado. Sin migración.
+
+## 2026-10-07 · feat: el catálogo NCM es el vigente de ARCA (CATALOGO-NCM-1)
+
+- **feat(ncm):** el catálogo pasa al nomenclador vigente de ARCA (10.504 NCM, con la enmienda de 2022: 8517.13.00, 8524, 8549). Una NCM dada de baja (522, como 8517.12.31) avisa que esa posición ya no existe y que hay que buscar la nueva, en la validación y en el asistente de NCM; es aviso, no freno. Se saca el CSV de respaldo con códigos que ya no existen.
+
+## 2026-10-07 · fix: el peso es el de la línea y las cuentas del TXT cierran al centavo (MARIA-5)
+
+- **fix(maria):** `QARTKGRNET` declara el peso neto de toda la línea (10 × 2,5 kg = 25 kg, lo que ya mostraba la validación), también en los grupos. El lector pide el peso de una unidad y el de la línea; el Excel divide «Peso total» y «Peso neto» por la cantidad y avisa si sólo trae el bruto. Editar un grupo en la pantalla de NCM reparte entre sus productos en vez de copiar el total.
+- **fix(maria):** importes al centavo con la mitad hacia arriba; el flete y el seguro se reparten para que la suma de los ítems dé exactamente la carátula (antes 10,01 contra 10,00), igual el FOB y los sub-ítems. En el servidor, «None», «null» o «N/A» en la carátula cuentan como vacíos y nunca llegan al TXT ni al nombre del archivo.
+- **fix(maria), devolución:** con dos pesos para la misma línea (lector o Excel) manda el neto de la línea, con un aviso que muestra los dos números; un peso en texto ya no saca la fila del Excel; un peso imposible (NaN, infinito, enorme o que redondea a 0,000) da error; los sub-ítems comparan exacto con exacto; un grupo nunca deja un producto en 0; la validación y el aviso de gastos dicen el mismo importe que el TXT.
 
 ## 2026-10-07 · fix: un campo vacío de la factura no llega al TXT como «None» (MARIA-1d)
 

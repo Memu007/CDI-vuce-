@@ -23,9 +23,72 @@ Tu PM principal te despierta con `fire_trigger` de tu rutina; vos la
 despertás a ella con el de la suya al entregar o al dejar una D que te frena
 (`/entregar` §5). Los ids están en `NOW.md`, «Quién hace qué».
 
+## Retoma 2026-10-19 — recepción pendiente
+
+Emi pidió continuar el plan. PM trabaja en `codex/pm-retoma-txt` desde
+`99f3625`. No reactivar cobro antes de cerrar lo pendiente de Fase 1.
+
+Git conserva EXCEL-2 `c2f8063` y GUARDAR-2 `2d930c5` como candidatos hermanos
+sobre `1cdfe49`; la punta `dfb6d24` no es una entrega conjunta. Tu
+`PARA-PM.md` todavía entrega GUARDAR-1: reemplazarlo al cerrar cada pieza,
+sin heredar pruebas de otra versión. D32 sigue (b), ya decidida.
+
+**Próximo paso cerrado:** entregar la devolución EXCEL-2 sobre `c2f8063`:
+seis criterios del veredicto de abajo, errores numéricos y sabotajes
+actualizados, regresiones sintéticas normales, suite y e2e sobre el SHA
+exacto; declarar lo no corrido. Después GUARDAR-2 por separado, con
+Postgres local descartable y los negativos de coincidencia de producto y
+separación de dueño. Si la actualización a la PM vigente genera conflictos,
+resolver en una rama nueva y volver a medir ese SHA, sin mezclar cobro.
+
+La revisión exploratoria de GUARDAR-2 ejecutó 17 focales verdes y otra
+corrida de 18 con bordes de aislamiento y SIM completa; entorno heredado y
+SQLite. No es aceptación ni sustituye Postgres/suite/e2e. Detalle en
+`REPRODUCCION-RETOMA-2026-10-19.md`.
+
 ## Último veredicto
 
-**EXCEL-2 devuelta sobre `3e6e63e`** (2026-10-07, 19:45 UTC) por seis puntos.
+**GUARDAR-1 aceptada sobre `d6fe25f` más `aec4f15`** (2026-10-07, 21:08 UTC).
+- **Aislada:** `d6fe25f` traía también EXCEL-2 y COBRO-MP-1. La PM pasó sólo
+  tus ocho commits con `cherry-pick` (`2621c3b`); entraron limpios, salvo el
+  CHANGELOG. Está integrada en `a9b03cf`, que es el candidato a publicar.
+- **Lo que corrió la PM sobre `2621c3b`:**
+  - Suite: `1247 passed, 102 skipped, 3 xfailed`.
+  - e2e de la CI: «E2E MARIA OK».
+  - `tests/test_guardar1.py` no corre con el producto viejo: importa
+    `NCM_HISTORIAL_MAX`. El rojo antes lo da `guardar1_postgres.py`.
+- **El subagente (Sonnet alto, contra Postgres 16):**
+  - Base: 7 fallas. Con la pieza: `fallas: 0`.
+  - Nunca queda una operación sin ítems, y el contador nunca cuenta dos
+    veces.
+  - Con 50 productos y uno que falla, se pierde sólo ese en el historial.
+  - Si se cae la conexión después del commit, la operación queda.
+  - El historial viejo de 10 caracteres y el listado y la exportación andan
+    igual.
+- Detalle en `REPRODUCCION-GUARDAR-1-2026-10-07.md`.
+
+**D32: (b)**, sin migración. Si el historial del cliente tiene 8 dígitos y
+el catálogo del proveedor tiene una SIM completa que empieza con esos 8, gana
+la del proveedor.
+- (a) no alcanza sola: `upsert_client_product_history` no actualiza el `ncm`
+  de una fila que ya existe.
+- Además, el `ALTER` necesita `lock_timeout`, y en el despliegue las
+  conexiones abiertas dieron `InvalidCachedStatementError` (un guardado
+  perdió el historial sin avisar).
+- Va como **GUARDAR-2**, apenas entregues la devolución de EXCEL-2 (abajo).
+
+**Se deja, anotado:**
+- Ocho guardados a la vez cuentan de menos y repiten el `op_code`, y con 14
+  usadas entran 8. Ya pasaba: va a COBRO-CORTE-1, que es «sin pasarse del
+  tope».
+- Un `grupo_id` que no es entero se descarta sin aviso (la pantalla no lo
+  manda).
+- La moneda «DOLARES» se guarda como `DOL`.
+- Un NUL al editar un producto da 500.
+
+---
+
+**Devolución de EXCEL-2 (en curso)**, sobre `3e6e63e` (2026-10-07, 19:45 UTC) por seis puntos.
 
 **Lo que corrió la PM:**
 - Rojo antes, `test_excel2.py` con el producto de `3b52bc9`:
@@ -186,7 +249,22 @@ Además:
    da 400, no 500 (`OverflowError`), en `/generate_maria`, los subítems y la
    exportación; y `cuit_agr` y `vendedor_id`, sólo con dígitos 0-9.
 
-## Ahora: GUARDAR-1 (Emi dijo que sí)
+## Siguiente, apenas entregues la devolución de EXCEL-2 — GUARDAR-2 (D32 b)
+
+Escrito el 2026-10-07, 21:08 UTC.
+- **Qué arregla:** en la sugerencia de NCM (`/api/catalog/lookup`,
+  `/api/ncm/sugerir` y el autorrelleno), si el historial del cliente tiene 8
+  dígitos y el catálogo del proveedor tiene una SIM completa que empieza con
+  esos 8, gana la del proveedor.
+- **Cómo se prueba:** hoy, con GUARDAR-1, la pantalla recibe `84714900` y
+  marca incompleto lo que antes llegaba listo (`84714900100D`).
+- **Sin migración.** Vale también para lo que ya escribía `guardar-uso`.
+- **Criterios:** rojo antes y verde después, contra Postgres. La e2e da «E2E
+  MARIA OK». Suite completa.
+
+Después, COBRO-MP-1 (en pausa).
+
+## Antes: GUARDAR-1 (Emi dijo que sí) — aceptada
 
 Escrito el 2026-10-07, 18:40 UTC. **Emi dijo que sí a GUARDAR-1**: es un error
 que ya está en producción, así que va antes que COBRO-MP-1.

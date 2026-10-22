@@ -64,11 +64,12 @@ def test_el_archivo_real_sale_identico_por_la_ruta():
 
 
 def test_ncm_que_no_esta_en_el_nomenclador_avisa_pero_deja_generar():
-    """El nomenclador que tenemos es el de 2018: una NCM que no está puede ser
-    de la enmienda de 2022 (8517.13.00, teléfonos). Avisa; no frena."""
+    """Una NCM que no está en el nomenclador vigente avisa; no frena. Desde
+    CATALOGO-NCM-1 el catálogo es el de 2026 y el texto lo dice (devolución
+    de la PM, punto 5: «el de 2018» ya era falso)."""
     r = _generar(item={"pieza": "99998888000A"})
     assert r.status_code == 200, r.text[:300]
-    assert any("la NCM 99998888 no está en el nomenclador" in w for w in r.json()["warnings"]), r.json()
+    assert any("la NCM 9999.88.88 no está en el nomenclador vigente" in w for w in r.json()["warnings"]), r.json()
 
 
 def test_ncm_que_perdio_el_0_inicial_propone_el_0():
