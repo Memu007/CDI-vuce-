@@ -6,6 +6,21 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-23 · fix: combinadas XML y lectura normal con ocho libros grandes
+
+- El origen combinado se conserva con comillas simples, espacios y entidades XML. Los libros que exceden con certeza el límite vigente de filas se rechazan antes de pandas, sin truncar datos ni contar filas vacías; se mantienen 10 MiB y 5000 filas.
+
+## 2026-10-22 · fix: el límite de columnas de Excel admite variantes XML válidas
+
+- El control previo reconoce comillas simples, espacios y entidades en las referencias de celdas; ninguna variante evita el límite de 256 columnas. Corta al superarlo y el XML malformado devuelve 400.
+
+## 2026-10-07 · fix: lo que el Excel no leía y abrir un libro armado (EXCEL-2)
+
+- **fix(excel):** el encabezado se busca en las primeras 30 filas (logo o datos del vendedor arriba); sin columna de país de origen los productos entran con el origen vacío y se avisa; el texto de una celda combinada hacia abajo vale para todas sus filas (los números no se copian); el aviso de mapeo nombra la columna que se usó.
+- **fix(excel, seguridad):** validar un .xlsx no lo abre: cuenta las hojas desde el índice (como openpyxl: toda relación que no sea de gráfico) y rechaza antes de abrir un libro con DTD o entidades XML, textos compartidos (10 MB), estilos de más (500.000 etiquetas), primera hoja de más de 10 MB o con celdas más allá de la columna 256, o un .rels de más de 1 MB; leer la factura abre sólo la primera hoja de cálculo. Con 8 libros armados delante, una subida normal ya no falla.
+- **fix(excel):** una celda combinada se rellena sólo en descripción, origen y NCM (nunca en cantidad, valor o peso, aunque sea texto como «5 UN») y sólo en las filas de la tabla; una fila vacía dentro de una combinada no sale como «sin leer».
+- **fix(ncm):** el historial de NCM lee CSV con «;», latin-1 o BOM, elige la codificación que explica más letras del castellano y avisa en la pantalla si el archivo las mezcla. **fix(maria):** un monto que es una lista o un entero enorme, o un producto mal formado, da 400 y no 500; el CUIT del despachante va con 11 dígitos 0-9 y el identificador del vendedor sin dígitos de otros alfabetos.
+
 ## 2026-10-21 · fix: conservar el mapeo de Excel cuando se omite la opción
 
 - Con versiones nuevas de FastAPI, omitir use_mapping conserva el uso del catálogo del cliente. false lo desactiva y un valor inválido sigue rechazándose.
