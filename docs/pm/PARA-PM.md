@@ -2,7 +2,7 @@
 
 ## EXCEL-2 integrada sobre release 648cd2f — devolución de 23 de octubre
 
-**Resultado: producto y focales terminados; falta aceptación independiente, suite completa y CI/e2e.** Rama local `codex/excel2-integration-648`, clone `/private/tmp/cdi-excel2-integration-648`. Base publicada `648cd2f`; producto inicial `7e9c4e0`; integración inicial de pruebas `d448033`. Devolución de los dos bloqueantes: producto `3906130`, pruebas `b073ba4`, prueba durable de concurrencia `0666881360962c3501b863ffbcd6a7518eacf25c`. Después de ese SHA sólo se agrega documentación.
+**Resultado: no aceptar aún. El mensaje de subítems de CI está corregido; queda un rojo de concurrencia con cobertura en diagnóstico PM.** Rama local `codex/excel2-integration-648`, clone `/private/tmp/cdi-excel2-integration-648`. Base publicada `648cd2f`; producto inicial `7e9c4e0`; integración inicial de pruebas `d448033`. Devolución de los dos bloqueantes: producto `3906130`, pruebas `b073ba4`, prueba durable de concurrencia `0666881360962c3501b863ffbcd6a7518eacf25c`. La entrega original terminó con documentación `0389f0c`; después se corrige el mensaje específico de subítems en producto `be17e1b` (ver devolución siguiente).
 
 ### Alcance y preservación
 
@@ -40,3 +40,14 @@ Sin push, main ni publicación. PM decide aceptación.
 Última vuelta: 2026-10-23.
 Contexto: ~60 %.
 /compact conservar: EXCEL-2 integrada local sobre648cd2f, producto3906130, pruebas b073ba4+0666881; dos rojos corregidos, 362 focales y durable8 verdes; logs en/private/tmp; 42negativos históricos no corridos, suite/CI independientes pendientes; sin publicar, preservar límites10MiB/5000 y DOC1/pesos/Form.
+
+
+## Devolución CI y suite — 23 de octubre
+
+CI de PR5 `39943030809` dio cuatro fallos: los subítems escalares se rechazaban con el mensaje genérico de producto. La guarda temprana añadida por EXCEL-2 estaba en `main.py`, no en `controles_maria`: ahora distingue producto no-dict y subítems mal formados, conserva el mensaje específico anterior y todas las guardas numéricas. Producto **`be17e1b0c7fe5727b1119038bdf7be3e37679b69`**, tres líneas cambiadas por tres. Los tests existentes no se tocaron ni debilitaron.
+
+- Rojo reproducido: **4 failed** en `tests/test_subitems1.py -k subitems_que_no_son_una_lista`.
+- Verde tras el fix: **51 passed, 101 deselected in 3.39s** (SUBITEMS, MARIA subítems y EXCEL-2 montos/productos/cantidad).
+- Negativo en archivo temporal: restituir sólo el mensaje genérico hace fallar los cuatro tests por la causa esperada; exit1 verificado. Log `/private/tmp/cdi-subitems-be17-negative.log`.
+- La suite independiente previa sobre `0666881` terminó **5 failed, 1726 passed, 102 skipped, 2 xfailed**. Cuatro son esta regresión; el quinto es la prueba de ocho libros, que bajo cobertura dio normal400 a31.4s. Los verdes sin cobertura y las mediciones de23–25s no borran ese rojo. PM reproduce sólo el caso instrumentado para clasificarlo; no se aumentaron timeouts ni se excluyeron tests.
+- No se repitió suite completa sobre `be17e1b` ni se ejecutó otro estrés desde Dev. No declarar CI/e2e ni pieza aceptada. Siguen pendientes la decisión del quinto rojo y las puertas posteriores sobre el producto resultante.

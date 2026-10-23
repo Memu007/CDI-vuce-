@@ -8,6 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-10-23 · fix: combinadas XML y lectura normal con ocho libros grandes
 
+- Los subítems mal formados conservan su mensaje específico, sin confundirse con un producto inválido.
 - El origen combinado se conserva con comillas simples, espacios y entidades XML. Los libros que exceden con certeza el límite vigente de filas se rechazan antes de pandas, sin truncar datos ni contar filas vacías; se mantienen 10 MiB y 5000 filas.
 
 ## 2026-10-22 · fix: el límite de columnas de Excel admite variantes XML válidas
