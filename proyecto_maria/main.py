@@ -4235,11 +4235,11 @@ async def generate_maria_endpoint(
         # son una lista de subítems): 400, no 500 (revisión de EXCEL-2).
         for _n, _it in enumerate(request.items or [], start=1):
             _subs = _it.get("subitems") if isinstance(_it, dict) else None
-            if not isinstance(_it, dict) or (
-                _subs is not None and not (isinstance(_subs, list) and all(isinstance(x, dict) for x in _subs))
-            ):
+            if not isinstance(_it, dict):
                 raise HTTPException(status_code=400, detail={"errors": [
                     f"Item {_n}: no tiene la forma de un producto."]})
+            if _subs is not None and not (isinstance(_subs, list) and all(isinstance(x, dict) for x in _subs)):
+                raise HTTPException(status_code=400, detail=f"Item {_n}: los sub-ítems no tienen el formato esperado.")
         errores_1b, avisos_1b = controles_antes_de_generar(request.items, request.model_dump())
         # Un monto que no es un número (lista, entero enorme) frena acá: lo que
         # sigue hace cuentas con él y daba 500 (EXCEL-2, de paso).
