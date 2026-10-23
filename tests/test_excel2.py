@@ -721,31 +721,50 @@ def test_una_primera_hoja_de_27_mb_se_rechaza():
     assert _contar_hojas_xlsx(_libro_con(filas_primera=int(9.5 * 2**20 / 1500))) == 1
 
 
-def test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_a_una_subida_normal():
-    """El criterio de D26 con el tope nuevo: 8 libros con la primera hoja al
-    borde de los 10 MB, sin <dimension>, delante, y la subida normal da 200.
-    Con 27 MB (el tope de antes dejaba pasar hasta 30) daba 504 a los 60 s."""
+def test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_a_una_subida_normal(monkeypatch):
+    """Ocho hojas realmente bajo 10 MiB entran al validador antes de la normal."""
     import asyncio
     import httpx
+    from proyecto_maria.security import file_security
 
-    armado = _libro_con(filas_primera=int(9.8 * 2**20 / 1500))
+    filas = 6000
+    for _ in range(3):
+        armado = _libro_con(filas_primera=filas)
+        with zipfile.ZipFile(io.BytesIO(armado)) as z:
+            tamano = z.getinfo("xl/worksheets/sheet1.xml").file_size
+        if 9.5 * 2**20 < tamano < 10 * 2**20:
+            break
+        filas = int(filas * (9.8 * 2**20) / tamano)
+    assert 9.5 * 2**20 < tamano < 10 * 2**20, (filas, tamano)
     normal = _libro_normal({"Factura": FILAS})
 
     async def _todo():
+        entradas = 0
+        listas = asyncio.Event()
+        validar = file_security.validate_file_upload
+        async def observar(file, *args, **kwargs):
+            nonlocal entradas
+            if file.filename == "pesada.xlsx":
+                entradas += 1
+                if entradas == 8:
+                    listas.set()
+            return await validar(file, *args, **kwargs)
+        monkeypatch.setattr(file_security, "validate_file_upload", observar)
         transporte = httpx.ASGITransport(app=main.app)
         async with httpx.AsyncClient(transport=transporte, base_url="http://test", timeout=600) as c:
-            def subir(contenido):
-                return c.post("/upload_excel_v2/", files={"file": ("factura.xlsx", contenido)})
-            pesadas = [asyncio.create_task(subir(armado)) for _ in range(8)]
-            await asyncio.sleep(0.5)
+            def subir(contenido, nombre):
+                return c.post("/upload_excel_v2/", files={"file": (nombre, contenido)})
+            pesadas = [asyncio.create_task(subir(armado, "pesada.xlsx")) for _ in range(8)]
+            await asyncio.wait_for(listas.wait(), 10)
             t0 = time.monotonic()
-            r = await subir(normal)
+            r = await subir(normal, "normal.xlsx")
             dt = time.monotonic() - t0
             await asyncio.gather(*pesadas)
+            assert entradas == 8
             return r, dt
 
     r, dt = asyncio.run(_todo())
-    print(f"subida normal: {r.status_code} en {dt:.1f} s")
+    print(f"XML: {tamano} bytes; zip: {len(armado)} bytes; entradas: 8; normal: {r.status_code} en {dt:.1f} s")
     assert r.status_code == 200, f"la subida normal dio {r.status_code} a los {dt:.1f} s: {r.text[:200]}"
 
 
