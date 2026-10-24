@@ -58,8 +58,11 @@ def _fitz_falso():
     return types.SimpleNamespace(open=lambda **kw: _Doc(), Matrix=lambda a, b: None)
 
 
-def _leer(monkeypatch, copia, respuesta):
+def _leer(monkeypatch, copia, respuesta, *, clasificar=True):
     """Corre el lector con un Gemini falso que devuelve `respuesta`."""
+    if clasificar:
+        respuesta = dict(respuesta)
+        respuesta.setdefault("documento", {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""})
     monkeypatch.setenv("GEMINI_API_KEY", "test-key")
     monkeypatch.setenv("ENABLE_PDF_LLM_FALLBACK", "true")
     monkeypatch.setattr("time.sleep", lambda s: None)

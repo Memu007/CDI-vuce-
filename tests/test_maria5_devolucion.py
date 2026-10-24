@@ -58,7 +58,7 @@ def test_si_coinciden_no_hay_aviso(monkeypatch, copia, peso):
 
 def test_el_aviso_del_lector_llega_a_la_pantalla(auth_override, client, monkeypatch):
     import proyecto_maria.main as main
-    leido = {"operacion": {"avisos_peso": ["Peso de «X»: aviso de prueba."]},
+    leido = {"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "operacion": {"avisos_peso": ["Peso de «X»: aviso de prueba."]},
              "items": [{"descripcion": "X", "cantidad": 1, "valor_unitario": 1}]}
     monkeypatch.setattr(main, "lectura_automatica_disponible", lambda: True)
     monkeypatch.setattr(main, "process_pdf", lambda contenido: leido)
