@@ -65,6 +65,12 @@ Qué tiene que pasar:
 Están en `ROADMAP.md`, Fase 1b. ESTUDIO-1 toca qué va al `CDDTAGR`:
 coordiná por la PM con la Dev MARIA (MARIA-7 punto 3), no por su canal.
 
+## Más adelante — GUARDAR-2
+
+Ya hay un candidato aislado: `2d930c5` en la rama vieja
+`claude/dev1-tecnica` (sobre `1cdfe49`). Partí de ahí, no lo rehagas;
+faltaba lo de `CIERRE-RETOMA-2026-10-24.md` («Qué sigue», punto 2).
+
 ## Respuestas a tus D
 
 (Ninguna todavía.)

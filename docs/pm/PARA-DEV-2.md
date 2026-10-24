@@ -33,8 +33,8 @@ repositorio.** Las pruebas usan sintéticos con la misma forma.
 ## Qué pasó el 2026-10-24
 
 Emi y el despachante cargaron en el MARIA un TXT de CDI de una factura real
-(48 renglones de lonas de PVC, una sola posición SIM `3921.90.19.900Z`,
-origen China, CFR). Entró después de doce correcciones a mano. Cada una es
+(decenas de renglones de un mismo producto en varios colores y medidas,
+una sola posición SIM, origen China, CFR). Entró después de doce correcciones a mano. Cada una es
 un defecto del generador. La versión que cargó tiene esta forma (valores
 inventados acá):
 
@@ -48,7 +48,7 @@ CDDTTYPDEC=IC05
 CDDTAGR=20111111112          ← CUIT del despachante: sin esta línea, «No existe el campo CDDTAGR»
 CDDTIMPEXP=I
 ...
-MDDTFLE=7925.00              ← CDI escribió 7.93: tomó «7.925» como decimal
+MDDTFLE=3480.00              ← CDI escribió 3.48: tomó «3.480» como decimal
 ...
 [DVD]
 LDVDREFDOC=<número real de la factura>   ← CDI escribió un pedazo («E7L1-1»)
@@ -69,7 +69,7 @@ MSBTFOB=...
 QSBTUNTDCL=...
 MSBTUNITAR=...
 IEXT=1-1
-CSBTSVL=AA(MARCA)-AI(620G GREY008 150CMX50M)-   ← AI distinto por renglón; sólo letras, números y espacios
+CSBTSVL=AA(MARCA)-AI(500G AZUL001 120CMX40M)-   ← AI distinto por renglón; sólo letras, números y espacios
 QSBTUNTEST=<kilos del renglón>
 ```
 
