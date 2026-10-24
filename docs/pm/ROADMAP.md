@@ -1,133 +1,141 @@
-# Roadmap — aprobado por Emi (orden del 2026-10-07)
+# Roadmap — propuesta del 2026-10-24 (a aprobar por Emi)
 
-> Retoma del 2026-10-20: sigue vigente el orden de las cuatro fases. Las
-> semanas de abajo son la estimación histórica, no fechas de lanzamiento
-> confirmadas. Seguimos en Fase 1. Pesos MARIA-5d y bloqueo DOC-1 se están
-> verificando juntos en un candidato local; EXCEL-2 y GUARDAR-2 requieren
-> revisión separada. El cierre sigue necesitando facturas reales revisadas
-> por Emi y aceptación del TXT en el Kit del despachante. Estado y evidencia
-> exactos en `NOW.md`.
+> Reemplaza las semanas del 2026-10-07. Sale de la reunión de prueba con el
+> despachante del 2026-10-24: el TXT de una factura real entró al MARIA
+> después de corregirlo a mano doce veces. Lo que hubo que corregir es la
+> Fase 1b. Tres meses: del 26/10/2026 al 24/01/2027. Estado y evidencia en
+> `NOW.md`; los acuerdos de la reunión, en `DECISIONS.md` (2026-10-24).
 
 ## Para Emi
 
-**Primero el TXT, después el cobro, la seguridad al final.** Ningún estudio
-entra antes de terminar la seguridad. Semanas desde el 2026-10-07.
+**Primero que el TXT entre al MARIA sin tocarlo; después el cobro; la
+seguridad antes de cualquier estudio nuevo.** Dos Devs nuevas: la Dev MARIA
+(el TXT, esfuerzo alto) y la Dev técnica (lectura, clientes, cobro y
+seguridad, esfuerzo medio).
 
-| Semanas | Fase | Está lista cuando… |
-|---|---|---|
-| 1 a 3 | **1 · El TXT:** subís un PDF o un Excel, lee todo solo y sale el MARIA.TXT bien | subís 2 o 3 facturas reales y el TXT sale bien, y el despachante lo carga en su Kit sin corregirlo |
-| 4 y 5 | **2 · El cobro** con Mercado Pago | pagás con tu tarjeta y ves alta, cobro, cancelación y corte |
-| 6 y 7 | **3 · Seguridad y datos, a fondo** | una auditoría nueva y completa no encuentra nada grave, y está publicado |
-| 8 y 9 | **4 · Piloto** con 3 a 5 estudios | tres estudios presentaron un MARIA hecho con CDI |
-
-Después, de a 10 o 15 estudios por semana.
+| Semanas | Fechas | Fase | Está lista cuando… |
+|---|---|---|---|
+| 1 y 2 | 26/10 al 08/11 | **1b · El TXT entra al MARIA sin tocarlo** | la factura de lonas del 24/10, subida tal como vino, da un TXT que el MARIA carga sin errores (subítems, sufijos, unidades, flete, ajustes) |
+| 3 y 4 | 09/11 al 22/11 | **1c · Pruebas con el despachante** y sufijos automáticos | el despachante prueba 3 o 4 operaciones reales en dos sesiones (cada 15 días) y no corrige nada a mano salvo lo que decide él |
+| 5 y 6 | 23/11 al 06/12 | **2 · El cobro** con Mercado Pago | pagás con tu tarjeta y ves alta, cobro, cancelación y corte |
+| 7 a 9 | 07/12 al 27/12 | **3 · Seguridad y datos, a fondo** | una auditoría nueva y completa no encuentra nada grave, y está publicado |
+| 10 a 13 | 28/12 al 24/01 | **4 · Piloto** con 3 a 5 estudios | tres estudios presentaron un MARIA hecho con CDI |
 
 **Lo que hacés vos:**
-- **Mañana:** la revisión de Railway y el «dale» para la publicación de
-  ensayo, que cierra la fuga de hoy (lista en `NOW.md`).
-- **Esta semana:** cambiar las claves de Gemini; recordarle al despachante
-  los archivos reales.
-- **Al terminar la fase 1:** probar con 2 o 3 facturas reales.
-- **En la fase 2:** crear los planes en Mercado Pago y pagar uno chico.
-- **Antes del piloto:** textos de términos y privacidad, correo del sitio,
-  quién atiende el soporte, qué estudios entran, precio y fecha.
+- **Esta semana:** el «dale» para publicar la mejora del Excel (EXCEL-2,
+  ya aceptada); pedirle al despachante el packing list de las lonas (peso
+  neto) y la lista de las tres opciones de destino con su código en el TXT.
+- **Al terminar la Fase 1b (~08/11):** la sesión con el despachante para
+  probar; la siguiente, 15 días después.
+- **En la Fase 2:** pagar un plan chico con tu tarjeta.
+- **Antes del piloto:** textos de términos y privacidad, quién atiende el
+  soporte, qué estudios entran, precio y fecha.
+- **Pendiente de antes:** cambiar la clave de Gemini.
 
 **Riesgos:**
-- **La seguridad va al final y el sitio ya tiene facturas reales.** Por eso
-  el ensayo de mañana y la revisión de Railway no se mueven.
-- **La lectura con Gemini de verdad sólo la podés probar vos.** Desde acá se
-  prueba con uno simulado.
-- **Si el despachante tarda, se corre la prueba en su Kit,** no el resto.
+- **El MARIA sólo lo tiene el despachante.** Cada prueba depende de su
+  tiempo: por eso las sesiones quincenales quedan fijas.
+- **La lectura con IA puede inventar** (lo dijo el despachante). Todo dato
+  que la IA no encontró en la factura queda marcado para que lo complete el
+  despachante; nunca se rellena solo.
+- **VUCE puede cambiar o caerse.** Si no responde, el sistema pide los
+  sufijos a mano y lo avisa; no inventa.
+- **Fiestas de fin de año:** la Fase 3 cae en diciembre; si se corre, se
+  corre el piloto, no la seguridad.
+
+**Fuera de estos tres meses (decide Emi si entra después):** el bot de
+turnos de las terminales portuarias (es otro producto), la exportación
+completa (EC*), estudios con varias sucursales.
 
 ---
 
 ## Detalle, para la PM y las Devs
 
 **Regla del archivo** (límite que no se negocia): lo que cambia el TXT
-necesita prueba: la ley, un archivo real o la respuesta del despachante
-(`PREGUNTAS-DESPACHANTE.md`). Columna «Prueba» abajo.
+necesita prueba: la ley, un archivo real, la respuesta del despachante o la
+prueba en su MARIA. La reunión del 24/10 cuenta como prueba para lo que se
+corrigió en vivo (ver «Prueba» abajo). Los TXT corregidos de esa reunión
+tienen datos reales de un cliente: **no entran al repositorio**; las pruebas
+usan un sintético con la misma forma.
 
-### Fase 1 — El TXT
+### Fase 1b — El TXT entra al MARIA sin tocarlo (semanas 1 y 2)
 
-**Dev 2:**
+**Dev MARIA (Dev 2, esfuerzo alto):**
 
-| Orden | Pieza | Qué arregla | Prueba para el TXT |
+| Orden | Pieza | Qué arregla | Prueba |
 |---|---|---|---|
-| ✅ | MARIA-2 | Sin clave de Gemini no se inventan productos (M4) | no cambia el TXT |
-| ✅ | MARIA-1a | País de origen bien leído (China salía Suiza), cantidades y precios con coma, nada inventado si falta un dato (M5) | tabla oficial de países (VUCE) e ISO 3166-1 |
-| ✅ | MARIA-2b | Con Gemini caído o la clave inválida, el mismo error claro y la carga manual | no cambia el TXT |
-| ✅ | MARIA-1c | Lo que el lector encontró pero no pudo leer (flete, seguro) se avisa en vez de salir 0; la pantalla vieja no repone cantidad 1 ni origen China (D5 de la Dev 2). Se publica junto con MARIA-1a | no cambia el TXT de una factura bien leída |
-| ✅ | MARIA-4 | Lo que decide el despachante: estado de la mercadería (seis, por producto), IVA adicional (completo en reventa; si hay reducción o exclusión, aviso de que se elige en «Ventajas» del Kit, no va en el TXT), banco y empresa de digitalización (las dos por operación; Modoc = `PSAD06`, Lakaut = `PSAD01`) (M2, M3) | respuestas 1, 2, 4 y 5, las dos cortas y el archivo real de 2026 |
-| ✅ | MARIA-3 | Avisos antes de generar (y sin avisos de más: «N/A», «FREE», «included» no son ilegibles); la fecha de emisión sale de la factura, no de hoy (D15 de la Dev 1); gastos anteriores al FOB en EXW, FCA y FAS; procedencia en pantalla (M6, M8) | respuesta 6, Código Aduanero art. 15, nota del SIM, archivo real de 2025 |
-| ✅ | MARIA-1d | Un campo vacío no llega al TXT como «None» o «NON» (D12 de la Dev 2) | no cambia el TXT de una factura bien leída |
-| ✅ | MARIA-5 | Peso total por producto; cuentas exactas al centavo (M1, M9); «None» escrito en la carátula cuenta como vacío (revisión de MARIA-1d) | peso: respuesta 3 y archivo real de 2026; cuentas: la prueba en el Kit |
-| ✅ | CATALOGO-NCM-1 | El catálogo NCM vigente (el de hoy es de 2018: le faltan 8517.13.00, 8524, 8549); una NCM dada de baja se avisa como tal (D21 de la Dev 1; archivo de Emi del 2026-10-07) | el nomenclador de ARCA del 07/10/2026 |
-| ✅ | SUBITEMS-1 | La pantalla v2 deja cargar, editar y ver los subítems de cada producto, con el formato que ya recibe `/generate_maria` (D24 de la Dev 1; Emi: sus facturas traen subítems, 2026-10-07) | `maria_golden_subitems_anon.TXT`: la prueba de punta a punta deja de agregarlos a mano |
-| 1 | MARIA-5d | «Peso bruto unitario» es bruto de una unidad: no se divide (revisión de la reentrega de MARIA-5). Antes de publicar | los archivos reales, idénticos |
-| 2 | DOC-1 | Bloquear documentos no admitidos/ambiguos y EC* en la ruta de importación; una subida nueva fallida no revive datos del documento anterior. Autorizada por Emi el 2026-10-19 | no cambia el TXT de una importación válida; casos sintéticos factura/despacho/ambigüedad y A→B |
-| 3 | MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11); el número de operación y la referencia de la factura que hoy arma la pantalla (D23 y D25 de la Dev 1) | sus archivos reales |
+| 1 | MARIA-7 | Lo que el MARIA rechazó el 24/10: todas las líneas con CRLF; identificador de la operación corto (`IDSO`, `IDDT`, `IARTESPAPU`; con 19 caracteres el MARIA lo rechaza, con 8 lo acepta); `CDDTAGR` (CUIT del despachante) obligatorio: sin él no se genera; la referencia de la factura (`LDVDREFDOC`) es el número real de la factura; unidad declarada la de la factura (m² = `03`, no `07` unidad); con unidad estadística en kilos, la cantidad estadística es igual al kilo neto, al centésimo; en sufijos y textos libres sólo letras, números y espacios (lo demás, espacio); el número de cuenta del banco nunca va como identificación del proveedor | los errores del MARIA del 24/10 (capturas de Emi) y el TXT que finalmente cargó |
+| 2 | MARIA-8 | Subítems por posición: cada renglón de la factura es un subítem con sus sufijos propios; los renglones con la misma posición SIM, origen, procedencia y estado van en un solo ítem; las sumas del ítem cierran exactas | el TXT de 1 ítem con 48 subítems que cargó el 24/10 |
+| 3 | VALOR-1 | Ajustes a incluir, ajustes a deducir y FOB casillero: campos que carga el usuario (el sistema no decide qué se descuenta) y cuentas a la vista; botón «calcular seguro» (1 % de FOB + flete) cuando la factura no lo trae; el reparto ítem por ítem queda para PRORRATEO-1 | reunión del 24/10 (FOB 40.952,08, ajuste 1.095, FOB casillero 39.857,08, seguro 488,77) |
+| 4 | SEPARADORES-1 | Montos con punto o coma: «7.925» y «7.925,00» son siete mil novecientos veinticinco, «7,93» es siete con noventa y tres; si es ambiguo, se pregunta | el flete del 24/10 salió 7,93 en vez de 7.925 |
 
-MARIA-4, MARIA-3 y MARIA-5 tocan el mismo generador: van en ese orden.
-MARIA-6 arranca cuando lleguen sus archivos reales.
+**Dev técnica (Dev 1, esfuerzo medio):**
 
-**Dev 1:**
+| Orden | Pieza | Qué arregla | Prueba |
+|---|---|---|---|
+| 0 | EXCEL-2 | Ya aceptada: integrar y publicar con el «dale» de Emi | — |
+| 1 | EXCEL-3 | La proforma china del 24/10 se lee tal como viene: encabezado en la fila 11, descripción que vale para los renglones de abajo, columnas `Specification`, `QTY (Rolls)`, `SM.TOTAL (sqm)`, `Unit price (USD/sqm)`, `Gross Weight(kgs)`; la cantidad es la unidad del precio (m²); descuento, flete y totales no son productos y el descuento se ofrece como ajuste | un sintético con la misma forma (la proforma real no entra al repo) |
+| 2 | CLIENTE-1 | Alta de cliente con lo que pide el MARIA: CUIT, razón social, domicilio y fecha de inicio de actividades; email y teléfono dejan de ser obligatorios | reunión del 24/10 |
+| 3 | ESTUDIO-1 | El CUIT del despachante se carga por estudio (puede haber varios) y se elige en la operación; va solo al `CDDTAGR` | reunión del 24/10 |
+| 4 | PA-1 | En pantallas, «NCM» pasa a «Posición arancelaria (PA SIM)» donde se habla de la posición de 11 dígitos con su letra | reunión del 24/10 |
+
+**Cierre de la Fase 1b:** publicar con el «dale»; la factura de lonas,
+subida tal como vino, da un TXT que el MARIA carga sin errores.
+
+### Fase 1c — Pruebas con el despachante y sufijos automáticos (semanas 3 y 4)
+
+**Dev MARIA:**
+
+| Orden | Pieza | Qué arregla | Prueba |
+|---|---|---|---|
+| 1 | SUFIJOS-1 | Con la posición SIM, el sistema trae de VUCE (consulta pública `/cice/sufijos/<posición>`) qué sufijos pide y la unidad estadística; los completa con lo que la IA encuentra en la factura (marca, modelo, código, medidas, color); el código de artículo (`AI`) es distinto en cada renglón; lo que falta queda marcado para el despachante; sin VUCE, se piden a mano con aviso | la consulta a VUCE del 24/10 (3921.90.19.900Z: AA marca, AI código; unidad kilogramo `01`) |
+| 2 | DESTINO-1 | Tres destinos por operación: comercialización en el mercado interno, bien de uso de la empresa, bien de uso particular, con su código en el TXT | la lista con códigos que pase el despachante |
+| 3 | PESO-NETO-1 | El peso neto sale del packing list cuando la factura sólo trae bruto; si no hay packing list, el aviso de hoy | el packing list de las lonas |
+| 4 | MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11) | sus archivos reales |
+
+**Dev técnica:**
 
 | Orden | Pieza | Qué arregla |
 |---|---|---|
-| ✅ | ADMIN-1 | Lo de administración, sólo para el admin (S2) |
-| ✅ | ADMIN-2 | Lo que encontró en ADMIN-1 (activar una suscripción sin pagar, configuración del sistema a la vista, dos puntos ciegos de la prueba) |
-| ✅ | RENDIMIENTO-1 | Leer un PDF no frena el sitio y tiene un tiempo máximo; el lector de PDF viejo, que se cuelga con un PDF armado, se cambia por su sucesor (D3, X3) |
-| ✅ | RENDIMIENTO-1b | Un PDF armado no deja a nadie sin lectura: la adivinanza del vendedor usa sólo `pypdf`; tiempos en 0 o negativos caen al valor por defecto (D10 b de la Dev 1). Se publica junto con RENDIMIENTO-1 |
-| ✅ | EXCEL-1 | Revisar la carga por Excel de punta a punta (nunca se auditó) y arreglar lo que falle; leer un Excel tampoco frena el sitio (D12 de la Dev 1) |
-| ✅ | MARIA-1b | Controles antes de generar: NCM del catálogo, moneda, incoterm, CUIT, montos; ningún texto mete líneas en el TXT; las filas de total o de flete no pasan como productos; al guardar la operación no se inventan cantidad 1 ni peso 0,5 (M10, D6 de la Dev 2) |
-| ✅ | PUNTA-A-PUNTA-1 | Prueba automática: sube un PDF y un Excel (Gemini simulado) y compara el TXT con los archivos reales |
-| ⏳ | EXCEL-2 | Abrir un libro armado no traba la lectura (D26 de la Dev 1); lo que el Excel todavía no lee: encabezado fuera de la fila 1, sin columna de origen, celdas combinadas (D18 de la Dev 1); CSV con `;`, latin-1 o BOM en el historial de NCM; el aviso de mapeo nombra la columna que se usó |
-| ✅ | GUARDAR-1 | Guardar una operación con la posición SIM completa (`84714900100D`) da 500 en producción y no guarda nada: la operación se guarda siempre, y el historial de NCM también (Emi dijo que sí, 2026-10-07). Va antes que COBRO-MP-1 |
-| 1 | GUARDAR-2 | La sugerencia de NCM: si el historial del cliente tiene 8 dígitos y el proveedor la SIM completa que empieza con esos 8, gana la del proveedor (D32 b de la Dev 1; sin migración) |
+| 1 | GUARDAR-2 | La sugerencia de posición: si el historial del cliente tiene 8 dígitos y el proveedor la SIM completa que empieza con esos 8, gana la del proveedor (D32 b; sin migración; Postgres descartable) |
+| 2 | ORDEN-1 | Reordenar los productos arrastrando, en la pantalla de revisión |
+| 3 | COBRO-MP-1 | Primera pieza de la Fase 2 (ver abajo) |
 
-**Cierre:** publicar con el «dale»; Emi prueba con facturas reales; el
-despachante carga un archivo en su Kit (cierra G4).
+**Cierre de la Fase 1c (cierra G4):** dos sesiones con el despachante, 3 o
+4 operaciones reales cargadas en el MARIA sin corregir el TXT a mano.
 
-### Fase 2 — Cobro
+### Fase 2 — Cobro (semanas 5 y 6)
 
 | Pieza | Quién | Qué arregla |
 |---|---|---|
-| COBRO-MP-1 | Dev 1 | Aviso de pago verificado, aplicado una vez aunque se reenvíe, con el monto controlado (C3, D8 de la Dev 1). Va primero: es el único camino que hoy activa sin pagar. Además, que las renovaciones de la suscripción extiendan el período (hoy sólo se procesa `type=payment`; leído en el ataque al ensayo, sin verificar). La suscripción está configurada en Railway (Emi, 2026-10-07): las renovaciones corren en producción |
-| COBRO-CORTE-1 | Dev 1 | Quien no paga no genera valor ni gasta Gemini; se cuenta una vez por operación; sin pasarse del tope; el aviso del corte dice la razón real (hoy una cuenta que fue activa recibe «prueba vencida») (C1, C5, C6). Con guardados a la vez, hoy el contador cuenta de menos y se pasa del tope (revisión de GUARDAR-1). Ya decidido: D4 (b, N = 10), D5 (a), D6 (a) de la Dev 1 (`PARA-DEV.md`) |
-| COBRO-MP-2 | Dev 1 | Cancelar también en Mercado Pago, sin perder días pagados, una sola suscripción, reactivar pagando (una prueba gratuita no pasa a activa); sin token de Mercado Pago, no decir «activada» (C2, C4, C8, D9 de la Dev 1) |
-| ORG-1 | Dev 2 (después de MARIA-5d y DOC-1; MARIA-6 espera los archivos) | Invitaciones que funcionan, tope de usuarios del plan, atadas al email (C7) |
-| LEGAL-1 | Dev 2 | Términos y privacidad con el texto de Emi, y cómo pedir el borrado de datos (X5) |
+| COBRO-MP-1 | Dev técnica | Aviso de pago verificado, aplicado una vez, con el monto controlado; las renovaciones extienden el período (C3, D8) |
+| COBRO-CORTE-1 | Dev técnica | Quien no paga no genera ni gasta Gemini; contar una vez por operación sin pasarse del tope (también con guardados a la vez); el aviso dice la razón real (C1, C5, C6; D4 b N = 10, D5 a, D6 a) |
+| COBRO-MP-2 | Dev técnica | Cancelar también en Mercado Pago sin perder días pagados, una sola suscripción, reactivar pagando (C2, C4, C8, D9) |
+| PRORRATEO-1 | Dev MARIA | El reparto ítem por ítem de ajustes, seguro y flete hasta el FOB casillero, con las sumas exactas al centavo (segunda etapa acordada el 24/10) |
+| ORG-1 | Dev MARIA | Invitaciones que funcionan, tope de usuarios del plan, atadas al email (C7) |
+| LEGAL-1 | Dev MARIA | Términos y privacidad con el texto de Emi; aviso de que CDI es un asistente y el despachante revisa; cómo pedir el borrado de datos (X5) |
 
 **Cierre:** publicar; el pago chico de Emi recorre todo el ciclo (cierra G7).
 
-### Fase 3 — Seguridad y datos, a fondo
+### Fase 3 — Seguridad y datos, a fondo (semanas 7 a 9)
 
-| Pieza | Quién | Qué arregla |
-|---|---|---|
-| SESION-1 | Dev 1 | Cambiar o resetear la contraseña y cerrar sesión revocan de verdad; cambiar el email pide la contraseña (S3) |
-| ABUSO-1 | Dev 1 | Una subida chica no espera detrás de las pesadas (validación de Excel); leer un PDF en un proceso aparte, con tiempo y memoria máximos, que se pueda matar (D10 a de la Dev 1); límite de intentos con la IP real; topes en registro, recuperar usuario, telemetría y sugerencias de NCM; no revelar qué emails existen (S4, S5, S6, C9, X1) |
-| AISLAMIENTO-2 | Dev 1 | La prueba de aislamiento ataca todas las funciones con datos de un estudio; la de admin también ve WebSockets y las rutas `/api/admin` y `/dev` exactas, y `roles` siempre es lista (revisión de ADMIN-2) |
-| LIMPIEZA-1 | Dev 1 | Las 10 pruebas excluidas vuelven a la CI; se borra el camino viejo a Google Cloud; fuera las cadenas que pueden tener contraseñas (X2, X4) |
-| DATOS-1 | Dev 2 | Borrar un cliente siempre funciona; la salud dice la verdad; los errores no muestran detalles internos (D2, D5, D6) |
-| BACKUP-1 | Dev 2 | Copia de la base fuera de Railway, con una restauración probada (D1) |
-| DISCO-1 | Dev 2 | El historial de NCM y los TXT pasan a la base (hoy se borran al publicar; si el servicio tuviera un volumen, los TXT viejos quedan donde `/download` ya no los busca) (D4) |
-| AUDITORIA-FINAL | PM | Auditoría completa nueva (Opus alto y Sonnet alto) y una vuelta de arreglos |
+Sin cambios respecto del 2026-10-07: SESION-1, ABUSO-1, AISLAMIENTO-2 y
+LIMPIEZA-1 (Dev técnica); DATOS-1, BACKUP-1 y DISCO-1 (Dev MARIA);
+AUDITORIA-FINAL (PM). Más una pieza nueva: OBSERVABILIDAD-1 (Dev técnica),
+la columna `api_logs.owner_username` que falta en producción, con migración
+probada en Postgres descartable.
 
-**Cierre:** publicar y probar volver atrás (cierra G3 y G6). Recién ahí entra
-el primer estudio.
+**Cierre:** publicar y probar volver atrás (cierra G3 y G6). Recién ahí
+entra el primer estudio nuevo.
 
-### Fase 4 — Piloto y oleadas
+### Fase 4 — Piloto (semanas 10 a 13)
 
-Con el kit `wave1_*`. Los estudios más tolerantes, no los más grandes. Cierra
-G8.
+Con el kit `wave1_*`. Los estudios más tolerantes, no los más grandes; el
+despachante de la prueba, primero. Cierra G8.
 
 ### Referencias
 
-- Hallazgos (C, S, M, D, X): `AUDITORIA-2026-10-06.md`. Todos tienen pieza
-  arriba, salvo: S1 (ya arreglada; llega con el ensayo), C10 (Emi mira las
-  cuentas antes de cada publicación), X6 (correo, Emi en Railway) y la clave
-  de Gemini (Emi la rota; sigue en la historia de Git, que no se reescribe).
-- Se miró y está bien: orígenes permitidos, cookies y CSRF, cabeceras de
-  seguridad, topes de subida de archivos.
-- Fuera del plan: ordenar `HANDOFF.md`, partir `main.py`, VUCE-4, AFIP y VUCE
-  reales (simulados por decisión).
+- Hallazgos (C, S, M, D, X): `AUDITORIA-2026-10-06.md`.
+- Acuerdos de la reunión del 2026-10-24: `DECISIONS.md`.
+- Fuera del plan: ordenar `HANDOFF.md`, partir `main.py`, VUCE-4, AFIP
+  real, el bot de turnos, la exportación completa.

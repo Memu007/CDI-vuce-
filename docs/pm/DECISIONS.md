@@ -118,3 +118,36 @@ las 23:55 UTC y el «Contexto: ~X %». Timbres por `send_message`, no por
 `fire_trigger`. No se aplican, por decisiones anteriores de Emi: el consejero
 para las Devs, Fable como subagente y el «muy alto» para las Devs.
 
+
+## 2026-10-24 — Reunión de prueba con el despachante (Emi)
+
+El TXT de una factura real entró al MARIA después de doce correcciones a
+mano (detalle en `PARA-DEV-2.md`). Acuerdos de la reunión (notas de la
+reunión, sin datos del cliente):
+
+- Ajustes a incluir, ajustes a deducir y FOB casillero: campos que carga el
+  usuario; el sistema hace las cuentas, no decide qué se descuenta (Emi). El
+  reparto detallado ítem por ítem va en una segunda etapa (PRORRATEO-1).
+- Botón para calcular el seguro (1 % de FOB + flete) cuando la factura no lo
+  trae.
+- Montos con punto o con coma.
+- Cliente: sólo lo que pide el MARIA (CUIT, razón social, domicilio, fecha
+  de inicio de actividades).
+- CUIT del despachante por estudio, cargado una vez y elegido en la
+  operación.
+- «NCM» pasa a «Posición arancelaria (PA SIM)» en pantallas.
+- Sufijos y unidad estadística desde VUCE según la posición SIM; lo que la
+  IA encuentra en la factura (marca, modelo, código, medidas, color) los
+  completa; lo que falta queda marcado para el despachante. Cada renglón
+  de la factura es un subítem con su código de artículo propio. En el TXT,
+  sólo letras, números y espacios dentro de los sufijos.
+- Tres destinos: comercialización en el mercado interno, bien de uso de la
+  empresa, bien de uso particular.
+- Reordenar los productos arrastrando.
+- Peso neto desde el packing list (lo manda el despachante).
+- Dos semanas de desarrollo y pruebas con el despachante cada 15 días.
+- Fuera de CDI por ahora: el bot de turnos portuarios.
+
+Emi (2026-10-24): Codex deja de trabajar en CDI; la PM principal arma dos
+Devs nuevas en Claude: Dev MARIA en esfuerzo alto y Dev técnica en medio.
+Roadmap nuevo a tres meses en `ROADMAP.md`, **propuesto, a aprobar por Emi**.
