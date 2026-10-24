@@ -98,6 +98,14 @@ falla: 4»):
   y decí por qué; si es `test_excel2.py` entero por vez, corré sólo la
   prueba que cada sabotaje nombra.
 
+- **`maria1b.sh`, lo mismo** (sobre `8b45207`, «sabotajes con falla: 2»):
+  EXCEL-2 (`7e9c4e0`) movió el código. «NaN e inf vuelven a pasar en la
+  cantidad» busca `if _fuera_de_rango(cantidad):` y ahora es
+  `cantidad_mala = _fuera_de_rango(cantidad)` (`core/controles_maria.py:115`);
+  «una hoja de gráfico vuelve a contar como hoja» busca la línea de
+  `chartsheet` en `main.py` y ahora está en `security/file_security.py:162`.
+  Sólo el script: no toques `controles_maria.py`.
+
 **a), validado por la PM:** con `page.waitForFunction(() =>
 document.activeElement && document.activeElement.id === 'cfNombre')` después
 de cada una de las cinco esperas de `#cfNombre` en `pantalla_cliente1.js`,
