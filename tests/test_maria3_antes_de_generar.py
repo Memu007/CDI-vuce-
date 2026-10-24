@@ -36,6 +36,7 @@ def _cuerpo(**kw):
         incoterm="EXW", flete=365.0, seguro=75.47, fecha_emision="22/06/2026",
         aduana_codigo="073", sbt_sufijo_valor=SUF_A,
         banco_bcra="191", empresa_digitalizacion="PSAD01", iva_adicional="NO_VALIDA",
+        cuit_agr="20111111112",  # sin CUIT del despachante no se genera (MARIA-7)
     )
     base.update(kw)
     return base
