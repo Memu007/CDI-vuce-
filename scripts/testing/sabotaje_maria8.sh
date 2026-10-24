@@ -137,11 +137,13 @@ reemplazar $F '                unitario = (float(renglon["valor_unitario"]) if' 
 caso "unitario_promedio" "FAILED $T::test_cada_subitem_lleva_lo_de_su_renglon"
 
 # 18. el renglón pierde su sufijo y lleva el de la operación
-reemplazar $F '                sufijo = limpiar_sufijo(str(renglon.get("sufijo") or "").strip())[0] or sufijo_sbt' '                sufijo = sufijo_sbt'
+reemplazar $F '                sufijo = limpiar_sufijo(str(renglon.get("sufijo") or "").strip(),
+                                        f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0] or sufijo_sbt' '                sufijo = sufijo_sbt'
 caso "sufijo_de_la_operacion" "FAILED $T::test_cada_subitem_lleva_lo_de_su_renglon"
 
 # 19. el sufijo del renglón sale sin limpiar
-reemplazar $F '                sufijo = limpiar_sufijo(str(renglon.get("sufijo") or "").strip())[0] or sufijo_sbt' '                sufijo = str(renglon.get("sufijo") or "").strip() or sufijo_sbt'
+reemplazar $F '                sufijo = limpiar_sufijo(str(renglon.get("sufijo") or "").strip(),
+                                        f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0] or sufijo_sbt' '                sufijo = str(renglon.get("sufijo") or "").strip() or sufijo_sbt'
 caso "sufijo_sucio" "FAILED $T::test_el_sufijo_del_renglon_se_limpia"
 
 # 20. vuelve a pedir el sufijo de la operación aunque cada renglón tenga el suyo
