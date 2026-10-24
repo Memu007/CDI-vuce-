@@ -131,6 +131,19 @@ def test_un_subtotal_sin_rotulo_ni_medidas_no_es_un_producto():
     assert data["filas_descartadas_numeros"] == [4], data
 
 
+def test_un_renglon_con_precio_y_sin_medidas_no_hereda():
+    """Con su precio pero sin medidas propias tampoco hereda: sólo un renglón
+    con su largo es del grupo (EXCEL-3b separa esto del precio)."""
+    data = _leer([
+        E,
+        ["DT-1", "LONA DEMO", 2, 10, 1, 20, 1.5, 30],
+        [None, None, 2, 15, 1, 30, 1.5, 45],
+        [None, None, None, None, 2, 50, 1.5, 75],
+    ])
+    assert [i["cantidad"] for i in data["items"]] == [20, 30], data["items"]
+    assert data["filas_descartadas_numeros"] == [4], data
+
+
 def test_un_flete_sin_monto_no_hereda_la_descripcion_del_grupo():
     """«Freight cost» en la columna Item, con cantidad y sin monto: no es un
     renglón del grupo de arriba ni un flete; queda como fila sin leer."""
@@ -286,10 +299,13 @@ def test_una_medida_larga_no_sale_en_notacion_cientifica():
     assert data["items"][0]["descripcion"] == "LONA DEMO, ancho 2,123456 m x largo 1234567 m", data["items"]
 
 
-def test_una_nota_de_flete_en_otra_columna_de_un_renglon_no_lo_saca():
+@pytest.mark.parametrize("nota", ["Remarks", "Item"])
+def test_una_nota_de_flete_en_otra_columna_de_un_renglon_no_lo_saca(nota):
+    """En «Item» la nota sí cuenta como rótulo (ahí vienen Freight y Discount
+    de la proforma), pero un renglón con sus medidas sigue siendo mercadería."""
     data = _leer([
         ["Part No.", "Specification", "Width(m)", "Length (m)", "SM.TOTAL (sqm)", "Unit price (USD/sqm)",
-         "Total Amount(USD)", "Remarks"],
+         "Total Amount(USD)", nota],
         ["D1", "LONA DEMO", 2, 10, 20, 1.5, 30, None],
         [None, None, 2, 15, 30, 1.5, 45, "Freight included"],
         [None, None, 2, 20, 40, 1.5, 60, "Discount 5% applied"],
@@ -318,11 +334,135 @@ def test_un_flete_negativo_no_se_suma_como_flete():
     assert data["filas_descartadas_numeros"] == [3], data
 
 
-def test_con_el_codigo_en_cada_renglon_la_descripcion_igual_se_hereda():
+def test_con_un_codigo_distinto_en_cada_renglon_la_descripcion_no_se_hereda():
+    """Cambia a propósito en EXCEL-3b (#3): un código nuevo sin especificación
+    es otro producto; no toma la del de arriba y queda sin leer, avisado."""
     data = _leer([
         ["Part No.", "Specification", "Width(m)", "Length (m)", "SM.TOTAL (sqm)", "Unit price (USD/sqm)"],
         ["D1-10", "LONA DEMO", 2, 10, 20, 1.5],
         ["D1-15", None, 2, 15, 30, 1.5],
     ])
-    assert [(i["codigo_parte"], i["descripcion"]) for i in data["items"]] == [
-        ("D1-10", "LONA DEMO, ancho 2 m x largo 10 m"), ("D1-15", "LONA DEMO, ancho 2 m x largo 15 m")], data
+    assert [i["codigo_parte"] for i in data["items"]] == ["D1-10"], data
+    assert data["filas_descartadas_numeros"] == [3], data
+
+
+# ------------------------------------------- EXCEL-3b (lo que dejó el adversario)
+
+@pytest.mark.parametrize("subtotal", [
+    [None, None, None, 25, 2, 50, None, 75],
+    [None, None, 2, 25, 2, 50, None, 75],
+], ids=["con_largo", "con_ancho_y_largo"])
+def test_un_subtotal_sin_rotulo_ni_precio_con_medidas_no_es_un_producto(subtotal):
+    """#2: sin precio propio un renglón no hereda el grupo aunque traiga un
+    largo: queda sin leer, como en la base, y no suma cantidad."""
+    data = _leer([
+        E,
+        ["DT-1", "LONA DEMO", 2, 10, 1, 20, 1.5, 30],
+        [None, None, 2, 15, 1, 30, 1.5, 45],
+        subtotal,
+    ])
+    assert [i["cantidad"] for i in data["items"]] == [20, 30], data["items"]
+    assert data["filas_descartadas_numeros"] == [4], data
+
+
+@pytest.mark.parametrize("monto, nota, campo", [
+    (100, "Freight included", "flete"),
+    (-50, "Discount", "descuento"),
+], ids=["flete", "descuento"])
+def test_un_texto_en_otra_columna_no_vuelve_flete_o_descuento_a_un_renglon(monto, nota, campo):
+    """#5: «Freight included» o «Discount» en Remarks de un renglón sin
+    descripción no es un flete ni un descuento: queda sin leer."""
+    data = _leer([
+        ["NCM", "Descripcion", "Cantidad", "Precio Unitario", "Importe", "Remarks"],
+        ["84713000", "Laptop", 10, 350, 3500, None],
+        [None, None, None, None, monto, nota],
+    ])
+    assert campo not in data["operacion"], data["operacion"]
+    assert data["filas_descartadas_numeros"] == [3], data
+
+
+def test_la_unidad_que_sale_del_encabezado_del_precio_se_avisa():
+    """#7: «Qty (M)» y «USD/M»: la unidad viaja (en lonas «M» es metro) y se
+    avisa cuál se tomó y de dónde."""
+    data = _leer([
+        ["NCM", "Description", "Origin", "Qty (M)", "Unit price (USD/M)"],
+        ["39269090", "CINTA DEMO", "CN", 100, 0.5],
+    ])
+    assert data["items"][0]["unidad"] == "m", data["items"]
+    assert any("«Unit price (USD/M)»" in a and "metros" in a for a in data["avisos_mapeo"]), data["avisos_mapeo"]
+
+
+def test_una_unidad_que_sale_solo_de_la_cantidad_no_avisa_del_precio():
+    data = _leer([
+        ["NCM", "Description", "Origin", "Qty (pcs)", "Unit price"],
+        ["84137000", "BOMBA DEMO", "CN", 5, 100],
+    ])
+    assert not any("encabezado del precio" in a for a in data["avisos_mapeo"]), data["avisos_mapeo"]
+
+
+def test_un_flete_sin_monto_corta_el_grupo():
+    """#4: «Freight cost» en la especificación, sin monto: el renglón de abajo
+    no hereda «Freight cost» ni el grupo de antes del flete."""
+    data = _leer([
+        E,
+        ["DT-1", "LONA DEMO", 2, 10, 1, 20, 1.5, 30],
+        [None, "Freight cost", None, None, 1, None, None, None],
+        [None, None, 2, 15, 1, 30, 1.5, 45],
+    ])
+    # Sin renglones agrupados la descripción va sin medidas (EXCEL-3).
+    assert [i["descripcion"] for i in data["items"]] == ["LONA DEMO"], data["items"]
+    assert data["filas_descartadas_numeros"] == [3, 4], data
+    assert not any("tomaron la del renglón de arriba" in a for a in data["avisos_mapeo"]), data["avisos_mapeo"]
+
+
+def test_un_descuento_leido_corta_el_grupo():
+    """#4: después de un descuento leído, un renglón sin descripción no es
+    del grupo de arriba."""
+    data = _leer([
+        E,
+        ["DT-1", "LONA DEMO", 2, 10, 1, 20, 1.5, 30],
+        [None, "Discount", None, None, None, None, None, -50],
+        [None, None, 2, 15, 1, 30, 1.5, 45],
+    ])
+    assert [i["cantidad"] for i in data["items"]] == [20], data["items"]
+    assert data["operacion"]["descuento"] == 50, data["operacion"]
+    assert data["filas_descartadas_numeros"] == [4], data
+
+
+def test_un_codigo_nuevo_sin_especificacion_no_hereda_la_del_grupo_anterior():
+    """#3: «DT-2» sin especificación es otro producto: no toma «LONA DEMO»
+    (ni él ni los renglones de su grupo); quedan sin leer, avisados."""
+    data = _leer([
+        E,
+        ["DT-1", "LONA DEMO", 2, 10, 1, 20, 1.5, 30],
+        ["DT-2", None, 2, 15, 1, 30, 1.5, 45],
+        [None, None, 2, 20, 1, 40, 1.5, 60],
+    ])
+    assert [i["codigo_parte"] for i in data["items"]] == ["DT-1"], data["items"]
+    assert data["filas_descartadas_numeros"] == [3, 4], data
+
+
+@pytest.mark.parametrize("fila", [
+    [None, "Descuento comercial", None, None, -500],
+    [None, "Discount for early payment", 1, -500, None],
+], ids=["importe", "precio"])
+def test_un_descuento_con_texto_y_monto_negativo_se_avisa_y_no_es_producto(fila):
+    """#1: no entra como producto de valor 0 (ni negativo): queda sin leer."""
+    data = _leer([
+        ["NCM", "Descripcion", "Cantidad", "Precio Unitario", "Importe"],
+        ["84713000", "Laptop", 10, 350, 3500],
+        fila,
+    ])
+    assert [i["descripcion"] for i in data["items"]] == ["Laptop"], data["items"]
+    assert "descuento" not in data["operacion"], data["operacion"]
+    assert data["filas_descartadas_numeros"] == [3], data
+
+
+def test_un_largo_escrito_con_su_unidad_no_la_repite():
+    """#9: «1,5m» en la columna «Length (m)» sale «largo 1,5m», no «1,5m m»."""
+    data = _leer([
+        E,
+        ["DT-1", "LONA DEMO", 2, "1,5m", 1, 3, 1.5, 4.5],
+        [None, None, 2, 10, 1, 20, 1.5, 30],
+    ])
+    assert data["items"][0]["descripcion"] == "LONA DEMO, ancho 2 m x largo 1,5m", data["items"]

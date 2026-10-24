@@ -92,10 +92,11 @@ sabotaje $M "los renglones del grupo vuelven a quedar sin descripción" \
   '                descripcion, parte = grupo[0], parte or grupo[1]' '                pass' "$XLS"
 sabotaje $M "hereda aunque el renglón no tenga medidas" \
   'if (not pieza and grupo and con_medidas and' 'if (not pieza and grupo and' \
-  "FAILED $T::test_un_subtotal_sin_rotulo_ni_medidas_no_es_un_producto"
-sabotaje $M "con el código en cada renglón no hereda la descripción" \
-  'if (not pieza and grupo and con_medidas and' 'if (not pieza and not parte and grupo and con_medidas and' \
-  "FAILED $T::test_con_el_codigo_en_cada_renglon_la_descripcion_igual_se_hereda"
+  "FAILED $T::test_un_renglon_con_precio_y_sin_medidas_no_hereda"
+sabotaje $M "un código distinto en cada renglón vuelve a heredar la descripción" \
+  '            if grupo and parte and parte != grupo[1] and not descripcion:' \
+  '            if False:' \
+  "FAILED $T::test_con_un_codigo_distinto_en_cada_renglon_la_descripcion_no_se_hereda"
 sabotaje $M "con la combinada se pierde el código de parte" \
   'descripcion in ("", grupo[0])' 'descripcion == ""' \
   "FAILED $T::test_con_la_especificacion_combinada_hacia_abajo_cada_renglon_conserva_su_codigo"
@@ -108,16 +109,16 @@ sabotaje $M "el rótulo de otra columna no se mira" \
 sabotaje $M "una nota de flete en otra columna saca el renglón" \
   '            if sin_ncm_ni_origen and (descripcion or not con_medidas):' \
   '            if sin_ncm_ni_origen:' \
-  "FAILED $T::test_una_nota_de_flete_en_otra_columna_de_un_renglon_no_lo_saca"
+  "FAILED $T::test_una_nota_de_flete_en_otra_columna_de_un_renglon_no_lo_saca[Item]"
 sabotaje $M "un producto «Discount …» vuelve a ser descuento" \
-  ' and not _DESCUENTO_SOLO_RE.match(rotulo):' ' and False:' \
+  ' and not _DESCUENTO_SOLO_RE.match(cargo):' ' and False:' \
   "FAILED $T::test_un_producto_que_empieza_con_discount_sigue_siendo_producto"
 sabotaje $M "un descuento en porcentaje vuelve a entrar" \
-  '                    if "%" in rotulo:' '                    if False:' \
+  '                    if "%" in cargo or _monto_de_la_linea() < 0:' '                    if False:' \
   "FAILED $T::test_un_descuento_en_porcentaje_no_se_lee_como_monto_ni_como_producto"
 sabotaje $M "el descuento negativo en el precio vuelve a ser un producto" \
-  '                        precio = _monto_de_fila(row[valor_col], decimal) or 0.0' \
-  '                        precio = valor_unitario' \
+  '                    precio = _monto_de_fila(row[valor_col], decimal) or 0.0' \
+  '                    precio = valor_unitario' \
   "FAILED $T::test_un_descuento_negativo_en_el_precio_sin_importe_tambien_se_lee"
 sabotaje $M "«USD -850» vuelve a no leerse" \
   '    m = re.fullmatch(r"(\D*?)\s*[-−]\s*(\d.*)", t)' '    m = None' \
@@ -138,6 +139,42 @@ sabotaje $M "una medida larga sale en notación científica" \
   "FAILED $T::test_una_medida_larga_no_sale_en_notacion_cientifica"
 sabotaje $M "la unidad no viaja con el producto" \
   '**({"unidad": unidad} if unidad else {}),' '' "$XLS"
+
+# EXCEL-3b: lo que dejó el adversario, uno por punto.
+B="FAILED $T::test_"
+sabotaje $M "3b#2 un subtotal con largo y sin precio vuelve a ser producto" \
+  '                    and valor_unitario):' '                    and (cantidad or valor_unitario)):' \
+  "${B}un_subtotal_sin_rotulo_ni_precio_con_medidas_no_es_un_producto[con_largo]"
+sabotaje $M "3b#5 una nota en Remarks vuelve a ser flete o descuento" \
+  '            cargo = descripcion or (_texto_de_celda(row[item_col]) if item_col else "")' \
+  '            cargo = rotulo' \
+  "${B}un_texto_en_otra_columna_no_vuelve_flete_o_descuento_a_un_renglon[flete]"
+sabotaje $M "3b#5 el flete en la columna Item deja de leerse" \
+  '            cargo = descripcion or (_texto_de_celda(row[item_col]) if item_col else "")' \
+  '            cargo = descripcion' "$XLS"
+sabotaje $M "3b#4 un flete sin monto vuelve a abrir un grupo" \
+  '            elif descripcion and not es_cargo:' '            elif descripcion:' \
+  "${B}un_flete_sin_monto_corta_el_grupo"
+sabotaje $M "3b#4 un descuento leído no corta el grupo" \
+  '                    grupo = None  # el flete o el descuento cierran el grupo de arriba' \
+  '                    pass' \
+  "${B}un_descuento_leido_corta_el_grupo"
+sabotaje $M "3b#3 un código nuevo sin especificación vuelve a heredar" \
+  '            if grupo and parte and parte != grupo[1] and not descripcion:' \
+  '            if False:' \
+  "${B}un_codigo_nuevo_sin_especificacion_no_hereda_la_del_grupo_anterior"
+sabotaje $M "3b#1 un descuento con texto y monto negativo vuelve a ser producto" \
+  '                    if "%" in cargo or _monto_de_la_linea() < 0:' '                    if "%" in cargo:' \
+  "${B}un_descuento_con_texto_y_monto_negativo_se_avisa_y_no_es_producto[importe]"
+sabotaje $M "3b#9 un largo con su unidad la repite" \
+  '(f" {unidad}" if unidad and numero is not None else "")' '(f" {unidad}" if unidad else "")' \
+  "${B}un_largo_escrito_con_su_unidad_no_la_repite"
+sabotaje $M "3b#7 la unidad del precio no se avisa" \
+  '        if unidad and not avisos_de_lo_usado and precio_col' '        if False and precio_col' \
+  "${B}la_unidad_que_sale_del_encabezado_del_precio_se_avisa"
+sabotaje $M "3b#7 se avisa del precio una unidad que no salió de él" \
+  ' and _unidad_de_columna(precio_col, True) == unidad:' ':' \
+  "${B}una_unidad_que_sale_solo_de_la_cantidad_no_avisa_del_precio"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
