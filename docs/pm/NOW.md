@@ -283,25 +283,14 @@ Archivos abiertos por Dev:
 
 ## Publicado
 
-- `a771693` (2026-07-18), anterior a este método. Cada publicación nueva: una
-  línea con fecha, SHA y qué verificó Emi.
-- `5cb03ab` (2026-10-07 12:53 UTC), publicación de ensayo: el producto atacado
-  en `REPRODUCCION-ENSAYO-2026-10-07.md` (ADMIN-1, ADMIN-2, MARIA-2 y los 25
-  commits de `e8344d0`). Suite sobre el mismo producto (`1ad3226`):
-  `716 passed, 102 skipped`. Avance directo de `a771693`, sin merge. Emi:
-  hizo la lista de Railway antes del «dale»; después verificó «Billing cron» con 0
-  y guardó una operación (2026-10-07, ~10:20 ARG). CI de GitHub en verde.
-- `6ea8ca9` (2026-10-07 19:58 UTC), segunda publicación: MARIA-1a, 2b, 1c, 4,
-  3 y 1d, RENDIMIENTO-1 y 1b, EXCEL-1 y MARIA-1b, atacado en
-  `REPRODUCCION-PUBLICACION-2-2026-10-07.md`. Suite sobre el mismo SHA:
-  `1224 passed, 102 skipped, 1 xfailed`. Avance directo de `5cb03ab`, sin
-  merge. «dale 6ea8ca9» de Emi a las ~16:58 ARG (antes, «dale a todo», que el
-  sistema de permisos no tomó). CI: pruebas en verde y `e2e-maria` en rojo. La e2e no completa la fecha de emisión que pide MARIA-3; la PM lo reprodujo y, con esa línea, pasa entero («E2E MARIA OK»). El producto está bien, la prueba quedó vieja; la arregla la Dev 1 con GUARDAR-1. Emi generó un TXT con una factura real y «se ve bien» (19:59 UTC, un minuto después del push: falta confirmar que ya corría la versión nueva; con ella el TXT dice `IVAADICIONAL1=NO_VALIDA` y `CARTUSO=2`).
-- `a9b03cf` (2026-10-07 21:35 UTC), tercera publicación: GUARDAR-1, aislada
-  con `cherry-pick` (`REPRODUCCION-GUARDAR-1-2026-10-07.md`), y la línea de la
-  e2e de la CI. Suite sobre el mismo producto (`2621c3b`): `1247 passed, 102
-  skipped, 3 xfailed`; e2e «E2E MARIA OK»; Postgres 16 `fallas: 0`. Avance
-  directo de `6ea8ca9`, sin merge. CI: en curso. Falta lo que verifica Emi.
+Una línea por publicación: fecha, SHA y qué verificó Emi. Las anteriores al
+2026-10-24 (`a771693`, `5cb03ab`, `6ea8ca9`, `a9b03cf`) están en la historia
+de Git de este archivo y en sus `REPRODUCCION-*`.
+
+- `dddcf6d` (2026-10-24 18:40 UTC): EXCEL-2, «dale dddcf6d». CI verde. Emi
+  probó el Excel en el sitio y anda.
+- `8b45207` (2026-10-24 20:33 UTC): EXCEL-3 + CLIENTE-1, «dale 8b45207».
+  Avance directo de `dddcf6d`. Falta lo que verifica Emi.
 
 ## Reglas
 
