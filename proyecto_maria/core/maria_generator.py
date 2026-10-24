@@ -277,6 +277,27 @@ FALTA_CUIT_DEL_DESPACHANTE = (
 LARGO_REF_FACTURA = 28
 
 
+def fecha_inicio_actividad(guardada) -> str:
+    """La fecha de inicio de actividad del cliente en DD/MM/AAAA, como en los
+    golden. El alta y la revisión la guardan AAAA-MM-DD (campo de fecha del
+    navegador); si ya viene DD/MM/AAAA sale igual. Lo que no es una fecha no
+    se adivina: no se genera y se dice dónde corregirla (MARIA-7)."""
+    texto = str(guardada or "").strip()
+    if not texto:
+        return ""
+    for patron, formato in ((r"\d{4}-\d{2}-\d{2}", "%Y-%m-%d"), (r"\d{2}/\d{2}/\d{4}", "%d/%m/%Y")):
+        if re.fullmatch(patron, texto):
+            try:
+                return datetime.strptime(texto, formato).strftime("%d/%m/%Y")
+            except ValueError:
+                break  # «2015-02-30»: tiene la forma pero no es una fecha
+    raise ValueError(
+        f"La fecha de inicio de actividad del cliente «{texto[:30]}» no es una fecha "
+        "(DD/MM/AAAA): corregila en «Clientes», campo «Inicio de actividad», o en la "
+        "revisión. Así no se genera el TXT."
+    )
+
+
 def id_corto_maria(operation_id: str) -> str:
     """Los últimos 8 letras o números del identificador de la operación (lo
     que distingue una factura de otra; el principio suele repetirse)."""
@@ -961,7 +982,7 @@ def generate_maria_txt(operation_id: str, items: list,
     # Antes caia el default "13/07/2016" (dato de OTRO cliente del sample) en
     # CUALQUIER declaracion. Mejor omitir y que el despachante lo complete a mano
     # que meter datos falsos de otra empresa en la declaracion aduanera.
-    fecha_ini_act = str(comprador_fecha_inic_activ or "").strip()
+    fecha_ini_act = fecha_inicio_actividad(comprador_fecha_inic_activ)
     if fecha_ini_act:
         lines.append("[CPL]")
         lines.append("NART=0000")
