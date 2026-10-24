@@ -14,6 +14,7 @@ HTML = "templates/dashboard_v2.html"
 NCM_JS = "static/v2/screens/ncm.js"
 CLIENTES_JS = "static/v2/screens/clientes.js"
 CATALOGO_JS = "static/v2/screens/catalogo.js"
+LANDING = "templates/landing.html"
 
 
 def _leer(rel):
@@ -31,6 +32,8 @@ CAMBIAN = [
     (NCM_JS, "scheduleUndoClear('PA SIM ' + result.ncm", "scheduleUndoClear('NCM ' + result.ncm"),
     (NCM_JS, 'title="Refrescar desde el asistente de posición arancelaria"',
      'title="Refrescar desde el asistente NCM"'),
+    # PA-1b: el paso 3 de la demo de la landing, como el progreso de la aplicación.
+    (LANDING, '<span class="num">3</span> PA SIM</div>', '<span class="num">3</span> NCM</div>'),
 ]
 
 # Hablan de los 8 dígitos: quedan con «NCM». (archivo, texto, cuántas veces):
@@ -62,7 +65,7 @@ QUEDAN = [
 ]
 
 
-@pytest.mark.parametrize("archivo,nuevo,viejo", CAMBIAN, ids=[c[1][:50] for c in CAMBIAN])
+@pytest.mark.parametrize("archivo,nuevo,viejo", CAMBIAN, ids=[f"{Path(c[0]).name}: {c[1][:50]}" for c in CAMBIAN])
 def test_la_posicion_completa_se_llama_pa_sim(archivo, nuevo, viejo):
     texto = _leer(archivo)
     assert viejo not in texto, f"{archivo} sigue diciendo {viejo!r}"
