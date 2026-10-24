@@ -106,6 +106,8 @@ def test_el_mapeo_guardado_con_la_cantidad_en_rollos_no_gana():
     r = _subir_xls(cliente_id=cid)
     assert r.status_code == 200, r.text[:300]
     _como_se_lee(r.json())
+    # Sin el aviso viejo que decía que se usó la de rollos.
+    assert not any("se usó la columna «QTY (Rolls)»" in a for a in r.json()["avisos_mapeo"]), r.json()["avisos_mapeo"]
 
 
 # ------------------------------------------------- lo que no se hereda
@@ -130,17 +132,18 @@ def test_un_subtotal_sin_rotulo_ni_medidas_no_es_un_producto():
 
 
 def test_un_flete_sin_monto_no_hereda_la_descripcion_del_grupo():
-    """«Freight cost» en la columna Item, con medidas y sin monto: no es un
-    renglón del grupo de arriba."""
+    """«Freight cost» en la columna Item, con cantidad y sin monto: no es un
+    renglón del grupo de arriba ni un flete; queda como fila sin leer."""
     r = _subir(_libro([
         ["Item"] + E,
         [1, "DT-1", "LONA DEMO", 2, 10, 1, 20, 1.5, 30],
-        ["Freight cost", None, None, 2, 10, 1, 1, None, None],
+        ["Freight cost", None, None, None, None, 1, 1, None, None],
     ]), "p.xlsx")
     assert r.status_code == 200, r.text[:300]
     data = r.json()
-    assert [i["descripcion"] for i in data["items"]] == ["LONA DEMO, ancho 2 m x largo 10 m"], data["items"]
+    assert [i["descripcion"] for i in data["items"]] == ["LONA DEMO"], data["items"]
     assert "flete" not in data["operacion"], data["operacion"]
+    assert data["filas_descartadas_numeros"] == [3], data
 
 
 def test_un_precio_por_unidad_sin_otra_columna_no_cambia_la_cantidad():
@@ -180,3 +183,146 @@ def test_un_descuento_negativo_en_el_precio_sin_importe_tambien_se_lee():
     data = r.json()
     assert [i["descripcion"] for i in data["items"]] == ["LAPTOP DEMO"], data["items"]
     assert data["operacion"]["descuento"] == 120.5, data["operacion"]
+
+
+# ------------------------------------------- autorrevisión (subagente y /code-review)
+
+def _leer(filas):
+    r = _subir(_libro(filas), "p.xlsx")
+    assert r.status_code == 200, r.text[:300]
+    return r.json()
+
+
+def test_una_columna_cantidad_con_mayuscula_no_tapa_la_de_m2():
+    """«Cantidad» y el precio por m²: antes quedaba la de rollos con un aviso
+    que decía lo contrario (FOB de 6,75 en vez de 216)."""
+    data = _leer([
+        ["Part No.", "Specification", "Width(m)", "Length (m)", "Cantidad", "SM.TOTAL (sqm)",
+         "Unit price (USD/sqm)", "Total Amount(USD)"],
+        ["A1", "LONA", 3.2, 10, 5, 160, 1.35, 216],
+    ])
+    assert data["items"][0]["cantidad"] == 160 and data["items"][0]["unidad"] == "m2", data["items"]
+
+
+def test_un_producto_que_empieza_con_discount_sigue_siendo_producto():
+    data = _leer([
+        ["Descripcion", "Cantidad", "Precio Unitario"],
+        ["Laptop", 10, 350],
+        ["Discount tag labels", 100, 2.5],
+        ["Rebate pad", 10, 35],
+    ])
+    assert [i["descripcion"] for i in data["items"]] == ["Laptop", "Discount tag labels", "Rebate pad"], data
+    assert "descuento" not in data["operacion"], data["operacion"]
+
+
+def test_un_descuento_en_porcentaje_no_se_lee_como_monto_ni_como_producto():
+    data = _leer([
+        ["NCM", "Descripcion", "Cantidad", "Precio Unitario"],
+        ["84713000", "Laptop", 10, 350],
+        [None, "Discount 5%", None, 5],
+    ])
+    assert [i["descripcion"] for i in data["items"]] == ["Laptop"], data["items"]
+    assert "descuento" not in data["operacion"], data["operacion"]
+    assert data["filas_descartadas_numeros"] == [3], data
+
+
+def test_mt_no_se_declara_como_metros():
+    """«MT» en comercio exterior es tonelada métrica: no se adivina."""
+    data = _leer([
+        ["NCM", "Description", "Origin", "Quantity (MT)", "Unit price (USD/MT)"],
+        ["39021000", "PP RESIN DEMO", "CN", 25, 1200],
+    ])
+    assert data["items"][0]["cantidad"] == 25 and "unidad" not in data["items"][0], data["items"]
+
+
+@pytest.mark.parametrize("encabezado, fila, cantidad", [
+    (["Description", "Width(m)", "Length (m)", "Area per roll (sqm)", "QTY (Rolls)", "Unit price (USD/sqm)"],
+     ["LONA DEMO", 3.2, 10, 32, 5, 1.35], 5),
+    (["Description", "Length (m)", "QTY (Rolls)", "Unit price (USD/m)"], ["CABLE DEMO", 100, 5, 2.0], 5),
+    (["Description", "Qty (cartons)", "Unit price (USD/pc)", "Pcs per carton (pcs)"], ["VASO DEMO", 10, 0.5, 100], 10),
+], ids=["area_de_un_rollo", "largo_de_un_rollo", "piezas_por_caja"])
+def test_la_medida_de_un_rollo_o_una_caja_no_es_la_cantidad(encabezado, fila, cantidad):
+    """Sólo una columna de la línea («total») reemplaza la cantidad: con la de
+    un rollo el FOB quedaba dividido por los rollos. Se avisa."""
+    data = _leer([encabezado, fila])
+    assert data["items"][0]["cantidad"] == cantidad and "unidad" not in data["items"][0], data["items"]
+    assert any("revisá la cantidad" in a for a in data["avisos_mapeo"]), data["avisos_mapeo"]
+
+
+def test_el_peso_bruto_abreviado_no_es_la_cantidad():
+    data = _leer([
+        ["Description", "Qty (bags)", "Unit price (USD/kg)", "Total G.W. (kgs)"],
+        ["HARINA DEMO", 40, 0.5, 1010],
+    ])
+    assert data["items"][0]["cantidad"] == 40, data["items"]
+
+
+def test_item_con_el_nombre_del_producto_sigue_siendo_la_descripcion():
+    """«Item» con el nombre y «Specification» con el detalle técnico: el
+    nombre no se pierde (en la proforma «Item» es «1st container» o un número)."""
+    data = _leer([
+        ["NCM", "Item", "Specification", "Origin", "Qty", "Price"],
+        ["84137000", "Bomba centrifuga", "220V 1HP", "CN", 5, 100],
+        ["84137000", "Bomba sumergible", "220V 2HP", "CN", 2, 150],
+    ])
+    assert [i["descripcion"] for i in data["items"]] == ["Bomba centrifuga", "Bomba sumergible"], data["items"]
+
+
+def test_las_medidas_no_se_pegan_a_una_factura_comun():
+    data = _leer([
+        ["NCM", "Descripcion", "Origen", "Cantidad", "Precio", "Largo (mm)", "Ancho (mm)"],
+        ["73064000", "Tubo acero", "CN", 10, 5, 6000, 100],
+        ["73064000", "Tubo acero liviano", "CN", 10, 4, 6000, 80],
+    ])
+    assert [i["descripcion"] for i in data["items"]] == ["Tubo acero", "Tubo acero liviano"], data["items"]
+
+
+def test_una_medida_larga_no_sale_en_notacion_cientifica():
+    data = _leer([
+        ["Part No.", "Specification", "Width(m)", "Length (m)", "SM.TOTAL (sqm)", "Unit price (USD/sqm)"],
+        ["D1", "LONA DEMO", 2.123456, 1234567, 10, 1.5],
+        [None, None, 2.123456, 15, 30, 1.5],
+    ])
+    assert data["items"][0]["descripcion"] == "LONA DEMO, ancho 2,123456 m x largo 1234567 m", data["items"]
+
+
+def test_una_nota_de_flete_en_otra_columna_de_un_renglon_no_lo_saca():
+    data = _leer([
+        ["Part No.", "Specification", "Width(m)", "Length (m)", "SM.TOTAL (sqm)", "Unit price (USD/sqm)",
+         "Total Amount(USD)", "Remarks"],
+        ["D1", "LONA DEMO", 2, 10, 20, 1.5, 30, None],
+        [None, None, 2, 15, 30, 1.5, 45, "Freight included"],
+        [None, None, 2, 20, 40, 1.5, 60, "Discount 5% applied"],
+    ])
+    assert [i["cantidad"] for i in data["items"]] == [20, 30, 40], data["items"]
+    assert "flete" not in data["operacion"] and "descuento" not in data["operacion"], data["operacion"]
+
+
+def test_un_descuento_con_moneda_adelante_se_lee():
+    data = _leer([
+        ["NCM", "Descripcion", "Cantidad", "Precio Unitario", "Importe"],
+        ["84713000", "Laptop", 10, 350, 3500],
+        [None, "Discount", None, None, "USD -850"],
+    ])
+    assert [i["descripcion"] for i in data["items"]] == ["Laptop"], data["items"]
+    assert data["operacion"]["descuento"] == 850, data["operacion"]
+
+
+def test_un_flete_negativo_no_se_suma_como_flete():
+    data = _leer([
+        ["NCM", "Descripcion", "Cantidad", "Precio Unitario", "Importe"],
+        ["84713000", "Laptop", 10, 350, 3500],
+        [None, "Freight refund", None, None, -100],
+    ])
+    assert "flete" not in data["operacion"], data["operacion"]
+    assert data["filas_descartadas_numeros"] == [3], data
+
+
+def test_con_el_codigo_en_cada_renglon_la_descripcion_igual_se_hereda():
+    data = _leer([
+        ["Part No.", "Specification", "Width(m)", "Length (m)", "SM.TOTAL (sqm)", "Unit price (USD/sqm)"],
+        ["D1-10", "LONA DEMO", 2, 10, 20, 1.5],
+        ["D1-15", None, 2, 15, 30, 1.5],
+    ])
+    assert [(i["codigo_parte"], i["descripcion"]) for i in data["items"]] == [
+        ("D1-10", "LONA DEMO, ancho 2 m x largo 10 m"), ("D1-15", "LONA DEMO, ancho 2 m x largo 15 m")], data
