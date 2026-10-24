@@ -3580,6 +3580,24 @@ def _con_encabezado(df, conocidas=()):
     return df
 
 
+def _combinadas_del_xls(ruta) -> list:
+    """Las celdas combinadas de la primera hoja de un .xls, como las de
+    _xlsx_solo_primera_hoja: [(fila1, col1, fila2, col2)], desde 1. Sin
+    ellas una especificación combinada hacia abajo sólo está en su primer
+    renglón (EXCEL-3b). Si xlrd no puede leerlas, el .xls se lee sin
+    rellenar, como antes."""
+    try:
+        import xlrd
+        libro = xlrd.open_workbook(ruta, formatting_info=True, on_demand=True)
+        try:
+            hoja = libro.sheet_by_index(0)
+            return [(f1 + 1, c1 + 1, f2, c2) for f1, f2, c1, c2 in hoja.merged_cells[:10_000]]
+        finally:
+            libro.release_resources()
+    except Exception:
+        return []
+
+
 def _leer_excel_ruta(ruta: str, engine: str, conocidas=()):
     # conocidas: el mapeo guardado del cliente, como pares (columna, campo) o
     # sólo los nombres de las columnas.
@@ -3592,6 +3610,8 @@ def _leer_excel_ruta(ruta: str, engine: str, conocidas=()):
         import io as _io
         contenido, combinadas = _xlsx_solo_primera_hoja(ruta, max_filas=_MAX_FILAS_EXCEL)
         origen = _io.BytesIO(contenido)
+    elif engine == "xlrd":
+        combinadas = _combinadas_del_xls(ruta)
     mapeo = dict(c for c in conocidas if isinstance(c, tuple) and len(c) == 2)
     nombres = set(mapeo) or {c for c in conocidas if isinstance(c, str)}
     df = _con_encabezado(pd.read_excel(origen, engine=engine, dtype=object), nombres)
@@ -4717,9 +4737,12 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
     libres = [c for c in df.columns if c not in usadas]
     importe_col = _columna_con_nombre(libres, _NOMBRES_DE_IMPORTE)
     parte_col = _columna_con_nombre(libres, _NOMBRES_DE_CODIGO_DE_PARTE)
-    # «Freight» o «Discount» pueden venir en la columna Item de la proforma;
-    # en otra («Remarks») son una nota del renglón (EXCEL-3b).
+    # «Freight» o «Discount» pueden venir en la columna Item de la proforma o
+    # en una a la izquierda de la descripción («No.», «S/N»); a la derecha
+    # («Remarks») son una nota del renglón (EXCEL-3b).
     item_col = _columna_con_nombre(libres, {"item"})
+    columnas_del_rotulo = ([item_col] if item_col else []) + [
+        c for c in list(df.columns)[:list(df.columns).index(desc_col)] if c != item_col]
     medidas = [(c, _NOMBRES_DE_MEDIDA[_nombre_sin_unidad(c)],
                 (re.search(r"\(\s*([^()]*?)\s*\)", str(c)) or [None, ""])[1])
                for c in libres if _nombre_sin_unidad(c) in _NOMBRES_DE_MEDIDA]
@@ -4776,20 +4799,24 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             # Un renglón con sus propias medidas es mercadería: una nota
             # («Freight included») en otra columna no lo saca.
             con_medidas = any(_texto_de_celda(row[c]) for c, _n, _u in medidas)
-            cargo = descripcion or (_texto_de_celda(row[item_col]) if item_col else "")
+            cargo = descripcion or next(
+                (t for t in (_texto_de_celda(row[c]) for c in columnas_del_rotulo)
+                 if t and _numero_factura(t, decimal) is None), "")
             es_cargo = False  # flete o descuento: no abre grupo
             if sin_ncm_ni_origen and (descripcion or not con_medidas):
                 es_flete = bool(_FILA_DE_FLETE_RE.match(cargo))
-                if es_flete or _FILA_DE_DESCUENTO_RE.match(cargo):
-                    grupo = None  # el flete o el descuento cierran el grupo de arriba
-                    es_cargo = True
-                if not es_flete and _FILA_DE_DESCUENTO_RE.match(cargo) and not _DESCUENTO_SOLO_RE.match(cargo):
+                es_descuento = not es_flete and bool(_FILA_DE_DESCUENTO_RE.match(cargo))
+                if es_descuento and not _DESCUENTO_SOLO_RE.match(cargo):
                     # «Descuento comercial -500» no es un producto de valor 0;
-                    # «Discount tag labels» con su precio, sí es un producto.
+                    # «Discount tag labels» con su precio, sí es un producto,
+                    # y abre su grupo.
                     if "%" in cargo or _monto_de_la_linea() < 0:
+                        grupo = None
                         descartes.append(_ + 2)  # un porcentaje no es un monto
                         continue
-                elif es_flete or _FILA_DE_DESCUENTO_RE.match(cargo):
+                elif es_flete or es_descuento:
+                    grupo = None  # el flete o el descuento cierran el grupo de arriba
+                    es_cargo = True
                     monto = _monto_de_la_linea()
                     # El descuento resta (su signo da igual); un flete negativo
                     # (un reintegro) no se suma como flete: se avisa.
@@ -4806,15 +4833,16 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             # medidas (cada renglón es un largo). Sin medidas no se hereda
             # nada: una fila así se avisa como sin leer (EXCEL-1), y un
             # subtotal sin rótulo no pasa a ser un producto.
-            # Con la descripción combinada hacia abajo (.xlsx) el renglón ya la
-            # trae, y hereda sólo el código. Sin precio propio es un subtotal
-            # con largo, no un renglón; un código nuevo sin especificación es
-            # otro producto: no hereda, y él y su grupo quedan sin leer
-            # (EXCEL-3b).
+            # Con la descripción combinada hacia abajo el renglón ya la trae, y
+            # hereda sólo el código; si el precio también viene combinado,
+            # alcanza con su cantidad. Sin descripción ni precio propio es un
+            # subtotal con largo, no un renglón; un código nuevo sin
+            # especificación es otro producto: no hereda, y él y su grupo
+            # quedan sin leer (EXCEL-3b).
             if grupo and parte and parte != grupo[1] and not descripcion:
                 grupo = None
             if (not pieza and grupo and con_medidas and descripcion in ("", grupo[0])
-                    and valor_unitario):
+                    and (valor_unitario or (descripcion and cantidad))):
                 if not descripcion:
                     heredadas.append(_ + 2)
                 descripcion, parte = grupo[0], parte or grupo[1]
@@ -4842,8 +4870,9 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
                 numero = _numero_factura(row[col], decimal)
                 if numero is not None:
                     texto = _medida(numero)
-                # «1,5m» ya trae su unidad: no sale «1,5m m».
-                tamaño.append(f"{nombre} {texto}" + (f" {unidad}" if unidad and numero is not None else ""))
+                # «1,5m» ya trae su unidad: no sale «1,5m m»; «48-50» no.
+                trae_unidad = numero is None and re.search(r"[^\W\d_]\s*$", texto)
+                tamaño.append(f"{nombre} {texto}" + (f" {unidad}" if unidad and not trae_unidad else ""))
 
             # Lo que falta o no se puede leer queda vacío (0 o ""), nunca
             # inventado; el semáforo de la revisión lo marca (MARIA-1a, EXCEL-1).
@@ -7586,13 +7615,16 @@ async def upload_excel_v2(
                 == [s for s, c in detected_mapping.items() if c == "cantidad"]):
             avisos_de_lo_usado = avisos_unidad
         avisos_mapeo.extend(avisos_de_lo_usado)
-        # La unidad que dice sólo el precio («USD/M») se avisa: es la que va al
-        # TXT (EXCEL-3b). Si se cambió la cantidad, el aviso de arriba ya la dice.
+        # La unidad que sale del encabezado del precio («USD/M», con «Qty (M)»)
+        # se avisa: es la que va al TXT (EXCEL-3b). Si se cambió la cantidad,
+        # el aviso de arriba ya la dice.
         precio_col = next((s for s, c in effective_mapping.items() if c == "valor_unitario"), None)
+        cant_col = next((s for s, c in effective_mapping.items() if c == "cantidad"), None)
         if unidad and not avisos_de_lo_usado and precio_col and _unidad_de_columna(precio_col, True) == unidad:
             avisos_mapeo.append(
-                f"La unidad de la cantidad se tomó del encabezado del precio («{precio_col}»): "
-                f"{_NOMBRE_DE_UNIDAD.get(unidad, unidad)}. Revisala en la revisión.")
+                f"La unidad que va al TXT se leyó de los encabezados de la cantidad («{cant_col}») "
+                f"y del precio («{precio_col}»): {_NOMBRE_DE_UNIDAD.get(unidad, unidad)}. "
+                "Revisala en la revisión.")
 
         avisos: list[str] = []
         rename = {src: canon for src, canon in effective_mapping.items() if canon in _CANON_COLUMNS}
