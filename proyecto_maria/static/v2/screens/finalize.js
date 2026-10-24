@@ -334,16 +334,18 @@
         }
         // El botón, cuando no hay seguro o cuando el que hay lo puso él.
         const calculado = ok && op.seguro_calculado;
+        // Sobre qué FOB va el 1 % lo dice el servidor (D12b).
+        const base = (ok && valor.base_seguro) || 'FOB';
         const mostrar = ok && (!(valor.seguro > 0) || calculado) && valor.seguro !== valor.seguro_sugerido;
         if (boton) {
             boton.hidden = !mostrar;
             boton.textContent = (calculado ? 'Recalcular seguro' : 'Calcular seguro') +
-                ' (1 % de FOB casillero + flete): ' + (ok ? importeEscrito(valor.seguro_sugerido) : '');
+                ' (1 % de ' + base + ' + flete): ' + (ok ? importeEscrito(valor.seguro_sugerido) : '');
         }
         if (nota) {
             nota.textContent = !ok ? '' :
                 (calculado && valor.seguro !== valor.seguro_sugerido) ? 'El seguro se calculó con otros importes.' :
-                calculado ? 'Seguro calculado: 1 % de (FOB casillero + flete).' :
+                calculado ? 'Seguro calculado: 1 % de (' + base + ' + flete).' :
                 valor.seguro > 0 ? 'La operación ya trae seguro.' : '';
         }
     }

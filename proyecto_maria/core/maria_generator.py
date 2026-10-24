@@ -830,6 +830,10 @@ def fob_total_del_txt(items: list, grupos: list | None = None) -> Decimal:
 
 
 TASA_SEGURO_SUGERIDO = Decimal("0.01")
+# Sobre qué FOB va el 1 % no está decidido (D12b de VALOR-1: lo contesta el
+# despachante). Para cambiarlo alcanza con esta línea: "fob_factura".
+BASE_SEGURO_SUGERIDO = "fob_casillero"
+NOMBRE_DEL_FOB = {"fob_casillero": "FOB casillero", "fob_factura": "FOB de la factura"}
 
 
 def importe_escrito(valor) -> str:
@@ -842,8 +846,8 @@ def cuentas_del_valor(items: list, flete=0, seguro=0, ajustes_incluir=None, ajus
 
     FOB casillero = FOB de la factura (el MDDTFOB del TXT) + ajustes a incluir
     − ajustes a deducir. Los ajustes los carga la persona: el sistema no
-    decide qué se descuenta. El seguro sugerido es el 1 % de (FOB casillero +
-    flete), al centavo. Nada de esto cambia el TXT (D12 de VALOR-1). Un
+    decide qué se descuenta. El seguro sugerido es el 1 % de (el FOB de
+    BASE_SEGURO_SUGERIDO + flete), al centavo. Nada de esto cambia el TXT (D12 de VALOR-1). Un
     importe inválido o un FOB casillero negativo es un ValueError."""
     fob_factura = fob_total_del_txt(items)
     incluir = centavos(importe_valido(ajustes_incluir, "Ajustes a incluir") or 0)
@@ -856,6 +860,7 @@ def cuentas_del_valor(items: list, flete=0, seguro=0, ajustes_incluir=None, ajus
             f"Los ajustes a deducir ({importe_escrito(deducir)}) superan el FOB de la "
             f"factura más los ajustes a incluir ({importe_escrito(fob_factura + incluir)})."
         )
+    fob_base = {"fob_casillero": fob_casillero, "fob_factura": fob_factura}[BASE_SEGURO_SUGERIDO]
     return {
         "fob_factura": float(fob_factura),
         "ajustes_incluir": float(incluir),
@@ -863,7 +868,8 @@ def cuentas_del_valor(items: list, flete=0, seguro=0, ajustes_incluir=None, ajus
         "fob_casillero": float(fob_casillero),
         "flete": float(flete_c),
         "seguro": float(seguro_c),
-        "seguro_sugerido": float(centavos(TASA_SEGURO_SUGERIDO * (fob_casillero + flete_c))),
+        "seguro_sugerido": float(centavos(TASA_SEGURO_SUGERIDO * (fob_base + flete_c))),
+        "base_seguro": NOMBRE_DEL_FOB[BASE_SEGURO_SUGERIDO],
     }
 
 

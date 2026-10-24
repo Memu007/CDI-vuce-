@@ -4238,9 +4238,9 @@ def _cuentas_del_valor(request: MariaRequest, items: list) -> tuple[dict, list]:
         return valor, []
     moneda = (str(request.moneda or "").strip().upper() + " ") if str(request.moneda or "").strip() else ""
     return valor, [
-        f"El TXT lleva el FOB de la factura ({moneda}{importe_escrito(valor['fob_factura'])}); "
+        f"El TXT todavía lleva el FOB de la factura ({moneda}{importe_escrito(valor['fob_factura'])}); "
         f"el FOB casillero con los ajustes ({moneda}{importe_escrito(valor['fob_casillero'])}) "
-        f"lo cargás vos en el MARIA."
+        f"va al TXT en una próxima versión."
     ]
 
 
