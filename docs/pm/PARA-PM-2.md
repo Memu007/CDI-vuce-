@@ -1,184 +1,252 @@
-# Candidato local Fase 1 — informes preservados
-
-Integración sin cambios nuevos de producto. Informes de las dos entregas, con sus límites originales:
-
 # Dev → PM
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## DOC-1 — implementación entregada a revisión PM (2026-10-20)
+## MARIA-7 — entregada a revisión (2026-10-24)
 
-Backend, subida y protección de deshacer NCM implementados y probados.
-**El bloqueante `lastSnapshot` quedó corregido**: cada borrador de deshacer
-pertenece a su estado de operación y no puede reemplazar otra operación.
-Sin bloqueante conocido de implementación; la aceptación independiente,
-integración y publicación siguen en manos de PM/Emi.
+**Resultado:** los 9 puntos están hechos, con su rojo antes. La suite completa da
+`1882 passed, 102 skipped, 2 xfailed`, sin rojos.
+La e2e de la CI, la pantalla y el smoke dan verde sobre `f0b73f7`. Los 25
+sabotajes dan rojo por la razón esperada. Las D1 a D8 de abajo son para vos,
+o para preguntarle al despachante. Ninguna frena la entrega.
 
 | Pieza | SHA |
 |---|---|
-| Base PM autorizada | `1469102` |
-| Producto: lector, guardas y estado de subida | `b5b6dec` |
-| Casos y actualización de mocks válidos | `917594e` |
-| Negativos DOC-1 aislados | `674379d` |
-| Caso de rechazo levantado en worker | `378288e` |
-| Adaptación de dos negativos MARIA-2b al retorno clasificado | `10bbe35` |
-| Informe provisional previo | `e148343` |
-| Protección de deshacer NCM (origen revisado `565b6aa`) | `c2d41b4` |
-| Casos NCM undo (origen revisado `e45e80e`) | `637758c` |
-| Registro del cambio de NCM en changelog | `380bb95` |
+| Base (tu rama al asignar) | `3dbfb4e` |
+| Producto: lo que el MARIA rechazó el 24/10 (puntos 1 a 7) | `67d5688` |
+| Casos del 24/10 y pruebas viejas con el CUIT del despachante | `39eef6c` |
+| Producto: la tabla del despachante se desplaza en el teléfono | `c03bb1d` |
+| Producto: punto 8, la fecha de la factura en su orden | `e3c68dc` |
+| Casos de fechas, pantalla y sabotajes | `525c91b`, `7248141` |
+| Producto: lo que encontró la autorrevisión | `449b157` |
+| Casos de la autorrevisión, pantalla y sabotajes | `f08613f` |
+| Merge de tu rama (`3fd8826`: EXCEL-3 y CLIENTE-1) | `3938330` |
+| Producto: punto 9, fecha de inicio de actividad | `11d4ac1`, `e4e0336` |
+| Casos y sabotajes del punto 9 | `35ba42d`, `f0b73f7` |
+| **SHA probado** | **`f0b73f7`** |
 
-Rama local `codex/doc1-block-invalid-pdf`, clon `/private/tmp/cdi-doc1-dev`.
-No push, merge a main ni publicación. Después de `378288e` sólo cambiaron scripts/documentación y la protección JS
-de NCM. `git diff 378288e..380bb95 -- "*.py"` no muestra diferencias. Por eso
-no se repitió la suite Python completa; sí los 38 focales y los 15 escenarios JS
-sobre la integración final.
+## Decisiones
 
-## Alcance real
+**D1. El largo y la unicidad de IDSO, IDDT e IARTESPAPU.**
+- El largo máximo no está escrito ni en el código ni en `docs/`. Usé 8, que es
+  lo que el MARIA aceptó: son los últimos 8 caracteres alfanuméricos del
+  identificador de la operación.
+- Dos facturas con el mismo final comparten IDSO. Por ejemplo, `FAC_ABC-00012345`
+  y `FAC_XYZ-00012345` dan las dos `00012345`.
+- `NDDTIMMTRN` y el `IEXT` de `[SBT]` siguen saliendo de `operation_id[:5]`.
+  Para la v2 eso da «FAC_x», con guion bajo. Esto ya pasaba antes de la pieza.
+- Opciones:
+  - (a) Dejarlo así y preguntarle al despachante dos cosas: el largo máximo, y
+    si el MARIA rechaza un IDSO repetido o el «_» en `NDDTIMMTRN`.
+  - (b) Además, sacar `NDDTIMMTRN` e `IEXT` del mismo identificador corto. Eso
+    cambia dos campos más del TXT, que la tarea no pidió.
+- Recomiendo (a). (b) cambia lo que sale sin un rechazo que lo pida.
 
-- Ambas copias Gemini piden clasificación en la misma llamada, la conservan y
-  rechazan clase ausente, desconocida, despacho, exportación y metadatos
-  contradictorios. El rechazo dedicado no se traga, reintenta ni cae en el
-  fallback. Una factura válida sin productos conserva clasificación y sigue
-  dando el 400 existente de tabla vacía.
-- La subida valida antes de intentar heurísticas opcionales; devuelve 422 con
-  `code=documento_no_admitido`, sin ítems. Se cubre tanto respuesta inválida
-  como excepción levantada dentro del worker.
-- EC* explícita no pasa por generación de importación, sus avisos ni la
-  función pura `generate_maria_txt`. No se cambió un campo del TXT válido ni
-  el exportador.
-- Subir B invalida datos/borrador local de A inmediatamente. Respuestas viejas
-  de subida, autoasignación, catálogo y confirmaciones Excel no pisan B.
-  Se conserva historial y preferencias; el rechazo ofrece elegir otra factura.
-- Deshacer las cuatro acciones NCM masivas conserva la operación dueña: una
-  nueva subida, carga manual o simulada invalida el borrador previo, mientras
-  que deshacer dentro de la misma operación continúa funcionando.
-- UI fue construida por el subagente `dev_doc1_ui` con modelo/esfuerzo heredado;
-  su arnés JS usa DOM/API falsos. Es autorrevisión, no aceptación independiente.
+**D2. QARTKGRNET con milésimos y QARTUNTEST al centésimo (error 2122).**
+- Con 465,125 kg salen `QARTKGRNET=465.125` y `QARTUNTEST=465.13`.
+- La tarea dice «redondeado igual». Lo leí como «la cantidad estadística es el
+  kilo neto al centésimo».
+- Opciones:
+  - (a) Dejarlo así.
+  - (b) Con la estadística en kilos, escribir también QARTKGRNET al centésimo
+    (`465.130`).
+- Recomiendo preguntarle al despachante si el TXT aceptado el 24/10 tenía
+  tres decimales distintos en esas dos líneas. Mientras tanto, (a).
 
-## Evidencia ejecutada
+**D3. Textos libres con «S.A.», paréntesis y comas.**
+- El punto 6 pide limpiar sufijos y textos libres. Limpié sólo los sufijos.
+- El archivo real que el MARIA aceptó trae «S.A.», paréntesis y comas en la
+  razón social y el domicilio. Limpiarlos daba 13 rojos en los golden. El
+  rechazo del 24/10 sólo nombra los valores de los sufijos.
+- Opciones:
+  - (a) Limpiar sólo los sufijos, como está.
+  - (b) Limpiar también los textos libres y cambiar los golden.
+- Recomiendo (a). (b) cambia lo que el MARIA ya aceptó.
 
-| Puerta | Resultado exacto / alcance |
-|---|---|
-| Rojo previo DOC-1 | `26 failed, 3 warnings in 2.90s` sobre producto base; falta conservación, rechazo y EC HTTP |
-| Rojo previo generador puro | `3 failed, 26 deselected, 3 warnings in 0.23s` antes de la guarda EC del core |
-| Focales lector, pesos, devolución, Gemini fallido, rendimiento, punta a punta, TXT y subítems | `352 passed, 2 xfailed, 10 warnings in 30.21s` |
-| DOC-1 final, incluye excepción worker | `38 passed, 3 warnings in 0.36s` sobre `378288e`; tras integrar JS: `38 passed, 3 warnings in 0.73s` sobre `637758c` |
-| UI sintética integrada | `DOC-1 upload: 11 synthetic scenarios OK (state, rejection, races, client, catalog, draft, Excel).`; `DOC-1 NCM undo: 4 synthetic scenarios OK.` sobre `637758c` |
-| Negativos DOC-1 aislados | 3/3 rojos esperados: clasificación, servidor HTTP y generador puro; cada mutante corre en snapshot temporal |
-| `compileall` y diff check | OK |
-| Preflight aislado `378288e` | OK: checkout limpio, Python 3.12 heredado, sin `.env`, claves inventadas, servicios fake/loopback9, API única `127.0.0.1:19001`, `/health` y frontend 200, tablas SQLite temporales |
-| Suite completa normal, cobertura por defecto, sobre `378288e` | `1564 passed, 102 skipped, 2 xfailed, 28 warnings in 393.02s (0:06:33)`; cobertura `50.53%` (mínimo 38%); `FIN SUITE exit=0` |
-| Smoke backend local | `OK · telemetría + alias session/state + by-cuit protegido` |
-| Negativos vigentes completos sobre `10bbe35` | MARIA-1a 10/10; MARIA-1c 4/4; MARIA-1d 8/8; MARIA-2 8/8; MARIA-3 30/30; MARIA-2b 6/6 |
+**D4. Una identificación tributaria que parece cuenta bancaria.**
+- Lo que tiene 16 dígitos o más y no es un código chino de crédito social que
+  cierra su verificador, o es un IBAN que cierra el suyo, se toma por cuenta.
+  Entonces el IDTRIB no sale y se avisa.
+- El BR de Hong Kong completo, de 16 dígitos, cae en esa regla. Si el usuario
+  lo vuelve a cargar, se vuelve a descartar.
+- Además, un número cualquiera de 18 dígitos tiene 1 en 31 de cerrar el
+  verificador chino y salir como tributaria.
+- Opciones:
+  - (a) Dejarlo así, con el aviso.
+  - (b) Agregar en la revisión un «es la tributaria, mandala igual». Es
+    funcionalidad nueva.
+- Recomiendo (a) ahora y (b) como propuesta si aparece un proveedor de Hong
+  Kong.
 
-Negativos vigentes adicionales: MARIA-4 empezó con base `41 passed` y cuatro
-mutantes rojos, pero el proceso perdió su sesión al interrumpirse el entorno;
-no hay cierre del script en el log y **no cuenta completo**. MARIA-5 de esa
-cola no consta ejecutado. No se ejecutaron acá todos los sabotajes históricos
-ni la e2e oficial con navegador.
+**D5. Otras formas de la fecha de inicio de actividad (punto 9).**
+- Se aceptan `AAAA-MM-DD` y `DD/MM/AAAA`. Todo lo demás frena el TXT con un
+  error que dice dónde corregir la fecha: `1/3/2015`, `01-03-2015`, una fecha
+  con hora y `01/03/15`.
+- `POST /api/clientes` guarda `[:10]` sin validar (`main.py:6304` y `:6382`).
+  Por eso un dato así recién aparece al generar.
+- `/generate_maria/avisos` no lo anticipa.
+- El campo de fecha del navegador esconde un valor que no es ISO. Con tu D3
+  (a) de CLIENTE-1 queda guardado y no se ve.
+- Opciones:
+  - (a) Dejarlo así: no se adivina y el error es claro.
+  - (b) Aceptar `D/M/AAAA` y `DD-MM-AAAA`.
+  - (c) Validar en el alta. Eso es de CLIENTE, no de esta pieza.
+- Recomiendo (a) más (c) como tarea aparte. (b) no es adivinar, pero la tarea
+  pidió sólo dos formas.
 
-PM comunicó revisión independiente de 38 casos DOC-1, 11 casos JS y los
-4 casos NCM undo del candidato aislado antes de autorizar la integración, y recorrido
-CUA sintético en `19002`: factura A admitida, despacho B rechazado, recarga sin
-revivir A. Es evidencia de PM, no una corrida Dev adicional.
+**D6. Una unidad que no se reconoce sale 07 sin aviso.**
+- Ya pasaba antes de la pieza. Sumé formas de m²: `㎡`, `m^2`, `MTK`, `m2.`,
+  `sq.m`, `Sq M` y `square meters`.
+- Algo como «Kg.» o «Rollos» sigue cayendo en 07 en silencio.
+- Opciones:
+  - (a) Dejarlo para SUFIJOS-1 o UNIDADES.
+  - (b) Sumar un aviso en los supuestos, en esta pieza.
+- Recomiendo (b) como pieza chica aparte. No la hice: está fuera del punto 5.
 
-## Rojos diagnosticados y límites
+**D7. Lo que pierde un sufijo al limpiarlo.**
+- Un valor con caracteres que no son latinos queda en blanco:
+  `AA(红色)-` sale `AA(  )-`.
+- Un decimal cambia de sentido: `AI(1.5)` sale `AI(1 5)`.
+- En los dos casos hay aviso, pero el TXT se genera igual.
+- Opciones:
+  - (a) Dejarlo así, con el aviso.
+  - (b) No generar si un valor queda en blanco.
+- Recomiendo preguntarle al despachante si el MARIA acepta un valor vacío y
+  cómo se escribe un decimal en un sufijo. Mientras tanto, (a).
 
-- La primera focal amplia dio `4 failed, 337 passed, 2 xfailed`: tres mocks de
-  éxito carecían de clasificación y el retorno vacío perdía metadatos. Se
-  corrigieron sin debilitar aserciones; focal final arriba.
-- Dos sabotajes MARIA-2b quedaron verdes porque mutaban un retorno terminal ya
-  no recorrido por una factura vacía clasificada. Se movieron al retorno
-  actual; los seis vuelven a fallar por su motivo esperado.
-- El primer bind local 19001 y el primer smoke fallaron por restricciones de
-  sandbox. Con permiso local escalado, los mismos controles pasaron; no se
-  accedió a producción.
-- Una suite diagnóstica sin cobertura arrancada antes del preflight fue
-  detenida al estar disponible la corrida válida; no se usa como puerta.
-- No se usaron PDFs/TXT ni datos privados. Lectura Gemini simulada: esto
-  demuestra el contrato y las guardas, **no precisión real del modelo**.
-  Falta futura comprobación de Emi con documentos permitidos.
-- Entorno heredado Python 3.12: no se probó instalación limpia de dependencias.
-- `/code-review` local no estuvo disponible: la herramienta expuesta sólo
-  inspecciona checks de PR y no hay PR de esta pieza. La revisión independiente
-  de PM sigue siendo necesaria.
+**D8. La v1 (`/dashboard?v=1`) no manda el número de factura.**
+- El TXT de la v1 sale con `LDVDREFDOC` en blanco y un aviso.
+- Opciones:
+  - (a) Dejarlo así, si la v1 ya no se usa.
+  - (b) Frenar el TXT sin número de factura, en las dos versiones.
+- Recomiendo (a) si confirmás que la v1 no se usa. Si se usa, (b).
 
-## Reproducción acotada
+## Qué cambia en el TXT (los dos golden)
 
-Desde el clon y con Python del entorno indicado, servicios fake y claves
-inventadas (nunca ejecutar contra producción):
+- `IDSO`, `IDDT` y la raíz de `IARTESPAPU`: de 9 a 8 caracteres (punto 2).
+  - `000999001` → `00999001`.
+  - `002720126` → `02720126`.
+  - El número completo sigue en `NRO.REF.INTERNA`.
+- `CSBTSVL`: `MODELO-A 001` → `MODELO A 001` (punto 6, el guion dentro del
+  valor).
+- Nada más cambia en los golden. `FECHA INIC.ACTIV` ya estaba `DD/MM/AAAA` en
+  los dos, así que el punto 9 no los toca.
+- Fuera de los golden también cambian:
+  - `CDDTAGR` ahora es obligatorio (punto 3).
+  - `LDVDREFDOC` lleva el número real (punto 4).
+  - Las unidades (punto 5).
+  - `IDTRIB-PROVEEDOR` (punto 7).
+  - La fecha (punto 8).
+  - `FECHA INIC.ACTIV` desde `AAAA-MM-DD` (punto 9).
+  - Cada uno con su caso en `tests/test_maria7_*.py`.
+
+## Comandos para reproducir
+
+Desde un worktree de `f0b73f7`, con el entorno de las pruebas
+(`DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key
+ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake
+DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares`):
 
 ```bash
-rtk proxy /private/tmp/cdi-codex-pm-venv/bin/python -m pytest tests/test_doc1_documentos.py -o addopts= --timeout=120 -q
-rtk proxy node tests/test_doc1_upload.js
-rtk proxy node tests/test_doc1_ncm_undo.js
-rtk proxy /private/tmp/cdi-codex-pm-venv/bin/python scripts/testing/sabotaje_doc1.py
-rtk proxy bash scripts/testing/sabotaje_maria2b.sh 10bbe35 /private/tmp/cdi-codex-pm-venv
-rtk git diff 378288e..380bb95 -- "*.py"
+python -m pytest -q --no-cov -p no:cacheprovider tests/test_maria7_rechazos_24_10.py tests/test_maria7_fechas.py tests/test_maria7_revision.py tests/test_maria7_inicio_actividad.py
+# → 125 passed
+scripts/testing/sabotaje_maria7.sh f0b73f7 <venv>
+# → «OK: los 25 sabotajes dan rojo por la razón esperada»
+git diff 3dbfb4e f0b73f7 -- tests/fixtures/maria_golden_anon.TXT tests/fixtures/maria_golden_subitems_anon.TXT
+# → sólo IDSO/IDDT/IARTESPAPU de 9 a 8 y el guion de CSBTSVL
+PM_DIR=<dir> docs/pm/herramientas/levantar.sh f0b73f7 <puerto>
+BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_maria7.js
+# → «PANTALLA MARIA-7 OK»
 ```
 
-Logs externos, sin datos reales: `/private/tmp/doc1-focals2.txt`,
-`/private/tmp/doc1-focused-final.txt`, `/private/tmp/doc1-integrated-focused.txt`, `/private/tmp/cdi-doc1-suite/suite.log`,
-`/private/tmp/doc1-smoke.txt`, `/private/tmp/doc1-sabotaje-maria2b-final.txt` y
-`/private/tmp/doc1-sabotajes-lector.txt`. El arnés preflight reproducible quedó
-fuera del repo en `/private/tmp/cdi-doc1-suite/preflight_and_suite.py`; comprueba
-SHA y limpieza antes de correr, no usarlo después de cambiar HEAD sin fijar
-explícitamente el SHA a verificar.
+## Puertas sobre `f0b73f7`
+
+| Puerta | Salida exacta |
+|---|---|
+| Rojo antes, casos del 24/10 sobre la base | 51 casos `FAILED` en `test_maria7_rechazos_24_10.py` |
+| Rojo antes, fechas (punto 8) | `26 failed, 4 passed, 3 warnings in 0.73s` |
+| Rojo antes, punto 9 | se vio en rojo cada caso; sabotajes 23 a 25 abajo |
+| Focales maria7 (4 archivos) | `125 passed, 5 warnings in 9.61s` |
+| Sabotajes `sabotaje_maria7.sh f0b73f7` | `OK: los 25 sabotajes dan rojo por la razón esperada` |
+| Suite completa (`--timeout=120`) | `1882 passed, 102 skipped, 2 xfailed, 23 warnings in 238.54s (0:03:58)` |
+| `compileall -q proyecto_maria` | `rc=0` |
+| e2e de la CI (`e2e_maria.sh`, con navegador) | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.` |
+| Pantalla (`pantalla_maria7.js`, 390 px) | `PANTALLA MARIA-7 OK` (sale `ancho de la página a 390 px: 582`; ver riesgos) |
+| `smoke_friccion.sh` | `OK · telemetría + alias session/state + by-cuit protegido` |
+
+- La e2e necesitó lo que dice `ONBOARDING-DEV.md`: `PATH=<venv>/bin:$PATH` y
+  `PUPPETEER_EXECUTABLE_PATH=/opt/pw-browsers/chromium`.
+- La primera corrida falló sin eso, con `ModuleNotFoundError: No module named
+  'fastapi'` y después con Chromium no encontrado. Es del entorno, no del
+  producto.
+- No corrí `ataque_aislamiento.sh`. La pieza no toca sesión, permisos ni de
+  quién son los datos.
+- Tampoco corrí `/security-review`, por la misma razón.
+
+- El rojo conocido de EXCEL-2 (`test_excel2::test_ocho_libros…`, la subida
+  normal daba 400 a los 30.1 s) esta vez pasó. Depende del tiempo de la
+  máquina y falla igual en tu `3fd8826`; no es de esta pieza.
+
+## Autorrevisión
+
+| Quién (modelo, esfuerzo) | Hallazgo | Qué hice |
+|---|---|---|
+| Sonnet alto + Opus alto + `/code-review high` | La revisión daba vuelta la fecha del lector (`20/10/2026` → `26/20/2010`) | Arreglado (`449b157`), con su caso |
+| Sonnet alto + Opus alto + `/code-review high` | Un año de dos cifras se adivinaba (`26/08/07` → 2007) | Ahora se pregunta |
+| Sonnet alto + `/code-review high` | m² escrito de otras formas caía en 07 | Sumadas 7 formas; el resto es D6 |
+| Opus alto + `/code-review high` | El código chino de crédito social, todo en números, se tomaba por cuenta | Verificador del código chino y del IBAN; lo que queda es D4 |
+| Sonnet alto + Opus alto | La factura de más de 28 caracteres frenaba sin aviso previo | Ahora se avisa en `/generate_maria/avisos` |
+| Sonnet alto + Opus alto | El mensaje de kilos con subítems no decía cómo salir | Ahora dice «con la cantidad igual al kilo neto al centésimo (465.13)» |
+| Sonnet alto | La pregunta por la fecha salía con el título «Revisá el peso» | Ahora sale con «Revisá la factura» |
+| Opus alto | La unidad del producto iba sin escapar al HTML | Escapada |
+| `/code-review high` | La prueba de pantalla esperaba con un bucle fijo | `waitForRequest` |
+| `/code-review high` | Textos libres sin limpiar | D3 |
+| Opus alto + `/code-review high` | Colisión de IDSO; `NDDTIMMTRN`/`IEXT` de `operation_id[:5]` | D1 |
+| Sonnet alto + Opus alto | QARTKGRNET 465.125 contra QARTUNTEST 465.13 | D2 |
+| Opus alto | El valor del sufijo con caracteres que no son latinos queda en blanco; `1.5` → `1 5` | D7 |
+| `/code-review high` | La v1 no manda el número de factura | D8 |
+| Sonnet alto (punto 9) | `strftime("%Y")` no rellena: `0099-03-01` salía `01/03/99` | Arreglado (`e4e0336`), visto en rojo antes |
+| Sonnet alto (punto 9) | El error no nombraba el campo de la revisión | Ahora nombra «Fecha inicio de actividades» |
+| Sonnet alto (punto 9) | Otras formas, el alta sin validar y los avisos que no lo anticipan | D5 |
+
+## Riesgos y lo que no se cubrió
+
+- **Desborde a 390 px.** La pantalla mide el ancho de la página en 582 px. La
+  tabla del despachante se desplaza sola (`c03bb1d`), pero la página entera
+  todavía es más ancha que el teléfono. No comparé contra la base. Lo mido y
+  te lo informo en la próxima vuelta, si no lo pedís antes.
+- **Pruebas débiles, sólo `grep`:** el título del aviso en `upload.js` y el
+  escape en `despachante.js` (sabotajes 21 y 22). El título sí se ve en el
+  navegador en `pantalla_maria7.js`; el escape no.
+- 0,004 kg con la estadística en kilos da `QARTUNTEST=0.00`. `peso_valido`
+  acepta desde 0,001.
+- `/generate_maria/avisos` no anticipa dos cosas:
+  - un CUIT del despachante con sólo espacios, que llega llamando a la API
+    directo porque el front los borra;
+  - una unidad estadística inválida.
+  Las dos frenan recién al generar, con un 400 claro.
+- El ancho fijo cuenta caracteres, no bytes de UTF-8. Esto no cambió con la
+  pieza.
+- El punto 8 depende de que Gemini copie la fecha tal cual. Una fecha con el
+  mes en letras y el año de 2 cifras sale vacía y se pregunta.
+- La unidad que trae el producto (por ejemplo un Excel con «PCS») pisa la que
+  elegís para la operación. Se ve en la lista de cada producto.
+- Gemini no se llamó: la lectura de fechas se probó con lo que devolvería, no
+  con el modelo real.
+- No se usó ningún dato real del cliente del 24/10. Todo es sintético.
+
+## Archivos de producto que toqué
+
+`proyecto_maria/core/maria_generator.py`, `proyecto_maria/main.py`,
+`proyecto_maria/core/controles_maria.py`, `proyecto_maria/pdf_extractor.py`,
+`proyecto_maria/static/v2/screens/despachante.js`, `finalize.js`, `review.js`,
+`upload.js`, `proyecto_maria/templates/dashboard_v2.html` y `CHANGELOG.md`.
 
 ## Siguiente
 
-No quedan decisiones de alcance ni bloqueantes conocidos de implementación.
-PM revisa la entrega integrada y prepara la PR hacia su rama; esto no autoriza
-fusionar a main ni publicar. No se ejecutó la puerta oficial completa de
-navegador; la evidencia JS y CUA sintética descrita no la reemplaza. No se
-afirma aceptación ni precisión de Gemini real.
+Sigo con MARIA-8, subítems por posición, sin esperar el veredicto. Si el
+veredicto trae una devolución, esa va primero.
 
-Última vuelta: 2026-10-20, 13:48 Argentina.
-Contexto: ~58 %.
+Última vuelta: 2026-10-24 20:19 UTC.
 
-
----
-
-# Dev 2 → PM
-
-## MARIA-5d — bruto de una unidad con kg y bruto explícito de la línea
-
-**Resultado: producto y focales terminados; aceptación pendiente de las puertas no corridas.** Rama local `codex/maria5d-unit-kg`, base `d22ff1a`. Producto `b3fd518` y `8b8b789`; pruebas `abe05ae`, `67d18a8`, `eff9dea`; changelog `000a74d`. SHA completo probado: `eff9dea`.
-
-- «Peso bruto unit (kg)», «Gross weight unit (kg)» y «Unit gross weight» conservan el bruto unitario: 10 × 3 kg llega por upload y genera `QARTKGRNET=30.000`, con mapeo automático o guardado.
-- La devolución PM sobre «Unit gross weight per line» y «Unit gross weight line» se corrigió en la misma guarda: 30 kg / 10 unidades conserva 30 kg en la línea, sin multiplicarlo a 300. Neto conserva prioridad; bruto total/plural conserva división.
-
-## Evidencia y reproducción
-
-```bash
-# Desde esta rama; entorno inventado descrito abajo.
-/private/tmp/cdi-codex-pm-venv/bin/python -m pytest -q --no-cov tests/test_maria5d.py tests/test_maria5d_unit_kg.py tests/test_maria5_peso_excel.py tests/test_devolucion2_maria5_ncm.py tests/test_generar_maria_txt.py tests/test_maria_subitems.py
-bash scripts/testing/sabotaje_maria5d.sh eff9dea /private/tmp/cdi-codex-pm-venv
-```
-
-La suite y el preflight quedaron en `/private/tmp/cdi-maria5d-suite/suite.log`. No repetir para cerrar esta entrega.
-
-| Puerta | Resultado |
-|---|---|
-| Rojo inicial sobre base, informado por la PM | `6 failed, 7 passed` |
-| Rojo de devolución inglesa, antes de `8b8b789` | `2 failed, 4 passed, 9 deselected` |
-| Focales sobre producto `8b8b789` (148 casos; últimos commits sólo script) | `148 passed, 3 warnings in 10.97s` |
-| Sabotaje `eff9dea` | base `80 passed`; `OK: los 11 sabotajes dan rojo por la razón esperada` |
-| Suite completa `eff9dea`, preflight OK | `1570 passed, 102 skipped, 2 xfailed, 28 warnings in 378.14s`; cobertura `50.47%` (mínimo `38%`); `FIN SUITE exit=0` |
-
-Focales: `test_maria5d.py`, `test_maria5d_unit_kg.py`, `test_maria5_peso_excel.py`, `test_devolucion2_maria5_ncm.py`, `test_generar_maria_txt.py`, `test_maria_subitems.py`. Incluyen referencias anonimizadas de MARIA; no se usaron documentos privados.
-
-Entorno: Python 3.12.8 y venv heredado `/private/tmp/cdi-codex-pm-venv` (NO instalación limpia de requirements), claves inventadas, conectores fake, endpoints de dólar/ARCA en loopback cerrado, SQLite temporal. Preflight verificó API propia en localhost:18982, health, frontend, tablas y checkout limpio. Primer intento de bind bloqueado por sandbox; reejecutado con permiso local. Corrida de suite anterior en `000a74d` interrumpida al llegar devolución PM: no cuenta como resultado. Corrida de sabotaje anterior invalidada por desajuste de patrón/SHA durante intervención: reemplazada por 11/11 sobre `eff9dea`.
-
-## Pendientes y límites
-
-- E2E y las tres pantallas: **no corridas**. No se operó navegador mediante shell.
-- Kit SIM real: **no corrido**. Sin publicación ni push, según instrucción actual PM.
-- Sabotaje EXCEL-1 histórico «mapeo guardado deja afuera lo detectado»: mutar `elegido = g or d` a `elegido = g` deja el test señalado verde (`1 passed`) tanto en base `d22ff1a` como en entrega `000a74d`. `_mapeo_efectivo` tiene AST idéntico entre base y `eff9dea`. Es una carencia de prueba anterior, no una regresión de esta pieza; no se amplió alcance para corregirla.
-
-Autorrevisión del diff contra base: helper de bruto, pruebas sintéticas, sabotajes y changelog; sin cambios de exportación ni otros clasificadores.
-
-**D1.** Mantener pendiente aceptación/publicación hasta completar e2e y pantallas. Recomendación: verificar esas puertas en el entorno habilitado, sin tocar producción.
-
-Última vuelta: 2026-10-20 11:42 UTC
-Contexto: ~50 %
+/compact conservar: Dev MARIA (Dev 2), rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. MARIA-7 entregada, SHA probado f0b73f7, D1–D8 abiertas en PARA-PM-2.md. Sigue MARIA-8 (subítems por posición), después VALOR-1 y SEPARADORES-1. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
