@@ -31,6 +31,14 @@ borra una fecha guardada en otro formato; va con PA-1. Hallazgo: la fecha de
 inicio va al TXT como `AAAA-MM-DD` y el MARIA usa `DD/MM/AAAA`; sumado a
 MARIA-7 como punto 9.
 
+**PA-1 + D3 aceptada 2026-10-24 21:10 UTC** (Dev técnica; producto
+`489daf4`, `c7e4c3a`, `26797f8`, `d8e084c`): «PA SIM» en las pantallas y
+editar un cliente no borra una fecha de inicio que el campo no muestra.
+Integrada con `merge` (`fe41228`), **sin publicar**. Detalle en
+`REPRODUCCION-PA-1-2026-10-24.md`. D4–D7 decididas por la PM: la demo de la
+landing va como PA-1b; la fecha validada en la API (con «None» y años de 5
+cifras) va a CLIENTE-1b, y limpiar lo guardado en producción lo decide Emi.
+
 **Rojo conocido de EXCEL-2, ya publicado:** `test_excel2.py::test_ocho_libros…`
 falla siempre en la máquina de la PM (4 núcleos), también en la base: una
 subida normal detrás de ocho libros de ~10 MiB espera en la fila de 2 hilos y
@@ -318,15 +326,13 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-10-24 21:10 UTC: PA-1 + D3 aceptada e integrada (`fe41228`), sin publicar: suite 1782 passed, sabotajes en rojo, adversario sobre D3 sin hallazgo propio. D4 (b), D5 (a) como PA-1b, D6 (a), D7 (a) dentro de CLIENTE-1b ampliada. PRUEBAS-1 suma (c), el rojo intermitente de la e2e. Dev técnica despertada. Cadena de sabotajes de `8b45207`: admin1 y admin2 en rojo limpio; siguen punta_a_punta1 y rendimiento.
+
 2026-10-24 20:55 UTC: publicada `8b45207` (EXCEL-3 + CLIENTE-1) con «dale 8b45207»; falta que Emi la pruebe en el sitio. MARIA-7 con devolución (`e996657`): sufijos que se funden, kilo neto al centésimo (D2 b, por el archivo aceptado), palabras de cuenta, unidad estadística cruda y aviso de unidad desconocida; D1–D8 respondidas; Dev MARIA despertada. PA-1 en revisión. PRUEBAS-1 suma `excel2.sh` (3 patrones viejos, no termina en 30 min). Para Emi: dos preguntas al despachante (largo del IDSO y repetidos; decimal y vacío en un sufijo). Cadena de sabotajes de la publicación sigue (guardar1 en adelante).
 
 2026-10-24 19:56 UTC: sin entregas. Las dos Devs trabajando: la técnica en D3 (prueba en rojo, arreglando), la MARIA cerrando MARIA-7 (sabotajes en rojo, trae la rama de la PM antes de las puertas). Suite de la PM en CLIENTE-1 verde (1757 passed). Ninguna D abierta. Los dos chats con ventana de 200k; el de la Dev MARIA marca 337k usados, sin compactar todavía: se mira en la próxima vuelta.
 
 2026-10-24 19:41 UTC: CLIENTE-1 aceptada e integrada por SHA (`c402bcb`), sin publicar. D3 (a) decidida por la PM. MARIA-7 suma el punto 9 (fecha de inicio en DD/MM/AAAA). Dev técnica en PA-1 con D3, después ESTUDIO-1; Dev MARIA en MARIA-7. Para Emi, sin cambios: «dale» para publicar EXCEL-3 (y ahora CLIENTE-1) y prioridad del rojo de los ocho libros.
-
-2026-10-24 19:33 UTC: EXCEL-3 aceptada e integrada por SHA (`a173af2`), sin publicar. D1 (a) y D2 (a) decididas por la PM. Dev técnica sigue con CLIENTE-1; Dev MARIA en MARIA-7, con la nota de VALOR-1 en su canal. Para Emi: «dale» cuando quiera publicarla y prioridad del rojo de los ocho libros.
-
-2026-10-24 18:56 UTC: sin entregas. Dev MARIA en MARIA-7 (ajusta las pruebas viejas que generaban sin CUIT del despachante, esperable por el punto 3); Dev técnica cerrando EXCEL-3 con /entregar. Ninguna D abierta. Los dos chats Dev siguen con ventana de 1M: falta el `/autocompact 200k` de Emi.
 
 ## Medición
 
@@ -334,5 +340,5 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## /compact conservar de la PM principal
 
-/compact conservar: Soy la PM principal de CDI (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK min 55). Producto Memu007/CDI-vuce-, clon /home/user/cdi-vuce-, mi rama claude/practical-shannon-szpwkn (nunca main; cada push a main publica). main = 8b45207 (EXCEL-3 + CLIENTE-1, publicada 24/10 20:33 UTC con «dale 8b45207»; falta que Emi la pruebe; volver a dddcf6d sólo con su ok). Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, alto): MARIA-7 con devolución (e996657, sobre f0b73f7; D1–D8 respondidas; D1 y D7 esperan al despachante vía Emi); después MARIA-8. Dev técnica (session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica, medio): PA-1 + D3 (31719c3) en revisión mía; sigue PRUEBAS-1 (a cliente1 foco, b excel1/excel2 sabotajes viejos), EXCEL-3b, ESTUDIO-1 (después de integrar MARIA-7), CLIENTE-1b. Pendiente de la PM: revisar PA-1 (sumar PRUEBAS-1 c, flake #validatingRerun), clasificar la cadena de sabotajes de 8b45207 (/tmp/cdi-pm/rev/pub3). Para Emi: probar 8b45207; preguntas al despachante; esfuerzo; rojo de los ocho libros; packing list; clave de Gemini. Roadmap a 3 meses en ROADMAP.md (aprobado 24/10); acuerdos del despachante en DECISIONS.md; TXT y proforma reales sólo en el scratchpad. Reglas de Emi: nada fuera del roadmap; Devs hasta alto, sin Fable; consejero sólo mío; castellano llano; consultas de 9 a 21 ARG; publicar sólo con «dale <SHA>» de día; usar date -u.
+/compact conservar: Soy la PM principal de CDI (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK min 55). Producto Memu007/CDI-vuce-, clon /home/user/cdi-vuce-, mi rama claude/practical-shannon-szpwkn (nunca main; cada push a main publica). main = 8b45207 (EXCEL-3 + CLIENTE-1, publicada 24/10 20:33 UTC con «dale 8b45207»; falta que Emi la pruebe; volver a dddcf6d sólo con su ok). Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, alto): MARIA-7 con devolución (e996657, sobre f0b73f7; D1–D8 respondidas; D1 y D7 esperan al despachante vía Emi); después MARIA-8. Dev técnica (session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica, medio): PA-1 + D3 aceptada e integrada (fe41228, sin publicar); sigue PRUEBAS-1 (a cliente1 foco, b excel1/excel2 sabotajes viejos, c e2e #validatingRerun), PA-1b (demo de la landing), EXCEL-3b, ESTUDIO-1 (después de integrar MARIA-7), CLIENTE-1b (fecha validada en la API; limpiar producción lo decide Emi). Pendiente de la PM: clasificar la cadena de sabotajes de 8b45207 (/tmp/cdi-pm/rev/pub3). Para Emi: probar 8b45207; preguntas al despachante; esfuerzo; rojo de los ocho libros; packing list; clave de Gemini. Roadmap a 3 meses en ROADMAP.md (aprobado 24/10); acuerdos del despachante en DECISIONS.md; TXT y proforma reales sólo en el scratchpad. Reglas de Emi: nada fuera del roadmap; Devs hasta alto, sin Fable; consejero sólo mío; castellano llano; consultas de 9 a 21 ARG; publicar sólo con «dale <SHA>» de día; usar date -u.
 

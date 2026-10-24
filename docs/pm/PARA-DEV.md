@@ -27,38 +27,30 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
-## Veredicto de CLIENTE-1 (2026-10-24): aceptada
+## Veredicto de PA-1 + D3 (2026-10-24): aceptada
 
-Sobre `c402bcb` (producto `fbc006a` + `12ff9b6`), integrada por SHA a la rama
-de la PM. Detalle en `REPRODUCCION-CLIENTE-1-2026-10-24.md`. Reproducido en
-`b0c920b`: tus 14 sabotajes en rojo, tu prueba de pantalla OK y cuatro
-negativos míos (domicilio de espacios, editar y borrar el CUIT, fecha que no
-es ISO, CUIT corto), todos como decís salvo un matiz de D3 (abajo).
+Sobre `31719c3` (producto `489daf4`, `c7e4c3a`, `26797f8`, `d8e084c`),
+incluido el supuesto de la fecha a medias. Integrada con `merge` a la rama de
+la PM (`fe41228`); el producto es idéntico al revisado. Detalle en
+`REPRODUCCION-PA-1-2026-10-24.md`: focales 65 passed, suite 1782 passed,
+`pa1.sh` 27 ROJO y `cliente1.sh` 23 ROJO con 0 sin rojo (esperando el foco,
+abajo). La e2e no la corrí.
 
-**Se cruzaron los mensajes:** EXCEL-3 y D1 ya estaban respondidas en
-`5237aa2` (abajo). No las reabras en `PARA-PM.md`.
+- **D4: (b).** «Posición SIM» queda.
+- **D5: (a)**, como pieza chica **PA-1b**: sólo la demo de la landing pasa a
+  «3 PA SIM» (`proyecto_maria/templates/landing.html:130` y `:139`).
+  `public_quote.html` no; el resto de la landing (textos de venta) tampoco.
+- **D6: (a).** `enrich.js:207` queda «NCM».
+- **D7: (a)**, dentro de **CLIENTE-1b** (abajo, ampliada).
 
-## Veredicto de EXCEL-3 (2026-10-24): aceptada
+Del adversario (sobre D3, en navegador): el núcleo de D3 aguanta. Salieron
+tres cosas anteriores a D3; dos van a CLIENTE-1b y la tercera queda como
+riesgo (un guardado en vuelo cierra el formulario de otro cliente abierto
+después). No la arregles.
 
-Integrada por SHA (`a173af2`) a la rama de la PM; el producto es idéntico al
-revisado. Detalle en `REPRODUCCION-EXCEL-3-2026-10-24.md`. Reproducido:
-focales 120 passed; 27 sabotajes, 0 sin rojo; sintético sin datos reales; la
-proforma real, en local, da 48 productos en m² y su mercadería, descuento y
-flete cierran con el total de la hoja. Suite completa: un rojo, el de los
-ocho libros de `test_excel2.py`, que falla igual en la base (es de EXCEL-2;
-no lo toques ahora, lo decide Emi).
+## Ahora (2026-10-24 21:05 UTC), en este orden
 
-**D1: (a).** `operacion.flete`, `operacion.descuento` (positivo: lo que se
-deduce) y `filas_excel_flete` / `filas_excel_descuento` quedan así. Coincide
-con la decisión del 24/10: el sistema ofrece el descuento leído y el usuario
-decide qué se deduce. Se lo paso a la Dev MARIA para VALOR-1.
-
-## Ahora (2026-10-24 20:35 UTC): mientras reviso PA-1
-
-PA-1 + D3 (`31719c3`) está en revisión; el veredicto y D4–D7 van acá
-cuando termine. No esperes: seguí en este orden.
-
-### 1. PRUEBAS-1: dos pruebas que quedaron mal (sólo pruebas, sin producto)
+### 1. PRUEBAS-1: pruebas que quedaron mal (sólo pruebas, sin producto)
 
 Salió al probar la publicación de `8b45207`. El producto está bien; las
 pruebas no.
@@ -105,12 +97,39 @@ falla: 4»):
   30 minutos: corrieron 26 de 42 (23 ROJO). Medí cuánto tarda cada sabotaje
   y decí por qué; si es `test_excel2.py` entero por vez, corré sólo la
   prueba que cada sabotaje nombra.
-- Al terminar: `excel1.sh`, `excel2.sh` y `cliente1.sh` con «sin rojo: 0» /
-  «con falla: 0» sobre tu SHA, y cuánto tardó cada uno.
 
-### 2. EXCEL-3b (abajo, «Más adelante»)
+**a), validado por la PM:** con `page.waitForFunction(() =>
+document.activeElement && document.activeElement.id === 'cfNombre')` después
+de cada una de las cinco esperas de `#cfNombre` en `pantalla_cliente1.js`,
+`cliente1.sh 31719c3` dio 23 ROJO y 0 sin rojo. Ése es el camino; falta la
+prueba de que distingue (arriba) y la familia.
 
-### 3. ESTUDIO-1, con lo que pediste definido (decidido por la PM)
+**c) e2e: el rojo intermitente de `#validatingRerun`** que viste sobre
+`d1f7833` (`Node is either not clickable or not an Element`,
+`config/e2e_maria.js:202`). No es de PA-1, y una repetición verde no lo
+cierra.
+- **Diagnóstico:** en el momento de la falla, registrá si el botón está en el
+  documento (`isConnected`), si se ve (`offsetParent`, caja) y si la
+  validación anterior terminó. Decí la causa.
+- **Qué:** esperar una condición observable (el botón visible y habilitado,
+  la validación anterior terminada), no una espera fija.
+- **Prueba de que distingue:** con una demora forzada en
+  `/api/validate/smart` (`page.route`), sin la espera falla y con la espera
+  pasa.
+
+**Al terminar:** `excel1.sh`, `excel2.sh` y `cliente1.sh` con «sin rojo: 0» /
+«con falla: 0» sobre tu SHA, y cuánto tardó cada uno; la e2e con la prueba
+de la demora.
+
+### 2. PA-1b: la demo de la landing (D5)
+
+Las dos líneas de la demo (`landing.html:130` y `:139`): «NCM» pasa a
+«PA SIM», como el progreso de la aplicación. Una prueba de texto como las de `test_pa1_textos.py` y su
+sabotaje. Nada más.
+
+### 3. EXCEL-3b (abajo, «Más adelante»)
+
+### 4. ESTUDIO-1, con lo que pediste definido (decidido por la PM)
 
 1. **Los estudios son de la cuenta**, como los clientes: cada usuario ve y
    elige sólo los suyos (mismo aislamiento por dueño que clientes; prueba
@@ -125,16 +144,9 @@ el CUIT (`f0b73f7`, en revisión). ESTUDIO-1 arranca **después** de que yo
 integre MARIA-7 a mi rama: traés mi rama y cambiás sólo de dónde sale el
 CUIT y el texto de «dónde cargarlo». Si llegás antes, seguí con EXCEL-3b.
 
-## Tarea 1 — PA-1, con D3 al lado; después ESTUDIO-1
-
-PA-1 como está en `ROADMAP.md`, Fase 1b. D3 (abajo) va en commits propios y
-se entrega junto con PA-1, en el mismo informe. ESTUDIO-1 toca qué va al
-`CDDTAGR`: coordiná por la PM con la Dev MARIA (MARIA-7 punto 3), no por su
-canal.
-
 ## Más adelante — EXCEL-3b (lo que dejó el adversario)
 
-Después de PA-1, en una sola pieza chica. Cada punto con su sintético y su
+Después de PA-1b, en una sola pieza chica. Cada punto con su sintético y su
 sabotaje; numeración de la tabla de `REPRODUCCION-EXCEL-3-2026-10-24.md`:
 
 1. (#2) Una fila sin rótulo y sin precio con largo o total de grupo no es
@@ -149,36 +161,31 @@ sabotaje; numeración de la tabla de `REPRODUCCION-EXCEL-3-2026-10-24.md`:
 5. (#1, #9) «Descuento …» con importe negativo y sin NCM se avisa (no entra
    como producto de valor 0); «1,5m» en el largo no repite la unidad.
 
-## Más adelante — CLIENTE-1b: validar la fecha de inicio en el alta
+## Más adelante — CLIENTE-1b: la fecha de inicio, validada en la API
 
-Salió de MARIA-7 (D5 de la Dev MARIA). `POST /api/clientes` guarda la fecha
-de inicio de actividad con `[:10]` sin validar; un valor que no es
-`AAAA-MM-DD` ni `DD/MM/AAAA` recién frena al generar el TXT. Al guardar, esas
-dos formas pasan y lo demás da error claro en el formulario. Sin migrar lo
-ya guardado (tu D3 de CLIENTE-1 lo conserva). Después de EXCEL-3b.
+Junta la D5 de la Dev MARIA (MARIA-7), tu D7 y dos hallazgos del adversario
+de D3. Después de ESTUDIO-1. Toca datos: revisión fuerte.
+
+- **Causa:** `create_cliente` y `update_cliente` (`main.py`) guardan
+  `str(...)[:10]` sin validar. Por eso un `null` se guarda «None» y un año de
+  5 cifras que el navegador acepta (`20150-01-01`) se guarda cortado
+  (`20150-01-0`); el campo lo muestra vacío y, con D3, se conserva sin aviso.
+  Recién frena (o no) al generar el TXT.
+- **Qué:** en el alta **y** en la edición, `null` y vacío guardan `""`;
+  pasan `AAAA-MM-DD` (año de 4 cifras, fecha que existe) y `DD/MM/AAAA`; lo
+  demás da un error claro que el formulario muestra. El aviso de lo que
+  falta dice también cuando la fecha conservada no sirve.
+- **Prueba, por la familia:** `null`, `""`, `"None"`, `20150-01-01`,
+  `2015-02-30`, `15/03/2015`, `2015-03-15`, por POST y por PUT. Cada arreglo
+  con su sabotaje en rojo.
+- **Lo ya guardado:** un script que **sólo informa** los clientes con «None»
+  o con una fecha que no sirve (cuántos y cuáles, sin mostrar datos del
+  cliente más allá del id) y, con una opción explícita, deja «None» en
+  vacío. Probado en una base local. Correrlo en producción lo decide Emi.
+- No toques el TXT (`maria_generator.py`): es de la Dev MARIA.
 
 ## Más adelante — GUARDAR-2
 
 Ya hay un candidato aislado: `2d930c5` en la rama vieja
 `claude/dev1-tecnica` (sobre `1cdfe49`). Partí de ahí, no lo rehagas;
 faltaba lo de `CIERRE-RETOMA-2026-10-24.md` («Qué sigue», punto 2).
-
-## Respuestas a tus D
-
-- **D3 (CLIENTE-1), 2026-10-24: (a).** Un matiz: la fecha no se borra «sin
-  aviso». Al guardar sale «Faltan para el MARIA: inicio de actividad»; lo
-  que no dice es que había una fecha y se perdió. Igual se arregla:
-  - **Causa:** el campo de fecha sólo muestra AAAA-MM-DD; si lo guardado
-    está en otro formato, el campo queda vacío y el guardado lo manda vacío.
-  - **Qué:** si lo guardado no es AAAA-MM-DD y el campo quedó vacío, la
-    fecha no se manda y se conserva. Si el usuario carga una fecha, la
-    nueva reemplaza a la vieja.
-  - **Prueba, por la familia:** fecha guardada `null`, `""`, `"01/03/2015"`,
-    otro texto no ISO y una ISO; editar sin tocar la fecha y guardar. Las
-    no ISO se conservan; `null` y `""` siguen vacías; la ISO se conserva.
-    Un sabotaje que vuelva a mandar el campo vacío tiene que dar rojo.
-  - **Lo que deja:** una fecha no ISO ya no se puede borrar desde el
-    formulario (sólo reemplazar). Aceptado; anotalo como riesgo.
-  - **Al aviso**, si la fecha vieja se conserva, que no diga que falta.
-  - No toques la API ni el TXT: la conversión al formato del TXT la hace la
-    Dev MARIA (MARIA-7, punto 9).
