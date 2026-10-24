@@ -95,8 +95,18 @@ falla: 4»):
   da 35 rojos, pero ya no el de
   `test_mapeo_guardado_no_deja_afuera_encabezados_nuevos`. Decí por qué esa
   prueba ya no lo distingue y ajustá la expectativa o la prueba.
-- Al terminar: `excel1.sh` y `cliente1.sh` con «sin rojo: 0» / «con falla:
-  0» sobre tu SHA.
+- **`excel2.sh`, lo mismo** (sobre `8b45207`, 20:20–20:50 UTC): tres
+  sabotajes no encuentran su patrón: «leer la factura vuelve a abrir el
+  libro entero» (la llamada ahora es `_xlsx_solo_primera_hoja(ruta,
+  max_filas=_MAX_FILAS_EXCEL)`), «la columna de origen vuelve a ser
+  obligatoria» (ahora `if not all([desc_col, cant_col, valor_col]):`) y «un
+  producto mal formado vuelve a dar 500» (`if not isinstance(_it, dict) or
+  (` ya no existe; está en `main.py` ~4238). Además el script no termina en
+  30 minutos: corrieron 26 de 42 (23 ROJO). Medí cuánto tarda cada sabotaje
+  y decí por qué; si es `test_excel2.py` entero por vez, corré sólo la
+  prueba que cada sabotaje nombra.
+- Al terminar: `excel1.sh`, `excel2.sh` y `cliente1.sh` con «sin rojo: 0» /
+  «con falla: 0» sobre tu SHA, y cuánto tardó cada uno.
 
 ### 2. EXCEL-3b (abajo, «Más adelante»)
 
