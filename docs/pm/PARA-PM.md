@@ -235,6 +235,6 @@ aparece cada uno:
   No arranco el código hasta tener esa tarea. Mientras tanto, si me la
   marcás, sigo con EXCEL-3b, que ya está definida.
 
-Última vuelta: 2026-10-24 20:20 UTC
+Última vuelta: 2026-10-24 20:10 UTC
 
 /compact conservar: Soy la Dev técnica (Dev 1) de CDI, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica (nunca main), rutina trig_011UpBfwEu9TUzoNUrviqoP5 min 15; aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM con send_message priority next empezando «Dev técnica:». PA-1 + D3 entregadas juntas (puertas sobre a114465; PA-1 producto 489daf4+c7e4c3a; D3 producto 26797f8+d8e084c, pruebas 5d3754c+ce84023+a114465). Abiertas para la PM: D4 (unificar «Posición SIM»), D5 (landing y cotización pública), D6 (enrich.js:207), D7 («None» por POST null en create_cliente; recomiendo (a) pieza de API). D1 y D3 decididas (a). ESTUDIO-1 espera que la PM escriba la tarea y coordine con MARIA-7 punto 3; propuse la costura main.py:4327-4341 (yo resuelvo de dónde sale el CUIT; MARIA el error si falta). Mientras, EXCEL-3b si la PM lo marca. Reglas de Emi: sólo me piden la PM o Emi; nada se publica sin su «dale» para el SHA; nunca main; sin secretos ni datos reales; no tocar maria_generator.py ni el canal/rama de la Dev MARIA; subagentes hasta alto, sin Fable; esfuerzo medio.
