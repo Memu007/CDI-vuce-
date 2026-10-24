@@ -12,8 +12,7 @@ la PM (el dominio está bloqueado): lo confirma Emi.
 **Desde el 2026-10-24, tarde:** Codex deja CDI (Emi). Dos Devs nuevas en
 Claude («Quién hace qué»). Ese día Emi y el despachante cargaron en el MARIA
 el TXT de una factura real después de doce correcciones a mano: son la
-Fase 1b del roadmap nuevo a tres meses (`ROADMAP.md`, aprobado por Emi el 2026-10-24). Pendiente de Emi: «dale dddcf6d» para
-publicar EXCEL-2, `/autocompact 200k` y el esfuerzo en los dos chats
+Fase 1b del roadmap nuevo a tres meses (`ROADMAP.md`, aprobado por Emi el 2026-10-24). Pendiente de Emi: `/autocompact 200k` y el esfuerzo en los dos chats
 nuevos, el packing list y los códigos de destino que manda el despachante.
 
 **Estado vigente, 2026-10-24 10:00 ARG:** publicación autorizada COMPLETADA.
