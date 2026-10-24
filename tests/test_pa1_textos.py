@@ -42,17 +42,20 @@ CAMBIAN = [
     (CATALOGO_JS, "'<span>PA SIM</span>' +", "'<span>NCM</span>' +"),
 ]
 
-# Hablan de los 8 dígitos: quedan con «NCM».
+# Hablan de los 8 dígitos: quedan con «NCM». (archivo, texto, cuántas veces):
+# con el número exacto, cambiar una sola de varias apariciones también es rojo.
 QUEDAN = [
-    (HTML, "La NCM tiene 8 dígitos. Para declarar en MARIA completá 3 dígitos SIM y la letra DC."),
-    (HTML, "<small>NCM 8 + SIM 3 + DC</small>"),
-    (HTML, "NCM 8 + SIM 3 + letra DC"),
-    (HTML, '<label class="field-label" for="calcNcm">NCM</label>'),
-    (HTML, "Recordatorios privados del capítulo NCM"),
-    (HTML, "Importar planilla maestra de NCMs"),
-    (NCM_JS, "La NCM de 8 dígitos todavía no fue asignada."),
-    (NCM_JS, "'<span class=\"spotlight-vuce-ncm\">NCM ' + CDI.escapeHtml(formattedBaseNcm)"),
-    (NCM_JS, "La posición SIM debe tener 11 dígitos: NCM (8) + detalle SIM (3)."),
+    (HTML, "La NCM tiene 8 dígitos. Para declarar en MARIA completá 3 dígitos SIM y la letra DC.", 1),
+    (HTML, "<small>NCM 8 + SIM 3 + DC</small>", 1),
+    (HTML, "NCM 8 + SIM 3 + letra DC", 1),
+    (HTML, '<label class="field-label" for="calcNcm">NCM</label>', 1),
+    (HTML, "Recordatorios privados del capítulo NCM", 1),
+    (HTML, "Importar planilla maestra de NCMs", 2),
+    (NCM_JS, "La NCM de 8 dígitos todavía no fue asignada.", 1),
+    # La NCM de 8 que se le consulta a VUCE: al cargar, sin respuesta y con respuesta.
+    (NCM_JS, "'<span class=\"spotlight-vuce-ncm\">NCM ' + CDI.escapeHtml(formatted)", 2),
+    (NCM_JS, "'<span class=\"spotlight-vuce-ncm\">NCM ' + CDI.escapeHtml(formattedBaseNcm)", 1),
+    (NCM_JS, "La posición SIM debe tener 11 dígitos: NCM (8) + detalle SIM (3).", 1),
 ]
 
 
@@ -63,6 +66,7 @@ def test_la_posicion_completa_se_llama_pa_sim(archivo, nuevo, viejo):
     assert texto.count(nuevo) == 1, f"{archivo} no dice {nuevo!r}"
 
 
-@pytest.mark.parametrize("archivo,texto", QUEDAN, ids=[q[1][:50] for q in QUEDAN])
-def test_los_8_digitos_siguen_siendo_ncm(archivo, texto):
-    assert texto in _leer(archivo), f"{archivo} ya no dice {texto!r}"
+@pytest.mark.parametrize("archivo,texto,veces", QUEDAN, ids=[q[1][:50] for q in QUEDAN])
+def test_los_8_digitos_siguen_siendo_ncm(archivo, texto, veces):
+    hay = _leer(archivo).count(texto)
+    assert hay == veces, f"{archivo} ya no dice {texto!r} ({hay} de {veces} veces)"

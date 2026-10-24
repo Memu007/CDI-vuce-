@@ -97,12 +97,18 @@ sabotaje $H "calculadora" '<label class="field-label" for="calcNcm">NCM</label>'
   '<label class="field-label" for="calcNcm">PA SIM</label>' "ya no dice '<label class=\"field-label\" for=\"calcNcm\">NCM</label>'"
 sabotaje $H "notas del capítulo" "Recordatorios privados del capítulo NCM" "Recordatorios privados del capítulo PA SIM" \
   "ya no dice 'Recordatorios privados del capítulo NCM'"
-sabotaje $H "planilla maestra" "Importar planilla maestra de NCMs" "Importar planilla maestra de PA SIM" \
-  "ya no dice 'Importar planilla maestra de NCMs'"
+sabotaje $H "planilla maestra, botón" 'title="Importar planilla maestra de NCMs' 'title="Importar planilla maestra de PA SIM' \
+  "ya no dice 'Importar planilla maestra de NCMs' (1 de 2 veces)"
+sabotaje $H "planilla maestra, título" '>Importar planilla maestra de NCMs<' '>Importar planilla maestra de PA SIM<' \
+  "ya no dice 'Importar planilla maestra de NCMs' (1 de 2 veces)"
 sabotaje $N "NCM sin asignar" "La NCM de 8 dígitos todavía no fue asignada." "La PA SIM todavía no fue asignada." \
   "ya no dice 'La NCM de 8 dígitos todavía no fue asignada.'"
-sabotaje $N "NCM que trae VUCE" "'<span class=\"spotlight-vuce-ncm\">NCM ' +" "'<span class=\"spotlight-vuce-ncm\">PA SIM ' +" \
-  "ya no dice '\\'<span class=\"spotlight-vuce-ncm\">NCM \\' + CDI.escapeHtml(formattedBaseNcm)'"
+sabotaje $N "NCM que se consulta a VUCE, cargando" \
+  "NCM ' + CDI.escapeHtml(formatted) + '</span>' +"$'\n'"                '<span class=\"spotlight-vuce-status\">Consultando" \
+  "PA SIM ' + CDI.escapeHtml(formatted) + '</span>' +"$'\n'"                '<span class=\"spotlight-vuce-status\">Consultando" \
+  "(1 de 2 veces)"
+sabotaje $N "NCM que se consulta a VUCE, con respuesta" "\">NCM ' + CDI.escapeHtml(formattedBaseNcm)" \
+  "\">PA SIM ' + CDI.escapeHtml(formattedBaseNcm)" "(0 de 1 veces)"
 sabotaje $N "largo de la posición" "NCM (8) + detalle SIM (3)." "PA SIM (8) + detalle SIM (3)." \
   "ya no dice 'La posición SIM debe tener 11 dígitos: NCM (8) + detalle SIM (3).'"
 
