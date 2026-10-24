@@ -108,5 +108,13 @@ Consultado antes del veredicto. Pidió:
 
 ## Suite de la PM
 
-En curso al escribir este veredicto (worktree en `b0c920b`); el resultado se
-agrega acá en el commit siguiente. Hasta entonces, no corrida por la PM.
+Corrida en `b0c920b` (worktree limpio, `--no-cov --timeout=120`), terminada
+después del commit del veredicto:
+
+```
+==== 1757 passed, 102 skipped, 2 xfailed, 23 warnings in 241.11s (0:04:01) =====
+fin: b0c920b
+exit 0
+```
+
+Igual a la de la Dev en el mismo SHA.
