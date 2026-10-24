@@ -4,15 +4,19 @@ Actualizado: 2026-10-24. Estado vigente; la historia está en Git.
 
 Método al día con CAMBIOS.md del secondbrain hasta 2026-10-21 (aplicado 2026-10-24).
 
-**Publicado 2026-10-24 18:40 UTC:** `main` = `dddcf6d` (EXCEL-2), con
-«dale dddcf6d» de Emi; avance limpio sobre `648cd2f`; CI 40017165638 verde
-(tests y e2e) sobre ese SHA. Railway no se puede mirar desde el entorno de
-la PM (el dominio está bloqueado); Emi lo probó en el sitio y anda (subió un Excel).
+**Publicado 2026-10-24 20:33 UTC:** `main` = `8b45207` (EXCEL-3 + CLIENTE-1),
+con «dale 8b45207» de Emi; avance limpio sobre `dddcf6d`. Evidencia: CI
+40128443771 verde (tests y e2e) sobre ese SHA; producto idéntico a `3fd8826`,
+donde la suite local de la PM dio verde; sabotajes sobre `8b45207`: excel3
+27/27 en rojo; cliente1 14 rojos y 1 «sin rojo» por una carrera de la prueba
+(el foco a `#cfNombre` a los 80 ms parte el `fill` del CUIT; reproducida 2
+de 82), sólo de prueba, va como PRUEBAS-1. La cadena de los scripts de piezas
+viejas sigue corriendo y se anota al terminar. Falta: que Emi lo pruebe en el
+sitio (proforma real y alta de cliente).
 
 **EXCEL-3 aceptada 2026-10-24 19:30 UTC** (Dev técnica; producto `f3f9eb8` +
 `b76be2f`): integrada por SHA (`a173af2`) a la rama de la PM, merge `a0c15ac`.
-**No publicada**: `main` sigue en `dddcf6d`; para publicar, CI verde sobre el
-SHA y «dale <SHA>» de Emi; después Emi prueba la proforma real en el sitio.
+**Publicada** en `8b45207` (arriba); falta que Emi pruebe la proforma real en el sitio.
 Detalle en `REPRODUCCION-EXCEL-3-2026-10-24.md`. D1 (descuento positivo,
 sólo leído) y D2 (CLIENTE-1, a la vista con aviso) decididas por la PM;
 Emi puede cambiarlas. Lo menor del adversario queda como EXCEL-3b, después
@@ -21,7 +25,7 @@ de PA-1.
 **CLIENTE-1 aceptada 2026-10-24 19:41 UTC** (Dev técnica; producto `fbc006a` +
 `12ff9b6`): el alta de cliente muestra CUIT, razón social, domicilio e inicio
 de actividad y avisa cuáles faltan. Integrada por SHA (`c402bcb`) a la rama
-de la PM, merge `23d7d5d`. **No publicada.** Detalle en
+de la PM, merge `23d7d5d`. **Publicada** en `8b45207`. Detalle en
 `REPRODUCCION-CLIENTE-1-2026-10-24.md`. D3 (a) decidida por la PM: editar no
 borra una fecha guardada en otro formato; va con PA-1. Hallazgo: la fecha de
 inicio va al TXT como `AAAA-MM-DD` y el MARIA usa `DD/MM/AAAA`; sumado a
