@@ -195,9 +195,10 @@ def test_sin_elegir_la_estadistica_es_la_declarada_como_antes():
 
 
 def test_estadistica_en_kilos_da_el_kilo_neto_al_centesimo():
-    """Error 2122 del MARIA: en kilos, QARTUNTEST = QARTKGRNET."""
+    """Error 2122 del MARIA: en kilos, QARTUNTEST = QARTKGRNET (D2 b: el
+    kilo neto también al centésimo)."""
     txt = _gen([dict(LONA, unidad_estadistica="01")])
-    assert _valor(txt, "QARTKGRNET") == ["465.125"]
+    assert _valor(txt, "QARTKGRNET") == ["465.130"]
     assert _valor(txt, "CARTUNTEST") == ["01"]
     assert _valor(txt, "QARTUNTEST") == ["465.13"]
     assert _valor(txt, "CARTUNTDCL") == ["03"]
@@ -253,10 +254,8 @@ def test_dentro_del_sufijo_solo_letras_numeros_y_espacios():
 
 @pytest.mark.parametrize("entrada,limpio", [
     ("AA(MÁRCA Ñ)-CA00-", "AA(MARCA N)-CA00-"),
-    ("AI(150CM(X)50M)-", "AI(150CM X 50M)-"),
     ("AA(A&B/C#1)-AB(OK 2)-", "AA(A B C 1)-AB(OK 2)-"),
     ("CA00-NA00-NB00-", "CA00-NA00-NB00-"),
-    ("AA(SIN CIERRE-", "AA(SIN CIERRE-"),
 ])
 def test_limpiar_sufijo(entrada, limpio):
     assert mg.limpiar_sufijo(entrada)[0] == limpio

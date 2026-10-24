@@ -275,8 +275,8 @@ def test_un_renglon_sin_cantidad_no_es_un_subitem(cantidad):
 def test_el_unitario_del_item_es_el_fob_sobre_la_cantidad_declarada():
     """3 + 7,005 = 10,005, que se declara 10,01: el unitario tiene que ser
     12,44 / 10,01 = 1,2428 y no 12,44 / 10,005 = 1,2434."""
-    renglones = [dict(LONA, cantidad=3, valor_unitario=1.24, sufijo="A"),
-                 dict(LONA, cantidad=7.005, valor_unitario=1.245, sufijo="B")]
+    renglones = [dict(LONA, cantidad=3, valor_unitario=1.24, sufijo="AA(A)-"),
+                 dict(LONA, cantidad=7.005, valor_unitario=1.245, sufijo="AA(B)-")]
     art = _bloques(_gen(renglones), "ART")[0]
     assert (art["QARTUNTDCL"], art["MARTFOB"], art["MARTUNITAR"]) == ("10.01", "12.44", "1.2428")
 
@@ -299,8 +299,8 @@ def test_kilos_que_al_restar_quedarian_negativos_no_se_generan():
 
 def test_el_fob_de_medio_centavo_sube_y_el_item_cierra():
     """3 × 3,335 = 10,005: sube a 10,01 (no al par, 10,00) y el ítem suma eso."""
-    renglones = [dict(LONA, cantidad=3, valor_unitario=3.335, sufijo="A"),
-                 dict(LONA, cantidad=1, valor_unitario=1, sufijo="B")]
+    renglones = [dict(LONA, cantidad=3, valor_unitario=3.335, sufijo="AA(A)-"),
+                 dict(LONA, cantidad=1, valor_unitario=1, sufijo="AA(B)-")]
     txt = _gen(renglones)
     art, sbts = _bloques(txt, "ART")[0], _bloques(txt, "SBT")
     assert [s["MSBTFOB"] for s in sbts] == ["10.01", "1.00"]
@@ -309,21 +309,21 @@ def test_el_fob_de_medio_centavo_sube_y_el_item_cierra():
 
 def test_si_empatan_el_sobrante_va_al_primero():
     """Tres renglones de 1,005 m² salen 1,01 cada uno (3,03) contra 3,02."""
-    renglones = [dict(LONA, cantidad=1.005, valor_unitario=2, sufijo=s) for s in "ABC"]
+    renglones = [dict(LONA, cantidad=1.005, valor_unitario=2, sufijo=f"AA({s})-") for s in "ABC"]
     sbts = _bloques(_gen(renglones), "SBT")
     assert [s["QSBTUNTDCL"] for s in sbts] == ["1.00", "1.01", "1.01"]
 
 
 def test_un_renglon_con_total_y_sin_unitario():
-    renglones = [dict(LONA, cantidad=4, valor_unitario=None, valor_total=9, sufijo="A"),
-                 dict(LONA, cantidad=1, valor_unitario=1, sufijo="B")]
+    renglones = [dict(LONA, cantidad=4, valor_unitario=None, valor_total=9, sufijo="AA(A)-"),
+                 dict(LONA, cantidad=1, valor_unitario=1, sufijo="AA(B)-")]
     sbt = _bloques(_gen(renglones), "SBT")[0]
     assert (sbt["MSBTFOB"], sbt["QSBTUNTDCL"], sbt["MSBTUNITAR"]) == ("9.00", "4.00", "2.2500")
 
 
 def test_declarada_en_kilos_la_cantidad_y_los_kilos_son_de_cada_renglon():
-    renglones = [dict(LONA, unidad="kg", unidad_estadistica="kg", cantidad=100, peso_kg=98.5, sufijo="A"),
-                 dict(LONA, unidad="kg", unidad_estadistica="kg", cantidad=50, peso_kg=49.25, sufijo="B")]
+    renglones = [dict(LONA, unidad="kg", unidad_estadistica="kg", cantidad=100, peso_kg=98.5, sufijo="AA(A)-"),
+                 dict(LONA, unidad="kg", unidad_estadistica="kg", cantidad=50, peso_kg=49.25, sufijo="AA(B)-")]
     txt = _gen(renglones)
     art, sbts = _bloques(txt, "ART")[0], _bloques(txt, "SBT")
     assert [(s["QSBTUNTDCL"], s["QSBTUNTEST"]) for s in sbts] == [("100.00", "98.50"), ("50.00", "49.25")]
@@ -349,7 +349,7 @@ def test_kilos_de_un_renglon_que_al_centesimo_dan_cero_no_se_generan():
 
 def test_los_avisos_dicen_que_renglones_van_juntos():
     renglones = _lonas()[:3] + [dict(LONA, pieza="39211390900F")]
-    avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor="X")
+    avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor="AA(X)-")
     assert any("renglones 1, 2 y 3 van en un solo ítem con 3 sub-ítems" in a for a in avisos)
 
 
@@ -362,7 +362,7 @@ def test_los_avisos_dicen_si_todos_los_subitems_llevan_el_mismo_sufijo():
 def test_los_avisos_dicen_si_se_limpio_el_sufijo_de_un_renglon():
     renglones = _lonas()[:2]
     renglones[1]["sufijo"] = "AA(MARCA)-AI(620G-BLUE.010 150CMX50M)-"
-    avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor="X")
+    avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor="AA(X)-")
     assert any(a.startswith("Sufijo de valor del renglón 2:")
                and "«AA(MARCA)-AI(620G BLUE 010 150CMX50M)-»" in a for a in avisos)
 
