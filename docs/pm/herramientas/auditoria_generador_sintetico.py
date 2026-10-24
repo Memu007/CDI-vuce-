@@ -24,7 +24,7 @@ for ref in refs:
             "origen": "IT", "cantidad": 2, "valor_unitario": 10,
             "peso_unitario": 1.25,
         }],
-        moneda="EUR", incoterm="FOB", sbt_sufijo_valor="SINTETICO",
+        moneda="EUR", incoterm="FOB", sbt_sufijo_valor="AA(SINTETICO)-",
         fecha_emision="01/01/2026",
     )
     default = namespace["generate_maria_txt"](**args).splitlines()
