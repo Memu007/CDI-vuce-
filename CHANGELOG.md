@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-24 · fix: editar un cliente no borra una fecha de inicio que no es AAAA-MM-DD (D3)
+
+- **fix(clientes):** si la fecha guardada no se puede mostrar en el campo de fecha y se deja vacío, al guardar no se manda y se conserva; el aviso no la pide. Una fecha cargada la reemplaza. Contra: esa fecha ya no se puede borrar desde el formulario.
+
 ## 2026-10-24 · feat: alta de cliente con lo que pide el MARIA (CLIENTE-1)
 
 - **feat(clientes):** razón social, CUIT, domicilio e inicio de actividad a la vista y marcados «lo pide el MARIA»; email y teléfono en «Más datos». Se guarda sin ellos, con un aviso de cuáles faltan; el detalle muestra el inicio de actividad.
