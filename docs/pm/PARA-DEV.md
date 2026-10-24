@@ -139,6 +139,14 @@ sabotaje; numeración de la tabla de `REPRODUCCION-EXCEL-3-2026-10-24.md`:
 5. (#1, #9) «Descuento …» con importe negativo y sin NCM se avisa (no entra
    como producto de valor 0); «1,5m» en el largo no repite la unidad.
 
+## Más adelante — CLIENTE-1b: validar la fecha de inicio en el alta
+
+Salió de MARIA-7 (D5 de la Dev MARIA). `POST /api/clientes` guarda la fecha
+de inicio de actividad con `[:10]` sin validar; un valor que no es
+`AAAA-MM-DD` ni `DD/MM/AAAA` recién frena al generar el TXT. Al guardar, esas
+dos formas pasan y lo demás da error claro en el formulario. Sin migrar lo
+ya guardado (tu D3 de CLIENTE-1 lo conserva). Después de EXCEL-3b.
+
 ## Más adelante — GUARDAR-2
 
 Ya hay un candidato aislado: `2d930c5` en la rama vieja
