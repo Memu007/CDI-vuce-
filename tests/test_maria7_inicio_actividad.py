@@ -30,6 +30,16 @@ def test_lo_que_no_es_fecha_no_se_adivina_y_dice_donde_corregirla(guardada):
     assert "«Clientes»" in mensaje and "«Inicio de actividad»" in mensaje
 
 
+def test_el_anio_sale_con_cuatro_cifras():
+    """`strftime("%Y")` no completa con ceros en Linux: «0099» salía «99»."""
+    assert _inicio_actividad(_gen(comprador_fecha_inic_activ="0099-03-01")).strip() == "01/03/0099"
+
+
+def test_el_error_nombra_el_campo_de_la_revision():
+    with pytest.raises(ValueError, match="«Fecha inicio de actividades»"):
+        _gen(comprador_fecha_inic_activ="marzo")
+
+
 def test_sin_fecha_el_bloque_no_sale_como_antes():
     assert "CCPL=FECHA INIC.ACTIV" not in _gen(comprador_fecha_inic_activ="")
 

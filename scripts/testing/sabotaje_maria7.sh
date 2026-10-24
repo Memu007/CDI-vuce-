@@ -178,5 +178,9 @@ caso "inicio_tal_cual" "FAILED $TI::test_sale_dd_mm_aaaa_con_el_ancho_de_siempre
 reemplazar $F '                break  # «2015-02-30»' '                return texto  # «2015-02-30»'
 caso "inicio_imposible" "FAILED $TI::test_lo_que_no_es_fecha_no_se_adivina_y_dice_donde_corregirla[2015-02-30]"
 
+# 25. el año vuelve a salir sin completar con ceros («0099» → «99»)
+reemplazar $F '                return f"{fecha.day:02d}/{fecha.month:02d}/{fecha.year:04d}"  # %Y no rellena' '                return fecha.strftime("%d/%m/%Y")'
+caso "inicio_anio_corto" "FAILED $TI::test_el_anio_sale_con_cuatro_cifras"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 24 sabotajes dan rojo por la razón esperada"
+echo "OK: los 25 sabotajes dan rojo por la razón esperada"
