@@ -1174,12 +1174,20 @@
         });
     }
 
+    // AAAA-MM-DD → DD/MM/AAAA; otro formato guardado se muestra tal cual.
+    function fechaDdMmAaaa(iso) {
+        const txt = String(iso || '').trim();
+        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(txt);
+        return m ? m[3] + '/' + m[2] + '/' + m[1] : txt;
+    }
+
     function renderDatos(c) {
         if (!datosGrid) return;
         const rows = [
             ['Razón social', c.nombre || '—'],
             ['CUIT', (c.cuit && CDI.formatCuit) ? CDI.formatCuit(c.cuit) : (c.cuit || '—')],
             ['Domicilio', c.direccion || '—'],
+            ['Inicio de actividad', fechaDdMmAaaa(c.fecha_inic_activ) || '—'],
             ['Email', c.email || '—'],
             ['Teléfono', c.telefono || '—'],
             ['Origen habitual', c.default_origin || '—'],
@@ -1670,7 +1678,7 @@
         if (fFechaInicActiv) fFechaInicActiv.value = c.fecha_inic_activ || '';
         const hasAdvanced = !!(
             c.email || c.telefono || c.default_origin ||
-            c.preferred_currency || c.notas || c.fecha_inic_activ
+            c.preferred_currency || c.notas
         );
         if (fAdvanced) fAdvanced.open = hasAdvanced;
     }
@@ -1760,7 +1768,17 @@
                 selectCliente(guardado.id);
             }
             closeForm();
-            CDI.toast && CDI.toast.success(isEdit ? 'Cliente actualizado' : 'Cliente creado', nombre);
+            // CLIENTE-1: se guarda sin lo que pide el MARIA, pero se avisa qué
+            // falta (lo que no puede faltar lo frena la generación del TXT).
+            const faltan = [
+                [cuitNorm, 'CUIT'], [direccion, 'domicilio'], [fechaInicActiv, 'inicio de actividad'],
+            ].filter(([v]) => !v).map(([, n]) => n);
+            const titulo = isEdit ? 'Cliente actualizado' : 'Cliente creado';
+            if (faltan.length && CDI.toast) {
+                CDI.toast(titulo, nombre + '. Faltan para el MARIA: ' + faltan.join(', ') + '.', 'warning');
+            } else {
+                CDI.toast && CDI.toast.success(titulo, nombre);
+            }
         } catch (err) {
             showFormError(String(err.message || err));
         } finally {

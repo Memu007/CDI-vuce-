@@ -1177,21 +1177,28 @@
             </header>
             <div class="cx-modal-body">
                 <div class="field">
-                    <label class="field-label" for="cfNombre">Razón social <span class="field-required">· requerido</span></label>
+                    <label class="field-label" for="cfNombre">Razón social <span class="field-required">· requerido · lo pide el MARIA</span></label>
                     <input class="input" type="text" id="cfNombre" autocomplete="off">
                 </div>
                 <div class="field-row">
                     <div class="field">
-                        <label class="field-label" for="cfCuit">CUIT</label>
+                        <label class="field-label" for="cfCuit">CUIT <span class="field-required">· lo pide el MARIA</span></label>
                         <input class="input" type="text" id="cfCuit" placeholder="XX-XXXXXXXX-X" inputmode="numeric" autocomplete="off">
                         <span class="field-hint">11 dígitos. Se normaliza al guardar.</span>
                     </div>
                     <div class="field">
-                        <label class="field-label" for="cfDireccion">Domicilio</label>
+                        <label class="field-label" for="cfDireccion">Domicilio <span class="field-required">· lo pide el MARIA</span></label>
                         <input class="input" type="text" id="cfDireccion" autocomplete="off">
-                        <span class="field-hint">Opcional. Se usa en el MARIA.TXT.</span>
                     </div>
                 </div>
+                <div class="field-row">
+                    <div class="field">
+                        <label class="field-label" for="cfFechaInicActiv">Inicio de actividad <span class="field-required">· lo pide el MARIA</span></label>
+                        <input class="input" type="date" id="cfFechaInicActiv" autocomplete="off">
+                    </div>
+                    <div class="field"></div>
+                </div>
+                <p class="field-hint">Se puede guardar sin estos datos; al guardar te avisamos cuáles faltan para el MARIA.TXT.</p>
 
                 <details class="cx-form-advanced" id="cfAdvanced">
                     <summary class="cx-form-advanced-summary">
@@ -1237,14 +1244,6 @@
                                     <option value="CNY">CNY</option>
                                 </select>
                             </div>
-                        </div>
-                        <div class="field-row">
-                            <div class="field">
-                                <label class="field-label" for="cfFechaInicActiv">Inicio de actividad</label>
-                                <input class="input" type="date" id="cfFechaInicActiv" autocomplete="off">
-                                <span class="field-hint">Se propaga al MARIA.TXT en cada operación.</span>
-                            </div>
-                            <div class="field"></div>
                         </div>
                         <div class="field">
                             <label class="field-label" for="cfNotas">Notas internas</label>
