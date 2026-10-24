@@ -9,6 +9,8 @@ import math
 import os
 import json
 import hashlib
+import unicodedata
+from datetime import datetime
 
 # Cargar variables de entorno desde .env
 from dotenv import load_dotenv
@@ -2198,6 +2200,66 @@ def _texto(raw) -> str:
 _TEXTO_VACIO = {'NONE', 'NULL', 'N/A'}
 
 
+# MARIA-7, punto 8: la fecha viene tal como está escrita en la factura y el
+# orden lo decide este código, no Gemini (el 24/10 «2026/08/07» salió
+# 08/07/2026). Meses en letras: castellano, inglés y portugués.
+_MESES = {
+    'ENE': 1, 'JAN': 1, 'FEB': 2, 'FEV': 2, 'MAR': 3, 'ABR': 4, 'APR': 4,
+    'MAY': 5, 'MAI': 5, 'JUN': 6, 'JUL': 7, 'AGO': 8, 'AUG': 8, 'SEP': 9,
+    'SET': 9, 'OCT': 10, 'OUT': 10, 'NOV': 11, 'DIC': 12, 'DEC': 12, 'DEZ': 12,
+}
+_NOMBRE_DEL_MES = ('enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+                   'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre')
+_SEP_FECHA = r"\s*[/.\-年月]\s*"
+
+
+def _fecha_o_vacia(dia: int, mes: int, anio: int) -> str:
+    try:
+        fecha = datetime(anio, mes, dia)
+    except ValueError:
+        return ""
+    return fecha.strftime("%d/%m/%Y") if fecha.year >= 1900 else ""
+
+
+def _fecha_leida(raw) -> tuple[str, str]:
+    """(fecha en DD/MM/AAAA, aviso). Con el año adelante el orden es
+    año/mes/día. Con el año al final, si uno de los dos primeros pasa de 12
+    ése es el día; si los dos son 12 o menos y distintos no se adivina: sale
+    vacía con un aviso que pregunta (Emi, 2026-10-24)."""
+    texto = _texto(raw)
+    if not texto:
+        return "", ""
+    pregunta = f"Fecha de emisión: «{texto[:30]}» "
+    m = re.fullmatch(rf"([0-9]{{4}}){_SEP_FECHA}([0-9]{{1,2}}){_SEP_FECHA}([0-9]{{1,2}})\s*日?", texto)
+    if m:
+        anio, mes, dia = (int(g) for g in m.groups())
+        fecha = _fecha_o_vacia(dia, mes, anio)
+        return fecha, "" if fecha else pregunta + "no es una fecha. Cargala en la revisión."
+    m = re.fullmatch(rf"([0-9]{{1,2}}){_SEP_FECHA}([0-9]{{1,2}}){_SEP_FECHA}([0-9]{{4}}|[0-9]{{2}})", texto)
+    if m:
+        a, b, anio = (int(g) for g in m.groups())
+        if len(m.group(3)) == 2:
+            anio += 2000
+        if 1 <= a <= 12 and 1 <= b <= 12 and a != b:
+            return "", (pregunta + f"puede ser el {a} de {_NOMBRE_DEL_MES[b - 1]} o el {b} de "
+                        f"{_NOMBRE_DEL_MES[a - 1]}; no se adivina. Cargala en la revisión (DD/MM/AAAA).")
+        dia, mes = (b, a) if b > 12 else (a, b)
+        fecha = _fecha_o_vacia(dia, mes, anio)
+        return fecha, "" if fecha else pregunta + "no es una fecha. Cargala en la revisión."
+    # Con el mes en letras no hay duda: «7 Aug 2026», «Aug 7, 2026», «7 de agosto de 2026».
+    sin_tildes = ''.join(c for c in unicodedata.normalize('NFKD', texto.upper()) if not unicodedata.combining(c))
+    m = (re.fullmatch(r"([0-9]{1,2})(?:ST|ND|RD|TH)?[\s.\-/]*(?:DE\s+)?([A-Z]{3})[A-Z]*\.?[\s.\-/,]*(?:DE\s+)?([0-9]{4})", sin_tildes)
+         or re.fullmatch(r"([A-Z]{3})[A-Z]*\.?[\s.\-/]*([0-9]{1,2})(?:ST|ND|RD|TH)?[\s,.\-/]*([0-9]{4})", sin_tildes))
+    if m:
+        g = m.groups()
+        dia, nombre = (g[0], g[1]) if g[0].isdigit() else (g[1], g[0])
+        if nombre in _MESES:
+            fecha = _fecha_o_vacia(int(dia), _MESES[nombre], int(g[2]))
+            if fecha:
+                return fecha, ""
+    return "", pregunta + "no se pudo leer como fecha. Cargala en la revisión (DD/MM/AAAA)."
+
+
 def _texto_del_producto(item_data: dict) -> tuple[str, str]:
     """La descripción (con la versión sumada) y el código de parte de un
     producto, igual en las dos copias del lector (MARIA-5)."""
@@ -2333,7 +2395,7 @@ SECCIÓN 1: DATOS DE LA OPERACIÓN (buscar en encabezado)
 Busca esta información en el encabezado de la factura:
 
 1. numero_factura: Número de factura/invoice (ej: "E001-1", "INV-2025-001")
-2. fecha_emision: Fecha de la factura (formato DD/MM/YYYY)
+2. fecha_emision: Fecha de la factura copiada TAL COMO ESTÁ ESCRITA (ej: "2026/08/07", "07.08.2026", "Aug 7, 2026"). NO la conviertas ni cambies el orden de día, mes y año.
 3. vendedor_nombre: Nombre del vendedor/proveedor/seller
 4. vendedor_id: ID tributario del vendedor (Tax ID, RUT, CNPJ, etc.)
 5. vendedor_pais: País del vendedor (código ISO2: CN, BR, US, PE, etc.)
@@ -2384,7 +2446,7 @@ FORMATO DE RESPUESTA (JSON estricto)
 {
   "operacion": {
     "numero_factura": "...",
-    "fecha_emision": "DD/MM/YYYY",
+    "fecha_emision": "tal como figura en la factura",
     "vendedor_nombre": "...",
     "vendedor_id": "...",
     "vendedor_pais": "XX",
@@ -2462,10 +2524,11 @@ IMPORTANTE:
 
                     # Extraer datos de operación
                     operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
+                    fecha, aviso_fecha = _fecha_leida(operacion.get('fecha_emision'))
                     operacion_data = {
                         'tipo_destinacion': documento['destinacion'],
                         'numero_factura': _texto(operacion.get('numero_factura')),
-                        'fecha_emision': _texto(operacion.get('fecha_emision')),
+                        'fecha_emision': fecha,
                         'vendedor_nombre': _texto(operacion.get('vendedor_nombre')),
                         'vendedor_id': _texto(operacion.get('vendedor_id')),
                         'vendedor_pais': _origen_desde_factura(operacion.get('vendedor_pais')),
@@ -2479,6 +2542,8 @@ IMPORTANTE:
                         'comprador_domicilio': _texto(operacion.get('comprador_domicilio')),
                     }
                     operacion_data['campos_sin_leer'] = _campos_sin_leer(operacion, decimal)
+                    if aviso_fecha:
+                        operacion_data['avisos_fecha'] = [aviso_fecha]
                     
                     # Extraer items
                     items = []
@@ -2573,7 +2638,7 @@ SECCIÓN 1: DATOS DE LA OPERACIÓN (buscar en encabezado)
 Busca esta información en el encabezado de la factura:
 
 1. numero_factura: Número de factura/invoice (ej: "E001-1", "INV-2025-001")
-2. fecha_emision: Fecha de la factura (formato DD/MM/YYYY)
+2. fecha_emision: Fecha de la factura copiada TAL COMO ESTÁ ESCRITA (ej: "2026/08/07", "07.08.2026", "Aug 7, 2026"). NO la conviertas ni cambies el orden de día, mes y año.
 3. vendedor_nombre: Nombre del vendedor/proveedor/seller
 4. vendedor_id: ID tributario del vendedor (Tax ID, RUT, CNPJ, etc.)
 5. vendedor_pais: País del vendedor (código ISO2: CN, BR, US, PE, etc.)
@@ -2606,7 +2671,7 @@ FORMATO DE RESPUESTA (JSON estricto)
 {
   "operacion": {
     "numero_factura": "...",
-    "fecha_emision": "DD/MM/YYYY",
+    "fecha_emision": "tal como figura en la factura",
     "vendedor_nombre": "...",
     "vendedor_id": "...",
     "vendedor_pais": "XX",
@@ -2658,10 +2723,11 @@ IMPORTANTE:
 
                         # Extraer datos de operación
                         operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
+                        fecha, aviso_fecha = _fecha_leida(operacion.get('fecha_emision'))
                         operacion_data = {
                             'tipo_destinacion': documento['destinacion'],
                             'numero_factura': _texto(operacion.get('numero_factura')),
-                            'fecha_emision': _texto(operacion.get('fecha_emision')),
+                            'fecha_emision': fecha,
                             'vendedor_nombre': _texto(operacion.get('vendedor_nombre')),
                             'vendedor_id': _texto(operacion.get('vendedor_id')),
                             'vendedor_pais': _origen_desde_factura(operacion.get('vendedor_pais')),
@@ -2675,6 +2741,8 @@ IMPORTANTE:
                             'comprador_domicilio': _texto(operacion.get('comprador_domicilio')),
                         }
                         operacion_data['campos_sin_leer'] = _campos_sin_leer(operacion, decimal)
+                        if aviso_fecha:
+                            operacion_data['avisos_fecha'] = [aviso_fecha]
                         
                         # Extraer items
                         items = []

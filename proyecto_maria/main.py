@@ -4027,8 +4027,11 @@ async def upload_pdf_public(
         if not items_data:
              raise HTTPException(status_code=400, detail="No se encontró tabla de items en el PDF. Asegurate de que el PDF tenga una tabla con columnas como: Model/Description, Price, Quantity.")
 
-        # Los dos pesos de una línea que no coinciden (devolución de MARIA-5).
-        avisos = operacion_data.pop('avisos_peso', []) if isinstance(operacion_data, dict) else []
+        # Los dos pesos de una línea que no coinciden (devolución de MARIA-5) y
+        # la fecha que no se pudo ordenar (MARIA-7, punto 8).
+        avisos = []
+        if isinstance(operacion_data, dict):
+            avisos = operacion_data.pop('avisos_fecha', []) + operacion_data.pop('avisos_peso', [])
 
         return {
             "message": "PDF procesado exitosamente",

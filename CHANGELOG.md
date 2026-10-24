@@ -10,6 +10,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - Sin CUIT del despachante no se genera el TXT (antes faltaba CDDTAGR en silencio); IDSO, IDDT e IARTESPAPU van con 8 caracteres y LDVDREFDOC con el número real de la factura.
 - Unidad de la factura y estadística elegibles en «Lo que decide el despachante» (m² = 03; en kilos, la cantidad estadística es el kilo neto al centésimo); en los sufijos sólo letras, números y espacios, con aviso; una cuenta del banco no sale como IDTRIB-PROVEEDOR.
+- La fecha de la factura se lee en su orden: con el año adelante es año/mes/día (`2026/08/07` → `07/08/2026`); si día y mes pueden intercambiarse, queda vacía y se le pregunta al usuario.
 
 ## 2026-10-23 · fix: combinadas XML y lectura normal con ocho libros grandes
 
