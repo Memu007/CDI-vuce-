@@ -209,10 +209,32 @@ aparece cada uno:
 - la calculadora, las notas del capítulo, la planilla maestra, «NCM 8 + SIM
   3 + DC» y los mensajes de largo.
 
-**Sigo con ESTUDIO-1**, que toca qué va al `CDDTAGR`. Necesito que me
-coordines con la Dev MARIA (MARIA-7 punto 3): mientras tanto leo el código
-sin tocar nada de lo suyo. Después, EXCEL-3b.
+### ESTUDIO-1: lo que leí para coordinar (no toqué código)
 
-Última vuelta: 2026-10-24 20:10 UTC
+- **Hoy:** el CUIT del despachante es uno por usuario, `users.cuit`
+  (`database/models.py:31`). Al generar, `main.py:4327-4341` toma el de la
+  operación (`request.cuit_agr`) y, si falta, el del perfil. Después valida
+  los 11 dígitos. Si no hay ninguno, el TXT sale sin `CDDTAGR` y no avisa.
+- **La costura con MARIA-7 punto 3 es ese mismo bloque.** ESTUDIO-1 cambia
+  **de dónde sale** el CUIT: el estudio elegido en la operación, con el
+  perfil como respaldo. El punto 3 cambia **qué pasa si no hay**: error en
+  lugar de omitir. Propongo dividirlo así:
+  - la Dev MARIA agrega el error **después** del bloque, sobre
+    `effective_cuit_agr` vacío;
+  - yo cambio sólo cómo se resuelve, **dentro** del bloque.
+  - El texto del error («dónde cargarlo») depende de ESTUDIO-1: hoy diría
+    «en tu perfil» y después, «en Estudios».
+  - Quien entregue segunda hace el merge.
+- **Necesito que me escribas la tarea en `PARA-DEV.md`.** Hoy ESTUDIO-1 es
+  una sola línea del roadmap. Faltan definir tres cosas:
+  1. si los estudios son por usuario o compartidos;
+  2. dónde se elige el estudio en la operación;
+  3. si el `users.cuit` actual pasa a ser el estudio por omisión. Es una
+     migración de datos, así que lleva revisión fuerte.
 
-/compact conservar: Soy la Dev técnica (Dev 1) de CDI, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica (nunca main), rutina trig_011UpBfwEu9TUzoNUrviqoP5 min 15; aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM con send_message priority next empezando «Dev técnica:». PA-1 + D3 entregadas juntas (puertas sobre a114465; PA-1 producto 489daf4+c7e4c3a; D3 producto 26797f8+d8e084c, pruebas 5d3754c+ce84023+a114465). Abiertas para la PM: D4 (unificar «Posición SIM»), D5 (landing y cotización pública), D6 (enrich.js:207), D7 («None» por POST null en create_cliente; recomiendo (a) pieza de API). D1 y D3 decididas (a). Sigue ESTUDIO-1 (CDDTAGR, coordinado por la PM con MARIA-7 punto 3); después EXCEL-3b. Reglas de Emi: sólo me piden la PM o Emi; nada se publica sin su «dale» para el SHA; nunca main; sin secretos ni datos reales; no tocar maria_generator.py ni el canal/rama de la Dev MARIA; subagentes hasta alto, sin Fable; esfuerzo medio.
+  No arranco el código hasta tener esa tarea. Mientras tanto, si me la
+  marcás, sigo con EXCEL-3b, que ya está definida.
+
+Última vuelta: 2026-10-24 20:20 UTC
+
+/compact conservar: Soy la Dev técnica (Dev 1) de CDI, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica (nunca main), rutina trig_011UpBfwEu9TUzoNUrviqoP5 min 15; aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM con send_message priority next empezando «Dev técnica:». PA-1 + D3 entregadas juntas (puertas sobre a114465; PA-1 producto 489daf4+c7e4c3a; D3 producto 26797f8+d8e084c, pruebas 5d3754c+ce84023+a114465). Abiertas para la PM: D4 (unificar «Posición SIM»), D5 (landing y cotización pública), D6 (enrich.js:207), D7 («None» por POST null en create_cliente; recomiendo (a) pieza de API). D1 y D3 decididas (a). ESTUDIO-1 espera que la PM escriba la tarea y coordine con MARIA-7 punto 3; propuse la costura main.py:4327-4341 (yo resuelvo de dónde sale el CUIT; MARIA el error si falta). Mientras, EXCEL-3b si la PM lo marca. Reglas de Emi: sólo me piden la PM o Emi; nada se publica sin su «dale» para el SHA; nunca main; sin secretos ni datos reales; no tocar maria_generator.py ni el canal/rama de la Dev MARIA; subagentes hasta alto, sin Fable; esfuerzo medio.
