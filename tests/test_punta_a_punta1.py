@@ -499,7 +499,9 @@ def test_dos_productos_reparten_flete_y_seguro_por_su_fob(monkeypatch):
             {"descripcion": "MAQUINA DEMO CHICA", "cantidad": "2", "valor_unitario": "1000.00",
              "peso_total_linea": "260", "origen": "Argentina"},
         ],
-    }, "estados": ["3", "3"]}
+    }, "estados": ["3", "5"]}
+    # Estados distintos: con la misma posición, origen, procedencia y estado
+    # desde MARIA-8 irían en un solo ítem con dos sub-ítems.
     txt, _ = _por_pdf(monkeypatch, factura).generar_y_descargar()
     ddt = _bloques(txt, "DDT")[0]
     arts = _bloques(txt, "ART")

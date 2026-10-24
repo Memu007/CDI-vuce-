@@ -31,7 +31,9 @@ def _cierra(txt):
 
 
 def test_el_flete_de_diez_suma_diez():
-    txt = _gen("OP_CENT", [_item(100), _item(100), _item(400)], flete=10, seguro=10)
+    # Posiciones distintas: desde MARIA-8 la misma posición va en un solo ítem.
+    txt = _gen("OP_CENT", [_item(100), _item(100, pieza="84713019"), _item(400, pieza="84714100")],
+               flete=10, seguro=10)
     assert _campo(txt, "MARTFLE") == [Decimal("1.67"), Decimal("1.66"), Decimal("6.67")]
     _cierra(txt)
 
@@ -43,7 +45,9 @@ def test_cualquier_reparto_cierra(semilla):
     items = []
     for _ in range(azar.randint(1, 9)):
         cantidad = azar.randint(1, 7)
-        items.append(_item(1, cantidad=cantidad, valor_unitario=round(azar.uniform(0.001, 900), 3)))
+        # Tres posiciones: unos van en ítems separados y otros juntos (MARIA-8).
+        items.append(_item(1, cantidad=cantidad, valor_unitario=round(azar.uniform(0.001, 900), 3),
+                           pieza=azar.choice(["84713012", "84713019", "84714100"])))
     txt = _gen("OP_AZAR", items, flete=round(azar.uniform(0, 999), 2), seguro=round(azar.uniform(0, 99), 2))
     _cierra(txt)
 

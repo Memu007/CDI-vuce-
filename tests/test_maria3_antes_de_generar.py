@@ -113,7 +113,7 @@ def test_gastos_fob_explicito_sigue_mandando(client, auth_override):
 
 def test_procedencia_por_operacion_llega_a_cada_producto(client, auth_override):
     data = _generar(client, procedencia="UY",
-                    items=[dict(ITEM_BASE, estado=2), dict(ITEM_BASE, estado=2, pieza="2")],
+                    items=[dict(ITEM_BASE, estado=2), dict(ITEM_BASE, estado=4, pieza="2")],
                     sbt_sufijo_valor=SUF_A)
     lineas = [ln for ln in data["content"].split("\r\n") if ln.startswith("CARTPAYPRC=")]
     assert lineas == ["CARTPAYPRC=225", "CARTPAYPRC=225"]
@@ -160,7 +160,8 @@ def test_procedencias_que_antes_se_rechazaban(client, auth_override, codigo):
 
 
 def test_procedencia_de_item_en_blanco_no_pisa_la_de_la_operacion(client, auth_override):
-    items = [dict(ITEM_BASE, estado=2, pais_procedencia="  "), dict(ITEM_BASE, estado=2, procedencia=" ")]
+    # Estados distintos: desde MARIA-8 la misma posición iría en un solo ítem.
+    items = [dict(ITEM_BASE, estado=2, pais_procedencia="  "), dict(ITEM_BASE, estado=4, procedencia=" ")]
     data = _generar(client, procedencia="UY", items=items)
     assert [ln for ln in data["content"].split("\r\n") if ln.startswith("CARTPAYPRC=")] == \
         ["CARTPAYPRC=225", "CARTPAYPRC=225"]
