@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-24 · fix: la proforma china sin leer de más (EXCEL-3b)
+
+- **fix(excel):** un subtotal con largo y sin precio, un flete o descuento sin monto y un código nuevo sin especificación ya no toman la descripción del renglón de arriba: quedan sin leer, con aviso. Una nota en «Remarks» no vuelve flete o descuento a un renglón; un «Descuento comercial -500» no entra como producto.
+- La unidad que sale sólo del encabezado del precio («USD/M») se avisa; un largo escrito «1,5m» no sale «1,5m m».
+
 ## 2026-10-24 · fix: la demo de la landing dice «3 PA SIM» (PA-1b)
 
 - **fix(landing):** el paso 3 del progreso de la demo dice «PA SIM», como la aplicación. El encabezado de la tabla de la demo sigue en «NCM» (sus valores son de 8 dígitos): lo decide la PM.
