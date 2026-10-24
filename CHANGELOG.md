@@ -12,6 +12,15 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - Unidad de la factura y estadística elegibles en «Lo que decide el despachante» (m² = 03; en kilos, la cantidad estadística es el kilo neto al centésimo); en los sufijos sólo letras, números y espacios, con aviso; una cuenta del banco (IBAN verificado) no sale como IDTRIB-PROVEEDOR y el código chino de crédito social sí; una factura más larga que LDVDREFDOC se avisa antes de generar.
 - La fecha de la factura se lee en su orden: con el año adelante es año/mes/día (`2026/08/07` → `07/08/2026`); si día y mes pueden intercambiarse o el año tiene dos cifras, queda vacía y se le pregunta al usuario; la revisión respeta ese orden.
 
+## 2026-10-24 · feat: alta de cliente con lo que pide el MARIA (CLIENTE-1)
+
+- **feat(clientes):** razón social, CUIT, domicilio e inicio de actividad a la vista y marcados «lo pide el MARIA»; email y teléfono en «Más datos». Se guarda sin ellos, con un aviso de cuáles faltan; el detalle muestra el inicio de actividad.
+
+## 2026-10-24 · fix: la proforma china se lee tal como viene (EXCEL-3)
+
+- **fix(excel):** una proforma sin NCM, con el código y la especificación sólo en el primer renglón de cada grupo, sale con un producto por renglón (con su ancho y largo); con el precio por m² la cantidad es la de m² y la unidad viaja al TXT.
+- El flete y el descuento de la planilla no entran como productos: se devuelven leídos en la operación, con aviso.
+
 ## 2026-10-23 · fix: combinadas XML y lectura normal con ocho libros grandes
 
 - Los subítems mal formados conservan su mensaje específico, sin confundirse con un producto inválido.

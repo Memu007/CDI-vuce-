@@ -1,53 +1,137 @@
 # Dev → PM
 
-## EXCEL-2 integrada sobre release 648cd2f — devolución de 23 de octubre
+Este archivo es mío y vos no lo tocás. Acá te informo.
 
-**Resultado: no aceptar aún. El mensaje de subítems de CI está corregido; queda un rojo de concurrencia con cobertura en diagnóstico PM.** Rama local `codex/excel2-integration-648`, clone `/private/tmp/cdi-excel2-integration-648`. Base publicada `648cd2f`; producto inicial `7e9c4e0`; integración inicial de pruebas `d448033`. Devolución de los dos bloqueantes: producto `3906130`, pruebas `b073ba4`, prueba durable de concurrencia `0666881360962c3501b863ffbcd6a7518eacf25c`. La entrega original terminó con documentación `0389f0c`; después se corrige el mensaje específico de subítems en producto `be17e1b` (ver devolución siguiente).
+## CLIENTE-1 — alta de cliente con lo que pide el MARIA: entregada
 
-### Alcance y preservación
+**Resultado: terminada, para revisar.** Hecha según tu D2 = (a). En el alta
+se ven arriba la razón social, el CUIT, el domicilio y el inicio de
+actividad, marcados «lo pide el MARIA». El email y el teléfono quedan en
+«Más datos». El cliente se guarda igual sin esos datos, con un aviso de
+advertencia que dice cuáles faltan. Con los cuatro cargados no hay aviso. No
+cambian la API, la importación de clientes ni el alta rápida desde la
+revisión (`review.js` no se tocó).
 
-Se aplicó sólo el diff EXCEL-2 `1cdfe49..04e1d0` con tres vías sobre `648cd2f`; ningún conflicto de producto. No se incorporó su historia, GUARDAR-2 ni cobro. No se trajeron los documentos PM antiguos: se preservaron los actuales y se reemplaza únicamente este canal Dev. El CHANGELOG sucio previo (11 líneas de EXCEL-2/XML) se conservó y se agrega esta devolución.
+| Qué | SHA |
+|---|---|
+| Base (merge de tu rama con D2) | `cb98105` |
+| Producto | `fbc006a` + `12ff9b6` (lo que salió de la autorrevisión) |
+| Pruebas: pantalla y sabotajes | `9c53522`, `b0c920b` |
+| Informe | este commit |
 
-Las funciones de peso `_dice_de_una_unidad`, `_bruto_de_una_unidad`, `_clase_de_peso`, `_peso_por_unidad` y la guarda EC permanecieron idénticas al release. Continúan la clasificación DOC-1, el estado/undo por operación y `use_mapping` omitido=True/false explícito/422 inválido. Sin cambios de dependencias, topes, esquema ni despliegue.
+Archivos de producto que toqué: `proyecto_maria/templates/dashboard_v2.html`
+(formulario de cliente), `proyecto_maria/static/v2/screens/clientes.js`
+(alta y detalle) y `proyecto_maria/static/v2/app_v2.js` (una línea: el
+ícono de los avisos de advertencia, compartido).
 
-### Dos bloqueantes corregidos
+### Decisiones
 
-1. La lectura de `mergeCell` tenía otra regex literal de atributos y perdía el origen de la segunda línea con XML válido. Ahora Expat estándar lee los atributos de la primera hoja sin construir un árbol, reconoce comillas/espacios/entidades y sólo cuenta elementos del namespace de la planilla.
-2. Ocho hojas de 10282491 bytes, dentro de 10 MiB, ocupaban la lectura de pandas antes de aplicar el límite de 5000 filas; la carga normal vencía a los 30 s. La misma pasada XML rechaza antes de pandas sólo cuando encuentra más de 5000+31 filas con valores numéricos reales. Es una cota conservadora: se descuentan hasta 31 filas para localizar el encabezado, no se cuentan huecos, estilos, sharedStrings, fórmulas sin valor ni NaN. No se usa nrows ni se truncan filas. El control completo posterior sigue vigente.
+- **D1 (de EXCEL-3), sigue abierta.** Son el nombre y el signo de
+  `operacion.descuento` para VALOR-1. El planteo está en el informe de
+  EXCEL-3 (`8622aab`). Recomiendo (a): queda como está, positivo.
+- **D3. ¿Arreglo que al editar un cliente se borre una fecha de inicio que
+  no está en formato AAAA-MM-DD?** Esto ya pasaba antes de CLIENTE-1; ahora
+  el campo está a la vista. Si un cliente tiene `fecha_inic_activ =
+  '01/03/2015'` (la API acepta cualquier texto de hasta 10 caracteres), el
+  campo de fecha del formulario lo muestra vacío. Al guardar cualquier
+  cambio, se manda vacío y la fecha queda en NULL, sin aviso. La
+  importación asistida normaliza a ISO, así que el caso entra por la API o
+  por datos viejos. Opciones:
+  (a) arreglarlo ahora en `clientes.js`: si la fecha guardada no es ISO y
+  el campo queda vacío, no se manda (la fecha se conserva);
+  (b) pieza aparte, que la API normalice o rechace las fechas que no son
+  ISO;
+  (c) dejarlo.
+  **Recomiendo (a)**: son unas pocas líneas en el mismo archivo y evitan
+  perder datos. (b) toca la API, que D2 dejó afuera.
 
-### Evidencia sobre esta devolución
+### Qué cambió
 
-- Rojo previo, nuevos fixtures sobre `d448033`: **4 failed, 1 passed**. Tres variantes XML pierden origen y la falta de guarda llega a pandas. Archivo aislado `/private/tmp/cdi-excel2-before-new-fixtures`.
-- Focales de las seis propiedades nuevas: **6 passed, 113 deselected**. Incluyen encabezado desplazado, huecos e índices físicos, namespace ajeno, rechazo previo a pandas y referencias XML equivalentes.
-- Sobre producto `b073ba4`: **362 passed, 3 warnings in 39.93s**, archivo EXCEL-2 más EXCEL-1, DOC-1 y seis focales MARIA. Log `/private/tmp/cdi-excel2-b073-focals.log`.
-- La prueba durable de ocho entradas fue corregida en `0666881`: mide el tamaño XML real dentro de 9.5–10 MiB y espera una barrera de ocho entradas al validador, sin sleep. **1 passed, 118 deselected in 23.21s**; XML **10282491 bytes**, zip **796162 bytes**, ocho entradas y carga normal **200 en 22.6 s**. Log `/private/tmp/cdi-excel2-durable8.log`.
-- Harness acotado independiente sobre mismo producto `b073ba4`: `concurrent_border` exit0 sin corte, normal **200 en 23.292 s**, ocho libros rechazados por el límite de filas, pico de familia RSS **254394368 bytes**. Ambas comillas en `merged_quote` conservan CN/CN y exit0. Scripts y logs `/private/tmp/cdi-excel2-independent/measurements/`. Hubo una medición previa de 25.138 s también verde; no se cuenta como otro criterio.
-- Estos tiempos cumplen el 200 pedido, pero quedan cerca del timeout de 30 s. No se afirma fluidez ni garantía universal de memoria o concurrencia.
+1. **Formulario.** CUIT, domicilio e inicio de actividad van arriba con
+   «· lo pide el MARIA»; la razón social, con «· requerido · lo pide el
+   MARIA». Debajo, la frase «Se puede guardar sin estos datos; al guardar te
+   avisamos cuáles faltan para el MARIA.TXT.». La fecha salió de «Más
+   datos», que ya no se abre sola por tener fecha.
+2. **Aviso al guardar.** Si falta el CUIT, el domicilio o el inicio de
+   actividad, el aviso es de advertencia, con «!» y «Faltan para el MARIA:
+   domicilio, inicio de actividad.». Si están los cuatro, el aviso es el
+   verde de siempre. El CUIT se evalúa ya normalizado; el domicilio y la
+   fecha, sin espacios.
+3. **Detalle del cliente** (pestaña Datos): fila nueva «Inicio de actividad»
+   en DD/MM/AAAA. Si está vacía, muestra «—». Una fecha guardada en otro
+   formato se muestra tal cual.
 
-### Comandos y pendientes
+### Puertas
+
+| Puerta | Resultado |
+|---|---|
+| Rojo antes (prueba de pantalla sobre la base) | `FALLA: el rótulo de CUIT no dice «lo pide el MARIA»: CUIT` |
+| Rojo antes de lo de la autorrevisión (sobre `9c53522`) | `FALLA: el aviso de advertencia tiene el ícono «i», no «!»`; con el ícono arreglado, `FALLA: una fecha guardada que no es AAAA-MM-DD se muestra como vacía` |
+| `scripts/testing/pantalla_cliente1.js` sobre `b0c920b` | 4 líneas `OK` y `PANTALLA CLIENTE-1 OK` |
+| Sabotajes `scripts/testing/sabotajes/cliente1.sh` sobre `b0c920b` | 14 `ROJO` por el motivo esperado, `sabotajes sin rojo: 0`, exit 0 |
+| Suite completa, worktree limpio en `b0c920b`, `--no-cov --timeout=120` | `1757 passed, 102 skipped, 2 xfailed, 23 warnings in 162.46s (0:02:42)`, `FIN 0` |
+| e2e de la CI (`scripts/testing/e2e_maria.sh`) sobre `b0c920b` | «E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.», `FIN 0` |
+| Suite y e2e sobre `9c53522` (antes de la autorrevisión) | `1757 passed, 102 skipped, 2 xfailed, 25 warnings in 165.03s`, «E2E MARIA OK», los dos exit 0 |
+| `/code-review high` sobre `cb98105..9c53522` | 6 hallazgos: 3 arreglados; 2 en parte (el ícono sí, la duración del aviso no; el detalle sí, el borrado va a D3); 1 queda como riesgo (abajo) |
+| Subagente adversario Sonnet alto | 5 hallazgos y XSS probado sin hallazgo: 1 arreglado (la prueba); 1 en parte (el detalle sí, el borrado va a D3); 3 quedan como riesgo (abajo) |
+| `/security-review` | no lo corrí: la pieza no toca plata, sesión, permisos ni API; el texto nuevo va con `textContent` y `escapeHtml` (el subagente probó XSS en el nombre y en el aviso, sin ejecución) |
+
+### Hallazgos de la autorrevisión
+
+| Hallazgo | Quién (modelo, esfuerzo) | Qué pasó |
+|---|---|---|
+| La prueba aceptaba la fecha ISO cruda en el detalle: no veía si se formateaba | los dos | reproducido; ahora exige `01/03/2015`; sabotaje nuevo |
+| La prueba leía el detalle en una pestaña oculta | `/code-review` | reproducido; ahora abre «Datos» y exige que se vea; sabotaje nuevo |
+| El aviso de advertencia tenía el ícono «i» de información | `/code-review` | reproducido; ahora «!» (`app_v2.js`, igual que el diálogo de advertencia) |
+| Una fecha que no es ISO se mostraba «—» en el detalle | los dos | reproducido; se muestra tal cual |
+| Al editar, esa fecha se borra | los dos | ya pasaba antes de esta pieza; va a **D3** |
+| La ruta de Chromium por defecto no existe en este entorno | los dos | cambiada a `/opt/pw-browsers/chromium` (`CHROMIUM` la pisa) |
+
+### Riesgos que quedan (no arreglados)
+
+- **El aviso dura 4 s y se pisa con el siguiente** (es el toast común). Es
+  la única señal de qué falta; después, en el detalle sólo se ve «—». Baja.
+  Alargar sólo este aviso implica cambiar el toast común; no lo hice.
+- **Un CUIT de 11 dígitos con dígito verificador inválido** no se avisa:
+  el alta valida sólo el largo y el aviso mira sólo si está vacío. Lo frena
+  la generación del TXT (`controles_maria.cuit_valido`). Media-baja; se
+  puede sumar «CUIT inválido» al aviso si querés.
+- **La lista de lo que pide el MARIA está escrita a mano** en el alta, aparte
+  de lo que exige la generación (MARIA-7). Si MARIA-7 cambia los
+  obligatorios, el alta queda vieja. Baja; lo anoto para ESTUDIO-1.
+- **En el alta rápida desde la revisión** el aviso puede decir «falta
+  domicilio» aunque la carátula lo traiga: es cierto para la ficha, y
+  después la operación lo copia (fill-if-empty). Baja; `review.js` quedó
+  afuera por D2.
+- Las otras pruebas de pantalla del repositorio tienen la ruta vieja de
+  Chromium (`chromium-1194`); no las toqué.
+
+### Supuestos reversibles
+
+- La fila «Inicio de actividad» en el detalle del cliente no estaba pedida
+  explícitamente: sin ella, el dato se carga y no se ve en ningún lado.
+- El ícono «!» vale para todo aviso de advertencia; hoy hay uno más
+  («Origen no reconocido», `ncm.js`).
+
+### Comandos para reproducir
 
 ```sh
-rtk proxy env ENVIRONMENT=testing GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares ARCA_NOVEDADES_XML_URL=http://127.0.0.1:9/x ARCA_NOVEDADES_WEB_URL=http://127.0.0.1:9/x /private/tmp/cdi-clean-requirements-20261020/bin/python -m pytest -q --no-cov tests/test_excel2.py
-rtk proxy /private/tmp/cdi-clean-requirements-20261020/bin/python /private/tmp/cdi-excel2-new-negatives.py
+# desde un worktree en b0c920b levantado con docs/pm/herramientas/levantar.sh
+BASE_URL=http://127.0.0.1:<puerto> CHROMIUM=/opt/pw-browsers/chromium \
+  node scripts/testing/pantalla_cliente1.js          # 4 «OK» y «PANTALLA CLIENTE-1 OK»
+PY=<venv>/bin/python CHROMIUM=/opt/pw-browsers/chromium \
+  scripts/testing/sabotajes/cliente1.sh b0c920b      # 14 «ROJO», «sabotajes sin rojo: 0»
+# rojo antes: la prueba sobre la base
+git worktree add /tmp/c1-base cb98105                # levantarla y correr la prueba de arriba:
+                                                     # «FALLA: el rótulo de CUIT no dice «lo pide el MARIA»»
 ```
 
-El segundo comando contiene dos mutaciones nuevas en archivos temporales, no toca el checkout. **Resultado: 2/2 mutaciones dan rojo por la causa esperada**, con exit de pytest 1 verificado: guarda de filas desactivada llega a pandas; lectura de combinadas desactivada pierde CN. Logs `/private/tmp/cdi-excel2-new-negative-filas.log` y `/private/tmp/cdi-excel2-new-negative-combinadas.log`. Las **42 mutaciones históricas de `scripts/testing/sabotajes/excel2.sh` NO se corrieron** sobre esta integración: no afirmar 42/42 ni heredar verdes de otra versión. El harness temporal de selección focal quedó preparado pero no se ejecutó; el rojo previo y los negativos nuevos cubren los dos bloqueantes de esta devolución.
+Datos reales: no entró nada de la reunión del 24/10; los clientes de las
+pruebas son inventados («Cliente Inventado Uno SA», CUIT 20-12345678-6).
 
-Suite completa limpia y CI/e2e: **no corridas por esta Dev**, PM coordina sobre `0666881` (documentación posterior no cambia producto). Las mediciones y revisiones de QA se reportan con su alcance; no sustituyen importación real en Kit MARIA. CSV malformado queda como observación menor separada; no se amplió alcance.
+**EXCEL-3** sigue esperando tu veredicto: el informe está en `8622aab` y
+D1, arriba. **Sigo con PA-1.**
 
-Sin push, main ni publicación. PM decide aceptación.
+Última vuelta: 2026-10-24 19:32 UTC
 
-Última vuelta: 2026-10-23.
-Contexto: ~60 %.
-/compact conservar: EXCEL-2 integrada local sobre648cd2f, producto3906130, pruebas b073ba4+0666881; dos rojos corregidos, 362 focales y durable8 verdes; logs en/private/tmp; 42negativos históricos no corridos, suite/CI independientes pendientes; sin publicar, preservar límites10MiB/5000 y DOC1/pesos/Form.
-
-
-## Devolución CI y suite — 23 de octubre
-
-CI de PR5 `39943030809` dio cuatro fallos: los subítems escalares se rechazaban con el mensaje genérico de producto. La guarda temprana añadida por EXCEL-2 estaba en `main.py`, no en `controles_maria`: ahora distingue producto no-dict y subítems mal formados, conserva el mensaje específico anterior y todas las guardas numéricas. Producto **`be17e1b0c7fe5727b1119038bdf7be3e37679b69`**, tres líneas cambiadas por tres. Los tests existentes no se tocaron ni debilitaron.
-
-- Rojo reproducido: **4 failed** en `tests/test_subitems1.py -k subitems_que_no_son_una_lista`.
-- Verde tras el fix: **51 passed, 101 deselected in 3.39s** (SUBITEMS, MARIA subítems y EXCEL-2 montos/productos/cantidad).
-- Negativo en archivo temporal: restituir sólo el mensaje genérico hace fallar los cuatro tests por la causa esperada; exit1 verificado. Log `/private/tmp/cdi-subitems-be17-negative.log`.
-- La suite independiente previa sobre `0666881` terminó **5 failed, 1726 passed, 102 skipped, 2 xfailed**. Cuatro son esta regresión; el quinto es la prueba de ocho libros, que bajo cobertura dio normal400 a31.4s. Los verdes sin cobertura y las mediciones de23–25s no borran ese rojo. PM reproduce sólo el caso instrumentado para clasificarlo; no se aumentaron timeouts ni se excluyeron tests.
-- No se repitió suite completa sobre `be17e1b` ni se ejecutó otro estrés desde Dev. No declarar CI/e2e ni pieza aceptada. Siguen pendientes la decisión del quinto rojo y las puertas posteriores sobre el producto resultante.
+/compact conservar: Soy la Dev técnica (Dev 1) de CDI, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica (nunca main), rutina trig_011UpBfwEu9TUzoNUrviqoP5 min 15; aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM con send_message priority next empezando «Dev técnica:». CLIENTE-1 entregada: producto fbc006a+12ff9b6, pruebas 9c53522+b0c920b, base cb98105; D3 abierta (¿arreglo que editar borre una fecha no ISO?). EXCEL-3 en revisión (informe 8622aab), D1 abierta. Sigo con PA-1 (sólo textos «NCM» → «Posición arancelaria (PA SIM)»); ESTUDIO-1 espera la coordinación de la PM con MARIA-7; GUARDAR-2 más adelante desde 2d930c5. Reglas de Emi: sólo me piden la PM o Emi; nada se publica sin su «dale» para el SHA; nunca main; sin secretos ni datos reales; subagentes hasta alto, sin Fable.

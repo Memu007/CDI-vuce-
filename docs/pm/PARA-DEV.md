@@ -27,43 +27,55 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
-## Tarea 1 — EXCEL-3: la proforma china tal como viene
+## Veredicto de CLIENTE-1 (2026-10-24): aceptada
 
-El 24/10 Emi subió una proforma `.xls` de un proveedor chino y CDI respondió
-«No se pudieron extraer items». Forma (sintetizala igual, con datos
-inventados):
+Sobre `c402bcb` (producto `fbc006a` + `12ff9b6`), integrada por SHA a la rama
+de la PM. Detalle en `REPRODUCCION-CLIENTE-1-2026-10-24.md`. Reproducido en
+`b0c920b`: tus 14 sabotajes en rojo, tu prueba de pantalla OK y cuatro
+negativos míos (domicilio de espacios, editar y borrar el CUIT, fecha que no
+es ISO, CUIT corto), todos como decís salvo un matiz de D3 (abajo).
 
-- Filas 1 a 9: nombre del proveedor, «Proforma Invoice», comprador, CUIT,
-  fecha, número de P/I, «Freight term: CNF Buenos Aires».
-- Fila 11, encabezado: `Item | Part No. | Specification | Width(m) |
-  Length (m) | SQ.MT. (sqm) | QTY (Rolls) | SM.TOTAL (sqm) |
-  Unit price (USD/sqm) | Total Amount(USD) | Gross Weight(kgs) | Volume(CBM)`.
-- 48 renglones; `Part No.` y `Specification` sólo en el primero de cada
-  grupo (vale para los de abajo hasta el siguiente); cada grupo es un color
-  y un ancho, cada renglón un largo distinto.
-- Al final: `Total`, `Discount` (negativo), `Freight cost …` (con cantidad
-  1) y otro `Total`; después texto (pago, banco, cuenta).
+**Se cruzaron los mensajes:** EXCEL-3 y D1 ya estaban respondidas en
+`5237aa2` (abajo). No las reabras en `PARA-PM.md`.
 
-Qué tiene que pasar:
-1. Encuentra el encabezado aunque no esté en la fila 1 (EXCEL-2 ya buscaba
-   algo de esto: partí de ahí).
-2. La descripción del grupo se arrastra a sus renglones; cada renglón sale
-   como producto propio, con ancho y largo en la descripción.
-3. La cantidad es la de la unidad del precio: el precio es por m², así que
-   la cantidad es `SM.TOTAL (sqm)`, no los rollos; la unidad (m²) viaja con
-   el producto.
-4. `Gross Weight(kgs)` es bruto de toda la línea (regla de pesos vigente).
-5. `Total`, `Discount` y `Freight` no son productos: el flete y el
-   descuento se ofrecen en la operación (el descuento, como ajuste; lo
-   resuelve VALOR-1 de la Dev MARIA: vos sólo los devolvés leídos).
-6. Una columna `Item` con texto («1st container») no es un código.
+## Veredicto de EXCEL-3 (2026-10-24): aceptada
 
-**Puertas:** rojo antes con el sintético; suite completa; e2e de la CI.
+Integrada por SHA (`a173af2`) a la rama de la PM; el producto es idéntico al
+revisado. Detalle en `REPRODUCCION-EXCEL-3-2026-10-24.md`. Reproducido:
+focales 120 passed; 27 sabotajes, 0 sin rojo; sintético sin datos reales; la
+proforma real, en local, da 48 productos en m² y su mercadería, descuento y
+flete cierran con el total de la hoja. Suite completa: un rojo, el de los
+ocho libros de `test_excel2.py`, que falla igual en la base (es de EXCEL-2;
+no lo toques ahora, lo decide Emi).
 
-## Tarea 2 (apenas entregues) — CLIENTE-1, después ESTUDIO-1 y PA-1
+**D1: (a).** `operacion.flete`, `operacion.descuento` (positivo: lo que se
+deduce) y `filas_excel_flete` / `filas_excel_descuento` quedan así. Coincide
+con la decisión del 24/10: el sistema ofrece el descuento leído y el usuario
+decide qué se deduce. Se lo paso a la Dev MARIA para VALOR-1.
 
-Están en `ROADMAP.md`, Fase 1b. ESTUDIO-1 toca qué va al `CDDTAGR`:
-coordiná por la PM con la Dev MARIA (MARIA-7 punto 3), no por su canal.
+## Tarea 1 — PA-1, con D3 al lado; después ESTUDIO-1
+
+PA-1 como está en `ROADMAP.md`, Fase 1b. D3 (abajo) va en commits propios y
+se entrega junto con PA-1, en el mismo informe. ESTUDIO-1 toca qué va al
+`CDDTAGR`: coordiná por la PM con la Dev MARIA (MARIA-7 punto 3), no por su
+canal.
+
+## Más adelante — EXCEL-3b (lo que dejó el adversario)
+
+Después de PA-1, en una sola pieza chica. Cada punto con su sintético y su
+sabotaje; numeración de la tabla de `REPRODUCCION-EXCEL-3-2026-10-24.md`:
+
+1. (#2) Una fila sin rótulo y sin precio con largo o total de grupo no es
+   producto: queda sin leer, como en la base.
+2. (#5) Un renglón sin descripción no pasa a ser flete o descuento por un
+   texto en otra columna que no sea la de la descripción.
+3. (#7) Cuando la unidad sale del encabezado del precio («USD/M», «USD/sqm»),
+   se avisa cuál se tomó.
+4. (#4, #3) El grupo se corta en una fila de flete o descuento (con o sin
+   monto) y en un renglón con código nuevo y sin especificación (ese no
+   hereda; se avisa).
+5. (#1, #9) «Descuento …» con importe negativo y sin NCM se avisa (no entra
+   como producto de valor 0); «1,5m» en el largo no repite la unidad.
 
 ## Más adelante — GUARDAR-2
 
@@ -73,4 +85,20 @@ faltaba lo de `CIERRE-RETOMA-2026-10-24.md` («Qué sigue», punto 2).
 
 ## Respuestas a tus D
 
-(Ninguna todavía.)
+- **D3 (CLIENTE-1), 2026-10-24: (a).** Un matiz: la fecha no se borra «sin
+  aviso». Al guardar sale «Faltan para el MARIA: inicio de actividad»; lo
+  que no dice es que había una fecha y se perdió. Igual se arregla:
+  - **Causa:** el campo de fecha sólo muestra AAAA-MM-DD; si lo guardado
+    está en otro formato, el campo queda vacío y el guardado lo manda vacío.
+  - **Qué:** si lo guardado no es AAAA-MM-DD y el campo quedó vacío, la
+    fecha no se manda y se conserva. Si el usuario carga una fecha, la
+    nueva reemplaza a la vieja.
+  - **Prueba, por la familia:** fecha guardada `null`, `""`, `"01/03/2015"`,
+    otro texto no ISO y una ISO; editar sin tocar la fecha y guardar. Las
+    no ISO se conservan; `null` y `""` siguen vacías; la ISO se conserva.
+    Un sabotaje que vuelva a mandar el campo vacío tiene que dar rojo.
+  - **Lo que deja:** una fecha no ISO ya no se puede borrar desde el
+    formulario (sólo reemplazar). Aceptado; anotalo como riesgo.
+  - **Al aviso**, si la fecha vieja se conserva, que no diga que falta.
+  - No toques la API ni el TXT: la conversión al formato del TXT la hace la
+    Dev MARIA (MARIA-7, punto 9).

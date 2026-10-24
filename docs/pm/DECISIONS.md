@@ -128,11 +128,19 @@ reunión, sin datos del cliente):
 - Ajustes a incluir, ajustes a deducir y FOB casillero: campos que carga el
   usuario; el sistema hace las cuentas, no decide qué se descuenta (Emi). El
   reparto detallado ítem por ítem va en una segunda etapa (PRORRATEO-1).
+  PM (2026-10-24, D1 de EXCEL-3): el Excel devuelve `operacion.descuento`
+  positivo (lo que se deduce), sólo leído y avisado; VALOR-1 lo ofrece como
+  ajuste a deducir.
 - Botón para calcular el seguro (1 % de FOB + flete) cuando la factura no lo
   trae.
 - Montos con punto o con coma.
 - Cliente: sólo lo que pide el MARIA (CUIT, razón social, domicilio, fecha
   de inicio de actividades).
+  PM (2026-10-24, D2 de CLIENTE-1): esos cuatro van a la vista y con aviso
+  si faltan, no obligatorios al guardar; el TXT los controla al generarse.
+  PM (2026-10-24, D3 de CLIENTE-1): editar un cliente no borra una fecha de
+  inicio guardada en otro formato; la pantalla no la manda si el campo
+  quedó vacío. La fecha va al TXT en DD/MM/AAAA (MARIA-7, punto 9).
 - CUIT del despachante por estudio, cargado una vez y elegido en la
   operación.
 - «NCM» pasa a «Posición arancelaria (PA SIM)» en pantallas.

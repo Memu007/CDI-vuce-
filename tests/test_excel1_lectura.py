@@ -242,7 +242,9 @@ def test_productos_que_empiezan_con_total_no_se_pierden():
 
 def test_total_flete_y_condiciones_no_son_productos():
     """«FOB TOTAL» es un total (no se cuenta); «Freight» y «Payment terms» sin
-    NCM ni origen no son mercadería: no entran (sumarían al FOB) y se avisan."""
+    NCM ni origen no son mercadería: no entran (sumarían al FOB). Las
+    condiciones se avisan como fila sin leer; el flete se lee para la
+    operación (EXCEL-3)."""
     r = _subir([H,
                 ["84713000", "Laptop", "CN", 10, 350, 1.5],
                 ["", "FOB TOTAL", "", 10, 3500, 15],
@@ -250,7 +252,9 @@ def test_total_flete_y_condiciones_no_son_productos():
                 ["", "Payment terms: T/T 30 days", "", None, None, None]])
     assert r.status_code == 200, r.text[:300]
     assert [i["descripcion"] for i in r.json()["items"]] == ["Laptop"], r.json()["items"]
-    assert r.json()["filas_descartadas_numeros"] == [4, 5], r.json()
+    assert r.json()["filas_descartadas_numeros"] == [5], r.json()
+    assert r.json()["operacion"]["flete"] == 500, r.json()["operacion"]
+    assert r.json()["operacion"]["filas_excel_flete"] == [4], r.json()["operacion"]
 
 
 def test_mapeo_corregido_a_mano_gana_sobre_lo_detectado():
