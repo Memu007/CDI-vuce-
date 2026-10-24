@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-24 · feat: alta de cliente con lo que pide el MARIA (CLIENTE-1)
+
+- **feat(clientes):** razón social, CUIT, domicilio e inicio de actividad a la vista y marcados «lo pide el MARIA»; email y teléfono en «Más datos». Se guarda sin ellos, con un aviso de cuáles faltan; el detalle muestra el inicio de actividad.
+
 ## 2026-10-24 · fix: la proforma china se lee tal como viene (EXCEL-3)
 
 - **fix(excel):** una proforma sin NCM, con el código y la especificación sólo en el primer renglón de cada grupo, sale con un producto por renglón (con su ancho y largo); con el precio por m² la cantidad es la de m² y la unidad viaja al TXT.
