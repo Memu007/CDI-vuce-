@@ -4,6 +4,17 @@ Actualizado: 2026-10-24. Estado vigente; la historia está en Git.
 
 Método al día con CAMBIOS.md del secondbrain hasta 2026-10-21 (aplicado 2026-10-24).
 
+**Publicado 2026-10-24 18:40 UTC:** `main` = `dddcf6d` (EXCEL-2), con
+«dale dddcf6d» de Emi; avance limpio sobre `648cd2f`; CI 40017165638 verde
+(tests y e2e) sobre ese SHA. Railway no se puede mirar desde el entorno de
+la PM (el dominio está bloqueado); Emi lo probó en el sitio y anda (subió un Excel).
+
+**Desde el 2026-10-24, tarde:** Codex deja CDI (Emi). Dos Devs nuevas en
+Claude («Quién hace qué»). Ese día Emi y el despachante cargaron en el MARIA
+el TXT de una factura real después de doce correcciones a mano: son la
+Fase 1b del roadmap nuevo a tres meses (`ROADMAP.md`, aprobado por Emi el 2026-10-24). Pendiente de Emi: `/autocompact 200k` y el esfuerzo en los dos chats
+nuevos, el packing list y los códigos de destino que manda el despachante.
+
 **Estado vigente, 2026-10-24 10:00 ARG:** publicación autorizada COMPLETADA.
 Railway muestra ACTIVE `4bb8b534-04e2-4d94-bfd8-7e101defbe94`, commit
 `648cd2f0c3103f466e7fd7b7022985907e08cd06`. `/health` 200 API/base ok a las
@@ -173,23 +184,22 @@ antes de cerrar la Fase 3.
 
 ## Quién hace qué
 
-| Rol | Sesión | Rutina | Rama |
-|---|---|---|---|
-| PM principal | session_01B7FVQspcEHF7PqNv797wNM | trig_01TvMmGfSLDfbcJrf66ZZ7YK (min 55) | claude/practical-shannon-szpwkn |
-| Dev 1 | session_01VV5RVDA64AuzLaPBDnwH39 | trig_016zR6giZB8Mq9ZdfaerVh2D (min 15) | claude/dev1-tecnica |
-| Dev 2 | session_01JssJQ6CQvEBZ7yjJp3hHQx | trig_019ehV8P48FzbNwYQGZjgYcW (min 35) | claude/dev2-maria |
+Desde el 2026-10-24 (Emi: Codex deja CDI; dos Devs nuevas en Claude).
 
-**Sin PM visual:** la PM principal revisa a las dos Devs, y las dos la
-despiertan con su rutina (donde los comandos dicen «PM visual», acá es la
-principal).
+| Rol | Sesión | Rutina | Rama | Esfuerzo |
+|---|---|---|---|---|
+| PM principal | session_01B7FVQspcEHF7PqNv797wNM | trig_01TvMmGfSLDfbcJrf66ZZ7YK (min 55) | claude/practical-shannon-szpwkn | — |
+| Dev MARIA (Dev 2) | session_01C8gCBjvn36wnYC6qG2Sixi | trig_01WmrC3ALqBXkD9UBv6dFGbP (min 35) | claude/dev-maria | alto |
+| Dev técnica (Dev 1) | session_018yxeKHYQKFA3qJ2WJmQru7 | trig_011UpBfwEu9TUzoNUrviqoP5 (min 15) | claude/dev-tecnica | medio |
 
-La sesión vieja «CDI — Dev 1» (session_01F66wsdGqhMMEiCLTopVVXe, rutina
-trig_01XijDAiEX4aBm8dfv9ZD6C1) se abrió sobre la copia vieja (`Memu007/CDI`):
-pausada, no trabaja acá.
+Canales: Dev MARIA lee `PARA-DEV-2.md` y contesta en `PARA-PM-2.md`; Dev
+técnica lee `PARA-DEV.md` y contesta en `PARA-PM.md`. **Sin PM visual:** la
+PM principal revisa a las dos. Timbres por `send_message`, `priority` `next`.
 
-Esfuerzo (Emi, 2026-10-07): PM principal extra; las Devs, como máximo alto,
-también sus subagentes (Emi confirmó las dos sesiones en alto). Ningún subagente usa Fable. El consejero es sólo de
-la PM principal.
+Sesiones viejas, apagadas (historia): Dev 1 session_01VV5RVDA64AuzLaPBDnwH39
+(trig_016zR6giZB8Mq9ZdfaerVh2D) y Dev 2 session_01JssJQ6CQvEBZ7yjJp3hHQx
+(trig_019ehV8P48FzbNwYQGZjgYcW), con ramas `claude/dev1-tecnica` y
+`claude/dev2-maria`; las ramas `codex/*`.
 
 Archivos abiertos por Dev:
 - Dev 1 (EXCEL-1): `proyecto_maria/main.py` (las cargas por Excel).
@@ -291,6 +301,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+
+2026-10-24 18:56 UTC: sin entregas. Dev MARIA en MARIA-7 (ajusta las pruebas viejas que generaban sin CUIT del despachante, esperable por el punto 3); Dev técnica cerrando EXCEL-3 con /entregar. Ninguna D abierta. Los dos chats Dev siguen con ventana de 1M: falta el `/autocompact 200k` de Emi.
 
 2026-10-19: retoma en Codex autorizada por Emi. Reconciliadas ramas y
 entregas conservadas; MARIA-5d devuelta con tres rojos reproducidos por PM;
@@ -400,3 +412,8 @@ incluyen los resultados finales y las puertas pendientes. La próxima PM no
 necesita volver a pedir permiso para este guardado: está hecho. Tampoco debe
 confundir borradores guardados con cambios publicados; el permiso para
 `main` sigue siendo específico del SHA final probado.
+
+## /compact conservar de la PM principal
+
+/compact conservar: Soy la PM principal de CDI (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK min 55). Producto Memu007/CDI-vuce-, clon /home/user/cdi-vuce-, mi rama claude/practical-shannon-szpwkn (nunca main; cada push a main publica). main = dddcf6d (EXCEL-2, publicada 24/10 18:40 UTC con «dale dddcf6d», CI verde; Emi la probó en el sitio y anda). Desde el 24/10 Codex deja CDI; Devs nuevas: Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, alto) con MARIA-7 (incluye punto 8, fechas año/mes/día, decidido por Emi) y Dev técnica (session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica, medio) con EXCEL-3. Roadmap a 3 meses en ROADMAP.md, aprobado por Emi el 24/10. Acuerdos de la reunión con el despachante del 24/10 en DECISIONS.md. Los TXT y la proforma reales de ese día quedan fuera del repo (scratchpad). Método al día con el secondbrain hasta 2026-10-21: /autocompact 200k en cada chat. Reglas de Emi: nada fuera del roadmap; Devs hasta alto, sin Fable; consejero sólo mío; castellano llano; consultas de 9 a 21 ARG; publicar sólo con «dale <SHA>» de día; usar date -u.
+
