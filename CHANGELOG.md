@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-24 · fix: la demo de la landing dice «3 PA SIM» (PA-1b)
+
+- **fix(landing):** el paso 3 del progreso de la demo dice «PA SIM», como la aplicación. El encabezado de la tabla de la demo sigue en «NCM» (sus valores son de 8 dígitos): lo decide la PM.
+
 ## 2026-10-24 · fix: editar un cliente no borra una fecha de inicio que no es AAAA-MM-DD (D3)
 
 - **fix(clientes):** si la fecha guardada no se puede mostrar en el campo de fecha y se deja vacío, al guardar no se manda y se conserva; el aviso no la pide. Una fecha cargada la reemplaza. Contra: esa fecha ya no se puede borrar desde el formulario.
