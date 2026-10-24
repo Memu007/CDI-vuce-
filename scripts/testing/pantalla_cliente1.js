@@ -116,12 +116,14 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   await page.reload();
   await page.waitForFunction(() => window.CDI && CDI.goTo);
   await page.evaluate(() => CDI.goTo('clientes'));
+  let ultimaConservada = false;
   for (const [n, , escribe, queda, pideFecha] of casosD3) {
     const nombreD3 = 'Cliente Inventado D3 ' + n + ' ' + id;
     await page.locator('.cx-card', { hasText: nombreD3 }).click();
     await page.locator('#cxKebabBtn').click();
     await page.locator('#cxKebabMenu [data-kaction="edit"]').click();
     await page.locator('#cfNombre').waitFor({ state: 'visible', timeout: 10000 });
+    const campoVacio = (await page.inputValue('#cfFechaInicActiv')) === '';
     await page.fill('#cfDireccion', 'Calle Inventada 2');
     if (escribe !== null) await page.fill('#cfFechaInicActiv', escribe);
     await page.locator('#cxFormSave').click();
@@ -136,8 +138,11 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
     if (/inicio de actividad/i.test(textoD3) !== pideFecha) {
       falla(n + ': el aviso ' + (pideFecha ? 'no dice' : 'dice') + ' que falta el inicio de actividad: ' + textoD3);
     }
+    ultimaConservada = campoVacio && escribe === null && queda !== null;
   }
   // Lo recordado de la última edición (una fecha conservada) no pasa a un alta.
+  // Sólo se ve si el último caso dejó una fecha conservada.
+  if (!ultimaConservada) falla('el último caso de D3 tiene que dejar una fecha conservada (campo vacío, sin tocar, y queda)');
   await page.locator('#cxNewBtn').click();
   await page.locator('#cfNombre').waitFor({ state: 'visible', timeout: 10000 });
   await page.fill('#cfNombre', 'Cliente Inventado D3 Alta ' + id);
