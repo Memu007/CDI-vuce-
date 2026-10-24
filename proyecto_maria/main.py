@@ -4561,14 +4561,54 @@ _FILA_QUE_NO_ES_MERCADERIA_RE = re.compile(
     re.IGNORECASE,
 )
 
+# EXCEL-3. El flete y el descuento de la factura no son productos: se
+# devuelven leídos para la operación (cómo se usa el descuento lo decide
+# VALOR-1). El seguro y lo demás siguen como filas sin leer.
+_FILA_DE_FLETE_RE = re.compile(
+    r"^\s*(?:freight|flete|shipping\s+(?:cost|charges?))\b", re.IGNORECASE)
+_FILA_DE_DESCUENTO_RE = re.compile(
+    r"^\s*(?:discount|descuento|rebate|bonificaci[oó]n)\b", re.IGNORECASE)
+
+# El importe de la línea («Total Amount(USD)», «Importe»), para leer el flete y
+# el descuento de su fila. «SM.TOTAL (sqm)» no es un importe.
+_NOMBRES_DE_IMPORTE = {"totalamount", "amount", "lineamount", "importe", "importetotal",
+                       "valortotal", "totalvalue", "total"}
+# El código de parte del proveedor («Part No.»): va a `codigo_parte`, no a la NCM.
+_NOMBRES_DE_CODIGO_DE_PARTE = {"partno", "partnumber", "codigodeparte", "codigoparte"}
+# Las medidas de cada renglón van en su descripción: en una proforma de rollos
+# cada renglón es un largo distinto del mismo material (EXCEL-3).
+_NOMBRES_DE_MEDIDA = {"width": "ancho", "ancho": "ancho", "length": "largo", "largo": "largo"}
+
+
+def _nombre_sin_unidad(columna) -> str:
+    return _normalize_header(re.sub(r"\(.*?\)", "", str(columna or "")))
+
+
+def _columna_con_nombre(columnas, nombres: set):
+    return next((c for c in columnas if _nombre_sin_unidad(c) in nombres), None)
+
+
+def _monto_de_fila(raw, decimal) -> float | None:
+    """Un monto sin el signo: el descuento viene negativo («-850» o «(850)»)."""
+    from proyecto_maria.pdf_extractor import _numero_factura
+    if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+        return _numero_factura(abs(raw), decimal)
+    t = _texto_de_celda(raw)
+    if t.startswith("(") and t.endswith(")"):
+        t = t[1:-1]
+    return _numero_factura(t.lstrip("-−").strip(), decimal) if t else None
+
 
 # La fila de ejemplo de la plantilla en blanco no es un producto (EXCEL-1).
 _FILA_DE_EJEMPLO_PLANTILLA = "Laptop 14 pulgadas modelo X"
 
 
-def extract_items_from_excel(df: pd.DataFrame, filename: str, descartes: list | None = None) -> list[Item]:
+def extract_items_from_excel(df: pd.DataFrame, filename: str, descartes: list | None = None,
+                             extras: dict | None = None) -> list[Item]:
     """
     Extrae items de un DataFrame de Excel intentando diferentes formatos.
+    En `extras` deja lo que la planilla trae fuera de los productos (flete,
+    descuento) y los renglones que tomaron la descripción del de arriba.
     """
     items = []
 
@@ -4595,11 +4635,13 @@ def extract_items_from_excel(df: pd.DataFrame, filename: str, descartes: list | 
     ]
 
     for mapping in possible_mappings:
-        de_este = []
-        items = try_extract_with_mapping(df, mapping, de_este)
+        de_este, extras_de_este = [], {}
+        items = try_extract_with_mapping(df, mapping, de_este, extras_de_este)
         if items:
             if descartes is not None:
                 descartes.extend(de_este)
+            if extras is not None:
+                extras.update(extras_de_este)
             print(f"✅ Extraídos {len(items)} items usando mapeo: {list(mapping.keys())}")
             break
 
@@ -4615,17 +4657,24 @@ def _texto_de_celda(valor) -> str:
     return str(valor).strip()
 
 
-def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | None = None) -> list[Item]:
+def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | None = None,
+                             extras: dict | None = None) -> list[Item]:
     """
     Intenta extraer items usando un mapeo específico de columnas.
 
     Las filas con datos que no se pudieron leer se anotan en `descartes` (su
     número de fila en la planilla) para avisarle al usuario; las filas vacías y
     las de total o subtotal no cuentan (EXCEL-1).
+
+    Proforma por grupos (EXCEL-3): el código de parte y la descripción vienen
+    sólo en el primer renglón de cada grupo y valen para los de abajo, hasta el
+    siguiente o un total. El flete y el descuento quedan en `extras`.
     """
     items = []
     if descartes is None:
         descartes = []
+    if extras is None:
+        extras = {}
 
     from proyecto_maria.pdf_extractor import (
         _decimal_de_la_factura,
@@ -4636,57 +4685,120 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
     # Buscar columnas que coincidan con el mapeo. Sin las obligatorias, este
     # mapeo no sirve y se prueba otro. El peso no es obligatorio (EXCEL-1), ni
     # el origen: sin esa columna los productos entran con el origen vacío y
-    # la subida lo avisa (D18, EXCEL-2).
+    # la subida lo avisa (D18, EXCEL-2). Tampoco la NCM: una proforma no la
+    # trae y la revisión la pide (EXCEL-3).
     pieza_col = find_column(df.columns, mapping['pieza'])
     desc_col = find_column(df.columns, mapping['descripcion'])
     origen_col = find_column(df.columns, mapping['origen'])
     peso_col = find_column(df.columns, mapping['peso_unitario'])
     cant_col = find_column(df.columns, mapping['cantidad'])
     valor_col = find_column(df.columns, mapping['valor_unitario'])
-    if not all([pieza_col, desc_col, cant_col, valor_col]):
+    if not all([desc_col, cant_col, valor_col]):
         return items
+    usadas = {pieza_col, desc_col, origen_col, peso_col, cant_col, valor_col}
+    libres = [c for c in df.columns if c not in usadas]
+    importe_col = _columna_con_nombre(libres, _NOMBRES_DE_IMPORTE)
+    parte_col = _columna_con_nombre(libres, _NOMBRES_DE_CODIGO_DE_PARTE)
+    medidas = [(c, _NOMBRES_DE_MEDIDA[_nombre_sin_unidad(c)],
+                (re.search(r"\(\s*([^()]*?)\s*\)", str(c)) or [None, ""])[1])
+               for c in libres if _nombre_sin_unidad(c) in _NOMBRES_DE_MEDIDA]
 
     # Separador decimal de la planilla, mirando los números escritos como
     # texto (la regla de MARIA-1a): «1.500» con miles, «1,5» con coma.
     decimal = _decimal_de_la_factura([
-        v for col in (cant_col, valor_col, peso_col) if col
+        v for col in (cant_col, valor_col, peso_col, importe_col) if col
         for v in df[col].tolist() if isinstance(v, str)
     ])
 
     # (número de fila, ¿trae NCM u origen?, ítem)
     candidatos = []
+    grupo = None  # (descripción, código de parte) del renglón de arriba
+    flete, descuento, heredadas = [], [], []
     for _, row in df.iterrows():
         try:
             if all((not pd.notna(v)) or str(v).strip() == "" for v in row.values):
                 continue  # fila vacía
 
-            pieza = _texto_de_celda(row[pieza_col])
+            pieza = _texto_de_celda(row[pieza_col]) if pieza_col else ""
             descripcion = _texto_de_celda(row[desc_col])
+            parte = _texto_de_celda(row[parte_col]) if parte_col else ""
 
-            if _es_fila_de_total(descripcion or pieza):
+            def _numero(col):
+                return (_numero_factura(row[col], decimal) or 0.0) if col else 0.0
+
+            cantidad, valor_unitario = _numero(cant_col), _numero(valor_col)
+            celda_origen = row[origen_col] if origen_col else None
+            sin_ncm_ni_origen = not pieza and not _texto_de_celda(celda_origen)
+
+            # El rótulo de una fila sin descripción puede estar en otra
+            # columna («Total» o «Discount» en la columna Item).
+            rotulo = descripcion or next(
+                (t for t in (_texto_de_celda(v) for v in row.values)
+                 if t and _numero_factura(t, decimal) is None
+                 and _monto_de_fila(t, decimal) is None), "")
+
+            if _es_fila_de_total(rotulo or pieza):
+                grupo = None
                 continue  # fila de total o subtotal: no es un ítem
             if descripcion.strip().lower() == _FILA_DE_EJEMPLO_PLANTILLA.lower():
                 continue  # la fila de ejemplo de la plantilla
+
+            if sin_ncm_ni_origen and (_FILA_DE_FLETE_RE.match(rotulo) or _FILA_DE_DESCUENTO_RE.match(rotulo)):
+                grupo = None  # nunca hereda la descripción de arriba
+                monto = _monto_de_fila(row[importe_col], decimal) if importe_col else None
+                if monto is None:
+                    # El precio del descuento también viene negativo.
+                    precio = _monto_de_fila(row[valor_col], decimal) or 0.0
+                    monto = precio * cantidad if cantidad else precio
+                if monto:
+                    (flete if _FILA_DE_FLETE_RE.match(rotulo) else descuento).append((_ + 2, monto))
+                    continue
+                # Sin monto que leer sigue como antes: el flete, fila sin leer.
+
+            # Un renglón del grupo de arriba: sin NCM, descripción ni código,
+            # pero con su cantidad o precio y sus propias medidas (cada
+            # renglón es un largo). Sin medidas no se hereda nada: una fila
+            # así se avisa como sin leer (EXCEL-1), y un subtotal sin rótulo
+            # no pasa a ser un producto.
+            # Con la descripción combinada hacia abajo (.xlsx) el renglón ya la
+            # trae, y hereda sólo el código.
+            con_medidas = any(_texto_de_celda(row[c]) for c, _n, _u in medidas)
+            if (not pieza and not parte and grupo and con_medidas and descripcion in ("", grupo[0])
+                    and (cantidad or valor_unitario)):
+                if not descripcion:
+                    heredadas.append(_ + 2)
+                descripcion, parte = grupo
+            elif descripcion or parte:
+                grupo = (descripcion, parte)
 
             # Sin descripción ni NCM no hay ítem que mostrar: se avisa.
             if not pieza and not descripcion:
                 descartes.append(_ + 2)
                 continue
 
-            def _numero(col):
-                return (_numero_factura(row[col], decimal) or 0.0) if col else 0.0
-
-            cantidad, valor_unitario = _numero(cant_col), _numero(valor_col)
             # Sin descripción y sin cantidad ni precio, no hay ítem: se avisa.
             if not descripcion and not cantidad and not valor_unitario:
                 descartes.append(_ + 2)
                 continue
 
+            # Ancho y largo de este renglón, en su descripción.
+            tamaño = []
+            for col, nombre, unidad in medidas:
+                texto = _texto_de_celda(row[col])
+                if not texto:
+                    continue
+                numero = _numero_factura(row[col], decimal)
+                if numero is not None:
+                    texto = f"{numero:g}".replace(".", ",")
+                tamaño.append(f"{nombre} {texto}" + (f" {unidad}" if unidad else ""))
+            if tamaño and descripcion:
+                descripcion = f"{descripcion}, " + " x ".join(tamaño)
+
             # Lo que falta o no se puede leer queda vacío (0 o ""), nunca
             # inventado; el semáforo de la revisión lo marca (MARIA-1a, EXCEL-1).
-            celda_origen = row[origen_col] if origen_col else None
-            candidatos.append((_ + 2, bool(pieza or _texto_de_celda(celda_origen)), Item(
+            candidatos.append((_ + 2, not sin_ncm_ni_origen, Item(
                 pieza=pieza,
+                codigo_parte=parte,
                 descripcion=descripcion,
                 origen=_origen_desde_factura(celda_origen) or "XX",
                 peso_unitario=_numero(peso_col),
@@ -4699,8 +4811,8 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             descartes.append(_ + 2)
             continue
 
-    # Flete, seguro o condiciones de pago sin NCM ni origen no son mercadería:
-    # no entran (sumarían al FOB) y se avisan. Cualquier otra fila sin NCM ni
+    # Seguro o condiciones de pago sin NCM ni origen no son mercadería: no
+    # entran (sumarían al FOB) y se avisan. Cualquier otra fila sin NCM ni
     # origen sí entra, con lo que falta vacío (EXCEL-1).
     for fila, trae, item in candidatos:
         if not trae and _FILA_QUE_NO_ES_MERCADERIA_RE.match(item.descripcion or ""):
@@ -4708,6 +4820,12 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
         else:
             items.append(item)
     descartes.sort()
+    if flete:
+        extras["flete"] = flete
+    if descuento:
+        extras["descuento"] = descuento
+    if heredadas:
+        extras["heredadas"] = heredadas
 
     return items
 
@@ -5299,7 +5417,10 @@ _ITEM_COL_ALIASES = {
         "posicionarancelaria", "hscode", "hs", "codigoncm", "itemcode", "sku",
     ],
     "descripcion": [
-        "descripcion", "descripción", "producto", "detalle", "description", "item",
+        "descripcion", "descripción", "producto", "detalle", "description",
+        # «Specification» antes que «Item»: en una proforma china «Item» es el
+        # número de renglón o «1st container» (EXCEL-3).
+        "specification", "specifications", "item",
         "articulo", "artículo", "nombre", "desc", "mercaderia", "mercadería",
     ],
     "origen": [
@@ -5572,6 +5693,63 @@ _NOMBRE_DEL_CAMPO = {
     "pieza": "NCM", "descripcion": "descripción", "origen": "país de origen",
     "peso_unitario": "peso", "cantidad": "cantidad", "valor_unitario": "precio unitario",
 }
+
+
+# EXCEL-3. La unidad de una columna, por lo que dice su nombre: «(sqm)»,
+# «(USD/sqm)», «per kg». Sólo las que el TXT sabe declarar.
+_UNIDADES_DE_COLUMNA = {
+    "sqm": "m2", "m2": "m2", "m²": "m2", "sqmt": "m2", "sqmts": "m2", "sqmtr": "m2",
+    "mt2": "m2", "mts2": "m2", "squaremeter": "m2", "squaremeters": "m2", "metrocuadrado": "m2",
+    "kg": "kg", "kgs": "kg", "kilo": "kg", "kilos": "kg",
+    "m": "m", "mt": "m", "mts": "m", "meter": "m", "meters": "m", "metro": "m", "metros": "m",
+    "pc": "u", "pcs": "u", "unit": "u", "units": "u", "unidad": "u", "unidades": "u", "u": "u",
+}
+
+
+def _unidad_de_columna(columna, del_precio: bool) -> str | None:
+    """«Unit price (USD/sqm)» → m2 (del precio: lo que va después de «/»,
+    «per» o «por»); «SM.TOTAL (sqm)» → m2 (de una cantidad: lo que va entre
+    paréntesis)."""
+    texto = str(columna or "").lower()
+    if del_precio:
+        m = re.search(r"(?:/|\bper\b|\bpor\b)\s*([^/()]+?)\s*\)?\s*$", texto)
+    else:
+        m = re.search(r"\(\s*([^()/]+?)\s*\)\s*$", texto)
+    if not m:
+        return None
+    return _UNIDADES_DE_COLUMNA.get(re.sub(r"[\s.]+", "", m.group(1)))
+
+
+def _cantidad_en_la_unidad_del_precio(mapeo: dict, columnas: list) -> tuple:
+    """(mapeo, unidad, avisos). Si el precio es por m² y la cantidad está en
+    rollos, la cantidad es la columna en m² de la línea («SM.TOTAL (sqm)», no
+    «SQ.MT. (sqm)», que es la de un rollo). La unidad viaja con el producto
+    para el TXT (EXCEL-3). `mapeo` es {columna: campo}."""
+    por_campo = {canon: src for src, canon in mapeo.items()}
+    precio, cant = por_campo.get("valor_unitario"), por_campo.get("cantidad")
+    unidad_precio = _unidad_de_columna(precio, True) if precio else None
+    unidad_cant = _unidad_de_columna(cant, False) if cant else None
+    if not unidad_precio:
+        return mapeo, unidad_cant, []
+    if unidad_cant == unidad_precio:
+        return mapeo, unidad_precio, []
+    # Un peso no es la cantidad aunque esté en kilos (el bruto no es lo vendido).
+    otras = [c for c in columnas if c not in mapeo and _unidad_de_columna(c, False) == unidad_precio
+             and not _es_nombre_de_peso(_normalize_header(c))]
+    de_la_linea = [c for c in otras if "total" in _normalize_header(c)]
+    elegida = de_la_linea[0] if len(de_la_linea) == 1 else (otras[0] if len(otras) == 1 else None)
+    if elegida is None:
+        # Sólo se avisa si la cantidad dice otra unidad («QTY (Rolls)»).
+        if cant is None or not re.search(r"\([^()]+\)\s*$", str(cant)):
+            return mapeo, None, []
+        return mapeo, None, [
+            f"El precio es por {unidad_precio} («{precio}») y la cantidad («{cant}») no: "
+            "revisá la cantidad y la unidad en la revisión."]
+    nuevo = {src: canon for src, canon in mapeo.items() if canon != "cantidad"}
+    nuevo[elegida] = "cantidad"
+    aviso = (f"La cantidad se tomó de «{elegida}», en la unidad del precio ({unidad_precio})"
+             + (f", no de «{cant}»." if cant else "."))
+    return nuevo, unidad_precio, [aviso]
 
 
 def _mapeo_efectivo(guardado: dict, detectado: dict, columnas: list) -> tuple:
@@ -7295,11 +7473,23 @@ async def upload_excel_v2(
 
         # Detectar columnas del Excel (independientemente de si el cliente ya tiene mapping)
         detected_mapping = _detect_item_columns(list(df.columns))
+        # Precio por m² y cantidad en rollos: se aprende la cantidad en m² (EXCEL-3).
+        detected_mapping, _unidad, avisos_unidad = _cantidad_en_la_unidad_del_precio(
+            detected_mapping or {}, list(df.columns))
 
         # Aplicar mapping renombrando columnas a canonicas antes de extraer
         effective_mapping, avisos_mapeo = _mapeo_efectivo(
             mapping or {}, detected_mapping or {}, list(df.columns)
         )
+        # Otra vez sobre lo que se usa: el mapeo guardado del cliente puede
+        # traer la cantidad en rollos de una subida anterior.
+        effective_mapping, unidad, avisos_de_lo_usado = _cantidad_en_la_unidad_del_precio(
+            effective_mapping, list(df.columns))
+        if not avisos_de_lo_usado and (
+                [s for s, c in effective_mapping.items() if c == "cantidad"]
+                == [s for s, c in detected_mapping.items() if c == "cantidad"]):
+            avisos_de_lo_usado = avisos_unidad
+        avisos_mapeo.extend(avisos_de_lo_usado)
 
         avisos: list[str] = []
         rename = {src: canon for src, canon in effective_mapping.items() if canon in _CANON_COLUMNS}
@@ -7325,8 +7515,9 @@ async def upload_excel_v2(
             avisos = _peso_por_unidad(df, pesos, columna_de, clases)
 
         descartes: list = []
+        extras: dict = {}
         items = await _leer_pdf_aparte(
-            extract_items_from_excel, df, file.filename, descartes,
+            extract_items_from_excel, df, file.filename, descartes, extras,
             limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
         )
         if not items:
@@ -7373,9 +7564,17 @@ async def upload_excel_v2(
                 "valor_unitario": float(getattr(it, "valor_unitario", 0) or 0),
                 "peso_unitario": float(getattr(it, "peso_unitario", 0) or 0),
                 "codigo_parte": str(getattr(it, "codigo_parte", "") or ""),
+                # La unidad del precio, para el TXT (m² = 03; EXCEL-3).
+                **({"unidad": unidad} if unidad else {}),
             }
             for it in items
         ]
+        if extras.get("heredadas"):
+            filas = extras["heredadas"]
+            avisos_mapeo.append(
+                f"{len(filas)} renglón(es) sin descripción tomaron la del renglón de arriba "
+                f"(como agrupa la proforma), desde la fila {filas[0]}. Revisalos."
+            )
 
         # Si hay cliente seleccionado, pre-populamos operacion con sus datos
         operacion: dict = {}
@@ -7390,6 +7589,20 @@ async def upload_excel_v2(
                 }
             except HTTPException:
                 operacion = {}
+
+        # El flete y el descuento de la planilla se ofrecen en la operación,
+        # leídos y avisados; qué hacer con el descuento lo decide VALOR-1
+        # (EXCEL-3). El descuento va sin signo: es lo que se deduce.
+        for campo, nombre in (("flete", "Flete"), ("descuento", "Descuento")):
+            if extras.get(campo):
+                monto = round(sum(m for _f, m in extras[campo]), 2)
+                operacion[campo] = monto
+                operacion[f"filas_excel_{campo}"] = [f for f, _m in extras[campo]][:50]
+                filas = ", ".join(str(f) for f, _m in extras[campo][:5])
+                avisos_mapeo.append(
+                    f"{nombre}: se leyó {monto:,.2f}".replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+                    + f" de la fila {filas} de la planilla; no entra como producto. Revisalo en la operación."
+                )
 
         # Lo que no se leyó del libro queda en la operación: el semáforo lo
         # muestra hasta que la persona lo descarta (MARIA-1b, D17 y D18).
