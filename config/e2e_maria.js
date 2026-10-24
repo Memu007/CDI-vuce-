@@ -36,6 +36,26 @@ async function replaceInput(page, selector, value, index = 0) {
     }, value);
 }
 
+// La pantalla de Validación pide los avisos del TXT al entrar y los pinta
+// arriba de los botones cuando llegan. Si llegan entre que Puppeteer scrollea
+// un botón y calcula dónde clickear, el botón queda fuera de la pantalla
+// («Node is either not clickable or not an Element») o el click cae en otro
+// lado. Antes de clickear se espera que la validación haya terminado, que los
+// avisos estén pintados (esta planilla siempre da avisos: unidad, estado e IVA
+// por defecto) y que el botón se vea y esté habilitado.
+async function validacionQuieta(page) {
+    await page.waitForFunction(() => {
+        const visible = (el) => el && !el.hidden && el.offsetParent !== null;
+        const rerun = document.getElementById('validatingRerun');
+        return document.querySelector('[data-screen="validating"].is-active')
+            && document.getElementById('validatingLoading').hidden
+            && visible(document.getElementById('validatingResults'))
+            && visible(document.getElementById('validatingAvisosPanel'))
+            && document.getElementById('validatingAvisosList').children.length > 0
+            && visible(rerun) && !rerun.disabled;
+    });
+}
+
 async function browserJson(page, endpoint, method = 'GET', payload) {
     return page.evaluate(async ({ endpoint, method, payload }) => {
         const options = { method };
@@ -180,7 +200,7 @@ async function verifyBlockingErrorsAndNonBlockingWarnings(page) {
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="ncm-weight-input"]').length === 2);
     await replaceInput(page, '[data-testid="ncm-weight-input"]', '0');
     await page.click('#ncmContinueBtn');
-    await page.waitForSelector('#validatingResults:not([hidden])');
+    await validacionQuieta(page);
     expect(
         (await page.$eval('#validatingIssues', (el) => el.textContent || '')).includes('peso unitario debe ser mayor a cero'),
         'La validación no mostró el peso inválido como error.',
@@ -195,7 +215,7 @@ async function verifyBlockingErrorsAndNonBlockingWarnings(page) {
     await page.waitForSelector('#ncmTbody .ncm-grupo-chip');
     await page.waitForFunction(() => !document.getElementById('ncmContinueBtn').disabled);
     await page.click('#ncmContinueBtn');
-    await page.waitForSelector('#validatingResults:not([hidden])');
+    await validacionQuieta(page);
     // La validación de antes (con el 0) puede estar en pantalla: se espera
     // la respuesta de la nueva.
     const revalidada = page.waitForResponse((r) => r.url().endsWith('/api/validate/smart'));
