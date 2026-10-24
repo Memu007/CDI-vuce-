@@ -397,7 +397,7 @@ def test_una_unidad_que_sale_solo_de_la_cantidad_no_avisa_del_precio():
         ["NCM", "Description", "Origin", "Qty (pcs)", "Unit price"],
         ["84137000", "BOMBA DEMO", "CN", 5, 100],
     ])
-    assert not any("encabezado del precio" in a for a in data["avisos_mapeo"]), data["avisos_mapeo"]
+    assert not any("se leyó de los encabezados" in a for a in data["avisos_mapeo"]), data["avisos_mapeo"]
 
 
 def test_un_flete_sin_monto_corta_el_grupo():
@@ -466,3 +466,132 @@ def test_un_largo_escrito_con_su_unidad_no_la_repite():
         [None, None, 2, 10, 1, 20, 1.5, 30],
     ])
     assert data["items"][0]["descripcion"] == "LONA DEMO, ancho 2 m x largo 1,5m", data["items"]
+
+
+# ---------------------------- EXCEL-3b (segunda vuelta del adversario)
+
+@pytest.mark.parametrize("columna", ["No.", "Item No.", "S/N", "Part No."])
+def test_el_flete_y_el_descuento_con_el_rotulo_a_la_izquierda_se_leen(columna):
+    """#1: el rótulo en la columna de la izquierda (no sólo «Item») se lee,
+    como en la base."""
+    data = _leer([
+        [columna, "Description", "Qty", "Unit price", "Amount"],
+        ["1", "LAPTOP DEMO", 10, 350, 3500],
+        ["Freight", None, None, None, 800],
+        ["Discount", None, None, None, -50],
+    ])
+    assert [i["descripcion"] for i in data["items"]] == ["LAPTOP DEMO"], data["items"]
+    assert data["operacion"]["flete"] == 800 and data["operacion"]["descuento"] == 50, data["operacion"]
+
+
+def test_un_producto_discount_abre_su_grupo():
+    """#5: «Discount tag labels» es un producto: el renglón de abajo es suyo."""
+    data = _leer([
+        E,
+        ["DT-1", "Discount tag labels", 2, 10, 1, 20, 1.5, 30],
+        [None, None, 2, 15, 1, 30, 1.5, 45],
+    ])
+    assert [i["descripcion"] for i in data["items"]] == [
+        "Discount tag labels, ancho 2 m x largo 10 m",
+        "Discount tag labels, ancho 2 m x largo 15 m"], data["items"]
+    assert "descuento" not in data["operacion"], data["operacion"]
+
+
+def test_con_la_especificacion_y_el_precio_combinados_cada_renglon_conserva_codigo_y_medidas():
+    """#4: con el precio combinado los de abajo no tienen precio propio, pero
+    la especificación combinada los hace del grupo: entran con su código y sus
+    medidas (el precio vacío lo marca la revisión, como en la base)."""
+    data = _leer_combinado([
+        E,
+        ["DT-1", "LONA DEMO", 2, 10, 1, 20, 1.5, 30],
+        [None, None, 2, 15, 1, 30, None, None],
+        [None, None, 2, 20, 1, 40, None, None],
+    ], ("B2:B4", "G2:G4"))
+    assert [(i["codigo_parte"], i["descripcion"]) for i in data["items"]] == [
+        ("DT-1", "LONA DEMO, ancho 2 m x largo 10 m"),
+        ("DT-1", "LONA DEMO, ancho 2 m x largo 15 m"),
+        ("DT-1", "LONA DEMO, ancho 2 m x largo 20 m")], data["items"]
+
+
+def _leer_combinado(filas, combinar):
+    r = _subir(_libro(filas, combinar=combinar), "p.xlsx")
+    assert r.status_code == 200, r.text[:300]
+    return r.json()
+
+
+XLS_COMBINADA = os.path.join(os.path.dirname(__file__), "fixtures", "combinada_con_codigo.xls")
+FILAS_COMBINADA = [
+    E,
+    ["DT-1", "LONA DEMO", 2, 10, 1, 20, 1.5, 30],
+    ["DT-2", None, 2, 15, 1, 30, 1.5, 45],
+    ["DT-3", None, 2, 20, 1, 40, 1.5, 60],
+]
+
+
+def escribir_xls_combinada(ruta: str) -> None:
+    """La especificación combinada en B2:B4 (hace falta xlwt, que no está en
+    requirements.txt: el .xls ya está en fixtures)."""
+    import xlwt
+    wb = xlwt.Workbook()
+    ws = wb.add_sheet("PI")
+    for i, fila in enumerate(FILAS_COMBINADA):
+        for j, v in enumerate(fila):
+            if v is not None and not (j == 1 and i > 1):
+                ws.write(i, j, v)
+    ws.merge(1, 3, 1, 1)
+    wb.save(ruta)
+
+
+def test_el_xls_combinado_guardado_es_el_de_las_filas():
+    import xlrd
+    libro = xlrd.open_workbook(XLS_COMBINADA, formatting_info=True)
+    hoja = libro.sheet_by_index(0)
+    assert hoja.merged_cells == [(1, 4, 1, 2)]
+    assert [[None if v == "" else v for v in hoja.row_values(i)] for i in range(hoja.nrows)] == FILAS_COMBINADA
+
+
+def test_un_xls_con_la_especificacion_combinada_y_un_codigo_por_renglon_da_un_producto_por_renglon():
+    """#2: en .xls también se leen las combinadas: «DT-2» y «DT-3» son del
+    grupo de «LONA DEMO», como en el .xlsx."""
+    with open(XLS_COMBINADA, "rb") as f:
+        r = _subir(f.read(), "p.xls")
+    assert r.status_code == 200, r.text[:300]
+    data = r.json()
+    assert [(i["codigo_parte"], i["descripcion"]) for i in data["items"]] == [
+        ("DT-1", "LONA DEMO, ancho 2 m x largo 10 m"),
+        ("DT-2", "LONA DEMO, ancho 2 m x largo 15 m"),
+        ("DT-3", "LONA DEMO, ancho 2 m x largo 20 m")], data["items"]
+
+
+def test_un_largo_con_rango_conserva_su_unidad():
+    """#10: «48-50» en «Length (m)» no es un número, pero no trae unidad:
+    sale «largo 48-50 m»."""
+    data = _leer([
+        E,
+        ["DT-1", "LONA DEMO", 2, "48-50", 1, 98, 1.5, 147],
+        [None, None, 2, 10, 1, 20, 1.5, 30],
+    ])
+    assert data["items"][0]["descripcion"] == "LONA DEMO, ancho 2 m x largo 48-50 m", data["items"]
+
+
+def test_la_unidad_de_la_cantidad_y_el_precio_se_avisa_con_las_dos_columnas():
+    """#9: «Qty (M)» y «USD/M»: la unidad sale de los dos encabezados, y el
+    aviso los nombra a los dos."""
+    data = _leer([
+        ["NCM", "Description", "Origin", "Qty (M)", "Unit price (USD/M)"],
+        ["39269090", "CINTA DEMO", "CN", 100, 0.5],
+    ])
+    assert any("«Qty (M)»" in a and "«Unit price (USD/M)»" in a for a in data["avisos_mapeo"]), data["avisos_mapeo"]
+
+
+def test_un_descuento_con_texto_que_queda_sin_leer_corta_el_grupo():
+    """#5: «Descuento comercial -50» queda sin leer y el renglón de abajo no
+    es del grupo de arriba."""
+    data = _leer([
+        E,
+        ["DT-1", "LONA DEMO", 2, 10, 1, 20, 1.5, 30],
+        [None, "Descuento comercial", None, None, None, None, None, -50],
+        [None, None, 2, 15, 1, 30, 1.5, 45],
+    ])
+    assert [i["cantidad"] for i in data["items"]] == [20], data["items"]
+    assert data["filas_descartadas_numeros"] == [3, 4], data

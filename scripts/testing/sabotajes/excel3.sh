@@ -143,15 +143,34 @@ sabotaje $M "la unidad no viaja con el producto" \
 # EXCEL-3b: lo que dejó el adversario, uno por punto.
 B="FAILED $T::test_"
 sabotaje $M "3b#2 un subtotal con largo y sin precio vuelve a ser producto" \
-  '                    and valor_unitario):' '                    and (cantidad or valor_unitario)):' \
+  '                    and (valor_unitario or (descripcion and cantidad))):' '                    and (cantidad or valor_unitario)):' \
   "${B}un_subtotal_sin_rotulo_ni_precio_con_medidas_no_es_un_producto[con_largo]"
-sabotaje $M "3b#5 una nota en Remarks vuelve a ser flete o descuento" \
-  '            cargo = descripcion or (_texto_de_celda(row[item_col]) if item_col else "")' \
-  '            cargo = rotulo' \
-  "${B}un_texto_en_otra_columna_no_vuelve_flete_o_descuento_a_un_renglon[flete]"
+for variante in flete descuento; do
+  sabotaje $M "3b#5 una nota en Remarks vuelve a ser $variante" \
+    '                (t for t in (_texto_de_celda(row[c]) for c in columnas_del_rotulo)' \
+    '                (t for t in (_texto_de_celda(row[c]) for c in df.columns)' \
+    "${B}un_texto_en_otra_columna_no_vuelve_flete_o_descuento_a_un_renglon[$variante]"
+done
 sabotaje $M "3b#5 el flete en la columna Item deja de leerse" \
-  '            cargo = descripcion or (_texto_de_celda(row[item_col]) if item_col else "")' \
-  '            cargo = descripcion' "$XLS"
+  '    columnas_del_rotulo = ([item_col] if item_col else []) + [' \
+  '    columnas_del_rotulo = [] + [' "$XLS"
+sabotaje $M "3b-2#1 el rótulo a la izquierda de la descripción deja de leerse" \
+  'c for c in list(df.columns)[:list(df.columns).index(desc_col)] if c != item_col]' ']' \
+  "${B}el_flete_y_el_descuento_con_el_rotulo_a_la_izquierda_se_leen[No.]"
+sabotaje $M "3b-2#5 un producto «Discount …» vuelve a cortar el grupo" \
+  '                if es_descuento and not _DESCUENTO_SOLO_RE.match(cargo):' \
+  $'                if es_descuento:\n                    grupo = None\n                    es_cargo = True\n                if es_descuento and not _DESCUENTO_SOLO_RE.match(cargo):' \
+  "${B}un_producto_discount_abre_su_grupo"
+sabotaje $M "3b-2#5 un descuento con texto sin leer no corta el grupo" \
+  $'                        grupo = None\n                        descartes.append(_ + 2)  # un porcentaje no es un monto' \
+  '                        descartes.append(_ + 2)' \
+  "${B}un_descuento_con_texto_que_queda_sin_leer_corta_el_grupo"
+sabotaje $M "3b-2#4 con el precio combinado los de abajo pierden código y medidas" \
+  '                    and (valor_unitario or (descripcion and cantidad))):' '                    and valor_unitario):' \
+  "${B}con_la_especificacion_y_el_precio_combinados_cada_renglon_conserva_codigo_y_medidas"
+sabotaje $M "3b-2#2 el .xls vuelve a leerse sin sus combinadas" \
+  '        combinadas = _combinadas_del_xls(ruta)' '        combinadas = []' \
+  "${B}un_xls_con_la_especificacion_combinada_y_un_codigo_por_renglon_da_un_producto_por_renglon"
 sabotaje $M "3b#4 un flete sin monto vuelve a abrir un grupo" \
   '            elif descripcion and not es_cargo:' '            elif descripcion:' \
   "${B}un_flete_sin_monto_corta_el_grupo"
@@ -166,12 +185,24 @@ sabotaje $M "3b#3 un código nuevo sin especificación vuelve a heredar" \
 sabotaje $M "3b#1 un descuento con texto y monto negativo vuelve a ser producto" \
   '                    if "%" in cargo or _monto_de_la_linea() < 0:' '                    if "%" in cargo:' \
   "${B}un_descuento_con_texto_y_monto_negativo_se_avisa_y_no_es_producto[importe]"
+sabotaje $M "3b#1 el monto negativo en el precio deja de leerse" \
+  '                    precio = _monto_de_fila(row[valor_col], decimal) or 0.0' '                    precio = 0.0' \
+  "${B}un_descuento_con_texto_y_monto_negativo_se_avisa_y_no_es_producto[precio]"
 sabotaje $M "3b#9 un largo con su unidad la repite" \
-  '(f" {unidad}" if unidad and numero is not None else "")' '(f" {unidad}" if unidad else "")' \
+  '                trae_unidad = numero is None and re.search(r"[^\W\d_]\s*$", texto)' \
+  '                trae_unidad = False' \
   "${B}un_largo_escrito_con_su_unidad_no_la_repite"
+sabotaje $M "3b-2#10 un largo con rango pierde la unidad" \
+  '                trae_unidad = numero is None and re.search(r"[^\W\d_]\s*$", texto)' \
+  '                trae_unidad = numero is None' \
+  "${B}un_largo_con_rango_conserva_su_unidad"
 sabotaje $M "3b#7 la unidad del precio no se avisa" \
   '        if unidad and not avisos_de_lo_usado and precio_col' '        if False and precio_col' \
   "${B}la_unidad_que_sale_del_encabezado_del_precio_se_avisa"
+sabotaje $M "3b-2#9 el aviso de la unidad no nombra la cantidad" \
+  'f"La unidad que va al TXT se leyó de los encabezados de la cantidad («{cant_col}») "' \
+  'f"La unidad que va al TXT se leyó de los encabezados de la cantidad "' \
+  "${B}la_unidad_de_la_cantidad_y_el_precio_se_avisa_con_las_dos_columnas"
 sabotaje $M "3b#7 se avisa del precio una unidad que no salió de él" \
   ' and _unidad_de_columna(precio_col, True) == unidad:' ':' \
   "${B}una_unidad_que_sale_solo_de_la_cantidad_no_avisa_del_precio"
