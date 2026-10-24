@@ -108,6 +108,13 @@ En `proyecto_maria/core/maria_generator.py` y lo que lo alimenta:
    año/mes/día. Si el orden no se puede saber (año al final y día y mes
    ambos de 12 o menos), se le pregunta al usuario; no se adivina. Prueba:
    sintéticos con `2026/08/07`, `2026-08-07`, `07/08/2026` y uno ambiguo.
+9. **Fecha de inicio de actividad** (sumado por la PM el 2026-10-24, al
+   revisar CLIENTE-1). El alta del cliente la guarda `AAAA-MM-DD` (campo de
+   fecha del navegador) y el generador la copia tal cual al `MCPL` de
+   `FECHA INIC.ACTIV` (`maria_generator.py`, bloque 6). Los dos golden
+   tienen `DD/MM/AAAA`. Sale `DD/MM/AAAA`; si ya viene así, igual; si no se
+   puede leer como fecha, error claro que diga dónde corregirla (no se
+   adivina). Prueba: `2015-03-01`, `01/03/2015` y un texto que no es fecha.
 
 **No se toca:** el valor de la fecha de emisión (Emi: «no se corrige»): el
 punto 8 la lee bien, no la cambia.
@@ -131,6 +138,14 @@ dos posiciones distintas (dos ítems).
 Están en `ROADMAP.md`, Fase 1b. Antes de arrancarlas, leé la decisión del
 2026-10-24 en `DECISIONS.md`: el reparto ítem por ítem de los ajustes queda
 para PRORRATEO-1.
+
+**Qué te deja EXCEL-3 para VALOR-1** (aceptada el 2026-10-24, en la rama de
+la PM): la lectura del Excel devuelve `operacion.flete` (el de siempre),
+`operacion.descuento` (nuevo, **positivo**: lo que la factura dice que se
+deduce) y `operacion.filas_excel_flete` / `filas_excel_descuento` (filas de
+la planilla). Hoy el descuento sólo se informa: no resta del FOB. VALOR-1
+lo ofrece como ajuste a deducir y el usuario decide. Si necesitás otro
+nombre o signo, pedilo por tu canal.
 
 ## Respuestas a tus D
 

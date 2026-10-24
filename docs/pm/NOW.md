@@ -9,6 +9,29 @@ Método al día con CAMBIOS.md del secondbrain hasta 2026-10-21 (aplicado 2026-1
 (tests y e2e) sobre ese SHA. Railway no se puede mirar desde el entorno de
 la PM (el dominio está bloqueado); Emi lo probó en el sitio y anda (subió un Excel).
 
+**EXCEL-3 aceptada 2026-10-24 19:30 UTC** (Dev técnica; producto `f3f9eb8` +
+`b76be2f`): integrada por SHA (`a173af2`) a la rama de la PM, merge `a0c15ac`.
+**No publicada**: `main` sigue en `dddcf6d`; para publicar, CI verde sobre el
+SHA y «dale <SHA>» de Emi; después Emi prueba la proforma real en el sitio.
+Detalle en `REPRODUCCION-EXCEL-3-2026-10-24.md`. D1 (descuento positivo,
+sólo leído) y D2 (CLIENTE-1, a la vista con aviso) decididas por la PM;
+Emi puede cambiarlas. Lo menor del adversario queda como EXCEL-3b, después
+de PA-1.
+
+**CLIENTE-1 aceptada 2026-10-24 19:41 UTC** (Dev técnica; producto `fbc006a` +
+`12ff9b6`): el alta de cliente muestra CUIT, razón social, domicilio e inicio
+de actividad y avisa cuáles faltan. Integrada por SHA (`c402bcb`) a la rama
+de la PM, merge `23d7d5d`. **No publicada.** Detalle en
+`REPRODUCCION-CLIENTE-1-2026-10-24.md`. D3 (a) decidida por la PM: editar no
+borra una fecha guardada en otro formato; va con PA-1. Hallazgo: la fecha de
+inicio va al TXT como `AAAA-MM-DD` y el MARIA usa `DD/MM/AAAA`; sumado a
+MARIA-7 como punto 9.
+
+**Rojo conocido de EXCEL-2, ya publicado:** `test_excel2.py::test_ocho_libros…`
+falla siempre en la máquina de la PM (4 núcleos), también en la base: una
+subida normal detrás de ocho libros de ~10 MiB espera en la fila de 2 hilos y
+pasa el tope de 30 s. Pendiente de Emi: si se prioriza.
+
 **Desde el 2026-10-24, tarde:** Codex deja CDI (Emi). Dos Devs nuevas en
 Claude («Quién hace qué»). Ese día Emi y el despachante cargaron en el MARIA
 el TXT de una factura real después de doce correcciones a mano: son la
@@ -302,6 +325,10 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-10-24 19:41 UTC: CLIENTE-1 aceptada e integrada por SHA (`c402bcb`), sin publicar. D3 (a) decidida por la PM. MARIA-7 suma el punto 9 (fecha de inicio en DD/MM/AAAA). Dev técnica en PA-1 con D3, después ESTUDIO-1; Dev MARIA en MARIA-7. Para Emi, sin cambios: «dale» para publicar EXCEL-3 (y ahora CLIENTE-1) y prioridad del rojo de los ocho libros.
+
+2026-10-24 19:33 UTC: EXCEL-3 aceptada e integrada por SHA (`a173af2`), sin publicar. D1 (a) y D2 (a) decididas por la PM. Dev técnica sigue con CLIENTE-1; Dev MARIA en MARIA-7, con la nota de VALOR-1 en su canal. Para Emi: «dale» cuando quiera publicarla y prioridad del rojo de los ocho libros.
+
 2026-10-24 18:56 UTC: sin entregas. Dev MARIA en MARIA-7 (ajusta las pruebas viejas que generaban sin CUIT del despachante, esperable por el punto 3); Dev técnica cerrando EXCEL-3 con /entregar. Ninguna D abierta. Los dos chats Dev siguen con ventana de 1M: falta el `/autocompact 200k` de Emi.
 
 2026-10-19: retoma en Codex autorizada por Emi. Reconciliadas ramas y
@@ -415,5 +442,5 @@ confundir borradores guardados con cambios publicados; el permiso para
 
 ## /compact conservar de la PM principal
 
-/compact conservar: Soy la PM principal de CDI (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK min 55). Producto Memu007/CDI-vuce-, clon /home/user/cdi-vuce-, mi rama claude/practical-shannon-szpwkn (nunca main; cada push a main publica). main = dddcf6d (EXCEL-2, publicada 24/10 18:40 UTC con «dale dddcf6d», CI verde; Emi la probó en el sitio y anda). Desde el 24/10 Codex deja CDI; Devs nuevas: Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, alto) con MARIA-7 (incluye punto 8, fechas año/mes/día, decidido por Emi) y Dev técnica (session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica, medio) con EXCEL-3. Roadmap a 3 meses en ROADMAP.md, aprobado por Emi el 24/10. Acuerdos de la reunión con el despachante del 24/10 en DECISIONS.md. Los TXT y la proforma reales de ese día quedan fuera del repo (scratchpad). Método al día con el secondbrain hasta 2026-10-21: /autocompact 200k en cada chat. Reglas de Emi: nada fuera del roadmap; Devs hasta alto, sin Fable; consejero sólo mío; castellano llano; consultas de 9 a 21 ARG; publicar sólo con «dale <SHA>» de día; usar date -u.
+/compact conservar: Soy la PM principal de CDI (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK min 55). Producto Memu007/CDI-vuce-, clon /home/user/cdi-vuce-, mi rama claude/practical-shannon-szpwkn (nunca main; cada push a main publica). main = dddcf6d (EXCEL-2, publicada 24/10 18:40 UTC con «dale dddcf6d», CI verde; Emi la probó en el sitio y anda). EXCEL-3 aceptada 24/10 19:30 UTC, integrada por SHA a173af2 (merge a0c15ac en mi rama), sin publicar; D1 y D2 decididas (a); rojo de los ocho libros de EXCEL-2, preexistente, prioridad de Emi; EXCEL-3b después de PA-1. CLIENTE-1 aceptada 24/10, integrada por SHA c402bcb (merge 23d7d5d), sin publicar; D3 (a) va con PA-1; MARIA-7 punto 9 (fecha de inicio DD/MM/AAAA) sumado por la PM. Desde el 24/10 Codex deja CDI; Devs nuevas: Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, alto) con MARIA-7 (incluye punto 8, fechas año/mes/día, decidido por Emi) y Dev técnica (session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica, medio) con PA-1 y D3, después ESTUDIO-1. Roadmap a 3 meses en ROADMAP.md, aprobado por Emi el 24/10. Acuerdos de la reunión con el despachante del 24/10 en DECISIONS.md. Los TXT y la proforma reales de ese día quedan fuera del repo (scratchpad). Método al día con el secondbrain hasta 2026-10-21: /autocompact 200k en cada chat. Reglas de Emi: nada fuera del roadmap; Devs hasta alto, sin Fable; consejero sólo mío; castellano llano; consultas de 9 a 21 ARG; publicar sólo con «dale <SHA>» de día; usar date -u.
 
