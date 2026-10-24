@@ -7,7 +7,7 @@ Método al día con CAMBIOS.md del secondbrain hasta 2026-10-21 (aplicado 2026-1
 **Publicado 2026-10-24 18:40 UTC:** `main` = `dddcf6d` (EXCEL-2), con
 «dale dddcf6d» de Emi; avance limpio sobre `648cd2f`; CI 40017165638 verde
 (tests y e2e) sobre ese SHA. Railway no se puede mirar desde el entorno de
-la PM (el dominio está bloqueado): lo confirma Emi.
+la PM (el dominio está bloqueado); Emi lo probó en el sitio y anda (subió un Excel).
 
 **Desde el 2026-10-24, tarde:** Codex deja CDI (Emi). Dos Devs nuevas en
 Claude («Quién hace qué»). Ese día Emi y el despachante cargaron en el MARIA
