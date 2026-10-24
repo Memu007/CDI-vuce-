@@ -1,8 +1,44 @@
 # NOW — CDI
 
-Actualizado: 2026-10-22. Estado vigente; la historia está en Git.
+Actualizado: 2026-10-24. Estado vigente; la historia está en Git.
 
-**Primero leer esto:** Emi autorizó publicar la candidata. PR #4 fusionado
+**Estado vigente, 2026-10-24 10:00 ARG:** publicación autorizada COMPLETADA.
+Railway muestra ACTIVE `4bb8b534-04e2-4d94-bfd8-7e101defbe94`, commit
+`648cd2f0c3103f466e7fd7b7022985907e08cd06`. `/health` 200 API/base ok a las
+12:59:33 UTC; upload.js servido coincide byte a byte con main648 (SHA256
+b20509580b9bf92271604caac0d77b86211fe0626b62a334d1b37f78592dd38d).
+Startup registrado el 23 a las 17:22:50 ARG. No repetir despliegue ni pedir
+nuevo permiso para esa publicación: está hecha. Captura en outputs y
+cierre completo en `CIERRE-RETOMA-2026-10-24.md`.
+
+**EXCEL-2 revisada y aceptada en su alcance funcional sobre `dddcf6d`**
+(producto `be17e1b`), PR #5 lista para revisión (ya no borrador), SIN fusionar ni publicar. Suite local
+completa: **1731 passed, 102 skipped, 2 xfailed**, 250.01 s, exit0; CI final
+40017165638 tests y e2e-maria success. PM y QA independientes verificaron
+origen combinado, límites, concurrencia real y nueve sintéticos iguales a
+base648. 38 mutaciones históricas detectadas por motivo correcto; 2 sin evaluar
+por timeout y 2 recetas obsoletas, NO 42/42. Nuevos negativos XML/subítems
+se registran aparte. Cerca del tope de estilos: 499900 xf añadidos, 200,
+9.18 s, RSS familiar 460140544 bytes. No es garantía universal de recursos.
+Margen de concurrencia limitado (23.29 s frente a timeout30 s). Diferencia
+con instrumentación de cobertura diagnosticada y anotada en DECISIONS;
+no se omitieron tests ni se cambió timeout. No repetir puertas verdes sin
+cambio nuevo. Informe `QA-EXCEL2-REENTREGA-2026-10-23.md` y cierre24.
+
+La autorización anterior cubría producto166/main648. Para publicar EXCEL-2
+nuevo hace falta autorización específica de Emi para HEADdddcf6d; no reutilizar
+el permiso anterior. GUARDAR-2 sigue separado/D32(b), sin cobro ni migración.
+Su preparación requiere Postgres local descartable y negativos de dueño;
+Docker no estaba iniciado y no había binarios Postgres al revisar. No se
+instaló ni arrancó ningún servicio. Fase1 no se cierra sin prueba real de
+Emi/despachante en Kit.
+
+Observación de arranque: log de métricas informa falta api_logs.owner_username;
+el modelo ya estaba igual en a9b03cf. Queda por clasificar con fuentes locales,
+sin leer ni migrar DB de producción. No se arregló de paso ni se incorporaron
+registros, clientes o credenciales. Detalle en cierre24.
+
+**Historial de retoma, superado por el estado de arriba:** Emi autorizó publicar la candidata. PR #4 fusionado
 tras CI tests y e2e-maria verdes; main ahora `648cd2f` y su producto es
 idéntico a `166395f` (diff comprobado). **Railway todavía no confirmado:**
 su UI conserva ACTIVE `a9b03cf`, la salud pública responde ok y el JS servido

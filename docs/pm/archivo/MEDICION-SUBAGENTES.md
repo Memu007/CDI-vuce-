@@ -54,3 +54,26 @@ qué modelo y esfuerzo rinden.
 | 2026-10-22 | Codex PM, EXCEL-2 | excel2_next_review, modelo/esfuerzo heredados | c2f8063 | un escape bloqueante XML válido y un CSV menor; 93 focales verdes no bastan | PM reprodujo escape con una celda, 16384 columnas al usar comillas simples | vuelve; Dev corrige aislado, no integrado en publicación |
 | 2026-10-22 | Codex PM, devolución XML EXCEL-2 | candidate_integration y clean_dependencies, modelo/esfuerzo heredados | 04e1d0 | 32 focales y checks propios verdes; observación de retención de nodos vacíos medida sin incumplimiento demostrado | PM repitió reproducción anterior en verde y revisó diff; QA midió 3MB XML/38.69MiB pico del parser | guarda verificada; aceptación completa de EXCEL-2 e integración pendientes |
 | 2026-10-22 | Codex PM, integración EXCEL-2 | candidate_integration preparó d448033; revisión/medición final PM | d448033 sobre648cd2f | Dev356focales/15JS; PM encontró dos rojos: concurrencia real y origen combinado XML simple | PM reprodujo ambos con harness acotado, nueve normales iguales a base, tiempo2000combinadas0.166s | vuelve; no full ni publicación por rojos conocidos. Agentes interrumpidos por cuota; no se atribuyen sus negativos inconclusos |
+
+
+### Retoma 2026-10-23 — EXCEL-2 integrada
+
+- candidate_integration (modelo/esfuerzo heredados): producto3906130 y
+be17e1b, pruebasb073ba4/0666881, entrega dddcf6d.362focales, test8durable,
+51focales adicionales y negativos nuevos; PM reprodujo lectura/origen,
+concurrencia y suitefinal1731. No hubo Fable ni medición de tokens exacta.
+- excel2_next_review (heredados):12checks, seis propios;3mutaciones
+con fallo correcto. Cero bloqueantes nuevos reproducidos; preservación de
+DOC1/pesos/Form/dueño confirmada por fuente. PM comprobó gatesindependientes.
+- clean_dependencies (heredados): descubrió patrón#9obsoleto y debilidad de
+harnessgrepFAILED; PM adoptó selección exacta/JUnit/motivo y cortesrecursos.
+EjecutorQAexterno concleanupfinally, sin producto. Grupoall300s en curso;
+no acreditar resultados aún. Primer sandbox no llegó a tests por psutil;
+se conservó evidencia y se aprobó escalación local, sin ocultar testrojo.
+
+
+Cierre24Oct: clean_dependencies ejecutó grupoall sobredddcf6d. Baseline37verdes;
+38detectadas por motivo (36matcher+2manual),2timeouts no evaluadas y2patrones
+obsoletos con count0. PM verificó motivos14/23/28 directamente.0sobrevivientes
+entre terminadas; no42/42. Modelo/esfuerzo heredados; uso tokens no disponible.
+PMmidió además499900xf admitidos460MB/9.18s, no límite universal. CI/e2everdes.

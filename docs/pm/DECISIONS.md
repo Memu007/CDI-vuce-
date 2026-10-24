@@ -91,3 +91,19 @@ La continuación sigue en Fase 1 con revisión separada de EXCEL-2/GUARDAR-2.
 | **«Dale» para el SHA de la segunda publicación (`6ea8ca9`)** | Hecho: Emi, 2026-10-07 ~16:58 ARG, «dale 6ea8ca9»; publicado 19:58 UTC como avance directo de `main`. Antes, su «dale a todo» lo frenó el sistema de permisos de la sesión | Emi: un TXT real «se ve bien», generado un minuto después del push; falta confirmar que era la versión nueva |
 | **«Dale» para el SHA de la tercera publicación (`a9b03cf`)** | Hecho: Emi, 2026-10-07 ~18:35 ARG, «dale a9b03cf» (GUARDAR-1); publicado 21:35 UTC como avance directo de `main` | Falta que Emi guarde una operación con la SIM completa |
 | **Precio y fecha de arranque** | Vencidos | Comercial; no se escriben acá |
+
+
+## 2026-10-23 — Medición de tiempo EXCEL-2 y cobertura (PM)
+
+No se cambia el test ni el timeout30s del producto. La suite con cobertura
+sobre0666881 dio5fallos:4regresiones de subítems corregidas enbe17e1b y el
+test8concurrente (40031.4s). Repetir sólo ese test instrumentado, aislado,
+reprodujo40031.5s. El mismo test sin instrumentación dio20022.6s y pasó en
+CI, que ya usa--no-cov. La cobertura global de la corrida roja fue52.67%,
+supera38%; no es un resultado funcional aprobado.
+
+Se ejecuta la suite completa final sin instrumentación comoCI, sin excluir
+casos ni modificarpytest.ini. El nuevo producto obliga a repetir la puerta;
+no se trata de repetir hasta verde el mismoSHA. Si el caso falla también
+sin cobertura, se devuelve por concurrencia; no se eleva timeout. Registrar
+ambos resultados y el margen limitado, no afirmar fluidez universal.

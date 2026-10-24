@@ -25,7 +25,29 @@ despertás a ella con el de la suya al entregar o al dejar una D que te frena
 
 ## Retoma 2026-10-19 — recepción pendiente
 
-### Devolución vigente EXCEL-2 — 2026-10-22
+### Veredicto EXCEL-2 — 2026-10-24
+
+Aceptada funcionalmente sobre HEADdddcf6d/productobe17e1b, PR#5 sin publicar.
+Suite local1731verdes; CI/e2e40017165638 verdes.38mutaciones históricas
+con causa correcta,2timeout no evaluadas,2recetas obsoletas: no42/42.
+CierreCIERRE-RETOMA-2026-10-24.md. No repetir puertas ni ampliar producto.
+Main648 anterior ya confirmado activo enRailway. PR5 espera permiso de Emi.
+SiguienteGUARDAR2D32(b) separado: negativosdueño+Postgresdescartable+puertas
+sobre integración exacta; preparación sin código ya registrada. Sin cobro.
+
+### Reentrega vigente EXCEL-2 — 2026-10-23
+
+HEADdddcf6d/productobe17e1b en PR#5 borrador, sin main/publicación. Los dos
+rojos de d448 ya pasan. Primera CI detectó4regresiones de mensaje subítems;
+fix específico entregado y51focalesverdes. Suite final yCI/e2e a cargoPM,
+no repetir estrés ni ampliar producto mientras se revisa. El test8 bajo
+cobertura falla por tiempo incluso aislado; ver decisión23Oct enDECISIONS:
+puerta completa sin instrumentar comoCI, sin excluirtest ni elevar timeout.
+42negativos históricos no acreditados; QAexterno separa41vigentes+#9obsoleto.
+Después GUARDAR-2 separado/D32(b), sin adelantar cobro. InformePM actual
+QA-EXCEL2-REENTREGA-2026-10-23.md. Lo siguiente es historia de la devolución.
+
+### Devolución anterior EXCEL-2 — 2026-10-22
 
 **Actualización que va primero:** integrada localmente en `d448033` sobre
 main648cd2f, rama `codex/excel2-integration-648`. PM devuelve por dos rojos:

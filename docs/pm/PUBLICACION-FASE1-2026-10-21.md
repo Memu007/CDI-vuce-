@@ -94,3 +94,52 @@ concurrencia y origen combinado. Ver `REVISION-EXCEL2-INTEGRADA-2026-10-22.md`;
 no publicar esa pieza ni atribuirle suite completa. Las comprobaciones PM
 se completaron aunque los agentes de implementación se interrumpieron por
 límite de uso. No hay corrección entregada de esos dos fallos todavía.
+
+## Retoma 2026-10-22, 20:34 ARG
+
+El estado oficial de 22:49 UTC habilita builds y despliegues para los cinco
+planes, a velocidad aproximadamente normal. La comprobación pública de
+23:34:01 UTC responde salud ok; SHA256 de upload.js remoto
+`322135ba7530e230b517f2507d22140f0f075c1ba4948d4a705e1218b0e1e7d8`, frente
+al local de main648
+`b20509580b9bf92271604caac0d77b86211fe0626b62a334d1b37f78592dd38d`.
+Sigue ACTIVE el mismo despliegue antiguo. Tras la recuperación del proveedor,
+un nuevo intento del comando visible Deploy latest commit no cambió el estado.
+
+La revisión de acceso aclara el bloqueo: la UI dice proyecto PUBLIC, muchos
+controles están deshabilitados y Members devuelve «You are not authorized to
+view the contents of this section». Navegar a inicio muestra Sign in;
+Continue with GitHub lleva al formulario de ingreso, sin sesión existente.
+Por tanto no atribuir toda la demora actual al incidente ni afirmar que hay
+un despliegue en cola. La pestaña de ingreso se conserva para Emi. No se
+leyeron credenciales, no se modificaron permisos y no se accedió a la base.
+La autorización del mismo producto sigue vigente; se necesita completar el
+ingreso en el navegador para poder ejecutar/verificar la acción.
+
+
+Seguimiento23Oct07:58ARG: salud pública ok; upload.js remoto conserva SHA256
+322135ba7530e230b517f2507d22140f0f075c1ba4948d4a705e1218b0e1e7d8,
+distinto de main648. Estado oficial09:34UTC: despliegues normales y posible
+necesidad de reconectar GitHub; no es evidencia de que esta cuenta lo requiera.
+Sin sesión autorizada en IAB no se puede comprobar/ejecutar esa reparación.
+No se usó el otro proyecto Railway visible en Brave ni se cambiaron permisos.
+La corrección nueva EXCEL-2 se guarda en PR#5 borrador, con CI roja y e2e
+omitida; no mezclarla con esta publicación anterior ya autorizada.
+
+
+23Oct17:13ARG: el selector de navegador para URL deCDI eligióBrave, que tiene
+sesión autorizada. Se creó pestaña propia; ningún cambio en el otro proyecto.
+Main remoto confirmado648cd2f porls-remote. Un único Deploy latest commit
+autorizado registra despliegue4bb8b534-04e2-4d94-bfd8-7e101defbe94 BUILDING,
+con mensaje de commit «Publicar Fase1». No afirmar en vivo hasta verificar.
+Se resuelve el bloqueo de acceso anterior, no se cambiaron credenciales.
+
+
+## Publicación completada, comprobación 2026-10-24
+
+Despliegue4bb8b534 ACTIVE/Deployment successful, enlace al commit648cd2f.
+Startup completo23Oct17:22:50ARG. Salud pública200 API/baseok24Oct12:59:33UTC;
+upload.js servido coincide byte a byte conmain648 (SHA256b20509580b9bf92271604caac0d77b86211fe0626b62a334d1b37f78592dd38d).
+Captura outputs/CDI-publicado-2026-10-24.png. Se cierra el despliegue autorizado;
+no repetirlo ni pedir otropermiso para eseproducto. PR5 EXCEL2 sigue aparte,
+requiere autorización nueva deSHA antesdemain. CierreCIERRE-RETOMA-2026-10-24.md.
