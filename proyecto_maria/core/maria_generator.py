@@ -198,7 +198,8 @@ UNIDADES_MARIA = {
     "kilogramo": "01", "kilogramos": "01",
     "m": "02", "mt": "02", "mts": "02", "metro": "02", "metros": "02",
     "m2": "03", "m²": "03", "metro cuadrado": "03", "metros cuadrados": "03",
-    "sqm": "03",
+    "sqm": "03", "㎡": "03", "m^2": "03", "mtk": "03", "sq m": "03",
+    "square meter": "03", "square meters": "03", "square metre": "03", "square metres": "03",
     "m3": "04", "metro cubico": "04",
     "l": "05", "lt": "05", "lts": "05", "litro": "05", "litros": "05",
     "u": "07", "un": "07", "und": "07", "unid": "07",
@@ -220,10 +221,17 @@ def get_unidad_codigo(unidad: str) -> str:
     """
     if not unidad:
         return "07"
-    clave = str(unidad).strip().lower()
+    clave = _clave_de_unidad(unidad)
     if clave.isdigit():  # ya vino el codigo numerico
         return clave.zfill(2)
     return UNIDADES_MARIA.get(clave, "07")
+
+
+def _clave_de_unidad(unidad) -> str:
+    """La unidad en minúsculas, sin puntos y con un solo espacio: «Sq.M.»,
+    «M2.» y «sq  m» se buscan como «sq m», «m2» y «sq m» (MARIA-7)."""
+    clave = re.sub(r"\.", " ", str(unidad or "").lower())
+    return re.sub(r"\s+", " ", clave).strip()
 
 
 UNIDAD_KILOGRAMO = "01"
@@ -240,7 +248,7 @@ def unidad_estadistica_de(item: dict, unidad_declarada: str, idx) -> str:
         return unidad_declarada
     codigo = get_unidad_codigo(crudo)
     if codigo not in (unidad_declarada, UNIDAD_KILOGRAMO) or (
-            not crudo.isdigit() and crudo.lower() not in UNIDADES_MARIA):
+            not crudo.isdigit() and _clave_de_unidad(crudo) not in UNIDADES_MARIA):
         raise ValueError(
             f"Ítem {idx}: unidad estadística «{crudo[:20]}» no válida: va la misma "
             f"que la declarada o kilogramo (01)."
@@ -326,16 +334,39 @@ _PALABRAS_DE_CUENTA = re.compile(
 
 def parece_cuenta_bancaria(identificador: str) -> bool:
     """Una cuenta y no una identificación tributaria: lo dice («account»,
-    «IBAN», «cuenta»…), tiene forma de IBAN o son 16 dígitos o más (las
-    cuentas chinas tienen de 16 a 19; el CNPJ 14, el número japonés 13 y el
-    código chino de crédito social 18 con letras)."""
+    «IBAN», «cuenta»…), es un IBAN (forma y dígitos de control) o son 16
+    dígitos o más (las cuentas chinas tienen de 16 a 19; el CNPJ 14 y el
+    número japonés 13). El código chino de crédito social (18, a veces
+    todos dígitos) se reconoce por su dígito verificador y no es cuenta."""
     texto = str(identificador or "").strip()
     if _PALABRAS_DE_CUENTA.search(texto):
         return True
     compacto = re.sub(r"[\s\-.]", "", texto).upper()
-    if re.fullmatch(r"[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}", compacto):
+    if es_codigo_chino_de_credito_social(compacto):
+        return False
+    if re.fullmatch(r"[A-Z]{2}[0-9]{2}[A-Z0-9]{11,30}", compacto) and _iban_valido(compacto):
         return True
     return compacto.isdigit() and len(compacto) >= 16
+
+
+def _iban_valido(iban: str) -> bool:
+    """Los dígitos de control del IBAN (ISO 13616, módulo 97). Sin esto un
+    CNPJ escrito con el país adelante («BR» + 14 dígitos) parecía cuenta."""
+    reordenado = iban[4:] + iban[:4]
+    return int("".join(str(int(c, 36)) for c in reordenado)) % 97 == 1
+
+
+_ALFABETO_USCC = "0123456789ABCDEFGHJKLMNPQRTUWXY"
+_PESOS_USCC = (1, 3, 9, 27, 19, 26, 16, 17, 20, 29, 25, 13, 8, 24, 10, 30, 28)
+
+
+def es_codigo_chino_de_credito_social(codigo: str) -> bool:
+    """El código unificado de crédito social de China (GB 32100-2015): 18
+    caracteres y el último es el verificador de los 17 anteriores."""
+    if len(codigo) != 18 or any(c not in _ALFABETO_USCC for c in codigo):
+        return False
+    suma = sum(_ALFABETO_USCC.index(c) * w for c, w in zip(codigo[:17], _PESOS_USCC))
+    return _ALFABETO_USCC[(31 - suma % 31) % 31] == codigo[17]
 
 
 def idtrib_del_proveedor(vendedor_id: str) -> str | None:
@@ -1091,7 +1122,8 @@ def generate_maria_txt(operation_id: str, items: list,
                 raise ValueError(
                     f"Item {lugar_en_el_pedido.get(id(item), idx)}: con unidad estadística en kilos "
                     f"y sub-ítems faltan los kilos de cada sub-ítem; por ahora declaralo sin "
-                    f"sub-ítems o con la unidad estadística igual a la declarada."
+                    f"sub-ítems, con la unidad estadística igual a la declarada, o en kilos con "
+                    f"la cantidad igual al kilo neto al centésimo ({cantidad_est:.2f})."
                 )
         else:
             cantidad_est = Decimal(f"{cantidad:.2f}")
@@ -1443,6 +1475,12 @@ def supuestos_declarados(
         avisos.append(
             "Número de factura: no se leyó; la referencia de la factura (LDVDREFDOC) sale "
             "vacía. Cargalo en la revisión."
+        )
+    elif items and numero_factura is not None and len(str(numero_factura).strip()) > LARGO_REF_FACTURA:
+        avisos.append(
+            f"Número de factura: «{str(numero_factura).strip()[:40]}» tiene "
+            f"{len(str(numero_factura).strip())} caracteres y en LDVDREFDOC entran "
+            f"{LARGO_REF_FACTURA}; así no se genera el TXT. Acortalo en la revisión."
         )
     if items and vendedor_id is not None:
         leido = str(vendedor_id).strip()

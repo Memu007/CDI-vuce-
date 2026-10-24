@@ -2224,8 +2224,9 @@ def _fecha_o_vacia(dia: int, mes: int, anio: int) -> str:
 def _fecha_leida(raw) -> tuple[str, str]:
     """(fecha en DD/MM/AAAA, aviso). Con el año adelante el orden es
     año/mes/día. Con el año al final, si uno de los dos primeros pasa de 12
-    ése es el día; si los dos son 12 o menos y distintos no se adivina: sale
-    vacía con un aviso que pregunta (Emi, 2026-10-24)."""
+    ése es el día; si los dos son 12 o menos y distintos, o el año tiene dos
+    cifras, no se adivina: sale vacía con un aviso que pregunta (Emi,
+    2026-10-24)."""
     texto = _texto(raw)
     if not texto:
         return "", ""
@@ -2239,7 +2240,9 @@ def _fecha_leida(raw) -> tuple[str, str]:
     if m:
         a, b, anio = (int(g) for g in m.groups())
         if len(m.group(3)) == 2:
-            anio += 2000
+            # «26/08/07» también puede ser año/mes/día: no se adivina.
+            return "", (pregunta + "tiene el año con dos cifras y el orden no se puede saber; "
+                        "no se adivina. Cargala en la revisión (DD/MM/AAAA).")
         if 1 <= a <= 12 and 1 <= b <= 12 and a != b:
             return "", (pregunta + f"puede ser el {a} de {_NOMBRE_DEL_MES[b - 1]} o el {b} de "
                         f"{_NOMBRE_DEL_MES[a - 1]}; no se adivina. Cargala en la revisión (DD/MM/AAAA).")

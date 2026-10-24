@@ -62,7 +62,7 @@
     function opciones(lista, elegido, vacio) {
         const html = vacio ? ['<option value="">' + CDI.escapeHtml(vacio) + '</option>'] : [];
         lista.forEach(([v, t]) => {
-            html.push('<option value="' + v + '"' + (String(elegido) === v ? ' selected' : '') + '>' +
+            html.push('<option value="' + CDI.escapeHtml(v) + '"' + (String(elegido) === v ? ' selected' : '') + '>' +
                 CDI.escapeHtml(t) + '</option>');
         });
         return html.join('');
