@@ -79,7 +79,7 @@ reemplazar $F '    if not cuit_agr:
 caso "cddtagr_opcional" "FAILED $T::test_sin_cuit_del_despachante_no_se_genera"
 
 # 3. LDVDREFDOC vuelve a ser «E» + el final del identificador
-reemplazar $F 'lines.append(f"LDVDREFDOC={ref_factura}")' 'lines.append(f"LDVDREFDOC={\"E\" + id_maria[-6:]:<28}")'
+reemplazar $F 'lines.append(f"LDVDREFDOC={ref_factura}")' 'lines.append("LDVDREFDOC=" + ("E" + id_maria[-6:]).ljust(28))'
 caso "ref_inventada" "FAILED $T::test_la_referencia_de_la_factura_es_el_numero_real_con_ancho_fijo"
 
 # 4. «m2» y «m²» dejan de ser 03
