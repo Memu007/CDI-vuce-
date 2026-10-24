@@ -192,15 +192,15 @@ antes de cerrar la Fase 3.
    fecha de emisión, moneda, incoterm, CUIT válido y estado si el origen es
    argentino: un error que pide eso no es una falla. Guardar con la SIM
    completa sigue dando error hasta GUARDAR-1.
-1a. **Tercera publicación, hecha:** `a9b03cf`, 2026-10-07 21:35 UTC («dale
-   a9b03cf» de Emi). Emi espera unos minutos y guarda una operación con un
-   producto con la SIM completa: tiene que guardar sin error.
-1b. **Sin volumen** (Emi, 2026-10-07): cada publicación o reinicio borra los
+1a. **Sin volumen** (Emi, 2026-10-07): cada publicación o reinicio borra los
    TXT generados y el historial de NCM aprendido; las operaciones quedan en
    la base. Descargar el TXT apenas se genera. Lo arregla DISCO-1 (Fase 3).
-2. **Rotar las claves de Gemini** (G0). En Google AI Studio: borrar las que
-   aparecieron, crear una nueva y ponerla sólo en Railway. Mirar la
-   facturación de Google.
+2. **Rotar las claves de Gemini y revocar la de Anthropic** (G0). Gemini: en
+   Google AI Studio borrar las que aparecieron, crear una nueva y ponerla sólo
+   en Railway; mirar la facturación. Anthropic (2026-10-24): hay una clave
+   real en `scripts/utils/cambiar_ai.sh:62` de `main` y en el historial desde
+   `32e4282`; revocarla en la consola de Anthropic. Después, pieza chica para
+   sacar el archivo (el historial queda; lo que protege es revocar).
 3. **Despachante:** recordarle los archivos reales (favor 1). Ya respondió
    todas las preguntas.
 4. **Catálogo NCM:** Emi trajo el nomenclador vigente (2026-10-07). Lo
@@ -326,13 +326,15 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-10-24 22:1x UTC: llegó el informe de Argon (14 hallazgos, 10 «alta») sobre 8b45207. Lo estoy reproduciendo con cuatro revisores Opus en paralelo, uno por área (subida de archivos 1-3, cobro/cupos/orgs 4-7, TXT MARIA 8/9/11, sesión/CSRF/aislamiento 10/12/13/14 + aislamiento del 7), cada uno sobre su propio worktree de 8b45207 en /tmp/argon-A..D. Nada entra al roadmap sin reproducir. Copia del informe en el scratchpad de la PM.
+
+2026-10-24 21:58 UTC: sin entregas ni D abiertas. Dev técnica en PRUEBAS-1 (rama en `99d4e3e`, maria1b.sh arreglado; puertas y medición del foco corriendo, sin informe todavía). Dev MARIA corriendo suite y sabotajes de la devolución de MARIA-7. Contexto: la técnica 127k de 200k; la MARIA sigue marcando 337k sin compactar, se le repite a Emi.
+
+2026-10-24 21:36 UTC: Emi pidió una auditoría externa (Argon). Pedido y ZIP de `8b45207` sin historial entregados a Emi, sin `cambiar_ai.sh` (tenía una clave real de Anthropic, también en el historial) ni notas viejas; escaneo de claves limpio. Para Emi: revocar esa clave (G0, punto 2).
+
 2026-10-24 21:10 UTC: PA-1 + D3 aceptada e integrada (`fe41228`), sin publicar: suite 1782 passed, sabotajes en rojo, adversario sobre D3 sin hallazgo propio. D4 (b), D5 (a) como PA-1b, D6 (a), D7 (a) dentro de CLIENTE-1b ampliada. PRUEBAS-1 suma (c), el rojo intermitente de la e2e. Dev técnica despertada. Cadena de sabotajes de `8b45207` terminada: excel3, guardar1, admin1, admin2, punta_a_punta1, rendimiento1 y 1b en rojo limpio; lo que no dio rojo son pruebas viejas, no el producto (cliente1: la carrera del foco; excel1 4, excel2 3 y maria1b 2 patrones que EXCEL-2/3 movieron), todo en PRUEBAS-1.
 
 2026-10-24 20:55 UTC: publicada `8b45207` (EXCEL-3 + CLIENTE-1) con «dale 8b45207»; falta que Emi la pruebe en el sitio. MARIA-7 con devolución (`e996657`): sufijos que se funden, kilo neto al centésimo (D2 b, por el archivo aceptado), palabras de cuenta, unidad estadística cruda y aviso de unidad desconocida; D1–D8 respondidas; Dev MARIA despertada. PA-1 en revisión. PRUEBAS-1 suma `excel2.sh` (3 patrones viejos, no termina en 30 min). Para Emi: dos preguntas al despachante (largo del IDSO y repetidos; decimal y vacío en un sufijo). Cadena de sabotajes de la publicación sigue (guardar1 en adelante).
-
-2026-10-24 19:56 UTC: sin entregas. Las dos Devs trabajando: la técnica en D3 (prueba en rojo, arreglando), la MARIA cerrando MARIA-7 (sabotajes en rojo, trae la rama de la PM antes de las puertas). Suite de la PM en CLIENTE-1 verde (1757 passed). Ninguna D abierta. Los dos chats con ventana de 200k; el de la Dev MARIA marca 337k usados, sin compactar todavía: se mira en la próxima vuelta.
-
-2026-10-24 19:41 UTC: CLIENTE-1 aceptada e integrada por SHA (`c402bcb`), sin publicar. D3 (a) decidida por la PM. MARIA-7 suma el punto 9 (fecha de inicio en DD/MM/AAAA). Dev técnica en PA-1 con D3, después ESTUDIO-1; Dev MARIA en MARIA-7. Para Emi, sin cambios: «dale» para publicar EXCEL-3 (y ahora CLIENTE-1) y prioridad del rojo de los ocho libros.
 
 ## Medición
 
@@ -340,5 +342,5 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## /compact conservar de la PM principal
 
-/compact conservar: Soy la PM principal de CDI (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK min 55). Producto Memu007/CDI-vuce-, clon /home/user/cdi-vuce-, mi rama claude/practical-shannon-szpwkn (nunca main; cada push a main publica). main = 8b45207 (EXCEL-3 + CLIENTE-1, publicada 24/10 20:33 UTC con «dale 8b45207»; falta que Emi la pruebe; volver a dddcf6d sólo con su ok). Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, alto): MARIA-7 con devolución (e996657, sobre f0b73f7; D1–D8 respondidas; D1 y D7 esperan al despachante vía Emi); después MARIA-8. Dev técnica (session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica, medio): PA-1 + D3 aceptada e integrada (fe41228, sin publicar); sigue PRUEBAS-1 (a cliente1 foco, b excel1/excel2 sabotajes viejos, c e2e #validatingRerun), PA-1b (demo de la landing), EXCEL-3b, ESTUDIO-1 (después de integrar MARIA-7), CLIENTE-1b (fecha validada en la API; limpiar producción lo decide Emi). Pendiente de la PM: revisar la devolución de MARIA-7 y PRUEBAS-1 cuando lleguen (la cadena de sabotajes de 8b45207 ya está clasificada: todo a PRUEBAS-1). Para Emi: probar 8b45207; preguntas al despachante; esfuerzo; rojo de los ocho libros; packing list; clave de Gemini. Roadmap a 3 meses en ROADMAP.md (aprobado 24/10); acuerdos del despachante en DECISIONS.md; TXT y proforma reales sólo en el scratchpad. Reglas de Emi: nada fuera del roadmap; Devs hasta alto, sin Fable; consejero sólo mío; castellano llano; consultas de 9 a 21 ARG; publicar sólo con «dale <SHA>» de día; usar date -u.
+/compact conservar: Soy la PM principal de CDI (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK min 55). Producto Memu007/CDI-vuce-, clon /home/user/cdi-vuce-, mi rama claude/practical-shannon-szpwkn (nunca main; cada push a main publica). main = 8b45207 (EXCEL-3 + CLIENTE-1, publicada 24/10 20:33 UTC con «dale 8b45207»; falta que Emi la pruebe; volver a dddcf6d sólo con su ok). Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, alto): MARIA-7 con devolución (e996657, sobre f0b73f7; D1–D8 respondidas; D1 y D7 esperan al despachante vía Emi); después MARIA-8. Dev técnica (session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica, medio): PA-1 + D3 aceptada e integrada (fe41228, sin publicar); sigue PRUEBAS-1 (a cliente1 foco, b excel1/excel2 sabotajes viejos, c e2e #validatingRerun), PA-1b (demo de la landing), EXCEL-3b, ESTUDIO-1 (después de integrar MARIA-7), CLIENTE-1b (fecha validada en la API; limpiar producción lo decide Emi). Pendiente de la PM: revisar la devolución de MARIA-7 y PRUEBAS-1 cuando lleguen (la cadena de sabotajes de 8b45207 ya está clasificada: todo a PRUEBAS-1). Para Emi: probar 8b45207; preguntas al despachante; esfuerzo; rojo de los ocho libros; packing list; revocar la clave de Anthropic de cambiar_ai.sh y rotar Gemini. Auditoría de Argon: pedido y ZIP de 8b45207 (sin esa clave) entregados a Emi el 24/10; cada hallazgo se reproduce antes de entrar al roadmap. Roadmap a 3 meses en ROADMAP.md (aprobado 24/10); acuerdos del despachante en DECISIONS.md; TXT y proforma reales sólo en el scratchpad. Reglas de Emi: nada fuera del roadmap; Devs hasta alto, sin Fable; consejero sólo mío; castellano llano; consultas de 9 a 21 ARG; publicar sólo con «dale <SHA>» de día; usar date -u.
 
