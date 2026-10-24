@@ -723,6 +723,56 @@ def peso_valido(peso, donde) -> float:
     return kilos
 
 
+def _enumerar(numeros: list) -> str:
+    """«1, 2 y 3»."""
+    textos = [str(n) for n in numeros]
+    return textos[0] if len(textos) == 1 else ", ".join(textos[:-1]) + " y " + textos[-1]
+
+
+def clave_de_posicion(item: dict, donde, iva_por_defecto: str | None) -> tuple:
+    """Lo que tienen que compartir dos renglones para ir en un solo ítem
+    (MARIA-8): posición SIM, origen, procedencia y estado, y además lo que el
+    ítem declara una sola vez (unidad, unidad estadística, IVA adicional)."""
+    pais = item.get('pais_origen') or item.get('origen', 'CN')
+    pais_codigo = get_pais_codigo(pais)
+    unidad = get_unidad_codigo(item.get('unidad') or item.get('unidad_medida') or item.get('um'))
+    iva = (_iva_adicional(item.get('iva_adicional'), f"Ítem {donde}")
+           if item.get('iva_adicional') else iva_por_defecto)
+    return (
+        re.sub(r"[.\s]", "", str(item.get('ncm') or item.get('pieza') or '')).upper(),
+        pais_codigo,
+        get_pais_codigo(procedencia_de(item) or pais),
+        _estado_item(item, donde, pais_codigo),
+        unidad,
+        unidad_estadistica_de(item, unidad, donde),
+        iva,
+    )
+
+
+def renglones_por_posicion(items: list, iva_por_defecto: str | None = None) -> list:
+    """Los números (desde 0) de los renglones que van juntos en un ítem, en el
+    orden de su primer renglón (MARIA-8). Sólo los que tienen más de uno. Un
+    grupo armado a mano y un producto con sub-ítems a mano no entran."""
+    juntos: dict = {}
+    for n, item in enumerate(items):
+        if item.get('grupo_id') is not None or item.get('subitems'):
+            continue
+        juntos.setdefault(clave_de_posicion(item, n + 1, iva_por_defecto), []).append(n)
+    return [ns for ns in juntos.values() if len(ns) > 1]
+
+
+def al_centesimo_cerrando(valores: list) -> tuple[list, Decimal]:
+    """Cada valor y su suma al centésimo, con la mitad hacia arriba; lo que
+    falta o sobra para que las partes sumen el total va a la parte más grande
+    (la primera, si empatan). MARIA-8: las sumas del ítem cierran exactas."""
+    centesimo = Decimal("0.01")
+    total = sum(valores, Decimal(0)).quantize(centesimo, ROUND_HALF_UP)
+    partes = [v.quantize(centesimo, ROUND_HALF_UP) for v in valores]
+    mayor = max(range(len(valores)), key=lambda i: (valores[i], -i))
+    partes[mayor] += total - sum(partes, Decimal(0))
+    return partes, total
+
+
 def fob_total_del_txt(items: list, grupos: list | None = None) -> Decimal:
     """El MDDTFOB que va a salir en el TXT: los productos de un grupo suman su
     valor y la línea se redondea una vez; el resto, cada uno al centavo. La
@@ -733,6 +783,21 @@ def fob_total_del_txt(items: list, grupos: list | None = None) -> Decimal:
         clave = ('grupo', gid) if gid is not None else ('item', n)
         lineas[clave] = lineas.get(clave, Decimal(0)) + valor_de_la_linea(item)
     return sum((centavos(v) for v in lineas.values()), Decimal('0.00'))
+
+
+def _item_de_los_renglones(renglones: list, renglones_de: dict, lugar: dict) -> dict:
+    """El ítem que junta renglones de la misma posición (MARIA-8): el FOB es
+    la suma de los de cada renglón al centavo (así MDDTFOB no cambia) y los
+    kilos, la de cada uno al gramo. Cada renglón se valida con su número en
+    la pantalla."""
+    kilos = [Decimal(f"{peso_valido(peso_de_la_linea(r), lugar[id(r)]):.3f}") for r in renglones]
+    item = dict(renglones[0])
+    item['cantidad'] = float(sum((_exacto(r.get('cantidad', 1)) for r in renglones), Decimal(0)))
+    item['valor_total'] = sum((_fob_de(r) for r in renglones), Decimal('0.00'))
+    item['peso_kg'] = float(sum(kilos, Decimal(0)))
+    item['valor_unitario'] = (float(item['valor_total']) / item['cantidad']) if item['cantidad'] > 0 else 0
+    renglones_de[id(item)] = (renglones, kilos)
+    return item
 
 
 def generate_maria_txt(operation_id: str, items: list, 
@@ -1031,10 +1096,19 @@ def generate_maria_txt(operation_id: str, items: list,
     # grupos antes, no es el de su línea del TXT. Los errores de los
     # sub-ítems lo usan para caer bajo el sub-ítem que falla (SUBITEMS-1).
     lugar_en_el_pedido = {id(it): k for k, it in enumerate(items, 1)}
+    # Los renglones de la misma posición van en un ítem, uno por sub-ítem
+    # (MARIA-8); el ítem sale donde estaba su primer renglón.
+    juntos_de = {n: ns for ns in renglones_por_posicion(items, iva_adicional) for n in ns}
+    renglones_de = {}
     items_export = []
     grupos_emitidos = set()
-    for item in items:
+    for n_renglon, item in enumerate(items):
         gid = item.get('grupo_id')
+        if n_renglon in juntos_de:
+            if juntos_de[n_renglon][0] == n_renglon:
+                items_export.append(_item_de_los_renglones(
+                    [items[k] for k in juntos_de[n_renglon]], renglones_de, lugar_en_el_pedido))
+            continue
         if gid is None:
             items_export.append(item)
             continue
@@ -1149,7 +1223,25 @@ def generate_maria_txt(operation_id: str, items: list,
                 )
         else:
             cantidad_est = Decimal(f"{cantidad:.2f}")
-        
+        cantidad_dcl = Decimal(f"{cantidad:.2f}")
+        # Renglones juntos (MARIA-8): la cantidad y la cantidad estadística de
+        # cada sub-ítem son las de su renglón, y suman exacto las del ítem.
+        renglones, kilos_renglones = renglones_de.get(id(item), (None, None))
+        if renglones:
+            cantidades_sub, cantidad_dcl = al_centesimo_cerrando(
+                [_exacto(r.get('cantidad', 1)) for r in renglones])
+            if unidad_est == UNIDAD_KILOGRAMO:
+                estadisticas_sub, cantidad_est = al_centesimo_cerrando(kilos_renglones)
+            else:
+                estadisticas_sub, cantidad_est = cantidades_sub, cantidad_dcl
+            if min(cantidades_sub + estadisticas_sub) < 0:
+                raise ValueError(
+                    f"Item {lugar_en_el_pedido[id(renglones[0])]}: los renglones "
+                    f"{_enumerar([lugar_en_el_pedido[id(r)] for r in renglones])} son tan chicos "
+                    f"que al llevar sus cantidades o kilos al centésimo no cierran con el total; "
+                    f"revisá las cantidades y los kilos."
+                )
+
         flete_item = fletes[idx - 1]
         seguro_item = seguros[idx - 1]
         base_imponible = valor_total + flete_item + seguro_item
@@ -1164,13 +1256,13 @@ def generate_maria_txt(operation_id: str, items: list,
         # S cuando el ítem se declara partido en sub-ítems, N cuando va entero.
         # Los dos archivos de referencia lo confirman: el que tiene un solo
         # [SBT] dice N, el que tiene dos dice S.
-        lines.append("CARTSBITEM=S" if item.get("subitems") else "CARTSBITEM=N")
+        lines.append("CARTSBITEM=S" if item.get("subitems") or renglones else "CARTSBITEM=N")
         lines.append(f"CARTUSO={_estado_item(item, idx, pais_codigo)}")
         lines.append(f"QARTKGRNET={peso_neto:.3f}")
         lines.append(f"CARTPAYORI={pais_codigo}")
         lines.append(f"CARTPAYPRC={pais_proc_codigo}") # Procedencia (default = origen)
         lines.append(f"CARTUNTDCL={unidad_codigo}") # Unidad declarada (oficial MARIA)
-        lines.append(f"QARTUNTDCL={cantidad:.2f}")
+        lines.append(f"QARTUNTDCL={cantidad_dcl:.2f}")
         lines.append(f"CARTUNTEST={unidad_est}")
         lines.append(f"QARTUNTEST={cantidad_est:.2f}")
         lines.append(f"MARTFOB={valor_total:.2f}")
@@ -1218,14 +1310,39 @@ def generate_maria_txt(operation_id: str, items: list,
         # los supuestos avisan lo que se cambió).
         sufijo_sbt = limpiar_sufijo((sbt_sufijo_valor or "").strip())[0]
 
-        if not subitems and not sufijo_sbt:
+        if not subitems and not renglones and not sufijo_sbt:
             raise ValueError(
                 "Falta el sufijo de valor SBT (CSBTSVL). "
                 "Este dato es obligatorio y depende del importador. "
                 "Contactá al despachante para obtenerlo."
             )
 
-        if not subitems:
+        if renglones:
+            # Un sub-ítem por renglón (MARIA-8), con lo de su renglón: el FOB
+            # al centavo, el unitario y el sufijo propio o el de la operación.
+            for n, (renglon, cant_sub, est_sub) in enumerate(
+                    zip(renglones, cantidades_sub, estadisticas_sub), start=1):
+                sufijo = limpiar_sufijo(str(renglon.get("sufijo") or "").strip())[0] or sufijo_sbt
+                if not sufijo:
+                    raise ValueError(
+                        f"Item {idx}, renglón {lugar_en_el_pedido[id(renglon)]}: falta el sufijo "
+                        f"de valor (CSBTSVL)."
+                    )
+                fob_sub = _fob_de(renglon)
+                unitario = (float(renglon["valor_unitario"]) if renglon.get("valor_unitario") not in (None, "")
+                            else float(valor_de_la_linea(renglon)) / float(renglon.get("cantidad", 1) or 1))
+                lines.append("[SBT]")
+                lines.append(f"IDDT={id_maria}")
+                lines.append(f"NART={idx:04d}")
+                lines.append(f"ISBT={n:04d}")
+                lines.append(f"MSBTFOB={fob_sub:.2f}")
+                lines.append(f"QSBTUNTDCL={cant_sub:.2f}")
+                lines.append(f"MSBTUNITAR={unitario:.4f}")
+                lines.append(f"IEXT={idx}-{n}")
+                lines.append(f"CSBTSVL={sufijo}")
+                lines.append(f"QSBTUNTEST={est_sub:.2f}")
+                lines.append("")
+        elif not subitems:
             # Ítem entero: un solo bloque, sin montos (numeración desde 0000).
             lines.append("[SBT]")
             lines.append(f"IDDT={id_maria}")
@@ -1530,6 +1647,34 @@ def supuestos_declarados(
                     f"Sufijo de valor{donde}: dentro de los paréntesis van sólo letras, números "
                     f"y espacios; sale «{limpio[:80]}»."
                 )
+
+    # --- Renglones de la misma posición (MARIA-8) ---------------------------
+    # Si un renglón tiene un error, el generador lo dice: acá no se avisa.
+    juntos = []
+    if items and all(isinstance(it, dict) for it in items):
+        try:
+            juntos = renglones_por_posicion(items, _iva_adicional(
+                iva_adicional or IVA_ADICIONAL_POR_DEFECTO, "Operación"))
+        except (ValueError, TypeError):
+            juntos = []
+    for ns in juntos:
+        cuales = _enumerar([n + 1 for n in ns])
+        avisos.append(
+            f"Sub-ítems: los renglones {cuales} van en un solo ítem con {len(ns)} sub-ítems "
+            f"(misma posición SIM, origen, procedencia y estado)."
+        )
+        de_cada_uno = {
+            limpiar_sufijo(str(items[n].get("sufijo") or "").strip())[0]
+            or limpiar_sufijo(str(sbt_sufijo_valor or "").strip())[0]
+            for n in ns
+        }
+        if len(de_cada_uno) == 1 and "" not in de_cada_uno:
+            avisos.append(
+                f"Sufijo de valor: en el ítem de los renglones {cuales} los {len(ns)} sub-ítems "
+                f"llevan el mismo sufijo («{next(iter(de_cada_uno))[:80]}»). Si cada renglón lleva "
+                f"el suyo (marca, modelo, color), la pantalla todavía no deja cargarlo: "
+                f"corregilo en el Kit."
+            )
 
     # --- Fecha de emisión (MARIA-3) ----------------------------------------
     fecha_ok = fecha_de_la_factura(fecha_emision)

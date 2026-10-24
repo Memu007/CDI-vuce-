@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-24 · feat: MARIA-8, sub-ítems por renglón
+
+- Los renglones de la factura con la misma posición SIM, origen, procedencia y estado (y la misma unidad, unidad estadística e IVA adicional) van en un solo ítem con un sub-ítem por renglón (`CARTSBITEM=S`), cada uno con su FOB, cantidad, unitario, kilos y sufijo propio o el de la operación.
+- Las sumas del ítem (FOB, cantidad, kilos y cantidad estadística) cierran exactas al centésimo; el redondeo sobrante va al sub-ítem más grande. Los avisos dicen qué renglones van juntos y si todos llevan el mismo sufijo. Los grupos y sub-ítems armados a mano siguen como antes.
+
 ## 2026-10-24 · fix: MARIA-7, lo que el MARIA rechazó el 24/10
 
 - Sin CUIT del despachante no se genera el TXT (antes faltaba CDDTAGR en silencio); IDSO, IDDT e IARTESPAPU van con 8 caracteres y LDVDREFDOC con el número real de la factura.
