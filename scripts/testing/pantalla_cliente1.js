@@ -8,7 +8,7 @@
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 (async () => {
-  const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium-1194/chrome-linux/chrome' });
+  const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium' });
   const page = await (await b.newContext({ viewport: { width: 1280, height: 1000 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
@@ -39,6 +39,8 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   await toast.waitFor({ timeout: 10000 }).catch(() => falla('no apareció ningún aviso al guardar'));
   const aviso = await toast.innerText();
   if (!(await toast.evaluate(el => el.classList.contains('is-warning')))) falla('el aviso no es de advertencia: ' + aviso);
+  const icono = await toast.locator('.toast-icon').innerText();
+  if (icono.trim() !== '!') falla('el aviso de advertencia tiene el ícono «' + icono + '», no «!»');
   if (!/domicilio/i.test(aviso) || !/inicio de actividad/i.test(aviso)) falla('el aviso no dice qué falta: ' + aviso);
   if (/CUIT/.test(aviso)) falla('el aviso dice que falta el CUIT, y se cargó: ' + aviso);
   const lista = await (await page.request.get(base + '/api/clientes')).json();
@@ -48,9 +50,16 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   if (await page.locator('#cxFormModal').evaluate(el => el.open)) falla('el formulario quedó abierto después de guardar');
   console.log('OK sin domicilio ni inicio de actividad se guarda y avisa: ' + aviso.replace(/\s+/g, ' '));
 
-  // El detalle muestra el inicio de actividad (vacío, con guion).
-  const datos = await page.locator('#cxDatosGrid').innerText().catch(() => '');
-  if (!/Inicio de actividad/.test(datos)) falla('el detalle del cliente no muestra el inicio de actividad: ' + datos);
+  // El detalle muestra el inicio de actividad (vacío, con guion), a la vista
+  // en la pestaña Datos.
+  async function verDatos() {
+    await page.locator('#cxTabDatos').click();
+    const grid = page.locator('#cxDatosGrid');
+    if (!(await grid.isVisible())) falla('la pestaña Datos no muestra el detalle del cliente');
+    return grid.innerText();
+  }
+  const datos = await verDatos();
+  if (!/Inicio de actividad\s*—/i.test(datos)) falla('el detalle del cliente no muestra el inicio de actividad: ' + datos);
 
   // Con los cuatro datos: sin aviso de lo que falta.
   await page.locator('#cxNewBtn').click();
@@ -64,9 +73,20 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
     .catch(() => falla('no apareció el aviso de cliente creado'));
   const ok = await toast.innerText();
   if (/falta/i.test(ok) || await toast.evaluate(el => el.classList.contains('is-warning'))) falla('con los cuatro datos igual avisa que falta algo: ' + ok);
-  const datos2 = await page.locator('#cxDatosGrid').innerText();
-  if (!/01\/03\/2015|2015-03-01/.test(datos2)) falla('el detalle no muestra el inicio de actividad cargado: ' + datos2);
+  const datos2 = await verDatos();
+  if (!/Inicio de actividad\s*01\/03\/2015/i.test(datos2)) falla('el detalle no muestra el inicio de actividad cargado como 01/03/2015: ' + datos2);
   console.log('OK con los cuatro datos no avisa nada y el detalle muestra el inicio de actividad');
+
+  // Una fecha guardada que no es AAAA-MM-DD (por la API) se muestra tal cual,
+  // no como vacía.
+  await page.request.post(base + '/api/clientes', { data: { nombre: 'Cliente Inventado Tres SA', cuit: '20123456786', fecha_inic_activ: '01/03/2015' } });
+  await page.reload();
+  await page.waitForFunction(() => window.CDI && CDI.goTo);
+  await page.evaluate(() => CDI.goTo('clientes'));
+  await page.locator('.cx-card', { hasText: 'Cliente Inventado Tres SA' }).click();
+  const datos3 = await verDatos();
+  if (!/Inicio de actividad\s*01\/03\/2015/i.test(datos3)) falla('una fecha guardada que no es AAAA-MM-DD se muestra como vacía: ' + datos3);
+  console.log('OK una fecha guardada en otro formato se muestra tal cual');
 
   if (process.argv[2]) await page.screenshot({ path: process.argv[2], fullPage: true });
   await b.close();

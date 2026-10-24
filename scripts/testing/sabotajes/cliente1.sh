@@ -94,7 +94,18 @@ sabotaje $J "el detalle no muestra el inicio de actividad" \
 sabotaje $J "el detalle da vuelta día y mes" \
   "m[3] + '/' + m[2] + '/' + m[1]" "m[2] + '/' + m[3] + '/' + m[1]" \
   "FALLA: el detalle no muestra el inicio de actividad cargado"
-
+sabotaje $J "el detalle muestra la fecha sin formatear" \
+  "return m ? m[3] + '/' + m[2] + '/' + m[1] : txt;" "return txt;" \
+  "FALLA: el detalle no muestra el inicio de actividad cargado como 01/03/2015"
+sabotaje $J "una fecha en otro formato se muestra vacía" \
+  "m[1] : txt;" "m[1] : '';" \
+  "FALLA: una fecha guardada que no es AAAA-MM-DD se muestra como vacía"
+sabotaje $J "la pestaña Datos no muestra el detalle" \
+  "panelDatos.hidden    = tab !== 'datos';" "panelDatos.hidden    = true;" \
+  "FALLA: la pestaña Datos no muestra el detalle del cliente"
+sabotaje proyecto_maria/static/v2/app_v2.js "el aviso de advertencia lleva el ícono de información" \
+  "(kind === 'error' || kind === 'warning') ? '!'" "kind === 'error' ? '!'" \
+  "FALLA: el aviso de advertencia tiene el ícono «i», no «!»"
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
