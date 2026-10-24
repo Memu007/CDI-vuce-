@@ -262,7 +262,7 @@
                 '</div>' +
                 '<div class="catalogo-product-fields">' +
                     '<label class="catalogo-product-field">' +
-                        '<span>PA SIM</span>' +
+                        '<span>NCM</span>' +
                         '<input type="text" data-field="ncm" value="' + CDI.escapeHtml(ncmFmt) + '" placeholder="0000.00.00" inputmode="numeric">' +
                     '</label>' +
                     '<label class="catalogo-product-field">' +

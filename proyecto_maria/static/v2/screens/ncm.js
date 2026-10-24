@@ -1140,7 +1140,7 @@
             '<div class="ncm-autofill-banner-inner">' +
                 '<span class="ncm-autofill-icon" aria-hidden="true">✨</span>' +
                 '<span class="ncm-autofill-text">Se autocompletaron <strong>' + total +
-                ' de ' + totalItems + '</strong> posiciones arancelarias (PA SIM)' + detailText +
+                ' de ' + totalItems + '</strong> NCM' + detailText +
                 '. Revisalos antes de continuar.</span>' +
                 '<button type="button" class="ncm-autofill-undo" id="ncmAutofillUndo">Deshacer</button>' +
                 '<button type="button" class="ncm-autofill-close" id="ncmAutofillClose" aria-label="Cerrar">×</button>' +
@@ -1165,7 +1165,7 @@
                 CDI.hint('banner_autofill', {
                     target: div,
                     title: '✨ Auto-catálogo en acción',
-                    text: 'Reconocimos al proveedor de este PDF y te sugerimos las posiciones arancelarias (PA SIM) que ya usó antes. Revisalos: CDI propone y vos confirmás.',
+                    text: 'Reconocimos al proveedor de este PDF y te sugerimos los NCM que ya usó antes. Revisalos: CDI propone y vos confirmás.',
                     cta: 'Entendido',
                     ttl: 12000,
                 });
@@ -1199,7 +1199,7 @@
         else if (src === 'proveedor') { label = 'Proveedor'; cls = 'chip-proveedor'; }
         else return '';
         const conf = it.__autofillConfidence ? ' (' + Math.round(it.__autofillConfidence * 100) + '%)' : '';
-        return '<span class="ncm-autofill-chip ' + cls + '" title="PA SIM sugerida desde ' + label.toLowerCase() + conf + '">' + icon + label + '</span>';
+        return '<span class="ncm-autofill-chip ' + cls + '" title="NCM sugerido desde ' + label.toLowerCase() + conf + '">' + icon + label + '</span>';
     }
 
     function renderNotesPill(ncm, rowIdx) {
@@ -1750,7 +1750,7 @@
                 const provNombre = String(op.vendedor_nombre || '').trim() || 'el proveedor';
                 CDI.hint('autocatalogo', {
                     title: '🧠 Memoria activada',
-                    text: 'Guardamos esta posición arancelaria (PA SIM) para ' + cliNombre + ' · ' + provNombre +
+                    text: 'Guardamos este NCM para ' + cliNombre + ' · ' + provNombre +
                           '. En la próxima factura del mismo proveedor ya te lo sugerimos.',
                     cta: 'Entendido',
                 });

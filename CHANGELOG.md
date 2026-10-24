@@ -12,7 +12,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-10-24 · feat: «NCM» pasa a «Posición arancelaria (PA SIM)» en pantallas (PA-1)
 
-- Donde la pantalla habla de la posición de 11 dígitos con su letra (paso 3, botones, memoria y catálogo del cliente, asistente) dice «PA SIM»; donde habla de los 8 dígitos de la nomenclatura queda «NCM».
+- **feat(textos):** donde la pantalla habla de la posición de 11 dígitos con su letra (paso 3, botones, asistente y los avisos de deshacer) dice «PA SIM»; donde habla de los 8 dígitos (la memoria del cliente, el catálogo del proveedor, VUCE, la calculadora) queda «NCM».
 
 ## 2026-10-24 · fix: la proforma china se lee tal como viene (EXCEL-3)
 
