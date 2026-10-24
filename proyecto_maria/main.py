@@ -70,7 +70,7 @@ PROJECT_VERSION = datetime.now().strftime("%Y%m%d%H%M%S")
 from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
     DocumentoNoAdmitido,
@@ -4088,6 +4088,8 @@ class MariaRequest(BaseModel):
     tipo_destinacion: str = "IC04"
     # Sufijo de valor SBT — obligatorio, específico de cada importador
     sbt_sufijo_valor: str = ""
+    # El número real de la factura, para LDVDREFDOC (MARIA-7).
+    numero_factura: str = ""
     # Gastos respecto del FOB: diferencia entre el valor en la condición de
     # venta pactada y el FOB declarado. El campo del TXT sale del incoterm
     # (EXW → GTOS-ANT-FOB, grupos C/D → GTOS-POS-FOB). Si no viene, en los
@@ -4114,6 +4116,7 @@ class MariaRequest(BaseModel):
         "bl_numero", "puerto_origen", "puerto_destino", "buque_nombre", "viaje_numero",
         "fecha_embarque", "fecha_emision", "contenedor_numero", "contenedor_tipo",
         "aduana_codigo", "tipo_destinacion", "sbt_sufijo_valor", "procedencia", "banco_bcra",
+        "numero_factura",
         mode="before",
     )
     @classmethod
@@ -4161,6 +4164,9 @@ def _supuestos_maria(request: MariaRequest, items: list, gastos_fob) -> list:
         comprador_nombre=request.comprador_nombre,
         comprador_cuit=request.comprador_cuit,
         moneda=request.moneda,
+        vendedor_id=request.vendedor_id,
+        numero_factura=request.numero_factura,
+        sbt_sufijo_valor=request.sbt_sufijo_valor,
     )
 
 
@@ -4190,6 +4196,9 @@ async def avisos_maria_endpoint(
         # Productos mal formados: el error sale al generar.
         kit_warnings = []
     supuestos = _supuestos_maria(request, items, gastos)
+    # Sin CUIT del despachante no se genera (MARIA-7): se avisa antes.
+    if not str(request.cuit_agr or "").strip() and not str((user or {}).get("cuit") or "").strip():
+        supuestos = [FALTA_CUIT_DEL_DESPACHANTE, *supuestos]
     # Lo que al generar es un error de procedencia, acá se avisa con el mismo texto.
     # La NCM dada de baja o que no está en el vigente, como en la validación
     # (CATALOGO-NCM-1): aviso, no freno.
@@ -4376,6 +4385,7 @@ async def generate_maria_endpoint(
             banco_bcra=request.banco_bcra,
             empresa_digitalizacion=request.empresa_digitalizacion or "PSAD06",
             iva_adicional=request.iva_adicional or "NO_VALIDA",
+            numero_factura=request.numero_factura,
         )
         
         # Sanitizar operation_id para filename (prevenir path traversal)
@@ -4389,7 +4399,8 @@ async def generate_maria_endpoint(
         filename = f"MARIA_{safe_id}.TXT"
         filepath = os.path.join(_user_downloads_dir(user["username"]), filename)
 
-        with open(filepath, 'w', encoding='utf-8') as f:
+        # newline="": el archivo lleva los CRLF tal cual, sin traducir (MARIA-7).
+        with open(filepath, 'w', encoding='utf-8', newline='') as f:
             f.write(txt_content)
         
         # Campos que el sistema declaró sin preguntar. No bloquean, pero el

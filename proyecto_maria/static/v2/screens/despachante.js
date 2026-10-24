@@ -2,7 +2,8 @@
    CDI v2 — Lo que decide el despachante (MARIA-4)
    En la pantalla de validación, antes de generar: banco, empresa de
    digitalización e IVA adicional por operación; estado de la mercadería
-   (y cambio de IVA) por producto.
+   (y cambio de IVA) por producto. MARIA-7: la unidad de la factura y la
+   estadística, por operación y con cambio por producto.
 
    Sólo se guarda lo que la persona elige (al elegirlo). Los valores por
    defecto se calculan cada vez con el origen actual y no se guardan: si el
@@ -27,6 +28,16 @@
     const ESTADOS_ARGENTINOS = ['1', '3', '5'];
     const IVA = [['NO_VALIDA', 'Reventa'], ['IVAAD1', 'Uso particular']];
     const EMPRESAS = [['PSAD06', 'Modoc'], ['PSAD01', 'Lakaut']];
+    // Códigos MARIA de core/maria_generator.py (UNIDADES_MARIA).
+    const UNIDADES = [
+        ['07', 'Unidad (07)'], ['03', 'Metro cuadrado (03)'], ['01', 'Kilogramo (01)'],
+        ['02', 'Metro (02)'], ['04', 'Metro cúbico (04)'], ['05', 'Litro (05)'],
+        ['08', 'Par (08)'], ['09', 'Docena (09)'], ['11', 'Millar (11)'],
+        ['14', 'Gramo (14)'], ['29', 'Tonelada (29)'],
+    ];
+    // La estadística: la misma que la declarada o kilos (con otra no se sabe
+    // la cantidad; la unidad por posición llega con SUFIJOS-1).
+    const ESTADISTICA = [['DCL', 'Igual que la de la factura'], ['01', 'Kilogramo (01)']];
 
     function $(id) { return document.getElementById(id); }
     // Igual que el servidor: Argentina es «AR», «200» o el nombre.
@@ -55,6 +66,13 @@
                 CDI.escapeHtml(t) + '</option>');
         });
         return html.join('');
+    }
+    // La unidad que trae el producto (planilla, operación guardada) y no es
+    // un código de la lista se muestra tal cual, para no esconderla.
+    function unidadesPara(it) {
+        const propia = String(it.unidad || '').trim();
+        return propia && !UNIDADES.some(([v]) => v === propia)
+            ? [[propia, propia + ' (como vino)']].concat(UNIDADES) : UNIDADES;
     }
     function clienteId() {
         const c = CDI.getClienteActivo && CDI.getClienteActivo();
@@ -102,6 +120,8 @@
         }
         $('despachanteEmpresa').innerHTML = opciones(EMPRESAS, e.empresa_digitalizacion || propuesta.empresa_digitalizacion || 'PSAD06');
         $('despachanteIva').innerHTML = opciones(IVA, e.iva_adicional || 'NO_VALIDA');
+        $('despachanteUnidad').innerHTML = opciones(UNIDADES, e.unidad || '', 'Sin elegir (sale 07, unidad)');
+        $('despachanteUnidadEst').innerHTML = opciones(ESTADISTICA, e.unidad_estadistica || 'DCL');
         $('despachanteItems').innerHTML = items.map((it, i) => {
             const porDefecto = esArgentino(it.origen) ? '' : '2';
             const estado = it.estado != null && it.estado !== '' ? String(it.estado) : porDefecto;
@@ -111,6 +131,10 @@
                 opciones(estadosPara(it.origen), estado, 'Elegí el estado') + '</select></td>' +
                 '<td><select class="form-input despachante-iva" data-row="' + i + '">' +
                 opciones(IVA, it.iva_adicional || '', 'Igual que la operación') + '</select></td>' +
+                '<td><select class="form-input despachante-unidad" data-row="' + i + '">' +
+                opciones(unidadesPara(it), it.unidad || '', 'Igual que la operación') + '</select></td>' +
+                '<td><select class="form-input despachante-unidad-est" data-row="' + i + '">' +
+                opciones(ESTADISTICA, it.unidad_estadistica || '', 'Igual que la operación') + '</select></td>' +
                 '</tr>';
         }).join('');
         $('despachanteError').hidden = true;
@@ -124,6 +148,8 @@
         if (t.id === 'despachanteBanco') e.banco_bcra = String(t.value || '').trim();
         else if (t.id === 'despachanteEmpresa') e.empresa_digitalizacion = t.value;
         else if (t.id === 'despachanteIva') e.iva_adicional = t.value;
+        else if (t.id === 'despachanteUnidad') e.unidad = t.value || null;
+        else if (t.id === 'despachanteUnidadEst') e.unidad_estadistica = t.value;
         else if (t.classList.contains('despachante-estado')) {
             const it = items[Number(t.dataset.row)];
             if (it) {
@@ -133,6 +159,12 @@
         } else if (t.classList.contains('despachante-iva')) {
             const it = items[Number(t.dataset.row)];
             if (it) it.iva_adicional = t.value || null;
+        } else if (t.classList.contains('despachante-unidad')) {
+            const it = items[Number(t.dataset.row)];
+            if (it) it.unidad = t.value || null;
+        } else if (t.classList.contains('despachante-unidad-est')) {
+            const it = items[Number(t.dataset.row)];
+            if (it) it.unidad_estadistica = t.value || null;
         }
     }
 
@@ -163,6 +195,18 @@
         };
     }
 
+    // Las unidades de un producto como van al pedido: la suya o la de la
+    // operación; la estadística sólo viaja si es kilos (si no, el servidor
+    // usa la declarada).
+    function unidadesDe(it) {
+        const e = elegidos();
+        const est = (it && it.unidad_estadistica) || e.unidad_estadistica || 'DCL';
+        return {
+            unidad: (it && it.unidad) || e.unidad || null,
+            unidad_estadistica: est === '01' ? '01' : null,
+        };
+    }
+
     // ¿Se puede generar? Muestra los errores y avisos al lado.
     function leer() {
         const items = CDI.state.items || [];
@@ -187,5 +231,5 @@
         return errores.length === 0;
     }
 
-    CDI.despachante = { render, leer, valores };
+    CDI.despachante = { render, leer, valores, unidadesDe };
 })();

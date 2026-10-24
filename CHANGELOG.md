@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-24 · fix: MARIA-7, lo que el MARIA rechazó el 24/10
+
+- Sin CUIT del despachante no se genera el TXT (antes faltaba CDDTAGR en silencio); IDSO, IDDT e IARTESPAPU van con 8 caracteres y LDVDREFDOC con el número real de la factura.
+- Unidad de la factura y estadística elegibles en «Lo que decide el despachante» (m² = 03; en kilos, la cantidad estadística es el kilo neto al centésimo); en los sufijos sólo letras, números y espacios, con aviso; una cuenta del banco no sale como IDTRIB-PROVEEDOR.
+
 ## 2026-10-23 · fix: combinadas XML y lectura normal con ocho libros grandes
 
 - Los subítems mal formados conservan su mensaje específico, sin confundirse con un producto inválido.
