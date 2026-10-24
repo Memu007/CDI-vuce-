@@ -1174,9 +1174,11 @@
         });
     }
 
+    // AAAA-MM-DD → DD/MM/AAAA; otro formato guardado se muestra tal cual.
     function fechaDdMmAaaa(iso) {
-        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(String(iso || ''));
-        return m ? m[3] + '/' + m[2] + '/' + m[1] : '';
+        const txt = String(iso || '').trim();
+        const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(txt);
+        return m ? m[3] + '/' + m[2] + '/' + m[1] : txt;
     }
 
     function renderDatos(c) {

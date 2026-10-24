@@ -199,7 +199,7 @@
         el.className = 'toast' + (kind ? ' is-' + kind : '');
         el.innerHTML = [
             '<div class="toast-icon">',
-            kind === 'error' ? '!' : (kind === 'success' ? '✓' : 'i'),
+            (kind === 'error' || kind === 'warning') ? '!' : (kind === 'success' ? '✓' : 'i'),
             '</div>',
             '<div class="toast-body">',
             '<p class="toast-title"></p>',
