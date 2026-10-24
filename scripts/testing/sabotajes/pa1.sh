@@ -59,36 +59,36 @@ sabotaje $H "paso 3 del progreso" '<span class="num">3</span> PA SIM</div>' '<sp
   "sigue diciendo '<span class=\"num\">3</span> NCM</div>'"
 sabotaje $H "botón continuar" "Continuar a PA SIM" "Continuar a NCM" "sigue diciendo 'Continuar a NCM'"
 sabotaje $H "botón volver" ">Volver a PA SIM<" ">Volver a NCM<" "sigue diciendo '>Volver a NCM<'"
-sabotaje $H "memoria del cliente" "recuerda las posiciones arancelarias (PA SIM) y orígenes confirmados" \
-  "recuerda los NCM y orígenes confirmados" "sigue diciendo 'recuerda los NCM y orígenes confirmados'"
 sabotaje $H "aria del asistente" 'aria-label="Asistente de posición arancelaria (PA SIM)"' 'aria-label="Asistente NCM"' \
   "sigue diciendo 'aria-label=\"Asistente NCM\"'"
 sabotaje $N "deshacer al borrar" "scheduleUndoClear('PA SIM ' + formatted" "scheduleUndoClear('NCM ' + formatted" \
   "sigue diciendo \"scheduleUndoClear('NCM ' + formatted\""
 sabotaje $N "deshacer del asistente" "scheduleUndoClear('PA SIM ' + result.ncm" "scheduleUndoClear('NCM ' + result.ncm" \
   "sigue diciendo \"scheduleUndoClear('NCM ' + result.ncm\""
-sabotaje $N "contador de memoria" "</strong> posiciones arancelarias (PA SIM)' + detailText" "</strong> NCM' + detailText" \
-  "sigue diciendo \"</strong> NCM' + detailText\""
-sabotaje $N "sugerencias del cliente" "te sugerimos las posiciones arancelarias (PA SIM) que ya usó antes" \
-  "te sugerimos los NCM que ya usó antes" "sigue diciendo 'te sugerimos los NCM que ya usó antes'"
-sabotaje $N "título de la sugerencia" 'title="PA SIM sugerida desde ' 'title="NCM sugerido desde ' \
-  "sigue diciendo 'title=\"NCM sugerido desde '"
-sabotaje $N "aviso al guardar en memoria" "'Guardamos esta posición arancelaria (PA SIM) para '" "'Guardamos este NCM para '" \
-  "sigue diciendo \"'Guardamos este NCM para '\""
 sabotaje $N "título de refrescar" 'title="Refrescar desde el asistente de posición arancelaria"' \
   'title="Refrescar desde el asistente NCM"' "sigue diciendo 'title=\"Refrescar desde el asistente NCM\"'"
-sabotaje $C "columna de importación del catálogo" "pieza: 'Posición arancelaria (PA SIM)'," "pieza: 'NCM / Pieza'," \
-  "sigue diciendo \"pieza: 'NCM / Pieza',\""
-sabotaje $C "título del input del catálogo" 'title="Posición arancelaria (PA SIM)"' 'title="NCM"' \
-  "sigue diciendo 'value=\"\\' + CDI.escapeHtml(p.ncm) + \\'\" title=\"NCM\"'"
-sabotaje $K "encabezado del catálogo" "'<span>PA SIM</span>' +" "'<span>NCM</span>' +" \
-  "sigue diciendo \"'<span>NCM</span>' +\""
 
 # Un texto nuevo que se duplica también es rojo: «no dice».
-sabotaje $K "encabezado duplicado" "'<span>PA SIM</span>' +" "'<span>PA SIM</span>' + '<span>PA SIM</span>' +" \
-  "no dice \"'<span>PA SIM</span>' +\""
+sabotaje $H "botón continuar duplicado" "Continuar a PA SIM" "Continuar a PA SIM / Continuar a PA SIM" \
+  "no dice 'Continuar a PA SIM'"
 
 # Lo que habla de los 8 dígitos no se cambia: «ya no dice».
+# La memoria del cliente y el catálogo del proveedor guardan la NCM de 8.
+sabotaje $H "memoria del cliente" "recuerda los NCM y orígenes" "recuerda las PA SIM y orígenes" \
+  "ya no dice 'recuerda los NCM y orígenes confirmados'"
+sabotaje $N "contador de memoria" "</strong> NCM' + detailText" "</strong> PA SIM' + detailText" \
+  "ya no dice \"</strong> NCM' + detailText\""
+sabotaje $N "sugerencias del cliente" "te sugerimos los NCM" "te sugerimos las PA SIM" \
+  "ya no dice 'te sugerimos los NCM que ya usó antes'"
+sabotaje $N "título de la sugerencia" 'title="NCM sugerido desde ' 'title="PA SIM sugerida desde ' \
+  "ya no dice 'title=\"NCM sugerido desde '"
+sabotaje $N "aviso al guardar en memoria" "'Guardamos este NCM para '" "'Guardamos esta PA SIM para '" \
+  "ya no dice \"'Guardamos este NCM para '\""
+sabotaje $C "columna de importación del catálogo" "pieza: 'NCM / Pieza'," "pieza: 'PA SIM'," \
+  "ya no dice \"pieza: 'NCM / Pieza',\""
+sabotaje $C "título del input del catálogo" 'title="NCM"' 'title="PA SIM"' "title=\"NCM\"' (0 de 1 veces)"
+sabotaje $K "encabezado del catálogo" "'<span>NCM</span>' +" "'<span>PA SIM</span>' +" \
+  "ya no dice \"'<span>NCM</span>' +\""
 sabotaje $H "ayuda de la NCM de 8" "La NCM tiene 8 dígitos." "La PA SIM tiene 8 dígitos." "ya no dice 'La NCM tiene 8 dígitos."
 sabotaje $H "formato corto" "<small>NCM 8 + SIM 3 + DC</small>" "<small>PA SIM 8 + SIM 3 + DC</small>" \
   "ya no dice '<small>NCM 8 + SIM 3 + DC</small>'"

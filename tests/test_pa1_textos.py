@@ -20,31 +20,34 @@ def _leer(rel):
     return (RAIZ / rel).read_text(encoding="utf-8")
 
 
+# La posición completa validada (11 dígitos y DC) y el asistente que la arma.
 # (archivo, texto nuevo, texto viejo que no tiene que quedar)
 CAMBIAN = [
     (HTML, '<span class="num">3</span> PA SIM</div>', '<span class="num">3</span> NCM</div>'),
     (HTML, "Continuar a PA SIM", "Continuar a NCM"),
     (HTML, ">Volver a PA SIM<", ">Volver a NCM<"),
-    (HTML, "recuerda las posiciones arancelarias (PA SIM) y orígenes confirmados",
-     "recuerda los NCM y orígenes confirmados"),
     (HTML, 'aria-label="Asistente de posición arancelaria (PA SIM)"', 'aria-label="Asistente NCM"'),
     (NCM_JS, "scheduleUndoClear('PA SIM ' + formatted", "scheduleUndoClear('NCM ' + formatted"),
     (NCM_JS, "scheduleUndoClear('PA SIM ' + result.ncm", "scheduleUndoClear('NCM ' + result.ncm"),
-    (NCM_JS, "</strong> posiciones arancelarias (PA SIM)' + detailText", "</strong> NCM' + detailText"),
-    (NCM_JS, "te sugerimos las posiciones arancelarias (PA SIM) que ya usó antes",
-     "te sugerimos los NCM que ya usó antes"),
-    (NCM_JS, 'title="PA SIM sugerida desde ', 'title="NCM sugerido desde '),
-    (NCM_JS, "'Guardamos esta posición arancelaria (PA SIM) para '", "'Guardamos este NCM para '"),
     (NCM_JS, 'title="Refrescar desde el asistente de posición arancelaria"',
      'title="Refrescar desde el asistente NCM"'),
-    (CLIENTES_JS, "pieza: 'Posición arancelaria (PA SIM)',", "pieza: 'NCM / Pieza',"),
-    (CLIENTES_JS, 'title="Posición arancelaria (PA SIM)"', 'value="\' + CDI.escapeHtml(p.ncm) + \'" title="NCM"'),
-    (CATALOGO_JS, "'<span>PA SIM</span>' +", "'<span>NCM</span>' +"),
 ]
 
 # Hablan de los 8 dígitos: quedan con «NCM». (archivo, texto, cuántas veces):
 # con el número exacto, cambiar una sola de varias apariciones también es rojo.
 QUEDAN = [
+    # La memoria del cliente y el catálogo del proveedor guardan la NCM de 8
+    # (`ncm_para_historial`, `/api/ncm/guardar-uso`); lo autocompletado desde
+    # ahí son esos 8 dígitos y la pantalla pide SIM y DC después.
+    (HTML, "recuerda los NCM y orígenes confirmados", 1),
+    (NCM_JS, "</strong> NCM' + detailText", 1),
+    (NCM_JS, "te sugerimos los NCM que ya usó antes", 1),
+    (NCM_JS, 'title="NCM sugerido desde ', 1),
+    (NCM_JS, "'Guardamos este NCM para '", 1),
+    (CLIENTES_JS, 'value="\' + CDI.escapeHtml(p.ncm) + \'" title="NCM"', 1),
+    (CATALOGO_JS, "'<span>NCM</span>' +", 1),
+    # La columna del Excel que se mapea a `pieza` suele traer la NCM de 8.
+    (CLIENTES_JS, "pieza: 'NCM / Pieza',", 1),
     (HTML, "La NCM tiene 8 dígitos. Para declarar en MARIA completá 3 dígitos SIM y la letra DC.", 1),
     (HTML, "<small>NCM 8 + SIM 3 + DC</small>", 1),
     (HTML, "NCM 8 + SIM 3 + letra DC", 1),
