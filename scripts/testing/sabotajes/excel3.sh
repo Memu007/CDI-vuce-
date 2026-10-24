@@ -104,8 +104,8 @@ sabotaje $M "el flete y el descuento vuelven a no leerse" \
   '                        (flete if es_flete else descuento).append((_ + 2, abs(monto)))' \
   '                        pass' "$XLS"
 sabotaje $M "el rótulo de otra columna no se mira" \
-  '                 if t and _numero_factura(t, decimal) is None' \
-  '                 if False and t and _numero_factura(t, decimal) is None' "$XLS"
+  '                (t for t in (_texto_de_celda(v) for v in row.values)' \
+  '                (t for t in (_texto_de_celda(v) for v in ())' "$XLS"
 sabotaje $M "una nota de flete en otra columna saca el renglón" \
   '            if sin_ncm_ni_origen and (descripcion or not con_medidas):' \
   '            if sin_ncm_ni_origen:' \

@@ -372,10 +372,11 @@ def test_un_subtotal_sin_rotulo_ni_precio_con_medidas_no_es_un_producto(subtotal
 def test_un_texto_en_otra_columna_no_vuelve_flete_o_descuento_a_un_renglon(monto, nota, campo):
     """#5: «Freight included» o «Discount» en Remarks de un renglón sin
     descripción no es un flete ni un descuento: queda sin leer."""
+    # Remarks antes del importe: el texto de la nota es el primero de la fila.
     data = _leer([
-        ["NCM", "Descripcion", "Cantidad", "Precio Unitario", "Importe", "Remarks"],
-        ["84713000", "Laptop", 10, 350, 3500, None],
-        [None, None, None, None, monto, nota],
+        ["NCM", "Descripcion", "Cantidad", "Precio Unitario", "Remarks", "Importe"],
+        ["84713000", "Laptop", 10, 350, None, 3500],
+        [None, None, None, None, nota, monto],
     ])
     assert campo not in data["operacion"], data["operacion"]
     assert data["filas_descartadas_numeros"] == [3], data
