@@ -2,191 +2,136 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## EXCEL-3 — la proforma china tal como viene: entregada
+## CLIENTE-1 — alta de cliente con lo que pide el MARIA: entregada
 
-**Resultado: terminada, para revisar.** El sintético con la forma de la
-proforma del 24/10 (en `.xls` y en `.xlsx`) da 48 productos, la cantidad en
-m², la unidad `m2`, y el flete y el descuento en la operación. En la base
-daba «No se pudieron extraer items».
+**Resultado: terminada, para revisar.** Hecha según tu D2 = (a). En el alta
+se ven arriba la razón social, el CUIT, el domicilio y el inicio de
+actividad, marcados «lo pide el MARIA». El email y el teléfono quedan en
+«Más datos». El cliente se guarda igual sin esos datos, con un aviso de
+advertencia que dice cuáles faltan. Con los cuatro cargados no hay aviso. No
+cambian la API, la importación de clientes ni el alta rápida desde la
+revisión (`review.js` no se tocó).
 
 | Qué | SHA |
 |---|---|
-| Base (tu rama al empezar) | `3dbfb4e` |
-| Producto | `f3f9eb8` + `b76be2f` (devolución de la autorrevisión) |
-| Pruebas, sintético y sabotajes | `b7e93f2`, `5bbc48f`, `956a291`, `d1884db` |
-| Merge de tu rama (sólo docs) | `15f5b2e` |
+| Base (merge de tu rama con D2) | `cb98105` |
+| Producto | `fbc006a` + `12ff9b6` (lo que salió de la autorrevisión) |
+| Pruebas: pantalla y sabotajes | `9c53522`, `b0c920b` |
 | Informe | este commit |
 
-Archivo de producto tocado: `proyecto_maria/main.py` (lectura del Excel:
-`try_extract_with_mapping`, `upload_excel_v2`, alias de columnas).
+Archivos de producto que toqué: `proyecto_maria/templates/dashboard_v2.html`
+(formulario de cliente), `proyecto_maria/static/v2/screens/clientes.js`
+(alta y detalle) y `proyecto_maria/static/v2/app_v2.js` (una línea: el
+ícono de los avisos de advertencia, compartido).
 
 ### Decisiones
 
-- **D2. CLIENTE-1: ¿obligatorios o a la vista?** (me frena; no empecé código).
-  Hoy (`d1884db`): el formulario de cliente (`dashboard_v2.html:1180-1244`,
-  `clientes.js:1690-1727`) exige sólo la razón social; CUIT y domicilio
-  están a la vista y son opcionales; **email y teléfono ya son opcionales**
-  (están en «Más datos», sólo se valida el formato del email), igual que la
-  fecha de inicio de actividades. La API (`main.py`, `create_cliente`) pide
-  sólo el nombre. El TXT exige el CUIT del importador (D20) pero no el
-  domicilio ni la fecha. Opciones:
-  (a) **a la vista y con aviso**: razón social, CUIT, domicilio y fecha de
-  inicio arriba, marcados «lo pide el MARIA»; email y teléfono en «Más
-  datos»; se puede guardar sin ellos, con un aviso que dice qué falta; la
-  API no cambia (la importación de clientes y el alta rápida de la revisión
-  siguen igual);
-  (b) **obligatorios**: el formulario y la API no guardan un cliente nuevo
-  sin los cuatro (CUIT válido de 11 dígitos, fecha válida); la importación
-  y el alta rápida desde la revisión también, o se los exime (hay que
-  decir cuál).
-  **Recomiendo (a)**: el despachante puede no tener la fecha al dar de alta
-  y (b) frena el alta rápida en medio de una operación; lo que no puede
-  faltar en el TXT lo controla la generación (MARIA-7 de la Dev MARIA). Si
-  es (b), la decisión es también si la generación del TXT pide domicilio y
-  fecha (eso es de la Dev MARIA).
-  Mientras tanto, ¿empiezo PA-1 (sólo textos de pantalla, «NCM» → «Posición
-  arancelaria (PA SIM)»)? ESTUDIO-1 espera la coordinación con MARIA-7.
+- **D1 (de EXCEL-3), sigue abierta.** Son el nombre y el signo de
+  `operacion.descuento` para VALOR-1. El planteo está en el informe de
+  EXCEL-3 (`8622aab`). Recomiendo (a): queda como está, positivo.
+- **D3. ¿Arreglo que al editar un cliente se borre una fecha de inicio que
+  no está en formato AAAA-MM-DD?** Esto ya pasaba antes de CLIENTE-1; ahora
+  el campo está a la vista. Si un cliente tiene `fecha_inic_activ =
+  '01/03/2015'` (la API acepta cualquier texto de hasta 10 caracteres), el
+  campo de fecha del formulario lo muestra vacío. Al guardar cualquier
+  cambio, se manda vacío y la fecha queda en NULL, sin aviso. La
+  importación asistida normaliza a ISO, así que el caso entra por la API o
+  por datos viejos. Opciones:
+  (a) arreglarlo ahora en `clientes.js`: si la fecha guardada no es ISO y
+  el campo queda vacío, no se manda (la fecha se conserva);
+  (b) pieza aparte, que la API normalice o rechace las fechas que no son
+  ISO;
+  (c) dejarlo.
+  **Recomiendo (a)**: son unas pocas líneas en el mismo archivo y evitan
+  perder datos. (b) toca la API, que D2 dejó afuera.
 
-- **D1. Nombre de los campos que lee VALOR-1.** Devuelvo
-  `operacion.flete` (ya existía: la revisión lo muestra y va al TXT) y
-  `operacion.descuento` (nuevo, **positivo**: lo que se deduce), más
-  `operacion.filas_excel_flete` / `filas_excel_descuento` (filas de la
-  planilla). (a) Quedan así y la Dev MARIA los toma en VALOR-1;
-  (b) VALOR-1 pide otro nombre o signo y lo cambio. **Recomiendo (a)**: el
-  descuento hoy sólo se informa, no resta del FOB, así que el nombre se puede
-  ajustar sin romper nada. Pasásela a la Dev MARIA.
+### Qué cambió
 
-Lo demás son supuestos reversibles (abajo, «Supuestos»).
-
-### Qué hace ahora la lectura de Excel
-
-1. Encabezado fuera de la fila 1: ya lo buscaba EXCEL-2; ahora además la NCM
-   **no es obligatoria** (una proforma no la trae: sin ella daba 400). Los
-   productos entran sin NCM y la revisión la pide.
-2. «Specification» es la descripción antes que «Item», salvo que «Item»
-   traiga el nombre del producto en tantos renglones con cantidad como
-   «Specification» (si no, se rompían facturas con `Item | Specification`).
-   «Part No.» va a `codigo_parte`, no a la NCM.
-3. Grupo: un renglón sin NCM ni descripción, con cantidad o precio **y con
-   sus propias medidas** (Width/Length/Ancho/Largo), toma la descripción y el
-   código del de arriba; si trae su propio código, lo conserva. Sin medidas
-   no hereda nada (una fila así sigue como «sin leer», regla de EXCEL-1; un
-   subtotal sin rótulo no pasa a producto). Con la especificación combinada
-   hacia abajo (`.xlsx`) cada renglón conserva el código. Ancho y largo van
-   en la descripción **sólo si la planilla agrupa**; en una factura común no
-   se tocan.
-4. Cantidad en la unidad del precio: con `Unit price (USD/sqm)` y
-   `QTY (Rolls)`, la cantidad es la única columna de **la línea** («total»)
-   en esa unidad, `SM.TOTAL (sqm)`. La de un rollo (`SQ.MT.`), un largo o
-   piezas por caja nunca reemplaza la cantidad; un peso tampoco (G.W./N.W.
-   incluidos). Si no hay una sola columna así y la cantidad dice otra unidad,
-   aviso. Cada ítem lleva `unidad` (`m2`, `kg`, `m`, `u`); el TXT ya la usa
-   (`m2` → `03`). «MT» no se adivina (es tonelada). También corrige el mapeo
-   guardado de un cliente que aprendió `QTY (Rolls)`.
-5. `Gross Weight(kgs)` = bruto de la línea, dividido por la cantidad (regla
-   de pesos vigente, con su aviso).
-6. Total, Discount y Freight no son productos, con el rótulo en cualquier
-   columna (por ejemplo `Item`). Flete y descuento quedan en la operación con
-   aviso que nombra la fila. No se leen como monto: un producto que empieza
-   con «Discount …», un descuento en porcentaje (fila sin leer), un flete
-   negativo (fila sin leer), ni una nota «Freight included» en otra columna
-   de un renglón con medidas.
-7. «1st container» en `Item` no es un código ni una descripción.
+1. **Formulario.** CUIT, domicilio e inicio de actividad van arriba con
+   «· lo pide el MARIA»; la razón social, con «· requerido · lo pide el
+   MARIA». Debajo, la frase «Se puede guardar sin estos datos; al guardar te
+   avisamos cuáles faltan para el MARIA.TXT.». La fecha salió de «Más
+   datos», que ya no se abre sola por tener fecha.
+2. **Aviso al guardar.** Si falta el CUIT, el domicilio o el inicio de
+   actividad, el aviso es de advertencia, con «!» y «Faltan para el MARIA:
+   domicilio, inicio de actividad.». Si están los cuatro, el aviso es el
+   verde de siempre. El CUIT se evalúa ya normalizado; el domicilio y la
+   fecha, sin espacios.
+3. **Detalle del cliente** (pestaña Datos): fila nueva «Inicio de actividad»
+   en DD/MM/AAAA. Si está vacía, muestra «—». Una fecha guardada en otro
+   formato se muestra tal cual.
 
 ### Puertas
 
 | Puerta | Resultado |
 |---|---|
-| Rojo antes (base `3dbfb4e`, primeros 10 casos) | `8 failed, 2 passed` (los 2 verdes son guardas de lo que no cambia) |
-| Rojo antes de la devolución (16 casos nuevos sobre `5bbc48f`) | `16 failed, 10 passed` |
-| `tests/test_excel3.py` (26 casos) | `26 passed` |
-| Focales de Excel, pesos, MARIA-1b, clientes, punta a punta (15 archivos) | `464 passed, 2 xfailed` |
-| Sabotajes `scripts/testing/sabotajes/excel3.sh` sobre `d1884db` | `27` rojos por el motivo esperado, `sabotajes sin rojo: 0`, exit 0 |
-| Suite completa, worktree limpio en `d1884db`, `--no-cov --timeout=120` | `1757 passed, 102 skipped, 2 xfailed, 25 warnings in 164.14s`, exit 0 |
-| `compileall` | exit 0 |
-| e2e de la CI (`scripts/testing/e2e_maria.sh`) sobre `d1884db` | «E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.», exit 0 |
-| `/code-review high` | 10 hallazgos: 7 arreglados con su rojo antes, 3 quedan como riesgo (abajo) |
-| Subagente adversario Sonnet alto | 10 reproducidos: 7 arreglados; 3 quedan (abajo) |
-| `/security-review` (subagente Sonnet medio) | nada que califique; los avisos van con `textContent` |
-
-**Rojo de entorno conocido:** en una primera suite **con cobertura** sobre
-`5bbc48f`, `1 failed, 1741 passed, 102 skipped, 2 xfailed`:
-`test_ocho_libros_con_la_primera_hoja_al_borde_del_tope…`, «la subida normal
-dio 504 a los 81.8 s». Lo corrí solo en la base `3dbfb4e` y en mi cambio:
-con cobertura, **504 a los 79.2 s en la base** y 79.3 s en el mío; sin
-cobertura, `1 passed` en 13.78 s y 13.79 s. Es el rojo bajo instrumentación
-que ya está en `DECISIONS.md`, no de esta pieza. No subí timeouts ni lo
-excluí.
+| Rojo antes (prueba de pantalla sobre la base) | `FALLA: el rótulo de CUIT no dice «lo pide el MARIA»: CUIT` |
+| Rojo antes de lo de la autorrevisión (sobre `9c53522`) | `FALLA: el aviso de advertencia tiene el ícono «i», no «!»`; con el ícono arreglado, `FALLA: una fecha guardada que no es AAAA-MM-DD se muestra como vacía` |
+| `scripts/testing/pantalla_cliente1.js` sobre `b0c920b` | 4 líneas `OK` y `PANTALLA CLIENTE-1 OK` |
+| Sabotajes `scripts/testing/sabotajes/cliente1.sh` sobre `b0c920b` | 14 `ROJO` por el motivo esperado, `sabotajes sin rojo: 0`, exit 0 |
+| Suite completa, worktree limpio en `b0c920b`, `--no-cov --timeout=120` | `1757 passed, 102 skipped, 2 xfailed, 23 warnings in 162.46s (0:02:42)`, `FIN 0` |
+| e2e de la CI (`scripts/testing/e2e_maria.sh`) sobre `b0c920b` | «E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.», `FIN 0` |
+| Suite y e2e sobre `9c53522` (antes de la autorrevisión) | `1757 passed, 102 skipped, 2 xfailed, 25 warnings in 165.03s`, «E2E MARIA OK», los dos exit 0 |
+| `/code-review high` sobre `cb98105..9c53522` | 6 hallazgos: 3 arreglados; 2 en parte (el ícono sí, la duración del aviso no; el detalle sí, el borrado va a D3); 1 queda como riesgo (abajo) |
+| Subagente adversario Sonnet alto | 5 hallazgos y XSS probado sin hallazgo: 1 arreglado (la prueba); 1 en parte (el detalle sí, el borrado va a D3); 3 quedan como riesgo (abajo) |
+| `/security-review` | no lo corrí: la pieza no toca plata, sesión, permisos ni API; el texto nuevo va con `textContent` y `escapeHtml` (el subagente probó XSS en el nombre y en el aviso, sin ejecución) |
 
 ### Hallazgos de la autorrevisión
 
 | Hallazgo | Quién (modelo, esfuerzo) | Qué pasó |
 |---|---|---|
-| «Cantidad» con mayúscula tapaba la de m²: FOB 6,75 en vez de 216, con aviso que decía lo contrario | Sonnet alto | reproducido; arreglado (`b76be2f`) |
-| La única columna en la unidad del precio era la cantidad aunque fuera la de un rollo o caja (FOB dividido por los rollos) | Sonnet alto y `/code-review` | reproducido; sólo «total» |
-| G.W./N.W. podían ser la cantidad con precio por kg | `/code-review` | reproducido; arreglado |
-| «MT» se leía como metro | Sonnet alto | reproducido; ya no se adivina |
-| `Item | Specification` con el nombre en Item perdía el nombre | los dos | reproducido; decide el contenido |
-| Ancho y largo se pegaban a cualquier factura; `:g` daba notación científica | los dos | reproducido; sólo si agrupa, sin notación científica |
-| «Discount tag labels» (producto) se leía como descuento; «Discount 5%» como USD 5 | Sonnet alto | reproducido; arreglado |
-| Flete negativo se sumaba como flete | Sonnet alto | reproducido; fila sin leer |
-| «USD -850» no se leía | `/code-review` | reproducido; arreglado |
-| Nota «Freight included» en otra columna sacaba el renglón | `/code-review` | reproducido; un renglón con medidas es mercadería |
-| Código propio en cada renglón y especificación sólo arriba: se descartaban | `/code-review` | reproducido; heredan la descripción |
-| Aviso viejo del catálogo («se usó QTY (Rolls)») quedaba al lado del nuevo | `/code-review` | reproducido; se saca |
+| La prueba aceptaba la fecha ISO cruda en el detalle: no veía si se formateaba | los dos | reproducido; ahora exige `01/03/2015`; sabotaje nuevo |
+| La prueba leía el detalle en una pestaña oculta | `/code-review` | reproducido; ahora abre «Datos» y exige que se vea; sabotaje nuevo |
+| El aviso de advertencia tenía el ícono «i» de información | `/code-review` | reproducido; ahora «!» (`app_v2.js`, igual que el diálogo de advertencia) |
+| Una fecha que no es ISO se mostraba «—» en el detalle | los dos | reproducido; se muestra tal cual |
+| Al editar, esa fecha se borra | los dos | ya pasaba antes de esta pieza; va a **D3** |
+| La ruta de Chromium por defecto no existe en este entorno | los dos | cambiada a `/opt/pw-browsers/chromium` (`CHROMIUM` la pisa) |
 
 ### Riesgos que quedan (no arreglados)
 
-- **El descuento no resta del FOB todavía** (lo decide VALOR-1): en la
-  proforma real el FOB de la revisión queda inflado en el descuento hasta
-  VALOR-1. Hay aviso.
-- La NCM no se hereda en el grupo: si una factura agrupada trae la NCM sólo
-  en el primer renglón, los de abajo la piden en la revisión. A propósito
-  (no se inventa); se puede proponer.
-- «Freight cost» en `Item` con texto en `Specification` («CNF Buenos
-  Aires») entra como producto: se mira el rótulo de otra columna sólo si la
-  descripción está vacía (mirar todas sacaría productos con notas). Media.
-- Dos filas «Discount» (un parcial y su total) se suman. Baja.
-- Un «Discount» con origen completo en la fila sigue como producto en 0 (como
-  antes). Baja.
-- Las filas de texto de pago y banco de abajo siguen como «filas sin leer»
-  (regla de EXCEL-1): en la proforma, 3 filas en el semáforo.
-- El origen no se deduce de «Ningbo, China» del encabezado: entra vacío,
-  con el aviso de siempre.
-- La lectura del sintético no mide la proforma real: Emi tiene que subir la
-  del 24/10 y mirar 48 productos, m², flete y descuento.
+- **El aviso dura 4 s y se pisa con el siguiente** (es el toast común). Es
+  la única señal de qué falta; después, en el detalle sólo se ve «—». Baja.
+  Alargar sólo este aviso implica cambiar el toast común; no lo hice.
+- **Un CUIT de 11 dígitos con dígito verificador inválido** no se avisa:
+  el alta valida sólo el largo y el aviso mira sólo si está vacío. Lo frena
+  la generación del TXT (`controles_maria.cuit_valido`). Media-baja; se
+  puede sumar «CUIT inválido» al aviso si querés.
+- **La lista de lo que pide el MARIA está escrita a mano** en el alta, aparte
+  de lo que exige la generación (MARIA-7). Si MARIA-7 cambia los
+  obligatorios, el alta queda vieja. Baja; lo anoto para ESTUDIO-1.
+- **En el alta rápida desde la revisión** el aviso puede decir «falta
+  domicilio» aunque la carátula lo traiga: es cierto para la ficha, y
+  después la operación lo copia (fill-if-empty). Baja; `review.js` quedó
+  afuera por D2.
+- Las otras pruebas de pantalla del repositorio tienen la ruta vieja de
+  Chromium (`chromium-1194`); no las toqué.
 
 ### Supuestos reversibles
 
-- Dos pruebas viejas cambian a propósito porque el flete deja de ser «fila
-  sin leer» (punto 5 de la tarea): `test_excel1_lectura.py::test_total_flete_y_condiciones_no_son_productos`
-  (ahora espera `[5]` sin leer y `flete == 500`) y
-  `test_maria1b_controles.py::test_el_excel_deja_en_la_operacion_lo_que_no_se_leyo`
-  (su fila «Freight» pasa a «Insurance», que sigue sin leer).
-- El `.xls` del sintético va hecho en `tests/fixtures/` (xlwt no está en
-  `requirements.txt`); una prueba comprueba que coincide con
-  `tests/proforma_china_sintetica.py`.
-- La descripción de un renglón queda «PVC TARPAULIN 650GSM BLUE, ancho 3,2 m
-  x largo 10 m».
+- La fila «Inicio de actividad» en el detalle del cliente no estaba pedida
+  explícitamente: sin ella, el dato se carga y no se ve en ningún lado.
+- El ícono «!» vale para todo aviso de advertencia; hoy hay uno más
+  («Origen no reconocido», `ncm.js`).
 
 ### Comandos para reproducir
 
 ```sh
-# desde un worktree en d1884db, con un venv de requirements.txt
-export ENVIRONMENT=testing GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
-       DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-python -m pytest -q --no-cov -p no:cacheprovider tests/test_excel3.py   # 26 passed
-PY=$(which python) scripts/testing/sabotajes/excel3.sh                  # 27 «ROJO», sabotajes sin rojo: 0
-# rojo antes: los casos sobre el producto de la base
-git worktree add /tmp/excel3-base 3dbfb4e
-cp tests/test_excel3.py tests/proforma_china_sintetica.py /tmp/excel3-base/tests/
-cp tests/fixtures/proforma_china_sintetica.xls /tmp/excel3-base/tests/fixtures/
-(cd /tmp/excel3-base && python -m pytest -q --no-cov tests/test_excel3.py)  # la proforma da 400 «No se pudieron extraer items»
+# desde un worktree en b0c920b levantado con docs/pm/herramientas/levantar.sh
+BASE_URL=http://127.0.0.1:<puerto> CHROMIUM=/opt/pw-browsers/chromium \
+  node scripts/testing/pantalla_cliente1.js          # 4 «OK» y «PANTALLA CLIENTE-1 OK»
+PY=<venv>/bin/python CHROMIUM=/opt/pw-browsers/chromium \
+  scripts/testing/sabotajes/cliente1.sh b0c920b      # 14 «ROJO», «sabotajes sin rojo: 0»
+# rojo antes: la prueba sobre la base
+git worktree add /tmp/c1-base cb98105                # levantarla y correr la prueba de arriba:
+                                                     # «FALLA: el rótulo de CUIT no dice «lo pide el MARIA»»
 ```
 
-Datos reales: nada de la proforma ni de la reunión del 24/10 entró al
-repositorio; todo es inventado («DEMO TEXTILE», CUIT 30-00000000-1).
+Datos reales: no entró nada de la reunión del 24/10; los clientes de las
+pruebas son inventados («Cliente Inventado Uno SA», CUIT 20-12345678-6).
 
-Última vuelta: 2026-10-24 19:15 UTC
+**EXCEL-3** sigue esperando tu veredicto: el informe está en `8622aab` y
+D1, arriba. **Sigo con PA-1.**
 
-/compact conservar: Soy la Dev técnica (Dev 1) de CDI, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica (nunca main), rutina trig_011UpBfwEu9TUzoNUrviqoP5 min 15; aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM con send_message priority next empezando «Dev técnica:». EXCEL-3 entregada: producto f3f9eb8+b76be2f, pruebas hasta d1884db, merge PM 15f5b2e; D1 (nombre/signo de operacion.descuento para VALOR-1) abierta. CLIENTE-1 frenada por D2 (¿obligatorios o a la vista?; email/teléfono ya opcionales; sin código); pregunté si sigo con PA-1 mientras; después ESTUDIO-1 y PA-1 (ROADMAP Fase 1b); GUARDAR-2 más adelante desde 2d930c5. Reglas de Emi: sólo me piden la PM o Emi; nada se publica sin su «dale» para el SHA; nunca main; sin secretos ni datos reales (proforma del 24/10 fuera del repo); subagentes hasta alto, sin Fable.
+Última vuelta: 2026-10-24 19:32 UTC
+
+/compact conservar: Soy la Dev técnica (Dev 1) de CDI, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica (nunca main), rutina trig_011UpBfwEu9TUzoNUrviqoP5 min 15; aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM con send_message priority next empezando «Dev técnica:». CLIENTE-1 entregada: producto fbc006a+12ff9b6, pruebas 9c53522+b0c920b, base cb98105; D3 abierta (¿arreglo que editar borre una fecha no ISO?). EXCEL-3 en revisión (informe 8622aab), D1 abierta. Sigo con PA-1 (sólo textos «NCM» → «Posición arancelaria (PA SIM)»); ESTUDIO-1 espera la coordinación de la PM con MARIA-7; GUARDAR-2 más adelante desde 2d930c5. Reglas de Emi: sólo me piden la PM o Emi; nada se publica sin su «dale» para el SHA; nunca main; sin secretos ni datos reales; subagentes hasta alto, sin Fable.
