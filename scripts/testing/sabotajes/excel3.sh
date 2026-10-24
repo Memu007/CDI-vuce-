@@ -40,6 +40,7 @@ PYEOF
   else
     echo "ROJO? | $nombre: rojo (salida $codigo), pero sin «$esperado»"; grep -E "^E " <<<"$salida" | head -5; FALLAS=$((FALLAS+1))
   fi
+}
 
 M=proyecto_maria/main.py
 T=tests/test_excel3.py
