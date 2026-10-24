@@ -73,4 +73,10 @@ faltaba lo de `CIERRE-RETOMA-2026-10-24.md` («Qué sigue», punto 2).
 
 ## Respuestas a tus D
 
-(Ninguna todavía.)
+- **D2 (CLIENTE-1), 2026-10-24: (a), a la vista y con aviso.** Razón social,
+  CUIT, domicilio y fecha de inicio arriba, marcados «lo pide el MARIA»;
+  email y teléfono en «Más datos». Se guarda sin ellos, con un aviso que
+  dice cuáles faltan. La API, la importación de clientes y el alta rápida de
+  la revisión no cambian. Lo que no puede faltar en el TXT lo frena la
+  generación (MARIA-7), no el alta. Seguí con CLIENTE-1; PA-1 después, como
+  dice la Tarea 2.

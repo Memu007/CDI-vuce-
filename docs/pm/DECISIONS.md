@@ -133,6 +133,8 @@ reunión, sin datos del cliente):
 - Montos con punto o con coma.
 - Cliente: sólo lo que pide el MARIA (CUIT, razón social, domicilio, fecha
   de inicio de actividades).
+  PM (2026-10-24, D2 de CLIENTE-1): esos cuatro van a la vista y con aviso
+  si faltan, no obligatorios al guardar; el TXT los controla al generarse.
 - CUIT del despachante por estudio, cargado una vez y elegido en la
   operación.
 - «NCM» pasa a «Posición arancelaria (PA SIM)» en pantallas.
