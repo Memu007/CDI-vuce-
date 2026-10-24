@@ -326,6 +326,10 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-10-24 22:1x UTC: llegó el informe de Argon (14 hallazgos, 10 «alta») sobre 8b45207. Lo estoy reproduciendo con cuatro revisores Opus en paralelo, uno por área (subida de archivos 1-3, cobro/cupos/orgs 4-7, TXT MARIA 8/9/11, sesión/CSRF/aislamiento 10/12/13/14 + aislamiento del 7), cada uno sobre su propio worktree de 8b45207 en /tmp/argon-A..D. Nada entra al roadmap sin reproducir. Copia del informe en el scratchpad de la PM.
+
+2026-10-24 21:58 UTC: sin entregas ni D abiertas. Dev técnica en PRUEBAS-1 (rama en `99d4e3e`, maria1b.sh arreglado; puertas y medición del foco corriendo, sin informe todavía). Dev MARIA corriendo suite y sabotajes de la devolución de MARIA-7. Contexto: la técnica 127k de 200k; la MARIA sigue marcando 337k sin compactar, se le repite a Emi.
+
 2026-10-24 21:36 UTC: Emi pidió una auditoría externa (Argon). Pedido y ZIP de `8b45207` sin historial entregados a Emi, sin `cambiar_ai.sh` (tenía una clave real de Anthropic, también en el historial) ni notas viejas; escaneo de claves limpio. Para Emi: revocar esa clave (G0, punto 2).
 
 2026-10-24 21:10 UTC: PA-1 + D3 aceptada e integrada (`fe41228`), sin publicar: suite 1782 passed, sabotajes en rojo, adversario sobre D3 sin hallazgo propio. D4 (b), D5 (a) como PA-1b, D6 (a), D7 (a) dentro de CLIENTE-1b ampliada. PRUEBAS-1 suma (c), el rojo intermitente de la e2e. Dev técnica despertada. Cadena de sabotajes de `8b45207` terminada: excel3, guardar1, admin1, admin2, punta_a_punta1, rendimiento1 y 1b en rojo limpio; lo que no dio rojo son pruebas viejas, no el producto (cliente1: la carrera del foco; excel1 4, excel2 3 y maria1b 2 patrones que EXCEL-2/3 movieron), todo en PRUEBAS-1.
