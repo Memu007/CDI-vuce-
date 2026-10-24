@@ -288,13 +288,14 @@ def fecha_inicio_actividad(guardada) -> str:
     for patron, formato in ((r"\d{4}-\d{2}-\d{2}", "%Y-%m-%d"), (r"\d{2}/\d{2}/\d{4}", "%d/%m/%Y")):
         if re.fullmatch(patron, texto):
             try:
-                return datetime.strptime(texto, formato).strftime("%d/%m/%Y")
+                fecha = datetime.strptime(texto, formato)
+                return f"{fecha.day:02d}/{fecha.month:02d}/{fecha.year:04d}"  # %Y no rellena
             except ValueError:
                 break  # «2015-02-30»: tiene la forma pero no es una fecha
     raise ValueError(
         f"La fecha de inicio de actividad del cliente «{texto[:30]}» no es una fecha "
         "(DD/MM/AAAA): corregila en «Clientes», campo «Inicio de actividad», o en la "
-        "revisión. Así no se genera el TXT."
+        "revisión, campo «Fecha inicio de actividades». Así no se genera el TXT."
     )
 
 
