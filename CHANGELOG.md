@@ -22,9 +22,18 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - Unidad de la factura y estadística elegibles en «Lo que decide el despachante» (m² = 03; en kilos, la cantidad estadística es el kilo neto al centésimo); en los sufijos sólo letras, números y espacios, con aviso; una cuenta del banco (IBAN verificado) no sale como IDTRIB-PROVEEDOR y el código chino de crédito social sí; una factura más larga que LDVDREFDOC se avisa antes de generar.
 - La fecha de la factura se lee en su orden: con el año adelante es año/mes/día (`2026/08/07` → `07/08/2026`); si día y mes pueden intercambiarse o el año tiene dos cifras, queda vacía y se le pregunta al usuario; la revisión respeta ese orden. La fecha de inicio de actividad del cliente sale DD/MM/AAAA (se guardaba AAAA-MM-DD y salía así); si no es una fecha, no se genera y se dice dónde corregirla.
 
+## 2026-10-24 · fix: editar un cliente no borra una fecha de inicio que no es AAAA-MM-DD (D3)
+
+- **fix(clientes):** si la fecha guardada no se puede mostrar en el campo de fecha y se deja vacío, al guardar no se manda y se conserva; el aviso no la pide. Una fecha cargada la reemplaza. Contra: esa fecha ya no se puede borrar desde el formulario.
+- Una fecha tipeada a medias no se guarda: el formulario pide completarla o borrarla (antes borraba la fecha guardada).
+
 ## 2026-10-24 · feat: alta de cliente con lo que pide el MARIA (CLIENTE-1)
 
 - **feat(clientes):** razón social, CUIT, domicilio e inicio de actividad a la vista y marcados «lo pide el MARIA»; email y teléfono en «Más datos». Se guarda sin ellos, con un aviso de cuáles faltan; el detalle muestra el inicio de actividad.
+
+## 2026-10-24 · feat: «NCM» pasa a «Posición arancelaria (PA SIM)» en pantallas (PA-1)
+
+- **feat(textos):** donde la pantalla habla de la posición de 11 dígitos con su letra (paso 3, botones, asistente y los avisos de deshacer) dice «PA SIM»; donde habla de los 8 dígitos (la memoria del cliente, el catálogo del proveedor, VUCE, la calculadora) queda «NCM».
 
 ## 2026-10-24 · fix: la proforma china se lee tal como viene (EXCEL-3)
 

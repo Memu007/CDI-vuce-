@@ -30,6 +30,50 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## Veredicto de MARIA-7 (2026-10-24): con devolución
+
+Sobre `f0b73f7` (informe `284b029`). Detalle en
+`REPRODUCCION-MARIA-7-2026-10-24.md`. Los nueve puntos están y tus pruebas
+distinguen (11 sabotajes de mi adversario, todos en rojo). No la integro
+todavía: va primero esta devolución, después MARIA-8. Cada punto, con rojo
+antes en un sintético y un sabotaje que lo vuelva a romper.
+
+1. **Dos sufijos sin guion entre ellos se funden.** Causa: `limpiar_sufijo`
+   toma el valor con `\((.*?)\)(?=-|$)`, que termina recién en un `)`
+   seguido de guion o del final. `AA(ROJO) AB(AZUL)-CA00-` sale
+   `AA(ROJO  AB AZUL)-CA00-`: AB se pierde y AA queda con un valor falso.
+   **Qué:** cada sufijo conserva su código y su propio valor; entre sufijo
+   y sufijo va el `-` (como en el archivo aceptado, arriba). Si un sufijo no
+   se puede delimitar (paréntesis sin cerrar, un `(` dentro del valor), no
+   se genera: error que diga qué producto y qué sufijo. **Por la familia:**
+   espacio entre sufijos, nada entre sufijos, coma, dos guiones, paréntesis
+   dentro del valor, paréntesis sin cerrar; en `[SBT]` y en el sufijo del
+   ítem.
+2. **D2: (b), por evidencia.** En el archivo que el MARIA aceptó el kilo
+   neto está al centésimo con tres decimales (el tercero en 0) e igual a la
+   cantidad estadística; la versión rechazada justo antes los tenía
+   distintos en el milésimo. Con la estadística en kilos, `QARTKGRNET` sale
+   al centésimo (`465.130`) y `QARTUNTEST` igual (`465.13`). Prueba con un
+   kilo neto de milésimo 5 (el caso de medio centavo) y corré el sabotaje
+   del redondeo (`ROUND_HALF_EVEN`) con un patrón que aparezca una sola vez.
+3. **Palabras de cuenta dentro de otras palabras.** Causa:
+   `_PALABRAS_DE_CUENTA` busca `BIC\b`, `IBAN`, `BANK`… sin borde adelante:
+   «ARABIC TRADING 123» se toma por cuenta y la tributaria no sale. **Qué:**
+   palabras enteras. **Familia:** una palabra que contenga cada una de las
+   de la lista, y las mismas solas, que siguen siendo cuenta.
+4. **El control de grupo compara la unidad estadística cruda** (`1`, `01`,
+   `kg` son la misma y dan error). Comparar por código, con
+   `get_unidad_codigo` o el equivalente de estadística.
+5. **D6 entra acá (decidido por la PM):** una unidad que no se reconoce no
+   sale 07 en silencio: aviso con la unidad leída, como el de «Unidad de
+   medida». Es la misma familia del punto 5 (m² salía 07). No cambies el
+   código que sale: sólo el aviso.
+
+**Queda como está (decidido por la PM):** el PDF no trae la unidad; el
+usuario la elige en el panel del despachante y ya sale el aviso. Leerla del
+PDF va al roadmap cuando haya un PDF real que la necesite. El mensaje de
+kilos con sub-ítems lo resolvés en MARIA-8.
+
 ## Qué pasó el 2026-10-24
 
 Emi y el despachante cargaron en el MARIA un TXT de CDI de una factura real
@@ -149,4 +193,18 @@ nombre o signo, pedilo por tu canal.
 
 ## Respuestas a tus D
 
-(Ninguna todavía.)
+MARIA-7, 2026-10-24:
+
+- **D1: (a).** Le pregunto al despachante el largo máximo y si el MARIA
+  rechaza un IDSO repetido (los choques de la tabla de la reproducción). No
+  cambies `NDDTIMMTRN` ni `IEXT` sin esa respuesta.
+- **D2: (b)**, devolución punto 2.
+- **D3: (a).** El archivo aceptado trae «S.A.», comas y paréntesis.
+- **D4: (a).** El «mandala igual» es propuesta, si aparece un proveedor que
+  lo necesite. Las palabras de cuenta, devolución punto 3.
+- **D5: (a).** La (c), validar la fecha en el alta, la paso a la cola de la
+  Dev técnica.
+- **D6: (b)**, devolución punto 5.
+- **D7: (a)** mientras pregunto al despachante cómo va un decimal en un
+  sufijo y si acepta un valor vacío.
+- **D8: (a).** La v1 no es la pantalla en uso; queda con el aviso.
