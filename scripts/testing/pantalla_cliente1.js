@@ -4,6 +4,7 @@
 // Se guarda sin esos datos, con un aviso que dice cuáles faltan; con los
 // cuatro no hay aviso. El detalle del cliente muestra el inicio de actividad.
 // D3: editar no borra una fecha guardada que el campo de fecha no puede mostrar.
+// Una fecha tipeada a medias no se guarda callada.
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_cliente1.js [captura.png]
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
@@ -153,6 +154,39 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   await avisoAlta.waitFor({ timeout: 10000 }).catch(() => falla('no apareció el aviso del alta después de editar'));
   if (!/inicio de actividad/i.test(await avisoAlta.innerText())) falla('un alta sin fecha después de editar no avisa que falta el inicio de actividad');
   console.log('OK al editar, la fecha que el campo no muestra se conserva y no se avisa como faltante; cargarla o borrarla anda');
+
+  // Una fecha tipeada a medias (el navegador la da como vacía) no se guarda
+  // callada: ni conserva la fecha guardada ni la borra; el formulario lo dice.
+  for (const [n, guardada] of [['A medias oculta', '01/03/2015'], ['A medias ISO', '2015-03-01']]) {
+    const nombreM = 'Cliente Inventado D3 ' + n + ' ' + id;
+    const r = await page.request.post(base + '/api/clientes', { data: { nombre: nombreM, cuit: '20123456786', direccion: 'Calle Inventada 1', fecha_inic_activ: guardada } });
+    const idM = (await r.json()).cliente.id;
+    await page.reload();
+    await page.waitForFunction(() => window.CDI && CDI.goTo);
+    await page.evaluate(() => CDI.goTo('clientes'));
+    await page.locator('.cx-card', { hasText: nombreM }).click();
+    await page.locator('#cxKebabBtn').click();
+    await page.locator('#cxKebabMenu [data-kaction="edit"]').click();
+    await page.locator('#cfNombre').waitFor({ state: 'visible', timeout: 10000 });
+    await page.fill('#cfDireccion', 'Calle Inventada 2');
+    await page.fill('#cfFechaInicActiv', '');
+    await page.locator('#cfFechaInicActiv').click();
+    await page.keyboard.type('03');
+    const aMedias = await page.locator('#cfFechaInicActiv').evaluate(el => el.validity.badInput && el.value === '');
+    if (!aMedias) falla(n + ': no se pudo dejar la fecha a medias en el campo');
+    await page.locator('#cxFormSave').click();
+    await page.locator('#cfError').waitFor({ state: 'visible', timeout: 5000 })
+      .catch(() => falla(n + ': una fecha a medias se guardó sin decir nada'));
+    const errorM = await page.locator('#cfError').innerText();
+    if (!/inicio de actividad/i.test(errorM)) falla(n + ': el error no habla del inicio de actividad: ' + errorM);
+    const cM = (await (await page.request.get(base + '/api/clientes/' + idM)).json());
+    const cliM = cM.cliente || cM;
+    if (cliM.direccion !== 'Calle Inventada 1' || (cliM.fecha_inic_activ || null) !== guardada) {
+      falla(n + ': con la fecha a medias igual se guardó: ' + JSON.stringify([cliM.direccion, cliM.fecha_inic_activ]));
+    }
+    await page.keyboard.press('Escape');
+  }
+  console.log('OK una fecha tipeada a medias no se guarda: el formulario avisa');
 
   if (process.argv[2]) await page.screenshot({ path: process.argv[2], fullPage: true });
   await b.close();

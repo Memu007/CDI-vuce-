@@ -128,6 +128,16 @@ sabotaje $J "lo recordado de una edición pasa al alta" \
   "        fechaInicOculta = '';"$'\n' '' \
   "FALLA: un alta sin fecha después de editar no avisa que falta el inicio de actividad"
 
+sabotaje $J "una fecha a medias se guarda callada" \
+  "fFechaInicActiv.validity && fFechaInicActiv.validity.badInput)" "false)" \
+  "FALLA: A medias oculta: una fecha a medias se guardó sin decir nada"
+sabotaje $J "sólo frena la fecha a medias si había una oculta" \
+  "fFechaInicActiv.validity && fFechaInicActiv.validity.badInput)" "fFechaInicActiv.validity.badInput && fechaInicOculta)" \
+  "FALLA: A medias ISO: una fecha a medias se guardó sin decir nada"
+sabotaje $J "el error de la fecha a medias no dice cuál" \
+  "'La fecha de inicio de actividad está incompleta: completala o borrala.'" "'Hay un dato incompleto.'" \
+  "FALLA: A medias oculta: el error no habla del inicio de actividad"
+
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
