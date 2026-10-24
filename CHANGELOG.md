@@ -9,7 +9,8 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-10-24 · fix: la proforma china sin leer de más (EXCEL-3b)
 
 - **fix(excel):** un subtotal con largo y sin precio, un flete o descuento sin monto y un código nuevo sin especificación ya no toman la descripción del renglón de arriba: quedan sin leer, con aviso. Una nota en «Remarks» no vuelve flete o descuento a un renglón; un «Descuento comercial -500» no entra como producto.
-- La unidad que sale sólo del encabezado del precio («USD/M») se avisa; un largo escrito «1,5m» no sale «1,5m m».
+- La unidad que sale de los encabezados de la cantidad y del precio («Qty (M)», «USD/M») se avisa con las dos columnas; un largo escrito «1,5m» no sale «1,5m m».
+- Las celdas combinadas de un .xls se leen como las de un .xlsx; el flete o descuento con el rótulo en una columna a la izquierda de la descripción («No.», «S/N») se lee.
 
 ## 2026-10-24 · fix: la demo de la landing dice «3 PA SIM» (PA-1b)
 
