@@ -221,7 +221,9 @@ H = ["pieza", "descripcion", "origen", "cantidad", "valor_unitario", "peso_unita
 def test_el_excel_deja_en_la_operacion_lo_que_no_se_leyo():
     r = _subir_libro({
         "Factura": [H, ["84713000", "Laptop", "CN", 10, 350, 1.5],
-                    ["", "Freight", "", 1, 500, None]],
+                    # El seguro sigue como fila sin leer (el flete se lee
+                    # para la operación desde EXCEL-3).
+                    ["", "Insurance", "", 1, 50, None]],
         "Hoja2": [H, ["85171300", "Telefono", "CN", 5, 100, 0.2]],
         "Vacia": [[" ", None, ""]],  # sólo espacios: no son datos
     })

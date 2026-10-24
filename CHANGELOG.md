@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-24 · fix: la proforma china se lee tal como viene (EXCEL-3)
+
+- **fix(excel):** una proforma sin NCM, con el código y la especificación sólo en el primer renglón de cada grupo, sale con un producto por renglón (con su ancho y largo); con el precio por m² la cantidad es la de m² y la unidad viaja al TXT.
+- El flete y el descuento de la planilla no entran como productos: se devuelven leídos en la operación, con aviso.
+
 ## 2026-10-23 · fix: combinadas XML y lectura normal con ocho libros grandes
 
 - Los subítems mal formados conservan su mensaje específico, sin confundirse con un producto inválido.
