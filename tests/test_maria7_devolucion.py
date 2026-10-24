@@ -96,8 +96,17 @@ def test_el_error_del_sufijo_llega_como_400(client):
 def test_el_aviso_dice_que_se_separo_y_no_rompe_con_un_sufijo_malo():
     avisos = mg.supuestos_declarados([dict(LONA)], sbt_sufijo_valor="AA(ROJO) AB(AZUL)-CA00-")
     assert any("Sufijo de valor:" in a and "AA(ROJO)-AB(AZUL)-CA00-" in a for a in avisos)
-    # El aviso no reemplaza al error: con un sufijo malo los avisos siguen saliendo.
-    assert mg.supuestos_declarados([dict(LONA)], sbt_sufijo_valor="AA(SIN CIERRE-") is not None
+    # El aviso no reemplaza al error: con un sufijo malo no sale aviso del
+    # sufijo y los demás salen igual que con uno bien escrito.
+    assert (mg.supuestos_declarados([dict(LONA)], sbt_sufijo_valor="AA(SIN CIERRE-")
+            == mg.supuestos_declarados([dict(LONA)], sbt_sufijo_valor="AA(DEMO)-CA00-"))
+
+
+def test_un_sufijo_que_separado_pasa_de_120_caracteres_no_genera():
+    # 120 caracteres pasan el tope del endpoint; con los guiones, 143.
+    with pytest.raises(ValueError, match=r"de la operación.*143 caracteres.*120"):
+        _gen(sbt_sufijo_valor="AA(X)" * 24)
+    assert len(_valor(_gen(sbt_sufijo_valor="AA(X)" * 20), "CSBTSVL")[0]) == 119
 
 
 # ------------------------------------- 2. D2 (b): el kilo neto al centésimo
@@ -117,6 +126,17 @@ def test_con_renglones_en_kilos_el_kilo_neto_es_la_cantidad_estadistica():
     # 465,129 de kilo neto: la cantidad estadística, al centésimo, y el kilo neto igual.
     assert _valor(txt, "QARTUNTEST") == ["465.13"]
     assert _valor(txt, "QARTKGRNET") == ["465.130"]
+
+
+@pytest.mark.parametrize("peso", [0.001, 0.004])
+def test_con_la_estadistica_en_kilos_un_kilo_neto_que_da_cero_al_centesimo_no_genera(peso):
+    with pytest.raises(ValueError, match=r"Item 1: .*al centésimo da 0\.00"):
+        _gen([dict(LONA, peso_kg=peso, unidad_estadistica="01")])
+
+
+def test_con_la_estadistica_en_kilos_medio_centesimo_sale():
+    txt = _gen([dict(LONA, peso_kg=0.005, unidad_estadistica="01")])
+    assert _valor(txt, "QARTKGRNET") == ["0.010"]
 
 
 def test_sin_kilos_en_la_estadistica_el_kilo_neto_sigue_con_sus_milesimos():
@@ -160,6 +180,13 @@ def test_los_casos_de_la_reproduccion_salen(tributaria):
     assert "IDTRIB-PROVEEDOR" in _gen(vendedor_id=tributaria)
 
 
+@pytest.mark.parametrize("cuenta", ["ICBC_ACCOUNT 6222", "NRO_CUENTA 6222", "1_BANK 6222", "N1IBAN 6222"])
+def test_la_palabra_pegada_a_un_numero_o_guion_bajo_sigue_siendo_cuenta(cuenta):
+    # El borde es «no hay una letra adelante»: «_» y los dígitos no tapan la palabra.
+    assert mg.parece_cuenta_bancaria(cuenta)
+    assert "IDTRIB-PROVEEDOR" not in _gen(vendedor_id=cuenta)
+
+
 @pytest.mark.parametrize("palabra", PALABRAS + ["A/C"])
 def test_la_palabra_sola_sigue_siendo_cuenta(palabra):
     assert mg.parece_cuenta_bancaria(f"{palabra} 0012345678")
@@ -180,6 +207,19 @@ def test_un_grupo_con_unidades_estadisticas_distintas_sigue_dando_error():
     items = [dict(LONA, unidad="u", cantidad=1, peso_kg=1, grupo_id=1, unidad_estadistica=e)
              for e in ("01", "07")]
     with pytest.raises(ValueError, match="misma unidad estadística"):
+        _gen(items)
+
+
+@pytest.mark.parametrize("unas", [("kg", "KGS"), ("1", "01"), ("u", "")])
+def test_un_grupo_con_la_misma_unidad_declarada_escrita_distinto_genera(unas):
+    # La misma familia que la estadística: se compara el código que sale.
+    items = [dict(LONA, unidad=u, cantidad=1, peso_kg=1, grupo_id=1) for u in unas]
+    assert len(_valor(_gen(items), "CARTUNTDCL")) == 1
+
+
+def test_un_grupo_con_unidades_declaradas_distintas_sigue_dando_error():
+    items = [dict(LONA, unidad=u, cantidad=1, peso_kg=1, grupo_id=1) for u in ("kg", "u")]
+    with pytest.raises(ValueError, match="misma unidad de medida"):
         _gen(items)
 
 

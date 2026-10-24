@@ -95,8 +95,12 @@ reemplazar $F '    return Decimal(f"{peso_kg:.3f}").quantize(Decimal("0.01"), RO
 caso "redondeo_al_par" "FAILED $TD::test_con_la_estadistica_en_kilos_el_kilo_neto_sale_al_centesimo"
 
 # 7. las palabras de cuenta vuelven a buscarse dentro de otras («ARABIC»)
-reemplazar $F 'r"\b(?:IBAN|SWIFT|BIC\b|ACCOUNT|ACCT|CUENTA|CTA\b|BANK|BANCO)|\bA/C"' 'r"IBAN|SWIFT|BIC\b|ACCOUNT|ACCT|A/C|CUENTA|CTA\b|BANK|BANCO"'
+reemplazar $F 'r"(?<![A-Z])(?:IBAN|SWIFT|BIC\b|ACCOUNT|ACCT|CUENTA|CTA\b|BANK|BANCO|A/C)"' 'r"IBAN|SWIFT|BIC\b|ACCOUNT|ACCT|A/C|CUENTA|CTA\b|BANK|BANCO"'
 caso "cuenta_sin_borde" "FAILED $TD::test_los_casos_de_la_reproduccion_salen"
+
+# 7b. el borde vuelve a ser \b: «ICBC_ACCOUNT» o «1_BANK» dejan de ser cuenta
+reemplazar $F 'r"(?<![A-Z])(?:IBAN|SWIFT|BIC\b|ACCOUNT|ACCT|CUENTA|CTA\b|BANK|BANCO|A/C)"' 'r"\b(?:IBAN|SWIFT|BIC\b|ACCOUNT|ACCT|CUENTA|CTA\b|BANK|BANCO|A/C)"'
+caso "cuenta_borde_de_palabra" "FAILED $TD::test_la_palabra_pegada_a_un_numero_o_guion_bajo_sigue_siendo_cuenta"
 
 # 8. el grupo vuelve a comparar la unidad estadística como se escribió
 reemplazar $F "        if len({unidad_estadistica_de(it, get_unidad_codigo(it.get('unidad') or it.get('unidad_medida')
@@ -108,5 +112,19 @@ caso "grupo_crudo" "FAILED $TD::test_un_grupo_con_la_misma_unidad_estadistica_es
 reemplazar $F '            no_reconocida.append(f"{idx} («{str(unidad)[:20]}»)")' '            pass'
 caso "unidad_sin_aviso" "FAILED $TD::test_una_unidad_que_no_se_reconoce_sale_07_y_se_avisa"
 
+# 10. el sufijo separado no se mide: puede pasar de 120 caracteres
+reemplazar $F '    if len(limpio) > SUFIJO_MAXIMO:' '    if False:'
+caso "sufijo_sin_tope" "FAILED $TD::test_un_sufijo_que_separado_pasa_de_120_caracteres_no_genera"
+
+# 11. con estadística en kilos, un kilo neto de 0,00 al centésimo sale igual
+reemplazar $F '            if cantidad_est <= 0:
+                # D2 (b)' '            if False:
+                # D2 (b)'
+caso "kilo_neto_cero" "FAILED $TD::test_con_la_estadistica_en_kilos_un_kilo_neto_que_da_cero_al_centesimo_no_genera"
+
+# 12. el grupo vuelve a comparar la unidad declarada como se escribió
+reemplazar $F "        unidades = {get_unidad_codigo(it.get('unidad') or it.get('unidad_medida') or it.get('um')) for it in grupo_items}" "        unidades = {str(it.get('unidad') or it.get('unidad_medida') or it.get('um') or '').strip().upper() for it in grupo_items}"
+caso "grupo_unidad_cruda" "FAILED $TD::test_un_grupo_con_la_misma_unidad_declarada_escrita_distinto_genera"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 9 sabotajes dan rojo por la razón esperada"
+echo "OK: los 13 sabotajes dan rojo por la razón esperada"
