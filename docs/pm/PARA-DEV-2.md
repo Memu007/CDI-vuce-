@@ -102,8 +102,15 @@ En `proyecto_maria/core/maria_generator.py` y lo que lo alimenta:
    espacios; lo demás se cambia por espacio y se avisa.
 7. **`IDTRIB-PROVEEDOR`:** un número de cuenta bancaria no es identificación
    tributaria; si lo que hay parece cuenta (o no hay), no se inventa: aviso.
+8. **Fechas año/mes/día** (Emi, 2026-10-24): una fecha escrita `2026/08/07`
+   en la factura es el 7 de agosto de 2026 y en el TXT sale `07/08/2026`; el
+   24/10 salió `08/07/2026`. Con el año adelante, el orden es siempre
+   año/mes/día. Si el orden no se puede saber (año al final y día y mes
+   ambos de 12 o menos), se le pregunta al usuario; no se adivina. Prueba:
+   sintéticos con `2026/08/07`, `2026-08-07`, `07/08/2026` y uno ambiguo.
 
-**No se toca:** la fecha de emisión (Emi: «no se corrige»).
+**No se toca:** el valor de la fecha de emisión (Emi: «no se corrige»): el
+punto 8 la lee bien, no la cambia.
 
 **Puertas:** rojo antes con un sintético que reproduzca cada punto; los dos
 golden siguen idénticos salvo lo que esta tarea cambia a propósito (decí

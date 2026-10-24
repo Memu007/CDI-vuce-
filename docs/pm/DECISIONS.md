@@ -150,4 +150,4 @@ reunión, sin datos del cliente):
 
 Emi (2026-10-24): Codex deja de trabajar en CDI; la PM principal arma dos
 Devs nuevas en Claude: Dev MARIA en esfuerzo alto y Dev técnica en medio.
-Roadmap nuevo a tres meses en `ROADMAP.md`: **aprobado por Emi el 2026-10-24** («Dale. Comenzá»). Abierta: si la lectura de fechas año/mes/día entra en MARIA-7.
+Roadmap nuevo a tres meses en `ROADMAP.md`: **aprobado por Emi el 2026-10-24** («Dale. Comenzá»). Emi (2026-10-24): la lectura de fechas año/mes/día entra en MARIA-7 (punto 8).
