@@ -22,6 +22,31 @@ Archivo de producto tocado: `proyecto_maria/main.py` (lectura del Excel:
 
 ### Decisiones
 
+- **D2. CLIENTE-1: ¿obligatorios o a la vista?** (me frena; no empecé código).
+  Hoy (`d1884db`): el formulario de cliente (`dashboard_v2.html:1180-1244`,
+  `clientes.js:1690-1727`) exige sólo la razón social; CUIT y domicilio
+  están a la vista y son opcionales; **email y teléfono ya son opcionales**
+  (están en «Más datos», sólo se valida el formato del email), igual que la
+  fecha de inicio de actividades. La API (`main.py`, `create_cliente`) pide
+  sólo el nombre. El TXT exige el CUIT del importador (D20) pero no el
+  domicilio ni la fecha. Opciones:
+  (a) **a la vista y con aviso**: razón social, CUIT, domicilio y fecha de
+  inicio arriba, marcados «lo pide el MARIA»; email y teléfono en «Más
+  datos»; se puede guardar sin ellos, con un aviso que dice qué falta; la
+  API no cambia (la importación de clientes y el alta rápida de la revisión
+  siguen igual);
+  (b) **obligatorios**: el formulario y la API no guardan un cliente nuevo
+  sin los cuatro (CUIT válido de 11 dígitos, fecha válida); la importación
+  y el alta rápida desde la revisión también, o se los exime (hay que
+  decir cuál).
+  **Recomiendo (a)**: el despachante puede no tener la fecha al dar de alta
+  y (b) frena el alta rápida en medio de una operación; lo que no puede
+  faltar en el TXT lo controla la generación (MARIA-7 de la Dev MARIA). Si
+  es (b), la decisión es también si la generación del TXT pide domicilio y
+  fecha (eso es de la Dev MARIA).
+  Mientras tanto, ¿empiezo PA-1 (sólo textos de pantalla, «NCM» → «Posición
+  arancelaria (PA SIM)»)? ESTUDIO-1 espera la coordinación con MARIA-7.
+
 - **D1. Nombre de los campos que lee VALOR-1.** Devuelvo
   `operacion.flete` (ya existía: la revisión lo muestra y va al TXT) y
   `operacion.descuento` (nuevo, **positivo**: lo que se deduce), más
@@ -162,6 +187,6 @@ cp tests/fixtures/proforma_china_sintetica.xls /tmp/excel3-base/tests/fixtures/
 Datos reales: nada de la proforma ni de la reunión del 24/10 entró al
 repositorio; todo es inventado («DEMO TEXTILE», CUIT 30-00000000-1).
 
-Última vuelta: 2026-10-24 19:12 UTC
+Última vuelta: 2026-10-24 19:15 UTC
 
-/compact conservar: Soy la Dev técnica (Dev 1) de CDI, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica (nunca main), rutina trig_011UpBfwEu9TUzoNUrviqoP5 min 15; aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM con send_message priority next empezando «Dev técnica:». EXCEL-3 entregada: producto f3f9eb8+b76be2f, pruebas hasta d1884db, merge PM 15f5b2e; D1 (nombre/signo de operacion.descuento para VALOR-1) abierta. Sigue CLIENTE-1, después ESTUDIO-1 y PA-1 (ROADMAP Fase 1b); GUARDAR-2 más adelante desde 2d930c5. Reglas de Emi: sólo me piden la PM o Emi; nada se publica sin su «dale» para el SHA; nunca main; sin secretos ni datos reales (proforma del 24/10 fuera del repo); subagentes hasta alto, sin Fable.
+/compact conservar: Soy la Dev técnica (Dev 1) de CDI, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica (nunca main), rutina trig_011UpBfwEu9TUzoNUrviqoP5 min 15; aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM con send_message priority next empezando «Dev técnica:». EXCEL-3 entregada: producto f3f9eb8+b76be2f, pruebas hasta d1884db, merge PM 15f5b2e; D1 (nombre/signo de operacion.descuento para VALOR-1) abierta. CLIENTE-1 frenada por D2 (¿obligatorios o a la vista?; email/teléfono ya opcionales; sin código); pregunté si sigo con PA-1 mientras; después ESTUDIO-1 y PA-1 (ROADMAP Fase 1b); GUARDAR-2 más adelante desde 2d930c5. Reglas de Emi: sólo me piden la PM o Emi; nada se publica sin su «dale» para el SHA; nunca main; sin secretos ni datos reales (proforma del 24/10 fuera del repo); subagentes hasta alto, sin Fable.
