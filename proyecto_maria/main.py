@@ -4276,6 +4276,9 @@ async def generate_maria_endpoint(
         # {cantidad, valor_unitario, sufijo} (SUBITEMS-1). Otra cosa es un
         # error con mensaje, no un 500.
         for _n, _it in enumerate(request.items or [], start=1):
+            # El sufijo propio de un renglón (MARIA-8) va a su [SBT].
+            if isinstance(_it, dict) and _it.get("sufijo") is not None and not isinstance(_it.get("sufijo"), str):
+                raise HTTPException(status_code=400, detail=f"Item {_n}: el sufijo de valor tiene que ser un texto.")
             _subs = _it.get("subitems") if isinstance(_it, dict) else None
             if _subs is None:
                 continue
@@ -4305,12 +4308,14 @@ async def generate_maria_endpoint(
                 detail="Falta el sufijo de valor SBT. Es un dato obligatorio y específico del importador. Consultar al despachante.",
             )
 
-        # Los sufijos que se validan son el general y los de cada sub-ítem; el
-        # de un sub-ítem dice cuál es (SUBITEMS-1).
+        # Los sufijos que se validan son el general, el de cada renglón
+        # (MARIA-8) y los de cada sub-ítem; el error dice cuál es (SUBITEMS-1).
         _sufijos = [("", sbt_raw)] if sbt_raw else []
         for _n, it in enumerate(request.items or [], start=1):
             if not isinstance(it, dict):
                 continue
+            if (it.get("sufijo") or "").strip():
+                _sufijos.append((f"Item {_n}: ", it["sufijo"].strip()))
             for _m, sub in enumerate(it.get("subitems") or [], start=1):
                 if isinstance(sub, dict) and (sub.get("sufijo") or "").strip():
                     _sufijos.append((f"Item {_n}, sub-ítem {_m}: ", sub["sufijo"].strip()))

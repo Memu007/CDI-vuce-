@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-24 · fix: MARIA-8, revisión de los sub-ítems por renglón
+
+- Los renglones sin posición no se juntan; un renglón cuya cantidad o kilos dan 0,00 al centésimo no sale como sub-ítem; el unitario del ítem es el FOB sobre la cantidad declarada.
+- Los errores de peso y de sufijo dicen el número del renglón en la pantalla; el sufijo propio de un renglón se valida en el endpoint como los otros y se avisa si se limpió.
+
 ## 2026-10-24 · feat: MARIA-8, sub-ítems por renglón
 
 - Los renglones de la factura con la misma posición SIM, origen, procedencia y estado (y la misma unidad, unidad estadística e IVA adicional) van en un solo ítem con un sub-ítem por renglón (`CARTSBITEM=S`), cada uno con su FOB, cantidad, unitario, kilos y sufijo propio o el de la operación.

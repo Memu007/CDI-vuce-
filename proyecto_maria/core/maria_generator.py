@@ -752,12 +752,16 @@ def clave_de_posicion(item: dict, donde, iva_por_defecto: str | None) -> tuple:
 def renglones_por_posicion(items: list, iva_por_defecto: str | None = None) -> list:
     """Los números (desde 0) de los renglones que van juntos en un ítem, en el
     orden de su primer renglón (MARIA-8). Sólo los que tienen más de uno. Un
-    grupo armado a mano y un producto con sub-ítems a mano no entran."""
+    grupo armado a mano, un producto con sub-ítems a mano y uno sin posición
+    no entran."""
     juntos: dict = {}
     for n, item in enumerate(items):
         if item.get('grupo_id') is not None or item.get('subitems'):
             continue
-        juntos.setdefault(clave_de_posicion(item, n + 1, iva_por_defecto), []).append(n)
+        clave = clave_de_posicion(item, n + 1, iva_por_defecto)
+        # Sin posición (la completa el despachante) no hay con qué comparar.
+        if clave[0]:
+            juntos.setdefault(clave, []).append(n)
     return [ns for ns in juntos.values() if len(ns) > 1]
 
 
@@ -791,6 +795,14 @@ def _item_de_los_renglones(renglones: list, renglones_de: dict, lugar: dict) -> 
     kilos, la de cada uno al gramo. Cada renglón se valida con su número en
     la pantalla."""
     kilos = [Decimal(f"{peso_valido(peso_de_la_linea(r), lugar[id(r)]):.3f}") for r in renglones]
+    for r in renglones:
+        # Como en los sub-ítems a mano: QSBTUNTDCL va al centésimo y no puede
+        # salir 0,00 con FOB.
+        if _exacto(r.get('cantidad', 1)).quantize(Decimal("0.01"), ROUND_HALF_UP) <= 0:
+            raise ValueError(
+                f"Item {lugar[id(r)]}: la cantidad «{str(r.get('cantidad'))[:20]}» tiene que ser "
+                f"un número mayor que 0 (al centésimo) para ir como sub-ítem."
+            )
     item = dict(renglones[0])
     item['cantidad'] = float(sum((_exacto(r.get('cantidad', 1)) for r in renglones), Decimal(0)))
     item['valor_total'] = sum((_fob_de(r) for r in renglones), Decimal('0.00'))
@@ -1204,7 +1216,7 @@ def generate_maria_txt(operation_id: str, items: list,
         unidad_codigo = get_unidad_codigo(
             item.get('unidad') or item.get('unidad_medida') or item.get('um'))
         unidad_est = unidad_estadistica_de(item, unidad_codigo, idx)
-        peso_neto = peso_valido(peso_kg, idx)
+        peso_neto = peso_valido(peso_kg, lugar_en_el_pedido.get(id(item), idx))
         subitems = item.get("subitems") or []
         # En kilos, la cantidad estadística es el kilo neto al centésimo
         # (error 2122 del MARIA). Con sub-ítems hacen falta los kilos de cada
@@ -1234,13 +1246,15 @@ def generate_maria_txt(operation_id: str, items: list,
                 estadisticas_sub, cantidad_est = al_centesimo_cerrando(kilos_renglones)
             else:
                 estadisticas_sub, cantidad_est = cantidades_sub, cantidad_dcl
-            if min(cantidades_sub + estadisticas_sub) < 0:
+            if min(cantidades_sub + estadisticas_sub) <= 0:
                 raise ValueError(
                     f"Item {lugar_en_el_pedido[id(renglones[0])]}: los renglones "
                     f"{_enumerar([lugar_en_el_pedido[id(r)] for r in renglones])} son tan chicos "
                     f"que al llevar sus cantidades o kilos al centésimo no cierran con el total; "
                     f"revisá las cantidades y los kilos."
                 )
+            # El unitario del ítem, sobre la cantidad que se declara.
+            valor_unit = float(valor_total) / float(cantidad_dcl)
 
         flete_item = fletes[idx - 1]
         seguro_item = seguros[idx - 1]
@@ -1325,8 +1339,7 @@ def generate_maria_txt(operation_id: str, items: list,
                 sufijo = limpiar_sufijo(str(renglon.get("sufijo") or "").strip())[0] or sufijo_sbt
                 if not sufijo:
                     raise ValueError(
-                        f"Item {idx}, renglón {lugar_en_el_pedido[id(renglon)]}: falta el sufijo "
-                        f"de valor (CSBTSVL)."
+                        f"Item {lugar_en_el_pedido[id(renglon)]}: falta el sufijo de valor (CSBTSVL)."
                     )
                 fob_sub = _fob_de(renglon)
                 unitario = (float(renglon["valor_unitario"]) if renglon.get("valor_unitario") not in (None, "")
@@ -1663,6 +1676,13 @@ def supuestos_declarados(
             f"Sub-ítems: los renglones {cuales} van en un solo ítem con {len(ns)} sub-ítems "
             f"(misma posición SIM, origen, procedencia y estado)."
         )
+        for n in ns:
+            limpio, cambio = limpiar_sufijo(str(items[n].get("sufijo") or "").strip())
+            if cambio:
+                avisos.append(
+                    f"Sufijo de valor del renglón {n + 1}: dentro de los paréntesis van sólo "
+                    f"letras, números y espacios; sale «{limpio[:80]}»."
+                )
         de_cada_uno = {
             limpiar_sufijo(str(items[n].get("sufijo") or "").strip())[0]
             or limpiar_sufijo(str(sbt_sufijo_valor or "").strip())[0]
