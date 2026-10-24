@@ -128,6 +128,9 @@ reunión, sin datos del cliente):
 - Ajustes a incluir, ajustes a deducir y FOB casillero: campos que carga el
   usuario; el sistema hace las cuentas, no decide qué se descuenta (Emi). El
   reparto detallado ítem por ítem va en una segunda etapa (PRORRATEO-1).
+  PM (2026-10-24, D1 de EXCEL-3): el Excel devuelve `operacion.descuento`
+  positivo (lo que se deduce), sólo leído y avisado; VALOR-1 lo ofrece como
+  ajuste a deducir.
 - Botón para calcular el seguro (1 % de FOB + flete) cuando la factura no lo
   trae.
 - Montos con punto o con coma.

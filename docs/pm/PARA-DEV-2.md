@@ -132,6 +132,14 @@ Están en `ROADMAP.md`, Fase 1b. Antes de arrancarlas, leé la decisión del
 2026-10-24 en `DECISIONS.md`: el reparto ítem por ítem de los ajustes queda
 para PRORRATEO-1.
 
+**Qué te deja EXCEL-3 para VALOR-1** (aceptada el 2026-10-24, en la rama de
+la PM): la lectura del Excel devuelve `operacion.flete` (el de siempre),
+`operacion.descuento` (nuevo, **positivo**: lo que la factura dice que se
+deduce) y `operacion.filas_excel_flete` / `filas_excel_descuento` (filas de
+la planilla). Hoy el descuento sólo se informa: no resta del FOB. VALOR-1
+lo ofrece como ajuste a deducir y el usuario decide. Si necesitás otro
+nombre o signo, pedilo por tu canal.
+
 ## Respuestas a tus D
 
 (Ninguna todavía.)
