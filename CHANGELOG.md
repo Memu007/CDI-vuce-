@@ -10,6 +10,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **feat(clientes):** razón social, CUIT, domicilio e inicio de actividad a la vista y marcados «lo pide el MARIA»; email y teléfono en «Más datos». Se guarda sin ellos, con un aviso de cuáles faltan; el detalle muestra el inicio de actividad.
 
+## 2026-10-24 · feat: «NCM» pasa a «Posición arancelaria (PA SIM)» en pantallas (PA-1)
+
+- Donde la pantalla habla de la posición de 11 dígitos con su letra (paso 3, botones, memoria y catálogo del cliente, asistente) dice «PA SIM»; donde habla de los 8 dígitos de la nomenclatura queda «NCM».
+
 ## 2026-10-24 · fix: la proforma china se lee tal como viene (EXCEL-3)
 
 - **fix(excel):** una proforma sin NCM, con el código y la especificación sólo en el primer renglón de cada grupo, sale con un producto por renglón (con su ancho y largo); con el precio por m² la cantidad es la de m² y la unidad viaja al TXT.

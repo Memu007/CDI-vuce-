@@ -533,7 +533,7 @@
             touched++;
         });
         try { CDI.track && CDI.track('ncm_batch_ncm_applied', { count: touched, ncm: formatted }); } catch (_) {}
-        scheduleUndoClear('NCM ' + formatted + ' a ' + touched + (touched === 1 ? ' item' : ' items'));
+        scheduleUndoClear('PA SIM ' + formatted + ' a ' + touched + (touched === 1 ? ' item' : ' items'));
         render();
         updateBatchBar();
     }
@@ -1083,7 +1083,7 @@
         }
         lastSnapshot = { state: CDI.state, items: before, ts: Date.now() };
         CDI.track && CDI.track('ncm_agrupar', { grupo_id: result.grupo_id, items: result.count, ncm: result.ncm, batch: true });
-        scheduleUndoClear('NCM ' + result.ncm + ' · ' + result.count + ' ítems → 1 unidad clasificatoria');
+        scheduleUndoClear('PA SIM ' + result.ncm + ' · ' + result.count + ' ítems → 1 unidad clasificatoria');
 
         selectedRows.clear();
         if (batchNcm) batchNcm.value = '';
@@ -1140,7 +1140,7 @@
             '<div class="ncm-autofill-banner-inner">' +
                 '<span class="ncm-autofill-icon" aria-hidden="true">✨</span>' +
                 '<span class="ncm-autofill-text">Se autocompletaron <strong>' + total +
-                ' de ' + totalItems + '</strong> NCM' + detailText +
+                ' de ' + totalItems + '</strong> posiciones arancelarias (PA SIM)' + detailText +
                 '. Revisalos antes de continuar.</span>' +
                 '<button type="button" class="ncm-autofill-undo" id="ncmAutofillUndo">Deshacer</button>' +
                 '<button type="button" class="ncm-autofill-close" id="ncmAutofillClose" aria-label="Cerrar">×</button>' +
@@ -1165,7 +1165,7 @@
                 CDI.hint('banner_autofill', {
                     target: div,
                     title: '✨ Auto-catálogo en acción',
-                    text: 'Reconocimos al proveedor de este PDF y te sugerimos los NCM que ya usó antes. Revisalos: CDI propone y vos confirmás.',
+                    text: 'Reconocimos al proveedor de este PDF y te sugerimos las posiciones arancelarias (PA SIM) que ya usó antes. Revisalos: CDI propone y vos confirmás.',
                     cta: 'Entendido',
                     ttl: 12000,
                 });
@@ -1199,7 +1199,7 @@
         else if (src === 'proveedor') { label = 'Proveedor'; cls = 'chip-proveedor'; }
         else return '';
         const conf = it.__autofillConfidence ? ' (' + Math.round(it.__autofillConfidence * 100) + '%)' : '';
-        return '<span class="ncm-autofill-chip ' + cls + '" title="NCM sugerido desde ' + label.toLowerCase() + conf + '">' + icon + label + '</span>';
+        return '<span class="ncm-autofill-chip ' + cls + '" title="PA SIM sugerida desde ' + label.toLowerCase() + conf + '">' + icon + label + '</span>';
     }
 
     function renderNotesPill(ncm, rowIdx) {
@@ -1750,7 +1750,7 @@
                 const provNombre = String(op.vendedor_nombre || '').trim() || 'el proveedor';
                 CDI.hint('autocatalogo', {
                     title: '🧠 Memoria activada',
-                    text: 'Guardamos este NCM para ' + cliNombre + ' · ' + provNombre +
+                    text: 'Guardamos esta posición arancelaria (PA SIM) para ' + cliNombre + ' · ' + provNombre +
                           '. En la próxima factura del mismo proveedor ya te lo sugerimos.',
                     cta: 'Entendido',
                 });
@@ -2139,7 +2139,7 @@
         const human = ageH < 24
             ? Math.round(ageH) + ' h'
             : Math.round(ageH / 24) + ' día' + (ageH >= 48 ? 's' : '');
-        return '<div class="spotlight-vuce-stale" title="Refrescar desde el asistente NCM">' +
+        return '<div class="spotlight-vuce-stale" title="Refrescar desde el asistente de posición arancelaria">' +
                'Datos con latencia de ' + CDI.escapeHtml(human) +
                '</div>';
     }

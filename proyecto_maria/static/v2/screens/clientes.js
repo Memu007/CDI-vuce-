@@ -1223,7 +1223,7 @@
        Catálogo del cliente (columnas + productos aprendidos)
        ========================================================== */
     const CANON_LABELS = {
-        pieza: 'NCM / Pieza',
+        pieza: 'Posición arancelaria (PA SIM)',
         descripcion: 'Descripción',
         origen: 'Origen',
         cantidad: 'Cantidad',
@@ -1383,7 +1383,7 @@
                     '<div class="cx-catalogo-producto-main">' +
                         '<div class="cx-catalogo-producto-desc" title="' + CDI.escapeHtml(p.descripcion) + '">' + CDI.escapeHtml(p.descripcion) + '</div>' +
                         '<div class="cx-catalogo-producto-sub">' +
-                            '<input type="text" class="cx-catalogo-producto-input" data-field="ncm" value="' + CDI.escapeHtml(p.ncm) + '" title="NCM" maxlength="10">' +
+                            '<input type="text" class="cx-catalogo-producto-input" data-field="ncm" value="' + CDI.escapeHtml(p.ncm) + '" title="Posición arancelaria (PA SIM)" maxlength="10">' +
                             '<span> · Origen </span>' +
                             '<input type="text" class="cx-catalogo-producto-input" data-field="origen" value="' + CDI.escapeHtml(p.origen || 'XX') + '" title="Origen" maxlength="3">' +
                             '<span> · Peso </span>' +
