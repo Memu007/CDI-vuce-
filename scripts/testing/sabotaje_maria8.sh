@@ -195,11 +195,7 @@ reemplazar $F '                        f"Item {lugar_en_el_pedido[id(renglon)]}:
 caso "sufijo_numero_del_txt" "FAILED $T::test_sin_ningun_sufijo_el_error_dice_el_numero_de_la_pantalla"
 
 # 31. no avisa que se limpió el sufijo de un renglón
-reemplazar $F '            if cambio:
-                avisos.append(
-                    f"Sufijo de valor del renglón' '            if False:
-                avisos.append(
-                    f"Sufijo de valor del renglón'
+reemplazar $F '            avisos.extend(_aviso_de_sufijo(f" del renglón {n + 1}", items[n].get("sufijo")))' '            pass'
 caso "sin_aviso_limpieza" "FAILED $T::test_los_avisos_dicen_si_se_limpio_el_sufijo_de_un_renglon"
 
 # 32. el endpoint no valida el sufijo de un renglón
