@@ -218,10 +218,14 @@ def test_con_todos_los_sufijos_propios_no_hace_falta_el_de_la_operacion():
     assert len(sbts) == 12
 
 
-def test_sin_ningun_sufijo_el_error_dice_que_renglon():
-    renglones = _lonas()[:3]
+def test_sin_ningun_sufijo_el_error_dice_el_numero_de_la_pantalla():
+    """Los renglones 1 y 2 van en el ítem 1 y los 3 y 4 en el 2: el que no
+    tiene sufijo es el 3, y la pantalla lleva al renglón por «Item N»."""
+    renglones = _lonas()[:4]
+    for r in renglones[2:]:
+        r["pieza"] = "39211390900F"
     del renglones[2]["sufijo"]
-    with pytest.raises(ValueError, match=r"renglón 3.*sufijo"):
+    with pytest.raises(ValueError, match=r"^Item 3: falta el sufijo"):
         _gen(renglones, sbt_sufijo_valor="")
 
 
@@ -250,10 +254,92 @@ def test_un_renglon_con_estado_que_no_corresponde_dice_su_numero():
         _gen(renglones)
 
 
+def test_el_peso_de_un_item_despues_de_los_juntos_dice_su_numero_en_la_pantalla():
+    """Los renglones 1 y 2 son el ítem 1 del TXT; el 3 es el ítem 2, pero en
+    la pantalla es el renglón 3."""
+    renglones = _lonas()[:2] + [dict(LONA, pieza="39211390900F", peso_kg=0)]
+    with pytest.raises(ValueError, match=r"^Item 3: el peso"):
+        _gen(renglones)
+
+
+@pytest.mark.parametrize("cantidad", [0, -5, 0.004])
+def test_un_renglon_sin_cantidad_no_es_un_subitem(cantidad):
+    """Un sub-ítem a mano con cantidad 0 ya era un error; uno automático
+    salía QSBTUNTDCL=0.00 con FOB. 0,004 también sale 0,00."""
+    renglones = _lonas()[:3]
+    renglones[1] = dict(renglones[1], cantidad=cantidad, valor_unitario=None, valor_total=5)
+    with pytest.raises(ValueError, match=r"^Item 2: la cantidad .*mayor que 0"):
+        _gen(renglones)
+
+
+def test_el_unitario_del_item_es_el_fob_sobre_la_cantidad_declarada():
+    """3 + 7,005 = 10,005, que se declara 10,01: el unitario tiene que ser
+    12,44 / 10,01 = 1,2428 y no 12,44 / 10,005 = 1,2434."""
+    renglones = [dict(LONA, cantidad=3, valor_unitario=1.24, sufijo="A"),
+                 dict(LONA, cantidad=7.005, valor_unitario=1.245, sufijo="B")]
+    art = _bloques(_gen(renglones), "ART")[0]
+    assert (art["QARTUNTDCL"], art["MARTFOB"], art["MARTUNITAR"]) == ("10.01", "12.44", "1.2428")
+
+
+def test_los_renglones_sin_posicion_no_se_juntan():
+    """La pieza puede llegar vacía (la completa el despachante): dos
+    productos sin posición no son la misma posición."""
+    renglones = [dict(r, pieza="") for r in _lonas()[:2]]
+    arts = _bloques(_gen(renglones), "ART")
+    assert [a["CARTSBITEM"] for a in arts] == ["N", "N"]
+
+
 def test_kilos_que_al_restar_quedarian_negativos_no_se_generan():
     """Doce renglones de 0,005 kg salen 0,01 cada uno (0,12) contra un total
     de 0,06: al más grande le tocaría −0,05."""
     renglones = [dict(r, peso_kg=0.005) for r in _lonas()]
+    with pytest.raises(ValueError, match="kilos"):
+        _gen(renglones)
+
+
+def test_el_fob_de_medio_centavo_sube_y_el_item_cierra():
+    """3 × 3,335 = 10,005: sube a 10,01 (no al par, 10,00) y el ítem suma eso."""
+    renglones = [dict(LONA, cantidad=3, valor_unitario=3.335, sufijo="A"),
+                 dict(LONA, cantidad=1, valor_unitario=1, sufijo="B")]
+    txt = _gen(renglones)
+    art, sbts = _bloques(txt, "ART")[0], _bloques(txt, "SBT")
+    assert [s["MSBTFOB"] for s in sbts] == ["10.01", "1.00"]
+    assert art["MARTFOB"] == "11.01"
+
+
+def test_si_empatan_el_sobrante_va_al_primero():
+    """Tres renglones de 1,005 m² salen 1,01 cada uno (3,03) contra 3,02."""
+    renglones = [dict(LONA, cantidad=1.005, valor_unitario=2, sufijo=s) for s in "ABC"]
+    sbts = _bloques(_gen(renglones), "SBT")
+    assert [s["QSBTUNTDCL"] for s in sbts] == ["1.00", "1.01", "1.01"]
+
+
+def test_un_renglon_con_total_y_sin_unitario():
+    renglones = [dict(LONA, cantidad=4, valor_unitario=None, valor_total=9, sufijo="A"),
+                 dict(LONA, cantidad=1, valor_unitario=1, sufijo="B")]
+    sbt = _bloques(_gen(renglones), "SBT")[0]
+    assert (sbt["MSBTFOB"], sbt["QSBTUNTDCL"], sbt["MSBTUNITAR"]) == ("9.00", "4.00", "2.2500")
+
+
+def test_declarada_en_kilos_la_cantidad_y_los_kilos_son_de_cada_renglon():
+    renglones = [dict(LONA, unidad="kg", unidad_estadistica="kg", cantidad=100, peso_kg=98.5, sufijo="A"),
+                 dict(LONA, unidad="kg", unidad_estadistica="kg", cantidad=50, peso_kg=49.25, sufijo="B")]
+    txt = _gen(renglones)
+    art, sbts = _bloques(txt, "ART")[0], _bloques(txt, "SBT")
+    assert [(s["QSBTUNTDCL"], s["QSBTUNTEST"]) for s in sbts] == [("100.00", "98.50"), ("50.00", "49.25")]
+    assert (art["QARTUNTDCL"], art["QARTUNTEST"]) == ("150.00", "147.75")
+
+
+def test_el_estado_que_no_corresponde_en_el_tercer_renglon_dice_el_tres():
+    renglones = _lonas()[:3]
+    renglones[2]["estado"] = "9"
+    with pytest.raises(ValueError, match=r"^Ítem 3 .*no válido"):
+        _gen(renglones)
+
+
+def test_kilos_de_un_renglon_que_al_centesimo_dan_cero_no_se_generan():
+    """0,004 kg sale QSBTUNTEST=0.00 con FOB."""
+    renglones = [dict(r, peso_kg=0.004) for r in _lonas()[:2]] + [dict(_lonas()[2], peso_kg=200)]
     with pytest.raises(ValueError, match="kilos"):
         _gen(renglones)
 
@@ -271,6 +357,30 @@ def test_los_avisos_dicen_si_todos_los_subitems_llevan_el_mismo_sufijo():
     renglones = [{k: v for k, v in r.items() if k != "sufijo"} for r in _lonas()[:3]]
     avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor="AA(MARCA)-")
     assert any("los 3 sub-ítems llevan el mismo sufijo" in a for a in avisos)
+
+
+def test_los_avisos_dicen_si_se_limpio_el_sufijo_de_un_renglon():
+    renglones = _lonas()[:2]
+    renglones[1]["sufijo"] = "AA(MARCA)-AI(620G-BLUE.010 150CMX50M)-"
+    avisos = mg.supuestos_declarados(renglones, sbt_sufijo_valor="X")
+    assert any(a.startswith("Sufijo de valor del renglón 2:")
+               and "«AA(MARCA)-AI(620G BLUE 010 150CMX50M)-»" in a for a in avisos)
+
+
+@pytest.mark.parametrize("caso, sufijo, dice", [
+    ("igual", "CSBTSVL=AA(MARCA)-", "«=»"),
+    ("largo", "A" * 121, "120 caracteres"),
+    ("control", "AA(MA\x85RCA)-", "caracteres de control"),
+    ("no_texto", {"a": 1}, "tiene que ser un texto"),
+])
+def test_el_sufijo_de_un_renglon_se_valida_como_los_otros(client, caso, sufijo, dice):
+    _registrar_con_cuit(client, f"maria8_sufijo_{caso}")
+    pedido = _pedido()
+    pedido["items"] = [dict(pedido["items"][0], sufijo="AA(MARCA)-"),
+                       dict(pedido["items"][0], sufijo=sufijo)]
+    r = client.post("/generate_maria", json=pedido)
+    assert r.status_code == 400, r.text
+    assert "Item 2" in r.text and dice in r.text
 
 
 def test_el_pedido_de_la_pantalla_sale_en_un_item(client):

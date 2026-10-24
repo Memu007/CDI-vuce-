@@ -65,6 +65,7 @@ fi
 echo "VERDE  sin sabotaje: $(grep -E 'passed' <<<"$base" | tail -1)"
 F=proyecto_maria/core/maria_generator.py
 T=tests/test_maria8_subitems_por_posicion.py
+M=proyecto_maria/main.py
 
 # 1. cada renglón vuelve a ser un ítem
 reemplazar $F '    return [ns for ns in juntos.values() if len(ns) > 1]' '    return []'
@@ -152,7 +153,7 @@ reemplazar $F '    kilos = [Decimal(f"{peso_valido(peso_de_la_linea(r), lugar[id
 caso "peso_sin_renglon" "FAILED $T::test_un_renglon_sin_peso_dice_su_numero_en_la_pantalla"
 
 # 22. kilos que quedarían negativos se generan igual
-reemplazar $F '            if min(cantidades_sub + estadisticas_sub) < 0:' '            if False:'
+reemplazar $F '            if min(cantidades_sub + estadisticas_sub) <= 0:' '            if False:'
 caso "negativos" "FAILED $T::test_kilos_que_al_restar_quedarian_negativos_no_se_generan"
 
 # 23. los avisos no dicen qué renglones van juntos
@@ -165,5 +166,69 @@ caso "sin_aviso_juntos" "FAILED $T::test_los_avisos_dicen_que_renglones_van_junt
 reemplazar $F '        if len(de_cada_uno) == 1 and "" not in de_cada_uno:' '        if False:'
 caso "sin_aviso_sufijo" "FAILED $T::test_los_avisos_dicen_si_todos_los_subitems_llevan_el_mismo_sufijo"
 
+# 25. dos renglones sin posición se juntan
+reemplazar $F '        if clave[0]:
+            juntos' '        if True:
+            juntos'
+caso "sin_posicion" "FAILED $T::test_los_renglones_sin_posicion_no_se_juntan"
+
+# 26. un renglón con cantidad 0 o negativa sale como sub-ítem
+reemplazar $F "        if _exacto(r.get('cantidad', 1)).quantize(Decimal(\"0.01\"), ROUND_HALF_UP) <= 0:" '        if False:'
+caso "cantidad_cero" "FAILED $T::test_un_renglon_sin_cantidad_no_es_un_subitem"
+
+# 27. un sub-ítem que al centésimo da 0,00 se genera
+reemplazar $F '            if min(cantidades_sub + estadisticas_sub) <= 0:' '            if min(cantidades_sub + estadisticas_sub) < 0:'
+caso "cero_al_centesimo" "FAILED $T::test_kilos_de_un_renglon_que_al_centesimo_dan_cero_no_se_generan"
+
+# 28. el unitario del ítem divide por la cantidad sin redondear
+reemplazar $F '            valor_unit = float(valor_total) / float(cantidad_dcl)' '            valor_unit = float(valor_total) / float(cantidad)'
+caso "unitario_sin_redondear" "FAILED $T::test_el_unitario_del_item_es_el_fob_sobre_la_cantidad_declarada"
+
+# 29. el error del peso de un ítem después de los juntos dice el número del TXT
+reemplazar $F '        peso_neto = peso_valido(peso_kg, lugar_en_el_pedido.get(id(item), idx))' '        peso_neto = peso_valido(peso_kg, idx)'
+caso "peso_numero_del_txt" "FAILED $T::test_el_peso_de_un_item_despues_de_los_juntos_dice_su_numero_en_la_pantalla"
+
+# 30. el error del sufijo que falta dice el número del TXT
+reemplazar $F '                        f"Item {lugar_en_el_pedido[id(renglon)]}: falta el sufijo de valor (CSBTSVL)."' '                        f"Item {idx}: falta el sufijo de valor (CSBTSVL)."'
+caso "sufijo_numero_del_txt" "FAILED $T::test_sin_ningun_sufijo_el_error_dice_el_numero_de_la_pantalla"
+
+# 31. no avisa que se limpió el sufijo de un renglón
+reemplazar $F '            if cambio:
+                avisos.append(
+                    f"Sufijo de valor del renglón' '            if False:
+                avisos.append(
+                    f"Sufijo de valor del renglón'
+caso "sin_aviso_limpieza" "FAILED $T::test_los_avisos_dicen_si_se_limpio_el_sufijo_de_un_renglon"
+
+# 32. el endpoint no valida el sufijo de un renglón
+reemplazar $M '                _sufijos.append((f"Item {_n}: ", it["sufijo"].strip()))' '                pass'
+caso "endpoint_sin_validar" "FAILED $T::test_el_sufijo_de_un_renglon_se_valida_como_los_otros[igual"
+
+# 33. el endpoint no mira el tipo del sufijo de un renglón
+reemplazar $M '            if isinstance(_it, dict) and _it.get("sufijo") is not None and not isinstance(_it.get("sufijo"), str):' '            if False:'
+caso "endpoint_sin_tipo" "FAILED $T::test_el_sufijo_de_un_renglon_se_valida_como_los_otros[no_texto"
+
+# 34. el FOB del sub-ítem redondea al par
+reemplazar $F '                fob_sub = _fob_de(renglon)' '                fob_sub = valor_de_la_linea(renglon).quantize(Decimal("0.01"))'
+caso "fob_al_par" "FAILED $T::test_el_fob_de_medio_centavo_sube_y_el_item_cierra"
+
+# 35. si empatan, el sobrante va al último
+reemplazar $F '    mayor = max(range(len(valores)), key=lambda i: (valores[i], -i))' '    mayor = max(range(len(valores)), key=lambda i: (valores[i], i))'
+caso "empate_al_ultimo" "FAILED $T::test_si_empatan_el_sobrante_va_al_primero"
+
+# 36. un renglón con total y sin unitario sale con unitario 0
+reemplazar $F '                            else float(valor_de_la_linea(renglon)) / float(renglon.get("cantidad", 1) or 1))' '                            else 0.0)'
+caso "total_sin_unitario" "FAILED $T::test_un_renglon_con_total_y_sin_unitario"
+
+# 37. declarada en kilos, la estadística sale de la cantidad y no de los kilos
+reemplazar $F '            if unidad_est == UNIDAD_KILOGRAMO:
+                estadisticas_sub' '            if unidad_est == UNIDAD_KILOGRAMO and unidad_codigo != UNIDAD_KILOGRAMO:
+                estadisticas_sub'
+caso "declarada_en_kilos" "FAILED $T::test_declarada_en_kilos_la_cantidad_y_los_kilos_son_de_cada_renglon"
+
+# 38. el error del estado dice siempre el renglón 1
+reemplazar $F '        clave = clave_de_posicion(item, n + 1, iva_por_defecto)' '        clave = clave_de_posicion(item, 1, iva_por_defecto)'
+caso "estado_renglon_fijo" "FAILED $T::test_el_estado_que_no_corresponde_en_el_tercer_renglon_dice_el_tres"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 24 sabotajes dan rojo por la razón esperada"
+echo "OK: los 38 sabotajes dan rojo por la razón esperada"
