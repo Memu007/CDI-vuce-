@@ -96,7 +96,7 @@ def test_el_vendedor_se_adivina_sin_pdfminer_ni_pdfplumber(_entorno, monkeypatch
         raise RuntimeError("pdfminer/pdfplumber no se usan con un PDF del usuario")
     monkeypatch.setattr(pdfminer.high_level, "extract_text", _prohibido)
     monkeypatch.setattr(pdfplumber, "open", _prohibido)
-    monkeypatch.setattr(main, "process_pdf", lambda *_: {"items": [{"descripcion": "x"}], "operacion": {}})
+    monkeypatch.setattr(main, "process_pdf", lambda *_: {"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "items": [{"descripcion": "x"}], "operacion": {}})
     r = _subir(_pdf_con_texto(["COMMERCIAL INVOICE", "VENDOR: ACME TRADING CO LTD", "Item 1"]))
     assert r.status_code == 200, r.text[:200]
     assert r.json()["operacion"].get("vendedor_nombre") == "ACME TRADING CO LTD", r.json()["operacion"]
@@ -107,7 +107,7 @@ def test_el_vendedor_se_adivina_sin_pdfminer_ni_pdfplumber(_entorno, monkeypatch
 def test_tiempo_de_lectura_en_cero_o_negativo_usa_el_de_siempre(_entorno, monkeypatch, valor):
     monkeypatch.setenv("PDF_READ_TIMEOUT_S", valor)
     monkeypatch.setattr(main, "process_pdf",
-                        lambda *_: {"items": [{"descripcion": "x"}], "operacion": {"vendedor_nombre": "P"}})
+                        lambda *_: {"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "items": [{"descripcion": "x"}], "operacion": {"vendedor_nombre": "P"}})
     r = _subir(PDF)
     assert r.status_code == 200, r.text[:200]
 
@@ -116,7 +116,7 @@ def test_tiempo_de_lectura_en_cero_o_negativo_usa_el_de_siempre(_entorno, monkey
 def test_tiempo_de_validacion_en_cero_o_negativo_usa_el_de_siempre(_entorno, monkeypatch, valor):
     monkeypatch.setenv("PDF_VALIDATE_TIMEOUT_S", valor)
     monkeypatch.setattr(main, "process_pdf",
-                        lambda *_: {"items": [{"descripcion": "x"}], "operacion": {"vendedor_nombre": "P"}})
+                        lambda *_: {"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "items": [{"descripcion": "x"}], "operacion": {"vendedor_nombre": "P"}})
     r = _subir(PDF)
     assert r.status_code == 200, r.text[:200]
 
@@ -124,7 +124,7 @@ def test_tiempo_de_validacion_en_cero_o_negativo_usa_el_de_siempre(_entorno, mon
 @pytest.mark.parametrize("valor", ["0", "-5"])
 def test_tiempo_del_vendedor_en_cero_o_negativo_usa_el_de_siempre(_entorno, monkeypatch, valor):
     monkeypatch.setenv("PDF_VENDOR_TIMEOUT_S", valor)
-    monkeypatch.setattr(main, "process_pdf", lambda *_: {"items": [{"descripcion": "x"}], "operacion": {}})
+    monkeypatch.setattr(main, "process_pdf", lambda *_: {"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "items": [{"descripcion": "x"}], "operacion": {}})
     r = _subir(_pdf_con_texto(["VENDOR: ACME TRADING CO LTD"]))
     assert r.status_code == 200, r.text[:200]
     assert r.json()["operacion"].get("vendedor_nombre") == "ACME TRADING CO LTD", r.json()["operacion"]

@@ -74,10 +74,11 @@ reemplazar $F "    if gemini_fallo:
     return []" "    return []"
 caso "pymupdf_no_avisa" "FAILED $T::test_gemini_falla_da_el_503_de_carga_manual[clave_invalida-pymupdf]"
 
-# 3. arreglo de más: sin productos también da 503
-reemplazar $F "    print(\"❌ Gemini Vision failed, returning empty\")
-    if gemini_fallo:" "    print(\"❌ Gemini Vision failed, returning empty\")
-    if True:"
+# 3. arreglo de más: sin productos también da 503.
+# DOC-1 conserva clasificación antes del retorno vacío; se sabotea ese retorno.
+reemplazar $F "                        print(f\"⚠️ {model_name} returned no valid items\")
+                        return {'documento': documento, 'operacion': operacion_data, 'items': []}" "                        print(f\"⚠️ {model_name} returned no valid items\")
+                        raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)"
 caso "sin_productos_503" "FAILED $T::test_gemini_responde_sin_productos_sigue_el_400[pymupdf]"
 
 # 4. la copia de producción vuelve a tragarse la falla al configurar Gemini
@@ -93,9 +94,9 @@ reemplazar $F "                    else:
 caso "respuesta_vacia" "FAILED $T::test_respuesta_vacia_de_gemini_da_el_503[texto_vacio-pdf_directo]"
 
 # 6. arreglo de más en la copia de producción: sin productos también da 503
-reemplazar $F "            if gemini_fallo:
-                raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)
-            return _fallback_image_extraction(data)" "            raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)"
+reemplazar $F "                        return {'documento': documento, 'operacion': operacion_data, 'items': []}
+                    else:" "                        raise LecturaAutomaticaNoDisponible(MENSAJE_LECTURA_NO_DISPONIBLE)
+                    else:"
 caso "directo_sin_productos_503" "FAILED $T::test_gemini_responde_sin_productos_sigue_el_400[pdf_directo]"
 
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi

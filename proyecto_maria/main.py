@@ -73,6 +73,8 @@ from proyecto_maria.core.excel_generator import create_maria_excel
 from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
+    DocumentoNoAdmitido,
+    validar_documento_importacion,
     LecturaAutomaticaNoDisponible,
     MENSAJE_LECTURA_NO_DISPONIBLE,
     lectura_automatica_disponible,
@@ -3371,12 +3373,233 @@ def _respuesta_excel_demasiado_largo(e: Exception) -> JSONResponse:
     )
 
 
-def _leer_excel_ruta(ruta: str, engine: str):
+def _xlsx_solo_primera_hoja(ruta, max_filas=None) -> tuple:
+    """El .xlsx con sólo su primera hoja de cálculo. openpyxl, al abrir un
+    libro, recorre entera cada hoja que no declara su medida (<dimension>), y
+    un libro armado con muchas hojas así tardaba minutos aunque se lea sólo la
+    primera (D26 a, EXCEL-2). Las demás hojas se miran aparte, con su propio
+    presupuesto (_otras_hojas_con_datos).
+
+    Devuelve (bytes del libro, celdas combinadas de la primera hoja como
+    [(fila1, col1, fila2, col2)]): pandas sólo ve el valor en la primera celda
+    de una combinada (D18, EXCEL-2)."""
+    import io as _io
+    import re as _re
+    import math
+    import zipfile
+    from xml.etree import ElementTree as ET
+    from proyecto_maria.security.file_security import _sin_dtd, partes_del_xlsx, sheets_del_libro
+    ns_main = "http://schemas.openxmlformats.org/spreadsheetml/2006/main"
+    def _col(letras):
+        n = 0
+        for letra in letras:
+            n = n * 26 + ord(letra) - 64
+        return n
+
+    with zipfile.ZipFile(_io.BytesIO(ruta) if isinstance(ruta, (bytes, bytearray)) else ruta) as z:
+        # Sin DTD: también se lee así el historial, que no pasa por la
+        # validación de la subida (revisión de la devolución de EXCEL-2).
+        _sin_dtd(z)
+        todas = sheets_del_libro(z)
+        hojas = [(nombre, ruta_hoja) for nombre, _rid, ruta_hoja, grafico in todas if not grafico]
+        combinadas = []
+        if hojas and hojas[0][1] in z.namelist():
+            xml = z.read(hojas[0][1])
+            # Expat lee atributos XML reales (comillas, espacios y entidades),
+            # sin construir el árbol de las celdas. También evita abrir con
+            # pandas libros que ya exceden el límite vigente de filas.
+            from xml.parsers import expat
+            filas, fila_con_datos, en_valor, valor = 0, False, False, []
+            tipo_celda = None
+            def inicio(nombre, atributos):
+                nonlocal fila_con_datos, en_valor, valor, tipo_celda
+                if not nombre.startswith(ns_main + "}"):
+                    return
+                nombre = nombre.rsplit("}", 1)[-1]
+                if nombre == "row":
+                    fila_con_datos = False
+                elif nombre == "c":
+                    tipo_celda = atributos.get("t")
+                elif nombre == "v":
+                    en_valor = tipo_celda in (None, "n", "b")
+                    valor = []
+                elif nombre == "mergeCell" and len(combinadas) < 10_000:
+                    m = _re.fullmatch(r"([A-Za-z]+)([0-9]+):([A-Za-z]+)([0-9]+)", atributos.get("ref", ""))
+                    if m:
+                        combinadas.append((int(m[2]), _col(m[1].upper()), int(m[4]), _col(m[3].upper())))
+            def texto(datos):
+                if en_valor:
+                    valor.append(datos)
+            def fin(nombre):
+                nonlocal filas, fila_con_datos, en_valor
+                if not nombre.startswith(ns_main + "}"):
+                    return
+                nombre = nombre.rsplit("}", 1)[-1]
+                if nombre == "v":
+                    if en_valor:
+                        try:
+                            fila_con_datos |= not math.isnan(float("".join(valor)))
+                        except ValueError:
+                            pass
+                    en_valor = False
+                elif nombre == "row" and fila_con_datos:
+                    filas += 1
+                    # Como máximo se descartan 31 filas al buscar el encabezado.
+                    # Sólo cuentan filas con valores numéricos reales; las
+                    # vacías, estilos y sharedStrings no se adivinan acá.
+                    if max_filas is not None and filas > max_filas + 31:
+                        raise HTTPException(400, f"La planilla supera el máximo de {max_filas} filas con datos. "
+                                                 "Dejá sólo los productos de la factura.")
+            parser = expat.ParserCreate(namespace_separator="}")
+            parser.StartElementHandler, parser.CharacterDataHandler, parser.EndElementHandler = inicio, texto, fin
+            parser.Parse(xml, True)
+        # Se queda sólo la primera hoja de cálculo, por su r:id: openpyxl lee
+        # entera una hoja de gráfico aun en read_only, y otra hoja con el
+        # mismo nombre que la primera quedaba (revisión de la devolución).
+        rid_primera = next((rid for _n, rid, _r, grafico in todas if not grafico), None)
+        if len(todas) <= 1:
+            if isinstance(ruta, (bytes, bytearray)):
+                return bytes(ruta), combinadas
+            with open(ruta, "rb") as f:
+                return f.read(), combinadas
+        afuera = {ruta_hoja for _n, rid, ruta_hoja, _g in todas if rid != rid_primera}
+        ET.register_namespace("", ns_main)
+        ET.register_namespace("r", "http://schemas.openxmlformats.org/officeDocument/2006/relationships")
+        parte_libro = partes_del_xlsx(z)[0]
+        libro = ET.fromstring(z.read(parte_libro))
+        ns_rel = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
+        sheets = libro.find(f"{{{ns_main}}}sheets")
+        for h in list(sheets):
+            if h.get(f"{ns_rel}id") != rid_primera:
+                sheets.remove(h)
+        # Los nombres definidos pueden apuntar a hojas que ya no están.
+        definidos = libro.find(f"{{{ns_main}}}definedNames")
+        if definidos is not None:
+            libro.remove(definidos)
+        salida = _io.BytesIO()
+        with zipfile.ZipFile(salida, "w", zipfile.ZIP_DEFLATED) as nuevo:
+            for info in z.infolist():
+                if info.filename in afuera:
+                    continue
+                if info.filename == parte_libro:
+                    nuevo.writestr(info, ET.tostring(libro, xml_declaration=True, encoding="UTF-8"))
+                else:
+                    nuevo.writestr(info, z.read(info.filename))
+        return salida.getvalue(), combinadas
+
+
+# Las columnas donde el texto de una combinada vale para todas sus filas. En
+# cantidad, valor y peso no se copia nada, sea número o texto («5 UN», «USD
+# 100»): duplicaba el FOB (devolución de EXCEL-2).
+_COMBINADAS_SE_COPIAN = {"descripcion", "origen", "pieza"}
+
+
+def _rellenar_combinadas(df, combinadas, mapeo=None):
+    """El texto de una celda combinada vale para todas sus filas, sólo en su
+    propia columna: «China» combinada en C4:C5 es el origen de las dos filas;
+    una descripción combinada hacia el costado no se copia a otra columna
+    (D18, EXCEL-2). Sólo en las columnas de descripción, origen y NCM
+    (detectadas o del mapeo guardado del cliente), y sin copiar números puros.
+    Se llama después de buscar el encabezado: su fila y las de arriba ya no
+    están en df, así que un encabezado combinado no se copia a los datos. El
+    índice de df es la fila de la planilla menos 2.
+
+    El trabajo es proporcional a las filas de la tabla, no al tamaño de las
+    combinadas: cada una se recorta a las filas que hay, y en una columna no
+    se pisan (Excel no deja que se superpongan; un libro armado con
+    C2:C1048576 repetida trababa la lectura; devolución de EXCEL-2)."""
+    import re as _re
+    if df.empty or not combinadas:
+        return df
+    columnas = list(df.columns)
+    detectados = dict(_detect_item_columns(columnas))
+    mapeados = dict(mapeo or {})
+    # Una columna se rellena sólo si lo que se sabe de ella es texto: si se
+    # detecta como cantidad, valor o peso no se rellena aunque el mapeo diga
+    # otra cosa (con dos columnas para descripción en el mapeo, «Quantity» se
+    # usaba como cantidad y se rellenaba; revisión de la devolución).
+    campos = {}
+    for col in columnas:
+        lo_que_es = {detectados.get(col), mapeados.get(col)} - {None}
+        if lo_que_es and lo_que_es <= _COMBINADAS_SE_COPIAN:
+            campos[col] = next(iter(lo_que_es))
+    primera, ultima = int(df.index.min()) + 2, int(df.index.max()) + 2
+    hasta_donde = {}
+    for f1, c1, f2, _c2 in sorted(set(combinadas)):
+        if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < 2:
+            continue
+        col = columnas[c1 - 1]
+        if campos.get(col) not in _COMBINADAS_SE_COPIAN or f1 <= hasta_donde.get(c1, 0):
+            continue
+        hasta_donde[c1] = f2
+        ancla = f1 - 2
+        if ancla not in df.index or f1 >= ultima:
+            continue
+        valor = df.at[ancla, col]
+        if not isinstance(valor, str) or not valor.strip() or _re.fullmatch(r"[\d\s.,+\-]+", valor.strip()):
+            continue
+        desde, hasta = max(f1 + 1, primera) - 2, min(f2, ultima) - 2
+        if desde <= hasta:
+            filas = df.index[(df.index >= desde) & (df.index <= hasta)]
+            df.loc[filas, col] = valor
+    return df
+
+
+def _con_encabezado(df, conocidas=()):
+    """Si el encabezado no está en la fila 1 (logo, título o datos del
+    vendedor arriba), lo busca en las primeras 30 filas: la primera donde se
+    reconocen al menos 3 columnas. Las columnas del mapeo guardado del cliente
+    cuentan como reconocidas: con ellas en la fila 1 no se busca (un pie con
+    «Peso Neto | Valor» no pasa a ser el encabezado). El índice sigue siendo la
+    fila de la planilla menos 2, así los avisos nombran la fila correcta
+    (D18, EXCEL-2)."""
+    conocidas = set(conocidas or ())
+    actuales = list(df.columns)
+    if len(_detect_item_columns(actuales)) + sum(1 for c in actuales if c in conocidas) >= 3:
+        return df
+    for k in range(min(30, len(df))):
+        valores = list(df.iloc[k].values)
+        # Un texto de más de 200 caracteres no es un encabezado: lo descarta
+        # _detect_item_columns, sin normalizarlo (revisión de EXCEL-2).
+        nombres = [_texto_de_celda(v) for v in valores]
+        if len(_detect_item_columns(nombres)) < 3:
+            continue
+        vistos: dict = {}
+        columnas = []
+        for j, nombre in enumerate(nombres):
+            nombre = nombre or f"Unnamed: {j}"
+            if nombre in vistos:
+                vistos[nombre] += 1
+                nombre = f"{nombre}.{vistos[nombre]}"
+            else:
+                vistos[nombre] = 0
+            columnas.append(nombre)
+        nuevo = df.iloc[k + 1:].copy()
+        nuevo.columns = columnas
+        return nuevo
+    return df
+
+
+def _leer_excel_ruta(ruta: str, engine: str, conocidas=()):
+    # conocidas: el mapeo guardado del cliente, como pares (columna, campo) o
+    # sólo los nombres de las columnas.
     # dtype=object: cada celda como viene. Sin eso pandas convierte el texto
     # «1.500» en 1,5 y la NCM 84713000 en 84713000.0 (EXCEL-1).
     # Las filas vacías se sacan acá, en el hilo de lectura: una celda suelta en
     # la fila 1.048.576 no obliga a recorrer un millón de filas (EXCEL-1).
-    return pd.read_excel(ruta, engine=engine, dtype=object).dropna(how="all")
+    origen, combinadas = ruta, []
+    if engine == "openpyxl":
+        import io as _io
+        contenido, combinadas = _xlsx_solo_primera_hoja(ruta, max_filas=_MAX_FILAS_EXCEL)
+        origen = _io.BytesIO(contenido)
+    mapeo = dict(c for c in conocidas if isinstance(c, tuple) and len(c) == 2)
+    nombres = set(mapeo) or {c for c in conocidas if isinstance(c, str)}
+    df = _con_encabezado(pd.read_excel(origen, engine=engine, dtype=object), nombres)
+    # Las filas vacías se sacan según lo que había antes de rellenar: una
+    # fila vacía dentro de una combinada no es una «fila sin leer»
+    # (devolución de EXCEL-2).
+    vacias = df.isna().all(axis=1)
+    return _rellenar_combinadas(df, combinadas, mapeo)[~vacias]
 
 
 # Mirar las otras hojas es sólo un aviso, y tiene su propio presupuesto que
@@ -3420,27 +3643,12 @@ class _LecturaMedida:
 
 def _hojas_del_xlsx(z) -> list:
     """[(nombre, ruta dentro del zip)] de las hojas de cálculo, en el orden
-    del libro. Las hojas de gráfico no cuentan: pandas lee la primera hoja de
-    cálculo, aunque haya un gráfico antes."""
-    import posixpath
-    from xml.etree import ElementTree as ET
-    ns_main = "{http://schemas.openxmlformats.org/spreadsheetml/2006/main}"
-    ns_rel = "{http://schemas.openxmlformats.org/officeDocument/2006/relationships}"
-    for parte in ("xl/workbook.xml", "xl/_rels/workbook.xml.rels"):
-        if z.getinfo(parte).file_size > 2**20:
-            raise _SeAcaboElPresupuesto("índice del libro")
-    destinos = {}
-    for r in ET.fromstring(z.read("xl/_rels/workbook.xml.rels")):
-        if not (r.get("Type") or "").endswith("/worksheet"):
-            continue
-        destino = r.get("Target") or ""
-        destino = destino.lstrip("/") if destino.startswith("/") else posixpath.normpath(posixpath.join("xl", destino))
-        destinos[r.get("Id")] = destino
-    hojas = []
-    for h in ET.fromstring(z.read("xl/workbook.xml")).iter(f"{ns_main}sheet"):
-        if h.get(f"{ns_rel}id") in destinos:
-            hojas.append((h.get("name") or "", destinos[h.get(f"{ns_rel}id")]))
-    return hojas
+    del libro (la misma lectura que la validación, file_security)."""
+    from proyecto_maria.security.file_security import ExcelDemasiadoGrande, hojas_del_xlsx
+    try:
+        return hojas_del_xlsx(z)
+    except ExcelDemasiadoGrande:
+        raise _SeAcaboElPresupuesto("índice del libro")
 
 
 def _textos_compartidos(z, presupuesto: dict) -> list:
@@ -3570,11 +3778,51 @@ def _leer_tabla(content: bytes, filename: str):
     """CSV o Excel a un DataFrame de texto (para correr en otro hilo)."""
     import io as _io
     if filename.endswith(".csv"):
+        # UTF-8 (con o sin BOM) o, si no, Windows-1252/latin-1: el CSV que
+        # guarda Excel en castellano. El separador es el que más aparece en el
+        # encabezado: el «;» de Excel en castellano antes se leía como una sola
+        # columna (EXCEL-2).
+        # Si no es UTF-8 limpio, gana la que explica más caracteres: las
+        # secuencias UTF-8 válidas contra los bytes sueltos. Un UTF-8 con algún
+        # byte suelto sigue siendo UTF-8, y un cp1252 con un par que parece
+        # UTF-8 («é®») sigue siendo cp1252 (revisión y devolución de EXCEL-2).
+        # Si hay de las dos, se avisa: alguna tilde puede haberse perdido.
+        import re as _re
+        crudo = content[3:] if content.startswith(b"\xef\xbb\xbf") else content
+        aviso = None
         try:
-            return pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False)
-        except Exception:
-            return pd.read_csv(_io.BytesIO(content), dtype=str, keep_default_na=False, sep=";")
-    if filename.endswith((".xlsx", ".xls")):
+            texto = crudo.decode("utf-8")
+        except UnicodeDecodeError:
+            secuencias = _re.findall(rb"[\xc2-\xdf][\x80-\xbf]|[\xe0-\xef][\x80-\xbf]{2}|[\xf0-\xf4][\x80-\xbf]{3}", crudo)
+            # Una secuencia UTF-8 válida cuenta sólo si da una letra que se usa
+            # en castellano (tildes, eñe, «¿», comillas tipográficas, «€»):
+            # «É» y un espacio duro en cp1252 arman «ɠ», que no es UTF-8 de
+            # verdad (revisión de la devolución de EXCEL-2).
+            def _plausible(seq):
+                cp = ord(seq.decode("utf-8"))
+                return 0xA0 <= cp <= 0x17F or 0x2010 <= cp <= 0x203A or cp in (0x20AC, 0x2122)
+            validas = [q for q in secuencias if _plausible(q)]
+            sueltos = sum(1 for b in crudo if b >= 0x80) - sum(len(v) for v in validas)
+            if validas and len(validas) >= sueltos:
+                texto = crudo.decode("utf-8", errors="replace")
+            else:
+                texto = crudo.decode("cp1252", errors="replace")
+            if validas and sueltos:
+                aviso = ("El archivo mezcla codificaciones (UTF-8 y Windows-1252): revisá las tildes "
+                         "y las eñes de lo importado.")
+        # Lo que va entre comillas no cuenta para elegir el separador.
+        encabezado = _re.sub(r'"[^"]*"', "", texto.split("\n", 1)[0])
+        separador = max((",", ";", "\t"), key=encabezado.count)
+        df = pd.read_csv(_io.StringIO(texto), dtype=str, keep_default_na=False, sep=separador)
+        if aviso:
+            df.attrs["aviso_codificacion"] = aviso
+        return df
+    if filename.endswith(".xlsx"):
+        # Sólo la primera hoja, que es la que se lee: un libro armado con
+        # muchas hojas sin <dimension> no traba (D26 a, EXCEL-2).
+        contenido, _ = _xlsx_solo_primera_hoja(content)
+        return pd.read_excel(_io.BytesIO(contenido), dtype=str, keep_default_na=False)
+    if filename.endswith(".xls"):
         return pd.read_excel(_io.BytesIO(content), dtype=str, keep_default_na=False)
     raise HTTPException(status_code=400, detail="Formato no soportado. Usá .csv, .xlsx o .xls")
 
@@ -3737,6 +3985,8 @@ async def upload_pdf_public(
         logging.info("Procesando PDF: %s (%d bytes)", safe_name, len(contents))
         try:
             result = await _leer_pdf_aparte(process_pdf, contents)
+        except DocumentoNoAdmitido as e:
+            return JSONResponse(status_code=422, content={"detail": str(e), "code": "documento_no_admitido"})
         except LecturaAutomaticaNoDisponible as e:
             return _respuesta_sin_lector(str(e))
         except LecturaPdfDemasiadoLarga as e:
@@ -3745,18 +3995,13 @@ async def upload_pdf_public(
                 content={"detail": str(e), "code": "lectura_pdf_demasiado_larga"},
             )
         
-        # Manejar tanto formato nuevo (dict) como viejo (lista)
-        if isinstance(result, dict) and 'items' in result:
-            # Nuevo formato con operacion + items
-            items_data = result.get('items', [])
-            operacion_data = result.get('operacion', {})
-        elif isinstance(result, list):
-            # Formato viejo: solo lista de items
-            items_data = result
-            operacion_data = {}
-        else:
-            items_data = []
-            operacion_data = {}
+        try:
+            documento = validar_documento_importacion(result)
+        except DocumentoNoAdmitido as e:
+            return JSONResponse(status_code=422, content={"detail": str(e), "code": "documento_no_admitido"})
+
+        items_data = result.get('items', [])
+        operacion_data = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
 
         # Fallback heurístico: si Vision no detectó vendedor (path no-LLM o
         # respuesta incompleta), intentar extraerlo del texto crudo del PDF.
@@ -3787,6 +4032,7 @@ async def upload_pdf_public(
 
         return {
             "message": "PDF procesado exitosamente",
+            "documento": documento,
             "filename": file.filename,
             "operacion": operacion_data,  # Datos de la operación extraídos
             "items": items_data,  # Items extraídos
@@ -3918,6 +4164,11 @@ def _supuestos_maria(request: MariaRequest, items: list, gastos_fob) -> list:
     )
 
 
+def _rechazar_exportacion_en_importacion(request: MariaRequest) -> None:
+    if (request.tipo_destinacion or "").strip().upper().startswith("EC"):
+        raise HTTPException(status_code=400, detail="Una destinación de exportación (EC*) no puede generar un TXT de importación.")
+
+
 @app.post("/generate_maria/avisos")
 async def avisos_maria_endpoint(
     request: MariaRequest,
@@ -3925,6 +4176,7 @@ async def avisos_maria_endpoint(
 ):
     """Los avisos de `/generate_maria`, antes de generar (MARIA-3): la
     pantalla los muestra junto al botón. No genera ni guarda nada."""
+    _rechazar_exportacion_en_importacion(request)
     items = _items_con_procedencia(request)
     try:
         gastos = gastos_fob_para_el_txt(request.incoterm, request.gastos_fob, request.gastos_anteriores_fob)
@@ -3958,6 +4210,7 @@ async def generate_maria_endpoint(
     Recibe los items con: ncm/pieza, cantidad, valor_unitario, peso_kg, origen
     Devuelve: archivo TXT descargable
     """
+    _rechazar_exportacion_en_importacion(request)
     try:
         from proyecto_maria.core.controles_maria import (
             CAMPOS_DE_TEXTO, CAMPOS_DE_TEXTO_DEL_ITEM, controles_antes_de_generar, limpiar_texto,
@@ -3978,7 +4231,21 @@ async def generate_maria_endpoint(
         # NCM en el nomenclador, moneda, incoterm, CUIT del importador y
         # montos de la cabecera: lo que impide un TXT válido no deja generar
         # (MARIA-1b). Se juntan con los demás errores para mostrarlos todos.
+        # Productos que no son productos (una lista, un texto, subítems que no
+        # son una lista de subítems): 400, no 500 (revisión de EXCEL-2).
+        for _n, _it in enumerate(request.items or [], start=1):
+            _subs = _it.get("subitems") if isinstance(_it, dict) else None
+            if not isinstance(_it, dict):
+                raise HTTPException(status_code=400, detail={"errors": [
+                    f"Item {_n}: no tiene la forma de un producto."]})
+            if _subs is not None and not (isinstance(_subs, list) and all(isinstance(x, dict) for x in _subs)):
+                raise HTTPException(status_code=400, detail=f"Item {_n}: los sub-ítems no tienen el formato esperado.")
         errores_1b, avisos_1b = controles_antes_de_generar(request.items, request.model_dump())
+        # Un monto que no es un número (lista, entero enorme) frena acá: lo que
+        # sigue hace cuentas con él y daba 500 (EXCEL-2, de paso).
+        from proyecto_maria.core.controles_maria import montos_fuera_de_rango
+        if montos_fuera_de_rango(request.items, {}):
+            raise HTTPException(status_code=400, detail={"errors": errores_1b})
 
         # Validar items (validación mínima)
         valid, errors = validate_items_for_maria(request.items)
@@ -4063,6 +4330,15 @@ async def generate_maria_endpoint(
                 effective_cuit_agr = str(user["cuit"]).strip()
         except Exception:
             pass
+        # El CUIT del despachante, sólo 11 dígitos 0-9 (sin guiones ni
+        # espacios), también el que viene del perfil (EXCEL-2, de paso).
+        if effective_cuit_agr:
+            effective_cuit_agr = "".join(str(effective_cuit_agr).replace("-", "").split())
+            import re as _re_cuit  # la función importa «re» más abajo
+            if not _re_cuit.fullmatch(r"[0-9]{11}", effective_cuit_agr):
+                raise HTTPException(status_code=400, detail={"errors": [
+                    f"El CUIT del despachante «{effective_cuit_agr}» tiene que tener 11 dígitos (0-9). "
+                    "Corregilo en la operación o en tu perfil."]})
 
         # Sin número de factura, el de la operación: el mismo en el TXT y en
         # el nombre del archivo.
@@ -4189,11 +4465,12 @@ async def generate_maria_export_endpoint(
         # Validar items. NaN, infinito o montos que desbordan no llegan al TXT
         # (revisión de la devolución de MARIA-1b).
         from proyecto_maria.core.controles_maria import montos_fuera_de_rango
-        valid, errors = validate_items_for_export(request.items)
+        # Primero los montos: con uno que no es un número (lista, entero
+        # enorme) la validación de abajo daba 500 (EXCEL-2, de paso).
         _montos = montos_fuera_de_rango(request.items, {"flete": request.flete, "seguro": request.seguro})
         if _montos:
-            errors = list(dict.fromkeys([*errors, *_montos]))
-            valid = False
+            raise HTTPException(status_code=400, detail={"errors": _montos})
+        valid, errors = validate_items_for_export(request.items)
         
         # Validar país de destino
         if request.comprador_pais and not pais_reconocido(request.comprador_pais):
@@ -4357,14 +4634,16 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
     )
 
     # Buscar columnas que coincidan con el mapeo. Sin las obligatorias, este
-    # mapeo no sirve y se prueba otro. El peso no es obligatorio (EXCEL-1).
+    # mapeo no sirve y se prueba otro. El peso no es obligatorio (EXCEL-1), ni
+    # el origen: sin esa columna los productos entran con el origen vacío y
+    # la subida lo avisa (D18, EXCEL-2).
     pieza_col = find_column(df.columns, mapping['pieza'])
     desc_col = find_column(df.columns, mapping['descripcion'])
     origen_col = find_column(df.columns, mapping['origen'])
     peso_col = find_column(df.columns, mapping['peso_unitario'])
     cant_col = find_column(df.columns, mapping['cantidad'])
     valor_col = find_column(df.columns, mapping['valor_unitario'])
-    if not all([pieza_col, desc_col, origen_col, cant_col, valor_col]):
+    if not all([pieza_col, desc_col, cant_col, valor_col]):
         return items
 
     # Separador decimal de la planilla, mirando los números escritos como
@@ -4405,10 +4684,11 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
 
             # Lo que falta o no se puede leer queda vacío (0 o ""), nunca
             # inventado; el semáforo de la revisión lo marca (MARIA-1a, EXCEL-1).
-            candidatos.append((_ + 2, bool(pieza or _texto_de_celda(row[origen_col])), Item(
+            celda_origen = row[origen_col] if origen_col else None
+            candidatos.append((_ + 2, bool(pieza or _texto_de_celda(celda_origen)), Item(
                 pieza=pieza,
                 descripcion=descripcion,
-                origen=_origen_desde_factura(row[origen_col]) or "XX",
+                origen=_origen_desde_factura(celda_origen) or "XX",
                 peso_unitario=_numero(peso_col),
                 cantidad=cantidad,
                 valor_unitario=valor_unitario,
@@ -5072,6 +5352,9 @@ def _detect_item_columns(headers: list) -> dict:
     # busca por el nombre entero y nunca se elige una por el orden.
     norm_to_orig: dict = {}
     sin_parentesis: dict = {}
+    # Un encabezado es corto: uno de megas no se normaliza (corre en el hilo
+    # del servidor y trababa a todos; revisión de EXCEL-2).
+    headers = [h for h in headers if len(str(h or "")) <= 200]
     for h in headers:
         norm_to_orig.setdefault(_normalize_header(str(h or "")), h)
         # «Peso (neto)» se busca también como «pesoneto».
@@ -5103,11 +5386,33 @@ def _detect_item_columns(headers: list) -> dict:
 _PESO_DE_UNA_UNIDAD = {"peso", "weight", "pesokg", "pesokgs", "pesoenkg", "kg", "kgs"}
 
 
+def _dice_de_una_unidad(normal: str) -> bool:
+    """«unitario», «unit», «per unit», «por unidad», «kg/u», «c/u» o «Peso U.»
+    (MARIA-5d)."""
+    sin_parentesis = re.sub(r"[()]", "", normal)
+    return ("unit" in normal or "unidad" in normal or sin_parentesis.endswith("/u")
+            or sin_parentesis in ("pesou", "pesobrutou"))
+
+
+def _bruto_de_una_unidad(normal: str) -> bool:
+    """El bruto no tiene contra qué compararse (va último): es de una unidad
+    sólo si lo dice sin dudas («unitario», «per unit», «por unidad», «unit.»,
+    «unid.», «kg/u», «c/u»). «Total», «unidades» o «units» lo dejan de la
+    línea (revisión de MARIA-5d)."""
+    sin_parentesis = re.sub(r"[()]", "", normal)
+    if "total" in normal or "line" in normal or "unidades" in normal or "units" in normal:
+        return False
+    # «unit (kg)» conserva la indicación de una unidad; también «Unit gross weight».
+    return bool(re.search(r"unitari|perunit|porunidad|xunidad|unitweight|unitgrossweight|"
+                          r"(unit|unid|/u|brutou)(kgs?)?$", sin_parentesis))
+
+
 def _clase_de_peso(normal: str) -> str:
-    # El bruto es bruto aunque diga «unitario» (segunda devolución de MARIA-5).
+    # El bruto es bruto aunque diga «unitario» (segunda devolución de MARIA-5):
+    # de una unidad si lo dice, si no de la línea (MARIA-5d).
     if "bruto" in normal or "gross" in normal:
-        return "bruto"
-    if "unit" in normal or "unidad" in normal:
+        return "bruto_unidad" if _bruto_de_una_unidad(normal) else "bruto"
+    if _dice_de_una_unidad(normal):
         return "unidad"
     if "neto" in normal or "net" in normal:
         return "neto"
@@ -5128,7 +5433,7 @@ def _clase_de_columna(columna, rename: dict) -> str:
 # Con varias columnas de peso manda el neto de la línea, después el total de
 # la línea, después el de una unidad y al final el bruto (devolución de
 # MARIA-5: el TXT pide el peso neto de la línea).
-_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "dudosa": 3, "bruto": 4}
+_RANGO_DE_PESO = {"neto": 0, "linea": 1, "unidad": 2, "dudosa": 3, "bruto": 4, "bruto_unidad": 4}
 
 
 def _es_nombre_de_peso(normal: str) -> bool:
@@ -5208,7 +5513,10 @@ def _peso_por_unidad(df: pd.DataFrame, pesos: list, columna_de: dict | None = No
     if clase == "dudosa":
         avisos.append(f"Peso: la columna «{origen}» no dice si es el peso de una unidad o el de toda la "
                       "línea; se usó como de una unidad. Revisala.")
-    if clase in ("unidad", "dudosa"):
+    if clase == "bruto_unidad":
+        avisos.append(f"Peso: el TXT pide peso neto y la planilla trae sólo «{origen}» (bruto de una "
+                      "unidad); se usó el bruto. Corregilo si tenés el neto.")
+    if clase in ("unidad", "dudosa", "bruto_unidad"):
         # La columna queda como vino: la lectura de la planilla la interpreta
         # con el mismo separador decimal que la cantidad y el precio.
         return avisos
@@ -5260,6 +5568,12 @@ def _rango_de_alias(encabezado, canon: str):
     return None
 
 
+_NOMBRE_DEL_CAMPO = {
+    "pieza": "NCM", "descripcion": "descripción", "origen": "país de origen",
+    "peso_unitario": "peso", "cantidad": "cantidad", "valor_unitario": "precio unitario",
+}
+
+
 def _mapeo_efectivo(guardado: dict, detectado: dict, columnas: list) -> tuple:
     """({columna: campo}, avisos) para leer este archivo, un campo por columna.
 
@@ -5293,6 +5607,14 @@ def _mapeo_efectivo(guardado: dict, detectado: dict, columnas: list) -> tuple:
             rg, rd = _rango_de_alias(g, canon), _rango_de_alias(d, canon)
             if rg is not None and rd is not None and rd < rg:
                 elegido = d
+            # Que no sea una elección en silencio: el aviso nombra la columna
+            # que se usó y la que no (EXCEL-2).
+            otra = d if elegido == g else g
+            avisos.append(
+                f"Para «{_NOMBRE_DEL_CAMPO.get(canon, canon)}» se usó la columna «{elegido}» "
+                + ("del catálogo del cliente" if elegido == g else "del archivo")
+                + f", no «{otra}». Revisalo en la revisión o en el catálogo."
+            )
         if elegido and elegido not in efectivo:
             efectivo[elegido] = canon
     return efectivo, avisos
@@ -6924,6 +7246,11 @@ async def upload_excel_v2(
     max_upload_bytes = _get_max_upload_bytes()
     contents = await validate_file_upload(file, 'excel', max_size=max_upload_bytes)
 
+    # Es una opción de API: omitida conserva True, no un checkbox desmarcado
+    # (FastAPI >= 0.147 interpreta los bool Form ausentes como False).
+    if "use_mapping" not in await request.form():
+        use_mapping = True
+
     mapping: dict = {}
     if cliente_id and use_mapping:
         try:
@@ -6943,7 +7270,7 @@ async def upload_excel_v2(
         engine = "openpyxl" if temp_filename.lower().endswith(".xlsx") else "xlrd"
         # En otro hilo y con tiempo máximo: no frena al resto (EXCEL-1).
         df = await _leer_pdf_aparte(
-            _leer_excel_ruta, temp_filename, engine,
+            _leer_excel_ruta, temp_filename, engine, tuple((mapping or {}).items()),
             limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
         )
 
@@ -7006,6 +7333,11 @@ async def upload_excel_v2(
             raise HTTPException(
                 status_code=400,
                 detail="No se pudieron extraer items. Verificá el archivo o el mapeo de columnas.",
+            )
+        if not find_column(df.columns, ["origen", "Origen", "pais", "País", "country", "Country"]):
+            avisos_mapeo.append(
+                "El Excel no tiene una columna de país de origen: los productos entran "
+                "sin origen. Completalo en la revisión."
             )
 
         # Persistir/mergear columnas detectadas en el cliente (Fase 0 Plan 04)
@@ -8027,12 +8359,15 @@ async def import_ncm_historial(
         logging.exception("import_ncm_historial save failed")
         raise HTTPException(status_code=500, detail=f"No se pudo guardar: {str(exc)[:120]}")
 
-    return {
+    respuesta = {
         "success": True,
         "importados": importados,
         "duplicados": duplicados,
         "errores": errores,
     }
+    if df.attrs.get("aviso_codificacion"):
+        respuesta["aviso"] = df.attrs["aviso_codificacion"]
+    return respuesta
 
 @app.get("/auth/me")
 async def get_auth_me(authorization: str = Header(None), db: AsyncSession = Depends(get_db)):
