@@ -11,7 +11,7 @@ Sólo PM. El método y sus porqués están en `docs/pm/ONBOARDING-PM.md`
 ## Canales
 
 Con dos Devs hay dos canales, y cada Dev usa sólo el suyo. A la Dev 1 la
-revisa la PM principal; a la Dev 2, la PM visual. La PM visual devuelve el veredicto también en `ENTRE-PMS.md`:
+revisa la PM principal; a la Dev 2 también, mientras no haya PM visual (`NOW.md`, «Quién hace qué»). Si hay PM visual, revisa a la Dev 2 y devuelve el veredicto también en `ENTRE-PMS.md`:
 
 | | PM escribe | la Dev contesta | rama de la Dev |
 |---|---|---|---|
@@ -59,6 +59,9 @@ Mirá el diff fuera de `docs/pm` vos misma: `git diff <base> <SHA> --stat`.
 - Arriba del canal de esa Dev (`PARA-DEV.md` o `PARA-DEV-2.md`): aceptada,
   rechazada o con devolución, sobre qué SHA, y las respuestas a cada D con
   su número.
+- Una devolución nombra la **causa** y pide un caso de la familia, no sólo el
+  ejemplo; al aceptar la vuelta, probá un ejemplo distinto del que diste
+  («Devolución por la causa» en `ONBOARDING-PM.md`).
 - Lo que se le suma a la siguiente tarea queda escrito antes de activarla.
 - `NOW.md` y `DECISIONS.md` si corresponde.
 - Si la aceptás, integrá recién ahí la rama de esa Dev con `merge`.
@@ -67,7 +70,7 @@ Mirá el diff fuera de `docs/pm` vos misma: `git diff <base> <SHA> --stat`.
 - Commits propios sólo en `docs/pm/` y `.claude/`. Push a la rama de PM
   (`claude/practical-shannon-szpwkn`); cada Dev la trae. Si el push se
   rechaza porque la otra PM empujó, `fetch` + `merge` y de nuevo.
-- **Despertá a la Dev ya:** `fire_trigger` de su rutina apenas está subido
+- **Despertá a la Dev ya:** `send_message` a su sesión (`priority` `next`) apenas está subido
   el veredicto, sin esperar su hora.
 
 ## 5. Emi

@@ -107,3 +107,14 @@ casos ni modificarpytest.ini. El nuevo producto obliga a repetir la puerta;
 no se trata de repetir hasta verde el mismoSHA. Si el caso falla también
 sin cobertura, se devuelve por concurrencia; no se eleva timeout. Registrar
 ambos resultados y el margen limitado, no afirmar fluidez universal.
+
+## 2026-10-24 — Método al día con el secondbrain (Emi)
+
+Emi: «Leé CAMBIOS.md del secondbrain y aplicá lo que falte». Se aplican las
+entradas del 2026-10-06 al 2026-10-21. **Reemplaza la fila de compactar del
+2026-10-07 (tarde):** cada sesión se compacta sola con `/autocompact 200k`
+(Emi lo escribe una vez en cada chat); salen el umbral 60/50 %, la ronda de
+las 23:55 UTC y el «Contexto: ~X %». Timbres por `send_message`, no por
+`fire_trigger`. No se aplican, por decisiones anteriores de Emi: el consejero
+para las Devs, Fable como subagente y el «muy alto» para las Devs.
+

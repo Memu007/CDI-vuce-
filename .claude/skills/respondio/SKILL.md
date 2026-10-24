@@ -80,4 +80,4 @@ git diff <SHA de antes>..HEAD -- docs/pm/<tu canal>
 Una línea con lo que hiciste; lo que haya que decidir, como D en tu
 informe. Vos no le hablás a Emi: lo lee la PM principal. Si escribiste
 una D sin la que no podés seguir, subila y avisale a tu PM con
-`fire_trigger` de su rutina, como en `/entregar` §5.
+`send_message` a su sesión, como en `/entregar` §5.

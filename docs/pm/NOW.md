@@ -2,6 +2,8 @@
 
 Actualizado: 2026-10-24. Estado vigente; la historia está en Git.
 
+Método al día con CAMBIOS.md del secondbrain hasta 2026-10-21 (aplicado 2026-10-24).
+
 **Estado vigente, 2026-10-24 10:00 ARG:** publicación autorizada COMPLETADA.
 Railway muestra ACTIVE `4bb8b534-04e2-4d94-bfd8-7e101defbe94`, commit
 `648cd2f0c3103f466e7fd7b7022985907e08cd06`. `/health` 200 API/base ok a las

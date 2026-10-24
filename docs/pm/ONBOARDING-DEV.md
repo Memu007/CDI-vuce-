@@ -71,8 +71,9 @@ local), Gemini para leer PDFs y sugerir NCM. Todo el backend vive en
 
 Si un caso nuevo podría dar verde sin mirar el estado real, entregá también su
 **negativo discriminante**: el sabotaje que lo pone rojo por la razón
-correcta. Los sabotajes viejos que tocan archivos que cambiaste se corren de
-nuevo; si uno ya no encuentra su patrón, el script está roto y se arregla.
+correcta. Al entregar corrés sólo los sabotajes de tu pieza; los de piezas
+anteriores los corre la PM antes de publicar («Publicar» en
+`ONBOARDING-PM.md`) y un rojo ahí vuelve como devolución.
 
 No repitas una prueba hasta que dé verde sin explicar por qué falló.
 
@@ -92,8 +93,7 @@ Breve y autosuficiente:
 6. lo que decide la PM, numerado D1, D2…, con opciones y recomendación.
 
 Reemplazá todo el cuerpo anterior de `PARA-PM.md`. Al final: «Última vuelta:
-<hora>» y «Contexto: ~X %» (y desde ~60 %, tu `/compact conservar: …`;
-lo dejás y seguís trabajando, sin esperar a que Emi lo pegue).
+<hora>», y siempre tu `/compact conservar: …` al día.
 
 Al terminar una pieza: commit, push, comprobar que el remoto tiene tu HEAD y
 después el informe. Nada terminado queda sólo en local.

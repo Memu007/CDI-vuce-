@@ -78,3 +78,22 @@ reemplazan independencia.
   otras herramientas, no reglas.
 - La CI (`.github/workflows/ci.yml`) deselecciona tests de presupuestos
   compartidos: no es una red de seguridad completa, y Railway no la espera.
+
+# Compact instructions
+
+Cada sesión se compacta sola con `/autocompact 200k`, alrededor de ~150k
+(«Eficiencia de chats» en `AGENTS.md`). Al compactar, sola o a mano, el
+resumen conserva:
+
+- quién sos: rol, sesión, rama, rutina y a quién avisás al terminar;
+- la pieza activa y su paso exacto: SHA, qué corre en segundo plano y dónde
+  deja la salida;
+- lo pendiente y de quién depende; las decisiones abiertas y las tomadas;
+- las reglas de Emi que estás usando (quién te puede pedir algo, nada
+  se publica sin su «dale» para el SHA, nunca `main`, sin secretos);
+- palabra por palabra, tu último `/compact conservar: …` escrito: Dev 1 al
+  final de `docs/pm/PARA-PM.md`, Dev 2 al final de `docs/pm/PARA-PM-2.md`,
+  PM principal en `docs/pm/NOW.md`.
+
+Después de compactar, antes de seguir, releé ese archivo y tu canal en la
+rama.

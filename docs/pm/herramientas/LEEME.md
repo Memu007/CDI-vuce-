@@ -16,13 +16,19 @@ repositorio.
 | `chequeo-previo.sh [SHA]` | antes de una corrida larga: worktree en el SHA, base con tablas, un solo proceso de API, API y frontend responden, carga de la máquina | una línea OK, FALLA o AVISO por punto; sale con 1 si algo falla |
 | `suite-y-puertas.sh <base> <SHA>` | corre el chequeo previo, la suite completa, repite sólo los rojos y las demás puertas | termina con una línea `fin: …` para poder esperarla |
 
-Lo largo se corre separado del turno (el contenedor se reinicia y los
-procesos en segundo plano tienen tiempo límite) y se espera mirando el
-registro:
+Lo largo se corre con `run_in_background` del arnés (hasta 2 h), con la
+salida redirigida a un registro, y se espera mirando el registro. Lo lanzado
+con `setsid nohup` muere cuando el contenedor se reinicia por turno quieto;
+lo de `run_in_background` sobrevive (`LECCIONES.md` del Second Brain,
+«Entorno»):
 
 ```bash
-(setsid nohup docs/pm/herramientas/suite-y-puertas.sh <base> <SHA> > "$PM_DIR/suite.out" 2>&1 < /dev/null &)
+docs/pm/herramientas/suite-y-puertas.sh <base> <SHA> > "$PM_DIR/suite.out" 2>&1 < /dev/null
 ```
+
+**Si un reinicio corta una corrida** (mata la corrida, la espera en
+segundo plano y los subagentes, sin avisar), lo ve la vuelta de cada hora y
+se relanza.
 
 Cuidados que costaron caro (ver `LECCIONES.md` del Second Brain):
 

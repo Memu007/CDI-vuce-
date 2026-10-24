@@ -90,27 +90,19 @@ prioridad, alcance ni aceptación por sí solo: la PM decide qué adopta.
 
 Vale para PMs y Devs; esta es su única copia.
 
-- **Cuándo compactar:** desde el 60 % de contexto las Devs y el 50 % las
-  PMs, en el primer corte natural (después de una entrega o de un veredicto).
-  Nunca en medio de una corrida. Además, **Emi compacta las tres antes de
-  dormir:** a las 20:55 (Argentina, la vuelta de las 23:55 UTC) la PM
-  principal le pasa los tres
-  `/compact conservar: …`, sin mirar el porcentaje. (Emi, 2026-10-07, tarde:
-  con 30 % una Dev compactaba después de cada pieza. Si la cuenta vuelve a
-  llegar a su límite, ese mismo día se vuelve a 30 y 40.)
-- **Nadie se frena esperando el `/compact`:** la sesión deja el texto en su
-  informe y sigue con lo que tiene escrito en su canal; Emi lo pega cuando la
-  ve quieta.
-- **El porcentaje que vale es el de la PM** (`get_session`). El «~X %» que
-  anota cada sesión es una estimación y nunca alcanza para frenarse.
-- **Se mide:** en cada veredicto, la PM anota cuánto contexto usó la Dev en
-  la pieza. El 2026-10-27 se revisa el número con esos datos.
-- **Lo mide la PM principal:** en cada vuelta, `get_session` de cada sesión da
-  `context_usage.used_tokens`. Pasado el umbral, le da a Emi el
-  `/compact conservar: …` listo para pegar en esa sesión.
-- **Ninguna sesión se compacta sola, y `/compact` no viaja por mensaje entre
-  sesiones:** lo pega Emi en cada chat.
-- Cada sesión deja al final de su informe «Contexto: ~X %» y, desde el umbral,
-  su propio `/compact conservar: …`.
+- **Compactar sola:** cada sesión tiene `/autocompact 200k` (lo escribe
+  Emi una vez en cada chat; vive en el contenedor) y se compacta sola
+  alrededor de ~150k, también en medio de una corrida (lo que corre en
+  segundo plano sigue). Con menos de ~180k se compacta sin parar y gasta
+  más. Lo que conserva lo dice `# Compact instructions` en `CLAUDE.md`: por
+  eso cada sesión deja **siempre al día** su `/compact conservar: …` (Dev 1,
+  al final de `docs/pm/PARA-PM.md`; Dev 2, al final de `docs/pm/PARA-PM-2.md`;
+  PM principal, en `NOW.md`).
+- **Control:** en su vuelta horaria la PM principal mira cada sesión con
+  `get_session`. Sólo si una muestra un `max_tokens` distinto de 200000
+  (contenedor nuevo) o `used_tokens` pasa ~170k, le pasa a Emi el
+  `/compact conservar: …` de esa sesión y le pide `/autocompact 200k` en
+  ese chat. `/compact` no viaja por mensaje entre sesiones. Emi puede
+  compactar a mano cuando quiera.
 - **Antes de compactar o cambiar de chat,** el estado vigente queda subido al
   repositorio.

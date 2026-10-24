@@ -15,8 +15,9 @@ comandos.
   tarea no pide. Lo que agregaste sin que se pidiera va en el informe como
   supuesto reversible, para que la PM pueda rechazarlo.
 - **Subagentes adversariales:** los que pide la tabla «Modelo y esfuerzo»
-  de `docs/pm/ONBOARDING-PM.md` («Subagentes»). Lo que
-  encuentren lo reproducís; el informe lleva la tabla de hallazgos con
+  de `docs/pm/ONBOARDING-PM.md` («Subagentes»); en la vuelta de una
+  devolución de plata, sesión o permisos, uno solo, Sonnet alto («Cuántos y
+  quién los corre»). Lo que encuentren lo reproducís; el informe lleva la tabla de hallazgos con
   modelo y esfuerzo de cada uno.
 - **`/code-review`:** corré `/code-review high` sobre lo que cambió
   la rama desde la base. Lo confirmado dentro de la tarea se arregla, con su
@@ -27,10 +28,10 @@ comandos.
   (un script por pieza, uno por motivo), con lo que el rojo tiene que decir y
   lo que no. Ningún sabotaje toca datos compartidos de prueba: el caso
   trabaja sobre lo que crea y retira.
-- **Sabotajes vigentes:** corré enteros, sobre el SHA que entregás, los
-  sabotajes de piezas anteriores que tocan archivos que cambiaste. Un patrón
-  que ya no se encuentra es una falla del script, no un salto: arreglalo, y
-  el script tiene que salir con error si no lo encuentra.
+- **Sabotajes de piezas anteriores:** al entregar corrés sólo los de tu
+  pieza. Los de lo que cambió en la tanda los corre la PM antes de publicar
+  («Publicar» en `ONBOARDING-PM.md`); si ahí falla uno que toca lo tuyo,
+  vuelve como devolución.
 
 ## 2. Commits
 
@@ -88,8 +89,9 @@ git fetch origin <rama Dev> && git log --oneline HEAD..origin/<rama Dev>
   2, 4, 8 y 16 s.
 - **Comprobá que subió:** `git ls-remote origin refs/heads/<rama Dev>` tiene
   que dar lo mismo que `git rev-parse HEAD`. Si no, no entregaste.
-- **Avisale a tu PM:** `fire_trigger` de su rutina (Dev 1 → PM principal;
-  Dev 2 → PM visual; los ids están en `NOW.md`, «Quién hace qué»), con el
+- **Avisale a tu PM:** `send_message` a la sesión de tu PM, `priority` `next`
+  (en CDI las dos Devs → PM principal, porque no hay PM visual; las sesiones
+  están en `NOW.md`, «Quién hace qué»; `fire_trigger` no la despierta), con el
   texto «Dev N: entregué <PIEZA> en <SHA>». Es un timbre: lo que vale es el
   informe en tu canal. Nunca a la otra Dev. En el chat, una línea igual. Lo
   que haya que decidir va como D en el informe.

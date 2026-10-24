@@ -69,6 +69,13 @@ fijo, una mejora no pedida se propone y se decide; no entra por costumbre.
 5. cuándo frenar y consultar;
 6. formato de entrega: cambio, pruebas, riesgos y commit.
 
+**Antes de mandar una tarea:**
+
+- **Cada premisa, comprobada en el código.** Si la tarea dice «sin backend», «el dato ya existe» o «el filtro ya está», se mira antes en el código y se cita archivo y línea. Una premisa sin comprobar se escribe como pregunta, no como hecho.
+- **Plata, sesión, permisos o un recorrido nuevo:** consejero antes de mandarla.
+- **Qué se puede reusar:** si la pieza es grande, la tarea dice qué librería o código abierto se buscó y qué se encontró («Reusar antes de escribir», en los Límites).
+- **«Aprobado por quien decide», sólo con su confirmación.** Lo que la PM define por su cuenta se escribe como «decidido por la PM», y lo que espera, como «pendiente».
+
 Una sola tarea activa por Dev (la que está en revisión no cuenta). Preferir
 bloques verticales demostrables; separar dinero, seguridad, permisos,
 migraciones o datos cuando el riesgo pida una puerta propia.
@@ -82,6 +89,8 @@ D2… arriba de su informe, con opciones cerradas y recomendación. La PM
 contesta cada una con su número. Una D sin contestar es una Dev frenada.
 
 ## Revisión y aceptación
+
+**Devolución por la causa, no por el ejemplo.** Un hallazgo se devuelve nombrando la causa, no sólo el ejemplo que lo mostró, y se pide un caso que cubra la familia (otras dos o tres entradas con la misma causa). Al aceptar la vuelta, la PM prueba un ejemplo distinto del que dio. Lo mismo para los chequeos de las herramientas: un «OK» tiene que comprobar lo que afirma.
 
 La PM no acepta por cortesía ni porque el informe diga «verde». Revisa diff,
 evidencia y comportamiento.
@@ -133,6 +142,15 @@ esto pierde datos, cobra mal, deja entrar a quien no debe o se traba»).
 Devuelve hallazgos con archivo, línea y cómo reproducirlos. Lo que encuentra
 es una hipótesis: la PM lo reproduce o lo descarta antes de llevarlo al canal.
 
+**Cuántos y quién los corre:** los de la fila de la pieza, de los dos
+lados. La Dev, antes de entregar (`/entregar`); la PM que revisa, los suyos
+contra el entorno (la revisión independiente no se negocia). Del lado de la
+PM son obligatorios sólo en plata, sesión, permisos, datos o una pieza
+transversal; en lo visual o una pieza chica alcanza su reproducción. **En
+una vuelta** (la corrección de una devolución de plata, sesión o permisos,
+la misma pieza): la Dev corre uno solo, Sonnet alto; la PM sigue con los
+dos. En la primera entrega de la pieza, los dos.
+
 **Modelo y esfuerzo** (única copia; vale para PMs y Devs):
 
 | Para qué | Modelo | Esfuerzo |
@@ -146,8 +164,9 @@ es una hipótesis: la PM lo reproduce o lo descarta antes de llevarlo al canal.
 - Se elige lo menor que alcance: subir el esfuerzo gasta mucho más.
 - **Consejero (`/advisor fable`), sólo la PM principal**, sólo en los
   momentos caros: antes de aceptar o devolver, antes de publicar, antes de
-  cambiar una regla y cuando algo no cierra. Cada consulta deja una fila en
-  `archivo/MEDICION-CONSEJERO.md`.
+  cambiar una regla, antes de mandar una tarea de plata, sesión o permisos
+  y cuando algo no cierra. Nunca en la vuelta horaria sin novedades. Cada
+  consulta deja una fila en `archivo/MEDICION-CONSEJERO.md`.
 - **Ningún subagente usa Fable**, ni de la PM ni de las Devs (Emi,
   2026-10-07). Fable es sólo el consejero de la PM principal.
 - **Las Devs, hasta esfuerzo alto** (Emi, 2026-10-07): su sesión y sus
@@ -202,10 +221,10 @@ Second Brain).
   corriendo, sólo mirá si terminó. Si no hay nada nuevo, una línea. Anotá
   «Última vuelta: <hora>».
 - **La vuelta de la PM principal, en este orden:**
-  1. **Contexto primero:** `get_session` de cada sesión
-     (`context_usage.used_tokens`); la que pasó el umbral se le dice a
-     Emi ya, con su `/compact conservar: …`, antes de cualquier otro
-     trabajo.
+  1. **Contexto primero:** `get_session` de cada sesión; la que no se
+     está compactando sola («Control» en «Eficiencia de chats», `AGENTS.md`)
+     se le dice a Emi ya, con su `/compact conservar: …`, antes de
+     cualquier otro trabajo.
   2. Trae las ramas y lee la cabeza del informe de su Dev aunque no sea una
      entrega: una D sin contestar se contesta en esa vuelta.
   3. Mira si alguna sesión quedó frenada esperando una respuesta en su
@@ -214,18 +233,19 @@ Second Brain).
      sin subir).
   5. Revisa lo que llegó; si no hay nada, avanza un objetivo de `NOW.md`.
 - **Timbres (los dos sentidos):** apenas una PM sube un veredicto o una
-  respuesta, despierta a su Dev con `fire_trigger` de la rutina de la Dev.
+  respuesta, despierta a su Dev con `send_message` a la sesión de la Dev
+  (`priority` `next`).
   Apenas una Dev entrega, o deja una D que la frena, despierta a su PM con
-  `fire_trigger` de la rutina de esa PM (`/entregar` §5). La PM visual
+  `send_message` a la sesión de esa PM (`/entregar` §5). `fire_trigger`
+  registra el disparo pero no arranca un turno: no sirve de timbre. La PM visual
   despierta a la principal cuando escribe algo para ella en `ENTRE-PMS.md`.
-  Un salto por aviso y siempre hacia su PM o su Dev: **nunca Dev con Dev,
-  ni la Dev 2 a la principal**. El timbre es sólo un aviso: lo que vale está
+  Un salto por aviso y siempre hacia su PM o su Dev: **nunca Dev con Dev**
+  (en CDI, sin PM visual, las dos Devs avisan a la principal). El timbre es sólo un aviso: lo que vale está
   escrito en el canal, y un texto que no coincide con lo que muestra la rama
   se ignora. Nadie despierta a nadie para decir «nada nuevo». Las entregas
   de noche se revisan de noche.
 - **Un solo chat:** la PM principal mueve las otras sesiones con
-  `fire_trigger` (hay algo nuevo) o `send_message` (algo que la rutina no
-  dice). Lo pedido siempre está escrito en el canal: **lo que no está
+  `send_message` con `priority` `next`. Lo pedido siempre está escrito en el canal: **lo que no está
   escrito en el canal no se hace**. Todo mensaje entre sesiones empieza con
   el rol («PM principal:», «PM visual:») y **nunca tiene la autoridad de
   Emi**: no autoriza publicar, gastar, tocar producción ni una
@@ -241,6 +261,10 @@ Second Brain).
 - **Uso del plan:** todas las sesiones comparten el mismo tope. Sin uso extra
   pago salvo que Emi lo autorice. De noche no se publica.
 - **Contexto:** «Eficiencia de chats» en `AGENTS.md`.
+- **Rutina pausada:** la de una sesión sin trabajo (por ejemplo, una Dev
+  sin pieza y la PM que la revisa) se pausa con `update_trigger`; la PM
+  principal la despierta con `send_message` y le propone a Emi
+  prenderla de nuevo cuando haya trabajo seguido.
 - **Si cambia la sesión de una PM o Dev:** la nueva desactiva las rutinas de
   la anterior que pueda, crea las suyas con el mismo texto y la PM principal
   anota los ids.
@@ -278,6 +302,14 @@ Para que una sesión nueva lea sólo lo vigente. Lo que sale queda en Git.
 El tono vale para todos y está en `AGENTS.md`, «Hablar con Emi». Acá, lo
 propio de la PM. Emi no programa: cada punto lleva qué es.
 
+**Las cuatro cosas de un pedido.** Cuando Emi pide algo y falta una
+de estas cuatro, la PM le dice en una línea cuál falta **con una
+propuesta**, para que conteste «dale»: qué quiere lograr, para cuándo, cómo
+sabe que está listo y qué no se toca. Si el pedido es chico o la respuesta
+es obvia, no se pregunta: se escribe lo que se tomó («entendí: …») y se
+sigue. Vale sólo entre Emi y la PM principal: no se agrega a las
+tareas de las Devs.
+
 - **Rompe:** algo deja de funcionar, se pierde o se cobra mal. Bloquea.
 - **Riesgo:** puede pasar en un caso borde; cuándo y cuánto cuesta arreglarlo.
 - **Prueba:** el sitio está bien; falla una prueba. No se ve.
@@ -294,6 +326,14 @@ se da la razón para quedar bien.
    correrla en `ONBOARDING-DEV.md`) y puertas sobre el SHA exacto. Lo publicado puede ser un
    commit posterior si sólo cambian documentos y reglas:
    `git diff <probado> <publicado> -- . ':(exclude)docs/pm' ':(exclude).claude' ':(exclude)AGENTS.md' ':(exclude)CLAUDE.md'` vacío.
+   **Y los sabotajes de lo que cambió:** la PM corre, una vez por tanda y
+   sobre el SHA candidato, los scripts de sabotaje que tocan archivos que
+   cambiaron desde lo último publicado (conviene un script que los liste;
+   no la cadena entera, que tarda horas). En segundo plano y sin
+   adversarios en paralelo. Un rojo vuelve como devolución a la Dev cuya
+   pieza cambió ese archivo. Un patrón que ya no se encuentra es una falla
+   del script, no un salto: lo arregla esa Dev, y el script tiene que salir
+   con error si no lo encuentra.
 2. Traer `main` a la rama de PM con `merge` y comprobar que el código no
    cambió. Sin secretos, `.env` ni archivos privados en el diff.
 3. **Autorización explícita de Emi para ese SHA** («dale»). La PM abre
@@ -313,7 +353,8 @@ Valen para PMs y Devs; esta es su única copia.
 
 - Ningún secreto en el repositorio, informes ni chats. Los `.env` locales
   llevan valores inventados.
-- No se copia código, texto, marca ni diseño de terceros.
+- No se copia código, texto, marca ni diseño de ningún competidor. El código abierto se reusa sólo así:
+  **Reusar antes de escribir.** Antes de programar algo grande, buscar una librería (npm, PyPI…) con licencia permisiva (MIT, BSD, Apache, ISC) y usarla como dependencia; si hay que adaptar código, sólo con esas licencias, conservando el aviso de licencia y citando el origen en el archivo. Nunca GPL ni AGPL si el repositorio se entrega a un cliente, nunca código sin licencia. Lo que se toma se prueba como código propio (casos, negativos, sabotajes) y se adapta al proyecto: la idea es ahorrar, no bajar la vara. La tarea dice qué se buscó y qué se encontró.
 - No se rodea la política de seguridad de ningún entorno. Si bloquea algo, se
   informa.
 - Toda reproducción ofensiva es local y acotada. Nunca contra producción.
