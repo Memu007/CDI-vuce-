@@ -44,6 +44,7 @@
     let opsExpanded = false;
 
     let editingId = null;            // null = nuevo, string = edit
+    let fechaInicOculta = '';        // fecha guardada que el campo de fecha no puede mostrar (D3)
     let detailClienteId = null;
     let activeIndex = -1;            // indice del item "focuseado" por teclado en vista filtrada
     let visibleIds = [];             // ids en el orden renderizado (para flechas)
@@ -1662,6 +1663,7 @@
         if (fMoneda) fMoneda.value = '';
         if (fNotas) fNotas.value = '';
         if (fFechaInicActiv) fFechaInicActiv.value = '';
+        fechaInicOculta = '';
         if (fAdvanced) fAdvanced.open = false;
     }
 
@@ -1676,6 +1678,9 @@
         if (fMoneda) fMoneda.value = c.preferred_currency || '';
         if (fNotas) fNotas.value = c.notas || '';
         if (fFechaInicActiv) fFechaInicActiv.value = c.fecha_inic_activ || '';
+        // D3: una fecha guardada que no es AAAA-MM-DD válida (vino por la API o
+        // es vieja) deja el campo vacío; se recuerda para no borrarla al guardar.
+        fechaInicOculta = (c.fecha_inic_activ && fFechaInicActiv && !fFechaInicActiv.value) ? c.fecha_inic_activ : '';
         const hasAdvanced = !!(
             c.email || c.telefono || c.default_origin ||
             c.preferred_currency || c.notas
@@ -1722,6 +1727,13 @@
             fEmail && fEmail.focus();
             return;
         }
+        // Una fecha tipeada a medias el navegador la da como vacía: guardarla
+        // así borraría (o conservaría, D3) la fecha sin que nadie lo pidiera.
+        if (fFechaInicActiv && fFechaInicActiv.validity && fFechaInicActiv.validity.badInput) {
+            showFormError('La fecha de inicio de actividad está incompleta: completala o borrala.');
+            fFechaInicActiv.focus();
+            return;
+        }
 
         const body = {
             nombre: nombre,
@@ -1732,8 +1744,11 @@
             default_origin: origen,
             preferred_currency: moneda,
             notas: notas,
-            fecha_inic_activ: fechaInicActiv,
         };
+        // D3: si el campo quedó vacío porque no podía mostrar la fecha guardada,
+        // no se manda y la API la conserva; una fecha cargada la reemplaza.
+        const conservaFecha = !fechaInicActiv && !!fechaInicOculta;
+        if (!conservaFecha) body.fecha_inic_activ = fechaInicActiv;
 
         const isEdit = !!editingId;
         const idEdit = editingId;
@@ -1771,7 +1786,7 @@
             // CLIENTE-1: se guarda sin lo que pide el MARIA, pero se avisa qué
             // falta (lo que no puede faltar lo frena la generación del TXT).
             const faltan = [
-                [cuitNorm, 'CUIT'], [direccion, 'domicilio'], [fechaInicActiv, 'inicio de actividad'],
+                [cuitNorm, 'CUIT'], [direccion, 'domicilio'], [fechaInicActiv || conservaFecha, 'inicio de actividad'],
             ].filter(([v]) => !v).map(([, n]) => n);
             const titulo = isEdit ? 'Cliente actualizado' : 'Cliente creado';
             if (faltan.length && CDI.toast) {

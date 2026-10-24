@@ -533,7 +533,7 @@
             touched++;
         });
         try { CDI.track && CDI.track('ncm_batch_ncm_applied', { count: touched, ncm: formatted }); } catch (_) {}
-        scheduleUndoClear('NCM ' + formatted + ' a ' + touched + (touched === 1 ? ' item' : ' items'));
+        scheduleUndoClear('PA SIM ' + formatted + ' a ' + touched + (touched === 1 ? ' item' : ' items'));
         render();
         updateBatchBar();
     }
@@ -1083,7 +1083,7 @@
         }
         lastSnapshot = { state: CDI.state, items: before, ts: Date.now() };
         CDI.track && CDI.track('ncm_agrupar', { grupo_id: result.grupo_id, items: result.count, ncm: result.ncm, batch: true });
-        scheduleUndoClear('NCM ' + result.ncm + ' · ' + result.count + ' ítems → 1 unidad clasificatoria');
+        scheduleUndoClear('PA SIM ' + result.ncm + ' · ' + result.count + ' ítems → 1 unidad clasificatoria');
 
         selectedRows.clear();
         if (batchNcm) batchNcm.value = '';
@@ -2139,7 +2139,7 @@
         const human = ageH < 24
             ? Math.round(ageH) + ' h'
             : Math.round(ageH / 24) + ' día' + (ageH >= 48 ? 's' : '');
-        return '<div class="spotlight-vuce-stale" title="Refrescar desde el asistente NCM">' +
+        return '<div class="spotlight-vuce-stale" title="Refrescar desde el asistente de posición arancelaria">' +
                'Datos con latencia de ' + CDI.escapeHtml(human) +
                '</div>';
     }
