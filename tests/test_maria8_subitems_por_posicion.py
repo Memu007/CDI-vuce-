@@ -167,7 +167,7 @@ def test_el_item_va_donde_aparece_su_primer_renglon():
 
 
 @pytest.mark.parametrize("cambio", [
-    {"origen": "TW"},
+    {"origen": "TW", "pais_procedencia": "CN"},   # la procedencia de los otros es su origen, CN
     {"pais_procedencia": "TW"},
     {"estado": "4"},
     {"unidad": "kg"},
