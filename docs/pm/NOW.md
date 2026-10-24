@@ -7,8 +7,7 @@ Método al día con CAMBIOS.md del secondbrain hasta 2026-10-21 (aplicado 2026-1
 **Desde el 2026-10-24, tarde:** Codex deja CDI (Emi). Dos Devs nuevas en
 Claude («Quién hace qué»). Ese día Emi y el despachante cargaron en el MARIA
 el TXT de una factura real después de doce correcciones a mano: son la
-Fase 1b del roadmap nuevo a tres meses (`ROADMAP.md`, **propuesto, falta el
-OK de Emi**). Pendiente de Emi: aprobar el roadmap, «dale dddcf6d» para
+Fase 1b del roadmap nuevo a tres meses (`ROADMAP.md`, aprobado por Emi el 2026-10-24). Pendiente de Emi: «dale dddcf6d» para
 publicar EXCEL-2, `/autocompact 200k` y el esfuerzo en los dos chats
 nuevos, el packing list y los códigos de destino que manda el despachante.
 
@@ -410,5 +409,5 @@ confundir borradores guardados con cambios publicados; el permiso para
 
 ## /compact conservar de la PM principal
 
-/compact conservar: Soy la PM principal de CDI (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK min 55). Producto Memu007/CDI-vuce-, clon /home/user/cdi-vuce-, mi rama claude/practical-shannon-szpwkn (nunca main; cada push a main publica). main = 648cd2f (Fase 1, publicada 22/10, verificada en Railway 24/10). Mi rama tiene además EXCEL-2 aceptada (dddcf6d, PR #5) sin publicar: falta «dale» de Emi. Desde el 24/10 Codex deja CDI; Devs nuevas: Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, alto) con MARIA-7 y Dev técnica (session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica, medio) con EXCEL-3. Roadmap a 3 meses en ROADMAP.md, propuesto, falta el OK de Emi. Acuerdos de la reunión con el despachante del 24/10 en DECISIONS.md. Los TXT y la proforma reales de ese día quedan fuera del repo (scratchpad). Método al día con el secondbrain hasta 2026-10-21: /autocompact 200k en cada chat. Reglas de Emi: nada fuera del roadmap; Devs hasta alto, sin Fable; consejero sólo mío; castellano llano; consultas de 9 a 21 ARG; publicar sólo con «dale <SHA>» de día; usar date -u.
+/compact conservar: Soy la PM principal de CDI (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK min 55). Producto Memu007/CDI-vuce-, clon /home/user/cdi-vuce-, mi rama claude/practical-shannon-szpwkn (nunca main; cada push a main publica). main = 648cd2f (Fase 1, publicada 22/10, verificada en Railway 24/10). Mi rama tiene además EXCEL-2 aceptada (dddcf6d, PR #5) sin publicar: falta «dale» de Emi. Desde el 24/10 Codex deja CDI; Devs nuevas: Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, alto) con MARIA-7 y Dev técnica (session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica, medio) con EXCEL-3. Roadmap a 3 meses en ROADMAP.md, aprobado por Emi el 24/10. Acuerdos de la reunión con el despachante del 24/10 en DECISIONS.md. Los TXT y la proforma reales de ese día quedan fuera del repo (scratchpad). Método al día con el secondbrain hasta 2026-10-21: /autocompact 200k en cada chat. Reglas de Emi: nada fuera del roadmap; Devs hasta alto, sin Fable; consejero sólo mío; castellano llano; consultas de 9 a 21 ARG; publicar sólo con «dale <SHA>» de día; usar date -u.
 

@@ -1,4 +1,4 @@
-# Roadmap — propuesta del 2026-10-24 (a aprobar por Emi)
+# Roadmap — aprobado por Emi el 2026-10-24 («Dale. Comenzá»)
 
 > Reemplaza las semanas del 2026-10-07. Sale de la reunión de prueba con el
 > despachante del 2026-10-24: el TXT de una factura real entró al MARIA
