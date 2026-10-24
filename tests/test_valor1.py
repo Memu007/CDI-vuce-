@@ -57,6 +57,18 @@ def test_los_ajustes_van_al_centavo_con_la_mitad_hacia_arriba():
     assert v["fob_casillero"] == 950.12
 
 
+def test_la_base_del_seguro_se_cambia_en_un_solo_lugar(monkeypatch):
+    """D12b: si el despachante dice que el 1 % va sobre el FOB antes del
+    descuento, alcanza con cambiar BASE_SEGURO_SUGERIDO."""
+    items = [{"cantidad": 1, "valor_unitario": 1000}]
+    v = _cuentas(items, flete=100, ajustes_deducir=200)
+    assert v["seguro_sugerido"] == 9.00 and v["base_seguro"] == "FOB casillero"
+    monkeypatch.setattr(mg, "BASE_SEGURO_SUGERIDO", "fob_factura")
+    v = _cuentas(items, flete=100, ajustes_deducir=200)
+    assert v["seguro_sugerido"] == 11.00 and v["base_seguro"] == "FOB de la factura"
+    assert v["fob_casillero"] == 800.00
+
+
 def test_deducir_mas_que_el_fob_no_es_un_casillero():
     with pytest.raises(ValueError, match=r"Los ajustes a deducir \(2\.000,00\) superan el FOB de la factura más "
                                          r"los ajustes a incluir \(1\.010,00\)"):
@@ -146,9 +158,11 @@ def test_los_avisos_traen_las_cuentas_y_dicen_que_el_casillero_va_a_mano(client)
     assert data["valor"] == {
         "fob_factura": 1387.5, "ajustes_incluir": 0.0, "ajustes_deducir": 87.5,
         "fob_casillero": 1300.0, "flete": 7925.0, "seguro": 12.4, "seguro_sugerido": 92.25,
+        "base_seguro": "FOB casillero",
     }
-    assert ("El TXT lleva el FOB de la factura (DOL 1.387,50); el FOB casillero con los ajustes "
-            "(DOL 1.300,00) lo cargás vos en el MARIA.") in data["avisos"]
+    # Que no parezca que ya se descuenta (respuesta de la PM a D12).
+    assert ("El TXT todavía lleva el FOB de la factura (DOL 1.387,50); el FOB casillero con los ajustes "
+            "(DOL 1.300,00) va al TXT en una próxima versión.") in data["avisos"]
 
 
 def test_sin_ajustes_no_hay_aviso_del_casillero(client):
@@ -219,7 +233,7 @@ def _pantalla(op, despues, valor=None):
 
 
 VALOR = {"fob_factura": 1387.5, "ajustes_incluir": 0.0, "ajustes_deducir": 0.0, "fob_casillero": 1387.5,
-         "flete": 7925.0, "seguro": 0.0, "seguro_sugerido": 93.13}
+         "flete": 7925.0, "seguro": 0.0, "seguro_sugerido": 93.13, "base_seguro": "FOB casillero"}
 
 
 def test_el_descuento_de_la_planilla_se_ofrece_y_no_se_pone_solo():
@@ -248,6 +262,19 @@ def test_el_boton_del_seguro_pone_el_sugerido_y_aparece_sin_seguro():
     assert r["els"]["valorCalcularSeguro"]["textContent"] == "Calcular seguro (1 % de FOB casillero + flete): 93,13"
     assert r["op"]["seguro"] == 93.13 and r["op"]["seguro_calculado"] is True
     assert r["refrescos"] == 1
+
+
+def test_despues_de_calcular_el_seguro_la_nota_dice_la_base():
+    # Lo que se pinta cuando vuelve la cuenta con el seguro nuevo.
+    r = _pantalla({}, "calcularSeguro(); pintarValor({...ultimoValor, seguro: 93.13});", VALOR)
+    assert r["els"]["valorCalcularSeguro"]["hidden"] is True
+    assert r["els"]["valorSeguroNota"]["textContent"] == "Seguro calculado: 1 % de (FOB casillero + flete)."
+
+
+def test_el_boton_nombra_la_base_que_dice_el_servidor():
+    r = _pantalla({}, "", {**VALOR, "base_seguro": "FOB de la factura", "seguro_sugerido": 93.13})
+    assert r["els"]["valorCalcularSeguro"]["textContent"] == (
+        "Calcular seguro (1 % de FOB de la factura + flete): 93,13")
 
 
 def test_con_seguro_de_la_factura_no_se_ofrece_calcularlo():
