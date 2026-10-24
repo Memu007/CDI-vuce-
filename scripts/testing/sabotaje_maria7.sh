@@ -20,7 +20,7 @@ cd "$WT"
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
        VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
 unset ENABLE_PDF_LLM_FALLBACK || true
-PRUEBA="tests/test_maria7_rechazos_24_10.py tests/test_maria7_fechas.py"
+PRUEBA="tests/test_maria7_rechazos_24_10.py tests/test_maria7_fechas.py tests/test_maria7_revision.py"
 
 correr() {
   "$VENV/bin/python" -m pytest -q --no-cov -p no:cacheprovider $PRUEBA 2>&1 || true
@@ -67,6 +67,8 @@ F=proyecto_maria/core/maria_generator.py
 L=proyecto_maria/pdf_extractor.py
 T=tests/test_maria7_rechazos_24_10.py
 TF=tests/test_maria7_fechas.py
+TR=tests/test_maria7_revision.py
+V2=proyecto_maria/static/v2/screens
 
 # 1. IDSO vuelve a llevar el identificador completo
 reemplazar $F 'lines.append(f"IDSO={id_maria}")' 'lines.append(f"IDSO={operation_id}")'
@@ -119,12 +121,53 @@ reemplazar $L '        dia, mes = (b, a) if b > 12 else (a, b)' '        dia, me
 caso "siempre_mes_dia" "FAILED $TF::test_cuando_el_orden_se_puede_saber_no_se_pregunta"
 
 # 13. la pregunta por la fecha no llega a la pantalla
-reemplazar proyecto_maria/main.py "operacion_data.pop('avisos_fecha', []) + " ""
+reemplazar proyecto_maria/main.py "avisos_fecha = operacion_data.pop('avisos_fecha', [])" "avisos_fecha = []; operacion_data.pop('avisos_fecha', [])"
 caso "pregunta_perdida" "FAILED $TF::test_la_pregunta_llega_a_la_pantalla"
 
 # 14. a Gemini se le vuelve a pedir la fecha convertida
 reemplazar $L 'NO la conviertas ni cambies el orden de día, mes y año.' 'Formato DD/MM/YYYY.' 2
 caso "gemini_convierte" "FAILED $TF::test_a_gemini_se_le_pide_la_fecha_tal_cual_en_las_dos_copias"
 
+# 15. la revisión vuelve a dar vuelta la fecha que dejó el lector
+reemplazar $V2/review.js "        if (m) return dos(m[3]) + '/' + dos(m[2]) + '/' + m[1];
+        m = s.match(/^(\d{1,2})[\s\/.\-]+(\d{1,2})[\s\/.\-]+(\d{4})\$/);
+        if (m) return dos(m[1]) + '/' + dos(m[2]) + '/' + m[3];
+        const digits = s.replace(/\D/g, '');
+        if (!/^\d{8}\$/.test(s)) return s;" "        const digits = s.replace(/\D/g, '');
+        if (digits.length !== 8) return s;"
+caso "revision_da_vuelta" "FAILED $TR::test_la_revision_respeta_el_orden_que_dejo_el_lector"
+
+# 16. un año de dos cifras se adivina
+reemplazar $L '        if len(m.group(3)) == 2:
+            # «26/08/07»' '        if False:
+            # «26/08/07»'
+caso "anio_dos_cifras" "FAILED $TR::test_un_anio_de_dos_cifras_no_se_adivina"
+
+# 17. la unidad se busca sin sacarle los puntos
+reemplazar $F 'clave = re.sub(r"\.", " ", str(unidad or "").lower())' 'clave = str(unidad or "").lower()'
+caso "unidad_con_puntos" "FAILED $TR::test_metro_cuadrado_escrito_de_otras_formas"
+
+# 18. el código chino de crédito social vuelve a tomarse por cuenta
+reemplazar $F '    if es_codigo_chino_de_credito_social(compacto):
+        return False' '    if False:
+        return False'
+caso "uscc_es_cuenta" "FAILED $TR::test_una_identificacion_que_parece_cuenta_pero_no_es_sale"
+
+# 19. cualquier cosa con forma de IBAN es cuenta, sin verificar
+reemplazar $F 'and _iban_valido(compacto):' ':'
+caso "iban_sin_verificar" "FAILED $TR::test_un_iban_valido_sigue_siendo_cuenta_y_uno_con_un_digito_cambiado_no"
+
+# 20. la factura más larga que el campo no se avisa
+reemplazar $F 'elif items and numero_factura is not None and len(str(numero_factura).strip()) > LARGO_REF_FACTURA:' 'elif False:'
+caso "factura_larga_sin_aviso" "FAILED $TR::test_la_factura_mas_larga_que_el_campo_se_avisa_antes_de_generar"
+
+# 21. (sólo busca el texto) la pantalla deja de mostrar la pregunta por la fecha
+reemplazar $V2/upload.js 'if (data && Array.isArray(data.avisos_fecha)) sinLeer.unshift.apply(sinLeer, data.avisos_fecha);' ''
+caso "pantalla_sin_fecha" "FAILED $TR::test_la_pantalla_muestra_la_fecha_con_el_titulo_de_la_factura"
+
+# 22. (sólo busca el texto) la unidad del producto entra al HTML sin escapar
+reemplazar $V2/despachante.js "'<option value=\"' + CDI.escapeHtml(v) + '\"'" "'<option value=\"' + v + '\"'"
+caso "unidad_sin_escapar" "FAILED $TR::test_la_unidad_del_producto_se_escapa_en_la_lista"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 14 sabotajes dan rojo por la razón esperada"
+echo "OK: los 22 sabotajes dan rojo por la razón esperada"

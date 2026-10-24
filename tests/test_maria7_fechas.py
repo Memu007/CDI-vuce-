@@ -85,5 +85,7 @@ def test_la_pregunta_llega_a_la_pantalla(auth_override, client, monkeypatch):
     monkeypatch.setattr("proyecto_maria.core.ai_quota.enforce_pdf_quota", lambda usuario: None)
     r = client.post("/upload_pdf/public", files={"file": ("f.pdf", io.BytesIO(_pdf_en_blanco()), "application/pdf")})
     assert r.status_code == 200, r.text
-    assert r.json()["avisos"] == ["Fecha de emisión: pregunta de prueba.", "Peso de «X»: aviso de prueba."]
+    # Cada una con su título en la pantalla: la fecha es de la factura.
+    assert r.json()["avisos"] == ["Peso de «X»: aviso de prueba."]
+    assert r.json()["avisos_fecha"] == ["Fecha de emisión: pregunta de prueba."]
     assert "avisos_fecha" not in r.json()["operacion"]
