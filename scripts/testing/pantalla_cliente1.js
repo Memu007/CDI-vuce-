@@ -141,7 +141,7 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
     const textoD3 = (await avisoD3.innerText()).replace(/\s+/g, ' ');
     const c = (await (await page.request.get(base + '/api/clientes/' + idsD3[n])).json());
     const cli = c.cliente || c;
-    if (cli.direccion !== 'Calle Inventada 2') falla(n + ': la edición no se guardó: ' + cli.direccion);
+    if (cli.direccion !== 'Calle Inventada 2') falla(n + ': la edición no se guardó: ' + cli.direccion + ' (razón social: ' + cli.nombre + ')');
     const tiene = cli.fecha_inic_activ || null;
     if (tiene !== queda) falla(n + ': después de editar, la fecha es ' + JSON.stringify(tiene) + ' y tenía que ser ' + JSON.stringify(queda));
     if (/inicio de actividad/i.test(textoD3) !== pideFecha) {
