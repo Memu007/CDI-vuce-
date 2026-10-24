@@ -1727,6 +1727,13 @@
             fEmail && fEmail.focus();
             return;
         }
+        // Una fecha tipeada a medias el navegador la da como vacía: guardarla
+        // así borraría (o conservaría, D3) la fecha sin que nadie lo pidiera.
+        if (fFechaInicActiv && fFechaInicActiv.validity && fFechaInicActiv.validity.badInput) {
+            showFormError('La fecha de inicio de actividad está incompleta: completala o borrala.');
+            fFechaInicActiv.focus();
+            return;
+        }
 
         const body = {
             nombre: nombre,
