@@ -330,6 +330,7 @@ def ref_de_la_factura(numero_factura: str) -> str:
 # (devolución de MARIA-7: antes «AA(ROJO) AB(AZUL)» salía «AA(ROJO  AB AZUL)»).
 _UN_SUFIJO = re.compile(r"([A-Za-z]{2})(?:\(([^()]*)\)|([0-9]{2}))")
 _ENTRE_SUFIJOS = re.compile(r"[\s,;\-]*")
+SUFIJO_MAXIMO = 120  # el mismo tope que valida /generate_maria
 
 
 def _solo_letras_numeros_espacios(texto: str) -> str:
@@ -362,6 +363,12 @@ def limpiar_sufijo(sufijo: str, donde: str = "") -> tuple[str, bool]:
         pos = _ENTRE_SUFIJOS.match(sufijo, uno.end()).end()
     final = "-" if partes and _ENTRE_SUFIJOS.fullmatch(sufijo[-1]) else ""
     limpio = "-".join(partes) + final
+    # El endpoint mide el sufijo como vino; con los guiones puede crecer.
+    if len(limpio) > SUFIJO_MAXIMO:
+        raise ValueError(
+            f"Sufijo de valor{donde}: separado con guiones queda de {len(limpio)} caracteres "
+            f"y no puede superar los {SUFIJO_MAXIMO}. Así no se genera el TXT."
+        )
     return limpio, limpio != sufijo
 
 
@@ -380,9 +387,10 @@ def _aviso_de_sufijo(donde: str, sufijo) -> list:
 
 # IDTRIB-PROVEEDOR es la identificación tributaria del proveedor. El 24/10
 # salió un número de cuenta del banco: eso no se declara. Las palabras van
-# con borde adelante: «ARABIC» o «VAT ARBANK-…» no son cuentas.
+# sin una letra adelante: «ARABIC» o «VAT ARBANK-…» no son cuentas, pero
+# «ICBC_ACCOUNT» o «1_BANK» sí (un dígito o «_» no tapan la palabra).
 _PALABRAS_DE_CUENTA = re.compile(
-    r"\b(?:IBAN|SWIFT|BIC\b|ACCOUNT|ACCT|CUENTA|CTA\b|BANK|BANCO)|\bA/C", re.I
+    r"(?<![A-Z])(?:IBAN|SWIFT|BIC\b|ACCOUNT|ACCT|CUENTA|CTA\b|BANK|BANCO|A/C)", re.I
 )
 
 
@@ -1165,7 +1173,8 @@ def generate_maria_txt(operation_id: str, items: list,
         # generación también puede llamarse directamente.
         ncms = {str(it.get('ncm') or it.get('pieza') or '').replace('.', '').replace(' ', '').upper() for it in grupo_items}
         origenes = {str(it.get('pais_origen') or it.get('origen') or '').strip().upper() for it in grupo_items}
-        unidades = {str(it.get('unidad') or it.get('unidad_medida') or it.get('um') or '').strip().upper() for it in grupo_items}
+        # Las unidades, por su código: «kg» y «KGS», o «1» y «01», son la misma.
+        unidades = {get_unidad_codigo(it.get('unidad') or it.get('unidad_medida') or it.get('um')) for it in grupo_items}
         if any(it.get('subitems') for it in grupo_items):
             raise ValueError(f"Grupo {gid}: un producto agrupado no lleva sub-ítems; "
                              f"desagrupalo para cargarlos.")
@@ -1260,6 +1269,13 @@ def generate_maria_txt(operation_id: str, items: list,
         # también es en kilos y suma lo mismo que el kilo neto.
         if unidad_est == UNIDAD_KILOGRAMO:
             cantidad_est = kilos_al_centesimo(peso_neto)
+            if cantidad_est <= 0:
+                # D2 (b): el kilo neto sale al centésimo; 0,00 kg no se declara.
+                raise ValueError(
+                    f"Item {lugar_en_el_pedido.get(id(item), idx)}: con unidad estadística en kilos, "
+                    f"el kilo neto ({peso_neto:g} kg) al centésimo da 0.00; tiene que ser de al "
+                    f"menos 0.005 kg (revisá el peso y la cantidad)."
+                )
             if subitems and (unidad_codigo != UNIDAD_KILOGRAMO
                              or cantidad_est != Decimal(f"{cantidad:.2f}")):
                 raise ValueError(
@@ -1763,7 +1779,7 @@ def supuestos_declarados(
         unidad = item.get("unidad") or item.get("unidad_medida") or item.get("um")
         if not unidad:
             sin_unidad.append(str(idx))
-        elif not _clave_de_unidad(unidad).isdigit() and _clave_de_unidad(unidad) not in UNIDADES_MARIA:
+        elif not (clave := _clave_de_unidad(unidad)).isdigit() and clave not in UNIDADES_MARIA:
             no_reconocida.append(f"{idx} («{str(unidad)[:20]}»)")
 
     if sin_procedencia:
