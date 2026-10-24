@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-24 · fix: devolución de MARIA-7
+
+- Dos sufijos de valor sin guion entre ellos se separan (`AA(ROJO) AB(AZUL)` → `AA(ROJO)-AB(AZUL)`); uno que no se puede separar en códigos (paréntesis sin cerrar, un código sin valor) no genera el TXT y dice dónde está.
+- Con la unidad estadística en kilos, el kilo neto (QARTKGRNET) sale al centésimo, igual a la cantidad estadística, como en el archivo que el MARIA aceptó. «ARABIC» o «ARBANK» ya no se toman por una cuenta del banco.
+- Un grupo compara la unidad estadística por su código («1», «01», «kg»); una unidad de medida que no se reconoce sale 07 con un aviso.
+
 ## 2026-10-24 · fix: MARIA-8, revisión de los sub-ítems por renglón
 
 - Los renglones sin posición no se juntan; un renglón cuya cantidad o kilos dan 0,00 al centésimo no sale como sub-ítem; el unitario del ítem es el FOB sobre la cantidad declarada.

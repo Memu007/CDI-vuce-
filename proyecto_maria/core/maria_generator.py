@@ -325,8 +325,11 @@ def ref_de_la_factura(numero_factura: str) -> str:
 
 # Un sufijo es una serie de «CC(valor)-» y «CCNN-». Dentro del valor el
 # MARIA sólo acepta letras, números y espacios (24/10: rechazó guiones y
-# puntos); el «)-» que separa un sufijo del otro queda.
-_VALOR_DE_SUFIJO = re.compile(r"\((.*?)\)(?=-|$)", re.S)
+# puntos). Entre un sufijo y otro va «-», como en el archivo aceptado; un
+# espacio, una coma o nada entre dos sufijos se toma como separación
+# (devolución de MARIA-7: antes «AA(ROJO) AB(AZUL)» salía «AA(ROJO  AB AZUL)»).
+_UN_SUFIJO = re.compile(r"([A-Za-z]{2})(?:\(([^()]*)\)|([0-9]{2}))")
+_ENTRE_SUFIJOS = re.compile(r"[\s,;\-]*")
 
 
 def _solo_letras_numeros_espacios(texto: str) -> str:
@@ -336,21 +339,50 @@ def _solo_letras_numeros_espacios(texto: str) -> str:
     return re.sub(r"[^A-Za-z0-9 ]", " ", sin_acentos)
 
 
-def limpiar_sufijo(sufijo: str) -> tuple[str, bool]:
-    """El sufijo con cada valor entre paréntesis reducido a letras, números
-    y espacios (lo demás, espacio; una letra con tilde, sin tilde). Devuelve
-    también si cambió algo, para avisarlo."""
+def limpiar_sufijo(sufijo: str, donde: str = "") -> tuple[str, bool]:
+    """El sufijo partido en sus códigos, cada uno con su valor reducido a
+    letras, números y espacios (lo demás, espacio; una letra con tilde, sin
+    tilde) y separados con «-»; el «-» final, si vino. Devuelve también si
+    cambió algo, para avisarlo. Lo que no se puede partir en códigos (un
+    paréntesis sin cerrar, un «(» dentro del valor) no se adivina: error
+    con `donde` (qué producto y qué sufijo)."""
     sufijo = str(sufijo or "")
-    limpio = _VALOR_DE_SUFIJO.sub(
-        lambda m: "(" + _solo_letras_numeros_espacios(m.group(1)) + ")", sufijo
-    )
+    partes, pos = [], _ENTRE_SUFIJOS.match(sufijo).end()
+    while pos < len(sufijo):
+        uno = _UN_SUFIJO.match(sufijo, pos)
+        if not uno:
+            raise ValueError(
+                f"Sufijo de valor{donde}: «{sufijo[:80]}» no se puede separar en códigos "
+                f"(cerca de «{sufijo[pos:pos + 20]}»). Cada uno va como AA(valor) o CA00, "
+                f"separados con un guion, y dentro del paréntesis van sólo letras, números "
+                f"y espacios. Así no se genera el TXT."
+            )
+        codigo, valor, numero = uno.groups()
+        partes.append(codigo + (f"({_solo_letras_numeros_espacios(valor)})" if numero is None else numero))
+        pos = _ENTRE_SUFIJOS.match(sufijo, uno.end()).end()
+    final = "-" if partes and _ENTRE_SUFIJOS.fullmatch(sufijo[-1]) else ""
+    limpio = "-".join(partes) + final
     return limpio, limpio != sufijo
 
 
+def _aviso_de_sufijo(donde: str, sufijo) -> list:
+    """El aviso de lo que se cambió en un sufijo. Si no se puede separar no
+    se avisa: el generador da el error."""
+    try:
+        limpio, cambio = limpiar_sufijo(str(sufijo or "").strip())
+    except ValueError:
+        return []
+    if not cambio:
+        return []
+    return [f"Sufijo de valor{donde}: entre un código y otro va un guion y dentro de los "
+            f"paréntesis van sólo letras, números y espacios; sale «{limpio[:80]}»."]
+
+
 # IDTRIB-PROVEEDOR es la identificación tributaria del proveedor. El 24/10
-# salió un número de cuenta del banco: eso no se declara.
+# salió un número de cuenta del banco: eso no se declara. Las palabras van
+# con borde adelante: «ARABIC» o «VAT ARBANK-…» no son cuentas.
 _PALABRAS_DE_CUENTA = re.compile(
-    r"IBAN|SWIFT|BIC\b|ACCOUNT|ACCT|A/C|CUENTA|CTA\b|BANK|BANCO", re.I
+    r"\b(?:IBAN|SWIFT|BIC\b|ACCOUNT|ACCT|CUENTA|CTA\b|BANK|BANCO)|\bA/C", re.I
 )
 
 
@@ -1143,7 +1175,10 @@ def generate_maria_txt(operation_id: str, items: list,
             raise ValueError(f"Grupo {gid}: todos los ítems deben tener el mismo origen")
         if len(unidades) != 1:
             raise ValueError(f"Grupo {gid}: todos los ítems deben tener la misma unidad de medida")
-        if len({str(it.get('unidad_estadistica') or '').strip().upper() for it in grupo_items}) != 1:
+        # La unidad estadística, por su código: «1», «01» y «kg» son la misma.
+        if len({unidad_estadistica_de(it, get_unidad_codigo(it.get('unidad') or it.get('unidad_medida')
+                                                            or it.get('um')), f"del grupo {gid}")
+                for it in grupo_items}) != 1:
             raise ValueError(f"Grupo {gid}: todos los ítems deben tener la misma unidad estadística")
         # Se comparan los valores que salen en el TXT, no cómo se escribieron.
         pais_grupo = get_pais_codigo(next(iter(origenes)))
@@ -1272,7 +1307,11 @@ def generate_maria_txt(operation_id: str, items: list,
         # [SBT] dice N, el que tiene dos dice S.
         lines.append("CARTSBITEM=S" if item.get("subitems") or renglones else "CARTSBITEM=N")
         lines.append(f"CARTUSO={_estado_item(item, idx, pais_codigo)}")
-        lines.append(f"QARTKGRNET={peso_neto:.3f}")
+        # D2 (b): con la estadística en kilos, el kilo neto es la cantidad
+        # estadística (al centésimo, con el tercer decimal en 0), como en el
+        # archivo que el MARIA aceptó el 24/10.
+        kilo_neto = cantidad_est if unidad_est == UNIDAD_KILOGRAMO else peso_neto
+        lines.append(f"QARTKGRNET={kilo_neto:.3f}")
         lines.append(f"CARTPAYORI={pais_codigo}")
         lines.append(f"CARTPAYPRC={pais_proc_codigo}") # Procedencia (default = origen)
         lines.append(f"CARTUNTDCL={unidad_codigo}") # Unidad declarada (oficial MARIA)
@@ -1322,7 +1361,7 @@ def generate_maria_txt(operation_id: str, items: list,
         # `tests/fixtures/maria_golden_subitems_anon.TXT`.
         # Dentro de los valores, sólo letras, números y espacios (MARIA-7;
         # los supuestos avisan lo que se cambió).
-        sufijo_sbt = limpiar_sufijo((sbt_sufijo_valor or "").strip())[0]
+        sufijo_sbt = limpiar_sufijo((sbt_sufijo_valor or "").strip(), " de la operación")[0]
 
         if not subitems and not renglones and not sufijo_sbt:
             raise ValueError(
@@ -1336,7 +1375,8 @@ def generate_maria_txt(operation_id: str, items: list,
             # al centavo, el unitario y el sufijo propio o el de la operación.
             for n, (renglon, cant_sub, est_sub) in enumerate(
                     zip(renglones, cantidades_sub, estadisticas_sub), start=1):
-                sufijo = limpiar_sufijo(str(renglon.get("sufijo") or "").strip())[0] or sufijo_sbt
+                sufijo = limpiar_sufijo(str(renglon.get("sufijo") or "").strip(),
+                                        f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0] or sufijo_sbt
                 if not sufijo:
                     raise ValueError(
                         f"Item {lugar_en_el_pedido[id(renglon)]}: falta el sufijo de valor (CSBTSVL)."
@@ -1422,7 +1462,8 @@ def generate_maria_txt(operation_id: str, items: list,
                 )
 
             for n, sub in enumerate(subitems, start=1):
-                sufijo = limpiar_sufijo((sub.get("sufijo") or "").strip())[0] or sufijo_sbt
+                sufijo = limpiar_sufijo((sub.get("sufijo") or "").strip(),
+                                        f" del ítem {n_item}, sub-ítem {n}")[0] or sufijo_sbt
                 if not sufijo:
                     raise ValueError(
                         f"Item {n_item}, sub-ítem {n}: falta el sufijo de valor (CSBTSVL)."
@@ -1654,12 +1695,7 @@ def supuestos_declarados(
                 if isinstance(sub, dict) and isinstance(sub.get("sufijo"), str):
                     sufijos.append((f" del ítem {idx}, sub-ítem {n}", sub["sufijo"]))
         for donde, sufijo in sufijos:
-            limpio, cambio = limpiar_sufijo(str(sufijo or "").strip())
-            if cambio:
-                avisos.append(
-                    f"Sufijo de valor{donde}: dentro de los paréntesis van sólo letras, números "
-                    f"y espacios; sale «{limpio[:80]}»."
-                )
+            avisos.extend(_aviso_de_sufijo(donde, sufijo))
 
     # --- Renglones de la misma posición (MARIA-8) ---------------------------
     # Si un renglón tiene un error, el generador lo dice: acá no se avisa.
@@ -1677,17 +1713,15 @@ def supuestos_declarados(
             f"(misma posición SIM, origen, procedencia y estado)."
         )
         for n in ns:
-            limpio, cambio = limpiar_sufijo(str(items[n].get("sufijo") or "").strip())
-            if cambio:
-                avisos.append(
-                    f"Sufijo de valor del renglón {n + 1}: dentro de los paréntesis van sólo "
-                    f"letras, números y espacios; sale «{limpio[:80]}»."
-                )
-        de_cada_uno = {
-            limpiar_sufijo(str(items[n].get("sufijo") or "").strip())[0]
-            or limpiar_sufijo(str(sbt_sufijo_valor or "").strip())[0]
-            for n in ns
-        }
+            avisos.extend(_aviso_de_sufijo(f" del renglón {n + 1}", items[n].get("sufijo")))
+        try:
+            de_cada_uno = {
+                limpiar_sufijo(str(items[n].get("sufijo") or "").strip())[0]
+                or limpiar_sufijo(str(sbt_sufijo_valor or "").strip())[0]
+                for n in ns
+            }
+        except ValueError:
+            de_cada_uno = set()  # el sufijo no se puede separar: lo dice el generador
         if len(de_cada_uno) == 1 and "" not in de_cada_uno:
             avisos.append(
                 f"Sufijo de valor: en el ítem de los renglones {cuales} los {len(ns)} sub-ítems "
@@ -1717,7 +1751,7 @@ def supuestos_declarados(
 
     # --- Defaults a nivel ítem -------------------------------------------
     sin_procedencia = []
-    sin_unidad = []
+    sin_unidad, no_reconocida = [], []
     for idx, item in enumerate(items or [], start=1):
         if not isinstance(item, dict):
             continue
@@ -1726,8 +1760,11 @@ def supuestos_declarados(
         proc = procedencia_de(item)
         if origen and not proc:
             sin_procedencia.append(str(idx))
-        if not (item.get("unidad") or item.get("unidad_medida") or item.get("um")):
+        unidad = item.get("unidad") or item.get("unidad_medida") or item.get("um")
+        if not unidad:
             sin_unidad.append(str(idx))
+        elif not _clave_de_unidad(unidad).isdigit() and _clave_de_unidad(unidad) not in UNIDADES_MARIA:
+            no_reconocida.append(f"{idx} («{str(unidad)[:20]}»)")
 
     if sin_procedencia:
         avisos.append(
@@ -1739,6 +1776,12 @@ def supuestos_declarados(
         avisos.append(
             f"Unidad de medida: en el/los ítem(s) {', '.join(sin_unidad)} se declaró "
             f"07 (unidad) por defecto."
+        )
+    # D6: la unidad leída que no está en la tabla también sale 07; se avisa.
+    if no_reconocida:
+        avisos.append(
+            f"Unidad de medida: en el/los ítem(s) {', '.join(no_reconocida)} la unidad "
+            f"no se reconoce y se declaró 07 (unidad). Si es otra, elegila en el panel."
         )
 
     # --- Lo que decide el despachante (MARIA-4) ---------------------------
