@@ -61,7 +61,8 @@ if espera == "no":
     # Sólo la visita del «Volver a validar» (la espera seguida de esa
     # respuesta): vuelve la espera vieja.
     sigue = "\n    // La validación de antes (con el 0)"
-    cambiar("    await validacionQuieta(page);" + sigue,
+    cambiar("    await entrarAValidacion(page);" + sigue,
+            "    await page.click('#ncmContinueBtn');\n"
             "    await page.waitForSelector('#validatingResults:not([hidden])');" + sigue)
 if click == "partido":
     cambiar("    await page.click('#validatingRerun');",

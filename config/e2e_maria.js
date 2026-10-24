@@ -40,13 +40,23 @@ async function replaceInput(page, selector, value, index = 0) {
 // arriba de los botones cuando llegan. Si llegan entre que Puppeteer scrollea
 // un botón y calcula dónde clickear, el botón queda fuera de la pantalla
 // («Node is either not clickable or not an Element») o el click cae en otro
-// lado. Antes de clickear se espera que la validación haya terminado, que los
-// avisos estén pintados (esta planilla siempre da avisos: unidad, estado e IVA
-// por defecto) y que el botón se vea y esté habilitado. Los avisos se piden
-// dos veces (al entrar y después de la propuesta del despachante): primero se
-// espera que la red quede quieta, así el segundo repintado ya pasó.
-async function validacionQuieta(page) {
-    await page.waitForNetworkIdle({ idleTime: 300 });
+// lado. Los avisos se piden dos veces por entrada (al entrar y después de la
+// propuesta del despachante, finalize.js): se espera que lleguen las dos
+// respuestas, que la validación haya terminado, que los avisos estén pintados
+// (esta planilla siempre da avisos: unidad, estado e IVA por defecto) y que
+// el botón se vea y esté habilitado. No sirve esperar la red quieta: la
+// telemetría (fetch con keepalive) nunca figura como terminada con la
+// intercepción puesta.
+let avisosRespondidos = 0;
+
+async function entrarAValidacion(page) {
+    const desde = avisosRespondidos;
+    await page.click('#ncmContinueBtn');
+    const limite = Date.now() + 15000;
+    while (avisosRespondidos < desde + 2) {
+        if (Date.now() > limite) throw new Error(`Llegaron ${avisosRespondidos - desde} de las 2 respuestas de avisos.`);
+        await new Promise((r) => setTimeout(r, 50));
+    }
     await page.waitForFunction(() => {
         const visible = (el) => el && !el.hidden && el.offsetParent !== null;
         const rerun = document.getElementById('validatingRerun');
@@ -202,8 +212,7 @@ async function verifyBlockingErrorsAndNonBlockingWarnings(page) {
     await page.click('#ncmTbody .ncm-grupo-chip');
     await page.waitForFunction(() => document.querySelectorAll('[data-testid="ncm-weight-input"]').length === 2);
     await replaceInput(page, '[data-testid="ncm-weight-input"]', '0');
-    await page.click('#ncmContinueBtn');
-    await validacionQuieta(page);
+    await entrarAValidacion(page);
     expect(
         (await page.$eval('#validatingIssues', (el) => el.textContent || '')).includes('peso unitario debe ser mayor a cero'),
         'La validación no mostró el peso inválido como error.',
@@ -217,8 +226,7 @@ async function verifyBlockingErrorsAndNonBlockingWarnings(page) {
     await page.click('#ncmBatchAgrupar');
     await page.waitForSelector('#ncmTbody .ncm-grupo-chip');
     await page.waitForFunction(() => !document.getElementById('ncmContinueBtn').disabled);
-    await page.click('#ncmContinueBtn');
-    await validacionQuieta(page);
+    await entrarAValidacion(page);
     // La validación de antes (con el 0) puede estar en pantalla: se espera
     // la respuesta de la nueva.
     const revalidada = page.waitForResponse((r) => r.url().endsWith('/api/validate/smart'));
@@ -308,6 +316,9 @@ async function main() {
         // dependa de Internet ni presente contenido externo como dato del
         // flujo probado.
         await page.setRequestInterception(true);
+        page.on('requestfinished', (request) => {
+            if (new URL(request.url()).pathname === '/generate_maria/avisos') avisosRespondidos += 1;
+        });
         page.on('request', (request) => {
             const url = new URL(request.url());
             if (url.origin === baseUrl && ['/api/arca/novedades', '/api/financials'].includes(url.pathname)) {
