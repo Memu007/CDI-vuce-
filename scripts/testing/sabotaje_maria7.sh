@@ -20,7 +20,7 @@ cd "$WT"
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
        VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
 unset ENABLE_PDF_LLM_FALLBACK || true
-PRUEBA="tests/test_maria7_rechazos_24_10.py tests/test_maria7_fechas.py tests/test_maria7_revision.py"
+PRUEBA="tests/test_maria7_rechazos_24_10.py tests/test_maria7_fechas.py tests/test_maria7_revision.py tests/test_maria7_inicio_actividad.py"
 
 correr() {
   "$VENV/bin/python" -m pytest -q --no-cov -p no:cacheprovider $PRUEBA 2>&1 || true
@@ -68,6 +68,7 @@ L=proyecto_maria/pdf_extractor.py
 T=tests/test_maria7_rechazos_24_10.py
 TF=tests/test_maria7_fechas.py
 TR=tests/test_maria7_revision.py
+TI=tests/test_maria7_inicio_actividad.py
 V2=proyecto_maria/static/v2/screens
 
 # 1. IDSO vuelve a llevar el identificador completo
@@ -169,5 +170,13 @@ caso "pantalla_sin_fecha" "FAILED $TR::test_la_pantalla_muestra_la_fecha_con_el_
 reemplazar $V2/despachante.js "'<option value=\"' + CDI.escapeHtml(v) + '\"'" "'<option value=\"' + v + '\"'"
 caso "unidad_sin_escapar" "FAILED $TR::test_la_unidad_del_producto_se_escapa_en_la_lista"
 
+# 23. la fecha de inicio de actividad vuelve a salir como se guardó
+reemplazar $F '    fecha_ini_act = fecha_inicio_actividad(comprador_fecha_inic_activ)' '    fecha_ini_act = str(comprador_fecha_inic_activ or "").strip()'
+caso "inicio_tal_cual" "FAILED $TI::test_sale_dd_mm_aaaa_con_el_ancho_de_siempre"
+
+# 24. una fecha de inicio con la forma pero imposible pasa (2015-02-30)
+reemplazar $F '                break  # «2015-02-30»' '                return texto  # «2015-02-30»'
+caso "inicio_imposible" "FAILED $TI::test_lo_que_no_es_fecha_no_se_adivina_y_dice_donde_corregirla[2015-02-30]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 22 sabotajes dan rojo por la razón esperada"
+echo "OK: los 24 sabotajes dan rojo por la razón esperada"
