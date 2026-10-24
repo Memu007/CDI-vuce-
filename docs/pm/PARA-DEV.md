@@ -27,6 +27,17 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
+## Veredicto de CLIENTE-1 (2026-10-24): aceptada
+
+Sobre `c402bcb` (producto `fbc006a` + `12ff9b6`), integrada por SHA a la rama
+de la PM. Detalle en `REPRODUCCION-CLIENTE-1-2026-10-24.md`. Reproducido en
+`b0c920b`: tus 14 sabotajes en rojo, tu prueba de pantalla OK y cuatro
+negativos míos (domicilio de espacios, editar y borrar el CUIT, fecha que no
+es ISO, CUIT corto), todos como decís salvo un matiz de D3 (abajo).
+
+**Se cruzaron los mensajes:** EXCEL-3 y D1 ya estaban respondidas en
+`5237aa2` (abajo). No las reabras en `PARA-PM.md`.
+
 ## Veredicto de EXCEL-3 (2026-10-24): aceptada
 
 Integrada por SHA (`a173af2`) a la rama de la PM; el producto es idéntico al
@@ -42,10 +53,12 @@ deduce) y `filas_excel_flete` / `filas_excel_descuento` quedan así. Coincide
 con la decisión del 24/10: el sistema ofrece el descuento leído y el usuario
 decide qué se deduce. Se lo paso a la Dev MARIA para VALOR-1.
 
-## Tarea 1 — CLIENTE-1, después ESTUDIO-1 y PA-1
+## Tarea 1 — PA-1, con D3 al lado; después ESTUDIO-1
 
-Están en `ROADMAP.md`, Fase 1b. ESTUDIO-1 toca qué va al `CDDTAGR`:
-coordiná por la PM con la Dev MARIA (MARIA-7 punto 3), no por su canal.
+PA-1 como está en `ROADMAP.md`, Fase 1b. D3 (abajo) va en commits propios y
+se entrega junto con PA-1, en el mismo informe. ESTUDIO-1 toca qué va al
+`CDDTAGR`: coordiná por la PM con la Dev MARIA (MARIA-7 punto 3), no por su
+canal.
 
 ## Más adelante — EXCEL-3b (lo que dejó el adversario)
 
@@ -72,10 +85,20 @@ faltaba lo de `CIERRE-RETOMA-2026-10-24.md` («Qué sigue», punto 2).
 
 ## Respuestas a tus D
 
-- **D2 (CLIENTE-1), 2026-10-24: (a), a la vista y con aviso.** Razón social,
-  CUIT, domicilio y fecha de inicio arriba, marcados «lo pide el MARIA»;
-  email y teléfono en «Más datos». Se guarda sin ellos, con un aviso que
-  dice cuáles faltan. La API, la importación de clientes y el alta rápida de
-  la revisión no cambian. Lo que no puede faltar en el TXT lo frena la
-  generación (MARIA-7), no el alta. Seguí con CLIENTE-1; PA-1 después, como
-  dice la Tarea 2.
+- **D3 (CLIENTE-1), 2026-10-24: (a).** Un matiz: la fecha no se borra «sin
+  aviso». Al guardar sale «Faltan para el MARIA: inicio de actividad»; lo
+  que no dice es que había una fecha y se perdió. Igual se arregla:
+  - **Causa:** el campo de fecha sólo muestra AAAA-MM-DD; si lo guardado
+    está en otro formato, el campo queda vacío y el guardado lo manda vacío.
+  - **Qué:** si lo guardado no es AAAA-MM-DD y el campo quedó vacío, la
+    fecha no se manda y se conserva. Si el usuario carga una fecha, la
+    nueva reemplaza a la vieja.
+  - **Prueba, por la familia:** fecha guardada `null`, `""`, `"01/03/2015"`,
+    otro texto no ISO y una ISO; editar sin tocar la fecha y guardar. Las
+    no ISO se conservan; `null` y `""` siguen vacías; la ISO se conserva.
+    Un sabotaje que vuelva a mandar el campo vacío tiene que dar rojo.
+  - **Lo que deja:** una fecha no ISO ya no se puede borrar desde el
+    formulario (sólo reemplazar). Aceptado; anotalo como riesgo.
+  - **Al aviso**, si la fecha vieja se conserva, que no diga que falta.
+  - No toques la API ni el TXT: la conversión al formato del TXT la hace la
+    Dev MARIA (MARIA-7, punto 9).

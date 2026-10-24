@@ -138,6 +138,9 @@ reunión, sin datos del cliente):
   de inicio de actividades).
   PM (2026-10-24, D2 de CLIENTE-1): esos cuatro van a la vista y con aviso
   si faltan, no obligatorios al guardar; el TXT los controla al generarse.
+  PM (2026-10-24, D3 de CLIENTE-1): editar un cliente no borra una fecha de
+  inicio guardada en otro formato; la pantalla no la manda si el campo
+  quedó vacío. La fecha va al TXT en DD/MM/AAAA (MARIA-7, punto 9).
 - CUIT del despachante por estudio, cargado una vez y elegido en la
   operación.
 - «NCM» pasa a «Posición arancelaria (PA SIM)» en pantallas.
