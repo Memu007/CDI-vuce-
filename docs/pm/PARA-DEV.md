@@ -53,6 +53,68 @@ deduce) y `filas_excel_flete` / `filas_excel_descuento` quedan así. Coincide
 con la decisión del 24/10: el sistema ofrece el descuento leído y el usuario
 decide qué se deduce. Se lo paso a la Dev MARIA para VALOR-1.
 
+## Ahora (2026-10-24 20:35 UTC): mientras reviso PA-1
+
+PA-1 + D3 (`31719c3`) está en revisión; el veredicto y D4–D7 van acá
+cuando termine. No esperes: seguí en este orden.
+
+### 1. PRUEBAS-1: dos pruebas que quedaron mal (sólo pruebas, sin producto)
+
+Salió al probar la publicación de `8b45207`. El producto está bien; las
+pruebas no.
+
+**a) `cliente1.sh` da un «sin rojo» que va y viene.** Lo vi 1 vez en una
+corrida y lo reproduje 2 de 82 veces.
+- **Causa:** `openForm()` (`clientes.js`) pone el foco en `#cfNombre` con
+  `setTimeout(..., 80)`. `page.fill('#cfCuit', …)` enfoca y escribe en dos
+  pasos; si el temporizador cae en el medio, el CUIT se escribe en el
+  nombre («Nombre20-12345678-6») y el CUIT queda vacío. Entonces el aviso
+  dice que falta el CUIT y la prueba lo toma como falla, aunque no haya
+  sabotaje.
+- **Qué:** antes de llenar el formulario recién abierto, esperar la
+  condición observable `document.activeElement.id === 'cfNombre'`
+  (`page.waitForFunction`), no una espera fija. **Por la familia:** toda
+  prueba que llene `cxForm` justo después de abrirlo (alta, «Cliente Dos»,
+  editar, y las de PA-1 si llenan el formulario).
+- **Prueba de que distingue:** con la espera, 100 corridas seguidas sin
+  que el CUIT caiga en el nombre; sin la espera, que se vea al menos una
+  (podés acortar el `setTimeout` en un worktree descartable para forzarlo,
+  nunca en el producto).
+
+**b) `excel1.sh` tiene cuatro sabotajes viejos.** EXCEL-3 cambió el código
+que atacan y el script no se actualizó (sobre `8b45207`: «sabotajes con
+falla: 4»):
+- «las filas de subtotal vuelven a entrar» y «el total en la columna de
+  código vuelve a entrar»: el patrón ahora es `_es_fila_de_total(rotulo or
+  pieza)`. Ojo: cambiarlo por `rotulo` solo **no** da rojo (rótulo ya toma
+  «TOTAL AMOUNT» de la columna de código); con `descripcion` sí. Elegí el
+  sabotaje que reproduce el defecto viejo.
+- «vuelven las dos columnas con el mismo nombre (500)»: el `drop` ahora son
+  dos líneas con `campos` y `pesos`.
+- «el mapeo guardado vuelve a dejar afuera lo detectado» (`elegido = g`):
+  da 35 rojos, pero ya no el de
+  `test_mapeo_guardado_no_deja_afuera_encabezados_nuevos`. Decí por qué esa
+  prueba ya no lo distingue y ajustá la expectativa o la prueba.
+- Al terminar: `excel1.sh` y `cliente1.sh` con «sin rojo: 0» / «con falla:
+  0» sobre tu SHA.
+
+### 2. EXCEL-3b (abajo, «Más adelante»)
+
+### 3. ESTUDIO-1, con lo que pediste definido (decidido por la PM)
+
+1. **Los estudios son de la cuenta**, como los clientes: cada usuario ve y
+   elige sólo los suyos (mismo aislamiento por dueño que clientes; prueba
+   de que otro usuario no los ve ni los usa).
+2. **Se elige en la operación donde hoy se carga el CUIT del despachante**
+   (`cuit_agr`), con el último usado o el único como opción preseleccionada.
+3. **Sin migración de datos:** `users.cuit` sigue como respaldo cuando la
+   operación no trae estudio. Nada se copia ni se borra.
+
+Costura con MARIA-7 punto 3: la Dev MARIA ya entregó el error cuando falta
+el CUIT (`f0b73f7`, en revisión). ESTUDIO-1 arranca **después** de que yo
+integre MARIA-7 a mi rama: traés mi rama y cambiás sólo de dónde sale el
+CUIT y el texto de «dónde cargarlo». Si llegás antes, seguí con EXCEL-3b.
+
 ## Tarea 1 — PA-1, con D3 al lado; después ESTUDIO-1
 
 PA-1 como está en `ROADMAP.md`, Fase 1b. D3 (abajo) va en commits propios y
