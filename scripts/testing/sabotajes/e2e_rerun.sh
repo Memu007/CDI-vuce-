@@ -30,6 +30,7 @@ git -C "$REPO" worktree add --detach "$WT" "$SHA" >/dev/null || exit 2
 trap 'git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$TMPD"' EXIT
 [ -d "$REPO/config/node_modules/puppeteer" ] || { echo "BASE  | falta config/node_modules: corré npm ci --prefix config"; exit 1; }
 ln -s "$REPO/config/node_modules" "$WT/config/node_modules"
+PY="$(command -v "$PY")" || { echo "BASE  | no encuentro $PY"; exit 1; }
 PATH="$(dirname "$PY"):$PATH"
 cd "$WT"
 E2E=config/e2e_maria.js
@@ -42,16 +43,12 @@ import sys
 origen, destino, espera, demora, click = sys.argv[1:]
 s = open(origen, encoding="utf-8").read()
 
-def cambiar(viejo, nuevo, veces=1, ultima=False):
+def cambiar(viejo, nuevo):
     global s
     n = s.count(viejo)
-    if (ultima and n < 1) or (not ultima and n != veces):
-        sys.exit(f"ROTO  | encontré {n} veces: {viejo!r}")
-    if ultima:
-        i = s.rindex(viejo)
-        s = s[:i] + nuevo + s[i + len(viejo):]
-    else:
-        s = s.replace(viejo, nuevo)
+    if n != 1:
+        sys.exit(f"ROTO  | encontré {n} veces (tiene que ser una): {viejo!r}")
+    s = s.replace(viejo, nuevo)
 
 ruta = {"avisos": "/generate_maria/avisos", "validacion": "/api/validate/smart"}[demora]
 ms = {"avisos": 1500, "validacion": 3000}[demora]
@@ -61,9 +58,11 @@ cambiar("            void request.continue();\n",
         "                return;\n            }\n"
         "            void request.continue();\n")
 if espera == "no":
-    # Sólo la visita del «Volver a validar»: vuelve la espera vieja.
-    cambiar("    await validacionQuieta(page);",
-            "    await page.waitForSelector('#validatingResults:not([hidden])');", ultima=True)
+    # Sólo la visita del «Volver a validar» (la espera seguida de esa
+    # respuesta): vuelve la espera vieja.
+    sigue = "\n    // La validación de antes (con el 0)"
+    cambiar("    await validacionQuieta(page);" + sigue,
+            "    await page.waitForSelector('#validatingResults:not([hidden])');" + sigue)
 if click == "partido":
     cambiar("    await page.click('#validatingRerun');",
             "    const rerun = await page.$('#validatingRerun');\n"
@@ -82,7 +81,7 @@ correr() {
   local nombre="$1" debe="$2"; shift 2
   variante "$@" || { FALLAS=$((FALLAS+1)); return; }
   local t=$SECONDS salida rc
-  salida=$(bash scripts/testing/e2e_maria.sh 2>&1); rc=$?
+  salida=$(TMPDIR="$TMPD" bash scripts/testing/e2e_maria.sh 2>&1); rc=$?
   local tardo=$((SECONDS-t))
   if [ "$debe" = pasar ]; then
     if [ $rc -eq 0 ]; then echo "VERDE | $nombre: pasó (${tardo} s)"

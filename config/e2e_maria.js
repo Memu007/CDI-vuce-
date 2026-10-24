@@ -42,8 +42,11 @@ async function replaceInput(page, selector, value, index = 0) {
 // («Node is either not clickable or not an Element») o el click cae en otro
 // lado. Antes de clickear se espera que la validación haya terminado, que los
 // avisos estén pintados (esta planilla siempre da avisos: unidad, estado e IVA
-// por defecto) y que el botón se vea y esté habilitado.
+// por defecto) y que el botón se vea y esté habilitado. Los avisos se piden
+// dos veces (al entrar y después de la propuesta del despachante): primero se
+// espera que la red quede quieta, así el segundo repintado ya pasó.
 async function validacionQuieta(page) {
+    await page.waitForNetworkIdle({ idleTime: 300 });
     await page.waitForFunction(() => {
         const visible = (el) => el && !el.hidden && el.offsetParent !== null;
         const rerun = document.getElementById('validatingRerun');
