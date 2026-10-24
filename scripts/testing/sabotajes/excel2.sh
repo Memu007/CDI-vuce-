@@ -34,13 +34,17 @@ PYEOF
   # Sólo la prueba que el sabotaje nombra: el archivo entero tarda medio
   # minuto, casi todo en las dos pruebas de los ocho libros (PRUEBAS-1).
   local prueba="${esperado#FAILED }"; prueba="${prueba%%\[*}"
-  local salida codigo inicio=$SECONDS
-  salida="$("$PY" -m pytest -q --no-cov -p no:cacheprovider "$prueba" 2>&1)"; codigo=$?
+  # Con un límite: el sabotaje de la combinada falla a los 15 s, pero el hilo
+  # de la lectura saboteada sigue siete minutos y pytest no sale hasta que
+  # termina. El resumen ya está impreso (sin búfer), así que se lee igual.
+  local salida codigo inicio=$SECONDS corte=""
+  salida="$(PYTHONUNBUFFERED=1 timeout "${LIMITE:-90}" "$PY" -m pytest -q --no-cov -p no:cacheprovider "$prueba" 2>&1)"; codigo=$?
   local tardo=$((SECONDS-inicio))
+  [ "$codigo" -eq 124 ] && corte=", cortado a los ${LIMITE:-90} s"
   if [ "$codigo" -eq 0 ]; then
     echo "VERDE | $nombre: la prueba no lo vio"; FALLAS=$((FALLAS+1))
   elif grep -qF -- "$esperado" <<<"$salida"; then
-    echo "ROJO  | $nombre: dice «$esperado» (${tardo} s)"
+    echo "ROJO  | $nombre: dice «$esperado» (${tardo} s$corte)"
   else
     echo "ROJO? | $nombre: rojo (salida $codigo), pero sin «$esperado»"; grep -E "^E " <<<"$salida" | head -5; FALLAS=$((FALLAS+1))
   fi
