@@ -829,6 +829,44 @@ def fob_total_del_txt(items: list, grupos: list | None = None) -> Decimal:
     return sum((centavos(v) for v in lineas.values()), Decimal('0.00'))
 
 
+TASA_SEGURO_SUGERIDO = Decimal("0.01")
+
+
+def importe_escrito(valor) -> str:
+    """Un importe como se escribe acá: 1.234,56."""
+    return f"{valor:,.2f}".replace(",", "@").replace(".", ",").replace("@", ".")
+
+
+def cuentas_del_valor(items: list, flete=0, seguro=0, ajustes_incluir=None, ajustes_deducir=None) -> dict:
+    """Las cuentas del valor que se muestran antes de generar (VALOR-1).
+
+    FOB casillero = FOB de la factura (el MDDTFOB del TXT) + ajustes a incluir
+    − ajustes a deducir. Los ajustes los carga la persona: el sistema no
+    decide qué se descuenta. El seguro sugerido es el 1 % de (FOB casillero +
+    flete), al centavo. Nada de esto cambia el TXT (D12 de VALOR-1). Un
+    importe inválido o un FOB casillero negativo es un ValueError."""
+    fob_factura = fob_total_del_txt(items)
+    incluir = centavos(importe_valido(ajustes_incluir, "Ajustes a incluir") or 0)
+    deducir = centavos(importe_valido(ajustes_deducir, "Ajustes a deducir") or 0)
+    flete_c = centavos(importe_valido(flete, "Flete") or 0)
+    seguro_c = centavos(importe_valido(seguro, "Seguro") or 0)
+    fob_casillero = fob_factura + incluir - deducir
+    if fob_casillero < 0:
+        raise ValueError(
+            f"Los ajustes a deducir ({importe_escrito(deducir)}) superan el FOB de la "
+            f"factura más los ajustes a incluir ({importe_escrito(fob_factura + incluir)})."
+        )
+    return {
+        "fob_factura": float(fob_factura),
+        "ajustes_incluir": float(incluir),
+        "ajustes_deducir": float(deducir),
+        "fob_casillero": float(fob_casillero),
+        "flete": float(flete_c),
+        "seguro": float(seguro_c),
+        "seguro_sugerido": float(centavos(TASA_SEGURO_SUGERIDO * (fob_casillero + flete_c))),
+    }
+
+
 def _item_de_los_renglones(renglones: list, renglones_de: dict, lugar: dict) -> dict:
     """El ítem que junta renglones de la misma posición (MARIA-8): el FOB es
     la suma de los de cada renglón al centavo (así MDDTFOB no cambia) y los

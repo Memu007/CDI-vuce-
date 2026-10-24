@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-24 · feat: ajustes y seguro antes de generar (VALOR-1)
+
+- En la pantalla de generar, una tarjeta «Ajustes y seguro»: ajustes a incluir y a deducir que carga la persona, con las cuentas a la vista (FOB de la factura, que es el del TXT, ± ajustes = FOB casillero, flete y seguro). El descuento de la planilla se ofrece con un botón; nunca se pone solo.
+- Botón «Calcular seguro» (1 % de FOB casillero + flete) cuando la operación no trae seguro. El TXT no cambia con los ajustes: el FOB casillero se carga a mano en el MARIA y lo dice un aviso.
+
 ## 2026-10-24 · fix: devolución de MARIA-7
 
 - Dos sufijos de valor sin guion entre ellos se separan (`AA(ROJO) AB(AZUL)` → `AA(ROJO)-AB(AZUL)`); uno que no se puede separar en códigos (paréntesis sin cerrar, un código sin valor) no genera el TXT y dice dónde está.

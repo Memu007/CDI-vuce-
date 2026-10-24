@@ -684,6 +684,8 @@
             value = value.trim();
         }
         op[el.name] = value;
+        // VALOR-1: un seguro escrito a mano deja de ser el calculado.
+        if (el.name === 'seguro') delete op.seguro_calculado;
         // MARIA-1c: un campo que la factura traía sin poder leerse deja de
         // avisarse cuando la persona escribe un valor (0 incluido) y vuelve a
         // avisarse si lo borra. La lista del lector no se toca.

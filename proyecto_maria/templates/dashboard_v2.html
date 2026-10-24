@@ -602,6 +602,36 @@
                             <p id="despachanteError" hidden role="alert" style="margin-top:.4rem;font-size:.85rem"></p>
                         </div>
 
+                        <!-- VALOR-1: los ajustes los carga la persona; el sistema no decide qué se descuenta. -->
+                        <div class="card card-body" id="valorWrap" style="margin-bottom:1rem">
+                            <p class="form-label" style="font-weight:600">Ajustes y seguro</p>
+                            <div class="row-3" style="gap:.75rem;flex-wrap:wrap">
+                                <label class="form-label">Ajustes a incluir
+                                    <input type="number" id="valorIncluir" class="form-input" step="0.01" min="0" inputmode="decimal" placeholder="0,00" autocomplete="off">
+                                </label>
+                                <label class="form-label">Ajustes a deducir
+                                    <input type="number" id="valorDeducir" class="form-input" step="0.01" min="0" inputmode="decimal" placeholder="0,00" autocomplete="off">
+                                </label>
+                            </div>
+                            <p id="valorDescuento" hidden style="margin-top:.5rem;font-size:.9rem">
+                                <span id="valorDescuentoTexto"></span>
+                                <button type="button" class="btn btn-ghost btn-sm" id="valorUsarDescuento">Usarlo como ajuste a deducir</button>
+                            </p>
+                            <div style="overflow-x:auto;max-width:100%">
+                            <table class="table" style="width:100%;margin-top:.75rem">
+                                <tbody id="valorCuentas"></tbody>
+                            </table>
+                            </div>
+                            <p style="margin-top:.5rem">
+                                <button type="button" class="btn btn-ghost btn-sm" id="valorCalcularSeguro" hidden></button>
+                                <span id="valorSeguroNota" class="caption" style="font-size:.85rem"></span>
+                            </p>
+                            <p class="caption" style="margin-top:.4rem;color:var(--muted,#666);font-size:.85rem">
+                                El TXT lleva el FOB de la factura: el FOB casillero con los ajustes se carga en el MARIA.
+                            </p>
+                            <p id="valorError" hidden role="alert" style="margin-top:.4rem;font-size:.85rem"></p>
+                        </div>
+
                         <div id="validatingAvisosPanel" class="issue-group is-warning" hidden style="margin-bottom:1rem">
                             <header class="issue-group-header">
                                 <strong>Revisá antes de generar</strong>

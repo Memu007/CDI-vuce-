@@ -70,7 +70,7 @@ PROJECT_VERSION = datetime.now().strftime("%Y%m%d%H%M%S")
 from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, importe_escrito
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
     DocumentoNoAdmitido,
@@ -4104,6 +4104,11 @@ class MariaRequest(BaseModel):
     # MARIA-3. Gastos anteriores al FOB del campo de la pantalla: van al TXT
     # (GTOS-ANT-FOB) sólo con EXW, FCA o FAS. `gastos_fob` explícito manda.
     gastos_anteriores_fob: float | None = None
+    # VALOR-1. Ajustes a incluir y a deducir que carga la persona: sólo para
+    # las cuentas del FOB casillero y del seguro sugerido. No van al TXT
+    # hasta saber en qué campo (D12): `/generate_maria` no los usa.
+    ajustes_incluir: float | None = None
+    ajustes_deducir: float | None = None
     # MARIA-3. Procedencia de la operación (país desde donde se embarca, art. 15
     # del Código Aduanero). Va a cada producto que no traiga la suya.
     procedencia: str = ""
@@ -4210,7 +4215,33 @@ async def avisos_maria_endpoint(
     # (CATALOGO-NCM-1): aviso, no freno.
     from proyecto_maria.core.controles_maria import avisos_de_ncm
     avisos_ncm = avisos_de_ncm(items)
-    return {"avisos": errores_de_procedencia(items) + kit_warnings + avisos_ncm + supuestos, "supuestos": supuestos}
+    valor, avisos_valor = _cuentas_del_valor(request, items)
+    return {
+        "avisos": errores_de_procedencia(items) + kit_warnings + avisos_ncm + avisos_valor + supuestos,
+        "supuestos": supuestos,
+        "valor": valor,
+    }
+
+
+def _cuentas_del_valor(request: MariaRequest, items: list) -> tuple[dict, list]:
+    """Las cuentas del valor para la pantalla y su aviso (VALOR-1). Un ajuste
+    inválido o un producto mal formado no frena los avisos: va en `error`."""
+    try:
+        valor = cuentas_del_valor(
+            [it for it in items if isinstance(it, dict)],
+            flete=request.flete, seguro=request.seguro,
+            ajustes_incluir=request.ajustes_incluir, ajustes_deducir=request.ajustes_deducir,
+        )
+    except (ValueError, TypeError) as e:
+        return {"error": str(e)}, []
+    if not (valor["ajustes_incluir"] or valor["ajustes_deducir"]):
+        return valor, []
+    moneda = (str(request.moneda or "").strip().upper() + " ") if str(request.moneda or "").strip() else ""
+    return valor, [
+        f"El TXT lleva el FOB de la factura ({moneda}{importe_escrito(valor['fob_factura'])}); "
+        f"el FOB casillero con los ajustes ({moneda}{importe_escrito(valor['fob_casillero'])}) "
+        f"lo cargás vos en el MARIA."
+    ]
 
 
 @app.post("/generate_maria")
