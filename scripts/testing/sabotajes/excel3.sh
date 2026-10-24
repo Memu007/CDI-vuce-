@@ -59,8 +59,8 @@ sabotaje $M "«Specification» le gana a un «Item» con el nombre" \
   '        detected_mapping = _detect_item_columns(list(df.columns))' \
   "FAILED $T::test_item_con_el_nombre_del_producto_sigue_siendo_la_descripcion"
 sabotaje $M "«Freight cost» en Item cuenta como nombre" \
-  '            _es_fila_de_total(t) or _FILA_DE_FLETE_RE.match(t) or _FILA_DE_DESCUENTO_RE.match(t)' \
-  '            False' \
+  $'            _es_fila_de_total(t) or _FILA_DE_FLETE_RE.match(t) or _FILA_DE_DESCUENTO_RE.match(t)\n            or _FILA_QUE_NO_ES_MERCADERIA_RE.match(t))' \
+  '            False)' \
   "FAILED $T::test_un_flete_sin_monto_no_hereda_la_descripcion_del_grupo"
 sabotaje $M "la cantidad vuelve a ser la de rollos" \
   $'    nuevo = {src: canon for src, canon in mapeo.items() if canon != "cantidad"}\n    nuevo[elegida] = "cantidad"' \
