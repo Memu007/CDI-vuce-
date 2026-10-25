@@ -21,6 +21,7 @@
     let lastMaria = null;         // { filename, download_url, content }
     let validatingInFlight = false;
     let generateInFlight = false;
+    let esperandoArancel = false; // onGenerate espera la propuesta (SUFIJOS-1)
 
     function $(id) { return document.getElementById(id); }
     function show(el) { if (el) el.hidden = false; }
@@ -569,9 +570,15 @@
     /* ==========================================================
        Pantalla 5: ready (generar + descargar)
        ========================================================== */
-    function onGenerate() {
-        if (generateInFlight) return;
+    async function onGenerate() {
+        if (generateInFlight || esperandoArancel) return;
         if (lastValidation && (lastValidation.errores || []).length > 0) return;
+        // La propuesta del arancel tiene que ser la de los productos como
+        // están ahora (si se borró uno, no se usa la de otro).
+        if (CDI.despachante && CDI.despachante.listo) {
+            esperandoArancel = true;
+            try { await CDI.despachante.listo(); } finally { esperandoArancel = false; }
+        }
 
         // Guardar SBT del input al estado antes de generar
         CDI.state = CDI.state || {};

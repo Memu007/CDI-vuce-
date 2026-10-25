@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-10-25 · feat: el sufijo de valor de cada producto, con el arancel de ARCA (SUFIJOS-1)
 
-- En «Lo que decide el despachante» cada producto propone su sufijo (marca AA, modelo AB, código AI) según el arancel de ARCA del 07/10/2026 y dice qué falta; una posición que no está queda vacía y se avisa. Sin elegir, la unidad estadística va en kilos si la posición la pide.
+- En «Lo que decide el despachante» cada producto propone su sufijo (marca AA, modelo AB, código AI) según el arancel de ARCA del 07/10/2026 junto con el de la operación (CA00 y los demás quedan) y dice qué falta; una posición que no está queda vacía y se avisa, con la letra de control correcta si la que vino es otra. Sin elegir, la unidad estadística va en kilos si la posición la pide.
 - Un producto entero sale con su propio sufijo (antes, el de la operación). Un grupo exige el mismo sufijo en todos sus ítems.
 
 ## 2026-10-25 · fix: un monto que no se pudo leer no sale como 0 (SEPARADORES-1b)

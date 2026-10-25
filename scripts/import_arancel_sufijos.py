@@ -26,7 +26,6 @@ import sys
 from pathlib import Path
 from zipfile import ZipFile
 
-from proyecto_maria.core.ncm_catalog import DATA_DIR
 from proyecto_maria.core.sufijos_arca import TABLA, parse_sufijos, parse_unidades
 
 LEEME = Path(__file__).resolve().parents[1] / "docs" / "pm" / "datos" / "LEEME.md"

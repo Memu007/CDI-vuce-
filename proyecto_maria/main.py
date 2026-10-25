@@ -8477,6 +8477,12 @@ async def aviso_de_ncm_escrita(codigo: str = "", user=Depends(get_current_user))
 SUFIJOS_POR_PEDIDO = 500
 
 
+def _texto_del_pedido(valor, largo: int) -> str:
+    """Un campo del pedido como texto que se puede devolver (sin mitades de
+    caracteres sueltas) y con tope."""
+    return str(valor or "").encode("utf-8", "replace").decode("utf-8").strip()[:largo]
+
+
 @app.post("/api/sufijos/propuesta")
 async def propuesta_de_sufijos(data: dict, user=Depends(get_current_user)):
     """El sufijo de valor y la unidad estadística que el arancel de ARCA pide
@@ -8491,18 +8497,21 @@ async def propuesta_de_sufijos(data: dict, user=Depends(get_current_user)):
     tabla = sufijos_arca.cargar()
     salida = []
     for it in items:
-        posicion = str(it.get("pieza") or it.get("ncm") or "").strip()[:20]
+        # Como el generador: si vienen las dos, manda la NCM.
+        posicion = _texto_del_pedido(it.get("ncm") or it.get("pieza"), 20)
         consulta = sufijos_arca.consultar(posicion, tabla)
         if not consulta:
             salida.append({"posicion": posicion, "en_la_tabla": False, "sufijo": "", "faltan": [],
-                           "sufijos": [], "opciones": [], "unidad_estadistica": None})
+                           "sufijos": [], "opciones": [], "unidad_estadistica": None,
+                           "letra_de_control": sufijos_arca.letra_de_control(posicion, tabla)})
             continue
-        propuesta = sufijos_arca.proponer(it, consulta)
+        propuesta = sufijos_arca.proponer(
+            {c: _texto_del_pedido(it.get(c), 200) for c in ("marca", "modelo", "codigo_parte")}, consulta)
         salida.append({"posicion": posicion, "en_la_tabla": True, "sufijo": propuesta["sufijo"],
                        "faltan": propuesta["faltan"], "sufijos": consulta["sufijos"],
                        "opciones": consulta["opciones"],
                        "unidad_estadistica": consulta["unidad_estadistica"]})
-    return {"fuente": sufijos_arca.fuente(tabla), "items": salida}
+    return {"fuente": sufijos_arca.fuente(tabla), "sin_tabla": not tabla, "items": salida}
 
 
 @app.post("/api/ncm/sugerir")

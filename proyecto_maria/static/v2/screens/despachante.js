@@ -113,26 +113,33 @@
     // Lo que el arancel dice de cada producto (SUFIJOS-1): por fila, el
     // sufijo propuesto y lo que falta; por posición, la unidad estadística.
     // Se pide de nuevo si cambian los productos; si falla, no se propone nada.
-    let arancel = { clave: null, fuente: '', filas: [] };
+    // Cada fila guarda lo que se pidió: si se borra o cambia un producto, su
+    // propuesta no pasa al que queda en su lugar.
+    let arancel = { clave: null, fuente: '', sin_tabla: false, filas: [], pedidos: [] };
     let tabla = {};
+    let pendiente = null;           // { clave, promesa }: el pedido en curso
     function posicionDe(it) { return String((it && it.pieza) || '').trim().toUpperCase(); }
     function recordarTabla(t) { tabla = t || {}; }
-    function cuerpoDeSufijos() {
-        const cuerpo = { items: (CDI.state.items || []).map(it => ({
-            pieza: posicionDe(it), marca: String(it.marca || ''), modelo: String(it.modelo || ''),
-            codigo_parte: String(it.codigo_parte || ''),
-        })) };
-        return { clave: JSON.stringify(cuerpo) };
+    function pedidoDe(it) {
+        return {
+            pieza: posicionDe(it), marca: String((it && it.marca) || ''), modelo: String((it && it.modelo) || ''),
+            codigo_parte: String((it && it.codigo_parte) || ''),
+        };
     }
-    async function pedirSufijos() {
-        const clave = cuerpoDeSufijos().clave;
-        if (arancel.clave === clave) return false;
-        let nuevo = { clave: clave, fuente: '', filas: [] };
+    function cuerpoDeSufijos() {
+        const items = (CDI.state.items || []).map(pedidoDe);
+        return { items: items, clave: JSON.stringify({ items: items }) };
+    }
+    async function pedirAlArancel(cuerpo) {
+        const clave = cuerpo.clave;
+        const nuevo = { clave: clave, fuente: '', sin_tabla: false, filas: [], pedidos: cuerpo.items };
         try {
             const r = await CDI.api('/api/sufijos/propuesta', { method: 'POST', body: clave });
             if (r && r.ok) {
                 const d = await r.json();
-                nuevo = { clave: clave, fuente: d.fuente || '', filas: d.items || [] };
+                nuevo.fuente = d.fuente || '';
+                nuevo.sin_tabla = Boolean(d.sin_tabla);
+                nuevo.filas = d.items || [];
             } else {
                 nuevo.clave = null;
             }
@@ -147,29 +154,119 @@
         recordarTabla(t);
         return true;
     }
-    // El sufijo propuesto, sólo para un producto que sale con su propio
-    // sufijo: no en sub-ítems (cada uno lleva el suyo) ni en un grupo (va
-    // uno solo para todos y lo escribe la persona).
+    // Un solo pedido por estado de los productos: si ya hay uno en curso
+    // para los mismos, se espera ése.
+    function pedirSufijos() {
+        const cuerpo = cuerpoDeSufijos();
+        if (arancel.clave === cuerpo.clave) return Promise.resolve(false);
+        if (pendiente && pendiente.clave === cuerpo.clave) return pendiente.promesa;
+        const este = { clave: cuerpo.clave };
+        este.promesa = pedirAlArancel(cuerpo).finally(() => { if (pendiente === este) pendiente = null; });
+        pendiente = este;
+        return este.promesa;
+    }
+    // Antes de generar: la propuesta de los productos como están ahora. Si el
+    // arancel no contesta en `tope` ms, se sigue sin ella (va el sufijo de
+    // la operación y el servidor avisa lo que falta).
+    async function listo(tope) {
+        let reloj;
+        const tiempo = new Promise(r => { reloj = setTimeout(() => r(false), tope || 10000); });
+        try {
+            return await Promise.race([pedirSufijos(), tiempo]);
+        } finally {
+            clearTimeout(reloj);
+        }
+    }
+    // La propuesta de la fila, sólo para un producto que sale con su propio
+    // sufijo (no en sub-ítems, cada uno lleva el suyo, ni en un grupo, va
+    // uno solo para todos y lo escribe la persona) y sólo si es la que se
+    // pidió para este producto.
     function propuestaDe(it, i) {
-        if (!it || it.grupo_id || (Array.isArray(it.subitems) && it.subitems.length)) return null;
-        const f = arancel.filas[i];
-        return f && posicionDe(it) === String(f.posicion || '').toUpperCase() ? f : null;
+        if (!it || it.grupo_id || (Array.isArray(it.subitems) && it.subitems.length) || !posicionDe(it)) return null;
+        const pedido = arancel.pedidos[i];
+        if (!pedido || JSON.stringify(pedido) !== JSON.stringify(pedidoDe(it))) return null;
+        return arancel.filas[i] || null;
+    }
+
+    // Un sufijo partido en sus códigos, con la misma regla que el servidor
+    // (limpiar_sufijo en core/maria_generator.py); null si no se puede partir.
+    const UN_SUFIJO = /([A-Za-z]{2})(?:\(([^()]*)\)|([0-9]{2}))/y;
+    const ENTRE_SUFIJOS = /[\s,;\-]*/y;
+    function partesDe(texto) {
+        const s = String(texto || '');
+        const partes = [];
+        ENTRE_SUFIJOS.lastIndex = 0;
+        ENTRE_SUFIJOS.exec(s);
+        let pos = ENTRE_SUFIJOS.lastIndex;
+        while (pos < s.length) {
+            UN_SUFIJO.lastIndex = pos;
+            const m = UN_SUFIJO.exec(s);
+            if (!m) return null;
+            partes.push({ codigo: m[1].toUpperCase(), texto: m[0] });
+            ENTRE_SUFIJOS.lastIndex = UN_SUFIJO.lastIndex;
+            ENTRE_SUFIJOS.exec(s);
+            pos = ENTRE_SUFIJOS.lastIndex;
+        }
+        return partes;
+    }
+    // El sufijo de la operación con lo que se propone para el producto: cada
+    // código propuesto (AA, AB, AI) reemplaza al mismo de la operación y los
+    // que la operación no trae van al final; los demás de la operación
+    // (CA00, PC01…) quedan. Si el de la operación no se puede partir, nada
+    // (el servidor lo dice); si juntos pasan del tope, la propuesta sola.
+    function combinar(op, propuesto) {
+        const prop = partesDe(propuesto);
+        const deOp = partesDe(op);
+        if (!prop || !prop.length || !deOp) return '';
+        const porCodigo = {};
+        prop.forEach(p => { porCodigo[p.codigo] = p.texto; });
+        const usados = {};
+        const partes = deOp.map(p => {
+            if (!porCodigo[p.codigo]) return p.texto;
+            usados[p.codigo] = true;
+            return porCodigo[p.codigo];
+        });
+        prop.forEach(p => { if (!usados[p.codigo]) partes.push(p.texto); });
+        const junto = partes.join('-') + '-';
+        return junto.length <= 120 ? junto : prop.map(p => p.texto).join('-') + '-';
+    }
+    function sufijoDeLaOperacion() {
+        const campo = $('sbtSufijoValor');
+        if (campo) return campo.value;
+        return String(((CDI.state || {}).operacion || {}).sbt_sufijo_valor || '');
     }
     // El sufijo de un producto como va al pedido: el que escribió la persona
-    // (aunque lo haya borrado, para usar el de la operación) o el propuesto.
+    // (aunque lo haya borrado, para usar el de la operación) o el propuesto
+    // junto con el de la operación.
     function sufijoDe(it, i) {
         if (it && it.sufijo != null) return String(it.sufijo).trim();
         const f = propuestaDe(it, i);
-        return f ? String(f.sufijo || '') : '';
+        return f && f.sufijo ? combinar(sufijoDeLaOperacion(), String(f.sufijo)) : '';
     }
     function notaDe(it, i) {
-        if (!it || it.grupo_id || (Array.isArray(it.subitems) && it.subitems.length)) return '';
-        const f = arancel.filas[i];
-        if (!f || posicionDe(it) !== String(f.posicion || '').toUpperCase() || !posicionDe(it)) return '';
-        if (!f.en_la_tabla) return 'La posición no está en el ' + arancel.fuente + ': cargalo a mano.';
+        const f = propuestaDe(it, i);
+        if (!f) return '';
+        if (!f.en_la_tabla) {
+            if (arancel.sin_tabla) return 'Falta la tabla del arancel de ARCA: cargalo a mano.';
+            if (f.letra_de_control) {
+                return 'En el ' + arancel.fuente + ' la letra de control de esta posición es '
+                    + f.letra_de_control + ': revisá la posición.';
+            }
+            return 'La posición no está en el ' + arancel.fuente + ': cargalo a mano.';
+        }
         const partes = ['Según el ' + arancel.fuente + ': unidad estadística ' + f.unidad_estadistica + '.'];
         if ((f.faltan || []).length) partes.push('Falta: ' + f.faltan.join('; ') + '.');
         return partes.join(' ');
+    }
+    // Si cambia el de la operación, las celdas que nadie escribió se
+    // actualizan (salvo la que se está escribiendo).
+    function alCambiarLaOperacion() {
+        const items = CDI.state.items || [];
+        document.querySelectorAll('.despachante-sufijo').forEach(campo => {
+            const i = Number(campo.dataset.row);
+            const it = items[i];
+            if (it && it.sufijo == null && document.activeElement !== campo) campo.value = sufijoDe(it, i);
+        });
     }
 
     function pintar() {
@@ -253,6 +350,8 @@
         if (!enlazado) {
             wrap.addEventListener('change', alElegir);
             wrap.addEventListener('input', alElegir);
+            const sbt = $('sbtSufijoValor');
+            if (sbt) sbt.addEventListener('input', alCambiarLaOperacion);
             enlazado = true;
         }
         pintar();                       // ya, con lo que hay
@@ -276,10 +375,12 @@
     // Las unidades de un producto como van al pedido: la suya o la de la
     // operación; la estadística sólo viaja si es kilos (si no, el servidor
     // usa la declarada). Si nadie la eligió, la de la posición cuando es
-    // kilos (SUFIJOS-1); otra la avisa el servidor.
+    // kilos (SUFIJOS-1) y el producto no tiene sub-ítems (con sub-ítems,
+    // kilos sólo sale si la factura también va en kilos); otra la avisa el
+    // servidor.
     function unidadesDe(it) {
         const e = elegidos();
-        const fila = tabla[posicionDe(it)];
+        const fila = it && Array.isArray(it.subitems) && it.subitems.length ? null : tabla[posicionDe(it)];
         const est = (it && it.unidad_estadistica) || e.unidad_estadistica ||
             (fila && fila.unidad_estadistica) || 'DCL';
         return {
@@ -312,5 +413,5 @@
         return errores.length === 0;
     }
 
-    CDI.despachante = { render, leer, valores, unidadesDe, sufijoDe, recordarTabla };
+    CDI.despachante = { render, leer, valores, unidadesDe, sufijoDe, notaDe, listo, recordarTabla };
 })();

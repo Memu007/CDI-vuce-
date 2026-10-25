@@ -31,6 +31,14 @@ def _digitos(codigo) -> str:
     return re.sub(r"\D", "", str(codigo or ""))
 
 
+def _partes(posicion) -> tuple[str, str] | None:
+    """(11 dígitos, letra de control o "") de una posición SIM escrita con o
+    sin puntos y espacios; None si no es una (una NCM de 8, letras de más)."""
+    texto = re.sub(r"[.\s]", "", str(posicion or "")).upper()
+    partes = re.fullmatch(r"(\d{%d})([A-Z]?)" % LARGO_SIM, texto)
+    return partes.groups() if partes else None
+
+
 def parse_sufijos(lineas: Iterable[str]) -> dict[str, list[list[str]]]:
     """{nivel en dígitos: [[código, descripción], ...]} de `sufijos_*.txt`.
 
@@ -73,12 +81,14 @@ def parse_unidades(lineas: Iterable[str]) -> dict[str, list[str]]:
 
 @lru_cache(maxsize=2)
 def cargar(ruta: Path = TABLA) -> dict:
-    """La tabla generada; vacía si no está (entonces nada se completa)."""
+    """La tabla generada; vacía si no está o no se puede leer (entonces nada
+    se completa)."""
     try:
         with gzip.open(ruta, "rt", encoding="utf-8") as fh:
-            return json.load(fh)
-    except (OSError, ValueError):
+            tabla = json.load(fh)
+    except (OSError, EOFError, ValueError):
         return {}
+    return tabla if isinstance(tabla, dict) else {}
 
 
 def fuente(tabla: dict) -> str:
@@ -92,13 +102,23 @@ def fuente(tabla: dict) -> str:
 
 def escrita(posicion) -> str:
     """La posición SIM como la escribe el arancel: «3920.10.10.100F». Si no
-    tiene los 11 dígitos, tal como vino."""
-    texto = str(posicion or "").strip().upper()
-    d = _digitos(texto)
-    if len(d) != LARGO_SIM:
-        return texto
-    letra = texto[-1] if texto[-1:].isalpha() else ""
+    es una posición SIM, tal como vino."""
+    partes = _partes(posicion)
+    if not partes:
+        return str(posicion or "").strip().upper()
+    d, letra = partes
     return f"{d[:4]}.{d[4:6]}.{d[6:8]}.{d[8:]}{letra}"
+
+
+def letra_de_control(posicion, tabla: dict | None = None) -> str:
+    """La letra de control que el arancel le da a la posición, si la que
+    vino es otra; "" si coincide, no vino o la posición no está."""
+    tabla = cargar() if tabla is None else tabla
+    partes = _partes(posicion)
+    fila = (tabla.get("unidades") or {}).get(partes[0]) if partes else None
+    if not fila or not partes[1] or not fila[0] or partes[1] == fila[0]:
+        return ""
+    return fila[0]
 
 
 def consultar(posicion, tabla: dict | None = None) -> dict | None:
@@ -110,14 +130,12 @@ def consultar(posicion, tabla: dict | None = None) -> dict | None:
     marca, `AI` código…) y los de opción cerrada agrupados (`PB01`,
     `PB02`…: se elige uno), con la fuente."""
     tabla = cargar() if tabla is None else tabla
+    partes = _partes(posicion)
+    fila = (tabla.get("unidades") or {}).get(partes[0]) if partes else None
+    if not fila or letra_de_control(posicion, tabla):
+        return None
+    digitos = partes[0]
     texto = str(posicion or "").strip().upper()
-    digitos = _digitos(texto)
-    fila = (tabla.get("unidades") or {}).get(digitos) if len(digitos) == LARGO_SIM else None
-    if not fila:
-        return None
-    letra = texto[-1] if texto[-1:].isalpha() else ""
-    if letra and fila[0] and letra != fila[0]:
-        return None
     abiertos, cerrados = [], defaultdict(list)
     vistos = set()
     for largo in range(2, LARGO_SIM + 1):
@@ -160,13 +178,17 @@ def faltan(consulta: dict, presentes: Iterable[str]) -> list[str]:
 COMPLETA = (("AA", ("marca",)), ("AB", ("modelo",)), ("AI", ("codigo_parte",)))
 
 
-def valor_de_sufijo(texto) -> str:
-    """El valor tal como entra entre paréntesis: letras sin tilde, números y
-    espacios (el MARIA rechazó guiones y puntos el 24/10), sin espacios de
-    más."""
+def solo_letras_numeros_espacios(texto) -> str:
+    """Letras sin tilde, números y espacios; lo demás, espacio (el MARIA
+    rechazó guiones y puntos el 24/10)."""
     sin_tildes = "".join(c for c in unicodedata.normalize("NFKD", str(texto or ""))
                          if not unicodedata.combining(c))
-    return " ".join(re.sub(r"[^A-Za-z0-9 ]", " ", sin_tildes).split())
+    return re.sub(r"[^A-Za-z0-9 ]", " ", sin_tildes)
+
+
+def valor_de_sufijo(texto) -> str:
+    """El valor tal como entra entre paréntesis, sin espacios de más."""
+    return " ".join(solo_letras_numeros_espacios(texto).split())
 
 
 def proponer(item: dict, consulta: dict | None, tope: int = 120) -> dict:
