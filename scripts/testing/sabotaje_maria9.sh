@@ -2,7 +2,9 @@
 # uso: scripts/testing/sabotaje_maria9.sh [SHA] [venv]
 # Negativos discriminantes de MARIA-9: el sufijo de la operación se valida
 # sólo si algún producto lo usa, los avisos anticipan su error y la pantalla
-# lleva cada error de sufijo a su lugar. Cada sabotaje se aplica en un
+# lleva cada error de sufijo a su lugar; los bordes del sufijo y de la
+# unidad (punto 3) tienen su caso de cada lado y el error de kilos nombra
+# sólo los renglones chicos (punto 4). Cada sabotaje se aplica en un
 # worktree descartable, corre los casos de MARIA-9 (o la pantalla, con su
 # propia API) y tiene que dar ROJO con el motivo esperado. Si un patrón no se
 # encuentra, el script sale con error.
@@ -20,7 +22,7 @@ cd "$WT"
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
        VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
 unset ENABLE_PDF_LLM_FALLBACK || true
-PRUEBA="tests/test_maria9_sufijo_operacion.py tests/test_maria7_devolucion.py"
+PRUEBA="tests/test_maria9_sufijo_operacion.py tests/test_maria7_devolucion.py tests/test_maria9_bordes.py tests/test_maria9_kilos.py"
 [ -d /opt/node22/bin ] && export PATH="/opt/node22/bin:$PATH"
 correr() {
   "$VENV/bin/python" -m pytest -q --no-cov -p no:cacheprovider $PRUEBA 2>&1 || true
@@ -160,5 +162,59 @@ caso_pantalla "item_ignorado" "FALLA: el del ítem 2: no sale bajo el sub-ítem 
 reemplazar $J "detail.startsWith('Sufijo de valor de la operación: ')" "detail.startsWith('Sufijo de valor')"
 caso_pantalla "todo_al_campo" "FALLA: el error de un sub-ítem que no existe se pierde"
 
+# --- Los bordes (punto 3): cada uno se mueve un paso y algún caso da rojo.
+B=tests/test_maria9_bordes.py
+
+# 15. el tope del generador deja afuera el 120
+reemplazar $F '    if len(limpio) > SUFIJO_MAXIMO:' '    if len(limpio) >= SUFIJO_MAXIMO:'
+caso "tope_generador_120_no_pasa" "FAILED $B::test_el_generador_deja_120_caracteres_y_no_121"
+
+# 16. el tope del generador deja pasar el 121
+reemplazar $F '    if len(limpio) > SUFIJO_MAXIMO:' '    if len(limpio) > SUFIJO_MAXIMO + 1:'
+caso "tope_generador_121_pasa" "FAILED $B::test_el_generador_deja_120_caracteres_y_no_121"
+
+# 17. el tope del endpoint deja afuera el 120
+reemplazar $M '            if len(_suf) > 120:' '            if len(_suf) >= 120:'
+caso "tope_endpoint_120_no_pasa" "FAILED $B::test_el_endpoint_deja_120_caracteres_y_no_121[120-True]"
+
+# 18. el tope del endpoint deja pasar el 121 (lo frena otro, con otro texto)
+reemplazar $M '            if len(_suf) > 120:' '            if len(_suf) > 121:'
+caso "tope_endpoint_121_pasa" "FAILED $B::test_el_endpoint_deja_120_caracteres_y_no_121[121-False]"
+
+# 19. un código numérico de tres cifras pasa
+reemplazar $F '(?:\(([^()]*)\)|([0-9]{2}))' '(?:\(([^()]*)\)|([0-9]{2,}))'
+caso "codigo_de_tres_cifras" "FAILED $B::test_un_codigo_numerico_tiene_dos_cifras_y_no_tres"
+
+# 20. un código de una letra pasa
+reemplazar $F '_UN_SUFIJO = re.compile(r"([A-Za-z]{2})' '_UN_SUFIJO = re.compile(r"([A-Za-z]{1,2})'
+caso "codigo_de_una_letra" "FAILED $B::test_un_codigo_tiene_dos_letras_y_no_una"
+
+# 21. el punto y coma no separa
+reemplazar $F '_ENTRE_SUFIJOS = re.compile(r"[\s,;\-]*")' '_ENTRE_SUFIJOS = re.compile(r"[\s,\-]*")'
+caso "punto_y_coma_no_separa" "FAILED $B::test_el_punto_y_coma_separa_un_codigo_del_otro"
+
+# 22. una unidad con su código se avisa como no reconocida
+reemplazar $F '        elif not (clave := _clave_de_unidad(unidad)).isdigit() and clave not in UNIDADES_MARIA:' '        elif (clave := _clave_de_unidad(unidad)) not in UNIDADES_MARIA:'
+caso "unidad_con_codigo_avisada" "FAILED $B::test_una_unidad_con_su_codigo_sale_igual_y_no_se_avisa[99]"
+
+# 23. una unidad que no se reconoce no se avisa
+reemplazar $F '        elif not (clave := _clave_de_unidad(unidad)).isdigit() and clave not in UNIDADES_MARIA:' '        elif False:'
+caso "unidad_desconocida_sin_aviso" "FAILED $B::test_una_unidad_que_no_se_reconoce_se_avisa"
+
+# --- El error de kilos (punto 4).
+K=tests/test_maria9_kilos.py
+
+# 24. el error nombra a todos los renglones del ítem (el defecto)
+reemplazar $F '                      in zip(renglones, cantidades_sub, estadisticas_sub) if min(cant, est) <= 0]' '                      in zip(renglones, cantidades_sub, estadisticas_sub)]'
+caso "nombra_a_todos" "FAILED $K::test_el_error_nombra_sólo_los_renglones_chicos[uno_al_final]"
+
+# 25. sólo mira la cantidad: unos kilos en cero ya no frenan
+reemplazar $F 'if min(cant, est) <= 0]' 'if cant <= 0]'
+caso "kilos_en_cero_pasan" "FAILED $K::test_el_error_nombra_sólo_los_renglones_chicos[uno_al_final] - Failed: DID NOT RAISE"
+
+# 26. siempre en plural
+reemplazar $F 'no cierra" if len(chicos) == 1 else' 'no cierra" if False else'
+caso "siempre_plural" "FAILED $K::test_el_error_nombra_sólo_los_renglones_chicos[uno_al_principio]"
+
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
-echo "OK: los 14 sabotajes dan rojo por la razón esperada"
+echo "OK: los 26 sabotajes dan rojo por la razón esperada"
