@@ -5069,13 +5069,19 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
                 # Si la cabecera no llegó a decidirse (quedó sin leer), el
                 # renglón tampoco: los dos se nombran como sin leer.
                 no_es_mercaderia, dudosa = no_es_mercaderia_en.get(grupo[2], (True, ""))
-            elif descripcion_copiada and not cargo:
+            elif descripcion_copiada:
                 # Lo mismo que la fila de la combinada; si ella no entró
-                # (flete, total), ésta tampoco: se avisa.
+                # (flete, total), ésta tampoco: se avisa. Un texto propio en
+                # Item («A2», «#3») no la saca de ahí; si ella entró, ese
+                # texto todavía puede ser un cargo.
                 ancla = _ - 1
                 while ancla in rellenadas.get(desc_col, ()):
                     ancla -= 1
                 no_es_mercaderia, dudosa = no_es_mercaderia_en.get(ancla, (True, ""))
+                if not no_es_mercaderia and cargo:
+                    no_es_mercaderia = _es_solo_un_cargo(cargo)
+                    if not no_es_mercaderia and not dudosa and _FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo):
+                        dudosa = cargo
             elif copiada:
                 no_es_mercaderia = _es_solo_un_cargo(cargo)
                 if not no_es_mercaderia and _FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo):
