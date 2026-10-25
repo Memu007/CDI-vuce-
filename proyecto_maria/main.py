@@ -12,6 +12,7 @@ import jwt
 import json
 import os
 import re
+import unicodedata
 import csv
 import io
 import smtplib
@@ -4839,14 +4840,15 @@ def extract_items_from_excel(df: pd.DataFrame, filename: str, descartes: list | 
 
     return items
 
+
 def _es_una_medida(valor, decimal) -> bool:
     """Una medida escrita: un número mayor que cero o un texto con una cifra
-    que no es cero («48-50», «1,5m»). «/», «-», «0» o «N/A» no lo son."""
-    from proyecto_maria.pdf_extractor import _numero_factura
-    numero = _numero_factura(valor, decimal)
+    que no es cero («48-50», «1,5m», «½»). «/», «-», «0», «-1» o «N/A» no lo
+    son."""
+    numero = _monto_de_fila(valor, decimal)
     if numero is not None:
         return numero > 0
-    return bool(re.search(r"[1-9]", _texto_de_celda(valor)))
+    return any(unicodedata.numeric(c, 0) > 0 for c in _texto_de_celda(valor))
 
 
 def _texto_de_celda(valor) -> str:
@@ -5057,9 +5059,9 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             # planilla agrupa (abajo); en una factura común no se tocan.
             tamaño = []
             for col, nombre, unidad in medidas:
+                if not _es_una_medida(row[col], decimal):
+                    continue  # «-», «/» o 0 no son un ancho (EXCEL-3e)
                 texto = _texto_de_celda(row[col])
-                if not texto:
-                    continue
                 numero = _numero_factura(row[col], decimal)
                 if numero is not None:
                     texto = _medida(numero)
