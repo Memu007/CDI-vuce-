@@ -1129,7 +1129,9 @@ def test_la_copia_de_un_cargo_combinado_con_texto_en_item_no_cambia_el_fob_sin_s
 
 MEDIDAS_QUE_NO_SON = {"barra": "/", "guion": "-", "cero": 0, "vacias": None,
                       "negativa": -1, "negativa_en_texto": "-1", "na": "N/A", "raya": "—",
-                      "cero_decimal": "0.0", "cero_con_unidad": "0 m"}
+                      "cero_decimal": "0.0", "cero_con_unidad": "0 m",
+                      "negativa_con_unidad": "-1 m", "negativa_con_raya": "\u20131",
+                      "ideograma_uno": "\u4e00", "solo_unidad": "m\u00b2"}
 CARGOS_H1 = {"flete": ("Freight", 1200), "seguro": ("Insurance", 40), "descuento": ("Discount", -10)}
 PRODUCTO_H1 = [1, "DT-1", "LONA DEMO", 2, 10, 1, 20, 1.5, 30]
 
@@ -1283,12 +1285,14 @@ def test_un_renglon_sin_descripcion_ni_medidas_no_hereda_y_se_avisa(medida, form
 
 
 @pytest.mark.parametrize("formato", ["xlsx", "xls"])
-@pytest.mark.parametrize("largo", ["48-50", "1,5m", "½"])
+@pytest.mark.parametrize("largo", ["48-50", "1,5m", "½", "2 m²"])
 def test_un_renglon_con_una_medida_escrita_en_texto_sigue_siendo_del_grupo(largo, formato):
-    """Una medida que no es un número («48-50», «1,5m», «½») sigue siendo una medida:
-    el renglón sin descripción hereda la de arriba."""
+    """Una medida que no es un número («48-50», «1,5m», «½», «2 m²») sigue siendo
+    una medida: el renglón sin descripción hereda la de arriba, y la unidad de la
+    columna se agrega sólo si el texto no trae la suya."""
     data = _leer_en(formato, [RENGLONES_PVC, PRODUCTO_H1,
                               [2, "DT-1", None, None, largo, 1, 4, 2, 8]], ())
     assert [i["descripcion"].split(",")[0] for i in data["items"]] == ["LONA DEMO"] * 2, data["items"]
+    assert data["items"][1]["descripcion"].endswith(f"largo {largo}" + ("" if largo in ("1,5m", "2 m²") else " m")), data["items"]
     assert _total(data["items"]) == 38, data["items"]
     assert data["filas_descartadas_numeros"] == [], data
