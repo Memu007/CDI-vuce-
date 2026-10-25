@@ -38,7 +38,8 @@ GUARDAS_FACTURA = [
     ("01,500", ",", 1.5),
     ("1.234,567", None, 1234.567), ("1.234,567", ".", 1234.567),
     # La pista a favor: la factura escribe con punto decimal, «4500.000» es 4500.
-    ("4500.000", ".", 4500.0), ("98765,432", ",", 98765.432),
+    ("4500.000", ".", 4500.0), ("98765,432", ",", 98765.432), ("4 500.000", ".", 4500.0),
+    ("1 234,56", ",", 1234.56), ("1 234,56", None, 1234.56),
 ]
 
 # Lo que no cambia, en la pantalla.
@@ -57,6 +58,16 @@ def test_en_la_factura_con_la_pista_en_contra_queda_sin_leer(texto):
     en_contra = "," if texto[-4] == "." else "."
     assert pdf_extractor._monto_factura(texto, en_contra) is None
     assert pdf_extractor._monto_factura(texto, None) is None
+
+
+@pytest.mark.parametrize("texto, en_contra", [
+    ("4 500.000", ","), ("4'500.000", ","), ("4\u202f500.000", ","), ("4\u00a0500.000", ","),
+    ("12 345,250", "."),
+])
+def test_en_la_factura_con_grupos_de_espacio_tambien(texto, en_contra):
+    """_numero_factura saca esos separadores: «4 500.000» con la coma decimal
+    también daba 4500000."""
+    assert pdf_extractor._monto_factura(texto, en_contra) is None
 
 
 @pytest.mark.parametrize("copia", COPIAS)
@@ -175,7 +186,7 @@ def test_el_monto_que_arma_la_pantalla_lo_rechaza_el_servidor(client):
     assert r.status_code == 400 and "Flete: «1,500» no es un importe." in r.text, r.text
 
 
-def test_un_ajuste_ilegible_se_dice_en_las_cuentas_y_no_frena_el_txt(client):
+def test_un_ajuste_ilegible_se_dice_en_las_cuentas_y_sin_seguro_calculado_no_frena_el_txt(client):
     """VALOR-1b sigue: el ajuste no va al TXT (D12). Antes «3.480» se tomaba
     como 3,48 sin aviso."""
     _registrar_con_cuit(client, "sep1b_ajuste")
@@ -186,6 +197,21 @@ def test_un_ajuste_ilegible_se_dice_en_las_cuentas_y_no_frena_el_txt(client):
     con = client.post("/generate_maria", json={**_pedido(), "ajustes_deducir": "3.480"})
     assert sin.status_code == con.status_code == 200, con.text
     assert con.content == sin.content
+
+
+def test_con_el_seguro_calculado_un_ajuste_ilegible_frena_hasta_que_se_elija(client):
+    """D20: el seguro que calculó el sistema no se puede comprobar con un
+    ajuste ilegible (VALOR-1c): el TXT espera a que se corrija el ajuste o se
+    deje el seguro. Antes la pantalla mandaba el ajuste como nada y no frenaba."""
+    _registrar_con_cuit(client, "sep1b_calculado")
+    sugerido = client.post("/generate_maria/avisos", json=_pedido()).json()["valor"]["seguro_sugerido"]
+    calculado = {**_pedido(), "seguro": sugerido, "seguro_calculado": True}
+    assert client.post("/generate_maria", json=calculado).status_code == 200
+    r = client.post("/generate_maria", json={**calculado, "ajustes_deducir": "1,500"})
+    assert r.status_code == 400, r.text
+    assert "no se puede comprobar: Ajustes a deducir: «1,500» no es un importe." in r.text, r.text
+    dejado = client.post("/generate_maria", json={**calculado, "seguro_calculado": False, "ajustes_deducir": "1,500"})
+    assert dejado.status_code == 200, dejado.text
 
 
 @pytest.mark.parametrize("escrito, txt", [("3221.66", "3221.66"), (" 150 ", "150.00"), ("7925", "7925.00"),

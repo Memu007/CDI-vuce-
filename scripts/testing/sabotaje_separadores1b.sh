@@ -74,6 +74,10 @@ caso "factura_multiplica" "FAILED $T::test_en_la_factura_con_la_pista_en_contra_
 reemplazar $P '        if sin_grupo and decimal != sin_grupo.group(1):' '        if sin_grupo:'
 caso "factura_ignora_la_pista" "FAILED $T::test_en_la_factura_lo_demas_sigue_como_hoy[4500.000-.-4500.0]"
 
+# 2b. los grupos con espacio o apóstrofo se saltean la regla
+reemplazar $P "\\d{3}\", re.sub(r\"[ '\\u00a0\\u202f]\", '', t))" '\d{3}", t)'
+caso "factura_grupo_con_espacio" "FAILED $T::test_en_la_factura_con_grupos_de_espacio_tambien"
+
 # --- La pantalla
 
 # 3. «2500.125» se lee 2500,125 sin preguntar
@@ -82,11 +86,11 @@ caso "pantalla_no_pregunta" "FAILED $T::test_en_la_pantalla_se_pregunta"
 
 # 4. el monto que no se pudo leer viaja como 0
 reemplazar $J '        if (r.error) return String(v).trim();' '        if (r.error) return 0;'
-caso "pedido_monto_cero" "-montoDelPedido] - assert 0 =="
+caso "pedido_monto_cero" "FAILED $T::test_lo_que_la_pantalla_no_lee_viaja_tal_cual[1,500-montoDelPedido]"
 
 # 5. el ajuste que no se pudo leer no viaja
 reemplazar $J '        return r.error ? String(v).trim() : r.valor;' '        return r.valor;'
-caso "pedido_ajuste_nada" "-ajusteDelPedido] - assert None =="
+caso "pedido_ajuste_nada" "FAILED $T::test_lo_que_la_pantalla_no_lee_viaja_tal_cual[1,500-ajusteDelPedido]"
 
 # --- El servidor
 
@@ -116,4 +120,4 @@ reemplazar $G '        if not valor:
 caso "blanco_no_es_cero" "FAILED $T::test_un_importe_vacio_cuenta_como_cero"
 
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
-echo "OK: los 10 sabotajes dan rojo por la razón esperada"
+echo "OK: los 11 sabotajes dan rojo por la razón esperada"
