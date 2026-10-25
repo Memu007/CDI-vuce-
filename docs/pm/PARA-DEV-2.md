@@ -30,88 +30,57 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
-## Veredicto de VALOR-1b y MARIA-9 (2026-10-25): aceptadas con nota
+## Veredicto de SEPARADORES-1 y VALOR-1c (2026-10-25): aceptadas
 
-Sobre `efa2e08` (informe `8f529d5`; el producto es igual en los dos).
-Integradas con `merge` a la rama de la PM (`9f787f6`). Detalle en
-`REPRODUCCION-VALOR-1b-MARIA-9-2026-10-25.md`. Yo corrí tus pruebas
-(`213 passed`) y tus tres sabotajes (23, 31 y 30 en rojo, `rc=0`). Dos
-adversarios (Opus alto y Sonnet alto):
-- el TXT es idéntico byte a byte en 86 casos y en 27, salvo el que pedía
-  MARIA-9.1;
-- el botón nunca pone un seguro calculado con cuentas viejas (cuatro caminos
-  en pantalla, distintos de mi ejemplo del descuento);
-- `/avisos` anticipa el error del sufijo en 6432 de 6432;
-- ningún 500 nuevo.
+Sobre `a099655` (informe `4548644`; tu merge `d4a3f08` es sólo de
+`docs/pm`). Integradas con `merge` a la rama de la PM. Detalle en
+`REPRODUCCION-SEPARADORES-1-VALOR-1c-2026-10-25.md`. Yo corrí tus pruebas
+(`301 passed`), tus dos sabotajes sobre `a099655` (26 y 17 en rojo, `rc=0`),
+la suite completa y un negativo propio sobre `montos_ar.js` (200.000 montos,
+ninguno mal). Un adversario Opus alto: TXT idéntico byte a byte en 56
+pedidos salvo lo pedido, ningún 500 nuevo en 333, la marca del seguro y D19
+probadas en el navegador.
 
-La familia de las cuentas viejas la seguiste hasta el final, y la firma del
-pedido la cierra mejor que lo que yo pedía.
+Bien que avisaras los dos rojos de `d0bfebc` y los arreglaras en un commit
+aparte: eran pruebas viejas que afirmaban lo que la tarea cambia.
 
-### Tus D (decidido por la PM)
+## Tu tarea: SEPARADORES-1b
 
-- **D18: (b).** El general se escribe sólo en `CSBTSVL` y siempre pasa por
-  `limpiar_sufijo`: si nadie lo usa, no se escribe y saltear sus controles
-  no rompe el formato. Dos condiciones:
-  - cuando alguien lo usa, los controles de `=`, caracteres de control y
-    largo siguen igual en los dos endpoints;
-  - cuando nadie lo usa, `/avisos` no dice nada de él. Hoy, con `AA(X=Y)`
-    sin usar, avisa «sale «AA(X Y)»» y `/generate_maria` da 400.
-- **D13: (b)** y **D14: (a)**, como estaban.
+Chica. Las dos cosas son de plata.
 
-### VALOR-1c: lo que queda (va primero, antes de SEPARADORES-1)
+1. **D19 (b).** `montoDelPedido` en `finalize.js` no manda 0 cuando no
+   puede leer el monto: manda el texto tal cual y el servidor lo rechaza
+   con un mensaje claro (no un 500, no un 422 crudo). Hoy la pantalla no
+   llega a generar con un monto ilegible; esto es la segunda red, por si
+   alguien llega por otro camino.
+2. **La causa del H1 y el H2: un separador seguido de exactamente tres
+   dígitos al final, cuando lo de adelante no es un grupo de miles bien
+   formado, se lee sin preguntar.** En la factura, `_monto_factura` con la
+   pista decimal en contra da «3480.000» → 3480000 y «3480,000» → 3480000.
+   En la pantalla, `montos_ar.js` toma «1234.567» y «1234,567» como
+   1234,567. Esa familia pasa a ser ambigua: en la factura queda sin leer
+   (con el aviso de hoy) y en la pantalla se pregunta, como «1,500».
+   **No toques `_numero_factura`** (precios y cantidades: ahí tres decimales
+   son normales).
 
-Pieza chica de la fila 3 del roadmap. Cada punto con su caso y su sabotaje
-en rojo.
+Lo que no cambia: «3.480», «3.480,00», «1.234.567», «1,234.56», «3,48»,
+«0,500», «01,500» (con el cero adelante no puede ser miles) y
+«1.234,567» (no es ambiguo) siguen como hoy.
 
-1. **Causa: un valor que puso el sistema con cuentas que ya no son llega al
-   TXT.** Generar no mira si el seguro calculado sigue valiendo
-   (`finalize.js:543`). Con el seguro calculado sobre flete 100 y el flete
-   cambiado a 7925 en revisión, el TXT sale con `MDDTFLE=7925.00` y
-   `MDDTASS=14.88`; sólo la nota lo dice.
-   - **Lo que tiene que quedar:** nadie genera con un seguro calculado sobre
-     otras cuentas sin enterarse y elegir (recalcularlo o dejarlo). Cómo, lo
-     decidís vos; en silencio, no.
-   - **Familia:** cualquier camino que cambie el pedido después de calcular
-     (revisión, restauración, otra operación, un campo de la tarjeta) y
-     cualquier valor que ponga el sistema con esas cuentas, no sólo el
-     seguro.
-2. **D18 (b)**, con sus dos condiciones de arriba.
-3. **El mensaje de kilos nombra a todos los que dan cero.** Con kilos 0,005,
-   0,005, 0,005 y 0,004 en la misma posición nombra sólo el 4, y por el
-   ajuste del redondeo dan cero del 1 al 4 (14 de 601 casos del fuzz de mi
-   adversario).
-4. **Sin ítems, un error claro en los dos endpoints.** Con `items=[]` y el
-   general vacío, hoy sale 200 con un TXT sin `[ART]` (antes, 400).
-5. **Pruebas que no distinguen.** Mutaciones que siguen en verde:
-   - el flete sin redondear en el seguro (`maria_generator.py:934`; FOB 1000
-     con flete 0,495 lo separa);
-   - la firma del pedido sin los ítems (`finalize.js:251`);
-   - sacar `pintarValor(null)` (`finalize.js:84`);
-   - `None` en vez de `request.iva_adicional` (`main.py:4341`: un caso con
-     IVAAD1 da 200 o 400);
-   - en `/avisos`, `request.items` en vez de los ítems con la procedencia
-     (`_supuestos_maria(request, items, gastos)`, `main.py:4212`); el de
-     `/generate_maria` ya lo cubre tu sabotaje 30;
-   - el número de renglón del error de kilos como índice dentro del ítem.
+**Pruebas:** un caso por cada punto y por cada lado (factura y pantalla),
+con al menos dos ejemplos de la familia que no sean los de acá; los que no
+cambian, como guarda; un sabotaje por punto que vuelva a la lectura de hoy.
+Suite completa sobre el SHA que entregás.
 
-Corregí el CHANGELOG para que diga sólo lo que queda probado.
+**Riesgos que quedan anotados, no se tocan:** lo que la factura deja sin
+leer sigue terminando en flete 0 con el aviso no bloqueante (diseño de
+MARIA-1c; SEPARADORES-1 manda más casos ahí); `pais_origen` desconocido
+sale `CARTPAYORI=310` sin aviso (va a M9).
 
-**Riesgos que anoto, no los arregles (anotalos si los tocás):**
-- mientras la firma está vieja, lo que se ve tarda en ponerse al día
-  (`finalize.js:312-317`); nunca aplica el valor viejo;
-- `"1_000"` pasa; `""` sale con comillas vacías; `nan`, `inf` y `1e400` en
-  un renglón no dicen qué renglón;
-- de antes: flete o seguro `true` por API cuentan como 1,00; `"abc"` como
-  valor unitario en `/generate_maria` da 400 con texto de Python;
-  `grupo_id` como lista da 500;
-- los de tu informe: el clic que sólo pide las cuentas, la firma de todo el
-  pedido, `_exacto`;
-- de VALOR-1: `type=number` con «3.480» (va en SEPARADORES-1), los
-  cosméticos y el ajuste mal escrito restaurado sobre un campo vacío;
-- de MARIA-7/8 (D10): nombres pegados a un número, como `CITIBANK 123456789`;
-- doble redondeo de kilos (`.3f` y después el centésimo: `465.1249` sale
-  `465.13`) y `cantidad=2.675` (`2.67` sola, `2.68` como renglón de un ítem
-  unido). Van a M9 cuando Emi ordene los hallazgos de Argon.
+**Apenas entregues:** SUFIJOS-1 (`ROADMAP.md`, Fase 1c, orden 1). En las
+pruebas, VUCE siempre simulado (`VUCE_MODE=fake`): ninguna llamada real a
+VUCE ni a terceros. Si para leer la forma de la respuesta te hace falta la
+consulta real, es una D: no la hagas vos.
 
 ## Qué pasó el 2026-10-24
 
@@ -161,11 +130,6 @@ Todas las líneas terminan en CRLF (una línea sin CR: «falta carácter de fin
 dentro de los valores de los sufijos: van espacios. El guión que separa un
 sufijo del otro (`)-`) sí.
 
-## Después de VALOR-1c: SEPARADORES-1
-
-Está en `ROADMAP.md`, Fase 1b. El reparto ítem por ítem de los ajustes
-queda para PRORRATEO-1 (`DECISIONS.md`, 2026-10-24).
-
 ## Respuestas a tus D
 
 MARIA-7, 2026-10-24:
@@ -183,3 +147,8 @@ MARIA-7, 2026-10-24:
 - **D7: (a)** mientras pregunto al despachante cómo va un decimal en un
   sufijo y si acepta un valor vacío.
 - **D8: (a).** La v1 no es la pantalla en uso; queda con el aviso.
+
+SEPARADORES-1, 2026-10-25:
+
+- **D19: (b)**, como recomendaste, en SEPARADORES-1b punto 1 (decidido por
+  la PM; `DECISIONS.md`).

@@ -39,27 +39,18 @@ Integrada con `merge` (`fe41228`), **sin publicar**. Detalle en
 landing va como PA-1b; la fecha validada en la API (con «None» y años de 5
 cifras) va a CLIENTE-1b, y limpiar lo guardado en producción lo decide Emi.
 
-**MARIA-7/8 aceptada con nota 2026-10-25 00:28 UTC** (Dev MARIA, sobre
-`30ceace`): integrada con `merge` (`1fa0b6e`), **sin publicar**. Antes de
-publicarla iba MARIA-9, ya integrada (abajo). Detalle en
-`REPRODUCCION-MARIA-7-8-2026-10-25.md`.
-
 **PRUEBAS-1 + PA-1b aceptadas con nota 2026-10-25 00:47 UTC** (Dev técnica,
 sobre `e924b29`): sólo pruebas y la demo de la landing. Integrado `e924b29`
 exactamente (merge `4f00636`), sin los commits de EXCEL-3b que vienen
 después en su rama; **sin publicar**. `foco_cliente1.sh` dio rc=1 sobre
 código sano: la nota va a CLIENTE-1b. Detalle en
 `REPRODUCCION-PRUEBAS-1-2026-10-25.md`.
-**EXCEL-3b vuelve como EXCEL-3c** (`fae424c`, sin integrar): dos
-regresiones que pierden filas con aviso, y el seguro con descripción
-combinada sigue entrando como producto. Detalle en
-`REPRODUCCION-EXCEL-3b-2026-10-25.md`.
-**VALOR-1b y MARIA-9 aceptadas con nota 2026-10-25 02:58 UTC** (Dev MARIA,
-sobre `efa2e08`): integradas con `merge` (`9f787f6`), **sin publicar**. El
-botón del seguro ya no usa cuentas viejas y el sufijo general sin usar ya no
-frena el TXT; ningún TXT equivocado. D18 (b). Queda VALOR-1c (Generar con un
-seguro calculado sobre otras cuentas, kilos, pruebas) antes de
-SEPARADORES-1. Detalle en `REPRODUCCION-VALOR-1b-MARIA-9-2026-10-25.md`.
+**Cola MARIA, aceptada e integrada, sin publicar:** MARIA-7/8
+(`1fa0b6e`), VALOR-1b y MARIA-9 (`9f787f6`), y **SEPARADORES-1 y VALOR-1c
+2026-10-25 07:05 UTC** sobre `a099655`: el flete «3.480» ya no sale 3,48, lo
+ambiguo se pregunta, Generar frena un seguro calculado con otras cuentas.
+D19 (b). Sigue SEPARADORES-1b. Detalle en
+`REPRODUCCION-SEPARADORES-1-VALOR-1c-2026-10-25.md`.
 
 **Rojo conocido de EXCEL-2, ya publicado:** `test_excel2.py::test_ocho_libros…`
 falla siempre en la máquina de la PM (4 núcleos), también en la base: una
@@ -341,11 +332,9 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-10-25 07:05 UTC: SEPARADORES-1 y VALOR-1c (`a099655`, informe `4548644`) **aceptadas** e integradas con `merge`, sin publicar: suite `2280 passed, 102 skipped, 2 xfailed`, sabotajes 26 y 17 en rojo, 301 focales, 200.000 montos sin error y un adversario Opus alto (TXT igual byte a byte en 56 pedidos, ningún 500 nuevo). D19 (b). Sigue **SEPARADORES-1b** (D19 b y «separador y tres dígitos» mal agrupados, en la factura y en la pantalla), después SUFIJOS-1. Contexto de las tres sesiones bajo 120k; la técnica, en CLIENTE-1c sin informe.
+
 2026-10-25 05:57 UTC: ESTUDIO-1 (`5468581`, código `c992715`) **aceptada**: 26 passed, 37 sabotajes en rojo, 8 negativos míos y un adversario Opus alto sin fugas entre cuentas. Se suma **ESTUDIO-1b** antes de publicarla: D23 (b), que el perfil cuente como último usado (un estudio único hoy gana sobre el perfil y elegir el perfil no queda), `estudio_id` «null» que cae al perfil, y nombres invisibles. No integro: `5468581` trae EXCEL-3d con H1 abierta; todo junto al aceptar EXCEL-3e. Detalle en `REPRODUCCION-ESTUDIO-1-2026-10-25.md`. En la misma vuelta: contexto de las tres sesiones bajo 130k; MARIA dice tener VALOR-1c subido pero su rama sigue en `2145d56` (miro en la próxima); la técnica, en EXCEL-3e.
-
-2026-10-25 05:45 UTC: EXCEL-3d (`5468581`) con devolución, **EXCEL-3e**: los tres puntos devueltos quedaron arreglados (264 passed, sabotajes 0 sin rojo), pero un flete o descuento con medidas «/», «-» o 0 bajo una especificación combinada entra como producto sin aviso (FOB 30 → 1230; las tres bases lo leían como flete). E1 del adversario descartado contra `e08b4c4`. D20 (a); D21 y D22 (b) en una pieza aparte, EXCEL-3f, con la familia H4. No integro: ESTUDIO-1 es ancestro; ya llegó (`c820c74`, D23) y la reviso ahora. MARIA sigue en VALOR-1c. Detalle en `REPRODUCCION-EXCEL-3d-2026-10-25.md`.
-
-2026-10-25 04:56 UTC: sin entregas nuevas. Las tres sesiones quedaron frenadas por el límite de gasto de la cuenta (se repuso a las 04:50; la vuelta de las 03:55 no corrió). MARIA en VALOR-1c (pruebas en rojo, sin subir; `0928ad4` y `2145d56` son SEPARADORES-1 de antes del veredicto); la técnica en EXCEL-3d (`e24abfa`, sin informe). Las despiertan sus rutinas.
 
 ## Medición
 
@@ -353,5 +342,5 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## /compact conservar de la PM principal
 
-/compact conservar: Soy la PM principal de CDI (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK min 55). Producto Memu007/CDI-vuce-, clon /home/user/cdi-vuce-, mi rama claude/practical-shannon-szpwkn (nunca main; cada push a main publica). main = 8b45207 (EXCEL-3 + CLIENTE-1, publicada 24/10 con «dale 8b45207»; falta que Emi la pruebe; volver a dddcf6d sólo con su ok). Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, alto): MARIA-7/8, VALOR-1b y MARIA-9 aceptadas e integradas (merge 9f787f6 sobre efa2e08, sin publicar; D13 b, D14 a, D18 b); ahora VALOR-1c (Generar con seguro calculado sobre otras cuentas, D18 b, kilos, items vacío, pruebas que no distinguen), después SEPARADORES-1. Dev técnica (session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica): EXCEL-3d 5468581 con devolución EXCEL-3e (H1: flete/descuento con medidas «/», «-», 0 bajo especificación combinada entra como producto sin aviso, causa con_medidas por texto + descripcion_propia vacía, main.py:4973/4945/4984/5071; piso 31c9b5a; no por lista); D20 a, D21 b y D22 b van en EXCEL-3f (lista + familia H4 sólo aviso); E1 descartado contra e08b4c4. ESTUDIO-1 aceptada sobre 5468581 (código c992715) con ESTUDIO-1b obligatoria antes de publicarla (D23 b: el perfil cuenta como último usado; estudio_id «null» no cae al perfil; nombres invisibles). No integré: 5468581 trae EXCEL-3d con H1; EXCEL-3d, CLIENTE-1b y ESTUDIO-1 se integran juntas al aceptar EXCEL-3e. Orden: EXCEL-3e, CLIENTE-1c (D15 b, D16 b), ESTUDIO-1b, EXCEL-3f, GUARDAR-2. PRUEBAS-1 + PA-1b integradas (merge 4f00636). Pendiente de la PM: revisar VALOR-1c y EXCEL-3e cuando lleguen; al aceptar EXCEL-3e, merge --no-ff de claude/dev-tecnica. Para Emi: el límite de gasto mensual de la cuenta frenó a las tres sesiones el 25/10 de ~03:30 a 04:50 UTC (si se repite, decide él si lo sube); orden de prioridad de Argon (REPRODUCCION-ARGON-2026-10-24.md; nada al roadmap sin su «dale»); probar 8b45207; preguntas al despachante (las cuatro nuevas de PREGUNTAS-DESPACHANTE.md); packing list; revocar la clave de Anthropic de cambiar_ai.sh y rotar Gemini; 4.1 y 6.1 de producción; el script de fechas de CLIENTE-1b con --base deja la clave de la base en el historial (pasarla por variable). Roadmap en ROADMAP.md; TXT y proforma reales sólo en el scratchpad. Reglas de Emi: nada fuera del roadmap; Devs hasta alto, sin Fable; consejero sólo mío; castellano llano; consultas de 9 a 21 ARG; publicar sólo con «dale <SHA>» de día; usar date -u.
+/compact conservar: Soy la PM principal de CDI (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK min 55). Producto Memu007/CDI-vuce-, clon /home/user/cdi-vuce-, mi rama claude/practical-shannon-szpwkn (nunca main; cada push a main publica). main = 8b45207 (EXCEL-3 + CLIENTE-1, publicada 24/10 con «dale 8b45207»; falta que Emi la pruebe; volver a dddcf6d sólo con su ok). Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, alto): MARIA-7/8, VALOR-1b, MARIA-9, SEPARADORES-1 y VALOR-1c aceptadas e integradas (las dos últimas sobre a099655, sin publicar; D18 b, D19 b); ahora SEPARADORES-1b (D19 b: montoDelPedido manda el texto y el servidor lo rechaza; familia «separador + tres dígitos sin miles bien formados» ambigua en _monto_factura y montos_ar.js, no en _numero_factura), después SUFIJOS-1 (Fase 1c, VUCE_MODE=fake en pruebas). Dev técnica (session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica): EXCEL-3d 5468581 con devolución EXCEL-3e (H1: flete/descuento con medidas «/», «-», 0 bajo especificación combinada entra como producto sin aviso, causa con_medidas por texto + descripcion_propia vacía, main.py:4973/4945/4984/5071; piso 31c9b5a; no por lista); D20 a, D21 b y D22 b van en EXCEL-3f (lista + familia H4 sólo aviso); E1 descartado contra e08b4c4. ESTUDIO-1 aceptada sobre 5468581 (código c992715) con ESTUDIO-1b obligatoria antes de publicarla (D23 b: el perfil cuenta como último usado; estudio_id «null» no cae al perfil; nombres invisibles). No integré: 5468581 trae EXCEL-3d con H1; EXCEL-3d, CLIENTE-1b y ESTUDIO-1 se integran juntas al aceptar EXCEL-3e. Orden: EXCEL-3e, CLIENTE-1c (D15 b, D16 b), ESTUDIO-1b, EXCEL-3f, GUARDAR-2. PRUEBAS-1 + PA-1b integradas (merge 4f00636). Pendiente de la PM: revisar SEPARADORES-1b y EXCEL-3e cuando lleguen; al aceptar EXCEL-3e, merge --no-ff de claude/dev-tecnica. Para Emi: el límite de gasto mensual de la cuenta frenó a las tres sesiones el 25/10 de ~03:30 a 04:50 UTC (si se repite, decide él si lo sube); orden de prioridad de Argon (REPRODUCCION-ARGON-2026-10-24.md; nada al roadmap sin su «dale»); probar 8b45207; preguntas al despachante (las cuatro nuevas de PREGUNTAS-DESPACHANTE.md); packing list; revocar la clave de Anthropic de cambiar_ai.sh y rotar Gemini; 4.1 y 6.1 de producción; el script de fechas de CLIENTE-1b con --base deja la clave de la base en el historial (pasarla por variable). Roadmap en ROADMAP.md; TXT y proforma reales sólo en el scratchpad. Reglas de Emi: nada fuera del roadmap; Devs hasta alto, sin Fable; consejero sólo mío; castellano llano; consultas de 9 a 21 ARG; publicar sólo con «dale <SHA>» de día; usar date -u.
 
