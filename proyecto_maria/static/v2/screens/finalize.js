@@ -297,8 +297,8 @@
     // El seguro sugerido lo calculó el servidor con lo que está a la vista,
     // para esta misma operación.
     function calcularSeguro() {
+        if (!ultimoValor || ultimoValor.error || cuentasDe !== (CDI.state.operacion || null)) return;
         const op = CDI.state.operacion = CDI.state.operacion || {};
-        if (!ultimoValor || ultimoValor.error || cuentasDe !== op) return;
         op.seguro = ultimoValor.seguro_sugerido;
         op.seguro_calculado = true;
         refrescarAvisos();
@@ -306,8 +306,8 @@
 
     function pintarValor(valor) {
         ultimoValor = valor;
-        const op = (CDI.state && CDI.state.operacion) || {};
-        cuentasDe = op;
+        cuentasDe = (CDI.state && CDI.state.operacion) || null;
+        const op = cuentasDe || {};
         const incluir = document.getElementById('valorIncluir');
         const deducir = document.getElementById('valorDeducir');
         // Lo que la persona está escribiendo no se pisa, y un número mal

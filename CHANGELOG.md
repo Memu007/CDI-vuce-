@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-10-25 · fix: la tarjeta de ajustes y seguro no usa cuentas viejas (VALOR-1)
 
-- «Usar como ajuste a deducir» ya no pisa un importe escrito a mano; «Calcular seguro» no usa cuentas de antes de cambiar un ajuste ni de otra operación. Si fallan los avisos, o un producto viene mal formado o fuera de rango, la tarjeta lo dice en vez de quedar vacía o dar error.
+- «Usar como ajuste a deducir» ya no pisa un importe escrito a mano; «Calcular seguro» no usa cuentas de antes de cambiar un ajuste ni de otra operación, y funciona aunque todavía no haya operación cargada. Si fallan los avisos, o un producto viene mal formado o fuera de rango, la tarjeta lo dice en vez de quedar vacía o dar error.
 
 ## 2026-10-24 · feat: ajustes y seguro antes de generar (VALOR-1)
 
