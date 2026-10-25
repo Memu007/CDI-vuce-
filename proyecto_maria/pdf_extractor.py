@@ -2175,9 +2175,9 @@ def _monto_factura(raw, decimal: str | None):
     t = _MONEDA_O_CUENTA_ATRAS.sub('', t).strip()
     miles = re.fullmatch(r"[1-9]\d{0,2}([.,])\d{3}", t)
     if not miles:
-        # SEPARADORES-1b. «4500.000» con la coma decimal: no es un grupo de
-        # miles ni tres decimales de un monto. Sin leer, no ×1000.
-        sin_grupo = re.fullmatch(r"[1-9]\d{3,}([.,])\d{3}", t)
+        # SEPARADORES-1b. «4500.000» (o «4 500.000») con la coma decimal: no
+        # es un grupo de miles ni tres decimales de un monto. Sin leer, no ×1000.
+        sin_grupo = re.fullmatch(r"[1-9]\d{3,}([.,])\d{3}", re.sub(r"[ '\u00a0\u202f]", '', t))
         if sin_grupo and decimal != sin_grupo.group(1):
             return None
         return _numero_factura(raw, decimal)
