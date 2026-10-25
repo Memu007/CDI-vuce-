@@ -232,14 +232,22 @@
 
     // Vacío es sin ajuste (null); lo que no es un número finito tampoco viaja,
     // para que un ajuste mal escrito nunca frene la generación del TXT.
+    // SEPARADORES-1: «1.500» es mil quinientos (montos_ar.js).
     function ajusteDelPedido(v) {
-        if (v === undefined || v === null || String(v).trim() === '') return null;
-        const n = Number(v);
-        return isFinite(n) ? n : null;
+        return CDI.montos.leer(v).valor;
     }
 
+    // Por qué un ajuste escrito no se puede leer, o null.
     function ajusteMalEscrito(v) {
-        return v !== undefined && v !== null && String(v).trim() !== '' && !isFinite(Number(v));
+        const error = CDI.montos.leer(v).error;
+        if (!error) return null;
+        return error === CDI.montos.NO_ES_NUMERO ? 'no es un número.' : error;
+    }
+
+    // Flete, seguro o gastos de la revisión, que ya frena lo que no se lee.
+    function montoDelPedido(v) {
+        const n = CDI.montos.leer(v).valor;
+        return n === null ? 0 : n;
     }
 
     function importeEscrito(n) {
@@ -259,8 +267,10 @@
     function cuentasViejas() {
         ultimoValor = null;
         avisosSeq++;
-        const boton = document.getElementById('valorCalcularSeguro');
-        if (boton) boton.hidden = true;
+        ['valorCalcularSeguro', 'valorDejarSeguro'].forEach(function (id) {
+            const boton = document.getElementById(id);
+            if (boton) boton.hidden = true;
+        });
     }
 
     function enlazarValor() {
@@ -277,8 +287,7 @@
             if (!input) return;
             input.addEventListener('input', function () {
                 const op = CDI.state.operacion = CDI.state.operacion || {};
-                // Un número que el campo no entiende llega vacío: se marca.
-                op[campos[id]] = input.validity && input.validity.badInput ? 'mal escrito' : input.value;
+                op[campos[id]] = input.value;
                 cuentasViejas();
                 programar();
             });
@@ -287,13 +296,24 @@
         if (usar) usar.addEventListener('click', usarDescuento);
         const seguro = document.getElementById('valorCalcularSeguro');
         if (seguro) seguro.addEventListener('click', calcularSeguro);
+        const dejar = document.getElementById('valorDejarSeguro');
+        if (dejar) dejar.addEventListener('click', dejarSeguro);
+    }
+
+    // El seguro que calculó el sistema con otros importes queda como está:
+    // pasa a ser de la persona y el servidor deja de frenarlo (VALOR-1c).
+    function dejarSeguro() {
+        const op = CDI.state.operacion = CDI.state.operacion || {};
+        delete op.seguro_calculado;
+        cuentasViejas();
+        refrescarAvisos();
     }
 
     function usarDescuento() {
         const op = CDI.state.operacion = CDI.state.operacion || {};
         const descuento = Number(op.descuento);
         if (!(descuento > 0) || otroDeducir(op, descuento)) return;
-        op.ajustes_deducir = String(descuento);
+        op.ajustes_deducir = CDI.montos.escribir(descuento);
         const input = document.getElementById('valorDeducir');
         if (input) input.value = op.ajustes_deducir;
         cuentasViejas();
@@ -303,7 +323,7 @@
     // Ajustes a deducir ya trae algo distinto del descuento: no se pisa.
     function otroDeducir(op, descuento) {
         const v = op.ajustes_deducir;
-        return v !== undefined && v !== null && String(v).trim() !== '' && Number(v) !== descuento;
+        return v !== undefined && v !== null && String(v).trim() !== '' && ajusteDelPedido(v) !== descuento;
     }
 
     // El seguro sugerido lo calculó el servidor con el pedido de ahora. Si
@@ -356,7 +376,7 @@
         const ofreceTexto = document.getElementById('valorDescuentoTexto');
         const descuento = Number(op.descuento);
         // Ya usado como ajuste, no se vuelve a ofrecer.
-        if (ofrece) ofrece.hidden = !(descuento > 0) || Number(op.ajustes_deducir) === descuento;
+        if (ofrece) ofrece.hidden = !(descuento > 0) || ajusteDelPedido(op.ajustes_deducir) === descuento;
         const otro = descuento > 0 && otroDeducir(op, descuento);
         const usar = document.getElementById('valorUsarDescuento');
         if (usar) usar.hidden = otro;
@@ -369,8 +389,8 @@
 
         const error = document.getElementById('valorError');
         const errores = [];
-        if (ajusteMalEscrito(op.ajustes_incluir)) errores.push('Ajustes a incluir: no es un número.');
-        if (ajusteMalEscrito(op.ajustes_deducir)) errores.push('Ajustes a deducir: no es un número.');
+        if (ajusteMalEscrito(op.ajustes_incluir)) errores.push('Ajustes a incluir: ' + ajusteMalEscrito(op.ajustes_incluir));
+        if (ajusteMalEscrito(op.ajustes_deducir)) errores.push('Ajustes a deducir: ' + ajusteMalEscrito(op.ajustes_deducir));
         if (valor && valor.error) errores.push(valor.error);
         if (error) {
             error.textContent = errores.join(' ');
@@ -406,6 +426,11 @@
             boton.textContent = (calculado ? 'Recalcular seguro' : 'Calcular seguro') +
                 ' (1 % de ' + base + ' + flete): ' + (ok ? importeEscrito(valor.seguro_sugerido) : '');
         }
+        // Lo calculó con otros importes, o ya no se puede comprobar: el
+        // servidor no genera hasta que se recalcule o se deje (VALOR-1c).
+        const dejar = document.getElementById('valorDejarSeguro');
+        if (dejar) dejar.hidden = !(valor && op.seguro_calculado &&
+            (valor.error || valor.seguro !== valor.seguro_sugerido));
         if (nota) {
             nota.textContent = !ok ? '' :
                 (calculado && valor.seguro !== valor.seguro_sugerido) ? 'El seguro se calculó con otros importes.' :
@@ -622,6 +647,12 @@
                     CDI.goTo('validating');
                     throw new Error(detail);
                 }
+                // El seguro calculado con otros importes se resuelve en
+                // «Ajustes y seguro» (VALOR-1c).
+                if (typeof detail === 'string' && detail.startsWith('Seguro: lo calculó el sistema')) {
+                    CDI.goTo('validating');
+                    throw new Error(detail);
+                }
                 // Los controles de antes de generar llegan como {errors: [...]}.
                 const texto = (detail && Array.isArray(detail.errors)) ? detail.errors.join(' ') : detail;
                 throw new Error(texto || 'No se pudo generar el archivo');
@@ -728,10 +759,11 @@
                 op.comprador_fecha_inic_activ ||
                 (cliente && cliente.fecha_inic_activ) || ''
             ).trim(),
-            flete: toNumber(op.flete, 0),
-            seguro: toNumber(op.seguro, 0),
+            flete: montoDelPedido(op.flete),
+            seguro: montoDelPedido(op.seguro),
+            seguro_calculado: !!op.seguro_calculado,
             // MARIA-3: el servidor decide si van al TXT (sólo EXW, FCA o FAS).
-            gastos_anteriores_fob: toNumber(op.gastos_anteriores_fob, 0),
+            gastos_anteriores_fob: montoDelPedido(op.gastos_anteriores_fob),
             // VALOR-1: sólo para las cuentas; no van al TXT (D12).
             ajustes_incluir: ajusteDelPedido(op.ajustes_incluir),
             ajustes_deducir: ajusteDelPedido(op.ajustes_deducir),

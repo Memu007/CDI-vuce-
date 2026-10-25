@@ -288,11 +288,17 @@ let refrescos = 0;
 function refrescarAvisos() { refrescos++; }
 let avisosTimer = null;
 const CDI = { state: { operacion: OP, items: [] }, escapeHtml: s => String(s) };
+const window = { CDI };
 """
 
 
+def _con_montos(dom):
+    # SEPARADORES-1: las pantallas leen los montos con montos_ar.js.
+    return dom + (V2.parent / "montos_ar.js").read_text(encoding="utf-8") + "\n"
+
+
 def _correr(codigo, op):
-    salida = subprocess.run(["node", "-e", DOM.replace("OP", json.dumps(op)) + codigo],
+    salida = subprocess.run(["node", "-e", _con_montos(DOM.replace("OP", json.dumps(op))) + codigo],
                             capture_output=True, text=True)
     assert salida.returncode == 0, salida.stderr[-800:]
     return json.loads(salida.stdout)
@@ -303,7 +309,8 @@ def _pantalla(op, despues, valor=None, salida_propia=False):
     corre `despues`. El pedido es el buildMariaRequest de verdad."""
     nombres = ["ajusteMalEscrito", "importeEscrito", "cuentasViejas", "enlazarValor", "otroDeducir",
                "usarDescuento", "calcularSeguro", "seguroSinLeer", "pintarValor", "firmaDelPedido",
-               "buildMariaRequest", "numeroDeFactura", "toNumber", "subitemsDelPedido", "ajusteDelPedido"]
+               "buildMariaRequest", "numeroDeFactura", "toNumber", "subitemsDelPedido", "ajusteDelPedido",
+               "montoDelPedido", "dejarSeguro"]
     codigo = ("let ultimoValor = null; let cuentasCon = null; let avisosSeq = 0; let valorEnlazado = false;\n"
               "let lastValidation = null; let semaforos = 0;\n"
               "CDI.semaforo = { refresh() { semaforos++; } };\n"
@@ -344,8 +351,9 @@ def test_usar_el_descuento_no_pisa_otro_ajuste_a_deducir():
 
 def test_el_boton_pone_el_descuento_como_ajuste_a_deducir():
     r = _pantalla({"descuento": 87.5}, "usarDescuento();", VALOR)
-    assert r["op"]["ajustes_deducir"] == "87.5"
-    assert r["els"]["valorDeducir"]["value"] == "87.5"
+    # SEPARADORES-1: se escribe como lo escribiría la persona.
+    assert r["op"]["ajustes_deducir"] == "87,5"
+    assert r["els"]["valorDeducir"]["value"] == "87,5"
     assert r["refrescos"] == 1
 
 
@@ -395,7 +403,7 @@ def test_despues_de_usar_el_descuento_no_se_calcula_con_las_cuentas_de_antes():
     r = _pantalla({"descuento": 87.5}, "usarDescuento();", VALOR)
     assert r["els"]["valorCalcularSeguro"]["hidden"] is True
     r = _pantalla({"descuento": 87.5}, "usarDescuento(); calcularSeguro();", VALOR)
-    assert "seguro" not in r["op"] and r["op"]["ajustes_deducir"] == "87.5"
+    assert "seguro" not in r["op"] and r["op"]["ajustes_deducir"] == "87,5"
 
 
 def test_un_seguro_puesto_despues_de_las_cuentas_no_se_pisa_con_el_sugerido_viejo():
@@ -467,10 +475,11 @@ def test_mientras_se_rehacen_las_cuentas_no_se_calcula_con_las_viejas():
 
 
 def test_un_numero_que_el_campo_no_entiende_queda_marcado_y_a_la_vista():
-    r = _pantalla({}, "enlazarValor(); els.valorIncluir.value = ''; els.valorIncluir.validity = {badInput: true};"
-                      " els.valorIncluir.listeners.input(); els.valorIncluir.value = '1-2'; pintarValor(VALOR);",
+    # SEPARADORES-1: el campo es de texto y guarda lo escrito tal cual.
+    r = _pantalla({}, "enlazarValor(); els.valorIncluir.value = '1-2';"
+                      " els.valorIncluir.listeners.input(); pintarValor(VALOR);",
                   VALOR)
-    assert r["op"]["ajustes_incluir"] == "mal escrito"
+    assert r["op"]["ajustes_incluir"] == "1-2"
     assert r["els"]["valorIncluir"]["value"] == "1-2"
     assert r["els"]["valorError"]["textContent"] == "Ajustes a incluir: no es un número."
 
@@ -569,7 +578,8 @@ def test_un_seguro_escrito_a_mano_deja_de_ser_el_calculado():
     stubs = ("let form = {}; const initialPdfValues = {};\n"
              "function updateFieldHint() {} function validateField() {} function renderMissingCount() {}\n"
              "function updateContinueEnabled() {} function renderIncotermWarning() {} function renderProrrateoPanel() {}\n")
-    codigo = stubs + _funciones("review.js", ["onFieldChange"]) + (
+    codigo = stubs + "const MONTOS = ['flete', 'seguro', 'gastos_anteriores_fob'];\n" + _funciones(
+        "review.js", ["montoDelCampo", "onFieldChange"]) + (
         "\nonFieldChange({target: {name: 'seguro', type: 'number', value: '15'}});"
         "\nconsole.log(JSON.stringify(CDI.state.operacion));")
     assert _correr(codigo, {"seguro": 93.13, "seguro_calculado": True}) == {"seguro": 15}

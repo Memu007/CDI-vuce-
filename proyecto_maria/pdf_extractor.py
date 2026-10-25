@@ -2167,6 +2167,20 @@ def _numero_factura(raw, decimal: str | None):
     return valor if math.isfinite(valor) else None
 
 
+def _monto_factura(raw, decimal: str | None):
+    """Flete o seguro de la factura (SEPARADORES-1). Un monto no lleva tres
+    decimales: «3.480» o «1,250» separan miles. Si la factura usa ese mismo
+    separador como decimal, puede ser 3,48: None, no se adivina."""
+    t = _MONEDA_ADELANTE.sub('', str(raw).strip()) if isinstance(raw, str) else ''
+    t = _MONEDA_O_CUENTA_ATRAS.sub('', t).strip()
+    miles = re.fullmatch(r"[1-9]\d{0,2}([.,])\d{3}", t)
+    if not miles:
+        return _numero_factura(raw, decimal)
+    if decimal == miles.group(1):
+        return None
+    return float(t.replace(miles.group(1), ''))
+
+
 def _campos_sin_leer(operacion: dict, decimal) -> list:
     """Campos de la operación que la factura traía pero no se pudieron leer
     (quedaron en 0 o vacíos). La pantalla los nombra (MARIA-1c). Un dato que
@@ -2175,7 +2189,7 @@ def _campos_sin_leer(operacion: dict, decimal) -> list:
     for campo in ('flete', 'seguro'):
         raw = operacion.get(campo)
         if (raw not in (None, '') and not _no_aplica(raw, _FLETE_NO_APLICA)
-                and _numero_factura(raw, decimal) is None):
+                and _monto_factura(raw, decimal) is None):
             sin_leer.append(campo)
     pais = str(operacion.get('vendedor_pais') or '').strip()
     if pais and not _no_aplica(pais, _PAIS_NO_APLICA) and not _origen_desde_factura(pais):
@@ -2407,8 +2421,8 @@ Busca esta información en el encabezado de la factura:
 8. comprador_cuit: CUIT del comprador argentino (si aparece). REGLA CRÍTICA: CUIT argentino tiene EXACTAMENTE 11 dígitos numéricos. Formato esperado: 30-61212382-01 o 306121238201. NO agregar prefijo país. Si el PDF dice "AR306121238201", devolver "306121238201" sin "AR". Si no hay 11 dígitos, devolver "".
 9. moneda: Moneda de la factura. Devolver SIEMPRE el codigo de 3 letras: DOL, EUR, BRL, ARS, CLP, UYU, GBP, JPY, CNY. Si no aparece la palabra "moneda" o "currency" pero hay simbolos en los valores, inferir asi: $ o "USD" o "U$S" -> DOL; "EUR" o EUR$ -> EUR; "R$" o "BRL" -> BRL; "AR$" o "ARS" -> ARS. Si no hay palabra ni simbolo de moneda, null (no adivinar).
 10. incoterm: Términos de entrega (FOB, CIF, DDP, EXW, etc.). Si viene con ciudad/puerto al lado (ej: "FOB Genova", "CIF Buenos Aires"), devolver SOLO las 3 letras del codigo.
-11. flete: Valor del flete/freight (número, 0 si no aparece)
-12. seguro: Valor del seguro/insurance (número, 0 si no aparece)
+11. flete: Valor del flete/freight, copiado tal como aparece en la factura, como texto ("" si no aparece)
+12. seguro: Valor del seguro/insurance, copiado tal como aparece en la factura, como texto ("" si no aparece)
 13. comprador_domicilio: Domicilio/dirección del comprador/importador argentino (la que figura junto al nombre del importador/buyer). Si no aparece claramente, devolver "". No inventar ni usar la dirección del vendedor.
 
 ═══════════════════════════════════════════════════════════════════
@@ -2458,8 +2472,8 @@ FORMATO DE RESPUESTA (JSON estricto)
     "comprador_cuit": "...",
     "moneda": "DOL",
     "incoterm": "FOB",
-    "flete": 0.00,
-    "seguro": 0.00,
+    "flete": "",
+    "seguro": "",
     "comprador_domicilio": "..."
   },
   "items": [
@@ -2540,8 +2554,8 @@ IMPORTANTE:
                         'comprador_cuit': _normalize_argentine_cuit(operacion.get('comprador_cuit', '')),
                         'moneda': _texto(operacion.get('moneda'))[:3].upper(),
                         'incoterm': _texto(operacion.get('incoterm'))[:3].upper(),
-                        'flete': _numero_factura(operacion.get('flete'), decimal) or 0.0,
-                        'seguro': _numero_factura(operacion.get('seguro'), decimal) or 0.0,
+                        'flete': _monto_factura(operacion.get('flete'), decimal) or 0.0,
+                        'seguro': _monto_factura(operacion.get('seguro'), decimal) or 0.0,
                         'comprador_domicilio': _texto(operacion.get('comprador_domicilio')),
                     }
                     operacion_data['campos_sin_leer'] = _campos_sin_leer(operacion, decimal)
@@ -2650,8 +2664,8 @@ Busca esta información en el encabezado de la factura:
 8. comprador_cuit: CUIT del comprador argentino (si aparece). REGLA CRÍTICA: CUIT argentino tiene EXACTAMENTE 11 dígitos numéricos. Formato esperado: 30-61212382-01 o 306121238201. NO agregar prefijo país. Si el PDF dice "AR306121238201", devolver "306121238201" sin "AR". Si no hay 11 dígitos, devolver "".
 9. moneda: Moneda de la factura. Devolver SIEMPRE el codigo de 3 letras: DOL, EUR, BRL, ARS, CLP, UYU, GBP, JPY, CNY. Si no aparece la palabra "moneda" o "currency" pero hay simbolos en los valores, inferir asi: $ o "USD" o "U$S" -> DOL; "EUR" o EUR$ -> EUR; "R$" o "BRL" -> BRL; "AR$" o "ARS" -> ARS. Si no hay palabra ni simbolo de moneda, null (no adivinar).
 10. incoterm: Términos de entrega (FOB, CIF, DDP, EXW, etc.). Si viene con ciudad/puerto al lado (ej: "FOB Genova", "CIF Buenos Aires"), devolver SOLO las 3 letras del codigo.
-11. flete: Valor del flete/freight (número, 0 si no aparece)
-12. seguro: Valor del seguro/insurance (número, 0 si no aparece)
+11. flete: Valor del flete/freight, copiado tal como aparece en la factura, como texto ("" si no aparece)
+12. seguro: Valor del seguro/insurance, copiado tal como aparece en la factura, como texto ("" si no aparece)
 13. comprador_domicilio: Domicilio/dirección del comprador/importador argentino (la que figura junto al nombre del importador/buyer). Si no aparece claramente, devolver "". No inventar ni usar la dirección del vendedor.
 
 ═══════════════════════════════════════════════════════════════════
@@ -2683,8 +2697,8 @@ FORMATO DE RESPUESTA (JSON estricto)
     "comprador_cuit": "...",
     "moneda": "DOL",
     "incoterm": "FOB",
-    "flete": 0.00,
-    "seguro": 0.00,
+    "flete": "",
+    "seguro": "",
     "comprador_domicilio": "..."
   },
   "items": [
@@ -2739,8 +2753,8 @@ IMPORTANTE:
                             'comprador_cuit': _normalize_argentine_cuit(operacion.get('comprador_cuit', '')),
                             'moneda': _texto(operacion.get('moneda'))[:3].upper(),
                             'incoterm': _texto(operacion.get('incoterm'))[:3].upper(),
-                            'flete': _numero_factura(operacion.get('flete'), decimal) or 0.0,
-                            'seguro': _numero_factura(operacion.get('seguro'), decimal) or 0.0,
+                            'flete': _monto_factura(operacion.get('flete'), decimal) or 0.0,
+                            'seguro': _monto_factura(operacion.get('seguro'), decimal) or 0.0,
                             'comprador_domicilio': _texto(operacion.get('comprador_domicilio')),
                         }
                         operacion_data['campos_sin_leer'] = _campos_sin_leer(operacion, decimal)

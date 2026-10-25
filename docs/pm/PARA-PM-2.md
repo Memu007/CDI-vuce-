@@ -2,265 +2,244 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## VALOR-1b y MARIA-9: entregadas a revisión (2026-10-25)
+## SEPARADORES-1 y VALOR-1c: entregadas a revisión (2026-10-25)
 
-**Resultado:** las dos van juntas en `efa2e08`.
-- **VALOR-1b:** van los cuatro puntos de tu devolución.
-  - «Calcular seguro» ya no usa cuentas de un pedido que cambió. Lo
-    comprueba al apretarlo, sea cual sea el campo que lo cambió.
-  - El seguro calculado deja de avisarse como no leído.
-  - La base es el FOB de la factura (D13 b).
-  - Un ajuste o un renglón que no es número va como `valor.error`, sin
-    texto de Python y sin perder los avisos.
-- **MARIA-9:** van sus cuatro puntos.
-- **El TXT no cambia** con ninguna de las dos fuera de lo que pediste en
-  MARIA-9.1: un sufijo general que nadie usa vuelve a dejar generar.
-- Los sabotajes dan rojo por la razón esperada: 23 de VALOR-1b, 31 de VALOR-1
-  y 30 de MARIA-9.
-- Suite, smoke, e2e y la pantalla de MARIA-9 dan verde sobre `efa2e08`.
+**Resultado:** las dos van juntas en `a099655`.
+- **VALOR-1c:** van los cinco puntos. Cada uno tiene su caso y su sabotaje
+  en rojo (26).
+- **SEPARADORES-1:** «3.480» es 3480 en la factura y en la pantalla, y
+  «1,500» se pregunta. Tiene 17 sabotajes en rojo, 3 de ellos en el
+  navegador.
+- **El TXT** cambia sólo en lo que pediste:
+  - `MDDTFLE` y `MDDTASS` con punto de miles salen enteros
+    (SEPARADORES-1);
+  - un seguro calculado con otros importes ya no sale sin que se elija;
+  - un general que nadie usa no frena (D18 b);
+  - sin productos ya no sale un TXT vacío.
+- Suite, smoke, e2e y la pantalla de SEPARADORES-1 dan verde.
 
-**Lo que decidís vos:** D18 (MARIA-9), nueva. No frena la entrega. Es D18
-porque D15 a D17 ya son de CLIENTE-1b.
+**Lo que decidís vos:** nada que frene. D19 es nueva y te la dejo para
+cuando la ordenes. Abajo, los supuestos reversibles.
+
+**Tenés que saber un rojo mío:** la suite completa sobre `d0bfebc` dio
+`2 failed`. Eran dos casos viejos que afirmaban lo que tu tarea cambia, y
+los puse al día en `a099655`. Antes no los vi porque perdí la línea final
+de la corrida: la había cortado con `tail`. Detalle en «Rojos».
 
 | Pieza | SHA |
 |---|---|
-| Base: informe de VALOR-1 | `23ba183` |
-| MARIA-9. Producto: el sufijo general se valida sólo si alguien lo usa | `4ab6a9b` |
-| Casos y sabotajes | `b90e11d`, `ecfd977` |
-| Producto: cada error de sufijo sale donde se corrige | `e87ea74` |
-| Pantalla y sabotajes | `7a83be6` |
-| Producto: el error de kilos nombra sólo el renglón chico | `9c20f21` |
-| Casos y sabotajes | `a6f7551` |
-| Producto: lo que encontró la autorrevisión (kilos, procedencia) | `58f2f79` |
-| Casos y sabotajes | `9f1e5b5` |
-| Merge de tu rama (`13a0939`, la devolución de VALOR-1) | `52b56a4` |
-| VALOR-1b. Producto: la firma del pedido, el aviso del seguro, D13 y los ajustes por API | `28819f0` |
-| Casos y sabotajes | `9546fa7`, `7184e9e` |
-| Producto: lo que encontró la autorrevisión (verdadero en un renglón, mensajes) | `6ed3619` |
-| Casos y sabotajes | `efa2e08` |
-| **SHA probado:** suite, sabotajes, smoke, e2e y pantalla | **`efa2e08`** |
-| Merge de tu rama (`903d141`, sólo `docs/pm`: no cambia lo probado) | `fbf64eb` |
+| Base: informe de VALOR-1b y MARIA-9 | `a74ee9d` (producto igual a `efa2e08`) |
+| D18 renumerada (doc) | `8f529d5` |
+| SEPARADORES-1. Producto | `0928ad4` |
+| Casos, pantalla y sabotajes | `2145d56` |
+| Merges de tu rama (sólo `docs/pm`) | `05768eb`, `eab6a7f` |
+| VALOR-1c. Producto | `3df999c` |
+| Casos y sabotajes | `ea3200c` |
+| Producto: lo que encontró `/code-review` (prefijo «Seguro: ») | `c336508` |
+| Casos y sabotajes | `d0bfebc` |
+| Dos casos viejos al día (sin productos, D18 b) | `a099655` |
+| **SHA probado:** suite, compileall y sabotajes de SEPARADORES-1 | **`a099655`** |
+| Smoke, e2e, pantalla y sabotajes de VALOR-1c | `d0bfebc` (de ahí a `a099655` cambian sólo dos archivos de `tests/`, fuera de esos scripts) |
 
 ## Decisiones
 
-**D18. Un sufijo general que nadie usa pero no se puede leer frena el TXT.**
-MARIA-9.1 dice «se valida sólo si algún sub-ítem o renglón lo toma». Ya lo
-hace con «ROJO» y con todo lo que no se puede separar en códigos. Pero un
-general con `=`, con caracteres de control o de más de 120 caracteres
-sigue frenando aunque nadie lo use. Esos controles están antes, porque
-rompen el formato `clave=valor` del TXT. El mensaje tampoco dice que es el
-sufijo de la operación. Lo encontró mi adversario.
-- (a) Dejarlo así y que el mensaje diga «Sufijo de valor de la
-  operación: …». Es un cambio de una línea.
-- (b) Saltear también esos controles cuando nadie lo usa.
+**D19. Un monto ilegible se manda como 0 (`finalize.js`, `montoDelPedido`).**
+Flete, seguro, gastos o ajustes que `leer` no entiende van como 0 al
+servidor. Hoy no encontré ningún camino para llegar así a generar:
+`review.js` frena al continuar, y lo restaurado pasa por revisión. Lo
+confirmó el adversario. Si algún día se entra a validar por otra ruta, sale
+0 sin aviso.
+- (a) Dejarlo así.
+- (b) Mandar el texto crudo. El servidor ya lo rechaza con «Flete: «1,500»
+  no es un importe.», como hace `semaforo.js`.
 
-**Recomiendo (a).** Un `=` o un salto de línea en ese campo es un error de
-carga, no un texto libre, y nadie lo ve si no frena. No cambié nada: es
-la letra de tu tarea.
+**Recomiendo (b)**, en una pieza aparte: son pocas líneas y quita la
+dependencia de que revisión frene. No lo toqué porque está fuera de VALOR-1c.
 
-**D13 y D14:** las tomé como decidiste (b y a).
+**D18 (b), D13 (b) y D14 (a):** las tomé como decidiste.
 
 ## Lo que se hizo
 
-### VALOR-1b
+### VALOR-1c
 
-1. **Cuentas viejas.** Seguí tu «familia» hasta el final. No alcanzaba con
-   llamar a `cuentasViejas()` desde cada lugar que escribe en `op`. Hay
-   caminos que cambian el pedido sin pasar por la tarjeta:
-   - la restauración;
-   - la pantalla de revisión;
-   - un campo del despachante;
-   - un cambio de operación.
+1. **Un seguro calculado con otros importes no sale sin que se elija.**
+   - **La marca.** Al calcularlo, la pantalla marca la operación
+     (`seguro_calculado`). La marca se borra al escribir el seguro a mano
+     (`review.js:666`) o al apretar «Dejar el seguro como está».
+   - **El control en el servidor.** Con la marca puesta, si el seguro ya no
+     es el sugerido con los importes de ahora, `/generate_maria` da 400:
+     «Seguro: lo calculó el sistema con otros importes; con los de ahora da
+     X y la operación lleva Y. Recalculalo o dejalo como está en «Ajustes y
+     seguro».».
+   - **El aviso.** `/avisos` lo dice antes, con el mismo texto.
+   - **Cuentas en error.** Si las cuentas fallan, dice «…ahora no se puede
+     comprobar: {error}…», y el botón «Dejar» también aparece.
+   - **Cubre todos los caminos.** El control está en el servidor, así que
+     vale para revisión, restauración, otra operación y la tarjeta. Una
+     factura nueva reemplaza la operación entera y la marca no sobrevive.
+   - **La familia.** El seguro es el único valor que el sistema pone con
+     esas cuentas. El descuento (`usarDescuento`) sale de la factura
+     (`op.descuento`), no de las cuentas.
+   - **La pantalla.** Si generar frena por esto, vuelve a «Ajustes y
+     seguro». Lo reconoce por el texto «Seguro: lo calculó el sistema»:
+     cualquier otro error, también «Seguro: «abc» no es un importe.», se
+     queda en generar. Ese caso lo encontró `/code-review`; lo arreglé en
+     `c336508`, con el rojo antes.
+2. **D18 (b).** El general que nadie usa no se controla ni se avisa, en
+   los dos endpoints. Cuando alguien lo usa, los controles de `=`,
+   caracteres de control y largo siguen igual. Los sabotajes 14 a 16
+   prueban las dos condiciones.
+3. **Kilos.** El error nombra a todos los renglones que dan cero, también
+   cuando el cero sale del ajuste del redondeo. Tu caso: 0,005, 0,005,
+   0,005 y 0,004 nombra del 1 al 4.
+4. **Sin productos.** Los dos endpoints dicen «No hay productos para
+   generar: volvé a cargar la factura.»: `/generate_maria` con 400 y
+   `/avisos` como aviso.
+5. **Pruebas que no distinguían.** Cada mutación de tu lista tiene su
+   sabotaje:
 
-   Ahora:
-   - cada respuesta de `/avisos` guarda la **firma del pedido con el que se
-     pidió** (`firmaDelPedido`: todo `buildMariaRequest()` menos
-     `operation_id`, que lleva la hora). La firma se toma al mandar, no al
-     volver;
-   - «Calcular seguro» compara esa firma con la del pedido de ahora. Si no
-     coinciden, no calcula: pide las cuentas de nuevo;
-   - `usarDescuento()` y el cálculo del seguro llaman además a
-     `cuentasViejas()`, así el botón se esconde hasta que vuelvan las
-     cuentas.
+   | Mutación | Sabotaje |
+   |---|---|
+   | flete sin redondear | 21 |
+   | firma sin los ítems | 22 |
+   | sin `pintarValor(null)` | 23 |
+   | `None` por el IVA adicional | 24 |
+   | `/avisos` con `request.items` | 25 |
+   | renglón de kilos como índice dentro del ítem | 18 |
 
-   Las pruebas miran las cuentas con las que se calcula, no el seguro, y dan
-   rojo con las dos bases. Cubren:
-   - el descuento, el flete, el seguro a mano, la restauración y otra
-     operación;
-   - un pedido que cambia mientras viajan las cuentas.
-2. **El aviso del seguro sin leer.** Al calcularlo, `seguro` entra en
-   `campos_completados` y se refresca el semáforo: el aviso «No pudimos leer
-   el seguro…» se va. Si `seguro` está en `campos_sin_leer`, la nota del
-   botón dice «La factura puede traer un seguro que no pudimos leer:
-   revisala antes de calcularlo.».
-3. **D13 (b).** Ahora `BASE_SEGURO_SUGERIDO = "fob_factura"`. El botón dice
-   «1 % de FOB de la factura + flete». Los casos de la base siguen probando
-   que la constante manda: el sabotaje la fija en el código y da rojo.
-4. **Ajustes que no son número, por API.**
-   - `ajustes_incluir` y `ajustes_deducir` van sin tipo en `MariaRequest`
-     (`Any`). `/generate_maria` responde como antes de VALOR-1 y no los usa.
-   - `/avisos` los muestra como `valor.error` sin perder los avisos.
-   - Un texto, una lista, un objeto, verdadero o falso dan «Ajustes a
-     deducir: no es un importe.» o el mensaje de `importe_valido` con el
-     texto cortado a 20 caracteres.
-   - Un renglón con una cantidad o un valor que no es número da «Renglón 2:
-     el valor total «abc» no es un número; no se pueden hacer las cuentas.».
-     Verdadero o falso en un renglón ya no cuentan como 1 o 0.
-   - Un `TypeError` que se escape da un mensaje fijo, sin el texto de
-     Python.
+El CHANGELOG dice sólo lo probado, en dos líneas.
 
-El CHANGELOG dice sólo lo probado: saqué «de antes de cambiar un ajuste ni»
-de la línea de VALOR-1.
+### SEPARADORES-1
 
-### MARIA-9
-
-1. **El sufijo general que no se usa ya no frena.**
-   `usa_el_sufijo_de_la_operacion` decide si algún sub-ítem o renglón lo
-   toma; si nadie lo toma, no se analiza. Cuando alguno lo toma y no se
-   puede separar, `/avisos` lo anticipa con el mismo texto del error.
-   - Casos: sub-ítems a mano, renglones por API, mezcla, ítem entero con
-     sufijo propio.
-   - La autorrevisión encontró que el endpoint preguntaba con los renglones
-     antes de ponerles la procedencia de la operación. Pedía el sufijo
-     general cuando cada renglón traía el suyo. Arreglado en `58f2f79`.
-2. **Cada error de sufijo sale donde se corrige** (`finalize.js`). El de
-   la operación va bajo su campo, y el de un sub-ítem, bajo ese sub-ítem.
-   Lo prueba `scripts/testing/pantalla_maria9.js` con el error forzado
-   (`page.route`).
-3. **Bordes.** Cada uno tiene su caso y su sabotaje:
-   - 120 caracteres pasan y 121 no;
-   - `CA100-`, `A(X)-` y `;` como separador;
-   - las unidades `05` y `99` del aviso.
-4. **El error de kilos nombra sólo el renglón chico.** Si ninguno da cero
-   solo y el cero sale del ajuste del redondeo, sigue nombrando a todos,
-   porque ahí el culpable es el conjunto.
+- **La factura.** A Gemini se le pide el flete y el seguro como texto, y
+  los lee `_monto_factura`.
+  - «3.480» y «3.480,00» son 3480.
+  - Si la misma factura usa el punto como decimal, el campo queda sin leer
+    y se avisa.
+- **La pantalla.** `montos_ar.js` lee y escribe los montos a mano (flete,
+  seguro, gastos y ajustes): punto de miles y coma decimal.
+  - «1,500» no se adivina: la pantalla pregunta «¿1.500 o 1,5?» bajo el
+    campo.
+  - Con esa pregunta abierta, continuar no avanza.
 
 ## Comandos para reproducir
 
 ```bash
 S=<tu scratchpad>   # con un venv del proyecto en $S/venv y node en el PATH
 git fetch origin claude/dev-maria
-git diff efa2e08 origin/claude/dev-maria -- proyecto_maria tests scripts   # vacío
-git diff 23ba183 efa2e08 -- tests/fixtures/                                # vacío: los golden no cambian
-$S/venv/bin/python -m pytest -q --no-cov tests/test_valor1.py tests/test_maria9_*.py tests/test_maria7_devolucion.py   # 213 passed
-scripts/testing/sabotaje_valor1b.sh efa2e08 $S/venv   # «OK: los 23 sabotajes dan rojo por la razón esperada»
-scripts/testing/sabotaje_valor1.sh  efa2e08 $S/venv   # «OK: los 31 sabotajes dan rojo por la razón esperada»
-scripts/testing/sabotaje_maria9.sh  efa2e08 $S/venv   # «OK: los 30 sabotajes dan rojo por la razón esperada»
+git diff a099655 origin/claude/dev-maria -- proyecto_maria tests scripts      # vacío
+git diff d0bfebc a099655 --stat      # sólo tests/test_maria7_rechazos_24_10.py y tests/test_prelaunch_block1.py
+$S/venv/bin/python -m pytest -q --no-cov tests/test_valor1c.py tests/test_valor1.py tests/test_maria9_kilos.py tests/test_separadores1.py
+scripts/testing/sabotaje_valor1c.sh     a099655 $S/venv   # «OK: los 26 sabotajes dan rojo por la razón esperada»
+scripts/testing/sabotaje_separadores1.sh a099655 $S/venv  # «OK: los 17 sabotajes dan rojo por la razón esperada»
 ```
 
-Para `e2e_maria.sh`, poné `$S/venv/bin` primero en el `PATH`: levanta su
-propio servidor con el `python` que encuentra.
-
-Cada sabotaje arma su propio worktree descartable. No los corras en
-paralelo con la suite (ver «Rojos»).
+- Cada sabotaje lee su script mientras corre. No edites el script durante
+  la corrida (ver «Rojos»). Tampoco los corras en paralelo con la suite.
+- Para `e2e_maria.sh`, poné `$S/venv/bin` primero en el `PATH`.
 
 ## Puertas
 
-Todas sobre `efa2e08`. La suite y compileall corrieron solas, en un
-worktree limpio.
+| Puerta | SHA | Salida |
+|---|---|---|
+| Suite completa (worktree limpio, sola) | `a099655` | `2280 passed, 102 skipped, 2 xfailed, 25 warnings in 287.49s (0:04:47)`, rc=0 |
+| `compileall -q proyecto_maria` | `a099655` | rc=0 |
+| `sabotaje_separadores1.sh` | `a099655` | `OK: los 17 sabotajes dan rojo por la razón esperada`, rc=0 |
+| `sabotaje_valor1c.sh` | `d0bfebc` | `OK: los 26 sabotajes dan rojo por la razón esperada`, rc=0 |
+| Smoke (`levantar.sh d0bfebc 8791`) | `d0bfebc` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
+| `e2e_maria.sh` | `d0bfebc` | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.` |
+| `pantalla_separadores1.js` | `d0bfebc` | `OK el TXT sale con MDDTFLE=2750.00 y MDDTASS=1234.50` / `PANTALLA SEPARADORES-1 OK` |
 
-| Puerta | Salida |
-|---|---|
-| Suite completa | `2165 passed, 102 skipped, 2 xfailed, 25 warnings in 271.86s (0:04:31)`, rc=0 |
-| `compileall -q proyecto_maria` | rc=0 |
-| `sabotaje_valor1b.sh` | `OK: los 23 sabotajes dan rojo por la razón esperada`, rc=0 |
-| `sabotaje_valor1.sh` | `OK: los 31 sabotajes dan rojo por la razón esperada`, rc=0 |
-| `sabotaje_maria9.sh` | `OK: los 30 sabotajes dan rojo por la razón esperada`, rc=0 |
-| Smoke (`levantar.sh efa2e08 8831`) | `==> OK · telemetría + alias session/state + by-cuit protegido` |
-| `e2e_maria.sh` | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.` |
-| `pantalla_maria9.js` | `PANTALLA MARIA-9 OK` |
-| Golden (`git diff 23ba183 efa2e08 -- tests/fixtures/`) | vacío |
-
-No corrí `ataque_aislamiento.sh`: no toqué datos, sesión ni permisos.
+**No corrí:**
+- `ataque_aislamiento.sh`: no toqué datos, sesión ni permisos.
+- Una pantalla de VALOR-1c en el navegador. El botón «Dejar» y la vuelta a
+  las cuentas están probados con el arnés de node de `test_valor1c.py`, no
+  en Chromium.
 
 ## Autorrevisión
 
 | Revisor | Modelo y esfuerzo | Sobre | Hallazgos | Qué pasó |
 |---|---|---|---|---|
-| `/code-review high` | — | `23ba183..9f1e5b5` (MARIA-9) | 6 | Arreglados: procedencia en el endpoint (`58f2f79`). Quedan como riesgo: el mensaje con «sbt» lleva al campo general un error de sufijo de renglón que llega por API (la pantalla nunca manda `item.sufijo`); `usa_el_sufijo_de_la_operacion` repite reglas del generador (deuda); los avisos de transformación del general salen aunque nadie lo use; un análisis repetido (eficiencia); un ítem entero descarta su sufijo propio sin avisar (de antes) |
-| Adversario | Sonnet, alto | `23ba183..a6f7551` (MARIA-9) | 5 (4 reproducidos, 1 por lectura) | (1) D18. (2) kilos que culpaban al más grande: arreglado en `58f2f79`. (3) El prefijo «Item N» es el del primer renglón: ya pasaba. (4) Un aviso falso del general: riesgo. (5) Pantalla: informativo |
-| `/code-review high` | — | `52b56a4..7184e9e` (VALOR-1b) | 10 | Arreglados en `6ed3619`: verdadero o falso en un renglón contaban como 1 o 0; comentario y CHANGELOG. Los demás, en «Riesgos» |
-| Adversario | Sonnet, alto (uno solo: vuelta de una devolución de plata) | `52b56a4..7184e9e` (VALOR-1b) | 6 | Arreglados: ninguna prueba distinguía la firma tomada al mandar de la tomada al volver (caso y sabotaje 5b, `efa2e08`); listas y objetos con el texto de Python en el mensaje (`6ed3619`); verdadero en un renglón (el mismo de arriba). Quedan: `_exacto` y `grupo_id` (de antes, en «Riesgos»); el clic que sólo pide las cuentas (informativo) |
-| Revisión de seguridad | Opus, el de la sesión (subagente general) | `52b56a4..efa2e08` | 0 vulnerabilidades | `/security-review` no corre en esta sesión (pide `origin/HEAD`, que no existe); la hizo un subagente con la misma consigna. Sin XSS (todo va por `textContent` o `CDI.escapeHtml`), el TXT no cambia, los campos `Any` no abren nada nuevo (corrió entradas hostiles: 1 MB, anidado 5000 niveles, `10**400`), sin filtración en los errores. Un detalle de antes: ver `_exacto` en «Riesgos» |
-
-MARIA-9 no tuvo revisión de seguridad aparte: no toca plata, sesión ni
-permisos (sufijos y kilos del TXT). La de arriba cubre sólo VALOR-1b.
-
-El adversario de VALOR-1b probó sin hallazgo: 14 variantes y unos 190
-renglones adulterados con el TXT idéntico byte a byte, y ningún 500 en
-`/avisos`.
+| `/code-review high` | — | `a74ee9d..ea3200c` | 10 | Arreglado: (5) el prefijo «Seguro: » lo comparte un error de `importe_valido` (`c336508`, caso y sabotaje 8b en `d0bfebc`). (1) es D19. (2) la familia: falso, el descuento sale de la factura. (3), (4), (6) a (8) en «Riesgos». (9) «1,234,567» se acepta: aceptable. (10) duplicación: no se toca |
+| Adversario | Sonnet, alto | `a74ee9d..ea3200c` | 4, todos bajos (3 reproducidos, 1 por lectura) | Nada para arreglar dentro de la tarea. (1) «3.480» sin pista de decimal se lee 3480 sin marca; (2) Gemini con número JSON 3.480 da 3.48; (3) «.5» y «3 480» se rechazan; (4) `montoDelPedido` (D19). Sin hallazgo en: el control del seguro contra los dos endpoints (11 casos), D18 (fuzz de 4000 pedidos: 0 casos de un general «no usado» que sale en el TXT), unos 50 casos de `leer`/`escribir` y 45 de `_monto_factura` |
+| Revisión de seguridad | Sonnet (subagente general) | `a74ee9d..ea3200c` | 0 vulnerabilidades | `/security-review` no corre en esta sesión. Sin XSS, sin cambios de sesión ni permisos. `seguro_calculado` lo pone el cliente y no es un límite de seguridad: sólo hace frenar, no habilita nada. El general que nadie usa no llega al TXT: `limpiar_sufijo` es la barrera |
 
 ## Rojos
 
-- **`test_excel2::test_ocho_libros…` bajo carga.** Con los sabotajes
-  corriendo en paralelo, la suite sobre `7184e9e` dio `1 failed, 2160
-  passed`: «la subida normal dio 400 a los 30.1 s … tardó demasiado». Es el
-  rojo de entorno conocido, por la CPU cargada. Sola, sobre `efa2e08`, da
-  verde.
-- **`e2e_maria.sh` sin el venv.** La primera corrida dio `ModuleNotFoundError:
-  No module named 'fastapi'`. El script levanta su propio servidor con el
-  `python` del `PATH`, que era el del sistema. Con `$S/venv/bin` en el `PATH`
-  da verde. Es del entorno, no del producto.
-- Ningún rojo de producto.
+- **La suite sobre `d0bfebc`:** `2 failed, 2278 passed, 102 skipped, 2
+  xfailed`.
+  - `test_prelaunch_block1::test_generate_maria_sin_items_genera_vacio`:
+    `assert 400 == 200`. Afirmaba el 200 con un TXT vacío, lo que pide
+    cambiar tu punto 4. Ahora se llama `…_sin_items_da_error_claro` y
+    espera el 400 con el texto exacto.
+  - `test_maria7_rechazos_24_10::test_lo_que_se_cambia_en_el_sufijo_se_avisa`:
+    `assert False`. Pedía el aviso del general en un pedido donde el
+    sub-ítem trae su propio sufijo, o sea que nadie usa el general. Con
+    D18 (b) no se avisa. Ahora el aviso del general se prueba con la lona
+    sola, que sí lo usa. El del sub-ítem queda igual.
+  - Los dos son de producto, por mi pieza, y los vi tarde. La corrida
+    anterior sobre el árbol de trabajo la corté con `tail` y la línea final
+    se perdió entre el ruido de asyncio. No se repitió hasta pasar: se
+    leyó el motivo y se cambiaron los casos.
+- **`sabotaje_valor1c.sh` sobre `ea3200c`** cortó después de 13 rojos con
+  «line 133: syntax error near unexpected token `;'».
+  - La causa fue que edité el script, agregando el 8b, mientras bash lo
+    leía. Bash lee el script de a pedazos.
+  - Corrido desde una copia fija sobre `d0bfebc`, dio los 26 en rojo,
+    rc=0.
 
 ## Riesgos y lo que no se cubrió
 
-**De VALOR-1b:**
-- **El clic que sólo pide las cuentas.** Si el pedido cambió desde las
-  últimas cuentas, «Calcular seguro» no calcula: las pide de nuevo y la
-  persona tiene que volver a apretarlo. Pasa en la ventana de 400 ms después
-  de escribir o con un campo del despachante. No hay aviso de que el clic
-  no hizo nada; el botón se esconde y vuelve.
-- **La firma es todo el pedido**, no sólo lo que entra en las cuentas. Un
-  cambio que no mueve el seguro (un dato del despachante, una descripción)
-  también pide recalcular. Lo elegí así a propósito: un falso «cambió» sólo
-  cuesta otro clic, y un falso «no cambió» calcula con cuentas viejas.
-  Supuesto reversible.
-- **`campos_completados`:** al calcular, `seguro` cuenta como completado y
-  el aviso se va, como pediste en el punto 2. Si la factura sí traía un
-  seguro que no leímos, el único aviso que queda es la nota del botón,
-  antes de apretarlo.
-- `ajustes_*` como `Any` en `MariaRequest`: el tipo lo valida
-  `cuentas_del_valor`, no Pydantic. Hoy no lo usa nadie más.
-- `seguroSinLeer` repite la regla de `camposSinLeer` de `review.js`: aquélla
-  devuelve mensajes y no se puede reutilizar sin tocar revisión.
-- Ajustes y renglones se validan en dos funciones parecidas (`_ajuste` y
-  `_numeros_de_los_renglones`).
-- **De antes de este diff:**
-  - `_exacto` (`maria_generator.py` ~709) repite el valor entero en el
-    mensaje. Un renglón con 1 MB de espacios y `inf` devuelve un
-    `valor.error` de 1.000.053 caracteres. Es un eco al mismo usuario, en
-    texto plano. Se arregla cortando a 20, como `importe_valido`.
-  - Un `grupo_id` que es lista u objeto da 500 en `/generate_maria`, y en
-    `/avisos` «Hay un dato que no es un número».
-- Los que nombraste, sin tocar: `type=number` con «1.000,50», los
-  cosméticos, el ajuste mal escrito restaurado sobre un campo vacío.
+**De VALOR-1c:**
+- **La marca es del cliente.** Un cliente que no la manda (por API, o una
+  pantalla vieja en caché) genera con el seguro que traiga, como antes de
+  VALOR-1c.
+- **Una operación restaurada conserva la marca.** El servidor la vuelve a
+  comprobar con los importes de ahora: si cambiaron, frena y ofrece
+  «Dejar».
+- **Con las cuentas en error, frena** aunque el error sea de un ajuste y
+  no del seguro. Hay salida con «Dejar». Supuesto reversible.
+- `pintarValor` pone `op.ajustes_incluir` tal cual. Un número restaurado
+  como 1.125 se mostraría «1.125», y `leer` lo tomaría como 1125. Riesgo
+  bajo: la pantalla siempre guarda lo que escribe `escribir`.
+- `escribir` con números ≥1e21 o menores de 0,005 no da la vuelta: no son
+  montos reales.
+- Kilos: con 4 × 0,004, todos dan cero solos y se nombra a los cuatro.
+  Está bien así.
 
-**De MARIA-9:**
-- doble redondeo de kilos (`465.1249` sale `465.13`);
-- `cantidad=2.675` sale `2.67` sola y `2.68` en un ítem unido;
-- `#sbtSufijoValor` está fuera de `#despachanteWrap`;
-- la unidad «99» pasa sin aviso;
-- `pantalla_subitems1.js` da rojo **de antes**, no de MARIA-9: usa la ruta
-  `chromium-1194` y no carga el CUIT del despachante. Parche:
-  `await page.request.put(base + '/api/user/profile', { data: { cuit: '20123456786' } });`
-  y la ruta `/opt/pw-browsers/chromium`.
+**De SEPARADORES-1:**
+- Con `decimal=None`, la factura no da pista del separador decimal. Ahí
+  «3.480» es 3480 sin marca, como en la regla pedida. Un monto en moneda de
+  tres decimales saldría ×1000.
+- Si Gemini devuelve el flete como número JSON, `3.480` llega como 3.48 y
+  ya no se puede distinguir. El prompt pide texto; no hay `parse_float=str`.
+- `_MONEDAS` no tiene todas las monedas: un código raro pegado al número
+  deja el campo sin leer.
+- «.5», «5.» y «3 480» se rechazan con «Debe ser un numero». El campo
+  queda marcado: no se pierde nada.
+
+**Los que anotaste en la tarea**, sin tocar.
 
 **General:** la CI deselecciona tests de presupuestos y no reemplaza la
 suite.
 
-**No corrí** `ataque_aislamiento.sh`: no toqué datos, sesión ni permisos.
-
 ## Archivos de producto que toqué
 
-- `proyecto_maria/core/maria_generator.py`
-- `proyecto_maria/main.py` (`MariaRequest`, `_cuentas_del_valor`, `/generate_maria`)
+- `proyecto_maria/main.py`: `MariaRequest`, `/generate_maria`, `/avisos`,
+  `_seguro_calculado_viejo`.
+- `proyecto_maria/core/maria_generator.py`: `supuestos_declarados` y el
+  error de kilos.
+- `proyecto_maria/pdf_extractor.py`: `_monto_factura` y el prompt.
+- `proyecto_maria/static/v2/montos_ar.js`: nuevo.
 - `proyecto_maria/static/v2/screens/finalize.js`
+- `proyecto_maria/static/v2/screens/review.js`
+- `proyecto_maria/templates/dashboard_v2.html`
 
 ## Siguiente
 
-Arranco SEPARADORES-1. Si el veredicto trae una devolución, esa va primero.
+No hay pieza marcada «apenas entregues». Espero tu veredicto; si trae una
+devolución, esa va primero.
 
-Última vuelta: 2026-10-25 02:27 UTC.
+Última vuelta: 2026-10-25 06:31 UTC.
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. Entregadas VALOR-1b y MARIA-9 en efa2e08 (suite, 23+31+30 sabotajes, smoke, e2e y pantalla sobre ese SHA); D18 (sufijo general con «=» que nadie usa) abierta en PARA-PM-2.md; D13 (b) y D14 (a) decididas. Sigue SEPARADORES-1. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. Entregadas SEPARADORES-1 y VALOR-1c en a099655 (suite y 17 sabotajes de SEPARADORES-1 sobre a099655; 26 sabotajes de VALOR-1c, smoke, e2e y pantalla sobre d0bfebc, que difiere sólo en dos tests); D19 (montoDelPedido manda 0) abierta en PARA-PM-2.md; D18 (b), D13 (b) y D14 (a) decididas. Sin pieza siguiente: esperar veredicto. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
