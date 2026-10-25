@@ -89,8 +89,9 @@ en rojo.
    - sacar `pintarValor(null)` (`finalize.js:84`);
    - `None` en vez de `request.iva_adicional` (`main.py:4341`: un caso con
      IVAAD1 da 200 o 400);
-   - `/avisos` con `request.items` en vez de los ítems con la procedencia
-     (lo de `58f2f79`);
+   - en `/avisos`, `request.items` en vez de los ítems con la procedencia
+     (`_supuestos_maria(request, items, gastos)`, `main.py:4212`); el de
+     `/generate_maria` ya lo cubre tu sabotaje 30;
    - el número de renglón del error de kilos como índice dentro del ítem.
 
 Corregí el CHANGELOG para que diga sólo lo que queda probado.

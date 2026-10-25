@@ -65,7 +65,7 @@ una pieza chica, **VALOR-1c**, antes de SEPARADORES-1.
 | Sacar `pintarValor(null)` (`finalize.js:84`) | Opus | pantalla |
 | `None` en vez de `request.iva_adicional` en `main.py:4341` | Sonnet | sí: un caso con IVAAD1 da 200 o 400 |
 | `None` en la línea 1837 del generador | Sonnet | — |
-| `/avisos` con `request.items` en vez de los ítems con la procedencia | Sonnet | sí: el arreglo de `58f2f79` |
+| En `/avisos`, `request.items` en vez de los ítems con la procedencia (`main.py:4212`). El de `/generate_maria` (`main.py:4341`) sí da rojo: sabotaje 30, `endpoint_sin_procedencia` | Sonnet | sí: el arreglo de `58f2f79` |
 | El número de renglón del error de kilos como índice dentro del ítem | Sonnet | mensaje |
 
 ### De antes de esta pieza (riesgo, no se arregla acá)
