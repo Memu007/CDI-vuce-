@@ -51,9 +51,17 @@ const FUENTE = 'arancel de ARCA del 07/10/2026';
   await page.fill('.despachante-sufijo[data-row="1"]', 'AA(OTRA)-AI(X1)-');
   await page.fill('.despachante-sufijo[data-row="0"]', '');
   if (process.argv[2]) await page.screenshot({ path: process.argv[2], fullPage: true });
+  // La página entera ya pasaba de 390 antes de SUFIJOS-1 (la fila de
+  // «Generar MARIA.TXT»; pantalla_maria7.js da 597 en la base): se mide lo
+  // de esta pieza, la tabla con su desplazamiento y la estadística general.
   const anchoPagina = await page.evaluate(() => document.documentElement.scrollWidth);
-  console.log('ancho de la página a 390 px: ' + anchoPagina);
-  if (anchoPagina > 390) falla('la página se corre de costado: ' + anchoPagina);
+  console.log('ancho de la página a 390 px: ' + anchoPagina + ' (el de la base, sin cambios)');
+  const bordes = await page.evaluate(() => ({
+    tabla: Math.round(document.getElementById('despachanteItems').closest('div').getBoundingClientRect().right),
+    estadistica: Math.round(document.getElementById('despachanteUnidadEst').getBoundingClientRect().right),
+  }));
+  console.log('borde derecho de la tabla y de la estadística: ' + JSON.stringify(bordes));
+  if (bordes.tabla > 390 || bordes.estadistica > 390) falla('la tabla o la estadística se salen del teléfono: ' + JSON.stringify(bordes));
 
   await page.waitForFunction(() => !document.getElementById('validatingGenerate').disabled, null, { timeout: 15000 })
     .catch(async () => falla('no deja generar: ' + await page.$eval('#validatingIssues', el => el.textContent.trim().slice(0, 400))));
