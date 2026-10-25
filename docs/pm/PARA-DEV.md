@@ -27,6 +27,21 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
+## Veredicto de PRUEBAS-1 + PA-1b (2026-10-25): aceptadas con nota
+
+Sobre `e924b29` (base `913d282`). Integradas con `merge` de `e924b29` a la
+rama de la PM; los commits de EXCEL-3b que vienen después no entran. Detalle
+en `REPRODUCCION-PRUEBAS-1-2026-10-25.md`. Mi adversario (Sonnet, alto):
+- `excel1.sh` 36, `excel2.sh` 42 y `maria1b.sh` 34 en rojo, 0 con falla;
+- la línea base, `302 passed`;
+- la prueba del mapeo guardado ahora distingue;
+- `e2e_rerun.sh`, VERDE / ROJO / VERDE, como tu informe.
+
+La nota va a CLIENTE-1b: `foco_cliente1.sh` dio rc=1 sobre código sano
+(«esta medición no distingue», 0 fallas sin espera de 30). Riesgos que
+quedan: `entrarAValidacion` supone dos respuestas de avisos, y el corte de
+90 s de `excel2.sh`.
+
 ## Veredicto de EXCEL-3b (2026-10-25): devolución, EXCEL-3c
 
 Sobre `7043cf2` (informe `e08b4c4`). **No la integro todavía.** Detalle en
@@ -93,124 +108,15 @@ el informe de reproducción.
   - el aviso de unidad en cualquier proforma con unidad en las dos
     cabeceras.
 
-## Mientras reviso (2026-10-25 00:30 UTC)
+## Mientras reviso EXCEL-3c
 
-PRUEBAS-1 + PA-1b (`e924b29`) siguen en revisión. El veredicto va acá arriba.
-
-- **D8: (b).** `landing.html:139` queda «NCM», igual que D6.
 - **Orden:** EXCEL-3c (arriba). Después terminá **CLIENTE-1b** («Más
-  adelante») y seguí con ESTUDIO-1. MARIA-7 ya está integrada en mi rama
-  (`1fa0b6e`): traela con `merge` antes de empezar EXCEL-3c.
+  adelante», con la nota de `foco_cliente1.sh`) y seguí con ESTUDIO-1.
+- **D8: (b).** `landing.html:139` queda «NCM», igual que D6.
 
-## Veredicto de PA-1 + D3 (2026-10-24): aceptada
+## Después de EXCEL-3c
 
-Sobre `31719c3` (producto `489daf4`, `c7e4c3a`, `26797f8`, `d8e084c`),
-incluido el supuesto de la fecha a medias. Integrada con `merge` a la rama de
-la PM (`fe41228`); el producto es idéntico al revisado. Detalle en
-`REPRODUCCION-PA-1-2026-10-24.md`: focales 65 passed, suite 1782 passed,
-`pa1.sh` 27 ROJO y `cliente1.sh` 23 ROJO con 0 sin rojo (esperando el foco,
-abajo). La e2e no la corrí.
-
-- **D4: (b).** «Posición SIM» queda.
-- **D5: (a)**, como pieza chica **PA-1b**: sólo la demo de la landing pasa a
-  «3 PA SIM» (`proyecto_maria/templates/landing.html:130` y `:139`).
-  `public_quote.html` no; el resto de la landing (textos de venta) tampoco.
-- **D6: (a).** `enrich.js:207` queda «NCM».
-- **D7: (a)**, dentro de **CLIENTE-1b** (abajo, ampliada).
-
-Del adversario (sobre D3, en navegador): el núcleo de D3 aguanta. Salieron
-tres cosas anteriores a D3; dos van a CLIENTE-1b y la tercera queda como
-riesgo (un guardado en vuelo cierra el formulario de otro cliente abierto
-después). No la arregles.
-
-## Ahora (2026-10-24 21:05 UTC), en este orden
-
-### 1. PRUEBAS-1: pruebas que quedaron mal (sólo pruebas, sin producto)
-
-Salió al probar la publicación de `8b45207`. El producto está bien; las
-pruebas no.
-
-**a) `cliente1.sh` da un «sin rojo» que va y viene.** Lo vi 1 vez en una
-corrida y lo reproduje 2 de 82 veces.
-- **Causa:** `openForm()` (`clientes.js`) pone el foco en `#cfNombre` con
-  `setTimeout(..., 80)`. `page.fill('#cfCuit', …)` enfoca y escribe en dos
-  pasos; si el temporizador cae en el medio, el CUIT se escribe en el
-  nombre («Nombre20-12345678-6») y el CUIT queda vacío. Entonces el aviso
-  dice que falta el CUIT y la prueba lo toma como falla, aunque no haya
-  sabotaje.
-- **Qué:** antes de llenar el formulario recién abierto, esperar la
-  condición observable `document.activeElement.id === 'cfNombre'`
-  (`page.waitForFunction`), no una espera fija. **Por la familia:** toda
-  prueba que llene `cxForm` justo después de abrirlo (alta, «Cliente Dos»,
-  editar, y las de PA-1 si llenan el formulario).
-- **Prueba de que distingue:** con la espera, 100 corridas seguidas sin
-  que el CUIT caiga en el nombre; sin la espera, que se vea al menos una
-  (podés acortar el `setTimeout` en un worktree descartable para forzarlo,
-  nunca en el producto).
-
-**b) `excel1.sh` tiene cuatro sabotajes viejos.** EXCEL-3 cambió el código
-que atacan y el script no se actualizó (sobre `8b45207`: «sabotajes con
-falla: 4»):
-- «las filas de subtotal vuelven a entrar» y «el total en la columna de
-  código vuelve a entrar»: el patrón ahora es `_es_fila_de_total(rotulo or
-  pieza)`. Ojo: cambiarlo por `rotulo` solo **no** da rojo (rótulo ya toma
-  «TOTAL AMOUNT» de la columna de código); con `descripcion` sí. Elegí el
-  sabotaje que reproduce el defecto viejo.
-- «vuelven las dos columnas con el mismo nombre (500)»: el `drop` ahora son
-  dos líneas con `campos` y `pesos`.
-- «el mapeo guardado vuelve a dejar afuera lo detectado» (`elegido = g`):
-  da 35 rojos, pero ya no el de
-  `test_mapeo_guardado_no_deja_afuera_encabezados_nuevos`. Decí por qué esa
-  prueba ya no lo distingue y ajustá la expectativa o la prueba.
-- **`excel2.sh`, lo mismo** (sobre `8b45207`, 20:20–20:50 UTC): tres
-  sabotajes no encuentran su patrón: «leer la factura vuelve a abrir el
-  libro entero» (la llamada ahora es `_xlsx_solo_primera_hoja(ruta,
-  max_filas=_MAX_FILAS_EXCEL)`), «la columna de origen vuelve a ser
-  obligatoria» (ahora `if not all([desc_col, cant_col, valor_col]):`) y «un
-  producto mal formado vuelve a dar 500» (`if not isinstance(_it, dict) or
-  (` ya no existe; está en `main.py` ~4238). Además el script no termina en
-  30 minutos: corrieron 26 de 42 (23 ROJO). Medí cuánto tarda cada sabotaje
-  y decí por qué; si es `test_excel2.py` entero por vez, corré sólo la
-  prueba que cada sabotaje nombra.
-
-- **`maria1b.sh`, lo mismo** (sobre `8b45207`, «sabotajes con falla: 2»):
-  EXCEL-2 (`7e9c4e0`) movió el código. «NaN e inf vuelven a pasar en la
-  cantidad» busca `if _fuera_de_rango(cantidad):` y ahora es
-  `cantidad_mala = _fuera_de_rango(cantidad)` (`core/controles_maria.py:115`);
-  «una hoja de gráfico vuelve a contar como hoja» busca la línea de
-  `chartsheet` en `main.py` y ahora está en `security/file_security.py:162`.
-  Sólo el script: no toques `controles_maria.py`.
-
-**a), validado por la PM:** con `page.waitForFunction(() =>
-document.activeElement && document.activeElement.id === 'cfNombre')` después
-de cada una de las cinco esperas de `#cfNombre` en `pantalla_cliente1.js`,
-`cliente1.sh 31719c3` dio 23 ROJO y 0 sin rojo. Ése es el camino; falta la
-prueba de que distingue (arriba) y la familia.
-
-**c) e2e: el rojo intermitente de `#validatingRerun`** que viste sobre
-`d1f7833` (`Node is either not clickable or not an Element`,
-`config/e2e_maria.js:202`). No es de PA-1, y una repetición verde no lo
-cierra.
-- **Diagnóstico:** en el momento de la falla, registrá si el botón está en el
-  documento (`isConnected`), si se ve (`offsetParent`, caja) y si la
-  validación anterior terminó. Decí la causa.
-- **Qué:** esperar una condición observable (el botón visible y habilitado,
-  la validación anterior terminada), no una espera fija.
-- **Prueba de que distingue:** con una demora forzada en
-  `/api/validate/smart` (`page.route`), sin la espera falla y con la espera
-  pasa.
-
-**Al terminar:** `excel1.sh`, `excel2.sh` y `cliente1.sh` con «sin rojo: 0» /
-«con falla: 0» sobre tu SHA, y cuánto tardó cada uno; la e2e con la prueba
-de la demora.
-
-### 2. PA-1b: la demo de la landing (D5)
-
-Las dos líneas de la demo (`landing.html:130` y `:139`): «NCM» pasa a
-«PA SIM», como el progreso de la aplicación. Una prueba de texto como las de `test_pa1_textos.py` y su
-sabotaje. Nada más.
-
-### 4. ESTUDIO-1, con lo que pediste definido (decidido por la PM)
+### ESTUDIO-1, con lo que pediste definido (decidido por la PM)
 
 1. **Los estudios son de la cuenta**, como los clientes: cada usuario ve y
    elige sólo los suyos (mismo aislamiento por dueño que clientes; prueba
@@ -247,6 +153,10 @@ de D3. Antes de ESTUDIO-1. Toca datos: revisión fuerte.
   cliente más allá del id) y, con una opción explícita, deja «None» en
   vacío. Probado en una base local. Correrlo en producción lo decide Emi.
 - No toques el TXT (`maria_generator.py`): es de la Dev MARIA.
+- **`foco_cliente1.sh` como puerta (de PRUEBAS-1):** sobre código sano dio
+  rc=1 porque la variante sin espera no falló en 30 («esta medición no
+  distingue»). Que sea informativa (sin rc=1 cuando no distingue) o subí M
+  hasta que el rojo sin espera sea seguro; decí cuál y por qué.
 
 ## Más adelante — GUARDAR-2
 

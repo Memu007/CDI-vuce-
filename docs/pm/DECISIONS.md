@@ -159,3 +159,11 @@ reunión, sin datos del cliente):
 Emi (2026-10-24): Codex deja de trabajar en CDI; la PM principal arma dos
 Devs nuevas en Claude: Dev MARIA en esfuerzo alto y Dev técnica en medio.
 Roadmap nuevo a tres meses en `ROADMAP.md`: **aprobado por Emi el 2026-10-24** («Dale. Comenzá»). Emi (2026-10-24): la lectura de fechas año/mes/día entra en MARIA-7 (punto 8).
+
+## 2026-10-25 — Base del seguro sugerido (PM, D13 de VALOR-1)
+
+Decidido por la PM: hasta PRORRATEO-1, el botón «Calcular seguro» calcula
+el 1 % sobre el FOB de la factura más el flete, no sobre el FOB casillero.
+Así el TXT no lleva un FOB sin ajustes con un seguro calculado con ajustes.
+Se revierte con una constante (`BASE_SEGURO_SUGERIDO`) cuando el casillero
+vaya al TXT. Pregunta 3 al despachante en `PREGUNTAS-DESPACHANTE.md`.

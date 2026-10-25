@@ -49,6 +49,7 @@ H=templates/dashboard_v2.html
 N=static/v2/screens/ncm.js
 C=static/v2/screens/clientes.js
 K=static/v2/screens/catalogo.js
+L=templates/landing.html
 
 if ! correr >/dev/null; then
   echo "BASE  | la prueba ya está en rojo sin sabotaje: no se puede medir nada"; correr | tail -5; exit 1
@@ -67,6 +68,9 @@ sabotaje $N "deshacer del asistente" "scheduleUndoClear('PA SIM ' + result.ncm" 
   "sigue diciendo \"scheduleUndoClear('NCM ' + result.ncm\""
 sabotaje $N "título de refrescar" 'title="Refrescar desde el asistente de posición arancelaria"' \
   'title="Refrescar desde el asistente NCM"' "sigue diciendo 'title=\"Refrescar desde el asistente NCM\"'"
+# PA-1b: el paso 3 de la demo de la landing.
+sabotaje $L "paso 3 de la demo de la landing" '<span class="num">3</span> PA SIM</div>' '<span class="num">3</span> NCM</div>' \
+  "templates/landing.html sigue diciendo '<span class=\"num\">3</span> NCM</div>'"
 
 # Un texto nuevo que se duplica también es rojo: «no dice».
 sabotaje $H "botón continuar duplicado" "Continuar a PA SIM" "Continuar a PA SIM / Continuar a PA SIM" \

@@ -14,12 +14,20 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   const page = await (await b.newContext({ viewport: { width: 1280, height: 1000 } })).newPage();
   const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
   const id = Date.now();
+  // openForm() pone el foco en la razón social con un temporizador: si se
+  // llena otro campo antes de que llegue, lo escrito cae en la razón social
+  // («Nombre20-12345678-6») y el CUIT queda vacío. Se espera ese foco.
+  async function formularioListo() {
+    await page.locator('#cfNombre').waitFor({ state: 'visible', timeout: 10000 });
+    await page.waitForFunction(() => document.activeElement && document.activeElement.id === 'cfNombre', null, { timeout: 10000 })
+      .catch(() => falla('el formulario abierto no puso el foco en la razón social'));
+  }
   await page.request.post(base + '/auth/register', { data: { username: 'c1_' + id, password: 'Clave-Inventada-123', email: 'c1' + id + '@ejemplo.test' } });
   await page.goto(base + '/dashboard');
   await page.waitForFunction(() => window.CDI && CDI.goTo);
   await page.evaluate(() => CDI.goTo('clientes'));
   await page.locator('#cxNewBtn').click();
-  await page.locator('#cfNombre').waitFor({ state: 'visible', timeout: 10000 });
+  await formularioListo();
 
   // Lo que pide el MARIA, a la vista sin abrir «Más datos» y marcado.
   for (const [campo, nombre] of [['cfCuit', 'CUIT'], ['cfDireccion', 'domicilio'], ['cfFechaInicActiv', 'inicio de actividad']]) {
@@ -65,7 +73,7 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 
   // Con los cuatro datos: sin aviso de lo que falta.
   await page.locator('#cxNewBtn').click();
-  await page.locator('#cfNombre').waitFor({ state: 'visible', timeout: 10000 });
+  await formularioListo();
   await page.fill('#cfNombre', 'Cliente Inventado Dos SRL');
   await page.fill('#cfCuit', '30-71234567-1');
   await page.fill('#cfDireccion', 'Calle Inventada 123, CABA');
@@ -123,7 +131,7 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
     await page.locator('.cx-card', { hasText: nombreD3 }).click();
     await page.locator('#cxKebabBtn').click();
     await page.locator('#cxKebabMenu [data-kaction="edit"]').click();
-    await page.locator('#cfNombre').waitFor({ state: 'visible', timeout: 10000 });
+    await formularioListo();
     const campoVacio = (await page.inputValue('#cfFechaInicActiv')) === '';
     await page.fill('#cfDireccion', 'Calle Inventada 2');
     if (escribe !== null) await page.fill('#cfFechaInicActiv', escribe);
@@ -133,7 +141,7 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
     const textoD3 = (await avisoD3.innerText()).replace(/\s+/g, ' ');
     const c = (await (await page.request.get(base + '/api/clientes/' + idsD3[n])).json());
     const cli = c.cliente || c;
-    if (cli.direccion !== 'Calle Inventada 2') falla(n + ': la edición no se guardó: ' + cli.direccion);
+    if (cli.direccion !== 'Calle Inventada 2') falla(n + ': la edición no se guardó: ' + cli.direccion + ' (razón social: ' + cli.nombre + ')');
     const tiene = cli.fecha_inic_activ || null;
     if (tiene !== queda) falla(n + ': después de editar, la fecha es ' + JSON.stringify(tiene) + ' y tenía que ser ' + JSON.stringify(queda));
     if (/inicio de actividad/i.test(textoD3) !== pideFecha) {
@@ -145,7 +153,7 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   // Sólo se ve si el último caso dejó una fecha conservada.
   if (!ultimaConservada) falla('el último caso de D3 tiene que dejar una fecha conservada (campo vacío, sin tocar, y queda)');
   await page.locator('#cxNewBtn').click();
-  await page.locator('#cfNombre').waitFor({ state: 'visible', timeout: 10000 });
+  await formularioListo();
   await page.fill('#cfNombre', 'Cliente Inventado D3 Alta ' + id);
   await page.fill('#cfCuit', '20-12345678-6');
   await page.fill('#cfDireccion', 'Calle Inventada 3');
@@ -167,7 +175,7 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
     await page.locator('.cx-card', { hasText: nombreM }).click();
     await page.locator('#cxKebabBtn').click();
     await page.locator('#cxKebabMenu [data-kaction="edit"]').click();
-    await page.locator('#cfNombre').waitFor({ state: 'visible', timeout: 10000 });
+    await formularioListo();
     await page.fill('#cfDireccion', 'Calle Inventada 2');
     await page.fill('#cfFechaInicActiv', '');
     await page.locator('#cfFechaInicActiv').click();
