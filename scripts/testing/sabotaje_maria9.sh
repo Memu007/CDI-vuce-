@@ -90,7 +90,7 @@ caso "subitem_sin_propio_no_cuenta" "FAILED $T::test_los_avisos_anticipan_el_err
 
 # 7. un ítem que sale entero no cuenta (se ignora si va junto con otros)
 reemplazar $F '        elif n not in juntos or sin_propio(item.get("sufijo")):' '        elif sin_propio(item.get("sufijo")):'
-caso "item_entero_no_cuenta" "FAILED $T::test_los_avisos_anticipan_el_error_sólo_si_alguien_lo_usa[item_entero]"
+caso "item_entero_no_cuenta" "FAILED $T::test_los_avisos_anticipan_el_error_sólo_si_alguien_lo_usa[item_entero_con_propio]"
 
 # 8. un renglón sin propio no cuenta
 reemplazar $F '        elif n not in juntos or sin_propio(item.get("sufijo")):' '        elif n not in juntos:'

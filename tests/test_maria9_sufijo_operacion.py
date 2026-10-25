@@ -36,6 +36,8 @@ FAMILIA = {
     "un_subitem_sin_propio": (lambda: [_subitems("AA(A)-", None)], True),
     "propio_que_queda_vacio": (lambda: [_subitems("AA(A)-", " - ")], True),
     "item_entero": (lambda: [dict(LONA)], True),
+    # Un ítem que sale entero toma el de la operación aunque traiga el suyo.
+    "item_entero_con_propio": (lambda: [dict(LONA, sufijo="AA(A)-")], True),
     "renglones_con_propio_y_un_item_entero": (lambda: _lonas()[:2] + [
         dict(LONA, pieza="39211390900F")], True),
 }
