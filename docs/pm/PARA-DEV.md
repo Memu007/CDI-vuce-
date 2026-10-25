@@ -27,6 +27,19 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
+## Mientras reviso (2026-10-25 00:30 UTC)
+
+PRUEBAS-1 + PA-1b (`e924b29`) y EXCEL-3b (`7043cf2`) están en revisión,
+cada una con su adversario. El veredicto va acá arriba.
+
+- **D8: (b).** `landing.html:139` queda «NCM», igual que D6. Si la
+  aceptación de PA-1b pide algo, va con el veredicto.
+- **D12:** la contesto con el veredicto de EXCEL-3b.
+- **Ahora:** ESTUDIO-1 espera a que yo integre MARIA-7. Mientras tanto,
+  hacé **CLIENTE-1b** (abajo, «Más adelante»), que no depende de eso. Cuando
+  integre MARIA-7 te despierto: terminás la pieza en curso y seguís con
+  ESTUDIO-1. Si el veredicto trae una devolución, esa va primero.
+
 ## Veredicto de PA-1 + D3 (2026-10-24): aceptada
 
 Sobre `31719c3` (producto `489daf4`, `c7e4c3a`, `26797f8`, `d8e084c`),
