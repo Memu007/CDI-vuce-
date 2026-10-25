@@ -193,9 +193,9 @@ def test_un_ajuste_invalido_va_en_la_tarjeta_y_no_tapa_los_otros_avisos(client):
 # VALOR-1b: por API, un ajuste que no es número no da 422.
 @pytest.mark.parametrize("ajuste, error", [
     ("abc", "Ajustes a deducir: «abc» no es un importe."),
-    (True, "Ajustes a deducir: «True» no es un importe."),
-    ([1], "Ajustes a deducir: «[1]» no es un importe."),
-    ({"x": 1}, "Ajustes a deducir: «{'x': 1}» no es un importe."),
+    (True, "Ajustes a deducir: no es un importe."),
+    ([1], "Ajustes a deducir: no es un importe."),
+    ({"x": 1}, "Ajustes a deducir: no es un importe."),
 ], ids=["texto", "verdadero", "lista", "objeto"])
 def test_un_ajuste_que_no_es_numero_va_en_la_tarjeta_con_todos_los_avisos(client, request, ajuste, error):
     _registrar_con_cuit(client, "valor1b_aj_" + request.node.callspec.id)
@@ -235,8 +235,11 @@ def test_un_error_de_tipo_que_se_escape_no_muestra_el_texto_de_python(client, mo
     ({"cantidad": "abc"}, "Renglón 2: la cantidad «abc» no es un número; no se pueden hacer las cuentas."),
     ({"valor_unitario": "x"}, "Renglón 2: el valor unitario «x» no es un número; no se pueden hacer las cuentas."),
     ({"valor_total": "z"}, "Renglón 2: el valor total «z» no es un número; no se pueden hacer las cuentas."),
-    ({"cantidad": [1]}, "Renglón 2: la cantidad «[1]» no es un número; no se pueden hacer las cuentas."),
-], ids=["cantidad", "unitario", "total", "lista"])
+    ({"cantidad": [1]}, "Renglón 2: la cantidad no es un número; no se pueden hacer las cuentas."),
+    # Verdadero o falso no es un número (se tomaría como 1 o 0), igual que en los ajustes.
+    ({"valor_total": True}, "Renglón 2: el valor total no es un número; no se pueden hacer las cuentas."),
+    ({"cantidad": False}, "Renglón 2: la cantidad no es un número; no se pueden hacer las cuentas."),
+], ids=["cantidad", "unitario", "total", "lista", "verdadero", "falso"])
 def test_un_renglon_con_texto_en_vez_de_numero_se_nombra_sin_texto_de_python(client, request, cambio, error):
     _registrar_con_cuit(client, "valor1b_ren_" + request.node.callspec.id)
     r = client.post("/generate_maria/avisos", json={**_pedido(), "items": [LONA, {**LONA, **cambio}]})
@@ -448,6 +451,13 @@ def test_sin_operacion_todavia_el_boton_igual_pone_el_seguro():
     assert r["op"] == {"seguro": 93.13, "seguro_calculado": True}
 
 
+def test_al_escribir_un_ajuste_el_boton_se_esconde_hasta_que_vuelvan_las_cuentas():
+    r = _pantalla({}, "", VALOR)
+    assert r["els"]["valorCalcularSeguro"]["hidden"] is False
+    r = _pantalla({}, "enlazarValor(); els.valorDeducir.value = '500'; els.valorDeducir.listeners.input();", VALOR)
+    assert r["els"]["valorCalcularSeguro"]["hidden"] is True
+
+
 def test_mientras_se_rehacen_las_cuentas_no_se_calcula_con_las_viejas():
     # Se escribe un ajuste y se toca el botón antes de que vuelvan las cuentas.
     r = _pantalla({}, "enlazarValor(); els.valorDeducir.value = '500';"
@@ -476,7 +486,7 @@ def _avisos(despues):
     stubs = ("let ultimoValor = null; let cuentasCon = null; let avisosSeq = 0;\n"
              "const SIN_CUENTAS = 'No se pudieron hacer las cuentas: mirá los avisos.';\n"
              "function stripLeadingIcon(s) { return s; } function extractItemRef() { return ''; }\n"
-             "function buildMariaRequest() { return {}; }\n"
+             "let pedidoAhora = {}; function buildMariaRequest() { return pedidoAhora; }\n"
              "const pendientes = []; CDI.state.items = [{}];\n"
              "CDI.api = () => new Promise(ok => pendientes.push(ok));\n"
              "function contestar(i, okHttp, data) { pendientes[i]({ok: okHttp, json: async () => data}); }\n")
@@ -503,6 +513,13 @@ def test_una_respuesta_vieja_no_pisa_las_cuentas_nuevas():
 
 def test_las_cuentas_quedan_atadas_al_pedido_que_se_mando():
     r = _avisos(f"const p = refrescarAvisos(); contestar(0, true, {{avisos: [], valor: {json.dumps(VALOR)}}}); await p")
+    assert r["cuentasCon"] == "{}"
+
+
+def test_un_pedido_que_cambia_mientras_viajan_las_cuentas_no_se_les_pega():
+    # La firma es la del pedido que se mandó, no la del de cuando vuelven.
+    r = _avisos("const p = refrescarAvisos(); pedidoAhora = {flete: 100};"
+                f" contestar(0, true, {{avisos: [], valor: {json.dumps(VALOR)}}}); await p")
     assert r["cuentasCon"] == "{}"
 
 

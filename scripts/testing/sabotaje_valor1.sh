@@ -134,12 +134,12 @@ caso "seguro_a_mano_marcado" "FAILED $T::test_un_seguro_escrito_a_mano_deja_de_s
 
 # 16. la base del seguro no sale de BASE_SEGURO_SUGERIDO
 reemplazar $F '}[BASE_SEGURO_SUGERIDO]
-    return {' '}["fob_casillero"]
+    return {' '}["fob_factura"]
     return {'
 caso "base_fija_en_la_cuenta" "FAILED $T::test_la_base_del_seguro_se_cambia_en_un_solo_lugar"
 
 # 17. el botón nombra una base fija en vez de la del servidor
-reemplazar $JS "const base = (ok && valor.base_seguro) || 'FOB';" "const base = 'FOB casillero';"
+reemplazar $JS "const base = (ok && valor.base_seguro) || 'FOB';" "const base = 'FOB de la factura';"
 caso "base_fija_en_el_boton" "FAILED $T::test_el_boton_nombra_la_base_que_dice_el_servidor"
 
 # 18. el aviso vuelve a decir que el casillero se carga a mano
@@ -173,10 +173,10 @@ caso "falla_avisos_callada" "FAILED $T::test_si_fallan_los_avisos_la_tarjeta_lo_
 reemplazar $JS '!ajusteMalEscrito(op.ajustes_incluir)) {' 'true) {'
 caso "mal_escrito_se_borra" "FAILED $T::test_un_numero_que_el_campo_no_entiende_queda_marcado_y_a_la_vista"
 
-# 25. al cambiar un ajuste, el botón sigue con las cuentas viejas
+# 25. al cambiar un ajuste, el botón sigue a la vista con las cuentas viejas
 reemplazar $JS '                cuentasViejas();
 ' ''
-caso "boton_con_cuentas_viejas" "FAILED $T::test_mientras_se_rehacen_las_cuentas_no_se_calcula_con_las_viejas"
+caso "boton_con_cuentas_viejas" "FAILED $T::test_al_escribir_un_ajuste_el_boton_se_esconde_hasta_que_vuelvan_las_cuentas"
 
 # 26. el seguro sugerido de otra operación se usa
 reemplazar $JS '        if (!cuentasCon || cuentasCon !== ahora) {' '        if (false) {'

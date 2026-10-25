@@ -85,6 +85,10 @@ caso "cuenta_vieja_tarde" "FAILED $T::test_una_cuenta_vieja_que_llega_tarde_no_p
 reemplazar $JS '        pintarValor(valor, firma);' '        pintarValor(valor);'
 caso "avisos_sin_firma" "FAILED $T::test_las_cuentas_quedan_atadas_al_pedido_que_se_mando"
 
+# 5b. la firma se toma cuando vuelven las cuentas, no cuando se mandó el pedido
+reemplazar $JS '        pintarValor(valor, firma);' '        pintarValor(valor, firmaDelPedido(buildMariaRequest()));'
+caso "firma_tardia" "FAILED $T::test_un_pedido_que_cambia_mientras_viajan_las_cuentas_no_se_les_pega"
+
 # 6. sin firma se calcula igual
 reemplazar $JS '        if (!cuentasCon || cuentasCon !== ahora) {' '        if (cuentasCon && cuentasCon !== ahora) {'
 caso "sin_firma_calcula" "FAILED $T::test_sin_firma_no_se_calcula"
@@ -132,19 +136,29 @@ reemplazar $M '    ajustes_incluir: Any = None' '    ajustes_incluir: float | No
 caso "ajuste_422_txt" "FAILED $T::test_un_ajuste_que_no_es_numero_no_frena_el_txt"
 
 # 16. verdadero se toma como 1
-reemplazar $F '    if isinstance(valor, bool):
-        raise' '    if False:
-        raise'
+reemplazar $F '    if isinstance(valor, bool) or not' '    if not'
 caso "verdadero_es_uno" "FAILED $T::test_un_ajuste_que_no_es_numero_va_en_la_tarjeta_con_todos_los_avisos[verdadero]"
+
+# 16b. un objeto en un ajuste se muestra como lo escribe Python
+reemplazar $F '        raise ValueError(f"{nombre}: no es un importe.")' '        return importe_valido(valor, nombre)'
+caso "ajuste_repr" "FAILED $T::test_un_ajuste_que_no_es_numero_va_en_la_tarjeta_con_todos_los_avisos[objeto]"
+
+# 16c. una lista en un renglón se muestra como la escribe Python
+reemplazar $F '            escrito = f" «{valor[:20]}»" if isinstance(valor, str) else ""' '            escrito = f" «{str(valor)[:20]}»"'
+caso "renglon_repr" "FAILED $T::test_un_renglon_con_texto_en_vez_de_numero_se_nombra_sin_texto_de_python[lista]"
 
 # 17. un renglón con texto muestra el texto de Python
 reemplazar $F '    _numeros_de_los_renglones(items)
 ' ''
 caso "renglon_texto_python" "FAILED $T::test_un_renglon_con_texto_en_vez_de_numero_se_nombra_sin_texto_de_python[cantidad]"
 
+# 17b. verdadero o falso en un renglón se toma como 1 o 0
+reemplazar $F '            if not isinstance(valor, bool):' '            if True:'
+caso "renglon_verdadero" "FAILED $T::test_un_renglon_con_texto_en_vez_de_numero_se_nombra_sin_texto_de_python[verdadero]"
+
 # 18. un error de tipo que se escapa muestra el texto de Python
 reemplazar $M '        return {"error": "Hay un dato que no es un número: no se pueden hacer las cuentas."}, []' '        raise'
 caso "tipo_crudo" "FAILED $T::test_un_error_de_tipo_que_se_escape_no_muestra_el_texto_de_python"
 
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
-echo "OK: los 18 sabotajes dan rojo por la razón esperada"
+echo "OK: los 23 sabotajes dan rojo por la razón esperada"
