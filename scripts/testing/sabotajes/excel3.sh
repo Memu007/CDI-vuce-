@@ -114,7 +114,7 @@ sabotaje $M "un producto «Discount …» vuelve a ser descuento" \
   ' and not _DESCUENTO_SOLO_RE.match(cargo):' ' and False:' \
   "FAILED $T::test_un_producto_que_empieza_con_discount_sigue_siendo_producto"
 sabotaje $M "un descuento en porcentaje vuelve a entrar" \
-  '                    if "%" in cargo or _monto_de_la_linea() < 0:' '                    if False:' \
+  '                    if "%" in cargo or _monto_de_la_linea() < 0 or not valor_unitario:' '                    if False:' \
   "FAILED $T::test_un_descuento_en_porcentaje_no_se_lee_como_monto_ni_como_producto"
 sabotaje $M "el descuento negativo en el precio vuelve a ser un producto" \
   '                    precio = _monto_de_fila(row[valor_col], decimal) or 0.0' \
@@ -183,7 +183,7 @@ sabotaje $M "3b#3 un código nuevo sin especificación vuelve a heredar" \
   '            if False:' \
   "${B}un_codigo_nuevo_sin_especificacion_no_hereda_la_del_grupo_anterior"
 sabotaje $M "3b#1 un descuento con texto y monto negativo vuelve a ser producto" \
-  '                    if "%" in cargo or _monto_de_la_linea() < 0:' '                    if "%" in cargo:' \
+  '                    if "%" in cargo or _monto_de_la_linea() < 0 or not valor_unitario:' '                    if "%" in cargo or not valor_unitario:' \
   "${B}un_descuento_con_texto_y_monto_negativo_se_avisa_y_no_es_producto[importe]"
 sabotaje $M "3b#1 el monto negativo en el precio deja de leerse" \
   '                    precio = _monto_de_fila(row[valor_col], decimal) or 0.0' '                    precio = 0.0' \
@@ -206,6 +206,32 @@ sabotaje $M "3b-2#9 el aviso de la unidad no nombra la cantidad" \
 sabotaje $M "3b#7 se avisa del precio una unidad que no salió de él" \
   ' and _unidad_de_columna(precio_col, True) == unidad:' ':' \
   "${B}una_unidad_que_sale_solo_de_la_cantidad_no_avisa_del_precio"
+
+sabotaje $M "3b-3#1 el origen combinado vuelve producto al flete" \
+  '            sin_ncm_ni_origen = not pieza and not _texto_de_celda(origen_propio)' \
+  '            sin_ncm_ni_origen = not pieza and not _texto_de_celda(celda_origen)' \
+  "${B}un_origen_combinado_que_alcanza_al_flete_no_lo_vuelve_producto[descripcion]"
+sabotaje $M "3b-3#1 el origen combinado vuelve producto al seguro" \
+  '            sin_ncm_ni_origen = not pieza and not _texto_de_celda(origen_propio)' \
+  '            sin_ncm_ni_origen = not pieza and not _texto_de_celda(celda_origen)' \
+  "${B}un_origen_combinado_que_alcanza_al_seguro_no_lo_vuelve_producto"
+sabotaje $M "3b-3#1 las celdas copiadas no siguen al renombre de la columna" \
+  '                    rename.get(c, c): f for c, f in' '                    c: f for c, f in' \
+  "${B}un_origen_combinado_que_alcanza_al_flete_no_lo_vuelve_producto[descripcion]"
+sabotaje $M "3b-3#1 el producto pierde el origen combinado" \
+  '            celda_origen = row[origen_col] if origen_col else None' \
+  '            celda_origen = row[origen_col] if origen_col and _propia(origen_col) else None' \
+  "${B}un_origen_combinado_que_alcanza_al_flete_no_lo_vuelve_producto[descripcion]"
+sabotaje $M "3b-3#3 la especificación copiada tapa el subtotal" \
+  '            rotulo = descripcion_propia or next(' '            rotulo = descripcion or next(' \
+  "${B}una_especificacion_combinada_que_alcanza_al_subtotal_no_lo_vuelve_producto"
+sabotaje $M "3b-3#1 la descripción copiada tapa el rótulo del flete" \
+  '            cargo = descripcion_propia or next(' '            cargo = descripcion or next(' \
+  "${B}una_descripcion_combinada_que_alcanza_al_flete_no_lo_vuelve_producto"
+sabotaje $M "3b-3#2 una nota de descuento sin precio abre un grupo" \
+  '                    if "%" in cargo or _monto_de_la_linea() < 0 or not valor_unitario:' \
+  '                    if "%" in cargo or _monto_de_la_linea() < 0:' \
+  "${B}una_nota_de_descuento_sin_precio_no_abre_un_grupo"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

@@ -596,3 +596,76 @@ def test_un_descuento_con_texto_que_queda_sin_leer_corta_el_grupo():
     ])
     assert [i["cantidad"] for i in data["items"]] == [20], data["items"]
     assert data["filas_descartadas_numeros"] == [3, 4], data
+
+
+# ------------------------------- EXCEL-3b (segunda vuelta del adversario)
+
+@pytest.mark.parametrize("flete", [
+    [3, "Freight charges", None, 1, 800, 800],
+    ["Freight", None, None, 1, 800, 800],
+], ids=["descripcion", "item"])
+def test_un_origen_combinado_que_alcanza_al_flete_no_lo_vuelve_producto(flete):
+    """«China» combinada hasta el renglón del flete no le da origen: el flete
+    se lee en la operación y no suma al FOB como producto."""
+    data = _leer_combinado([
+        ["Item", "Description", "Origin", "Qty", "Unit price", "Amount"],
+        [1, "LAPTOP DEMO", "China", 10, 350, 3500],
+        [2, "MOUSE DEMO", None, 10, 5, 50],
+        flete,
+    ], ("C2:C4",))
+    assert [i["descripcion"] for i in data["items"]] == ["LAPTOP DEMO", "MOUSE DEMO"], data["items"]
+    # El origen combinado sigue valiendo para los productos (EXCEL-2).
+    assert [i["origen"] for i in data["items"]] == ["CN", "CN"], data["items"]
+    assert data["operacion"].get("flete") == 800, data["operacion"]
+
+
+def test_un_origen_combinado_que_alcanza_al_seguro_no_lo_vuelve_producto():
+    """El seguro sin NCM ni origen propio se avisa como sin leer (EXCEL-1),
+    aunque «China» venga combinada hasta su fila."""
+    data = _leer_combinado([
+        ["Item", "Description", "Origin", "Qty", "Unit price", "Amount"],
+        [1, "LAPTOP DEMO", "China", 10, 350, 3500],
+        [2, "Insurance", None, 1, 40, 40],
+    ], ("C2:C3",))
+    assert [i["descripcion"] for i in data["items"]] == ["LAPTOP DEMO"], data["items"]
+    assert data["filas_descartadas_numeros"] == [3], data
+
+
+def test_una_descripcion_combinada_que_alcanza_al_flete_no_lo_vuelve_producto():
+    """La descripción copiada no es el rótulo de la fila: «Freight» en Item
+    sigue siendo el flete."""
+    data = _leer_combinado([
+        ["Item", "Description", "Origin", "Qty", "Unit price", "Amount"],
+        [1, "LAPTOP DEMO", "China", 10, 350, 3500],
+        ["Freight", None, None, 1, 800, 800],
+    ], ("B2:B3",))
+    assert [i["descripcion"] for i in data["items"]] == ["LAPTOP DEMO"], data["items"]
+    assert data["operacion"].get("flete") == 800, data["operacion"]
+
+
+def test_una_especificacion_combinada_que_alcanza_al_subtotal_no_lo_vuelve_producto():
+    """«Subtotal» en Part No. con la especificación combinada hasta su fila
+    sigue siendo un subtotal, no un renglón del grupo."""
+    data = _leer_combinado([
+        E,
+        ["DT-1", "LONA DEMO", 2, 10, 1, 20, 1.5, 30],
+        [None, None, 2, 15, 1, 30, 1.5, 45],
+        ["Subtotal", None, None, 25, 2, 50, None, 75],
+        ["DT-9", "LONA OTRA", 3, 10, 1, 30, 3, 90],
+    ], ("B2:B4",))
+    assert [i["cantidad"] for i in data["items"]] == [20, 30, 30], data["items"]
+    assert "Subtotal" not in [i["codigo_parte"] for i in data["items"]], data["items"]
+
+
+@pytest.mark.parametrize("nota", ["Discount applies to rolls below", "Descuento comercial"])
+def test_una_nota_de_descuento_sin_precio_no_abre_un_grupo(nota):
+    """Un texto de descuento sin precio propio no es la descripción de los
+    renglones de abajo: quedan sin leer, como sin el texto."""
+    data = _leer([
+        E,
+        ["DT-1", "LONA DEMO", 2, 10, 1, 20, 1.5, 30],
+        [None, nota, None, None, None, None, None, None],
+        [None, None, 2, 15, 1, 30, 1.5, 45],
+    ])
+    assert [i["descripcion"] for i in data["items"]] == ["LONA DEMO"], data["items"]
+    assert data["filas_descartadas_numeros"] == [3, 4], data
