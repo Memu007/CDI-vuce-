@@ -71,7 +71,7 @@ PROJECT_VERSION = datetime.now().strftime("%Y%m%d%H%M%S")
 from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, importe_escrito, usa_el_sufijo_de_la_operacion
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
     DocumentoNoAdmitido,
@@ -4162,6 +4162,13 @@ class MariaRequest(BaseModel):
     # MARIA-3. Gastos anteriores al FOB del campo de la pantalla: van al TXT
     # (GTOS-ANT-FOB) sólo con EXW, FCA o FAS. `gastos_fob` explícito manda.
     gastos_anteriores_fob: float | None = None
+    # VALOR-1. Ajustes a incluir y a deducir que carga la persona: sólo para
+    # las cuentas del FOB casillero y del seguro sugerido. No van al TXT
+    # hasta saber en qué campo (D12): `/generate_maria` no los usa. Van sin
+    # tipo: uno que no es número no frena nada y se ve en `valor.error`
+    # (VALOR-1b).
+    ajustes_incluir: Any = None
+    ajustes_deducir: Any = None
     # MARIA-3. Procedencia de la operación (país desde donde se embarca, art. 15
     # del Código Aduanero). Va a cada producto que no traiga la suya.
     procedencia: str = ""
@@ -4270,7 +4277,39 @@ async def avisos_maria_endpoint(
     # (CATALOGO-NCM-1): aviso, no freno.
     from proyecto_maria.core.controles_maria import avisos_de_ncm
     avisos_ncm = avisos_de_ncm(items)
-    return {"avisos": errores_de_procedencia(items) + kit_warnings + avisos_ncm + supuestos, "supuestos": supuestos}
+    valor, avisos_valor = _cuentas_del_valor(request, items)
+    return {
+        "avisos": errores_de_procedencia(items) + kit_warnings + avisos_ncm + avisos_valor + supuestos,
+        "supuestos": supuestos,
+        "valor": valor,
+    }
+
+
+def _cuentas_del_valor(request: MariaRequest, items: list) -> tuple[dict, list]:
+    """Las cuentas del valor para la pantalla y su aviso (VALOR-1). Un ajuste
+    inválido o un producto mal formado no frena los avisos: va en `error`."""
+    malos = [n for n, it in enumerate(items, 1) if not isinstance(it, dict)]
+    if malos:
+        return {"error": f"Hay un producto mal formado (renglón {malos[0]}): no se pueden hacer las cuentas."}, []
+    try:
+        valor = cuentas_del_valor(
+            items, flete=request.flete, seguro=request.seguro,
+            ajustes_incluir=request.ajustes_incluir, ajustes_deducir=request.ajustes_deducir,
+        )
+    except ValueError as e:
+        return {"error": str(e)}, []
+    except TypeError:  # un dato que no es número y se escapó: sin el texto de Python
+        return {"error": "Hay un dato que no es un número: no se pueden hacer las cuentas."}, []
+    except ArithmeticError:  # un número que no entra en un float, como 10 ** 400
+        return {"error": "Hay un importe o una cantidad fuera de rango: no se pueden hacer las cuentas."}, []
+    if not (valor["ajustes_incluir"] or valor["ajustes_deducir"]):
+        return valor, []
+    moneda = (str(request.moneda or "").strip().upper() + " ") if str(request.moneda or "").strip() else ""
+    return valor, [
+        f"El TXT todavía lleva el FOB de la factura ({moneda}{importe_escrito(valor['fob_factura'])}); "
+        f"el FOB casillero con los ajustes ({moneda}{importe_escrito(valor['fob_casillero'])}) "
+        f"va al TXT en una próxima versión."
+    ]
 
 
 @app.post("/generate_maria")
@@ -4355,16 +4394,12 @@ async def generate_maria_endpoint(
 
         # Validar sbt_sufijo_valor: obligatorio, sin caracteres de control.
         #
-        # Cuando un ítem se declara partido en sub-ítems, cada sub-ítem trae su
-        # propio sufijo (un modelo por sufijo), así que el sufijo general deja
-        # de ser obligatorio. El generador igual exige que ningún sub-ítem
-        # quede sin sufijo.
+        # Cuando cada sub-ítem o renglón trae su propio sufijo (un modelo por
+        # sufijo), el general deja de ser obligatorio: es la misma regla con
+        # la que el generador lo valida (MARIA-9). El generador igual exige
+        # que ninguno quede sin sufijo.
         sbt_raw = (request.sbt_sufijo_valor or "").strip()
-        _hay_subitems = any(
-            (it.get("subitems") if isinstance(it, dict) else None)
-            for it in (request.items or [])
-        )
-        if not sbt_raw and not _hay_subitems:
+        if not sbt_raw and usa_el_sufijo_de_la_operacion(items, request.iva_adicional):
             raise HTTPException(
                 status_code=400,
                 detail="Falta el sufijo de valor SBT. Es un dato obligatorio y específico del importador. Consultar al despachante.",

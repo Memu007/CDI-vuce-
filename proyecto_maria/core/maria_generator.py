@@ -385,6 +385,37 @@ def _aviso_de_sufijo(donde: str, sufijo) -> list:
             f"paréntesis van sólo letras, números y espacios; sale «{limpio[:80]}»."]
 
 
+def usa_el_sufijo_de_la_operacion(items, iva_por_defecto=None) -> bool:
+    """Si algún producto lleva el sufijo de la operación (MARIA-9): uno que
+    sale entero (sin sub-ítems y sin ir junto con otros renglones; un grupo
+    cuenta como uno), o un renglón o un sub-ítem sin sufijo propio. Sólo
+    entonces se valida. Un propio que no se puede separar no lo usa: el
+    error es el suyo. Si no se sabe, se valida."""
+    if not isinstance(items, list) or not all(isinstance(it, dict) for it in items):
+        return True
+    try:
+        juntos = {n for ns in renglones_por_posicion(items, _iva_adicional(
+            iva_por_defecto or IVA_ADICIONAL_POR_DEFECTO, "Operación")) for n in ns}
+    except (ValueError, TypeError):
+        return True
+
+    def sin_propio(sufijo):
+        try:
+            return not limpiar_sufijo(str(sufijo or "").strip())[0]
+        except ValueError:
+            return False
+
+    for n, item in enumerate(items):
+        subs = item.get("subitems")
+        if subs:
+            if not isinstance(subs, list) or any(
+                    not isinstance(sub, dict) or sin_propio(sub.get("sufijo")) for sub in subs):
+                return True
+        elif n not in juntos or sin_propio(item.get("sufijo")):
+            return True
+    return False
+
+
 # IDTRIB-PROVEEDOR es la identificación tributaria del proveedor. El 24/10
 # salió un número de cuenta del banco: eso no se declara. Las palabras van
 # sin una letra adelante: «ARABIC» o «VAT ARBANK-…» no son cuentas, pero
@@ -829,6 +860,82 @@ def fob_total_del_txt(items: list, grupos: list | None = None) -> Decimal:
     return sum((centavos(v) for v in lineas.values()), Decimal('0.00'))
 
 
+TASA_SEGURO_SUGERIDO = Decimal("0.01")
+# El 1 % va sobre el FOB de la factura (D13 de VALOR-1b, decidido por la PM).
+# Para cambiarlo alcanza con esta línea: "fob_casillero".
+BASE_SEGURO_SUGERIDO = "fob_factura"
+NOMBRE_DEL_FOB = {"fob_casillero": "FOB casillero", "fob_factura": "FOB de la factura"}
+
+
+def importe_escrito(valor) -> str:
+    """Un importe como se escribe acá: 1.234,56."""
+    return f"{valor:,.2f}".replace(",", "@").replace(".", ",").replace("@", ".")
+
+
+def _ajuste(valor, nombre: str):
+    """Un ajuste como lo manda la pantalla: número, texto con un número o
+    nada. Verdadero o falso no es un importe (float(True) daría 1); una lista
+    o un objeto tampoco, y no se muestra como lo escribe Python."""
+    if isinstance(valor, bool) or not isinstance(valor, (str, int, float, Decimal, type(None))):
+        raise ValueError(f"{nombre}: no es un importe.")
+    return importe_valido(valor, nombre)
+
+
+def _numeros_de_los_renglones(items: list):
+    """Que cada cantidad y cada valor de los renglones se pueda leer como
+    número, con un mensaje que lo nombre en vez del texto de Python.
+    Verdadero o falso no es un número, como en _ajuste."""
+    campos = (("cantidad", "la cantidad"), ("valor_unitario", "el valor unitario"),
+              ("valor_total", "el valor total"))
+    for n, item in enumerate(items, 1):
+        for campo, nombre in campos:
+            valor = item.get(campo)
+            if not isinstance(valor, bool):
+                if not valor or isinstance(valor, (int, float, Decimal)):
+                    continue
+                try:
+                    float(valor)
+                    continue
+                except (TypeError, ValueError):
+                    pass
+            escrito = f" «{valor[:20]}»" if isinstance(valor, str) else ""
+            raise ValueError(f"Renglón {n}: {nombre}{escrito} no es un número; "
+                             f"no se pueden hacer las cuentas.")
+
+
+def cuentas_del_valor(items: list, flete=0, seguro=0, ajustes_incluir=None, ajustes_deducir=None) -> dict:
+    """Las cuentas del valor que se muestran antes de generar (VALOR-1).
+
+    FOB casillero = FOB de la factura (el MDDTFOB del TXT) + ajustes a incluir
+    − ajustes a deducir. Los ajustes los carga la persona: el sistema no
+    decide qué se descuenta. El seguro sugerido es el 1 % de (el FOB de
+    BASE_SEGURO_SUGERIDO + flete), al centavo. Nada de esto cambia el TXT (D12 de VALOR-1). Un
+    importe inválido o un FOB casillero negativo es un ValueError."""
+    _numeros_de_los_renglones(items)
+    fob_factura = fob_total_del_txt(items)
+    incluir = centavos(_ajuste(ajustes_incluir, "Ajustes a incluir") or 0)
+    deducir = centavos(_ajuste(ajustes_deducir, "Ajustes a deducir") or 0)
+    flete_c = centavos(importe_valido(flete, "Flete") or 0)
+    seguro_c = centavos(importe_valido(seguro, "Seguro") or 0)
+    fob_casillero = fob_factura + incluir - deducir
+    if fob_casillero < 0:
+        raise ValueError(
+            f"Los ajustes a deducir ({importe_escrito(deducir)}) superan el FOB de la "
+            f"factura más los ajustes a incluir ({importe_escrito(fob_factura + incluir)})."
+        )
+    fob_base = {"fob_casillero": fob_casillero, "fob_factura": fob_factura}[BASE_SEGURO_SUGERIDO]
+    return {
+        "fob_factura": float(fob_factura),
+        "ajustes_incluir": float(incluir),
+        "ajustes_deducir": float(deducir),
+        "fob_casillero": float(fob_casillero),
+        "flete": float(flete_c),
+        "seguro": float(seguro_c),
+        "seguro_sugerido": float(centavos(TASA_SEGURO_SUGERIDO * (fob_base + flete_c))),
+        "base_seguro": NOMBRE_DEL_FOB[BASE_SEGURO_SUGERIDO],
+    }
+
+
 def _item_de_los_renglones(renglones: list, renglones_de: dict, lugar: dict) -> dict:
     """El ítem que junta renglones de la misma posición (MARIA-8): el FOB es
     la suma de los de cada renglón al centavo (así MDDTFOB no cambia) y los
@@ -1222,6 +1329,11 @@ def generate_maria_txt(operation_id: str, items: list,
     seguros = repartir(seguro, fobs)
     lines[linea_fob_total] = f"MDDTFOB={sum(fobs, Decimal('0.00')):.2f}"
 
+    def sufijo_de_la_operacion():
+        # Se analiza donde se usa: si todos traen el suyo, un texto libre
+        # acá no frena el TXT (MARIA-9).
+        return limpiar_sufijo((sbt_sufijo_valor or "").strip(), " de la operación")[0]
+
     for idx, item in enumerate(items_export, 1):
         # Obtener valores
         ncm_raw = str(item.get('ncm') or item.get('pieza', '')).strip()
@@ -1291,18 +1403,28 @@ def generate_maria_txt(operation_id: str, items: list,
         # cada sub-ítem son las de su renglón, y suman exacto las del ítem.
         renglones, kilos_renglones = renglones_de.get(id(item), (None, None))
         if renglones:
-            cantidades_sub, cantidad_dcl = al_centesimo_cerrando(
-                [_exacto(r.get('cantidad', 1)) for r in renglones])
+            cantidades_renglones = [_exacto(r.get('cantidad', 1)) for r in renglones]
+            cantidades_sub, cantidad_dcl = al_centesimo_cerrando(cantidades_renglones)
             if unidad_est == UNIDAD_KILOGRAMO:
                 estadisticas_sub, cantidad_est = al_centesimo_cerrando(kilos_renglones)
             else:
                 estadisticas_sub, cantidad_est = cantidades_sub, cantidad_dcl
             if min(cantidades_sub + estadisticas_sub) <= 0:
+                # Se nombran los que dan cero solos, no todos los del ítem.
+                # Si el cero sale del ajuste (que cae en el más grande) no hay
+                # uno más chico que los otros, y se nombran todos.
+                propios = [cantidades_renglones] + (
+                    [kilos_renglones] if unidad_est == UNIDAD_KILOGRAMO else [])
+                chicos = [lugar_en_el_pedido[id(r)] for r, *valores in zip(renglones, *propios)
+                          if min(valores).quantize(Decimal("0.01"), ROUND_HALF_UP) <= 0]
+                chicos = chicos or [lugar_en_el_pedido[id(r)] for r in renglones]
                 raise ValueError(
-                    f"Item {lugar_en_el_pedido[id(renglones[0])]}: los renglones "
-                    f"{_enumerar([lugar_en_el_pedido[id(r)] for r in renglones])} son tan chicos "
-                    f"que al llevar sus cantidades o kilos al centésimo no cierran con el total; "
-                    f"revisá las cantidades y los kilos."
+                    f"Item {lugar_en_el_pedido[id(renglones[0])]}: "
+                    + (f"el renglón {chicos[0]} es tan chico que al llevar su cantidad o sus "
+                       f"kilos al centésimo no cierra" if len(chicos) == 1 else
+                       f"los renglones {_enumerar(chicos)} son tan chicos que al llevar sus "
+                       f"cantidades o kilos al centésimo no cierran")
+                    + " con el total; revisá las cantidades y los kilos."
                 )
             # El unitario del ítem, sobre la cantidad que se declara.
             valor_unit = float(valor_total) / float(cantidad_dcl)
@@ -1377,22 +1499,13 @@ def generate_maria_txt(operation_id: str, items: list,
         # `tests/fixtures/maria_golden_subitems_anon.TXT`.
         # Dentro de los valores, sólo letras, números y espacios (MARIA-7;
         # los supuestos avisan lo que se cambió).
-        sufijo_sbt = limpiar_sufijo((sbt_sufijo_valor or "").strip(), " de la operación")[0]
-
-        if not subitems and not renglones and not sufijo_sbt:
-            raise ValueError(
-                "Falta el sufijo de valor SBT (CSBTSVL). "
-                "Este dato es obligatorio y depende del importador. "
-                "Contactá al despachante para obtenerlo."
-            )
-
         if renglones:
             # Un sub-ítem por renglón (MARIA-8), con lo de su renglón: el FOB
             # al centavo, el unitario y el sufijo propio o el de la operación.
             for n, (renglon, cant_sub, est_sub) in enumerate(
                     zip(renglones, cantidades_sub, estadisticas_sub), start=1):
                 sufijo = limpiar_sufijo(str(renglon.get("sufijo") or "").strip(),
-                                        f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0] or sufijo_sbt
+                                        f" del renglón {lugar_en_el_pedido[id(renglon)]}")[0] or sufijo_de_la_operacion()
                 if not sufijo:
                     raise ValueError(
                         f"Item {lugar_en_el_pedido[id(renglon)]}: falta el sufijo de valor (CSBTSVL)."
@@ -1413,6 +1526,13 @@ def generate_maria_txt(operation_id: str, items: list,
                 lines.append("")
         elif not subitems:
             # Ítem entero: un solo bloque, sin montos (numeración desde 0000).
+            sufijo_sbt = sufijo_de_la_operacion()
+            if not sufijo_sbt:
+                raise ValueError(
+                    "Falta el sufijo de valor SBT (CSBTSVL). "
+                    "Este dato es obligatorio y depende del importador. "
+                    "Contactá al despachante para obtenerlo."
+                )
             lines.append("[SBT]")
             lines.append(f"IDDT={id_maria}")
             lines.append(f"NART={idx:04d}")
@@ -1479,7 +1599,7 @@ def generate_maria_txt(operation_id: str, items: list,
 
             for n, sub in enumerate(subitems, start=1):
                 sufijo = limpiar_sufijo((sub.get("sufijo") or "").strip(),
-                                        f" del ítem {n_item}, sub-ítem {n}")[0] or sufijo_sbt
+                                        f" del ítem {n_item}, sub-ítem {n}")[0] or sufijo_de_la_operacion()
                 if not sufijo:
                     raise ValueError(
                         f"Item {n_item}, sub-ítem {n}: falta el sufijo de valor (CSBTSVL)."
@@ -1712,6 +1832,13 @@ def supuestos_declarados(
                     sufijos.append((f" del ítem {idx}, sub-ítem {n}", sub["sufijo"]))
         for donde, sufijo in sufijos:
             avisos.extend(_aviso_de_sufijo(donde, sufijo))
+        # Si alguno lo usa y no se puede separar, el generador frena: se dice
+        # antes, con el mismo texto (MARIA-9).
+        if usa_el_sufijo_de_la_operacion(items, iva_adicional):
+            try:
+                limpiar_sufijo(str(sbt_sufijo_valor or "").strip(), " de la operación")
+            except ValueError as error:
+                avisos.append(str(error))
 
     # --- Renglones de la misma posición (MARIA-8) ---------------------------
     # Si un renglón tiene un error, el generador lo dice: acá no se avisa.

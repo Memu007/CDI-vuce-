@@ -26,6 +26,28 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix(clientes):** el alta y la edición ya no guardan «None» ni una fecha cortada: aceptan AAAA-MM-DD o DD/MM/AAAA (se guarda AAAA-MM-DD), y otra cosa da un error que el formulario muestra sin guardar nada.
 - El aviso de lo que falta para el MARIA pide también la fecha guardada que no es válida; `scripts/datos/clientes_fecha_inic_activ.py` informa por id las que quedaron mal y, con `--arreglar-none`, vacía las «None».
 
+## 2026-10-25 · fix: «Calcular seguro» sólo usa cuentas del pedido de ahora (VALOR-1b)
+
+- «Calcular seguro» compara el pedido de ahora con el de las cuentas: si cambió un ajuste, el flete, el seguro o el descuento, pide las cuentas de nuevo en vez de usar las viejas. El seguro calculado deja de avisarse como no leído, y si la factura puede traer un seguro sin leer, la tarjeta lo avisa antes de calcularlo.
+- El 1 % del seguro sugerido va sobre el FOB de la factura (D13). Un ajuste o un renglón que no es número va en la tarjeta con un mensaje claro, sin texto de Python, y no frena el TXT.
+
+## 2026-10-25 · fix: el error de kilos nombra sólo el renglón chico (MARIA-9)
+
+- Cuando varios renglones van juntos en un ítem y uno es tan chico que sus kilos al centésimo dan cero, el error nombra ese renglón. Antes nombraba a todos los del ítem. Si ninguno da cero solo y el cero sale del ajuste del redondeo, sigue nombrando a todos.
+- Con procedencia de la operación, la generación ya no pide el sufijo general cuando cada renglón trae el suyo.
+
+## 2026-10-25 · fix: cada error de sufijo sale donde se corrige (MARIA-9)
+
+- En la pantalla de generar, el error del sufijo de la operación sale bajo su campo, y el del sufijo de un sub-ítem bajo ese sub-ítem, en el paso de NCM. Antes los dos salían como error general de la generación.
+
+## 2026-10-25 · fix: el sufijo de la operación frena sólo si alguien lo usa (MARIA-9)
+
+- Si todos los productos traen su propio sufijo de valor, un texto libre en el sufijo de la operación ya no frena el TXT (volvió a generarse con los propios). Cuando algún producto lo toma y no se puede separar, los avisos lo anticipan con el mismo texto del error.
+
+## 2026-10-25 · fix: la tarjeta de ajustes y seguro no usa cuentas viejas (VALOR-1)
+
+- «Usar como ajuste a deducir» ya no pisa un importe escrito a mano; «Calcular seguro» no usa cuentas de otra operación, y funciona aunque todavía no haya operación cargada. Si fallan los avisos, o un producto viene mal formado o fuera de rango, la tarjeta lo dice en vez de quedar vacía o dar error.
+
 ## 2026-10-24 · fix: la proforma china sin leer de más (EXCEL-3b)
 
 - **fix(excel):** un subtotal con largo y sin precio, un flete o descuento sin monto y un código nuevo sin especificación ya no toman la descripción del renglón de arriba: quedan sin leer, con aviso. Una nota en «Remarks» no vuelve flete o descuento a un renglón; un «Descuento comercial -500» no entra como producto.
@@ -36,6 +58,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-10-24 · fix: la demo de la landing dice «3 PA SIM» (PA-1b)
 
 - **fix(landing):** el paso 3 del progreso de la demo dice «PA SIM», como la aplicación. El encabezado de la tabla de la demo sigue en «NCM» (sus valores son de 8 dígitos): lo decide la PM.
+
+## 2026-10-24 · feat: ajustes y seguro antes de generar (VALOR-1)
+
+- En la pantalla de generar, una tarjeta «Ajustes y seguro»: ajustes a incluir y a deducir que carga la persona, con las cuentas a la vista (FOB de la factura, que es el del TXT, ± ajustes = FOB casillero, flete y seguro). El descuento de la planilla se ofrece con un botón; nunca se pone solo.
+- Botón «Calcular seguro» (1 % de FOB casillero + flete) cuando la operación no trae seguro. La base del 1 % se nombra en el botón y está en un solo lugar del código (sin decidir). El TXT todavía lleva el FOB de la factura; un aviso dice que el FOB casillero va al TXT en una próxima versión.
 
 ## 2026-10-24 · fix: devolución de MARIA-7
 
@@ -358,6 +385,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-07-12 · fix: campo SBT en frontend + validación backend anti-inyección
 
 El dashboard v2 ahora tiene un campo "Sufijo de valor SBT" en la pantalla de revisión (antes de generar). Es obligatorio, con texto de ayuda "Dato obligatorio y específico del importador. Consultar al despachante." El backend valida: trim, máximo 120 caracteres, rechaza saltos de línea (`\r`, `\n`) y caracteres de control para impedir inyección de líneas en el TXT. Si el backend devuelve error de SBT, se muestra junto al campo (no como error genérico). Sin fallback VOWYNNS/VITTO. Cobertura: 39.05%, 547 tests, 0 failures.
+
 ## 2026-07-07 · feat: ficha del cliente se auto-completa (fill-if-empty) al guardar operación
 
 Al guardar una operación, si la ficha del cliente tiene `address` o `fecha_inic_activ` vacíos y la carátula trae esos datos, se rellenan. Nunca pisa valores existentes. Datos por-embarque (flete, seguro, gastos FOB, factura, etc.) no se guardan en la ficha. Excepción atrapada: si falla el fill, no rompe el guardado de la operación.
@@ -542,6 +570,7 @@ Nuevo `proyecto_maria/core/vuce_ci_client.py`: usa la API pública interna de ww
 - **feat (admin):** Implementada promoción automática a rol `admin` durante el arranque de la app para los usuarios (por username o email) listados en la variable de entorno `ADMIN_USERNAMES`. Esto desbloquea el acceso del dueño en producción sin requerir acceso directo a la BD.
 
 ---
+
 ## 2026-06-20 · Hardening Pilar B + Tests E2E
 
 - **feat (backend):** refactor en `quote_router.py` para usar `asyncio.to_thread` al llamar a Tarifar (evitando bloquear el event loop).
@@ -562,13 +591,13 @@ Nuevo `proyecto_maria/core/vuce_ci_client.py`: usa la API pública interna de ww
 
 - **feat (ui):** añadido botón inteligente "Crear cliente" en la validación de Carga Manual. Si el usuario ingresa un importador no registrado, el sistema permite crearlo y auto-asignarlo con un clic directo sin abrir modales.
 - **fix (ui):** se corrigió un bug lógico donde al seleccionar un cliente desde el panel lateral, el mensaje de error de validación en pantalla ("Falta: Cliente asignado") no se limpiaba dinámicamente.
+
 ## 2026-06-19 · Auditoría UX (Simulación 50 usuarios)
 
 - **feat (ui/ux):** añadido botón "+ Agregar producto" en NCM para evitar el punto muerto de Carga Manual.
 - **fix (ui/ux):** validación de fechas flexible. Ahora auto-completa años de 2 dígitos y acepta barras/guiones.
 - **feat (ui/ux):** Incoterms convertidos a campo abierto con sugerencias (`datalist`) para no bloquear casos atípicos (CPT, CIP).
 - **fix (ui/ux):** buffer de Deshacer (Ctrl+Z) invalidado automáticamente al editar celdas a mano, evitando pérdida de datos por colisión de historial.
-
 
 ## 2026-06-19 · Robustez de UX/UI y Persistencia de Estado
 
