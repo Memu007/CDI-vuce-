@@ -4607,6 +4607,16 @@ _FILA_QUE_NO_ES_MERCADERIA_RE = re.compile(
     r"|handling|shipping\s+(?:cost|charges?)|incoterm|delivery\s+terms?)\b",
     re.IGNORECASE,
 )
+# EXCEL-3c. Con el origen copiado de una combinada no se sabe si la fila lo
+# trae: el rótulo propio tiene que ser sólo el cargo («Insurance», «Payment
+# 30% TT», «Handling fee»); «Payment terminal POS» es un producto.
+_FILA_QUE_ES_SOLO_UN_CARGO_RE = re.compile(
+    r"^\s*(?:freight|flete|insurance|seguro|payment|pago|bank\s+charges?|gastos"
+    r"|handling|shipping\s+(?:cost|charges?)|incoterm|delivery\s+terms?)"
+    r"(?:[\s\d.,:;/()%$-]|\b(?:fees?|charges?|costs?|premium|bank|bancari[oa]s?|de|env[ií]o"
+    r"|terms?|t/?t|usd|of|cif|fob|invoice|value|advance|deposit|balance|anticipad[oa])\b)*$",
+    re.IGNORECASE,
+)
 
 # EXCEL-3. El flete y el descuento de la factura no son productos: se
 # devuelven leídos para la operación (cómo se usa el descuento lo decide
@@ -4781,11 +4791,12 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
         for v in df[col].tolist() if isinstance(v, str)
     ])
 
-    # (número de fila, ¿trae NCM u origen?, ítem)
+    # (número de fila, ¿trae NCM u origen?, ¿el origen es copiado?, rótulo
+    # propio, medidas, ítem)
     candidatos = []
     grupo = None  # (descripción, código de parte) del renglón de arriba
     agrupada = False  # si algún renglón tomó lo del de arriba
-    flete, descuento, heredadas = [], [], []
+    flete, descuento, heredadas, sin_precio = [], [], [], []
     rellenadas = df.attrs.get("celdas_rellenadas", {})
     for _, row in df.iterrows():
         try:
@@ -4875,14 +4886,17 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             # subtotal con largo, no un renglón; un código nuevo sin
             # especificación es otro producto: no hereda, y él y su grupo
             # quedan sin leer (EXCEL-3b).
-            if grupo and parte and parte != grupo[1] and not descripcion:
+            del_grupo = False
+            if grupo and grupo[1] and parte and parte != grupo[1] and not descripcion:
                 grupo = None
             if (not pieza and grupo and con_medidas and descripcion in ("", grupo[0])
                     and (valor_unitario or (descripcion and cantidad))):
                 if not descripcion:
                     heredadas.append(_ + 2)
+                if not valor_unitario:
+                    sin_precio.append(_ + 2)  # no se inventa: se avisa (EXCEL-3c)
                 descripcion, parte = grupo[0], parte or grupo[1]
-                agrupada = True
+                agrupada = del_grupo = True
             elif descripcion and not es_cargo:
                 grupo = (descripcion, parte)
 
@@ -4910,9 +4924,16 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
                 trae_unidad = numero is None and re.search(r"[^\W\d_]\s*$", texto)
                 tamaño.append(f"{nombre} {texto}" + (f" {unidad}" if unidad and not trae_unidad else ""))
 
+            # Si es un cargo lo dice lo escrito en la fila, no lo copiado de
+            # una combinada (EXCEL-3c). Un renglón del grupo es mercadería:
+            # una nota en Item («Freight included») no lo saca.
+            rotulo_propio = "" if del_grupo and not descripcion_propia else cargo
+            origen_copiado = bool(origen_col and not _propia(origen_col)
+                                  and _texto_de_celda(celda_origen))
+
             # Lo que falta o no se puede leer queda vacío (0 o ""), nunca
             # inventado; el semáforo de la revisión lo marca (MARIA-1a, EXCEL-1).
-            candidatos.append((_ + 2, not sin_ncm_ni_origen, tamaño, Item(
+            candidatos.append((_ + 2, not sin_ncm_ni_origen, origen_copiado, rotulo_propio, tamaño, Item(
                 pieza=pieza,
                 codigo_parte=parte,
                 descripcion=descripcion,
@@ -4930,8 +4951,11 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
     # Seguro o condiciones de pago sin NCM ni origen no son mercadería: no
     # entran (sumarían al FOB) y se avisan. Cualquier otra fila sin NCM ni
     # origen sí entra, con lo que falta vacío (EXCEL-1).
-    for fila, trae, tamaño, item in candidatos:
-        if not trae and _FILA_QUE_NO_ES_MERCADERIA_RE.match(item.descripcion or ""):
+    # Con el origen copiado de una combinada, sólo el rótulo que es
+    # nada más que el cargo (EXCEL-3c).
+    for fila, trae, origen_copiado, rotulo_propio, tamaño, item in candidatos:
+        es_cargo = _FILA_QUE_ES_SOLO_UN_CARGO_RE if origen_copiado else _FILA_QUE_NO_ES_MERCADERIA_RE
+        if not trae and es_cargo.match(rotulo_propio):
             descartes.append(fila)
             continue
         if agrupada and tamaño and item.descripcion:
@@ -4944,6 +4968,8 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
         extras["descuento"] = descuento
     if heredadas:
         extras["heredadas"] = heredadas
+    if sin_precio:
+        extras["sin_precio"] = sin_precio
 
     return items
 
@@ -7788,6 +7814,12 @@ async def upload_excel_v2(
             avisos_mapeo.append(
                 f"{len(filas)} renglón(es) sin descripción tomaron la del renglón de arriba "
                 f"(como agrupa la proforma), desde la fila {filas[0]}. Revisalos."
+            )
+        if extras.get("sin_precio"):
+            filas = extras["sin_precio"]
+            avisos_mapeo.append(
+                f"{len(filas)} renglón(es) entraron sin precio (la planilla lo trae sólo "
+                f"arriba o combinado), desde la fila {filas[0]}. Completalos en la revisión."
             )
 
         # Si hay cliente seleccionado, pre-populamos operacion con sus datos

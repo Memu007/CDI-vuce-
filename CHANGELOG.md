@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-25 · fix: la proforma con combinadas, sin perder productos ni sumar cargos (EXCEL-3c)
+
+- **fix(excel):** con el origen combinado, un producto con descripción propia que empieza con «Payment», «Handling» o «Seguro» vuelve a entrar; el seguro, el pago, los gastos o el handling cuyo rótulo es sólo el cargo («Insurance», «Payment 30% TT», «Handling fee») quedan sin leer, con aviso, aunque la descripción o el origen vengan combinados hasta su fila.
+- Una cabecera de grupo sin código vuelve a dar su descripción a los renglones con código propio. Los renglones del grupo que entran sin precio (lo trae sólo el primero o combinado) se avisan al subir.
+
 ## 2026-10-25 · fix: la fecha de inicio de actividad se valida al guardar el cliente (CLIENTE-1b)
 
 - **fix(clientes):** el alta y la edición ya no guardan «None» ni una fecha cortada: aceptan AAAA-MM-DD o DD/MM/AAAA (se guarda AAAA-MM-DD), y otra cosa da un error que el formulario muestra sin guardar nada.
@@ -16,7 +21,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix(excel):** un subtotal con largo y sin precio, un flete o descuento sin monto y un código nuevo sin especificación ya no toman la descripción del renglón de arriba: quedan sin leer, con aviso. Una nota en «Remarks» no vuelve flete o descuento a un renglón; un «Descuento comercial -500» no entra como producto.
 - La unidad que sale de los encabezados de la cantidad y del precio («Qty (M)», «USD/M») se avisa con las dos columnas; un largo escrito «1,5m» no sale «1,5m m».
 - Las celdas combinadas de un .xls se leen como las de un .xlsx; el flete o descuento con el rótulo en una columna a la izquierda de la descripción («No.», «S/N») se lee.
-- Un origen o una especificación combinados hasta el flete, el seguro o el subtotal no los vuelven producto; una nota de descuento sin precio no abre un grupo.
+- Un origen o una especificación combinados hasta el flete o el subtotal no los vuelven producto; una nota de descuento sin precio no abre un grupo. (El seguro con la descripción combinada seguía entrando: lo arregla EXCEL-3c.)
 
 ## 2026-10-24 · fix: la demo de la landing dice «3 PA SIM» (PA-1b)
 
