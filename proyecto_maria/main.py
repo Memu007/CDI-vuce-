@@ -4333,7 +4333,7 @@ async def generate_maria_endpoint(
         # la que el generador lo valida (MARIA-9). El generador igual exige
         # que ninguno quede sin sufijo.
         sbt_raw = (request.sbt_sufijo_valor or "").strip()
-        if not sbt_raw and usa_el_sufijo_de_la_operacion(request.items, request.iva_adicional):
+        if not sbt_raw and usa_el_sufijo_de_la_operacion(items, request.iva_adicional):
             raise HTTPException(
                 status_code=400,
                 detail="Falta el sufijo de valor SBT. Es un dato obligatorio y específico del importador. Consultar al despachante.",

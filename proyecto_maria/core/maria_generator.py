@@ -1371,16 +1371,21 @@ def generate_maria_txt(operation_id: str, items: list,
         # cada sub-ítem son las de su renglón, y suman exacto las del ítem.
         renglones, kilos_renglones = renglones_de.get(id(item), (None, None))
         if renglones:
-            cantidades_sub, cantidad_dcl = al_centesimo_cerrando(
-                [_exacto(r.get('cantidad', 1)) for r in renglones])
+            cantidades_renglones = [_exacto(r.get('cantidad', 1)) for r in renglones]
+            cantidades_sub, cantidad_dcl = al_centesimo_cerrando(cantidades_renglones)
             if unidad_est == UNIDAD_KILOGRAMO:
                 estadisticas_sub, cantidad_est = al_centesimo_cerrando(kilos_renglones)
             else:
                 estadisticas_sub, cantidad_est = cantidades_sub, cantidad_dcl
-            # Se nombran sólo los que quedan en cero, no todos los del ítem.
-            chicos = [lugar_en_el_pedido[id(r)] for r, cant, est
-                      in zip(renglones, cantidades_sub, estadisticas_sub) if min(cant, est) <= 0]
-            if chicos:
+            if min(cantidades_sub + estadisticas_sub) <= 0:
+                # Se nombran los que dan cero solos, no todos los del ítem.
+                # Si el cero sale del ajuste (que cae en el más grande) no hay
+                # uno más chico que los otros, y se nombran todos.
+                propios = [cantidades_renglones] + (
+                    [kilos_renglones] if unidad_est == UNIDAD_KILOGRAMO else [])
+                chicos = [lugar_en_el_pedido[id(r)] for r, *valores in zip(renglones, *propios)
+                          if min(valores).quantize(Decimal("0.01"), ROUND_HALF_UP) <= 0]
+                chicos = chicos or [lugar_en_el_pedido[id(r)] for r in renglones]
                 raise ValueError(
                     f"Item {lugar_en_el_pedido[id(renglones[0])]}: "
                     + (f"el renglón {chicos[0]} es tan chico que al llevar su cantidad o sus "

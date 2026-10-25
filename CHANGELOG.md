@@ -8,7 +8,8 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-10-25 · fix: el error de kilos nombra sólo el renglón chico (MARIA-9)
 
-- Cuando varios renglones van juntos en un ítem y uno es tan chico que sus kilos al centésimo dan cero, el error nombra ese renglón. Antes nombraba a todos los del ítem.
+- Cuando varios renglones van juntos en un ítem y uno es tan chico que sus kilos al centésimo dan cero, el error nombra ese renglón. Antes nombraba a todos los del ítem. Si ninguno da cero solo y el cero sale del ajuste del redondeo, sigue nombrando a todos.
+- Con procedencia de la operación, la generación ya no pide el sufijo general cuando cada renglón trae el suyo.
 
 ## 2026-10-25 · fix: cada error de sufijo sale donde se corrige (MARIA-9)
 
