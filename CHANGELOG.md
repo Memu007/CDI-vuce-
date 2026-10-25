@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-25 · fix: la fecha de inicio de actividad se valida al guardar el cliente (CLIENTE-1b)
+
+- **fix(clientes):** el alta y la edición ya no guardan «None» ni una fecha cortada: aceptan AAAA-MM-DD o DD/MM/AAAA (se guarda AAAA-MM-DD), y otra cosa da un error que el formulario muestra sin guardar nada.
+- El aviso de lo que falta para el MARIA pide también la fecha guardada que no es válida; `scripts/datos/clientes_fecha_inic_activ.py` informa por id las que quedaron mal y, con `--arreglar-none`, vacía las «None».
+
 ## 2026-10-24 · fix: la proforma china sin leer de más (EXCEL-3b)
 
 - **fix(excel):** un subtotal con largo y sin precio, un flete o descuento sin monto y un código nuevo sin especificación ya no toman la descripción del renglón de arriba: quedan sin leer, con aviso. Una nota en «Remarks» no vuelve flete o descuento a un renglón; un «Descuento comercial -500» no entra como producto.

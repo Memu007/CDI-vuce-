@@ -6,7 +6,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, field_validator
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 import jwt
 import json
 import os
@@ -5028,6 +5028,39 @@ def _client_to_dict(c: ClientModel) -> dict:
     }
 
 
+_FECHA_INIC_ACTIV_ERROR = (
+    "La fecha de inicio de actividad no es una fecha válida: "
+    "usá AAAA-MM-DD o DD/MM/AAAA, o dejala vacía."
+)
+
+
+def _fecha_inic_activ_de_api(raw) -> str:
+    """CLIENTE-1b. La fecha de inicio de actividad que llega al alta o a la
+    edición, como AAAA-MM-DD; `null` o vacío da "". Pasan AAAA-MM-DD y
+    DD/MM/AAAA (año de cuatro cifras, fecha que existe); lo demás es un 400.
+    Antes se guardaba `str(...)[:10]`: un `null` quedaba «None» y un año de
+    cinco cifras, cortado."""
+    if raw is None:
+        return ""
+    if not isinstance(raw, str):
+        raise HTTPException(status_code=400, detail=_FECHA_INIC_ACTIV_ERROR)
+    texto = raw.strip()
+    if not texto:
+        return ""
+    m = re.fullmatch(r"([0-9]{4})-([0-9]{2})-([0-9]{2})", texto)
+    if m:
+        anio, mes, dia = (int(g) for g in m.groups())
+    else:
+        m = re.fullmatch(r"([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})", texto)
+        if not m:
+            raise HTTPException(status_code=400, detail=_FECHA_INIC_ACTIV_ERROR)
+        dia, mes, anio = (int(g) for g in m.groups())
+    try:
+        return date(anio, mes, dia).isoformat()
+    except ValueError:
+        raise HTTPException(status_code=400, detail=_FECHA_INIC_ACTIV_ERROR) from None
+
+
 def _digits_only(raw: str | None, maxlen: int = 20) -> str:
     return "".join(ch for ch in (raw or "") if ch.isdigit())[:maxlen]
 
@@ -6350,6 +6383,7 @@ async def create_cliente(
     email = str(client.get("email", "")).strip()[:100]
     if not nombre:
         raise HTTPException(status_code=400, detail="Nombre requerido")
+    fecha_inic_activ = _fecha_inic_activ_de_api(client.get("fecha_inic_activ"))
 
     # Evitar duplicados por (owner, email) si se provee email.
     if email:
@@ -6371,8 +6405,6 @@ async def create_cliente(
     auto_ncm_enabled = client.get("auto_ncm_enabled")
     if auto_ncm_enabled is None:
         auto_ncm_enabled = True
-
-    fecha_inic_activ = str(client.get("fecha_inic_activ", "")).strip()[:10] or None
 
     new_client = ClientModel(
         id=str(uuid.uuid4()),
@@ -6426,6 +6458,9 @@ async def update_cliente(
     """
     username = user["username"]
     client = await _get_owned_client(db, client_id, username)
+    # Antes de tocar el cliente: con la fecha mala no se guarda nada.
+    if "fecha_inic_activ" in client_data:
+        fecha_inic_activ = _fecha_inic_activ_de_api(client_data["fecha_inic_activ"])
 
     if "nombre" in client_data:
         client.name = str(client_data["nombre"]).strip()[:200]
@@ -6450,8 +6485,7 @@ async def update_cliente(
     if "auto_ncm_enabled" in client_data:
         client.auto_ncm_enabled = bool(client_data.get("auto_ncm_enabled"))
     if "fecha_inic_activ" in client_data:
-        val = str(client_data.get("fecha_inic_activ", "") or "").strip()[:10]
-        client.fecha_inic_activ = val or None
+        client.fecha_inic_activ = fecha_inic_activ
     await db.commit()
     await db.refresh(client)
     return {"success": True, "cliente": _client_to_dict(client)}

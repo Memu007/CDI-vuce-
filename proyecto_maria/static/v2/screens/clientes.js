@@ -1667,6 +1667,25 @@
         if (fAdvanced) fAdvanced.open = false;
     }
 
+    // CLIENTE-1b: la fecha guardada que el TXT acepta (AAAA-MM-DD o DD/MM/AAAA,
+    // y que exista), el mismo criterio que `fecha_inicio_actividad` del generador.
+    function fechaGuardadaSirve(texto) {
+        const t = String(texto || '').trim();
+        let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+        let anio, mes, dia;
+        if (m) {
+            [anio, mes, dia] = [+m[1], +m[2], +m[3]];
+        } else {
+            m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(t);
+            if (!m) return false;
+            [dia, mes, anio] = [+m[1], +m[2], +m[3]];
+        }
+        if (anio < 1) return false;  // Python no tiene año 0
+        const f = new Date(Date.UTC(2000, mes - 1, dia));
+        f.setUTCFullYear(anio);
+        return f.getUTCFullYear() === anio && f.getUTCMonth() === mes - 1 && f.getUTCDate() === dia;
+    }
+
     function fillFormFromCliente(c) {
         if (!c) return;
         if (fNombre) fNombre.value = c.nombre || '';
@@ -1749,6 +1768,9 @@
         // no se manda y la API la conserva; una fecha cargada la reemplaza.
         const conservaFecha = !fechaInicActiv && !!fechaInicOculta;
         if (!conservaFecha) body.fecha_inic_activ = fechaInicActiv;
+        // Una fecha conservada que el TXT no acepta también falta (CLIENTE-1b).
+        // Se mira acá: closeForm() olvida la fecha oculta.
+        const fechaMala = conservaFecha && !fechaGuardadaSirve(fechaInicOculta);
 
         const isEdit = !!editingId;
         const idEdit = editingId;
@@ -1786,7 +1808,9 @@
             // CLIENTE-1: se guarda sin lo que pide el MARIA, pero se avisa qué
             // falta (lo que no puede faltar lo frena la generación del TXT).
             const faltan = [
-                [cuitNorm, 'CUIT'], [direccion, 'domicilio'], [fechaInicActiv || conservaFecha, 'inicio de actividad'],
+                [cuitNorm, 'CUIT'], [direccion, 'domicilio'],
+                [fechaInicActiv || (conservaFecha && !fechaMala), fechaMala
+                    ? 'inicio de actividad (la guardada no es una fecha válida)' : 'inicio de actividad'],
             ].filter(([v]) => !v).map(([, n]) => n);
             const titulo = isEdit ? 'Cliente actualizado' : 'Cliente creado';
             if (faltan.length && CDI.toast) {
