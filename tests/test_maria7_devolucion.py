@@ -102,8 +102,12 @@ def test_el_aviso_dice_que_se_separo_y_no_rompe_con_un_sufijo_malo():
     malo = mg.supuestos_declarados([dict(LONA)], sbt_sufijo_valor="AA(SIN CIERRE-")
     errores = [a for a in malo if "no se puede separar" in a]
     assert len(errores) == 1 and errores[0].startswith("Sufijo de valor de la operación: «AA(SIN CIERRE-»")
-    assert ([a for a in malo if a not in errores]
-            == mg.supuestos_declarados([dict(LONA)], sbt_sufijo_valor="AA(DEMO)-CA00-"))
+    # Lo que el arancel echa de menos en un sufijo se dice sólo del que se
+    # puede separar (SUFIJOS-1): se deja afuera de la comparación.
+    def sin_arancel(avisos):
+        return [a for a in avisos if "según el arancel de ARCA" not in a]
+    assert (sin_arancel([a for a in malo if a not in errores])
+            == sin_arancel(mg.supuestos_declarados([dict(LONA)], sbt_sufijo_valor="AA(DEMO)-CA00-")))
 
 
 def test_un_sufijo_que_separado_pasa_de_120_caracteres_no_genera():

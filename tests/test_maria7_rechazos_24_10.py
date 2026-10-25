@@ -277,7 +277,9 @@ def test_lo_que_se_cambia_en_el_sufijo_se_avisa():
     item = dict(LONA, subitems=[{"cantidad": 750, "sufijo": "AA(X.Y)-"}])
     avisos = mg.supuestos_declarados([item], sbt_sufijo_valor=SUFIJO)
     assert any("ítem 1, sub-ítem 1" in a and "AA(X Y)-" in a for a in avisos)
-    assert not any("Sufijo" in a for a in mg.supuestos_declarados([dict(LONA)], sbt_sufijo_valor="AA(OK)-"))
+    # Bien escrito no se avisa que se cambió; lo que pide el arancel, sí (SUFIJOS-1).
+    assert not any("Sufijo" in a and "según el arancel de ARCA" not in a
+                   for a in mg.supuestos_declarados([dict(LONA)], sbt_sufijo_valor="AA(OK)-"))
 
 
 def test_el_aviso_del_sufijo_llega_a_la_pantalla(client):

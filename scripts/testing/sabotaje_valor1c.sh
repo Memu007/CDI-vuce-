@@ -146,7 +146,7 @@ reemplazar $G '        sufijos = [("", sbt_sufijo_valor)] if usa_el_general else
 caso "d18_avisos" "FAILED $T::test_un_general_que_nadie_usa_no_frena_ni_se_avisa"
 
 # 16. el general que se usa deja de controlarse
-reemplazar $M '        usa_el_general = usa_el_sufijo_de_la_operacion(items, request.iva_adicional)' '        usa_el_general = False'
+reemplazar $M '        usa_el_general = usa_el_sufijo_de_la_operacion(items)' '        usa_el_general = False'
 caso "d18_sin_control" "FAILED $T::test_un_general_que_se_usa_sigue_controlado"
 
 # --- 3. Kilos
@@ -189,9 +189,9 @@ reemplazar $J '        pintarValor(null);
 ' ''
 caso "cuentas_de_antes" "FAILED $T::test_al_entrar_a_validar_no_quedan_las_cuentas_de_antes"
 
-# 24. el general se decide sin el IVA adicional de la operación
-reemplazar $M '        usa_el_general = usa_el_sufijo_de_la_operacion(items, request.iva_adicional)' '        usa_el_general = usa_el_sufijo_de_la_operacion(items, None)'
-caso "general_sin_iva_de_la_operacion" "FAILED $T::test_el_iva_adicional_de_la_operacion_junta_los_renglones"
+# 24. (retirado en SUFIJOS-1) el general ya no depende del IVA adicional:
+# un producto entero también lleva su sufijo propio, así que si se juntan o no
+# los renglones no cambia quién usa el de la operación.
 
 # 25. los avisos usan los productos sin la procedencia de la operación
 reemplazar $M '

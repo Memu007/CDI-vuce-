@@ -1,0 +1,70 @@
+// SUFIJOS-1 en el navegador local (sin terceros: /generate_maria se
+// intercepta; el arancel es la tabla local del repositorio).
+// En «Lo que decide el despachante», cada producto entero muestra el sufijo
+// propuesto con lo que leyó la IA (marca y código) y dice de dónde sale y
+// qué falta; la posición que no está en el arancel queda vacía y marcada. Lo
+// que escribe la persona reemplaza a la propuesta, y borrado usa el de la
+// operación. El pedido lleva el sufijo de cada producto y kilos si la
+// posición los pide. Sale con error si algo no se cumple.
+// uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_sufijos1.js [captura-telefono.png]
+const { chromium } = require('playwright');
+function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
+const FUENTE = 'arancel de ARCA del 07/10/2026';
+(async () => {
+  const b = await chromium.launch();
+  const base = process.env.BASE_URL || 'http://127.0.0.1:8820';
+  const id = Date.now();
+  const ctx = await b.newContext({ viewport: { width: 390, height: 844 } });
+  const page = await ctx.newPage();
+  await page.request.post(base + '/auth/register', { data: { username: 's1_' + id, password: 'Clave-Inventada-123', email: 's1' + id + '@ejemplo.test' } });
+  await page.route('**/generate_maria', async r => { await r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, filename: 'MARIA_X.TXT', download_url: '#', content: '', supuestos: [] }) }); });
+
+  await page.goto(base + '/dashboard');
+  await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.despachante && CDI.despachante.sufijoDe);
+  await page.evaluate(() => {
+    CDI.state = CDI.state || {};
+    CDI.state.operacion = { numero_factura: 'INV-2026/0457', moneda: 'DOL', incoterm: 'CFR', comprador_cuit: '30712345671', fecha_emision: '10/10/2026', sbt_sufijo_valor: 'AA(1)-CA00-' };
+    CDI.state.items = [
+      // 3920.10.10.100F: pide AA y AI, en kilos.
+      { pieza: '39201010100F', descripcion: 'Lona de PVC gris', origen: 'CN', cantidad: 750, valor_unitario: 1.85, peso_unitario: 0.62, unidad: '03', marca: 'Marca Demo', codigo_parte: '620G-GRIS' },
+      { pieza: '39201010100F', descripcion: 'Lona de PVC negra', origen: 'CN', cantidad: 10, valor_unitario: 5, peso_unitario: 1, unidad: '03', marca: 'Marca Demo', codigo_parte: '620G-NEGRA' },
+      // No está en el arancel.
+      { pieza: '39211390900F', descripcion: 'Lona inventada', origen: 'CN', cantidad: 5, valor_unitario: 2, peso_unitario: 1, unidad: '03' },
+    ];
+    CDI.goTo('validating');
+  });
+  await page.waitForFunction(() => {
+    const s = document.querySelectorAll('.despachante-sufijo');
+    return s.length === 3 && s[0].value;
+  }, null, { timeout: 10000 }).catch(() => falla('no aparece el sufijo propuesto por producto'));
+  const valores = await page.$$eval('.despachante-sufijo', s => s.map(x => x.value));
+  if (JSON.stringify(valores) !== JSON.stringify(['AA(Marca Demo)-AI(620G GRIS)-', 'AA(Marca Demo)-AI(620G NEGRA)-', '']))
+    falla('sufijos propuestos: ' + JSON.stringify(valores));
+  console.log('OK se propone marca y código de cada producto; la posición fuera del arancel queda vacía');
+
+  const notas = await page.$$eval('.despachante-sufijo', s => s.map(x => (x.nextElementSibling && x.nextElementSibling.textContent) || ''));
+  if (!notas[0].includes('Según el ' + FUENTE) || !notas[0].includes('unidad estadística 01')) falla('nota del producto 1: ' + notas[0]);
+  if (!notas[2].includes('no está en el ' + FUENTE)) falla('nota del producto fuera del arancel: ' + notas[2]);
+  console.log('OK cada nota dice de dónde sale: ' + notas[0]);
+
+  // La persona corrige el segundo y borra el primero (va el de la operación).
+  await page.fill('.despachante-sufijo[data-row="1"]', 'AA(OTRA)-AI(X1)-');
+  await page.fill('.despachante-sufijo[data-row="0"]', '');
+  if (process.argv[2]) await page.screenshot({ path: process.argv[2], fullPage: true });
+  const anchoPagina = await page.evaluate(() => document.documentElement.scrollWidth);
+  console.log('ancho de la página a 390 px: ' + anchoPagina);
+  if (anchoPagina > 390) falla('la página se corre de costado: ' + anchoPagina);
+
+  await page.waitForFunction(() => !document.getElementById('validatingGenerate').disabled, null, { timeout: 15000 })
+    .catch(async () => falla('no deja generar: ' + await page.$eval('#validatingIssues', el => el.textContent.trim().slice(0, 400))));
+  await page.fill('#sbtSufijoValor', 'AA(1)-CA00-');
+  const pedida = page.waitForRequest('**/generate_maria', { timeout: 5000 }).catch(() => falla('no se pidió el TXT'));
+  await page.click('#validatingGenerate');
+  const pedido = JSON.parse((await pedida).postData());
+  const s = pedido.items.map(i => [i.sufijo, i.unidad_estadistica]);
+  if (JSON.stringify(s) !== JSON.stringify([[null, '01'], ['AA(OTRA)-AI(X1)-', '01'], [null, null]]))
+    falla('sufijo y estadística del pedido: ' + JSON.stringify(s));
+  console.log('OK el pedido lleva el sufijo escrito, el de la operación donde se borró, y kilos donde la posición los pide');
+  await b.close();
+  console.log('PANTALLA SUFIJOS-1 OK');
+})().catch(e => falla(e && e.stack || e));
