@@ -20,6 +20,7 @@ import os
 import sys
 
 from sqlalchemy import text
+from sqlalchemy.engine import make_url
 from sqlalchemy.ext.asyncio import create_async_engine
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -84,6 +85,12 @@ def main(argv=None) -> int:
     p.add_argument("--arreglar-none", action="store_true",
                    help="deja vacías las fechas que dicen «None»; sin esto sólo se lee")
     args = p.parse_args(argv)
+    # SQLite crea el archivo que no existe: una ruta mal escrita dejaría una
+    # base vacía y un traceback.
+    url = make_url(_url_async(args.base))
+    if (url.get_backend_name() == "sqlite" and url.database not in (None, "", ":memory:")
+            and not os.path.exists(url.database)):
+        p.error(f"la base sqlite no existe: {url.database}")
     r = asyncio.run(revisar(args.base, args.arreglar_none))
     print(f"Con «None»: {len(r['con_none'])}")
     for cid in r["con_none"]:
