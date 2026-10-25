@@ -19,7 +19,8 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
   y 30 de MARIA-9.
 - Suite, smoke, e2e y la pantalla de MARIA-9 dan verde sobre `efa2e08`.
 
-**Lo que decidís vos:** D15 (MARIA-9), nueva. No frena la entrega.
+**Lo que decidís vos:** D18 (MARIA-9), nueva. No frena la entrega. Es D18
+porque D15 a D17 ya son de CLIENTE-1b.
 
 | Pieza | SHA |
 |---|---|
@@ -38,10 +39,11 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 | Producto: lo que encontró la autorrevisión (verdadero en un renglón, mensajes) | `6ed3619` |
 | Casos y sabotajes | `efa2e08` |
 | **SHA probado:** suite, sabotajes, smoke, e2e y pantalla | **`efa2e08`** |
+| Merge de tu rama (`903d141`, sólo `docs/pm`: no cambia lo probado) | `fbf64eb` |
 
 ## Decisiones
 
-**D15. Un sufijo general que nadie usa pero no se puede leer frena el TXT.**
+**D18. Un sufijo general que nadie usa pero no se puede leer frena el TXT.**
 MARIA-9.1 dice «se valida sólo si algún sub-ítem o renglón lo toma». Ya lo
 hace con «ROJO» y con todo lo que no se puede separar en códigos. Pero un
 general con `=`, con caracteres de control o de más de 120 caracteres
@@ -176,7 +178,7 @@ No corrí `ataque_aislamiento.sh`: no toqué datos, sesión ni permisos.
 | Revisor | Modelo y esfuerzo | Sobre | Hallazgos | Qué pasó |
 |---|---|---|---|---|
 | `/code-review high` | — | `23ba183..9f1e5b5` (MARIA-9) | 6 | Arreglados: procedencia en el endpoint (`58f2f79`). Quedan como riesgo: el mensaje con «sbt» lleva al campo general un error de sufijo de renglón que llega por API (la pantalla nunca manda `item.sufijo`); `usa_el_sufijo_de_la_operacion` repite reglas del generador (deuda); los avisos de transformación del general salen aunque nadie lo use; un análisis repetido (eficiencia); un ítem entero descarta su sufijo propio sin avisar (de antes) |
-| Adversario | Sonnet, alto | `23ba183..a6f7551` (MARIA-9) | 5 (4 reproducidos, 1 por lectura) | (1) D15. (2) kilos que culpaban al más grande: arreglado en `58f2f79`. (3) El prefijo «Item N» es el del primer renglón: ya pasaba. (4) Un aviso falso del general: riesgo. (5) Pantalla: informativo |
+| Adversario | Sonnet, alto | `23ba183..a6f7551` (MARIA-9) | 5 (4 reproducidos, 1 por lectura) | (1) D18. (2) kilos que culpaban al más grande: arreglado en `58f2f79`. (3) El prefijo «Item N» es el del primer renglón: ya pasaba. (4) Un aviso falso del general: riesgo. (5) Pantalla: informativo |
 | `/code-review high` | — | `52b56a4..7184e9e` (VALOR-1b) | 10 | Arreglados en `6ed3619`: verdadero o falso en un renglón contaban como 1 o 0; comentario y CHANGELOG. Los demás, en «Riesgos» |
 | Adversario | Sonnet, alto (uno solo: vuelta de una devolución de plata) | `52b56a4..7184e9e` (VALOR-1b) | 6 | Arreglados: ninguna prueba distinguía la firma tomada al mandar de la tomada al volver (caso y sabotaje 5b, `efa2e08`); listas y objetos con el texto de Python en el mensaje (`6ed3619`); verdadero en un renglón (el mismo de arriba). Quedan: `_exacto` y `grupo_id` (de antes, en «Riesgos»); el clic que sólo pide las cuentas (informativo) |
 | Revisión de seguridad | Opus, el de la sesión (subagente general) | `52b56a4..efa2e08` | 0 vulnerabilidades | `/security-review` no corre en esta sesión (pide `origin/HEAD`, que no existe); la hizo un subagente con la misma consigna. Sin XSS (todo va por `textContent` o `CDI.escapeHtml`), el TXT no cambia, los campos `Any` no abren nada nuevo (corrió entradas hostiles: 1 MB, anidado 5000 niveles, `10**400`), sin filtración en los errores. Un detalle de antes: ver `_exacto` en «Riesgos» |
@@ -261,4 +263,4 @@ Arranco SEPARADORES-1. Si el veredicto trae una devolución, esa va primero.
 
 Última vuelta: 2026-10-25 02:27 UTC.
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. Entregadas VALOR-1b y MARIA-9 en efa2e08 (suite, 23+31+30 sabotajes, smoke, e2e y pantalla sobre ese SHA); D15 (sufijo general con «=» que nadie usa) abierta en PARA-PM-2.md; D13 (b) y D14 (a) decididas. Sigue SEPARADORES-1. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. Entregadas VALOR-1b y MARIA-9 en efa2e08 (suite, 23+31+30 sabotajes, smoke, e2e y pantalla sobre ese SHA); D18 (sufijo general con «=» que nadie usa) abierta en PARA-PM-2.md; D13 (b) y D14 (a) decididas. Sigue SEPARADORES-1. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
