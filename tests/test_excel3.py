@@ -1127,7 +1127,9 @@ def test_la_copia_de_un_cargo_combinado_con_texto_en_item_no_cambia_el_fob_sin_s
 # flete y el descuento se leen como en la base (31c9b5a), y el seguro queda
 # afuera o entra con un aviso que nombra su fila.
 
-MEDIDAS_QUE_NO_SON = {"barra": "/", "guion": "-", "cero": 0, "vacias": None}
+MEDIDAS_QUE_NO_SON = {"barra": "/", "guion": "-", "cero": 0, "vacias": None,
+                      "negativa": -1, "negativa_en_texto": "-1", "na": "N/A", "raya": "—",
+                      "cero_decimal": "0.0", "cero_con_unidad": "0 m"}
 CARGOS_H1 = {"flete": ("Freight", 1200), "seguro": ("Insurance", 40), "descuento": ("Discount", -10)}
 PRODUCTO_H1 = [1, "DT-1", "LONA DEMO", 2, 10, 1, 20, 1.5, 30]
 
@@ -1173,23 +1175,19 @@ def _leer_en(formato, filas, combinar):
 
 
 def _el_cargo_h1_no_entra_como_producto(data, cargo, monto):
-    """Lo que pide EXCEL-3e: el producto queda con FOB 30; el flete y el
-    descuento se leen con su fila, como en la base; el seguro queda sin leer
-    o entra con un aviso que nombra su fila."""
+    """Lo que pide EXCEL-3e: entra sólo el producto, con FOB 30; el flete y el
+    descuento se leen con su fila, como en la base, y el seguro queda sin
+    leer, con el aviso de su fila."""
     op = data["operacion"]
-    assert [(i["codigo_parte"], i["descripcion"].split(",")[0]) for i in data["items"]][:1] == [
+    assert [(i["codigo_parte"], i["descripcion"].split(",")[0]) for i in data["items"]] == [
         ("DT-1", "LONA DEMO")], data["items"]
+    assert _total(data["items"]) == 30, data["items"]
     if cargo == "flete":
         assert (op.get("flete"), op.get("filas_excel_flete")) == (monto, [3]), op
-        assert _total(data["items"]) == 30, data["items"]
     elif cargo == "descuento":
         assert (op.get("descuento"), op.get("filas_excel_descuento")) == (abs(monto), [3]), op
-        assert _total(data["items"]) == 30, data["items"]
-    elif 3 in data["filas_descartadas_numeros"]:
-        assert _total(data["items"]) == 30, data["items"]
     else:
-        assert _total(data["items"]) == 30 + monto, data["items"]
-        assert re.search(r"\bfila 3 \(«", _avisos(data)), data["avisos_mapeo"]
+        assert data["filas_descartadas_numeros"] == [3], data
 
 
 @pytest.mark.parametrize("formato", ["xlsx", "xls"])
@@ -1260,6 +1258,20 @@ def test_un_producto_con_medidas_que_no_son_sigue_entrando(medida, combinar, for
 
 
 @pytest.mark.parametrize("formato", ["xlsx", "xls"])
+@pytest.mark.parametrize("medida", ["-", "/", 0, -1])
+def test_la_descripcion_no_lleva_las_medidas_que_no_son(medida, formato):
+    """Cuando la planilla agrupa, el ancho y el largo van en la descripción:
+    «-», «/», 0 o -1 no son una medida y no se escriben («ancho - m»)."""
+    data = _leer_en(formato, [RENGLONES_PVC, PRODUCTO_H1,
+                              [None, "DT-1", None, 1, 5, 1, 5, 1.5, 7.5],  # agrupa
+                              [2, "DT-2", "CINTA DEMO", medida, 3, 1, 4, 2, 8],
+                              [3, "DT-3", "MALLA DEMO", medida, medida, 1, 4, 2, 8]], ())
+    assert [i["descripcion"] for i in data["items"]] == [
+        "LONA DEMO, ancho 2 m x largo 10 m", "LONA DEMO, ancho 1 m x largo 5 m",
+        "CINTA DEMO, largo 3 m", "MALLA DEMO"], data["items"]
+
+
+@pytest.mark.parametrize("formato", ["xlsx", "xls"])
 @pytest.mark.parametrize("medida", ["-", "/", 0])
 def test_un_renglon_sin_descripcion_ni_medidas_no_hereda_y_se_avisa(medida, formato):
     """Sin descripción y con medidas «-» no es un largo del grupo: no hereda la
@@ -1271,9 +1283,9 @@ def test_un_renglon_sin_descripcion_ni_medidas_no_hereda_y_se_avisa(medida, form
 
 
 @pytest.mark.parametrize("formato", ["xlsx", "xls"])
-@pytest.mark.parametrize("largo", ["48-50", "1,5m"])
+@pytest.mark.parametrize("largo", ["48-50", "1,5m", "½"])
 def test_un_renglon_con_una_medida_escrita_en_texto_sigue_siendo_del_grupo(largo, formato):
-    """Una medida que no es un número («48-50», «1,5m») sigue siendo una medida:
+    """Una medida que no es un número («48-50», «1,5m», «½») sigue siendo una medida:
     el renglón sin descripción hereda la de arriba."""
     data = _leer_en(formato, [RENGLONES_PVC, PRODUCTO_H1,
                               [2, "DT-1", None, None, largo, 1, 4, 2, 8]], ())
