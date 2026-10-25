@@ -213,7 +213,8 @@
     // código propuesto (AA, AB, AI) reemplaza al mismo de la operación y los
     // que la operación no trae van al final; los demás de la operación
     // (CA00, PC01…) quedan. Si el de la operación no se puede partir, nada
-    // (el servidor lo dice); si juntos pasan del tope, la propuesta sola.
+    // (el servidor lo dice); si juntos pasan del tope, tampoco: no se pierde
+    // lo de la operación para que entre la propuesta.
     function combinar(op, propuesto) {
         const prop = partesDe(propuesto);
         const deOp = partesDe(op);
@@ -228,7 +229,7 @@
         });
         prop.forEach(p => { if (!usados[p.codigo]) partes.push(p.texto); });
         const junto = partes.join('-') + '-';
-        return junto.length <= 120 ? junto : prop.map(p => p.texto).join('-') + '-';
+        return junto.length <= 120 ? junto : '';
     }
     function sufijoDeLaOperacion() {
         const campo = $('sbtSufijoValor');
@@ -248,6 +249,9 @@
         if (!f) return '';
         if (!f.en_la_tabla) {
             if (arancel.sin_tabla) return 'Falta la tabla del arancel de ARCA: cargalo a mano.';
+            if (!/^[0-9]{11}[A-Z]?$/.test(posicionDe(it).replace(/[.\s]/g, ''))) {
+                return 'No es una posición SIM completa (11 dígitos y la letra de control): cargalo a mano.';
+            }
             if (f.letra_de_control) {
                 return 'En el ' + arancel.fuente + ' la letra de control de esta posición es '
                     + f.letra_de_control + ': revisá la posición.';
@@ -305,6 +309,11 @@
     function celdaSufijo(it, i) {
         if (Array.isArray(it.subitems) && it.subitems.length) {
             return '<span class="caption">Va en cada sub-ítem.</span>';
+        }
+        // Un grupo sale con un solo sufijo: no se escribe uno por producto.
+        if (it.grupo_id) {
+            return '<span class="caption">' + (it.sufijo ? 'Va el del grupo: ' + CDI.escapeHtml(String(it.sufijo))
+                : 'Va el de la operación para todo el grupo.') + '</span>';
         }
         const nota = notaDe(it, i);
         return '<input type="text" class="form-input despachante-sufijo" data-row="' + i + '" maxlength="120"' +
@@ -413,5 +422,5 @@
         return errores.length === 0;
     }
 
-    CDI.despachante = { render, leer, valores, unidadesDe, sufijoDe, notaDe, listo, recordarTabla };
+    CDI.despachante = { render, leer, valores, unidadesDe, sufijoDe, notaDe, celdaSufijo, listo, recordarTabla };
 })();

@@ -1806,6 +1806,13 @@ def _avisos_del_arancel(items: list, sbt_sufijo_valor, juntos: list) -> list:
             fuera.setdefault(posicion, []).append(n)
     for posicion, ns in fuera.items():
         donde = f"Posición {sufijos_arca.escrita(posicion)} ({'ítem ' + str(ns[0]) if len(ns) == 1 else 'ítems ' + _enumerar(ns)})"
+        if not sufijos_arca.es_sim(posicion):
+            avisos.append(
+                f"{donde}: no es una posición SIM completa (11 dígitos y la letra de control). "
+                f"Los sufijos de valor y la unidad estadística no se completan ni se controlan: "
+                f"cargalos a mano con el despachante."
+            )
+            continue
         letra = sufijos_arca.letra_de_control(posicion, tabla)
         if letra:
             escrita = sufijos_arca.escrita(posicion)

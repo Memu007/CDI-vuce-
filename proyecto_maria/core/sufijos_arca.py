@@ -91,6 +91,11 @@ def cargar(ruta: Path = TABLA) -> dict:
     return tabla if isinstance(tabla, dict) else {}
 
 
+def es_sim(posicion) -> bool:
+    """¿Es una posición SIM completa (11 dígitos, con o sin la letra)?"""
+    return _partes(posicion) is not None
+
+
 def fuente(tabla: dict) -> str:
     """«arancel de ARCA del 07/10/2026», con la fecha de la tabla."""
     fecha = str(tabla.get("fecha") or "")
