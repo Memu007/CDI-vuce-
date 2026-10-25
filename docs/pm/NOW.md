@@ -1,6 +1,6 @@
 # NOW — CDI
 
-Actualizado: 2026-10-24. Estado vigente; la historia está en Git.
+Actualizado: 2026-10-25. Estado vigente; la historia está en Git.
 
 Método al día con CAMBIOS.md del secondbrain hasta 2026-10-21 (aplicado 2026-10-24).
 
@@ -38,6 +38,15 @@ Integrada con `merge` (`fe41228`), **sin publicar**. Detalle en
 `REPRODUCCION-PA-1-2026-10-24.md`. D4–D7 decididas por la PM: la demo de la
 landing va como PA-1b; la fecha validada en la API (con «None» y años de 5
 cifras) va a CLIENTE-1b, y limpiar lo guardado en producción lo decide Emi.
+
+**MARIA-7/8 aceptada con nota 2026-10-25 00:28 UTC** (Dev MARIA, sobre
+`30ceace`): integrada con `merge` (`1fa0b6e`), **sin publicar**. Antes de
+publicarla va MARIA-9: el sufijo general sin usar hoy frena el TXT
+(regresión). Detalle en `REPRODUCCION-MARIA-7-8-2026-10-25.md`.
+**EXCEL-3b vuelve como EXCEL-3c** (`fae424c`, sin integrar): dos
+regresiones que pierden filas con aviso, y el seguro con descripción
+combinada sigue entrando como producto. Detalle en
+`REPRODUCCION-EXCEL-3b-2026-10-25.md`.
 
 **Rojo conocido de EXCEL-2, ya publicado:** `test_excel2.py::test_ocho_libros…`
 falla siempre en la máquina de la PM (4 núcleos), también en la base: una
@@ -319,17 +328,16 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-10-25 00:35 UTC: MARIA-7/8 aceptada con nota e integrada (`1fa0b6e`). Lo que queda va a MARIA-9 (regresión del sufijo general sin usar, errores de sufijo en la v2, bordes y el mensaje de kilos), antes de publicar MARIA-7/8. EXCEL-3b vuelve como EXCEL-3c (`fae424c`): dos regresiones que pierden filas con aviso, y el seguro con descripción combinada sigue entrando como producto. D12 (a) ahora, (b) aparte. PRUEBAS-1 + PA-1b (`e924b29`) en revisión. El rojo de e2e-maria en la CI del PR 6 es el intermitente que arregla PRUEBAS-1 c).
+
 2026-10-24 22:18 UTC: Dev MARIA entregó la devolución de MARIA-7 + MARIA-8 en `f71eaa9` (SHA probado `536c679`; informe en PARA-PM-2.md). La reproduzco después del lote de Argon (no la toco en paralelo con 4 Opus corriendo). Dejó D9/D10/D11: mi lectura provisional (no es veredicto, falta reproducir) es D9(a) y D10(a) como las recomienda, y D11(b) como pieza aparte a proponer. D9 me rompía `auditoria_generador_sintetico.py:27` (`SINTETICO` ya no es sufijo válido): lo cambié a `AA(SINTETICO)-`, que vale en cualquier caso. Para el despachante se suma: ¿qué formas de sufijo acepta el MARIA? La suite da 1 rojo de entorno (test_excel2, por tiempo); a verificar en la reproducción.
 
 2026-10-24 23:58 UTC: Argon reproducido (los cuatro revisores; la PM re-verificó lo principal). Tabla, causas y lo no corrido en `REPRODUCCION-ARGON-2026-10-24.md`. Lo más grave: archivos de 2-3 KB que tiran el servidor (1, 2, 3.1), repetición de pagos viejos por el IPN sin firma (5.3, también sin MP_WEBHOOK_SECRET) y dos recargas a la vez que acreditan una (5.4, nuevo), link de verificación reusable (10). Llevado a Emi con prioridad propuesta; nada entra al roadmap sin su «dale». Pendiente de producción: tipo de `extra_ops_expires_at` (4.1) y si MP rechaza la suscripción (6.1).
 
 2026-10-24 21:58 UTC: sin entregas ni D abiertas. Dev técnica en PRUEBAS-1 (rama en `99d4e3e`, maria1b.sh arreglado; puertas y medición del foco corriendo, sin informe todavía). Dev MARIA corriendo suite y sabotajes de la devolución de MARIA-7. Contexto: la técnica 127k de 200k; la MARIA sigue marcando 337k sin compactar, se le repite a Emi.
 
-2026-10-24 21:36 UTC: pedido y ZIP de `8b45207` para Argon entregados a Emi, sin `cambiar_ai.sh` (clave real de Anthropic, también en el historial: revocarla, G0 punto 2).
 
-2026-10-24 21:10 UTC: PA-1 + D3 aceptada e integrada (`fe41228`), sin publicar: suite 1782 passed, sabotajes en rojo, adversario sobre D3 sin hallazgo propio. D4 (b), D5 (a) como PA-1b, D6 (a), D7 (a) dentro de CLIENTE-1b ampliada. PRUEBAS-1 suma (c), el rojo intermitente de la e2e. Dev técnica despertada. Cadena de sabotajes de `8b45207` terminada: excel3, guardar1, admin1, admin2, punta_a_punta1, rendimiento1 y 1b en rojo limpio; lo que no dio rojo son pruebas viejas, no el producto (cliente1: la carrera del foco; excel1 4, excel2 3 y maria1b 2 patrones que EXCEL-2/3 movieron), todo en PRUEBAS-1.
 
-2026-10-24 20:55 UTC: publicada `8b45207` (EXCEL-3 + CLIENTE-1) con «dale 8b45207»; falta que Emi la pruebe en el sitio. MARIA-7 con devolución (`e996657`): sufijos que se funden, kilo neto al centésimo (D2 b, por el archivo aceptado), palabras de cuenta, unidad estadística cruda y aviso de unidad desconocida; D1–D8 respondidas; Dev MARIA despertada. PA-1 en revisión. PRUEBAS-1 suma `excel2.sh` (3 patrones viejos, no termina en 30 min). Para Emi: dos preguntas al despachante (largo del IDSO y repetidos; decimal y vacío en un sufijo). Cadena de sabotajes de la publicación sigue (guardar1 en adelante).
 
 ## Medición
 
@@ -337,5 +345,5 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## /compact conservar de la PM principal
 
-/compact conservar: Soy la PM principal de CDI (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK min 55). Producto Memu007/CDI-vuce-, clon /home/user/cdi-vuce-, mi rama claude/practical-shannon-szpwkn (nunca main; cada push a main publica). main = 8b45207 (EXCEL-3 + CLIENTE-1, publicada 24/10 20:33 UTC con «dale 8b45207»; falta que Emi la pruebe; volver a dddcf6d sólo con su ok). Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, alto): MARIA-7 con devolución (e996657, sobre f0b73f7; D1–D8 respondidas; D1 y D7 esperan al despachante vía Emi); después MARIA-8. Dev técnica (session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica, medio): PA-1 + D3 aceptada e integrada (fe41228, sin publicar); sigue PRUEBAS-1 (a cliente1 foco, b excel1/excel2 sabotajes viejos, c e2e #validatingRerun), PA-1b (demo de la landing), EXCEL-3b, ESTUDIO-1 (después de integrar MARIA-7), CLIENTE-1b (fecha validada en la API; limpiar producción lo decide Emi). Pendiente de la PM: revisar la devolución de MARIA-7 y PRUEBAS-1 cuando lleguen (la cadena de sabotajes de 8b45207 ya está clasificada: todo a PRUEBAS-1). Para Emi: probar 8b45207; preguntas al despachante; esfuerzo; rojo de los ocho libros; packing list; revocar la clave de Anthropic de cambiar_ai.sh y rotar Gemini. Argon: reproducido, tabla en REPRODUCCION-ARGON-2026-10-24.md, llevada a Emi el 24/10; esperan su orden de prioridad (nada al roadmap sin su «dale»). Pendiente de la PM: MARIA-7/8 en f71eaa9 (D9 a, D10 a, D11 b provisorio) y PRUEBAS-1 + PA-1b en 53a441d. Roadmap a 3 meses en ROADMAP.md (aprobado 24/10); acuerdos del despachante en DECISIONS.md; TXT y proforma reales sólo en el scratchpad. Reglas de Emi: nada fuera del roadmap; Devs hasta alto, sin Fable; consejero sólo mío; castellano llano; consultas de 9 a 21 ARG; publicar sólo con «dale <SHA>» de día; usar date -u.
+/compact conservar: Soy la PM principal de CDI (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK min 55). Producto Memu007/CDI-vuce-, clon /home/user/cdi-vuce-, mi rama claude/practical-shannon-szpwkn (nunca main; cada push a main publica). main = 8b45207 (EXCEL-3 + CLIENTE-1, publicada 24/10 con «dale 8b45207»; falta que Emi la pruebe; volver a dddcf6d sólo con su ok). Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, alto): MARIA-7/8 aceptada e integrada (1fa0b6e, sin publicar; antes de publicar va MARIA-9); sigue VALOR-1, MARIA-9, SEPARADORES-1. Dev técnica (session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica): EXCEL-3c (devolución de EXCEL-3b, fae424c; D12 a, b aparte después de ESTUDIO-1), CLIENTE-1b, ESTUDIO-1. Pendiente de la PM: veredicto de PRUEBAS-1 + PA-1b (e924b29, adversario corriendo); arreglar mi auditoria_generador_sintetico.py (CUIT, EC02). Para Emi: orden de prioridad de Argon (REPRODUCCION-ARGON-2026-10-24.md; nada al roadmap sin su «dale»); probar 8b45207; preguntas al despachante; packing list; revocar la clave de Anthropic de cambiar_ai.sh y rotar Gemini; 4.1 y 6.1 de producción. Roadmap en ROADMAP.md; TXT y proforma reales sólo en el scratchpad. Reglas de Emi: nada fuera del roadmap; Devs hasta alto, sin Fable; consejero sólo mío; castellano llano; consultas de 9 a 21 ARG; publicar sólo con «dale <SHA>» de día; usar date -u.
 
