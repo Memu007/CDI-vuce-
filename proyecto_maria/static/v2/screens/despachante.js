@@ -186,7 +186,7 @@
         $('despachanteIva').innerHTML = opciones(IVA, e.iva_adicional || 'NO_VALIDA');
         $('despachanteUnidad').innerHTML = opciones(UNIDADES, e.unidad || '', 'Sin elegir (sale 07, unidad)');
         $('despachanteUnidadEst').innerHTML = opciones(ESTADISTICA, e.unidad_estadistica || '',
-            'Según el arancel de ARCA (si no, la de la factura)');
+            'Sin elegir (la del arancel)');
         $('despachanteItems').innerHTML = items.map((it, i) => {
             const porDefecto = esArgentino(it.origen) ? '' : '2';
             const estado = it.estado != null && it.estado !== '' ? String(it.estado) : porDefecto;
