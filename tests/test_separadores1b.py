@@ -114,6 +114,14 @@ def test_en_la_pantalla_lo_demas_sigue_como_hoy(escrito, valor):
     assert _leer_js(escrito) == {"valor": valor, "error": None}
 
 
+def test_una_cifra_larga_pegada_no_traba_la_pantalla():
+    """Revisión de seguridad: con la regex de grupos, 199 998 cifras y «.125»
+    tardaban decenas de segundos (crece con el cuadrado del largo)."""
+    r = _js("const t0 = Date.now(); const r = CDI.montos.leer('1'.repeat(199998) + '.125');"
+            "console.log(JSON.stringify({ms: Date.now() - t0, pregunta: r.error.slice(0, 9)}));")
+    assert r["pregunta"] == "¿111.111." and r["ms"] < 1000, r
+
+
 def test_las_dos_respuestas_a_la_pregunta_se_leen_sin_dudas():
     r = _js("console.log(JSON.stringify(['2.500.125', '2.500,125'].map(t => CDI.montos.leer(t))));")
     assert r == [{"valor": 2500125, "error": None}, {"valor": 2500.125, "error": None}]
