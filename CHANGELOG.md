@@ -11,6 +11,35 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - El flete, el seguro o los gastos que la pantalla no pudo leer ya no viajan como 0: el servidor no genera y dice cuál es. Tampoco toma «3.480» como 3,48 ni «1e3» como 1000. Un ajuste así se avisa en las cuentas; frena el TXT sólo si el seguro lo calculó el sistema (D19, D20).
 - «4500.000» o «2500,125»: en la factura, con el otro separador decimal, quedan sin leer y se avisa (antes salían por mil). En la pantalla se pregunta, como con «1,500», sin trabarse si se pega una cifra muy larga.
 
+## 2026-10-25 · fix: la fecha de inicio de actividad de la operación y de la importación pasa por la regla del alta (CLIENTE-1c)
+
+- **fix(clientes):** la operación copia a la ficha vacía sólo una fecha válida (guardada AAAA-MM-DD); si no sirve no se copia y la operación se guarda igual. La importación deja vacía la fecha que no sirve y la vista previa avisa la fila; el año sale siempre con cuatro cifras.
+- La ficha avisa la fecha guardada con el mismo criterio que el generador del TXT (también con dígitos de ancho completo). El script de datos no muestra la clave de la base en sus errores.
+
+## 2026-10-25 · fix: un cargo con medidas «/», «-» o 0 no entra como producto (EXCEL-3e)
+
+- **fix(excel):** «/», «-», 0, un negativo («-1 m», «–1»), un texto sin cifras («N/A», «一») o vacío no cuentan como medidas ni se escriben en la descripción («ancho - m»): el flete, el seguro o el descuento con la especificación combinada y su rótulo en Item ya no pasan por renglón del grupo; se leen como flete o descuento, o quedan sin leer con aviso. Un renglón sin descripción ni medidas tampoco hereda la de arriba: queda sin leer, con aviso; con la descripción combinada y sin rótulo propio sigue siendo del grupo y conserva el código.
+
+## 2026-10-25 · feat: los estudios de la cuenta para el CUIT del despachante (ESTUDIO-1)
+
+- **feat(estudios):** en «Mi perfil», «Mis estudios» se cargan los estudios (nombre y CUIT) de la cuenta; en la operación se elige uno, con el último usado o el único ya elegido, y su CUIT va al CDDTAGR. Sin estudio sigue el CUIT del perfil; cada usuario ve, borra y usa sólo los suyos.
+- El CUIT del estudio se guarda sólo si su verificador es correcto. Sin CUIT del despachante, el aviso y el error dicen dónde cargarlo.
+
+## 2026-10-25 · fix: lo que empieza como un cargo no cambia el FOB sin avisar su fila (EXCEL-3d)
+
+- **fix(excel):** con algo copiado de una combinada, «Flete int.» o «Freight elevator» se leen como flete, con un aviso que nombra la fila; «Payment terminal POS» entra como producto con ese aviso, y un rótulo que dice más que el cargo («Gastos administrativos», «Insurance as per policy») queda sin leer o entra con él: ninguno cambia el FOB en silencio. El renglón de un grupo queda afuera o entra igual que su cabecera, y la fila que copia la descripción de un flete, seguro o gasto combinado queda afuera como esa fila aunque traiga un texto propio en Item («A2», «#3»).
+- Todo renglón que entra sin precio se avisa al subir, con sus filas (hasta cinco por número).
+
+## 2026-10-25 · fix: la proforma con combinadas, sin perder productos ni sumar cargos (EXCEL-3c)
+
+- **fix(excel):** con el origen combinado, un producto con descripción propia que empieza con «Payment», «Handling» o «Seguro» vuelve a entrar; el seguro, el pago, los gastos o el handling cuyo rótulo dice sólo el cargo («Insurance», «Seguro de carga», «Payment 30% T/T in advance») quedan sin leer, con aviso, aunque la descripción o el origen vengan combinados hasta su fila o el rótulo ocupe dos filas.
+- Una cabecera de grupo sin código vuelve a dar su descripción a los renglones con código propio. Los renglones del grupo que entran sin precio (lo trae sólo el primero o combinado) se avisan al subir.
+
+## 2026-10-25 · fix: la fecha de inicio de actividad se valida al guardar el cliente (CLIENTE-1b)
+
+- **fix(clientes):** el alta y la edición ya no guardan «None» ni una fecha cortada: aceptan AAAA-MM-DD o DD/MM/AAAA (se guarda AAAA-MM-DD), y otra cosa da un error que el formulario muestra sin guardar nada.
+- El aviso de lo que falta para el MARIA pide también la fecha guardada que no es válida; `scripts/datos/clientes_fecha_inic_activ.py` informa por id las que quedaron mal y, con `--arreglar-none`, vacía las «None».
+
 ## 2026-10-25 · fix: el seguro calculado con otros importes no sale sin que se elija (VALOR-1c)
 
 - Si el seguro lo calculó el sistema y los importes cambiaron, no se genera hasta recalcularlo o dejarlo como está; se avisa antes con el mismo texto. Un sufijo general que nadie usa ya no frena ni se avisa (D18).
@@ -43,6 +72,17 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - «Usar como ajuste a deducir» ya no pisa un importe escrito a mano; «Calcular seguro» no usa cuentas de otra operación, y funciona aunque todavía no haya operación cargada. Si fallan los avisos, o un producto viene mal formado o fuera de rango, la tarjeta lo dice en vez de quedar vacía o dar error.
 
+## 2026-10-24 · fix: la proforma china sin leer de más (EXCEL-3b)
+
+- **fix(excel):** un subtotal con largo y sin precio, un flete o descuento sin monto y un código nuevo sin especificación ya no toman la descripción del renglón de arriba: quedan sin leer, con aviso. Una nota en «Remarks» no vuelve flete o descuento a un renglón; un «Descuento comercial -500» no entra como producto.
+- La unidad que sale de los encabezados de la cantidad y del precio («Qty (M)», «USD/M») se avisa con las dos columnas; un largo escrito «1,5m» no sale «1,5m m».
+- Las celdas combinadas de un .xls se leen como las de un .xlsx; el flete o descuento con el rótulo en una columna a la izquierda de la descripción («No.», «S/N») se lee.
+- Un origen o una especificación combinados hasta el flete o el subtotal no los vuelven producto; una nota de descuento sin precio no abre un grupo. (El seguro con la descripción combinada seguía entrando: lo arregla EXCEL-3c.)
+
+## 2026-10-24 · fix: la demo de la landing dice «3 PA SIM» (PA-1b)
+
+- **fix(landing):** el paso 3 del progreso de la demo dice «PA SIM», como la aplicación. El encabezado de la tabla de la demo sigue en «NCM» (sus valores son de 8 dígitos): lo decide la PM.
+
 ## 2026-10-24 · feat: ajustes y seguro antes de generar (VALOR-1)
 
 - En la pantalla de generar, una tarjeta «Ajustes y seguro»: ajustes a incluir y a deducir que carga la persona, con las cuentas a la vista (FOB de la factura, que es el del TXT, ± ajustes = FOB casillero, flete y seguro). El descuento de la planilla se ofrece con un botón; nunca se pone solo.
@@ -69,10 +109,6 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - Sin CUIT del despachante no se genera el TXT (antes faltaba CDDTAGR en silencio); IDSO, IDDT e IARTESPAPU van con 8 caracteres y LDVDREFDOC con el número real de la factura.
 - Unidad de la factura y estadística elegibles en «Lo que decide el despachante» (m² = 03; en kilos, la cantidad estadística es el kilo neto al centésimo); en los sufijos sólo letras, números y espacios, con aviso; una cuenta del banco (IBAN verificado) no sale como IDTRIB-PROVEEDOR y el código chino de crédito social sí; una factura más larga que LDVDREFDOC se avisa antes de generar.
 - La fecha de la factura se lee en su orden: con el año adelante es año/mes/día (`2026/08/07` → `07/08/2026`); si día y mes pueden intercambiarse o el año tiene dos cifras, queda vacía y se le pregunta al usuario; la revisión respeta ese orden. La fecha de inicio de actividad del cliente sale DD/MM/AAAA (se guardaba AAAA-MM-DD y salía así); si no es una fecha, no se genera y se dice dónde corregirla.
-
-## 2026-10-24 · fix: la demo de la landing dice «3 PA SIM» (PA-1b)
-
-- **fix(landing):** el paso 3 del progreso de la demo dice «PA SIM», como la aplicación. El encabezado de la tabla de la demo sigue en «NCM» (sus valores son de 8 dígitos): lo decide la PM.
 
 ## 2026-10-24 · fix: editar un cliente no borra una fecha de inicio que no es AAAA-MM-DD (D3)
 
@@ -373,6 +409,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-07-12 · fix: campo SBT en frontend + validación backend anti-inyección
 
 El dashboard v2 ahora tiene un campo "Sufijo de valor SBT" en la pantalla de revisión (antes de generar). Es obligatorio, con texto de ayuda "Dato obligatorio y específico del importador. Consultar al despachante." El backend valida: trim, máximo 120 caracteres, rechaza saltos de línea (`\r`, `\n`) y caracteres de control para impedir inyección de líneas en el TXT. Si el backend devuelve error de SBT, se muestra junto al campo (no como error genérico). Sin fallback VOWYNNS/VITTO. Cobertura: 39.05%, 547 tests, 0 failures.
+
 ## 2026-07-07 · feat: ficha del cliente se auto-completa (fill-if-empty) al guardar operación
 
 Al guardar una operación, si la ficha del cliente tiene `address` o `fecha_inic_activ` vacíos y la carátula trae esos datos, se rellenan. Nunca pisa valores existentes. Datos por-embarque (flete, seguro, gastos FOB, factura, etc.) no se guardan en la ficha. Excepción atrapada: si falla el fill, no rompe el guardado de la operación.
@@ -557,6 +594,7 @@ Nuevo `proyecto_maria/core/vuce_ci_client.py`: usa la API pública interna de ww
 - **feat (admin):** Implementada promoción automática a rol `admin` durante el arranque de la app para los usuarios (por username o email) listados en la variable de entorno `ADMIN_USERNAMES`. Esto desbloquea el acceso del dueño en producción sin requerir acceso directo a la BD.
 
 ---
+
 ## 2026-06-20 · Hardening Pilar B + Tests E2E
 
 - **feat (backend):** refactor en `quote_router.py` para usar `asyncio.to_thread` al llamar a Tarifar (evitando bloquear el event loop).
@@ -577,13 +615,13 @@ Nuevo `proyecto_maria/core/vuce_ci_client.py`: usa la API pública interna de ww
 
 - **feat (ui):** añadido botón inteligente "Crear cliente" en la validación de Carga Manual. Si el usuario ingresa un importador no registrado, el sistema permite crearlo y auto-asignarlo con un clic directo sin abrir modales.
 - **fix (ui):** se corrigió un bug lógico donde al seleccionar un cliente desde el panel lateral, el mensaje de error de validación en pantalla ("Falta: Cliente asignado") no se limpiaba dinámicamente.
+
 ## 2026-06-19 · Auditoría UX (Simulación 50 usuarios)
 
 - **feat (ui/ux):** añadido botón "+ Agregar producto" en NCM para evitar el punto muerto de Carga Manual.
 - **fix (ui/ux):** validación de fechas flexible. Ahora auto-completa años de 2 dígitos y acepta barras/guiones.
 - **feat (ui/ux):** Incoterms convertidos a campo abierto con sugerencias (`datalist`) para no bloquear casos atípicos (CPT, CIP).
 - **fix (ui/ux):** buffer de Deshacer (Ctrl+Z) invalidado automáticamente al editar celdas a mano, evitando pérdida de datos por colisión de historial.
-
 
 ## 2026-06-19 · Robustez de UX/UI y Persistencia de Estado
 

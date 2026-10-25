@@ -77,8 +77,11 @@
         // Hasta que llegue la respuesta, nada de los avisos de otra operación.
         const avisosPanel = document.getElementById('validatingAvisosPanel');
         if (avisosPanel) avisosPanel.hidden = true;
-        Promise.resolve(CDI.despachante ? CDI.despachante.render() : null)
-            .catch(() => null).then(refrescarAvisos);
+        // ESTUDIO-1: el estudio elegido también cambia los avisos.
+        Promise.all([
+            Promise.resolve(CDI.despachante ? CDI.despachante.render() : null).catch(() => null),
+            Promise.resolve(CDI.estudios ? CDI.estudios.render() : null).catch(() => null),
+        ]).then(refrescarAvisos);
         enlazarAvisos();
         enlazarValor();
         pintarValor(null);
@@ -174,6 +177,8 @@
         };
         wrap.addEventListener('change', programar);
         wrap.addEventListener('input', programar);
+        const estudio = document.getElementById('estudioWrap');
+        if (estudio) estudio.addEventListener('change', programar);
     }
 
     async function refrescarAvisos() {
@@ -620,6 +625,7 @@
             return;
         }
 
+        if (CDI.estudios) await CDI.estudios.listo();   // ESTUDIO-1
         const body = buildMariaRequest();
         try {
             const startedAt = Date.now();
@@ -751,6 +757,8 @@
             moneda: moneda,
             incoterm: incoterm,
             cuit_agr: cuit_agr,
+            // ESTUDIO-1: si hay uno elegido, su CUIT manda sobre cuit_agr.
+            estudio_id: CDI.estudios ? CDI.estudios.elegido() : '',
             vendedor_nombre: String(op.vendedor_nombre || '').trim(),
             vendedor_id: String(op.vendedor_id || '').trim(),
             comprador_nombre: String(op.comprador_nombre || '').trim(),
