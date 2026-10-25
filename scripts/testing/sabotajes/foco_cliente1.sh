@@ -30,6 +30,7 @@ API=$!
 for _ in $(seq 1 60); do curl -fsS "http://127.0.0.1:$PUERTO/health" >/dev/null 2>&1 && break; sleep 1; done
 curl -fsS "http://127.0.0.1:$PUERTO/health" >/dev/null || { echo "BASE  | la API no levantó"; tail -20 "$TMPD/api.log"; exit 1; }
 export BASE_URL="http://127.0.0.1:$PUERTO"
+export CDI_DB="$WT/local.db"   # CLIENTE-1b: la prueba siembra ahí las fechas viejas
 
 J=proyecto_maria/static/v2/screens/clientes.js
 P=scripts/testing/pantalla_cliente1.js

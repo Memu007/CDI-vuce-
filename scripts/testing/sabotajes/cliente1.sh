@@ -27,6 +27,7 @@ API=$!
 for _ in $(seq 1 60); do curl -fsS "http://127.0.0.1:$PUERTO/health" >/dev/null 2>&1 && break; sleep 1; done
 curl -fsS "http://127.0.0.1:$PUERTO/health" >/dev/null || { echo "BASE  | la API no levantó"; tail -20 "$TMPD/api.log"; exit 1; }
 export BASE_URL="http://127.0.0.1:$PUERTO"
+export CDI_DB="$WT/local.db"   # CLIENTE-1b: la prueba siembra ahí las fechas viejas
 FALLAS=0
 
 correr() { node scripts/testing/pantalla_cliente1.js 2>&1; }
@@ -122,7 +123,7 @@ sabotaje $J "una fecha cargada no reemplaza a la conservada" \
   "const conservaFecha = !fechaInicActiv && !!fechaInicOculta;" "const conservaFecha = !!fechaInicOculta;" \
   'FALLA: Reemplazada: después de editar, la fecha es "01/03/2015" y tenía que ser "2016-04-02"'
 sabotaje $J "el aviso pide la fecha que se conservó" \
-  "[fechaInicActiv || conservaFecha, 'inicio de actividad']" "[fechaInicActiv, 'inicio de actividad']" \
+  "[fechaInicActiv || (conservaFecha && !fechaMala), fechaMala" "[fechaInicActiv, fechaMala" \
   "FALLA: Barras: el aviso dice que falta el inicio de actividad"
 sabotaje $J "lo recordado de una edición pasa al alta" \
   "        fechaInicOculta = '';"$'\n' '' \
@@ -137,6 +138,24 @@ sabotaje $J "sólo frena la fecha a medias si había una oculta" \
 sabotaje $J "el error de la fecha a medias no dice cuál" \
   "'La fecha de inicio de actividad está incompleta: completala o borrala.'" "'Hay un dato incompleto.'" \
   "FALLA: A medias oculta: el error no habla del inicio de actividad"
+
+# CLIENTE-1b: la conservada que el TXT no acepta se pide en el aviso; el error
+# de la API se ve en el formulario.
+sabotaje $J "el aviso no pide la conservada que no sirve" \
+  "const fechaMala = conservaFecha && !fechaGuardadaSirve(fechaInicOculta);" "const fechaMala = false;" \
+  "FALLA: Texto: el aviso no dice que falta el inicio de actividad"
+sabotaje $J "sirve cualquier fecha con forma, exista o no" \
+  "return f.getUTCFullYear() === anio && f.getUTCMonth() === mes - 1 && f.getUTCDate() === dia;" "return true;" \
+  "FALLA: Imposible: el aviso no dice que falta el inicio de actividad"
+sabotaje $J "la conservada DD/MM/AAAA no sirve" \
+  'm = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(t);' "m = null;" \
+  "FALLA: Barras: el aviso dice que falta el inicio de actividad"
+sabotaje $J "el aviso no dice que la guardada no es válida" \
+  "'inicio de actividad (la guardada no es una fecha válida)'" "'inicio de actividad'" \
+  "FALLA: Texto: el aviso no dice que la fecha guardada no es válida"
+sabotaje $J "el error de la API no se ve en el formulario" \
+  "showFormError(String(err.message || err));" "void err;" \
+  "FALLA: la fecha que la API rechaza no muestra error en el formulario"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

@@ -5,10 +5,22 @@
 // cuatro no hay aviso. El detalle del cliente muestra el inicio de actividad.
 // D3: editar no borra una fecha guardada que el campo de fecha no puede mostrar.
 // Una fecha tipeada a medias no se guarda callada.
+// CLIENTE-1b: la API ya no guarda una fecha que no sirve; las viejas (de antes
+// del arreglo) se siembran directo en la base local del servidor (CDI_DB). Una
+// fecha conservada que el TXT no acepta se pide en el aviso, y el error de la
+// API se ve en el formulario.
 // Sale con error si algo no se cumple.
-// uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_cliente1.js [captura.png]
+// uso: BASE_URL=http://127.0.0.1:<puerto> CDI_DB=<base sqlite del servidor> node scripts/testing/pantalla_cliente1.js [captura.png]
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
+const { execFileSync } = require('child_process');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
+const baseLocal = process.env.CDI_DB || falla('falta CDI_DB: la base sqlite local del servidor, para sembrar fechas viejas');
+// Una fecha como quedaba guardada antes de CLIENTE-1b, sin pasar por la API.
+function sembrarFecha(clienteId, fecha) {
+  execFileSync('python3', ['-c',
+    'import sqlite3,sys; c=sqlite3.connect(sys.argv[1]); n=c.execute("UPDATE clients SET fecha_inic_activ=? WHERE id=?", (sys.argv[3], sys.argv[2])).rowcount; c.commit(); sys.exit(0 if n == 1 else 1)',
+    baseLocal, clienteId, fecha]);
+}
 (async () => {
   const b = await chromium.launch({ executablePath: process.env.CHROMIUM || '/opt/pw-browsers/chromium' });
   const page = await (await b.newContext({ viewport: { width: 1280, height: 1000 } })).newPage();
@@ -87,9 +99,10 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   if (!/Inicio de actividad\s*01\/03\/2015/i.test(datos2)) falla('el detalle no muestra el inicio de actividad cargado como 01/03/2015: ' + datos2);
   console.log('OK con los cuatro datos no avisa nada y el detalle muestra el inicio de actividad');
 
-  // Una fecha guardada que no es AAAA-MM-DD (por la API) se muestra tal cual,
-  // no como vacía.
-  await page.request.post(base + '/api/clientes', { data: { nombre: 'Cliente Inventado Tres SA', cuit: '20123456786', fecha_inic_activ: '01/03/2015' } });
+  // Una fecha guardada que no es AAAA-MM-DD (vieja) se muestra tal cual, no
+  // como vacía.
+  const rTres = await page.request.post(base + '/api/clientes', { data: { nombre: 'Cliente Inventado Tres SA', cuit: '20123456786' } });
+  sembrarFecha((await rTres.json()).cliente.id, '01/03/2015');
   await page.reload();
   await page.waitForFunction(() => window.CDI && CDI.goTo);
   await page.evaluate(() => CDI.goTo('clientes'));
@@ -101,32 +114,35 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   // D3: editar un cliente sin tocar la fecha no la borra aunque el campo de
   // fecha no la pueda mostrar (no es AAAA-MM-DD, o no es una fecha válida); si
   // se conserva, el aviso no dice que falta. Cargar o borrar una fecha a mano
-  // sigue andando. Cada caso: fecha guardada, lo que se escribe en el campo
-  // (null = no se toca), la fecha que tiene que quedar y si el aviso la pide.
+  // sigue andando. CLIENTE-1b: si la conservada no la acepta el TXT, el aviso
+  // la pide. Cada caso: fecha guardada, si es vieja (se siembra en la base: la
+  // API ya no la acepta), lo que se escribe en el campo (null = no se toca), la
+  // fecha que tiene que quedar y si el aviso la pide.
   const casosD3 = [
-    ['Nula', null, null, null, true],
-    ['Vacía', '', null, null, true],
-    ['Barras', '01/03/2015', null, '01/03/2015', false],
-    ['Texto', 'mar-2015', null, 'mar-2015', false],
-    ['ISO', '2015-03-01', null, '2015-03-01', false],
-    ['Reemplazada', '01/03/2015', '2016-04-02', '2016-04-02', false],
-    ['Borrada', '2015-03-01', '', null, true],
-    ['Imposible', '2015-02-30', null, '2015-02-30', false],
+    ['Nula', null, false, null, null, true],
+    ['Vacía', '', false, null, null, true],
+    ['Barras', '01/03/2015', true, null, '01/03/2015', false],
+    ['Texto', 'mar-2015', true, null, 'mar-2015', true],
+    ['None', 'None', true, null, 'None', true],
+    ['ISO', '2015-03-01', false, null, '2015-03-01', false],
+    ['Reemplazada', '01/03/2015', true, '2016-04-02', '2016-04-02', false],
+    ['Borrada', '2015-03-01', false, '', null, true],
+    ['Imposible', '2015-02-30', true, null, '2015-02-30', true],
   ];
-  // Sin fecha, el campo no se manda: así guarda la pantalla (un null explícito
-  // la API lo guarda como el texto «None»; queda anotado, fuera de D3).
   const idsD3 = {};
-  for (const [n, guardada] of casosD3) {
+  for (const [n, guardada, vieja] of casosD3) {
     const datosD3 = { nombre: 'Cliente Inventado D3 ' + n + ' ' + id, cuit: '20123456786', direccion: 'Calle Inventada 1' };
-    if (guardada !== null) datosD3.fecha_inic_activ = guardada;
+    if (!vieja) datosD3.fecha_inic_activ = guardada;
     const r = await page.request.post(base + '/api/clientes', { data: datosD3 });
+    if (!r.ok()) falla(n + ': el alta por la API dio ' + r.status() + ': ' + await r.text());
     idsD3[n] = (await r.json()).cliente.id;
+    if (vieja) sembrarFecha(idsD3[n], guardada);
   }
   await page.reload();
   await page.waitForFunction(() => window.CDI && CDI.goTo);
   await page.evaluate(() => CDI.goTo('clientes'));
   let ultimaConservada = false;
-  for (const [n, , escribe, queda, pideFecha] of casosD3) {
+  for (const [n, , , escribe, queda, pideFecha] of casosD3) {
     const nombreD3 = 'Cliente Inventado D3 ' + n + ' ' + id;
     await page.locator('.cx-card', { hasText: nombreD3 }).click();
     await page.locator('#cxKebabBtn').click();
@@ -147,6 +163,12 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
     if (/inicio de actividad/i.test(textoD3) !== pideFecha) {
       falla(n + ': el aviso ' + (pideFecha ? 'no dice' : 'dice') + ' que falta el inicio de actividad: ' + textoD3);
     }
+    // La conservada que no sirve se nombra como tal, no como si faltara sin más.
+    const dicenMala = /la guardada no es una fecha válida/i.test(textoD3);
+    const conservadaMala = campoVacio && escribe === null && pideFecha && queda !== null;
+    if (dicenMala !== conservadaMala) {
+      falla(n + ': el aviso ' + (conservadaMala ? 'no dice' : 'dice') + ' que la fecha guardada no es válida: ' + textoD3);
+    }
     ultimaConservada = campoVacio && escribe === null && queda !== null;
   }
   // Lo recordado de la última edición (una fecha conservada) no pasa a un alta.
@@ -161,14 +183,15 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   const avisoAlta = page.locator('#toastHost .toast', { hasText: 'Cliente Inventado D3 Alta ' + id });
   await avisoAlta.waitFor({ timeout: 10000 }).catch(() => falla('no apareció el aviso del alta después de editar'));
   if (!/inicio de actividad/i.test(await avisoAlta.innerText())) falla('un alta sin fecha después de editar no avisa que falta el inicio de actividad');
-  console.log('OK al editar, la fecha que el campo no muestra se conserva y no se avisa como faltante; cargarla o borrarla anda');
+  console.log('OK al editar, la fecha que el campo no muestra se conserva; el aviso la pide sólo si el TXT no la acepta; cargarla o borrarla anda');
 
   // Una fecha tipeada a medias (el navegador la da como vacía) no se guarda
   // callada: ni conserva la fecha guardada ni la borra; el formulario lo dice.
   for (const [n, guardada] of [['A medias oculta', '01/03/2015'], ['A medias ISO', '2015-03-01']]) {
     const nombreM = 'Cliente Inventado D3 ' + n + ' ' + id;
-    const r = await page.request.post(base + '/api/clientes', { data: { nombre: nombreM, cuit: '20123456786', direccion: 'Calle Inventada 1', fecha_inic_activ: guardada } });
+    const r = await page.request.post(base + '/api/clientes', { data: { nombre: nombreM, cuit: '20123456786', direccion: 'Calle Inventada 1' } });
     const idM = (await r.json()).cliente.id;
+    sembrarFecha(idM, guardada);
     await page.reload();
     await page.waitForFunction(() => window.CDI && CDI.goTo);
     await page.evaluate(() => CDI.goTo('clientes'));
@@ -196,7 +219,42 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   }
   console.log('OK una fecha tipeada a medias no se guarda: el formulario avisa');
 
+  // CLIENTE-1b: si la API rechaza la fecha, el formulario muestra su error y no
+  // se cierra. El campo de fecha no deja escribir una mala: se cambia lo que
+  // sale hacia la API.
+  const nombreE = 'Cliente Inventado 1b Error ' + id;
+  const rE = await page.request.post(base + '/api/clientes', { data: { nombre: nombreE, cuit: '20123456786', direccion: 'Calle Inventada 1', fecha_inic_activ: '2015-03-01' } });
+  const idE = (await rE.json()).cliente.id;
+  await page.reload();
+  await page.waitForFunction(() => window.CDI && CDI.goTo);
+  await page.evaluate(() => CDI.goTo('clientes'));
+  await page.locator('.cx-card', { hasText: nombreE }).click();
+  await page.locator('#cxKebabBtn').click();
+  await page.locator('#cxKebabMenu [data-kaction="edit"]').click();
+  await formularioListo();
+  await page.fill('#cfDireccion', 'Calle Inventada 2');
+  await page.route('**/api/clientes/' + idE, ruta => {
+    if (ruta.request().method() !== 'PUT') return ruta.continue();
+    const cuerpo = JSON.parse(ruta.request().postData());
+    cuerpo.fecha_inic_activ = '2015-02-30';
+    return ruta.continue({ postData: JSON.stringify(cuerpo) });
+  });
+  await page.locator('#cxFormSave').click();
+  await page.locator('#cfError').waitFor({ state: 'visible', timeout: 5000 })
+    .catch(() => falla('la fecha que la API rechaza no muestra error en el formulario'));
+  const errorE = await page.locator('#cfError').innerText();
+  if (!/fecha de inicio de actividad/i.test(errorE) || !/AAAA-MM-DD/.test(errorE)) falla('el error del formulario no es el de la fecha: ' + errorE);
+  if (!(await page.locator('#cxFormModal').evaluate(el => el.open))) falla('con la fecha rechazada el formulario se cerró');
+  const cE = (await (await page.request.get(base + '/api/clientes/' + idE)).json());
+  const cliE = cE.cliente || cE;
+  if (cliE.direccion !== 'Calle Inventada 1' || cliE.fecha_inic_activ !== '2015-03-01') {
+    falla('con la fecha rechazada igual se guardó: ' + JSON.stringify([cliE.direccion, cliE.fecha_inic_activ]));
+  }
+  await page.unroute('**/api/clientes/' + idE);
+  await page.keyboard.press('Escape');
+  console.log('OK la fecha que la API rechaza se muestra en el formulario y no guarda nada: ' + errorE.replace(/\s+/g, ' '));
+
   if (process.argv[2]) await page.screenshot({ path: process.argv[2], fullPage: true });
   await b.close();
-  console.log('PANTALLA CLIENTE-1 OK');
+  console.log('PANTALLA CLIENTE-1 OK (con CLIENTE-1b)');
 })().catch(e => falla(e.message));
