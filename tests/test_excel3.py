@@ -1268,3 +1268,15 @@ def test_un_renglon_sin_descripcion_ni_medidas_no_hereda_y_se_avisa(medida, form
                               [2, "DT-1", None, medida, medida, 1, 4, 2, 8]], ())
     assert [i["codigo_parte"] for i in data["items"]] == ["DT-1"], data["items"]
     assert data["filas_descartadas_numeros"] == [3], data
+
+
+@pytest.mark.parametrize("formato", ["xlsx", "xls"])
+@pytest.mark.parametrize("largo", ["48-50", "1,5m"])
+def test_un_renglon_con_una_medida_escrita_en_texto_sigue_siendo_del_grupo(largo, formato):
+    """Una medida que no es un número («48-50», «1,5m») sigue siendo una medida:
+    el renglón sin descripción hereda la de arriba."""
+    data = _leer_en(formato, [RENGLONES_PVC, PRODUCTO_H1,
+                              [2, "DT-1", None, None, largo, 1, 4, 2, 8]], ())
+    assert [i["descripcion"].split(",")[0] for i in data["items"]] == ["LONA DEMO"] * 2, data["items"]
+    assert _total(data["items"]) == 38, data["items"]
+    assert data["filas_descartadas_numeros"] == [], data
