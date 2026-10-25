@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-25 · fix: el error de kilos nombra sólo el renglón chico (MARIA-9)
+
+- Cuando varios renglones van juntos en un ítem y uno es tan chico que sus kilos al centésimo dan cero, el error nombra ese renglón. Antes nombraba a todos los del ítem.
+
 ## 2026-10-25 · fix: cada error de sufijo sale donde se corrige (MARIA-9)
 
 - En la pantalla de generar, el error del sufijo de la operación sale bajo su campo, y el del sufijo de un sub-ítem bajo ese sub-ítem, en el paso de NCM. Antes los dos salían como error general de la generación.

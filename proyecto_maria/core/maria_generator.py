@@ -1377,12 +1377,17 @@ def generate_maria_txt(operation_id: str, items: list,
                 estadisticas_sub, cantidad_est = al_centesimo_cerrando(kilos_renglones)
             else:
                 estadisticas_sub, cantidad_est = cantidades_sub, cantidad_dcl
-            if min(cantidades_sub + estadisticas_sub) <= 0:
+            # Se nombran sólo los que quedan en cero, no todos los del ítem.
+            chicos = [lugar_en_el_pedido[id(r)] for r, cant, est
+                      in zip(renglones, cantidades_sub, estadisticas_sub) if min(cant, est) <= 0]
+            if chicos:
                 raise ValueError(
-                    f"Item {lugar_en_el_pedido[id(renglones[0])]}: los renglones "
-                    f"{_enumerar([lugar_en_el_pedido[id(r)] for r in renglones])} son tan chicos "
-                    f"que al llevar sus cantidades o kilos al centésimo no cierran con el total; "
-                    f"revisá las cantidades y los kilos."
+                    f"Item {lugar_en_el_pedido[id(renglones[0])]}: "
+                    + (f"el renglón {chicos[0]} es tan chico que al llevar su cantidad o sus "
+                       f"kilos al centésimo no cierra" if len(chicos) == 1 else
+                       f"los renglones {_enumerar(chicos)} son tan chicos que al llevar sus "
+                       f"cantidades o kilos al centésimo no cierran")
+                    + " con el total; revisá las cantidades y los kilos."
                 )
             # El unitario del ítem, sobre la cantidad que se declara.
             valor_unit = float(valor_total) / float(cantidad_dcl)
