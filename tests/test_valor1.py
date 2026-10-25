@@ -2,8 +2,8 @@
 
 Los ajustes los carga la persona (el sistema no decide qué se descuenta) y
 sólo sirven para las cuentas: el TXT lleva el FOB de la factura hasta saber
-en qué campo van (D12). El seguro sugerido es el 1 % de (FOB casillero +
-flete). Datos inventados, con la forma de la factura del 24/10.
+en qué campo van (D12). El seguro sugerido es el 1 % de (FOB de la factura +
+flete) (D13). Datos inventados, con la forma de la factura del 24/10.
 """
 import json
 import re
@@ -34,8 +34,8 @@ def test_fob_casillero_es_el_de_la_factura_mas_lo_que_se_incluye_menos_lo_que_se
     assert v["fob_factura"] == 1387.50
     assert v["ajustes_incluir"] == 12.50 and v["ajustes_deducir"] == 50.00
     assert v["fob_casillero"] == 1350.00
-    # 1 % de (1.350 + 100)
-    assert v["seguro_sugerido"] == 14.50
+    # 1 % de (1.387,50 + 100) = 14,875: va sobre el FOB de la factura (D13)
+    assert v["seguro_sugerido"] == 14.88
 
 
 def test_sin_ajustes_el_casillero_es_el_fob_de_la_factura():
@@ -57,15 +57,20 @@ def test_los_ajustes_van_al_centavo_con_la_mitad_hacia_arriba():
     assert v["fob_casillero"] == 950.12
 
 
+def test_el_seguro_va_sobre_el_fob_de_la_factura():
+    """D13: el 1 % va sobre el FOB antes de los ajustes."""
+    v = _cuentas([{"cantidad": 1, "valor_unitario": 1000}], flete=100, ajustes_deducir=200, ajustes_incluir=50)
+    assert v["seguro_sugerido"] == 11.00 and v["base_seguro"] == "FOB de la factura"
+    assert v["fob_casillero"] == 850.00
+
+
 def test_la_base_del_seguro_se_cambia_en_un_solo_lugar(monkeypatch):
-    """D12b: si el despachante dice que el 1 % va sobre el FOB antes del
-    descuento, alcanza con cambiar BASE_SEGURO_SUGERIDO."""
+    """Si hubiera que volver al FOB casillero, alcanza con cambiar
+    BASE_SEGURO_SUGERIDO."""
     items = [{"cantidad": 1, "valor_unitario": 1000}]
+    monkeypatch.setattr(mg, "BASE_SEGURO_SUGERIDO", "fob_casillero")
     v = _cuentas(items, flete=100, ajustes_deducir=200)
     assert v["seguro_sugerido"] == 9.00 and v["base_seguro"] == "FOB casillero"
-    monkeypatch.setattr(mg, "BASE_SEGURO_SUGERIDO", "fob_factura")
-    v = _cuentas(items, flete=100, ajustes_deducir=200)
-    assert v["seguro_sugerido"] == 11.00 and v["base_seguro"] == "FOB de la factura"
     assert v["fob_casillero"] == 800.00
 
 
@@ -157,8 +162,8 @@ def test_los_avisos_traen_las_cuentas_y_dicen_que_el_casillero_va_al_txt_mas_ade
     data = r.json()
     assert data["valor"] == {
         "fob_factura": 1387.5, "ajustes_incluir": 0.0, "ajustes_deducir": 87.5,
-        "fob_casillero": 1300.0, "flete": 7925.0, "seguro": 12.4, "seguro_sugerido": 92.25,
-        "base_seguro": "FOB casillero",
+        "fob_casillero": 1300.0, "flete": 7925.0, "seguro": 12.4, "seguro_sugerido": 93.13,
+        "base_seguro": "FOB de la factura",
     }
     # Que no parezca que ya se descuenta (respuesta de la PM a D12).
     assert ("El TXT todavía lleva el FOB de la factura (DOL 1.387,50); el FOB casillero con los ajustes "
@@ -179,10 +184,64 @@ def test_un_ajuste_invalido_va_en_la_tarjeta_y_no_tapa_los_otros_avisos(client):
     r = client.post("/generate_maria/avisos", json={**_pedido(), "ajustes_incluir": -5})
     assert r.status_code == 200, r.text
     data = r.json()
-    assert data["valor"] == {"error": "Ajustes a incluir: «-5.0» no es un importe válido "
+    assert data["valor"] == {"error": "Ajustes a incluir: «-5» no es un importe válido "
                                       "(entre 0 y 1.000.000.000.000)."}
     # Los demás avisos siguen todos: el ajuste inválido no los tapa.
     assert sin_ajustes and data["avisos"] == sin_ajustes
+
+
+# VALOR-1b: por API, un ajuste que no es número no da 422.
+@pytest.mark.parametrize("ajuste, error", [
+    ("abc", "Ajustes a deducir: «abc» no es un importe."),
+    (True, "Ajustes a deducir: «True» no es un importe."),
+    ([1], "Ajustes a deducir: «[1]» no es un importe."),
+    ({"x": 1}, "Ajustes a deducir: «{'x': 1}» no es un importe."),
+], ids=["texto", "verdadero", "lista", "objeto"])
+def test_un_ajuste_que_no_es_numero_va_en_la_tarjeta_con_todos_los_avisos(client, request, ajuste, error):
+    _registrar_con_cuit(client, "valor1b_aj_" + request.node.callspec.id)
+    sin_ajustes = client.post("/generate_maria/avisos", json=_pedido()).json()["avisos"]
+    r = client.post("/generate_maria/avisos", json={**_pedido(), "ajustes_deducir": ajuste})
+    assert r.status_code == 200, r.text
+    assert r.json()["valor"] == {"error": error}
+    assert sin_ajustes and r.json()["avisos"] == sin_ajustes
+
+
+def test_un_ajuste_que_no_es_numero_no_frena_el_txt(client):
+    _registrar_con_cuit(client, "valor1b_aj_txt")
+    sin = client.post("/generate_maria", json=_pedido())
+    con = client.post("/generate_maria", json={**_pedido(), "ajustes_incluir": "abc", "ajustes_deducir": True})
+    assert sin.status_code == con.status_code == 200, con.text
+    assert con.content == sin.content
+
+
+def test_un_ajuste_escrito_como_texto_con_numero_se_toma():
+    v = _cuentas([{"cantidad": 1, "valor_unitario": 1000}], ajustes_deducir="87.5")
+    assert v["fob_casillero"] == 912.50
+
+
+def test_un_error_de_tipo_que_se_escape_no_muestra_el_texto_de_python(client, monkeypatch):
+    import proyecto_maria.main as main
+
+    def cuentas(*a, **k):
+        raise TypeError("float() argument must be a string or a real number, not 'list'")
+    monkeypatch.setattr(main, "cuentas_del_valor", cuentas)
+    _registrar_con_cuit(client, "valor1b_tipo")
+    r = client.post("/generate_maria/avisos", json=_pedido())
+    assert r.status_code == 200, r.text
+    assert r.json()["valor"] == {"error": "Hay un dato que no es un número: no se pueden hacer las cuentas."}
+
+
+@pytest.mark.parametrize("cambio, error", [
+    ({"cantidad": "abc"}, "Renglón 2: la cantidad «abc» no es un número; no se pueden hacer las cuentas."),
+    ({"valor_unitario": "x"}, "Renglón 2: el valor unitario «x» no es un número; no se pueden hacer las cuentas."),
+    ({"valor_total": "z"}, "Renglón 2: el valor total «z» no es un número; no se pueden hacer las cuentas."),
+    ({"cantidad": [1]}, "Renglón 2: la cantidad «[1]» no es un número; no se pueden hacer las cuentas."),
+], ids=["cantidad", "unitario", "total", "lista"])
+def test_un_renglon_con_texto_en_vez_de_numero_se_nombra_sin_texto_de_python(client, request, cambio, error):
+    _registrar_con_cuit(client, "valor1b_ren_" + request.node.callspec.id)
+    r = client.post("/generate_maria/avisos", json={**_pedido(), "items": [LONA, {**LONA, **cambio}]})
+    assert r.status_code == 200, r.text
+    assert r.json()["valor"] == {"error": error}
 
 
 @pytest.mark.parametrize("producto, error", [
@@ -236,22 +295,30 @@ def _correr(codigo, op):
     return json.loads(salida.stdout)
 
 
-def _pantalla(op, despues, valor=None):
+def _pantalla(op, despues, valor=None, salida_propia=False):
+    """Pinta `valor` como si hubiera vuelto con el pedido de ahora y después
+    corre `despues`. El pedido es el buildMariaRequest de verdad."""
     nombres = ["ajusteMalEscrito", "importeEscrito", "cuentasViejas", "enlazarValor", "otroDeducir",
-               "usarDescuento", "calcularSeguro", "pintarValor"]
-    codigo = ("let ultimoValor = null; let cuentasDe = null; let avisosSeq = 0; let valorEnlazado = false;\n"
+               "usarDescuento", "calcularSeguro", "seguroSinLeer", "pintarValor", "firmaDelPedido",
+               "buildMariaRequest", "numeroDeFactura", "toNumber", "subitemsDelPedido", "ajusteDelPedido"]
+    codigo = ("let ultimoValor = null; let cuentasCon = null; let avisosSeq = 0; let valorEnlazado = false;\n"
+              "let lastValidation = null; let semaforos = 0;\n"
+              "CDI.semaforo = { refresh() { semaforos++; } };\n"
               f"const VALOR = {json.dumps(VALOR)};\n"
               "const SIN_CUENTAS = 'No se pudieron hacer las cuentas: mirá los avisos.';\n" +
               _funciones("finalize.js", nombres) +
-              f"\npintarValor({json.dumps(valor)});\n{despues}\n"
-              "console.log(JSON.stringify({op: CDI.state.operacion, refrescos,"
+              "\nfunction firmaDeAhora() { return firmaDelPedido(buildMariaRequest()); }"
+              f"\npintarValor({json.dumps(valor)}, firmaDeAhora());\n{despues}\n"
+              "console.log(JSON.stringify({op: CDI.state.operacion, refrescos, semaforos,"
               " els: Object.fromEntries(Object.entries(els).map(([k, v]) =>"
               " [k, {value: v.value, hidden: v.hidden, textContent: v.textContent, innerHTML: v.innerHTML}]))}));")
+    if salida_propia:
+        codigo = codigo[:codigo.rindex("console.log(JSON.stringify({op:")]
     return _correr(codigo, op)
 
 
 VALOR = {"fob_factura": 1387.5, "ajustes_incluir": 0.0, "ajustes_deducir": 0.0, "fob_casillero": 1387.5,
-         "flete": 7925.0, "seguro": 0.0, "seguro_sugerido": 93.13, "base_seguro": "FOB casillero"}
+         "flete": 7925.0, "seguro": 0.0, "seguro_sugerido": 93.13, "base_seguro": "FOB de la factura"}
 
 
 def test_el_descuento_de_la_planilla_se_ofrece_y_no_se_pone_solo():
@@ -284,19 +351,26 @@ def test_sin_descuento_no_se_ofrece_nada():
     assert r["els"]["valorDescuento"]["hidden"] is True
 
 
-def test_el_boton_del_seguro_pone_el_sugerido_y_aparece_sin_seguro():
-    r = _pantalla({}, "calcularSeguro();", VALOR)
+def test_el_boton_del_seguro_aparece_sin_seguro():
+    r = _pantalla({}, "", VALOR)
     assert r["els"]["valorCalcularSeguro"]["hidden"] is False
-    assert r["els"]["valorCalcularSeguro"]["textContent"] == "Calcular seguro (1 % de FOB casillero + flete): 93,13"
+    assert r["els"]["valorCalcularSeguro"]["textContent"] == (
+        "Calcular seguro (1 % de FOB de la factura + flete): 93,13")
+
+
+def test_el_boton_del_seguro_pone_el_sugerido_y_pide_las_cuentas_de_nuevo():
+    r = _pantalla({}, "calcularSeguro();", VALOR)
     assert r["op"]["seguro"] == 93.13 and r["op"]["seguro_calculado"] is True
-    assert r["refrescos"] == 1
+    assert r["refrescos"] == 1 and r["semaforos"] == 1
+    # Hasta que vuelvan, el botón no se ofrece con las cuentas de antes.
+    assert r["els"]["valorCalcularSeguro"]["hidden"] is True
 
 
 def test_despues_de_calcular_el_seguro_la_nota_dice_la_base():
     # Lo que se pinta cuando vuelve la cuenta con el seguro nuevo.
-    r = _pantalla({}, "calcularSeguro(); pintarValor({...ultimoValor, seguro: 93.13});", VALOR)
+    r = _pantalla({}, "calcularSeguro(); pintarValor({...VALOR, seguro: 93.13}, firmaDeAhora());", VALOR)
     assert r["els"]["valorCalcularSeguro"]["hidden"] is True
-    assert r["els"]["valorSeguroNota"]["textContent"] == "Seguro calculado: 1 % de (FOB casillero + flete)."
+    assert r["els"]["valorSeguroNota"]["textContent"] == "Seguro calculado: 1 % de (FOB de la factura + flete)."
 
 
 def test_con_error_en_las_cuentas_no_se_calcula_el_seguro():
@@ -304,9 +378,69 @@ def test_con_error_en_las_cuentas_no_se_calcula_el_seguro():
     assert "seguro_calculado" not in r["op"] and r["refrescos"] == 0
 
 
+# VALOR-1b: las cuentas valen sólo para el pedido con que se hicieron. Cada
+# camino por el que cambia el pedido sin pasar por los campos de ajustes.
+
+
 def test_el_seguro_sugerido_de_otra_operacion_no_se_usa():
-    r = _pantalla({}, "CDI.state.operacion = {otra: true}; calcularSeguro();", VALOR)
-    assert r["op"] == {"otra": True}
+    r = _pantalla({}, "CDI.state.operacion = {flete: 100}; calcularSeguro();", VALOR)
+    assert r["op"] == {"flete": 100}
+    assert r["refrescos"] == 1
+
+
+def test_despues_de_usar_el_descuento_no_se_calcula_con_las_cuentas_de_antes():
+    r = _pantalla({"descuento": 87.5}, "usarDescuento();", VALOR)
+    assert r["els"]["valorCalcularSeguro"]["hidden"] is True
+    r = _pantalla({"descuento": 87.5}, "usarDescuento(); calcularSeguro();", VALOR)
+    assert "seguro" not in r["op"] and r["op"]["ajustes_deducir"] == "87.5"
+
+
+def test_un_seguro_puesto_despues_de_las_cuentas_no_se_pisa_con_el_sugerido_viejo():
+    # Lo escribió a mano (review.js) o vino al restaurar la operación.
+    r = _pantalla({}, "CDI.state.operacion.seguro = '15'; calcularSeguro();", VALOR)
+    assert r["op"] == {"seguro": "15"}
+    assert r["refrescos"] == 1
+
+
+def test_un_flete_cambiado_despues_de_las_cuentas_no_se_calcula_con_el_viejo():
+    r = _pantalla({"flete": 7925}, "CDI.state.operacion.flete = 100; calcularSeguro();", VALOR)
+    assert r["op"] == {"flete": 100}
+
+
+def test_una_cuenta_vieja_que_llega_tarde_no_pisa_el_seguro_recien_calculado():
+    # Cuentas hechas con seguro 0 que se pintan después de calcular.
+    r = _pantalla({}, "const vieja = firmaDeAhora(); calcularSeguro();"
+                      " pintarValor({...VALOR, seguro_sugerido: 50}, vieja); calcularSeguro();", VALOR)
+    assert r["op"]["seguro"] == 93.13
+
+
+def test_la_firma_no_cambia_por_el_numero_de_operacion_y_si_por_lo_demas():
+    # Sin factura, el número de operación lleva la hora: no invalida nada.
+    r = _pantalla({}, "console.log(JSON.stringify([firmaDelPedido({operation_id: 'OP_1', flete: 1}) ==="
+                      " firmaDelPedido({operation_id: 'OP_2', flete: 1}), firmaDelPedido({flete: 1}) ==="
+                      " firmaDelPedido({flete: 2})])); process.exit(0);", VALOR, salida_propia=True)
+    assert r == [True, False]
+
+
+def test_sin_firma_no_se_calcula():
+    r = _pantalla({}, "pintarValor(VALOR); calcularSeguro();", VALOR)
+    assert "seguro" not in r["op"]
+
+
+def test_el_seguro_calculado_deja_de_avisarse_como_no_leido():
+    r = _pantalla({"campos_sin_leer": ["seguro", "flete"], "campos_completados": ["flete"]},
+                  "calcularSeguro();", VALOR)
+    assert sorted(r["op"]["campos_completados"]) == ["flete", "seguro"]
+    assert r["semaforos"] == 1
+
+
+def test_si_la_factura_puede_traer_seguro_se_avisa_antes_de_calcularlo():
+    r = _pantalla({"campos_sin_leer": ["seguro"]}, "", VALOR)
+    assert r["els"]["valorCalcularSeguro"]["hidden"] is False
+    assert r["els"]["valorSeguroNota"]["textContent"] == (
+        "La factura puede traer un seguro que no pudimos leer: revisala antes de calcularlo.")
+    r = _pantalla({"campos_sin_leer": ["seguro"], "campos_completados": ["seguro"]}, "", VALOR)
+    assert r["els"]["valorSeguroNota"]["textContent"] == ""
 
 
 def test_sin_operacion_todavia_el_boton_igual_pone_el_seguro():
@@ -339,7 +473,7 @@ def test_lo_que_se_esta_escribiendo_no_se_pisa():
 
 def _avisos(despues):
     """refrescarAvisos de verdad, con CDI.api que contesta cuando se le dice."""
-    stubs = ("let ultimoValor = null; let cuentasDe = null; let avisosSeq = 0;\n"
+    stubs = ("let ultimoValor = null; let cuentasCon = null; let avisosSeq = 0;\n"
              "const SIN_CUENTAS = 'No se pudieron hacer las cuentas: mirá los avisos.';\n"
              "function stripLeadingIcon(s) { return s; } function extractItemRef() { return ''; }\n"
              "function buildMariaRequest() { return {}; }\n"
@@ -347,9 +481,9 @@ def _avisos(despues):
              "CDI.api = () => new Promise(ok => pendientes.push(ok));\n"
              "function contestar(i, okHttp, data) { pendientes[i]({ok: okHttp, json: async () => data}); }\n")
     codigo = stubs + _funciones("finalize.js", ["ajusteMalEscrito", "importeEscrito", "otroDeducir", "pintarValor",
-                                                "refrescarAvisos"]) + (
+                                                "seguroSinLeer", "firmaDelPedido", "refrescarAvisos"]) + (
         f"\n(async () => {{ {despues}; await new Promise(r => setTimeout(r, 0));"
-        " console.log(JSON.stringify({ultimoValor, error: els.valorError.textContent,"
+        " console.log(JSON.stringify({ultimoValor, cuentasCon, error: els.valorError.textContent,"
         " cuentas: els.valorCuentas.innerHTML})); })();")
     return _correr(codigo, {})
 
@@ -367,10 +501,15 @@ def test_una_respuesta_vieja_no_pisa_las_cuentas_nuevas():
     assert r["ultimoValor"] == VALOR
 
 
+def test_las_cuentas_quedan_atadas_al_pedido_que_se_mando():
+    r = _avisos(f"const p = refrescarAvisos(); contestar(0, true, {{avisos: [], valor: {json.dumps(VALOR)}}}); await p")
+    assert r["cuentasCon"] == "{}"
+
+
 def test_el_boton_nombra_la_base_que_dice_el_servidor():
-    r = _pantalla({}, "", {**VALOR, "base_seguro": "FOB de la factura", "seguro_sugerido": 93.13})
+    r = _pantalla({}, "", {**VALOR, "base_seguro": "FOB casillero", "seguro_sugerido": 92.25})
     assert r["els"]["valorCalcularSeguro"]["textContent"] == (
-        "Calcular seguro (1 % de FOB de la factura + flete): 93,13")
+        "Calcular seguro (1 % de FOB casillero + flete): 92,25")
 
 
 def test_con_seguro_de_la_factura_no_se_ofrece_calcularlo():
