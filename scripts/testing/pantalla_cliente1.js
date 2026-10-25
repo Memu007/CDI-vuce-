@@ -182,7 +182,11 @@ function sembrarFecha(clienteId, fecha) {
   await page.locator('#cxFormSave').click();
   const avisoAlta = page.locator('#toastHost .toast', { hasText: 'Cliente Inventado D3 Alta ' + id });
   await avisoAlta.waitFor({ timeout: 10000 }).catch(() => falla('no apareció el aviso del alta después de editar'));
-  if (!/inicio de actividad/i.test(await avisoAlta.innerText())) falla('un alta sin fecha después de editar no avisa que falta el inicio de actividad');
+  const textoAlta = (await avisoAlta.innerText()).replace(/\s+/g, ' ');
+  if (!/inicio de actividad/i.test(textoAlta)) falla('un alta sin fecha después de editar no avisa que falta el inicio de actividad');
+  // El último caso conserva una fecha que no sirve: si pasara al alta, el
+  // aviso hablaría de «la guardada» (CLIENTE-1b).
+  if (/la guardada no es una fecha válida/i.test(textoAlta)) falla('un alta después de editar habla de la fecha guardada de la edición: ' + textoAlta);
   console.log('OK al editar, la fecha que el campo no muestra se conserva; el aviso la pide sólo si el TXT no la acepta; cargarla o borrarla anda');
 
   // Una fecha tipeada a medias (el navegador la da como vacía) no se guarda

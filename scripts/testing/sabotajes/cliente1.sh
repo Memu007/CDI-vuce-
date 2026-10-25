@@ -127,7 +127,7 @@ sabotaje $J "el aviso pide la fecha que se conservó" \
   "FALLA: Barras: el aviso dice que falta el inicio de actividad"
 sabotaje $J "lo recordado de una edición pasa al alta" \
   "        fechaInicOculta = '';"$'\n' '' \
-  "FALLA: un alta sin fecha después de editar no avisa que falta el inicio de actividad"
+  "FALLA: un alta después de editar habla de la fecha guardada de la edición"
 
 sabotaje $J "una fecha a medias se guarda callada" \
   "fFechaInicActiv.validity && fFechaInicActiv.validity.badInput)" "false)" \
