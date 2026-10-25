@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-25 · fix: cada error de sufijo sale donde se corrige (MARIA-9)
+
+- En la pantalla de generar, el error del sufijo de la operación sale bajo su campo, y el del sufijo de un sub-ítem bajo ese sub-ítem, en el paso de NCM. Antes los dos salían como error general de la generación.
+
 ## 2026-10-25 · fix: el sufijo de la operación frena sólo si alguien lo usa (MARIA-9)
 
 - Si todos los productos traen su propio sufijo de valor, un texto libre en el sufijo de la operación ya no frena el TXT (volvió a generarse con los propios). Cuando algún producto lo toma y no se puede separar, los avisos lo anticipan con el mismo texto del error.
