@@ -196,3 +196,13 @@ rechaza con un mensaje claro; nunca un 0 silencioso. Es la segunda red: la
 pantalla ya no deja generar con un monto ilegible. Va en SEPARADORES-1b,
 junto con la familia «separador y tres dígitos sin miles bien formados»,
 que pasa a ser ambigua en la factura y en la pantalla (no en los precios).
+
+## 2026-10-25 — Los sufijos salen del arancel de ARCA (PM, D22 de SUFIJOS-1)
+
+Decidido por la PM: D22 (a). En el repositorio no hay ruta ni respuesta
+guardada de VUCE `/cice/sufijos`; escribir el lector sería inventar la
+forma. SUFIJOS-1 toma los sufijos y la unidad estadística del arancel de
+ARCA del 07/10/2026 (`docs/pm/datos/`), en una tabla local con su fecha a
+la vista; lo que no está se marca para el despachante. VUCE va en una pieza
+aparte cuando Emi guarde una respuesta real. Se le cuenta a Emi; se puede
+revertir.
