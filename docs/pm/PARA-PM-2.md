@@ -2,6 +2,62 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## SUFIJOS-1: D22 antes de escribir código (2026-10-25)
+
+**Resultado:** no arranqué el código. La fuente de los sufijos la decidís
+vos, y de esa decisión depende todo lo demás.
+
+**Por qué frené.** La tarea dice que los sufijos se traen de VUCE
+(`/cice/sufijos/<posición>`).
+- En el repositorio no está esa ruta ni la forma de su respuesta.
+- No hay ninguna respuesta guardada: ni la del 24/10 ni una sintética.
+- Escribir el lector y el simulado sin conocer la forma es inventar.
+- La única forma de conocerla es la consulta real, y la tarea me dice que
+  eso es una D.
+
+**Lo que sí hay, público y sin red: el arancel de ARCA**
+(`docs/pm/datos/arancel_ARCA_07102026.zip`, del 07/10).
+- `sufijos_07102026.txt` dice qué sufijos pide cada posición. Van por
+  nivel: capítulo, partida y posición SIM, y se suman.
+  - Ejemplo: `3@39@AA@IG 11@MARCA` y
+    `3@39@AI@IG 11@CODIGO DE PRODUCTO O ARTICULO`.
+  - Para una posición de plásticos (capítulo 39) da AA y AI, lo mismo que
+    contestó VUCE el 24/10.
+- `nomenclador_07102026.txt` trae la unidad estadística de cada posición
+  SIM. Ejemplo: `3920.10.10.100F` lleva `01`, kilogramo, también como el
+  24/10.
+  - 33 243 posiciones SIM; las unidades más comunes son `01` (26 646) y
+    `07` (6 431).
+- **Contra:** es una foto del 07/10. Si ARCA cambia un sufijo, CDI no se
+  entera hasta que alguien suba el archivo nuevo.
+
+**D22. ¿De dónde salen los sufijos y la unidad estadística?**
+- **(a) Del arancel de ARCA, en el producto.**
+  - Una tabla local, armada con un script desde el zip.
+  - Ninguna llamada a terceros. Se puede probar entero con sintéticos.
+  - VUCE queda para una pieza aparte, cuando haya una respuesta real
+    guardada.
+- **(b) De VUCE, como dice la tarea.**
+  - Antes alguien (vos o Emi) guarda una respuesta real de
+    `/cice/sufijos/<posición>`, sin datos del cliente: es una consulta
+    pública por posición.
+  - Con eso armo el lector y el simulado con la misma forma.
+  - Mientras tanto la pieza queda frenada.
+- **(c) ARCA primero y VUCE encima cuando exista.**
+  - Hago (a) ahora.
+  - Dejo el lugar para que, cuando haya una respuesta real guardada, VUCE
+    corrija lo que ARCA tenga viejo.
+
+**Recomiendo (a).**
+- Cubre el caso del 24/10 sin depender de una consulta que no puedo hacer.
+- No agrega un tercero que se puede caer en medio de una operación.
+- Los sufijos cambian poco.
+- (c) agrega una segunda fuente que hoy nadie puede probar.
+
+**Mientras decidís** no escribo código. El resto de la pieza depende de
+esta respuesta: completar con lo que lee la IA, el `AI` distinto por
+renglón y marcar lo que falta.
+
 ## SEPARADORES-1b: entregada a revisión (2026-10-25)
 
 **Resultado:** van los dos puntos en `db39de0`.
@@ -265,8 +321,8 @@ bash scripts/testing/sabotaje_separadores1b.sh db39de0 <venv>
 #   última línea: «OK: los 12 sabotajes dan rojo por la razón esperada»
 ```
 
-**Apenas entregada:** arranco SUFIJOS-1, con VUCE simulado.
+**Apenas entregada:** SUFIJOS-1, frenada en D22 (arriba).
 
-Última vuelta: 2026-10-25 07:58 UTC
+Última vuelta: 2026-10-25 07:59 UTC
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. Entregada SEPARADORES-1b en db39de0 (compileall, 12 sabotajes, smoke y e2e verdes sobre db39de0; suite con 1 rojo de borde en test_excel2 ocho_libros, también en la base a2fdabd); D20 (recomiendo a) y D21 (recomiendo b, pieza aparte) abiertas en PARA-PM-2.md. Pieza siguiente: SUFIJOS-1 (ROADMAP.md, Fase 1c, orden 1) con VUCE_MODE=fake. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. Entregada SEPARADORES-1b en db39de0 (compileall, 12 sabotajes, smoke y e2e verdes sobre db39de0; suite con 1 rojo de borde en test_excel2 ocho_libros, también en la base a2fdabd); D20 (recomiendo a) y D21 (recomiendo b, pieza aparte) abiertas en PARA-PM-2.md. SUFIJOS-1 (ROADMAP.md, Fase 1c, orden 1) frenada en D22 (fuente: ARCA local o VUCE /cice/sufijos; recomiendo a, ARCA); sin código hasta la respuesta. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
