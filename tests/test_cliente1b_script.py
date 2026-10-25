@@ -1,6 +1,9 @@
 """CLIENTE-1b: el script que informa las fechas de inicio ya guardadas que no
 sirven, sobre una base sqlite temporal con la tabla real. Datos inventados."""
 import sqlite3
+import subprocess
+import sys
+from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine
@@ -114,3 +117,56 @@ def test_una_base_sqlite_que_no_existe_no_se_crea(tmp_path, capsys):
     assert salida.value.code == 2
     assert not ruta.exists()
     assert "no existe" in capsys.readouterr().err
+
+
+# CLIENTE-1c: con un --base mal escrito o una base que no responde, el error
+# no muestra la clave ni un traceback. Se corre como proceso, como lo corre
+# una persona: así se ve también lo que imprimiría Python al caerse.
+SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "datos" / "clientes_fecha_inic_activ.py"
+
+
+def _correr(base):
+    r = subprocess.run([sys.executable, str(SCRIPT), "--base", base],
+                       capture_output=True, text=True, timeout=60)
+    return r.returncode, r.stdout + r.stderr
+
+
+@pytest.mark.parametrize("base", [
+    "postgresql//usuario:CLAVESECRETA@127.0.0.1/base",       # sin los dos puntos
+    "usuario:CLAVESECRETA@127.0.0.1/base",                   # sin el esquema
+    "postgresql://usuario:CLAVESECRETA@127.0.0.1:abc/base",  # puerto que no es número
+], ids=["sin-dos-puntos", "sin-esquema", "puerto-texto"])
+def test_un_base_mal_escrito_no_muestra_la_clave(base):
+    rc, salida = _correr(base)
+    assert rc == 2, salida
+    assert "CLAVESECRETA" not in salida, salida
+    assert "Traceback" not in salida, salida
+    assert "--base" in salida, salida
+
+
+def test_una_base_que_no_responde_no_muestra_la_clave():
+    # El puerto 9 no escucha: la conexión se rechaza.
+    rc, salida = _correr("postgresql://usuario:CLAVESECRETA@127.0.0.1:9/base")
+    assert rc == 2, salida
+    assert "CLAVESECRETA" not in salida, salida
+    assert "Traceback" not in salida, salida
+    assert "127.0.0.1:9" in salida, salida   # dice a cuál quiso entrar
+
+
+@pytest.mark.parametrize("clave", ["CLAVESECRETA", "Clave/Con Raros+1"], ids=["simple", "escapada"])
+def test_si_el_error_de_la_base_nombra_la_clave_no_se_muestra(monkeypatch, capsys, clave):
+    """Ningún driver de los que probamos pone la clave en su error, pero alguno
+    podría repetir la URL: se tapa como venga, tal cual o escapada."""
+    from urllib.parse import quote, quote_plus
+
+    import scripts.datos.clientes_fecha_inic_activ as script
+
+    async def _cae(url, arreglar_none):
+        raise RuntimeError(f"no conecta: {clave} | {quote(clave, safe='')} | {quote_plus(clave)}")
+    monkeypatch.setattr(script, "revisar", _cae)
+    base = f"postgresql://usuario:{quote(clave, safe='')}@127.0.0.1:9/base"
+    assert main(["--base", base]) == 2
+    err = capsys.readouterr().err
+    assert "no conecta" in err
+    for forma in (clave, quote(clave, safe=""), quote_plus(clave)):
+        assert forma not in err, err

@@ -142,23 +142,44 @@ sabotaje $J "el error de la fecha a medias no dice cuál" \
 # CLIENTE-1b: la conservada que el TXT no acepta se pide en el aviso; el error
 # de la API se ve en el formulario.
 sabotaje $J "el aviso no pide la conservada que no sirve" \
-  "const fechaMala = conservaFecha && !fechaGuardadaSirve(fechaInicOculta);" "const fechaMala = false;" \
+  "const fechaMala = conservaFecha && !fechaInicOcultaSirve;" "const fechaMala = false;" \
   "FALLA: Texto: el aviso no dice que falta el inicio de actividad"
-sabotaje $J "sirve cualquier fecha con forma, exista o no" \
-  "return f.getUTCFullYear() === anio && f.getUTCMonth() === mes - 1 && f.getUTCDate() === dia;" "return true;" \
-  "FALLA: Imposible: el aviso no dice que falta el inicio de actividad"
-sabotaje $J "sirve el año 0000, que Python no tiene" \
-  "        if (anio < 1) return false;  // Python no tiene año 0" "" \
-  "FALLA: Año cero: el aviso no dice que falta el inicio de actividad"
-sabotaje $J "la conservada DD/MM/AAAA no sirve" \
-  'm = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(t);' "m = null;" \
+# CLIENTE-1c: si la conservada sirve lo dice el servidor, con el criterio del
+# generador; la pantalla ya no tiene su propia regla.
+sabotaje $J "sirve cualquier conservada" \
+  "fechaInicOcultaSirve = !!c.fecha_inic_activ_sirve;" "fechaInicOcultaSirve = true;" \
+  "FALLA: Texto: el aviso no dice que falta el inicio de actividad"
+sabotaje $J "no sirve ninguna conservada" \
+  "fechaInicOcultaSirve = !!c.fecha_inic_activ_sirve;" "fechaInicOcultaSirve = false;" \
   "FALLA: Barras: el aviso dice que falta el inicio de actividad"
+sabotaje $J "la pantalla vuelve a decidir con su propia forma" \
+  "fechaInicOcultaSirve = !!c.fecha_inic_activ_sirve;" \
+  'fechaInicOcultaSirve = /^\d{4}-\d{2}-\d{2}$|^\d{2}\/\d{2}\/\d{4}$/.test(fechaInicOculta);' \
+  "FALLA: Ancho completo: el aviso dice que falta el inicio de actividad"
 sabotaje $J "el aviso no dice que la guardada no es válida" \
   "'inicio de actividad (la guardada no es una fecha válida)'" "'inicio de actividad'" \
   "FALLA: Texto: el aviso no dice que la fecha guardada no es válida"
 sabotaje $J "el error de la API no se ve en el formulario" \
   "showFormError(String(err.message || err));" "void err;" \
   "FALLA: la fecha que la API rechaza no muestra error en el formulario"
+
+# CLIENTE-1c: la vista previa de la importación dice qué fila trae una fecha
+# que no se importa.
+sabotaje $J "la vista previa no avisa las fechas que no sirven" \
+  "importPreviewFechas.hidden = fechas.length === 0;" "importPreviewFechas.hidden = true;" \
+  "FALLA: la vista previa no avisa la fecha que no sirve"
+sabotaje $J "el aviso de la fecha no dice la fila" \
+  "(variasHojas && item.sheet ? 'Hoja ' + item.sheet + ', fila ' : 'Fila ') + item.row" "'Una fila'" \
+  "FALLA: la vista previa no avisa la fecha que no sirve"
+sabotaje $J "el aviso de la fecha no dice el valor" \
+  "«' + item.value + '»" "«»" \
+  "FALLA: la vista previa no avisa la fecha que no sirve"
+sabotaje $J "el aviso de las fechas aparece siempre" \
+  "importPreviewFechas.hidden = fechas.length === 0;" "importPreviewFechas.hidden = false;" \
+  "FALLA: sin fechas malas igual aparece el aviso de fechas"
+sabotaje $H "la vista previa no tiene dónde avisar las fechas" \
+  '<ul class="migration-omitted" id="importPreviewFechas" hidden></ul>' '' \
+  "FALLA: la vista previa no avisa la fecha que no sirve"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

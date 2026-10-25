@@ -8,7 +8,8 @@
 // CLIENTE-1b: la API ya no guarda una fecha que no sirve; las viejas (de antes
 // del arreglo) se siembran directo en la base local del servidor (CDI_DB). Una
 // fecha conservada que el TXT no acepta se pide en el aviso, y el error de la
-// API se ve en el formulario.
+// API se ve en el formulario. CLIENTE-1c: si la conservada sirve lo dice el
+// servidor, con el criterio del generador.
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> CDI_DB=<base sqlite del servidor> node scripts/testing/pantalla_cliente1.js [captura.png]
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
@@ -127,6 +128,10 @@ function sembrarFecha(clienteId, fecha) {
     ['ISO', '2015-03-01', false, null, '2015-03-01', false],
     ['Reemplazada', '01/03/2015', true, '2016-04-02', '2016-04-02', false],
     ['Borrada', '2015-03-01', false, '', null, true],
+    // CLIENTE-1c: el criterio es el del generador, que lee «２０１５-03-15»
+    // (no es una falsa alarma) y no «２０１５-０３-15».
+    ['Ancho completo', '２０１５-03-15', true, null, '２０１５-03-15', false],
+    ['Ancho completo mes', '２０１５-０３-15', true, null, '２０１５-０３-15', true],
     ['Año cero', '0000-01-01', true, null, '0000-01-01', true],
     ['Imposible', '2015-02-30', true, null, '2015-02-30', true],
   ];
@@ -259,7 +264,55 @@ function sembrarFecha(clienteId, fecha) {
   await page.keyboard.press('Escape');
   console.log('OK la fecha que la API rechaza se muestra en el formulario y no guarda nada: ' + errorE.replace(/\s+/g, ' '));
 
+  // CLIENTE-1c: la importación deja vacía la fecha que no sirve y la vista
+  // previa dice en qué fila. Un CUIT inventado y nuevo en cada corrida.
+  function cuitInventado(n) {
+    const pesos = [5, 4, 3, 2, 7, 6, 5, 4, 3, 2];
+    for (let k = n; ; k++) {
+      const base = '30' + String(k % 100000000).padStart(8, '0');
+      let v = 11 - [...base].reduce((t, d, i) => t + Number(d) * pesos[i], 0) % 11;
+      if (v === 11) v = 0;
+      if (v !== 10) return base + v;
+    }
+  }
+  const cuitMala = cuitInventado(id % 90000000), cuitBuena = cuitInventado(id % 90000000 + 7);
+  const csv = 'CUIT,RAZON SOCIAL,FECHA INICIO ACTIVIDADES\n'
+    + cuitMala + ',Importadora Inventada Mala ' + id + ',20150-01-0\n'
+    + cuitBuena + ',Importadora Inventada Buena ' + id + ',01/06/2018\n';
+  await page.reload();
+  await page.waitForFunction(() => window.CDI && CDI.goTo);
+  await page.evaluate(() => CDI.goTo('clientes'));
+  await page.locator('#cxImportBtn').click();
+  await page.setInputFiles('#importFileInput', { name: 'clientes.csv', mimeType: 'text/csv', buffer: Buffer.from(csv) });
+  await page.locator('#importPreviewStep').waitFor({ state: 'visible', timeout: 15000 })
+    .catch(() => falla('la importación no llegó a la vista previa'));
+  const fechasVisible = await page.locator('#importPreviewFechas').isVisible();
+  const avisosFecha = await page.locator('#importPreviewFechas li').allInnerTexts();
+  const esperado = 'Fila 2: la fecha de inicio «20150-01-0» no es válida; el cliente se importa sin esa fecha.';
+  if (!fechasVisible || avisosFecha.length !== 1 || avisosFecha[0] !== esperado) {
+    falla('la vista previa no avisa la fecha que no sirve: ' + JSON.stringify([fechasVisible, avisosFecha]));
+  }
+  await page.locator('#importConfirm').click();
+  await page.locator('#importDoneStep').waitFor({ state: 'visible', timeout: 15000 })
+    .catch(() => falla('la importación no terminó'));
+  for (const [cuitI, queda] of [[cuitMala, ''], [cuitBuena, '2018-06-01']]) {
+    const cI = await (await page.request.get(base + '/api/clientes/by-cuit/' + cuitI)).json();
+    const fI = (cI.cliente || cI).fecha_inic_activ;
+    if ((fI || '') !== queda) falla('la importación guardó «' + fI + '» para ' + cuitI + ', tenía que quedar «' + queda + '»');
+  }
+  console.log('OK la importación avisa la fila con la fecha que no sirve y la deja vacía: ' + avisosFecha[0]);
+  // Sin fechas malas, el aviso no aparece.
+  await page.locator('#importClose').click();
+  await page.locator('#cxImportBtn').click();
+  const cuitSin = cuitInventado(id % 90000000 + 31);
+  await page.setInputFiles('#importFileInput', { name: 'clientes.csv', mimeType: 'text/csv',
+    buffer: Buffer.from('CUIT,RAZON SOCIAL,FECHA INICIO ACTIVIDADES\n' + cuitSin + ',Importadora Inventada Sin ' + id + ',01/06/2018\n') });
+  await page.locator('#importPreviewStep').waitFor({ state: 'visible', timeout: 15000 })
+    .catch(() => falla('la segunda importación no llegó a la vista previa'));
+  if (await page.locator('#importPreviewFechas').isVisible()) falla('sin fechas malas igual aparece el aviso de fechas');
+  console.log('OK sin fechas malas no hay aviso de fechas');
+
   if (process.argv[2]) await page.screenshot({ path: process.argv[2], fullPage: true });
   await b.close();
-  console.log('PANTALLA CLIENTE-1 OK (con CLIENTE-1b)');
+  console.log('PANTALLA CLIENTE-1 OK (con CLIENTE-1b y 1c)');
 })().catch(e => falla(e.message));
