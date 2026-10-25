@@ -94,7 +94,7 @@ sabotaje $M "hereda aunque el renglón no tenga medidas" \
   'if (not pieza and grupo and con_medidas and' 'if (not pieza and grupo and' \
   "FAILED $T::test_un_renglon_con_precio_y_sin_medidas_no_hereda"
 sabotaje $M "un código distinto en cada renglón vuelve a heredar la descripción" \
-  '            if grupo and parte and parte != grupo[1] and not descripcion:' \
+  '            if grupo and grupo[1] and parte and parte != grupo[1] and not descripcion:' \
   '            if False:' \
   "FAILED $T::test_con_un_codigo_distinto_en_cada_renglon_la_descripcion_no_se_hereda"
 sabotaje $M "con la combinada se pierde el código de parte" \
@@ -179,7 +179,7 @@ sabotaje $M "3b#4 un descuento leído no corta el grupo" \
   '                    pass' \
   "${B}un_descuento_leido_corta_el_grupo"
 sabotaje $M "3b#3 un código nuevo sin especificación vuelve a heredar" \
-  '            if grupo and parte and parte != grupo[1] and not descripcion:' \
+  '            if grupo and grupo[1] and parte and parte != grupo[1] and not descripcion:' \
   '            if False:' \
   "${B}un_codigo_nuevo_sin_especificacion_no_hereda_la_del_grupo_anterior"
 sabotaje $M "3b#1 un descuento con texto y monto negativo vuelve a ser producto" \
@@ -232,6 +232,42 @@ sabotaje $M "3b-3#2 una nota de descuento sin precio abre un grupo" \
   '                    if "%" in cargo or _monto_de_la_linea() < 0 or not valor_unitario:' \
   '                    if "%" in cargo or _monto_de_la_linea() < 0:' \
   "${B}una_nota_de_descuento_sin_precio_no_abre_un_grupo"
+
+# EXCEL-3c
+sabotaje $M "3c R1 con el origen copiado, un producto con «Payment» queda sin leer" \
+  '        es_cargo = _FILA_QUE_ES_SOLO_UN_CARGO_RE if origen_copiado else _FILA_QUE_NO_ES_MERCADERIA_RE' \
+  '        es_cargo = _FILA_QUE_NO_ES_MERCADERIA_RE' \
+  "${B}un_producto_con_una_palabra_de_cargo_y_su_descripcion_se_lee[payment_handling-origen_combinado]"
+sabotaje $M "3c R1 el rótulo de cargo no tiene que ser entero" \
+  '|advance|deposit|balance|anticipad[oa])\b)*$",' '|advance|deposit|balance|anticipad[oa])\b)*",' \
+  "${B}un_producto_con_una_palabra_de_cargo_y_su_descripcion_se_lee[payment_handling-origen_combinado]"
+sabotaje $M "3c R1 «Handling fee» con el origen copiado entra como producto" \
+  '(?:fees?|charges?|costs?|' '(?:charges?|costs?|' \
+  "${B}un_cargo_no_entra_como_producto_aunque_venga_una_combinada[origen_rotulo_en_descripcion-handling]"
+sabotaje $M "3c B1 decide con la descripción copiada" \
+  '            rotulo_propio = "" if del_grupo and not descripcion_propia else cargo' \
+  '            rotulo_propio = descripcion' \
+  "${B}un_cargo_no_entra_como_producto_aunque_venga_una_combinada[descripcion-insurance]"
+# Sin sabotaje: sacar «not _propia(origen_col)» de origen_copiado es
+# equivalente. El filtro mira sólo filas sin origen propio (not trae), y ahí
+# un origen con texto siempre es copiado.
+sabotaje $M "3c una nota en Item saca a un renglón del grupo" \
+  '                agrupada = del_grupo = True' '                agrupada = True; del_grupo = False' \
+  "${B}una_nota_de_flete_en_otra_columna_de_un_renglon_no_lo_saca[Item]"
+sabotaje $M "3c R2 una cabecera sin código corta a los renglones con código" \
+  '            if grupo and grupo[1] and parte and parte != grupo[1] and not descripcion:' \
+  '            if grupo and parte and parte != grupo[1] and not descripcion:' \
+  "${B}una_cabecera_sin_codigo_le_da_la_descripcion_a_los_renglones_con_codigo"
+sabotaje $M "3c D12 un renglón sin precio no se avisa" \
+  '                    sin_precio.append(_ + 2)  # no se inventa: se avisa (EXCEL-3c)' '                    pass' \
+  "${B}los_renglones_que_entran_sin_precio_se_avisan_al_subir[precio_solo_arriba]"
+sabotaje $M "3c D12 el aviso no dice desde qué fila" \
+  'arriba o combinado), desde la fila {filas[0]}. Completalos' 'arriba o combinado). Completalos' \
+  "${B}los_renglones_que_entran_sin_precio_se_avisan_al_subir[precio_combinado]"
+sabotaje $M "3c D12 se inventa el precio del de arriba" \
+  '                descripcion, parte = grupo[0], parte or grupo[1]' \
+  '                descripcion, parte = grupo[0], parte or grupo[1]; valor_unitario = valor_unitario or 1.35' \
+  "${B}los_renglones_que_entran_sin_precio_se_avisan_al_subir[precio_solo_arriba]"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
