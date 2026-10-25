@@ -671,3 +671,122 @@ def test_una_nota_de_descuento_sin_precio_no_abre_un_grupo(nota):
     ])
     assert [i["descripcion"] for i in data["items"]] == ["LONA DEMO"], data["items"]
     assert data["filas_descartadas_numeros"] == [3, 4], data
+
+
+# ------------------------------- EXCEL-3c (devolución de EXCEL-3b)
+
+PROFORMA = ["Item", "Description", "Origin", "Qty", "Unit price", "Amount"]
+RENGLONES_PVC = ["Item", "Part No.", "Specification", "Width(m)", "Length (m)", "QTY (Rolls)",
+                 "SM.TOTAL (sqm)", "Unit price (USD/sqm)", "Total Amount(USD)"]
+
+
+def _total(items):
+    return round(sum(i["cantidad"] * i["valor_unitario"] for i in items), 2)
+
+
+@pytest.mark.parametrize("combinar", [("C2:C4",), ()], ids=["origen_combinado", "sin_combinar"])
+@pytest.mark.parametrize("productos", [
+    ["Payment terminal POS", "Handling cart"],
+    ["Seguro de puerta", "Insurance card printer"],
+], ids=["payment_handling", "seguro_insurance"])
+def test_un_producto_con_una_palabra_de_cargo_y_su_descripcion_se_lee(productos, combinar):
+    """R1: con el origen combinado, un producto cuya descripción propia empieza
+    con «Payment», «Handling» o «Seguro» es mercadería, como en la base."""
+    data = _leer_combinado([
+        PROFORMA,
+        [1, "Widget A", "CN", 10, 5, 50],
+        [2, productos[0], "CN", 3, 100, 300],
+        [3, productos[1], "CN", 2, 40, 80],
+    ], combinar)
+    assert [i["descripcion"] for i in data["items"]] == ["Widget A"] + productos, data["items"]
+    assert _total(data["items"]) == 430, data["items"]
+    assert not data["filas_descartadas_numeros"], data
+
+
+@pytest.mark.parametrize("rotulo", [
+    ["Insurance", None, None, 1, 40, 40],
+    ["Seguro", None, None, None, None, 40],
+    ["Payment 30% TT", None, None, 1, 100, 100],
+    ["Bank charges", None, None, 1, 25, 25],
+    ["Handling fee", None, None, 1, 30, 30],
+    ["Gastos bancarios", None, None, 1, 15, 15],
+], ids=["insurance", "seguro", "payment", "bank", "handling", "gastos"])
+@pytest.mark.parametrize("forma", [
+    "descripcion", "descripcion_y_origen", "origen_rotulo_en_item", "origen_rotulo_en_descripcion",
+])
+def test_un_cargo_no_entra_como_producto_aunque_venga_una_combinada(rotulo, forma):
+    """B1 y familia: el seguro, el pago, los gastos o el handling, con el
+    rótulo en Item o en la descripción, no se vuelven producto porque la
+    descripción o el origen de arriba vengan combinados hasta su fila: queda
+    sin leer, avisado (EXCEL-1)."""
+    if forma == "descripcion":
+        filas, combinar = [[None, None, "China", 10, 5, 50], rotulo], ("B2:B4",)
+    elif forma == "descripcion_y_origen":
+        filas, combinar = [[None, None, None, 10, 5, 50], rotulo], ("B2:B4", "C2:C4")
+    elif forma == "origen_rotulo_en_item":
+        filas, combinar = [[2, "MOUSE DEMO", None, 10, 5, 50], rotulo], ("C2:C4",)
+    else:
+        filas, combinar = [[2, "MOUSE DEMO", None, 10, 5, 50], [3] + rotulo[:1] + rotulo[2:]], ("C2:C4",)
+    data = _leer_combinado([PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500]] + filas, combinar)
+    assert len(data["items"]) == 2, data["items"]
+    assert _total(data["items"]) == 3550, data["items"]
+    assert data["filas_descartadas_numeros"] == [4], data
+
+
+def test_una_cabecera_sin_codigo_le_da_la_descripcion_a_los_renglones_con_codigo():
+    """R2: «PVC BLUE» sin código y renglones «DT-1A», «DT-1B» sin
+    especificación: heredan la descripción, como en la base."""
+    data = _leer([
+        RENGLONES_PVC,
+        [1, None, "PVC BLUE", 3.2, 10, 2, 64, 1.35, 86.4],
+        [None, "DT-1A", None, 3.2, 15, 3, 144, 1.35, 194.4],
+        [None, "DT-1B", None, 3.2, 20, 3, 192, 1.35, 259.2],
+    ])
+    assert [i["codigo_parte"] for i in data["items"]] == ["", "DT-1A", "DT-1B"], data["items"]
+    assert all(i["descripcion"].startswith("PVC BLUE, ") for i in data["items"]), data["items"]
+    assert _total(data["items"]) == 540, data["items"]
+    assert not data["filas_descartadas_numeros"], data
+
+
+def test_un_codigo_que_empieza_con_el_del_grupo_no_hereda():
+    """G3, por ahora: «DT-1-15» bajo «DT-1» es otro código y no se sabe si
+    es el mismo material (en la proforma, DT-650-BL y DT-650-WH son colores
+    distintos); queda sin leer, avisado, como un código nuevo (EXCEL-3b)."""
+    data = _leer([
+        RENGLONES_PVC,
+        [1, "DT-1", "PVC BLUE", 3.2, 10, 2, 64, 1.35, 86.4],
+        [None, "DT-1-15", None, 3.2, 15, 3, 144, 1.35, 194.4],
+        [None, "DT-1-20", None, 3.2, 20, 3, 192, 1.35, 259.2],
+    ])
+    assert [i["codigo_parte"] for i in data["items"]] == ["DT-1"], data["items"]
+    assert data["filas_descartadas_numeros"] == [3, 4], data
+
+
+def _grupo_sin_precio_abajo(combinar):
+    return _leer_combinado([
+        RENGLONES_PVC,
+        [1, "DT-1", "PVC BLUE", 3.2, 10, 2, 64, 1.35, 86.4],
+        [None, None, None, 3.2, 15, 3, 144, None, None],
+        [None, None, None, 3.2, 20, 3, 192, None, None],
+        ["Total", None, None, None, None, 8, 400, None, 540],
+    ], combinar)
+
+
+@pytest.mark.parametrize("combinar", [("C2:C4",), ("C2:C4", "I2:I4")],
+                         ids=["precio_solo_arriba", "precio_combinado"])
+def test_los_renglones_que_entran_sin_precio_se_avisan_al_subir(combinar):
+    """D12 (a): con la especificación combinada, los renglones de abajo
+    entran con su cantidad y sin precio: no se inventa, se avisa al subir."""
+    data = _grupo_sin_precio_abajo(combinar)
+    assert [i["valor_unitario"] for i in data["items"]] == [1.35, 0, 0], data["items"]
+    avisos = " | ".join(data["avisos_mapeo"])
+    assert "2 renglón(es) entraron sin precio" in avisos and "desde la fila 3" in avisos, avisos
+
+
+@pytest.mark.parametrize("combinar", [(), ("I2:I4",)], ids=["nada", "precio_combinado"])
+def test_sin_la_especificacion_combinada_los_renglones_sin_precio_quedan_sin_leer(combinar):
+    """D12, el resto: sin descripción ni precio propio el renglón no hereda
+    (EXCEL-3b) y queda sin leer, avisado; no hay aviso de precio."""
+    data = _grupo_sin_precio_abajo(combinar)
+    assert len(data["items"]) == 1 and data["filas_descartadas_numeros"] == [3, 4], data
+    assert "sin precio" not in " | ".join(data["avisos_mapeo"]), data["avisos_mapeo"]
