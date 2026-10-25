@@ -85,11 +85,17 @@ sabotaje $M "la edición sin la fecha la borra" \
 
 # El script
 sabotaje $D "sin la opción igual arregla" \
-  "if arreglar_none and con_none:" "if con_none:" \
+  "            if arreglar_none:" "            if True:" \
   "FAILED tests/test_cliente1b_script.py::test_sin_la_opcion_informa_y_no_cambia_nada"
 sabotaje $D "con la opción arregla también otras" \
-  "WHERE TRIM(fecha_inic_activ) = 'None'" "WHERE fecha_inic_activ IS NOT NULL" \
+  '"WHERE id = :id AND fecha_inic_activ = :fecha"' '"WHERE fecha_inic_activ IS NOT NULL OR id = :id OR id = :fecha"' \
   "FAILED tests/test_cliente1b_script.py::test_con_la_opcion_deja_vacias_solo_las_none"
+sabotaje $D "con la opción vacía sólo la «None» exacta" \
+  '{"id": cid, "fecha": fecha}' '{"id": cid, "fecha": "None"}' \
+  "FAILED tests/test_cliente1b_script.py::test_con_la_opcion_vacia_cada_none_que_informa"
+sabotaje $D "una URL sqlite:/// no se pasa al driver async" \
+  $'    if url.startswith("sqlite://"):\n        return "sqlite+aiosqlite://" + url[len("sqlite://"):]\n' '' \
+  "FAILED tests/test_cliente1b_script.py::test_acepta_la_url_sqlite_sin_driver"
 sabotaje $D "una fecha que no sirve no se informa" \
   "            no_sirven.append(cid)" "            pass" \
   "FAILED tests/test_cliente1b_script.py::test_sin_la_opcion_informa_y_no_cambia_nada"

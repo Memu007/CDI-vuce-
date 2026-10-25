@@ -76,3 +76,27 @@ def test_la_base_es_obligatoria(monkeypatch, capsys):
     monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:///./no-usar.db")
     with pytest.raises(SystemExit):
         main([])
+
+
+def test_con_la_opcion_vacia_cada_none_que_informa(tmp_path, capsys):
+    """La que se informa como «None» se vacía, con el espacio que sea: el
+    informe y el arreglo usan el mismo criterio."""
+    ruta = tmp_path / "clientes.db"
+    engine = create_engine(f"sqlite:///{ruta}")
+    Client.__table__.create(engine)
+    engine.dispose()
+    con = sqlite3.connect(ruta)
+    con.executemany("INSERT INTO clients (id, name, fecha_inic_activ) VALUES (?, ?, ?)",
+                    [("id-tab", "Cliente Inventado", "None\t"), ("id-salto", "Cliente Inventado", "\nNone")])
+    con.commit()
+    con.close()
+    assert main(["--base", f"sqlite+aiosqlite:///{ruta}", "--arreglar-none"]) == 0
+    salida = capsys.readouterr().out
+    assert "Con «None»: 2" in salida
+    assert _fechas(ruta) == {"id-tab": "", "id-salto": ""}
+    assert "Quedaron vacías: 2" in salida
+
+
+def test_acepta_la_url_sqlite_sin_driver(base, capsys):
+    assert main(["--base", f"sqlite:///{base}"]) == 0
+    assert "Con «None»: 2" in capsys.readouterr().out
