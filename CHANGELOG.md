@@ -17,6 +17,28 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(landing):** el paso 3 del progreso de la demo dice «PA SIM», como la aplicación. El encabezado de la tabla de la demo sigue en «NCM» (sus valores son de 8 dígitos): lo decide la PM.
 
+## 2026-10-24 · fix: devolución de MARIA-7
+
+- Dos sufijos de valor sin guion entre ellos se separan (`AA(ROJO) AB(AZUL)` → `AA(ROJO)-AB(AZUL)`); uno que no se puede separar en códigos (paréntesis sin cerrar, un código sin valor) no genera el TXT y dice dónde está.
+- Con la unidad estadística en kilos, el kilo neto (QARTKGRNET) sale al centésimo, igual a la cantidad estadística, como en el archivo que el MARIA aceptó. «ARABIC» o «ARBANK» ya no se toman por una cuenta del banco.
+- Un grupo compara la unidad estadística y la declarada por su código («1», «01», «kg»); una unidad de medida que no se reconoce sale 07 con un aviso. Un sufijo que separado pasa de 120 caracteres, o un kilo neto que en kilos da 0,00 al centésimo, no generan el TXT.
+
+## 2026-10-24 · fix: MARIA-8, revisión de los sub-ítems por renglón
+
+- Los renglones sin posición no se juntan; un renglón cuya cantidad o kilos dan 0,00 al centésimo no sale como sub-ítem; el unitario del ítem es el FOB sobre la cantidad declarada.
+- Los errores de peso y de sufijo dicen el número del renglón en la pantalla; el sufijo propio de un renglón se valida en el endpoint como los otros y se avisa si se limpió.
+
+## 2026-10-24 · feat: MARIA-8, sub-ítems por renglón
+
+- Los renglones de la factura con la misma posición SIM, origen, procedencia y estado (y la misma unidad, unidad estadística e IVA adicional) van en un solo ítem con un sub-ítem por renglón (`CARTSBITEM=S`), cada uno con su FOB, cantidad, unitario, kilos y sufijo propio o el de la operación.
+- Las sumas del ítem (FOB, cantidad, kilos y cantidad estadística) cierran exactas al centésimo; el redondeo sobrante va al sub-ítem más grande. Los avisos dicen qué renglones van juntos y si todos llevan el mismo sufijo. Los grupos y sub-ítems armados a mano siguen como antes.
+
+## 2026-10-24 · fix: MARIA-7, lo que el MARIA rechazó el 24/10
+
+- Sin CUIT del despachante no se genera el TXT (antes faltaba CDDTAGR en silencio); IDSO, IDDT e IARTESPAPU van con 8 caracteres y LDVDREFDOC con el número real de la factura.
+- Unidad de la factura y estadística elegibles en «Lo que decide el despachante» (m² = 03; en kilos, la cantidad estadística es el kilo neto al centésimo); en los sufijos sólo letras, números y espacios, con aviso; una cuenta del banco (IBAN verificado) no sale como IDTRIB-PROVEEDOR y el código chino de crédito social sí; una factura más larga que LDVDREFDOC se avisa antes de generar.
+- La fecha de la factura se lee en su orden: con el año adelante es año/mes/día (`2026/08/07` → `07/08/2026`); si día y mes pueden intercambiarse o el año tiene dos cifras, queda vacía y se le pregunta al usuario; la revisión respeta ese orden. La fecha de inicio de actividad del cliente sale DD/MM/AAAA (se guardaba AAAA-MM-DD y salía así); si no es una fecha, no se genera y se dice dónde corregirla.
+
 ## 2026-10-24 · fix: editar un cliente no borra una fecha de inicio que no es AAAA-MM-DD (D3)
 
 - **fix(clientes):** si la fecha guardada no se puede mostrar en el campo de fecha y se deja vacío, al guardar no se manda y se conserva; el aviso no la pide. Una fecha cargada la reemplaza. Contra: esa fecha ya no se puede borrar desde el formulario.

@@ -177,6 +177,7 @@ def test_endpoint_pasa_los_valores_y_avisa_lo_que_falta(client, auth_override):
         incoterm="EXW", flete=365.0, seguro=75.47, fecha_emision="22/06/2026",
         aduana_codigo="073", sbt_sufijo_valor=SUF_A,
         banco_bcra="191", empresa_digitalizacion="PSAD01", iva_adicional="IVAAD1",
+        cuit_agr="20111111112",  # sin CUIT del despachante no se genera (MARIA-7)
     )
     r = client.post("/generate_maria", json=cuerpo)
     assert r.status_code == 200, r.text

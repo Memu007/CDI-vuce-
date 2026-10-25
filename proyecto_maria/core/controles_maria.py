@@ -25,11 +25,12 @@ CAMPOS_DE_TEXTO = (
     "operation_id", "vendedor_nombre", "vendedor_id", "comprador_nombre",
     "comprador_domicilio", "comprador_fecha_inic_activ", "cuit_agr",
     "comprador_cuit", "moneda", "incoterm", "fecha_embarque", "fecha_emision",
-    "aduana_codigo", "tipo_destinacion",
+    "aduana_codigo", "tipo_destinacion", "numero_factura",
 )
 CAMPOS_DE_TEXTO_DEL_ITEM = (
     "descripcion", "pieza", "ncm", "origen", "pais_origen", "procedencia",
     "pais_procedencia", "unidad", "unidad_medida", "um", "codigo_parte",
+    "unidad_estadistica",
 )
 
 # Controles C0 y C1 (\x85 es «nueva línea»), y los separadores de línea y de

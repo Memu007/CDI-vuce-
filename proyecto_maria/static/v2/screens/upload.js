@@ -405,6 +405,8 @@
             if (format === 'excel' && data && Array.isArray(data.avisos_mapeo)) {
                 sinLeer.unshift.apply(sinLeer, data.avisos_mapeo);
             }
+            // La fecha que no se pudo ordenar (MARIA-7): es de la factura, no del peso.
+            if (data && Array.isArray(data.avisos_fecha)) sinLeer.unshift.apply(sinLeer, data.avisos_fecha);
             const revisar = sinLeer.concat(avisosPeso);
             if (revisar.length && CDI.toast) {
                 CDI.toast(sinLeer.length ? 'Revisá la factura' : 'Revisá el peso', revisar.join(' '), 'warning');

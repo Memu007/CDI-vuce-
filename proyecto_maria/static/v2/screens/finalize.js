@@ -479,7 +479,10 @@
             peso_unitario: toNumber(it.peso_unitario, 0),
             codigo_parte: String(it.codigo_parte || '').trim(),
             grupo_id: it.grupo_id || null,
-            unidad: it.unidad || null,
+            // MARIA-7: la de la factura y la estadística, elegidas en «Lo
+            // que decide el despachante».
+            ...(CDI.despachante && CDI.despachante.unidadesDe ? CDI.despachante.unidadesDe(it)
+                : { unidad: it.unidad || null }),
             estado: it.estado || null,
             iva_adicional: it.iva_adicional || null,
             // Partido en subítems (SUBITEMS-1); sin subítems no va el campo.
@@ -497,6 +500,8 @@
 
         return {
             operation_id: operation_id,
+            // El número real, para LDVDREFDOC (MARIA-7).
+            numero_factura: factura,
             items: items,
             ...(CDI.despachante ? CDI.despachante.valores()
                 : { banco_bcra: '', empresa_digitalizacion: null, iva_adicional: null }),

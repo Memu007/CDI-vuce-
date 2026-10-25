@@ -37,6 +37,7 @@ BASE = dict(
     flete=365.00,
     seguro=75.47,
     sbt_sufijo_valor="AA(Demo)-CA00-",
+    cuit_agr="20111111112",  # sin CUIT del despachante no se genera (MARIA-7)
 )
 
 

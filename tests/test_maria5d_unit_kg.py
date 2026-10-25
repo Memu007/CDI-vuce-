@@ -38,7 +38,8 @@ def _peso_del_txt(client, data):
         "origen": item["origen"], "cantidad": item["cantidad"],
         "valor_unitario": item["valor_unitario"], "peso_unitario": item["peso_unitario"]}],
         "fecha_emision": "01/10/2026", "sbt_sufijo_valor": "AA(DEMO)-CA00-",
-        "moneda": "DOL", "incoterm": "FOB", "comprador_cuit": "30999999995"}
+        "moneda": "DOL", "incoterm": "FOB", "comprador_cuit": "30999999995",
+        "cuit_agr": "20111111112"}  # sin CUIT del despachante no se genera (MARIA-7)
     r = client.post("/generate_maria", json=pedido)
     assert r.status_code == 200, r.text
     return re.findall(r"^QARTKGRNET=(\S+)", r.json()["content"], re.M)
