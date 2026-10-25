@@ -115,7 +115,7 @@ sabotaje $J "la fecha que el campo no muestra se vuelve a mandar vacía" \
 sabotaje $J "sólo se conserva la que no tiene forma AAAA-MM-DD" \
   "(c.fecha_inic_activ && fFechaInicActiv && !fFechaInicActiv.value)" \
   '(c.fecha_inic_activ && !/^\d{4}-\d{2}-\d{2}$/.test(c.fecha_inic_activ))' \
-  'FALLA: Imposible: después de editar, la fecha es null y tenía que ser "2015-02-30"'
+  'FALLA: Año cero: después de editar, la fecha es null y tenía que ser "0000-01-01"'
 sabotaje $J "se recuerda también la que el campo muestra" \
   "(c.fecha_inic_activ && fFechaInicActiv && !fFechaInicActiv.value)" "c.fecha_inic_activ" \
   'FALLA: Borrada: después de editar, la fecha es "2015-03-01" y tenía que ser null'
