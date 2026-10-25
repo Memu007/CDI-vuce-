@@ -13,7 +13,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-10-25 · fix: un cargo con medidas «/», «-» o 0 no entra como producto (EXCEL-3e)
 
-- **fix(excel):** «/», «-», 0, un negativo o vacío no cuentan como medidas ni se escriben en la descripción («ancho - m»): el flete, el seguro o el descuento con la especificación combinada y su rótulo en Item ya no pasan por renglón del grupo; se leen como flete o descuento, o quedan sin leer con aviso. Un renglón sin descripción ni medidas tampoco hereda la de arriba: queda sin leer, con aviso.
+- **fix(excel):** «/», «-», 0, un negativo («-1 m», «–1»), un texto sin cifras («N/A», «一») o vacío no cuentan como medidas ni se escriben en la descripción («ancho - m»): el flete, el seguro o el descuento con la especificación combinada y su rótulo en Item ya no pasan por renglón del grupo; se leen como flete o descuento, o quedan sin leer con aviso. Un renglón sin descripción ni medidas tampoco hereda la de arriba: queda sin leer, con aviso.
 
 ## 2026-10-25 · feat: los estudios de la cuenta para el CUIT del despachante (ESTUDIO-1)
 

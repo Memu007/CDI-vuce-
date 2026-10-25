@@ -4843,12 +4843,19 @@ def extract_items_from_excel(df: pd.DataFrame, filename: str, descartes: list | 
 
 def _es_una_medida(valor, decimal) -> bool:
     """Una medida escrita: un número mayor que cero o un texto con una cifra
-    que no es cero («48-50», «1,5m», «½»). «/», «-», «0», «-1» o «N/A» no lo
-    son."""
+    que no es cero («48-50», «1,5m», «½»). «/», «-», «0», «-1», «-1 m», «N/A»,
+    «一» o «m²» no lo son."""
     numero = _monto_de_fila(valor, decimal)
     if numero is not None:
         return numero > 0
-    return any(unicodedata.numeric(c, 0) > 0 for c in _texto_de_celda(valor))
+    texto = _texto_de_celda(valor).strip()
+    if texto and (unicodedata.category(texto[0]) == "Pd" or texto[0] == "\u2212"):
+        return False  # un negativo con unidad o escrito con otra raya
+    return any((c.isdecimal() and unicodedata.decimal(c) > 0) or _es_una_fraccion(c) for c in texto)
+
+
+def _es_una_fraccion(c: str) -> bool:
+    return unicodedata.name(c, "").startswith("VULGAR FRACTION")  # «½», «¾»
 
 
 def _texto_de_celda(valor) -> str:
@@ -5066,7 +5073,8 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
                 if numero is not None:
                     texto = _medida(numero)
                 # «1,5m» ya trae su unidad: no sale «1,5m m»; «48-50» no.
-                trae_unidad = numero is None and re.search(r"[^\W\d_]\s*$", texto)
+                trae_unidad = (numero is None and re.search(r"[^\W\d_]\s*$", texto)
+                               and not _es_una_fraccion(texto.rstrip()[-1]))  # «½» no es una unidad
                 tamaño.append(f"{nombre} {texto}" + (f" {unidad}" if unidad and not trae_unidad else ""))
 
             # Seguro o condiciones de pago sin NCM ni origen no son
