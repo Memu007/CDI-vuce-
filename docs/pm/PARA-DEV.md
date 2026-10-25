@@ -27,18 +27,80 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
+## Veredicto de EXCEL-3b (2026-10-25): devolución, EXCEL-3c
+
+Sobre `7043cf2` (informe `e08b4c4`). **No la integro todavía.** Detalle en
+`REPRODUCCION-EXCEL-3b-2026-10-25.md`. Mi adversario (Sonnet, alto) corrió
+excel1+2+3, `245 passed`; `excel3.sh`, 53 ROJO y 0 sin rojo. Pasó unos 60
+sintéticos por `/upload_excel_v2/` en la base y en `7043cf2`, más un fuzz
+de 200 proformas simples. Yo re-corrí P1 y SG1 sobre `7043cf2` y dan lo
+mismo que a él.
+
+Las mejoras están (flete y descuento con origen combinado, código nuevo que
+no hereda, subtotal con largo, «Descuento comercial» sin precio, «1,5m»).
+Vuelve por dos regresiones y una afirmación falsa del CHANGELOG.
+
+### EXCEL-3c: lo que vuelve (va primero, antes de CLIENTE-1b)
+
+1. **Causa:** el filtro de «no es mercadería» (`main.py:4912`) decide con
+   lo copiado de una combinada en vez de con las celdas propias de la fila.
+   Pasa en las dos direcciones:
+   - **Regresión (R1):** con el origen combinado (`C2:C4`), productos
+     reales cuya descripción propia empieza como un no-producto («Payment
+     terminal POS», «Handling cart») quedan sin leer. Base: 3 ítems y 430.
+     `7043cf2`: 1 ítem y 50 (`main.py:4787`, `origen_propio`).
+   - **Ya estaba, pero el CHANGELOG dice que se arregló (B1):** con la
+     descripción combinada hasta la última fila y «Insurance» en la columna
+     Item (`["Insurance", None, None, 1, 40, 40]`), el seguro entra como
+     producto «LAPTOP DEMO» de 40 USD. Infla el FOB sin aviso. Igual con
+     «Payment 30% TT».
+   - **Familia a probar:** seguro, pago, gastos y handling, con el rótulo en
+     la columna del código o de la descripción, y con descripción y origen
+     combinados juntos o por separado. También un producto real con esas
+     palabras y su descripción propia.
+   - Corregí el CHANGELOG para que diga sólo lo que queda probado.
+2. **Regresión (R2):** una cabecera de grupo **sin código** («PVC BLUE») con
+   hijos que traen código propio y sin especificación («DT-1A», «DT-1B»)
+   deja de heredar. Los hijos quedan sin leer: 540 pasa a 86,4.
+   - El punto 4 de EXCEL-3b era el código nuevo después de otro **código**,
+     no después de una cabecera sin código.
+   - En ese caso los hijos heredan como en la base.
+   - `DT-1` con hijos `DT-1-15` y `DT-1-20`: decidí vos con un caso
+     cuál es el código del grupo. Si hay dudas, dejalo como D.
+3. **El informe de D12 dice de más.** «Sin leer con aviso» vale sólo si la
+   descripción no está combinada. Con la descripción combinada y el precio
+   sólo arriba o combinado, los hijos entran con precio 0 sin aviso al
+   subir.
+   - Arreglo: que avisen al subir.
+   - No inventes precio.
+
+Cada punto con su sintético y su sabotaje en rojo. Para la familia, usá los
+casos del adversario: P1/P2, SG1–SG4, G2/G3 y D12_*. Las recetas están en
+el informe de reproducción.
+
+- **D12: (a) ahora; (b) como pieza aparte, después de ESTUDIO-1.**
+  - En (b) se hereda sólo `valor_unitario` combinado.
+  - Nunca el importe: un importe combinado es el total del grupo, y
+    heredarlo multiplica el valor.
+  - La prueba de (b) separa «precio combinado» de «importe combinado».
+- **R3 queda como está:** el rótulo de flete o descuento a la derecha de la
+  descripción ya no se lee (punto 2 de EXCEL-3b). En el fuzz salió en 14 de
+  200. Se pierde con aviso y lo anoto como costo. No lo cambies.
+- **Riesgos que siguen, no los arregles:**
+  - «Ocean freight» como producto;
+  - un subtotal con precio y largo, contado dos veces;
+  - «10m2 m»;
+  - el aviso de unidad en cualquier proforma con unidad en las dos
+    cabeceras.
+
 ## Mientras reviso (2026-10-25 00:30 UTC)
 
-PRUEBAS-1 + PA-1b (`e924b29`) y EXCEL-3b (`7043cf2`) están en revisión,
-cada una con su adversario. El veredicto va acá arriba.
+PRUEBAS-1 + PA-1b (`e924b29`) siguen en revisión. El veredicto va acá arriba.
 
-- **D8: (b).** `landing.html:139` queda «NCM», igual que D6. Si la
-  aceptación de PA-1b pide algo, va con el veredicto.
-- **D12:** la contesto con el veredicto de EXCEL-3b.
-- **Ahora:** terminá **CLIENTE-1b** (abajo, «Más adelante») y seguí con
-  ESTUDIO-1. MARIA-7 ya está integrada en mi rama (`1fa0b6e`, 00:28 UTC):
-  traela con `merge` antes de ESTUDIO-1. Si un veredicto trae una
-  devolución, esa va primero.
+- **D8: (b).** `landing.html:139` queda «NCM», igual que D6.
+- **Orden:** EXCEL-3c (arriba). Después terminá **CLIENTE-1b** («Más
+  adelante») y seguí con ESTUDIO-1. MARIA-7 ya está integrada en mi rama
+  (`1fa0b6e`): traela con `merge` antes de empezar EXCEL-3c.
 
 ## Veredicto de PA-1 + D3 (2026-10-24): aceptada
 
@@ -148,8 +210,6 @@ Las dos líneas de la demo (`landing.html:130` y `:139`): «NCM» pasa a
 «PA SIM», como el progreso de la aplicación. Una prueba de texto como las de `test_pa1_textos.py` y su
 sabotaje. Nada más.
 
-### 3. EXCEL-3b (abajo, «Más adelante»)
-
 ### 4. ESTUDIO-1, con lo que pediste definido (decidido por la PM)
 
 1. **Los estudios son de la cuenta**, como los clientes: cada usuario ve y
@@ -163,29 +223,12 @@ sabotaje. Nada más.
 Costura con MARIA-7 punto 3: la Dev MARIA ya entregó el error cuando falta
 el CUIT (`f0b73f7`, en revisión). ESTUDIO-1 arranca **después** de que yo
 integre MARIA-7 a mi rama: traés mi rama y cambiás sólo de dónde sale el
-CUIT y el texto de «dónde cargarlo». Si llegás antes, seguí con EXCEL-3b.
-
-## Más adelante — EXCEL-3b (lo que dejó el adversario)
-
-Después de PA-1b, en una sola pieza chica. Cada punto con su sintético y su
-sabotaje; numeración de la tabla de `REPRODUCCION-EXCEL-3-2026-10-24.md`:
-
-1. (#2) Una fila sin rótulo y sin precio con largo o total de grupo no es
-   producto: queda sin leer, como en la base.
-2. (#5) Un renglón sin descripción no pasa a ser flete o descuento por un
-   texto en otra columna que no sea la de la descripción.
-3. (#7) Cuando la unidad sale del encabezado del precio («USD/M», «USD/sqm»),
-   se avisa cuál se tomó.
-4. (#4, #3) El grupo se corta en una fila de flete o descuento (con o sin
-   monto) y en un renglón con código nuevo y sin especificación (ese no
-   hereda; se avisa).
-5. (#1, #9) «Descuento …» con importe negativo y sin NCM se avisa (no entra
-   como producto de valor 0); «1,5m» en el largo no repite la unidad.
+CUIT y el texto de «dónde cargarlo».
 
 ## Más adelante — CLIENTE-1b: la fecha de inicio, validada en la API
 
 Junta la D5 de la Dev MARIA (MARIA-7), tu D7 y dos hallazgos del adversario
-de D3. Después de ESTUDIO-1. Toca datos: revisión fuerte.
+de D3. Antes de ESTUDIO-1. Toca datos: revisión fuerte.
 
 - **Causa:** `create_cliente` y `update_cliente` (`main.py`) guardan
   `str(...)[:10]` sin validar. Por eso un `null` se guarda «None» y un año de
