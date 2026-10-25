@@ -14,7 +14,7 @@ import pytest
 from sqlalchemy import select
 
 from proyecto_maria.database.connection import AsyncSessionLocal
-from proyecto_maria.database.models import Client as ClientModel, SystemBackup
+from proyecto_maria.database.models import Client as ClientModel, SystemBackup, User as UserModel
 
 
 def _cuit(serial: int) -> str:
@@ -62,7 +62,29 @@ def _sembrar(cid, fecha):
 
 # --- D15: la operación ------------------------------------------------------
 
+def _contador(username, valor=None):
+    """Lee las operaciones del período del usuario o las vuelve a `valor`."""
+    async def _ir():
+        async with AsyncSessionLocal() as s:
+            u = (await s.execute(select(UserModel).where(UserModel.username == username))).scalars().first()
+            if valor is not None:
+                u.ops_used_this_period = valor
+                await s.commit()
+            return u.ops_used_this_period
+    return asyncio.run(_ir())
+
+
 def _operacion(client, cid, fecha, domicilio="Calle Inventada 77"):
+    # El usuario de prueba es compartido y su plan tiene tope de operaciones:
+    # la que se crea acá no le gasta el cupo a las pruebas que siguen.
+    antes = _contador("test_user")
+    try:
+        _crear_operacion(client, cid, fecha, domicilio)
+    finally:
+        _contador("test_user", antes or 0)
+
+
+def _crear_operacion(client, cid, fecha, domicilio):
     r = client.post(f"/api/clientes/{cid}/operaciones", json={
         "source": "pdf_v2", "currency": "USD",
         "comprador_domicilio": domicilio, "comprador_fecha_inic_activ": fecha,
