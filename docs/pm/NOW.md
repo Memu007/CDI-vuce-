@@ -66,131 +66,14 @@ nuevos (el `/autocompact 200k` ya está: los dos marcan 200k), el packing list y
 
 **Publicación del 2026-10-24 10:00 ARG (`648cd2f`):** completada; cierre en `CIERRE-RETOMA-2026-10-24.md`.
 
-**EXCEL-2 revisada y aceptada en su alcance funcional sobre `dddcf6d`**
-(producto `be17e1b`), PR #5 lista para revisión (ya no borrador), SIN fusionar ni publicar. Suite local
-completa: **1731 passed, 102 skipped, 2 xfailed**, 250.01 s, exit0; CI final
-40017165638 tests y e2e-maria success. PM y QA independientes verificaron
-origen combinado, límites, concurrencia real y nueve sintéticos iguales a
-base648. 38 mutaciones históricas detectadas por motivo correcto; 2 sin evaluar
-por timeout y 2 recetas obsoletas, NO 42/42. Nuevos negativos XML/subítems
-se registran aparte. Cerca del tope de estilos: 499900 xf añadidos, 200,
-9.18 s, RSS familiar 460140544 bytes. No es garantía universal de recursos.
-Margen de concurrencia limitado (23.29 s frente a timeout30 s). Diferencia
-con instrumentación de cobertura diagnosticada y anotada en DECISIONS;
-no se omitieron tests ni se cambió timeout. No repetir puertas verdes sin
-cambio nuevo. Informe `QA-EXCEL2-REENTREGA-2026-10-23.md` y cierre24.
-
-La autorización anterior cubría producto166/main648. Para publicar EXCEL-2
-nuevo hace falta autorización específica de Emi para HEADdddcf6d; no reutilizar
-el permiso anterior. GUARDAR-2 sigue separado/D32(b), sin cobro ni migración.
-Su preparación requiere Postgres local descartable y negativos de dueño;
-Docker no estaba iniciado y no había binarios Postgres al revisar. No se
-instaló ni arrancó ningún servicio. Fase1 no se cierra sin prueba real de
-Emi/despachante en Kit.
-
-Observación de arranque: log de métricas informa falta api_logs.owner_username;
-el modelo ya estaba igual en a9b03cf. Queda por clasificar con fuentes locales,
-sin leer ni migrar DB de producción. No se arregló de paso ni se incorporaron
-registros, clientes o credenciales. Detalle en cierre24.
-
-**Historial de retoma, superado por el estado de arriba:** Emi autorizó publicar la candidata. PR #4 fusionado
-tras CI tests y e2e-maria verdes; main ahora `648cd2f` y su producto es
-idéntico a `166395f` (diff comprobado). **Railway todavía no confirmado:**
-su UI conserva ACTIVE `a9b03cf`, la salud pública responde ok y el JS servido
-aún era anterior a las 09:00 ARG. Fuente main/autodeploy correctos, pero
-Railway informa incidente y colas de despliegue. No repetir deploys ni
-afirmar que el sitio ya se actualizó. La autorización sigue vigente para
-terminar esta misma publicación, sin pedir otro «dale».
-Detalle: `PUBLICACION-FASE1-2026-10-21.md`.
-
-**Continuación activa:** EXCEL-2 `c2f8063` devuelta aunque 93 focales verdes:
-una referencia XML de celda con comillas simples evade el tope de 256
-columnas. PM reprodujo con una celda; devolución corregida localmente en
-`04e1d0`, rama `codex/excel2-xml-quotes`, preservada en el repo de trabajo.
-PM repitió reproducción verde y QA independiente aprobó 32 focales y checks
-propios. Guarda XML satisfactoria; **EXCEL-2 completa sigue sin aceptar**:
-falta integrar aisladamente con main y verificar suite/CI, memoria/concurrencia
-y criterios históricos. `QA-EXCEL2-XML-2026-10-22.md` conserva los límites
-de lo medido. No entró en PR #4. GUARDAR-2 sigue separado; no adelantar cobro.
-
-**Último veredicto de EXCEL-2, manda sobre el párrafo anterior:** integración
-local `d448033` sobre main648cd2f, rama `codex/excel2-integration-648`,
-**devuelta**. Dev informó 356 focales y 15 JS verdes, pero PM reprodujo:
-normal 400 a los 30.26 s detrás de ocho libros con XML de 10282491 bytes
-(dentro de 10 MiB); y una combinada de origen con comillas simples pierde
-el país en el segundo producto. La prueba existente de ocho libros usaba
-una estimación incorrecta de tamaño y podía pasar por rechazo temprano.
-Nueve libros sintéticos normales sí devuelven los mismos datos JSON que
-la base, y 2000 combinadas dieron 200 en 0.166 s. No correr suite
-larga hasta corregir los dos rojos. Consigna en PARA-DEV e informe completo
-`REVISION-EXCEL2-INTEGRADA-2026-10-22.md`. Subagentes de implementación
-interrumpidos por límite de uso; PM completó QA y dejó devolución. No
-afirmar implementación ni negativos terminados; rama local preservada.
-
-**Verificación previa al merge (histórica):** candidato `166395f` (pesos + DOC-1 +
-compatibilidad Excel), rama `codex/phase1-form-default-compat`, preservada en
-el repo de trabajo. Suite completa en entorno limpio: **1612 passed, 102
-skipped, 2 xfailed**, cobertura 50.75 %, salida 0; chequeo previo aprobado.
-PM revisó el cambio y reprodujo el rojo previo y ocho focales verdes. La
-primera combinación `8b19662` había fallado cuatro casos: FastAPI nuevo
-interpretaba `use_mapping` omitido como False. Se corrigió sin cambiar requisitos.
-CUA sobre esa combinación llegó a descarga, controles y persistencia con datos
-sintéticos. **No publicado ni listo para declarar MVP terminado**: falta la
-puerta oficial de CI sobre el SHA final y la prueba real de Emi/despachante.
-Evidencia completa en `VERIFICACION-CANDIDATO-2026-10-21.md`.
-Siguiente cola: revisión separada EXCEL-2 y GUARDAR-2; no adelantar cobro.
-Los párrafos históricos de devolución anteriores no reabren los defectos
-de peso/DOC-1 ya corregidos. El candidato nuevo sigue local; el permiso
-anterior cubrió las tres ramas/PR existentes, no publicar a main.
-
-**Producto:** `Memu007/CDI-vuce-` (privado desde el 2026-10-06).
-**En GitHub:** `main` = `648cd2f` (PR #4, 2026-10-22). **Último activo confirmado
-en Railway:** `a9b03cf` (2026-10-07, GUARDAR-1); despliegue nuevo pendiente,
-`cdi-production.up.railway.app`. Railway publica cada push a `main` sin
-esperar los tests.
-**En producción:** la usa sólo Emi, con facturas reales (Emi, 2026-10-07).
-**Rama PM histórica:** `claude/practical-shannon-szpwkn` (`99f3625`); retoma
-en `codex/pm-retoma-txt`. La rama histórica contiene lo aceptado y sin publicar
-(incluye los 25 commits de `e8344d0`, ADMIN-1, ADMIN-2 y MARIA-2). **Ramas de las
-Devs:** `claude/dev1-tecnica` y `claude/dev2-maria`.
+**Producto:** `Memu007/CDI-vuce-` (privado desde el 2026-10-06). Railway
+(`cdi-production.up.railway.app`) publica cada push a `main` sin esperar los
+tests. **En producción:** la usa sólo Emi, con facturas reales.
 **Plan:** `ROADMAP.md`, con el orden de Emi del 2026-10-07: primero el TXT,
 después el cobro, la seguridad al final y exhaustiva. Ningún estudio entra
 antes de cerrar la Fase 3.
 
 ## Para Emi
-
-0. **Retoma autorizada por Emi, 2026-10-19:** pidió actuar como PM con
-   subagentes y continuar el plan. Trabajo actual en `codex/pm-retoma-txt`
-   desde `99f3625`; `main` sigue en `a9b03cf`. Las sesiones y rutinas de
-   Claude de la tabla siguiente son históricas: Codex no tiene las
-   herramientas `update_trigger`, `get_session` ni el consejero Fable; no
-   se afirma que se reactivaron. Se trabaja con subagentes locales por esta
-   solicitud, sin nuevas automatizaciones ni publicación.
-   - **MARIA-5d:** revisión independiente sobre `d22ff1a`: 65 focales y 68
-     de generador/subítems verdes; tres variantes inequívocas de peso bruto
-     unitario fallan por HTTP local (3 kg / 10 unidades devuelve 0,3 kg por
-     unidad). PM reprodujo los tres rojos. Devolución y tarea cerrada en
-     `PARA-DEV-2.md`, antes de aceptar o publicar.
-   - **Dev 1:** Git conserva dos candidatos hermanos sobre `1cdfe49`:
-     EXCEL-2 en `c2f8063` y GUARDAR-2 en `2d930c5`. `dfb6d24` preserva
-     trabajo, no es una entrega única. El informe de su rama sigue viejo;
-     no se aceptan piezas por los verdes de GUARDAR-1. D32 ya es (b).
-   - **DOC-1 autorizada por Emi el 2026-10-19:** eligió bloquear el TXT
-     incorrecto antes que sumar exportación completa. Consigna en
-     `PARA-DEV-2.md`; implementación aislada en `codex/doc1-block-invalid-pdf`
-     desde `1469102`, con subagentes backend y UI. Clasificación documental,
-     rechazo EC* por importación y prevención de arrastre A→B. Va antes de
-     ORG-1. La publicación sigue esperando revisión y autorización por SHA.
-   - **Incidente PDF/TXT:** la mezcla entre documentos sigue sin demostrar.
-     Se confirmó con datos sintéticos que la lectura pierde la
-     clasificación de despacho/EC02 y que la v2 usa la ruta de importación.
-     La generación de exportación sigue fuera del alcance vigente
-     (`DECISIONS.md`, pendiente v1/export). DOC-1 bloquea la salida errónea;
-     no amplía a exportación completa. Ningún PDF/TXT privado se
-     incorpora al repositorio.
-   - **Entorno:** focales en Python 3.12 con paquetes instalados y SQLite
-     temporal, no un entorno limpio desde `requirements.txt`. Son revisión
-     parcial, no sustituyen suite, pantallas, Postgres ni prueba en el Kit.
 
 1. **Segunda publicación, hecha:** `6ea8ca9`, 2026-10-07 19:58 UTC («dale
    6ea8ca9» de Emi). Emi genera un TXT con una factura real, lo descarga
@@ -250,37 +133,7 @@ Archivos abiertos por Dev:
 
 ## En curso
 
-- **Dev 1:** GUARDAR-1 (Emi dijo que sí; está en producción). Después, la
-  devolución de EXCEL-2 (devuelta sobre `3e6e63e` a las 19:45 UTC por seis
-  puntos; tres rompen: una combinada gigante traba la lectura, una
-  combinada con texto duplica el FOB, el tope de estilos no protege la
-  memoria; D27 (a)). Después, COBRO-MP-1, en pausa en `18a1850`.
-- **Dev 2:** MARIA-5, CATALOGO-NCM-1 y SUBITEMS-1 aceptadas sobre `df4de22` e integradas (`0e57f70`). Ahora MARIA-5d: devolución del 2026-10-19 por variantes «unit (kg)»; va antes de la próxima publicación. Después ORG-1 (Fase 2); MARIA-6 espera los archivos del despachante.
-- **Aceptadas e integradas el 2026-10-07 después del ensayo** (sin publicar):
-  RENDIMIENTO-1 y 1b (`ec3d793`), MARIA-1a, 2b, 1c, 4, 3 y 1d (`9679e21`).
-  Suite sobre la rama integrada (`7b42556`, venv armado sólo con el
-  `requirements.txt` nuevo): `1067 passed, 102 skipped, 0 failed`. Al
-  integrar, dos pruebas de MARIA armaban su PDF con PyPDF2, que salió en
-  RENDIMIENTO-1: pasan a `pypdf` (`7b42556`).
-- **Integradas a las 15:20 UTC:** EXCEL-1 y MARIA-1b con su devolución (`beea9eb`). Suite sobre `6ea8ca9`: `1224 passed, 102 skipped, 1 xfailed`.
-- **Aceptadas el 2026-10-07 e integradas:** ADMIN-1 (`ac25dbc`), MARIA-2
-  (`65ea6f3`) y ADMIN-2 (`f9f8393`). Suite sobre `f9f8393`, que tiene el
-  mismo producto y las mismas pruebas que la rama de PM:
-  `716 passed, 102 skipped`.
-- **Publicación de ensayo:** dos candidatos. (a) `cb8f509`, el código de
-  `e8344d0` tal cual; (b) la cabeza de la rama de PM, que además cierra el
-  admin, borra el atajo que activaba una suscripción sin pagar y saca los
-  productos inventados, pero pide `ADMIN_USERNAMES`. La PM
-  recomienda (b) si la variable está; si no, (a). Un subagente Opus alto
-  atacó `81bcaba` y repitió sobre `7f1dd2c` (con ADMIN-2): se puede publicar
-  si Emi hace antes la lista de arriba. Suite sobre `321f34b` (04:05 UTC):
-  `716 passed, 102 skipped`; de ahí a la cabeza sólo cambian documentos. Si
-  entra producto antes del «dale», se corre otra vez sobre el SHA exacto.
-- **Despachante:** respondió las seis preguntas y las dos cortas el
-  2026-10-06 (`PREGUNTAS-DESPACHANTE.md`): la empresa de digitalización se
-  elige por operación (Modoc = `PSAD06`, Lakaut = `PSAD01`) y la reducción del
-  IVA adicional es una «ventaja» que elige él en el Kit, no va en el TXT.
-  Faltan los archivos reales y, al cerrar la Fase 1, la prueba en su Kit.
+Ver «Última vuelta» y la línea `/compact conservar` de abajo.
 
 ## Puertas para cobrarle a un estudio
 
