@@ -1044,7 +1044,7 @@ def test_la_cabecera_y_su_hijo_se_deciden_igual(rotulo, forma):
 
 
 def test_la_cabecera_insurance_sin_combinadas_deja_sin_leer_al_hijo():
-    """La receta f3_insurance de la reproducción: en la base, sin leer las dos."""
+    """La receta f3_insurance de la reproducción: en la base (e08b4c4), sin leer las dos."""
     data = _leer([
         SIN_ORIGEN,
         ["W-1", "LONA DEMO", 2, 10, 1, 1.5, 15],
@@ -1119,3 +1119,152 @@ def test_la_copia_de_un_cargo_combinado_con_texto_en_item_no_cambia_el_fob_sin_s
     assert _total(data["items"]) == 3500 + sum(filas[f][5] for f in entraron), (data["items"], fuera)
     for f in entraron:
         assert re.search(rf"\bfila {f} \(«", _avisos(data)), (f, data["avisos_mapeo"])
+
+
+# ------------------------------------------------------------------ EXCEL-3e (H1)
+# Con la especificación combinada hasta la fila del cargo, unas medidas que
+# no son una medida («/», «-», 0) no lo vuelven un renglón del grupo: el
+# flete y el descuento se leen como en la base (31c9b5a), y el seguro queda
+# afuera o entra con un aviso que nombra su fila.
+
+MEDIDAS_QUE_NO_SON = {"barra": "/", "guion": "-", "cero": 0, "vacias": None}
+CARGOS_H1 = {"flete": ("Freight", 1200), "seguro": ("Insurance", 40), "descuento": ("Discount", -10)}
+PRODUCTO_H1 = [1, "DT-1", "LONA DEMO", 2, 10, 1, 20, 1.5, 30]
+
+
+def _fila_del_cargo(rotulo, monto, medida, importe, donde):
+    precio = [1, monto, monto] if importe == "importe_y_precio" else [None, None, monto]
+    if donde == "rotulo_en_item":
+        return [rotulo, "-", None, medida, medida, "-"] + precio, ("C2:C3",)
+    return [2, "-", rotulo, medida, medida, "-"] + precio, ()
+
+
+def _xls(filas, combinar) -> bytes:
+    """El mismo libro en .xls (xlwt no está en requirements.txt: sin él, el
+    barrido en .xls no corre y lo cubren los .xls de fixtures)."""
+    xlwt = pytest.importorskip("xlwt")
+    import io as _io
+    from openpyxl.utils.cell import range_boundaries
+    wb = xlwt.Workbook()
+    ws = wb.add_sheet("PI")
+    tapadas = set()
+    rangos = []
+    for rango in combinar:
+        c1, f1, c2, f2 = range_boundaries(rango)
+        rangos.append((f1 - 1, f2 - 1, c1 - 1, c2 - 1))
+        tapadas |= {(f, c) for f in range(f1 - 1, f2) for c in range(c1 - 1, c2)} - {(f1 - 1, c1 - 1)}
+    for i, fila in enumerate(filas):
+        for j, v in enumerate(fila):
+            if v is not None and (i, j) not in tapadas:
+                ws.write(i, j, v)
+    for r in rangos:
+        ws.merge(*r)
+    buf = _io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue()
+
+
+def _leer_en(formato, filas, combinar):
+    if formato == "xlsx":
+        return _leer_combinado(filas, combinar)
+    r = _subir(_xls(filas, combinar), "p.xls")
+    assert r.status_code == 200, r.text[:300]
+    return r.json()
+
+
+def _el_cargo_h1_no_entra_como_producto(data, cargo, monto):
+    """Lo que pide EXCEL-3e: el producto queda con FOB 30; el flete y el
+    descuento se leen con su fila, como en la base; el seguro queda sin leer
+    o entra con un aviso que nombra su fila."""
+    op = data["operacion"]
+    assert [(i["codigo_parte"], i["descripcion"].split(",")[0]) for i in data["items"]][:1] == [
+        ("DT-1", "LONA DEMO")], data["items"]
+    if cargo == "flete":
+        assert (op.get("flete"), op.get("filas_excel_flete")) == (monto, [3]), op
+        assert _total(data["items"]) == 30, data["items"]
+    elif cargo == "descuento":
+        assert (op.get("descuento"), op.get("filas_excel_descuento")) == (abs(monto), [3]), op
+        assert _total(data["items"]) == 30, data["items"]
+    elif 3 in data["filas_descartadas_numeros"]:
+        assert _total(data["items"]) == 30, data["items"]
+    else:
+        assert _total(data["items"]) == 30 + monto, data["items"]
+        assert re.search(r"\bfila 3 \(«", _avisos(data)), data["avisos_mapeo"]
+
+
+@pytest.mark.parametrize("formato", ["xlsx", "xls"])
+@pytest.mark.parametrize("donde", ["rotulo_en_item", "rotulo_en_descripcion"])
+@pytest.mark.parametrize("importe", ["importe_y_precio", "solo_importe"])
+@pytest.mark.parametrize("cargo", list(CARGOS_H1))
+@pytest.mark.parametrize("medida", list(MEDIDAS_QUE_NO_SON))
+def test_un_cargo_con_medidas_que_no_son_no_entra_como_producto(medida, cargo, importe, donde, formato):
+    rotulo, monto = CARGOS_H1[cargo]
+    fila, combinar = _fila_del_cargo(rotulo, monto, MEDIDAS_QUE_NO_SON[medida], importe, donde)
+    data = _leer_en(formato, [RENGLONES_PVC, PRODUCTO_H1, fila], combinar)
+    _el_cargo_h1_no_entra_como_producto(data, cargo, monto)
+
+
+# Los .xls de la familia que corren también donde no está xlwt (la CI).
+XLS_H1 = {
+    "flete_barra": ("flete", "barra", "importe_y_precio"),
+    "seguro_guion": ("seguro", "guion", "solo_importe"),
+    "descuento_cero": ("descuento", "cero", "importe_y_precio"),
+}
+
+
+def _filas_xls_h1(nombre):
+    cargo, medida, importe = XLS_H1[nombre]
+    rotulo, monto = CARGOS_H1[cargo]
+    fila, combinar = _fila_del_cargo(rotulo, monto, MEDIDAS_QUE_NO_SON[medida], importe, "rotulo_en_item")
+    return [RENGLONES_PVC, PRODUCTO_H1, fila], combinar
+
+
+def _ruta_xls_h1(nombre):
+    return os.path.join(os.path.dirname(__file__), "fixtures", f"h1_{nombre}.xls")
+
+
+def escribir_xls_h1() -> None:
+    for nombre in XLS_H1:
+        with open(_ruta_xls_h1(nombre), "wb") as f:
+            f.write(_xls(*_filas_xls_h1(nombre)))
+
+
+@pytest.mark.parametrize("nombre", list(XLS_H1))
+def test_el_xls_del_cargo_con_medidas_que_no_son_no_entra_como_producto(nombre):
+    import xlrd
+    filas, combinar = _filas_xls_h1(nombre)
+    hoja = xlrd.open_workbook(_ruta_xls_h1(nombre), formatting_info=True).sheet_by_index(0)
+    assert hoja.merged_cells == [(1, 3, 2, 3)]  # el .xls guardado es el de las filas
+    assert [[None if v == "" else v for v in hoja.row_values(i)] for i in range(hoja.nrows)] == [
+        [None if (i, j) == (2, 2) else v for j, v in enumerate(f)] for i, f in enumerate(filas)]
+    with open(_ruta_xls_h1(nombre), "rb") as f:
+        r = _subir(f.read(), "p.xls")
+    assert r.status_code == 200, r.text[:300]
+    cargo = XLS_H1[nombre][0]
+    _el_cargo_h1_no_entra_como_producto(r.json(), cargo, CARGOS_H1[cargo][1])
+
+
+@pytest.mark.parametrize("formato", ["xlsx", "xls"])
+@pytest.mark.parametrize("combinar", [(), ("C2:C3",)], ids=["descripcion_propia", "descripcion_combinada"])
+@pytest.mark.parametrize("medida", ["-", "/", 0])
+def test_un_producto_con_medidas_que_no_son_sigue_entrando(medida, combinar, formato):
+    """Un producto con su código, cantidad y precio entra aunque sus medidas
+    digan «-»: con su descripción o con la combinada de arriba."""
+    data = _leer_en(formato, [RENGLONES_PVC, PRODUCTO_H1,
+                              [2, "DT-2", "CINTA DEMO", medida, medida, 1, 4, 2, 8]], combinar)
+    assert [i["codigo_parte"] for i in data["items"]] == ["DT-1", "DT-2"], data["items"]
+    assert _total(data["items"]) == 38, data["items"]
+    assert data["filas_descartadas_numeros"] == [], data
+    if combinar:
+        assert all(i["descripcion"].startswith("LONA DEMO") for i in data["items"]), data["items"]
+
+
+@pytest.mark.parametrize("formato", ["xlsx", "xls"])
+@pytest.mark.parametrize("medida", ["-", "/", 0])
+def test_un_renglon_sin_descripcion_ni_medidas_no_hereda_y_se_avisa(medida, formato):
+    """Sin descripción y con medidas «-» no es un largo del grupo: no hereda la
+    descripción de arriba, queda sin leer y se avisa su fila (EXCEL-3e)."""
+    data = _leer_en(formato, [RENGLONES_PVC, PRODUCTO_H1,
+                              [2, "DT-1", None, medida, medida, 1, 4, 2, 8]], ())
+    assert [i["codigo_parte"] for i in data["items"]] == ["DT-1"], data["items"]
+    assert data["filas_descartadas_numeros"] == [3], data
