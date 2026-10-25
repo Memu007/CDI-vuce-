@@ -1,9 +1,11 @@
 """SEPARADORES-1b: un monto ilegible no viaja como 0, y «1234.567» se pregunta.
 
 1. D19 (b): si la pantalla no puede leer el flete, el seguro, los gastos o un
-   ajuste, el pedido lleva el texto tal cual y el servidor lo rechaza con un
-   mensaje (ni 0 silencioso, ni 422 crudo, ni 500). Un texto que Python lee a
-   su manera («3.480» → 3,48; «1e3» → 1000) tampoco pasa.
+   ajuste, el pedido lleva el texto tal cual (ni 0 silencioso, ni 422 crudo,
+   ni 500). El flete, el seguro o los gastos: el servidor no genera y dice
+   cuál es. Un ajuste: se dice en las cuentas y frena sólo con el seguro
+   calculado (D20). Un texto que Python lee a su manera («3.480» → 3,48;
+   «1e3» → 1000) tampoco pasa.
 2. Un separador seguido de tres cifras, con cuatro o más cifras adelante
    («4500.000», «98765,432»): no es un grupo de miles bien formado. En la
    factura, con la pista decimal en contra, queda sin leer (antes 4500000);
