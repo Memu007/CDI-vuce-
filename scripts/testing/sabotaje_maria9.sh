@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # uso: scripts/testing/sabotaje_maria9.sh [SHA] [venv]
 # Negativos discriminantes de MARIA-9: el sufijo de la operación se valida
-# sólo si algún producto lo usa, y los avisos anticipan su error. Cada
-# sabotaje se aplica en un worktree descartable, corre los casos de MARIA-9 y
-# tiene que dar ROJO con el motivo esperado. Si un patrón no se encuentra, el
-# script sale con error.
+# sólo si algún producto lo usa, los avisos anticipan su error y la pantalla
+# lleva cada error de sufijo a su lugar. Cada sabotaje se aplica en un
+# worktree descartable, corre los casos de MARIA-9 (o la pantalla, con su
+# propia API) y tiene que dar ROJO con el motivo esperado. Si un patrón no se
+# encuentra, el script sale con error.
 set -euo pipefail
 SHA="${1:-HEAD}"
 VENV="${2:-${VENV:-/tmp/cdi-dev2/venv}}"
@@ -104,5 +105,60 @@ caso "api_exige_el_general" "FAILED $T::test_por_api_los_renglones_con_propio_ge
 reemplazar $M '        if not sbt_raw and usa_el_sufijo_de_la_operacion(request.items, request.iva_adicional):' '        if False:'
 caso "api_sin_falta" "FAILED $T::test_por_api_sin_ninguno_falta_el_sufijo"
 
+# --- La pantalla (punto 2): scripts/testing/pantalla_maria9.js contra una API
+# levantada en este worktree. Sirve los archivos del disco: cada sabotaje se
+# ve sin reiniciarla.
+PUERTO="$("$VENV/bin/python" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')"
+(env ENVIRONMENT=development DATABASE_URL=sqlite+aiosqlite:///./pantalla.db \
+     JWT_SECRET_KEY=clave-inventada-solo-local-0123456789abcdef EMAIL_VERIFICATION_REQUIRED=false \
+     ARCA_NOVEDADES_XML_URL=http://127.0.0.1:9/x ARCA_NOVEDADES_WEB_URL=http://127.0.0.1:9/x \
+     "$VENV/bin/python" -m uvicorn proyecto_maria.main:app --host 127.0.0.1 --port "$PUERTO" \
+     > "$TMP/api.log" 2>&1 < /dev/null & echo $! > "$TMP/api.pid")
+trap 'kill "$(cat "$TMP/api.pid")" 2>/dev/null || true; git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1 || true; rm -rf "$TMP"' EXIT
+"$VENV/bin/python" - "$PUERTO" <<'PY2' || { echo "FALLA: la API no levanta"; tail -20 "$TMP/api.log"; exit 1; }
+import sys, time, urllib.request
+fin = time.time() + 90
+while True:
+    try:
+        urllib.request.urlopen(f"http://127.0.0.1:{sys.argv[1]}/health", timeout=2); break
+    except Exception:
+        if time.time() > fin: sys.exit(1)
+        time.sleep(0.5)
+PY2
+pantalla() { BASE_URL="http://127.0.0.1:$PUERTO" node scripts/testing/pantalla_maria9.js 2>&1 || true; }
+caso_pantalla() {  # caso_pantalla <nombre> <texto que la falla tiene que mostrar>
+  local nombre="$1" espera="$2" salida
+  salida="$(pantalla)"
+  git checkout -q -- .
+  if grep -q "PANTALLA MARIA-9 OK" <<<"$salida"; then
+    echo "FALLA  $nombre: quedó verde"; FALLAS=$((FALLAS+1)); return
+  fi
+  if grep -qF -- "$espera" <<<"$salida"; then
+    echo "ROJO   $nombre: $(grep FALLA: <<<"$salida" | head -1 | cut -c1-110)"
+  else
+    echo "FALLA  $nombre: rojo, pero sin «$espera»"; FALLAS=$((FALLAS+1)); tail -5 <<<"$salida"
+  fi
+}
+base="$(pantalla)"
+grep -q "PANTALLA MARIA-9 OK" <<<"$base" || { echo "FALLA: la pantalla no está verde sin sabotaje"; tail -5 <<<"$base"; exit 1; }
+echo "VERDE  pantalla sin sabotaje"
+J=proyecto_maria/static/v2/screens/finalize.js
+
+# 11. el error del sufijo de un sub-ítem no va al sub-ítem
+reemplazar $J '/^(?:Item|Sufijo de valor del ítem) (\d+), sub-ítem (\d+): /' '/^(?:Item) (\d+), sub-ítem (\d+): /'
+caso_pantalla "subitem_no_reconocido" "FALLA: el del sub-ítem: no sale bajo el sub-ítem 2 del ítem 1"
+
+# 12. el error del sufijo de la operación no va a su campo
+reemplazar $J "detail.startsWith('Sufijo de valor de la operación: ')" "false"
+caso_pantalla "operacion_no_reconocida" "FALLA: el de la operación: no sale bajo el campo"
+
+# 13. el número del ítem no se usa (todo cae en el primero)
+reemplazar $J 'marcarErrorDeSubitem(parseInt(sub[1], 10) - 1,' 'marcarErrorDeSubitem(0,'
+caso_pantalla "item_ignorado" "FALLA: el del ítem 2: no sale bajo el sub-ítem 1 del ítem 2"
+
+# 14. cualquier error de sufijo va al campo de la operación
+reemplazar $J "detail.startsWith('Sufijo de valor de la operación: ')" "detail.startsWith('Sufijo de valor')"
+caso_pantalla "todo_al_campo" "FALLA: el error de un sub-ítem que no existe se pierde"
+
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
-echo "OK: los 10 sabotajes dan rojo por la razón esperada"
+echo "OK: los 14 sabotajes dan rojo por la razón esperada"
