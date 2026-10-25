@@ -133,3 +133,17 @@ Sin `uvicorn`, `pytest` ni `chromium` de la revisión andando al terminar
 (`ps`). Worktrees `/tmp/rev-x3e`, `/tmp/rev-x3e-base`, `/tmp/rev-x3e-neg` y
 `/tmp/rev-x3e-piso` borrados (`git worktree prune`); el sabotaje borra el
 suyo. Los ayudantes de los negativos quedaron fuera del repositorio.
+
+## Suite sobre el merge `5eb6ae4`
+
+Desde base limpia (`rm -f test.db`, el mismo entorno), en `/tmp/rev-merge`:
+los mismos 12 FAILED de arriba, ninguno más.
+
+```
+= 12 failed, 3114 passed, 102 skipped, 2 xfailed, 94 warnings in 329.95s (0:05:29) =
+rc=1
+```
+
+Los 105 passed de más son las pruebas de la Dev MARIA que ya estaban en mi
+rama. Las líneas `ERROR sqlalchemy.pool…` son registro del cierre de
+conexiones, no pruebas en error. Worktree `/tmp/rev-merge` borrado.

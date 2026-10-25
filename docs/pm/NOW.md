@@ -199,7 +199,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-25 09:40 UTC: EXCEL-3e (`6f798d8`, informe `e1acb64`) **aceptada**; integradas con ella EXCEL-3d, CLIENTE-1b y ESTUDIO-1 (`merge` `5eb6ae4`), sin publicar. 861 de Excel, 96 sabotajes en rojo (en dos partes: la primera se cortó por mi tope de tiempo en 81), suite de la entrega con los 12 rojos que informó la Dev, once negativos y un adversario Opus alto. Suite sobre el merge: corriendo al subir; el resultado va en el commit siguiente. D24 (a). H1 (descripción repetida a mano) y H3 (texto de contenedor como medida) van a EXCEL-3f. La técnica sigue con CLIENTE-1c; MARIA en SUFIJOS-1.
+2026-10-25 09:40 UTC: EXCEL-3e (`6f798d8`, informe `e1acb64`) **aceptada**; integradas con ella EXCEL-3d, CLIENTE-1b y ESTUDIO-1 (`merge` `5eb6ae4`), sin publicar. 861 de Excel, 96 sabotajes en rojo (en dos partes: la primera se cortó por mi tope de tiempo en 81), suite de la entrega con los 12 rojos que informó la Dev, once negativos y un adversario Opus alto. Suite sobre el merge: los mismos 12 rojos de la entrega, 3114 passed. D24 (a). H1 (descripción repetida a mano) y H3 (texto de contenedor como medida) van a EXCEL-3f. La técnica sigue con CLIENTE-1c; MARIA en SUFIJOS-1.
 
 ## Medición
 
