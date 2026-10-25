@@ -102,6 +102,15 @@ Dos condiciones nuevas, por la integración de hoy:
   `test_guardar1::test_datos_largos_de_la_operacion_no_impiden_guardarla`.
   Es la regresión que informaste (la fecha con hora queda vacía en la
   ficha); su rojo antes, como dijiste.
+- **Los 11 rojos de presupuesto también (corrección mía, 09:35 UTC).** Tu
+  informe dice que la CI los deselecciona y lo acepté sin mirar: no es así,
+  `ci.yml` deselecciona otros 10. La CI de mi rama estuvo verde hasta
+  `c5eab07` y dio 12 rojos en `bcab8b5`, la primera con tu rama integrada
+  (402 «Alcanzaste el límite de 15 operaciones del plan Premium»). Alguna
+  prueba de tu rama gasta operaciones del usuario de prueba compartido sin
+  devolverlas. Buscá cuál por la causa y arreglala en las pruebas; no
+  deselecciones nada ni subas el tope del producto. Puerta: la CI verde
+  con el mismo `ci.yml`.
 - **Mi diff de revisión va desde `c820c74`**, el padre de `d7aa875`, no
   desde `1955cac`: los commits de CLIENTE-1c que ya están en la base
   (`d7aa875`…`8b65b6b`) entran en la revisión.

@@ -120,7 +120,12 @@ Los mismos 12 que informó la Dev. Esta vez `test_ocho_libros…` pasó.
 
 - **Los 11 de presupuesto:** corridos solos con base nueva, `11 passed, 3
   warnings in 0.52s`. Con la suite entera chocan con el tope de 15
-  operaciones del plan; la CI los deselecciona.
+  operaciones del plan. **Corrección (09:35 UTC):** el informe decía que la
+  CI los deselecciona y lo copié sin mirar; no es así (`ci.yml` deselecciona
+  otros 10). La CI de mi rama estuvo verde hasta `c5eab07` y dio estos
+  mismos 12 rojos en `bcab8b5`, la primera con la rama técnica integrada:
+  es una regresión de las pruebas que trae esa rama, no ruido conocido. Va
+  a la puerta de CLIENTE-1c.
 - **`test_guardar1::test_datos_largos…`:** corrido solo falla igual,
   `assert [('',)] == [('2020-01-15',)]`. Es la regresión del CLIENTE-1c a
   medio hacer (`d7aa875`…`8b65b6b`, ya en la base `1955cac`): una fecha
