@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-10-25 · fix: «Calcular seguro» sólo usa cuentas del pedido de ahora (VALOR-1b)
 
-- «Calcular seguro» compara el pedido de ahora con el de las cuentas: si cambió un ajuste, el flete, el seguro o el descuento, pide las cuentas de nuevo en vez de usar las viejas. El seguro calculado deja de avisarse como no leído, y si la factura puede traer un seguro sin leer, el botón lo avisa.
+- «Calcular seguro» compara el pedido de ahora con el de las cuentas: si cambió un ajuste, el flete, el seguro o el descuento, pide las cuentas de nuevo en vez de usar las viejas. El seguro calculado deja de avisarse como no leído, y si la factura puede traer un seguro sin leer, la tarjeta lo avisa antes de calcularlo.
 - El 1 % del seguro sugerido va sobre el FOB de la factura (D13). Un ajuste o un renglón que no es número va en la tarjeta con un mensaje claro, sin texto de Python, y no frena el TXT.
 
 ## 2026-10-25 · fix: el error de kilos nombra sólo el renglón chico (MARIA-9)

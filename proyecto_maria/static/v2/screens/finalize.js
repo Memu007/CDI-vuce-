@@ -398,7 +398,7 @@
         }
         // El botón, cuando no hay seguro o cuando el que hay lo puso él.
         const calculado = ok && op.seguro_calculado;
-        // Sobre qué FOB va el 1 % lo dice el servidor (D12b).
+        // Sobre qué FOB va el 1 % lo dice el servidor (BASE_SEGURO_SUGERIDO, D13).
         const base = (ok && valor.base_seguro) || 'FOB';
         const mostrar = ok && (!(valor.seguro > 0) || calculado) && valor.seguro !== valor.seguro_sugerido;
         if (boton) {

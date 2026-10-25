@@ -874,27 +874,33 @@ def importe_escrito(valor) -> str:
 
 def _ajuste(valor, nombre: str):
     """Un ajuste como lo manda la pantalla: número, texto con un número o
-    nada. Verdadero o falso no es un importe (float(True) daría 1)."""
-    if isinstance(valor, bool):
-        raise ValueError(f"{nombre}: «{valor}» no es un importe.")
+    nada. Verdadero o falso no es un importe (float(True) daría 1); una lista
+    o un objeto tampoco, y no se muestra como lo escribe Python."""
+    if isinstance(valor, bool) or not isinstance(valor, (str, int, float, Decimal, type(None))):
+        raise ValueError(f"{nombre}: no es un importe.")
     return importe_valido(valor, nombre)
 
 
 def _numeros_de_los_renglones(items: list):
     """Que cada cantidad y cada valor de los renglones se pueda leer como
-    número, con un mensaje que lo nombre en vez del texto de Python."""
+    número, con un mensaje que lo nombre en vez del texto de Python.
+    Verdadero o falso no es un número, como en _ajuste."""
     campos = (("cantidad", "la cantidad"), ("valor_unitario", "el valor unitario"),
               ("valor_total", "el valor total"))
     for n, item in enumerate(items, 1):
         for campo, nombre in campos:
             valor = item.get(campo)
-            if not valor or isinstance(valor, (int, float, Decimal)):
-                continue
-            try:
-                float(valor)
-            except (TypeError, ValueError):
-                raise ValueError(f"Renglón {n}: {nombre} «{str(valor)[:20]}» no es un número; "
-                                 f"no se pueden hacer las cuentas.") from None
+            if not isinstance(valor, bool):
+                if not valor or isinstance(valor, (int, float, Decimal)):
+                    continue
+                try:
+                    float(valor)
+                    continue
+                except (TypeError, ValueError):
+                    pass
+            escrito = f" «{valor[:20]}»" if isinstance(valor, str) else ""
+            raise ValueError(f"Renglón {n}: {nombre}{escrito} no es un número; "
+                             f"no se pueden hacer las cuentas.")
 
 
 def cuentas_del_valor(items: list, flete=0, seguro=0, ajustes_incluir=None, ajustes_deducir=None) -> dict:
