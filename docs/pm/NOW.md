@@ -332,9 +332,9 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-25 07:05 UTC: SEPARADORES-1 y VALOR-1c (`a099655`, informe `4548644`) **aceptadas** e integradas con `merge`, sin publicar: suite `2280 passed, 102 skipped, 2 xfailed`, sabotajes 26 y 17 en rojo, 301 focales, 200.000 montos sin error y un adversario Opus alto (TXT igual byte a byte en 56 pedidos, ningún 500 nuevo). D19 (b). Sigue **SEPARADORES-1b** (D19 b y «separador y tres dígitos» mal agrupados, en la factura y en la pantalla), después SUFIJOS-1. Contexto de las tres sesiones bajo 120k; la técnica, en CLIENTE-1c sin informe.
+2026-10-25 07:56 UTC: sin entregas nuevas. MARIA en SEPARADORES-1b (`db39de0`, sin informe; contexto 142k); la técnica en CLIENTE-1c (`1955cac`, corriendo sabotajes, sin informe; 115k). CI verde sobre `a2fdabd`.
 
-2026-10-25 05:57 UTC: ESTUDIO-1 (`5468581`, código `c992715`) **aceptada**: 26 passed, 37 sabotajes en rojo, 8 negativos míos y un adversario Opus alto sin fugas entre cuentas. Se suma **ESTUDIO-1b** antes de publicarla: D23 (b), que el perfil cuente como último usado (un estudio único hoy gana sobre el perfil y elegir el perfil no queda), `estudio_id` «null» que cae al perfil, y nombres invisibles. No integro: `5468581` trae EXCEL-3d con H1 abierta; todo junto al aceptar EXCEL-3e. Detalle en `REPRODUCCION-ESTUDIO-1-2026-10-25.md`. En la misma vuelta: contexto de las tres sesiones bajo 130k; MARIA dice tener VALOR-1c subido pero su rama sigue en `2145d56` (miro en la próxima); la técnica, en EXCEL-3e.
+2026-10-25 07:05 UTC: SEPARADORES-1 y VALOR-1c (`a099655`, informe `4548644`) **aceptadas** e integradas con `merge`, sin publicar: suite `2280 passed, 102 skipped, 2 xfailed`, sabotajes 26 y 17 en rojo, 301 focales, 200.000 montos sin error y un adversario Opus alto (TXT igual byte a byte en 56 pedidos, ningún 500 nuevo). D19 (b). Sigue **SEPARADORES-1b** (D19 b y «separador y tres dígitos» mal agrupados, en la factura y en la pantalla), después SUFIJOS-1. Contexto de las tres sesiones bajo 120k; la técnica, en CLIENTE-1c sin informe.
 
 ## Medición
 
