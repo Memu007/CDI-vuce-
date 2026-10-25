@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-25 · fix: el seguro calculado con otros importes no sale sin que se elija (VALOR-1c)
+
+- Si el seguro lo calculó el sistema y los importes cambiaron, no se genera hasta recalcularlo o dejarlo como está; se avisa antes con el mismo texto. Un sufijo general que nadie usa ya no frena ni se avisa (D18).
+- Sin productos se dice «No hay productos para generar», y el error de kilos nombra a todos los renglones cuando el cero sale del ajuste.
+
 ## 2026-10-25 · fix: «3.480» es tres mil cuatrocientos ochenta, en la factura y en la pantalla (SEPARADORES-1)
 
 - El flete y el seguro de la factura se leen como texto: «3.480» y «3.480,00» son 3480 (antes el TXT salía con MDDTFLE=3.48). Si la misma factura usa ese separador como decimal, el dato queda sin leer y se avisa.

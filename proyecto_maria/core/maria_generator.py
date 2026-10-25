@@ -1411,13 +1411,17 @@ def generate_maria_txt(operation_id: str, items: list,
                 estadisticas_sub, cantidad_est = cantidades_sub, cantidad_dcl
             if min(cantidades_sub + estadisticas_sub) <= 0:
                 # Se nombran los que dan cero solos, no todos los del ítem.
-                # Si el cero sale del ajuste (que cae en el más grande) no hay
-                # uno más chico que los otros, y se nombran todos.
+                # Si el cero sale del ajuste (que cae en el más grande), o
+                # queda en cero uno que solo no daba cero, los que dan cero
+                # solos no lo explican, y se nombran todos (VALOR-1c).
                 propios = [cantidades_renglones] + (
                     [kilos_renglones] if unidad_est == UNIDAD_KILOGRAMO else [])
-                chicos = [lugar_en_el_pedido[id(r)] for r, *valores in zip(renglones, *propios)
-                          if min(valores).quantize(Decimal("0.01"), ROUND_HALF_UP) <= 0]
-                chicos = chicos or [lugar_en_el_pedido[id(r)] for r in renglones]
+                solos = {i for i, valores in enumerate(zip(*propios))
+                         if min(valores).quantize(Decimal("0.01"), ROUND_HALF_UP) <= 0}
+                en_cero = {i for i, valores in enumerate(zip(cantidades_sub, estadisticas_sub))
+                           if min(valores) <= 0}
+                chicos = [lugar_en_el_pedido[id(r)] for i, r in enumerate(renglones)
+                          if i in solos or not en_cero <= solos]
                 raise ValueError(
                     f"Item {lugar_en_el_pedido[id(renglones[0])]}: "
                     + (f"el renglón {chicos[0]} es tan chico que al llevar su cantidad o sus "
@@ -1824,7 +1828,9 @@ def supuestos_declarados(
                 f"banco; IDTRIB-PROVEEDOR no sale. Cargá la del proveedor en la revisión."
             )
     if sbt_sufijo_valor is not None:
-        sufijos = [("", sbt_sufijo_valor)]
+        # El general, sólo si alguno lo usa: si no, no va al TXT (D18).
+        usa_el_general = usa_el_sufijo_de_la_operacion(items, iva_adicional)
+        sufijos = [("", sbt_sufijo_valor)] if usa_el_general else []
         for idx, item in enumerate(items or [], start=1):
             subs = item.get("subitems") if isinstance(item, dict) else None
             for n, sub in enumerate(subs if isinstance(subs, list) else [], start=1):
@@ -1834,7 +1840,7 @@ def supuestos_declarados(
             avisos.extend(_aviso_de_sufijo(donde, sufijo))
         # Si alguno lo usa y no se puede separar, el generador frena: se dice
         # antes, con el mismo texto (MARIA-9).
-        if usa_el_sufijo_de_la_operacion(items, iva_adicional):
+        if usa_el_general:
             try:
                 limpiar_sufijo(str(sbt_sufijo_valor or "").strip(), " de la operación")
             except ValueError as error:

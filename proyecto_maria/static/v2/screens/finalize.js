@@ -267,8 +267,10 @@
     function cuentasViejas() {
         ultimoValor = null;
         avisosSeq++;
-        const boton = document.getElementById('valorCalcularSeguro');
-        if (boton) boton.hidden = true;
+        ['valorCalcularSeguro', 'valorDejarSeguro'].forEach(function (id) {
+            const boton = document.getElementById(id);
+            if (boton) boton.hidden = true;
+        });
     }
 
     function enlazarValor() {
@@ -294,6 +296,17 @@
         if (usar) usar.addEventListener('click', usarDescuento);
         const seguro = document.getElementById('valorCalcularSeguro');
         if (seguro) seguro.addEventListener('click', calcularSeguro);
+        const dejar = document.getElementById('valorDejarSeguro');
+        if (dejar) dejar.addEventListener('click', dejarSeguro);
+    }
+
+    // El seguro que calculó el sistema con otros importes queda como está:
+    // pasa a ser de la persona y el servidor deja de frenarlo (VALOR-1c).
+    function dejarSeguro() {
+        const op = CDI.state.operacion = CDI.state.operacion || {};
+        delete op.seguro_calculado;
+        cuentasViejas();
+        refrescarAvisos();
     }
 
     function usarDescuento() {
@@ -413,6 +426,11 @@
             boton.textContent = (calculado ? 'Recalcular seguro' : 'Calcular seguro') +
                 ' (1 % de ' + base + ' + flete): ' + (ok ? importeEscrito(valor.seguro_sugerido) : '');
         }
+        // Lo calculó con otros importes, o ya no se puede comprobar: el
+        // servidor no genera hasta que se recalcule o se deje (VALOR-1c).
+        const dejar = document.getElementById('valorDejarSeguro');
+        if (dejar) dejar.hidden = !(valor && op.seguro_calculado &&
+            (valor.error || valor.seguro !== valor.seguro_sugerido));
         if (nota) {
             nota.textContent = !ok ? '' :
                 (calculado && valor.seguro !== valor.seguro_sugerido) ? 'El seguro se calculó con otros importes.' :
@@ -629,6 +647,12 @@
                     CDI.goTo('validating');
                     throw new Error(detail);
                 }
+                // El seguro calculado con otros importes se resuelve en
+                // «Ajustes y seguro» (VALOR-1c).
+                if (typeof detail === 'string' && detail.startsWith('Seguro: ')) {
+                    CDI.goTo('validating');
+                    throw new Error(detail);
+                }
                 // Los controles de antes de generar llegan como {errors: [...]}.
                 const texto = (detail && Array.isArray(detail.errors)) ? detail.errors.join(' ') : detail;
                 throw new Error(texto || 'No se pudo generar el archivo');
@@ -737,6 +761,7 @@
             ).trim(),
             flete: montoDelPedido(op.flete),
             seguro: montoDelPedido(op.seguro),
+            seguro_calculado: !!op.seguro_calculado,
             // MARIA-3: el servidor decide si van al TXT (sólo EXW, FCA o FAS).
             gastos_anteriores_fob: montoDelPedido(op.gastos_anteriores_fob),
             // VALOR-1: sólo para las cuentas; no van al TXT (D12).
