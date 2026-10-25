@@ -17,7 +17,14 @@ def _renglon(n, peso_kg):
     ((0.004, 300.0), "Item 1: el renglón 1 es tan chico que"),
     ((300.0, 0.004, 0.003), "Item 1: los renglones 2 y 3 son tan chicos que"),
     ((0.004, 300.0, 120.0, 0.003), "Item 1: los renglones 1 y 4 son tan chicos que"),
-], ids=["uno_al_final", "uno_al_principio", "dos_al_final", "dos_en_las_puntas"])
+    # El cero sale del ajuste, que cae en el más grande o en el primero: no
+    # hay uno más chico que los otros, y se nombran todos.
+    ((0.025,) + (0.005,) * 5, "Item 1: los renglones 1, 2, 3, 4, 5 y 6 son tan chicos que"),
+    ((0.005, 0.005, 0.005), "Item 1: los renglones 1, 2 y 3 son tan chicos que"),
+    # Los dos dan cero solos; el ajuste rescata a uno, pero es igual de chico.
+    ((0.004, 0.004), "Item 1: los renglones 1 y 2 son tan chicos que"),
+], ids=["uno_al_final", "uno_al_principio", "dos_al_final", "dos_en_las_puntas",
+        "el_cero_cae_en_el_mas_grande", "todos_iguales", "dos_que_dan_cero_solos"])
 def test_el_error_nombra_sólo_los_renglones_chicos(pesos, mensaje):
     with pytest.raises(ValueError) as error:
         _gen([_renglon(n, p) for n, p in enumerate(pesos)])

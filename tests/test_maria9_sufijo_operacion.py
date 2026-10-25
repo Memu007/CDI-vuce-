@@ -128,3 +128,18 @@ def test_por_api_los_avisos_anticipan_el_error(client):
     r = client.post("/generate_maria/avisos", json=_pedido_de_renglones(LIBRE))
     assert r.status_code == 200, r.text
     assert not any(a.startswith(ERROR_GENERAL) for a in r.json()["avisos"])
+
+
+def test_el_endpoint_agrupa_con_la_procedencia_de_la_operacion(client):
+    # Uno trae la procedencia de la operación escrita y el otro la toma de
+    # ella: el generador los junta en un ítem con un sufijo por renglón, así
+    # que el de la operación no hace falta. El endpoint tiene que verlos
+    # juntos igual, y no pedirlo.
+    _registrar_con_cuit(client, "maria9_procedencia")
+    pedido = _pedido()
+    lona = dict(pedido["items"][0], estado=2)
+    pedido["items"] = [dict(lona, pais_procedencia="UY", sufijo="AA(A)-"),
+                       dict(lona, sufijo="AA(B)-", descripcion="Lona de PVC azul")]
+    r = client.post("/generate_maria", json=dict(pedido, procedencia="UY", sbt_sufijo_valor=""))
+    assert r.status_code == 200, r.text
+    assert _valor(r.json()["content"], "CSBTSVL") == ["AA(A)-", "AA(B)-"]
