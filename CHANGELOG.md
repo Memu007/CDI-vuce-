@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-25 · feat: los estudios de la cuenta para el CUIT del despachante (ESTUDIO-1)
+
+- **feat(estudios):** en «Mi perfil», «Mis estudios» se cargan los estudios (nombre y CUIT) de la cuenta; en la operación se elige uno, con el último usado o el único ya elegido, y su CUIT va al CDDTAGR. Sin estudio sigue el CUIT del perfil; cada usuario ve, borra y usa sólo los suyos.
+- Sin CUIT del despachante, el aviso y el error dicen dónde cargarlo.
+
 ## 2026-10-25 · fix: la proforma con combinadas, sin perder productos ni sumar cargos (EXCEL-3c)
 
 - **fix(excel):** con el origen combinado, un producto con descripción propia que empieza con «Payment», «Handling» o «Seguro» vuelve a entrar; el seguro, el pago, los gastos o el handling cuyo rótulo dice sólo el cargo («Insurance», «Seguro de carga», «Payment 30% T/T in advance») quedan sin leer, con aviso, aunque la descripción o el origen vengan combinados hasta su fila o el rótulo ocupe dos filas; «Freight elevator» con el origen combinado es un producto, no el flete.

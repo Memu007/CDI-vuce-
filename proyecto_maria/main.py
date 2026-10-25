@@ -7,6 +7,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, field_validator
 from datetime import date, datetime, timedelta, timezone
+from typing import Any
 import jwt
 import json
 import os
@@ -132,7 +133,7 @@ security = HTTPBearer()
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from proyecto_maria.database.connection import get_async_session, init_db
-from proyecto_maria.database.models import User, Client, PasswordResetToken, Organization, Invitation
+from proyecto_maria.database.models import User, Client, PasswordResetToken, Organization, Invitation, Estudio
 import uuid
 import logging
 from sqlalchemy.exc import IntegrityError
@@ -4081,6 +4082,35 @@ async def upload_pdf_public(
         )
 
 
+# El texto de «dónde cargarlo» del CUIT del despachante (ESTUDIO-1). El
+# generador avisa con FALTA_CUIT_DEL_DESPACHANTE; la API lo cambia por éste.
+FALTA_CUIT_DONDE_CARGARLO = (
+    "Falta el CUIT del despachante (CDDTAGR): elegí el estudio en la operación o "
+    "cargá uno en «Mi perfil», «Mis estudios». Sin él no se genera el TXT."
+)
+
+
+async def _estudio_elegido(db: AsyncSession, estudio_id: str, username: str):
+    """El estudio que eligió la operación, si es de la cuenta (ESTUDIO-1).
+
+    Vacío: ninguno (sigue `cuit_agr` y el perfil). Uno que no es de la cuenta
+    o no existe es un error: no se cae en silencio al CUIT del perfil.
+    """
+    estudio_id = (estudio_id or "").strip()
+    if not estudio_id:
+        return None
+    result = await db.execute(
+        select(Estudio).where(Estudio.id == estudio_id, Estudio.owner_username == username)
+    )
+    estudio = result.scalars().first()
+    if estudio is None:
+        raise HTTPException(
+            status_code=400,
+            detail="El estudio elegido no está en tu cuenta: elegí otro en la operación.",
+        )
+    return estudio
+
+
 class MariaRequest(BaseModel):
     """Request para generar archivo MARIA TXT."""
     operation_id: str
@@ -4090,6 +4120,9 @@ class MariaRequest(BaseModel):
     moneda: str = ""
     incoterm: str = ""
     cuit_agr: str = ""
+    # El estudio elegido en la operación (ESTUDIO-1): su CUIT va al CDDTAGR
+    # y manda sobre `cuit_agr` y el perfil. Vacío: como antes.
+    estudio_id: str = ""
     vendedor_nombre: str = ""
     vendedor_id: str = ""
     comprador_nombre: str = ""
@@ -4147,7 +4180,7 @@ class MariaRequest(BaseModel):
         "bl_numero", "puerto_origen", "puerto_destino", "buque_nombre", "viaje_numero",
         "fecha_embarque", "fecha_emision", "contenedor_numero", "contenedor_tipo",
         "aduana_codigo", "tipo_destinacion", "sbt_sufijo_valor", "procedencia", "banco_bcra",
-        "numero_factura",
+        "numero_factura", "estudio_id",
         mode="before",
     )
     @classmethod
@@ -4210,10 +4243,12 @@ def _rechazar_exportacion_en_importacion(request: MariaRequest) -> None:
 async def avisos_maria_endpoint(
     request: MariaRequest,
     user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """Los avisos de `/generate_maria`, antes de generar (MARIA-3): la
     pantalla los muestra junto al botón. No genera ni guarda nada."""
     _rechazar_exportacion_en_importacion(request)
+    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])
     items = _items_con_procedencia(request)
     try:
         gastos = gastos_fob_para_el_txt(request.incoterm, request.gastos_fob, request.gastos_anteriores_fob)
@@ -4228,8 +4263,8 @@ async def avisos_maria_endpoint(
         kit_warnings = []
     supuestos = _supuestos_maria(request, items, gastos)
     # Sin CUIT del despachante no se genera (MARIA-7): se avisa antes.
-    if not str(request.cuit_agr or "").strip() and not str((user or {}).get("cuit") or "").strip():
-        supuestos = [FALTA_CUIT_DEL_DESPACHANTE, *supuestos]
+    if estudio is None and not str(request.cuit_agr or "").strip() and not str((user or {}).get("cuit") or "").strip():
+        supuestos = [FALTA_CUIT_DONDE_CARGARLO, *supuestos]
     # Lo que al generar es un error de procedencia, acá se avisa con el mismo texto.
     # La NCM dada de baja o que no está en el vigente, como en la validación
     # (CATALOGO-NCM-1): aviso, no freno.
@@ -4242,6 +4277,7 @@ async def avisos_maria_endpoint(
 async def generate_maria_endpoint(
     request: MariaRequest,
     user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Genera archivo TXT en formato MARIA para el sistema SIM de AFIP.
@@ -4251,6 +4287,7 @@ async def generate_maria_endpoint(
     Devuelve: archivo TXT descargable
     """
     _rechazar_exportacion_en_importacion(request)
+    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])
     try:
         from proyecto_maria.core.controles_maria import (
             CAMPOS_DE_TEXTO, CAMPOS_DE_TEXTO_DEL_ITEM, controles_antes_de_generar, limpiar_texto,
@@ -4369,7 +4406,8 @@ async def generate_maria_endpoint(
         # Si el user tiene CUIT en su perfil y la request no manda cuit_agr,
         # usamos el del perfil (para que el despachante no tenga que re-escribir
         # su propio CUIT en cada operacion).
-        effective_cuit_agr = request.cuit_agr
+        # El estudio elegido manda (ESTUDIO-1); su CUIT se validó al guardarlo.
+        effective_cuit_agr = estudio.cuit if estudio is not None else request.cuit_agr
         try:
             if not effective_cuit_agr and user and user.get("cuit"):
                 effective_cuit_agr = str(user["cuit"]).strip()
@@ -4444,6 +4482,16 @@ async def generate_maria_endpoint(
         # valor asumido en silencio se descubre recién en la aduana.
         supuestos = _supuestos_maria(request, items, gastos)
 
+        # Generó: el estudio pasa a ser el último usado (se preselecciona).
+        # Si no se puede anotar, el TXT igual se entrega.
+        if estudio is not None:
+            try:
+                estudio.last_used_at = datetime.now(timezone.utc)
+                await db.commit()
+            except Exception as e:
+                await db.rollback()
+                print(f"No se anotó el uso del estudio {estudio.id}: {e}")
+
         return {
             "success": True,
             "filename": filename,
@@ -4456,7 +4504,10 @@ async def generate_maria_endpoint(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # El generador lo controla al final (los demás errores primero); acá
+        # se dice también que se elige en la operación (ESTUDIO-1).
+        detalle = FALTA_CUIT_DONDE_CARGARLO if str(e) == FALTA_CUIT_DEL_DESPACHANTE else str(e)
+        raise HTTPException(status_code=400, detail=detalle)
     except Exception as e:
         print(f"Error generando MARIA TXT: {e}")
         raise HTTPException(status_code=500, detail=f"Error generando archivo MARIA: {str(e)}")
@@ -6579,6 +6630,101 @@ async def toggle_favorito(
     client.favorite = not bool(client.favorite)
     await db.commit()
     return {"success": True, "favorito": client.favorite}
+
+
+# --- Estudios de la cuenta (ESTUDIO-1) ---
+# Como los clientes: cada usuario ve, borra y usa sólo los suyos; uno ajeno
+# es 404, como uno que no existe.
+
+def _estudio_to_dict(e: Estudio) -> dict:
+    return {
+        "id": e.id,
+        "nombre": e.nombre,
+        "cuit": e.cuit,
+        "ultimo_uso": e.last_used_at.isoformat() if e.last_used_at else None,
+    }
+
+
+class EstudioRequest(BaseModel):
+    # Sin tipos: un número o un null llegan y se rechazan con el mismo texto.
+    nombre: Any = None
+    cuit: Any = None
+
+
+@app.get("/api/estudios")
+async def list_estudios(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Los estudios de la cuenta y el que la operación preselecciona: el
+    último usado o, si ninguno se usó y hay uno solo, ése."""
+    result = await db.execute(
+        select(Estudio).where(Estudio.owner_username == user["username"]).order_by(Estudio.nombre, Estudio.id)
+    )
+    estudios = list(result.scalars().all())
+    usados = [e for e in estudios if e.last_used_at is not None]
+    if usados:
+        preseleccionado = max(usados, key=lambda e: e.last_used_at).id
+    elif len(estudios) == 1:
+        preseleccionado = estudios[0].id
+    else:
+        preseleccionado = None
+    return {"estudios": [_estudio_to_dict(e) for e in estudios], "preseleccionado": preseleccionado}
+
+
+@app.post("/api/estudios")
+async def create_estudio(
+    payload: EstudioRequest,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    nombre = payload.nombre.strip() if isinstance(payload.nombre, str) else ""
+    if not nombre or len(nombre) > 200 or any(ord(c) < 32 or 0x7f <= ord(c) <= 0x9f or c in "\u2028\u2029" for c in nombre):
+        raise HTTPException(
+            status_code=400,
+            detail="El nombre del estudio no puede quedar vacío, pasar de 200 caracteres ni tener saltos de línea.",
+        )
+    cuit = "".join(payload.cuit.replace("-", "").split()) if isinstance(payload.cuit, str) else ""
+    if not re.fullmatch(r"[0-9]{11}", cuit):
+        raise HTTPException(
+            status_code=400,
+            detail="El CUIT del estudio tiene que tener 11 dígitos (0-9), con o sin guiones.",
+        )
+    username = user["username"]
+    repetido = await db.execute(
+        select(Estudio.id).where(Estudio.owner_username == username, Estudio.cuit == cuit)
+    )
+    if repetido.first() is not None:
+        raise HTTPException(status_code=409, detail="Ya tenés un estudio con ese CUIT.")
+    estudio = Estudio(owner_username=username, nombre=nombre, cuit=cuit)
+    db.add(estudio)
+    try:
+        await db.commit()
+    except IntegrityError:
+        # Dos altas a la vez: la segunda choca con el UNIQUE.
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Ya tenés un estudio con ese CUIT.")
+    await db.refresh(estudio)
+    return {"estudio": _estudio_to_dict(estudio)}
+
+
+@app.delete("/api/estudios/{estudio_id}")
+async def delete_estudio(
+    estudio_id: str,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Borra el estudio de la cuenta. Las operaciones no lo guardan: no se
+    toca nada más."""
+    result = await db.execute(
+        select(Estudio).where(Estudio.id == estudio_id, Estudio.owner_username == user["username"])
+    )
+    estudio = result.scalars().first()
+    if estudio is None:
+        raise HTTPException(status_code=404, detail="Estudio no encontrado")
+    await db.delete(estudio)
+    await db.commit()
+    return {"success": True}
 
 
 @app.delete("/api/clientes/{client_id}")

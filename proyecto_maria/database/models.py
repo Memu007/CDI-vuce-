@@ -156,6 +156,27 @@ class Client(Base):
     ncm_notes = relationship("NCMNote", back_populates="client")
 
 
+class Estudio(Base):
+    """Estudio de despachante de la cuenta: su CUIT va al CDDTAGR (ESTUDIO-1).
+
+    Es de la cuenta, como los clientes: `owner_username` decide quién lo ve y
+    lo usa. No es `Organization` (los equipos). `users.cuit` sigue como
+    respaldo cuando la operación no elige un estudio.
+    """
+    __tablename__ = "estudios"
+    __table_args__ = (
+        UniqueConstraint("owner_username", "cuit", name="uq_estudios_owner_cuit"),
+    )
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    owner_username = Column(String(50), ForeignKey("users.username"), nullable=False, index=True)
+    nombre = Column(String(200), nullable=False)
+    cuit = Column(String(11), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    # La última vez que generó un TXT: el más reciente se preselecciona.
+    last_used_at = Column(DateTime(timezone=True), nullable=True)
+
+
 class Operation(Base):
     """Operación de importación procesada."""
     __tablename__ = "operations"
