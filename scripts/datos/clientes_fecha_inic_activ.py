@@ -17,8 +17,9 @@ Correrlo en producción lo decide Emi.
 import argparse
 import asyncio
 import os
+import re
 import sys
-from urllib.parse import quote, quote_plus
+from urllib.parse import parse_qsl, quote, quote_plus, unquote, unquote_plus, urlsplit
 
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
@@ -40,12 +41,34 @@ def _url_async(url: str) -> str:
     return url
 
 
-def _sin_clave(texto: str, clave) -> str:
-    """El texto de un error, sin la clave de la base (como viene o escapada)."""
-    if clave:
-        for forma in {clave, quote(clave, safe=""), quote_plus(clave)}:
-            texto = texto.replace(forma, "***")
-    return texto
+def _donde_y_secretos(base: str):
+    """Dónde está la base (host, puerto y base, sin usuario ni consulta) y lo
+    que puede ser la clave: todo lo de antes del último «@» y los valores de la
+    consulta. Se lee del texto escrito, no de SQLAlchemy: una clave con «@» o
+    «;» sin escapar, o en `?password=`, SQLAlchemy no la ve como clave."""
+    partes = urlsplit(base)
+    usuario, _, lugar = partes.netloc.rpartition("@")
+    secretos = {usuario, *re.split(r"[:;@]", usuario)}
+    secretos |= {v for _, v in parse_qsl(partes.query, keep_blank_values=True)}
+    try:
+        host = partes.hostname or ""
+    except ValueError:
+        host = ""
+    return lugar + partes.path, host, {s for s in secretos if s}
+
+
+def _sin_clave(texto: str, secretos, host: str = "") -> str:
+    """El texto de un error sin ninguno de los secretos, como vengan o
+    escapados. El host no se tapa: una clave «1» no borra «127.0.0.1»."""
+    formas = set()
+    for s in secretos:
+        for crudo in {s, unquote(s), unquote_plus(s)}:
+            formas |= {crudo, quote(crudo, safe=""), quote_plus(crudo)}
+    if host:
+        texto = texto.replace(host, "\0")
+    for forma in sorted(formas - {""}, key=len, reverse=True):
+        texto = texto.replace(forma, "***")
+    return texto.replace("\0", host) if host else texto
 
 
 def clasificar(filas):
@@ -109,9 +132,13 @@ def main(argv=None) -> int:
     try:
         r = asyncio.run(revisar(args.base, args.arreglar_none))
     except Exception as e:  # noqa: BLE001 - se informa sin traceback
-        donde = url.render_as_string(hide_password=True)
-        print(_sin_clave(f"No se pudo revisar la base {donde}: {type(e).__name__}: {e}", url.password),
-              file=sys.stderr)
+        donde, host, secretos = _donde_y_secretos(args.base)
+        if url.get_backend_name() == "sqlite":
+            donde = url.database or donde
+        if url.password:
+            secretos.add(url.password)
+        print(f"No se pudo revisar la base {donde}: "
+              + _sin_clave(f"{type(e).__name__}: {e}", secretos, host), file=sys.stderr)
         return 2
     print(f"Con «None»: {len(r['con_none'])}")
     for cid in r["con_none"]:
