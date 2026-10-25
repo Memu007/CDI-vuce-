@@ -288,7 +288,7 @@ function sembrarFecha(clienteId, fecha) {
     .catch(() => falla('la importación no llegó a la vista previa'));
   const fechasVisible = await page.locator('#importPreviewFechas').isVisible();
   const avisosFecha = await page.locator('#importPreviewFechas li').allInnerTexts();
-  const esperado = 'Fila 2: la fecha de inicio «20150-01-0» no es válida; el cliente se importa sin esa fecha.';
+  const esperado = 'Fila 2: la fecha de inicio «20150-01-0» no es válida y no se importa.';
   if (!fechasVisible || avisosFecha.length !== 1 || avisosFecha[0] !== esperado) {
     falla('la vista previa no avisa la fecha que no sirve: ' + JSON.stringify([fechasVisible, avisosFecha]));
   }

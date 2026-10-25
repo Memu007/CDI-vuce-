@@ -145,6 +145,18 @@ def test_la_vista_previa_avisa_la_fila_con_la_fecha_que_no_sirve(auth_override, 
     assert not preview["conflicts"]
 
 
+def test_con_el_cuit_repetido_la_fecha_que_sirve_es_la_que_queda(auth_override, client):
+    """El aviso es de la fila, no del cliente: la fecha que no sirve no se usa
+    y otra fila del mismo CUIT puede traer la buena."""
+    cuit = _cuit(_serial())
+    preview = _analizar(client, _csv([
+        [cuit, "Importadora Inventada Repetida", "20150-01-0"],
+        [cuit, "Importadora Inventada Repetida", "01/06/2018"],
+    ]))["preview"]
+    assert [(a["row"], a["value"]) for a in preview["fechas_que_no_sirven"]] == [(2, "20150-01-0")]
+    assert [r["fecha_inic_activ"] for r in preview["new_clients"]] == ["2018-06-01"]
+
+
 def test_sin_fechas_malas_no_hay_aviso(auth_override, client):
     preview = _analizar(client, _csv([[_cuit(_serial()), "Importadora Inventada", ""]]))["preview"]
     assert preview["fechas_que_no_sirven"] == []
