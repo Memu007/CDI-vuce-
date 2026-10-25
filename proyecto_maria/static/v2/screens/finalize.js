@@ -391,6 +391,7 @@
             return;
         }
 
+        if (CDI.estudios) await CDI.estudios.listo();   // ESTUDIO-1
         const body = buildMariaRequest();
         try {
             const startedAt = Date.now();

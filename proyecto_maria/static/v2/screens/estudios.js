@@ -2,17 +2,23 @@
    CDI v2 — Estudios de la cuenta (ESTUDIO-1)
    El CUIT del despachante (CDDTAGR) se carga por estudio en «Mi perfil»,
    «Mis estudios», y se elige en la operación. Sin estudio elegido sigue el
-   CUIT del perfil. Expone CDI.estudios.render(), .elegido() y
-   .renderPerfil().
+   CUIT del perfil. Expone CDI.estudios.render(), .listo(),
+   .elegido() y .renderPerfil().
    ============================================================ */
 (function () {
     'use strict';
     const CDI = window.CDI = window.CDI || {};
 
-    // Lo que la persona eligió en esta sesión ('' es el CUIT del perfil);
-    // null mientras no eligió nada: manda la preselección.
+    // Lo que la persona eligió en esta operación ('' es el CUIT del perfil);
+    // null mientras no eligió nada: manda la preselección. Cada operación
+    // nueva tiene su propio CDI.state.uploadedAt y vuelve a empezar.
     let elegidoAhora = null;
+    let elegidoPara = null;
     let renderSeq = 0;
+    let perfilSeq = 0;
+    let pendiente = Promise.resolve();
+
+    function operacionActual() { return (CDI.state && CDI.state.uploadedAt) || null; }
 
     function $(id) { return document.getElementById(id); }
 
@@ -29,12 +35,18 @@
     }
 
     /* ---------- El selector de la operación ---------- */
-    async function render() {
+    function render() {
+        pendiente = dibujar();
+        return pendiente;
+    }
+
+    async function dibujar() {
         const wrap = $('estudioWrap');
         const select = $('estudioSelect');
         const hint = $('estudioHint');
         if (!wrap || !select || !hint) return;
         const seq = ++renderSeq;
+        const antes = select.hidden ? null : select.value;
         let datos;
         try {
             datos = await leer();
@@ -42,11 +54,18 @@
             if (seq !== renderSeq) return;
             select.hidden = true;
             select.innerHTML = '';
-            hint.textContent = 'No se pudieron leer tus estudios: se usa el CUIT de tu perfil.';
+            hint.textContent = (CDI.currentUser && CDI.currentUser.cuit)
+                ? 'No se pudieron leer tus estudios: se usa el CUIT de tu perfil.'
+                : 'No se pudieron leer tus estudios y tu perfil no tiene CUIT: sin el CUIT del despachante no se genera el TXT.';
+            avisarSiCambio(wrap, antes, null);
             return;
         }
         if (seq !== renderSeq) return;   // llegó uno más nuevo
 
+        if (elegidoPara !== operacionActual()) {   // otra operación
+            elegidoAhora = null;
+            elegidoPara = operacionActual();
+        }
         const perfil = (CDI.currentUser && CDI.currentUser.cuit) || '';
         select.innerHTML = '';
         if (!datos.estudios.length) {
@@ -55,6 +74,7 @@
             hint.textContent = perfil
                 ? 'Se usa el CUIT de tu perfil. Para elegir otro, cargá tus estudios en «Mi perfil», «Mis estudios».'
                 : 'Cargá tu estudio en «Mi perfil», «Mis estudios»: sin el CUIT del despachante no se genera el TXT.';
+            avisarSiCambio(wrap, antes, null);
             return;
         }
         const primera = document.createElement('option');
@@ -75,7 +95,19 @@
             : (ids.indexOf(datos.preseleccionado) >= 0 ? datos.preseleccionado : '');
         select.hidden = false;
         hint.textContent = 'Su CUIT va al CDDTAGR del TXT.';
+        avisarSiCambio(wrap, antes, select.value);
     }
+
+    // Si el código cambió lo que va al TXT (un alta o un borrado), los avisos
+    // se vuelven a pedir: el evento va a la tarjeta, no al selector, para no
+    // contar como elección de la persona.
+    function avisarSiCambio(wrap, antes, despues) {
+        if (antes !== despues) wrap.dispatchEvent(new Event('change'));
+    }
+
+    // Espera a que el selector termine de leer los estudios: generar antes
+    // mandaría el CUIT del perfil en lugar del preseleccionado.
+    function listo() { return pendiente.catch(() => null); }
 
     function elegido() {
         const select = $('estudioSelect');
@@ -88,14 +120,18 @@
         const lista = $('pfEstudiosList');
         const error = $('pfEstudiosError');
         if (!lista) return;
+        const seq = ++perfilSeq;
         let datos;
         try {
             datos = await leer();
         } catch (err) {
+            if (seq !== perfilSeq) return;
             lista.innerHTML = '';
             if (error) { error.textContent = String(err.message || err); error.hidden = false; }
             return;
         }
+        if (seq !== perfilSeq) return;   // llegó uno más nuevo
+        mostrarError('');
         lista.innerHTML = '';
         if (!datos.estudios.length) {
             const vacio = document.createElement('p');
@@ -181,7 +217,10 @@
 
     function init() {
         const select = $('estudioSelect');
-        if (select) select.addEventListener('change', () => { elegidoAhora = select.value || ''; });
+        if (select) select.addEventListener('change', () => {
+            elegidoAhora = select.value || '';
+            elegidoPara = operacionActual();
+        });
         const btn = $('pfEstudioAlta');
         if (btn) btn.addEventListener('click', alta);
         [$('pfEstudioNombre'), $('pfEstudioCuit')].forEach(el => {
@@ -194,6 +233,6 @@
         if (block) block.addEventListener('toggle', () => { if (block.open) renderPerfil(); });
     }
 
-    CDI.estudios = { render: render, elegido: elegido, renderPerfil: renderPerfil };
+    CDI.estudios = { render: render, listo: listo, elegido: elegido, renderPerfil: renderPerfil };
     document.addEventListener('DOMContentLoaded', init);
 })();

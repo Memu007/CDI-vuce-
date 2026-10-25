@@ -6679,29 +6679,26 @@ async def create_estudio(
     db: AsyncSession = Depends(get_db),
 ):
     nombre = payload.nombre.strip() if isinstance(payload.nombre, str) else ""
-    if not nombre or len(nombre) > 200 or any(ord(c) < 32 or 0x7f <= ord(c) <= 0x9f or c in "\u2028\u2029" for c in nombre):
+    if not nombre or len(nombre) > 200 or any(ord(c) < 32 or 0x7f <= ord(c) <= 0x9f or 0xd800 <= ord(c) <= 0xdfff
+                                               or c in "\u2028\u2029" for c in nombre):
         raise HTTPException(
             status_code=400,
             detail="El nombre del estudio no puede quedar vacío, pasar de 200 caracteres ni tener saltos de línea.",
         )
+    from proyecto_maria.core.controles_maria import cuit_valido
     cuit = "".join(payload.cuit.replace("-", "").split()) if isinstance(payload.cuit, str) else ""
-    if not re.fullmatch(r"[0-9]{11}", cuit):
+    if not cuit_valido(cuit):
         raise HTTPException(
             status_code=400,
-            detail="El CUIT del estudio tiene que tener 11 dígitos (0-9), con o sin guiones.",
+            detail="El CUIT del estudio no es válido: 11 dígitos (0-9), con o sin guiones, y el último es el verificador.",
         )
-    username = user["username"]
-    repetido = await db.execute(
-        select(Estudio.id).where(Estudio.owner_username == username, Estudio.cuit == cuit)
-    )
-    if repetido.first() is not None:
-        raise HTTPException(status_code=409, detail="Ya tenés un estudio con ese CUIT.")
-    estudio = Estudio(owner_username=username, nombre=nombre, cuit=cuit)
+    estudio = Estudio(owner_username=user["username"], nombre=nombre, cuit=cuit)
     db.add(estudio)
     try:
         await db.commit()
     except IntegrityError:
-        # Dos altas a la vez: la segunda choca con el UNIQUE.
+        # El mismo CUIT ya está en la cuenta: lo frena el UNIQUE, también con
+        # dos altas a la vez.
         await db.rollback()
         raise HTTPException(status_code=409, detail="Ya tenés un estudio con ese CUIT.")
     await db.refresh(estudio)

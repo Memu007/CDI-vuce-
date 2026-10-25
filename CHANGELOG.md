@@ -9,7 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-10-25 · feat: los estudios de la cuenta para el CUIT del despachante (ESTUDIO-1)
 
 - **feat(estudios):** en «Mi perfil», «Mis estudios» se cargan los estudios (nombre y CUIT) de la cuenta; en la operación se elige uno, con el último usado o el único ya elegido, y su CUIT va al CDDTAGR. Sin estudio sigue el CUIT del perfil; cada usuario ve, borra y usa sólo los suyos.
-- Sin CUIT del despachante, el aviso y el error dicen dónde cargarlo.
+- El CUIT del estudio se guarda sólo si su verificador es correcto. Sin CUIT del despachante, el aviso y el error dicen dónde cargarlo.
 
 ## 2026-10-25 · fix: la proforma con combinadas, sin perder productos ni sumar cargos (EXCEL-3c)
 
