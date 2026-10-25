@@ -185,10 +185,13 @@
         if (!(CDI.state && (CDI.state.items || []).length)) { panel.hidden = true; return; }
         let avisos;
         let valor = null;
+        let firma = null;
         try {
+            const pedido = buildMariaRequest();
+            firma = firmaDelPedido(pedido);
             const res = await CDI.api('/generate_maria/avisos', {
                 method: 'POST',
-                body: JSON.stringify(buildMariaRequest())
+                body: JSON.stringify(pedido)
             });
             const data = await res.json();
             if (!res.ok) {
@@ -205,7 +208,7 @@
             valor = { error: SIN_CUENTAS };
         }
         if (seq !== avisosSeq) return;   // llegó uno más nuevo
-        pintarValor(valor);
+        pintarValor(valor, firma);
         panel.hidden = !avisos.length;
         if (count) count.textContent = avisos.length ? '· ' + avisos.length : '';
         list.innerHTML = avisos.map(function (msg) {
@@ -224,7 +227,7 @@
     // con la misma cuenta del MDDTFOB del TXT.
     let valorEnlazado = false;
     let ultimoValor = null;
-    let cuentasDe = null;   // la operación de ultimoValor
+    let cuentasCon = null;   // el pedido con el que se hizo ultimoValor
     const SIN_CUENTAS = 'No se pudieron hacer las cuentas: mirá los avisos.';
 
     // Vacío es sin ajuste (null); lo que no es un número finito tampoco viaja,
@@ -243,8 +246,16 @@
         return Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
     }
 
-    // Cambió un ajuste: las cuentas a la vista ya no valen, ni las que están
-    // por llegar, hasta que vuelvan las nuevas.
+    // El pedido sin lo que cambia solo (el número de operación sin factura
+    // lleva la hora): si cambia, las cuentas que se hicieron con él no valen.
+    function firmaDelPedido(pedido) {
+        const resto = Object.assign({}, pedido);
+        delete resto.operation_id;
+        return JSON.stringify(resto);
+    }
+
+    // Cambió algo de la cuenta: las cuentas a la vista ya no valen, ni las
+    // que están por llegar, hasta que vuelvan las nuevas.
     function cuentasViejas() {
         ultimoValor = null;
         avisosSeq++;
@@ -285,6 +296,7 @@
         op.ajustes_deducir = String(descuento);
         const input = document.getElementById('valorDeducir');
         if (input) input.value = op.ajustes_deducir;
+        cuentasViejas();
         refrescarAvisos();
     }
 
@@ -294,20 +306,41 @@
         return v !== undefined && v !== null && String(v).trim() !== '' && Number(v) !== descuento;
     }
 
-    // El seguro sugerido lo calculó el servidor con lo que está a la vista,
-    // para esta misma operación.
+    // El seguro sugerido lo calculó el servidor con el pedido de ahora. Si
+    // algo cambió desde entonces (un ajuste, el descuento, el seguro, otra
+    // operación), no se usa: se piden las cuentas de nuevo.
     function calcularSeguro() {
-        if (!ultimoValor || ultimoValor.error || cuentasDe !== (CDI.state.operacion || null)) return;
+        if (!ultimoValor || ultimoValor.error) return;
+        let ahora = null;
+        try { ahora = firmaDelPedido(buildMariaRequest()); } catch (err) { ahora = null; }
+        if (!cuentasCon || cuentasCon !== ahora) {
+            cuentasViejas();
+            refrescarAvisos();
+            return;
+        }
         const op = CDI.state.operacion = CDI.state.operacion || {};
         op.seguro = ultimoValor.seguro_sugerido;
         op.seguro_calculado = true;
+        // Ya está completo: deja de avisarse que no se leyó (MARIA-1c).
+        if (Array.isArray(op.campos_sin_leer) && op.campos_sin_leer.includes('seguro')) {
+            const completados = new Set(op.campos_completados || []);
+            completados.add('seguro');
+            op.campos_completados = Array.from(completados);
+        }
+        cuentasViejas();
         refrescarAvisos();
+        if (CDI.semaforo && CDI.semaforo.refresh) CDI.semaforo.refresh();
     }
 
-    function pintarValor(valor) {
+    function seguroSinLeer(op) {
+        return Array.isArray(op.campos_sin_leer) && op.campos_sin_leer.includes('seguro') &&
+            !(Array.isArray(op.campos_completados) && op.campos_completados.includes('seguro'));
+    }
+
+    function pintarValor(valor, firma) {
         ultimoValor = valor;
-        cuentasDe = (CDI.state && CDI.state.operacion) || null;
-        const op = cuentasDe || {};
+        cuentasCon = firma || null;
+        const op = (CDI.state && CDI.state.operacion) || {};
         const incluir = document.getElementById('valorIncluir');
         const deducir = document.getElementById('valorDeducir');
         // Lo que la persona está escribiendo no se pisa, y un número mal
@@ -377,7 +410,9 @@
             nota.textContent = !ok ? '' :
                 (calculado && valor.seguro !== valor.seguro_sugerido) ? 'El seguro se calculó con otros importes.' :
                 calculado ? 'Seguro calculado: 1 % de (' + base + ' + flete).' :
-                valor.seguro > 0 ? 'La operación ya trae seguro.' : '';
+                valor.seguro > 0 ? 'La operación ya trae seguro.' :
+                mostrar && seguroSinLeer(op) ? 'La factura puede traer un seguro que no pudimos leer: ' +
+                    'revisala antes de calcularlo.' : '';
         }
     }
 

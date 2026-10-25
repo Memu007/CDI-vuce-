@@ -861,15 +861,40 @@ def fob_total_del_txt(items: list, grupos: list | None = None) -> Decimal:
 
 
 TASA_SEGURO_SUGERIDO = Decimal("0.01")
-# Sobre qué FOB va el 1 % no está decidido (D12b de VALOR-1: lo contesta el
-# despachante). Para cambiarlo alcanza con esta línea: "fob_factura".
-BASE_SEGURO_SUGERIDO = "fob_casillero"
+# El 1 % va sobre el FOB de la factura (D13 de VALOR-1b, decidido por la PM).
+# Para cambiarlo alcanza con esta línea: "fob_casillero".
+BASE_SEGURO_SUGERIDO = "fob_factura"
 NOMBRE_DEL_FOB = {"fob_casillero": "FOB casillero", "fob_factura": "FOB de la factura"}
 
 
 def importe_escrito(valor) -> str:
     """Un importe como se escribe acá: 1.234,56."""
     return f"{valor:,.2f}".replace(",", "@").replace(".", ",").replace("@", ".")
+
+
+def _ajuste(valor, nombre: str):
+    """Un ajuste como lo manda la pantalla: número, texto con un número o
+    nada. Verdadero o falso no es un importe (float(True) daría 1)."""
+    if isinstance(valor, bool):
+        raise ValueError(f"{nombre}: «{valor}» no es un importe.")
+    return importe_valido(valor, nombre)
+
+
+def _numeros_de_los_renglones(items: list):
+    """Que cada cantidad y cada valor de los renglones se pueda leer como
+    número, con un mensaje que lo nombre en vez del texto de Python."""
+    campos = (("cantidad", "la cantidad"), ("valor_unitario", "el valor unitario"),
+              ("valor_total", "el valor total"))
+    for n, item in enumerate(items, 1):
+        for campo, nombre in campos:
+            valor = item.get(campo)
+            if not valor or isinstance(valor, (int, float, Decimal)):
+                continue
+            try:
+                float(valor)
+            except (TypeError, ValueError):
+                raise ValueError(f"Renglón {n}: {nombre} «{str(valor)[:20]}» no es un número; "
+                                 f"no se pueden hacer las cuentas.") from None
 
 
 def cuentas_del_valor(items: list, flete=0, seguro=0, ajustes_incluir=None, ajustes_deducir=None) -> dict:
@@ -880,9 +905,10 @@ def cuentas_del_valor(items: list, flete=0, seguro=0, ajustes_incluir=None, ajus
     decide qué se descuenta. El seguro sugerido es el 1 % de (el FOB de
     BASE_SEGURO_SUGERIDO + flete), al centavo. Nada de esto cambia el TXT (D12 de VALOR-1). Un
     importe inválido o un FOB casillero negativo es un ValueError."""
+    _numeros_de_los_renglones(items)
     fob_factura = fob_total_del_txt(items)
-    incluir = centavos(importe_valido(ajustes_incluir, "Ajustes a incluir") or 0)
-    deducir = centavos(importe_valido(ajustes_deducir, "Ajustes a deducir") or 0)
+    incluir = centavos(_ajuste(ajustes_incluir, "Ajustes a incluir") or 0)
+    deducir = centavos(_ajuste(ajustes_deducir, "Ajustes a deducir") or 0)
     flete_c = centavos(importe_valido(flete, "Flete") or 0)
     seguro_c = centavos(importe_valido(seguro, "Seguro") or 0)
     fob_casillero = fob_factura + incluir - deducir

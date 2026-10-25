@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-25 · fix: «Calcular seguro» sólo usa cuentas del pedido de ahora (VALOR-1b)
+
+- «Calcular seguro» compara el pedido de ahora con el de las cuentas: si cambió un ajuste, el flete, el seguro o el descuento, pide las cuentas de nuevo en vez de usar las viejas. El seguro calculado deja de avisarse como no leído, y si la factura puede traer un seguro sin leer, el botón lo avisa.
+- El 1 % del seguro sugerido va sobre el FOB de la factura (D13). Un ajuste o un renglón que no es número va en la tarjeta con un mensaje claro, sin texto de Python, y no frena el TXT.
+
 ## 2026-10-25 · fix: el error de kilos nombra sólo el renglón chico (MARIA-9)
 
 - Cuando varios renglones van juntos en un ítem y uno es tan chico que sus kilos al centésimo dan cero, el error nombra ese renglón. Antes nombraba a todos los del ítem. Si ninguno da cero solo y el cero sale del ajuste del redondeo, sigue nombrando a todos.
@@ -21,7 +26,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-10-25 · fix: la tarjeta de ajustes y seguro no usa cuentas viejas (VALOR-1)
 
-- «Usar como ajuste a deducir» ya no pisa un importe escrito a mano; «Calcular seguro» no usa cuentas de antes de cambiar un ajuste ni de otra operación, y funciona aunque todavía no haya operación cargada. Si fallan los avisos, o un producto viene mal formado o fuera de rango, la tarjeta lo dice en vez de quedar vacía o dar error.
+- «Usar como ajuste a deducir» ya no pisa un importe escrito a mano; «Calcular seguro» no usa cuentas de otra operación, y funciona aunque todavía no haya operación cargada. Si fallan los avisos, o un producto viene mal formado o fuera de rango, la tarjeta lo dice en vez de quedar vacía o dar error.
 
 ## 2026-10-24 · feat: ajustes y seguro antes de generar (VALOR-1)
 

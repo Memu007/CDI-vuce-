@@ -6,6 +6,7 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, field_validator
+from typing import Any
 from datetime import datetime, timedelta, timezone
 import jwt
 import json
@@ -4106,9 +4107,11 @@ class MariaRequest(BaseModel):
     gastos_anteriores_fob: float | None = None
     # VALOR-1. Ajustes a incluir y a deducir que carga la persona: sólo para
     # las cuentas del FOB casillero y del seguro sugerido. No van al TXT
-    # hasta saber en qué campo (D12): `/generate_maria` no los usa.
-    ajustes_incluir: float | None = None
-    ajustes_deducir: float | None = None
+    # hasta saber en qué campo (D12): `/generate_maria` no los usa. Van sin
+    # tipo: uno que no es número no frena nada y se ve en `valor.error`
+    # (VALOR-1b).
+    ajustes_incluir: Any = None
+    ajustes_deducir: Any = None
     # MARIA-3. Procedencia de la operación (país desde donde se embarca, art. 15
     # del Código Aduanero). Va a cada producto que no traiga la suya.
     procedencia: str = ""
@@ -4234,8 +4237,10 @@ def _cuentas_del_valor(request: MariaRequest, items: list) -> tuple[dict, list]:
             items, flete=request.flete, seguro=request.seguro,
             ajustes_incluir=request.ajustes_incluir, ajustes_deducir=request.ajustes_deducir,
         )
-    except (ValueError, TypeError) as e:
+    except ValueError as e:
         return {"error": str(e)}, []
+    except TypeError:  # un dato que no es número y se escapó: sin el texto de Python
+        return {"error": "Hay un dato que no es un número: no se pueden hacer las cuentas."}, []
     except ArithmeticError:  # un número que no entra en un float, como 10 ** 400
         return {"error": "Hay un importe o una cantidad fuera de rango: no se pueden hacer las cuentas."}, []
     if not (valor["ajustes_incluir"] or valor["ajustes_deducir"]):
