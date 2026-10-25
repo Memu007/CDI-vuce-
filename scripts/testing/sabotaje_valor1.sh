@@ -179,7 +179,7 @@ reemplazar $JS '                cuentasViejas();
 caso "boton_con_cuentas_viejas" "FAILED $T::test_mientras_se_rehacen_las_cuentas_no_se_calcula_con_las_viejas"
 
 # 26. el seguro sugerido de otra operación se usa
-reemplazar $JS ' || cuentasDe !== op) return;' ') return;'
+reemplazar $JS ' || cuentasDe !== (CDI.state.operacion || null)) return;' ') return;'
 caso "seguro_de_otra_operacion" "FAILED $T::test_el_seguro_sugerido_de_otra_operacion_no_se_usa"
 
 # 27. se pisa lo que la persona está escribiendo
@@ -196,8 +196,12 @@ reemplazar $JS "input.validity && input.validity.badInput ? 'mal escrito' : inpu
 caso "bad_input_sin_marca" "FAILED $T::test_un_numero_que_el_campo_no_entiende_queda_marcado_y_a_la_vista"
 
 # 30. con error en las cuentas, el botón pone un seguro igual
-reemplazar $JS '        if (!ultimoValor || ultimoValor.error || cuentasDe !== op) return;' '        if (!ultimoValor || cuentasDe !== op) return;'
+reemplazar $JS '        if (!ultimoValor || ultimoValor.error || cuentasDe' '        if (!ultimoValor || cuentasDe'
 caso "seguro_con_error" "FAILED $T::test_con_error_en_las_cuentas_no_se_calcula_el_seguro"
 
+# 31. sin operación cargada, el botón compara con un objeto vacío nuevo y no hace nada
+reemplazar $JS '        cuentasDe = (CDI.state && CDI.state.operacion) || null;' '        cuentasDe = (CDI.state && CDI.state.operacion) || {};'
+caso "sin_operacion_no_calcula" "FAILED $T::test_sin_operacion_todavia_el_boton_igual_pone_el_seguro"
+
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
-echo "OK: los 30 sabotajes dan rojo por la razón esperada"
+echo "OK: los 31 sabotajes dan rojo por la razón esperada"

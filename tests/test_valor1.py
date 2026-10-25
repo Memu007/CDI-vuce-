@@ -309,6 +309,11 @@ def test_el_seguro_sugerido_de_otra_operacion_no_se_usa():
     assert r["op"] == {"otra": True}
 
 
+def test_sin_operacion_todavia_el_boton_igual_pone_el_seguro():
+    r = _pantalla(None, "calcularSeguro();", VALOR)
+    assert r["op"] == {"seguro": 93.13, "seguro_calculado": True}
+
+
 def test_mientras_se_rehacen_las_cuentas_no_se_calcula_con_las_viejas():
     # Se escribe un ajuste y se toca el botón antes de que vuelvan las cuentas.
     r = _pantalla({}, "enlazarValor(); els.valorDeducir.value = '500';"
