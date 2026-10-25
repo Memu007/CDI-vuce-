@@ -790,3 +790,105 @@ def test_sin_la_especificacion_combinada_los_renglones_sin_precio_quedan_sin_lee
     data = _grupo_sin_precio_abajo(combinar)
     assert len(data["items"]) == 1 and data["filas_descartadas_numeros"] == [3, 4], data
     assert "sin precio" not in " | ".join(data["avisos_mapeo"]), data["avisos_mapeo"]
+
+
+@pytest.mark.parametrize("rotulo", [
+    ["Seguro de carga", 1, 40, 40],
+    ["Insurance fee for shipment", 1, 40, 40],
+    ["Handling charges at origin", 1, 40, 40],
+    ["Bank charges & commission", 1, 40, 40],
+    ["Insurance €40", None, None, 40],
+    ["Seguro: U$S 40", None, None, 40],
+    ["Freight prepaid", None, None, None],
+    ["Payment 30% T/T in advance", None, None, None],
+], ids=["seguro_de_carga", "insurance_fee", "handling_at_origin", "bank_commission",
+        "insurance_eur", "seguro_usd", "freight_prepaid", "payment_in_advance"])
+@pytest.mark.parametrize("forma", ["origen", "descripcion"])
+def test_un_cargo_dicho_con_mas_palabras_no_entra_aunque_venga_una_combinada(rotulo, forma):
+    """Autorrevisión de EXCEL-3c: con algo copiado de una combinada, el cargo
+    escrito con más palabras («Seguro de carga», «Insurance €40») tampoco es
+    un producto; en la base quedaba sin leer y no sumaba al FOB."""
+    if forma == "origen":
+        filas, combinar = [[2, "MOUSE DEMO", None, 10, 5, 50], [3, rotulo[0], None] + rotulo[1:]], ("C2:C4",)
+    else:
+        filas, combinar = [[None, None, "China", 10, 5, 50], [rotulo[0], None, None] + rotulo[1:]], ("B2:B4",)
+    data = _leer_combinado([PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500]] + filas, combinar)
+    assert len(data["items"]) == 2, data["items"]
+    assert _total(data["items"]) == 3550, data["items"]
+    assert data["filas_descartadas_numeros"] == [4], data
+
+
+def test_con_la_descripcion_combinada_una_palabra_de_cargo_en_otra_columna_no_saca_al_producto():
+    """Autorrevisión de EXCEL-3c: «Handling equipment» en Category y la
+    descripción combinada: el renglón de abajo es otro PALLET JACK, como en
+    la base."""
+    data = _leer_combinado([
+        ["Item", "Category", "Description", "Qty", "Unit price", "Amount"],
+        [1, "Handling equipment", "PALLET JACK", 2, 100, 200],
+        [2, "Handling equipment", None, 3, 100, 300],
+    ], ("C2:C3",))
+    assert [i["descripcion"] for i in data["items"]] == ["PALLET JACK"] * 2, data["items"]
+    assert _total(data["items"]) == 500 and not data["filas_descartadas_numeros"], data
+
+
+@pytest.mark.parametrize("combinar", [("B3:B4",), ("B3:B4", "C2:C4")], ids=["descripcion", "y_origen"])
+@pytest.mark.parametrize("rotulo", ["Payment 30% TT", "Insurance", "Bank charges"])
+def test_un_cargo_con_su_rotulo_combinado_no_suma_la_fila_de_abajo(rotulo, combinar):
+    """Adversario de EXCEL-3c: el rótulo del cargo combinado en dos filas; la
+    de abajo es el mismo cargo, no un producto: las dos quedan sin leer, como
+    en la base."""
+    data = _leer_combinado([
+        PROFORMA,
+        [1, "LAPTOP DEMO", "China", 10, 350, 3500],
+        [None, rotulo, None, 1, 1050, 1050],
+        [None, None, None, 1, 2450, 2450],
+    ], combinar)
+    assert [i["descripcion"] for i in data["items"]] == ["LAPTOP DEMO"], data["items"]
+    assert _total(data["items"]) == 3500, data["items"]
+    assert data["filas_descartadas_numeros"] == [3, 4], data
+
+
+@pytest.mark.parametrize("producto", ["Freight elevator DEMO", "Shipping cost calculator scale"])
+def test_un_producto_que_empieza_como_el_flete_con_el_origen_combinado_es_mercaderia(producto):
+    """Adversario de EXCEL-3c (R1): con el origen combinado, un producto que
+    empieza con «Freight» no es el flete; se lee como sin combinar."""
+    data = _leer_combinado([
+        PROFORMA,
+        [1, "Widget A", "CN", 10, 5, 50],
+        [2, producto, None, 1, 9000, 9000],
+        [3, "Widget B", None, 2, 10, 20],
+    ], ("C2:C4",))
+    assert [i["descripcion"] for i in data["items"]] == ["Widget A", producto, "Widget B"], data["items"]
+    assert _total(data["items"]) == 9070, data["items"]
+    assert not data["operacion"].get("flete"), data["operacion"]
+
+
+SIN_ORIGEN = ["Part No.", "Specification", "Width(m)", "Length (m)", "QTY", "Unit price",
+              "Total Amount(USD)"]
+
+
+def test_el_aviso_sin_precio_no_nombra_filas_que_quedaron_sin_leer():
+    """Adversario de EXCEL-3c: un renglón sin precio de un grupo que es un
+    cargo queda sin leer; el aviso de «entraron sin precio» no lo nombra."""
+    data = _leer([
+        SIN_ORIGEN,
+        ["W-1", "LONA DEMO", 2, 10, 1, 1.5, 15],
+        ["H-1", "Handling trolley DEMO", 1, 2, 5, 10, 50],
+        [None, "Handling trolley DEMO", 1, 3, 4, None, None],
+    ])
+    assert data["filas_descartadas_numeros"] == [3, 4], data
+    assert "sin precio" not in " | ".join(data["avisos_mapeo"]), data["avisos_mapeo"]
+
+
+def test_la_copia_de_una_descripcion_combinada_se_decide_como_su_fila():
+    """Adversario de EXCEL-3c: sin columna de origen y la descripción
+    combinada, la fila de abajo es el mismo renglón que la de arriba: entran o
+    quedan sin leer las dos, no la mitad."""
+    data = _leer_combinado([
+        SIN_ORIGEN,
+        ["W-1", "LONA DEMO", 2, 10, 1, 1.5, 15],
+        ["H-1", "Handling trolley DEMO", 1, 2, 5, 10, 50],
+        [None, None, 1, 3, 4, 10, 40],
+    ], ("B3:B4",))
+    assert [i["descripcion"] for i in data["items"]] == ["LONA DEMO, ancho 2 m x largo 10 m"], data["items"]
+    assert data["filas_descartadas_numeros"] == [3, 4], data
