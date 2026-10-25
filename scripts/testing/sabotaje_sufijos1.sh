@@ -1,13 +1,23 @@
 #!/usr/bin/env bash
 # uso: scripts/testing/sabotaje_sufijos1.sh [SHA] [venv]
-# Negativos discriminantes de SUFIJOS-1: el producto entero lleva su propio
-# sufijo, un grupo exige uno solo, se avisan lo que la posición pide y falta,
-# la posición fuera del arancel, la unidad estadística que no es la suya y el
-# AI repetido; la estadística de la tabla va al pedido, el script frena si el
-# SHA del ZIP no es el del LEEME y la propuesta pide sesión. Cada sabotaje se
-# aplica en un worktree descartable, corre los casos y tiene que dar ROJO con
-# el motivo esperado. Si un patrón no se encuentra, el script sale con error.
-# La pantalla (pantalla_sufijos1.js) necesita la app levantada: va aparte.
+# El entorno virtual es /tmp/cdi-dev2/venv (o el de $VENV); si es otro, se
+# pasa como 2.º argumento.
+# Negativos discriminantes de SUFIJOS-1, uno por motivo: el producto entero
+# lleva su propio sufijo, un grupo exige uno solo (el «-» final no cuenta),
+# se avisan lo que la posición pide y falta (también un código vacío), la
+# posición fuera del arancel y la letra de control equivocada, la unidad
+# estadística que no es la suya (con sub-ítems, el aviso propio) y el AI
+# repetido; la tabla rota es una tabla que falta y la posición se lee entera;
+# la estadística de la tabla va al pedido salvo con sub-ítems, el script
+# frena si el SHA del ZIP no es el del LEEME y la propuesta pide sesión, lee
+# la NCM primero, sanea y recorta el texto, dice si falta la tabla y la letra
+# que corresponde. En la pantalla: la propuesta se suma a la de la operación,
+# no pasa al producto que queda en su lugar, no se pide dos veces y la nota
+# dice si falta la tabla o es la letra. Cada sabotaje se aplica en un
+# worktree descartable, corre los casos y tiene que dar ROJO con el motivo
+# esperado. Si un patrón no se encuentra, el script sale con error.
+# La pantalla (pantalla_sufijos1.js) necesita la app levantada: va aparte,
+# y con ella la espera de la propuesta al generar (finalize.js).
 set -euo pipefail
 SHA="${1:-HEAD}"
 VENV="${2:-${VENV:-/tmp/cdi-dev2/venv}}"
@@ -65,6 +75,7 @@ M=proyecto_maria/main.py
 G=proyecto_maria/core/maria_generator.py
 D=proyecto_maria/static/v2/screens/despachante.js
 I=scripts/import_arancel_sufijos.py
+A=proyecto_maria/core/sufijos_arca.py
 T=tests/test_sufijos1.py
 
 # 1. el producto entero usa el de la operación aunque traiga el suyo
@@ -73,7 +84,7 @@ reemplazar $G '            sufijo_sbt = (limpiar_sufijo(str(item.get("sufijo") o
 caso "propio_ignorado" "FAILED $T::test_un_producto_entero_lleva_su_propio_sufijo"
 
 # 2. un grupo con sufijos distintos sale igual
-reemplazar $G '        if len(sufijos) != 1:' '        if False:'
+reemplazar $G "        if len({s.rstrip('-') for s in sufijos}) != 1:" '        if False:'
 caso "grupo_sin_control" "FAILED $T::test_un_grupo_con_sufijos_distintos_no_se_genera"
 
 # 3. lo que la posición pide y falta no se avisa
@@ -104,6 +115,86 @@ caso "sha_sin_control" "FAILED $T::test_el_script_frena_si_el_sha_no_es_el_del_l
 reemplazar $M 'async def propuesta_de_sufijos(data: dict, user=Depends(get_current_user)):' \
   'async def propuesta_de_sufijos(data: dict, user=None):'
 caso "propuesta_sin_sesion" "FAILED $T::test_la_propuesta_pide_sesion"
+
+# 10. el «-» final hace distintos los sufijos de un grupo
+reemplazar $G "        if len({s.rstrip('-') for s in sufijos}) != 1:" '        if len(set(sufijos)) != 1:'
+caso "guion_final_distingue" "FAILED $T::test_en_un_grupo_el_guion_final_no_hace_distintos_los_sufijos"
+
+# 11. un código con el valor vacío cuenta como cargado
+reemplazar $G '                                               if v.strip() or len(c) == 4])' '                                               ])'
+caso "codigo_vacio_cargado" "FAILED $T::test_un_codigo_con_el_valor_vacio_es_un_codigo_que_falta"
+
+# 12. la letra de control equivocada sale como «no está»
+reemplazar $G '        if letra:' '        if False:'
+caso "letra_como_no_esta" "FAILED $T::test_la_letra_de_control_equivocada_se_dice_como_tal"
+
+# 13. con sub-ítems, el aviso de unidad manda a elegir kilos
+reemplazar $G '        if pide == UNIDAD_KILOGRAMO and con_subitems:' '        if False:'
+caso "subitems_aviso_comun" "FAILED $T::test_con_sub_items_el_aviso_de_unidad_no_manda_a_elegir_kilos"
+
+# 14. la posición se lee con letras de más
+reemplazar $A '    partes = re.fullmatch(r"(\d{%d})([A-Z]?)" % LARGO_SIM, texto)' '    partes = re.match(r"(\d{%d})([A-Z]?)" % LARGO_SIM, texto)'
+caso "posicion_con_letras_de_mas" "FAILED $T::test_la_posicion_se_lee_con_puntos_y_sin_letras_de_mas"
+
+# 15. una letra de control que no es la suya se consulta igual
+reemplazar $A '    if not fila or letra_de_control(posicion, tabla):' '    if not fila:'
+caso "consulta_con_otra_letra" "FAILED $T::test_la_posicion_se_lee_con_puntos_y_sin_letras_de_mas"
+
+# 16. una tabla que no es un diccionario se usa igual
+reemplazar $A '    return tabla if isinstance(tabla, dict) else {}' '    return tabla'
+caso "tabla_que_no_es_dict" "FAILED $T::test_una_tabla_rota_es_una_tabla_que_falta"
+
+# 17. una tabla cortada rompe la carga
+reemplazar $A '    except (OSError, EOFError, ValueError):' '    except (OSError, ValueError):'
+caso "tabla_cortada" "FAILED $T::test_una_tabla_rota_es_una_tabla_que_falta"
+
+# 18. la propuesta no dice que falta la tabla
+reemplazar $M '"sin_tabla": not tabla,' '"sin_tabla": False,'
+caso "propuesta_sin_aviso_de_tabla" "FAILED $T::test_sin_la_tabla_la_propuesta_lo_dice"
+
+# 19. la propuesta lee la pieza antes que la NCM
+reemplazar $M '_texto_del_pedido(it.get("ncm") or it.get("pieza"), 20)' '_texto_del_pedido(it.get("pieza") or it.get("ncm"), 20)'
+caso "pieza_antes_que_ncm" "FAILED $T::test_la_propuesta_lee_la_ncm_antes_que_la_pieza"
+
+# 20. el texto del pedido no se sanea
+reemplazar $M '    return str(valor or "").encode("utf-8", "replace").decode("utf-8").strip()[:largo]' '    return str(valor or "").strip()[:largo]'
+caso "texto_sin_sanear" "FAILED $T::test_la_propuesta_aguanta_texto_que_no_es_utf8_y_recorta_lo_largo"
+
+# 21. el texto del pedido no se recorta
+reemplazar $M '{c: _texto_del_pedido(it.get(c), 200) for c in' '{c: _texto_del_pedido(it.get(c), 10**6) for c in'
+caso "texto_sin_tope" "FAILED $T::test_la_propuesta_aguanta_texto_que_no_es_utf8_y_recorta_lo_largo"
+
+# 22. la propuesta no dice la letra que corresponde
+reemplazar $M '"letra_de_control": sufijos_arca.letra_de_control(posicion, tabla)})' '"letra_de_control": ""})'
+caso "propuesta_sin_letra" "FAILED $T::test_la_propuesta_dice_la_letra_de_control_que_corresponde"
+
+# 23. la pantalla usa la propuesta sola, sin el de la operación
+reemplazar $D "        return f && f.sufijo ? combinar(sufijoDeLaOperacion(), String(f.sufijo)) : '';" "        return f && f.sufijo ? String(f.sufijo) : '';"
+caso "pantalla_sin_el_de_la_operacion" "FAILED $T::test_la_propuesta_se_suma_a_lo_que_trae_el_de_la_operacion"
+
+# 24. la pantalla pierde los códigos propuestos que la operación no trae
+reemplazar $D '        prop.forEach(p => { if (!usados[p.codigo]) partes.push(p.texto); });' ''
+caso "pantalla_pierde_codigos" "FAILED $T::test_la_propuesta_se_suma_a_lo_que_trae_el_de_la_operacion"
+
+# 25. la propuesta de una fila pasa al producto que queda en su lugar
+reemplazar $D '        if (!pedido || JSON.stringify(pedido) !== JSON.stringify(pedidoDe(it))) return null;' '        if (!pedido) return null;'
+caso "propuesta_de_otro_producto" "FAILED $T::test_la_propuesta_de_una_fila_no_pasa_al_producto_que_queda_en_su_lugar"
+
+# 26. la pantalla repite el pedido en curso
+reemplazar $D '        if (pendiente && pendiente.clave === cuerpo.clave) return pendiente.promesa;' ''
+caso "pedido_repetido" "FAILED $T::test_listo_no_repite_el_pedido_en_curso"
+
+# 27. la nota dice «no está» cuando falta la tabla
+reemplazar $D "            if (arancel.sin_tabla) return 'Falta la tabla del arancel de ARCA: cargalo a mano.';" ''
+caso "nota_sin_tabla" "FAILED $T::test_sin_la_tabla_la_nota_no_dice_que_la_posicion_no_esta"
+
+# 28. la nota dice «no está» cuando es la letra de control
+reemplazar $D '            if (f.letra_de_control) {' '            if (false) {'
+caso "nota_sin_letra" "FAILED $T::test_con_la_letra_equivocada_la_nota_no_dice_que_la_posicion_no_esta"
+
+# 29. con sub-ítems, la estadística de la tabla va sola al pedido
+reemplazar $D '        const fila = it && Array.isArray(it.subitems) && it.subitems.length ? null : tabla[posicionDe(it)];' '        const fila = tabla[posicionDe(it)];'
+caso "subitems_con_estadistica_de_la_tabla" "FAILED $T::test_con_sub_items_la_estadistica_de_la_tabla_no_va_sola"
 
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
 echo "OK: los $CASOS sabotajes dan rojo por la razón esperada"
