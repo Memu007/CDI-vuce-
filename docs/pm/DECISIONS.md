@@ -178,3 +178,12 @@ Decidido por la PM:
   `@validates` en el modelo.
 - D17 (a): la Dev técnica arregla `ataque_aislamiento.sh` (el sufijo «01» que
   la API rechaza desde MARIA-7), en un commit aparte.
+
+## 2026-10-25 — El sufijo general que nadie usa (PM, D18 de MARIA-9)
+
+Decidido por la PM: D18 (b). Si ningún sub-ítem ni renglón toma el sufijo
+de valor de la operación, no se valida nada de él (tampoco `=`, caracteres
+de control ni el largo) y `/generate_maria/avisos` no avisa por él. Es
+seguro porque el general sólo se escribe en `CSBTSVL` y siempre pasa por
+`limpiar_sufijo`. Cuando alguno lo toma, los controles siguen igual. Va en
+VALOR-1c.

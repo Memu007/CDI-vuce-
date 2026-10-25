@@ -30,98 +30,88 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
-## Veredicto de VALOR-1 (2026-10-25): devolución, VALOR-1b
+## Veredicto de VALOR-1b y MARIA-9 (2026-10-25): aceptadas con nota
 
-Sobre `3352a01` (informe `23ba183`). **No la integro todavía.** Detalle en
-`REPRODUCCION-VALOR-1-2026-10-25.md`. Yo corrí `test_valor1.py`
-(`49 passed`) y tus 31 sabotajes (todos en rojo, `rc=0`). Dos adversarios
-(Opus alto y Sonnet alto):
-- con ajustes, el TXT es idéntico en 36 variantes;
-- el FOB de la tarjeta es igual a `MDDTFOB` en 290 de 290;
-- las respuestas fuera de orden y el cambio de operación no arrastran nada;
-- ningún 500;
-- el HTML inyectado no ejecuta nada.
+Sobre `efa2e08` (informe `8f529d5`; el producto es igual en los dos).
+Integradas con `merge` a la rama de la PM (`9f787f6`). Detalle en
+`REPRODUCCION-VALOR-1b-MARIA-9-2026-10-25.md`. Yo corrí tus pruebas
+(`213 passed`) y tus tres sabotajes (23, 31 y 30 en rojo, `rc=0`). Dos
+adversarios (Opus alto y Sonnet alto):
+- el TXT es idéntico byte a byte en 86 casos y en 27, salvo el que pedía
+  MARIA-9.1;
+- el botón nunca pone un seguro calculado con cuentas viejas (cuatro caminos
+  en pantalla, distintos de mi ejemplo del descuento);
+- `/avisos` anticipa el error del sufijo en 6432 de 6432;
+- ningún 500 nuevo.
 
-La tarjeta está bien hecha. Vuelve por las cuentas viejas en un camino que
-el informe da por cerrado, y por D13.
+La familia de las cuentas viejas la seguiste hasta el final, y la firma del
+pedido la cierra mejor que lo que yo pedía.
 
-### VALOR-1b: lo que vuelve (va primero, antes de MARIA-9)
+### Tus D (decidido por la PM)
 
-1. **Causa: no todo cambio de `op` que entra en la cuenta invalida
-   `ultimoValor`.** `usarDescuento()` cambia `op.ajustes_deducir` y llama a
-   `refrescarAvisos()`, pero no a `cuentasViejas()`; los manejadores del
-   campo sí. Con `usarDescuento(); calcularSeguro();` el seguro sale con el
-   FOB de antes del descuento: 93,13 en vez de 92,25 (lo reproduje con
-   `_pantalla` de `test_valor1.py`).
-   - Contradice tu punto 3 y la línea del CHANGELOG «no usa cuentas de
-     antes de cambiar un ajuste».
-   - **Familia:** todo lo que escribe en `op` un campo de la cuenta (el
-     descuento, la restauración, el seguro calculado o a mano). Revisalos
-     todos, no sólo `usarDescuento`.
-   - **Prueba:** después de cada uno, el botón no se puede usar con las
-     cuentas viejas. Tiene que dar rojo sin el arreglo **con cualquier base
-     del seguro**: con el punto 3, el seguro deja de depender de los
-     ajustes, así que la prueba mira las cuentas, no sólo el seguro.
-2. **El aviso del seguro sin leer.** `calcularSeguro` no suma `seguro` a
-   `campos_completados`, así que «No pudimos leer el seguro de la factura:
-   completalo.» sigue después de calcularlo (`review.js:692`,
-   `semaforo.js:53`). Que se vaya al calcularlo.
-   - Si `seguro` está en `campos_sin_leer`, el botón avisa que la factura
-     puede traer un seguro que no leímos.
-3. **D13: (b), decidido por la PM.** `BASE_SEGURO_SUGERIDO = "fob_factura"`
-   hasta PRORRATEO-1. El botón y el aviso dicen «1 % de FOB de la factura +
-   flete». Así el TXT queda coherente consigo mismo. Tus casos de la base
-   siguen probando que la constante manda.
-4. **Ajustes que no son número, por API** (`main.py:4110`, `float | None`).
-   - Hoy dan 422 en `/generate_maria` (antes, 200) y en `/avisos`, donde se
-     pierden todos los avisos.
-   - Que vayan como `valor.error` sin perder los avisos.
-   - Que `/generate_maria` responda como antes.
-   - Cambiá los textos crudos de Python en `valor.error` por mensajes
-     claros.
+- **D18: (b).** El general se escribe sólo en `CSBTSVL` y siempre pasa por
+  `limpiar_sufijo`: si nadie lo usa, no se escribe y saltear sus controles
+  no rompe el formato. Dos condiciones:
+  - cuando alguien lo usa, los controles de `=`, caracteres de control y
+    largo siguen igual en los dos endpoints;
+  - cuando nadie lo usa, `/avisos` no dice nada de él. Hoy, con `AA(X=Y)`
+    sin usar, avisa «sale «AA(X Y)»» y `/generate_maria` da 400.
+- **D13: (b)** y **D14: (a)**, como estaban.
 
-Cada punto con su sabotaje en rojo. Corregí el CHANGELOG para que diga sólo
-lo que queda probado.
+### VALOR-1c: lo que queda (va primero, antes de SEPARADORES-1)
 
-- **D14: (a).** El botón se ofrece en cualquier condición y la persona
-  decide. Le pregunto al despachante qué condiciones ya llevan el seguro
-  (CIF, CIP…) y si la base del seguro es el FOB de la factura o el
-  casillero.
-- **Riesgos que quedan, no los arregles (anotalos si los tocás):**
-  - `type=number` toma «1.000,50» como 1,0005 y «3.480» como 3,48 sin aviso,
-    igual que los campos de flete y seguro de hoy (no probado en Chrome
-    real con es-AR);
-  - los cosméticos del informe (textos cortados, «0», desborde a 390 px);
-  - el ajuste mal escrito restaurado sobre un campo vacío.
+Pieza chica de la fila 3 del roadmap. Cada punto con su caso y su sabotaje
+en rojo.
 
-## Veredicto de MARIA-7 y MARIA-8 (2026-10-25): aceptadas con nota
+1. **Causa: un valor que puso el sistema con cuentas que ya no son llega al
+   TXT.** Generar no mira si el seguro calculado sigue valiendo
+   (`finalize.js:543`). Con el seguro calculado sobre flete 100 y el flete
+   cambiado a 7925 en revisión, el TXT sale con `MDDTFLE=7925.00` y
+   `MDDTASS=14.88`; sólo la nota lo dice.
+   - **Lo que tiene que quedar:** nadie genera con un seguro calculado sobre
+     otras cuentas sin enterarse y elegir (recalcularlo o dejarlo). Cómo, lo
+     decidís vos; en silencio, no.
+   - **Familia:** cualquier camino que cambie el pedido después de calcular
+     (revisión, restauración, otra operación, un campo de la tarjeta) y
+     cualquier valor que ponga el sistema con esas cuentas, no sólo el
+     seguro.
+2. **D18 (b)**, con sus dos condiciones de arriba.
+3. **El mensaje de kilos nombra a todos los que dan cero.** Con kilos 0,005,
+   0,005, 0,005 y 0,004 en la misma posición nombra sólo el 4, y por el
+   ajuste del redondeo dan cero del 1 al 4 (14 de 601 casos del fuzz de mi
+   adversario).
+4. **Sin ítems, un error claro en los dos endpoints.** Con `items=[]` y el
+   general vacío, hoy sale 200 con un TXT sin `[ART]` (antes, 400).
+5. **Pruebas que no distinguen.** Mutaciones que siguen en verde:
+   - el flete sin redondear en el seguro (`maria_generator.py:934`; FOB 1000
+     con flete 0,495 lo separa);
+   - la firma del pedido sin los ítems (`finalize.js:251`);
+   - sacar `pintarValor(null)` (`finalize.js:84`);
+   - `None` en vez de `request.iva_adicional` (`main.py:4341`: un caso con
+     IVAAD1 da 200 o 400);
+   - en `/avisos`, `request.items` en vez de los ítems con la procedencia
+     (`_supuestos_maria(request, items, gastos)`, `main.py:4212`); el de
+     `/generate_maria` ya lo cubre tu sabotaje 30;
+   - el número de renglón del error de kilos como índice dentro del ítem.
 
-Sobre `30ceace` (informe `f71eaa9`; el producto es igual en `536c679` y en
-`f71eaa9`). Integradas con `merge` a la rama de la PM (`1fa0b6e`); el
-producto es idéntico al revisado. Detalle en
-`REPRODUCCION-MARIA-7-8-2026-10-25.md`. Mi adversario (Sonnet, alto):
-- suite `2046 passed, 102 skipped, 2 xfailed`, cero rojos;
-- tus sabotajes, 13/13, 38/38 y 25/25 en rojo;
-- smoke y e2e OK;
-- un fuzz de 5000 ítems con renglones unidos, donde FOB, cantidades y
-  kilos cierran exactos.
+Corregí el CHANGELOG para que diga sólo lo que queda probado.
 
-`test_excel2` no reprodujo: pasó en 23–24 s contra el tope de 30. Es de
-entorno, como dijiste.
-
-Lo que queda va a **MARIA-9** (abajo), antes de SEPARADORES-1 y antes de
-que esto se publique.
-
-## Respuestas a tus D9–D11 (MARIA-7/8)
-
-- **D9: (a).** El texto libre no genera. Tu ejemplo de mi herramienta es
-  mío: ya estaba rota antes (le falta el CUIT del despachante y pide EC02).
-  La arreglo yo; vos no la tocás.
-- **D10: (a).** Palabra entera. La regresión que trae (nombres pegados de
-  menos de 16 dígitos, como `CITIBANK 123456789`) queda como riesgo
-  anotado.
-- **D11: (b)**, en MARIA-9. Mi adversario encontró más que la falta de
-  aviso: hay una regresión.
+**Riesgos que anoto, no los arregles (anotalos si los tocás):**
+- mientras la firma está vieja, lo que se ve tarda en ponerse al día
+  (`finalize.js:312-317`); nunca aplica el valor viejo;
+- `"1_000"` pasa; `""` sale con comillas vacías; `nan`, `inf` y `1e400` en
+  un renglón no dicen qué renglón;
+- de antes: flete o seguro `true` por API cuentan como 1,00; `"abc"` como
+  valor unitario en `/generate_maria` da 400 con texto de Python;
+  `grupo_id` como lista da 500;
+- los de tu informe: el clic que sólo pide las cuentas, la firma de todo el
+  pedido, `_exacto`;
+- de VALOR-1: `type=number` con «3.480» (va en SEPARADORES-1), los
+  cosméticos y el ajuste mal escrito restaurado sobre un campo vacío;
+- de MARIA-7/8 (D10): nombres pegados a un número, como `CITIBANK 123456789`;
+- doble redondeo de kilos (`.3f` y después el centésimo: `465.1249` sale
+  `465.13`) y `cantidad=2.675` (`2.67` sola, `2.68` como renglón de un ítem
+  unido). Van a M9 cuando Emi ordene los hallazgos de Argon.
 
 ## Qué pasó el 2026-10-24
 
@@ -171,52 +161,7 @@ Todas las líneas terminan en CRLF (una línea sin CR: «falta carácter de fin
 dentro de los valores de los sufijos: van espacios. El guión que separa un
 sufijo del otro (`)-`) sí.
 
-## Después de VALOR-1b: MARIA-9, después SEPARADORES-1
-
-### MARIA-9: el sufijo de la operación y sus errores en pantalla
-
-Es lo que dejó la revisión de MARIA-7/8. Cada punto con su sintético y su
-sabotaje.
-
-1. **Un sufijo general que no se usa frena el TXT (regresión).** Si todos
-   los sub-ítems o renglones traen su sufijo propio válido y
-   `sbt_sufijo_valor` es texto libre («ROJO»), en `284b029` se generaba con
-   los propios; hoy `/generate_maria` da 400 («Sufijo de valor de la
-   operación: «ROJO» no se puede separar…»). Además,
-   `/generate_maria/avisos` responde 200 sin anticiparlo.
-   - **Causa:** el general se analiza aunque no se use.
-   - **Qué:** se valida sólo si algún sub-ítem o renglón lo toma; cuando
-     lo toma y es inválido, `/avisos` lo anticipa.
-   - **Familia:** sub-ítems a mano, renglones por API, mezcla de ítems con y
-     sin propio.
-2. **La pantalla v2 no lleva los errores de sufijo a su lugar.**
-   - **Causa:** `static/v2/screens/finalize.js:401` sólo reconoce
-     `^Item N, sub-ítem M: ` y `:410` sólo los que dicen «sbt». Los mensajes
-     nuevos («Sufijo de valor de la operación: …», «Sufijo de valor del
-     ítem N, sub-ítem M: …», «…del renglón N…») caen como texto genérico.
-   - **Qué:** cada uno se muestra donde se corrige: bajo el campo del
-     sufijo de la operación o en el sub-ítem.
-   - **Prueba:** de pantalla, con el error forzado (`page.route`).
-3. **Bordes sin prueba.** Mutaciones de mi adversario que siguen en verde,
-   cada una con su caso y su sabotaje:
-   - el tope de 120 (120 pasa, 121 no);
-   - `CA100-`;
-   - `A(X)-`;
-   - `;` como separador;
-   - las unidades numéricas del aviso (`05`, `99`).
-4. **Mensaje engañoso:** con dos renglones de la misma posición en kilos y
-   uno solo de 0,004 kg, el error dice «los renglones 1 y 2 son tan chicos…»
-   (`maria_generator.py` ~1304). Tiene que nombrar sólo el chico.
-
-**Riesgos que no arreglás (anotalos si los tocás):**
-- doble redondeo de kilos (`.3f` y después el centésimo: `465.1249` sale
-  `465.13`);
-- `cantidad=2.675` sale `2.67` sola y `2.68` como renglón de un ítem unido.
-
-Van a M9 cuando Emi ordene los hallazgos de Argon (9.2 es la misma
-familia).
-
-### SEPARADORES-1
+## Después de VALOR-1c: SEPARADORES-1
 
 Está en `ROADMAP.md`, Fase 1b. El reparto ítem por ítem de los ajustes
 queda para PRORRATEO-1 (`DECISIONS.md`, 2026-10-24).
