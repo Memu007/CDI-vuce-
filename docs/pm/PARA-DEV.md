@@ -27,119 +27,146 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
-## Veredicto de EXCEL-3c y CLIENTE-1b (2026-10-25)
+## Veredicto de ESTUDIO-1 (2026-10-25)
 
-Sobre `273c153` (informe `69347ff`). Detalle y salidas en
-`REPRODUCCION-EXCEL-3c-2026-10-25.md`. Mi adversario fue Opus, alto. Yo
-re-corrí mis casos en la entrega y en la base `e08b4c4`.
+Sobre `5468581` (código `c992715`, informe `c820c74`). El detalle está en
+`REPRODUCCION-ESTUDIO-1-2026-10-25.md`. Re-corrí `test_estudio1.py` (26
+passed) y `estudio1.sh` (37 ROJO, 0 sin rojo), más 8 negativos míos. Mi adversario fue
+Opus, alto: no encontró cómo entrar a lo ajeno ni cómo perder datos.
 
-- **EXCEL-3c: devolución, EXCEL-3d.** R2 mejoró. B1 mejoró sólo en parte:
-  con la descripción combinada, «Insurance as per policy» e «Insurance 40
-  GBP» siguen entrando como producto, igual que en la base. Es la misma
-  causa del punto 1. Además, la vuelta trae una regresión de plata sin
-  aviso. R1 no lo re-corrí.
-- **CLIENTE-1b: aceptada con nota.** Todavía no la integro. La rama no se
-  separa limpia: `23936d5` ya trae `test_excel3.py` y `excel3.sh`. Entra
-  junto con EXCEL-3d.
+- **ESTUDIO-1: aceptada.** Se suma **ESTUDIO-1b**, que va antes de publicar.
+- **No integro todavía.** `5468581` trae EXCEL-3d, y su H1 sigue abierta.
+  Integro todo junto cuando acepte EXCEL-3e.
+- **D23: (b)**, en ESTUDIO-1b.
 
-### EXCEL-3d: lo que vuelve (va primero)
+### ESTUDIO-1b (después de CLIENTE-1c; antes de publicar ESTUDIO-1)
 
-1. **Causa:** cuando hay celdas combinadas o copiadas, la fila se decide con
-   una lista de palabras (`_es_solo_un_cargo`, `main.py:4600-4637`). Una fila
-   cuyo rótulo empieza como un cargo y trae una palabra que la lista no
-   conoce entra como producto, en silencio.
-   - Con el origen combinado (`C2:C4`), «Flete int.», «Gastos
-     administrativos» e «Insurance 40 GBP» suben el FOB de 3550 a 4750 con
-     avisos `[]`.
-   - La base leía «Flete int.» como flete de 1200, con aviso de su fila.
-   - **Lo que tiene que quedar:** ninguna fila que empiece como un cargo
-     cambia el FOB sin un aviso que nombre su fila. Si queda afuera o entra
-     marcada, lo decidís vos.
-   - **Piso:** lo que hacía la base con «Flete int.» combinado, o mejor.
-   - «Freight elevator» (un producto real) se resuelve con la misma regla.
-   - **No** se arregla agregando palabras a la lista.
-2. **Cabecera y su hijo, la misma decisión (regresión sin combinadas).** Una
-   cabecera con código y rótulo de cargo («H-1», «Insurance», con medidas)
-   queda sin leer. Su hijo sin descripción hereda «Insurance» y entra como
-   producto: 40 USD al FOB.
-   - El único aviso es el genérico de herencia.
-   - La causa: `rotulo_propio = ""` si `del_grupo` (`main.py:4958`).
-   - En la base quedaban los dos sin leer.
-3. **D12 (a) en toda la familia.** El aviso de «sin precio» está sólo en el
-   grupo con medidas (`main.py:4921`). Con la descripción combinada
-   (`B2:B4`), sin medidas y el precio sólo arriba, dos hijos entran sin
-   precio y con avisos `[]`.
-   - Tiene que avisar, con su fila, con la descripción combinada, con el
-     origen combinado y sin combinadas.
-   - Sigue sin inventar precio.
+1. **D23 (b).** Hay que anotar cuándo se generó con el CUIT del perfil, en la
+   tabla chica aparte que propusiste. La preselección es lo último que se
+   usó, estudio o perfil.
+   - Mi adversario lo vio más ancho. Con un solo estudio que nunca se usó,
+     ese estudio gana sobre el perfil.
+   - Y elegir «CUIT de mi perfil» en la operación N no cuenta: en la N+1
+     vuelve el estudio. Lo reprodujo en Chromium.
+   - La prueba cubre los tres casos:
+     - perfil después de un estudio;
+     - perfil elegido a mano en la pantalla, con la operación siguiente
+       sin tocar el selector;
+     - un estudio único recién cargado sin ningún uso previo del perfil:
+       ahí sí gana el estudio.
+2. **`estudio_id` escrito como vacío.** Hoy `"null"`, `"None"`, `"N/A"` y
+   `"  "` caen al perfil en silencio, por `_vacio_escrito`. Contradice el
+   docstring de `_estudio_elegido`.
+   - Sólo `""`, y la falta del campo, son «sin estudio».
+   - Lo demás que no es de la cuenta da 400.
+3. **Nombre del estudio.** El alta rechaza un nombre que se ve vacío o al
+   revés: espacios de ancho cero, controles de dirección (U+200B–U+200F,
+   U+202A–U+202E, U+2066–U+2069) y un nombre que queda vacío sin ellos.
 
-**La prueba barre la familia, no mis ejemplos:**
-- varios rótulos de cargo (flete, seguro, gastos, handling, pago, comisión),
-  cada uno con palabras de más arbitrarias;
-- el rótulo en la columna del código y en la de la descripción;
-- origen combinado, descripción combinada, los dos juntos y sin combinadas;
-- cabecera con hijos, en vertical y en horizontal;
-- al menos un producto real que empiece como un cargo.
+Cada punto con su sabotaje en rojo. Riesgos que anoto, no los arregles:
+- `cuit_valido` acepta `00000000000`; ya estaba en la base.
+- Un estudio borrado mientras se genera sale igual en ese TXT.
 
-Cada punto con su sabotaje en rojo. Las recetas están en la reproducción.
-Corregí el CHANGELOG para que diga sólo lo que queda probado.
+## Veredicto de EXCEL-3d (2026-10-25)
 
-**Siguen como en EXCEL-3c:**
-- D12 (b) es aparte, después de ESTUDIO-1;
-- R3 se queda como está;
-- los riesgos que no se arreglan: «Ocean freight», el subtotal con largo,
-  «10m2 m» y el aviso de unidad.
+Sobre `5468581` (informe `470fc48`). El detalle y las salidas están en
+`REPRODUCCION-EXCEL-3d-2026-10-25.md`. Mi adversario fue Opus, alto. Yo
+re-corrí sus casos de plata contra `e08b4c4`, `273c153`, `31c9b5a` y la
+entrega.
 
-**Riesgos que anoto, no los arregles:**
-- la herencia de R2 cambia tres proformas del fuzz, todas con aviso;
-- «Ins.», «Commission» y parecidos entran al FOB también en la base.
+- **EXCEL-3d: devolución, EXCEL-3e.** Los tres puntos que devolví están
+  arreglados, con mis ejemplos y con otros distintos. `test_excel3.py` da
+  264 passed y los sabotajes, 0 sin rojo. Pero la vuelta trae una regresión
+  de plata sin aviso, H1, abajo.
+- **E1 del adversario no es un hallazgo.** Contra `e08b4c4`, la base de mi
+  veredicto anterior, la cabecera y su hijo quedan los dos sin leer, igual
+  que en 3d. Lo que dejó entrar al hijo fue 3c. Las filas sin leer se ven en
+  el semáforo. Sólo pido que la docstring de `test_excel3.py:1046` diga a qué
+  SHA llama «la base». Va en el próximo commit de código.
+- **No integro todavía.** EXCEL-3d, CLIENTE-1b y ESTUDIO-1 entran juntas
+  cuando acepte EXCEL-3e.
 
-### Notas de CLIENTE-1b (van a CLIENTE-1c)
+### EXCEL-3e: lo que vuelve (va primero, antes que CLIENTE-1c)
 
-- El día con una cifra pasa.
-- Los años 0001 y 9999 pasan.
-- Con un `--base` mal escrito, el script muestra la clave en el error de
-  Python. Esto sí arreglalo: que el error no la muestre.
-- Un dígito de ancho completo se lee distinto en la pantalla y en el
-  generador.
+**H1. Un cargo con medidas que no son números entra como producto.**
 
-### Tus D (decidido por la PM)
+El caso: la especificación está combinada (`C2:C3`) y la fila 3 es
+`Freight, -, -, "/", "/", -, 1, 1200, 1200`.
+- `e08b4c4`, `273c153` y `31c9b5a` leen un flete de 1200 con aviso de la
+  fila 3. El FOB queda en 30.
+- `5468581` da FOB 1230, un producto «LONA DEMO, ancho / m x largo / m» y
+  avisos `[]`.
+- Con medidas «-» o 0 pasa lo mismo.
+- Con «Discount» y -10, se pierde el descuento de 10 y entra un producto
+  fantasma. El único aviso es «sin precio», que confunde.
 
-- **D15: (b).**
-- **D16: (b).** Va junto con D15 en una pieza chica, **CLIENTE-1c**, con las
-  dos últimas notas de arriba. (c) no: toca el modelo y cambia el error de
-  tres lugares a la vez.
-- **D17: (a).** Arreglá `ataque_aislamiento.sh` vos, en un commit aparte de
-  EXCEL-3d. La puerta está ciega también en mi rama.
-- **D8: (b)**, como ya estaba. D12 como arriba.
+La causa:
+- `con_medidas` (`main.py:4973`) mira si la celda tiene texto, no si es un
+  número.
+- Con la descripción copiada, `descripcion_propia` (`main.py:4945`) queda
+  vacía.
+- Con las dos, la fila no pasa por la lectura de flete y descuento
+  (`main.py:4984`). Entra como hijo y hereda la decisión del producto de
+  arriba (`main.py:5071`).
+
+**Lo que tiene que quedar:**
+- Una fila con rótulo de cargo o descuento, bajo una descripción combinada o
+  copiada y con medidas que no son números, nunca entra como producto sin un
+  aviso que nombre su fila.
+- Se lee como la leía la base, o queda afuera con ese aviso.
+- **Piso:** lo que hace `31c9b5a`.
+- **No** se arregla agregando palabras a la lista: se arregla la causa.
+
+**La prueba barre la familia:**
+- medidas «/», «-», 0 y vacías;
+- flete, seguro y descuento;
+- con importe y precio, y con sólo el importe;
+- `.xlsx` y `.xls`;
+- el rótulo en Item y en la columna de la descripción;
+- un producto real con medidas «-», que tiene que seguir entrando.
+
+Cada caso con su sabotaje en rojo. Corregí el CHANGELOG si dice algo que la
+vuelta cambia.
+
+### Tus D de EXCEL-3d (decidido por la PM)
+
+- **D20: (a).** Se queda así: las filas se ven como sin leer.
+- **D21: (b)**, en una pieza aparte, **EXCEL-3f**, después de ESTUDIO-1:
+  - plurales y «fee» en `_FILA_QUE_NO_ES_MERCADERIA_RE`, con aviso de su
+    fila;
+  - la familia H4, con el cargo que no viene primero: «Ocean freight», «Sea
+    freight», «Air freight», «Packing charges», «Inland freight», «Courier
+    DHL», «Comisión bancaria», «THC», «2. Insurance». Para estas, sólo
+    aviso: no se sacan del FOB.
+  - Ésta sí es una pieza de lista, decidida aparte. La regla de «no por
+    lista» vale para EXCEL-3e.
+- **D22: (b)**, en EXCEL-3f: aviso sin sacarla.
+- **H5** (el aviso de flete sin «y N más», `main.py:8115`): opcional, en
+  EXCEL-3f.
+- **D8 (b) y D12 (b)**, como estaban: D12 (b) va aparte, después de
+  ESTUDIO-1. R3 se queda como está.
+
+**Riesgos que anoto, no los arregles:** H2, H3 y H6 de la reproducción, y
+«Seguro de carga» con medidas «/» combinada. Están igual en los cuatro SHAs.
 
 ### Orden
 
-1. EXCEL-3d (con D17 en commit aparte).
-2. ESTUDIO-1 (abajo).
-3. CLIENTE-1c.
-4. GUARDAR-2.
-
-## Después de EXCEL-3d
-
-### ESTUDIO-1, con lo que pediste definido (decidido por la PM)
-
-1. **Los estudios son de la cuenta**, como los clientes: cada usuario ve y
-   elige sólo los suyos (mismo aislamiento por dueño que clientes; prueba
-   de que otro usuario no los ve ni los usa).
-2. **Se elige en la operación donde hoy se carga el CUIT del despachante**
-   (`cuit_agr`), con el último usado o el único como opción preseleccionada.
-3. **Sin migración de datos:** `users.cuit` sigue como respaldo cuando la
-   operación no trae estudio. Nada se copia ni se borra.
-
-Costura con MARIA-7 punto 3: el error cuando falta el CUIT ya está
-integrado en mi rama (`1fa0b6e`). Traés mi rama y cambiás sólo de dónde
-sale el CUIT y el texto de «dónde cargarlo».
+1. EXCEL-3e.
+2. CLIENTE-1c, que ya empezaste.
+3. ESTUDIO-1b.
+4. EXCEL-3f.
+5. GUARDAR-2.
 
 ## Después — CLIENTE-1c
 
-D15 y D16 (b), con las dos últimas notas de CLIENTE-1b. Toca datos:
-revisión fuerte. Cada lugar con su sabotaje en rojo.
+D15 (b) y D16 (b) en una pieza chica. (c) no: toca el modelo y cambia el
+error de tres lugares a la vez. Van con estas notas de CLIENTE-1b:
+- Con un `--base` mal escrito, el script muestra la clave en el error de
+  Python. Que el error no la muestre.
+- Un dígito de ancho completo se lee distinto en la pantalla y en el
+  generador.
+
+Toca datos: revisión fuerte. Cada lugar con su sabotaje en rojo.
 
 ## Más adelante — GUARDAR-2
 
