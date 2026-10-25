@@ -580,11 +580,14 @@
             CDI.state.operacion.sbt_sufijo_valor = sbtInput.value.trim();
         }
         // Validación frontend: si está vacío, mostrar error junto al campo.
-        // No hace falta si todos los productos van en subítems con sufijo
-        // propio (SUBITEMS-1; el servidor tampoco lo pide).
+        // No hace falta si todos los productos llevan sufijo propio, en sus
+        // subítems (SUBITEMS-1) o en «Lo que decide el despachante»
+        // (SUFIJOS-1); el servidor tampoco lo pide.
         const itemsSufijo = CDI.state.items || [];
-        const todosConSufijoPropio = itemsSufijo.length > 0 && itemsSufijo.every(it =>
-            Array.isArray(it.subitems) && it.subitems.length && it.subitems.every(s => String(s.sufijo || '').trim()));
+        const todosConSufijoPropio = itemsSufijo.length > 0 && itemsSufijo.every((it, i) =>
+            Array.isArray(it.subitems) && it.subitems.length
+                ? it.subitems.every(s => String(s.sufijo || '').trim())
+                : Boolean(CDI.despachante && CDI.despachante.sufijoDe && CDI.despachante.sufijoDe(it, i)));
         if (!CDI.state.operacion.sbt_sufijo_valor && !todosConSufijoPropio) {
             if (sbtError) {
                 sbtError.textContent = 'Ingresá el sufijo de valor SBT. Es obligatorio.';
@@ -713,7 +716,7 @@
         const operation_id = factura ? ('FAC_' + factura.replace(/[^a-zA-Z0-9_-]/g, '')) :
             ('OP_' + new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14));
 
-        const items = (CDI.state.items || []).map(it => ({
+        const items = (CDI.state.items || []).map((it, i) => ({
             pieza: String(it.pieza || '').trim(),
             descripcion: String(it.descripcion || '').trim(),
             origen: String(it.origen || 'XX').trim().toUpperCase() || 'XX',
@@ -728,6 +731,8 @@
                 : { unidad: it.unidad || null }),
             estado: it.estado || null,
             iva_adicional: it.iva_adicional || null,
+            // El suyo o el propuesto del arancel; vacío, el de la operación (SUFIJOS-1).
+            sufijo: (CDI.despachante && CDI.despachante.sufijoDe ? CDI.despachante.sufijoDe(it, i) : '') || null,
             // Partido en subítems (SUBITEMS-1); sin subítems no va el campo.
             subitems: subitemsDelPedido(it)
         }));

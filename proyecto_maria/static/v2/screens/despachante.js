@@ -3,7 +3,9 @@
    En la pantalla de validación, antes de generar: banco, empresa de
    digitalización e IVA adicional por operación; estado de la mercadería
    (y cambio de IVA) por producto. MARIA-7: la unidad de la factura y la
-   estadística, por operación y con cambio por producto.
+   estadística, por operación y con cambio por producto. SUFIJOS-1: el
+   sufijo de valor de cada producto y la unidad estadística que pide su
+   posición, del arancel de ARCA (POST /api/sufijos/propuesta).
 
    Sólo se guarda lo que la persona elige (al elegirlo). Los valores por
    defecto se calculan cada vez con el origen actual y no se guardan: si el
@@ -36,7 +38,7 @@
         ['14', 'Gramo (14)'], ['29', 'Tonelada (29)'],
     ];
     // La estadística: la misma que la declarada o kilos (con otra no se sabe
-    // la cantidad; la unidad por posición llega con SUFIJOS-1).
+    // la cantidad). Sin elegir, la que pide la posición si es kilos.
     const ESTADISTICA = [['DCL', 'Igual que la de la factura'], ['01', 'Kilogramo (01)']];
 
     function $(id) { return document.getElementById(id); }
@@ -108,6 +110,68 @@
         if (clienteId() === cid) propuesta = nueva;
     }
 
+    // Lo que el arancel dice de cada producto (SUFIJOS-1): por fila, el
+    // sufijo propuesto y lo que falta; por posición, la unidad estadística.
+    // Se pide de nuevo si cambian los productos; si falla, no se propone nada.
+    let arancel = { clave: null, fuente: '', filas: [] };
+    let tabla = {};
+    function posicionDe(it) { return String((it && it.pieza) || '').trim().toUpperCase(); }
+    function recordarTabla(t) { tabla = t || {}; }
+    function cuerpoDeSufijos() {
+        const cuerpo = { items: (CDI.state.items || []).map(it => ({
+            pieza: posicionDe(it), marca: String(it.marca || ''), modelo: String(it.modelo || ''),
+            codigo_parte: String(it.codigo_parte || ''),
+        })) };
+        return { clave: JSON.stringify(cuerpo) };
+    }
+    async function pedirSufijos() {
+        const clave = cuerpoDeSufijos().clave;
+        if (arancel.clave === clave) return false;
+        let nuevo = { clave: clave, fuente: '', filas: [] };
+        try {
+            const r = await CDI.api('/api/sufijos/propuesta', { method: 'POST', body: clave });
+            if (r && r.ok) {
+                const d = await r.json();
+                nuevo = { clave: clave, fuente: d.fuente || '', filas: d.items || [] };
+            } else {
+                nuevo.clave = null;
+            }
+        } catch (e) {
+            nuevo.clave = null;
+            console.warn('[despachante] sin arancel:', e && e.message);
+        }
+        if (cuerpoDeSufijos().clave !== clave) return false;   // cambiaron mientras tanto
+        arancel = nuevo;
+        const t = {};
+        nuevo.filas.forEach(f => { if (f && f.en_la_tabla) t[String(f.posicion || '').toUpperCase()] = f; });
+        recordarTabla(t);
+        return true;
+    }
+    // El sufijo propuesto, sólo para un producto que sale con su propio
+    // sufijo: no en sub-ítems (cada uno lleva el suyo) ni en un grupo (va
+    // uno solo para todos y lo escribe la persona).
+    function propuestaDe(it, i) {
+        if (!it || it.grupo_id || (Array.isArray(it.subitems) && it.subitems.length)) return null;
+        const f = arancel.filas[i];
+        return f && posicionDe(it) === String(f.posicion || '').toUpperCase() ? f : null;
+    }
+    // El sufijo de un producto como va al pedido: el que escribió la persona
+    // (aunque lo haya borrado, para usar el de la operación) o el propuesto.
+    function sufijoDe(it, i) {
+        if (it && it.sufijo != null) return String(it.sufijo).trim();
+        const f = propuestaDe(it, i);
+        return f ? String(f.sufijo || '') : '';
+    }
+    function notaDe(it, i) {
+        if (!it || it.grupo_id || (Array.isArray(it.subitems) && it.subitems.length)) return '';
+        const f = arancel.filas[i];
+        if (!f || posicionDe(it) !== String(f.posicion || '').toUpperCase() || !posicionDe(it)) return '';
+        if (!f.en_la_tabla) return 'La posición no está en el ' + arancel.fuente + ': cargalo a mano.';
+        const partes = ['Según el ' + arancel.fuente + ': unidad estadística ' + f.unidad_estadistica + '.'];
+        if ((f.faltan || []).length) partes.push('Falta: ' + f.faltan.join('; ') + '.');
+        return partes.join(' ');
+    }
+
     function pintar() {
         const wrap = $('despachanteWrap');
         if (!wrap) return;
@@ -121,7 +185,8 @@
         $('despachanteEmpresa').innerHTML = opciones(EMPRESAS, e.empresa_digitalizacion || propuesta.empresa_digitalizacion || 'PSAD06');
         $('despachanteIva').innerHTML = opciones(IVA, e.iva_adicional || 'NO_VALIDA');
         $('despachanteUnidad').innerHTML = opciones(UNIDADES, e.unidad || '', 'Sin elegir (sale 07, unidad)');
-        $('despachanteUnidadEst').innerHTML = opciones(ESTADISTICA, e.unidad_estadistica || 'DCL');
+        $('despachanteUnidadEst').innerHTML = opciones(ESTADISTICA, e.unidad_estadistica || '',
+            'Según el arancel de ARCA (si no, la de la factura)');
         $('despachanteItems').innerHTML = items.map((it, i) => {
             const porDefecto = esArgentino(it.origen) ? '' : '2';
             const estado = it.estado != null && it.estado !== '' ? String(it.estado) : porDefecto;
@@ -135,9 +200,19 @@
                 opciones(unidadesPara(it), it.unidad || '', 'Igual que la operación') + '</select></td>' +
                 '<td><select class="form-input despachante-unidad-est" data-row="' + i + '">' +
                 opciones(ESTADISTICA, it.unidad_estadistica || '', 'Igual que la operación') + '</select></td>' +
+                '<td>' + celdaSufijo(it, i) + '</td>' +
                 '</tr>';
         }).join('');
         $('despachanteError').hidden = true;
+    }
+    function celdaSufijo(it, i) {
+        if (Array.isArray(it.subitems) && it.subitems.length) {
+            return '<span class="caption">Va en cada sub-ítem.</span>';
+        }
+        const nota = notaDe(it, i);
+        return '<input type="text" class="form-input despachante-sufijo" data-row="' + i + '" maxlength="120"' +
+            ' autocomplete="off" placeholder="El de la operación" value="' + CDI.escapeHtml(sufijoDe(it, i)) + '">' +
+            (nota ? '<div class="caption" style="font-size:.8rem;color:var(--muted,#666)">' + CDI.escapeHtml(nota) + '</div>' : '');
     }
 
     // Lo que la persona toca se guarda en el momento.
@@ -165,6 +240,9 @@
         } else if (t.classList.contains('despachante-unidad-est')) {
             const it = items[Number(t.dataset.row)];
             if (it) it.unidad_estadistica = t.value || null;
+        } else if (t.classList.contains('despachante-sufijo')) {
+            const it = items[Number(t.dataset.row)];
+            if (it) it.sufijo = t.value;
         }
     }
 
@@ -179,8 +257,8 @@
         }
         pintar();                       // ya, con lo que hay
         const antes = propuesta.cliente;
-        await pedirPropuesta();
-        if (propuesta.cliente !== antes || propuesta.ok) pintar();
+        const [, cambio] = await Promise.all([pedirPropuesta(), pedirSufijos()]);
+        if (propuesta.cliente !== antes || propuesta.ok || cambio) pintar();
     }
 
     // Lo que va al pedido: lo elegido; si no, la propuesta del cliente; si no,
@@ -197,10 +275,13 @@
 
     // Las unidades de un producto como van al pedido: la suya o la de la
     // operación; la estadística sólo viaja si es kilos (si no, el servidor
-    // usa la declarada).
+    // usa la declarada). Si nadie la eligió, la de la posición cuando es
+    // kilos (SUFIJOS-1); otra la avisa el servidor.
     function unidadesDe(it) {
         const e = elegidos();
-        const est = (it && it.unidad_estadistica) || e.unidad_estadistica || 'DCL';
+        const fila = tabla[posicionDe(it)];
+        const est = (it && it.unidad_estadistica) || e.unidad_estadistica ||
+            (fila && fila.unidad_estadistica) || 'DCL';
         return {
             unidad: (it && it.unidad) || e.unidad || null,
             unidad_estadistica: est === '01' ? '01' : null,
@@ -231,5 +312,5 @@
         return errores.length === 0;
     }
 
-    CDI.despachante = { render, leer, valores, unidadesDe };
+    CDI.despachante = { render, leer, valores, unidadesDe, sufijoDe, recordarTabla };
 })();

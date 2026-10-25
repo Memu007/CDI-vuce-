@@ -11,6 +11,8 @@ from fractions import Fraction
 from functools import lru_cache
 from pathlib import Path
 
+from proyecto_maria.core import sufijos_arca
+
 # Condiciones de venta de los grupos C y D de Incoterms. En estas, la
 # informacion complementaria del SIM pide `GTOS-POS-FOB` (diferencia entre la
 # condicion pactada y el FOB declarado). En EXW pide `GTOS-ANT-FOB` (gastos
@@ -241,8 +243,8 @@ def unidad_estadistica_de(item: dict, unidad_declarada: str, idx) -> str:
     """El código de la unidad estadística (CARTUNTEST) del ítem (MARIA-7).
 
     Sin elegir, la misma que la declarada (como antes). Elegida, sólo la
-    declarada o kilos: con otra no se sabe la cantidad estadística (la
-    unidad por posición la resuelve SUFIJOS-1)."""
+    declarada o kilos: con otra no se sabe la cantidad estadística. La que
+    pide la posición no se pone sola: si es otra, se avisa (SUFIJOS-1)."""
     crudo = str(item.get("unidad_estadistica") or "").strip()
     if not crudo:
         return unidad_declarada
@@ -385,18 +387,13 @@ def _aviso_de_sufijo(donde: str, sufijo) -> list:
             f"paréntesis van sólo letras, números y espacios; sale «{limpio[:80]}»."]
 
 
-def usa_el_sufijo_de_la_operacion(items, iva_por_defecto=None) -> bool:
+def usa_el_sufijo_de_la_operacion(items) -> bool:
     """Si algún producto lleva el sufijo de la operación (MARIA-9): uno que
-    sale entero (sin sub-ítems y sin ir junto con otros renglones; un grupo
-    cuenta como uno), o un renglón o un sub-ítem sin sufijo propio. Sólo
-    entonces se valida. Un propio que no se puede separar no lo usa: el
-    error es el suyo. Si no se sabe, se valida."""
+    sale entero, un renglón o un sub-ítem, sin sufijo propio (SUFIJOS-1: el
+    que sale entero también lleva el suyo). Sólo entonces se valida. Un
+    propio que no se puede separar no lo usa: el error es el suyo. Si no se
+    sabe, se valida."""
     if not isinstance(items, list) or not all(isinstance(it, dict) for it in items):
-        return True
-    try:
-        juntos = {n for ns in renglones_por_posicion(items, _iva_adicional(
-            iva_por_defecto or IVA_ADICIONAL_POR_DEFECTO, "Operación")) for n in ns}
-    except (ValueError, TypeError):
         return True
 
     def sin_propio(sufijo):
@@ -405,13 +402,13 @@ def usa_el_sufijo_de_la_operacion(items, iva_por_defecto=None) -> bool:
         except ValueError:
             return False
 
-    for n, item in enumerate(items):
+    for item in items:
         subs = item.get("subitems")
         if subs:
             if not isinstance(subs, list) or any(
                     not isinstance(sub, dict) or sin_propio(sub.get("sufijo")) for sub in subs):
                 return True
-        elif n not in juntos or sin_propio(item.get("sufijo")):
+        elif sin_propio(item.get("sufijo")):
             return True
     return False
 
@@ -1321,10 +1318,17 @@ def generate_maria_txt(operation_id: str, items: list,
             raise ValueError(f"Grupo {gid}: todos los ítems deben tener el mismo estado de la mercadería")
         if len(ivas) != 1:
             raise ValueError(f"Grupo {gid}: todos los ítems deben tener el mismo IVA adicional")
+        # Un grupo sale en un solo [SBT]: un solo sufijo (SUFIJOS-1).
+        sufijos = {limpiar_sufijo(str(it.get('sufijo') or '').strip(), f" del grupo {gid}")[0]
+                   for it in grupo_items}
+        if len(sufijos) != 1:
+            raise ValueError(f"Grupo {gid}: todos los ítems deben llevar el mismo sufijo de valor; "
+                             f"si cada producto lleva el suyo, desagrupalos.")
 
         # Combinar los items del grupo en uno solo
         primero = grupo_items[0]
         combined = dict(primero)
+        combined['sufijo'] = next(iter(sufijos))
         combined['descripcion'] = ' + '.join(
             str(it.get('descripcion', '')).strip() for it in grupo_items
         )
@@ -1543,8 +1547,12 @@ def generate_maria_txt(operation_id: str, items: list,
                 lines.append(f"QSBTUNTEST={est_sub:.2f}")
                 lines.append("")
         elif not subitems:
-            # Ítem entero: un solo bloque, sin montos (numeración desde 0000).
-            sufijo_sbt = sufijo_de_la_operacion()
+            # Ítem entero: un solo bloque, sin montos (numeración desde 0000),
+            # con su sufijo propio o el de la operación (SUFIJOS-1).
+            donde = (f" del grupo {item['grupo_id']}" if item.get("grupo_id") is not None
+                     else f" del ítem {lugar_en_el_pedido.get(id(item), idx)}")
+            sufijo_sbt = (limpiar_sufijo(str(item.get("sufijo") or "").strip(), donde)[0]
+                          or sufijo_de_la_operacion())
             if not sufijo_sbt:
                 raise ValueError(
                     "Falta el sufijo de valor SBT (CSBTSVL). "
@@ -1732,6 +1740,137 @@ def _dos_decimales(valor):
             return 0.0
 
 
+def _cuales(lugares: list) -> str:
+    """«el ítem 1», «los ítems 1 y 2» o «el grupo g1 y el ítem 3»: `lugares`
+    son números de ítem o textos («grupo g1», «ítem 1, sub-ítem 2»)."""
+    if all(isinstance(n, int) for n in lugares):
+        return f"el ítem {lugares[0]}" if len(lugares) == 1 else f"los ítems {_enumerar(lugares)}"
+    return _enumerar([f"el ítem {n}" if isinstance(n, int) else f"el {n}" for n in lugares])
+
+
+def _de(cuales: str) -> str:
+    return "del " + cuales[3:] if cuales.startswith("el ") else "de " + cuales
+
+
+def _codigos_del_sufijo(sufijo: str) -> list:
+    """[(código, valor)] de un sufijo ya limpio: («AI», «620G GRIS»), («PB02», "")."""
+    return [(codigo + (numero or ""), valor or "") for codigo, valor, numero in _UN_SUFIJO.findall(sufijo)]
+
+
+def _avisos_del_arancel(items: list, sbt_sufijo_valor, juntos: list) -> list:
+    """Lo que el arancel de ARCA dice de cada posición y no se cumple
+    (SUFIJOS-1): la posición que no está, lo que pide y el sufijo no trae, la
+    unidad estadística que no es la suya y el código de artículo (`AI`)
+    repetido. No cambia nada del TXT; el error de un sufijo que no se puede
+    separar lo da el generador."""
+    tabla = sufijos_arca.cargar()
+    fuente = sufijos_arca.fuente(tabla)
+    if not tabla:
+        return [f"Sufijos de valor: falta la tabla del {fuente}; no se completan ni se "
+                f"controlan. Cargalos a mano con el despachante."]
+
+    def posicion_de(item):
+        return str(item.get("ncm") or item.get("pieza") or "").strip()
+
+    def limpio(sufijo):
+        return limpiar_sufijo(str(sufijo or "").strip())[0]
+
+    try:
+        general = limpio(sbt_sufijo_valor)
+    except ValueError:
+        general = ""
+    en_renglones = {n for ns in juntos for n in ns}
+
+    # Cada [SBT] que sale: dónde está, su posición y su sufijo. Un renglón
+    # junto con otros se nombra como su ítem.
+    sbts, grupos = [], set()
+    for n, item in enumerate(items):
+        try:
+            if item.get("subitems"):
+                for m, sub in enumerate(item["subitems"], start=1):
+                    sbts.append((f"ítem {n + 1}, sub-ítem {m}", posicion_de(item),
+                                 limpio(sub.get("sufijo")) or general))
+            elif item.get("grupo_id") is not None and n not in en_renglones:
+                if item["grupo_id"] not in grupos:
+                    grupos.add(item["grupo_id"])
+                    sbts.append((f"grupo {item['grupo_id']}", posicion_de(item),
+                                 limpio(item.get("sufijo")) or general))
+            else:
+                sbts.append((n + 1, posicion_de(item), limpio(item.get("sufijo")) or general))
+        except (ValueError, TypeError, AttributeError):
+            continue  # lo dice el generador
+
+    avisos = []
+    consultas = {}
+    fuera = {}
+    for n, item in enumerate(items, start=1):
+        posicion = posicion_de(item)
+        if not posicion:
+            continue
+        consultas.setdefault(posicion, sufijos_arca.consultar(posicion, tabla))
+        if consultas[posicion] is None:
+            fuera.setdefault(posicion, []).append(n)
+    for posicion, ns in fuera.items():
+        avisos.append(
+            f"Posición {sufijos_arca.escrita(posicion)} ({'ítem ' + str(ns[0]) if len(ns) == 1 else 'ítems ' + _enumerar(ns)}): "
+            f"no está en el {fuente}. Los sufijos de valor y la unidad estadística no se "
+            f"completan ni se controlan: cargalos a mano con el despachante."
+        )
+
+    for lugar, posicion, sufijo in sbts:
+        consulta = consultas.get(posicion)
+        if not consulta or not sufijo:
+            continue  # fuera de la tabla, o sin sufijo: lo dice el generador
+        falta = sufijos_arca.faltan(consulta, [c for c, _ in _codigos_del_sufijo(sufijo)])
+        if falta:
+            avisos.append(
+                f"Sufijo de valor {_de(_cuales([lugar]))}: según el {fuente}, la posición "
+                f"{sufijos_arca.escrita(posicion)} pide {_enumerar(falta)}, "
+                f"y no {'está' if len(falta) == 1 else 'están'}."
+            )
+
+    # La unidad estadística que sale contra la de la posición, por posición.
+    distintas = {}
+    for n, item in enumerate(items, start=1):
+        consulta = consultas.get(posicion_de(item))
+        if not consulta:
+            continue
+        try:
+            declarada = get_unidad_codigo(item.get("unidad") or item.get("unidad_medida") or item.get("um"))
+            sale = unidad_estadistica_de(item, declarada, n)
+        except (ValueError, TypeError):
+            continue  # lo dice el generador
+        if sale != consulta["unidad_estadistica"]:
+            clave = (posicion_de(item), consulta["unidad_estadistica"], sale, declarada)
+            distintas.setdefault(clave, []).append(n)
+    for (posicion, pide, sale, declarada), ns in distintas.items():
+        cuales = _cuales(ns)
+        if pide == UNIDAD_KILOGRAMO:
+            como = "Elegí «Kilogramo (01)» en «Lo que decide el despachante»."
+        elif pide == declarada:
+            como = "Elegí «Igual que la de la factura» en «Lo que decide el despachante»."
+        else:
+            como = ("La pantalla deja elegir sólo la de la factura o kilogramo: "
+                    "cambiá la unidad del producto o corregilo en el Kit.")
+        avisos.append(
+            f"Unidad estadística: según el {fuente}, la posición {sufijos_arca.escrita(posicion)} "
+            f"va en {pide}{' (kilogramo)' if pide == UNIDAD_KILOGRAMO else ''}; {cuales} "
+            f"sale{'n' if len(ns) > 1 else ''} en {sale}. {como}"
+        )
+
+    # El código de artículo es de cada producto: repetido, es el de otro.
+    por_codigo = {}
+    for lugar, _posicion, sufijo in sbts:
+        for codigo, valor in _codigos_del_sufijo(sufijo):
+            if codigo == "AI" and valor:
+                por_codigo.setdefault(valor, []).append(lugar)
+    for valor, lugares in por_codigo.items():
+        if len(lugares) > 1:
+            avisos.append(f"Código de artículo (AI): «{valor[:40]}» se repite en "
+                          f"{_cuales(lugares)}; cada producto lleva el suyo.")
+    return avisos
+
+
 def supuestos_declarados(
     items: list,
     incoterm: str = "FOB",
@@ -1841,15 +1980,35 @@ def supuestos_declarados(
                 f"Identificación tributaria del proveedor: «{leido[:40]}» parece una cuenta del "
                 f"banco; IDTRIB-PROVEEDOR no sale. Cargá la del proveedor en la revisión."
             )
+    # Si un renglón tiene un error, el generador lo dice: acá no se avisa.
+    juntos = []
+    if items and all(isinstance(it, dict) for it in items):
+        try:
+            juntos = renglones_por_posicion(items, _iva_adicional(
+                iva_adicional or IVA_ADICIONAL_POR_DEFECTO, "Operación"))
+        except (ValueError, TypeError):
+            juntos = []
+    en_renglones = {n for ns in juntos for n in ns}
     if sbt_sufijo_valor is not None:
         # El general, sólo si alguno lo usa: si no, no va al TXT (D18).
-        usa_el_general = usa_el_sufijo_de_la_operacion(items, iva_adicional)
+        usa_el_general = usa_el_sufijo_de_la_operacion(items)
         sufijos = [("", sbt_sufijo_valor)] if usa_el_general else []
+        grupos = set()
         for idx, item in enumerate(items or [], start=1):
             subs = item.get("subitems") if isinstance(item, dict) else None
             for n, sub in enumerate(subs if isinstance(subs, list) else [], start=1):
                 if isinstance(sub, dict) and isinstance(sub.get("sufijo"), str):
                     sufijos.append((f" del ítem {idx}, sub-ítem {n}", sub["sufijo"]))
+            # El propio de uno que sale entero (SUFIJOS-1); el de un renglón
+            # se avisa con los renglones, y el de un grupo, una vez.
+            if (isinstance(item, dict) and not subs and idx - 1 not in en_renglones
+                    and isinstance(item.get("sufijo"), str)):
+                gid = item.get("grupo_id")
+                if gid is None:
+                    sufijos.append((f" del ítem {idx}", item["sufijo"]))
+                elif gid not in grupos:
+                    grupos.add(gid)
+                    sufijos.append((f" del grupo {gid}", item["sufijo"]))
         for donde, sufijo in sufijos:
             avisos.extend(_aviso_de_sufijo(donde, sufijo))
         # Si alguno lo usa y no se puede separar, el generador frena: se dice
@@ -1861,14 +2020,6 @@ def supuestos_declarados(
                 avisos.append(str(error))
 
     # --- Renglones de la misma posición (MARIA-8) ---------------------------
-    # Si un renglón tiene un error, el generador lo dice: acá no se avisa.
-    juntos = []
-    if items and all(isinstance(it, dict) for it in items):
-        try:
-            juntos = renglones_por_posicion(items, _iva_adicional(
-                iva_adicional or IVA_ADICIONAL_POR_DEFECTO, "Operación"))
-        except (ValueError, TypeError):
-            juntos = []
     for ns in juntos:
         cuales = _enumerar([n + 1 for n in ns])
         avisos.append(
@@ -1889,9 +2040,13 @@ def supuestos_declarados(
             avisos.append(
                 f"Sufijo de valor: en el ítem de los renglones {cuales} los {len(ns)} sub-ítems "
                 f"llevan el mismo sufijo («{next(iter(de_cada_uno))[:80]}»). Si cada renglón lleva "
-                f"el suyo (marca, modelo, color), la pantalla todavía no deja cargarlo: "
-                f"corregilo en el Kit."
+                f"el suyo (marca, modelo, color), cargalo en «Sufijo de valor» de cada producto, "
+                f"en «Lo que decide el despachante»."
             )
+
+    # --- Arancel de ARCA (SUFIJOS-1) ----------------------------------------
+    if items and all(isinstance(it, dict) for it in items):
+        avisos.extend(_avisos_del_arancel(items, sbt_sufijo_valor, juntos))
 
     # --- Fecha de emisión (MARIA-3) ----------------------------------------
     fecha_ok = fecha_de_la_factura(fecha_emision)
