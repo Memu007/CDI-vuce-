@@ -360,10 +360,20 @@ sabotaje $M "3e un renglón sin descripción con medidas 0 vuelve a heredar" \
 sabotaje $M "3e el 0 cuenta como medida" \
   '        return numero > 0' '        return numero >= 0' \
   "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[cero-flete-importe_y_precio-rotulo_en_item-xlsx]"
-CIFRA='    return any(unicodedata.numeric(c, 0) > 0 for c in _texto_de_celda(valor))'
+CIFRA='    return any((c.isdecimal() and unicodedata.decimal(c) > 0) or _es_una_fraccion(c) for c in texto)'
 sabotaje $M "3e un texto sin cifras cuenta como medida" \
-  "$CIFRA" '    return any(not c.isspace() for c in _texto_de_celda(valor))' \
-  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[guion-flete-importe_y_precio-rotulo_en_item-xlsx]"
+  "$CIFRA" '    return any(not c.isspace() for c in texto)' \
+  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[barra-flete-importe_y_precio-rotulo_en_item-xlsx]"
+sabotaje $M "3e «一» cuenta como medida: cualquier carácter numérico" \
+  "$CIFRA" '    return any(unicodedata.numeric(c, 0) > 0 for c in texto)' \
+  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[ideograma_uno-flete-importe_y_precio-rotulo_en_item-xlsx]"
+RAYA='    if texto and (unicodedata.category(texto[0]) == "Pd" or texto[0] == "\u2212"):'
+sabotaje $M "3e «-1 m» cuenta como medida: sin mirar la raya del principio" \
+  "$RAYA" '    if False:' \
+  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[negativa_con_unidad-flete-importe_y_precio-rotulo_en_item-xlsx]"
+sabotaje $M "3e «–1» cuenta como medida: sólo el guion ASCII es negativo" \
+  "$RAYA" '    if texto[:1] == "-":' \
+  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[negativa_con_raya-flete-importe_y_precio-rotulo_en_item-xlsx]"
 sabotaje $M "3e una medida en texto («48-50») no cuenta" \
   "$CIFRA" '    return False' \
   "${B}un_renglon_con_una_medida_escrita_en_texto_sigue_siendo_del_grupo[48-50-xlsx]"
@@ -375,6 +385,14 @@ sabotaje $M "3e una medida negativa cuenta: sin el signo" \
   '    from proyecto_maria.pdf_extractor import _numero_factura
     numero = _numero_factura(valor, decimal)' \
   "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[negativa-flete-importe_y_precio-rotulo_en_item-xlsx]"
+UNIDAD='                               and not _es_una_fraccion(texto.rstrip()[-1]))  # «½» no es una unidad'
+sabotaje $M "3e «½» se toma como la unidad: sale sin «m»" \
+  "$UNIDAD" '                               )' \
+  "${B}un_renglon_con_una_medida_escrita_en_texto_sigue_siendo_del_grupo[\\xbd-xlsx]"
+sabotaje $M "3e «m²» no es una unidad: sale «2 m² m»" \
+  '                trae_unidad = (numero is None and re.search(r"[^\W\d_]\s*$", texto)' \
+  '                trae_unidad = (numero is None and texto.rstrip()[-1:].isalpha()' \
+  "${B}un_renglon_con_una_medida_escrita_en_texto_sigue_siendo_del_grupo[2 m\\xb2-xlsx]"
 sabotaje $M "3e la descripción vuelve a escribir «ancho - m»" \
   '                if not _es_una_medida(row[col], decimal):' \
   '                if not _texto_de_celda(row[col]):' \
