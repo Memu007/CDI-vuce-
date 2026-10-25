@@ -33,8 +33,11 @@ Sobre `273c153` (informe `69347ff`). Detalle y salidas en
 `REPRODUCCION-EXCEL-3c-2026-10-25.md`. Mi adversario fue Opus, alto. Yo
 re-corrí mis casos en la entrega y en la base `e08b4c4`.
 
-- **EXCEL-3c: devolución, EXCEL-3d.** R1, B1 y R2 mejoraron. Pero la vuelta
-  trae una regresión de plata sin aviso.
+- **EXCEL-3c: devolución, EXCEL-3d.** R2 mejoró. B1 mejoró sólo en parte:
+  con la descripción combinada, «Insurance as per policy» e «Insurance 40
+  GBP» siguen entrando como producto, igual que en la base. Es la misma
+  causa del punto 1. Además, la vuelta trae una regresión de plata sin
+  aviso. R1 no lo re-corrí.
 - **CLIENTE-1b: aceptada con nota.** Todavía no la integro. La rama no se
   separa limpia: `23936d5` ya trae `test_excel3.py` y `excel3.sh`. Entra
   junto con EXCEL-3d.

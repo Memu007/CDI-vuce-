@@ -340,7 +340,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-25 02:40 UTC: EXCEL-3c (`273c153`) vuelve como EXCEL-3d. Con el origen combinado, «Flete int.», «Gastos administrativos» o «Insurance 40 GBP» suben el FOB de 3550 a 4750 sin aviso, y la base lo leía como flete. Además, el hijo de una cabecera «Insurance» entra como producto, y D12 avisa sólo con medidas. CLIENTE-1b aceptada con nota; se integra con EXCEL-3d porque la rama no se separa. D15 (b), D16 (b) como CLIENTE-1c; D17 (a). La técnica sigue con EXCEL-3d, después ESTUDIO-1 y CLIENTE-1c. La Dev MARIA, en VALOR-1b.
+2026-10-25 02:24 UTC: EXCEL-3c (`273c153`) vuelve como EXCEL-3d. Con el origen combinado, «Flete int.», «Gastos administrativos» o «Insurance 40 GBP» suben el FOB de 3550 a 4750 sin aviso, y la base lo leía como flete. El seguro con la descripción combinada sigue entrando con algunos rótulos. Además, el hijo de una cabecera «Insurance» entra como producto, y D12 avisa sólo con medidas. CLIENTE-1b aceptada con nota; se integra con EXCEL-3d porque la rama no se separa. D15 (b), D16 (b) como CLIENTE-1c; D17 (a). La técnica sigue con EXCEL-3d, después ESTUDIO-1 y CLIENTE-1c. La Dev MARIA, en VALOR-1b.
 
 2026-10-25 00:58 UTC: VALOR-1 vuelve como VALOR-1b. D13 (b), base FOB de la factura; D14 (a). Cuatro preguntas nuevas al despachante en `PREGUNTAS-DESPACHANTE.md`.
 

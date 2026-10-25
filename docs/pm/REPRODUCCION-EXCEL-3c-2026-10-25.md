@@ -81,6 +81,20 @@ precio sólo arriba:
 Dos renglones entran sin precio y nadie avisa al subir. Es lo que pedía el
 punto 3 de EXCEL-3c, en un miembro de la familia que la prueba no cubre.
 
+### Lo que se devolvió en EXCEL-3c (casos del adversario, FOB)
+
+| Caso | `273c153` | base `e08b4c4` |
+|---|---|---|
+| R2: cabecera sin código, hijos con códigos distintos | 315.8, 3 ítems | 86.4, 1 ítem |
+| B1: descripción combinada, «INSURANCE» en Item | 3550, 2 ítems | 4750, 3 ítems |
+| B1: ídem, «Insurance – USD 40» | 3550, 2 ítems | 4750, 3 ítems |
+| B1: ídem, «Insurance as per policy» | 4750, 3 ítems | 4750, 3 ítems |
+| B1: ídem, «Insurance 40 GBP» | 4750, 3 ítems | 4750, 3 ítems |
+| origen combinado, «Insurance as per policy» | 4750, 3 ítems | 3550, 2 ítems |
+
+R2 mejoró. B1 mejoró sólo para los rótulos de la lista: es la misma causa
+del hallazgo 1. R1 («Payment terminal POS», «Handling cart») no se re-corrió.
+
 ### Lo que cambió y trae aviso (riesgo, no se devuelve)
 
 En el fuzz del adversario cambian tres proformas de la base a la entrega,
@@ -107,6 +121,7 @@ Las dos últimas van a CLIENTE-1c, con D15 y D16.
 ## Lo que no se corrió
 
 - La suite completa sobre `273c153`.
+- R1 de EXCEL-3c.
 - `ataque_aislamiento.sh` con G3: no llega a generar el TXT (D17).
 - El script de fechas contra una base que no sea local.
 - Nada contra producción.
