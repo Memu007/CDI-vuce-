@@ -36,7 +36,7 @@ cada una con su adversario. El veredicto va acá arriba.
   aceptación de PA-1b pide algo, va con el veredicto.
 - **D12:** la contesto con el veredicto de EXCEL-3b.
 - **Ahora:** terminá **CLIENTE-1b** (abajo, «Más adelante») y seguí con
-  ESTUDIO-1. MARIA-7 ya está integrada en mi rama (`1fa0b6e`, 01:00 UTC):
+  ESTUDIO-1. MARIA-7 ya está integrada en mi rama (`1fa0b6e`, 00:28 UTC):
   traela con `merge` antes de ESTUDIO-1. Si un veredicto trae una
   devolución, esa va primero.
 
