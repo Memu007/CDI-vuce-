@@ -11,6 +11,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix(excel):** un subtotal con largo y sin precio, un flete o descuento sin monto y un código nuevo sin especificación ya no toman la descripción del renglón de arriba: quedan sin leer, con aviso. Una nota en «Remarks» no vuelve flete o descuento a un renglón; un «Descuento comercial -500» no entra como producto.
 - La unidad que sale de los encabezados de la cantidad y del precio («Qty (M)», «USD/M») se avisa con las dos columnas; un largo escrito «1,5m» no sale «1,5m m».
 - Las celdas combinadas de un .xls se leen como las de un .xlsx; el flete o descuento con el rótulo en una columna a la izquierda de la descripción («No.», «S/N») se lee.
+- Un origen o una especificación combinados hasta el flete, el seguro o el subtotal no los vuelven producto; una nota de descuento sin precio no abre un grupo.
 
 ## 2026-10-24 · fix: la demo de la landing dice «3 PA SIM» (PA-1b)
 
