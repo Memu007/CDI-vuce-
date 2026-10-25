@@ -1285,6 +1285,20 @@ def test_un_renglon_sin_descripcion_ni_medidas_no_hereda_y_se_avisa(medida, form
 
 
 @pytest.mark.parametrize("formato", ["xlsx", "xls"])
+@pytest.mark.parametrize("medida", ["-", "/", 0])
+def test_un_renglon_bajo_la_descripcion_combinada_sin_medidas_conserva_el_codigo(medida, formato):
+    """Con la descripción combinada, el renglón sin rótulo propio y con medidas
+    «-» sigue siendo del grupo, como en la base: hereda el código de arriba y
+    el producto de arriba conserva su ancho y largo (EXCEL-3e)."""
+    data = _leer_en(formato, [RENGLONES_PVC, PRODUCTO_H1,
+                              [2, None, None, medida, medida, 1, 4, 2, 8]], ("C2:C3",))
+    assert [(i["codigo_parte"], i["descripcion"]) for i in data["items"]] == [
+        ("DT-1", "LONA DEMO, ancho 2 m x largo 10 m"), ("DT-1", "LONA DEMO")], data["items"]
+    assert _total(data["items"]) == 38, data["items"]
+    assert data["filas_descartadas_numeros"] == [], data
+
+
+@pytest.mark.parametrize("formato", ["xlsx", "xls"])
 @pytest.mark.parametrize("largo", ["48-50", "1,5m", "½", "2 m²"])
 def test_un_renglon_con_una_medida_escrita_en_texto_sigue_siendo_del_grupo(largo, formato):
     """Una medida que no es un número («48-50», «1,5m», «½», «2 m²») sigue siendo
