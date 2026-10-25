@@ -6,12 +6,13 @@ from fastapi.responses import RedirectResponse
 from fastapi.templating import Jinja2Templates
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, field_validator
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
-from datetime import datetime, timedelta, timezone
 import jwt
 import json
 import os
 import re
+import unicodedata
 import csv
 import io
 import smtplib
@@ -71,7 +72,7 @@ PROJECT_VERSION = datetime.now().strftime("%Y%m%d%H%M%S")
 from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, importe_escrito, usa_el_sufijo_de_la_operacion
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, importe_escrito, usa_el_sufijo_de_la_operacion, fecha_inicio_actividad
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
     DocumentoNoAdmitido,
@@ -134,7 +135,7 @@ security = HTTPBearer()
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from proyecto_maria.database.connection import get_async_session, init_db
-from proyecto_maria.database.models import User, Client, PasswordResetToken, Organization, Invitation
+from proyecto_maria.database.models import User, Client, PasswordResetToken, Organization, Invitation, Estudio
 import uuid
 import logging
 from sqlalchemy.exc import IntegrityError
@@ -3527,6 +3528,10 @@ def _rellenar_combinadas(df, combinadas, mapeo=None):
             campos[col] = next(iter(lo_que_es))
     primera, ultima = int(df.index.min()) + 2, int(df.index.max()) + 2
     hasta_donde = {}
+    # Qué celdas son copia de una combinada: no son el rótulo ni el origen
+    # propios de la fila (un origen combinado hasta el flete no lo vuelve
+    # producto; EXCEL-3b).
+    rellenadas = df.attrs.setdefault("celdas_rellenadas", {})
     for f1, c1, f2, _c2 in sorted(set(combinadas)):
         if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < 2:
             continue
@@ -3544,6 +3549,7 @@ def _rellenar_combinadas(df, combinadas, mapeo=None):
         if desde <= hasta:
             filas = df.index[(df.index >= desde) & (df.index <= hasta)]
             df.loc[filas, col] = valor
+            rellenadas.setdefault(col, set()).update(filas)
     return df
 
 
@@ -3582,6 +3588,24 @@ def _con_encabezado(df, conocidas=()):
     return df
 
 
+def _combinadas_del_xls(ruta) -> list:
+    """Las celdas combinadas de la primera hoja de un .xls, como las de
+    _xlsx_solo_primera_hoja: [(fila1, col1, fila2, col2)], desde 1. Sin
+    ellas una especificación combinada hacia abajo sólo está en su primer
+    renglón (EXCEL-3b). Si xlrd no puede leerlas, el .xls se lee sin
+    rellenar, como antes."""
+    try:
+        import xlrd
+        libro = xlrd.open_workbook(ruta, formatting_info=True, on_demand=True)
+        try:
+            hoja = libro.sheet_by_index(0)
+            return [(f1 + 1, c1 + 1, f2, c2) for f1, f2, c1, c2 in hoja.merged_cells[:10_000]]
+        finally:
+            libro.release_resources()
+    except Exception:
+        return []
+
+
 def _leer_excel_ruta(ruta: str, engine: str, conocidas=()):
     # conocidas: el mapeo guardado del cliente, como pares (columna, campo) o
     # sólo los nombres de las columnas.
@@ -3594,6 +3618,8 @@ def _leer_excel_ruta(ruta: str, engine: str, conocidas=()):
         import io as _io
         contenido, combinadas = _xlsx_solo_primera_hoja(ruta, max_filas=_MAX_FILAS_EXCEL)
         origen = _io.BytesIO(contenido)
+    elif engine == "xlrd":
+        combinadas = _combinadas_del_xls(ruta)
     mapeo = dict(c for c in conocidas if isinstance(c, tuple) and len(c) == 2)
     nombres = set(mapeo) or {c for c in conocidas if isinstance(c, str)}
     df = _con_encabezado(pd.read_excel(origen, engine=engine, dtype=object), nombres)
@@ -4058,6 +4084,35 @@ async def upload_pdf_public(
         )
 
 
+# El texto de «dónde cargarlo» del CUIT del despachante (ESTUDIO-1). El
+# generador avisa con FALTA_CUIT_DEL_DESPACHANTE; la API lo cambia por éste.
+FALTA_CUIT_DONDE_CARGARLO = (
+    "Falta el CUIT del despachante (CDDTAGR): elegí el estudio en la operación o "
+    "cargá uno en «Mi perfil», «Mis estudios». Sin él no se genera el TXT."
+)
+
+
+async def _estudio_elegido(db: AsyncSession, estudio_id: str, username: str):
+    """El estudio que eligió la operación, si es de la cuenta (ESTUDIO-1).
+
+    Vacío: ninguno (sigue `cuit_agr` y el perfil). Uno que no es de la cuenta
+    o no existe es un error: no se cae en silencio al CUIT del perfil.
+    """
+    estudio_id = (estudio_id or "").strip()
+    if not estudio_id:
+        return None
+    result = await db.execute(
+        select(Estudio).where(Estudio.id == estudio_id, Estudio.owner_username == username)
+    )
+    estudio = result.scalars().first()
+    if estudio is None:
+        raise HTTPException(
+            status_code=400,
+            detail="El estudio elegido no está en tu cuenta: elegí otro en la operación.",
+        )
+    return estudio
+
+
 class MariaRequest(BaseModel):
     """Request para generar archivo MARIA TXT."""
     operation_id: str
@@ -4067,6 +4122,9 @@ class MariaRequest(BaseModel):
     moneda: str = ""
     incoterm: str = ""
     cuit_agr: str = ""
+    # El estudio elegido en la operación (ESTUDIO-1): su CUIT va al CDDTAGR
+    # y manda sobre `cuit_agr` y el perfil. Vacío: como antes.
+    estudio_id: str = ""
     vendedor_nombre: str = ""
     vendedor_id: str = ""
     comprador_nombre: str = ""
@@ -4137,7 +4195,7 @@ class MariaRequest(BaseModel):
         "bl_numero", "puerto_origen", "puerto_destino", "buque_nombre", "viaje_numero",
         "fecha_embarque", "fecha_emision", "contenedor_numero", "contenedor_tipo",
         "aduana_codigo", "tipo_destinacion", "sbt_sufijo_valor", "procedencia", "banco_bcra",
-        "numero_factura",
+        "numero_factura", "estudio_id",
         mode="before",
     )
     @classmethod
@@ -4228,10 +4286,12 @@ def _rechazar_exportacion_en_importacion(request: MariaRequest) -> None:
 async def avisos_maria_endpoint(
     request: MariaRequest,
     user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """Los avisos de `/generate_maria`, antes de generar (MARIA-3): la
     pantalla los muestra junto al botón. No genera ni guarda nada."""
     _rechazar_exportacion_en_importacion(request)
+    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])
     items = _items_con_procedencia(request)
     try:
         gastos = gastos_fob_para_el_txt(request.incoterm, request.gastos_fob, request.gastos_anteriores_fob)
@@ -4245,8 +4305,8 @@ async def avisos_maria_endpoint(
         kit_warnings = []
     supuestos = _supuestos_maria(request, items, gastos)
     # Sin CUIT del despachante no se genera (MARIA-7): se avisa antes.
-    if not str(request.cuit_agr or "").strip() and not str((user or {}).get("cuit") or "").strip():
-        supuestos = [FALTA_CUIT_DEL_DESPACHANTE, *supuestos]
+    if estudio is None and not str(request.cuit_agr or "").strip() and not str((user or {}).get("cuit") or "").strip():
+        supuestos = [FALTA_CUIT_DONDE_CARGARLO, *supuestos]
     # Lo que al generar es un error de procedencia, acá se avisa con el mismo texto.
     # La NCM dada de baja o que no está en el vigente, como en la validación
     # (CATALOGO-NCM-1): aviso, no freno.
@@ -4296,6 +4356,7 @@ def _cuentas_del_valor(request: MariaRequest, items: list) -> tuple[dict, list]:
 async def generate_maria_endpoint(
     request: MariaRequest,
     user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Genera archivo TXT en formato MARIA para el sistema SIM de AFIP.
@@ -4305,6 +4366,7 @@ async def generate_maria_endpoint(
     Devuelve: archivo TXT descargable
     """
     _rechazar_exportacion_en_importacion(request)
+    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])
     if not request.items:
         raise HTTPException(status_code=400, detail=SIN_PRODUCTOS)
     try:
@@ -4427,7 +4489,8 @@ async def generate_maria_endpoint(
         # Si el user tiene CUIT en su perfil y la request no manda cuit_agr,
         # usamos el del perfil (para que el despachante no tenga que re-escribir
         # su propio CUIT en cada operacion).
-        effective_cuit_agr = request.cuit_agr
+        # El estudio elegido manda (ESTUDIO-1); su CUIT se validó al guardarlo.
+        effective_cuit_agr = estudio.cuit if estudio is not None else request.cuit_agr
         try:
             if not effective_cuit_agr and user and user.get("cuit"):
                 effective_cuit_agr = str(user["cuit"]).strip()
@@ -4502,6 +4565,16 @@ async def generate_maria_endpoint(
         # valor asumido en silencio se descubre recién en la aduana.
         supuestos = _supuestos_maria(request, items, gastos)
 
+        # Generó: el estudio pasa a ser el último usado (se preselecciona).
+        # Si no se puede anotar, el TXT igual se entrega.
+        if estudio is not None:
+            try:
+                estudio.last_used_at = datetime.now(timezone.utc)
+                await db.commit()
+            except Exception as e:
+                await db.rollback()
+                print(f"No se anotó el uso del estudio {estudio.id}: {e}")
+
         return {
             "success": True,
             "filename": filename,
@@ -4514,7 +4587,10 @@ async def generate_maria_endpoint(
     except HTTPException:
         raise
     except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        # El generador lo controla al final (los demás errores primero); acá
+        # se dice también que se elige en la operación (ESTUDIO-1).
+        detalle = FALTA_CUIT_DONDE_CARGARLO if str(e) == FALTA_CUIT_DEL_DESPACHANTE else str(e)
+        raise HTTPException(status_code=400, detail=detalle)
     except Exception as e:
         print(f"Error generando MARIA TXT: {e}")
         raise HTTPException(status_code=500, detail=f"Error generando archivo MARIA: {str(e)}")
@@ -4660,11 +4736,52 @@ def _es_fila_de_total(texto: str) -> bool:
 # Renglones de la factura que no son mercadería: flete, seguro, condiciones de
 # pago, gastos. Sin NCM ni origen no entran como producto (sumarían al FOB) y
 # se cuentan en el aviso de filas sin leer (EXCEL-1).
-_FILA_QUE_NO_ES_MERCADERIA_RE = re.compile(
-    r"^\s*(?:freight|flete|insurance|seguro|payment|pago|bank\s+charges?|gastos"
-    r"|handling|shipping\s+(?:cost|charges?)|incoterm|delivery\s+terms?)\b",
-    re.IGNORECASE,
-)
+_CARGOS = (r"freight|flete|insurance|seguro|payment|pago|bank\s+charges?|gastos"
+           r"|handling|shipping\s+(?:cost|charges?)|incoterm|delivery\s+terms?")
+_FILA_QUE_NO_ES_MERCADERIA_RE = re.compile(rf"^\s*(?:{_CARGOS})\b", re.IGNORECASE)
+
+# EXCEL-3c. Con el origen o la descripción copiados de una combinada no se
+# sabe si la fila es mercadería: es un cargo si su rótulo, además de empezar
+# como uno, dice sólo palabras de cargo, monto o moneda («Seguro de carga»,
+# «Insurance €40», «Payment 30% T/T in advance»). Si dice algo más
+# («Payment terminal POS», «Gastos administrativos») la fila es dudosa: el
+# flete se lee como flete y lo demás entra como producto, las dos con un
+# aviso que nombra la fila (EXCEL-3d). La lista sólo decide si hace falta
+# ese aviso: una palabra que falta no cambia el FOB en silencio.
+_PALABRAS_DE_CARGO = {
+    "freight", "flete", "fletes", "insurance", "seguro", "seguros", "payment", "payments",
+    "pago", "pagos", "bank", "banco", "bancario", "bancaria", "bancarios", "bancarias",
+    "charge", "charges", "gasto", "gastos", "handling", "shipping", "cost", "costs", "costo",
+    "costos", "incoterm", "incoterms", "delivery", "term", "terms", "fee", "fees", "premium",
+    "prima", "commission", "commissions", "comision", "comisión", "comisiones", "policy",
+    "poliza", "póliza", "carga", "cargo", "cargos", "goods", "mercaderia", "mercadería",
+    "mercancia", "mercancía", "merchandise", "shipment", "embarque", "envio", "envío",
+    "transport", "transporte", "maritime", "maritimo", "marítimo", "ocean", "sea", "air",
+    "aereo", "aéreo", "inland", "local", "international", "internacional", "origin", "origen",
+    "destination", "destino", "port", "puerto", "prepaid", "collect", "pagado", "advance",
+    "anticipado", "anticipada", "anticipo", "deposit", "deposito", "depósito", "balance",
+    "saldo", "before", "after", "against", "copy", "tt", "wire", "transfer", "transferencia",
+    "swift", "total", "and", "y", "for", "on", "at", "to", "por", "para", "con", "with",
+    "from", "al", "los", "las", "days", "dias", "días",
+}
+
+
+def _filas_del_aviso(filas) -> str:
+    """«filas 3, 4, 5, 6, 7 y 2 más» o, con su rótulo, «fila 3 («Seguro»),
+    fila 4 («Pago») y 2 más»: hasta cinco por número."""
+    primeras = filas[:5]
+    if primeras and isinstance(primeras[0], tuple):
+        nombradas = ", ".join(f"fila {f} («{r}»)" for f, r in primeras)
+    else:
+        nombradas = f"fila{'s' if len(filas) > 1 else ''} " + ", ".join(str(f) for f in primeras)
+    return nombradas + (f" y {len(filas) - 5} más" if len(filas) > 5 else "")
+
+
+def _es_solo_un_cargo(texto: str) -> bool:
+    palabras = [p for p in re.split(r"[\s\d.,:;/()\[\]\-%&+]+", (texto or "").lower()) if p]
+    return (bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(texto or ""))
+            and all(len(p) == 1 or p in _PALABRAS_DE_CARGO or p in _PALABRAS_DE_MONTO
+                    for p in palabras))
 
 # EXCEL-3. El flete y el descuento de la factura no son productos: se
 # devuelven leídos para la operación (cómo se usa el descuento lo decide
@@ -4770,6 +4887,24 @@ def extract_items_from_excel(df: pd.DataFrame, filename: str, descartes: list | 
 
     return items
 
+
+def _es_una_medida(valor, decimal) -> bool:
+    """Una medida escrita: un número mayor que cero o un texto con una cifra
+    que no es cero («48-50», «1,5m», «½»). «/», «-», «0», «-1», «-1 m», «N/A»,
+    «一» o «m²» no lo son."""
+    numero = _monto_de_fila(valor, decimal)
+    if numero is not None:
+        return numero > 0
+    texto = _texto_de_celda(valor).strip()
+    if texto and (unicodedata.category(texto[0]) == "Pd" or texto[0] == "\u2212"):
+        return False  # un negativo con unidad o escrito con otra raya
+    return any((c.isdecimal() and unicodedata.decimal(c) > 0) or _es_una_fraccion(c) for c in texto)
+
+
+def _es_una_fraccion(c: str) -> bool:
+    return unicodedata.name(c, "").startswith("VULGAR FRACTION")  # «½», «¾»
+
+
 def _texto_de_celda(valor) -> str:
     """Texto de una celda: vacío si no hay nada, y un número entero sin «.0»
     (con una fila vacía en el medio pandas lee la NCM 84713000 como 84713000.0)."""
@@ -4822,6 +4957,12 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
     libres = [c for c in df.columns if c not in usadas]
     importe_col = _columna_con_nombre(libres, _NOMBRES_DE_IMPORTE)
     parte_col = _columna_con_nombre(libres, _NOMBRES_DE_CODIGO_DE_PARTE)
+    # «Freight» o «Discount» pueden venir en la columna Item de la proforma o
+    # en una a la izquierda de la descripción («No.», «S/N»); a la derecha
+    # («Remarks») son una nota del renglón (EXCEL-3b).
+    item_col = _columna_con_nombre(libres, {"item"})
+    columnas_del_rotulo = ([item_col] if item_col else []) + [
+        c for c in list(df.columns)[:list(df.columns).index(desc_col)] if c != item_col]
     medidas = [(c, _NOMBRES_DE_MEDIDA[_nombre_sin_unidad(c)],
                 (re.search(r"\(\s*([^()]*?)\s*\)", str(c)) or [None, ""])[1])
                for c in libres if _nombre_sin_unidad(c) in _NOMBRES_DE_MEDIDA]
@@ -4833,11 +4974,19 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
         for v in df[col].tolist() if isinstance(v, str)
     ])
 
-    # (número de fila, ¿trae NCM u origen?, ítem)
+    # (número de fila, ¿es un cargo y no mercadería?, rótulo si es dudosa,
+    # medidas, ítem)
     candidatos = []
-    grupo = None  # (descripción, código de parte) del renglón de arriba
+    grupo = None  # (descripción, código de parte, fila) del renglón de arriba
     agrupada = False  # si algún renglón tomó lo del de arriba
-    flete, descuento, heredadas = [], [], []
+    flete, descuento, heredadas, sin_precio = [], [], [], []
+    # Filas que empiezan como un cargo y no se sabe si lo son: (fila, rótulo).
+    flete_dudoso, dudosas = [], []
+    # Fila → (¿es un cargo y no mercadería?, rótulo si es dudosa). Una copia de su
+    # descripción combinada sin otro rótulo es la misma cosa (EXCEL-3c), y un
+    # renglón del grupo, lo mismo que su cabecera (EXCEL-3d).
+    no_es_mercaderia_en = {}
+    rellenadas = df.attrs.get("celdas_rellenadas", {})
     for _, row in df.iterrows():
         try:
             if all((not pd.notna(v)) or str(v).strip() == "" for v in row.values):
@@ -4851,13 +5000,23 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
                 return (_numero_factura(row[col], decimal) or 0.0) if col else 0.0
 
             cantidad, valor_unitario = _numero(cant_col), _numero(valor_col)
+            def _propia(col):
+                return _ not in rellenadas.get(col, ())
+
+            # El origen combinado vale para el producto (EXCEL-2), pero no
+            # vuelve mercadería al flete o al seguro de abajo (EXCEL-3b).
             celda_origen = row[origen_col] if origen_col else None
-            sin_ncm_ni_origen = not pieza and not _texto_de_celda(celda_origen)
+            origen_propio = celda_origen if origen_col and _propia(origen_col) else None
+            sin_ncm_ni_origen = not pieza and not _texto_de_celda(origen_propio)
+            descripcion_propia = descripcion if _propia(desc_col) else ""
+            descripcion_copiada = "" if descripcion_propia else descripcion
+            # Sin origen propio, un origen con texto es copiado.
+            copiada = bool(_texto_de_celda(celda_origen) or descripcion_copiada)
 
             # El rótulo de una fila sin descripción puede estar en otra
             # columna («Total» o «Discount» en la columna Item).
-            rotulo = descripcion or next(
-                (t for t in (_texto_de_celda(v) for v in row.values)
+            rotulo = descripcion_propia or next(
+                (t for t in (_texto_de_celda(v) for c, v in row.items() if _propia(c))
                  if t and _numero_factura(t, decimal) is None
                  and _monto_de_fila(t, decimal) is None), "")
 
@@ -4867,25 +5026,50 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             if descripcion.strip().lower() == _FILA_DE_EJEMPLO_PLANTILLA.lower():
                 continue  # la fila de ejemplo de la plantilla
 
+            def _monto_de_la_linea():
+                monto = _monto_de_fila(row[importe_col], decimal) if importe_col else None
+                if monto is None:
+                    # El precio del descuento también viene negativo.
+                    precio = _monto_de_fila(row[valor_col], decimal) or 0.0
+                    monto = precio * cantidad if cantidad else precio
+                return monto
+
             # Un renglón con sus propias medidas es mercadería: una nota
-            # («Freight included») en otra columna no lo saca.
-            con_medidas = any(_texto_de_celda(row[c]) for c, _n, _u in medidas)
-            if sin_ncm_ni_origen and (descripcion or not con_medidas):
-                es_flete = bool(_FILA_DE_FLETE_RE.match(rotulo))
-                if not es_flete and _FILA_DE_DESCUENTO_RE.match(rotulo) and not _DESCUENTO_SOLO_RE.match(rotulo):
-                    if "%" in rotulo:
+            # («Freight included») en otra columna no lo saca. «/», «-» o 0
+            # no son una medida: el flete con la especificación combinada no
+            # pasa por renglón del grupo (EXCEL-3e).
+            con_medidas = any(_es_una_medida(row[c], decimal) for c, _n, _u in medidas)
+            cargo = descripcion_propia or next(
+                (t for t in (_texto_de_celda(row[c]) for c in columnas_del_rotulo)
+                 if t and _numero_factura(t, decimal) is None), "")
+            es_cargo = False  # flete o descuento: no abre grupo
+            # Una descripción copiada no cuenta: el renglón con medidas y una
+            # nota en Item sigue siendo del grupo, como sin combinadas.
+            if sin_ncm_ni_origen and (descripcion_propia or not con_medidas):
+                # Con algo copiado, «Freight elevator» o «Flete int.» no se
+                # distinguen: se leen como flete, como sin combinadas, y se
+                # avisa la fila (EXCEL-3d).
+                es_flete = bool(_FILA_DE_FLETE_RE.match(cargo))
+                es_descuento = not es_flete and bool(_FILA_DE_DESCUENTO_RE.match(cargo))
+                if es_descuento and not _DESCUENTO_SOLO_RE.match(cargo):
+                    # «Descuento comercial -500» no es un producto de valor 0;
+                    # «Discount tag labels» con su precio, sí es un producto,
+                    # y abre su grupo.
+                    # Sin precio propio es una nota: no abre grupo.
+                    if "%" in cargo or _monto_de_la_linea() < 0 or not valor_unitario:
+                        grupo = None
                         descartes.append(_ + 2)  # un porcentaje no es un monto
                         continue
-                elif es_flete or _FILA_DE_DESCUENTO_RE.match(rotulo):
-                    monto = _monto_de_fila(row[importe_col], decimal) if importe_col else None
-                    if monto is None:
-                        # El precio del descuento también viene negativo.
-                        precio = _monto_de_fila(row[valor_col], decimal) or 0.0
-                        monto = precio * cantidad if cantidad else precio
+                elif es_flete or es_descuento:
+                    grupo = None  # el flete o el descuento cierran el grupo de arriba
+                    es_cargo = True
+                    monto = _monto_de_la_linea()
                     # El descuento resta (su signo da igual); un flete negativo
                     # (un reintegro) no se suma como flete: se avisa.
                     if monto and (monto > 0 or not es_flete):
                         (flete if es_flete else descuento).append((_ + 2, abs(monto)))
+                        if es_flete and copiada and not _es_solo_un_cargo(cargo):
+                            flete_dudoso.append((_ + 2, cargo))
                         continue
                     if es_flete and monto:
                         descartes.append(_ + 2)
@@ -4897,16 +5081,28 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             # medidas (cada renglón es un largo). Sin medidas no se hereda
             # nada: una fila así se avisa como sin leer (EXCEL-1), y un
             # subtotal sin rótulo no pasa a ser un producto.
-            # Con la descripción combinada hacia abajo (.xlsx) el renglón ya la
-            # trae, y hereda sólo el código.
-            if (not pieza and grupo and con_medidas and descripcion in ("", grupo[0])
-                    and (cantidad or valor_unitario)):
+            # Con la descripción combinada hacia abajo el renglón ya la trae, y
+            # hereda sólo el código; si el precio también viene combinado,
+            # alcanza con su cantidad. Sin descripción ni precio propio es un
+            # subtotal con largo, no un renglón; un código nuevo sin
+            # especificación es otro producto: no hereda, y él y su grupo
+            # quedan sin leer (EXCEL-3b). Con la descripción del grupo copiada
+            # y sin rótulo propio, «-» en las medidas no lo saca del grupo:
+            # sólo un cargo con su rótulo deja de ser renglón (EXCEL-3e).
+            del_grupo = False
+            if grupo and grupo[1] and parte and parte != grupo[1] and not descripcion:
+                grupo = None
+            del_grupo_copiado = bool(grupo and descripcion_copiada
+                                     and descripcion == grupo[0] and not cargo)
+            if (not pieza and grupo and (con_medidas or del_grupo_copiado)
+                    and descripcion in ("", grupo[0])
+                    and (valor_unitario or (descripcion and cantidad))):
                 if not descripcion:
                     heredadas.append(_ + 2)
                 descripcion, parte = grupo[0], parte or grupo[1]
-                agrupada = True
-            elif descripcion:
-                grupo = (descripcion, parte)
+                agrupada = del_grupo = True
+            elif descripcion and not es_cargo:
+                grupo = (descripcion, parte, _)
 
             # Sin descripción ni NCM no hay ítem que mostrar: se avisa.
             if not pieza and not descripcion:
@@ -4922,17 +5118,55 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             # planilla agrupa (abajo); en una factura común no se tocan.
             tamaño = []
             for col, nombre, unidad in medidas:
+                if not _es_una_medida(row[col], decimal):
+                    continue  # «-», «/» o 0 no son un ancho (EXCEL-3e)
                 texto = _texto_de_celda(row[col])
-                if not texto:
-                    continue
                 numero = _numero_factura(row[col], decimal)
                 if numero is not None:
                     texto = _medida(numero)
-                tamaño.append(f"{nombre} {texto}" + (f" {unidad}" if unidad else ""))
+                # «1,5m» ya trae su unidad: no sale «1,5m m»; «48-50» no.
+                trae_unidad = (numero is None and re.search(r"[^\W\d_]\s*$", texto)
+                               and not _es_una_fraccion(texto.rstrip()[-1]))  # «½» no es una unidad
+                tamaño.append(f"{nombre} {texto}" + (f" {unidad}" if unidad and not trae_unidad else ""))
+
+            # Seguro o condiciones de pago sin NCM ni origen no son
+            # mercadería: no entran (sumarían al FOB) y se avisan. Lo dice lo
+            # escrito en la fila, no lo copiado de una combinada; con el
+            # origen o la descripción copiados, un rótulo que dice algo más
+            # que el cargo entra con un aviso que nombra la fila (EXCEL-3c,
+            # EXCEL-3d). Un renglón del grupo se decide como su cabecera: una
+            # nota en Item («Freight included») no lo saca.
+            dudosa = ""  # el rótulo que la vuelve dudosa
+            if not sin_ncm_ni_origen:
+                no_es_mercaderia = False
+            elif del_grupo:
+                # Si la cabecera no llegó a decidirse (quedó sin leer), el
+                # renglón tampoco: los dos se nombran como sin leer.
+                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(grupo[2], (True, ""))
+            elif descripcion_copiada:
+                # Lo mismo que la fila de la combinada; si ella no entró
+                # (flete, total), ésta tampoco: se avisa. Un texto propio en
+                # Item («A2», «#3») no la saca de ahí; si ella entró, ese
+                # texto todavía puede ser un cargo.
+                ancla = _ - 1
+                while ancla in rellenadas.get(desc_col, ()):
+                    ancla -= 1
+                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(ancla, (True, ""))
+                if not no_es_mercaderia and cargo:
+                    no_es_mercaderia = _es_solo_un_cargo(cargo)
+                    if not no_es_mercaderia and not dudosa and _FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo):
+                        dudosa = cargo
+            elif copiada:
+                no_es_mercaderia = _es_solo_un_cargo(cargo)
+                if not no_es_mercaderia and _FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo):
+                    dudosa = cargo
+            else:
+                no_es_mercaderia = bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo))
+            no_es_mercaderia_en[_] = (no_es_mercaderia, dudosa)
 
             # Lo que falta o no se puede leer queda vacío (0 o ""), nunca
             # inventado; el semáforo de la revisión lo marca (MARIA-1a, EXCEL-1).
-            candidatos.append((_ + 2, not sin_ncm_ni_origen, tamaño, Item(
+            candidatos.append((_ + 2, no_es_mercaderia, dudosa, tamaño, Item(
                 pieza=pieza,
                 codigo_parte=parte,
                 descripcion=descripcion,
@@ -4947,23 +5181,32 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             descartes.append(_ + 2)
             continue
 
-    # Seguro o condiciones de pago sin NCM ni origen no son mercadería: no
-    # entran (sumarían al FOB) y se avisan. Cualquier otra fila sin NCM ni
-    # origen sí entra, con lo que falta vacío (EXCEL-1).
-    for fila, trae, tamaño, item in candidatos:
-        if not trae and _FILA_QUE_NO_ES_MERCADERIA_RE.match(item.descripcion or ""):
+    # Cualquier otra fila sin NCM ni origen sí entra, con lo que falta vacío
+    # (EXCEL-1).
+    for fila, no_es_mercaderia, rotulo_dudoso, tamaño, item in candidatos:
+        if no_es_mercaderia:
             descartes.append(fila)
             continue
         if agrupada and tamaño and item.descripcion:
             item.descripcion = f"{item.descripcion}, " + " x ".join(tamaño)
+        if rotulo_dudoso:
+            dudosas.append((fila, rotulo_dudoso))
+        if not item.valor_unitario:
+            sin_precio.append(fila)  # no se inventa: se avisa (EXCEL-3c, EXCEL-3d)
         items.append(item)
     descartes.sort()
+    if flete_dudoso:
+        extras["flete_dudoso"] = flete_dudoso
+    if dudosas:
+        extras["dudosas"] = dudosas
     if flete:
         extras["flete"] = flete
     if descuento:
         extras["descuento"] = descuento
     if heredadas:
         extras["heredadas"] = heredadas
+    if sin_precio:
+        extras["sin_precio"] = sin_precio
 
     return items
 
@@ -5044,8 +5287,63 @@ def _client_to_dict(c: ClientModel) -> dict:
         "preferred_currency": c.preferred_currency or "",
         "auto_ncm_enabled": bool(c.auto_ncm_enabled) if c.auto_ncm_enabled is not None else True,
         "fecha_inic_activ": c.fecha_inic_activ or "",
+        "fecha_inic_activ_sirve": _fecha_inic_activ_sirve(c.fecha_inic_activ),
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
     }
+
+
+_FECHA_INIC_ACTIV_ERROR = (
+    "La fecha de inicio de actividad no es una fecha válida: "
+    "usá AAAA-MM-DD o DD/MM/AAAA, o dejala vacía."
+)
+
+
+def _fecha_inic_activ_de_api(raw) -> str:
+    """CLIENTE-1b. La fecha de inicio de actividad que llega al alta o a la
+    edición, como AAAA-MM-DD; `null` o vacío da "". Pasan AAAA-MM-DD y
+    DD/MM/AAAA (año de cuatro cifras, fecha que existe); lo demás es un 400.
+    Antes se guardaba `str(...)[:10]`: un `null` quedaba «None» y un año de
+    cinco cifras, cortado."""
+    if raw is None:
+        return ""
+    if not isinstance(raw, str):
+        raise HTTPException(status_code=400, detail=_FECHA_INIC_ACTIV_ERROR)
+    texto = raw.strip()
+    if not texto:
+        return ""
+    m = re.fullmatch(r"([0-9]{4})-([0-9]{2})-([0-9]{2})", texto)
+    if m:
+        anio, mes, dia = (int(g) for g in m.groups())
+    else:
+        m = re.fullmatch(r"([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})", texto)
+        if not m:
+            raise HTTPException(status_code=400, detail=_FECHA_INIC_ACTIV_ERROR)
+        dia, mes, anio = (int(g) for g in m.groups())
+    try:
+        return date(anio, mes, dia).isoformat()
+    except ValueError:
+        raise HTTPException(status_code=400, detail=_FECHA_INIC_ACTIV_ERROR) from None
+
+
+def _fecha_inic_activ_o_vacia(raw) -> str:
+    """CLIENTE-1c. La misma regla que el alta, para lo que llega por la
+    operación o la importación: la fecha que no sirve queda "" en vez de un 400."""
+    try:
+        return _fecha_inic_activ_de_api(raw)
+    except HTTPException:
+        return ""
+
+
+def _fecha_inic_activ_sirve(guardada) -> bool:
+    """CLIENTE-1c. Si la fecha guardada le sirve al TXT: el criterio es el del
+    generador, así la ficha y el TXT no se contradicen."""
+    if not str(guardada or "").strip():
+        return False
+    try:
+        fecha_inicio_actividad(guardada)
+    except ValueError:
+        return False
+    return True
 
 
 def _digits_only(raw: str | None, maxlen: int = 20) -> str:
@@ -5845,6 +6143,9 @@ _UNIDADES_DE_COLUMNA = {
 }
 
 
+_NOMBRE_DE_UNIDAD = {"m2": "metros cuadrados", "m": "metros", "kg": "kilos", "u": "unidades"}
+
+
 def _unidad_de_columna(columna, del_precio: bool) -> str | None:
     """«Unit price (USD/sqm)» → m2 (del precio: lo que va después de «/»,
     «per» o «por»); «SM.TOTAL (sqm)» → m2 (de una cantidad: lo que va entre
@@ -6114,6 +6415,9 @@ def _migration_fill_empty(client: ClientModel, record: dict) -> tuple[dict, dict
     applied: dict[str, str] = {}
     for source_field, model_field in _MIGRATION_CLIENT_FIELDS.items():
         incoming = str(record.get(source_field) or "").strip()
+        if model_field == "fecha_inic_activ":
+            # Un lote viejo puede traer una que no sirve (CLIENTE-1c).
+            incoming = _fecha_inic_activ_o_vacia(incoming)
         current = getattr(client, model_field, None)
         if incoming and not str(current or "").strip():
             before[model_field] = current
@@ -6219,7 +6523,7 @@ async def confirm_client_migration(
                 address=str(record.get("direccion") or "").strip() or None,
                 email=email or None,
                 phone=str(record.get("telefono") or "").strip()[:50] or None,
-                fecha_inic_activ=str(record.get("fecha_inic_activ") or "").strip()[:10] or None,
+                fecha_inic_activ=_fecha_inic_activ_o_vacia(str(record.get("fecha_inic_activ") or "")) or None,
                 is_active=True,
             )
             db.add(new_client)
@@ -6367,6 +6671,7 @@ async def create_cliente(
     email = str(client.get("email", "")).strip()[:100]
     if not nombre:
         raise HTTPException(status_code=400, detail="Nombre requerido")
+    fecha_inic_activ = _fecha_inic_activ_de_api(client.get("fecha_inic_activ"))
 
     # Evitar duplicados por (owner, email) si se provee email.
     if email:
@@ -6388,8 +6693,6 @@ async def create_cliente(
     auto_ncm_enabled = client.get("auto_ncm_enabled")
     if auto_ncm_enabled is None:
         auto_ncm_enabled = True
-
-    fecha_inic_activ = str(client.get("fecha_inic_activ", "")).strip()[:10] or None
 
     new_client = ClientModel(
         id=str(uuid.uuid4()),
@@ -6443,6 +6746,9 @@ async def update_cliente(
     """
     username = user["username"]
     client = await _get_owned_client(db, client_id, username)
+    # Antes de tocar el cliente: con la fecha mala no se guarda nada.
+    if "fecha_inic_activ" in client_data:
+        fecha_inic_activ = _fecha_inic_activ_de_api(client_data["fecha_inic_activ"])
 
     if "nombre" in client_data:
         client.name = str(client_data["nombre"]).strip()[:200]
@@ -6467,8 +6773,7 @@ async def update_cliente(
     if "auto_ncm_enabled" in client_data:
         client.auto_ncm_enabled = bool(client_data.get("auto_ncm_enabled"))
     if "fecha_inic_activ" in client_data:
-        val = str(client_data.get("fecha_inic_activ", "") or "").strip()[:10]
-        client.fecha_inic_activ = val or None
+        client.fecha_inic_activ = fecha_inic_activ
     await db.commit()
     await db.refresh(client)
     return {"success": True, "cliente": _client_to_dict(client)}
@@ -6497,6 +6802,98 @@ async def toggle_favorito(
     client.favorite = not bool(client.favorite)
     await db.commit()
     return {"success": True, "favorito": client.favorite}
+
+
+# --- Estudios de la cuenta (ESTUDIO-1) ---
+# Como los clientes: cada usuario ve, borra y usa sólo los suyos; uno ajeno
+# es 404, como uno que no existe.
+
+def _estudio_to_dict(e: Estudio) -> dict:
+    return {
+        "id": e.id,
+        "nombre": e.nombre,
+        "cuit": e.cuit,
+        "ultimo_uso": e.last_used_at.isoformat() if e.last_used_at else None,
+    }
+
+
+class EstudioRequest(BaseModel):
+    # Sin tipos: un número o un null llegan y se rechazan con el mismo texto.
+    nombre: Any = None
+    cuit: Any = None
+
+
+@app.get("/api/estudios")
+async def list_estudios(
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Los estudios de la cuenta y el que la operación preselecciona: el
+    último usado o, si ninguno se usó y hay uno solo, ése."""
+    result = await db.execute(
+        select(Estudio).where(Estudio.owner_username == user["username"]).order_by(Estudio.nombre, Estudio.id)
+    )
+    estudios = list(result.scalars().all())
+    usados = [e for e in estudios if e.last_used_at is not None]
+    if usados:
+        preseleccionado = max(usados, key=lambda e: e.last_used_at).id
+    elif len(estudios) == 1:
+        preseleccionado = estudios[0].id
+    else:
+        preseleccionado = None
+    return {"estudios": [_estudio_to_dict(e) for e in estudios], "preseleccionado": preseleccionado}
+
+
+@app.post("/api/estudios")
+async def create_estudio(
+    payload: EstudioRequest,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    nombre = payload.nombre.strip() if isinstance(payload.nombre, str) else ""
+    if not nombre or len(nombre) > 200 or any(ord(c) < 32 or 0x7f <= ord(c) <= 0x9f or 0xd800 <= ord(c) <= 0xdfff
+                                               or c in "\u2028\u2029" for c in nombre):
+        raise HTTPException(
+            status_code=400,
+            detail="El nombre del estudio no puede quedar vacío, pasar de 200 caracteres ni tener saltos de línea.",
+        )
+    from proyecto_maria.core.controles_maria import cuit_valido
+    cuit = "".join(payload.cuit.replace("-", "").split()) if isinstance(payload.cuit, str) else ""
+    if not cuit_valido(cuit):
+        raise HTTPException(
+            status_code=400,
+            detail="El CUIT del estudio no es válido: 11 dígitos (0-9), con o sin guiones, y el último es el verificador.",
+        )
+    estudio = Estudio(owner_username=user["username"], nombre=nombre, cuit=cuit)
+    db.add(estudio)
+    try:
+        await db.commit()
+    except IntegrityError:
+        # El mismo CUIT ya está en la cuenta: lo frena el UNIQUE, también con
+        # dos altas a la vez.
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Ya tenés un estudio con ese CUIT.")
+    await db.refresh(estudio)
+    return {"estudio": _estudio_to_dict(estudio)}
+
+
+@app.delete("/api/estudios/{estudio_id}")
+async def delete_estudio(
+    estudio_id: str,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Borra el estudio de la cuenta. Las operaciones no lo guardan: no se
+    toca nada más."""
+    result = await db.execute(
+        select(Estudio).where(Estudio.id == estudio_id, Estudio.owner_username == user["username"])
+    )
+    estudio = result.scalars().first()
+    if estudio is None:
+        raise HTTPException(status_code=404, detail="Estudio no encontrado")
+    await db.delete(estudio)
+    await db.commit()
+    return {"success": True}
 
 
 @app.delete("/api/clientes/{client_id}")
@@ -6849,11 +7246,12 @@ async def save_client_operation(
         # que estén vacíos. Nunca pisa valores existentes.
         try:
             domicilio_op = str(data.get("comprador_domicilio") or "").strip()
-            fecha_op = str(data.get("comprador_fecha_inic_activ") or "").strip()
+            # Con la regla del alta: la que no sirve no se copia (CLIENTE-1c).
+            fecha_op = _fecha_inic_activ_o_vacia(data.get("comprador_fecha_inic_activ"))
             if domicilio_op and not (client.address or "").strip():
                 client.address = domicilio_op
             if fecha_op and not (client.fecha_inic_activ or "").strip():
-                client.fecha_inic_activ = fecha_op[:10]
+                client.fecha_inic_activ = fecha_op
         except Exception as fill_err:
             logger.warning("[fill-if-empty] No se pudo rellenar ficha: %s", fill_err)
 
@@ -7668,6 +8066,16 @@ async def upload_excel_v2(
                 == [s for s, c in detected_mapping.items() if c == "cantidad"]):
             avisos_de_lo_usado = avisos_unidad
         avisos_mapeo.extend(avisos_de_lo_usado)
+        # La unidad que sale del encabezado del precio («USD/M», con «Qty (M)»)
+        # se avisa: es la que va al TXT (EXCEL-3b). Si se cambió la cantidad,
+        # el aviso de arriba ya la dice.
+        precio_col = next((s for s, c in effective_mapping.items() if c == "valor_unitario"), None)
+        cant_col = next((s for s, c in effective_mapping.items() if c == "cantidad"), None)
+        if unidad and not avisos_de_lo_usado and precio_col and _unidad_de_columna(precio_col, True) == unidad:
+            avisos_mapeo.append(
+                f"La unidad que va al TXT se leyó de los encabezados de la cantidad («{cant_col}») "
+                f"y del precio («{precio_col}»): {_NOMBRE_DE_UNIDAD.get(unidad, unidad)}. "
+                "Revisala en la revisión.")
 
         avisos: list[str] = []
         rename = {src: canon for src, canon in effective_mapping.items() if canon in _CANON_COLUMNS}
@@ -7694,6 +8102,11 @@ async def upload_excel_v2(
             df = df.drop(columns=[c for c in df.columns
                                   if str(c).strip().lower() in campos and c not in rename and c not in pesos])
             df = df.rename(columns=rename)
+            # Las celdas copiadas de una combinada siguen a su columna
+            # renombrada («Origin» pasa a «origen»; EXCEL-3b).
+            if "celdas_rellenadas" in df.attrs:
+                df.attrs["celdas_rellenadas"] = {
+                    rename.get(c, c): f for c, f in df.attrs["celdas_rellenadas"].items()}
             avisos = _peso_por_unidad(df, pesos, columna_de, clases)
 
         descartes: list = []
@@ -7756,6 +8169,25 @@ async def upload_excel_v2(
             avisos_mapeo.append(
                 f"{len(filas)} renglón(es) sin descripción tomaron la del renglón de arriba "
                 f"(como agrupa la proforma), desde la fila {filas[0]}. Revisalos."
+            )
+        if extras.get("sin_precio"):
+            filas = extras["sin_precio"]
+            avisos_mapeo.append(
+                f"{len(filas)} renglón(es) entraron sin precio ({_filas_del_aviso(filas)}). "
+                "Completalos en la revisión."
+            )
+        # EXCEL-3d: lo que empieza como un cargo y no se sabe si lo es.
+        if extras.get("flete_dudoso"):
+            filas = extras["flete_dudoso"]
+            avisos_mapeo.append(
+                f"{len(filas)} renglón(es) se leyeron como flete y dicen algo más: "
+                f"{_filas_del_aviso(filas)}; si alguno es un producto, cargalo en la revisión."
+            )
+        if extras.get("dudosas"):
+            filas = extras["dudosas"]
+            avisos_mapeo.append(
+                f"{len(filas)} renglón(es) empiezan como un cargo y entraron como producto: "
+                f"{_filas_del_aviso(filas)}; si alguno es un cargo, sacalo en la revisión."
             )
 
         # Si hay cliente seleccionado, pre-populamos operacion con sus datos

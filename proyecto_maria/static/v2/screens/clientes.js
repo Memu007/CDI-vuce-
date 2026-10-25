@@ -45,6 +45,7 @@
 
     let editingId = null;            // null = nuevo, string = edit
     let fechaInicOculta = '';        // fecha guardada que el campo de fecha no puede mostrar (D3)
+    let fechaInicOcultaSirve = false; // si esa fecha le sirve al TXT: lo dice el servidor (CLIENTE-1c)
     let detailClienteId = null;
     let activeIndex = -1;            // indice del item "focuseado" por teclado en vista filtrada
     let visibleIds = [];             // ids en el orden renderizado (para flechas)
@@ -263,7 +264,7 @@
     let importModalEl, importInput, importDropzone, importPickBtn, importFilenameEl;
     let importProgress, importProgressTitle, importResult, importCancel, importClose;
     let importUploadStep, importPreviewStep, importDoneStep, importConfirm, importTryInvoice;
-    let importPreviewFilename, importPreviewSummary, importPreviewDoubts, importPreviewDoubtsList, importPreviewOmitted;
+    let importPreviewFilename, importPreviewSummary, importPreviewDoubts, importPreviewDoubtsList, importPreviewOmitted, importPreviewFechas;
     let importDoneSummary, importDoneMessage, importUndoBtn, importChooseAnother;
     let importBatchId = null;
     let importSelectedFilename = '';
@@ -294,6 +295,7 @@
         importPreviewDoubts = $('importPreviewDoubts');
         importPreviewDoubtsList = $('importPreviewDoubtsList');
         importPreviewOmitted = $('importPreviewOmitted');
+        importPreviewFechas = $('importPreviewFechas');
         importDoneSummary = $('importDoneSummary');
         importDoneMessage = $('importDoneMessage');
         importUndoBtn = $('importUndoBtn');
@@ -565,6 +567,24 @@
         if (importPreviewOmitted) {
             importPreviewOmitted.hidden = omitted === 0;
             importPreviewOmitted.textContent = omitted ? omitted + ' ' + (omitted === 1 ? 'fila queda' : 'filas quedan') + ' afuera para evitar datos incorrectos.' : '';
+        }
+        // CLIENTE-1c: la fecha de inicio que no sirve no se importa; se dice dónde.
+        const fechas = Array.isArray(preview && preview.fechas_que_no_sirven) ? preview.fechas_que_no_sirven : [];
+        if (importPreviewFechas) {
+            importPreviewFechas.replaceChildren();
+            importPreviewFechas.hidden = fechas.length === 0;
+            const variasHojas = Array.isArray(preview.sheets) && preview.sheets.length > 1;
+            fechas.slice(0, 8).forEach(item => {
+                const li = document.createElement('li');
+                const lugar = (variasHojas && item.sheet ? 'Hoja ' + item.sheet + ', fila ' : 'Fila ') + item.row;
+                li.textContent = lugar + ': la fecha de inicio «' + item.value + '» no es válida y no se importa.';
+                importPreviewFechas.appendChild(li);
+            });
+            if (fechas.length > 8) {
+                const li = document.createElement('li');
+                li.textContent = 'Y ' + (fechas.length - 8) + ' fechas más que no se importan.';
+                importPreviewFechas.appendChild(li);
+            }
         }
         const newCount = collectionCount(preview && preview.new_clients);
         const fillCount = [
@@ -1664,6 +1684,7 @@
         if (fNotas) fNotas.value = '';
         if (fFechaInicActiv) fFechaInicActiv.value = '';
         fechaInicOculta = '';
+        fechaInicOcultaSirve = false;
         if (fAdvanced) fAdvanced.open = false;
     }
 
@@ -1681,6 +1702,9 @@
         // D3: una fecha guardada que no es AAAA-MM-DD válida (vino por la API o
         // es vieja) deja el campo vacío; se recuerda para no borrarla al guardar.
         fechaInicOculta = (c.fecha_inic_activ && fFechaInicActiv && !fFechaInicActiv.value) ? c.fecha_inic_activ : '';
+        // Si le sirve al TXT lo decide el servidor con el criterio del generador:
+        // una regla propia acá leía distinto «２０１５-03-15» (CLIENTE-1c).
+        fechaInicOcultaSirve = !!c.fecha_inic_activ_sirve;
         const hasAdvanced = !!(
             c.email || c.telefono || c.default_origin ||
             c.preferred_currency || c.notas
@@ -1749,6 +1773,9 @@
         // no se manda y la API la conserva; una fecha cargada la reemplaza.
         const conservaFecha = !fechaInicActiv && !!fechaInicOculta;
         if (!conservaFecha) body.fecha_inic_activ = fechaInicActiv;
+        // Una fecha conservada que el TXT no acepta también falta (CLIENTE-1b).
+        // Se mira acá: closeForm() olvida la fecha oculta.
+        const fechaMala = conservaFecha && !fechaInicOcultaSirve;
 
         const isEdit = !!editingId;
         const idEdit = editingId;
@@ -1786,7 +1813,9 @@
             // CLIENTE-1: se guarda sin lo que pide el MARIA, pero se avisa qué
             // falta (lo que no puede faltar lo frena la generación del TXT).
             const faltan = [
-                [cuitNorm, 'CUIT'], [direccion, 'domicilio'], [fechaInicActiv || conservaFecha, 'inicio de actividad'],
+                [cuitNorm, 'CUIT'], [direccion, 'domicilio'],
+                [fechaInicActiv || (conservaFecha && !fechaMala), fechaMala
+                    ? 'inicio de actividad (la guardada no es una fecha válida)' : 'inicio de actividad'],
             ].filter(([v]) => !v).map(([, n]) => n);
             const titulo = isEdit ? 'Cliente actualizado' : 'Cliente creado';
             if (faltan.length && CDI.toast) {

@@ -31,6 +31,10 @@ if s.count(viejo) != 1:
 open(p, "w").write(s.replace(viejo, nuevo))
 PYEOF
   then echo "ROTO  | $nombre: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1)); return; fi
+  # Un sabotaje que no compila da rojo por el SyntaxError, no por su motivo.
+  if ! "$PY" -c 'import ast, sys; ast.parse(open(sys.argv[1]).read())' "$archivo" 2>/dev/null; then
+    echo "ROTO  | $nombre: el sabotaje deja $archivo sin compilar"; FALLAS=$((FALLAS+1)); return
+  fi
   local salida codigo
   salida="$("$PY" -m pytest -q --no-cov -p no:cacheprovider tests/test_excel3.py 2>&1)"; codigo=$?
   if [ "$codigo" -eq 0 ]; then
@@ -91,11 +95,12 @@ sabotaje $M "queda el aviso viejo del catálogo" \
 sabotaje $M "los renglones del grupo vuelven a quedar sin descripción" \
   '                descripcion, parte = grupo[0], parte or grupo[1]' '                pass' "$XLS"
 sabotaje $M "hereda aunque el renglón no tenga medidas" \
-  'if (not pieza and grupo and con_medidas and' 'if (not pieza and grupo and' \
-  "FAILED $T::test_un_subtotal_sin_rotulo_ni_medidas_no_es_un_producto"
-sabotaje $M "con el código en cada renglón no hereda la descripción" \
-  'if (not pieza and grupo and con_medidas and' 'if (not pieza and not parte and grupo and con_medidas and' \
-  "FAILED $T::test_con_el_codigo_en_cada_renglon_la_descripcion_igual_se_hereda"
+  'if (not pieza and grupo and (con_medidas or del_grupo_copiado)' 'if (not pieza and grupo and (True)' \
+  "FAILED $T::test_un_renglon_con_precio_y_sin_medidas_no_hereda"
+sabotaje $M "un código distinto en cada renglón vuelve a heredar la descripción" \
+  '            if grupo and grupo[1] and parte and parte != grupo[1] and not descripcion:' \
+  '            if False:' \
+  "FAILED $T::test_con_un_codigo_distinto_en_cada_renglon_la_descripcion_no_se_hereda"
 sabotaje $M "con la combinada se pierde el código de parte" \
   'descripcion in ("", grupo[0])' 'descripcion == ""' \
   "FAILED $T::test_con_la_especificacion_combinada_hacia_abajo_cada_renglon_conserva_su_codigo"
@@ -103,21 +108,21 @@ sabotaje $M "el flete y el descuento vuelven a no leerse" \
   '                        (flete if es_flete else descuento).append((_ + 2, abs(monto)))' \
   '                        pass' "$XLS"
 sabotaje $M "el rótulo de otra columna no se mira" \
-  '                 if t and _numero_factura(t, decimal) is None' \
-  '                 if False and t and _numero_factura(t, decimal) is None' "$XLS"
+  '                (t for t in (_texto_de_celda(v) for c, v in row.items() if _propia(c))' \
+  '                (t for t in (_texto_de_celda(v) for c, v in ())' "$XLS"
 sabotaje $M "una nota de flete en otra columna saca el renglón" \
-  '            if sin_ncm_ni_origen and (descripcion or not con_medidas):' \
+  '            if sin_ncm_ni_origen and (descripcion_propia or not con_medidas):' \
   '            if sin_ncm_ni_origen:' \
-  "FAILED $T::test_una_nota_de_flete_en_otra_columna_de_un_renglon_no_lo_saca"
+  "FAILED $T::test_una_nota_de_flete_en_otra_columna_de_un_renglon_no_lo_saca[Item]"
 sabotaje $M "un producto «Discount …» vuelve a ser descuento" \
-  ' and not _DESCUENTO_SOLO_RE.match(rotulo):' ' and False:' \
+  ' and not _DESCUENTO_SOLO_RE.match(cargo):' ' and False:' \
   "FAILED $T::test_un_producto_que_empieza_con_discount_sigue_siendo_producto"
 sabotaje $M "un descuento en porcentaje vuelve a entrar" \
-  '                    if "%" in rotulo:' '                    if False:' \
+  '                    if "%" in cargo or _monto_de_la_linea() < 0 or not valor_unitario:' '                    if False:' \
   "FAILED $T::test_un_descuento_en_porcentaje_no_se_lee_como_monto_ni_como_producto"
 sabotaje $M "el descuento negativo en el precio vuelve a ser un producto" \
-  '                        precio = _monto_de_fila(row[valor_col], decimal) or 0.0' \
-  '                        precio = valor_unitario' \
+  '                    precio = _monto_de_fila(row[valor_col], decimal) or 0.0' \
+  '                    precio = valor_unitario' \
   "FAILED $T::test_un_descuento_negativo_en_el_precio_sin_importe_tambien_se_lee"
 sabotaje $M "«USD -850» vuelve a no leerse" \
   '    m = re.fullmatch(r"(\D*?)\s*[-−]\s*(\d.*)", t)' '    m = None' \
@@ -138,6 +143,282 @@ sabotaje $M "una medida larga sale en notación científica" \
   "FAILED $T::test_una_medida_larga_no_sale_en_notacion_cientifica"
 sabotaje $M "la unidad no viaja con el producto" \
   '**({"unidad": unidad} if unidad else {}),' '' "$XLS"
+
+# EXCEL-3b: lo que dejó el adversario, uno por punto.
+B="FAILED $T::test_"
+sabotaje $M "3b#2 un subtotal con largo y sin precio vuelve a ser producto" \
+  '                    and (valor_unitario or (descripcion and cantidad))):' '                    and (cantidad or valor_unitario)):' \
+  "${B}un_subtotal_sin_rotulo_ni_precio_con_medidas_no_es_un_producto[con_largo]"
+for variante in flete descuento; do
+  sabotaje $M "3b#5 una nota en Remarks vuelve a ser $variante" \
+    '                (t for t in (_texto_de_celda(row[c]) for c in columnas_del_rotulo)' \
+    '                (t for t in (_texto_de_celda(row[c]) for c in df.columns)' \
+    "${B}un_texto_en_otra_columna_no_vuelve_flete_o_descuento_a_un_renglon[$variante]"
+done
+sabotaje $M "3b#5 el flete en la columna Item deja de leerse" \
+  '    columnas_del_rotulo = ([item_col] if item_col else []) + [' \
+  '    columnas_del_rotulo = [] + [' "$XLS"
+sabotaje $M "3b-2#1 el rótulo a la izquierda de la descripción deja de leerse" \
+  'c for c in list(df.columns)[:list(df.columns).index(desc_col)] if c != item_col]' ']' \
+  "${B}el_flete_y_el_descuento_con_el_rotulo_a_la_izquierda_se_leen[No.]"
+sabotaje $M "3b-2#5 un producto «Discount …» vuelve a cortar el grupo" \
+  '                if es_descuento and not _DESCUENTO_SOLO_RE.match(cargo):' \
+  $'                if es_descuento:\n                    grupo = None\n                    es_cargo = True\n                if es_descuento and not _DESCUENTO_SOLO_RE.match(cargo):' \
+  "${B}un_producto_discount_abre_su_grupo"
+sabotaje $M "3b-2#5 un descuento con texto sin leer no corta el grupo" \
+  $'                        grupo = None\n                        descartes.append(_ + 2)  # un porcentaje no es un monto' \
+  '                        descartes.append(_ + 2)' \
+  "${B}un_descuento_con_texto_que_queda_sin_leer_corta_el_grupo"
+sabotaje $M "3b-2#4 con el precio combinado los de abajo pierden código y medidas" \
+  '                    and (valor_unitario or (descripcion and cantidad))):' '                    and valor_unitario):' \
+  "${B}con_la_especificacion_y_el_precio_combinados_cada_renglon_conserva_codigo_y_medidas"
+sabotaje $M "3b-2#2 el .xls vuelve a leerse sin sus combinadas" \
+  '        combinadas = _combinadas_del_xls(ruta)' '        combinadas = []' \
+  "${B}un_xls_con_la_especificacion_combinada_y_un_codigo_por_renglon_da_un_producto_por_renglon"
+sabotaje $M "3b#4 un flete sin monto vuelve a abrir un grupo" \
+  '            elif descripcion and not es_cargo:' '            elif descripcion:' \
+  "${B}un_flete_sin_monto_corta_el_grupo"
+sabotaje $M "3b#4 un descuento leído no corta el grupo" \
+  '                    grupo = None  # el flete o el descuento cierran el grupo de arriba' \
+  '                    pass' \
+  "${B}un_descuento_leido_corta_el_grupo"
+sabotaje $M "3b#3 un código nuevo sin especificación vuelve a heredar" \
+  '            if grupo and grupo[1] and parte and parte != grupo[1] and not descripcion:' \
+  '            if False:' \
+  "${B}un_codigo_nuevo_sin_especificacion_no_hereda_la_del_grupo_anterior"
+sabotaje $M "3b#1 un descuento con texto y monto negativo vuelve a ser producto" \
+  '                    if "%" in cargo or _monto_de_la_linea() < 0 or not valor_unitario:' '                    if "%" in cargo or not valor_unitario:' \
+  "${B}un_descuento_con_texto_y_monto_negativo_se_avisa_y_no_es_producto[precio_e_importe]"
+sabotaje $M "3b#1 el monto negativo en el precio deja de leerse" \
+  '                    precio = _monto_de_fila(row[valor_col], decimal) or 0.0' '                    precio = 0.0' \
+  "${B}un_descuento_negativo_en_el_precio_sin_importe_tambien_se_lee"
+sabotaje $M "3b#9 un largo con su unidad la repite" \
+  '                trae_unidad = (numero is None and re.search(r"[^\W\d_]\s*$", texto)' \
+  '                trae_unidad = (False' \
+  "${B}un_largo_escrito_con_su_unidad_no_la_repite"
+sabotaje $M "3b-2#10 un largo con rango pierde la unidad" \
+  '                trae_unidad = (numero is None and re.search(r"[^\W\d_]\s*$", texto)' \
+  '                trae_unidad = (numero is None' \
+  "${B}un_largo_con_rango_conserva_su_unidad"
+sabotaje $M "3b#7 la unidad del precio no se avisa" \
+  '        if unidad and not avisos_de_lo_usado and precio_col' '        if False and precio_col' \
+  "${B}la_unidad_que_sale_del_encabezado_del_precio_se_avisa"
+sabotaje $M "3b-2#9 el aviso de la unidad no nombra la cantidad" \
+  'f"La unidad que va al TXT se leyó de los encabezados de la cantidad («{cant_col}») "' \
+  'f"La unidad que va al TXT se leyó de los encabezados de la cantidad "' \
+  "${B}la_unidad_de_la_cantidad_y_el_precio_se_avisa_con_las_dos_columnas"
+sabotaje $M "3b#7 se avisa del precio una unidad que no salió de él" \
+  ' and _unidad_de_columna(precio_col, True) == unidad:' ':' \
+  "${B}una_unidad_que_sale_solo_de_la_cantidad_no_avisa_del_precio"
+
+sabotaje $M "3b-3#1 el origen combinado vuelve producto al flete" \
+  '            sin_ncm_ni_origen = not pieza and not _texto_de_celda(origen_propio)' \
+  '            sin_ncm_ni_origen = not pieza and not _texto_de_celda(celda_origen)' \
+  "${B}un_origen_combinado_que_alcanza_al_flete_no_lo_vuelve_producto[descripcion]"
+sabotaje $M "3b-3#1 el origen combinado vuelve producto al seguro" \
+  '            sin_ncm_ni_origen = not pieza and not _texto_de_celda(origen_propio)' \
+  '            sin_ncm_ni_origen = not pieza and not _texto_de_celda(celda_origen)' \
+  "${B}un_origen_combinado_que_alcanza_al_seguro_no_lo_vuelve_producto"
+sabotaje $M "3b-3#1 las celdas copiadas no siguen al renombre de la columna" \
+  '                    rename.get(c, c): f for c, f in' '                    c: f for c, f in' \
+  "${B}un_origen_combinado_que_alcanza_al_flete_no_lo_vuelve_producto[descripcion]"
+sabotaje $M "3b-3#1 el producto pierde el origen combinado" \
+  '            celda_origen = row[origen_col] if origen_col else None' \
+  '            celda_origen = row[origen_col] if origen_col and _propia(origen_col) else None' \
+  "${B}un_origen_combinado_que_alcanza_al_flete_no_lo_vuelve_producto[descripcion]"
+sabotaje $M "3b-3#3 la especificación copiada tapa el subtotal" \
+  '            rotulo = descripcion_propia or next(' '            rotulo = descripcion or next(' \
+  "${B}una_especificacion_combinada_que_alcanza_al_subtotal_no_lo_vuelve_producto"
+sabotaje $M "3b-3#1 la descripción copiada tapa el rótulo del flete" \
+  '            cargo = descripcion_propia or next(' '            cargo = descripcion or next(' \
+  "${B}una_descripcion_combinada_que_alcanza_al_flete_no_lo_vuelve_producto"
+sabotaje $M "3b-3#2 una nota de descuento sin precio abre un grupo" \
+  '                    if "%" in cargo or _monto_de_la_linea() < 0 or not valor_unitario:' \
+  '                    if "%" in cargo or _monto_de_la_linea() < 0:' \
+  "${B}una_nota_de_descuento_sin_precio_no_abre_un_grupo"
+
+# EXCEL-3c
+sabotaje $M "3c R1 con algo copiado, un producto con «Payment» queda sin leer" \
+  '            elif copiada:
+                no_es_mercaderia = _es_solo_un_cargo(cargo)' \
+  '            elif copiada:
+                no_es_mercaderia = bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo))' \
+  "${B}un_producto_con_una_palabra_de_cargo_y_su_descripcion_se_lee[payment_handling-origen_combinado]"
+sabotaje $M "3c R1 con una palabra de cargo alcanza" \
+  '            and all(len(p) == 1 or p in _PALABRAS_DE_CARGO' '            and any(len(p) == 1 or p in _PALABRAS_DE_CARGO' \
+  "${B}un_producto_con_una_palabra_de_cargo_y_su_descripcion_se_lee[payment_handling-origen_combinado]"
+sabotaje $M "3c R1 «fee» no es palabra de cargo" \
+  '"incoterms", "delivery", "term", "terms", "fee", "fees", "premium",' \
+  '"incoterms", "delivery", "term", "terms", "premium",' \
+  "${B}un_cargo_dicho_con_mas_palabras_no_entra_aunque_venga_una_combinada[origen-insurance_fee]"
+sabotaje $M "3c R1 «carga» no es palabra de cargo" \
+  '"poliza", "póliza", "carga", "cargo",' '"poliza", "póliza", "cargo",' \
+  "${B}un_cargo_dicho_con_mas_palabras_no_entra_aunque_venga_una_combinada[origen-seguro_de_carga]"
+sabotaje $M "3c R1 la descripción copiada no cuenta como copiada" \
+  '            copiada = bool(_texto_de_celda(celda_origen) or descripcion_copiada)' \
+  '            copiada = bool(_texto_de_celda(celda_origen))' \
+  "${B}con_la_descripcion_combinada_un_rotulo_de_flete_en_item_se_lee_como_flete_avisado[Freight elevator DEMO]"
+sabotaje $M "3c R1 el origen copiado no cuenta como copiado" \
+  '            copiada = bool(_texto_de_celda(celda_origen) or descripcion_copiada)' \
+  '            copiada = bool(descripcion_copiada)' \
+  "${B}un_producto_con_una_palabra_de_cargo_y_su_descripcion_se_lee[payment_handling-origen_combinado]"
+sabotaje $M "3c B1 decide con la descripción copiada" \
+  '                    no_es_mercaderia = _es_solo_un_cargo(cargo)' \
+  '                    no_es_mercaderia = _es_solo_un_cargo(descripcion)' \
+  "${B}un_cargo_no_entra_como_producto_aunque_venga_una_combinada[descripcion-insurance]"
+# Desde 3c (B1 y familia) ese renglón combinado lo deja sin leer otra guarda; el
+# que distingue es la copia de un cargo con texto en Item. Con «-descripcion]»
+# (sin origen copiado) falla sólo este sabotaje, no el de 3d.
+sabotaje $M "3c B1 la copia sin rótulo entra aunque su fila no" \
+  '                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(ancla, (True, ""))' \
+  '                no_es_mercaderia, dudosa = False, ""' \
+  "${B}la_copia_de_un_cargo_combinado_con_texto_en_item_no_cambia_el_fob_sin_su_fila[Insurance as per policy-items0-descripcion]"
+# El caso de la copia de 3c tiene la fila de arriba como cargo: ahí el valor
+# por defecto da lo mismo. Lo ve la proforma de EXCEL-3, cuyos renglones son
+# copias de un producto (y 11 casos más).
+sabotaje $M "3c B1 la copia sin rótulo nunca entra" \
+  '            no_es_mercaderia_en[_] = (no_es_mercaderia, dudosa)' '            pass' \
+  "${B}con_la_especificacion_combinada_hacia_abajo_cada_renglon_conserva_su_codigo"
+sabotaje $M "3c D12 el aviso nombra filas sin leer" \
+  '        if no_es_mercaderia:
+            descartes.append(fila)' \
+  '        if no_es_mercaderia and not item.valor_unitario:
+            sin_precio.append(fila)
+        if no_es_mercaderia:
+            descartes.append(fila)' \
+  "${B}el_aviso_sin_precio_no_nombra_filas_que_quedaron_sin_leer"
+# Sin sabotaje: tomar el origen propio en vez de la celda en «copiada» es
+# equivalente. El veredicto con algo copiado mira sólo filas sin NCM ni origen
+# propio, y ahí un origen con texto siempre es copiado.
+sabotaje $M "3c una nota en Item saca a un renglón del grupo" \
+  '                agrupada = del_grupo = True' '                agrupada = True; del_grupo = False' \
+  "${B}una_nota_de_flete_en_otra_columna_de_un_renglon_no_lo_saca[Item]"
+sabotaje $M "3c R2 una cabecera sin código corta a los renglones con código" \
+  '            if grupo and grupo[1] and parte and parte != grupo[1] and not descripcion:' \
+  '            if grupo and parte and parte != grupo[1] and not descripcion:' \
+  "${B}una_cabecera_sin_codigo_le_da_la_descripcion_a_los_renglones_con_codigo"
+sabotaje $M "3c D12 un renglón sin precio no se avisa" \
+  '            sin_precio.append(fila)  # no se inventa: se avisa (EXCEL-3c, EXCEL-3d)' '            pass' \
+  "${B}los_renglones_que_entran_sin_precio_se_avisan_al_subir[precio_solo_arriba]"
+sabotaje $M "3d D12 el aviso dice sólo la primera fila" \
+  'sin precio ({_filas_del_aviso(filas)}). ' 'sin precio (desde la fila {filas[0]}). ' \
+  "${B}todo_renglon_que_entra_sin_precio_se_avisa_con_su_fila[descripcion_combinada]"
+sabotaje $M "3c D12 se inventa el precio del de arriba" \
+  '                descripcion, parte = grupo[0], parte or grupo[1]' \
+  '                descripcion, parte = grupo[0], parte or grupo[1]; valor_unitario = valor_unitario or 1.35' \
+  "${B}los_renglones_que_entran_sin_precio_se_avisan_al_subir[precio_solo_arriba]"
+
+# EXCEL-3d
+sabotaje $M "3d con algo copiado, el flete tiene que ser sólo el flete" \
+  '                es_flete = bool(_FILA_DE_FLETE_RE.match(cargo))' \
+  '                es_flete = bool(_FILA_DE_FLETE_RE.match(cargo)) and (not copiada or _es_solo_un_cargo(cargo))' \
+  "${B}el_flete_int_combinado_se_lee_como_en_la_base[origen_rotulo_en_descripcion]"
+sabotaje $M "3d el flete dudoso no se avisa" \
+  '                            flete_dudoso.append((_ + 2, cargo))' '                            pass' \
+  "${B}un_producto_que_empieza_como_el_flete_con_el_origen_combinado_se_lee_como_flete_avisado[Freight elevator DEMO]"
+sabotaje $M "3d el rótulo dudoso entra como producto común" \
+  'match(cargo):
+                    dudosa = cargo' 'match(cargo):
+                    pass' \
+  "${B}un_cargo_con_palabras_de_mas_no_cambia_el_fob_sin_un_aviso_con_su_fila[Gastos administrativos-origen_rotulo_en_descripcion]"
+sabotaje $M "3d las dudosas no llegan al aviso" \
+  '        extras["dudosas"] = dudosas' '        pass' \
+  "${B}un_producto_que_empieza_como_un_cargo_entra_con_un_aviso_que_nombra_su_fila[payment_handling]"
+sabotaje $M "3d el hijo no se decide como su cabecera" \
+  '                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(grupo[2], (True, ""))' \
+  '                no_es_mercaderia, dudosa = False, ""' \
+  "${B}la_cabecera_y_su_hijo_se_deciden_igual[Insurance-vertical_por_herencia]"
+# El rótulo dudoso en dos filas no pasa por la copia de una fila dudosa (igual en 1955cac):
+# el aviso de la copia dudosa lo distingue la copia con el origen copiado.
+sabotaje $M "3d la copia de una fila dudosa entra sin aviso" \
+  '                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(ancla, (True, ""))' \
+  '                no_es_mercaderia = no_es_mercaderia_en.get(ancla, (True, ""))[0]' \
+  "${B}la_copia_de_un_cargo_combinado_con_texto_en_item_no_cambia_el_fob_sin_su_fila[Insurance as per policy-items0-descripcion_y_origen]"
+sabotaje $M "3d el aviso nombra todas las filas" \
+  '    primeras = filas[:5]' '    primeras = filas' \
+  "${B}los_avisos_nombran_hasta_cinco_filas_y_cuentan_el_resto"
+sabotaje $M "3d la descripción copiada cuenta como propia para el flete" \
+  '            if sin_ncm_ni_origen and (descripcion_propia or not con_medidas):' \
+  '            if sin_ncm_ni_origen and (descripcion or not con_medidas):' \
+  "${B}con_la_especificacion_combinada_una_nota_de_flete_en_item_no_saca_al_renglon"
+
+sabotaje $M "3d con la descripción copiada, un texto en Item decide solo" \
+  '            elif descripcion_copiada:' '            elif descripcion_copiada and not cargo:' \
+  "${B}la_copia_de_un_cargo_combinado_con_texto_en_item_no_cambia_el_fob_sin_su_fila[Flete int.-items0-descripcion]"
+sabotaje $M "3d con la descripción copiada, un cargo en Item entra como producto" \
+  '                if not no_es_mercaderia and cargo:' '                if False:' \
+  "${B}un_cargo_no_entra_como_producto_aunque_venga_una_combinada[descripcion-insurance]"
+sabotaje $M "3d con la descripción copiada, un rótulo dudoso en Item entra sin aviso" \
+  'match(cargo):
+                        dudosa = cargo' 'match(cargo):
+                        pass' \
+  "${B}un_cargo_con_palabras_de_mas_no_cambia_el_fob_sin_un_aviso_con_su_fila[Gastos administrativos-descripcion_rotulo_en_item]"
+
+
+# EXCEL-3e (H1): «/», «-» o 0 no son una medida.
+CON_MEDIDAS='            con_medidas = any(_es_una_medida(row[c], decimal) for c, _n, _u in medidas)'
+sabotaje $M "3e «/» vuelve a contar como medida" \
+  "$CON_MEDIDAS" '            con_medidas = any(_texto_de_celda(row[c]) for c, _n, _u in medidas)' \
+  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[barra-flete-importe_y_precio-rotulo_en_item-xlsx]"
+sabotaje $M "3e «/» vuelve a contar como medida (el .xls guardado, sin xlwt)" \
+  "$CON_MEDIDAS" '            con_medidas = any(_texto_de_celda(row[c]) for c, _n, _u in medidas)' \
+  "${B}el_xls_del_cargo_con_medidas_que_no_son_no_entra_como_producto[flete_barra]"
+sabotaje $M "3e un renglón sin descripción con medidas 0 vuelve a heredar" \
+  "$CON_MEDIDAS" '            con_medidas = any(_texto_de_celda(row[c]) for c, _n, _u in medidas)' \
+  "${B}un_renglon_sin_descripcion_ni_medidas_no_hereda_y_se_avisa[0-xlsx]"
+sabotaje $M "3e el 0 cuenta como medida" \
+  '        return numero > 0' '        return numero >= 0' \
+  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[cero-flete-importe_y_precio-rotulo_en_item-xlsx]"
+CIFRA='    return any((c.isdecimal() and unicodedata.decimal(c) > 0) or _es_una_fraccion(c) for c in texto)'
+sabotaje $M "3e un texto sin cifras cuenta como medida" \
+  "$CIFRA" '    return any(not c.isspace() for c in texto)' \
+  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[barra-flete-importe_y_precio-rotulo_en_item-xlsx]"
+sabotaje $M "3e «一» cuenta como medida: cualquier carácter numérico" \
+  "$CIFRA" '    return any(unicodedata.numeric(c, 0) > 0 for c in texto)' \
+  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[ideograma_uno-flete-importe_y_precio-rotulo_en_item-xlsx]"
+RAYA='    if texto and (unicodedata.category(texto[0]) == "Pd" or texto[0] == "\u2212"):'
+sabotaje $M "3e «-1 m» cuenta como medida: sin mirar la raya del principio" \
+  "$RAYA" '    if False:' \
+  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[negativa_con_unidad-flete-importe_y_precio-rotulo_en_item-xlsx]"
+sabotaje $M "3e «–1» cuenta como medida: sólo el guion ASCII es negativo" \
+  "$RAYA" '    if texto[:1] == "-":' \
+  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[negativa_con_raya-flete-importe_y_precio-rotulo_en_item-xlsx]"
+sabotaje $M "3e una medida en texto («48-50») no cuenta" \
+  "$CIFRA" '    return False' \
+  "${B}un_renglon_con_una_medida_escrita_en_texto_sigue_siendo_del_grupo[48-50-xlsx]"
+sabotaje $M "3e «½» no cuenta: sólo las cifras ASCII" \
+  "$CIFRA" '    return bool(re.search(r"[1-9]", _texto_de_celda(valor)))' \
+  "${B}un_renglon_con_una_medida_escrita_en_texto_sigue_siendo_del_grupo[\\xbd-xlsx]"
+# «-1» y «-1 m» los rechaza igual la guarda de la raya: el signo decide sólo en «(1)».
+sabotaje $M "3e una medida negativa cuenta: sin el signo" \
+  '    numero = _monto_de_fila(valor, decimal)' \
+  '    from proyecto_maria.pdf_extractor import _numero_factura
+    numero = _numero_factura(valor, decimal)' \
+  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[negativa_entre_parentesis-flete-importe_y_precio-rotulo_en_item-xlsx]"
+UNIDAD='                               and not _es_una_fraccion(texto.rstrip()[-1]))  # «½» no es una unidad'
+sabotaje $M "3e «½» se toma como la unidad: sale sin «m»" \
+  "$UNIDAD" '                               )' \
+  "${B}un_renglon_con_una_medida_escrita_en_texto_sigue_siendo_del_grupo[\\xbd-xlsx]"
+sabotaje $M "3e «m²» no es una unidad: sale «2 m² m»" \
+  '                trae_unidad = (numero is None and re.search(r"[^\W\d_]\s*$", texto)' \
+  '                trae_unidad = (numero is None and texto.rstrip()[-1:].isalpha()' \
+  "${B}un_renglon_con_una_medida_escrita_en_texto_sigue_siendo_del_grupo[2 m\\xb2-xlsx]"
+sabotaje $M "3e la descripción vuelve a escribir «ancho - m»" \
+  '                if not _es_una_medida(row[col], decimal):' \
+  '                if not _texto_de_celda(row[col]):' \
+  "${B}la_descripcion_no_lleva_las_medidas_que_no_son[--xlsx]"
+sabotaje $M "3e de más: sin medidas, lo copiado queda afuera" \
+  "$CON_MEDIDAS" "$CON_MEDIDAS
+            if copiada and not con_medidas:
+                descartes.append(_ + 2)
+                continue" \
+  "${B}un_producto_con_medidas_que_no_son_sigue_entrando[/-descripcion_combinada-xlsx]"
+sabotaje $M "3e el renglón con «-» bajo la combinada pierde el código de arriba" \
+  '(con_medidas or del_grupo_copiado)' 'con_medidas' \
+  "${B}un_renglon_bajo_la_descripcion_combinada_sin_medidas_conserva_el_codigo[--xls]"
+sabotaje $M "3e el seguro con la descripción copiada vuelve a entrar por el grupo" \
+  'descripcion == grupo[0] and not cargo)' 'descripcion == grupo[0])' \
+  "${B}un_cargo_no_entra_como_producto_aunque_venga_una_combinada[descripcion-insurance]"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
