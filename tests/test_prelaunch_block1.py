@@ -280,6 +280,7 @@ class TestGenerateMaria:
             "moneda": "DOL", "incoterm": "FOB",  # MARIA-1b: el servidor ya no los inventa
             "fecha_emision": "18/07/2025",
             "operation_id": "TEST001",
+            "cuit_agr": "20111111112",  # sin CUIT del despachante no se genera (MARIA-7)
             "items": [{
                 "pieza": "84713000900R",
                 "descripcion": "Laptop importada",
@@ -305,6 +306,7 @@ class TestGenerateMaria:
             "moneda": "DOL", "incoterm": "FOB",  # MARIA-1b: el servidor ya no los inventa
             "fecha_emision": "18/07/2025",
             "operation_id": "TEST002",
+            "cuit_agr": "20111111112",  # sin CUIT del despachante no se genera (MARIA-7)
             "items": [],
             "sbt_sufijo_valor": "AA(DEMO)-AB(DEMO)-CA00-",
         })

@@ -70,6 +70,19 @@ async function assertMariaDownload(page) {
         expect(content.includes(block), `MARIA.TXT no contiene ${block}.`);
     }
     assert.equal((content.match(/\[ART\]/g) || []).length, 1, 'La agrupación debía generar un único [ART].');
+    // MARIA-7: el CUIT del despachante del perfil y CRLF en todas las líneas.
+    expect(content.includes(`CDDTAGR=${CUIT_DESPACHANTE}\r\n`), 'MARIA.TXT no lleva el CDDTAGR del perfil.');
+    expect(content.endsWith('\r\n') && !content.replace(/\r\n/g, '').includes('\n'),
+        'MARIA.TXT tiene líneas sin CRLF.');
+}
+
+// Sin CUIT del despachante no se genera (MARIA-7): el despachante de la
+// prueba lo tiene cargado en su perfil, como en el uso real.
+const CUIT_DESPACHANTE = '20111111112';
+
+async function loadDespachanteCuit(page) {
+    const result = await browserJson(page, '/api/user/profile', 'PUT', { cuit: CUIT_DESPACHANTE });
+    assert.equal(result.status, 200, `No se pudo cargar el CUIT del despachante: ${JSON.stringify(result.body)}`);
 }
 
 async function registerAndOpenDashboard(page) {
@@ -295,6 +308,7 @@ async function main() {
         });
 
         await registerAndOpenDashboard(page);
+        await loadDespachanteCuit(page);
         const client = await createAndSelectClient(page);
         await confirmReview(page);
         await classifyAndGroup(page);

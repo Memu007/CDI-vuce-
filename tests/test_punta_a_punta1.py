@@ -37,6 +37,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from proyecto_maria import main
+from proyecto_maria.core.maria_generator import id_corto_maria
 from tests.test_maria1a_lectura_factura import _pdf_en_blanco
 from tests.test_maria_subitems import REFERENCIA as SUBITEMS_PATH
 from tests.test_generar_maria_txt import _GOLDEN_PATH
@@ -104,19 +105,22 @@ FACTURA_SUBITEMS = {
 #      el generador saca de ahí NDDTIMMTRN e IEXT («FAC_0»).
 # D24 (resuelta en SUBITEMS-1): los subítems se cargan en el panel del paso de
 #      NCM y viajan en el pedido de la pantalla.
-# D25: la referencia de la factura (LDVDREFDOC) sale del número de operación
-#      («E126-1»); el archivo real lleva el de la factura («110»).
+# D25 (resuelta en MARIA-7): la referencia de la factura (LDVDREFDOC) es el
+#      número de factura de la pantalla.
+# MARIA-7: IDSO, IDDT e IARTESPAPU llevan los últimos 8 letras o números del
+#      número de operación; con «FAC_» + los 9 dígitos dan lo mismo que el
+#      archivo real recortado.
 
 
 def _como_sale_por_la_pantalla(real: str, original: str, operation_id: str) -> str:
     """El archivo real con las líneas de D23 (y el CUIT válido) cambiadas."""
     cambios = {
         "NDDTIMMIOE=30999999990": f"NDDTIMMIOE={CUIT_IMPORTADOR}",
-        f"IDSO={original}": f"IDSO={operation_id}",
+        f"IDSO={id_corto_maria(original)}": f"IDSO={id_corto_maria(operation_id)}",
         f"NDDTIMMTRN={original[:5]}": f"NDDTIMMTRN={operation_id[:5]}",
         f"MCPL={original}": f"MCPL={operation_id}",
-        f"IDDT={original}": f"IDDT={operation_id}",
-        f"IARTESPAPU={original}0001": f"IARTESPAPU={operation_id}0001",
+        f"IDDT={id_corto_maria(original)}": f"IDDT={id_corto_maria(operation_id)}",
+        f"IARTESPAPU={id_corto_maria(original)}0001": f"IARTESPAPU={id_corto_maria(operation_id)}0001",
         f"IEXT={original[:5]}-": f"IEXT={operation_id[:5]}-",
     }
     # El MCPL del número va completado a 40 con espacios: el largo no cambia.
@@ -124,6 +128,10 @@ def _como_sale_por_la_pantalla(real: str, original: str, operation_id: str) -> s
     if padded in real:
         cambios.pop(f"MCPL={original}")
         cambios[padded] = f"MCPL={operation_id:<40}"
+    # MARIA-7: LDVDREFDOC es el número de factura de la pantalla (D25).
+    referencia = "LDVDREFDOC=E001-1" + " " * 22
+    if referencia in real:
+        cambios[referencia] = f"LDVDREFDOC={original:<28}"
     for antes, despues in cambios.items():
         assert antes in real, f"el archivo real ya no tiene {antes!r}"
         real = real.replace(antes, despues)
@@ -302,12 +310,18 @@ class _Pantalla:
 
         numero = _numero_js
 
+        elegidos = op.get("despachante") or {}
         items = [{
             "pieza": texto(it.get("pieza")), "descripcion": texto(it.get("descripcion")),
             "origen": texto(it.get("origen") or "XX").upper() or "XX",
             "cantidad": numero(it.get("cantidad")), "valor_unitario": numero(it.get("valor_unitario")),
             "peso_unitario": numero(it.get("peso_unitario")), "codigo_parte": texto(it.get("codigo_parte")),
-            "grupo_id": it.get("grupo_id") or None, "unidad": it.get("unidad") or None,
+            "grupo_id": it.get("grupo_id") or None,
+            # despachante.js, unidadesDe (MARIA-7): la del producto o la de la
+            # operación; la estadística viaja sólo si es kilos.
+            "unidad": it.get("unidad") or elegidos.get("unidad") or None,
+            "unidad_estadistica": "01" if (it.get("unidad_estadistica") or elegidos.get(
+                "unidad_estadistica") or "DCL") == "01" else None,
             "estado": it.get("estado") or None, "iva_adicional": it.get("iva_adicional") or None,
             # subitemsDelPedido: sólo si el producto está partido (SUBITEMS-1).
             **({"subitems": [{"cantidad": numero(s.get("cantidad")), "valor_unitario": numero(s.get("valor_unitario")),
@@ -315,7 +329,6 @@ class _Pantalla:
                              for s in it["subitems"]]} if it.get("subitems") else {}),
         } for it in self.items]
         # despachante.js, valores(): sin cliente activo no hay propuesta.
-        elegidos = op.get("despachante") or {}
         despachante = {
             "banco_bcra": elegidos["banco_bcra"] if elegidos.get("banco_bcra") is not None else "",
             "empresa_digitalizacion": elegidos.get("empresa_digitalizacion") or None,
@@ -325,7 +338,7 @@ class _Pantalla:
         procedencia = texto(op.get("procedencia"))
         codigo = re.match(r"^(\d{3})(?:\s*[·-].*)?$", procedencia)
         return {
-            "operation_id": operation_id, "items": items, **despachante,
+            "operation_id": operation_id, "numero_factura": factura, "items": items, **despachante,
             "moneda": texto(op.get("moneda")).upper(), "incoterm": texto(op.get("incoterm")).upper(),
             "cuit_agr": re.sub(r"[-\s]", "", str(op.get("cuit_agr") or self.usuario.get("cuit") or "")),
             "vendedor_nombre": texto(op.get("vendedor_nombre")), "vendedor_id": texto(op.get("vendedor_id")),
@@ -437,7 +450,8 @@ def test_subitems_de_punta_a_punta_dan_el_archivo_real(monkeypatch, camino):
     p = _por_pdf(monkeypatch, FACTURA_SUBITEMS) if camino == "pdf" else _por_excel(FACTURA_SUBITEMS)
     txt, operation_id = p.generar_y_descargar()
     esperado = _como_sale_por_la_pantalla(_leer(SUBITEMS_PATH), "002720126", operation_id)
-    esperado = esperado.replace("LDVDREFDOC=110", f"LDVDREFDOC=E{operation_id[-3:]}-1")  # D25
+    # D25: el archivo real lleva «110»; la pantalla, el número de factura.
+    esperado = esperado.replace("LDVDREFDOC=110", "LDVDREFDOC=002720126")
     assert _sin_relleno(txt) == _sin_relleno(esperado)
 
 
@@ -485,7 +499,9 @@ def test_dos_productos_reparten_flete_y_seguro_por_su_fob(monkeypatch):
             {"descripcion": "MAQUINA DEMO CHICA", "cantidad": "2", "valor_unitario": "1000.00",
              "peso_total_linea": "260", "origen": "Argentina"},
         ],
-    }, "estados": ["3", "3"]}
+    }, "estados": ["3", "5"]}
+    # Estados distintos: con la misma posición, origen, procedencia y estado
+    # desde MARIA-8 irían en un solo ítem con dos sub-ítems.
     txt, _ = _por_pdf(monkeypatch, factura).generar_y_descargar()
     ddt = _bloques(txt, "DDT")[0]
     arts = _bloques(txt, "ART")
@@ -504,8 +520,9 @@ def test_dos_productos_reparten_flete_y_seguro_por_su_fob(monkeypatch):
     assert abs(sum(float(a["MARTFLE"]) for a in arts) - float(ddt["MDDTFLE"])) <= 0.01
 
 
-@pytest.mark.xfail(strict=True, reason="D25: la referencia de la factura sale del número de "
-                   "operación («E126-1»), no la de la factura («110»); va a MARIA-6")
+@pytest.mark.xfail(strict=True, reason="D23/D25: desde MARIA-7 LDVDREFDOC es el número de factura "
+                   "de la pantalla; este sintético carga 002720126 (el número de operación del "
+                   "despachante en el archivo real) y el real dice 110")
 def test_subitems_dan_la_referencia_de_la_factura_del_archivo_real(monkeypatch):
     p = _por_pdf(monkeypatch, FACTURA_SUBITEMS)
     txt, _ = p.generar_y_descargar()

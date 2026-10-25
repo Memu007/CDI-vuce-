@@ -19,6 +19,10 @@ def _item(fob, cantidad=1, **extra):
                  "valor_unitario": fob / cantidad, "peso_unitario": 1, "origen": "CN"}, **extra)
 
 
+POSICIONES = ["84713012", "84713019", "84714100", "84715010", "84716052",
+              "84717012", "84718000", "84719012", "84733041"]
+
+
 def _campo(txt, clave):
     return [Decimal(v) for v in re.findall(rf"^{clave}=(\S+)", txt, re.M)]
 
@@ -28,10 +32,20 @@ def _cierra(txt):
         assert sum(_campo(txt, item)) == _campo(txt, cabecera)[0], (item, _campo(txt, item))
     for fob, fle, ass, base in zip(*(_campo(txt, c) for c in ("MARTFOB", "MARTFLE", "MARTASS", "MARTBASIMP"))):
         assert fob + fle + ass == base
+    # Los sub-ítems de un ítem con renglones juntos suman su FOB (MARIA-8).
+    bloques = [dict(ln.split("=", 1) for ln in b.strip("\r\n").split("\r\n")[1:])
+               for b in txt.split("\r\n\r\n") if b.strip("\r\n").startswith("[")]
+    arts = [b for b in bloques if "MARTFOB" in b]
+    for art in arts:
+        sbts = [b for b in bloques if "MSBTFOB" in b and b["NART"] == art["NART"]]
+        if sbts:
+            assert sum(Decimal(b["MSBTFOB"]) for b in sbts) == Decimal(art["MARTFOB"]), art["NART"]
 
 
 def test_el_flete_de_diez_suma_diez():
-    txt = _gen("OP_CENT", [_item(100), _item(100), _item(400)], flete=10, seguro=10)
+    # Posiciones distintas: desde MARIA-8 la misma posición va en un solo ítem.
+    txt = _gen("OP_CENT", [_item(100), _item(100, pieza="84713019"), _item(400, pieza="84714100")],
+               flete=10, seguro=10)
     assert _campo(txt, "MARTFLE") == [Decimal("1.67"), Decimal("1.66"), Decimal("6.67")]
     _cierra(txt)
 
@@ -43,7 +57,9 @@ def test_cualquier_reparto_cierra(semilla):
     items = []
     for _ in range(azar.randint(1, 9)):
         cantidad = azar.randint(1, 7)
-        items.append(_item(1, cantidad=cantidad, valor_unitario=round(azar.uniform(0.001, 900), 3)))
+        # Nueve posiciones: hasta nueve ítems, y a veces renglones juntos (MARIA-8).
+        items.append(_item(1, cantidad=cantidad, valor_unitario=round(azar.uniform(0.001, 900), 3),
+                           pieza=azar.choice(POSICIONES)))
     txt = _gen("OP_AZAR", items, flete=round(azar.uniform(0, 999), 2), seguro=round(azar.uniform(0, 99), 2))
     _cierra(txt)
 

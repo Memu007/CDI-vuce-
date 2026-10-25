@@ -582,11 +582,20 @@
                                 <label class="form-label">IVA adicional
                                     <select id="despachanteIva" class="form-input"></select>
                                 </label>
+                                <label class="form-label">Unidad de la factura
+                                    <select id="despachanteUnidad" class="form-input"></select>
+                                </label>
+                                <label class="form-label">Unidad estadística
+                                    <select id="despachanteUnidadEst" class="form-input"></select>
+                                </label>
                             </div>
+                            <!-- En el teléfono la tabla se desplaza sola, no la página (MARIA-7). -->
+                            <div style="overflow-x:auto;max-width:100%">
                             <table class="table" style="width:100%;margin-top:.75rem">
-                                <thead><tr><th>Producto</th><th>Estado de la mercadería</th><th>IVA adicional</th></tr></thead>
+                                <thead><tr><th>Producto</th><th>Estado de la mercadería</th><th>IVA adicional</th><th>Unidad</th><th>Unidad estadística</th></tr></thead>
                                 <tbody id="despachanteItems"></tbody>
                             </table>
+                            </div>
                             <p class="caption" style="margin-top:.4rem;color:var(--muted,#666);font-size:.85rem">
                                 Reducción o exclusión del IVA adicional: se elige en «Ventajas» del Kit; no va en el TXT.
                             </p>

@@ -182,14 +182,21 @@
     function $(id) { return document.getElementById(id); }
 
     // Normaliza fechas al formato DD/MM/AAAA sin importar como venga del PDF.
-    // Soporta: ISO YYYY-MM-DD, separadores '-' '/' '.', 8 digitos pegados.
-    // Detecta heuristicamente si el año esta primero (YYYY 1900-2100).
+    // Soporta: ISO YYYY-MM-DD, separadores '-' '/' '.' y espacio, 8 digitos
+    // pegados (en ésos detecta si el año esta primero, YYYY 1900-2100).
     function normalizeDateForInput(raw) {
         if (raw === undefined || raw === null) return '';
         const s = String(raw).trim();
         if (!s) return '';
+        const dos = (n) => n.padStart(2, '0');
+        // Con separadores se respeta el orden escrito (MARIA-7): el año
+        // adelante es año/mes/día; con el año al final, día/mes/año.
+        let m = s.match(/^(\d{4})[\s\/.\-]+(\d{1,2})[\s\/.\-]+(\d{1,2})$/);
+        if (m) return dos(m[3]) + '/' + dos(m[2]) + '/' + m[1];
+        m = s.match(/^(\d{1,2})[\s\/.\-]+(\d{1,2})[\s\/.\-]+(\d{4})$/);
+        if (m) return dos(m[1]) + '/' + dos(m[2]) + '/' + m[3];
         const digits = s.replace(/\D/g, '');
-        if (digits.length !== 8) return s;
+        if (!/^\d{8}$/.test(s)) return s;
         const first4 = parseInt(digits.slice(0, 4), 10);
         if (first4 >= 1900 && first4 <= 2100) {
             return digits.slice(6, 8) + '/' + digits.slice(4, 6) + '/' + digits.slice(0, 4);
