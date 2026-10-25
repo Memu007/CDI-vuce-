@@ -103,39 +103,42 @@ sabotaje $M "con estudio el aviso igual pide el CUIT" \
   'if not str(request.cuit_agr or "").strip()' \
   "FAILED $T::test_con_estudio_los_avisos_no_piden_el_cuit"
 sabotaje $M "el CUIT del estudio no se mira" \
-  'if not re.fullmatch(r"[0-9]{11}", cuit):' \
+  'if not cuit_valido(cuit):' \
   'if not cuit:' \
   "FAILED $T::test_el_alta_rechaza_un_cuit_que_no_es_de_11_digitos[3022222222]"
-sabotaje $M "el CUIT del estudio admite letras" \
+sabotaje $M "el verificador del CUIT no se mira" \
+  'if not cuit_valido(cuit):' \
   'if not re.fullmatch(r"[0-9]{11}", cuit):' \
-  'if not re.fullmatch(r"[0-9A-Z]{11}", cuit):' \
-  "FAILED $T::test_el_alta_rechaza_un_cuit_que_no_es_de_11_digitos[30-2222222A-3]"
+  "FAILED $T::test_el_alta_rechaza_un_cuit_con_el_verificador_mal"
 sabotaje $M "el CUIT con guiones no se guarda limpio" \
   'cuit = "".join(payload.cuit.replace("-", "").split()) if isinstance(payload.cuit, str) else ""' \
-  'cuit = payload.cuit.replace("-", "") if isinstance(payload.cuit, str) else ""; cuit = payload.cuit if re.fullmatch(r"[0-9]{11}", cuit) else cuit' \
+  'cuit = payload.cuit.replace("-", "") if isinstance(payload.cuit, str) else ""; cuit = payload.cuit if cuit_valido(cuit) else cuit' \
   "FAILED $T::test_el_alta_guarda_el_cuit_sin_guiones_y_lo_lista"
 sabotaje $M "un CUIT numérico entra" \
   'cuit = "".join(payload.cuit.replace("-", "").split()) if isinstance(payload.cuit, str) else ""' \
   'cuit = "".join(str(payload.cuit).replace("-", "").split()) if payload.cuit is not None else ""' \
-  "FAILED $T::test_el_alta_rechaza_un_cuit_que_no_es_de_11_digitos[30222222223]"
+  "FAILED $T::test_el_alta_rechaza_un_cuit_que_no_es_de_11_digitos[30222222229]"
 sabotaje $M "el nombre en blanco entra" \
   'nombre = payload.nombre.strip() if isinstance(payload.nombre, str) else ""' \
   'nombre = payload.nombre if isinstance(payload.nombre, str) else ""' \
   "FAILED $T::test_el_alta_rechaza_un_nombre_vacio_o_que_no_sirve[   ]"
 sabotaje $M "el nombre con salto de línea entra" \
-  'or any(ord(c) < 32 or 0x7f <= ord(c) <= 0x9f or c in "  " for c in nombre)' \
-  'or False' \
+  'any(ord(c) < 32 or 0x7f <= ord(c) <= 0x9f or 0xd800' \
+  'any(0x7f <= ord(c) <= 0x9f or 0xd800' \
   "FAILED $T::test_el_alta_rechaza_un_nombre_vacio_o_que_no_sirve[Estudio\\nInventado]"
+sabotaje $M "el nombre con un surrogate suelto da 500" \
+  ' or 0xd800 <= ord(c) <= 0xdfff' '' \
+  "FAILED $T::test_el_alta_rechaza_un_nombre_con_un_surrogate_suelto"
 sabotaje $M "el nombre de más de 200 entra" \
   'len(nombre) > 200' 'len(nombre) > 2000' \
   "FAILED $T::test_el_alta_rechaza_un_nombre_vacio_o_que_no_sirve[xxxxx"
-sabotaje $M "el mismo CUIT dos veces en la cuenta" \
-  $'    if repetido.first() is not None:\n        raise HTTPException(status_code=409' \
-  $'    if False:\n        raise HTTPException(status_code=409' \
+sabotaje $M "el mismo CUIT dos veces en la cuenta da 500" \
+  $'    except IntegrityError:\n        # El mismo CUIT ya está en la cuenta' \
+  $'    except ValueError:\n        # El mismo CUIT ya está en la cuenta' \
   "FAILED $T::test_el_mismo_cuit_dos_veces_en_la_cuenta_no_se_guarda"
-sabotaje $M "el repetido mira todas las cuentas" \
-  'select(Estudio.id).where(Estudio.owner_username == username, Estudio.cuit == cuit)' \
-  'select(Estudio.id).where(Estudio.cuit == cuit)' \
+sabotaje proyecto_maria/database/models.py "el repetido mira todas las cuentas" \
+  'UniqueConstraint("owner_username", "cuit", name="uq_estudios_owner_cuit")' \
+  'UniqueConstraint("cuit", name="uq_estudios_owner_cuit")' \
   "FAILED $T::test_el_mismo_cuit_en_otra_cuenta_si_se_guarda"
 sabotaje $M "con varios sin usar se elige uno igual" \
   '    elif len(estudios) == 1:' '    elif estudios:' \
@@ -194,6 +197,22 @@ sabotaje $F "el pedido no lleva el estudio" \
 sabotaje $F "al validar no se leen los estudios" \
   "Promise.resolve(CDI.estudios ? CDI.estudios.render() : null)" "Promise.resolve(null)" \
   "FALLA: sin estudios, el hint no aparece"
+sabotaje $J "lo elegido pasa a la operación siguiente" \
+  "        if (elegidoPara !== operacionActual()) {   // otra operación" \
+  "        if (false) {   // otra operación" \
+  "FALLA: en la operación siguiente queda lo elegido en la anterior"
+sabotaje $F "generar no espera la lista de estudios" \
+  "        if (CDI.estudios) await CDI.estudios.listo();   // ESTUDIO-1" "" \
+  "FALLA: generar antes de la lista manda estudio_id"
+sabotaje $J "un alta o un borrado no refresca los avisos" \
+  "        if (antes !== despues) wrap.dispatchEvent(new Event('change'));" "" \
+  "FALLA: después del alta, los avisos siguen pidiendo el CDDTAGR"
+sabotaje $J "sin lista ni perfil, el hint promete el perfil" \
+  "            hint.textContent = (CDI.currentUser && CDI.currentUser.cuit)
+                ? 'No se pudieron leer tus estudios: se usa el CUIT de tu perfil.'" \
+  "            hint.textContent = true
+                ? 'No se pudieron leer tus estudios: se usa el CUIT de tu perfil.'" \
+  "FALLA: hint sin perfil y sin lista"
 sabotaje $H "el selector toma el ancho de la opción más larga" \
   '<select id="estudioSelect" class="form-input" style="width:100%;max-width:100%" hidden>' \
   '<select id="estudioSelect" class="form-input" hidden>' \

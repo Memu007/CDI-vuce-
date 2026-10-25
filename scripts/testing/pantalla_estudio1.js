@@ -8,8 +8,8 @@
 const { chromium } = require('playwright');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const CUIT_PERFIL = '20111111112';
-const CUIT_UNO = '30222222223';
-const CUIT_DOS = '27333333334';
+const CUIT_UNO = '30222222229';
+const CUIT_DOS = '27333333339';
 const NOMBRE_HTML = '<img src=x onerror="window.__xss=1">Estudio Inventado Uno';
 
 (async () => {
@@ -71,7 +71,7 @@ const NOMBRE_HTML = '<img src=x onerror="window.__xss=1">Estudio Inventado Uno';
 
   // 3. Dos estudios; el nombre con HTML se muestra como texto.
   await page.fill('#pfEstudioNombre', NOMBRE_HTML);
-  await page.fill('#pfEstudioCuit', '30-22222222-3');
+  await page.fill('#pfEstudioCuit', '30-22222222-9');
   await page.click('#pfEstudioAlta');
   await page.waitForFunction(() => document.querySelectorAll('#pfEstudiosList > div').length === 1, null, { timeout: 10000 })
     .catch(() => falla('el primer estudio no aparece en la lista'));
@@ -83,7 +83,7 @@ const NOMBRE_HTML = '<img src=x onerror="window.__xss=1">Estudio Inventado Uno';
     .catch(() => falla('el segundo estudio (con Enter) no aparece en la lista'));
   const lista = await filas();
   if (await page.$('#pfEstudiosList img') || await page.evaluate(() => window.__xss)) falla('el nombre del estudio se interpretó como HTML');
-  if (!lista.includes(NOMBRE_HTML + ' · 30-22222222-3')) falla('lista: ' + JSON.stringify(lista));
+  if (!lista.includes(NOMBRE_HTML + ' · 30-22222222-9')) falla('lista: ' + JSON.stringify(lista));
   console.log('OK dos estudios en la lista, con el CUIT con guiones y el nombre como texto');
   await cerrarPerfil();
 
@@ -93,7 +93,7 @@ const NOMBRE_HTML = '<img src=x onerror="window.__xss=1">Estudio Inventado Uno';
   await page.waitForFunction(() => !document.getElementById('estudioSelect').hidden, null, { timeout: 10000 })
     .catch(() => falla('con estudios, el selector no aparece'));
   const opciones = await page.$$eval('#estudioSelect option', os => os.map(o => [o.value, o.textContent]));
-  const esperadas = [['', 'CUIT de mi perfil (20-11111111-2)'], [uno.id, NOMBRE_HTML + ' — 30-22222222-3'], [dos.id, 'Estudio Inventado Dos — 27-33333333-4']];
+  const esperadas = [['', 'CUIT de mi perfil (20-11111111-2)'], [uno.id, NOMBRE_HTML + ' — 30-22222222-9'], [dos.id, 'Estudio Inventado Dos — 27-33333333-9']];
   if (JSON.stringify(opciones) !== JSON.stringify(esperadas)) falla('opciones: ' + JSON.stringify(opciones));
   if (await page.$eval('#estudioSelect', s => s.value) !== '') falla('con dos sin usar, ya viene uno elegido');
   console.log('OK el selector ofrece el perfil y los dos estudios, sin elegir por la persona');
@@ -131,6 +131,13 @@ const NOMBRE_HTML = '<img src=x onerror="window.__xss=1">Estudio Inventado Uno';
   if (preseleccionado !== dos.id) falla('después de usarlo, viene elegido: ' + JSON.stringify(preseleccionado));
   console.log('OK al volver viene elegido el último estudio usado');
 
+  // 6b. Lo que la persona eligió en una operación no pasa a la siguiente.
+  await page.selectOption('#estudioSelect', uno.id);
+  await page.evaluate(() => { CDI.state.uploadedAt = new Date().toISOString(); CDI.goTo('validating'); });
+  await page.waitForFunction(id => document.getElementById('estudioSelect').value === id, dos.id, { timeout: 10000 })
+    .catch(async () => falla('en la operación siguiente queda lo elegido en la anterior: ' + JSON.stringify(await page.$eval('#estudioSelect', s => s.value))));
+  console.log('OK en la operación siguiente vuelve la preselección, no lo elegido en la anterior');
+
   // 7. La persona lo elige y después lo borra: el que queda es el único y
   // viene elegido (lo elegido que se borró no queda pegado).
   await page.selectOption('#estudioSelect', uno.id);
@@ -142,13 +149,71 @@ const NOMBRE_HTML = '<img src=x onerror="window.__xss=1">Estudio Inventado Uno';
   await page.click('#cdiConfirmAccept');
   await page.waitForFunction(() => document.querySelectorAll('#pfEstudiosList > div').length === 1, null, { timeout: 10000 })
     .catch(() => falla('el estudio borrado sigue en la lista'));
-  if ((await filas())[0] !== NOMBRE_HTML + ' · 30-22222222-3') falla('quedó otro: ' + JSON.stringify(await filas()));
+  if ((await filas())[0] !== NOMBRE_HTML + ' · 30-22222222-9') falla('quedó otro: ' + JSON.stringify(await filas()));
   await cerrarPerfil();
   await page.waitForFunction(id => document.getElementById('estudioSelect').value === id, uno.id, { timeout: 10000 })
     .catch(async () => falla('después de borrar, viene elegido: ' + JSON.stringify(await page.$eval('#estudioSelect', s => s.value))));
   const quedan = await page.$$eval('#estudioSelect option', os => os.map(o => o.value));
   if (JSON.stringify(quedan) !== JSON.stringify(['', uno.id])) falla('opciones después de borrar: ' + JSON.stringify(quedan));
   console.log('OK borrar pide confirmación; el que queda es el único y viene elegido');
+
+  // 8. Generar antes de que lleguen los estudios: se espera la lista y va el
+  // preseleccionado, no el CUIT del perfil. La lista se retiene hasta el clic.
+  await page.reload();
+  const retenidas = [];
+  await page.route('**/api/estudios', route => { retenidas.push(route); });
+  await aValidar();
+  await page.waitForFunction(() => !document.getElementById('validatingGenerate').disabled, null, { timeout: 15000 })
+    .catch(() => falla('con la lista retenida, no deja generar'));
+  if (!retenidas.length) falla('la lista de estudios no se pidió');
+  if (!await page.$eval('#estudioSelect', s => s.hidden)) falla('el selector ya se ve con la lista retenida');
+  await page.fill('#sbtSufijoValor', 'AA(1)-CA00-');
+  const respuesta2 = page.waitForResponse(x => x.url().endsWith('/generate_maria') && x.request().method() === 'POST', { timeout: 15000 })
+    .catch(() => falla('no se pidió el TXT con la lista retenida'));
+  await page.click('#validatingGenerate');
+  for (const r of retenidas) await r.continue();
+  await page.unroute('**/api/estudios');
+  const pedido2 = JSON.parse((await respuesta2).request().postData());
+  if (pedido2.estudio_id !== uno.id) falla('generar antes de la lista manda estudio_id ' + JSON.stringify(pedido2.estudio_id));
+  console.log('OK generar antes de que llegue la lista espera y manda el preseleccionado');
+
+  // 9. Sin CUIT en el perfil: si la lista no se lee, el hint no promete el
+  // perfil; al cargar el estudio, los avisos dejan de pedir el CDDTAGR.
+  const ctx2 = await b.newContext({ viewport: { width: 390, height: 844 } });
+  const p2 = await ctx2.newPage();
+  const usuario2 = 'e1b_' + id;
+  r = await p2.request.post(base + '/auth/register', { data: { username: usuario2, password: 'Clave-Inventada-123', email: 'e1b' + id + '@ejemplo.test' } });
+  if (!r.ok()) falla('registro sin perfil: ' + r.status());
+  await p2.route('**/api/estudios', route => route.fulfill({ status: 500, contentType: 'application/json', body: '{"detail":"x"}' }));
+  await p2.goto(base + '/dashboard');
+  await p2.waitForFunction(() => window.CDI && CDI.goTo && CDI.estudios && CDI.currentUser);
+  await p2.evaluate(() => {
+    CDI.state = CDI.state || {};
+    CDI.state.operacion = { numero_factura: 'INV-2026/0458', moneda: 'DOL', incoterm: 'CFR', comprador_cuit: '30712345671', fecha_emision: '10/10/2026', sbt_sufijo_valor: 'AA(1)-CA00-' };
+    CDI.state.items = [{ pieza: '39219019900Z', descripcion: 'Lona de PVC gris', origen: 'CN', cantidad: 750, valor_unitario: 1.85, peso_unitario: 0.62 }];
+    CDI.goTo('validating');
+  });
+  await p2.waitForFunction(() => document.getElementById('estudioHint').textContent.includes('No se pudieron leer'), null, { timeout: 10000 })
+    .catch(() => falla('la lista que falla no lo dice'));
+  const hint2 = (await p2.textContent('#estudioHint')).trim();
+  if (hint2.includes('se usa el CUIT de tu perfil') || !hint2.includes('tu perfil no tiene CUIT')) falla('hint sin perfil y sin lista: ' + hint2);
+  console.log('OK sin perfil y sin lista, el hint dice que no se genera: «' + hint2 + '»');
+  await p2.unroute('**/api/estudios');
+  const avisos2 = () => p2.$eval('#validatingAvisosList', l => l.textContent);
+  await p2.waitForFunction(() => document.getElementById('validatingAvisosList').textContent.includes('CDDTAGR'), null, { timeout: 10000 })
+    .catch(async () => falla('sin estudio ni perfil, los avisos no piden el CDDTAGR: ' + await avisos2()));
+  await p2.evaluate(() => CDI.openProfileModal());
+  await p2.waitForSelector('#pfEstudiosBlock', { state: 'visible' });
+  if (!await p2.$eval('#pfEstudiosBlock', d => d.open)) await p2.click('#pfEstudiosBlock summary');
+  await p2.fill('#pfEstudioNombre', 'Estudio Inventado Tres');
+  await p2.fill('#pfEstudioCuit', CUIT_UNO);
+  await p2.click('#pfEstudioAlta');
+  await p2.waitForFunction(() => document.querySelectorAll('#pfEstudiosList > div').length === 1, null, { timeout: 10000 })
+    .catch(() => falla('sin perfil, el estudio no aparece en la lista'));
+  await p2.evaluate(() => CDI.closeProfileModal());
+  await p2.waitForFunction(() => !document.getElementById('validatingAvisosList').textContent.includes('CDDTAGR'), null, { timeout: 10000 })
+    .catch(async () => falla('después del alta, los avisos siguen pidiendo el CDDTAGR: ' + await avisos2()));
+  console.log('OK al cargar el estudio, los avisos dejan de pedir el CDDTAGR');
 
   await b.close();
   console.log('PANTALLA ESTUDIO-1 OK');

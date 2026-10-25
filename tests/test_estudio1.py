@@ -17,8 +17,8 @@ from proyecto_maria.main import app
 from tests.test_maria7_rechazos_24_10 import _pedido
 
 CUIT_PERFIL = "20111111112"
-CUIT_A = "30222222223"
-CUIT_B = "27333333334"
+CUIT_A = "30222222229"
+CUIT_B = "27333333339"
 
 
 def _cddtagr(txt):
@@ -78,18 +78,27 @@ def _generar(c, estudio_id=None, cuit_agr=""):
 
 def test_el_alta_guarda_el_cuit_sin_guiones_y_lo_lista(usuario):
     a = usuario()
-    est = _alta(a, "Estudio Inventado Uno", "30-22222222-3")
+    est = _alta(a, "Estudio Inventado Uno", "30-22222222-9")
     assert est["cuit"] == CUIT_A and est["nombre"] == "Estudio Inventado Uno"
     datos = _lista(a)
     assert [(e["id"], e["cuit"]) for e in datos["estudios"]] == [(est["id"], CUIT_A)]
 
 
-@pytest.mark.parametrize("cuit", ["3022222222", "302222222233", "30-2222222A-3", "", None, 30222222223])
+@pytest.mark.parametrize("cuit", ["3022222222", "302222222299", "30-2222222A-9", "", None, 30222222229])
 def test_el_alta_rechaza_un_cuit_que_no_es_de_11_digitos(usuario, cuit):
     a = usuario()
     r = a.post("/api/estudios", json={"nombre": "Estudio Inventado", "cuit": cuit})
     assert r.status_code == 400, r.text
     assert "11 dígitos" in r.json()["detail"]
+    assert _lista(a)["estudios"] == []
+
+
+def test_el_alta_rechaza_un_cuit_con_el_verificador_mal(usuario):
+    """30-22222222-3 tiene 11 dígitos pero el verificador es 9: el TXT no saldría."""
+    a = usuario()
+    r = a.post("/api/estudios", json={"nombre": "Estudio Inventado", "cuit": "30-22222222-3"})
+    assert r.status_code == 400, r.text
+    assert "verificador" in r.json()["detail"]
     assert _lista(a)["estudios"] == []
 
 
@@ -102,10 +111,20 @@ def test_el_alta_rechaza_un_nombre_vacio_o_que_no_sirve(usuario, nombre):
     assert _lista(a)["estudios"] == []
 
 
+def test_el_alta_rechaza_un_nombre_con_un_surrogate_suelto(usuario):
+    """JSON admite «\\ud800» suelto; Postgres no lo guarda: es un 400, no un 500."""
+    a = usuario()
+    cuerpo = '{"nombre": "Estudio \\ud800 Inventado", "cuit": "%s"}' % CUIT_A
+    r = a.post("/api/estudios", content=cuerpo, headers={"Content-Type": "application/json"})
+    assert r.status_code == 400, r.text
+    assert "nombre" in r.json()["detail"]
+    assert _lista(a)["estudios"] == []
+
+
 def test_el_mismo_cuit_dos_veces_en_la_cuenta_no_se_guarda(usuario):
     a = usuario()
     _alta(a, "Estudio Inventado Uno", CUIT_A)
-    r = a.post("/api/estudios", json={"nombre": "Otro nombre", "cuit": "30-22222222-3"})
+    r = a.post("/api/estudios", json={"nombre": "Otro nombre", "cuit": "30-22222222-9"})
     assert r.status_code == 409, r.text
     assert len(_lista(a)["estudios"]) == 1
 
