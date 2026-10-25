@@ -142,6 +142,27 @@ Quedan los dos favores:
 > 2. ¿Podés probar en tu Kit María un archivo nuestro? Sólo cargarlo para ver
 >    si lo acepta, sin oficializar nada. (Se manda al cerrar la Fase 1.)
 
+## Preguntas nuevas (2026-10-25), para que Emi las mande
+
+Salen de la carga del 2026-10-24 y de VALOR-1. Mientras no conteste, CDI
+sigue como está.
+
+> 1. El identificador de la operación (`IDSO`): ¿cuántos caracteres puede
+>    tener como máximo? ¿El MARIA rechaza uno que ya se usó?
+> 2. En los sufijos de valor (lo que va entre paréntesis, como `AI(...)`):
+>    ¿cómo se escribe un número con decimales? ¿Acepta un sufijo vacío?
+> 3. El seguro del 1 %: ¿se calcula sobre el FOB de la factura o sobre el
+>    FOB con los ajustes (descuentos y gastos que se suman o se restan)?
+> 4. ¿En qué condiciones de venta el seguro ya viene en el precio y no hay
+>    que sumarlo (CIF, CIP, alguna otra)?
+
+| Pregunta | Qué decide | Mientras tanto |
+|---|---|---|
+| 1 | Largo y repetición de `IDSO` (D1 de MARIA-7) | no cambian `NDDTIMMTRN` ni `IEXT` |
+| 2 | Decimales y vacío en los sufijos (D7 de MARIA-7) | como hoy |
+| 3 | Base del seguro sugerido (D13 de VALOR-1) | FOB de la factura |
+| 4 | Si el botón del seguro se esconde en algunas condiciones (D14) | se ofrece siempre |
+
 ## El mensaje que se mandó (2026-10-06)
 
 Emi (2026-10-06): la versión anterior era demasiado técnica. Tenía los
