@@ -11,6 +11,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix(clientes):** la operación copia a la ficha vacía sólo una fecha válida (guardada AAAA-MM-DD); si no sirve no se copia y la operación se guarda igual. La importación deja vacía la fecha que no sirve y la vista previa avisa la fila; el año sale siempre con cuatro cifras.
 - La ficha avisa la fecha guardada con el mismo criterio que el generador del TXT (también con dígitos de ancho completo). El script de datos no muestra la clave de la base en sus errores.
 
+## 2026-10-25 · fix: un cargo con medidas «/», «-» o 0 no entra como producto (EXCEL-3e)
+
+- **fix(excel):** «/», «-», 0 o vacío no cuentan como medidas: el flete, el seguro o el descuento con la especificación combinada y su rótulo en Item ya no pasan por renglón del grupo; se leen como flete o descuento, o quedan sin leer con aviso. Un renglón sin descripción ni medidas tampoco hereda la de arriba: queda sin leer, con aviso.
+
 ## 2026-10-25 · feat: los estudios de la cuenta para el CUIT del despachante (ESTUDIO-1)
 
 - **feat(estudios):** en «Mi perfil», «Mis estudios» se cargan los estudios (nombre y CUIT) de la cuenta; en la operación se elige uno, con el último usado o el único ya elegido, y su CUIT va al CDDTAGR. Sin estudio sigue el CUIT del perfil; cada usuario ve, borra y usa sólo los suyos.

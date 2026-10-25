@@ -4839,6 +4839,16 @@ def extract_items_from_excel(df: pd.DataFrame, filename: str, descartes: list | 
 
     return items
 
+def _es_una_medida(valor, decimal) -> bool:
+    """Una medida escrita: un número mayor que cero o un texto con una cifra
+    que no es cero («48-50», «1,5m»). «/», «-», «0» o «N/A» no lo son."""
+    from proyecto_maria.pdf_extractor import _numero_factura
+    numero =_numero_factura(valor, decimal) if _texto_de_celda(valor) else None
+    if numero is not None:
+        return numero > 0
+    return bool(re.search(r"[1-9]", _texto_de_celda(valor)))
+
+
 def _texto_de_celda(valor) -> str:
     """Texto de una celda: vacío si no hay nada, y un número entero sin «.0»
     (con una fila vacía en el medio pandas lee la NCM 84713000 como 84713000.0)."""
@@ -4969,8 +4979,10 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
                 return monto
 
             # Un renglón con sus propias medidas es mercadería: una nota
-            # («Freight included») en otra columna no lo saca.
-            con_medidas = any(_texto_de_celda(row[c]) for c, _n, _u in medidas)
+            # («Freight included») en otra columna no lo saca. «/», «-» o 0
+            # no son una medida: el flete con la especificación combinada no
+            # pasa por renglón del grupo (EXCEL-3e).
+            con_medidas = any(_es_una_medida(row[c], decimal) for c, _n, _u in medidas)
             cargo = descripcion_propia or next(
                 (t for t in (_texto_de_celda(row[c]) for c in columnas_del_rotulo)
                  if t and _numero_factura(t, decimal) is None), "")
