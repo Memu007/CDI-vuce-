@@ -1131,6 +1131,7 @@ MEDIDAS_QUE_NO_SON = {"barra": "/", "guion": "-", "cero": 0, "vacias": None,
                       "negativa": -1, "negativa_en_texto": "-1", "na": "N/A", "raya": "—",
                       "cero_decimal": "0.0", "cero_con_unidad": "0 m",
                       "negativa_con_unidad": "-1 m", "negativa_con_raya": "\u20131",
+                      "negativa_entre_parentesis": "(1)",
                       "ideograma_uno": "\u4e00", "solo_unidad": "m\u00b2"}
 CARGOS_H1 = {"flete": ("Freight", 1200), "seguro": ("Insurance", 40), "descuento": ("Discount", -10)}
 PRODUCTO_H1 = [1, "DT-1", "LONA DEMO", 2, 10, 1, 20, 1.5, 30]

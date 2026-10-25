@@ -266,10 +266,13 @@ sabotaje $M "3c B1 decide con la descripción copiada" \
   '                    no_es_mercaderia = _es_solo_un_cargo(cargo)' \
   '                    no_es_mercaderia = _es_solo_un_cargo(descripcion)' \
   "${B}un_cargo_no_entra_como_producto_aunque_venga_una_combinada[descripcion-insurance]"
+# Desde 3c (B1 y familia) ese renglón combinado lo deja sin leer otra guarda; el
+# que distingue es la copia de un cargo con texto en Item. Con «-descripcion]»
+# (sin origen copiado) falla sólo este sabotaje, no el de 3d.
 sabotaje $M "3c B1 la copia sin rótulo entra aunque su fila no" \
   '                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(ancla, (True, ""))' \
   '                no_es_mercaderia, dudosa = False, ""' \
-  "${B}un_cargo_con_su_rotulo_combinado_no_suma_la_fila_de_abajo"
+  "${B}la_copia_de_un_cargo_combinado_con_texto_en_item_no_cambia_el_fob_sin_su_fila[Insurance as per policy-items0-descripcion]"
 # El caso de la copia de 3c tiene la fila de arriba como cargo: ahí el valor
 # por defecto da lo mismo. Lo ve la proforma de EXCEL-3, cuyos renglones son
 # copias de un producto (y 11 casos más).
@@ -325,10 +328,12 @@ sabotaje $M "3d el hijo no se decide como su cabecera" \
   '                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(grupo[2], (True, ""))' \
   '                no_es_mercaderia, dudosa = False, ""' \
   "${B}la_cabecera_y_su_hijo_se_deciden_igual[Insurance-vertical_por_herencia]"
+# El rótulo dudoso en dos filas no pasa por la copia de una fila dudosa (igual en 1955cac):
+# el aviso de la copia dudosa lo distingue la copia con el origen copiado.
 sabotaje $M "3d la copia de una fila dudosa entra sin aviso" \
   '                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(ancla, (True, ""))' \
   '                no_es_mercaderia = no_es_mercaderia_en.get(ancla, (True, ""))[0]' \
-  "${B}un_rotulo_dudoso_combinado_en_dos_filas_nombra_las_dos[rotulo_y_origen]"
+  "${B}la_copia_de_un_cargo_combinado_con_texto_en_item_no_cambia_el_fob_sin_su_fila[Insurance as per policy-items0-descripcion_y_origen]"
 sabotaje $M "3d el aviso nombra todas las filas" \
   '    primeras = filas[:5]' '    primeras = filas' \
   "${B}los_avisos_nombran_hasta_cinco_filas_y_cuentan_el_resto"
@@ -384,11 +389,12 @@ sabotaje $M "3e una medida en texto («48-50») no cuenta" \
 sabotaje $M "3e «½» no cuenta: sólo las cifras ASCII" \
   "$CIFRA" '    return bool(re.search(r"[1-9]", _texto_de_celda(valor)))' \
   "${B}un_renglon_con_una_medida_escrita_en_texto_sigue_siendo_del_grupo[\\xbd-xlsx]"
+# «-1» y «-1 m» los rechaza igual la guarda de la raya: el signo decide sólo en «(1)».
 sabotaje $M "3e una medida negativa cuenta: sin el signo" \
   '    numero = _monto_de_fila(valor, decimal)' \
   '    from proyecto_maria.pdf_extractor import _numero_factura
     numero = _numero_factura(valor, decimal)' \
-  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[negativa-flete-importe_y_precio-rotulo_en_item-xlsx]"
+  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[negativa_entre_parentesis-flete-importe_y_precio-rotulo_en_item-xlsx]"
 UNIDAD='                               and not _es_una_fraccion(texto.rstrip()[-1]))  # «½» no es una unidad'
 sabotaje $M "3e «½» se toma como la unidad: sale sin «m»" \
   "$UNIDAD" '                               )' \
