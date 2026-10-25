@@ -308,23 +308,26 @@ sabotaje $M "3d el flete dudoso no se avisa" \
   '                            flete_dudoso.append((_ + 2, cargo))' '                            pass' \
   "${B}un_producto_que_empieza_como_el_flete_con_el_origen_combinado_se_lee_como_flete_avisado[Freight elevator DEMO]"
 sabotaje $M "3d el rótulo dudoso entra como producto común" \
-  '                dudosa = not no_es_mercaderia and bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo))' \
-  '                dudosa = False' \
+  '                    dudosa = cargo' '                    pass' \
   "${B}un_cargo_con_palabras_de_mas_no_cambia_el_fob_sin_un_aviso_con_su_fila[Gastos administrativos-origen_rotulo_en_descripcion]"
 sabotaje $M "3d las dudosas no llegan al aviso" \
   '        extras["dudosas"] = dudosas' '        pass' \
   "${B}un_producto_que_empieza_como_un_cargo_entra_con_un_aviso_que_nombra_su_fila[payment_handling]"
 sabotaje $M "3d el hijo no se decide como su cabecera" \
-  '                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(grupo[2], (True, False))' \
-  '                no_es_mercaderia, dudosa = False, False' \
+  '                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(grupo[2], (True, ""))' \
+  '                no_es_mercaderia, dudosa = False, ""' \
   "${B}la_cabecera_y_su_hijo_se_deciden_igual[Insurance-vertical_por_herencia]"
 sabotaje $M "3d la copia de una fila dudosa entra sin aviso" \
-  '                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(ancla, (True, False))' \
-  '                no_es_mercaderia = no_es_mercaderia_en.get(ancla, (True, False))[0]' \
+  '                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(ancla, (True, ""))' \
+  '                no_es_mercaderia = no_es_mercaderia_en.get(ancla, (True, ""))[0]' \
   "${B}un_rotulo_dudoso_combinado_en_dos_filas_nombra_las_dos[rotulo_y_origen]"
 sabotaje $M "3d el aviso nombra todas las filas" \
-  '    nombradas = ", ".join(str(f) for f in filas[:5])' '    nombradas = ", ".join(str(f) for f in filas)' \
+  '    primeras = filas[:5]' '    primeras = filas' \
   "${B}los_avisos_nombran_hasta_cinco_filas_y_cuentan_el_resto"
+sabotaje $M "3d la descripción copiada cuenta como propia para el flete" \
+  '            if sin_ncm_ni_origen and (descripcion_propia or not con_medidas):' \
+  '            if sin_ncm_ni_origen and (descripcion or not con_medidas):' \
+  "${B}con_la_especificacion_combinada_una_nota_de_flete_en_item_no_saca_al_renglon"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

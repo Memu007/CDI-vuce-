@@ -314,6 +314,22 @@ def test_una_nota_de_flete_en_otra_columna_de_un_renglon_no_lo_saca(nota):
     assert "flete" not in data["operacion"] and "descuento" not in data["operacion"], data["operacion"]
 
 
+def test_con_la_especificacion_combinada_una_nota_de_flete_en_item_no_saca_al_renglon():
+    """Autorrevisión de EXCEL-3d: la descripción copiada de la combinada no es
+    la del renglón; con sus medidas sigue siendo del grupo, como sin combinar."""
+    data = _leer_combinado([
+        RENGLONES_PVC,
+        [1, "DT-1", "LONA DEMO", 2, 10, 1, 20, 1.5, 30],
+        ["Freight included", None, None, 2, 15, 1, 30, 1.5, 45],
+        [3, None, None, 2, 20, 1, 40, 1.5, 60],
+    ], ("C2:C4",))
+    assert [i["descripcion"] for i in data["items"]] == [
+        "LONA DEMO, ancho 2 m x largo 10 m",
+        "LONA DEMO, ancho 2 m x largo 15 m",
+        "LONA DEMO, ancho 2 m x largo 20 m"], data["items"]
+    assert "flete" not in data["operacion"], data["operacion"]
+
+
 def test_un_descuento_con_moneda_adelante_se_lee():
     data = _leer([
         ["NCM", "Descripcion", "Cantidad", "Precio Unitario", "Importe"],
@@ -984,7 +1000,8 @@ def test_un_producto_que_empieza_como_el_flete_con_el_origen_combinado_se_lee_co
     ], ("C2:C4",))
     assert [i["descripcion"] for i in data["items"]] == ["Widget A", "Widget B"], data["items"]
     assert data["operacion"]["flete"] == 9000 and data["operacion"]["filas_excel_flete"] == [3], data["operacion"]
-    assert "de la fila 3" in _avisos(data), data["avisos_mapeo"]
+    assert (f"1 renglón(es) se leyeron como flete y dicen algo más: fila 3 («{producto}»); "
+            "si alguno es un producto, cargalo en la revisión.") in _avisos(data), data["avisos_mapeo"]
 
 
 CABECERAS = {
@@ -1010,7 +1027,7 @@ def test_la_cabecera_y_su_hijo_se_deciden_igual(rotulo, forma):
     else:
         assert _total(data["items"]) == 1.5 + 50 + 40, data["items"]
         avisos = _avisos(data)
-        assert "fila 3 (" in avisos and "fila 4 (" in avisos, avisos
+        assert f"fila 3 («{rotulo}»)" in avisos and f"fila 4 («{rotulo}»)" in avisos, avisos
 
 
 def test_la_cabecera_insurance_sin_combinadas_deja_sin_leer_al_hijo():
@@ -1056,7 +1073,7 @@ def test_los_avisos_nombran_hasta_cinco_filas_y_cuentan_el_resto():
     assert _total(data["items"]) == 4200, data["items"]
     assert ("7 renglón(es) empiezan como un cargo y entraron como producto: fila 3 («Gastos administrativos 2»), "
             "fila 4 («Gastos administrativos 3»)") in avisos, avisos
-    assert "fila 7 («Gastos administrativos 6»), y 2 más;" in avisos and "Gastos administrativos 7" not in avisos, avisos
+    assert "fila 7 («Gastos administrativos 6») y 2 más;" in avisos and "Gastos administrativos 7" not in avisos, avisos
 
 
 @pytest.mark.parametrize("filas, combinar, sin_precio", [
