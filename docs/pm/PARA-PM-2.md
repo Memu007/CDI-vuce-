@@ -13,8 +13,7 @@ encontró dentro de la tarea va arreglado, cada uno con su rojo antes. Los 31
 sabotajes dan rojo por la razón esperada. El smoke y la e2e dan verde.
 La suite completa sobre `3352a01` da verde, sin rojos de entorno.
 
-**Lo que decidís vos:** D13 y D14 (nuevas, de VALOR-1), y D9, D10 y D11
-(siguen abiertas desde MARIA-7). Ninguna frena la entrega, pero **D13
+**Lo que decidís vos:** D13 y D14, nuevas. Ninguna frena la entrega, pero **D13
 contradice en parte «VALOR-1 no toca el TXT»**: leela antes del veredicto.
 
 | Pieza | SHA |
@@ -33,7 +32,9 @@ contradice en parte «VALOR-1 no toca el TXT»**: leela antes del veredicto.
 | Caso y sabotaje 31 | `3352a01` |
 | **SHA probado:** suite, sabotajes, smoke y e2e | **`3352a01`** |
 
-Después de `3352a01` sólo cambia este informe.
+Después de `3352a01` sólo cambian este informe y el merge de tu rama
+(`d234fe2`: documentos y tu herramienta; `git diff 3352a01 HEAD --
+proyecto_maria tests scripts` da vacío).
 
 ## Decisiones
 
@@ -66,12 +67,8 @@ sobrar. Hoy el botón se ofrece igual si la operación no trae seguro.
 condiciones llevan el seguro adentro para el MARIA, y adivinarlo cambia lo
 que sale.
 
-**D9, D10 y D11** siguen como las dejé en `f71eaa9` (`git show
-f71eaa9:docs/pm/PARA-PM-2.md`). Tu lectura provisional fue D9 (a), D10 (a)
-y D11 (b) como pieza aparte; cuando la escribas en `PARA-DEV-2.md` las doy
-por cerradas. Recordatorio de D9: tu
-`docs/pm/herramientas/auditoria_generador_sintetico.py:27` usa
-`sbt_sufijo_valor="SINTETICO"`, que ahora da error.
+**D9, D10 y D11:** leí tus respuestas en `PARA-DEV-2.md` (a, a y b en
+MARIA-9). Las doy por cerradas.
 
 ## Lo que se hizo
 
@@ -173,8 +170,8 @@ El adversario probó sin hallazgo:
 
 ## Siguiente
 
-Arranco SEPARADORES-1. Si el veredicto trae una devolución, esa va primero.
+Arranco MARIA-9 y después SEPARADORES-1, como dice tu canal. Si el veredicto trae una devolución, esa va primero.
 
 Última vuelta: 2026-10-25 00:45 UTC.
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. Entregada VALOR-1 en 3352a01 (suite, 31 sabotajes, smoke y e2e sobre ese SHA); D13 (base del seguro) y D14 (CIF/CIP) nuevas, D9–D11 abiertas, en PARA-PM-2.md. Sigue SEPARADORES-1. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. Entregada VALOR-1 en 3352a01 (suite, 31 sabotajes, smoke y e2e sobre ese SHA); D13 (base del seguro) y D14 (CIF/CIP) abiertas en PARA-PM-2.md; D9–D11 respondidas. Sigue MARIA-9 y después SEPARADORES-1. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
