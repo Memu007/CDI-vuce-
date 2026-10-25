@@ -649,7 +649,7 @@
                 }
                 // El seguro calculado con otros importes se resuelve en
                 // «Ajustes y seguro» (VALOR-1c).
-                if (typeof detail === 'string' && detail.startsWith('Seguro: ')) {
+                if (typeof detail === 'string' && detail.startsWith('Seguro: lo calculó el sistema')) {
                     CDI.goTo('validating');
                     throw new Error(detail);
                 }
