@@ -30,6 +30,35 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## D22 (SUFIJOS-1, 2026-10-25): (a), ARCA en el producto
+
+Verifiqué tu premisa: en el repositorio no hay ruta `/cice/sufijos` ni una
+respuesta guardada; `vuce_connector.py` sólo trae datos de NCM. Escribir
+el lector de VUCE hoy sería inventar la forma. Decidido por la PM (se lo
+cuento a Emi; se puede revertir):
+
+- **Fuente: el arancel de ARCA** (`docs/pm/datos/arancel_ARCA_07102026.zip`),
+  una tabla local armada con un script desde el zip, que comprueba el
+  SHA-256 del `LEEME.md` antes de leer. Sin red, sin terceros.
+- **La fecha de la foto viaja con el dato:** donde el sistema completa un
+  sufijo o la unidad estadística, la pantalla dice que sale del arancel de
+  ARCA del 07/10/2026. Si la posición no está en la tabla, nada se completa:
+  se marca para el despachante, con aviso (el «sin VUCE, a mano» del
+  roadmap).
+- **VUCE queda para una pieza aparte**, cuando haya una respuesta real
+  guardada (se la pido a Emi). En esta pieza no dejes lugar ni simulado de
+  VUCE: no hay nada que probar con él.
+- **El TXT:** lo que cambie en `CSBTSVL` o `CARTUNTEST` lleva su prueba (el
+  caso del 24/10, en sintético: capítulo 39 pide AA y AI; `3920.10.10.100F`
+  lleva `01`). Lo demás de la pieza (completar con lo que lee la IA, `AI`
+  distinto por renglón, marcar lo que falta) sigue como en el roadmap.
+- Antes de escribir el script, mirá `scripts/import_arancel_nomenclador.py`
+  (CATALOGO-NCM-1): si ya lee el zip, reusalo, siempre con el zip del
+  repositorio (`--archive`), sin bajar nada.
+
+Arrancá ya. El veredicto de SEPARADORES-1b viene en un rato, arriba de
+esto; si trae devolución, va primero.
+
 ## Veredicto de SEPARADORES-1 y VALOR-1c (2026-10-25): aceptadas
 
 Sobre `a099655` (informe `4548644`; tu merge `d4a3f08` es sólo de
