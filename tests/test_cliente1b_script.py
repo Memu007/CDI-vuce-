@@ -71,11 +71,15 @@ def test_con_la_opcion_deja_vacias_solo_las_none(base, capsys):
     assert "Quedaron vacías: 2" in salida
 
 
-def test_la_base_es_obligatoria(monkeypatch, capsys):
-    """No se toma de DATABASE_URL: así no se corre contra una base sin nombrarla."""
-    monkeypatch.setenv("DATABASE_URL", "sqlite+aiosqlite:///./no-usar.db")
-    with pytest.raises(SystemExit):
-        main([])
+def test_la_base_es_obligatoria(base, monkeypatch, capsys):
+    """No se toma de DATABASE_URL: así no se corre contra una base sin nombrarla.
+    DATABASE_URL apunta a una base que existe, para que no frene por otra cosa."""
+    monkeypatch.setenv("DATABASE_URL", f"sqlite+aiosqlite:///{base}")
+    with pytest.raises(SystemExit) as salida:
+        main(["--arreglar-none"])
+    assert salida.value.code == 2
+    assert "--base" in capsys.readouterr().err
+    assert _fechas(base)["id-none"] == "None"
 
 
 def test_con_la_opcion_vacia_cada_none_que_informa(tmp_path, capsys):
