@@ -70,7 +70,7 @@ PROJECT_VERSION = datetime.now().strftime("%Y%m%d%H%M%S")
 from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, importe_escrito
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, importe_escrito, usa_el_sufijo_de_la_operacion
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
     DocumentoNoAdmitido,
@@ -4328,16 +4328,12 @@ async def generate_maria_endpoint(
 
         # Validar sbt_sufijo_valor: obligatorio, sin caracteres de control.
         #
-        # Cuando un ítem se declara partido en sub-ítems, cada sub-ítem trae su
-        # propio sufijo (un modelo por sufijo), así que el sufijo general deja
-        # de ser obligatorio. El generador igual exige que ningún sub-ítem
-        # quede sin sufijo.
+        # Cuando cada sub-ítem o renglón trae su propio sufijo (un modelo por
+        # sufijo), el general deja de ser obligatorio: es la misma regla con
+        # la que el generador lo valida (MARIA-9). El generador igual exige
+        # que ninguno quede sin sufijo.
         sbt_raw = (request.sbt_sufijo_valor or "").strip()
-        _hay_subitems = any(
-            (it.get("subitems") if isinstance(it, dict) else None)
-            for it in (request.items or [])
-        )
-        if not sbt_raw and not _hay_subitems:
+        if not sbt_raw and usa_el_sufijo_de_la_operacion(request.items, request.iva_adicional):
             raise HTTPException(
                 status_code=400,
                 detail="Falta el sufijo de valor SBT. Es un dato obligatorio y específico del importador. Consultar al despachante.",

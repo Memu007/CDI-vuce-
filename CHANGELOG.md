@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-25 · fix: el sufijo de la operación frena sólo si alguien lo usa (MARIA-9)
+
+- Si todos los productos traen su propio sufijo de valor, un texto libre en el sufijo de la operación ya no frena el TXT (volvió a generarse con los propios). Cuando algún producto lo toma y no se puede separar, los avisos lo anticipan con el mismo texto del error.
+
 ## 2026-10-25 · fix: la tarjeta de ajustes y seguro no usa cuentas viejas (VALOR-1)
 
 - «Usar como ajuste a deducir» ya no pisa un importe escrito a mano; «Calcular seguro» no usa cuentas de antes de cambiar un ajuste ni de otra operación, y funciona aunque todavía no haya operación cargada. Si fallan los avisos, o un producto viene mal formado o fuera de rango, la tarjeta lo dice en vez de quedar vacía o dar error.
