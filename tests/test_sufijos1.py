@@ -26,7 +26,7 @@ ROOT = Path(__file__).resolve().parents[1]
 ZIP = ROOT / "docs" / "pm" / "datos" / "arancel_ARCA_07102026.zip"
 FUENTE = "arancel de ARCA del 07/10/2026"
 PLASTICO = "39201010100F"  # 3920.10.10.100F
-FUERA = "39211390900F"     # no está en el arancel
+FUERA = "39211390999F"     # no está en el arancel (39211390900 sí, con G)
 PROPIO = "AA(MARCA DEMO)-AI(620G GRIS 150CMX50M)-"
 
 
@@ -224,7 +224,7 @@ def test_un_grupo_se_controla_una_vez():
 
 def test_una_posicion_fuera_del_arancel_se_marca_para_el_despachante():
     avisos = _avisos([dict(LONA, pieza=FUERA, sufijo=PROPIO), dict(LONA, pieza=FUERA, sufijo="AA(B)-AI(C)-")])
-    assert (f"Posición 3921.13.90.900F (ítems 1 y 2): no está en el {FUENTE}. Los sufijos de "
+    assert (f"Posición 3921.13.90.999F (ítems 1 y 2): no está en el {FUENTE}. Los sufijos de "
             f"valor y la unidad estadística no se completan ni se controlan: cargalos a mano "
             f"con el despachante.") in avisos
 
@@ -281,7 +281,8 @@ def test_la_propuesta_por_producto(client):
                               {"codigo": "AI", "descripcion": "CODIGO DE PRODUCTO O ARTICULO"}]
     assert uno["faltan"] == [] and uno["en_la_tabla"] is True
     assert dos == {"posicion": FUERA, "en_la_tabla": False, "sufijo": "", "faltan": [],
-                   "sufijos": [], "opciones": [], "unidad_estadistica": None}
+                   "sufijos": [], "opciones": [], "unidad_estadistica": None,
+                   "letra_de_control": ""}
     assert tres["en_la_tabla"] is False and tres["sufijo"] == ""
 
 
@@ -325,3 +326,201 @@ def test_la_estadistica_de_la_tabla_va_al_pedido_si_nadie_eligio_otra():
         [dict(lona, unidad_estadistica="DCL"), {}, kilos],   # en el producto, también
         [{"pieza": FUERA, "unidad": "03"}, {"unidad_estadistica": "01"}, kilos],
     ])] == ["01", None, None, None, None, "01"]
+
+
+def test_con_sub_items_la_estadistica_de_la_tabla_no_va_sola():
+    # Con sub-ítems, kilos sólo cierra si la de la factura también es en kilos
+    # (el generador lo frena): la pantalla no la pone sola.
+    kilos = {PLASTICO: {"unidad_estadistica": "01"}}
+    partido = {"pieza": PLASTICO, "unidad": "03", "subitems": [{"cantidad": 1}, {"cantidad": 2}]}
+    assert [u["unidad_estadistica"] for u in _unidades_de([
+        [partido, {}, kilos],
+        [partido, {"unidad_estadistica": "01"}, kilos],      # la persona eligió kilos: va
+    ])] == [None, "01"]
+
+
+def _despachante(pasos):
+    """Corre despachante.js en node con un CDI mínimo y un arancel falso que
+    propone AA con la marca y AI con el código; `pasos` es JS que deja lo que
+    se mide en `salida`."""
+    codigo = (
+        "global.window = {}; global.document = { getElementById: () => null };\n"
+        + (V2 / "despachante.js").read_text(encoding="utf-8")
+        + "\nconst CDI = window.CDI; CDI.state = { operacion: { despachante: {} }, items: [] };"
+        + "\nlet pedidos = 0;"
+        + "\nCDI.api = async (ruta, op) => { pedidos += 1; const b = JSON.parse(op.body);"
+        + " await new Promise(r => setImmediate(r));"
+        + " return { ok: true, json: async () => ({ fuente: 'arancel de ARCA del 07/10/2026', items:"
+        + " b.items.map(x => x.pieza === '" + PLASTICO + "' ? { posicion: x.pieza, en_la_tabla: true,"
+        + " unidad_estadistica: '01', faltan: [], sufijo: (x.marca ? 'AA(' + x.marca + ')-' : '')"
+        + " + (x.codigo_parte ? 'AI(' + x.codigo_parte + ')-' : '') }"
+        + " : { posicion: x.pieza, en_la_tabla: false, sufijo: '', faltan: [] }) }) }; };"
+        + "\nconst salida = {}; const D = CDI.despachante;"
+        + "\n(async () => {\n" + pasos + "\nconsole.log(JSON.stringify(salida)); })();"
+    )
+    r = subprocess.run(["node", "-e", codigo], capture_output=True, text=True)
+    assert r.returncode == 0, r.stderr
+    return json.loads(r.stdout)
+
+
+def _producto(marca, codigo="", pieza=PLASTICO):
+    return {"pieza": pieza, "marca": marca, "codigo_parte": codigo}
+
+
+def test_la_propuesta_se_suma_a_lo_que_trae_el_de_la_operacion():
+    # El de la operación tiene códigos que la propuesta no completa (PC01,
+    # CA00): se conservan, y AA y AI salen del producto.
+    casos = {
+        "op_con_otros": ("AA(OPMARCA)-PC01-", "AA(ACME)-PC01-AI(X1)-"),
+        "op_en_minusculas": ("aa(op)-ca00", "AA(ACME)-ca00-AI(X1)-"),
+        "op_vacia": ("", "AA(ACME)-AI(X1)-"),
+        "op_que_no_se_separa": ("AA(SIN CERRAR", ""),   # lo dice el servidor con el de la operación
+    }
+    pasos = "".join(
+        f"CDI.state.items = [{json.dumps(_producto('ACME', 'X1'))}];"
+        f"CDI.state.operacion.sbt_sufijo_valor = {json.dumps(op)};"
+        f"await D.listo(); salida[{json.dumps(nombre)}] = D.sufijoDe(CDI.state.items[0], 0);\n"
+        for nombre, (op, _) in casos.items())
+    assert _despachante(pasos) == {nombre: esperado for nombre, (_, esperado) in casos.items()}
+
+
+def test_lo_que_escribe_la_persona_va_tal_cual():
+    salida = _despachante(
+        f"CDI.state.operacion.sbt_sufijo_valor = 'AA(OP)-CA00-';"
+        f"CDI.state.items = [{json.dumps(dict(_producto('ACME', 'X1'), sufijo='AA(MANO)-'))},"
+        f" {json.dumps(_producto('ACME', pieza=FUERA))}];"
+        "await D.listo(); salida.mano = D.sufijoDe(CDI.state.items[0], 0);"
+        " salida.fuera = D.sufijoDe(CDI.state.items[1], 1);")
+    assert salida == {"mano": "AA(MANO)-", "fuera": ""}
+
+
+def test_la_propuesta_de_una_fila_no_pasa_al_producto_que_queda_en_su_lugar():
+    # Se borra el primero: hasta que llega la propuesta nueva, el que queda
+    # en la fila 0 no lleva la marca del borrado.
+    salida = _despachante(
+        f"CDI.state.items = [{json.dumps(_producto('SAMSUNG', 'S1'))}, {json.dumps(_producto('LG', 'L1'))}];"
+        "await D.listo(); salida.antes = D.sufijoDe(CDI.state.items[1], 1);"
+        "CDI.state.items.splice(0, 1);"
+        "salida.en_el_medio = D.sufijoDe(CDI.state.items[0], 0);"
+        "const viejo = D.listo(); CDI.state.items[0].marca = 'LG2';"   # cambia otra vez en vuelo
+        "await D.listo(); await viejo; salida.despues = D.sufijoDe(CDI.state.items[0], 0);"
+        "salida.pedidos = pedidos;")
+    assert salida == {"antes": "AA(LG)-AI(L1)-", "en_el_medio": "",
+                      "despues": "AA(LG2)-AI(L1)-", "pedidos": 3}
+
+
+def test_listo_no_repite_el_pedido_en_curso():
+    salida = _despachante(
+        f"CDI.state.items = [{json.dumps(_producto('ACME'))}];"
+        "await Promise.all([D.listo(), D.listo(), D.listo()]); await D.listo();"
+        "salida.pedidos = pedidos;")
+    assert salida == {"pedidos": 1}
+
+
+def test_sin_la_tabla_la_nota_no_dice_que_la_posicion_no_esta():
+    salida = _despachante(
+        "CDI.api = async () => ({ ok: true, json: async () => ({ fuente: 'arancel de ARCA', sin_tabla: true,"
+        " items: [{ posicion: 'X', en_la_tabla: false, sufijo: '', faltan: [] }] }) });"
+        f"CDI.state.items = [{json.dumps(_producto('ACME'))}];"
+        "await D.listo(); salida.nota = D.notaDe(CDI.state.items[0], 0);")
+    assert salida == {"nota": "Falta la tabla del arancel de ARCA: cargalo a mano."}
+
+
+# ------------------------------------------------- bordes de la revisión
+
+
+def test_con_sub_items_el_aviso_de_unidad_no_manda_a_elegir_kilos():
+    lona = dict(LONA, pieza=PLASTICO, subitems=[
+        {"cantidad": 375, "valor_unitario": 1.85, "sufijo": "AA(DEMO)-AI(X1)-"},
+        {"cantidad": 375, "valor_unitario": 1.85, "sufijo": "AA(DEMO)-AI(X2)-"}])
+    avisos = [a for a in _avisos([lona]) if a.startswith("Unidad estadística")]
+    assert avisos == [
+        f"Unidad estadística: según el {FUENTE}, la posición 3920.10.10.100F va en 01 "
+        f"(kilogramo); el ítem 1 sale en 03. Con sub-ítems sale en kilos sólo si la unidad "
+        f"de la factura también es kilogramo y la cantidad es el kilo neto: declaralo así, "
+        f"o sin sub-ítems, o confirmalo con el despachante."
+    ]
+
+
+def test_en_un_grupo_el_guion_final_no_hace_distintos_los_sufijos():
+    a = dict(LONA, grupo_id="g1", sufijo="AA(DEMO)-AI(GRIS 1)-")
+    assert _valor(_gen([a, dict(a, sufijo="AA(DEMO)-AI(GRIS 1)")]), "CSBTSVL") == ["AA(DEMO)-AI(GRIS 1)-"]
+
+
+def test_un_codigo_con_el_valor_vacio_es_un_codigo_que_falta():
+    avisos = _avisos([dict(LONA, pieza=PLASTICO, sufijo="AA( )-AI(620G)-")])
+    assert (f"Sufijo de valor del ítem 1: según el {FUENTE}, la posición 3920.10.10.100F "
+            f"pide AA (MARCA), y no está.") in avisos
+
+
+def test_la_posicion_se_lee_con_puntos_y_sin_letras_de_mas():
+    assert sa.consultar("3920.10.10.100F")["unidad_estadistica"] == "01"
+    assert sa.consultar(" 3920.10.10.100f ")["unidad_estadistica"] == "01"
+    for mal in ("3920.10.10.100X.", "39201010100FF", "39201010100X", "3920101010012"):
+        assert sa.consultar(mal) is None, mal
+
+
+def test_la_letra_de_control_equivocada_se_dice_como_tal():
+    avisos = _avisos([dict(LONA, pieza="3920.10.10.100X", sufijo=PROPIO)])
+    assert (f"Posición 3920.10.10.100X (ítem 1): en el {FUENTE} la letra de control de "
+            f"3920.10.10.100 es F, no X. Revisá la posición; los sufijos de valor y la unidad "
+            f"estadística no se completan ni se controlan.") in avisos
+    assert not any(a.startswith("Posición 3920.10.10.100X (ítem 1): no está") for a in avisos)
+
+
+def test_una_tabla_rota_es_una_tabla_que_falta(tmp_path):
+    entera = gzip.compress(json.dumps({"unidades": {}}).encode())
+    (tmp_path / "cortada.json.gz").write_bytes(entera[: len(entera) // 2])
+    with gzip.open(tmp_path / "lista.json.gz", "wt") as fh:
+        json.dump([1, 2], fh)
+    assert sa.cargar(tmp_path / "cortada.json.gz") == {}
+    assert sa.cargar(tmp_path / "lista.json.gz") == {}
+
+
+def test_sin_la_tabla_la_propuesta_lo_dice(client, monkeypatch):
+    _registrar_con_cuit(client, "sufijos1_sin_tabla")
+    monkeypatch.setattr(sa, "cargar", lambda *a, **k: {})
+    r = client.post("/api/sufijos/propuesta", json={"items": [{"pieza": PLASTICO}]})
+    assert r.status_code == 200, r.text
+    assert r.json()["sin_tabla"] is True
+    monkeypatch.undo()
+    assert client.post("/api/sufijos/propuesta", json={"items": [{"pieza": PLASTICO}]}).json()["sin_tabla"] is False
+
+
+def test_la_propuesta_lee_la_ncm_antes_que_la_pieza(client):
+    # Como el generador: si vienen las dos, manda la NCM.
+    _registrar_con_cuit(client, "sufijos1_ncm")
+    r = client.post("/api/sufijos/propuesta", json={"items": [{"ncm": PLASTICO, "pieza": "SKU-1"}]})
+    assert r.json()["items"][0]["en_la_tabla"] is True
+
+
+def test_la_propuesta_aguanta_texto_que_no_es_utf8_y_recorta_lo_largo(client, monkeypatch):
+    _registrar_con_cuit(client, "sufijos1_bordes")
+    r = client.post("/api/sufijos/propuesta", content=b'{"items": [{"pieza": "\\ud800", "marca": "\\udfff"}]}',
+                    headers={"Content-Type": "application/json"})
+    assert r.status_code == 200, r.text
+    vistos = []
+    original = sa.proponer
+    monkeypatch.setattr(sa, "proponer", lambda it, c, **k: vistos.append(it) or original(it, c, **k))
+    largo = "M" * 40000
+    r = client.post("/api/sufijos/propuesta", json={"items": [
+        {"pieza": PLASTICO, "marca": largo, "modelo": largo, "codigo_parte": largo}]})
+    assert r.status_code == 200, r.text
+    assert vistos and all(len(vistos[0][c]) <= 200 for c in ("marca", "modelo", "codigo_parte"))
+
+
+def test_la_propuesta_dice_la_letra_de_control_que_corresponde(client):
+    _registrar_con_cuit(client, "sufijos1_letra")
+    r = client.post("/api/sufijos/propuesta", json={"items": [{"pieza": "3920.10.10.100X"}]})
+    assert r.json()["items"][0]["en_la_tabla"] is False
+    assert r.json()["items"][0]["letra_de_control"] == "F"
+
+
+def test_con_la_letra_equivocada_la_nota_no_dice_que_la_posicion_no_esta():
+    salida = _despachante(
+        "CDI.api = async () => ({ ok: true, json: async () => ({ fuente: 'arancel de ARCA del 07/10/2026',"
+        " items: [{ posicion: 'X', en_la_tabla: false, letra_de_control: 'F', sufijo: '', faltan: [] }] }) });"
+        f"CDI.state.items = [{json.dumps(_producto('ACME'))}];"
+        "await D.listo(); salida.nota = D.notaDe(CDI.state.items[0], 0);")
+    assert salida == {"nota": "En el arancel de ARCA del 07/10/2026 la letra de control de esta "
+                              "posición es F: revisá la posición."}
