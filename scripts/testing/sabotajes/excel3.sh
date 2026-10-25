@@ -104,8 +104,8 @@ sabotaje $M "el flete y el descuento vuelven a no leerse" \
   '                        (flete if es_flete else descuento).append((_ + 2, abs(monto)))' \
   '                        pass' "$XLS"
 sabotaje $M "el rótulo de otra columna no se mira" \
-  '                (t for t in (_texto_de_celda(v) for v in row.values)' \
-  '                (t for t in (_texto_de_celda(v) for v in ())' "$XLS"
+  '                (t for t in (_texto_de_celda(v) for c, v in row.items() if _propia(c))' \
+  '                (t for t in (_texto_de_celda(v) for c, v in ())' "$XLS"
 sabotaje $M "una nota de flete en otra columna saca el renglón" \
   '            if sin_ncm_ni_origen and (descripcion or not con_medidas):' \
   '            if sin_ncm_ni_origen:' \
@@ -184,10 +184,10 @@ sabotaje $M "3b#3 un código nuevo sin especificación vuelve a heredar" \
   "${B}un_codigo_nuevo_sin_especificacion_no_hereda_la_del_grupo_anterior"
 sabotaje $M "3b#1 un descuento con texto y monto negativo vuelve a ser producto" \
   '                    if "%" in cargo or _monto_de_la_linea() < 0 or not valor_unitario:' '                    if "%" in cargo or not valor_unitario:' \
-  "${B}un_descuento_con_texto_y_monto_negativo_se_avisa_y_no_es_producto[importe]"
+  "${B}un_descuento_con_texto_y_monto_negativo_se_avisa_y_no_es_producto[precio_e_importe]"
 sabotaje $M "3b#1 el monto negativo en el precio deja de leerse" \
   '                    precio = _monto_de_fila(row[valor_col], decimal) or 0.0' '                    precio = 0.0' \
-  "${B}un_descuento_con_texto_y_monto_negativo_se_avisa_y_no_es_producto[precio]"
+  "${B}un_descuento_negativo_en_el_precio_sin_importe_tambien_se_lee"
 sabotaje $M "3b#9 un largo con su unidad la repite" \
   '                trae_unidad = numero is None and re.search(r"[^\W\d_]\s*$", texto)' \
   '                trae_unidad = False' \

@@ -446,7 +446,9 @@ def test_un_codigo_nuevo_sin_especificacion_no_hereda_la_del_grupo_anterior():
 @pytest.mark.parametrize("fila", [
     [None, "Descuento comercial", None, None, -500],
     [None, "Discount for early payment", 1, -500, None],
-], ids=["importe", "precio"])
+    # Con precio propio sólo el importe negativo lo distingue de un producto.
+    [None, "Descuento comercial", 1, 500, -500],
+], ids=["importe", "precio", "precio_e_importe"])
 def test_un_descuento_con_texto_y_monto_negativo_se_avisa_y_no_es_producto(fila):
     """#1: no entra como producto de valor 0 (ni negativo): queda sin leer."""
     data = _leer([
