@@ -4135,6 +4135,9 @@ class MariaRequest(BaseModel):
     comprador_fecha_inic_activ: str = ""
     flete: float = 0
     seguro: float = 0
+    # El seguro lo puso el botón «Calcular seguro» (VALOR-1c): si las cuentas
+    # de ahora dan otro, no se genera hasta recalcularlo o dejarlo.
+    seguro_calculado: bool = False
     # Transport data
     bl_numero: str = ""
     puerto_origen: str = ""
@@ -4242,6 +4245,24 @@ def _supuestos_maria(request: MariaRequest, items: list, gastos_fob) -> list:
     )
 
 
+SIN_PRODUCTOS = "No hay productos para generar: volvé a cargar la factura."
+
+
+def _seguro_calculado_viejo(request: MariaRequest, valor: dict) -> str | None:
+    """Un seguro que calculó el sistema con otros importes (VALOR-1c): la
+    persona elige recalcularlo o dejarlo; el TXT no lo lleva sin que elija."""
+    if not request.seguro_calculado:
+        return None
+    if valor.get("error"):
+        return (f"Seguro: lo calculó el sistema y ahora no se puede comprobar: {valor['error']} "
+                "Corregí las cuentas o dejá el seguro como está en «Ajustes y seguro».")
+    if valor["seguro"] == valor["seguro_sugerido"]:
+        return None
+    return (f"Seguro: lo calculó el sistema con otros importes; con los de ahora da "
+            f"{importe_escrito(valor['seguro_sugerido'])} y la operación lleva "
+            f"{importe_escrito(valor['seguro'])}. Recalculalo o dejalo como está en «Ajustes y seguro».")
+
+
 def _rechazar_exportacion_en_importacion(request: MariaRequest) -> None:
     if (request.tipo_destinacion or "").strip().upper().startswith("EC"):
         raise HTTPException(status_code=400, detail="Una destinación de exportación (EC*) no puede generar un TXT de importación.")
@@ -4279,6 +4300,11 @@ async def avisos_maria_endpoint(
     from proyecto_maria.core.controles_maria import avisos_de_ncm
     avisos_ncm = avisos_de_ncm(items)
     valor, avisos_valor = _cuentas_del_valor(request, items)
+    viejo = _seguro_calculado_viejo(request, valor)
+    if viejo:
+        avisos_valor = [viejo, *avisos_valor]
+    if not items:
+        avisos_valor = [SIN_PRODUCTOS, *avisos_valor]
     return {
         "avisos": errores_de_procedencia(items) + kit_warnings + avisos_ncm + avisos_valor + supuestos,
         "supuestos": supuestos,
@@ -4328,6 +4354,8 @@ async def generate_maria_endpoint(
     """
     _rechazar_exportacion_en_importacion(request)
     estudio = await _estudio_elegido(db, request.estudio_id, user["username"])
+    if not request.items:
+        raise HTTPException(status_code=400, detail=SIN_PRODUCTOS)
     try:
         from proyecto_maria.core.controles_maria import (
             CAMPOS_DE_TEXTO, CAMPOS_DE_TEXTO_DEL_ITEM, controles_antes_de_generar, limpiar_texto,
@@ -4400,7 +4428,8 @@ async def generate_maria_endpoint(
         # la que el generador lo valida (MARIA-9). El generador igual exige
         # que ninguno quede sin sufijo.
         sbt_raw = (request.sbt_sufijo_valor or "").strip()
-        if not sbt_raw and usa_el_sufijo_de_la_operacion(items, request.iva_adicional):
+        usa_el_general = usa_el_sufijo_de_la_operacion(items, request.iva_adicional)
+        if not sbt_raw and usa_el_general:
             raise HTTPException(
                 status_code=400,
                 detail="Falta el sufijo de valor SBT. Es un dato obligatorio y específico del importador. Consultar al despachante.",
@@ -4408,7 +4437,8 @@ async def generate_maria_endpoint(
 
         # Los sufijos que se validan son el general, el de cada renglón
         # (MARIA-8) y los de cada sub-ítem; el error dice cuál es (SUBITEMS-1).
-        _sufijos = [("", sbt_raw)] if sbt_raw else []
+        # El general, sólo si alguno lo usa: si no, no va al TXT (D18).
+        _sufijos = [("", sbt_raw)] if sbt_raw and usa_el_general else []
         for _n, it in enumerate(request.items or [], start=1):
             if not isinstance(it, dict):
                 continue
@@ -4438,6 +4468,9 @@ async def generate_maria_endpoint(
                 )
         if kit_errors or errores_1b:
             raise HTTPException(status_code=400, detail={"errors": list(dict.fromkeys([*errors, *kit_errors, *errores_1b]))})
+        _viejo = _seguro_calculado_viejo(request, _cuentas_del_valor(request, items)[0])
+        if _viejo:
+            raise HTTPException(status_code=400, detail=_viejo)
 
         # Si el user tiene CUIT en su perfil y la request no manda cuit_agr,
         # usamos el del perfil (para que el despachante no tenga que re-escribir

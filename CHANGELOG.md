@@ -34,6 +34,15 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(clientes):** el alta y la edición ya no guardan «None» ni una fecha cortada: aceptan AAAA-MM-DD o DD/MM/AAAA (se guarda AAAA-MM-DD), y otra cosa da un error que el formulario muestra sin guardar nada.
 - El aviso de lo que falta para el MARIA pide también la fecha guardada que no es válida; `scripts/datos/clientes_fecha_inic_activ.py` informa por id las que quedaron mal y, con `--arreglar-none`, vacía las «None».
+## 2026-10-25 · fix: el seguro calculado con otros importes no sale sin que se elija (VALOR-1c)
+
+- Si el seguro lo calculó el sistema y los importes cambiaron, no se genera hasta recalcularlo o dejarlo como está; se avisa antes con el mismo texto. Un sufijo general que nadie usa ya no frena ni se avisa (D18).
+- Sin productos se dice «No hay productos para generar», y el error de kilos nombra a todos los renglones cuando el cero sale del ajuste.
+
+## 2026-10-25 · fix: «3.480» es tres mil cuatrocientos ochenta, en la factura y en la pantalla (SEPARADORES-1)
+
+- El flete y el seguro de la factura se leen como texto: «3.480» y «3.480,00» son 3480 (antes el TXT salía con MDDTFLE=3.48). Si la misma factura usa ese separador como decimal, el dato queda sin leer y se avisa.
+- Flete, seguro, gastos y ajustes se escriben a mano con punto de miles y coma decimal. «1,500» no se adivina: la pantalla pregunta si es 1.500 o 1,5.
 
 ## 2026-10-25 · fix: «Calcular seguro» sólo usa cuentas del pedido de ahora (VALOR-1b)
 

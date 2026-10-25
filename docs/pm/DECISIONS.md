@@ -187,3 +187,12 @@ de control ni el largo) y `/generate_maria/avisos` no avisa por él. Es
 seguro porque el general sólo se escribe en `CSBTSVL` y siempre pasa por
 `limpiar_sufijo`. Cuando alguno lo toma, los controles siguen igual. Va en
 VALOR-1c.
+
+## 2026-10-25 — Un monto ilegible no viaja como 0 (PM, D19 de SEPARADORES-1)
+
+Decidido por la PM: D19 (b). Si la pantalla no puede leer el flete, el
+seguro o un ajuste, el pedido lleva el texto tal cual y el servidor lo
+rechaza con un mensaje claro; nunca un 0 silencioso. Es la segunda red: la
+pantalla ya no deja generar con un monto ilegible. Va en SEPARADORES-1b,
+junto con la familia «separador y tres dígitos sin miles bien formados»,
+que pasa a ser ambigua en la factura y en la pantalla (no en los precios).

@@ -20,7 +20,7 @@ def _factura(**operacion):
 
 @pytest.mark.parametrize("copia", COPIAS)
 def test_flete_y_seguro_ilegibles_se_marcan(monkeypatch, copia):
-    r = _leer(monkeypatch, copia, _factura(flete="1,500", seguro="350 USD/kg"))
+    r = _leer(monkeypatch, copia, _factura(flete="12x3", seguro="350 USD/kg"))
     op = r["operacion"]
     assert op["campos_sin_leer"] == ["flete", "seguro"]
     assert op["flete"] == 0 and op["seguro"] == 0
