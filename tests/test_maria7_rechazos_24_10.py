@@ -271,9 +271,11 @@ def test_el_sufijo_de_cada_subitem_tambien_se_limpia():
 
 
 def test_lo_que_se_cambia_en_el_sufijo_se_avisa():
+    # El general se controla cuando alguien lo usa (D18 b): acá, la lona sola.
+    avisos = mg.supuestos_declarados([dict(LONA)], sbt_sufijo_valor=SUFIJO)
+    assert any("Sufijo de valor:" in a and "AI(620G GREY 008 150CMX50M)" in a for a in avisos)
     item = dict(LONA, subitems=[{"cantidad": 750, "sufijo": "AA(X.Y)-"}])
     avisos = mg.supuestos_declarados([item], sbt_sufijo_valor=SUFIJO)
-    assert any("Sufijo de valor:" in a and "AI(620G GREY 008 150CMX50M)" in a for a in avisos)
     assert any("ítem 1, sub-ítem 1" in a and "AA(X Y)-" in a for a in avisos)
     assert not any("Sufijo" in a for a in mg.supuestos_declarados([dict(LONA)], sbt_sufijo_valor="AA(OK)-"))
 
