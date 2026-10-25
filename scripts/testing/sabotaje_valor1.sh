@@ -83,7 +83,7 @@ reemplazar $F '    fob_factura = fob_total_del_txt(items)' '    fob_factura = su
 caso "fob_sin_grupos" "FAILED $T::test_el_fob_de_la_factura_es_el_mddtfob_del_txt[grupo]"
 
 # 6. el ajuste a incluir no se valida
-reemplazar $F 'centavos(importe_valido(ajustes_incluir, "Ajustes a incluir") or 0)' 'centavos(Decimal(str(ajustes_incluir or 0)))'
+reemplazar $F 'centavos(_ajuste(ajustes_incluir, "Ajustes a incluir") or 0)' 'centavos(Decimal(str(ajustes_incluir or 0)))'
 caso "incluir_sin_validar" "FAILED $T::test_un_ajuste_invalido_dice_cual"
 
 # 7. el aviso del casillero sale sin ajustes
