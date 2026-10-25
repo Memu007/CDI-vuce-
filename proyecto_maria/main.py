@@ -4843,7 +4843,7 @@ def _es_una_medida(valor, decimal) -> bool:
     """Una medida escrita: un número mayor que cero o un texto con una cifra
     que no es cero («48-50», «1,5m»). «/», «-», «0» o «N/A» no lo son."""
     from proyecto_maria.pdf_extractor import _numero_factura
-    numero =_numero_factura(valor, decimal) if _texto_de_celda(valor) else None
+    numero = _numero_factura(valor, decimal)
     if numero is not None:
         return numero > 0
     return bool(re.search(r"[1-9]", _texto_de_celda(valor)))
