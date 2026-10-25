@@ -345,6 +345,47 @@ sabotaje $M "3d con la descripción copiada, un rótulo dudoso en Item entra sin
                         pass' \
   "${B}un_cargo_con_palabras_de_mas_no_cambia_el_fob_sin_un_aviso_con_su_fila[Gastos administrativos-descripcion_rotulo_en_item]"
 
+
+# EXCEL-3e (H1): «/», «-» o 0 no son una medida.
+CON_MEDIDAS='            con_medidas = any(_es_una_medida(row[c], decimal) for c, _n, _u in medidas)'
+sabotaje $M "3e «/» vuelve a contar como medida" \
+  "$CON_MEDIDAS" '            con_medidas = any(_texto_de_celda(row[c]) for c, _n, _u in medidas)' \
+  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[barra-flete-importe_y_precio-rotulo_en_item-xlsx]"
+sabotaje $M "3e «/» vuelve a contar como medida (el .xls guardado, sin xlwt)" \
+  "$CON_MEDIDAS" '            con_medidas = any(_texto_de_celda(row[c]) for c, _n, _u in medidas)' \
+  "${B}el_xls_del_cargo_con_medidas_que_no_son_no_entra_como_producto[flete_barra]"
+sabotaje $M "3e un renglón sin descripción con medidas 0 vuelve a heredar" \
+  "$CON_MEDIDAS" '            con_medidas = any(_texto_de_celda(row[c]) for c, _n, _u in medidas)' \
+  "${B}un_renglon_sin_descripcion_ni_medidas_no_hereda_y_se_avisa[0-xlsx]"
+sabotaje $M "3e el 0 cuenta como medida" \
+  '        return numero > 0' '        return numero >= 0' \
+  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[cero-flete-importe_y_precio-rotulo_en_item-xlsx]"
+CIFRA='    return any(unicodedata.numeric(c, 0) > 0 for c in _texto_de_celda(valor))'
+sabotaje $M "3e un texto sin cifras cuenta como medida" \
+  "$CIFRA" '    return any(not c.isspace() for c in _texto_de_celda(valor))' \
+  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[guion-flete-importe_y_precio-rotulo_en_item-xlsx]"
+sabotaje $M "3e una medida en texto («48-50») no cuenta" \
+  "$CIFRA" '    return False' \
+  "${B}un_renglon_con_una_medida_escrita_en_texto_sigue_siendo_del_grupo[48-50-xlsx]"
+sabotaje $M "3e «½» no cuenta: sólo las cifras ASCII" \
+  "$CIFRA" '    return bool(re.search(r"[1-9]", _texto_de_celda(valor)))' \
+  "${B}un_renglon_con_una_medida_escrita_en_texto_sigue_siendo_del_grupo[\\xbd-xlsx]"
+sabotaje $M "3e una medida negativa cuenta: sin el signo" \
+  '    numero = _monto_de_fila(valor, decimal)' \
+  '    from proyecto_maria.pdf_extractor import _numero_factura
+    numero = _numero_factura(valor, decimal)' \
+  "${B}un_cargo_con_medidas_que_no_son_no_entra_como_producto[negativa-flete-importe_y_precio-rotulo_en_item-xlsx]"
+sabotaje $M "3e la descripción vuelve a escribir «ancho - m»" \
+  '                if not _es_una_medida(row[col], decimal):' \
+  '                if not _texto_de_celda(row[col]):' \
+  "${B}la_descripcion_no_lleva_las_medidas_que_no_son[--xlsx]"
+sabotaje $M "3e de más: sin medidas, lo copiado queda afuera" \
+  "$CON_MEDIDAS" "$CON_MEDIDAS
+            if copiada and not con_medidas:
+                descartes.append(_ + 2)
+                continue" \
+  "${B}un_producto_con_medidas_que_no_son_sigue_entrando[/-descripcion_combinada-xlsx]"
+
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
