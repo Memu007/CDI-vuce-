@@ -78,7 +78,7 @@ sabotaje $M "el peso bruto vuelve a usarse como peso unitario" \
         return "bruto"' \
   "FAILED $L::test_peso_bruto_o_total_no_se_toma_como_peso_unitario"
 sabotaje $M "las filas de subtotal vuelven a entrar" \
-  '            if _es_fila_de_total(descripcion or pieza):' \
+  '            if _es_fila_de_total(rotulo or pieza):' \
   '            if False:' \
   "FAILED $L::test_fila_de_subtotal_no_entra_como_item"
 sabotaje $M "«.XLSX» en mayúsculas vuelve a fallar" \
@@ -118,7 +118,8 @@ sabotaje $M "dos columnas guardadas para un campo vuelven a pasar sin aviso" \
   '        if False:' \
   "FAILED $L::test_mapeo_viejo_con_dos_columnas_para_el_mismo_campo_avisa_y_no_da_500"
 sabotaje $M "vuelven las dos columnas con el mismo nombre (500)" \
-  '            df = df.drop(columns=[c for c in df.columns if c in rename.values() and c not in rename])' \
+  '            df = df.drop(columns=[c for c in df.columns
+                                  if str(c).strip().lower() in campos and c not in rename and c not in pesos])' \
   '            pass' \
   "FAILED $L::test_columna_con_el_nombre_del_campo_y_mapeo_a_otra_no_da_500"
 sabotaje $M "vuelve a saltearse cualquier producto que empiece con «Total»" \
@@ -133,8 +134,10 @@ sabotaje $M "los totales en otro idioma vuelven a entrar como producto" \
   '    "合计", "合計", "总计", "總計", "小计", "小計",' \
   '    "合計", "总计", "總計", "小计", "小計",' \
   "FAILED $L::test_filas_de_total_con_moneda_o_idioma_no_entran["
+# El defecto viejo: sólo se miraba la descripción. Con «rotulo» solo no
+# alcanza: el rótulo ya toma «TOTAL AMOUNT» de la columna de código.
 sabotaje $M "el total en la columna de código vuelve a entrar" \
-  '            if _es_fila_de_total(descripcion or pieza):' \
+  '            if _es_fila_de_total(rotulo or pieza):' \
   '            if _es_fila_de_total(descripcion):' \
   "FAILED $L::test_total_en_la_columna_de_codigo_no_entra"
 sabotaje $M "el flete vuelve a entrar como producto" \
