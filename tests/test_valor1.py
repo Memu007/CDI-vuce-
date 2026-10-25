@@ -567,7 +567,9 @@ def test_el_pedido_manda_los_ajustes_y_nunca_algo_que_frene_el_txt():
     codigo = _funciones("finalize.js", ["ajusteDelPedido"]) + (
         "\nconsole.log(JSON.stringify(['', null, undefined, '12.5', 'mal escrito', '1e999', 0, '0']"
         ".map(ajusteDelPedido)));")
-    assert _correr(codigo, {}) == [None, None, None, 12.5, None, None, 0, 0]
+    # Lo que no se lee viaja tal cual: el servidor lo dice en las cuentas y no
+    # frena el TXT (SEPARADORES-1b, D19; test_separadores1b).
+    assert _correr(codigo, {}) == [None, None, None, 12.5, "mal escrito", "1e999", 0, 0]
     fuente = (V2 / "finalize.js").read_text(encoding="utf-8")
     pedido = re.search(r"function buildMariaRequest\(\) \{.*?\n    \}", fuente, re.S).group(0)
     assert "ajustes_incluir: ajusteDelPedido(op.ajustes_incluir)" in pedido

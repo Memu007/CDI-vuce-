@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-25 · fix: un monto que no se pudo leer no sale como 0 (SEPARADORES-1b)
+
+- El flete, el seguro o los gastos que la pantalla no pudo leer ya no viajan como 0: el servidor no genera y dice cuál es. Tampoco toma «3.480» como 3,48 ni «1e3» como 1000. Un ajuste así se avisa en las cuentas; frena el TXT sólo si el seguro lo calculó el sistema (D19, D20).
+- «4500.000» o «2500,125»: en la factura, con el otro separador decimal, quedan sin leer y se avisa (antes salían por mil). En la pantalla se pregunta, como con «1,500», sin trabarse si se pega una cifra muy larga.
+
 ## 2026-10-25 · fix: el seguro calculado con otros importes no sale sin que se elija (VALOR-1c)
 
 - Si el seguro lo calculó el sistema y los importes cambiaron, no se genera hasta recalcularlo o dejarlo como está; se avisa antes con el mismo texto. Un sufijo general que nadie usa ya no frena ni se avisa (D18).

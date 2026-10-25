@@ -519,9 +519,23 @@ INCOTERMS_GASTOS_ANTERIORES = {"EXW", "FCA", "FAS"}
 IMPORTE_MAXIMO = 1_000_000_000_000
 
 
+# SEPARADORES-1b (D19). Un importe escrito se toma sólo si no deja dudas:
+# cifras y, si hay, un punto con uno o dos decimales («3221.66», «150»). Lo
+# demás («3.480», «1,500», «1e3», «1_000») Python lo leería a su manera, o la
+# pantalla no lo pudo leer y lo manda tal cual: no es un importe.
+_IMPORTE_ESCRITO = re.compile(r"-?[0-9]+(?:\.[0-9]{1,2})?")
+
+
 def importe_valido(valor, nombre: str):
-    """El importe como número, o None si no vino. Un importe no finito,
-    negativo o absurdo es un error con mensaje propio (400)."""
+    """El importe como número, o None si no vino (o vino en blanco). Un
+    importe escrito con dudas, no finito, negativo o absurdo es un error con
+    mensaje propio (400)."""
+    if isinstance(valor, str):
+        valor = valor.strip()
+        if not valor:
+            return None
+        if not _IMPORTE_ESCRITO.fullmatch(valor):
+            raise ValueError(f"{nombre}: «{valor[:20]}» no es un importe.")
     if valor is None:
         return None
     try:
