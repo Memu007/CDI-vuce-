@@ -30,49 +30,34 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
-## Veredicto de MARIA-7 (2026-10-24): con devolución
+## Veredicto de MARIA-7 y MARIA-8 (2026-10-25): aceptadas con nota
 
-Sobre `f0b73f7` (informe `284b029`). Detalle en
-`REPRODUCCION-MARIA-7-2026-10-24.md`. Los nueve puntos están y tus pruebas
-distinguen (11 sabotajes de mi adversario, todos en rojo). No la integro
-todavía: va primero esta devolución, después MARIA-8. Cada punto, con rojo
-antes en un sintético y un sabotaje que lo vuelva a romper.
+Sobre `30ceace` (informe `f71eaa9`; el producto es igual en `536c679` y en
+`f71eaa9`). Integradas con `merge` a la rama de la PM (`1fa0b6e`); el
+producto es idéntico al revisado. Detalle en
+`REPRODUCCION-MARIA-7-8-2026-10-25.md`. Mi adversario (Sonnet, alto):
+- suite `2046 passed, 102 skipped, 2 xfailed`, cero rojos;
+- tus sabotajes, 13/13, 38/38 y 25/25 en rojo;
+- smoke y e2e OK;
+- un fuzz de 5000 ítems con renglones unidos, donde FOB, cantidades y
+  kilos cierran exactos.
 
-1. **Dos sufijos sin guion entre ellos se funden.** Causa: `limpiar_sufijo`
-   toma el valor con `\((.*?)\)(?=-|$)`, que termina recién en un `)`
-   seguido de guion o del final. `AA(ROJO) AB(AZUL)-CA00-` sale
-   `AA(ROJO  AB AZUL)-CA00-`: AB se pierde y AA queda con un valor falso.
-   **Qué:** cada sufijo conserva su código y su propio valor; entre sufijo
-   y sufijo va el `-` (como en el archivo aceptado, arriba). Si un sufijo no
-   se puede delimitar (paréntesis sin cerrar, un `(` dentro del valor), no
-   se genera: error que diga qué producto y qué sufijo. **Por la familia:**
-   espacio entre sufijos, nada entre sufijos, coma, dos guiones, paréntesis
-   dentro del valor, paréntesis sin cerrar; en `[SBT]` y en el sufijo del
-   ítem.
-2. **D2: (b), por evidencia.** En el archivo que el MARIA aceptó el kilo
-   neto está al centésimo con tres decimales (el tercero en 0) e igual a la
-   cantidad estadística; la versión rechazada justo antes los tenía
-   distintos en el milésimo. Con la estadística en kilos, `QARTKGRNET` sale
-   al centésimo (`465.130`) y `QARTUNTEST` igual (`465.13`). Prueba con un
-   kilo neto de milésimo 5 (el caso de medio centavo) y corré el sabotaje
-   del redondeo (`ROUND_HALF_EVEN`) con un patrón que aparezca una sola vez.
-3. **Palabras de cuenta dentro de otras palabras.** Causa:
-   `_PALABRAS_DE_CUENTA` busca `BIC\b`, `IBAN`, `BANK`… sin borde adelante:
-   «ARABIC TRADING 123» se toma por cuenta y la tributaria no sale. **Qué:**
-   palabras enteras. **Familia:** una palabra que contenga cada una de las
-   de la lista, y las mismas solas, que siguen siendo cuenta.
-4. **El control de grupo compara la unidad estadística cruda** (`1`, `01`,
-   `kg` son la misma y dan error). Comparar por código, con
-   `get_unidad_codigo` o el equivalente de estadística.
-5. **D6 entra acá (decidido por la PM):** una unidad que no se reconoce no
-   sale 07 en silencio: aviso con la unidad leída, como el de «Unidad de
-   medida». Es la misma familia del punto 5 (m² salía 07). No cambies el
-   código que sale: sólo el aviso.
+`test_excel2` no reprodujo: pasó en 23–24 s contra el tope de 30. Es de
+entorno, como dijiste.
 
-**Queda como está (decidido por la PM):** el PDF no trae la unidad; el
-usuario la elige en el panel del despachante y ya sale el aviso. Leerla del
-PDF va al roadmap cuando haya un PDF real que la necesite. El mensaje de
-kilos con sub-ítems lo resolvés en MARIA-8.
+Lo que queda va a **MARIA-9** (abajo), antes de SEPARADORES-1 y antes de
+que esto se publique.
+
+## Respuestas a tus D9–D11 (MARIA-7/8)
+
+- **D9: (a).** El texto libre no genera. Tu ejemplo de mi herramienta es
+  mío: ya estaba rota antes (le falta el CUIT del despachante y pide EC02).
+  La arreglo yo; vos no la tocás.
+- **D10: (a).** Palabra entera. La regresión que trae (nombres pegados de
+  menos de 16 dígitos, como `CITIBANK 123456789`) queda como riesgo
+  anotado.
+- **D11: (b)**, en MARIA-9. Mi adversario encontró más que la falta de
+  aviso: hay una regresión.
 
 ## Qué pasó el 2026-10-24
 
@@ -122,62 +107,52 @@ Todas las líneas terminan en CRLF (una línea sin CR: «falta carácter de fin
 dentro de los valores de los sufijos: van espacios. El guión que separa un
 sufijo del otro (`)-`) sí.
 
-## Tarea 1 — MARIA-7: lo que el MARIA rechazó el 24/10
+## Ahora — VALOR-1 (seguí), después MARIA-9, después SEPARADORES-1
 
-En `proyecto_maria/core/maria_generator.py` y lo que lo alimenta:
+### MARIA-9: el sufijo de la operación y sus errores en pantalla
 
-1. **CRLF en todas las líneas**, también las que se reescriben después de
-   armar el texto. Prueba: ninguna línea del TXT termina sin `\r`.
-2. **Identificador corto.** `IDSO`, `IDDT` y la raíz de `IARTESPAPU` no se
-   arman con el número de factura completo. Averiguá en el código y en
-   `docs/` el largo máximo; si no está, usá 8 caracteres (lo que el MARIA
-   aceptó) y anotalo como D para el despachante. El número completo sigue en
-   `NRO.REF.INTERNA`.
-3. **`CDDTAGR` obligatorio:** sin CUIT del despachante no se genera; error
-   claro que diga dónde cargarlo. Hoy se omite la línea en silencio.
-4. **`LDVDREFDOC` es el número real de la factura**, con el ancho fijo de
-   hoy.
-5. **Unidades:** la declarada es la de la factura (m² → `03`, no `07`); con
-   unidad estadística en kilos (`01`), `QARTUNTEST` = `QARTKGRNET` redondeado
-   igual (error 2122 del MARIA). La unidad estadística por posición la
-   resuelve SUFIJOS-1 más adelante; acá, que el usuario la pueda elegir y
-   que kilos dé cantidad = kilo neto.
-6. **Caracteres:** en sufijos y textos libres, sólo letras, números y
-   espacios; lo demás se cambia por espacio y se avisa.
-7. **`IDTRIB-PROVEEDOR`:** un número de cuenta bancaria no es identificación
-   tributaria; si lo que hay parece cuenta (o no hay), no se inventa: aviso.
-8. **Fechas año/mes/día** (Emi, 2026-10-24): una fecha escrita `2026/08/07`
-   en la factura es el 7 de agosto de 2026 y en el TXT sale `07/08/2026`; el
-   24/10 salió `08/07/2026`. Con el año adelante, el orden es siempre
-   año/mes/día. Si el orden no se puede saber (año al final y día y mes
-   ambos de 12 o menos), se le pregunta al usuario; no se adivina. Prueba:
-   sintéticos con `2026/08/07`, `2026-08-07`, `07/08/2026` y uno ambiguo.
-9. **Fecha de inicio de actividad** (sumado por la PM el 2026-10-24, al
-   revisar CLIENTE-1). El alta del cliente la guarda `AAAA-MM-DD` (campo de
-   fecha del navegador) y el generador la copia tal cual al `MCPL` de
-   `FECHA INIC.ACTIV` (`maria_generator.py`, bloque 6). Los dos golden
-   tienen `DD/MM/AAAA`. Sale `DD/MM/AAAA`; si ya viene así, igual; si no se
-   puede leer como fecha, error claro que diga dónde corregirla (no se
-   adivina). Prueba: `2015-03-01`, `01/03/2015` y un texto que no es fecha.
+Es lo que dejó la revisión de MARIA-7/8. Cada punto con su sintético y su
+sabotaje.
 
-**No se toca:** el valor de la fecha de emisión (Emi: «no se corrige»): el
-punto 8 la lee bien, no la cambia.
+1. **Un sufijo general que no se usa frena el TXT (regresión).** Si todos
+   los sub-ítems o renglones traen su sufijo propio válido y
+   `sbt_sufijo_valor` es texto libre («ROJO»), en `284b029` se generaba con
+   los propios; hoy `/generate_maria` da 400 («Sufijo de valor de la
+   operación: «ROJO» no se puede separar…»). Además,
+   `/generate_maria/avisos` responde 200 sin anticiparlo.
+   - **Causa:** el general se analiza aunque no se use.
+   - **Qué:** se valida sólo si algún sub-ítem o renglón lo toma; cuando
+     lo toma y es inválido, `/avisos` lo anticipa.
+   - **Familia:** sub-ítems a mano, renglones por API, mezcla de ítems con y
+     sin propio.
+2. **La pantalla v2 no lleva los errores de sufijo a su lugar.**
+   - **Causa:** `static/v2/screens/finalize.js:401` sólo reconoce
+     `^Item N, sub-ítem M: ` y `:410` sólo los que dicen «sbt». Los mensajes
+     nuevos («Sufijo de valor de la operación: …», «Sufijo de valor del
+     ítem N, sub-ítem M: …», «…del renglón N…») caen como texto genérico.
+   - **Qué:** cada uno se muestra donde se corrige: bajo el campo del
+     sufijo de la operación o en el sub-ítem.
+   - **Prueba:** de pantalla, con el error forzado (`page.route`).
+3. **Bordes sin prueba.** Mutaciones de mi adversario que siguen en verde,
+   cada una con su caso y su sabotaje:
+   - el tope de 120 (120 pasa, 121 no);
+   - `CA100-`;
+   - `A(X)-`;
+   - `;` como separador;
+   - las unidades numéricas del aviso (`05`, `99`).
+4. **Mensaje engañoso:** con dos renglones de la misma posición en kilos y
+   uno solo de 0,004 kg, el error dice «los renglones 1 y 2 son tan chicos…»
+   (`maria_generator.py` ~1304). Tiene que nombrar sólo el chico.
 
-**Puertas:** rojo antes con un sintético que reproduzca cada punto; los dos
-golden siguen idénticos salvo lo que esta tarea cambia a propósito (decí
-qué y por qué); suite completa; e2e de la CI (`ONBOARDING-DEV.md`).
+**Riesgos que no arreglás (anotalos si los tocás):**
+- doble redondeo de kilos (`.3f` y después el centésimo: `465.1249` sale
+  `465.13`);
+- `cantidad=2.675` sale `2.67` sola y `2.68` como renglón de un ítem unido.
 
-## Tarea 2 (apenas entregues) — MARIA-8: subítems por posición
+Van a M9 cuando Emi ordene los hallazgos de Argon (9.2 es la misma
+familia).
 
-Cada renglón de la factura es un subítem con su FOB, cantidad, precio,
-kilos y sufijos propios. Los renglones con la misma posición SIM, origen,
-procedencia y estado van en un solo ítem (`CARTSBITEM=S`). Las sumas del
-ítem (FOB, cantidad, kilos, cantidad estadística) cierran exactas al
-centavo; el redondeo sobrante va al subítem más grande. Prueba: un sintético
-de un ítem con al menos 12 subítems de dos anchos y tres colores, y otro con
-dos posiciones distintas (dos ítems).
-
-## Tarea 3 — VALOR-1, y 4 — SEPARADORES-1
+### VALOR-1 y SEPARADORES-1
 
 Están en `ROADMAP.md`, Fase 1b. Antes de arrancarlas, leé la decisión del
 2026-10-24 en `DECISIONS.md`: el reparto ítem por ítem de los ajustes queda

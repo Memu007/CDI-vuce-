@@ -35,10 +35,10 @@ cada una con su adversario. El veredicto va acá arriba.
 - **D8: (b).** `landing.html:139` queda «NCM», igual que D6. Si la
   aceptación de PA-1b pide algo, va con el veredicto.
 - **D12:** la contesto con el veredicto de EXCEL-3b.
-- **Ahora:** ESTUDIO-1 espera a que yo integre MARIA-7. Mientras tanto,
-  hacé **CLIENTE-1b** (abajo, «Más adelante»), que no depende de eso. Cuando
-  integre MARIA-7 te despierto: terminás la pieza en curso y seguís con
-  ESTUDIO-1. Si el veredicto trae una devolución, esa va primero.
+- **Ahora:** terminá **CLIENTE-1b** (abajo, «Más adelante») y seguí con
+  ESTUDIO-1. MARIA-7 ya está integrada en mi rama (`1fa0b6e`, 01:00 UTC):
+  traela con `merge` antes de ESTUDIO-1. Si un veredicto trae una
+  devolución, esa va primero.
 
 ## Veredicto de PA-1 + D3 (2026-10-24): aceptada
 
