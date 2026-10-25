@@ -340,6 +340,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-10-25 01:57 UTC: sin entregas nuevas. La Dev MARIA ya trabaja en VALOR-1b (commits locales, informe en curso); la técnica, en el informe de EXCEL-3c y CLIENTE-1b. Contexto de las dos sesiones bien.
+
 2026-10-25 00:58 UTC: VALOR-1 vuelve como VALOR-1b (cuentas viejas después de «Usarlo», aviso del seguro, D13 b con base FOB de la factura, ajustes no numéricos por API). D14 (a). Cuatro preguntas nuevas al despachante en `PREGUNTAS-DESPACHANTE.md` (IDSO, sufijos con decimales, base del seguro, CIF/CIP). La Dev MARIA sigue con VALOR-1b y después MARIA-9; la técnica, con EXCEL-3c.
 
 2026-10-25 00:47 UTC: PRUEBAS-1 + PA-1b aceptadas con nota e integradas (`e924b29`, merge `4f00636`); la técnica sigue en EXCEL-3c. VALOR-1 de la Dev MARIA (`3352a01`, informe `23ba183`) en revisión: dos adversarios y sus sabotajes corriendo; D13 y D14 se contestan con el veredicto. Arreglé mi `auditoria_generador_sintetico.py` (`d234fe2`).
