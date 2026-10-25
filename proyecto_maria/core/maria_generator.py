@@ -2025,9 +2025,14 @@ def supuestos_declarados(
                 gid = item.get("grupo_id")
                 if gid is None:
                     sufijos.append((f" del ítem {idx}", item["sufijo"]))
-                elif gid not in grupos:
-                    grupos.add(gid)
-                    sufijos.append((f" del grupo {gid}", item["sufijo"]))
+                else:
+                    try:
+                        nuevo = gid not in grupos
+                    except TypeError:
+                        continue  # lo dice el generador
+                    if nuevo:
+                        grupos.add(gid)
+                        sufijos.append((f" del grupo {gid}", item["sufijo"]))
         for donde, sufijo in sufijos:
             avisos.extend(_aviso_de_sufijo(donde, sufijo))
         # Si alguno lo usa y no se puede separar, el generador frena: se dice
