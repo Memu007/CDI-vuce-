@@ -27,6 +27,46 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
+## Veredicto de ESTUDIO-1 (2026-10-25)
+
+Sobre `5468581` (código `c992715`, informe `c820c74`). El detalle está en
+`REPRODUCCION-ESTUDIO-1-2026-10-25.md`. Re-corrí `test_estudio1.py` (26
+passed) y `estudio1.sh` (37 ROJO, 0 sin rojo), más 8 negativos míos. Mi adversario fue
+Opus, alto: no encontró cómo entrar a lo ajeno ni cómo perder datos.
+
+- **ESTUDIO-1: aceptada.** Se suma **ESTUDIO-1b**, que va antes de publicar.
+- **No integro todavía.** `5468581` trae EXCEL-3d, y su H1 sigue abierta.
+  Integro todo junto cuando acepte EXCEL-3e.
+- **D23: (b)**, en ESTUDIO-1b.
+
+### ESTUDIO-1b (después de CLIENTE-1c; antes de publicar ESTUDIO-1)
+
+1. **D23 (b).** Hay que anotar cuándo se generó con el CUIT del perfil, en la
+   tabla chica aparte que propusiste. La preselección es lo último que se
+   usó, estudio o perfil.
+   - Mi adversario lo vio más ancho. Con un solo estudio que nunca se usó,
+     ese estudio gana sobre el perfil.
+   - Y elegir «CUIT de mi perfil» en la operación N no cuenta: en la N+1
+     vuelve el estudio. Lo reprodujo en Chromium.
+   - La prueba cubre los tres casos:
+     - perfil después de un estudio;
+     - perfil elegido a mano en la pantalla, con la operación siguiente
+       sin tocar el selector;
+     - un estudio único recién cargado sin ningún uso previo del perfil:
+       ahí sí gana el estudio.
+2. **`estudio_id` escrito como vacío.** Hoy `"null"`, `"None"`, `"N/A"` y
+   `"  "` caen al perfil en silencio, por `_vacio_escrito`. Contradice el
+   docstring de `_estudio_elegido`.
+   - Sólo `""`, y la falta del campo, son «sin estudio».
+   - Lo demás que no es de la cuenta da 400.
+3. **Nombre del estudio.** El alta rechaza un nombre que se ve vacío o al
+   revés: espacios de ancho cero, controles de dirección (U+200B–U+200F,
+   U+202A–U+202E, U+2066–U+2069) y un nombre que queda vacío sin ellos.
+
+Cada punto con su sabotaje en rojo. Riesgos que anoto, no los arregles:
+- `cuit_valido` acepta `00000000000`; ya estaba en la base.
+- Un estudio borrado mientras se genera sale igual en ese TXT.
+
 ## Veredicto de EXCEL-3d (2026-10-25)
 
 Sobre `5468581` (informe `470fc48`). El detalle y las salidas están en
@@ -43,9 +83,8 @@ entrega.
   que en 3d. Lo que dejó entrar al hijo fue 3c. Las filas sin leer se ven en
   el semáforo. Sólo pido que la docstring de `test_excel3.py:1046` diga a qué
   SHA llama «la base». Va en el próximo commit de código.
-- **No integro todavía.** ESTUDIO-1 es ancestro de `5468581`. EXCEL-3e,
-  CLIENTE-1b y ESTUDIO-1 entran juntas cuando acepte ESTUDIO-1, que reviso
-  ahora.
+- **No integro todavía.** EXCEL-3d, CLIENTE-1b y ESTUDIO-1 entran juntas
+  cuando acepte EXCEL-3e.
 
 ### EXCEL-3e: lo que vuelve (va primero, antes que CLIENTE-1c)
 
@@ -113,10 +152,10 @@ vuelta cambia.
 ### Orden
 
 1. EXCEL-3e.
-2. CLIENTE-1c, que ya empezaste; ESTUDIO-1 lo reviso yo y D23 va con su
-   veredicto.
-3. EXCEL-3f.
-4. GUARDAR-2.
+2. CLIENTE-1c, que ya empezaste.
+3. ESTUDIO-1b.
+4. EXCEL-3f.
+5. GUARDAR-2.
 
 ## Después — CLIENTE-1c
 
