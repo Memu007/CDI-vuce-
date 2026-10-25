@@ -524,3 +524,46 @@ def test_con_la_letra_equivocada_la_nota_no_dice_que_la_posicion_no_esta():
         "await D.listo(); salida.nota = D.notaDe(CDI.state.items[0], 0);")
     assert salida == {"nota": "En el arancel de ARCA del 07/10/2026 la letra de control de esta "
                               "posición es F: revisá la posición."}
+
+
+# ------------------------------------------- bordes de la autorrevisión
+
+
+def test_si_junto_con_el_de_la_operacion_no_entra_no_se_pierde_lo_de_la_operacion():
+    # Lo que trae la operación (CA00, PC) no se cae para que entre la
+    # propuesta: el producto va con el de la operación y el servidor avisa.
+    op = "CA00-PC(" + "X" * 100 + ")-"
+    salida = _despachante(
+        f"CDI.state.operacion.sbt_sufijo_valor = {json.dumps(op)};"
+        f"CDI.state.items = [{json.dumps(_producto('ACME', 'X1'))}];"
+        "await D.listo(); salida.sufijo = D.sufijoDe(CDI.state.items[0], 0);")
+    assert salida == {"sufijo": ""}
+
+
+def test_en_un_grupo_la_celda_no_deja_escribir_un_sufijo_por_producto():
+    # Un grupo sale con un solo sufijo: una celda por producto dejaría
+    # escribir sufijos distintos y el TXT no se genera.
+    salida = _despachante(
+        "CDI.escapeHtml = s => s;"
+        f"CDI.state.items = [{json.dumps(dict(_producto('ACME', 'X1'), grupo_id=1))},"
+        f" {json.dumps(dict(_producto('ACME', 'X2'), grupo_id=1, sufijo='AA(G)-'))}];"
+        "await D.listo(); salida.sin = D.celdaSufijo(CDI.state.items[0], 0);"
+        " salida.con = D.celdaSufijo(CDI.state.items[1], 1);")
+    assert "<input" not in salida["sin"] and "<input" not in salida["con"]
+    assert "Va el de la operación para todo el grupo." in salida["sin"]
+    assert "Va el del grupo: AA(G)-" in salida["con"]
+
+
+def test_una_ncm_de_ocho_no_se_dice_fuera_del_arancel():
+    avisos = _avisos([dict(LONA, pieza="3920.10.10", sufijo=PROPIO)])
+    assert ("Posición 3920.10.10 (ítem 1): no es una posición SIM completa (11 dígitos y la letra "
+            "de control). Los sufijos de valor y la unidad estadística no se completan ni se "
+            "controlan: cargalos a mano con el despachante.") in avisos
+    assert not any("no está en el" in a for a in avisos)
+    salida = _despachante(
+        "CDI.api = async () => ({ ok: true, json: async () => ({ fuente: 'arancel de ARCA del 07/10/2026',"
+        " items: [{ posicion: '3920.10.10', en_la_tabla: false, sufijo: '', faltan: [] }] }) });"
+        f"CDI.state.items = [{json.dumps(_producto('ACME', pieza='3920.10.10'))}];"
+        "await D.listo(); salida.nota = D.notaDe(CDI.state.items[0], 0);")
+    assert salida == {"nota": "No es una posición SIM completa (11 dígitos y la letra de control): "
+                              "cargalo a mano."}

@@ -13,7 +13,9 @@
 # la NCM primero, sanea y recorta el texto, dice si falta la tabla y la letra
 # que corresponde. En la pantalla: la propuesta se suma a la de la operación,
 # no pasa al producto que queda en su lugar, no se pide dos veces y la nota
-# dice si falta la tabla o es la letra. Cada sabotaje se aplica en un
+# dice si falta la tabla o es la letra; si junto con el de la operación pasa
+# del tope no se pierde lo de la operación, un grupo no tiene celda por
+# producto y una NCM de 8 no se dice fuera del arancel. Cada sabotaje se aplica en un
 # worktree descartable, corre los casos y tiene que dar ROJO con el motivo
 # esperado. Si un patrón no se encuentra, el script sale con error.
 # La pantalla (pantalla_sufijos1.js) necesita la app levantada: va aparte,
@@ -195,6 +197,22 @@ caso "nota_sin_letra" "FAILED $T::test_con_la_letra_equivocada_la_nota_no_dice_q
 # 29. con sub-ítems, la estadística de la tabla va sola al pedido
 reemplazar $D '        const fila = it && Array.isArray(it.subitems) && it.subitems.length ? null : tabla[posicionDe(it)];' '        const fila = tabla[posicionDe(it)];'
 caso "subitems_con_estadistica_de_la_tabla" "FAILED $T::test_con_sub_items_la_estadistica_de_la_tabla_no_va_sola"
+
+# 30. junto con el de la operación pasa del tope y se cae lo de la operación
+reemplazar $D "        return junto.length <= 120 ? junto : '';" "        return junto.length <= 120 ? junto : prop.map(p => p.texto).join('-') + '-';"
+caso "tope_pierde_la_operacion" "FAILED $T::test_si_junto_con_el_de_la_operacion_no_entra_no_se_pierde_lo_de_la_operacion"
+
+# 31. en un grupo, una celda por producto
+reemplazar $D '        if (it.grupo_id) {' '        if (false) {'
+caso "grupo_con_celda_por_producto" "FAILED $T::test_en_un_grupo_la_celda_no_deja_escribir_un_sufijo_por_producto"
+
+# 32. una NCM de 8 se dice fuera del arancel (en el servidor)
+reemplazar $G '        if not sufijos_arca.es_sim(posicion):' '        if False:'
+caso "ncm_de_ocho_fuera_en_el_servidor" "FAILED $T::test_una_ncm_de_ocho_no_se_dice_fuera_del_arancel"
+
+# 33. una NCM de 8 se dice fuera del arancel (en la nota)
+reemplazar $D "            if (!/^[0-9]{11}[A-Z]?\$/.test(posicionDe(it).replace(/[.\\s]/g, ''))) {" '            if (false) {'
+caso "ncm_de_ocho_fuera_en_la_nota" "FAILED $T::test_una_ncm_de_ocho_no_se_dice_fuera_del_arancel"
 
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
 echo "OK: los $CASOS sabotajes dan rojo por la razón esperada"
