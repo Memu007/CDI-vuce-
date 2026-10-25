@@ -126,11 +126,26 @@ sabotaje $D "una base que no responde sale con el traceback" \
   'except Exception as e:  # noqa: BLE001' 'except ZeroDivisionError as e:  # noqa: BLE001' \
   "${B}test_una_base_que_no_responde_no_muestra_la_clave"
 sabotaje $D "el error del driver muestra la clave" \
-  ', url.password),' ', None),' \
+  '+ _sin_clave(f"{type(e).__name__}: {e}", secretos, host)' '+ f"{type(e).__name__}: {e}"' \
   "${B}test_si_el_error_de_la_base_nombra_la_clave_no_se_muestra[simple]"
 sabotaje $D "se tapa sólo la clave tal cual, no la escapada" \
-  'for forma in {clave, quote(clave, safe=""), quote_plus(clave)}:' 'for forma in {clave}:' \
+  'formas |= {crudo, quote(crudo, safe=""), quote_plus(crudo)}' 'formas |= {crudo}' \
   "${B}test_si_el_error_de_la_base_nombra_la_clave_no_se_muestra[escapada]"
+sabotaje $D "se nombra la base con la URL escrita, como antes" \
+  'return lugar + partes.path, host,' 'return base, host,' \
+  "${B}test_una_base_mal_armada_que_no_responde_no_muestra_la_clave[arroba]"
+sabotaje $D "se tapa sólo la clave que ve SQLAlchemy" \
+  'secretos = {usuario, *re.split(r"[:;@]", usuario)}' 'secretos = set()' \
+  "${B}test_si_el_error_repite_una_base_mal_armada_no_se_ve_la_clave[punto-y-coma]"
+sabotaje $D "lo de antes del «@» se tapa entero, no por partes" \
+  'secretos = {usuario, *re.split(r"[:;@]", usuario)}' 'secretos = {usuario}' \
+  "${B}test_si_el_error_repite_una_base_mal_armada_no_se_ve_la_clave[arroba]"
+sabotaje $D "la clave en la consulta no se tapa" \
+  $'    secretos |= {v for _, v in parse_qsl(partes.query, keep_blank_values=True)}\n' '' \
+  "${B}test_si_el_error_repite_una_base_mal_armada_no_se_ve_la_clave[en-la-consulta]"
+sabotaje $D "una clave corta tapa el host del error" \
+  '        texto = texto.replace(host, "\0")' '        pass' \
+  "${B}test_una_clave_corta_no_tapa_el_host_en_el_error"
 
 git checkout -q -- proyecto_maria/ scripts/datos/
 echo "sabotajes sin rojo: $FALLAS"
