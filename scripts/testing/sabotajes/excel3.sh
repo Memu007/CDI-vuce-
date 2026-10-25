@@ -308,7 +308,9 @@ sabotaje $M "3d el flete dudoso no se avisa" \
   '                            flete_dudoso.append((_ + 2, cargo))' '                            pass' \
   "${B}un_producto_que_empieza_como_el_flete_con_el_origen_combinado_se_lee_como_flete_avisado[Freight elevator DEMO]"
 sabotaje $M "3d el rótulo dudoso entra como producto común" \
-  '                    dudosa = cargo' '                    pass' \
+  'match(cargo):
+                    dudosa = cargo' 'match(cargo):
+                    pass' \
   "${B}un_cargo_con_palabras_de_mas_no_cambia_el_fob_sin_un_aviso_con_su_fila[Gastos administrativos-origen_rotulo_en_descripcion]"
 sabotaje $M "3d las dudosas no llegan al aviso" \
   '        extras["dudosas"] = dudosas' '        pass' \
@@ -328,6 +330,18 @@ sabotaje $M "3d la descripción copiada cuenta como propia para el flete" \
   '            if sin_ncm_ni_origen and (descripcion_propia or not con_medidas):' \
   '            if sin_ncm_ni_origen and (descripcion or not con_medidas):' \
   "${B}con_la_especificacion_combinada_una_nota_de_flete_en_item_no_saca_al_renglon"
+
+sabotaje $M "3d con la descripción copiada, un texto en Item decide solo" \
+  '            elif descripcion_copiada:' '            elif descripcion_copiada and not cargo:' \
+  "${B}la_copia_de_un_cargo_combinado_con_texto_en_item_no_cambia_el_fob_sin_su_fila[Flete int.-items0-descripcion]"
+sabotaje $M "3d con la descripción copiada, un cargo en Item entra como producto" \
+  '                if not no_es_mercaderia and cargo:' '                if False:' \
+  "${B}un_cargo_no_entra_como_producto_aunque_venga_una_combinada[descripcion-insurance]"
+sabotaje $M "3d con la descripción copiada, un rótulo dudoso en Item entra sin aviso" \
+  'match(cargo):
+                        dudosa = cargo' 'match(cargo):
+                        pass' \
+  "${B}un_cargo_con_palabras_de_mas_no_cambia_el_fob_sin_un_aviso_con_su_fila[Gastos administrativos-descripcion_rotulo_en_item]"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

@@ -5,6 +5,7 @@ items». El sintético (`tests/proforma_china_sintetica.py`) tiene su misma
 forma con datos inventados; la real no entra al repositorio.
 """
 import os
+import re
 
 import pytest
 from fastapi.testclient import TestClient
@@ -1089,3 +1090,20 @@ def test_todo_renglon_que_entra_sin_precio_se_avisa_con_su_fila(filas, combinar,
     data = _leer_combinado([PROFORMA] + filas, combinar)
     assert [i["valor_unitario"] for i in data["items"]][1:] == [0] * (len(filas) - 1), data["items"]
     assert f"entraron sin precio ({sin_precio})" in _avisos(data), data["avisos_mapeo"]
+
+
+# Adversario de EXCEL-3d: con la descripción combinada, un texto propio en
+# Item que no es un número («A2», «#3») no vuelve producto común a la copia.
+@pytest.mark.parametrize("combinar", [("B3:B4",), ("B3:B4", "C2:C4")], ids=["descripcion", "descripcion_y_origen"])
+@pytest.mark.parametrize("items", [("A1", "A2"), ("#2", "#3"), ("2a", "2b"), ("(2)", "(3)"), (2, "-")])
+@pytest.mark.parametrize("rotulo", ["Flete int.", "Gastos administrativos", "Insurance", "Insurance as per policy"])
+def test_la_copia_de_un_cargo_combinado_con_texto_en_item_no_cambia_el_fob_sin_su_fila(rotulo, items, combinar):
+    """Cada fila del cargo combinado queda sin leer, es el flete o entra con
+    un aviso que nombra su fila: ninguna sube el FOB en silencio."""
+    filas = {3: [items[0], rotulo, None, 1, 1050, 1050], 4: [items[1], None, None, 1, 2450, 2450]}
+    data = _leer_combinado([PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500]] + list(filas.values()), combinar)
+    fuera = set(data["filas_descartadas_numeros"]) | set(data["operacion"].get("filas_excel_flete", []))
+    entraron = [f for f in filas if f not in fuera]
+    assert _total(data["items"]) == 3500 + sum(filas[f][5] for f in entraron), (data["items"], fuera)
+    for f in entraron:
+        assert re.search(rf"\bfila {f} \(«", _avisos(data)), (f, data["avisos_mapeo"])
