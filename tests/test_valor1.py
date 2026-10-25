@@ -310,7 +310,7 @@ def _pantalla(op, despues, valor=None, salida_propia=False):
     nombres = ["ajusteMalEscrito", "importeEscrito", "cuentasViejas", "enlazarValor", "otroDeducir",
                "usarDescuento", "calcularSeguro", "seguroSinLeer", "pintarValor", "firmaDelPedido",
                "buildMariaRequest", "numeroDeFactura", "toNumber", "subitemsDelPedido", "ajusteDelPedido",
-               "montoDelPedido"]
+               "montoDelPedido", "dejarSeguro"]
     codigo = ("let ultimoValor = null; let cuentasCon = null; let avisosSeq = 0; let valorEnlazado = false;\n"
               "let lastValidation = null; let semaforos = 0;\n"
               "CDI.semaforo = { refresh() { semaforos++; } };\n"
