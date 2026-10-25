@@ -32,18 +32,21 @@ def _url_async(url: str) -> str:
     for prefijo in ("postgres://", "postgresql://"):
         if url.startswith(prefijo):
             return "postgresql+asyncpg://" + url[len(prefijo):]
+    if url.startswith("sqlite://"):
+        return "sqlite+aiosqlite://" + url[len("sqlite://"):]
     return url
 
 
 def clasificar(filas):
-    """De (id, fecha) a los ids con «None» y los ids con otra fecha que no sirve."""
+    """De (id, fecha) a las filas (id, fecha) con «None» y los ids con otra
+    fecha que no sirve."""
     con_none, no_sirven = [], []
     for cid, fecha in filas:
         texto = (fecha or "").strip()
         if not texto:
             continue
         if texto == "None":
-            con_none.append(cid)
+            con_none.append((cid, fecha))
             continue
         try:
             fecha_inicio_actividad(texto)
@@ -61,15 +64,18 @@ async def revisar(url: str, arreglar_none: bool) -> dict:
             ))).all()
             con_none, no_sirven = clasificar(filas)
             arreglados = 0
-            if arreglar_none and con_none:
-                # Sólo las que siguen diciendo «None» al momento de escribir.
-                resultado = await conn.execute(text(
-                    "UPDATE clients SET fecha_inic_activ = '' WHERE TRIM(fecha_inic_activ) = 'None'"
-                ))
-                arreglados = resultado.rowcount
+            if arreglar_none:
+                # Las informadas, por id, y sólo si siguen con lo que se leyó.
+                for cid, fecha in con_none:
+                    resultado = await conn.execute(text(
+                        "UPDATE clients SET fecha_inic_activ = '' "
+                        "WHERE id = :id AND fecha_inic_activ = :fecha"
+                    ), {"id": cid, "fecha": fecha})
+                    arreglados += resultado.rowcount
     finally:
         await engine.dispose()
-    return {"con_none": con_none, "no_sirven": no_sirven, "arreglados": arreglados}
+    return {"con_none": [cid for cid, _ in con_none], "no_sirven": no_sirven,
+            "arreglados": arreglados}
 
 
 def main(argv=None) -> int:
