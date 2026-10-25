@@ -206,3 +206,13 @@ ARCA del 07/10/2026 (`docs/pm/datos/`), en una tabla local con su fecha a
 la vista; lo que no está se marca para el despachante. VUCE va en una pieza
 aparte cuando Emi guarde una respuesta real. Se le cuenta a Emi; se puede
 revertir.
+
+## 2026-10-25 — Un ajuste ilegible frena el seguro calculado; ceros adelante, aparte (PM, D20 y D21 de SEPARADORES-1b)
+
+Decidido por la PM. D20 (a): con el seguro calculado por el sistema, un
+ajuste que no se lee da 400 hasta corregirlo o elegir «Dejar el seguro como
+está»; sin el seguro calculado, se dice en las cuentas y no frena. D21 (b):
+el cero adelante y los grupos de miles mal formados en la factura, el
+«en blanco» distinto entre pantalla y servidor y la pregunta que sugiere
+tres decimales van en SEPARADORES-1c, después de SUFIJOS-1. Son de antes o
+piden saltearse la revisión.
