@@ -309,7 +309,9 @@ function sembrarFecha(clienteId, fecha) {
     buffer: Buffer.from('CUIT,RAZON SOCIAL,FECHA INICIO ACTIVIDADES\n' + cuitSin + ',Importadora Inventada Sin ' + id + ',01/06/2018\n') });
   await page.locator('#importPreviewStep').waitFor({ state: 'visible', timeout: 15000 })
     .catch(() => falla('la segunda importación no llegó a la vista previa'));
-  if (await page.locator('#importPreviewFechas').isVisible()) falla('sin fechas malas igual aparece el aviso de fechas');
+  // isVisible() no sirve: un <ul> vacío no ocupa lugar y Playwright lo da por oculto aunque no lo esté.
+  if (!(await page.locator('#importPreviewFechas').evaluate(el => el.hidden && el.children.length === 0)))
+    falla('sin fechas malas igual aparece el aviso de fechas');
   console.log('OK sin fechas malas no hay aviso de fechas');
 
   if (process.argv[2]) await page.screenshot({ path: process.argv[2], fullPage: true });
