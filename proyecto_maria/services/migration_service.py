@@ -242,6 +242,7 @@ def analyze_migration_file(
     sheet_summaries: list[dict[str, Any]] = []
     rows: list[dict[str, Any]] = []
     omitted: list[dict[str, Any]] = []
+    invalid_dates: list[dict[str, Any]] = []
     total_rows = 0
 
     for sheet in sheets:
@@ -271,7 +272,7 @@ def analyze_migration_file(
             for offset in range(len(sheet.frame)):
                 omitted.append(_omitted(sheet.name, offset + 2, "missing_cuit_column"))
             continue
-        _collect_rows(sheet, mapping, rows, omitted)
+        _collect_rows(sheet, mapping, rows, omitted, invalid_dates)
 
     return _build_preview(
         content=content,
@@ -282,6 +283,7 @@ def analyze_migration_file(
         rows=rows,
         omitted=omitted,
         existing_clients=existing_clients,
+        invalid_dates=invalid_dates,
     )
 
 
@@ -415,6 +417,7 @@ def _collect_rows(
     mapping: Mapping[str, str],
     rows: list[dict[str, Any]],
     omitted: list[dict[str, Any]],
+    invalid_dates: list[dict[str, Any]] | None = None,
 ) -> None:
     for offset, (_, source) in enumerate(sheet.frame.iterrows(), start=2):
         values = {
@@ -429,6 +432,12 @@ def _collect_rows(
             omitted.append(_omitted(sheet.name, offset, reason, raw_cuit))
             continue
         values["cuit"] = cuit
+        date_column = mapping.get("fecha_inic_activ")
+        if invalid_dates is not None and date_column is not None and not values.get("fecha_inic_activ"):
+            # La fecha que no sirve queda vacía y se avisa con la fila (CLIENTE-1c).
+            raw_date = _cell_text(source.get(date_column, ""), limit=32)
+            if raw_date:
+                invalid_dates.append({"sheet": sheet.name, "row": offset, "cuit": cuit, "value": raw_date})
         invalid_fields: list[str] = []
         if not values.get("nombre"):
             invalid_fields.append("nombre")
@@ -453,7 +462,9 @@ def _build_preview(
     rows: list[dict[str, Any]],
     omitted: list[dict[str, Any]],
     existing_clients: Iterable[Any],
+    invalid_dates: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
+    invalid_dates = list(invalid_dates or [])
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for row in rows:
         grouped[row["cuit"]].append(row)
@@ -552,6 +563,7 @@ def _build_preview(
         "existing": len(found_existing),
         "conflicts": len(conflicts),
         "omitted": len(omitted),
+        "fechas_que_no_sirven": len(invalid_dates),
         "staged": len(staged),
         # Alias explicitos para que el contrato HTTP sea autoexplicativo.
         "new_clients": len(new_clients),
@@ -569,6 +581,7 @@ def _build_preview(
         "existing_clients": found_existing,
         "conflicts": conflicts,
         "omitted": omitted,
+        "fechas_que_no_sirven": invalid_dates,
         "staged_records": staged,
     }
 
@@ -642,7 +655,8 @@ def _field_text(field: str, value: Any) -> str:
             "%d/%m/%y", "%d-%m-%y",
         ):
             try:
-                return datetime.strptime(text, date_format).strftime("%Y-%m-%d")
+                # isoformat rellena el año: strftime("%Y") deja «1-02-01».
+                return datetime.strptime(text, date_format).date().isoformat()
             except ValueError:
                 continue
         return ""

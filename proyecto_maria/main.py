@@ -71,7 +71,7 @@ PROJECT_VERSION = datetime.now().strftime("%Y%m%d%H%M%S")
 from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, importe_escrito, usa_el_sufijo_de_la_operacion
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, importe_escrito, usa_el_sufijo_de_la_operacion, fecha_inicio_actividad
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
     DocumentoNoAdmitido,
@@ -5213,6 +5213,7 @@ def _client_to_dict(c: ClientModel) -> dict:
         "preferred_currency": c.preferred_currency or "",
         "auto_ncm_enabled": bool(c.auto_ncm_enabled) if c.auto_ncm_enabled is not None else True,
         "fecha_inic_activ": c.fecha_inic_activ or "",
+        "fecha_inic_activ_sirve": _fecha_inic_activ_sirve(c.fecha_inic_activ),
         "updated_at": c.updated_at.isoformat() if c.updated_at else None,
     }
 
@@ -5248,6 +5249,27 @@ def _fecha_inic_activ_de_api(raw) -> str:
         return date(anio, mes, dia).isoformat()
     except ValueError:
         raise HTTPException(status_code=400, detail=_FECHA_INIC_ACTIV_ERROR) from None
+
+
+def _fecha_inic_activ_o_vacia(raw) -> str:
+    """CLIENTE-1c. La misma regla que el alta, para lo que llega por la
+    operación o la importación: la fecha que no sirve queda "" en vez de un 400."""
+    try:
+        return _fecha_inic_activ_de_api(raw)
+    except HTTPException:
+        return ""
+
+
+def _fecha_inic_activ_sirve(guardada) -> bool:
+    """CLIENTE-1c. Si la fecha guardada le sirve al TXT: el criterio es el del
+    generador, así la ficha y el TXT no se contradicen."""
+    if not str(guardada or "").strip():
+        return False
+    try:
+        fecha_inicio_actividad(guardada)
+    except ValueError:
+        return False
+    return True
 
 
 def _digits_only(raw: str | None, maxlen: int = 20) -> str:
@@ -6319,6 +6341,9 @@ def _migration_fill_empty(client: ClientModel, record: dict) -> tuple[dict, dict
     applied: dict[str, str] = {}
     for source_field, model_field in _MIGRATION_CLIENT_FIELDS.items():
         incoming = str(record.get(source_field) or "").strip()
+        if model_field == "fecha_inic_activ":
+            # Un lote viejo puede traer una que no sirve (CLIENTE-1c).
+            incoming = _fecha_inic_activ_o_vacia(incoming)
         current = getattr(client, model_field, None)
         if incoming and not str(current or "").strip():
             before[model_field] = current
@@ -6424,7 +6449,7 @@ async def confirm_client_migration(
                 address=str(record.get("direccion") or "").strip() or None,
                 email=email or None,
                 phone=str(record.get("telefono") or "").strip()[:50] or None,
-                fecha_inic_activ=str(record.get("fecha_inic_activ") or "").strip()[:10] or None,
+                fecha_inic_activ=_fecha_inic_activ_o_vacia(str(record.get("fecha_inic_activ") or "")) or None,
                 is_active=True,
             )
             db.add(new_client)
@@ -7147,11 +7172,12 @@ async def save_client_operation(
         # que estén vacíos. Nunca pisa valores existentes.
         try:
             domicilio_op = str(data.get("comprador_domicilio") or "").strip()
-            fecha_op = str(data.get("comprador_fecha_inic_activ") or "").strip()
+            # Con la regla del alta: la que no sirve no se copia (CLIENTE-1c).
+            fecha_op = _fecha_inic_activ_o_vacia(data.get("comprador_fecha_inic_activ"))
             if domicilio_op and not (client.address or "").strip():
                 client.address = domicilio_op
             if fecha_op and not (client.fecha_inic_activ or "").strip():
-                client.fecha_inic_activ = fecha_op[:10]
+                client.fecha_inic_activ = fecha_op
         except Exception as fill_err:
             logger.warning("[fill-if-empty] No se pudo rellenar ficha: %s", fill_err)
 

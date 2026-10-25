@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-25 · fix: la fecha de inicio de actividad de la operación y de la importación pasa por la regla del alta (CLIENTE-1c)
+
+- **fix(clientes):** la operación copia a la ficha vacía sólo una fecha válida (guardada AAAA-MM-DD); si no sirve no se copia y la operación se guarda igual. La importación deja vacía la fecha que no sirve y la vista previa avisa la fila; el año sale siempre con cuatro cifras.
+- La ficha avisa la fecha guardada con el mismo criterio que el generador del TXT (también con dígitos de ancho completo). El script de datos no muestra la clave de la base en sus errores.
+
 ## 2026-10-25 · feat: los estudios de la cuenta para el CUIT del despachante (ESTUDIO-1)
 
 - **feat(estudios):** en «Mi perfil», «Mis estudios» se cargan los estudios (nombre y CUIT) de la cuenta; en la operación se elige uno, con el último usado o el único ya elegido, y su CUIT va al CDDTAGR. Sin estudio sigue el CUIT del perfil; cada usuario ve, borra y usa sólo los suyos.

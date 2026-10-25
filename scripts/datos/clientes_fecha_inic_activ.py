@@ -18,9 +18,11 @@ import argparse
 import asyncio
 import os
 import sys
+from urllib.parse import quote, quote_plus
 
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
+from sqlalchemy.exc import ArgumentError
 from sqlalchemy.ext.asyncio import create_async_engine
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -36,6 +38,14 @@ def _url_async(url: str) -> str:
     if url.startswith("sqlite://"):
         return "sqlite+aiosqlite://" + url[len("sqlite://"):]
     return url
+
+
+def _sin_clave(texto: str, clave) -> str:
+    """El texto de un error, sin la clave de la base (como viene o escapada)."""
+    if clave:
+        for forma in {clave, quote(clave, safe=""), quote_plus(clave)}:
+            texto = texto.replace(forma, "***")
+    return texto
 
 
 def clasificar(filas):
@@ -87,11 +97,23 @@ def main(argv=None) -> int:
     args = p.parse_args(argv)
     # SQLite crea el archivo que no existe: una ruta mal escrita dejaría una
     # base vacía y un traceback.
-    url = make_url(_url_async(args.base))
+    # Un error de Python mostraría la URL entera, con la clave (CLIENTE-1c).
+    try:
+        url = make_url(_url_async(args.base))
+        url.port  # «:abc» recién falla acá
+    except (ArgumentError, ValueError):
+        p.error("--base no es una URL de base que se entienda "
+                "(por ejemplo postgresql://usuario:clave@host/base)")
     if (url.get_backend_name() == "sqlite" and url.database not in (None, "", ":memory:")
             and not os.path.exists(url.database)):
         p.error(f"la base sqlite no existe: {url.database}")
-    r = asyncio.run(revisar(args.base, args.arreglar_none))
+    try:
+        r = asyncio.run(revisar(args.base, args.arreglar_none))
+    except Exception as e:  # noqa: BLE001 - se informa sin traceback
+        donde = url.render_as_string(hide_password=True)
+        print(_sin_clave(f"No se pudo revisar la base {donde}: {type(e).__name__}: {e}", url.password),
+              file=sys.stderr)
+        return 2
     print(f"Con «None»: {len(r['con_none'])}")
     for cid in r["con_none"]:
         print(f"  {cid}")
