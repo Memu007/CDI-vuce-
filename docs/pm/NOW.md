@@ -1,5 +1,3 @@
-2026-10-25 04:56 UTC: sin entregas nuevas. Las tres sesiones quedaron frenadas por el límite de gasto de la cuenta (se repuso a las 04:50; la vuelta de las 03:55 no corrió). MARIA en VALOR-1c (pruebas en rojo, sin subir; `0928ad4` y `2145d56` son SEPARADORES-1 de antes del veredicto); la técnica en EXCEL-3d (`e24abfa`, sin informe). Las despiertan sus rutinas.
-
 # NOW — CDI
 
 Actualizado: 2026-10-25. Estado vigente; la historia está en Git.
@@ -343,7 +341,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-25 03:00 UTC: sin entregas nuevas. Las dos Devs trabajando (MARIA en VALOR-1c, sin subir; la técnica en EXCEL-3d, rama en `31c9b5a`), contexto de las tres sesiones bajo 130k de 200k.
+2026-10-25 04:56 UTC: sin entregas nuevas. Las tres sesiones quedaron frenadas por el límite de gasto de la cuenta (se repuso a las 04:50; la vuelta de las 03:55 no corrió). MARIA en VALOR-1c (pruebas en rojo, sin subir; `0928ad4` y `2145d56` son SEPARADORES-1 de antes del veredicto); la técnica en EXCEL-3d (`e24abfa`, sin informe). Las despiertan sus rutinas.
 
 2026-10-25 02:58 UTC: VALOR-1b y MARIA-9 (`efa2e08`) aceptadas con nota e integradas (`9f787f6`), sin publicar. Dos adversarios sin TXT equivocado ni regresión de plata; sus sabotajes 23, 31 y 30 en rojo. D18 (b). La Dev MARIA sigue con VALOR-1c, después SEPARADORES-1. La técnica, en EXCEL-3d.
 
