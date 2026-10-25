@@ -43,8 +43,10 @@ PY
 }
 
 FALLAS=0
+CASOS=0
 caso() {  # caso <nombre> <texto que el rojo tiene que mostrar>
   local nombre="$1" espera="$2" salida
+  CASOS=$((CASOS+1))
   salida="$(correr)"
   git checkout -q -- .
   if grep -q "passed" <<<"$salida" && ! grep -q "failed" <<<"$salida"; then
@@ -200,4 +202,4 @@ reemplazar $M '
 caso "avisos_sin_procedencia" "FAILED $T::test_los_avisos_usan_la_procedencia_de_la_operacion"
 
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
-echo "OK: los 26 sabotajes dan rojo por la razón esperada"
+echo "OK: los $CASOS sabotajes dan rojo por la razón esperada"
