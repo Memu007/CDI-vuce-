@@ -780,7 +780,7 @@ def test_los_renglones_que_entran_sin_precio_se_avisan_al_subir(combinar):
     data = _grupo_sin_precio_abajo(combinar)
     assert [i["valor_unitario"] for i in data["items"]] == [1.35, 0, 0], data["items"]
     avisos = " | ".join(data["avisos_mapeo"])
-    assert "2 renglón(es) entraron sin precio" in avisos and "desde la fila 3" in avisos, avisos
+    assert "2 renglón(es) entraron sin precio (filas 3, 4)" in avisos, avisos
 
 
 @pytest.mark.parametrize("combinar", [(), ("I2:I4",)], ids=["nada", "precio_combinado"])
@@ -848,21 +848,6 @@ def test_un_cargo_con_su_rotulo_combinado_no_suma_la_fila_de_abajo(rotulo, combi
     assert data["filas_descartadas_numeros"] == [3, 4], data
 
 
-@pytest.mark.parametrize("producto", ["Freight elevator DEMO", "Shipping cost calculator scale"])
-def test_un_producto_que_empieza_como_el_flete_con_el_origen_combinado_es_mercaderia(producto):
-    """Adversario de EXCEL-3c (R1): con el origen combinado, un producto que
-    empieza con «Freight» no es el flete; se lee como sin combinar."""
-    data = _leer_combinado([
-        PROFORMA,
-        [1, "Widget A", "CN", 10, 5, 50],
-        [2, producto, None, 1, 9000, 9000],
-        [3, "Widget B", None, 2, 10, 20],
-    ], ("C2:C4",))
-    assert [i["descripcion"] for i in data["items"]] == ["Widget A", producto, "Widget B"], data["items"]
-    assert _total(data["items"]) == 9070, data["items"]
-    assert not data["operacion"].get("flete"), data["operacion"]
-
-
 SIN_ORIGEN = ["Part No.", "Specification", "Width(m)", "Length (m)", "QTY", "Unit price",
               "Total Amount(USD)"]
 
@@ -892,3 +877,198 @@ def test_la_copia_de_una_descripcion_combinada_se_decide_como_su_fila():
     ], ("B3:B4",))
     assert [i["descripcion"] for i in data["items"]] == ["LONA DEMO, ancho 2 m x largo 10 m"], data["items"]
     assert data["filas_descartadas_numeros"] == [3, 4], data
+
+
+# ------------------------------- EXCEL-3d (devolución de EXCEL-3c)
+
+# Rótulos que empiezan como un cargo, con palabras de más que ninguna lista
+# conoce. El flete es el piso de la base: se lee como flete, con su fila.
+CARGOS_CON_PALABRAS_DE_MAS = [
+    "Flete int.", "Flete qwerty zx", "Freight blorp", "Shipping cost wxq",
+    "Gastos administrativos", "Gastos zzyzx", "Insurance 40 GBP", "Insurance as per policy",
+    "Seguro abcde", "Handling xyz", "Payment qwerty", "Pago plorf",
+]
+FORMAS_DEL_CARGO = {
+    # forma: (filas 3 y 4 con el rótulo, combinadas)
+    "origen_rotulo_en_descripcion": (lambda r: [[2, "MOUSE DEMO", None, 10, 5, 50], [3, r, None, 1, 1200, 1200]], ("C2:C4",)),
+    "origen_rotulo_en_item": (lambda r: [[2, "MOUSE DEMO", None, 10, 5, 50], [r, None, None, 1, 1200, 1200]], ("C2:C4",)),
+    "descripcion_rotulo_en_item": (lambda r: [[2, None, "China", 10, 5, 50], [r, None, None, 1, 1200, 1200]], ("B2:B4",)),
+    "las_dos_rotulo_en_item": (lambda r: [[2, None, None, 10, 5, 50], [r, None, None, 1, 1200, 1200]], ("B2:B4", "C2:C4")),
+    "sin_combinar_rotulo_en_descripcion": (lambda r: [[2, "MOUSE DEMO", "China", 10, 5, 50], [3, r, None, 1, 1200, 1200]], ()),
+    "sin_combinar_rotulo_en_item": (lambda r: [[2, "MOUSE DEMO", "China", 10, 5, 50], [r, None, None, 1, 1200, 1200]], ()),
+}
+
+
+def _avisos(data):
+    return " | ".join(data["avisos_mapeo"])
+
+
+def _el_cargo_no_cambia_el_fob_sin_nombrar_su_fila(data, fila, rotulo, fob_sin_el, monto):
+    """Lo que pide EXCEL-3d: la fila del cargo queda sin leer, o es el flete
+    leído con su fila, o entra con un aviso que nombra su fila y su rótulo."""
+    op = data["operacion"]
+    if fila in data["filas_descartadas_numeros"]:
+        assert _total(data["items"]) == fob_sin_el, data["items"]
+    elif fila in op.get("filas_excel_flete", []):
+        assert _total(data["items"]) == fob_sin_el and op["flete"] == monto, (data["items"], op)
+        assert f"de la fila {fila}" in _avisos(data), data["avisos_mapeo"]
+    else:
+        assert _total(data["items"]) == fob_sin_el + monto, data["items"]
+        assert f"fila {fila} («{rotulo}»)" in _avisos(data), data["avisos_mapeo"]
+
+
+@pytest.mark.parametrize("forma", list(FORMAS_DEL_CARGO))
+@pytest.mark.parametrize("rotulo", CARGOS_CON_PALABRAS_DE_MAS)
+def test_un_cargo_con_palabras_de_mas_no_cambia_el_fob_sin_un_aviso_con_su_fila(rotulo, forma):
+    """Punto 1: con o sin combinadas, una fila cuyo rótulo empieza como un
+    cargo no sube el FOB en silencio por traer una palabra que la lista no
+    conoce. El flete se lee como flete, como en la base («Flete int.»)."""
+    filas, combinar = FORMAS_DEL_CARGO[forma]
+    data = _leer_combinado([PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500]] + filas(rotulo), combinar)
+    _el_cargo_no_cambia_el_fob_sin_nombrar_su_fila(data, 4, rotulo, 3550, 1200)
+    if main._FILA_DE_FLETE_RE.match(rotulo):
+        assert data["operacion"].get("flete") == 1200, data["operacion"]
+        assert data["operacion"]["filas_excel_flete"] == [4], data["operacion"]
+
+
+@pytest.mark.parametrize("forma", ["origen_rotulo_en_descripcion", "descripcion_rotulo_en_item"])
+def test_el_flete_int_combinado_se_lee_como_en_la_base(forma):
+    """El piso de la PM: «Flete int.» con el origen combinado da flete 1200 y
+    FOB 3550, con el aviso de su fila."""
+    filas, combinar = FORMAS_DEL_CARGO[forma]
+    data = _leer_combinado([PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500]] + filas("Flete int."), combinar)
+    assert len(data["items"]) == 2 and _total(data["items"]) == 3550, data["items"]
+    assert data["operacion"]["flete"] == 1200, data["operacion"]
+    assert "Flete: se leyó 1.200,00 de la fila 4" in _avisos(data), data["avisos_mapeo"]
+
+
+@pytest.mark.parametrize("productos", [
+    ["Payment terminal POS", "Handling cart"],
+    ["Seguro de puerta", "Insurance card printer"],
+], ids=["payment_handling", "seguro_insurance"])
+def test_un_producto_que_empieza_como_un_cargo_entra_con_un_aviso_que_nombra_su_fila(productos):
+    """R1 sigue: el producto real entra, y con el origen combinado no se sabe
+    si es un cargo: el aviso nombra su fila y su rótulo."""
+    data = _leer_combinado([
+        PROFORMA,
+        [1, "Widget A", "CN", 10, 5, 50],
+        [2, productos[0], None, 3, 100, 300],
+        [3, productos[1], None, 2, 40, 80],
+    ], ("C2:C4",))
+    assert _total(data["items"]) == 430, data["items"]
+    avisos = _avisos(data)
+    assert f"fila 3 («{productos[0]}»)" in avisos and f"fila 4 («{productos[1]}»)" in avisos, avisos
+    assert "Widget A" not in avisos, avisos
+
+
+def test_un_producto_comun_con_el_origen_combinado_no_lleva_el_aviso_del_cargo():
+    data = _leer_combinado([
+        PROFORMA,
+        [1, "Widget A", "CN", 10, 5, 50],
+        [2, "Widget B", None, 3, 100, 300],
+    ], ("C2:C3",))
+    assert _total(data["items"]) == 350, data["items"]
+    assert "empieza como un cargo" not in _avisos(data), data["avisos_mapeo"]
+
+
+@pytest.mark.parametrize("producto", ["Freight elevator DEMO", "Shipping cost calculator scale"])
+def test_un_producto_que_empieza_como_el_flete_con_el_origen_combinado_se_lee_como_flete_avisado(producto):
+    """«Freight elevator» y «Flete int.» no se distinguen sin una lista de
+    palabras, que no cierra la familia: con el origen combinado se lee como
+    flete, como sin combinadas, con el aviso de su fila (EXCEL-3d)."""
+    data = _leer_combinado([
+        PROFORMA,
+        [1, "Widget A", "CN", 10, 5, 50],
+        [2, producto, None, 1, 9000, 9000],
+        [3, "Widget B", None, 2, 10, 20],
+    ], ("C2:C4",))
+    assert [i["descripcion"] for i in data["items"]] == ["Widget A", "Widget B"], data["items"]
+    assert data["operacion"]["flete"] == 9000 and data["operacion"]["filas_excel_flete"] == [3], data["operacion"]
+    assert "de la fila 3" in _avisos(data), data["avisos_mapeo"]
+
+
+CABECERAS = {
+    # forma: (filas de la cabecera y su hijo, combinadas)
+    "vertical_por_herencia": (lambda r: [["H-1", r, 1, 2, 5, 10, 50], [None, None, 1, 1, 4, 10, 40]], ()),
+    "vertical_combinada": (lambda r: [["H-1", r, 1, 2, 5, 10, 50], [None, None, 1, 1, 4, 10, 40]], ("B3:B4",)),
+    "horizontal": (lambda r: [[r, None, 1, 2, 5, 10, 50], [None, None, 1, 1, 4, 10, 40]], ("A3:B3",)),
+    "codigo_combinado": (lambda r: [["H-1", r, 1, 2, 5, 10, 50], [None, None, 1, 1, 4, 10, 40]], ("A3:A4",)),
+}
+
+
+@pytest.mark.parametrize("forma", list(CABECERAS))
+@pytest.mark.parametrize("rotulo", ["Insurance", "Handling trolley DEMO", "Payment qwerty", "Gastos zzyzx"])
+def test_la_cabecera_y_su_hijo_se_deciden_igual(rotulo, forma):
+    """Punto 2: el hijo sin descripción hereda la de la cabecera; si ella
+    queda sin leer, él también, y si entra, entran los dos."""
+    filas, combinar = CABECERAS[forma]
+    data = _leer_combinado([SIN_ORIGEN, ["W-1", "LONA DEMO", 2, 10, 1, 1.5, 15]] + filas(rotulo), combinar)
+    sin_leer = data["filas_descartadas_numeros"]
+    assert sin_leer in ([], [3, 4]), data
+    if sin_leer:
+        assert _total(data["items"]) == 1.5, data["items"]
+    else:
+        assert _total(data["items"]) == 1.5 + 50 + 40, data["items"]
+        avisos = _avisos(data)
+        assert "fila 3 (" in avisos and "fila 4 (" in avisos, avisos
+
+
+def test_la_cabecera_insurance_sin_combinadas_deja_sin_leer_al_hijo():
+    """La receta f3_insurance de la reproducción: en la base, sin leer las dos."""
+    data = _leer([
+        SIN_ORIGEN,
+        ["W-1", "LONA DEMO", 2, 10, 1, 1.5, 15],
+        ["H-1", "Insurance", 1, 2, 5, 10, 50],
+        [None, None, 1, 1, 4, 10, 40],
+    ])
+    assert data["filas_descartadas_numeros"] == [3, 4], data
+    assert _total(data["items"]) == 1.5, data["items"]
+
+
+@pytest.mark.parametrize("combinar", [("B3:B4",), ("B3:B4", "C2:C4")], ids=["rotulo", "rotulo_y_origen"])
+def test_un_rotulo_dudoso_combinado_en_dos_filas_nombra_las_dos(combinar):
+    """La copia de abajo es lo mismo que su fila: si entra, entra con el aviso
+    que nombra su fila, no como un producto común."""
+    data = _leer_combinado([
+        PROFORMA,
+        [1, "LAPTOP DEMO", "China", 10, 350, 3500],
+        [None, "Gastos administrativos", None, 1, 1050, 1050],
+        [None, None, None, 1, 2450, 2450],
+    ], combinar)
+    if data["filas_descartadas_numeros"]:
+        assert data["filas_descartadas_numeros"] == [3, 4], data
+        assert _total(data["items"]) == 3500, data["items"]
+    else:
+        assert _total(data["items"]) == 3500 + 1050 + 2450, data["items"]
+        avisos = _avisos(data)
+        assert ("fila 3 («Gastos administrativos»)" in avisos
+                and "fila 4 («Gastos administrativos»)" in avisos), avisos
+
+
+def test_los_avisos_nombran_hasta_cinco_filas_y_cuentan_el_resto():
+    sin_precio = [[k, f"MOUSE DEMO {k}", "China", 1, None, None] for k in range(2, 9)]
+    data = _leer_combinado([PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500]] + sin_precio, ())
+    assert "7 renglón(es) entraron sin precio (filas 3, 4, 5, 6, 7 y 2 más)" in _avisos(data), data["avisos_mapeo"]
+
+    gastos = [[k, f"Gastos administrativos {k}", None, 1, 100, 100] for k in range(2, 9)]
+    data = _leer_combinado([PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500]] + gastos, ("C2:C9",))
+    avisos = _avisos(data)
+    assert _total(data["items"]) == 4200, data["items"]
+    assert ("7 renglón(es) empiezan como un cargo y entraron como producto: fila 3 («Gastos administrativos 2»), "
+            "fila 4 («Gastos administrativos 3»)") in avisos, avisos
+    assert "fila 7 («Gastos administrativos 6»), y 2 más;" in avisos and "Gastos administrativos 7" not in avisos, avisos
+
+
+@pytest.mark.parametrize("filas, combinar, sin_precio", [
+    ([[1, "LAPTOP DEMO", "China", 10, 350, 3500], [2, None, "China", 5, None, None],
+      [3, None, "China", 5, None, None]], ("B2:B4",), "filas 3, 4"),
+    ([[1, "LAPTOP DEMO", "China", 10, 350, 3500], [2, "MOUSE DEMO", None, 5, None, None]],
+     ("C2:C3",), "fila 3"),
+    ([[1, "LAPTOP DEMO", "China", 10, 350, 3500], [2, "MOUSE DEMO", "China", 5, None, None]],
+     (), "fila 3"),
+], ids=["descripcion_combinada", "origen_combinado", "sin_combinadas"])
+def test_todo_renglon_que_entra_sin_precio_se_avisa_con_su_fila(filas, combinar, sin_precio):
+    """Punto 3: D12 (a) en toda la familia, sin inventar el precio."""
+    data = _leer_combinado([PROFORMA] + filas, combinar)
+    assert [i["valor_unitario"] for i in data["items"]][1:] == [0] * (len(filas) - 1), data["items"]
+    assert f"entraron sin precio ({sin_precio})" in _avisos(data), data["avisos_mapeo"]

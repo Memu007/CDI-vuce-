@@ -235,8 +235,8 @@ sabotaje $M "3b-3#2 una nota de descuento sin precio abre un grupo" \
 
 # EXCEL-3c
 sabotaje $M "3c R1 con algo copiado, un producto con «Payment» queda sin leer" \
-  '                no_es_mercaderia = _es_solo_un_cargo(rotulo_propio)' \
-  '                no_es_mercaderia = bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(rotulo_propio))' \
+  '                no_es_mercaderia = _es_solo_un_cargo(cargo)' \
+  '                no_es_mercaderia = bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo))' \
   "${B}un_producto_con_una_palabra_de_cargo_y_su_descripcion_se_lee[payment_handling-origen_combinado]"
 sabotaje $M "3c R1 con una palabra de cargo alcanza" \
   '            and all(len(p) == 1 or p in _PALABRAS_DE_CARGO' '            and any(len(p) == 1 or p in _PALABRAS_DE_CARGO' \
@@ -256,26 +256,27 @@ sabotaje $M "3c R1 el origen copiado no cuenta como copiado" \
   '            copiada = bool(_texto_de_celda(celda_origen) or descripcion_copiada)' \
   '            copiada = bool(descripcion_copiada)' \
   "${B}un_producto_con_una_palabra_de_cargo_y_su_descripcion_se_lee[payment_handling-origen_combinado]"
-sabotaje $M "3c R1 con algo copiado, «Freight elevator» es el flete" \
-  '                            and (not copiada or _es_solo_un_cargo(cargo)))' '                            )' \
-  "${B}un_producto_que_empieza_como_el_flete_con_el_origen_combinado_es_mercaderia"
 sabotaje $M "3c B1 decide con la descripción copiada" \
-  '            rotulo_propio = "" if del_grupo and not descripcion_propia else cargo' \
-  '            rotulo_propio = descripcion' \
+  '                no_es_mercaderia = _es_solo_un_cargo(cargo)' \
+  '                no_es_mercaderia = _es_solo_un_cargo(descripcion)' \
   "${B}un_cargo_no_entra_como_producto_aunque_venga_una_combinada[descripcion-insurance]"
 sabotaje $M "3c B1 la copia sin rótulo entra aunque su fila no" \
-  '                no_es_mercaderia = no_es_mercaderia_en.get(ancla, True)' \
-  '                no_es_mercaderia = False' \
+  '                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(ancla, (True, False))' \
+  '                no_es_mercaderia, dudosa = False, False' \
   "${B}un_cargo_con_su_rotulo_combinado_no_suma_la_fila_de_abajo"
 # El caso de la copia de 3c tiene la fila de arriba como cargo: ahí el valor
 # por defecto da lo mismo. Lo ve la proforma de EXCEL-3, cuyos renglones son
 # copias de un producto (y 11 casos más).
 sabotaje $M "3c B1 la copia sin rótulo nunca entra" \
-  '                no_es_mercaderia_en[_] = no_es_mercaderia' '                pass' \
+  '            no_es_mercaderia_en[_] = (no_es_mercaderia, dudosa)' '            pass' \
   "${B}con_la_especificacion_combinada_hacia_abajo_cada_renglon_conserva_su_codigo"
 sabotaje $M "3c D12 el aviso nombra filas sin leer" \
-  '    sin_precio = [f for f in sin_precio if f not in sin_leer]  # sólo las que entraron' \
-  '    pass' \
+  '        if no_es_mercaderia:
+            descartes.append(fila)' \
+  '        if no_es_mercaderia and not item.valor_unitario:
+            sin_precio.append(fila)
+        if no_es_mercaderia:
+            descartes.append(fila)' \
   "${B}el_aviso_sin_precio_no_nombra_filas_que_quedaron_sin_leer"
 # Sin sabotaje: tomar el origen propio en vez de la celda en «copiada» es
 # equivalente. El veredicto con algo copiado mira sólo filas sin NCM ni origen
@@ -288,15 +289,42 @@ sabotaje $M "3c R2 una cabecera sin código corta a los renglones con código" \
   '            if grupo and parte and parte != grupo[1] and not descripcion:' \
   "${B}una_cabecera_sin_codigo_le_da_la_descripcion_a_los_renglones_con_codigo"
 sabotaje $M "3c D12 un renglón sin precio no se avisa" \
-  '                    sin_precio.append(_ + 2)  # no se inventa: se avisa (EXCEL-3c)' '                    pass' \
+  '            sin_precio.append(fila)  # no se inventa: se avisa (EXCEL-3c, EXCEL-3d)' '            pass' \
   "${B}los_renglones_que_entran_sin_precio_se_avisan_al_subir[precio_solo_arriba]"
-sabotaje $M "3c D12 el aviso no dice desde qué fila" \
-  'arriba o combinado), desde la fila {filas[0]}. Completalos' 'arriba o combinado). Completalos' \
-  "${B}los_renglones_que_entran_sin_precio_se_avisan_al_subir[precio_combinado]"
+sabotaje $M "3d D12 el aviso dice sólo la primera fila" \
+  'sin precio ({_filas_del_aviso(filas)}). ' 'sin precio (desde la fila {filas[0]}). ' \
+  "${B}todo_renglon_que_entra_sin_precio_se_avisa_con_su_fila[descripcion_combinada]"
 sabotaje $M "3c D12 se inventa el precio del de arriba" \
   '                descripcion, parte = grupo[0], parte or grupo[1]' \
   '                descripcion, parte = grupo[0], parte or grupo[1]; valor_unitario = valor_unitario or 1.35' \
   "${B}los_renglones_que_entran_sin_precio_se_avisan_al_subir[precio_solo_arriba]"
+
+# EXCEL-3d
+sabotaje $M "3d con algo copiado, el flete tiene que ser sólo el flete" \
+  '                es_flete = bool(_FILA_DE_FLETE_RE.match(cargo))' \
+  '                es_flete = bool(_FILA_DE_FLETE_RE.match(cargo)) and (not copiada or _es_solo_un_cargo(cargo))' \
+  "${B}el_flete_int_combinado_se_lee_como_en_la_base[origen_rotulo_en_descripcion]"
+sabotaje $M "3d el flete dudoso no se avisa" \
+  '                            flete_dudoso.append((_ + 2, cargo))' '                            pass' \
+  "${B}un_producto_que_empieza_como_el_flete_con_el_origen_combinado_se_lee_como_flete_avisado[Freight elevator DEMO]"
+sabotaje $M "3d el rótulo dudoso entra como producto común" \
+  '                dudosa = not no_es_mercaderia and bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo))' \
+  '                dudosa = False' \
+  "${B}un_cargo_con_palabras_de_mas_no_cambia_el_fob_sin_un_aviso_con_su_fila[Gastos administrativos-origen_rotulo_en_descripcion]"
+sabotaje $M "3d las dudosas no llegan al aviso" \
+  '        extras["dudosas"] = dudosas' '        pass' \
+  "${B}un_producto_que_empieza_como_un_cargo_entra_con_un_aviso_que_nombra_su_fila[payment_handling]"
+sabotaje $M "3d el hijo no se decide como su cabecera" \
+  '                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(grupo[2], (True, False))' \
+  '                no_es_mercaderia, dudosa = False, False' \
+  "${B}la_cabecera_y_su_hijo_se_deciden_igual[Insurance-vertical_por_herencia]"
+sabotaje $M "3d la copia de una fila dudosa entra sin aviso" \
+  '                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(ancla, (True, False))' \
+  '                no_es_mercaderia = no_es_mercaderia_en.get(ancla, (True, False))[0]' \
+  "${B}un_rotulo_dudoso_combinado_en_dos_filas_nombra_las_dos[rotulo_y_origen]"
+sabotaje $M "3d el aviso nombra todas las filas" \
+  '    nombradas = ", ".join(str(f) for f in filas[:5])' '    nombradas = ", ".join(str(f) for f in filas)' \
+  "${B}los_avisos_nombran_hasta_cinco_filas_y_cuentan_el_resto"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
