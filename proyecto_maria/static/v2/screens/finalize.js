@@ -194,6 +194,7 @@
             if (!res.ok) {
                 const detail = data && data.detail;
                 avisos = [typeof detail === 'string' ? detail : 'No se pudieron revisar los avisos.'];
+                valor = { error: SIN_CUENTAS };
             } else {
                 avisos = (data && data.avisos) || [];
                 valor = (data && data.valor) || null;
@@ -201,6 +202,7 @@
         } catch (err) {
             console.warn('[avisos] no se pudieron pedir', err);
             avisos = ['No se pudieron revisar los avisos; aparecen al generar.'];
+            valor = { error: SIN_CUENTAS };
         }
         if (seq !== avisosSeq) return;   // llegó uno más nuevo
         pintarValor(valor);
@@ -222,6 +224,8 @@
     // con la misma cuenta del MDDTFOB del TXT.
     let valorEnlazado = false;
     let ultimoValor = null;
+    let cuentasDe = null;   // la operación de ultimoValor
+    const SIN_CUENTAS = 'No se pudieron hacer las cuentas: mirá los avisos.';
 
     // Vacío es sin ajuste (null); lo que no es un número finito tampoco viaja,
     // para que un ajuste mal escrito nunca frene la generación del TXT.
@@ -237,6 +241,15 @@
 
     function importeEscrito(n) {
         return Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // Cambió un ajuste: las cuentas a la vista ya no valen, ni las que están
+    // por llegar, hasta que vuelvan las nuevas.
+    function cuentasViejas() {
+        ultimoValor = null;
+        avisosSeq++;
+        const boton = document.getElementById('valorCalcularSeguro');
+        if (boton) boton.hidden = true;
     }
 
     function enlazarValor() {
@@ -255,6 +268,7 @@
                 const op = CDI.state.operacion = CDI.state.operacion || {};
                 // Un número que el campo no entiende llega vacío: se marca.
                 op[campos[id]] = input.validity && input.validity.badInput ? 'mal escrito' : input.value;
+                cuentasViejas();
                 programar();
             });
         });
@@ -267,17 +281,24 @@
     function usarDescuento() {
         const op = CDI.state.operacion = CDI.state.operacion || {};
         const descuento = Number(op.descuento);
-        if (!(descuento > 0)) return;
+        if (!(descuento > 0) || otroDeducir(op, descuento)) return;
         op.ajustes_deducir = String(descuento);
         const input = document.getElementById('valorDeducir');
         if (input) input.value = op.ajustes_deducir;
         refrescarAvisos();
     }
 
-    // El seguro sugerido lo calculó el servidor con lo que está a la vista.
+    // Ajustes a deducir ya trae algo distinto del descuento: no se pisa.
+    function otroDeducir(op, descuento) {
+        const v = op.ajustes_deducir;
+        return v !== undefined && v !== null && String(v).trim() !== '' && Number(v) !== descuento;
+    }
+
+    // El seguro sugerido lo calculó el servidor con lo que está a la vista,
+    // para esta misma operación.
     function calcularSeguro() {
-        if (!ultimoValor || ultimoValor.error) return;
         const op = CDI.state.operacion = CDI.state.operacion || {};
+        if (!ultimoValor || ultimoValor.error || cuentasDe !== op) return;
         op.seguro = ultimoValor.seguro_sugerido;
         op.seguro_calculado = true;
         refrescarAvisos();
@@ -286,21 +307,31 @@
     function pintarValor(valor) {
         ultimoValor = valor;
         const op = (CDI.state && CDI.state.operacion) || {};
+        cuentasDe = op;
         const incluir = document.getElementById('valorIncluir');
         const deducir = document.getElementById('valorDeducir');
-        // Lo que la persona está escribiendo no se pisa.
-        if (incluir && document.activeElement !== incluir) incluir.value = op.ajustes_incluir == null ? '' : op.ajustes_incluir;
-        if (deducir && document.activeElement !== deducir) deducir.value = op.ajustes_deducir == null ? '' : op.ajustes_deducir;
+        // Lo que la persona está escribiendo no se pisa, y un número mal
+        // escrito queda a la vista para que lo corrija.
+        if (incluir && document.activeElement !== incluir && !ajusteMalEscrito(op.ajustes_incluir)) {
+            incluir.value = op.ajustes_incluir == null ? '' : op.ajustes_incluir;
+        }
+        if (deducir && document.activeElement !== deducir && !ajusteMalEscrito(op.ajustes_deducir)) {
+            deducir.value = op.ajustes_deducir == null ? '' : op.ajustes_deducir;
+        }
 
         const ofrece = document.getElementById('valorDescuento');
         const ofreceTexto = document.getElementById('valorDescuentoTexto');
         const descuento = Number(op.descuento);
         // Ya usado como ajuste, no se vuelve a ofrecer.
         if (ofrece) ofrece.hidden = !(descuento > 0) || Number(op.ajustes_deducir) === descuento;
+        const otro = descuento > 0 && otroDeducir(op, descuento);
+        const usar = document.getElementById('valorUsarDescuento');
+        if (usar) usar.hidden = otro;
         if (ofreceTexto && descuento > 0) {
             const filas = Array.isArray(op.filas_excel_descuento) ? op.filas_excel_descuento : [];
             ofreceTexto.textContent = 'La planilla trae un descuento de ' + importeEscrito(descuento) +
-                (filas.length ? ' (fila ' + filas.slice(0, 5).join(', ') + ')' : '') + '.';
+                (filas.length ? ' (fila ' + filas.slice(0, 5).join(', ') + ')' : '') + '.' +
+                (otro ? ' Ajustes a deducir ya tiene otro importe: si el descuento va aparte, sumalo a mano.' : '');
         }
 
         const error = document.getElementById('valorError');

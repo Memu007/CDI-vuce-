@@ -4226,14 +4226,18 @@ async def avisos_maria_endpoint(
 def _cuentas_del_valor(request: MariaRequest, items: list) -> tuple[dict, list]:
     """Las cuentas del valor para la pantalla y su aviso (VALOR-1). Un ajuste
     inválido o un producto mal formado no frena los avisos: va en `error`."""
+    malos = [n for n, it in enumerate(items, 1) if not isinstance(it, dict)]
+    if malos:
+        return {"error": f"Hay un producto mal formado (renglón {malos[0]}): no se pueden hacer las cuentas."}, []
     try:
         valor = cuentas_del_valor(
-            [it for it in items if isinstance(it, dict)],
-            flete=request.flete, seguro=request.seguro,
+            items, flete=request.flete, seguro=request.seguro,
             ajustes_incluir=request.ajustes_incluir, ajustes_deducir=request.ajustes_deducir,
         )
     except (ValueError, TypeError) as e:
         return {"error": str(e)}, []
+    except ArithmeticError:  # un número que no entra en un float, como 10 ** 400
+        return {"error": "Hay un importe o una cantidad fuera de rango: no se pueden hacer las cuentas."}, []
     if not (valor["ajustes_incluir"] or valor["ajustes_deducir"]):
         return valor, []
     moneda = (str(request.moneda or "").strip().upper() + " ") if str(request.moneda or "").strip() else ""
