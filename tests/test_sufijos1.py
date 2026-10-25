@@ -567,3 +567,10 @@ def test_una_ncm_de_ocho_no_se_dice_fuera_del_arancel():
         "await D.listo(); salida.nota = D.notaDe(CDI.state.items[0], 0);")
     assert salida == {"nota": "No es una posición SIM completa (11 dígitos y la letra de control): "
                               "cargalo a mano."}
+
+
+def test_un_grupo_que_no_se_puede_comparar_no_rompe_los_avisos():
+    # Un pedido armado a mano con grupo_id lista: lo dice el generador, los
+    # avisos no se caen (antes de SUFIJOS-1 tampoco se caían).
+    avisos = _avisos([dict(LONA, pieza=PLASTICO, grupo_id=[1], sufijo="AA(DEMO)-")])
+    assert isinstance(avisos, list)

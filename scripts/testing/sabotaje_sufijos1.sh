@@ -15,7 +15,8 @@
 # no pasa al producto que queda en su lugar, no se pide dos veces y la nota
 # dice si falta la tabla o es la letra; si junto con el de la operación pasa
 # del tope no se pierde lo de la operación, un grupo no tiene celda por
-# producto y una NCM de 8 no se dice fuera del arancel. Cada sabotaje se aplica en un
+# producto y una NCM de 8 no se dice fuera del arancel; un grupo_id que no se
+# puede comparar no rompe los avisos. Cada sabotaje se aplica en un
 # worktree descartable, corre los casos y tiene que dar ROJO con el motivo
 # esperado. Si un patrón no se encuentra, el script sale con error.
 # La pantalla (pantalla_sufijos1.js) necesita la app levantada: va aparte,
@@ -213,6 +214,10 @@ caso "ncm_de_ocho_fuera_en_el_servidor" "FAILED $T::test_una_ncm_de_ocho_no_se_d
 # 33. una NCM de 8 se dice fuera del arancel (en la nota)
 reemplazar $D "            if (!/^[0-9]{11}[A-Z]?\$/.test(posicionDe(it).replace(/[.\\s]/g, ''))) {" '            if (false) {'
 caso "ncm_de_ocho_fuera_en_la_nota" "FAILED $T::test_una_ncm_de_ocho_no_se_dice_fuera_del_arancel"
+
+# 34. un grupo_id que no se puede comparar rompe los avisos
+reemplazar $G '                    except TypeError:' '                    except KeyError:'
+caso "grupo_que_no_se_compara" "FAILED $T::test_un_grupo_que_no_se_puede_comparar_no_rompe_los_avisos"
 
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
 echo "OK: los $CASOS sabotajes dan rojo por la razón esperada"
