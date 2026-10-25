@@ -53,6 +53,14 @@
                         '? Escribilo con punto de miles (' + partes[0] + '.' + partes[1] + ') o como ' + dec + '.' };
                 }
                 entero = partes.join('');  // 3.480: punto de miles
+            } else if (/^[1-9]\d{3,}$/.test(partes[0]) && partes[1].length === 3) {
+                // SEPARADORES-1b. «2500.125»: ni miles bien escritos ni
+                // decimales sin dudas. ¿2.500.125 o 2.500,125?
+                const grupos = partes[0].replace(/\B(?=(\d{3})+$)/g, '.');
+                const miles = grupos + '.' + partes[1];
+                const dec = grupos + ',' + partes[1];
+                return { valor: null, error: '¿' + miles + ' o ' + dec +
+                    '? Escribilo con puntos de miles (' + miles + ') o como ' + dec + '.' };
             } else {
                 entero = partes[0];
                 decimales = partes[1];

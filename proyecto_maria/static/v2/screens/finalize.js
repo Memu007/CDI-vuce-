@@ -230,11 +230,12 @@
     let cuentasCon = null;   // el pedido con el que se hizo ultimoValor
     const SIN_CUENTAS = 'No se pudieron hacer las cuentas: mirá los avisos.';
 
-    // Vacío es sin ajuste (null); lo que no es un número finito tampoco viaja,
-    // para que un ajuste mal escrito nunca frene la generación del TXT.
+    // Vacío es sin ajuste (null). Lo que no se puede leer viaja tal cual: el
+    // servidor lo dice en las cuentas y no frena el TXT (SEPARADORES-1b, D19).
     // SEPARADORES-1: «1.500» es mil quinientos (montos_ar.js).
     function ajusteDelPedido(v) {
-        return CDI.montos.leer(v).valor;
+        const r = CDI.montos.leer(v);
+        return r.error ? String(v).trim() : r.valor;
     }
 
     // Por qué un ajuste escrito no se puede leer, o null.
@@ -245,9 +246,12 @@
     }
 
     // Flete, seguro o gastos de la revisión, que ya frena lo que no se lee.
+    // Si igual llega uno así, viaja tal cual y el servidor lo rechaza con su
+    // mensaje: nunca un 0 silencioso (SEPARADORES-1b, D19). Vacío es 0.
     function montoDelPedido(v) {
-        const n = CDI.montos.leer(v).valor;
-        return n === null ? 0 : n;
+        const r = CDI.montos.leer(v);
+        if (r.error) return String(v).trim();
+        return r.valor === null ? 0 : r.valor;
     }
 
     function importeEscrito(n) {
