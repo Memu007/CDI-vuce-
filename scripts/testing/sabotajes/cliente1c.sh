@@ -63,6 +63,10 @@ sabotaje $M "la operación copia lo que trae, como antes" \
   'fecha_op = _fecha_inic_activ_o_vacia(data.get("comprador_fecha_inic_activ"))' \
   'fecha_op = str(data.get("comprador_fecha_inic_activ") or "").strip()' \
   "${C}test_la_operacion_solo_copia_una_fecha_que_sirve[20150-01-0]"
+sabotaje $M "la operación corta a diez caracteres, como antes" \
+  'fecha_op = _fecha_inic_activ_o_vacia(data.get("comprador_fecha_inic_activ"))' \
+  'fecha_op = _fecha_inic_activ_o_vacia(str(data.get("comprador_fecha_inic_activ") or "")[:10])' \
+  "${C}test_la_operacion_solo_copia_una_fecha_que_sirve[2015-03-15T00:00:00]"
 sabotaje $M "la regla de la operación deja pasar la que no sirve" \
   $'    except HTTPException:\n        return ""' $'    except HTTPException:\n        return str(raw or "")' \
   "${C}test_la_operacion_solo_copia_una_fecha_que_sirve[2015-02-30]"
