@@ -107,7 +107,7 @@ sabotaje $M "el rótulo de otra columna no se mira" \
   '                (t for t in (_texto_de_celda(v) for c, v in row.items() if _propia(c))' \
   '                (t for t in (_texto_de_celda(v) for c, v in ())' "$XLS"
 sabotaje $M "una nota de flete en otra columna saca el renglón" \
-  '            if sin_ncm_ni_origen and (descripcion or not con_medidas):' \
+  '            if sin_ncm_ni_origen and (descripcion_propia or not con_medidas):' \
   '            if sin_ncm_ni_origen:' \
   "FAILED $T::test_una_nota_de_flete_en_otra_columna_de_un_renglon_no_lo_saca[Item]"
 sabotaje $M "un producto «Discount …» vuelve a ser descuento" \
@@ -235,8 +235,10 @@ sabotaje $M "3b-3#2 una nota de descuento sin precio abre un grupo" \
 
 # EXCEL-3c
 sabotaje $M "3c R1 con algo copiado, un producto con «Payment» queda sin leer" \
-  '                no_es_mercaderia = _es_solo_un_cargo(cargo)' \
-  '                no_es_mercaderia = bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo))' \
+  '            elif copiada:
+                no_es_mercaderia = _es_solo_un_cargo(cargo)' \
+  '            elif copiada:
+                no_es_mercaderia = bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo))' \
   "${B}un_producto_con_una_palabra_de_cargo_y_su_descripcion_se_lee[payment_handling-origen_combinado]"
 sabotaje $M "3c R1 con una palabra de cargo alcanza" \
   '            and all(len(p) == 1 or p in _PALABRAS_DE_CARGO' '            and any(len(p) == 1 or p in _PALABRAS_DE_CARGO' \
@@ -251,18 +253,18 @@ sabotaje $M "3c R1 «carga» no es palabra de cargo" \
 sabotaje $M "3c R1 la descripción copiada no cuenta como copiada" \
   '            copiada = bool(_texto_de_celda(celda_origen) or descripcion_copiada)' \
   '            copiada = bool(_texto_de_celda(celda_origen))' \
-  "${B}con_la_descripcion_combinada_una_palabra_de_cargo_en_otra_columna_no_saca_al_producto"
+  "${B}con_la_descripcion_combinada_un_rotulo_de_flete_en_item_se_lee_como_flete_avisado[Freight elevator DEMO]"
 sabotaje $M "3c R1 el origen copiado no cuenta como copiado" \
   '            copiada = bool(_texto_de_celda(celda_origen) or descripcion_copiada)' \
   '            copiada = bool(descripcion_copiada)' \
   "${B}un_producto_con_una_palabra_de_cargo_y_su_descripcion_se_lee[payment_handling-origen_combinado]"
 sabotaje $M "3c B1 decide con la descripción copiada" \
-  '                no_es_mercaderia = _es_solo_un_cargo(cargo)' \
-  '                no_es_mercaderia = _es_solo_un_cargo(descripcion)' \
+  '                    no_es_mercaderia = _es_solo_un_cargo(cargo)' \
+  '                    no_es_mercaderia = _es_solo_un_cargo(descripcion)' \
   "${B}un_cargo_no_entra_como_producto_aunque_venga_una_combinada[descripcion-insurance]"
 sabotaje $M "3c B1 la copia sin rótulo entra aunque su fila no" \
-  '                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(ancla, (True, False))' \
-  '                no_es_mercaderia, dudosa = False, False' \
+  '                no_es_mercaderia, dudosa = no_es_mercaderia_en.get(ancla, (True, ""))' \
+  '                no_es_mercaderia, dudosa = False, ""' \
   "${B}un_cargo_con_su_rotulo_combinado_no_suma_la_fila_de_abajo"
 # El caso de la copia de 3c tiene la fila de arriba como cargo: ahí el valor
 # por defecto da lo mismo. Lo ve la proforma de EXCEL-3, cuyos renglones son

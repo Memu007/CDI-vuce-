@@ -1005,6 +1005,18 @@ def test_un_producto_que_empieza_como_el_flete_con_el_origen_combinado_se_lee_co
             "si alguno es un producto, cargalo en la revisión.") in _avisos(data), data["avisos_mapeo"]
 
 
+@pytest.mark.parametrize("producto", ["Freight elevator DEMO", "Shipping cost calculator scale", "Flete int."])
+def test_con_la_descripcion_combinada_un_rotulo_de_flete_en_item_se_lee_como_flete_avisado(producto):
+    """La misma regla con la descripción combinada y el rótulo en Item: flete
+    con el aviso de que dice algo más, nombrando su fila."""
+    filas, combinar = FORMAS_DEL_CARGO["descripcion_rotulo_en_item"]
+    data = _leer_combinado([PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500]] + filas(producto), combinar)
+    assert _total(data["items"]) == 3550, data["items"]
+    assert data["operacion"]["flete"] == 1200 and data["operacion"]["filas_excel_flete"] == [4], data["operacion"]
+    assert (f"1 renglón(es) se leyeron como flete y dicen algo más: fila 4 («{producto}»); "
+            "si alguno es un producto, cargalo en la revisión.") in _avisos(data), data["avisos_mapeo"]
+
+
 CABECERAS = {
     # forma: (filas de la cabecera y su hijo, combinadas)
     "vertical_por_herencia": (lambda r: [["H-1", r, 1, 2, 5, 10, 50], [None, None, 1, 1, 4, 10, 40]], ()),
