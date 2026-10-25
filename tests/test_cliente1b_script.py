@@ -153,6 +153,28 @@ def test_una_base_que_no_responde_no_muestra_la_clave():
     assert "127.0.0.1:9" in salida, salida   # dice a cuál quiso entrar
 
 
+@pytest.mark.parametrize("base", [
+    "postgresql://usuario:CLAVE@SECRETA@127.0.0.1:9/base",       # «@» sin escapar en la clave
+    "postgresql://usuario@127.0.0.1:9/base?password=CLAVESECRETA",  # la clave en la consulta
+    "postgresql://usuario;CLAVESECRETA@127.0.0.1:9/base",        # «;» en vez de «:»
+], ids=["arroba", "en-la-consulta", "punto-y-coma"])
+def test_una_base_mal_armada_que_no_responde_no_muestra_la_clave(base):
+    """SQLAlchemy no reconoce estas claves como clave: el error no puede
+    repetir la URL tal como la entiende."""
+    rc, salida = _correr(base)
+    assert rc == 2, salida
+    for pedazo in ("CLAVE", "SECRETA"):
+        assert pedazo not in salida, salida
+    assert "Traceback" not in salida, salida
+    assert "127.0.0.1:9" in salida, salida
+
+
+def test_una_clave_corta_no_tapa_el_nombre_de_la_base():
+    rc, salida = _correr("postgresql://usuario:1@127.0.0.1:9/base")
+    assert rc == 2, salida
+    assert "127.0.0.1:9" in salida, salida
+
+
 @pytest.mark.parametrize("clave", ["CLAVESECRETA", "Clave/Con Raros+1"], ids=["simple", "escapada"])
 def test_si_el_error_de_la_base_nombra_la_clave_no_se_muestra(monkeypatch, capsys, clave):
     """Ningún driver de los que probamos pone la clave en su error, pero alguno
@@ -170,3 +192,38 @@ def test_si_el_error_de_la_base_nombra_la_clave_no_se_muestra(monkeypatch, capsy
     assert "no conecta" in err
     for forma in (clave, quote(clave, safe=""), quote_plus(clave)):
         assert forma not in err, err
+
+
+@pytest.mark.parametrize("base", [
+    "postgresql://usuario:CLAVE@SECRETA@127.0.0.1:9/base",
+    "postgresql://usuario@127.0.0.1:9/base?password=CLAVESECRETA",
+    "postgresql://usuario;CLAVESECRETA@127.0.0.1:9/base",
+], ids=["arroba", "en-la-consulta", "punto-y-coma"])
+def test_si_el_error_repite_una_base_mal_armada_no_se_ve_la_clave(monkeypatch, capsys, base):
+    """El error repite la URL como se escribió y como la entiende SQLAlchemy
+    (con «@» de más, el host le queda «SECRETA@127.0.0.1»)."""
+    from sqlalchemy.engine import make_url
+
+    import scripts.datos.clientes_fecha_inic_activ as script
+
+    entendida = make_url(base)
+
+    async def _cae(url, arreglar_none):
+        raise RuntimeError(f"no conecta: {base} | {entendida.render_as_string(hide_password=False)}"
+                           f" | host {entendida.host}")
+    monkeypatch.setattr(script, "revisar", _cae)
+    assert main(["--base", base]) == 2
+    err = capsys.readouterr().err
+    assert "no conecta" in err
+    for pedazo in ("CLAVE", "SECRETA"):
+        assert pedazo not in err, err
+
+
+def test_una_clave_corta_no_tapa_el_host_en_el_error(monkeypatch, capsys):
+    import scripts.datos.clientes_fecha_inic_activ as script
+
+    async def _cae(url, arreglar_none):
+        raise RuntimeError("no conecta a 127.0.0.1")
+    monkeypatch.setattr(script, "revisar", _cae)
+    assert main(["--base", "postgresql://usuario:1@127.0.0.1:9/base"]) == 2
+    assert "no conecta a 127.0.0.1" in capsys.readouterr().err
