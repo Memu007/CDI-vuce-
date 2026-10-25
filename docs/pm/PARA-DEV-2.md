@@ -30,6 +30,70 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## Veredicto de VALOR-1 (2026-10-25): devolución, VALOR-1b
+
+Sobre `3352a01` (informe `23ba183`). **No la integro todavía.** Detalle en
+`REPRODUCCION-VALOR-1-2026-10-25.md`. Yo corrí `test_valor1.py`
+(`49 passed`) y tus 31 sabotajes (todos en rojo, `rc=0`). Dos adversarios
+(Opus alto y Sonnet alto):
+- con ajustes, el TXT es idéntico en 36 variantes;
+- el FOB de la tarjeta es igual a `MDDTFOB` en 290 de 290;
+- las respuestas fuera de orden y el cambio de operación no arrastran nada;
+- ningún 500;
+- el HTML inyectado no ejecuta nada.
+
+La tarjeta está bien hecha. Vuelve por las cuentas viejas en un camino que
+el informe da por cerrado, y por D13.
+
+### VALOR-1b: lo que vuelve (va primero, antes de MARIA-9)
+
+1. **Causa: no todo cambio de `op` que entra en la cuenta invalida
+   `ultimoValor`.** `usarDescuento()` cambia `op.ajustes_deducir` y llama a
+   `refrescarAvisos()`, pero no a `cuentasViejas()`; los manejadores del
+   campo sí. Con `usarDescuento(); calcularSeguro();` el seguro sale con el
+   FOB de antes del descuento: 93,13 en vez de 92,25 (lo reproduje con
+   `_pantalla` de `test_valor1.py`).
+   - Contradice tu punto 3 y la línea del CHANGELOG «no usa cuentas de
+     antes de cambiar un ajuste».
+   - **Familia:** todo lo que escribe en `op` un campo de la cuenta (el
+     descuento, la restauración, el seguro calculado o a mano). Revisalos
+     todos, no sólo `usarDescuento`.
+   - **Prueba:** después de cada uno, el botón no se puede usar con las
+     cuentas viejas. Tiene que dar rojo sin el arreglo **con cualquier base
+     del seguro**: con el punto 3, el seguro deja de depender de los
+     ajustes, así que la prueba mira las cuentas, no sólo el seguro.
+2. **El aviso del seguro sin leer.** `calcularSeguro` no suma `seguro` a
+   `campos_completados`, así que «No pudimos leer el seguro de la factura:
+   completalo.» sigue después de calcularlo (`review.js:692`,
+   `semaforo.js:53`). Que se vaya al calcularlo.
+   - Si `seguro` está en `campos_sin_leer`, el botón avisa que la factura
+     puede traer un seguro que no leímos.
+3. **D13: (b), decidido por la PM.** `BASE_SEGURO_SUGERIDO = "fob_factura"`
+   hasta PRORRATEO-1. El botón y el aviso dicen «1 % de FOB de la factura +
+   flete». Así el TXT queda coherente consigo mismo. Tus casos de la base
+   siguen probando que la constante manda.
+4. **Ajustes que no son número, por API** (`main.py:4110`, `float | None`).
+   - Hoy dan 422 en `/generate_maria` (antes, 200) y en `/avisos`, donde se
+     pierden todos los avisos.
+   - Que vayan como `valor.error` sin perder los avisos.
+   - Que `/generate_maria` responda como antes.
+   - Cambiá los textos crudos de Python en `valor.error` por mensajes
+     claros.
+
+Cada punto con su sabotaje en rojo. Corregí el CHANGELOG para que diga sólo
+lo que queda probado.
+
+- **D14: (a).** El botón se ofrece en cualquier condición y la persona
+  decide. Le pregunto al despachante qué condiciones ya llevan el seguro
+  (CIF, CIP…) y si la base del seguro es el FOB de la factura o el
+  casillero.
+- **Riesgos que quedan, no los arregles (anotalos si los tocás):**
+  - `type=number` toma «1.000,50» como 1,0005 y «3.480» como 3,48 sin aviso,
+    igual que los campos de flete y seguro de hoy (no probado en Chrome
+    real con es-AR);
+  - los cosméticos del informe (textos cortados, «0», desborde a 390 px);
+  - el ajuste mal escrito restaurado sobre un campo vacío.
+
 ## Veredicto de MARIA-7 y MARIA-8 (2026-10-25): aceptadas con nota
 
 Sobre `30ceace` (informe `f71eaa9`; el producto es igual en `536c679` y en
@@ -107,7 +171,7 @@ Todas las líneas terminan en CRLF (una línea sin CR: «falta carácter de fin
 dentro de los valores de los sufijos: van espacios. El guión que separa un
 sufijo del otro (`)-`) sí.
 
-## Ahora — VALOR-1 (seguí), después MARIA-9, después SEPARADORES-1
+## Después de VALOR-1b: MARIA-9, después SEPARADORES-1
 
 ### MARIA-9: el sufijo de la operación y sus errores en pantalla
 
@@ -152,19 +216,10 @@ sabotaje.
 Van a M9 cuando Emi ordene los hallazgos de Argon (9.2 es la misma
 familia).
 
-### VALOR-1 y SEPARADORES-1
+### SEPARADORES-1
 
-Están en `ROADMAP.md`, Fase 1b. Antes de arrancarlas, leé la decisión del
-2026-10-24 en `DECISIONS.md`: el reparto ítem por ítem de los ajustes queda
-para PRORRATEO-1.
-
-**Qué te deja EXCEL-3 para VALOR-1** (aceptada el 2026-10-24, en la rama de
-la PM): la lectura del Excel devuelve `operacion.flete` (el de siempre),
-`operacion.descuento` (nuevo, **positivo**: lo que la factura dice que se
-deduce) y `operacion.filas_excel_flete` / `filas_excel_descuento` (filas de
-la planilla). Hoy el descuento sólo se informa: no resta del FOB. VALOR-1
-lo ofrece como ajuste a deducir y el usuario decide. Si necesitás otro
-nombre o signo, pedilo por tu canal.
+Está en `ROADMAP.md`, Fase 1b. El reparto ítem por ítem de los ajustes
+queda para PRORRATEO-1 (`DECISIONS.md`, 2026-10-24).
 
 ## Respuestas a tus D
 
