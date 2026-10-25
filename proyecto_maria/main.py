@@ -5039,11 +5039,16 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             # alcanza con su cantidad. Sin descripción ni precio propio es un
             # subtotal con largo, no un renglón; un código nuevo sin
             # especificación es otro producto: no hereda, y él y su grupo
-            # quedan sin leer (EXCEL-3b).
+            # quedan sin leer (EXCEL-3b). Con la descripción del grupo copiada
+            # y sin rótulo propio, «-» en las medidas no lo saca del grupo:
+            # sólo un cargo con su rótulo deja de ser renglón (EXCEL-3e).
             del_grupo = False
             if grupo and grupo[1] and parte and parte != grupo[1] and not descripcion:
                 grupo = None
-            if (not pieza and grupo and con_medidas and descripcion in ("", grupo[0])
+            del_grupo_copiado = bool(grupo and descripcion_copiada
+                                     and descripcion == grupo[0] and not cargo)
+            if (not pieza and grupo and (con_medidas or del_grupo_copiado)
+                    and descripcion in ("", grupo[0])
                     and (valor_unitario or (descripcion and cantidad))):
                 if not descripcion:
                     heredadas.append(_ + 2)
