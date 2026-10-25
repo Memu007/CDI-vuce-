@@ -4602,21 +4602,39 @@ def _es_fila_de_total(texto: str) -> bool:
 # Renglones de la factura que no son mercadería: flete, seguro, condiciones de
 # pago, gastos. Sin NCM ni origen no entran como producto (sumarían al FOB) y
 # se cuentan en el aviso de filas sin leer (EXCEL-1).
-_FILA_QUE_NO_ES_MERCADERIA_RE = re.compile(
-    r"^\s*(?:freight|flete|insurance|seguro|payment|pago|bank\s+charges?|gastos"
-    r"|handling|shipping\s+(?:cost|charges?)|incoterm|delivery\s+terms?)\b",
-    re.IGNORECASE,
-)
-# EXCEL-3c. Con el origen copiado de una combinada no se sabe si la fila lo
-# trae: el rótulo propio tiene que ser sólo el cargo («Insurance», «Payment
-# 30% TT», «Handling fee»); «Payment terminal POS» es un producto.
-_FILA_QUE_ES_SOLO_UN_CARGO_RE = re.compile(
-    r"^\s*(?:freight|flete|insurance|seguro|payment|pago|bank\s+charges?|gastos"
-    r"|handling|shipping\s+(?:cost|charges?)|incoterm|delivery\s+terms?)"
-    r"(?:[\s\d.,:;/()%$-]|\b(?:fees?|charges?|costs?|premium|bank|bancari[oa]s?|de|env[ií]o"
-    r"|terms?|t/?t|usd|of|cif|fob|invoice|value|advance|deposit|balance|anticipad[oa])\b)*$",
-    re.IGNORECASE,
-)
+_CARGOS = (r"freight|flete|insurance|seguro|payment|pago|bank\s+charges?|gastos"
+           r"|handling|shipping\s+(?:cost|charges?)|incoterm|delivery\s+terms?")
+_FILA_QUE_NO_ES_MERCADERIA_RE = re.compile(rf"^\s*(?:{_CARGOS})\b", re.IGNORECASE)
+
+# EXCEL-3c. Con el origen o la descripción copiados de una combinada no se
+# sabe si la fila es mercadería: es un cargo si su rótulo, además de empezar
+# como uno, dice sólo palabras de cargo, monto o moneda («Seguro de carga»,
+# «Insurance €40», «Payment 30% T/T in advance»). «Payment terminal POS» o
+# «Seguro de puerta» son productos. Una palabra que falta acá vuelve producto
+# a un cargo: la lista se amplía, no se achica.
+_PALABRAS_DE_CARGO = {
+    "freight", "flete", "fletes", "insurance", "seguro", "seguros", "payment", "payments",
+    "pago", "pagos", "bank", "banco", "bancario", "bancaria", "bancarios", "bancarias",
+    "charge", "charges", "gasto", "gastos", "handling", "shipping", "cost", "costs", "costo",
+    "costos", "incoterm", "incoterms", "delivery", "term", "terms", "fee", "fees", "premium",
+    "prima", "commission", "commissions", "comision", "comisión", "comisiones", "policy",
+    "poliza", "póliza", "carga", "cargo", "cargos", "goods", "mercaderia", "mercadería",
+    "mercancia", "mercancía", "merchandise", "shipment", "embarque", "envio", "envío",
+    "transport", "transporte", "maritime", "maritimo", "marítimo", "ocean", "sea", "air",
+    "aereo", "aéreo", "inland", "local", "international", "internacional", "origin", "origen",
+    "destination", "destino", "port", "puerto", "prepaid", "collect", "pagado", "advance",
+    "anticipado", "anticipada", "anticipo", "deposit", "deposito", "depósito", "balance",
+    "saldo", "before", "after", "against", "copy", "tt", "wire", "transfer", "transferencia",
+    "swift", "total", "and", "y", "for", "on", "at", "to", "por", "para", "con", "with",
+    "from", "al", "los", "las", "days", "dias", "días",
+}
+
+
+def _es_solo_un_cargo(texto: str) -> bool:
+    palabras = [p for p in re.split(r"[\s\d.,:;/()\[\]\-%&+]+", (texto or "").lower()) if p]
+    return (bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(texto or ""))
+            and all(len(p) == 1 or p in _PALABRAS_DE_CARGO or p in _PALABRAS_DE_MONTO
+                    for p in palabras))
 
 # EXCEL-3. El flete y el descuento de la factura no son productos: se
 # devuelven leídos para la operación (cómo se usa el descuento lo decide
@@ -4791,12 +4809,14 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
         for v in df[col].tolist() if isinstance(v, str)
     ])
 
-    # (número de fila, ¿trae NCM u origen?, ¿el origen es copiado?, rótulo
-    # propio, medidas, ítem)
+    # (número de fila, ¿es un cargo y no mercadería?, medidas, ítem)
     candidatos = []
     grupo = None  # (descripción, código de parte) del renglón de arriba
     agrupada = False  # si algún renglón tomó lo del de arriba
     flete, descuento, heredadas, sin_precio = [], [], [], []
+    # Fila con su propia descripción → ¿es un cargo y no mercadería? Una copia
+    # de su descripción combinada sin otro rótulo es la misma cosa (EXCEL-3c).
+    no_es_mercaderia_en = {}
     rellenadas = df.attrs.get("celdas_rellenadas", {})
     for _, row in df.iterrows():
         try:
@@ -4820,6 +4840,9 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             origen_propio = celda_origen if origen_col and _propia(origen_col) else None
             sin_ncm_ni_origen = not pieza and not _texto_de_celda(origen_propio)
             descripcion_propia = descripcion if _propia(desc_col) else ""
+            descripcion_copiada = "" if descripcion_propia else descripcion
+            # Sin origen propio, un origen con texto es copiado.
+            copiada = bool(_texto_de_celda(celda_origen) or descripcion_copiada)
 
             # El rótulo de una fila sin descripción puede estar en otra
             # columna («Total» o «Discount» en la columna Item).
@@ -4850,7 +4873,9 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
                  if t and _numero_factura(t, decimal) is None), "")
             es_cargo = False  # flete o descuento: no abre grupo
             if sin_ncm_ni_origen and (descripcion or not con_medidas):
-                es_flete = bool(_FILA_DE_FLETE_RE.match(cargo))
+                # Con algo copiado, «Freight elevator» es un producto (EXCEL-3c).
+                es_flete = (bool(_FILA_DE_FLETE_RE.match(cargo))
+                            and (not copiada or _es_solo_un_cargo(cargo)))
                 es_descuento = not es_flete and bool(_FILA_DE_DESCUENTO_RE.match(cargo))
                 if es_descuento and not _DESCUENTO_SOLO_RE.match(cargo):
                     # «Descuento comercial -500» no es un producto de valor 0;
@@ -4924,16 +4949,32 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
                 trae_unidad = numero is None and re.search(r"[^\W\d_]\s*$", texto)
                 tamaño.append(f"{nombre} {texto}" + (f" {unidad}" if unidad and not trae_unidad else ""))
 
-            # Si es un cargo lo dice lo escrito en la fila, no lo copiado de
-            # una combinada (EXCEL-3c). Un renglón del grupo es mercadería:
-            # una nota en Item («Freight included») no lo saca.
+            # Seguro o condiciones de pago sin NCM ni origen no son
+            # mercadería: no entran (sumarían al FOB) y se avisan. Lo dice lo
+            # escrito en la fila, no lo copiado de una combinada; con el
+            # origen o la descripción copiados, sólo si el rótulo dice nada
+            # más que el cargo (EXCEL-3c). Un renglón del grupo es
+            # mercadería: una nota en Item («Freight included») no lo saca.
             rotulo_propio = "" if del_grupo and not descripcion_propia else cargo
-            origen_copiado = bool(origen_col and not _propia(origen_col)
-                                  and _texto_de_celda(celda_origen))
+            if not sin_ncm_ni_origen:
+                no_es_mercaderia = False
+            elif descripcion_copiada and not rotulo_propio:
+                # Lo mismo que la fila de la combinada; si ella no entró
+                # (flete, total), ésta tampoco: se avisa.
+                ancla = _ - 1
+                while ancla in rellenadas.get(desc_col, ()):
+                    ancla -= 1
+                no_es_mercaderia = no_es_mercaderia_en.get(ancla, True)
+            elif copiada:
+                no_es_mercaderia = _es_solo_un_cargo(rotulo_propio)
+            else:
+                no_es_mercaderia = bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(rotulo_propio))
+            if descripcion_propia:
+                no_es_mercaderia_en[_] = no_es_mercaderia
 
             # Lo que falta o no se puede leer queda vacío (0 o ""), nunca
             # inventado; el semáforo de la revisión lo marca (MARIA-1a, EXCEL-1).
-            candidatos.append((_ + 2, not sin_ncm_ni_origen, origen_copiado, rotulo_propio, tamaño, Item(
+            candidatos.append((_ + 2, no_es_mercaderia, tamaño, Item(
                 pieza=pieza,
                 codigo_parte=parte,
                 descripcion=descripcion,
@@ -4948,20 +4989,18 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             descartes.append(_ + 2)
             continue
 
-    # Seguro o condiciones de pago sin NCM ni origen no son mercadería: no
-    # entran (sumarían al FOB) y se avisan. Cualquier otra fila sin NCM ni
-    # origen sí entra, con lo que falta vacío (EXCEL-1).
-    # Con el origen copiado de una combinada, sólo el rótulo que es
-    # nada más que el cargo (EXCEL-3c).
-    for fila, trae, origen_copiado, rotulo_propio, tamaño, item in candidatos:
-        es_cargo = _FILA_QUE_ES_SOLO_UN_CARGO_RE if origen_copiado else _FILA_QUE_NO_ES_MERCADERIA_RE
-        if not trae and es_cargo.match(rotulo_propio):
+    # Cualquier otra fila sin NCM ni origen sí entra, con lo que falta vacío
+    # (EXCEL-1).
+    for fila, no_es_mercaderia, tamaño, item in candidatos:
+        if no_es_mercaderia:
             descartes.append(fila)
             continue
         if agrupada and tamaño and item.descripcion:
             item.descripcion = f"{item.descripcion}, " + " x ".join(tamaño)
         items.append(item)
     descartes.sort()
+    sin_leer = set(descartes)
+    sin_precio = [f for f in sin_precio if f not in sin_leer]  # sólo las que entraron
     if flete:
         extras["flete"] = flete
     if descuento:

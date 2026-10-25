@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-10-25 · fix: la proforma con combinadas, sin perder productos ni sumar cargos (EXCEL-3c)
 
-- **fix(excel):** con el origen combinado, un producto con descripción propia que empieza con «Payment», «Handling» o «Seguro» vuelve a entrar; el seguro, el pago, los gastos o el handling cuyo rótulo es sólo el cargo («Insurance», «Payment 30% TT», «Handling fee») quedan sin leer, con aviso, aunque la descripción o el origen vengan combinados hasta su fila.
+- **fix(excel):** con el origen combinado, un producto con descripción propia que empieza con «Payment», «Handling» o «Seguro» vuelve a entrar; el seguro, el pago, los gastos o el handling cuyo rótulo dice sólo el cargo («Insurance», «Seguro de carga», «Payment 30% T/T in advance») quedan sin leer, con aviso, aunque la descripción o el origen vengan combinados hasta su fila o el rótulo ocupe dos filas; «Freight elevator» con el origen combinado es un producto, no el flete.
 - Una cabecera de grupo sin código vuelve a dar su descripción a los renglones con código propio. Los renglones del grupo que entran sin precio (lo trae sólo el primero o combinado) se avisan al subir.
 
 ## 2026-10-25 · fix: la fecha de inicio de actividad se valida al guardar el cliente (CLIENTE-1b)
