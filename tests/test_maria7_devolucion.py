@@ -96,9 +96,13 @@ def test_el_error_del_sufijo_llega_como_400(client):
 def test_el_aviso_dice_que_se_separo_y_no_rompe_con_un_sufijo_malo():
     avisos = mg.supuestos_declarados([dict(LONA)], sbt_sufijo_valor="AA(ROJO) AB(AZUL)-CA00-")
     assert any("Sufijo de valor:" in a and "AA(ROJO)-AB(AZUL)-CA00-" in a for a in avisos)
-    # El aviso no reemplaza al error: con un sufijo malo no sale aviso del
-    # sufijo y los demás salen igual que con uno bien escrito.
-    assert (mg.supuestos_declarados([dict(LONA)], sbt_sufijo_valor="AA(SIN CIERRE-")
+    # El aviso no reemplaza al error: con un sufijo malo no sale el aviso de
+    # lo que se separó y los demás salen igual que con uno bien escrito. El
+    # error mismo se anticipa (MARIA-9): es lo único que se agrega.
+    malo = mg.supuestos_declarados([dict(LONA)], sbt_sufijo_valor="AA(SIN CIERRE-")
+    errores = [a for a in malo if "no se puede separar" in a]
+    assert len(errores) == 1 and errores[0].startswith("Sufijo de valor de la operación: «AA(SIN CIERRE-»")
+    assert ([a for a in malo if a not in errores]
             == mg.supuestos_declarados([dict(LONA)], sbt_sufijo_valor="AA(DEMO)-CA00-"))
 
 

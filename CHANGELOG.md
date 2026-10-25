@@ -6,6 +6,33 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-25 · fix: «Calcular seguro» sólo usa cuentas del pedido de ahora (VALOR-1b)
+
+- «Calcular seguro» compara el pedido de ahora con el de las cuentas: si cambió un ajuste, el flete, el seguro o el descuento, pide las cuentas de nuevo en vez de usar las viejas. El seguro calculado deja de avisarse como no leído, y si la factura puede traer un seguro sin leer, la tarjeta lo avisa antes de calcularlo.
+- El 1 % del seguro sugerido va sobre el FOB de la factura (D13). Un ajuste o un renglón que no es número va en la tarjeta con un mensaje claro, sin texto de Python, y no frena el TXT.
+
+## 2026-10-25 · fix: el error de kilos nombra sólo el renglón chico (MARIA-9)
+
+- Cuando varios renglones van juntos en un ítem y uno es tan chico que sus kilos al centésimo dan cero, el error nombra ese renglón. Antes nombraba a todos los del ítem. Si ninguno da cero solo y el cero sale del ajuste del redondeo, sigue nombrando a todos.
+- Con procedencia de la operación, la generación ya no pide el sufijo general cuando cada renglón trae el suyo.
+
+## 2026-10-25 · fix: cada error de sufijo sale donde se corrige (MARIA-9)
+
+- En la pantalla de generar, el error del sufijo de la operación sale bajo su campo, y el del sufijo de un sub-ítem bajo ese sub-ítem, en el paso de NCM. Antes los dos salían como error general de la generación.
+
+## 2026-10-25 · fix: el sufijo de la operación frena sólo si alguien lo usa (MARIA-9)
+
+- Si todos los productos traen su propio sufijo de valor, un texto libre en el sufijo de la operación ya no frena el TXT (volvió a generarse con los propios). Cuando algún producto lo toma y no se puede separar, los avisos lo anticipan con el mismo texto del error.
+
+## 2026-10-25 · fix: la tarjeta de ajustes y seguro no usa cuentas viejas (VALOR-1)
+
+- «Usar como ajuste a deducir» ya no pisa un importe escrito a mano; «Calcular seguro» no usa cuentas de otra operación, y funciona aunque todavía no haya operación cargada. Si fallan los avisos, o un producto viene mal formado o fuera de rango, la tarjeta lo dice en vez de quedar vacía o dar error.
+
+## 2026-10-24 · feat: ajustes y seguro antes de generar (VALOR-1)
+
+- En la pantalla de generar, una tarjeta «Ajustes y seguro»: ajustes a incluir y a deducir que carga la persona, con las cuentas a la vista (FOB de la factura, que es el del TXT, ± ajustes = FOB casillero, flete y seguro). El descuento de la planilla se ofrece con un botón; nunca se pone solo.
+- Botón «Calcular seguro» (1 % de FOB casillero + flete) cuando la operación no trae seguro. La base del 1 % se nombra en el botón y está en un solo lugar del código (sin decidir). El TXT todavía lleva el FOB de la factura; un aviso dice que el FOB casillero va al TXT en una próxima versión.
+
 ## 2026-10-24 · fix: devolución de MARIA-7
 
 - Dos sufijos de valor sin guion entre ellos se separan (`AA(ROJO) AB(AZUL)` → `AA(ROJO)-AB(AZUL)`); uno que no se puede separar en códigos (paréntesis sin cerrar, un código sin valor) no genera el TXT y dice dónde está.
