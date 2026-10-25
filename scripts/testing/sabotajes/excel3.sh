@@ -234,23 +234,52 @@ sabotaje $M "3b-3#2 una nota de descuento sin precio abre un grupo" \
   "${B}una_nota_de_descuento_sin_precio_no_abre_un_grupo"
 
 # EXCEL-3c
-sabotaje $M "3c R1 con el origen copiado, un producto con «Payment» queda sin leer" \
-  '        es_cargo = _FILA_QUE_ES_SOLO_UN_CARGO_RE if origen_copiado else _FILA_QUE_NO_ES_MERCADERIA_RE' \
-  '        es_cargo = _FILA_QUE_NO_ES_MERCADERIA_RE' \
+sabotaje $M "3c R1 con algo copiado, un producto con «Payment» queda sin leer" \
+  '                no_es_mercaderia = _es_solo_un_cargo(rotulo_propio)' \
+  '                no_es_mercaderia = bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(rotulo_propio))' \
   "${B}un_producto_con_una_palabra_de_cargo_y_su_descripcion_se_lee[payment_handling-origen_combinado]"
-sabotaje $M "3c R1 el rótulo de cargo no tiene que ser entero" \
-  '|advance|deposit|balance|anticipad[oa])\b)*$",' '|advance|deposit|balance|anticipad[oa])\b)*",' \
+sabotaje $M "3c R1 con una palabra de cargo alcanza" \
+  '            and all(len(p) == 1 or p in _PALABRAS_DE_CARGO' '            and any(len(p) == 1 or p in _PALABRAS_DE_CARGO' \
   "${B}un_producto_con_una_palabra_de_cargo_y_su_descripcion_se_lee[payment_handling-origen_combinado]"
-sabotaje $M "3c R1 «Handling fee» con el origen copiado entra como producto" \
-  '(?:fees?|charges?|costs?|' '(?:charges?|costs?|' \
-  "${B}un_cargo_no_entra_como_producto_aunque_venga_una_combinada[origen_rotulo_en_descripcion-handling]"
+sabotaje $M "3c R1 «fee» no es palabra de cargo" \
+  '"incoterms", "delivery", "term", "terms", "fee", "fees", "premium",' \
+  '"incoterms", "delivery", "term", "terms", "premium",' \
+  "${B}un_cargo_dicho_con_mas_palabras_no_entra_aunque_venga_una_combinada[origen-insurance_fee]"
+sabotaje $M "3c R1 «carga» no es palabra de cargo" \
+  '"poliza", "póliza", "carga", "cargo",' '"poliza", "póliza", "cargo",' \
+  "${B}un_cargo_dicho_con_mas_palabras_no_entra_aunque_venga_una_combinada[origen-seguro_de_carga]"
+sabotaje $M "3c R1 la descripción copiada no cuenta como copiada" \
+  '            copiada = bool(_texto_de_celda(celda_origen) or descripcion_copiada)' \
+  '            copiada = bool(_texto_de_celda(celda_origen))' \
+  "${B}con_la_descripcion_combinada_una_palabra_de_cargo_en_otra_columna_no_saca_al_producto"
+sabotaje $M "3c R1 el origen copiado no cuenta como copiado" \
+  '            copiada = bool(_texto_de_celda(celda_origen) or descripcion_copiada)' \
+  '            copiada = bool(descripcion_copiada)' \
+  "${B}un_producto_con_una_palabra_de_cargo_y_su_descripcion_se_lee[payment_handling-origen_combinado]"
+sabotaje $M "3c R1 con algo copiado, «Freight elevator» es el flete" \
+  '                            and (not copiada or _es_solo_un_cargo(cargo)))' '                            )' \
+  "${B}un_producto_que_empieza_como_el_flete_con_el_origen_combinado_es_mercaderia"
 sabotaje $M "3c B1 decide con la descripción copiada" \
   '            rotulo_propio = "" if del_grupo and not descripcion_propia else cargo' \
   '            rotulo_propio = descripcion' \
   "${B}un_cargo_no_entra_como_producto_aunque_venga_una_combinada[descripcion-insurance]"
-# Sin sabotaje: sacar «not _propia(origen_col)» de origen_copiado es
-# equivalente. El filtro mira sólo filas sin origen propio (not trae), y ahí
-# un origen con texto siempre es copiado.
+sabotaje $M "3c B1 la copia sin rótulo entra aunque su fila no" \
+  '                no_es_mercaderia = no_es_mercaderia_en.get(ancla, True)' \
+  '                no_es_mercaderia = False' \
+  "${B}un_cargo_con_su_rotulo_combinado_no_suma_la_fila_de_abajo"
+# El caso de la copia de 3c tiene la fila de arriba como cargo: ahí el valor
+# por defecto da lo mismo. Lo ve la proforma de EXCEL-3, cuyos renglones son
+# copias de un producto (y 11 casos más).
+sabotaje $M "3c B1 la copia sin rótulo nunca entra" \
+  '                no_es_mercaderia_en[_] = no_es_mercaderia' '                pass' \
+  "${B}con_la_especificacion_combinada_hacia_abajo_cada_renglon_conserva_su_codigo"
+sabotaje $M "3c D12 el aviso nombra filas sin leer" \
+  '    sin_precio = [f for f in sin_precio if f not in sin_leer]  # sólo las que entraron' \
+  '    pass' \
+  "${B}el_aviso_sin_precio_no_nombra_filas_que_quedaron_sin_leer"
+# Sin sabotaje: tomar el origen propio en vez de la celda en «copiada» es
+# equivalente. El veredicto con algo copiado mira sólo filas sin NCM ni origen
+# propio, y ahí un origen con texto siempre es copiado.
 sabotaje $M "3c una nota en Item saca a un renglón del grupo" \
   '                agrupada = del_grupo = True' '                agrupada = True; del_grupo = False' \
   "${B}una_nota_de_flete_en_otra_columna_de_un_renglon_no_lo_saca[Item]"
