@@ -320,18 +320,21 @@
                                 <div class="review-grid">
                                     <div class="field">
                                         <label class="field-label" for="f_flete">Flete (USD)</label>
-                                        <input class="input" type="number" step="0.01" min="0" id="f_flete" name="flete" autocomplete="off">
+                                        <input class="input" type="text" inputmode="decimal" id="f_flete" name="flete" autocomplete="off">
                                         <span class="field-hint">Dejar en 0 si el PDF ya lo incluye.</span>
+                                        <span class="field-error" data-error-for="flete" hidden></span>
                                     </div>
                                     <div class="field">
                                         <label class="field-label" for="f_seguro">Seguro (USD)</label>
-                                        <input class="input" type="number" step="0.01" min="0" id="f_seguro" name="seguro" autocomplete="off">
+                                        <input class="input" type="text" inputmode="decimal" id="f_seguro" name="seguro" autocomplete="off">
                                         <span class="field-hint">Dejar en 0 si no aplica.</span>
+                                        <span class="field-error" data-error-for="seguro" hidden></span>
                                     </div>
                                     <div class="field">
                                         <label class="field-label" for="f_gastos_anteriores_fob">Gastos anteriores a FOB (USD)</label>
-                                        <input class="input" type="number" step="0.01" min="0" id="f_gastos_anteriores_fob" name="gastos_anteriores_fob" autocomplete="off">
+                                        <input class="input" type="text" inputmode="decimal" id="f_gastos_anteriores_fob" name="gastos_anteriores_fob" autocomplete="off">
                                         <span class="field-hint">Sólo con EXW, FCA o FAS: lo que costó llevar la mercadería hasta FOB. Va al TXT como GTOS-ANT-FOB.</span>
+                                        <span class="field-error" data-error-for="gastos_anteriores_fob" hidden></span>
                                     </div>
                                 </div>
                                 <div class="cx-incoterm-warning" id="reviewIncotermWarning" hidden role="alert"></div>
@@ -607,10 +610,10 @@
                             <p class="form-label" style="font-weight:600">Ajustes y seguro</p>
                             <div class="row-3" style="gap:.75rem;flex-wrap:wrap">
                                 <label class="form-label">Ajustes a incluir
-                                    <input type="number" id="valorIncluir" class="form-input" step="0.01" min="0" inputmode="decimal" placeholder="0,00" autocomplete="off">
+                                    <input type="text" id="valorIncluir" class="form-input" inputmode="decimal" placeholder="0,00" autocomplete="off">
                                 </label>
                                 <label class="form-label">Ajustes a deducir
-                                    <input type="number" id="valorDeducir" class="form-input" step="0.01" min="0" inputmode="decimal" placeholder="0,00" autocomplete="off">
+                                    <input type="text" id="valorDeducir" class="form-input" inputmode="decimal" placeholder="0,00" autocomplete="off">
                                 </label>
                             </div>
                             <p id="valorDescuento" hidden style="margin-top:.5rem;font-size:.9rem">
@@ -1665,6 +1668,7 @@
     </script>
 
     <script src="/static/v2/app_v2.js?v={{ version }}" defer></script>
+    <script src="/static/v2/montos_ar.js?v={{ version }}" defer></script>
     <script src="/static/v2/topbar_financials.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/semaforo.js?v={{ version }}" defer></script>
     <script src="/static/v2/screens/cockpit.js?v={{ version }}" defer></script>

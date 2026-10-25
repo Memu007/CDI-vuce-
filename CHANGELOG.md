@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-25 · fix: «3.480» es tres mil cuatrocientos ochenta, en la factura y en la pantalla (SEPARADORES-1)
+
+- El flete y el seguro de la factura se leen como texto: «3.480» y «3.480,00» son 3480 (antes el TXT salía con MDDTFLE=3.48). Si la misma factura usa ese separador como decimal, el dato queda sin leer y se avisa.
+- Flete, seguro, gastos y ajustes se escriben a mano con punto de miles y coma decimal. «1,500» no se adivina: la pantalla pregunta si es 1.500 o 1,5.
+
 ## 2026-10-25 · fix: «Calcular seguro» sólo usa cuentas del pedido de ahora (VALOR-1b)
 
 - «Calcular seguro» compara el pedido de ahora con el de las cuentas: si cambió un ajuste, el flete, el seguro o el descuento, pide las cuentas de nuevo en vez de usar las viejas. El seguro calculado deja de avisarse como no leído, y si la factura puede traer un seguro sin leer, la tarjeta lo avisa antes de calcularlo.
