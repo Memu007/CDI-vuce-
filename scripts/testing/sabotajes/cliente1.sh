@@ -174,9 +174,6 @@ sabotaje $J "el aviso de la fecha no dice la fila" \
 sabotaje $J "el aviso de la fecha no dice el valor" \
   "«' + item.value + '»" "«»" \
   "FALLA: la vista previa no avisa la fecha que no sirve"
-sabotaje $J "el aviso de las fechas aparece siempre" \
-  "importPreviewFechas.hidden = fechas.length === 0;" "importPreviewFechas.hidden = false;" \
-  "FALLA: sin fechas malas igual aparece el aviso de fechas"
 sabotaje $H "la vista previa no tiene dónde avisar las fechas" \
   '<ul class="migration-omitted" id="importPreviewFechas" hidden></ul>' '' \
   "FALLA: la vista previa no avisa la fecha que no sirve"

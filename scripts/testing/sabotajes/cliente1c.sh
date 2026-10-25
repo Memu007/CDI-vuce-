@@ -106,7 +106,7 @@ sabotaje $M "la ficha no dice si la guardada sirve" \
   "${C}test_la_ficha_dice_si_la_fecha_guardada_sirve[2015-02-30]"
 sabotaje $M "la ficha decide con la regla del alta, no con la del generador" \
   '        fecha_inicio_actividad(guardada)' '        _fecha_inic_activ_o_vacia(guardada) or int("no sirve")' \
-  "${C}test_la_ficha_dice_si_la_fecha_guardada_sirve[２０１５-03-15]"
+  "${C}test_la_ficha_dice_si_la_fecha_guardada_sirve[\uff12\uff10\uff11\uff15-03-15]"
 sabotaje $M "la ficha dice que sirve una vacía" \
   $'    if not str(guardada or "").strip():\n        return False\n' '' \
   "${C}test_la_ficha_dice_si_la_fecha_guardada_sirve[vacia]"
@@ -115,8 +115,8 @@ sabotaje $M "la ficha dice que sirve una vacía" \
 sabotaje $D "un --base mal escrito sale con el error de Python" \
   'except (ArgumentError, ValueError):' 'except ZeroDivisionError:' \
   "${B}test_un_base_mal_escrito_no_muestra_la_clave[sin-dos-puntos]"
-sabotaje $D "el puerto que no es número no se mira antes" \
-  '        url.port  # «:abc» recién falla acá' '        pass' \
+sabotaje $D "un puerto que no es número sale con el error de Python" \
+  'except (ArgumentError, ValueError):' 'except ArgumentError:' \
   "${B}test_un_base_mal_escrito_no_muestra_la_clave[puerto-texto]"
 sabotaje $D "una base que no responde sale con el traceback" \
   'except Exception as e:  # noqa: BLE001' 'except ZeroDivisionError as e:  # noqa: BLE001' \
