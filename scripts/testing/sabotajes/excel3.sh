@@ -91,7 +91,7 @@ sabotaje $M "queda el aviso viejo del catálogo" \
 sabotaje $M "los renglones del grupo vuelven a quedar sin descripción" \
   '                descripcion, parte = grupo[0], parte or grupo[1]' '                pass' "$XLS"
 sabotaje $M "hereda aunque el renglón no tenga medidas" \
-  'if (not pieza and grupo and con_medidas and' 'if (not pieza and grupo and' \
+  'if (not pieza and grupo and (con_medidas or del_grupo_copiado)' 'if (not pieza and grupo and (True' \
   "FAILED $T::test_un_renglon_con_precio_y_sin_medidas_no_hereda"
 sabotaje $M "un código distinto en cada renglón vuelve a heredar la descripción" \
   '            if grupo and grupo[1] and parte and parte != grupo[1] and not descripcion:' \
@@ -403,6 +403,12 @@ sabotaje $M "3e de más: sin medidas, lo copiado queda afuera" \
                 descartes.append(_ + 2)
                 continue" \
   "${B}un_producto_con_medidas_que_no_son_sigue_entrando[/-descripcion_combinada-xlsx]"
+sabotaje $M "3e el renglón con «-» bajo la combinada pierde el código de arriba" \
+  '(con_medidas or del_grupo_copiado)' 'con_medidas' \
+  "${B}un_renglon_bajo_la_descripcion_combinada_sin_medidas_conserva_el_codigo[--xls]"
+sabotaje $M "3e el seguro con la descripción copiada vuelve a entrar por el grupo" \
+  'descripcion == grupo[0] and not cargo)' 'descripcion == grupo[0])' \
+  "${B}un_cargo_no_entra_como_producto_aunque_venga_una_combinada[descripcion-insurance]"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
