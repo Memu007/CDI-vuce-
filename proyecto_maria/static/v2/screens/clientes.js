@@ -577,7 +577,7 @@
             fechas.slice(0, 8).forEach(item => {
                 const li = document.createElement('li');
                 const lugar = (variasHojas && item.sheet ? 'Hoja ' + item.sheet + ', fila ' : 'Fila ') + item.row;
-                li.textContent = lugar + ': la fecha de inicio «' + item.value + '» no es válida; el cliente se importa sin esa fecha.';
+                li.textContent = lugar + ': la fecha de inicio «' + item.value + '» no es válida y no se importa.';
                 importPreviewFechas.appendChild(li);
             });
             if (fechas.length > 8) {
@@ -1684,6 +1684,7 @@
         if (fNotas) fNotas.value = '';
         if (fFechaInicActiv) fFechaInicActiv.value = '';
         fechaInicOculta = '';
+        fechaInicOcultaSirve = false;
         if (fAdvanced) fAdvanced.open = false;
     }
 
