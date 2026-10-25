@@ -13,7 +13,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-10-25 · fix: lo que empieza como un cargo no cambia el FOB sin avisar su fila (EXCEL-3d)
 
-- **fix(excel):** con algo copiado de una combinada, «Flete int.» o «Freight elevator» se leen como flete y un rótulo que dice más que el cargo («Gastos administrativos», «Payment terminal POS») entra como producto: los dos con un aviso que nombra la fila. El renglón de un grupo queda afuera o entra igual que su cabecera.
+- **fix(excel):** con algo copiado de una combinada, «Flete int.» o «Freight elevator» se leen como flete y un rótulo que dice más que el cargo («Gastos administrativos», «Payment terminal POS») entra como producto: los dos con un aviso que nombra la fila. El renglón de un grupo queda afuera o entra igual que su cabecera, y la fila que copia la descripción de un flete, seguro o gasto combinado queda afuera como esa fila aunque traiga un texto propio en Item («A2», «#3»).
 - Todo renglón que entra sin precio se avisa al subir, con sus filas (hasta cinco por número).
 
 ## 2026-10-25 · fix: la proforma con combinadas, sin perder productos ni sumar cargos (EXCEL-3c)
