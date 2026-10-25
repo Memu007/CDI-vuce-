@@ -41,8 +41,8 @@ cifras) va a CLIENTE-1b, y limpiar lo guardado en producción lo decide Emi.
 
 **MARIA-7/8 aceptada con nota 2026-10-25 00:28 UTC** (Dev MARIA, sobre
 `30ceace`): integrada con `merge` (`1fa0b6e`), **sin publicar**. Antes de
-publicarla va MARIA-9: el sufijo general sin usar hoy frena el TXT
-(regresión). Detalle en `REPRODUCCION-MARIA-7-8-2026-10-25.md`.
+publicarla iba MARIA-9, ya integrada (abajo). Detalle en
+`REPRODUCCION-MARIA-7-8-2026-10-25.md`.
 
 **PRUEBAS-1 + PA-1b aceptadas con nota 2026-10-25 00:47 UTC** (Dev técnica,
 sobre `e924b29`): sólo pruebas y la demo de la landing. Integrado `e924b29`
@@ -54,11 +54,12 @@ código sano: la nota va a CLIENTE-1b. Detalle en
 regresiones que pierden filas con aviso, y el seguro con descripción
 combinada sigue entrando como producto. Detalle en
 `REPRODUCCION-EXCEL-3b-2026-10-25.md`.
-**VALOR-1 vuelve como VALOR-1b** (Dev MARIA, `3352a01`, sin integrar): con
-«Usarlo» el seguro puede salir con las cuentas de antes del descuento, y el
-aviso del seguro sin leer no se va. D13 (b), decidido por la PM: el seguro
-sugerido sobre el FOB de la factura hasta PRORRATEO-1. D14 (a). Las dos, al
-despachante. Detalle en `REPRODUCCION-VALOR-1-2026-10-25.md`.
+**VALOR-1b y MARIA-9 aceptadas con nota 2026-10-25 02:58 UTC** (Dev MARIA,
+sobre `efa2e08`): integradas con `merge` (`9f787f6`), **sin publicar**. El
+botón del seguro ya no usa cuentas viejas y el sufijo general sin usar ya no
+frena el TXT; ningún TXT equivocado. D18 (b). Queda VALOR-1c (Generar con un
+seguro calculado sobre otras cuentas, kilos, pruebas) antes de
+SEPARADORES-1. Detalle en `REPRODUCCION-VALOR-1b-MARIA-9-2026-10-25.md`.
 
 **Rojo conocido de EXCEL-2, ya publicado:** `test_excel2.py::test_ocho_libros…`
 falla siempre en la máquina de la PM (4 núcleos), también en la base: una
@@ -340,9 +341,9 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-25 02:24 UTC: EXCEL-3c (`273c153`) vuelve como EXCEL-3d. Con el origen combinado, «Flete int.», «Gastos administrativos» o «Insurance 40 GBP» suben el FOB de 3550 a 4750 sin aviso, y la base lo leía como flete. El seguro con la descripción combinada sigue entrando con algunos rótulos. Además, el hijo de una cabecera «Insurance» entra como producto, y D12 avisa sólo con medidas. CLIENTE-1b aceptada con nota; se integra con EXCEL-3d porque la rama no se separa. D15 (b), D16 (b) como CLIENTE-1c; D17 (a). La técnica sigue con EXCEL-3d, después ESTUDIO-1 y CLIENTE-1c. La Dev MARIA, en VALOR-1b.
+2026-10-25 02:58 UTC: VALOR-1b y MARIA-9 (`efa2e08`) aceptadas con nota e integradas (`9f787f6`), sin publicar. Dos adversarios sin TXT equivocado ni regresión de plata; sus sabotajes 23, 31 y 30 en rojo. D18 (b). La Dev MARIA sigue con VALOR-1c, después SEPARADORES-1. La técnica, en EXCEL-3d.
 
-2026-10-25 00:58 UTC: VALOR-1 vuelve como VALOR-1b. D13 (b), base FOB de la factura; D14 (a). Cuatro preguntas nuevas al despachante en `PREGUNTAS-DESPACHANTE.md`.
+2026-10-25 02:24 UTC: EXCEL-3c (`273c153`) vuelve como EXCEL-3d. Con el origen combinado, «Flete int.», «Gastos administrativos» o «Insurance 40 GBP» suben el FOB de 3550 a 4750 sin aviso, y la base lo leía como flete. El seguro con la descripción combinada sigue entrando con algunos rótulos. Además, el hijo de una cabecera «Insurance» entra como producto, y D12 avisa sólo con medidas. CLIENTE-1b aceptada con nota; se integra con EXCEL-3d porque la rama no se separa. D15 (b), D16 (b) como CLIENTE-1c; D17 (a). La técnica sigue con EXCEL-3d, después ESTUDIO-1 y CLIENTE-1c. La Dev MARIA, en VALOR-1b.
 
 ## Medición
 
@@ -350,5 +351,5 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## /compact conservar de la PM principal
 
-/compact conservar: Soy la PM principal de CDI (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK min 55). Producto Memu007/CDI-vuce-, clon /home/user/cdi-vuce-, mi rama claude/practical-shannon-szpwkn (nunca main; cada push a main publica). main = 8b45207 (EXCEL-3 + CLIENTE-1, publicada 24/10 con «dale 8b45207»; falta que Emi la pruebe; volver a dddcf6d sólo con su ok). Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, alto): MARIA-7/8 aceptada e integrada (1fa0b6e, sin publicar; antes de publicar va MARIA-9); VALOR-1 vuelve como VALOR-1b (3352a01 sin integrar; D13 b base FOB factura, D14 a), sigue MARIA-9, SEPARADORES-1. Dev técnica (session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica): EXCEL-3d (devolución de EXCEL-3c 273c153: cargos con palabra fuera de la lista entran al FOB sin aviso con combinadas, hijo de cabecera de cargo, D12 sin medidas; sin ampliar la lista), con D17 (a) en commit aparte; CLIENTE-1b aceptada con nota, se integra con EXCEL-3d; después ESTUDIO-1, CLIENTE-1c (D15 b, D16 b), GUARDAR-2. PRUEBAS-1 + PA-1b integradas (merge 4f00636). Pendiente de la PM: revisar EXCEL-3d y VALOR-1b cuando lleguen. Para Emi: orden de prioridad de Argon (REPRODUCCION-ARGON-2026-10-24.md; nada al roadmap sin su «dale»); probar 8b45207; preguntas al despachante (las cuatro nuevas de PREGUNTAS-DESPACHANTE.md); packing list; revocar la clave de Anthropic de cambiar_ai.sh y rotar Gemini; 4.1 y 6.1 de producción; el script de fechas de CLIENTE-1b con --base deja la clave de la base en el historial (pasarla por variable). Roadmap en ROADMAP.md; TXT y proforma reales sólo en el scratchpad. Reglas de Emi: nada fuera del roadmap; Devs hasta alto, sin Fable; consejero sólo mío; castellano llano; consultas de 9 a 21 ARG; publicar sólo con «dale <SHA>» de día; usar date -u.
+/compact conservar: Soy la PM principal de CDI (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK min 55). Producto Memu007/CDI-vuce-, clon /home/user/cdi-vuce-, mi rama claude/practical-shannon-szpwkn (nunca main; cada push a main publica). main = 8b45207 (EXCEL-3 + CLIENTE-1, publicada 24/10 con «dale 8b45207»; falta que Emi la pruebe; volver a dddcf6d sólo con su ok). Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, alto): MARIA-7/8, VALOR-1b y MARIA-9 aceptadas e integradas (merge 9f787f6 sobre efa2e08, sin publicar; D13 b, D14 a, D18 b); ahora VALOR-1c (Generar con seguro calculado sobre otras cuentas, D18 b, kilos, items vacío, pruebas que no distinguen), después SEPARADORES-1. Dev técnica (session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica): EXCEL-3d (devolución de EXCEL-3c 273c153: cargos con palabra fuera de la lista entran al FOB sin aviso con combinadas, hijo de cabecera de cargo, D12 sin medidas; sin ampliar la lista), con D17 (a) en commit aparte; CLIENTE-1b aceptada con nota, se integra con EXCEL-3d; después ESTUDIO-1, CLIENTE-1c (D15 b, D16 b), GUARDAR-2. PRUEBAS-1 + PA-1b integradas (merge 4f00636). Pendiente de la PM: revisar EXCEL-3d y VALOR-1c cuando lleguen. Para Emi: orden de prioridad de Argon (REPRODUCCION-ARGON-2026-10-24.md; nada al roadmap sin su «dale»); probar 8b45207; preguntas al despachante (las cuatro nuevas de PREGUNTAS-DESPACHANTE.md); packing list; revocar la clave de Anthropic de cambiar_ai.sh y rotar Gemini; 4.1 y 6.1 de producción; el script de fechas de CLIENTE-1b con --base deja la clave de la base en el historial (pasarla por variable). Roadmap en ROADMAP.md; TXT y proforma reales sólo en el scratchpad. Reglas de Emi: nada fuera del roadmap; Devs hasta alto, sin Fable; consejero sólo mío; castellano llano; consultas de 9 a 21 ARG; publicar sólo con «dale <SHA>» de día; usar date -u.
 
