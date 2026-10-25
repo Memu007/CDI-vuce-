@@ -127,6 +127,7 @@ function sembrarFecha(clienteId, fecha) {
     ['ISO', '2015-03-01', false, null, '2015-03-01', false],
     ['Reemplazada', '01/03/2015', true, '2016-04-02', '2016-04-02', false],
     ['Borrada', '2015-03-01', false, '', null, true],
+    ['Año cero', '0000-01-01', true, null, '0000-01-01', true],
     ['Imposible', '2015-02-30', true, null, '2015-02-30', true],
   ];
   const idsD3 = {};

@@ -100,3 +100,13 @@ def test_con_la_opcion_vacia_cada_none_que_informa(tmp_path, capsys):
 def test_acepta_la_url_sqlite_sin_driver(base, capsys):
     assert main(["--base", f"sqlite:///{base}"]) == 0
     assert "Con «None»: 2" in capsys.readouterr().out
+
+
+def test_una_base_sqlite_que_no_existe_no_se_crea(tmp_path, capsys):
+    """Una ruta mal escrita no deja una base vacía ni un traceback."""
+    ruta = tmp_path / "no-existe.db"
+    with pytest.raises(SystemExit) as salida:
+        main(["--base", f"sqlite:///{ruta}"])
+    assert salida.value.code == 2
+    assert not ruta.exists()
+    assert "no existe" in capsys.readouterr().err

@@ -96,6 +96,9 @@ sabotaje $D "con la opción vacía sólo la «None» exacta" \
 sabotaje $D "una URL sqlite:/// no se pasa al driver async" \
   $'    if url.startswith("sqlite://"):\n        return "sqlite+aiosqlite://" + url[len("sqlite://"):]\n' '' \
   "FAILED tests/test_cliente1b_script.py::test_acepta_la_url_sqlite_sin_driver"
+sabotaje $D "una base sqlite que no existe se crea vacía" \
+  '        p.error(f"la base sqlite no existe: {url.database}")' '        pass' \
+  "FAILED tests/test_cliente1b_script.py::test_una_base_sqlite_que_no_existe_no_se_crea"
 sabotaje $D "una fecha que no sirve no se informa" \
   "            no_sirven.append(cid)" "            pass" \
   "FAILED tests/test_cliente1b_script.py::test_sin_la_opcion_informa_y_no_cambia_nada"

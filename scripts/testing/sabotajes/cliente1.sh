@@ -147,6 +147,9 @@ sabotaje $J "el aviso no pide la conservada que no sirve" \
 sabotaje $J "sirve cualquier fecha con forma, exista o no" \
   "return f.getUTCFullYear() === anio && f.getUTCMonth() === mes - 1 && f.getUTCDate() === dia;" "return true;" \
   "FALLA: Imposible: el aviso no dice que falta el inicio de actividad"
+sabotaje $J "sirve el año 0000, que Python no tiene" \
+  "        if (anio < 1) return false;  // Python no tiene año 0" "" \
+  "FALLA: Año cero: el aviso no dice que falta el inicio de actividad"
 sabotaje $J "la conservada DD/MM/AAAA no sirve" \
   'm = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(t);' "m = null;" \
   "FALLA: Barras: el aviso dice que falta el inicio de actividad"
