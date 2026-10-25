@@ -341,9 +341,9 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-25 02:58 UTC: VALOR-1b y MARIA-9 (`efa2e08`) aceptadas con nota e integradas (`9f787f6`), sin publicar. Dos adversarios sin TXT equivocado ni regresión de plata; sus sabotajes 23, 31 y 30 en rojo. D18 (b). La Dev MARIA sigue con VALOR-1c, después SEPARADORES-1. La técnica, en EXCEL-3d.
+2026-10-25 03:00 UTC: sin entregas nuevas. Las dos Devs trabajando (MARIA en VALOR-1c, sin subir; la técnica en EXCEL-3d, rama en `31c9b5a`), contexto de las tres sesiones bajo 130k de 200k.
 
-2026-10-25 02:24 UTC: EXCEL-3c (`273c153`) vuelve como EXCEL-3d. Con el origen combinado, «Flete int.», «Gastos administrativos» o «Insurance 40 GBP» suben el FOB de 3550 a 4750 sin aviso, y la base lo leía como flete. El seguro con la descripción combinada sigue entrando con algunos rótulos. Además, el hijo de una cabecera «Insurance» entra como producto, y D12 avisa sólo con medidas. CLIENTE-1b aceptada con nota; se integra con EXCEL-3d porque la rama no se separa. D15 (b), D16 (b) como CLIENTE-1c; D17 (a). La técnica sigue con EXCEL-3d, después ESTUDIO-1 y CLIENTE-1c. La Dev MARIA, en VALOR-1b.
+2026-10-25 02:58 UTC: VALOR-1b y MARIA-9 (`efa2e08`) aceptadas con nota e integradas (`9f787f6`), sin publicar. Dos adversarios sin TXT equivocado ni regresión de plata; sus sabotajes 23, 31 y 30 en rojo. D18 (b). La Dev MARIA sigue con VALOR-1c, después SEPARADORES-1. La técnica, en EXCEL-3d.
 
 ## Medición
 
