@@ -102,12 +102,16 @@ reemplazar $M '    if valor.get("error"):
 caso "error_no_frena" "FAILED $T::test_si_no_se_pueden_hacer_las_cuentas_tampoco_genera"
 
 # 7. si el servidor lo frena, la pantalla no vuelve a las cuentas
-reemplazar $J "detail.startsWith('Seguro: ')" "detail.startsWith('Seguro calculado: ')"
+reemplazar $J "detail.startsWith('Seguro: lo calculó el sistema')" "detail.startsWith('Seguro calculado: ')"
 caso "no_vuelve_a_las_cuentas" "FAILED $T::test_si_el_servidor_lo_frena_se_vuelve_a_las_cuentas"
 
 # 8. vuelve a las cuentas con cualquier error
-reemplazar $J "        if (typeof detail === 'string' && detail.startsWith('Seguro: ')) {" "        if (typeof detail === 'string') {"
-caso "vuelve_con_cualquier_error" "FAILED $T::test_otro_error_se_queda_en_la_pantalla_de_generar"
+reemplazar $J "        if (typeof detail === 'string' && detail.startsWith('Seguro: lo calculó el sistema')) {" "        if (typeof detail === 'string') {"
+caso "vuelve_con_cualquier_error" "FAILED $T::test_otro_error_se_queda_en_la_pantalla_de_generar[Item"
+
+# 8b. vuelve con cualquier error del seguro, también el mal escrito
+reemplazar $J "detail.startsWith('Seguro: lo calculó el sistema')" "detail.startsWith('Seguro: ')"
+caso "vuelve_con_el_seguro_mal_escrito" "FAILED $T::test_otro_error_se_queda_en_la_pantalla_de_generar[Seguro"
 
 # 9. «Dejar» se ofrece sólo con las cuentas en error
 reemplazar $J '(valor.error || valor.seguro !== valor.seguro_sugerido)' '(valor.error)'
@@ -196,4 +200,4 @@ reemplazar $M '
 caso "avisos_sin_procedencia" "FAILED $T::test_los_avisos_usan_la_procedencia_de_la_operacion"
 
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
-echo "OK: los 25 sabotajes dan rojo por la razón esperada"
+echo "OK: los 26 sabotajes dan rojo por la razón esperada"

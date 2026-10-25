@@ -136,9 +136,14 @@ def test_si_el_servidor_lo_frena_se_vuelve_a_las_cuentas():
     assert r["fueA"] == "validating"
 
 
-def test_otro_error_se_queda_en_la_pantalla_de_generar():
+@pytest.mark.parametrize("detalle", [
+    "Item 1: algo",
+    # El seguro mal escrito empieza igual y se corrige en la revisión.
+    "Seguro: «abc» no es un importe.",
+])
+def test_otro_error_se_queda_en_la_pantalla_de_generar(detalle):
     # Que la vuelta no dependa de cualquier error.
-    assert _generar_en_pantalla("Item 1: algo")["fueA"] is None
+    assert _generar_en_pantalla(detalle)["fueA"] is None
 
 
 # --------------------------------------------- 2. D18: el general que nadie usa
