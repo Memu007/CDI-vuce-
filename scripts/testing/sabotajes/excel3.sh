@@ -31,6 +31,10 @@ if s.count(viejo) != 1:
 open(p, "w").write(s.replace(viejo, nuevo))
 PYEOF
   then echo "ROTO  | $nombre: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1)); return; fi
+  # Un sabotaje que no compila da rojo por el SyntaxError, no por su motivo.
+  if ! "$PY" -c 'import ast, sys; ast.parse(open(sys.argv[1]).read())' "$archivo" 2>/dev/null; then
+    echo "ROTO  | $nombre: el sabotaje deja $archivo sin compilar"; FALLAS=$((FALLAS+1)); return
+  fi
   local salida codigo
   salida="$("$PY" -m pytest -q --no-cov -p no:cacheprovider tests/test_excel3.py 2>&1)"; codigo=$?
   if [ "$codigo" -eq 0 ]; then
@@ -91,7 +95,7 @@ sabotaje $M "queda el aviso viejo del catálogo" \
 sabotaje $M "los renglones del grupo vuelven a quedar sin descripción" \
   '                descripcion, parte = grupo[0], parte or grupo[1]' '                pass' "$XLS"
 sabotaje $M "hereda aunque el renglón no tenga medidas" \
-  'if (not pieza and grupo and (con_medidas or del_grupo_copiado)' 'if (not pieza and grupo and (True' \
+  'if (not pieza and grupo and (con_medidas or del_grupo_copiado)' 'if (not pieza and grupo and (True)' \
   "FAILED $T::test_un_renglon_con_precio_y_sin_medidas_no_hereda"
 sabotaje $M "un código distinto en cada renglón vuelve a heredar la descripción" \
   '            if grupo and grupo[1] and parte and parte != grupo[1] and not descripcion:' \
@@ -189,12 +193,12 @@ sabotaje $M "3b#1 el monto negativo en el precio deja de leerse" \
   '                    precio = _monto_de_fila(row[valor_col], decimal) or 0.0' '                    precio = 0.0' \
   "${B}un_descuento_negativo_en_el_precio_sin_importe_tambien_se_lee"
 sabotaje $M "3b#9 un largo con su unidad la repite" \
-  '                trae_unidad = numero is None and re.search(r"[^\W\d_]\s*$", texto)' \
-  '                trae_unidad = False' \
+  '                trae_unidad = (numero is None and re.search(r"[^\W\d_]\s*$", texto)' \
+  '                trae_unidad = (False' \
   "${B}un_largo_escrito_con_su_unidad_no_la_repite"
 sabotaje $M "3b-2#10 un largo con rango pierde la unidad" \
-  '                trae_unidad = numero is None and re.search(r"[^\W\d_]\s*$", texto)' \
-  '                trae_unidad = numero is None' \
+  '                trae_unidad = (numero is None and re.search(r"[^\W\d_]\s*$", texto)' \
+  '                trae_unidad = (numero is None' \
   "${B}un_largo_con_rango_conserva_su_unidad"
 sabotaje $M "3b#7 la unidad del precio no se avisa" \
   '        if unidad and not avisos_de_lo_usado and precio_col' '        if False and precio_col' \
