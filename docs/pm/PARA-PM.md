@@ -2,154 +2,130 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## EXCEL-3d: entregada
+## ESTUDIO-1: entregada
 
-**Resultado:** los tres hallazgos de tu reproducción (`REPRODUCCION-EXCEL-3c-2026-10-25.md`)
-están arreglados y cada uno tiene su prueba y su sabotaje en rojo. «Flete
-int.» combinado da flete 1200 y FOB 3550. «Freight elevator» sale por la
-misma regla, sin palabras nuevas en la lista. La cabecera y su hijo se
-deciden igual, y todo renglón que entra sin precio se avisa con su fila, en
-toda la familia. D17 está en su propio commit y `ataque_aislamiento.sh`
-vuelve a probar G3. La autorrevisión encontró dos agujeros más dentro de la
-pieza; los dos están arreglados, con su rojo antes. Quedan tres decisiones
-(D20–D22): son cosas que ya pasaban en la base, o una regresión chica que
-sigue una regla que ya teníamos. Falta la prueba con la proforma real del
-24/10, que no entra al repositorio: la hace Emi.
+**Resultado:** los estudios son de la cuenta. Se cargan en «Mi perfil», «Mis
+estudios», y se eligen en la operación, con el último usado o el único ya
+puesto. Su CUIT va al CDDTAGR. Sin estudio sigue el CUIT del perfil: no hay
+migración ni se copia nada. Otra cuenta no ve, no borra y no usa un estudio
+ajeno; si lo intenta da 404 o 400 y no cae al perfil. El error que agregaste
+cuando falta el CUIT (`1fa0b6e`) ahora dice que se elige en la operación o
+se carga en «Mis estudios».
 
-| SHA | Qué |
+**Lo que decidís:** D23, abajo. Siguen abiertas D20, D21 y D22 de EXCEL-3d:
+están en el informe `470fc48`, que reemplazo acá. El resumen va al final.
+
+### Decisiones
+
+**D23. Generar con el CUIT del perfil no cuenta como «último usado».**
+Pasa así: alguien despacha con su perfil, carga un estudio y lo usa una vez.
+Desde ahí ese estudio queda puesto en cada operación nueva, aunque después
+genere varias veces con el perfil. El selector lo muestra con su CUIT antes
+de generar, pero quien no mira sale con el CDDTAGR del estudio. Lo encontró
+el adversario Opus alto y lo reproduje: tres TXT con el perfil, y la API
+sigue preseleccionando el estudio.
+- (a) Dejarlo así. «El último usado» cuenta sólo estudios, como dice la
+  tarea al pie de la letra.
+- (b) Anotar también cuándo se generó con el perfil, y preseleccionar lo
+  último de las dos cosas. No alcanza con una columna nueva en `users`:
+  `create_all` no agrega columnas a tablas que ya existen. Va en una tabla
+  chica aparte, que sí se crea sola. Es una pieza chica después de
+  CLIENTE-1c.
+- **Recomiendo (b).** Un CDDTAGR equivocado se descubre recién en la aduana,
+  y la preselección existe para que la persona no tenga que mirar.
+
+### SHAs
+
+| Commit | Qué es |
 |---|---|
-| `d4982e9` | fix: lo que empieza como un cargo no cambia el FOB sin un aviso con su fila |
-| `b6b06a7` | test: casos y sabotajes |
-| `c0f69b5` | changelog |
-| `25f2a4f` | **D17**: `ataque_aislamiento.sh` vuelve a generar el MARIA.TXT de Ana |
-| `22b481a` | fix (code-review): la descripción copiada no saca del grupo al renglón con medidas; un solo aviso de flete dudoso con tope |
-| `d5f1e58` | test: rojos de esa vuelta |
-| `6c5fd02` | fix (adversario Opus): la copia de un cargo combinado con texto en Item no entra al FOB |
-| `2cc46d3` | test: su rojo y sus sabotajes |
-| `e24abfa` | changelog |
-| `7de44b7` | test: los sabotajes de 3b y 3c siguen al código nuevo. **Las puertas corrieron sobre este SHA** |
-| `eeae447` | changelog: dice sólo lo que fijan las pruebas |
-| (este informe) | docs |
+| 609ec52 | producto: tabla `estudios`, API, selector y «Mis estudios» |
+| 6d4cc89 | pruebas: casos, pantalla y sabotajes |
+| 8bbfbe6 | producto: lo confirmado de la autorrevisión |
+| c992715 | pruebas: el rojo de esa autorrevisión y sus sabotajes |
+| 7de44b7 | después vino EXCEL-3d; las puertas corrieron sobre este SHA, que ya contiene ESTUDIO-1 |
+| 5468581 | merge de tu rama; los sabotajes de ESTUDIO-1 corrieron sobre este SHA |
 
-Después de `7de44b7` sólo cambian `CHANGELOG.md` y este archivo.
+`git diff --stat 7de44b7 5468581` muestra sólo `CHANGELOG.md`, `NOW.md` y
+este archivo. Por eso las puertas sobre 7de44b7 valen para el código que se
+entrega.
 
-Archivo de producto tocado: **`proyecto_maria/main.py`** (`try_extract_with_mapping`
-y los avisos del mapeo). La rama también lleva ESTUDIO-1 (`609ec52`…`c992715`),
-que ya estaba en `31c9b5a`, sin entregar: su informe va aparte.
+**Archivos de producto:**
+- `proyecto_maria/database/models.py`
+- `proyecto_maria/main.py`
+- `proyecto_maria/static/v2/screens/estudios.js` (nuevo)
+- `proyecto_maria/static/v2/screens/finalize.js`
+- `proyecto_maria/templates/dashboard_v2.html`
 
-## Decisiones
+No toqué `maria_generator.py`, `controles_maria.py` ni `despachante.js`.
 
-Numero desde D20 porque D18 y D19 ya están usadas en otros informes.
+### Hallazgos de la autorrevisión
 
-- **D20. Cabecera de descuento sin precio con copias que sí tienen precio (R3 del adversario Sonnet).**
-  Una cabecera «Discount tag labels», «Rebate valve DEMO» o «Freight elevator DEMO»
-  sin precio, con la descripción combinada y copias que tienen texto en Item y precio.
-  En `31c9b5a` daba FOB 170 y sin leer [3]. Ahora da FOB 100, sin leer [3, 4, 5],
-  y ningún aviso propio. Con Item vacío la base ya daba eso. La causa: esa cabecera
-  sale antes de registrarse, y su copia se decide «sin leer».
-  - (a) Dejarlo. Sigue la regla de EXCEL-3b, «una nota de descuento sin precio
-    no abre grupo», y las filas quedan nombradas en «sin leer». Nada entra al FOB
-    en silencio.
-  - (b) Que la cabecera sin precio, cuando sus copias sí tienen precio, abra el grupo.
-  - **Recomiendo (a).** El FOB baja, pero de forma visible, y (b) reabre lo que
-    decidimos en EXCEL-3b. El riesgo: las filas aparecen en «sin leer» sin un
-    aviso que diga por qué.
-- **D21. Plurales y rótulos que la lista no conoce, con o sin combinadas.**
-  «Fletes», «Seguros» y «Bank fee», con el origen combinado o sin combinadas,
-  entran como producto y suben el FOB sin aviso: 3500 → 4700. En `31c9b5a` da
-  exactamente lo mismo; no es de esta pieza. La regla de EXCEL-3d se apoya en
-  lo que la lista reconoce como cargo, y esas palabras no están. «Ocean freight»
-  sigue igual porque me pediste no tocarlo.
-  - (a) Dejarlo como riesgo.
-  - (b) Una pieza chica aparte: plurales y «fee» en `_FILA_QUE_NO_ES_MERCADERIA_RE`,
-    con un aviso de su fila como los de esta pieza.
-  - **Recomiendo (b), aparte.** Cambia la lista base, que se usa también sin
-    combinadas. Mezclarla acá agranda una pieza que ya está revisada.
-- **D22. Una fila con origen propio que empieza como un cargo.** «Gastos administrativos»
-  con «China» en el origen y precio entra como producto, sin aviso, con o sin
-  combinadas, igual que en `31c9b5a`. Lo mismo pasa con la copia con medidas e
-  «Insurance» en Item. La fila tiene su propio origen, así que no pasa por el
-  filtro de lo que no es mercadería.
-  - (a) Dejarlo. Un producto real puede tener ese rótulo y un origen.
-  - (b) Avisarlo con su fila, sin sacarlo, como «Payment terminal POS».
-  - **Recomiendo (b) en la misma pieza que D21.** Sólo agrega un aviso y no
-    cambia el FOB.
-
-## Punto por punto contra tu reproducción
-
-| Hallazgo o pedido | Ahora | Prueba (`tests/test_excel3.py`) |
+| Quién | Hallazgo | Qué hice |
 |---|---|---|
-| 1. Cargo con una palabra que la lista no conoce entra al FOB sin aviso | Queda sin leer, es el flete con «de la fila N», o entra con «fila N («rótulo»)». Ninguna otra salida | `test_un_cargo_con_palabras_de_mas_no_cambia_el_fob_sin_un_aviso_con_su_fila`: cada cargo de `CARGOS_CON_PALABRAS_DE_MAS` en las 6 `FORMAS_DEL_CARGO` |
-| «Flete int.» combinado (C2:C4) | flete 1200, FOB 3550, «Flete: se leyó 1.200,00 de la fila 4» | `test_el_flete_int_combinado_se_lee_como_en_la_base` |
-| «Freight elevator», con la misma regla | Se lee como flete, con un aviso que nombra su fila: «1 renglón(es) se leyeron como flete y dicen algo más: fila 3 («…»); si alguno es un producto, cargalo en la revisión.» | `test_un_producto_que_empieza_como_el_flete_con_el_origen_combinado_se_lee_como_flete_avisado`, `test_con_la_descripcion_combinada_un_rotulo_de_flete_en_item_se_lee_como_flete_avisado` |
-| Producto que empieza como un cargo | Entra con «fila N («rótulo»)» | `test_un_producto_que_empieza_como_un_cargo_entra_con_un_aviso_que_nombra_su_fila` («Payment terminal POS», «Handling cart», «Seguro de puerta», «Insurance card printer») |
-| «Insurance as per policy» e «Insurance 40 GBP» en Item, con la descripción combinada | Ya no entran en silencio | dentro de la familia, forma `descripcion_rotulo_en_item` |
-| 2. La cabecera y su hijo se deciden distinto | Se deciden igual: si la cabecera queda sin leer, el hijo también, y los dos aparecen nombrados | `test_la_cabecera_y_su_hijo_se_deciden_igual`: 4 formas de cabecera (vertical por herencia, vertical combinada, horizontal, código combinado) por 4 rótulos; `test_la_cabecera_insurance_sin_combinadas_deja_sin_leer_al_hijo` |
-| 3. D12 (a) avisa sólo en el grupo con medidas | Todo renglón que entra sin precio se avisa con su fila: con la descripción combinada («filas 3, 4»), con el origen combinado y sin combinadas («fila 3») | `test_todo_renglon_que_entra_sin_precio_se_avisa_con_su_fila` |
-| Copia de un cargo combinado con texto en Item («A2», «#3», «2b», «(3)», «-») | Queda sin leer o entra con aviso de su fila | `test_la_copia_de_un_cargo_combinado_con_texto_en_item_no_cambia_el_fob_sin_su_fila`: 4 rótulos × 5 formas de Item × 2 combinadas |
-| Avisos largos | Nombran hasta cinco filas y cuentan el resto («… y 2 más») | `test_los_avisos_nombran_hasta_cinco_filas_y_cuentan_el_resto` |
+| `/code-review high` y Opus alto | el CUIT del estudio no controlaba el verificador | `cuit_valido` en el alta, con prueba y sabotaje. Los CUIT de prueba son sintéticos y tienen el verificador válido |
+| Opus alto (reproducido con Playwright) y `/code-review` | generar antes de que llegue la lista mandaba el CUIT del perfil | generar espera `CDI.estudios.listo()`, con prueba de pantalla y sabotaje |
+| `/code-review` | lo elegido en una operación seguía en la siguiente | cada operación vuelve a la preselección, con prueba y sabotaje |
+| `/code-review` | un alta o un borrado no refrescaba los avisos | se vuelven a pedir, con prueba y sabotaje |
+| `/code-review` | sin perfil, el hint de error prometía el perfil | dice que sin CUIT no se genera, con prueba y sabotaje |
+| `/code-review` | `renderPerfil` sin guardia de orden | ahora tiene una secuencia propia |
+| `/code-review` | SELECT de duplicado antes del UNIQUE | lo saqué: lo frena el UNIQUE, también con dos altas a la vez |
+| Opus alto | un nombre con un surrogate suelto daba 500 en Postgres | ahora es 400, con prueba y sabotaje |
+| Opus alto | el perfil no cuenta como «último usado» | **D23** |
+| `/code-review` | el rótulo «CUIT de mi perfil» no coincide si la operación trae su propio `cuit_agr` | descartado: ninguna pantalla carga `op.cuit_agr` (grep en `static/`), así que siempre va el del perfil |
+| `/code-review` | el texto del error vive en dos constantes y se reemplaza comparando cadenas | se queda: la otra copia está en `maria_generator.py`, que no toco. Si el generador cambia su texto, la comparación deja de coincidir y `test_sin_estudio_ni_perfil_el_error_dice_donde_cargarlo` pasa a rojo (pide «estudio» y «Mi perfil») |
+| `/code-review` | la consulta por dueño está repetida y el filtro de caracteres no reutiliza `controles_maria` | se queda: es estilo, y `controles_maria.py` no se toca |
+| Opus alto | faltan casos para el `IntegrityError` concurrente, el rollback del uso y el `estudio_id` con espacios | riesgo bajo, abajo. Opus los probó y el código responde bien: 8 altas a la vez en Postgres dieron 200 y siete 409 |
+| `/security-review` (sobre 609ec52^..c992715) | nada con confianza alta | todos los endpoints piden `get_current_user` y filtran por `owner_username`; ajeno o inexistente da 404 o 400; los nombres se muestran con `textContent`; `create_all` crea la tabla en Postgres (Opus la creó en un Postgres 16 propio) |
 
-Lo que decidí: el cargo «dudoso», el que empieza como cargo y dice algo más,
-**entra con aviso**. No lo dejo afuera, porque los productos reales de la
-familia («Payment terminal POS») también empiezan así. El cargo que dice sólo
-el cargo queda sin leer, como en EXCEL-3c.
+### Puertas
 
-## Hallazgos de la autorrevisión
+| Puerta | SHA | Salida |
+|---|---|---|
+| Suite completa | 7de44b7 | `2469 passed, 102 skipped, 2 xfailed, 25 warnings in 288.41s (0:04:48)`, rc=0 |
+| compileall | 7de44b7 | rc=0 |
+| smoke | 7de44b7 | «==> OK · telemetría + alias session/state + by-cuit protegido», rc=0 |
+| ataque | 7de44b7 | «✅ PUERTA G3 PASADA. Ningún despachante ve datos de otro.», `Bloqueado: 22 · Fugas: 0` |
+| `tests/test_estudio1.py` | 5468581 | `26 passed, 3 warnings in 21.94s` |
+| `sabotajes/estudio1.sh` | 5468581 | 37 ROJO, «sabotajes sin rojo: 0», salida 0. Antes de sabotear, la API y la pantalla pasaron en verde |
 
-| Revisor | Modelo y esfuerzo | Hallazgo | Qué hice |
-|---|---|---|---|
-| `/code-review high` sobre `31c9b5a..d4982e9` | el de la sesión, alto | Con la especificación combinada, una nota «Freight included» en Item sacaba del grupo al renglón con medidas (regresión mía) | Arreglado en `22b481a`. Rojo en `d5f1e58`: falla con `d4982e9` y pasa con el arreglo |
-| ídem | ídem | Un aviso por cada flete dudoso, sin tope; las listas de filas se armaban de dos maneras | Un solo aviso, con hasta cinco filas; las listas usan una sola función (`22b481a`) |
-| ídem | ídem | La cabecera sin leer deja al hijo sin leer | Sin cambio: eso cumple «se deciden igual» |
-| ídem | ídem | El rótulo dudoso se guardaba como texto en un lado y verdadero/falso en otro | No pude armar un caso que lo distinga: los dos árboles dan lo mismo. Lo unifiqué como texto. Va sin rojo propio |
-| Sabotajes | — | «el flete dudoso no se avisa» daba VERDE | La prueba ahora pide el texto exacto del aviso (`d5f1e58`) |
-| Adversario | Opus, alto, sobre `d4982e9` | La copia de un cargo combinado con texto en Item («A2», «#3») entraba al FOB sin aviso | Arreglado en `6c5fd02`. Rojo: 40 casos que fallan con el código anterior (`2cc46d3`) |
-| Adversario | Sonnet, alto, sobre `6c5fd02`: 48 casos | R3: cabecera de descuento sin precio con copias con precio | D20 |
-| ídem | ídem | Mejoras confirmadas: C1, C2, D4, D5, D9, D10, R6 y D13. C14 y D7 ahora nombran las dos filas | — |
-| ídem | ídem | Ya pasaban en la base: cargo en «Part No.» tapado por el texto de Item (C8); copia con medidas e «Insurance» en Item (D3); fila con origen propio que empieza como cargo (D8, C13); Origin «Freight» da XX (C9); «1. Insurance» entra sin aviso (C10) | Riesgos. D3, D8 y C13 van en D22 |
-| Sabotajes en `e24abfa` | — | 4 ROTO (el patrón ya no estaba) y 1 VERDE, de 3b y 3c | Al día en `7de44b7`: 79 ROJO, 0 sin rojo |
-| CHANGELOG en `e24abfa` | — | Afirmaba más de lo que fija la prueba de la familia | Corregido en `eeae447` |
+### Lo que no se corrió
 
-## Puertas, sobre 7de44b7
+- `ataque_aislamiento.sh` no cubre estudios: sólo cubre clientes y
+  descargas. El aislamiento de estudios lo prueba
+  `test_otro_usuario_no_ve_ni_borra_ni_usa_los_estudios_ajenos`.
+- Postgres: lo probó sólo el adversario Opus, sobre 6d4cc89, no sobre el SHA
+  final.
+- La e2e completa con un TXT real no se corrió. Las pruebas usan CUIT
+  sintéticos.
 
-| Puerta | Salida |
-|---|---|
-| `compileall -q proyecto_maria` | rc=0 |
-| Suite completa (worktree limpio) | `2469 passed, 102 skipped, 2 xfailed, 25 warnings in 288.41s (0:04:48)`, rc=0 |
-| `test_excel3.py` | `264 passed, 3 warnings in 7.41s` |
-| `excel3.sh 7de44b7` | 79 ROJO, «sabotajes sin rojo: 0», rc=0 |
-| `smoke_friccion.sh` | «==> OK · telemetría + alias session/state + by-cuit protegido», rc=0 |
-| `ataque_aislamiento.sh` (D17) | «✅ PUERTA G3 PASADA. Ningún despachante ve datos de otro.», `Bloqueado: 22 · Fugas: 0`, rc=0 |
+### Riesgos
 
-**No corrí:**
-- el mapeo guardado del cliente (`celdas_rellenadas` al reaplicar un mapeo
-  guardado, `main.py` ~8007);
-- la proforma real del 24/10, que la hace Emi;
-- la e2e completa y los sabotajes de piezas anteriores, salvo los de 3b y 3c que
-  están en `excel3.sh`.
+- **D23:** el CDDTAGR por defecto puede ser un estudio cuando la persona
+  despacha con el perfil.
+- **Bajo:** sin prueba para el 409 de dos altas simultáneas, el rollback si
+  falla anotar el uso y el `estudio_id` con espacios.
 
-## Riesgos
-
-- Los avisos se muestran en un toast de 4 s (`app_v2.js:213`). Si el usuario no
-  lo lee, la fila sin leer igual queda en la lista de «sin leer», pero el aviso
-  del producto dudoso no queda en ningún lado. Ya pasaba.
-- Una regla por prefijo nunca es completa: D21 y D22 son los huecos que
-  encontré. Puede haber otros que ninguna prueba cubre.
-
-## Comandos
+### Comandos
 
 ```bash
-git checkout <SHA de este informe>
-export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
-       VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-python -m pytest -q --no-cov tests/test_excel3.py              # 264 passed
-PY=<venv>/bin/python bash scripts/testing/sabotajes/excel3.sh   # 79 ROJO, «sabotajes sin rojo: 0»
-PUERTO=8847 ./scripts/testing/ataque_aislamiento.sh             # «PUERTA G3 PASADA», Bloqueado: 22 · Fugas: 0
+git fetch origin claude/dev-tecnica && git checkout <sha>   # 5468581 o el SHA que subo con este informe
+export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
+python -m pytest -q --no-cov --timeout=120 tests/test_estudio1.py   # 26 passed
+PY=$(command -v python) PUERTO=8873 scripts/testing/sabotajes/estudio1.sh   # 37 ROJO, «sabotajes sin rojo: 0»
 ```
+
+## Pendiente de EXCEL-3d (informe completo en `470fc48`)
+
+- **D20:** la cabecera de descuento sin precio, con copias que sí tienen
+  precio. Recomiendo (a), dejarlo.
+- **D21:** los plurales «Fletes», «Seguros» y «Bank fee». Recomiendo (b),
+  una pieza chica aparte.
+- **D22:** la fila con origen propio que empieza como un cargo. Recomiendo
+  (b), un aviso, junto con D21.
 
 ## Sigo con
 
-ESTUDIO-1: `/security-review`, las puertas sobre su SHA final y el informe.
-Después, CLIENTE-1c y GUARDAR-2.
+CLIENTE-1c: D15 (b) y D16 (b) con `_fecha_inic_activ_de_api`, el error de
+`--base` sin la clave y el dígito de ancho completo. Después, GUARDAR-2.
 
-/compact conservar: Soy la Dev técnica (Dev 1) de CDI, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica (nunca main), rutina trig_011UpBfwEu9TUzoNUrviqoP5 min 15; aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM con send_message priority next empezando «Dev técnica:». EXCEL-3d entregada (puertas sobre 7de44b7; después sólo CHANGELOG eeae447 y este informe). Abiertas para la PM: D20 (R3 cabecera de descuento sin precio con copias con precio, recomiendo a), D21 (plurales Fletes/Seguros/Bank fee, recomiendo b aparte), D22 (fila con origen propio que empieza como cargo, recomiendo b con D21). Próxima D: D23. Sigo con ESTUDIO-1 (security-review, puertas, informe), después CLIENTE-1c (D15 b y D16 b con _fecha_inic_activ_de_api, error de --base sin la clave, dígito de ancho completo) y GUARDAR-2 (desde 2d930c5 en claude/dev1-tecnica). Reglas de Emi: sólo me piden la PM o Emi; nada se publica sin su «dale» para el SHA; nunca main; sin secretos ni datos reales (la proforma del 24/10 no entra); no tocar maria_generator.py, controles_maria.py, despachante.js ni el canal/rama de la Dev MARIA; subagentes hasta alto, sin Fable.
+/compact conservar: Soy la Dev técnica (Dev 1) de CDI, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica (nunca main), rutina trig_011UpBfwEu9TUzoNUrviqoP5 min 15; aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM con send_message priority next empezando «Dev técnica:». EXCEL-3d entregada (informe 470fc48) y ESTUDIO-1 entregada (producto 609ec52+8bbfbe6, pruebas 6d4cc89+c992715, puertas sobre 7de44b7, sabotajes 37 ROJO sobre 5468581). Abiertas para la PM: D20 (a), D21 (b), D22 (b), D23 (perfil como último usado, recomiendo b con tabla aparte). Próxima D: D24. Sigo con CLIENTE-1c (D15 b y D16 b con _fecha_inic_activ_de_api en main.py ~6934 y ~6303, error de --base sin la clave, dígito de ancho completo, sabotaje por lugar) y después GUARDAR-2 (desde 2d930c5 en claude/dev1-tecnica + punto 2 de «Qué sigue» de CIERRE-RETOMA-2026-10-24.md). Reglas de Emi: sólo me piden la PM o Emi; nada se publica sin su «dale» para el SHA; nunca main; sin secretos ni datos reales (la proforma del 24/10 no entra); no tocar maria_generator.py, controles_maria.py, despachante.js ni el canal/rama de la Dev MARIA; subagentes hasta alto, sin Fable.
