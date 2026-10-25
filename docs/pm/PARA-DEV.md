@@ -27,94 +27,97 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
-## Veredicto de PRUEBAS-1 + PA-1b (2026-10-25): aceptadas con nota
+## Veredicto de EXCEL-3c y CLIENTE-1b (2026-10-25)
 
-Sobre `e924b29` (base `913d282`). Integradas con `merge` de `e924b29` a la
-rama de la PM; los commits de EXCEL-3b que vienen después no entran. Detalle
-en `REPRODUCCION-PRUEBAS-1-2026-10-25.md`. Mi adversario (Sonnet, alto):
-- `excel1.sh` 36, `excel2.sh` 42 y `maria1b.sh` 34 en rojo, 0 con falla;
-- la línea base, `302 passed`;
-- la prueba del mapeo guardado ahora distingue;
-- `e2e_rerun.sh`, VERDE / ROJO / VERDE, como tu informe.
+Sobre `273c153` (informe `69347ff`). Detalle y salidas en
+`REPRODUCCION-EXCEL-3c-2026-10-25.md`. Mi adversario fue Opus, alto. Yo
+re-corrí mis casos en la entrega y en la base `e08b4c4`.
 
-La nota va a CLIENTE-1b: `foco_cliente1.sh` dio rc=1 sobre código sano
-(«esta medición no distingue», 0 fallas sin espera de 30). Riesgos que
-quedan: `entrarAValidacion` supone dos respuestas de avisos, y el corte de
-90 s de `excel2.sh`.
+- **EXCEL-3c: devolución, EXCEL-3d.** R1, B1 y R2 mejoraron. Pero la vuelta
+  trae una regresión de plata sin aviso.
+- **CLIENTE-1b: aceptada con nota.** Todavía no la integro. La rama no se
+  separa limpia: `23936d5` ya trae `test_excel3.py` y `excel3.sh`. Entra
+  junto con EXCEL-3d.
 
-## Veredicto de EXCEL-3b (2026-10-25): devolución, EXCEL-3c
+### EXCEL-3d: lo que vuelve (va primero)
 
-Sobre `7043cf2` (informe `e08b4c4`). **No la integro todavía.** Detalle en
-`REPRODUCCION-EXCEL-3b-2026-10-25.md`. Mi adversario (Sonnet, alto) corrió
-excel1+2+3, `245 passed`; `excel3.sh`, 53 ROJO y 0 sin rojo. Pasó unos 60
-sintéticos por `/upload_excel_v2/` en la base y en `7043cf2`, más un fuzz
-de 200 proformas simples. Yo re-corrí P1 y SG1 sobre `7043cf2` y dan lo
-mismo que a él.
+1. **Causa:** cuando hay celdas combinadas o copiadas, la fila se decide con
+   una lista de palabras (`_es_solo_un_cargo`, `main.py:4600-4637`). Una fila
+   cuyo rótulo empieza como un cargo y trae una palabra que la lista no
+   conoce entra como producto, en silencio.
+   - Con el origen combinado (`C2:C4`), «Flete int.», «Gastos
+     administrativos» e «Insurance 40 GBP» suben el FOB de 3550 a 4750 con
+     avisos `[]`.
+   - La base leía «Flete int.» como flete de 1200, con aviso de su fila.
+   - **Lo que tiene que quedar:** ninguna fila que empiece como un cargo
+     cambia el FOB sin un aviso que nombre su fila. Si queda afuera o entra
+     marcada, lo decidís vos.
+   - **Piso:** lo que hacía la base con «Flete int.» combinado, o mejor.
+   - «Freight elevator» (un producto real) se resuelve con la misma regla.
+   - **No** se arregla agregando palabras a la lista.
+2. **Cabecera y su hijo, la misma decisión (regresión sin combinadas).** Una
+   cabecera con código y rótulo de cargo («H-1», «Insurance», con medidas)
+   queda sin leer. Su hijo sin descripción hereda «Insurance» y entra como
+   producto: 40 USD al FOB.
+   - El único aviso es el genérico de herencia.
+   - La causa: `rotulo_propio = ""` si `del_grupo` (`main.py:4958`).
+   - En la base quedaban los dos sin leer.
+3. **D12 (a) en toda la familia.** El aviso de «sin precio» está sólo en el
+   grupo con medidas (`main.py:4921`). Con la descripción combinada
+   (`B2:B4`), sin medidas y el precio sólo arriba, dos hijos entran sin
+   precio y con avisos `[]`.
+   - Tiene que avisar, con su fila, con la descripción combinada, con el
+     origen combinado y sin combinadas.
+   - Sigue sin inventar precio.
 
-Las mejoras están (flete y descuento con origen combinado, código nuevo que
-no hereda, subtotal con largo, «Descuento comercial» sin precio, «1,5m»).
-Vuelve por dos regresiones y una afirmación falsa del CHANGELOG.
+**La prueba barre la familia, no mis ejemplos:**
+- varios rótulos de cargo (flete, seguro, gastos, handling, pago, comisión),
+  cada uno con palabras de más arbitrarias;
+- el rótulo en la columna del código y en la de la descripción;
+- origen combinado, descripción combinada, los dos juntos y sin combinadas;
+- cabecera con hijos, en vertical y en horizontal;
+- al menos un producto real que empiece como un cargo.
 
-### EXCEL-3c: lo que vuelve (va primero, antes de CLIENTE-1b)
+Cada punto con su sabotaje en rojo. Las recetas están en la reproducción.
+Corregí el CHANGELOG para que diga sólo lo que queda probado.
 
-1. **Causa:** el filtro de «no es mercadería» (`main.py:4912`) decide con
-   lo copiado de una combinada en vez de con las celdas propias de la fila.
-   Pasa en las dos direcciones:
-   - **Regresión (R1):** con el origen combinado (`C2:C4`), productos
-     reales cuya descripción propia empieza como un no-producto («Payment
-     terminal POS», «Handling cart») quedan sin leer. Base: 3 ítems y 430.
-     `7043cf2`: 1 ítem y 50 (`main.py:4787`, `origen_propio`).
-   - **Ya estaba, pero el CHANGELOG dice que se arregló (B1):** con la
-     descripción combinada hasta la última fila y «Insurance» en la columna
-     Item (`["Insurance", None, None, 1, 40, 40]`), el seguro entra como
-     producto «LAPTOP DEMO» de 40 USD. Infla el FOB sin aviso. Igual con
-     «Payment 30% TT».
-   - **Familia a probar:** seguro, pago, gastos y handling, con el rótulo en
-     la columna del código o de la descripción, y con descripción y origen
-     combinados juntos o por separado. También un producto real con esas
-     palabras y su descripción propia.
-   - Corregí el CHANGELOG para que diga sólo lo que queda probado.
-2. **Regresión (R2):** una cabecera de grupo **sin código** («PVC BLUE») con
-   hijos que traen código propio y sin especificación («DT-1A», «DT-1B»)
-   deja de heredar. Los hijos quedan sin leer: 540 pasa a 86,4.
-   - El punto 4 de EXCEL-3b era el código nuevo después de otro **código**,
-     no después de una cabecera sin código.
-   - En ese caso los hijos heredan como en la base.
-   - `DT-1` con hijos `DT-1-15` y `DT-1-20`: decidí vos con un caso
-     cuál es el código del grupo. Si hay dudas, dejalo como D.
-3. **El informe de D12 dice de más.** «Sin leer con aviso» vale sólo si la
-   descripción no está combinada. Con la descripción combinada y el precio
-   sólo arriba o combinado, los hijos entran con precio 0 sin aviso al
-   subir.
-   - Arreglo: que avisen al subir.
-   - No inventes precio.
+**Siguen como en EXCEL-3c:**
+- D12 (b) es aparte, después de ESTUDIO-1;
+- R3 se queda como está;
+- los riesgos que no se arreglan: «Ocean freight», el subtotal con largo,
+  «10m2 m» y el aviso de unidad.
 
-Cada punto con su sintético y su sabotaje en rojo. Para la familia, usá los
-casos del adversario: P1/P2, SG1–SG4, G2/G3 y D12_*. Las recetas están en
-el informe de reproducción.
+**Riesgos que anoto, no los arregles:**
+- la herencia de R2 cambia tres proformas del fuzz, todas con aviso;
+- «Ins.», «Commission» y parecidos entran al FOB también en la base.
 
-- **D12: (a) ahora; (b) como pieza aparte, después de ESTUDIO-1.**
-  - En (b) se hereda sólo `valor_unitario` combinado.
-  - Nunca el importe: un importe combinado es el total del grupo, y
-    heredarlo multiplica el valor.
-  - La prueba de (b) separa «precio combinado» de «importe combinado».
-- **R3 queda como está:** el rótulo de flete o descuento a la derecha de la
-  descripción ya no se lee (punto 2 de EXCEL-3b). En el fuzz salió en 14 de
-  200. Se pierde con aviso y lo anoto como costo. No lo cambies.
-- **Riesgos que siguen, no los arregles:**
-  - «Ocean freight» como producto;
-  - un subtotal con precio y largo, contado dos veces;
-  - «10m2 m»;
-  - el aviso de unidad en cualquier proforma con unidad en las dos
-    cabeceras.
+### Notas de CLIENTE-1b (van a CLIENTE-1c)
 
-## Mientras reviso EXCEL-3c
+- El día con una cifra pasa.
+- Los años 0001 y 9999 pasan.
+- Con un `--base` mal escrito, el script muestra la clave en el error de
+  Python. Esto sí arreglalo: que el error no la muestre.
+- Un dígito de ancho completo se lee distinto en la pantalla y en el
+  generador.
 
-- **Orden:** EXCEL-3c (arriba). Después terminá **CLIENTE-1b** («Más
-  adelante», con la nota de `foco_cliente1.sh`) y seguí con ESTUDIO-1.
-- **D8: (b).** `landing.html:139` queda «NCM», igual que D6.
+### Tus D (decidido por la PM)
 
-## Después de EXCEL-3c
+- **D15: (b).**
+- **D16: (b).** Va junto con D15 en una pieza chica, **CLIENTE-1c**, con las
+  dos últimas notas de arriba. (c) no: toca el modelo y cambia el error de
+  tres lugares a la vez.
+- **D17: (a).** Arreglá `ataque_aislamiento.sh` vos, en un commit aparte de
+  EXCEL-3d. La puerta está ciega también en mi rama.
+- **D8: (b)**, como ya estaba. D12 como arriba.
+
+### Orden
+
+1. EXCEL-3d (con D17 en commit aparte).
+2. ESTUDIO-1 (abajo).
+3. CLIENTE-1c.
+4. GUARDAR-2.
+
+## Después de EXCEL-3d
 
 ### ESTUDIO-1, con lo que pediste definido (decidido por la PM)
 
@@ -126,37 +129,14 @@ el informe de reproducción.
 3. **Sin migración de datos:** `users.cuit` sigue como respaldo cuando la
    operación no trae estudio. Nada se copia ni se borra.
 
-Costura con MARIA-7 punto 3: la Dev MARIA ya entregó el error cuando falta
-el CUIT (`f0b73f7`, en revisión). ESTUDIO-1 arranca **después** de que yo
-integre MARIA-7 a mi rama: traés mi rama y cambiás sólo de dónde sale el
-CUIT y el texto de «dónde cargarlo».
+Costura con MARIA-7 punto 3: el error cuando falta el CUIT ya está
+integrado en mi rama (`1fa0b6e`). Traés mi rama y cambiás sólo de dónde
+sale el CUIT y el texto de «dónde cargarlo».
 
-## Más adelante — CLIENTE-1b: la fecha de inicio, validada en la API
+## Después — CLIENTE-1c
 
-Junta la D5 de la Dev MARIA (MARIA-7), tu D7 y dos hallazgos del adversario
-de D3. Antes de ESTUDIO-1. Toca datos: revisión fuerte.
-
-- **Causa:** `create_cliente` y `update_cliente` (`main.py`) guardan
-  `str(...)[:10]` sin validar. Por eso un `null` se guarda «None» y un año de
-  5 cifras que el navegador acepta (`20150-01-01`) se guarda cortado
-  (`20150-01-0`); el campo lo muestra vacío y, con D3, se conserva sin aviso.
-  Recién frena (o no) al generar el TXT.
-- **Qué:** en el alta **y** en la edición, `null` y vacío guardan `""`;
-  pasan `AAAA-MM-DD` (año de 4 cifras, fecha que existe) y `DD/MM/AAAA`; lo
-  demás da un error claro que el formulario muestra. El aviso de lo que
-  falta dice también cuando la fecha conservada no sirve.
-- **Prueba, por la familia:** `null`, `""`, `"None"`, `20150-01-01`,
-  `2015-02-30`, `15/03/2015`, `2015-03-15`, por POST y por PUT. Cada arreglo
-  con su sabotaje en rojo.
-- **Lo ya guardado:** un script que **sólo informa** los clientes con «None»
-  o con una fecha que no sirve (cuántos y cuáles, sin mostrar datos del
-  cliente más allá del id) y, con una opción explícita, deja «None» en
-  vacío. Probado en una base local. Correrlo en producción lo decide Emi.
-- No toques el TXT (`maria_generator.py`): es de la Dev MARIA.
-- **`foco_cliente1.sh` como puerta (de PRUEBAS-1):** sobre código sano dio
-  rc=1 porque la variante sin espera no falló en 30 («esta medición no
-  distingue»). Que sea informativa (sin rc=1 cuando no distingue) o subí M
-  hasta que el rojo sin espera sea seguro; decí cuál y por qué.
+D15 y D16 (b), con las dos últimas notas de CLIENTE-1b. Toca datos:
+revisión fuerte. Cada lugar con su sabotaje en rojo.
 
 ## Más adelante — GUARDAR-2
 

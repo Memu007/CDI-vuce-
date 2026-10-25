@@ -167,3 +167,14 @@ el 1 % sobre el FOB de la factura más el flete, no sobre el FOB casillero.
 Así el TXT no lleva un FOB sin ajustes con un seguro calculado con ajustes.
 Se revierte con una constante (`BASE_SEGURO_SUGERIDO`) cuando el casillero
 vaya al TXT. Pregunta 3 al despachante en `PREGUNTAS-DESPACHANTE.md`.
+
+## 2026-10-25 — Fechas de inicio y la prueba de aislamiento (PM, D15–D17 de CLIENTE-1b)
+
+Decidido por la PM:
+- D15 (b) y D16 (b): la fecha de inicio que se copia desde la operación y la de
+  la importación masiva se validan con la misma función que el alta y la
+  edición. Una que no sirve no se copia o queda vacía, y el informe de la
+  importación lo dice. Va como pieza chica, CLIENTE-1c. No se usa un
+  `@validates` en el modelo.
+- D17 (a): la Dev técnica arregla `ataque_aislamiento.sh` (el sufijo «01» que
+  la API rechaza desde MARIA-7), en un commit aparte.
