@@ -99,8 +99,7 @@ def main(argv=None) -> int:
     # base vacía y un traceback.
     # Un error de Python mostraría la URL entera, con la clave (CLIENTE-1c).
     try:
-        url = make_url(_url_async(args.base))
-        url.port  # «:abc» recién falla acá
+        url = make_url(_url_async(args.base))  # también rechaza el puerto «:abc»
     except (ArgumentError, ValueError):
         p.error("--base no es una URL de base que se entienda "
                 "(por ejemplo postgresql://usuario:clave@host/base)")
