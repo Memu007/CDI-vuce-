@@ -3525,6 +3525,10 @@ def _rellenar_combinadas(df, combinadas, mapeo=None):
             campos[col] = next(iter(lo_que_es))
     primera, ultima = int(df.index.min()) + 2, int(df.index.max()) + 2
     hasta_donde = {}
+    # Qué celdas son copia de una combinada: no son el rótulo ni el origen
+    # propios de la fila (un origen combinado hasta el flete no lo vuelve
+    # producto; EXCEL-3b).
+    rellenadas = df.attrs.setdefault("celdas_rellenadas", {})
     for f1, c1, f2, _c2 in sorted(set(combinadas)):
         if f2 <= f1 or not 1 <= c1 <= len(columnas) or f1 < 2:
             continue
@@ -3542,6 +3546,7 @@ def _rellenar_combinadas(df, combinadas, mapeo=None):
         if desde <= hasta:
             filas = df.index[(df.index >= desde) & (df.index <= hasta)]
             df.loc[filas, col] = valor
+            rellenadas.setdefault(col, set()).update(filas)
     return df
 
 
@@ -4759,6 +4764,7 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
     grupo = None  # (descripción, código de parte) del renglón de arriba
     agrupada = False  # si algún renglón tomó lo del de arriba
     flete, descuento, heredadas = [], [], []
+    rellenadas = df.attrs.get("celdas_rellenadas", {})
     for _, row in df.iterrows():
         try:
             if all((not pd.notna(v)) or str(v).strip() == "" for v in row.values):
@@ -4772,13 +4778,20 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
                 return (_numero_factura(row[col], decimal) or 0.0) if col else 0.0
 
             cantidad, valor_unitario = _numero(cant_col), _numero(valor_col)
+            def _propia(col):
+                return _ not in rellenadas.get(col, ())
+
+            # El origen combinado vale para el producto (EXCEL-2), pero no
+            # vuelve mercadería al flete o al seguro de abajo (EXCEL-3b).
             celda_origen = row[origen_col] if origen_col else None
-            sin_ncm_ni_origen = not pieza and not _texto_de_celda(celda_origen)
+            origen_propio = celda_origen if origen_col and _propia(origen_col) else None
+            sin_ncm_ni_origen = not pieza and not _texto_de_celda(origen_propio)
+            descripcion_propia = descripcion if _propia(desc_col) else ""
 
             # El rótulo de una fila sin descripción puede estar en otra
             # columna («Total» o «Discount» en la columna Item).
-            rotulo = descripcion or next(
-                (t for t in (_texto_de_celda(v) for v in row.values)
+            rotulo = descripcion_propia or next(
+                (t for t in (_texto_de_celda(v) for c, v in row.items() if _propia(c))
                  if t and _numero_factura(t, decimal) is None
                  and _monto_de_fila(t, decimal) is None), "")
 
@@ -4799,7 +4812,7 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             # Un renglón con sus propias medidas es mercadería: una nota
             # («Freight included») en otra columna no lo saca.
             con_medidas = any(_texto_de_celda(row[c]) for c, _n, _u in medidas)
-            cargo = descripcion or next(
+            cargo = descripcion_propia or next(
                 (t for t in (_texto_de_celda(row[c]) for c in columnas_del_rotulo)
                  if t and _numero_factura(t, decimal) is None), "")
             es_cargo = False  # flete o descuento: no abre grupo
@@ -4810,7 +4823,8 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
                     # «Descuento comercial -500» no es un producto de valor 0;
                     # «Discount tag labels» con su precio, sí es un producto,
                     # y abre su grupo.
-                    if "%" in cargo or _monto_de_la_linea() < 0:
+                    # Sin precio propio es una nota: no abre grupo.
+                    if "%" in cargo or _monto_de_la_linea() < 0 or not valor_unitario:
                         grupo = None
                         descartes.append(_ + 2)  # un porcentaje no es un monto
                         continue
@@ -7651,6 +7665,11 @@ async def upload_excel_v2(
             df = df.drop(columns=[c for c in df.columns
                                   if str(c).strip().lower() in campos and c not in rename and c not in pesos])
             df = df.rename(columns=rename)
+            # Las celdas copiadas de una combinada siguen a su columna
+            # renombrada («Origin» pasa a «origen»; EXCEL-3b).
+            if "celdas_rellenadas" in df.attrs:
+                df.attrs["celdas_rellenadas"] = {
+                    rename.get(c, c): f for c, f in df.attrs["celdas_rellenadas"].items()}
             avisos = _peso_por_unidad(df, pesos, columna_de, clases)
 
         descartes: list = []
