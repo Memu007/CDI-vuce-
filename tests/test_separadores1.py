@@ -171,7 +171,7 @@ console.log(JSON.stringify({
     assert r["vacio"] == 0 and r["sinAviso"] is None
 
 
-@pytest.mark.parametrize("escrito, valor", [("1.500", 1500), ("1.500,25", 1500.25), ("87,5", 87.5), ("1,500", None)])
+@pytest.mark.parametrize("escrito, valor", [("1.500", 1500), ("1.500,25", 1500.25), ("87,5", 87.5), ("1,500", "1,500")])
 def test_un_ajuste_con_punto_de_miles(escrito, valor):
     """VALOR-1: antes «1.500» viajaba como 1,5 (Number)."""
     r = _js(_funciones("finalize.js", ["ajusteDelPedido"]) + f"\nconsole.log(JSON.stringify(ajusteDelPedido({json.dumps(escrito)})));")
@@ -187,7 +187,7 @@ console.log(JSON.stringify({
   avisoMal: ajusteMalEscrito('1,500'), avisoBasura: ajusteMalEscrito('x'), sinAviso: ajusteMalEscrito('1.500'),
 }));""")
     assert r["flete"] == 3480 and r["numero"] == 3480 and r["vacio"] == 0
-    assert r["ajuste"] == 1500 and r["ajusteVacio"] is None and r["ajusteMal"] is None
+    assert r["ajuste"] == 1500 and r["ajusteVacio"] is None and r["ajusteMal"] == "1,500"
     assert r["avisoMal"].startswith("¿1.500 o 1,5?") and r["avisoBasura"] == "no es un número."
     assert r["sinAviso"] is None
     fuente = (ROOT / "proyecto_maria" / "static" / "v2" / "screens" / "finalize.js").read_text(encoding="utf-8")

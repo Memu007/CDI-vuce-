@@ -4133,8 +4133,11 @@ class MariaRequest(BaseModel):
     # declaracion). El despachante los completa a mano en el Kit SIM.
     comprador_domicilio: str = ""
     comprador_fecha_inic_activ: str = ""
-    flete: float = 0
-    seguro: float = 0
+    # Flete, seguro y gastos aceptan texto: lo que la pantalla no pudo leer
+    # viaja tal cual y se rechaza con su mensaje, no con un 422 ni como 0
+    # (SEPARADORES-1b, D19). Ver `importe_valido`.
+    flete: float | str = 0
+    seguro: float | str = 0
     # El seguro lo puso el botón «Calcular seguro» (VALOR-1c): si las cuentas
     # de ahora dan otro, no se genera hasta recalcularlo o dejarlo.
     seguro_calculado: bool = False
@@ -4162,10 +4165,10 @@ class MariaRequest(BaseModel):
     # venta pactada y el FOB declarado. El campo del TXT sale del incoterm
     # (EXW → GTOS-ANT-FOB, grupos C/D → GTOS-POS-FOB). Si no viene, en los
     # grupos C/D se usa flete + seguro y fuera de ellos no se declara nada.
-    gastos_fob: float | None = None
+    gastos_fob: float | str | None = None
     # MARIA-3. Gastos anteriores al FOB del campo de la pantalla: van al TXT
     # (GTOS-ANT-FOB) sólo con EXW, FCA o FAS. `gastos_fob` explícito manda.
-    gastos_anteriores_fob: float | None = None
+    gastos_anteriores_fob: float | str | None = None
     # VALOR-1. Ajustes a incluir y a deducir que carga la persona: sólo para
     # las cuentas del FOB casillero y del seguro sugerido. No van al TXT
     # hasta saber en qué campo (D12): `/generate_maria` no los usa. Van sin
@@ -4263,6 +4266,16 @@ def _seguro_calculado_viejo(request: MariaRequest, valor: dict) -> str | None:
             f"{importe_escrito(valor['seguro'])}. Recalculalo o dejalo como está en «Ajustes y seguro».")
 
 
+def _importes_como_numeros(request: MariaRequest) -> None:
+    """Flete, seguro y gastos como números, para las cuentas que siguen. Un
+    importe que no lo es (lo que la pantalla no pudo leer viene tal cual,
+    D19) es un ValueError con su mensaje (SEPARADORES-1b)."""
+    request.flete = importe_valido(request.flete, "Flete") or 0
+    request.seguro = importe_valido(request.seguro, "Seguro") or 0
+    request.gastos_fob = importe_valido(request.gastos_fob, "Gastos (gastos_fob)")
+    request.gastos_anteriores_fob = importe_valido(request.gastos_anteriores_fob, "Gastos (gastos anteriores a FOB)")
+
+
 def _rechazar_exportacion_en_importacion(request: MariaRequest) -> None:
     if (request.tipo_destinacion or "").strip().upper().startswith("EC"):
         raise HTTPException(status_code=400, detail="Una destinación de exportación (EC*) no puede generar un TXT de importación.")
@@ -4281,8 +4294,7 @@ async def avisos_maria_endpoint(
     items = _items_con_procedencia(request)
     try:
         gastos = gastos_fob_para_el_txt(request.incoterm, request.gastos_fob, request.gastos_anteriores_fob)
-        importe_valido(request.flete, "Flete")
-        importe_valido(request.seguro, "Seguro")
+        _importes_como_numeros(request)
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     try:
@@ -4468,6 +4480,7 @@ async def generate_maria_endpoint(
                 )
         if kit_errors or errores_1b:
             raise HTTPException(status_code=400, detail={"errors": list(dict.fromkeys([*errors, *kit_errors, *errores_1b]))})
+        _importes_como_numeros(request)
         _viejo = _seguro_calculado_viejo(request, _cuentas_del_valor(request, items)[0])
         if _viejo:
             raise HTTPException(status_code=400, detail=_viejo)

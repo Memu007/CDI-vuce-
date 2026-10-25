@@ -30,6 +30,33 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## Veredicto de SEPARADORES-1b (2026-10-25): aceptada
+
+Sobre `db39de0` (informe `8974daf`). Integrada con `merge` a la rama de la
+PM, sin publicar. Detalle en `REPRODUCCION-SEPARADORES-1b-2026-10-25.md`.
+Yo corrí tus pruebas (`295 passed`), tu sabotaje sobre `db39de0` (los 12 en
+rojo, `rc=0`), la suite completa y dos negativos propios: 71 pedidos raros
+contra las dos rutas (ningún 500; « 12.50 » como texto da el mismo TXT que
+12.5) y `leer` sobre la familia nueva. Un adversario Opus alto: con número
+JSON el TXT es idéntico al de la base; las 72 diferencias de `leer` en 1157
+entradas pasan de leerse a preguntarse, ninguna cambia de magnitud.
+
+Tu sabotaje usa por defecto tu venv (`/tmp/cdi-dev2/venv`); en otra máquina
+sale con `rc=127` si no se le pasa el venv como segundo argumento. Para la
+próxima, que lo diga el encabezado del script.
+
+**Me equivoqué en la tarea:** «01,500» con la pista «.» sí se puede leer como
+miles (da 1500). Bien que lo marcaras en D21.
+
+## D20 y D21
+
+- **D20: (a)**, como recomendaste. Con el seguro calculado, un ajuste que no
+  se lee frena el TXT hasta que se corrija o se elija «Dejar el seguro como
+  está».
+- **D21: (b)**, pieza aparte: SEPARADORES-1c, abajo.
+
+Las dos decididas por la PM (`DECISIONS.md`).
+
 ## D22 (SUFIJOS-1, 2026-10-25): (a), ARCA en el producto
 
 Verifiqué tu premisa: en el repositorio no hay ruta `/cice/sufijos` ni una
@@ -56,60 +83,41 @@ cuento a Emi; se puede revertir):
   (CATALOGO-NCM-1): si ya lee el zip, reusalo, siempre con el zip del
   repositorio (`--archive`), sin bajar nada.
 
-Arrancá ya. El veredicto de SEPARADORES-1b viene en un rato, arriba de
-esto; si trae devolución, va primero.
+Seguís con SUFIJOS-1; el veredicto de arriba no trae devolución.
 
-## Veredicto de SEPARADORES-1 y VALOR-1c (2026-10-25): aceptadas
+## Después de SUFIJOS-1: SEPARADORES-1c
 
-Sobre `a099655` (informe `4548644`; tu merge `d4a3f08` es sólo de
-`docs/pm`). Integradas con `merge` a la rama de la PM. Detalle en
-`REPRODUCCION-SEPARADORES-1-VALOR-1c-2026-10-25.md`. Yo corrí tus pruebas
-(`301 passed`), tus dos sabotajes sobre `a099655` (26 y 17 en rojo, `rc=0`),
-la suite completa y un negativo propio sobre `montos_ar.js` (200.000 montos,
-ninguno mal). Un adversario Opus alto: TXT idéntico byte a byte en 56
-pedidos salvo lo pedido, ningún 500 nuevo en 333, la marca del seguro y D19
-probadas en el navegador.
+Chica, de plata. Va apenas entregues SUFIJOS-1. Los hallazgos están en la
+reproducción (H1 a H3).
 
-Bien que avisaras los dos rojos de `d0bfebc` y los arreglaras en un commit
-aparte: eran pruebas viejas que afirmaban lo que la tarea cambia.
+1. **Factura: una lectura de miles exige grupos bien formados** (la cabeza
+   de una a tres cifras, sin cero adelante, y cada grupo de tres). Si un
+   monto sólo se puede leer como miles con grupos mal formados, queda sin
+   leer, con el aviso de hoy. Hoy salen por mil: «0500.000» y «01500.000»
+   con la pista «,»; «01,500» con «.»; «4500.000.000» y «4500.000,00» con
+   cualquier pista. Siguen como hoy: «0500.000» con «.» (500), «01,500» con
+   «,» (1,5), «0,500» (0,5) y todo lo que SEPARADORES-1b dejó como guarda.
+   La pantalla aplica la misma regla: «01234.500» pregunta.
+2. **Lo que la pantalla no lee nunca llega al TXT como blanco.** Hoy
+   `trim()` de JS no saca `\x85` ni `\x1c`-`\x1f` y `strip()` de Python sí:
+   `leer` da error, `montoDelPedido` manda el texto, `importe_valido` lo deja
+   en blanco y el TXT sale con `MDDTFLE=0.00`. La causa es que la pantalla y
+   el servidor no usan la misma idea de «en blanco»; elegí vos de qué lado
+   se arregla. El campo vacío o con espacios comunes sigue siendo 0.
+3. **La pregunta no sugiere una forma que el sistema lea distinto.** Para
+   «2500.125» hoy propone «2.500,125», que se acepta y el TXT redondea a
+   2500.13 sin aviso; para «4500.000» propone «4.500,000»; con «-1234.500»
+   pierde el signo. Las dos lecturas se escriben con `escribir()`, como en
+   la rama de la coma («¿1.500 o 1,5?»).
 
-## Tu tarea: SEPARADORES-1b
+**Pruebas:** por cada punto, al menos dos ejemplos de la familia que no sean
+los de acá, de los dos lados donde aplique; las guardas de arriba; un
+sabotaje por punto que vuelva a la lectura de hoy. Suite completa sobre el
+SHA que entregás.
 
-Chica. Las dos cosas son de plata.
-
-1. **D19 (b).** `montoDelPedido` en `finalize.js` no manda 0 cuando no
-   puede leer el monto: manda el texto tal cual y el servidor lo rechaza
-   con un mensaje claro (no un 500, no un 422 crudo). Hoy la pantalla no
-   llega a generar con un monto ilegible; esto es la segunda red, por si
-   alguien llega por otro camino.
-2. **La causa del H1 y el H2: un separador seguido de exactamente tres
-   dígitos al final, cuando lo de adelante no es un grupo de miles bien
-   formado, se lee sin preguntar.** En la factura, `_monto_factura` con la
-   pista decimal en contra da «3480.000» → 3480000 y «3480,000» → 3480000.
-   En la pantalla, `montos_ar.js` toma «1234.567» y «1234,567» como
-   1234,567. Esa familia pasa a ser ambigua: en la factura queda sin leer
-   (con el aviso de hoy) y en la pantalla se pregunta, como «1,500».
-   **No toques `_numero_factura`** (precios y cantidades: ahí tres decimales
-   son normales).
-
-Lo que no cambia: «3.480», «3.480,00», «1.234.567», «1,234.56», «3,48»,
-«0,500», «01,500» (con el cero adelante no puede ser miles) y
-«1.234,567» (no es ambiguo) siguen como hoy.
-
-**Pruebas:** un caso por cada punto y por cada lado (factura y pantalla),
-con al menos dos ejemplos de la familia que no sean los de acá; los que no
-cambian, como guarda; un sabotaje por punto que vuelva a la lectura de hoy.
-Suite completa sobre el SHA que entregás.
-
-**Riesgos que quedan anotados, no se tocan:** lo que la factura deja sin
-leer sigue terminando en flete 0 con el aviso no bloqueante (diseño de
-MARIA-1c; SEPARADORES-1 manda más casos ahí); `pais_origen` desconocido
-sale `CARTPAYORI=310` sin aviso (va a M9).
-
-**Apenas entregues:** SUFIJOS-1 (`ROADMAP.md`, Fase 1c, orden 1). En las
-pruebas, VUCE siempre simulado (`VUCE_MODE=fake`): ninguna llamada real a
-VUCE ni a terceros. Si para leer la forma de la respuesta te hace falta la
-consulta real, es una D: no la hagas vos.
+**No se toca:** lo que la factura deja sin leer termina en flete 0 con el
+aviso no bloqueante (MARIA-1c); «1.234,567» se sigue aceptando; por API, el
+campo en blanco sigue siendo 0; `pais_origen` desconocido va a M9.
 
 ## Qué pasó el 2026-10-24
 
@@ -181,3 +189,8 @@ SEPARADORES-1, 2026-10-25:
 
 - **D19: (b)**, como recomendaste, en SEPARADORES-1b punto 1 (decidido por
   la PM; `DECISIONS.md`).
+
+SEPARADORES-1b, 2026-10-25:
+
+- **D20: (a).** **D21: (b)**, SEPARADORES-1c (decididas por la PM;
+  `DECISIONS.md`).
