@@ -150,7 +150,7 @@ def test_un_ajuste_que_no_cierra_no_frena_la_generacion(client):
 # ------------------------------------------------ los avisos de antes
 
 
-def test_los_avisos_traen_las_cuentas_y_dicen_que_el_casillero_va_a_mano(client):
+def test_los_avisos_traen_las_cuentas_y_dicen_que_el_casillero_va_al_txt_mas_adelante(client):
     _registrar_con_cuit(client, "valor1_avisos")
     r = client.post("/generate_maria/avisos", json={**_pedido(), "ajustes_deducir": 87.5})
     assert r.status_code == 200, r.text
@@ -175,12 +175,25 @@ def test_sin_ajustes_no_hay_aviso_del_casillero(client):
 
 def test_un_ajuste_invalido_va_en_la_tarjeta_y_no_tapa_los_otros_avisos(client):
     _registrar_con_cuit(client, "valor1_invalido")
-    r = client.post("/generate_maria/avisos", json={**_pedido(cuit_agr=""), "ajustes_incluir": -5})
+    sin_ajustes = client.post("/generate_maria/avisos", json=_pedido()).json()["avisos"]
+    r = client.post("/generate_maria/avisos", json={**_pedido(), "ajustes_incluir": -5})
     assert r.status_code == 200, r.text
     data = r.json()
     assert data["valor"] == {"error": "Ajustes a incluir: «-5.0» no es un importe válido "
                                       "(entre 0 y 1.000.000.000.000)."}
-    assert not any("FOB casillero" in a for a in data["avisos"])
+    # Los demás avisos siguen todos: el ajuste inválido no los tapa.
+    assert sin_ajustes and data["avisos"] == sin_ajustes
+
+
+@pytest.mark.parametrize("producto, error", [
+    ("basura", "Hay un producto mal formado (renglón 2): no se pueden hacer las cuentas."),
+    ({**LONA, "cantidad": 10 ** 400}, "Hay un importe o una cantidad fuera de rango: no se pueden hacer las cuentas."),
+], ids=["texto", "enorme"])
+def test_un_producto_mal_formado_va_en_la_tarjeta_y_no_tira_los_avisos(client, request, producto, error):
+    _registrar_con_cuit(client, "valor1_mal_" + request.node.callspec.id)
+    r = client.post("/generate_maria/avisos", json={**_pedido(), "items": [LONA, producto]})
+    assert r.status_code == 200, r.text
+    assert r.json()["valor"] == {"error": error}
 
 
 def test_un_casillero_negativo_va_en_la_tarjeta(client):
@@ -197,7 +210,7 @@ def _funciones(archivo, nombres):
     fuente = (V2 / archivo).read_text(encoding="utf-8")
     partes = []
     for nombre in nombres:
-        m = re.search(rf"\n(\s*)function {nombre}\([^)]*\) \{{.*?\n\1\}}", fuente, re.S)
+        m = re.search(rf"\n(\s*)(?:async )?function {nombre}\([^)]*\) \{{.*?\n\1\}}", fuente, re.S)
         assert m, f"no está {nombre} en {archivo}"
         partes.append(m.group(0))
     return "\n".join(partes)
@@ -218,13 +231,18 @@ const CDI = { state: { operacion: OP, items: [] }, escapeHtml: s => String(s) };
 
 def _correr(codigo, op):
     salida = subprocess.run(["node", "-e", DOM.replace("OP", json.dumps(op)) + codigo],
-                            check=True, capture_output=True, text=True)
+                            capture_output=True, text=True)
+    assert salida.returncode == 0, salida.stderr[-800:]
     return json.loads(salida.stdout)
 
 
 def _pantalla(op, despues, valor=None):
-    nombres = ["ajusteMalEscrito", "importeEscrito", "usarDescuento", "calcularSeguro", "pintarValor"]
-    codigo = ("let ultimoValor = null;\n" + _funciones("finalize.js", nombres) +
+    nombres = ["ajusteMalEscrito", "importeEscrito", "cuentasViejas", "enlazarValor", "otroDeducir",
+               "usarDescuento", "calcularSeguro", "pintarValor"]
+    codigo = ("let ultimoValor = null; let cuentasDe = null; let avisosSeq = 0; let valorEnlazado = false;\n"
+              f"const VALOR = {json.dumps(VALOR)};\n"
+              "const SIN_CUENTAS = 'No se pudieron hacer las cuentas: mirá los avisos.';\n" +
+              _funciones("finalize.js", nombres) +
               f"\npintarValor({json.dumps(valor)});\n{despues}\n"
               "console.log(JSON.stringify({op: CDI.state.operacion, refrescos,"
               " els: Object.fromEntries(Object.entries(els).map(([k, v]) =>"
@@ -242,6 +260,16 @@ def test_el_descuento_de_la_planilla_se_ofrece_y_no_se_pone_solo():
     assert r["els"]["valorDeducir"]["value"] == ""
     assert r["els"]["valorDescuento"]["hidden"] is False
     assert r["els"]["valorDescuentoTexto"]["textContent"] == "La planilla trae un descuento de 87,50 (fila 14)."
+    assert r["els"]["valorUsarDescuento"]["hidden"] is False
+
+
+def test_usar_el_descuento_no_pisa_otro_ajuste_a_deducir():
+    r = _pantalla({"descuento": 87.5, "ajustes_deducir": "50"}, "usarDescuento();", VALOR)
+    assert r["op"]["ajustes_deducir"] == "50"
+    assert r["els"]["valorUsarDescuento"]["hidden"] is True
+    assert r["els"]["valorDescuentoTexto"]["textContent"] == (
+        "La planilla trae un descuento de 87,50. Ajustes a deducir ya tiene otro importe: "
+        "si el descuento va aparte, sumalo a mano.")
 
 
 def test_el_boton_pone_el_descuento_como_ajuste_a_deducir():
@@ -269,6 +297,69 @@ def test_despues_de_calcular_el_seguro_la_nota_dice_la_base():
     r = _pantalla({}, "calcularSeguro(); pintarValor({...ultimoValor, seguro: 93.13});", VALOR)
     assert r["els"]["valorCalcularSeguro"]["hidden"] is True
     assert r["els"]["valorSeguroNota"]["textContent"] == "Seguro calculado: 1 % de (FOB casillero + flete)."
+
+
+def test_con_error_en_las_cuentas_no_se_calcula_el_seguro():
+    r = _pantalla({}, "ultimoValor = {error: 'x'}; calcularSeguro();", {"error": "x"})
+    assert "seguro_calculado" not in r["op"] and r["refrescos"] == 0
+
+
+def test_el_seguro_sugerido_de_otra_operacion_no_se_usa():
+    r = _pantalla({}, "CDI.state.operacion = {otra: true}; calcularSeguro();", VALOR)
+    assert r["op"] == {"otra": True}
+
+
+def test_mientras_se_rehacen_las_cuentas_no_se_calcula_con_las_viejas():
+    # Se escribe un ajuste y se toca el botón antes de que vuelvan las cuentas.
+    r = _pantalla({}, "enlazarValor(); els.valorDeducir.value = '500';"
+                      " els.valorDeducir.listeners.input(); calcularSeguro();", VALOR)
+    assert r["op"] == {"ajustes_deducir": "500"}
+    assert r["els"]["valorCalcularSeguro"]["hidden"] is True
+
+
+def test_un_numero_que_el_campo_no_entiende_queda_marcado_y_a_la_vista():
+    r = _pantalla({}, "enlazarValor(); els.valorIncluir.value = ''; els.valorIncluir.validity = {badInput: true};"
+                      " els.valorIncluir.listeners.input(); els.valorIncluir.value = '1-2'; pintarValor(VALOR);",
+                  VALOR)
+    assert r["op"]["ajustes_incluir"] == "mal escrito"
+    assert r["els"]["valorIncluir"]["value"] == "1-2"
+    assert r["els"]["valorError"]["textContent"] == "Ajustes a incluir: no es un número."
+
+
+def test_lo_que_se_esta_escribiendo_no_se_pisa():
+    r = _pantalla({}, "els.valorDeducir.value = '12'; document.activeElement = els.valorDeducir;"
+                      " CDI.state.operacion.ajustes_deducir = '99'; pintarValor(VALOR);", VALOR)
+    assert r["els"]["valorDeducir"]["value"] == "12"
+
+
+def _avisos(despues):
+    """refrescarAvisos de verdad, con CDI.api que contesta cuando se le dice."""
+    stubs = ("let ultimoValor = null; let cuentasDe = null; let avisosSeq = 0;\n"
+             "const SIN_CUENTAS = 'No se pudieron hacer las cuentas: mirá los avisos.';\n"
+             "function stripLeadingIcon(s) { return s; } function extractItemRef() { return ''; }\n"
+             "function buildMariaRequest() { return {}; }\n"
+             "const pendientes = []; CDI.state.items = [{}];\n"
+             "CDI.api = () => new Promise(ok => pendientes.push(ok));\n"
+             "function contestar(i, okHttp, data) { pendientes[i]({ok: okHttp, json: async () => data}); }\n")
+    codigo = stubs + _funciones("finalize.js", ["ajusteMalEscrito", "importeEscrito", "otroDeducir", "pintarValor",
+                                                "refrescarAvisos"]) + (
+        f"\n(async () => {{ {despues}; await new Promise(r => setTimeout(r, 0));"
+        " console.log(JSON.stringify({ultimoValor, error: els.valorError.textContent,"
+        " cuentas: els.valorCuentas.innerHTML})); })();")
+    return _correr(codigo, {})
+
+
+def test_si_fallan_los_avisos_la_tarjeta_lo_dice():
+    r = _avisos("const p = refrescarAvisos(); contestar(0, false, {detail: 'Procedencia: no'}); await p")
+    assert r["error"] == "No se pudieron hacer las cuentas: mirá los avisos."
+    assert r["cuentas"] == ""
+
+
+def test_una_respuesta_vieja_no_pisa_las_cuentas_nuevas():
+    r = _avisos("const a = refrescarAvisos(); const b = refrescarAvisos();"
+                    f" contestar(1, true, {{avisos: [], valor: {json.dumps(VALOR)}}}); await b;"
+                    " contestar(0, true, {avisos: [], valor: {error: 'vieja'}}); await a")
+    assert r["ultimoValor"] == VALOR
 
 
 def test_el_boton_nombra_la_base_que_dice_el_servidor():

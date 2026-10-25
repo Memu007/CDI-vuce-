@@ -144,7 +144,60 @@ caso "base_fija_en_el_boton" "FAILED $T::test_el_boton_nombra_la_base_que_dice_e
 
 # 18. el aviso vuelve a decir que el casillero se carga a mano
 reemplazar $M 'f"va al TXT en una próxima versión."' 'f"lo cargás vos en el MARIA."'
-caso "aviso_viejo" "FAILED $T::test_los_avisos_traen_las_cuentas_y_dicen_que_el_casillero_va_a_mano"
+caso "aviso_viejo" "FAILED $T::test_los_avisos_traen_las_cuentas_y_dicen_que_el_casillero_va_al_txt_mas_adelante"
+
+# 19. un producto que no es un renglón se saltea sin decir nada
+reemplazar $M '    if malos:
+        return' '    if False:
+        return'
+caso "producto_mal_formado_callado" "FAILED $T::test_un_producto_mal_formado_va_en_la_tarjeta_y_no_tira_los_avisos[texto]"
+
+# 20. un número que no entra en un float tira los avisos
+reemplazar $M '    except ArithmeticError:' '    except ZeroDivisionError:'
+caso "fuera_de_rango_500" "FAILED $T::test_un_producto_mal_formado_va_en_la_tarjeta_y_no_tira_los_avisos[enorme]"
+
+# 21. el descuento pisa otro ajuste a deducir ya escrito
+reemplazar $JS '        if (!(descuento > 0) || otroDeducir(op, descuento)) return;' '        if (!(descuento > 0)) return;'
+caso "descuento_pisa_deducir" "FAILED $T::test_usar_el_descuento_no_pisa_otro_ajuste_a_deducir"
+
+# 22. con otro ajuste a deducir, el botón del descuento se sigue ofreciendo
+reemplazar $JS '        if (usar) usar.hidden = otro;' '        if (usar) usar.hidden = false;'
+caso "boton_descuento_con_otro" "FAILED $T::test_usar_el_descuento_no_pisa_otro_ajuste_a_deducir"
+
+# 23. si fallan los avisos la tarjeta queda vacía y sin error
+reemplazar $JS '            valor = { error: SIN_CUENTAS };
+' '' 2
+caso "falla_avisos_callada" "FAILED $T::test_si_fallan_los_avisos_la_tarjeta_lo_dice"
+
+# 24. un ajuste mal escrito se repinta vacío
+reemplazar $JS '!ajusteMalEscrito(op.ajustes_incluir)) {' 'true) {'
+caso "mal_escrito_se_borra" "FAILED $T::test_un_numero_que_el_campo_no_entiende_queda_marcado_y_a_la_vista"
+
+# 25. al cambiar un ajuste, el botón sigue con las cuentas viejas
+reemplazar $JS '                cuentasViejas();
+' ''
+caso "boton_con_cuentas_viejas" "FAILED $T::test_mientras_se_rehacen_las_cuentas_no_se_calcula_con_las_viejas"
+
+# 26. el seguro sugerido de otra operación se usa
+reemplazar $JS ' || cuentasDe !== op) return;' ') return;'
+caso "seguro_de_otra_operacion" "FAILED $T::test_el_seguro_sugerido_de_otra_operacion_no_se_usa"
+
+# 27. se pisa lo que la persona está escribiendo
+reemplazar $JS 'document.activeElement !== deducir' 'true'
+caso "pisa_lo_que_se_escribe" "FAILED $T::test_lo_que_se_esta_escribiendo_no_se_pisa"
+
+# 28. una respuesta vieja de los avisos pisa la nueva
+reemplazar $JS '        if (seq !== avisosSeq) return;   // llegó uno más nuevo
+' ''
+caso "respuesta_vieja" "FAILED $T::test_una_respuesta_vieja_no_pisa_las_cuentas_nuevas"
+
+# 29. un número que el campo no entiende no se marca
+reemplazar $JS "input.validity && input.validity.badInput ? 'mal escrito' : input.value" 'input.value'
+caso "bad_input_sin_marca" "FAILED $T::test_un_numero_que_el_campo_no_entiende_queda_marcado_y_a_la_vista"
+
+# 30. con error en las cuentas, el botón pone un seguro igual
+reemplazar $JS '        if (!ultimoValor || ultimoValor.error || cuentasDe !== op) return;' '        if (!ultimoValor || cuentasDe !== op) return;'
+caso "seguro_con_error" "FAILED $T::test_con_error_en_las_cuentas_no_se_calcula_el_seguro"
 
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
-echo "OK: los 18 sabotajes dan rojo por la razón esperada"
+echo "OK: los 30 sabotajes dan rojo por la razón esperada"
