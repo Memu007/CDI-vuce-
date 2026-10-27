@@ -79,8 +79,8 @@ sabotaje $M "el cuit_agr que manda la pantalla gana al estudio" \
   'effective_cuit_agr = request.cuit_agr or (estudio.cuit if estudio is not None else "")' \
   "FAILED $T::test_el_estudio_elegido_va_al_cddtagr_aunque_haya_perfil_y_cuit_agr"
 sabotaje $M "el uso se anota antes de generar" \
-  $'    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])\n    try:\n' \
-  $'    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])\n    if estudio is not None:\n        estudio.last_used_at = datetime.now(timezone.utc)\n        await db.commit()\n    try:\n' \
+  $'    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])\n    if not request.items:' \
+  $'    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])\n    if estudio is not None:\n        estudio.last_used_at = datetime.now(timezone.utc)\n        await db.commit()\n    if not request.items:' \
   "FAILED $T::test_los_avisos_y_un_txt_que_no_se_genera_no_cuentan_como_uso"
 sabotaje $M "los avisos anotan el uso" \
   $'    estudio = await _estudio_elegido(db, request.estudio_id, user["username"])\n    items = _items_con_procedencia(request)\n' \
@@ -147,8 +147,8 @@ sabotaje $M "el único no se preselecciona" \
   '    elif len(estudios) == 1:' '    elif False:' \
   "FAILED $T::test_se_preselecciona_el_unico"
 sabotaje $M "se preselecciona el usado hace más tiempo" \
-  'preseleccionado = max(usados, key=lambda e: e.last_used_at).id' \
-  'preseleccionado = min(usados, key=lambda e: e.last_used_at).id' \
+  'preseleccionado = max(usados, key=lambda u: (u[0], u[1] is None))[1]' \
+  'preseleccionado = min(usados, key=lambda u: (u[0], u[1] is None))[1]' \
   "FAILED $T::test_con_varios_se_preselecciona_el_ultimo_usado"
 
 # ------------------------------------------------------------- la pantalla

@@ -27,40 +27,37 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
-## Veredicto de CLIENTE-1c (2026-10-27): con devolución
+## Veredicto de la vuelta de CLIENTE-1c y de ESTUDIO-1b (2026-10-27): aceptadas
 
-Sobre `4452b22` (informe `dbe7c4a`). El detalle y las salidas están en
-`REPRODUCCION-CLIENTE-1c-2026-10-27.md`. Re-corrí la suite desde base
-limpia (3135 passed, **0 rojos**: los 12 quedaron cerrados) y
-`cliente1c.sh` (25 ROJO, 0 sin rojo), más negativos míos contra el script.
-Mi adversario fue Opus, alto.
+Sobre `3aba9c2` (informe `807d562`). El detalle está en
+`REPRODUCCION-CLIENTE-1c-2026-10-27.md` («Vuelta») y en
+`REPRODUCCION-ESTUDIO-1b-2026-10-27.md`. Corrí la suite desde base limpia
+(3229 passed, 0 rojos), los sabotajes de CLIENTE-1c, CLIENTE-1b y ESTUDIO-1b (todos en rojo; el de ESTUDIO-1 sigue corriendo), 32 negativos míos por API y
+un fuzz de la clave de `--base`. Mi adversario no corrió (presupuesto).
+Integro tu rama (`418ada3`).
 
-- **Bien:** D15 (b), D16 (b), la regla única de la fecha con
-  `fecha_inic_activ_sirve` y la causa de los 402 (`2ff3262`). La fecha con
-  hora que ya no se copia es D15 (b): está decidido.
-- **Devolución — la clave de `--base` en el error.** Causa: el dónde y los
-  secretos salen de una segunda lectura del texto (`urlsplit` en
-  `_donde_y_secretos`), no de lo mismo que conecta (`make_url`). Cuando las
-  dos lecturas no coinciden, el error muestra la clave, o el script se cae
-  con un traceback en vez del mensaje limpio. Ejemplo:
-  `postgresql://u:pa/ss@127.0.0.1:1/db` → «No se pudo revisar la base
-  u:pa/ss@127.0.0.1:1/db: …».
-  - Arreglá la familia, no el «/»: cualquier `--base` que la conexión
-    acepte tiene que dar el mensaje limpio, sin la clave, con rc 2.
-  - De la misma causa: el enmascarado reemplaza el usuario en todo el
-    texto («ConnectionRef***sedError» con usuario «u»). Lo que se tapa
-    tiene que ser lo que leyó la conexión, sin romper el resto del mensaje.
-  - Caso y sabotaje en `cliente1c.sh` para cada forma que encuentres.
-- **D25: (b).** La importación sigue la regla del alta: la fecha que no
-  sirve queda vacía, con aviso en su fila. Va en esta misma vuelta, con su
-  caso y su sabotaje.
-- **Se anota, no lo arregles:** el año `0001` pasa por los tres lugares.
-- **No integro todavía** tu rama: entra con la vuelta. La CI de mi rama
-  sigue roja hasta entonces.
+- **Bien:** H1 y H2 de la devolución (una sola lectura con `make_url`),
+  D25 (b) en un solo módulo, D23 (b) con sus tres casos, `estudio_id` y el
+  nombre del estudio. Tus supuestos quedan aceptados.
+- **Se suma a EXCEL-3f (H1-bis), primero:** el fuzz con 4000 claves da 0
+  fugas en la URL escrita, la clave, el host y la consulta, pero 113 de
+  4000 cuando el error repite `url.render_as_string(hide_password=False)`.
+  Causa: SQLAlchemy escribe la clave con `quote(clave, safe=" +")`, y esa
+  forma no está entre las que tapás. Una clave que mezcla un espacio con
+  otro carácter que se escapa queda a la vista:
+  `QZXW KJVB|NMPL` → `…://***:QZXW KJVB%7CNMPL@db.local…`. Tu prueba usa
+  `render_as_string`, pero sólo con claves de un separador.
+  - Arreglá la familia: toda forma en que SQLAlchemy o el driver puedan
+    escribir la clave, no sólo este ejemplo.
+  - Caso parametrizado que combine espacio con otro carácter escapado en
+    la misma clave, y su sabotaje en `cliente1c.sh`.
+  - Hasta que entre, el script no se corre contra producción.
+- **Riesgos anotados, no los arregles:** el choque al anotar el uso del
+  perfil con dos TXT a la vez, U+3164 y U+2800 en el nombre, `cuit_valido`
+  con `00000000000`, el año `0001` y `--base` en el historial (lo decide
+  Emi).
 
-Después, ESTUDIO-1b.
-
-## EXCEL-3f (después de ESTUDIO-1b)
+## EXCEL-3f (tarea activa)
 
 Lo que ya estaba: **D21 (b)**, **D22 (b)** y **H5** opcional (el aviso de
 flete sin «y N más», `main.py:8115`).
@@ -94,44 +91,11 @@ como estaban: D12 (b) va aparte, después de ESTUDIO-1.
 
 ## Orden
 
-1. La vuelta de CLIENTE-1c (arriba), con D25 (b).
-2. ESTUDIO-1b.
-3. EXCEL-3f.
-4. GUARDAR-2.
+1. EXCEL-3f, con H1-bis primero.
+2. GUARDAR-2.
 
-Puertas de la vuelta: la suite sigue en 0 rojos, `cliente1c.sh` sin
-sabotaje en verde, y mi diff de revisión va desde `4452b22`.
-
-
-## ESTUDIO-1b (después de CLIENTE-1c; antes de publicar ESTUDIO-1)
-
-D23 (b), decidida en el veredicto de ESTUDIO-1 (aceptada sobre `5468581`).
-
-1. **D23 (b).** Hay que anotar cuándo se generó con el CUIT del perfil, en la
-   tabla chica aparte que propusiste. La preselección es lo último que se
-   usó, estudio o perfil.
-   - Mi adversario lo vio más ancho. Con un solo estudio que nunca se usó,
-     ese estudio gana sobre el perfil.
-   - Y elegir «CUIT de mi perfil» en la operación N no cuenta: en la N+1
-     vuelve el estudio. Lo reprodujo en Chromium.
-   - La prueba cubre los tres casos:
-     - perfil después de un estudio;
-     - perfil elegido a mano en la pantalla, con la operación siguiente
-       sin tocar el selector;
-     - un estudio único recién cargado sin ningún uso previo del perfil:
-       ahí sí gana el estudio.
-2. **`estudio_id` escrito como vacío.** Hoy `"null"`, `"None"`, `"N/A"` y
-   `"  "` caen al perfil en silencio, por `_vacio_escrito`. Contradice el
-   docstring de `_estudio_elegido`.
-   - Sólo `""`, y la falta del campo, son «sin estudio».
-   - Lo demás que no es de la cuenta da 400.
-3. **Nombre del estudio.** El alta rechaza un nombre que se ve vacío o al
-   revés: espacios de ancho cero, controles de dirección (U+200B–U+200F,
-   U+202A–U+202E, U+2066–U+2069) y un nombre que queda vacío sin ellos.
-
-Cada punto con su sabotaje en rojo. Riesgos que anoto, no los arregles:
-- `cuit_valido` acepta `00000000000`; ya estaba en la base.
-- Un estudio borrado mientras se genera sale igual en ese TXT.
+Puertas de EXCEL-3f: la suite en 0 rojos, `excel3.sh` y `cliente1c.sh`
+sin sabotaje en verde, y mi diff de revisión va desde `3aba9c2`.
 
 ## Más adelante — GUARDAR-2
 

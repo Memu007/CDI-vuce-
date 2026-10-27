@@ -50,6 +50,7 @@ PYEOF
 M=proyecto_maria/main.py
 G=proyecto_maria/services/migration_service.py
 D=scripts/datos/clientes_fecha_inic_activ.py
+F=proyecto_maria/services/fecha_inic_activ.py
 C=FAILED\ tests/test_cliente1c.py::
 B=FAILED\ tests/test_cliente1b_script.py::
 
@@ -63,6 +64,10 @@ sabotaje $M "la operación copia lo que trae, como antes" \
   'fecha_op = _fecha_inic_activ_o_vacia(data.get("comprador_fecha_inic_activ"))' \
   'fecha_op = str(data.get("comprador_fecha_inic_activ") or "").strip()' \
   "${C}test_la_operacion_solo_copia_una_fecha_que_sirve[20150-01-0]"
+sabotaje $M "la operación corta a diez caracteres, como antes" \
+  'fecha_op = _fecha_inic_activ_o_vacia(data.get("comprador_fecha_inic_activ"))' \
+  'fecha_op = _fecha_inic_activ_o_vacia(str(data.get("comprador_fecha_inic_activ") or "")[:10])' \
+  "${C}test_la_operacion_solo_copia_una_fecha_que_sirve[2015-03-15T00:00:00]"
 sabotaje $M "la regla de la operación deja pasar la que no sirve" \
   $'    except HTTPException:\n        return ""' $'    except HTTPException:\n        return str(raw or "")' \
   "${C}test_la_operacion_solo_copia_una_fecha_que_sirve[2015-02-30]"
@@ -87,10 +92,29 @@ sabotaje $G "el aviso no dice qué traía" \
 sabotaje $G "avisa también la celda vacía" \
   '            if raw_date:' '            if True:' \
   "${C}test_sin_fechas_malas_no_hay_aviso"
-sabotaje $G "el año vuelve a quedar sin rellenar" \
-  'return datetime.strptime(text, date_format).date().isoformat()' \
-  'return datetime.strptime(text, date_format).strftime("%Y-%m-%d")' \
+sabotaje $F "el año vuelve a quedar sin rellenar" \
+  'return date(anio, mes, dia).isoformat()' 'return f"{anio}-{mes:02d}-{dia:02d}" if date(anio, mes, dia) else None' \
   "${C}test_la_importacion_guarda_el_anio_con_cuatro_cifras"
+
+# D25 (b): la importación sigue la regla del alta.
+sabotaje $G "la importación guarda lo que trae, cortado" \
+  'return fecha_del_alta(re.sub(r" 00:00:00\Z", "", text)) or ""' 'return text[:10]' \
+  "${C}test_la_importacion_deja_vacia_la_fecha_que_el_alta_no_acepta[15-03-2015]"
+sabotaje $G "la celda de fecha de Excel no se importa" \
+  'return fecha_del_alta(re.sub(r" 00:00:00\Z", "", text)) or ""' 'return fecha_del_alta(text) or ""' \
+  "${C}test_la_celda_de_fecha_de_excel_se_importa"
+sabotaje $F "la regla acepta el año de dos cifras" \
+  'r"([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})"' 'r"([0-9]{1,2})/([0-9]{1,2})/([0-9]{2,4})"' \
+  "${C}test_la_importacion_deja_vacia_la_fecha_que_el_alta_no_acepta[15/03/15]"
+sabotaje $F "la regla acepta dígitos de ancho completo" \
+  'r"([0-9]{4})-([0-9]{2})-([0-9]{2})"' 'r"(\d{4})-(\d{2})-(\d{2})"' \
+  "${C}test_la_importacion_deja_vacia_la_fecha_que_el_alta_no_acepta[\uff12\uff10\uff11\uff15-03-15]"
+sabotaje $F "la regla no acepta D/M/AAAA" \
+  'r"([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})"' 'r"([0-9]{2})/([0-9]{2})/([0-9]{4})"' \
+  "${C}test_la_importacion_acepta_lo_que_acepta_el_alta[5/3/2015-2015-03-05]"
+sabotaje $F "la regla acepta una fecha que no existe" \
+  'return date(anio, mes, dia).isoformat()' 'return f"{anio:04d}-{mes:02d}-{dia:02d}"' \
+  "${C}test_la_operacion_solo_copia_una_fecha_que_sirve[2015-02-30]"
 sabotaje $M "la confirmación crea con lo que trae el lote" \
   'fecha_inic_activ=_fecha_inic_activ_o_vacia(str(record.get("fecha_inic_activ") or "")) or None,' \
   'fecha_inic_activ=str(record.get("fecha_inic_activ") or "").strip()[:10] or None,' \
@@ -122,11 +146,44 @@ sabotaje $D "una base que no responde sale con el traceback" \
   'except Exception as e:  # noqa: BLE001' 'except ZeroDivisionError as e:  # noqa: BLE001' \
   "${B}test_una_base_que_no_responde_no_muestra_la_clave"
 sabotaje $D "el error del driver muestra la clave" \
-  ', url.password),' ', None),' \
+  'detalle = _tapar(f"{type(e).__name__}: {e}", secretos, visibles)' 'detalle = f"{type(e).__name__}: {e}"' \
   "${B}test_si_el_error_de_la_base_nombra_la_clave_no_se_muestra[simple]"
 sabotaje $D "se tapa sólo la clave tal cual, no la escapada" \
-  'for forma in {clave, quote(clave, safe=""), quote_plus(clave)}:' 'for forma in {clave}:' \
+  'formas |= {crudo, quote(crudo, safe=""), quote_plus(crudo)}' 'formas |= {crudo}' \
   "${B}test_si_el_error_de_la_base_nombra_la_clave_no_se_muestra[escapada]"
+sabotaje $D "se nombra la base con la URL escrita, como antes" \
+  'donde = _tapar(_donde(url), secretos, visibles)' 'donde = args.base.split("://", 1)[-1]' \
+  "${B}test_una_clave_con_un_separador_no_se_ve_en_el_error[CLA/VESECRETA]"
+sabotaje $D "se tapa sólo la clave que ve SQLAlchemy" \
+  'secretos = {antes, antes.partition(":")[2], *re.split(_SEPARADORES, antes),' 'secretos = {' \
+  "${B}test_si_el_error_repite_una_base_mal_armada_no_se_ve_la_clave[arroba]"
+sabotaje $D "lo de antes del «@» se tapa entero, no por partes" \
+  '*re.split(_SEPARADORES, antes),' '' \
+  "${B}test_si_el_error_repite_una_base_mal_armada_no_se_ve_la_clave[arroba]"
+sabotaje $D "se parte sólo en «:», «;» y «@», como antes" \
+  '_SEPARADORES = r"[:;@/?#]"' '_SEPARADORES = r"[:;@]"' \
+  "${B}test_si_el_error_repite_la_url_una_clave_con_separador_no_se_ve[CLA@VE/SE@CRETA]"
+sabotaje $D "la clave en la consulta no se tapa" \
+  $'    for valor in url.query.values():\n        secretos |= set(valor) if isinstance(valor, tuple) else {valor}\n' '' \
+  "${B}test_si_el_error_repite_una_base_mal_armada_no_se_ve_la_clave[en-la-consulta]"
+sabotaje $D "lo que conecta es la URL escrita, no la que se leyó" \
+  'r = asyncio.run(revisar(url, args.arreglar_none))' 'r = asyncio.run(revisar(args.base, args.arreglar_none))' \
+  "${B}test_lo_que_conecta_es_lo_que_se_lee"
+sabotaje $D "una clave corta tapa el host del error" \
+  'visibles = {v for v in visibles if v} - formas' 'visibles = set()' \
+  "${B}test_una_clave_corta_no_tapa_el_host_en_el_error"
+sabotaje $D "el host protege lo que es parte de la clave" \
+  'for f in sorted(formas | visibles, key=len, reverse=True):' 'for f in sorted(formas | visibles, key=len):' \
+  "${B}test_una_clave_que_empieza_como_el_host_se_tapa_entera"
+sabotaje $D "un usuario corto rompe la palabra (sin mirar antes)" \
+  '                patron = r"(?<!\w)" + patron' '                pass' \
+  "${B}test_un_usuario_corto_no_rompe_el_mensaje[o]"
+sabotaje $D "un usuario corto rompe la palabra (sin mirar después)" \
+  '                patron += r"(?!\w)"' '                pass' \
+  "${B}test_un_usuario_corto_no_rompe_el_mensaje[Connection]"
+sabotaje $D "si tapar falla sale el traceback" \
+  'except Exception:  # noqa: BLE001 - tapar nunca muestra un traceback' 'except ZeroDivisionError:' \
+  "${B}test_si_tapar_falla_no_hay_traceback_ni_clave"
 
 git checkout -q -- proyecto_maria/ scripts/datos/
 echo "sabotajes sin rojo: $FALLAS"

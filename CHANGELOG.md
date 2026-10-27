@@ -17,18 +17,23 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - Un importe con un carácter que la pantalla no lee (\x85, \x1c a \x1f) ya no sale como 0 en el TXT: el servidor lo rechaza con mensaje.
 - La pregunta de la pantalla propone las dos formas como se leen («¿2500125 o 2500,1250?») y conserva el signo.
 
+## 2026-10-27 · fix: la importación sigue la regla del alta y el script de datos no muestra la clave (vuelta de CLIENTE-1c)
+
+- **fix(clientes):** la fecha de inicio de actividad importada pasa por la misma regla que el alta (D25 b): año de dos cifras, dígitos de ancho completo o DD-MM-AAAA quedan vacíos con aviso en su fila; una celda con formato fecha de Excel se importa.
+- **fix(datos):** el script lee la base, la clave y el lugar de lo mismo que conecta; una clave con «/», «?», «#», «[» o caracteres de ancho completo ya no se ve ni da traceback, y tapar no corta palabras del mensaje.
+
+## 2026-10-27 · fix: generar con el CUIT del perfil también cuenta como último usado (ESTUDIO-1b)
+
+- **fix(estudios):** la operación siguiente trae elegido lo último con que se generó, estudio o CUIT del perfil; un estudio único gana sólo si el perfil nunca se usó. Un `estudio_id` que no es vacío ni de la cuenta («null», espacios, un número) da 400 y no cae al perfil.
+- El nombre del estudio no admite caracteres invisibles ni controles de dirección.
+
 ## 2026-10-25 · feat: el sufijo de valor de cada producto, con el arancel de ARCA (SUFIJOS-1)
 
 - En «Lo que decide el despachante» cada producto propone su sufijo (marca AA, modelo AB, código AI) según el arancel de ARCA del 07/10/2026 junto con el de la operación (CA00 y los demás quedan) y dice qué falta; una posición que no está queda vacía y se avisa, con la letra de control correcta si la que vino es otra. Sin elegir, la unidad estadística va en kilos si la posición la pide.
 - Un producto entero sale con su propio sufijo (antes, el de la operación). Un grupo exige el mismo sufijo en todos sus ítems.
 - En un grupo no hay celda de sufijo por producto (va uno para todo el grupo); si la propuesta junto con el de la operación pasa de 120 caracteres no se propone nada; una NCM de 8 dígitos se avisa como posición incompleta, no como fuera del arancel.
 
-## 2026-10-25 · fix: un monto que no se pudo leer no sale como 0 (SEPARADORES-1b)
-
-- El flete, el seguro o los gastos que la pantalla no pudo leer ya no viajan como 0: el servidor no genera y dice cuál es. Tampoco toma «3.480» como 3,48 ni «1e3» como 1000. Un ajuste así se avisa en las cuentas; frena el TXT sólo si el seguro lo calculó el sistema (D19, D20).
-- «4500.000» o «2500,125»: en la factura, con el otro separador decimal, quedan sin leer y se avisa (antes salían por mil). En la pantalla se pregunta, como con «1,500», sin trabarse si se pega una cifra muy larga.
-
-## 2026-10-25 · fix: la fecha de inicio de actividad de la operación y de la importación pasa por la regla del alta (CLIENTE-1c)
+## 2026-10-25 · fix: la fecha de inicio de actividad de la operación pasa por la regla del alta y la importación no guarda una que no sirve (CLIENTE-1c)
 
 - **fix(clientes):** la operación copia a la ficha vacía sólo una fecha válida (guardada AAAA-MM-DD); si no sirve no se copia y la operación se guarda igual. La importación deja vacía la fecha que no sirve y la vista previa avisa la fila; el año sale siempre con cuatro cifras.
 - La ficha avisa la fecha guardada con el mismo criterio que el generador del TXT (también con dígitos de ancho completo). El script de datos no muestra la clave de la base en sus errores.
@@ -56,6 +61,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(clientes):** el alta y la edición ya no guardan «None» ni una fecha cortada: aceptan AAAA-MM-DD o DD/MM/AAAA (se guarda AAAA-MM-DD), y otra cosa da un error que el formulario muestra sin guardar nada.
 - El aviso de lo que falta para el MARIA pide también la fecha guardada que no es válida; `scripts/datos/clientes_fecha_inic_activ.py` informa por id las que quedaron mal y, con `--arreglar-none`, vacía las «None».
+
+## 2026-10-25 · fix: un monto que no se pudo leer no sale como 0 (SEPARADORES-1b)
+
+- El flete, el seguro o los gastos que la pantalla no pudo leer ya no viajan como 0: el servidor no genera y dice cuál es. Tampoco toma «3.480» como 3,48 ni «1e3» como 1000. Un ajuste así se avisa en las cuentas; frena el TXT sólo si el seguro lo calculó el sistema (D19, D20).
+- «4500.000» o «2500,125»: en la factura, con el otro separador decimal, quedan sin leer y se avisa (antes salían por mil). En la pantalla se pregunta, como con «1,500», sin trabarse si se pega una cifra muy larga.
 
 ## 2026-10-25 · fix: el seguro calculado con otros importes no sale sin que se elija (VALOR-1c)
 

@@ -2,187 +2,172 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## EXCEL-3e: entregada
+## Vuelta de CLIENTE-1c y ESTUDIO-1b: entregadas en `3aba9c2`
 
-**Resultado:** un flete, seguro o descuento bajo una especificación
-combinada, con medidas «/», «-», 0 o vacías, ya no entra como producto.
-Se lee como flete o descuento, o queda sin leer con aviso de su fila.
-
-Arreglé la causa, no una lista: `_es_una_medida` decide qué es una medida.
-Sirve un número mayor que 0, o un texto con una cifra que no empieza con
-raya («48-50», «1,5m», «½», «2 m²»). «/», «-», «—», 0, «0.0», «-1 m»,
-«–1», «N/A» o «一» no son medida: no abren el renglón del grupo y no se
-escriben en la descripción («ancho - m»).
-
-Un producto real con «-» sigue entrando, con o sin la descripción
-combinada. Bajo la descripción combinada, un renglón sin rótulo propio con
-«-» sigue siendo del grupo y conserva el código. Lo encontró el adversario
-como regresión mía, y quedó arreglado en `f127546`.
-
-**Lo que decidís:** D24, abajo. Las D20 a D23 ya las contestaste.
-
-### Decisiones
-
-**D24. Sin combinadas, el renglón sin descripción y con medidas «-» ya no
-hereda.**
-
-El caso es `[2, "DT-1", vacío, "-", "-", 1, 4, 2, 8]` debajo de un producto,
-sin combinar.
-- En la base heredaba la descripción de arriba, con el aviso «tomaron la
-  del renglón de arriba».
-- Ahora queda sin leer, con su aviso de fila, y el FOB no suma sus 8.
-
-Lo encontró el adversario Opus alto y lo reproduje. Es a propósito: es la
-regla de EXCEL-1, sin medidas no se hereda, y es la misma condición que
-impide que un subtotal sin rótulo con «-» se vuelva producto.
-- (a) Dejarlo así: la fila se ve como sin leer y la persona la carga.
-- (b) Que herede con aviso cuando tiene código propio igual al del grupo.
-  Un subtotal o un cargo con el código repetido entraría como producto: es
-  la puerta de H1 por otro lado.
-- **Recomiendo (a).** Perder una fila con aviso se ve. Sumar un cargo al
-  FOB sin aviso no se ve.
-
-### SHAs
-
-Base: `1955cac` (lo que ya estaba en origin).
-
-| Commit | Qué es |
+| Qué | SHA |
 |---|---|
-| eeef144 | pruebas: el cargo con medidas «/», «-», 0 o vacías, toda la familia |
-| c74741d | producto: «/», «-» o 0 no son una medida |
-| c95ec27 | pruebas: una medida en texto sigue abriendo el renglón |
-| c0ae47d | refactor: `_es_una_medida` sin una guarda que no cambiaba nada |
-| 798d2b2 | pruebas: negativos, «N/A», «—», «0.0», «0 m», «½» y la descripción |
-| 5c2b8cf | producto: un negativo o «-» no es medida ni va a la descripción, con el CHANGELOG |
-| b6dd426 | sabotajes |
-| afcb215 | pruebas: «-1 m», «–1», «一», «m²» y la unidad de «½» (del `/code-review`) |
-| 4af14da | producto: lo de afcb215, con el CHANGELOG corregido |
-| f2755e7 | sabotajes |
-| e662ac7 | pruebas: el renglón con «-» bajo la combinada conserva el código (rojo del adversario) |
-| f127546 | producto: ese arreglo, con el CHANGELOG |
-| 2552158 | sabotajes |
-| 14a19e8 | sabotajes: dos patrones viejos y uno que no compilaba; ahora un sabotaje que no compila es ROTO |
-| 1d9ef2e | merge de tu rama (SEPARADORES-1 y VALOR-1c). La suite, compileall, smoke y ataque corrieron sobre él |
-| 6f798d8 | pruebas: «(1)» como medida negativa, y tres sabotajes que ya no distinguían. **Es el SHA que entrego.** Las cinco de Excel y los sabotajes corrieron sobre él |
-| 482ec98 | merge de tu rama (sólo `docs/pm`) |
+| ESTUDIO-1b, producto | `e226ac3`, `975d627` |
+| ESTUDIO-1b, pruebas, pantalla y sabotajes | `009ad58`, `8359e53` |
+| Vuelta de CLIENTE-1c, producto | `7e43604`, `eda3755` (import sin uso), `2a21835` (refactor) |
+| Vuelta de CLIENTE-1c, pruebas y sabotajes | `d0dcf04`, `f1cb25e` |
+| Merge de tu rama (`ce70729`), sólo `docs/pm/` | `3aba9c2` (lo que se entrega) |
+| Informe | este commit |
 
-**Archivos de producto:** `proyecto_maria/main.py` y `CHANGELOG.md`. No
-toqué `maria_generator.py`, `controles_maria.py` ni `despachante.js`.
+Tu diff de revisión: `git diff 4452b22..3aba9c2`. Los merges de tu rama
+traen sólo `docs/pm/`; mi canal `PARA-DEV.md` no cambió con `ce70729`.
 
-Los tres `.xls` nuevos (`tests/fixtures/h1_*.xls`) son sintéticos: «LONA
-DEMO», «DT-1». La proforma del 24/10 no entró.
+**Nada para decidir.** Lo que elegí sin que se pidiera va en «Supuestos»,
+para que lo puedas rechazar. Próxima D: D26.
 
-### Lo que barre la prueba
+## 1. Vuelta de CLIENTE-1c
 
-`test_un_cargo_con_medidas_que_no_son_no_entra_como_producto` cruza todo:
-- las medidas «/», «-», 0, vacía y las variantes de raya y texto;
-- flete, seguro y descuento;
-- importe y precio, o sólo importe;
-- el rótulo en Item o en la descripción;
-- `.xlsx`.
+- **H1, la clave de `--base`.** El script ya no lee la URL dos veces:
+  conecta con la de `make_url` y tapa con esa misma (sin `urlsplit`). El
+  lugar del error sale de `url.host`, `url.port` y `url.database`, y pasa
+  igual por `_tapar`. Lo que no entiende `make_url` (por ejemplo el puerto
+  «:abc») da el mensaje de uso con rc 2, nunca un traceback. Si tapar falla,
+  sale «(sin detalle)» y el nombre del error: tampoco hay traceback.
+  - Casos: claves con «/», «?», «#», «[», «]», «;», espacio, «%2F» y «@», y
+    esos signos en ancho completo («／», «＠», «？», «＃»). Cada una corre el
+    script como proceso, y otra vez con un error que repite la URL entera.
+    Ninguna muestra la clave ni un traceback; todas dan rc 2.
+- **H2, el usuario que rompía palabras.** Se tapa sólo el secreto entero
+  (no pegado a letras o dígitos). Un usuario «u» ya no deja
+  «ConnectionRef***sedError». Los pedazos del host que no son secretos
+  quedan: una clave «1» no borra «127.0.0.1».
+- **H3, el año `0001`:** anotado, no lo toqué.
+- **D25 (b):** la regla vive en un solo módulo,
+  `proyecto_maria/services/fecha_inic_activ.py` (`fecha_del_alta`). La usan
+  el alta y la edición (`main.py`) y la importación
+  (`migration_service.py`). En la importación, «15/03/15», «01/01/50»,
+  DD-MM-AAAA y los dígitos de ancho completo quedan vacíos con el aviso de
+  su fila.
+- **Saqué código mío que no hacía nada (`2a21835`).** Tapar el lugar del
+  error pedazo por pedazo sólo cambiaba la salida en URLs absurdas (la clave
+  repetida dentro del host), y ahí no tapaba más. Lo encontré porque su
+  sabotaje quedaba verde. Ahora es una línea:
+  `donde = _tapar(_donde(url), secretos, visibles)`.
+- **Sabotajes arreglados (`f1cb25e`).** En `cliente1c.sh` los textos
+  esperados siguen los ids que escribe pytest (escapa lo que no es ASCII,
+  `[２０１５-03-15]`). En `cliente1b.sh` tres sabotajes
+  apuntaban a `main.py`: ahora apuntan al módulo de la regla.
 
-El `.xls` va con los tres fixtures de `XLS_H1`, uno por cargo.
+## 2. ESTUDIO-1b
 
-El producto real con «-» se prueba con y sin la descripción combinada, y el
-renglón bajo la combinada en `.xlsx` y `.xls`.
+- **D23 (b):** generar con el CUIT del perfil se anota (tabla nueva
+  `usos_cuit_perfil`, por cuenta) y compite con los estudios. La operación
+  siguiente trae elegido lo último usado, estudio o perfil. Cuenta tanto
+  `estudio_id: ""` como la falta del campo, y también el CUIT del perfil
+  mandado en `cuit_agr` (la pantalla lo hace así). Los avisos y un TXT que
+  no sale no cuentan.
+- **`estudio_id`:** sólo `""` o la falta del campo es «sin estudio».
+  «null», «None», «N/A», espacios, un null de JSON, un número o una lista
+  dan 400, en `/generate_maria` y en `/generate_maria/avisos`.
+- **Nombre del estudio:** rechaza los caracteres de formato invisibles
+  (Unicode Cf: ancho cero, controles de dirección, BOM). Acepta acentos y
+  otros alfabetos.
+- **Pantalla (`scripts/testing/pantalla_estudio1b.js`):** estudio único
+  elegido, perfil elegido a mano, la operación siguiente sin tocar el
+  selector viene con el perfil, y sigue así al recargar.
+- **Arreglo propio de `/code-review` (`975d627`):** con el CUIT del perfil
+  borrado, su uso viejo dejaba elegida la opción sin CUIT. Ahora no cuenta.
+- **`estudio1.sh`:** VALOR-1c (`3df999c`) movió el código y un sabotaje
+  perdió su patrón; lo actualicé en `8359e53`.
 
-### Hallazgos de la autorrevisión
+## Supuestos (los podés rechazar)
 
-| Quién | Hallazgo | Qué hice |
+CLIENTE-1c:
+- La importación acepta la celda de fecha de Excel («2015-03-15 00:00:00»):
+  sólo se le saca la hora `00:00:00`. Con otra hora (14:30) queda vacía y
+  con aviso, como en la operación (D15 b). Antes de esta vuelta se
+  importaba la fecha sin la hora.
+- Se tapa de más, a propósito: el usuario, cada pedazo de lo de antes del
+  «@», los valores de la consulta (`sslmode=require` sale `***`) y una clave
+  corta igual al puerto. Si la base se llama igual que un pedazo, el lugar
+  sale `host/***`.
+- No se tapa un secreto pegado a letras o dígitos (`%40127.0.0.1`). Es lo
+  que permite no romper palabras.
+- Si el texto de la clave también es parte del host, el host puede
+  mostrarlo: no se puede tapar uno sin el otro.
+
+ESTUDIO-1b:
+- El rechazo del nombre es por la categoría Cf entera, más amplio que la
+  lista de la tarea. Otros caracteres en blanco que no son Cf (`U+3164`,
+  `U+2800`) pasan.
+- A la misma hora gana el perfil.
+- Un estudio único cargado después de usar el perfil no gana: cargar no es
+  usar.
+- Un `estudio_id` con espacios alrededor da 400, no se recorta.
+- Sin CUIT en el perfil, su uso viejo no cuenta.
+
+## Riesgos
+
+| Riesgo | Severidad | Detalle |
 |---|---|---|
-| Opus alto | con la descripción combinada, el renglón con «-» perdía el código y el producto de arriba su ancho y largo (regresión mía) | arreglado en f127546, con rojo en e662ac7 y dos sabotajes |
-| Opus alto | sin combinar, el renglón con código y «-» ya no hereda | **D24** |
-| `/code-review high` | «-1 m», «–1» y «－1» contaban como medida | arreglado en 4af14da, con rojo y sabotaje |
-| `/code-review high` | «一» (cifra CJK) y «m²» se tomaban mal | arreglado en 4af14da, con rojo y sabotaje |
-| `/code-review high` | «½» sin unidad salía sin «m» | arreglado en 4af14da, con rojo y sabotaje |
-| `/code-review high` y Opus alto | «Ocean freight» y «Mould fee» (la familia H4) | riesgo alto, abajo: es EXCEL-3f |
-| Opus alto | «1x40HQ» y «20GP» cuentan como medida | riesgo, abajo |
-| Opus alto | «STD», «FULL» y «A/R» ya no son medida | supuesto, abajo |
-| Opus alto | «(5)» se lee como negativo | riesgo bajo |
-| Opus alto | «2 PCS» o «USD 5» en una medida | riesgo que ya estaba en la base |
-| `/code-review high` | `_es_una_medida` corre dos veces por celda | eficiencia, no lo toco |
-| `/code-review high` | la CI saltea el `.xls` si no tiene xlwt | riesgo, abajo |
-| yo, al correr los sabotajes | dos sabotajes de `trae_unidad` no encontraban su patrón desde 4af14da (ROTO), y el de «hereda aunque el renglón no tenga medidas» dejaba `main.py` sin compilar: su rojo era el SyntaxError | arreglado en 14a19e8; el script ahora da ROTO si un sabotaje no compila, probado volviendo a poner el paréntesis de más |
-| yo, al correr los sabotajes sobre 1d9ef2e | «sin el signo» daba VERDE: era equivalente, porque «-1» y «-1 m» los rechaza igual la guarda de la raya. 3c B1 y 3d daban ROJO? porque esperaban casos que no pasan por la línea saboteada (en 3d, igual desde la base `1955cac`) | arreglado en 6f798d8: caso nuevo «(1)», en el que decide el signo, y 3c B1 y 3d esperan cada uno un caso distinto de la copia de un cargo con texto en Item |
+| `test_excel2` con la máquina cargada | baja, de entorno | Corrida junto a 4 sabotajes, `test_ocho_libros_con_la_primera_hoja_al_borde_del_tope…` dio rojo una vez. Sola: «2 passed», subida en 15.1 s contra un tope de 30 s. En la suite final, 0 rojos. No es de mi pieza. |
+| `cuit_valido` acepta `00000000000` | baja | De ESTUDIO-1, no lo toqué. |
+| Estudio borrado mientras se genera | baja | De ESTUDIO-1, no lo toqué. |
+| Dos generaciones a la vez con el perfil, sin uso anterior | baja | Las dos insertan; la segunda da IntegrityError, se deshace y sólo se pierde esa anotación de uso. El TXT sale igual. |
+| Un CUIT del perfil mal armado preseleccionado | muy baja | Sólo se mira que no esté vacío. No encontré camino: el perfil guarda sólo dígitos y el uso se anota recién después de un TXT con ese CUIT. |
+| La URL de `--base` queda en el historial de la terminal | propuesta | No implementado: leerla de una variable de entorno. Si querés, va como pieza. |
 
-### Puertas
+## Hallazgos de la revisión
 
-La suite, compileall, smoke y ataque corrieron sobre `1d9ef2e`; de ahí a `6f798d8` cambian sólo `tests/test_excel3.py` y `excel3.sh`. Las cinco de Excel y los sabotajes corrieron sobre `6f798d8`.
+| Hallazgo | Quién | Qué pasó |
+|---|---|---|
+| Uso viejo del perfil sin CUIT gana la preselección | `/code-review high` | Arreglado en `975d627`, con su caso y sabotaje |
+| Tapar el lugar por pedazos no hacía nada | sabotaje verde propio | Sacado en `2a21835` |
+| 3 sabotajes de `cliente1b.sh` sin patrón, 4 de `cliente1c.sh` sin rojo | corrida de sabotajes | Arreglados en `f1cb25e` |
+| Fecha de Excel con hora queda vacía | `/code-review high` | Supuesto, arriba |
+| Nombre con blancos que no son Cf | `/code-review high` | Supuesto, arriba |
+| Carrera al anotar el uso del perfil | `/code-review high` | Riesgo, arriba |
+| Se tapa de más el lugar | `/code-review high` | Supuesto, arriba |
+| Limpiezas (excepción para dar vacío, `_utc` repetido, limpieza del CUIT en cuatro lugares) | `/code-review high` | No las hice: no cambian resultado y ampliaban el diff |
+| `/security-review` | sobre ESTUDIO-1b y CLIENTE-1c | Sin hallazgos altos ni medios |
+
+**No corrí los subagentes adversariales:** sin presupuesto de gasto hasta
+el 2026-10-28 18:00 UTC. La revisión independiente queda para vos.
+
+## Puertas, sobre `3aba9c2`
 
 | Puerta | Salida |
 |---|---|
-| Suite completa (worktree limpio, 1d9ef2e) | `12 failed, 2985 passed, 102 skipped, 2 xfailed, 29 warnings in 314.28s (0:05:14)`; las mismas 12 fallan en la base `1955cac` (`12 failed, 2491 passed, …`). Ver «Rojos» |
-| Las cinco de Excel (6f798d8) | `861 passed, 5 warnings in 74.76s (0:01:14)`; los 24 nuevos son «(1)», y los 2 warnings de más son los `SyntaxWarning '\-'` de `pdf_extractor.py`, que salen sólo sin caché de compilación (en 1d9ef2e: `837 passed, 3 warnings`) |
-| compileall | rc=0 |
-| smoke | «==> OK · telemetría + alias session/state + by-cuit protegido», rc=0 |
-| ataque | «✅ PUERTA G3 PASADA. Ningún despachante ve datos de otro.», rc=0 |
-| `sabotajes/excel3.sh 6f798d8` | 96 ROJO, «sabotajes sin rojo: 0», exit 0 |
+| Suite completa, worktree limpio | `3229 passed, 102 skipped, 2 xfailed, 94 warnings in 415.01s (0:06:55)`, exit 0 |
+| `compileall -q proyecto_maria` | 0 |
+| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido`, exit 0 |
+| `ataque_aislamiento.sh` | `Bloqueado: 22 · Fugas: 0`, «PUERTA G3 PASADA», exit 0 |
+| `cliente1c.sh` (en `f1cb25e`) | 37 ROJO, `sabotajes sin rojo: 0`, `salida 0` |
+| `cliente1b.sh` (en `f1cb25e`) | 16 ROJO, `sabotajes sin rojo: 0`, `salida 0` |
+| `estudio1b.sh` (incluye la pantalla) | 20 ROJO, `sabotajes sin rojo: 0`, `salida 0` |
+| `estudio1.sh` | 37 ROJO, `sabotajes sin rojo: 0`, `salida 0` |
 
-### Rojos de la suite (no son de EXCEL-3e)
+`f1cb25e` → `3aba9c2` es sólo el merge de `docs/pm/`.
 
-Las mismas 12 fallan en la base `1955cac`, con la misma lista (`diff` vacío).
-- **11 son del presupuesto compartido:** con la suite entera dan 402
-  «Alcanzaste el límite de 15 operaciones del plan Premium». Corridas solas,
-  con una base nueva, pasan. Son las que la CI deselecciona.
-- **1 es mía, de CLIENTE-1c:** `test_guardar1::test_datos_largos_de_la_operacion_no_impiden_guardarla`
-  falla también sola: `assert [('',)] == [('2020-01-15',)]`. La operación trae
-  «2020-01-15T00:00:00» y desde CLIENTE-1c esa fecha no se copia a la ficha
-  (antes se cortaba a diez caracteres). Es una regresión de CLIENTE-1c, que ya
-  está en origin. La arreglo en CLIENTE-1c, que es lo que sigo ahora, con su
-  rojo antes.
+**No corrí:** los adversarios (sin presupuesto) ni la CI de tu `ci.yml`
+(corre cuando suba).
 
-### Lo que no se corrió
-
-- La suite completa sobre 6f798d8: corrió sobre 1d9ef2e, y lo que cambia después son sólo pruebas de Excel y el script de sabotajes.
-- Postgres: no hay cambios de base.
-- Una proforma real: las pruebas usan sintéticos.
-
-### El merge de tu rama
-
-- **Conflicto en `main.py`:** en `generate_maria_endpoint` quedaron las dos
-  líneas, primero el estudio de ESTUDIO-1 y después «sin productos» de
-  VALOR-1c. `test_estudio1`, `test_valor1c` y `test_valor1`: `131 passed`.
-- **Conflicto en `CHANGELOG.md`:** quedaron las entradas de las dos ramas.
-- **compileall:** muestra dos `SyntaxWarning: invalid escape sequence '\-'`
-  en `pdf_extractor.py` (927 y 936). Vienen con tu rama, de la Dev MARIA: no
-  es un error, y no lo toqué.
-
-### Riesgos (sin arreglar, como pediste)
-
-- **H2, H3 y H6:** siguen como en tu devolución.
-- **«Seguro de carga» con «/» combinada:** sigue igual.
-- **Alto. H4:** «Ocean freight» y «Mould fee» entran como producto. Va en
-  EXCEL-3f, con aviso.
-- **Medio.** «1x40HQ» o «20GP» en una medida cuentan como medida: un flete
-  con eso pasa por renglón del grupo.
-- **Supuesto reversible.** «STD», «FULL» y «A/R» ya no son medida: un
-  renglón con eso y sin cifra no hereda, y queda sin leer con aviso.
-- **Bajo.** «(5)» se lee como negativo y no es medida.
-- **Bajo.** «2 PCS» o «USD 5» en una medida cuentan como medida: ya era así
-  en la base.
-- **CI.** Sin xlwt, la CI saltea los casos `.xls`. Acá corrieron con xlwt.
-
-### Comandos
+## Para reproducir
 
 ```bash
-git fetch origin claude/dev-tecnica && git checkout 6f798d8
-export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-python -m pytest -q --no-cov -p no:randomly tests/test_excel1_lectura.py tests/test_excel1_txt.py tests/test_excel2.py tests/test_excel3.py tests/test_maria5_peso_excel.py   # 861 passed
-PY=$(command -v python) bash scripts/testing/sabotajes/excel3.sh 6f798d8   # 96 ROJO, «sabotajes sin rojo: 0»
-python -m pytest -q --no-cov tests/test_excel3.py -k conserva_el_codigo   # 6 passed (en f2755e7 dan 6 failed)
+git fetch origin claude/dev-tecnica && git checkout 3aba9c2
+git diff 4452b22..3aba9c2 --stat                       # 14 archivos fuera de docs/pm
+bash scripts/testing/sabotajes/cliente1c.sh 3aba9c2    # «sabotajes sin rojo: 0», salida 0
+bash scripts/testing/sabotajes/cliente1b.sh 3aba9c2    # «sabotajes sin rojo: 0», salida 0
+bash scripts/testing/sabotajes/estudio1b.sh 3aba9c2    # «sabotajes sin rojo: 0», salida 0
+bash scripts/testing/sabotajes/estudio1.sh 3aba9c2     # «sabotajes sin rojo: 0», salida 0
+python -m pytest -q --no-cov tests/test_cliente1c.py tests/test_cliente1b_script.py tests/test_estudio1b.py
 ```
 
-## Lo que sigue abierto de antes
+## Archivos de producto que toqué
 
-- **ESTUDIO-1:** aceptada. ESTUDIO-1b va con D23 (b), en una tabla aparte,
-  con los 400 del `estudio_id` y del nombre, y con los dos riesgos que
-  pediste anotar.
-- **EXCEL-3f:** D21 (b) y D22 (b), con la familia H4 sólo con aviso.
-- **D20:** (a), queda así.
+`proyecto_maria/main.py`, `proyecto_maria/database/models.py`,
+`proyecto_maria/services/fecha_inic_activ.py` (nuevo),
+`proyecto_maria/services/migration_service.py`,
+`scripts/datos/clientes_fecha_inic_activ.py`, `CHANGELOG.md`.
 
 ## Sigo con
 
-CLIENTE-1c, que ya está empezada (`d2df3c4` y `8b65b6b`). Después vienen
-ESTUDIO-1b, EXCEL-3f y GUARDAR-2.
+EXCEL-3f y después GUARDAR-2. Si tu veredicto trae una devolución, va
+primero.
 
-/compact conservar: Soy la Dev técnica (Dev 1) de CDI, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica (nunca main), rutina trig_011UpBfwEu9TUzoNUrviqoP5 min 15; aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM con send_message priority next empezando «Dev técnica:». EXCEL-3e entregada en 6f798d8 (base 1955cac; puertas: suite en 1d9ef2e, Excel y sabotajes en 6f798d8; producto main.py y CHANGELOG; arreglo final f127546), abierta D24 (renglón con código y «-» sin combinar no hereda; recomiendo a). Próxima D: D25. Sigo con CLIENTE-1c (ya hay d2df3c4 y 8b65b6b en origin; tests/test_cliente1c.py; falta test_guardar1::test_datos_largos_de_la_operacion_no_impiden_guardarla: la fecha con hora queda vacía, D15 b, supuesto reversible; y las notas de CLIENTE-1b: --base sin la clave en el error, dígito de ancho completo), después ESTUDIO-1b (D23 b tabla aparte, 400 para estudio_id "null"/"None"/"N/A"/espacios, nombre sin U+200B–200F/202A–202E/2066–2069 ni vacío; riesgos cuit_valido 00000000000 y estudio borrado durante la generación), EXCEL-3f (D21 b, H4 con aviso, D22 b, H5 opcional) y GUARDAR-2 (desde 2d930c5 en claude/dev1-tecnica + punto 2 de «Qué sigue» de CIERRE-RETOMA-2026-10-24.md). Reglas de Emi: sólo me piden la PM o Emi; nada se publica sin su «dale» para el SHA; nunca main; sin secretos ni datos reales (la proforma del 24/10 no entra); no tocar maria_generator.py, controles_maria.py, despachante.js ni el canal/rama de la Dev MARIA; subagentes hasta alto, sin Fable.
+/compact conservar: Soy la Dev técnica (Dev 1) de CDI, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica (nunca main), rutina trig_011UpBfwEu9TUzoNUrviqoP5 min 15; aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM con send_message priority next empezando «Dev técnica:». Entregué la vuelta de CLIENTE-1c y ESTUDIO-1b en 3aba9c2 (base 4452b22), sin D abiertas; próxima D: D26. Sigo con EXCEL-3f (D21 b, D22 b, familia H4 con aviso, H5 opcional, H1 descripción repetida a mano y H3 de PARA-DEV.md) y después GUARDAR-2. Reglas de Emi: sólo me piden la PM o Emi; nada se publica sin su «dale» para el SHA; nunca main; sin secretos ni datos reales (la proforma del 24/10 no entra); no tocar maria_generator.py, controles_maria.py, despachante.js ni el canal/rama de la Dev MARIA; subagentes hasta alto, sin Fable; sin presupuesto para subagentes hasta 2026-10-28 18:00 UTC.

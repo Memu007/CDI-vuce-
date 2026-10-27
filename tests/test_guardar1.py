@@ -188,7 +188,8 @@ def test_datos_largos_de_la_operacion_no_impiden_guardarla(client):
     """Mismo defecto en otras columnas de largo fijo del mismo guardado
     (Postgres): moneda String(3), origen String(50), fecha de inicio de
     actividades del cliente String(10); y el carácter NUL, que Postgres no
-    acepta en un texto."""
+    acepta en un texto. Desde CLIENTE-1c (D15 b) la fecha con hora no se
+    copia a la ficha: queda vacía y la operación se guarda igual."""
     cid = _cliente(client)
     r = client.post(f"/api/clientes/{cid}/operaciones", json={
         "currency": "DOLARES", "source": "x" * 80,
@@ -198,7 +199,7 @@ def test_datos_largos_de_la_operacion_no_impiden_guardarla(client):
     op = r.json()["operation_id"]
     assert _sql("select currency, length(source) from operations where id=:o", o=op) == [("DOL", 50)]
     assert _sql("select descripcion from operation_items where operation_id=:o", o=op) == [("COMPUTADORA",)]
-    assert _sql("select fecha_inic_activ from clients where id=:c", c=cid) == [("2020-01-15",)]
+    assert _sql("select fecha_inic_activ from clients where id=:c", c=cid) == [("",)]
 
 
 def _con_un_producto_que_la_base_rechaza(monkeypatch):

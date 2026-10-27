@@ -48,6 +48,7 @@ PYEOF
 
 M=proyecto_maria/main.py
 D=scripts/datos/clientes_fecha_inic_activ.py
+F=proyecto_maria/services/fecha_inic_activ.py
 
 rm -f test.db
 if ! correr >/dev/null; then
@@ -66,13 +67,13 @@ sabotaje $M "la edición guarda lo que llega, como antes" \
 sabotaje $M "un null se guarda «None»" \
   $'    if raw is None:\n        return ""' $'    if raw is None:\n        return "None"' \
   "FAILED tests/test_cliente1b.py::test_el_alta_valida_la_fecha_de_inicio[None]"
-sabotaje $M "DD/MM/AAAA no se pasa a AAAA-MM-DD" \
+sabotaje $F "DD/MM/AAAA no se pasa a AAAA-MM-DD" \
   "        return date(anio, mes, dia).isoformat()" $'        date(anio, mes, dia)\n        return texto' \
   "FAILED tests/test_cliente1b.py::test_el_alta_valida_la_fecha_de_inicio['15/03/2015']"
-sabotaje $M "no se mira que la fecha exista" \
+sabotaje $F "no se mira que la fecha exista" \
   "        return date(anio, mes, dia).isoformat()" "        return f\"{anio:04d}-{mes:02d}-{dia:02d}\"" \
   "FAILED tests/test_cliente1b.py::test_la_edicion_valida_la_fecha_de_inicio['2015-02-30']"
-sabotaje $M "DD/MM/AAAA con año de dos cifras pasa" \
+sabotaje $F "DD/MM/AAAA con año de dos cifras pasa" \
   'r"([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})"' 'r"([0-9]{1,2})/([0-9]{1,2})/([0-9]{2,4})"' \
   "FAILED tests/test_cliente1b.py::test_el_alta_valida_la_fecha_de_inicio['15/03/15']"
 sabotaje $M "el error no dice qué formatos sirven" \
