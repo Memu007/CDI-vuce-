@@ -194,6 +194,7 @@ def test_un_grupo_a_mano_y_los_subitems_a_mano_no_se_mezclan():
     misma posición que otro renglón."""
     a, b, c, d = (dict(r, cantidad=40, unidad_estadistica="m²") for r in _lonas()[:4])
     a["grupo_id"] = b["grupo_id"] = "g1"
+    b["sufijo"] = a["sufijo"]  # un grupo, un solo sufijo (SUFIJOS-1)
     c["subitems"] = [{"cantidad": 15, "valor_unitario": 1.85}, {"cantidad": 25, "valor_unitario": 1.85}]
     txt = _gen([a, b, c, d])
     arts = _bloques(txt, "ART")

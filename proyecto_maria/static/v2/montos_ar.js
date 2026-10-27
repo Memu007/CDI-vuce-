@@ -10,9 +10,10 @@
     const NO_ES_NUMERO = 'Debe ser un numero.';
     const NO_CIERRAN = 'Los puntos y comas no cierran: escribí, por ejemplo, 3.480,50.';
 
-    // Grupos de miles bien armados: «3», «480»; «1», «234», «567».
+    // Grupos de miles bien armados: «3», «480»; «1», «234», «567». Sin cero
+    // adelante (SEPARADORES-1c): «01.500.000» no cierra.
     function sonMiles(grupos) {
-        return /^\d{1,3}$/.test(grupos[0]) && grupos.slice(1).every(g => /^\d{3}$/.test(g));
+        return /^[1-9]\d{0,2}$/.test(grupos[0]) && grupos.slice(1).every(g => /^\d{3}$/.test(g));
     }
 
     // { valor, error }: valor es un número o null (vacío o con error).
@@ -48,24 +49,23 @@
             } else if (/^[1-9]\d{0,2}$/.test(partes[0]) && partes[1].length === 3) {
                 if (sep === ',') {
                     // «1,500»: ¿mil quinientos o uno con cinco?
-                    const dec = escribir(Number(partes[0] + '.' + partes[1]));
-                    return { valor: null, error: '¿' + partes[0] + '.' + partes[1] + ' o ' + dec +
-                        '? Escribilo con punto de miles (' + partes[0] + '.' + partes[1] + ') o como ' + dec + '.' };
+                    const miles = (signo < 0 ? '-' : '') + partes[0] + '.' + partes[1];
+                    const dec = escribir(signo * Number(partes[0] + '.' + partes[1]));
+                    return { valor: null, error: '¿' + miles + ' o ' + dec +
+                        '? Escribilo con punto de miles (' + miles + ') o como ' + dec + '.' };
                 }
                 entero = partes.join('');  // 3.480: punto de miles
-            } else if (/^[1-9]\d{3,}$/.test(partes[0]) && partes[1].length === 3) {
-                // SEPARADORES-1b. «2500.125»: ni miles bien escritos ni
-                // decimales sin dudas. ¿2.500.125 o 2.500,125?
-                // Grupos de a tres desde la derecha, sin regex: una con
-                // lookahead crece con el cuadrado del largo pegado.
-                const primero = partes[0].length % 3 || 3;
-                const trozos = [partes[0].slice(0, primero)];
-                for (let i = primero; i < partes[0].length; i += 3) trozos.push(partes[0].slice(i, i + 3));
-                const grupos = trozos.join('.');
-                const miles = grupos + '.' + partes[1];
-                const dec = grupos + ',' + partes[1];
+            } else if (/^\d{4,}$/.test(partes[0]) && !/^0+$/.test(partes[0]) && partes[1].length === 3) {
+                // SEPARADORES-1b. «2500.125» (o «01234.500», SEPARADORES-1c):
+                // ni miles bien escritos ni decimales sin dudas. Las dos
+                // lecturas como las escribe escribir(), que leer() lee igual:
+                // ¿2500125 o 2500,1250?
+                // Más de quince cifras ya no se escriben exactas.
+                if (partes[0].replace(/^0+/, '').length + 3 > 15) return { valor: null, error: NO_ES_NUMERO };
+                const miles = escribir(signo * Number(partes[0] + partes[1]));
+                const dec = escribir(signo * Number(partes[0] + '.' + partes[1]));
                 return { valor: null, error: '¿' + miles + ' o ' + dec +
-                    '? Escribilo con puntos de miles (' + miles + ') o como ' + dec + '.' };
+                    '? Escribilo sin separador (' + miles + ') o como ' + dec + '.' };
             } else {
                 entero = partes[0];
                 decimales = partes[1];
