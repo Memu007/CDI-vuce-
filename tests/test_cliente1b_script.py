@@ -227,3 +227,121 @@ def test_una_clave_corta_no_tapa_el_host_en_el_error(monkeypatch, capsys):
     monkeypatch.setattr(script, "revisar", _cae)
     assert main(["--base", "postgresql://usuario:1@127.0.0.1:9/base"]) == 2
     assert "no conecta a 127.0.0.1" in capsys.readouterr().err
+
+
+# Vuelta de CLIENTE-1c (H1): el lugar y la clave salen de lo mismo que
+# conecta (`make_url`), no de `urlsplit`. Con «/», «?», «#», «[» o un carácter
+# de ancho completo en la clave, el error mostraba la clave o se caía con un
+# traceback.
+CLAVES_RARAS = ["CLA/VESECRETA", "CLA?VESECRETA", "CLA#VESECRETA", "CLA[VESECRETA",
+                "CLA]VESECRETA", "CLA／VESECRETA", "CLA＠VESECRETA", "CLA？VESECRETA",
+                "CLA＃VESECRETA", "CLA%2FVESECRETA", "CLA;VESECRETA", "CLA VESECRETA"]
+
+
+@pytest.mark.parametrize("clave", CLAVES_RARAS)
+def test_una_clave_con_un_separador_no_se_ve_en_el_error(clave):
+    rc, salida = _correr(f"postgresql://usuario:{clave}@127.0.0.1:9/base")
+    assert rc == 2, salida
+    for pedazo in ("CLA", "VESECRETA"):
+        assert pedazo not in salida, salida
+    assert "Traceback" not in salida, salida
+    assert "No se pudo revisar la base 127.0.0.1:9/base:" in salida, salida
+
+
+@pytest.mark.parametrize("clave", CLAVES_RARAS + ["CLA@VESECRETA", "CLA@VE/SE@CRETA"])
+def test_si_el_error_repite_la_url_una_clave_con_separador_no_se_ve(monkeypatch, capsys, clave):
+    from sqlalchemy.engine import make_url
+
+    import scripts.datos.clientes_fecha_inic_activ as script
+
+    base = f"postgresql://usuario:{clave}@127.0.0.1:9/base"
+    entendida = make_url(base)
+
+    async def _cae(url, arreglar_none):
+        raise RuntimeError(f"no conecta: {base} | {entendida.render_as_string(hide_password=False)}"
+                           f" | host {entendida.host} | base {entendida.database} | clave {entendida.password}")
+    monkeypatch.setattr(script, "revisar", _cae)
+    assert main(["--base", base]) == 2
+    err = capsys.readouterr().err
+    assert "no conecta" in err, err
+    for pedazo in ("CLA", "VE", "SE", "CRETA"):
+        assert pedazo not in err, err
+
+
+def test_una_clave_que_hace_ilegible_la_url_tampoco_se_ve():
+    """«:» después de un «@» de la clave: SQLAlchemy no la entiende y el
+    script corta antes de conectar, sin mostrarla."""
+    rc, salida = _correr("postgresql://usuario:CLA@VESE:CRETA@127.0.0.1:9/base")
+    assert rc == 2, salida
+    assert "--base" in salida, salida
+    for pedazo in ("CLA", "VESE", "CRETA", "Traceback"):
+        assert pedazo not in salida, salida
+
+
+def test_lo_que_conecta_es_lo_que_se_lee(monkeypatch, capsys):
+    """El motor recibe la misma URL que se usó para tapar la clave."""
+    import scripts.datos.clientes_fecha_inic_activ as script
+
+    vistas = []
+
+    def _motor(url, *a, **k):
+        vistas.append(url)
+        raise RuntimeError("no conecta")
+    monkeypatch.setattr(script, "create_async_engine", _motor)
+    assert main(["--base", "postgresql://usuario:CLA/VESECRETA@127.0.0.1:9/base"]) == 2
+    assert [(u.password, u.host, u.port, u.database) for u in vistas] == [
+        ("CLA/VESECRETA", "127.0.0.1", 9, "base")]
+
+
+# H2: lo que se tapa no rompe el resto del mensaje.
+@pytest.mark.parametrize("usuario", ["u", "o", "Error", "Connection", "ed"])
+def test_un_usuario_corto_no_rompe_el_mensaje(monkeypatch, capsys, usuario):
+    import scripts.datos.clientes_fecha_inic_activ as script
+
+    async def _cae(url, arreglar_none):
+        raise ConnectionRefusedError(111, "Connect call failed ('127.0.0.1', 9)")
+    monkeypatch.setattr(script, "revisar", _cae)
+    assert main(["--base", f"postgresql://{usuario}:CLAVESECRETA@127.0.0.1:9/base"]) == 2
+    err = capsys.readouterr().err
+    assert ("No se pudo revisar la base 127.0.0.1:9/base: ConnectionRefusedError: "
+            "[Errno 111] Connect call failed ('127.0.0.1', 9)") in err, err
+
+
+def test_el_usuario_suelto_en_el_error_se_tapa(monkeypatch, capsys):
+    import scripts.datos.clientes_fecha_inic_activ as script
+
+    async def _cae(url, arreglar_none):
+        raise RuntimeError('password authentication failed for user "ulises"')
+    monkeypatch.setattr(script, "revisar", _cae)
+    assert main(["--base", "postgresql://ulises:CLAVESECRETA@127.0.0.1:9/base"]) == 2
+    err = capsys.readouterr().err
+    assert 'failed for user "***"' in err, err
+
+
+def test_una_clave_que_empieza_como_el_host_se_tapa_entera(monkeypatch, capsys):
+    """El host queda visible, pero no protege lo que es parte de la clave."""
+    import scripts.datos.clientes_fecha_inic_activ as script
+
+    async def _cae(url, arreglar_none):
+        raise RuntimeError(f"no conecta con clave {url.password} a {url.host}")
+    monkeypatch.setattr(script, "revisar", _cae)
+    assert main(["--base", "postgresql://usuario:127.0.0.1CLAVE@127.0.0.1:9/base"]) == 2
+    err = capsys.readouterr().err
+    assert "CLAVE" not in err, err
+    assert "no conecta con clave *** a 127.0.0.1" in err, err
+
+
+def test_si_tapar_falla_no_hay_traceback_ni_clave(monkeypatch, capsys):
+    import scripts.datos.clientes_fecha_inic_activ as script
+
+    async def _cae(url, arreglar_none):
+        raise RuntimeError(f"no conecta con clave {url.password}")
+
+    def _rompe(*a, **k):
+        raise ValueError("tapar se rompió")
+    monkeypatch.setattr(script, "revisar", _cae)
+    monkeypatch.setattr(script, "_tapar", _rompe)
+    assert main(["--base", "postgresql://usuario:CLAVESECRETA@127.0.0.1:9/base"]) == 2
+    err = capsys.readouterr().err
+    assert "CLAVESECRETA" not in err and "Traceback" not in err, err
+    assert "No se pudo revisar la base (sin detalle): RuntimeError" in err, err

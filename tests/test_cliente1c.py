@@ -195,6 +195,53 @@ def test_la_importacion_guarda_el_anio_con_cuatro_cifras(auth_override, client):
     assert _por_cuit(client, cuit)["fecha_inic_activ"] == "0001-02-01"
 
 
+# D25 (b): la importación sigue la regla del alta. Lo que el alta no acepta
+# queda vacío y se avisa en su fila, aunque `strptime` lo entendiera.
+FUERA_DE_LA_REGLA = ["15/03/15", "01/01/50", "15-03-2015", "２０１５-03-15",
+                     "１５/03/2015", "2015-03-15T00:00:00", " 2015-3-15"]
+
+
+@pytest.mark.parametrize("fecha", FUERA_DE_LA_REGLA)
+def test_la_importacion_deja_vacia_la_fecha_que_el_alta_no_acepta(auth_override, client, fecha):
+    cuit = _cuit(_serial())
+    lote = _analizar(client, _csv([[cuit, "Importadora Inventada D25", fecha]]))
+    preview = lote["preview"]
+    assert preview["new_clients"][0]["fecha_inic_activ"] == ""
+    assert [(a["row"], a["value"]) for a in preview["fechas_que_no_sirven"]] == [(2, fecha.strip())]
+    assert _confirmar(client, lote["batch_id"])["created"] == 1
+    assert _por_cuit(client, cuit)["fecha_inic_activ"] == ""
+
+
+@pytest.mark.parametrize("fecha,queda", [("2015-03-15", "2015-03-15"), ("15/03/2015", "2015-03-15"),
+                                         ("5/3/2015", "2015-03-05")])
+def test_la_importacion_acepta_lo_que_acepta_el_alta(auth_override, client, fecha, queda):
+    cuit = _cuit(_serial())
+    preview = _analizar(client, _csv([[cuit, "Importadora Inventada D25", fecha]]))["preview"]
+    assert preview["new_clients"][0]["fecha_inic_activ"] == queda
+    assert preview["fechas_que_no_sirven"] == []
+
+
+def test_la_celda_de_fecha_de_excel_se_importa(auth_override, client):
+    """Una celda con formato fecha llega como «AAAA-MM-DD 00:00:00»: es una
+    fecha de verdad, no un texto escrito a mano, y se guarda."""
+    import datetime as dt
+    import openpyxl
+    cuit = _cuit(_serial())
+    libro = openpyxl.Workbook()
+    hoja = libro.active
+    hoja.append(["CUIT", "RAZON SOCIAL", "FECHA INICIO ACTIVIDADES"])
+    hoja.append([cuit, "Importadora Inventada Excel", dt.date(2015, 3, 15)])
+    contenido = io.BytesIO()
+    libro.save(contenido)
+    r = client.post("/api/migrations/analyze", files={"file": (
+        "clientes.xlsx", io.BytesIO(contenido.getvalue()),
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")})
+    assert r.status_code == 200, r.text
+    preview = r.json()["preview"]
+    assert preview["new_clients"][0]["fecha_inic_activ"] == "2015-03-15"
+    assert preview["fechas_que_no_sirven"] == []
+
+
 def _lote_con_fecha(client, cuit, fecha, nombre="Importadora Inventada Vieja"):
     """Un lote analizado y, después, con la fecha que dejaba la vista previa
     vieja: un lote que quedó sin confirmar cuando se publique esto."""
