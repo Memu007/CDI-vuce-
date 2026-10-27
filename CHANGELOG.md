@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-27 · fix: lo que va al TXT por producto es lo que muestra su celda (SUFIJOS-1, vuelta)
+
+- Si el arancel de ARCA no contestó, todavía consulta o hay más de 500 productos, no viaja nada de la propuesta (ni sufijo ni kilos) y la celda y los avisos lo dicen. Lo escrito en el sufijo de la operación gana: la propuesta sólo agrega los códigos que faltan y avisa en la fila si propone otro valor.
+- Una celda escrita avisa si después cambia el sufijo de la operación; un grupo y un producto con sub-ítems ya no llevan un sufijo propio que no se ve. Con el de la operación vacío y todos los productos con el propio, se avisa sin frenar (D23).
+
 ## 2026-10-27 · fix: miles mal formados, blancos raros y la pregunta de la pantalla (SEPARADORES-1c)
 
 - En la factura, un flete o seguro con grupos de miles mal formados («0750.000», «7500.000.000») queda sin leer con aviso, en vez de leerse por mil. En la pantalla, «01234.500» pregunta y «01.500.000» no cierra.
