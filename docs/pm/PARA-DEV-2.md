@@ -30,102 +30,60 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
-## Al traer mi rama (2026-10-25)
+## Al traer mi rama (2026-10-27)
 
-Mi rama ya trae lo aceptado de la Dev técnica (EXCEL-3d, CLIENTE-1b,
-ESTUDIO-1 y EXCEL-3e) y un CLIENTE-1c a medio hacer. Con eso la suite tiene
-un rojo conocido más, `test_guardar1.py::test_datos_largos_de_la_operacion_no_impiden_guardarla`:
-es de la Dev técnica y lo cierra ella en CLIENTE-1c. También 11 que chocan
-con el tope de 15 operaciones del plan en la suite entera (402 «Alcanzaste el
-límite…», en `test_clientes_plan02/04`, `test_maria4_despachante`,
-`test_op_code_and_fill_if_empty`, `test_operations_manual` y
-`test_prelaunch_block1`); la CI los corre y da rojo. Los trae la rama técnica
-y los cierra ella. No los persigas; si te da otro rojo nuevo al traer mi
-rama, ése sí me lo decís.
+Mi rama ya trae CLIENTE-1c y ESTUDIO-1b de la Dev técnica, aceptadas hoy:
+con eso se cierran los 12 rojos conocidos (11 del tope de 15 operaciones y
+`test_guardar1`). El único rojo esperable es el de tiempo de `test_excel2`
+en un contenedor cargado (`NOW.md`). Cualquier otro rojo al traer mi rama,
+decímelo.
 
-## Veredicto de SUFIJOS-1 (2026-10-27): con devolución
+## Revisión (2026-10-27): SUFIJOS-1 y SEPARADORES-1c sin hallazgos que frenen
 
-Sobre `97cd2fa` (base `adfe707`). Detalle y salidas en
-`REPRODUCCION-SUFIJOS-1-2026-10-27.md`. Corrí tus pruebas (`50 passed`), tu
-sabotaje (34 en rojo, rc=0), la suite desde base limpia (los 12 rojos
-conocidos, ninguno nuevo), negativos míos contra el generador y el mismo
-pedido sin sufijo propio en las dos bases: el TXT sale idéntico byte a byte
-en siete casos. Mi adversario fue Opus, alto.
+Las dos sobre `45a3ea1` (informes en `76570de` y `91be665`). **Falta sólo
+mi suite completa sobre `45a3ea1`, que está corriendo:** cuando termine
+escribo acá «aceptadas» e integro tu rama. No esperes: SEPARADORES-1d
+arranca desde tu `91be665`. Detalle y salidas en `REPRODUCCION-SUFIJOS-1-vuelta-2026-10-27.md`
+y `REPRODUCCION-SEPARADORES-1c-2026-10-27.md`.
 
-- **Bien:** D22 (a) con la tabla local y la fecha del arancel, el
-  generador (sufijo propio, grupo, errores explícitos) y el endpoint (sesión,
-  tope, saneo de la marca).
-- **Devolución — lo que viaja no es lo que se ve.** Causa: el sufijo y la
-  unidad estadística que se mandan por producto (`sufijoDe`, `unidadesDe`)
-  salen de un estado guardado (`it.sufijo`, la propuesta pedida al generar),
-  no de lo que la celda muestra en ese momento. Regla de la familia: **al
-  generar, lo que va al TXT por producto es lo que muestra su celda.**
-  - **H1** (de plata): si el arancel no contesta al entrar, las celdas
-    quedan vacías y sin nota, y «Generar» vuelve a pedir y manda la
-    propuesta y la unidad en kilos sin pintarlas (`QSBTUNTEST=465.00` en
-    vez de 750 unidades). Igual con más de 500 productos (400 sin aviso).
-    Si no hay propuesta en pantalla, no se agrega al generar; la celda y
-    los avisos dicen que el arancel no contestó.
-  - **H2** (de plata): una celda tocada guarda el texto entero, con el
-    sufijo de la operación de ese momento; si después cambia el de la
-    operación, esa fila sale con CA00 y las otras con CA01, sin aviso. Lo
-    propio de la celda tiene que seguir al de la operación, o la fila avisa.
-  - **H3:** un sufijo escrito antes de agrupar traba el TXT (400 «Grupo
-    g1…») y la celda del grupo no deja corregirlo.
-  - **H4:** un sufijo que ya no se ve (el producto pasó a sub-ítems) sigue
-    viajando y el servidor lo rechaza.
-  - Caso y sabotaje por cada uno, con ejemplos de la familia que no sean
-    estos (al aceptar pruebo otros).
-- **H5, decidido por la PM:** lo que el despachante escribió en el sufijo
-  de la operación gana. La propuesta del arancel sólo agrega los códigos
-  que faltan; si propone otro valor para un AA, AB o AI que ya está
-  escrito, no lo pisa y lo avisa en la fila. Hoy `combinar` reemplaza
-  «AA(1)-CA00-» por «AA(Marca Demo)-CA00-…» sin aviso; eso contradice «lo
-  que escribe la persona va tal cual».
-- **D23: (c)**, como recomendaste, en esta misma vuelta: no frena, avisa
-  junto al botón con tu texto. Con caso y sabotaje.
-- **Se anota, no lo arregles:** `combinar` con códigos repetidos o «AA00»,
-  el «-» final siempre agregado, y el BOM que separa en JS y no en Python.
-- **No integro todavía** tu rama: entra con la vuelta.
+- **SUFIJOS-1:** tus 47 sabotajes en rojo por la razón esperada y nueve casos
+  míos en Chromium con fallas del arancel, códigos y casos distintos de los
+  tuyos (500, `{}`, `items` que no es lista, no JSON, H5 con AI, H2 con AB):
+  lo que viaja es lo que muestra la celda. El sabotaje 47 queda.
+- **SEPARADORES-1c:** tus 10 sabotajes en rojo por la razón esperada, y negativos míos de los tres
+  puntos: la factura, el blanco en el servidor y cada forma que propone la
+  pregunta vuelta a leer con `leer`.
+- **Se anota, no lo arregles:** con el arancel contestando 200 y `{}`, las
+  celdas quedan sin nota ni aviso (no viaja nada).
+- **El rojo de `test_excel2`** es el conocido de tiempo en esta máquina
+  (`NOW.md`), no tuyo.
+- **D24: (a). D25: (b).** Decididas por la PM; van en SEPARADORES-1d, abajo.
 
-Puertas de la vuelta: `test_sufijos1` y `sabotaje_sufijos1.sh` en verde,
-el TXT sin sufijo propio idéntico al de `adfe707`, suite completa sobre el
-SHA, y mi diff de revisión va desde `97cd2fa`. Después, SEPARADORES-1c.
+## SEPARADORES-1d — tarea activa
 
-## SEPARADORES-1c (después de la vuelta de SUFIJOS-1)
+Chica, de plata. Diff de revisión desde `91be665`.
 
-Chica, de plata. Si ya la empezaste, guardala en tu rama y hacé primero la
-vuelta de arriba. Los hallazgos están en la
-reproducción (H1 a H3).
+1. **D24: la regla de miles de 1c también en `_numero_factura`** (cantidad,
+   valor unitario y pesos). Un número que sólo se puede leer como miles con
+   grupos mal formados queda sin leer, vacío, como hoy «12x3», y la
+   revisión lo marca como hoy. Lo bien formado se lee igual que hoy.
+2. **D25: aviso no bloqueante cuando un importe que va al TXT con dos
+   decimales tiene más.** Flete y seguro, en la pantalla, junto a los otros
+   avisos no bloqueantes: qué escribió y qué lleva el TXT (por ejemplo
+   «2500,1250» → «El TXT lleva 2500,13»). No cambia lo que se lee ni lo que
+   sale en el TXT; «1.234,567» se sigue aceptando.
 
-1. **Factura: una lectura de miles exige grupos bien formados** (la cabeza
-   de una a tres cifras, sin cero adelante, y cada grupo de tres). Si un
-   monto sólo se puede leer como miles con grupos mal formados, queda sin
-   leer, con el aviso de hoy. Hoy salen por mil: «0500.000» y «01500.000»
-   con la pista «,»; «01,500» con «.»; «4500.000.000» y «4500.000,00» con
-   cualquier pista. Siguen como hoy: «0500.000» con «.» (500), «01,500» con
-   «,» (1,5), «0,500» (0,5) y todo lo que SEPARADORES-1b dejó como guarda.
-   La pantalla aplica la misma regla: «01234.500» pregunta.
-2. **Lo que la pantalla no lee nunca llega al TXT como blanco.** Hoy
-   `trim()` de JS no saca `\x85` ni `\x1c`-`\x1f` y `strip()` de Python sí:
-   `leer` da error, `montoDelPedido` manda el texto, `importe_valido` lo deja
-   en blanco y el TXT sale con `MDDTFLE=0.00`. La causa es que la pantalla y
-   el servidor no usan la misma idea de «en blanco»; elegí vos de qué lado
-   se arregla. El campo vacío o con espacios comunes sigue siendo 0.
-3. **La pregunta no sugiere una forma que el sistema lea distinto.** Para
-   «2500.125» hoy propone «2.500,125», que se acepta y el TXT redondea a
-   2500.13 sin aviso; para «4500.000» propone «4.500,000»; con «-1234.500»
-   pierde el signo. Las dos lecturas se escriben con `escribir()`, como en
-   la rama de la coma («¿1.500 o 1,5?»).
+**Pruebas:** por cada punto, al menos dos ejemplos de la familia que no
+sean los de acá; las guardas (lo bien formado no cambia; con dos decimales
+o menos no hay aviso); un sabotaje por punto que vuelva a lo de hoy. Suite
+completa sobre el SHA que entregás.
 
-**Pruebas:** por cada punto, al menos dos ejemplos de la familia que no sean
-los de acá, de los dos lados donde aplique; las guardas de arriba; un
-sabotaje por punto que vuelva a la lectura de hoy. Suite completa sobre el
-SHA que entregás.
+**No se toca:** lo que sale en el TXT para números bien formados; el
+redondeo; lo que 1c dejó como guarda.
 
-**No se toca:** lo que la factura deja sin leer termina en flete 0 con el
-aviso no bloqueante (MARIA-1c); «1.234,567» se sigue aceptando; por API, el
-campo en blanco sigue siendo 0; `pais_origen` desconocido va a M9.
+**Apenas entregues:** DESTINO-1 y PESO-NETO-1 esperan datos del despachante
+(la lista de códigos y el packing list); te aviso cuando lleguen. Si no
+llegaron, la siguiente te la dejo acá al darte el veredicto de 1d.
 
 ## Qué pasó el 2026-10-24
 
@@ -196,3 +154,6 @@ MARIA-7, 2026-10-24:
 SEPARADORES-1 y 1b, 2026-10-25: **D19 (b)**, **D20 (a)**, **D21 (b)**
 (SEPARADORES-1c). SUFIJOS-1: **D22 (a)**, **D23 (c)**. Todas decididas por
 la PM (`DECISIONS.md`).
+
+SEPARADORES-1c, 2026-10-27: **D24 (a)**, **D25 (b)** (SEPARADORES-1d).
+Decididas por la PM.
