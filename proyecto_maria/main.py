@@ -4785,13 +4785,17 @@ _PALABRAS_DE_CARGO = {
     "saldo", "before", "after", "against", "copy", "tt", "wire", "transfer", "transferencia",
     "swift", "total", "and", "y", "for", "on", "at", "to", "por", "para", "con", "with",
     "from", "al", "los", "las", "days", "dias", "días",
-    "packing", "courier", "dhl", "fedex", "ups", "tnt", "thc", "express", "container",
-    "containers", "contenedor", "contenedores", "hq", "hc", "gp", "fcl", "lcl",
 }
 # EXCEL-3f. Un cargo que no viene primero («Ocean freight», «Courier DHL»,
 # «2. Insurance», «THC») se avisa con su fila, sin sacarlo del FOB: todo lo que
 # dice es de cargo y al menos una palabra lo es por sí sola. «Power bank» o
 # «Packing tape» dicen algo más; «Sea» o «Express» solos no son un cargo.
+# Estas palabras sólo suman ese aviso: no sacan del FOB ni del aviso de flete
+# dudoso a «Insurance container» o «Freight express».
+_PALABRAS_DE_CARGO_QUE_NO_VIENE_PRIMERO = _PALABRAS_DE_CARGO | {
+    "packing", "courier", "dhl", "fedex", "ups", "tnt", "thc", "express", "container",
+    "containers", "contenedor", "contenedores", "hq", "hc", "gp", "fcl", "lcl",
+}
 _PALABRAS_QUE_SON_UN_CARGO = {
     "freight", "freights", "flete", "fletes", "insurance", "insurances", "seguro", "seguros",
     "payment", "payments", "pago", "pagos", "charge", "charges", "fee", "fees", "gasto",
@@ -4811,10 +4815,10 @@ def _filas_del_aviso(filas) -> str:
     return nombradas + (f" y {len(filas) - 5} más" if len(filas) > 5 else "")
 
 
-def _palabras_de_cargo(texto: str) -> list | None:
+def _palabras_de_cargo(texto: str, de_cargo=_PALABRAS_DE_CARGO) -> list | None:
     """Las palabras del rótulo, o None si alguna no es de cargo ni de monto."""
     palabras = [p for p in re.split(r"[\s\d.,:;/()\[\]\-%&+]+", (texto or "").lower()) if p]
-    if all(len(p) == 1 or p in _PALABRAS_DE_CARGO or p in _PALABRAS_DE_MONTO for p in palabras):
+    if all(len(p) == 1 or p in de_cargo or p in _PALABRAS_DE_MONTO for p in palabras):
         return palabras
     return None
 
@@ -4825,7 +4829,8 @@ def _es_solo_un_cargo(texto: str) -> bool:
 
 
 def _dice_solo_un_cargo(texto: str) -> bool:
-    return any(p in _PALABRAS_QUE_SON_UN_CARGO for p in _palabras_de_cargo(texto) or ())
+    palabras = _palabras_de_cargo(texto, _PALABRAS_DE_CARGO_QUE_NO_VIENE_PRIMERO)
+    return any(p in _PALABRAS_QUE_SON_UN_CARGO for p in palabras or ())
 
 
 # EXCEL-3. El flete y el descuento de la factura no son productos: se
@@ -5209,10 +5214,11 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
                     dudosa = cargo
             else:
                 no_es_mercaderia = bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo))
-            # Lo que entra y parece un cargo se avisa con su fila (EXCEL-3f):
-            # con su propio origen («Insurance», «China») o un cargo que no
-            # viene primero («Ocean freight»).
-            if (not no_es_mercaderia and not dudosa and descripcion_propia
+            # Lo que entra sin NCM propia y parece un cargo se avisa con su
+            # fila (EXCEL-3f): con su propio origen («Insurance», «China») o un
+            # cargo que no viene primero («Ocean freight»). Con su NCM es
+            # mercadería, como antes.
+            if (not no_es_mercaderia and not dudosa and not pieza and descripcion_propia
                     and (_FILA_QUE_NO_ES_MERCADERIA_RE.match(descripcion_propia)
                          or _dice_solo_un_cargo(descripcion_propia))):
                 dudosa = descripcion_propia
@@ -5221,7 +5227,7 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             # («Freight», «LONA DEMO»), también. Es de esta fila: la que copia
             # la descripción no lo hereda. «Freight included» o «Handling
             # equipment» en Item son una nota.
-            if (not no_es_mercaderia and not dudosa
+            if (not no_es_mercaderia and not dudosa and not pieza
                     and (_es_solo_un_cargo(rotulo_aparte) or _dice_solo_un_cargo(rotulo_aparte))):
                 dudosa = rotulo_aparte
 
