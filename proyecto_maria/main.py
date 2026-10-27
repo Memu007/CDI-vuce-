@@ -5211,14 +5211,12 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
                         dudosa = cargo
             elif copiada:
                 no_es_mercaderia = _es_solo_un_cargo(cargo)
-                if not no_es_mercaderia and _FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo):
-                    dudosa = cargo
             else:
                 no_es_mercaderia = bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo))
             # Lo que entra sin NCM propia y parece un cargo se avisa con su
-            # fila (EXCEL-3f): con su propio origen («Insurance», «China») o un
-            # cargo que no viene primero («Ocean freight»). Con su NCM es
-            # mercadería, como antes.
+            # fila: con el origen copiado (EXCEL-3d), con su propio origen
+            # («Insurance», «China») o un cargo que no viene primero («Ocean
+            # freight») (EXCEL-3f). Con su NCM es mercadería, como antes.
             if (not no_es_mercaderia and not dudosa and not pieza and descripcion_propia
                     and (_FILA_QUE_NO_ES_MERCADERIA_RE.match(descripcion_propia)
                          or _dice_solo_un_cargo(descripcion_propia))):
