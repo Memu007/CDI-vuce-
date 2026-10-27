@@ -88,16 +88,12 @@ def _tapar(texto: str, secretos, visibles=()) -> str:
                   lambda m: m.group(0) if m.group(0) in visibles else "***", texto)
 
 
-def _donde(url, secretos) -> str:
-    """Host, puerto y base de lo que se conectó, con los pedazos que son
-    secretos tapados."""
+def _donde(url) -> str:
+    """Host, puerto y base de lo que se conectó, sin tapar: lo tapa `_tapar`."""
     if url.get_backend_name() == "sqlite":
-        lugar = url.database or ""
-    else:
-        lugar = (url.host or "") + (f":{url.port}" if url.port else "") + (
-            f"/{url.database}" if url.database else "")
-    pedazos = re.split(f"({_SEPARADORES})", lugar)
-    return "".join("***" if p in secretos else p for p in pedazos)
+        return url.database or ""
+    return (url.host or "") + (f":{url.port}" if url.port else "") + (
+        f"/{url.database}" if url.database else "")
 
 
 def clasificar(filas):
@@ -165,7 +161,7 @@ def main(argv=None) -> int:
         try:
             secretos = _secretos(args.base, url)
             visibles = set(re.split(_SEPARADORES, url.host or "")) - secretos
-            donde = _tapar(_donde(url, secretos), secretos, visibles)
+            donde = _tapar(_donde(url), secretos, visibles)
             detalle = _tapar(f"{type(e).__name__}: {e}", secretos, visibles)
         except Exception:  # noqa: BLE001 - tapar nunca muestra un traceback
             donde, detalle = "(sin detalle)", type(e).__name__
