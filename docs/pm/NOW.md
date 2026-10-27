@@ -194,7 +194,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-27 18:20 UTC: **SUFIJOS-1 con devolución** sobre `97cd2fa` (`REPRODUCCION-SUFIJOS-1-2026-10-27.md`): pruebas 50 passed, sabotaje 34 ROJO, suite con los 12 rojos conocidos, TXT sin sufijo propio idéntico al de la base; falla la pantalla: lo que viaja por producto no es lo que muestra la celda (H1 a H4). H5 y D23 (c) decididos (`DECISIONS.md`). No integro MARIA hasta la vuelta. CLIENTE-1c sigue con devolución sobre `4452b22`.
+2026-10-27 18:58 UTC: sin entregas nuevas. Dev técnica con la vuelta de CLIENTE-1c a medio subir (producto `7e43604`, pruebas `d0dcf04`, `eda3755`; falta el informe). Dev MARIA trabajando; todavía no trajo el veredicto de SUFIJOS-1 (`ce70729`), ya despertada. Contextos bajo 140k. Antes: 2026-10-27 18:20 UTC: **SUFIJOS-1 con devolución** sobre `97cd2fa` (`REPRODUCCION-SUFIJOS-1-2026-10-27.md`): pruebas 50 passed, sabotaje 34 ROJO, suite con los 12 rojos conocidos, TXT sin sufijo propio idéntico al de la base; falla la pantalla: lo que viaja por producto no es lo que muestra la celda (H1 a H4). H5 y D23 (c) decididos (`DECISIONS.md`). No integro MARIA hasta la vuelta. CLIENTE-1c sigue con devolución sobre `4452b22`.
 
 ## Medición
 
