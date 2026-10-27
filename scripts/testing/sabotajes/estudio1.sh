@@ -147,8 +147,8 @@ sabotaje $M "el único no se preselecciona" \
   '    elif len(estudios) == 1:' '    elif False:' \
   "FAILED $T::test_se_preselecciona_el_unico"
 sabotaje $M "se preselecciona el usado hace más tiempo" \
-  'preseleccionado = max(usados, key=lambda e: e.last_used_at).id' \
-  'preseleccionado = min(usados, key=lambda e: e.last_used_at).id' \
+  'preseleccionado = max(usados, key=lambda u: (u[0], u[1] is None))[1]' \
+  'preseleccionado = min(usados, key=lambda u: (u[0], u[1] is None))[1]' \
   "FAILED $T::test_con_varios_se_preselecciona_el_ultimo_usado"
 
 # ------------------------------------------------------------- la pantalla
