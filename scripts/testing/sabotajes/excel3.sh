@@ -230,7 +230,7 @@ sabotaje $M "3b-3#3 la especificación copiada tapa el subtotal" \
   '            rotulo = descripcion_propia or next(' '            rotulo = descripcion or next(' \
   "${B}una_especificacion_combinada_que_alcanza_al_subtotal_no_lo_vuelve_producto"
 sabotaje $M "3b-3#1 la descripción copiada tapa el rótulo del flete" \
-  '            cargo = descripcion_propia or next(' '            cargo = descripcion or next(' \
+  '            cargo = descripcion_propia or rotulo_aparte' '            cargo = descripcion or rotulo_aparte' \
   "${B}una_descripcion_combinada_que_alcanza_al_flete_no_lo_vuelve_producto"
 sabotaje $M "3b-3#2 una nota de descuento sin precio abre un grupo" \
   '                    if "%" in cargo or _monto_de_la_linea() < 0 or not valor_unitario:' \
@@ -245,7 +245,7 @@ sabotaje $M "3c R1 con algo copiado, un producto con «Payment» queda sin leer"
                 no_es_mercaderia = bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo))' \
   "${B}un_producto_con_una_palabra_de_cargo_y_su_descripcion_se_lee[payment_handling-origen_combinado]"
 sabotaje $M "3c R1 con una palabra de cargo alcanza" \
-  '            and all(len(p) == 1 or p in _PALABRAS_DE_CARGO' '            and any(len(p) == 1 or p in _PALABRAS_DE_CARGO' \
+  '    if all(len(p) == 1 or p in de_cargo' '    if any(len(p) == 1 or p in de_cargo' \
   "${B}un_producto_con_una_palabra_de_cargo_y_su_descripcion_se_lee[payment_handling-origen_combinado]"
 sabotaje $M "3c R1 «fee» no es palabra de cargo" \
   '"incoterms", "delivery", "term", "terms", "fee", "fees", "premium",' \
@@ -316,10 +316,10 @@ sabotaje $M "3d con algo copiado, el flete tiene que ser sólo el flete" \
 sabotaje $M "3d el flete dudoso no se avisa" \
   '                            flete_dudoso.append((_ + 2, cargo))' '                            pass' \
   "${B}un_producto_que_empieza_como_el_flete_con_el_origen_combinado_se_lee_como_flete_avisado[Freight elevator DEMO]"
+# Desde EXCEL-3f el aviso del rótulo con el origen copiado lo pone el bloque de D22.
 sabotaje $M "3d el rótulo dudoso entra como producto común" \
-  'match(cargo):
-                    dudosa = cargo' 'match(cargo):
-                    pass' \
+  $'                    and (_FILA_QUE_NO_ES_MERCADERIA_RE.match(descripcion_propia)\n                         or _dice_solo_un_cargo(descripcion_propia))):' \
+  '                    and _dice_solo_un_cargo(descripcion_propia)):' \
   "${B}un_cargo_con_palabras_de_mas_no_cambia_el_fob_sin_un_aviso_con_su_fila[Gastos administrativos-origen_rotulo_en_descripcion]"
 sabotaje $M "3d las dudosas no llegan al aviso" \
   '        extras["dudosas"] = dudosas' '        pass' \
