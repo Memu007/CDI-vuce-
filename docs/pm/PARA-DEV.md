@@ -27,25 +27,38 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
-## Veredicto de EXCEL-3e (2026-10-25)
+## Veredicto de CLIENTE-1c (2026-10-27): con devolución
 
-Sobre `6f798d8` (informe `e1acb64`). El detalle y las salidas están en
-`REPRODUCCION-EXCEL-3e-2026-10-25.md`. Re-corrí las cinco de Excel (861
-passed), `excel3.sh` (96 ROJO, 0 sin rojo, en dos partes por un tope mío de tiempo) y la suite (los mismos 12 rojos
-que informaste), más once negativos míos contra el piso, la base y la
-entrega. Mi adversario fue Opus, alto.
+Sobre `4452b22` (informe `dbe7c4a`). El detalle y las salidas están en
+`REPRODUCCION-CLIENTE-1c-2026-10-27.md`. Re-corrí la suite desde base
+limpia (3135 passed, **0 rojos**: los 12 quedaron cerrados) y
+`cliente1c.sh` (25 ROJO, 0 sin rojo), más negativos míos contra el script.
+Mi adversario fue Opus, alto.
 
-- **EXCEL-3e: aceptada.** El cargo o descuento con medidas que no son
-  números bajo una combinada ya no entra como producto sin aviso, con mis
-  ejemplos y con otros («Flete internacional» con «--», «Insurance» con
-  «x»). Lo nuevo que baja el FOB lo hace siempre con aviso de su fila.
-- **Integrada:** EXCEL-3d, CLIENTE-1b, ESTUDIO-1 y EXCEL-3e entran a mi rama
-  con `merge` de la tuya (`5eb6ae4`). Sin publicar.
-- **D24: (a).** El renglón queda sin leer, va a `filas_excel_sin_leer` y la
-  pantalla lo muestra en el semáforo, como en la D20.
-- **CHANGELOG:** el merge chocaba con las entradas de la Dev MARIA del
-  mismo día. Lo resolví sumando las dos, sin cambiar texto; con eso queda
-  la línea en blanco que faltaba antes de VALOR-1c. No tenés que tocarlo.
+- **Bien:** D15 (b), D16 (b), la regla única de la fecha con
+  `fecha_inic_activ_sirve` y la causa de los 402 (`2ff3262`). La fecha con
+  hora que ya no se copia es D15 (b): está decidido.
+- **Devolución — la clave de `--base` en el error.** Causa: el dónde y los
+  secretos salen de una segunda lectura del texto (`urlsplit` en
+  `_donde_y_secretos`), no de lo mismo que conecta (`make_url`). Cuando las
+  dos lecturas no coinciden, el error muestra la clave, o el script se cae
+  con un traceback en vez del mensaje limpio. Ejemplo:
+  `postgresql://u:pa/ss@127.0.0.1:1/db` → «No se pudo revisar la base
+  u:pa/ss@127.0.0.1:1/db: …».
+  - Arreglá la familia, no el «/»: cualquier `--base` que la conexión
+    acepte tiene que dar el mensaje limpio, sin la clave, con rc 2.
+  - De la misma causa: el enmascarado reemplaza el usuario en todo el
+    texto («ConnectionRef***sedError» con usuario «u»). Lo que se tapa
+    tiene que ser lo que leyó la conexión, sin romper el resto del mensaje.
+  - Caso y sabotaje en `cliente1c.sh` para cada forma que encuentres.
+- **D25: (b).** La importación sigue la regla del alta: la fecha que no
+  sirve queda vacía, con aviso en su fila. Va en esta misma vuelta, con su
+  caso y su sabotaje.
+- **Se anota, no lo arregles:** el año `0001` pasa por los tres lugares.
+- **No integro todavía** tu rama: entra con la vuelta. La CI de mi rama
+  sigue roja hasta entonces.
+
+Después, ESTUDIO-1b.
 
 ## EXCEL-3f (después de ESTUDIO-1b)
 
@@ -81,39 +94,13 @@ como estaban: D12 (b) va aparte, después de ESTUDIO-1.
 
 ## Orden
 
-1. CLIENTE-1c, que ya empezaste.
+1. La vuelta de CLIENTE-1c (arriba), con D25 (b).
 2. ESTUDIO-1b.
 3. EXCEL-3f.
 4. GUARDAR-2.
 
-## Ahora — CLIENTE-1c
-
-D15 (b) y D16 (b) en una pieza chica. (c) no: toca el modelo y cambia el
-error de tres lugares a la vez. Van con estas notas de CLIENTE-1b:
-- Con un `--base` mal escrito, el script muestra la clave en el error de
-  Python. Que el error no la muestre.
-- Un dígito de ancho completo se lee distinto en la pantalla y en el
-  generador.
-
-Toca datos: revisión fuerte. Cada lugar con su sabotaje en rojo.
-
-Dos condiciones nuevas, por la integración de hoy:
-- **Puerta de suite:** sin el rojo de
-  `test_guardar1::test_datos_largos_de_la_operacion_no_impiden_guardarla`.
-  Es la regresión que informaste (la fecha con hora queda vacía en la
-  ficha); su rojo antes, como dijiste.
-- **Los 11 rojos de presupuesto también (corrección mía, 09:35 UTC).** Tu
-  informe dice que la CI los deselecciona y lo acepté sin mirar: no es así,
-  `ci.yml` deselecciona otros 10. La CI de mi rama estuvo verde hasta
-  `c5eab07` y dio 12 rojos en `bcab8b5`, la primera con tu rama integrada
-  (402 «Alcanzaste el límite de 15 operaciones del plan Premium»). Alguna
-  prueba de tu rama gasta operaciones del usuario de prueba compartido sin
-  devolverlas. Buscá cuál por la causa y arreglala en las pruebas; no
-  deselecciones nada ni subas el tope del producto. Puerta: la CI verde
-  con el mismo `ci.yml`.
-- **Mi diff de revisión va desde `c820c74`**, el padre de `d7aa875`, no
-  desde `1955cac`: los commits de CLIENTE-1c que ya están en la base
-  (`d7aa875`…`8b65b6b`) entran en la revisión.
+Puertas de la vuelta: la suite sigue en 0 rojos, `cliente1c.sh` sin
+sabotaje en verde, y mi diff de revisión va desde `4452b22`.
 
 
 ## ESTUDIO-1b (después de CLIENTE-1c; antes de publicar ESTUDIO-1)
