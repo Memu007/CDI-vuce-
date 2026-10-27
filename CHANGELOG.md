@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-27 · fix: un cargo en plural, que no viene primero o en Item con otra descripción se avisa con su fila (EXCEL-3f)
+
+- **fix(excel):** «Fletes», «Seguros», «Bank fees» o «Fee» se leen como el cargo en singular. «Ocean freight», «Courier DHL», «2. Insurance», un cargo con su propio origen o «Freight» en Item con la descripción escrita otra vez entran al FOB como antes, pero con un aviso que nombra su fila.
+- El aviso del flete nombra todas sus filas como los demás («filas 3, 4, … y N más»).
+
 ## 2026-10-27 · fix: la importación sigue la regla del alta y el script de datos no muestra la clave (vuelta de CLIENTE-1c)
 
 - **fix(clientes):** la fecha de inicio de actividad importada pasa por la misma regla que el alta (D25 b): año de dos cifras, dígitos de ancho completo o DD-MM-AAAA quedan vacíos con aviso en su fila; una celda con formato fecha de Excel se importa.

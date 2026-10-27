@@ -4756,9 +4756,10 @@ def _es_fila_de_total(texto: str) -> bool:
 
 # Renglones de la factura que no son mercadería: flete, seguro, condiciones de
 # pago, gastos. Sin NCM ni origen no entran como producto (sumarían al FOB) y
-# se cuentan en el aviso de filas sin leer (EXCEL-1).
-_CARGOS = (r"freight|flete|insurance|seguro|payment|pago|bank\s+charges?|gastos"
-           r"|handling|shipping\s+(?:cost|charges?)|incoterm|delivery\s+terms?")
+# se cuentan en el aviso de filas sin leer (EXCEL-1). El plural y «fee» son
+# el mismo cargo (EXCEL-3f).
+_CARGOS = (r"freights?|fletes?|insurances?|seguros?|payments?|pagos?|bank\s+(?:charges?|fees?)"
+           r"|gastos?|handling|shipping\s+(?:costs?|charges?)|incoterms?|delivery\s+terms?|fees?")
 _FILA_QUE_NO_ES_MERCADERIA_RE = re.compile(rf"^\s*(?:{_CARGOS})\b", re.IGNORECASE)
 
 # EXCEL-3c. Con el origen o la descripción copiados de una combinada no se
@@ -4770,9 +4771,9 @@ _FILA_QUE_NO_ES_MERCADERIA_RE = re.compile(rf"^\s*(?:{_CARGOS})\b", re.IGNORECAS
 # aviso que nombra la fila (EXCEL-3d). La lista sólo decide si hace falta
 # ese aviso: una palabra que falta no cambia el FOB en silencio.
 _PALABRAS_DE_CARGO = {
-    "freight", "flete", "fletes", "insurance", "seguro", "seguros", "payment", "payments",
-    "pago", "pagos", "bank", "banco", "bancario", "bancaria", "bancarios", "bancarias",
-    "charge", "charges", "gasto", "gastos", "handling", "shipping", "cost", "costs", "costo",
+    "freight", "freights", "flete", "fletes", "insurance", "insurances", "seguro", "seguros",
+    "payment", "payments", "pago", "pagos", "bank", "banco", "bancario", "bancaria",
+    "bancarios", "bancarias", "charge", "charges", "gasto", "gastos", "handling", "shipping", "cost", "costs", "costo",
     "costos", "incoterm", "incoterms", "delivery", "term", "terms", "fee", "fees", "premium",
     "prima", "commission", "commissions", "comision", "comisión", "comisiones", "policy",
     "poliza", "póliza", "carga", "cargo", "cargos", "goods", "mercaderia", "mercadería",
@@ -4784,6 +4785,18 @@ _PALABRAS_DE_CARGO = {
     "saldo", "before", "after", "against", "copy", "tt", "wire", "transfer", "transferencia",
     "swift", "total", "and", "y", "for", "on", "at", "to", "por", "para", "con", "with",
     "from", "al", "los", "las", "days", "dias", "días",
+    "packing", "courier", "dhl", "fedex", "ups", "tnt", "thc", "express", "container",
+    "containers", "contenedor", "contenedores", "hq", "hc", "gp", "fcl", "lcl",
+}
+# EXCEL-3f. Un cargo que no viene primero («Ocean freight», «Courier DHL»,
+# «2. Insurance», «THC») se avisa con su fila, sin sacarlo del FOB: todo lo que
+# dice es de cargo y al menos una palabra lo es por sí sola. «Power bank» o
+# «Packing tape» dicen algo más; «Sea» o «Express» solos no son un cargo.
+_PALABRAS_QUE_SON_UN_CARGO = {
+    "freight", "freights", "flete", "fletes", "insurance", "insurances", "seguro", "seguros",
+    "payment", "payments", "pago", "pagos", "charge", "charges", "fee", "fees", "gasto",
+    "gastos", "handling", "shipping", "incoterm", "incoterms", "commission", "commissions",
+    "comision", "comisión", "comisiones", "courier", "thc", "transport", "transporte",
 }
 
 
@@ -4798,17 +4811,28 @@ def _filas_del_aviso(filas) -> str:
     return nombradas + (f" y {len(filas) - 5} más" if len(filas) > 5 else "")
 
 
-def _es_solo_un_cargo(texto: str) -> bool:
+def _palabras_de_cargo(texto: str) -> list | None:
+    """Las palabras del rótulo, o None si alguna no es de cargo ni de monto."""
     palabras = [p for p in re.split(r"[\s\d.,:;/()\[\]\-%&+]+", (texto or "").lower()) if p]
+    if all(len(p) == 1 or p in _PALABRAS_DE_CARGO or p in _PALABRAS_DE_MONTO for p in palabras):
+        return palabras
+    return None
+
+
+def _es_solo_un_cargo(texto: str) -> bool:
     return (bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(texto or ""))
-            and all(len(p) == 1 or p in _PALABRAS_DE_CARGO or p in _PALABRAS_DE_MONTO
-                    for p in palabras))
+            and _palabras_de_cargo(texto) is not None)
+
+
+def _dice_solo_un_cargo(texto: str) -> bool:
+    return any(p in _PALABRAS_QUE_SON_UN_CARGO for p in _palabras_de_cargo(texto) or ())
+
 
 # EXCEL-3. El flete y el descuento de la factura no son productos: se
 # devuelven leídos para la operación (cómo se usa el descuento lo decide
 # VALOR-1). El seguro y lo demás siguen como filas sin leer.
 _FILA_DE_FLETE_RE = re.compile(
-    r"^\s*(?:freight|flete|shipping\s+(?:cost|charges?))\b", re.IGNORECASE)
+    r"^\s*(?:freights?|fletes?|shipping\s+(?:costs?|charges?))\b", re.IGNORECASE)
 _FILA_DE_DESCUENTO_RE = re.compile(
     r"^\s*(?:discount|descuento|rebate|bonificaci[oó]n)\b", re.IGNORECASE)
 # El rótulo entero es el descuento («Discount», «Descuento USD:», «Discount
@@ -5001,7 +5025,7 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
     grupo = None  # (descripción, código de parte, fila) del renglón de arriba
     agrupada = False  # si algún renglón tomó lo del de arriba
     flete, descuento, heredadas, sin_precio = [], [], [], []
-    # Filas que empiezan como un cargo y no se sabe si lo son: (fila, rótulo).
+    # Filas que parecen un cargo y no se sabe si lo son: (fila, rótulo).
     flete_dudoso, dudosas = [], []
     # Fila → (¿es un cargo y no mercadería?, rótulo si es dudosa). Una copia de su
     # descripción combinada sin otro rótulo es la misma cosa (EXCEL-3c), y un
@@ -5060,9 +5084,11 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
             # no son una medida: el flete con la especificación combinada no
             # pasa por renglón del grupo (EXCEL-3e).
             con_medidas = any(_es_una_medida(row[c], decimal) for c, _n, _u in medidas)
-            cargo = descripcion_propia or next(
+            # El rótulo de Item o de una columna a la izquierda de la descripción.
+            rotulo_aparte = next(
                 (t for t in (_texto_de_celda(row[c]) for c in columnas_del_rotulo)
                  if t and _numero_factura(t, decimal) is None), "")
+            cargo = descripcion_propia or rotulo_aparte
             es_cargo = False  # flete o descuento: no abre grupo
             # Una descripción copiada no cuenta: el renglón con medidas y una
             # nota en Item sigue siendo del grupo, como sin combinadas.
@@ -5183,7 +5209,21 @@ def try_extract_with_mapping(df: pd.DataFrame, mapping: dict, descartes: list | 
                     dudosa = cargo
             else:
                 no_es_mercaderia = bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo))
+            # Lo que entra y parece un cargo se avisa con su fila (EXCEL-3f):
+            # con su propio origen («Insurance», «China») o un cargo que no
+            # viene primero («Ocean freight»).
+            if (not no_es_mercaderia and not dudosa and descripcion_propia
+                    and (_FILA_QUE_NO_ES_MERCADERIA_RE.match(descripcion_propia)
+                         or _dice_solo_un_cargo(descripcion_propia))):
+                dudosa = descripcion_propia
             no_es_mercaderia_en[_] = (no_es_mercaderia, dudosa)
+            # Un cargo en Item con otra descripción escrita o con medidas
+            # («Freight», «LONA DEMO»), también. Es de esta fila: la que copia
+            # la descripción no lo hereda. «Freight included» o «Handling
+            # equipment» en Item son una nota.
+            if (not no_es_mercaderia and not dudosa
+                    and (_es_solo_un_cargo(rotulo_aparte) or _dice_solo_un_cargo(rotulo_aparte))):
+                dudosa = rotulo_aparte
 
             # Lo que falta o no se puede leer queda vacío (0 o ""), nunca
             # inventado; el semáforo de la revisión lo marca (MARIA-1a, EXCEL-1).
@@ -8202,7 +8242,7 @@ async def upload_excel_v2(
                 f"{len(filas)} renglón(es) entraron sin precio ({_filas_del_aviso(filas)}). "
                 "Completalos en la revisión."
             )
-        # EXCEL-3d: lo que empieza como un cargo y no se sabe si lo es.
+        # EXCEL-3d y EXCEL-3f: lo que parece un cargo y no se sabe si lo es.
         if extras.get("flete_dudoso"):
             filas = extras["flete_dudoso"]
             avisos_mapeo.append(
@@ -8212,7 +8252,7 @@ async def upload_excel_v2(
         if extras.get("dudosas"):
             filas = extras["dudosas"]
             avisos_mapeo.append(
-                f"{len(filas)} renglón(es) empiezan como un cargo y entraron como producto: "
+                f"{len(filas)} renglón(es) parecen un cargo y entraron como producto: "
                 f"{_filas_del_aviso(filas)}; si alguno es un cargo, sacalo en la revisión."
             )
 
@@ -8238,10 +8278,11 @@ async def upload_excel_v2(
                 monto = round(sum(m for _f, m in extras[campo]), 2)
                 operacion[campo] = monto
                 operacion[f"filas_excel_{campo}"] = [f for f, _m in extras[campo]][:50]
-                filas = ", ".join(str(f) for f, _m in extras[campo][:5])
+                filas = [f for f, _m in extras[campo]]
                 avisos_mapeo.append(
                     f"{nombre}: se leyó {monto:,.2f}".replace(",", "\x00").replace(".", ",").replace("\x00", ".")
-                    + f" de la fila {filas} de la planilla; no entra como producto. Revisalo en la operación."
+                    + f" de la{'s' if len(filas) > 1 else ''} {_filas_del_aviso(filas)} de la planilla;"
+                    " no entra como producto. Revisalo en la operación."
                 )
 
         # Lo que no se leyó del libro queda en la operación: el semáforo lo
