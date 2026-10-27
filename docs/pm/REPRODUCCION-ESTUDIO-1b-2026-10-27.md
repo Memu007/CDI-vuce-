@@ -13,7 +13,7 @@ sintéticos.
 |---|---|
 | Suite completa sobre `3aba9c2` | `3229 passed, 102 skipped, 2 xfailed`, rc=0 |
 | `sabotajes/estudio1b.sh 3aba9c2` (incluye la pantalla en Chromium) | 20 de 20 en rojo («sabotajes sin rojo: 0») |
-| `sabotajes/estudio1.sh 3aba9c2` | corriendo al subir este veredicto (9 de 37 en rojo hasta ahí, ninguno verde); el total va en la próxima vuelta |
+| `sabotajes/estudio1.sh 3aba9c2` | 37 de 37 en rojo («sabotajes sin rojo: 0»; terminó 20:03 UTC, después del veredicto) |
 | 32 negativos propios por API (archivo descartable, no entra al repo) | `32 passed` |
 
 El revisor adversarial **no corrió** (presupuesto semanal).

@@ -38,12 +38,12 @@ con eso se cierran los 12 rojos conocidos (11 del tope de 15 operaciones y
 en un contenedor cargado (`NOW.md`). Cualquier otro rojo al traer mi rama,
 decímelo.
 
-## Revisión (2026-10-27): SUFIJOS-1 y SEPARADORES-1c sin hallazgos que frenen
+## Veredicto (2026-10-27): SUFIJOS-1 y SEPARADORES-1c aceptadas
 
-Las dos sobre `45a3ea1` (informes en `76570de` y `91be665`). **Falta sólo
-mi suite completa sobre `45a3ea1`, que está corriendo:** cuando termine
-escribo acá «aceptadas» e integro tu rama. No esperes: SEPARADORES-1d
-arranca desde tu `91be665`. Detalle y salidas en `REPRODUCCION-SUFIJOS-1-vuelta-2026-10-27.md`
+Las dos sobre `45a3ea1` (informes en `76570de` y `91be665`). Suite sobre
+`45a3ea1`: sólo los 12 rojos conocidos (esa base no trae `2ff3262`); sobre
+mi merge de tu rama (`e9981e5`): 3393 passed, 0 rojos. Integré tu rama.
+SEPARADORES-1d arranca desde tu `91be665` (o desde mi rama, igual). Detalle y salidas en `REPRODUCCION-SUFIJOS-1-vuelta-2026-10-27.md`
 y `REPRODUCCION-SEPARADORES-1c-2026-10-27.md`.
 
 - **SUFIJOS-1:** tus 47 sabotajes en rojo por la razón esperada y nueve casos

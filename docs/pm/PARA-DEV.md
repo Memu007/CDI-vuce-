@@ -32,7 +32,7 @@ un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 Sobre `3aba9c2` (informe `807d562`). El detalle está en
 `REPRODUCCION-CLIENTE-1c-2026-10-27.md` («Vuelta») y en
 `REPRODUCCION-ESTUDIO-1b-2026-10-27.md`. Corrí la suite desde base limpia
-(3229 passed, 0 rojos), los sabotajes de CLIENTE-1c, CLIENTE-1b y ESTUDIO-1b (todos en rojo; el de ESTUDIO-1 sigue corriendo), 32 negativos míos por API y
+(3229 passed, 0 rojos), los sabotajes de CLIENTE-1c, CLIENTE-1b, ESTUDIO-1b y ESTUDIO-1 (todos en rojo; el de ESTUDIO-1, 37 de 37, terminó después del veredicto), 32 negativos míos por API y
 un fuzz de la clave de `--base`. Mi adversario no corrió (presupuesto).
 Integro tu rama (`418ada3`).
 
