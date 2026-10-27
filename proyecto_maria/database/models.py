@@ -177,6 +177,17 @@ class Estudio(Base):
     last_used_at = Column(DateTime(timezone=True), nullable=True)
 
 
+class UsoCuitPerfil(Base):
+    """La última vez que la cuenta generó un TXT con el CUIT de su perfil
+    (ESTUDIO-1b, D23 b): compite con `Estudio.last_used_at` por la
+    preselección. Tabla aparte porque `create_all` no agrega columnas a
+    `users`, que ya existe."""
+    __tablename__ = "usos_cuit_perfil"
+
+    owner_username = Column(String(50), ForeignKey("users.username"), primary_key=True)
+    last_used_at = Column(DateTime(timezone=True), nullable=False)
+
+
 class Operation(Base):
     """Operación de importación procesada."""
     __tablename__ = "operations"

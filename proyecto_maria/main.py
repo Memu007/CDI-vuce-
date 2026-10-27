@@ -134,7 +134,7 @@ security = HTTPBearer()
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from proyecto_maria.database.connection import get_async_session, init_db
-from proyecto_maria.database.models import User, Client, PasswordResetToken, Organization, Invitation, Estudio
+from proyecto_maria.database.models import User, Client, PasswordResetToken, Organization, Invitation, Estudio, UsoCuitPerfil
 import uuid
 import logging
 from sqlalchemy.exc import IntegrityError
@@ -4091,19 +4091,22 @@ FALTA_CUIT_DONDE_CARGARLO = (
 )
 
 
-async def _estudio_elegido(db: AsyncSession, estudio_id: str, username: str):
+async def _estudio_elegido(db: AsyncSession, estudio_id, username: str):
     """El estudio que eligió la operación, si es de la cuenta (ESTUDIO-1).
 
-    Vacío: ninguno (sigue `cuit_agr` y el perfil). Uno que no es de la cuenta
-    o no existe es un error: no se cae en silencio al CUIT del perfil.
+    Sólo `""` (o la falta del campo) es «sin estudio»: sigue `cuit_agr` y el
+    perfil. Todo lo demás que no es un estudio de la cuenta («null», «N/A»,
+    espacios, un null de JSON, un número) es un error: no se cae en silencio
+    al CUIT del perfil (ESTUDIO-1b).
     """
-    estudio_id = (estudio_id or "").strip()
-    if not estudio_id:
+    if estudio_id == "":
         return None
-    result = await db.execute(
-        select(Estudio).where(Estudio.id == estudio_id, Estudio.owner_username == username)
-    )
-    estudio = result.scalars().first()
+    estudio = None
+    if isinstance(estudio_id, str):
+        result = await db.execute(
+            select(Estudio).where(Estudio.id == estudio_id, Estudio.owner_username == username)
+        )
+        estudio = result.scalars().first()
     if estudio is None:
         raise HTTPException(
             status_code=400,
@@ -4122,8 +4125,9 @@ class MariaRequest(BaseModel):
     incoterm: str = ""
     cuit_agr: str = ""
     # El estudio elegido en la operación (ESTUDIO-1): su CUIT va al CDDTAGR
-    # y manda sobre `cuit_agr` y el perfil. Vacío: como antes.
-    estudio_id: str = ""
+    # y manda sobre `cuit_agr` y el perfil. Sólo "" es «sin estudio»; sin
+    # tipo, para que lo demás llegue a `_estudio_elegido` y sea un 400.
+    estudio_id: Any = ""
     vendedor_nombre: str = ""
     vendedor_id: str = ""
     comprador_nombre: str = ""
@@ -4194,7 +4198,7 @@ class MariaRequest(BaseModel):
         "bl_numero", "puerto_origen", "puerto_destino", "buque_nombre", "viaje_numero",
         "fecha_embarque", "fecha_emision", "contenedor_numero", "contenedor_tipo",
         "aduana_codigo", "tipo_destinacion", "sbt_sufijo_valor", "procedencia", "banco_bcra",
-        "numero_factura", "estudio_id",
+        "numero_factura",
         mode="before",
     )
     @classmethod
@@ -4504,6 +4508,11 @@ async def generate_maria_endpoint(
                 raise HTTPException(status_code=400, detail={"errors": [
                     f"El CUIT del despachante «{effective_cuit_agr}» tiene que tener 11 dígitos (0-9). "
                     "Corregilo en la operación o en tu perfil."]})
+        # Sin estudio y con el CUIT del perfil (la pantalla lo manda en
+        # `cuit_agr`): cuenta como uso del perfil para la preselección
+        # (ESTUDIO-1b, D23 b). Un `cuit_agr` distinto no.
+        cuit_del_perfil = "".join(str((user or {}).get("cuit") or "").replace("-", "").split())
+        con_el_perfil = estudio is None and bool(effective_cuit_agr) and effective_cuit_agr == cuit_del_perfil
 
         # Sin número de factura, el de la operación: el mismo en el TXT y en
         # el nombre del archivo.
@@ -4564,8 +4573,9 @@ async def generate_maria_endpoint(
         # valor asumido en silencio se descubre recién en la aduana.
         supuestos = _supuestos_maria(request, items, gastos)
 
-        # Generó: el estudio pasa a ser el último usado (se preselecciona).
-        # Si no se puede anotar, el TXT igual se entrega.
+        # Generó: el estudio, o el CUIT del perfil, pasa a ser lo último
+        # usado (se preselecciona). Si no se puede anotar, el TXT igual se
+        # entrega.
         if estudio is not None:
             try:
                 estudio.last_used_at = datetime.now(timezone.utc)
@@ -4573,6 +4583,17 @@ async def generate_maria_endpoint(
             except Exception as e:
                 await db.rollback()
                 print(f"No se anotó el uso del estudio {estudio.id}: {e}")
+        elif con_el_perfil:
+            try:
+                uso = await db.get(UsoCuitPerfil, user["username"])
+                if uso is None:
+                    uso = UsoCuitPerfil(owner_username=user["username"])
+                    db.add(uso)
+                uso.last_used_at = datetime.now(timezone.utc)
+                await db.commit()
+            except Exception as e:
+                await db.rollback()
+                print(f"No se anotó el uso del CUIT del perfil: {e}")
 
         return {
             "success": True,
@@ -6816,6 +6837,11 @@ def _estudio_to_dict(e: Estudio) -> dict:
     }
 
 
+def _utc(momento: datetime) -> datetime:
+    """SQLite devuelve la hora sin zona; Postgres, con zona. Se guardan en UTC."""
+    return momento if momento.tzinfo else momento.replace(tzinfo=timezone.utc)
+
+
 class EstudioRequest(BaseModel):
     # Sin tipos: un número o un null llegan y se rechazan con el mismo texto.
     nombre: Any = None
@@ -6827,15 +6853,20 @@ async def list_estudios(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Los estudios de la cuenta y el que la operación preselecciona: el
-    último usado o, si ninguno se usó y hay uno solo, ése."""
+    """Los estudios de la cuenta y el que la operación preselecciona: lo
+    último usado, estudio o CUIT del perfil (ESTUDIO-1b, D23 b; el perfil es
+    None). Si no se usó nada y hay un solo estudio, ése."""
     result = await db.execute(
         select(Estudio).where(Estudio.owner_username == user["username"]).order_by(Estudio.nombre, Estudio.id)
     )
     estudios = list(result.scalars().all())
-    usados = [e for e in estudios if e.last_used_at is not None]
+    uso_perfil = await db.get(UsoCuitPerfil, user["username"])
+    usados = [(_utc(e.last_used_at), e.id) for e in estudios if e.last_used_at is not None]
+    if uso_perfil is not None:
+        usados.append((_utc(uso_perfil.last_used_at), None))
     if usados:
-        preseleccionado = max(usados, key=lambda e: e.last_used_at).id
+        # Con la misma hora gana el perfil: lo que pide menos sorpresa.
+        preseleccionado = max(usados, key=lambda u: (u[0], u[1] is None))[1]
     elif len(estudios) == 1:
         preseleccionado = estudios[0].id
     else:
@@ -6850,11 +6881,16 @@ async def create_estudio(
     db: AsyncSession = Depends(get_db),
 ):
     nombre = payload.nombre.strip() if isinstance(payload.nombre, str) else ""
+    # Los caracteres de formato (Cf: espacios de ancho cero, controles de
+    # dirección como U+202E) hacen que el nombre se vea vacío o al revés en
+    # el selector (ESTUDIO-1b).
     if not nombre or len(nombre) > 200 or any(ord(c) < 32 or 0x7f <= ord(c) <= 0x9f or 0xd800 <= ord(c) <= 0xdfff
-                                               or c in "\u2028\u2029" for c in nombre):
+                                               or c in "\u2028\u2029" or unicodedata.category(c) == "Cf"
+                                               for c in nombre):
         raise HTTPException(
             status_code=400,
-            detail="El nombre del estudio no puede quedar vacío, pasar de 200 caracteres ni tener saltos de línea.",
+            detail="El nombre del estudio no puede quedar vacío, pasar de 200 caracteres ni tener saltos "
+                   "de línea ni caracteres invisibles.",
         )
     from proyecto_maria.core.controles_maria import cuit_valido
     cuit = "".join(payload.cuit.replace("-", "").split()) if isinstance(payload.cuit, str) else ""

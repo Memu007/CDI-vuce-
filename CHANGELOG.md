@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-27 · fix: generar con el CUIT del perfil también cuenta como último usado (ESTUDIO-1b)
+
+- **fix(estudios):** la operación siguiente trae elegido lo último con que se generó, estudio o CUIT del perfil; un estudio único gana sólo si el perfil nunca se usó. Un `estudio_id` que no es vacío ni de la cuenta («null», espacios, un número) da 400 y no cae al perfil.
+- El nombre del estudio no admite caracteres invisibles ni controles de dirección.
+
 ## 2026-10-25 · fix: la fecha de inicio de actividad de la operación pasa por la regla del alta y la importación no guarda una que no sirve (CLIENTE-1c)
 
 - **fix(clientes):** la operación copia a la ficha vacía sólo una fecha válida (guardada AAAA-MM-DD); si no sirve no se copia y la operación se guarda igual. La importación deja vacía la fecha que no sirve y la vista previa avisa la fila; el año sale siempre con cuatro cifras.
