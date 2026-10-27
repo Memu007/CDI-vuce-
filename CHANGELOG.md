@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-27 · fix: la importación sigue la regla del alta y el script de datos no muestra la clave (vuelta de CLIENTE-1c)
+
+- **fix(clientes):** la fecha de inicio de actividad importada pasa por la misma regla que el alta (D25 b): año de dos cifras, dígitos de ancho completo o DD-MM-AAAA quedan vacíos con aviso en su fila; una celda con formato fecha de Excel se importa.
+- **fix(datos):** el script lee la base, la clave y el lugar de lo mismo que conecta; una clave con «/», «?», «#», «[» o caracteres de ancho completo ya no se ve ni da traceback, y tapar no corta palabras del mensaje.
+
 ## 2026-10-27 · fix: generar con el CUIT del perfil también cuenta como último usado (ESTUDIO-1b)
 
 - **fix(estudios):** la operación siguiente trae elegido lo último con que se generó, estudio o CUIT del perfil; un estudio único gana sólo si el perfil nunca se usó. Un `estudio_id` que no es vacío ni de la cuenta («null», espacios, un número) da 400 y no cae al perfil.

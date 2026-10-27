@@ -20,11 +20,12 @@ import zipfile
 from collections import defaultdict
 from collections.abc import Awaitable, Iterable, Mapping
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Any, Protocol, TypeAlias
 
 import pandas as pd
+
+from proyecto_maria.services.fecha_inic_activ import fecha_del_alta
 
 
 MAX_FILE_BYTES = 10 * 1024 * 1024
@@ -650,16 +651,9 @@ def _same_field(field: str, left: str, right: str) -> bool:
 def _field_text(field: str, value: Any) -> str:
     text = _cell_text(value, limit=_FIELD_LIMITS.get(field, 500))
     if field == "fecha_inic_activ" and text:
-        for date_format in (
-            "%Y-%m-%d", "%Y-%m-%d %H:%M:%S", "%d/%m/%Y", "%d-%m-%Y",
-            "%d/%m/%y", "%d-%m-%y",
-        ):
-            try:
-                # isoformat rellena el año: strftime("%Y") deja «1-02-01».
-                return datetime.strptime(text, date_format).date().isoformat()
-            except ValueError:
-                continue
-        return ""
+        # D25 (b): la regla del alta. Una celda con formato fecha llega de
+        # pandas como «AAAA-MM-DD 00:00:00»; esa hora se saca y nada más.
+        return fecha_del_alta(re.sub(r" 00:00:00\Z", "", text)) or ""
     return text.casefold() if field == "email" else text
 
 

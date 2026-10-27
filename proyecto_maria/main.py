@@ -72,6 +72,7 @@ PROJECT_VERSION = datetime.now().strftime("%Y%m%d%H%M%S")
 from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
+from proyecto_maria.services.fecha_inic_activ import fecha_del_alta
 from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, importe_escrito, usa_el_sufijo_de_la_operacion, fecha_inicio_actividad
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
@@ -5328,21 +5329,10 @@ def _fecha_inic_activ_de_api(raw) -> str:
         return ""
     if not isinstance(raw, str):
         raise HTTPException(status_code=400, detail=_FECHA_INIC_ACTIV_ERROR)
-    texto = raw.strip()
-    if not texto:
-        return ""
-    m = re.fullmatch(r"([0-9]{4})-([0-9]{2})-([0-9]{2})", texto)
-    if m:
-        anio, mes, dia = (int(g) for g in m.groups())
-    else:
-        m = re.fullmatch(r"([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})", texto)
-        if not m:
-            raise HTTPException(status_code=400, detail=_FECHA_INIC_ACTIV_ERROR)
-        dia, mes, anio = (int(g) for g in m.groups())
-    try:
-        return date(anio, mes, dia).isoformat()
-    except ValueError:
-        raise HTTPException(status_code=400, detail=_FECHA_INIC_ACTIV_ERROR) from None
+    fecha = fecha_del_alta(raw)
+    if fecha is None:
+        raise HTTPException(status_code=400, detail=_FECHA_INIC_ACTIV_ERROR)
+    return fecha
 
 
 def _fecha_inic_activ_o_vacia(raw) -> str:

@@ -19,7 +19,8 @@ import asyncio
 import os
 import re
 import sys
-from urllib.parse import parse_qsl, quote, quote_plus, unquote, unquote_plus, urlsplit
+import unicodedata
+from urllib.parse import quote, quote_plus, unquote, unquote_plus
 
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
@@ -41,34 +42,62 @@ def _url_async(url: str) -> str:
     return url
 
 
-def _donde_y_secretos(base: str):
-    """Dónde está la base (host, puerto y base, sin usuario ni consulta) y lo
-    que puede ser la clave: todo lo de antes del último «@» y los valores de la
-    consulta. Se lee del texto escrito, no de SQLAlchemy: una clave con «@» o
-    «;» sin escapar, o en `?password=`, SQLAlchemy no la ve como clave."""
-    partes = urlsplit(base)
-    usuario, _, lugar = partes.netloc.rpartition("@")
-    secretos = {usuario, *re.split(r"[:;@]", usuario)}
-    secretos |= {v for _, v in parse_qsl(partes.query, keep_blank_values=True)}
-    try:
-        host = partes.hostname or ""
-    except ValueError:
-        host = ""
-    return lugar + partes.path, host, {s for s in secretos if s}
+# Lo que parte la URL escrita en pedazos que pueden ser la clave o el usuario.
+_SEPARADORES = r"[:;@/?#]"
 
 
-def _sin_clave(texto: str, secretos, host: str = "") -> str:
-    """El texto de un error sin ninguno de los secretos, como vengan o
-    escapados. El host no se tapa: una clave «1» no borra «127.0.0.1»."""
+def _secretos(base: str, url) -> set:
+    """Lo que puede ser la clave: lo que SQLAlchemy leyó como clave, usuario y
+    valores de la consulta, y además todo lo de antes del último «@» del texto
+    escrito, entero y partido en «:», «;», «@», «/», «?» y «#». Una clave mal
+    escapada SQLAlchemy la puede leer como host o base: también se tapa. El
+    usuario se tapa como la clave."""
+    crudo = base.split("://", 1)[-1]
+    antes = crudo.rpartition("@")[0]
+    secretos = {antes, antes.partition(":")[2], *re.split(_SEPARADORES, antes),
+                url.password or "", url.username or ""}
+    for valor in url.query.values():
+        secretos |= set(valor) if isinstance(valor, tuple) else {valor}
+    return {s for s in secretos if s}
+
+
+def _tapar(texto: str, secretos, visibles=()) -> str:
+    """El texto sin ninguno de los secretos, como vengan o escapados. Se tapa
+    sólo el secreto entero, no un pedazo de palabra: un usuario «u» no rompe
+    «ConnectionRefusedError». Los `visibles` (los pedazos del host que no son
+    secretos) quedan: una clave «1» no borra «127.0.0.1»; una clave que los
+    contiene se tapa igual, porque se prueba primero lo más largo."""
     formas = set()
     for s in secretos:
-        for crudo in {s, unquote(s), unquote_plus(s)}:
+        for crudo in {s, unquote(s), unquote_plus(s), unicodedata.normalize("NFKC", s)}:
             formas |= {crudo, quote(crudo, safe=""), quote_plus(crudo)}
-    if host:
-        texto = texto.replace(host, "\0")
-    for forma in sorted(formas - {""}, key=len, reverse=True):
-        texto = texto.replace(forma, "***")
-    return texto.replace("\0", host) if host else texto
+    formas.discard("")
+    visibles = {v for v in visibles if v} - formas
+    if not formas:
+        return texto
+    opciones = []
+    for f in sorted(formas | visibles, key=len, reverse=True):
+        patron = re.escape(f)
+        if f not in visibles:
+            if re.match(r"\w", f):
+                patron = r"(?<!\w)" + patron
+            if re.search(r"\w\Z", f):
+                patron += r"(?!\w)"
+        opciones.append(patron)
+    return re.sub("|".join(opciones),
+                  lambda m: m.group(0) if m.group(0) in visibles else "***", texto)
+
+
+def _donde(url, secretos) -> str:
+    """Host, puerto y base de lo que se conectó, con los pedazos que son
+    secretos tapados."""
+    if url.get_backend_name() == "sqlite":
+        lugar = url.database or ""
+    else:
+        lugar = (url.host or "") + (f":{url.port}" if url.port else "") + (
+            f"/{url.database}" if url.database else "")
+    pedazos = re.split(f"({_SEPARADORES})", lugar)
+    return "".join("***" if p in secretos else p for p in pedazos)
 
 
 def clasificar(filas):
@@ -89,8 +118,9 @@ def clasificar(filas):
     return sorted(con_none), sorted(no_sirven)
 
 
-async def revisar(url: str, arreglar_none: bool) -> dict:
-    engine = create_async_engine(_url_async(url))
+async def revisar(url, arreglar_none: bool) -> dict:
+    # `url` es la de `make_url`: lo que conecta es lo mismo que se tapa.
+    engine = create_async_engine(url)
     try:
         async with engine.begin() as conn:
             filas = (await conn.execute(text(
@@ -130,15 +160,16 @@ def main(argv=None) -> int:
             and not os.path.exists(url.database)):
         p.error(f"la base sqlite no existe: {url.database}")
     try:
-        r = asyncio.run(revisar(args.base, args.arreglar_none))
+        r = asyncio.run(revisar(url, args.arreglar_none))
     except Exception as e:  # noqa: BLE001 - se informa sin traceback
-        donde, host, secretos = _donde_y_secretos(args.base)
-        if url.get_backend_name() == "sqlite":
-            donde = url.database or donde
-        if url.password:
-            secretos.add(url.password)
-        print(f"No se pudo revisar la base {donde}: "
-              + _sin_clave(f"{type(e).__name__}: {e}", secretos, host), file=sys.stderr)
+        try:
+            secretos = _secretos(args.base, url)
+            visibles = set(re.split(_SEPARADORES, url.host or "")) - secretos
+            donde = _tapar(_donde(url, secretos), secretos, visibles)
+            detalle = _tapar(f"{type(e).__name__}: {e}", secretos, visibles)
+        except Exception:  # noqa: BLE001 - tapar nunca muestra un traceback
+            donde, detalle = "(sin detalle)", type(e).__name__
+        print(f"No se pudo revisar la base {donde}: {detalle}", file=sys.stderr)
         return 2
     print(f"Con «None»: {len(r['con_none'])}")
     for cid in r["con_none"]:
