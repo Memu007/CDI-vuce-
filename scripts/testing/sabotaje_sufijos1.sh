@@ -228,7 +228,7 @@ caso "grupo_que_no_se_compara" "FAILED $T::test_un_grupo_que_no_se_puede_compara
 # Vuelta de SUFIJOS-1: lo que viaja es lo que muestra la celda.
 # 35. H1: la fila del arancel se usa aunque lo pintado no sea «ok»
 reemplazar $D "        if (!it || mostrado.estado !== 'ok') return null;" '        if (!it) return null;'
-caso "fila_sin_mirar_el_estado" "FAILED $T::test_mientras_consulta_no_viaja_nada_de_la_propuesta"
+caso "fila_sin_mirar_el_estado" "FAILED $T::test_mientras_consulta_otra_fila_la_que_no_cambio_tampoco_lleva_la_propuesta"
 
 # 36. H1: los avisos no dicen que el arancel no contestó
 reemplazar $D "        if (items.length && mostrado.estado !== 'ok') lista.push(notaDelArancel({ pieza: '-' }, 0));" ''
@@ -278,7 +278,7 @@ caso "operacion_vacia_sin_aviso" "FAILED $T::test_con_el_de_la_operacion_vacio_y
 # 47. lo que viaja sale de lo que llegó, no de lo que se pintó
 reemplazar $D '        const pedido = mostrado.arancel.pedidos[i];' '        const pedido = arancel.pedidos[i];'
 reemplazar $D '        return mostrado.arancel.filas[i] || null;' '        return arancel.filas[i] || null;'
-caso "viaja_lo_que_llego" "FAILED $T::test_lo_que_viaja_es_lo_que_muestra_la_celda"
+caso "viaja_lo_que_llego" "FAILED $T::test_la_propuesta_que_llego_y_no_se_pinto_no_viaja"
 
 if [ "$FALLAS" -ne 0 ]; then echo "FALLAN $FALLAS sabotajes"; exit 1; fi
 echo "OK: los $CASOS sabotajes dan rojo por la razón esperada"

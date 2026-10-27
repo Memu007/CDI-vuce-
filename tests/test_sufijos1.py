@@ -303,7 +303,8 @@ APP = ROOT / "proyecto_maria" / "static" / "v2" / "app_v2.js"
 # sufijo y sus notas se leen de lo que la pantalla pintó en despachanteItems.
 # El arancel falso propone AA con la marca y AI con el código para PLASTICO,
 # con la unidad estadística de `unidades`; `modo` lo hace fallar ('falla',
-# respuesta no ok) o tirar ('tira'); `frenar` lo deja colgado hasta soltar().
+# respuesta no ok) o tirar ('tira'); `frenar` lo deja colgado hasta soltar(),
+# y `frenarOtras`, los demás pedidos (los del cliente) hasta soltarOtras().
 _PAGINA = r"""
 global.window = {};
 const elementos = {};
@@ -344,11 +345,15 @@ global.document = {
 _ARNES = r"""
 const CDI = window.CDI; CDI.state = { operacion: { despachante: {} }, items: [] };
 const D = CDI.despachante;
-let pedidos = 0, modo = 'ok', frenar = false, colgados = [];
+let pedidos = 0, modo = 'ok', frenar = false, colgados = [], frenarOtras = false, otras = [];
 const unidades = { 'PLASTICO': '01' };
 function soltar() { const c = colgados; colgados = []; c.forEach(r => r()); }
+function soltarOtras() { const c = otras; otras = []; c.forEach(r => r()); }
 CDI.api = async (ruta, op) => {
-  if (ruta !== '/api/sufijos/propuesta') return { ok: true, json: async () => ({ operaciones: [] }) };
+  if (ruta !== '/api/sufijos/propuesta') {
+    if (frenarOtras) await new Promise(r => otras.push(r));
+    return { ok: true, json: async () => ({ operaciones: [] }) };
+  }
   pedidos += 1;
   const b = JSON.parse(op.body);
   if (frenar) await new Promise(r => colgados.push(r));
@@ -530,6 +535,39 @@ def test_mientras_consulta_no_viaja_nada_de_la_propuesta():
         "soltar(); await p; salida.llego = [viaja(), celda(0).value, D.avisos()];")
     assert salida["consultando"] == [[["", None]], "", CONSULTANDO, [CONSULTANDO]]
     assert salida["llego"] == [[["PC02-AA(BETA)-AI(K7)-", "01"]], "PC02-AA(BETA)-AI(K7)-", []]
+
+
+def test_mientras_consulta_otra_fila_la_que_no_cambio_tampoco_lleva_la_propuesta():
+    # Cambia el segundo producto: mientras se consulta, la celda del primero
+    # se pinta sin propuesta y dice que consulta; lo que viaja es eso.
+    salida = _pantalla(
+        "operacion('PC04-');" + _items(_producto('KAPA', 'M1'), _producto('LAMBDA', 'M2'))
+        + "await D.render(); salida.antes = viaja()[0][0];"
+        "frenar = true; CDI.state.items[1].codigo_parte = 'M3'; const p = D.render(); await tick();"
+        "salida.consultando = [viaja()[0], celda(0).value, nota(0)];"
+        "soltar(); await p; salida.llego = viaja().map(v => v[0]);")
+    assert salida["antes"] == "PC04-AA(KAPA)-AI(M1)-"
+    assert salida["consultando"] == [["", None], "", CONSULTANDO]
+    assert salida["llego"] == ["PC04-AA(KAPA)-AI(M1)-", "PC04-AA(LAMBDA)-AI(M3)-"]
+
+
+def test_la_propuesta_que_llego_y_no_se_pinto_no_viaja():
+    # La propuesta del cliente todavía no llegó (la pantalla no se repinta
+    # sola). Se pintó la de M1; el producto pasa a M2 y vuelve, y con M2 de
+    # nuevo llega la de un pedido viejo. Hasta pintarla no viaja: ni la de
+    # M1 (ya no es ese producto) ni la de M2.
+    salida = _pantalla(
+        "frenarOtras = true; operacion('PC05-');" + _items(_producto('SIGMA', 'M1'))
+        + "D.render(); for (let k = 0; k < 5; k++) await tick();"
+        "D.render(); await tick(); salida.pintado = viaja()[0];"
+        "frenar = true; CDI.state.items[0].codigo_parte = 'M2'; D.render(); await tick();"
+        "CDI.state.items[0].codigo_parte = 'M1'; D.render(); await tick();"
+        "CDI.state.items[0].codigo_parte = 'M2'; soltar(); for (let k = 0; k < 5; k++) await tick();"
+        "salida.sin_pintar = [pedidos, viaja()[0]];"
+        "frenarOtras = false; soltarOtras(); await D.render(); salida.repintado = [viaja()[0], celda(0).value];")
+    assert salida["pintado"] == ["PC05-AA(SIGMA)-AI(M1)-", "01"]
+    assert salida["sin_pintar"] == [2, ["", None]]
+    assert salida["repintado"] == [["PC05-AA(SIGMA)-AI(M2)-", "01"], "PC05-AA(SIGMA)-AI(M2)-"]
 
 
 def test_lo_que_viaja_es_lo_que_muestra_la_celda():
