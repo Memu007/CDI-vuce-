@@ -2,231 +2,193 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## SUFIJOS-1: entregada a revisión (2026-10-27)
+## SUFIJOS-1, vuelta de la devolución: entregada a revisión (2026-10-27)
 
-**Resultado:** va en `97cd2fa`, con D22 (a): la fuente es el arancel de ARCA
-del 07/10/2026, en una tabla local. No hay red, no hay terceros y no queda
-lugar para VUCE.
+**Resultado:** lo probado es `45a3ea1`; el commit de este informe sólo
+toca `PARA-PM-2.md`. Implementé la regla «al generar, lo que va
+al TXT por producto es lo que muestra su celda», con H1 a H5 y D23 (c).
+Cada uno tiene su caso y su sabotaje. El TXT sin sufijo propio sale idéntico
+byte a byte al de `adfe707` en siete casos; el octavo da el mismo error en
+las dos bases.
 
-**Lo que decidís vos:**
-- **D23:** no frena la entrega. Recomiendo (c).
-- Los supuestos reversibles van abajo.
-- D20, D21 y D22 ya están contestadas; no queda ninguna D mía abierta.
+**Lo que decidís vos: nada para decidir.** Los supuestos reversibles van
+abajo. D23 ya está contestada y no abro ninguna D nueva.
+
+**Ojo con tu diff desde `97cd2fa`:** también trae SEPARADORES-1c
+(`4f2045f`, `d5a3f58`, `9663ac6`). Esa pieza todavía no la entregué; la
+informo apenas cierre esta.
+- **Lo de esta vuelta:** `despachante.js`, `finalize.js`, `CHANGELOG.md` y
+  los tres archivos de prueba de SUFIJOS-1.
+- **Lo de SEPARADORES-1c:** `maria_generator.py`, `controles_maria.py`,
+  `pdf_extractor.py`, `montos_ar.js`, `test_separadores1b.py`,
+  `test_separadores1c.py` y `sabotaje_separadores1c.sh`.
+- La suite de abajo corre sobre `45a3ea1`, así que incluye las dos.
 
 | Pieza | SHA |
 |---|---|
-| Base: tu rama con D22 | `f82bdda` |
-| Producto: tabla de ARCA, propuesta por producto, sufijo propio y grupo | `fe95a49` |
-| Casos y pantalla; casos viejos ajustados a las reglas nuevas | `eec344f` |
-| Producto: la unidad estadística general entra en el teléfono | `91e7540` |
-| Pantalla, sabotajes y conteo de `sabotaje_valor1c` | `03bc6ed`, `b6b78b9`, `01d27a5` |
-| Merge de tu rama | `b2d5588` |
-| Producto: hallazgos de la ronda 1 (combinar, producto borrado, letra de control) | `91a7d68` |
-| Casos, pantalla y sabotajes de la ronda 1 | `32f3c27`, `0b1c08e` |
-| Merge de tu rama (`adfe707`) | `af93dae` |
-| Producto: hallazgos de la ronda 2 (tope, celda de grupo, NCM de 8) | `e7f018f` |
-| Casos y sabotajes de la ronda 2 | `f86c508` |
-| Producto: un `grupo_id` que no se compara no rompe los avisos | `366cecc` |
-| Caso y sabotaje 34 | `97cd2fa` |
-| **SHA probado:** suite, compileall, sabotajes, smoke, pantalla y e2e | **`97cd2fa`** |
+| Base de la vuelta (lo que revisaste) | `97cd2fa` |
+| SEPARADORES-1c, sin entregar (producto, casos, sabotajes) | `4f2045f`, `d5a3f58`, `9663ac6` |
+| Producto: lo que viaja es lo que muestra la celda (H1–H5, D23) | `252f04d` |
+| Casos, pantalla y sabotajes de la vuelta | `b5d71ea` |
+| Merge de tu rama (`842d68a`, sólo `NOW.md`) | `78648f3` |
+| Casos: los sabotajes 35 y 47 apuntan a casos que los distinguen | `45a3ea1` |
+| **SHA probado:** suite, compileall, casos y sabotajes | **`45a3ea1`** |
 
-## Decisiones
+## Qué cambió
 
-**D23. Si todos los productos tienen su propio sufijo, el sufijo de la
-operación deja de ser obligatorio.**
+Los archivos de producto que toqué son
+`proyecto_maria/static/v2/screens/despachante.js` y
+`proyecto_maria/static/v2/screens/finalize.js`. El generador y el servidor
+no cambiaron en esta vuelta.
 
-- **Qué pasa.** Antes de esta pieza, el campo «Sufijo de valor SBT» de la
-  operación era obligatorio, salvo cuando todos los productos tenían
-  sub-ítems con sufijo (SUBITEMS-1).
-- Ahora también deja generar si cada producto entero tiene un sufijo,
-  aunque sea el que propuso el sistema. Con el campo vacío, cada producto
-  sale sólo con lo que pide el arancel (AA, AB, AI). Un código que el
-  arancel no pide y la operación sí, por ejemplo uno de condición de venta,
-  no sale y nadie lo dice.
-- **Lo que sigue avisando el servidor:** lo que la posición pide y falta.
-  Eso no se pierde.
-- **Dónde está:** `finalize.js`, `todosConSufijoPropio`. Salió en la ronda 2.
+- **La regla.** `sufijoDe` y `unidadesDe` ahora leen de lo que la celda
+  muestra, no de `it.sufijo` ni de una propuesta pedida al generar.
+  - Hay una sola función, `filaDe`, que arma lo que muestra cada fila.
+  - La celda, los avisos y el pedido salen de ahí.
+  - «Generar» ya no vuelve a pedir la propuesta: se quitó `listo()` en
+    `onGenerate`.
+- **H1.** Si el arancel no contestó, está consultando o hay más de 500
+  productos, no viaja nada de la propuesta: ni sufijo ni unidad
+  estadística.
+  - La celda lo dice en su nota.
+  - Los avisos lo dicen con «Ítem N: …».
+  - Si el arancel se cae al entrar, el pedido va con `[null, null]` por
+    producto.
+- **H2.** La celda escrita guarda el sufijo de la operación de ese momento
+  (`sufijo_op`). Si después cambia el de la operación, esa fila avisa en la
+  celda y en los avisos. Al aceptarlo (volver a tocar la celda), el aviso
+  se va.
+- **H3 y H4.** Un producto en un grupo, o con sub-ítems, no lleva sufijo
+  propio aunque tenga `it.sufijo` guardado. El grupo sale con el de la
+  operación y los sub-ítems con el suyo.
+- **H5.** Lo escrito en el sufijo de la operación gana.
+  - La propuesta sólo agrega los códigos que faltan.
+  - Si propone otro valor para un código ya escrito, no lo pisa y la fila
+    lo avisa.
+  - Ejemplo: con «AA(PROPIA SA)-CA00-» sale `AA(PROPIA SA)`, y la fila dice
+    que el arancel proponía otro valor.
+- **D23 (c).** Con el de la operación vacío y todos los productos con
+  sufijo propio, aparece este aviso junto al botón, y no frena: «El sufijo
+  de la operación está vacío: cada producto sale sólo con lo que pide el
+  arancel de ARCA».
 
-Opciones:
-- **(a) Dejarlo así.** Si falta un código que el arancel no pide, se
-  entera el MARIA al cargar el TXT.
-- **(b) Volver a exigir el campo**, salvo que todos los sufijos los haya
-  escrito una persona. Contra: quien no tiene nada que agregar a nivel
-  operación tiene que escribir algo para pasar.
-- **(c) No frenar, pero avisar** junto al botón: «El sufijo de la operación
-  está vacío: cada producto sale sólo con lo que pide el arancel de ARCA».
+## Dos sabotajes que no distinguían
 
-**Recomiendo (c).**
-- No inventa un código.
-- No traba a quien no tiene nada que agregar.
-- Dice lo que hoy pasa en silencio.
-- Es chica, pero es una pieza aparte: no la hice porque no estaba en la
-  tarea.
+Con los casos de `b5d71ea`, el script dio 45 en rojo y 2 en verde: los
+mutantes 35 y 47 daban lo mismo que el producto en esos casos. En
+`45a3ea1` agregué un caso para cada uno; los dos casos fallan sólo con su
+sabotaje.
 
-## Lo que se hizo
+- **35** (`filaDe` sin mirar si lo pintado está «ok»): el caso de antes
+  cambiaba el único producto, y la propuesta vieja ya no coincidía igual.
+  El nuevo tiene dos filas y cambia sólo la segunda. Mientras consulta, la
+  primera tampoco lleva la propuesta.
+- **47** (lo que viaja sale de lo que llegó y no de lo pintado): sólo se
+  distingue si la propuesta del arancel llega y la pantalla todavía no la
+  pintó, con lo pintado en «ok». Eso pasa sólo si los productos cambian sin
+  repintar mientras la propuesta del cliente no llegó. El caso arma eso a
+  mano: el arnés deja colgado el pedido del cliente (`frenarOtras`). Es un
+  camino angosto; si te parece que no vale su caso, se retiran el caso y el
+  sabotaje.
 
-- **Tabla local** (`proyecto_maria/data/sufijos_arca.json.gz`), armada
-  desde el ZIP del repositorio con `scripts/import_arancel_sufijos.py
-  --archive docs/pm/datos/arancel_ARCA_07102026.zip`.
-  - El script frena si el SHA-256 no es el de `LEEME.md` y no usa la red.
-  - La tabla tiene 12 891 niveles y 33 243 unidades estadísticas.
-  - Una prueba comprueba que la tabla del repositorio es la misma que sale
-    del ZIP.
-  - Es un script aparte del de CATALOGO-NCM-1: aquel reescribe el catálogo
-    de NCM y sus bajas, y éste sólo suma la tabla de sufijos.
-- **En «Lo que decide el despachante», por producto:**
-  - Propone marca AA, modelo AB y código AI con lo que leyó la IA, y dice
-    qué falta.
-  - La fecha viaja con el dato: «arancel de ARCA del 07/10/2026».
-  - **Se suma al sufijo de la operación:** AA, AB y AI reemplazan a los
-    mismos códigos; CA00 y los demás quedan.
-  - Si la suma pasa de 120 caracteres, no se propone nada y queda para el
-    despachante.
-  - Lo que escribe la persona va tal cual.
-- **Si la posición no está:** queda vacía y se avisa.
-  - Con la letra de control equivocada, se dice cuál corresponde.
-  - Una NCM de 8 dígitos se avisa como posición incompleta.
-- **El TXT:**
-  - Un producto entero sale con su propio sufijo en `CSBTSVL`; antes salía
-    el de la operación.
-  - Un grupo exige el mismo sufijo en todos sus ítems. El «-» final no
-    cuenta, y la pantalla no tiene celda por producto dentro de un grupo.
-  - Si nadie eligió otra unidad estadística, `CARTUNTEST` sale `01` cuando
-    la posición lo pide. Con sub-ítems no: sólo si la factura viene en
-    kilos.
-  - Se avisa el AI repetido entre productos, también en los sub-ítems.
-- **El caso del 24/10, en sintético:** el capítulo 39 pide AA y AI, y
-  `3920.10.10.100F` lleva `01`. Las pruebas son
-  `test_el_capitulo_39_pide_marca_y_codigo_y_la_unidad_es_kilos` y
-  `test_la_estadistica_de_la_tabla_va_al_pedido_si_nadie_eligio_otra`.
+## Puertas sobre `45a3ea1`
 
-## Puertas, sobre `97cd2fa`
+| Puerta | Resultado (salida exacta) | Log |
+|---|---|---|
+| `tests/test_sufijos1.py` | `62 passed, 3 warnings in 7.37s` | — |
+| `sabotaje_sufijos1.sh 45a3ea1` (47 sabotajes) | `OK: los 47 sabotajes dan rojo por la razón esperada`, `salida 0` | `sab_suf1b.log` |
+| Suite completa, base limpia, sola | `13 failed, 3077 passed, 302 skipped, 2 xfailed, 94 warnings in 452.55s (0:07:32)` | `suite-45a3ea1.log` |
+| `compileall -q proyecto_maria` | rc 0 | — |
+| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` | `smoke252.log` |
+| `pantalla_sufijos1.js` | `PANTALLA SUFIJOS-1 OK`; ancho a 390 px: 597, igual que la base | — |
+| `pantalla_maria7.js` | `PANTALLA MARIA-7 OK` | `pm7.log` |
+| `e2e_maria.js` | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.` | `e2e78.log` |
+| TXT sin sufijo propio, `adfe707` contra `252f04d` | `cmp` sin diferencias en 7 casos; `op_vacio` da el mismo error en las dos | — |
 
-| Puerta | Salida exacta |
-|---|---|
-| Suite completa (worktree limpio en `97cd2fa`) | `12 failed, 2964 passed, 302 skipped, 2 xfailed, 96 warnings in 363.63s (0:06:03)` |
-| `tests/test_sufijos1.py` | `50 passed, 3 warnings in 7.15s` |
-| `python -m compileall -q proyecto_maria` | sin salida, `rc=0` |
-| `scripts/testing/sabotaje_sufijos1.sh 97cd2fa <venv>` | `OK: los 34 sabotajes dan rojo por la razón esperada` |
-| `scripts/testing/sabotaje_valor1c.sh 97cd2fa <venv>` | `OK: los 25 sabotajes dan rojo por la razón esperada` |
-| `smoke_friccion.sh` (app en `97cd2fa`) | `==> OK · telemetría + alias session/state + by-cuit protegido` |
-| `pantalla_sufijos1.js` | `PANTALLA SUFIJOS-1 OK` |
-| `e2e_maria.sh` | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.` |
+Notas sobre dónde corrió cada puerta:
+- **Pantalla, smoke y e2e.** Corrieron con la app levantada en `252f04d`.
+  Su producto es idéntico al de `45a3ea1`: después sólo entraron `NOW.md`
+  y casos.
+- **TXT.** Los casos de la comparación de bytes son: lona, cuatro lonas,
+  plástico y lona, grupo, sub-ítems, sufijo vacío y `None`, otro sufijo de
+  la operación, y operación sin sufijo.
+- **Pantalla nueva en el SHA viejo.** `pantalla_sufijos1.js` nueva no corre
+  contra `97cd2fa`, porque ahí no existen la nota ni `avisos()`. Lo que
+  distingue el defecto lo cubren los casos de pytest y los sabotajes.
 
-## Rojos
+**Rojos de la suite:** los 12 conocidos (`test_guardar1` y los 11 del
+tope del plan) y uno nuevo que no es de esta vuelta:
 
-Los 12 son los conocidos que dice `PARA-DEV-2.md` («Al traer mi rama»): el
-de `test_guardar1` y los 11 del tope de 15 operaciones. No hay ninguno nuevo.
+- `tests/test_excel2.py::test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_a_una_subida_normal`
+  da `AssertionError: la subida normal dio 400 a los 30.0 s: {"detail":"No pudimos abrir el Excel: tardó demasiado. Probá con otro archivo."}`.
+- **Falla igual en tu `842d68a`.** La corrí sola en un worktree limpio de
+  tu rama, con la máquina quieta (load 0,90): `normal: 400 en 30.2 s`,
+  `1 failed`.
+- **Mi diff no toca nada de Excel.** No cambian la validación ni la
+  prueba (`git diff 842d68a..45a3ea1 -- tests/test_excel2.py proyecto_maria/security` vacío).
+- **Mi lectura:** es una prueba de tiempo. Ocho libros pesados entran al
+  validador delante de la subida normal, que tiene un tope de 30 s, y en
+  este contenedor de 4 núcleos no llega. En tu suite sobre `97cd2fa` no
+  apareció. No la persigo porque está fuera de la tarea; si en tu máquina
+  también falla, es de la cola de Excel.
 
+**No se corrió:**
+- **Subagentes adversariales y `/code-review`:** no hay cuota hasta el
+  28/10 a las 18:00 UTC. En su lugar hice una autorrevisión del diff
+  completo desde `97cd2fa`. La revisión independiente queda en vos.
+- **`ataque_aislamiento.sh`:** esta vuelta no toca datos, sesión ni
+  permisos.
+
+## Comandos para reproducir
+
+```bash
+git fetch origin claude/dev-maria && git checkout 45a3ea1
+export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
+       VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
+python -m pytest -q --no-cov -p no:randomly tests/test_sufijos1.py   # 62 passed
+scripts/testing/sabotaje_sufijos1.sh 45a3ea1 <venv>                    # «OK: los 47 sabotajes dan rojo…»
+git diff 97cd2fa..45a3ea1 -- proyecto_maria/static/v2/screens/        # lo de producto de esta vuelta
+BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_sufijos1.js   # PANTALLA SUFIJOS-1 OK
 ```
-FAILED tests/test_clientes_plan02.py::test_export_csv_returns_csv_with_ops
-FAILED tests/test_clientes_plan04.py::test_catalogo_productos_endpoints
-FAILED tests/test_guardar1.py::test_datos_largos_de_la_operacion_no_impiden_guardarla
-FAILED tests/test_maria4_despachante.py::test_lo_elegido_se_guarda_con_la_operacion_y_vuelve_en_los_listados
-FAILED tests/test_maria4_despachante.py::test_los_listados_recortan_lo_guardado
-FAILED tests/test_op_code_and_fill_if_empty.py::test_fill_if_empty_populates_client_profile
-FAILED tests/test_op_code_and_fill_if_empty.py::test_fill_if_empty_does_not_overwrite
-FAILED tests/test_operations_manual.py::test_manual_operation_null_client_id
-FAILED tests/test_prelaunch_block1.py::TestOperacionManual::test_crear_operacion_manual_ok
-FAILED tests/test_prelaunch_block1.py::TestOperacionManual::test_crear_operacion_sin_client_id_400
-FAILED tests/test_prelaunch_block1.py::TestOperacionManual::test_crear_operacion_null_client_id_400
-FAILED tests/test_prelaunch_block1.py::TestOperacionManual::test_crear_operacion_sin_items_400
-```
-
-El rojo de borde de `test_excel2` («ocho_libros») que informé en
-SEPARADORES-1b no salió en esta corrida. Una corrida no alcanza para decir
-que se fue.
-
-## Hallazgos de la autorrevisión
-
-**Revisores:**
-- **Ronda 1, sobre `f82bdda..b2d5588`:** `/code-review high`, adversario
-  Opus alto y adversario Sonnet alto.
-- **Ronda 2, sobre `f82bdda..0b1c08e`:** `/code-review high` y adversario
-  Sonnet alto.
-- **`/security-review` no corre acá:** falla porque no hay `origin/HEAD`.
-  Lo reemplazó el adversario Sonnet alto, que miró la ruta nueva
-  `/api/sufijos/propuesta`: pide sesión, sanea el texto y recorta lo
-  largo.
-
-| # | Hallazgo | Ronda | Qué hice |
-|---|---|---|---|
-| 1 | La propuesta pisaba lo que se escribió en la operación | 1 | Arreglado (`91a7d68`); rojo antes |
-| 2 | Al borrar un producto, la propuesta pasaba al que quedaba en su lugar | 1 | Arreglado (`91a7d68`) |
-| 3 | Con la letra de control equivocada decía «no está» | 1 | Arreglado (`91a7d68`): dice cuál corresponde |
-| 4 | Con sub-ítems, kilos iba solo aunque la factura no viniera en kilos | 1 | Arreglado (`91a7d68`) |
-| 5 | El «-» final hacía distintos los sufijos de un grupo; un código con el valor vacío no contaba como faltante | 1 | Arreglado (`91a7d68`) |
-| 6 | Una tabla rota rompía la carga; el texto del pedido no tenía límite ni saneo | 1 | Arreglado (`91a7d68`) |
-| 7 | Si la suma pasaba de 120 caracteres se perdían los códigos de la operación | 2 | Arreglado (`e7f018f`) |
-| 8 | Un grupo tenía celda de sufijo por producto | 2 | Arreglado (`e7f018f`) |
-| 9 | Una NCM de 8 dígitos se decía fuera del arancel | 2 | Arreglado (`e7f018f`) |
-| 10 | Un `grupo_id` lista daba 500 en los avisos | 2 | Arreglado (`366cecc`) |
-| 11 | Todos con sufijo propio, el TXT sale sin el de la operación | 2 | **D23** |
-| 12 | Choque de PB01 con PB02 | 2 | Falso: la gramática exige dos letras y (valor), o dos letras y dos cifras |
-
-No anoté qué revisor encontró cada uno; la ronda sí. Cada arreglo tiene su caso, que dio rojo antes del arreglo, y su sabotaje en
-`sabotaje_sufijos1.sh`.
-
-## Riesgos (no arreglados; severidad)
-
-- **Media:**
-  - Si el arancel tarda más de 10 s en contestar a «listo», la unidad
-    estadística no se completa en kilos. Va lo que eligió la persona o DCL,
-    como antes de la pieza.
-  - Un código repetido dentro del sufijo de la operación se reemplaza en
-    cada aparición, así que sale duplicado.
-- **Baja:**
-  - El tope de 120 en la pantalla mide el texto crudo; el servidor mide
-    después de NFKD (las ligaduras se expanden). El servidor lo rechaza con
-    un mensaje claro.
-  - Un `try/except` en el bucle de sub-ítems, si salta, se saltea los
-    avisos que siguen.
-  - Al repintar, la celda en la que se está escribiendo pierde el foco. El
-    patrón es de antes de esta pieza.
-  - `lru_cache` guarda `{}` si la primera lectura de la tabla falla, hasta
-    que se reinicia el proceso.
-  - La ruta es async y hace trabajo de CPU.
-  - No hay límite al tamaño del pedido.
-  - `escrita(posicion)` no tiene tope.
-  - Un AI heredado de la operación dispara «se repite».
-  - El «Falta» de la nota se calcula sólo sobre la propuesta.
 
 ## Supuestos reversibles
 
-- **Cambio de contrato:** el sufijo propio de un producto entero reemplaza
-  al de la operación en `CSBTSVL`. Antes salía siempre el de la operación.
-- Si nadie eligió otra unidad estadística, va la de la tabla (`01`).
-- Un grupo no tiene celda por producto: va un sufijo para todo el grupo.
-- Arriba de 120 caracteres no se propone nada; queda para el despachante.
+- **H2 y H5 también en los avisos.** Además de avisar en la fila, aparecen
+  en la lista de avisos junto al botón, como H1. La devolución pedía la
+  fila.
+- **Grupos.** Un grupo sale siempre con el sufijo de la operación más lo
+  que proponga el arancel. No le agregué una celda propia.
+- **`sufijo_op`.** Es un campo nuevo por producto en el estado de la
+  pantalla. No va al servidor ni al TXT.
+- **Texto de D23.** Es el que propuse. Si una persona escribió el sufijo
+  de algún producto, decir «sale sólo con lo que pide el arancel» queda
+  impreciso.
 
-## Archivos de producto que toqué
+## Riesgos
 
-- `proyecto_maria/core/sufijos_arca.py` (nuevo)
-- `proyecto_maria/data/sufijos_arca.json.gz` (nuevo)
-- `scripts/import_arancel_sufijos.py` (nuevo)
-- `proyecto_maria/core/maria_generator.py`
-- `proyecto_maria/main.py`
-- `proyecto_maria/static/v2/screens/despachante.js`
-- `proyecto_maria/static/v2/screens/finalize.js`
-- `proyecto_maria/templates/dashboard_v2.html`
-- `CHANGELOG.md`
+- **H2 sólo con lo nuevo.** Avisa sólo cuando quedó guardado `sufijo_op`.
+  Una celda escrita antes de esta versión no avisa si cambia el de la
+  operación. Severidad: baja, porque el estado es de la sesión de la
+  pantalla.
+- **Aceptar H2.** Hoy se acepta volviendo a tocar la celda; no hay un botón
+  «aceptar».
+- **Reintento del arancel.** Si el arancel no contestó, sólo se reintenta
+  al volver a entrar a la pantalla. Mientras tanto no viaja nada de la
+  propuesta, que es lo pedido, pero la persona tiene que salir y volver.
+- **Avisos del botón.** Se refrescan después de pintar la pantalla. Entre
+  medio, el botón puede mostrar los avisos anteriores por un instante. El
+  pedido no se ve afectado, porque sale de lo pintado.
+- **Aviso de H5 de más.** Si `limpiar_sufijo` deja un valor apenas distinto
+  del que propone el arancel (espacios, signos), H5 puede avisar de más.
+  Nunca pisa lo escrito.
+- **Anotado, sin arreglar,** como pediste:
+  - `combinar` con códigos repetidos o «AA00»;
+  - el «-» final que siempre se agrega;
+  - el BOM, que separa en JS y no en Python.
 
-## Para reproducir
+**Lo que sigue:** cierro SEPARADORES-1c, que ya está en la rama, con su
+suite, su smoke y su informe. Ahí van a ir D24 y D25.
 
-```bash
-# 1) casos de la pieza → «50 passed»
-PYTHONPATH=. python -m pytest -q --no-cov tests/test_sufijos1.py
-# 2) sabotajes → «OK: los 34 sabotajes dan rojo por la razón esperada»
-scripts/testing/sabotaje_sufijos1.sh 97cd2fa <ruta del venv>
-# 3) con la app levantada en 97cd2fa → «PANTALLA SUFIJOS-1 OK»
-BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_sufijos1.js
-# 4) la tabla sale igual del ZIP (lo prueba también el caso 1)
-python scripts/import_arancel_sufijos.py --archive docs/pm/datos/arancel_ARCA_07102026.zip
-git status --short proyecto_maria/data   # sin cambios
-```
+Última vuelta: Tue Oct 27 19:27:54 UTC 2026
 
-**Lo que sigue:** SEPARADORES-1c (D21 b).
-
-Última vuelta: Tue Oct 27 17:50:03 UTC 2026
-
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. Entregada SUFIJOS-1 en 97cd2fa (suite con los 12 rojos conocidos, compileall, 34 sabotajes sufijos1, 25 de valor1c, smoke, pantalla y e2e verdes sobre 97cd2fa); D23 abierta en PARA-PM-2.md (sufijo de la operación vacío con todos los productos con propio; recomiendo c, avisar sin frenar), no frena. Sigo con SEPARADORES-1c (D21 b, en PARA-DEV-2.md). Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. Entregada la vuelta de SUFIJOS-1, probada en 45a3ea1 (62 casos, 47 sabotajes, suite, compileall, smoke, pantallas, e2e y TXT idéntico a adfe707); nada para decidir. Sigo con SEPARADORES-1c (D21 b, en PARA-DEV-2.md; producto en 4f2045f/d5a3f58/9663ac6, 10 sabotajes en rojo; falta suite, smoke e informe con D24 miles en _numero_factura y D25 leer con más de 2 decimales). Sin cuota de subagentes ni /code-review hasta 28/10 18:00 UTC. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
