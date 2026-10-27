@@ -436,20 +436,31 @@ sabotaje $M "3f «Freights» con más texto no es sólo un cargo" \
   $'_PALABRAS_DE_CARGO = {\n    "freight", "freights",' $'_PALABRAS_DE_CARGO = {\n    "freight",' \
   "${B}un_cargo_en_plural_se_lee_como_en_singular[Freights-Freight-origen_rotulo_en_descripcion]"
 sabotaje $M "3f D22 un cargo con su propio origen entra sin aviso" \
-  '            if (not no_es_mercaderia and not dudosa and descripcion_propia' \
-  '            if (False and not no_es_mercaderia and not dudosa and descripcion_propia' \
+  '            if (not no_es_mercaderia and not dudosa and not pieza and descripcion_propia' \
+  '            if (False and not no_es_mercaderia and not dudosa and not pieza and descripcion_propia' \
   "${B}una_fila_con_origen_propio_que_es_un_cargo_entra_con_el_aviso_de_su_fila[Insurance-xlsx]"
 sabotaje $M "3f D22 «Gastos administrativos» con su origen entra sin aviso" \
   $'                    and (_FILA_QUE_NO_ES_MERCADERIA_RE.match(descripcion_propia)\n                         or _dice_solo_un_cargo(descripcion_propia))):' \
   '                    and _dice_solo_un_cargo(descripcion_propia)):' \
   "${B}una_fila_con_origen_propio_que_es_un_cargo_entra_con_el_aviso_de_su_fila[Gastos administrativos-xlsx]"
-DICE='    return any(p in _PALABRAS_QUE_SON_UN_CARGO for p in _palabras_de_cargo(texto) or ())'
+DICE='    return any(p in _PALABRAS_QUE_SON_UN_CARGO for p in palabras or ())'
 sabotaje $M "3f H4 un cargo que no viene primero entra sin aviso" \
   "$DICE" '    return False' \
   "${B}un_cargo_que_no_viene_primero_entra_con_el_aviso_de_su_fila[Ocean freight-origen_rotulo_en_descripcion]"
 sabotaje $M "3f H4 de más: «Container» o «A2» se avisan como cargo" \
-  "$DICE" '    return _palabras_de_cargo(texto) is not None' \
+  "$DICE" '    return palabras is not None' \
   "${B}un_producto_con_una_palabra_de_cargo_no_lleva_el_aviso[Container-origen_rotulo_en_descripcion]"
+sabotaje $M "3f H4 «Insurance container» con el origen combinado sale del FOB" \
+  'def _palabras_de_cargo(texto: str, de_cargo=_PALABRAS_DE_CARGO)' \
+  'def _palabras_de_cargo(texto: str, de_cargo=_PALABRAS_DE_CARGO_QUE_NO_VIENE_PRIMERO)' \
+  "${B}un_cargo_que_dice_algo_mas_con_el_origen_combinado_no_sale_del_fob[Insurance container]"
+sabotaje $M "3f D22 una fila con su NCM lleva el aviso de cargo" \
+  'not dudosa and not pieza and descripcion_propia' 'not dudosa and descripcion_propia' \
+  "${B}una_fila_con_su_ncm_no_lleva_el_aviso_de_cargo[descripcion-xlsx]"
+sabotaje $M "3f H1 un cargo en Item con su NCM lleva el aviso" \
+  $'not dudosa and not pieza\n                    and (_es_solo_un_cargo(rotulo_aparte)' \
+  $'not dudosa\n                    and (_es_solo_un_cargo(rotulo_aparte)' \
+  "${B}una_fila_con_su_ncm_no_lleva_el_aviso_de_cargo[en_item-xlsx]"
 APARTE='                    and (_es_solo_un_cargo(rotulo_aparte) or _dice_solo_un_cargo(rotulo_aparte))):'
 sabotaje $M "3f H1 «Freight» en Item con la descripción escrita entra sin aviso" \
   "$APARTE" '                    and False):' \
