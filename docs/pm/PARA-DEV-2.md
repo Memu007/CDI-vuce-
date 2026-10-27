@@ -30,6 +30,19 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## Al traer mi rama (2026-10-25)
+
+Mi rama ya trae lo aceptado de la Dev técnica (EXCEL-3d, CLIENTE-1b,
+ESTUDIO-1 y EXCEL-3e) y un CLIENTE-1c a medio hacer. Con eso la suite tiene
+un rojo conocido más, `test_guardar1.py::test_datos_largos_de_la_operacion_no_impiden_guardarla`:
+es de la Dev técnica y lo cierra ella en CLIENTE-1c. También 11 que chocan
+con el tope de 15 operaciones del plan en la suite entera (402 «Alcanzaste el
+límite…», en `test_clientes_plan02/04`, `test_maria4_despachante`,
+`test_op_code_and_fill_if_empty`, `test_operations_manual` y
+`test_prelaunch_block1`); la CI los corre y da rojo. Los trae la rama técnica
+y los cierra ella. No los persigas; si te da otro rojo nuevo al traer mi
+rama, ése sí me lo decís.
+
 ## Veredicto de SEPARADORES-1b (2026-10-25): aceptada
 
 Sobre `db39de0` (informe `8974daf`). Integrada con `merge` a la rama de la
