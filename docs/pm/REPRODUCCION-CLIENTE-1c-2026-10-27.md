@@ -70,3 +70,69 @@ Claves inventadas, puerto 1 cerrado en local. Todas rc=2.
 Sin `uvicorn` ni `pytest` de la revisión andando al terminar. El sabotaje
 borra su worktree. Los ayudantes del revisor quedaron en `/tmp/cdi-pm/adv`,
 fuera del repositorio.
+
+---
+
+# Vuelta de CLIENTE-1c — `3aba9c2` (2026-10-27)
+
+Producto `7e43604`, `eda3755`, `2a21835`; pruebas `d0dcf04`, `f1cb25e`,
+`009ad58`, `8359e53`; informe `807d562`; base de revisión `4452b22`. Entra
+junto con ESTUDIO-1b (`REPRODUCCION-ESTUDIO-1b-2026-10-27.md`).
+
+**Veredicto:** aceptada, con un punto que se suma a EXCEL-3f (H1-bis).
+
+## Lo que corrió la PM
+
+| Qué | Resultado |
+|---|---|
+| Suite completa sobre `3aba9c2`, worktree limpio | `3229 passed, 102 skipped, 2 xfailed, 93 warnings in 364.32s`, rc=0 |
+| `sabotajes/cliente1c.sh 3aba9c2` | 37 de 37 en rojo («sabotajes sin rojo: 0») |
+| `sabotajes/cliente1b.sh 3aba9c2` | 16 de 16 en rojo («sabotajes sin rojo: 0») |
+| `git merge-base --is-ancestor 2ff3262 3aba9c2` | sí: entran los arreglos de los 12 rojos de la CI |
+
+El revisor adversarial **no corrió** (presupuesto semanal). En su lugar, la
+PM hizo el fuzz de abajo.
+
+## La clave de `--base` (H1 de la devolución)
+
+Ahora el dónde y los secretos salen de `make_url`, que es lo que conecta.
+Fuzz de la PM: 4000 claves por forma, armadas como
+`QZXW<sep>KJVB<sep>NMPL`, con separadores ASCII, de ancho completo,
+escapados con `%`, espacio y tab. Se mira qué queda sin tapar cuando el
+error repite la clave de distintas maneras:
+
+| Lo que repite el error | Claves que se ven |
+|---|---|
+| la URL tal como se escribió | 0 de 4000 |
+| la clave (cruda, `unquote`, `unquote_plus`, NFKC) | 0 de 4000 |
+| host y base | 0 de 4000 |
+| los valores de la consulta | 0 de 4000 |
+| `url.render_as_string(hide_password=False)` | **113 de 4000** |
+| `repr(url.query)` | 102 de 4000 (artificial, no cuenta) |
+
+Ninguna excepción: siempre rc 2 y mensaje limpio.
+
+**H1-bis.** SQLAlchemy 2.0.25 escribe la clave como
+`quote(clave, safe=" +")`: deja el espacio y escapa lo demás. Una clave
+que mezcla un espacio con otro carácter que se escapa no está entre las
+formas que se tapan. Reproducido sobre `3aba9c2`:
+
+```
+'QZXW KJVB|NMPL' -> fallo: postgresql+asyncpg://***:QZXW KJVB%7CNMPL@db.local:5432/x
+'QZXW KJVB"NMPL' -> fallo: postgresql+asyncpg://***:QZXW KJVB%22NMPL@db.local:5432/x
+'QZXW KJVB'      -> fallo: postgresql+asyncpg://***@db.local:5432/x
+'QZXW|KJVB'      -> fallo: postgresql+asyncpg://***@db.local:5432/x
+```
+
+La prueba de la Dev usa justamente `render_as_string`, pero sólo con claves
+de un separador. Su afirmación es más ancha que su evidencia. La exposición
+real es baja: ni los drivers ni `str(url)` repiten la clave. Por eso no es
+devolución, pero el script **no se corre contra producción** hasta que
+entre el arreglo en EXCEL-3f.
+
+## D25 (b), la fecha en la importación
+
+Las pruebas de la Dev cubren «15/03/15», «01/01/50», DD-MM-AAAA, dígitos de
+ancho completo, ISO con T y la celda de fecha de Excel
+(«AAAA-MM-DD 00:00:00»). La PM leyó el merge de la importación: un valor
+entrante vacío nunca pisa una fecha que ya está.

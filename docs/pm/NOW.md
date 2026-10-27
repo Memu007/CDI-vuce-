@@ -49,7 +49,7 @@ código sano: la nota va a CLIENTE-1b. Detalle en
 EXCEL-3d, CLIENTE-1b, ESTUDIO-1 y **EXCEL-3e** (`6f798d8`, informe
 `e1acb64`), juntas con `merge` de `claude/dev-tecnica` (`5eb6ae4`). Un cargo
 con medidas «/», «-» o 0 bajo una combinada ya no entra como producto sin
-aviso. D24 (a). ESTUDIO-1 no se publica sin ESTUDIO-1b. CLIENTE-1c volvió con devolución (27/10).
+aviso. D24 (a). **CLIENTE-1c y ESTUDIO-1b aceptadas 2026-10-27** sobre `3aba9c2` (merge de `418ada3`): con eso ESTUDIO-1 ya se puede publicar. H1-bis (la clave de `--base` como la escribe SQLAlchemy) va primero en EXCEL-3f; hasta entonces el script de fechas no se corre contra producción. Detalle en `REPRODUCCION-ESTUDIO-1b-2026-10-27.md` y en la «Vuelta» de `REPRODUCCION-CLIENTE-1c-2026-10-27.md`.
 Detalle en `REPRODUCCION-EXCEL-3e-2026-10-25.md`.
 **Cola MARIA, aceptada e integrada, sin publicar:** MARIA-7/8
 (`1fa0b6e`), VALOR-1b y MARIA-9 (`9f787f6`), SEPARADORES-1 y VALOR-1c
@@ -59,7 +59,7 @@ ya no va como 0 y «1234.567» se pregunta. D20 (a), D21 (b), D22 (a, ARCA).
 SUFIJOS-1 entregada el 27/10, en revisión; ella sigue con SEPARADORES-1c. Detalle en
 `REPRODUCCION-SEPARADORES-1b-2026-10-25.md`.
 
-**Rojos de la rama técnica integrada (CI de mi rama roja desde `bcab8b5`):** 11 de presupuesto (tope de 15 operaciones en la suite entera) y `test_guardar1::test_datos_largos…` (la fecha con hora ya no se copia, que es D15 b). Los cierra CLIENTE-1c (`2ff3262` y la prueba ajustada): sobre `4452b22` la suite da 0 rojos. Entran cuando acepte la vuelta de CLIENTE-1c (devolución del 27/10 por la clave de `--base`); no publicar antes.
+**Rojos de la CI de mi rama (desde `bcab8b5`):** los 12 conocidos (11 de presupuesto y `test_guardar1`) los cierra `2ff3262`, que entró con el merge del 27/10; la suite local sobre `3aba9c2` da 0 rojos. Falta ver la CI verde en ese push antes de dar por cerrado.
 
 **Rojo conocido de EXCEL-2, ya publicado:** `test_excel2.py::test_ocho_libros…`
 falla siempre en la máquina de la PM (4 núcleos), también en la base: una
