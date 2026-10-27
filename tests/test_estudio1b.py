@@ -183,3 +183,13 @@ def test_el_alta_acepta_un_nombre_con_acentos_y_otros_alfabetos(usuario, nombre)
     a = usuario()
     est = _alta(a, nombre, CUIT_A)
     assert est["nombre"] == nombre
+
+
+def test_sin_cuit_en_el_perfil_su_uso_viejo_no_cuenta(usuario):
+    """Si el perfil ya no tiene CUIT, elegirlo deja la operación sin CUIT del
+    despachante: el estudio único vuelve a venir elegido."""
+    a = usuario(CUIT_PERFIL)
+    assert _generar(a, "").status_code == 200
+    assert a.put("/api/user/profile", json={"cuit": ""}).status_code == 200
+    uno = _alta(a, "Estudio Inventado Uno", CUIT_A)
+    assert _lista(a)["preseleccionado"] == uno["id"]

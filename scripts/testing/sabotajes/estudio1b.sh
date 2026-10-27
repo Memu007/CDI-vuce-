@@ -89,6 +89,9 @@ sabotaje $M "el uso del perfil se lee de otra cuenta" \
   '    uso_perfil = await db.get(UsoCuitPerfil, user["username"])' \
   '    uso_perfil = (await db.execute(select(UsoCuitPerfil).order_by(UsoCuitPerfil.last_used_at.desc()))).scalars().first()' \
   "FAILED $T::test_el_uso_del_perfil_es_de_cada_cuenta"
+sabotaje $M "el uso del perfil cuenta aunque el perfil ya no tenga CUIT" \
+  '    if uso_perfil is not None and user.get("cuit"):' '    if uso_perfil is not None:' \
+  "FAILED $T::test_sin_cuit_en_el_perfil_su_uso_viejo_no_cuenta"
 sabotaje $M "el estudio único gana aunque el perfil se haya usado después" \
   $'    if usados:\n        # Con la misma hora' \
   $'    if len(estudios) == 1:\n        preseleccionado = estudios[0].id\n    elif usados:\n        # Con la misma hora' \
