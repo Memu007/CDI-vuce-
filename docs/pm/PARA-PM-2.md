@@ -2,193 +2,222 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## SUFIJOS-1, vuelta de la devolución: entregada a revisión (2026-10-27)
+## SEPARADORES-1c: entregada a revisión (2026-10-27)
 
-**Resultado:** lo probado es `45a3ea1`; el commit de este informe sólo
-toca `PARA-PM-2.md`. Implementé la regla «al generar, lo que va
-al TXT por producto es lo que muestra su celda», con H1 a H5 y D23 (c).
-Cada uno tiene su caso y su sabotaje. El TXT sin sufijo propio sale idéntico
-byte a byte al de `adfe707` en siete casos; el octavo da el mismo error en
-las dos bases.
+**Antes:** la vuelta de SUFIJOS-1 sigue en tu revisión. Su informe es la
+versión de este archivo en `76570de` (probada en `45a3ea1`, nada para
+decidir).
 
-**Lo que decidís vos: nada para decidir.** Los supuestos reversibles van
-abajo. D23 ya está contestada y no abro ninguna D nueva.
+**Resultado:** están hechos los tres puntos, cada uno con casos y
+sabotajes.
+- La factura deja sin leer los miles mal formados.
+- El servidor toma como blanco sólo lo que la pantalla también toma como
+  blanco.
+- La pregunta escribe las dos lecturas con `escribir()` y conserva el
+  signo.
 
-**Ojo con tu diff desde `97cd2fa`:** también trae SEPARADORES-1c
-(`4f2045f`, `d5a3f58`, `9663ac6`). Esa pieza todavía no la entregué; la
-informo apenas cierre esta.
-- **Lo de esta vuelta:** `despachante.js`, `finalize.js`, `CHANGELOG.md` y
-  los tres archivos de prueba de SUFIJOS-1.
-- **Lo de SEPARADORES-1c:** `maria_generator.py`, `controles_maria.py`,
-  `pdf_extractor.py`, `montos_ar.js`, `test_separadores1b.py`,
-  `test_separadores1c.py` y `sabotaje_separadores1c.sh`.
-- La suite de abajo corre sobre `45a3ea1`, así que incluye las dos.
+Lo probado es `45a3ea1`, que tiene el mismo código de 1c que `9663ac6`.
+`git diff 9663ac6 45a3ea1` sobre los cuatro archivos de producto y los tres
+de prueba de 1c da vacío.
+
+**Lo que decidís vos: D24 y D25**, abajo. Ninguna frena esta entrega. La
+numeración sigue la de este canal (D22 y D23 fueron SUFIJOS-1). La D24 y
+la D25 de `PARA-PM.md` y `PARA-DEV.md` son de la Dev técnica.
 
 | Pieza | SHA |
 |---|---|
-| Base de la vuelta (lo que revisaste) | `97cd2fa` |
-| SEPARADORES-1c, sin entregar (producto, casos, sabotajes) | `4f2045f`, `d5a3f58`, `9663ac6` |
-| Producto: lo que viaja es lo que muestra la celda (H1–H5, D23) | `252f04d` |
-| Casos, pantalla y sabotajes de la vuelta | `b5d71ea` |
-| Merge de tu rama (`842d68a`, sólo `NOW.md`) | `78648f3` |
-| Casos: los sabotajes 35 y 47 apuntan a casos que los distinguen | `45a3ea1` |
-| **SHA probado:** suite, compileall, casos y sabotajes | **`45a3ea1`** |
+| Casos en rojo antes del producto | `90cc097`, `69a4593` |
+| Producto y `CHANGELOG.md` | `4f2045f` |
+| Casos de SEPARADORES-1b que cambian con 1c | `d5a3f58` |
+| Caso del semáforo y sabotajes | `9663ac6` |
+| **SHA probado:** suite, compileall, casos | **`45a3ea1`** |
+
+Tu diff de revisión es `adfe707..9663ac6`, sólo sobre los archivos de 1c.
+El resto de ese rango es SUFIJOS-1.
+
+## Decisiones
+
+**D24. La misma regla de miles para cantidades, precios y pesos de la
+factura.** El punto 1 lo apliqué sólo a `_monto_factura`, que lee el flete y
+el seguro. `_numero_factura` lee cantidad, valor unitario y pesos, y sigue
+leyendo por mil lo mal formado. Corrido sobre `45a3ea1`:
+
+```
+0750.000 ,      monto None  numero 750000.0
+7500.000.000 ,  monto None  numero 7500000000.0
+02500.000 ,     monto None  numero 2500000.0
+7500.000,50 ,   monto None  numero 7500000.5
+```
+
+Eso entra al FOB del TXT.
+- **(a)** Una pieza chica aparte, con casos y sabotaje. Sería la misma
+  regla en `_numero_factura`, y lo que no se lee queda vacío, como hoy con
+  «12x3».
+- **(b)** Dejarlo como está.
+
+Recomiendo **(a)**. Es la misma familia y pega en el valor de la
+mercadería, no sólo en el flete. No lo hice en esta pieza por dos razones:
+la tarea habla de montos y tus ejemplos son flete y seguro, y cambiaría lo
+que sale en el TXT por otro camino.
+
+**D25. La forma decimal que propone la pregunta se acepta y el TXT
+redondea sin aviso.** Seguí tu indicación: las dos lecturas con
+`escribir()`. Para «2500.125» la pregunta propone «2500,1250».
+- La pantalla lo lee como `2500.125`.
+- El servidor lo lleva a `MDDTFLE=2500.13` sin avisar.
+- Es lo que marcaste en el punto 3, ahora con otra forma escrita.
+
+Corrido:
+
+```
+leer('2500,1250')                          → {"valor":2500.125,"error":null}
+centavos(importe_valido(2500.125,'Flete')) → 2500.13
+```
+
+La causa es que `leer` acepta más de dos decimales. «No se toca» pide que
+«1.234,567» se siga aceptando, así que no lo cambié.
+- **(a)** Queda así. La forma propuesta se lee como dice la pregunta, y el
+  redondeo es el mismo de cualquier importe con tres decimales.
+- **(b)** Una pieza chica: la revisión avisa sin frenar cuando un importe
+  tiene más de dos decimales («va al TXT como 2500,13»).
+- **(c)** `leer` rechaza más de dos decimales. Contradice «No se toca».
+
+Recomiendo **(b)**. Saca el «sin aviso», que era tu objeción, sin tocar lo
+que se acepta.
 
 ## Qué cambió
 
-Los archivos de producto que toqué son
-`proyecto_maria/static/v2/screens/despachante.js` y
-`proyecto_maria/static/v2/screens/finalize.js`. El generador y el servidor
-no cambiaron en esta vuelta.
+Estos son los archivos que toqué:
+- `proyecto_maria/pdf_extractor.py`
+- `proyecto_maria/core/maria_generator.py`
+- `proyecto_maria/core/controles_maria.py`
+- `proyecto_maria/static/v2/montos_ar.js`
+- `CHANGELOG.md`
 
-- **La regla.** `sufijoDe` y `unidadesDe` ahora leen de lo que la celda
-  muestra, no de `it.sufijo` ni de una propuesta pedida al generar.
-  - Hay una sola función, `filaDe`, que arma lo que muestra cada fila.
-  - La celda, los avisos y el pedido salen de ahí.
-  - «Generar» ya no vuelve a pedir la propuesta: se quitó `listo()` en
-    `onGenerate`.
-- **H1.** Si el arancel no contestó, está consultando o hay más de 500
-  productos, no viaja nada de la propuesta: ni sufijo ni unidad
-  estadística.
-  - La celda lo dice en su nota.
-  - Los avisos lo dicen con «Ítem N: …».
-  - Si el arancel se cae al entrar, el pedido va con `[null, null]` por
-    producto.
-- **H2.** La celda escrita guarda el sufijo de la operación de ese momento
-  (`sufijo_op`). Si después cambia el de la operación, esa fila avisa en la
-  celda y en los avisos. Al aceptarlo (volver a tocar la celda), el aviso
-  se va.
-- **H3 y H4.** Un producto en un grupo, o con sub-ítems, no lleva sufijo
-  propio aunque tenga `it.sufijo` guardado. El grupo sale con el de la
-  operación y los sub-ítems con el suyo.
-- **H5.** Lo escrito en el sufijo de la operación gana.
-  - La propuesta sólo agrega los códigos que faltan.
-  - Si propone otro valor para un código ya escrito, no lo pisa y la fila
-    lo avisa.
-  - Ejemplo: con «AA(PROPIA SA)-CA00-» sale `AA(PROPIA SA)`, y la fila dice
-    que el arancel proponía otro valor.
-- **D23 (c).** Con el de la operación vacío y todos los productos con
-  sufijo propio, aparece este aviso junto al botón, y no frena: «El sufijo
-  de la operación está vacío: cada producto sale sólo con lo que pide el
-  arancel de ARCA».
+- **1. Factura.** `_miles_mal_formados` corre antes de leer el flete o el
+  seguro. Si la parte entera viene en grupos de miles con cero adelante, o
+  con una cabeza de cuatro cifras o más, el monto queda en `None`.
+  - Termina en flete 0 con el aviso de MARIA-1c, como pide «No se toca».
+  - En la pantalla, `sonMiles` exige la cabeza sin cero: «01.500.000» no
+    cierra.
+  - La rama «cuatro cifras o más y tres decimales» también toma el cero
+    adelante: «01234.500» pregunta.
+- **2. Blanco.** Lo arreglé del lado del servidor.
+  - `importe_valido` y los controles de la cabecera hacen
+    `strip(ESPACIOS)`. `ESPACIOS` son sólo los blancos que `trim()` de JS
+    también saca.
+  - `\x85` y `\x1c`–`\x1f` ya no son blanco: llegan como texto y dan 400
+    «no es un importe.». El semáforo dice lo mismo.
+  - La pantalla no cambió. El campo vacío o con espacios comunes sigue
+    siendo 0, también por API.
+  - Un caso recorre todo el plano básico: lo que el servidor toma como
+    blanco es un subconjunto de lo que saca `trim()`.
+  - El BOM (`﻿`) lo saca `trim()` y el servidor no, así que por API da
+    400 en vez de 0. Ya era así antes de 1c. Es más estricto, no un 0
+    callado.
+- **3. La pregunta.** Las dos lecturas se escriben con `escribir()` y
+  conservan el signo, también en la rama de la coma:
+  - «2500.125» → «¿2500125 o 2500,1250?»;
+  - «-1234.500» → «¿-1234500 o -1234,5?»;
+  - «-3,480» → «¿-3.480 o -3,48?».
 
-## Dos sabotajes que no distinguían
-
-Con los casos de `b5d71ea`, el script dio 45 en rojo y 2 en verde: los
-mutantes 35 y 47 daban lo mismo que el producto en esos casos. En
-`45a3ea1` agregué un caso para cada uno; los dos casos fallan sólo con su
-sabotaje.
-
-- **35** (`filaDe` sin mirar si lo pintado está «ok»): el caso de antes
-  cambiaba el único producto, y la propuesta vieja ya no coincidía igual.
-  El nuevo tiene dos filas y cambia sólo la segunda. Mientras consulta, la
-  primera tampoco lleva la propuesta.
-- **47** (lo que viaja sale de lo que llegó y no de lo pintado): sólo se
-  distingue si la propuesta del arancel llega y la pantalla todavía no la
-  pintó, con lo pintado en «ok». Eso pasa sólo si los productos cambian sin
-  repintar mientras la propuesta del cliente no llegó. El caso arma eso a
-  mano: el arnés deja colgado el pedido del cliente (`frenarOtras`). Es un
-  camino angosto; si te parece que no vale su caso, se retiran el caso y el
-  sabotaje.
-
-## Puertas sobre `45a3ea1`
-
-| Puerta | Resultado (salida exacta) | Log |
-|---|---|---|
-| `tests/test_sufijos1.py` | `62 passed, 3 warnings in 7.37s` | — |
-| `sabotaje_sufijos1.sh 45a3ea1` (47 sabotajes) | `OK: los 47 sabotajes dan rojo por la razón esperada`, `salida 0` | `sab_suf1b.log` |
-| Suite completa, base limpia, sola | `13 failed, 3077 passed, 302 skipped, 2 xfailed, 94 warnings in 452.55s (0:07:32)` | `suite-45a3ea1.log` |
-| `compileall -q proyecto_maria` | rc 0 | — |
-| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` | `smoke252.log` |
-| `pantalla_sufijos1.js` | `PANTALLA SUFIJOS-1 OK`; ancho a 390 px: 597, igual que la base | — |
-| `pantalla_maria7.js` | `PANTALLA MARIA-7 OK` | `pm7.log` |
-| `e2e_maria.js` | `E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.` | `e2e78.log` |
-| TXT sin sufijo propio, `adfe707` contra `252f04d` | `cmp` sin diferencias en 7 casos; `op_vacio` da el mismo error en las dos | — |
-
-Notas sobre dónde corrió cada puerta:
-- **Pantalla, smoke y e2e.** Corrieron con la app levantada en `252f04d`.
-  Su producto es idéntico al de `45a3ea1`: después sólo entraron `NOW.md`
-  y casos.
-- **TXT.** Los casos de la comparación de bytes son: lona, cuatro lonas,
-  plástico y lona, grupo, sub-ítems, sufijo vacío y `None`, otro sufijo de
-  la operación, y operación sin sufijo.
-- **Pantalla nueva en el SHA viejo.** `pantalla_sufijos1.js` nueva no corre
-  contra `97cd2fa`, porque ahí no existen la nota ni `avisos()`. Lo que
-  distingue el defecto lo cubren los casos de pytest y los sabotajes.
-
-**Rojos de la suite:** los 12 conocidos (`test_guardar1` y los 11 del
-tope del plan) y uno nuevo que no es de esta vuelta:
-
-- `tests/test_excel2.py::test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_a_una_subida_normal`
-  da `AssertionError: la subida normal dio 400 a los 30.0 s: {"detail":"No pudimos abrir el Excel: tardó demasiado. Probá con otro archivo."}`.
-- **Falla igual en tu `842d68a`.** La corrí sola en un worktree limpio de
-  tu rama, con la máquina quieta (load 0,90): `normal: 400 en 30.2 s`,
-  `1 failed`.
-- **Mi diff no toca nada de Excel.** No cambian la validación ni la
-  prueba (`git diff 842d68a..45a3ea1 -- tests/test_excel2.py proyecto_maria/security` vacío).
-- **Mi lectura:** es una prueba de tiempo. Ocho libros pesados entran al
-  validador delante de la subida normal, que tiene un tope de 30 s, y en
-  este contenedor de 4 núcleos no llega. En tu suite sobre `97cd2fa` no
-  apareció. No la persigo porque está fuera de la tarea; si en tu máquina
-  también falla, es de la cola de Excel.
-
-**No se corrió:**
-- **Subagentes adversariales y `/code-review`:** no hay cuota hasta el
-  28/10 a las 18:00 UTC. En su lugar hice una autorrevisión del diff
-  completo desde `97cd2fa`. La revisión independiente queda en vos.
-- **`ataque_aislamiento.sh`:** esta vuelta no toca datos, sesión ni
-  permisos.
-
-## Comandos para reproducir
-
-```bash
-git fetch origin claude/dev-maria && git checkout 45a3ea1
-export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
-       VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-python -m pytest -q --no-cov -p no:randomly tests/test_sufijos1.py   # 62 passed
-scripts/testing/sabotaje_sufijos1.sh 45a3ea1 <venv>                    # «OK: los 47 sabotajes dan rojo…»
-git diff 97cd2fa..45a3ea1 -- proyecto_maria/static/v2/screens/        # lo de producto de esta vuelta
-BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_sufijos1.js   # PANTALLA SUFIJOS-1 OK
-```
+  Un caso lee cada forma propuesta y comprueba que da lo que dice la
+  pregunta. D25 es lo que pasa después, en el TXT.
 
 ## Supuestos reversibles
 
-- **H2 y H5 también en los avisos.** Además de avisar en la fila, aparecen
-  en la lista de avisos junto al botón, como H1. La devolución pedía la
-  fila.
-- **Grupos.** Un grupo sale siempre con el sufijo de la operación más lo
-  que proponga el arancel. No le agregué una celda propia.
-- **`sufijo_op`.** Es un campo nuevo por producto en el estado de la
-  pantalla. No va al servidor ni al TXT.
-- **Texto de D23.** Es el que propuse. Si una persona escribió el sufijo
-  de algún producto, decir «sale sólo con lo que pide el arancel» queda
-  impreciso.
+- **La forma «miles» va sin separador** («2500125»), no «2.500.125».
+  `escribir()` no pone puntos de miles, y la tarea pide `escribir()` para
+  las dos.
+- **Más de quince cifras no pregunta: «Debe ser un numero.».** Pasado ese
+  largo, `Number` ya no da las cifras exactas y la pregunta propondría otro
+  número. Antes «1» repetido 199998 veces, con «.125», preguntaba
+  «¿111.111.…».
+- **Cambié dos casos de SEPARADORES-1b** (`d5a3f58`): la pregunta con el
+  texto nuevo y la cifra larga con el error de arriba. Son consecuencia
+  directa del punto 3. Si preferís otro texto, se revierte ahí.
+
+## Puertas
+
+Todo es sobre `45a3ea1`, salvo los sabotajes (`9663ac6`) y el smoke
+(`252f04d`). Los tres tienen el mismo código de 1c.
+
+| Puerta | Resultado |
+|---|---|
+| `test_separadores1c.py`, `1b` y `1` | `292 passed, 4 warnings in 57.17s` |
+| `sabotaje_separadores1c.sh 9663ac6` | `OK: los 10 sabotajes dan rojo por la razón esperada`, salida 0 |
+| Suite completa, worktree limpio, sola | `13 failed, 3077 passed, 302 skipped, 2 xfailed, 94 warnings in 452.55s (0:07:32)` |
+| `compileall -q proyecto_maria` | rc 0 |
+| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
+
+Cada sabotaje vuelve a una lectura de antes:
+
+| Sabotaje | Qué vuelve a como era |
+|---|---|
+| `factura_sin_regla` | la factura sin la regla de miles |
+| `factura_cero_adelante` | la factura con cero adelante |
+| `pantalla_miles_con_cero` | la pantalla acepta miles con cero adelante |
+| `pantalla_no_pregunta_con_cero` | la pantalla no pregunta con cero adelante |
+| `generador_strip_python` | `strip()` de Python en el generador |
+| `controles_strip_python` | `strip()` de Python en los controles |
+| `pregunta_sin_signo` | la pregunta sin el signo |
+| `coma_sin_signo` | la rama de la coma sin el signo |
+| `pregunta_tres_decimales` | la pregunta con tres decimales |
+| `pregunta_sin_tope` | la pregunta sin el tope de quince cifras |
+
+**Los 13 rojos** son los 12 conocidos más uno.
+- **Los 12 conocidos:**
+  - `test_guardar1`, que cierra CLIENTE-1c;
+  - los 11 del tope de 15 operaciones (`clientes_plan02/04`,
+    `maria4_despachante`, `op_code_and_fill_if_empty`, `operations_manual`
+    y `prelaunch_block1`).
+- **El otro es**
+  `test_excel2.py::test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_a_una_subida_normal`,
+  ya informado en SUFIJOS-1. Es de tiempo en este entorno, no de esta
+  pieza:
+  - corrido solo, da rojo también en tu `842d68a`: «normal: 400 en 30.2 s»;
+  - `git diff 842d68a..45a3ea1 -- tests/test_excel2.py proyecto_maria/security`
+    da vacío.
+
+**Lo que no corrí:**
+- Ni subagentes adversariales ni `/code-review`: no tengo cuota hasta el
+  28/10 a las 18:00 UTC. La autorrevisión es sólo mía, sin independencia.
+- `ataque_aislamiento.sh`: no toqué sesión, datos ni permisos.
+
+## Comandos
+
+Este muestra sólo lo de 1c:
+
+```bash
+git diff adfe707..9663ac6 -- proyecto_maria/pdf_extractor.py proyecto_maria/core/maria_generator.py \
+  proyecto_maria/core/controles_maria.py proyecto_maria/static/v2/montos_ar.js
+```
+
+Este tiene que dar `292 passed`:
+
+```bash
+python -m pytest -q --no-cov -p no:randomly tests/test_separadores1c.py tests/test_separadores1b.py tests/test_separadores1.py
+```
+
+Este tiene que dar «OK: los 10 sabotajes dan rojo por la razón esperada» y
+salida 0:
+
+```bash
+scripts/testing/sabotaje_separadores1c.sh 9663ac6 <venv>
+```
 
 ## Riesgos
 
-- **H2 sólo con lo nuevo.** Avisa sólo cuando quedó guardado `sufijo_op`.
-  Una celda escrita antes de esta versión no avisa si cambia el de la
-  operación. Severidad: baja, porque el estado es de la sesión de la
-  pantalla.
-- **Aceptar H2.** Hoy se acepta volviendo a tocar la celda; no hay un botón
-  «aceptar».
-- **Reintento del arancel.** Si el arancel no contestó, sólo se reintenta
-  al volver a entrar a la pantalla. Mientras tanto no viaja nada de la
-  propuesta, que es lo pedido, pero la persona tiene que salir y volver.
-- **Avisos del botón.** Se refrescan después de pintar la pantalla. Entre
-  medio, el botón puede mostrar los avisos anteriores por un instante. El
-  pedido no se ve afectado, porque sale de lo pintado.
-- **Aviso de H5 de más.** Si `limpiar_sufijo` deja un valor apenas distinto
-  del que propone el arancel (espacios, signos), H5 puede avisar de más.
-  Nunca pisa lo escrito.
-- **Anotado, sin arreglar,** como pediste:
-  - `combinar` con códigos repetidos o «AA00»;
-  - el «-» final que siempre se agrega;
-  - el BOM, que separa en JS y no en Python.
+- **Con dos marcas distintas, `_separador_decimal` decide cuál es la
+  decimal.** Si un PDF trae una forma rara («1.234.567,890,12»), la regla
+  nueva la deja sin leer, que es el lado seguro.
+- **Un solo grupo sin pista, como «02 750», queda sin leer. Antes daba
+  2750** (corrido sobre `adfe707`).
+  - Es lo que pide el punto 1: con espacio no puede ser decimal, y el cero
+    adelante hace mal formado el grupo.
+  - Si algún proveedor escribe así de verdad, ahora va con flete 0 y aviso.
+- **D24 y D25**, arriba: el mismo defecto sigue por otros dos caminos.
 
-**Lo que sigue:** cierro SEPARADORES-1c, que ya está en la rama, con su
-suite, su smoke y su informe. Ahí van a ir D24 y D25.
+Última vuelta: Tue Oct 27 19:30:30 UTC 2026
 
-Última vuelta: Tue Oct 27 19:27:54 UTC 2026
-
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. Entregada la vuelta de SUFIJOS-1, probada en 45a3ea1 (62 casos, 47 sabotajes, suite, compileall, smoke, pantallas, e2e y TXT idéntico a adfe707); nada para decidir. Sigo con SEPARADORES-1c (D21 b, en PARA-DEV-2.md; producto en 4f2045f/d5a3f58/9663ac6, 10 sabotajes en rojo; falta suite, smoke e informe con D24 miles en _numero_factura y D25 leer con más de 2 decimales). Sin cuota de subagentes ni /code-review hasta 28/10 18:00 UTC. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. Entregadas a revisión la vuelta de SUFIJOS-1 (informe en 76570de, probada en 45a3ea1, nada para decidir) y SEPARADORES-1c (probada en 45a3ea1, 10 sabotajes; D24 miles en _numero_factura, recomiendo a; D25 aviso por más de 2 decimales, recomiendo b). Espero veredicto; no hay pieza marcada «apenas entregues». Sin cuota de subagentes ni /code-review hasta 28/10 18:00 UTC. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
