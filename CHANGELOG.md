@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-27 · feat: el registro con invitación viene con el email invitado (ORG-1b)
+
+- Al abrir el enlace de una invitación válida, el email del registro ya viene completo con el email invitado y no se puede cambiar; una línea lo explica. Sin invitación válida, el campo queda como antes.
+
 ## 2026-10-27 · fix: invitaciones al estudio sin 500, atadas al email, con tope del plan y de un solo uso (ORG-1)
 
 - Validar o usar una invitación ya no da error 500 en Postgres. La invitación sólo sirve para registrarse con el email invitado, y el estudio no pasa de los usuarios de su plan (el dueño incluido; al invitar cuentan también las invitaciones pendientes sin vencer).

@@ -351,6 +351,7 @@
             <label class="field">
                 <span>Email</span>
                 <input name="email" type="email" autocomplete="email" required />
+                <small id="inviteEmailHint" class="auth-hint" hidden>Es el email al que te invitaron.</small>
             </label>
             <label class="field">
                 <span>Contraseña</span>
@@ -788,6 +789,17 @@
                 if (inviteBanner) inviteBanner.style.display = 'block';
                 if (inviteOrgName) inviteOrgName.textContent = data.org_name || 'Un estudio';
                 if (registerSub) registerSub.textContent = 'Completá tus datos para unirte al estudio.';
+                // El registro sólo entra con el email invitado (el servidor
+                // lo exige): se completa y queda de sólo lectura. readOnly y no
+                // disabled, para que viaje en el envío.
+                const invitedEmail = (data.email || '').trim();
+                const emailInput = forms.register.querySelector('input[name=email]');
+                if (invitedEmail && emailInput) {
+                    emailInput.value = invitedEmail;
+                    emailInput.readOnly = true;
+                    const hint = document.getElementById('inviteEmailHint');
+                    if (hint) hint.hidden = false;
+                }
                 openAuth('register');
             }
         } catch (_) {}
