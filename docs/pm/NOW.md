@@ -196,6 +196,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-10-27 23:57 UTC: sin novedades. MARIA espera el cupo (ORG-1 y ORG-1b listas); la técnica sigue con EXCEL-3f, sin informe. Sesiones: MARIA 121k, técnica 139k.
+
 2026-10-27 22:58 UTC: MARIA hizo **ORG-1b** (producto `f8616cf`, probado en `5d42909`; 7 sabotajes en rojo) y deja ORG-1 y ORG-1b sin entregar hasta el cupo del 28/10 18:00 UTC; sin D nuevas. La técnica subió `d9e728d`/`b3e4bcb` (EXCEL-3f, sabotajes de 3b-3d) y sigue corriendo sabotajes; sin informe. Sesiones: MARIA 113k, técnica 129k. Después de ORG-1, lo de MARIA en el roadmap espera a terceros: PRORRATEO-1, DESTINO-1 y PESO-NETO-1 al despachante; LEGAL-1 al texto de Emi (le pido términos, privacidad y el email para pedir el borrado).
 
 2026-10-27 22:00 UTC: MARIA dejó **ORG-1 lista sin entregar** (`ddfc798`; premisa confirmada: 15 fallas 500 en Postgres antes, 0 ahora; 9 sabotajes en rojo; suite 1 rojo, el de tiempo de `test_excel2`; aislamiento 22 bloqueados, 0 fugas). Entrega con el cupo del 28/10 18:00 UTC. **D26 (a)** por ahora: cancelar una invitación pendiente es endpoint nuevo, se lo propongo a Emi (recomiendo sí). **D27 (b)**: ORG-1b, completar el email invitado en el registro, decidido por la PM dentro de la línea de ORG-1. La técnica sigue corriendo excel3.sh para EXCEL-3f. Sesiones: MARIA 143k, técnica 135k, PM 138k (todas con tope 200k).
