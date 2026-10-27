@@ -10,6 +10,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(excel):** «Fletes», «Seguros», «Bank fees» o «Fee» se leen como el cargo en singular. «Ocean freight», «Courier DHL», «2. Insurance», un cargo con su propio origen o «Freight» en Item con la descripción escrita otra vez entran al FOB como antes, pero con un aviso que nombra su fila. Una fila con su propia NCM no lleva ese aviso.
 - El aviso del flete nombra todas sus filas como los demás («filas 3, 4, … y N más»).
+- **fix(datos):** el error del script de fechas de inicio de actividad tapa la clave de la base como la escriba SQLAlchemy o el driver: con un espacio y otro carácter escapado en la misma clave, %XX en minúscula, «+» o escapes de Python y JSON (H1-bis).
 
 ## 2026-10-27 · fix: lo que va al TXT por producto es lo que muestra su celda (SUFIJOS-1, vuelta)
 

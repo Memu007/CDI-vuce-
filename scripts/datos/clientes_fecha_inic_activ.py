@@ -16,11 +16,12 @@ Correrlo en producción lo decide Emi.
 """
 import argparse
 import asyncio
+import json
 import os
 import re
 import sys
 import unicodedata
-from urllib.parse import quote, quote_plus, unquote, unquote_plus
+from urllib.parse import unquote, unquote_plus
 
 from sqlalchemy import text
 from sqlalchemy.engine import make_url
@@ -61,6 +62,24 @@ def _secretos(base: str, url) -> set:
     return {s for s in secretos if s}
 
 
+def _escrito_de_cualquier_forma(secreto: str) -> str:
+    """Un patrón que encuentra el secreto como lo escriba quien sea: cada
+    carácter tal cual, como %XX en una URL (en mayúscula o minúscula, con
+    cualquier lista de caracteres que no se escapan), «+» por el espacio, o
+    como lo escribe Python o JSON («\\t», «\\xf1», «\\u00f1», «\\'»).
+    SQLAlchemy, por ejemplo, escribe la clave con `quote(clave, safe=" +")`
+    (EXCEL-3f, H1-bis)."""
+    partes = []
+    for c in secreto:
+        formas = {re.escape(c), re.escape(ascii(c)[1:-1]), re.escape(json.dumps(c)[1:-1]),
+                  re.escape("\\" + c),
+                  "(?i:" + "".join(f"%{b:02x}" for b in c.encode()) + ")"}
+        if c == " ":
+            formas.add(r"\+")
+        partes.append("(?:" + "|".join(sorted(formas, key=len, reverse=True)) + ")")
+    return "".join(partes)
+
+
 def _tapar(texto: str, secretos, visibles=()) -> str:
     """El texto sin ninguno de los secretos, como vengan o escapados. Se tapa
     sólo el secreto entero, no un pedazo de palabra: un usuario «u» no rompe
@@ -69,20 +88,23 @@ def _tapar(texto: str, secretos, visibles=()) -> str:
     contiene se tapa igual, porque se prueba primero lo más largo."""
     formas = set()
     for s in secretos:
-        for crudo in {s, unquote(s), unquote_plus(s), unicodedata.normalize("NFKC", s)}:
-            formas |= {crudo, quote(crudo, safe=""), quote_plus(crudo)}
+        formas |= {s, unquote(s), unquote_plus(s), unicodedata.normalize("NFKC", s)}
     formas.discard("")
-    visibles = {v for v in visibles if v} - formas
     if not formas:
         return texto
+    patrones = {f: _escrito_de_cualquier_forma(f) for f in formas}
+    visibles = {v for v in visibles
+                if v and not any(re.fullmatch(p, v) for p in patrones.values())}
     opciones = []
     for f in sorted(formas | visibles, key=len, reverse=True):
-        patron = re.escape(f)
-        if f not in visibles:
-            if re.match(r"\w", f):
-                patron = r"(?<!\w)" + patron
-            if re.search(r"\w\Z", f):
-                patron += r"(?!\w)"
+        if f in visibles:
+            opciones.append(re.escape(f))
+            continue
+        patron = patrones[f]
+        if re.match(r"\w", f):
+            patron = r"(?<!\w)" + patron
+        if re.search(r"\w\Z", f):
+            patron += r"(?!\w)"
         opciones.append(patron)
     return re.sub("|".join(opciones),
                   lambda m: m.group(0) if m.group(0) in visibles else "***", texto)
