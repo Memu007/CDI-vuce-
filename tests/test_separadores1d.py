@@ -134,12 +134,14 @@ def _avisos_de(op):
 
 
 @pytest.mark.parametrize("op, escrito, txt", [
-    ({"flete": 2500.125}, "Flete: escribiste 2500,1250", "El TXT lleva 2500,13."),
-    ({"seguro": 12.34567}, "Seguro: escribiste 12,34567", "El TXT lleva 12,35."),
-    ({"flete": 2.675}, "Flete: escribiste 2,6750", "El TXT lleva 2,68."),   # Math.round daría 2,67
-    ({"seguro": 1.005}, "Seguro: escribiste 1,0050", "El TXT lleva 1,01."),  # Math.round daría 1,00
-    ({"flete": "1.234,567"}, "Flete: escribiste 1.234,567", "El TXT lleva 1234,57."),
-    ({"flete": 0.004}, "Flete: escribiste 0,0040", "El TXT lleva 0,00."),
+    ({"flete": 2500.125}, "Flete: escribiste «2500,1250».", "El TXT lleva 2500,13."),
+    ({"seguro": 12.34567}, "Seguro: escribiste «12,34567».", "El TXT lleva 12,35."),
+    ({"flete": 2.675}, "Flete: escribiste «2,6750».", "El TXT lleva 2,68."),   # Math.round daría 2,67
+    ({"seguro": 1.005}, "Seguro: escribiste «1,0050».", "El TXT lleva 1,01."),  # Math.round daría 1,00
+    ({"flete": "1.234,567"}, "Flete: escribiste «1.234,567».", "El TXT lleva 1234,57."),
+    ({"flete": 0.004}, "Flete: escribiste «0,0040».", "El TXT lleva 0,00."),
+    # Una cuenta de una planilla (0,1 + 0,2) también tiene más: se dice qué lleva.
+    ({"seguro": 0.1 + 0.2}, "Seguro: escribiste «0,30000000000000004».", "El TXT lleva 0,30."),
 ])
 def test_con_mas_de_dos_decimales_se_avisa_que_lleva_el_txt(op, escrito, txt):
     avisos = _avisos_de(op)
@@ -154,7 +156,7 @@ def test_el_flete_y_el_seguro_avisan_cada_uno():
 
 @pytest.mark.parametrize("op", [
     {"flete": 2500.12}, {"flete": 2500.1}, {"flete": 2500}, {"flete": 0}, {"flete": "3.480,50"},
-    {"flete": "3,48"}, {"flete": ""}, {"flete": None}, {}, {"seguro": 0.1 + 0.2 - 0.3 + 0.3},
+    {"flete": "3,48"}, {"flete": ""}, {"flete": None}, {},
     # Lo que no se lee o es negativo ya lo frena la revisión: acá no se suma nada.
     {"flete": "1,500"}, {"flete": "abc"}, {"flete": -2.125},
     # Otros importes no son el flete ni el seguro.
@@ -216,4 +218,4 @@ def test_el_aviso_va_junto_a_los_otros_avisos_no_bloqueantes():
     assert r["panel"] is False
     assert r["cuenta"] == "· 3"
     assert "Del despachante." in r["lista"] and "Del servidor." in r["lista"]
-    assert "Flete: escribiste 2500,1250" in r["lista"] and "El TXT lleva 2500,13." in r["lista"]
+    assert "Flete: escribiste «2500,1250»." in r["lista"] and "El TXT lleva 2500,13." in r["lista"]
