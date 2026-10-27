@@ -1,5 +1,7 @@
 """CLIENTE-1b: el script que informa las fechas de inicio ya guardadas que no
 sirven, sobre una base sqlite temporal con la tabla real. Datos inventados."""
+import json
+import re
 import sqlite3
 import subprocess
 import sys
@@ -345,3 +347,96 @@ def test_si_tapar_falla_no_hay_traceback_ni_clave(monkeypatch, capsys):
     err = capsys.readouterr().err
     assert "CLAVESECRETA" not in err and "Traceback" not in err, err
     assert "No se pudo revisar la base (sin detalle): RuntimeError" in err, err
+
+
+# EXCEL-3f, H1-bis: SQLAlchemy escribe la clave con `quote(clave, safe=" +")`
+# y esa forma no se tapaba si la clave mezclaba un espacio con otro carácter
+# escapado. Se tapa cualquier forma escapada: con cualquier carácter tal cual o
+# como %XX (en mayúscula o minúscula), «+» por el espacio, o escrita por Python
+# o JSON (con las dos comillas, Python escribe «\'»).
+def _formas_de(clave):
+    from urllib.parse import quote, quote_plus
+
+    return {
+        "sqlalchemy": quote(clave, safe=" +"),
+        "quote": quote(clave),
+        "quote-vacio": quote(clave, safe=""),
+        "quote_plus": quote_plus(clave),
+        "minusculas": re.sub(r"%[0-9A-F]{2}", lambda m: m.group(0).lower(), quote(clave, safe="")),
+        "repr": repr(clave),
+        "ascii": ascii(clave),
+        "json": json.dumps(clave),
+    }
+
+
+@pytest.mark.parametrize("clave", [
+    "QZXW KJVB|NMPL", "QZXW KJVB%NMPL", "QZXW KJVB\"NMPL", "QZXW KJVB/NMPL",
+    "QZXW+KJVB NMPL", "QZXW KJVB\\NMPL", "QZXW KJVBñNMPL", "QZXW\tKJVB NMPL",
+    "QZXW 'KJVB\"NMPL",
+], ids=["barra", "porcentaje", "comilla", "barra-comun", "mas", "contrabarra", "enie", "tab",
+        "las-dos-comillas"])
+@pytest.mark.parametrize("forma", list(_formas_de("x")))
+def test_la_clave_con_espacio_y_otro_escapado_no_se_ve_como_la_escriba_el_error(
+        monkeypatch, capsys, clave, forma):
+    from urllib.parse import quote
+
+    from sqlalchemy.engine import make_url
+
+    import scripts.datos.clientes_fecha_inic_activ as script
+
+    base = f"postgresql://usuario:{quote(clave, safe='')}@db.local:9/base"
+    assert make_url(base).password == clave
+
+    async def _cae(url, arreglar_none):
+        raise RuntimeError(f"no conecta: [{_formas_de(clave)[forma]}]")
+    monkeypatch.setattr(script, "revisar", _cae)
+    assert main(["--base", base]) == 2
+    err = capsys.readouterr().err
+    assert "No se pudo revisar la base db.local:9/base: RuntimeError: no conecta: [" in err, err
+    for pedazo in ("QZXW", "KJVB", "NMPL"):
+        assert pedazo not in err, err
+
+
+def test_el_error_con_la_url_de_sqlalchemy_no_muestra_ninguna_clave_al_azar(monkeypatch, capsys):
+    """Como el fuzz de la PM: claves al azar con separadores, espacios y letras
+    de otros alfabetos, y el error repite la URL como la escribe SQLAlchemy y
+    las otras formas. Ningún pedazo de la clave queda a la vista."""
+    import random
+    from urllib.parse import quote
+
+    from sqlalchemy.engine import make_url
+
+    import scripts.datos.clientes_fecha_inic_activ as script
+
+    azar = random.Random(20261027)
+    raros = " |%+/@:?#;[]\\\"'<>{}^`~!$&*()=,\tñé€／＠"
+    letras = "ABCDEFGHJKLMNPQRSTVWXZ"
+    fugas = []
+    for _ in range(400):
+        pedazos = ["".join(azar.choices(letras, k=4)) for _ in range(3)]
+        clave = pedazos[0]
+        for p in pedazos[1:]:
+            clave += "".join(azar.choices(raros, k=azar.randint(1, 3))) + p
+        base = f"postgresql://usuario:{quote(clave, safe='')}@db.local:9/base"
+        entendida = make_url(base)
+        assert entendida.password == clave
+
+        async def _cae(url, arreglar_none, entendida=entendida, clave=clave):
+            raise RuntimeError(f"no conecta: {entendida.render_as_string(hide_password=False)} | "
+                               + " | ".join(_formas_de(clave).values()))
+        monkeypatch.setattr(script, "revisar", _cae)
+        assert main(["--base", base]) == 2
+        err = capsys.readouterr().err
+        if any(p in err for p in pedazos) or "db.local:9/base" not in err:
+            fugas.append((clave, err))
+    assert not fugas, f"{len(fugas)} de 400: {fugas[:3]}"
+
+
+@pytest.mark.parametrize("visible", ["QZXW%20KJVB%7CNMPL", "QZXW KJVB%7cNMPL", "QZXW+KJVB|NMPL"],
+                         ids=["quote", "minusculas", "mas"])
+def test_un_pedazo_del_host_que_es_la_clave_escrita_de_otra_forma_se_tapa(visible):
+    """Lo que se deja ver es el host, nunca la clave escapada aunque llegue
+    como pedazo del host."""
+    from scripts.datos.clientes_fecha_inic_activ import _tapar
+
+    assert _tapar(f"host {visible} y db", {"QZXW KJVB|NMPL"}, {visible, "db"}) == "host *** y db"
