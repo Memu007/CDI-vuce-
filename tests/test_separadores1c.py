@@ -224,3 +224,28 @@ def test_vacio_o_con_espacios_comunes_sigue_siendo_cero_o_el_numero(client, requ
 def test_la_pantalla_manda_cero_con_espacios_comunes():
     r = _js(PEDIDO_JS + "\nconsole.log(JSON.stringify(['', '  ', '\\u00a0', ' 150\\u00a0'].map(montoDelPedido)));")
     assert r == [0, 0, 0, 150]
+
+
+ITEM_SEMAFORO = {"pieza": "84713012", "descripcion": "MAQUINA DEMO", "origen": "CN",
+                 "cantidad": 1, "valor_unitario": 10, "peso_unitario": 1}
+
+
+@pytest.mark.parametrize("campo, nombre, escrito", [
+    ("flete", "Flete: ", "\x85"), ("seguro", "Seguro: ", "\x1f"), ("flete", "Flete: ", " \x1d "),
+])
+def test_el_semaforo_tampoco_lo_toma_como_blanco(client, campo, nombre, escrito):
+    """Los controles de la cabecera (semáforo y exportación) usan la misma
+    idea de blanco. Antes «\\x85» se salteaba y el semáforo no decía nada
+    mientras /generate_maria lo rechazaba."""
+    r = client.post("/api/validate/smart", json={
+        "items": [ITEM_SEMAFORO], "operacion": {"moneda": "DOL", "incoterm": "FOB", campo: escrito}})
+    assert r.status_code == 200, r.text
+    assert any(e.startswith(nombre) and "no es un importe." in e for e in r.json()["errores"]), r.json()
+
+
+@pytest.mark.parametrize("escrito", ["", "  ", " ", "\t"])
+def test_el_semaforo_sigue_tomando_como_blanco_los_espacios_comunes(client, escrito):
+    r = client.post("/api/validate/smart", json={
+        "items": [ITEM_SEMAFORO], "operacion": {"moneda": "DOL", "incoterm": "FOB", "flete": escrito}})
+    assert r.status_code == 200, r.text
+    assert not any(e.startswith("Flete") for e in r.json()["errores"]), r.json()
