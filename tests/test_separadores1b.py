@@ -86,11 +86,12 @@ def test_en_la_factura_lo_demas_sigue_como_hoy(texto, decimal, esperado):
 
 
 def test_los_precios_no_cambian():
-    """_numero_factura (precios y cantidades) no se toca: tres decimales ahí
-    son normales."""
+    """_numero_factura (precios y cantidades): tres decimales ahí son
+    normales. SEPARADORES-1d (D24): con la coma decimal, «4500.000» sólo se
+    lee como miles mal formados y queda sin leer (antes 4500000)."""
     assert pdf_extractor._numero_factura("4500.000", ".") == 4500.0
     assert pdf_extractor._numero_factura("4500,000", ",") == 4500.0
-    assert pdf_extractor._numero_factura("4500.000", ",") == 4500000.0
+    assert pdf_extractor._numero_factura("4500.000", ",") is None
 
 
 # ---------------------------------------------------------------- la pantalla

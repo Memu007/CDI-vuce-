@@ -30,60 +30,90 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
-## Al traer mi rama (2026-10-27)
+## Veredicto (2026-10-27): SEPARADORES-1d aceptada
 
-Mi rama ya trae CLIENTE-1c y ESTUDIO-1b de la Dev técnica, aceptadas hoy:
-con eso se cierran los 12 rojos conocidos (11 del tope de 15 operaciones y
-`test_guardar1`). El único rojo esperable es el de tiempo de `test_excel2`
-en un contenedor cargado (`NOW.md`). Cualquier otro rojo al traer mi rama,
-decímelo.
+Sobre `140c122` (probado en `1240c08`, sabotajes en `36f54a3`). Suite mía
+sobre `140c122`: 3478 passed, 102 skipped, 2 xfailed, 0 rojos. Tus 5
+sabotajes y los 10 de 1c en rojo por la razón esperada. Integré tu rama por
+avance rápido: mi rama está en `140c122` más este veredicto. Detalle en
+`REPRODUCCION-SEPARADORES-1d-2026-10-27.md`.
 
-## Veredicto (2026-10-27): SUFIJOS-1 y SEPARADORES-1c aceptadas
+- **D24:** 19 textos míos contra la base `91be665`; la única diferencia es
+  `01.234` con pista `,` (antes 1234, ahora sin leer). Lo bien formado no
+  cambió.
+- **D25:** `alCentavoDelTxt` contra el redondeo del generador, 20012 montos
+  al azar, 0 distintos.
+- **Se acepta** que `1234.567` con pista `,` quede sin leer: es el lado
+  seguro.
+- **Se anota, no es tarea:** el aviso no cubre gastos ni ajustes. Los
+  ajustes esperan la pregunta 5 al despachante (`PREGUNTAS-DESPACHANTE.md`).
 
-Las dos sobre `45a3ea1` (informes en `76570de` y `91be665`). Suite sobre
-`45a3ea1`: sólo los 12 rojos conocidos (esa base no trae `2ff3262`); sobre
-mi merge de tu rama (`e9981e5`): 3393 passed, 0 rojos. Integré tu rama.
-SEPARADORES-1d arranca desde tu `91be665` (o desde mi rama, igual). Detalle y salidas en `REPRODUCCION-SUFIJOS-1-vuelta-2026-10-27.md`
-y `REPRODUCCION-SEPARADORES-1c-2026-10-27.md`.
+## ORG-1 — tarea activa
 
-- **SUFIJOS-1:** tus 47 sabotajes en rojo por la razón esperada y nueve casos
-  míos en Chromium con fallas del arancel, códigos y casos distintos de los
-  tuyos (500, `{}`, `items` que no es lista, no JSON, H5 con AI, H2 con AB):
-  lo que viaja es lo que muestra la celda. El sabotaje 47 queda.
-- **SEPARADORES-1c:** tus 10 sabotajes en rojo por la razón esperada, y negativos míos de los tres
-  puntos: la factura, el blanco en el servidor y cada forma que propone la
-  pregunta vuelta a leer con `leer`.
-- **Se anota, no lo arregles:** con el arancel contestando 200 y `{}`, las
-  celdas quedan sin nota ni aviso (no viaja nada).
-- **El rojo de `test_excel2`** es el conocido de tiempo en esta máquina
-  (`NOW.md`), no tuyo.
-- **D24: (a). D25: (b).** Decididas por la PM; van en SEPARADORES-1d, abajo.
+Invitaciones al estudio (`ROADMAP.md`, Fase 2; C7 de
+`AUDITORIA-2026-10-06.md`). **Toca permisos: revisión fuerte.** Diff de
+revisión desde la punta de mi rama. Trae mi rama antes de arrancar.
 
-## SEPARADORES-1d — tarea activa
+**Alcance:** las invitaciones funcionan sin 500, quedan atadas al email
+invitado y respetan el tope de usuarios del plan. **No entra** lo demás de
+la fila 7 de `REPRODUCCION-ARGON-2026-10-24.md` (miembros que no ven los
+clientes del estudio, cancelar sobre el usuario, cobros del miembro raso,
+el trial al sacar un miembro, vaciar el email): espera la decisión de Emi.
+Si para que ORG-1 funcione hace falta algo de eso, es una D.
 
-Chica, de plata. Diff de revisión desde `91be665`.
+El código: `invite_to_organization` y `validate_invitation` en
+`proyecto_maria/main.py` (~9480 y ~9540), el registro con `invite_token`
+(~2898-2921), `Invitation` en `database/models.py` y el plan en
+`services/billing_service.py`.
 
-1. **D24: la regla de miles de 1c también en `_numero_factura`** (cantidad,
-   valor unitario y pesos). Un número que sólo se puede leer como miles con
-   grupos mal formados queda sin leer, vacío, como hoy «12x3», y la
-   revisión lo marca como hoy. Lo bien formado se lee igual que hoy.
-2. **D25: aviso no bloqueante cuando un importe que va al TXT con dos
-   decimales tiene más.** Flete y seguro, en la pantalla, junto a los otros
-   avisos no bloqueantes: qué escribió y qué lleva el TXT (por ejemplo
-   «2500,1250» → «El TXT lleva 2500,13»). No cambia lo que se lee ni lo que
-   sale en el TXT; «1.234,567» se sigue aceptando.
+1. **Premisa primero.** Reproducí el 500 en Postgres antes de arreglar.
+   Mi sospecha, sin correr: `expires_at` es `DateTime(timezone=True)` y se
+   compara con `datetime.utcnow()`, sin zona; en Postgres vuelve con zona y
+   la comparación revienta, en SQLite no. Hay Postgres 16 instalado en el
+   contenedor (`/usr/lib/postgresql/16`). Si es otra cosa, decímelo con la
+   salida.
+2. **Sin 500 en las dos bases.** Validar, registrarse con invitación y una
+   invitación vencida dan la respuesta de hoy en SQLite y en Postgres. Los
+   registros viejos de SQLite vienen sin zona: también. Una prueba que sólo
+   corre en SQLite no distingue este defecto: corré contra un Postgres
+   local, o inyectá un `expires_at` con zona.
+3. **Atada al email.** Al registrarse con `invite_token`, el email del
+   registro (con `strip().lower()`, como lo guarda la invitación) tiene que
+   ser el invitado. Si no coincide o falta: 400 y la invitación **no** se
+   gasta. Una cuenta que ya existe y se suma por invitación no entra: hoy
+   sólo existe el camino del registro.
+4. **Tope del plan.** Sale de `billing_service.get_plan(org.plan or
+   "premium")["users"]`, nunca un 3 escrito a mano. Cuentan los usuarios con
+   el `organization_id` del estudio (el dueño también). Al invitar: 400 si
+   miembros más invitaciones pendientes sin vencer llegan al tope. Al
+   registrarse: 400 si los miembros ya llegaron, sin gastar la invitación.
+   Sacar un miembro libera el lugar (ya lo hace).
+5. **Un solo uso, de verdad.** Hoy el usuario y el «accepted» se guardan en
+   dos commits: dos registros a la vez con el mismo token pasan los dos. La
+   invitación se gasta en la misma transacción que el alta, con una
+   actualización condicionada a `status = 'pending'`, y se comprueba que
+   tocó una fila. Contame qué deja una carrera de dos registros a la vez; si
+   en SQLite no se puede provocar, decilo.
 
-**Pruebas:** por cada punto, al menos dos ejemplos de la familia que no
-sean los de acá; las guardas (lo bien formado no cambia; con dos decimales
-o menos no hay aviso); un sabotaje por punto que vuelva a lo de hoy. Suite
-completa sobre el SHA que entregás.
+**Pruebas:** por punto, casos de la familia y no un solo ejemplo; las
+guardas (una invitación válida del email correcto con lugar entra igual que
+hoy); un sabotaje por punto que vuelva a lo de hoy; corré
+`scripts/testing/ataque_aislamiento.sh`. Suite completa sobre el SHA que
+entregás.
 
-**No se toca:** lo que sale en el TXT para números bien formados; el
-redondeo; lo que 1c dejó como guarda.
+**No se toca:** el alta sin invitación, el cobro y los planes, lo que ve
+cada miembro.
 
-**Apenas entregues:** DESTINO-1 y PESO-NETO-1 esperan datos del despachante
-(la lista de códigos y el packing list); te aviso cuando lleguen. Si no
-llegaron, la siguiente te la dejo acá al darte el veredicto de 1d.
+**Tu cupo:** hasta el 28/10 a las 18:00 UTC no tenés subagentes ni
+`/code-review`. Programá, armá casos y sabotajes ya; `/entregar` espera a
+que vuelva el cupo. Yo sumo un adversario de permisos en mi revisión.
+
+**Puede pausarse:** le pregunto a Emi si tres errores del TXT de la
+auditoría (8.1, 9.2 y 8.2) van antes. Si dice que sí, te aviso acá y ORG-1
+queda donde esté.
+
+**Apenas entregues:** DESTINO-1, PESO-NETO-1 y PRORRATEO-1 esperan datos
+del despachante; te aviso cuando lleguen.
 
 ## Qué pasó el 2026-10-24
 
@@ -156,4 +186,4 @@ SEPARADORES-1 y 1b, 2026-10-25: **D19 (b)**, **D20 (a)**, **D21 (b)**
 la PM (`DECISIONS.md`).
 
 SEPARADORES-1c, 2026-10-27: **D24 (a)**, **D25 (b)** (SEPARADORES-1d).
-Decididas por la PM.
+Decididas por la PM. Aceptada en `140c122`. La próxima D es la D26.

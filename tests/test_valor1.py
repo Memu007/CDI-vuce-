@@ -500,7 +500,8 @@ def _avisos(despues):
              "CDI.api = () => new Promise(ok => pendientes.push(ok));\n"
              "function contestar(i, okHttp, data) { pendientes[i]({ok: okHttp, json: async () => data}); }\n")
     codigo = stubs + _funciones("finalize.js", ["ajusteMalEscrito", "importeEscrito", "otroDeducir", "pintarValor",
-                                                "seguroSinLeer", "firmaDelPedido", "refrescarAvisos"]) + (
+                                                "seguroSinLeer", "firmaDelPedido", "refrescarAvisos",
+                                                "avisosDeLosMontos", "alCentavoDelTxt"]) + (
         f"\n(async () => {{ {despues}; await new Promise(r => setTimeout(r, 0));"
         " console.log(JSON.stringify({ultimoValor, cuentasCon, error: els.valorError.textContent,"
         " cuentas: els.valorCuentas.innerHTML})); })();")

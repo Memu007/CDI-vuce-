@@ -184,6 +184,34 @@
         if (estudio) estudio.addEventListener('change', programar);
     }
 
+    // SEPARADORES-1d (D25): el flete y el seguro van al TXT con dos
+    // decimales. Si tienen más, se avisa sin frenar qué se escribió y qué
+    // lleva el TXT. Lo que no se lee o es negativo ya lo frena la revisión.
+    function avisosDeLosMontos(op) {
+        return [['Flete', op.flete], ['Seguro', op.seguro]].map(function (par) {
+            const r = CDI.montos.leer(par[1]);
+            if (r.error || r.valor === null || r.valor < 0) return null;
+            const txt = alCentavoDelTxt(r.valor);
+            if (txt === null) return null;
+            const escrito = typeof par[1] === 'string' ? par[1].trim() : CDI.montos.escribir(r.valor);
+            return par[0] + ': escribiste «' + escrito + '». El TXT lleva ' + txt + '.';
+        }).filter(Boolean);
+    }
+
+    // Como centavos() del generador: el número más corto que lo escribe
+    // (String de JS da lo mismo que repr de Python) y la mitad hacia arriba,
+    // con cuentas de texto: Math.round(2.675 * 100) da 267. null si tiene dos
+    // decimales o menos.
+    function alCentavoDelTxt(n) {
+        const s = String(n);
+        if (/e/i.test(s)) return /e-/i.test(s) ? '0,00' : null;   // menos de 0,000001 o más de 1e21
+        const [entero, dec = ''] = s.split('.');
+        if (dec.length <= 2) return null;
+        const cent = BigInt(entero + dec.slice(0, 2)) + (dec[2] >= '5' ? 1n : 0n);
+        const t = cent.toString().padStart(3, '0');
+        return t.slice(0, -2) + ',' + t.slice(-2);
+    }
+
     async function refrescarAvisos() {
         const panel = document.getElementById('validatingAvisosPanel');
         const list = document.getElementById('validatingAvisosList');
@@ -195,8 +223,10 @@
         let valor = null;
         let firma = null;
         // SUFIJOS-1: lo que dicen las celdas del sufijo (el arancel no
-        // contestó, lo escrito con otro de la operación, D23).
-        const deLaPantalla = CDI.despachante && CDI.despachante.avisos ? CDI.despachante.avisos() : [];
+        // contestó, lo escrito con otro de la operación, D23). SEPARADORES-1d:
+        // el flete o el seguro con más de dos decimales.
+        const deLaPantalla = (CDI.despachante && CDI.despachante.avisos ? CDI.despachante.avisos() : [])
+            .concat(avisosDeLosMontos((CDI.state && CDI.state.operacion) || {}));
         try {
             const pedido = buildMariaRequest();
             firma = firmaDelPedido(pedido);

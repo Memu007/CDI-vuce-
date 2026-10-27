@@ -2138,6 +2138,11 @@ def _numero_factura(raw, decimal: str | None):
     t = _MONEDA_O_CUENTA_ATRAS.sub('', t).strip()
     if not re.fullmatch(r"\d{1,3}(?:[ '\u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d[\d.,]*", t):
         return None
+    # SEPARADORES-1d (D24): la regla de miles de 1c vale para todo número de
+    # la factura (flete, seguro, cantidad, precio y peso). «0.500.000» no se
+    # lee como 500000: queda vacío, como «12x3».
+    if _miles_mal_formados(t, decimal):
+        return None
     t = re.sub(r"[ '\u00a0\u202f]", '', t)
     propio = _separador_decimal(t)
     if '.' in t and ',' in t:
@@ -2193,8 +2198,6 @@ def _monto_factura(raw, decimal: str | None):
     separador como decimal, puede ser 3,48: None, no se adivina."""
     t = _MONEDA_ADELANTE.sub('', str(raw).strip()) if isinstance(raw, str) else ''
     t = _MONEDA_O_CUENTA_ATRAS.sub('', t).strip()
-    if _miles_mal_formados(t, decimal):
-        return None
     miles = re.fullmatch(r"[1-9]\d{0,2}([.,])\d{3}", t)
     if not miles:
         # SEPARADORES-1b. «4500.000» (o «4 500.000») con la coma decimal: no
