@@ -216,3 +216,11 @@ el cero adelante y los grupos de miles mal formados en la factura, el
 «en blanco» distinto entre pantalla y servidor y la pregunta que sugiere
 tres decimales van en SEPARADORES-1c, después de SUFIJOS-1. Son de antes o
 piden saltearse la revisión.
+
+## 2026-10-27 — Gana el sufijo que escribió la persona; aviso del sufijo vacío (PM, H5 y D23 de SUFIJOS-1)
+
+Decidido por la PM. H5: la propuesta del arancel no pisa un AA, AB o AI que
+el despachante escribió en el sufijo de la operación; sólo agrega los
+códigos que faltan y, si propone otro valor, lo avisa en la fila. D23 (c):
+si todos los productos tienen sufijo propio, el de la operación vacío no
+frena, pero se avisa junto al botón. Las dos van en la vuelta de SUFIJOS-1.

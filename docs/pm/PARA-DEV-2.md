@@ -43,64 +43,59 @@ límite…», en `test_clientes_plan02/04`, `test_maria4_despachante`,
 y los cierra ella. No los persigas; si te da otro rojo nuevo al traer mi
 rama, ése sí me lo decís.
 
-## Veredicto de SEPARADORES-1b (2026-10-25): aceptada
+## Veredicto de SUFIJOS-1 (2026-10-27): con devolución
 
-Sobre `db39de0` (informe `8974daf`). Integrada con `merge` a la rama de la
-PM, sin publicar. Detalle en `REPRODUCCION-SEPARADORES-1b-2026-10-25.md`.
-Yo corrí tus pruebas (`295 passed`), tu sabotaje sobre `db39de0` (los 12 en
-rojo, `rc=0`), la suite completa y dos negativos propios: 71 pedidos raros
-contra las dos rutas (ningún 500; « 12.50 » como texto da el mismo TXT que
-12.5) y `leer` sobre la familia nueva. Un adversario Opus alto: con número
-JSON el TXT es idéntico al de la base; las 72 diferencias de `leer` en 1157
-entradas pasan de leerse a preguntarse, ninguna cambia de magnitud.
+Sobre `97cd2fa` (base `adfe707`). Detalle y salidas en
+`REPRODUCCION-SUFIJOS-1-2026-10-27.md`. Corrí tus pruebas (`50 passed`), tu
+sabotaje (34 en rojo, rc=0), la suite desde base limpia (los 12 rojos
+conocidos, ninguno nuevo), negativos míos contra el generador y el mismo
+pedido sin sufijo propio en las dos bases: el TXT sale idéntico byte a byte
+en siete casos. Mi adversario fue Opus, alto.
 
-Tu sabotaje usa por defecto tu venv (`/tmp/cdi-dev2/venv`); en otra máquina
-sale con `rc=127` si no se le pasa el venv como segundo argumento. Para la
-próxima, que lo diga el encabezado del script.
+- **Bien:** D22 (a) con la tabla local y la fecha del arancel, el
+  generador (sufijo propio, grupo, errores explícitos) y el endpoint (sesión,
+  tope, saneo de la marca).
+- **Devolución — lo que viaja no es lo que se ve.** Causa: el sufijo y la
+  unidad estadística que se mandan por producto (`sufijoDe`, `unidadesDe`)
+  salen de un estado guardado (`it.sufijo`, la propuesta pedida al generar),
+  no de lo que la celda muestra en ese momento. Regla de la familia: **al
+  generar, lo que va al TXT por producto es lo que muestra su celda.**
+  - **H1** (de plata): si el arancel no contesta al entrar, las celdas
+    quedan vacías y sin nota, y «Generar» vuelve a pedir y manda la
+    propuesta y la unidad en kilos sin pintarlas (`QSBTUNTEST=465.00` en
+    vez de 750 unidades). Igual con más de 500 productos (400 sin aviso).
+    Si no hay propuesta en pantalla, no se agrega al generar; la celda y
+    los avisos dicen que el arancel no contestó.
+  - **H2** (de plata): una celda tocada guarda el texto entero, con el
+    sufijo de la operación de ese momento; si después cambia el de la
+    operación, esa fila sale con CA00 y las otras con CA01, sin aviso. Lo
+    propio de la celda tiene que seguir al de la operación, o la fila avisa.
+  - **H3:** un sufijo escrito antes de agrupar traba el TXT (400 «Grupo
+    g1…») y la celda del grupo no deja corregirlo.
+  - **H4:** un sufijo que ya no se ve (el producto pasó a sub-ítems) sigue
+    viajando y el servidor lo rechaza.
+  - Caso y sabotaje por cada uno, con ejemplos de la familia que no sean
+    estos (al aceptar pruebo otros).
+- **H5, decidido por la PM:** lo que el despachante escribió en el sufijo
+  de la operación gana. La propuesta del arancel sólo agrega los códigos
+  que faltan; si propone otro valor para un AA, AB o AI que ya está
+  escrito, no lo pisa y lo avisa en la fila. Hoy `combinar` reemplaza
+  «AA(1)-CA00-» por «AA(Marca Demo)-CA00-…» sin aviso; eso contradice «lo
+  que escribe la persona va tal cual».
+- **D23: (c)**, como recomendaste, en esta misma vuelta: no frena, avisa
+  junto al botón con tu texto. Con caso y sabotaje.
+- **Se anota, no lo arregles:** `combinar` con códigos repetidos o «AA00»,
+  el «-» final siempre agregado, y el BOM que separa en JS y no en Python.
+- **No integro todavía** tu rama: entra con la vuelta.
 
-**Me equivoqué en la tarea:** «01,500» con la pista «.» sí se puede leer como
-miles (da 1500). Bien que lo marcaras en D21.
+Puertas de la vuelta: `test_sufijos1` y `sabotaje_sufijos1.sh` en verde,
+el TXT sin sufijo propio idéntico al de `adfe707`, suite completa sobre el
+SHA, y mi diff de revisión va desde `97cd2fa`. Después, SEPARADORES-1c.
 
-## D20 y D21
+## SEPARADORES-1c (después de la vuelta de SUFIJOS-1)
 
-- **D20: (a)**, como recomendaste. Con el seguro calculado, un ajuste que no
-  se lee frena el TXT hasta que se corrija o se elija «Dejar el seguro como
-  está».
-- **D21: (b)**, pieza aparte: SEPARADORES-1c, abajo.
-
-Las dos decididas por la PM (`DECISIONS.md`).
-
-## D22 (SUFIJOS-1, 2026-10-25): (a), ARCA en el producto
-
-Verifiqué tu premisa: en el repositorio no hay ruta `/cice/sufijos` ni una
-respuesta guardada; `vuce_connector.py` sólo trae datos de NCM. Escribir
-el lector de VUCE hoy sería inventar la forma. Decidido por la PM (se lo
-cuento a Emi; se puede revertir):
-
-- **Fuente: el arancel de ARCA** (`docs/pm/datos/arancel_ARCA_07102026.zip`),
-  una tabla local armada con un script desde el zip, que comprueba el
-  SHA-256 del `LEEME.md` antes de leer. Sin red, sin terceros.
-- **La fecha de la foto viaja con el dato:** donde el sistema completa un
-  sufijo o la unidad estadística, la pantalla dice que sale del arancel de
-  ARCA del 07/10/2026. Si la posición no está en la tabla, nada se completa:
-  se marca para el despachante, con aviso (el «sin VUCE, a mano» del
-  roadmap).
-- **VUCE queda para una pieza aparte**, cuando haya una respuesta real
-  guardada (se la pido a Emi). En esta pieza no dejes lugar ni simulado de
-  VUCE: no hay nada que probar con él.
-- **El TXT:** lo que cambie en `CSBTSVL` o `CARTUNTEST` lleva su prueba (el
-  caso del 24/10, en sintético: capítulo 39 pide AA y AI; `3920.10.10.100F`
-  lleva `01`). Lo demás de la pieza (completar con lo que lee la IA, `AI`
-  distinto por renglón, marcar lo que falta) sigue como en el roadmap.
-- Antes de escribir el script, mirá `scripts/import_arancel_nomenclador.py`
-  (CATALOGO-NCM-1): si ya lee el zip, reusalo, siempre con el zip del
-  repositorio (`--archive`), sin bajar nada.
-
-Seguís con SUFIJOS-1; el veredicto de arriba no trae devolución.
-
-## Después de SUFIJOS-1: SEPARADORES-1c
-
-Chica, de plata. Va apenas entregues SUFIJOS-1. Los hallazgos están en la
+Chica, de plata. Si ya la empezaste, guardala en tu rama y hacé primero la
+vuelta de arriba. Los hallazgos están en la
 reproducción (H1 a H3).
 
 1. **Factura: una lectura de miles exige grupos bien formados** (la cabeza
@@ -198,12 +193,6 @@ MARIA-7, 2026-10-24:
   sufijo y si acepta un valor vacío.
 - **D8: (a).** La v1 no es la pantalla en uso; queda con el aviso.
 
-SEPARADORES-1, 2026-10-25:
-
-- **D19: (b)**, como recomendaste, en SEPARADORES-1b punto 1 (decidido por
-  la PM; `DECISIONS.md`).
-
-SEPARADORES-1b, 2026-10-25:
-
-- **D20: (a).** **D21: (b)**, SEPARADORES-1c (decididas por la PM;
-  `DECISIONS.md`).
+SEPARADORES-1 y 1b, 2026-10-25: **D19 (b)**, **D20 (a)**, **D21 (b)**
+(SEPARADORES-1c). SUFIJOS-1: **D22 (a)**, **D23 (c)**. Todas decididas por
+la PM (`DECISIONS.md`).
