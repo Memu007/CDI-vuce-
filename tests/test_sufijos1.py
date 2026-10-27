@@ -297,133 +297,336 @@ def test_la_propuesta_rechaza_lo_que_no_es_una_lista(client):
 
 
 V2 = ROOT / "proyecto_maria" / "static" / "v2" / "screens"
+APP = ROOT / "proyecto_maria" / "static" / "v2" / "app_v2.js"
+
+# Una página mínima para despachante.js: cada id existe; las celdas del
+# sufijo y sus notas se leen de lo que la pantalla pintó en despachanteItems.
+# El arancel falso propone AA con la marca y AI con el código para PLASTICO,
+# con la unidad estadística de `unidades`; `modo` lo hace fallar ('falla',
+# respuesta no ok) o tirar ('tira'); `frenar` lo deja colgado hasta soltar().
+_PAGINA = r"""
+global.window = {};
+const elementos = {};
+function elemento(id) {
+  if (!elementos[id]) {
+    elementos[id] = { id, value: '', innerHTML: '', hidden: false, style: {}, textContent: '', dataset: {},
+      oyentes: {}, classList: { contains: () => false },
+      addEventListener(t, f) { (this.oyentes[t] = this.oyentes[t] || []).push(f); } };
+  }
+  return elementos[id];
+}
+const desescapar = s => s.replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
+  .replace(/&#39;/g, "'").replace(/&amp;/g, '&');
+let leido = { html: null, celdas: [], notas: [] };
+function leerFilas() {
+  const html = elemento('despachanteItems').innerHTML;
+  if (leido.html === html) return leido;
+  const celdas = [...html.matchAll(/<input [^>]*class="[^"]*\bdespachante-sufijo"[^>]*>/g)].map(m => ({
+    value: desescapar(/ value="([^"]*)"/.exec(m[0])[1]), dataset: { row: /data-row="(\d+)"/.exec(m[0])[1] },
+    classList: { contains: c => c === 'despachante-sufijo' } }));
+  const notas = [...html.matchAll(/<div class="[^"]*\bdespachante-sufijo-nota"[^>]*data-row="(\d+)"[^>]*>(.*?)<\/div>/g)]
+    .map(m => ({ dataset: { row: m[1] }, textContent: desescapar(m[2]),
+      classList: { contains: c => c === 'despachante-sufijo-nota' } }));
+  leido = { html, celdas, notas };
+  return leido;
+}
+global.document = {
+  activeElement: null,
+  getElementById: elemento,
+  querySelectorAll(sel) {
+    if (sel === '.despachante-sufijo') return leerFilas().celdas;
+    if (sel === '.despachante-sufijo-nota') return leerFilas().notas;
+    return [];
+  },
+};
+"""
+
+_ARNES = r"""
+const CDI = window.CDI; CDI.state = { operacion: { despachante: {} }, items: [] };
+const D = CDI.despachante;
+let pedidos = 0, modo = 'ok', frenar = false, colgados = [];
+const unidades = { 'PLASTICO': '01' };
+function soltar() { const c = colgados; colgados = []; c.forEach(r => r()); }
+CDI.api = async (ruta, op) => {
+  if (ruta !== '/api/sufijos/propuesta') return { ok: true, json: async () => ({ operaciones: [] }) };
+  pedidos += 1;
+  const b = JSON.parse(op.body);
+  if (frenar) await new Promise(r => colgados.push(r));
+  await new Promise(r => setImmediate(r));
+  if (modo === 'tira') throw new Error('sin red');
+  if (modo === 'falla') return { ok: false, json: async () => ({ detail: 'caído' }) };
+  return { ok: true, json: async () => ({ fuente: 'arancel de ARCA del 07/10/2026', items:
+    b.items.map(x => x.pieza === 'PLASTICO' ? { posicion: x.pieza, en_la_tabla: true,
+      unidad_estadistica: unidades['PLASTICO'], faltan: [],
+      sufijo: (x.marca ? 'AA(' + x.marca + ')-' : '') + (x.codigo_parte ? 'AI(' + x.codigo_parte + ')-' : '') }
+      : { posicion: x.pieza, en_la_tabla: false, sufijo: '', faltan: [] }) }) };
+};
+const tick = () => new Promise(r => setImmediate(r));
+function operacion(texto) {
+  CDI.state.operacion.sbt_sufijo_valor = texto;
+  const campo = document.getElementById('sbtSufijoValor');
+  campo.value = texto;
+  (campo.oyentes.input || []).forEach(f => f({ target: campo }));
+}
+const celda = i => leerFilas().celdas.find(c => c.dataset.row === String(i));
+const nota = i => { const n = leerFilas().notas.find(c => c.dataset.row === String(i)); return n ? n.textContent : null; };
+function escribir(i, texto) {
+  const c = celda(i);
+  c.value = texto;
+  (document.getElementById('despachanteWrap').oyentes.input || []).forEach(f => f({ target: c }));
+}
+// Lo que iría al pedido de cada producto si se genera ahora.
+const viaja = () => CDI.state.items.map((it, i) => [D.sufijoDe(it, i), D.unidadesDe(it, i).unidad_estadistica]);
+"""
 
 
-def _unidades_de(casos):
-    """Corre `unidadesDe` de despachante.js en node con un CDI mínimo."""
+def _pantalla(pasos):
+    """Corre despachante.js en node con la página mínima; `pasos` es JS que
+    deja lo que se mide en `salida`."""
+    escape = APP.read_text(encoding="utf-8").split("function escapeHtml(s) {", 1)[1].split("\n    }", 1)[0]
     codigo = (
-        "global.window = {}; global.document = { getElementById: () => null };\n"
+        _PAGINA
         + (V2 / "despachante.js").read_text(encoding="utf-8")
-        + "\nconst CDI = window.CDI; CDI.state = { operacion: { despachante: {} } };"
-        + f"\nconst casos = {json.dumps(casos)};"
-        + "\nconsole.log(JSON.stringify(casos.map(([it, op, tabla]) => {"
-        + " CDI.state.operacion.despachante = op; CDI.despachante.recordarTabla(tabla);"
-        + " return CDI.despachante.unidadesDe(it); })));"
-    )
-    salida = subprocess.run(["node", "-e", codigo], check=True, capture_output=True, text=True)
-    return json.loads(salida.stdout)
-
-
-def test_la_estadistica_de_la_tabla_va_al_pedido_si_nadie_eligio_otra():
-    kilos = {PLASTICO: {"unidad_estadistica": "01"}}
-    m2 = {PLASTICO: {"unidad_estadistica": "03"}}
-    lona = {"pieza": PLASTICO, "unidad": "03"}
-    assert [u["unidad_estadistica"] for u in _unidades_de([
-        [lona, {}, kilos],                                   # la tabla dice kilos: va 01
-        [lona, {}, m2],                                      # la tabla dice la declarada: nada
-        [lona, {}, {}],                                      # fuera de la tabla: nada
-        [lona, {"unidad_estadistica": "DCL"}, kilos],        # la persona eligió la de la factura
-        [dict(lona, unidad_estadistica="DCL"), {}, kilos],   # en el producto, también
-        [{"pieza": FUERA, "unidad": "03"}, {"unidad_estadistica": "01"}, kilos],
-    ])] == ["01", None, None, None, None, "01"]
-
-
-def test_con_sub_items_la_estadistica_de_la_tabla_no_va_sola():
-    # Con sub-ítems, kilos sólo cierra si la de la factura también es en kilos
-    # (el generador lo frena): la pantalla no la pone sola.
-    kilos = {PLASTICO: {"unidad_estadistica": "01"}}
-    partido = {"pieza": PLASTICO, "unidad": "03", "subitems": [{"cantidad": 1}, {"cantidad": 2}]}
-    assert [u["unidad_estadistica"] for u in _unidades_de([
-        [partido, {}, kilos],
-        [partido, {"unidad_estadistica": "01"}, kilos],      # la persona eligió kilos: va
-    ])] == [None, "01"]
-
-
-def _despachante(pasos):
-    """Corre despachante.js en node con un CDI mínimo y un arancel falso que
-    propone AA con la marca y AI con el código; `pasos` es JS que deja lo que
-    se mide en `salida`."""
-    codigo = (
-        "global.window = {}; global.document = { getElementById: () => null };\n"
-        + (V2 / "despachante.js").read_text(encoding="utf-8")
-        + "\nconst CDI = window.CDI; CDI.state = { operacion: { despachante: {} }, items: [] };"
-        + "\nlet pedidos = 0;"
-        + "\nCDI.api = async (ruta, op) => { pedidos += 1; const b = JSON.parse(op.body);"
-        + " await new Promise(r => setImmediate(r));"
-        + " return { ok: true, json: async () => ({ fuente: 'arancel de ARCA del 07/10/2026', items:"
-        + " b.items.map(x => x.pieza === '" + PLASTICO + "' ? { posicion: x.pieza, en_la_tabla: true,"
-        + " unidad_estadistica: '01', faltan: [], sufijo: (x.marca ? 'AA(' + x.marca + ')-' : '')"
-        + " + (x.codigo_parte ? 'AI(' + x.codigo_parte + ')-' : '') }"
-        + " : { posicion: x.pieza, en_la_tabla: false, sufijo: '', faltan: [] }) }) }; };"
-        + "\nconst salida = {}; const D = CDI.despachante;"
-        + "\n(async () => {\n" + pasos + "\nconsole.log(JSON.stringify(salida)); })();"
+        + "\nwindow.CDI.escapeHtml = function (s) {" + escape + "\n};"
+        + _ARNES.replace("'PLASTICO'", json.dumps(PLASTICO))
+        + "\nconst salida = {};\n(async () => {\n" + pasos + "\nconsole.log(JSON.stringify(salida)); })()"
+        + ".catch(e => { console.error(e); process.exit(1); });"
     )
     r = subprocess.run(["node", "-e", codigo], capture_output=True, text=True)
     assert r.returncode == 0, r.stderr
     return json.loads(r.stdout)
 
 
-def _producto(marca, codigo="", pieza=PLASTICO):
-    return {"pieza": pieza, "marca": marca, "codigo_parte": codigo}
+def _producto(marca, codigo="", pieza=PLASTICO, **mas):
+    return dict({"pieza": pieza, "marca": marca, "codigo_parte": codigo}, **mas)
+
+
+def _items(*productos):
+    return f"CDI.state.items = {json.dumps(list(productos))};"
+
+
+def test_la_estadistica_de_la_tabla_va_al_pedido_si_nadie_eligio_otra():
+    lona = {"pieza": PLASTICO, "unidad": "03"}
+    casos = [
+        # producto, la de la operación, la unidad de la tabla
+        (lona, {}, "01"),                                   # la tabla dice kilos: va 01
+        (lona, {}, "03"),                                   # la tabla dice la declarada: nada
+        ({"pieza": FUERA, "unidad": "03"}, {}, "01"),       # fuera de la tabla: nada
+        (lona, {"unidad_estadistica": "DCL"}, "01"),        # la persona eligió la de la factura
+        (dict(lona, unidad_estadistica="DCL"), {}, "01"),   # en el producto, también
+        ({"pieza": FUERA, "unidad": "03"}, {"unidad_estadistica": "01"}, "01"),
+    ]
+    pasos = "salida.est = [];" + "".join(
+        f"unidades[{json.dumps(PLASTICO)}] = {json.dumps(u)}; CDI.state.operacion.despachante = {json.dumps(op)};"
+        f"{_items(dict(it, marca=f'M{n}'))} await D.render(); salida.est.push(viaja()[0][1]);\n"
+        for n, (it, op, u) in enumerate(casos))
+    assert _pantalla(pasos)["est"] == ["01", None, None, None, None, "01"]
+
+
+def test_con_sub_items_la_estadistica_de_la_tabla_no_va_sola():
+    # Con sub-ítems, kilos sólo cierra si la de la factura también es en kilos
+    # (el generador lo frena): la pantalla no la pone sola.
+    partido = {"pieza": PLASTICO, "unidad": "03", "subitems": [{"cantidad": 1}, {"cantidad": 2}]}
+    salida = _pantalla(
+        f"{_items(partido)} await D.render(); salida.sola = viaja()[0][1];"
+        "CDI.state.operacion.despachante = { unidad_estadistica: '01' }; salida.elegida = viaja()[0][1];")
+    assert salida == {"sola": None, "elegida": "01"}
 
 
 def test_la_propuesta_se_suma_a_lo_que_trae_el_de_la_operacion():
-    # El de la operación tiene códigos que la propuesta no completa (PC01,
-    # CA00): se conservan, y AA y AI salen del producto.
+    # El de la operación gana (H5): la propuesta sólo agrega los códigos que
+    # faltan, y los demás de la operación (PC01, CA00) quedan.
     casos = {
-        "op_con_otros": ("AA(OPMARCA)-PC01-", "AA(ACME)-PC01-AI(X1)-"),
-        "op_en_minusculas": ("aa(op)-ca00", "AA(ACME)-ca00-AI(X1)-"),
+        "op_con_otros": ("AA(OPMARCA)-PC01-", "AA(OPMARCA)-PC01-AI(X1)-"),
+        "op_en_minusculas": ("aa(op)-ca00", "aa(op)-ca00-AI(X1)-"),
         "op_vacia": ("", "AA(ACME)-AI(X1)-"),
         "op_que_no_se_separa": ("AA(SIN CERRAR", ""),   # lo dice el servidor con el de la operación
     }
     pasos = "".join(
-        f"CDI.state.items = [{json.dumps(_producto('ACME', 'X1'))}];"
-        f"CDI.state.operacion.sbt_sufijo_valor = {json.dumps(op)};"
-        f"await D.listo(); salida[{json.dumps(nombre)}] = D.sufijoDe(CDI.state.items[0], 0);\n"
+        f"{_items(_producto('ACME', 'X1'))} operacion({json.dumps(op)});"
+        f"await D.render(); salida[{json.dumps(nombre)}] = [viaja()[0][0], celda(0).value];\n"
         for nombre, (op, _) in casos.items())
-    assert _despachante(pasos) == {nombre: esperado for nombre, (_, esperado) in casos.items()}
+    assert _pantalla(pasos) == {nombre: [esperado, esperado] for nombre, (_, esperado) in casos.items()}
 
 
 def test_lo_que_escribe_la_persona_va_tal_cual():
-    salida = _despachante(
-        f"CDI.state.operacion.sbt_sufijo_valor = 'AA(OP)-CA00-';"
-        f"CDI.state.items = [{json.dumps(dict(_producto('ACME', 'X1'), sufijo='AA(MANO)-'))},"
-        f" {json.dumps(_producto('ACME', pieza=FUERA))}];"
-        "await D.listo(); salida.mano = D.sufijoDe(CDI.state.items[0], 0);"
-        " salida.fuera = D.sufijoDe(CDI.state.items[1], 1);")
-    assert salida == {"mano": "AA(MANO)-", "fuera": ""}
+    salida = _pantalla(
+        "operacion('AA(OP)-CA00-');"
+        + _items(_producto('ACME', 'X1', sufijo='AA(MANO)-'), _producto('ACME', pieza=FUERA))
+        + "await D.render(); salida.viaja = viaja().map(v => v[0]);")
+    assert salida == {"viaja": ["AA(MANO)-", ""]}
 
 
 def test_la_propuesta_de_una_fila_no_pasa_al_producto_que_queda_en_su_lugar():
-    # Se borra el primero: hasta que llega la propuesta nueva, el que queda
-    # en la fila 0 no lleva la marca del borrado.
-    salida = _despachante(
-        f"CDI.state.items = [{json.dumps(_producto('SAMSUNG', 'S1'))}, {json.dumps(_producto('LG', 'L1'))}];"
-        "await D.listo(); salida.antes = D.sufijoDe(CDI.state.items[1], 1);"
-        "CDI.state.items.splice(0, 1);"
-        "salida.en_el_medio = D.sufijoDe(CDI.state.items[0], 0);"
-        "const viejo = D.listo(); CDI.state.items[0].marca = 'LG2';"   # cambia otra vez en vuelo
-        "await D.listo(); await viejo; salida.despues = D.sufijoDe(CDI.state.items[0], 0);"
+    # Se borra el primero: hasta que se vuelve a pintar, el que queda en la
+    # fila 0 no lleva la marca del borrado; si cambia otra vez mientras se
+    # consulta, vale la última.
+    salida = _pantalla(
+        _items(_producto('SAMSUNG', 'S1'), _producto('LG', 'L1'))
+        + "await D.render(); salida.antes = viaja()[1][0];"
+        "CDI.state.items.splice(0, 1); salida.en_el_medio = viaja()[0];"
+        "const viejo = D.render(); CDI.state.items[0].marca = 'LG2';"
+        "await D.render(); await viejo; salida.despues = [viaja()[0][0], celda(0).value];"
         "salida.pedidos = pedidos;")
-    assert salida == {"antes": "AA(LG)-AI(L1)-", "en_el_medio": "",
-                      "despues": "AA(LG2)-AI(L1)-", "pedidos": 3}
+    assert salida == {"antes": "AA(LG)-AI(L1)-", "en_el_medio": ["", None],
+                      "despues": ["AA(LG2)-AI(L1)-", "AA(LG2)-AI(L1)-"], "pedidos": 3}
 
 
-def test_listo_no_repite_el_pedido_en_curso():
-    salida = _despachante(
-        f"CDI.state.items = [{json.dumps(_producto('ACME'))}];"
-        "await Promise.all([D.listo(), D.listo(), D.listo()]); await D.listo();"
+def test_volver_a_pintar_no_repite_el_pedido_en_curso():
+    salida = _pantalla(
+        _items(_producto('ACME'))
+        + "await Promise.all([D.render(), D.render(), D.render()]); await D.render();"
         "salida.pedidos = pedidos;")
     assert salida == {"pedidos": 1}
 
 
 def test_sin_la_tabla_la_nota_no_dice_que_la_posicion_no_esta():
-    salida = _despachante(
+    salida = _pantalla(
         "CDI.api = async () => ({ ok: true, json: async () => ({ fuente: 'arancel de ARCA', sin_tabla: true,"
         " items: [{ posicion: 'X', en_la_tabla: false, sufijo: '', faltan: [] }] }) });"
-        f"CDI.state.items = [{json.dumps(_producto('ACME'))}];"
-        "await D.listo(); salida.nota = D.notaDe(CDI.state.items[0], 0);")
+        + _items(_producto('ACME'))
+        + "await D.render(); salida.nota = nota(0);")
     assert salida == {"nota": "Falta la tabla del arancel de ARCA: cargalo a mano."}
+
+
+# --------------------------------- la vuelta: lo que viaja es lo que se ve
+
+
+NO_CONTESTO = "El arancel de ARCA no contestó: no se propone sufijo ni unidad; va el de la operación."
+CONSULTANDO = "Consultando el arancel de ARCA…"
+TOPE = "Con más de 500 productos no se consulta el arancel de ARCA: cargá los sufijos a mano."
+D23 = ("El sufijo de la operación está vacío: cada producto sale sólo con lo que pide el "
+       "arancel de ARCA")
+
+
+@pytest.mark.parametrize("modo", ["falla", "tira"])
+def test_si_el_arancel_no_contesta_no_viaja_nada_y_la_celda_lo_dice(modo):
+    # H1: sin propuesta en pantalla no se agrega nada al generar (ni sufijo
+    # ni kilos), y la celda y los avisos lo dicen. Al volver, se reintenta.
+    salida = _pantalla(
+        f"modo = {json.dumps(modo)}; operacion('PC02-');"
+        + _items(_producto('BETA', 'K7'), _producto('GAMA', pieza=FUERA))
+        + "await D.render(); salida.caido = [viaja(), celda(0).value, nota(0), nota(1), D.avisos()];"
+        "const antes = pedidos; viaja(); D.todosConPropio(); salida.al_generar_no_pide = pedidos === antes;"
+        "modo = 'ok'; await D.render(); salida.vuelve = [viaja(), celda(0).value, pedidos];")
+    assert salida["caido"] == [[["", None], ["", None]], "", NO_CONTESTO, NO_CONTESTO, [NO_CONTESTO]]
+    assert salida["al_generar_no_pide"] is True
+    assert salida["vuelve"] == [[["PC02-AA(BETA)-AI(K7)-", "01"], ["", None]], "PC02-AA(BETA)-AI(K7)-", 2]
+
+
+def test_con_mas_de_500_productos_no_se_consulta_y_se_dice():
+    salida = _pantalla(
+        f"CDI.state.items = Array.from({{ length: 501 }}, (_, i) => ({json.dumps(_producto('DELTA'))}));"
+        "await D.render(); salida.r = [pedidos, viaja().every(v => v[0] === '' && v[1] === null),"
+        " nota(0), nota(500), D.avisos()];")
+    assert salida["r"] == [0, True, TOPE, TOPE, [TOPE]]
+
+
+def test_mientras_consulta_no_viaja_nada_de_la_propuesta():
+    salida = _pantalla(
+        "frenar = true; operacion('PC02-');" + _items(_producto('BETA', 'K7'))
+        + "const p = D.render(); await tick();"
+        "salida.consultando = [viaja(), celda(0).value, nota(0), D.avisos()];"
+        "soltar(); await p; salida.llego = [viaja(), celda(0).value, D.avisos()];")
+    assert salida["consultando"] == [[["", None]], "", CONSULTANDO, [CONSULTANDO]]
+    assert salida["llego"] == [[["PC02-AA(BETA)-AI(K7)-", "01"]], "PC02-AA(BETA)-AI(K7)-", []]
+
+
+def test_lo_que_viaja_es_lo_que_muestra_la_celda():
+    # Cada fila: el sufijo es el de la celda, y los kilos van sólo si la
+    # nota los dice. Un producto que cambió y no se volvió a pintar no lleva
+    # nada de la propuesta.
+    salida = _pantalla(
+        "operacion('CA03-');"
+        + _items(_producto('OMEGA', 'Z2'), _producto('', ''), _producto('ETA', pieza=FUERA),
+                 _producto('RHO', 'P4', unidad_estadistica='DCL'))
+        + "await D.render();"
+        "salida.filas = CDI.state.items.map((it, i) => [viaja()[i][0] === celda(i).value,"
+        " viaja()[i][1] === '01', /unidad estadística 01/.test(nota(i))]);"
+        "CDI.state.items[0].codigo_parte = 'Z3'; salida.cambiado = viaja()[0];")
+    assert salida["filas"] == [[True, True, True], [True, True, True], [True, False, False], [True, False, True]]
+    assert salida["cambiado"] == ["", None]
+
+
+def test_si_cambia_el_de_la_operacion_la_celda_escrita_avisa():
+    # H2: lo escrito va tal cual, pero si después cambia el de la operación
+    # la fila lo avisa (y los avisos del botón); tocarla de nuevo lo acepta.
+    aviso = "Lo escribiste con otro sufijo de la operación: revisalo, va tal cual."
+    salida = _pantalla(
+        "operacion('PC03-');" + _items(_producto('ZETA', 'Q9'), _producto('IOTA', 'Q8'))
+        + "await D.render(); escribir(0, 'PC03-AA(ZETA)-');"
+        "salida.igual = [nota(0), D.avisos()];"
+        "operacion('PC07-');"
+        "salida.cambio = [viaja().map(v => v[0]), celda(1).value, nota(0), D.avisos()];"
+        "escribir(0, 'PC07-AA(ZETA)-'); salida.tocada = [nota(0), D.avisos()];"
+        "operacion('PC09-'); escribir(0, ''); salida.vacia = [nota(0), viaja()[0][0]];"
+        "await D.render(); operacion('PC11-'); salida.repintada = nota(0);")
+    assert salida["igual"] == ["Según el arancel de ARCA del 07/10/2026: unidad estadística 01.", []]
+    assert salida["cambio"][0] == ["PC03-AA(ZETA)-", "PC07-AA(IOTA)-AI(Q8)-"]
+    assert salida["cambio"][1] == "PC07-AA(IOTA)-AI(Q8)-"
+    assert aviso in salida["cambio"][2]
+    assert salida["cambio"][3] == ["Ítem 1: " + aviso]
+    assert aviso not in salida["tocada"][0] and salida["tocada"][1] == []
+    assert aviso not in salida["vacia"][0] and salida["vacia"][1] == ""
+    assert aviso not in salida["repintada"]
+
+
+def test_en_un_grupo_no_viaja_un_sufijo_escrito_antes_de_agrupar():
+    # H3: el grupo sale con el de la operación; lo escrito antes no viaja y
+    # la celda no lo muestra.
+    salida = _pantalla(
+        "operacion('PC05-');"
+        + _items(_producto('KAPPA', 'W1', sufijo='AA(KAPPA)-AI(W1)-', grupo_id='g7'),
+                 _producto('KAPPA', 'W2', grupo_id='g7'))
+        + "await D.render(); salida.viaja = viaja();"
+        "salida.celdas = CDI.state.items.map((it, i) => D.celdaSufijo(it, i));")
+    assert salida["viaja"] == [["", "01"], ["", "01"]]
+    for html in salida["celdas"]:
+        assert "<input" not in html and "W1" not in html
+        assert "Va el de la operación para todo el grupo." in html
+        assert "unidad estadística 01" in html
+
+
+def test_con_sub_items_no_viaja_el_sufijo_del_producto():
+    # H4: el producto pasó a sub-ítems; su sufijo de antes ya no se ve y no
+    # viaja (cada sub-ítem lleva el suyo).
+    salida = _pantalla(
+        _items(_producto('SIGMA', 'V3', sufijo='AA(SIGMA)-AI(V3)-',
+                         subitems=[{"cantidad": 1, "sufijo": "AA(SIGMA)-AI(V3 A)-"}]))
+        + "await D.render(); salida.viaja = viaja()[0][0]; salida.celda = D.celdaSufijo(CDI.state.items[0], 0);")
+    assert salida == {"viaja": "", "celda": '<span class="caption">Va en cada sub-ítem.</span>'}
+
+
+def test_el_de_la_operacion_gana_y_lo_distinto_se_avisa_en_la_fila():
+    # H5: la propuesta sólo agrega lo que falta; un AA distinto no lo pisa y
+    # se avisa. Mayúsculas y espacios no son una diferencia.
+    salida = _pantalla(
+        _items(_producto('ZETA', 'Q9'))
+        + "operacion('AA(PROPIA)-PC03-'); await D.render(); salida.distinto = [viaja()[0][0], nota(0)];"
+        + _items(_producto('ZETA ROJA', 'Q9'))
+        + "operacion('aa(zeta  roja)-pc03-'); await D.render(); salida.igual = [viaja()[0][0], nota(0)];"
+        + _items(_producto('ZETA', 'Q9'))
+        + "operacion('PC03-AI(R2)-'); await D.render(); salida.ai = [viaja()[0][0], nota(0)];")
+    assert salida["distinto"][0] == "AA(PROPIA)-PC03-AI(Q9)-"
+    assert "El arancel propone AA(ZETA); queda el de la operación: AA(PROPIA)." in salida["distinto"][1]
+    assert salida["igual"][0] == "aa(zeta  roja)-pc03-AI(Q9)-"
+    assert "El arancel propone" not in salida["igual"][1]
+    assert salida["ai"][0] == "PC03-AI(R2)-AA(ZETA)-"
+    assert "El arancel propone AI(Q9); queda el de la operación: AI(R2)." in salida["ai"][1]
+
+
+def test_con_el_de_la_operacion_vacio_y_todos_con_el_propio_se_avisa():
+    # D23 (c): no frena; avisa junto al botón.
+    salida = _pantalla(
+        _items(_producto('LAMBDA', 'N5'),
+               _producto('MU', pieza=FUERA, subitems=[{"cantidad": 1, "sufijo": "AA(MU)-"}]))
+        + "operacion(''); await D.render(); salida.vacio = [D.todosConPropio(), D.avisos()];"
+        "operacion('PC04-'); salida.con_op = [D.todosConPropio(), D.avisos()];"
+        "operacion(''); CDI.state.items.push({ pieza: " + json.dumps(FUERA) + ", marca: 'NU' });"
+        "salida.uno_sin = [D.todosConPropio(), D.avisos()];")
+    assert salida["vacio"] == [True, [D23]]
+    assert salida["con_op"] == [True, []]
+    assert salida["uno_sin"] == [False, []]
 
 
 # ------------------------------------------------- bordes de la revisión
@@ -517,11 +720,11 @@ def test_la_propuesta_dice_la_letra_de_control_que_corresponde(client):
 
 
 def test_con_la_letra_equivocada_la_nota_no_dice_que_la_posicion_no_esta():
-    salida = _despachante(
+    salida = _pantalla(
         "CDI.api = async () => ({ ok: true, json: async () => ({ fuente: 'arancel de ARCA del 07/10/2026',"
         " items: [{ posicion: 'X', en_la_tabla: false, letra_de_control: 'F', sufijo: '', faltan: [] }] }) });"
-        f"CDI.state.items = [{json.dumps(_producto('ACME'))}];"
-        "await D.listo(); salida.nota = D.notaDe(CDI.state.items[0], 0);")
+        + _items(_producto('ACME'))
+        + "await D.render(); salida.nota = nota(0);")
     assert salida == {"nota": "En el arancel de ARCA del 07/10/2026 la letra de control de esta "
                               "posición es F: revisá la posición."}
 
@@ -533,25 +736,21 @@ def test_si_junto_con_el_de_la_operacion_no_entra_no_se_pierde_lo_de_la_operacio
     # Lo que trae la operación (CA00, PC) no se cae para que entre la
     # propuesta: el producto va con el de la operación y el servidor avisa.
     op = "CA00-PC(" + "X" * 100 + ")-"
-    salida = _despachante(
-        f"CDI.state.operacion.sbt_sufijo_valor = {json.dumps(op)};"
-        f"CDI.state.items = [{json.dumps(_producto('ACME', 'X1'))}];"
-        "await D.listo(); salida.sufijo = D.sufijoDe(CDI.state.items[0], 0);")
-    assert salida == {"sufijo": ""}
+    salida = _pantalla(
+        f"operacion({json.dumps(op)});" + _items(_producto('ACME', 'X1'))
+        + "await D.render(); salida.sufijo = [viaja()[0][0], celda(0).value];")
+    assert salida == {"sufijo": ["", ""]}
 
 
 def test_en_un_grupo_la_celda_no_deja_escribir_un_sufijo_por_producto():
-    # Un grupo sale con un solo sufijo: una celda por producto dejaría
-    # escribir sufijos distintos y el TXT no se genera.
-    salida = _despachante(
-        "CDI.escapeHtml = s => s;"
-        f"CDI.state.items = [{json.dumps(dict(_producto('ACME', 'X1'), grupo_id=1))},"
-        f" {json.dumps(dict(_producto('ACME', 'X2'), grupo_id=1, sufijo='AA(G)-'))}];"
-        "await D.listo(); salida.sin = D.celdaSufijo(CDI.state.items[0], 0);"
-        " salida.con = D.celdaSufijo(CDI.state.items[1], 1);")
-    assert "<input" not in salida["sin"] and "<input" not in salida["con"]
-    assert "Va el de la operación para todo el grupo." in salida["sin"]
-    assert "Va el del grupo: AA(G)-" in salida["con"]
+    # Un grupo sale con un solo sufijo, el de la operación: una celda por
+    # producto dejaría escribir sufijos distintos y el TXT no se genera.
+    salida = _pantalla(
+        _items(_producto('ACME', 'X1', grupo_id=1), _producto('ACME', 'X2', grupo_id=1, sufijo='AA(G)-'))
+        + "await D.render(); salida.celdas = CDI.state.items.map((it, i) => D.celdaSufijo(it, i));")
+    for html in salida["celdas"]:
+        assert "<input" not in html and "AA(G)" not in html
+        assert "Va el de la operación para todo el grupo." in html
 
 
 def test_una_ncm_de_ocho_no_se_dice_fuera_del_arancel():
@@ -560,11 +759,11 @@ def test_una_ncm_de_ocho_no_se_dice_fuera_del_arancel():
             "de control). Los sufijos de valor y la unidad estadística no se completan ni se "
             "controlan: cargalos a mano con el despachante.") in avisos
     assert not any("no está en el" in a for a in avisos)
-    salida = _despachante(
+    salida = _pantalla(
         "CDI.api = async () => ({ ok: true, json: async () => ({ fuente: 'arancel de ARCA del 07/10/2026',"
         " items: [{ posicion: '3920.10.10', en_la_tabla: false, sufijo: '', faltan: [] }] }) });"
-        f"CDI.state.items = [{json.dumps(_producto('ACME', pieza='3920.10.10'))}];"
-        "await D.listo(); salida.nota = D.notaDe(CDI.state.items[0], 0);")
+        + _items(_producto('ACME', pieza='3920.10.10'))
+        + "await D.render(); salida.nota = nota(0);")
     assert salida == {"nota": "No es una posición SIM completa (11 dígitos y la letra de control): "
                               "cargalo a mano."}
 
