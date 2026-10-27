@@ -108,7 +108,7 @@ sabotaje $F "la regla acepta el año de dos cifras" \
   "${C}test_la_importacion_deja_vacia_la_fecha_que_el_alta_no_acepta[15/03/15]"
 sabotaje $F "la regla acepta dígitos de ancho completo" \
   'r"([0-9]{4})-([0-9]{2})-([0-9]{2})"' 'r"(\d{4})-(\d{2})-(\d{2})"' \
-  "${C}test_la_importacion_deja_vacia_la_fecha_que_el_alta_no_acepta[２０１５-03-15]"
+  "${C}test_la_importacion_deja_vacia_la_fecha_que_el_alta_no_acepta[\uff12\uff10\uff11\uff15-03-15]"
 sabotaje $F "la regla no acepta D/M/AAAA" \
   'r"([0-9]{1,2})/([0-9]{1,2})/([0-9]{4})"' 'r"([0-9]{2})/([0-9]{2})/([0-9]{4})"' \
   "${C}test_la_importacion_acepta_lo_que_acepta_el_alta[5/3/2015-2015-03-05]"
@@ -152,14 +152,11 @@ sabotaje $D "se tapa sólo la clave tal cual, no la escapada" \
   'formas |= {crudo, quote(crudo, safe=""), quote_plus(crudo)}' 'formas |= {crudo}' \
   "${B}test_si_el_error_de_la_base_nombra_la_clave_no_se_muestra[escapada]"
 sabotaje $D "se nombra la base con la URL escrita, como antes" \
-  'donde = _tapar(_donde(url, secretos), secretos, visibles)' 'donde = args.base.split("://", 1)[-1]' \
+  'donde = _tapar(_donde(url), secretos, visibles)' 'donde = args.base.split("://", 1)[-1]' \
   "${B}test_una_clave_con_un_separador_no_se_ve_en_el_error[CLA/VESECRETA]"
-sabotaje $D "el lugar no tapa el pedazo de clave que SQLAlchemy leyó como host" \
-  'return "".join("***" if p in secretos else p for p in pedazos)' 'return lugar' \
-  "${B}test_una_base_mal_armada_que_no_responde_no_muestra_la_clave[arroba]"
 sabotaje $D "se tapa sólo la clave que ve SQLAlchemy" \
   'secretos = {antes, antes.partition(":")[2], *re.split(_SEPARADORES, antes),' 'secretos = {' \
-  "${B}test_si_el_error_repite_una_base_mal_armada_no_se_ve_la_clave[punto-y-coma]"
+  "${B}test_si_el_error_repite_una_base_mal_armada_no_se_ve_la_clave[arroba]"
 sabotaje $D "lo de antes del «@» se tapa entero, no por partes" \
   '*re.split(_SEPARADORES, antes),' '' \
   "${B}test_si_el_error_repite_una_base_mal_armada_no_se_ve_la_clave[arroba]"
@@ -180,7 +177,7 @@ sabotaje $D "el host protege lo que es parte de la clave" \
   "${B}test_una_clave_que_empieza_como_el_host_se_tapa_entera"
 sabotaje $D "un usuario corto rompe la palabra (sin mirar antes)" \
   '                patron = r"(?<!\w)" + patron' '                pass' \
-  "${B}test_un_usuario_corto_no_rompe_el_mensaje[u]"
+  "${B}test_un_usuario_corto_no_rompe_el_mensaje[o]"
 sabotaje $D "un usuario corto rompe la palabra (sin mirar después)" \
   '                patron += r"(?!\w)"' '                pass' \
   "${B}test_un_usuario_corto_no_rompe_el_mensaje[Connection]"
