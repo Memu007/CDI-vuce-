@@ -9,7 +9,7 @@ import math
 import re
 
 from proyecto_maria.core.maria_generator import (
-    _INCOTERMS_GRUPO_C_D, IMPORTE_MAXIMO, INCOTERMS_VALIDOS, importe_valido,
+    _INCOTERMS_GRUPO_C_D, ESPACIOS, IMPORTE_MAXIMO, INCOTERMS_VALIDOS, importe_valido,
 )
 
 # Los que acepta el generador, más FAS (la pantalla lo ofrece) y los de 2000
@@ -136,7 +136,7 @@ def montos_fuera_de_rango(items, cabecera: dict) -> list:
                 errores.append(f"Item {n}, sub-ítem {m}: Valor inválido")
     for campo, nombre in _IMPORTES_DE_LA_CABECERA:
         valor = cabecera.get(campo)
-        if valor is None or (isinstance(valor, str) and not valor.strip()):
+        if valor is None or (isinstance(valor, str) and not valor.strip(ESPACIOS)):
             continue
         try:
             importe_valido(valor, nombre)

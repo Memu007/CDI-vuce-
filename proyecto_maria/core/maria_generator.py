@@ -514,6 +514,11 @@ IMPORTE_MAXIMO = 1_000_000_000_000
 # demás («3.480», «1,500», «1e3», «1_000») Python lo leería a su manera, o la
 # pantalla no lo pudo leer y lo manda tal cual: no es un importe.
 _IMPORTE_ESCRITO = re.compile(r"-?[0-9]+(?:\.[0-9]{1,2})?")
+# SEPARADORES-1c. Un importe en blanco es 0. «En blanco» es sólo lo que
+# también es blanco para trim() de la pantalla: Python saca además \x1c a
+# \x1f y \x85, que la pantalla no lee y manda tal cual. Si el servidor los
+# tomara por blanco, lo que la pantalla no leyó saldría 0 en el TXT.
+ESPACIOS = "\t\n\x0b\x0c\r \xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000"
 
 
 def importe_valido(valor, nombre: str):
@@ -521,7 +526,7 @@ def importe_valido(valor, nombre: str):
     importe escrito con dudas, no finito, negativo o absurdo es un error con
     mensaje propio (400)."""
     if isinstance(valor, str):
-        valor = valor.strip()
+        valor = valor.strip(ESPACIOS)
         if not valor:
             return None
         if not _IMPORTE_ESCRITO.fullmatch(valor):

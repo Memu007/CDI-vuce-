@@ -2167,12 +2167,34 @@ def _numero_factura(raw, decimal: str | None):
     return valor if math.isfinite(valor) else None
 
 
+def _miles_mal_formados(t: str, decimal: str | None) -> bool:
+    """SEPARADORES-1c. True si la parte entera de `t` viene en grupos de
+    miles y no están bien armados: la cabeza de una a tres cifras sin cero
+    adelante y cada grupo de tres. «0500.000» o «4500.000.000» no son miles
+    de nadie: mejor sin leer que por mil."""
+    t = re.sub(r"[ '\u00a0\u202f]", ' ', t)
+    marcas = [c for c in '.,' if c in t]
+    propio = _separador_decimal(t)
+    if len(marcas) == 2:
+        dec = propio
+    elif len(marcas) == 1 and t.count(marcas[0]) == 1 and marcas[0] in (propio, decimal):
+        dec = marcas[0]
+    else:
+        dec = None  # sin separador decimal: todos son de miles
+    entero = t.rpartition(dec)[0] if dec else t
+    grupos = re.split(r"[ .,]", entero)
+    return len(grupos) > 1 and not (
+        re.fullmatch(r"[1-9]\d{0,2}", grupos[0]) and all(re.fullmatch(r"\d{3}", g) for g in grupos[1:]))
+
+
 def _monto_factura(raw, decimal: str | None):
     """Flete o seguro de la factura (SEPARADORES-1). Un monto no lleva tres
     decimales: «3.480» o «1,250» separan miles. Si la factura usa ese mismo
     separador como decimal, puede ser 3,48: None, no se adivina."""
     t = _MONEDA_ADELANTE.sub('', str(raw).strip()) if isinstance(raw, str) else ''
     t = _MONEDA_O_CUENTA_ATRAS.sub('', t).strip()
+    if _miles_mal_formados(t, decimal):
+        return None
     miles = re.fullmatch(r"[1-9]\d{0,2}([.,])\d{3}", t)
     if not miles:
         # SEPARADORES-1b. «4500.000» (o «4 500.000») con la coma decimal: no

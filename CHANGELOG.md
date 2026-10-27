@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-27 · fix: miles mal formados, blancos raros y la pregunta de la pantalla (SEPARADORES-1c)
+
+- En la factura, un flete o seguro con grupos de miles mal formados («0750.000», «7500.000.000») queda sin leer con aviso, en vez de leerse por mil. En la pantalla, «01234.500» pregunta y «01.500.000» no cierra.
+- Un importe con un carácter que la pantalla no lee (\x85, \x1c a \x1f) ya no sale como 0 en el TXT: el servidor lo rechaza con mensaje.
+- La pregunta de la pantalla propone las dos formas como se leen («¿2500125 o 2500,1250?») y conserva el signo.
+
 ## 2026-10-25 · feat: el sufijo de valor de cada producto, con el arancel de ARCA (SUFIJOS-1)
 
 - En «Lo que decide el despachante» cada producto propone su sufijo (marca AA, modelo AB, código AI) según el arancel de ARCA del 07/10/2026 junto con el de la operación (CA00 y los demás quedan) y dice qué falta; una posición que no está queda vacía y se avisa, con la letra de control correcta si la que vino es otra. Sin elegir, la unidad estadística va en kilos si la posición la pide.
