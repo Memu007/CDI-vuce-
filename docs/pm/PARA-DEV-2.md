@@ -115,6 +115,39 @@ queda donde esté.
 **Apenas entregues:** DESTINO-1, PESO-NETO-1 y PRORRATEO-1 esperan datos
 del despachante; te aviso cuando lleguen.
 
+### Tu aviso del 27/10 (`de8d175`, sin entregar)
+
+Leído. Está bien esperar el cupo: no la reviso hasta tu `/entregar`. Los
+supuestos reversibles los miro en la revisión.
+
+- **D26: (a) por ahora.** Cancelar una pendiente es un endpoint nuevo y no
+  está en el roadmap; se lo propongo a Emi con tu recomendación (b). No lo
+  empieces sin mi aviso.
+- **D27: (b), como ORG-1b.** Entra en la línea de ORG-1 del roadmap
+  («invitaciones que funcionan»): sin esto, el punto 3 deja al invitado con
+  un 400 evitable. Decidido por la PM.
+
+### ORG-1b — hacela ahora, mientras esperás el cupo
+
+En `landing.html`, cuando `/api/invitations/{token}` responde válida:
+
+1. El email del registro se completa con `data.email` y queda de sólo
+   lectura (`readOnly`, no `disabled`, para que viaje en el envío). Una
+   línea cerca dice que es el email al que te invitaron.
+2. Si `data.email` viene vacío, o no hay `invite`, o el token no es válido,
+   el campo queda como hoy: vacío y editable.
+3. El servidor no cambia: el 400 del punto 3 sigue siendo la guarda.
+
+**Pruebas:** en un navegador (Playwright), con datos sintéticos: invitación
+válida (email completo y de sólo lectura, el registro entra), sin `invite` y
+con token inválido (campo editable y vacío), y una invitación válida con el
+email cambiado a mano en el DOM (sigue el 400). Un sabotaje que saque el
+completado y dé rojo. Una línea en `CHANGELOG.md`.
+
+**Entrega:** commits aparte encima de `ddfc798`, en el mismo `/entregar` que
+ORG-1, con su propio SHA de producto en la tabla, para que pueda revisarla
+separada.
+
 ## Qué pasó el 2026-10-24
 
 Emi y el despachante cargaron en el MARIA un TXT de CDI de una factura real
@@ -186,4 +219,7 @@ SEPARADORES-1 y 1b, 2026-10-25: **D19 (b)**, **D20 (a)**, **D21 (b)**
 la PM (`DECISIONS.md`).
 
 SEPARADORES-1c, 2026-10-27: **D24 (a)**, **D25 (b)** (SEPARADORES-1d).
-Decididas por la PM. Aceptada en `140c122`. La próxima D es la D26.
+Decididas por la PM. Aceptada en `140c122`.
+
+ORG-1, 2026-10-27: **D26 (a)** por ahora (se lo propongo a Emi), **D27 (b)**
+(ORG-1b, decidida por la PM). La próxima D es la D28.
