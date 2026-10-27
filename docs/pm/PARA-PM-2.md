@@ -2,9 +2,13 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ORG-1: lista, **sin entregar** (2026-10-27)
+## ORG-1 y ORG-1b: listas, **sin entregar** (2026-10-27)
 
-**Estado:** los cinco puntos están hechos. Tienen casos en SQLite, un script
+**ORG-1b (D27 b) está hecha**, en commits aparte, con su propio SHA de
+producto (`f8616cf`). Va en el mismo `/entregar` que ORG-1. Detalle en
+«ORG-1b», abajo.
+
+**ORG-1. Estado:** los cinco puntos están hechos. Tienen casos en SQLite, un script
 contra Postgres, sabotajes y suite completa. **No la entrego todavía.** Tu
 canal dice «`/entregar` espera a que vuelva el cupo», y el cupo de
 subagentes y `/code-review` vuelve el 28/10 a las 18:00 UTC. Ahí corro la
@@ -12,8 +16,8 @@ autorrevisión independiente y `/security-review`, reproduzco lo que
 encuentren y entrego con el timbre. Subo ahora para que el trabajo no se
 pierda si el contenedor muere. **No hace falta que la revises todavía.**
 
-**Nada para decidir ahora.** Abajo van los supuestos y dos candidatas a D
-(D26 y D27) que no frenan ORG-1.
+**Nada para decidir ahora.** D26 y D27 ya están contestadas: D26 (a) por
+ahora, D27 (b) como ORG-1b.
 
 | Pieza | SHA |
 |---|---|
@@ -22,14 +26,24 @@ pierda si el contenedor muere. **No hace falta que la revises todavía.**
 | Sabotajes (9, uno por motivo) | `18f7f25` |
 | Carrera de dos invitaciones a la vez, en Postgres | `ddfc798` |
 | **SHA probado:** suite, compileall, smoke, aislamiento | **`18f7f25`** |
+| ORG-1b: la prueba de pantalla, en rojo antes del producto | `9ad42e4` |
+| **ORG-1b: producto y `CHANGELOG.md`** | **`f8616cf`** |
+| ORG-1b: sabotajes (7, uno por motivo) | `b7a7927` |
+| ORG-1b: arreglo de la prueba (dos sabotajes no daban su rojo) | `5d42909` |
+| **ORG-1b, SHA probado:** pantalla y sabotajes | **`5d42909`** |
 
 Entre `18f7f25` y `ddfc798` sólo cambia `scripts/testing/org1_postgres.py`,
-que pytest no junta. Tu diff de revisión parte de `ea64a9c`, la punta de tu
-rama.
+que pytest no junta. Tu diff de revisión de ORG-1 parte de `ea64a9c`, la
+punta de tu rama.
+
+ORG-1b está encima de `ddfc798`, pero no pegada a él. En el medio quedan mi
+informe (`de8d175`) y el merge de tu rama (`373ef55`). Ninguno de los dos
+toca producto. Para ver sólo ORG-1b: `git diff 373ef55..5d42909`.
 
 Toqué estos archivos de producto:
-- `proyecto_maria/main.py`
-- `CHANGELOG.md`
+- `proyecto_maria/main.py` (ORG-1)
+- `proyecto_maria/templates/landing.html` (ORG-1b)
+- `CHANGELOG.md` (las dos)
 
 ## 1. La premisa: confirmada
 
@@ -114,24 +128,69 @@ pasa ninguna de las dos.
   porque no está pendiente. Hoy sólo `validate_invitation` marca «expired»,
   y lo hace con la fecha vencida, así que no debería existir.
 
-## Candidatas a D (no frenan ORG-1)
+## D26 y D27: contestadas
 
-- **D26. No hay forma de cancelar una invitación pendiente.** Con el tope
-  nuevo, una invitación a un email equivocado ocupa un lugar hasta que vence
-  a los 7 días.
-  - (a) Dejarlo así.
-  - (b) Un endpoint chico para que el dueño cancele una pendiente.
+- **D26 (a) por ahora.** No hay forma de cancelar una invitación pendiente.
+  Se lo proponés a Emi. No la empiezo sin tu aviso.
+- **D27 (b): es ORG-1b**, abajo.
 
-  Recomiendo (b) como pieza aparte, porque es funcionalidad nueva y no entra
-  en ORG-1.
-- **D27. La pantalla de registro no completa el email invitado.**
-  `proyecto_maria/templates/landing.html` (~774-794) valida el token pero deja el email vacío. Con el
-  punto 3, si el invitado escribe otro email recibe el 400.
-  - (a) Dejarlo así.
-  - (b) Completar el email con el que devuelve `/api/invitations/{token}`,
-    sólo lectura.
+## ORG-1b: el registro con invitación trae el email invitado
 
-  Recomiendo (b), aparte: es pantalla y no entra en ORG-1.
+En `landing.html`, cuando `/api/invitations/{token}` responde válida y trae
+email:
+- El email del registro se completa con ese email.
+- Queda `readOnly`, no `disabled`, así viaja en el envío.
+- Debajo aparece «Es el email al que te invitaron.».
+
+Sin `invite`, con un token que no existe, con uno ya usado o con una
+respuesta válida sin email, el campo queda como antes: vacío y editable. El
+servidor no cambia, y su 400 sigue siendo la guarda.
+
+**La prueba** es `scripts/testing/pantalla_org1b.js`. Usa Playwright, la API
+local de verdad y datos inventados. Los casos van en este orden:
+
+1. Sin `invite`, y con un token que no existe: el campo queda vacío y
+   editable, y la línea no se ve. El registro se abre con el botón del
+   inicio, como lo haría una persona.
+2. Respuesta válida sin email: igual que el caso 1. Es el único caso con la
+   respuesta simulada (`page.route`), porque la API no deja invitar sin
+   email.
+3. Invitación válida con el email cambiado a mano en el DOM (se le sacan
+   `readOnly` y `disabled`): da 400, y el error dice «otro email».
+4. Invitación válida:
+   - el email viene completo, es de sólo lectura y no `disabled`;
+   - la línea se ve;
+   - escribir encima no lo cambia;
+   - el registro da 200, manda el email y el token, y la invitada queda en
+     el estudio.
+5. El mismo token ya usado: igual que el caso 1.
+
+**Rojo antes del producto** (contra `373ef55`): `FALLA: con invitación
+válida el email no viene completo: {"value":"","readOnly":false,"disabled":false}`.
+
+**Dos sabotajes no daban su rojo en la primera vuelta**, y los arreglé en la
+prueba (`5d42909`):
+- **«La línea se ve siempre»:** sin invitación válida, el registro está
+  cerrado, así que «no se ve» era cierto para cualquier cosa. Ahora la
+  prueba abre el registro antes de mirar.
+- **«Además disabled»:** caía antes, en el caso del DOM, con un 422. Ahora
+  ese caso saca también `disabled`, como haría quien edita el DOM.
+
+| Sabotaje (`sabotajes/org1b.sh`) | Rojo |
+|---|---|
+| no se completa el email | «con invitación válida el email no viene completo» |
+| el email completo queda editable | «con invitación válida el email no es de sólo lectura» |
+| además `disabled` (no viaja en el envío) | «con invitación válida el email está disabled» |
+| la línea del email invitado no aparece | «con invitación válida no se ve la línea del email invitado» |
+| la línea se ve siempre | «sin invite: se ve la línea del email invitado» |
+| se bloquea aunque la invitación no traiga email | «válida sin email: el email no queda vacío y editable» |
+| el servidor deja de exigir el email invitado | «con el email cambiado en el DOM el registro dio 200, no 400» |
+
+**Supuesto reversible:** el texto «Es el email al que te invitaron.».
+
+La captura a 390 px se ve bien. El campo de sólo lectura se ve igual que uno
+editable; lo explica la línea de abajo. No le cambié el estilo, porque no lo
+pediste.
 
 ## Puertas
 
@@ -146,6 +205,9 @@ pasa ninguna de las dos.
 | `compileall -q proyecto_maria` | rc 0 |
 | `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
 | `ataque_aislamiento.sh` | `Bloqueado: 22 · Fugas: 0`, «✅ PUERTA G3 PASADA. Ningún despachante ve datos de otro.» |
+| ORG-1b: `sabotajes/org1b.sh 5d42909` | `sabotajes sin rojo: 0`, salida 0; los 7 dan su rojo, y sin sabotaje la prueba da verde |
+| ORG-1b: `pantalla_org1b.js` contra `373ef55` | `FALLA: con invitación válida el email no viene completo`, salida 1 |
+| ORG-1b: `test_pa1_textos`, `test_regression_phase0`, `test_static_endpoints` (las que leen la landing) y `test_org1`, sobre `5d42909` | `93 passed, 1 skipped, 3 warnings in 32.68s` |
 
 Los casos corren cada uno dos veces, `sqlite_sin_zona` y
 `postgres_con_zona`. El segundo inyecta un `expires_at` con zona al cargar
@@ -184,7 +246,9 @@ ve ahí:
   cuota hasta el 28/10 a las 18:00 UTC. La autorrevisión del diff completo
   contra `ea64a9c` es sólo mía, sin independencia. Por eso todavía no
   entrego.
-- La pantalla en un navegador: no toqué pantallas.
+- ORG-1: la pantalla en un navegador. ORG-1 no toca pantallas.
+- ORG-1b: la suite completa ni el smoke. ORG-1b cambia sólo la plantilla
+  `landing.html`; corrí las pruebas que la leen, arriba.
 
 ## Comandos
 
@@ -214,7 +278,34 @@ script rechaza cualquier host que no sea local:
 python scripts/testing/org1_postgres.py postgresql://<usuario>@127.0.0.1:<puerto>/<base>
 ```
 
+Este muestra sólo lo de ORG-1b:
+
+```bash
+git diff 373ef55..5d42909
+```
+
+Este tiene que terminar con `OK ORG-1b`. Va contra una API local
+levantada con datos inventados:
+
+```bash
+BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_org1b.js
+```
+
+Este tiene que dar `sabotajes sin rojo: 0` y salida 0. Necesita `node` y
+el Chromium de Playwright:
+
+```bash
+PY=<venv>/bin/python scripts/testing/sabotajes/org1b.sh 5d42909
+```
+
 ## Riesgos
+
+- **ORG-1b: una invitación a un email que la pantalla no acepta queda sin
+  salida.** Invitar sólo exige una «@» (`a@b` entra). La pantalla, al
+  enviar, pide `usuario@dominio.tld` y responde «Email no válido». Con el
+  campo de sólo lectura, el invitado no lo puede cambiar. Antes de ORG-1b
+  también quedaba sin salida, porque otro email da el 400 de ORG-1. Es de
+  antes y no lo cambié. Si querés, va como D.
 
 - **La carrera de dos invitaciones a la vez no está protegida en SQLite.**
   `FOR UPDATE` no hace nada ahí, y la invitación no escribe antes de
@@ -229,6 +320,6 @@ python scripts/testing/org1_postgres.py postgresql://<usuario>@127.0.0.1:<puerto
 - **El 400 «es para otro email»** dice que el email escrito no es el
   invitado. No dice cuál es. Hace falta el token para preguntar.
 
-Última vuelta: Tue Oct 27 21:50:44 UTC 2026
+Última vuelta: Tue Oct 27 22:08:04 UTC 2026
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. SEPARADORES-1d aceptada. ORG-1 lista y subida SIN ENTREGAR (producto e43810b, sabotajes 18f7f25, carrera PG ddfc798; suite 18f7f25 1 failed conocido de test_excel2, 3323 passed). Pendiente: el 28/10 después de las 18:00 UTC, /entregar ORG-1 con subagentes (hasta alto), /code-review high y /security-review; reproducir lo que encuentren, actualizar este informe y timbre «Dev MARIA: entregué ORG-1 en <SHA>». D26 (cancelar pendiente) y D27 (precargar email) son candidatas, no frenan. Apenas entregues: DESTINO-1, PESO-NETO-1, PRORRATEO-1 esperan datos del despachante. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1 lista y subida SIN ENTREGAR (producto e43810b, sabotajes 18f7f25, carrera PG ddfc798; suite 18f7f25 1 failed conocido de test_excel2, 3323 passed). ORG-1b (D27 b) lista y subida SIN ENTREGAR (prueba 9ad42e4, producto f8616cf, sabotajes b7a7927, arreglo de la prueba 5d42909; sabotajes 7/7). D26 (a) por ahora: no empezar sin aviso de la PM. Pendiente: el 28/10 después de las 18:00 UTC, un solo /entregar de ORG-1 y ORG-1b con subagentes (hasta alto), /code-review high y /security-review; reproducir lo que encuentren, actualizar este informe y timbre «Dev MARIA: entregué ORG-1 y ORG-1b en <SHA>». Después, apagar el Postgres local (puerto 55432). Apenas entregues: DESTINO-1, PESO-NETO-1, PRORRATEO-1 esperan datos del despachante. La próxima D es la D28. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
