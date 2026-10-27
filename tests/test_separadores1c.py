@@ -90,6 +90,8 @@ def _leer_js(escrito):
     ("2500.125", "¿2500125 o 2500,1250?"), ("4500.000", "¿4500000 o 4500?"),
     ("-1234.500", "¿-1234500 o -1234,5?"), ("7125,375", "¿7125375 o 7125,3750?"),
     ("-98765.000", "¿-98765000 o -98765?"),
+    # la rama de la coma tampoco pierde el signo
+    ("-3,480", "¿-3.480 o -3,48?"), ("-1,125", "¿-1.125 o -1,1250?"),
 ])
 def test_en_la_pantalla_se_pregunta_con_formas_que_se_leen_igual(escrito, pregunta):
     """Antes «01234.500» se leía 1234,5 sin preguntar; «2500.125» proponía
@@ -100,7 +102,7 @@ def test_en_la_pantalla_se_pregunta_con_formas_que_se_leen_igual(escrito, pregun
 
 @pytest.mark.parametrize("escrito, miles_esperado", [
     ("2500.125", 2500125), ("4500.000", 4500000), ("-1234.500", -1234500), ("01234.500", 1234500),
-    ("7125,375", 7125375), ("-98765.000", -98765000),
+    ("7125,375", 7125375), ("-98765.000", -98765000), ("-3,480", -3480), ("-1,125", -1125),
 ])
 def test_las_dos_formas_que_propone_se_leen_como_dice(escrito, miles_esperado):
     """Cada forma de la pregunta, escrita tal cual, se lee sin dudas y da lo
