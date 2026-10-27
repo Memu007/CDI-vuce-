@@ -74,6 +74,13 @@ const CLAVE = 'Clave-Inventada-123';
   }
   async function editableYVacio(query, que, rutaFalsa) {
     const { ctx, page } = await abrir(query, rutaFalsa);
+    // Sin invitación válida el registro no se abre solo: se abre como lo
+    // haría una persona, para que la línea se pueda ver si estuviera.
+    if (!(await page.isVisible('#registerForm'))) {
+      await page.click('#btnHeroCta');
+      await page.waitForSelector('#registerForm', { state: 'visible', timeout: 5000 })
+        .catch(() => falla(que + ': el botón del inicio no abre el registro'));
+    }
     const c = await campo(page);
     if (c.value !== '' || c.readOnly || c.disabled) falla(que + ': el email no queda vacío y editable: ' + JSON.stringify(c));
     if (await pista(page)) falla(que + ': se ve la línea del email invitado');
@@ -93,7 +100,7 @@ const CLAVE = 'Clave-Inventada-123';
   // la invitación no se gasta.
   {
     const { ctx, page } = await abrir('?invite=' + encodeURIComponent(token));
-    await page.$eval('#registerForm input[name=email]', el => { el.readOnly = false; el.value = 'otra' + Date.now() + '@ejemplo.test'; });
+    await page.$eval('#registerForm input[name=email]', el => { el.readOnly = false; el.disabled = false; el.value = 'otra' + Date.now() + '@ejemplo.test'; });
     const resp = await registrar(page);
     if (resp.status() !== 400) falla('con el email cambiado en el DOM el registro dio ' + resp.status() + ', no 400');
     await page.waitForFunction(() => !document.getElementById('registerError').hidden, null, { timeout: 5000 })
