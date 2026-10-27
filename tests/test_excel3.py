@@ -1438,7 +1438,7 @@ def test_un_cargo_que_no_viene_primero_tambien_se_avisa_en_xls(rotulo, formato):
 @pytest.mark.parametrize("forma", ["origen_rotulo_en_descripcion", "sin_combinar_rotulo_en_descripcion"])
 @pytest.mark.parametrize("producto", ["Power bank 10000mAh", "Air fryer DEMO", "Packing tape DEMO",
                                       "Courier bag DEMO", "Sea salt DEMO", "Bank card reader",
-                                      "Feeder DEMO"])
+                                      "Feeder DEMO", "Container"])
 def test_un_producto_con_una_palabra_de_cargo_no_lleva_el_aviso(producto, forma):
     """La familia H4 no avisa un producto que sólo comparte una palabra."""
     filas, combinar = FORMAS_DEL_CARGO[forma]
@@ -1448,7 +1448,8 @@ def test_un_producto_con_una_palabra_de_cargo_no_lleva_el_aviso(producto, forma)
 
 
 @pytest.mark.parametrize("formato", ["xlsx", "xls"])
-@pytest.mark.parametrize("rotulo", ["Freight", "Insurance", "Ocean freight", "Bank charges"])
+@pytest.mark.parametrize("rotulo", ["Freight", "Insurance", "Ocean freight", "Bank charges",
+                                    "Delivery terms"])
 def test_un_cargo_en_item_con_la_descripcion_escrita_otra_vez_se_avisa(rotulo, formato):
     """H1: «Freight» en Item y «LONA DEMO» escrita otra vez en la descripción,
     medidas «/»: en la base entraba con FOB 1230 sin aviso. Entra o se lee
