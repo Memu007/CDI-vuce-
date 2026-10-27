@@ -163,6 +163,17 @@ sigue como está.
 | 3 | Base del seguro sugerido (D13 de VALOR-1) | FOB de la factura |
 | 4 | Si el botón del seguro se esconde en algunas condiciones (D14) | se ofrece siempre |
 
+Una más (2026-10-27), para PRORRATEO-1. Por ítem, el TXT sólo trae FOB,
+flete y seguro (`MARTFOB`, `MARTFLE`, `MARTASS`); no hay campo de ajustes:
+
+> 5. Los ajustes que se suman o se restan al valor (descuentos, gastos,
+>    comisiones): ¿van en el archivo, y en qué campo, o los cargás vos a mano
+>    en el MARIA? Si van repartidos por ítem, ¿cómo los repartís?
+
+| Pregunta | Qué decide | Mientras tanto |
+|---|---|---|
+| 5 | Si PRORRATEO-1 escribe algo en el TXT o sólo muestra el reparto | no arranca; los ajustes no cambian el TXT (D12) |
+
 ## El mensaje que se mandó (2026-10-06)
 
 Emi (2026-10-06): la versión anterior era demasiado técnica. Tenía los
