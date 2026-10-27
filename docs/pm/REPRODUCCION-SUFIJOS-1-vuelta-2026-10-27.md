@@ -5,7 +5,7 @@ producto de la vuelta en `252f04d`, diff de revisión desde `97cd2fa` sobre
 `despachante.js` y `finalize.js`). Todo local, con sintéticos, sin Gemini.
 La primera revisión está en `REPRODUCCION-SUFIJOS-1-2026-10-27.md`.
 
-**Veredicto:** SUFIJOS-1 **sin hallazgos que frenen**; se acepta si la suite no trae rojos nuevos. Se cumple la regla de la familia:
+**Veredicto:** SUFIJOS-1 **aceptada** (la suite no trajo rojos nuevos). Se cumple la regla de la familia:
 al generar, lo que va al TXT por producto es lo que muestra su celda. La
 PM la probó con fallas del arancel, códigos y casos distintos de los del
 informe.
@@ -15,7 +15,7 @@ informe.
 | Qué | Resultado |
 |---|---|
 | `scripts/testing/sabotaje_sufijos1.sh 45a3ea1 <venv>` | 47 de 47 en rojo por la razón esperada (rc=0) |
-| Suite completa sobre `45a3ea1`, desde base limpia | corriendo al subir esto; el resultado va acá en la próxima vuelta |
+| Suite completa sobre `45a3ea1`, desde base limpia | sólo los 12 rojos conocidos del tope de 15 operaciones y `test_guardar1` (`45a3ea1` no trae `2ff3262`), los mismos de `REPRODUCCION-EXCEL-3e-2026-10-25.md`; sobre el merge con mi rama (`e9981e5`): 3393 passed, 102 skipped, 2 xfailed, 0 rojos (rc=0) |
 | Negativos propios en Chromium, 390 px (abajo) | 9 de 9 OK |
 
 ## Negativos propios en Chromium

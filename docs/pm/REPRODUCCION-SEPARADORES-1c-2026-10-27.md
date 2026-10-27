@@ -5,7 +5,7 @@ Sobre `45a3ea1` (mismo código de 1c que `9663ac6`; informe en
 `adfe707..9663ac6` sobre `pdf_extractor.py`, `maria_generator.py`,
 `controles_maria.py` y `montos_ar.js`. Todo local, con sintéticos.
 
-**Veredicto:** SEPARADORES-1c **sin hallazgos que frenen**; se acepta si la suite no trae rojos nuevos. Los tres puntos se cumplen con
+**Veredicto:** SEPARADORES-1c **aceptada** (la suite no trajo rojos nuevos). Los tres puntos se cumplen con
 ejemplos distintos de los del informe. D24 **(a)** y D25 **(b)**, decididas
 por la PM: van juntas en SEPARADORES-1d.
 
@@ -14,7 +14,7 @@ por la PM: van juntas en SEPARADORES-1d.
 | Qué | Resultado |
 |---|---|
 | `scripts/testing/sabotaje_separadores1c.sh 9663ac6 <venv>` | 10 de 10 en rojo por la razón esperada (rc=0) |
-| Suite completa sobre `45a3ea1`, desde base limpia | corriendo al subir esto; el resultado va acá en la próxima vuelta |
+| Suite completa sobre `45a3ea1`, desde base limpia | sólo los 12 rojos conocidos del tope de 15 operaciones y `test_guardar1` (`45a3ea1` no trae `2ff3262`), los mismos de `REPRODUCCION-EXCEL-3e-2026-10-25.md`; sobre el merge con mi rama (`e9981e5`): 3393 passed, 102 skipped, 2 xfailed, 0 rojos (rc=0) |
 
 ## Negativos propios
 
