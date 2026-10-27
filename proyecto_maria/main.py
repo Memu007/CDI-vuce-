@@ -6862,7 +6862,8 @@ async def list_estudios(
     estudios = list(result.scalars().all())
     uso_perfil = await db.get(UsoCuitPerfil, user["username"])
     usados = [(_utc(e.last_used_at), e.id) for e in estudios if e.last_used_at is not None]
-    if uso_perfil is not None:
+    # Sin CUIT en el perfil, elegirlo deja la operación sin despachante.
+    if uso_perfil is not None and user.get("cuit"):
         usados.append((_utc(uso_perfil.last_used_at), None))
     if usados:
         # Con la misma hora gana el perfil: lo que pide menos sorpresa.
