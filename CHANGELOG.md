@@ -6,6 +6,17 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-27 · fix: lo que va al TXT por producto es lo que muestra su celda (SUFIJOS-1, vuelta)
+
+- Si el arancel de ARCA no contestó, todavía consulta o hay más de 500 productos, no viaja nada de la propuesta (ni sufijo ni kilos) y la celda y los avisos lo dicen. Lo escrito en el sufijo de la operación gana: la propuesta sólo agrega los códigos que faltan y avisa en la fila si propone otro valor.
+- Una celda escrita avisa si después cambia el sufijo de la operación; un grupo y un producto con sub-ítems ya no llevan un sufijo propio que no se ve. Con el de la operación vacío y todos los productos con el propio, se avisa sin frenar (D23).
+
+## 2026-10-27 · fix: miles mal formados, blancos raros y la pregunta de la pantalla (SEPARADORES-1c)
+
+- En la factura, un flete o seguro con grupos de miles mal formados («0750.000», «7500.000.000») queda sin leer con aviso, en vez de leerse por mil. En la pantalla, «01234.500» pregunta y «01.500.000» no cierra.
+- Un importe con un carácter que la pantalla no lee (\x85, \x1c a \x1f) ya no sale como 0 en el TXT: el servidor lo rechaza con mensaje.
+- La pregunta de la pantalla propone las dos formas como se leen («¿2500125 o 2500,1250?») y conserva el signo.
+
 ## 2026-10-27 · fix: la importación sigue la regla del alta y el script de datos no muestra la clave (vuelta de CLIENTE-1c)
 
 - **fix(clientes):** la fecha de inicio de actividad importada pasa por la misma regla que el alta (D25 b): año de dos cifras, dígitos de ancho completo o DD-MM-AAAA quedan vacíos con aviso en su fila; una celda con formato fecha de Excel se importa.
@@ -15,6 +26,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(estudios):** la operación siguiente trae elegido lo último con que se generó, estudio o CUIT del perfil; un estudio único gana sólo si el perfil nunca se usó. Un `estudio_id` que no es vacío ni de la cuenta («null», espacios, un número) da 400 y no cae al perfil.
 - El nombre del estudio no admite caracteres invisibles ni controles de dirección.
+
+## 2026-10-25 · feat: el sufijo de valor de cada producto, con el arancel de ARCA (SUFIJOS-1)
+
+- En «Lo que decide el despachante» cada producto propone su sufijo (marca AA, modelo AB, código AI) según el arancel de ARCA del 07/10/2026 junto con el de la operación (CA00 y los demás quedan) y dice qué falta; una posición que no está queda vacía y se avisa, con la letra de control correcta si la que vino es otra. Sin elegir, la unidad estadística va en kilos si la posición la pide.
+- Un producto entero sale con su propio sufijo (antes, el de la operación). Un grupo exige el mismo sufijo en todos sus ítems.
+- En un grupo no hay celda de sufijo por producto (va uno para todo el grupo); si la propuesta junto con el de la operación pasa de 120 caracteres no se propone nada; una NCM de 8 dígitos se avisa como posición incompleta, no como fuera del arancel.
 
 ## 2026-10-25 · fix: la fecha de inicio de actividad de la operación pasa por la regla del alta y la importación no guarda una que no sirve (CLIENTE-1c)
 

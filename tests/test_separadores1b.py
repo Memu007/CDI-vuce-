@@ -101,9 +101,10 @@ def _leer_js(escrito):
 
 
 @pytest.mark.parametrize("escrito, pregunta", [
-    ("4500.000", "¿4.500.000 o 4.500,000?"), ("98765,432", "¿98.765.432 o 98.765,432?"),
-    ("2500.125", "¿2.500.125 o 2.500,125?"), ("12345,250", "¿12.345.250 o 12.345,250?"),
-    ("-2500.125", "¿2.500.125 o 2.500,125?"),
+    # SEPARADORES-1c: las dos lecturas como las escribe escribir(), con el signo
+    ("4500.000", "¿4500000 o 4500?"), ("98765,432", "¿98765432 o 98765,4320?"),
+    ("2500.125", "¿2500125 o 2500,1250?"), ("12345,250", "¿12345250 o 12345,25?"),
+    ("-2500.125", "¿-2500125 o -2500,1250?"),
 ])
 def test_en_la_pantalla_se_pregunta(escrito, pregunta):
     """Antes «2500.125» se leía 2500,125 sin preguntar."""
@@ -118,10 +119,11 @@ def test_en_la_pantalla_lo_demas_sigue_como_hoy(escrito, valor):
 
 def test_una_cifra_larga_pegada_no_traba_la_pantalla():
     """Revisión de seguridad: con la regex de grupos, 199 998 cifras y «.125»
-    tardaban decenas de segundos (crece con el cuadrado del largo)."""
+    tardaban decenas de segundos (crece con el cuadrado del largo). Desde
+    SEPARADORES-1c, con más de quince cifras no se pregunta: no es un número."""
     r = _js("const t0 = Date.now(); const r = CDI.montos.leer('1'.repeat(199998) + '.125');"
-            "console.log(JSON.stringify({ms: Date.now() - t0, pregunta: r.error.slice(0, 9)}));")
-    assert r["pregunta"] == "¿111.111." and r["ms"] < 1000, r
+            "console.log(JSON.stringify({ms: Date.now() - t0, error: r.error}));")
+    assert r["error"] == "Debe ser un numero." and r["ms"] < 1000, r
 
 
 def test_las_dos_respuestas_a_la_pregunta_se_leen_sin_dudas():

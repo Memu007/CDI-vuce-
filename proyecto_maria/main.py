@@ -85,6 +85,7 @@ from proyecto_maria.pdf_extractor import (  # Importar el extractor
 import pandas as pd
 from proyecto_maria.core.vuce_connector import get_ncm_data  # VUCE activo en modo mock
 from proyecto_maria.core import ncm_catalog
+from proyecto_maria.core import sufijos_arca
 from proyecto_maria.routers import admin_router, quote_router
 from proyecto_maria.services import billing_service
 from proyecto_maria.auth.dependencies import get_current_user
@@ -4445,7 +4446,7 @@ async def generate_maria_endpoint(
         # la que el generador lo valida (MARIA-9). El generador igual exige
         # que ninguno quede sin sufijo.
         sbt_raw = (request.sbt_sufijo_valor or "").strip()
-        usa_el_general = usa_el_sufijo_de_la_operacion(items, request.iva_adicional)
+        usa_el_general = usa_el_sufijo_de_la_operacion(items)
         if not sbt_raw and usa_el_general:
             raise HTTPException(
                 status_code=400,
@@ -8930,6 +8931,46 @@ async def aviso_de_ncm_escrita(codigo: str = "", user=Depends(get_current_user))
     digitos = re.sub(r"\D", "", codigo)[:8]
     return {"aviso": aviso[:1].upper() + aviso[1:],
             "baja": bool(aviso) and (len(digitos) < 8 or bool(ncm_catalog.ncm_de_baja(digitos)))}
+
+
+SUFIJOS_POR_PEDIDO = 500
+
+
+def _texto_del_pedido(valor, largo: int) -> str:
+    """Un campo del pedido como texto que se puede devolver (sin mitades de
+    caracteres sueltas) y con tope."""
+    return str(valor or "").encode("utf-8", "replace").decode("utf-8").strip()[:largo]
+
+
+@app.post("/api/sufijos/propuesta")
+async def propuesta_de_sufijos(data: dict, user=Depends(get_current_user)):
+    """El sufijo de valor y la unidad estadística que el arancel de ARCA pide
+    para cada producto (SUFIJOS-1): se completa marca, modelo y código de
+    artículo con lo que leyó la IA, y lo demás queda para el despachante.
+    Una posición fuera de la tabla no trae nada. No guarda ni cambia nada."""
+    items = data.get("items")
+    if (not isinstance(items, list) or len(items) > SUFIJOS_POR_PEDIDO
+            or not all(isinstance(it, dict) for it in items)):
+        raise HTTPException(status_code=400,
+                            detail=f"«items» va como una lista de hasta {SUFIJOS_POR_PEDIDO} productos.")
+    tabla = sufijos_arca.cargar()
+    salida = []
+    for it in items:
+        # Como el generador: si vienen las dos, manda la NCM.
+        posicion = _texto_del_pedido(it.get("ncm") or it.get("pieza"), 20)
+        consulta = sufijos_arca.consultar(posicion, tabla)
+        if not consulta:
+            salida.append({"posicion": posicion, "en_la_tabla": False, "sufijo": "", "faltan": [],
+                           "sufijos": [], "opciones": [], "unidad_estadistica": None,
+                           "letra_de_control": sufijos_arca.letra_de_control(posicion, tabla)})
+            continue
+        propuesta = sufijos_arca.proponer(
+            {c: _texto_del_pedido(it.get(c), 200) for c in ("marca", "modelo", "codigo_parte")}, consulta)
+        salida.append({"posicion": posicion, "en_la_tabla": True, "sufijo": propuesta["sufijo"],
+                       "faltan": propuesta["faltan"], "sufijos": consulta["sufijos"],
+                       "opciones": consulta["opciones"],
+                       "unidad_estadistica": consulta["unidad_estadistica"]})
+    return {"fuente": sufijos_arca.fuente(tabla), "sin_tabla": not tabla, "items": salida}
 
 
 @app.post("/api/ncm/sugerir")

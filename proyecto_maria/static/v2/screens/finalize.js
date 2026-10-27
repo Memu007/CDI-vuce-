@@ -177,6 +177,9 @@
         };
         wrap.addEventListener('change', programar);
         wrap.addEventListener('input', programar);
+        // El sufijo de la operación cambia lo que viaja por producto.
+        const sbt = document.getElementById('sbtSufijoValor');
+        if (sbt) sbt.addEventListener('input', programar);
         const estudio = document.getElementById('estudioWrap');
         if (estudio) estudio.addEventListener('change', programar);
     }
@@ -191,6 +194,9 @@
         let avisos;
         let valor = null;
         let firma = null;
+        // SUFIJOS-1: lo que dicen las celdas del sufijo (el arancel no
+        // contestó, lo escrito con otro de la operación, D23).
+        const deLaPantalla = CDI.despachante && CDI.despachante.avisos ? CDI.despachante.avisos() : [];
         try {
             const pedido = buildMariaRequest();
             firma = firmaDelPedido(pedido);
@@ -201,15 +207,15 @@
             const data = await res.json();
             if (!res.ok) {
                 const detail = data && data.detail;
-                avisos = [typeof detail === 'string' ? detail : 'No se pudieron revisar los avisos.'];
+                avisos = deLaPantalla.concat([typeof detail === 'string' ? detail : 'No se pudieron revisar los avisos.']);
                 valor = { error: SIN_CUENTAS };
             } else {
-                avisos = (data && data.avisos) || [];
+                avisos = deLaPantalla.concat((data && data.avisos) || []);
                 valor = (data && data.valor) || null;
             }
         } catch (err) {
             console.warn('[avisos] no se pudieron pedir', err);
-            avisos = ['No se pudieron revisar los avisos; aparecen al generar.'];
+            avisos = deLaPantalla.concat(['No se pudieron revisar los avisos; aparecen al generar.']);
             valor = { error: SIN_CUENTAS };
         }
         if (seq !== avisosSeq) return;   // llegó uno más nuevo
@@ -574,7 +580,7 @@
     /* ==========================================================
        Pantalla 5: ready (generar + descargar)
        ========================================================== */
-    function onGenerate() {
+    async function onGenerate() {
         if (generateInFlight) return;
         if (lastValidation && (lastValidation.errores || []).length > 0) return;
 
@@ -585,11 +591,10 @@
             CDI.state.operacion.sbt_sufijo_valor = sbtInput.value.trim();
         }
         // Validación frontend: si está vacío, mostrar error junto al campo.
-        // No hace falta si todos los productos van en subítems con sufijo
-        // propio (SUBITEMS-1; el servidor tampoco lo pide).
-        const itemsSufijo = CDI.state.items || [];
-        const todosConSufijoPropio = itemsSufijo.length > 0 && itemsSufijo.every(it =>
-            Array.isArray(it.subitems) && it.subitems.length && it.subitems.every(s => String(s.sufijo || '').trim()));
+        // No hace falta si todos los productos llevan sufijo propio, en sus
+        // subítems (SUBITEMS-1) o en «Lo que decide el despachante»
+        // (SUFIJOS-1); el servidor tampoco lo pide.
+        const todosConSufijoPropio = Boolean(CDI.despachante && CDI.despachante.todosConPropio());
         if (!CDI.state.operacion.sbt_sufijo_valor && !todosConSufijoPropio) {
             if (sbtError) {
                 sbtError.textContent = 'Ingresá el sufijo de valor SBT. Es obligatorio.';
@@ -719,7 +724,7 @@
         const operation_id = factura ? ('FAC_' + factura.replace(/[^a-zA-Z0-9_-]/g, '')) :
             ('OP_' + new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14));
 
-        const items = (CDI.state.items || []).map(it => ({
+        const items = (CDI.state.items || []).map((it, i) => ({
             pieza: String(it.pieza || '').trim(),
             descripcion: String(it.descripcion || '').trim(),
             origen: String(it.origen || 'XX').trim().toUpperCase() || 'XX',
@@ -730,10 +735,12 @@
             grupo_id: it.grupo_id || null,
             // MARIA-7: la de la factura y la estadística, elegidas en «Lo
             // que decide el despachante».
-            ...(CDI.despachante && CDI.despachante.unidadesDe ? CDI.despachante.unidadesDe(it)
+            ...(CDI.despachante && CDI.despachante.unidadesDe ? CDI.despachante.unidadesDe(it, i)
                 : { unidad: it.unidad || null }),
             estado: it.estado || null,
             iva_adicional: it.iva_adicional || null,
+            // El suyo o el propuesto del arancel; vacío, el de la operación (SUFIJOS-1).
+            sufijo: (CDI.despachante && CDI.despachante.sufijoDe ? CDI.despachante.sufijoDe(it, i) : '') || null,
             // Partido en subítems (SUBITEMS-1); sin subítems no va el campo.
             subitems: subitemsDelPedido(it)
         }));
