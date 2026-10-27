@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-27 · fix: miles mal formados en cantidades, precios y pesos; aviso por más de dos decimales (SEPARADORES-1d)
+
+- La factura y la planilla dejan sin leer una cantidad, un precio o un peso que sólo se puede leer como miles mal armados («0.500.000»), como ya hacían con el flete y el seguro: queda vacío y la revisión lo marca, en vez de llegar por mil al TXT.
+- Si el flete o el seguro tienen más de dos decimales, la revisión avisa sin frenar qué lleva el TXT («2500,1250» → 2500,13). El TXT no cambia.
+
 ## 2026-10-27 · fix: lo que va al TXT por producto es lo que muestra su celda (SUFIJOS-1, vuelta)
 
 - Si el arancel de ARCA no contestó, todavía consulta o hay más de 500 productos, no viaja nada de la propuesta (ni sufijo ni kilos) y la celda y los avisos lo dicen. Lo escrito en el sufijo de la operación gana: la propuesta sólo agrega los códigos que faltan y avisa en la fila si propone otro valor.
