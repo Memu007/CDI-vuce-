@@ -8,15 +8,18 @@ Comprueba:
 2. la invitación sólo sirve para el email invitado, y el intento con otro email
    no la gasta;
 3. el tope de usuarios del plan, al invitar y al registrarse;
-4. un solo uso: dos registros a la vez con la misma invitación, y dos
-   invitaciones a la vez por el último lugar del estudio.
+4. un solo uso y el tope bajo carrera: dos registros a la vez con la misma
+   invitación, dos registros con invitaciones distintas por el último lugar
+   del estudio, y dos invitaciones enviadas a la vez por ese último lugar.
 
 uso (con un Postgres local y descartable, nunca el de producción):
   python scripts/testing/org1_postgres.py postgresql://cdi@127.0.0.1:55432/<base>
 """
+import asyncio
 import os
 import sys
 import threading
+import time
 import uuid
 from urllib.parse import urlparse
 
@@ -227,6 +230,49 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
         chequear([s for s, _ in res] == [200, 400] and "los 2 usuarios" in res[1][1]
                  and miembros(est.org_id) == 2 and estados == ["accepted", "pending"],
                  f"dos invitaciones por el último lugar: entra una ({res}, miembros {miembros(est.org_id)}, {estados})")
+
+        # --- 4b. dos invitaciones enviadas a la vez por el último lugar. Cada
+        # una, ya pasado el control del tope, espera en su commit hasta que la
+        # otra también llegue al commit (sin bloqueo: las dos contaron el mismo
+        # lugar libre) o quede frenada en el bloqueo del estudio
+        # (pg_stat_activity). El plazo sólo corre si no pasa ninguna de las dos.
+        from sqlalchemy.ext.asyncio import AsyncSession
+        from proyecto_maria.database.models import Invitation
+        commit_real = AsyncSession.commit
+        en_el_commit = []
+
+        async def _commit_con_la_otra_a_la_par(self):
+            if any(isinstance(o, Invitation) for o in self.new):
+                en_el_commit.append(1)
+                hasta = time.monotonic() + 20
+                while time.monotonic() < hasta and len(en_el_commit) < 2 and not sql(
+                        "select count(*) from pg_stat_activity where datname = current_database()"
+                        " and wait_event_type = 'Lock'")[0][0]:
+                    await asyncio.sleep(0.05)  # sin frenar el loop: la otra tiene que poder avanzar
+            return await commit_real(self)
+
+        PREMIUM["users"] = 2
+        est = Estudio()
+        a, b = email(), email()
+        res = [None, None]
+
+        def invitar_a_la_vez(i, correo):
+            r = c.post("/api/organizations/invite", json={"email": correo})
+            res[i] = (r.status_code, detalle(r))
+
+        AsyncSession.commit = _commit_con_la_otra_a_la_par
+        try:
+            hilos = [threading.Thread(target=invitar_a_la_vez, args=(i, x)) for i, x in enumerate((a, b))]
+            for h in hilos:
+                h.start()
+            for h in hilos:
+                h.join(timeout=120)
+        finally:
+            AsyncSession.commit = commit_real
+        res = sorted(r for r in res if r)
+        pendientes = sql("select count(*) from invitations where org_id=%s and status='pending'", est.org_id)[0][0]
+        chequear([s for s, _ in res] == [200, 400] and "ocupa los 2" in res[1][1] and pendientes == 1,
+                 f"dos invitaciones a la vez por el último lugar: sale una ({res}, pendientes {pendientes})")
     finally:
         PREMIUM["users"] = TOPE_REAL
 
