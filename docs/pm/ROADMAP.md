@@ -134,7 +134,7 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 
 | Pieza | Quién | Qué arregla |
 |---|---|---|
-| ⚪ SESION-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
+| 🔵 SESION-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
 | ⚪ ABUSO-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | ⚪ AISLAMIENTO-2 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | ⚪ LIMPIEZA-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
