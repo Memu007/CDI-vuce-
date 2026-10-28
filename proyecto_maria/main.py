@@ -1766,16 +1766,115 @@ async def _get_billing_entity(db: AsyncSession, db_user: User):
     return db_user, False
 
 
-async def require_active_billing(
-    request: Request,
+def _vencer_si_corresponde(entidad, ahora=None):
+    """Pasa a past_due una cuenta vencida y dice qué venció ("trial",
+    "active") o None. No hace commit.
+
+    - trial vencido: sin gracia (nadie pagó todavía).
+    - active vencido: con BILLING_GRACE_DAYS_ACTIVE días de gracia (G7.3), para
+      no cortar por un webhook de renovación que llegó tarde.
+    """
+    ahora = ahora or datetime.now(timezone.utc)
+    fin = entidad.trial_ends_at
+    if fin is None:
+        return None
+    if fin.tzinfo is None:
+        fin = fin.replace(tzinfo=timezone.utc)
+    if entidad.billing_status == "trial" and fin < ahora:
+        entidad.billing_status = "past_due"
+        return "trial"
+    if (
+        entidad.billing_status == "active"
+        and fin < ahora - timedelta(days=BILLING_GRACE_DAYS_ACTIVE)
+    ):
+        entidad.billing_status = "past_due"
+        return "active"
+    return None
+
+
+def _detalle_402(entidad, razon_del_plan=None, vencio=None):
+    """El detail del 402 con la razón real: impago, vencido, cancelado o tope.
+
+    El code no cambia respecto de antes (los tests de G7 lo leen):
+    past_due/canceled con pago real de MP → SUBSCRIPTION_PAST_DUE; sin pago
+    real → TRIAL_EXPIRED; trial/active sin cupo → PLAN_LIMIT_EXCEEDED. Una
+    cuenta sin suscripción (none) tiene su propio code, SUBSCRIPTION_INACTIVE.
+    """
+    estado = entidad.billing_status
+    pago_real = getattr(entidad, "payment_provider", None) == "mercadopago"
+    if estado == "past_due":
+        if pago_real:
+            code = "SUBSCRIPTION_PAST_DUE"
+            message = ("Tenés un pago pendiente de tu suscripción. "
+                       "Regularizalo para seguir usando CDI.")
+        else:
+            # Sin pago de Mercado Pago, en producción sólo vence una prueba:
+            # el active sin MP sale de simulate-charge o de los usuarios demo.
+            code = "TRIAL_EXPIRED"
+            que = "tu suscripción" if vencio == "active" else "tu prueba gratis"
+            message = f"Venció {que}. Suscribite para seguir usando CDI."
+    elif estado == "canceled":
+        code = "SUBSCRIPTION_PAST_DUE" if pago_real else "TRIAL_EXPIRED"
+        message = "Cancelaste tu suscripción. Reactivala para seguir usando CDI."
+    elif estado in ("trial", "active"):
+        code = "PLAN_LIMIT_EXCEEDED"
+        message = razon_del_plan or "Alcanzaste el límite de operaciones de tu plan."
+    else:
+        code = "SUBSCRIPTION_INACTIVE"
+        message = "No tenés una suscripción activa. Suscribite para seguir usando CDI."
+    return {"message": message, "code": code, "billing_status": estado}
+
+
+async def _cuenta_bloqueada(db: AsyncSession, username: str):
+    """Bloquea (SELECT … FOR UPDATE) la fila del usuario y, si tiene, la de su
+    organización, siempre en ese orden. Devuelve (db_user, entidad de cobro) o
+    None si el usuario no existe. El lock dura hasta el commit o rollback.
+
+    populate_existing: la sesión del pedido ya cargó al usuario en
+    get_current_user; sin esto se usarían los contadores leídos antes del lock.
+    SQLite ignora FOR UPDATE (serializa las escrituras por su cuenta).
+    """
+    result = await db.execute(
+        select(User)
+        .where(User.username == username)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    db_user = result.scalars().first()
+    if not db_user:
+        return None
+    if db_user.organization_id:
+        result = await db.execute(
+            select(Organization)
+            .where(Organization.id == db_user.organization_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        org = result.scalars().first()
+        if org:
+            return db_user, org
+    return db_user, db_user
+
+
+async def _vencer_y_guardar(db: AsyncSession, entidad):
+    vencio = _vencer_si_corresponde(entidad)
+    if vencio:
+        try:
+            await db.commit()
+            await db.refresh(entidad)
+        except Exception:
+            await db.rollback()
+    return vencio
+
+
+async def require_billing_vigente(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Dependencia: exige que el usuario tenga billing activo/trial y que no
-    haya excedido el límite de operaciones del plan. Usar en endpoints que
-    crean operaciones o clientes.
-
-    Devuelve HTTP 402 Payment Required si está vencido o sin ops.
+    """Dependencia: corta por estado (vencido, impago, cancelado o sin
+    suscripción → 402). No mira el tope del plan: va en las rutas que gastan
+    Gemini o generan valor; el tope se mira sólo donde se cuenta una
+    operación (COBRO-CORTE-1, D5 a).
     """
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
@@ -1784,55 +1883,63 @@ async def require_active_billing(
             return User(username=user["username"], plan="premium", billing_status="active")
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
 
-    # Corte por vencimiento. Chequear la entidad de billing (org o user).
-    #  - trial vencido: sin gracia (nadie pagó todavía).
-    #  - active vencido: con BILLING_GRACE_DAYS_ACTIVE días de gracia (G7.3), para no
-    #    cortar por un webhook de renovación que llegó tarde.
-    billing_entity, is_org = await _get_billing_entity(db, db_user)
-    now = datetime.now(timezone.utc)
-    trial_end = billing_entity.trial_ends_at
-    if trial_end is not None and trial_end.tzinfo is None:
-        trial_end = trial_end.replace(tzinfo=timezone.utc)
-
-    # get_current_user ya pasa a past_due un `trial` vencido. Acá cubrimos al
-    # `active` vencido pasada la gracia (y al `trial` por si se llega sin pasar por
-    # get_current_user, p. ej. billing por organización).
-    if trial_end is not None:
-        vencido_trial = billing_entity.billing_status == "trial" and trial_end < now
-        vencido_active = (
-            billing_entity.billing_status == "active"
-            and trial_end < now - timedelta(days=BILLING_GRACE_DAYS_ACTIVE)
-        )
-        if vencido_trial or vencido_active:
-            billing_entity.billing_status = "past_due"
-            try:
-                await db.commit()
-                await db.refresh(billing_entity)
-            except Exception:
-                await db.rollback()
-
-    ok, reason = billing_service.can_create_operation(billing_entity)
-    if not ok:
-        # 402 distinguible, para que Emi sepa la causa de un vistazo:
-        #  - past_due/canceled y pagó de verdad (payment_provider=="mercadopago",
-        #    lo setea el webhook real de MP; el registro con tarjeta deja
-        #    "simulated") → renovación impaga.
-        #  - past_due/canceled sin pago real → trial vencido (nunca pagó).
-        #  - trial/active vigente sin ops → límite del plan.
-        if billing_entity.billing_status in ("past_due", "canceled"):
-            pago_real = getattr(billing_entity, "payment_provider", None) == "mercadopago"
-            code = "SUBSCRIPTION_PAST_DUE" if pago_real else "TRIAL_EXPIRED"
-        else:
-            code = "PLAN_LIMIT_EXCEEDED"
-        raise HTTPException(
-            status_code=402,
-            detail={
-                "message": reason,
-                "code": code,
-                "billing_status": billing_entity.billing_status,
-            },
-        )
+    entidad, _ = await _get_billing_entity(db, db_user)
+    vencio = await _vencer_y_guardar(db, entidad)
+    if entidad.billing_status not in ("trial", "active"):
+        raise HTTPException(status_code=402, detail=_detalle_402(entidad, vencio=vencio))
     return db_user
+
+
+async def require_active_billing(
+    request: Request,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Dependencia: estado vigente y cupo del plan (402 si no). Mira el tope
+    sin bloquear: las rutas que cuentan lo vuelven a mirar con la cuenta
+    bloqueada, en la misma transacción que cuentan.
+    """
+    result = await db.execute(select(User).where(User.username == user["username"]))
+    db_user = result.scalars().first()
+    if not db_user:
+        if os.getenv("ENVIRONMENT") == "testing":
+            return User(username=user["username"], plan="premium", billing_status="active")
+        raise HTTPException(status_code=401, detail="Usuario no encontrado")
+
+    entidad, _ = await _get_billing_entity(db, db_user)
+    vencio = await _vencer_y_guardar(db, entidad)
+    ok, reason = billing_service.can_create_operation(entidad)
+    if not ok:
+        raise HTTPException(status_code=402, detail=_detalle_402(entidad, reason, vencio))
+    return db_user
+
+
+async def _contar_operacion_bloqueada(db: AsyncSession, username: str):
+    """Con la cuenta bloqueada: vence, mira el tope y cuenta. No hace commit:
+    el que llama crea la operación y hace un solo commit (D6 a).
+
+    Devuelve la entidad contada, o None si no hay fila del usuario (sólo en
+    testing, el mismo atajo que require_active_billing). Con el tope lleno o
+    la cuenta no vigente guarda el vencimiento, libera el lock y tira 402.
+    """
+    cuenta = await _cuenta_bloqueada(db, username)
+    if cuenta is None:
+        if os.getenv("ENVIRONMENT") == "testing":
+            return None
+        raise HTTPException(status_code=401, detail="Usuario no encontrado")
+    return await _contar_en_la_cuenta(db, cuenta[1])
+
+
+async def _contar_en_la_cuenta(db: AsyncSession, entidad):
+    """El conteo de _contar_operacion_bloqueada, con la cuenta ya bloqueada."""
+    vencio = _vencer_si_corresponde(entidad)
+    ok, reason = billing_service.can_create_operation(entidad)
+    if not ok:
+        detalle = _detalle_402(entidad, reason, vencio)
+        await db.commit()
+        raise HTTPException(status_code=402, detail=detalle)
+    billing_service.record_operation_created(entidad)
+    return entidad
 
 
 # --- USER PROFILE ENDPOINTS ---
@@ -3213,7 +3320,9 @@ async def create_manual_operation(
     total_value = sum(float(it.get("valor_unitario", 0) or 0) * float(it.get("cantidad", 0) or 0) for it in items_raw)
     total_weight = sum(float(it.get("peso_unitario", 0) or 0) * float(it.get("cantidad", 0) or 0) for it in items_raw)
 
-    # Crear operación
+    # Contar, calcular el op_code y crear la operación con la cuenta bloqueada,
+    # en un solo commit (COBRO-CORTE-1, D6 a).
+    await _contar_operacion_bloqueada(db, username)
     op_code = await _next_op_code(db, username)
 
     operation = OperationModel(
@@ -3246,10 +3355,6 @@ async def create_manual_operation(
 
     await db.commit()
 
-    billing_entity, _ = await _get_billing_entity(db, db_user)
-    billing_service.record_operation_created(billing_entity)
-    await db.commit()
-
     return {
         "success": True,
         "operation_id": operation_id,
@@ -3265,6 +3370,7 @@ async def process_operation(
     request: Request,
     payload: OperationPayload,
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
 ):
     """
     Recibe los datos de una operación, los valida y genera el Excel.
@@ -4031,6 +4137,7 @@ async def upload_pdf_public(
     request: Request,
     file: UploadFile = File(...),
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
 ):
     """
     Sube y procesa un archivo PDF para extraer items y datos de operación.
@@ -4405,6 +4512,7 @@ async def generate_maria_endpoint(
     request: MariaRequest,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    _cobro=Depends(require_billing_vigente),
 ):
     """
     Genera archivo TXT en formato MARIA para el sistema SIM de AFIP.
@@ -4609,6 +4717,11 @@ async def generate_maria_endpoint(
         filename = f"MARIA_{safe_id}.TXT"
         filepath = os.path.join(_user_downloads_dir(user["username"]), filename)
 
+        # La primera vez que se genera este id se cuenta la operación; con
+        # el tope lleno, 402 sin escribir el archivo (COBRO-CORTE-1).
+        await _contar_maria(db, user["username"], filename, txt_content,
+                            len(request.items or []))
+
         # newline="": el archivo lleva los CRLF tal cual, sin traducir (MARIA-7).
         with open(filepath, 'w', encoding='utf-8', newline='') as f:
             f.write(txt_content)
@@ -4683,6 +4796,7 @@ class MariaExportRequest(BaseModel):
 async def generate_maria_export_endpoint(
     request: MariaExportRequest,
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
 ):
     """
     Genera archivo TXT en formato MARIA para EXPORTACIÓN.
@@ -5713,6 +5827,75 @@ async def _next_op_code(db: AsyncSession, owner_username: str) -> str:
     return f"OP-{max_num + 1:06d}"
 
 
+# Contenidos distintos que admite un mismo MARIA_<id>.TXT (COBRO-CORTE-1, D4 b).
+MARIA_REGENERACIONES = 10
+_ARCHIVO_MARIA = re.compile(r"MARIA_[A-Za-z0-9_-]{1,50}\.TXT")
+
+
+async def _operacion_maria(db: AsyncSession, owner_username: str, archivo: str):
+    """La operación del usuario creada al generar ese MARIA_<id>.TXT, o None."""
+    result = await db.execute(
+        sa_select(OperationModel)
+        .where(
+            OperationModel.owner_username == owner_username,
+            OperationModel.generated_file == archivo,
+        )
+        .order_by(OperationModel.created_at.asc(), OperationModel.id.asc())
+        .limit(1)
+    )
+    return result.scalars().first()
+
+
+async def _contar_maria(db: AsyncSession, username: str, archivo: str,
+                        contenido: str, total_items: int) -> None:
+    """Cuenta la operación la primera vez que se genera su MARIA (D4 b).
+
+    Con la cuenta bloqueada (D6 a): si el usuario no tiene operación con ese
+    archivo, mira el tope, cuenta y la crea con su op_code, en un solo commit.
+    Si ya la tiene, no cuenta: anota la huella del contenido, hasta
+    MARIA_REGENERACIONES distintas (409 la siguiente). Va antes de escribir
+    el archivo: un 402 o un 409 no lo pisa.
+    """
+    import hashlib
+
+    huella = hashlib.sha256(contenido.encode("utf-8")).hexdigest()
+    cuenta = await _cuenta_bloqueada(db, username)
+    if cuenta is None:
+        if os.getenv("ENVIRONMENT") == "testing":
+            return
+        raise HTTPException(status_code=401, detail="Usuario no encontrado")
+
+    operacion = await _operacion_maria(db, username, archivo)
+    if operacion is None:
+        await _contar_en_la_cuenta(db, cuenta[1])
+        db.add(OperationModel(
+            id=str(uuid.uuid4()),
+            owner_username=username,
+            op_code=await _next_op_code(db, username),
+            source="maria",
+            generated_file=archivo,
+            total_items=total_items,
+            extra={"maria_hashes": [huella]},
+        ))
+        await db.commit()
+        return
+
+    huellas = list((operacion.extra or {}).get("maria_hashes") or [])
+    if huella in huellas:
+        await db.commit()  # libera el lock
+        return
+    if len(huellas) >= MARIA_REGENERACIONES:
+        await db.commit()  # libera el lock; no hubo cambios
+        raise HTTPException(status_code=409, detail={
+            "code": "MARIA_REGENERACIONES_AGOTADAS",
+            "message": (f"Esta operación ya se generó {MARIA_REGENERACIONES} veces "
+                        "con datos distintos, el máximo. Si es otra operación, "
+                        "cargala como nueva."),
+        })
+    operacion.extra = {**(operacion.extra or {}), "maria_hashes": huellas + [huella]}
+    await db.commit()
+
+
 async def _get_owned_client(
     db: AsyncSession, client_id: str, username: str
 ) -> ClientModel:
@@ -6431,6 +6614,7 @@ async def _get_owned_migration_batch(
 async def analyze_client_migration(
     file: UploadFile = File(...),
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
     db: AsyncSession = Depends(get_db),
 ):
     """Analiza un CSV/Excel sin crear ni modificar clientes."""
@@ -6528,6 +6712,7 @@ def _migration_fill_empty(client: ClientModel, record: dict) -> tuple[dict, dict
 async def confirm_client_migration(
     batch_id: str,
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
     db: AsyncSession = Depends(get_db),
 ):
     """Confirma un preview. Es idempotente y nunca pisa datos existentes."""
@@ -7327,9 +7512,14 @@ async def save_client_operation(
     request: Request,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    db_user: User = Depends(require_active_billing),
+    _cobro=Depends(require_billing_vigente),
 ):
-    """Guarda una operación en el historial del cliente."""
+    """Guarda una operación en el historial del cliente.
+
+    Si es la de un MARIA ya generado (operation_id MARIA_<id>.TXT), completa
+    esa operación y no cuenta otra; si no, cuenta una con el tope y la cuenta
+    bloqueados, en el mismo commit (COBRO-CORTE-1, D4 b y D6 a).
+    """
     username = user["username"]
     client = await _get_owned_client(db, client_id, username)
 
@@ -7338,22 +7528,46 @@ async def save_client_operation(
         resumen = data.get("resumen", {}) or {}
         items = data.get("items", []) or []
 
-        op_code = await _next_op_code(db, username)
-
-        operation = OperationModel(
-            id=str(uuid.uuid4()),
-            owner_username=username,
+        archivo = str(data.get("operation_id") or "")
+        if not _ARCHIVO_MARIA.fullmatch(archivo):
+            archivo = None
+        operation = None
+        if archivo:
+            # Con la cuenta bloqueada, como al generar: un guardado y una
+            # generación del mismo id a la vez no crean dos operaciones.
+            await _cuenta_bloqueada(db, username)
+            operation = await _operacion_maria(db, username, archivo)
+        # Lo que viene de afuera se recorta al largo de la columna: en
+        # Postgres un dato más largo tira abajo el guardado (GUARDAR-1).
+        campos = dict(
             client_id=client_id,
-            op_code=op_code,
-            # Lo que viene de afuera se recorta al largo de la columna: en
-            # Postgres un dato más largo tira abajo el guardado (GUARDAR-1).
             source=str(data.get("source") or "manual")[:50],
             total_items=int(resumen.get("items", len(items))),
             total_value=float(resumen.get("valor_total", 0) or 0),
             currency=str(data.get("currency") or "USD")[:3],
-            extra={"resumen": resumen},
         )
-        db.add(operation)
+        if operation is not None:
+            # Ya se contó al generar: se completa y sus ítems se reemplazan.
+            for campo, valor in campos.items():
+                setattr(operation, campo, valor)
+            operation.extra = {**(operation.extra or {}), "resumen": resumen}
+            await db.execute(
+                sa_delete(OperationItemModel).where(
+                    OperationItemModel.operation_id == operation.id
+                )
+            )
+        else:
+            await _contar_operacion_bloqueada(db, username)
+            operation = OperationModel(
+                id=str(uuid.uuid4()),
+                owner_username=username,
+                op_code=await _next_op_code(db, username),
+                generated_file=archivo,
+                extra={"resumen": resumen},
+                **campos,
+            )
+            db.add(operation)
+        op_code = operation.op_code
         await db.flush()  # para tener operation.id
 
         # Fill-if-empty: rellenar ficha del cliente con datos de carátula
@@ -7393,8 +7607,6 @@ async def save_client_operation(
         # guardaba nada (GUARDAR-1).
         # El contador del plan va en el mismo commit que la operación: si
         # falla, no queda una operación guardada sin contar y con un 500.
-        billing_entity, _ = await _get_billing_entity(db, db_user)
-        billing_service.record_operation_created(billing_entity)
         await db.commit()
         operation_id = operation.id
     except HTTPException:
@@ -9094,6 +9306,7 @@ async def propuesta_de_sufijos(data: dict, user=Depends(get_current_user)):
 async def sugerir_ncm(
     data: dict,
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
     db: AsyncSession = Depends(get_db),
 ):
     """Sugiere hasta 5 NCM: memoria confirmada, código exacto o IA validada.
