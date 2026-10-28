@@ -301,3 +301,14 @@ cuando Emi lo diga, prendiendo las rutinas con `update_trigger`.
 Emi, 28/10 a la noche: «volver a trabajar tranqui», porque su entrega del
 otro proyecto pasó al martes. Se prenden de nuevo las tres rutinas con la
 misma frecuencia (PM cada hora, Devs cada 3 horas).
+
+## 2026-10-28 — Sin apurar: calidad antes que velocidad (Emi)
+
+Emi preguntó si el plan de tres meses podía hacerse en un mes y medio. La PM
+(con el advisor) contestó que el código puede adelantarse pero el calendario
+depende del despachante, de Emi y de los estudios, y que apurar baja la
+calidad y sube el uso. Emi: «seguimos así… que no se adelanten, que vamos
+tranqui. Si se estira un poquito más, no hay problema… pero que no se salten
+nada. Prioridad es tener un código que se sienta hecho por un senior».
+Queda escrito arriba de `PARA-DEV.md` y `PARA-DEV-2.md` («Ritmo y calidad»).
+Las fechas se re-estiman después de la primera sesión con el despachante.

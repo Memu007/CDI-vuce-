@@ -3,6 +3,20 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## Ritmo y calidad (Emi, 2026-10-28)
+
+Vamos tranquilas: no hay fecha de entrega y, si el plan se estira, no pasa
+nada. Lo que no se negocia es la calidad: código que se lea como hecho por
+una persona senior, no generado a las apuradas.
+
+- No te adelantes: una pieza a la vez, cerrada entera antes de la siguiente.
+- No te saltees ningún paso de `/entregar` (autorrevisión, `/code-review`,
+  `/security-review` cuando toca dinero, sesión, permisos o datos, rojo antes
+  del arreglo, sabotajes). Si algo no se corrió, se dice.
+- Preferí el arreglo simple y legible al ingenioso; nombres claros, sin
+  código muerto ni duplicado, y comentarios sólo donde explican un porqué.
+- Mejor una entrega más tarde que una devolución.
+
 ## Cómo trabajás
 
 `AGENTS.md`, `CLAUDE.md`, `docs/pm/ONBOARDING-DEV.md` y los comandos
