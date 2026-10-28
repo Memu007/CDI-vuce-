@@ -33,8 +33,9 @@ repositorio.** Las pruebas usan sintéticos con la misma forma.
 ## Orden después de las 18:00, y D45 y D46 (2026-10-28 17:58 UTC)
 
 1. DESPACHO-1b (devolución y D41). 2. DISCO-1 (devolución). 3. SESION-1
-(devolución, abajo). 4. ABUSO-1 (devolución, abajo). 5. EMAIL-1: la D45 y
-el mutante. 6. CONEXIONES-1: la D46. Cada una con su rojo, su sabotaje y
+(devolución, abajo). 4. ABUSO-1 (devolución, abajo). 5. SUFIJOS-2
+(devolución, abajo). 6. EMAIL-1: la D45 y el mutante. 7. CONEXIONES-1: la
+D46. Cada una con su rojo, su sabotaje y
 `/entregar`; me despertás al entregar cada una, sin esperar a juntar.
 
 - **D45 (EMAIL-1): (1), decidido por la PM.** El tope por correo se
@@ -103,6 +104,43 @@ respondiendo. Además:
 Lo demás del revisor (XFF y `TRUSTED_PROXY_HOPS`, IPv6, deadlock con
 ventanas cortas, filas sin tope, tiempos del login) va a riesgos en tu
 informe, sin tocar producto.
+
+## SUFIJOS-2: devolución, sobre `bd76f9f` (2026-10-28 18:05 UTC)
+
+Evidencia en `REPRODUCCION-SUFIJOS-2-2026-10-28.md`. Va en la cola después
+de ABUSO-1 y antes de EMAIL-1.
+
+**Causa.** La detección de «cambiaría de valor» mira el texto crudo con una
+lista de signos ASCII; la limpieza que va al TXT (`caracteres_del_maria`)
+hace NFKD y pasa a espacio todo lo que no es letra ni número. Lo que la
+limpieza cambia y la lista no nombra sale cambiado sin frenar: `ZA(−5)` →
+`ZA( 5)`, `AJ(½)` → `AJ(1 2)`, `AJ(1E-3)` y `AJ(1E+3)` → `AJ(1E 3)` los
+dos, `AJ(１.５００)` → `AJ(1 500)`, `ZA(10%)` → `ZA(10 )`.
+
+Se pide:
+
+1. **Un solo criterio, sobre lo que sale.** Que la decisión compare el
+   valor que escribió el usuario con el que va al TXT (después de NFKD y de
+   la limpieza), no una lista de signos sobre el texto crudo. Lo que cambia
+   un número, frena con el aviso de hoy.
+2. **Fechas, decidido por la PM:** la pieza no pidió frenar fechas y antes
+   pasaban. Una fecha `dd/mm/aaaa`, `dd.mm.aaaa` o `dd-mm-aaaa` sale
+   `dd mm aaaa` sin frenar, igual con los tres separadores. Hoy
+   `AR(31/12/2026)` y `AR(31.12.2026)` dan error y `AR(31-12-2026)` pasa.
+   Sumá la pregunta a `PREGUNTAS-DESPACHANTE.md` (cómo se escribe una fecha
+   en un sufijo); no se espera la respuesta.
+3. **Z, sólo dígitos:** en un sufijo que pide número, cualquier carácter
+   que no sea un dígito ASCII (incluidos `%`, espacio entre dígitos, letras
+   de ancho completo) frena. Hoy `ZA(10%)` y `ZA(1 500)` pasan.
+4. **Caso de la familia, en rojo antes del arreglo:** menos Unicode, raya,
+   `- 5`, ancho completo, `½`, `1⁄2`, `1 / 2`, `1E-3` contra `1E+3`, `10⁻³`,
+   `1'500`, `%`, y uno que no esté en esta lista.
+5. **Los siete mutantes que sobreviven** (en la reproducción), cada uno con
+   la prueba que lo mata.
+6. A riesgos, sin cambiar: `AJ(1,500)` pasa sin aviso (el sistema no lo
+   cambia); `AK`, `AI` y `AW` pasan `15.3` a `15,3`.
+
+Toca el TXT: el golden no se toca.
 
 ## D41 y el orden de lo que queda (2026-10-28 17:20 UTC)
 
@@ -530,30 +568,6 @@ cambio de incoterm en los dos sentidos (el calculado se borra, el escrito
 queda); un sabotaje por regla (uno de los cinco fuera de la lista, la
 regla sólo en la pantalla, el calculado que sobrevive al cambio). El golden
 no se toca.
-
-### SUFIJOS-2 — hecha, sin entregar (encargada 2026-10-28 03:00 UTC)
-
-DESTINO-1 ya está hecha y el cupo vuelve a las 18:00 UTC: mientras tanto,
-SUFIJOS-2, en commits aparte encima de DESTINO-1 (`4905cd8`), con su propio
-`/entregar` después del de DESTINO-1. Respuesta del despachante (pregunta 2,
-`PREGUNTAS-DESPACHANTE.md`):
-
-- **Sufijo de código libre:** un número puede llevar coma. Hoy `AF(2.5)`
-  sale `AF(2 5)`: el número cambia. Tiene que salir `AF(2,5)`.
-- **Sufijo que pide número:** sin decimales. Uno con decimales no se
-  redondea en silencio: aviso que nombra el ítem y el sufijo, y no se genera.
-- **Ninguno vacío:** `AA()` hoy pasa. Mismo aviso, no se genera.
-
-Premisa primero:
-- comprobá en el código, o en el catálogo de sufijos que ya tenga, cuáles
-  piden número;
-- comprobá que una coma no rompe el formato del campo en el TXT.
-
-Si alguna de las dos no se puede saber desde el repo, es la D29 y seguís
-con lo que no depende de ella.
-
-Pruebas: los tres casos, uno que hoy está bien y sigue igual, y un sabotaje
-por regla. Toca el TXT: el golden no se toca.
 
 ## Qué pasó el 2026-10-24
 
