@@ -96,9 +96,9 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 | Orden | Pieza | Qué arregla | Prueba |
 |---|---|---|---|
 | 1 | ✅ SUFIJOS-1 | Con la posición SIM, el sistema trae de VUCE (consulta pública `/cice/sufijos/<posición>`) qué sufijos pide y la unidad estadística; los completa con lo que la IA encuentra en la factura (marca, modelo, código, medidas, color); el código de artículo (`AI`) es distinto en cada renglón; lo que falta queda marcado para el despachante; sin VUCE, se piden a mano con aviso | la consulta a VUCE del 24/10 (una posición de plásticos pidió AA marca y AI código; unidad kilogramo `01`) |
-| 2 | ⚪ DESTINO-1 | Tres destinos por operación: comercialización en el mercado interno, bien de uso de la empresa, bien de uso particular, con su código en el TXT. Corrige lo de hoy: `GANANCIASOP3` siempre `COMERC` y «uso particular» con `COMERC` + `IVAAD1` | los tres pares del despachante del 28/10 (`COMERC`/`NO_VALIDA`, `BDEUSO`/`IVAAD2`, `USOPAR`/`IVAAD1`) |
-| 3 | ⚪ SUFIJOS-2 | Sufijos (D7 de MARIA-7): un número en un sufijo libre puede llevar coma; en uno que pide número, sin decimales (hoy `2.5` sale `2 5`); ninguno vacío (hoy `AA()` pasa) | respuesta del despachante del 28/10 |
-| 4 | ⚪ SEGURO-1 | El botón «calcular seguro» no se ofrece en CIF, CIP, DPU, DAP y DDP (D14 de VALOR-1); el seguro se sigue declarando | respuesta del despachante del 28/10 |
+| 2 | 🔵 DESTINO-1 | Tres destinos por operación: comercialización en el mercado interno, bien de uso de la empresa, bien de uso particular, con su código en el TXT. Corrige lo de hoy: `GANANCIASOP3` siempre `COMERC` y «uso particular» con `COMERC` + `IVAAD1` | los tres pares del despachante del 28/10 (`COMERC`/`NO_VALIDA`, `BDEUSO`/`IVAAD2`, `USOPAR`/`IVAAD1`) |
+| 3 | 🔵 SUFIJOS-2 | Sufijos (D7 de MARIA-7): un número en un sufijo libre puede llevar coma; en uno que pide número, sin decimales (hoy `2.5` sale `2 5`); ninguno vacío (hoy `AA()` pasa) | respuesta del despachante del 28/10 |
+| 4 | 🔵 SEGURO-1 | El botón «calcular seguro» no se ofrece en CIF, CIP, DPU, DAP y DDP (D14 de VALOR-1); el seguro se sigue declarando | respuesta del despachante del 28/10 |
 | 5 | ⏳ PESO-NETO-1 | El peso neto sale del packing list cuando la factura sólo trae bruto; si no hay packing list, el aviso de hoy | un packing list, tapado, de cualquier operación (las lonas no tienen; mientras, el aviso de hoy) |
 | 6 | ⏳ MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11) | sus archivos TXT reales (los despachos del 28/10 muestran los sufijos, no el TXT) |
 | 7 | 🔵 DESPACHO-1 | Sumada por Emi el 28/10; ubicada por la PM (Emi: «acomodalo dónde digas»): después de ORG-1, detrás de las piezas que hacen entrar el TXT; como todas esperan al despachante, se hace la primera que tenga lo suyo; tiene que estar lista antes del piloto (28/12), porque es lo que facilita sumar estudios. Para que un despachante que viene de otro sistema arme rápido el catálogo de sus clientes con despachos que ya tiene, y después haga el predespacho en CDI con ese catálogo. El despacho oficializado es el formulario OM-1993-A SIM que el despachante imprime y firma después de oficializar en el MARIA; trae por ítem y subítem la posición SIM, los sufijos, el origen, la procedencia, el estado, la unidad, la cantidad, el FOB y el peso neto (normativa de ARCA, búsqueda del 28/10). Subir un despacho ya oficializado para armar el catálogo del cliente: se lee por renglón la posición SIM, la descripción, los sufijos, el origen, la unidad, el valor unitario y el peso; se revisa y se edita en pantalla antes de guardar en el catálogo de ese cliente; el catálogo del cliente se puede bajar en Excel, o en el formato que usen los despachantes si la pregunta 6 trae uno. Nunca arma un TXT ni una operación (el lector de facturas sigue rechazando despachos); lo que no se encontró queda marcado, no se rellena | tres despachos oficializados del despachante, del 28/10 (los reales sólo fuera del repo; las pruebas usan un sintético con la forma de `DESPACHOS-FORMA.md`) |
@@ -108,7 +108,7 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 | Orden | Pieza | Qué arregla |
 |---|---|---|
 | 0 | EXCEL-2b | Carril liviano: una subida chica no espera en cola detrás de libros pesados (vuelve a cumplir el criterio D26 a de EXCEL-2, ya aceptada; arreglo de esa pieza, no cuenta aparte; D4 y D5 de la técnica, 28/10) |
-| 1 | ⚪ GUARDAR-2 | La sugerencia de posición: si el historial del cliente tiene 8 dígitos y el proveedor la SIM completa que empieza con esos 8, gana la del proveedor (D32 b; sin migración; Postgres descartable) |
+| 1 | 🔵 GUARDAR-2 | La sugerencia de posición: si el historial del cliente tiene 8 dígitos y el proveedor la SIM completa que empieza con esos 8, gana la del proveedor (D32 b; sin migración; Postgres descartable) |
 | 2 | 🔵 ORDEN-1 | Reordenar los productos arrastrando, en la pantalla de revisión |
 | 3 | COBRO-MP-1 | Primera pieza de la Fase 2 (ver abajo) |
 
@@ -119,7 +119,7 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 
 | Pieza | Quién | Qué arregla |
 |---|---|---|
-| ⚪ COBRO-MP-1 | Dev técnica | Aviso de pago verificado, aplicado una vez, con el monto controlado; las renovaciones extienden el período (C3, D8) |
+| 🔵 COBRO-MP-1 | Dev técnica | Aviso de pago verificado, aplicado una vez, con el monto controlado; las renovaciones extienden el período (C3, D8) |
 | ⚪ COBRO-CORTE-1 | Dev técnica | Quien no paga no genera ni gasta Gemini; contar una vez por operación sin pasarse del tope (también con guardados a la vez); el aviso dice la razón real (C1, C5, C6; D4 b N = 10, D5 a, D6 a) |
 | ⚪ COBRO-MP-2 | Dev técnica | Cancelar también en Mercado Pago sin perder días pagados, una sola suscripción, reactivar pagando (C2, C4, C8, D9) |
 | ⏳ PRORRATEO-1 | Dev MARIA | El reparto ítem por ítem de ajustes, seguro y flete hasta el FOB casillero, con las sumas exactas al centavo (segunda etapa acordada el 24/10) |
