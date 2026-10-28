@@ -286,13 +286,23 @@ sabotaje $M "C: cancelar desde past_due deja los días que quedaban" \
   '            pass' \
   "cancelar desde past_due da acceso"
 sabotaje $M "E: decide payment_provider aunque haya pagos registrados" \
-  $'    if not filas:\n        return db_user.payment_provider == "mercadopago"\n' \
+  $'    if not tipos:\n        return db_user.payment_provider == "mercadopago"\n' \
   $'    return db_user.payment_provider == "mercadopago"\n' \
   "una prueba con recarga no vuelve a la prueba"
 sabotaje $M "E: la recarga cuenta como plan pagado" \
-  '    return any(estado == "aplicado" and tipo != "topup" for tipo, estado in filas)' \
-  '    return any(estado == "aplicado" for tipo, estado in filas)' \
+  '    return any(tipo != "topup" for tipo in tipos)' \
+  '    return bool(tipos)' \
   "una prueba con recarga no vuelve a la prueba"
+sabotaje $M "E: un pago rechazado cuenta como plan" \
+  $',\n               PagoMercadoPagoAplicado.estado == "aplicado")' \
+  ')' \
+  "un plan rechazado cuenta como plan"
+# Lo de antes: un rechazo hace que la cuenta tenga filas y deja de decidir
+# payment_provider.
+sabotaje $M "E: un rechazo saca la decisión de payment_provider" \
+  $'               PagoMercadoPagoAplicado.estado == "aplicado")\n    )).scalars().all()\n    if not tipos:' \
+  $'               PagoMercadoPagoAplicado.estado == "aplicado")\n    )).scalars().all()\n    if not tipos and not (await db.execute(select(PagoMercadoPagoAplicado.payment_id).where(PagoMercadoPagoAplicado.cuenta == db_user.username))).first():' \
+  "una cuenta pagada volvió como prueba"
 
 # D, el backend: la carrera de dos checkouts en un Postgres 16 descartable.
 T=scripts/testing/cobro_mp1d_postgres.py
