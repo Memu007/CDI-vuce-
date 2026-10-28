@@ -2,7 +2,37 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ABUSO-1: premisa confirmada; **D35 abierta**, sigo con S5 (2026-10-28)
+## ABUSO-1: S5 hecho; sigo con la D35 (1) que contestaste (2026-10-28)
+
+**Estado.** Tu D35 llegó en `f600ed4` y la integré (merge `ddc1b61`). Sigo
+con a, b, d y e, en ese orden de riesgo: primero D35a y S4. **No hace falta
+que la revises todavía**: va en su propio `/entregar`, después del de
+SESION-1.
+
+**S5, ya hecho** (sin depender de la D35d):
+
+| SHA | Qué |
+|---|---|
+| `584b8d1` | producto y `CHANGELOG.md`: tope de 16 KB en `/api/ui/event` y `/api/session/state` (lee por partes y corta, haya o no `Content-Length`; lo que se pasa da 413 y no se guarda) y deja de escribirse `logs/ui_events.jsonl` |
+| `25158c6` | `tests/test_abuso1.py`, arnés de dos motores y `scripts/testing/sabotajes/abuso1.sh` (5 sabotajes) |
+| `8c37653` | `HANDOFF.md:57` y el texto del `CHANGELOG.md` |
+
+Corrido sobre `25158c6`:
+
+| Qué | Salida |
+|---|---|
+| `tests/test_abuso1.py` sobre `e25e87c` (rojo antes) | `10 failed, 3 warnings in 2.75s` |
+| `tests/test_abuso1.py` + `tests/test_static_endpoints.py` | `22 passed, 3 warnings in 2.03s` |
+| `abuso1.sh 25158c6` | `sabotajes sin rojo: 0` (5 en rojo, cada uno por su motivo) |
+| `abuso1_motores.py sqlite` | `sqlite: FALLAS: 6`: S4a, S4b, S6, C9 y «un evento sin sesión con una acción cualquiera no se guarda» en las dos rutas. Las seis son de la D35 |
+| `abuso1_motores.py pg` (PG16, 55432) | `pg: FALLAS: 6`, las mismas |
+
+Los OK de 5 MB dicen, en los dos motores, «da 413 y no se guarda». El
+cliente ve «connection reset»: el servidor contesta 413 y cierra sin leer los
+5 MB. Por eso el arnés toma el código del log del servidor.
+
+No corrí la suite completa ni el smoke sobre `25158c6`: van en el `/entregar`.
+
 
 Encima de SESION-1 (`895ee73`) y de tu merge `c702655`, sin cambios de
 producto. Por ahora sólo pruebas: `b08dbc0` (reproducción en dos motores) y
@@ -174,19 +204,6 @@ Qué muestra:
   Además, cada pedido guarda una fila de 8000 caracteres.
 - **S6 y C9.** Sin límite ninguno de los dos. Cada alta da 14 días de prueba.
 
-### Qué hago mientras contestás
-
-S5 sin lo que depende de la D35d:
-
-- **Tope de 16 KB** en el cuerpo de las dos rutas de eventos. Se mira el
-  `Content-Length` y además se lee por partes con corte. Lo que se pasa da
-  413 y no se guarda.
-- **Saco la escritura a `logs/ui_events.jsonl`.** Es un supuesto reversible:
-  ninguna línea de código lo lee, está en `.gitignore` y en Railway vive en
-  el disco del contenedor, que se pierde en cada deploy.
-
-Los dos con su rojo antes, en PG16 y SQLite, y su línea en `CHANGELOG.md`.
-
 ### Riesgos y fuera de alcance
 
 - **Fila 14 de Argon** (el login exitoso reinicia el contador; bloqueo
@@ -196,9 +213,14 @@ Los dos con su rojo antes, en PG16 y SQLite, y su línea en `CHANGELOG.md`.
 - **`scripts/testing/sesion1_motores.py`** esquiva el límite de login
   mandando una IP inventada distinta en cada pedido. Con S4 arreglado
   deja de servir, y lo ajusto en esta pieza.
-- **`recover-username` compara el email distinguiendo mayúsculas**, y el
-  registro lo guarda en minúsculas: si alguien lo escribe con mayúsculas, no
-  le llega nada. Es de antes y no lo toco salvo que me digas.
+- **`recover-username` y mayúsculas:** lo arreglo en esta pieza, como dijiste
+  en la D35. Si dos cuentas pueden tener el mismo email cambiando sólo
+  mayúsculas, no lo toco y abro la D36.
+- **Un token revocado sigue firmando eventos.** `_jwt_sub_from_token_text`
+  (eventos de uso) mira la firma y el vencimiento, pero no la revocación:
+  después de cerrar sesión, ese token puede seguir guardando eventos a nombre
+  del usuario hasta que vence. Sólo afecta la telemetría. Es de antes y no lo
+  toco.
 
 ## SESION-1: hecha, **sin entregar** (2026-10-28)
 
@@ -1629,6 +1651,6 @@ PY=<venv>/bin/python scripts/testing/sabotajes/despacho1a.sh 51890cd
 - **El 400 «es para otro email»** dice que el email escrito no es el
   invitado. No dice cuál es. Hace falta el token para preguntar.
 
-Última vuelta: Wed Oct 28 10:12:12 UTC 2026
+Última vuelta: Wed Oct 28 10:21:04 UTC 2026
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 contestada (a) en 3da0a8b, costos en riesgos. DATOS-1 (D5+D32 (a) borrar cliente borra sus presupuestos compartidos, D2 /health 503, D6 sin dev_detail) hecha y subida SIN ENTREGAR encima de d01f95c: producto 7d09c6f, casos 4416076, Postgres y sabotajes 162d277, arreglo de casos que gastaban el cupo de test_user c996ad4; SHA probado c996ad4 (test_datos1 9 passed; sabotajes datos1.sh 12/12; suite 3836 passed, 336 skipped, 2 xfailed, 0 failed; datos1_postgres.py fallas 0; smoke y aislamiento 0 sobre 162d277); su propio /entregar después del de DESPACHO-1b, con /security-review. Postgres 16 descartable en /tmp/cdi-pg55432, puerto 55432, base datos1a. DISCO-1 (historial de NCM de DATA_DIR a la tabla ncm_historial por dueño; carga única de archivos viejos a .migrado) hecha SIN ENTREGAR encima de c996ad4 y del merge cf84a76 (PM 1f6e0de): producto bd53fc4, casos y sabotajes 0f1161a, Postgres y textos de sabotajes 88b22c8; SHA probado 88b22c8 (test_disco1 11 passed; sabotajes disco1.sh 20/20; suite 3847 passed, 336 skipped, 2 xfailed, 0 failed; disco1_postgres.py fallas 0 y con sabotaje de carrera fallas 1; smoke y aislamiento 0); D33 contestada (a) en a3efc3a, riesgo anotado en DISCO-1; va en su propio /entregar, con subagentes, /code-review high y /security-review. OBSERVABILIDAD-1 (api_logs.owner_username nullable con su índice al arrancar, helper _migrate_add_api_logs_owner_column en main.py; si falla, log y la app sigue) hecha SIN ENTREGAR encima de 88b22c8: producto y CHANGELOG 8b1ce3b, casos, arnés y sabotajes 7ae35ab, merge de la PM 39be45e; SHA probado 39be45e (test_observabilidad1 8 passed; observabilidad1_arranque.py con Postgres 55432 38 OK fallas 0; sabotajes observabilidad1.sh con PG_URL 16/16 sobre 7ae35ab; suite 3855 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D34 contestada (a) en 486e655 (sólo la columna; la métrica sigue sin dueño); va en su propio /entregar después del de DISCO-1, con subagentes, /code-review high y /security-review. SESION-1 (S3: revocar_sesiones nunca escribe NULL en active_jti; change-password cierra las otras y conserva la propia; reset cierra todas; /auth/logout y /logout revocan el token sólo si es el vigente; PUT /api/user/profile pide current_password si cambia el email, 400) hecha SIN ENTREGAR encima de 39be45e y del merge f5160d7 (PM 486e655): producto y CHANGELOG 7dfe144, casos, motores, pantalla y sabotajes 014a3e4, arreglo 4c1ae09 (jti_de_la_request en vez de request.state: la suite sobre 014a3e4 dio 1 failed en test_auth_invalid_plan), sabotajes ajustados 895ee73; SHA probado 895ee73 (test_sesion1 17 casos, rojo en base 11 failed; sesion1_motores.py sqlite y pg 26 OK, todo OK, rojo en base FALLAS 12; sabotajes sesion1.sh 19/19; pantalla 3/3; suite 3872 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); va en su propio /entregar después del de OBSERVABILIDAD-1, con subagentes, /code-review high y /security-review. ABUSO-1 (S4 IP de login desde XFF, S5 eventos sin tope, S6 recuperar usuario sin límite, C9 registro sin límite) en curso encima de 895ee73 y del merge c702655: premisa confirmada con scripts/testing/abuso1_motores.py (b08dbc0; sqlite y pg FALLAS 10, logs $S/abuso1_premisa_*.log) y abuso1_reciclado.sh (--max-requests borra los contadores en memoria); D35 abierta (a IP de la derecha de XFF, b números, c texto del registro, d eventos anónimos de la landing, e contadores en tabla por el reciclado), recomendación (1) en todas; mientras, S5: tope 16 KB con 413 y sacar logs/ui_events.jsonl, rojo antes en PG16 y SQLite; S4, S6 y C9 esperan la D35; ajustar sesion1_motores.py cuando cambie S4; ABUSO-1 va con su propio /entregar después del de SESION-1. La próxima D es la D36. Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review), DESPACHO-1b, DATOS-1, DISCO-1, OBSERVABILIDAD-1 y SESION-1; timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 contestada (a) en 3da0a8b, costos en riesgos. DATOS-1 (D5+D32 (a) borrar cliente borra sus presupuestos compartidos, D2 /health 503, D6 sin dev_detail) hecha y subida SIN ENTREGAR encima de d01f95c: producto 7d09c6f, casos 4416076, Postgres y sabotajes 162d277, arreglo de casos que gastaban el cupo de test_user c996ad4; SHA probado c996ad4 (test_datos1 9 passed; sabotajes datos1.sh 12/12; suite 3836 passed, 336 skipped, 2 xfailed, 0 failed; datos1_postgres.py fallas 0; smoke y aislamiento 0 sobre 162d277); su propio /entregar después del de DESPACHO-1b, con /security-review. Postgres 16 descartable en /tmp/cdi-pg55432, puerto 55432, base datos1a. DISCO-1 (historial de NCM de DATA_DIR a la tabla ncm_historial por dueño; carga única de archivos viejos a .migrado) hecha SIN ENTREGAR encima de c996ad4 y del merge cf84a76 (PM 1f6e0de): producto bd53fc4, casos y sabotajes 0f1161a, Postgres y textos de sabotajes 88b22c8; SHA probado 88b22c8 (test_disco1 11 passed; sabotajes disco1.sh 20/20; suite 3847 passed, 336 skipped, 2 xfailed, 0 failed; disco1_postgres.py fallas 0 y con sabotaje de carrera fallas 1; smoke y aislamiento 0); D33 contestada (a) en a3efc3a, riesgo anotado en DISCO-1; va en su propio /entregar, con subagentes, /code-review high y /security-review. OBSERVABILIDAD-1 (api_logs.owner_username nullable con su índice al arrancar, helper _migrate_add_api_logs_owner_column en main.py; si falla, log y la app sigue) hecha SIN ENTREGAR encima de 88b22c8: producto y CHANGELOG 8b1ce3b, casos, arnés y sabotajes 7ae35ab, merge de la PM 39be45e; SHA probado 39be45e (test_observabilidad1 8 passed; observabilidad1_arranque.py con Postgres 55432 38 OK fallas 0; sabotajes observabilidad1.sh con PG_URL 16/16 sobre 7ae35ab; suite 3855 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D34 contestada (a) en 486e655 (sólo la columna; la métrica sigue sin dueño); va en su propio /entregar después del de DISCO-1, con subagentes, /code-review high y /security-review. SESION-1 (S3: revocar_sesiones nunca escribe NULL en active_jti; change-password cierra las otras y conserva la propia; reset cierra todas; /auth/logout y /logout revocan el token sólo si es el vigente; PUT /api/user/profile pide current_password si cambia el email, 400) hecha SIN ENTREGAR encima de 39be45e y del merge f5160d7 (PM 486e655): producto y CHANGELOG 7dfe144, casos, motores, pantalla y sabotajes 014a3e4, arreglo 4c1ae09 (jti_de_la_request en vez de request.state: la suite sobre 014a3e4 dio 1 failed en test_auth_invalid_plan), sabotajes ajustados 895ee73; SHA probado 895ee73 (test_sesion1 17 casos, rojo en base 11 failed; sesion1_motores.py sqlite y pg 26 OK, todo OK, rojo en base FALLAS 12; sabotajes sesion1.sh 19/19; pantalla 3/3; suite 3872 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); va en su propio /entregar después del de OBSERVABILIDAD-1, con subagentes, /code-review high y /security-review. ABUSO-1 (S4 IP de login desde XFF, S5 eventos sin tope, S6 recuperar usuario sin límite, C9 registro sin límite) en curso encima de 895ee73 y del merge c702655: premisa con scripts/testing/abuso1_motores.py (b08dbc0) y abuso1_reciclado.sh. S5 hecho: producto y CHANGELOG 584b8d1 (tope 16 KB, 413, sin logs/ui_events.jsonl), casos, arnés y sabotajes 25158c6, HANDOFF 8c37653; sobre 25158c6 abuso1.sh sabotajes sin rojo 0, motores sqlite y pg FALLAS 6 (S4a, S4b, S6, C9, anónimo en las dos rutas: todas de la D35). D35 contestada por la PM en f600ed4 (merge ddc1b61): (1) en las cinco. a: un helper con la última IP de XFF, saltos configurables (1), log obligatorio en el 429 del login con IP tomada y cantidad de entradas. b: registro 5/hora y 20/día, recuperar 5 cada 15 min por IP y 3/hora por email silencioso, eventos 120/min por ruta; justificar en el informe. c: los mensajes quedan; S6 mitigada, no cerrada. d: anónimos sólo pricing_cta_clicked, hero_cta_clicked y register_pending_verify, lista explícita con límite. e: contadores de login y recuperación en tabla, incremento atómico con prueba en paralelo en PG16, filas vencidas se borran, _migrate_* al arrancar, un solo camino con o sin REDIS_URL, commit propio para la tabla; el 5/min de slowapi queda en memoria (riesgo). recover-username compara email sin mayúsculas con prueba; si dos cuentas pueden diferir sólo en mayúsculas, no tocar y abrir D36. Ajustar sesion1_motores.py y tests/test_static_endpoints.py:74. Riesgo anotado: _jwt_sub_from_token_text no mira revocación. ABUSO-1 va con su propio /entregar después del de SESION-1, revisión fuerte. La próxima D es la D36. Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review), DESPACHO-1b, DATOS-1, DISCO-1, OBSERVABILIDAD-1 y SESION-1; timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
