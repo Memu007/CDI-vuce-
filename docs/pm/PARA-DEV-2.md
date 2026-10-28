@@ -44,7 +44,60 @@ repositorio.** Las pruebas usan sintéticos con la misma forma.
   primero las devoluciones que lleguen (DESTINO-1 ya está arriba), después
   D41.
 
-## DATOS-1: aceptada sobre `c996ad4` (2026-10-28 17:55 UTC)
+## EMAIL-1: aceptada sobre `2b93071` (2026-10-28 17:55 UTC)
+
+Lo de la pieza está bien: ningún camino manda el correo de una cuenta a
+otra y la respuesta no cambia exista o no. Se integra con la cadena.
+Evidencia en `REPRODUCCION-EMAIL-1-2026-10-28.md`. Sumá, encima de la
+cadena: una prueba que dé rojo si `if not email: return None` de
+`_cuenta_por_email` pasa a `if False:` (hoy `24 passed`).
+
+**A riesgos, sin tocar producto** (todo es de antes de la pieza): el nombre
+va sin escapar en el HTML de los dos correos de recuperación (phishing
+desde el remitente de CDI, reproducido); el envío síncrono delata la cuenta
+por tiempo y traba el worker; un token de recuperación viejo sigue valiendo
+tras usar uno nuevo; `dev_token_hint` fuera de producción; el 500 sin
+`FRONTEND_URL`. El 1, el 2 y el token se los propongo a Emi como pieza
+aparte: **no los arregles hasta que diga que sí**.
+
+## DISCO-1: devolución, sobre `88b22c8` (2026-10-28 17:55 UTC)
+
+La migración está bien (dos arranques, sin duplicar, dueños separados,
+Postgres 16 y SQLite). Evidencia en `REPRODUCCION-DISCO-1-2026-10-28.md`.
+Va encima de la cadena, después de D41.
+
+1. **Causa (regresión, reproducida por la PM en Postgres 16):** en
+   Postgres, una excepción de la base atrapada sin `rollback` deja la
+   transacción abortada para todo lo que sigue en ese pedido. En
+   `sugerir_ncm` los pasos 1 y 2 atrapan sin `rollback`; si fallan, el
+   paso 3 (ahora en la base) falla también y se pierde el historial sin
+   aviso. Rompiendo una columna de `client_product_history`: `c996ad4`
+   `['historial']`, `88b22c8` `[]`. Revisá **todo** `except` que atrape un
+   error de la base y siga usando la misma sesión en lo que toca tu diff,
+   no sólo estos dos. Prueba roja en Postgres (en
+   `disco1_postgres.py` vale) con su mutante en `disco1.sh`.
+2. **Un NUL** en la descripción o el NCM de `guardar-uso` da 500 en
+   Postgres (el archivo lo aceptaba). Que sea 400 claro, o que se limpie;
+   lo mismo en la importación. Con prueba.
+3. **Tope de tamaño, decidido por la PM:** la descripción y el NCM de
+   `guardar-uso` y de cada fila importada con un largo máximo; si se pasa,
+   400. Elegí el número mirando qué largo de descripción admite el resto
+   del producto y decilo. 30 MB entraron con 200. El
+   tope de filas por dueño va a riesgos.
+4. **Orden fijo al importar:** ordená las filas por la clave antes de
+   escribirlas, para que dos importaciones del mismo dueño no se bloqueen
+   entre sí (el revisor sacó `DeadlockDetectedError` en 2 de 4 corridas con
+   órdenes distintos; no lo reproduje). Si no hace falta, decí por qué.
+5. **No pises un `.migrado` anterior** al pasar el archivo (elegí otro
+   nombre libre). Menor.
+6. **Pruebas que faltan** (mutantes que hoy sobreviven): sin `order_by` en
+   la carga; `_HISTORIAL_FILAS_POR_SENTENCIA = 10**6` (con unas 7000 filas
+   el real da ok y el mutante falla en asyncpg); sin `or count < 1`; sin
+   `not desc.strip()`; `os.replace` por `os.remove` en la suite, no sólo en
+   el script de Postgres. Cada una roja con su mutante y sumada a
+   `disco1.sh`.
+
+## DATOS-1: aceptada sobre `c996ad4` (2026-10-28 17:41 UTC)
 
 El producto hace lo que pedía la D32 (a): sin fuga a otro dueño, una sola
 transacción, `/health` sin texto del error. Se integra con la cadena, cuando
@@ -161,7 +214,7 @@ error. Reproducido por la PM sobre `f887b4a`: agregando
   los dos rojos de tiempos de `4ce6d22`, te lo escribo acá. Acepto con las
   pruebas; integro después de ORG-1. Nada se publica antes.
 
-## ORG-1: aceptada sobre `4ce6d22`, con ORG-1b y DESPACHO-1a (2026-10-28 17:45 UTC)
+## ORG-1: aceptada sobre `4ce6d22`, con ORG-1b y DESPACHO-1a (2026-10-28 17:38 UTC)
 
 Integrada en la rama de la PM (merge `cda3320`). Evidencia en
 `REPRODUCCION-ORG-1-2026-10-28.md`. Los guardas del producto están bien;
@@ -224,23 +277,6 @@ Las dos entran al roadmap (Fase 3, tuyas). En commits aparte encima de
 `e1b3129`, cada una con su propio `/entregar` después del de ABUSO-1, en
 este orden.
 
-### EMAIL-1 — empezala ya (tu (1) de la D36)
-
-- Recuperar usuario y recuperar contraseña encuentran la cuenta aunque el
-  email venga con otras mayúsculas.
-- La causa es comparar el email tal cual: revisá **todo** lugar que busque,
-  cree o cambie un email (registro, perfil, invitaciones, recuperar), no
-  sólo los dos que viste. Ninguno deja crear un email que ya existe con
-  otras mayúsculas.
-- La respuesta no cambia exista o no el email (no revelar quién está).
-- Si hoy hay dos cuentas con el mismo email en distintas mayúsculas, no se
-  tocan: sin migración de datos y sin índice único nuevo hasta que Emi
-  cuente los pares en producción. Qué hacer cuando un pedido encuentra
-  dos cuentas, proponelo en la D38 con opciones; mientras, ningún camino
-  le da a una cuenta el acceso de la otra.
-- Pruebas en SQLite y Postgres 16; un sabotaje por regla. Autenticación:
-  revisión fuerte.
-
 ### CONEXIONES-1 — después de EMAIL-1 (tu (1) de la D37)
 
 - Medí si `session.close()` cancelado deja conexiones tomadas: gunicorn con
@@ -263,7 +299,7 @@ Cerradas. Quedan resumidas en `DECISIONS.md` («D28 a D34 de la Dev MARIA»).
 
 ## Lo encargado de las piezas entregadas, todavía en revisión
 
-Lo de ORG-1, ORG-1b, DESPACHO-1a, DESTINO-1 y DATOS-1 (aceptadas o con devolución
+Lo de ORG-1, ORG-1b, DESPACHO-1a, DESTINO-1, DATOS-1, EMAIL-1 y DISCO-1 (aceptadas o con devolución
 arriba) salió del canal: `git show 1f648c3:docs/pm/PARA-DEV-2.md`.
 
 ### ABUSO-1 — hecha, sin entregar (encargada 2026-10-28 10:00 UTC)
@@ -377,50 +413,6 @@ columna y el índice quedan, las filas viejas siguen, la métrica se graba
 (dueño: ver D34), y dos arranques seguidos no cambian nada; en SQLite igual;
 una falla simulada de la migración no frena el arranque. Un sabotaje por
 regla. Línea en `CHANGELOG.md`. Es una migración: revisión fuerte.
-
-### DISCO-1 — hecha, sin entregar (encargada 2026-10-28 07:00 UTC)
-
-DATOS-1 quedó hecha (`c996ad4`). Sigue la tuya de la Fase 3 que es sólo
-código: **DISCO-1**, hallazgo D4 de `AUDITORIA-2026-10-06.md`. BACKUP-1
-(D1) queda para después: necesita algo fuera de Railway y eso lo decide
-Emi. En commits aparte encima de `c996ad4`, con su propio `/entregar`
-después del de DATOS-1.
-
-- **El problema:** el historial de NCM de cada despachante
-  (`load_ncm_historial` / `save_ncm_historial`, `main.py` cerca de la línea
-  9032) vive en `ncm_historial_<usuario>.json` dentro de `DATA_DIR`, en el
-  disco de Railway, que se borra en cada publicación. Lo usan sugerir NCM
-  (fuente «historial»), `/api/ncm/guardar-uso` y `/api/ncm/import-historial`.
-- **Premisa primero:** confirmalo con el código (que `DATA_DIR` no es un
-  volumen que sobreviva; no ves las variables de Railway, decilo como
-  supuesto) y hacé la lista de todo lo demás que se escribe en `DATA_DIR`
-  (`descargas/`, `generated/`, `localStorage_backup.json`…), con una línea
-  por cada uno: si es un dato del usuario que se pierde o un archivo de paso.
-  **Sólo el historial de NCM entra en DISCO-1**; lo otro va a «riesgos» y,
-  si hay algo que se pierde y duele, me lo proponés.
-- **Qué hacer:** el historial pasa a la base, por dueño, con el mismo
-  comportamiento que hoy: misma clave (la descripción tal como se guarda),
-  `ncm` y `count`, incrementa al confirmar de nuevo, actualiza el NCM si
-  cambió, la importación suma igual que hoy y cuenta igual los duplicados.
-  Tabla nueva solamente, sin tocar las existentes. Dos confirmaciones
-  simultáneas de la misma descripción no pierden ninguna cuenta (hoy el
-  archivo pierde una: no copies eso). Un dueño nunca ve ni pisa el
-  historial de otro.
-- **Lo que ya está en disco:** si al arrancar hay archivos
-  `ncm_historial_*.json`, se pasan a la base una sola vez (correr dos veces
-  no duplica cuentas) y el archivo no se vuelve a leer después. Un archivo
-  roto no frena el arranque: va al log.
-- **Migración:** como se crean hoy las tablas nuevas; probada en Postgres
-  16 descartable (el 55432) desde una base con el esquema de `c996ad4` y
-  datos, además de SQLite. Decí en el informe qué pasa en producción la
-  primera vez que arranca.
-
-Pruebas: guardar, sugerir e importar con el historial en la base; que
-sobrevive a borrar `DATA_DIR` (lo que hoy pasa en cada publicación); dos
-dueños separados; dos confirmaciones a la vez; la carga de los archivos
-viejos, dos veces; un archivo roto. Un sabotaje por regla. Línea en
-`CHANGELOG.md`. Toca datos de los usuarios y migración: revisión fuerte.
-Si alguna de estas reglas choca con el código, preguntá en la **D33**.
 
 ### DESPACHO-1b — hecha, sin entregar (encargada 2026-10-28 05:00 UTC)
 
