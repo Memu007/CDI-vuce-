@@ -90,6 +90,7 @@ from proyecto_maria.core import sufijos_arca
 from proyecto_maria.routers import admin_router, quote_router
 from proyecto_maria.services import billing_service
 from proyecto_maria.auth.dependencies import get_current_user
+from proyecto_maria.auth.roles import roles_de
 
 # ============== Configuración de Autenticación ==============
 _DEFAULT_DEV_SECRET = "tu-clave-secreta-super-segura-cambiar-en-produccion"
@@ -1742,7 +1743,7 @@ def _admin_usernames() -> set:
 
 
 def _es_admin(user) -> bool:
-    return user["username"] in _admin_usernames() or "admin" in (user.get("roles") or [])
+    return user["username"] in _admin_usernames() or "admin" in roles_de(user)
 
 
 async def require_admin(user=Depends(get_current_user)):
