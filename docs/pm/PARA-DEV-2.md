@@ -212,11 +212,52 @@ primero entregás ORG-1 y después seguís. Datos que llegaron el 28/10
   por par. Es un campo de impuestos: revisión fuerte.
 
 Después: **SUFIJOS-2**, **SEGURO-1**, **DESPACHO-1b**, **DATOS-1** y
-**DISCO-1** y **OBSERVABILIDAD-1** (hechas, sin entregar) y **SESION-1**
-(abajo, empezala ya). PESO-NETO-1 y PRORRATEO-1 siguen esperando al
+**DISCO-1**, **OBSERVABILIDAD-1** y **SESION-1** (hechas, sin entregar)
+y **ABUSO-1** (abajo, empezala ya). PESO-NETO-1 y PRORRATEO-1 siguen esperando al
 despachante.
 
-### SESION-1 — empezala ya (2026-10-28 09:00 UTC)
+### ABUSO-1 — empezala ya (2026-10-28 10:00 UTC)
+
+SESION-1 quedó hecha (`895ee73`, informe `5105838`): recibido, la reviso
+cuando la entregues. Te paso la pieza vecina de la Fase 3, que también era
+de la técnica: **ABUSO-1**, los hallazgos S4, S5, S6 y C9 de
+`AUDITORIA-2026-10-06.md`. Decidido por la PM; dentro del roadmap. En
+commits aparte encima de `895ee73`, con su propio `/entregar` después del
+de SESION-1.
+
+- **S4:** el límite de intentos de login usa la IP que manda el cliente
+  (`X-Forwarded-For`): se esquiva y se puede bloquear a otra persona.
+- **S5:** `/api/ui/event` (y `/api/session/state`, si está igual) sin
+  sesión ni tope de tamaño: llenan el disco y ensucian los números del
+  admin.
+- **S6:** el registro dice qué usuarios y emails existen; recuperar
+  usuario no tiene límite (correo masivo).
+- **C9:** pruebas gratis infinitas: cada email nuevo da 14 días más y el
+  registro no tiene límite.
+
+**Premisa primero:** reproducí cada uno sobre `895ee73` (PG16 en el 55432
+y SQLite) y decí qué limitador hay hoy y con qué clave cuenta. Si alguno ya
+no se reproduce, decilo con la prueba.
+
+**Antes de hacer, D35** para lo que cambia lo que ve el cliente o depende
+de algo que no se ve desde acá: qué IP se toma detrás del proxy de Railway
+(no se puede mirar; decí qué suponés y qué pasa si el supuesto falla), los
+números de los límites nuevos (registros, recuperar usuario, eventos) y qué
+dice el registro cuando el email o el usuario ya existen. Con opciones y tu
+recomendación. Mientras contestás, hacé lo que no dependa de la D35 (por
+ejemplo S5).
+
+**Fuera de alcance:** la fila 14 de Argon (el login exitoso reinicia el
+contador, bloqueo perpetuo del pedido de reset) y X1 (sugerencias de NCM
+sin tope). Si tu cambio arregla alguno de paso, decilo; si no, una línea en
+«riesgos».
+
+Pruebas: cada hallazgo en rojo antes del arreglo, en PG16 y SQLite; una IP
+inventada en `X-Forwarded-For` no esquiva el límite ni bloquea a otro; un
+evento sin sesión o demasiado grande no se guarda; un sabotaje por regla.
+Línea en `CHANGELOG.md`. Es autenticación y registro: revisión fuerte.
+
+### SESION-1 — hecha, sin entregar (encargada 2026-10-28 09:00 UTC)
 
 OBSERVABILIDAD-1 quedó hecha (`39be45e`). Lo tuyo que queda espera a gente
 de afuera, así que te paso otra pieza de la Fase 3 que era de la técnica:
