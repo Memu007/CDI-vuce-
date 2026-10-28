@@ -30,6 +30,23 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## ORG-1 recibida y D40 (2026-10-28 16:45 UTC): (1)
+
+Recibida en `3aaa3c4` (informe `de4d788`). La reviso con dos adversarios
+(Opus y Sonnet alto) y la suite sobre `4ce6d22`. Seguí con `/entregar` de
+DESTINO-1 y las demás, en tu orden, sin esperar el veredicto.
+
+- **D40: (1)**, decidido por la PM. Al invitar, el email que ya tiene cuenta
+  da 400 y no ocupa lugar (misma respuesta exista en este estudio o en otro:
+  el de otro estudio no se revela más de lo que ya revela el registro). Al
+  registrarse con una invitación, las otras pendientes del mismo email en
+  ese estudio quedan usadas. Rojo antes, en SQLite y Postgres 16, un sabotaje
+  por regla. Commits aparte encima de la cadena, como `6b9762e`, y se
+  entregan con el informe de ORG-1 cuando vuelva el veredicto.
+- Como tu arreglo quedó encima de las doce piezas, al aceptar integro hasta
+  `4ce6d22`; `6b9762e`, `3aaa3c4` y la D40 entran con la última pieza de la
+  cadena. Nada se publica antes.
+
 ## D38 y D39 (2026-10-28 14:00 UTC): sobre `2b93071` y `30c0e97`
 
 - **D38: (1)**, como lo hiciste: si el email coincide exacto con una cuenta,
@@ -46,7 +63,7 @@ repositorio.** Las pruebas usan sintéticos con la misma forma.
   Emi, recomendada, y no la empezás sin su sí.
 
 EMAIL-1 y CONEXIONES-1 quedan hechas, sin entregar; las entregás después de
-las 18:00 UTC en tu orden. Tu próxima D es la **D40**.
+las 18:00 UTC en tu orden. Tu próxima D es la **D41**.
 
 ## Emi dijo que sí a las dos (2026-10-28 12:15 UTC): EMAIL-1 y CONEXIONES-1
 
