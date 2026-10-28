@@ -4853,6 +4853,7 @@ async def generate_maria_export_endpoint(
     request: MariaExportRequest,
     user=Depends(get_current_user),
     _cobro=Depends(require_billing_vigente),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Genera archivo TXT en formato MARIA para EXPORTACIÓN.
@@ -4924,6 +4925,11 @@ async def generate_maria_export_endpoint(
         # _user_downloads_dir): el nombre sale del nro de factura y es adivinable.
         filename = f"MARIA_EXPORT_{safe_id}.TXT"
         filepath = os.path.join(_user_downloads_dir(user["username"]), filename)
+
+        # Cuenta como /generate_maria: la primera vez que se genera este id;
+        # con el tope lleno, 402 sin escribir el archivo (COBRO-MP-1, B).
+        await _contar_maria(db, user["username"], filename, txt_content,
+                            len(request.items or []))
 
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(txt_content)

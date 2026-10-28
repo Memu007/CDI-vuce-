@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: la exportación también cuenta la operación, una vez por id (COBRO-MP-1 B)
+
+- **fix(cobro):** generar el MARIA de exportación cuenta como el de importación: la primera vez de cada operación; con el tope lleno, la nueva da 402 y la ya contada sigue saliendo.
+
 ## 2026-10-28 · fix: un pago de Mercado Pago de antes del registro no se vuelve a aplicar (COBRO-MP-1 A)
 
 - **fix(cobro):** un pago aprobado antes de que empezara el registro de pagos (o sin fecha de aprobación legible) no renueva ni reactiva la cuenta aunque se reenvíe; queda rechazado, a la vista en los pagos rechazados del admin.
