@@ -9892,6 +9892,53 @@ async def payment_pending():
     """
     return HTMLResponse(content=html)
 
+async def _registrar_pago_mp(session, payment_id: str, cuenta: str, update: dict, pay_resp: dict) -> bool:
+    """Anota el pago en mp_pagos_aplicados, en la misma transacción que el
+    cambio de la cuenta. False si ya se había aplicado: antes sólo se miraba
+    el último pago y alternando dos pagos viejos se renovaba gratis
+    (COBRO-MP-1, D8)."""
+    from proyecto_maria.database.models import PagoMercadoPagoAplicado
+    if await session.get(PagoMercadoPagoAplicado, str(payment_id)) is not None:
+        return False
+    monto = pay_resp.get("transaction_amount")
+    try:
+        monto = float(monto) if monto is not None else None
+    except (TypeError, ValueError):
+        monto = None
+    session.add(PagoMercadoPagoAplicado(
+        payment_id=str(payment_id), cuenta=cuenta,
+        tipo="topup" if update.get("action") == "topup" else str(update.get("plan") or ""),
+        monto=monto, moneda=str(pay_resp.get("currency_id") or "") or None,
+        aprobado_en=str(pay_resp.get("date_approved") or "") or None,
+    ))
+    return True
+
+
+async def _guardar_pago_mp(session) -> bool:
+    """Commit del pago y de la cuenta juntos. Si otro aviso del mismo pago
+    llegó a la vez y ganó, la clave repetida lo frena: no se aplica dos veces."""
+    try:
+        await session.commit()
+        return True
+    except IntegrityError:
+        await session.rollback()
+        return False
+
+
+def _extender_periodo(cuenta, update: dict) -> None:
+    """Un pago de plan suma 30 días desde el fin del período si la cuenta
+    sigue activa, y desde hoy si no: pagar antes de que venza no pierde los
+    días que quedaban (COBRO-MP-1)."""
+    if update.get("action") == "topup" or "trial_ends_at" not in update:
+        return
+    ahora = datetime.now(timezone.utc)
+    fin = getattr(cuenta, "trial_ends_at", None)
+    if fin is not None and fin.tzinfo is None:
+        fin = fin.replace(tzinfo=timezone.utc)
+    desde = fin if (getattr(cuenta, "billing_status", None) == "active" and fin and fin > ahora) else ahora
+    update["trial_ends_at"] = desde + timedelta(days=30)
+
+
 def _verify_mp_webhook_signature(request: Request, raw_body: bytes) -> bool:
     """Valida la firma HMAC-SHA256 del webhook MP.
 
@@ -10053,10 +10100,11 @@ async def mercadopago_webhook(request: Request):
                         detail=f"Organización '{org_id}' no existe. MP reintentará."
                     )
 
-                # Deduplicación
-                if db_org.last_payment_id == payment_id:
+                # Cada pago se aplica una sola vez (COBRO-MP-1).
+                if not await _registrar_pago_mp(session, payment_id, f"org:{org_id}", update, pay_resp):
                     logger.info("Webhook MP: payment_id=%s ya procesado para org %s", payment_id, org_id)
                     return {"success": True, "skipped": "payment_id ya procesado"}
+                _extender_periodo(db_org, update)
 
                 db_org.last_payment_id = payment_id
                 db_org.plan = update.get("plan", db_org.plan)
@@ -10083,7 +10131,8 @@ async def mercadopago_webhook(request: Request):
                 if "payment_method_brand" in update and update["payment_method_brand"]:
                     db_org.payment_method_brand = update["payment_method_brand"]
 
-                await session.commit()
+                if not await _guardar_pago_mp(session):
+                    return {"success": True, "skipped": "payment_id ya procesado"}
                 logger.info("Webhook MP: pago sincronizado org=%s action=%s payment_id=%s",
                             org_id, update.get("action"), payment_id)
                 break
@@ -10099,10 +10148,11 @@ async def mercadopago_webhook(request: Request):
                     detail=f"Usuario '{username}' no existe. MP reintentará."
                 )
 
-            # Deduplicación: si ya procesamos este payment_id, saltear.
-            if db_user.last_payment_id == payment_id:
+            # Cada pago se aplica una sola vez (COBRO-MP-1).
+            if not await _registrar_pago_mp(session, payment_id, username, update, pay_resp):
                 logger.info("Webhook MP: payment_id=%s ya procesado para %s", payment_id, username)
                 return {"success": True, "skipped": "payment_id ya procesado"}
+            _extender_periodo(db_user, update)
 
             db_user.last_payment_id = payment_id
             db_user.plan = update.get("plan", db_user.plan)
@@ -10129,7 +10179,8 @@ async def mercadopago_webhook(request: Request):
             if "extra_ops_expires_at" in update:
                 db_user.extra_ops_expires_at = update["extra_ops_expires_at"]
 
-            await session.commit()
+            if not await _guardar_pago_mp(session):
+                return {"success": True, "skipped": "payment_id ya procesado"}
             logger.info("Webhook MP: pago sincronizado user=%s action=%s payment_id=%s",
                         username, update.get("action"), payment_id)
             break

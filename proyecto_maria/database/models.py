@@ -532,3 +532,21 @@ class Invitation(Base):
     expires_at = Column(DateTime(timezone=True), nullable=False)
 
     org = relationship("Organization", back_populates="invitations")
+
+
+class PagoMercadoPagoAplicado(Base):
+    """Cada pago de Mercado Pago que se aplicó a una cuenta, una sola vez.
+
+    Antes sólo se recordaba el último pago (`last_payment_id`): alternando
+    dos pagos viejos reales, cualquiera renovaba una cuenta sin pagar
+    (COBRO-MP-1, D8). La clave es el id del pago: un reenvío no se aplica.
+    """
+    __tablename__ = "mp_pagos_aplicados"
+
+    payment_id = Column(String(100), primary_key=True)
+    cuenta = Column(String(200), nullable=False, index=True)  # usuario u «org:<id>»
+    tipo = Column(String(40), nullable=False)  # plan o «topup»
+    monto = Column(Float, nullable=True)
+    moneda = Column(String(10), nullable=True)
+    aprobado_en = Column(String(40), nullable=True)  # date_approved de MP, tal cual
+    aplicado_en = Column(DateTime(timezone=True), server_default=func.now())
