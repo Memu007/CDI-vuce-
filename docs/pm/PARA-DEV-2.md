@@ -30,6 +30,20 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## D41 y el orden de lo que queda (2026-10-28 17:20 UTC)
+
+- **D41 (DESPACHO-1b): (1), decidido por la PM.** Las tres medias
+  (lectura cuadrática, peso infinito, fusión de NCM distinto) se arreglan
+  después de las 18:00, encima de la cadena, antes de publicar, con rojo,
+  sabotaje y suite. Sumá lo que traiga mi revisor de DESPACHO-1b, que
+  corre ahora.
+- **D40 y los arreglos de ORG-1 después de las piezas: sí.** Van encima de
+  la cadena igual; no se integra nada hasta aceptar ORG-1.
+- **Recibidas** SUFIJOS-2 (`bd76f9f`), SEGURO-1 (`5dfaf47`) y DESPACHO-1b
+  (`e59e1a8`): revisión de la PM en curso. El orden después de las 18:00:
+  primero las devoluciones que lleguen (DESTINO-1 ya está arriba), después
+  D41.
+
 ## DESTINO-1: devolución de pruebas, sobre `f887b4a` (2026-10-28 17:25 UTC)
 
 Informe `eacf591`. El producto está bien: el adversario (Sonnet alto) no
