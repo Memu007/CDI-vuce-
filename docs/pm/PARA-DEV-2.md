@@ -177,42 +177,15 @@ todo junto y el servidor dice «cargalos en partes»); guardar no tiene
 `@limiter.limit`; renglones de «Información Adicional» que caerían en la
 descripción (sin despacho real para probarlo).
 
-## DESTINO-1: devolución de pruebas, sobre `f887b4a` (2026-10-28 17:25 UTC)
+## DESTINO-1: aceptada sobre `f887b4a` con `b9881fb` (2026-10-28 17:52 UTC)
 
-Informe `eacf591`. El producto está bien: el adversario (Sonnet alto) no
-sacó un par mezclado ni un destino distinto del elegido, y tus 15 sabotajes
-de `destino1.sh` dan rojo los 15 (corrida de la PM, `rc=0`). Lo que falta
-son pruebas. **Causa:** ninguna prueba mira el par que sale cuando un ítem
-se arma con varias entradas; `test_destino1.py` sólo prueba el grupo que da
-error. Reproducido por la PM sobre `f887b4a`: agregando
-`item.pop('iva_adicional', None)` después de `item = dict(renglones[0])` y
-`combined.pop('iva_adicional', None)` después de `combined = dict(primero)`
-(`maria_generator.py`), `test_destino1.py` + las suites de MARIA dan
-`182 passed`, y el TXT sale `COMERC`/`NO_VALIDA` donde debía salir
-`BDEUSO`/`IVAAD2`.
+`test_destino1.py` `32 passed` y `destino1.sh b9881fb` 19 de 19 en rojo
+(corrida de la PM). Integrada `f887b4a` en la rama de la PM; `b9881fb`
+entra con la cadena. Evidencia: `REPRODUCCION-DESTINO-1-2026-10-28.md`.
 
-- **Sumá, en un commit de pruebas encima de la cadena** (como `6b9762e`, sin
-  tocar producto), con el destino explícito **distinto del de la
-  operación** en cada uno:
-  1. dos renglones de la misma posición que se juntan;
-  2. un grupo válido (todos con el mismo destino explícito, y el primero
-     explícito con el resto vacío);
-  3. un grupo de reventa (que no salga `USOPAR`/`IVAAD1` por ningún lado);
-  4. un ítem con subítems y destino a nivel ítem.
-  Cada una, roja con su mutante (los dos de arriba; el grupo que fuerza
-  `IVAAD1`; el ítem con subítems que toma el de la operación) y verde sin
-  él. Sumá los cuatro mutantes a `destino1.sh`.
-- **A riesgos, sin tocar producto** (los tres son de antes de esta pieza o
-  piden un body armado a mano): un `iva_adicional` falso por ítem (`false`,
-  `0`, `[]`) se toma como «igual que la operación»; el 400 por destino
-  inválido devuelve el valor entero (100 000 caracteres vuelven en el
-  mensaje; los otros recortan a 20); `/generate_maria/avisos` no valida el
-  destino, así que el error recién aparece al generar. Y la premisa: el
-  golden de 2025 trae `COMERC` con `IVAAD1`; si la pregunta 7 dice otra
-  cosa, se reabre la tabla (D28).
-- La suite completa sobre `f887b4a` está corriendo; si da algo distinto de
-  los dos rojos de tiempos de `4ce6d22`, te lo escribo acá. Acepto con las
-  pruebas; integro después de ORG-1. Nada se publica antes.
+- **Punto 2(b), decidido por la PM: queda así.** Tenías razón: vacío es «el
+  de la operación», y ese grupo no se genera. No heredes el del primero.
+- Los tres riesgos y la premisa del golden quedan como los escribiste.
 
 ## ORG-1: aceptada sobre `4ce6d22`, con ORG-1b y DESPACHO-1a (2026-10-28 17:38 UTC)
 

@@ -13,6 +13,10 @@ Integrada en la rama de la PM con el merge `cda3320`.
 - `despacho1a.sh` y `org1b.sh` sobre `4ce6d22`, de a uno desde la raíz (los
   dos usan el puerto 8852): `sabotajes sin rojo: 0`, `rc=0` cada uno. Una
   primera corrida en paralelo chocó en el puerto; no cuenta.
+- Suite de la PM sobre el merge `cda3320` (rama de la PM con ORG-1),
+  copia limpia, SQLite: `1 failed, 3921 passed, 102 skipped, 2 xfailed`.
+  El rojo es `test_excel2.py::test_ocho_libros_…`, el de tiempos que
+  arregla EXCEL-2b; preexistente.
 
 ## Adversarios (Opus alto y Sonnet alto, contexto nuevo)
 
