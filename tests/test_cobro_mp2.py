@@ -397,13 +397,17 @@ def test_la_pagina_de_exito_sin_token_no_dice_activada(client, monkeypatch):
 
 # --- Etiqueta «Próximo cobro» (D7.3: ningún texto la dice si no lo hay) ---
 
-@pytest.mark.parametrize("estado, con_suscripcion, renueva", [
-    ("active", True, True), ("active", False, False), ("canceled", True, False), ("trial", False, False),
-], ids=["suscripta", "sin_suscripcion", "cancelada", "prueba"])
-def test_billing_me_dice_si_hay_proximo_cobro(client, estado, con_suscripcion, renueva):
+# El id se guarda al abrir el checkout, antes de pagar: una cuenta activa sin
+# un pago de Mercado Pago que abrió el checkout y no pagó no tiene próximo cobro.
+@pytest.mark.parametrize("estado, con_suscripcion, proveedor, renueva", [
+    ("active", True, "mercadopago", True), ("active", False, "mercadopago", False),
+    ("active", True, None, False), ("canceled", True, "mercadopago", False), ("trial", False, None, False),
+], ids=["suscripta", "sin_suscripcion", "checkout_sin_pagar", "cancelada", "prueba"])
+def test_billing_me_dice_si_hay_proximo_cobro(client, estado, con_suscripcion, proveedor, renueva):
     usuario = _unique("mp2_me")
     _register(client, usuario)
-    _set_user(usuario, billing_status=estado, mp_preapproval_id=f"sus-{usuario}" if con_suscripcion else None)
+    _set_user(usuario, billing_status=estado, payment_provider=proveedor,
+              mp_preapproval_id=f"sus-{usuario}" if con_suscripcion else None)
     r = client.get("/api/billing/me")
     assert r.status_code == 200, r.text
     assert r.json().get("renueva") is renueva, r.json()
