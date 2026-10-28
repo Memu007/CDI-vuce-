@@ -139,11 +139,13 @@ def _como(usuario):
     app.dependency_overrides[get_current_user] = lambda: usuario
 
 
-def _cliente_con_presupuesto(c):
-    """Crea un cliente con una operación compartida; devuelve (cliente, op, token)."""
+def _cliente_con_presupuesto(c, creados):
+    """Crea un cliente con una operación compartida; devuelve (cliente, op, token).
+    Lo anota en `creados` para que la prueba lo retire al terminar."""
     r = c.post("/api/clientes", json={"nombre": f"DATOS1_{uuid.uuid4().hex[:8]}"})
     assert r.status_code == 200, r.text
     cid = r.json()["cliente"]["id"]
+    creados.append((app.dependency_overrides[get_current_user](), cid))
     r = c.post(f"/api/clientes/{cid}/operaciones", json={"items": [{
         "pieza": "8471.30.12", "descripcion": "TABLETA SINTETICA", "origen": "CHN",
         "cantidad": 1, "valor_unitario": 50, "peso_unitario": 0.5,
@@ -161,22 +163,46 @@ async def _presupuestos_de(op_id):
         return len(res.scalars().all())
 
 
+def _usuario_nuevo(base, prefijo):
+    u = dict(base)
+    u["username"] = u["effective_owner"] = f"{prefijo}_{uuid.uuid4().hex[:8]}"
+    return u
+
+
+# Cada prueba usa dueños propios y no `test_user`: el cupo de operaciones de
+# `test_user` lo comparte toda la suite (el plan corta en 15) y gastarlo acá
+# hace fallar con 402 a pruebas de otros archivos.
+@pytest.fixture()
+def dueno(auth_override):
+    return _usuario_nuevo(auth_override, "d1")
+
+
 @pytest.fixture()
 def otro_usuario(auth_override):
-    otro = dict(auth_override)
-    otro["username"] = f"otro_{uuid.uuid4().hex[:8]}"
-    return otro
+    return _usuario_nuevo(auth_override, "otro")
+
+
+@pytest.fixture()
+def creados(cliente_http):
+    """Clientes que creó la prueba; al terminar se borran (con sus operaciones
+    y presupuestos) como su dueño."""
+    lista = []
+    yield lista
+    app.dependency_overrides.pop(get_db, None)
+    for usuario, cid in lista:
+        _como(usuario)
+        cliente_http.delete(f"/api/clientes/{cid}")
 
 
 async def test_borrar_cliente_borra_sus_presupuestos_y_no_los_ajenos(
-    auth_override, otro_usuario, cliente_http
+    dueno, otro_usuario, cliente_http, creados
 ):
     c = cliente_http
     _como(otro_usuario)
-    _, _, token_ajeno = _cliente_con_presupuesto(c)
-    _como(auth_override)
-    cid, op, token = _cliente_con_presupuesto(c)
-    _, _, token_otro_cliente = _cliente_con_presupuesto(c)
+    _, _, token_ajeno = _cliente_con_presupuesto(c, creados)
+    _como(dueno)
+    cid, op, token = _cliente_con_presupuesto(c, creados)
+    _, _, token_otro_cliente = _cliente_con_presupuesto(c, creados)
     assert c.get(f"/api/quotes/public/{token}").status_code == 200
 
     r = c.delete(f"/api/clientes/{cid}")
@@ -191,25 +217,25 @@ async def test_borrar_cliente_borra_sus_presupuestos_y_no_los_ajenos(
 
 
 def test_otro_dueno_no_borra_el_cliente_ni_su_presupuesto(
-    auth_override, otro_usuario, cliente_http
+    dueno, otro_usuario, cliente_http, creados
 ):
     c = cliente_http
-    _como(auth_override)
-    cid, _, token = _cliente_con_presupuesto(c)
+    _como(dueno)
+    cid, _, token = _cliente_con_presupuesto(c, creados)
     _como(otro_usuario)
     r = c.delete(f"/api/clientes/{cid}")
     assert r.status_code == 404
-    _como(auth_override)
+    _como(dueno)
     assert c.get(f"/api/clientes/{cid}").status_code == 200
     assert c.get(f"/api/quotes/public/{token}").status_code == 200
 
 
-async def test_si_falla_a_mitad_no_se_borra_nada(auth_override, cliente_http):
+async def test_si_falla_a_mitad_no_se_borra_nada(dueno, cliente_http, creados):
     """El cliente se borra último: si eso falla, el presupuesto (que ya se
     borró en la misma transacción) tiene que volver."""
     c = cliente_http
-    _como(auth_override)
-    cid, op, token = _cliente_con_presupuesto(c)
+    _como(dueno)
+    cid, op, token = _cliente_con_presupuesto(c, creados)
 
     async def _get_db_que_falla_al_final():
         async with AsyncSessionLocal() as s:
