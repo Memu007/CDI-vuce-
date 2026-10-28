@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: se puede cancelar un plan vencido y una prueba con recarga se reactiva como prueba (COBRO-MP-1 C y E)
+
+- **fix(cobro):** desde «plan vencido» se puede cancelar: se cancela también en Mercado Pago, así no vuelve a cobrar cuando la tarjeta pasa, y la cuenta no gana días por cancelar.
+- Reactivar una prueba que sólo compró una recarga la vuelve a la prueba con sus días; ya no pide pagar ni dice «período ya pagado».
+
 ## 2026-10-28 · fix: la exportación también cuenta la operación, una vez por id (COBRO-MP-1 B)
 
 - **fix(cobro):** generar el MARIA de exportación cuenta como el de importación: la primera vez de cada operación; con el tope lleno, la nueva da 402 y la ya contada sigue saliendo.

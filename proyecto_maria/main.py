@@ -2117,14 +2117,16 @@ async def cancel_billing(
     puede, no se cambia nada en CDI (COBRO-MP-2, C2). No corta el servicio:
     deja `billing_status='canceled'` y `trial_ends_at` como la fecha hasta la
     que ya pagó (o en la que vence la prueba); hasta esa fecha sigue
-    generando (billing_service.tiene_acceso).
+    generando (billing_service.tiene_acceso). Desde past_due también se
+    cancela, sin ganar acceso: si no, la suscripción vieja cobra cuando la
+    tarjeta vuelve (COBRO-MP-1, C).
     """
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    if db_user.billing_status not in ("trial", "active"):
+    if db_user.billing_status not in ("trial", "active", "past_due"):
         raise HTTPException(
             status_code=409,
             detail=f"No se puede cancelar desde el estado actual: {db_user.billing_status}",
@@ -2141,6 +2143,12 @@ async def cancel_billing(
             raise HTTPException(status_code=503, detail=no_se_pudo)
         db_user.mp_preapproval_id = None
 
+    if db_user.billing_status == "past_due":
+        # canceled da acceso hasta trial_ends_at: past_due no lo tenía.
+        ahora = datetime.now(timezone.utc)
+        fin = db_user.trial_ends_at
+        if fin is not None and (fin if fin.tzinfo else fin.replace(tzinfo=timezone.utc)) > ahora:
+            db_user.trial_ends_at = ahora
     db_user.billing_status = "canceled"
     await db.commit()
     print(f"🚪 User canceló suscripción: {db_user.username} (servicio activo hasta {db_user.trial_ends_at})")
@@ -2149,6 +2157,21 @@ async def cancel_billing(
         "billing_status": "canceled",
         "service_until": db_user.trial_ends_at.isoformat() if db_user.trial_ends_at else None,
     }
+
+
+async def _pago_un_plan_mp(db: AsyncSession, db_user) -> bool:
+    """Si la cuenta pagó un plan con Mercado Pago. Una recarga sola no es un
+    plan: la prueba que recargó vuelve a la prueba (COBRO-MP-1, E). Sin
+    ninguna fila en mp_pagos_aplicados (pagó antes del registro) decide
+    payment_provider, como antes."""
+    from proyecto_maria.database.models import PagoMercadoPagoAplicado
+    filas = (await db.execute(
+        select(PagoMercadoPagoAplicado.tipo, PagoMercadoPagoAplicado.estado)
+        .where(PagoMercadoPagoAplicado.cuenta == db_user.username)
+    )).all()
+    if not filas:
+        return db_user.payment_provider == "mercadopago"
+    return any(estado == "aplicado" and tipo != "topup" for tipo, estado in filas)
 
 
 @app.post("/api/billing/reactivate")
@@ -2185,7 +2208,7 @@ async def reactivate_billing(
             "message": "Tu período pagado ya terminó. Activá el plan para continuar.",
         }
 
-    if db_user.payment_provider == "mercadopago":
+    if await _pago_un_plan_mp(db, db_user):
         return {
             "success": True,
             "billing_status": "canceled",
