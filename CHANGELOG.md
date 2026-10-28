@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: la operación recuperada tarde no pisa lo que se está haciendo (ORDEN-1, vuelta 2)
+
+- **fix(orden):** si el usuario tarda en llegar al recargar y mientras tanto se cambió de pantalla o se empezó a subir un archivo, la operación de antes queda guardada y se avisa, sin mover la pantalla.
+- Avisa también cuando la pestaña abre con otro usuario, cuando la consulta de la sesión no contesta en 10 s y cuando el navegador no tiene lugar para recuperar la operación.
+
 ## 2026-10-28 · fix: la pestaña comprueba la sesión antes de guardar y avisa cuando no guarda (ORDEN-1, devolución 20:08)
 
 - **fix(orden):** si alguien sale y entra con otro usuario, o la sesión se cierra, la pestaña deja de guardar la operación y lo dice en un aviso arriba; si vuelve a entrar el mismo usuario, sigue guardando.
