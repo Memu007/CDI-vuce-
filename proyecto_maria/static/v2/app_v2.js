@@ -498,6 +498,7 @@
 
     /* ---------- 8. Public API ---------- */
     CDI.api = api;
+    CDI.irAlCheckout = irAlCheckout;
     CDI.logout = logout;
     CDI.goTo = goTo;
     CDI.goBack = goBack;
@@ -666,6 +667,27 @@
         }
     }
 
+    /* Pide el checkout del plan y lleva el navegador a Mercado Pago. Quien la
+       llama deshabilita su botón antes y lo rehabilita sólo si esto falla: otro
+       clic mientras el navegador se va pediría un segundo checkout, que cancela
+       la suscripción adonde va (COBRO-MP-1, D). Si vuelve con «Atrás» y el
+       navegador restaura la página de su caché, se recarga: el botón y el
+       estado de cobro que mostraba quedaron viejos. */
+    async function irAlCheckout(plan) {
+        const res = await api('/api/billing/checkout', {
+            method: 'POST',
+            body: JSON.stringify({ plan })
+        });
+        const data = (await res.json().catch(() => null)) || {};
+        if (!res.ok || !data.init_point) {
+            throw new Error((typeof data.detail === 'string' && data.detail) || 'No se pudo iniciar el cobro.');
+        }
+        window.addEventListener('pageshow', (ev) => {
+            if (ev.persisted) window.location.reload();
+        }, { once: true });
+        window.location.href = data.init_point;
+    }
+
     /* ---------- Billing banner (trial / past_due / activar plan) ----------
        Renderiza un banner soft con días de trial restantes, o uno urgente si
        el trial ya venció. Click en CTA → POST /api/billing/checkout → redirige
@@ -712,24 +734,14 @@
                 cta.textContent = 'Abriendo...';
                 track('billing_cta_clicked', { status: status });
                 try {
-                    const plan = (user && user.plan) || 'premium';
-                    const res = await api('/api/billing/checkout', {
-                        method: 'POST',
-                        body: JSON.stringify({ plan })
- })
-                    const data = await res.json().catch(() => ({}));
-                    if (data && data.init_point) {
-                        window.location.href = data.init_point;
-                        return;
-                    }
-                    if (CDI.toast) CDI.toast('Error', 'No se pudo iniciar el cobro. Probemos de nuevo.', 'error');
+                    await irAlCheckout((user && user.plan) || 'premium');
+                    return;
                 } catch (err) {
                     console.warn('[billing] checkout error', err);
-                    if (CDI.toast) CDI.toast('Error', 'No se pudo iniciar el cobro.', 'error');
-                } finally {
-                    cta.disabled = false;
-                    cta.textContent = status === 'past_due' ? 'Activar plan ahora' : 'Activar plan';
+                    if (CDI.toast) CDI.toast('Error', String(err.message || err), 'error');
                 }
+                cta.disabled = false;
+                cta.textContent = status === 'past_due' ? 'Activar plan ahora' : 'Activar plan';
             });
         }
         if (close && !close._wired) {

@@ -395,45 +395,28 @@
         }
     }
 
-    // Con el botón deshabilitado mientras pide, dos clics no piden dos
-    // checkouts (COBRO-MP-1, D); como el CTA del banner en app_v2.js.
-    async function openCheckout(boton) {
-        const textoBoton = boton ? boton.textContent : '';
-        if (boton) {
-            boton.disabled = true;
-            boton.textContent = 'Abriendo…';
-        }
+    // Pide el checkout del plan elegido. Devuelve true si el navegador ya va a
+    // Mercado Pago; si no, muestra el error y devuelve false.
+    async function pedirCheckout() {
+        const plan = billingPlanSelect && !billingPlanSelect.hidden ? billingPlanSelect.value : 'premium';
         try {
-            const plan = billingPlanSelect && !billingPlanSelect.hidden ? billingPlanSelect.value : 'premium';
-            const res = await CDI.api('/api/billing/checkout', {
-                method: 'POST',
-                body: JSON.stringify({ plan: plan })
-            });
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data && data.init_point) {
-                if (boton) {
-                    // Si vuelve con «Atrás» y el navegador restaura la página
-                    // tal cual, el botón no queda trabado en «Abriendo…».
-                    window.addEventListener('pageshow', (ev) => {
-                        if (ev.persisted) {
-                            boton.disabled = false;
-                            boton.textContent = textoBoton;
-                        }
-                    }, { once: true });
-                }
-                window.location.href = data.init_point;
-                return;
-            }
-            CDI.toast('Error', (data && typeof data.detail === 'string' && data.detail) || 'No se pudo iniciar el cobro.', 'error');
+            await CDI.irAlCheckout(plan);
+            return true;
         } catch (err) {
             CDI.toast('Error', String(err.message || err), 'error');
+            return false;
         }
-        // Sólo se rehabilita si no va a Mercado Pago: otro clic durante la
-        // redirección pediría un segundo checkout y cancelaría este.
-        if (boton) {
-            boton.disabled = false;
-            boton.textContent = textoBoton;
-        }
+    }
+
+    // Con el botón deshabilitado mientras pide, dos clics no piden dos
+    // checkouts (COBRO-MP-1, D).
+    async function openCheckout(boton) {
+        const textoBoton = boton.textContent;
+        boton.disabled = true;
+        boton.textContent = 'Abriendo…';
+        if (await pedirCheckout()) return;
+        boton.disabled = false;
+        boton.textContent = textoBoton;
     }
 
     async function openTopup() {
@@ -496,19 +479,17 @@
                     acceptText: 'Ir a pagar',
                     cancelText: 'Volver'
                 });
-                if (!seguir) return;
-                await openCheckout();
-                return;
+                if (seguir && await pedirCheckout()) return;
+            } else {
+                CDI.toast('Prueba reactivada', 'Sigue hasta el fin de la prueba.', 'success');
+                CDI.track('billing_reactivated');
+                await loadBilling();
             }
-            CDI.toast('Prueba reactivada', 'Sigue hasta el fin de la prueba.', 'success');
-            CDI.track('billing_reactivated');
-            await loadBilling();
         } catch (err) {
             CDI.toast('Error', String(err.message || err), 'error');
-        } finally {
-            billingReactivateBtn.disabled = false;
-            billingReactivateBtn.textContent = 'Reactivar plan';
         }
+        billingReactivateBtn.disabled = false;
+        billingReactivateBtn.textContent = 'Reactivar plan';
     }
 
     CDI.openProfileModal = open;

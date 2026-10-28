@@ -24,7 +24,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-10-28 · fix: un solo pedido de pago a la vez por cuenta (COBRO-MP-1 D)
 
 - **fix(cobro):** dos pedidos de pago a la vez dejan una sola suscripción viva en Mercado Pago, la que CDI guarda; cancelar mientras corre uno espera y cancela también la que ese pedido creó.
-- «Activar plan» queda deshabilitado mientras espera el pedido y mientras el navegador va a Mercado Pago, así un segundo clic no pide otro pago.
+- «Activar plan», «Reactivar plan» y el «Activar plan» del aviso de arriba quedan deshabilitados mientras esperan el pedido y mientras el navegador va a Mercado Pago, así un segundo clic no pide otro pago. Volver de Mercado Pago con «Atrás» recarga la página.
 
 ## 2026-10-28 · fix: se puede cancelar un plan vencido y una prueba con recarga se reactiva como prueba (COBRO-MP-1 C y E)
 
