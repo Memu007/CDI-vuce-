@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: un pago de Mercado Pago de antes del registro no se vuelve a aplicar (COBRO-MP-1 A)
+
+- **fix(cobro):** un pago aprobado antes de que empezara el registro de pagos (o sin fecha de aprobación legible) no renueva ni reactiva la cuenta aunque se reenvíe; queda rechazado, a la vista en los pagos rechazados del admin.
+
 ## 2026-10-28 · fix: la operación sin terminar es de quien la dejó y vence a los 7 días (ORDEN-1, devolución)
 
 - **fix(borrador):** al abrir sólo se recupera una operación del mismo usuario y de hace menos de 7 días; las más viejas se borran. Una pestaña duplicada no toma la operación de la original mientras sigue abierta; al recargar o restaurar se recupera la propia.

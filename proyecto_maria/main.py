@@ -10479,6 +10479,32 @@ async def _registrar_pago_mp(session, payment_id: str, cuenta: str, update: dict
     return estado
 
 
+async def _control_de_fecha_mp(session, pay_resp: dict, control: tuple) -> tuple:
+    """Un pago aprobado antes de que empezara el registro de pagos no se
+    aplica (COBRO-MP-1, A): el código viejo ya lo aplicó y, si no fue el
+    último de la cuenta, nada más lo recuerda. Sin una fecha legible tampoco:
+    no se sabe de cuándo es. Queda rechazado, a la vista del admin."""
+    from proyecto_maria.database.models import InicioRegistroPagosMP
+    esperado, motivo = control
+    if motivo:
+        return control
+    inicio = await session.get(InicioRegistroPagosMP, 1)
+    if inicio is None:
+        logging.getLogger("mp_webhook").error("Webhook MP: falta el inicio del registro de pagos (init_db)")
+        raise HTTPException(status_code=503, detail="Registro de pagos no inicializado. MP reintentará.")
+    desde = inicio.desde if inicio.desde.tzinfo else inicio.desde.replace(tzinfo=timezone.utc)
+    crudo = pay_resp.get("date_approved")
+    try:
+        aprobado = datetime.fromisoformat(crudo) if isinstance(crudo, str) else None
+    except ValueError:
+        aprobado = None
+    if aprobado is None or aprobado.tzinfo is None:
+        return esperado, "sin fecha de aprobación legible"
+    if aprobado < desde:
+        return esperado, f"aprobado antes de que empezara el registro de pagos ({desde.isoformat()})"
+    return control
+
+
 async def _rechazar_pago_mp(session, payment_id: str, cuenta: str, motivo: str) -> dict:
     """Guarda el rechazo sin tocar la cuenta. Responde 200 para que Mercado
     Pago no reintente: el pago no va a alcanzar la próxima vez tampoco."""
@@ -10715,6 +10741,7 @@ async def mercadopago_webhook(request: Request):
             except _SuscripcionMPIlegible as e:
                 logger.warning("Webhook MP: no se pudo leer la suscripción %s del pago %s", e, payment_id)
                 raise HTTPException(status_code=503, detail="No se pudo leer la suscripción. MP reintentará.")
+            control = await _control_de_fecha_mp(session, pay_resp, control)
 
             if org_id:
                 # Pago de organización: actualizar la org, no el user

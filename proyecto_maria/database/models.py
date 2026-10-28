@@ -555,3 +555,16 @@ class PagoMercadoPagoAplicado(Base):
     monto_esperado = Column(Float, nullable=True)
     motivo = Column(String(300), nullable=True)  # por qué se rechazó
     aplicado_en = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class InicioRegistroPagosMP(Base):
+    """Desde cuándo mp_pagos_aplicados anota cada pago (COBRO-MP-1, A).
+
+    Un pago aplicado antes no tiene fila: si no es el último de la cuenta,
+    last_payment_id tampoco lo frena. El webhook no aplica un pago aprobado
+    antes de este momento. Una sola fila (id=1), sembrada por init_db.
+    """
+    __tablename__ = "mp_registro_pagos_inicio"
+
+    id = Column(Integer, primary_key=True)
+    desde = Column(DateTime(timezone=True), nullable=False)
