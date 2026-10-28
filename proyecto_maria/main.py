@@ -10231,6 +10231,8 @@ class _CobroMPFormaInesperada(Exception):
     """El cobro autorizado no tiene la forma esperada: no se aplica nada."""
 
 
+# Ids de Mercado Pago (cobros y pagos) que llegan en un aviso que puede no
+# venir firmado: sólo esto, para que no cambien la ruta que se le pide.
 _ID_COBRO_MP = re.compile(r"[0-9A-Za-z_-]{1,64}")
 
 
@@ -10495,11 +10497,21 @@ async def mercadopago_webhook(request: Request):
 
         logger.info("Webhook MP recibido: type=%s payment_id=%s", event_type, payment_id)
 
+        # Sin token, un aviso de pago se rechaza para que Mercado Pago lo
+        # reintente; el id va en la ruta que se le pide: sólo la forma esperada.
+        if event_type in ("payment", "subscription_authorized_payment"):
+            if not payment_id or not MP_ACCESS_TOKEN:
+                logger.warning("Webhook MP: falta payment_id o MP_ACCESS_TOKEN")
+                raise HTTPException(status_code=400, detail="Falta payment_id o token")
+            if not _ID_COBRO_MP.fullmatch(payment_id):
+                logger.warning("Webhook MP: payment_id inválido %r", payment_id[:80])
+                raise HTTPException(status_code=400, detail="payment_id inválido")
+
         # Renovación de una suscripción: el aviso trae el cobro autorizado; de
         # ahí sale el pago, que se aplica como cualquier otro, controlado
         # contra el monto de la suscripción (COBRO-MP-1, paso 4).
         suscripcion_del_cobro = None
-        if event_type == "subscription_authorized_payment" and payment_id and MP_ACCESS_TOKEN:
+        if event_type == "subscription_authorized_payment":
             try:
                 payment_id, suscripcion_del_cobro = _pago_del_cobro_mp(
                     _leer_cobro_autorizado_mp(payment_id))
@@ -10514,16 +10526,20 @@ async def mercadopago_webhook(request: Request):
         if event_type != "payment":
             return {"success": True, "skipped": "not a payment event"}
 
-        if not payment_id or not MP_ACCESS_TOKEN:
-            logger.warning("Webhook MP: falta payment_id o MP_ACCESS_TOKEN")
-            raise HTTPException(status_code=400, detail="Falta payment_id o token")
-
         sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
         payment_info = sdk.payment().get(payment_id)
         pay_resp = payment_info.get("response", {}) if isinstance(payment_info, dict) else {}
 
         if pay_resp.get("status") != "approved":
             return {"success": True, "skipped": f"status={pay_resp.get('status')}"}
+
+        # El pago se registra con el id que devuelve Mercado Pago: «0123» y
+        # «123» son el mismo pago para su API y no pueden aplicarse dos veces.
+        canonico = pay_resp.get("id")
+        payment_id = str(canonico) if isinstance(canonico, (str, int)) and not isinstance(canonico, bool) else ""
+        if not _ID_COBRO_MP.fullmatch(payment_id):
+            logger.warning("Webhook MP: pago aprobado sin id reconocible, no se aplica")
+            return {"success": True, "skipped": "pago con forma inesperada"}
 
         if suscripcion_del_cobro:
             # El pago de una renovación puede no traer la referencia: la tiene
@@ -10584,7 +10600,11 @@ async def mercadopago_webhook(request: Request):
                         detail=f"Organización '{org_id}' no existe. MP reintentará."
                     )
 
-                # Cada pago se aplica una sola vez (COBRO-MP-1).
+                # Cada pago se aplica una sola vez (COBRO-MP-1). El último pago
+                # de antes del registro sólo quedó en last_payment_id.
+                if db_org.last_payment_id == payment_id:
+                    logger.info("Webhook MP: payment_id=%s ya procesado para org %s", payment_id, org_id)
+                    return {"success": True, "skipped": "payment_id ya procesado"}
                 estado = await _registrar_pago_mp(session, payment_id, f"org:{org_id}", update, pay_resp, control)
                 if estado is None:
                     logger.info("Webhook MP: payment_id=%s ya procesado para org %s", payment_id, org_id)
@@ -10635,7 +10655,11 @@ async def mercadopago_webhook(request: Request):
                     detail=f"Usuario '{username}' no existe. MP reintentará."
                 )
 
-            # Cada pago se aplica una sola vez (COBRO-MP-1).
+            # Cada pago se aplica una sola vez (COBRO-MP-1). El último pago
+            # de antes del registro sólo quedó en last_payment_id.
+            if db_user.last_payment_id == payment_id:
+                logger.info("Webhook MP: payment_id=%s ya procesado para %s", payment_id, username)
+                return {"success": True, "skipped": "payment_id ya procesado"}
             estado = await _registrar_pago_mp(session, payment_id, username, update, pay_resp, control)
             if estado is None:
                 logger.info("Webhook MP: payment_id=%s ya procesado para %s", payment_id, username)

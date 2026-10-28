@@ -34,6 +34,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(cobro):** un pago se anota por su `payment_id` y no se vuelve a aplicar aunque el aviso llegue repetido, alternado con otro o dos a la vez. Pagar con la cuenta activa extiende desde el fin del período; vencida, desde hoy.
 - El monto y la moneda se comparan con el precio del link cuando se armó (o con el de la suscripción en Mercado Pago); si no coinciden, no se aplica y Emi lo ve en el panel. Las renovaciones de una suscripción ahora extienden el período (antes se ignoraban).
+- El pago se reconoce por el id que da Mercado Pago (escrito de otra forma, «0123» o «123#a», no se aplica otra vez); un id con barras se rechaza sin consultarlo, y el último pago de antes de este cambio tampoco se reaplica.
 
 ## 2026-10-28 · fix: una subida chica de Excel no espera detrás de las pesadas (EXCEL-2b)
 
