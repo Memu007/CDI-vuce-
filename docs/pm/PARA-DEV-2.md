@@ -148,11 +148,34 @@ primero entregás ORG-1 y después seguís. Datos que llegaron el 28/10
   valor que no es ninguno de los tres (error, no se genera), y un sabotaje
   por par. Es un campo de impuestos: revisión fuerte.
 
-Después, en este orden: **SUFIJOS-2** (D7: un número en un sufijo libre
-puede llevar coma; en uno que pide número, sin decimales; ninguno vacío) y
+Después: **SUFIJOS-2** (abajo, empezala ya) y
 **SEGURO-1** (D14: el botón «calcular seguro» no se ofrece en CIF, CIP,
 DPU, DAP y DDP; el seguro se sigue declarando). Te las detallo antes de que
 lleguen. PESO-NETO-1 y PRORRATEO-1 siguen esperando al despachante.
+
+### SUFIJOS-2 — empezala ya (2026-10-28 03:00 UTC)
+
+DESTINO-1 ya está hecha y el cupo vuelve a las 18:00 UTC: mientras tanto,
+SUFIJOS-2, en commits aparte encima de DESTINO-1 (`4905cd8`), con su propio
+`/entregar` después del de DESTINO-1. Respuesta del despachante (pregunta 2,
+`PREGUNTAS-DESPACHANTE.md`):
+
+- **Sufijo de código libre:** un número puede llevar coma. Hoy `AF(2.5)`
+  sale `AF(2 5)`: el número cambia. Tiene que salir `AF(2,5)`.
+- **Sufijo que pide número:** sin decimales. Uno con decimales no se
+  redondea en silencio: aviso que nombra el ítem y el sufijo, y no se genera.
+- **Ninguno vacío:** `AA()` hoy pasa. Mismo aviso, no se genera.
+
+Premisa primero:
+- comprobá en el código, o en el catálogo de sufijos que ya tenga, cuáles
+  piden número;
+- comprobá que una coma no rompe el formato del campo en el TXT.
+
+Si alguna de las dos no se puede saber desde el repo, es la D29 y seguís
+con lo que no depende de ella.
+
+Pruebas: los tres casos, uno que hoy está bien y sigue igual, y un sabotaje
+por regla. Toca el TXT: el golden no se toca.
 
 ### DESPACHO-1a — pieza nueva del roadmap; hacela mientras esperás el cupo
 
