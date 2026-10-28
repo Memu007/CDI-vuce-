@@ -405,6 +405,11 @@ class ClientProductHistory(Base):
 
     valor_unitario_avg = Column(Float, nullable=True)
     cantidad_avg = Column(Float, nullable=True)
+    # Cuántos usos trajeron cada valor: el promedio cuenta sólo esos. En las
+    # filas de antes quedan vacíos y se toma veces_usado.
+    veces_peso = Column(Integer, nullable=True)
+    veces_valor = Column(Integer, nullable=True)
+    veces_cantidad = Column(Integer, nullable=True)
 
     primera_vez = Column(DateTime(timezone=True), server_default=func.now())
     ultima_vez = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())

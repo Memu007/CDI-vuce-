@@ -1736,7 +1736,7 @@
         despachoGuardar.disabled = true;
         try {
             const res = await CDI.api('/api/clientes/' + encodeURIComponent(cid) + '/catalogo/despacho/guardar', {
-                method: 'POST', body: JSON.stringify({ renglones }),
+                method: 'POST', body: JSON.stringify({ renglones, divisa: despachoDivisa }),
             });
             const data = await res.json().catch(() => ({}));
             if (seq !== despachoSeq) return;
@@ -1753,6 +1753,11 @@
             }
             cerrarDespacho();
             CDI.toast && CDI.toast.success('Guardé ' + data.guardados + (data.guardados === 1 ? ' producto' : ' productos') + ' en el catálogo.');
+            // D47: el valor unitario sólo se guarda si el despacho está en dólares.
+            const sinValor = Array.isArray(data.avisos) ? data.avisos.length : 0;
+            if (sinValor && CDI.toast && CDI.toast.info) {
+                CDI.toast.info('Sin valor unitario', 'El despacho no está en dólares: no guardé el valor unitario de ' + sinValor + (sinValor === 1 ? ' producto.' : ' productos.'));
+            }
             CDI.track && CDI.track('catalogo_despacho_guardado', { id: cid, renglones: data.guardados });
             if (cid === detailClienteId) loadCatalogo(cid);
         } catch (err) {

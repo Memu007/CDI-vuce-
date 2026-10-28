@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: el despacho no traba al lector ni mezcla productos (DESPACHO-1b, devolución 20:07)
+
+- Leer un despacho tiene tope de 10 s de CPU (avisa hasta qué hoja leyó) y cada usuario lee uno a la vez (429 si ya está leyendo otro); el lector no carga el `.env`.
+- El catálogo une el mismo NCM con o sin puntos y no funde dos descripciones largas distintas; cada promedio cuenta sólo los usos con ese valor, también en el historial de operaciones.
+- Aprender o editar un peso infinito o negativo no se guarda (400 al editar), un infinito viejo no rompe el catálogo, y el valor unitario de un despacho que no está en dólares no se guarda (D47).
+
 ## 2026-10-28 · fix: historial de NCM sin 500 y sin sugerencias perdidas (DISCO-1, devolución)
 
 - Si falla la memoria del cliente o el catálogo del proveedor, sugerir sigue con el historial (en Postgres se perdía todo).

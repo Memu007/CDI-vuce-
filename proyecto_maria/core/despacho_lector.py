@@ -54,6 +54,11 @@ _MAX_COLUMNAS = 40
 _MAX_MEMORIA_HIJO = 256 * 1024 * 1024
 _HIJOS_A_LA_VEZ = 2
 _SALIDA_SIN_MEMORIA = 3
+# Tiempo de CPU del proceso que lee, medido entre hoja y hoja. Cada hoja
+# cuesta según sus operaciones de texto, no según lo que pesa el PDF: 20 hojas
+# que comparten un contenido de 500 KB pesan 50 KB y costaban 23 s. Un
+# despacho de 200 hojas llenas cuesta menos de 3 s.
+_MAX_CPU_LECTURA = 10.0
 
 AVISO_SIN_TEXTO = (
     "El PDF no tiene texto que se pueda leer: parece escaneado. Pedí el "
@@ -66,6 +71,9 @@ AVISO_NO_ES_DESPACHO = (
 AVISO_SIN_MEMORIA = (
     "El PDF es demasiado pesado para leerlo. Pedí el despacho en PDF del "
     "sistema o cargá los productos a mano."
+)
+AVISO_OCUPADO = (
+    "Ya estoy leyendo otro despacho tuyo. Esperá a que termine y probá de nuevo."
 )
 
 CAMPOS = ("posicion_sim", "descripcion", "sufijos", "origen", "unidad",
@@ -263,8 +271,11 @@ def texto_del_pdf(data: bytes) -> tuple[str, list[str]]:
     return texto, avisos
 
 
-def _hojas_del_pdf(data: bytes) -> tuple[str, list[str], bool]:
-    """Texto, avisos y si quedó alguna hoja sin leer por pesada o rota."""
+def _hojas_del_pdf(data: bytes, limite_cpu_s: float = _MAX_CPU_LECTURA) -> tuple[str, list[str], bool]:
+    """Texto, avisos y si quedó alguna hoja sin leer por pesada o rota. Deja
+    de leer cuando el proceso gastó `limite_cpu_s` segundos de CPU."""
+    import time
+
     from pypdf import PdfReader, apply_configuration
     from pypdf.errors import LimitReachedError
 
@@ -287,7 +298,12 @@ def _hojas_del_pdf(data: bytes) -> tuple[str, list[str], bool]:
             avisos.append(f"El PDF tiene {len(paginas)} hojas: leí las primeras {_MAX_PAGINAS}.")
             paginas = paginas[:_MAX_PAGINAS]
         textos, largo = [], 0
+        hasta = time.process_time() + limite_cpu_s
         for n, pagina in enumerate(paginas, start=1):
+            if time.process_time() > hasta:
+                avisos.append(f"El PDF da demasiado trabajo: leí hasta la hoja {n - 1}.")
+                salteadas = True
+                break
             try:
                 contenido = pagina.get_contents()
                 if contenido is not None and len(contenido.get_data()) > _MAX_CONTENIDO_PAGINA:
@@ -500,9 +516,9 @@ def _renglon(bloque: dict, padre: dict | None = None) -> dict:
     return renglon
 
 
-def leer_despacho(data: bytes) -> dict:
+def leer_despacho(data: bytes, limite_cpu_s: float = _MAX_CPU_LECTURA) -> dict:
     """Renglones del catálogo de un PDF de despacho. No guarda nada."""
-    texto, avisos, salteadas = _hojas_del_pdf(data)
+    texto, avisos, salteadas = _hojas_del_pdf(data, limite_cpu_s)
     if not texto.strip():
         # Si quedaron hojas sin leer, no se sabe si es escaneado.
         return {"renglones": [], "divisa": None, "sin_texto": not salteadas,
@@ -517,7 +533,13 @@ class PdfDemasiadoPesado(Exception):
     """La lectura pasó del tope de memoria del proceso que lee."""
 
 
+class LectorOcupado(Exception):
+    """El mismo usuario ya tiene una lectura en curso."""
+
+
 _SEMAFOROS: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
+# Las claves (usuarios) con una lectura en curso, por loop.
+_LEYENDO: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
 
 
 _FINAL_DE_ERRORES = 2000
@@ -541,23 +563,41 @@ async def _final(flujo, tope: int) -> bytes:
     return final
 
 
-async def leer_despacho_aparte(data: bytes, limite_s: float) -> dict:
+async def leer_despacho_aparte(data: bytes, limite_s: float, clave: str | None = None,
+                               limite_cpu_s: float = _MAX_CPU_LECTURA) -> dict:
     """`leer_despacho` en otro proceso, con la memoria topeada y un tiempo
     máximo. Si pasa del tiempo, el proceso se mata (un hilo no se puede
     cortar desde afuera) y levanta TimeoutError; si pasa de la memoria,
     PdfDemasiadoPesado. Como mucho `_HIJOS_A_LA_VEZ` a la vez: la espera
-    cuenta dentro del tiempo máximo."""
+    cuenta dentro del tiempo máximo. Con `clave`, una sola lectura por clave
+    a la vez: la segunda levanta LectorOcupado, así un usuario no ocupa todos
+    los lugares. Es por proceso de la app: con varios procesos, cada uno
+    tiene los suyos."""
     loop = asyncio.get_running_loop()
     semaforo = _SEMAFOROS.get(loop)
     if semaforo is None:
         semaforo = _SEMAFOROS[loop] = asyncio.Semaphore(_HIJOS_A_LA_VEZ)
+    leyendo = _LEYENDO.setdefault(loop, set())
+    if clave is not None:
+        if clave in leyendo:
+            raise LectorOcupado(AVISO_OCUPADO)
+        leyendo.add(clave)
+    try:
+        return await _leer_aparte(data, limite_s, semaforo, limite_cpu_s)
+    finally:
+        leyendo.discard(clave)
+
+
+async def _leer_aparte(data: bytes, limite_s: float, semaforo, limite_cpu_s: float) -> dict:
     entorno = {k: os.environ[k] for k in ("PATH", "HOME", "LANG", "LC_ALL", "PYTHONUSERBASE")
                if k in os.environ}
+    # El lector de facturas carga el .env al importarse: el hijo no lo lee.
+    entorno["PYTHON_DOTENV_DISABLED"] = "1"
 
     async def correr():
         async with semaforo:
             proceso = await asyncio.create_subprocess_exec(
-                sys.executable, "-m", __name__,
+                sys.executable, "-m", __name__, repr(float(limite_cpu_s)),
                 stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE, cwd=str(Path(__file__).resolve().parents[2]),
                 env=entorno)
@@ -599,8 +639,9 @@ def _main() -> int:
         print(f"lector de despachos sin tope de memoria: {e}", file=sys.stderr)
     logging.getLogger("pypdf").setLevel(logging.ERROR)  # un aviso por objeto roto
     try:
+        limite_cpu_s = float(sys.argv[1]) if len(sys.argv) > 1 else _MAX_CPU_LECTURA
         data = sys.stdin.buffer.read()
-        sys.stdout.write(json.dumps(leer_despacho(data), ensure_ascii=False))
+        sys.stdout.write(json.dumps(leer_despacho(data, limite_cpu_s), ensure_ascii=False))
         sys.stdout.flush()
     except MemoryError:
         return _SALIDA_SIN_MEMORIA
@@ -631,13 +672,14 @@ def renglon_para_catalogo(renglon) -> tuple[dict | None, list[str]]:
     sirve con su posición SIM (o el NCM de 8 dígitos) y su descripción; el
     origen, si viene, tiene que ser un país de la tabla."""
     from proyecto_maria.core.maria_generator import pais_reconocido
-    from proyecto_maria.services.client_memory import ncm_para_historial
 
     if not isinstance(renglon, dict):
         return None, ["El renglón no tiene la forma esperada."]
     problemas = []
     posicion = str(renglon.get("posicion_sim") or "").strip().upper()
-    ncm = ncm_para_historial(posicion) if _POSICION.match(posicion) else None
+    # Los 8 dígitos, sin puntos: «8471.49.00», «84714900» y «8471.4900» son
+    # el mismo NCM.
+    ncm = re.sub(r"\D", "", posicion)[:8] if _POSICION.match(posicion) else None
     if not ncm:
         problemas.append("Falta la posición SIM o no tiene sus 8 dígitos.")
     descripcion = re.sub(r"\s+", " ", str(renglon.get("descripcion") or "")).strip()
@@ -645,6 +687,8 @@ def renglon_para_catalogo(renglon) -> tuple[dict | None, list[str]]:
         problemas.append("Falta la descripción.")
     elif len(descripcion) > _MAX_DESCRIPCION:
         problemas.append(f"La descripción pasa de {_MAX_DESCRIPCION} caracteres.")
+    if _MEDIO_PAR.search(descripcion):
+        problemas.append("La descripción tiene un carácter que no se puede guardar.")
     origen = str(renglon.get("origen") or "").strip().upper() or None
     if origen and not (len(origen) == 2 and origen.isalpha() and pais_reconocido(origen)):
         problemas.append(f"No reconozco el origen «{origen}»: usá el código de dos letras.")

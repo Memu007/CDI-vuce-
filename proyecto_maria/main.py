@@ -12,6 +12,7 @@ import jwt
 import glob
 import hashlib
 import json
+import math
 import os
 import re
 import unicodedata
@@ -1298,6 +1299,34 @@ async def _migrate_add_unidad_column():
         print(f"⚠️ Migracion unidad (no critica): {mig_err!r}")
 
 
+async def _migrate_add_product_history_counts():
+    """Agrega a client_product_history cuántos usos trajeron cada valor
+    (DESPACHO-1b). Las filas de antes quedan vacías y cuentan veces_usado."""
+    from proyecto_maria.database.connection import engine, IS_SQLITE
+
+    try:
+        async with engine.begin() as conn:
+            if IS_SQLITE:
+                res = await conn.exec_driver_sql("PRAGMA table_info(client_product_history)")
+                existing = {row[1] for row in res.fetchall()}
+            else:
+                res = await conn.exec_driver_sql(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_name = 'client_product_history'"
+                )
+                existing = {row[0] for row in res.fetchall()}
+            if not existing:
+                return
+            for columna in ("veces_peso", "veces_valor", "veces_cantidad"):
+                if columna not in existing:
+                    await conn.exec_driver_sql(
+                        f"ALTER TABLE client_product_history ADD COLUMN {columna} INTEGER"
+                    )
+                    print(f"✅ Migracion: agregada columna client_product_history.{columna}")
+    except Exception as mig_err:
+        print(f"⚠️ Migracion veces por valor (no critica): {mig_err!r}")
+
+
 async def _migrate_limites_auth() -> None:
     """Borra los contadores de intentos vencidos de `limites_auth` (ABUSO-1).
     La tabla la crea `init_db`; las escrituras también borran los vencidos,
@@ -1400,6 +1429,7 @@ async def lifespan(app: FastAPI):
     await _migrate_widen_pieza_column()
     await _migrate_add_grupo_id_column()
     await _migrate_add_unidad_column()
+    await _migrate_add_product_history_counts()
     await _migrate_add_api_logs_owner_column()
     await _migrate_create_telemetry_events_table()
     # Organizaciones: crear tabla orgs primero, luego FK en users, luego invitations
@@ -7962,6 +7992,11 @@ def _column_mapping_status(mapping: dict) -> dict:
     }
 
 
+def _finito(valor):
+    """Un infinito o NaN guardado antes no se puede mandar en JSON."""
+    return valor if valor is None or math.isfinite(valor) else None
+
+
 def _product_history_to_dict(row: ClientProductHistoryModel) -> dict:
     return {
         "id": row.id,
@@ -7969,9 +8004,9 @@ def _product_history_to_dict(row: ClientProductHistoryModel) -> dict:
         "descripcion": row.descripcion,
         "descripcion_normalizada": row.descripcion_normalizada or "",
         "origen": row.origen_frecuente or "XX",
-        "peso_unitario_avg": row.peso_unitario_avg,
-        "valor_unitario_avg": row.valor_unitario_avg,
-        "cantidad_avg": row.cantidad_avg,
+        "peso_unitario_avg": _finito(row.peso_unitario_avg),
+        "valor_unitario_avg": _finito(row.valor_unitario_avg),
+        "cantidad_avg": _finito(row.cantidad_avg),
         "veces_usado": row.veces_usado or 1,
         "primera_vez": row.primera_vez.isoformat() if row.primera_vez else None,
         "ultima_vez": row.ultima_vez.isoformat() if row.ultima_vez else None,
@@ -8208,12 +8243,15 @@ async def leer_despacho_para_catalogo(
     await _get_owned_client(db, client_id, user["username"])
 
     from proyecto_maria.security.file_security import validate_file_upload
-    from proyecto_maria.core.despacho_lector import PdfDemasiadoPesado, leer_despacho_aparte
+    from proyecto_maria.core.despacho_lector import LectorOcupado, PdfDemasiadoPesado, leer_despacho_aparte
     contents = await validate_file_upload(file, 'pdf', max_size=_get_max_upload_bytes())
     # En otro proceso, con la memoria topeada: si tarda demasiado se mata, y
     # no se queda ocupando un hilo de los que comparten todas las lecturas.
     try:
-        resultado = await leer_despacho_aparte(contents, _pdf_read_timeout_s())
+        # Una lectura por usuario a la vez: uno solo no ocupa todos los lugares.
+        resultado = await leer_despacho_aparte(contents, _pdf_read_timeout_s(), clave=user["username"])
+    except LectorOcupado as e:
+        return JSONResponse(status_code=429, content={"detail": str(e), "code": "lector_ocupado"})
     except TimeoutError:
         return JSONResponse(
             status_code=504,
@@ -8247,13 +8285,20 @@ async def guardar_despacho_en_catalogo(
     if len(renglones) > MAX_RENGLONES:
         raise HTTPException(status_code=400, detail=f"Son más de {MAX_RENGLONES} productos: cargalos en partes.")
 
-    listos, errores = [], []
+    # El catálogo guarda el valor unitario en dólares. Si el despacho está en
+    # otra divisa, o no se encontró, el valor no se guarda (D47). «DOL» es el
+    # código de AFIP para el dólar.
+    en_dolares = isinstance(body.get("divisa"), str) and body["divisa"].strip().upper() in ("USD", "DOL")
+    listos, errores, avisos = [], [], []
     for n, renglon in enumerate(renglones, start=1):
         campos, problemas = renglon_para_catalogo(renglon)
         if problemas:
             errores.append({"renglon": n, "problemas": problemas})
-        else:
-            listos.append(campos)
+            continue
+        if not en_dolares and campos["valor_unitario"] is not None:
+            campos["valor_unitario"] = None
+            avisos.append({"renglon": n, "aviso": "No guardé el valor unitario: el despacho no está en dólares."})
+        listos.append(campos)
     if errores:
         return JSONResponse(status_code=422, content={
             "detail": "Hay productos sin completar: no guardé ninguno.",
@@ -8270,7 +8315,7 @@ async def guardar_despacho_en_catalogo(
         await db.rollback()
         logging.exception("despacho al catálogo: no se guardó client_id=%s", client_id)
         raise HTTPException(status_code=500, detail="No pude guardar los productos: no se guardó ninguno.")
-    return {"success": True, "cliente_id": client_id, "guardados": len(listos)}
+    return {"success": True, "cliente_id": client_id, "guardados": len(listos), "avisos": avisos}
 
 
 @app.put("/api/clientes/{client_id}/catalogo/productos/{product_id}")
@@ -8298,6 +8343,10 @@ async def update_client_catalogo_producto(
 
     if not isinstance(body, dict):
         body = {}
+    from proyecto_maria.services.client_memory import valor_para_promedio
+    textos = [str(body[k]) for k in ("ncm", "origen", "descripcion") if k in body]
+    if any(re.search("[\ud800-\udfff]", t) for t in textos):
+        raise HTTPException(status_code=400, detail="Hay un carácter que no se puede guardar.")
     if "ncm" in body:
         # La posición SIM completa no entra en la columna: antes se cortaba a
         # 10 caracteres y quedaba un código que no existe (GUARDAR-1).
@@ -8309,10 +8358,15 @@ async def update_client_catalogo_producto(
     if "origen" in body:
         row.origen_frecuente = str(body["origen"]).strip()[:3] or "XX"
     if "peso_unitario_avg" in body:
-        try:
-            row.peso_unitario_avg = float(body["peso_unitario_avg"])
-        except (TypeError, ValueError):
-            pass
+        peso = body["peso_unitario_avg"]
+        if peso in (None, "", 0):
+            row.peso_unitario_avg, row.veces_peso = 0.0, 0
+        else:
+            peso = valor_para_promedio(peso)
+            if peso is None:
+                raise HTTPException(status_code=400, detail="El peso tiene que ser un número positivo.")
+            # Lo que carga la persona cuenta como un uso con peso.
+            row.peso_unitario_avg, row.veces_peso = peso, max(row.veces_peso or 0, 1)
     if "descripcion" in body:
         from proyecto_maria.core.catalog_service import _normalize as _cat_normalize
         row.descripcion = str(body["descripcion"]).strip()

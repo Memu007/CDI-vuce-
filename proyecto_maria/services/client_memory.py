@@ -17,13 +17,14 @@ Principios:
 from __future__ import annotations
 
 import logging
+import math
 import unicodedata
 import re
 import uuid
 from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import select as sa_select
+from sqlalchemy import func, select as sa_select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database.models import ClientProductHistory
@@ -32,6 +33,50 @@ from ..core.catalog_service import _normalize, _similarity  # reuso de normaliza
 logger = logging.getLogger(__name__)
 
 FUZZY_THRESHOLD = 0.80
+# Lo que se guarda como promedio: más grande no es un valor de verdad.
+_MAX_VALOR = 1e12
+_MEDIO_PAR = re.compile("[\ud800-\udfff]")  # no se puede escribir en UTF-8
+
+
+def valor_para_promedio(valor) -> Optional[float]:
+    """El número que entra a un promedio, o None. Infinito, NaN, negativo o
+    desmedido no entra: un infinito guardado rompe el catálogo al mostrarlo."""
+    if valor is None or isinstance(valor, bool):
+        return None
+    try:
+        valor = float(valor)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(valor) or valor <= 0 or valor >= _MAX_VALOR:
+        return None
+    return valor
+
+
+def _usos(promedio, veces, veces_usado) -> int:
+    """Cuántos usos trajeron el valor de `promedio`. Un infinito guardado
+    antes cuenta como vacío: si no, ningún valor nuevo lo arregla."""
+    if valor_para_promedio(promedio) is None:
+        return 0
+    if veces is None:  # fila de antes de contar por valor
+        return max(veces_usado or 1, 1)
+    return max(veces, 0)
+
+
+def sumar_al_promedio(promedio, veces, veces_usado, nuevo) -> tuple[Optional[float], int]:
+    """El promedio y su cuenta después de sumar `nuevo`. Un uso sin valor no
+    lo mueve ni se cuenta: sin valor, después 2, después 4 da 3."""
+    n = _usos(promedio, veces, veces_usado)
+    nuevo = valor_para_promedio(nuevo)
+    if nuevo is None:
+        return (promedio if n else None), n
+    if not n:
+        return nuevo, 1
+    return (promedio * n + nuevo) / (n + 1), n + 1
+
+
+def _misma_descripcion(desc: str) -> str:
+    """La descripción entera para comparar: sin mayúsculas ni espacios de más."""
+    return re.sub(r"\s+", " ", desc or "").strip().casefold()
 
 
 def _norm_desc(desc: str) -> str:
@@ -84,19 +129,39 @@ async def upsert_client_product_history(
 
     if not ncm or not descripcion or not client_id or not owner_username:
         return None
+    if _MEDIO_PAR.search(descripcion) or _MEDIO_PAR.search(str(origen or "")):
+        return None
 
     desc_norm = _norm_desc(descripcion)
 
-    # 1) Intento match exacto por NCM + owner + client
-    q = sa_select(ClientProductHistory).where(
-        ClientProductHistory.owner_username == owner_username,
-        ClientProductHistory.client_id == client_id,
-        ClientProductHistory.ncm == ncm,
-    )
-    result = await db.execute(q)
-    rows = result.scalars().all()
-
     existing: Optional[ClientProductHistory] = None
+    if solo_mismo_ncm:
+        # Es el mismo producto sólo con el mismo NCM (sin mirar puntos ni
+        # espacios) y la misma descripción entera: la normalizada se corta
+        # en 200 y dos textos largos distintos quedaban en una fila.
+        digitos = re.sub(r"\D", "", ncm)
+        ncm_sin_puntos = func.replace(func.replace(ClientProductHistory.ncm, ".", ""), " ", "")
+        q = sa_select(ClientProductHistory).where(
+            ClientProductHistory.owner_username == owner_username,
+            ClientProductHistory.client_id == client_id,
+            ncm_sin_puntos == digitos,
+        )
+        buscada = _misma_descripcion(descripcion)
+        for row in (await db.execute(q)).scalars().all():
+            if _misma_descripcion(row.descripcion) == buscada:
+                existing = row
+                break
+        rows = []
+    else:
+        # 1) Intento match exacto por NCM + owner + client
+        q = sa_select(ClientProductHistory).where(
+            ClientProductHistory.owner_username == owner_username,
+            ClientProductHistory.client_id == client_id,
+            ClientProductHistory.ncm == ncm,
+        )
+        result = await db.execute(q)
+        rows = result.scalars().all()
+
     if rows:
         # Si hay varias filas con el mismo NCM, elegir la de descripcion mas parecida.
         best_score = -1.0
@@ -132,23 +197,16 @@ async def upsert_client_product_history(
     now = datetime.now(timezone.utc)
 
     if existing is not None:
-        n_prev = max(existing.veces_usado or 1, 1)
-        n_new = n_prev + 1
-
-        def _incr_avg(prev, new_value):
-            """Promedio incremental. Si new_value es None o 0, no mueve el promedio.
-            Si no había valor, el nuevo es el primero: no se promedia con un 0
-            que nunca se cargó (DESPACHO-1b)."""
-            if new_value is None or new_value <= 0:
-                return prev
-            if not prev:
-                return new_value
-            return ((prev * n_prev) + new_value) / n_new
-
-        existing.veces_usado = n_new
-        existing.peso_unitario_avg = _incr_avg(existing.peso_unitario_avg, peso_unitario)
-        existing.valor_unitario_avg = _incr_avg(existing.valor_unitario_avg, valor_unitario)
-        existing.cantidad_avg = _incr_avg(existing.cantidad_avg, cantidad)
+        # Cada promedio cuenta sólo los usos que trajeron ese valor.
+        usado = existing.veces_usado
+        peso, existing.veces_peso = sumar_al_promedio(
+            existing.peso_unitario_avg, existing.veces_peso, usado, peso_unitario)
+        existing.peso_unitario_avg = peso or 0.0
+        existing.valor_unitario_avg, existing.veces_valor = sumar_al_promedio(
+            existing.valor_unitario_avg, existing.veces_valor, usado, valor_unitario)
+        existing.cantidad_avg, existing.veces_cantidad = sumar_al_promedio(
+            existing.cantidad_avg, existing.veces_cantidad, usado, cantidad)
+        existing.veces_usado = max(usado or 1, 1) + 1
         if origen and (origen or "").strip():
             existing.origen_frecuente = (origen or "").strip()[:3]
         existing.ultima_vez = now
@@ -164,10 +222,13 @@ async def upsert_client_product_history(
         ncm=ncm,
         descripcion=descripcion,
         descripcion_normalizada=desc_norm,
-        peso_unitario_avg=float(peso_unitario or 0.0),
+        peso_unitario_avg=valor_para_promedio(peso_unitario) or 0.0,
         origen_frecuente=(origen or "XX").strip()[:3] or "XX",
-        valor_unitario_avg=float(valor_unitario or 0.0) or None,
-        cantidad_avg=float(cantidad or 0.0) or None,
+        valor_unitario_avg=valor_para_promedio(valor_unitario),
+        cantidad_avg=valor_para_promedio(cantidad),
+        veces_peso=1 if valor_para_promedio(peso_unitario) else 0,
+        veces_valor=1 if valor_para_promedio(valor_unitario) else 0,
+        veces_cantidad=1 if valor_para_promedio(cantidad) else 0,
         veces_usado=1,
         primera_vez=now,
         ultima_vez=now,
