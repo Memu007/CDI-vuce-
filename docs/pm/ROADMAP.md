@@ -23,10 +23,9 @@ seguridad, esfuerzo medio).
 
 **Lo que hacés vos:**
 - **Esta semana:** el «dale» para publicar la mejora del Excel (EXCEL-2,
-  ya aceptada); pedirle al despachante el packing list de las lonas (peso
-  neto) y la lista de las tres opciones de destino con su código en el TXT.
-- **Para DESPACHO-1:** pedirle al despachante uno o dos despachos ya
-  oficializados, tal como los baja del sistema.
+  ya aceptada); mandarle al despachante las preguntas 5 a 9 de
+  `PREGUNTAS-DESPACHANTE.md` (los destinos, el packing y los despachos
+  llegaron el 28/10).
 - **Al terminar la Fase 1b (~08/11):** la sesión con el despachante para
   probar; la siguiente, 15 días después.
 - **En la Fase 2:** pagar un plan chico con tu tarjeta.
@@ -97,10 +96,12 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 | Orden | Pieza | Qué arregla | Prueba |
 |---|---|---|---|
 | 1 | ✅ SUFIJOS-1 | Con la posición SIM, el sistema trae de VUCE (consulta pública `/cice/sufijos/<posición>`) qué sufijos pide y la unidad estadística; los completa con lo que la IA encuentra en la factura (marca, modelo, código, medidas, color); el código de artículo (`AI`) es distinto en cada renglón; lo que falta queda marcado para el despachante; sin VUCE, se piden a mano con aviso | la consulta a VUCE del 24/10 (una posición de plásticos pidió AA marca y AI código; unidad kilogramo `01`) |
-| 2 | ⏳ DESTINO-1 | Tres destinos por operación: comercialización en el mercado interno, bien de uso de la empresa, bien de uso particular, con su código en el TXT | la lista con códigos que pase el despachante |
-| 3 | ⏳ PESO-NETO-1 | El peso neto sale del packing list cuando la factura sólo trae bruto; si no hay packing list, el aviso de hoy | el packing list de las lonas |
-| 4 | ⏳ MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11) | sus archivos reales |
-| 5 | 🔵 DESPACHO-1 | Sumada por Emi el 28/10; ubicada por la PM (Emi: «acomodalo dónde digas»): después de ORG-1, detrás de las piezas que hacen entrar el TXT; como todas esperan al despachante, se hace la primera que tenga lo suyo; tiene que estar lista antes del piloto (28/12), porque es lo que facilita sumar estudios. Para que un despachante que viene de otro sistema arme rápido el catálogo de sus clientes con despachos que ya tiene, y después haga el predespacho en CDI con ese catálogo. El despacho oficializado es el formulario OM-1993-A SIM que el despachante imprime y firma después de oficializar en el MARIA; trae por ítem y subítem la posición SIM, los sufijos, el origen, la procedencia, el estado, la unidad, la cantidad, el FOB y el peso neto (normativa de ARCA, búsqueda del 28/10). Subir un despacho ya oficializado para armar el catálogo del cliente: se lee por renglón la posición SIM, la descripción, los sufijos, el origen, la unidad, el valor unitario y el peso; se revisa y se edita en pantalla antes de guardar en el catálogo de ese cliente; el catálogo del cliente se puede bajar en Excel, o en el formato que usen los despachantes si la pregunta 6 trae uno. Nunca arma un TXT ni una operación (el lector de facturas sigue rechazando despachos); lo que no se encontró queda marcado, no se rellena | uno o dos despachos oficializados que pase el despachante (los reales sólo fuera del repo; las pruebas usan un sintético con la misma forma) |
+| 2 | ⚪ DESTINO-1 | Tres destinos por operación: comercialización en el mercado interno, bien de uso de la empresa, bien de uso particular, con su código en el TXT. Corrige lo de hoy: `GANANCIASOP3` siempre `COMERC` y «uso particular» con `COMERC` + `IVAAD1` | los tres pares del despachante del 28/10 (`COMERC`/`NO_VALIDA`, `BDEUSO`/`IVAAD2`, `USOPAR`/`IVAAD1`) |
+| 3 | ⚪ SUFIJOS-2 | Sufijos (D7 de MARIA-7): un número en un sufijo libre puede llevar coma; en uno que pide número, sin decimales (hoy `2.5` sale `2 5`); ninguno vacío (hoy `AA()` pasa) | respuesta del despachante del 28/10 |
+| 4 | ⚪ SEGURO-1 | El botón «calcular seguro» no se ofrece en CIF, CIP, DPU, DAP y DDP (D14 de VALOR-1); el seguro se sigue declarando | respuesta del despachante del 28/10 |
+| 5 | ⏳ PESO-NETO-1 | El peso neto sale del packing list cuando la factura sólo trae bruto; si no hay packing list, el aviso de hoy | un packing list, tapado, de cualquier operación (las lonas no tienen; mientras, el aviso de hoy) |
+| 6 | ⏳ MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11) | sus archivos TXT reales (los despachos del 28/10 muestran los sufijos, no el TXT) |
+| 7 | 🔵 DESPACHO-1 | Sumada por Emi el 28/10; ubicada por la PM (Emi: «acomodalo dónde digas»): después de ORG-1, detrás de las piezas que hacen entrar el TXT; como todas esperan al despachante, se hace la primera que tenga lo suyo; tiene que estar lista antes del piloto (28/12), porque es lo que facilita sumar estudios. Para que un despachante que viene de otro sistema arme rápido el catálogo de sus clientes con despachos que ya tiene, y después haga el predespacho en CDI con ese catálogo. El despacho oficializado es el formulario OM-1993-A SIM que el despachante imprime y firma después de oficializar en el MARIA; trae por ítem y subítem la posición SIM, los sufijos, el origen, la procedencia, el estado, la unidad, la cantidad, el FOB y el peso neto (normativa de ARCA, búsqueda del 28/10). Subir un despacho ya oficializado para armar el catálogo del cliente: se lee por renglón la posición SIM, la descripción, los sufijos, el origen, la unidad, el valor unitario y el peso; se revisa y se edita en pantalla antes de guardar en el catálogo de ese cliente; el catálogo del cliente se puede bajar en Excel, o en el formato que usen los despachantes si la pregunta 6 trae uno. Nunca arma un TXT ni una operación (el lector de facturas sigue rechazando despachos); lo que no se encontró queda marcado, no se rellena | tres despachos oficializados del despachante, del 28/10 (los reales sólo fuera del repo; las pruebas usan un sintético con la forma de `DESPACHOS-FORMA.md`) |
 
 **Dev técnica:**
 

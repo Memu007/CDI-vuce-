@@ -134,7 +134,8 @@ Sin nombres: la fuente es «el despachante de Emi».
 ## Lo que falta pedirle (para que Emi lo mande)
 
 Las dos preguntas cortas ya están respondidas (2026-10-06, 22:12 y 22:15).
-Quedan los dos favores:
+El favor 1 llegó el 2026-10-28 (sin tapar; ver «Respuestas del
+2026-10-28»). Queda el 2:
 
 > 1. ¿Me pasás dos o tres despachos que hayas cargado, con nombres, CUIT y
 >    montos tapados? Mejor si son distintos: uno EXW, uno CIF y uno con
@@ -187,6 +188,53 @@ despachos ya oficializados):
 | Pregunta | Qué decide | Mientras tanto |
 |---|---|---|
 | 6 | Qué archivo lee DESPACHO-1 y en qué formato se baja el catálogo | DESPACHO-1 no arranca; el catálogo se bajaría en Excel |
+
+## Respuestas del 2026-10-28 (por mensaje a Emi, con tres despachos)
+
+**Destino de la mercadería.** El MARIA hace dos preguntas por ítem; las
+respuestas van de a pares:
+
+| Destino | `GANANCIASOP3` | `IVAADICIONAL1` |
+|---|---|---|
+| Comercialización o reventa | `COMERC` | `NO_VALIDA` |
+| Bien de uso de la empresa | `BDEUSO` | `IVAAD2` |
+| Bien de uso de una persona | `USOPAR` | `IVAAD1` |
+
+Hoy CDI escribe `GANANCIASOP3` siempre `COMERC`, y «uso particular» sale
+`COMERC` + `IVAAD1`, un par que no está en la lista. Lo corrige DESTINO-1.
+El archivo real de 2025 (`maria_golden_anon.TXT`, que el MARIA aceptó) trae
+justo `COMERC` + `IVAAD1`: el golden queda como lo que se aceptó y la regla
+nueva sigue la respuesta (pregunta 7, abajo).
+
+**Las lonas no tienen packing list.** PESO-NETO-1 se queda sin el dato con
+que se iba a probar; mientras, el aviso de hoy.
+
+**Favor 1, cumplido a medias.** Mandó tres despachos oficializados (uno EXW,
+uno CIF y uno con varios productos), en PDF del sistema, **sin tapar**:
+quedan sólo fuera del repo. Lo que muestran, sin ningún dato real, está en
+`DESPACHOS-FORMA.md`.
+
+| Pregunta | Respuesta | Qué cambia |
+|---|---|---|
+| 1, `IDSO` | No está definido el largo; si se repite, el MARIA no lo rechaza | Nada. El 24/10 el MARIA sí rechazó uno de 19 caracteres (capturas de Emi): queda corto, D1 de MARIA-7 sigue |
+| 2, sufijos | Si es un código libre, un número puede llevar coma. Si el sufijo pide número sí o sí, no acepta decimales. Ninguno puede quedar vacío | Hoy `AF(2.5)` sale `AF(2 5)` (cambia el número) y `AA()` pasa sin aviso. Lo corrige SUFIJOS-2 (D7) |
+| 3, base del seguro | El 1 % va sobre FOB total + flete | Confirma la fórmula de hoy. No dice si «FOB total» lleva los ajustes, y los tres despachos tienen ajustes en cero: la base sigue en el FOB de la factura (D13) y se vuelve a preguntar (pregunta 8) |
+| 4, seguro en el precio | CIF, CIP, DPU, DAP y DDP | El botón «calcular seguro» (la sugerencia del 1 %) no se ofrece en esas cinco. El seguro se sigue declarando: el despacho CIF trae su seguro. CFR y CPT siguen con el botón. Es SEGURO-1 (D14) |
+| 5, ajustes en el TXT | Sin respuesta | Dato nuevo: el despacho tiene por ítem «Ajuste a incluir» y «Ajuste a deducir»; si el TXT tiene esos campos, sigue sin saberse. PRORRATEO-1 sigue sin arrancar |
+| 6, despachos y catálogo | Los despachos, en PDF del sistema (no escaneados). El formato del catálogo, sin respuesta | DESPACHO-1 ya tiene su ejemplo; el catálogo se baja en Excel |
+
+### Preguntas que quedan (para que Emi las mande)
+
+> 5. (la de antes) Los ajustes que se suman o se restan al valor: ¿van en
+>    el archivo, y en qué campo, o los cargás a mano en el MARIA?
+> 6. (la de antes, la parte que faltó) Para el catálogo de productos de un
+>    cliente, ¿usan algún formato o programa, o con un Excel alcanza?
+> 7. En un archivo tuyo de 2025 que el MARIA aceptó va `COMERC` con
+>    `IVAAD1`. ¿Ese par está bien, o tendría que haber sido `USOPAR`?
+> 8. Cuando hay un ajuste (un descuento, por ejemplo), el 1 % del seguro
+>    ¿va sobre el FOB de la factura o sobre el FOB ya ajustado?
+> 9. La próxima vez, ¿nos tapás nombres, CUIT y montos? Los de esta vez no
+>    los subimos a ningún lado.
 
 ## El mensaje que se mandó (2026-10-06)
 
