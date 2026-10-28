@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: un email, una cuenta al invitar al estudio (ORG-1, D40)
+
+- Invitar un email que ya tiene cuenta en CDI (en este estudio, en otro o en ninguno) da error y no ocupa un lugar del plan.
+- Al registrarse con una invitación, las otras pendientes de ese email en el estudio quedan usadas: quien sale del estudio no puede volver a entrar con una de ellas.
+
 ## 2026-10-28 · fix: sin respuesta de los avisos no se ofrece «Dejar el seguro» (SEGURO-1, revisión)
 
 - Si los avisos no contestan, la pantalla no ofrece dejar el seguro que calculó el sistema: con CIF, el 1 % habría salido en el TXT.

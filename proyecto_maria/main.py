@@ -3111,6 +3111,16 @@ async def register(request: RegisterRequest, req: Request, background_tasks: Bac
         if len(await _emails_de_miembros(db, invite_org.id)) >= tope:
             await db.rollback()  # la invitación queda pendiente
             raise HTTPException(status_code=400, detail=f"El estudio ya tiene los {tope} usuarios de su plan.")
+        # Un email, una cuenta (D40): las otras pendientes de este email en el
+        # estudio quedan usadas con el alta. Si no, quien sale del estudio y se
+        # cambia el email podría volver a entrar con una de ellas.
+        await db.execute(
+            sa_update(Invitation)
+            .where(Invitation.org_id == invite_org.id, Invitation.status == "pending",
+                   func.lower(func.trim(Invitation.email)) == request.email)
+            .values(status="accepted")
+            .execution_options(synchronize_session=False)
+        )
         new_user.organization_id = invite_org.id
 
     db.add(new_user)
@@ -10086,12 +10096,15 @@ async def invite_to_organization(
             or len(clean_email) > 100):
         raise HTTPException(status_code=400, detail="Email no válido. Debe tener formato usuario@dominio.com")
 
-    # Si ya existe un user con ese email en la org, no invitamos
-    existing = await db.execute(
-        select(User).where(func.lower(User.email) == clean_email, User.organization_id == org.id)
-    )
-    if existing.scalars().first():
-        raise HTTPException(status_code=400, detail="Ese email ya es miembro del estudio")
+    # Un email, una cuenta (D40): si ya tiene una, en este estudio, en otro o
+    # en ninguno, el registro la rechazaría y la invitación ocuparía un lugar
+    # sin que nadie la pueda usar. La respuesta es la misma en los tres casos.
+    existing = await db.execute(select(User.username).where(func.lower(User.email) == clean_email))
+    if existing.first():
+        raise HTTPException(
+            status_code=400,
+            detail="Ese email ya tiene una cuenta en CDI y no se puede invitar como miembro nuevo.",
+        )
 
     # Tope del plan: miembros (el dueño también) más los emails con una
     # invitación pendiente sin vencer. Volver a invitar a un email que ya
