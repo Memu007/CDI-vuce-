@@ -1,8 +1,8 @@
 /* ============================================================
    CDI v2 — Lo que decide el despachante (MARIA-4)
    En la pantalla de validación, antes de generar: banco, empresa de
-   digitalización e IVA adicional por operación; estado de la mercadería
-   (y cambio de IVA) por producto. MARIA-7: la unidad de la factura y la
+   digitalización y destino de la mercadería por operación; estado de la
+   mercadería (y cambio de destino) por producto. MARIA-7: la unidad de la factura y la
    estadística, por operación y con cambio por producto. SUFIJOS-1: el
    sufijo de valor de cada producto y la unidad estadística que pide su
    posición, del arancel de ARCA (POST /api/sufijos/propuesta).
@@ -28,7 +28,14 @@
     ];
     // El estado corresponde al origen: 1, 3 y 5 argentinos; 2, 4 y 6 importados.
     const ESTADOS_ARGENTINOS = ['1', '3', '5'];
-    const IVA = [['NO_VALIDA', 'Reventa'], ['IVAAD1', 'Uso particular']];
+    // Destino de la mercadería (DESTINO-1): se guarda el código de
+    // IVAADICIONAL1; el servidor saca el de GANANCIASOP3 de la misma tabla
+    // (IVA_ADICIONAL en core/maria_generator.py).
+    const IVA = [
+        ['NO_VALIDA', 'Comercialización o reventa'],
+        ['IVAAD2', 'Bien de uso de la empresa'],
+        ['IVAAD1', 'Bien de uso de una persona'],
+    ];
     const EMPRESAS = [['PSAD06', 'Modoc'], ['PSAD01', 'Lakaut']];
     // Códigos MARIA de core/maria_generator.py (UNIDADES_MARIA).
     const UNIDADES = [

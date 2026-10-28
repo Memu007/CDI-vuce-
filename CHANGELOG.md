@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · feat: el destino de la mercadería sale de a pares en el TXT (DESTINO-1)
+
+- En la pantalla de validación, «Destino de la mercadería» ofrece comercialización o reventa (por defecto), bien de uso de la empresa o bien de uso de una persona, por operación y con cambio por producto.
+- El TXT saca GANANCIASOP3 e IVAADICIONAL1 de a pares: COMERC + NO_VALIDA, BDEUSO + IVAAD2 o USOPAR + IVAAD1. Antes GANANCIASOP3 salía siempre COMERC. Un valor fuera de esos tres no genera el archivo.
+
 ## 2026-10-28 · feat: el catálogo del cliente se baja en Excel (DESPACHO-1a)
 
 - En la pestaña Catálogo del cliente, «Descargar en Excel» baja los productos aprendidos de ese cliente, un renglón por producto y en el mismo orden que la pantalla: posición (como texto, con ceros y letra), descripción, origen, valor unitario, cantidad y peso promedio, veces usado y última vez.
