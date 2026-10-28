@@ -13,6 +13,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-10-28 · fix: la operación sin terminar es de quien la dejó y vence a los 7 días (ORDEN-1, devolución)
 
 - **fix(borrador):** al abrir sólo se recupera una operación del mismo usuario y de hace menos de 7 días; las más viejas se borran. Una pestaña duplicada no toma la operación de la original mientras sigue abierta; al recargar o restaurar se recupera la propia.
+- Si al abrir no se puede saber quién es el usuario (error del servidor o corte), la pestaña lo vuelve a pedir y la operación se sigue guardando.
 
 ## 2026-10-28 · feat: copia de la base que se restaura y se compara antes de darla por buena (BACKUP-1a)
 

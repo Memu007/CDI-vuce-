@@ -328,6 +328,7 @@
 
     /* ---------- 6. Usuario actual (avatar + saludo) ---------- */
     let currentUser = null;
+    // Devuelve si ya se sabe quién es el usuario (sin él no hay autoguardado).
     async function loadCurrentUser() {
         try {
             const res = await api('/auth/current_user');
@@ -353,6 +354,15 @@
             if (name) name.textContent = user.name || user.username || '';
         } catch (err) {
             console.warn('[CDI v2] no se pudo cargar usuario:', err);
+        }
+        return !!currentUser;
+    }
+
+    // Un 500 o un corte al abrir no deja la pestaña sin dueño para siempre:
+    // reintenta de 1 a 30 segundos (un 401 ya manda al login).
+    async function cargarUsuarioHastaTenerlo() {
+        for (let espera = 1000; !(await loadCurrentUser()); espera = Math.min(espera * 2, 30000)) {
+            await new Promise(r => setTimeout(r, espera));
         }
     }
 
@@ -730,7 +740,7 @@
     /* ---------- 10. Bootstrap ---------- */
     document.addEventListener('DOMContentLoaded', () => {
         try { localStorage.removeItem(CLIENTE_KEY); } catch (_) {}
-        const usuarioListo = loadCurrentUser();
+        const usuarioListo = cargarUsuarioHastaTenerlo();
         handleBillingReturn();
         updateClientePill();
         setupFakeSourceBanner();
