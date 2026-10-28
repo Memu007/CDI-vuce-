@@ -23,6 +23,9 @@
 //      recupera la suya;
 //  (j) si la consulta del usuario falla (500) al abrir, la pestaña lo vuelve a
 //      pedir y la operación se guarda con su dueño.
+//  (k) si otro usuario entra en el mismo navegador mientras la pestaña
+//      reintenta, la operación cargada no se guarda a su nombre ni él la
+//      recupera.
 // Datos inventados. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_orden1.js
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
@@ -459,6 +462,33 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     });
     if (dueno !== usuario) falla('la operación se guardó con otro dueño: ' + dueno);
     console.log('OK con la consulta del usuario caída al abrir, la operación se guarda con su dueño');
+    await ctx.close();
+  }
+
+  // (k) La consulta del usuario da 500 hasta que otro usuario entra en el
+  // mismo navegador (otra pestaña); la operación ya estaba cargada.
+  if (corre('k')) {
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    await nuevoUsuario(ctx, 'ord1ka');
+    let caida = true;
+    await ctx.route('**/auth/current_user', ruta => (caida
+      ? ruta.fulfill({ status: 500, body: 'error de prueba' }) : ruta.continue()));
+    const p = await ctx.newPage();
+    p.on('dialog', d => d.accept().catch(() => {}));
+    await p.goto(base + '/dashboard');
+    await p.waitForFunction(() => window.CDI && CDI.goTo && CDI.api && document.querySelector('.screen.is-active'));
+    await cargar(p, 'DE-A-SIN-USUARIO', [prod('Producto de A con el usuario caído', '84714900100D', 2, 10)]);
+    const otro = await nuevoUsuario(ctx, 'ord1kb');
+    caida = false;
+    await p.waitForFunction(() => CDI.currentUser, null, { timeout: 40000 });
+    await p.waitForTimeout(2 * INTERVALO_MS);
+    const ajenos = (await borradores(p)).filter(x => (x.texto || '').includes('"DE-A-SIN-USUARIO"'))
+      .map(x => { try { return JSON.parse(x.texto).user; } catch (_) { return '?'; } });
+    if (ajenos.length) falla('la operación cargada antes de saber el usuario se guardó a nombre de quien entró después: ' + ajenos.join(', ') + ' (' + otro + ')');
+    const q = await abrir(ctx);
+    const r = await recuperada(q);
+    if (r) falla('quien entró después recupera la operación cargada antes de saber el usuario: ' + r);
+    console.log('OK si otro usuario entra mientras la pestaña reintenta, la operación no queda a su nombre');
     await ctx.close();
   }
 
