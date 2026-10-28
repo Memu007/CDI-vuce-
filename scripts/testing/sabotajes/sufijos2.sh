@@ -72,8 +72,13 @@ sabotaje $A "el punto decimal sale espacio, como antes" \
   "test_un_sufijo_libre_que_ya_trae_la_coma_sale_igual" \
   "test_la_propuesta_del_arancel_tambien_lleva_la_coma"
 sabotaje $A "una cadena con varios puntos se toma como número" \
-  '(\d+)[.,](\d+)(?![.,]?\d)"' '(\d+)[.,](\d+)"' \
+  '([0-9]+)[.,]([0-9]+)(?![.,]?[0-9])"' '([0-9]+)[.,]([0-9]+)"' \
   "test_un_codigo_con_varios_puntos_no_se_toma_como_numero"
+
+sabotaje $A "un número con dígitos que no son ASCII entra al TXT" \
+  '_DECIMAL = r"(?<![0-9])(?<![0-9][.,])([0-9]+)[.,]([0-9]+)(?![.,]?[0-9])"' \
+  '_DECIMAL = r"(?<!\d)(?<!\d[.,])(\d+)[.,](\d+)(?![.,]?\d)"' \
+  "test_un_numero_que_no_es_ascii_no_entra_al_txt"
 
 # 2. Un sufijo que pide número, sin decimales.
 sabotaje $G "un Z con decimales pasa" \
