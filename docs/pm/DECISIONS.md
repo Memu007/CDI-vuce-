@@ -226,3 +226,16 @@ el despachante escribió en el sufijo de la operación; sólo agrega los
 códigos que faltan y, si propone otro valor, lo avisa en la fila. D23 (c):
 si todos los productos tienen sufijo propio, el de la operación vacío no
 frena, pero se avisa junto al botón. Las dos van en la vuelta de SUFIJOS-1.
+
+## 2026-10-28 — D28 a D34 de la Dev MARIA (PM)
+
+Decidido por la PM; el texto entero está en `git show 02d28b1:docs/pm/PARA-DEV-2.md`.
+D28 (a): el golden de 2025 no se toca; las pruebas comparan todo salvo el
+`MCPL` de `GANANCIASOP3`, que dice `USOPAR` (se reabre si la pregunta 7 dice
+otra cosa). D29 (a): `PIDE_NUMERO = ("Z",)`; los decimales de los `Z` van en
+la pregunta 10. D30 (a): SEGURO-1 avisa y no frena; frenar es SEGURO-2, para
+Emi. D31 (a): el catálogo guarda sólo lo que ya tiene columna. D32 (a):
+borrar un cliente borra sus presupuestos compartidos, en la misma
+transacción. D33 (a): el cargador de `ncm_historial_*.json` no cambia; si se
+rescatan los de producción lo decide Emi al publicar DISCO-1. D34 (a):
+OBSERVABILIDAD-1 sólo crea la columna y su índice.
