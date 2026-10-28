@@ -520,6 +520,63 @@ PY=python bash scripts/testing/sabotajes/email1.sh 2b93071   # 13 ROJO, «sabota
 python -m pytest -q --no-cov tests/test_email1.py
 ```
 
+## CONEXIONES-1: **entregada** en `30c0e97` (2026-10-28, 17:18 UTC)
+
+**Resultado:** la pieza como está en `30c0e97` (base `2b93071`), sin
+arreglo. No cambia producto ni pytest. Sabotajes `conexiones1.sh`: «3 OK,
+`FALLAS 0`» (una corrida limpia que da 0 y dos fugas que dan 1). Detalle en «CONEXIONES-1: medida» más abajo. **Los dos revisores
+dicen que mi conclusión no se sostiene, y tienen razón en lo que leyeron:
+la medición no prueba que el corte sea del `TestClient` (D46).**
+
+**Decide la PM:** D46.
+
+- **D46 (CONEXIONES-1):** lo que la medición no prueba. (a) La fase
+  `cortes_del_cliente` puede quedar «quieta» antes de que el servidor
+  procese los pedidos; el Sonnet vio 60 logins procesados después de
+  «quieto», y el medidor no compara `api_logs` con los pedidos. Eso es un
+  falso verde posible en el mecanismo de la D37. (b) Ningún pedido se
+  cortó en vuelo: `cancelados = 0` sin un control que muestre que el
+  medidor ve una cancelación cuando la hay, y ningún sabotaje cancela el
+  `close`. Por eso «el corte es del `TestClient`» es una hipótesis, no un
+  resultado; la D37 sigue abierta para el servidor real. (1) Rehago la
+  medición después de las 18:00: espero a que `api_logs` tenga todos los
+  pedidos en vez de «quieto», agrego un sabotaje que cancela el `close` y
+  tiene que dar rojo, y corto pedidos en vuelo de verdad (recomendada:
+  hoy el informe dice más de lo que midió). (2) Se acepta como está, con
+  la conclusión retirada y la D37 abierta en riesgos.
+
+**Lo que ya corrigo acá:** la frase «El corte del `close` es del
+`TestClient` de las pruebas, no del servidor» de «CONEXIONES-1: medida»
+queda retirada; vale lo de la D46. También el «no quedan conexiones tomadas» del resultado vale sólo con
+los límites de arriba: es lo que vio el medidor (0 tomadas al final, 3544
+cierres sin cancelar), no una prueba de que no haya fuga.
+
+**Relación con la D39 y la D44:** la medición de la D39 (2), logins malos
+de 60 a 100 a la vez con pedidos normales, ya la hizo en parte el
+revisor de ABUSO-1: con 120, 24 a 35 respuestas 500 y `/health` en 33 s.
+Está en la D44.
+
+| Revisor | Modelo y esfuerzo | Hallazgos | Qué hice |
+|---|---|---|---|
+| conexiones1-sonnet | Sonnet alto | R1 media: «quieto» puede ser vacuo (D46 (a)). R2 media: la conclusión no se sostiene (D46 (b)); un `close` que entra por `__aexit__` dentro de un `shield` no se cuenta. R3 baja: los sabotajes no simulan un `close` cancelado. R4 baja: las versiones del venv no quedan registradas; sin Redis, Sentry ni proxy. R5 baja: quedan temporales `conexiones1_*` sin borrar | D46; lo demás, riesgos |
+| `/code-review high` | Opus alto, en fork; sin `/security-review` porque sólo cambia scripts de prueba | (1) **alta**, leída: = Sonnet R1, falso verde. (2) media: la salida 1, reservada para una fuga, la usan también los errores del medidor. (3) media: ningún sabotaje cancela el `close` y la base exige `cancelados = 0`. (4) baja-media, sospecha: cierres contados dos veces. (5) `urllib` bloquea el loop. (6) la base no se borra si falla antes del `try`. (7) con `--n` de 140 o más se recicla el worker. (8) `pg_stat_activity` sin `backend_type`. (9) el 401 sin mirar el `detail`. (10) partir la URL pierde `?sslmode` | D46; lo demás, riesgos |
+
+**Lo que es lectura y lo que corrió cada uno:** los 60 logins después de
+«quieto» salen de una corrida del Sonnet; lo demás es lectura. Yo no
+reproduje ninguno.
+
+**Riesgos que quedan:** la D37 sigue abierta en el servidor real hasta
+la D46; el medidor confunde sus errores con una fuga (salida 1); los
+temporales que deja.
+
+**Archivos de producto:** ninguno (sólo `scripts/testing/`).
+
+```bash
+git diff --stat 2b93071..30c0e97 -- . ':!docs'   # 3 files changed, 486 insertions(+)
+PY=python scripts/testing/sabotajes/conexiones1.sh postgresql://<usuario>@127.0.0.1:<puerto>/postgres
+#   tres «OK    |» y «FALLAS 0»
+```
+
 ## Entregas preparadas para las 18:00 UTC (2026-10-28)
 
 Recibí la D37 (2) en `20fb535`. En ABUSO-1 la pasé a riesgos, con lo que
@@ -550,7 +607,7 @@ tocan `docs/`. A las 18:00 queda sólo la autorrevisión con subagentes,
 | 9 | SESION-1 | `895ee73`, **entregada** | `f5160d7` | 3872 passed, 336 skipped, 2 xfailed, 0 failed | 19/19 |
 | 10 | ABUSO-1 | `43916a7`, **entregada** | `c702655` | 3930 passed, 336 skipped, 2 xfailed, 0 failed | 27/27 |
 | 11 | EMAIL-1 | `2b93071`, **entregada** | `e22a5cf` | 3954 passed, 336 skipped, 2 xfailed, 0 failed | email1 13/13; abuso1 27/27 sobre `2b93071` |
-| 12 | CONEXIONES-1 | `30c0e97` | `2b93071` | no cambia producto ni pytest; medición «sin conexiones tomadas» | 3/3 |
+| 12 | CONEXIONES-1 | `30c0e97`, **entregada** | `2b93071` | no cambia producto ni pytest; la conclusión no se sostiene (D46) | 3 OK, `FALLAS 0` |
 
 - **Base de ORG-1: `fb11735`, no `ea64a9c`.** `git diff ea64a9c..4ce6d22`
   arrastra EXCEL-3f de la Dev técnica (`main.py`, `test_excel3.py`,
