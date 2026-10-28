@@ -27,6 +27,31 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
+## Veredicto de GUARDAR-2 (2026-10-28 16:35 UTC): aceptada
+
+Sobre `cef45ce` (informe `cb42e8f`). Evidencia en
+`REPRODUCCION-GUARDAR-2-2026-10-28.md`: suite sobre `0d89c20` con un solo
+rojo, el de `test_excel2` que arregla EXCEL-2b; adversario Sonnet alto con
+Postgres 16 (16 OK). No hubo fuga entre despachantes ni SIM de otro
+producto. Integro tu rama hasta `cb42e8f`. Tus supuestos quedan aceptados.
+
+- **Un agregado, sólo pruebas, en un commit aparte que se entrega con
+  EXCEL-2b:** ninguna prueba distingue que se borre el filtro por
+  `client_id` en `lookup_client_memory` (`services/client_memory.py`). Lo
+  reproduje: sin esa línea, `test_guardar1.py` + `test_guardar2.py` dan
+  39 verdes. Falta el caso de dos clientes **del mismo despachante** con
+  igual nombre y CUIT, historial sólo en uno: el otro no recibe la
+  sugerencia, ni en `/api/ncm/sugerir` ni en `/api/catalog/lookup`. Con su
+  sabotaje (borrar esa línea → rojo). No cambiás código de producto.
+- **Riesgos que anoto, no los arregles ahora (preexistentes):**
+  1. con el catálogo caído, `/api/catalog/lookup` da 500 y se pierde
+     también la sugerencia del cliente (`match_items` sin `try` propio);
+     en `/api/ncm/sugerir` sí queda la del cliente;
+  2. `_vendor_key` da `""` para proveedores sin letras latinas: dentro del
+     mismo despachante comparten catálogo y ahora uno completa la SIM del
+     otro (misma descripción, mismos 8 dígitos);
+  3. mismos 8 dígitos y otra SIM: se sugiere la del catálogo (D32 b).
+
 ## BACKUP-1a — después de LIMPIEZA-1 (2026-10-28 12:00 UTC)
 
 Primero **subí LIMPIEZA-1 a tu rama ya** (commits aparte, encima de
@@ -112,8 +137,8 @@ Decidido por la PM.
 
 Recibida en `cdc9c57` (código `0d89c20`). Es de pantalla y del borrador
 del navegador: la reproduzco ahora y sumo un adversario sobre los
-borradores (computadora compartida, pérdida de productos) cuando haya
-presupuesto, hoy después de las 18:00 UTC. Mientras, no la integro.
+borradores (computadora compartida, pérdida de productos): en curso desde
+las 16:20 UTC. Mientras, no la integro.
 
 - **D1: (a).** El orden vive en el borrador de cada pestaña. Una columna
   que nadie lee es una migración sin uso; si algún día una pantalla
@@ -125,12 +150,6 @@ presupuesto, hoy después de las 18:00 UTC. Mientras, no la integro.
   xfail con su motivo.
 
 Decidido por la PM.
-
-## GUARDAR-2 (en revisión)
-
-Recibida en `cef45ce` (informe `cb42e8f`). Toca lectura por dueño: la
-reviso con adversario cuando haya presupuesto (hoy, después de las 18:00
-UTC). Si vuelve con devolución, va antes que lo que estés haciendo.
 
 ## COBRO-MP-1 — hecha, sin entregar (encargada 2026-10-28 04:00 UTC)
 
@@ -303,8 +322,9 @@ supuestos de Mercado Pago que no pudiste ver sin red: los estados, que una
 
 ## Orden
 
-1. EXCEL-2b (D4 a y D5 a): hecha, se entrega con el cupo de las 18:00 UTC.
-2. Si GUARDAR-2 u ORDEN-1 vuelven con devolución, esa va primero.
+1. EXCEL-2b (D4 a y D5 a): hecha, entregala ya (hay cupo desde las 16:20 UTC).
+2. Si ORDEN-1 vuelve con devolución, esa va primero. El agregado de
+   GUARDAR-2 (arriba) va en un commit de pruebas con EXCEL-2b.
 3. COBRO-MP-1: hecha; subila ya y se entrega después de EXCEL-2b.
 4. COBRO-CORTE-1: hecha; se entrega después de COBRO-MP-1.
 5. COBRO-MP-2: hecha; subila ya y se entrega después de COBRO-CORTE-1.
