@@ -197,7 +197,16 @@ def caracteres_del_maria(texto) -> str:
     (SUFIJOS-2): «2.5» sale «2,5», no «2 5», que es otro número."""
     sin_tildes = "".join(c for c in unicodedata.normalize("NFKD", str(texto or ""))
                          if not unicodedata.combining(c))
-    return _DECIMAL_O_SIGNO.sub(lambda m: f"{m[1]},{m[2]}" if m[1] else " ", sin_tildes)
+    return _DECIMAL_O_SIGNO.sub(lambda m: (" " if not m[1] else f"{m[1]} {m[2]}"
+                                          if miles_o_decimales(m[0]) else f"{m[1]},{m[2]}"),
+                                sin_tildes)
+
+
+def miles_o_decimales(numero: str) -> bool:
+    """«1.500» puede ser mil quinientos o uno y medio: un punto seguido de
+    tres dígitos, sin un cero adelante, no se pasa a coma."""
+    entero, _, decimales = numero.partition(".")
+    return bool(decimales) and len(decimales) == 3 and entero.lstrip("0") != ""
 
 
 def valor_de_sufijo(texto) -> str:
