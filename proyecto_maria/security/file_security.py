@@ -206,28 +206,31 @@ def hojas_del_xlsx(z) -> list:
     return [(nombre, ruta) for nombre, _rid, ruta, grafico in sheets_del_libro(z) if not grafico]
 
 
-def _mb_de_entorno(nombre: str, defecto: float) -> int:
+def tope_de_entorno(nombre: str, defecto: float, escala: int = 1) -> int:
+    """Lee un tope del entorno (en MB con escala 1024*1024, o en elementos) y
+    devuelve el entero. Usa el de defecto si no se lee, si no es finito o si
+    el entero da 0 o menos: con tope 0 no entra ningún archivo (devolución de
+    EXCEL-2b). 1e308 MB es finito, pero en bytes no."""
     import math
     try:
-        valor = float(os.getenv(nombre, "") or defecto)
+        valor = float(os.getenv(nombre, "") or defecto) * escala
     except (TypeError, ValueError):
-        valor = defecto
-    # 1e308 es finito, pero en bytes ya no: daba OverflowError (EXCEL-2b).
-    if not math.isfinite(valor * 1024 * 1024) or valor <= 0:
-        valor = defecto
-    return int(valor * 1024 * 1024)
+        valor = 0.0
+    tope = int(valor) if math.isfinite(valor) else 0
+    if tope <= 0:
+        return int(defecto * escala)
+    return tope
+
+
+def _mb_de_entorno(nombre: str, defecto: float) -> int:
+    return tope_de_entorno(nombre, defecto, 1024 * 1024)
 
 
 def _elementos_de_entorno() -> int:
     """EXCEL_MAX_ELEMENTOS_ESTILOS, 500.000 por defecto: unos 300 MB y 6 s
     al abrir. Un libro real con 40.000 formatos y sus fuentes ya tiene
     220.000 (revisión de la devolución de EXCEL-2)."""
-    import math
-    try:
-        valor = float(os.getenv("EXCEL_MAX_ELEMENTOS_ESTILOS", "") or 500_000)
-    except (TypeError, ValueError):
-        valor = 500_000.0
-    return int(valor) if math.isfinite(valor) and valor > 0 else 500_000
+    return tope_de_entorno("EXCEL_MAX_ELEMENTOS_ESTILOS", 500_000)
 
 
 def _mas_elementos_que(z, parte: str, tope: int) -> bool:

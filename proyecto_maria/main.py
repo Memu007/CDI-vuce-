@@ -4105,11 +4105,8 @@ async def _leer_pdf_aparte(funcion, *args, limite=None, que="el PDF", pool=None)
 
 
 def _get_max_upload_bytes() -> int:
-    try:
-        max_mb = float(os.getenv("MAX_UPLOAD_MB", "10"))
-    except (TypeError, ValueError):
-        max_mb = 10.0
-    return int(max_mb * 1024 * 1024)
+    from proyecto_maria.security.file_security import tope_de_entorno
+    return tope_de_entorno("MAX_UPLOAD_MB", 10, 1024 * 1024)
 
 
 

@@ -59,7 +59,8 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-10-28 · fix: una subida chica de Excel no espera detrás de las pesadas (EXCEL-2b)
 
 - **fix(excel):** un libro chico (hasta 2 MiB de XML descomprimido sin contar las imágenes; un `.xls`, por su tamaño; umbral en `EXCEL_LIVIANO_MB`) valida y se lee en hilos propios. Antes esperaba ~30 s detrás de ocho planillas pesadas; medido ahora, 1,5 y 1,7 s. Ante cualquier duda (índice largo, zip64, un índice que no se puede leer, algo que no es zip) va al carril de siempre.
-- Un tope de Excel en MB tan grande que no entra en bytes (`1e308` en `EXCEL_LIVIANO_MB`, `EXCEL_MAX_TEXTOS_MB`, `EXCEL_MAX_PRIMERA_HOJA_MB` o `EXCEL_MAX_DESCOMPRIMIDO_MB`) vale el de defecto: antes toda subida de Excel daba error (500, o 400 con el descomprimido).
+- Un tope de subida que no sirve vale el de defecto: los cuatro de Excel en MB, `EXCEL_MAX_ELEMENTOS_ESTILOS` y `MAX_UPLOAD_MB`, si no son un número finito o si en bytes o elementos dan 0 (`1e308`, `inf`, `nan`, `-0`, `1e-9`). Antes daban error o un tope de 0. Medio MB sí es un tope (512 KiB).
+- Límite conocido hasta EXCEL-2c: un libro de 1,5 KB armado para ser lento (una celda en la fila 1.048.576) entra al carril liviano y tarda unos 10 s y 1,5 GB en leerse; mientras tanto, una subida normal espera.
 
 ## 2026-10-28 · feat: reordenar productos arrastrando, también los grupos, y cada pestaña con su borrador (ORDEN-1)
 
