@@ -2,6 +2,16 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## DESTINO-1: hecha, **sin entregar** (2026-10-28)
+
+Producto `7526be9`, pruebas y sabotajes hasta `f887b4a`, encima de
+`4ce6d22`. Sabotajes 15/15 en rojo (`scripts/testing/sabotajes/destino1.sh`)
+y suite completa en `f887b4a`: 3697 passed, 0 failed. Va en su propio
+`/entregar`, después del de ORG-1, cuando vuelva el cupo. **No hace falta que
+la revises todavía.** Ojo con D28: no eran seis pruebas las que comparan el
+golden entero, son ocho (se sumaron `test_maria1b_controles` y
+`test_maria3_antes_de_generar`); las dos con el mismo criterio de (a).
+
 ## ORG-1, ORG-1b y DESPACHO-1a: listas, **sin entregar** (2026-10-28)
 
 **DESPACHO-1a está hecha** (producto `e438dad`, probado en `51890cd`), en
@@ -511,6 +521,6 @@ PY=<venv>/bin/python scripts/testing/sabotajes/despacho1a.sh 51890cd
 - **El 400 «es para otro email»** dice que el email escrito no es el
   invitado. No dice cuál es. Hace falta el token para preguntar.
 
-Última vuelta: Wed Oct 28 00:38:37 UTC 2026
+Última vuelta: Wed Oct 28 02:50:30 UTC 2026
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1 lista y subida SIN ENTREGAR (producto e43810b, sabotajes 18f7f25, carrera PG ddfc798; suite 18f7f25 1 failed conocido de test_excel2, 3323 passed). ORG-1b (D27 b) lista y subida SIN ENTREGAR (prueba 9ad42e4, producto f8616cf, sabotajes b7a7927, arreglo 5d42909; sabotajes 7/7). DESPACHO-1a lista y subida SIN ENTREGAR (casos ee82997, producto e438dad, pantalla y sabotajes 51890cd; sabotajes 14/14; 249 passed en clientes/catálogo). D26 (a) por ahora: no empezar sin aviso. DESPACHO-1 no se empieza (espera ejemplo del despachante). Pendiente: el 28/10 después de las 18:00 UTC, un solo /entregar de ORG-1, ORG-1b y DESPACHO-1a con subagentes (hasta alto), /code-review high y /security-review; reproducir lo que encuentren, suite completa en el SHA final, actualizar este informe y timbre «Dev MARIA: entregué ORG-1, ORG-1b y DESPACHO-1a en <SHA>». Después, apagar el Postgres local (puerto 55432). Apenas entregues: DESTINO-1 (datos del 28/10 en PREGUNTAS-DESPACHANTE.md; D28 (a): golden intacto, las seis pruebas comparan todo salvo el MCPL de GANANCIASOP3, que tiene que decir USOPAR, con referencia a la pregunta 7), después SUFIJOS-2 y SEGURO-1; PESO-NETO-1 y PRORRATEO-1 esperan al despachante. DESPACHO-1 (lectura) va después de esas tres. La próxima D es la D29. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed, 2026-10-28 02:29 UTC). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed); ocho pruebas comparan el golden, no seis. Pendiente: el 28/10 después de las 18:00 UTC, primero /entregar de ORG-1, ORG-1b y DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, levantar Postgres 55432 para org1_postgres.py y apagarlo después), timbre «Dev MARIA: entregué ORG-1, ORG-1b y DESPACHO-1a en <SHA>»; después /entregar de DESTINO-1 aparte (informe: supuestos reversibles —COMERC/BDEUSO/USOPAR no se aceptan como entrada, textos «destino de la mercadería»—; rojo previo ajeno de pantalla_maria4.js por ruta chromium-1194 y falta de comprador_cuit; nueve scripts con la ruta vieja de chromium). Después SUFIJOS-2 y SEGURO-1 (la PM las detalla). PESO-NETO-1 y PRORRATEO-1 esperan al despachante; DESPACHO-1 después de esas. La próxima D es la D29. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
