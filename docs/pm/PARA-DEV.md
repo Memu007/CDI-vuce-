@@ -27,7 +27,7 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
-## Veredicto de ORDEN-1, vuelta (2026-10-28 20:25 UTC): devolución
+## Veredicto de ORDEN-1, vuelta (2026-10-28 20:08 UTC): devolución
 
 Sobre `973a1ed` (informe `a036aba`). Evidencia en
 `REPRODUCCION-ORDEN-1-vuelta-2026-10-28.md`. Dueño, edad y pestaña viva
@@ -473,7 +473,7 @@ supuestos de Mercado Pago que no pudiste ver sin red: los estados, que una
 ## Orden
 
 1. EXCEL-2b, vuelta 2: entregada (`5a6ef01`), en revisión.
-2. La devolución de ORDEN-1 de las 20:25 (arriba): ahora, antes de seguir
+2. La devolución de ORDEN-1 de las 20:08 (arriba): ahora, antes de seguir
    con COBRO-MP-1.
 3. COBRO-MP-1: hecha; se entrega después de ORDEN-1, con A–E de arriba
    arreglados.

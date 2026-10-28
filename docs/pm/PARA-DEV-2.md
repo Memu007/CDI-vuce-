@@ -30,7 +30,7 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
-## DESPACHO-1b: devolución, sobre `09e16f3`, y D47 y D48 (2026-10-28 20:15 UTC)
+## DESPACHO-1b: devolución, sobre `09e16f3`, y D47 y D48 (2026-10-28 20:07 UTC)
 
 Evidencia en `REPRODUCCION-DESPACHO-1b-vuelta-2026-10-28.md`. Bien: la
 memoria del hijo con tope, el lector fuera del pool de las facturas, el
