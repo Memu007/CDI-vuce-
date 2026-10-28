@@ -535,11 +535,13 @@ class Invitation(Base):
 
 
 class PagoMercadoPagoAplicado(Base):
-    """Cada pago de Mercado Pago que se aplicó a una cuenta, una sola vez.
+    """Cada pago de Mercado Pago que llegó a una cuenta, una sola vez.
 
     Antes sólo se recordaba el último pago (`last_payment_id`): alternando
     dos pagos viejos reales, cualquiera renovaba una cuenta sin pagar
     (COBRO-MP-1, D8). La clave es el id del pago: un reenvío no se aplica.
+    Un pago que no alcanza queda «rechazado» con su motivo, para que el
+    admin lo vea en /dev/dashboard: es un cliente que pagó y no recibió nada.
     """
     __tablename__ = "mp_pagos_aplicados"
 
@@ -549,4 +551,7 @@ class PagoMercadoPagoAplicado(Base):
     monto = Column(Float, nullable=True)
     moneda = Column(String(10), nullable=True)
     aprobado_en = Column(String(40), nullable=True)  # date_approved de MP, tal cual
+    estado = Column(String(20), nullable=False, default="aplicado")  # «aplicado» o «rechazado»
+    monto_esperado = Column(Float, nullable=True)
+    motivo = Column(String(300), nullable=True)  # por qué se rechazó
     aplicado_en = Column(DateTime(timezone=True), server_default=func.now())

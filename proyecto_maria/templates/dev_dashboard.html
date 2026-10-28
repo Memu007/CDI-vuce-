@@ -174,6 +174,35 @@
             </div>
         </div>
 
+        <!-- Pagos de Mercado Pago rechazados (COBRO-MP-1) -->
+        <div class="card mb-4">
+            <div class="card-header border-bottom border-secondary bg-transparent py-3 d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Pagos de Mercado Pago no aplicados</h5>
+                <button type="button" class="refresh-btn py-1" onclick="fetchPagosRechazados()" style="font-size:0.82rem;">Actualizar</button>
+            </div>
+            <div class="card-body p-0">
+                <p class="text-muted small px-3 pt-3">Pagos aprobados por Mercado Pago que no alcanzaban el precio o venían en otra moneda: el cliente pagó y no recibió el servicio. Hay que revisarlos uno por uno.</p>
+                <div class="table-responsive">
+                    <table class="table table-dark table-hover mb-0 log-table">
+                        <thead>
+                            <tr>
+                                <th>FECHA</th>
+                                <th>CUENTA</th>
+                                <th>TIPO</th>
+                                <th>PAGÓ</th>
+                                <th>PRECIO</th>
+                                <th>MOTIVO</th>
+                                <th>PAGO MP</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pagos-rechazados-body">
+                            <tr><td colspan="7" class="text-center py-4 text-muted">Cargando…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- Logs Section -->
         <div class="card">
             <div class="card-header border-bottom border-secondary bg-transparent py-3">
@@ -293,7 +322,41 @@
             }
         }
 
+        async function fetchPagosRechazados() {
+            const tbody = document.getElementById('pagos-rechazados-body');
+            const fila = (celdas) => {
+                const tr = document.createElement('tr');
+                celdas.forEach((texto) => {
+                    const td = document.createElement('td');
+                    td.textContent = texto == null ? '—' : String(texto);
+                    tr.appendChild(td);
+                });
+                return tr;
+            };
+            try {
+                const response = await fetch('/api/dev/pagos-mp-rechazados');
+                const data = await response.json();
+                tbody.replaceChildren();
+                if (!response.ok) {
+                    tbody.appendChild(fila(['No se pudo leer: ' + response.status, '', '', '', '', '', '']));
+                    return;
+                }
+                if (!data.pagos.length) {
+                    tbody.appendChild(fila(['Ninguno', '', '', '', '', '', '']));
+                    return;
+                }
+                data.pagos.forEach((p) => tbody.appendChild(fila([
+                    p.aprobado_en || p.registrado_en, p.cuenta, p.tipo,
+                    p.monto == null ? null : p.monto + ' ' + (p.moneda || ''),
+                    p.monto_esperado, p.motivo, p.payment_id,
+                ])));
+            } catch (e) {
+                console.error('Pagos rechazados', e);
+            }
+        }
+
         fetchWave1();
+        fetchPagosRechazados();
 
         // Initial load
         fetchStats();
