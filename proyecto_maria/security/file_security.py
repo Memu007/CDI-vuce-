@@ -416,12 +416,30 @@ _FIRMAS_IMAGEN = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff", b"GIF87a", b"GIF89a", b
 _LIVIANO_INDICE_MAX = 128 * 1024        # bytes del índice del zip que se leen en el loop
 _LIVIANO_IMAGENES_MAX = 10 * 1024 * 1024  # bytes de imagen que se descuentan, como mucho
 _LIVIANO_IMAGENES_LECTURAS = 20
+_LIVIANO_CABEZA_COMPRIMIDA = 16 * 1024  # bytes comprimidos que se miran por cabeza
 
 
 def _es_imagen(cabeza: bytes) -> bool:
     if cabeza.startswith(_FIRMAS_IMAGEN):
         return True
     return cabeza.startswith(b"\x01\x00\x00\x00") and cabeza[40:44] == b" EMF"
+
+
+def _cabeza_de(contents: bytes, info) -> bytes:
+    """Los primeros 44 bytes de una entrada, mirando a lo sumo 16 KiB de lo
+    comprimido: zipfile la descomprimiría entera si no da bytes antes."""
+    import zipfile
+    import zlib
+    local = info.header_offset
+    if contents[local:local + 4] != b"PK\x03\x04":
+        return b""
+    nombre, extra = int.from_bytes(contents[local + 26:local + 28], "little"), \
+        int.from_bytes(contents[local + 28:local + 30], "little")
+    inicio = local + 30 + nombre + extra
+    datos = contents[inicio:inicio + min(info.compress_size, _LIVIANO_CABEZA_COMPRIMIDA)]
+    if info.compress_type == zipfile.ZIP_STORED:
+        return datos[:44]
+    return zlib.decompressobj(-15).decompress(datos, 44)
 
 
 def _excel_liviano(contents: bytes, file_ext: str) -> bool:
@@ -463,8 +481,7 @@ def _excel_liviano(contents: bytes, file_ext: str) -> bool:
                 if descontado + info.file_size > _LIVIANO_IMAGENES_MAX:
                     continue
                 try:
-                    with z.open(info) as f:
-                        cabeza = f.read(44)
+                    cabeza = _cabeza_de(contents, info)
                 except Exception:
                     continue
                 if _es_imagen(cabeza):
