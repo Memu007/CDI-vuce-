@@ -204,6 +204,46 @@ PY=python bash scripts/testing/sabotajes/seguro1.sh 5dfaf47   # 11 ROJO, «sabot
 python -m pytest -q --no-cov tests/test_seguro1.py             # 48 passed
 ```
 
+## DESPACHO-1b: **entregada** en `e59e1a8` (2026-10-28, 17:11 UTC)
+
+**Resultado:** la pieza como está en `e59e1a8` (base `49f8e29`), sin
+arreglo: no me alcanzó el tiempo antes de las 18:00 para arreglar con rojo,
+sabotaje y suite. Suite completa sobre `e59e1a8`: 3827 passed, 336
+skipped, 2 xfailed, 0 failed. Sabotajes `despacho1b.sh`: 24/24 en rojo.
+Lo que encontraron los revisores va abajo como riesgos; ninguno es una
+regresión (es lectura nueva), pero tres son medias dentro de la pieza.
+
+**Decide la PM:** D41.
+
+- **D41 (DESPACHO-1b):** las tres medias de abajo (lectura cuadrática,
+  peso infinito y fusión de renglones con NCM distinto). (1) Las arreglo
+  después de las 18:00, encima de la cadena, antes de publicar
+  (recomendada: el 500 del catálogo y la fusión dejan datos mal guardados
+  en la memoria del cliente). (2) Se publica así y van a una pieza nueva.
+
+| Revisor | Modelo y esfuerzo | Hallazgos | Qué hice |
+|---|---|---|---|
+| despacho1b-sonnet | Sonnet alto | 1 media: `_valores_por_columna` es cuadrática (`despacho_lector.py:144-171`): un PDF de 97 KB con 20 000 valores tarda 25,6 s; cinco subidas llenan el pool de lectura de PDF, compartido (504 a otros). 2 media: peso = kilo/cantidad puede dar `inf` (cantidad `1e-320`) y el GET del catálogo de productos da 500 (`despacho_lector.py:468`). 3 media: guardar funde renglones con NCM distinto por el respaldo por descripción (`client_memory.py:109-126`); mi informe decía «mismo NCM». 4 baja-media: 500 renglones tardan 8 a 29 s y guardar no es idempotente (`veces_usado` 2 al guardar dos veces). 5 baja: NCM con puntos queda en varias formas. 6 baja: sufijos cortados por un salto de hoja se pierden | Riesgos (D41) |
+| `/code-review high` + `/security-review` | Opus alto, en fork; la security a mano porque la skill falló con `fatal: ambiguous argument 'origin/HEAD...'` | Medias: una línea de sufijo que no se entiende pierde las siguientes (`despacho_lector.py:310`); el salto de página corta sufijos (`:267`); el upsert por parecido funde productos con NCM distinto y `guardados` los cuenta (`main.py:8066`); una línea de rótulos sin valores se come la siguiente (`:279`). Baja-media: guardar no idempotente; NCM con y sin puntos; pool de lectura de PDF bloqueable. Bajas: `startswith` de CONCEPTOS; mensaje naranja en `clientes.js:1661`; muchas consultas; guardar sin tope de pedidos (security) | Riesgos (D41) |
+
+Los tiempos y el 500 del Sonnet salen de sus corridas; lo demás es
+lectura. Yo no los reproduje.
+
+**Riesgos que quedan:** todo lo de la tabla. Lo que más pesa: un PDF
+grande traba la lectura de PDF de todos (también el lector de facturas);
+un renglón con cantidad casi cero deja el catálogo en 500; y guardar puede
+fundir dos productos de NCM distinto en la memoria del cliente.
+
+**Archivos de producto:** `proyecto_maria/core/despacho_lector.py` (nuevo),
+`proyecto_maria/main.py`, `proyecto_maria/static/v2/app_v2.css`,
+`proyecto_maria/static/v2/screens/clientes.js`,
+`proyecto_maria/templates/dashboard_v2.html`, `CHANGELOG.md`.
+
+```bash
+git diff --stat 49f8e29..e59e1a8 -- . ':!docs'   # 9 files changed, 1747 insertions(+), 2 deletions(-)
+PY=python bash scripts/testing/sabotajes/despacho1b.sh e59e1a8   # 24 ROJO, «sabotajes sin rojo: 0»
+```
+
 ## Entregas preparadas para las 18:00 UTC (2026-10-28)
 
 Recibí la D37 (2) en `20fb535`. En ABUSO-1 la pasé a riesgos, con lo que
@@ -227,7 +267,7 @@ tocan `docs/`. A las 18:00 queda sólo la autorrevisión con subagentes,
 | 2 | DESTINO-1 | `f887b4a` | `4ce6d22` | 3697 passed, 336 skipped, 2 xfailed, 0 failed | 15/15 |
 | 3 | SUFIJOS-2 | `4ca6829`; entregada en `bd76f9f` con el arreglo | `4905cd8`; el arreglo, sobre `eacf591` | 3731 passed, 336 skipped, 2 xfailed, 0 failed; con el arreglo, 4005 passed sobre `4821fff` | 9/9; con el arreglo, 17/17 |
 | 4 | SEGURO-1 | `371cde2`; entregada en `5dfaf47` con el arreglo | `1948207`; el arreglo, sobre `bd76f9f` | 3777 passed, 336 skipped, 2 xfailed, 0 failed; con el arreglo, 4007 passed sobre `5dfaf47` | 10/10; con el arreglo, 11/11 |
-| 5 | DESPACHO-1b | `e59e1a8` | `49f8e29` | 3827 passed, 336 skipped, 2 xfailed, 0 failed | 24/24 |
+| 5 | DESPACHO-1b | `e59e1a8`, **entregada** | `49f8e29` | 3827 passed, 336 skipped, 2 xfailed, 0 failed | 24/24 |
 | 6 | DATOS-1 | `c996ad4` | `d01f95c` | 3836 passed, 336 skipped, 2 xfailed, 0 failed | 12/12 |
 | 7 | DISCO-1 | `88b22c8` | `cf84a76` | 3847 passed, 336 skipped, 2 xfailed, 0 failed | 20/20 |
 | 8 | OBSERVABILIDAD-1 | `39be45e` | `88b22c8` | 3855 passed, 336 skipped, 2 xfailed, 0 failed | 16/16 |
