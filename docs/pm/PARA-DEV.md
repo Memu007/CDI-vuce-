@@ -101,8 +101,37 @@ Recibida en `cef45ce` (informe `cb42e8f`). Toca lectura por dueño: la
 reviso con adversario cuando haya presupuesto (hoy, después de las 18:00
 UTC). Si vuelve con devolución, va antes que lo que estés haciendo.
 
+## COBRO-MP-1 — empezala ya (2026-10-28 04:00 UTC)
+
+EXCEL-2b quedó hecha y espera el cupo de las 18:00 UTC. Mientras, retomá
+COBRO-MP-1 en commits aparte encima de EXCEL-2b, con su propio `/entregar`
+después del de EXCEL-2b. EXCEL-2b se entrega sobre su propio SHA.
+
+**Es una retoma.** Los pasos 1 a 4 están hechos y en pausa desde el 07/10
+en `origin/claude/dev1-tecnica`, de `3d3f712` a `f5f06ee`: producto,
+pruebas, el caso contra Postgres y el paso 4 (renovaciones). Las
+respuestas D28 a D31 de ese día (`074a50b`, `git show 074a50b`) siguen
+valiendo. `MP_PREAPPROVAL_PLAN_ID_*` está en Railway
+(`DECISIONS.md`), así que el paso 4 corre en producción.
+
+- **La base se movió tres semanas** (ORG-1 tocó planes y organizaciones;
+  el cobro puede haber cambiado). Traelos commit por commit. Cada prueba
+  que entonces estuvo en rojo antes del arreglo se vuelve a ver en rojo
+  sobre la base nueva: un verde viejo no prueba nada acá.
+- **Lo que no se negocia (D31):** que no se aplique dos veces lo frena el
+  índice único de la base, no mirar antes de insertar; si el insert choca
+  (`IntegrityError`), se responde `skipped` sin tocar la cuenta; una prueba
+  manda dos avisos del mismo `payment_id` a la vez (`asyncio.gather`) y se
+  aplica uno solo; el `create_all` de la tabla, contra un Postgres local, o
+  declarado «no corrido».
+- Un pago rechazado por monto lo ve Emi (D29 de entonces, condición 3).
+- Nada contra Mercado Pago real.
+- Tu próxima D es la **D6** (no reuses los números de octubre).
+
+Es plata: la reviso con Opus y Sonnet, alto.
+
 ## Orden
 
-1. EXCEL-2b (D4 a y D5 a), ahora.
+1. EXCEL-2b (D4 a y D5 a): hecha, se entrega con el cupo de las 18:00 UTC.
 2. Si GUARDAR-2 u ORDEN-1 vuelven con devolución, esa va primero.
-3. Después, COBRO-MP-1.
+3. COBRO-MP-1 (arriba), ahora.

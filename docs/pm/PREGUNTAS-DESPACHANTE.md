@@ -235,6 +235,11 @@ quedan sólo fuera del repo. Lo que muestran, sin ningún dato real, está en
 >    ¿va sobre el FOB de la factura o sobre el FOB ya ajustado?
 > 9. La próxima vez, ¿nos tapás nombres, CUIT y montos? Los de esta vez no
 >    los subimos a ningún lado.
+> 10. Los sufijos que piden número: ¿son todos los que empiezan con `Z`
+>    (peso, ancho, cilindrada…), y los que empiezan con `A` son texto libre?
+>    Y en un `Z` de porcentaje, ppm o quilates promedio, ¿tampoco van
+>    decimales? Hoy el sistema frena cualquier `Z` con decimales hasta que
+>    se escriba entero.
 
 ## El mensaje que se mandó (2026-10-06)
 
