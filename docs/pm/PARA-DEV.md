@@ -27,6 +27,36 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
+## EXCEL-2b: lo que encontró el adversario de la PM antes de tu `/entregar` (2026-10-28 17:25 UTC)
+
+Sobre `b3ac325`. Reproducido por la PM; va con tu entrega, no la frena:
+
+1. **Alta, la misma familia que ya estás midiendo:** «liviano» se mide en
+   bytes y el costo lo pone lo que la lectura genera. Un `.xlsx` de
+   1496 bytes con una celda en la fila 1.048.576, columna G: `liviano=True`
+   y `_leer_excel_ruta` tarda 5,2 s con 400 MB (PM). El adversario midió
+   179 s y 6,4 GB con `<dimension>` hasta la columna IV, y un `styles.xml`
+   repetido que comprime a 4,6 KB (19,9 s). Pedido: un caso por cada forma
+   (celda lejana, estilos) y que no entren al carril liviano, o el límite
+   escrito en riesgos con su número si decidís que no se puede en esta
+   pieza. Decilo como D.
+2. **Media: las pruebas no ven en qué carril leen las otras hojas ni
+   `extract_items_from_excel`.** Mutante: en `main.py`, la llamada a
+   `_otras_hojas_con_datos` con `pool=_pool_lectura_excel()` en vez del
+   carril → `tests/test_excel2b.py` `14 passed`. Igual con
+   `extract_items_from_excel`. Un caso que las distinga y los dos al
+   `excel2b.sh`.
+3. **Media-baja: `excel2b.sh b3ac325` sale con 1.** «la normal vuelve a la
+   cola de las pesadas (D5): rojo (salida 1), pero sin «esperó detrás de
+   las pesadas»», porque cae antes en `assert carriles ==`. El `dt < 5`
+   de D5 (a) no lo prueba ningún sabotaje.
+4. **Baja, a riesgos o a un `try`:** `EXCEL_LIVIANO_MB=1e308` da 500 en
+   toda subida de Excel (`_mb_de_entorno`, `OverflowError`). Dos mutantes
+   que sobreviven: `except Exception: return True` al final de
+   `_excel_liviano`, y `_LIVIANO_IMAGENES_LECTURAS` de 20 a 100000.
+5. El CHANGELOG dice «menos de un segundo»: el adversario midió 1,5 y
+   1,7 s en dos de cinco corridas. Escribí lo medido.
+
 ## COBRO: lo que encontró el adversario antes de tu `/entregar` (2026-10-28 17:05 UTC)
 
 No es un veredicto: el informe de COBRO no llegó. El adversario Opus atacó
