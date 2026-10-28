@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: la pestaña comprueba la sesión antes de guardar y avisa cuando no guarda (ORDEN-1, devolución 20:08)
+
+- **fix(orden):** si alguien sale y entra con otro usuario, o la sesión se cierra, la pestaña deja de guardar la operación y lo dice en un aviso arriba; si vuelve a entrar el mismo usuario, sigue guardando.
+- La operación de antes de recargar vuelve aunque la consulta del usuario tarde; también avisa cuando el navegador no tiene lugar para guardarla.
+
 ## 2026-10-28 · fix: se puede cancelar un plan vencido y una prueba con recarga se reactiva como prueba (COBRO-MP-1 C y E)
 
 - **fix(cobro):** desde «plan vencido» se puede cancelar: se cancela también en Mercado Pago, así no vuelve a cobrar cuando la tarjeta pasa, y la cuenta no gana días por cancelar.
@@ -26,7 +31,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(borrador):** al abrir sólo se recupera una operación del mismo usuario y de hace menos de 7 días; las más viejas se borran. Una pestaña duplicada no toma la operación de la original mientras sigue abierta; al recargar o restaurar se recupera la propia.
 - Si al abrir no se puede saber quién es el usuario (error del servidor o corte), la pestaña lo vuelve a pedir y la operación se sigue guardando.
-- Si mientras tanto otro usuario entra en el mismo navegador, lo cargado en esa pestaña no se guarda a su nombre ni él lo recupera; la pestaña deja de autoguardar hasta recargarla.
+- Si mientras tanto otro usuario entra en el mismo navegador, lo cargado en esa pestaña no se guarda a su nombre ni él lo recupera.
 
 ## 2026-10-28 · feat: copia de la base que se restaura y se compara antes de darla por buena (BACKUP-1a)
 

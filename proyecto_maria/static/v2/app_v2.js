@@ -332,19 +332,24 @@
     // cambió desde que abrió: si otro entra en el mismo navegador mientras
     // ésta reintenta, o la consulta trae después otro usuario, lo cargado no
     // es de él y la pestaña deja de guardar y de recuperar.
+    // La sesión se reconoce por la cookie CSRF, que cambia en cada login:
+    // sesionDelDueno es la que tenía cuando se confirmó al dueño. Si cambia,
+    // la pestaña no guarda hasta volver a preguntar quién es (revisarSesion).
     const sesionAlAbrir = getCsrfToken();
-    let duenoPestana = null, sesionAjena = false, sinSesion = false;
+    let duenoPestana = null, sesionAjena = false, sinSesion = false, sesionDelDueno = null;
     // Devuelve si ya se sabe quién es el usuario (sin él no hay autoguardado).
     async function loadCurrentUser() {
         try {
+            const sesionAntes = getCsrfToken();
             const res = await api('/auth/current_user');
             if (!res.ok) return;
             const user = await res.json();
             if (duenoPestana === null) {
                 duenoPestana = user.username || '';
-                if (getCsrfToken() !== sesionAlAbrir) sesionAjena = true;
-            } else if (user.username !== duenoPestana) {
-                sesionAjena = true;
+                if (sesionAntes !== sesionAlAbrir || getCsrfToken() !== sesionAlAbrir) sesionAjena = true;
+                else sesionDelDueno = sesionAlAbrir;
+            } else {
+                confirmarSesion(user.username, sesionAntes);
             }
             currentUser = user;
             CDI.currentUser = user;
@@ -802,17 +807,36 @@
 
         // Persistence: Load from localStorage. El borrador es de un usuario:
         // se recupera después de saber quién entró (con tope, para no dejar la
-        // pantalla en blanco si la red no contesta).
+        // pantalla en blanco si la red no contesta). Si el usuario llega
+        // después del tope, se recupera entonces, salvo que la pestaña ya
+        // tenga otra operación: ésa no se pisa y la de antes queda guardada.
+        const recuperada = parsed => {
+            CDI.state = parsed;
+            if (parsed.clienteActivo) setClienteActivo(parsed.clienteActivo);
+            if (CDI.toast) CDI.toast.info('Recuperado', 'Se recuperó la operación en curso.');
+        };
         const espera = new Promise(r => setTimeout(r, ESPERA_USUARIO_MS));
         Promise.race([usuarioListo, espera])
-            .then(() => recuperarBorrador())
+            .then(() => {
+                if (!CDI.borrador.usuario()) {
+                    usuarioListo.then(() => CDI.borrador.buscar()).then(b => {
+                        if (!b) return;
+                        if (CDI.state && CDI.state.items && CDI.state.items.length > 0) {
+                            CDI.borrador.avisar('pendiente', 'Quedó guardada la operación que tenías antes de recargar. Para seguirla, abrí el sistema en otra pestaña.');
+                            return;
+                        }
+                        const parsed = CDI.borrador.adoptar(b);
+                        if (!parsed) return;
+                        recuperada(parsed);
+                        goTo('review');
+                    }).catch(e => console.warn('[app_v2] failed to restore state', e));
+                    return null;
+                }
+                return recuperarBorrador();
+            })
             .catch(e => { console.warn('[app_v2] failed to restore state', e); return null; })
             .then(parsed => {
-                if (parsed) {
-                    CDI.state = parsed;
-                    if (parsed.clienteActivo) setClienteActivo(parsed.clienteActivo);
-                    if (CDI.toast) CDI.toast.info('Recuperado', 'Se recuperó la operación en curso.');
-                }
+                if (parsed) recuperada(parsed);
                 // Si ya había items (por ej. carga asíncrona de PDF, o restaurado recién)
                 // nos vamos a review. Sino, arrancamos en upload.
                 if (CDI.state && CDI.state.items && CDI.state.items.length > 0) {
@@ -873,9 +897,71 @@
             .finally(() => clearTimeout(reloj));
     }
 
+    // El dueño, si la sesión de ahora es la que se confirmó con él. Si la
+    // sesión cambió, null hasta que revisarSesion diga quién es.
     function usuarioActual() {
-        if (sesionAjena) return null;
-        return (CDI.currentUser && CDI.currentUser.username) || null;
+        if (sesionAjena || !duenoPestana || !CDI.currentUser) return null;
+        if (getCsrfToken() !== sesionDelDueno) {
+            revisarSesion();
+            return null;
+        }
+        return duenoPestana;
+    }
+
+    // Lo que contestó /auth/current_user con la sesión `sesion` (la cookie
+    // antes del pedido; si cambió mientras tanto, no se sabe de quién es).
+    function confirmarSesion(username, sesion) {
+        if (sesionAjena || getCsrfToken() !== sesion) return false;
+        if (username !== duenoPestana) {
+            sesionAjena = true;
+            avisarBorrador('ajena', 'Entró otro usuario en este navegador: esta pestaña ya no guarda la operación. Recargá la página.');
+            return false;
+        }
+        sesionDelDueno = sesion;
+        if (avisoBorrador === 'sinsesion' || avisoBorrador === 'red') avisarBorrador(null);
+        return true;
+    }
+
+    // Una consulta por cada cambio de sesión. Va con fetch directo: con un
+    // 401 api() manda al login y la pestaña perdería lo cargado.
+    let revisando = false, sesionRevisada = null, revisarDesde = 0;
+    function revisarSesion() {
+        const sesion = getCsrfToken();
+        if (revisando || sesionAjena || sesion === sesionRevisada || Date.now() < revisarDesde) return;
+        revisando = true;
+        sesionRevisada = sesion;
+        fetch('/auth/current_user', { credentials: 'same-origin' })
+            .then(async res => {
+                if (res.status === 401) {
+                    if (getCsrfToken() === sesion) {
+                        avisarBorrador('sinsesion', 'Se cerró la sesión: esta pestaña no guarda la operación hasta que vuelvas a entrar.');
+                    } else {
+                        sesionRevisada = null;
+                    }
+                    return;
+                }
+                if (!res.ok) throw new Error('current_user ' + res.status);
+                const user = await res.json();
+                if (getCsrfToken() !== sesion) { sesionRevisada = null; return; }
+                if (confirmarSesion(user.username, sesion)) guardarBorrador(false);
+            })
+            .catch(() => {
+                sesionRevisada = null;
+                revisarDesde = Date.now() + 10000;
+                avisarBorrador('red', 'No se pudo comprobar la sesión: esta pestaña no guarda la operación por ahora.');
+            })
+            .finally(() => { revisando = false; });
+    }
+
+    // Un solo aviso a la vez. El de otro usuario no se va: hay que recargar.
+    let avisoBorrador = null;
+    function avisarBorrador(motivo, texto) {
+        if (avisoBorrador === 'ajena' && motivo !== 'ajena') return;
+        avisoBorrador = motivo;
+        const el = document.getElementById('avisoBorrador');
+        if (!el) return;
+        el.textContent = motivo ? texto : '';
+        el.hidden = !motivo;
     }
 
     function enFlujo() {
@@ -887,10 +973,17 @@
         const user = usuarioActual();
         if (!enFlujo() || !user) return;
         const sobre = { v: 1, user, savedAt: Date.now(), closed: !!cerrada, state: CDI.state };
-        try { localStorage.setItem(claveBorrador, JSON.stringify(sobre)); } catch (_) {}
+        try {
+            localStorage.setItem(claveBorrador, JSON.stringify(sobre));
+            if (avisoBorrador === 'lleno') avisarBorrador(null);
+        } catch (_) {
+            avisarBorrador('lleno', 'El navegador no tiene lugar para guardar la operación: si cerrás o recargás esta pestaña, se pierde.');
+        }
     }
 
+    // Lo guardado es del dueño: si la sesión ya no es la suya, no se borra.
     function borrarBorrador() {
+        if (!usuarioActual()) return;
         try { localStorage.removeItem(claveBorrador); } catch (_) {}
     }
 
@@ -922,12 +1015,13 @@
         return b.state;
     }
 
-    async function recuperarBorrador() {
+    // El borrador que le toca a esta pestaña, sin adoptarlo todavía.
+    async function buscarBorrador() {
         const user = usuarioActual();
         if (!user) return null;
         if (pestanaAnterior) {
             const propio = leerBorrador(BORRADOR + ':' + pestanaAnterior, user);
-            if (propio && !(await pestanaViva(pestanaAnterior))) return adoptarBorrador(propio);
+            if (propio && !(await pestanaViva(pestanaAnterior))) return propio;
         }
         let claves = [];
         try { claves = Object.keys(localStorage); } catch (_) { return null; }
@@ -941,10 +1035,15 @@
             if (!b.closed && ahora - b.savedAt < BORRADOR_HUERFANO_MS) return;  // otra pestaña la está usando
             if (!elegido || b.savedAt > elegido.savedAt) elegido = b;
         });
-        return elegido ? adoptarBorrador(elegido) : null;
+        return elegido;
     }
 
-    CDI.borrador = { borrar: borrarBorrador };
+    async function recuperarBorrador() {
+        const b = await buscarBorrador();
+        return b ? adoptarBorrador(b) : null;
+    }
+
+    CDI.borrador = { borrar: borrarBorrador, buscar: buscarBorrador, adoptar: adoptarBorrador, avisar: avisarBorrador, usuario: usuarioActual };
 
     window.addEventListener('beforeunload', (e) => {
         if (enFlujo()) {
@@ -960,7 +1059,8 @@
         if (enFlujo()) guardarBorrador(true);
         else borrarBorrador();
     });
-    // Vuelve desde la caché del navegador (atrás/adelante): sigue en uso.
+    // Vuelve desde la caché del navegador (atrás/adelante): sigue en uso, si
+    // la sesión es la del dueño (guardarBorrador pasa por usuarioActual).
     window.addEventListener('pageshow', (e) => {
         if (e.persisted) guardarBorrador(false);
     });

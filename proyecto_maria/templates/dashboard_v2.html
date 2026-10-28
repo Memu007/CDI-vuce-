@@ -64,6 +64,8 @@
             <button type="button" class="billing-banner-cta" id="billingBannerCta">Activar plan</button>
             <button type="button" class="billing-banner-close" id="billingBannerClose" aria-label="Cerrar aviso" hidden>&times;</button>
         </div>
+        <!-- Aviso de la operación en curso: la pestaña no la puede guardar (sesión de otro usuario, sin sesión, sin red o sin lugar). Lo maneja app_v2.js. -->
+        <div class="billing-banner is-urgent" id="avisoBorrador" role="status" aria-live="polite" hidden></div>
 
         <main class="main">
             <div class="fake-source-banner" id="fakeSourceBanner" role="status" aria-live="polite" hidden>
