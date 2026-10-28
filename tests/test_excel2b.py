@@ -352,6 +352,44 @@ def test_ningun_tope_de_excel_enorme_rompe_la_subida(monkeypatch, variable):
     assert r.status_code == 200, r.text[:300]
 
 
+# Todo tope que lee la subida de Excel desde el entorno usa el de defecto si
+# el valor no es finito, si no es positivo o si en bytes o elementos da 0
+# (devolución de EXCEL-2b, 28/10 19:20, punto 1): con tope 0 no entra ningún
+# Excel. Medio MB sí es un tope (512 KB); medio elemento, no.
+_LECTORES = {
+    "EXCEL_LIVIANO_MB": (lambda: fs._mb_de_entorno("EXCEL_LIVIANO_MB", 2), 2 * 2**20),
+    "EXCEL_MAX_TEXTOS_MB": (lambda: fs._mb_de_entorno("EXCEL_MAX_TEXTOS_MB", 10), 10 * 2**20),
+    "EXCEL_MAX_PRIMERA_HOJA_MB": (lambda: fs._mb_de_entorno("EXCEL_MAX_PRIMERA_HOJA_MB", 10), 10 * 2**20),
+    "EXCEL_MAX_DESCOMPRIMIDO_MB": (fs._excel_max_descomprimido_bytes, 100 * 2**20),
+    "EXCEL_MAX_ELEMENTOS_ESTILOS": (fs._elementos_de_entorno, 500_000),
+    "MAX_UPLOAD_MB": (main._get_max_upload_bytes, 10 * 2**20),
+}
+
+
+@pytest.mark.parametrize("valor", ["1e-9", "0.5", "inf", "nan", "-0", "0", "-3"])
+@pytest.mark.parametrize("variable", list(_LECTORES))
+def test_un_tope_que_no_sirve_vale_el_de_defecto(monkeypatch, variable, valor):
+    leer, defecto = _LECTORES[variable]
+    monkeypatch.setenv(variable, valor)
+    if valor == "0.5" and variable.endswith("_MB"):
+        esperado = 2**19
+    else:
+        esperado = defecto
+    try:
+        obtenido = leer()
+    except (OverflowError, ValueError) as e:
+        pytest.fail(f"{variable}={valor} rompe la lectura del tope: {e!r}")
+    assert obtenido == esperado, f"{variable}={valor} da un tope de {obtenido}, no {esperado}"
+
+
+@pytest.mark.parametrize("valor", ["1e-9", "inf", "nan", "-0"])
+@pytest.mark.parametrize("variable", list(_LECTORES))
+def test_un_tope_que_no_sirve_no_traba_la_subida(monkeypatch, variable, valor):
+    monkeypatch.setenv(variable, valor)
+    r = _subir(_normal())
+    assert r.status_code == 200, f"{variable}={valor}: {r.status_code} {r.text[:300]}"
+
+
 def test_se_leen_exactamente_20_cabezas_de_imagen(monkeypatch):
     """El tope de lecturas es 20, no «alguno»: con 40 candidatas se miran 20
     cabezas, ni una más ni una menos."""
