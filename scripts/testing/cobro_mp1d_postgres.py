@@ -6,7 +6,10 @@ simulado. Al final tiene que quedar una sola suscripción viva en Mercado Pago
 (no cancelada) y tiene que ser la que CDI guarda; si no, cancelar en CDI deja
 la otra cobrando.
 1. sin suscripción anterior;
-2. con una suscripción anterior pendiente (los dos la ven).
+2. con una suscripción anterior pendiente (los dos la ven);
+3. un /api/billing/cancel mientras corre un checkout (hallazgo de los
+   adversarios): si cancelar no espera al checkout, CDI queda cancelada y
+   sin id, y la suscripción nueva sigue viva en Mercado Pago.
 
 Para que la carrera pase de verdad, el primero que lee la cuenta en el
 checkout espera a ver al otro: o el otro también la leyó (no hubo lock) o
@@ -21,6 +24,7 @@ La base tiene que estar vacía: el script crea las tablas.
 import asyncio
 import os
 import sys
+import threading
 import types
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -80,38 +84,55 @@ def esperando_un_lock():
 
 
 # El primero que lee la cuenta dentro del checkout espera a ver al otro.
+# En el caso 3, el checkout espera a que cancelar haya leído la cuenta o
+# esté esperando el lock.
 LLEGADAS = []
 VISTO = []
+CON_CANCEL = []
+CANCEL_LEYO = []
+CHECKOUT_LEYO = threading.Event()
 _execute_original = AsyncSession.execute
 
 
-def _en_el_checkout():
+def _en(funcion):
     marco = sys._getframe(2)
     while marco is not None:
-        if marco.f_code.co_name == "billing_checkout":
+        if marco.f_code.co_name == funcion:
             return True
         marco = marco.f_back
     return False
+
+
+async def _esperar_al_otro(llego):
+    for _ in range(500):
+        if llego():
+            VISTO.append("llegaron los dos")
+            return
+        if await asyncio.to_thread(esperando_un_lock):
+            VISTO.append("el otro espera el lock")
+            return
+        await asyncio.sleep(0.01)
+    VISTO.append("nada")
 
 
 async def _execute_con_carrera(self, statement, *args, **kwargs):
     resultado = await _execute_original(self, statement, *args, **kwargs)
     tabla = getattr(getattr(statement, "column_descriptions", [{}])[0].get("entity"), "__tablename__", None) \
         if getattr(statement, "is_select", False) else None
-    if tabla != "users" or not _en_el_checkout():
+    if tabla != "users":
+        return resultado
+    if CON_CANCEL:
+        if _en("cancel_billing"):
+            CANCEL_LEYO.append(1)
+        elif _en("billing_checkout"):
+            CHECKOUT_LEYO.set()
+            await _esperar_al_otro(lambda: CANCEL_LEYO)
+        return resultado
+    if not _en("billing_checkout"):
         return resultado
     LLEGADAS.append(1)
     if len(LLEGADAS) == 1:
-        for _ in range(500):
-            if len(LLEGADAS) >= 2:
-                VISTO.append("llegaron los dos")
-                break
-            if await asyncio.to_thread(esperando_un_lock):
-                VISTO.append("el otro espera el lock")
-                break
-            await asyncio.sleep(0.01)
-        else:
-            VISTO.append("nada")
+        await _esperar_al_otro(lambda: len(LLEGADAS) >= 2)
     return resultado
 
 
@@ -157,6 +178,42 @@ with TestClient(main_mod.app) as c:
 
     caso("sin suscripción anterior")
     caso("con una pendiente anterior", anterior=f"vieja-{uuid.uuid4().hex[:8]}")
+
+    # 3. Cancelar mientras corre el checkout de una cuenta vencida.
+    que = "cancelar durante un checkout"
+    usuario = f"mp1d_{uuid.uuid4().hex[:8]}"
+    r = c.post("/auth/register", json={"username": usuario, "password": "SecureP@ss1",
+                                       "email": f"{usuario}@example.com", "name": usuario})
+    assert r.status_code == 200, r.text
+    SUS.clear()
+    CREADAS.clear()
+    vieja = f"vieja-{uuid.uuid4().hex[:8]}"
+    SUS[vieja] = "authorized"
+    sql("update users set billing_status = 'past_due', payment_provider = 'mercadopago', "
+        "mp_preapproval_id = %s, trial_ends_at = now() - interval '2 days' where username = %s",
+        vieja, usuario)
+    LLEGADAS.clear()
+    VISTO.clear()
+    CANCEL_LEYO.clear()
+    CHECKOUT_LEYO.clear()
+    CON_CANCEL.append(1)
+    c.cookies.clear()
+    assert c.post("/auth/login", json={"username": usuario, "password": "SecureP@ss1"}).status_code == 200
+    with ThreadPoolExecutor(2) as hilos:
+        checkout = hilos.submit(c.post, "/api/billing/checkout", json={"plan": "premium"})
+        chequear(CHECKOUT_LEYO.wait(10), f"{que}: el checkout leyó la cuenta")
+        cancel = hilos.submit(c.post, "/api/billing/cancel")
+        respuestas = [checkout.result(), cancel.result()]
+    CON_CANCEL.clear()
+    chequear(VISTO[:1] in (["llegaron los dos"], ["el otro espera el lock"]),
+             f"{que}: los dos pedidos se cruzaron ({VISTO})")
+    chequear([r.status_code for r in respuestas] == [200, 200],
+             f"{que}: los dos contestan 200 ({[(r.status_code, r.text[:80]) for r in respuestas]})")
+    estado, guardada_ = sql("select billing_status, mp_preapproval_id from users where username = %s",
+                            usuario)[0]
+    vivas = sorted(s for s, e in SUS.items() if e != "cancelled")
+    chequear(estado == "canceled", f"{que}: la cuenta queda cancelada ({estado})")
+    chequear(vivas == [], f"{que}: no queda ninguna suscripción viva en Mercado Pago ({vivas}, CDI guarda {guardada_})")
 
 print(f"fallas: {len(FALLAS)}")
 sys.exit(1 if FALLAS else 0)
