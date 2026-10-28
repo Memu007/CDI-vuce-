@@ -332,6 +332,43 @@ PY=python bash scripts/testing/sabotajes/disco1.sh 88b22c8   # 20 ROJO, «sabota
 python -m pytest -q --no-cov tests/test_disco1.py
 ```
 
+## OBSERVABILIDAD-1: **entregada** en `39be45e` (2026-10-28, 17:14 UTC)
+
+**Resultado:** la pieza como está en `39be45e` (base `88b22c8`; el código
+es el de `7ae35ab`), sin arreglo. Suite completa sobre `39be45e`: 3855
+passed, 336 skipped, 2 xfailed, 0 failed. Sabotajes `observabilidad1.sh`:
+16/16 en rojo. Detalle en «OBSERVABILIDAD-1: hecha» más abajo.
+
+**Decide la PM:** nada nuevo. La D34 ya está contestada (a).
+
+| Revisor | Modelo y esfuerzo | Hallazgos | Qué hice |
+|---|---|---|---|
+| observabilidad1-sonnet | Sonnet medio | Nada dentro. Bajas: sin FK (igual que el modelo); `CREATE INDEX` sin `CONCURRENTLY`; un índice parcial con ese nombre cuenta como existente | Riesgos |
+| `/code-review high` + `/security-review` | Opus alto, en fork; la security a mano porque la skill falló con `fatal: ambiguous argument 'origin/HEAD...'` | (1) media: `MetricsMiddleware` no graba `owner_username` (es la D34 (a); la prueba afirma `None`). (2) baja-media, sospecha: el `ALTER` y el `CREATE INDEX` van en la misma transacción y bloquean `api_logs`; sin `statement_timeout`, contra los 60 s del healthcheck. (3) un índice `INVALID` o parcial pasa el chequeo. (4) `current_schema` contra `regclass`. (5) dos arranques a la vez dejan un log confuso. (6) sin FK. (7) un comentario. Security: el token de invitación queda en `api_logs.endpoint` y se ve en `/api/dev/stats` (sólo admin); es código previo que la pieza vuelve a hacer andar | Riesgos |
+
+**Lo que es lectura y lo que corrí:** los hallazgos son lectura de los
+revisores; no reproduje ninguno.
+
+**Riesgos que quedan:**
+- **Media, security:** con las métricas andando de nuevo, la URL de
+  aceptar invitación, con su token, queda guardada en `api_logs` y la ve el
+  admin en `/api/dev/stats`. Antes de esta pieza no se guardaba nada
+  porque cada insert fallaba. Propuesta (otra pieza): no guardar el query
+  ni el token en `endpoint`.
+- **Propuesta de la D34:** que `MetricsMiddleware` lea el dueño del token
+  y lo grabe; toca sesión y autenticación.
+- **Baja:** con una `api_logs` grande, el primer arranque bloquea la
+  tabla mientras crea el índice (sin medir); un índice inválido o parcial
+  con ese nombre no se rehace.
+
+**Archivos de producto:** `proyecto_maria/main.py`, `CHANGELOG.md`.
+
+```bash
+git diff --stat 88b22c8..39be45e -- . ':!docs'   # 5 files changed, 760 insertions(+)
+PY=python bash scripts/testing/sabotajes/observabilidad1.sh 39be45e   # 16 ROJO, «sabotajes sin rojo: 0»
+python -m pytest -q --no-cov tests/test_observabilidad1.py
+```
+
 ## Entregas preparadas para las 18:00 UTC (2026-10-28)
 
 Recibí la D37 (2) en `20fb535`. En ABUSO-1 la pasé a riesgos, con lo que
@@ -358,7 +395,7 @@ tocan `docs/`. A las 18:00 queda sólo la autorrevisión con subagentes,
 | 5 | DESPACHO-1b | `e59e1a8`, **entregada** | `49f8e29` | 3827 passed, 336 skipped, 2 xfailed, 0 failed | 24/24 |
 | 6 | DATOS-1 | `c996ad4`, **entregada** | `d01f95c` | 3836 passed, 336 skipped, 2 xfailed, 0 failed | 12/12 |
 | 7 | DISCO-1 | `88b22c8`, **entregada** | `cf84a76` | 3847 passed, 336 skipped, 2 xfailed, 0 failed | 20/20 |
-| 8 | OBSERVABILIDAD-1 | `39be45e` | `88b22c8` | 3855 passed, 336 skipped, 2 xfailed, 0 failed | 16/16 |
+| 8 | OBSERVABILIDAD-1 | `39be45e`, **entregada** | `88b22c8` | 3855 passed, 336 skipped, 2 xfailed, 0 failed | 16/16 |
 | 9 | SESION-1 | `895ee73` | `f5160d7` | 3872 passed, 336 skipped, 2 xfailed, 0 failed | 19/19 |
 | 10 | ABUSO-1 | `43916a7` | `c702655` | 3930 passed, 336 skipped, 2 xfailed, 0 failed | 27/27 |
 | 11 | EMAIL-1 | `2b93071` | `e22a5cf` | 3954 passed, 336 skipped, 2 xfailed, 0 failed | email1 13/13; abuso1 27/27 sobre `2b93071` |
