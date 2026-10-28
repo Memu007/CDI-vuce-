@@ -20,8 +20,39 @@ autorrevisión independiente y `/security-review`, reproduzco lo que
 encuentren y entrego con el timbre. Subo ahora para que el trabajo no se
 pierda si el contenedor muere. **No hace falta que la revises todavía.**
 
-**Nada para decidir ahora.** D26 y D27 ya están contestadas: D26 (a) por
-ahora, D27 (b) como ORG-1b.
+## Decisiones
+
+**D28 — DESTINO-1 rompe seis pruebas que comparan el golden entero.** No
+frena la entrega de ORG-1, ORG-1b y DESPACHO-1a; frena DESTINO-1, que
+arranco apenas entregue. Lo aviso ahora porque pediste que avise antes de
+cambiar una prueba que compara el golden.
+
+Estas pruebas generan con `iva_adicional="IVAAD1"` y comparan contra
+`maria_golden_anon.TXT` todo el archivo, byte a byte. El golden trae
+`COMERC` + `IVAAD1`:
+
+- `tests/test_generar_maria_txt.py::test_golden_reproduce_estructura_real`
+- `tests/test_maria1b_controles.py::test_el_archivo_real_sale_identico_por_la_ruta`
+- en `tests/test_punta_a_punta1.py`, las cuatro que comparan con
+  `_GOLDEN_PATH`: líneas 433, 438, 445 y 478.
+
+Con DESTINO-1, `IVAAD1` se lee como bien de uso de una persona. Eso da
+`USOPAR` + `IVAAD1`, que difiere del golden en una línea: el `MCPL` de
+`GANANCIASOP3`. Ningún par permitido da `COMERC` + `IVAAD1`, así que no
+hay entrada que reproduzca el golden entero. El golden de subítems trae
+`COMERC` + `NO_VALIDA`, que es un par permitido, y no cambia.
+
+- **(a) Recomiendo esta.** El golden no se toca. Las seis pruebas comparan
+  el archivo entero salvo esa línea, y la prueba exige que esa línea diga
+  exactamente `USOPAR`. Así cualquier otro cambio sigue apareciendo y la
+  diferencia queda escrita, con referencia a la pregunta 7 al despachante.
+- **(b)** Las pruebas siguen generando con comercialización. Ahí la línea
+  que difiere pasa a ser la de `IVAADICIONAL1` (`NO_VALIDA` en vez de
+  `IVAAD1`). El arreglo de las pruebas es el mismo de (a), pero muestra un
+  caso que el MARIA nunca vio.
+- **(c)** DESTINO-1 espera la respuesta a la pregunta 7.
+
+D26 y D27 ya están contestadas: D26 (a) por ahora, D27 (b) como ORG-1b.
 
 | Pieza | SHA |
 |---|---|
@@ -479,6 +510,6 @@ PY=<venv>/bin/python scripts/testing/sabotajes/despacho1a.sh 51890cd
 - **El 400 «es para otro email»** dice que el email escrito no es el
   invitado. No dice cuál es. Hace falta el token para preguntar.
 
-Última vuelta: Wed Oct 28 00:30:47 UTC 2026
+Última vuelta: Wed Oct 28 00:37:39 UTC 2026
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1 lista y subida SIN ENTREGAR (producto e43810b, sabotajes 18f7f25, carrera PG ddfc798; suite 18f7f25 1 failed conocido de test_excel2, 3323 passed). ORG-1b (D27 b) lista y subida SIN ENTREGAR (prueba 9ad42e4, producto f8616cf, sabotajes b7a7927, arreglo 5d42909; sabotajes 7/7). DESPACHO-1a lista y subida SIN ENTREGAR (casos ee82997, producto e438dad, pantalla y sabotajes 51890cd; sabotajes 14/14; 249 passed en clientes/catálogo). D26 (a) por ahora: no empezar sin aviso. DESPACHO-1 no se empieza (espera ejemplo del despachante). Pendiente: el 28/10 después de las 18:00 UTC, un solo /entregar de ORG-1, ORG-1b y DESPACHO-1a con subagentes (hasta alto), /code-review high y /security-review; reproducir lo que encuentren, suite completa en el SHA final, actualizar este informe y timbre «Dev MARIA: entregué ORG-1, ORG-1b y DESPACHO-1a en <SHA>». Después, apagar el Postgres local (puerto 55432). Apenas entregues: DESTINO-1, PESO-NETO-1, PRORRATEO-1 esperan datos del despachante. La próxima D es la D28. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1 lista y subida SIN ENTREGAR (producto e43810b, sabotajes 18f7f25, carrera PG ddfc798; suite 18f7f25 1 failed conocido de test_excel2, 3323 passed). ORG-1b (D27 b) lista y subida SIN ENTREGAR (prueba 9ad42e4, producto f8616cf, sabotajes b7a7927, arreglo 5d42909; sabotajes 7/7). DESPACHO-1a lista y subida SIN ENTREGAR (casos ee82997, producto e438dad, pantalla y sabotajes 51890cd; sabotajes 14/14; 249 passed en clientes/catálogo). D26 (a) por ahora: no empezar sin aviso. DESPACHO-1 no se empieza (espera ejemplo del despachante). Pendiente: el 28/10 después de las 18:00 UTC, un solo /entregar de ORG-1, ORG-1b y DESPACHO-1a con subagentes (hasta alto), /code-review high y /security-review; reproducir lo que encuentren, suite completa en el SHA final, actualizar este informe y timbre «Dev MARIA: entregué ORG-1, ORG-1b y DESPACHO-1a en <SHA>». Después, apagar el Postgres local (puerto 55432). Apenas entregues: DESTINO-1 (datos del 28/10 en PREGUNTAS-DESPACHANTE.md; D28 abierta: seis pruebas comparan el golden entero), después SUFIJOS-2 y SEGURO-1; PESO-NETO-1 y PRORRATEO-1 esperan al despachante. DESPACHO-1 (lectura) va después de esas tres. La próxima D es la D29. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
