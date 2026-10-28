@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Negativos de RENDIMIENTO-1c: cada sabotaje vuelve a validar el PDF en el
-# proceso de la app, saca la fila por usuario o cuenta hojas antes de mirar
-# si está encriptado, y la prueba tiene que ponerse roja.
+# proceso de la app, saca la fila por usuario, cuenta hojas antes de mirar
+# si está encriptado o culpa al PDF cuando el validador se cae, y la prueba tiene que ponerse roja.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/rendimiento1c.sh [SHA]
 # Trabaja en un worktree descartable: no toca tu copia ni datos compartidos.
@@ -54,17 +54,21 @@ sabotaje $DL "sin fila por usuario: todas las validaciones comparten los dos lug
         return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, "validar")' \
   '    if True:
         return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, "validar")' \
-  'FAILED tests/test_rendimiento1c.py::test_diez_pdfs_pesados_de_uno_no_frenan_la_subida_de_otro'
+  'B esperó detrás de las bombas de A'
 sabotaje proyecto_maria/main.py "la subida de facturas no pasa el usuario" \
   "max_size=max_upload_bytes, clave=user[\"username\"])" \
   'max_size=max_upload_bytes)' \
-  'FAILED tests/test_rendimiento1c.py::test_diez_pdfs_pesados_de_uno_no_frenan_la_subida_de_otro'
+  'B esperó detrás de las bombas de A'
 sabotaje $DL "vuelve a contar páginas antes de mirar si está encriptado" \
   '        if pdf.is_encrypted:
             return {"encriptado": True, "paginas": 0}' \
   '        if len(pdf.pages) < 0:
             return {"encriptado": True, "paginas": 0}' \
   'FAILED tests/test_rendimiento1c.py::test_validar_aparte_devuelve_lo_mismo_que_antes'
+sabotaje $FS "un validador que se cae vuelve a ser un PDF inválido" \
+  'raise HTTPException(500, "No pudimos revisar el PDF. Probá de nuevo en un rato.")' \
+  'raise HTTPException(400, "Invalid PDF file: no pudimos abrirlo")' \
+  'FAILED tests/test_rendimiento1c.py::test_un_validador_que_se_cae_es_un_error_nuestro'
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"

@@ -106,9 +106,10 @@ print(json.dumps(asyncio.run({"memoria": memoria, "diez": diez_y_uno}[sys.argv[1
 """
 
 
-def _correr(escenario):
+def _correr(escenario, **extra):
     entorno = {k: v for k, v in os.environ.items()}
     entorno["PYTHONPATH"] = str(_REPO)
+    entorno.update(extra)
     r = subprocess.run([sys.executable, "-c", _APP, escenario], capture_output=True, text=True,
                        cwd=_REPO, timeout=300, env=entorno)
     assert r.returncode == 0, r.stderr[-3000:]
@@ -132,12 +133,13 @@ def test_un_pdf_que_se_infla_no_hace_crecer_la_app():
 @solo_linux
 def test_diez_pdfs_pesados_de_uno_no_frenan_la_subida_de_otro():
     """Diez bombas a la vez de A: la factura normal de B no espera detrás de
-    ellas."""
-    m = _correr("diez")
+    ellas. Se mide por orden, no por reloj: B termina con la mayoría de las
+    bombas todavía en fila (sin la fila por usuario, B espera detrás de casi
+    todas). Con 120 s, ninguna bomba se corta por tiempo en una máquina lenta."""
+    m = _correr("diez", PDF_VALIDATE_TIMEOUT_S="120")
     assert m["b"][0] == 503, m  # pasó la validación; sin lector con IA
     assert m["bombas"] == [[400, PESADO]], m
-    assert m["bombas_sin_terminar"] > 0, f"las bombas terminaron antes que B: no mide nada {m}"
-    assert m["demora_b"] < 1.5, m
+    assert m["bombas_sin_terminar"] >= 5, f"B esperó detrás de las bombas de A: {m}"
 
 
 def test_validar_aparte_devuelve_lo_mismo_que_antes():
@@ -165,3 +167,40 @@ def test_validar_aparte_devuelve_lo_mismo_que_antes():
     assert normal == {"encriptado": False, "paginas": 2}
     assert encr == {"encriptado": True, "paginas": 0}
     assert set(roto) == {"error"} and roto["error"], roto
+
+
+def test_un_validador_que_se_cae_es_un_error_nuestro(monkeypatch, caplog):
+    """Si el proceso que valida se cae sin contestar, es un 500 con su registro,
+    no un «PDF inválido» que culpa al archivo."""
+    import asyncio
+
+    from fastapi import HTTPException
+
+    from proyecto_maria.security.file_security import validate_file_upload
+    from tests.pdf_bombas import hojas
+
+    real = asyncio.create_subprocess_exec
+
+    async def se_cae(*args, **kwargs):
+        assert args[-1] == "validar"
+        return await real(sys.executable, "-c", "import sys; sys.exit(7)", **kwargs)
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", se_cae)
+
+    class _Subida:
+        filename, content_type = "x.pdf", "application/pdf"
+
+        def __init__(self, data):
+            self._data = data
+
+        async def read(self, *_):
+            return self._data
+
+        async def seek(self, *_):
+            return None
+
+    with pytest.raises(HTTPException) as e:
+        asyncio.run(validate_file_upload(_Subida(hojas([("UNO", 0)])), "pdf"))
+    assert e.value.status_code == 500, e.value.detail
+    assert "Invalid PDF" not in e.value.detail
+    assert "salió con 7" in caplog.text
