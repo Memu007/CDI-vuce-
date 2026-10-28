@@ -93,11 +93,11 @@ sabotaje $M "el pago se registra sin su tipo" \
 
 # ── Paso 3: el período se extiende desde su fin ──
 sabotaje $M "pagar con la cuenta activa vuelve a contar desde hoy" \
-  '    desde = fin if (getattr(cuenta, "billing_status", None) == "active" and fin and fin > ahora) else ahora' \
+  '    desde = fin if (vigente and fin and fin > ahora) else ahora' \
   '    desde = ahora' \
   "FAILED $T::test_pagar_con_la_cuenta_activa_extiende_desde_el_fin"
 sabotaje $M "una cuenta vencida suma desde el fin viejo" \
-  '    desde = fin if (getattr(cuenta, "billing_status", None) == "active" and fin and fin > ahora) else ahora' \
+  '    desde = fin if (vigente and fin and fin > ahora) else ahora' \
   '    desde = fin if fin else ahora' \
   "FAILED $T::test_pagar_con_la_cuenta_vencida_cuenta_desde_hoy"
 sabotaje $M "la organización vuelve a contar desde hoy" \
@@ -182,12 +182,12 @@ sabotaje $M "el id del cobro arma cualquier ruta" \
   '_ID_COBRO_MP = re.compile(r".{0,200}")' \
   "FAILED $T::test_leer_un_cobro_no_arma_una_ruta_con_lo_que_mande_cualquiera"
 sabotaje $M "un 500 de Mercado Pago no reintenta" \
-  '    if resp.status_code != 200:' \
-  '    if False:' \
+  $'    if resp.status_code != 200:\n        raise _CobroMPIlegible(' \
+  $'    if False:\n        raise _CobroMPIlegible(' \
   "FAILED $T::test_el_cobro_que_mercado_pago_no_contesta_bien_no_aplica_nada[http_500]"
 sabotaje $M "sin conexión no reintenta" \
-  '    except httpx.HTTPError as e:' \
-  '    except KeyError as e:' \
+  $'    except httpx.HTTPError as e:\n        raise _CobroMPIlegible(' \
+  $'    except KeyError as e:\n        raise _CobroMPIlegible(' \
   "FAILED $T::test_el_cobro_que_mercado_pago_no_contesta_bien_no_aplica_nada[sin_conexion]"
 sabotaje $M "una respuesta que no es JSON rompe" \
   $'    except ValueError as e:\n        raise _CobroMPFormaInesperada(f"{cobro_id}: la respuesta no es JSON") from e' \
