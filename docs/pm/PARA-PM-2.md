@@ -244,6 +244,48 @@ git diff --stat 49f8e29..e59e1a8 -- . ':!docs'   # 9 files changed, 1747 inserti
 PY=python bash scripts/testing/sabotajes/despacho1b.sh e59e1a8   # 24 ROJO, «sabotajes sin rojo: 0»
 ```
 
+## DATOS-1: **entregada** en `c996ad4` (2026-10-28, 17:13 UTC)
+
+**Resultado:** la pieza como está en `c996ad4` (base `d01f95c`), sin
+arreglo. Suite completa sobre `c996ad4`: 3836 passed, 336 skipped, 2
+xfailed, 0 failed; `compileall` 0. Sabotajes `datos1.sh`: 12/12 en rojo.
+Postgres 16: «fallas: 3» antes, «fallas: 0» después. Detalle en «DATOS-1:
+hecha» más abajo.
+
+**Lo que es lectura y lo que corrí:** los hallazgos son lectura de los
+revisores; no reproduje ninguno.
+
+**Decide la PM:** nada nuevo. Los hallazgos van como riesgos.
+
+| Revisor | Modelo y esfuerzo | Hallazgos | Qué hice |
+|---|---|---|---|
+| datos1-sonnet | Sonnet alto | Nada dentro. Bajas, fuera: el `HEALTHCHECK` del `Dockerfile` también ve el 503; los 502 de `main.py:8687` y `:8897` llevan `{err}`; el dashboard viejo muestra `<pre>{e}</pre>` (`main.py:2306`) | Riesgos |
+| `/code-review high` + `/security-review` | Opus alto, en fork; la security a mano porque la skill falló con `fatal: ambiguous argument 'origin/HEAD...'` | (1) media: el manejador tapa sólo los 500; los 502 de `main.py:8687` y `:8897` devuelven el texto de un tercero tal cual, así que la D6 queda incompleta. (2) media, sospecha: el borrado filtra por `owner_username`, y una fila vieja con dueño `NULL` sobrevive y daría 500 de FK en Postgres. (3) media: `/health` con 503 haría que Railway rechace la publicación. (4) baja: carrera entre compartir y borrar. (5) baja: cascada a mano. (6) baja: una traza en el log por cada `/health` sin base. (7) baja: el 500 no lleva un id para buscarlo en el log. (8 a 10) pruebas: la limpieza ignora errores del `DELETE`, otro loop, psycopg2 sin cerrar | Riesgos. La (3) la contradigo abajo |
+
+**La (3) no cambia lo que ya informé:** si la base no contesta al
+arrancar, `init_db` corre sin `try` y uvicorn sale con código 3, así que
+`/health` no contesta nunca, con o sin 503. El 503 sólo aparece si la base
+se cae con la app ya andando. Lo del Railway sigue sin verificar
+(`docs.railway.com` bloqueado desde acá); Emi lo tiene que saber antes de
+publicar.
+
+**Riesgos que quedan:** los 502 con texto de un tercero (fuera de la D6,
+que era de los 500); la sospecha de las filas con dueño `NULL` en Postgres,
+sin reproducir; el `HEALTHCHECK` del `Dockerfile` marca el contenedor como
+no sano mientras la base no contesta; la carrera entre compartir y borrar,
+que es lectura del revisor y no la reproduje. La pantalla vieja
+(`app.js`) sigue sin avisar que se borran los links.
+
+**Archivos de producto:** `proyecto_maria/main.py`,
+`proyecto_maria/static/v2/screens/clientes.js`,
+`proyecto_maria/static/v2/screens/finalize.js`, `CHANGELOG.md`.
+
+```bash
+git diff --stat d01f95c..c996ad4 -- . ':!docs'   # 7 files changed, 568 insertions(+), 24 deletions(-)
+PY=python bash scripts/testing/sabotajes/datos1.sh c996ad4   # 12 ROJO, «sabotajes sin rojo: 0»
+python -m pytest -q --no-cov tests/test_datos1.py             # 9 passed
+```
+
 ## Entregas preparadas para las 18:00 UTC (2026-10-28)
 
 Recibí la D37 (2) en `20fb535`. En ABUSO-1 la pasé a riesgos, con lo que
@@ -268,7 +310,7 @@ tocan `docs/`. A las 18:00 queda sólo la autorrevisión con subagentes,
 | 3 | SUFIJOS-2 | `4ca6829`; entregada en `bd76f9f` con el arreglo | `4905cd8`; el arreglo, sobre `eacf591` | 3731 passed, 336 skipped, 2 xfailed, 0 failed; con el arreglo, 4005 passed sobre `4821fff` | 9/9; con el arreglo, 17/17 |
 | 4 | SEGURO-1 | `371cde2`; entregada en `5dfaf47` con el arreglo | `1948207`; el arreglo, sobre `bd76f9f` | 3777 passed, 336 skipped, 2 xfailed, 0 failed; con el arreglo, 4007 passed sobre `5dfaf47` | 10/10; con el arreglo, 11/11 |
 | 5 | DESPACHO-1b | `e59e1a8`, **entregada** | `49f8e29` | 3827 passed, 336 skipped, 2 xfailed, 0 failed | 24/24 |
-| 6 | DATOS-1 | `c996ad4` | `d01f95c` | 3836 passed, 336 skipped, 2 xfailed, 0 failed | 12/12 |
+| 6 | DATOS-1 | `c996ad4`, **entregada** | `d01f95c` | 3836 passed, 336 skipped, 2 xfailed, 0 failed | 12/12 |
 | 7 | DISCO-1 | `88b22c8` | `cf84a76` | 3847 passed, 336 skipped, 2 xfailed, 0 failed | 20/20 |
 | 8 | OBSERVABILIDAD-1 | `39be45e` | `88b22c8` | 3855 passed, 336 skipped, 2 xfailed, 0 failed | 16/16 |
 | 9 | SESION-1 | `895ee73` | `f5160d7` | 3872 passed, 336 skipped, 2 xfailed, 0 failed | 19/19 |
