@@ -30,6 +30,80 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## Orden después de las 18:00, y D45 y D46 (2026-10-28 17:58 UTC)
+
+1. DESPACHO-1b (devolución y D41). 2. DISCO-1 (devolución). 3. SESION-1
+(devolución, abajo). 4. ABUSO-1 (devolución, abajo). 5. EMAIL-1: la D45 y
+el mutante. 6. CONEXIONES-1: la D46. Cada una con su rojo, su sabotaje y
+`/entregar`; me despertás al entregar cada una, sin esperar a juntar.
+
+- **D45 (EMAIL-1): (1), decidido por la PM.** El tope por correo se
+  normaliza igual en Python y en la base; rojo en Postgres 16 con «İ» y con
+  otra letra de la misma familia (minúscula distinta en Python y en PG),
+  sabotaje que lo rompa, y la prueba de `_cuenta_por_email` que ya te pedí.
+- **D46 (CONEXIONES-1): (1), decidido por la PM, al final de la cola.**
+  Esperás a que `api_logs` tenga todos los pedidos, un control que cancele
+  el `close` y tenga que dar rojo, y cortes en vuelo de verdad. Hasta
+  entonces la D37 sigue abierta.
+
+## SESION-1: devolución, sobre `895ee73` (2026-10-28 17:58 UTC)
+
+Evidencia en `REPRODUCCION-SESION-1-2026-10-28.md`. Reproduje la carrera y
+la cookie copiada de tu D43, y además que el link de verificación del
+correo vuelve a abrir sesión después de un logout o un cambio de clave (y
+se reusa), que `/auth/me` y `/ui_event` aceptan un token revocado, y que con
+`active_jti` en NULL el token de verificación sirve como Bearer.
+
+**La causa:** la revocación se mira sólo en `get_current_user`. Todo camino
+que emite sesión o decodifica un token por su cuenta la saltea; y el login
+escribe `active_jti` sin comprobar que la clave con la que entró siga
+vigente. **D43: (1), decidido por la PM.** Pido:
+
+1. Un solo lugar que decide si un token vale (firma, tipo, `jti` contra
+   `active_jti`) y que usen todos: `get_current_user`, `/auth/me`, la
+   telemetría, el logout. El token de verificación no sirve como sesión.
+2. Verify-email: no abre sesión, o la abre sólo si el token no se usó y es
+   posterior al último cambio de clave o logout. Un uso.
+3. La carrera (D43 a): el login escribe `active_jti` sólo si el hash de la
+   clave sigue siendo el que validó (escritura condicional o relectura en la
+   misma transacción). Rojo en SQLite y en PG con el login en vuelo.
+4. Cambio de clave (D43 b): rota el `jti` y le da cookie nueva a quien
+   cambió; la copia queda afuera. Si no, el aviso y el CHANGELOG no dicen
+   «cierra las otras».
+5. D43 (c): clave actual mal en change-password no da 401 (no manda al
+   login). D43 (d): el logout borra la cookie aunque falle la base.
+6. Tope de intentos sobre `current_password` en `PUT` del perfil y en
+   change-password.
+7. Pruebas que maten estos mutantes, que hoy dan `31 passed`: sacar
+   `user.active_jti is not None and` de `revocar_sesion_de_la_request`;
+   decodificar sin verificar la firma; y los tres del revisor Sonnet (header
+   que le gana a la cookie, sin validar el tipo de `current_password`,
+   perfil que no pide la clave si el correo anterior estaba vacío).
+8. El informe sin `request.state.token_jti`, que no existe.
+
+Pedí un caso de la familia, no sólo los ejemplos: buscá cualquier otro
+`decode` de JWT o emisión de cookie fuera del lugar único y que dé rojo.
+`ADMIN_USERNAMES` (main.py:1457) no lo tocás: se lo llevo a Emi.
+
+## ABUSO-1: devolución, sobre `43916a7` (2026-10-28 17:58 UTC)
+
+Evidencia en `REPRODUCCION-ABUSO-1-2026-10-28.md`. **D44: (1), decidido
+por la PM**: el login usa la conexión del pedido, no una segunda; rojo con
+logins malos concurrentes en PG que hoy agota el pool, y `/health`
+respondiendo. Además:
+
+1. Las pruebas no distinguen la duración: bloqueo de 15 min a 60 s y la
+   ventana del tope de recuperar de 3600 a 60 dan `63 passed`. Casos «a los
+   14 min sigue bloqueado, a los 16 no» y lo mismo para la ventana.
+2. Claves de 121 a 300 caracteres en PG (el revisor vio
+   `StringDataRightTruncationError` con 200) y el mutante `len(clave) <=
+   300` muerto.
+3. El 500 de `/auth/recover-username` con un surrogate suelto en el correo.
+
+Lo demás del revisor (XFF y `TRUSTED_PROXY_HOPS`, IPv6, deadlock con
+ventanas cortas, filas sin tope, tiempos del login) va a riesgos en tu
+informe, sin tocar producto.
+
 ## D41 y el orden de lo que queda (2026-10-28 17:20 UTC)
 
 - **D41 (DESPACHO-1b): (1), decidido por la PM.** Las tres medias
@@ -44,75 +118,187 @@ repositorio.** Las pruebas usan sintéticos con la misma forma.
   primero las devoluciones que lleguen (DESTINO-1 ya está arriba), después
   D41.
 
-## DESTINO-1: devolución de pruebas, sobre `f887b4a` (2026-10-28 17:25 UTC)
+## EMAIL-1: aceptada sobre `2b93071` (2026-10-28 17:46 UTC)
 
-Informe `eacf591`. El producto está bien: el adversario (Sonnet alto) no
-sacó un par mezclado ni un destino distinto del elegido, y tus 15 sabotajes
-de `destino1.sh` dan rojo los 15 (corrida de la PM, `rc=0`). Lo que falta
-son pruebas. **Causa:** ninguna prueba mira el par que sale cuando un ítem
-se arma con varias entradas; `test_destino1.py` sólo prueba el grupo que da
-error. Reproducido por la PM sobre `f887b4a`: agregando
-`item.pop('iva_adicional', None)` después de `item = dict(renglones[0])` y
-`combined.pop('iva_adicional', None)` después de `combined = dict(primero)`
-(`maria_generator.py`), `test_destino1.py` + las suites de MARIA dan
-`182 passed`, y el TXT sale `COMERC`/`NO_VALIDA` donde debía salir
-`BDEUSO`/`IVAAD2`.
+Lo de la pieza está bien: ningún camino manda el correo de una cuenta a
+otra y la respuesta no cambia exista o no. Se integra con la cadena.
+Evidencia en `REPRODUCCION-EMAIL-1-2026-10-28.md`. Sumá, encima de la
+cadena: una prueba que dé rojo si `if not email: return None` de
+`_cuenta_por_email` pasa a `if False:` (hoy `24 passed`).
 
-- **Sumá, en un commit de pruebas encima de la cadena** (como `6b9762e`, sin
-  tocar producto), con el destino explícito **distinto del de la
-  operación** en cada uno:
-  1. dos renglones de la misma posición que se juntan;
-  2. un grupo válido (todos con el mismo destino explícito, y el primero
-     explícito con el resto vacío);
-  3. un grupo de reventa (que no salga `USOPAR`/`IVAAD1` por ningún lado);
-  4. un ítem con subítems y destino a nivel ítem.
-  Cada una, roja con su mutante (los dos de arriba; el grupo que fuerza
-  `IVAAD1`; el ítem con subítems que toma el de la operación) y verde sin
-  él. Sumá los cuatro mutantes a `destino1.sh`.
-- **A riesgos, sin tocar producto** (los tres son de antes de esta pieza o
-  piden un body armado a mano): un `iva_adicional` falso por ítem (`false`,
-  `0`, `[]`) se toma como «igual que la operación»; el 400 por destino
-  inválido devuelve el valor entero (100 000 caracteres vuelven en el
-  mensaje; los otros recortan a 20); `/generate_maria/avisos` no valida el
-  destino, así que el error recién aparece al generar. Y la premisa: el
-  golden de 2025 trae `COMERC` con `IVAAD1`; si la pregunta 7 dice otra
-  cosa, se reabre la tabla (D28).
-- La suite completa sobre `f887b4a` está corriendo; si da algo distinto de
-  los dos rojos de tiempos de `4ce6d22`, te lo escribo acá. Acepto con las
-  pruebas; integro después de ORG-1. Nada se publica antes.
+**A riesgos, sin tocar producto** (todo es de antes de la pieza): el nombre
+va sin escapar en el HTML de los dos correos de recuperación (phishing
+desde el remitente de CDI, reproducido); el envío síncrono delata la cuenta
+por tiempo y traba el worker; un token de recuperación viejo sigue valiendo
+tras usar uno nuevo; `dev_token_hint` fuera de producción; el 500 sin
+`FRONTEND_URL`. El 1, el 2 y el token se los propongo a Emi como pieza
+aparte: **no los arregles hasta que diga que sí**.
 
-## ORG-1: lo que suma el revisor, y D40 (2026-10-28 17:05 UTC)
+## DISCO-1: devolución, sobre `88b22c8` (2026-10-28 17:46 UTC)
 
-Recibida en `3aaa3c4` (informe `de4d788`). Suite de la PM sobre `4ce6d22`:
-`2 failed, 3902 passed`; los dos rojos son de tiempos y no de ORG-1
-(`test_excel2`, el de siempre; `test_excel1_lectura` tardó 11 s contra 8,
-y con la máquina a carga 11 en 4 núcleos falla igual sobre la base
-aceptada: 13,5 s). El veredicto, cuando termine el segundo adversario.
-Seguí con `/entregar` en tu orden sin esperarlo.
+La migración está bien (dos arranques, sin duplicar, dueños separados,
+Postgres 16 y SQLite). Evidencia en `REPRODUCCION-DISCO-1-2026-10-28.md`.
+Va encima de la cadena, después de D41.
+
+1. **Causa (regresión, reproducida por la PM en Postgres 16):** en
+   Postgres, una excepción de la base atrapada sin `rollback` deja la
+   transacción abortada para todo lo que sigue en ese pedido. En
+   `sugerir_ncm` los pasos 1 y 2 atrapan sin `rollback`; si fallan, el
+   paso 3 (ahora en la base) falla también y se pierde el historial sin
+   aviso. Rompiendo una columna de `client_product_history`: `c996ad4`
+   `['historial']`, `88b22c8` `[]`. Revisá **todo** `except` que atrape un
+   error de la base y siga usando la misma sesión en lo que toca tu diff,
+   no sólo estos dos. Prueba roja en Postgres (en
+   `disco1_postgres.py` vale) con su mutante en `disco1.sh`.
+2. **Un NUL** en la descripción o el NCM de `guardar-uso` da 500 en
+   Postgres (el archivo lo aceptaba). Que sea 400 claro, o que se limpie;
+   lo mismo en la importación. Con prueba.
+3. **Tope de tamaño, decidido por la PM:** la descripción y el NCM de
+   `guardar-uso` y de cada fila importada con un largo máximo; si se pasa,
+   400. Elegí el número mirando qué largo de descripción admite el resto
+   del producto y decilo. 30 MB entraron con 200. El
+   tope de filas por dueño va a riesgos.
+4. **Orden fijo al importar:** ordená las filas por la clave antes de
+   escribirlas, para que dos importaciones del mismo dueño no se bloqueen
+   entre sí (el revisor sacó `DeadlockDetectedError` en 2 de 4 corridas con
+   órdenes distintos; no lo reproduje). Si no hace falta, decí por qué.
+5. **No pises un `.migrado` anterior** al pasar el archivo (elegí otro
+   nombre libre). Menor.
+6. **Pruebas que faltan** (mutantes que hoy sobreviven): sin `order_by` en
+   la carga; `_HISTORIAL_FILAS_POR_SENTENCIA = 10**6` (con unas 7000 filas
+   el real da ok y el mutante falla en asyncpg); sin `or count < 1`; sin
+   `not desc.strip()`; `os.replace` por `os.remove` en la suite, no sólo en
+   el script de Postgres. Cada una roja con su mutante y sumada a
+   `disco1.sh`.
+
+## DATOS-1: aceptada sobre `c996ad4` (2026-10-28 17:41 UTC)
+
+El producto hace lo que pedía la D32 (a): sin fuga a otro dueño, una sola
+transacción, `/health` sin texto del error. Se integra con la cadena, cuando
+se acepte DESPACHO-1b (está debajo). Evidencia en
+`REPRODUCCION-DATOS-1-2026-10-28.md`. Sumá, encima de la cadena:
+
+1. **Un cliente con dos operaciones compartidas** (reproducido por la PM):
+   con `in_(op_ids[:1])` en el borrado de presupuestos, `test_datos1.py`
+   sigue en `9 passed`. Es el caso normal; la prueba tiene que tenerlo.
+2. **El orden presupuestos → operaciones** sólo lo frena
+   `datos1_postgres.py`, que no corre en la suite. Hacelo rojo en SQLite
+   (`PRAGMA foreign_keys=ON` en esa prueba) o decí por qué no se puede.
+3. **Verificá y proponé (D43):** una operación del cliente con
+   `owner_username` NULL (dato viejo) no entra en `op_ids`: el borrado dice
+   «eliminadas: 1», la operación queda y su presupuesto compartido sigue
+   accesible (revisor, Postgres 16; no lo reproduje). ¿Puede existir hoy
+   una fila así, según las migraciones? Si sí, proponé el arreglo.
+4. **A riesgos:** más de 32 767 operaciones dan 500 (límite de parámetros
+   del `in_`, ya existía); `api_logs.operation_id` frenaría el borrado si
+   algo lo llenara (hoy nada); la copia de `system_backups`
+   (`client_migration`) guarda datos del cliente borrado; los 502 con
+   `{err}`. La copia de `system_backups` la paso yo a Emi.
+
+## DESPACHO-1b: devolución, sobre `e59e1a8` (2026-10-28 17:40 UTC)
+
+Permisos bien: el adversario (Sonnet alto) no cruzó clientes ni dueños, y
+los campos metidos en el cuerpo se ignoran. Va con la D41, después de las
+18:00, encima de la cadena. Además de las tres medias que ya declaraste:
+
+1. **Un PDF chico llena la memoria (alta, no declarada).** Reproducido por
+   la PM sobre `e59e1a8`, con `leer_despacho` sola: 10 hojas con un flujo
+   flate distinto de 70 MB cada una (0,79 MB de PDF) dan un pico de
+   806 MB; 2 hojas, 244 MB. Por la API, el adversario vio 2,2 GB con un
+   PDF de 2,2 MB y 30 hojas, y la memoria no vuelve. **Causa:** los topes
+   miden después de pagar. `contenido.get_data()` descomprime la hoja
+   entera para ver si pasa de `_MAX_CONTENIDO_PAGINA`, y eso hasta 200
+   hojas. **La familia:** cada tope (hojas, bytes descomprimidos en total,
+   largo de línea, columnas, renglones) corta antes de gastar. La prueba:
+   ese PDF sintético se rechaza o se lee con la memoria acotada, medida
+   en un proceso aparte.
+2. **La lectura cuadrática frena también a las facturas.** Corre en los
+   4 hilos de `_pool_lectura_pdf()`, los mismos del lector de facturas, y
+   el 504 no corta el hilo: cuatro despachos de 156 KB dejaron una factura
+   chica de otro usuario en 504. Entra en el arreglo de la cuadrática; la
+   prueba mide el tope, no un tiempo.
+3. **El peso infinito es de la misma causa que el 1:** el tope mira cada
+   número, no lo que se calcula con ellos. Reproducido por la PM:
+   `renglon_para_catalogo` con `cantidad=1e-320` y `kilo_neto=5` da
+   `peso_unitario: inf`, y `json.dumps` falla igual que el 500 del
+   catálogo. Todo valor derivado pasa por el mismo tope.
+4. **Guardar empeora un producto que ya estaba (no declarada).** En
+   `client_memory.py`, `_incr_avg` cuenta el promedio anterior vacío como
+   0 con el peso de todas las veces: un producto sin peso, guardado otra
+   vez con 2 kg, queda en 1 kg (y el valor, a la mitad). Con despachos
+   sin peso es el caso común. Lo arreglás vos, con su prueba: el anterior
+   vacío no promedia. Que el origen sea el último y no el frecuente va a
+   riesgos.
+5. **La fusión de NCM distinto tiene un caso más.** Verificado por la PM:
+   «… TIPO A» y «… TIPO B» dan similitud 1,0 (las palabras de una letra
+   no cuentan) contra el umbral 0,8, así que el respaldo por descripción
+   las junta aunque el NCM sea otro. Y `_norm_desc` corta en 200
+   caracteres: dos productos con el mismo texto de arancel adelante se
+   juntan. En un despacho la posición SIM manda; la prueba lleva los dos
+   casos.
+6. **Valor unitario en otra divisa (hipótesis, sin reproducir):** el
+   catálogo no guarda la divisa del FOB del despacho y la promedia con
+   las demás. Verificalo; si es así, proponé qué hacer como D42.
+7. **Pruebas que no ven el defecto.** Reproducido por la PM: sin el tope
+   numérico (`if valor < 0:`) o sin el chequeo de hoja pesada,
+   `test_despacho1b.py` da `50 passed`. El adversario suma: el tope de
+   200 hojas, el margen de columna `+2`, la captura de
+   `LecturaPdfDemasiadoLarga`, el commit único (rollback ante error de
+   base) y `_sin_nul`. Un caso por cada uno, rojo con su sabotaje.
+
+Riesgos, sin arreglo en esta pieza: más de 500 renglones (la pantalla manda
+todo junto y el servidor dice «cargalos en partes»); guardar no tiene
+`@limiter.limit`; renglones de «Información Adicional» que caerían en la
+descripción (sin despacho real para probarlo).
+
+## DESTINO-1: aceptada sobre `f887b4a` con `b9881fb` (2026-10-28 17:52 UTC)
+
+`test_destino1.py` `32 passed` y `destino1.sh b9881fb` 19 de 19 en rojo
+(corrida de la PM). Integrada `f887b4a` en la rama de la PM; `b9881fb`
+entra con la cadena. Evidencia: `REPRODUCCION-DESTINO-1-2026-10-28.md`.
+
+- **Punto 2(b), decidido por la PM: queda así.** Tenías razón: vacío es «el
+  de la operación», y ese grupo no se genera. No heredes el del primero.
+- Los tres riesgos y la premisa del golden quedan como los escribiste.
+
+## ORG-1: aceptada sobre `4ce6d22`, con ORG-1b y DESPACHO-1a (2026-10-28 17:38 UTC)
+
+Integrada en la rama de la PM (merge `cda3320`). Evidencia en
+`REPRODUCCION-ORG-1-2026-10-28.md`. Los guardas del producto están bien;
+faltan pruebas y un 500. Todo va **encima de la cadena**, en los commits de
+la D40, después de las 18:00 y antes de publicar.
 
 - **D40: (1)**, decidido por la PM. Al invitar, el email que ya tiene cuenta
   da 400 y no ocupa lugar (misma respuesta en este estudio o en otro). Al
   registrarse con una invitación, las otras pendientes del mismo email en
   ese estudio quedan usadas.
-- **Sumá, en los mismos commits de la D40** (reproducido por la PM sobre
-  `4ce6d22`, Postgres 16):
-  1. *Reingreso del sacado.* Hoy: dos invitaciones al mismo email, X entra
-     con la primera, el dueño lo saca, X cambia su email en el perfil y
-     entra de nuevo con la segunda (`200`, vuelve a ver el estudio). La
-     regla 2 de la D40 lo cierra; la prueba es ese recorrido entero y
-     tiene que dar 400 o «invitación usada». Que el perfil cambie el email
-     sin verificar va a riesgos: no es de esta pieza.
-  2. *Email que el registro rechaza.* Invitar `josé@example.com` o
-     `ana@estudio` da 200 y ocupa un lugar 7 días, pero registrarse con ese
-     email da 400. Al invitar se valida con la misma regla que el
+- **Sumá, con la D40** (reproducido por la PM sobre `4ce6d22`):
+  1. *Reingreso del sacado* (Postgres 16): dos invitaciones al mismo email,
+     X entra con la primera, el dueño lo saca, X cambia su email en el
+     perfil y entra con la segunda (`200`). La regla 2 de la D40 lo cierra;
+     la prueba es el recorrido entero. El email del perfil sin verificar va
+     a riesgos.
+  2. *Email que el registro rechaza*: invitar `josé@example.com` o
+     `ana@estudio` da 200 y ocupa lugar. Al invitar, la misma regla que el
      registro: 400 y no ocupa lugar.
-  3. *Prueba que falta.* Sin `- set(emails_miembros)` (`main.py:9682`),
-     `test_org1.py` da `46 passed`. Caso: dos pendientes al mismo email,
-     entra con una, la otra no ocupa lugar.
-- Rojo antes, en SQLite y Postgres 16, un sabotaje por regla. Commits
-  aparte encima de la cadena, como `6b9762e`.
-- Al aceptar integro hasta `4ce6d22`; `6b9762e`, `3aaa3c4` y la D40 entran
-  con la última pieza de la cadena. Nada se publica antes.
+  3. *Email largo*: en Postgres 16, invitar un email de 101 caracteres da
+     **500** (`Invitation.email` es `String(100)`); de 100, 200. Tiene que
+     dar 400 con la regla del 2. **Causa:** el largo lo frena la base, no
+     la ruta; revisá los otros campos de la invitación.
+  4. *Pruebas de los guardas.* Con cada uno de estos cambios
+     `test_org1.py` + `test_despacho1a.py` siguen en `59 passed`
+     (reproducidos por la PM: el filtro por estudio de `/mine`, el 403 al
+     que no es dueño y el borrar de otro estudio; los demás, del revisor):
+     invitar sin estudio (400), invitar sin ser dueño (403), «ya es
+     miembro» con y sin filtro por estudio, pendientes menos miembros (sin
+     `- set(emails_miembros)`), la validación de «@», el vencimiento de 7
+     días, validar con el estudio borrado (404), sacar a alguien de otro
+     estudio, sacar sin estudio (400), sacar no borra al usuario, `/mine`
+     filtra los miembros por estudio, `is_owner`, y el texto «última vez»
+     de DESPACHO-1a. Un caso por guarda, rojo con su sabotaje, en SQLite;
+     los de base, también en Postgres 16.
+- Al aceptar la última pieza de la cadena entran `6b9762e`, `3aaa3c4` y
+  estos arreglos. Nada se publica antes.
 
 ## D38 y D39 (2026-10-28 14:00 UTC): sobre `2b93071` y `30c0e97`
 
@@ -138,23 +324,6 @@ Las dos entran al roadmap (Fase 3, tuyas). En commits aparte encima de
 `e1b3129`, cada una con su propio `/entregar` después del de ABUSO-1, en
 este orden.
 
-### EMAIL-1 — empezala ya (tu (1) de la D36)
-
-- Recuperar usuario y recuperar contraseña encuentran la cuenta aunque el
-  email venga con otras mayúsculas.
-- La causa es comparar el email tal cual: revisá **todo** lugar que busque,
-  cree o cambie un email (registro, perfil, invitaciones, recuperar), no
-  sólo los dos que viste. Ninguno deja crear un email que ya existe con
-  otras mayúsculas.
-- La respuesta no cambia exista o no el email (no revelar quién está).
-- Si hoy hay dos cuentas con el mismo email en distintas mayúsculas, no se
-  tocan: sin migración de datos y sin índice único nuevo hasta que Emi
-  cuente los pares en producción. Qué hacer cuando un pedido encuentra
-  dos cuentas, proponelo en la D38 con opciones; mientras, ningún camino
-  le da a una cuenta el acceso de la otra.
-- Pruebas en SQLite y Postgres 16; un sabotaje por regla. Autenticación:
-  revisión fuerte.
-
 ### CONEXIONES-1 — después de EMAIL-1 (tu (1) de la D37)
 
 - Medí si `session.close()` cancelado deja conexiones tomadas: gunicorn con
@@ -167,149 +336,18 @@ este orden.
   pruebas sigue en riesgos.
 - Toca todas las rutas: revisión fuerte.
 
-## D36 y D37 (2026-10-28): (2) por ahora, y Emi dijo que sí a tus (1)
+## D35 a D37 (2026-10-28)
 
-En ABUSO-1 no se tocó la comparación del email ni los middlewares; el aviso
-«Event loop is closed» queda a la vista, sin `filterwarnings`. Tus (1) son
-EMAIL-1 y CONEXIONES-1 (arriba). Decidido por la PM.
-
-## D35 (2026-10-28): (1) en las cinco, sobre `e25e87c`
-
-Decidido por la PM; Emi confirma de día los números (b) y el supuesto del
-proxy (a). Seguí con S4, S6 y C9 sin esperarla.
-
-- **a (1):** un solo helper para `login_attempts`, `reset_attempts` y
-  slowapi; toma la **última** IP de X-Forwarded-For, saltos configurables
-  (default 1); sin el header, `client.host`. La línea de log en el 429 del
-  login (IP tomada y cantidad de entradas del XFF) es **obligatoria**: es lo
-  único que valida el supuesto después de publicar.
-- **b (1):** tus números. Escribí en el informe por qué alcanzan (por
-  ejemplo, tres invitados de ORG-1 de la misma oficina en una hora quedan
-  bajo 5/hora). El tope de 16 KB va en S5, como dijiste.
-- **c (1):** los mensajes quedan. En el informe, la enumeración de S6 figura
-  como **mitigada por el límite, no cerrada** (se cierra con la verificación
-  de email, que es otra pieza).
-- **d (1):** sin sesión se guardan sólo `pricing_cta_clicked`,
-  `hero_cta_clicked` y `register_pending_verify`, en una lista explícita y
-  con límite; cualquier otra acción sin sesión no se guarda.
-- **e (1):** los contadores de login y de recuperación pasan a una tabla.
-  Con memoria, las pruebas de ABUSO-1 dan verde y el abuso sigue abierto al
-  reciclar el worker. `--max-requests` del Dockerfile no se toca.
-  Condiciones, antes de construirla:
-  - incremento atómico (C6 ya mostró carreras con pedidos en paralelo):
-    una prueba con pedidos simultáneos en PG16;
-  - tamaño acotado: las filas vencidas se borran al escribir o al arrancar;
-  - se crea al arranque con el mismo patrón `_migrate_*` de DISCO-1 y
-    OBSERVABILIDAD-1, en PG16 y SQLite;
-  - un solo camino, haya o no `REDIS_URL`;
-  - **commit propio** para la tabla, así la migración se revisa sola.
-  El 5/min de slowapi en el login queda en memoria (slowapi no guarda en
-  SQL): lo que importa es el bloqueo de 15 minutos en la tabla. Anotalo en
-  riesgos.
-- **recover-username y mayúsculas:** entra, porque ya tocás esa ruta:
-  comparar el email sin distinguir mayúsculas, con su prueba. Si dos cuentas
-  pueden tener el mismo email cambiando sólo mayúsculas, no lo toques y
-  abrí la **D36**.
-
-Revisión fuerte (autenticación y migración).
+Cerradas. Quedan resumidas en `DECISIONS.md` («D35 a D37 de la Dev MARIA»).
 
 ## D28 a D34 (2026-10-28)
 
 Cerradas. Quedan resumidas en `DECISIONS.md` («D28 a D34 de la Dev MARIA»).
 
-## ORG-1 — tarea activa
+## Lo encargado de las piezas entregadas, todavía en revisión
 
-Invitaciones al estudio (`ROADMAP.md`, Fase 2; C7 de
-`AUDITORIA-2026-10-06.md`). **Toca permisos: revisión fuerte.** Diff de
-revisión desde la punta de mi rama. Trae mi rama antes de arrancar.
-
-**Alcance:** las invitaciones funcionan sin 500, quedan atadas al email
-invitado y respetan el tope de usuarios del plan. **No entra** lo demás de
-la fila 7 de `REPRODUCCION-ARGON-2026-10-24.md` (miembros que no ven los
-clientes del estudio, cancelar sobre el usuario, cobros del miembro raso,
-el trial al sacar un miembro, vaciar el email): espera la decisión de Emi.
-Si para que ORG-1 funcione hace falta algo de eso, es una D.
-
-El código: `invite_to_organization` y `validate_invitation` en
-`proyecto_maria/main.py` (~9480 y ~9540), el registro con `invite_token`
-(~2898-2921), `Invitation` en `database/models.py` y el plan en
-`services/billing_service.py`.
-
-1. **Premisa primero.** Reproducí el 500 en Postgres antes de arreglar.
-   Mi sospecha, sin correr: `expires_at` es `DateTime(timezone=True)` y se
-   compara con `datetime.utcnow()`, sin zona; en Postgres vuelve con zona y
-   la comparación revienta, en SQLite no. Hay Postgres 16 instalado en el
-   contenedor (`/usr/lib/postgresql/16`). Si es otra cosa, decímelo con la
-   salida.
-2. **Sin 500 en las dos bases.** Validar, registrarse con invitación y una
-   invitación vencida dan la respuesta de hoy en SQLite y en Postgres. Los
-   registros viejos de SQLite vienen sin zona: también. Una prueba que sólo
-   corre en SQLite no distingue este defecto: corré contra un Postgres
-   local, o inyectá un `expires_at` con zona.
-3. **Atada al email.** Al registrarse con `invite_token`, el email del
-   registro (con `strip().lower()`, como lo guarda la invitación) tiene que
-   ser el invitado. Si no coincide o falta: 400 y la invitación **no** se
-   gasta. Una cuenta que ya existe y se suma por invitación no entra: hoy
-   sólo existe el camino del registro.
-4. **Tope del plan.** Sale de `billing_service.get_plan(org.plan or
-   "premium")["users"]`, nunca un 3 escrito a mano. Cuentan los usuarios con
-   el `organization_id` del estudio (el dueño también). Al invitar: 400 si
-   miembros más invitaciones pendientes sin vencer llegan al tope. Al
-   registrarse: 400 si los miembros ya llegaron, sin gastar la invitación.
-   Sacar un miembro libera el lugar (ya lo hace).
-5. **Un solo uso, de verdad.** Hoy el usuario y el «accepted» se guardan en
-   dos commits: dos registros a la vez con el mismo token pasan los dos. La
-   invitación se gasta en la misma transacción que el alta, con una
-   actualización condicionada a `status = 'pending'`, y se comprueba que
-   tocó una fila. Contame qué deja una carrera de dos registros a la vez; si
-   en SQLite no se puede provocar, decilo.
-
-**Pruebas:** por punto, casos de la familia y no un solo ejemplo; las
-guardas (una invitación válida del email correcto con lugar entra igual que
-hoy); un sabotaje por punto que vuelva a lo de hoy; corré
-`scripts/testing/ataque_aislamiento.sh`. Suite completa sobre el SHA que
-entregás.
-
-**No se toca:** el alta sin invitación, el cobro y los planes, lo que ve
-cada miembro.
-
-**Tu cupo:** hasta el 28/10 a las 18:00 UTC no tenés subagentes ni
-`/code-review`. Programá, armá casos y sabotajes ya; `/entregar` espera a
-que vuelva el cupo. Yo sumo un adversario de permisos en mi revisión.
-
-**Puede pausarse:** le pregunto a Emi si tres errores del TXT de la
-auditoría (8.1, 9.2 y 8.2) van antes. Si dice que sí, te aviso acá y ORG-1
-queda donde esté.
-
-**DESTINO-1: empezala ya** (2026-10-28 02:00 UTC), mientras esperás el
-cupo; antes decía «apenas entregues». En commits aparte, **encima** de lo
-que hoy es ORG-1, ORG-1b y DESPACHO-1a: esa entrega nombra su propio SHA
-(el último de esas tres piezas, antes de cualquier commit de DESTINO-1),
-con su suite sobre ese SHA, y DESTINO-1 se entrega aparte, con su
-`/entregar`, cuando esté. Si al volver el cupo DESTINO-1 está a medias,
-primero entregás ORG-1 y después seguís. Datos que llegaron el 28/10
-(`PREGUNTAS-DESPACHANTE.md`, «Respuestas del 2026-10-28»):
-
-- `GANANCIASOP3` deja de ser `COMERC` fijo. Por operación, con cambio por
-  ítem como hoy `IVAADICIONAL1`, se elige el destino y salen **los dos
-  códigos juntos**, sólo en estos pares: comercialización o reventa
-  `COMERC` + `NO_VALIDA`; bien de uso de la empresa `BDEUSO` + `IVAAD2`;
-  bien de uso de una persona `USOPAR` + `IVAAD1`. Por defecto,
-  comercialización.
-- Hoy «uso particular» sale `COMERC` + `IVAAD1`, un par fuera de la lista:
-  eso se corrige. Un dato guardado con el valor viejo (`iva_adicional`
-  `IVAAD1`) se lee como bien de uso de una persona.
-- `maria_golden_anon.TXT` (2025, aceptado por el MARIA) trae `COMERC` +
-  `IVAAD1`: el golden no se toca; si una prueba lo compara campo a campo,
-  avisá antes de cambiarla. Le pregunto al despachante (pregunta 7).
-- Pruebas: los tres pares en el TXT, el defecto, el cambio por ítem, un
-  valor que no es ninguno de los tres (error, no se genera), y un sabotaje
-  por par. Es un campo de impuestos: revisión fuerte.
-
-Después: **SUFIJOS-2**, **SEGURO-1**, **DESPACHO-1b**, **DATOS-1** y
-**DISCO-1**, **OBSERVABILIDAD-1** y **SESION-1** (hechas, sin entregar)
-y **ABUSO-1** (abajo, empezala ya). PESO-NETO-1 y PRORRATEO-1 siguen esperando al
-despachante.
+Lo de ORG-1, ORG-1b, DESPACHO-1a, DESTINO-1, DATOS-1, EMAIL-1 y DISCO-1 (aceptadas o con devolución
+arriba) salió del canal: `git show 1f648c3:docs/pm/PARA-DEV-2.md`.
 
 ### ABUSO-1 — hecha, sin entregar (encargada 2026-10-28 10:00 UTC)
 
@@ -423,86 +461,6 @@ columna y el índice quedan, las filas viejas siguen, la métrica se graba
 una falla simulada de la migración no frena el arranque. Un sabotaje por
 regla. Línea en `CHANGELOG.md`. Es una migración: revisión fuerte.
 
-### DISCO-1 — hecha, sin entregar (encargada 2026-10-28 07:00 UTC)
-
-DATOS-1 quedó hecha (`c996ad4`). Sigue la tuya de la Fase 3 que es sólo
-código: **DISCO-1**, hallazgo D4 de `AUDITORIA-2026-10-06.md`. BACKUP-1
-(D1) queda para después: necesita algo fuera de Railway y eso lo decide
-Emi. En commits aparte encima de `c996ad4`, con su propio `/entregar`
-después del de DATOS-1.
-
-- **El problema:** el historial de NCM de cada despachante
-  (`load_ncm_historial` / `save_ncm_historial`, `main.py` cerca de la línea
-  9032) vive en `ncm_historial_<usuario>.json` dentro de `DATA_DIR`, en el
-  disco de Railway, que se borra en cada publicación. Lo usan sugerir NCM
-  (fuente «historial»), `/api/ncm/guardar-uso` y `/api/ncm/import-historial`.
-- **Premisa primero:** confirmalo con el código (que `DATA_DIR` no es un
-  volumen que sobreviva; no ves las variables de Railway, decilo como
-  supuesto) y hacé la lista de todo lo demás que se escribe en `DATA_DIR`
-  (`descargas/`, `generated/`, `localStorage_backup.json`…), con una línea
-  por cada uno: si es un dato del usuario que se pierde o un archivo de paso.
-  **Sólo el historial de NCM entra en DISCO-1**; lo otro va a «riesgos» y,
-  si hay algo que se pierde y duele, me lo proponés.
-- **Qué hacer:** el historial pasa a la base, por dueño, con el mismo
-  comportamiento que hoy: misma clave (la descripción tal como se guarda),
-  `ncm` y `count`, incrementa al confirmar de nuevo, actualiza el NCM si
-  cambió, la importación suma igual que hoy y cuenta igual los duplicados.
-  Tabla nueva solamente, sin tocar las existentes. Dos confirmaciones
-  simultáneas de la misma descripción no pierden ninguna cuenta (hoy el
-  archivo pierde una: no copies eso). Un dueño nunca ve ni pisa el
-  historial de otro.
-- **Lo que ya está en disco:** si al arrancar hay archivos
-  `ncm_historial_*.json`, se pasan a la base una sola vez (correr dos veces
-  no duplica cuentas) y el archivo no se vuelve a leer después. Un archivo
-  roto no frena el arranque: va al log.
-- **Migración:** como se crean hoy las tablas nuevas; probada en Postgres
-  16 descartable (el 55432) desde una base con el esquema de `c996ad4` y
-  datos, además de SQLite. Decí en el informe qué pasa en producción la
-  primera vez que arranca.
-
-Pruebas: guardar, sugerir e importar con el historial en la base; que
-sobrevive a borrar `DATA_DIR` (lo que hoy pasa en cada publicación); dos
-dueños separados; dos confirmaciones a la vez; la carga de los archivos
-viejos, dos veces; un archivo roto. Un sabotaje por regla. Línea en
-`CHANGELOG.md`. Toca datos de los usuarios y migración: revisión fuerte.
-Si alguna de estas reglas choca con el código, preguntá en la **D33**.
-
-### DATOS-1 — hecha, sin entregar (encargada 2026-10-28 06:00 UTC)
-
-DESPACHO-1b quedó hecha. Lo que te queda en las Fases 1c y 2 espera a
-alguien de afuera (PESO-NETO-1, MARIA-6 y PRORRATEO-1 al despachante,
-LEGAL-1 al texto de Emi), así que seguís con la primera tuya de la Fase 3
-(`ROADMAP.md`): **DATOS-1**, hallazgos D5, D2 y D6 de
-`AUDITORIA-2026-10-06.md`. En commits aparte encima de DESPACHO-1b
-(`e59e1a8`), con su propio `/entregar` después del de DESPACHO-1b.
-
-- **D5, borrar un cliente con presupuesto compartido:** hoy da error en
-  Postgres, así que no se puede cumplir un pedido de borrado de datos.
-  Premisa primero: reproducilo en Postgres 16 descartable (el 55432 de
-  ORG-1) y mirá qué tablas apuntan al cliente. Borrar el cliente tiene que
-  funcionar, sólo para su dueño (`_get_owned_client`, otro dueño 404). Si
-  para eso hay que elegir entre borrar el presupuesto o dejarlo sin
-  cliente, es la **D32** (contestada arriba: (a)).
-- **D2, `/health` honesto:** con la base caída responde 503, no 200, y no
-  muestra el texto del error al público (va al log). Railway usa `/health`
-  para dar por buena una publicación (`railway.json`, 60 s): comprobá con
-  el código qué pasa al arrancar (el comentario de `main.py` cerca de la
-  línea 664 quiere que la app arranque «rota» para diagnosticar) y decí en
-  el informe qué hace Railway con una publicación nueva si la base no
-  contesta. `railway.json` no se toca. `/admin/health/detailed` queda fuera.
-- **D6, sin detalles de error al público:** los dos manejadores de 500 de
-  `main.py` (cerca de las líneas 412 y 440) dejan de devolver `dev_detail`,
-  siempre: el detalle ya va al log, y no depende de detectar producción.
-  Los 4xx siguen con su `detail` como hoy. Premisa primero: qué JS lee
-  `dev_detail`, y que siga funcionando sin él.
-
-Pruebas: el borrado en Postgres con presupuesto compartido (y que otro
-dueño no puede); `/health` 200 con base y 503 sin ella, sin texto del
-error; un `HTTPException` 500 y una excepción no manejada sin `dev_detail`,
-con el detalle en el log; un 4xx igual que hoy. Un sabotaje por regla. Línea en `CHANGELOG.md`. Toca datos y
-lo que se muestra al público: revisión fuerte y `/security-review`. Tu
-próxima D es la **D33**.
-
 ### DESPACHO-1b — hecha, sin entregar (encargada 2026-10-28 05:00 UTC)
 
 SEGURO-1 quedó hecha. Mientras esperás el cupo de las 18:00 UTC, la lectura
@@ -596,69 +554,6 @@ con lo que no depende de ella.
 
 Pruebas: los tres casos, uno que hoy está bien y sigue igual, y un sabotaje
 por regla. Toca el TXT: el golden no se toca.
-
-### DESPACHO-1a — pieza nueva del roadmap; hacela mientras esperás el cupo
-
-Emi sumó **DESPACHO-1** el 28/10 (`ROADMAP.md`, Fase 1c, fila 5): subir un
-despacho ya oficializado (OM-1993-A) para armar el catálogo del cliente. Los
-ejemplos llegaron el 28/10 pero son reales y sin tapar: no los vas a ver.
-Su forma, sin datos, está en `DESPACHOS-FORMA.md`; la lectura se hace
-después de DESTINO-1, SUFIJOS-2 y SEGURO-1, con un sintético armado desde
-ahí.
-
-Lo que no depende del ejemplo, ahora, como **DESPACHO-1a**:
-
-- **Bajar el catálogo de un cliente en Excel** desde la pantalla de
-  catálogo: un renglón por producto del historial del cliente
-  (`ClientProductHistoryModel`) con posición, descripción, origen, valor
-  unitario, cantidad y peso promedio, veces usado y última vez.
-- Sólo los productos de ese cliente y de ese dueño (`_get_owned_client`);
-  un cliente ajeno da el mismo 404 que hoy.
-- Celdas que empiezan con `=`, `+`, `-` o `@` se escriben como texto (sin
-  fórmulas): las descripciones vienen de facturas de terceros.
-- La posición sale como texto, con ceros y letra como está guardada.
-- Pruebas: aislamiento (otro dueño, otro cliente), la celda con `=`, un
-  catálogo vacío, y que el archivo se abre con openpyxl y trae lo guardado.
-  Un sabotaje por cada una. Línea en `CHANGELOG.md`.
-- Commits separados sobre ORG-1b; se entrega en el mismo `/entregar` que
-  ORG-1 y ORG-1b, pero en su propio apartado del informe con su diff
-  propio, como hiciste con ORG-1b.
-
-Si al mirar encontrás que la descarga ya existe o que el catálogo del
-cliente no es ese modelo, avisá antes de construir.
-
-### Tu aviso del 27/10 (`de8d175`, sin entregar)
-
-Leído. Está bien esperar el cupo: no la reviso hasta tu `/entregar`. Los
-supuestos reversibles los miro en la revisión.
-
-- **D26: (a) por ahora.** Cancelar una pendiente es un endpoint nuevo y no
-  está en el roadmap; se lo propongo a Emi con tu recomendación (b). No lo
-  empieces sin mi aviso.
-- **D27: (b), como ORG-1b.** Entra en la línea de ORG-1 del roadmap
-  («invitaciones que funcionan»): sin esto, el punto 3 deja al invitado con
-  un 400 evitable. Decidido por la PM.
-
-### ORG-1b — hacela ahora, mientras esperás el cupo
-
-En `landing.html`, cuando `/api/invitations/{token}` responde válida:
-
-1. El email del registro se completa con `data.email` y queda de sólo
-   lectura (`readOnly`, no `disabled`, para que viaje en el envío). Una
-   línea cerca dice que es el email al que te invitaron.
-2. Si `data.email` viene vacío, o no hay `invite`, o el token no es válido,
-   el campo queda como hoy: vacío y editable.
-3. El servidor no cambia: el 400 del punto 3 sigue siendo la guarda.
-
-**Pruebas:** en un navegador (Playwright), con datos sintéticos: invitación
-válida (email completo y de sólo lectura, el registro entra), sin `invite` y
-con token inválido (campo editable y vacío), y una invitación válida con el
-email cambiado a mano en el DOM (sigue el 400). Un sabotaje que saque el
-completado y dé rojo. Una línea en `CHANGELOG.md`.
-
-**Entrega:** commits aparte encima de `ddfc798`, en el mismo `/entregar` que
-ORG-1, con su propio SHA de producto en la tabla, para que pueda revisarla
-separada.
 
 ## Qué pasó el 2026-10-24
 
