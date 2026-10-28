@@ -500,8 +500,11 @@
         }
         // Lo calculó con otros importes, o ya no se puede comprobar: el
         // servidor no genera hasta que se recalcule o se deje (VALOR-1c).
+        // Sin respuesta de los avisos no se sabe si el incoterm lleva el
+        // seguro en el precio: dejarlo mandaría el 1 % con CIF (SEGURO-1).
         const dejar = document.getElementById('valorDejarSeguro');
         if (dejar) dejar.hidden = !(valor && !enElPrecio && op.seguro_calculado &&
+            valor.error !== SIN_CUENTAS &&
             (valor.error || valor.seguro !== valor.seguro_sugerido));
         const incoterm = String(op.incoterm || '').trim().toUpperCase() || 'este incoterm';
         if (nota) {

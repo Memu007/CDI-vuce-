@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: sin respuesta de los avisos no se ofrece «Dejar el seguro» (SEGURO-1, revisión)
+
+- Si los avisos no contestan, la pantalla no ofrece dejar el seguro que calculó el sistema: con CIF, el 1 % habría salido en el TXT.
+
 ## 2026-10-28 · fix: un número que cambiaría de valor en un sufijo no se genera (SUFIJOS-2, revisión)
 
 - Un sufijo con un número que el MARIA convertiría en otro (un signo como «-5», una fracción como «1/2», un punto de miles como «1.500») no genera el TXT y el aviso dice dónde. Los que piden número (Z) aceptan sólo enteros.
