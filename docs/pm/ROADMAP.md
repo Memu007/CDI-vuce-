@@ -51,6 +51,12 @@ completa (EC*), estudios con varias sucursales.
 
 ---
 
+**Avance:** `python3 docs/pm/herramientas/avance.py` lo cuenta desde las
+marcas de cada pieza de abajo: ✅ aceptada por la PM, 🔵 en curso o lista
+sin revisar, ⏳ espera a alguien de afuera (despachante, Emi), ⚪ sin
+empezar. La PM cambia la marca en el mismo commit del veredicto. Aceptada
+no es publicada: lo publicado está en `NOW.md`, «Publicado».
+
 ## Detalle, para la PM y las Devs
 
 **Regla del archivo** (límite que no se negocia): lo que cambia el TXT
@@ -66,20 +72,20 @@ usan un sintético con la misma forma.
 
 | Orden | Pieza | Qué arregla | Prueba |
 |---|---|---|---|
-| 1 | MARIA-7 | Lo que el MARIA rechazó el 24/10: todas las líneas con CRLF; identificador de la operación corto (`IDSO`, `IDDT`, `IARTESPAPU`; con 19 caracteres el MARIA lo rechaza, con 8 lo acepta); `CDDTAGR` (CUIT del despachante) obligatorio: sin él no se genera; la referencia de la factura (`LDVDREFDOC`) es el número real de la factura; unidad declarada la de la factura (m² = `03`, no `07` unidad); con unidad estadística en kilos, la cantidad estadística es igual al kilo neto, al centésimo; en sufijos y textos libres sólo letras, números y espacios (lo demás, espacio); el número de cuenta del banco nunca va como identificación del proveedor | los errores del MARIA del 24/10 (capturas de Emi) y el TXT que finalmente cargó |
-| 2 | MARIA-8 | Subítems por posición: cada renglón de la factura es un subítem con sus sufijos propios; los renglones con la misma posición SIM, origen, procedencia y estado van en un solo ítem; las sumas del ítem cierran exactas | el TXT de 1 ítem con 48 subítems que cargó el 24/10 |
-| 3 | VALOR-1 | Ajustes a incluir, ajustes a deducir y FOB casillero: campos que carga el usuario (el sistema no decide qué se descuenta) y cuentas a la vista; botón «calcular seguro» (1 % de FOB + flete) cuando la factura no lo trae; el reparto ítem por ítem queda para PRORRATEO-1 | reunión del 24/10 (forma: FOB de factura − ajuste = FOB casillero; seguro = 1 % de FOB + flete) |
-| 4 | SEPARADORES-1 | Montos con punto o coma: «3.480» y «3.480,00» son tres mil cuatrocientos ochenta, «3,48» es tres con cuarenta y ocho; si es ambiguo, se pregunta | el flete del 24/10 salió mil veces más chico |
+| 1 | ✅ MARIA-7 | Lo que el MARIA rechazó el 24/10: todas las líneas con CRLF; identificador de la operación corto (`IDSO`, `IDDT`, `IARTESPAPU`; con 19 caracteres el MARIA lo rechaza, con 8 lo acepta); `CDDTAGR` (CUIT del despachante) obligatorio: sin él no se genera; la referencia de la factura (`LDVDREFDOC`) es el número real de la factura; unidad declarada la de la factura (m² = `03`, no `07` unidad); con unidad estadística en kilos, la cantidad estadística es igual al kilo neto, al centésimo; en sufijos y textos libres sólo letras, números y espacios (lo demás, espacio); el número de cuenta del banco nunca va como identificación del proveedor | los errores del MARIA del 24/10 (capturas de Emi) y el TXT que finalmente cargó |
+| 2 | ✅ MARIA-8 | Subítems por posición: cada renglón de la factura es un subítem con sus sufijos propios; los renglones con la misma posición SIM, origen, procedencia y estado van en un solo ítem; las sumas del ítem cierran exactas | el TXT de 1 ítem con 48 subítems que cargó el 24/10 |
+| 3 | ✅ VALOR-1 | Ajustes a incluir, ajustes a deducir y FOB casillero: campos que carga el usuario (el sistema no decide qué se descuenta) y cuentas a la vista; botón «calcular seguro» (1 % de FOB + flete) cuando la factura no lo trae; el reparto ítem por ítem queda para PRORRATEO-1 | reunión del 24/10 (forma: FOB de factura − ajuste = FOB casillero; seguro = 1 % de FOB + flete) |
+| 4 | ✅ SEPARADORES-1 | Montos con punto o coma: «3.480» y «3.480,00» son tres mil cuatrocientos ochenta, «3,48» es tres con cuarenta y ocho; si es ambiguo, se pregunta | el flete del 24/10 salió mil veces más chico |
 
 **Dev técnica (Dev 1, esfuerzo medio):**
 
 | Orden | Pieza | Qué arregla | Prueba |
 |---|---|---|---|
-| 0 | EXCEL-2 | Ya aceptada: integrar y publicar con el «dale» de Emi | — |
-| 1 | EXCEL-3 | La proforma china del 24/10 se lee tal como viene: encabezado en la fila 11, descripción que vale para los renglones de abajo, columnas `Specification`, `QTY (Rolls)`, `SM.TOTAL (sqm)`, `Unit price (USD/sqm)`, `Gross Weight(kgs)`; la cantidad es la unidad del precio (m²); descuento, flete y totales no son productos y el descuento se ofrece como ajuste | un sintético con la misma forma (la proforma real no entra al repo) |
-| 2 | CLIENTE-1 | Alta de cliente con lo que pide el MARIA: CUIT, razón social, domicilio y fecha de inicio de actividades; email y teléfono dejan de ser obligatorios | reunión del 24/10 |
-| 3 | ESTUDIO-1 | El CUIT del despachante se carga por estudio (puede haber varios) y se elige en la operación; va solo al `CDDTAGR` | reunión del 24/10 |
-| 4 | PA-1 | En pantallas, «NCM» pasa a «Posición arancelaria (PA SIM)» donde se habla de la posición de 11 dígitos con su letra | reunión del 24/10 |
+| 0 | ✅ EXCEL-2 | Ya aceptada: integrar y publicar con el «dale» de Emi | — |
+| 1 | 🔵 EXCEL-3 | La proforma china del 24/10 se lee tal como viene: encabezado en la fila 11, descripción que vale para los renglones de abajo, columnas `Specification`, `QTY (Rolls)`, `SM.TOTAL (sqm)`, `Unit price (USD/sqm)`, `Gross Weight(kgs)`; la cantidad es la unidad del precio (m²); descuento, flete y totales no son productos y el descuento se ofrece como ajuste | un sintético con la misma forma (la proforma real no entra al repo) |
+| 2 | ✅ CLIENTE-1 | Alta de cliente con lo que pide el MARIA: CUIT, razón social, domicilio y fecha de inicio de actividades; email y teléfono dejan de ser obligatorios | reunión del 24/10 |
+| 3 | ✅ ESTUDIO-1 | El CUIT del despachante se carga por estudio (puede haber varios) y se elige en la operación; va solo al `CDDTAGR` | reunión del 24/10 |
+| 4 | ✅ PA-1 | En pantallas, «NCM» pasa a «Posición arancelaria (PA SIM)» donde se habla de la posición de 11 dígitos con su letra | reunión del 24/10 |
 
 **Cierre de la Fase 1b:** publicar con el «dale»; la factura de lonas,
 subida tal como vino, da un TXT que el MARIA carga sin errores.
@@ -90,18 +96,18 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 
 | Orden | Pieza | Qué arregla | Prueba |
 |---|---|---|---|
-| 1 | SUFIJOS-1 | Con la posición SIM, el sistema trae de VUCE (consulta pública `/cice/sufijos/<posición>`) qué sufijos pide y la unidad estadística; los completa con lo que la IA encuentra en la factura (marca, modelo, código, medidas, color); el código de artículo (`AI`) es distinto en cada renglón; lo que falta queda marcado para el despachante; sin VUCE, se piden a mano con aviso | la consulta a VUCE del 24/10 (una posición de plásticos pidió AA marca y AI código; unidad kilogramo `01`) |
-| 2 | DESTINO-1 | Tres destinos por operación: comercialización en el mercado interno, bien de uso de la empresa, bien de uso particular, con su código en el TXT | la lista con códigos que pase el despachante |
-| 3 | PESO-NETO-1 | El peso neto sale del packing list cuando la factura sólo trae bruto; si no hay packing list, el aviso de hoy | el packing list de las lonas |
-| 4 | MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11) | sus archivos reales |
-| 5 | DESPACHO-1 | Sumada por Emi el 28/10; ubicada por la PM (Emi: «acomodalo dónde digas»): después de ORG-1, detrás de las piezas que hacen entrar el TXT; como todas esperan al despachante, se hace la primera que tenga lo suyo; tiene que estar lista antes del piloto (28/12), porque es lo que facilita sumar estudios. Para que un despachante que viene de otro sistema arme rápido el catálogo de sus clientes con despachos que ya tiene, y después haga el predespacho en CDI con ese catálogo. El despacho oficializado es el formulario OM-1993-A SIM que el despachante imprime y firma después de oficializar en el MARIA; trae por ítem y subítem la posición SIM, los sufijos, el origen, la procedencia, el estado, la unidad, la cantidad, el FOB y el peso neto (normativa de ARCA, búsqueda del 28/10). Subir un despacho ya oficializado para armar el catálogo del cliente: se lee por renglón la posición SIM, la descripción, los sufijos, el origen, la unidad, el valor unitario y el peso; se revisa y se edita en pantalla antes de guardar en el catálogo de ese cliente; el catálogo del cliente se puede bajar en Excel, o en el formato que usen los despachantes si la pregunta 6 trae uno. Nunca arma un TXT ni una operación (el lector de facturas sigue rechazando despachos); lo que no se encontró queda marcado, no se rellena | uno o dos despachos oficializados que pase el despachante (los reales sólo fuera del repo; las pruebas usan un sintético con la misma forma) |
+| 1 | ✅ SUFIJOS-1 | Con la posición SIM, el sistema trae de VUCE (consulta pública `/cice/sufijos/<posición>`) qué sufijos pide y la unidad estadística; los completa con lo que la IA encuentra en la factura (marca, modelo, código, medidas, color); el código de artículo (`AI`) es distinto en cada renglón; lo que falta queda marcado para el despachante; sin VUCE, se piden a mano con aviso | la consulta a VUCE del 24/10 (una posición de plásticos pidió AA marca y AI código; unidad kilogramo `01`) |
+| 2 | ⏳ DESTINO-1 | Tres destinos por operación: comercialización en el mercado interno, bien de uso de la empresa, bien de uso particular, con su código en el TXT | la lista con códigos que pase el despachante |
+| 3 | ⏳ PESO-NETO-1 | El peso neto sale del packing list cuando la factura sólo trae bruto; si no hay packing list, el aviso de hoy | el packing list de las lonas |
+| 4 | ⏳ MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11) | sus archivos reales |
+| 5 | 🔵 DESPACHO-1 | Sumada por Emi el 28/10; ubicada por la PM (Emi: «acomodalo dónde digas»): después de ORG-1, detrás de las piezas que hacen entrar el TXT; como todas esperan al despachante, se hace la primera que tenga lo suyo; tiene que estar lista antes del piloto (28/12), porque es lo que facilita sumar estudios. Para que un despachante que viene de otro sistema arme rápido el catálogo de sus clientes con despachos que ya tiene, y después haga el predespacho en CDI con ese catálogo. El despacho oficializado es el formulario OM-1993-A SIM que el despachante imprime y firma después de oficializar en el MARIA; trae por ítem y subítem la posición SIM, los sufijos, el origen, la procedencia, el estado, la unidad, la cantidad, el FOB y el peso neto (normativa de ARCA, búsqueda del 28/10). Subir un despacho ya oficializado para armar el catálogo del cliente: se lee por renglón la posición SIM, la descripción, los sufijos, el origen, la unidad, el valor unitario y el peso; se revisa y se edita en pantalla antes de guardar en el catálogo de ese cliente; el catálogo del cliente se puede bajar en Excel, o en el formato que usen los despachantes si la pregunta 6 trae uno. Nunca arma un TXT ni una operación (el lector de facturas sigue rechazando despachos); lo que no se encontró queda marcado, no se rellena | uno o dos despachos oficializados que pase el despachante (los reales sólo fuera del repo; las pruebas usan un sintético con la misma forma) |
 
 **Dev técnica:**
 
 | Orden | Pieza | Qué arregla |
 |---|---|---|
-| 1 | GUARDAR-2 | La sugerencia de posición: si el historial del cliente tiene 8 dígitos y el proveedor la SIM completa que empieza con esos 8, gana la del proveedor (D32 b; sin migración; Postgres descartable) |
-| 2 | ORDEN-1 | Reordenar los productos arrastrando, en la pantalla de revisión |
+| 1 | ⚪ GUARDAR-2 | La sugerencia de posición: si el historial del cliente tiene 8 dígitos y el proveedor la SIM completa que empieza con esos 8, gana la del proveedor (D32 b; sin migración; Postgres descartable) |
+| 2 | ⚪ ORDEN-1 | Reordenar los productos arrastrando, en la pantalla de revisión |
 | 3 | COBRO-MP-1 | Primera pieza de la Fase 2 (ver abajo) |
 
 **Cierre de la Fase 1c (cierra G4):** dos sesiones con el despachante, 3 o
@@ -111,22 +117,30 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 
 | Pieza | Quién | Qué arregla |
 |---|---|---|
-| COBRO-MP-1 | Dev técnica | Aviso de pago verificado, aplicado una vez, con el monto controlado; las renovaciones extienden el período (C3, D8) |
-| COBRO-CORTE-1 | Dev técnica | Quien no paga no genera ni gasta Gemini; contar una vez por operación sin pasarse del tope (también con guardados a la vez); el aviso dice la razón real (C1, C5, C6; D4 b N = 10, D5 a, D6 a) |
-| COBRO-MP-2 | Dev técnica | Cancelar también en Mercado Pago sin perder días pagados, una sola suscripción, reactivar pagando (C2, C4, C8, D9) |
-| PRORRATEO-1 | Dev MARIA | El reparto ítem por ítem de ajustes, seguro y flete hasta el FOB casillero, con las sumas exactas al centavo (segunda etapa acordada el 24/10) |
-| ORG-1 | Dev MARIA | Invitaciones que funcionan, tope de usuarios del plan, atadas al email (C7) |
-| LEGAL-1 | Dev MARIA | Términos y privacidad con el texto de Emi; aviso de que CDI es un asistente y el despachante revisa; cómo pedir el borrado de datos (X5) |
+| ⚪ COBRO-MP-1 | Dev técnica | Aviso de pago verificado, aplicado una vez, con el monto controlado; las renovaciones extienden el período (C3, D8) |
+| ⚪ COBRO-CORTE-1 | Dev técnica | Quien no paga no genera ni gasta Gemini; contar una vez por operación sin pasarse del tope (también con guardados a la vez); el aviso dice la razón real (C1, C5, C6; D4 b N = 10, D5 a, D6 a) |
+| ⚪ COBRO-MP-2 | Dev técnica | Cancelar también en Mercado Pago sin perder días pagados, una sola suscripción, reactivar pagando (C2, C4, C8, D9) |
+| ⏳ PRORRATEO-1 | Dev MARIA | El reparto ítem por ítem de ajustes, seguro y flete hasta el FOB casillero, con las sumas exactas al centavo (segunda etapa acordada el 24/10) |
+| 🔵 ORG-1 | Dev MARIA | Invitaciones que funcionan, tope de usuarios del plan, atadas al email (C7) |
+| ⏳ LEGAL-1 | Dev MARIA | Términos y privacidad con el texto de Emi; aviso de que CDI es un asistente y el despachante revisa; cómo pedir el borrado de datos (X5) |
 
 **Cierre:** publicar; el pago chico de Emi recorre todo el ciclo (cierra G7).
 
 ### Fase 3 — Seguridad y datos, a fondo (semanas 7 a 9)
 
-Sin cambios respecto del 2026-10-07: SESION-1, ABUSO-1, AISLAMIENTO-2 y
-LIMPIEZA-1 (Dev técnica); DATOS-1, BACKUP-1 y DISCO-1 (Dev MARIA);
-AUDITORIA-FINAL (PM). Más una pieza nueva: OBSERVABILIDAD-1 (Dev técnica),
-la columna `api_logs.owner_username` que falta en producción, con migración
-probada en Postgres descartable.
+Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
+
+| Pieza | Quién | Qué arregla |
+|---|---|---|
+| ⚪ SESION-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
+| ⚪ ABUSO-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
+| ⚪ AISLAMIENTO-2 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
+| ⚪ LIMPIEZA-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
+| ⚪ OBSERVABILIDAD-1 | Dev técnica | La columna `api_logs.owner_username` que falta en producción, con migración probada en Postgres descartable |
+| ⚪ DATOS-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
+| ⚪ BACKUP-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
+| ⚪ DISCO-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
+| ⚪ AUDITORIA-FINAL | PM | Ver `AUDITORIA-2026-10-06.md` |
 
 **Cierre:** publicar y probar volver atrás (cierra G3 y G6). Recién ahí
 entra el primer estudio nuevo.
@@ -135,6 +149,10 @@ entra el primer estudio nuevo.
 
 Con el kit `wave1_*`. Los estudios más tolerantes, no los más grandes; el
 despachante de la prueba, primero. Cierra G8.
+
+| Pieza | Quién | Qué arregla |
+|---|---|---|
+| ⚪ PILOTO-1 | PM y Emi | Tres estudios presentan un MARIA hecho con CDI |
 
 ### Referencias
 
