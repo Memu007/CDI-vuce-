@@ -349,6 +349,26 @@ sabotaje $A "la primera consulta no mira si la sesión cambió mientras volvía"
   "FALLA: entró otro usuario con la primera consulta del usuario en camino y lo cargado se guardó a nombre de él" \
   ' || getCsrfToken() !== sesionAlAbrir' ''
 
+# El diálogo de archivos abierto antes de que llegue el usuario: la pestaña
+# ya se tocó y la recuperación tardía no adopta.
+export CASOS=z6
+sabotaje $A "la recuperación tardía no mira si se tocó la pestaña" \
+  "FALLA: se abrió el diálogo de archivos antes de que llegara el usuario y la operación de antes de recargar se perdió" \
+  'const ocupada = pestanaTocada || ' 'const ocupada = '
+
+# La consulta del usuario da error o no contesta al recargar: se avisa y,
+# colgada, se corta para reintentar.
+export CASOS=z7
+sabotaje $A "sin usuario a tiempo no se avisa" \
+  "FALLA: al recargar la consulta del usuario da error y en 8 s la pestaña no avisa que no guarda" \
+  "if (!sinSesion) CDI.borrador.avisar('red', AVISO_RED);" ''
+sabotaje $A "la primera consulta colgada no se corta" \
+  "FALLA: al recargar la consulta del usuario no contesta y cuando vuelve a contestar la pestaña no se entera en 30 s" \
+  "api('/auth/current_user', { signal: corte.signal })" "api('/auth/current_user')"
+sabotaje $A "el aviso de espera no se va cuando llega el usuario" \
+  "FALLA: al recargar la consulta del usuario da error, cuando vuelve a contestar sigue el aviso" \
+  "                    if (avisoBorrador === 'red') avisarBorrador(null);" ''
+
 # Con la sesión vencida (401) no se reintenta.
 export CASOS=r
 sabotaje $A "un 401 no marca la sesión vencida" \
