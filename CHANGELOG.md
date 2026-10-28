@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: el historial de NCM ya no se borra con cada deploy (DISCO-1)
+
+- Las NCM confirmadas e importadas se guardan en la base, por usuario, con el mismo comportamiento que antes. Al arrancar, los archivos de historial que hubiera en el disco se cargan una sola vez.
+
 ## 2026-10-28 · fix: borrar un cliente con presupuesto compartido, `/health` y los errores 500 (DATOS-1)
 
 - Borrar un cliente que tenía un presupuesto compartido ya no da error: se borran también sus presupuestos compartidos, y esos links dejan de andar (dan «no encontrado»). La pantalla lo avisa antes de borrar.

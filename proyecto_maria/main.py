@@ -9,6 +9,8 @@ from pydantic import BaseModel, field_validator
 from datetime import datetime, timedelta, timezone
 from typing import Any
 import jwt
+import glob
+import hashlib
 import json
 import os
 import re
@@ -136,7 +138,7 @@ security = HTTPBearer()
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from proyecto_maria.database.connection import get_async_session, init_db
-from proyecto_maria.database.models import User, Client, PasswordResetToken, Organization, Invitation, Estudio, UsoCuitPerfil
+from proyecto_maria.database.models import User, Client, PasswordResetToken, Organization, Invitation, Estudio, UsoCuitPerfil, NcmHistorial
 import uuid
 import logging
 from sqlalchemy.exc import IntegrityError
@@ -1391,6 +1393,9 @@ async def lifespan(app: FastAPI):
         except Exception as e:
             print(f"⚠️ Error creando usuarios demo: {e}")
         break  # Solo necesitamos ejecutar esto una vez
+
+    # Después de crear usuarios: cada archivo se carga a su dueño (DISCO-1).
+    await _migrate_ncm_historial_archivos()
         
     yield  # La aplicación está sirviendo peticiones
     
@@ -9029,27 +9034,141 @@ async def delete_ncm_nota(
 
 # === SUGERIR NCM: memoria confirmada + catálogo ARCA + IA opcional ===
 
-def _ncm_historial_path(owner_username: str) -> str:
-    safe = re.sub(r'[^a-zA-Z0-9_\-]', '_', owner_username)
-    return os.path.join(DATA_DIR, f'ncm_historial_{safe}.json')
+# El historial de NCM vive en la tabla `ncm_historial`, por dueño (DISCO-1).
+# Antes era `ncm_historial_<usuario>.json` en DATA_DIR, que en Railway se
+# borra con cada deploy.
 
-def load_ncm_historial(owner_username: str) -> dict:
-    """Carga historial de NCM por-owner (no compartido)."""
-    path = _ncm_historial_path(owner_username)
-    if os.path.exists(path):
-        try:
-            with open(path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
-            logging.warning(f"Error loading NCM historial for {owner_username}: {e}")
-            return {}
-    return {}
+# Filas por sentencia: 150 × 5 columnas queda bajo el límite de 999
+# parámetros de los SQLite viejos.
+_HISTORIAL_FILAS_POR_SENTENCIA = 150
 
-def save_ncm_historial(owner_username: str, data: dict) -> None:
-    """Guarda historial de NCM por-owner."""
-    path = _ncm_historial_path(owner_username)
-    with open(path, 'w', encoding='utf-8') as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+
+def _clave_ncm_historial(descripcion: str) -> str:
+    return hashlib.sha256(descripcion.encode("utf-8")).hexdigest()
+
+
+def _insert_ncm_historial():
+    """INSERT con `ON CONFLICT` del motor en uso (SQLite o Postgres)."""
+    from proyecto_maria.database.connection import IS_SQLITE
+    if IS_SQLITE:
+        from sqlalchemy.dialects.sqlite import insert as _insert
+    else:
+        from sqlalchemy.dialects.postgresql import insert as _insert
+    return _insert(NcmHistorial)
+
+
+def _fila_ncm_historial(owner_username: str, descripcion: str, ncm: str, count: int = 1) -> dict:
+    return {"owner_username": owner_username, "clave": _clave_ncm_historial(descripcion),
+            "descripcion": descripcion, "ncm": ncm, "count": count}
+
+
+async def load_ncm_historial(db: AsyncSession, owner_username: str) -> dict:
+    """Historial de NCM del dueño, `{descripción: {"ncm", "count"}}`, en el
+    orden en que se agregó (no compartido)."""
+    filas = await db.execute(
+        select(NcmHistorial.descripcion, NcmHistorial.ncm, NcmHistorial.count)
+        .where(NcmHistorial.owner_username == owner_username)
+        .order_by(NcmHistorial.id)
+    )
+    return {desc: {"ncm": ncm, "count": count} for desc, ncm, count in filas.all()}
+
+
+async def _sumar_uso_ncm(db: AsyncSession, owner_username: str, descripcion: str, ncm: str) -> None:
+    """Confirmar: la primera vez cuenta 1; después suma uno y actualiza la
+    NCM. Es una sola sentencia en la base, así dos confirmaciones a la vez no
+    pierden ninguna."""
+    ins = _insert_ncm_historial().values(**_fila_ncm_historial(owner_username, descripcion, ncm))
+    await db.execute(ins.on_conflict_do_update(
+        index_elements=["owner_username", "clave"],
+        set_={"ncm": ins.excluded.ncm, "count": NcmHistorial.count + 1},
+    ))
+    await db.commit()
+
+
+async def _guardar_historial_importado(db: AsyncSession, owner_username: str, nuevas: dict) -> None:
+    """Importar: lo nuevo entra con cuenta 1; lo que ya estaba toma la NCM del
+    archivo y conserva su cuenta. `nuevas` es `{descripción: ncm}`."""
+    filas = [_fila_ncm_historial(owner_username, d, n) for d, n in nuevas.items()]
+    for i in range(0, len(filas), _HISTORIAL_FILAS_POR_SENTENCIA):
+        ins = _insert_ncm_historial().values(filas[i:i + _HISTORIAL_FILAS_POR_SENTENCIA])
+        await db.execute(ins.on_conflict_do_update(
+            index_elements=["owner_username", "clave"], set_={"ncm": ins.excluded.ncm},
+        ))
+    await db.commit()
+
+
+def _nombre_archivo_historial(owner_username: str) -> str:
+    """Cómo se llamaba el archivo de cada usuario antes de DISCO-1."""
+    return re.sub(r'[^a-zA-Z0-9_\-]', '_', owner_username)
+
+
+async def _cargar_archivo_historial(db: AsyncSession, ruta: str, por_nombre: dict) -> None:
+    nombre = os.path.basename(ruta)
+    duenos = por_nombre.get(nombre[len("ncm_historial_"):-len(".json")], [])
+    if len(duenos) != 1:
+        # El nombre del archivo cambiaba los signos por «_»: «a.b» y «a_b»
+        # compartían archivo. No se adivina de quién es.
+        motivo = "ningún usuario tiene ese nombre" if not duenos else "más de un usuario tiene ese nombre"
+        logging.warning("[DISCO-1] %s no se carga (%s); queda en su lugar", nombre, motivo)
+        return
+    dueno = duenos[0]
+    try:
+        with open(ruta, encoding="utf-8") as f:
+            datos = json.load(f)
+    except (OSError, ValueError) as e:
+        logging.warning("[DISCO-1] %s no se pudo leer (%s); queda en su lugar", nombre, e)
+        return
+    if not isinstance(datos, dict):
+        logging.warning("[DISCO-1] %s no es un historial; queda en su lugar", nombre)
+        return
+
+    filas, salteadas = [], 0
+    for desc, entrada in datos.items():
+        ncm = entrada.get("ncm") if isinstance(entrada, dict) else None
+        if not desc.strip() or not isinstance(ncm, str) or not ncm.strip():
+            salteadas += 1
+            continue
+        count = entrada.get("count", 1)
+        if isinstance(count, bool) or not isinstance(count, int) or count < 1:
+            count = 1
+        filas.append(_fila_ncm_historial(dueno, desc, ncm, count))
+    # Si ya está cargado (otro arranque, el archivo volvió), no se toca: las
+    # cuentas no se duplican y lo confirmado después no se pisa.
+    for i in range(0, len(filas), _HISTORIAL_FILAS_POR_SENTENCIA):
+        ins = _insert_ncm_historial().values(filas[i:i + _HISTORIAL_FILAS_POR_SENTENCIA])
+        await db.execute(ins.on_conflict_do_nothing(index_elements=["owner_username", "clave"]))
+    await db.commit()
+    if salteadas:
+        logging.warning("[DISCO-1] %s: %d entradas sin NCM no se cargaron", nombre, salteadas)
+    try:
+        os.replace(ruta, ruta + ".migrado")
+    except OSError as e:
+        logging.warning("[DISCO-1] %s se cargó pero no se pudo renombrar (%s)", nombre, e)
+    logging.info("[DISCO-1] %s: %d entradas cargadas en la base", nombre, len(filas))
+
+
+async def _migrate_ncm_historial_archivos() -> None:
+    """Al arrancar, carga en la base los `ncm_historial_*.json` que haya en
+    DATA_DIR y los renombra a `.migrado` para no volver a leerlos. Un archivo
+    que no se puede cargar va al log y queda en su lugar; nunca frena el
+    arranque."""
+    try:
+        rutas = sorted(glob.glob(os.path.join(DATA_DIR, "ncm_historial_*.json")))
+        if not rutas:
+            return
+        from proyecto_maria.database.connection import AsyncSessionLocal
+        async with AsyncSessionLocal() as db:
+            por_nombre: dict[str, list[str]] = {}
+            for (username,) in (await db.execute(select(User.username))).all():
+                por_nombre.setdefault(_nombre_archivo_historial(username), []).append(username)
+            for ruta in rutas:
+                try:
+                    await _cargar_archivo_historial(db, ruta, por_nombre)
+                except Exception:
+                    await db.rollback()
+                    logging.exception("[DISCO-1] %s no se pudo cargar; queda en su lugar", os.path.basename(ruta))
+    except Exception:
+        logging.exception("[DISCO-1] no se pudieron cargar los historiales de DATA_DIR")
 
 def normalizar_desc(desc: str) -> str:
     """Normaliza descripción para matching"""
@@ -9284,7 +9403,12 @@ async def sugerir_ncm(
 
     # 3) Historial liviano de asignaciones de este despachante.
     desc_norm = normalizar_desc(descripcion)
-    historial = load_ncm_historial(user["username"])
+    try:
+        historial = await load_ncm_historial(db, user["username"])
+    except Exception as err:
+        await db.rollback()
+        logging.warning("ncm suggestion history unavailable: %s", err)
+        historial = {}
     for desc_guardada, ncm_data in historial.items():
         if desc_norm in normalizar_desc(desc_guardada) or normalizar_desc(desc_guardada) in desc_norm:
             add_suggestion({
@@ -9352,15 +9476,9 @@ async def guardar_uso_ncm(
     if not descripcion or not ncm:
         return {"success": False}
 
-    historial = load_ncm_historial(user["username"])
-    
-    # Guardar o incrementar contador
-    if descripcion in historial:
-        historial[descripcion]["count"] = historial[descripcion].get("count", 0) + 1
-        historial[descripcion]["ncm"] = ncm  # Actualizar NCM si cambió
-    else:
-        historial[descripcion] = {"ncm": ncm, "count": 1}
-    save_ncm_historial(user["username"], historial)
+    # Guardar o incrementar contador (y actualizar la NCM si cambió). Se
+    # confirma antes de las memorias de abajo: su rollback no lo deshace.
+    await _sumar_uso_ncm(db, user["username"], descripcion, ncm)
 
     # Las memorias persistentes usan la NCM base: obligan a volver a confirmar
     # la posición SIM/DC en VUCE en lugar de reutilizar una letra antigua.
@@ -9404,6 +9522,7 @@ async def import_ncm_historial(
     request: Request,
     file: UploadFile = File(...),
     user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     """Importa planilla maestra 'descripción → NCM' desde CSV/Excel.
 
@@ -9459,7 +9578,8 @@ async def import_ncm_historial(
             detail="No se detectaron las columnas. Necesitamos 'descripcion' y 'ncm'.",
         )
 
-    historial = load_ncm_historial(username)
+    historial = await load_ncm_historial(db, username)
+    nuevas: dict[str, str] = {}
     importados = 0
     duplicados = 0
     errores: list[dict] = []
@@ -9482,12 +9602,14 @@ async def import_ncm_historial(
             else:
                 historial[desc] = {"ncm": ncm, "count": 1}
                 importados += 1
+            nuevas[desc] = ncm
         except Exception as exc:
             errores.append({"fila": int(idx) + 2, "error": str(exc)[:120]})
 
     try:
-        save_ncm_historial(username, historial)
+        await _guardar_historial_importado(db, username, nuevas)
     except Exception as exc:
+        await db.rollback()
         logging.exception("import_ncm_historial save failed")
         raise HTTPException(status_code=500, detail=f"No se pudo guardar: {str(exc)[:120]}")
 

@@ -188,6 +188,26 @@ class UsoCuitPerfil(Base):
     last_used_at = Column(DateTime(timezone=True), nullable=False)
 
 
+class NcmHistorial(Base):
+    """Historial de NCM confirmadas por dueño (DISCO-1): una fila por
+    descripción, tal cual se guardó, con su NCM y cuántas veces se confirmó.
+    Antes era `ncm_historial_<usuario>.json` en DATA_DIR, que en Railway se
+    borra con cada deploy. `clave` es el sha256 de la descripción: la
+    unicidad no depende del largo del texto. `id` conserva el orden en que
+    se agregaron, que es el orden en que se sugieren."""
+    __tablename__ = "ncm_historial"
+    __table_args__ = (
+        UniqueConstraint("owner_username", "clave", name="uq_ncm_historial_owner_clave"),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    owner_username = Column(String(50), ForeignKey("users.username"), nullable=False)
+    clave = Column(String(64), nullable=False)
+    descripcion = Column(Text, nullable=False)
+    ncm = Column(Text, nullable=False)
+    count = Column(Integer, nullable=False, default=1)
+
+
 class Operation(Base):
     """Operación de importación procesada."""
     __tablename__ = "operations"
