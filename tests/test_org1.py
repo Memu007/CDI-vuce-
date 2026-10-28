@@ -475,3 +475,143 @@ def test_todo_email_que_se_puede_invitar_se_puede_registrar(monkeypatch):
     for bueno in ("Ana.Perez+cdi@Mi-Estudio.com.ar", " x_y%z@a.io "):
         tok = est.invitar_ok(bueno)
         assert _registrar(bueno.strip(), tok).status_code == 200
+
+
+# ================================================================ 5. un email, una cuenta (D40)
+# Al invitar, un email que ya tiene cuenta da 400 y no ocupa lugar, con la
+# misma respuesta si la cuenta es de este estudio, de otro o de ninguno. Al
+# registrarse con una invitación, las otras pendientes de ese email en ese
+# estudio quedan usadas.
+
+YA_TIENE_CUENTA = "Ese email ya tiene una cuenta en CDI y no se puede invitar como miembro nuevo."
+
+
+def _pendientes(org_id, email):
+    async def q(s):
+        res = await s.execute(select(Invitation.token).where(
+            Invitation.org_id == org_id, Invitation.email == email, Invitation.status == "pending"))
+        return [t for (t,) in res.all()]
+    return _db(q)
+
+
+@pytest.mark.parametrize("donde", ["este estudio", "otro estudio", "sin estudio"])
+def test_invitar_un_email_que_ya_tiene_cuenta_400_sin_ocupar_lugar(monkeypatch, donde):
+    _tope(monkeypatch, 3)
+    est = Estudio()
+    email = _email()
+    if donde == "este estudio":
+        assert _registrar(email, est.invitar_ok(email)).status_code == 200
+    elif donde == "otro estudio":
+        otro = Estudio()
+        assert _registrar(email, otro.invitar_ok(email)).status_code == 200
+    else:
+        r = TestClient(app).post("/auth/register", json={
+            "username": _azar("o1u_"), "password": CLAVE, "email": email})
+        assert r.status_code == 200, r.text
+    r = est.invitar(f" {email.upper()} ")
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == YA_TIENE_CUENTA, r.text
+    assert _pendientes(est.org_id, email) == []
+    # Los lugares libres siguen libres, y no hay uno más.
+    for _ in range(3 - len(_miembros(est.org_id))):
+        est.invitar_ok(_email())
+    assert est.invitar(_email()).status_code == 400
+
+
+def test_registrarse_con_una_invitacion_usa_las_otras_del_mismo_email(zona):
+    est, otro = Estudio(), Estudio()
+    email = _email()
+    tok1, tok2 = est.invitar_ok(email), est.invitar_ok(email.upper())
+    de_otro_email = est.invitar_ok(_email())
+    de_otro_estudio = otro.invitar_ok(email)
+    assert _registrar(email, tok2).status_code == 200
+    assert _invitacion(tok1)["status"] == "accepted"
+    r = _validar(tok1)
+    assert r.status_code == 400 and "ya fue usada" in r.json()["detail"], r.text
+    # Sólo las de ese email en ese estudio.
+    assert _invitacion(de_otro_email)["status"] == "pending"
+    assert _invitacion(de_otro_estudio)["status"] == "pending"
+
+
+
+def test_registrarse_usa_tambien_una_vieja_con_mayusculas_y_espacios(zona):
+    """Una invitación guardada antes de EMAIL-1 puede tener el email con
+    mayúsculas o espacios, y el registro la acepta igual: también queda usada."""
+    est = Estudio()
+    email = _email()
+    vieja = est.invitar_ok(email)
+    _cambiar_invitacion(vieja, email=f"  {email.upper()} ")
+    assert _registrar(email, est.invitar_ok(email)).status_code == 200
+    assert _invitacion(vieja)["status"] == "accepted"
+
+def test_si_el_alta_no_entra_las_otras_del_mismo_email_siguen_pendientes(zona, monkeypatch):
+    _tope(monkeypatch, 3)
+    est = Estudio()
+    a, b = _email(), _email()
+    tok_a1, tok_a2, tok_b = est.invitar_ok(a), est.invitar_ok(a), est.invitar_ok(b)
+    _tope(monkeypatch, 2)
+    assert _registrar(b, tok_b).status_code == 200
+    r = _registrar(a, tok_a1)
+    assert r.status_code == 400 and "los 2 usuarios" in r.json()["detail"], r.text
+    assert sorted(_pendientes(est.org_id, a)) == sorted([tok_a1, tok_a2])
+
+
+def test_el_sacado_no_vuelve_a_entrar_con_otra_invitacion_vieja(zona):
+    """Devolución de la PM (17:05), el recorrido entero: dos invitaciones al
+    mismo email, entra con la primera, el dueño lo saca, se cambia el email en
+    el perfil y prueba con la segunda."""
+    est = Estudio()
+    email = _email()
+    tok1, tok2 = est.invitar_ok(email), est.invitar_ok(email)
+    sacado = _azar("o1u_")
+    suyo = TestClient(app)
+    assert _registrar(email, tok1, username=sacado, cliente=suyo).status_code == 200
+    assert est.quitar(sacado).status_code == 200
+    r = suyo.put("/api/user/profile", json={"email": _email(), "current_password": CLAVE})
+    assert r.status_code == 200, r.text
+    assert _usuarios(email) == []  # el email invitado quedó libre
+    r = _registrar(email, tok2)
+    assert r.status_code == 400 and "ya fue usada" in r.json()["detail"], r.text
+    assert _usuarios(email) == []
+    assert _miembros(est.org_id) == [est.dueno]
+
+
+def test_carrera_dos_registros_con_dos_invitaciones_del_mismo_email(monkeypatch):
+    est = Estudio()
+    email = _email()
+    tok1, tok2 = est.invitar_ok(email), est.invitar_ok(email)
+    resultado = _carrera(monkeypatch, [(email, tok1), (email, tok2)])
+    assert [s for s, _ in resultado] == [200, 400], resultado
+    assert "ya fue usada" in resultado[1][1]
+    assert len(_usuarios(email)) == 1
+    assert {_invitacion(tok1)["status"], _invitacion(tok2)["status"]} == {"accepted"}
+
+
+def test_dos_pendientes_al_mismo_email_entra_con_una_y_la_otra_no_ocupa_lugar(monkeypatch):
+    """El caso de la PM (17:05, agregado 3). Con la regla 2 de la D40 la otra
+    queda usada, así que este caso ya no mira la resta de los miembros: la
+    mira el siguiente."""
+    _tope(monkeypatch, 3)
+    est = Estudio()
+    email = _email()
+    est.invitar_ok(email)
+    assert _registrar(email, est.invitar_ok(email)).status_code == 200
+    est.invitar_ok(_email())  # dueño + miembro + esta: lleno
+    assert est.invitar(_email()).status_code == 400
+
+
+def test_una_pendiente_al_email_de_un_miembro_no_ocupa_lugar(monkeypatch):
+    """La pendiente que la D40 no usa: un miembro se cambia el email en el
+    perfil al de una invitación pendiente. Nadie la puede usar (el email ya
+    tiene cuenta) y la persona ya cuenta como miembro: no ocupa otro lugar."""
+    _tope(monkeypatch, 3)
+    est = Estudio()
+    email, nuevo = _email(), _email()
+    miembro = TestClient(app)
+    assert _registrar(email, est.invitar_ok(email), cliente=miembro).status_code == 200
+    est.invitar_ok(nuevo)  # dueño + miembro + pendiente: lleno
+    r = miembro.put("/api/user/profile", json={"email": nuevo, "current_password": CLAVE})
+    assert r.status_code == 200, r.text
+    assert _pendientes(est.org_id, nuevo)  # sigue pendiente
+    est.invitar_ok(_email())  # el lugar que la pendiente no ocupa
+    assert est.invitar(_email()).status_code == 400
