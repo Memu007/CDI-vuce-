@@ -81,6 +81,11 @@ sabotaje $M "si el PUT falla no se pregunta el estado" \
     if _leer_suscripcion_mp(sid)" "    except _SuscripcionMPError:
         raise
     if _leer_suscripcion_mp(sid)"
+sabotaje $M "cancelar sin suscripción llama a Mercado Pago" \
+  "FAILED $T::test_cancelar_sin_suscripcion_no_llama_a_mp" \
+  "    if db_user.mp_preapproval_id:
+        no_se_pudo" "    if True:
+        no_se_pudo"
 sabotaje $B "la cancelada no sigue hasta el fin del período" \
   "FAILED $T2::test_la_cancelada_genera_hasta_el_fin_del_periodo" \
   "    return fin > (ahora or datetime.now(timezone.utc))" "    return False"
@@ -109,6 +114,9 @@ sabotaje $M "el 409 vale aunque la cuenta no esté vigente" \
 sabotaje $M "la vieja no se cancela antes de crear la nueva" \
   "FAILED $T::test_sin_cuenta_vigente_la_vieja_se_cancela_antes_de_crear[pending]" \
   "        if estado_mp != \"cancelled\":" "        if False:"
+sabotaje $M "la vieja ya cancelada se vuelve a cancelar" \
+  "FAILED $T::test_sin_cuenta_vigente_la_vieja_se_cancela_antes_de_crear[ya_cancelada]" \
+  "        if estado_mp != \"cancelled\":" "        if True:"
 sabotaje $M "si no se puede cancelar la vieja, se crea igual" \
   "FAILED $T::test_si_no_se_puede_cancelar_la_vieja_no_se_crea_nada" \
   "vieja en MP: {e}\")
