@@ -30,6 +30,39 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## ORG-1: lo que suma el revisor, y D40 (2026-10-28 17:05 UTC)
+
+Recibida en `3aaa3c4` (informe `de4d788`). Suite de la PM sobre `4ce6d22`:
+`2 failed, 3902 passed`; los dos rojos son de tiempos y no de ORG-1
+(`test_excel2`, el de siempre; `test_excel1_lectura` tardó 11 s contra 8,
+y con la máquina a carga 11 en 4 núcleos falla igual sobre la base
+aceptada: 13,5 s). El veredicto, cuando termine el segundo adversario.
+Seguí con `/entregar` en tu orden sin esperarlo.
+
+- **D40: (1)**, decidido por la PM. Al invitar, el email que ya tiene cuenta
+  da 400 y no ocupa lugar (misma respuesta en este estudio o en otro). Al
+  registrarse con una invitación, las otras pendientes del mismo email en
+  ese estudio quedan usadas.
+- **Sumá, en los mismos commits de la D40** (reproducido por la PM sobre
+  `4ce6d22`, Postgres 16):
+  1. *Reingreso del sacado.* Hoy: dos invitaciones al mismo email, X entra
+     con la primera, el dueño lo saca, X cambia su email en el perfil y
+     entra de nuevo con la segunda (`200`, vuelve a ver el estudio). La
+     regla 2 de la D40 lo cierra; la prueba es ese recorrido entero y
+     tiene que dar 400 o «invitación usada». Que el perfil cambie el email
+     sin verificar va a riesgos: no es de esta pieza.
+  2. *Email que el registro rechaza.* Invitar `josé@example.com` o
+     `ana@estudio` da 200 y ocupa un lugar 7 días, pero registrarse con ese
+     email da 400. Al invitar se valida con la misma regla que el
+     registro: 400 y no ocupa lugar.
+  3. *Prueba que falta.* Sin `- set(emails_miembros)` (`main.py:9682`),
+     `test_org1.py` da `46 passed`. Caso: dos pendientes al mismo email,
+     entra con una, la otra no ocupa lugar.
+- Rojo antes, en SQLite y Postgres 16, un sabotaje por regla. Commits
+  aparte encima de la cadena, como `6b9762e`.
+- Al aceptar integro hasta `4ce6d22`; `6b9762e`, `3aaa3c4` y la D40 entran
+  con la última pieza de la cadena. Nada se publica antes.
+
 ## D38 y D39 (2026-10-28 14:00 UTC): sobre `2b93071` y `30c0e97`
 
 - **D38: (1)**, como lo hiciste: si el email coincide exacto con una cuenta,
@@ -46,7 +79,7 @@ repositorio.** Las pruebas usan sintéticos con la misma forma.
   Emi, recomendada, y no la empezás sin su sí.
 
 EMAIL-1 y CONEXIONES-1 quedan hechas, sin entregar; las entregás después de
-las 18:00 UTC en tu orden. Tu próxima D es la **D40**.
+las 18:00 UTC en tu orden. Tu próxima D es la **D41**.
 
 ## Emi dijo que sí a las dos (2026-10-28 12:15 UTC): EMAIL-1 y CONEXIONES-1
 

@@ -27,6 +27,98 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
+## COBRO: lo que encontró el adversario antes de tu `/entregar` (2026-10-28 17:05 UTC)
+
+No es un veredicto: el informe de COBRO no llegó. El adversario Opus atacó
+`b3ac325..dda9f5b` y la PM reprodujo A–D en SQLite (`/tmp/cdi-pm/wt-cobro-o`)
+y A también sobre la base. Arreglalos **antes** de entregar las tres COBRO,
+en commits aparte encima de `dda9f5b`, rojo antes y un sabotaje por regla.
+Todo decidido por la PM.
+
+- **A. Regresión de COBRO-MP-1 (alta).** Un pago aplicado antes de que
+  existiera `mp_pagos_aplicados` se vuelve a aplicar con cada aviso IPN
+  sin firma (`?topic=payment&id=<id>`): en `dda9f5b` la cuenta past_due
+  queda `active` 30 días más y con el contador en 0; en la base respondía
+  `skipped: payment_id ya procesado`. Ningún pago anterior al despliegue
+  se puede volver a aplicar, sea el último o uno más viejo. Elegí cómo
+  (cargar la tabla desde `last_payment_id` en la migración, no aplicar un
+  pago aprobado antes del período vigente, o las dos) y decilo en el
+  informe. Prueba: un pago aplicado por el código viejo, reenviado.
+- **B. `/generate_maria_export` no cuenta (media).** Con el tope lleno, la
+  importación da 402 y la exportación sale cinco veces con 200. La D4 b es
+  «el MARIA de un operation_id»: la exportación también cuenta, con la
+  misma regla de una vez por operación.
+- **C. past_due no puede cancelar (media).** `/api/billing/cancel` da 409
+  y la suscripción `authorized` sigue cobrando cuando la tarjeta vuelve.
+  Desde past_due se puede cancelar: cancela en Mercado Pago, la cuenta
+  queda `canceled` y no gana acceso.
+- **D. Dos checkouts a la vez (media/alta).** Dos pedidos simultáneos
+  crean dos suscripciones en Mercado Pago y CDI guarda una sola; cancelar
+  deja la otra cobrando. El checkout bloquea la fila de la cuenta (como
+  el conteo), el segundo no crea otra, y el botón de `profile.js`
+  (`openCheckout`) se deshabilita como el de `app_v2.js`. Prueba de la
+  carrera en Postgres 16.
+- **E. Reactivar una prueba con recarga (baja).** Queda `canceled` con
+  `needs_checkout` y el texto «período ya pagado», que es falso. Vuelve a
+  `trial` con sus días, como una prueba sin recarga.
+- **A riesgos, no ahora:** el webhook que no bloquea la fila mientras un
+  pedido la vence (F, base); el aviso `payment` de renovación antes que
+  `subscription_authorized_payment` con monto de panel menor; el aviso sin
+  `external_reference` que da 400 antes de deduplicar; `precio_esperado`
+  sin vencimiento (D29).
+
+El adversario Sonnet de COBRO sigue: si suma algo, va abajo de esto.
+
+## Veredicto de ORDEN-1 (2026-10-28 16:45 UTC): devolución
+
+Sobre `0d89c20`. Evidencia en `REPRODUCCION-ORDEN-1-2026-10-28.md`. El
+reordenado aguantó todo (grupos, subítems, 800 ítems, TXT). Lo que vuelve es
+el borrador por pestaña. **La causa:** `recuperarBorrador` adopta cualquier
+clave de localStorage sin mirar de quién es, cuán vieja es ni si su
+pestaña sigue viva. Reproducido:
+
+1. A deja dos operaciones a medias, sale y cierra; B entra en la misma
+   computadora y cada pestaña nueva le muestra una de A (la base mostraba
+   una; la pieza, todas en cola).
+2. Los borradores cerrados no vencen: vuelven de a uno, incluso uno de
+   40 días.
+3. Una pestaña duplicada (sessionStorage copiado) adopta la clave de la
+   original viva; editan las dos y quedan dos versiones.
+
+Lo que pido, con la familia y no sólo estos tres ejemplos:
+
+- **Dueño:** el sobre guarda el usuario; sólo lo recupera ese usuario. La
+  clave vieja sin pestaña no tiene dueño: se descarta, no se muestra
+  (decidido por la PM).
+- **Edad:** un borrador guardado hace más de 7 días no se recupera y se
+  borra al barrer.
+- **Pestaña viva:** la duplicada no toma la operación de una viva; la
+  recarga y la restauración después de un cierre sin `pagehide` siguen
+  recuperando la suya. El método lo elegís vos.
+- **Pruebas:** rojo antes de cada regla y un sabotaje por regla, con dos
+  usuarios, una edad al borde y una duplicada. Además, que distingan los
+  dos mutantes que hoy pasan: `BORRADOR_HUERFANO_MS` enorme (recuperar el
+  de una pestaña muerta sin `pagehide`) y quitar el `selectedRows.add` de
+  `reorderItems`.
+- **No lo arregles (a riesgos):** pestaña congelada más de 3 minutos; dos
+  filas del mismo renglón que se funden en un ítem del TXT (MARIA-8,
+  queda como está); `draggable` colgado al soltar fuera de la tabla; el
+  borrador de A sigue en localStorage después de su salida (sólo que B ya
+  no lo ve).
+
+Commits aparte encima de `0d89c20`, informe nuevo. Tus D:
+
+- **D1: (a).** El orden vive en el borrador de cada pestaña. Una columna
+  que nadie lee es una migración sin uso; si algún día una pantalla
+  reabre operaciones del servidor, la posición entra en esa pieza.
+- **D2: (a). Tenías razón:** «el Excel» lo puse yo sin comprobar que v2
+  lo tuviera. Se cumple con la tabla y el TXT. Un Excel de la operación
+  en v2 no entra al roadmap salvo que Emi lo pida.
+- **D3: (a).** El centavo puede cambiar de ítem, el total no. Queda el
+  xfail con su motivo.
+
+Decidido por la PM.
+
 ## Veredicto de GUARDAR-2 (2026-10-28 16:35 UTC): aceptada
 
 Sobre `cef45ce` (informe `cb42e8f`). Evidencia en
@@ -130,24 +222,6 @@ criterio de EXCEL-2 ya aceptado (D26 a: ocho libros armados y la normal da
   Toca `file_security.py` y `main.py`: revisión fuerte con adversario
   (cupo, hoy después de las 18:00 UTC).
 - **D5: (a).** La prueba afirma también `dt` < 5 s, en la misma pieza.
-
-Decidido por la PM.
-
-## ORDEN-1 (en revisión) y tus D (2026-10-28)
-
-Recibida en `cdc9c57` (código `0d89c20`). Es de pantalla y del borrador
-del navegador: la reproduzco ahora y sumo un adversario sobre los
-borradores (computadora compartida, pérdida de productos): en curso desde
-las 16:20 UTC. Mientras, no la integro.
-
-- **D1: (a).** El orden vive en el borrador de cada pestaña. Una columna
-  que nadie lee es una migración sin uso; si algún día una pantalla
-  reabre operaciones del servidor, la posición entra en esa pieza.
-- **D2: (a). Tenías razón:** «el Excel» lo puse yo sin comprobar que v2
-  lo tuviera. Se cumple con la tabla y el TXT. Un Excel de la operación
-  en v2 no entra al roadmap salvo que Emi lo pida.
-- **D3: (a).** El centavo puede cambiar de ítem, el total no. Queda el
-  xfail con su motivo.
 
 Decidido por la PM.
 
@@ -323,9 +397,11 @@ supuestos de Mercado Pago que no pudiste ver sin red: los estados, que una
 ## Orden
 
 1. EXCEL-2b (D4 a y D5 a): hecha, entregala ya (hay cupo desde las 16:20 UTC).
-2. Si ORDEN-1 vuelve con devolución, esa va primero. El agregado de
-   GUARDAR-2 (arriba) va en un commit de pruebas con EXCEL-2b.
-3. COBRO-MP-1: hecha; subila ya y se entrega después de EXCEL-2b.
+2. La devolución de ORDEN-1 (arriba): justo después de EXCEL-2b, antes
+   que lo demás. El agregado de GUARDAR-2 va en un commit de pruebas con
+   EXCEL-2b.
+3. COBRO-MP-1: hecha; se entrega después de ORDEN-1, con A–E de arriba
+   arreglados.
 4. COBRO-CORTE-1: hecha; se entrega después de COBRO-MP-1.
 5. COBRO-MP-2: hecha; subila ya y se entrega después de COBRO-CORTE-1.
 6. AISLAMIENTO-2 y LIMPIEZA-1: hechas; se entregan después de COBRO-MP-2.
