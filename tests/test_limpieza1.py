@@ -40,7 +40,7 @@ def _comando_de_la_suite():
     texto = CI.read_text(encoding="utf-8")
     paso = re.search(r"- name: Suite completa\n(.*?)(?=\n\s*- name:|\n  \S|\Z)", texto, re.S)
     assert paso, "ci.yml no tiene el paso «Suite completa»"
-    run = re.search(r"\n\s*run:\s*[>|]?-?\s*\n(.*)", paso.group(1), re.S)
+    run = re.search(r"\brun:[ \t]*(?:[>|][-+]?)?(.*)", paso.group(1), re.S)
     assert run, "el paso «Suite completa» no tiene run"
     tokens = shlex.split(" ".join(run.group(1).split()))
     assert "pytest" in tokens, f"el paso «Suite completa» no corre pytest: {tokens}"
