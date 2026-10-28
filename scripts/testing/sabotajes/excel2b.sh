@@ -20,11 +20,12 @@ export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
        DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
 FALLAS=0
 B=tests/test_excel2b.py
+G=tests/test_guardar2.py
 D5="tests/test_excel2.py::test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_a_una_subida_normal"
 
 correr() { "$PY" -m pytest -q --no-cov -p no:cacheprovider "$@" 2>&1; }
 
-if ! salida="$(correr $B "$D5")"; then
+if ! salida="$(correr $B "$D5" $G)"; then
   echo "la base no está en verde:"; tail -5 <<<"$salida"; exit 1
 fi
 echo "base en verde"
@@ -142,7 +143,7 @@ sabotaje $F "el tope de lecturas de cabezas sube a 100000" $B \
   '_LIVIANO_IMAGENES_LECTURAS = 20' '_LIVIANO_IMAGENES_LECTURAS = 100000'
 sabotaje $F "un umbral que no entra en bytes vuelve a dar 500" $B \
   "FAILED $B::test_un_umbral_enorme_no_rompe_la_subida[1e308-2097152]" \
-  '    if not math.isfinite(valor * 1024 * 1024) or valor <= 0:' '    if not math.isfinite(valor) or valor <= 0:'
+  '    tope = int(valor) if math.isfinite(valor) else 0' '    tope = int(valor)'
 # Hallazgos del adversario Sonnet alto: el cuarto tope, la cuenta exacta de
 # lecturas y una entrada que no se puede descomprimir.
 sabotaje $F "el tope de lo descomprimido vuelve a su propia lectura" $B \
@@ -158,6 +159,45 @@ sabotaje $F "el tope de lecturas de cabezas sube a 21" $B \
 sabotaje $F "una entrada que no se descomprime corta la medida" $B \
   "FAILED $B::test_una_entrada_que_no_se_puede_descomprimir_no_corta_la_medida" \
   $'                except Exception:\n                    continue' $'                except ZeroDivisionError:\n                    continue'
+# Vuelta 2 de la devolución. Punto 1: un tope 0 vale el de defecto.
+sabotaje $F "un tope 0 se acepta como tope" $B \
+  "FAILED $B::test_un_tope_que_no_sirve_vale_el_de_defecto[MAX_UPLOAD_MB-0]" \
+  '    if tope <= 0:' '    if tope < 0:'
+# Punto 2: las guardas que no tenían caso.
+sabotaje $F "la cabeza descomprime la entrada entera y después corta" $B \
+  "FAILED $B::test_la_cabeza_de_una_imagen_no_descomprime_mas_de_44_bytes" \
+  '    return zlib.decompressobj(-15).decompress(datos, 44)' '    return zlib.decompressobj(-15).decompress(datos)[:44]'
+sabotaje $F "una imagen que no entra en el presupuesto corta las que siguen" $B \
+  "FAILED $B::test_una_imagen_que_no_entra_en_el_presupuesto_no_corta_las_que_siguen" \
+  $'_LIVIANO_IMAGENES_MAX:\n                    continue' $'_LIVIANO_IMAGENES_MAX:\n                    break'
+sabotaje $F "las imágenes se miran de la más chica a la más grande" $B \
+  "FAILED $B::test_las_imagenes_se_miran_de_la_mas_grande_a_la_mas_chica" \
+  'reverse=True)' 'reverse=False)'
+sabotaje $F "una entrada cifrada se descuenta" $B \
+  "FAILED $B::test_una_entrada_cifrada_no_se_descuenta" \
+  ' and not info.flag_bits & 0x1)' ')'
+sabotaje $F "la cabeza no mira la firma del encabezado local" $B \
+  "FAILED $B::test_una_cabeza_sin_la_firma_del_encabezado_local_no_cuenta_como_imagen" \
+  'if contents[local:local + 4] != b"PK\x03\x04":' 'if False:'
+sabotaje $F "un libro justo en el umbral va al pesado" $B \
+  "FAILED $B::test_un_libro_justo_en_el_umbral_va_al_liviano" \
+  'if resto <= umbral:' 'if resto < umbral:'
+sabotaje $F "un xls justo en el umbral va al pesado" $B \
+  "FAILED $B::test_un_xls_justo_en_el_umbral_va_al_liviano" \
+  'return len(contents) <= umbral' 'return len(contents) < umbral'
+sabotaje $F "un libro justo en el umbral sin la imagen va al pesado" $B \
+  "FAILED $B::test_un_libro_que_queda_justo_en_el_umbral_sin_la_imagen_va_al_liviano" \
+  'if resto - descontado <= umbral:' 'if resto - descontado < umbral:'
+sabotaje $F "una imagen de 10 MiB justos no se descuenta" $B \
+  "FAILED $B::test_una_imagen_de_10_mib_justos_se_descuenta" \
+  'if descontado + info.file_size > _LIVIANO_IMAGENES_MAX:' 'if descontado + info.file_size >= _LIVIANO_IMAGENES_MAX:'
+# Punto 3 (GUARDAR-2): lo guardado con un cliente no sale como del otro.
+sabotaje proyecto_maria/services/client_memory.py "la memoria del cliente se lee sin filtrar el cliente" $G \
+  "FAILED $G::test_guardar_uso_con_un_cliente_no_le_sugiere_a_otro_como_suyo" \
+  $'        ClientProductHistory.client_id == client_id,\n    )' $'        True,\n    )'
+sabotaje $M "el historial del despachante sale como del cliente" $G \
+  "FAILED $G::test_guardar_uso_con_un_cliente_no_le_sugiere_a_otro_como_suyo" \
+  $'                "count": ncm_data.get("count", 1)\n            })' $'                "count": ncm_data.get("count", 1), "scope": "cliente",\n            })'
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
