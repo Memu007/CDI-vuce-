@@ -730,7 +730,7 @@
     /* ---------- 10. Bootstrap ---------- */
     document.addEventListener('DOMContentLoaded', () => {
         try { localStorage.removeItem(CLIENTE_KEY); } catch (_) {}
-        loadCurrentUser();
+        const usuarioListo = loadCurrentUser();
         handleBillingReturn();
         updateClientePill();
         setupFakeSourceBanner();
@@ -777,42 +777,52 @@
             }
         });
 
-        // Persistence: Load from localStorage
-        let restored = false;
-        try {
-            const parsed = recuperarBorrador();
-            if (parsed) {
-                CDI.state = parsed;
-                if (parsed.clienteActivo) setClienteActivo(parsed.clienteActivo);
-                restored = true;
-                if (CDI.toast) CDI.toast.info('Recuperado', 'Se recuperó la operación en curso.');
-            }
-        } catch (e) {
-            console.warn('[app_v2] failed to restore state', e);
-        }
-
-        // Si ya había items (por ej. carga asíncrona de PDF, o restaurado recién)
-        // nos vamos a review. Sino, arrancamos en upload.
-        if (CDI.state && CDI.state.items && CDI.state.items.length > 0) {
-            goTo('review');
-        } else {
-            goTo('upload');
-        }
+        // Persistence: Load from localStorage. El borrador es de un usuario:
+        // se recupera después de saber quién entró (con tope, para no dejar la
+        // pantalla en blanco si la red no contesta).
+        const espera = new Promise(r => setTimeout(r, ESPERA_USUARIO_MS));
+        Promise.race([usuarioListo, espera])
+            .then(() => recuperarBorrador())
+            .catch(e => { console.warn('[app_v2] failed to restore state', e); return null; })
+            .then(parsed => {
+                if (parsed) {
+                    CDI.state = parsed;
+                    if (parsed.clienteActivo) setClienteActivo(parsed.clienteActivo);
+                    if (CDI.toast) CDI.toast.info('Recuperado', 'Se recuperó la operación en curso.');
+                }
+                // Si ya había items (por ej. carga asíncrona de PDF, o restaurado recién)
+                // nos vamos a review. Sino, arrancamos en upload.
+                if (CDI.state && CDI.state.items && CDI.state.items.length > 0) {
+                    goTo('review');
+                } else {
+                    goTo('upload');
+                }
+            });
     });
 
     /* ---------- 11. Persistence Auto-Save & BeforeUnload ---------- */
     // Cada pestaña guarda su operación en su propia clave (ORDEN-1): con una
     // sola clave, dos pestañas abiertas se pisaban y la que quedaba en la carga
     // de archivos borraba la operación de la otra.
-    //   cdi_v2_state:<pestaña> = { v: 1, savedAt, closed, state }
+    //   cdi_v2_state:<pestaña> = { v: 1, user, savedAt, closed, state }
     // La pestaña estrena un id en cada carga y adopta el borrador del id
     // anterior (recargar); si no lo tiene, el más reciente que nadie usa: el de
-    // una pestaña cerrada, uno que no se guarda hace rato o la clave vieja sin
-    // pestaña. Adoptar copia y después borra, así que dos pestañas que adoptan
-    // el mismo a la vez lo duplican, no lo pierden.
+    // una pestaña cerrada o uno que no se guarda hace rato. Adoptar copia y
+    // después borra, así que dos pestañas que adoptan el mismo a la vez lo
+    // duplican, no lo pierden.
+    // Sólo se recupera un borrador del usuario que entró y de menos de 7 días;
+    // el más viejo, y el que no tiene dueño (la clave de antes, sin pestaña),
+    // se borran al barrer.
+    // Una pestaña duplicada trae el id de la original en sessionStorage: cada
+    // pestaña retiene un Web Lock con su id mientras vive, y el borrador del id
+    // anterior se adopta sólo si ese lock se libera (recargar, o restaurar una
+    // pestaña que se cerró sin pagehide). Sin Web Locks, se adopta como antes.
     const BORRADOR = 'cdi_v2_state';
     const BORRADOR_PESTANA = 'cdi_v2_tab';
     const BORRADOR_HUERFANO_MS = 3 * 60 * 1000;
+    const BORRADOR_VENCE_MS = 7 * 24 * 60 * 60 * 1000;
+    const ESPERA_USUARIO_MS = 4000;
+    const ESPERA_PESTANA_MS = 1500;
     const pestanaAnterior = (() => {
         try { return sessionStorage.getItem(BORRADOR_PESTANA); } catch (_) { return null; }
     })();
@@ -822,6 +832,27 @@
     })();
     const claveBorrador = BORRADOR + ':' + pestana;
     try { sessionStorage.setItem(BORRADOR_PESTANA, pestana); } catch (_) {}
+    const hayLocks = (() => {
+        try { return !!(navigator.locks && navigator.locks.request); } catch (_) { return false; }
+    })();
+    if (hayLocks) {
+        try { navigator.locks.request(BORRADOR_PESTANA + ':' + pestana, () => new Promise(() => {})).catch(() => {}); } catch (_) {}
+    }
+
+    // ¿Sigue viva la pestaña que usó ese id? Si su lock no se libera a tiempo,
+    // sí: esta es una copia de ella.
+    function pestanaViva(id) {
+        if (!hayLocks) return Promise.resolve(false);
+        const corte = new AbortController();
+        const reloj = setTimeout(() => corte.abort(), ESPERA_PESTANA_MS);
+        return navigator.locks.request(BORRADOR_PESTANA + ':' + id, { signal: corte.signal }, () => false)
+            .catch(() => true)
+            .finally(() => clearTimeout(reloj));
+    }
+
+    function usuarioActual() {
+        return (CDI.currentUser && CDI.currentUser.username) || null;
+    }
 
     function enFlujo() {
         const state = CDI.state || {};
@@ -829,8 +860,9 @@
     }
 
     function guardarBorrador(cerrada) {
-        if (!enFlujo()) return;
-        const sobre = { v: 1, savedAt: Date.now(), closed: !!cerrada, state: CDI.state };
+        const user = usuarioActual();
+        if (!enFlujo() || !user) return;
+        const sobre = { v: 1, user, savedAt: Date.now(), closed: !!cerrada, state: CDI.state };
         try { localStorage.setItem(claveBorrador, JSON.stringify(sobre)); } catch (_) {}
     }
 
@@ -838,20 +870,27 @@
         try { localStorage.removeItem(claveBorrador); } catch (_) {}
     }
 
-    function leerBorrador(clave) {
+    // Devuelve el borrador si es del usuario. El que no tiene dueño (la clave
+    // vieja guardaba la operación sola) o tiene más de 7 días se borra, sea de
+    // quien sea.
+    function leerBorrador(clave, user) {
         let parsed = null;
         try { parsed = JSON.parse(localStorage.getItem(clave) || 'null'); } catch (_) { return null; }
         if (!parsed || typeof parsed !== 'object') return null;
-        // La clave vieja guardaba la operación sola, sin pestaña.
-        const sobre = parsed.v === 1 ? parsed : { savedAt: 0, closed: true, state: parsed };
-        const state = sobre.state;
+        const savedAt = Number(parsed.savedAt) || 0;
+        if (parsed.v !== 1 || typeof parsed.user !== 'string' || !parsed.user || Date.now() - savedAt > BORRADOR_VENCE_MS) {
+            try { localStorage.removeItem(clave); } catch (_) {}
+            return null;
+        }
+        if (parsed.user !== user) return null;
+        const state = parsed.state;
         if (!state || !Array.isArray(state.items) || state.items.length === 0) return null;
-        return { clave, savedAt: Number(sobre.savedAt) || 0, closed: !!sobre.closed, state };
+        return { clave, savedAt, closed: !!parsed.closed, state };
     }
 
     function adoptarBorrador(b) {
         try {
-            localStorage.setItem(claveBorrador, JSON.stringify({ v: 1, savedAt: Date.now(), closed: false, state: b.state }));
+            localStorage.setItem(claveBorrador, JSON.stringify({ v: 1, user: usuarioActual(), savedAt: Date.now(), closed: false, state: b.state }));
         } catch (_) { return null; }
         if (b.clave !== claveBorrador) {
             try { localStorage.removeItem(b.clave); } catch (_) {}
@@ -859,10 +898,12 @@
         return b.state;
     }
 
-    function recuperarBorrador() {
+    async function recuperarBorrador() {
+        const user = usuarioActual();
+        if (!user) return null;
         if (pestanaAnterior) {
-            const propio = leerBorrador(BORRADOR + ':' + pestanaAnterior);
-            if (propio) return adoptarBorrador(propio);
+            const propio = leerBorrador(BORRADOR + ':' + pestanaAnterior, user);
+            if (propio && !(await pestanaViva(pestanaAnterior))) return adoptarBorrador(propio);
         }
         let claves = [];
         try { claves = Object.keys(localStorage); } catch (_) { return null; }
@@ -871,7 +912,7 @@
         claves.forEach(clave => {
             if (clave === claveBorrador) return;
             if (clave !== BORRADOR && clave.indexOf(BORRADOR + ':') !== 0) return;
-            const b = leerBorrador(clave);
+            const b = leerBorrador(clave, user);
             if (!b) return;
             if (!b.closed && ahora - b.savedAt < BORRADOR_HUERFANO_MS) return;  // otra pestaña la está usando
             if (!elegido || b.savedAt > elegido.savedAt) elegido = b;

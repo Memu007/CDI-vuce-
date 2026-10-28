@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: la operación sin terminar es de quien la dejó y vence a los 7 días (ORDEN-1, devolución)
+
+- **fix(borrador):** al abrir sólo se recupera una operación del mismo usuario y de hace menos de 7 días; las más viejas se borran. Una pestaña duplicada no toma la operación de la original mientras sigue abierta; al recargar o restaurar se recupera la propia.
+
 ## 2026-10-28 · feat: copia de la base que se restaura y se compara antes de darla por buena (BACKUP-1a)
 
 - **feat(datos):** `scripts/datos/copia_base.py` saca la copia de Postgres (`pg_dump -Fc`), la restaura en una base descartable y compara, tabla por tabla, la cantidad de filas y un resumen del contenido; si no da igual, sale con error y no la marca como verificada.
