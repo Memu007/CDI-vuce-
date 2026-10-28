@@ -168,6 +168,21 @@ sabotaje $G "un grupo con destinos distintos se genera" \
   $'        if len(ivas) != 1:\n' $'        if False:\n' \
   "FAILED $T::test_un_grupo_con_destinos_distintos_no_se_genera" "DID NOT RAISE"
 
+# --- Un ítem armado con varias entradas (devolución de la PM, 17:25)
+sabotaje $G "los renglones juntados pierden su destino" \
+  $'    item = dict(renglones[0])\n' $'    item = dict(renglones[0])\n    item.pop(\'iva_adicional\', None)\n' \
+  "FAILED $T::test_dos_renglones_de_la_misma_posicion_salen_con_su_destino" "('COMERC', 'NO_VALIDA')"
+sabotaje $G "el grupo pierde su destino" \
+  $'        combined = dict(primero)\n' $'        combined = dict(primero)\n        combined.pop(\'iva_adicional\', None)\n' \
+  "FAILED $T::test_un_grupo_con_el_mismo_destino_sale_con_ese_destino" "('COMERC', 'NO_VALIDA')"
+sabotaje $G "el grupo sale como bien de uso de una persona" \
+  $'        combined = dict(primero)\n' $'        combined = dict(primero)\n        combined[\'iva_adicional\'] = \'IVAAD1\'\n' \
+  "FAILED $T::test_un_grupo_de_reventa_no_sale_como_bien_de_una_persona" "('USOPAR', 'IVAAD1')"
+sabotaje $G "el ítem con sub-ítems toma el destino de la operación" \
+  $'            if item.get("iva_adicional") else iva_adicional\n' \
+  $'            if item.get("iva_adicional") and not item.get("subitems") else iva_adicional\n' \
+  "FAILED $T::test_un_item_con_subitems_sale_con_el_destino_del_item" "('COMERC', 'NO_VALIDA')"
+
 # --- Lo que no está en la tabla
 sabotaje $G "se acepta cualquier destino" \
   '    if codigo not in IVA_ADICIONAL:' '    if False:' \

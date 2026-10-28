@@ -20,7 +20,7 @@ import pytest
 from proyecto_maria.core.maria_generator import supuestos_declarados
 from tests.test_maria1b_controles import _entorno, _generar  # noqa: F401 (fixture)
 from tests.test_maria4_despachante import _cpl, _gen
-from tests.test_maria_subitems import ITEM_BASE
+from tests.test_maria_subitems import ITEM_BASE, SUF_A, SUF_B
 
 PARES = {"NO_VALIDA": "COMERC", "IVAAD2": "BDEUSO", "IVAAD1": "USOPAR"}
 
@@ -86,6 +86,46 @@ def test_un_grupo_con_destinos_distintos_no_se_genera():
              dict(ITEM_BASE, grupo_id=1, iva_adicional="IVAAD2")]
     with pytest.raises(ValueError, match="mismo destino"):
         _gen(items)
+
+
+# --- Un ítem armado con varias entradas (devolución de la PM, 17:25) -------
+# En cada uno el destino elegido es distinto del de la operación: si el ítem
+# armado lo perdiera, saldría el de la operación y la prueba lo vería.
+
+def test_dos_renglones_de_la_misma_posicion_salen_con_su_destino():
+    items = [dict(ITEM_BASE, iva_adicional="IVAAD2"),
+             dict(ITEM_BASE, iva_adicional="IVAAD2", cantidad=2)]
+    assert _pares(_gen(items)) == {"0001": ("BDEUSO", "IVAAD2")}
+
+
+def test_un_grupo_con_el_mismo_destino_sale_con_ese_destino():
+    items = [dict(ITEM_BASE, grupo_id=1, iva_adicional="IVAAD2"),
+             dict(ITEM_BASE, grupo_id=1, iva_adicional="IVAAD2")]
+    assert _pares(_gen(items)) == {"0001": ("BDEUSO", "IVAAD2")}
+
+
+def test_un_grupo_con_el_primero_elegido_y_el_resto_vacio_no_se_genera():
+    """Vacío quiere decir «el de la operación»: el grupo tiene dos destinos."""
+    items = [dict(ITEM_BASE, grupo_id=1, iva_adicional="IVAAD2"),
+             dict(ITEM_BASE, grupo_id=1)]
+    with pytest.raises(ValueError, match="Grupo 1: todos los ítems deben tener el mismo destino"):
+        _gen(items)
+
+
+def test_un_grupo_de_reventa_no_sale_como_bien_de_una_persona():
+    items = [dict(ITEM_BASE, grupo_id=1, iva_adicional="NO_VALIDA"),
+             dict(ITEM_BASE, grupo_id=1, iva_adicional="NO_VALIDA")]
+    txt = _gen(items, iva_adicional="IVAAD1")
+    assert _pares(txt) == {"0001": ("COMERC", "NO_VALIDA")}
+    assert "USOPAR" not in txt and "IVAAD1" not in txt
+
+
+def test_un_item_con_subitems_sale_con_el_destino_del_item():
+    subitems = [{"cantidad": 2, "valor_unitario": 1197.00, "sufijo": SUF_A},
+                {"cantidad": 4, "valor_unitario": 1197.00, "sufijo": SUF_B}]
+    txt = _gen([dict(ITEM_BASE, iva_adicional="IVAAD2", subitems=subitems)])
+    assert "CARTSBITEM=S" in txt
+    assert _pares(txt) == {"0001": ("BDEUSO", "IVAAD2")}
 
 
 # Los códigos de GANANCIASOP3 no son un valor de `iva_adicional`: el dato es
