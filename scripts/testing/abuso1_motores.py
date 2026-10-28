@@ -5,8 +5,9 @@ Cada chequeo dice lo que tiene que pasar cuando el abuso está cerrado: sobre
 el código de antes del arreglo da FALLA, y esa FALLA es la reproducción.
 1. S4: rotar una IP inventada en X-Forwarded-For no esquiva el bloqueo de
    login, y mandar la IP de otro no lo bloquea a él;
-2. S5: un evento demasiado grande o sin sesión no se guarda (ni en la tabla
-   ni en logs/ui_events.jsonl);
+2. S5: un evento demasiado grande da 413 (según el log del servidor: el
+   cliente puede ver el corte de la conexión) y no se guarda ni en la tabla ni
+   en logs/ui_events.jsonl; uno sin sesión tampoco se guarda;
 3. S6: recuperar usuario tiene límite;
 4. C9: registrarse tiene límite (cada alta da 14 días de prueba).
 
@@ -152,6 +153,19 @@ def pedir(ruta, cuerpo=None, ip=None, inventada=None, token=None, crudo=None):
             return e.code, json.loads(e.read() or b"{}")
         except ValueError:
             return e.code, {}
+    except (urllib.error.URLError, ConnectionError) as e:
+        # Si el servidor contesta antes de leer todo el cuerpo y cierra, el
+        # cliente puede ver el corte en vez de la respuesta: lo que contestó
+        # sale de su log (codigo_en_el_servidor).
+        return 0, {"corte": str(e)}
+
+
+def codigo_en_el_servidor(ruta):
+    """El código de la última respuesta del servidor a `ruta`, según su log."""
+    marca = f'"POST {ruta} HTTP/1.1" '
+    with open(LOG) as f:
+        lineas = [x for x in f if marca in x]
+    return int(lineas[-1].split(marca, 1)[1].split()[0]) if lineas else None
 
 
 def registrar(u, ip):
@@ -203,16 +217,20 @@ def s5_eventos():
         s, _ = pedir(ruta, crudo=grande(marca), ip="203.0.113.12")
         crecio = tam_jsonl() - antes
         f = filas(marca)
-        print(f"INFO  | S5 {ruta}: 5 MB sin sesión → {s}, JSONL +{crecio} bytes, filas {f}")
-        chequear(not f and crecio < 64 * 1024, f"S5 {ruta}: un evento de 5 MB sin sesión no se guarda")
+        srv = codigo_en_el_servidor(ruta)
+        print(f"INFO  | S5 {ruta}: 5 MB sin sesión → cliente {s}, servidor {srv}, JSONL +{crecio} bytes, filas {f}")
+        chequear(srv == 413 and not f and crecio < 64 * 1024,
+                 f"S5 {ruta}: un evento de 5 MB sin sesión da 413 y no se guarda")
 
         marca = uuid.uuid4().hex
         antes = tam_jsonl()
         s, _ = pedir(ruta, crudo=grande(marca), ip="203.0.113.11", token=token)
         crecio = tam_jsonl() - antes
         f = filas(marca)
-        print(f"INFO  | S5 {ruta}: 5 MB con sesión → {s}, JSONL +{crecio} bytes, filas {f}")
-        chequear(not f and crecio < 64 * 1024, f"S5 {ruta}: un evento de 5 MB con sesión no se guarda")
+        srv = codigo_en_el_servidor(ruta)
+        print(f"INFO  | S5 {ruta}: 5 MB con sesión → cliente {s}, servidor {srv}, JSONL +{crecio} bytes, filas {f}")
+        chequear(srv == 413 and not f and crecio < 64 * 1024,
+                 f"S5 {ruta}: un evento de 5 MB con sesión da 413 y no se guarda")
 
         marca = uuid.uuid4().hex
         s, _ = pedir(ruta, {"action": "ab1_inventada", "screen": "x", "m": marca}, ip="203.0.113.12")
