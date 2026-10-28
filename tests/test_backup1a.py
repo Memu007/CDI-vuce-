@@ -333,7 +333,7 @@ def test_copiar_no_pisa_una_copia_que_ya_existe(origen, tmp_path):
     archivo = tmp_path / "copia.dump"
     archivo.write_bytes(b"copia anterior")
     r = correr("copiar", str(archivo), origen=origen)
-    assert r.returncode == 1 and "ya existe" in r.stderr, r.stdout + r.stderr
+    assert r.returncode == 1 and "no se pisa una copia" in r.stderr, r.stdout + r.stderr
     assert archivo.read_bytes() == b"copia anterior"
 
 
@@ -342,12 +342,19 @@ def test_la_direccion_entra_solo_por_variable(origen, tmp_path):
     r = correr("copiar", str(archivo))
     assert r.returncode == 1 and "falta la variable COPIA_ORIGEN_URL" in r.stderr, r.stdout + r.stderr
     assert not archivo.exists()
+    r = correr("copiar", str(archivo), origen=origen, COPIA_PRUEBA_URL="")
+    assert r.returncode == 1 and "falta la variable COPIA_PRUEBA_URL" in r.stderr, r.stdout + r.stderr
+    assert not archivo.exists(), "copió sin saber dónde probarla"
 
-    r = correr("copiar", "--base", _url_de(origen), str(archivo))
-    assert r.returncode == 2, "acepta la dirección por argumento"
-    assert not archivo.exists()
+    # Sin la dirección en las variables, tapar() no sabe cuál es la clave: lo
+    # que la saca del mensaje de argparse es el reemplazo del argumento.
     clave = _clave()
-    assert clave not in r.stderr and quote(clave, safe="") not in r.stderr, "el error repite la clave"
+    for args in (["--base=" + _url_de(origen), str(archivo)], [str(archivo), _url_de(origen)]):
+        r = correr("copiar", *args, COPIA_PRUEBA_URL="")
+        assert r.returncode == 2, f"acepta la dirección por argumento: {args[0][:6]}"
+        assert not archivo.exists()
+        assert "unrecognized arguments" in r.stderr, r.stderr
+        assert clave not in r.stderr and quote(clave, safe="") not in r.stderr, "el error repite la clave"
 
 
 def test_los_errores_no_muestran_la_clave(origen, tmp_path):
@@ -402,9 +409,13 @@ def test_enviar_no_lleva_una_copia_que_cambio(origen, tmp_path):
     assert list(destino.iterdir()) == []
 
 
-@pytest.mark.parametrize("destino", ["s3://cubo/copias", "relativo/copias", ""])
-def test_enviar_solo_a_una_carpeta_local(origen, tmp_path, destino):
+@pytest.mark.parametrize("destino, dice", [
+    ("s3://cubo/copias", "COPIA_DESTINO: enviar a un servicio no está soportado"),
+    ("relativo/copias", "COPIA_DESTINO tiene que ser una carpeta local"),
+    ("", "falta la variable COPIA_DESTINO"),
+])
+def test_enviar_solo_a_una_carpeta_local(origen, tmp_path, destino, dice):
     archivo = tmp_path / "copia.dump"
     _copiar_ok(origen, archivo)
     r = correr("enviar", str(archivo), COPIA_DESTINO=destino)
-    assert r.returncode == 1 and "COPIA_DESTINO" in r.stderr, r.stdout + r.stderr
+    assert r.returncode == 1 and dice in r.stderr, r.stdout + r.stderr
