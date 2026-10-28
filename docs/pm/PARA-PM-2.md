@@ -54,6 +54,34 @@ por un error de tipeo del admin, y la D26 no tiene fecha.
 - `inf` y `nan` salen como celda vacía en el xlsx.
 - `clientes.js:1549` llama `res.json()` con `res` null cuando la red falla: el toast muestra un error genérico.
 
+## DESTINO-1: **entregada** en `f887b4a` (2026-10-28, 16:50 UTC)
+
+**Resultado:** la pieza es `f887b4a` (base `4ce6d22`): producto `7526be9`,
+pruebas y sabotajes hasta `f887b4a`. Suite completa sobre `f887b4a`: 3697
+passed, 336 skipped, 2 xfailed, 0 failed; sabotajes 15/15 en rojo
+(`destino1.sh`). La autorrevisión no encontró nada alto ni medio dentro de la
+tarea: **no hay arreglo nuevo** y el SHA es el mismo de la tabla de abajo.
+
+**Decide la PM:** nada. La D28 (ocho pruebas comparan el golden entero, no
+seis) ya la anoté en la sección «hecha» de abajo.
+
+| Revisor | Modelo y esfuerzo | Hallazgos | Qué hice |
+|---|---|---|---|
+| destino1-sonnet | Sonnet alto | Nada reproducible. Tres bajas que ya estaban: el aviso por defecto, `despachante.js:369`, `NONE`/`N/A` en `iva_adicional` | Riesgos |
+| destino1-opus | Opus alto | Ningún par de Ganancias o IVA adicional fuera de los tres, ni una mezcla de destinos sin aviso: 100 combinaciones de renglones juntados y grupos, valores viejos o raros (`None`, `''`, minúsculas, `NONE`, `\x00`), sub-ítems y mezcla en un pedido. Dos bajas: (1) `despachante.js:74/357/369` compara con `===` y el servidor normaliza mayúsculas y espacios: un `'ivaad1'` en el estado local muestra «Igual que la operación» y sale USOPAR+IVAAD1; la pantalla nunca guardó minúsculas, sólo se llega editando `cdi_v2_state`. (2) El destino de un sub-ítem se ignora (vale el del ítem); la pantalla no lo ofrece y el MARIA declara un par por ítem | Riesgos |
+| `/code-review high` sobre `4ce6d22..f887b4a` | Opus alto, en fork | Todo bajo. (1) Reproducido, ya estaba: el aviso «COMERC + NO_VALIDA por defecto» sale con la operación vacía aunque todos los ítems hayan elegido el suyo (`maria_generator.py:2156`); la pieza sólo cambió el texto. (2) Dos dicts paralelos: si uno pierde una clave, `KeyError` → 500. (3) La lista de destinos del JS es una copia a mano. (4) La regla ítem/operación está en tres lugares y «Ítem N» cuenta distinto. (5) La lista `PRUEBAS` de `destino1.sh` es manual (hoy completa). (6) Un nombre de test viejo | Riesgos. Descartado: que un `IVAAD1` guardado pase a USOPAR; lo pide la tarea |
+| `/security-review` sobre el mismo rango | Opus alto | Sin hallazgos. La skill falló al arrancar: «fatal: ambiguous argument 'origin/HEAD...': unknown revision or path not in the working tree.»; se hizo a mano sobre el diff | Nada |
+
+**Riesgos que quedan (bajos):** los de la tabla. El que más engaña es el
+aviso por defecto con la operación vacía: dice «COMERC + NO_VALIDA» aunque
+cada ítem haya elegido el suyo. El TXT sale bien; el aviso, no. Ya estaba
+antes de la pieza.
+
+```bash
+git diff --stat 4ce6d22..f887b4a -- . ':!docs'
+PY=python bash scripts/testing/sabotajes/destino1.sh f887b4a   # 15/15 en rojo
+```
+
 ## Entregas preparadas para las 18:00 UTC (2026-10-28)
 
 Recibí la D37 (2) en `20fb535`. En ABUSO-1 la pasé a riesgos, con lo que
