@@ -50,7 +50,7 @@ juzgar() {
   for esperado in "$@"; do
     if ! grep -qF -- "$esperado" <<<"$salida"; then
       echo "ROJO? | $nombre: rojo (salida $codigo), pero sin «$esperado»"
-      grep -E "^(FAILED|E )" <<<"$salida" | head -8; FALLAS=$((FALLAS+1)); return
+      grep -E "^(FAILED|E |FALLA)" <<<"$salida" | cut -c1-300 | head -8; FALLAS=$((FALLAS+1)); return
     fi
   done
   echo "ROJO  | $nombre: $(printf '«%s» ' "$@")"
@@ -227,7 +227,7 @@ sabotaje "un archivo viejo con un carácter que la base no guarda se carga" 1 \
 sabotaje "la carga de archivos viejos no aplica los topes" 1 \
   $'        if _problema_historial(desc, ncm):\n            invalidas += 1' \
   $'        if "\\x00" in desc + ncm or not _es_utf8(desc + ncm):\n            invalidas += 1' \
-  "FAILED $T::test_un_archivo_viejo_con_caracteres_que_la_base_no_guarda_los_saltea" "8888888888"
+  "FAILED $T::test_un_archivo_viejo_con_caracteres_que_la_base_no_guarda_los_saltea" "At index 0 diff: ('CCCCCCCCCC"
 sabotaje "un NUL en el cliente pasa" 1 \
   'if "\x00" in client_id or not _es_utf8(client_id):' 'if False:' \
   "FAILED $T::test_confirmar_con_un_cliente_que_no_sirve_no_suma[cliente\\x00sintetico-400]" \
@@ -259,7 +259,7 @@ sabotaje_pg "sugerir sin rollback si falla la memoria del cliente" \
   $'            await db.rollback()\n            logging.warning("ncm suggestion client memory unavailable: %s", err)' \
   $'            logging.warning("ncm suggestion client memory unavailable: %s", err)' \
   "FALLA | falla la memoria del cliente: sigue el historial: []" \
-  "FALLA | falla la memoria del cliente: sigue el proveedor: []"
+  "FALLA | falla la memoria del cliente: sigue el proveedor: [('historial', None)]"
 sabotaje_pg "sugerir sin rollback si falla el catálogo del proveedor" \
   $'            await db.rollback()\n            logging.warning("ncm suggestion vendor catalog unavailable: %s", err)' \
   $'            logging.warning("ncm suggestion vendor catalog unavailable: %s", err)' \
@@ -267,7 +267,7 @@ sabotaje_pg "sugerir sin rollback si falla el catálogo del proveedor" \
 sabotaje_pg "importar sin el bloqueo por dueño" \
   $'    if not IS_SQLITE:\n        from sqlalchemy import text as sa_text\n        await db.execute(sa_text("SELECT pg_advisory_xact_lock' \
   $'    if False:\n        from sqlalchemy import text as sa_text\n        await db.execute(sa_text("SELECT pg_advisory_xact_lock' \
-  "FALLA | dos importaciones a la vez en orden contrario" "DeadlockDetectedError"
+  "FALLA | dos importaciones a la vez en orden contrario, vuelta 0: [(500,"
 sabotaje_pg "importar todo en una sola sentencia (Postgres)" \
   '_HISTORIAL_FILAS_POR_SENTENCIA = 150' '_HISTORIAL_FILAS_POR_SENTENCIA = 10**6' \
   "FALLA | importar 7000 filas en Postgres: 500"
