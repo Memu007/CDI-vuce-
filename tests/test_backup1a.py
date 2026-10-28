@@ -258,8 +258,9 @@ def test_una_copia_cortada_a_la_mitad_da_error(origen, tmp_path):
     destino = tmp_path / "destino"
     destino.mkdir()
     r = correr("enviar", str(archivo), COPIA_DESTINO=str(destino))
-    assert r.returncode == 1 and "no está verificada" in r.stderr, r.stdout + r.stderr
+    # Primero el destino: si algo llegó, el rojo lo nombra.
     assert list(destino.iterdir()) == []
+    assert r.returncode == 1 and "no está verificada" in r.stderr, r.stdout + r.stderr
 
 
 # ── Una base que se escribe mientras se copia, y la configuración de cada base ─
