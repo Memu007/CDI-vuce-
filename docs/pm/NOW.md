@@ -196,13 +196,13 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-10-28 11:00 UTC: sesiones bajo 170k (técnica 141k, MARIA 109k). Sin D abiertas. MARIA sigue con ABUSO-1 (tabla de contadores y límites, `74ccb76`); la técnica con AISLAMIENTO-2 (sabotajes, `0f2f160`). Emi: nada hasta las 12:00 UTC.
+
 2026-10-28 10:00 UTC: sesiones bajo 170k (técnica 105k, MARIA 143k). MARIA terminó SESION-1 sin entregar (895ee73, informe 5105838; suite 3872 passed 0 rojos según ella) y le pasé ABUSO-1 de la técnica (decidido por la PM; D35 antes de lo que ve el cliente). La técnica dice COBRO-MP-2 hecha en dda9f5b pero no la subió: se lo pedí, y le di AISLAMIENTO-2 mientras espera el cupo de las 18:00. Emi: nada hasta las 12:00 UTC. 10:15: MARIA confirmó la premisa de ABUSO-1 en los dos motores y abrió la D35; contestada (1) en las cinco, y a las 10:30 la D36 (2) por ahora (decidido por la PM; Emi confirma de día).
 
 2026-10-28 09:00 UTC: sesiones bajo 170k (técnica 120k, MARIA 144k). MARIA terminó OBSERVABILIDAD-1 sin entregar (probada en `39be45e`: sabotajes 16/16, suite 3855 passed 0 rojos, arranque real en Postgres «fallas 0», según ella) con la D34: **(a)**, la pieza sólo crea la columna; grabar el dueño de la métrica toca la sesión y va a «riesgos» como propuesta (decidido por la PM). A MARIA, **SESION-1** (🔵, S3 de la auditoría, pasada de la técnica; decidido por la PM). La técnica sigue con COBRO-MP-2 (D7 (a) decidida por la PM a las 08:20). Nada para Emi esta noche.
 
 2026-10-28 08:00 UTC: sesiones bajo 170k (técnica 120k, MARIA 108k). MARIA terminó DISCO-1 sin entregar (probada en `88b22c8`: sabotajes 20/20, suite 3847 passed 0 rojos, Postgres «fallas 0», según ella) con la D33: **(a)** para el código, el cargador de los `.json` viejos queda; si se rescatan los historiales de producción lo decide Emi al publicar DISCO-1 (decidido por la PM). A MARIA, **OBSERVABILIDAD-1** (🔵, pasada de la técnica, que tiene la cola larga; decidido por la PM). La técnica terminó COBRO-CORTE-1 sin entregar (`27e4594`, suite verde según ella) y quedaba sin trabajo hasta el cupo: **COBRO-MP-2** (🔵, empezala ya). Nada para Emi esta noche.
-
-2026-10-28 07:00 UTC: sesiones bajo 170k (técnica 116k, MARIA 127k). MARIA terminó DATOS-1 sin entregar (probada en `c996ad4`: sabotajes 12/12, suite 3836 passed 0 rojos, Postgres «fallas 0», según ella) y quedaba sin trabajo: a MARIA, **DISCO-1** (🔵, Fase 3: el historial de NCM pasa del disco de Railway a la base); BACKUP-1 queda para Emi (necesita algo fuera de Railway). La técnica sigue con COBRO-CORTE-1 (sabotajes corriendo, `8b47d12`); al revisarla, ver que aislar `test_user` en las pruebas no tape un bloqueo real a quien regenera mucho. Nada para Emi esta noche.
 
 ## Medición
 
