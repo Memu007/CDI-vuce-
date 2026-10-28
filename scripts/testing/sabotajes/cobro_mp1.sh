@@ -390,29 +390,25 @@ else
     "            acceptText: 'Sí, cancelar'," \
     "            confirmText: 'Sí, cancelar'," \
     "FALLA: past_due: el botón de aceptar dice"
-  sabotaje $P "D: openCheckout no deshabilita el botón" \
+  sabotaje $APP "D: irAlCheckout no deshabilita el botón" \
     "        boton.disabled = true;" \
     "" \
     "FALLA: el botón «Activar plan» no se deshabilita mientras pide el checkout"
-  sabotaje $P "D: «Activar plan» no le pasa el botón a openCheckout" \
-    "billingActivateBtn.addEventListener('click', () => openCheckout(billingActivateBtn));" \
-    "billingActivateBtn.addEventListener('click', () => openCheckout());" \
-    "FALLA: el botón «Activar plan» no se deshabilita mientras pide el checkout"
-  sabotaje $P "D: el botón no vuelve después del error" \
-    $'        if (await pedirCheckout()) return;\n        boton.disabled = false;' \
-    $'        if (await pedirCheckout()) return;' \
+  sabotaje $APP "D: el botón no vuelve después del error" \
+    "        boton.disabled = false;" \
+    "" \
     "FALLA: el botón «Activar plan» no vuelve a su estado después del error"
-  sabotaje $P "D: «Activar plan» se rehabilita al ir a Mercado Pago" \
-    "        if (await pedirCheckout()) return;" \
-    "        if (await pedirCheckout()) { boton.disabled = false; return; }" \
+  sabotaje $APP "D: irAlCheckout rehabilita el botón al ir a Mercado Pago" \
+    "                window.location.href = data.init_point;" \
+    "                boton.disabled = false; window.location.href = data.init_point;" \
     "FALLA: «Activar plan» se vuelve a habilitar mientras el navegador va a Mercado Pago"
   sabotaje $P "D: «Reactivar plan» se rehabilita al ir a Mercado Pago" \
-    "if (seguir && await pedirCheckout()) return;" \
-    "if (seguir && await pedirCheckout()) { billingReactivateBtn.disabled = false; return; }" \
+    "if (seguir && await CDI.irAlCheckout(planElegido(), billingReactivateBtn)) return;" \
+    "if (seguir && await CDI.irAlCheckout(planElegido(), billingReactivateBtn)) { billingReactivateBtn.disabled = false; return; }" \
     "FALLA: «Reactivar plan» se vuelve a habilitar mientras el navegador va a Mercado Pago"
   sabotaje $APP "D: el aviso rehabilita «Activar plan ahora» al ir a Mercado Pago" \
-    "await irAlCheckout((user && user.plan) || 'premium');" \
-    "await irAlCheckout((user && user.plan) || 'premium'); cta.disabled = false;" \
+    "irAlCheckout((user && user.plan) || 'premium', cta);" \
+    "irAlCheckout((user && user.plan) || 'premium', cta).then(() => { cta.disabled = false; });" \
     "FALLA: «Activar plan ahora» se vuelve a habilitar mientras el navegador va a Mercado Pago"
   sabotaje $APP "D: volver con «Atrás» no recarga la página" \
     "if (ev.persisted) window.location.reload();" \

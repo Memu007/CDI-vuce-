@@ -138,7 +138,11 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   async function sigueDeshabilitado(nombre, selector, pedir) {
     const yendo = new Promise(r => { llego = r; });
     await pedir();
-    await yendo;
+    let reloj;
+    const tope = new Promise(r => { reloj = setTimeout(r, 10000); })
+      .then(() => falla('«' + nombre + '»: el navegador no va a Mercado Pago'));
+    await Promise.race([yendo, tope]);
+    clearTimeout(reloj);
     if (!await page.evaluate(s => document.querySelector(s).disabled, selector))
       falla('«' + nombre + '» se vuelve a habilitar mientras el navegador va a Mercado Pago');
     console.log('OK | con el checkout creado, «' + nombre + '» sigue deshabilitado mientras va a Mercado Pago');
