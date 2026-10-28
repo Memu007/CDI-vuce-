@@ -11,7 +11,7 @@ scripts/testing/guardar2_postgres.py.
 import pytest
 
 from tests.test_guardar1 import SIM, _cliente, _guardar, _historial
-from tests.test_prelaunch_block2 import client  # noqa: F401
+from tests.test_prelaunch_block2 import _register, _unique, client  # noqa: F401
 import proyecto_maria.main as main_mod
 
 PROVEEDOR = "Proveedor de prueba"
@@ -117,3 +117,39 @@ def test_la_sim_de_otro_producto_parecido_no_gana(client, monkeypatch):
 def test_la_sim_del_proveedor_sale_en_la_forma_de_siempre(client):
     item = _lookup(client, _con_proveedor(client, "8471 49 00 100d"))
     assert item["ncm"] == SIM
+
+
+# Negativos por dueño: el catálogo del proveedor y el historial del cliente
+# son de cada despachante. Lo de otro no se filtra ni cambia la SIM.
+
+def _catalogo_de_otro_usuario(client, ncm=SIM):
+    """Registra otro despachante (queda su sesión) con su catálogo del proveedor."""
+    _register(client, _unique("g2otro"))
+    r = client.post("/api/catalog/proveedor_de_prueba/productos", json={
+        "vendor_name": PROVEEDOR, "productos": [{"descripcion": DESC, "ncm": ncm}]})
+    assert r.status_code == 200, r.text
+
+
+def test_el_catalogo_de_otro_usuario_no_cambia_la_sim(client, monkeypatch):
+    _catalogo_de_otro_usuario(client)
+    cid = _cliente(client)  # otro despachante, sin catálogo propio de ese proveedor
+    assert _guardar(client, cid, [{"pieza": SIM, "ncm": SIM, "descripcion": DESC}]).status_code == 200
+    item = _lookup(client, cid)
+    assert (item["source"], item["ncm"]) == ("cliente", "84714900")
+    sugerencias = _sugerir(client, cid, monkeypatch)
+    assert [(s["source"], s["ncm"]) for s in sugerencias] == [("historial", "84714900")]
+
+
+def test_el_historial_de_un_cliente_ajeno_no_se_usa(client, monkeypatch):
+    cid = _con_proveedor(client, SIM)  # cliente y catálogo del primer despachante
+    _catalogo_de_otro_usuario(client)
+    # El segundo pide con el client_id del primero: sólo ve su propio catálogo.
+    item = _lookup(client, cid)
+    assert (item["source"], item["ncm"]) == ("proveedor", SIM)
+    assert "veces_usado" not in item
+    sugerencias = _sugerir(client, cid, monkeypatch)
+    assert [(s["source"], s["ncm"]) for s in sugerencias] == [("proveedor", SIM)]
+    # Sin proveedor no queda nada del primero.
+    r = client.post("/api/catalog/lookup", json={"items": [{"descripcion": DESC}], "client_id": cid})
+    assert r.status_code == 200, r.text
+    assert (r.json()["items"][0]["source"], r.json()["items"][0]["ncm"]) == ("ninguno", None)

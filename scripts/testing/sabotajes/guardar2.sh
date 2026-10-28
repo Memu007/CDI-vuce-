@@ -80,5 +80,17 @@ sabotaje $M "la SIM del proveedor sale tal como está guardada" \
   '        return proveedor' \
   "FAILED $T::test_la_sim_del_proveedor_sale_en_la_forma_de_siempre"
 
+# Por dueño: sin el filtro del despachante, lo de otro se cuela.
+C=proyecto_maria/core/catalog_service.py
+CM=proyecto_maria/services/client_memory.py
+sabotaje $C "el catálogo del proveedor de otro despachante cambia la SIM" \
+  $'    stmt = select(VendorCatalogProduct).where(\n        VendorCatalogProduct.owner_username == owner_username,\n        VendorCatalogProduct.vendor_id == vendor_id,\n    )\n    result = await db.execute(stmt)\n    return list(' \
+  $'    stmt = select(VendorCatalogProduct).where(\n        VendorCatalogProduct.vendor_id == vendor_id,\n    )\n    result = await db.execute(stmt)\n    return list(' \
+  "FAILED $T::test_el_catalogo_de_otro_usuario_no_cambia_la_sim"
+sabotaje $CM "el historial de un cliente ajeno se usa" \
+  $'    q = sa_select(ClientProductHistory).where(\n        ClientProductHistory.owner_username == owner_username,\n        ClientProductHistory.client_id == client_id,\n    )\n    result = await db.execute(q)\n    candidates' \
+  $'    q = sa_select(ClientProductHistory).where(\n        ClientProductHistory.client_id == client_id,\n    )\n    result = await db.execute(q)\n    candidates' \
+  "FAILED $T::test_el_historial_de_un_cliente_ajeno_no_se_usa"
+
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]
