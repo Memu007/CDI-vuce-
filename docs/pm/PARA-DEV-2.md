@@ -30,6 +30,15 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## D30 (2026-10-28): (a) por ahora, sobre `371cde2`
+
+SEGURO-1 se entrega como está: un seguro «para completar» avisa en pantalla
+y no frena el TXT. Frenar en el servidor (tu (b), un cero real escrito a
+mano) es una pieza nueva y no está en el roadmap: se la propongo a Emi de
+día como **SEGURO-2**, con mi recomendación de (b). No la empieces hasta que
+la veas acá. Anotá el riesgo (seguro 0 en el TXT si nadie lo completa) en
+el informe de SEGURO-1, en «riesgos».
+
 ## D29 (2026-10-28): opción (a), sobre `4ca6829`
 
 Los `Z` piden número y los `A` son libres: `PIDE_NUMERO = ("Z",)` queda
@@ -160,10 +169,47 @@ primero entregás ORG-1 y después seguís. Datos que llegaron el 28/10
   valor que no es ninguno de los tres (error, no se genera), y un sabotaje
   por par. Es un campo de impuestos: revisión fuerte.
 
-Después: **SUFIJOS-2** (hecha, sin entregar) y **SEGURO-1** (abajo,
-empezala ya). PESO-NETO-1 y PRORRATEO-1 siguen esperando al despachante.
+Después: **SUFIJOS-2** y **SEGURO-1** (hechas, sin entregar) y
+**DESPACHO-1b** (abajo, empezala ya). PESO-NETO-1 y PRORRATEO-1 siguen esperando al despachante.
 
-### SEGURO-1 — empezala ya (2026-10-28 04:00 UTC)
+### DESPACHO-1b (lectura y pantalla) — empezala ya (2026-10-28 05:00 UTC)
+
+SEGURO-1 quedó hecha. Mientras esperás el cupo de las 18:00 UTC, la lectura
+de DESPACHO-1 (`ROADMAP.md`, Fase 1c, fila 7), en commits aparte encima de
+SEGURO-1 (`371cde2`), con su propio `/entregar` después del de SEGURO-1.
+
+- **Qué lee:** lo de `DESPACHOS-FORMA.md`, «Lo que DESPACHO-1 lee para el
+  catálogo»: por renglón (ítem o subítem) posición SIM, descripción,
+  sufijos de valor, origen, unidad, cantidad, valor unitario y kilo neto.
+  Se lee **por rótulo, no por posición**; números `1.234,56`; con unidad
+  `SUBITEM`, un renglón por subítem con sus valores y sufijos. Lo que no
+  encuentra queda marcado; nada se rellena. El resto del despacho no se
+  guarda.
+- **Cómo:** sobre el texto del PDF, sin Gemini. Premisa primero: mirá qué
+  usa ya el repo para sacar texto de un PDF y si alcanza. Un PDF sin texto
+  (escaneado) da un aviso claro y no guarda nada. Si algo de esto no se
+  puede sin Gemini o sin una librería nueva, es la D31 y seguís con lo que
+  no depende de ella.
+- **Pantalla:** se revisa y se edita renglón por renglón antes de guardar
+  en el catálogo de ese cliente (el mismo de DESPACHO-1a, con
+  `_get_owned_client`: un cliente ajeno da el 404 de hoy). Lo marcado como
+  no encontrado se ve marcado.
+- **Nunca** arma un TXT ni una operación. El lector de facturas sigue
+  rechazando despachos: una prueba lo muestra.
+- **Datos:** los tres despachos reales no los vas a ver y no entran nunca.
+  El sintético lo arma la prueba con la forma de `DESPACHOS-FORMA.md` y
+  valores inventados: dos ítems, uno con subítems, un `AI` con espacios, un
+  carácter con tilde roto («Las dem?s»), FOB y flete en divisas distintas,
+  y un renglón al que le falta el kilo neto.
+
+Pruebas: cada rótulo leído; subítems; sufijos con y sin paréntesis; el
+faltante marcado y no rellenado; rótulos en otro orden en la hoja (se lee
+por rótulo); el PDF sin texto; que el lector de facturas lo sigue
+rechazando; aislamiento (otro dueño, otro cliente); que no se crea ninguna
+operación. Un sabotaje por regla. Línea en `CHANGELOG.md`. Toca datos de
+clientes: revisión fuerte. Tu próxima D es la **D31**.
+
+### SEGURO-1 — hecha, sin entregar (encargada 2026-10-28 04:00 UTC)
 
 En commits aparte encima de SUFIJOS-2 (`4ca6829`), con su propio
 `/entregar` después del de SUFIJOS-2. Respuesta del despachante (pregunta
