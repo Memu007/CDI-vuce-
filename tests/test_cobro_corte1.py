@@ -219,7 +219,7 @@ ESTADOS = {
     "suscripcion_vencida": ({"billing_status": "active", "trial_ends_at": AHORA - timedelta(days=10)},
                             "TRIAL_EXPIRED", "Venció tu suscripción", "past_due"),
     "cancelada": ({"billing_status": "canceled"},
-                  "SUBSCRIPTION_CANCELED", "Cancelaste tu suscripción", "canceled"),
+                  "TRIAL_EXPIRED", "Cancelaste tu suscripción", "canceled"),
 }
 
 
