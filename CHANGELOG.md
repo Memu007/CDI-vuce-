@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · feat: con CIF, CIP, DPU, DAP y DDP el sistema no sugiere el seguro (SEGURO-1)
+
+- Con esos incoterms el seguro ya está en el precio: no hay botón «Calcular seguro». El seguro de la factura se sigue cargando y sale en el TXT como siempre.
+- Si el seguro lo calculó el sistema y el incoterm pasa a uno de esos, se borra y queda para completar; el que cargó la persona no se toca.
+
 ## 2026-10-28 · feat: los sufijos de valor aceptan la coma de un número y frenan los vacíos (SUFIJOS-2)
 
 - En un sufijo de código libre, un número con decimales sale con coma: «AF(2.5)» sale «AF(2,5)», no «AF(2 5)».

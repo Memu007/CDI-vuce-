@@ -907,6 +907,14 @@ TASA_SEGURO_SUGERIDO = Decimal("0.01")
 # Para cambiarlo alcanza con esta línea: "fob_casillero".
 BASE_SEGURO_SUGERIDO = "fob_factura"
 NOMBRE_DEL_FOB = {"fob_casillero": "FOB casillero", "fob_factura": "FOB de la factura"}
+# Con estos incoterms el seguro ya está en el precio (SEGURO-1): no se sugiere
+# el 1 %. El seguro se sigue declarando, el de la factura o el que se escribe.
+INCOTERMS_CON_SEGURO = ("CIF", "CIP", "DPU", "DAP", "DDP")
+
+
+def seguro_en_el_precio(incoterm) -> bool:
+    """Si el incoterm lleva el seguro en el precio; vacío o desconocido, no."""
+    return str(incoterm or "").strip().upper() in INCOTERMS_CON_SEGURO
 
 
 def importe_escrito(valor) -> str:
@@ -945,14 +953,16 @@ def _numeros_de_los_renglones(items: list):
                              f"no se pueden hacer las cuentas.")
 
 
-def cuentas_del_valor(items: list, flete=0, seguro=0, ajustes_incluir=None, ajustes_deducir=None) -> dict:
+def cuentas_del_valor(items: list, flete=0, seguro=0, ajustes_incluir=None, ajustes_deducir=None,
+                      incoterm=None) -> dict:
     """Las cuentas del valor que se muestran antes de generar (VALOR-1).
 
     FOB casillero = FOB de la factura (el MDDTFOB del TXT) + ajustes a incluir
     − ajustes a deducir. Los ajustes los carga la persona: el sistema no
     decide qué se descuenta. El seguro sugerido es el 1 % de (el FOB de
-    BASE_SEGURO_SUGERIDO + flete), al centavo. Nada de esto cambia el TXT (D12 de VALOR-1). Un
-    importe inválido o un FOB casillero negativo es un ValueError."""
+    BASE_SEGURO_SUGERIDO + flete), al centavo; con un incoterm que ya lleva el
+    seguro en el precio no hay sugerido (None). Nada de esto cambia el TXT (D12
+    de VALOR-1). Un importe inválido o un FOB casillero negativo es un ValueError."""
     _numeros_de_los_renglones(items)
     fob_factura = fob_total_del_txt(items)
     incluir = centavos(_ajuste(ajustes_incluir, "Ajustes a incluir") or 0)
@@ -966,6 +976,7 @@ def cuentas_del_valor(items: list, flete=0, seguro=0, ajustes_incluir=None, ajus
             f"factura más los ajustes a incluir ({importe_escrito(fob_factura + incluir)})."
         )
     fob_base = {"fob_casillero": fob_casillero, "fob_factura": fob_factura}[BASE_SEGURO_SUGERIDO]
+    en_el_precio = seguro_en_el_precio(incoterm)
     return {
         "fob_factura": float(fob_factura),
         "ajustes_incluir": float(incluir),
@@ -973,8 +984,9 @@ def cuentas_del_valor(items: list, flete=0, seguro=0, ajustes_incluir=None, ajus
         "fob_casillero": float(fob_casillero),
         "flete": float(flete_c),
         "seguro": float(seguro_c),
-        "seguro_sugerido": float(centavos(TASA_SEGURO_SUGERIDO * (fob_base + flete_c))),
+        "seguro_sugerido": None if en_el_precio else float(centavos(TASA_SEGURO_SUGERIDO * (fob_base + flete_c))),
         "base_seguro": NOMBRE_DEL_FOB[BASE_SEGURO_SUGERIDO],
+        "seguro_en_el_precio": en_el_precio,
     }
 
 

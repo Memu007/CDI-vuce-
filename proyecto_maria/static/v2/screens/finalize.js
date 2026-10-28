@@ -375,7 +375,7 @@
     // algo cambió desde entonces (un ajuste, el descuento, el seguro, otra
     // operación), no se usa: se piden las cuentas de nuevo.
     function calcularSeguro() {
-        if (!ultimoValor || ultimoValor.error) return;
+        if (!ultimoValor || ultimoValor.error || ultimoValor.seguro_en_el_precio) return;
         let ahora = null;
         try { ahora = firmaDelPedido(buildMariaRequest()); } catch (err) { ahora = null; }
         if (!cuentasCon || cuentasCon !== ahora) {
@@ -402,9 +402,33 @@
             !(Array.isArray(op.campos_completados) && op.campos_completados.includes('seguro'));
     }
 
+    // Con un incoterm que ya lleva el seguro en el precio, el 1 % que puso el
+    // sistema no va: se borra y queda para completar, como un campo que no se
+    // leyó (SEGURO-1). Sólo con las cuentas del pedido de ahora; el seguro
+    // leído o escrito por la persona no se toca.
+    function borrarSeguroCalculado(valor, firma) {
+        const op = CDI.state && CDI.state.operacion;
+        if (!op || !valor || !valor.seguro_en_el_precio || !op.seguro_calculado) return false;
+        let ahora = null;
+        try { ahora = firmaDelPedido(buildMariaRequest()); } catch (err) { ahora = null; }
+        if (!firma || firma !== ahora) return false;
+        op.seguro = '';
+        delete op.seguro_calculado;
+        const sinLeer = Array.isArray(op.campos_sin_leer) ? op.campos_sin_leer : [];
+        if (!sinLeer.includes('seguro')) op.campos_sin_leer = sinLeer.concat(['seguro']);
+        if (Array.isArray(op.campos_completados)) {
+            op.campos_completados = op.campos_completados.filter(c => c !== 'seguro');
+        }
+        cuentasViejas();
+        refrescarAvisos();
+        if (CDI.semaforo && CDI.semaforo.refresh) CDI.semaforo.refresh();
+        return true;
+    }
+
     function pintarValor(valor, firma) {
         ultimoValor = valor;
         cuentasCon = firma || null;
+        if (borrarSeguroCalculado(valor, firma)) return;
         const op = (CDI.state && CDI.state.operacion) || {};
         const incluir = document.getElementById('valorIncluir');
         const deducir = document.getElementById('valorDeducir');
@@ -465,19 +489,26 @@
         const calculado = ok && op.seguro_calculado;
         // Sobre qué FOB va el 1 % lo dice el servidor (BASE_SEGURO_SUGERIDO, D13).
         const base = (ok && valor.base_seguro) || 'FOB';
-        const mostrar = ok && (!(valor.seguro > 0) || calculado) && valor.seguro !== valor.seguro_sugerido;
+        // Con CIF, CIP, DPU, DAP o DDP no hay 1 %: lo dice el servidor (SEGURO-1).
+        const enElPrecio = !!(valor && valor.seguro_en_el_precio);
+        const mostrar = ok && !enElPrecio && (!(valor.seguro > 0) || calculado) &&
+            valor.seguro !== valor.seguro_sugerido;
         if (boton) {
             boton.hidden = !mostrar;
             boton.textContent = (calculado ? 'Recalcular seguro' : 'Calcular seguro') +
-                ' (1 % de ' + base + ' + flete): ' + (ok ? importeEscrito(valor.seguro_sugerido) : '');
+                ' (1 % de ' + base + ' + flete): ' + (mostrar ? importeEscrito(valor.seguro_sugerido) : '');
         }
         // Lo calculó con otros importes, o ya no se puede comprobar: el
         // servidor no genera hasta que se recalcule o se deje (VALOR-1c).
         const dejar = document.getElementById('valorDejarSeguro');
-        if (dejar) dejar.hidden = !(valor && op.seguro_calculado &&
+        if (dejar) dejar.hidden = !(valor && !enElPrecio && op.seguro_calculado &&
             (valor.error || valor.seguro !== valor.seguro_sugerido));
+        const incoterm = String(op.incoterm || '').trim().toUpperCase() || 'este incoterm';
         if (nota) {
             nota.textContent = !ok ? '' :
+                enElPrecio ? 'Con ' + incoterm + ' el seguro ya está en el precio: el sistema no lo calcula.' +
+                    (seguroSinLeer(op) ? ' No pudimos leerlo de la factura: completalo en la revisión.' :
+                        valor.seguro > 0 ? '' : ' Si la factura lo trae, cargalo en la revisión.') :
                 (calculado && valor.seguro !== valor.seguro_sugerido) ? 'El seguro se calculó con otros importes.' :
                 calculado ? 'Seguro calculado: 1 % de (' + base + ' + flete).' :
                 valor.seguro > 0 ? 'La operación ya trae seguro.' :

@@ -73,7 +73,7 @@ from proyecto_maria.models.operations import OperationPayload, Item
 from proyecto_maria.core.validations import run_pre_maria_validations, run_smart_validations
 from proyecto_maria.core.excel_generator import create_maria_excel
 from proyecto_maria.services.fecha_inic_activ import fecha_del_alta
-from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, importe_escrito, usa_el_sufijo_de_la_operacion, fecha_inicio_actividad
+from proyecto_maria.core.maria_generator import generate_maria_txt, validate_items_for_maria, validate_for_kit_maria, pais_reconocido, pais_de_la_tabla, procedencia_de, errores_de_procedencia, importe_valido, supuestos_declarados, gastos_fob_para_el_txt, FALTA_CUIT_DEL_DESPACHANTE, cuentas_del_valor, seguro_en_el_precio, importe_escrito, usa_el_sufijo_de_la_operacion, fecha_inicio_actividad
 from proyecto_maria.pdf_extractor import (  # Importar el extractor
     process_pdf,
     DocumentoNoAdmitido,
@@ -4282,9 +4282,14 @@ SIN_PRODUCTOS = "No hay productos para generar: volvé a cargar la factura."
 
 def _seguro_calculado_viejo(request: MariaRequest, valor: dict) -> str | None:
     """Un seguro que calculó el sistema con otros importes (VALOR-1c): la
-    persona elige recalcularlo o dejarlo; el TXT no lo lleva sin que elija."""
+    persona elige recalcularlo o dejarlo; el TXT no lo lleva sin que elija.
+    Con un incoterm que ya lleva el seguro en el precio no hay 1 % que
+    comprobar ni que dejar (SEGURO-1): se carga el de la factura."""
     if not request.seguro_calculado:
         return None
+    if seguro_en_el_precio(request.incoterm):
+        return (f"Seguro: lo calculó el sistema, pero con {str(request.incoterm).strip().upper()} el seguro "
+                "ya está en el precio y no se calcula. Cargá el de la factura en la revisión.")
     if valor.get("error"):
         return (f"Seguro: lo calculó el sistema y ahora no se puede comprobar: {valor['error']} "
                 "Corregí las cuentas o dejá el seguro como está en «Ajustes y seguro».")
@@ -4355,7 +4360,16 @@ async def avisos_maria_endpoint(
 
 def _cuentas_del_valor(request: MariaRequest, items: list) -> tuple[dict, list]:
     """Las cuentas del valor para la pantalla y su aviso (VALOR-1). Un ajuste
-    inválido o un producto mal formado no frena los avisos: va en `error`."""
+    inválido o un producto mal formado no frena los avisos: va en `error`.
+    Con `error`, si el incoterm lleva el seguro en el precio, también lo dice:
+    la pantalla no ofrece el 1 % aunque no haya cuentas (SEGURO-1)."""
+    valor, avisos = _cuentas_o_error(request, items)
+    if "error" in valor and seguro_en_el_precio(request.incoterm):
+        valor["seguro_en_el_precio"] = True
+    return valor, avisos
+
+
+def _cuentas_o_error(request: MariaRequest, items: list) -> tuple[dict, list]:
     malos = [n for n, it in enumerate(items, 1) if not isinstance(it, dict)]
     if malos:
         return {"error": f"Hay un producto mal formado (renglón {malos[0]}): no se pueden hacer las cuentas."}, []
@@ -4363,6 +4377,7 @@ def _cuentas_del_valor(request: MariaRequest, items: list) -> tuple[dict, list]:
         valor = cuentas_del_valor(
             items, flete=request.flete, seguro=request.seguro,
             ajustes_incluir=request.ajustes_incluir, ajustes_deducir=request.ajustes_deducir,
+            incoterm=request.incoterm,
         )
     except ValueError as e:
         return {"error": str(e)}, []
