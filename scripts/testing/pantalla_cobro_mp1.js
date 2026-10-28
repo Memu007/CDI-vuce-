@@ -119,6 +119,30 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   if (pedidos.length !== 1) falla('dos clics en «Activar plan» pidieron ' + pedidos.length + ' checkouts');
   console.log('OK | dos clics en «Activar plan»: un checkout, botón deshabilitado mientras espera');
 
+  // Con el checkout creado, el botón sigue deshabilitado mientras el navegador
+  // va a Mercado Pago: otro clic pediría un segundo checkout, que cancela la
+  // suscripción adonde está yendo.
+  await page.unroute('**/api/billing/checkout');
+  await perfilCon('past_due');
+  const destino = base + '/mercado-pago-de-prueba-' + id;
+  // Mercado Pago de prueba contesta 204: el navegador intenta ir y se queda en
+  // la página, como si la navegación no hubiera terminado todavía.
+  let llego;
+  const yendo = new Promise(r => { llego = r; });
+  await page.route(destino, route => { llego(); route.fulfill({ status: 204 }); });
+  let checkouts = 0;
+  await page.route('**/api/billing/checkout', route => {
+    checkouts++;
+    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, init_point: destino }) });
+  });
+  await activar.click();
+  await yendo;
+  if (!await page.evaluate(() => document.getElementById('pfBillingActivate').disabled))
+    falla('el botón «Activar plan» se vuelve a habilitar mientras el navegador va a Mercado Pago');
+  await activar.click({ force: true }).catch(() => {});
+  if (checkouts !== 1) falla('otro clic mientras va a Mercado Pago pidió ' + checkouts + ' checkouts');
+  console.log('OK | con el checkout creado, «Activar plan» sigue deshabilitado mientras va a Mercado Pago');
+
   await b.close();
   console.log('pantalla COBRO-MP-1: OK');
 })().catch(e => falla(String(e && e.stack || e)));
