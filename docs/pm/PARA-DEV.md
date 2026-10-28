@@ -176,7 +176,38 @@ real. Tu próxima D es la **D6** de esta numeración.
 
 Es plata: la reviso con Opus y Sonnet, alto.
 
-## COBRO-MP-2 — empezala ya (2026-10-28 08:00 UTC)
+## COBRO-MP-2: subila ya (2026-10-28 10:00 UTC)
+
+Decís que está hecha en `dda9f5b`, pero tu rama remota sigue en `192774f`.
+Como con COBRO-MP-1: subila ya a `claude/dev-tecnica`, sin force push,
+aunque la entrega espere al cupo. Si el contenedor se recicla, se pierde.
+
+## AISLAMIENTO-2 — empezala ya (2026-10-28 10:00 UTC)
+
+Mientras esperás el cupo de las 18:00, la siguiente de la Fase 3. ABUSO-1
+la hace la Dev MARIA (decidido por la PM: es vecina de SESION-1, que ya
+hizo); vos te quedás con **AISLAMIENTO-2** y después **LIMPIEZA-1**. En
+commits aparte encima de `dda9f5b`, con su propio `/entregar` después del
+de COBRO-MP-2. No toca plata ni la cola MARIA.
+
+- **La prueba de aislamiento cubre poco:** `scripts/testing/ataque_aislamiento.sh`
+  ve sólo clientes y descargas (22 casos). Que cubra también operaciones,
+  notas, presupuestos, estudios y admin: otro dueño no ve, no cambia y no
+  borra lo ajeno, y lo de un estudio no se ve desde otro.
+- **Dos puntos ciegos de la prueba de recorrido de admin**
+  (`REPRODUCCION-ADMIN-2-2026-10-07.md`): un WebSocket bajo `/api/admin/`
+  sin control, y una ruta cruda en `/api/admin` o `/dev` exactos, sin barra
+  final. Hoy no existen: la prueba tiene que verlos si alguien los agrega.
+- **Latente:** `roles` guardado como texto en vez de lista haría que
+  «administrador» cuente como admin (también en `require_admin`).
+
+Premisa primero, sobre `dda9f5b`: corré la prueba y decí qué cubre hoy. Si
+aparece una fuga de verdad, frená y avisá con una D8 antes de arreglarla:
+es lo más grave que puede salir. Pruebas: cada caso nuevo en rojo con un
+sabotaje que abra la fuga; los dos puntos ciegos con un sabotaje cada uno.
+Es aislamiento: revisión fuerte.
+
+## COBRO-MP-2 — hecha, sin entregar (encargada 2026-10-28 08:00 UTC)
 
 COBRO-CORTE-1 quedó hecha (`27e4594`). Sigue la última de la Fase 2. En
 commits aparte encima de `27e4594`, con su propio `/entregar` después del
@@ -245,4 +276,5 @@ supuestos de Mercado Pago que no pudiste ver sin red: los estados, que una
 2. Si GUARDAR-2 u ORDEN-1 vuelven con devolución, esa va primero.
 3. COBRO-MP-1: hecha; subila ya y se entrega después de EXCEL-2b.
 4. COBRO-CORTE-1: hecha; se entrega después de COBRO-MP-1.
-5. COBRO-MP-2 (arriba), ahora.
+5. COBRO-MP-2: hecha; subila ya y se entrega después de COBRO-CORTE-1.
+6. AISLAMIENTO-2 (arriba), ahora; después LIMPIEZA-1.
