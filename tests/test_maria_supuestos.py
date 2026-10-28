@@ -89,7 +89,7 @@ def test_avisa_los_valores_por_defecto_de_lo_que_decide_el_despachante():
     valor por defecto, el despachante lo ve."""
     texto = _texto(supuestos_declarados([ITEM], incoterm="FOB"))
     assert "estado de la mercadería" in texto
-    assert "reventa (no_valida) por defecto" in texto
+    assert "comercialización o reventa (comerc + no_valida) por defecto" in texto
     assert "ventajas" in texto
     assert "banco" in texto
     assert "modoc (psad06) por defecto" in texto

@@ -10,6 +10,7 @@ en smoke manual. Acá protegemos la parte determinística: que el TXT que pega
 el despachante en el Kit SIM salga bien armado.
 """
 import os
+import re
 
 import pytest
 from fastapi.testclient import TestClient
@@ -282,6 +283,18 @@ _GOLDEN_PATH = os.path.join(os.path.dirname(__file__), "fixtures",
                             "maria_golden_anon.TXT")
 
 
+def golden_con_destino(texto: str) -> str:
+    """DESTINO-1 (D28 a): el archivo de 2025 trae `GANANCIASOP3` `COMERC` con
+    `IVAAD1`, un par que no está en la tabla del despachante
+    (`PREGUNTAS-DESPACHANTE.md`, «Respuestas del 2026-10-28»). El golden no se
+    toca: se compara entero salvo esa línea, que tiene que decir `USOPAR`
+    (bien de uso de una persona). Si la pregunta 7 dice otra cosa, se reabre."""
+    nuevo, n = re.subn(r"(CCPL=GANANCIASOP3    \r?\n)MCPL=COMERC {34}(?=\r?\n)",
+                       lambda m: m.group(1) + f"MCPL={'USOPAR':<40}", texto)
+    assert n == 1, f"el golden tiene {n} GANANCIASOP3 COMERC; se esperaba uno"
+    return nuevo
+
+
 def test_golden_reproduce_estructura_real():
     """El generador debe reproducir el TXT validado por el despachante (anonimizado).
 
@@ -290,7 +303,7 @@ def test_golden_reproduce_estructura_real():
     (op 001790125) que el Kit SIM aceptó.
     """
     with open(_GOLDEN_PATH, "r", newline="") as f:
-        esperado = f.read()
+        esperado = golden_con_destino(f.read())
     generado = generate_maria_txt(**GOLDEN_INPUTS)
     assert generado == esperado
 

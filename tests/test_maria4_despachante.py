@@ -2,15 +2,16 @@
 
 - Estado de la mercadería (CARTUSO), por producto: 1 a 6; por defecto 2 con
   origen extranjero; con origen argentino no hay por defecto.
-- IVA adicional (IVAADICIONAL1): reventa (NO_VALIDA, por defecto) o uso
-  particular (IVAAD1), por operación con cambio por producto.
+- IVA adicional (IVAADICIONAL1): por operación con cambio por producto. Desde
+  DESTINO-1 sale de a pares con GANANCIASOP3 (`test_destino1.py`).
 - Banco (BANCOSARGENTINA): código BCRA de 3 dígitos; sin banco la línea no sale.
 - Empresa de digitalización (ARDIG-CUIT-PSAD): PSAD06 Modoc (por defecto) o
   PSAD01 Lakaut.
 
 Prueba: respuestas 1, 2, 4 y 5 del despachante y los dos archivos reales
 (2025: estado 3, uso particular, sin banco, PSAD06; 2026: estado 2,
-reventa, banco 191, PSAD01). El archivo de 2025 sale idéntico en
+reventa, banco 191, PSAD01). El archivo de 2025 sale idéntico, salvo el
+GANANCIASOP3 que corrige DESTINO-1, en
 `test_generar_maria_txt.py::test_golden_reproduce_estructura_real`.
 """
 import pytest
@@ -120,7 +121,7 @@ def test_iva_uso_particular_por_operacion_y_cambio_por_producto():
     assert _valor(txt, "IVAADICIONAL1", "0002") == ["NO_VALIDA"]
 
 
-@pytest.mark.parametrize("kw", [{"iva_adicional": "IVAAD2"}, {"empresa_digitalizacion": "PSAD99"},
+@pytest.mark.parametrize("kw", [{"iva_adicional": "IVAAD3"}, {"empresa_digitalizacion": "PSAD99"},
                                 {"banco_bcra": "19"}, {"banco_bcra": "abc"}])
 def test_valores_no_validos_se_rechazan(kw):
     with pytest.raises(ValueError):
@@ -220,7 +221,7 @@ def test_iva_en_minusculas_se_normaliza():
 def test_grupo_con_iva_distinto_se_rechaza():
     items = [dict(ITEM_BASE, grupo_id=1, iva_adicional="IVAAD1"),
              dict(ITEM_BASE, grupo_id=1, iva_adicional="NO_VALIDA")]
-    with pytest.raises(ValueError, match="mismo IVA"):
+    with pytest.raises(ValueError, match="mismo destino"):
         _gen(items)
 
 
