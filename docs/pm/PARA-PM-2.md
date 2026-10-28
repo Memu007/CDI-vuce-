@@ -2,6 +2,46 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## Entregas preparadas para las 18:00 UTC (2026-10-28)
+
+Recibí la D37 (2) en `20fb535`. En ABUSO-1 la pasé a riesgos, con lo que
+pediste.
+
+Las diez piezas, en el orden de entrega, con su suite completa sobre el SHA
+que se entrega. Desde la base limpia: cada corrida es un worktree nuevo en
+ese SHA, con `test.db` vacía. Comprobé que la cadena es lineal: cada SHA
+contiene al anterior, y los merges de tu rama que hay entre las piezas sólo
+tocan `docs/`. A las 18:00 queda sólo la autorrevisión con subagentes,
+`/code-review` y, donde corresponde, `/security-review`.
+
+| # | Pieza | SHA que se entrega | Base para el diff | Suite sobre ese SHA | Sabotajes |
+|---|---|---|---|---|---|
+| 1 | ORG-1 + ORG-1b + DESPACHO-1a | `4ce6d22` | `fb11735` | 3670 passed, 336 skipped, 2 xfailed, 0 failed | org1, org1b y despacho1a en sus apartados |
+| 2 | DESTINO-1 | `f887b4a` | `4ce6d22` | 3697 passed, 336 skipped, 2 xfailed, 0 failed | 15/15 |
+| 3 | SUFIJOS-2 | `4ca6829` | `4905cd8` | 3731 passed, 336 skipped, 2 xfailed, 0 failed | 9/9 |
+| 4 | SEGURO-1 | `371cde2` | `1948207` | 3777 passed, 336 skipped, 2 xfailed, 0 failed (`$S/suite_371cde2.log`) | 10/10 |
+| 5 | DESPACHO-1b | `e59e1a8` | `49f8e29` | 3827 passed, 336 skipped, 2 xfailed, 0 failed | 24/24 |
+| 6 | DATOS-1 | `c996ad4` | `d01f95c` | 3836 passed, 336 skipped, 2 xfailed, 0 failed | 12/12 |
+| 7 | DISCO-1 | `88b22c8` | `cf84a76` | 3847 passed, 336 skipped, 2 xfailed, 0 failed | 20/20 |
+| 8 | OBSERVABILIDAD-1 | `39be45e` | `88b22c8` | 3855 passed, 336 skipped, 2 xfailed, 0 failed | 16/16 |
+| 9 | SESION-1 | `895ee73` | `f5160d7` | 3872 passed, 336 skipped, 2 xfailed, 0 failed | 19/19 |
+| 10 | ABUSO-1 | `43916a7` | `c702655` | 3930 passed, 336 skipped, 2 xfailed, 0 failed | 27/27 |
+
+- **Base de ORG-1: `fb11735`, no `ea64a9c`.** `git diff ea64a9c..4ce6d22`
+  arrastra EXCEL-3f de la Dev técnica (`main.py`, `test_excel3.py`,
+  `excel3.sh`, `cliente1c.sh` y otros), que entró con tus merges. Contra
+  `fb11735`, que es lo último de tu rama que tiene `4ce6d22`, quedan sólo
+  mis 13 archivos. Los subrangos del apartado de ORG-1 (`ea64a9c..ddfc798`,
+  `373ef55..5d42909` y `fe1571c..51890cd`) no traen nada de la Dev técnica.
+- **SEGURO-1:** la suite del informe era de `a08de1f`. Entre ese SHA y
+  `371cde2` sólo cambia `seguro1.sh`, pero igual la corrí sobre `371cde2`: «3777 passed, 336 skipped, 2 xfailed, 94 warnings in 498.52s», `compileall 0`.
+
+```bash
+git diff --stat fb11735..4ce6d22 -- . ':!docs'   # 13 files changed, 1736 insertions(+), 10 deletions(-)
+git diff --name-only fb11735..4ce6d22 -- . ':!docs' | grep -ci 'excel\|cliente1c'   # 0
+git diff --stat 43916a7 HEAD -- . ':!docs'       # vacío: después de ABUSO-1 sólo hay docs
+```
+
 ## ABUSO-1: hecha, **sin entregar** (2026-10-28)
 
 **Estado.** La D35 está hecha entera, como la contestaste en `f600ed4`, con
@@ -12,44 +52,7 @@ sólo esta pieza: `git diff c702655..43916a7 -- . ':!docs'`.
 
 ### Decisiones
 
-**D36** la contestaste en `eaee1b1`: (2) por ahora; va a riesgos. **D37** es nueva.
-
-**D37. Un `await session.close()` cancelado al terminar el pedido (de
-antes, hallazgo nuevo).** En las pruebas aparece a veces
-`PytestUnhandledThreadExceptionWarning: Exception in thread …
-(_connection_worker_thread) … RuntimeError: Event loop is closed`. Lo rastreé
-con un plugin que registra cada operación de aiosqlite cancelada
-(`$S/plug/rastro_aiosqlite.py`):
-
-- La cancelada es el `await session.close()` del `finally` de
-  `get_async_session` (`database/connection.py:107`), al cerrar la sesión de
-  la dependencia después de mandar la respuesta.
-- **Ya pasaba antes de ABUSO-1.** Sobre la base `895ee73`
-  (static + auth_login + sesion1, 34 passed) se cancela en 2 de 2 corridas
-  (`$S/rastrobase_1.log`, `_2.log`: «=== CANCELADA close en
-  tests/test_auth_login.py::test_login_email_inexistente»), pero la
-  advertencia no apareció en 4 de 4 (`$S/warnbase_*.log`).
-- Con ABUSO-1, la advertencia aparece en 1 de cada 3 corridas, más o menos
-  (`$S/warn_*.log`), en pruebas distintas cada vez. ABUSO-1 abre más
-  conexiones aiosqlite en el camino del 401 y del 429 (la tabla), y el hilo
-  del worker de aiosqlite llega a terminar después de que `TestClient` cerró
-  su loop.
-- **Quién cancela no lo confirmé.** Mi hipótesis es `BaseHTTPMiddleware`
-  (`MetricsMiddleware`, `main.py:1664`, y `CSRFMiddleware`, `:1782`), que en
-  starlette 1.10 corta la tarea de la ruta cuando termina la respuesta. No
-  lo probé sacando los middlewares.
-- **En producción no lo medí.** Con uvicorn el loop es uno solo, así que la
-  advertencia no aplica. Lo que no sé es si un `close` cancelado deja una
-  conexión de Postgres afuera del pool.
-
-1. **(recomendada)** Una pieza aparte y chica, después de esta tanda:
-   uvicorn + PG16 con muchos 401 seguidos, mirando `pg_stat_activity` y el
-   pool. Si quedan conexiones colgadas, pasar esos dos middlewares a ASGI
-   puros. ABUSO-1 no lo toca: es de antes y tocaría `get_db` o los
-   middlewares.
-2. Dejarlo como riesgo, sin pieza.
-
-Mientras tanto no lo oculto: la advertencia queda visible en la suite.
+Nada para decidir. **D36** la contestaste en `eaee1b1` y **D37** en `20fb535`: las dos (2) por ahora; están en riesgos. Mi próxima D es la D38.
 
 ### SHAs
 
@@ -192,7 +195,29 @@ No corrí todavía: `smoke_friccion.sh`, `ataque_aislamiento.sh`, subagentes,
   mayúsculas no recupera nada. El PUT del perfil (`:2027`) busca el
   duplicado con `User.email == raw_email` (ya en minúsculas) y deja crear
   pares. El contador de 3 por hora por email sí va en minúsculas.
-- **`close` cancelado de `get_db`:** D37.
+- **Un `close` de sesión cancelado al terminar el pedido** (D37, (2) por
+  ahora; es de antes de ABUSO-1). El `await session.close()` del `finally`
+  de `get_async_session` (`database/connection.py:107`) se cancela después
+  de mandar la respuesta. Lo rastreé con un plugin que registra cada
+  operación de aiosqlite cancelada (`$S/plug/rastro_aiosqlite.py`).
+  - **Ya pasaba en la base `895ee73`:** con static, auth_login y sesion1
+    (34 passed), se cancela en 2 de 2 corridas («=== CANCELADA close en
+    tests/test_auth_login.py::test_login_email_inexistente»,
+    `$S/rastrobase_1.log` y `_2.log`). Ahí la advertencia no apareció en
+    ninguna de 4 corridas (`$S/warnbase_*.log`).
+  - **Con ABUSO-1** aparece la advertencia
+    `PytestUnhandledThreadExceptionWarning … (_connection_worker_thread) …
+    RuntimeError: Event loop is closed`. Sale más o menos en 1 de cada 3
+    corridas (`$S/warn_*.log`), en pruebas distintas cada vez, porque
+    ABUSO-1 abre más conexiones en el camino del 401 y del 429. En la
+    suite completa sobre `43916a7` no salió. La advertencia queda a la
+    vista: sin `filterwarnings` y sin repetir corridas.
+  - **Quién cancela no está confirmado.** La hipótesis son los
+    `BaseHTTPMiddleware` (`main.py:1664` y `:1782`); no la probé y no los
+    toqué.
+  - **No medimos si en producción deja conexiones de Postgres colgadas.**
+    Medirlo con uvicorn, Postgres 16 y `pg_stat_activity` es una pieza
+    nueva, que le proponés a Emi.
 - **Fila 14 de Argon y X1:** fuera de alcance, no los toqué.
 
 ### Supuestos reversibles
@@ -1641,6 +1666,6 @@ PY=<venv>/bin/python scripts/testing/sabotajes/despacho1a.sh 51890cd
 - **El 400 «es para otro email»** dice que el email escrito no es el
   invitado. No dice cuál es. Hace falta el token para preguntar.
 
-Última vuelta: Wed Oct 28 11:29:47 UTC 2026
+Última vuelta: Wed Oct 28 12:13:59 UTC 2026
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 contestada (a) en 3da0a8b, costos en riesgos. DATOS-1 (D5+D32 (a) borrar cliente borra sus presupuestos compartidos, D2 /health 503, D6 sin dev_detail) hecha y subida SIN ENTREGAR encima de d01f95c: producto 7d09c6f, casos 4416076, Postgres y sabotajes 162d277, arreglo de casos que gastaban el cupo de test_user c996ad4; SHA probado c996ad4 (test_datos1 9 passed; sabotajes datos1.sh 12/12; suite 3836 passed, 336 skipped, 2 xfailed, 0 failed; datos1_postgres.py fallas 0; smoke y aislamiento 0 sobre 162d277); su propio /entregar después del de DESPACHO-1b, con /security-review. Postgres 16 descartable en /tmp/cdi-pg55432, puerto 55432, base datos1a. DISCO-1 (historial de NCM de DATA_DIR a la tabla ncm_historial por dueño; carga única de archivos viejos a .migrado) hecha SIN ENTREGAR encima de c996ad4 y del merge cf84a76 (PM 1f6e0de): producto bd53fc4, casos y sabotajes 0f1161a, Postgres y textos de sabotajes 88b22c8; SHA probado 88b22c8 (test_disco1 11 passed; sabotajes disco1.sh 20/20; suite 3847 passed, 336 skipped, 2 xfailed, 0 failed; disco1_postgres.py fallas 0 y con sabotaje de carrera fallas 1; smoke y aislamiento 0); D33 contestada (a) en a3efc3a, riesgo anotado en DISCO-1; va en su propio /entregar, con subagentes, /code-review high y /security-review. OBSERVABILIDAD-1 (api_logs.owner_username nullable con su índice al arrancar, helper _migrate_add_api_logs_owner_column en main.py; si falla, log y la app sigue) hecha SIN ENTREGAR encima de 88b22c8: producto y CHANGELOG 8b1ce3b, casos, arnés y sabotajes 7ae35ab, merge de la PM 39be45e; SHA probado 39be45e (test_observabilidad1 8 passed; observabilidad1_arranque.py con Postgres 55432 38 OK fallas 0; sabotajes observabilidad1.sh con PG_URL 16/16 sobre 7ae35ab; suite 3855 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D34 contestada (a) en 486e655 (sólo la columna; la métrica sigue sin dueño); va en su propio /entregar después del de DISCO-1, con subagentes, /code-review high y /security-review. SESION-1 (S3: revocar_sesiones nunca escribe NULL en active_jti; change-password cierra las otras y conserva la propia; reset cierra todas; /auth/logout y /logout revocan el token sólo si es el vigente; PUT /api/user/profile pide current_password si cambia el email, 400) hecha SIN ENTREGAR encima de 39be45e y del merge f5160d7 (PM 486e655): producto y CHANGELOG 7dfe144, casos, motores, pantalla y sabotajes 014a3e4, arreglo 4c1ae09 (jti_de_la_request en vez de request.state: la suite sobre 014a3e4 dio 1 failed en test_auth_invalid_plan), sabotajes ajustados 895ee73; SHA probado 895ee73 (test_sesion1 17 casos, rojo en base 11 failed; sesion1_motores.py sqlite y pg 26 OK, todo OK, rojo en base FALLAS 12; sabotajes sesion1.sh 19/19; pantalla 3/3; suite 3872 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); va en su propio /entregar después del de OBSERVABILIDAD-1, con subagentes, /code-review high y /security-review. ABUSO-1 (D35 (1) en las cinco, de f600ed4: IP desde XFF con TRUSTED_PROXY_HOPS, contadores de login y recuperación en la tabla limites_auth, registro 5/hora y 20/día, recuperar 5/15 min por IP y 3/hora por email, eventos 120/min, anónimos con lista explícita) hecha y subida SIN ENTREGAR encima de 895ee73: S5 584b8d1, 25158c6, 8c37653; IP ca7eee9; tabla 790dd8e; producto a3abd92; pruebas a2fc7f0; arreglo de concurrencia en reset 777ebc8 y sus pruebas 74ccb76; IP larga en la clave 44b43db y sus pruebas 43916a7; SHA probado 43916a7 (test_abuso1 58 passed, rojo en base 25 failed; abuso1_motores.py y sesion1_motores.py sqlite y pg todo OK; sabotajes abuso1.sh 27 ROJO, sin rojo 0; suite 3930 passed, 336 skipped, 2 xfailed, 0 failed); ver solo la pieza con git diff c702655..43916a7 -- . ':!docs'. D36 contestada (2) en eaee1b1: no se toca la comparación del email; en riesgos los dos lugares que comparan exacto y el PUT que deja crear pares. D37 abierta (close cancelado de conexiones con PG / advertencia de hilo; recomiendo pieza aparte); no bloquea. La próxima D es la D38. Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review), DESPACHO-1b, DATOS-1, DISCO-1, OBSERVABILIDAD-1, SESION-1 y ABUSO-1 (revisión fuerte, /security-review, smoke y ataque_aislamiento); timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 contestada (a) en 3da0a8b, costos en riesgos. DATOS-1 (D5+D32 (a) borrar cliente borra sus presupuestos compartidos, D2 /health 503, D6 sin dev_detail) hecha y subida SIN ENTREGAR encima de d01f95c: producto 7d09c6f, casos 4416076, Postgres y sabotajes 162d277, arreglo de casos que gastaban el cupo de test_user c996ad4; SHA probado c996ad4 (test_datos1 9 passed; sabotajes datos1.sh 12/12; suite 3836 passed, 336 skipped, 2 xfailed, 0 failed; datos1_postgres.py fallas 0; smoke y aislamiento 0 sobre 162d277); su propio /entregar después del de DESPACHO-1b, con /security-review. Postgres 16 descartable en /tmp/cdi-pg55432, puerto 55432, base datos1a. DISCO-1 (historial de NCM de DATA_DIR a la tabla ncm_historial por dueño; carga única de archivos viejos a .migrado) hecha SIN ENTREGAR encima de c996ad4 y del merge cf84a76 (PM 1f6e0de): producto bd53fc4, casos y sabotajes 0f1161a, Postgres y textos de sabotajes 88b22c8; SHA probado 88b22c8 (test_disco1 11 passed; sabotajes disco1.sh 20/20; suite 3847 passed, 336 skipped, 2 xfailed, 0 failed; disco1_postgres.py fallas 0 y con sabotaje de carrera fallas 1; smoke y aislamiento 0); D33 contestada (a) en a3efc3a, riesgo anotado en DISCO-1; va en su propio /entregar, con subagentes, /code-review high y /security-review. OBSERVABILIDAD-1 (api_logs.owner_username nullable con su índice al arrancar, helper _migrate_add_api_logs_owner_column en main.py; si falla, log y la app sigue) hecha SIN ENTREGAR encima de 88b22c8: producto y CHANGELOG 8b1ce3b, casos, arnés y sabotajes 7ae35ab, merge de la PM 39be45e; SHA probado 39be45e (test_observabilidad1 8 passed; observabilidad1_arranque.py con Postgres 55432 38 OK fallas 0; sabotajes observabilidad1.sh con PG_URL 16/16 sobre 7ae35ab; suite 3855 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D34 contestada (a) en 486e655 (sólo la columna; la métrica sigue sin dueño); va en su propio /entregar después del de DISCO-1, con subagentes, /code-review high y /security-review. SESION-1 (S3: revocar_sesiones nunca escribe NULL en active_jti; change-password cierra las otras y conserva la propia; reset cierra todas; /auth/logout y /logout revocan el token sólo si es el vigente; PUT /api/user/profile pide current_password si cambia el email, 400) hecha SIN ENTREGAR encima de 39be45e y del merge f5160d7 (PM 486e655): producto y CHANGELOG 7dfe144, casos, motores, pantalla y sabotajes 014a3e4, arreglo 4c1ae09 (jti_de_la_request en vez de request.state: la suite sobre 014a3e4 dio 1 failed en test_auth_invalid_plan), sabotajes ajustados 895ee73; SHA probado 895ee73 (test_sesion1 17 casos, rojo en base 11 failed; sesion1_motores.py sqlite y pg 26 OK, todo OK, rojo en base FALLAS 12; sabotajes sesion1.sh 19/19; pantalla 3/3; suite 3872 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); va en su propio /entregar después del de OBSERVABILIDAD-1, con subagentes, /code-review high y /security-review. ABUSO-1 (D35 (1) en las cinco, de f600ed4: IP desde XFF con TRUSTED_PROXY_HOPS, contadores de login y recuperación en la tabla limites_auth, registro 5/hora y 20/día, recuperar 5/15 min por IP y 3/hora por email, eventos 120/min, anónimos con lista explícita) hecha y subida SIN ENTREGAR encima de 895ee73: S5 584b8d1, 25158c6, 8c37653; IP ca7eee9; tabla 790dd8e; producto a3abd92; pruebas a2fc7f0; arreglo de concurrencia en reset 777ebc8 y sus pruebas 74ccb76; IP larga en la clave 44b43db y sus pruebas 43916a7; SHA probado 43916a7 (test_abuso1 58 passed, rojo en base 25 failed; abuso1_motores.py y sesion1_motores.py sqlite y pg todo OK; sabotajes abuso1.sh 27 ROJO, sin rojo 0; suite 3930 passed, 336 skipped, 2 xfailed, 0 failed); ver solo la pieza con git diff c702655..43916a7 -- . ':!docs'. D36 contestada (2) en eaee1b1: no se toca la comparación del email; en riesgos los dos lugares que comparan exacto y el PUT que deja crear pares. D37 contestada (2) en 20fb535: ABUSO-1 no cambia, el close cancelado de get_async_session va a riesgos, la advertencia queda a la vista, no se tocan middlewares; medirlo es pieza nueva que la PM propone a Emi. La próxima D es la D38. Entregas preparadas (sección arriba del informe): cada pieza con su SHA, su base para el diff y su suite sobre ese SHA en verde; la base de ORG-1 para el diff es fb11735 (ea64a9c arrastra EXCEL-3f de la Dev técnica); suite de SEGURO-1 sobre 371cde2: 3777 passed, 0 failed. Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review), DESPACHO-1b, DATOS-1, DISCO-1, OBSERVABILIDAD-1, SESION-1 y ABUSO-1 (revisión fuerte, /security-review, smoke y ataque_aislamiento); timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
