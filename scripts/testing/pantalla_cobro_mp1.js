@@ -1,8 +1,10 @@
 // COBRO-MP-1 C y D en el perfil, contra el servidor local (sin terceros).
 // C: con el plan vencido (past_due) se ve «Cancelar plan» y la confirmación
 // no promete el «período ya pagado»; con el plan activo, sí.
-// D: dos clics en «Activar plan» piden un solo checkout, y el botón queda
-// deshabilitado mientras espera y mientras el navegador va a Mercado Pago.
+// D: dos clics en «Activar plan» piden un solo checkout. «Activar plan»,
+// «Reactivar plan» y «Activar plan ahora» (el aviso de arriba) quedan
+// deshabilitados mientras el navegador va a Mercado Pago, y volver de ahí
+// con «Atrás» recarga la página.
 // El estado de cobro y las respuestas de cancelar y del checkout se fuerzan
 // con page.route: las pruebas del servidor cubren cuándo salen de verdad.
 // Sale con error si algo no se cumple.
@@ -119,29 +121,63 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   if (pedidos.length !== 1) falla('dos clics en «Activar plan» pidieron ' + pedidos.length + ' checkouts');
   console.log('OK | dos clics en «Activar plan»: un checkout, botón deshabilitado mientras espera');
 
-  // Con el checkout creado, el botón sigue deshabilitado mientras el navegador
+  // Con el checkout creado, el botón queda deshabilitado mientras el navegador
   // va a Mercado Pago: otro clic pediría un segundo checkout, que cancela la
-  // suscripción adonde está yendo.
+  // suscripción adonde está yendo. Vale para los tres botones que lo piden.
   await page.unroute('**/api/billing/checkout');
-  await perfilCon('past_due');
-  const destino = base + '/mercado-pago-de-prueba-' + id;
+  const mercadoPago = base + '/mercado-pago-de-prueba-' + id;
   // Mercado Pago de prueba contesta 204: el navegador intenta ir y se queda en
   // la página, como si la navegación no hubiera terminado todavía.
-  let llego;
-  const yendo = new Promise(r => { llego = r; });
-  await page.route(destino, route => { llego(); route.fulfill({ status: 204 }); });
-  let checkouts = 0;
-  await page.route('**/api/billing/checkout', route => {
-    checkouts++;
-    route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, init_point: destino }) });
+  let llego = () => {};
+  await page.route(mercadoPago, route => { llego(); route.fulfill({ status: 204 }); });
+  await page.route('**/api/billing/checkout', route => route.fulfill({
+    status: 200, contentType: 'application/json', body: JSON.stringify({ success: true, init_point: mercadoPago }) }));
+
+  // Pide el checkout con `pedir` y comprueba que el botón siga deshabilitado
+  // cuando el navegador ya va a Mercado Pago.
+  async function sigueDeshabilitado(nombre, selector, pedir) {
+    const yendo = new Promise(r => { llego = r; });
+    await pedir();
+    await yendo;
+    if (!await page.evaluate(s => document.querySelector(s).disabled, selector))
+      falla('«' + nombre + '» se vuelve a habilitar mientras el navegador va a Mercado Pago');
+    console.log('OK | con el checkout creado, «' + nombre + '» sigue deshabilitado mientras va a Mercado Pago');
+  }
+
+  await perfilCon('past_due');
+  await sigueDeshabilitado('Activar plan', '#pfBillingActivate', () => activar.click());
+
+  // Si vuelve con «Atrás» y el navegador restaura la página de su caché, se
+  // recarga: el botón y el estado de cobro que mostraba quedaron viejos. La
+  // restauración se simula con el evento, porque Chromium automatizado no la
+  // hace de forma confiable.
+  await Promise.all([
+    page.waitForEvent('load', { timeout: 5000 })
+      .catch(() => falla('volver de Mercado Pago con «Atrás» no recarga la página')),
+    page.evaluate(() => window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }))).catch(() => {}),
+  ]);
+  console.log('OK | volver de Mercado Pago con «Atrás» recarga la página');
+
+  await page.route('**/api/billing/reactivate', route => route.fulfill({
+    status: 200, contentType: 'application/json',
+    body: JSON.stringify({ success: true, needs_checkout: true, message: 'Tu período pagado terminó.' }) }));
+  await perfilCon('canceled', { suscripcion_abierta: false });
+  await sigueDeshabilitado('Reactivar plan', '#pfBillingReactivate', async () => {
+    await page.click('#pfBillingReactivate');
+    await aceptar.waitFor({ state: 'visible', timeout: 5000 }).catch(() => falla('reactivar: no sale la confirmación'));
+    await aceptar.click();
   });
-  await activar.click();
-  await yendo;
-  if (!await page.evaluate(() => document.getElementById('pfBillingActivate').disabled))
-    falla('el botón «Activar plan» se vuelve a habilitar mientras el navegador va a Mercado Pago');
-  await activar.click({ force: true }).catch(() => {});
-  if (checkouts !== 1) falla('otro clic mientras va a Mercado Pago pidió ' + checkouts + ' checkouts');
-  console.log('OK | con el checkout creado, «Activar plan» sigue deshabilitado mientras va a Mercado Pago');
+  await page.unroute('**/api/billing/reactivate');
+
+  // El aviso de arriba sale con el estado de /auth/current_user.
+  await page.route('**/auth/current_user', async route => {
+    const res = await route.fetch();
+    route.fulfill({ response: res, json: { ...(await res.json()), billing_status: 'past_due' } });
+  });
+  await page.goto(base + '/dashboard');
+  await page.locator('#billingBannerCta').waitFor({ state: 'visible', timeout: 10000 })
+    .catch(() => falla('past_due: no sale el aviso con «Activar plan ahora»'));
+  await sigueDeshabilitado('Activar plan ahora', '#billingBannerCta', () => page.click('#billingBannerCta'));
 
   await b.close();
   console.log('pantalla COBRO-MP-1: OK');
