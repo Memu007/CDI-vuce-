@@ -2,6 +2,137 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## DESPACHO-1b: hecha, **sin entregar** (2026-10-28)
+
+Commits encima de SEGURO-1 (`371cde2`), de mi informe (`de9cb24`) y del
+merge de tu rama (`49f8e29`): producto y `CHANGELOG.md` `0591722`; casos,
+pantalla y sabotajes `e59e1a8`. **SHA probado: `e59e1a8`.** Para ver sólo
+esta pieza: `git diff 49f8e29..e59e1a8`. Va en su propio `/entregar`,
+después del de SEGURO-1, con subagentes y `/code-review` cuando vuelva el
+cupo. **No hace falta que la revises todavía.** Tiene una decisión: D31,
+arriba en «Decisiones».
+
+**La premisa: confirmada, sin Gemini y sin librería nueva.** El repo ya saca
+texto de PDF con `pypdf` (el lector de facturas, `pdf_extractor.py`) y lo
+corre aparte con su tope de tiempo (`_leer_pdf_aparte`). Uso lo mismo, con
+los mismos topes de página.
+
+- **Qué lee** (`proyecto_maria/core/despacho_lector.py`, nuevo): por
+  renglón, posición SIM, descripción, sufijos, origen, unidad, cantidad,
+  valor unitario y kilo neto. **Por rótulo:** busca la línea del rótulo y
+  toma el valor de abajo en la misma columna. Hay una prueba con los
+  rótulos en otro orden y otra con un valor vacío en el medio: sin kilo, el
+  origen sigue siendo el origen (leyendo por posición, caería en el kilo).
+- **Números** `1.234,56`. Otra forma (`12.5`, `1,234.56`) no se adivina:
+  queda faltante, con un aviso.
+- **Subítems:** con unidad `SUBITEM`, un renglón por subítem con su valor,
+  descripción y sufijos. La posición y el origen se toman del ítem, y el
+  aviso lo dice. Lo que al subítem le falta no se toma del ítem.
+- **Lo que falta** queda en `faltantes`, vacío y marcado en pantalla. Nada
+  se rellena: sin kilo, el peso queda vacío, no cero ni una cuenta.
+- **Escaneado:** sin texto, avisa «El PDF no tiene texto que se pueda leer:
+  parece escaneado…» y no devuelve renglones. Un PDF que no es despacho o
+  está roto, también avisa.
+- **Tilde rota** («Las dem?s»): la descripción queda como vino, con un
+  aviso para que la corrijan en la revisión.
+- **Divisa:** la del FOB, no la del flete (hay prueba con las dos
+  distintas).
+- **Pantalla** (Catálogo del cliente, `clientes.js`): «Cargar desde
+  despacho» abre el selector, muestra los renglones editables con lo
+  faltante marcado y guarda sólo al tocar «Guardar en el catálogo». La
+  prueba de pantalla falla si se pide guardar antes del clic. Probada en
+  1280 y 390 px.
+- **Guardar** es todo o nada: si un renglón no sirve, 422 con qué le falta
+  a cada uno y no se guarda ninguno. Pide posición con sus 8 dígitos y
+  descripción; el origen, si viene, tiene que ser un país de la tabla. Tope
+  de renglones (400 si se pasa). Lista vacía, 400.
+- **De quién:** leer y guardar usan `_get_owned_client`: un cliente ajeno o
+  de otro dueño da 404 y no se toca nada.
+- **Nunca** arma un TXT ni una operación: hay pruebas que cuentan las
+  operaciones antes y después y que fallan si se llama al generador. El
+  lector de facturas sigue rechazando un despacho (prueba con el sintético).
+- **Datos:** el sintético lo arma la prueba con la forma de
+  `DESPACHOS-FORMA.md` y valores inventados: dos ítems, uno con subítems,
+  un `AI` con espacios, «Las dem?s», FOB y flete en divisas distintas y un
+  renglón sin kilo neto. Ningún despacho real.
+- **Archivos de producto:** `proyecto_maria/core/despacho_lector.py`
+  (nuevo), `proyecto_maria/main.py`, `proyecto_maria/static/v2/screens/clientes.js`,
+  `proyecto_maria/static/v2/app_v2.css`,
+  `proyecto_maria/templates/dashboard_v2.html` y `CHANGELOG.md`.
+
+**Supuestos reversibles:**
+- Los rótulos del subítem («Nº Subitem» y sus valores) son supuestos: los
+  despachos de muestra no los traían con su rótulo. Están escritos en la
+  cabecera de `despacho_lector.py`.
+- La unidad, la cantidad y el valor unitario salen de «VALOR MERCADERIA».
+- El peso que guarda el catálogo es por unidad: kilo neto dividido
+  cantidad, si están los dos.
+
+**Puertas sobre `e59e1a8`:**
+
+| Puerta | Resultado |
+|---|---|
+| `tests/test_despacho1b.py` | 50 passed |
+| Suite completa (`--timeout=120`) y `compileall` | 3827 passed, 336 skipped, 2 xfailed, 0 failed; `compileall` 0 |
+| Sabotajes `scripts/testing/sabotajes/despacho1b.sh e59e1a8` | 24 líneas ROJO, «sabotajes sin rojo: 0», salida 0 |
+| Pantalla `scripts/testing/pantalla_despacho1b.js` | OK en 1280 px (panel 644 px) y 390 px (panel 308 px) |
+| `smoke_friccion.sh` (puerto 8855) | salida 0, «OK · telemetría + alias session/state + by-cuit protegido» |
+| `ataque_aislamiento.sh` (puerto 8857) | salida 0, «PUERTA G3 PASADA. Ningún despachante ve datos de otro.» (cubre clientes y descargas; lo de esta pieza lo cubren sus pruebas de 404) |
+
+La suite suma los 50 casos nuevos a los 3777 de SEGURO-1. Los 32 avisos
+«Task was destroyed but it is pending!» de su salida ya estaban en las
+suites de `4ca6829` y `a08de1f`: no son de esta pieza. Los sabotajes
+corrieron también en `9dcd5cc` (mismo árbol que `e59e1a8`), con los mismos 24
+rojos.
+
+**Sabotajes (24, uno por regla), todos en rojo:** el subítem toma lo que le
+falta del ítem; lo que falta no se marca; se lee por posición; se aceptan
+números con otra forma; un número que no se entiende se lee igual; los
+subítems no se separan; la posición heredada no se avisa; la divisa es la
+del flete; un sufijo con espacios no se lee; un escaneado no avisa; sin
+kilo se inventa el peso; leer no mira el dueño; guardar no mira el dueño;
+se guarda lo bueno y se descarta el resto; guardar acepta una lista vacía;
+guardar no tiene tope; leer acepta lo que no es PDF; guardar arma un TXT;
+guardar crea una operación; el lector de facturas acepta despachos; el
+botón no está conectado; el faltante no se marca en pantalla; se guarda al
+leer, sin revisar; el panel es más ancho que la pantalla.
+
+**Comandos:**
+
+```bash
+git diff 49f8e29..e59e1a8 --stat        # 9 archivos, ninguno en tests/fixtures
+python -m pytest -q --no-cov tests/test_despacho1b.py
+#   50 passed
+PY=<venv>/bin/python scripts/testing/sabotajes/despacho1b.sh e59e1a8
+#   24 líneas ROJO y al final «sabotajes sin rojo: 0»
+PY=<venv>/bin/python BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_despacho1b.js
+#   OK en 1280 y 390
+```
+
+**Riesgos y lo que no hice:**
+- **No se probó con un despacho real** (no entran). Si el sistema del
+  despachante pega dos columnas con un solo espacio, el valor puede quedar
+  faltante: falla hacia «falta», no hacia un dato cambiado.
+- **D31:** hoy el catálogo guarda NCM de 8 dígitos, descripción, origen,
+  valor unitario, cantidad y peso. Los sufijos, la unidad, la posición
+  completa y la divisa se ven en la revisión pero no se guardan. El valor
+  unitario queda sin divisa.
+- Dos renglones con el mismo NCM y descripción parecida (Jaccard ≥ 0,80,
+  la regla de siempre del catálogo) se funden en uno: `guardados` puede
+  decir más de lo que aparece. Dos subítems que sólo difieren en el `AI`
+  quedan en uno.
+- Guardar en un producto que ya existe promedia sus valores, como el
+  aprendizaje de hoy.
+- `leer` tiene el límite de pedidos del resto; `guardar` no, igual que el
+  aprendizaje de hoy.
+- El rechazo del lector de facturas pasa por Gemini, simulado en la prueba.
+- Previos, no de esta pieza: `--t-12` no está definido en el CSS; el
+  tablero mide 523 px de ancho en 390.
+- La pantalla muestra en notación exponencial un número absurdo
+  (`1e21`); no cambia lo que se guarda.
+- Sin correr todavía: subagentes, `/code-review` y `/security-review`.
+  Vuelven a las 18:00 UTC.
+
 ## SEGURO-1: hecha, **sin entregar** (2026-10-28)
 
 Commits encima de SUFIJOS-2 (`4ca6829`) y del merge de tu rama
@@ -12,7 +143,7 @@ Commits encima de SUFIJOS-2 (`4ca6829`) y del merge de tu rama
 3777 passed, 336 skipped, 2 xfailed, 0 failed (`compileall` limpio). Entre `a08de1f` y `371cde2` sólo cambia el script de
 sabotajes, que pytest no junta. Va en su propio `/entregar`, después del de SUFIJOS-2,
 con `/security-review` porque es un campo de dinero. **No hace falta que la
-revises todavía.** Tiene una decisión: D30, abajo.
+revises todavía.** La D30 ya está contestada (a).
 
 **La premisa: confirmada.** `cuentas_del_valor` no conocía el incoterm,
 pero quien la llama (`_cuentas_del_valor` en `main.py`) tiene
@@ -90,7 +221,7 @@ python -m pytest -q --no-cov tests/test_seguro1.py tests/test_valor1.py tests/te
 ```
 
 **Riesgos y lo que no hice:**
-- **D30:** un seguro «para completar» deja generar con seguro cero.
+- **Seguro 0 en el TXT si nadie lo completa** (D30, contestada (a)): un seguro «para completar» avisa en pantalla y no frena el TXT. Frenarlo es SEGURO-2.
 - `finalize.js` se carga con `?v={{ version }}`; una pestaña abierta antes
   del despliegue sigue con el JS viejo y muestra el botón con CIF. Si lo
   aprieta, el servidor da el 400 de arriba: no sale el 1 % en el TXT.
@@ -180,27 +311,25 @@ pierda si el contenedor muere. **No hace falta que la revises todavía.**
 
 ## Decisiones
 
-**D30 — un seguro «para completar» deja generar con seguro cero.** Lo
-pediste comprobar en SEGURO-1 y lo deja. Lo que pasa hoy:
-- «Para completar» (`campos_sin_leer`) vive sólo en la pantalla. El
-  semáforo lo muestra como aviso y el botón de generar no se traba: se traba
-  sólo con los errores que devuelve el servidor (`finalize.js`, línea 586).
-- El servidor no recibe `campos_sin_leer`. Comprobado contra el endpoint:
-  CIF con seguro `""` o `0` da 200 y `MDDTASS 0.00`.
-- No es nuevo de SEGURO-1: pasa igual cuando el lector no lee el seguro de
-  una factura (MARIA-1c). SEGURO-1 suma un camino más para llegar ahí.
+**D31 — qué guarda el catálogo de lo que lee un despacho (DESPACHO-1b).**
+La lectura saca posición SIM completa, descripción, sufijos, origen,
+unidad, cantidad, valor unitario y kilo neto. El catálogo de hoy
+(`client_product_history`, el de DESPACHO-1a) tiene lugar para NCM de 8
+dígitos, descripción, origen, valor unitario, cantidad y peso por unidad.
+Los sufijos, la unidad, la posición completa (con su letra) y la divisa no
+tienen columna.
 
-- **(b) Recomiendo esta.** El pedido lleva qué campos siguen «para
-  completar» y el servidor no genera mientras el seguro esté ahí, con un
-  400 que dice qué completar, como `_seguro_calculado_viejo`. Así la regla
-  vive en el servidor, como pediste para SEGURO-1. El costo: con CIF, una
-  factura que de verdad no trae seguro necesita que alguien escriba `0` a
-  propósito, y eso hay que decirlo en la nota. Es una pieza chica aparte
-  (servidor, pantalla, pruebas y sabotajes), no la meto en SEGURO-1.
-- **(a)** Queda como aviso, como hoy. Se puede generar con seguro cero sin
-  completarlo.
-- **(c)** Frenar sólo el caso del borrado de SEGURO-1 y dejar el del lector
-  como aviso. Deja dos reglas para el mismo campo; no la recomiendo.
+- **(a) Recomiendo esta, y es lo que hice.** Se guarda lo que entra hoy; lo
+  demás se ve en la revisión y no se guarda. Sin migración y sin tocar el
+  catálogo de DESPACHO-1a. El costo: el valor unitario queda sin divisa, y
+  dos subítems que sólo difieren en los sufijos (el `AI`) se funden en un
+  producto, porque el catálogo junta por NCM y descripción parecida.
+- **(b)** Una tabla o columnas nuevas para sufijos, unidad, posición y
+  divisa. Es una migración sobre datos de clientes: pieza aparte, con su
+  revisión fuerte, y antes conviene saber para qué se van a usar esos datos
+  (sugerir sufijos al armar una operación sería otra pieza).
+
+**D30 — contestada (a) en `53e1e86`.** Un seguro «para completar» sigue siendo un aviso; SEGURO-2 no la empiezo hasta verla en tu canal.
 
 **D29 — contestada (a) en `3d3ab47`.** `PIDE_NUMERO = ("Z",)` queda.
 
@@ -693,6 +822,6 @@ PY=<venv>/bin/python scripts/testing/sabotajes/despacho1a.sh 51890cd
 - **El 400 «es para otro email»** dice que el email escrito no es el
   invitado. No dice cuál es. Hace falta el token para preguntar.
 
-Última vuelta: Wed Oct 28 04:21:29 UTC 2026
+Última vuelta: Wed Oct 28 05:46:09 UTC 2026
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed); ocho pruebas comparan el golden, no seis. SUFIJOS-2 hecha y subida SIN ENTREGAR encima de 4905cd8: producto 79dc0c6+0118f5f+4ca6829, SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 336 skipped, 2 xfailed, 0 failed); D29 contestada (a) en 3d3ab47, PIDE_NUMERO=("Z",) queda. SEGURO-1 hecha y subida SIN ENTREGAR encima de 4ca6829 y del merge 1948207: producto 4f75f3d, pruebas a08de1f, arreglo de sabotaje 371cde2, SHA probado 371cde2 (sabotajes seguro1.sh 10/10 en 371cde2; suite a08de1f 3777 passed, 336 skipped, 2 xfailed, 0 failed); D30 abierta (un seguro «para completar» deja generar con seguro 0; recomiendo b, pieza aparte). Pendiente: el 28/10 después de las 18:00 UTC, primero /entregar de ORG-1, ORG-1b y DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), timbre «Dev MARIA: entregué ORG-1, ORG-1b y DESPACHO-1a en <SHA>»; después /entregar de DESTINO-1 aparte (supuestos reversibles COMERC/BDEUSO/USOPAR, rojo previo ajeno de pantalla_maria4.js, nueve scripts con ruta vieja de chromium); después /entregar de SUFIJOS-2; después /entregar de SEGURO-1 con /security-review (campo de dinero). PESO-NETO-1 y PRORRATEO-1 esperan al despachante; DESPACHO-1 después. La próxima D es la D31. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 abierta (qué guarda el catálogo de un despacho; recomiendo a). Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review) y DESPACHO-1b; timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. La próxima D es la D32. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
