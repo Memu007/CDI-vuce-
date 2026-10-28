@@ -161,9 +161,10 @@ def test_pdf_armado_se_lee_sin_colgarse(monkeypatch):
     assert isinstance(texto, str)
     assert usado, "el PDF armado no pasó por pypdf"
     # Y validarlo (abrirlo y contar páginas) también termina.
-    from proyecto_maria.security.file_security import _abrir_pdf
+    from proyecto_maria.core.despacho_lector import validar_pdf
     with concurrent.futures.ThreadPoolExecutor(1) as ex:
-        assert ex.submit(_abrir_pdf, _pdf_armado()).result(timeout=20) == (False, 1)
+        assert ex.submit(validar_pdf, _pdf_armado()).result(timeout=20) == {
+            "encriptado": False, "paginas": 1}
 
 
 def test_ya_no_se_usa_pyPDF2_ni_python_jose():
@@ -182,10 +183,29 @@ def test_ya_no_se_usa_pyPDF2_ni_python_jose():
         assert not usa, (archivo, usa and usa.group(0))
 
 
+def _validacion_lenta(monkeypatch):
+    """Validar tarda LENTO_S, venga de donde venga: el proceso aparte que
+    valida duerme (y anota cuándo se lanzó), y validar en este proceso
+    retiene el hilo."""
+    import sys
+    from proyecto_maria.core import despacho_lector
+    monkeypatch.setattr(despacho_lector, "validar_pdf",
+                        lambda *_: (_bloquear(), {"encriptado": False, "paginas": 1})[1])
+    real = asyncio.create_subprocess_exec
+
+    async def _lento(*args, **kw):
+        if args[-1] != "validar":
+            return await real(*args, **kw)
+        INICIO["t"] = time.monotonic()
+        dormir = ("import sys,time; sys.stdin.buffer.read(); time.sleep(%r); "
+                  "print('{\"encriptado\": false, \"paginas\": 1}')" % LENTO_S)
+        return await real(sys.executable, "-c", dormir, **kw)
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", _lento)
+
+
 def test_health_responde_mientras_se_valida_el_pdf(monkeypatch):
     """Abrir el PDF para validarlo (antes de leerlo) también va aparte."""
-    from proyecto_maria.security import file_security
-    monkeypatch.setattr(file_security, "_abrir_pdf", lambda *_: (_bloquear(), (False, 1))[1])
+    _validacion_lenta(monkeypatch)
     monkeypatch.setattr(main, "process_pdf",
                         lambda *_: {"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "items": [{"descripcion": "x"}], "operacion": {"vendedor_nombre": "P"}})
     demora, r = asyncio.run(_health_mientras(_subir))
@@ -211,9 +231,8 @@ def _subir_sincronico(monkeypatch):
 
 
 def test_validar_el_pdf_tiene_tiempo_maximo(monkeypatch):
-    from proyecto_maria.security import file_security
     monkeypatch.setenv("PDF_VALIDATE_TIMEOUT_S", "0.3")
-    monkeypatch.setattr(file_security, "_abrir_pdf", lambda *_: (_bloquear(), (False, 1))[1])
+    _validacion_lenta(monkeypatch)
     r, demora = _subir_y_medir()
     assert r.status_code == 400, r.text[:200]
     assert "tardó demasiado" in r.json()["detail"]

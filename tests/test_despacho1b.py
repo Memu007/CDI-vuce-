@@ -731,11 +731,14 @@ def test_mas_de_500_items_lee_los_primeros_500(items, avisa):
 
 def test_leer_que_tarda_demasiado_da_504_y_mata_al_lector(auth_override, client, monkeypatch):
     """El proceso que lee se mata al pasar el tiempo: no queda ocupando nada.
-    El lector se reemplaza por uno que no termina nunca."""
+    El lector se reemplaza por uno que no termina nunca (validar el PDF,
+    antes de leerlo, queda como es)."""
     real = asyncio.create_subprocess_exec
     procesos = []
 
     async def lector_colgado(*args, **kwargs):
+        if args[-1] == "validar":
+            return await real(*args, **kwargs)
         proceso = await real(sys.executable, "-c", "import time; time.sleep(60)", **kwargs)
         procesos.append(proceso)
         return proceso

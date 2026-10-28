@@ -1,0 +1,167 @@
+"""RENDIMIENTO-1c: validar un PDF corre en un proceso aparte, con tope de
+memoria y de tiempo, al subir facturas y al leer despachos.
+
+El PDF es sintético: una hoja con 99 000 claves, repetida 200 veces en el
+árbol de hojas. Pesa menos de 1 MB y abrirlo con pypdf para contar sus hojas
+ocupa más de 1 GB.
+
+Las dos pruebas de la app corren en un python nuevo: la memoria que se mide
+es la de ese proceso (VmHWM de /proc), no la de pytest.
+"""
+import json
+import os
+import subprocess
+import sys
+from pathlib import Path
+
+import pytest
+
+_REPO = Path(__file__).resolve().parents[1]
+solo_linux = pytest.mark.skipif(not Path("/proc/self/status").exists(), reason="mide /proc")
+
+
+def pdf_que_se_infla(repeticiones=200, claves=99_000):
+    from tests.pdf_bombas import _pdf
+
+    def armar(add, objs):
+        raiz = add(b"")
+        extra = b" ".join(b"/K%d 1" % i for i in range(claves))
+        hoja = add(b"<< /Type /Page /Parent %d 0 R /MediaBox [0 0 1 1] %s >>" % (raiz, extra))
+        kids = b" ".join(b"%d 0 R" % hoja for _ in range(repeticiones))
+        objs[raiz - 1] = b"<< /Type /Pages /Kids [" + kids + b"] /Count %d >>" % repeticiones
+        return add(b"<< /Type /Catalog /Pages %d 0 R >>" % raiz)
+
+    return _pdf(armar)
+
+
+# La app con un usuario por pedido (cabecera x-usuario), sin límite de pedidos
+# y sin lector con IA: la factura vuelve apenas pasa la validación.
+_APP = r"""
+import asyncio, json, re, sys, time
+import httpx
+from fastapi import Request
+from proyecto_maria import main
+from proyecto_maria.core.rate_limit import limiter
+from tests.pdf_bombas import hojas
+from tests.test_rendimiento1c import pdf_que_se_infla
+
+limiter.enabled = False
+main.lectura_automatica_disponible = lambda: False
+async def _usuario(request: Request):
+    u = request.headers.get("x-usuario", "a")
+    return {"username": u, "roles": ["operador"], "effective_owner": u,
+            "plan": "premium", "billing_status": "active"}
+main.app.dependency_overrides[main.get_current_user] = _usuario
+async def _cliente_propio(db, client_id, username):
+    return None
+main._get_owned_client = _cliente_propio
+
+NORMAL = hojas([("FACTURA INVENTADA", 0)])
+BOMBA = pdf_que_se_infla()
+
+def pico_mb():
+    return int(re.search(r"VmHWM:\s+(\d+)", open("/proc/self/status").read()).group(1)) // 1024
+
+def subir(c, ruta, data, usuario="a"):
+    return c.post(ruta, files={"file": ("x.pdf", data, "application/pdf")},
+                  headers={"x-usuario": usuario})
+
+FACTURA, DESPACHO = "/upload_pdf/public", "/api/clientes/c1/catalogo/despacho/leer"
+
+async def memoria():
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url="http://t") as c:
+        # Lo que se carga la primera vez (pypdf, el lector) entra en el antes.
+        normales = [(await subir(c, r, NORMAL)).status_code for r in (FACTURA, DESPACHO)]
+        antes = pico_mb()
+        bombas = []
+        for ruta in (FACTURA, DESPACHO):
+            r = await subir(c, ruta, BOMBA)
+            bombas.append([r.status_code, r.json().get("detail")])
+        return {"normales": normales, "bombas": bombas, "antes_mb": antes, "crecio_mb": pico_mb() - antes}
+
+async def diez_y_uno():
+    real = asyncio.create_subprocess_exec
+    hijos = []
+    async def contar(*a, **k):
+        hijos.append(1)
+        return await real(*a, **k)
+    asyncio.create_subprocess_exec = contar
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url="http://t",
+                                 timeout=120) as c:
+        bombas = [asyncio.create_task(subir(c, FACTURA, BOMBA, "a")) for _ in range(10)]
+        limite = time.monotonic() + 60
+        while not hijos:  # la primera bomba de A ya está validándose
+            assert time.monotonic() < limite, "ninguna validación empezó"
+            await asyncio.sleep(0.01)
+        t0 = time.monotonic()
+        r = await subir(c, FACTURA, NORMAL, "b")
+        demora = time.monotonic() - t0
+        quedaban = sum(not b.done() for b in bombas)
+        hechas = await asyncio.gather(*bombas)
+    return {"b": [r.status_code, r.json().get("detail")], "demora_b": demora,
+            "bombas_sin_terminar": quedaban,
+            "bombas": sorted({(x.status_code, x.json().get("detail")) for x in hechas})}
+
+print(json.dumps(asyncio.run({"memoria": memoria, "diez": diez_y_uno}[sys.argv[1]]())))
+"""
+
+
+def _correr(escenario):
+    entorno = {k: v for k, v in os.environ.items()}
+    entorno["PYTHONPATH"] = str(_REPO)
+    r = subprocess.run([sys.executable, "-c", _APP, escenario], capture_output=True, text=True,
+                       cwd=_REPO, timeout=300, env=entorno)
+    assert r.returncode == 0, r.stderr[-3000:]
+    return json.loads(r.stdout.strip().splitlines()[-1])
+
+
+PESADO = "El PDF es demasiado pesado para abrirlo. Probá con otro archivo."
+
+
+@solo_linux
+def test_un_pdf_que_se_infla_no_hace_crecer_la_app():
+    """Facturas y despachos: el PDF de 200 repeticiones se rechaza con un 400
+    claro y la app no crece (antes crecía más de 1 GB)."""
+    m = _correr("memoria")
+    assert m["crecio_mb"] < 150, f"la app creció {m['crecio_mb']} MB: {m}"
+    # La factura normal pasa la validación: el 503 es «sin lector con IA».
+    assert m["normales"] == [503, 200], m
+    assert m["bombas"] == [[400, PESADO], [400, PESADO]], m
+
+
+@solo_linux
+def test_diez_pdfs_pesados_de_uno_no_frenan_la_subida_de_otro():
+    """Diez bombas a la vez de A: la factura normal de B no espera detrás de
+    ellas."""
+    m = _correr("diez")
+    assert m["b"][0] == 503, m  # pasó la validación; sin lector con IA
+    assert m["bombas"] == [[400, PESADO]], m
+    assert m["bombas_sin_terminar"] > 0, f"las bombas terminaron antes que B: no mide nada {m}"
+    assert m["demora_b"] < 1.5, m
+
+
+def test_validar_aparte_devuelve_lo_mismo_que_antes():
+    """Encriptado, sin hojas y roto dan los mismos 400 que antes; uno normal
+    pasa con sus hojas."""
+    import asyncio
+    import io
+
+    from pypdf import PdfWriter
+
+    from proyecto_maria.core.despacho_lector import validar_pdf_aparte
+    from tests.pdf_bombas import hojas
+
+    w = PdfWriter()
+    w.add_blank_page(200, 200)
+    w.encrypt("una-clave")
+    encriptado = io.BytesIO()
+    w.write(encriptado)
+
+    async def _todos():
+        return [await validar_pdf_aparte(d, 30) for d in (
+            hojas([("UNO", 0), ("DOS", 0)]), encriptado.getvalue(), b"%PDF-1.4 esto no es un pdf")]
+
+    normal, encr, roto = asyncio.run(_todos())
+    assert normal == {"encriptado": False, "paginas": 2}
+    assert encr == {"encriptado": True, "paginas": 0}
+    assert set(roto) == {"error"} and roto["error"], roto
