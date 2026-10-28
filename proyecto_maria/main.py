@@ -3353,6 +3353,25 @@ def _pool_lectura_excel():
     return _POOL_LECTURA_EXCEL
 
 
+# Carril liviano (EXCEL-2b): el libro que la validación midió chico se lee en
+# hilos propios y no espera detrás de las planillas pesadas.
+_POOL_LECTURA_EXCEL_LIVIANO = None
+
+
+def _pool_lectura_excel_carril(liviano: bool):
+    global _POOL_LECTURA_EXCEL_LIVIANO
+    if not liviano:
+        return _pool_lectura_excel()
+    if _POOL_LECTURA_EXCEL_LIVIANO is None:
+        from concurrent.futures import ThreadPoolExecutor
+        try:
+            hilos = max(1, int(os.getenv("EXCEL_READ_WORKERS", "2")))
+        except (TypeError, ValueError):
+            hilos = 2
+        _POOL_LECTURA_EXCEL_LIVIANO = ThreadPoolExecutor(hilos, thread_name_prefix="lectura-excel-liviano")
+    return _POOL_LECTURA_EXCEL_LIVIANO
+
+
 def _correr_lectura(funcion, *args):
     # Un TimeoutError del propio lector (p. ej. de una conexión) no es «el PDF
     # tardó demasiado»: se informa como cualquier otro error.
@@ -8064,9 +8083,9 @@ async def upload_excel_v2(
     Review de v2. Si el usuario elige un cliente con `column_mapping`, las
     columnas se renombran a los canónicos antes de extraer.
     """
-    from proyecto_maria.security.file_security import validate_file_upload, sanitize_filename
+    from proyecto_maria.security.file_security import validar_con_carril, sanitize_filename
     max_upload_bytes = _get_max_upload_bytes()
-    contents = await validate_file_upload(file, 'excel', max_size=max_upload_bytes)
+    contents, liviano = await validar_con_carril(file, 'excel', max_size=max_upload_bytes)
 
     # Es una opción de API: omitida conserva True, no un checkbox desmarcado
     # (FastAPI >= 0.147 interpreta los bool Form ausentes como False).
@@ -8093,7 +8112,7 @@ async def upload_excel_v2(
         # En otro hilo y con tiempo máximo: no frena al resto (EXCEL-1).
         df = await _leer_pdf_aparte(
             _leer_excel_ruta, temp_filename, engine, tuple((mapping or {}).items()),
-            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
+            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel_carril(liviano),
         )
 
         # Mirar las otras hojas es sólo un aviso: si no alcanza su presupuesto
@@ -8102,7 +8121,7 @@ async def upload_excel_v2(
         try:
             otras_hojas, hojas_revisadas = await _leer_pdf_aparte(
                 _otras_hojas_con_datos, temp_filename, engine,
-                limite=min(10.0, _excel_read_timeout_s()), que="el Excel", pool=_pool_lectura_excel(),
+                limite=min(10.0, _excel_read_timeout_s()), que="el Excel", pool=_pool_lectura_excel_carril(liviano),
             )
         except Exception as e:
             logging.warning("upload_excel_v2: no se pudieron mirar las otras hojas: %s", e)
@@ -8184,7 +8203,7 @@ async def upload_excel_v2(
         extras: dict = {}
         items = await _leer_pdf_aparte(
             extract_items_from_excel, df, file.filename, descartes, extras,
-            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
+            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel_carril(liviano),
         )
         if not items:
             raise HTTPException(

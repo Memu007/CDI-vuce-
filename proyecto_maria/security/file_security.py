@@ -390,6 +390,92 @@ def _pool_validar_excel():
     return _POOL_VALIDAR_EXCEL
 
 
+# Carril liviano (EXCEL-2b): un libro chico valida y se lee en hilos propios y
+# no espera detrás de las subidas pesadas, que comparten el GIL y tardan.
+_POOL_VALIDAR_EXCEL_LIVIANO = None
+
+
+def _pool_validar_excel_carril(liviano: bool):
+    global _POOL_VALIDAR_EXCEL_LIVIANO
+    if not liviano:
+        return _pool_validar_excel()
+    if _POOL_VALIDAR_EXCEL_LIVIANO is None:
+        from concurrent.futures import ThreadPoolExecutor
+        try:
+            hilos = max(1, int(os.getenv("EXCEL_VALIDATE_WORKERS", "2")))
+        except (TypeError, ValueError):
+            hilos = 2
+        _POOL_VALIDAR_EXCEL_LIVIANO = ThreadPoolExecutor(hilos, thread_name_prefix="validar-excel-liviano")
+    return _POOL_VALIDAR_EXCEL_LIVIANO
+
+
+# Firmas de imagen: una parte que empieza así no es XML y el parser la
+# rechaza en el primer byte, así que no puede ser una hoja disfrazada.
+_FIRMAS_IMAGEN = (b"\x89PNG\r\n\x1a\n", b"\xff\xd8\xff", b"GIF87a", b"GIF89a", b"BM",
+                  b"II*\x00", b"MM\x00*", b"\xd7\xcd\xc6\x9a")
+_LIVIANO_INDICE_MAX = 128 * 1024        # bytes del índice del zip que se leen en el loop
+_LIVIANO_IMAGENES_MAX = 10 * 1024 * 1024  # bytes de imagen que se descuentan, como mucho
+_LIVIANO_IMAGENES_LECTURAS = 20
+
+
+def _es_imagen(cabeza: bytes) -> bool:
+    if cabeza.startswith(_FIRMAS_IMAGEN):
+        return True
+    return cabeza.startswith(b"\x01\x00\x00\x00") and cabeza[40:44] == b" EMF"
+
+
+def _excel_liviano(contents: bytes, file_ext: str) -> bool:
+    """¿Va al carril liviano? Se mide una sola vez, desde los bytes subidos:
+    un .xls, por su tamaño; un .xlsx, por lo que declara descomprimido su
+    índice, sin las imágenes reconocidas por su firma. El libro no puede
+    declarar menos de lo que entrega: zipfile no lee más bytes que los del
+    índice. Corre en el hilo del servidor, así que todo está acotado antes de
+    abrir el zip; ante cualquier duda, carril pesado (EXCEL-2b)."""
+    umbral = _mb_de_entorno("EXCEL_LIVIANO_MB", 2)
+    if file_ext != ".xlsx":
+        return len(contents) <= umbral
+    import zipfile
+    try:
+        # El mismo fin de índice que busca zipfile: en los últimos 64 KiB.
+        # Con un índice largo, o zip64, el índice no se lee acá.
+        fin = contents.rfind(b"PK\x05\x06", max(0, len(contents) - (1 << 16) - 22))
+        if fin < 0 or len(contents) - fin < 22:
+            return False
+        if contents[max(0, fin - 20):fin].startswith(b"PK\x06\x07"):
+            return False
+        if int.from_bytes(contents[fin + 12:fin + 16], "little") > _LIVIANO_INDICE_MAX:
+            return False
+        with zipfile.ZipFile(io.BytesIO(contents)) as z:
+            entradas = z.infolist()
+            resto = sum(info.file_size for info in entradas)
+            if resto <= umbral:
+                return True
+            # Las imágenes no cuentan, pero sólo las que lo son por su firma:
+            # una hoja con nombre de imagen sigue contando.
+            candidatas = sorted(
+                (info for info in entradas
+                 if not info.filename.lower().endswith((".xml", ".rels", ".vml"))
+                 and info.compress_type in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED)
+                 and not info.flag_bits & 0x1),
+                key=lambda info: info.file_size, reverse=True)
+            descontado = 0
+            for info in candidatas[:_LIVIANO_IMAGENES_LECTURAS]:
+                if descontado + info.file_size > _LIVIANO_IMAGENES_MAX:
+                    continue
+                try:
+                    with z.open(info) as f:
+                        cabeza = f.read(44)
+                except Exception:
+                    continue
+                if _es_imagen(cabeza):
+                    descontado += info.file_size
+                    if resto - descontado <= umbral:
+                        return True
+        return False
+    except Exception:
+        return False
+
+
 def _abrir_excel(contents: bytes, file_ext: str) -> int:
     """Mira cuánto ocupa descomprimido y recién entonces cuenta las hojas.
     Corre en otro hilo: un zip con miles de entradas también tarda (EXCEL-1)."""
@@ -413,6 +499,15 @@ async def validate_file_upload(
     file_type: str,
     max_size: Optional[int] = None
 ) -> bytes:
+    """Valida y devuelve los bytes. Ver validar_con_carril."""
+    return (await validar_con_carril(file, file_type, max_size))[0]
+
+
+async def validar_con_carril(
+    file: UploadFile,
+    file_type: str,
+    max_size: Optional[int] = None
+) -> tuple:
     """
     Validate uploaded file for security.
 
@@ -428,13 +523,12 @@ async def validate_file_upload(
         max_size: Maximum file size in bytes (optional, uses default)
 
     Returns:
-        File contents as bytes
+        (contents, liviano): los bytes, y si un Excel va al carril liviano
+        (_excel_liviano); para otros tipos, False. Quien lee el Excel después
+        usa ese mismo valor: no se vuelve a medir (EXCEL-2b).
 
     Raises:
         HTTPException: If file is invalid
-
-    Example:
-        >>> contents = await validate_file_upload(uploaded_file, 'pdf')
     """
     # Validate file type parameter
     if file_type not in ALLOWED_EXTENSIONS:
@@ -516,7 +610,9 @@ async def validate_file_upload(
             raise HTTPException(400, f"Invalid PDF file: {str(e)}")
 
     # Additional validation for Excel
+    liviano = False
     if file_type == 'excel':
+        liviano = _excel_liviano(contents, file_ext)
         try:
             # Abrir el Excel es sincrónico: va en otro hilo y con tiempo máximo,
             # para que un archivo pesado no frene al resto (EXCEL-1).
@@ -524,7 +620,7 @@ async def validate_file_upload(
             try:
                 hojas = await asyncio.wait_for(
                     asyncio.get_running_loop().run_in_executor(
-                        _pool_validar_excel(), _abrir_excel, contents, file_ext
+                        _pool_validar_excel_carril(liviano), _abrir_excel, contents, file_ext
                     ),
                     timeout=_pdf_validate_timeout_s(),
                 )
@@ -550,7 +646,7 @@ async def validate_file_upload(
     # Reset file pointer for later use
     await file.seek(0)
 
-    return contents
+    return contents, liviano
 
 
 def get_safe_temp_filename(original_filename: str, prefix: str = "upload_") -> str:

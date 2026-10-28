@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: una subida chica de Excel no espera detrás de las pesadas (EXCEL-2b)
+
+- **fix(excel):** un libro chico (hasta 2 MiB de XML descomprimido sin contar las imágenes; un `.xls`, por su tamaño; umbral en `EXCEL_LIVIANO_MB`) valida y se lee en hilos propios. Antes esperaba ~30 s detrás de ocho planillas pesadas; ahora responde en menos de un segundo. Ante cualquier duda (índice largo, zip64, algo que no es zip) va al carril de siempre.
+
 ## 2026-10-28 · feat: reordenar productos arrastrando, también los grupos, y cada pestaña con su borrador (ORDEN-1)
 
 - **feat(revisión):** en la tabla de productos un grupo se arrastra entero y se puede soltar un producto sobre él; el orden que queda es el del pedido y el del TXT, con los ítems numerados corridos. Ctrl+Z después de arrastrar ya no vuelve el orden viejo.
