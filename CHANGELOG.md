@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: límites en registro, recuperar usuario y eventos (ABUSO-1, S6 y C9)
+
+- Registro: 5 por hora y 20 por día por IP. Recuperar usuario: 5 cada 15 minutos por IP y, por email, 3 por hora (el resto contesta lo mismo sin mandar el mail). Eventos de uso: 120 por minuto por ruta, y sin sesión se guardan sólo los de la landing y el registro.
+- Los intentos de login, recuperar contraseña, registro y recuperar usuario se cuentan en la base (tabla `limites_auth`) y no en la memoria de cada proceso: un reinicio ya no los borra. La cuenta de fallos se olvida a las 24 horas sin fallos.
+
 ## 2026-10-28 · fix: los límites contra abuso cuentan la IP real (ABUSO-1, S4)
 
 - Los límites de intentos (login, recuperar contraseña y los por minuto) toman la IP que agrega el proxy de Railway, la última de X-Forwarded-For, y no la primera, que la escribe quien manda el pedido: inventando una IP distinta en cada intento se esquivaba el bloqueo, y poniendo la de otro se lo bloqueaba. Cada 429 deja en el log la IP tomada.

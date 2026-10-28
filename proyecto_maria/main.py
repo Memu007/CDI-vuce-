@@ -150,6 +150,7 @@ from sqlalchemy.exc import IntegrityError
 from passlib.context import CryptContext
 
 from proyecto_maria.core.rate_limit import limiter, get_dynamic_rate_limit, get_client_ip, log_429
+from proyecto_maria.core import limites_auth
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -1512,25 +1513,14 @@ class PasswordResetConfirm(BaseModel):
 @app.post("/auth/request-password-reset")
 async def request_password_reset(request: PasswordResetRequest, req: Request, db: AsyncSession = Depends(get_db)):
     """Solicita un link de recuperación de contraseña"""
-    client_ip = get_client_ip(req)
-    now = datetime.now(timezone.utc).timestamp()
-    
-    # Rate limiting: máximo 5 intentos por IP cada 15 minutos
-    if client_ip in reset_attempts:
-        attempt_data = reset_attempts[client_ip]
-        if attempt_data["block_until"] > now:
-            wait_mins = int((attempt_data["block_until"] - now) / 60) + 1
-            log_429(req, "reset bloqueado")
-            raise HTTPException(status_code=429, detail=f"Demasiados intentos. Intente en {wait_mins} minutos.")
-    
-    # Incrementar contador
-    if client_ip not in reset_attempts:
-        reset_attempts[client_ip] = {"count": 0, "block_until": 0}
-    reset_attempts[client_ip]["count"] += 1
-    
-    if reset_attempts[client_ip]["count"] >= 5:
-        reset_attempts[client_ip]["block_until"] = now + (15 * 60)  # 15 min
-        print(f"🚫 IP {client_ip} bloqueada para reset por 15 minutos")
+    clave = f"reset:{get_client_ip(req)}"
+
+    # Rate limiting: desde el quinto pedido de la IP, bloqueo de 15 minutos
+    espera = await limites_auth.segundos_bloqueado(clave)
+    if espera:
+        log_429(req, "reset bloqueado")
+        raise HTTPException(status_code=429, detail=f"Demasiados intentos. Intente en {espera // 60 + 1} minutos.")
+    await limites_auth.sumar_fallo(clave)
     
     # 1. Buscar usuario
     result = await db.execute(select(User).where(User.email == request.email))
@@ -1581,15 +1571,26 @@ class RecoverUsernameRequest(BaseModel):
     email: str
 
 @app.post("/auth/recover-username")
-async def recover_username(request: RecoverUsernameRequest, db: AsyncSession = Depends(get_db)):
+async def recover_username(request: RecoverUsernameRequest, req: Request, db: AsyncSession = Depends(get_db)):
     """Envía el username al email del usuario"""
+    mensaje = {"message": "Si el email está registrado, te enviamos tu nombre de usuario."}
+    # 0. Límites (ABUSO-1, S6): 5 pedidos cada 15 minutos por IP; por email,
+    # 3 por hora y después se contesta lo mismo sin buscar ni mandar nada.
+    if limiter.enabled:
+        if await limites_auth.contar(f"recuperar:ip:{get_client_ip(req)}", 15 * 60) > 5:
+            log_429(req, "recuperar usuario")
+            raise HTTPException(status_code=429, detail="Demasiados intentos. Intente en 15 minutos.")
+        email_hash = hashlib.sha256(request.email.strip().lower().encode()).hexdigest()[:32]
+        if await limites_auth.contar(f"recuperar:email:{email_hash}", 3600) > 3:
+            return mensaje
+
     # 1. Buscar usuario por email
     result = await db.execute(select(User).where(User.email == request.email))
     user = result.scalars().first()
     
     if not user:
         # Por seguridad, no revelar si el email existe
-        return {"message": "Si el email está registrado, te enviamos tu nombre de usuario."}
+        return mensaje
     
     # 2. Enviar email con username
     email_body = f"""
@@ -1603,7 +1604,7 @@ async def recover_username(request: RecoverUsernameRequest, db: AsyncSession = D
     
     email_sent = send_email(user.email, "Tu nombre de usuario - CDI", email_body)
     
-    response = {"message": "Si el email está registrado, te enviamos tu nombre de usuario."}
+    response = dict(mensaje)
     
     if not email_sent and not IS_PRODUCTION:
         # MODO DEV: Devolver username para facilitar pruebas
@@ -2438,9 +2439,26 @@ async def _leer_cuerpo_con_tope(request: Request, tope: int):
     return b"".join(partes)
 
 
+# Sin sesión se guardan sólo estos eventos (ABUSO-1): los de la landing y el
+# registro, que pasan antes de que haya usuario. El resto se descarta.
+_UI_EVENT_SIN_SESION = frozenset({"pricing_cta_clicked", "hero_cta_clicked", "register_pending_verify"})
+
+
+# Cada ruta con su propio límite de 120 por minuto por IP; por eso son dos
+# funciones y no dos decoradores sobre la misma.
 @app.post("/api/ui/event")
-@app.post("/api/session/state")
+@limiter.limit("120/minute")
 async def ui_event(request: Request, db: AsyncSession = Depends(get_db)):
+    return await _ui_event(request, db)
+
+
+@app.post("/api/session/state")
+@limiter.limit("120/minute")
+async def session_state(request: Request, db: AsyncSession = Depends(get_db)):
+    return await _ui_event(request, db)
+
+
+async def _ui_event(request: Request, db: AsyncSession):
     """Endpoint de telemetria simple para comparar v1 vs v2 durante la beta.
 
     Acepta JSON (o blob sendBeacon) con: version, screen, action, duration_ms,
@@ -2451,7 +2469,8 @@ async def ui_event(request: Request, db: AsyncSession = Depends(get_db)):
     Ruta duplicada `/api/session/state` por compatibilidad con clientes legacy.
 
     Sin auth obligatoria para no perder eventos pre-login; el usuario opcional
-    sale de Bearer o de la cookie HttpOnly de sesión cuando existe.
+    sale de Bearer o de la cookie HttpOnly de sesión cuando existe. Sin
+    usuario se guardan sólo las acciones de `_UI_EVENT_SIN_SESION`.
     """
     try:
         raw = await _leer_cuerpo_con_tope(request, _UI_EVENT_MAX_BYTES)
@@ -2473,6 +2492,11 @@ async def ui_event(request: Request, db: AsyncSession = Depends(get_db)):
         if not username:
             raw_cookie = request.cookies.get("access_token") or ""
             username = _jwt_sub_from_token_text(raw_cookie)
+
+        if not username:
+            accion = payload.get("action") if isinstance(payload, dict) else None
+            if accion not in _UI_EVENT_SIN_SESION:
+                return {"ok": False, "detail": "Evento sin sesión no admitido"}
 
         try:
             await _persist_ui_telemetry_row(db, username, payload)
@@ -2720,24 +2744,20 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     except Exception:
         return False
 
-# Rate Limiting simple en memoria (Funciona con workers=1)
-login_attempts = {} # {ip: {"count": 0, "block_until": timestamp}}
-reset_attempts = {} # {ip: {"count": 0, "block_until": timestamp}} - Para reset password
+# Los intentos fallidos por IP van en la tabla `limites_auth` (ABUSO-1): valen
+# para todos los workers y sobreviven a los reinicios.
 
 @app.post("/auth/login")
 @limiter.limit("5/minute")
 async def login(request: Request, login_request: LoginRequest, response: Response, background_tasks: BackgroundTasks, db: AsyncSession = Depends(get_db)):
     """Endpoint de login con HttpOnly Cookie y Rate Limiting"""
-    client_ip = get_client_ip(request)
-    now = datetime.now(timezone.utc).timestamp()
-    
+    clave_intentos = f"login:{get_client_ip(request)}"
+
     # Verificar bloqueo
-    if client_ip in login_attempts:
-        attempt_data = login_attempts[client_ip]
-        if attempt_data["block_until"] > now:
-            wait_seconds = int(attempt_data["block_until"] - now)
-            log_429(request, "login bloqueado")
-            raise HTTPException(status_code=429, detail=f"Demasiados intentos fallidos. Intente de nuevo en {wait_seconds} segundos.")
+    wait_seconds = await limites_auth.segundos_bloqueado(clave_intentos)
+    if wait_seconds:
+        log_429(request, "login bloqueado")
+        raise HTTPException(status_code=429, detail=f"Demasiados intentos fallidos. Intente de nuevo en {wait_seconds} segundos.")
             
     username = login_request.username
     password = login_request.password
@@ -2750,21 +2770,13 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
     user = result.scalars().first()
     
     # Función auxiliar para manejar fallo y rate limit
-    def handle_failed_login():
-        if client_ip not in login_attempts:
-            login_attempts[client_ip] = {"count": 0, "block_until": 0}
-        
-        login_attempts[client_ip]["count"] += 1
-        
-        if login_attempts[client_ip]["count"] >= 5:
-            # Bloquear por 15 minutos
-            login_attempts[client_ip]["block_until"] = now + (15 * 60)
-            print(f"🚫 IP {client_ip} bloqueada por 15 minutos.")
-            
+    # (desde el quinto fallo de la IP, bloqueo de 15 minutos)
+    async def handle_failed_login():
+        await limites_auth.sumar_fallo(clave_intentos)
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
     if not user:
-        handle_failed_login()
+        await handle_failed_login()
     
     stored_password = user.password
     
@@ -2789,7 +2801,7 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
             pass
     
     if not is_valid:
-        handle_failed_login()
+        await handle_failed_login()
 
     # Gate de verificacion de email: si esta activado globalmente y el user
     # todavia no confirmo, bloqueamos y reenviamos el mail para que no tenga
@@ -2809,8 +2821,7 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
         )
 
     # Login exitoso: limpiar intentos fallidos
-    if client_ip in login_attempts:
-        del login_attempts[client_ip]
+    await limites_auth.limpiar(clave_intentos)
     
     token, jti = create_access_token({"sub": user.username, "plan": user.plan})
     user.active_jti = jti
@@ -2910,7 +2921,7 @@ from fastapi import BackgroundTasks
 from starlette.concurrency import run_in_threadpool
 
 @app.post("/auth/register")
-async def register(request: RegisterRequest, background_tasks: BackgroundTasks, response: Response, db: AsyncSession = Depends(get_db)):
+async def register(request: RegisterRequest, req: Request, background_tasks: BackgroundTasks, response: Response, db: AsyncSession = Depends(get_db)):
     """Registro de usuario.
 
     Si EMAIL_VERIFICATION_REQUIRED=true (prod recomendado):
@@ -2923,6 +2934,15 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
     - is_verified=True de una, sin mandar email.
     """
     import re
+
+    # Límites por IP (ABUSO-1, C9): 5 registros por hora y 20 por día. Cuentan
+    # también los rechazados, para que probar datos inválidos no salga gratis.
+    if limiter.enabled:
+        ip = get_client_ip(req)
+        if (await limites_auth.contar(f"registro:h:{ip}", 3600) > 5
+                or await limites_auth.contar(f"registro:d:{ip}", 24 * 3600) > 20):
+            log_429(req, "registro")
+            raise HTTPException(status_code=429, detail="Demasiados registros desde esta conexión. Intente más tarde.")
 
     # Validar username (solo alfanuméricos, guiones y guiones bajos)
     if not re.match(r'^[a-zA-Z0-9_-]{3,30}$', request.username):
