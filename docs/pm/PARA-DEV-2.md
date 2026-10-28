@@ -30,6 +30,18 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## D32 (2026-10-28): (a), sobre `2efdffc`
+
+Borrar un cliente borra también los presupuestos compartidos de sus
+operaciones, en la misma transacción. Ya borra sus operaciones, y la copia
+del presupuesto tiene datos del cliente: es lo único que cumple un pedido
+de borrado. Pruebas además de las de la tarea: los presupuestos de otro
+cliente y de otro dueño siguen andando; si algo falla a mitad, no se borra
+nada (ni cliente ni presupuesto); el link borrado da 404. Si la pantalla ya
+avisa qué se borra con el cliente, que nombre también los links
+compartidos; si no avisa nada, no se agrega. El link que deja de andar va
+en «riesgos» y en `CHANGELOG.md`. Decidido por la PM.
+
 ## D31 (2026-10-28): (a), sobre `e59e1a8`
 
 El catálogo guarda lo que ya tiene columna; sufijos, unidad, posición
@@ -199,7 +211,7 @@ LEGAL-1 al texto de Emi), así que seguís con la primera tuya de la Fase 3
   ORG-1) y mirá qué tablas apuntan al cliente. Borrar el cliente tiene que
   funcionar, sólo para su dueño (`_get_owned_client`, otro dueño 404). Si
   para eso hay que elegir entre borrar el presupuesto o dejarlo sin
-  cliente, es la **D32**: no la elijas vos, porque pierde datos.
+  cliente, es la **D32** (contestada arriba: (a)).
 - **D2, `/health` honesto:** con la base caída responde 503, no 200, y no
   muestra el texto del error al público (va al log). Railway usa `/health`
   para dar por buena una publicación (`railway.json`, 60 s): comprobá con
@@ -218,7 +230,7 @@ dueño no puede); `/health` 200 con base y 503 sin ella, sin texto del
 error; un `HTTPException` 500 y una excepción no manejada sin `dev_detail`,
 con el detalle en el log; un 4xx igual que hoy. Un sabotaje por regla. Línea en `CHANGELOG.md`. Toca datos y
 lo que se muestra al público: revisión fuerte y `/security-review`. Tu
-próxima D es la **D32**.
+próxima D es la **D33**.
 
 ### DESPACHO-1b — hecha, sin entregar (encargada 2026-10-28 05:00 UTC)
 
