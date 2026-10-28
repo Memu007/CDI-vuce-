@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: borrar un cliente con presupuesto compartido, `/health` y los errores 500 (DATOS-1)
+
+- Borrar un cliente que tenía un presupuesto compartido ya no da error: se borran también sus presupuestos compartidos, y esos links dejan de andar (dan «no encontrado»). La pantalla lo avisa antes de borrar.
+- `/health` responde 503 cuando la base no contesta, y los errores 500 ya no muestran el detalle técnico: va sólo al log del servidor.
+
 ## 2026-10-28 · feat: el catálogo del cliente se carga desde un despacho, sin IA (DESPACHO-1b)
 
 - En Catálogo, «Cargar desde despacho» lee del PDF, por rótulo, un renglón por ítem o subítem: posición SIM, descripción, sufijos, origen, unidad, cantidad, valor unitario y kilo neto. Lo que falta queda marcado y vacío; un escaneado avisa.

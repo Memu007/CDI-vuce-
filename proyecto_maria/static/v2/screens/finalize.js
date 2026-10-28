@@ -1231,9 +1231,8 @@
                 return { ok: true, cliente_id: cliente.id };
             }
             // Error real: mostrar al user en vez de silenciar.
-            // Preferimos dev_detail (técnico) si vino, para diagnosticar; si no, el detail amigable.
-            const dev = data && data.dev_detail;
-            const msg = dev || (data && data.detail) || ('HTTP ' + res.status);
+            // El servidor ya no manda el detalle técnico (DATOS-1, D6): queda en su log.
+            const msg = (data && data.detail) || ('HTTP ' + res.status);
             console.error('[history] save_client_operation fallo:', msg, data);
             CDI.track('operation_save_failed', {
                 cliente_id: cliente.id,
@@ -1242,7 +1241,7 @@
             });
             CDI.toast && CDI.toast(
                 'No se guardó al cliente',
-                'La operación no quedó en el historial de ' + (cliente.nombre || 'el cliente') + '. Detalle: ' + String(msg).slice(0, 100),
+                'La operación no quedó en el historial de ' + (cliente.nombre || 'el cliente') + '. Detalle: ' + String(msg).slice(0, 200),
                 'error'
             );
             return { ok: false, reason: 'http_error', error: msg };

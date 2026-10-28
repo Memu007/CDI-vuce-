@@ -413,21 +413,16 @@ _FRIENDLY_5XX = (
 @app.exception_handler(StarletteHTTPException)
 async def _http_exception_friendly(request: Request, exc: StarletteHTTPException):
     if exc.status_code == 500:
-        logging.exception(
+        # El detalle técnico va sólo al log: al público, el mensaje amigable
+        # (DATOS-1, D6). Puede traer texto de la base o de un tercero.
+        logging.error(
             "HTTPException 500 en %s %s: %s",
             request.method, request.url.path, exc.detail,
+            exc_info=exc,
         )
-        # Mantener el mensaje amigable como `detail` para users finales,
-        # pero exponer el detail técnico en `dev_detail` para diagnóstico
-        # desde DevTools. No filtra nada nuevo: ya iba al log de Railway.
-        dev_detail = str(exc.detail)[:400] if exc.detail else ""
         return JSONResponse(
             status_code=exc.status_code,
-            content={
-                "detail": _FRIENDLY_5XX,
-                "dev_detail": dev_detail,
-                "code": "internal_error",
-            },
+            content={"detail": _FRIENDLY_5XX, "code": "internal_error"},
         )
     # 4xx y 5xx controlados (503, 429, etc.) pasan sin ofuscar
     detail = exc.detail if exc.detail is not None else ""
@@ -440,16 +435,15 @@ async def _http_exception_friendly(request: Request, exc: StarletteHTTPException
 
 @app.exception_handler(Exception)
 async def _unhandled_exception_friendly(request: Request, exc: Exception):
-    logging.exception(
-        "Excepcion no manejada en %s %s", request.method, request.url.path
+    # Como arriba: el detalle, con su traza, sólo al log (DATOS-1, D6).
+    logging.error(
+        "Excepcion no manejada en %s %s: %s: %s",
+        request.method, request.url.path, type(exc).__name__, exc,
+        exc_info=exc,
     )
     return JSONResponse(
         status_code=500,
-        content={
-            "detail": _FRIENDLY_5XX,
-            "dev_detail": f"{type(exc).__name__}: {str(exc)[:300]}",
-            "code": "internal_error",
-        },
+        content={"detail": _FRIENDLY_5XX, "code": "internal_error"},
     )
 
 # Agregar middleware de seguridad
@@ -2585,10 +2579,14 @@ async def health(db: AsyncSession = Depends(get_db)):
     try:
         await db.execute(text("SELECT 1"))
         checks["database"] = "ok"
-    except Exception as e:
+    except Exception:
+        # Sin base la API no sirve: 503 para que quien mira /health lo vea.
+        # El texto del error puede traer el host o el usuario de la base, así
+        # que va sólo al log (DATOS-1, D2).
+        logging.exception("/health: la base no responde")
         checks["database"] = "error"
         checks["status"] = "degraded"
-        checks["db_error"] = str(e)[:100]
+        return JSONResponse(status_code=503, content=checks)
     return checks
 
 # Configuración de hashing de contraseñas
@@ -5372,6 +5370,7 @@ from proyecto_maria.database.models import (
     OperationItem as OperationItemModel,
     NCMNote as NCMNoteModel,
     ClientProductHistory as ClientProductHistoryModel,
+    PublicQuote as PublicQuoteModel,
 )
 from sqlalchemy import delete as sa_delete, select as sa_select, func as sa_func, desc as sa_desc, or_ as sa_or
 
@@ -7031,6 +7030,15 @@ async def delete_cliente(
         )
         op_ids = [row[0] for row in op_rows.fetchall()]
         if op_ids:
+            # Los presupuestos compartidos de esas operaciones se borran con
+            # ellas: su copia tiene datos del cliente, y en Postgres la clave
+            # foránea no deja borrar la operación (DATOS-1, D32 (a)). El link
+            # deja de andar. Todo en la misma transacción que el cliente.
+            await db.execute(
+                sa_delete(PublicQuoteModel).where(
+                    PublicQuoteModel.operation_id.in_(op_ids)
+                )
+            )
             await db.execute(
                 sa_delete(OperationItemModel).where(
                     OperationItemModel.operation_id.in_(op_ids)
