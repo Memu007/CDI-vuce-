@@ -177,8 +177,9 @@ flete y seguro (`MARTFOB`, `MARTFLE`, `MARTASS`); no hay campo de ajustes:
 Una más (2026-10-28), para DESPACHO-1 (armar el catálogo del cliente con
 despachos ya oficializados):
 
-> 6. Un despacho ya oficializado, ¿cómo lo bajás del sistema (PDF, otro
->    archivo)? ¿Me pasás uno o dos así, con nombres, CUIT y montos tapados?
+> 6. ¿Me pasás uno o dos despachos ya oficializados (el OM-1993-A que
+>    imprimís después de oficializar), con nombres, CUIT y montos tapados?
+>    ¿Los guardás en PDF del sistema o escaneados en papel firmado?
 >    Y para el catálogo de productos de un cliente: ¿los despachantes usan
 >    algún formato o programa para guardarlo o pasárselo, o con un Excel
 >    alcanza?
