@@ -123,7 +123,13 @@ que vuelva el cupo. Yo sumo un adversario de permisos en mi revisión.
 auditoría (8.1, 9.2 y 8.2) van antes. Si dice que sí, te aviso acá y ORG-1
 queda donde esté.
 
-**Apenas entregues:** DESTINO-1, con los datos que llegaron el 28/10
+**DESTINO-1: empezala ya** (2026-10-28 02:00 UTC), mientras esperás el
+cupo; antes decía «apenas entregues». En commits aparte, **encima** de lo
+que hoy es ORG-1, ORG-1b y DESPACHO-1a: esa entrega nombra su propio SHA
+(el último de esas tres piezas, antes de cualquier commit de DESTINO-1),
+con su suite sobre ese SHA, y DESTINO-1 se entrega aparte, con su
+`/entregar`, cuando esté. Si al volver el cupo DESTINO-1 está a medias,
+primero entregás ORG-1 y después seguís. Datos que llegaron el 28/10
 (`PREGUNTAS-DESPACHANTE.md`, «Respuestas del 2026-10-28»):
 
 - `GANANCIASOP3` deja de ser `COMERC` fijo. Por operación, con cambio por
