@@ -2,226 +2,149 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ORDEN-1: entregada en el commit de este informe (código en `0d89c20`)
+## Rojo de `test_excel2` (ocho libros): diagnóstico en el commit de este informe
 
 | Qué | SHA |
 |---|---|
-| Producto: arrastrar también los grupos y un borrador por pestaña | `82cea39` |
-| Pruebas: TXT reordenado, subítems juntos, recarga, dos pestañas, arnés de pantalla y sabotajes | `e610881` |
-| Pruebas: el arrastre que no arranca y la pestaña que toma la operación ajena se ven por su motivo | `d4d3b41` |
-| Pruebas: sabotaje de la numeración corrida | `0d89c20` |
-| Merge de tu rama (`fb11735`, sólo `docs/pm/`) | `dbba4b2` |
+| Pruebas: `tests/medir_excel2.py`, herramienta de medición (la suite no la recoge) | `ff03efe` |
+| Merge de tu rama (`3b60e3d`, sólo `docs/pm/`) | `5ee5fa0` |
 | Informe | este commit |
 
-Diff de revisión: `git diff 69f7441..0d89c20 -- . ':!docs/pm' ':!.claude'`
-(8 archivos, +882 −55). Archivos de producto para «Quién hace qué»:
-`proyecto_maria/static/v2/app_v2.js`, `proyecto_maria/static/v2/screens/ncm.js`,
-`proyecto_maria/static/v2/screens/upload.js` y `CHANGELOG.md`. No toqué
-`maria_generator.py` ni nada del servidor.
+Producto tocado: **ninguno** (`git diff 0d89c20 HEAD -- proyecto_maria` vacío).
+No subí el corte de 30 s ni toqué la prueba.
 
-**Resultado: los 14 sabotajes en rojo por su motivo; el TXT reordenado es el
-original salvo el orden, con los subítems juntos y la numeración corrida;
-recargar y dos pestañas conservan orden y productos. Una F en la suite que no
-es de esta pieza (el `test_excel2` que ya me pasaste). `/code-review`,
-`/security-review` y adversarios no corridos (sin presupuesto).**
-
-El informe de GUARDAR-2 sigue en `cb42e8f`.
+**Resultado: los 30 s son cola, no trabajo de la subida normal.** Su propio
+trabajo cuesta ~0,1 s. Espera en dos colas FIFO de 2 hilos cada una
+(validación y lectura) detrás de las ocho pesadas, y el reloj de 30 s corre
+desde que entra, con la espera incluida. Cada pesada cuesta además unas 3 a 4
+veces más que sola, porque los 4 hilos de trabajo comparten el GIL de un único
+proceso: hay 4 núcleos, pero se usa uno. El margen es de ±3 s alrededor del
+corte. Por eso yo veo 1 rojo de 5 y vos, con un contenedor más lento, 6 de 6.
+En producción pasa lo mismo si corre un solo proceso: 1 réplica
+(`railway.json`) y 1 worker de gunicorn salvo que haya `REDIS_URL` o
+`WEB_CONCURRENCY` (`gunicorn_conf.py:28-33`); no veo las variables de Railway.
+Con más workers cada uno tiene sus propias colas y el efecto se reparte, pero
+no desaparece. `/upload_excel_v2/` no tiene límite de frecuencia: cualquier
+usuario con sesión que suba ocho libros al borde del tope deja a los demás ~30 s
+sin poder subir.
 
 ## Decisiones
 
-**D1. Dónde vive el orden «guardado».** La tarea dice «guardar con otro orden
-y volver a abrir conserva el orden». En v2 nada reabre una operación desde el
-servidor: `OperationItem` (`models.py:239`) no tiene columna de posición, su
-`id` es un UUID, el CSV sale con `.order_by(OperationItemModel.id)`
-(`main.py:7614`) y las pantallas v2 (`despachante.js:97`, `clientes.js:1489`)
-sólo listan operaciones. Hoy «volver a abrir» es el borrador del navegador.
-- (a) El orden vive en el borrador local de cada pestaña (lo que entregué). Recargar, cerrar y volver a abrir el navegador lo conservan; otra computadora no.
-- (b) Columna `posicion` en `OperationItem`, con migración, y que el guardado la escriba. Sirve el día que una pantalla reabra operaciones desde el servidor. Hoy nadie la leería.
-- **Recomiendo (a)** hasta que exista «reabrir del servidor»; (b) sin quien la lea es una migración sin uso.
+**D4. Cómo evitar que una subida chica espere detrás de las pesadas.**
+- **(a) Carril liviano.** Un libro chico (≤ 2 MiB de XML descomprimido, con el
+  umbral en una variable de entorno) valida y se lee en pools propios de 2
+  hilos. No espera a las pesadas en ninguna de las dos colas. Medido con un
+  prototipo (no es producto, `prototipo-carril.diff` en mi scratchpad), sobre
+  la prueba real, 3 de 3: «normal: 200 en 0.1 s», «0.2 s», «0.1 s». Límites:
+  no ayuda a una subida legítima grande que llega detrás de las pesadas, y
+  alguien puede inundar el carril chico (cada libro chico cuesta ~0, así que
+  necesita muchos más pedidos). Toca `file_security.py` y `main.py`, así que
+  pide una revisión más fuerte.
+- **(b) Abaratar el paso caro.** `_ultima_columna` (el `iterparse` de toda la
+  primera hoja) baja de 1,58 a 0,86 s con expat directo. La cola sigue siendo
+  FIFO, así que la normal sigue esperando, menos pero sin medir cuánto. Sirve
+  como complemento, no como arreglo.
+- **(c) Pool de procesos para validar y leer.** Paralelismo real, y además se
+  puede matar un trabajo vencido (hoy un hilo vencido sigue gastando CPU). Es un
+  cambio grande: cada proceso carga sus módulos y no conozco la memoria ni los
+  núcleos que da Railway. Sola no saca a la normal de la cola: la acorta.
+- (d) Que el reloj de 30 s no cuente la espera en la cola. Esconde el problema
+  y no lo recomiendo: la normal seguiría tardando 30 s.
+- **Recomiendo (a)**, porque es la única opción que saca a la subida normal de la
+  cola, y lo medí. (b) puede ir después en otra pieza. Si elegís (a), la entrego
+  con:
+  - el umbral calculado una sola vez y sobre las partes XML, no sobre las
+    imágenes, para que un logo no mande una factura chica al carril pesado;
+  - la prueba más dura de D5;
+  - sabotajes que manden la normal al carril pesado.
 
-**D2. «El Excel» no existe en v2: contradigo la premisa.** El único Excel de
-la operación sale de `POST /process_operation/` (`main.py:3238` →
-`create_maria_excel`, `main.py:3282`) y sólo lo llama la pantalla vieja
-(`static/app.js:1092` y `:3186`). v2 genera el TXT, que sí sigue el orden.
-- (a) Se da por cumplido con el TXT y la tabla.
-- (b) Pieza aparte: un Excel de la operación en v2, con el mismo orden.
-- **Recomiendo (a)** y que (b) entre al roadmap sólo si Emi lo pide. Si «el Excel» era otra cosa, decime cuál y lo cubro.
+**D5. Endurecer la prueba.** Hoy el verde esconde la espera: en mi base dio
+«normal: 200 en 30.7 s» y pasó. Propongo afirmar también `dt` < 5 s; con el
+prototipo da 0,1 a 0,2 s. Es más estricta, no la afloja.
+- (a) Sí, junto con D4 (a).
+- (b) No, dejarla como está.
+- **Recomiendo (a)**: sin eso, una regresión que la vuelva a meter en la cola
+  da verde mientras quede debajo de los 30 s.
 
-**D3. El centavo del flete con dos FOB iguales depende del orden.** `repartir()`
-(en `maria_generator.py`) le da el centavo que sobra al primero; si se
-reordenan dos ítems con el mismo FOB, el centavo cambia de ítem. El total no
-cambia. Lo dejé como xfail
-(`test_con_dos_fob_iguales_el_flete_de_cada_item_no_depende_del_orden`).
-- (a) Queda así: el TXT sigue siendo válido y suma igual.
-- (b) Pieza para la Dev MARIA: desempatar por algo estable (por ejemplo, la posición original o la pieza).
-- **Recomiendo (a)**: no es un error de importe y tocar el reparto pide sus propias pruebas.
+## Dónde se van los 30 s
 
-## Qué faltaba y qué hice
+`tests/medir_excel2.py::test_linea_de_tiempo` corre el mismo escenario de la
+prueba y anota cada paso con su hora y su hilo. Extracto, en segundos desde
+el arranque:
 
-Comprobé la premisa antes de tocar: **el arrastre de un producto suelto ya
-existía** en la tabla de `ncm.js`, y el TXT ya sale en el orden de los
-productos, con los subítems juntos («orden de su primer renglón») y los
-`NARTEXT` corridos. Supuse que «la pantalla de revisión» es esa tabla. Lo
-que faltaba, con su rojo sobre `69f7441` (`rojo-69f7441.log`):
-
-| Hueco | Rojo en la base |
+| s | qué |
 |---|---|
-| El grupo (MARIA-8) no se podía arrastrar | «FALLA: el grupo no tiene de dónde arrastrarlo» |
-| Ctrl+Z justo después de arrastrar volvía el orden de antes | «FALLA: Ctrl+Z después de arrastrar vuelve el orden de antes: ["Equipo demo","Cable demo","Mouse demo"]» |
-| Con dos pestañas, la segunda tomaba la operación de la primera | «FALLA: la segunda pestaña tomó la operación de la primera, que sigue abierta» |
-| Una pestaña en la carga de archivos borraba la operación de otra | «FALLA: la pestaña que quedó en la carga de archivos borró la operación cerrada: se recupera null» |
+| 0,03–0,05 | entran las 8 pesadas al validador; 2 empiezan a validar |
+| 0,06 | entra la normal: queda detrás de las 6 pesadas que esperan |
+| 5,09 / 5,13 | terminan las 2 primeras validaciones (1,84 s sola → ~5 s con contención); empiezan las 2 siguientes y 2 lecturas |
+| 10,56 / 10,99 | primeras dos respuestas 400 de las pesadas (pasan de 5000 filas, después de leerlas enteras) |
+| 12,5 / 12,6 · 20,17 / 20,42 | tercera y cuarta tanda de validaciones |
+| **27,46** | **la normal recién empieza a validar** y termina en 0,06 s |
+| 27,57–27,62 | lee su hoja en 0,05 s |
+| 27,62–29,69 | su «otras hojas» espera en la cola de lectura, detrás de las dos últimas pesadas |
+| **29,78** | **respuesta 200 de la normal**, a 0,2 s del corte |
 
-El arrastre suelto y la recarga ya daban OK en la base; su rojo sale por
-sabotaje.
+Costo de la pesada sola (`test_etapas`): validarla entera, 1,84 s;
+`_ultima_columna`, medida aparte, 1,92 s: es casi todo. `_leer_excel_ruta`,
+0,94 s. La normal: 0,0 en todo.
 
-Cambios:
-- **`ncm.js`:** el grupo se arrastra entero desde su número (con `⋮⋮`) y se
-  puede soltar sobre él, abierto o cerrado. Se mueven unidades (un producto
-  suelto o un grupo entero), armadas con `buildRenderRows`, así que un grupo
-  no se parte. Arrastrar anula el Ctrl+Z pendiente.
-- **`app_v2.js`:** el borrador pasa a ser uno por pestaña
-  (`cdi_v2_state:<id de pestaña>`, con fecha y si la pestaña se cerró). Al
-  abrir, una pestaña recupera el suyo; si no tiene, adopta el más reciente
-  cerrado o abandonado hace más de 3 minutos, nunca uno de una pestaña viva.
-  La clave vieja (`cdi_v2_state` sin id) se lee como cerrada, así que nadie
-  pierde lo que tenía al publicar.
-- **`upload.js`:** empezar otra operación borra sólo el borrador de esa pestaña.
+En la lectura se pierde trabajo de dos formas: las pesadas se leen enteras para
+después dar 400 por pasar de 5000 filas, y la hoja se parsea dos veces (validar y
+`_xlsx_solo_primera_hoja`). Rechazar las de más de 5000 filas ya en la
+validación ahorraría la lectura. No lo propongo como D: hay que probar
+antes que ese conteo sea equivalente al de la lectura.
 
-## Puertas
+GIL (`test_hilos_contra_procesos`, `_ultima_columna` cuatro veces a la vez):
+«núcleos: 4; una: 1.96 s; cuatro en hilos: 10.55 s; cuatro en procesos:
+2.18 s».
 
-Suite sobre `e610881`, todo lo demás sobre `0d89c20`. Entre los dos sólo
-cambiaron `scripts/testing/pantalla_orden1.js` y
-`scripts/testing/sabotajes/orden1.sh`, que pytest no recoge. Los logs están
-en mi scratchpad.
-
-| Puerta | Salida |
-|---|---|
-| Suite desde worktree limpio (`suite-orden1.log`) | `= 1 failed, 3886 passed, 102 skipped, 3 xfailed, 95 warnings in 471.89s (0:07:51) =` |
-| `compileall -q proyecto_maria` | salida 0 |
-| `tests/test_orden1.py` | `24 passed, 1 xfailed, 3 warnings in 0.30s` |
-| `node tests/test_doc1_upload.js` | `DOC-1 upload: 11 synthetic scenarios OK (state, rejection, races, client, catalog, draft, Excel).` |
-| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
-| `pantalla_orden1.js` (Chromium) | `OK: ORDEN-1 en el navegador`, con las 6 líneas OK de abajo |
-| `ataque_aislamiento.sh` (sobre `d4d3b41`, mismo producto) | `Bloqueado: 22   ·   Fugas: 0`, `✅ PUERTA G3 PASADA. Ningún despachante ve datos de otro.` |
-| `sabotajes/orden1.sh 0d89c20` (`sab-orden1c.log`) | 14 ROJO, `sabotajes sin rojo: 0` |
-
-Pantalla:
-```
-OK dos pestañas cerradas: al abrir otras dos se recuperan ORD-B y ORD-A
-OK una pestaña en la carga de archivos no borra la operación que otra dejó a medias
-OK arrastrar con el mouse cambia la tabla, el pedido y el TXT: 8544.42.00.900E · 3921.90.19.900Z · 8471.49.00.100D; las dos lonas, un ítem con dos subítems
-OK el grupo se arrastra entero y se puede soltar sobre él, abierto o cerrado
-OK recargar enseguida de arrastrar conserva el orden
-OK Ctrl+Z después de arrastrar no deshace el orden
-```
-
-Sabotajes (uno por motivo):
-```
-ROJO  | el generador no sigue el orden de los productos: dice «FAILED tests/test_orden1.py::test_el_txt_reordenado_es_el_original_salvo_el_orden_de_los_items»
-ROJO  | los renglones de la misma posición no se juntan (subítems separados): dice «FAILED tests/test_orden1.py::test_los_subitems_quedan_juntos_bajo_su_item»
-ROJO  | el ítem de la posición sale en su último renglón: dice «FAILED tests/test_orden1.py::test_el_txt_reordenado_es_el_original_salvo_el_orden_de_los_items»
-ROJO  | los ítems no quedan numerados corridos: dice «FAILED tests/test_orden1.py::test_los_items_quedan_numerados_corridos»
-ROJO  | empezar otra operación borra el borrador de todas las pestañas: dice «AssertionError [ERR_ASSERTION]: another tab keeps its draft»
-ROJO  | empezar otra operación borra la clave vieja y no el borrador de la pestaña: dice «AssertionError [ERR_ASSERTION]: reload cannot restore A draft»
-ROJO  | todas las pestañas guardan en la misma clave: dice «FALLA: con dos pestañas abiertas no quedan guardadas las dos operaciones»
-ROJO  | una pestaña nueva toma la operación de otra que sigue abierta: dice «FALLA: la segunda pestaña tomó la operación de la primera, que sigue abierta»
-ROJO  | la pestaña que queda en la carga borra el borrador de todas: dice «FALLA: la pestaña que quedó en la carga de archivos borró la operación cerrada»
-ROJO  | soltar no reordena: dice «FALLA: arrastrar el cable arriba de todo deja»
-ROJO  | el número de la fila no se puede arrastrar: dice «FALLA: el producto no tiene de dónde arrastrarlo»
-ROJO  | el grupo no se arrastra: dice «FALLA: el grupo no tiene de dónde arrastrarlo»
-ROJO  | al irse no se guarda el orden recién arrastrado: dice «FALLA: al recargar enseguida vuelve el orden de antes»
-ROJO  | Ctrl+Z después de arrastrar vuelve la lista de antes: dice «FALLA: Ctrl+Z después de arrastrar vuelve el orden de antes»
-```
-
-Los sabotajes del generador se aplican sólo dentro del worktree descartable.
-
-**La F de la suite** es la que me pasaste para después de ORDEN-1:
-```
-FAILED tests/test_excel2.py::test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_a_una_subida_normal
-E   AssertionError: la subida normal dio 400 a los 30.1 s: {"detail":"No pudimos abrir el Excel: tardó demasiado. Probá con otro archivo."}
-```
-Corrido solo, en la misma máquina: `normal: 200 en 30.1 s`, `1 passed`. Además,
-la suite compartió la CPU con los sabotajes. ORDEN-1 no la toca: el único
-`.py` del diff es `tests/test_orden1.py`. El diagnóstico va en la pieza
-siguiente.
-
-**Rojos del arnés que arreglé antes de entregar.** La primera corrida sobre
-`e610881` (`sab-orden1.log`) dio `sabotajes sin rojo: 3`: tres `ROJO?` (en
-rojo, pero sin el texto esperado) en «una pestaña nueva toma la operación»,
-«el número de la fila no se puede arrastrar» y «el grupo no se arrastra». Había
-dos causas:
-- el arnés no esperaba a que la primera pestaña guardara sus borradores;
-- un arrastre que no arrancaba seguía como si hubiera arrancado.
-
-En `d4d3b41`, el arnés espera esos borradores y `arrastrar()` falla si no hay
-un `dragstart` sin cancelar. `0d89c20` suma el sabotaje de la numeración.
-
-## Comandos
+## Comandos para reproducir
 
 ```bash
-git checkout 0d89c20
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
        VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-python -m pytest -q --no-cov tests/test_orden1.py     # 24 passed, 1 xfailed
-node tests/test_doc1_upload.js                         # DOC-1 upload: 11 synthetic scenarios OK (...)
-PY=$(command -v python) PUERTO=8853 scripts/testing/sabotajes/orden1.sh 0d89c20   # 14 ROJO, «sabotajes sin rojo: 0»
-# pantalla sola, con una API local levantada en BASE_URL (ENVIRONMENT=development):
-BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_orden1.js       # «OK: ORDEN-1 en el navegador»
+# 1. Línea de tiempo: «validar:empieza normal» después de que validan las 8 pesadas (~27 s)
+python -m pytest -q -s --no-cov -p no:cacheprovider tests/medir_excel2.py::test_linea_de_tiempo
+# 2. GIL: «cuatro en hilos» ≈ 4 × «una»; «cuatro en procesos» ≈ «una»
+python -m pytest -q -s --no-cov -p no:cacheprovider tests/medir_excel2.py::test_hilos_contra_procesos
+# 3. La prueba real: «normal: 400» o «normal: 200 en ~30 s»
+python -m pytest -q -s --no-cov -p no:cacheprovider \
+  "tests/test_excel2.py::test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_a_una_subida_normal"
 ```
 
-`orden1.sh` levanta su propia API con SQLite en un directorio temporal y
-borra su worktree al terminar.
+Lo que ya corrí, salida exacta:
+
+| Qué | Salida |
+|---|---|
+| Prueba real en la base de hoy | «XML: 10282491 bytes; zip: 796162 bytes; entradas: 8; normal: 200 en 30.7 s», `1 passed, 3 warnings in 31.35s` |
+| Prueba real con el prototipo (a), 3 corridas | «normal: 200 en 0.1 s» / «0.2 s» / «0.1 s», `1 passed` en 30.42 s, 29.80 s y 30.49 s |
+| `test_etapas` | pesada `{'indice': 0.0, 'sin_dtd': 0.02, 'partes': 0.0, 'leer_hoja': 0.02, 'ultima_columna': 1.92, 'TOTAL_validar': 1.84}`; «pesada leer_excel_ruta 0.94» |
+| `test_hilos_contra_procesos` | «núcleos: 4; una: 1.96 s; cuatro en hilos: 10.55 s; cuatro en procesos: 2.18 s», `1 passed` |
+| Banco de `_ultima_columna` (9101451 bytes, script en mi scratchpad) | `iterparse` 1,58 s; expat con handler 0,86 s |
 
 ## No corrido
 
-- `/code-review high`, `/security-review` y los adversarios: sin presupuesto
-  para subagentes hasta las 18:00 UTC de hoy (son las 02:11). Si hay vuelta
-  después, los corro.
-- El ataque corrió sobre `d4d3b41`, no sobre `0d89c20`. Entre los dos
-  cambiaron sólo scripts de prueba.
-- Arrastrar con el dedo (táctil) y con el teclado: no lo probé. Hoy el arrastre
-  es sólo con mouse, como ya era antes.
-- Los arneses viejos de pantalla que también tocan el arrastre: no los
-  corrí; ya estaban rotos antes de esta pieza.
-
-## Observaciones (no las cambié)
-
-- La pantalla no junta en una sola fila los renglones de la misma posición
-  (MARIA-8); el TXT sí. La numeración de la pantalla (filas) no es la del TXT
-  (ítems).
-- Reordenar dos renglones de la misma posición cambia el orden de sus
-  `[SBT]` dentro del ítem. Es lo que se espera de «el orden que queda», pero
-  es el único cambio del TXT que no es mover un ítem entero.
-- Si los miembros de un grupo estaban separados en la lista, el primer
-  arrastre los deja contiguos, como ya se ven en la tabla.
+- `/code-review`, `/security-review` y adversarios: hasta el 2026-10-28 a las
+  18:00 UTC no hay presupuesto para subagentes. Sobre esta entrega pesan
+  poco: no toca producto.
+- Suite completa: no hay cambio de producto. La suite no recoge
+  `tests/medir_excel2.py` (`python_files = test_*.py`).
+- No medí cuánto cuesta un `.xls` de 2 MiB (para el umbral de (a) en `.xls`).
+- No medí cuánto frena el GIL al resto del servidor (otros endpoints) mientras
+  corren las pesadas.
 
 ## Riesgos
 
-- **Táctil y teclado:** sin arrastre, como antes.
-- **Borradores en el navegador:** uno por pestaña. Los de pestañas cerradas
-  que nadie adopta no vencen; con muchas operaciones a medias, se puede llenar
-  la cuota de `localStorage` (y entonces no se guarda el borrador, como ya
-  pasaba con uno solo).
-- **Dos pestañas nuevas que se abren a la vez** pueden adoptar el mismo
-  borrador abandonado: queda duplicado, sin pérdida.
-- **Duplicar una pestaña** copia su id de pestaña: las dos escriben la misma
-  clave, como pasaba con todas antes de esta pieza.
-- **Pestaña congelada más de 3 minutos** (el navegador la suspende) o vuelta
-  desde la caché de atrás/adelante: otra pestaña puede adoptar su operación.
-  Al volver, la primera guarda otra vez la suya; queda duplicada, sin pérdida.
-- **Cerrar dos y abrir una sola** recupera la más reciente; la otra queda
-  guardada pero oculta hasta abrir otra pestaña.
-- **Otro usuario en el mismo navegador** puede adoptar un borrador abandonado
-  del anterior. Ya pasaba con la clave única.
-- **`filaDe` de `despachante.js`** busca la fila por posición: no lo toqué.
-- Al arrastrar hacia abajo, la línea que marca dónde cae (`border-top`) se
-  dibuja arriba de la fila de destino, pero el producto queda debajo de
-  ella. Hacia arriba coincide. Las pruebas comprueban el orden que queda, no
-  la línea.
-- Un aviso que aparece mientras se arrastra puede mover la tabla.
-- `gid` va sin escapar en el HTML de la fila del grupo (ya estaba así; viene
-  del propio armado de grupos).
-- La CI no corre `tests/test_doc1_upload.js`.
-- `test_excel2` sin margen respecto al corte de 30 s: es la pieza siguiente.
+- Mientras no se decida D4, cualquier usuario con sesión puede dejar ~30 s
+  sin subir Excel al resto de las cuentas, y el loop pierde CPU en ese rato.
+  `/upload_excel_v2/` no tiene límite de frecuencia.
+- La prueba sigue sin margen: en tu contenedor da rojo siempre y en el mío,
+  de vez en cuando. No la marqué como esperada ni la toqué.
+- Fuera del repositorio quedó `/orden1_app.py`, un archivo vacío en la raíz del
+  contenedor, de una corrida de ORDEN-1. El control no me dejó borrarlo y no
+  afecta al repositorio.
 
-/compact conservar: Dev técnica (Dev 1), sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica, rutina trig_011UpBfwEu9TUzoNUrviqoP5 (/respondio horaria); aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM con send_message priority next («Dev técnica: …»). ORDEN-1 entregada: código 0d89c20 (producto 82cea39; pruebas e610881, d4d3b41, 0d89c20), D1–D3 abiertas. GUARDAR-2 (cef45ce) en revisión: si vuelve, primero. Siguiente: diagnóstico del rojo de test_excel2 (ocho libros) con una D, sin subir el corte de 30 s ni aflojar la prueba. Reglas: sólo pide la PM o Emi; nada se publica sin el «dale» de Emi para el SHA; nunca main ni push --force; sin secretos ni datos reales; subagentes hasta alto, nunca Fable, sin presupuesto hasta 2026-10-28 18:00 UTC.
+El informe de ORDEN-1 sigue en `cdc9c57` (aceptada, D1–D3 (a)); el de GUARDAR-2,
+en `cb42e8f`.
+
+/compact conservar: Dev técnica (Dev 1), sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica, rutina trig_011UpBfwEu9TUzoNUrviqoP5 (/respondio horaria); aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM con send_message priority next («Dev técnica: …»). ORDEN-1 aceptada (D1–D3 (a)). GUARDAR-2 (cef45ce) en revisión: si vuelve, primero. Entregado: diagnóstico del rojo de test_excel2 (cola FIFO de 2 hilos en validación y lectura + GIL), medición ff03efe, D4 (recomiendo (a) carril liviano; prototipo en scratchpad prototipo-carril.diff) y D5 (endurecer la prueba con dt < 5 s) abiertas: no implementar sin decisión. Reglas: sólo pide la PM o Emi; nada se publica sin el «dale» de Emi para el SHA; nunca main ni push --force; sin secretos ni datos reales; subagentes hasta alto, nunca Fable, sin presupuesto hasta 2026-10-28 18:00 UTC.
