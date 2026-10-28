@@ -97,10 +97,10 @@ sabotaje "el lector no avisa que se quedó sin memoria" "$LECTOR" \
   "test_un_pdf_que_llena_la_memoria_se_rechaza" \
   "test_leer_un_pdf_que_llena_la_memoria_avisa"
 sabotaje "una hoja que se queda sin memoria se saltea" "$LECTOR" \
-  "            except MemoryError:
-                raise
-            except LimitReachedError:" \
-  "            except LimitReachedError:" \
+  "        except MemoryError:
+            raise
+        except LimitReachedError:" \
+  "        except LimitReachedError:" \
   "test_un_pdf_que_llena_la_memoria_se_rechaza"
 sabotaje "los flujos sin tope" "$LECTOR" \
   "_MAX_FLUJO = 8 * 1024 * 1024" \
@@ -312,11 +312,11 @@ sabotaje "la ruta no ataja al lector ocupado" proyecto_maria/main.py \
 
 # Devolución 20:07: los mutantes vivos del adversario.
 sabotaje "sin memoria al abrir es un PDF roto" "$LECTOR" \
-  "            paginas = list(reader.pages)
-        except MemoryError:
-            raise
+  "        paginas = list(reader.pages)
+    except MemoryError:
+        raise
 " \
-  "            paginas = list(reader.pages)
+  "        paginas = list(reader.pages)
 " \
   "test_sin_memoria_al_abrir_el_pdf_no_se_disfraza_de_pdf_roto"
 sabotaje "sin el tope de RunLength" "$LECTOR" \
