@@ -330,12 +330,12 @@ def test_un_indice_que_no_se_puede_leer_va_al_pesado():
     assert fs._excel_liviano(bytes(libro), ".xlsx") is False
 
 
-@pytest.mark.parametrize("valor", ["1e308", "1e300"])
-def test_un_umbral_enorme_no_rompe_la_subida(monkeypatch, valor):
+@pytest.mark.parametrize("valor, bytes_", [("1e308", 2 * 2**20), ("1e300", int(1e300 * 2**20))])
+def test_un_umbral_enorme_no_rompe_la_subida(monkeypatch, valor, bytes_):
     """EXCEL_LIVIANO_MB=1e308 daba 500 en toda subida de Excel: en bytes no
     entra en un entero. Un valor así vale lo que vale mal escrito, el de
     defecto (punto 4 de la devolución)."""
     monkeypatch.setenv("EXCEL_LIVIANO_MB", valor)
-    assert fs._mb_de_entorno("EXCEL_LIVIANO_MB", 2) in (2 * 2**20, int(float(valor) * 2**20))
+    assert fs._mb_de_entorno("EXCEL_LIVIANO_MB", 2) == bytes_
     r = _subir(_normal())
     assert r.status_code == 200, r.text[:300]
