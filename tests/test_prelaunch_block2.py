@@ -284,6 +284,7 @@ class TestWebhook:
                         "id": pid,
                         "status": "approved",
                         "external_reference": f"{uname}:premium",
+                        "transaction_amount": 45000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-mp-1"},
                         "card": {"last_four_digits": "4242", "payment_method": {"name": "visa"}},
                     },
@@ -321,6 +322,7 @@ class TestWebhook:
                         "id": pid,
                         "status": "approved",
                         "external_reference": f"{uname}:premium",
+                        "transaction_amount": 45000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-2"},
                     },
                 }
@@ -350,6 +352,7 @@ class TestWebhook:
                         "id": pid,
                         "status": "approved",
                         "external_reference": f"{uname}:premium",
+                        "transaction_amount": 45000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-3"},
                     },
                 }
@@ -412,6 +415,7 @@ class TestWebhook:
                         "id": pid,
                         "status": "approved",
                         "external_reference": "usuarioquenoeexiste:premium",
+                        "transaction_amount": 45000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-x"},
                     },
                 }
@@ -559,6 +563,7 @@ class TestTopup:
                         "id": pid,
                         "status": "approved",
                         "external_reference": f"{uname}:topup",
+                        "transaction_amount": 10000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-tu"},
                     },
                 }
@@ -601,6 +606,7 @@ class TestTopup:
                         "id": pid,
                         "status": "approved",
                         "external_reference": f"{uname}:topup",
+                        "transaction_amount": 10000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-cap"},
                     },
                 }

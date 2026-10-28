@@ -19,7 +19,8 @@ def _mock_sdk(payment_id: str = "164743017608", external_ref: str = "test_user:p
             "status": status,
             "external_reference": external_ref,
             "payer": {"id": "payer_123"},
-            "transaction_amount": 30000.00,
+            "transaction_amount": 45000.00,  # el precio del plan (COBRO-MP-1)
+            "currency_id": "ARS",
         },
     }
     return sdk

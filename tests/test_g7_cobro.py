@@ -78,7 +78,8 @@ def _mock_sdk_approved(username: str, plan: str = "premium"):
             "status": "approved",
             "external_reference": f"{username}:{plan}",
             "payer": {"id": "payer_g7"},
-            "transaction_amount": 30000.00,
+            "transaction_amount": 45000.00,  # el precio del plan (COBRO-MP-1)
+            "currency_id": "ARS",
         },
     }
     return sdk
