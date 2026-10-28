@@ -8001,6 +8001,78 @@ async def learn_client_catalogo_productos(
     return {"success": True, "cliente_id": client_id, "aprendidos": updated}
 
 
+@app.post("/api/clientes/{client_id}/catalogo/despacho/leer")
+@limiter.limit(get_dynamic_rate_limit)
+async def leer_despacho_para_catalogo(
+    request: Request,
+    client_id: str,
+    file: UploadFile = File(...),
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Lee los productos de un despacho para revisarlos (DESPACHO-1b). Sin IA
+    y sin guardar nada: lo guarda `.../despacho/guardar` después de revisar."""
+    await _get_owned_client(db, client_id, user["username"])
+
+    from proyecto_maria.security.file_security import validate_file_upload
+    from proyecto_maria.core.despacho_lector import leer_despacho
+    contents = await validate_file_upload(file, 'pdf', max_size=_get_max_upload_bytes())
+    try:
+        resultado = await _leer_pdf_aparte(leer_despacho, contents, que="el despacho")
+    except LecturaPdfDemasiadoLarga as e:
+        return JSONResponse(
+            status_code=504,
+            content={"detail": str(e), "code": "lectura_pdf_demasiado_larga"},
+        )
+    return {"success": True, "cliente_id": client_id, **resultado}
+
+
+@app.post("/api/clientes/{client_id}/catalogo/despacho/guardar")
+async def guardar_despacho_en_catalogo(
+    client_id: str,
+    body: dict,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Guarda en el catálogo del cliente los renglones revisados de un
+    despacho (DESPACHO-1b). Todo o nada: si un renglón no sirve, no se guarda
+    ninguno. Nunca arma una operación ni un TXT."""
+    username = user["username"]
+    await _get_owned_client(db, client_id, username)
+
+    from proyecto_maria.core.despacho_lector import MAX_RENGLONES, renglon_para_catalogo
+    from proyecto_maria.services.client_memory import upsert_client_product_history
+
+    renglones = _sin_nul(body.get("renglones")) if isinstance(body, dict) else None
+    if not isinstance(renglones, list) or not renglones:
+        raise HTTPException(status_code=400, detail="Se requiere body.renglones con al menos un producto.")
+    if len(renglones) > MAX_RENGLONES:
+        raise HTTPException(status_code=400, detail=f"Son más de {MAX_RENGLONES} productos: cargalos en partes.")
+
+    listos, errores = [], []
+    for n, renglon in enumerate(renglones, start=1):
+        campos, problemas = renglon_para_catalogo(renglon)
+        if problemas:
+            errores.append({"renglon": n, "problemas": problemas})
+        else:
+            listos.append(campos)
+    if errores:
+        return JSONResponse(status_code=422, content={
+            "detail": "Hay productos sin completar: no guardé ninguno.",
+            "code": "renglones_incompletos", "errores": errores})
+
+    try:
+        for campos in listos:
+            await upsert_client_product_history(
+                db, owner_username=username, client_id=client_id, **campos)
+        await db.commit()
+    except Exception:
+        await db.rollback()
+        logging.exception("despacho al catálogo: no se guardó client_id=%s", client_id)
+        raise HTTPException(status_code=500, detail="No pude guardar los productos: no se guardó ninguno.")
+    return {"success": True, "cliente_id": client_id, "guardados": len(listos)}
+
+
 @app.put("/api/clientes/{client_id}/catalogo/productos/{product_id}")
 async def update_client_catalogo_producto(
     client_id: str,

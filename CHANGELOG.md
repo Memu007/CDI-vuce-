@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · feat: el catálogo del cliente se carga desde un despacho, sin IA (DESPACHO-1b)
+
+- En Catálogo, «Cargar desde despacho» lee del PDF, por rótulo, un renglón por ítem o subítem: posición SIM, descripción, sufijos, origen, unidad, cantidad, valor unitario y kilo neto. Lo que falta queda marcado y vacío; un escaneado avisa.
+- Se revisa renglón por renglón y se guarda todo o nada en los productos del cliente. No arma operaciones ni TXT; el lector de facturas sigue rechazando despachos.
+
 ## 2026-10-28 · feat: con CIF, CIP, DPU, DAP y DDP el sistema no sugiere el seguro (SEGURO-1)
 
 - Con esos incoterms el seguro ya está en el precio: no hay botón «Calcular seguro». El seguro de la factura se sigue cargando y sale en el TXT como siempre.
