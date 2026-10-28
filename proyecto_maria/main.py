@@ -10934,7 +10934,9 @@ async def billing_checkout(
     if plan_id not in billing_service.PLANS:
         raise HTTPException(status_code=400, detail=f"Plan invalido: {plan_id}")
 
-    result = await db.execute(select(User).where(User.username == username))
+    # La fila queda bloqueada hasta guardar la suscripción nueva: un segundo
+    # checkout a la vez espera y ve la del primero (COBRO-MP-1 D).
+    result = await db.execute(select(User).where(User.username == username).with_for_update())
     db_user = result.scalars().first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
@@ -10989,8 +10991,8 @@ async def billing_checkout(
             except _SuscripcionMPError as e:
                 print(f"⚠️ Checkout de {username}: no se pudo cancelar la suscripción vieja en MP: {e}")
                 raise HTTPException(status_code=503, detail=no_disponible)
+        # Sin commit todavía: soltaría el bloqueo antes de crear la nueva.
         db_user.mp_preapproval_id = None
-        await db.commit()
 
     try:
         checkout = billing_service.create_checkout(db_user, plan_id, org_id=org_id)
@@ -10998,12 +11000,14 @@ async def billing_checkout(
         if checkout.get("preapproval_id"):
             db_user.mp_preapproval_id = checkout["preapproval_id"]
             db_user.mp_plan_id = plan_id
-            await db.commit()
+        await db.commit()
         return {"success": True, **checkout}
     except HTTPException:
         raise
     except Exception as e:
         print(f"Error creando checkout MP: {e}")
+        # La vieja ya quedó cancelada en Mercado Pago: no se deja guardada.
+        await db.commit()
         raise HTTPException(status_code=500, detail=f"Error con MercadoPago: {e}")
 
 # SEGURIDAD: endpoints Bitcoin demo eliminados (eran simulaciones sin auth ni
