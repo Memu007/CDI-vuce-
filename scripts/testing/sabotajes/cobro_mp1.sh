@@ -308,6 +308,10 @@ else
     '    result = await db.execute(select(User).where(User.username == username).with_for_update())' \
     '    result = await db.execute(select(User).where(User.username == username))' \
     "FALLA | sin suscripción anterior: queda una sola suscripción viva en Mercado Pago"
+  sabotaje $M "D: cancelar no espera al checkout en curso" \
+    '    result = await db.execute(select(User).where(User.username == user["username"]).with_for_update())' \
+    '    result = await db.execute(select(User).where(User.username == user["username"]))' \
+    "FALLA | cancelar durante un checkout: no queda ninguna suscripción viva en Mercado Pago"
 fi
 
 # C y D en el perfil: la pantalla, con la API levantada desde el worktree y
