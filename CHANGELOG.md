@@ -14,6 +14,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(orden):** si el usuario tarda en llegar al recargar y mientras tanto se cambió de pantalla o se empezó a subir un archivo, la operación de antes queda guardada y se avisa, sin mover la pantalla.
 - Avisa también cuando la pestaña abre con otro usuario, cuando la consulta de la sesión no contesta en 10 s y cuando el navegador no tiene lugar para recuperar la operación.
+- Tampoco la pisa si ya se tocó la pestaña (por ejemplo, con el diálogo de archivos abierto); y si el usuario no llega en 4 s, avisa que no guarda hasta que llegue.
 
 ## 2026-10-28 · fix: la pestaña comprueba la sesión antes de guardar y avisa cuando no guarda (ORDEN-1, devolución 20:08)
 

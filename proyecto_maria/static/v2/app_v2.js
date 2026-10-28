@@ -341,9 +341,17 @@
     async function loadCurrentUser() {
         try {
             const sesionAntes = getCsrfToken();
-            const res = await api('/auth/current_user');
-            if (!res.ok) return;
-            const user = await res.json();
+            // Una consulta que no contesta cuenta como error y se reintenta.
+            const corte = new AbortController();
+            const tope = setTimeout(() => corte.abort(), ESPERA_SESION_MS);
+            let user;
+            try {
+                const res = await api('/auth/current_user', { signal: corte.signal });
+                if (!res.ok) return;
+                user = await res.json();
+            } finally {
+                clearTimeout(tope);
+            }
             if (duenoPestana === null) {
                 duenoPestana = user.username || '';
                 if (sesionAntes !== sesionAlAbrir || getCsrfToken() !== sesionAlAbrir) {
@@ -351,6 +359,7 @@
                     avisarBorrador('ajena', AVISO_AJENA);
                 } else {
                     sesionDelDueno = sesionAlAbrir;
+                    if (avisoBorrador === 'red') avisarBorrador(null);
                 }
             } else {
                 confirmarSesion(user.username, sesionAntes);
@@ -760,6 +769,12 @@
     }
 
     /* ---------- 10. Bootstrap ---------- */
+    // Si la persona ya tocó la pestaña (un clic, una tecla, soltar un
+    // archivo), la recuperación tardía no la cambia: puede tener abierto el
+    // diálogo de archivos o haber elegido algo.
+    let pestanaTocada = false;
+    ['pointerdown', 'keydown', 'drop'].forEach(ev =>
+        document.addEventListener(ev, () => { pestanaTocada = true; }, true));
     document.addEventListener('DOMContentLoaded', () => {
         try { localStorage.removeItem(CLIENTE_KEY); } catch (_) {}
         const usuarioListo = cargarUsuarioHastaTenerlo();
@@ -824,9 +839,11 @@
         Promise.race([usuarioListo, espera])
             .then(() => {
                 if (!CDI.borrador.usuario()) {
+                    // Sin usuario no se guarda: se avisa hasta que llegue.
+                    if (!sinSesion) CDI.borrador.avisar('red', AVISO_RED);
                     usuarioListo.then(() => CDI.borrador.buscar()).then(b => {
                         if (!b) return;
-                        const ocupada = currentScreen !== 'upload'
+                        const ocupada = pestanaTocada || currentScreen !== 'upload'
                             || (CDI.state && CDI.state.items && CDI.state.items.length > 0)
                             || (CDI.subidaEnCurso && CDI.subidaEnCurso());
                         if (ocupada) {
@@ -879,6 +896,7 @@
     const ESPERA_USUARIO_MS = 4000;
     const ESPERA_PESTANA_MS = 1500;
     const ESPERA_SESION_MS = 10000;
+    const AVISO_RED = 'No se pudo comprobar la sesión: esta pestaña no guarda la operación por ahora.';
     const AVISO_AJENA = 'Entró otro usuario en este navegador: esta pestaña ya no guarda la operación. Recargá la página.';
     const pestanaAnterior = (() => {
         try { return sessionStorage.getItem(BORRADOR_PESTANA); } catch (_) { return null; }
@@ -961,7 +979,7 @@
             .catch(() => {
                 sesionRevisada = null;
                 revisarDesde = Date.now() + 10000;
-                avisarBorrador('red', 'No se pudo comprobar la sesión: esta pestaña no guarda la operación por ahora.');
+                avisarBorrador('red', AVISO_RED);
             })
             .finally(() => { clearTimeout(tope); revisando = false; });
     }
