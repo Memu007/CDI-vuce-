@@ -153,3 +153,27 @@ def test_el_historial_de_un_cliente_ajeno_no_se_usa(client, monkeypatch):
     r = client.post("/api/catalog/lookup", json={"items": [{"descripcion": DESC}], "client_id": cid})
     assert r.status_code == 200, r.text
     assert (r.json()["items"][0]["source"], r.json()["items"][0]["ncm"]) == ("ninguno", None)
+
+
+def test_el_historial_de_otro_cliente_del_mismo_despachante_no_se_usa(client, monkeypatch):
+    """Dos clientes del mismo despachante, con igual nombre y CUIT; sólo uno
+    tiene historial. El otro no recibe su sugerencia, ni en el autorrelleno
+    ni en /api/ncm/sugerir (agregado de la PM a GUARDAR-2)."""
+    cid = _cliente(client)
+    ficha = client.get(f"/api/clientes/{cid}").json()
+    r = client.post("/api/clientes", json={"nombre": ficha["nombre"], "cuit": ficha["cuit"]})
+    assert r.status_code == 200, r.text
+    otro = r.json()["cliente"]["id"]
+    assert otro != cid
+    assert _guardar(client, cid, [{"pieza": SIM, "ncm": SIM, "descripcion": DESC}]).status_code == 200
+    assert _historial(cid) == {DESC: "84714900"} and _historial(otro) == {}
+    # El primero sí la recibe: el caso distingue.
+    r = client.post("/api/catalog/lookup", json={"items": [{"descripcion": DESC}], "client_id": cid})
+    assert (r.json()["items"][0]["source"], r.json()["items"][0]["ncm"]) == ("cliente", "84714900")
+    r = client.post("/api/catalog/lookup", json={"items": [{"descripcion": DESC}], "client_id": otro})
+    assert r.status_code == 200, r.text
+    assert (r.json()["items"][0]["source"], r.json()["items"][0]["ncm"]) == ("ninguno", None)
+    monkeypatch.setattr(main_mod, "_suggest_ncm_with_gemini", lambda *a, **k: [])
+    r = client.post("/api/ncm/sugerir", json={"descripcion": DESC, "client_id": otro})
+    assert r.status_code == 200, r.text
+    assert r.json()["sugerencias"] == []
