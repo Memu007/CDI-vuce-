@@ -1003,9 +1003,12 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
       const t = await abrir(ctx);
       await cargar(t, factura, [prod('Producto de ' + factura, '84714900100D', 2, 10)]);
       await esperarBorradores(t, [factura], 'la operación ' + factura + ' no se guarda');
-      let soltar;
+      // Las consultas que salen antes de que vuelva quedan colgadas hasta
+      // después de mirar si la pestaña se enteró; las de después contestan.
+      let soltar, vuelve = false;
       const suelta = new Promise(r => { soltar = r; });
       await t.route('**/auth/current_user', async ruta => {
+        if (vuelve) return ruta.continue().catch(() => {});
         if (caida) return ruta.fulfill({ status: 500, body: 'error de prueba' });
         await suelta;
         return ruta.continue().catch(() => {});
@@ -1016,9 +1019,10 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
       if (!avisó) falla('al recargar ' + que + ' y en 8 s la pestaña no avisa que no guarda');
       const texto = await t.locator('#avisoBorrador').textContent();
       if (!/no guarda/.test(texto)) falla('al recargar ' + que + ' y la pestaña avisa otra cosa: ' + texto);
-      await t.unroute('**/auth/current_user');
+      vuelve = true;
       const llegó = await t.waitForFunction(() => CDI.currentUser, null, { timeout: 30000 }).then(() => true, () => false);
       soltar();
+      await t.unroute('**/auth/current_user');
       if (!llegó) falla('al recargar ' + que + ' y cuando vuelve a contestar la pestaña no se entera en 30 s');
       const volvió = await t.waitForFunction(f => ((CDI.state || {}).operacion || {}).numero_factura === f, factura, { timeout: 5000 }).then(() => true, () => false);
       if (!volvió) falla('al recargar ' + que + ', cuando vuelve a contestar la operación no vuelve');

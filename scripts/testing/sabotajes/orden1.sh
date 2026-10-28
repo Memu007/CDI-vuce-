@@ -315,7 +315,7 @@ sabotaje $A "sin lugar en el navegador no se avisa" \
 export CASOS=z
 sabotaje $A "el usuario tarde recupera aunque la pestaña esté fuera de la carga" \
   "FALLA: el usuario llegó tarde y la pestaña se fue de la pantalla en que estaba" \
-  "const ocupada = currentScreen !== 'upload'" "const ocupada = false"
+  "const ocupada = pestanaTocada || currentScreen !== 'upload'" "const ocupada = pestanaTocada"
 # Lo mismo con una subida en curso.
 export CASOS=z2
 sabotaje $A "el usuario tarde recupera aunque haya una subida en curso" \
