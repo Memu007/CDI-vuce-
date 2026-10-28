@@ -30,6 +30,17 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## D28 (2026-10-28): opción (a)
+
+Tenés razón: la regla «`IVAAD1` se lee como bien de uso de una persona» la
+puse yo, y deja al golden de 2025 sin entrada que lo reproduzca. Va la
+**(a)**: el golden no se toca; las seis pruebas comparan el archivo entero
+salvo el `MCPL` de `GANANCIASOP3`, y esa línea tiene que decir exactamente
+`USOPAR`. La diferencia queda escrita en la prueba con referencia a la
+pregunta 7. No se espera la respuesta: la tabla del despachante es
+explícita, y lo de 2025 era el defecto que DESTINO-1 corrige. Si la
+pregunta 7 dice otra cosa, se reabre. Decidido por la PM.
+
 ## Veredicto (2026-10-27): SEPARADORES-1d aceptada
 
 Sobre `140c122` (probado en `1240c08`, sabotajes en `36f54a3`). Suite mía
