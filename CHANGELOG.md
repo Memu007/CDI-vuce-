@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: invitar exige un email que el registro acepte (ORG-1)
+
+- Invitar a alguien al estudio rechaza el email con el mismo criterio que el registro (formato usuario@dominio.com, hasta 100 caracteres). Antes bastaba una «@», y esa invitación no la podía usar nadie y ocupaba un lugar 7 días.
+
 ## 2026-10-28 · fix: el email de la cuenta se busca sin mirar mayúsculas (EMAIL-1)
 
 - Recuperar usuario, recuperar contraseña y entrar con el email encuentran la cuenta aunque el email venga con otras mayúsculas o espacios; el correo sale a la dirección guardada. La respuesta es la misma exista o no.

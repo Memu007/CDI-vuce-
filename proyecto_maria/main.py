@@ -10044,8 +10044,11 @@ async def invite_to_organization(
         raise HTTPException(status_code=403, detail="Solo el administrador del estudio puede invitar")
 
     clean_email = (req.email or "").strip().lower()
-    if not clean_email or "@" not in clean_email:
-        raise HTTPException(status_code=400, detail="Email inválido")
+    # El mismo criterio que el registro: la invitación fija el email, y una que el
+    # registro rechace no la puede usar nadie y ocupa un lugar hasta que vence.
+    if (not re.match(r'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$', clean_email)
+            or len(clean_email) > 100):
+        raise HTTPException(status_code=400, detail="Email no válido. Debe tener formato usuario@dominio.com")
 
     # Si ya existe un user con ese email en la org, no invitamos
     existing = await db.execute(
