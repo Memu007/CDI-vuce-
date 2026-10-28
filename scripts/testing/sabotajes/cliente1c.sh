@@ -149,8 +149,32 @@ sabotaje $D "el error del driver muestra la clave" \
   'detalle = _tapar(f"{type(e).__name__}: {e}", secretos, visibles)' 'detalle = f"{type(e).__name__}: {e}"' \
   "${B}test_si_el_error_de_la_base_nombra_la_clave_no_se_muestra[simple]"
 sabotaje $D "se tapa sólo la clave tal cual, no la escapada" \
-  'formas |= {crudo, quote(crudo, safe=""), quote_plus(crudo)}' 'formas |= {crudo}' \
+  $',\n                  "(?i:" + "".join(f"%{b:02x}" for b in c.encode()) + ")"}' '}' \
   "${B}test_si_el_error_de_la_base_nombra_la_clave_no_se_muestra[escapada]"
+# EXCEL-3f, H1-bis: la clave escapada como la escriba SQLAlchemy o el driver.
+sabotaje $D "se tapa la clave escapada entera, no carácter por carácter (H1-bis)" \
+  'patrones = {f: _escrito_de_cualquier_forma(f) for f in formas}' \
+  'patrones = {f: "(?:" + "|".join(map(re.escape, {f, __import__("urllib.parse").parse.quote(f, safe=""), __import__("urllib.parse").parse.quote_plus(f)})) + ")" for f in formas}' \
+  "${B}test_la_clave_con_espacio_y_otro_escapado_no_se_ve_como_la_escriba_el_error[sqlalchemy-barra]"
+sabotaje $D "el %XX en minúscula no se tapa" \
+  '"(?i:" + "".join(f"%{b:02x}"' '"(?:" + "".join(f"%{b:02X}"' \
+  "${B}test_la_clave_con_espacio_y_otro_escapado_no_se_ve_como_la_escriba_el_error[minusculas-barra]"
+sabotaje $D "el «+» por el espacio no se tapa" \
+  '            formas.add(r"\+")' '            pass' \
+  "${B}test_la_clave_con_espacio_y_otro_escapado_no_se_ve_como_la_escriba_el_error[quote_plus-barra]"
+sabotaje $D "la clave escrita con ascii() no se tapa" \
+  're.escape(ascii(c)[1:-1]), ' '' \
+  "${B}test_la_clave_con_espacio_y_otro_escapado_no_se_ve_como_la_escriba_el_error[ascii-enie]"
+sabotaje $D "la clave escrita en JSON no se tapa" \
+  ' re.escape(json.dumps(c)[1:-1]),' '' \
+  "${B}test_la_clave_con_espacio_y_otro_escapado_no_se_ve_como_la_escriba_el_error[json-enie]"
+sabotaje $D "la comilla escapada con «\\» no se tapa" \
+  $'\n                  re.escape("\\\\" + c),' '' \
+  "${B}test_la_clave_con_espacio_y_otro_escapado_no_se_ve_como_la_escriba_el_error[repr-las-dos-comillas]"
+sabotaje $D "un pedazo del host que es la clave escapada queda a la vista" \
+  $'visibles = {v for v in visibles\n                if v and not any(re.fullmatch(p, v) for p in patrones.values())}' \
+  'visibles = {v for v in visibles if v}' \
+  "${B}test_un_pedazo_del_host_que_es_la_clave_escrita_de_otra_forma_se_tapa[quote]"
 sabotaje $D "se nombra la base con la URL escrita, como antes" \
   'donde = _tapar(_donde(url), secretos, visibles)' 'donde = args.base.split("://", 1)[-1]' \
   "${B}test_una_clave_con_un_separador_no_se_ve_en_el_error[CLA/VESECRETA]"
@@ -170,16 +194,16 @@ sabotaje $D "lo que conecta es la URL escrita, no la que se leyó" \
   'r = asyncio.run(revisar(url, args.arreglar_none))' 'r = asyncio.run(revisar(args.base, args.arreglar_none))' \
   "${B}test_lo_que_conecta_es_lo_que_se_lee"
 sabotaje $D "una clave corta tapa el host del error" \
-  'visibles = {v for v in visibles if v} - formas' 'visibles = set()' \
+  $'visibles = {v for v in visibles\n                if v and not any(re.fullmatch(p, v) for p in patrones.values())}' 'visibles = set()' \
   "${B}test_una_clave_corta_no_tapa_el_host_en_el_error"
 sabotaje $D "el host protege lo que es parte de la clave" \
   'for f in sorted(formas | visibles, key=len, reverse=True):' 'for f in sorted(formas | visibles, key=len):' \
   "${B}test_una_clave_que_empieza_como_el_host_se_tapa_entera"
 sabotaje $D "un usuario corto rompe la palabra (sin mirar antes)" \
-  '                patron = r"(?<!\w)" + patron' '                pass' \
+  '            patron = r"(?<!\w)" + patron' '            pass' \
   "${B}test_un_usuario_corto_no_rompe_el_mensaje[o]"
 sabotaje $D "un usuario corto rompe la palabra (sin mirar después)" \
-  '                patron += r"(?!\w)"' '                pass' \
+  '            patron += r"(?!\w)"' '            pass' \
   "${B}test_un_usuario_corto_no_rompe_el_mensaje[Connection]"
 sabotaje $D "si tapar falla sale el traceback" \
   'except Exception:  # noqa: BLE001 - tapar nunca muestra un traceback' 'except ZeroDivisionError:' \

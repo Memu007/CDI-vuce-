@@ -2,172 +2,193 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## Vuelta de CLIENTE-1c y ESTUDIO-1b: entregadas en `3aba9c2`
+## EXCEL-3f, con H1-bis: entregada en `8c63c37`
 
 | Qué | SHA |
 |---|---|
-| ESTUDIO-1b, producto | `e226ac3`, `975d627` |
-| ESTUDIO-1b, pruebas, pantalla y sabotajes | `009ad58`, `8359e53` |
-| Vuelta de CLIENTE-1c, producto | `7e43604`, `eda3755` (import sin uso), `2a21835` (refactor) |
-| Vuelta de CLIENTE-1c, pruebas y sabotajes | `d0dcf04`, `f1cb25e` |
-| Merge de tu rama (`ce70729`), sólo `docs/pm/` | `3aba9c2` (lo que se entrega) |
+| H1-bis, producto | `6be261c` |
+| H1-bis, pruebas y sabotajes | `b24daa0` |
+| EXCEL-3f, producto | `e330340`, `42f4e42`, `d9e728d` (refactor, abajo) |
+| EXCEL-3f, pruebas y sabotajes | `d513219`, `41011f2`, `d5da28c`, `2fdd4e1`, `b3e4bcb` |
+| Merges de tu rama (`7145201`, `ea64a9c`, `89a0fde`) | `c59a873`, `b2eadb8`, `8c63c37` (lo que se entrega) |
+| Merges posteriores, sólo `NOW.md` (`5a5052d`, `f5953eb`) | `847d7b9`, `06c4461` |
 | Informe | este commit |
 
-Tu diff de revisión: `git diff 4452b22..3aba9c2`. Los merges de tu rama
-traen sólo `docs/pm/`; mi canal `PARA-DEV.md` no cambió con `ce70729`.
+Tu diff de revisión desde `3aba9c2` trae también lo de la Dev MARIA que vos
+integraste (`e9981e5` y SEPARADORES-1d). Lo mío solo, sin eso:
+`git diff 89a0fde..8c63c37` (7 archivos, +539 −39; `89a0fde` es la punta de
+tu rama, integrada entera).
 
-**Nada para decidir.** Lo que elegí sin que se pidiera va en «Supuestos»,
-para que lo puedas rechazar. Próxima D: D26.
+**Suite en `8c63c37`: 0 rojos.** Un caso de `test_excel2` está al borde de
+su corte de 30 s en esta máquina: en una corrida anterior (`2fdd4e1`) salió
+rojo, y en la base `7145201`, sin lo mío, sale igual (1 de 5). Va en
+«Riesgos» con la serie. No lo toqué: no es de esta pieza.
 
-## 1. Vuelta de CLIENTE-1c
+**Nada para decidir.** Lo que elegí sin que se pidiera va en «Supuestos».
 
-- **H1, la clave de `--base`.** El script ya no lee la URL dos veces:
-  conecta con la de `make_url` y tapa con esa misma (sin `urlsplit`). El
-  lugar del error sale de `url.host`, `url.port` y `url.database`, y pasa
-  igual por `_tapar`. Lo que no entiende `make_url` (por ejemplo el puerto
-  «:abc») da el mensaje de uso con rc 2, nunca un traceback. Si tapar falla,
-  sale «(sin detalle)» y el nombre del error: tampoco hay traceback.
-  - Casos: claves con «/», «?», «#», «[», «]», «;», espacio, «%2F» y «@», y
-    esos signos en ancho completo («／», «＠», «？», «＃»). Cada una corre el
-    script como proceso, y otra vez con un error que repite la URL entera.
-    Ninguna muestra la clave ni un traceback; todas dan rc 2.
-- **H2, el usuario que rompía palabras.** Se tapa sólo el secreto entero
-  (no pegado a letras o dígitos). Un usuario «u» ya no deja
-  «ConnectionRef***sedError». Los pedazos del host que no son secretos
-  quedan: una clave «1» no borra «127.0.0.1».
-- **H3, el año `0001`:** anotado, no lo toqué.
-- **D25 (b):** la regla vive en un solo módulo,
-  `proyecto_maria/services/fecha_inic_activ.py` (`fecha_del_alta`). La usan
-  el alta y la edición (`main.py`) y la importación
-  (`migration_service.py`). En la importación, «15/03/15», «01/01/50»,
-  DD-MM-AAAA y los dígitos de ancho completo quedan vacíos con el aviso de
-  su fila.
-- **Saqué código mío que no hacía nada (`2a21835`).** Tapar el lugar del
-  error pedazo por pedazo sólo cambiaba la salida en URLs absurdas (la clave
-  repetida dentro del host), y ahí no tapaba más. Lo encontré porque su
-  sabotaje quedaba verde. Ahora es una línea:
-  `donde = _tapar(_donde(url), secretos, visibles)`.
-- **Sabotajes arreglados (`f1cb25e`).** En `cliente1c.sh` los textos
-  esperados siguen los ids que escribe pytest (escapa lo que no es ASCII,
-  `[２０１５-03-15]`). En `cliente1b.sh` tres sabotajes
-  apuntaban a `main.py`: ahora apuntan al módulo de la regla.
+## 1. H1-bis: la clave de `--base` como la escriba quien sea
 
-## 2. ESTUDIO-1b
+- **La familia, no el ejemplo.** Antes se tapaban la clave y tres formas
+  fijas (`quote` sin lista segura y `quote_plus`). Ahora cada secreto se
+  busca con un patrón que, carácter por carácter, acepta: el carácter tal
+  cual, su `%XX` (mayúscula o minúscula, UTF-8), «+» por el espacio, y cómo
+  lo escriben Python (`repr`/`ascii`: `\t`, `\xf1`, `\'`) y JSON
+  (`\u00f1`, `\"`). No depende de qué lista de «no escapar» use SQLAlchemy o
+  el driver: `quote(clave, safe=" +")` de SQLAlchemy cae adentro, y también
+  cualquier otra lista.
+- Un pedazo del host que resulta ser la clave escrita de otra forma ya no
+  queda «visible»: se tapa.
+- Tu ejemplo `QZXW KJVB|NMPL` y ocho claves más (espacio con `|`, `%`, `"`,
+  `/`, `+`, `\`, `ñ`, tab, las dos comillas) × ocho formas de escribirla
+  (la de SQLAlchemy, `quote`, `quote` sin lista, `quote_plus`, `%xx` en
+  minúscula, `repr`, `ascii`, JSON): 72 casos. Más un fuzz de 400 claves al
+  azar con separadores, blancos y otros alfabetos, con el error repitiendo
+  `render_as_string(hide_password=False)` y las otras formas. Fuera de la
+  suite corrí el mismo fuzz con dos semillas más, 5000 claves cada una: 0
+  fugas.
+- **Sabotajes en `cliente1c.sh`:** sin «+» por el espacio, sin `%xx` en
+  minúscula, sin las formas de Python y de JSON, sin tapar el pedazo del
+  host. Todos en rojo (abajo).
 
-- **D23 (b):** generar con el CUIT del perfil se anota (tabla nueva
-  `usos_cuit_perfil`, por cuenta) y compite con los estudios. La operación
-  siguiente trae elegido lo último usado, estudio o perfil. Cuenta tanto
-  `estudio_id: ""` como la falta del campo, y también el CUIT del perfil
-  mandado en `cuit_agr` (la pantalla lo hace así). Los avisos y un TXT que
-  no sale no cuentan.
-- **`estudio_id`:** sólo `""` o la falta del campo es «sin estudio».
-  «null», «None», «N/A», espacios, un null de JSON, un número o una lista
-  dan 400, en `/generate_maria` y en `/generate_maria/avisos`.
-- **Nombre del estudio:** rechaza los caracteres de formato invisibles
-  (Unicode Cf: ancho cero, controles de dirección, BOM). Acepta acentos y
-  otros alfabetos.
-- **Pantalla (`scripts/testing/pantalla_estudio1b.js`):** estudio único
-  elegido, perfil elegido a mano, la operación siguiente sin tocar el
-  selector viene con el perfil, y sigue así al recargar.
-- **Arreglo propio de `/code-review` (`975d627`):** con el CUIT del perfil
-  borrado, su uso viejo dejaba elegida la opción sin CUIT. Ahora no cuenta.
-- **`estudio1.sh`:** VALOR-1c (`3df999c`) movió el código y un sabotaje
-  perdió su patrón; lo actualicé en `8359e53`.
+## 2. EXCEL-3f
+
+Todo lo nuevo **sólo suma un aviso que nombra la fila**: no saca nada del
+FOB que antes entraba. Lo único que cambia el FOB es el plural (punto 1).
+
+1. **Plurales y «fee».** «Fletes», «Freights», «Seguros», «Insurances»,
+   «Bank fees», «Fee», «Payments», «Shipping costs»… se leen como el cargo
+   en singular: el flete va a la operación y lo demás a filas sin leer,
+   como «Freight» o «Insurance».
+2. **D22 (b).** Un cargo con su propio origen («Insurance», «China») o
+   «Gastos administrativos» con su origen entra como producto, con el aviso
+   «N renglón(es) parecen un cargo y entraron como producto: …».
+3. **Familia H4, el cargo que no viene primero.** Los nueve de la tarea
+   («Ocean freight», «Sea freight», «Air freight», «Packing charges»,
+   «Inland freight», «Courier DHL», «Comisión bancaria», «THC»,
+   «2. Insurance») entran con ese aviso, en las cuatro formas (origen
+   combinado o no, rótulo en descripción o en Item) y en xls. La regla: todo
+   lo que dice el rótulo es de cargo y al menos una palabra lo es por sí
+   sola. Un producto que comparte una palabra no se avisa: «Power bank»,
+   «Air fryer», «Packing tape», «Courier bag», «Sea salt», «Bank card
+   reader», «Feeder», «Container».
+4. **Una fila con su propia NCM no lleva el aviso**: es mercadería, como
+   antes.
+5. **H1, la descripción escrita otra vez.** «Freight» en Item con «LONA
+   DEMO» escrita en la descripción y medidas: entra como antes, con el aviso
+   de su fila. La fila de abajo que copia la descripción no hereda el aviso.
+   «Freight included», «Handling equipment», «A2» o «#3» en Item son una
+   nota: sin aviso.
+6. **H3, texto de contenedor como medida.** Elegí avisar, no cambiar
+   `_es_una_medida`: «Freight» o «Freight 1x40HQ» con «1x40HQ», «20'» o
+   «40'HC» en las medidas entra con el aviso de su fila. «Freight» en la
+   descripción con eso sigue siendo flete, como antes.
+7. **H5.** El aviso del flete nombra las filas como los demás: «de la fila
+   3» con una, «de las filas 3, 4, 5, 6, 7 y N más» con más de cinco.
+8. El texto del aviso pasó de «empiezan como un cargo» a «parecen un cargo»:
+   ahora incluye cargos que no empiezan así.
+
+**Hallazgo propio de `/code-review` (`42f4e42`):** con las palabras nuevas
+(«container», «express», «packing») en la lista de siempre, «Insurance
+container» con el origen combinado salía del FOB y «Freight express»
+perdía el aviso de flete dudoso. Ahora esas palabras viven en otra lista
+que sólo suma el aviso; casos y sabotaje en `d5da28c` y `2fdd4e1`.
+
+**Refactor después de la corrida de sabotajes (`d9e728d`).** Tres sabotajes
+viejos de `excel3.sh` (3b, 3c y 3d) dejaron de servir con 3f: dos no
+encontraban su patrón y el de 3d («el rótulo dudoso entra como producto
+común») quedaba verde. El verde era real: la rama `copiada` ponía el mismo
+aviso que el bloque nuevo de D22, y cada copia tapaba el sabotaje de la
+otra. Saqué la de `copiada` (dos líneas): el aviso queda en un solo lugar y
+el comportamiento no cambia (`test_excel3`: 958 passed antes y después).
+Los tres sabotajes apuntan ahora al código de 3f (`b3e4bcb`); el de 3d da
+rojo en
+`test_un_cargo_con_palabras_de_mas_no_cambia_el_fob_sin_un_aviso_con_su_fila[Gastos administrativos-origen_rotulo_en_descripcion]`.
 
 ## Supuestos (los podés rechazar)
 
-CLIENTE-1c:
-- La importación acepta la celda de fecha de Excel («2015-03-15 00:00:00»):
-  sólo se le saca la hora `00:00:00`. Con otra hora (14:30) queda vacía y
-  con aviso, como en la operación (D15 b). Antes de esta vuelta se
-  importaba la fecha sin la hora.
-- Se tapa de más, a propósito: el usuario, cada pedazo de lo de antes del
-  «@», los valores de la consulta (`sslmode=require` sale `***`) y una clave
-  corta igual al puerto. Si la base se llama igual que un pedazo, el lugar
-  sale `host/***`.
-- No se tapa un secreto pegado a letras o dígitos (`%40127.0.0.1`). Es lo
-  que permite no romper palabras.
-- Si el texto de la clave también es parte del host, el host puede
-  mostrarlo: no se puede tapar uno sin el otro.
-
-ESTUDIO-1b:
-- El rechazo del nombre es por la categoría Cf entera, más amplio que la
-  lista de la tarea. Otros caracteres en blanco que no son Cf (`U+3164`,
-  `U+2800`) pasan.
-- A la misma hora gana el perfil.
-- Un estudio único cargado después de usar el perfil no gana: cargar no es
-  usar.
-- Un `estudio_id` con espacios alrededor da 400, no se recorta.
-- Sin CUIT en el perfil, su uso viejo no cuenta.
+- H3 con aviso, sin tocar `_es_una_medida`: cambiarla movía la lectura de
+  todas las medidas de la planilla.
+- El aviso nuevo exige que la fila no tenga NCM propia (`not pieza`).
+- «parecen un cargo» en vez de «empiezan como un cargo».
+- Los plurales también entran a la lista que reconoce un rótulo de cargo en
+  el resto del lector (por ejemplo «Seguros» como rótulo de columna).
 
 ## Riesgos
 
 | Riesgo | Severidad | Detalle |
 |---|---|---|
-| `test_excel2` con la máquina cargada | baja, de entorno | Corrida junto a 4 sabotajes, `test_ocho_libros_con_la_primera_hoja_al_borde_del_tope…` dio rojo una vez. Sola: «2 passed», subida en 15.1 s contra un tope de 30 s. En la suite final, 0 rojos. No es de mi pieza. |
-| `cuit_valido` acepta `00000000000` | baja | De ESTUDIO-1, no lo toqué. |
-| Estudio borrado mientras se genera | baja | De ESTUDIO-1, no lo toqué. |
-| Dos generaciones a la vez con el perfil, sin uso anterior | baja | Las dos insertan; la segunda da IntegrityError, se deshace y sólo se pierde esa anotación de uso. El TXT sale igual. |
-| Un CUIT del perfil mal armado preseleccionado | muy baja | Sólo se mira que no esté vacío. No encontré camino: el perfil guarda sólo dígitos y el uso se anota recién después de un TXT con ese CUIT. |
-| La URL de `--base` queda en el historial de la terminal | propuesta | No implementado: leerla de una variable de entorno. Si querés, va como pieza. |
+| El rótulo de Item puede venir de Part No. o Transporte | baja | `rotulo_aparte` lee las columnas a la izquierda de la descripción. «Courier» en una columna de transporte, sin NCM, daría el aviso de más. Sólo aviso, no cambia el FOB. |
+| «Shipping container 20GP» como producto | baja | Todo lo que dice es de cargo y «shipping» lo es por sí sola: aviso de más. Con su NCM no se avisa. |
+| Los plurales amplían el descarte | baja | Una fila «Fees» o «Seguros» sin NCM ni origen sale del FOB como su singular. Es lo pedido; lo anoto porque también toca dónde se reconoce un rótulo. |
+| Un código como «THC-200» | baja | Sin NCM ni más texto, se avisa como cargo. Sólo aviso. |
+| Sabotaje M de H1-bis queda verde | baja, sin fuga | Sacar `unquote(s)` de `_tapar` (línea de antes de H1-bis) no da rojo: `url.password` ya trae la clave decodificada. No la saqué: el caso de un pedazo escapado fuera de la clave no lo pude armar, y sacarla es ampliar. |
+| `test_excel2::test_ocho_libros_con_la_primera_hoja_al_borde_del_tope…` | media, no es de 3f | Rojo en la suite sobre `2fdd4e1` (verde sobre `8c63c37`): «la subida normal dio 400 a los 30.0 s». En esta máquina (4 núcleos) la subida normal tarda ~30 s y el corte de la validación es 30 s: está al borde. Serie alternada, sola, 5 por SHA: base `7145201` (sin lo mío) 200/400/200/200/200 en 32.0/30.0/32.4/30.7/29.6 s; `2fdd4e1` 200/400/200/200/200 en 31.1/30.0/31.4/30.6/31.1 s. Mismo reparto: el corte está en `file_security.py`, que no toqué. Cualquier máquina más lenta lo pone rojo; queda para quien tenga EXCEL-2. |
+| Lo de tu lista | — | Cargo en el medio de una combinada, Item «A2», rótulo en columna de notas, Unicode raro en medidas; de H1-bis, lo del veredicto. No los toqué. |
 
 ## Hallazgos de la revisión
 
 | Hallazgo | Quién | Qué pasó |
 |---|---|---|
-| Uso viejo del perfil sin CUIT gana la preselección | `/code-review high` | Arreglado en `975d627`, con su caso y sabotaje |
-| Tapar el lugar por pedazos no hacía nada | sabotaje verde propio | Sacado en `2a21835` |
-| 3 sabotajes de `cliente1b.sh` sin patrón, 4 de `cliente1c.sh` sin rojo | corrida de sabotajes | Arreglados en `f1cb25e` |
-| Fecha de Excel con hora queda vacía | `/code-review high` | Supuesto, arriba |
-| Nombre con blancos que no son Cf | `/code-review high` | Supuesto, arriba |
-| Carrera al anotar el uso del perfil | `/code-review high` | Riesgo, arriba |
-| Se tapa de más el lugar | `/code-review high` | Supuesto, arriba |
-| Limpiezas (excepción para dar vacío, `_utc` repetido, limpieza del CUIT en cuatro lugares) | `/code-review high` | No las hice: no cambian resultado y ampliaban el diff |
-| `/security-review` | sobre ESTUDIO-1b y CLIENTE-1c | Sin hallazgos altos ni medios |
+| Palabras nuevas sacaban «Insurance container» del FOB y el aviso de flete dudoso a «Freight express» | `/code-review high` | Arreglado en `42f4e42`, casos y sabotaje |
+| Fila con su NCM llevaba el aviso | `/code-review high` | Arreglado en `42f4e42`, casos y dos sabotajes |
+| `rotulo_aparte` lee Part No. y Transporte | `/code-review high` | Riesgo, arriba |
+| «Shipping container 20GP» | `/code-review high` | Riesgo, arriba |
+| Plurales amplían el descarte | `/code-review high` | Riesgo, arriba |
+| Recorrido duplicado de las palabras | `/code-review high` | No lo cambié: no cambia resultado |
+| Sabotajes de `excel3.sh` que perdieron su patrón con 3f | corrida de sabotajes | Arreglados en `2fdd4e1` |
+| 3b-3#1 y 3c R1 sin patrón; 3d verde porque el aviso estaba dos veces | corrida de sabotajes sobre `2fdd4e1` | Saqué la copia de `copiada` (`d9e728d`) y reapunté los tres (`b3e4bcb`) |
 
-**No corrí los subagentes adversariales:** sin presupuesto de gasto hasta
-el 2026-10-28 18:00 UTC. La revisión independiente queda para vos.
+**No corrí los subagentes adversariales:** sin presupuesto hasta el
+2026-10-28 18:00 UTC. La revisión independiente queda para vos.
 
-## Puertas, sobre `3aba9c2`
+## Puertas, sobre `8c63c37`
 
 | Puerta | Salida |
 |---|---|
-| Suite completa, worktree limpio | `3229 passed, 102 skipped, 2 xfailed, 94 warnings in 415.01s (0:06:55)`, exit 0 |
-| `compileall -q proyecto_maria` | 0 |
-| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido`, exit 0 |
-| `ataque_aislamiento.sh` | `Bloqueado: 22 · Fugas: 0`, «PUERTA G3 PASADA», exit 0 |
-| `cliente1c.sh` (en `f1cb25e`) | 37 ROJO, `sabotajes sin rojo: 0`, `salida 0` |
-| `cliente1b.sh` (en `f1cb25e`) | 16 ROJO, `sabotajes sin rojo: 0`, `salida 0` |
-| `estudio1b.sh` (incluye la pantalla) | 20 ROJO, `sabotajes sin rojo: 0`, `salida 0` |
-| `estudio1.sh` | 37 ROJO, `sabotajes sin rojo: 0`, `salida 0` |
+| Suite completa, worktree limpio | `3845 passed, 102 skipped, 2 xfailed, 92 warnings in 470.50s (0:07:50)`, 0 rojos |
+| `compileall -q proyecto_maria` | salida 0 (dos `SyntaxWarning` de `pdf_extractor.py:927` y `:936`, de `a77e6ad`, 7 de octubre: no son míos) |
+| `smoke_friccion.sh` | `OK · telemetría + alias session/state + by-cuit protegido`, salida 0 |
+| `cliente1c.sh 8c63c37` | 44 ROJO, `sabotajes sin rojo: 0`, salida 0 |
+| `excel3.sh 8c63c37` | 112 de 112 en ROJO; ningún VERDE, ROTO ni ROJO?. En dos tramos (abajo). |
+| `test_excel3.py` antes y después del refactor | `2fdd4e1`: `958 passed`; `d9e728d`: `958 passed` |
 
-`f1cb25e` → `3aba9c2` es sólo el merge de `docs/pm/`.
+**`excel3.sh` en dos tramos.** El contenedor se reinició dos veces y mató la
+corrida (unos 70 min). El segundo intento llegó a 92 sabotajes, todos en
+ROJO, y se cortó sin la línea final. Los 20 que faltaban los corrí con una
+copia del script de `8c63c37`, igual byte a byte salvo una línea que saltea
+los nombres que ya habían dado ROJO. El chequeo de base en verde corrió
+igual, y cada sabotaje es independiente: arranca de `git checkout` del
+producto. El segundo tramo dio 20 ROJO, `sabotajes sin rojo: 0`, salida 0.
+Entre los dos tramos están los 112 sabotajes del script: 110 llamadas, más
+2 del bucle de 3b#5. La corrida de un tirón está en «Para reproducir».
 
-**No corrí:** los adversarios (sin presupuesto) ni la CI de tu `ci.yml`
-(corre cuando suba).
+El rojo de borde de `test_excel2` no salió en esta corrida: sigue en
+«Riesgos», porque en `2fdd4e1` y en la base `7145201` salió 1 de 5.
+
+**No corrí:** los adversarios (sin presupuesto), `ataque_aislamiento.sh`
+(no toqué datos, sesión ni permisos) y la CI de `ci.yml` (corre cuando
+suba).
 
 ## Para reproducir
 
 ```bash
-git fetch origin claude/dev-tecnica && git checkout 3aba9c2
-git diff 4452b22..3aba9c2 --stat                       # 14 archivos fuera de docs/pm
-bash scripts/testing/sabotajes/cliente1c.sh 3aba9c2    # «sabotajes sin rojo: 0», salida 0
-bash scripts/testing/sabotajes/cliente1b.sh 3aba9c2    # «sabotajes sin rojo: 0», salida 0
-bash scripts/testing/sabotajes/estudio1b.sh 3aba9c2    # «sabotajes sin rojo: 0», salida 0
-bash scripts/testing/sabotajes/estudio1.sh 3aba9c2     # «sabotajes sin rojo: 0», salida 0
-python -m pytest -q --no-cov tests/test_cliente1c.py tests/test_cliente1b_script.py tests/test_estudio1b.py
+git fetch origin claude/dev-tecnica && git checkout 8c63c37
+git diff 89a0fde..8c63c37 --stat                       # 7 archivos, +539 −39: sólo lo mío
+bash scripts/testing/sabotajes/cliente1c.sh 8c63c37    # «sabotajes sin rojo: 0», salida 0
+bash scripts/testing/sabotajes/excel3.sh 8c63c37       # «sabotajes sin rojo: 0», salida 0 (~70 min)
+python -m pytest -q --no-cov tests/test_excel3.py tests/test_cliente1b_script.py
+# el rojo de borde de test_excel2, en la base y en lo mío (cada uno ~31 s; alguno da 400 en ~1 de 5):
+python -m pytest -q -s --no-cov tests/test_excel2.py::test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_a_una_subida_normal
 ```
 
 ## Archivos de producto que toqué
 
-`proyecto_maria/main.py`, `proyecto_maria/database/models.py`,
-`proyecto_maria/services/fecha_inic_activ.py` (nuevo),
-`proyecto_maria/services/migration_service.py`,
+`proyecto_maria/main.py` (también el refactor `d9e728d`),
 `scripts/datos/clientes_fecha_inic_activ.py`, `CHANGELOG.md`.
 
 ## Sigo con
 
-EXCEL-3f y después GUARDAR-2. Si tu veredicto trae una devolución, va
+GUARDAR-2, desde `2d930c5`. Si tu veredicto trae una devolución, va
 primero.
 
-/compact conservar: Soy la Dev técnica (Dev 1) de CDI, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica (nunca main), rutina trig_011UpBfwEu9TUzoNUrviqoP5 min 15; aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM con send_message priority next empezando «Dev técnica:». Entregué la vuelta de CLIENTE-1c y ESTUDIO-1b en 3aba9c2 (base 4452b22), sin D abiertas; próxima D: D26. Sigo con EXCEL-3f (D21 b, D22 b, familia H4 con aviso, H5 opcional, H1 descripción repetida a mano y H3 de PARA-DEV.md) y después GUARDAR-2. Reglas de Emi: sólo me piden la PM o Emi; nada se publica sin su «dale» para el SHA; nunca main; sin secretos ni datos reales (la proforma del 24/10 no entra); no tocar maria_generator.py, controles_maria.py, despachante.js ni el canal/rama de la Dev MARIA; subagentes hasta alto, sin Fable; sin presupuesto para subagentes hasta 2026-10-28 18:00 UTC.
+/compact conservar: Soy la Dev técnica (Dev 1) de CDI, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica (nunca main), rutina trig_011UpBfwEu9TUzoNUrviqoP5 min 15; aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM con send_message priority next empezando «Dev técnica:». Entregué EXCEL-3f con H1-bis en 8c63c37 (base 3aba9c2; lo mío solo: 89a0fde..8c63c37), sin D abiertas. Sigo con GUARDAR-2 desde 2d930c5 (rama vieja claude/dev1-tecnica, sobre 1cdfe49), lo que falta está en CIERRE-RETOMA-2026-10-24.md, «Qué sigue», punto 2. Reglas de Emi: sólo me piden la PM o Emi; nada se publica sin su «dale» para el SHA; nunca main; sin secretos ni datos reales (la proforma del 24/10 no entra); no tocar maria_generator.py, controles_maria.py, despachante.js ni el canal/rama de la Dev MARIA; subagentes hasta alto, sin Fable; sin presupuesto para subagentes hasta 2026-10-28 18:00 UTC.
