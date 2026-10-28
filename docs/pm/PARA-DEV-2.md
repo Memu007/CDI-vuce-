@@ -30,6 +30,18 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## D29 (2026-10-28): opción (a), sobre `4ca6829`
+
+Los `Z` piden número y los `A` son libres: `PIDE_NUMERO = ("Z",)` queda
+como está. Lo sostienen la tabla de ARCA (los `Z` son magnitudes, y en
+algunos ARCA elige la unidad para no usar decimales) y el archivo aceptado
+(`ZA(016384)`). Se revierte en esa línea. El costo que nombraste (unas 90
+descripciones `Z` con decimales naturales: %, ppm, quilates) va en la
+pregunta 10 al despachante (`PREGUNTAS-DESPACHANTE.md`), que Emi manda de
+día. Si contesta otra lista, la lista cambia con sus pruebas, en otra
+pieza. Lo de rellenar los `Z` con ceros a seis dígitos no entra ahora.
+Decidido por la PM.
+
 ## D28 (2026-10-28): opción (a)
 
 Tenés razón: la regla «`IVAAD1` se lee como bien de uso de una persona» la
@@ -148,12 +160,43 @@ primero entregás ORG-1 y después seguís. Datos que llegaron el 28/10
   valor que no es ninguno de los tres (error, no se genera), y un sabotaje
   por par. Es un campo de impuestos: revisión fuerte.
 
-Después: **SUFIJOS-2** (abajo, empezala ya) y
-**SEGURO-1** (D14: el botón «calcular seguro» no se ofrece en CIF, CIP,
-DPU, DAP y DDP; el seguro se sigue declarando). Te las detallo antes de que
-lleguen. PESO-NETO-1 y PRORRATEO-1 siguen esperando al despachante.
+Después: **SUFIJOS-2** (hecha, sin entregar) y **SEGURO-1** (abajo,
+empezala ya). PESO-NETO-1 y PRORRATEO-1 siguen esperando al despachante.
 
-### SUFIJOS-2 — empezala ya (2026-10-28 03:00 UTC)
+### SEGURO-1 — empezala ya (2026-10-28 04:00 UTC)
+
+En commits aparte encima de SUFIJOS-2 (`4ca6829`), con su propio
+`/entregar` después del de SUFIJOS-2. Respuesta del despachante (pregunta
+4, `PREGUNTAS-DESPACHANTE.md`, D14 de VALOR-1): en **CIF, CIP, DPU, DAP y
+DDP** el seguro ya está en el precio.
+
+- **La regla:** con esos cinco incoterms el sistema no sugiere el 1 %: no
+  hay botón «Calcular seguro». El seguro se sigue declarando (el despacho
+  CIF trae el suyo): el campo queda, se carga a mano o lo lee el lector, y
+  sale en el TXT como hoy. CFR, CPT y los demás siguen con el botón.
+- **Dónde vive:** en el servidor, donde se arma `seguro_sugerido`
+  (`maria_generator.py`, cerca de la línea 943), y el botón sigue a lo que
+  diga el servidor. Esconderlo sólo en `finalize.js` no alcanza: la
+  sugerencia seguiría viva y una prueba de Python no la cubre. Premisa
+  primero: comprobá que ese código conoce el incoterm. Si no se puede sin
+  salir del alcance, es la D30 y seguís con lo que no depende de ella.
+- **Cambio de incoterm después de calcular:** si el seguro lo calculó el
+  sistema (`seguro_calculado`) y el incoterm pasa a uno de los cinco, ese
+  seguro se borra y el campo queda como «para completar», con el mismo
+  mecanismo que un campo sin leer. Un seguro leído de la factura o escrito
+  por el usuario no se toca. Comprobá que un campo «para completar» no deja
+  generar en silencio con seguro cero; si lo deja, es la D30.
+- **Incoterm:** mayúsculas, minúsculas y espacios dan lo mismo. Vacío o
+  desconocido, como hoy (con botón).
+
+Pruebas: los cinco sin sugerencia ni botón; CFR y CPT con botón; una
+operación CIF con su seguro en el TXT; minúsculas y espacios; vacío; el
+cambio de incoterm en los dos sentidos (el calculado se borra, el escrito
+queda); un sabotaje por regla (uno de los cinco fuera de la lista, la
+regla sólo en la pantalla, el calculado que sobrevive al cambio). El golden
+no se toca.
+
+### SUFIJOS-2 — hecha, sin entregar (encargada 2026-10-28 03:00 UTC)
 
 DESTINO-1 ya está hecha y el cupo vuelve a las 18:00 UTC: mientras tanto,
 SUFIJOS-2, en commits aparte encima de DESTINO-1 (`4905cd8`), con su propio
