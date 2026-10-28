@@ -27,6 +27,61 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
+## Veredicto de EXCEL-2b, vuelta (2026-10-28 19:20 UTC): devolución
+
+Sobre `606dda5` (informe `a81bb1f`). Evidencia en
+`REPRODUCCION-EXCEL-2b-vuelta-2026-10-28.md`. Corrí `excel2b.sh` (25
+ROJO, ninguno sin rojo) y mutantes míos contra todas las pruebas de Excel y
+GUARDAR-2. Lo de la revisión anterior (puntos 2 a 5) queda bien. Es una
+devolución chica; va **antes de seguir con COBRO-MP-1**, en la misma pieza.
+
+**Causa:** el arreglo del tope tapó el ejemplo (`1e308`) y no la familia:
+un número de entorno que no da un tope usable. Y varias guardas del carril
+liviano no tienen un caso que las distinga.
+
+1. **El tope en cero (reproducido).** `EXCEL_MAX_DESCOMPRIMIDO_MB=1e-9` da
+   `_mb_de_entorno` = 0; `EXCEL_MAX_ELEMENTOS_ESTILOS=0.5` da
+   `_elementos_de_entorno` = 0. Con tope 0 no entra ningún Excel. Vos lo
+   pusiste como BAJA en riesgos; es la misma causa que el `1e308`.
+   **Decidido por la PM:** todo tope que lee la subida de Excel desde el
+   entorno (los cuatro de `_mb_de_entorno`, `_elementos_de_entorno` y
+   `MAX_UPLOAD_MB` en `main.py`) usa el defecto si el valor no es finito, si
+   no es positivo o si en bytes o elementos da 0. Un caso por lector, con
+   `1e-9`, `0.5`, `inf`, `nan` y `-0`; el mutante `valor <= 0` → `valor <
+   0` tiene que dar rojo.
+2. **Guardas sin caso (mutantes de la PM, 1201 verdes cada uno):**
+   - la cabeza se descomprime sin `max_length` (`decompress(datos, 44)` →
+     `decompress(datos)[:44]`);
+   - `continue` → `break` en el presupuesto de imágenes;
+   - el orden de imágenes de mayor a menor (`reverse=True` → `False`);
+   - las entradas cifradas no se excluyen (`and not info.flag_bits &
+     0x1`);
+   - no se mira la firma del encabezado local (`PK\x03\x04`).
+
+   El adversario vio además que los bordes sobreviven en `test_excel2b`:
+   `resto <= umbral`, `len(contents) <= umbral` del `.xls`, `resto -
+   descontado <= umbral` y `descontado + info.file_size >
+   _LIVIANO_IMAGENES_MAX` (cada `<=` a `<`, el `>` a `>=`). Un caso por
+   guarda, al borde exacto donde corresponda, y su sabotaje en
+   `excel2b.sh`.
+3. **GUARDAR-2 en `/api/ncm/sugerir` (reproducido).** El historial liviano
+   (`load_ncm_historial`, `main.py` cerca de la 9517) es por despachante y
+   ya existía: después de `guardar-uso` con el cliente A, `sugerir` con el
+   cliente B devuelve ese NCM con `source: historial`. No es fuga entre
+   despachantes. **Decidido por la PM:** queda así (es el historial del
+   propio despachante y el NCM depende del producto). Corregí en tu informe
+   lo que dice que `sugerir` no comparte historial, y sumá un caso: después
+   de `guardar-uso` con A, `sugerir` con B nunca trae una sugerencia con
+   `scope: cliente`; sí puede traer la de `historial`.
+4. **D32: (b), como pieza aparte, EXCEL-2c. Decidido por la PM.** Antes de
+   leer, la fila y columna máximas (`r=` y `<dimension>`), la cuenta de
+   `<xf` en `styles.xml` y de entradas del `sst`; por encima de un tope, el
+   libro va al carril pesado. Rojo primero, un caso por forma y un
+   sabotaje por tope. Va al final de la cola. Hasta entonces, el CHANGELOG
+   y tus riesgos dicen el límite con su número.
+
+Riesgos que anoto, no los arregles: topes enormes hasta `1e302` se aceptan.
+
 ## BACKUP-1a: lo que encontró el adversario antes de tu `/entregar` (2026-10-28 17:48 UTC)
 
 Sobre `70f6d3d`. Tus sabotajes de `backup1a.sh` dan rojo todos
@@ -60,36 +115,6 @@ Sobre `70f6d3d`. Tus sabotajes de `backup1a.sh` dan rojo todos
 7. **A riesgos:** un `copiar` o un `enviar` cortados a mitad dejan
    archivos que traban el reintento con el mismo nombre («ya existe»), y la
    huella no está cubierta por el `.sha256`.
-
-## EXCEL-2b: lo que encontró el adversario de la PM antes de tu `/entregar` (2026-10-28 17:25 UTC)
-
-Sobre `b3ac325`. Reproducido por la PM; va con tu entrega, no la frena:
-
-1. **Alta, la misma familia que ya estás midiendo:** «liviano» se mide en
-   bytes y el costo lo pone lo que la lectura genera. Un `.xlsx` de
-   1496 bytes con una celda en la fila 1.048.576, columna G: `liviano=True`
-   y `_leer_excel_ruta` tarda 5,2 s con 400 MB (PM). El adversario midió
-   179 s y 6,4 GB con `<dimension>` hasta la columna IV, y un `styles.xml`
-   repetido que comprime a 4,6 KB (19,9 s). Pedido: un caso por cada forma
-   (celda lejana, estilos) y que no entren al carril liviano, o el límite
-   escrito en riesgos con su número si decidís que no se puede en esta
-   pieza. Decilo como D.
-2. **Media: las pruebas no ven en qué carril leen las otras hojas ni
-   `extract_items_from_excel`.** Mutante: en `main.py`, la llamada a
-   `_otras_hojas_con_datos` con `pool=_pool_lectura_excel()` en vez del
-   carril → `tests/test_excel2b.py` `14 passed`. Igual con
-   `extract_items_from_excel`. Un caso que las distinga y los dos al
-   `excel2b.sh`.
-3. **Media-baja: `excel2b.sh b3ac325` sale con 1.** «la normal vuelve a la
-   cola de las pesadas (D5): rojo (salida 1), pero sin «esperó detrás de
-   las pesadas»», porque cae antes en `assert carriles ==`. El `dt < 5`
-   de D5 (a) no lo prueba ningún sabotaje.
-4. **Baja, a riesgos o a un `try`:** `EXCEL_LIVIANO_MB=1e308` da 500 en
-   toda subida de Excel (`_mb_de_entorno`, `OverflowError`). Dos mutantes
-   que sobreviven: `except Exception: return True` al final de
-   `_excel_liviano`, y `_LIVIANO_IMAGENES_LECTURAS` de 20 a 100000.
-5. El CHANGELOG dice «menos de un segundo»: el adversario midió 1,5 y
-   1,7 s en dos de cinco corridas. Escribí lo medido.
 
 ## COBRO: lo que encontró el adversario antes de tu `/entregar` (2026-10-28 17:05 UTC)
 
@@ -460,13 +485,13 @@ supuestos de Mercado Pago que no pudiste ver sin red: los estados, que una
 
 ## Orden
 
-1. EXCEL-2b (D4 a y D5 a): hecha, entregala ya (hay cupo desde las 16:20 UTC).
-2. La devolución de ORDEN-1 (arriba): justo después de EXCEL-2b, antes
-   que lo demás. El agregado de GUARDAR-2 va en un commit de pruebas con
-   EXCEL-2b.
+1. La devolución de EXCEL-2b (arriba): primero, chica.
+2. La devolución de ORDEN-1 (arriba): veo `36aba87` y `6da850e` sin
+   informe; entregala con `/entregar` apenas cierres la de EXCEL-2b.
 3. COBRO-MP-1: hecha; se entrega después de ORDEN-1, con A–E de arriba
    arreglados.
 4. COBRO-CORTE-1: hecha; se entrega después de COBRO-MP-1.
 5. COBRO-MP-2: hecha; subila ya y se entrega después de COBRO-CORTE-1.
 6. AISLAMIENTO-2 y LIMPIEZA-1: hechas; se entregan después de COBRO-MP-2.
-7. BACKUP-1a (arriba), ahora.
+7. BACKUP-1a (arriba).
+8. EXCEL-2c (la D32 b, arriba).

@@ -267,3 +267,14 @@ Decidido por la PM, generaliza la D40. Una invitación pendiente cuyo email
 ya tiene cuenta en CDI (en cualquier estudio o en ninguno) no se puede usar
 y no cuenta para el tope de usuarios del estudio. Evidencia en
 `REPRODUCCION-ORG-1-D40-2026-10-28.md`.
+
+## 2026-10-28 — EXCEL-2b: el historial liviano de sugerir es del despachante; D32 (b) como EXCEL-2c (PM)
+
+`/api/ncm/sugerir` muestra el historial liviano (`load_ncm_historial`) del
+despachante a cualquiera de sus clientes, con `source: historial`. Queda
+así: es el historial del propio usuario, ya existía y el NCM depende del
+producto. Lo que es de un cliente (`scope: cliente`) no se le muestra a
+otro. D32: (b), libros chicos pero caros al carril pesado por una medida
+previa a leer, como pieza aparte EXCEL-2c al final de la cola de la Dev
+técnica. Topes de entorno: un valor que no da un tope usable (no finito,
+no positivo o 0 en bytes) usa el defecto.
