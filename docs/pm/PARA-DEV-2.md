@@ -30,6 +30,41 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## Emi dijo que sí a las dos (2026-10-28 12:15 UTC): EMAIL-1 y CONEXIONES-1
+
+Las dos entran al roadmap (Fase 3, tuyas). En commits aparte encima de
+`e1b3129`, cada una con su propio `/entregar` después del de ABUSO-1, en
+este orden. Tu próxima D es la **D38**.
+
+### EMAIL-1 — empezala ya (tu (1) de la D36)
+
+- Recuperar usuario y recuperar contraseña encuentran la cuenta aunque el
+  email venga con otras mayúsculas.
+- La causa es comparar el email tal cual: revisá **todo** lugar que busque,
+  cree o cambie un email (registro, perfil, invitaciones, recuperar), no
+  sólo los dos que viste. Ninguno deja crear un email que ya existe con
+  otras mayúsculas.
+- La respuesta no cambia exista o no el email (no revelar quién está).
+- Si hoy hay dos cuentas con el mismo email en distintas mayúsculas, no se
+  tocan: sin migración de datos y sin índice único nuevo hasta que Emi
+  cuente los pares en producción. Qué hacer cuando un pedido encuentra
+  dos cuentas, proponelo en la D38 con opciones; mientras, ningún camino
+  le da a una cuenta el acceso de la otra.
+- Pruebas en SQLite y Postgres 16; un sabotaje por regla. Autenticación:
+  revisión fuerte.
+
+### CONEXIONES-1 — después de EMAIL-1 (tu (1) de la D37)
+
+- Medí si `session.close()` cancelado deja conexiones tomadas: gunicorn con
+  la misma configuración del `Dockerfile` y Postgres 16, muchas respuestas
+  401 y algunas normales, mirando `pg_stat_activity` y el pool. Esperás
+  condiciones que se ven, no tiempos fijos.
+- Si quedan conexiones tomadas: arreglo (por ejemplo, middlewares en ASGI
+  puro) con una prueba que dé rojo antes y verde después. Si no quedan: no
+  se cambia el producto; el informe trae los números y el aviso de las
+  pruebas sigue en riesgos.
+- Toca todas las rutas: revisión fuerte.
+
 ## D37 (2026-10-28): (2) por ahora, sobre `76def65`
 
 ABUSO-1 no cambia por esto. El aviso «Event loop is closed» queda a la
@@ -41,18 +76,7 @@ lo viste, que ya pasaba antes de ABUSO-1 y que no medimos si en producción
 deja conexiones colgadas. Tu (1), medir con uvicorn y Postgres 16 muchas
 respuestas 401 mirando `pg_stat_activity` y el pool, y pasar los
 middlewares a ASGI puro sólo si quedan conexiones colgadas, es una pieza
-nueva: se la propongo a Emi hoy, recomendada. Hasta que conteste, seguís
-con lo de abajo («Mientras tanto»). Tu próxima D es la **D38**.
-
-### Mientras tanto (2026-10-28 12:00 UTC)
-
-No te queda pieza tuya que arranque sin alguien de afuera: PESO-NETO-1,
-MARIA-6 y PRORRATEO-1 esperan al despachante, LEGAL-1 el texto de Emi, y
-BACKUP-1 pasa a la técnica. Hasta las 18:00 UTC preparás las entregas: el
-orden de siempre, cada una con su SHA, su base y su suite desde base
-limpia ya corrida; lo que falte de eso, corrélo ahora, que a las 18:00
-quede sólo la autorrevisión con subagentes. Si Emi dice que sí a las
-piezas de la D36 o de la D37, te aviso y van después de ABUSO-1.
+nueva: Emi dijo que sí (CONEXIONES-1, arriba).
 
 ## D36 (2026-10-28): (2) por ahora, sobre `abdc0db`
 
