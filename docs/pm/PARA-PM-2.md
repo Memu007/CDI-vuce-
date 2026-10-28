@@ -351,10 +351,10 @@ revisores; no reproduje ninguno.
 
 **Riesgos que quedan:**
 - **Media, security:** con las métricas andando de nuevo, la URL de
-  aceptar invitación, con su token, queda guardada en `api_logs` y la ve el
-  admin en `/api/dev/stats`. Antes de esta pieza no se guardaba nada
-  porque cada insert fallaba. Propuesta (otra pieza): no guardar el query
-  ni el token en `endpoint`.
+  la invitación (`/api/invitations/{token}`) queda guardada con el token
+  en `api_logs` y la ve el admin en `/api/dev/stats`. Antes de esta pieza,
+  en una base sin la columna, no se guardaba nada porque cada insert
+  fallaba. Propuesta (otra pieza): guardar la ruta sin el token.
 - **Propuesta de la D34:** que `MetricsMiddleware` lea el dueño del token
   y lo grabe; toca sesión y autenticación.
 - **Baja:** con una `api_logs` grande, el primer arranque bloquea la
