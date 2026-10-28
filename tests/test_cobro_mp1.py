@@ -769,3 +769,126 @@ def test_el_cobro_que_mercado_pago_no_contesta_bien_no_aplica_nada(client, monke
     assert len(pedidos) == 1
     assert _get_user(usuario)["billing_status"] == "past_due"
     assert _leer_pago(pid) == {}
+
+
+# ── El id del pago es el que dice Mercado Pago ───────────────────────
+# Mercado Pago lee el id del pago de la ruta que se le pide: «9000001#a»,
+# «%39000001», «./9000001» o «09000001» son el mismo pago. El registro de
+# pagos aplicados no puede tomarlos por pagos distintos. Este simulado
+# resuelve el id como lo haría la ruta de su API.
+
+PEDIDOS: list = []
+
+
+def _como_mp(pid) -> str:
+    import posixpath
+    from urllib.parse import unquote
+    ruta = str(pid).split("#")[0].split("?")[0]
+    return posixpath.normpath("/v1/payments/" + unquote(ruta)).rsplit("/", 1)[-1].lstrip("0")
+
+
+class _PagosComoMP:
+    def get(self, pid):
+        PEDIDOS.append(str(pid))
+        pago = PAGOS.get(_como_mp(pid))
+        if pago is None:
+            return {"status": 404, "response": {"message": "Payment not found"}}
+        return {"status": 200, "response": pago}
+
+
+class _SDKComoMP(_SDK):
+    def payment(self):
+        return _PagosComoMP()
+
+
+@pytest.fixture
+def mp_como_mp(monkeypatch):
+    import proyecto_maria.main as main_mod
+    PEDIDOS.clear()
+    monkeypatch.setattr(main_mod.mercadopago, "SDK", _SDKComoMP)
+
+
+def _pago_numerico(referencia: str, monto: float = 45000.0) -> str:
+    """Un pago con id numérico, que Mercado Pago devuelve como número."""
+    import random
+    pid = str(random.randint(10**9, 10**10 - 1))
+    _pago(pid, referencia, monto)
+    PAGOS[pid]["id"] = int(pid)
+    return pid
+
+
+def _aviso_ipn_tal_cual(client, pid: str):
+    """El aviso IPN con el id tal como lo escribe quien lo manda: escapado
+    entero, para que el servidor lo reciba con «%», «#» o «?» adentro."""
+    from urllib.parse import quote
+    client.cookies.clear()
+    return client.post(f"/api/payments/webhook?topic=payment&id={quote(pid, safe='')}")
+
+
+VARIANTES = {
+    "fragmento": lambda p: f"{p}#a",
+    "consulta": lambda p: f"{p}?a=1",
+    "escapado": lambda p: "%{:02X}{}".format(ord(p[0]), p[1:]),
+    "punto": lambda p: f"./{p}",
+    "cero": lambda p: f"0{p}",
+}
+
+
+@pytest.mark.parametrize("variante", sorted(VARIANTES))
+def test_el_mismo_pago_escrito_de_otra_forma_no_se_aplica_otra_vez(client, mp_como_mp, variante):
+    """Con un solo pago de plan y una recarga, reenviar sus ids escritos de
+    otra forma daba un año de plan y cuarenta operaciones."""
+    usuario = _unique("mp1_var")
+    _register(client, usuario)
+    plan = _pago_numerico(f"{usuario}:premium")
+    recarga = _pago_numerico(f"{usuario}:topup", monto=10000.0)
+    for pid in (plan, recarga):
+        assert _aviso_ipn_tal_cual(client, pid).status_code == 200
+    antes = _get_user(usuario)
+    for pid in (plan, recarga):
+        r = _aviso_ipn_tal_cual(client, VARIANTES[variante](pid))
+        assert r.status_code < 500, r.text[:300]
+    despues = _get_user(usuario)
+    assert _fin(despues) == _fin(antes), (antes["trial_ends_at"], despues["trial_ends_at"])
+    assert despues["extra_ops_remaining"] == antes["extra_ops_remaining"], despues
+
+
+def test_un_id_con_barras_no_llega_a_mercado_pago(client, mp_como_mp):
+    """El aviso IPN no viene firmado: su id no puede cambiar la ruta que se
+    le pide a Mercado Pago (llegaba a /preapproval/ABC)."""
+    r = _aviso_ipn_tal_cual(client, "../../preapproval/ABC")
+    assert r.status_code == 400, r.text[:300]
+    assert PEDIDOS == []
+
+
+@pytest.mark.parametrize("cuenta", ["usuario", "organizacion"])
+def test_el_ultimo_pago_de_antes_del_registro_no_se_aplica_otra_vez(client, cuenta):
+    """Antes de COBRO-MP-1 sólo se guardaba el último pago de cada cuenta:
+    al desplegar, ese pago no tiene fila en el registro de pagos aplicados."""
+    usuario = _unique("mp1_ult")
+    _register(client, usuario)
+    fin = datetime.now(timezone.utc) + timedelta(days=25)
+    pid = f"pl-{usuario}"
+    if cuenta == "usuario":
+        _set_user(usuario, billing_status="active", plan="premium", trial_ends_at=fin, last_payment_id=pid)
+        _pago(pid, f"{usuario}:premium")
+        leer = lambda: _get_user(usuario)  # noqa: E731
+    else:
+        org_id = _org(usuario, billing_status="active", plan="premium", trial_ends_at=fin, last_payment_id=pid)
+        _pago(pid, f"org:{org_id}:premium")
+        leer = lambda: _leer_org(org_id)  # noqa: E731
+    assert _aviso_ipn(client, pid).status_code == 200
+    assert abs((_fin(leer()) - fin).total_seconds()) < 2, leer()
+
+
+def test_sin_token_el_aviso_de_una_renovacion_no_se_pierde(client, monkeypatch):
+    """Sin MP_ACCESS_TOKEN no se puede leer el cobro: el aviso no se da por
+    procesado, para que Mercado Pago lo reintente."""
+    import proyecto_maria.main as main_mod
+    usuario = _unique("mp1_tok")
+    _register(client, usuario)
+    cobro, pid = _renovacion(usuario)
+    monkeypatch.setattr(main_mod, "MP_ACCESS_TOKEN", "")
+    r = _aviso_cobro(client, cobro)
+    assert r.status_code == 400, r.text[:300]
+    assert _leer_pago(pid) == {}
