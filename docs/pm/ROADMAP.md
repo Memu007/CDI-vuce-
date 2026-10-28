@@ -108,7 +108,7 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 | Orden | Pieza | Qué arregla |
 |---|---|---|
 | 1 | ⚪ GUARDAR-2 | La sugerencia de posición: si el historial del cliente tiene 8 dígitos y el proveedor la SIM completa que empieza con esos 8, gana la del proveedor (D32 b; sin migración; Postgres descartable) |
-| 2 | ⚪ ORDEN-1 | Reordenar los productos arrastrando, en la pantalla de revisión |
+| 2 | 🔵 ORDEN-1 | Reordenar los productos arrastrando, en la pantalla de revisión |
 | 3 | COBRO-MP-1 | Primera pieza de la Fase 2 (ver abajo) |
 
 **Cierre de la Fase 1c (cierra G4):** dos sesiones con el despachante, 3 o
