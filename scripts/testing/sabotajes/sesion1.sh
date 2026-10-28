@@ -110,10 +110,10 @@ fi
 
 # --- cambiar la contraseña: cierra las otras, conserva la propia
 sabotaje pytest $M "cambiar la clave vuelve a poner active_jti en NULL" \
-  '    revocar_sesiones(db_user, getattr(request.state, "token_jti", None))' '    db_user.active_jti = None' \
+  '    revocar_sesiones(db_user, jti_de_la_request(request))' '    db_user.active_jti = None' \
   "FAILED $T::test_cambiar_clave_revoca_las_otras_y_conserva_la_propia" "la otra sesión sigue entrando después de cambiar la clave"
 sabotaje pytest $M "cambiar la clave cierra también la propia" \
-  '    revocar_sesiones(db_user, getattr(request.state, "token_jti", None))' '    revocar_sesiones(db_user)' \
+  '    revocar_sesiones(db_user, jti_de_la_request(request))' '    revocar_sesiones(db_user)' \
   "FAILED $T::test_cambiar_clave_revoca_las_otras_y_conserva_la_propia" "cambiar la clave cerró la sesión de quien la cambió" \
   "FAILED $T::test_cambiar_clave_con_cookie_conserva_el_navegador"
 
