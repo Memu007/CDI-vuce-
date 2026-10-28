@@ -101,7 +101,7 @@ Recibida en `cef45ce` (informe `cb42e8f`). Toca lectura por dueño: la
 reviso con adversario cuando haya presupuesto (hoy, después de las 18:00
 UTC). Si vuelve con devolución, va antes que lo que estés haciendo.
 
-## COBRO-MP-1 — empezala ya (2026-10-28 04:00 UTC)
+## COBRO-MP-1 — hecha, sin entregar (encargada 2026-10-28 04:00 UTC)
 
 EXCEL-2b quedó hecha y espera el cupo de las 18:00 UTC. Mientras, retomá
 COBRO-MP-1 en commits aparte encima de EXCEL-2b, con su propio `/entregar`
@@ -130,8 +130,55 @@ valiendo. `MP_PREAPPROVAL_PLAN_ID_*` está en Railway
 
 Es plata: la reviso con Opus y Sonnet, alto.
 
+## COBRO-MP-1: subila ya (2026-10-28 05:00 UTC)
+
+Está hecha en `f54d8a9`, pero sólo en tu contenedor (rama local
+`cobro-mp-1`). Si el contenedor se recicla, se pierde. Subila ya a
+`claude/dev-tecnica`, sin force push, aunque la entrega espere al cupo.
+EXCEL-2b se sigue entregando sobre su propio SHA (`b3ac325`). Los dos
+riesgos que proponés como piezas aparte (dos pagos a la vez de una cuenta
+dan una sola extensión; un aviso de renovación sin suscripción puede
+quedar rechazado para siempre) se los llevo a Emi de día: anotalos en el
+informe, en «riesgos».
+
+## COBRO-CORTE-1 — empezala ya (2026-10-28 05:00 UTC)
+
+En commits aparte encima de COBRO-MP-1 (`f54d8a9`), con su propio
+`/entregar` después del de COBRO-MP-1. Arregla C1, C5 y C6
+(`AUDITORIA-2026-10-06.md`). Tu análisis de entonces está en `62b1d14`;
+las decisiones, en `efef997` (ahí se llamaron D4 a D6 y siguen valiendo):
+
+- **Cuándo se cuenta (D4 b, N = 10):** la primera vez que se genera el
+  MARIA de un `operation_id` del usuario se crea la operación y se cuenta.
+  Las descargas siguientes del mismo id no cuentan, y `finalize.js` guarda
+  con ese id (no uno nuevo). Un mismo id no pasa de 10 regeneraciones con
+  contenido distinto.
+- **El corte (D5 a):** en las rutas que gastan Gemini o generan valor, sólo
+  por estado (vencido o impago → 402). El tope del plan, sólo donde se
+  cuenta una operación.
+- **Carreras (D6 a):** `SELECT … FOR UPDATE` de la fila de la cuenta
+  (usuario u organización) mientras se mira el tope, se cuenta y se
+  calcula el `op_code`, en una sola transacción, sin migración. El índice
+  único `(owner_username, op_code)` es una pieza aparte, más adelante.
+- **El aviso:** dice la razón real (impago, vencido o tope).
+
+Premisa primero: la base se movió tres semanas desde `62b1d14` (ORG-1,
+COBRO-MP-1). Comprobá que las rutas y líneas que nombraste siguen siendo
+esas antes de tocar nada. Cada prueba se ve en rojo antes del arreglo.
+
+Pruebas: una cuenta impaga y una vencida no generan ni suben a Gemini
+(402 con su razón); una paga con el tope lleno puede validar y bajar lo ya
+contado; regenerar el mismo id no cuenta y la 11.ª distinta se frena;
+guardar después de generar no cuenta dos veces; pedidos al mismo tiempo
+contra un Postgres local no pasan el tope ni repiten `op_code` (o
+declarado «no corrido»). Un sabotaje por regla. Nada contra Mercado Pago
+real. Tu próxima D es la **D6** de esta numeración.
+
+Es plata: la reviso con Opus y Sonnet, alto.
+
 ## Orden
 
 1. EXCEL-2b (D4 a y D5 a): hecha, se entrega con el cupo de las 18:00 UTC.
 2. Si GUARDAR-2 u ORDEN-1 vuelven con devolución, esa va primero.
-3. COBRO-MP-1 (arriba), ahora.
+3. COBRO-MP-1: hecha; subila ya y se entrega después de EXCEL-2b.
+4. COBRO-CORTE-1 (arriba), ahora.
