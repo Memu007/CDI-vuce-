@@ -141,7 +141,7 @@ dan una sola extensión; un aviso de renovación sin suscripción puede
 quedar rechazado para siempre) se los llevo a Emi de día: anotalos en el
 informe, en «riesgos».
 
-## COBRO-CORTE-1 — empezala ya (2026-10-28 05:00 UTC)
+## COBRO-CORTE-1 — hecha, sin entregar (encargada 2026-10-28 05:00 UTC)
 
 En commits aparte encima de COBRO-MP-1 (`f54d8a9`), con su propio
 `/entregar` después del de COBRO-MP-1. Arregla C1, C5 y C6
@@ -176,9 +176,44 @@ real. Tu próxima D es la **D6** de esta numeración.
 
 Es plata: la reviso con Opus y Sonnet, alto.
 
+## COBRO-MP-2 — empezala ya (2026-10-28 08:00 UTC)
+
+COBRO-CORTE-1 quedó hecha (`27e4594`). Sigue la última de la Fase 2. En
+commits aparte encima de `27e4594`, con su propio `/entregar` después del
+de COBRO-CORTE-1. Arregla C2, C4 y C8 de `AUDITORIA-2026-10-06.md` y lo que
+de tu D9 del 07/10 quedó para acá (`7f1dd2c`):
+
+- **Cancelar (C2):** cancelar en CDI también cancela la suscripción en
+  Mercado Pago, y la cuenta sigue activa hasta el fin del período pagado,
+  como ya dice la pantalla («activo hasta…»). Si Mercado Pago no contesta
+  o da error, no se cancela en CDI a medias: se dice que no se pudo.
+- **Una sola suscripción (C4):** el checkout mira si ya hay una vigente y
+  no deja pagar dos veces. Un pago nunca hace perder los días que
+  quedaban.
+- **Reactivar pagando (C8 y D9):** cancelar y reactivar desde una prueba
+  gratis no deja la cuenta activa sin pagar. Sin `MP_ACCESS_TOKEN` no se
+  dice «Tu cuenta Premium ha sido activada» ni se cambia nada.
+
+Premisa primero: comprobá cada una sobre `27e4594` (la base cambió con
+COBRO-MP-1 y COBRO-CORTE-1) y cómo se cancela una suscripción en la API de
+Mercado Pago según el código y la documentación que ya esté en el repo (la
+red está cerrada: lo que no puedas ver, como supuesto). Si para «no perder
+días» o «una sola suscripción» hay que elegir entre comportamientos que ve
+el cliente, preguntá en la **D7** antes de hacerlo.
+
+Pruebas, con Mercado Pago simulado (nada contra el real): cancelar llama
+a Mercado Pago y deja la cuenta activa hasta el fin del período; Mercado
+Pago con error no deja nada a medias; el segundo checkout con una vigente
+se frena; un pago no acorta el período; cancelar y reactivar una prueba no
+la activa; sin token no dice «activada» ni cambia el estado. Cada prueba en
+rojo antes del arreglo; un sabotaje por regla. Línea en `CHANGELOG.md`.
+
+Es plata: la reviso con Opus y Sonnet, alto.
+
 ## Orden
 
 1. EXCEL-2b (D4 a y D5 a): hecha, se entrega con el cupo de las 18:00 UTC.
 2. Si GUARDAR-2 u ORDEN-1 vuelven con devolución, esa va primero.
 3. COBRO-MP-1: hecha; subila ya y se entrega después de EXCEL-2b.
-4. COBRO-CORTE-1 (arriba), ahora.
+4. COBRO-CORTE-1: hecha; se entrega después de COBRO-MP-1.
+5. COBRO-MP-2 (arriba), ahora.

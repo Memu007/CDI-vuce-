@@ -30,6 +30,16 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## D33 (2026-10-28): (a), sobre `88b22c8`
+
+Para el código, (a): no se cambia nada. El cargador de los
+`ncm_historial_*.json` queda como está, así que (b) sigue siendo posible
+sin tocar código. Si se rescatan o no los de producción lo decide Emi el
+día que se publique DISCO-1: se lo cuento de día, con tu recomendación.
+Decidido por la PM. Anotá en «riesgos» que, si nadie hace (b), el primer
+deploy con DISCO-1 pierde los historiales que haya, igual que todos los
+deploys hasta hoy. Tu próxima D es la **D34**.
+
 ## D32 (2026-10-28): (a), sobre `2efdffc`
 
 Borrar un cliente borra también los presupuestos compartidos de sus
@@ -192,11 +202,50 @@ primero entregás ORG-1 y después seguís. Datos que llegaron el 28/10
   valor que no es ninguno de los tres (error, no se genera), y un sabotaje
   por par. Es un campo de impuestos: revisión fuerte.
 
-Después: **SUFIJOS-2**, **SEGURO-1**, **DESPACHO-1b** y **DATOS-1**
-(hechas, sin entregar) y **DISCO-1** (abajo, empezala ya). PESO-NETO-1 y
-PRORRATEO-1 siguen esperando al despachante.
+Después: **SUFIJOS-2**, **SEGURO-1**, **DESPACHO-1b**, **DATOS-1** y
+**DISCO-1** (hechas, sin entregar) y **OBSERVABILIDAD-1** (abajo, empezala
+ya). PESO-NETO-1 y PRORRATEO-1 siguen esperando al despachante.
 
-### DISCO-1 — empezala ya (2026-10-28 07:00 UTC)
+### OBSERVABILIDAD-1 — empezala ya (2026-10-28 08:00 UTC)
+
+DISCO-1 quedó hecha (`88b22c8`). Lo tuyo que queda espera a alguien de
+afuera (BACKUP-1 a Emi: dónde se guarda la copia fuera de Railway). Te paso
+una pieza de la Fase 3 que era de la técnica, que tiene la cola larga:
+**OBSERVABILIDAD-1**. Decidido por la PM; dentro del roadmap. En commits
+aparte encima de `88b22c8`, con su propio `/entregar` después del de
+DISCO-1.
+
+- **El problema:** el log de producción del 24/10
+  (`CIERRE-RETOMA-2026-10-24.md`, «Observación operativa») muestra que
+  registrar una métrica falla porque a `api_logs` le falta la columna
+  `owner_username`. El modelo la tiene (`database/models.py`, cerca de la
+  línea 342), pero la tabla de producción se creó antes, y crear las tablas
+  al arrancar no agrega columnas a una tabla que ya existe. Hay un script
+  viejo, `scripts/migrate_add_owner.py`, que la agrega a mano.
+- **Premisa primero:** reproducilo en Postgres 16 descartable (el 55432):
+  una base con `api_logs` sin la columna, arrancar la app de `88b22c8` y un
+  pedido cualquiera; qué pasa (¿se pierde la métrica, falla el pedido?).
+  Decí cómo se aplican hoy los cambios de esquema al publicar y si
+  `migrate_add_owner.py` corrió alguna vez en producción (con lo que se ve
+  en el repo; no ves la base de producción: supuesto).
+- **Qué hacer:** que al arrancar la columna exista, con su índice, sin
+  intervención a mano: sólo agregar (columna que acepta vacío), sin borrar
+  ni reescribir nada, y que correrlo dos veces no haga nada. Si falla, la
+  app arranca igual y lo dice en el log; la métrica no frena ningún pedido.
+  Usá el mecanismo que ya tenga el proyecto para esto; si no hay uno o hay
+  dos que compiten, preguntá en la **D34** antes de inventar otro.
+- **Lo demás:** hacé la lista de las otras columnas del modelo que una base
+  vieja podría no tener (comparando el modelo con lo que agregan los
+  scripts de migración), una línea por cada una, a «riesgos». Sólo
+  `api_logs.owner_username` entra en esta pieza.
+
+Pruebas: en Postgres 16 desde una base sin la columna y con filas, la
+columna y el índice quedan, las filas viejas siguen, la métrica se graba
+con su dueño, y dos arranques seguidos no cambian nada; en SQLite igual;
+una falla simulada de la migración no frena el arranque. Un sabotaje por
+regla. Línea en `CHANGELOG.md`. Es una migración: revisión fuerte.
+
+### DISCO-1 — hecha, sin entregar (encargada 2026-10-28 07:00 UTC)
 
 DATOS-1 quedó hecha (`c996ad4`). Sigue la tuya de la Fase 3 que es sólo
 código: **DISCO-1**, hallazgo D4 de `AUDITORIA-2026-10-06.md`. BACKUP-1
