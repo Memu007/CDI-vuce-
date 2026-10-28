@@ -113,6 +113,7 @@ _SUFIJO = re.compile(r"^([A-Z]{2})(?:\((.*?)\)|(\d{2}))\s*=\s*(.*?)\s*$")
 _NUMERO_AR = re.compile(r"^\d{1,3}(?:\.\d{3})+(?:,\d+)?$|^\d+(?:,\d+)?$")
 _POSICION = re.compile(r"^\d{4}\.?\d{2}\.?\d{2}(?:\.?\d{3}[A-Z])?$")
 _CARACTER_ROTO = re.compile(r"\w\?\w|�")
+_MEDIO_PAR = re.compile("[\ud800-\udfff]")  # no se puede escribir en UTF-8
 
 
 def _plano(texto: str) -> str:
@@ -291,7 +292,7 @@ def _hojas_del_pdf(data: bytes) -> tuple[str, list[str], bool]:
                 contenido = pagina.get_contents()
                 if contenido is not None and len(contenido.get_data()) > _MAX_CONTENIDO_PAGINA:
                     raise LimitReachedError("contenido de la hoja")
-                texto = pagina.extract_text(extraction_mode="layout") or ""
+                texto = _MEDIO_PAR.sub("\ufffd", pagina.extract_text(extraction_mode="layout") or "")
             except MemoryError:
                 raise
             except LimitReachedError:
@@ -462,6 +463,9 @@ def _renglon(bloque: dict, padre: dict | None = None) -> dict:
         valor = numero_ar(crudo)
         if valor is None:
             avisos.append(f"No pude leer {nombre}: «{crudo}».")
+        elif not valor < _MAX_NUMERO:  # el mismo tope que guardar; también el infinito
+            avisos.append(f"{nombre[0].upper()}{nombre[1:]} pasa del máximo: «{crudo[:40]}».")
+            return None
         return valor
 
     unidad = leer("Unidad")
