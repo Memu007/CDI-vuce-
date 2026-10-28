@@ -159,7 +159,9 @@ sabotaje $G "el ítem ignora su destino" \
   $'            iva_adicional\n' \
   "FAILED $T::test_cada_destino_por_item_sale_con_su_par[IVAAD1-USOPAR]" \
   "FAILED $T::test_cada_item_cambia_el_de_la_operacion" \
-  "FAILED $T::test_un_destino_por_item_que_no_esta_en_la_tabla_no_genera[BDEUSO]"
+  "FAILED $T::test_un_item_sin_destino_toma_el_por_defecto_aunque_otro_cambie"
+# (Un destino inválido por ítem igual no genera: lo rechaza antes
+# clave_de_posicion, al agrupar renglones.)
 sabotaje $G "un grupo con destinos distintos se genera" \
   $'        if len(ivas) != 1:\n' $'        if False:\n' \
   "FAILED $T::test_un_grupo_con_destinos_distintos_no_se_genera" "DID NOT RAISE"
