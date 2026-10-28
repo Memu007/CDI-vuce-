@@ -2130,7 +2130,10 @@ async def cancel_billing(
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    if db_user.billing_status not in ("trial", "active", "past_due"):
+    # Una cuenta cancelada que reactivó y abrió el checkout tiene la
+    # suscripción nueva guardada hasta el primer cobro: se puede cancelar.
+    cancelada_con_suscripcion = db_user.billing_status == "canceled" and db_user.mp_preapproval_id
+    if db_user.billing_status not in ("trial", "active", "past_due") and not cancelada_con_suscripcion:
         raise HTTPException(
             status_code=409,
             detail=f"No se puede cancelar desde el estado actual: {db_user.billing_status}",
@@ -3318,6 +3321,9 @@ async def billing_me(user=Depends(get_current_user), db: AsyncSession = Depends(
         # se guarda al abrir el checkout, antes de pagar: hace falta un pago de MP.
         "renueva": (billing_entity.billing_status == "active" and bool(db_user.mp_preapproval_id)
                     and getattr(billing_entity, "payment_provider", None) == "mercadopago"),
+        # Cancelada con la suscripción de un checkout nuevo: el perfil le
+        # muestra «Cancelar plan», como /api/billing/cancel (COBRO-MP-1).
+        "suscripcion_abierta": db_user.billing_status == "canceled" and bool(db_user.mp_preapproval_id),
     }
 
 

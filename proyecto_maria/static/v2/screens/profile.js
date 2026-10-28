@@ -379,7 +379,9 @@
 
         // Botones por estado.
         // past_due también cancela: si no, la suscripción cobra cuando la tarjeta vuelve (COBRO-MP-1, C).
-        if (status === 'trial' || status === 'active' || status === 'past_due') {
+        // Una cancelada que abrió el checkout tiene una suscripción nueva que cancelar.
+        if (status === 'trial' || status === 'active' || status === 'past_due'
+            || (status === 'canceled' && b && b.suscripcion_abierta)) {
             if (billingCancelBtn) billingCancelBtn.hidden = false;
         }
         if (status === 'past_due' || status === 'none') {

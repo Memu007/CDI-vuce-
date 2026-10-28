@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: una cuenta cancelada que reabrió el checkout puede cancelar la suscripción nueva (COBRO-MP-1)
+
+- **fix(cobro):** si reactivó un plan pagado, abrió el checkout y el primer cobro no entró, «Cancelar plan» vuelve a aparecer y cancela en Mercado Pago la suscripción nueva; antes daba 409 y la suscripción seguía viva.
+
 ## 2026-10-28 · fix: la operación recuperada tarde no pisa lo que se está haciendo (ORDEN-1, vuelta 2)
 
 - **fix(orden):** si el usuario tarda en llegar al recargar y mientras tanto se cambió de pantalla o se empezó a subir un archivo, la operación de antes queda guardada y se avisa, sin mover la pantalla.
