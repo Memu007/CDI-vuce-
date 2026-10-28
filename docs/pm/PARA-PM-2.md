@@ -2,6 +2,151 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## DISCO-1: hecha, **sin entregar** (2026-10-28)
+
+Encima de DATOS-1 (`c996ad4`) y del merge de tu rama `1f6e0de`
+(`cf84a76`): producto y `CHANGELOG.md` `bd53fc4`; casos y sabotajes
+`0f1161a`; prueba en Postgres y textos de dos sabotajes `88b22c8`.
+**SHA probado: `88b22c8`.** Para ver sólo esta pieza:
+`git diff cf84a76..88b22c8`. Va en su propio `/entregar`, la última,
+después del de DATOS-1, con subagentes, `/code-review high` y
+`/security-review` cuando vuelva el cupo. **No hace falta que la revises
+todavía.**
+
+### Decisiones
+
+- **D33. ¿Se rescatan los historiales que hoy están en el contenedor de
+  producción?** El primer arranque con DISCO-1 es un deploy, y ese deploy
+  borra los archivos como cualquier otro deploy.
+  - (a) **Se aceptan perdidos** (recomiendo): es un caché de sugerencias,
+    cada deploy ya lo borró hasta hoy, y rescatarlo toca producción a mano.
+  - (b) Antes del deploy, Emi copia los `ncm_historial_*.json` del
+    contenedor que corre y los pone en el `DATA_DIR` del nuevo (o en un
+    volumen), y reinicia: el cargador los toma una vez. Toca producción:
+    lo decide Emi.
+
+### Premisa: `DATA_DIR` no es persistente (confirmado con código)
+
+- `DATA_DIR = os.getenv("CDI_DATA_DIR") or os.path.join(basedir, 'data')`
+  (`proyecto_maria/main.py:34`): sin la variable, `/app/data` en la imagen.
+- `Dockerfile`: `WORKDIR /app` y `RUN mkdir -p data generated backups logs`
+  (línea 46); copia sólo `proyecto_maria` y `gunicorn_conf.py` (42-43).
+- `railway.json` no declara volumen (builder DOCKERFILE, 1 réplica,
+  healthcheck `/health`). `docker-compose.yml` monta `./data:/app/data`,
+  pero es sólo local.
+- **Supuesto:** no veo las variables ni los volúmenes de Railway. Si
+  hubiera un volumen montado en `/app/data`, o `CDI_DATA_DIR` apuntando a
+  uno, la premisa cae para ese caso y el primer arranque cargaría los
+  archivos (ver abajo).
+
+### Lo demás que se escribe en `DATA_DIR` (o al lado), una línea cada uno
+
+- `descargas/<hash>/` (`DOWNLOADS_DIR`, `main.py:47`): TXT de MARIA y
+  Excel. **Temporal**: se regeneran; un link de descarga viejo da 404
+  después de un deploy.
+- `generated/` (`main.py:8184`, `8224`): plantillas Excel con fecha.
+  **Temporal.**
+- `localStorage_backup.json` (`BACKUP_FILE`, `main.py:36`): no se usa en
+  ningún lado.
+- `Operation.generated_file`: columna que nunca se escribe (sólo se lee en
+  7143 y 7224).
+- `excel_generator.py:102`: escribe en `DATA_DIR` sólo si lo llaman sin
+  `output_dir` (scripts y pruebas). **Temporal.**
+- Fuera de `DATA_DIR` y también efímero: `proyecto_maria/data/error_notes.json`
+  (`core/error_notes_tracker.py`, estadística de notas de error del
+  admin). **Dato del usuario que se pierde** en cada deploy; no es de esta
+  tarea, va como riesgo. `maria.log` si el log a archivo está prendido.
+- Archivos subidos: `tempfile.mkstemp` (`main.py:8287`). **Temporal.**
+
+### Qué hace
+
+- Tabla nueva `ncm_historial` (`database/models.py`, `NcmHistorial`):
+  dueño (clave foránea a `users.username`), clave, descripción, NCM y
+  cuenta; única por dueño y clave. La clave es el sha256 de la
+  descripción **tal cual se guardaba** (sin normalizar), para que la
+  unicidad no dependa del largo del texto. El orden de sugerencia es el de
+  inserción, como en el archivo.
+- Confirmar (`guardar-uso`): un solo `INSERT … ON CONFLICT DO UPDATE` que
+  suma uno y actualiza la NCM. Sin leer antes: dos confirmaciones a la vez
+  no pierden cuenta.
+- Importar: suma y cuenta duplicados igual que antes; lo ya existente
+  conserva la cuenta y toma la NCM nueva. Todo en un commit: si falla, 500
+  «No se pudo guardar» y no queda nada a medias.
+- Sugerir: lee sólo lo del dueño; si la lectura falla, sigue sin historial.
+- Al arrancar: carga una vez cada `ncm_historial_*.json` de `DATA_DIR` a
+  su dueño con `ON CONFLICT DO NOTHING` (no suma dos veces ni pisa lo
+  confirmado después) y lo renombra a `.migrado`. Ya no lo vuelve a leer.
+  Un archivo roto, con un nombre que corresponde a más de un usuario o a
+  ninguno, o con una cuenta que no entra en la columna, va al log (sin
+  copiar descripciones) y queda en su lugar; nunca frena el arranque.
+
+### Qué pasa en producción el primer arranque
+
+- `create_all` crea sólo `ncm_historial`; las demás tablas no se tocan
+  (en Postgres conservan sus filas, abajo).
+- El cargador busca archivos en `DATA_DIR`. Sin volumen, el contenedor
+  nuevo arranca vacío: no carga nada y no escribe nada en el log.
+- Lo acumulado en el contenedor que corre desde el último deploy se pierde
+  en este deploy, igual que en todos los anteriores. Es la D33.
+- Con varios workers el cargador corre en cada uno; es idempotente (el
+  segundo no inserta y el que pierde el renombre lo anota en el log). Hoy
+  es uno solo (`--workers 1`, `gunicorn_conf.py`).
+
+### Puertas sobre `88b22c8`
+
+| Puerta | Salida exacta |
+|---|---|
+| Suite completa (worktree limpio) | `3847 passed, 336 skipped, 2 xfailed, 94 warnings in 502.78s (0:08:22)`; `compileall 0` |
+| Sabotajes `scripts/testing/sabotajes/disco1.sh 88b22c8` | 20 líneas `ROJO`; `sabotajes sin rojo: 0` |
+| `scripts/testing/disco1_postgres.py` (Postgres 16 local, parte de `c996ad4` con datos) | 20 `OK`; `fallas: 0`; no queda base |
+| El mismo, con confirmar «leer y después escribir» (sabotaje a mano) | `FALLA \| 16 confirmaciones a la vez cuentan 16: [500] [('Rodamiento sintetico', '8482.10.10', 7)]`; `fallas: 1` |
+| `smoke_friccion.sh` | `==> OK · telemetría + alias session/state + by-cuit protegido` |
+| `ataque_aislamiento.sh` (Postgres) | `Bloqueado: 22 · Fugas: 0`; `✅ PUERTA G3 PASADA. Ningún despachante ve datos de otro.` |
+| `tests/test_disco1.py` sobre `c996ad4` | rojo al importar: `cannot import name 'NcmHistorial'` |
+
+Lo que discrimina de verdad son los 20 sabotajes (uno por regla: suma,
+NCM, commit, que no escriba el archivo, clave tal cual, dueño, carrera,
+importar ×4, cargar dos veces, pisar, renombrar, roto ×4, ambiguo,
+arranque) y el script de Postgres, que primero comprueba que la versión
+anterior escribía archivos. **No corrido:** subagentes, `/code-review` y
+`/security-review` (sin cupo hasta las 18:00 UTC).
+
+```bash
+# sabotajes: 20 «ROJO», última línea «sabotajes sin rojo: 0»
+scripts/testing/sabotajes/disco1.sh 88b22c8
+# Postgres 16 local en 55432, con un venv que tenga uvicorn y psycopg2: «fallas: 0»
+python scripts/testing/disco1_postgres.py postgresql://cdi@127.0.0.1:55432/postgres
+# el test nuevo: «11 passed»
+python -m pytest -q --no-cov tests/test_disco1.py
+```
+
+### Riesgos
+
+- Las pruebas usan `./data` como `DATA_DIR` y cada arranque del
+  `TestClient` corre el cargador ahí. Restos locales de otras pruebas con
+  usuarios que no están en la base de prueba quedan donde están; un
+  checkout limpio no tiene ninguno.
+- Un archivo con una cuenta que no entra en un entero de Postgres se
+  rechaza entero, va al log y queda en su lugar (probado).
+- Nombres ambiguos: la validación de usuario (`^[a-zA-Z0-9_-]{3,30}$`)
+  los hace teóricos; igual no se le cargan a nadie.
+- `error_notes.json` sigue siendo efímero (fuera de la tarea).
+
+### Supuestos reversibles
+
+- La clave es el sha256 de la descripción exacta; la descripción se
+  guarda como vino.
+- Las entradas salteadas al cargar (sin descripción o sin NCM) no se
+  copian al log, sólo cuántas.
+- Una cuenta inválida en el archivo (no entero, booleano o menor que 1)
+  se carga como 1.
+
+### Archivos de producto que toqué
+
+`proyecto_maria/main.py`, `proyecto_maria/database/models.py`,
+`CHANGELOG.md`. Casos existentes adaptados: `tests/test_catalogo_ncm1.py`,
+`tests/test_ncm_sugerir_catalog.py`.
+
 ## DATOS-1: hecha, **sin entregar** (2026-10-28)
 
 Encima de DESPACHO-1b (`e59e1a8`) y del merge de tu rama con la D32 (a)
@@ -960,6 +1105,6 @@ PY=<venv>/bin/python scripts/testing/sabotajes/despacho1a.sh 51890cd
 - **El 400 «es para otro email»** dice que el email escrito no es el
   invitado. No dice cuál es. Hace falta el token para preguntar.
 
-Última vuelta: Wed Oct 28 06:36:43 UTC 2026
+Última vuelta: Wed Oct 28 07:34:26 UTC 2026
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 contestada (a) en 3da0a8b, costos en riesgos. DATOS-1 (D5+D32 (a) borrar cliente borra sus presupuestos compartidos, D2 /health 503, D6 sin dev_detail) hecha y subida SIN ENTREGAR encima de d01f95c: producto 7d09c6f, casos 4416076, Postgres y sabotajes 162d277, arreglo de casos que gastaban el cupo de test_user c996ad4; SHA probado c996ad4 (test_datos1 9 passed; sabotajes datos1.sh 12/12; suite 3836 passed, 336 skipped, 2 xfailed, 0 failed; datos1_postgres.py fallas 0; smoke y aislamiento 0 sobre 162d277); su propio /entregar después del de DESPACHO-1b, con /security-review. Postgres 16 descartable en /tmp/cdi-pg55432, puerto 55432, base datos1a. Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review), DESPACHO-1b y DATOS-1; timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. La próxima D es la D33. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 contestada (a) en 3da0a8b, costos en riesgos. DATOS-1 (D5+D32 (a) borrar cliente borra sus presupuestos compartidos, D2 /health 503, D6 sin dev_detail) hecha y subida SIN ENTREGAR encima de d01f95c: producto 7d09c6f, casos 4416076, Postgres y sabotajes 162d277, arreglo de casos que gastaban el cupo de test_user c996ad4; SHA probado c996ad4 (test_datos1 9 passed; sabotajes datos1.sh 12/12; suite 3836 passed, 336 skipped, 2 xfailed, 0 failed; datos1_postgres.py fallas 0; smoke y aislamiento 0 sobre 162d277); su propio /entregar después del de DESPACHO-1b, con /security-review. Postgres 16 descartable en /tmp/cdi-pg55432, puerto 55432, base datos1a. DISCO-1 (historial de NCM de DATA_DIR a la tabla ncm_historial por dueño; carga única de archivos viejos a .migrado) hecha SIN ENTREGAR encima de c996ad4 y del merge cf84a76 (PM 1f6e0de): producto bd53fc4, casos y sabotajes 0f1161a, Postgres y textos de sabotajes 88b22c8; SHA probado 88b22c8 (test_disco1 11 passed; sabotajes disco1.sh 20/20; suite 3847 passed, 336 skipped, 2 xfailed, 0 failed; disco1_postgres.py fallas 0 y con sabotaje de carrera fallas 1; smoke y aislamiento 0); D33 abierta (rescatar historiales de producción: recomiendo (a) aceptarlos perdidos); va en su propio /entregar, el último, con subagentes, /code-review high y /security-review. Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review), DESPACHO-1b, DATOS-1 y DISCO-1; timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. La próxima D es la D34. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
