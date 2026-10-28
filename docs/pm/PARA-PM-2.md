@@ -803,6 +803,96 @@ PY=python bash scripts/testing/sabotajes/despacho1b.sh 09e16f3   # 30 ROJO, «sa
 python -m pytest -q --no-cov tests/test_despacho1b.py tests/test_despacho1a.py   # 103 passed
 ```
 
+## DISCO-1 (devolución): **entregada** en `a6c82f5` (2026-10-28, 20:15 UTC)
+
+**Resultado:** cinco commits encima de `18cf27d`:
+- `47c4d7b`: producto y `CHANGELOG.md`;
+- `772d715`: pruebas y sabotajes;
+- `5f8707f`: lo que encontraron el `/code-review` y el adversario, producto;
+- `8bff4a5`: lo que encontraron el `/code-review` y el adversario, pruebas y sabotajes;
+- `a6c82f5`: sólo `disco1.sh`, el texto esperado de tres sabotajes (abajo).
+
+Los 6 puntos de la devolución están atendidos. **El 4 no lo hice como lo pediste: lo cambié** (abajo, primer supuesto).
+
+Sabotajes de `disco1.sh` sobre `a6c82f5`, con `PG_URL`: 43 sabotajes, 43 `ROJO`, «sabotajes sin rojo: 0».
+- La primera corrida, sobre `8bff4a5`, dio 40 `ROJO` y 3 `ROJO?` («sabotajes sin rojo: 3»). Los tres eran rojos de verdad, con el texto esperado mal escrito por mí:
+  - «la carga de archivos viejos no aplica los topes» esperaba «8888888888», pero la prueba falla antes, en la aserción del orden (`assert [('CCCCCCCCCC...07.19.00', 1)] == [('DDDDDDDDDD...07.19.00', 1)]`);
+  - «sugerir sin rollback si falla la memoria del cliente» esperaba `FALLA | falla la memoria del cliente: sigue el proveedor: []`, y el diagnóstico de Postgres dice `sigue el proveedor: [('historial', None)]`;
+  - «importar sin el bloqueo por dueño» esperaba «DeadlockDetectedError» en la salida, pero la línea `FALLA` muestra los 500 de la respuesta (`vuelta 0: [(500,`), no el nombre de la excepción; además el sabotaje no mostraba las líneas `FALLA`.
+- `a6c82f5` corrige esos tres textos y hace que el diagnóstico muestre también las líneas `FALLA`. Cambia sólo `disco1.sh` (4 líneas); el producto es el mismo que en `8bff4a5`.
+
+`test_disco1.py`: 33 passed. `disco1_postgres.py` sobre el árbol de `8bff4a5`: «fallas: 0».
+
+Suite completa sobre `8bff4a5`, desde un worktree limpio: «4089 passed, 336 skipped, 2 xfailed, 95 warnings in 597.49s (0:09:57)», `compileall` 0. No la volví a correr sobre `a6c82f5`: entre los dos sólo cambia `scripts/testing/sabotajes/disco1.sh`, que la suite no corre.
+
+**Decide la PM:** nada nuevo (D47 y D48 ya las decidiste a las 20:07; las tomo en DESPACHO-1b y RENDIMIENTO-1c). Pedí que revises el primer supuesto, porque contradice el punto 4 tal como lo escribiste.
+
+**Supuestos reversibles:**
+1. **Punto 4: no ordené por clave. Importar escribe en el orden del archivo y toma un bloqueo por dueño.** Es `pg_advisory_xact_lock(hashtext('ncm_historial:' || dueño))` y dura lo que la transacción. Lo toman la importación y la carga de archivos viejos, sólo en Postgres.
+   - **Por qué no ordené.** `load_ncm_historial` ordena por `id`, y sugerir toma las primeras 5 coincidencias. Si escribo en orden de clave, el `id` sale en orden de hash, y las sugerencias de un archivo importado o migrado cambian de orden y de conjunto.
+     - Lo encontraron el `/code-review` y el adversario sobre `772d715`, que ya ordenaba.
+     - El adversario lo reprodujo en Postgres: Bomba5, Bomba7 y Bomba8 importadas en ese orden volvían como Bomba8, Bomba5, Bomba7.
+     - Mis rojos contra `772d715`: `assert ['Arandela si...etica 2', ...] == ['Arandela si...etica 3', ...]` (importar) y `assert ['Brida sinte...etica 1', ...] == ['Brida sinte...etica 3', ...]` (archivo viejo).
+   - **El deadlock existe, y el bloqueo lo saca.** Lo medí en Postgres 16 con dos importaciones a la vez de las mismas 1000 filas ya guardadas, en orden contrario, 10 vueltas:
+     - sin el bloqueo, 10 errores `asyncpg.exceptions.DeadlockDetectedError`;
+     - con el bloqueo, 0.
+   - El caso queda en `disco1_postgres.py`, con 3 vueltas, y tiene su sabotaje («importar sin el bloqueo por dueño»).
+   - Si preferís el orden por clave igual, es volver a poner `sorted` en `_en_tandas`. Hay un sabotaje que hace eso («las tandas reordenan por clave»), y lo matan dos pruebas.
+2. **La carga de archivos viejos saltea lo que no pasa el tope**, además del NUL y del medio par UTF-16, y lo cuenta en el log. Sin eso, una descripción de 5000 caracteres entraba por esa vía, y después confirmarla daba 400 para siempre (`/code-review`, hallazgo 3).
+3. **Guardar-uso revisa el cliente antes de escribir.** Un `client_id` con NUL o con medio par da 400, y uno ajeno da 404, y en ningún caso suma. Antes daba 500 y 404 **después** de sumar, y cada reintento sumaba otra vez (adversario, hallazgo 3, reproducido en Postgres).
+
+**Los topes (punto 3): 2000 caracteres de descripción y 20 de NCM.**
+- 2000 es el tope de un renglón del despacho (`despacho_lector._MAX_DESCRIPCION`).
+- 20 es el largo de las columnas de NCM del resto de la base (`String(20)`, por ejemplo `database/models.py:444`).
+- En la NCM, confirmar cuenta el texto tal cual, con los puntos. Importar cuenta sólo los dígitos, porque así la guarda.
+
+| Revisor | Modelo y esfuerzo | Hallazgos | Qué hice |
+|---|---|---|---|
+| `/code-review high` | Opus alto, en fork, sobre `18cf27d..772d715` | (1) orden de hash en vez del orden del archivo. (2) el 400 de guardar-uso corta también la memoria del cliente y el catálogo, y las dos pantallas se tragan el error. (3) la carga de archivos viejos no aplicaba los topes. (4) una fila larga frena todo el archivo, y «NCM muy corto» sólo suma a errores. (5) rollback entero en vez de `begin_nested`. (6) `.migrado.N` sin tope. (7) el tope de NCM mide distinto al confirmar y al importar | (1) y (3), arreglados con rojo y sabotaje. Lo demás va a riesgos |
+| Adversario | Sonnet alto, sobre `772d715` | (1) la prueba de las tandas no mataba el mutante `10**6`: este SQLite admite 250000 variables. (2) el rollback de sugerir sólo lo cubre el script de Postgres. (3) un `client_id` con NUL da 500 después de sumar. (4) orden de hash (igual que el (1) del `/code-review`). (5) topes salteables en la carga vieja, y el 400 que es distinto de «NCM muy corto». (6) 500 por tipos que no son texto, anteriores. (7) carrera de `_ruta_migrado_libre`, nada accionable | (1): ahora la prueba cuenta las filas de cada sentencia, y el sabotaje de Postgres importa 7000. (3) y (4), arreglados con rojo y sabotaje. (5), arreglada la carga. Lo demás va a riesgos |
+| `/security-review` | a mano: la skill falla | Nada nuevo. Una colisión de `hashtext` entre dos dueños sólo los pone en fila: no comparte datos. El 400 de importar devuelve el número de fila, no el contenido. El rollback de sugerir no deshace escrituras, porque sugerir sólo lee | — |
+
+**Rojos.** Cada prueba nueva la corrí contra el producto anterior a su arreglo. El texto está copiado de la salida.
+- **Contra `18cf27d`** (los puntos 2, 3, 5 y 6 de la devolución): `test_disco1.py` dio «14 failed, 15 passed». Entre ellas:
+  - `test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda`, con 5 casos;
+  - `test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada`, con 4;
+  - `test_un_migrado_anterior_no_se_pisa`: `FileNotFou...`;
+  - `test_un_archivo_viejo_con_descripcion_en_blanco_no_la_carga`;
+  - `test_un_archivo_viejo_con_caracteres_que_la_base_no_guarda_los_saltea`.
+- **Punto 1 (rollback):** sólo se ve en Postgres. Lo matan los sabotajes «sugerir sin rollback si falla la memoria del cliente» y «… el catálogo del proveedor», que corren `disco1_postgres.py`. Tu medición era `c996ad4` `['historial']` contra `88b22c8` `[]`.
+- **Orden, contra `772d715`:** las dos aserciones de arriba, y `assert [('Codo sinte...07.19.00', 1)] == [('DDDDDDDDDD...07.19.00', 1)]` en la carga vieja con topes.
+- **Cliente, contra `772d715`:**
+  - un cliente ajeno: `{"detail":"Cliente no encontrado"}`, `assert 404 == 400`, es decir, el viejo 404 llegaba después de sumar;
+  - un NUL: `assert 500 == 400`;
+  - la cuenta: `assert [('Bomba sint...13.70.10', 2)] == [('Bomba sint...13.70.10', 1)]`.
+- **Mutante `_HISTORIAL_FILAS_POR_SENTENCIA = 10**6`:** `AssertionError: [7000]`, porque la prueba ahora cuenta las filas por sentencia. En Postgres, con el mutante, importar 7000 filas da 500.
+- **Deadlock en Postgres sin el bloqueo:** 10 de 10 vueltas con `DeadlockDetectedError`.
+
+**Riesgos que quedan:**
+- **Media:** el 400 de guardar-uso (tope, NUL) corta también la memoria del cliente y el catálogo del proveedor, y `ncm.js:1812` y `app.js:3933` se tragan el error. Según el `/code-review` (no lo reproduje en la pantalla), una descripción de factura de más de 2000 caracteres ya no deja nada guardado, y nadie se entera. El tope lo decidiste vos; si lo querés sólo para el historial, es mover la revisión adentro del `try` del historial.
+- **Media:** una fila de más de 2000 caracteres frena todo el archivo, y una «NCM muy corto» sólo suma a errores. El 400 dice sólo la primera fila mala. Lo dejé así porque el punto 3 dice «si se pasa, 400».
+- **Media:** el rollback de sugerir sólo lo prueba Postgres. La CI corre SQLite y no lo ve.
+- **Baja-media:** sugerir vuelve con un `rollback` entero, no con `begin_nested` por fuente. Si el rollback mismo falla (se cae la conexión), da 500. Hoy no hay nada escrito antes en ese pedido que se pierda.
+- **Baja:** el tope de NCM mide el texto con puntos al confirmar y sólo los dígitos al importar.
+- **Baja:** no hay tope de filas por dueño (lo pediste en riesgos).
+- **Baja:** con dos importaciones a la vez, los números de «importados» y «duplicados» de la respuesta pueden quedar viejos. La tabla queda bien.
+- **Baja:** cada arranque en que vuelve el mismo archivo deja otro `.migrado.N`, sin tope.
+- **Baja, anteriores:**
+  - guardar-uso y sugerir dan 500 con una descripción o una NCM que no es texto (un número, null);
+  - sugerir da 500 con medio par UTF-16 en la descripción, porque la devuelve en la respuesta;
+  - una cuenta mayor que int4 deja el archivo viejo en su lugar y se reintenta en cada arranque.
+- **Baja:** un NUL en un CSV no llega a la revisión: lo frenan antes el validador de tipo o pandas (el adversario vio el 400 del validador). El caso de la importación lo prueba reemplazando el lector de la tabla.
+- **No verificado:** un `vendor_name` con NUL va al catálogo dentro del `try`. El adversario lo vio dar 200, pero no miré qué queda guardado.
+
+**Archivos de producto:** `proyecto_maria/main.py`, `CHANGELOG.md`.
+
+```bash
+git diff --stat 18cf27d..a6c82f5 -- . ':!docs'   # 5 files changed, 489 insertions(+), 17 deletions(-)
+git diff --stat 8bff4a5..a6c82f5                  # sólo scripts/testing/sabotajes/disco1.sh
+python -m pytest -q --no-cov tests/test_disco1.py   # 33 passed
+python scripts/testing/disco1_postgres.py postgresql://cdi@127.0.0.1:55432/postgres   # «fallas: 0»
+PG_URL=postgresql://cdi@127.0.0.1:55432/postgres PY=python bash scripts/testing/sabotajes/disco1.sh a6c82f5   # 43 ROJO, «sabotajes sin rojo: 0»
+```
 ## Entregas preparadas para las 18:00 UTC (2026-10-28)
 
 Recibí la D37 (2) en `20fb535`. En ABUSO-1 la pasé a riesgos, con lo que
