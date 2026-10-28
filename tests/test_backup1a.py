@@ -286,7 +286,7 @@ def _envoltorio(tmp_path: Path) -> Path:
 def test_una_escritura_durante_la_copia_no_la_rompe(origen, tmp_path):
     archivo = tmp_path / "copia.dump"
     _copiar_ok(origen, archivo, COPIA_PG_BIN=str(_envoltorio(tmp_path)),
-               B1A_ESCRITURA="DELETE FROM ncm_cache WHERE ncm = '0-ncm_cache.ncm'",
+               B1A_ESCRITURA="DELETE FROM ncm_cache WHERE ncm = (SELECT min(ncm) FROM ncm_cache)",
                B1A_ESCRITURA_URL=_url_de(origen))
     assert sql(_url_de(origen), "SELECT count(*) AS n FROM ncm_cache")[0]["n"] == FILAS - 1, \
         "la escritura no pasó"
@@ -346,6 +346,8 @@ def test_la_direccion_entra_solo_por_variable(origen, tmp_path):
     r = correr("copiar", "--base", _url_de(origen), str(archivo))
     assert r.returncode == 2, "acepta la dirección por argumento"
     assert not archivo.exists()
+    clave = _clave()
+    assert clave not in r.stderr and quote(clave, safe="") not in r.stderr, "el error repite la clave"
 
 
 def test_los_errores_no_muestran_la_clave(origen, tmp_path):
