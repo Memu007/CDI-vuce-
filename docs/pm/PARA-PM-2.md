@@ -9,8 +9,8 @@ merge de tu rama (`49f8e29`): producto y `CHANGELOG.md` `0591722`; casos,
 pantalla y sabotajes `e59e1a8`. **SHA probado: `e59e1a8`.** Para ver sólo
 esta pieza: `git diff 49f8e29..e59e1a8`. Va en su propio `/entregar`,
 después del de SEGURO-1, con subagentes y `/code-review` cuando vuelva el
-cupo. **No hace falta que la revises todavía.** Tiene una decisión: D31,
-arriba en «Decisiones».
+cupo. **No hace falta que la revises todavía.** La D31 está contestada
+(a) en `3da0a8b`: es lo que hice, sin cambios.
 
 **La premisa: confirmada, sin Gemini y sin librería nueva.** El repo ya saca
 texto de PDF con `pypdf` (el lector de facturas, `pdf_extractor.py`) y lo
@@ -113,14 +113,18 @@ PY=<venv>/bin/python BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pan
 - **No se probó con un despacho real** (no entran). Si el sistema del
   despachante pega dos columnas con un solo espacio, el valor puede quedar
   faltante: falla hacia «falta», no hacia un dato cambiado.
-- **D31:** hoy el catálogo guarda NCM de 8 dígitos, descripción, origen,
-  valor unitario, cantidad y peso. Los sufijos, la unidad, la posición
-  completa y la divisa se ven en la revisión pero no se guardan. El valor
-  unitario queda sin divisa.
+- **Costos de la D31 (a), decidida por la PM:**
+  1. **El valor unitario queda sin divisa** en el catálogo: si el despacho
+     estaba en otra moneda, la pantalla de revisión la muestra, pero el
+     catálogo la pierde y su promedio puede mezclar monedas.
+  2. **Dos subítems que sólo difieren en sufijos** (el `AI`) **se funden
+     en un producto**, porque el catálogo junta por NCM y descripción
+     parecida.
+  Los sufijos, la unidad y la posición completa tampoco se guardan; se ven
+  en la revisión.
 - Dos renglones con el mismo NCM y descripción parecida (Jaccard ≥ 0,80,
   la regla de siempre del catálogo) se funden en uno: `guardados` puede
-  decir más de lo que aparece. Dos subítems que sólo difieren en el `AI`
-  quedan en uno.
+  decir más de lo que aparece.
 - Guardar en un producto que ya existe promedia sus valores, como el
   aprendizaje de hoy.
 - `leer` tiene el límite de pedidos del resto; `guardar` no, igual que el
@@ -311,23 +315,8 @@ pierda si el contenedor muere. **No hace falta que la revises todavía.**
 
 ## Decisiones
 
-**D31 — qué guarda el catálogo de lo que lee un despacho (DESPACHO-1b).**
-La lectura saca posición SIM completa, descripción, sufijos, origen,
-unidad, cantidad, valor unitario y kilo neto. El catálogo de hoy
-(`client_product_history`, el de DESPACHO-1a) tiene lugar para NCM de 8
-dígitos, descripción, origen, valor unitario, cantidad y peso por unidad.
-Los sufijos, la unidad, la posición completa (con su letra) y la divisa no
-tienen columna.
-
-- **(a) Recomiendo esta, y es lo que hice.** Se guarda lo que entra hoy; lo
-  demás se ve en la revisión y no se guarda. Sin migración y sin tocar el
-  catálogo de DESPACHO-1a. El costo: el valor unitario queda sin divisa, y
-  dos subítems que sólo difieren en los sufijos (el `AI`) se funden en un
-  producto, porque el catálogo junta por NCM y descripción parecida.
-- **(b)** Una tabla o columnas nuevas para sufijos, unidad, posición y
-  divisa. Es una migración sobre datos de clientes: pieza aparte, con su
-  revisión fuerte, y antes conviene saber para qué se van a usar esos datos
-  (sugerir sufijos al armar una operación sería otra pieza).
+**D31 — contestada (a) en `3da0a8b`.** El catálogo guarda lo que ya tiene
+columna; los dos costos están en los riesgos de DESPACHO-1b.
 
 **D30 — contestada (a) en `53e1e86`.** Un seguro «para completar» sigue siendo un aviso; SEGURO-2 no la empiezo hasta verla en tu canal.
 
@@ -824,4 +813,4 @@ PY=<venv>/bin/python scripts/testing/sabotajes/despacho1a.sh 51890cd
 
 Última vuelta: Wed Oct 28 05:46:09 UTC 2026
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 abierta (qué guarda el catálogo de un despacho; recomiendo a). Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review) y DESPACHO-1b; timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. La próxima D es la D32. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 contestada (a) en 3da0a8b, costos en riesgos. DATOS-1 (D5 borrar cliente con presupuesto, D2 /health 503, D6 sin dev_detail) en curso encima de e59e1a8, su propio /entregar después del de DESPACHO-1b; si borrar el cliente obliga a elegir presupuesto, es la D32. Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review) y DESPACHO-1b; timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. La próxima D es la D32. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
