@@ -2,6 +2,173 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## OBSERVABILIDAD-1: hecha, **sin entregar** (2026-10-28)
+
+Encima de DISCO-1 (`88b22c8`): producto y `CHANGELOG.md` `8b1ce3b`;
+casos, arnés de arranque y sabotajes `7ae35ab`; merge de tu rama
+(`4e7896d`, sólo `NOW.md` y `PARA-DEV.md`) `39be45e`. **SHA probado:
+`39be45e`** (el código es el de `7ae35ab`). Para ver sólo esta pieza:
+`git diff 88b22c8..7ae35ab`. Va en su propio `/entregar`, después del de
+DISCO-1, con subagentes, `/code-review high` y `/security-review` cuando
+vuelva el cupo. **No hace falta que la revises todavía.**
+
+### Decisiones
+
+- **D34. «La métrica se graba con su dueño» choca con el código.**
+  `MetricsMiddleware` (`main.py`, `APILog(...)` cerca de la línea 1671)
+  nunca pone `owner_username`: con la columna, la métrica se graba, pero
+  con dueño vacío.
+  - (a) **Esta pieza sólo hace que la columna exista** (recomiendo; lo
+    apliqué como supuesto reversible). Lo que pediste se cumple: la
+    métrica se vuelve a grabar y el panel deja de dar 500. Atribuir cada
+    métrica a su usuario es otra pieza.
+  - (b) En esta pieza, el middleware lee el token ya verificado y graba el
+    usuario. Toca sesión y suma un caso por tipo de token: revisión de
+    auth. No lo hice.
+
+### Premisa: confirmada en Postgres 16 (55432)
+
+Base con `api_logs` sin la columna y 3 filas; arranco la app, registro un
+admin, pido `/robots.txt`, hago login y pido `/api/dev/stats`
+(`$S/obs/premisa.py`, fuera del repo).
+
+- **`88b22c8` (antes):** `registro 200`, `robots 200`, `login 200`,
+  `stats (500, …)`, `filas antes/después: 3 3`. En el log, por cada
+  pedido: `⚠️ Error logging metrics: (…) UndefinedColumnError'>: column
+  "owner_username" of relation "api_logs" does not exist`. **Ningún pedido
+  falla; se pierde cada métrica y el panel de admin da 500.**
+- **`39be45e` (después):** `cols antes: []`, `stats (200, …)`,
+  `filas antes/después: 3 6`, y en el log `✅ Migracion: agregada columna
+  api_logs.owner_username` y `✅ Migracion: agregado indice
+  ix_api_logs_owner_username`.
+
+### Cómo se aplican hoy los cambios de esquema
+
+- **Uno solo, automático:** al arrancar, `lifespan` corre `init_db`
+  (`create_all`: crea tablas que no existen, no agrega columnas) y después
+  los `_migrate_*` de `main.py` (19 de esquema), que agregan columnas a tablas
+  viejas en SQLite y Postgres. El `Dockerfile` arranca gunicorn directo;
+  `railway.json` no tiene paso de deploy. Usé ese mecanismo: no hizo
+  falta preguntar.
+- `proyecto_maria/scripts/migrate_add_owner.py` es manual y sólo SQLite
+  (`sqlite3`, `--db`); su docstring dice «No toca PostgreSQL de producción
+  — eso se hace con alembic aparte», pero **en el repo no hay alembic**
+  (ni `alembic.ini` ni versiones): no compite.
+- **¿Corrió en producción?** Con el repo: no pudo, producción es Postgres.
+  Y el log del 24/10 muestra que a `api_logs` le falta la columna, o sea
+  que nadie la agregó por otro lado. **Supuesto:** no veo la base.
+
+### Qué hace (`_migrate_add_api_logs_owner_column`, `main.py:1288`)
+
+- Corre al arrancar después de `_migrate_add_unidad_column`, en una
+  transacción.
+- Lee las columnas de `api_logs`. Si la tabla no existe, no hace nada
+  (`create_all` ya la crea completa).
+- Si falta, `ADD COLUMN owner_username VARCHAR(50)`: acepta vacío, sin
+  default, no toca filas. En Postgres con `IF NOT EXISTS`.
+- Si no hay **un índice cuya primera columna sea `owner_username`** (se
+  llame `ix_api_logs_owner_username`, como lo nombra `create_all`, o
+  `ix_api_logs_owner`, como el script viejo), crea
+  `ix_api_logs_owner_username`.
+- Si ya está todo, no hace nada **y no pide el lock** de la tabla.
+- En Postgres, `lock_timeout` de 5 s: con la tabla tomada por otra
+  conexión, falla al rato en vez de colgar el arranque.
+- Si algo falla: `logging.exception("[OBSERVABILIDAD-1] no se pudo agregar
+  api_logs.owner_username; la app arranca igual, pero las métricas no se
+  graban hasta que exista")`, con el motivo, y la app sigue. El próximo
+  arranque reintenta.
+
+### Puertas sobre `39be45e`
+
+| Puerta | Salida |
+|---|---|
+| `tests/test_observabilidad1.py` (SQLite, 8 casos) | `8 passed` |
+| Arranque real con uvicorn, SQLite y Postgres 16 | 38 `OK`, `fallas 0`, salida 0 |
+| Sabotajes `observabilidad1.sh` con `PG_URL` (sobre `7ae35ab`) | 16 `ROJO`, `sabotajes sin rojo: 0; no corridos: 0`, salida 0 |
+| Suite completa, desde worktree limpio | `3855 passed, 336 skipped, 2 xfailed, 95 warnings in 515.51s`, `compileall 0`, `pytest salida 0` |
+| Smoke | `==> OK · telemetría + alias session/state + by-cuit protegido`, salida 0 |
+| Ataque de aislamiento | `Bloqueado: 22 · Fugas: 0`, `✅ PUERTA G3 PASADA. Ningún despachante ve datos de otro.`, salida 0 |
+| Subagentes, `/code-review high`, `/security-review` | **No corridos:** sin cupo hasta las 18:00 UTC |
+
+El arranque prueba, en cada motor: base vieja con filas → columna
+`VARCHAR(50)` nullable sin default, un único índice, filas iguales y sin
+dueño inventado, la métrica de `/robots.txt` grabada, sin «Error logging
+metrics», `/api/dev/stats` 200; segundo arranque (en Postgres, con una
+lectura abierta sobre `api_logs`) → esquema y filas iguales y nada en el
+log. Falla simulada (SQLite: `api_logs` es una vista; Postgres: otra
+conexión con `LOCK … ACCESS EXCLUSIVE`) → la app arranca (~8 s en
+Postgres), el log trae el motivo y `/robots.txt` da 200; en Postgres, al
+soltar la tabla el próximo arranque la agrega.
+
+Los 16 sabotajes, uno por regla: el arranque no la llama; no agrega la
+columna (SQLite y Postgres); NOT NULL o DEFAULT con dueño; no crea el
+índice (SQLite y Postgres); busca el índice por nombre (duplica el del
+script viejo); agrega la columna aunque ya esté; pide el lock aunque ya
+esté; sin tabla no se va antes; la falla se propaga; la falla frena el
+arranque; la falla no va al log; va al log sin el motivo; espera el lock
+sin límite.
+
+### Comandos
+
+```bash
+# Postgres 16 descartable en 127.0.0.1:55432, rol cdi (sólo acepta host local)
+python -m pytest -q --no-cov tests/test_observabilidad1.py
+#   → 8 passed
+python scripts/testing/observabilidad1_arranque.py postgresql://cdi@127.0.0.1:55432/postgres
+#   → 38 líneas OK y «fallas 0» (sin URL corre sólo SQLite)
+PY=$(which python) PG_URL=postgresql://cdi@127.0.0.1:55432/postgres \
+  scripts/testing/sabotajes/observabilidad1.sh 7ae35ab
+#   → 16 «ROJO» y «sabotajes sin rojo: 0; no corridos: 0» (~5 min)
+```
+
+### Riesgos
+
+Otras columnas del modelo que una base vieja podría no tener: las que
+agrega `migrate_add_owner.py` y ningún `_migrate_*`. Si falta una, toda
+consulta a esa tabla da `UndefinedColumn`:
+
+- `clients.owner_username`: supuesto, en producción está, porque el
+  aislamiento por dueño funciona y sin ella fallaría todo.
+- `ncm_notes.owner_username` (y su índice `ix_ncm_notes_owner_ncm`); el
+  script además rehace la tabla para que `client_id` acepte vacío, y eso
+  tampoco lo hace ningún helper.
+- `client_product_history.owner_username` (e `ix_cph_owner_client`).
+- `system_backups.owner_username` (e `ix_system_backups_owner`).
+
+Ya cubiertas por helpers: `operations.owner_username`, `op_code`,
+`source`, `extra` (`_migrate_sync_operations_columns`) y `clients.notes`,
+`favorite` (`_migrate_sync_clients_columns`). Las tablas creadas después
+(`vendor_catalog_products`, `telemetry_events`, `estudios`,
+`ncm_historial`…) las crea `create_all` completas: supuesto: el clon es
+superficial y no llega a cuándo se crearon.
+
+De esta pieza:
+
+- El `CREATE INDEX` no es `CONCURRENTLY`: con un `api_logs` grande, el
+  primer arranque tarda lo que tarde construirlo, con la tabla bloqueada
+  para escritura. `lock_timeout` acota la espera del lock, no la
+  construcción. Desde que falta la columna la tabla no crece; cuántas
+  filas tiene de antes, no lo sé.
+- En Postgres, si falla el índice se revierte también la columna; el
+  próximo arranque reintenta las dos.
+- El arranque puede demorarse hasta 5 s si otra conexión tiene la tabla.
+- Con más de un worker (`WEB_CONCURRENCY` en `gunicorn_conf.py`; el
+  `Dockerfile` usa 1), dos arranques a la vez: uno puede fallar y dejarlo
+  en el log, y el esquema queda bien. **No probado.**
+- D34: las métricas siguen sin dueño.
+
+### Supuestos reversibles
+
+- La columna va sin la clave foránea a `users` que tiene el modelo:
+  agregarla valida todas las filas y puede fallar con datos viejos.
+- `lock_timeout` de 5 s.
+- Se acepta como índice el `ix_api_logs_owner` del script viejo.
+- Dueño vacío (D34 (a)).
+
+### Archivos de producto que toqué
+
+`proyecto_maria/main.py`, `CHANGELOG.md`.
+
 ## DISCO-1: hecha, **sin entregar** (2026-10-28)
 
 Encima de DATOS-1 (`c996ad4`) y del merge de tu rama `1f6e0de`
@@ -15,6 +182,8 @@ todavía.**
 
 ### Decisiones
 
+- **D33: contestada (a) en `a3efc3a`.** El riesgo que pediste está en
+  «Riesgos».
 - **D33. ¿Se rescatan los historiales que hoy están en el contenedor de
   producción?** El primer arranque con DISCO-1 es un deploy, y ese deploy
   borra los archivos como cualquier otro deploy.
@@ -122,6 +291,8 @@ python -m pytest -q --no-cov tests/test_disco1.py
 
 ### Riesgos
 
+- **D33 (a):** si nadie hace (b), el primer deploy con DISCO-1 pierde los
+  historiales que haya, igual que todos los deploys hasta hoy.
 - Las pruebas usan `./data` como `DATA_DIR` y cada arranque del
   `TestClient` corre el cargador ahí. Restos locales de otras pruebas con
   usuarios que no están en la base de prueba quedan donde están; un
@@ -1105,6 +1276,6 @@ PY=<venv>/bin/python scripts/testing/sabotajes/despacho1a.sh 51890cd
 - **El 400 «es para otro email»** dice que el email escrito no es el
   invitado. No dice cuál es. Hace falta el token para preguntar.
 
-Última vuelta: Wed Oct 28 07:34:26 UTC 2026
+Última vuelta: Wed Oct 28 08:32:53 UTC 2026
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 contestada (a) en 3da0a8b, costos en riesgos. DATOS-1 (D5+D32 (a) borrar cliente borra sus presupuestos compartidos, D2 /health 503, D6 sin dev_detail) hecha y subida SIN ENTREGAR encima de d01f95c: producto 7d09c6f, casos 4416076, Postgres y sabotajes 162d277, arreglo de casos que gastaban el cupo de test_user c996ad4; SHA probado c996ad4 (test_datos1 9 passed; sabotajes datos1.sh 12/12; suite 3836 passed, 336 skipped, 2 xfailed, 0 failed; datos1_postgres.py fallas 0; smoke y aislamiento 0 sobre 162d277); su propio /entregar después del de DESPACHO-1b, con /security-review. Postgres 16 descartable en /tmp/cdi-pg55432, puerto 55432, base datos1a. DISCO-1 (historial de NCM de DATA_DIR a la tabla ncm_historial por dueño; carga única de archivos viejos a .migrado) hecha SIN ENTREGAR encima de c996ad4 y del merge cf84a76 (PM 1f6e0de): producto bd53fc4, casos y sabotajes 0f1161a, Postgres y textos de sabotajes 88b22c8; SHA probado 88b22c8 (test_disco1 11 passed; sabotajes disco1.sh 20/20; suite 3847 passed, 336 skipped, 2 xfailed, 0 failed; disco1_postgres.py fallas 0 y con sabotaje de carrera fallas 1; smoke y aislamiento 0); D33 abierta (rescatar historiales de producción: recomiendo (a) aceptarlos perdidos); va en su propio /entregar, el último, con subagentes, /code-review high y /security-review. Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review), DESPACHO-1b, DATOS-1 y DISCO-1; timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. La próxima D es la D34. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 contestada (a) en 3da0a8b, costos en riesgos. DATOS-1 (D5+D32 (a) borrar cliente borra sus presupuestos compartidos, D2 /health 503, D6 sin dev_detail) hecha y subida SIN ENTREGAR encima de d01f95c: producto 7d09c6f, casos 4416076, Postgres y sabotajes 162d277, arreglo de casos que gastaban el cupo de test_user c996ad4; SHA probado c996ad4 (test_datos1 9 passed; sabotajes datos1.sh 12/12; suite 3836 passed, 336 skipped, 2 xfailed, 0 failed; datos1_postgres.py fallas 0; smoke y aislamiento 0 sobre 162d277); su propio /entregar después del de DESPACHO-1b, con /security-review. Postgres 16 descartable en /tmp/cdi-pg55432, puerto 55432, base datos1a. DISCO-1 (historial de NCM de DATA_DIR a la tabla ncm_historial por dueño; carga única de archivos viejos a .migrado) hecha SIN ENTREGAR encima de c996ad4 y del merge cf84a76 (PM 1f6e0de): producto bd53fc4, casos y sabotajes 0f1161a, Postgres y textos de sabotajes 88b22c8; SHA probado 88b22c8 (test_disco1 11 passed; sabotajes disco1.sh 20/20; suite 3847 passed, 336 skipped, 2 xfailed, 0 failed; disco1_postgres.py fallas 0 y con sabotaje de carrera fallas 1; smoke y aislamiento 0); D33 contestada (a) en a3efc3a, riesgo anotado en DISCO-1; va en su propio /entregar, con subagentes, /code-review high y /security-review. OBSERVABILIDAD-1 (api_logs.owner_username nullable con su índice al arrancar, helper _migrate_add_api_logs_owner_column en main.py; si falla, log y la app sigue) hecha SIN ENTREGAR encima de 88b22c8: producto y CHANGELOG 8b1ce3b, casos, arnés y sabotajes 7ae35ab, merge de la PM 39be45e; SHA probado 39be45e (test_observabilidad1 8 passed; observabilidad1_arranque.py con Postgres 55432 38 OK fallas 0; sabotajes observabilidad1.sh con PG_URL 16/16 sobre 7ae35ab; suite 3855 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D34 abierta (la métrica sigue sin dueño porque MetricsMiddleware no lo pone: recomiendo (a) sólo la columna); va en su propio /entregar después del de DISCO-1, con subagentes, /code-review high y /security-review. Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review), DESPACHO-1b, DATOS-1, DISCO-1 y OBSERVABILIDAD-1; timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. La próxima D es la D35. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
