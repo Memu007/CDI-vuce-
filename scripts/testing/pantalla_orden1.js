@@ -19,7 +19,9 @@
 //      minutos se recupera;
 //  (i) una pestaña duplicada no toma la operación de la original, que sigue
 //      abierta; la misma pestaña restaurada después de un cierre sin pagehide
-//      recupera la suya.
+//      recupera la suya;
+//  (j) si la consulta del usuario falla (500) al abrir, la pestaña lo vuelve a
+//      pedir y la operación se guarda con su dueño.
 // Datos inventados. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_orden1.js
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
@@ -423,6 +425,33 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     const r3 = await recuperada(p3);
     if (r3 !== 'DUP-A') falla('la pestaña restaurada no recupera su operación: se recupera ' + r3);
     console.log('OK la duplicada no toma la operación de la original viva; la restaurada recupera la suya');
+    await ctx.close();
+  }
+
+  // (j) La consulta del usuario da 500 durante los primeros 2 segundos (todas:
+  // la del tour también la pide) y después anda.
+  if (corre('j')) {
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    const usuario = await nuevoUsuario(ctx, 'ord1j');
+    let fallidas = 0, hasta = Infinity;
+    await ctx.route('**/auth/current_user', ruta => {
+      if (Date.now() < hasta) { fallidas++; return ruta.fulfill({ status: 500, body: 'error de prueba' }); }
+      return ruta.continue();
+    });
+    const p = await ctx.newPage();
+    p.on('dialog', d => d.accept().catch(() => {}));
+    hasta = Date.now() + 2000;
+    await p.goto(base + '/dashboard');
+    await p.waitForFunction(() => window.CDI && CDI.goTo && CDI.api && document.querySelector('.screen.is-active'));
+    if (fallidas === 0) falla('la consulta del usuario no pasó por la falla de prueba');
+    await cargar(p, 'SIN-USUARIO-1', [prod('Producto con el usuario caído', '84714900100D', 2, 10)]);
+    await esperarBorradores(p, ['SIN-USUARIO-1'], 'con la consulta del usuario caída al abrir, la operación no se guarda');
+    const dueno = await p.evaluate(() => {
+      const k = Object.keys(localStorage).find(k => k.startsWith('cdi_v2_state') && (localStorage.getItem(k) || '').includes('"SIN-USUARIO-1"'));
+      return JSON.parse(localStorage.getItem(k)).user;
+    });
+    if (dueno !== usuario) falla('la operación se guardó con otro dueño: ' + dueno);
+    console.log('OK con la consulta del usuario caída al abrir, la operación se guarda con su dueño');
     await ctx.close();
   }
 
