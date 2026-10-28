@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: una operación se cuenta una vez, al generar su MARIA, y el corte dice por qué (COBRO-CORTE-1)
+
+- **fix(cobro):** la operación se crea y se cuenta la primera vez que se genera el MARIA de su id; regenerarla o guardarla después no cuenta otra vez (hasta 10 versiones distintas por id). Con el tope lleno se sigue validando y bajando lo ya contado. La cuenta se bloquea mientras se cuenta: dos pedidos a la vez no pasan el tope ni repiten el número de operación.
+- Una cuenta impaga, vencida o cancelada ya no lee facturas en PDF, ni sugiere NCM, ni arma el Excel o el MARIA, ni importa clientes, ni guarda. Cada 402 dice su razón: pago pendiente, prueba o suscripción vencida, cancelada o tope del plan.
+
 ## 2026-10-28 · fix: cada pago de Mercado Pago se aplica una sola vez y por su monto (COBRO-MP-1)
 
 - **fix(cobro):** un pago se anota por su `payment_id` y no se vuelve a aplicar aunque el aviso llegue repetido, alternado con otro o dos a la vez. Pagar con la cuenta activa extiende desde el fin del período; vencida, desde hoy.
