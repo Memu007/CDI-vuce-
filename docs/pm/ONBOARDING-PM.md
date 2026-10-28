@@ -214,8 +214,10 @@ Second Brain).
 ## Modo automático y un solo chat
 
 - **Modo automático:** Emi habla sólo con la PM principal. Cada sesión
-  tiene una rutina horaria con `create_trigger` en su propia sesión
-  (sobrevive a los reinicios; un `/loop` no). Ids de rutinas y sesiones en
+  tiene una rutina con `create_trigger` en su propia sesión
+  (sobrevive a los reinicios; un `/loop` no): la PM principal cada hora y
+  las Devs cada 3 horas (Emi, 28/10), porque los avisos entre sesiones son
+  el canal principal y la vuelta de la PM despierta a la Dev parada. Ids de rutinas y sesiones en
   `NOW.md`, «Quién hace qué».
 - **Al despertar:** lo que estás haciendo va primero. Si dejaste algo largo
   corriendo, sólo mirá si terminó. Si no hay nada nuevo, una línea. Anotá

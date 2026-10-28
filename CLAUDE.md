@@ -58,7 +58,7 @@ seguridad requieren una revisión más fuerte.
 El procedimiento está en los comandos del proyecto (`.claude/skills/`):
 `/entregar` cierra una pieza (con autorrevisión de subagentes y
 `/code-review`) y `/respondio` retoma después de que la PM escribió. La Dev no
-deja un `/loop`: la despierta su rutina horaria o la PM principal. Al
+deja un `/loop`: la despierta la PM principal o su rutina (cada 3 horas). Al
 entregar no se queda esperando el veredicto: sigue con la pieza marcada
 «apenas entregues»; si el veredicto trae una devolución, esa va primero.
 
