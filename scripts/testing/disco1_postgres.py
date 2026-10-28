@@ -20,6 +20,9 @@ Comprueba:
 - sugerir devuelve lo cargado, confirmar suma uno y actualiza la NCM;
   un dueño no ve ni pisa el historial de otro;
 - confirmaciones a la vez no pierden cuentas (contra Postgres, no SQLite);
+- un NUL o un texto de más da 400, no 500, y no guarda nada;
+- importar 7000 filas entra en tandas, y dos importaciones a la vez con las
+  mismas filas en orden contrario no se traban;
 - arrancar otra vez, aunque vuelva un archivo, no duplica cuentas;
 - borrar DATA_DIR no borra el historial.
 
@@ -302,6 +305,31 @@ try:
             r = c.post("/api/ncm/guardar-uso", json={"descripcion": desc, "ncm": ncm})
             chequear(r.status_code == 400, f"{que} da 400: {r.status_code} {r.text[:160]}")
         chequear(filas(A) == antes_a, "y no se guarda nada")
+        r = c.post("/api/ncm/guardar-uso", json={"descripcion": "Bomba sintetica", "ncm": "8413.70.10",
+                                                 "client_id": "cliente\x00sintetico"})
+        chequear(r.status_code == 400 and filas(A) == antes_a,
+                 f"un NUL en el cliente da 400 y no suma: {r.status_code} {r.text[:160]}")
+
+        # Muchas filas: en tandas, por debajo del tope de parámetros de asyncpg.
+        entrar(B)
+        n = 7000
+        csv = "descripcion,ncm\n" + "".join(f"Pieza sintetica {i},8481.80.95\n" for i in range(n))
+        r = c.post("/api/ncm/import-historial", files={"file": ("h.csv", csv.encode(), "text/csv")})
+        chequear(r.status_code == 200 and len(filas(B)) == n + 2,
+                 f"importar {n} filas en Postgres: {r.status_code} {r.text[:160]} {len(filas(B))}")
+
+        # Dos importaciones a la vez con las mismas filas en orden contrario:
+        # sin el bloqueo por dueño se trababan (deadlock) y una daba 500.
+        descs = [f"Pieza sintetica {i}" for i in range(1000)]
+        def importar(orden):
+            csv = "descripcion,ncm\n" + "".join(f"{d},8413.19.00\n" for d in orden)
+            return c.post("/api/ncm/import-historial", files={"file": ("h.csv", csv.encode(), "text/csv")})
+        for vuelta in range(3):
+            with concurrent.futures.ThreadPoolExecutor(2) as ex:
+                rs = list(ex.map(importar, (descs, descs[::-1])))
+            chequear([r.status_code for r in rs] == [200, 200],
+                     f"dos importaciones a la vez en orden contrario, vuelta {vuelta}: "
+                     f"{[(r.status_code, r.text[:120]) for r in rs]}")
 
     # --- otro arranque, con el archivo de A de vuelta
     shutil.copy(os.path.join(DATA_DIR, f"ncm_historial_{A}.json.migrado"),

@@ -348,6 +348,20 @@ def test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda(client, due
     assert _filas(a["username"]) == []
 
 
+@pytest.mark.parametrize("client_id,status", [
+    ("cliente\x00sintetico", 400), ("cliente\ud800sintetico", 400), ("cliente-ajeno-sintetico", 404),
+])
+def test_confirmar_con_un_cliente_que_no_sirve_no_suma(client, duenos, client_id, status):
+    """El error llega antes de escribir: reintentar no suma otra vez."""
+    a = duenos()
+    _como(a)
+    _confirmar(client, "Bomba sintetica", "8413.70.10")
+    r = _sin_excepciones().post("/api/ncm/guardar-uso", json={
+        "descripcion": "Bomba sintetica", "ncm": "8413.70.10", "client_id": client_id})
+    assert r.status_code == status, r.text
+    assert _filas(a["username"]) == [("Bomba sintetica", "8413.70.10", 1)]
+
+
 def test_confirmar_en_el_tope_entra(client, duenos):
     a = duenos()
     _como(a)
@@ -377,27 +391,32 @@ def test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada(
     assert _filas(a["username"]) == [], "se guardó una parte del archivo"
 
 
-def test_importar_escribe_las_filas_en_orden_de_clave(client, duenos, monkeypatch):
-    """Dos importaciones del mismo dueño toman los bloqueos en el mismo orden:
-    así no se traban entre sí en Postgres."""
+def _en_orden_contrario_a_la_clave(prefijo, n=7):
+    return sorted((f"{prefijo} {k}" for k in range(n)), key=main._clave_ncm_historial, reverse=True)
+
+
+def test_importar_respeta_el_orden_del_archivo_para_sugerir(client, duenos, monkeypatch):
+    """Lo importado se sugiere en el orden del archivo, también entre tandas;
+    no en el de la clave."""
     a = duenos()
     _como(a)
     monkeypatch.setattr(main, "_HISTORIAL_FILAS_POR_SENTENCIA", 3)
-    original, claves = main._insert_ncm_historial, []
+    descs = _en_orden_contrario_a_la_clave("Arandela sintetica")
+    r = _importar(client, "descripcion,ncm\n" + "".join(f"{d},7318.22.{n:02d}\n" for n, d in enumerate(descs)))
+    assert r.status_code == 200 and r.json()["importados"] == 7, r.text
+    assert [f[0] for f in _filas(a["username"])] == descs
+    assert [s["desc"] for s in _del_historial(client, "arandela sintetica")] == descs[:5]
 
-    class _Espia:
-        def __init__(self):
-            self._ins = original()
 
-        def values(self, filas):
-            claves.extend(f["clave"] for f in filas)
-            return self._ins.values(filas)
-    monkeypatch.setattr(main, "_insert_ncm_historial", _Espia)
-    descs = [f"Arandela sintetica {n}" for n in range(10)]
-    r = _importar(client, "descripcion,ncm\n" + "".join(f"{d},7318.22.00\n" for d in descs))
-    assert r.status_code == 200 and r.json()["importados"] == 10, r.text
-    assert len(claves) == 10
-    assert claves == sorted(claves), "las filas no se escriben en orden de clave"
+def test_un_archivo_viejo_se_carga_en_su_orden(client, duenos, monkeypatch):
+    a = duenos()
+    _como(a)
+    monkeypatch.setattr(main, "_HISTORIAL_FILAS_POR_SENTENCIA", 3)
+    descs = _en_orden_contrario_a_la_clave("Brida sintetica")
+    _archivo(a["username"], {d: {"ncm": f"7307.21.{n:02d}", "count": 1} for n, d in enumerate(descs)})
+    _cargar_archivos()
+    assert [f[0] for f in _filas(a["username"])] == descs
+    assert [s["desc"] for s in _del_historial(client, "brida sintetica")] == descs[:5]
 
 
 def test_sugerir_recorre_el_historial_en_el_orden_en_que_se_agrego(client, duenos):
@@ -413,14 +432,27 @@ def test_sugerir_recorre_el_historial_en_el_orden_en_que_se_agrego(client, dueno
     assert [s["desc"] for s in sug] == descs[:5]
 
 
-def test_importar_muchas_filas_va_en_tandas(client, duenos):
+def test_importar_muchas_filas_va_en_tandas(client, duenos, monkeypatch):
     """7000 filas son 35000 parámetros: en una sola sentencia pasan el tope de
-    SQLite (32766) y el de asyncpg (32767)."""
+    asyncpg (32767) y el de los SQLite compilados con el de fábrica (32766).
+    El SQLite de la prueba puede tener otro tope: se mira cuántas filas lleva
+    cada sentencia."""
     a = duenos()
     _como(a)
+    original, por_sentencia = main._insert_ncm_historial, []
+
+    class _Espia:
+        def __init__(self):
+            self._ins = original()
+
+        def values(self, filas):
+            por_sentencia.append(len(filas))
+            return self._ins.values(filas)
+    monkeypatch.setattr(main, "_insert_ncm_historial", _Espia)
     r = _importar(client, "descripcion,ncm\n" + "".join(f"Perno sintetico {n},7318.15.00\n" for n in range(7000)))
     assert r.status_code == 200 and r.json()["importados"] == 7000, r.text[:300]
     assert len(_filas(a["username"])) == 7000
+    assert sum(por_sentencia) == 7000 and max(por_sentencia) * 5 <= 999, por_sentencia[:3]
 
 
 def test_un_archivo_viejo_con_cuenta_cero_o_negativa_carga_cuenta_uno(client, duenos):
@@ -475,18 +507,23 @@ def test_un_migrado_anterior_no_se_pisa(client, duenos):
 
 
 def test_un_archivo_viejo_con_caracteres_que_la_base_no_guarda_los_saltea(client, duenos, caplog):
-    """Un NUL (Postgres no lo guarda) o medio par UTF-16 (ninguna base): esa
-    entrada no se carga, las demás sí y el archivo queda como `.migrado`."""
+    """Un NUL (Postgres no lo guarda), medio par UTF-16 (ninguna base) o algo
+    más largo que el tope de confirmar: esa entrada no se carga, las demás sí
+    (también las del tope justo) y el archivo queda como `.migrado`."""
     a = duenos()
     # Escapados en el JSON (\u0000, \ud800), como los deja json.dumps por defecto.
     ruta = _archivo(a["username"], json.dumps({
         "Codo\x00sintetico": {"ncm": "7307.19.00", "count": 1},
         "Codo sintetico con NUL en la NCM": {"ncm": "7307.19.00\x00", "count": 1},
         "Codo\ud800sintetico": {"ncm": "7307.19.00", "count": 1},
+        "C" * 2001: {"ncm": "7307.19.00", "count": 1},
+        "Codo sintetico con NCM larga": {"ncm": "8" * 21, "count": 1},
+        "D" * 2000: {"ncm": "8" * 20, "count": 1},
         "Codo sintetico": {"ncm": "7307.19.00", "count": 1},
     }))
     with caplog.at_level(logging.WARNING):
         _cargar_archivos()
-    assert _filas(a["username"]) == [("Codo sintetico", "7307.19.00", 1)]
-    assert f"ncm_historial_{a['username']}.json: 3 entradas con un carácter nulo" in caplog.text, caplog.text
+    assert _filas(a["username"]) == [("D" * 2000, "8" * 20, 1), ("Codo sintetico", "7307.19.00", 1)]
+    assert (f"ncm_historial_{a['username']}.json: 5 entradas más largas que el tope, con un carácter nulo"
+            in caplog.text), caplog.text
     assert os.path.exists(ruta + ".migrado") and not os.path.exists(ruta)

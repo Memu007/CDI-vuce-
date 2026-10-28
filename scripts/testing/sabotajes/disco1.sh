@@ -138,7 +138,7 @@ sabotaje "cargar un archivo pisa lo confirmado después" 1 \
   'await db.execute(ins.on_conflict_do_update(index_elements=["owner_username", "clave"], set_={"count": ins.excluded.count}))' \
   "FAILED $T::test_los_archivos_viejos_se_cargan_una_sola_vez"
 sabotaje "el archivo cargado no se renombra" 1 \
-  '        os.replace(ruta, ruta + ".migrado")' '        pass' \
+  'os.replace(ruta, _ruta_migrado_libre(ruta))' 'pass' \
   "FAILED $T::test_los_archivos_viejos_se_cargan_una_sola_vez" "el archivo cargado no se tiene que volver a leer"
 sabotaje "un archivo roto frena a los demás" 2 \
   'except (OSError, ValueError) as e:' 'except OSError as e:' \
@@ -173,7 +173,7 @@ sabotaje "la carga sin orden" 1 \
   "FAILED $T::test_sugerir_recorre_el_historial_en_el_orden_en_que_se_agrego"
 sabotaje "todo el archivo en una sola sentencia" 1 \
   '_HISTORIAL_FILAS_POR_SENTENCIA = 150' '_HISTORIAL_FILAS_POR_SENTENCIA = 10**6' \
-  "FAILED $T::test_importar_muchas_filas_va_en_tandas" "too many SQL variables"
+  "FAILED $T::test_importar_muchas_filas_va_en_tandas" "AssertionError: [7000]"
 sabotaje "una cuenta cero o negativa se carga tal cual" 1 \
   'not isinstance(count, int) or count < 1:' 'not isinstance(count, int):' \
   "FAILED $T::test_un_archivo_viejo_con_cuenta_cero_o_negativa_carga_cuenta_uno" "'Codo sintetico cero', '7307.19.00', 0"
@@ -186,9 +186,11 @@ sabotaje "el archivo cargado se borra" 1 \
 sabotaje "un .migrado anterior se pisa" 1 \
   $'    while os.path.exists(destino):' $'    while False:' \
   "FAILED $T::test_un_migrado_anterior_no_se_pisa" "FileNotFoundError"
-sabotaje "importar sin ordenar por clave" 1 \
-  'filas = sorted(filas, key=lambda f: f["clave"])' 'filas = list(filas)' \
-  "FAILED $T::test_importar_escribe_las_filas_en_orden_de_clave" "las filas no se escriben en orden de clave"
+sabotaje "las tandas reordenan por clave" 1 \
+  $'    for i in range(0, len(filas), _HISTORIAL_FILAS_POR_SENTENCIA):' \
+  $'    filas = sorted(filas, key=lambda f: f["clave"])\n    for i in range(0, len(filas), _HISTORIAL_FILAS_POR_SENTENCIA):' \
+  "FAILED $T::test_importar_respeta_el_orden_del_archivo_para_sugerir" \
+  "FAILED $T::test_un_archivo_viejo_se_carga_en_su_orden"
 sabotaje "sin tope de descripción" 1 \
   '_HISTORIAL_MAX_DESCRIPCION = 2000' '_HISTORIAL_MAX_DESCRIPCION = 10**9' \
   "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[BBBB" \
@@ -220,8 +222,21 @@ sabotaje "la fila mala va a errores y lo demás se guarda" 1 \
   $'        except Exception as exc:\n            errores.append' \
   "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[BBBB" "assert 200 == 400"
 sabotaje "un archivo viejo con un carácter que la base no guarda se carga" 1 \
-  'if "\x00" in desc + ncm or not _es_utf8(desc + ncm):' 'if False:' \
+  $'        if _problema_historial(desc, ncm):\n            invalidas += 1' $'        if False:\n            invalidas += 1' \
   "FAILED $T::test_un_archivo_viejo_con_caracteres_que_la_base_no_guarda_los_saltea"
+sabotaje "la carga de archivos viejos no aplica los topes" 1 \
+  $'        if _problema_historial(desc, ncm):\n            invalidas += 1' \
+  $'        if "\\x00" in desc + ncm or not _es_utf8(desc + ncm):\n            invalidas += 1' \
+  "FAILED $T::test_un_archivo_viejo_con_caracteres_que_la_base_no_guarda_los_saltea" "8888888888"
+sabotaje "un NUL en el cliente pasa" 1 \
+  'if "\x00" in client_id or not _es_utf8(client_id):' 'if False:' \
+  "FAILED $T::test_confirmar_con_un_cliente_que_no_sirve_no_suma[cliente\\x00sintetico-400]" \
+  "FAILED $T::test_confirmar_con_un_cliente_que_no_sirve_no_suma[cliente\\ud800sintetico-400]"
+sabotaje "el cliente se revisa después de escribir" 2 \
+  $'    if client_id:\n        if "\\x00" in client_id or not _es_utf8(client_id):\n            raise HTTPException(status_code=400, detail="El cliente tiene un carácter que no es texto válido.")\n        await _get_owned_client(db, client_id, user["username"])\n' '' \
+  $'    await _sumar_uso_ncm(db, user["username"], descripcion, ncm)\n' \
+  $'    await _sumar_uso_ncm(db, user["username"], descripcion, ncm)\n    if client_id:\n        if "\\x00" in client_id or not _es_utf8(client_id):\n            raise HTTPException(status_code=400, detail="El cliente tiene un carácter que no es texto válido.")\n        await _get_owned_client(db, client_id, user["username"])\n' \
+  "FAILED $T::test_confirmar_con_un_cliente_que_no_sirve_no_suma[cliente-ajeno-sintetico-404]"
 
 # Postgres: con la transacción abortada, sugerir sin rollback no sugiere nada.
 # SQLite no aborta la transacción: sólo se ve contra un Postgres local.
@@ -249,6 +264,13 @@ sabotaje_pg "sugerir sin rollback si falla el catálogo del proveedor" \
   $'            await db.rollback()\n            logging.warning("ncm suggestion vendor catalog unavailable: %s", err)' \
   $'            logging.warning("ncm suggestion vendor catalog unavailable: %s", err)' \
   "FALLA | falla el catálogo del proveedor: sigue el historial: []"
+sabotaje_pg "importar sin el bloqueo por dueño" \
+  $'    if not IS_SQLITE:\n        from sqlalchemy import text as sa_text\n        await db.execute(sa_text("SELECT pg_advisory_xact_lock' \
+  $'    if False:\n        from sqlalchemy import text as sa_text\n        await db.execute(sa_text("SELECT pg_advisory_xact_lock' \
+  "FALLA | dos importaciones a la vez en orden contrario" "DeadlockDetectedError"
+sabotaje_pg "importar todo en una sola sentencia (Postgres)" \
+  '_HISTORIAL_FILAS_POR_SENTENCIA = 150' '_HISTORIAL_FILAS_POR_SENTENCIA = 10**6' \
+  "FALLA | importar 7000 filas en Postgres: 500"
 [ "$SIN_PG" -eq 0 ] || echo "sabotajes de Postgres sin correr: $SIN_PG"
 
 git checkout -q -- proyecto_maria/
