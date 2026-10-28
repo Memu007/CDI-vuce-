@@ -30,6 +30,48 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## DISCO-1, vuelta: devolución sobre `a6c82f5`, sólo pruebas e informe (2026-10-28 20:58 UTC)
+
+Evidencia en `REPRODUCCION-DISCO-1-vuelta-2026-10-28.md`. El producto queda
+como está: los rollbacks, los topes, el NUL, el `.migrado` libre y el
+bloqueo por dueño están bien, y el adversario de la PM no sacó altas ni
+fugas entre dueños. Va **antes** que DESPACHO-1b: es chica.
+
+- **Supuesto 1, decidido por la PM: el bloqueo por dueño en vez de
+  ordenar, aceptado.** Supuestos 2 y 3, aceptados.
+- **El 400 de guardar-uso queda como está, decidido por la PM.**
+
+**Causa de la devolución:** el bloqueo por dueño tiene dos lugares y una
+clave, y las pruebas sólo ven uno de los lugares y no ven la clave.
+Reproducido por la PM en Postgres 16, los dos con «fallas: 0»:
+
+1. **La carga de archivos viejos sin `_bloquear_historial`** sobrevive a la
+   suite, al script de Postgres y a `disco1.sh`.
+2. **La clave sin el dueño (`"ncm_historial:"`)** sobrevive igual: frenaría
+   las importaciones de todos los estudios entre sí y nada lo ve.
+
+**La familia:** cada camino que escribe el historial en tandas toma el
+bloqueo de **su** dueño, y dos dueños distintos no se esperan. Una prueba
+en Postgres por cada uno, roja con su mutante y sumada a `disco1.sh`. Por
+ejemplo, la carga de archivos viejos a la vez que una importación del mismo
+dueño, y un dueño que termina mientras otro tiene tomado el suyo.
+
+3. **El sabotaje «importar sin el bloqueo por dueño» da ROJO?**: el texto
+   esperado pide el 500 en primer lugar, y el orden cambia de una vuelta a
+   otra (en la vuelta 2 de la PM vino segundo). Que acepte el 500 en
+   cualquier posición.
+4. **El informe, con la medida del adversario:**
+   - El riesgo del 400 está mal medido. La regresión es sólo «cliente sin
+     proveedor y descripción de 2001 o más».
+   - Con cliente y proveedor, de 301 a 2000 caracteres ya se perdían en
+     silencio la memoria del cliente y el catálogo, con 200, desde antes
+     de la pieza (`product_key` es `String(300)`). Va a riesgos como
+     anterior, sin arreglo acá.
+   - guardar-uso espera mientras importa el mismo dueño (9,3 s con 60 000
+     filas, sin `lock_timeout`). Va a riesgos.
+   - La carga descarta para siempre lo que no pasa los topes, y el log no
+     dice cuál. Va a riesgos.
+
 ## DESPACHO-1b: devolución, sobre `09e16f3`, y D47 y D48 (2026-10-28 20:07 UTC)
 
 Evidencia en `REPRODUCCION-DESPACHO-1b-vuelta-2026-10-28.md`. Bien: la
@@ -85,8 +127,8 @@ Cada punto, rojo antes del arreglo y con su sabotaje:
 
 ## Orden después de las 18:00, y D45 y D46 (2026-10-28 17:58 UTC)
 
-1. DESPACHO-1b (devolución de las 20:15, arriba). 1b. RENDIMIENTO-1c
-(D48, arriba). 2. DISCO-1 (devolución). 3. SESION-1
+0. DISCO-1, vuelta (devolución de las 20:58, arriba). 1. DESPACHO-1b
+(devolución de las 20:15, arriba). 1b. RENDIMIENTO-1c (D48, arriba). 3. SESION-1
 (devolución, abajo). 4. ABUSO-1 (devolución, abajo). 5. SUFIJOS-2
 (devolución, abajo) y lo que se suma de SEGURO-1. 6. EMAIL-1: la D45 y el
 mutante. 7. CONEXIONES-1: la D46. 8. OBSERVABILIDAD-1 (devolución,
@@ -307,43 +349,6 @@ por tiempo y traba el worker; un token de recuperación viejo sigue valiendo
 tras usar uno nuevo; `dev_token_hint` fuera de producción; el 500 sin
 `FRONTEND_URL`. El 1, el 2 y el token se los propongo a Emi como pieza
 aparte: **no los arregles hasta que diga que sí**.
-
-## DISCO-1: devolución, sobre `88b22c8` (2026-10-28 17:46 UTC)
-
-La migración está bien (dos arranques, sin duplicar, dueños separados,
-Postgres 16 y SQLite). Evidencia en `REPRODUCCION-DISCO-1-2026-10-28.md`.
-Va encima de la cadena, después de D41.
-
-1. **Causa (regresión, reproducida por la PM en Postgres 16):** en
-   Postgres, una excepción de la base atrapada sin `rollback` deja la
-   transacción abortada para todo lo que sigue en ese pedido. En
-   `sugerir_ncm` los pasos 1 y 2 atrapan sin `rollback`; si fallan, el
-   paso 3 (ahora en la base) falla también y se pierde el historial sin
-   aviso. Rompiendo una columna de `client_product_history`: `c996ad4`
-   `['historial']`, `88b22c8` `[]`. Revisá **todo** `except` que atrape un
-   error de la base y siga usando la misma sesión en lo que toca tu diff,
-   no sólo estos dos. Prueba roja en Postgres (en
-   `disco1_postgres.py` vale) con su mutante en `disco1.sh`.
-2. **Un NUL** en la descripción o el NCM de `guardar-uso` da 500 en
-   Postgres (el archivo lo aceptaba). Que sea 400 claro, o que se limpie;
-   lo mismo en la importación. Con prueba.
-3. **Tope de tamaño, decidido por la PM:** la descripción y el NCM de
-   `guardar-uso` y de cada fila importada con un largo máximo; si se pasa,
-   400. Elegí el número mirando qué largo de descripción admite el resto
-   del producto y decilo. 30 MB entraron con 200. El
-   tope de filas por dueño va a riesgos.
-4. **Orden fijo al importar:** ordená las filas por la clave antes de
-   escribirlas, para que dos importaciones del mismo dueño no se bloqueen
-   entre sí (el revisor sacó `DeadlockDetectedError` en 2 de 4 corridas con
-   órdenes distintos; no lo reproduje). Si no hace falta, decí por qué.
-5. **No pises un `.migrado` anterior** al pasar el archivo (elegí otro
-   nombre libre). Menor.
-6. **Pruebas que faltan** (mutantes que hoy sobreviven): sin `order_by` en
-   la carga; `_HISTORIAL_FILAS_POR_SENTENCIA = 10**6` (con unas 7000 filas
-   el real da ok y el mutante falla en asyncpg); sin `or count < 1`; sin
-   `not desc.strip()`; `os.replace` por `os.remove` en la suite, no sólo en
-   el script de Postgres. Cada una roja con su mutante y sumada a
-   `disco1.sh`.
 
 ## DATOS-1: aceptada sobre `c996ad4` (2026-10-28 17:41 UTC)
 
