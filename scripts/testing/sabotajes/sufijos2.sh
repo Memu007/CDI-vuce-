@@ -134,8 +134,8 @@ sabotaje $A "un cero adelante también se toma como miles" \
 sabotaje $G "un dígito que no es ASCII junto a un número pasa" \
   'if _junto_a_un_digito_que_no_es_ascii(valor):' 'if False:' \
   "test_un_numero_que_cambiaria_no_se_genera[AF(1\xbd)-]"
-sabotaje $G "cualquier dígito que no es ASCII se toma como pegado" \
-  'v in "0123456789" for v in' 'v.isnumeric() for v in' \
+sabotaje $G "un dígito que no es ASCII junto a un punto se toma como pegado a un número" \
+  'v in "0123456789" for v in' 'v in "0123456789.," for v in' \
   "test_lo_que_no_cambia_un_numero_sale_como_antes[AF(2.5 X٣.٥)--AF(2,5 X   )-]"
 
 git checkout -q -- proyecto_maria/
