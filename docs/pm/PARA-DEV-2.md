@@ -112,15 +112,39 @@ que vuelva el cupo. Yo sumo un adversario de permisos en mi revisión.
 auditoría (8.1, 9.2 y 8.2) van antes. Si dice que sí, te aviso acá y ORG-1
 queda donde esté.
 
-**Apenas entregues:** DESTINO-1, PESO-NETO-1 y PRORRATEO-1 esperan datos
-del despachante; te aviso cuando lleguen.
+**Apenas entregues:** DESTINO-1, con los datos que llegaron el 28/10
+(`PREGUNTAS-DESPACHANTE.md`, «Respuestas del 2026-10-28»):
+
+- `GANANCIASOP3` deja de ser `COMERC` fijo. Por operación, con cambio por
+  ítem como hoy `IVAADICIONAL1`, se elige el destino y salen **los dos
+  códigos juntos**, sólo en estos pares: comercialización o reventa
+  `COMERC` + `NO_VALIDA`; bien de uso de la empresa `BDEUSO` + `IVAAD2`;
+  bien de uso de una persona `USOPAR` + `IVAAD1`. Por defecto,
+  comercialización.
+- Hoy «uso particular» sale `COMERC` + `IVAAD1`, un par fuera de la lista:
+  eso se corrige. Un dato guardado con el valor viejo (`iva_adicional`
+  `IVAAD1`) se lee como bien de uso de una persona.
+- `maria_golden_anon.TXT` (2025, aceptado por el MARIA) trae `COMERC` +
+  `IVAAD1`: el golden no se toca; si una prueba lo compara campo a campo,
+  avisá antes de cambiarla. Le pregunto al despachante (pregunta 7).
+- Pruebas: los tres pares en el TXT, el defecto, el cambio por ítem, un
+  valor que no es ninguno de los tres (error, no se genera), y un sabotaje
+  por par. Es un campo de impuestos: revisión fuerte.
+
+Después, en este orden: **SUFIJOS-2** (D7: un número en un sufijo libre
+puede llevar coma; en uno que pide número, sin decimales; ninguno vacío) y
+**SEGURO-1** (D14: el botón «calcular seguro» no se ofrece en CIF, CIP,
+DPU, DAP y DDP; el seguro se sigue declarando). Te las detallo antes de que
+lleguen. PESO-NETO-1 y PRORRATEO-1 siguen esperando al despachante.
 
 ### DESPACHO-1a — pieza nueva del roadmap; hacela mientras esperás el cupo
 
 Emi sumó **DESPACHO-1** el 28/10 (`ROADMAP.md`, Fase 1c, fila 5): subir un
-despacho ya oficializado (OM-1993-A) para armar el catálogo del cliente. La
-lectura del despacho espera un ejemplo del despachante (pregunta 6 de
-`PREGUNTAS-DESPACHANTE.md`); no la empieces ni inventes su forma.
+despacho ya oficializado (OM-1993-A) para armar el catálogo del cliente. Los
+ejemplos llegaron el 28/10 pero son reales y sin tapar: no los vas a ver.
+Su forma, sin datos, está en `DESPACHOS-FORMA.md`; la lectura se hace
+después de DESTINO-1, SUFIJOS-2 y SEGURO-1, con un sintético armado desde
+ahí.
 
 Lo que no depende del ejemplo, ahora, como **DESPACHO-1a**:
 
