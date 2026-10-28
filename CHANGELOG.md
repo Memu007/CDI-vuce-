@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: historial de NCM sin 500 y sin sugerencias perdidas (DISCO-1, devolución)
+
+- Si falla la memoria del cliente o el catálogo del proveedor, sugerir sigue con el historial (en Postgres se perdía todo).
+- Confirmar o importar una descripción de más de 2000 caracteres, una NCM de más de 20 o un carácter que la base no guarda da 400 claro; en la importación, el archivo entero y nombrando la fila. Los archivos viejos saltean esas entradas y un `.migrado` anterior ya no se pisa.
+
 ## 2026-10-28 · fix: leer y guardar un despacho sin trabar ni romper el catálogo (DESPACHO-1b, D41)
 
 - El despacho se lee en un proceso aparte con la memoria y el tiempo topeados: un PDF que se infla avisa o da 504, y no traba a los demás. Hojas, texto, líneas y rótulos tienen tope; se leen hasta 500 renglones contando subítems, y de los errores del lector se guarda sólo el final. Un número del tope para arriba o un carácter que no es Unicode ya no dan 500: quedan con aviso.

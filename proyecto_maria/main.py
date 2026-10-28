@@ -9229,6 +9229,44 @@ async def delete_ncm_nota(
 # parámetros de los SQLite viejos.
 _HISTORIAL_FILAS_POR_SENTENCIA = 150
 
+# Topes de lo que se guarda en el historial. La descripción, el mismo de un
+# renglón del despacho (`despacho_lector._MAX_DESCRIPCION`); la NCM, el de
+# las columnas de NCM del resto de la base (String(20)). Sin tope, 30 MB
+# entraban en una sola confirmación.
+_HISTORIAL_MAX_DESCRIPCION = 2000
+_HISTORIAL_MAX_NCM = 20
+
+
+def _problema_historial(descripcion: str, ncm: str) -> str | None:
+    """Por qué el historial no puede guardar este par, o None. Postgres no
+    guarda el carácter nulo y ninguna base guarda medio par UTF-16."""
+    for que, texto, tope in (("La descripción", descripcion, _HISTORIAL_MAX_DESCRIPCION),
+                             ("La NCM", ncm, _HISTORIAL_MAX_NCM)):
+        if len(texto) > tope:
+            return f"{que} pasa de {tope} caracteres."
+        if "\x00" in texto:
+            return f"{que} tiene un carácter nulo."
+        if not _es_utf8(texto):
+            return f"{que} tiene un carácter que no es texto válido."
+    return None
+
+
+def _es_utf8(texto: str) -> bool:
+    try:
+        texto.encode("utf-8")
+    except UnicodeEncodeError:
+        return False
+    return True
+
+
+def _en_tandas_por_clave(filas: list[dict]):
+    """Las filas en orden de clave y de a `_HISTORIAL_FILAS_POR_SENTENCIA`.
+    Dos escrituras del mismo dueño toman los bloqueos en el mismo orden y
+    así no se traban entre sí en Postgres."""
+    filas = sorted(filas, key=lambda f: f["clave"])
+    for i in range(0, len(filas), _HISTORIAL_FILAS_POR_SENTENCIA):
+        yield filas[i:i + _HISTORIAL_FILAS_POR_SENTENCIA]
+
 
 def _clave_ncm_historial(descripcion: str) -> str:
     return hashlib.sha256(descripcion.encode("utf-8")).hexdigest()
@@ -9276,8 +9314,8 @@ async def _guardar_historial_importado(db: AsyncSession, owner_username: str, nu
     """Importar: lo nuevo entra con cuenta 1; lo que ya estaba toma la NCM del
     archivo y conserva su cuenta. `nuevas` es `{descripción: ncm}`."""
     filas = [_fila_ncm_historial(owner_username, d, n) for d, n in nuevas.items()]
-    for i in range(0, len(filas), _HISTORIAL_FILAS_POR_SENTENCIA):
-        ins = _insert_ncm_historial().values(filas[i:i + _HISTORIAL_FILAS_POR_SENTENCIA])
+    for tanda in _en_tandas_por_clave(filas):
+        ins = _insert_ncm_historial().values(tanda)
         await db.execute(ins.on_conflict_do_update(
             index_elements=["owner_username", "clave"], set_={"ncm": ins.excluded.ncm},
         ))
@@ -9287,6 +9325,16 @@ async def _guardar_historial_importado(db: AsyncSession, owner_username: str, nu
 def _nombre_archivo_historial(owner_username: str) -> str:
     """Cómo se llamaba el archivo de cada usuario antes de DISCO-1."""
     return re.sub(r'[^a-zA-Z0-9_\-]', '_', owner_username)
+
+
+def _ruta_migrado_libre(ruta: str) -> str:
+    """`ruta.migrado`, o `.migrado.1`, `.2`… si ya hay uno: no se pisa lo que
+    dejó una carga anterior."""
+    destino, n = ruta + ".migrado", 0
+    while os.path.exists(destino):
+        n += 1
+        destino = f"{ruta}.migrado.{n}"
+    return destino
 
 
 async def _cargar_archivo_historial(db: AsyncSession, ruta: str, por_nombre: dict) -> None:
@@ -9309,11 +9357,14 @@ async def _cargar_archivo_historial(db: AsyncSession, ruta: str, por_nombre: dic
         logging.warning("[DISCO-1] %s no es un historial; queda en su lugar", nombre)
         return
 
-    filas, salteadas = [], 0
+    filas, salteadas, invalidas = [], 0, 0
     for desc, entrada in datos.items():
         ncm = entrada.get("ncm") if isinstance(entrada, dict) else None
         if not desc.strip() or not isinstance(ncm, str) or not ncm.strip():
             salteadas += 1
+            continue
+        if "\x00" in desc + ncm or not _es_utf8(desc + ncm):
+            invalidas += 1
             continue
         count = entrada.get("count", 1)
         if isinstance(count, bool) or not isinstance(count, int) or count < 1:
@@ -9321,14 +9372,17 @@ async def _cargar_archivo_historial(db: AsyncSession, ruta: str, por_nombre: dic
         filas.append(_fila_ncm_historial(dueno, desc, ncm, count))
     # Si ya está cargado (otro arranque, el archivo volvió), no se toca: las
     # cuentas no se duplican y lo confirmado después no se pisa.
-    for i in range(0, len(filas), _HISTORIAL_FILAS_POR_SENTENCIA):
-        ins = _insert_ncm_historial().values(filas[i:i + _HISTORIAL_FILAS_POR_SENTENCIA])
+    for tanda in _en_tandas_por_clave(filas):
+        ins = _insert_ncm_historial().values(tanda)
         await db.execute(ins.on_conflict_do_nothing(index_elements=["owner_username", "clave"]))
     await db.commit()
     if salteadas:
-        logging.warning("[DISCO-1] %s: %d entradas sin NCM no se cargaron", nombre, salteadas)
+        logging.warning("[DISCO-1] %s: %d entradas sin descripción o sin NCM no se cargaron", nombre, salteadas)
+    if invalidas:
+        logging.warning("[DISCO-1] %s: %d entradas con un carácter nulo o que no es texto válido "
+                        "no se cargaron", nombre, invalidas)
     try:
-        os.replace(ruta, ruta + ".migrado")
+        os.replace(ruta, _ruta_migrado_libre(ruta))
     except OSError as e:
         logging.warning("[DISCO-1] %s se cargó pero no se pudo renombrar (%s)", nombre, e)
     logging.info("[DISCO-1] %s: %d entradas cargadas en la base", nombre, len(filas))
@@ -9598,6 +9652,9 @@ async def sugerir_ncm(
                 })
                 recordado = remembered
         except Exception as err:
+            # En Postgres el error deja la transacción abortada: sin rollback,
+            # las consultas de abajo fallan todas y no se sugiere nada.
+            await db.rollback()
             logging.warning("ncm suggestion client memory unavailable: %s", err)
 
     # 2) Catálogo confirmado para el proveedor activo. Va después del cliente:
@@ -9622,6 +9679,7 @@ async def sugerir_ncm(
                     "scope": "proveedor",
                 })
         except Exception as err:
+            await db.rollback()
             logging.warning("ncm suggestion vendor catalog unavailable: %s", err)
 
     # 3) Historial liviano de asignaciones de este despachante.
@@ -9698,6 +9756,9 @@ async def guardar_uso_ncm(
     ncm = data.get("ncm", "").strip()
     if not descripcion or not ncm:
         return {"success": False}
+    problema = _problema_historial(descripcion, ncm)
+    if problema:
+        raise HTTPException(status_code=400, detail=problema)
 
     # Guardar o incrementar contador (y actualizar la NCM si cambió). Se
     # confirma antes de las memorias de abajo: su rollback no lo deshace.
@@ -9818,6 +9879,12 @@ async def import_ncm_historial(
             if len(ncm) < 6:
                 errores.append({"fila": int(idx) + 2, "error": f"NCM muy corto: {ncm_raw}"})
                 continue
+            problema = _problema_historial(desc, ncm)
+            if problema:
+                # Una fila que la base no guarda frena el archivo entero: nada
+                # queda a medias.
+                raise HTTPException(status_code=400, detail=(
+                    f"Fila {int(idx) + 2}: {problema[0].lower()}{problema[1:]} No se importó nada."))
 
             if desc in historial:
                 historial[desc]["ncm"] = ncm
@@ -9826,6 +9893,8 @@ async def import_ncm_historial(
                 historial[desc] = {"ncm": ncm, "count": 1}
                 importados += 1
             nuevas[desc] = ncm
+        except HTTPException:
+            raise
         except Exception as exc:
             errores.append({"fila": int(idx) + 2, "error": str(exc)[:120]})
 
