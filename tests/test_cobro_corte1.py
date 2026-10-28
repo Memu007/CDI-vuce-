@@ -271,6 +271,21 @@ def test_la_organizacion_impaga_corta_a_su_miembro_aunque_el_usuario_diga_active
     assert _operaciones(u) == []
 
 
+def test_el_estudio_con_la_prueba_vencida_no_genera_ni_gasta_gemini(cuenta, gemini):
+    # El trial vencido del usuario ya lo vence el login (get_current_user); el
+    # del estudio sólo lo vence el corte.
+    c, u = cuenta(org=True)
+    _fijar(u, billing_status="active", trial_ends_at=AHORA + timedelta(days=20))
+    _fijar(u, de_la_org=True, billing_status="trial", trial_ends_at=AHORA - timedelta(days=1))
+    r = c.post("/api/ncm/sugerir", json={"descripcion": "lona de pvc para toldos"})
+    assert gemini == [], (gemini, r.status_code)
+    assert r.status_code == 402, r.text
+    detalle = r.json()["detail"]
+    assert detalle["code"] == "TRIAL_EXPIRED", detalle
+    assert "Venció tu prueba gratis" in detalle["message"], detalle
+    assert _leer(u, de_la_org=True)["estado"] == "past_due"
+
+
 @pytest.mark.parametrize("estado", list(ESTADOS))
 def test_regenerar_lo_ya_contado_con_la_cuenta_que_no_esta_al_dia_da_402(cuenta, estado):
     # Lo ya contado no pasa por el tope, pero sí por el estado.
