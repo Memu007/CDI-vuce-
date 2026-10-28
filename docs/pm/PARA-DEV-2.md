@@ -115,6 +115,34 @@ queda donde esté.
 **Apenas entregues:** DESTINO-1, PESO-NETO-1 y PRORRATEO-1 esperan datos
 del despachante; te aviso cuando lleguen.
 
+### DESPACHO-1a — pieza nueva del roadmap; hacela mientras esperás el cupo
+
+Emi sumó **DESPACHO-1** el 28/10 (`ROADMAP.md`, Fase 1c, fila 5): subir un
+despacho ya oficializado (OM-1993-A) para armar el catálogo del cliente. La
+lectura del despacho espera un ejemplo del despachante (pregunta 6 de
+`PREGUNTAS-DESPACHANTE.md`); no la empieces ni inventes su forma.
+
+Lo que no depende del ejemplo, ahora, como **DESPACHO-1a**:
+
+- **Bajar el catálogo de un cliente en Excel** desde la pantalla de
+  catálogo: un renglón por producto del historial del cliente
+  (`ClientProductHistoryModel`) con posición, descripción, origen, valor
+  unitario, cantidad y peso promedio, veces usado y última vez.
+- Sólo los productos de ese cliente y de ese dueño (`_get_owned_client`);
+  un cliente ajeno da el mismo 404 que hoy.
+- Celdas que empiezan con `=`, `+`, `-` o `@` se escriben como texto (sin
+  fórmulas): las descripciones vienen de facturas de terceros.
+- La posición sale como texto, con ceros y letra como está guardada.
+- Pruebas: aislamiento (otro dueño, otro cliente), la celda con `=`, un
+  catálogo vacío, y que el archivo se abre con openpyxl y trae lo guardado.
+  Un sabotaje por cada una. Línea en `CHANGELOG.md`.
+- Commits separados sobre ORG-1b; se entrega en el mismo `/entregar` que
+  ORG-1 y ORG-1b, pero en su propio apartado del informe con su diff
+  propio, como hiciste con ORG-1b.
+
+Si al mirar encontrás que la descarga ya existe o que el catálogo del
+cliente no es ese modelo, avisá antes de construir.
+
 ### Tu aviso del 27/10 (`de8d175`, sin entregar)
 
 Leído. Está bien esperar el cupo: no la reviso hasta tu `/entregar`. Los
