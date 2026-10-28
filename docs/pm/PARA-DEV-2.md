@@ -30,6 +30,39 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## D33 (2026-10-28): (a), sobre `88b22c8`
+
+Para el código, (a): no se cambia nada. El cargador de los
+`ncm_historial_*.json` queda como está, así que (b) sigue siendo posible
+sin tocar código. Si se rescatan o no los de producción lo decide Emi el
+día que se publique DISCO-1: se lo cuento de día, con tu recomendación.
+Decidido por la PM. Anotá en «riesgos» que, si nadie hace (b), el primer
+deploy con DISCO-1 pierde los historiales que haya, igual que todos los
+deploys hasta hoy. Tu próxima D es la **D34**.
+
+## D32 (2026-10-28): (a), sobre `2efdffc`
+
+Borrar un cliente borra también los presupuestos compartidos de sus
+operaciones, en la misma transacción. Ya borra sus operaciones, y la copia
+del presupuesto tiene datos del cliente: es lo único que cumple un pedido
+de borrado. Pruebas además de las de la tarea: los presupuestos de otro
+cliente y de otro dueño siguen andando; si algo falla a mitad, no se borra
+nada (ni cliente ni presupuesto); el link borrado da 404. Si la pantalla ya
+avisa qué se borra con el cliente, que nombre también los links
+compartidos; si no avisa nada, no se agrega. El link que deja de andar va
+en «riesgos» y en `CHANGELOG.md`. Decidido por la PM.
+
+## D31 (2026-10-28): (a), sobre `e59e1a8`
+
+El catálogo guarda lo que ya tiene columna; sufijos, unidad, posición
+completa y divisa se ven en la revisión y no se guardan. Sin migración y
+sin tocar el catálogo de DESPACHO-1a. Anotá en el informe de DESPACHO-1b,
+en «riesgos», los dos costos que nombraste: el valor unitario sin divisa y
+dos subítems que sólo difieren en sufijos fundidos en un producto. Guardar
+lo demás (tu (b)) es una migración sobre datos de clientes y no está en el
+roadmap: si hace falta, se la propongo a Emi cuando haya un uso (por
+ejemplo, sugerir sufijos al armar una operación). Decidido por la PM.
+
 ## D30 (2026-10-28): (a) por ahora, sobre `371cde2`
 
 SEGURO-1 se entrega como está: un seguro «para completar» avisa en pantalla
@@ -169,10 +202,130 @@ primero entregás ORG-1 y después seguís. Datos que llegaron el 28/10
   valor que no es ninguno de los tres (error, no se genera), y un sabotaje
   por par. Es un campo de impuestos: revisión fuerte.
 
-Después: **SUFIJOS-2** y **SEGURO-1** (hechas, sin entregar) y
-**DESPACHO-1b** (abajo, empezala ya). PESO-NETO-1 y PRORRATEO-1 siguen esperando al despachante.
+Después: **SUFIJOS-2**, **SEGURO-1**, **DESPACHO-1b**, **DATOS-1** y
+**DISCO-1** (hechas, sin entregar) y **OBSERVABILIDAD-1** (abajo, empezala
+ya). PESO-NETO-1 y PRORRATEO-1 siguen esperando al despachante.
 
-### DESPACHO-1b (lectura y pantalla) — empezala ya (2026-10-28 05:00 UTC)
+### OBSERVABILIDAD-1 — empezala ya (2026-10-28 08:00 UTC)
+
+DISCO-1 quedó hecha (`88b22c8`). Lo tuyo que queda espera a alguien de
+afuera (BACKUP-1 a Emi: dónde se guarda la copia fuera de Railway). Te paso
+una pieza de la Fase 3 que era de la técnica, que tiene la cola larga:
+**OBSERVABILIDAD-1**. Decidido por la PM; dentro del roadmap. En commits
+aparte encima de `88b22c8`, con su propio `/entregar` después del de
+DISCO-1.
+
+- **El problema:** el log de producción del 24/10
+  (`CIERRE-RETOMA-2026-10-24.md`, «Observación operativa») muestra que
+  registrar una métrica falla porque a `api_logs` le falta la columna
+  `owner_username`. El modelo la tiene (`database/models.py`, cerca de la
+  línea 342), pero la tabla de producción se creó antes, y crear las tablas
+  al arrancar no agrega columnas a una tabla que ya existe. Hay un script
+  viejo, `scripts/migrate_add_owner.py`, que la agrega a mano.
+- **Premisa primero:** reproducilo en Postgres 16 descartable (el 55432):
+  una base con `api_logs` sin la columna, arrancar la app de `88b22c8` y un
+  pedido cualquiera; qué pasa (¿se pierde la métrica, falla el pedido?).
+  Decí cómo se aplican hoy los cambios de esquema al publicar y si
+  `migrate_add_owner.py` corrió alguna vez en producción (con lo que se ve
+  en el repo; no ves la base de producción: supuesto).
+- **Qué hacer:** que al arrancar la columna exista, con su índice, sin
+  intervención a mano: sólo agregar (columna que acepta vacío), sin borrar
+  ni reescribir nada, y que correrlo dos veces no haga nada. Si falla, la
+  app arranca igual y lo dice en el log; la métrica no frena ningún pedido.
+  Usá el mecanismo que ya tenga el proyecto para esto; si no hay uno o hay
+  dos que compiten, preguntá en la **D34** antes de inventar otro.
+- **Lo demás:** hacé la lista de las otras columnas del modelo que una base
+  vieja podría no tener (comparando el modelo con lo que agregan los
+  scripts de migración), una línea por cada una, a «riesgos». Sólo
+  `api_logs.owner_username` entra en esta pieza.
+
+Pruebas: en Postgres 16 desde una base sin la columna y con filas, la
+columna y el índice quedan, las filas viejas siguen, la métrica se graba
+con su dueño, y dos arranques seguidos no cambian nada; en SQLite igual;
+una falla simulada de la migración no frena el arranque. Un sabotaje por
+regla. Línea en `CHANGELOG.md`. Es una migración: revisión fuerte.
+
+### DISCO-1 — hecha, sin entregar (encargada 2026-10-28 07:00 UTC)
+
+DATOS-1 quedó hecha (`c996ad4`). Sigue la tuya de la Fase 3 que es sólo
+código: **DISCO-1**, hallazgo D4 de `AUDITORIA-2026-10-06.md`. BACKUP-1
+(D1) queda para después: necesita algo fuera de Railway y eso lo decide
+Emi. En commits aparte encima de `c996ad4`, con su propio `/entregar`
+después del de DATOS-1.
+
+- **El problema:** el historial de NCM de cada despachante
+  (`load_ncm_historial` / `save_ncm_historial`, `main.py` cerca de la línea
+  9032) vive en `ncm_historial_<usuario>.json` dentro de `DATA_DIR`, en el
+  disco de Railway, que se borra en cada publicación. Lo usan sugerir NCM
+  (fuente «historial»), `/api/ncm/guardar-uso` y `/api/ncm/import-historial`.
+- **Premisa primero:** confirmalo con el código (que `DATA_DIR` no es un
+  volumen que sobreviva; no ves las variables de Railway, decilo como
+  supuesto) y hacé la lista de todo lo demás que se escribe en `DATA_DIR`
+  (`descargas/`, `generated/`, `localStorage_backup.json`…), con una línea
+  por cada uno: si es un dato del usuario que se pierde o un archivo de paso.
+  **Sólo el historial de NCM entra en DISCO-1**; lo otro va a «riesgos» y,
+  si hay algo que se pierde y duele, me lo proponés.
+- **Qué hacer:** el historial pasa a la base, por dueño, con el mismo
+  comportamiento que hoy: misma clave (la descripción tal como se guarda),
+  `ncm` y `count`, incrementa al confirmar de nuevo, actualiza el NCM si
+  cambió, la importación suma igual que hoy y cuenta igual los duplicados.
+  Tabla nueva solamente, sin tocar las existentes. Dos confirmaciones
+  simultáneas de la misma descripción no pierden ninguna cuenta (hoy el
+  archivo pierde una: no copies eso). Un dueño nunca ve ni pisa el
+  historial de otro.
+- **Lo que ya está en disco:** si al arrancar hay archivos
+  `ncm_historial_*.json`, se pasan a la base una sola vez (correr dos veces
+  no duplica cuentas) y el archivo no se vuelve a leer después. Un archivo
+  roto no frena el arranque: va al log.
+- **Migración:** como se crean hoy las tablas nuevas; probada en Postgres
+  16 descartable (el 55432) desde una base con el esquema de `c996ad4` y
+  datos, además de SQLite. Decí en el informe qué pasa en producción la
+  primera vez que arranca.
+
+Pruebas: guardar, sugerir e importar con el historial en la base; que
+sobrevive a borrar `DATA_DIR` (lo que hoy pasa en cada publicación); dos
+dueños separados; dos confirmaciones a la vez; la carga de los archivos
+viejos, dos veces; un archivo roto. Un sabotaje por regla. Línea en
+`CHANGELOG.md`. Toca datos de los usuarios y migración: revisión fuerte.
+Si alguna de estas reglas choca con el código, preguntá en la **D33**.
+
+### DATOS-1 — hecha, sin entregar (encargada 2026-10-28 06:00 UTC)
+
+DESPACHO-1b quedó hecha. Lo que te queda en las Fases 1c y 2 espera a
+alguien de afuera (PESO-NETO-1, MARIA-6 y PRORRATEO-1 al despachante,
+LEGAL-1 al texto de Emi), así que seguís con la primera tuya de la Fase 3
+(`ROADMAP.md`): **DATOS-1**, hallazgos D5, D2 y D6 de
+`AUDITORIA-2026-10-06.md`. En commits aparte encima de DESPACHO-1b
+(`e59e1a8`), con su propio `/entregar` después del de DESPACHO-1b.
+
+- **D5, borrar un cliente con presupuesto compartido:** hoy da error en
+  Postgres, así que no se puede cumplir un pedido de borrado de datos.
+  Premisa primero: reproducilo en Postgres 16 descartable (el 55432 de
+  ORG-1) y mirá qué tablas apuntan al cliente. Borrar el cliente tiene que
+  funcionar, sólo para su dueño (`_get_owned_client`, otro dueño 404). Si
+  para eso hay que elegir entre borrar el presupuesto o dejarlo sin
+  cliente, es la **D32** (contestada arriba: (a)).
+- **D2, `/health` honesto:** con la base caída responde 503, no 200, y no
+  muestra el texto del error al público (va al log). Railway usa `/health`
+  para dar por buena una publicación (`railway.json`, 60 s): comprobá con
+  el código qué pasa al arrancar (el comentario de `main.py` cerca de la
+  línea 664 quiere que la app arranque «rota» para diagnosticar) y decí en
+  el informe qué hace Railway con una publicación nueva si la base no
+  contesta. `railway.json` no se toca. `/admin/health/detailed` queda fuera.
+- **D6, sin detalles de error al público:** los dos manejadores de 500 de
+  `main.py` (cerca de las líneas 412 y 440) dejan de devolver `dev_detail`,
+  siempre: el detalle ya va al log, y no depende de detectar producción.
+  Los 4xx siguen con su `detail` como hoy. Premisa primero: qué JS lee
+  `dev_detail`, y que siga funcionando sin él.
+
+Pruebas: el borrado en Postgres con presupuesto compartido (y que otro
+dueño no puede); `/health` 200 con base y 503 sin ella, sin texto del
+error; un `HTTPException` 500 y una excepción no manejada sin `dev_detail`,
+con el detalle en el log; un 4xx igual que hoy. Un sabotaje por regla. Línea en `CHANGELOG.md`. Toca datos y
+lo que se muestra al público: revisión fuerte y `/security-review`. Tu
+próxima D es la **D33**.
+
+### DESPACHO-1b — hecha, sin entregar (encargada 2026-10-28 05:00 UTC)
 
 SEGURO-1 quedó hecha. Mientras esperás el cupo de las 18:00 UTC, la lectura
 de DESPACHO-1 (`ROADMAP.md`, Fase 1c, fila 7), en commits aparte encima de
