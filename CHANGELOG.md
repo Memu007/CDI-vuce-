@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: cada pago de Mercado Pago se aplica una sola vez y por su monto (COBRO-MP-1)
+
+- **fix(cobro):** un pago se anota por su `payment_id` y no se vuelve a aplicar aunque el aviso llegue repetido, alternado con otro o dos a la vez. Pagar con la cuenta activa extiende desde el fin del período; vencida, desde hoy.
+- El monto y la moneda se comparan con el precio del link cuando se armó (o con el de la suscripción en Mercado Pago); si no coinciden, no se aplica y Emi lo ve en el panel. Las renovaciones de una suscripción ahora extienden el período (antes se ignoraban).
+
 ## 2026-10-28 · fix: una subida chica de Excel no espera detrás de las pesadas (EXCEL-2b)
 
 - **fix(excel):** un libro chico (hasta 2 MiB de XML descomprimido sin contar las imágenes; un `.xls`, por su tamaño; umbral en `EXCEL_LIVIANO_MB`) valida y se lee en hilos propios. Antes esperaba ~30 s detrás de ocho planillas pesadas; ahora responde en menos de un segundo. Ante cualquier duda (índice largo, zip64, algo que no es zip) va al carril de siempre.
