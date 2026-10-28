@@ -769,11 +769,13 @@ def test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_
     carriles = set()
     r, dt = asyncio.run(_todo())
     print(f"XML: {tamano} bytes; zip: {len(armado)} bytes; entradas: 8; normal: {r.status_code} en {dt:.1f} s")
+    # El tiempo va primero: si la normal espera detrás de las pesadas, su
+    # validación puede no terminar y su carril no llega a anotarse.
+    assert dt < 5, f"la subida normal tardó {dt:.1f} s: esperó detrás de las pesadas"
+    assert r.status_code == 200, f"la subida normal dio {r.status_code} a los {dt:.1f} s: {r.text[:200]}"
     # Las pesadas van al carril pesado y la normal al liviano (EXCEL-2b): si
     # no, el tiempo de la normal no prueba nada.
     assert carriles == {("pesada.xlsx", False), ("normal.xlsx", True)}, carriles
-    assert r.status_code == 200, f"la subida normal dio {r.status_code} a los {dt:.1f} s: {r.text[:200]}"
-    assert dt < 5, f"la subida normal tardó {dt:.1f} s: esperó detrás de las pesadas"
 
 
 def test_la_pantalla_muestra_el_aviso_del_csv():
