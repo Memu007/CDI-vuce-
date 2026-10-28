@@ -44,6 +44,30 @@ repositorio.** Las pruebas usan sintéticos con la misma forma.
   primero las devoluciones que lleguen (DESTINO-1 ya está arriba), después
   D41.
 
+## DATOS-1: aceptada sobre `c996ad4` (2026-10-28 17:55 UTC)
+
+El producto hace lo que pedía la D32 (a): sin fuga a otro dueño, una sola
+transacción, `/health` sin texto del error. Se integra con la cadena, cuando
+se acepte DESPACHO-1b (está debajo). Evidencia en
+`REPRODUCCION-DATOS-1-2026-10-28.md`. Sumá, encima de la cadena:
+
+1. **Un cliente con dos operaciones compartidas** (reproducido por la PM):
+   con `in_(op_ids[:1])` en el borrado de presupuestos, `test_datos1.py`
+   sigue en `9 passed`. Es el caso normal; la prueba tiene que tenerlo.
+2. **El orden presupuestos → operaciones** sólo lo frena
+   `datos1_postgres.py`, que no corre en la suite. Hacelo rojo en SQLite
+   (`PRAGMA foreign_keys=ON` en esa prueba) o decí por qué no se puede.
+3. **Verificá y proponé (D43):** una operación del cliente con
+   `owner_username` NULL (dato viejo) no entra en `op_ids`: el borrado dice
+   «eliminadas: 1», la operación queda y su presupuesto compartido sigue
+   accesible (revisor, Postgres 16; no lo reproduje). ¿Puede existir hoy
+   una fila así, según las migraciones? Si sí, proponé el arreglo.
+4. **A riesgos:** más de 32 767 operaciones dan 500 (límite de parámetros
+   del `in_`, ya existía); `api_logs.operation_id` frenaría el borrado si
+   algo lo llenara (hoy nada); la copia de `system_backups`
+   (`client_migration`) guarda datos del cliente borrado; los 502 con
+   `{err}`. La copia de `system_backups` la paso yo a Emi.
+
 ## DESPACHO-1b: devolución, sobre `e59e1a8` (2026-10-28 17:40 UTC)
 
 Permisos bien: el adversario (Sonnet alto) no cruzó clientes ni dueños, y
@@ -239,7 +263,7 @@ Cerradas. Quedan resumidas en `DECISIONS.md` («D28 a D34 de la Dev MARIA»).
 
 ## Lo encargado de las piezas entregadas, todavía en revisión
 
-Lo de ORG-1, ORG-1b, DESPACHO-1a y DESTINO-1 (aceptadas o con devolución
+Lo de ORG-1, ORG-1b, DESPACHO-1a, DESTINO-1 y DATOS-1 (aceptadas o con devolución
 arriba) salió del canal: `git show 1f648c3:docs/pm/PARA-DEV-2.md`.
 
 ### ABUSO-1 — hecha, sin entregar (encargada 2026-10-28 10:00 UTC)
@@ -397,42 +421,6 @@ dueños separados; dos confirmaciones a la vez; la carga de los archivos
 viejos, dos veces; un archivo roto. Un sabotaje por regla. Línea en
 `CHANGELOG.md`. Toca datos de los usuarios y migración: revisión fuerte.
 Si alguna de estas reglas choca con el código, preguntá en la **D33**.
-
-### DATOS-1 — hecha, sin entregar (encargada 2026-10-28 06:00 UTC)
-
-DESPACHO-1b quedó hecha. Lo que te queda en las Fases 1c y 2 espera a
-alguien de afuera (PESO-NETO-1, MARIA-6 y PRORRATEO-1 al despachante,
-LEGAL-1 al texto de Emi), así que seguís con la primera tuya de la Fase 3
-(`ROADMAP.md`): **DATOS-1**, hallazgos D5, D2 y D6 de
-`AUDITORIA-2026-10-06.md`. En commits aparte encima de DESPACHO-1b
-(`e59e1a8`), con su propio `/entregar` después del de DESPACHO-1b.
-
-- **D5, borrar un cliente con presupuesto compartido:** hoy da error en
-  Postgres, así que no se puede cumplir un pedido de borrado de datos.
-  Premisa primero: reproducilo en Postgres 16 descartable (el 55432 de
-  ORG-1) y mirá qué tablas apuntan al cliente. Borrar el cliente tiene que
-  funcionar, sólo para su dueño (`_get_owned_client`, otro dueño 404). Si
-  para eso hay que elegir entre borrar el presupuesto o dejarlo sin
-  cliente, es la **D32** (contestada arriba: (a)).
-- **D2, `/health` honesto:** con la base caída responde 503, no 200, y no
-  muestra el texto del error al público (va al log). Railway usa `/health`
-  para dar por buena una publicación (`railway.json`, 60 s): comprobá con
-  el código qué pasa al arrancar (el comentario de `main.py` cerca de la
-  línea 664 quiere que la app arranque «rota» para diagnosticar) y decí en
-  el informe qué hace Railway con una publicación nueva si la base no
-  contesta. `railway.json` no se toca. `/admin/health/detailed` queda fuera.
-- **D6, sin detalles de error al público:** los dos manejadores de 500 de
-  `main.py` (cerca de las líneas 412 y 440) dejan de devolver `dev_detail`,
-  siempre: el detalle ya va al log, y no depende de detectar producción.
-  Los 4xx siguen con su `detail` como hoy. Premisa primero: qué JS lee
-  `dev_detail`, y que siga funcionando sin él.
-
-Pruebas: el borrado en Postgres con presupuesto compartido (y que otro
-dueño no puede); `/health` 200 con base y 503 sin ella, sin texto del
-error; un `HTTPException` 500 y una excepción no manejada sin `dev_detail`,
-con el detalle en el log; un 4xx igual que hoy. Un sabotaje por regla. Línea en `CHANGELOG.md`. Toca datos y
-lo que se muestra al público: revisión fuerte y `/security-review`. Tu
-próxima D es la **D33**.
 
 ### DESPACHO-1b — hecha, sin entregar (encargada 2026-10-28 05:00 UTC)
 
