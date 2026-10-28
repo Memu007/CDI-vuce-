@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · feat: el catálogo del cliente se baja en Excel (DESPACHO-1a)
+
+- En la pestaña Catálogo del cliente, «Descargar en Excel» baja los productos aprendidos de ese cliente, un renglón por producto y en el mismo orden que la pantalla: posición (como texto, con ceros y letra), descripción, origen, valor unitario, cantidad y peso promedio, veces usado y última vez.
+- Un texto que empieza con =, +, - o @ queda como texto, no como fórmula.
+
 ## 2026-10-27 · feat: el registro con invitación viene con el email invitado (ORG-1b)
 
 - Al abrir el enlace de una invitación válida, el email del registro ya viene completo con el email invitado y no se puede cambiar; una línea lo explica. Sin invitación válida, el campo queda como antes.

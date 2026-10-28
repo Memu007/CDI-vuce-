@@ -21,7 +21,7 @@
     let heroEl, kpiOps, kpiItems, kpiPromedio, kpiOrigen, kpiValor, kpiUltimo;
     let tabOps, tabCatalogo, tabDatos, panelOps, panelCatalogo, panelDatos;
     let opsList, opsEmpty, opsExpand, opsExpandBtn, exportCsvBtn;
-    let catalogoList, catalogoEmpty, catalogoActions, catalogoReset, catalogoSave, catalogoBadge, catalogoProductosList, catalogoProductosEmpty;
+    let catalogoList, catalogoEmpty, catalogoActions, catalogoReset, catalogoSave, catalogoBadge, catalogoProductosList, catalogoProductosEmpty, catalogoExcelBtn;
     let datosGrid;
     let filterChips = [], sortSelect;
 
@@ -102,6 +102,7 @@
         catalogoBadge          = $('cxCatalogoBadge');
         catalogoProductosList  = $('cxCatalogoProductosList');
         catalogoProductosEmpty = $('cxCatalogoProductosEmpty');
+        catalogoExcelBtn       = $('cxCatalogoExcelBtn');
         datosGrid      = $('cxDatosGrid');
         filterChips    = Array.from(screenEl.querySelectorAll('.cx-chip[data-filter]'));
         sortSelect     = $('cxSort');
@@ -172,6 +173,7 @@
         if (tabDatos)    tabDatos.addEventListener('click', () => switchTab('datos'));
         if (catalogoReset) catalogoReset.addEventListener('click', resetCatalogo);
         if (catalogoSave)  catalogoSave.addEventListener('click', saveCatalogo);
+        if (catalogoExcelBtn) catalogoExcelBtn.addEventListener('click', downloadCatalogoExcel);
 
         // Export CSV e expand de operaciones
         if (exportCsvBtn) exportCsvBtn.addEventListener('click', exportClientCsv);
@@ -1534,6 +1536,34 @@
             setTimeout(() => URL.revokeObjectURL(url), 2000);
             CDI.toast && CDI.toast.success('Descarga iniciada.');
             CDI.track && CDI.track('cliente_template_download', { id: detailClienteId });
+        } catch (err) {
+            CDI.toast && CDI.toast.error(String(err.message || err));
+        }
+    }
+
+    // DESPACHO-1a: el catálogo del cliente, tal como se ve, en Excel.
+    async function downloadCatalogoExcel() {
+        if (!detailClienteId) return;
+        try {
+            const res = await CDI.api('/api/clientes/' + encodeURIComponent(detailClienteId) + '/catalogo/productos.xlsx');
+            if (!res || !res.ok) {
+                const err = await res.json().catch(() => ({}));
+                throw new Error(err.detail || ('Error ' + (res && res.status)));
+            }
+            const blob = await res.blob();
+            const c = clientes.find(x => x.id === detailClienteId);
+            const baseName = (c && c.nombre ? c.nombre : 'cliente').toLowerCase()
+                .replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '') || 'cliente';
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'catalogo_' + baseName + '.xlsx';
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+            CDI.toast && CDI.toast.success('Descarga iniciada.');
+            CDI.track && CDI.track('cliente_catalogo_download', { id: detailClienteId });
         } catch (err) {
             CDI.toast && CDI.toast.error(String(err.message || err));
         }

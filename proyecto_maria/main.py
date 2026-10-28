@@ -7825,6 +7825,81 @@ async def get_client_catalogo_productos(
     }
 
 
+_CATALOGO_XLSX_COLUMNAS = (
+    ("Posición", "ncm"),
+    ("Descripción", "descripcion"),
+    ("Origen", "origen"),
+    ("Valor unitario promedio", "valor_unitario_avg"),
+    ("Cantidad promedio", "cantidad_avg"),
+    ("Peso unitario promedio", "peso_unitario_avg"),
+    ("Veces usado", "veces_usado"),
+    ("Última vez", "ultima_vez"),
+)
+
+
+def _catalogo_xlsx(productos: list[dict]) -> bytes:
+    """Arma el Excel del catálogo en memoria, un renglón por producto.
+
+    Las descripciones vienen de facturas de terceros: todo texto se escribe
+    como texto, nunca como fórmula, y el que empieza con =, +, - o @ lleva
+    el apóstrofo invisible para que siga siendo texto si se lo edita."""
+    from openpyxl import Workbook
+    from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Catálogo"
+    ws.append([titulo for titulo, _ in _CATALOGO_XLSX_COLUMNAS])
+    for fila, producto in enumerate(productos, start=2):
+        for col, (_, campo) in enumerate(_CATALOGO_XLSX_COLUMNAS, start=1):
+            valor = producto.get(campo)
+            celda = ws.cell(row=fila, column=col)
+            if campo == "ultima_vez":
+                if valor:
+                    celda.value = datetime.fromisoformat(valor[:10]).date()
+                    celda.number_format = "dd/mm/yyyy"
+            elif isinstance(valor, str):
+                texto = ILLEGAL_CHARACTERS_RE.sub("", valor)
+                celda.value = texto
+                celda.data_type = "s"
+                if texto[:1] in ("=", "+", "-", "@"):
+                    celda.quotePrefix = True
+                if campo == "ncm":
+                    celda.number_format = "@"
+            else:
+                celda.value = valor
+    salida = io.BytesIO()
+    wb.save(salida)
+    return salida.getvalue()
+
+
+@app.get("/api/clientes/{client_id}/catalogo/productos.xlsx")
+async def download_client_catalogo_productos(
+    client_id: str,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """DESPACHO-1a: el catálogo del cliente en Excel, lo mismo que muestra
+    la pantalla y en el mismo orden."""
+    username = user["username"]
+    client = await _get_owned_client(db, client_id, username)
+
+    stmt = sa_select(ClientProductHistoryModel).where(
+        ClientProductHistoryModel.owner_username == username,
+        ClientProductHistoryModel.client_id == client_id,
+    ).order_by(sa_desc(ClientProductHistoryModel.ultima_vez))
+    rows = (await db.execute(stmt)).scalars().all()
+    contenido = _catalogo_xlsx([_product_history_to_dict(r) for r in rows])
+
+    nombre = unicodedata.normalize("NFKD", client.name or "cliente")
+    safe_name = re.sub(r"[^a-zA-Z0-9_-]", "_", nombre.encode("ascii", "ignore").decode())[:40]
+    return Response(
+        content=contenido,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="catalogo_{safe_name}.xlsx"'},
+    )
+
+
 @app.post("/api/clientes/{client_id}/catalogo/productos/learn")
 async def learn_client_catalogo_productos(
     client_id: str,
