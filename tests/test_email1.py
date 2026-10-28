@@ -291,8 +291,10 @@ def test_invitacion_a_un_miembro_con_otras_mayusculas(monkeypatch):
         dueno = _nombre()
         d = _dominio()
         r = c.post("/api/organizations/create", headers=_ip(),
-                   json={"name": "Estudio", "username": dueno, "password": CLAVE, "email": f"Lia@{d}"})
+                   json={"name": "Estudio", "username": dueno, "password": CLAVE, "email": f"lia@{d}"})
         assert r.status_code == 200, r.text
+        # Una cuenta vieja: el alta de hoy guarda en minúsculas, ésta no.
+        asyncio.run(_sql("update users set email = :e where username = :u", e=f"Lia@{d}", u=dueno))
         r = c.post("/api/organizations/invite", headers=_token(c, dueno), json={"email": f"LIA@{d.upper()}"})
     assert r.status_code == 400 and "miembro" in r.text, r.text
 

@@ -109,8 +109,8 @@ sabotaje $M "par sin exacto: la respuesta lo delata" \
 sabotaje $M "par: no gana el exacto" \
   $'    cuenta = exacta.scalars().first()\n    if cuenta:' \
   $'    cuenta = exacta.scalars().first()\n    if False:' \
-  "FAILED tests/test_email1.py::test_par_el_exacto_gana" \
-  "FAILED tests/test_email1.py::test_par_login"
+  "FAILED tests/test_email1.py::test_par_el_exacto_gana[/auth/recover-username-dev_username_hint]" \
+  "FAILED tests/test_email1.py::test_par_el_exacto_gana[/auth/request-password-reset-dev_token_hint]"
 sabotaje $M "par: el perfil reescribe el email aunque no cambie" \
   $'    # Email editable para contacto/login\n    if cambia_email:' \
   $'    # Email editable para contacto/login\n    if "email" in body:' \
@@ -137,10 +137,20 @@ sabotaje $M "el registro con reemplazo archiva sólo una cuenta" \
   '                for existing_email_user in existing_email_users:' \
   '                for existing_email_user in existing_email_users[:1]:' \
   "FAILED tests/test_email1.py::test_registro_de_prueba_con_reemplazo_archiva_todo_el_par"
-sabotaje $M "el registro no pasa el email a minúsculas" \
-  '    clean_email = (request.email or "").strip().lower()' \
-  '    clean_email = (request.email or "").strip()' \
-  "FAILED tests/test_email1.py::test_registro_con_invitacion_acepta_otras_mayusculas"
+# El registro pasa el email a minúsculas dos veces (al validar y al buscar el
+# duplicado): sacar una sola no es un defecto, el sabotaje saca las dos.
+git checkout -q -- proyecto_maria/
+if aplicar $M '    clean_email = (request.email or "").strip().lower()' \
+              '    clean_email = (request.email or "").strip()' &&
+   aplicar $M '        clean_email = request.email.strip().lower()' \
+              '        clean_email = request.email.strip()'; then
+  salida="$(pytest_e1)"; codigo=$?
+  juzgar "el registro no pasa el email a minúsculas" "$salida" "$codigo" \
+    "FAILED tests/test_email1.py::test_registro_con_invitacion_acepta_otras_mayusculas"
+else
+  echo "ROTO  | el registro no pasa el email a minúsculas: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1))
+fi
+git checkout -q -- proyecto_maria/
 
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
