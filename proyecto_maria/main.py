@@ -2120,8 +2120,12 @@ async def cancel_billing(
     generando (billing_service.tiene_acceso). Desde past_due también se
     cancela, sin ganar acceso: si no, la suscripción vieja cobra cuando la
     tarjeta vuelve (COBRO-MP-1, C).
+
+    Toma la fila como el checkout: si uno está en curso, espera a que guarde
+    la suscripción nueva y la cancela; si no, quedaría cobrando sin que CDI
+    la conozca.
     """
-    result = await db.execute(select(User).where(User.username == user["username"]))
+    result = await db.execute(select(User).where(User.username == user["username"]).with_for_update())
     db_user = result.scalars().first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")

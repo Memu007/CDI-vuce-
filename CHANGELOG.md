@@ -11,6 +11,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix(cobro):** desde «plan vencido» se puede cancelar: se cancela también en Mercado Pago, así no vuelve a cobrar cuando la tarjeta pasa, y la cuenta no gana días por cancelar.
 - Reactivar una prueba que sólo compró una recarga la vuelve a la prueba con sus días; ya no pide pagar ni dice «período ya pagado».
 - Dos pedidos de pago a la vez de la misma cuenta dejan una sola suscripción viva en Mercado Pago, la que CDI guarda: el segundo espera al primero (D).
+- Cancelar mientras corre un pedido de pago espera a que termine y cancela también la suscripción que ese pedido creó.
 
 ## 2026-10-28 · fix: la exportación también cuenta la operación, una vez por id (COBRO-MP-1 B)
 
