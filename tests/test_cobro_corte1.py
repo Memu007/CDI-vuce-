@@ -526,3 +526,40 @@ def test_el_conteo_vence_la_cuenta_que_vencio_despues_del_corte(cuenta):
     assert e.value.status_code == 402
     assert e.value.detail["code"] == "TRIAL_EXPIRED", e.value.detail
     assert _leer(u, de_la_org=True) == {"ops": 0, "extra": 0, "estado": "past_due"}
+
+
+# ------------------------------------------------------------ exportación (B)
+
+
+def _exportar(c, operation_id="FAC_CORTE1EXP", flete=100.0):
+    from tests.test_maria1b_devolucion import EXPORT
+    return c.post("/generate_maria_export", json={**EXPORT, "operation_id": operation_id, "flete": flete})
+
+
+def test_la_exportacion_cuenta_una_vez_por_operacion(cuenta):
+    # COBRO-MP-1, B: la D4 b es «el MARIA de un operation_id»; la
+    # exportación también cuenta, con la misma regla que la importación.
+    c, u = cuenta()
+    r = _exportar(c)
+    assert r.status_code == 200, r.text
+    assert _leer(u)["ops"] == 1, "la exportación no cuenta la operación"
+    assert _exportar(c).status_code == 200
+    assert _exportar(c, flete=200.0).status_code == 200
+    assert _leer(u)["ops"] == 1, "volver a exportar la misma operación cuenta otra vez"
+    ops = _operaciones(u)
+    assert [o["archivo"] for o in ops] == ["MARIA_EXPORT_FAC_CORTE1EXP.TXT"], ops
+    assert len(ops[0]["extra"]["maria_hashes"]) == 2, ops
+
+
+def test_con_el_tope_lleno_la_exportacion_nueva_da_402_y_la_ya_contada_sale(cuenta):
+    c, u = cuenta()
+    assert _exportar(c).status_code == 200
+    _fijar(u, billing_status="active", trial_ends_at=AHORA + timedelta(days=20),
+           ops_used_this_period=15, extra_ops_remaining=0)
+    assert _exportar(c, flete=300.0).status_code == 200
+    r = _exportar(c, operation_id="FAC_CORTE1EXPNUEVA")
+    assert r.status_code == 402, r.text
+    assert r.json()["detail"]["code"] == "PLAN_LIMIT_EXCEEDED", r.json()
+    assert c.get("/download/MARIA_EXPORT_FAC_CORTE1EXPNUEVA.TXT").status_code == 404
+    assert _leer(u)["ops"] == 15
+    assert len(_operaciones(u)) == 1
