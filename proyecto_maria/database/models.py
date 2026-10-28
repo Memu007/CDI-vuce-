@@ -208,6 +208,21 @@ class NcmHistorial(Base):
     count = Column(Integer, nullable=False, default=1)
 
 
+
+class LimiteAuth(Base):
+    """Contadores de intentos de login, recuperación y registro (ABUSO-1).
+    Antes vivían en un dict de cada proceso: se perdían con cada reinicio y
+    cada worker contaba por su lado. Una fila por clave (`login:<ip>`,
+    `reset:<ip>`, ...); los tiempos son epoch en segundos. Una fila con
+    `vence` pasado ya no cuenta y se borra en la próxima escritura."""
+    __tablename__ = "limites_auth"
+
+    clave = Column(String(120), primary_key=True)
+    cuenta = Column(Integer, nullable=False, default=0)
+    bloqueado_hasta = Column(Float, nullable=False, default=0.0)
+    vence = Column(Float, nullable=False, index=True)
+
+
 class Operation(Base):
     """Operación de importación procesada."""
     __tablename__ = "operations"

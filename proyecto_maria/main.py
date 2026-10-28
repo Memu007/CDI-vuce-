@@ -1297,6 +1297,19 @@ async def _migrate_add_unidad_column():
         print(f"⚠️ Migracion unidad (no critica): {mig_err!r}")
 
 
+async def _migrate_limites_auth() -> None:
+    """Borra los contadores de intentos vencidos de `limites_auth` (ABUSO-1).
+    La tabla la crea `init_db`; las escrituras también borran los vencidos,
+    esto limpia lo que quedó si después nadie escribió. Si falla, queda en el
+    log y la app arranca igual."""
+    from proyecto_maria.core import limites_auth
+
+    try:
+        await limites_auth.purgar_vencidas()
+    except Exception as e:
+        logging.warning("limites_auth: no se pudieron borrar los vencidos: %s", e)
+
+
 async def _migrate_add_api_logs_owner_column():
     """Agrega `api_logs.owner_username` (nullable) y su índice si la base no
     los tiene.
@@ -1477,6 +1490,7 @@ async def lifespan(app: FastAPI):
 
     # Después de crear usuarios: cada archivo se carga a su dueño (DISCO-1).
     await _migrate_ncm_historial_archivos()
+    await _migrate_limites_auth()
         
     yield  # La aplicación está sirviendo peticiones
     
