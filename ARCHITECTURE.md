@@ -73,7 +73,6 @@
 │   └── deploy.yml               # GitHub Actions
 ├── Dockerfile                   # Multi-stage build
 ├── docker-compose.yml           # Dev local
-├── cloudbuild.yaml              # Deploy GCP
 ├── add_indexes.sql              # Índices performance
 └── DEPLOY_CHANGES_SUMMARY.md    # Resumen cambios
 ```
@@ -404,11 +403,9 @@ docker-compose up -d
 # Acceder: http://localhost:8001
 ```
 
-### Deploy Manual:
+### Deploy:
 
-```bash
-gcloud builds submit --config=cloudbuild.yaml
-```
+Railway, con el `Dockerfile`. Guía: `docs/deployment/RAILWAY_SETUP.md`.
 
 ---
 

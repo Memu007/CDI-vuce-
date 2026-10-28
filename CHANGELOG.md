@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · chore: la CI corre la suite entera y se borra el camino a Google Cloud (LIMPIEZA-1)
+
+- **chore(ci):** la CI ya no excluye a mano las 10 pruebas de presupuestos públicos, CSRF y el botón de NCM automático; una prueba falla si vuelve a sacar alguna.
+- Se borran `cloudbuild.yaml`, `setup_gcp.sh`, `scripts/deployment/deploy-cloud-run.sh` y las cinco guías de Google Cloud: el sitio se publica sólo por Railway.
+
 ## 2026-10-28 · fix: los roles guardados como texto no dan administrador por una parte (AISLAMIENTO-2)
 
 - **fix(permisos):** si la columna de roles guarda un texto o un objeto en vez de una lista, «administrador» o {"admin": false} ya no cuentan como admin, ni en las rutas de administración ni en require_role. Un texto vale como un único rol entero.

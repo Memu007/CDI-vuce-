@@ -77,7 +77,7 @@ fi
 DB="${DATABASE_URL:-}"
 if [ -z "$DB" ]; then
     err "Falta DATABASE_URL: la app cae a SQLite dentro del contenedor."
-    echo "   En Cloud Run / Railway el disco es efímero: usuarios, clientes y"
+    echo "   En Railway el disco es efímero: usuarios, clientes y"
     echo "   operaciones se borran en cada deploy o reinicio."
 elif [ "${DB#sqlite}" != "$DB" ]; then
     err "DATABASE_URL apunta a SQLite. Mismo problema: se pierden los datos."

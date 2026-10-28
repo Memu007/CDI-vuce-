@@ -104,10 +104,6 @@ El proyecto está 100% pre-configurado para un despliegue automático en [Railwa
    - `DATABASE_URL`: Referenciar a la variable de base de datos de Railway (ej. `${{Postgres.DATABASE_URL}}`).
 6. El despliegue comenzará automáticamente. Railway detectará el `Dockerfile` y expondrá la aplicación en la web.
 
-## 🚀 Deploy Alternativo (Google Cloud)
-
-**[Ver DEPLOY.md](./DEPLOY.md)** - Guía de 3 pasos para deploy manual en GCP Cloud Run.
-
 ### 📋 Últimos Cambios (Marzo 2026)
 
 - ✅ Preparación para Railway deployment con `railway.json`
