@@ -286,6 +286,52 @@ PY=python bash scripts/testing/sabotajes/datos1.sh c996ad4   # 12 ROJO, «sabota
 python -m pytest -q --no-cov tests/test_datos1.py             # 9 passed
 ```
 
+## DISCO-1: **entregada** en `88b22c8` (2026-10-28, 17:14 UTC)
+
+**Resultado:** la pieza como está en `88b22c8` (base `cf84a76`), sin
+arreglo. Suite completa sobre `88b22c8`: 3847 passed, 336 skipped, 2
+xfailed, 0 failed. Sabotajes `disco1.sh`: 20/20 en rojo. Detalle en
+«DISCO-1: hecha» más abajo. **Hay una regresión leída y no reproducida:
+no recomiendo publicar sin arreglarla (D42).**
+
+**Decide la PM:** D42.
+
+- **D42 (DISCO-1):** dos hallazgos dentro de la pieza. (a) La regresión:
+  en `sugerir_ncm` (`main.py:9382`, `:9401`, `:9407`) los pasos 1 y 2
+  atrapan la excepción sin `rollback`; en Postgres la transacción queda
+  abortada y el historial que se lee después sale vacío, sin aviso. Antes
+  el historial era un archivo y eso no pasaba. (b) Un carácter NUL en una
+  descripción hace que Postgres rechace la fila: el archivo entero no
+  carga y se reintenta en cada arranque, y guardar-uso da 500. (1) Los
+  arreglo después de las 18:00, encima de la cadena, con rojo en Postgres
+  16 y sabotaje, antes de publicar (recomendada: (a) deja sin sugerencias
+  sin que nadie se entere). (2) Se publica así y van a una pieza nueva.
+
+| Revisor | Modelo y esfuerzo | Hallazgos | Qué hice |
+|---|---|---|---|
+| disco1-sonnet | Sonnet alto | R1 media, dentro: NUL (`\u0000`) en la descripción, Postgres rechaza (`CharacterNotInRepertoireError`), el archivo no carga y se reintenta en cada arranque; guardar-uso da 500. R2 baja: un surrogate (`\ud800`) da `UnicodeEncodeError` y el archivo no carga (`main.py:9047`). R3 baja: sin tope de tamaño, un archivo de 64 MB traba el arranque 50 s. La carrera con 3 procesos en Postgres, bien | D42 (b); lo demás, riesgos |
+| `/code-review high` + `/security-review` | Opus alto, en fork; la security a mano porque la skill falló con `fatal: ambiguous argument 'origin/HEAD...'` | (1) alta, sin confirmar: sin volumen en Railway el primer deploy pierde los historiales (es la D33, contestada (a)). (2) media, regresión, leída: `sugerir_ncm` sin `rollback`. (3) media: `_sumar_uso_ncm` sin proteger da 500, y suma antes de `_get_owned_client`: con un `client_id` ajeno suma y después da 404 (`:9481`). (4) baja-media: las pruebas sin `CDI_DATA_DIR` migran el `data/` real del dev; los huérfanos se reintentan y se loguean en cada arranque (`:1398`). (5) media, sospecha: deadlock entre dos importaciones simultáneas (`:9088`). (6 a 10) bajas. Security: un huérfano lo hereda quien registre ese nombre de usuario en el próximo deploy (`:9076`, `:9156`); 500 con `str(exc)` del driver (`:9612`) | (2) D42 (a); lo demás, riesgos |
+
+**Lo que es lectura y lo que corrió cada uno:** el NUL, el surrogate y los
+64 MB salen de las corridas del Sonnet; la regresión de `sugerir_ncm` es
+lectura del code-review. Yo no reproduje ninguno.
+
+**Riesgos que quedan:** la D33 (el primer deploy pierde los historiales
+salvo que Emi los rescate); el 500 de guardar-uso y la suma con un
+`client_id` ajeno; la herencia del huérfano por quien registre su nombre;
+la sospecha de deadlock entre importaciones; el arranque lento con un
+archivo enorme; las pruebas que pueden migrar el `data/` real de quien
+las corre sin `CDI_DATA_DIR`.
+
+**Archivos de producto:** `proyecto_maria/database/models.py`,
+`proyecto_maria/main.py`, `CHANGELOG.md`.
+
+```bash
+git diff --stat cf84a76..88b22c8 -- . ':!docs'   # 8 files changed, 990 insertions(+), 42 deletions(-)
+PY=python bash scripts/testing/sabotajes/disco1.sh 88b22c8   # 20 ROJO, «sabotajes sin rojo: 0»
+python -m pytest -q --no-cov tests/test_disco1.py
+```
+
 ## Entregas preparadas para las 18:00 UTC (2026-10-28)
 
 Recibí la D37 (2) en `20fb535`. En ABUSO-1 la pasé a riesgos, con lo que
@@ -311,7 +357,7 @@ tocan `docs/`. A las 18:00 queda sólo la autorrevisión con subagentes,
 | 4 | SEGURO-1 | `371cde2`; entregada en `5dfaf47` con el arreglo | `1948207`; el arreglo, sobre `bd76f9f` | 3777 passed, 336 skipped, 2 xfailed, 0 failed; con el arreglo, 4007 passed sobre `5dfaf47` | 10/10; con el arreglo, 11/11 |
 | 5 | DESPACHO-1b | `e59e1a8`, **entregada** | `49f8e29` | 3827 passed, 336 skipped, 2 xfailed, 0 failed | 24/24 |
 | 6 | DATOS-1 | `c996ad4`, **entregada** | `d01f95c` | 3836 passed, 336 skipped, 2 xfailed, 0 failed | 12/12 |
-| 7 | DISCO-1 | `88b22c8` | `cf84a76` | 3847 passed, 336 skipped, 2 xfailed, 0 failed | 20/20 |
+| 7 | DISCO-1 | `88b22c8`, **entregada** | `cf84a76` | 3847 passed, 336 skipped, 2 xfailed, 0 failed | 20/20 |
 | 8 | OBSERVABILIDAD-1 | `39be45e` | `88b22c8` | 3855 passed, 336 skipped, 2 xfailed, 0 failed | 16/16 |
 | 9 | SESION-1 | `895ee73` | `f5160d7` | 3872 passed, 336 skipped, 2 xfailed, 0 failed | 19/19 |
 | 10 | ABUSO-1 | `43916a7` | `c702655` | 3930 passed, 336 skipped, 2 xfailed, 0 failed | 27/27 |
