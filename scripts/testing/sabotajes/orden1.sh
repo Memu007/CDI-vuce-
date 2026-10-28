@@ -163,6 +163,46 @@ sabotaje $N "Ctrl+Z después de arrastrar vuelve la lista de antes" \
   "FALLA: Ctrl+Z después de arrastrar vuelve el orden de antes" \
   $'        lastSnapshot = null;\n        try { CDI.track' $'        try { CDI.track'
 
+sabotaje $N "al arrastrar, la selección no sigue a los productos" \
+  "FALLA: al arrastrar, la selección no sigue a los productos" \
+  '        items.forEach((it, i) => { if (elegidos.has(it)) selectedRows.add(i); });' ''
+
+# Dueño: la operación es del usuario que la dejó.
+export CASOS=f
+sabotaje $A "otro usuario recupera la operación" \
+  "FALLA: otro usuario en la misma computadora recupera la operación" \
+  '        if (parsed.user !== user) return null;' ''
+sabotaje $A "la clave vieja sin pestaña no se borra" \
+  "FALLA: la clave vieja sin pestaña no se descarta" \
+  '            try { localStorage.removeItem(clave); } catch (_) {}' ''
+
+# Edad: 7 días.
+export CASOS=g
+sabotaje $A "un borrador de más de 7 días se recupera" \
+  "FALLA: se recupera un borrador de hace más de 7 días" \
+  ' || Date.now() - savedAt > BORRADOR_VENCE_MS' ''
+sabotaje $A "vence a los 6 días y no a los 7" \
+  "FALLA: un borrador de hace casi 7 días no se recupera" \
+  'const BORRADOR_VENCE_MS = 7 * 24' 'const BORRADOR_VENCE_MS = 6 * 24'
+
+# Pestaña que murió sin pagehide.
+export CASOS=h
+sabotaje $A "una pestaña muerta sin avisar no se da por muerta nunca" \
+  "FALLA: no se recupera la operación de una pestaña que murió sin avisar" \
+  'const BORRADOR_HUERFANO_MS = 3 * 60 * 1000;' 'const BORRADOR_HUERFANO_MS = 1e12;'
+
+# Pestaña viva: la duplicada no toma; la restaurada sí.
+export CASOS=i
+sabotaje $A "la duplicada toma la operación de la original viva" \
+  "FALLA: la pestaña duplicada tomó la operación de la original, que sigue abierta" \
+  'if (propio && !(await pestanaViva(pestanaAnterior)))' 'if (propio)'
+sabotaje $A "la propia se recupera sólo si se cerró con pagehide" \
+  "FALLA: la pestaña restaurada no recupera su operación" \
+  'if (propio && !(await pestanaViva(pestanaAnterior)))' 'if (propio && propio.closed)'
+sabotaje $A "toda pestaña anterior se da por viva" \
+  "FALLA: la pestaña restaurada no recupera su operación" \
+  '            .catch(() => true)' '            .then(() => true, () => true)'
+
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
