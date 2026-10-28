@@ -148,3 +148,51 @@ def test_por_el_endpoint_la_coma_llega_al_txt(client):
     r = client.post("/generate_maria", json=dict(_pedido(), sbt_sufijo_valor="AF(2.5)-CA00-"))
     assert r.status_code == 200, r.text
     assert "CSBTSVL=AF(2,5)-CA00-" in r.text
+
+
+# ------------------------- 5. Un número que cambiaría de valor no se adivina
+# (revisión de SUFIJOS-2: sacarle el signo, la barra o un separador de miles
+# a un número da otro número; no sale al TXT, se dice dónde y no se genera).
+
+CAMBIA_EN_UN_Z = ["ZA(.5)-", "ZA(-5)-", "ZA(+5)-", "ZA(1/2)-", "ZA(1,000.50)-",
+                  "ZA(16.384.000)-", "ZA(2-5)-", "ZA(1½)-"]
+
+
+@pytest.mark.parametrize("malo", CAMBIA_EN_UN_Z)
+def test_un_sufijo_que_pide_numero_no_acepta_signos(malo):
+    with pytest.raises(ValueError, match=r"del ítem 3: «ZA\(.*pide un número sin decimales.*no se genera"):
+        mg.limpiar_sufijo(malo, " del ítem 3")
+
+
+CAMBIA_EN_UNO_LIBRE = ["AF(-2.5)-", "AF(-5)-", "AJ(ROLLO .5 M)-", "AJ(ROLLO 1.500 M)-",
+                       "AF(1,000.50)-", "AF(16.384.000)-", "AF(1/2)-", "AF(1½)-", "AF(1.5²)-"]
+
+
+@pytest.mark.parametrize("malo", CAMBIA_EN_UNO_LIBRE)
+def test_un_numero_que_cambiaria_no_se_genera(malo):
+    with pytest.raises(ValueError, match=r"del ítem 3: en «A[FJ]\(.*cambiaría de valor.*no se genera"):
+        mg.limpiar_sufijo(malo, " del ítem 3")
+
+
+@pytest.mark.parametrize("malo", ["AJ(ROLLO 1.500 M)-", "AF(-2.5)-"])
+def test_el_numero_que_cambiaria_no_genera_y_dice_donde(malo):
+    with pytest.raises(ValueError, match=r"de la operación.*cambiaría de valor"):
+        _gen(sbt_sufijo_valor=malo)
+    with pytest.raises(ValueError, match=r"del ítem 1.*cambiaría de valor"):
+        _gen([dict(LONA, sufijo=malo)])
+
+
+SIGUEN_IGUAL = [
+    ("AJ(0.750)-", "AJ(0,750)-"),                 # con cero adelante es decimal
+    ("AJ(1,500)-", "AJ(1,500)-"),                 # la coma ya es la del MARIA
+    ("AB(RT-AC68U)-", "AB(RT AC68U)-"),           # guion de un modelo, no un signo
+    ("AI(123-456)-", "AI(123 456)-"),             # código de pieza en un libre
+    ("AI(V1.2.3)-", "AI(V1 2 3)-"),
+    ("AJ(1,5 M²)-", "AJ(1,5 M2)-"),          # el ² de una unidad
+    ("AF(2.5 X٣.٥)-", "AF(2,5 X   )-"),
+]
+
+
+@pytest.mark.parametrize("entrada,limpio", SIGUEN_IGUAL)
+def test_lo_que_no_cambia_un_numero_sale_como_antes(entrada, limpio):
+    assert mg.limpiar_sufijo(entrada)[0] == limpio
