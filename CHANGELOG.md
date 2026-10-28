@@ -18,6 +18,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(borrador):** al abrir sólo se recupera una operación del mismo usuario y de hace menos de 7 días; las más viejas se borran. Una pestaña duplicada no toma la operación de la original mientras sigue abierta; al recargar o restaurar se recupera la propia.
 - Si al abrir no se puede saber quién es el usuario (error del servidor o corte), la pestaña lo vuelve a pedir y la operación se sigue guardando.
+- Si mientras tanto otro usuario entra en el mismo navegador, lo cargado en esa pestaña no se guarda a su nombre ni él lo recupera; la pestaña deja de autoguardar hasta recargarla.
 
 ## 2026-10-28 · feat: copia de la base que se restaura y se compara antes de darla por buena (BACKUP-1a)
 

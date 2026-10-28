@@ -328,12 +328,24 @@
 
     /* ---------- 6. Usuario actual (avatar + saludo) ---------- */
     let currentUser = null;
+    // La pestaña es del primer usuario que conoce, y sólo si la sesión no
+    // cambió desde que abrió: si otro entra en el mismo navegador mientras
+    // ésta reintenta, o la consulta trae después otro usuario, lo cargado no
+    // es de él y la pestaña deja de guardar y de recuperar.
+    const sesionAlAbrir = getCsrfToken();
+    let duenoPestana = null, sesionAjena = false, sinSesion = false;
     // Devuelve si ya se sabe quién es el usuario (sin él no hay autoguardado).
     async function loadCurrentUser() {
         try {
             const res = await api('/auth/current_user');
             if (!res.ok) return;
             const user = await res.json();
+            if (duenoPestana === null) {
+                duenoPestana = user.username || '';
+                if (getCsrfToken() !== sesionAlAbrir) sesionAjena = true;
+            } else if (user.username !== duenoPestana) {
+                sesionAjena = true;
+            }
             currentUser = user;
             CDI.currentUser = user;
             // Banner de billing (trial / past_due / activar plan).
@@ -353,15 +365,16 @@
             else if (avatar) avatar.textContent = initials;
             if (name) name.textContent = user.name || user.username || '';
         } catch (err) {
+            if (err && err.message === 'unauthorized') sinSesion = true;
             console.warn('[CDI v2] no se pudo cargar usuario:', err);
         }
         return !!currentUser;
     }
 
     // Un 500 o un corte al abrir no deja la pestaña sin dueño para siempre:
-    // reintenta de 1 a 30 segundos (un 401 ya manda al login).
+    // reintenta de 1 a 30 segundos; un 401 corta, porque ya manda al login.
     async function cargarUsuarioHastaTenerlo() {
-        for (let espera = 1000; !(await loadCurrentUser()); espera = Math.min(espera * 2, 30000)) {
+        for (let espera = 1000; !(await loadCurrentUser()) && !sinSesion; espera = Math.min(espera * 2, 30000)) {
             await new Promise(r => setTimeout(r, espera));
         }
     }
@@ -861,6 +874,7 @@
     }
 
     function usuarioActual() {
+        if (sesionAjena) return null;
         return (CDI.currentUser && CDI.currentUser.username) || null;
     }
 
