@@ -424,6 +424,63 @@ PY=python bash scripts/testing/sabotajes/sesion1.sh 895ee73   # 19 ROJO, «sabot
 python -m pytest -q --no-cov tests/test_sesion1.py
 ```
 
+## ABUSO-1: **entregada** en `43916a7` (2026-10-28, 17:16 UTC)
+
+**Resultado:** la pieza como está en `43916a7` (base `c702655`), sin
+arreglo. Suite completa sobre `43916a7`: 3930 passed, 336 skipped, 2
+xfailed, 0 failed. Sabotajes `abuso1.sh`: 27/27 en rojo. Detalle en
+«ABUSO-1: hecha» más abajo. **Hay una regresión reproducida por el
+revisor: no recomiendo publicar sin arreglarla (D44).**
+
+**Decide la PM:** D44.
+
+- **D44 (ABUSO-1):** el login ahora toma dos conexiones: la de la sesión
+  del pedido y otra de `engine.begin` para sumar o limpiar el contador
+  (`main.py:2770`, `2778`, `2827`). Con 120 logins malos a la vez desde IPs
+  distintas, el revisor midió en Postgres 16 `401:96 / 500:24` y
+  `401:85 / 500:35`, `/health` en 33,9 s y 33,1 s, y en el log «QueuePool
+  limit of size 20 overflow 30 reached ... timeout 30.00»; sobre
+  `c702655`, `401:120` y sin QueuePool. El fallo que termina en 500 no se
+  cuenta. Hacen falta unas 100 IPs (slowapi deja 5 por minuto por IP).
+  Es el mismo mecanismo que los «50 de 50 con 40 logins» de la D39, pero
+  ahora con el número que muestra que lo agrava esta pieza. (1) Lo
+  arreglo después de las 18:00, encima de la cadena: el contador usa la
+  conexión del pedido, con rojo de concurrencia en Postgres 16 y sabotaje,
+  antes de publicar (recomendada: es un 500 nuevo que traba también
+  `/health`). (2) Se publica así y queda con la D39.
+
+| Revisor | Modelo y esfuerzo | Hallazgos | Qué hice |
+|---|---|---|---|
+| abuso1-opus | Opus alto | (1) media, regresión, reproducida: la D44. (2) media, del diseño de la D35 (b): el tope de recuperar usuario (3 por hora por email, ventana fija) deja a la víctima sin mail 1 h con 4 pedidos desde otra IP; con el email en MAYÚSCULAS el pedido no encuentra cuenta pero el contador pasa a minúsculas (`main.py:1587`). (3) media, de antes (fila 14): el login correcto borra el contador de la IP; 4 fallos y un login propio por minuto nunca bloquean (unos 5700 intentos por día por IP). (4) baja, decidida: eventos anónimos, 240 filas y 1 920 000 caracteres en `props` en un minuto desde una IP. (5) baja: deadlock en Postgres entre el `DELETE` de vencidas y el upsert (`limites_auth.py:78`, `:92`): 18 de 400 con ventanas de 10 a 100 ms, 0 de 16 000 con 1 a 2 s. Sospechas: IPv6 /64; varios `X-Forwarded-For`; `TRUSTED_PROXY_HOPS=2` con acceso directo. **Aviso:** tocó la base `adv_email1_opus` (usuario `advpool1`, 60 logins fallidos desde 10.8.0.x) en el puerto 24817, local y descartable | D44; lo demás, riesgos |
+| abuso1-sonnet | Sonnet alto | R1 media: `change-password` y el `PUT` del perfil sin límite (30 intentos, nunca 429). R2 media: el reset sin tope por email, unos 110 mails por día a una víctima desde una IP. R3 media: = opus (2). R4 media, fuera: = opus (3). R5 baja: invitaciones y verify-email sin tope. R6 baja: telemetría antes del login, 8000 caracteres sin retención. Sospechas: varias entradas de `X-Forwarded-For` en Railway dan una IP común; el puerto en la IP | Riesgos |
+| `/code-review high` + `/security-review` | Opus alto, en fork; la security a mano porque la skill falló con `fatal: ambiguous argument 'origin/HEAD...'` | (1) media: = opus (1). (2) media: = opus (5). (3) baja: los topes de recuperar usuario y de registro sólo valen si `limiter.enabled`, que se apaga sólo en `conftest`: es un atajo de prueba en el producto (`main.py:1582`, `:2943`). (4) baja: los eventos sin sesión aceptan un token revocado (`main.py:2501`). (5) baja: cada 429 deja un WARNING. (6) baja: `logging_middleware` toma la primera entrada de `X-Forwarded-For`. (7 a 9) bajas. Security: el login ignora lo que devuelve `sumar_fallo`, así que al vencer el bloqueo una ráfaga prueba hasta 5 claves por IP cada 15 min (`main.py:2760`); `TRUSTED_PROXY_HOPS` mal puesto (D35, runbook); los topes son sólo por IP | D44; lo demás, riesgos |
+
+**Lo que es lectura y lo que corrió cada uno:** el pool, el deadlock y
+los eventos los midió el Opus con sus scripts; los 30 intentos sin 429 y
+los mails por día salen del Sonnet; lo demás es lectura. Yo no reproduje
+ninguno.
+
+**Riesgos que quedan:**
+- **Medias:** el tope por email de recuperar usuario silencia a la
+  víctima; el reset sin tope por email; `change-password` y el perfil sin
+  límite; el login correcto limpia el contador (de antes); el deadlock
+  ocasional con ventanas cortas (con las de producción, de 15 min, no
+  apareció en 16 000).
+- **Baja, regla de `CLAUDE.md`:** `limiter.enabled` funciona como atajo de
+  prueba dentro del producto. Propuesta: que los topes propios no dependan
+  de esa bandera.
+- **Bajas:** lo demás de la tabla.
+
+**Archivos de producto:** `proyecto_maria/core/limites_auth.py`,
+`proyecto_maria/core/rate_limit.py`, `proyecto_maria/database/models.py`,
+`proyecto_maria/main.py`, `HANDOFF.md`, `CHANGELOG.md`.
+
+```bash
+git diff --stat c702655..43916a7 -- . ':!docs'   # 13 files changed, 1454 insertions(+), 90 deletions(-)
+PY=python bash scripts/testing/sabotajes/abuso1.sh 43916a7   # 27 ROJO, «sabotajes sin rojo: 0»
+python -m pytest -q --no-cov tests/test_abuso1.py
+```
+
 ## Entregas preparadas para las 18:00 UTC (2026-10-28)
 
 Recibí la D37 (2) en `20fb535`. En ABUSO-1 la pasé a riesgos, con lo que
@@ -452,7 +509,7 @@ tocan `docs/`. A las 18:00 queda sólo la autorrevisión con subagentes,
 | 7 | DISCO-1 | `88b22c8`, **entregada** | `cf84a76` | 3847 passed, 336 skipped, 2 xfailed, 0 failed | 20/20 |
 | 8 | OBSERVABILIDAD-1 | `39be45e`, **entregada** | `88b22c8` | 3855 passed, 336 skipped, 2 xfailed, 0 failed | 16/16 |
 | 9 | SESION-1 | `895ee73`, **entregada** | `f5160d7` | 3872 passed, 336 skipped, 2 xfailed, 0 failed | 19/19 |
-| 10 | ABUSO-1 | `43916a7` | `c702655` | 3930 passed, 336 skipped, 2 xfailed, 0 failed | 27/27 |
+| 10 | ABUSO-1 | `43916a7`, **entregada** | `c702655` | 3930 passed, 336 skipped, 2 xfailed, 0 failed | 27/27 |
 | 11 | EMAIL-1 | `2b93071` | `e22a5cf` | 3954 passed, 336 skipped, 2 xfailed, 0 failed | email1 13/13; abuso1 27/27 sobre `2b93071` |
 | 12 | CONEXIONES-1 | `30c0e97` | `2b93071` | no cambia producto ni pytest; medición «sin conexiones tomadas» | 3/3 |
 
