@@ -2,7 +2,7 @@
 // C: con el plan vencido (past_due) se ve «Cancelar plan» y la confirmación
 // no promete el «período ya pagado»; con el plan activo, sí.
 // D: dos clics en «Activar plan» piden un solo checkout, y el botón queda
-// deshabilitado mientras espera.
+// deshabilitado mientras espera y mientras el navegador va a Mercado Pago.
 // El estado de cobro y las respuestas de cancelar y del checkout se fuerzan
 // con page.route: las pruebas del servidor cubren cuándo salen de verdad.
 // Sale con error si algo no se cumple.

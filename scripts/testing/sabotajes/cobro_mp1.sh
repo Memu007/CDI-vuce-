@@ -398,9 +398,13 @@ else
     "billingActivateBtn.addEventListener('click', () => openCheckout());" \
     "FALLA: el botón «Activar plan» no se deshabilita mientras pide el checkout"
   sabotaje $P "D: el botón no vuelve después del error" \
-    "                boton.disabled = false;" \
-    "" \
+    $'        if (boton) {\n            boton.disabled = false;' \
+    $'        if (boton) {' \
     "FALLA: el botón «Activar plan» no vuelve a su estado después del error"
+  sabotaje $P "D: el botón se rehabilita al ir a Mercado Pago" \
+    $'                }\n                window.location.href = data.init_point;' \
+    $'                }\n                if (boton) { boton.disabled = false; } window.location.href = data.init_point;' \
+    "FALLA: el botón «Activar plan» se vuelve a habilitar mientras el navegador va a Mercado Pago"
 fi
 
 echo "sabotajes con falla: $FALLAS"
