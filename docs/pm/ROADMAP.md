@@ -25,6 +25,8 @@ seguridad, esfuerzo medio).
 - **Esta semana:** el «dale» para publicar la mejora del Excel (EXCEL-2,
   ya aceptada); pedirle al despachante el packing list de las lonas (peso
   neto) y la lista de las tres opciones de destino con su código en el TXT.
+- **Para DESPACHO-1:** pedirle al despachante uno o dos despachos ya
+  oficializados, tal como los baja del sistema.
 - **Al terminar la Fase 1b (~08/11):** la sesión con el despachante para
   probar; la siguiente, 15 días después.
 - **En la Fase 2:** pagar un plan chico con tu tarjeta.
@@ -92,6 +94,7 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 | 2 | DESTINO-1 | Tres destinos por operación: comercialización en el mercado interno, bien de uso de la empresa, bien de uso particular, con su código en el TXT | la lista con códigos que pase el despachante |
 | 3 | PESO-NETO-1 | El peso neto sale del packing list cuando la factura sólo trae bruto; si no hay packing list, el aviso de hoy | el packing list de las lonas |
 | 4 | MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11) | sus archivos reales |
+| 5 | DESPACHO-1 | Sumada por Emi el 28/10. Subir un despacho ya oficializado para armar el catálogo del cliente: se lee por renglón la posición SIM, la descripción, los sufijos, el origen, la unidad, el valor unitario y el peso; se revisa y se edita en pantalla antes de guardar en el catálogo de ese cliente; el catálogo del cliente se puede bajar en Excel. Nunca arma un TXT ni una operación (el lector de facturas sigue rechazando despachos); lo que no se encontró queda marcado, no se rellena | uno o dos despachos oficializados que pase el despachante (los reales sólo fuera del repo; las pruebas usan un sintético con la misma forma) |
 
 **Dev técnica:**
 
