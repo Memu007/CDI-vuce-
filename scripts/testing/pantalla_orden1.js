@@ -9,7 +9,17 @@
 //      siguen saliendo como un ítem con sus dos subítems;
 //  (c) un grupo se arrastra entero, y un producto se puede soltar sobre él;
 //  (d) recargar enseguida de arrastrar conserva el orden;
-//  (e) arrastrar después de una acción masiva: Ctrl+Z no vuelve el orden.
+//  (e) arrastrar después de una acción masiva: Ctrl+Z no vuelve el orden, y
+//      la selección sigue a los productos;
+//  (f) la operación es de quien la dejó: otro usuario en la misma computadora
+//      no la ve, y la clave vieja sin pestaña no se muestra a nadie;
+//  (g) un borrador de más de 7 días no se recupera y se borra; uno de casi 7
+//      días, sí;
+//  (h) la operación de una pestaña que murió sin avisar (sin pagehide) hace 4
+//      minutos se recupera;
+//  (i) una pestaña duplicada no toma la operación de la original, que sigue
+//      abierta; la misma pestaña restaurada después de un cierre sin pagehide
+//      recupera la suya.
 // Datos inventados. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_orden1.js
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
@@ -32,20 +42,34 @@ const CABLE = prod('Cable demo', '85444200900E', 40, 0.73);
 const TEL_1 = prod('Telefono demo uno', '85171300100F', 7, 99.97, { grupo_id: 7 });
 const TEL_2 = prod('Telefono demo dos', '85171300100F', 2, 55.51, { grupo_id: 7 });
 
+const CLAVE = 'Clave-Inventada-123';
+// Registra un usuario y deja abierta su sesión en el contexto; devuelve el nombre.
 async function nuevoUsuario(ctx, nombre) {
   const p = await ctx.newPage();
   const id = Date.now() + '_' + Math.floor(Math.random() * 1e6);
+  const usuario = nombre + '_' + id;
   const r = await p.request.post(base + '/auth/register',
-    { data: { username: nombre + '_' + id, password: 'Clave-Inventada-123', email: nombre + id + '@ejemplo.test' } });
+    { data: { username: usuario, password: CLAVE, email: nombre + id + '@ejemplo.test' } });
   if (!r.ok()) falla('no se pudo registrar el usuario de prueba: ' + r.status());
   // Sin el CUIT del despachante no se genera el TXT (ESTUDIO-1); inventado.
   const perfil = await p.request.put(base + '/api/user/profile', { data: { cuit: '20999999998' } });
   if (!perfil.ok()) falla('no se pudo cargar el CUIT del perfil: ' + perfil.status());
   await p.close();
+  return usuario;
 }
 
-async function abrir(ctx) {
+async function entrar(ctx, usuario) {
+  const r = await ctx.request.post(base + '/auth/login', { data: { username: usuario, password: CLAVE } });
+  if (!r.ok()) falla('no se pudo volver a entrar como ' + usuario + ': ' + r.status());
+}
+
+// Con `pestana`, la página arranca con ese id de pestaña en sessionStorage,
+// como la duplica o la restaura el navegador; sólo en la primera carga.
+async function abrir(ctx, pestana) {
   const p = await ctx.newPage();
+  if (pestana) await p.addInitScript(id => {
+    if (window.name !== 'cdi-prueba-pestana') { window.name = 'cdi-prueba-pestana'; sessionStorage.setItem('cdi_v2_tab', id); }
+  }, pestana);
   p.on('dialog', d => d.accept().catch(() => {}));
   await p.goto(base + '/dashboard');
   await p.waitForFunction(() => window.CDI && CDI.goTo && CDI.api && document.querySelector('.screen.is-active'));
@@ -83,6 +107,43 @@ async function cerrar(p) {
   await p.close({ runBeforeUnload: true });
   await cerrada;
 }
+
+// Abre, carga la operación, espera a que se guarde y cierra la pestaña.
+async function dejarAMedias(ctx, factura) {
+  const p = await abrir(ctx);
+  await cargar(p, factura, [prod('Producto de ' + factura, '84714900100D', 2, 10)]);
+  await esperarBorradores(p, [factura], 'la operación ' + factura + ' no se guarda');
+  await cerrar(p);
+}
+
+// Toca localStorage desde una página del mismo sitio que no corre la app, así
+// nadie adopta nada al abrirla.
+async function enElSitio(ctx, f, arg) {
+  const p = await ctx.newPage();
+  await p.goto(base + '/health');
+  const r = await p.evaluate(f, arg);
+  await p.close();
+  return r;
+}
+// Corre la fecha de guardado (edadMs atrás) o la marca de cerrada del borrador
+// de la factura, sin tocar el resto del sobre. Devuelve su clave.
+async function cambiarBorrador(ctx, factura, cambios) {
+  const clave = await enElSitio(ctx, ([f, c]) => {
+    const k = Object.keys(localStorage).find(k => k.startsWith('cdi_v2_state') && (localStorage.getItem(k) || '').includes('"' + f + '"'));
+    if (!k) return null;
+    const sobre = JSON.parse(localStorage.getItem(k));
+    if (c.edadMs !== undefined) sobre.savedAt = Date.now() - c.edadMs;
+    if (c.closed !== undefined) sobre.closed = c.closed;
+    localStorage.setItem(k, JSON.stringify(sobre));
+    return k;
+  }, [factura, cambios]);
+  if (!clave) falla('no está el borrador de ' + factura);
+  return clave;
+}
+const guardadas = async ctx => (await enElSitio(ctx, () => Object.keys(localStorage)
+  .filter(k => k.startsWith('cdi_v2_state')).map(k => ((localStorage.getItem(k) || '').match(/"numero_factura":"([^"]*)"/) || [])[1])));
+const MIN = 60 * 1000;
+const DIA = 24 * 60 * MIN;
 
 async function recuperada(p) {
   const hay = await p.waitForFunction(() => CDI.state && CDI.state.items && CDI.state.items.length > 0,
@@ -272,11 +333,96 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     if (!(await arrastrar(p, fila(2), fila(0)))) falla('el producto no tiene de dónde arrastrarlo');
     const esperado = ['Mouse demo', 'Equipo demo', 'Cable demo'];
     if (!igual(await orden(p), esperado)) falla('arrastrar el mouse arriba deja ' + JSON.stringify(await orden(p)));
+    // Estaban elegidos el equipo y el cable: siguen elegidos en su lugar nuevo.
+    const marcados = await p.$$eval('#ncmTbody [data-row-check]', cbs => cbs.filter(c => c.checked).map(c => c.getAttribute('data-row-check')));
+    if (!igual(marcados, ['1', '2'])) falla('al arrastrar, la selección no sigue a los productos: quedan elegidas las filas ' + JSON.stringify(marcados));
     await p.locator('body').click({ position: { x: 5, y: 300 } });
     await p.keyboard.press('Control+z');
     // El deshacer es sincrónico: si iba a cambiar algo, ya cambió.
     if (!igual(await orden(p), esperado)) falla('Ctrl+Z después de arrastrar vuelve el orden de antes: ' + JSON.stringify(await orden(p)));
     console.log('OK Ctrl+Z después de arrastrar no deshace el orden');
+    await ctx.close();
+  }
+
+  // (f) La operación es de quien la dejó.
+  if (corre('f')) {
+    const ctx = await nuevoContexto('ord1g');
+    const a = await (async () => (await (await abrir(ctx)).evaluate(() => CDI.currentUser.username)))();
+    await dejarAMedias(ctx, 'DUE-A');
+    // La clave de antes de ORDEN-1: la operación sola, sin pestaña ni dueño.
+    await enElSitio(ctx, it => localStorage.setItem('cdi_v2_state', JSON.stringify(
+      { operacion: { numero_factura: 'VIEJA-SIN-PESTANA' }, items: [it] })), prod('Producto viejo', '84714900100D', 1, 1));
+    const usuarioB = await nuevoUsuario(ctx, 'ord1h');
+    const pb = await abrir(ctx);
+    if ((await pb.evaluate(() => CDI.currentUser.username)) !== usuarioB) falla('la sesión no pasó al segundo usuario');
+    const rb = await recuperada(pb);
+    if (rb) falla('otro usuario en la misma computadora recupera la operación ' + rb);
+    const pb2 = await abrir(ctx);
+    const rb2 = await recuperada(pb2);
+    if (rb2) falla('otro usuario en la misma computadora recupera la operación ' + rb2 + ' en su segunda pestaña');
+    await cerrar(pb);
+    await cerrar(pb2);
+    if ((await guardadas(ctx)).includes('VIEJA-SIN-PESTANA')) falla('la clave vieja sin pestaña no se descarta');
+    await entrar(ctx, a);
+    const pa = await abrir(ctx);
+    const ra = await recuperada(pa);
+    if (ra !== 'DUE-A') falla('quien dejó la operación no la recupera: se recupera ' + ra);
+    console.log('OK la operación sólo la recupera quien la dejó; la clave vieja sin pestaña no se muestra');
+    await ctx.close();
+  }
+
+  // (g) La edad: 7 días.
+  if (corre('g')) {
+    const ctx = await nuevoContexto('ord1i');
+    await dejarAMedias(ctx, 'EDAD-FUERA');
+    await cambiarBorrador(ctx, 'EDAD-FUERA', { edadMs: 7 * DIA + MIN });
+    const p1 = await abrir(ctx);
+    const r1 = await recuperada(p1);
+    if (r1) falla('se recupera un borrador de hace más de 7 días: ' + r1);
+    if ((await guardadas(ctx)).includes('EDAD-FUERA')) falla('el borrador de hace más de 7 días no se borra al barrer');
+    await cerrar(p1);
+    await dejarAMedias(ctx, 'EDAD-DENTRO');
+    await cambiarBorrador(ctx, 'EDAD-DENTRO', { edadMs: 7 * DIA - MIN });
+    const p2 = await abrir(ctx);
+    const r2 = await recuperada(p2);
+    if (r2 !== 'EDAD-DENTRO') falla('un borrador de hace casi 7 días no se recupera: se recupera ' + r2);
+    console.log('OK un borrador de más de 7 días no vuelve y se borra; uno de casi 7, sí');
+    await ctx.close();
+  }
+
+  // (h) Una pestaña que murió sin pagehide hace 4 minutos.
+  if (corre('h')) {
+    const ctx = await nuevoContexto('ord1j');
+    await dejarAMedias(ctx, 'HUERFANA');
+    await cambiarBorrador(ctx, 'HUERFANA', { closed: false, edadMs: 4 * MIN });
+    const p = await abrir(ctx);
+    const r = await recuperada(p);
+    if (r !== 'HUERFANA') falla('no se recupera la operación de una pestaña que murió sin avisar hace 4 minutos: se recupera ' + r);
+    console.log('OK la operación de una pestaña muerta sin pagehide vuelve a los 3 minutos');
+    await ctx.close();
+  }
+
+  // (i) Duplicada y restaurada.
+  if (corre('i')) {
+    const ctx = await nuevoContexto('ord1k');
+    const p1 = await abrir(ctx);
+    await cargar(p1, 'DUP-A', [prod('Producto de la original', '84714900100D', 2, 10)]);
+    await esperarBorradores(p1, ['DUP-A'], 'la operación de la original no se guarda');
+    const id1 = await p1.evaluate(() => sessionStorage.getItem('cdi_v2_tab'));
+    if (!id1) falla('la pestaña no tiene id en sessionStorage');
+    const p2 = await abrir(ctx, id1);
+    const r2 = await recuperada(p2);
+    if (r2) falla('la pestaña duplicada tomó la operación de la original, que sigue abierta: ' + r2);
+    await esperarBorradores(p1, ['DUP-A'], 'con la duplicada abierta, la original perdió su operación');
+    await cerrar(p2);
+    // La original se va sin pagehide (el navegador se cerró de golpe) y el
+    // navegador la restaura con su id.
+    await cerrar(p1);
+    await cambiarBorrador(ctx, 'DUP-A', { closed: false, edadMs: 0 });
+    const p3 = await abrir(ctx, id1);
+    const r3 = await recuperada(p3);
+    if (r3 !== 'DUP-A') falla('la pestaña restaurada no recupera su operación: se recupera ' + r3);
+    console.log('OK la duplicada no toma la operación de la original viva; la restaurada recupera la suya');
     await ctx.close();
   }
 
