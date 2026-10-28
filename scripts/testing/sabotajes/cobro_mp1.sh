@@ -278,8 +278,8 @@ sabotaje $M "B: la exportación no cuenta la operación" \
 # C y E: cancelar desde past_due y reactivar una prueba con recarga.
 T=tests/test_cobro_mp1_cde.py
 sabotaje $M "C: past_due no puede cancelar" \
-  '    if db_user.billing_status not in ("trial", "active", "past_due"):' \
-  '    if db_user.billing_status not in ("trial", "active"):' \
+  '    if db_user.billing_status not in ("trial", "active", "past_due") and not cancelada_con_suscripcion:' \
+  '    if db_user.billing_status not in ("trial", "active") and not cancelada_con_suscripcion:' \
   "past_due no se puede cancelar"
 sabotaje $M "C: cancelar desde past_due deja los días que quedaban" \
   '            db_user.trial_ends_at = ahora' \
@@ -303,6 +303,24 @@ sabotaje $M "E: un rechazo saca la decisión de payment_provider" \
   $'               PagoMercadoPagoAplicado.estado == "aplicado")\n    )).scalars().all()\n    if not tipos:' \
   $'               PagoMercadoPagoAplicado.estado == "aplicado")\n    )).scalars().all()\n    if not tipos and not (await db.execute(select(PagoMercadoPagoAplicado.payment_id).where(PagoMercadoPagoAplicado.cuenta == db_user.username))).first():' \
   "una cuenta pagada volvió como prueba"
+
+# La cancelada que reabrió el checkout (hallazgo del adversario Opus).
+sabotaje $M "C: una cancelada con suscripción nueva no puede cancelarla" \
+  ' and not cancelada_con_suscripcion:' \
+  ':' \
+  "la suscripción nueva no se puede cancelar"
+sabotaje $M "C: una cancelada sin suscripción vuelve a cancelar" \
+  '    cancelada_con_suscripcion = db_user.billing_status == "canceled" and db_user.mp_preapproval_id' \
+  '    cancelada_con_suscripcion = db_user.billing_status == "canceled"' \
+  "assert 200 == 409"
+sabotaje $M "C: /billing/me nunca dice que hay suscripción abierta" \
+  '        "suscripcion_abierta": db_user.billing_status == "canceled" and bool(db_user.mp_preapproval_id),' \
+  '        "suscripcion_abierta": False,' \
+  "cancelada_con_checkout"
+sabotaje $M "C: /billing/me dice abierta a cualquier cancelada" \
+  '        "suscripcion_abierta": db_user.billing_status == "canceled" and bool(db_user.mp_preapproval_id),' \
+  '        "suscripcion_abierta": db_user.billing_status == "canceled",' \
+  "cancelada_sin"
 
 # D, el backend: la carrera de dos checkouts en un Postgres 16 descartable.
 T=scripts/testing/cobro_mp1d_postgres.py
@@ -352,9 +370,17 @@ if ! correr >/dev/null; then
 else
   echo "BASE  | la pantalla, en verde"
   sabotaje $P "C: past_due no muestra «Cancelar plan»" \
-    "        if (status === 'trial' || status === 'active' || status === 'past_due') {" \
-    "        if (status === 'trial' || status === 'active') {" \
+    "        if (status === 'trial' || status === 'active' || status === 'past_due'" \
+    "        if (status === 'trial' || status === 'active'" \
     "FALLA: past_due: no se ve «Cancelar plan»"
+  sabotaje $P "C: una cancelada con suscripción abierta no ve «Cancelar plan»" \
+    "            || (status === 'canceled' && b && b.suscripcion_abierta)) {" \
+    "            || false) {" \
+    "FALLA: canceled con suscripción abierta: no se ve «Cancelar plan»"
+  sabotaje $P "C: cualquier cancelada ve «Cancelar plan»" \
+    "            || (status === 'canceled' && b && b.suscripcion_abierta)) {" \
+    "            || (status === 'canceled')) {" \
+    "FALLA: canceled sin suscripción: se ve «Cancelar plan»"
   sabotaje $P "C: la confirmación de past_due promete el período ya pagado" \
     "        const vencido = billingStatusEl && billingStatusEl.dataset.status === 'past_due';" \
     "        const vencido = false;" \
