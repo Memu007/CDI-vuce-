@@ -2,6 +2,101 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## SEGURO-1: hecha, **sin entregar** (2026-10-28)
+
+Commits encima de SUFIJOS-2 (`4ca6829`) y del merge de tu rama
+(`1948207`): producto y `CHANGELOG.md` `4f75f3d`; casos y sabotajes
+`a08de1f`; un sabotaje con su patrón arreglado `371cde2`. **SHA probado:
+`371cde2`.** Sabotajes 10/10 en rojo en `371cde2`
+(`scripts/testing/sabotajes/seguro1.sh`) y suite completa en `a08de1f`:
+3777 passed, 336 skipped, 2 xfailed, 0 failed (`compileall` limpio). Entre `a08de1f` y `371cde2` sólo cambia el script de
+sabotajes, que pytest no junta. Va en su propio `/entregar`, después del de SUFIJOS-2,
+con `/security-review` porque es un campo de dinero. **No hace falta que la
+revises todavía.** Tiene una decisión: D30, abajo.
+
+**La premisa: confirmada.** `cuentas_del_valor` no conocía el incoterm,
+pero quien la llama (`_cuentas_del_valor` en `main.py`) tiene
+`request.incoterm`. Se lo paso: la regla vive en el servidor sin salir del
+alcance.
+
+- **La regla, en el servidor:** `INCOTERMS_CON_SEGURO = ("CIF", "CIP",
+  "DPU", "DAP", "DDP")` en `maria_generator.py`. Con esos, las cuentas
+  traen `seguro_sugerido: None` y `seguro_en_el_precio: true`. Con los
+  demás, el 1 % como antes. Mayúsculas, minúsculas y espacios dan lo mismo
+  (`" cif "` es CIF); vacío o desconocido (`"XYZ"`, `"C I F"`), con 1 %.
+- **La pantalla sigue al servidor**, no al incoterm de la operación: sin
+  `seguro_en_el_precio` hay botón aunque la operación diga CIF (hay una
+  prueba que lo fija). Con CIF no hay «Calcular seguro» ni «Dejar el
+  seguro», y `calcularSeguro()` no pone nada. La nota dice «Con CIF el
+  seguro ya está en el precio: el sistema no lo calcula.» y agrega que lo
+  carguen en la revisión si no hay seguro.
+- **El seguro se sigue declarando:** una operación CIF con seguro 14,88
+  sale con `MDDTASS 14.88` y `CDDTINCOTE CIF`. Un seguro escrito de 93,13
+  (el mismo número que daría el 1 %) con CIF también genera: es de la
+  persona.
+- **Cambio de incoterm con el seguro calculado:** cuando llegan las cuentas
+  del pedido de ahora con `seguro_en_el_precio` y la operación tiene
+  `seguro_calculado`, la pantalla borra el seguro, saca la marca, lo agrega
+  a `campos_sin_leer` (el mismo mecanismo que un campo que el lector no
+  leyó) y lo saca de `campos_completados`. El semáforo dice «No pudimos leer
+  el seguro de la factura: completalo.». Con cuentas de otro pedido no
+  borra nada. El leído o escrito no se toca. De CIF a CFR vuelve el botón y
+  no pone nada solo.
+- **El servidor también frena:** un pedido con `seguro_calculado` y uno de
+  los cinco da 400 «Seguro: lo calculó el sistema, pero con CIF el seguro ya
+  está en el precio y no se calcula. Cargá el de la factura en la
+  revisión.», en `/generate_maria` y en los avisos, aunque las cuentas
+  estén en error. Cubre una pestaña con el `finalize.js` viejo.
+- **El golden no se tocó:** `git diff 1948207..a08de1f -- tests/fixtures`
+  sale vacío.
+- **Dos pruebas existentes cambiaron, sin cambiar lo que miden:** en
+  `tests/test_valor1.py` la expectativa de las cuentas suma
+  `"seguro_en_el_precio": False`, y la función nueva
+  `borrarSeguroCalculado` se suma a las listas de los arneses de pantalla de
+  `test_valor1.py` y `test_valor1c.py` (extraen funciones por nombre).
+- **Archivos de producto:** `proyecto_maria/core/maria_generator.py`,
+  `proyecto_maria/main.py`, `proyecto_maria/static/v2/screens/finalize.js` y
+  `CHANGELOG.md`.
+
+**Supuestos reversibles:**
+- El borrado usa `campos_sin_leer`, que es la lista del lector. Por eso el
+  semáforo dice «No pudimos leer el seguro de la factura», aunque lo que
+  pasó es que el sistema lo borró. Si preferís otro texto, es un aviso
+  propio en `semaforo.js`.
+- La nota nombra el incoterm de la operación («Con CIF…»); si falta, dice
+  «este incoterm».
+- El 400 del servidor con un calculado y CIF no estaba pedido: es la regla
+  «vive en el servidor» aplicada a `seguro_calculado`. Sin él, una pestaña
+  vieja mandaría el 1 % con CIF.
+
+**Sabotajes (uno por regla):** DPU fuera de la lista; el incoterm sin
+normalizar; `main.py` no pasa el incoterm; la pantalla decide por
+`op.incoterm`; el botón calcula con CIF; `pintarValor` no borra; el
+servidor no frena el calculado con CIF; se borra también el escrito; se
+borra sin mirar la firma del pedido; el borrado deja el seguro como
+completado. En la primera corrida, el del incoterm en `main.py` no
+encontraba su patrón (la línea aparece cuatro veces): lo arreglé en
+`371cde2` con un patrón que aparece una sola vez.
+
+**Comandos:**
+
+```bash
+git diff 1948207..371cde2 --stat                 # 8 archivos; tests/fixtures no aparece
+git diff 1948207..371cde2 -- tests/fixtures | wc -l   # 0
+PY=<venv>/bin/python scripts/testing/sabotajes/seguro1.sh 371cde2
+#   10 líneas ROJO y al final «sabotajes sin rojo: 0»
+python -m pytest -q --no-cov tests/test_seguro1.py tests/test_valor1.py tests/test_valor1c.py
+#   151 passed
+```
+
+**Riesgos y lo que no hice:**
+- **D30:** un seguro «para completar» deja generar con seguro cero.
+- `finalize.js` se carga con `?v={{ version }}`; una pestaña abierta antes
+  del despliegue sigue con el JS viejo y muestra el botón con CIF. Si lo
+  aprieta, el servidor da el 400 de arriba: no sale el 1 % en el TXT.
+- Sin correr todavía: subagentes, `/code-review` y `/security-review`.
+  Vuelven a las 18:00 UTC.
+
 ## SUFIJOS-2: hecha, **sin entregar** (2026-10-28)
 
 Commits encima de `4905cd8`: casos en rojo `a12aae3`; producto y
@@ -10,14 +105,14 @@ Commits encima de `4905cd8`: casos en rojo `a12aae3`; producto y
 líneas cortas `4ca6829`. **SHA probado: `4ca6829`.** Sabotajes 9/9 en rojo
 (`scripts/testing/sabotajes/sufijos2.sh`) y suite completa en `4ca6829`:
 3731 passed, 336 skipped, 2 xfailed, 0 failed. Va en su propio `/entregar`, después del de DESTINO-1, cuando
-vuelva el cupo. **No hace falta que la revises todavía.** Tiene una
-decisión: D29, abajo.
+vuelva el cupo. **No hace falta que la revises todavía.** La D29 ya
+está contestada (a).
 
 - **Sufijo libre:** un número con decimales sale con coma. `AF(2.5)` sale
   `AF(2,5)`. Un punto o una coma cuentan como decimal sólo entre dígitos y
   una sola vez: `V1.2.3` sale `V1 2 3`, como antes, y `ROJO, AZUL` sale con
   espacio. Vale también para la propuesta que arma el arancel.
-- **Sufijo que pide número** (los `Z`, ver D29) con decimales: no se
+- **Sufijo que pide número** (los `Z`, D29 contestada (a)) con decimales: no se
   genera. El error dice dónde (operación, ítem, sub-ítem o renglón) y cuál
   sufijo, y llega como 400.
 - **Ninguno vacío:** `AA()`, `AA(   )` o `AA(--)` (que queda vacío al
@@ -85,28 +180,29 @@ pierda si el contenedor muere. **No hace falta que la revises todavía.**
 
 ## Decisiones
 
-**D29 — cuáles sufijos «piden número».** El despachante dijo «sin
-decimales», pero ni el repo ni la tabla de ARCA (`sufijos_arca.json.gz`,
-07/10/2026) dicen qué sufijo es numérico: la tabla no trae tipo de dato.
-Lo que sí muestra la tabla: los libres son de dos letras y empiezan sólo con
-`A` o con `Z`.
-- Los `A`: 55 descripciones, 2339 entradas. Son texto: marca, modelo,
-  versión, código de producto.
-- Los `Z`: 442 descripciones, 9478 entradas. Son magnitudes o cantidades:
-  peso, ancho, hilos por cm, cilindrada, año.
-- En algunos `Z` ARCA ya elige la unidad para no usar decimales: «en
-  décimas de mm», «milésimas de quilates».
-- El archivo aceptado trae `ZA(016384)`, `ZB(004400)` y otros: enteros.
+**D30 — un seguro «para completar» deja generar con seguro cero.** Lo
+pediste comprobar en SEGURO-1 y lo deja. Lo que pasa hoy:
+- «Para completar» (`campos_sin_leer`) vive sólo en la pantalla. El
+  semáforo lo muestra como aviso y el botón de generar no se traba: se traba
+  sólo con los errores que devuelve el servidor (`finalize.js`, línea 586).
+- El servidor no recibe `campos_sin_leer`. Comprobado contra el endpoint:
+  CIF con seguro `""` o `0` da 200 y `MDDTASS 0.00`.
+- No es nuevo de SEGURO-1: pasa igual cuando el lector no lee el seguro de
+  una factura (MARIA-1c). SEGURO-1 suma un camino más para llegar ahí.
 
-El supuesto quedó en una línea, `PIDE_NUMERO = ("Z",)`.
+- **(b) Recomiendo esta.** El pedido lleva qué campos siguen «para
+  completar» y el servidor no genera mientras el seguro esté ahí, con un
+  400 que dice qué completar, como `_seguro_calculado_viejo`. Así la regla
+  vive en el servidor, como pediste para SEGURO-1. El costo: con CIF, una
+  factura que de verdad no trae seguro necesita que alguien escriba `0` a
+  propósito, y eso hay que decirlo en la nota. Es una pieza chica aparte
+  (servidor, pantalla, pruebas y sabotajes), no la meto en SEGURO-1.
+- **(a)** Queda como aviso, como hoy. Se puede generar con seguro cero sin
+  completarlo.
+- **(c)** Frenar sólo el caso del borrado de SEGURO-1 y dejar el del lector
+  como aviso. Deja dos reglas para el mismo campo; no la recomiendo.
 
-- **(a) Recomiendo esta.** Los `Z` piden número y los `A` son libres, como
-  está. Es lo que muestran la tabla y el archivo aceptado, y se revierte en
-  una línea. El costo: unas 90 descripciones `Z` (1459 entradas: quilates
-  promedio, ppm, %, g/m2) pueden traer decimales naturales. Con (a) esas no
-  generan hasta que se escriben enteras, y el error dice cuál es.
-- **(b)** Otra lista, confirmada por el despachante (pregunta nueva). Hasta
-  que conteste, queda (a).
+**D29 — contestada (a) en `3d3ab47`.** `PIDE_NUMERO = ("Z",)` queda.
 
 **D28 — contestada (a) en `be1cac2`.** DESTINO-1 rompe seis pruebas que
 comparan el golden entero. No
@@ -597,6 +693,6 @@ PY=<venv>/bin/python scripts/testing/sabotajes/despacho1a.sh 51890cd
 - **El 400 «es para otro email»** dice que el email escrito no es el
   invitado. No dice cuál es. Hace falta el token para preguntar.
 
-Última vuelta: Wed Oct 28 03:22:06 UTC 2026
+Última vuelta: Wed Oct 28 04:21:29 UTC 2026
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed); ocho pruebas comparan el golden, no seis. SUFIJOS-2 hecha y subida SIN ENTREGAR encima de 4905cd8: producto 79dc0c6+0118f5f+4ca6829, SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 336 skipped, 2 xfailed, 0 failed); D29 abierta (qué sufijos piden número; supuesto PIDE_NUMERO=("Z",), recomiendo a); cambió test_sufijos1::test_un_codigo_con_el_valor_vacio_no_se_genera. Pendiente: el 28/10 después de las 18:00 UTC, primero /entregar de ORG-1, ORG-1b y DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), timbre «Dev MARIA: entregué ORG-1, ORG-1b y DESPACHO-1a en <SHA>»; después /entregar de DESTINO-1 aparte (supuestos reversibles COMERC/BDEUSO/USOPAR, rojo previo ajeno de pantalla_maria4.js, nueve scripts con ruta vieja de chromium); después /entregar de SUFIJOS-2. Después SEGURO-1 (la PM la detalla). PESO-NETO-1 y PRORRATEO-1 esperan al despachante; DESPACHO-1 después. La próxima D es la D30. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed); ocho pruebas comparan el golden, no seis. SUFIJOS-2 hecha y subida SIN ENTREGAR encima de 4905cd8: producto 79dc0c6+0118f5f+4ca6829, SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 336 skipped, 2 xfailed, 0 failed); D29 contestada (a) en 3d3ab47, PIDE_NUMERO=("Z",) queda. SEGURO-1 hecha y subida SIN ENTREGAR encima de 4ca6829 y del merge 1948207: producto 4f75f3d, pruebas a08de1f, arreglo de sabotaje 371cde2, SHA probado 371cde2 (sabotajes seguro1.sh 10/10 en 371cde2; suite a08de1f 3777 passed, 336 skipped, 2 xfailed, 0 failed); D30 abierta (un seguro «para completar» deja generar con seguro 0; recomiendo b, pieza aparte). Pendiente: el 28/10 después de las 18:00 UTC, primero /entregar de ORG-1, ORG-1b y DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), timbre «Dev MARIA: entregué ORG-1, ORG-1b y DESPACHO-1a en <SHA>»; después /entregar de DESTINO-1 aparte (supuestos reversibles COMERC/BDEUSO/USOPAR, rojo previo ajeno de pantalla_maria4.js, nueve scripts con ruta vieja de chromium); después /entregar de SUFIJOS-2; después /entregar de SEGURO-1 con /security-review (campo de dinero). PESO-NETO-1 y PRORRATEO-1 esperan al despachante; DESPACHO-1 después. La próxima D es la D31. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
