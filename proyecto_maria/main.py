@@ -149,7 +149,7 @@ import logging
 from sqlalchemy.exc import IntegrityError
 from passlib.context import CryptContext
 
-from proyecto_maria.core.rate_limit import limiter, get_dynamic_rate_limit, get_client_ip
+from proyecto_maria.core.rate_limit import limiter, get_dynamic_rate_limit, get_client_ip, log_429
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
@@ -402,7 +402,14 @@ app.add_middleware(
 
 # Configurar Rate Limiting
 app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+
+def _limite_por_minuto_excedido(request: Request, exc: RateLimitExceeded):
+    log_429(request, f"limite {exc.detail}")
+    return _rate_limit_exceeded_handler(request, exc)
+
+
+app.add_exception_handler(RateLimitExceeded, _limite_por_minuto_excedido)
 
 
 # ----- Handlers globales: dejar mensaje amigable al user en 5xx,
@@ -1499,6 +1506,7 @@ async def request_password_reset(request: PasswordResetRequest, req: Request, db
         attempt_data = reset_attempts[client_ip]
         if attempt_data["block_until"] > now:
             wait_mins = int((attempt_data["block_until"] - now) / 60) + 1
+            log_429(req, "reset bloqueado")
             raise HTTPException(status_code=429, detail=f"Demasiados intentos. Intente en {wait_mins} minutos.")
     
     # Incrementar contador
@@ -2714,6 +2722,7 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
         attempt_data = login_attempts[client_ip]
         if attempt_data["block_until"] > now:
             wait_seconds = int(attempt_data["block_until"] - now)
+            log_429(request, "login bloqueado")
             raise HTTPException(status_code=429, detail=f"Demasiados intentos fallidos. Intente de nuevo en {wait_seconds} segundos.")
             
     username = login_request.username

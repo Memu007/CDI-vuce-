@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: los límites contra abuso cuentan la IP real (ABUSO-1, S4)
+
+- Los límites de intentos (login, recuperar contraseña y los por minuto) toman la IP que agrega el proxy de Railway, la última de X-Forwarded-For, y no la primera, que la escribe quien manda el pedido: inventando una IP distinta en cada intento se esquivaba el bloqueo, y poniendo la de otro se lo bloqueaba. Cada 429 deja en el log la IP tomada.
+
 ## 2026-10-28 · fix: los eventos de uso tienen un tope de tamaño (ABUSO-1, S5)
 
 - Un evento de uso de más de 16 KB se rechaza y no se guarda; antes cualquiera, sin sesión, podía mandar eventos de varios MB que se copiaban enteros a un archivo del servidor. Los eventos ya no se copian a un archivo de log que nadie leía: quedan sólo en la base.
