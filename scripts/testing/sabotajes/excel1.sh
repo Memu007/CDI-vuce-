@@ -140,13 +140,14 @@ sabotaje $M "el total en la columna de código vuelve a entrar" \
   '            if _es_fila_de_total(rotulo or pieza):' \
   '            if _es_fila_de_total(descripcion):' \
   "FAILED $L::test_total_en_la_columna_de_codigo_no_entra"
+# Desde EXCEL-3c el filtro decide con el rótulo propio de la fila (cargo).
 sabotaje $M "el flete vuelve a entrar como producto" \
-  '        if not trae and _FILA_QUE_NO_ES_MERCADERIA_RE.match(item.descripcion or ""):' \
-  '        if False:' \
+  $'            else:\n                no_es_mercaderia = bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo))' \
+  $'            else:\n                no_es_mercaderia = False' \
   "FAILED $L::test_total_flete_y_condiciones_no_son_productos"
 sabotaje $M "vuelve a descartarse todo producto sin NCM ni origen" \
-  '        if not trae and _FILA_QUE_NO_ES_MERCADERIA_RE.match(item.descripcion or ""):' \
-  '        if not trae and any(t for _f, t, _i in candidatos):' \
+  $'        if no_es_mercaderia:\n            descartes.append(fila)' \
+  $'        if no_es_mercaderia or (not item.pieza and item.origen == "XX"\n                                and any(c[4].pieza or c[4].origen != "XX" for c in candidatos)):\n            descartes.append(fila)' \
   "FAILED $L::test_productos_sin_ncm_ni_origen_entran_aunque_otra_fila_los_traiga"
 # Con MARIA-5 integrada (D23): entre «Peso (kg)» y «Peso (bruto)» decide el
 # rango del peso, no el orden de las columnas.
