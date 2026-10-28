@@ -481,6 +481,45 @@ PY=python bash scripts/testing/sabotajes/abuso1.sh 43916a7   # 27 ROJO, «sabota
 python -m pytest -q --no-cov tests/test_abuso1.py
 ```
 
+## EMAIL-1: **entregada** en `2b93071` (2026-10-28, 17:16 UTC)
+
+**Resultado:** la pieza como está en `2b93071` (base `e22a5cf`), sin
+arreglo. Suite completa sobre `2b93071`: 3954 passed, 336 skipped, 2
+xfailed, 0 failed. Sabotajes `email1.sh`: 13/13 en rojo, y `abuso1.sh`
+sobre `2b93071`: 27/27. Detalle en «EMAIL-1: hecha» más abajo.
+
+**Decide la PM:** D45.
+
+- **D45 (EMAIL-1):** en Postgres, un email con «İ» (U+0130) esquiva el
+  tope por email de recuperar usuario: Python y Postgres pasan esa letra
+  a minúsculas distinto, y el revisor sacó 12 mails con un tope de 3. En
+  SQLite no pasa. (1) Lo arreglo después de las 18:00, encima de la
+  cadena, con rojo en Postgres 16 y sabotaje, antes de publicar
+  (recomendada: es un tope que la pieza dice cumplir). (2) Se publica así
+  y va a otra pieza.
+
+| Revisor | Modelo y esfuerzo | Hallazgos | Qué hice |
+|---|---|---|---|
+| email1-opus | Opus alto | R1 media, dentro: la D45, reproducida en Postgres. R2 baja: el bootstrap de admin compara exacto (falla del lado seguro). Fuera: el alta de estudio y la invitación no validan el formato del email | D45; lo demás, riesgos |
+| email1-sonnet | Sonnet alto | Nada dentro. Bajas: `func.lower` sin índice (el barrido lo acotan los topes por IP, `main.py:1524`); bootstrap de admin exacto, a propósito (`:1478`); `Client.email` exacto (fuera, `:6948`); un cambio sólo de mayúsculas se ignora con 200 (supuesto); `dev_token_hint` y el tiempo del SMTP, de antes | Riesgos |
+| `/code-review high` + `/security-review` | Opus alto, en fork; la security a mano porque la skill falló con `fatal: ambiguous argument 'origin/HEAD...'` | (1) media, sospecha: sin índice único sobre `lower(email)`, una carrera crea un par y traba la recuperación y el login de las dos (es la D38 (3), que espera el conteo de Emi). (2) baja: `email1_motores.py:268-272` no distingue el defecto (pytest sí). (3) baja: `REGISTER_TEST_EMAIL_REPLACE` archiva variantes antes de validar. (4) baja: no recorta el guardado. (5) baja: el perfil no normaliza (D38). (6) `func.lower` sin índice. (7 y 8) consultas dobles y tiempo. (9) bootstrap exacto. (10) el script de motores no cierra la conexión. Security: el reset sin tope por email (de antes; está en ABUSO-1) | Riesgos |
+
+**Lo que es lectura y lo que corrió cada uno:** los 12 mails los sacó el
+Opus en su Postgres; lo demás es lectura. Yo no reproduje ninguno.
+
+**Riesgos que quedan:** la carrera que crea pares hasta el índice de la
+D38 (3); quien ya tiene un par y escribe otras mayúsculas no recupera
+hasta la D38 (3); el perfil guarda el email como viene; el script de
+motores no distingue el defecto en un punto (lo distingue pytest).
+
+**Archivos de producto:** `proyecto_maria/main.py`, `CHANGELOG.md`.
+
+```bash
+git diff --stat e22a5cf..2b93071 -- . ':!docs'   # 6 files changed, 832 insertions(+), 25 deletions(-)
+PY=python bash scripts/testing/sabotajes/email1.sh 2b93071   # 13 ROJO, «sabotajes sin rojo: 0»
+python -m pytest -q --no-cov tests/test_email1.py
+```
+
 ## Entregas preparadas para las 18:00 UTC (2026-10-28)
 
 Recibí la D37 (2) en `20fb535`. En ABUSO-1 la pasé a riesgos, con lo que
@@ -510,7 +549,7 @@ tocan `docs/`. A las 18:00 queda sólo la autorrevisión con subagentes,
 | 8 | OBSERVABILIDAD-1 | `39be45e`, **entregada** | `88b22c8` | 3855 passed, 336 skipped, 2 xfailed, 0 failed | 16/16 |
 | 9 | SESION-1 | `895ee73`, **entregada** | `f5160d7` | 3872 passed, 336 skipped, 2 xfailed, 0 failed | 19/19 |
 | 10 | ABUSO-1 | `43916a7`, **entregada** | `c702655` | 3930 passed, 336 skipped, 2 xfailed, 0 failed | 27/27 |
-| 11 | EMAIL-1 | `2b93071` | `e22a5cf` | 3954 passed, 336 skipped, 2 xfailed, 0 failed | email1 13/13; abuso1 27/27 sobre `2b93071` |
+| 11 | EMAIL-1 | `2b93071`, **entregada** | `e22a5cf` | 3954 passed, 336 skipped, 2 xfailed, 0 failed | email1 13/13; abuso1 27/27 sobre `2b93071` |
 | 12 | CONEXIONES-1 | `30c0e97` | `2b93071` | no cambia producto ni pytest; medición «sin conexiones tomadas» | 3/3 |
 
 - **Base de ORG-1: `fb11735`, no `ea64a9c`.** `git diff ea64a9c..4ce6d22`
