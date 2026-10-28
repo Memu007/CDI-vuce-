@@ -15,7 +15,9 @@ el código de antes del arreglo da FALLA, y esa FALLA es la reproducción.
 6. recuperar usuario corta en silencio al cuarto pedido de la hora para un
    mismo email, venga de la IP que venga;
 7. los eventos tienen 120 por minuto por ruta, y sin sesión se guardan los de
-   la lista.
+   la lista;
+8. una IP de más de 120 caracteres (la clave de la tabla) no rompe ninguna de
+   las cuatro rutas con contador y sigue contando.
 
 El servidor corre con --no-proxy-headers: así request.client.host es la
 dirección del que conecta, como en Railway, donde el que conecta es su proxy
@@ -366,6 +368,22 @@ def eventos():
                  f"eventos {ruta}: uno de la lista sin sesión se guarda ({f})")
 
 
+def ip_larga():
+    # La última entrada de X-Forwarded-For la escribe el cliente si no hay
+    # proxy delante, o si el de Railway no agrega la suya.
+    ip = "x" * 300 + uuid.uuid4().hex
+    rutas = [("/auth/login", {"username": "nadie", "password": "x"}),
+             ("/auth/request-password-reset", {"email": "nadie@example.com"}),
+             ("/auth/recover-username", {"email": "nadie@example.com"}),
+             ("/auth/register", {"username": "ab1_larga", "password": CLAVE,
+                                 "email": "ab1_larga@example.com", "name": "Ab"})]
+    codigos = [pedir(r, c, ip=ip)[0] for r, c in rutas]
+    login = [pedir("/auth/login", {"username": "nadie", "password": "x"}, ip=ip)[0] for _ in range(5)]
+    print(f"INFO  | IP de 332 caracteres: login, reset, recuperar, registro → {codigos}; 5 logins más → {login}")
+    chequear(codigos == [401, 200, 200, 200], "una IP larga no rompe las rutas con contador")
+    chequear(login == [401] * 4 + [429], "una IP larga también se bloquea al quinto fallo")
+
+
 proc = None
 jsonl_original = tam_jsonl()
 try:
@@ -377,6 +395,7 @@ try:
     concurrencia()
     s6_por_email()
     eventos()
+    ip_larga()
     s4_login()
     s5_eventos()
     s6_recuperar()

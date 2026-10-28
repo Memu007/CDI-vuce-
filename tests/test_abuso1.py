@@ -226,12 +226,14 @@ def test_s4_el_limite_por_minuto_del_login_cuenta_la_ip_real(token):
     assert codigos == [200] * 5 + [429], codigos
 
 
-def test_s4_el_login_correcto_borra_los_fallos(token):
+@pytest.mark.parametrize("larga", (False, True))
+def test_s4_el_login_correcto_borra_los_fallos(token, larga):
     """Cuatro fallos, un login correcto, cuatro fallos más: no bloquea, porque
-    el correcto vuelve la cuenta a cero."""
+    el correcto vuelve la cuenta a cero (también con una IP más larga que la
+    clave de la tabla)."""
     from proyecto_maria.core.rate_limit import limiter
     limiter.enabled = False
-    real, c = _ip(), TestClient(app)
+    real, c = (_ip_larga() if larga else _ip()), TestClient(app)
     for _ in range(2):
         codigos = [_login(c, token[0], "mal", real).status_code for _ in range(4)]
         assert codigos == [401] * 4, codigos
@@ -453,3 +455,50 @@ def test_c9_registros_simultaneos_no_pasan_el_tope():
             return sorted(r.status_code for r in rs)
     codigos = asyncio.run(_correr())
     assert codigos == [200] * 5 + [429] * 15, codigos
+
+
+def _ip_larga():
+    # Sin proxy delante (o si Railway no agrega su entrada), la última de
+    # X-Forwarded-For la escribe el cliente y puede tener cualquier largo.
+    return "x" * 300 + uuid.uuid4().hex
+
+
+def _claves_largas():
+    async def _correr():
+        async with conn.AsyncSessionLocal() as s:
+            r = await s.execute(text("select clave from limites_auth"))
+            return [c for (c,) in r.all() if len(c) > 120]
+    return asyncio.run(_correr())
+
+
+@pytest.mark.parametrize("ruta,cuerpo", [
+    ("/auth/login", {"username": "nadie", "password": "x"}),
+    (RESET, {"email": "n@ejemplo.test"}),
+    ("/auth/recover-username", {"email": "n@ejemplo.test"}),
+    ("/auth/register", {"username": "ab1l_" + uuid.uuid4().hex[:8], "password": CLAVE,
+                        "email": f"ab1l_{uuid.uuid4().hex[:8]}@ejemplo.test", "name": "Ab"}),
+])
+def test_tabla_una_ip_larga_entra_en_la_clave(ruta, cuerpo):
+    """La clave de la tabla tiene 120 caracteres: una IP más larga no puede
+    llegar tal cual (en Postgres el INSERT falla y la ruta da 500)."""
+    r = TestClient(app).post(ruta, json=cuerpo, headers=_xff(_ip_larga()))
+    assert r.status_code in (200, 401), (r.status_code, r.text)
+    assert _claves_largas() == []
+
+
+def test_s4_una_ip_larga_tambien_se_bloquea():
+    from proyecto_maria.core.rate_limit import limiter
+    limiter.enabled = False
+    real, c = _ip_larga(), TestClient(app)
+    codigos = [_login(c, "nadie", "x", real).status_code for _ in range(6)]
+    assert codigos == [401] * 5 + [429], codigos
+
+
+def test_s4_dos_ips_largas_con_el_mismo_comienzo_no_se_pisan():
+    from proyecto_maria.core.rate_limit import limiter
+    limiter.enabled = False
+    una, otra, c = _ip_larga(), _ip_larga(), TestClient(app)
+    for _ in range(6):
+        _login(c, "nadie", "x", una)
+    r = _login(c, "nadie", "x", otra)
+    assert r.status_code == 401, (r.status_code, r.text)

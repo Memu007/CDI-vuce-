@@ -11,6 +11,9 @@
 # pasar el tope con pedidos simultáneos.
 # Eventos: 120 por minuto por ruta; sin sesión, sólo los de la lista.
 # Tabla: las vencidas se borran al escribir y al arrancar; contar es atómico.
+# IP larga: una IP de más de 120 caracteres entra en la clave (comienzo y
+# sha256), se bloquea, no pisa a otra con el mismo comienzo y el login correcto
+# la limpia.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/abuso1.sh [SHA]
 # Trabaja en un worktree descartable con su propia SQLite y sin terceros: no
@@ -119,7 +122,7 @@ sabotaje $M "el 429 del login no deja la IP en el log" \
   "FAILED $T::test_s4_el_429_del_login_deja_ip_y_entradas_en_el_log"
 sabotaje $M "el login correcto no borra los fallos" \
   '    await limites_auth.limpiar(clave_intentos)' '    pass' \
-  "FAILED $T::test_s4_el_login_correcto_borra_los_fallos" "[401, 401, 429, 429]"
+  "FAILED $T::test_s4_el_login_correcto_borra_los_fallos" "[401, 429, 429, 429]"
 
 # --- S6: recuperar usuario
 sabotaje $M "recuperar usuario sin límite por IP" \
@@ -179,6 +182,20 @@ sabotaje $L "contar lee y después escribe" \
   $'    ins = ins.on_conflict_do_update(index_elements=[_T.c.clave], set_={\n        "cuenta": _T.c.cuenta + 1,\n    })' \
   $'    async with _conn.engine.connect() as conn:\n        leida = (await conn.execute(select(_T.c.cuenta).where(_T.c.clave == clave, _T.c.vence > ahora))).scalar() or 0\n    ins = ins.on_conflict_do_update(index_elements=[_T.c.clave], set_={\n        "cuenta": leida + 1,\n    })' \
   "FAILED $T::test_c9_registros_simultaneos_no_pasan_el_tope"
+
+# --- una IP más larga que la clave de la tabla (120)
+sabotaje $L "la clave larga entra tal cual" \
+  '    if len(clave) <= 120:' '    if True:' \
+  "FAILED $T::test_tabla_una_ip_larga_entra_en_la_clave[/auth/login-cuerpo0]"
+sabotaje $L "la clave larga se corta sin hash" \
+  '    return clave[:50] + ":" + hashlib.sha256(clave.encode()).hexdigest()' '    return clave[:120]' \
+  "FAILED $T::test_s4_dos_ips_largas_con_el_mismo_comienzo_no_se_pisan" "(429, "
+sabotaje $L "segundos_bloqueado no acorta la clave" \
+  $'0 si no está bloqueada."""\n    clave = _clave(clave)' $'0 si no está bloqueada."""' \
+  "FAILED $T::test_s4_una_ip_larga_tambien_se_bloquea" "[401, 401, 401, 401, 401, 401]"
+sabotaje $L "limpiar no acorta la clave" \
+  $'async def limpiar(clave: str) -> None:\n    clave = _clave(clave)' $'async def limpiar(clave: str) -> None:' \
+  "FAILED $T::test_s4_el_login_correcto_borra_los_fallos[True]" "[401, 429, 429, 429]"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
