@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: cerrar sesión y cambiar la contraseña cierran de verdad las sesiones (SESION-1)
+
+- Cambiar la contraseña cierra las otras sesiones y deja abierta la tuya; resetearla las cierra todas; cerrar sesión invalida ese acceso aunque alguien se haya copiado la cookie. Antes, cambiar o resetear la contraseña volvía a habilitar las sesiones viejas.
+- Cambiar el email en el perfil pide la contraseña actual.
+
 ## 2026-10-28 · fix: las métricas de uso se vuelven a grabar en bases viejas (OBSERVABILIDAD-1)
 
 - Al arrancar, si la tabla de métricas no tiene la columna del dueño, se agrega sola (vacía, sin tocar lo grabado) con su índice. Sin ella cada métrica se perdía y el panel de admin daba error. Si no se puede agregar, la app arranca igual y lo deja en el log.

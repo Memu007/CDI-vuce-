@@ -90,7 +90,11 @@ from proyecto_maria.core import ncm_catalog
 from proyecto_maria.core import sufijos_arca
 from proyecto_maria.routers import admin_router, quote_router
 from proyecto_maria.services import billing_service
-from proyecto_maria.auth.dependencies import get_current_user
+from proyecto_maria.auth.dependencies import (
+    get_current_user,
+    revocar_sesion_de_la_request,
+    revocar_sesiones,
+)
 
 # ============== Configuración de Autenticación ==============
 _DEFAULT_DEV_SECRET = "tu-clave-secreta-super-segura-cambiar-en-produccion"
@@ -1615,8 +1619,8 @@ async def reset_password(request: Request, data: PasswordResetConfirm, db: Async
 
     # 4. Actualizar contraseña
     user.password = hash_password(data.new_password)
-    # Invalidar todos los tokens anteriores
-    user.active_jti = None
+    # Invalidar todos los tokens anteriores (NULL los aceptaría a todos)
+    revocar_sesiones(user)
 
     # 5. Marcar token como usado
     reset_token.is_used = True
@@ -1954,6 +1958,21 @@ async def update_user_profile(
     if not u:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
+    # El email sirve para recuperar la cuenta: cambiarlo (o vaciarlo) pide la
+    # contraseña actual, antes de tocar cualquier otro campo. La pantalla de
+    # perfil siempre manda el email, así que sólo se pide si cambió.
+    raw_email = str(body.get("email") or "").strip().lower()
+    if "email" in body and raw_email != (u.email or "").strip().lower():
+        if raw_email and not re.match(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", raw_email):
+            raise HTTPException(status_code=400, detail="Email no válido")
+        current_password = body.get("current_password")
+        if not isinstance(current_password, str) or not current_password:
+            raise HTTPException(status_code=400, detail="Para cambiar el email ingresá tu contraseña actual")
+        # 400 y no 401: el frontend toma cualquier 401 como sesión vencida y
+        # manda al login.
+        if not await run_in_threadpool(verify_password, current_password, u.password):
+            raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta")
+
     # Name: string libre. NO escapamos en storage (el frontend escapa al renderizar);
     # asi evitamos doble-escape de '&', comillas, etc. y caracteres validos como
     # "Importadora & Hijos SRL" se guardan tal cual.
@@ -1977,9 +1996,6 @@ async def update_user_profile(
 
     # Email editable para contacto/login
     if "email" in body:
-        raw_email = str(body.get("email") or "").strip().lower()
-        if raw_email and not re.match(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", raw_email):
-            raise HTTPException(status_code=400, detail="Email no válido")
         if raw_email:
             dup = await db.execute(select(User).where(User.email == raw_email, User.username != u.username))
             if dup.scalars().first():
@@ -2028,6 +2044,7 @@ class ChangePasswordRequest(BaseModel):
 @app.post("/api/user/change-password")
 async def change_password(
     body: ChangePasswordRequest,
+    request: Request,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -2055,7 +2072,8 @@ async def change_password(
         raise HTTPException(status_code=401, detail="La contraseña actual es incorrecta")
 
     db_user.password = await run_in_threadpool(hash_password, body.new_password)
-    db_user.active_jti = None
+    # Cierra las otras sesiones y conserva la de quien la cambió.
+    revocar_sesiones(db_user, getattr(request.state, "token_jti", None))
     await db.commit()
     print(f"🔒 Password cambiada por el propio user: {db_user.username}")
     return {"success": True, "message": "Contraseña actualizada"}
@@ -2794,8 +2812,9 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
     }
 
 @app.post("/auth/logout")
-async def logout(response: Response):
-    """Cierra sesión eliminando la cookie"""
+async def logout(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
+    """Cierra sesión: revoca el token y elimina la cookie"""
+    await revocar_sesion_de_la_request(request, db)
     response.delete_cookie("access_token")
     response.delete_cookie(CSRF_COOKIE_NAME)
     return {"message": "Sesión cerrada"}
@@ -9724,8 +9743,9 @@ async def get_auth_me(authorization: str = Header(None), db: AsyncSession = Depe
 
 # /logout is called by the frontend (app.js), must delete the auth cookie
 @app.post("/logout")
-def logout_root(response: Response):
-    """Cierra sesión eliminando la cookie (alias de /auth/logout)"""
+async def logout_root(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
+    """Cierra sesión: revoca el token y elimina la cookie (alias de /auth/logout)"""
+    await revocar_sesion_de_la_request(request, db)
     response.delete_cookie("access_token")
     return {"message": "Sesión cerrada"}
 
