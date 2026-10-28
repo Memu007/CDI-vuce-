@@ -290,6 +290,7 @@ class TestWebhook:
                     "response": {
                         "id": pid,
                         "status": "approved",
+                        "date_approved": datetime.now(timezone.utc).isoformat(),
                         "external_reference": f"{uname}:premium",
                         "transaction_amount": 45000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-mp-1"},
@@ -327,6 +328,7 @@ class TestWebhook:
                     "response": {
                         "id": pid,
                         "status": "approved",
+                        "date_approved": datetime.now(timezone.utc).isoformat(),
                         "external_reference": f"{uname}:premium",
                         "transaction_amount": 45000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-2"},
@@ -357,6 +359,7 @@ class TestWebhook:
                     "response": {
                         "id": pid,
                         "status": "approved",
+                        "date_approved": datetime.now(timezone.utc).isoformat(),
                         "external_reference": f"{uname}:premium",
                         "transaction_amount": 45000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-3"},
@@ -420,6 +423,7 @@ class TestWebhook:
                     "response": {
                         "id": pid,
                         "status": "approved",
+                        "date_approved": datetime.now(timezone.utc).isoformat(),
                         "external_reference": "usuarioquenoeexiste:premium",
                         "transaction_amount": 45000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-x"},
@@ -568,6 +572,7 @@ class TestTopup:
                     "response": {
                         "id": pid,
                         "status": "approved",
+                        "date_approved": datetime.now(timezone.utc).isoformat(),
                         "external_reference": f"{uname}:topup",
                         "transaction_amount": 10000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-tu"},
@@ -611,6 +616,7 @@ class TestTopup:
                     "response": {
                         "id": pid,
                         "status": "approved",
+                        "date_approved": datetime.now(timezone.utc).isoformat(),
                         "external_reference": f"{uname}:topup",
                         "transaction_amount": 10000.0, "currency_id": "ARS",  # el precio (COBRO-MP-1)
                         "payer": {"id": "payer-cap"},
@@ -639,6 +645,7 @@ class TestTopup:
         payment = {
             "id": "pay-exp-1",
             "status": "approved",
+            "date_approved": datetime.now(timezone.utc).isoformat(),
             "external_reference": "alice:topup",
             "payer": {"id": "payer-1"},
         }
@@ -754,6 +761,7 @@ class TestPlanesPublicos:
         pay = {
             "id": "pay-sub-1",
             "status": "approved",
+            "date_approved": datetime.now(timezone.utc).isoformat(),
             "external_reference": "alice:premium",
             "payer": {"id": "payer-alice"},
         }

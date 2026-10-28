@@ -43,7 +43,8 @@ def _mp(monkeypatch):
 
 def _pago(pid: str, referencia: str, monto: float = 45000.0) -> str:
     PAGOS[pid] = {"id": pid, "status": "approved", "external_reference": referencia,
-                  "transaction_amount": monto, "currency_id": "ARS", "payer": {"id": "payer-1"}}
+                  "transaction_amount": monto, "currency_id": "ARS", "payer": {"id": "payer-1"},
+                  "date_approved": datetime.now(timezone.utc).isoformat()}
     return pid
 
 
@@ -882,6 +883,82 @@ def test_el_ultimo_pago_de_antes_del_registro_no_se_aplica_otra_vez(client, cuen
     assert abs((_fin(leer()) - fin).total_seconds()) < 2, leer()
 
 
+# COBRO-MP-1, A: el registro de pagos empezó con el despliegue. Un pago que el
+# código viejo ya aplicó no tiene fila; si no es el último de la cuenta,
+# last_payment_id tampoco lo frena y el aviso IPN sin firma lo volvía a aplicar.
+APROBADO_ANTES_DEL_REGISTRO = "2020-03-01T10:00:00.000-03:00"
+
+
+@pytest.mark.parametrize("cuenta", ["usuario", "organizacion"])
+def test_un_pago_viejo_que_no_es_el_ultimo_no_se_aplica_otra_vez(client, cuenta):
+    """El código viejo aplicó dos pagos y sólo recuerda el último: reenviar el
+    anterior no renueva la cuenta vencida ni la reactiva."""
+    usuario = _unique("mp1_ant")
+    _register(client, usuario)
+    vencida = datetime.now(timezone.utc) - timedelta(days=40)
+    viejo, ultimo = f"pv1-{usuario}", f"pv2-{usuario}"
+    if cuenta == "usuario":
+        _set_user(usuario, billing_status="past_due", plan="premium", trial_ends_at=vencida,
+                  last_payment_id=ultimo)
+        ref = f"{usuario}:premium"
+        leer = lambda: _get_user(usuario)  # noqa: E731
+    else:
+        org_id = _org(usuario, billing_status="past_due", plan="premium", trial_ends_at=vencida,
+                      last_payment_id=ultimo)
+        ref = f"org:{org_id}:premium"
+        leer = lambda: _leer_org(org_id)  # noqa: E731
+    for pid in (viejo, ultimo):
+        _pago(pid, ref)
+        PAGOS[pid]["date_approved"] = APROBADO_ANTES_DEL_REGISTRO
+    for pid in (viejo, ultimo, viejo):
+        r = _aviso_ipn(client, pid)
+        assert r.status_code == 200, r.text[:300]
+    despues = leer()
+    assert despues["billing_status"] == "past_due", f"un pago viejo reenviado se volvió a aplicar: {despues}"
+    assert abs((_fin(despues) - vencida).total_seconds()) < 2, f"un pago viejo reenviado se volvió a aplicar: {despues}"
+    assert _leer_pago(viejo).get("estado") != "aplicado", _leer_pago(viejo)
+
+
+def test_un_pago_viejo_queda_a_la_vista_del_admin(client):
+    """No se aplica, pero queda rechazado con su motivo: si fuera un pago
+    legítimo que llegó tarde, Emi lo ve en los pagos rechazados."""
+    usuario = _unique("mp1_vis")
+    _register(client, usuario)
+    pid = _pago(f"pvis-{usuario}", f"{usuario}:premium")
+    PAGOS[pid]["date_approved"] = APROBADO_ANTES_DEL_REGISTRO
+    assert _aviso_ipn(client, pid).status_code == 200
+    fila = _leer_pago(pid)
+    assert fila.get("estado") == "rechazado", f"el pago viejo no quedó a la vista: {fila}"
+    assert "antes de que empezara el registro" in (fila.get("motivo") or ""), fila
+
+
+@pytest.mark.parametrize("fecha", [None, "", "ayer", "2026-10-28T10:00:00"],
+                         ids=["sin_fecha", "vacia", "ilegible", "sin_zona"])
+def test_un_pago_sin_fecha_de_aprobacion_legible_no_se_aplica(client, fecha):
+    """Sin la fecha no se sabe si es anterior al registro: no se aplica."""
+    usuario = _unique("mp1_fec")
+    _register(client, usuario)
+    _vencida(usuario)
+    pid = _pago(f"pf-{usuario}", f"{usuario}:premium")
+    if fecha is None:
+        PAGOS[pid].pop("date_approved", None)
+    else:
+        PAGOS[pid]["date_approved"] = fecha
+    assert _aviso_ipn(client, pid).status_code == 200
+    assert _get_user(usuario)["billing_status"] == "past_due", "se aplicó un pago sin fecha de aprobación legible"
+    assert _leer_pago(pid).get("estado") == "rechazado", _leer_pago(pid)
+
+
+def test_un_pago_nuevo_se_aplica(client):
+    """El corte no frena lo que se aprobó después de empezar el registro."""
+    usuario = _unique("mp1_nue")
+    _register(client, usuario)
+    _vencida(usuario)
+    pid = _pago(f"pn-{usuario}", f"{usuario}:premium")
+    assert _aviso_ipn(client, pid).status_code == 200
+    assert _get_user(usuario)["billing_status"] == "active"
+
+
 def test_sin_token_el_aviso_de_una_renovacion_no_se_pierde(client, monkeypatch):
     """Sin MP_ACCESS_TOKEN no se puede leer el cobro: el aviso no se da por
     procesado, para que Mercado Pago lo reintente."""
@@ -909,3 +986,49 @@ def test_un_pago_aprobado_sin_id_reconocible_no_se_aplica(client, id_en_la_respu
     assert r.json().get("skipped") == "pago con forma inesperada", r.json()
     assert _fin(_get_user(usuario)) == _fin(antes)
     assert _leer_pago(pid) == {}
+
+
+def _base_temporal(tmp_path):
+    from sqlalchemy import create_engine
+    from proyecto_maria.database.models import Base, InicioRegistroPagosMP, PagoMercadoPagoAplicado
+    motor = create_engine(f"sqlite:///{tmp_path / 'inicio.db'}")
+    Base.metadata.create_all(motor, tables=[PagoMercadoPagoAplicado.__table__, InicioRegistroPagosMP.__table__])
+    return motor
+
+
+def _leer_inicio(motor):
+    from sqlalchemy import text
+    with motor.connect() as conn:
+        filas = conn.execute(text("SELECT id, desde FROM mp_registro_pagos_inicio")).all()
+    return [(i, datetime.fromisoformat(str(d)).replace(tzinfo=None)) for i, d in filas]
+
+
+def test_el_inicio_del_registro_es_el_primer_pago_registrado_y_no_se_mueve(tmp_path):
+    """Si COBRO-MP-1 ya estaba desplegado, el registro empezó con su primer
+    pago, no con este arranque: un pago aplicado entre medio sigue frenado
+    por su fila, y uno de antes, por el corte."""
+    from sqlalchemy import text
+    from proyecto_maria.database.connection import sembrar_inicio_registro_mp
+    motor = _base_temporal(tmp_path)
+    with motor.begin() as conn:
+        for pid, cuando in (("b", "2026-10-20 12:00:00"), ("a", "2026-10-15 09:30:00")):
+            conn.execute(text("INSERT INTO mp_pagos_aplicados (payment_id, cuenta, tipo, estado, aplicado_en)"
+                              " VALUES (:p, 'x', 'premium', 'aplicado', :c)"), {"p": pid, "c": cuando})
+    with motor.begin() as conn:
+        sembrar_inicio_registro_mp(conn)
+    assert _leer_inicio(motor) == [(1, datetime(2026, 10, 15, 9, 30))], _leer_inicio(motor)
+    with motor.begin() as conn:
+        conn.execute(text("DELETE FROM mp_pagos_aplicados"))
+    with motor.begin() as conn:
+        sembrar_inicio_registro_mp(conn)
+    assert _leer_inicio(motor) == [(1, datetime(2026, 10, 15, 9, 30))], "el inicio del registro se movió al rearrancar"
+
+
+def test_sin_pagos_registrados_el_inicio_es_ahora(tmp_path):
+    from proyecto_maria.database.connection import sembrar_inicio_registro_mp
+    motor = _base_temporal(tmp_path)
+    antes = datetime.now(timezone.utc).replace(tzinfo=None)
+    with motor.begin() as conn:
+        sembrar_inicio_registro_mp(conn)
+    [(_, desde)] = _leer_inicio(motor)
+    assert abs((desde - antes).total_seconds()) < 5, desde

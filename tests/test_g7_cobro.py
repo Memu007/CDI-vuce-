@@ -76,6 +76,7 @@ def _mock_sdk_approved(username: str, plan: str = "premium"):
         "response": {
             "id": "999000111",
             "status": "approved",
+            "date_approved": datetime.now(timezone.utc).isoformat(),
             "external_reference": f"{username}:{plan}",
             "payer": {"id": "payer_g7"},
             "transaction_amount": 45000.00,  # el precio del plan (COBRO-MP-1)

@@ -317,7 +317,8 @@ def test_modo_preference_con_suscripcion_vigente_tambien_se_frena(client, monkey
 
 def _pago(pid: str, referencia: str, monto: float = 45000.0) -> str:
     PAGOS[pid] = {"id": pid, "status": "approved", "external_reference": referencia,
-                  "transaction_amount": monto, "currency_id": "ARS", "payer": {"id": "payer-1"}}
+                  "transaction_amount": monto, "currency_id": "ARS", "payer": {"id": "payer-1"},
+                  "date_approved": datetime.now(timezone.utc).isoformat()}
     return pid
 
 
