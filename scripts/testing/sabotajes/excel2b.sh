@@ -92,6 +92,11 @@ sabotaje $F "el índice largo vuelve a leerse en el hilo del servidor" $B \
   "FAILED $B::test_un_indice_largo_va_al_pesado_sin_leerlo" \
   $'        if int.from_bytes(contents[fin + 12:fin + 16], "little") > _LIVIANO_INDICE_MAX:\n            return False' \
   $'        if False:\n            return False'
+# Abrir el ZipFile ya lee el índice: vigilar infolist() no lo veía.
+sabotaje $F "el índice largo se lee antes del tope y sigue yendo al pesado" $B \
+  "el índice largo se leyó en el hilo del servidor" \
+  $'        if int.from_bytes(contents[fin + 12:fin + 16], "little") > _LIVIANO_INDICE_MAX:\n            return False' \
+  $'        zipfile.ZipFile(io.BytesIO(contents)).close()\n        if int.from_bytes(contents[fin + 12:fin + 16], "little") > _LIVIANO_INDICE_MAX:\n            return False'
 sabotaje $F "el zip64 deja de mandarse al carril pesado" $B \
   "FAILED $B::test_un_zip64_que_declara_un_indice_corto_va_al_pesado" \
   $'        if contents[max(0, fin - 20):fin].startswith(b"PK\\x06\\x07"):\n            return False' \
@@ -104,6 +109,9 @@ sabotaje $F "las imágenes se descuentan sin tope" $B \
   $'                if descontado + info.file_size > _LIVIANO_IMAGENES_MAX:\n                    continue' \
   $'                if False:\n                    continue'
 
+sabotaje $F "las cabezas de imagen se leen sin tope de lecturas" $B \
+  "FAILED $B::test_no_se_leen_mas_de_20_cabezas_de_imagen" \
+  '            for info in candidatas[:_LIVIANO_IMAGENES_LECTURAS]:' '            for info in candidatas:'
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]

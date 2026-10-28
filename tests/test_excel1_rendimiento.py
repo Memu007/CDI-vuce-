@@ -47,6 +47,7 @@ def _entorno(monkeypatch):
     monkeypatch.setattr(limiter, "enabled", False)
     monkeypatch.setattr(main, "_POOL_LECTURA_PDF", None)
     monkeypatch.setattr(main, "_POOL_LECTURA_EXCEL", None)
+    monkeypatch.setattr(main, "_POOL_LECTURA_EXCEL_LIVIANO", None)
     main.app.dependency_overrides[main.get_current_user] = lambda: dict(USUARIO)
     yield
     main.app.dependency_overrides.pop(main.get_current_user, None)

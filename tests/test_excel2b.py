@@ -81,6 +81,21 @@ def test_mas_de_10_mib_de_imagen_no_se_descuentan():
     assert fs._excel_liviano(libro, ".xlsx") is False
 
 
+def test_no_se_leen_mas_de_20_cabezas_de_imagen():
+    """Cada cabeza de imagen se descomprime en el hilo del servidor: con 40
+    imágenes, a las 20 lecturas se corta y el libro va al pesado aunque
+    descontándolas todas entraría."""
+    normal = _normal()
+    imagenes = [(f"xl/media/image{i}.png", PNG + bytes(110 * 1024)) for i in range(40)]
+    libro = _con_entradas(normal, *imagenes)
+    with zipfile.ZipFile(io.BytesIO(libro)) as z:
+        xml = sum(i.file_size for i in z.infolist() if not i.filename.startswith("xl/media/"))
+    tam = len(imagenes[0][1])
+    assert xml + 20 * tam > 2 * 2**20  # con 20 descontadas, no entra
+    assert xml + 2 * tam <= 2 * 2**20  # descontando casi todas, entraría
+    assert fs._excel_liviano(libro, ".xlsx") is False
+
+
 def _indice_largo():
     """Un libro chico con 2000 entradas vacías: su índice pasa de 128 KiB."""
     libro = _con_entradas(_normal(), *[(f"xl/x/{i:060d}.txt", b"") for i in range(2000)])
@@ -93,8 +108,10 @@ def test_un_indice_largo_va_al_pesado_sin_leerlo(monkeypatch):
     """La medida corre en el hilo del servidor: un índice largo no se lee ahí."""
     libro = _indice_largo()
     leidos = []
-    original = zipfile.ZipFile.infolist
-    monkeypatch.setattr(zipfile.ZipFile, "infolist", lambda self: leidos.append(1) or original(self))
+    # Abrir el ZipFile ya lee el índice entero: se espía eso, no infolist().
+    original = zipfile.ZipFile._RealGetContents
+    monkeypatch.setattr(zipfile.ZipFile, "_RealGetContents",
+                        lambda self: leidos.append(1) or original(self))
     assert fs._excel_liviano(libro, ".xlsx") is False
     assert leidos == [], "el índice largo se leyó en el hilo del servidor"
 
