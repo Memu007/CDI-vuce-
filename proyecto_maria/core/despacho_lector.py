@@ -23,13 +23,16 @@ Supuestos (los despachos de muestra no traían subítems con su rótulo):
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import io
 import json
 import logging
 import math
 import os
 import re
+import signal
 import sys
+import threading
 import unicodedata
 import weakref
 from bisect import bisect_left, bisect_right
@@ -271,13 +274,42 @@ def texto_del_pdf(data: bytes) -> tuple[str, list[str]]:
     return texto, avisos
 
 
+class _DemasiadoTrabajo(BaseException):
+    """Se gastó el tope de CPU en medio de una hoja. No hereda de Exception
+    para que el `except Exception` de cada hoja no se la trague."""
+
+
+@contextlib.contextmanager
+def _tope_de_cpu(segundos: float):
+    """Corta con `_DemasiadoTrabajo` cuando el proceso gastó `segundos` de CPU,
+    aunque sea en medio de una hoja: una sola hoja puede costar minutos. Una
+    señal sólo se atiende en el hilo principal; en otro hilo queda el control
+    entre hojas."""
+    if threading.current_thread() is not threading.main_thread() or not hasattr(signal, "setitimer"):
+        yield
+        return
+    leyendo = True
+
+    def cortar(*_):
+        if leyendo:
+            raise _DemasiadoTrabajo
+
+    anterior = signal.signal(signal.SIGPROF, cortar)
+    signal.setitimer(signal.ITIMER_PROF, max(segundos, 0.001))
+    try:
+        yield
+    finally:
+        leyendo = False
+        signal.setitimer(signal.ITIMER_PROF, 0)
+        signal.signal(signal.SIGPROF, anterior)
+
+
 def _hojas_del_pdf(data: bytes, limite_cpu_s: float = _MAX_CPU_LECTURA) -> tuple[str, list[str], bool]:
     """Texto, avisos y si quedó alguna hoja sin leer por pesada o rota. Deja
     de leer cuando el proceso gastó `limite_cpu_s` segundos de CPU."""
     import time
 
-    from pypdf import PdfReader, apply_configuration
-    from pypdf.errors import LimitReachedError
+    from pypdf import apply_configuration
 
     topes = {clave: _MAX_FLUJO for clave in (
         "maximum_declared_stream_length", "array_based_stream_maximum_output_length",
@@ -286,47 +318,66 @@ def _hojas_del_pdf(data: bytes, limite_cpu_s: float = _MAX_CPU_LECTURA) -> tuple
         "jbig2_maximum_output_length", "stream_decoding_work_maximum_length")}
     avisos = []
     salteadas = False
-    with apply_configuration(**topes):
+    textos: list[str] = []
+    hasta = time.process_time() + limite_cpu_s
+    try:
+        with apply_configuration(**topes), _tope_de_cpu(limite_cpu_s):
+            salteadas = _leer_hojas(data, hasta, textos, avisos)
+    except _DemasiadoTrabajo:
+        avisos.append(f"El PDF da demasiado trabajo: leí hasta la hoja {len(textos)}.")
+        salteadas = True
+    return "\n".join(textos), avisos, salteadas
+
+
+def _leer_hojas(data: bytes, hasta: float, textos: list[str], avisos: list[str]) -> bool:
+    """Suma a `textos` el texto de cada hoja que leyó y a `avisos` lo que no.
+    Devuelve si quedó alguna hoja sin leer."""
+    import time
+
+    from pypdf import PdfReader
+    from pypdf.errors import LimitReachedError
+
+    salteadas = False
+    try:
+        reader = PdfReader(io.BytesIO(data))
+        paginas = list(reader.pages)
+    except MemoryError:
+        raise
+    except Exception:
+        avisos.append("No pude abrir el PDF.")
+        return True
+    if len(paginas) > _MAX_PAGINAS:
+        avisos.append(f"El PDF tiene {len(paginas)} hojas: leí las primeras {_MAX_PAGINAS}.")
+        paginas = paginas[:_MAX_PAGINAS]
+    largo = 0
+    for n, pagina in enumerate(paginas, start=1):
+        if time.process_time() > hasta:
+            avisos.append(f"El PDF da demasiado trabajo: leí hasta la hoja {n - 1}.")
+            salteadas = True
+            break
         try:
-            reader = PdfReader(io.BytesIO(data))
-            paginas = list(reader.pages)
+            contenido = pagina.get_contents()
+            if contenido is not None and len(contenido.get_data()) > _MAX_CONTENIDO_PAGINA:
+                raise LimitReachedError("contenido de la hoja")
+            texto = _MEDIO_PAR.sub("\ufffd", pagina.extract_text(extraction_mode="layout") or "")
         except MemoryError:
             raise
+        except LimitReachedError:
+            avisos.append(f"No leí la hoja {n}: es demasiado pesada.")
+            salteadas = True
+            continue
         except Exception:
-            return "", ["No pude abrir el PDF."], True
-        if len(paginas) > _MAX_PAGINAS:
-            avisos.append(f"El PDF tiene {len(paginas)} hojas: leí las primeras {_MAX_PAGINAS}.")
-            paginas = paginas[:_MAX_PAGINAS]
-        textos, largo = [], 0
-        hasta = time.process_time() + limite_cpu_s
-        for n, pagina in enumerate(paginas, start=1):
-            if time.process_time() > hasta:
-                avisos.append(f"El PDF da demasiado trabajo: leí hasta la hoja {n - 1}.")
-                salteadas = True
-                break
-            try:
-                contenido = pagina.get_contents()
-                if contenido is not None and len(contenido.get_data()) > _MAX_CONTENIDO_PAGINA:
-                    raise LimitReachedError("contenido de la hoja")
-                texto = _MEDIO_PAR.sub("\ufffd", pagina.extract_text(extraction_mode="layout") or "")
-            except MemoryError:
-                raise
-            except LimitReachedError:
-                avisos.append(f"No leí la hoja {n}: es demasiado pesada.")
-                salteadas = True
-                continue
-            except Exception:
-                avisos.append(f"No pude leer la hoja {n}.")
-                salteadas = True
-                continue
-            largo += len(texto)
-            if largo > _MAX_TEXTO:
-                avisos.append("El texto de la primera hoja es demasiado largo: no leí ninguna." if n == 1
-                              else f"El texto del PDF es demasiado largo: leí hasta la hoja {n - 1}.")
-                salteadas = True
-                break
-            textos.append(texto)
-    return "\n".join(textos), avisos, salteadas
+            avisos.append(f"No pude leer la hoja {n}.")
+            salteadas = True
+            continue
+        largo += len(texto)
+        if largo > _MAX_TEXTO:
+            avisos.append("El texto de la primera hoja es demasiado largo: no leí ninguna." if n == 1
+                          else f"El texto del PDF es demasiado largo: leí hasta la hoja {n - 1}.")
+            salteadas = True
+            break
+        textos.append(texto)
+    return salteadas
 
 
 def _nuevo_bloque(tipo: str, numero: str | None) -> dict:
@@ -690,7 +741,10 @@ def renglon_para_catalogo(renglon) -> tuple[dict | None, list[str]]:
     if _MEDIO_PAR.search(descripcion):
         problemas.append("La descripción tiene un carácter que no se puede guardar.")
     origen = str(renglon.get("origen") or "").strip().upper() or None
-    if origen and not (len(origen) == 2 and origen.isalpha() and pais_reconocido(origen)):
+    if origen and _MEDIO_PAR.search(origen):
+        # No se repite en el mensaje: no se puede mandar en la respuesta.
+        problemas.append("El origen tiene un carácter que no se puede guardar.")
+    elif origen and not (len(origen) == 2 and origen.isalpha() and pais_reconocido(origen)):
         problemas.append(f"No reconozco el origen «{origen}»: usá el código de dos letras.")
     cantidad = _numero_del_renglon(renglon.get("cantidad"), "La cantidad", problemas)
     unitario = _numero_del_renglon(renglon.get("valor_unitario"), "El valor unitario", problemas)

@@ -8221,7 +8221,7 @@ async def learn_client_catalogo_productos(
                 cantidad=float(item.get("cantidad") or 0) or None,
                 peso_unitario=float(item.get("peso_unitario") or 0) or None,
             )
-        except (TypeError, ValueError):
+        except (TypeError, ValueError, OverflowError):  # 10**400 no entra en un float
             continue
         updated += await _historial_de_un_producto(db, upsert_client_product_history, **campos)
 
@@ -8343,9 +8343,9 @@ async def update_client_catalogo_producto(
 
     if not isinstance(body, dict):
         body = {}
-    from proyecto_maria.services.client_memory import valor_para_promedio
+    from proyecto_maria.services.client_memory import _MEDIO_PAR, valor_para_promedio
     textos = [str(body[k]) for k in ("ncm", "origen", "descripcion") if k in body]
-    if any(re.search("[\ud800-\udfff]", t) for t in textos):
+    if any(_MEDIO_PAR.search(t) for t in textos):
         raise HTTPException(status_code=400, detail="Hay un carácter que no se puede guardar.")
     if "ncm" in body:
         # La posición SIM completa no entra en la columna: antes se cortaba a
@@ -8359,14 +8359,16 @@ async def update_client_catalogo_producto(
         row.origen_frecuente = str(body["origen"]).strip()[:3] or "XX"
     if "peso_unitario_avg" in body:
         peso = body["peso_unitario_avg"]
-        if peso in (None, "", 0):
+        # Vacío o cero lo borra; «false» no es un peso (False == 0).
+        if peso is None or (not isinstance(peso, bool) and peso in ("", 0, "0")):
             row.peso_unitario_avg, row.veces_peso = 0.0, 0
         else:
             peso = valor_para_promedio(peso)
             if peso is None:
                 raise HTTPException(status_code=400, detail="El peso tiene que ser un número positivo.")
-            # Lo que carga la persona cuenta como un uso con peso.
-            row.peso_unitario_avg, row.veces_peso = peso, max(row.veces_peso or 0, 1)
+            # Lo que carga la persona cuenta como un uso con peso, sin heredar
+            # los anteriores: si no, una fila vieja y una nueva dan otro promedio.
+            row.peso_unitario_avg, row.veces_peso = peso, 1
     if "descripcion" in body:
         from proyecto_maria.core.catalog_service import _normalize as _cat_normalize
         row.descripcion = str(body["descripcion"]).strip()

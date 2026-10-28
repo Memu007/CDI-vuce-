@@ -45,11 +45,15 @@ def valor_para_promedio(valor) -> Optional[float]:
         return None
     try:
         valor = float(valor)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):  # 10**400 no entra en un float
         return None
     if not math.isfinite(valor) or valor <= 0 or valor >= _MAX_VALOR:
         return None
     return valor
+
+
+def _finito(valor) -> Optional[float]:
+    return valor if valor is not None and math.isfinite(valor) else None
 
 
 def _usos(promedio, veces, veces_usado) -> int:
@@ -135,17 +139,18 @@ async def upsert_client_product_history(
     desc_norm = _norm_desc(descripcion)
 
     existing: Optional[ClientProductHistory] = None
+    # El mismo NCM es el mismo sin mirar puntos ni espacios: el despacho lo
+    # guarda «39269090» y una operación puede traer «3926.90.90».
+    ncm_sin_puntos = func.replace(func.replace(ClientProductHistory.ncm, ".", ""), " ", "")
+    q = sa_select(ClientProductHistory).where(
+        ClientProductHistory.owner_username == owner_username,
+        ClientProductHistory.client_id == client_id,
+        ncm_sin_puntos == re.sub(r"\D", "", ncm),
+    )
     if solo_mismo_ncm:
-        # Es el mismo producto sólo con el mismo NCM (sin mirar puntos ni
-        # espacios) y la misma descripción entera: la normalizada se corta
-        # en 200 y dos textos largos distintos quedaban en una fila.
-        digitos = re.sub(r"\D", "", ncm)
-        ncm_sin_puntos = func.replace(func.replace(ClientProductHistory.ncm, ".", ""), " ", "")
-        q = sa_select(ClientProductHistory).where(
-            ClientProductHistory.owner_username == owner_username,
-            ClientProductHistory.client_id == client_id,
-            ncm_sin_puntos == digitos,
-        )
+        # Es el mismo producto sólo con la misma descripción entera: la
+        # normalizada se corta en 200 y dos textos largos distintos quedaban
+        # en una fila.
         buscada = _misma_descripcion(descripcion)
         for row in (await db.execute(q)).scalars().all():
             if _misma_descripcion(row.descripcion) == buscada:
@@ -154,11 +159,6 @@ async def upsert_client_product_history(
         rows = []
     else:
         # 1) Intento match exacto por NCM + owner + client
-        q = sa_select(ClientProductHistory).where(
-            ClientProductHistory.owner_username == owner_username,
-            ClientProductHistory.client_id == client_id,
-            ClientProductHistory.ncm == ncm,
-        )
         result = await db.execute(q)
         rows = result.scalars().all()
 
@@ -275,9 +275,10 @@ async def lookup_client_memory(
         "ncm": best_row.ncm,
         "descripcion": best_row.descripcion,
         "origen": best_row.origen_frecuente,
-        "peso_unitario_avg": best_row.peso_unitario_avg,
-        "valor_unitario_avg": best_row.valor_unitario_avg,
-        "cantidad_avg": best_row.cantidad_avg,
+        # Un infinito guardado antes no se puede mandar en JSON: daba 500.
+        "peso_unitario_avg": _finito(best_row.peso_unitario_avg),
+        "valor_unitario_avg": _finito(best_row.valor_unitario_avg),
+        "cantidad_avg": _finito(best_row.cantidad_avg),
         "veces_usado": best_row.veces_usado,
         "ultima_vez": best_row.ultima_vez.isoformat() if best_row.ultima_vez else None,
         "confidence": round(best_score, 3),
