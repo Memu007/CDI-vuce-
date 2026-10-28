@@ -27,6 +27,37 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
+## BACKUP-1a — después de LIMPIEZA-1 (2026-10-28 12:00 UTC)
+
+Primero **subí LIMPIEZA-1 a tu rama ya** (commits aparte, encima de
+`7d3a7f8`), para que no se pierda si se recicla el contenedor; se sigue
+entregando después del informe de AISLAMIENTO-2.
+
+Después, la mitad de BACKUP-1 que no espera a Emi (hallazgo D1 de
+`AUDITORIA-2026-10-06.md`: no hay ninguna copia de la base de producción).
+Es de MARIA en `ROADMAP.md`; te la paso yo porque ella no tiene pieza que
+arranque y vos tenés menos entregas en cola. Decidido por la PM.
+
+- **Qué:** un script que saca la copia de una base Postgres
+  (`pg_dump -Fc`), la restaura en una base descartable y comprueba que
+  quedó igual: por tabla, la cantidad de filas, y algo que distinga el
+  contenido (por ejemplo, un resumen de las filas ordenadas). Si la
+  restauración no da igual, sale con error y lo dice.
+- **Lo que espera a Emi, no lo hacés:** adónde va la copia (fuera de
+  Railway) y dónde se programa. Dejá el envío como un paso aparte con un
+  destino de prueba local, y en el informe, la lista de lo que tiene que
+  cargar Emi para activarlo.
+- **Límites:** sólo Postgres 16 local; ninguna dirección ni clave de
+  producción en el repositorio, en las pruebas ni en el informe. La
+  dirección de la base entra por variable, nunca por argumento (queda en el
+  historial del shell).
+- **Pruebas:** copia y restauración de una base con datos sintéticos de
+  todas las tablas; una fila cambiada, una tabla vacía y una copia cortada
+  a la mitad tienen que dar error. Un sabotaje por regla.
+- Commits aparte encima de LIMPIEZA-1, con su propio `/entregar` después
+  del de LIMPIEZA-1. Toca datos: revisión fuerte. Si algo choca, preguntá
+  en la **D8**.
+
 ## Veredicto de EXCEL-3f (con H1-bis) (2026-10-28): aceptada
 
 Sobre `8c63c37` (informe `0557f03`). El detalle está en
@@ -277,4 +308,5 @@ supuestos de Mercado Pago que no pudiste ver sin red: los estados, que una
 3. COBRO-MP-1: hecha; subila ya y se entrega después de EXCEL-2b.
 4. COBRO-CORTE-1: hecha; se entrega después de COBRO-MP-1.
 5. COBRO-MP-2: hecha; subila ya y se entrega después de COBRO-CORTE-1.
-6. AISLAMIENTO-2 (arriba), ahora; después LIMPIEZA-1.
+6. AISLAMIENTO-2 y LIMPIEZA-1: hechas; se entregan después de COBRO-MP-2.
+7. BACKUP-1a (arriba), ahora.

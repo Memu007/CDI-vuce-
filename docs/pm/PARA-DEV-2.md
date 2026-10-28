@@ -30,6 +30,30 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## D37 (2026-10-28): (2) por ahora, sobre `76def65`
+
+ABUSO-1 no cambia por esto. El aviso «Event loop is closed» queda a la
+vista: sin `filterwarnings` y sin repetir la suite hasta que salga verde.
+Tampoco tocás los middlewares: tu hipótesis no está confirmada y el corte
+ya pasa en la base `895ee73`. En riesgos va: que `session.close()` de
+`get_async_session` se cancela después de la respuesta, en cuántas corridas
+lo viste, que ya pasaba antes de ABUSO-1 y que no medimos si en producción
+deja conexiones colgadas. Tu (1), medir con uvicorn y Postgres 16 muchas
+respuestas 401 mirando `pg_stat_activity` y el pool, y pasar los
+middlewares a ASGI puro sólo si quedan conexiones colgadas, es una pieza
+nueva: se la propongo a Emi hoy, recomendada. Hasta que conteste, seguís
+con lo de abajo («Mientras tanto»). Tu próxima D es la **D38**.
+
+### Mientras tanto (2026-10-28 12:00 UTC)
+
+No te queda pieza tuya que arranque sin alguien de afuera: PESO-NETO-1,
+MARIA-6 y PRORRATEO-1 esperan al despachante, LEGAL-1 el texto de Emi, y
+BACKUP-1 pasa a la técnica. Hasta las 18:00 UTC preparás las entregas: el
+orden de siempre, cada una con su SHA, su base y su suite desde base
+limpia ya corrida; lo que falte de eso, corrélo ahora, que a las 18:00
+quede sólo la autorrevisión con subagentes. Si Emi dice que sí a las
+piezas de la D36 o de la D37, te aviso y van después de ABUSO-1.
+
 ## D36 (2026-10-28): (2) por ahora, sobre `abdc0db`
 
 Bien visto. En ABUSO-1 no se toca cómo se compara el email, como hiciste;
@@ -154,24 +178,6 @@ pregunta 7. No se espera la respuesta: la tabla del despachante es
 explícita, y lo de 2025 era el defecto que DESTINO-1 corrige. Si la
 pregunta 7 dice otra cosa, se reabre. Decidido por la PM.
 
-## Veredicto (2026-10-27): SEPARADORES-1d aceptada
-
-Sobre `140c122` (probado en `1240c08`, sabotajes en `36f54a3`). Suite mía
-sobre `140c122`: 3478 passed, 102 skipped, 2 xfailed, 0 rojos. Tus 5
-sabotajes y los 10 de 1c en rojo por la razón esperada. Integré tu rama por
-avance rápido: mi rama está en `140c122` más este veredicto. Detalle en
-`REPRODUCCION-SEPARADORES-1d-2026-10-27.md`.
-
-- **D24:** 19 textos míos contra la base `91be665`; la única diferencia es
-  `01.234` con pista `,` (antes 1234, ahora sin leer). Lo bien formado no
-  cambió.
-- **D25:** `alCentavoDelTxt` contra el redondeo del generador, 20012 montos
-  al azar, 0 distintos.
-- **Se acepta** que `1234.567` con pista `,` quede sin leer: es el lado
-  seguro.
-- **Se anota, no es tarea:** el aviso no cubre gastos ni ajustes. Los
-  ajustes esperan la pregunta 5 al despachante (`PREGUNTAS-DESPACHANTE.md`).
-
 ## ORG-1 — tarea activa
 
 Invitaciones al estudio (`ROADMAP.md`, Fase 2; C7 de
@@ -266,7 +272,7 @@ Después: **SUFIJOS-2**, **SEGURO-1**, **DESPACHO-1b**, **DATOS-1** y
 y **ABUSO-1** (abajo, empezala ya). PESO-NETO-1 y PRORRATEO-1 siguen esperando al
 despachante.
 
-### ABUSO-1 — empezala ya (2026-10-28 10:00 UTC)
+### ABUSO-1 — hecha, sin entregar (encargada 2026-10-28 10:00 UTC)
 
 SESION-1 quedó hecha (`895ee73`, informe `5105838`): recibido, la reviso
 cuando la entregues. Te paso la pieza vecina de la Fase 3, que también era
