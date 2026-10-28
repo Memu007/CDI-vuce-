@@ -705,6 +705,104 @@ python -m pytest -q --no-cov tests/test_org1.py tests/test_email1.py     # 92 pa
 PY=python PG=postgresql://cdi@127.0.0.1:55432 bash scripts/testing/sabotajes/org1.sh b358827   # 14 ROJO, «sabotajes sin rojo: 0»
 ```
 
+## DESPACHO-1b + D41 (devolución): **entregada** en `09e16f3` (2026-10-28, 19:28 UTC)
+
+**Resultado:** seis commits encima de `6ca3c21` (tu merge):
+- `5508317`: producto y `CHANGELOG.md`;
+- `bcd2eaf`: pruebas y sabotajes;
+- `aabf3e5`: lo que encontró el `/code-review`, producto;
+- `6357d25`: lo que encontró el `/code-review`, pruebas y sabotajes;
+- `bf9f3d8`: lo que encontró el adversario, producto;
+- `09e16f3`: lo que encontró el adversario, pruebas y sabotajes.
+
+Los 7 puntos de la devolución están atendidos. El 6, la divisa, va como D47.
+
+Sabotajes de `despacho1b.sh` sobre `09e16f3`: los 30 dan rojo, «sabotajes sin rojo: 0».
+
+`test_despacho1b.py` y `test_despacho1a.py`: 103 passed.
+
+Suite completa sobre `09e16f3`, desde un worktree limpio: «4067 passed, 336 skipped, 2 xfailed», «compileall 0». Sobre `6357d25` había dado «4060 passed, 336 skipped, 2 xfailed».
+
+**Decide la PM:** D47 y D48. **Ojo con el número:** pediste la divisa «como D42», pero la D42 ya es de DISCO-1, en este mismo canal. Uso la próxima libre, que es la que dice NOW.md.
+
+- **D47 (divisa del valor unitario):** verificado en el código, sin despacho real.
+  - El lector devuelve `divisa`, pero `guardar_despacho_en_catalogo` no la lee (`main.py:8229`).
+  - `ClientProductHistory` no tiene columna para la divisa (`database/models.py:406`).
+  - `valor_unitario_avg` promedia dólares con euros o lo que venga.
+  - Y no queda en el catálogo: `client_service.py:318` lo usa como respaldo del valor unitario de una factura.
+
+  Opciones:
+  - **(a)** Una columna de divisa con su migración. El promedio sólo mezcla valores de la misma divisa.
+  - **(b)** Si la divisa no es USD o no se encontró, no se guarda `valor_unitario`, y se avisa en ese renglón. Lo demás se guarda.
+  - **(c)** Sólo avisar en la pantalla.
+
+  **Recomiendo (b).** Corta la mezcla sin migración y es reversible. (c) deja que la mezcla llegue al respaldo de la factura. (a) es lo correcto a largo plazo, pero es una migración con datos, para una pieza propia.
+
+- **D48 (severidad alta, código que no es de esta pieza): abrir el PDF para validarlo no tiene tope de memoria.**
+  - `validate_file_upload` abre todo PDF con `_abrir_pdf` (`security/file_security.py:117` y `:495`) en un hilo del proceso de la app, antes de que el despacho llegue al lector topeado. Lo usan leer el despacho (`main.py:8212`) y leer facturas (`main.py:4205`).
+  - Lo reproduje con un PDF sintético de 0,98 MB: una hoja de 99 000 claves repetida en `/Kids`. Con 100 repeticiones, 557 MB; con 200, 1057 MB; con 400, 2057 MB, en 4,4 s. Son unos 5 MB por repetición: el adversario llegó a 5,8 GB con 2000.
+  - El `wait_for` contesta 400 a tiempo, pero el hilo sigue y la memoria no vuelve: varios pedidos así pueden tirar la app. Hace falta estar logueado.
+  - Opciones:
+    - **(a)** Validar el PDF en el mismo proceso aparte del lector, con su tope de memoria y de tiempo. Cubre las dos rutas.
+    - **(b)** Una pieza propia para `file_security.py`, que también valida Excel en el proceso de la app.
+    - **(c)** Dejarlo como riesgo.
+  - **Recomiendo (a), como pieza propia apenas cierre esta.** No lo arreglé acá: toca la validación de todas las subidas de PDF, y eso es fuera de la tarea.
+
+| Revisor | Modelo y esfuerzo | Hallazgos | Qué hice |
+|---|---|---|---|
+| `/code-review high` | Opus alto, en fork | (1) alta: falta el tope de formularios XObject. (2) media: los errores del lector se juntan enteros en memoria. (3) media: el tope de 500 contaba bloques, no renglones; 300 ítems con un subítem cortaban en 250. (4) media: `_incr_avg` cuenta las veces sin valor. (5) baja: una salida distinta de 0 y 3 da un 500 genérico. (6) baja: la prueba de facturas parchaba sólo `leer_despacho`. (7) baja: la espera del semáforo cuenta dentro del tiempo. (8) baja: el hijo sin PYTHONPATH. (9) baja: `sin_texto` con hojas salteadas. (10) baja: «leí hasta la hoja 0» | (2), (3), (6) y (10), arreglados con rojo. (1) y (8), descartados con evidencia (abajo). Lo demás, riesgos |
+| `/security-review` | a mano: la skill falla con `fatal: ambiguous argument 'origin/HEAD...'` | Nada nuevo. Leer chequea al dueño del cliente antes de abrir el PDF. El hijo no hereda secretos: sólo PATH, HOME, LANG, LC_ALL y PYTHONUSERBASE. Su salida la arma nuestro código y tiene tope. El final de los errores no llega al usuario: el manejador global reescribe el detalle de los 500 | — |
+| Adversario | Sonnet alto, sobre `bcd2eaf` | (1) alta: abrir el PDF para validarlo no tiene tope (arriba). (2) alta: un número de 400 dígitos es infinito y leer da 500. (2b) media: un carácter que es medio par UTF-16 hace fallar al lector y leer da 500. (3) media: los errores sin tope. (4) media: la espera del semáforo. (5) media: con el mismo NCM, dos productos distintos de descripción parecida se funden. (6) media-baja: `veces_usado`. (7) baja: una posición con puntos se guarda con los puntos. (8) baja: la divisa. (9) baja: una línea muy larga o una fuente pesada dejan sin leer. (10) el tope de formularios no tenía efecto. Pruebas que no discriminan: el semáforo, el entorno del lector, la salida 1 | (2) y (2b), arreglados con rojo y sabotaje. El entorno, con prueba y sabotaje. (1) es la D48. (3) y (10) ya estaban arreglados. (8) es la D47. Lo demás, riesgos |
+
+**Rojos de esta vuelta.** Corrí cada prueba nueva contra el producto anterior a su arreglo; el texto está copiado de la salida.
+- Contra `6357d25`, `test_un_numero_del_tope_para_arriba_queda_faltante_y_leer_no_da_500`: con «9» × 400, `ValueError: Out of range float values are not JSON compliant: inf`; con 1.000.000.000.000,00 en la cantidad, el unitario y el kilo, `assert (1000000000000.0 is None)`.
+- Contra `6357d25`, `test_un_caracter_suelto_que_no_es_unicode_avisa_y_leer_no_da_500`: `UnicodeEncodeError: 'utf-8' codec can't encode character '\ud800' in position 105: surrogates not allowed`, desde el lector.
+- `test_el_lector_no_hereda_los_secretos_del_proceso` da verde sobre el producto actual. Lo que demuestra que distingue es su sabotaje (`entorno = dict(os.environ)`).
+- `test_300_items_con_un_subitem_son_300_renglones_sin_aviso`: `assert 250 == 300`.
+- `test_mas_de_500_renglones_con_subitems_lee_los_primeros_500[0]`: `assert 499 == 500`.
+- `test_si_la_primera_hoja_pasa_el_tope_del_texto_no_dice_hoja_0`: `assert ['El texto de...a la hoja 0.'] == ['El texto de...leí ninguna.']`. Los cuatro, en un worktree de `6357d25` con `proyecto_maria/` de `bcd2eaf`: «4 failed, 79 passed».
+- `test_los_errores_del_lector_no_se_juntan_enteros_en_memoria`: `assert 621 < 100`. Son 300 MB de errores, y con el arreglo el proceso queda en unos 20 MB.
+  - La memoria se mide con `VmHWM` de `/proc`. `ru_maxrss` arranca con la de pytest y daba 187 aun con el arreglo puesto.
+  - La prueba lleva `@solo_linux`.
+
+**Descartados con evidencia:**
+- **(1) Formularios XObject.**
+  - Leemos con `extract_text(extraction_mode="layout")`, y ese modo no abre los formularios.
+  - Lo medí con un PDF sintético de 25 formularios con texto: el modo plain da 25, layout da 0 y `texto_del_pdf` da 0.
+  - El tope `xform_maximum_invocations_per_extraction` no tenía efecto en este camino: lo saqué.
+  - Lo que queda va a riesgos.
+- **(8) PYTHONPATH.** El hijo corre con `-m` y `cwd` en la raíz del repo, igual que en el Dockerfile (`WORKDIR /app`). La suite y los sabotajes lo lanzan sin PYTHONPATH.
+
+**Supuesto reversible:** `pypdf>=6.21.2` en `requirements.txt` (antes `>=6.19.0`). Es la versión con la que medí los topes.
+
+**Riesgos que quedan:**
+- **Media, fuera:** `client_service.py:371` promedia con `or 0`, el mismo defecto de `_incr_avg` en el camino de las facturas.
+- **Media:** el texto que viene dentro de un formulario XObject no se lee. Si toda la hoja está ahí, sale el aviso de «escaneado».
+- **Baja-media:** `veces_usado` sube también cuando el renglón no trae valor. El promedio sigue pesando bien sólo si todos los usos traen valor. Arreglarlo pide una columna por campo, con migración.
+- **Baja:** al volver a guardar, el origen queda en el último, no en el más frecuente.
+- **Baja:** si el lector sale con un código distinto de 0 y de 3, da un 500 genérico. El detalle queda en el log, no en la pantalla.
+- **Baja:** la espera del semáforo (2 a la vez) cuenta dentro del tiempo máximo: con mucha cola, un PDF chico puede dar 504.
+- **Baja:** con hojas salteadas, `sin_texto` es falso aunque el resto esté escaneado.
+- **Baja:** una línea de más de 2000 caracteres hace que no se lea ningún renglón del despacho. Un solo glifo con una x muy grande alcanza para armarla.
+- **Media:** con el mismo NCM, una similitud de descripción de 0,8 o más funde dos productos distintos (el adversario usó «A100» y «A200»). Es el respaldo que ya existía para el mismo NCM: la devolución pedía no fundir con NCM distinto, y eso está.
+- **Baja:** una fuente de 9 MB deja sin leer esa hoja (el tope por flujo es de 8 MB).
+- **Baja:** la prueba del semáforo (2 lectores a la vez) no existe: subirlo a 1000 no da rojo.
+- **Baja:** si se cancela el pedido mientras nace el lector, el lector podría quedar vivo. No lo probé.
+- **De tu devolución, sin arreglo:**
+  - más de 500 renglones: la pantalla los manda todos juntos y el servidor dice «cargalos en partes»;
+  - guardar no tiene `@limiter.limit`;
+  - los renglones de «Información Adicional» podrían caer en la descripción.
+
+**Archivos de producto:** `proyecto_maria/core/despacho_lector.py`,
+`proyecto_maria/main.py`, `proyecto_maria/services/client_memory.py`,
+`requirements.txt`, `CHANGELOG.md`.
+
+```bash
+git diff --stat 6ca3c21..09e16f3 -- . ':!docs'   # 8 files changed, 994 insertions(+), 172 deletions(-)
+PY=python bash scripts/testing/sabotajes/despacho1b.sh 09e16f3   # 30 ROJO, «sabotajes sin rojo: 0»
+python -m pytest -q --no-cov tests/test_despacho1b.py tests/test_despacho1a.py   # 103 passed
+```
+
 ## Entregas preparadas para las 18:00 UTC (2026-10-28)
 
 Recibí la D37 (2) en `20fb535`. En ABUSO-1 la pasé a riesgos, con lo que
