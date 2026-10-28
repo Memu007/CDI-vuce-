@@ -2,6 +2,31 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## DATOS-1: en curso, D5 frenada por la D32 (2026-10-28)
+
+Encima de `e59e1a8`. Sigo con D2 (`/health`) y D6 (`dev_detail`), que no
+dependen de la D32. **D5 la empiezo cuando contestes la D32.**
+
+**Premisa de D5: confirmada** en Postgres 16.15 descartable (127.0.0.1:55432),
+sobre `e7c7af0`, con un usuario, un cliente, una operación y su presupuesto
+compartido (`POST /api/quotes/share`):
+
+- `DELETE /api/clientes/{id}` responde **500** y el cliente, la operación y
+  el presupuesto quedan. El log de Postgres: `update or delete on table
+  "operations" violates foreign key constraint "public_quotes_operation_id_fkey"
+  on table "public_quotes"`.
+- Sin presupuesto compartido, el mismo borrado responde 200 y borra cliente
+  y operación: el único bloqueo es `public_quotes`.
+- Qué apunta al cliente: `operations`, `ncm_notes` y
+  `client_product_history` (el borrado ya las limpia). Qué apunta a sus
+  operaciones: `operation_items` (las limpia), `public_quotes` (no) y
+  `api_logs.operation_id` (nada en el código la llena).
+- **El bloqueo no se va solo:** un presupuesto vencido sólo se borra cuando
+  alguien abre el link (`quote_router.py`, «Lazy cleanup»). Un cliente que
+  alguna vez compartió un presupuesto no se puede borrar nunca.
+- La respuesta del 500 trae `"dev_detail":"No se pudo eliminar el cliente…"`:
+  es D6.
+
 ## DESPACHO-1b: hecha, **sin entregar** (2026-10-28)
 
 Commits encima de SEGURO-1 (`371cde2`), de mi informe (`de9cb24`) y del
@@ -314,6 +339,28 @@ encuentren y entrego con el timbre. Subo ahora para que el trabajo no se
 pierda si el contenedor muere. **No hace falta que la revises todavía.**
 
 ## Decisiones
+
+**D32 — qué pasa con el presupuesto compartido al borrar su cliente (DATOS-1, D5).**
+Hoy borrar un cliente ya borra sus operaciones (es lo que dice el código
+desde antes). Un presupuesto compartido (`public_quotes`) apunta a una
+operación y no puede quedar sin ella (`operation_id` es obligatorio), así
+que para borrar el cliente hay que elegir. El presupuesto guarda una copia
+con la descripción, cantidad y valor de cada producto del cliente, el
+costo calculado y el nombre del usuario.
+
+- **(a) Recomiendo esta.** Se borran también los presupuestos compartidos de
+  las operaciones del cliente, en la misma transacción. El link deja de
+  andar (404) antes de vencer. Es coherente con lo que ya hace el borrado
+  (borra las operaciones) y es lo único que cumple un pedido de supresión:
+  la copia tiene datos del cliente. Pierde: el link compartido.
+- **(b)** Las operaciones con presupuesto compartido quedan sin cliente
+  (`client_id` vacío) y el presupuesto sigue hasta que venza. Pierde menos
+  hoy, pero no cumple la supresión: quedan la operación y la copia, y como
+  los vencidos sólo se borran si alguien abre el link, quedan para siempre.
+  Esas operaciones no aparecen en ningún cliente.
+- **(c)** No borrar: responder 409 «tiene presupuestos compartidos» en vez
+  del 500. No pierde nada, pero no hay forma de dar de baja un presupuesto,
+  así que el cliente sigue sin poder borrarse: no resuelve D5.
 
 **D31 — contestada (a) en `3da0a8b`.** El catálogo guarda lo que ya tiene
 columna; los dos costos están en los riesgos de DESPACHO-1b.
@@ -811,6 +858,6 @@ PY=<venv>/bin/python scripts/testing/sabotajes/despacho1a.sh 51890cd
 - **El 400 «es para otro email»** dice que el email escrito no es el
   invitado. No dice cuál es. Hace falta el token para preguntar.
 
-Última vuelta: Wed Oct 28 05:46:09 UTC 2026
+Última vuelta: Wed Oct 28 06:03:02 UTC 2026
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 contestada (a) en 3da0a8b, costos en riesgos. DATOS-1 (D5 borrar cliente con presupuesto, D2 /health 503, D6 sin dev_detail) en curso encima de e59e1a8, su propio /entregar después del de DESPACHO-1b; si borrar el cliente obliga a elegir presupuesto, es la D32. Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review) y DESPACHO-1b; timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. La próxima D es la D32. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 contestada (a) en 3da0a8b, costos en riesgos. DATOS-1 (D5 borrar cliente con presupuesto, D2 /health 503, D6 sin dev_detail) en curso encima de e59e1a8, su propio /entregar después del de DESPACHO-1b; D5 frenada por la D32 (abierta: qué pasa con el presupuesto compartido; recomiendo a, borrarlo); D2 y D6 en curso. Postgres 16 descartable en /tmp/cdi-pg55432, puerto 55432, base datos1a. Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review) y DESPACHO-1b; timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. La próxima D es la D33. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
