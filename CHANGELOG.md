@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: los roles guardados como texto no dan administrador por una parte (AISLAMIENTO-2)
+
+- **fix(permisos):** si la columna de roles guarda un texto o un objeto en vez de una lista, «administrador» o {"admin": false} ya no cuentan como admin, ni en las rutas de administración ni en require_role. Un texto vale como un único rol entero.
+
 ## 2026-10-28 · fix: cancelar también cancela en Mercado Pago y no se paga dos veces (COBRO-MP-2)
 
 - **fix(cobro):** cancelar en CDI cancela la suscripción en Mercado Pago y la cuenta sigue hasta el fin del período; si Mercado Pago no confirma, no se cancela nada y se avisa. Con una suscripción vigente, el checkout no deja pagar otra; si la vieja no se pudo cobrar, se cancela antes de crear la nueva.
