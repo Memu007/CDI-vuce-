@@ -22,14 +22,39 @@ Supuestos (los despachos de muestra no traían subítems con su rótulo):
 
 from __future__ import annotations
 
+import asyncio
 import io
+import json
+import math
+import os
 import re
+import sys
 import unicodedata
+import weakref
+from bisect import bisect_left, bisect_right
+from pathlib import Path
 
+# Topes de la lectura: cada uno corta antes de gastar, y lo que pasa de uno se
+# avisa o rechaza el despacho; nunca se lee a medias sin decirlo.
 # Igual que el lector de facturas: pypdf tarda más que lineal con una página
 # de contenido enorme (RENDIMIENTO-1b).
 _MAX_CONTENIDO_PAGINA = 512 * 1024
 _MAX_PAGINAS = 200
+# Cada flujo del PDF descomprimido (contenido, fuentes, mapas de caracteres).
+# Generoso: una fuente incrustada puede pesar unos MB.
+_MAX_FLUJO = 8 * 1024 * 1024
+# Formularios (XObject) que se abren al leer una hoja.
+_MAX_FORMULARIOS = 20
+# Texto de todas las hojas juntas. Un despacho de 200 hojas tiene menos de 1 MB.
+_MAX_TEXTO = 4 * 1024 * 1024
+# Una línea de un despacho tiene menos de 300 caracteres y menos de 10 rótulos.
+_MAX_LARGO_LINEA = 2000
+_MAX_COLUMNAS = 40
+# Memoria del proceso que lee el PDF (`leer_despacho_aparte`). Una lectura
+# normal usa menos de 100 MB.
+_MAX_MEMORIA_HIJO = 256 * 1024 * 1024
+_HIJOS_A_LA_VEZ = 2
+_SALIDA_SIN_MEMORIA = 3
 
 AVISO_SIN_TEXTO = (
     "El PDF no tiene texto que se pueda leer: parece escaneado. Pedí el "
@@ -38,6 +63,10 @@ AVISO_SIN_TEXTO = (
 AVISO_NO_ES_DESPACHO = (
     "No encontré ningún ítem («Nº Item»). Revisá que sea el PDF del despacho "
     "oficializado."
+)
+AVISO_SIN_MEMORIA = (
+    "El PDF es demasiado pesado para leerlo. Pedí el despacho en PDF del "
+    "sistema o cargá los productos a mano."
 )
 
 CAMPOS = ("posicion_sim", "descripcion", "sufijos", "origen", "unidad",
@@ -115,6 +144,10 @@ _PATRONES = sorted(((r, _patron_rotulo(r)) for r in _ROTULOS),
                    key=lambda par: -len(par[0]))
 
 
+class _NoEsDespacho(Exception):
+    """El texto pasa de un tope: no se lee y se avisa por qué."""
+
+
 def _rotulos_de_linea(linea: str) -> list[tuple[int, str]] | None:
     """Los rótulos de la línea, con su columna, de izquierda a derecha. None si
     la línea no es de rótulos: tiene que estar hecha sólo de rótulos (así una
@@ -123,11 +156,23 @@ def _rotulos_de_linea(linea: str) -> list[tuple[int, str]] | None:
     plano = _plano(linea)
     encontrados = []
     for rotulo, patron in _PATRONES:
-        for m in patron.finditer(plano):
-            encontrados.append((m.start(), m.end(), rotulo))
-            plano = plano[:m.start()] + "\0" * (m.end() - m.start()) + plano[m.end():]
+        # Se tapan todos los de este rótulo de una vez: tapar de a uno
+        # rearmaba la línea por cada uno (cuadrático con miles de rótulos).
+        # Dos del mismo rótulo no pueden estar pegados (el patrón lo impide),
+        # así que da lo mismo.
+        cortes = [(m.start(), m.end()) for m in patron.finditer(plano)]
+        if not cortes:
+            continue
+        partes, desde = [], 0
+        for inicio, fin in cortes:
+            encontrados.append((inicio, fin, rotulo))
+            partes += [plano[desde:inicio], "\0" * (fin - inicio)]
+            desde = fin
+        plano = "".join(partes) + plano[desde:]
     if not encontrados or re.search(r"[A-Z0-9]", plano):
         return None
+    if len(encontrados) > _MAX_COLUMNAS:
+        raise _NoEsDespacho(f"Una línea tiene más de {_MAX_COLUMNAS} rótulos: no parece un despacho.")
     encontrados.sort()
     nombres = {r for _, _, r in encontrados}
     if len(encontrados) < 2 and not nombres & {_INICIO_ITEM, _INICIO_SUBITEM}:
@@ -146,12 +191,14 @@ def _valores_por_columna(linea: str, columnas: list[tuple[int, str]]) -> dict[st
     en la que empieza cada valor. Los valores se separan por dos o más
     espacios; uno que pisa la columna siguiente se corta donde ella empieza,
     si ahí hay un espacio."""
+    # Las columnas vienen ordenadas: se buscan con bisect y no recorriéndolas
+    # todas por cada valor (con miles de rótulos, eso trababa la lectura).
     inicios = [c for c, _ in columnas]
     trozos = []
     for m in re.finditer(r"\S+(?: \S+)*", linea):
         a, b = m.start(), m.end()
-        for col in inicios:
-            if a + 1 < col < b and linea[col - 1] == " ":
+        for col in inicios[bisect_right(inicios, a + 1):bisect_left(inicios, b)]:
+            if a + 1 < col and linea[col - 1] == " ":
                 trozos.append((a, linea[a:col].strip()))
                 a = col
         trozos.append((a, linea[a:b].strip()))
@@ -161,12 +208,8 @@ def _valores_por_columna(linea: str, columnas: list[tuple[int, str]]) -> dict[st
             continue
         # La columna es la del último rótulo que empieza a la izquierda (con
         # dos de margen: un número alineado a la derecha puede asomar).
-        elegida = None
-        for col, rotulo in columnas:
-            if col <= inicio + 2:
-                elegida = rotulo
-        if elegida is None:
-            elegida = columnas[0][1]
+        k = bisect_right(inicios, inicio + 2) - 1
+        elegida = columnas[max(k, 0)][1]
         valores[elegida] = (valores[elegida] + " " + texto) if elegida in valores else texto
     return valores
 
@@ -216,28 +259,57 @@ def parsear_sufijo(linea: str) -> dict | None:
 def texto_del_pdf(data: bytes) -> tuple[str, list[str]]:
     """Texto de todas las páginas, con las columnas en su lugar. Sólo pypdf
     (pdfminer se cuelga con un PDF armado, RENDIMIENTO-1b), sin OCR."""
-    from pypdf import PdfReader
+    texto, avisos, _ = _hojas_del_pdf(data)
+    return texto, avisos
 
+
+def _hojas_del_pdf(data: bytes) -> tuple[str, list[str], bool]:
+    """Texto, avisos y si quedó alguna hoja sin leer por pesada o rota."""
+    from pypdf import PdfReader, apply_configuration
+    from pypdf.errors import LimitReachedError
+
+    topes = {clave: _MAX_FLUJO for clave in (
+        "maximum_declared_stream_length", "array_based_stream_maximum_output_length",
+        "zlib_maximum_output_length", "lzw_maximum_output_length",
+        "run_length_maximum_output_length", "brotli_maximum_output_length",
+        "jbig2_maximum_output_length", "stream_decoding_work_maximum_length")}
     avisos = []
-    try:
-        reader = PdfReader(io.BytesIO(data))
-        paginas = list(reader.pages)
-    except Exception:
-        return "", ["No pude abrir el PDF."]
-    if len(paginas) > _MAX_PAGINAS:
-        avisos.append(f"El PDF tiene {len(paginas)} hojas: leí las primeras {_MAX_PAGINAS}.")
-        paginas = paginas[:_MAX_PAGINAS]
-    textos = []
-    for n, pagina in enumerate(paginas, start=1):
+    salteadas = False
+    with apply_configuration(**topes, xform_maximum_invocations_per_extraction=_MAX_FORMULARIOS):
         try:
-            contenido = pagina.get_contents()
-            if contenido is not None and len(contenido.get_data()) > _MAX_CONTENIDO_PAGINA:
-                avisos.append(f"No leí la hoja {n}: es demasiado pesada.")
-                continue
-            textos.append(pagina.extract_text(extraction_mode="layout") or "")
+            reader = PdfReader(io.BytesIO(data))
+            paginas = list(reader.pages)
+        except MemoryError:
+            raise
         except Exception:
-            avisos.append(f"No pude leer la hoja {n}.")
-    return "\n".join(textos), avisos
+            return "", ["No pude abrir el PDF."], True
+        if len(paginas) > _MAX_PAGINAS:
+            avisos.append(f"El PDF tiene {len(paginas)} hojas: leí las primeras {_MAX_PAGINAS}.")
+            paginas = paginas[:_MAX_PAGINAS]
+        textos, largo = [], 0
+        for n, pagina in enumerate(paginas, start=1):
+            try:
+                contenido = pagina.get_contents()
+                if contenido is not None and len(contenido.get_data()) > _MAX_CONTENIDO_PAGINA:
+                    raise LimitReachedError("contenido de la hoja")
+                texto = pagina.extract_text(extraction_mode="layout") or ""
+            except MemoryError:
+                raise
+            except LimitReachedError:
+                avisos.append(f"No leí la hoja {n}: es demasiado pesada.")
+                salteadas = True
+                continue
+            except Exception:
+                avisos.append(f"No pude leer la hoja {n}.")
+                salteadas = True
+                continue
+            largo += len(texto)
+            if largo > _MAX_TEXTO:
+                avisos.append(f"El texto del PDF es demasiado largo: leí hasta la hoja {n - 1}.")
+                salteadas = True
+                break
+            textos.append(texto)
+    return "\n".join(textos), avisos, salteadas
 
 
 def _nuevo_bloque(tipo: str, numero: str | None) -> dict:
@@ -248,13 +320,23 @@ def _nuevo_bloque(tipo: str, numero: str | None) -> dict:
 
 def leer_texto(texto: str) -> dict:
     """Renglones del catálogo a partir del texto del despacho."""
+    try:
+        return _leer_texto(texto)
+    except _NoEsDespacho as e:
+        return {"renglones": [], "divisa": None, "avisos": [str(e)]}
+
+
+def _leer_texto(texto: str) -> dict:
     lineas = [l.rstrip() for l in texto.splitlines()]
+    if any(len(l) > _MAX_LARGO_LINEA for l in lineas):
+        raise _NoEsDespacho(f"Una línea pasa de {_MAX_LARGO_LINEA} caracteres: no parece un despacho.")
     avisos: list[str] = []
     caratula: dict[str, str] = {}
     items: list[dict] = []
     bloque = None  # el ítem o subítem que se está leyendo
     item = None
     en_sufijos = False
+    bloques = 0  # ítems y subítems leídos
 
     i = 0
     while i < len(lineas):
@@ -279,6 +361,12 @@ def leer_texto(texto: str) -> dict:
                 valores = _valores_por_columna(lineas[j], columnas)
                 i = j + 1
             nombres = [r for _, r in columnas]
+            if _INICIO_ITEM in nombres or (_INICIO_SUBITEM in nombres and item is not None):
+                bloques += 1
+                if bloques > MAX_RENGLONES:
+                    avisos.append(f"El despacho tiene más de {MAX_RENGLONES} ítems y subítems: "
+                                  f"leí sólo los primeros {MAX_RENGLONES}.")
+                    break
             if _INICIO_ITEM in nombres:
                 item = _nuevo_bloque("item", valores.get(_INICIO_ITEM))
                 items.append(item)
@@ -407,14 +495,84 @@ def _renglon(bloque: dict, padre: dict | None = None) -> dict:
 
 def leer_despacho(data: bytes) -> dict:
     """Renglones del catálogo de un PDF de despacho. No guarda nada."""
-    texto, avisos = texto_del_pdf(data)
+    texto, avisos, salteadas = _hojas_del_pdf(data)
     if not texto.strip():
-        return {"renglones": [], "divisa": None, "sin_texto": True,
-                "avisos": avisos + [AVISO_SIN_TEXTO]}
+        # Si quedaron hojas sin leer, no se sabe si es escaneado.
+        return {"renglones": [], "divisa": None, "sin_texto": not salteadas,
+                "avisos": avisos if salteadas else avisos + [AVISO_SIN_TEXTO]}
     resultado = leer_texto(texto)
     resultado["avisos"] = avisos + resultado["avisos"]
     resultado["sin_texto"] = False
     return resultado
+
+
+class PdfDemasiadoPesado(Exception):
+    """La lectura pasó del tope de memoria del proceso que lee."""
+
+
+_SEMAFOROS: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
+
+
+async def leer_despacho_aparte(data: bytes, limite_s: float) -> dict:
+    """`leer_despacho` en otro proceso, con la memoria topeada y un tiempo
+    máximo. Si pasa del tiempo, el proceso se mata (un hilo no se puede
+    cortar desde afuera) y levanta TimeoutError; si pasa de la memoria,
+    PdfDemasiadoPesado. Como mucho `_HIJOS_A_LA_VEZ` a la vez: la espera
+    cuenta dentro del tiempo máximo."""
+    loop = asyncio.get_running_loop()
+    semaforo = _SEMAFOROS.get(loop)
+    if semaforo is None:
+        semaforo = _SEMAFOROS[loop] = asyncio.Semaphore(_HIJOS_A_LA_VEZ)
+    entorno = {k: os.environ[k] for k in ("PATH", "HOME", "LANG", "LC_ALL", "PYTHONUSERBASE")
+               if k in os.environ}
+
+    async def correr():
+        async with semaforo:
+            proceso = await asyncio.create_subprocess_exec(
+                sys.executable, "-m", __name__,
+                stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE, cwd=str(Path(__file__).resolve().parents[2]),
+                env=entorno)
+            try:
+                salida, errores = await proceso.communicate(data)
+            finally:
+                if proceso.returncode is None:
+                    proceso.kill()
+                    await proceso.wait()
+            return proceso.returncode, salida, errores
+
+    codigo, salida, errores = await asyncio.wait_for(correr(), timeout=limite_s)
+    if codigo == _SALIDA_SIN_MEMORIA:
+        raise PdfDemasiadoPesado(AVISO_SIN_MEMORIA)
+    final = errores.decode("utf-8", "replace")[-2000:]
+    if codigo != 0:
+        raise RuntimeError(f"el lector de despachos salió con {codigo}: {final}")
+    try:
+        resultado = json.loads(salida)
+    except ValueError as e:
+        raise RuntimeError(f"el lector de despachos no devolvió JSON: {final}") from e
+    if not isinstance(resultado, dict):
+        raise RuntimeError("el lector de despachos no devolvió un resultado")
+    return resultado
+
+
+def _main() -> int:
+    """El proceso que lee: el PDF por la entrada, el resultado en JSON por la
+    salida. Sale con `_SALIDA_SIN_MEMORIA` si pasa del tope de memoria."""
+    try:
+        import resource
+        _, duro = resource.getrlimit(resource.RLIMIT_AS)
+        tope = _MAX_MEMORIA_HIJO if duro == resource.RLIM_INFINITY else min(_MAX_MEMORIA_HIJO, duro)
+        resource.setrlimit(resource.RLIMIT_AS, (tope, duro))
+    except (ImportError, ValueError, OSError) as e:
+        print(f"lector de despachos sin tope de memoria: {e}", file=sys.stderr)
+    try:
+        data = sys.stdin.buffer.read()
+        sys.stdout.write(json.dumps(leer_despacho(data), ensure_ascii=False))
+        sys.stdout.flush()
+    except MemoryError:
+        return _SALIDA_SIN_MEMORIA
+    return 0
 
 
 # --- Guardar en el catálogo -------------------------------------------------
@@ -466,6 +624,13 @@ def renglon_para_catalogo(renglon) -> tuple[dict | None, list[str]]:
     # El catálogo guarda el peso por unidad: el kilo neto del renglón dividido
     # la cantidad, si están los dos.
     peso = kilo / cantidad if kilo and cantidad else None
+    if peso is not None and not (math.isfinite(peso) and peso <= _MAX_NUMERO):
+        # Una cantidad ínfima da un peso infinito, que no se puede mostrar.
+        return None, ["El peso por unidad no se puede calcular: revisá la cantidad y el kilo neto."]
     return {"ncm": ncm, "descripcion": descripcion, "origen": origen,
             "valor_unitario": unitario or None, "cantidad": cantidad or None,
             "peso_unitario": peso}, []
+
+
+if __name__ == "__main__":
+    sys.exit(_main())

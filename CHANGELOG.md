@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: leer y guardar un despacho sin trabar ni romper el catálogo (DESPACHO-1b, D41)
+
+- El despacho se lee en un proceso aparte con la memoria y el tiempo topeados: un PDF que se infla avisa o da 504, y no traba a los demás. Hojas, texto, líneas y rótulos tienen tope.
+- Guardar es todo o nada; un número o un peso por unidad que pasa el tope no se guarda y avisa; no se suma a un producto de otro NCM porque la descripción se parezca.
+- Un valor nuevo sobre uno que estaba vacío ya no se promedia con ese vacío.
+
 ## 2026-10-28 · fix: un email, una cuenta al invitar al estudio (ORG-1, D40)
 
 - Invitar un email que ya tiene cuenta en CDI (en este estudio, en otro o en ninguno) da error y no ocupa un lugar del plan.

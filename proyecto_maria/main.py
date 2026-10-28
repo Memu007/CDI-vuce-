@@ -8208,15 +8208,20 @@ async def leer_despacho_para_catalogo(
     await _get_owned_client(db, client_id, user["username"])
 
     from proyecto_maria.security.file_security import validate_file_upload
-    from proyecto_maria.core.despacho_lector import leer_despacho
+    from proyecto_maria.core.despacho_lector import PdfDemasiadoPesado, leer_despacho_aparte
     contents = await validate_file_upload(file, 'pdf', max_size=_get_max_upload_bytes())
+    # En otro proceso, con la memoria topeada: si tarda demasiado se mata, y
+    # no se queda ocupando un hilo de los que comparten todas las lecturas.
     try:
-        resultado = await _leer_pdf_aparte(leer_despacho, contents, que="el despacho")
-    except LecturaPdfDemasiadoLarga as e:
+        resultado = await leer_despacho_aparte(contents, _pdf_read_timeout_s())
+    except TimeoutError:
         return JSONResponse(
             status_code=504,
-            content={"detail": str(e), "code": "lectura_pdf_demasiado_larga"},
+            content={"detail": "Leer el despacho tardó demasiado. Probá de nuevo o cargá los productos a mano.",
+                     "code": "lectura_pdf_demasiado_larga"},
         )
+    except PdfDemasiadoPesado as e:
+        resultado = {"renglones": [], "divisa": None, "sin_texto": False, "avisos": [str(e)]}
     return {"success": True, "cliente_id": client_id, **resultado}
 
 
@@ -8256,8 +8261,10 @@ async def guardar_despacho_en_catalogo(
 
     try:
         for campos in listos:
+            # Lo que trae el despacho es de su posición: no se suma a un producto
+            # de otro NCM por parecido de descripción.
             await upsert_client_product_history(
-                db, owner_username=username, client_id=client_id, **campos)
+                db, owner_username=username, client_id=client_id, solo_mismo_ncm=True, **campos)
         await db.commit()
     except Exception:
         await db.rollback()

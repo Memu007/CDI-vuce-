@@ -69,8 +69,12 @@ async def upsert_client_product_history(
     valor_unitario: Optional[float] = None,
     cantidad: Optional[float] = None,
     peso_unitario: Optional[float] = None,
+    solo_mismo_ncm: bool = False,
 ) -> Optional[ClientProductHistory]:
     """Crea o actualiza la entrada de memoria de producto del cliente.
+
+    Con `solo_mismo_ncm` no se usa el respaldo por descripción del paso 2: una
+    descripción parecida con otro NCM queda como otro producto.
 
     Returns:
         La entrada (nueva o actualizada). None si faltan campos obligatorios.
@@ -107,7 +111,7 @@ async def upsert_client_product_history(
             existing = None
 
     # 2) Si no pego por NCM, fallback fuzzy por descripcion en el universo del cliente
-    if existing is None:
+    if existing is None and not solo_mismo_ncm:
         q_all = sa_select(ClientProductHistory).where(
             ClientProductHistory.owner_username == owner_username,
             ClientProductHistory.client_id == client_id,
@@ -132,10 +136,13 @@ async def upsert_client_product_history(
         n_new = n_prev + 1
 
         def _incr_avg(prev, new_value):
-            """Promedio incremental. Si new_value es None o 0, no mueve el promedio."""
+            """Promedio incremental. Si new_value es None o 0, no mueve el promedio.
+            Si no había valor, el nuevo es el primero: no se promedia con un 0
+            que nunca se cargó (DESPACHO-1b)."""
             if new_value is None or new_value <= 0:
                 return prev
-            prev = prev or 0.0
+            if not prev:
+                return new_value
             return ((prev * n_prev) + new_value) / n_new
 
         existing.veces_usado = n_new
