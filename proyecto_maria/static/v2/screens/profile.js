@@ -94,7 +94,7 @@
         billingUsageWrap = $('pfBillingUsageWrap');
         billingUsageEl = $('pfBillingUsage');
         billingTopupBtn = $('pfBillingTopup');
-        if (billingActivateBtn) billingActivateBtn.addEventListener('click', () => openCheckout('activate'));
+        if (billingActivateBtn) billingActivateBtn.addEventListener('click', () => openCheckout(billingActivateBtn));
         if (billingReactivateBtn) billingReactivateBtn.addEventListener('click', reactivateBilling);
         if (billingCancelBtn) billingCancelBtn.addEventListener('click', cancelBilling);
         if (billingTopupBtn) billingTopupBtn.addEventListener('click', openTopup);
@@ -337,6 +337,7 @@
             canceled: 'Cancelado'
         };
         billingStatusEl.textContent = labels[status] || status;
+        billingStatusEl.dataset.status = status;
         billingSummary.textContent = labels[status] || status;
 
         // Mostrar uso del mes siempre.
@@ -377,7 +378,8 @@
         }
 
         // Botones por estado.
-        if (status === 'trial' || status === 'active') {
+        // past_due también cancela: si no, la suscripción cobra cuando la tarjeta vuelve (COBRO-MP-1, C).
+        if (status === 'trial' || status === 'active' || status === 'past_due') {
             if (billingCancelBtn) billingCancelBtn.hidden = false;
         }
         if (status === 'past_due' || status === 'none') {
@@ -391,7 +393,14 @@
         }
     }
 
-    async function openCheckout() {
+    // Con el botón deshabilitado mientras pide, dos clics no piden dos
+    // checkouts (COBRO-MP-1, D); como el CTA del banner en app_v2.js.
+    async function openCheckout(boton) {
+        const textoBoton = boton ? boton.textContent : '';
+        if (boton) {
+            boton.disabled = true;
+            boton.textContent = 'Abriendo…';
+        }
         try {
             const plan = billingPlanSelect && !billingPlanSelect.hidden ? billingPlanSelect.value : 'premium';
             const res = await CDI.api('/api/billing/checkout', {
@@ -406,6 +415,11 @@
             CDI.toast('Error', (data && typeof data.detail === 'string' && data.detail) || 'No se pudo iniciar el cobro.', 'error');
         } catch (err) {
             CDI.toast('Error', String(err.message || err), 'error');
+        } finally {
+            if (boton) {
+                boton.disabled = false;
+                boton.textContent = textoBoton;
+            }
         }
     }
 
@@ -424,11 +438,15 @@
     }
 
     async function cancelBilling() {
+        // Desde past_due no hay período pagado: se corta al cancelar.
+        const vencido = billingStatusEl && billingStatusEl.dataset.status === 'past_due';
         const ok = await CDI.confirm({
             title: 'Cancelar plan',
             lead: '¿Seguro que querés cancelar?',
-            text: 'Vas a poder seguir usando CDI hasta el fin del período ya pagado. Después no se renueva automáticamente. Podés reactivar cuando quieras.',
-            confirmText: 'Sí, cancelar',
+            text: vencido
+                ? 'Tu plan tiene un pago pendiente. Al cancelar no se cobra más y dejás de usar CDI hasta que actives un plan.'
+                : 'Vas a poder seguir usando CDI hasta el fin del período ya pagado. Después no se renueva automáticamente. Podés reactivar cuando quieras.',
+            acceptText: 'Sí, cancelar',
             cancelText: 'Volver'
         });
         if (!ok) return;
