@@ -493,7 +493,8 @@ def _renovacion(usuario: str, monto: float = 30000.0, estado_pago: str = "approv
                           "auto_recurring": {"transaction_amount": 30000.0, "currency_id": "ARS"}}
     pid = f"prn{sufijo}-{usuario}"
     PAGOS[pid] = {"id": pid, "status": estado_pago, "external_reference": "", "transaction_amount": monto,
-                  "currency_id": "ARS", "payer": {"id": "payer-1"}}
+                  "currency_id": "ARS", "payer": {"id": "payer-1"},
+                  "date_approved": datetime.now(timezone.utc).isoformat()}
     cobro = f"cob{sufijo}-{usuario}"
     COBROS[cobro] = {"id": cobro, "preapproval_id": pre, "type": "scheduled", "status": "processed",
                      "transaction_amount": monto, "currency_id": "ARS",
