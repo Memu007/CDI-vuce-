@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: las métricas de uso se vuelven a grabar en bases viejas (OBSERVABILIDAD-1)
+
+- Al arrancar, si la tabla de métricas no tiene la columna del dueño, se agrega sola (vacía, sin tocar lo grabado) con su índice. Sin ella cada métrica se perdía y el panel de admin daba error. Si no se puede agregar, la app arranca igual y lo deja en el log.
+
 ## 2026-10-28 · fix: el historial de NCM ya no se borra con cada deploy (DISCO-1)
 
 - Las NCM confirmadas e importadas se guardan en la base, por usuario, con el mismo comportamiento que antes. Al arrancar, los archivos de historial que hubiera en el disco se cargan una sola vez.

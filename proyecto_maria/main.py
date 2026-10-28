@@ -1285,6 +1285,74 @@ async def _migrate_add_unidad_column():
         print(f"⚠️ Migracion unidad (no critica): {mig_err!r}")
 
 
+async def _migrate_add_api_logs_owner_column():
+    """Agrega `api_logs.owner_username` (nullable) y su índice si la base no
+    los tiene.
+
+    Una `api_logs` creada antes de que el modelo tuviera la columna no la
+    recibe de `create_all`, y entonces cada métrica falla con
+    UndefinedColumn. No toca filas y, si ya están, no hace nada (ni pide el
+    lock de la tabla). Si falla, queda en el log y la app arranca igual.
+    """
+    from proyecto_maria.database.connection import engine, IS_SQLITE
+
+    try:
+        async with engine.begin() as conn:
+            if IS_SQLITE:
+                res = await conn.exec_driver_sql("PRAGMA table_info(api_logs)")
+                columnas = {row[1] for row in res.fetchall()}
+            else:
+                res = await conn.exec_driver_sql(
+                    "SELECT column_name FROM information_schema.columns "
+                    "WHERE table_schema = current_schema() AND table_name = 'api_logs'"
+                )
+                columnas = {row[0] for row in res.fetchall()}
+            if not columnas:
+                # Base vacía: init_db ya la crea con la columna y el índice.
+                return
+            if not IS_SQLITE:
+                # Si otra conexión tiene tomada la tabla, mejor fallar al rato
+                # (y reintentar en el próximo arranque) que colgar el arranque.
+                await conn.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
+            if "owner_username" not in columnas:
+                await conn.exec_driver_sql(
+                    "ALTER TABLE api_logs ADD COLUMN owner_username VARCHAR(50)"
+                    if IS_SQLITE else
+                    "ALTER TABLE api_logs ADD COLUMN IF NOT EXISTS owner_username VARCHAR(50)"
+                )
+                print("✅ Migracion: agregada columna api_logs.owner_username")
+
+            # Un índice cuya primera columna sea owner_username alcanza, se
+            # llame como lo nombra create_all o como `ix_api_logs_owner`, el
+            # de scripts/migrate_add_owner.py.
+            if IS_SQLITE:
+                res = await conn.exec_driver_sql("PRAGMA index_list(api_logs)")
+                tiene_indice = False
+                for nombre in [row[1] for row in res.fetchall()]:
+                    res = await conn.exec_driver_sql(f'PRAGMA index_info("{nombre}")')
+                    primera = res.fetchall()[:1]
+                    if primera and primera[0][2] == "owner_username":
+                        tiene_indice = True
+            else:
+                res = await conn.exec_driver_sql(
+                    "SELECT 1 FROM pg_index i JOIN pg_attribute a "
+                    "ON a.attrelid = i.indrelid AND a.attnum = i.indkey[0] "
+                    "WHERE i.indrelid = 'api_logs'::regclass AND a.attname = 'owner_username'"
+                )
+                tiene_indice = res.first() is not None
+            if not tiene_indice:
+                await conn.exec_driver_sql(
+                    "CREATE INDEX IF NOT EXISTS ix_api_logs_owner_username "
+                    "ON api_logs (owner_username)"
+                )
+                print("✅ Migracion: agregado indice ix_api_logs_owner_username")
+    except Exception:
+        logging.exception(
+            "[OBSERVABILIDAD-1] no se pudo agregar api_logs.owner_username; "
+            "la app arranca igual, pero las métricas no se graban hasta que exista"
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Eventos de ciclo de vida de la aplicación (Startup/Shutdown)"""
@@ -1306,6 +1374,7 @@ async def lifespan(app: FastAPI):
     await _migrate_widen_pieza_column()
     await _migrate_add_grupo_id_column()
     await _migrate_add_unidad_column()
+    await _migrate_add_api_logs_owner_column()
     await _migrate_create_telemetry_events_table()
     # Organizaciones: crear tabla orgs primero, luego FK en users, luego invitations
     await _migrate_create_organizations_table()
