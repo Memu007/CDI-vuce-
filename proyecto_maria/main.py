@@ -10005,10 +10005,11 @@ def _leer_cobro_autorizado_mp(cobro_id: str) -> dict:
 
 
 def _pago_del_cobro_mp(cobro) -> tuple:
-    """(id del pago, id de la suscripción, estado del pago) de un cobro
-    autorizado, según la documentación pública de Mercado Pago (COBRO-MP-1,
-    D30: no se pudo confirmar contra un aviso real). Lo que no tenga esa
-    forma levanta _CobroMPFormaInesperada y no se aplica nada."""
+    """(id del pago, id de la suscripción) de un cobro autorizado, según la
+    documentación pública de Mercado Pago (COBRO-MP-1, D30: no se pudo
+    confirmar contra un aviso real). Lo que no tenga esa forma levanta
+    _CobroMPFormaInesperada y no se aplica nada. El estado no se toma del
+    cobro: lo decide el pago, que se lee después."""
     if not isinstance(cobro, dict):
         raise _CobroMPFormaInesperada("el cobro no es un objeto")
     suscripcion_id, pago = cobro.get("preapproval_id"), cobro.get("payment")
@@ -10017,7 +10018,7 @@ def _pago_del_cobro_mp(cobro) -> tuple:
     if not isinstance(pago, dict) or not isinstance(pago.get("id"), (str, int)) \
             or isinstance(pago.get("id"), bool) or not str(pago.get("id")):
         raise _CobroMPFormaInesperada("el cobro no dice qué pago lo cobró")
-    return str(pago["id"]), suscripcion_id, pago.get("status")
+    return str(pago["id"]), suscripcion_id
 
 
 async def _registrar_pago_mp(session, payment_id: str, cuenta: str, update: dict, pay_resp: dict,
@@ -10193,7 +10194,7 @@ async def mercadopago_webhook(request: Request):
         suscripcion_del_cobro = None
         if event_type == "subscription_authorized_payment" and payment_id and MP_ACCESS_TOKEN:
             try:
-                payment_id, suscripcion_del_cobro, estado_cobro = _pago_del_cobro_mp(
+                payment_id, suscripcion_del_cobro = _pago_del_cobro_mp(
                     _leer_cobro_autorizado_mp(payment_id))
             except _CobroMPIlegible as e:
                 logger.warning("Webhook MP: no se pudo leer el cobro autorizado %s", e)
@@ -10201,8 +10202,6 @@ async def mercadopago_webhook(request: Request):
             except _CobroMPFormaInesperada as e:
                 logger.warning("Webhook MP: cobro autorizado con forma inesperada, no se aplica: %s", e)
                 return {"success": True, "skipped": "cobro autorizado con forma inesperada"}
-            if estado_cobro != "approved":
-                return {"success": True, "skipped": f"cobro status={estado_cobro}"}
             event_type = "payment"
 
         if event_type != "payment":
