@@ -667,25 +667,38 @@
         }
     }
 
-    /* Pide el checkout del plan y lleva el navegador a Mercado Pago. Quien la
-       llama deshabilita su botón antes y lo rehabilita sólo si esto falla: otro
-       clic mientras el navegador se va pediría un segundo checkout, que cancela
-       la suscripción adonde va (COBRO-MP-1, D). Si vuelve con «Atrás» y el
-       navegador restaura la página de su caché, se recarga: el botón y el
-       estado de cobro que mostraba quedaron viejos. */
-    async function irAlCheckout(plan) {
-        const res = await api('/api/billing/checkout', {
-            method: 'POST',
-            body: JSON.stringify({ plan })
-        });
-        const data = (await res.json().catch(() => null)) || {};
-        if (!res.ok || !data.init_point) {
-            throw new Error((typeof data.detail === 'string' && data.detail) || 'No se pudo iniciar el cobro.');
+    /* Pide el checkout del plan y lleva el navegador a Mercado Pago. El botón
+       queda deshabilitado mientras pide y mientras el navegador se va: otro
+       clic pediría un segundo checkout, que cancela la suscripción adonde va
+       (COBRO-MP-1, D). Sólo vuelve a su estado si el checkout falla; entonces
+       devuelve false. Si vuelve con «Atrás» y el navegador restaura la página
+       de su caché, se recarga: el botón y el estado de cobro quedaron viejos. */
+    async function irAlCheckout(plan, boton) {
+        const textoBoton = boton.textContent;
+        boton.disabled = true;
+        boton.textContent = 'Abriendo…';
+        let motivo = 'No se pudo iniciar el cobro.';
+        try {
+            const res = await api('/api/billing/checkout', {
+                method: 'POST',
+                body: JSON.stringify({ plan })
+            });
+            const data = (await res.json().catch(() => null)) || {};
+            if (res.ok && data.init_point) {
+                window.addEventListener('pageshow', (ev) => {
+                    if (ev.persisted) window.location.reload();
+                }, { once: true });
+                window.location.href = data.init_point;
+                return true;
+            }
+            if (typeof data.detail === 'string' && data.detail) motivo = data.detail;
+        } catch (err) {
+            console.warn('[billing] checkout error', err);
         }
-        window.addEventListener('pageshow', (ev) => {
-            if (ev.persisted) window.location.reload();
-        }, { once: true });
-        window.location.href = data.init_point;
+        if (CDI.toast) CDI.toast('Error', motivo, 'error');
+        boton.disabled = false;
+        boton.textContent = textoBoton;
+        return false;
     }
 
     /* ---------- Billing banner (trial / past_due / activar plan) ----------
@@ -729,19 +742,9 @@
         // Click en CTA → abrir checkout MP en la misma ventana.
         if (!cta._wired) {
             cta._wired = true;
-            cta.addEventListener('click', async () => {
-                cta.disabled = true;
-                cta.textContent = 'Abriendo...';
+            cta.addEventListener('click', () => {
                 track('billing_cta_clicked', { status: status });
-                try {
-                    await irAlCheckout((user && user.plan) || 'premium');
-                    return;
-                } catch (err) {
-                    console.warn('[billing] checkout error', err);
-                    if (CDI.toast) CDI.toast('Error', String(err.message || err), 'error');
-                }
-                cta.disabled = false;
-                cta.textContent = status === 'past_due' ? 'Activar plan ahora' : 'Activar plan';
+                irAlCheckout((user && user.plan) || 'premium', cta);
             });
         }
         if (close && !close._wired) {

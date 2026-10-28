@@ -94,7 +94,7 @@
         billingUsageWrap = $('pfBillingUsageWrap');
         billingUsageEl = $('pfBillingUsage');
         billingTopupBtn = $('pfBillingTopup');
-        if (billingActivateBtn) billingActivateBtn.addEventListener('click', () => openCheckout(billingActivateBtn));
+        if (billingActivateBtn) billingActivateBtn.addEventListener('click', () => CDI.irAlCheckout(planElegido(), billingActivateBtn));
         if (billingReactivateBtn) billingReactivateBtn.addEventListener('click', reactivateBilling);
         if (billingCancelBtn) billingCancelBtn.addEventListener('click', cancelBilling);
         if (billingTopupBtn) billingTopupBtn.addEventListener('click', openTopup);
@@ -395,28 +395,8 @@
         }
     }
 
-    // Pide el checkout del plan elegido. Devuelve true si el navegador ya va a
-    // Mercado Pago; si no, muestra el error y devuelve false.
-    async function pedirCheckout() {
-        const plan = billingPlanSelect && !billingPlanSelect.hidden ? billingPlanSelect.value : 'premium';
-        try {
-            await CDI.irAlCheckout(plan);
-            return true;
-        } catch (err) {
-            CDI.toast('Error', String(err.message || err), 'error');
-            return false;
-        }
-    }
-
-    // Con el botón deshabilitado mientras pide, dos clics no piden dos
-    // checkouts (COBRO-MP-1, D).
-    async function openCheckout(boton) {
-        const textoBoton = boton.textContent;
-        boton.disabled = true;
-        boton.textContent = 'Abriendo…';
-        if (await pedirCheckout()) return;
-        boton.disabled = false;
-        boton.textContent = textoBoton;
+    function planElegido() {
+        return billingPlanSelect && !billingPlanSelect.hidden ? billingPlanSelect.value : 'premium';
     }
 
     async function openTopup() {
@@ -479,7 +459,7 @@
                     acceptText: 'Ir a pagar',
                     cancelText: 'Volver'
                 });
-                if (seguir && await pedirCheckout()) return;
+                if (seguir && await CDI.irAlCheckout(planElegido(), billingReactivateBtn)) return;
             } else {
                 CDI.toast('Prueba reactivada', 'Sigue hasta el fin de la prueba.', 'success');
                 CDI.track('billing_reactivated');
