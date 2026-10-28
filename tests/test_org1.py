@@ -494,7 +494,7 @@ def _pendientes(org_id, email):
     return _db(q)
 
 
-@pytest.mark.parametrize("donde", ["este estudio", "otro estudio", "sin estudio"])
+@pytest.mark.parametrize("donde", ["este estudio", "otro estudio", "sin estudio", "vieja en mayusculas"])
 def test_invitar_un_email_que_ya_tiene_cuenta_400_sin_ocupar_lugar(monkeypatch, donde):
     _tope(monkeypatch, 3)
     est = Estudio()
@@ -508,6 +508,12 @@ def test_invitar_un_email_que_ya_tiene_cuenta_400_sin_ocupar_lugar(monkeypatch, 
         r = TestClient(app).post("/auth/register", json={
             "username": _azar("o1u_"), "password": CLAVE, "email": email})
         assert r.status_code == 200, r.text
+    if donde == "vieja en mayusculas":
+        # Una cuenta de antes de EMAIL-1 puede tener el email con mayúsculas.
+        async def q(s):
+            await s.execute(update(User).where(User.email == email).values(email=email.upper()))
+        _db(q)
+        assert _usuarios(email.upper()) != []
     r = est.invitar(f" {email.upper()} ")
     assert r.status_code == 400, r.text
     assert r.json()["detail"] == YA_TIENE_CUENTA, r.text

@@ -279,7 +279,7 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
         # --- 5. un email, una cuenta (D40)
         YA_TIENE_CUENTA = "Ese email ya tiene una cuenta en CDI y no se puede invitar como miembro nuevo."
         PREMIUM["users"] = 3
-        for donde in ("este estudio", "otro estudio", "sin estudio"):
+        for donde in ("este estudio", "otro estudio", "sin estudio", "guardada con mayúsculas"):
             est = Estudio()
             a = email()
             if donde == "este estudio":
@@ -290,6 +290,10 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
                 c.cookies.clear()
                 c.post("/auth/register", json={"username": azar("o1u_"), "password": CLAVE, "email": a})
             chequear(len(usuarios(a)) == 1, f"cuenta {donde}: creada")
+            if donde == "guardada con mayúsculas":
+                # Una cuenta de antes de EMAIL-1 puede tener el email con mayúsculas.
+                sql("update users set email=%s where email=%s", a.upper(), a)
+                chequear(len(usuarios(a.upper())) == 1, "  la cuenta queda con el email en mayúsculas")
             r = est.invitar(f" {a.upper()} ")
             pend = sql("select count(*) from invitations where org_id=%s and email=%s and status='pending'", est.org_id, a)[0][0]
             chequear(r.status_code == 400 and detalle(r) == YA_TIENE_CUENTA and pend == 0,
@@ -353,6 +357,7 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
         c.cookies.clear()
         r = c.post("/auth/register", json={"username": azar("o1u_"), "password": CLAVE, "email": a,
                                            "invite_token": tok})
+        chequear(r.status_code == 200, f"el miembro entra con su invitación ({r.status_code} {detalle(r)})")
         suya = dict(c.cookies)
         tok_nuevo = est.token(nuevo)
         c.cookies.clear()

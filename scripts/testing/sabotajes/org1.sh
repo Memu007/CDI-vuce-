@@ -97,6 +97,11 @@ sabotaje "la regla 1 sólo mira este estudio" \
   "select(User.username).where(func.lower(User.email) == clean_email, User.organization_id == org.id)" \
   "test_invitar_un_email_que_ya_tiene_cuenta_400_sin_ocupar_lugar[otro estudio]" \
   "invitar un email con cuenta otro estudio"
+sabotaje "la regla 1 sin mayúsculas" \
+  "select(User.username).where(func.lower(User.email) == clean_email)" \
+  "select(User.username).where(User.email == clean_email)" \
+  "test_invitar_un_email_que_ya_tiene_cuenta_400_sin_ocupar_lugar[vieja en mayusculas]" \
+  "invitar un email con cuenta guardada con mayúsculas"
 sabotaje "sin la regla 1" \
   "    if existing.first():
         raise HTTPException(
