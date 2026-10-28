@@ -765,15 +765,12 @@
         // Persistence: Load from localStorage
         let restored = false;
         try {
-            const savedStateStr = localStorage.getItem('cdi_v2_state');
-            if (savedStateStr) {
-                const parsed = JSON.parse(savedStateStr);
-                if (parsed && parsed.items && parsed.items.length > 0) {
-                    CDI.state = parsed;
-                    if (parsed.clienteActivo) setClienteActivo(parsed.clienteActivo);
-                    restored = true;
-                    if (CDI.toast) CDI.toast.info('Recuperado', 'Se recuperó la operación en curso.');
-                }
+            const parsed = recuperarBorrador();
+            if (parsed) {
+                CDI.state = parsed;
+                if (parsed.clienteActivo) setClienteActivo(parsed.clienteActivo);
+                restored = true;
+                if (CDI.toast) CDI.toast.info('Recuperado', 'Se recuperó la operación en curso.');
             }
         } catch (e) {
             console.warn('[app_v2] failed to restore state', e);
@@ -789,23 +786,112 @@
     });
 
     /* ---------- 11. Persistence Auto-Save & BeforeUnload ---------- */
-    window.addEventListener('beforeunload', (e) => {
+    // Cada pestaña guarda su operación en su propia clave (ORDEN-1): con una
+    // sola clave, dos pestañas abiertas se pisaban y la que quedaba en la carga
+    // de archivos borraba la operación de la otra.
+    //   cdi_v2_state:<pestaña> = { v: 1, savedAt, closed, state }
+    // La pestaña estrena un id en cada carga y adopta el borrador del id
+    // anterior (recargar); si no lo tiene, el más reciente que nadie usa: el de
+    // una pestaña cerrada, uno que no se guarda hace rato o la clave vieja sin
+    // pestaña. Adoptar copia y después borra, así que dos pestañas que adoptan
+    // el mismo a la vez lo duplican, no lo pierden.
+    const BORRADOR = 'cdi_v2_state';
+    const BORRADOR_PESTANA = 'cdi_v2_tab';
+    const BORRADOR_HUERFANO_MS = 3 * 60 * 1000;
+    const pestanaAnterior = (() => {
+        try { return sessionStorage.getItem(BORRADOR_PESTANA); } catch (_) { return null; }
+    })();
+    const pestana = (() => {
+        try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (_) {}
+        return Date.now().toString(36) + Math.random().toString(36).slice(2);
+    })();
+    const claveBorrador = BORRADOR + ':' + pestana;
+    try { sessionStorage.setItem(BORRADOR_PESTANA, pestana); } catch (_) {}
+
+    function enFlujo() {
         const state = CDI.state || {};
-        if (state.items && state.items.length > 0 && currentScreen !== 'upload' && currentScreen !== 'ready') {
+        return !!(state.items && state.items.length > 0 && currentScreen !== 'upload' && currentScreen !== 'ready');
+    }
+
+    function guardarBorrador(cerrada) {
+        if (!enFlujo()) return;
+        const sobre = { v: 1, savedAt: Date.now(), closed: !!cerrada, state: CDI.state };
+        try { localStorage.setItem(claveBorrador, JSON.stringify(sobre)); } catch (_) {}
+    }
+
+    function borrarBorrador() {
+        try { localStorage.removeItem(claveBorrador); } catch (_) {}
+    }
+
+    function leerBorrador(clave) {
+        let parsed = null;
+        try { parsed = JSON.parse(localStorage.getItem(clave) || 'null'); } catch (_) { return null; }
+        if (!parsed || typeof parsed !== 'object') return null;
+        // La clave vieja guardaba la operación sola, sin pestaña.
+        const sobre = parsed.v === 1 ? parsed : { savedAt: 0, closed: true, state: parsed };
+        const state = sobre.state;
+        if (!state || !Array.isArray(state.items) || state.items.length === 0) return null;
+        return { clave, savedAt: Number(sobre.savedAt) || 0, closed: !!sobre.closed, state };
+    }
+
+    function adoptarBorrador(b) {
+        try {
+            localStorage.setItem(claveBorrador, JSON.stringify({ v: 1, savedAt: Date.now(), closed: false, state: b.state }));
+        } catch (_) { return null; }
+        if (b.clave !== claveBorrador) {
+            try { localStorage.removeItem(b.clave); } catch (_) {}
+        }
+        return b.state;
+    }
+
+    function recuperarBorrador() {
+        if (pestanaAnterior) {
+            const propio = leerBorrador(BORRADOR + ':' + pestanaAnterior);
+            if (propio) return adoptarBorrador(propio);
+        }
+        let claves = [];
+        try { claves = Object.keys(localStorage); } catch (_) { return null; }
+        const ahora = Date.now();
+        let elegido = null;
+        claves.forEach(clave => {
+            if (clave === claveBorrador) return;
+            if (clave !== BORRADOR && clave.indexOf(BORRADOR + ':') !== 0) return;
+            const b = leerBorrador(clave);
+            if (!b) return;
+            if (!b.closed && ahora - b.savedAt < BORRADOR_HUERFANO_MS) return;  // otra pestaña la está usando
+            if (!elegido || b.savedAt > elegido.savedAt) elegido = b;
+        });
+        return elegido ? adoptarBorrador(elegido) : null;
+    }
+
+    CDI.borrador = { borrar: borrarBorrador };
+
+    window.addEventListener('beforeunload', (e) => {
+        if (enFlujo()) {
             e.preventDefault();
             e.returnValue = '';
-            try { localStorage.setItem('cdi_v2_state', JSON.stringify(state)); } catch (_) {}
+            guardarBorrador(false);
         }
     });
 
+    // Al irse de verdad la pestaña queda marcada como cerrada, para que otra la
+    // pueda recuperar; si la operación ya terminó o se canceló, se borra.
+    window.addEventListener('pagehide', () => {
+        if (enFlujo()) guardarBorrador(true);
+        else borrarBorrador();
+    });
+    // Vuelve desde la caché del navegador (atrás/adelante): sigue en uso.
+    window.addEventListener('pageshow', (e) => {
+        if (e.persisted) guardarBorrador(false);
+    });
+
     setInterval(() => {
-        const state = CDI.state || {};
         // Auto-guardamos si estamos a mitad de flujo
-        if (state.items && state.items.length > 0 && currentScreen !== 'upload' && currentScreen !== 'ready') {
-            try { localStorage.setItem('cdi_v2_state', JSON.stringify(state)); } catch (_) {}
+        if (enFlujo()) {
+            guardarBorrador(false);
         } else if (currentScreen === 'upload' || currentScreen === 'ready') {
-            // Limpiamos el localStorage si la operacion fue terminada o cancelada
-            try { localStorage.removeItem('cdi_v2_state'); } catch (_) {}
+            // Se borra sólo el de esta pestaña: la operación terminó o se canceló
+            borrarBorrador();
         }
     }, 2500);
 })();

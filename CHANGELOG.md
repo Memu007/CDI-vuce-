@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · feat: reordenar productos arrastrando, también los grupos, y cada pestaña con su borrador (ORDEN-1)
+
+- **feat(revisión):** en la tabla de productos un grupo se arrastra entero y se puede soltar un producto sobre él; el orden que queda es el del pedido y el del TXT, con los ítems numerados corridos. Ctrl+Z después de arrastrar ya no vuelve el orden viejo.
+- **fix(borrador):** cada pestaña guarda su operación en su propia clave: dos pestañas abiertas no se pisan y la que queda en la carga de archivos no borra la de otra. Al abrir, se recupera la propia o la más reciente de una pestaña cerrada.
+
 ## 2026-10-28 · fix: la sugerencia de NCM no pierde la SIM completa del proveedor (GUARDAR-2, D32 b)
 
 - **fix(sugerencia):** si el historial del cliente tiene el NCM de 8 dígitos y el catálogo del proveedor tiene, para el mismo producto (la misma descripción, no una parecida), la SIM completa que empieza con esos 8, el autorrelleno (`/api/catalog/lookup`) y `/api/ncm/sugerir` traen la del proveedor. Desde GUARDAR-1 llegaba `84714900` y la pantalla marcaba incompleto lo que antes llegaba listo. Sin migración.

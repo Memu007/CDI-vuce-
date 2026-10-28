@@ -247,7 +247,8 @@
             operationSavedFor: null, orphanDismissedFor: null,
         });
         try { sessionStorage.removeItem('cdi.pending_create_client'); } catch (_) {}
-        try { localStorage.removeItem('cdi_v2_state'); } catch (_) {}
+        // El borrador de esta pestaña, no el de otras (ORDEN-1).
+        try { CDI.borrador.borrar(); } catch (_) {}
     }
 
     async function handleFile(file) {
