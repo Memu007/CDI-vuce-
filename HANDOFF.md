@@ -54,7 +54,7 @@ Usuarios demo (creados al primer arranque, NO en `ENVIRONMENT=production`):
 | VUCE | `proyecto_maria/core/vuce_connector.py` (HTTP retry + backoff; `modo_fake=true` por default) |
 | Auth | JWT en cookie HttpOnly (`samesite="lax"`) |
 | Frontend v2 | `templates/dashboard_v2.html` + `static/v2/` (vanilla JS, sin framework) |
-| Telemetría | `POST /api/ui/event` → `logs/ui_events.jsonl` + tabla `telemetry_events` |
+| Telemetría | `POST /api/ui/event` → tabla `telemetry_events` (cuerpo de hasta 16 KB; más da 413) |
 | Deploy | Dockerfile + Railway |
 
 ---

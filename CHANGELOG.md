@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-10-28 · fix: los eventos de uso tienen un tope de tamaño (ABUSO-1, S5)
 
-- Un evento de uso de más de 16 KB se rechaza y no se guarda; antes cualquiera podía mandar eventos de varios MB y llenar el disco y la base. Los eventos ya no se copian a un archivo de log que nadie leía: quedan sólo en la base.
+- Un evento de uso de más de 16 KB se rechaza y no se guarda; antes cualquiera, sin sesión, podía mandar eventos de varios MB que se copiaban enteros a un archivo del servidor. Los eventos ya no se copian a un archivo de log que nadie leía: quedan sólo en la base.
 
 ## 2026-10-28 · fix: cerrar sesión y cambiar la contraseña cierran de verdad las sesiones (SESION-1)
 
