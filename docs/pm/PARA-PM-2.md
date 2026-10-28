@@ -629,6 +629,82 @@ python -m pytest -q --no-cov tests/test_destino1.py            # 32 passed
 PY=python bash scripts/testing/sabotajes/destino1.sh b9881fb   # 19 ROJO, «sabotajes sin rojo: 0»
 ```
 
+## ORG-1 + D40: **entregada** en `b358827` (2026-10-28, 18:00 UTC)
+
+**Resultado:** tres commits encima de la cadena (base `3d001a6`):
+`3c2693b` producto y `CHANGELOG.md`, `1ef1d38` pruebas, Postgres y
+sabotajes, `b358827` un caso más que pidió el adversario.
+- **Regla 1:** invitar un email que ya tiene cuenta da 400 «Ese email ya
+  tiene una cuenta en CDI y no se puede invitar como miembro nuevo.» y no
+  ocupa lugar. La respuesta es la misma con la cuenta en este estudio, en
+  otro o sin estudio. Se compara sin mayúsculas, porque una cuenta de antes
+  de EMAIL-1 puede tenerlas.
+- **Regla 2:** al registrarse con una invitación, las otras pendientes del
+  mismo email en ese estudio quedan usadas. La comparación ignora mayúsculas
+  y espacios. Va en la misma transacción que el alta: si el alta no entra,
+  siguen pendientes.
+- **Rojo con el producto de `3d001a6`** (copiado de los logs):
+  - SQLite: «10 failed, 57 passed, 6 warnings in 50.70s».
+  - Postgres 16: «fallas: 8». Por ejemplo: «FALLA | el sacado no vuelve a
+    entrar con la segunda (200 , miembros 2)» y «FALLA | invitar un email con
+    cuenta otro estudio: 400 sin invitación (200 )».
+- **Verde sobre `1ef1d38`:**
+  - SQLite (`test_org1.py` + `test_email1.py`): «91 passed».
+  - Postgres 16: «fallas: 0».
+- **Sabotajes** `org1.sh` sobre `b358827`: 7 sabotajes, 14 de 14 en rojo (SQLite y Postgres), «sabotajes sin rojo: 0», salida 0.
+- **Suite completa sobre `1ef1d38`:** «4026 passed, 336 skipped, 2 xfailed,
+  95 warnings in 576.00s», 0 failed. Sobre `b358827` no la corrí: sólo suma
+  un caso y un sabotaje.
+
+**Decide la PM:** nada. Lo que queda abierto va en riesgos.
+
+**Tus tres agregados:**
+1. *Reingreso del sacado:* `test_el_sacado_no_vuelve_a_entrar_con_otra_invitacion_vieja`
+   hace el recorrido entero (dos invitaciones, entra, lo sacan, cambia el email,
+   prueba con la segunda) y espera 400 «ya fue usada». Lo pone en rojo el
+   sabotaje «sin la regla 2».
+2. *Email que el registro rechaza:* ya estaba en `6b9762e` / `3aaa3c4`.
+3. *Prueba que falta, con una contradicción:* tu caso (dos pendientes al
+   mismo email, entra con una, la otra no ocupa lugar) **ya no distingue**
+   la resta `- set(emails_miembros)`, porque la regla 2 deja usada la otra.
+   Lo dejé, y su docstring lo dice. La resta la mira
+   `test_una_pendiente_al_email_de_un_miembro_no_ocupa_lugar`: un miembro se
+   cambia el email en el perfil al de una pendiente. Su sabotaje es «el tope
+   cuenta la pendiente al email de un miembro».
+
+| Revisor | Modelo y esfuerzo | Hallazgos | Qué hice |
+|---|---|---|---|
+| adversario D40 | Sonnet alto | (1) **media, dentro:** sin `func.lower(User.email)` en la regla 1 seguía «67 passed». Lo reprodujo con una cuenta guardada en mayúsculas: el código da 400, y la mutación da 200 con una invitación que nadie puede usar. (2) media, fuera: invitaciones muertas que ocupan lugar hasta 7 días (se registra solo, entra por otro estudio, alguien se apropia del email en el perfil), sin forma de revocarlas. (3) baja: sin backfill de las pendientes viejas. (4) baja: carrera con 500, ya existía, la frena el índice único. (5) baja: invitar sin `@limiter`; `trim` contra tabs. Probó sin romper: el sacado, el tope con rollback, carreras con tokens distintos | (1) caso nuevo en SQLite y Postgres y sabotaje «la regla 1 sin mayúsculas» (`b358827`). Lo demás, riesgos |
+| `/code-review high` + security a mano | Opus alto, en fork. La skill security-review falla al arrancar, así que la hice a mano sobre el diff | (1) baja: el 400 revela que el email tiene cuenta, pero `/api/organizations/create` ya lo revela sin sesión. (2) media, fuera: create sin límite de pedidos. (3) media, en el borde: una pendiente ocupa lugar si el email se registra por otro lado. (4) baja: carrera con 500. (5) baja: `trim` de SQL contra `.strip()` de Python (tabs). (6) baja: los emails de prueba de staging (`REGISTER_TEST_EMAIL_REPLACE`) ya no se pueden invitar. (7) baja: la regla 2 también marca usadas las vencidas que seguían «pending». (8) baja: `func.lower` sin índice (D38). (9)(10)(11) calidad. Security: nada más | (11) arreglado: `org1_postgres.py` mira la respuesta del registro. (9) es el agregado 3, explicado arriba. (10): el caso con `email.upper()` no prueba mayúsculas, porque invitar ya las saca; las cubre el caso «vieja», que escribe la fila con SQL. Lo demás, riesgos |
+
+**Riesgos que quedan:**
+- **Media, fuera:** una pendiente puede quedar muerta y ocupar un lugar
+  hasta 7 días. Pasa si el email se registra solo o entra por otro estudio
+  después de invitado, o si un miembro se apropia del email en el perfil
+  (este último caso ya no ocupa lugar). No hay endpoint para revocar
+  invitaciones. El cambio de email en el perfil no se verifica (tu agregado 1).
+- **Media, fuera:** `/api/organizations/create` no tiene límite de pedidos.
+- **Baja:**
+  - el 400 dice que el email tiene cuenta (create ya lo decía);
+  - en staging, los emails de prueba re-registrables no se pueden invitar;
+  - la regla 2 marca «usadas» las vencidas que seguían «pending»: su
+    enlace dice «ya fue usada» en vez de «expiró»;
+  - el `trim` de SQL no saca tabs, y el registro sí: una invitación vieja
+    con un tab no quedaría usada. No hay camino que hoy guarde un tab;
+  - sin backfill de las pendientes de antes de la D40;
+  - dos registros a la vez con dos tokens del mismo email: uno da 500 en
+    vez de 400, y el índice único impide el doble alta. Ya existía;
+  - invitar no tiene `@limiter`;
+  - `func.lower(User.email)` sin índice (la D38).
+
+**Archivos de producto:** `proyecto_maria/main.py`, `CHANGELOG.md`.
+
+```bash
+git diff --stat 3d001a6..b358827        # 5 files changed, 409 insertions(+), 7 deletions(-)
+python -m pytest -q --no-cov tests/test_org1.py tests/test_email1.py     # 92 passed
+PY=python PG=postgresql://cdi@127.0.0.1:55432 bash scripts/testing/sabotajes/org1.sh b358827   # 14 ROJO, «sabotajes sin rojo: 0»
+```
+
 ## Entregas preparadas para las 18:00 UTC (2026-10-28)
 
 Recibí la D37 (2) en `20fb535`. En ABUSO-1 la pasé a riesgos, con lo que
