@@ -196,11 +196,11 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-10-28 15:00 UTC: sesiones bajo 170k (técnica 140k, MARIA 138k). Sin entregas ni D abiertas; MARIA pasó D38 y D39 a su informe (70f2ca5). Las dos esperan el cupo de las 18:00. Emi: sí o no a la medición chica de la D39.
+
 2026-10-28 14:00 UTC: sesiones bajo 170k (técnica 137k, MARIA 118k), las dos esperan el cupo de las 18:00. MARIA terminó EMAIL-1 (2b93071, suite 3954 passed) y CONEXIONES-1 (30c0e97: sin conexiones colgadas, sin cambio de producto), sin entregar. D38 (1) y D39 (1) por ahora, decididas por la PM; la medición chica de la D39 se le propone a Emi. La técnica, BACKUP-1a subida en 70f6d3d.
 
 2026-10-28 13:00 UTC: sesiones bajo 170k (técnica 137k, MARIA 139k). Sin D abiertas. MARIA tiene EMAIL-1 en su clon (sin subir) y mide CONEXIONES-1: sin conexiones colgadas en la primera corrida, arma los sabotajes del medidor. La técnica, BACKUP-1a en la rama hasta `9d2d4bb`: sabotajes y suites corriendo; entrega con el cupo de las 18:00. Emi: contar los pares de email, destino de la copia, textos legales.
-
-2026-10-28 12:15 UTC: Emi dijo sí a las dos piezas nuevas (EMAIL-1 de la D36 y CONEXIONES-1 de la D37); a MARIA, EMAIL-1 ya y después CONEXIONES-1. Falta que Emi cuente los pares de email en producción.
 
 ## Medición
 
