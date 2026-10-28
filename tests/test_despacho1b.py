@@ -968,6 +968,52 @@ def test_un_pdf_que_da_mucho_trabajo_deja_de_leerse_por_tiempo_de_cpu():
     assert int(aviso.rsplit(" ", 1)[1].rstrip(".")) < 60, aviso
 
 
+def test_una_sola_hoja_cara_se_corta_en_el_tope_de_cpu():
+    """Una hoja de 80 KB de «T*» cuesta unos 6 s: el tope se miraba sólo
+    entre hojas y esa hoja se leía entera."""
+    import time
+    from proyecto_maria.core.despacho_lector import leer_despacho
+    from tests.pdf_bombas import una_hoja_cara
+    data = una_hoja_cara(80)
+    antes = time.process_time()
+    leido = leer_despacho(data, 0.5)
+    gastado = time.process_time() - antes
+    assert "El PDF da demasiado trabajo: leí hasta la hoja 0." in leido["avisos"], leido["avisos"]
+    assert gastado < 2.5, gastado
+
+
+def test_el_lector_aparte_corta_una_sola_hoja_cara():
+    from proyecto_maria.core.despacho_lector import leer_despacho_aparte
+    from tests.pdf_bombas import una_hoja_cara
+    leido = asyncio.run(leer_despacho_aparte(una_hoja_cara(80), 120, limite_cpu_s=0.5))
+    assert "El PDF da demasiado trabajo: leí hasta la hoja 0." in leido["avisos"], leido["avisos"]
+
+
+def test_fuera_del_hilo_principal_el_tope_se_mira_entre_hojas():
+    """Una señal sólo se atiende en el hilo principal: en otro hilo no hay
+    temporizador y queda el control entre hojas."""
+    import threading
+    from proyecto_maria.core.despacho_lector import leer_despacho
+    from tests.pdf_bombas import trabajo
+    leido = {}
+    hilo = threading.Thread(target=lambda: leido.update(leer_despacho(trabajo(60), 0.5)))
+    hilo.start()
+    hilo.join(120)
+    assert not hilo.is_alive()
+    [aviso] = [a for a in leido["avisos"] if a.startswith("El PDF da demasiado trabajo: leí hasta la hoja ")]
+    assert int(aviso.rsplit(" ", 1)[1].rstrip(".")) < 60, aviso
+
+
+def test_el_tope_de_cpu_deja_la_senal_como_estaba():
+    import signal
+    from proyecto_maria.core.despacho_lector import leer_despacho
+    from tests.pdf_bombas import una_hoja_cara
+    antes = signal.getsignal(signal.SIGPROF)
+    leer_despacho(una_hoja_cara(80), 0.5)
+    assert signal.getsignal(signal.SIGPROF) is antes
+    assert signal.getitimer(signal.ITIMER_PROF) == (0.0, 0.0)
+
+
 def test_el_lector_aparte_usa_el_tope_de_cpu_que_recibe():
     from proyecto_maria.core.despacho_lector import leer_despacho_aparte
     from tests.pdf_bombas import trabajo
@@ -1233,6 +1279,19 @@ def test_aprender_un_peso_infinito_no_lo_guarda_y_el_catalogo_anda(auth_override
     assert (producto["peso_unitario_avg"], producto["valor_unitario_avg"]) == (0.0, None), producto
 
 
+@pytest.mark.parametrize("campo", ["peso_unitario", "valor_unitario", "cantidad"])
+def test_aprender_un_entero_enorme_no_da_500(auth_override, client, campo):
+    """10**400 es JSON válido pero no entra en un float: daba 500. Va como
+    cualquier valor que no es un número: ese producto no se aprende."""
+    cid = _crear_cliente(client)
+    r = client.post(f"/api/clientes/{cid}/catalogo/productos/learn", json={"items": [
+        {"ncm": "39269090", "descripcion": "TAPA INVENTADA VERDE", campo: 10 ** 400},
+        {"ncm": "39269090", "descripcion": "TAPA INVENTADA AZUL", campo: 2}]})
+    assert r.status_code == 200, r.text
+    assert r.json()["aprendidos"] == 1
+    assert [p["descripcion"] for p in _catalogo(client, cid)] == ["TAPA INVENTADA AZUL"]
+
+
 def test_un_infinito_guardado_antes_no_rompe_el_catalogo_y_se_arregla(auth_override, client):
     cid = _crear_cliente(client)
 
@@ -1255,7 +1314,59 @@ def test_un_infinito_guardado_antes_no_rompe_el_catalogo_y_se_arregla(auth_overr
     assert (producto["peso_unitario_avg"], producto["valor_unitario_avg"]) == (2.0, 3.0), producto
 
 
-@pytest.mark.parametrize("peso", ["inf", "nan", -1, "1e400", "dos"])
+def test_un_infinito_guardado_antes_no_rompe_la_busqueda(auth_override, client):
+    """«/api/catalog/lookup» devuelve el valor recordado: un infinito viejo
+    daba 500."""
+    cid = _crear_cliente(client)
+
+    async def meter():
+        async with AsyncSessionLocal() as s:
+            s.add(ClientProductHistory(
+                id=str(uuid.uuid4()), owner_username=auth_override["username"], client_id=cid,
+                ncm="39269090", descripcion="TAPA INVENTADA VERDE",
+                descripcion_normalizada="tapa inventada verde", peso_unitario_avg=float("inf"),
+                origen_frecuente="BR", valor_unitario_avg=float("inf"), veces_usado=4))
+            await s.commit()
+    asyncio.run(meter())
+    r = client.post("/api/catalog/lookup", json={
+        "items": [{"descripcion": "TAPA INVENTADA VERDE"}], "client_id": cid})
+    assert r.status_code == 200, r.text
+    [item] = r.json()["items"]
+    assert (item["source"], item["ncm"], item["valor_unitario_avg"]) == ("cliente", "39269090", None), item
+
+
+def test_aprender_con_puntos_suma_al_producto_del_despacho_y_no_a_otro(auth_override, client):
+    """El despacho guarda «39269090»; aprender «3926.90.90» con la misma
+    descripción no lo encontraba por NCM y el respaldo por descripción lo
+    sumaba al primero parecido, que tenía otro NCM."""
+    cid = _crear_cliente(client)
+    assert _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", "8471.30.12.000W"),
+                                  _renglon("TAPA INVENTADA VERDE", "3926.90.90.000A")]).status_code == 200
+    r = client.post(f"/api/clientes/{cid}/catalogo/productos/learn", json={"items": [
+        {"ncm": "3926.90.90", "descripcion": "TAPA INVENTADA VERDE", "peso_unitario": 2}]})
+    assert r.status_code == 200, r.text
+    assert sorted((p["ncm"], p["veces_usado"]) for p in _catalogo(client, cid)) == [
+        ("39269090", 2), ("84713012", 1)]
+
+
+def test_el_peso_que_carga_la_persona_cuenta_como_un_uso(auth_override, client):
+    """Tres despachos con peso y después la persona lo cambia a 2: el próximo
+    de 4 da 3. Antes la corrección heredaba los tres usos y daba 2,5."""
+    cid = _crear_cliente(client)
+    for _ in range(3):
+        assert _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", "3926.90.90.000A")]).status_code == 200
+    [producto] = _catalogo(client, cid)
+    r = client.put(f"/api/clientes/{cid}/catalogo/productos/{producto['id']}",
+                   json={"peso_unitario_avg": 2.0})
+    assert r.status_code == 200, r.text
+    renglon = _renglon("TAPA INVENTADA VERDE", "3926.90.90.000A")
+    renglon["kilo_neto"] = 40.0
+    assert _guardar(client, cid, [renglon]).status_code == 200
+    assert _catalogo(client, cid)[0]["peso_unitario_avg"] == 3.0
+
+
+@pytest.mark.parametrize("peso", ["inf", "nan", -1, "1e400", 10 ** 400, "dos", False],
+                         ids=["inf", "nan", "negativo", "1e400", "entero enorme", "dos", "false"])
 def test_cambiar_el_peso_a_algo_que_no_es_un_peso_da_400(auth_override, client, peso):
     cid = _crear_cliente(client)
     assert _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", "3926.90.90.000A")]).status_code == 200
@@ -1267,11 +1378,12 @@ def test_cambiar_el_peso_a_algo_que_no_es_un_peso_da_400(auth_override, client, 
     assert _catalogo(client, cid)[0]["peso_unitario_avg"] == 0.1
 
 
-def test_cambiar_el_peso_a_cero_lo_borra(auth_override, client):
+@pytest.mark.parametrize("cero", [0, "0", None, ""], ids=["cero", "cero en texto", "null", "vacio"])
+def test_cambiar_el_peso_a_cero_lo_borra(auth_override, client, cero):
     cid = _crear_cliente(client)
     assert _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", "3926.90.90.000A")]).status_code == 200
     [producto] = _catalogo(client, cid)
-    r = client.put(f"/api/clientes/{cid}/catalogo/productos/{producto['id']}", json={"peso_unitario_avg": 0})
+    r = client.put(f"/api/clientes/{cid}/catalogo/productos/{producto['id']}", json={"peso_unitario_avg": cero})
     assert r.status_code == 200, r.text
     assert _catalogo(client, cid)[0]["peso_unitario_avg"] == 0.0
 
@@ -1286,6 +1398,20 @@ def test_guardar_una_mitad_de_par_suelta_da_422(auth_override, client):
     assert r.status_code == 422, r.text
     assert r.json()["errores"] == [
         {"renglon": 1, "problemas": ["La descripción tiene un carácter que no se puede guardar."]}]
+    assert _contar(ClientProductHistory, client_id=cid) == 0
+
+
+@pytest.mark.parametrize("origen", ["\\ud800", "B\\ud800"], ids=["solo", "con una letra"])
+def test_guardar_un_origen_con_mitad_de_par_da_422(auth_override, client, origen):
+    """El 422 repetía el origen y no se podía mandar: daba 500."""
+    cid = _crear_cliente(client)
+    cuerpo = ('{"divisa": "USD", "renglones": [{"posicion_sim": "3926.90.90.000A", '
+              '"descripcion": "TAPA INVENTADA", "origen": "%s"}]}' % origen)
+    r = client.post(f"/api/clientes/{cid}/catalogo/despacho/guardar", content=cuerpo,
+                    headers={"Content-Type": "application/json"})
+    assert r.status_code == 422, r.text
+    assert r.json()["errores"] == [
+        {"renglon": 1, "problemas": ["El origen tiene un carácter que no se puede guardar."]}]
     assert _contar(ClientProductHistory, client_id=cid) == 0
 
 

@@ -90,6 +90,15 @@ def trabajo(hojas=20, operaciones=14000):
     return _pdf(armar)
 
 
+def una_hoja_cara(kb=80):
+    """Una sola hoja con `kb` KB de saltos de renglón («T*»): pesa poco y
+    queda debajo del tope de bytes, pero leerla cuesta el cuadrado de lo que
+    pesa (80 KB, unos 6 s). El tope de CPU entre hojas no la cortaba."""
+    def armar(add, objs):
+        return _hojas(add, objs, [_flujo(add, b"BT /F1 9 Tf 1 TL " + b"T* " * (kb * 1024 // 3), 0, b"ET\n")])
+    return _pdf(armar)
+
+
 def run_length(mb):
     """Una hoja cuyo contenido, con RunLengthDecode, se infla a `mb` MB (128
     espacios cada dos bytes), y después una hoja normal. Los topes de pypdf

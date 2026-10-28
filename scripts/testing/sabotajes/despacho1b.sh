@@ -263,12 +263,27 @@ sabotaje "el lector lee el .env" "$LECTOR" \
   "test_el_lector_no_hereda_los_secretos_del_proceso"
 
 # Devolución 20:07: trabajo y turnos.
-sabotaje "sin el tope de CPU" "$LECTOR" \
-  "            if time.process_time() > hasta:" \
-  "            if False:" \
-  "test_un_pdf_que_da_mucho_trabajo_deja_de_leerse_por_tiempo_de_cpu" \
-  "test_el_lector_aparte_usa_el_tope_de_cpu_que_recibe" \
-  "test_el_lector_aparte_tiene_tope_de_cpu_sin_pedirlo"
+sabotaje "sin el tope de CPU entre hojas" "$LECTOR" \
+  "        if time.process_time() > hasta:" \
+  "        if False:" \
+  "test_fuera_del_hilo_principal_el_tope_se_mira_entre_hojas"
+sabotaje "sin el temporizador de CPU" "$LECTOR" \
+  "    if threading.current_thread() is not threading.main_thread() or not hasattr(signal, \"setitimer\"):" \
+  "    if True:" \
+  "test_una_sola_hoja_cara_se_corta_en_el_tope_de_cpu" \
+  "test_el_lector_aparte_corta_una_sola_hoja_cara"
+no_debe "sin el temporizador de CPU" "$ULTIMA" \
+  "test_un_pdf_que_da_mucho_trabajo_deja_de_leerse_por_tiempo_de_cpu"
+sabotaje "el corte de CPU es una Exception" "$LECTOR" \
+  "class _DemasiadoTrabajo(BaseException):" \
+  "class _DemasiadoTrabajo(Exception):" \
+  "test_una_sola_hoja_cara_se_corta_en_el_tope_de_cpu" \
+  "test_el_lector_aparte_corta_una_sola_hoja_cara"
+sabotaje "la señal queda puesta" "$LECTOR" \
+  "        signal.setitimer(signal.ITIMER_PROF, 0)
+        signal.signal(signal.SIGPROF, anterior)" \
+  "        pass" \
+  "test_el_tope_de_cpu_deja_la_senal_como_estaba"
 sabotaje "el hijo no recibe el tope de CPU" "$LECTOR" \
   "sys.executable, \"-m\", __name__, repr(float(limite_cpu_s))," \
   "sys.executable, \"-m\", __name__, repr(float(_MAX_CPU_LECTURA * 100))," \
@@ -340,9 +355,10 @@ sabotaje "el NCM se guarda con puntos" "$LECTOR" \
   "ncm = posicion[:10] if _POSICION.match(posicion) else None" \
   "test_el_mismo_ncm_con_o_sin_puntos_es_el_mismo_producto"
 sabotaje "el upsert compara el NCM tal cual" proyecto_maria/services/client_memory.py \
-  "            ncm_sin_puntos == digitos," \
-  "            ClientProductHistory.ncm == ncm," \
-  "test_lo_aprendido_con_puntos_y_el_despacho_son_el_mismo_producto"
+  "        ncm_sin_puntos == re.sub(r\"\\D\", \"\", ncm)," \
+  "        ClientProductHistory.ncm == ncm," \
+  "test_lo_aprendido_con_puntos_y_el_despacho_son_el_mismo_producto" \
+  "test_aprender_con_puntos_suma_al_producto_del_despacho_y_no_a_otro"
 sabotaje "el upsert compara la descripción cortada" proyecto_maria/services/client_memory.py \
   "            if _misma_descripcion(row.descripcion) == buscada:" \
   "            if row.descripcion_normalizada == desc_norm:" \
@@ -372,12 +388,45 @@ sabotaje "el PUT guarda cualquier peso" proyecto_maria/main.py \
   "test_cambiar_el_peso_a_algo_que_no_es_un_peso_da_400[inf]" \
   "test_cambiar_el_peso_a_algo_que_no_es_un_peso_da_400[dos]"
 no_debe "el PUT guarda cualquier peso" "$ULTIMA" "test_cambiar_el_peso_a_cero_lo_borra"
+sabotaje "la búsqueda manda el infinito guardado" proyecto_maria/services/client_memory.py \
+  "        \"valor_unitario_avg\": _finito(best_row.valor_unitario_avg)," \
+  "        \"valor_unitario_avg\": best_row.valor_unitario_avg," \
+  "test_un_infinito_guardado_antes_no_rompe_la_busqueda"
+sabotaje "el peso cargado hereda los usos" proyecto_maria/main.py \
+  "row.peso_unitario_avg, row.veces_peso = peso, 1" \
+  "row.peso_unitario_avg, row.veces_peso = peso, max(row.veces_peso or 0, 1)" \
+  "test_el_peso_que_carga_la_persona_cuenta_como_un_uso"
+sabotaje "false es un peso cero" proyecto_maria/main.py \
+  "if peso is None or (not isinstance(peso, bool) and peso in (\"\", 0, \"0\")):" \
+  "if peso is None or peso in (\"\", 0, \"0\"):" \
+  "test_cambiar_el_peso_a_algo_que_no_es_un_peso_da_400[false]"
+no_debe "false es un peso cero" "$ULTIMA" "test_cambiar_el_peso_a_cero_lo_borra"
+sabotaje "«0» en texto no borra el peso" proyecto_maria/main.py \
+  "peso in (\"\", 0, \"0\")):" \
+  "peso in (\"\", 0)):" \
+  "test_cambiar_el_peso_a_cero_lo_borra[cero en texto]"
+no_debe "«0» en texto no borra el peso" "$ULTIMA" "test_cambiar_el_peso_a_cero_lo_borra[cero]"
+sabotaje "el PUT no ataja el entero enorme" proyecto_maria/services/client_memory.py \
+  "    except (TypeError, ValueError, OverflowError):  # 10**400 no entra en un float" \
+  "    except (TypeError, ValueError):" \
+  "test_cambiar_el_peso_a_algo_que_no_es_un_peso_da_400[entero enorme]"
+sabotaje "aprender no ataja el entero enorme" proyecto_maria/main.py \
+  "        except (TypeError, ValueError, OverflowError):  # 10**400 no entra en un float" \
+  "        except (TypeError, ValueError):" \
+  "test_aprender_un_entero_enorme_no_da_500[peso_unitario]" \
+  "test_aprender_un_entero_enorme_no_da_500[valor_unitario]" \
+  "test_aprender_un_entero_enorme_no_da_500[cantidad]"
 sabotaje "guardar no mira la mitad de par" "$LECTOR" \
   "    if _MEDIO_PAR.search(descripcion):
         problemas.append" \
   "    if False:
         problemas.append" \
   "test_guardar_una_mitad_de_par_suelta_da_422"
+sabotaje "el origen con mitad de par se repite" "$LECTOR" \
+  "    if origen and _MEDIO_PAR.search(origen):" \
+  "    if False:" \
+  "test_guardar_un_origen_con_mitad_de_par_da_422[solo]" \
+  "test_guardar_un_origen_con_mitad_de_par_da_422[con una letra]"
 
 # D47: el valor unitario sólo en dólares.
 sabotaje "guarda el valor de cualquier divisa" proyecto_maria/main.py \
