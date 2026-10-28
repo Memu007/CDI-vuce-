@@ -370,6 +370,10 @@ sabotaje "el promedio cuenta los usos sin valor" proyecto_maria/services/client_
   "    if True:" \
   "test_el_promedio_no_cuenta_los_usos_sin_valor" \
   "test_el_historial_de_operaciones_tampoco_cuenta_los_usos_sin_valor"
+sabotaje "el historial de operaciones cuenta los usos sin valor" proyecto_maria/services/client_service.py \
+  "existing.veces_valor, usado, item.get('valor_unitario'))" \
+  "None, usado, item.get('valor_unitario'))" \
+  "test_el_historial_de_operaciones_tampoco_cuenta_los_usos_sin_valor"
 sabotaje "el promedio acepta infinitos" proyecto_maria/services/client_memory.py \
   "    if not math.isfinite(valor) or valor <= 0 or valor >= _MAX_VALOR:" \
   "    if valor <= 0:" \
