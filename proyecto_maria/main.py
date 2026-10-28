@@ -2166,16 +2166,17 @@ async def cancel_billing(
 async def _pago_un_plan_mp(db: AsyncSession, db_user) -> bool:
     """Si la cuenta pagó un plan con Mercado Pago. Una recarga sola no es un
     plan: la prueba que recargó vuelve a la prueba (COBRO-MP-1, E). Sin
-    ninguna fila en mp_pagos_aplicados (pagó antes del registro) decide
-    payment_provider, como antes."""
+    ningún pago aplicado en mp_pagos_aplicados (pagó antes del registro)
+    decide payment_provider, como antes: un rechazo no dice nada del plan."""
     from proyecto_maria.database.models import PagoMercadoPagoAplicado
-    filas = (await db.execute(
-        select(PagoMercadoPagoAplicado.tipo, PagoMercadoPagoAplicado.estado)
-        .where(PagoMercadoPagoAplicado.cuenta == db_user.username)
-    )).all()
-    if not filas:
+    tipos = (await db.execute(
+        select(PagoMercadoPagoAplicado.tipo)
+        .where(PagoMercadoPagoAplicado.cuenta == db_user.username,
+               PagoMercadoPagoAplicado.estado == "aplicado")
+    )).scalars().all()
+    if not tipos:
         return db_user.payment_provider == "mercadopago"
-    return any(estado == "aplicado" and tipo != "topup" for tipo, estado in filas)
+    return any(tipo != "topup" for tipo in tipos)
 
 
 @app.post("/api/billing/reactivate")
