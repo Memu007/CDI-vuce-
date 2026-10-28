@@ -196,7 +196,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-28 16:35 UTC: Emi: «hay que gastar cupo» (reinicio 18:00 UTC). Devs a /entregar ya. GUARDAR-2 aceptada e integrada (adversario Sonnet alto y suite sobre 0d89c20, sólo el rojo conocido de test_excel2). ORDEN-1: adversario en curso. Decidido por la PM: adversarios de la PM ya, sin esperar el informe, sobre lo subido: EXCEL-2b (b3ac325, Sonnet alto), COBRO-MP-1/CORTE-1/MP-2 (dda9f5b, Opus y Sonnet alto), ORG-1+1b+DESPACHO-1a (4ce6d22, Opus y Sonnet alto); entrega 17:45 UTC. Emi: sí o no a la medición chica de la D39.
+2026-10-28 16:35 UTC: Emi: «hay que gastar cupo» (reinicio 18:00 UTC). Devs a /entregar ya. GUARDAR-2 aceptada e integrada (adversario Sonnet alto y suite sobre 0d89c20, sólo el rojo conocido de test_excel2). ORDEN-1: adversario en curso. Decidido por la PM: adversarios ya, sin esperar informes, sobre EXCEL-2b b3ac325, COBRO dda9f5b y ORG-1 4ce6d22. Emi: sí o no a la medición chica de la D39.
 
 2026-10-28 14:00 UTC: sesiones bajo 170k (técnica 137k, MARIA 118k), las dos esperan el cupo de las 18:00. MARIA terminó EMAIL-1 (2b93071, suite 3954 passed) y CONEXIONES-1 (30c0e97: sin conexiones colgadas, sin cambio de producto), sin entregar. D38 (1) y D39 (1) por ahora, decididas por la PM; la medición chica de la D39 se le propone a Emi. La técnica, BACKUP-1a subida en 70f6d3d.
 
