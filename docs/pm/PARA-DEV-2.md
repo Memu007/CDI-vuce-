@@ -30,6 +30,43 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## DESTINO-1: devolución de pruebas, sobre `f887b4a` (2026-10-28 17:25 UTC)
+
+Informe `eacf591`. El producto está bien: el adversario (Sonnet alto) no
+sacó un par mezclado ni un destino distinto del elegido, y tus 15 sabotajes
+de `destino1.sh` dan rojo los 15 (corrida de la PM, `rc=0`). Lo que falta
+son pruebas. **Causa:** ninguna prueba mira el par que sale cuando un ítem
+se arma con varias entradas; `test_destino1.py` sólo prueba el grupo que da
+error. Reproducido por la PM sobre `f887b4a`: agregando
+`item.pop('iva_adicional', None)` después de `item = dict(renglones[0])` y
+`combined.pop('iva_adicional', None)` después de `combined = dict(primero)`
+(`maria_generator.py`), `test_destino1.py` + las suites de MARIA dan
+`182 passed`, y el TXT sale `COMERC`/`NO_VALIDA` donde debía salir
+`BDEUSO`/`IVAAD2`.
+
+- **Sumá, en un commit de pruebas encima de la cadena** (como `6b9762e`, sin
+  tocar producto), con el destino explícito **distinto del de la
+  operación** en cada uno:
+  1. dos renglones de la misma posición que se juntan;
+  2. un grupo válido (todos con el mismo destino explícito, y el primero
+     explícito con el resto vacío);
+  3. un grupo de reventa (que no salga `USOPAR`/`IVAAD1` por ningún lado);
+  4. un ítem con subítems y destino a nivel ítem.
+  Cada una, roja con su mutante (los dos de arriba; el grupo que fuerza
+  `IVAAD1`; el ítem con subítems que toma el de la operación) y verde sin
+  él. Sumá los cuatro mutantes a `destino1.sh`.
+- **A riesgos, sin tocar producto** (los tres son de antes de esta pieza o
+  piden un body armado a mano): un `iva_adicional` falso por ítem (`false`,
+  `0`, `[]`) se toma como «igual que la operación»; el 400 por destino
+  inválido devuelve el valor entero (100 000 caracteres vuelven en el
+  mensaje; los otros recortan a 20); `/generate_maria/avisos` no valida el
+  destino, así que el error recién aparece al generar. Y la premisa: el
+  golden de 2025 trae `COMERC` con `IVAAD1`; si la pregunta 7 dice otra
+  cosa, se reabre la tabla (D28).
+- La suite completa sobre `f887b4a` está corriendo; si da algo distinto de
+  los dos rojos de tiempos de `4ce6d22`, te lo escribo acá. Acepto con las
+  pruebas; integro después de ORG-1. Nada se publica antes.
+
 ## ORG-1: lo que suma el revisor, y D40 (2026-10-28 17:05 UTC)
 
 Recibida en `3aaa3c4` (informe `de4d788`). Suite de la PM sobre `4ce6d22`:
@@ -162,79 +199,9 @@ proxy (a). Seguí con S4, S6 y C9 sin esperarla.
 
 Revisión fuerte (autenticación y migración).
 
-## D34 (2026-10-28): (a), sobre `39be45e`
+## D28 a D34 (2026-10-28)
 
-(a), como ya aplicaste: OBSERVABILIDAD-1 sólo hace que la columna y su
-índice existan. Que `MetricsMiddleware` grabe el dueño leyendo el token
-toca sesión y autenticación: es otra pieza, no entra acá. Anotala en
-«riesgos» como propuesta (una línea: qué haría y qué toca). Donde la tarea
-decía «la métrica se graba con su dueño», vale «la métrica se graba y no
-falla». Decidido por la PM. Tu próxima D es la **D35**.
-
-## D33 (2026-10-28): (a), sobre `88b22c8`
-
-Para el código, (a): no se cambia nada. El cargador de los
-`ncm_historial_*.json` queda como está, así que (b) sigue siendo posible
-sin tocar código. Si se rescatan o no los de producción lo decide Emi el
-día que se publique DISCO-1: se lo cuento de día, con tu recomendación.
-Decidido por la PM. Anotá en «riesgos» que, si nadie hace (b), el primer
-deploy con DISCO-1 pierde los historiales que haya, igual que todos los
-deploys hasta hoy. Tu próxima D es la **D34**.
-
-## D32 (2026-10-28): (a), sobre `2efdffc`
-
-Borrar un cliente borra también los presupuestos compartidos de sus
-operaciones, en la misma transacción. Ya borra sus operaciones, y la copia
-del presupuesto tiene datos del cliente: es lo único que cumple un pedido
-de borrado. Pruebas además de las de la tarea: los presupuestos de otro
-cliente y de otro dueño siguen andando; si algo falla a mitad, no se borra
-nada (ni cliente ni presupuesto); el link borrado da 404. Si la pantalla ya
-avisa qué se borra con el cliente, que nombre también los links
-compartidos; si no avisa nada, no se agrega. El link que deja de andar va
-en «riesgos» y en `CHANGELOG.md`. Decidido por la PM.
-
-## D31 (2026-10-28): (a), sobre `e59e1a8`
-
-El catálogo guarda lo que ya tiene columna; sufijos, unidad, posición
-completa y divisa se ven en la revisión y no se guardan. Sin migración y
-sin tocar el catálogo de DESPACHO-1a. Anotá en el informe de DESPACHO-1b,
-en «riesgos», los dos costos que nombraste: el valor unitario sin divisa y
-dos subítems que sólo difieren en sufijos fundidos en un producto. Guardar
-lo demás (tu (b)) es una migración sobre datos de clientes y no está en el
-roadmap: si hace falta, se la propongo a Emi cuando haya un uso (por
-ejemplo, sugerir sufijos al armar una operación). Decidido por la PM.
-
-## D30 (2026-10-28): (a) por ahora, sobre `371cde2`
-
-SEGURO-1 se entrega como está: un seguro «para completar» avisa en pantalla
-y no frena el TXT. Frenar en el servidor (tu (b), un cero real escrito a
-mano) es una pieza nueva y no está en el roadmap: se la propongo a Emi de
-día como **SEGURO-2**, con mi recomendación de (b). No la empieces hasta que
-la veas acá. Anotá el riesgo (seguro 0 en el TXT si nadie lo completa) en
-el informe de SEGURO-1, en «riesgos».
-
-## D29 (2026-10-28): opción (a), sobre `4ca6829`
-
-Los `Z` piden número y los `A` son libres: `PIDE_NUMERO = ("Z",)` queda
-como está. Lo sostienen la tabla de ARCA (los `Z` son magnitudes, y en
-algunos ARCA elige la unidad para no usar decimales) y el archivo aceptado
-(`ZA(016384)`). Se revierte en esa línea. El costo que nombraste (unas 90
-descripciones `Z` con decimales naturales: %, ppm, quilates) va en la
-pregunta 10 al despachante (`PREGUNTAS-DESPACHANTE.md`), que Emi manda de
-día. Si contesta otra lista, la lista cambia con sus pruebas, en otra
-pieza. Lo de rellenar los `Z` con ceros a seis dígitos no entra ahora.
-Decidido por la PM.
-
-## D28 (2026-10-28): opción (a)
-
-Tenés razón: la regla «`IVAAD1` se lee como bien de uso de una persona» la
-puse yo, y deja al golden de 2025 sin entrada que lo reproduzca. Va la
-**(a)**: el golden no se toca; las seis pruebas comparan el archivo entero
-salvo el `MCPL` de `GANANCIASOP3`, y esa línea tiene que decir exactamente
-`USOPAR`. La diferencia queda escrita en la prueba con referencia a la
-pregunta 7. No se espera la respuesta: la tabla del despachante es
-explícita, y lo de 2025 era el defecto que DESTINO-1 corrige. Si la
-pregunta 7 dice otra cosa, se reabre. Decidido por la PM.
+Cerradas. Quedan resumidas en `DECISIONS.md` («D28 a D34 de la Dev MARIA»).
 
 ## ORG-1 — tarea activa
 
