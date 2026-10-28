@@ -82,7 +82,7 @@ fi
 # --- confirmar: suma uno, actualiza la NCM, queda en la base
 sabotaje "confirmar no suma" 1 \
   '"count": NcmHistorial.count + 1}' '"count": NcmHistorial.count}' \
-  "FAILED $T::test_confirmar_guarda_en_la_base_suma_y_actualiza_la_ncm" "'count': 1"
+  "FAILED $T::test_confirmar_guarda_en_la_base_suma_y_actualiza_la_ncm" "confirmar otra vez suma uno y actualiza la NCM"
 sabotaje "confirmar no actualiza la NCM" 1 \
   'set_={"ncm": ins.excluded.ncm, "count": NcmHistorial.count + 1}' 'set_={"count": NcmHistorial.count + 1}' \
   "FAILED $T::test_confirmar_guarda_en_la_base_suma_y_actualiza_la_ncm" "8413.70.10"
@@ -93,7 +93,7 @@ sabotaje "confirmar no hace commit" 1 \
 sabotaje "confirmar también escribe el archivo en DATA_DIR" 1 \
   $'    await _sumar_uso_ncm(db, user["username"], descripcion, ncm)\n' \
   $'    await _sumar_uso_ncm(db, user["username"], descripcion, ncm)\n    with open(os.path.join(DATA_DIR, f"ncm_historial_{_nombre_archivo_historial(user[\'username\'])}.json"), "w") as _f:\n        json.dump(await load_ncm_historial(db, user["username"]), _f)\n' \
-  "FAILED $T::test_confirmar_guarda_en_la_base_suma_y_actualiza_la_ncm" "ncm_historial_"
+  "FAILED $T::test_confirmar_guarda_en_la_base_suma_y_actualiza_la_ncm" "el historial ya no se escribe en DATA_DIR"
 sabotaje "la clave normaliza la descripción" 1 \
   'hashlib.sha256(descripcion.encode("utf-8"))' 'hashlib.sha256(descripcion.strip().lower().encode("utf-8"))' \
   "FAILED $T::test_la_clave_es_la_descripcion_tal_cual"
