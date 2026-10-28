@@ -45,9 +45,28 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **feat(revisión):** en la tabla de productos un grupo se arrastra entero y se puede soltar un producto sobre él; el orden que queda es el del pedido y el del TXT, con los ítems numerados corridos. Ctrl+Z después de arrastrar ya no vuelve el orden viejo.
 - **fix(borrador):** cada pestaña guarda su operación en su propia clave: dos pestañas abiertas no se pisan y la que queda en la carga de archivos no borra la de otra. Al abrir, se recupera la propia o la más reciente de una pestaña cerrada.
 
+## 2026-10-28 · feat: el destino de la mercadería sale de a pares en el TXT (DESTINO-1)
+
+- En la pantalla de validación, «Destino de la mercadería» ofrece comercialización o reventa (por defecto), bien de uso de la empresa o bien de uso de una persona, por operación y con cambio por producto.
+- El TXT saca GANANCIASOP3 e IVAADICIONAL1 de a pares: COMERC + NO_VALIDA, BDEUSO + IVAAD2 o USOPAR + IVAAD1. Antes GANANCIASOP3 salía siempre COMERC. Un valor fuera de esos tres no genera el archivo.
+
 ## 2026-10-28 · fix: la sugerencia de NCM no pierde la SIM completa del proveedor (GUARDAR-2, D32 b)
 
 - **fix(sugerencia):** si el historial del cliente tiene el NCM de 8 dígitos y el catálogo del proveedor tiene, para el mismo producto (la misma descripción, no una parecida), la SIM completa que empieza con esos 8, el autorrelleno (`/api/catalog/lookup`) y `/api/ncm/sugerir` traen la del proveedor. Desde GUARDAR-1 llegaba `84714900` y la pantalla marcaba incompleto lo que antes llegaba listo. Sin migración.
+
+## 2026-10-28 · feat: el catálogo del cliente se baja en Excel (DESPACHO-1a)
+
+- En la pestaña Catálogo del cliente, «Descargar en Excel» baja los productos aprendidos de ese cliente, un renglón por producto y en el mismo orden que la pantalla: posición (como texto, con ceros y letra), descripción, origen, valor unitario, cantidad y peso promedio, veces usado y última vez.
+- Un texto que empieza con =, +, - o @ queda como texto, no como fórmula.
+
+## 2026-10-27 · feat: el registro con invitación viene con el email invitado (ORG-1b)
+
+- Al abrir el enlace de una invitación válida, el email del registro ya viene completo con el email invitado y no se puede cambiar; una línea lo explica. Sin invitación válida, el campo queda como antes.
+
+## 2026-10-27 · fix: invitaciones al estudio sin 500, atadas al email, con tope del plan y de un solo uso (ORG-1)
+
+- Validar o usar una invitación ya no da error 500 en Postgres. La invitación sólo sirve para registrarse con el email invitado, y el estudio no pasa de los usuarios de su plan (el dueño incluido; al invitar cuentan también las invitaciones pendientes sin vencer).
+- La invitación se gasta en la misma transacción que el alta y sólo si seguía pendiente: dos registros a la vez con el mismo enlace dejan un usuario y un 400, no dos altas ni un 500.
 
 ## 2026-10-27 · fix: un cargo en plural, que no viene primero o en Item con otra descripción se avisa con su fila (EXCEL-3f)
 

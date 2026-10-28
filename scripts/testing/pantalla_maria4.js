@@ -58,7 +58,7 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   if (p.banco_bcra !== '191' || p.empresa_digitalizacion !== 'PSAD01' || p.iva_adicional !== 'IVAAD1') falla('operación: ' + JSON.stringify([p.banco_bcra, p.empresa_digitalizacion, p.iva_adicional]));
   // El importado no se eligió: no va (el servidor usa 2 y lo avisa).
   if (p.items[0].estado != null || String(p.items[1].estado) !== '3') falla('estados: ' + JSON.stringify(p.items.map(i => i.estado)));
-  console.log('OK el pedido lleva banco 191, Lakaut, uso particular, el estado 3 elegido y el importado sin elegir');
+  console.log('OK el pedido lleva banco 191, Lakaut, bien de uso de una persona (IVAAD1), el estado 3 elegido y el importado sin elegir');
 
   // Se vuelve atrás y el importado pasa a argentino: el 2 por defecto no quedó
   // guardado, así que se vuelve a pedir el estado.

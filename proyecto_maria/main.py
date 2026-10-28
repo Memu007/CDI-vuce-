@@ -3064,21 +3064,44 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
             raise HTTPException(status_code=400, detail="Token de invitación inválido")
         if invite_inv.status == "accepted":
             raise HTTPException(status_code=400, detail="Esta invitación ya fue usada")
-        if invite_inv.expires_at and invite_inv.expires_at < datetime.utcnow():
+        if invite_inv.expires_at and _utc(invite_inv.expires_at) < datetime.now(timezone.utc):
             raise HTTPException(status_code=400, detail="Esta invitación expiró")
-        invite_org = await db.execute(select(Organization).where(Organization.id == invite_inv.org_id))
+        # La invitación es para una persona: el email del registro tiene que
+        # ser el invitado (los dos se guardan con strip().lower()).
+        if request.email != (invite_inv.email or "").strip().lower():
+            raise HTTPException(status_code=400, detail="Esta invitación es para otro email. Registrate con el email al que te invitaron.")
+        # Bloquea el estudio hasta el commit (Postgres; SQLite lo ignora).
+        invite_org = await db.execute(
+            select(Organization).where(Organization.id == invite_inv.org_id).with_for_update()
+        )
         invite_org = invite_org.scalars().first()
         if not invite_org:
             raise HTTPException(status_code=400, detail="El estudio ya no existe")
+
+        # La invitación se gasta en la misma transacción que el alta, y sólo
+        # si sigue pendiente: de dos registros a la vez con el mismo token,
+        # el segundo no toca ninguna fila y no se crea. Va antes de contar los
+        # miembros porque esta escritura es la que, en SQLite, hace esperar
+        # al otro registro hasta que este termine.
+        from sqlalchemy import update as sa_update
+        gastada = await db.execute(
+            sa_update(Invitation)
+            .where(Invitation.id == invite_inv.id, Invitation.status == "pending")
+            .values(status="accepted")
+            .execution_options(synchronize_session=False)
+        )
+        if gastada.rowcount != 1:
+            await db.rollback()
+            raise HTTPException(status_code=400, detail="Esta invitación ya fue usada")
+
+        tope = billing_service.get_plan(invite_org.plan or "premium")["users"]
+        if len(await _emails_de_miembros(db, invite_org.id)) >= tope:
+            await db.rollback()  # la invitación queda pendiente
+            raise HTTPException(status_code=400, detail=f"El estudio ya tiene los {tope} usuarios de su plan.")
         new_user.organization_id = invite_org.id
 
     db.add(new_user)
     await db.commit()
-
-    # Marcar invitación como accepted (reutiliza el objeto ya cargado)
-    if invite_inv and invite_inv.status == "pending":
-        invite_inv.status = "accepted"
-        await db.commit()
 
     # Email de verificacion (solo si el toggle esta on). Lo mandamos en
     # background para no frenar el response. Pasamos strings, no el ORM,
@@ -8134,6 +8157,81 @@ async def get_client_catalogo_productos(
     }
 
 
+_CATALOGO_XLSX_COLUMNAS = (
+    ("Posición", "ncm"),
+    ("Descripción", "descripcion"),
+    ("Origen", "origen"),
+    ("Valor unitario promedio", "valor_unitario_avg"),
+    ("Cantidad promedio", "cantidad_avg"),
+    ("Peso unitario promedio", "peso_unitario_avg"),
+    ("Veces usado", "veces_usado"),
+    ("Última vez", "ultima_vez"),
+)
+
+
+def _catalogo_xlsx(productos: list[dict]) -> bytes:
+    """Arma el Excel del catálogo en memoria, un renglón por producto.
+
+    Las descripciones vienen de facturas de terceros: todo texto se escribe
+    como texto, nunca como fórmula, y el que empieza con =, +, - o @ lleva
+    el apóstrofo invisible para que siga siendo texto si se lo edita."""
+    from openpyxl import Workbook
+    from openpyxl.cell.cell import ILLEGAL_CHARACTERS_RE
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Catálogo"
+    ws.append([titulo for titulo, _ in _CATALOGO_XLSX_COLUMNAS])
+    for fila, producto in enumerate(productos, start=2):
+        for col, (_, campo) in enumerate(_CATALOGO_XLSX_COLUMNAS, start=1):
+            valor = producto.get(campo)
+            celda = ws.cell(row=fila, column=col)
+            if campo == "ultima_vez":
+                if valor:
+                    celda.value = datetime.fromisoformat(valor[:10]).date()
+                    celda.number_format = "dd/mm/yyyy"
+            elif isinstance(valor, str):
+                texto = ILLEGAL_CHARACTERS_RE.sub("", valor)
+                celda.value = texto
+                celda.data_type = "s"
+                if texto[:1] in ("=", "+", "-", "@"):
+                    celda.quotePrefix = True
+                if campo == "ncm":
+                    celda.number_format = "@"
+            else:
+                celda.value = valor
+    salida = io.BytesIO()
+    wb.save(salida)
+    return salida.getvalue()
+
+
+@app.get("/api/clientes/{client_id}/catalogo/productos.xlsx")
+async def download_client_catalogo_productos(
+    client_id: str,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """DESPACHO-1a: el catálogo del cliente en Excel, lo mismo que muestra
+    la pantalla y en el mismo orden."""
+    username = user["username"]
+    client = await _get_owned_client(db, client_id, username)
+
+    stmt = sa_select(ClientProductHistoryModel).where(
+        ClientProductHistoryModel.owner_username == username,
+        ClientProductHistoryModel.client_id == client_id,
+    ).order_by(sa_desc(ClientProductHistoryModel.ultima_vez))
+    rows = (await db.execute(stmt)).scalars().all()
+    contenido = _catalogo_xlsx([_product_history_to_dict(r) for r in rows])
+
+    nombre = unicodedata.normalize("NFKD", client.name or "cliente")
+    safe_name = re.sub(r"[^a-zA-Z0-9_-]", "_", nombre.encode("ascii", "ignore").decode())[:40]
+    return Response(
+        content=contenido,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="catalogo_{safe_name}.xlsx"'},
+    )
+
+
 @app.post("/api/clientes/{client_id}/catalogo/productos/learn")
 async def learn_client_catalogo_productos(
     client_id: str,
@@ -9846,6 +9944,12 @@ async def get_my_organization(
     }
 
 
+async def _emails_de_miembros(db: AsyncSession, org_id: str) -> list[str]:
+    """Un email (en minúsculas) por cada usuario del estudio, el dueño incluido."""
+    res = await db.execute(select(User.email).where(User.organization_id == org_id))
+    return [(email or "").strip().lower() for (email,) in res.all()]
+
+
 @app.post("/api/organizations/invite")
 async def invite_to_organization(
     req: InviteRequest,
@@ -9865,7 +9969,10 @@ async def invite_to_organization(
     if not db_user or not db_user.organization_id:
         raise HTTPException(status_code=400, detail="No pertenecés a un estudio")
 
-    org = await db.execute(select(Organization).where(Organization.id == db_user.organization_id))
+    # Bloqueado hasta el commit, como en el registro: el tope se cuenta una vez por vez.
+    org = await db.execute(
+        select(Organization).where(Organization.id == db_user.organization_id).with_for_update()
+    )
     org = org.scalars().first()
     if not org:
         raise HTTPException(status_code=404, detail="Organización no encontrada")
@@ -9883,6 +9990,26 @@ async def invite_to_organization(
     )
     if existing.scalars().first():
         raise HTTPException(status_code=400, detail="Ese email ya es miembro del estudio")
+
+    # Tope del plan: miembros (el dueño también) más los emails con una
+    # invitación pendiente sin vencer. Volver a invitar a un email que ya
+    # tiene una pendiente no ocupa otro lugar.
+    tope = billing_service.get_plan(org.plan or "premium")["users"]
+    emails_miembros = await _emails_de_miembros(db, org.id)
+    ahora = datetime.now(timezone.utc)
+    pendientes = await db.execute(
+        select(Invitation).where(Invitation.org_id == org.id, Invitation.status == "pending")
+    )
+    emails_pendientes = {
+        (inv.email or "").strip().lower()
+        for inv in pendientes.scalars().all()
+        if not inv.expires_at or _utc(inv.expires_at) > ahora
+    } - set(emails_miembros)
+    if clean_email not in emails_pendientes and len(emails_miembros) + len(emails_pendientes) >= tope:
+        raise HTTPException(
+            status_code=400,
+            detail=f"El estudio ya ocupa los {tope} usuarios de su plan, contando las invitaciones pendientes.",
+        )
 
     token = _csrf_secrets.token_urlsafe(32)
     invitation = Invitation(
@@ -9922,7 +10049,7 @@ async def validate_invitation(
     if inv.status == "accepted":
         raise HTTPException(status_code=400, detail="Esta invitación ya fue usada")
 
-    if inv.expires_at and inv.expires_at < datetime.utcnow():
+    if inv.expires_at and _utc(inv.expires_at) < datetime.now(timezone.utc):
         if inv.status != "expired":
             inv.status = "expired"
             await db.commit()

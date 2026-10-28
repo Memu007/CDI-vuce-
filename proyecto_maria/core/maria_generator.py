@@ -483,10 +483,18 @@ ESTADO_POR_DEFECTO_IMPORTADO = 2
 ESTADOS_ARGENTINOS = {1, 3, 5}
 ESTADOS_IMPORTADOS = {2, 4, 6}
 
-# IVA adicional (IVAADICIONAL1): reventa o uso particular (respuesta 2,
-# 21:34; archivo de 2026). La reducción o exclusión es una «ventaja» que se
-# elige en el Kit (22:12): no va en el TXT.
-IVA_ADICIONAL = {"NO_VALIDA": "Reventa", "IVAAD1": "Uso particular"}
+# Destino de la mercadería (DESTINO-1): el MARIA hace dos preguntas por ítem
+# y las respuestas van de a pares (PREGUNTAS-DESPACHANTE.md, «Respuestas del
+# 2026-10-28»). Se elige y se guarda el código de IVAADICIONAL1; el de
+# GANANCIASOP3 sale de esta tabla, así no puede salir un par que no está.
+# La reducción o exclusión del IVA es una «ventaja» que se elige en el Kit
+# (22:12): no va en el TXT.
+IVA_ADICIONAL = {
+    "NO_VALIDA": "Comercialización o reventa",
+    "IVAAD2": "Bien de uso de la empresa",
+    "IVAAD1": "Bien de uso de una persona",
+}
+GANANCIAS_POR_IVA_ADICIONAL = {"NO_VALIDA": "COMERC", "IVAAD2": "BDEUSO", "IVAAD1": "USOPAR"}
 IVA_ADICIONAL_POR_DEFECTO = "NO_VALIDA"
 
 # Empresa de digitalización (ARDIG-CUIT-PSAD), por operación (respuesta 5,
@@ -653,7 +661,8 @@ def _estado_item(item: dict, idx, pais_codigo: int) -> int:
 def _iva_adicional(valor, donde: str) -> str:
     codigo = str(valor or "").strip().upper()
     if codigo not in IVA_ADICIONAL:
-        raise ValueError(f"{donde}: IVA adicional «{valor}» no válido (NO_VALIDA o IVAAD1).")
+        raise ValueError(f"{donde}: destino de la mercadería «{valor}» no válido "
+                         f"(NO_VALIDA, IVAAD2 o IVAAD1).")
     return codigo
 
 
@@ -1315,7 +1324,7 @@ def generate_maria_txt(operation_id: str, items: list,
         if len(estados) != 1:
             raise ValueError(f"Grupo {gid}: todos los ítems deben tener el mismo estado de la mercadería")
         if len(ivas) != 1:
-            raise ValueError(f"Grupo {gid}: todos los ítems deben tener el mismo IVA adicional")
+            raise ValueError(f"Grupo {gid}: todos los ítems deben tener el mismo destino de la mercadería")
         # Un grupo sale en un solo [SBT]: un solo sufijo (SUFIJOS-1). El «-»
         # final no los hace distintos; sale el del primero.
         sufijos = [limpiar_sufijo(str(it.get('sufijo') or '').strip(), f" del grupo {gid}")[0]
@@ -1491,21 +1500,22 @@ def generate_maria_txt(operation_id: str, items: list,
         lines.append("")
         
         # [CPL] Items
+        # Los dos del destino salen juntos, de la misma tabla (DESTINO-1).
+        iva_item = (
+            _iva_adicional(item.get("iva_adicional"), f"Ítem {idx}")
+            if item.get("iva_adicional") else iva_adicional
+        )
         lines.append("[CPL]")
         lines.append(f"NART={idx:04d}")
         lines.append("ICPLDIF=S")
         lines.append("CCPL=GANANCIASOP3    ")
-        lines.append(f"MCPL={'COMERC':<40}")
+        lines.append(f"MCPL={GANANCIAS_POR_IVA_ADICIONAL[iva_item]:<40}")
         lines.append("")
         
         lines.append("[CPL]")
         lines.append(f"NART={idx:04d}")
         lines.append("ICPLDIF=S")
         lines.append("CCPL=IVAADICIONAL1   ")
-        iva_item = (
-            _iva_adicional(item.get("iva_adicional"), f"Ítem {idx}")
-            if item.get("iva_adicional") else iva_adicional
-        )
         lines.append(f"MCPL={iva_item:<40}")
         lines.append("")
         
@@ -2145,8 +2155,8 @@ def supuestos_declarados(
         )
     if items and not iva_adicional:
         avisos.append(
-            "IVA adicional: se declaró reventa (NO_VALIDA) por defecto. Si la mercadería "
-            "es para uso particular, cambialo."
+            "Destino de la mercadería: se declaró comercialización o reventa (COMERC + "
+            "NO_VALIDA) por defecto. Si la mercadería es un bien de uso, cambialo."
         )
     if items:
         avisos.append(

@@ -96,7 +96,7 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 | Orden | Pieza | Qué arregla | Prueba |
 |---|---|---|---|
 | 1 | ✅ SUFIJOS-1 | Con la posición SIM, el sistema trae de VUCE (consulta pública `/cice/sufijos/<posición>`) qué sufijos pide y la unidad estadística; los completa con lo que la IA encuentra en la factura (marca, modelo, código, medidas, color); el código de artículo (`AI`) es distinto en cada renglón; lo que falta queda marcado para el despachante; sin VUCE, se piden a mano con aviso | la consulta a VUCE del 24/10 (una posición de plásticos pidió AA marca y AI código; unidad kilogramo `01`) |
-| 2 | 🔵 DESTINO-1 | Tres destinos por operación: comercialización en el mercado interno, bien de uso de la empresa, bien de uso particular, con su código en el TXT. Corrige lo de hoy: `GANANCIASOP3` siempre `COMERC` y «uso particular» con `COMERC` + `IVAAD1` | los tres pares del despachante del 28/10 (`COMERC`/`NO_VALIDA`, `BDEUSO`/`IVAAD2`, `USOPAR`/`IVAAD1`) |
+| 2 | ✅ DESTINO-1 | Tres destinos por operación: comercialización en el mercado interno, bien de uso de la empresa, bien de uso particular, con su código en el TXT. Corrige lo de hoy: `GANANCIASOP3` siempre `COMERC` y «uso particular» con `COMERC` + `IVAAD1` | los tres pares del despachante del 28/10 (`COMERC`/`NO_VALIDA`, `BDEUSO`/`IVAAD2`, `USOPAR`/`IVAAD1`) |
 | 3 | 🔵 SUFIJOS-2 | Sufijos (D7 de MARIA-7): un número en un sufijo libre puede llevar coma; en uno que pide número, sin decimales (hoy `2.5` sale `2 5`); ninguno vacío (hoy `AA()` pasa) | respuesta del despachante del 28/10 |
 | 4 | 🔵 SEGURO-1 | El botón «calcular seguro» no se ofrece en CIF, CIP, DPU, DAP y DDP (D14 de VALOR-1); el seguro se sigue declarando | respuesta del despachante del 28/10 |
 | 5 | ⏳ PESO-NETO-1 | El peso neto sale del packing list cuando la factura sólo trae bruto; si no hay packing list, el aviso de hoy | un packing list, tapado, de cualquier operación (las lonas no tienen; mientras, el aviso de hoy) |
@@ -108,7 +108,7 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 | Orden | Pieza | Qué arregla |
 |---|---|---|
 | 0 | EXCEL-2b | Carril liviano: una subida chica no espera en cola detrás de libros pesados (vuelve a cumplir el criterio D26 a de EXCEL-2, ya aceptada; arreglo de esa pieza, no cuenta aparte; D4 y D5 de la técnica, 28/10) |
-| 1 | 🔵 GUARDAR-2 | La sugerencia de posición: si el historial del cliente tiene 8 dígitos y el proveedor la SIM completa que empieza con esos 8, gana la del proveedor (D32 b; sin migración; Postgres descartable) |
+| 1 | ✅ GUARDAR-2 | La sugerencia de posición: si el historial del cliente tiene 8 dígitos y el proveedor la SIM completa que empieza con esos 8, gana la del proveedor (D32 b; sin migración; Postgres descartable) |
 | 2 | 🔵 ORDEN-1 | Reordenar los productos arrastrando, en la pantalla de revisión |
 | 3 | COBRO-MP-1 | Primera pieza de la Fase 2 (ver abajo) |
 
@@ -123,7 +123,7 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 | 🔵 COBRO-CORTE-1 | Dev técnica | Quien no paga no genera ni gasta Gemini; contar una vez por operación sin pasarse del tope (también con guardados a la vez); el aviso dice la razón real (C1, C5, C6; D4 b N = 10, D5 a, D6 a) |
 | 🔵 COBRO-MP-2 | Dev técnica | Cancelar también en Mercado Pago sin perder días pagados, una sola suscripción, reactivar pagando (C2, C4, C8, D9) |
 | ⏳ PRORRATEO-1 | Dev MARIA | El reparto ítem por ítem de ajustes, seguro y flete hasta el FOB casillero, con las sumas exactas al centavo (segunda etapa acordada el 24/10) |
-| 🔵 ORG-1 | Dev MARIA | Invitaciones que funcionan, tope de usuarios del plan, atadas al email (C7) |
+| ✅ ORG-1 | Dev MARIA | Invitaciones que funcionan, tope de usuarios del plan, atadas al email (C7) |
 | ⏳ LEGAL-1 | Dev MARIA | Términos y privacidad con el texto de Emi; aviso de que CDI es un asistente y el despachante revisa; cómo pedir el borrado de datos (X5) |
 
 **Cierre:** publicar; el pago chico de Emi recorre todo el ciclo (cierra G7).
@@ -136,12 +136,12 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 |---|---|---|
 | 🔵 SESION-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
 | 🔵 ABUSO-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
-| 🔵 EMAIL-1 | Dev MARIA | Sumada por Emi el 28/10 (D36 de MARIA): recuperar usuario y contraseña encuentran el email con otras mayúsculas; ningún alta ni cambio crea un email repetido con otras mayúsculas; los pares que ya existan no se tocan hasta que Emi los cuente |
+| ✅ EMAIL-1 | Dev MARIA | Sumada por Emi el 28/10 (D36 de MARIA): recuperar usuario y contraseña encuentran el email con otras mayúsculas; ningún alta ni cambio crea un email repetido con otras mayúsculas; los pares que ya existan no se tocan hasta que Emi los cuente |
 | 🔵 CONEXIONES-1 | Dev MARIA | Sumada por Emi el 28/10 (D37 de MARIA): medir si el cierre de la sesión de base cancelado deja conexiones tomadas, con Postgres 16; arreglar sólo si las deja |
 | 🔵 AISLAMIENTO-2 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | 🔵 LIMPIEZA-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | 🔵 OBSERVABILIDAD-1 | Dev MARIA | La columna `api_logs.owner_username` que falta en producción, con migración probada en Postgres descartable |
-| 🔵 DATOS-1 | Dev MARIA | Borrar un cliente con presupuesto; `/health` honesto; sin detalles de error al público (D5, D2, D6 de `AUDITORIA-2026-10-06.md`) |
+| ✅ DATOS-1 | Dev MARIA | Borrar un cliente con presupuesto; `/health` honesto; sin detalles de error al público (D5, D2, D6 de `AUDITORIA-2026-10-06.md`) |
 | 🔵 BACKUP-1 | Dev técnica (pasada por la PM el 28/10) | Ver `AUDITORIA-2026-10-06.md`. BACKUP-1a: copia y restauración probada; el destino fuera de Railway y dónde se programa esperan a Emi |
 | 🔵 DISCO-1 | Dev MARIA | El historial de NCM de cada estudio pasa del disco de Railway a la base (D4 de `AUDITORIA-2026-10-06.md`) |
 | ⚪ AUDITORIA-FINAL | PM | Ver `AUDITORIA-2026-10-06.md` |

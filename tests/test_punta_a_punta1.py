@@ -40,7 +40,7 @@ from proyecto_maria import main
 from proyecto_maria.core.maria_generator import id_corto_maria
 from tests.test_maria1a_lectura_factura import _pdf_en_blanco
 from tests.test_maria_subitems import REFERENCIA as SUBITEMS_PATH
-from tests.test_generar_maria_txt import _GOLDEN_PATH
+from tests.test_generar_maria_txt import _GOLDEN_PATH, golden_con_destino
 
 CUIT_DESPACHANTE = "20111111112"
 # El CUIT anonimizado del archivo real (30999999990) tiene mal el dígito
@@ -430,19 +430,19 @@ def _por_excel(factura: dict) -> _Pantalla:
 
 def test_pdf_de_punta_a_punta_da_el_archivo_real(monkeypatch):
     txt, operation_id = _por_pdf(monkeypatch, FACTURA).generar_y_descargar()
-    assert txt == _como_sale_por_la_pantalla(_leer(_GOLDEN_PATH), "000999001", operation_id)
+    assert txt == _como_sale_por_la_pantalla(golden_con_destino(_leer(_GOLDEN_PATH)), "000999001", operation_id)
 
 
 def test_excel_de_punta_a_punta_da_el_archivo_real():
     txt, operation_id = _por_excel(FACTURA).generar_y_descargar()
-    assert txt == _como_sale_por_la_pantalla(_leer(_GOLDEN_PATH), "000999001", operation_id)
+    assert txt == _como_sale_por_la_pantalla(golden_con_destino(_leer(_GOLDEN_PATH)), "000999001", operation_id)
 
 
 @pytest.mark.xfail(strict=True, reason="D23 (va a MARIA-6): la pantalla manda «FAC_» + número de "
                    "factura como número de operación")
 def test_pdf_de_punta_a_punta_da_el_archivo_real_sin_cambios(monkeypatch):
     txt, _ = _por_pdf(monkeypatch, FACTURA).generar_y_descargar()
-    assert txt == _leer(_GOLDEN_PATH).replace("NDDTIMMIOE=30999999990", f"NDDTIMMIOE={CUIT_IMPORTADOR}")
+    assert txt == golden_con_destino(_leer(_GOLDEN_PATH)).replace("NDDTIMMIOE=30999999990", f"NDDTIMMIOE={CUIT_IMPORTADOR}")
 
 
 @pytest.mark.parametrize("camino", ["pdf", "excel"])
@@ -475,7 +475,7 @@ def test_una_factura_con_coma_decimal_da_el_mismo_archivo(monkeypatch):
         "items": [{**FACTURA["gemini"]["items"][0], "valor_unitario": "5.000,00", "peso_total_linea": "1.220"}],
     }}
     txt, operation_id = _por_pdf(monkeypatch, factura).generar_y_descargar()
-    assert txt == _como_sale_por_la_pantalla(_leer(_GOLDEN_PATH), "000999001", operation_id)
+    assert txt == _como_sale_por_la_pantalla(golden_con_destino(_leer(_GOLDEN_PATH)), "000999001", operation_id)
 
 
 def _bloques(txt: str, nombre: str) -> list:

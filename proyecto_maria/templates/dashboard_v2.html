@@ -589,7 +589,7 @@
                                 <label class="form-label">Empresa de digitalización
                                     <select id="despachanteEmpresa" class="form-input"></select>
                                 </label>
-                                <label class="form-label">IVA adicional
+                                <label class="form-label">Destino de la mercadería
                                     <select id="despachanteIva" class="form-input"></select>
                                 </label>
                                 <label class="form-label">Unidad de la factura
@@ -602,7 +602,7 @@
                             <!-- En el teléfono la tabla se desplaza sola, no la página (MARIA-7). -->
                             <div style="overflow-x:auto;max-width:100%">
                             <table class="table" style="width:100%;margin-top:.75rem">
-                                <thead><tr><th>Producto</th><th>Estado de la mercadería</th><th>IVA adicional</th><th>Unidad</th><th>Unidad estadística</th><th>Sufijo de valor</th></tr></thead>
+                                <thead><tr><th>Producto</th><th>Estado de la mercadería</th><th>Destino</th><th>Unidad</th><th>Unidad estadística</th><th>Sufijo de valor</th></tr></thead>
                                 <tbody id="despachanteItems"></tbody>
                             </table>
                             </div>
@@ -989,6 +989,7 @@
                                     <div class="cx-catalogo-section">
                                         <div class="cx-catalogo-header">
                                             <h4 class="cx-catalogo-title">Productos aprendidos</h4>
+                                            <button type="button" class="btn btn-ghost btn-sm" id="cxCatalogoExcelBtn">Descargar en Excel</button>
                                         </div>
                                         <div class="cx-catalogo-productos-empty" id="cxCatalogoProductosEmpty" hidden>
                                             <p class="caption">Todavía no aprendí productos de este cliente.</p>
