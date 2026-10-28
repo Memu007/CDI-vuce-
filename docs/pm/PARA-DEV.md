@@ -54,6 +54,29 @@ revisión. **Con esto EXCEL-3 queda cerrada.**
   hilos, CPU) y proponé el arreglo con una D. Sin subir el corte de 30 s ni
   aflojar la prueba.
 
+## Tu diagnóstico de `test_excel2` y D4-D5 (2026-10-28): EXCEL-2b, ahora
+
+Recibido en `b5a50d1` (medición `ff03efe`). Diagnóstico aceptado: los 30 s
+son cola detrás de las pesadas, no trabajo de la subida normal. Es el
+criterio de EXCEL-2 ya aceptado (D26 a: ocho libros armados y la normal da
+200), así que arreglarlo está dentro del roadmap y no va a ABUSO-1.
+
+- **D4: (a), carril liviano.** Pieza **EXCEL-2b**, ahora. Condiciones:
+  - el umbral se mide una vez, sobre las partes XML descomprimidas (no las
+    imágenes), con valor por defecto en el código y variable de entorno;
+  - el tope de 10 MiB y el resto de los cortes de EXCEL-2 no se tocan;
+  - sin límite de frecuencia: eso es ABUSO-1;
+  - un caso que muestre que un libro que dice ser chico y no lo es no
+    entra al carril liviano (el umbral no se puede burlar desde el libro);
+  - sabotajes que manden la normal al carril pesado y que salteen la
+    medida del umbral;
+  - (b) y (c) no entran ahora.
+  Toca `file_security.py` y `main.py`: revisión fuerte con adversario
+  (cupo, hoy después de las 18:00 UTC).
+- **D5: (a).** La prueba afirma también `dt` < 5 s, en la misma pieza.
+
+Decidido por la PM.
+
 ## ORDEN-1 (en revisión) y tus D (2026-10-28)
 
 Recibida en `cdc9c57` (código `0d89c20`). Es de pantalla y del borrador
@@ -80,5 +103,6 @@ UTC). Si vuelve con devolución, va antes que lo que estés haciendo.
 
 ## Orden
 
-1. El rojo de `test_excel2` (diagnóstico y D), ahora.
+1. EXCEL-2b (D4 a y D5 a), ahora.
 2. Si GUARDAR-2 u ORDEN-1 vuelven con devolución, esa va primero.
+3. Después, COBRO-MP-1.
