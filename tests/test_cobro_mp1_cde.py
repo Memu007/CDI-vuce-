@@ -156,3 +156,38 @@ def test_una_prueba_con_un_pago_de_plan_rechazado_vuelve_a_la_prueba(client):
     cuerpo = client.post("/api/billing/reactivate").json()
     assert cuerpo["billing_status"] == "trial", f"un plan rechazado cuenta como plan: {cuerpo}"
     assert cuerpo["needs_checkout"] is False, cuerpo
+
+
+# --- Cancelar una suscripción nueva abierta desde «canceled» ---
+
+def test_cancelada_que_abrio_el_checkout_puede_cancelar_la_suscripcion_nueva(client):
+    # Reactivar un plan pagado deja «canceled» hasta que se pague; si el
+    # checkout ya creó la suscripción y el primer cobro no entra, cancelar
+    # tiene que cancelarla en Mercado Pago (si no, cobra cuando la tarjeta
+    # vuelve y la cuenta no tiene cómo frenarla).
+    usuario, sid = _suscripto(client, "cde_canre")
+    assert client.post("/api/billing/cancel").status_code == 200
+    fin = _fin(_leer(usuario))
+    assert client.post("/api/billing/reactivate").json()["needs_checkout"] is True
+    r = client.post("/api/billing/checkout", json={"plan": "premium"})
+    assert r.status_code == 200, r.text
+    nueva = r.json()["preapproval_id"]
+    SUS[nueva] = "authorized"
+    assert _leer(usuario)["mp_preapproval_id"] == nueva
+
+    r = client.post("/api/billing/cancel")
+    assert r.status_code == 200, f"la suscripción nueva no se puede cancelar: {r.status_code} {r.text}"
+    despues = _leer(usuario)
+    assert SUS[nueva] == "cancelled", "cancelar no cancela en Mercado Pago la suscripción del checkout"
+    assert despues["billing_status"] == "canceled", despues
+    assert despues["mp_preapproval_id"] is None, despues
+    assert _cerca(_fin(despues), fin), f"cancelar otra vez movió el fin del período pagado: {despues}"
+
+
+def test_cancelada_sin_suscripcion_no_se_cancela_otra_vez(client):
+    usuario, sid = _suscripto(client, "cde_candos")
+    assert client.post("/api/billing/cancel").status_code == 200
+    pedidos = len(PEDIDOS)
+    r = client.post("/api/billing/cancel")
+    assert r.status_code == 409, r.text
+    assert len(PEDIDOS) == pedidos, "cancelar dos veces vuelve a llamar a Mercado Pago"
