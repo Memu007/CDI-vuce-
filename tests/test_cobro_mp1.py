@@ -334,7 +334,8 @@ def test_el_link_de_pago_guarda_el_precio(monkeypatch):
 
 
 def _pago_de_suscripcion(usuario: str, monto: float, ref_suscripcion=None, pre="pre-1"):
-    pid = _pago(f"ps-{usuario}-{monto}", f"{usuario}:premium", monto=monto)
+    # Sin punto: un id de pago de Mercado Pago no lo lleva.
+    pid = _pago(f"ps-{usuario}-{int(monto)}", f"{usuario}:premium", monto=monto)
     PAGOS[pid]["metadata"] = {"preapproval_id": f"{pre}-{usuario}"}
     SUSCRIPCIONES[f"{pre}-{usuario}"] = {
         "id": f"{pre}-{usuario}", "status": "authorized",
@@ -891,4 +892,20 @@ def test_sin_token_el_aviso_de_una_renovacion_no_se_pierde(client, monkeypatch):
     monkeypatch.setattr(main_mod, "MP_ACCESS_TOKEN", "")
     r = _aviso_cobro(client, cobro)
     assert r.status_code == 400, r.text[:300]
+    assert _leer_pago(pid) == {}
+
+
+@pytest.mark.parametrize("id_en_la_respuesta", [None, True, "", "12/34"], ids=["nulo", "booleano", "vacio", "barra"])
+def test_un_pago_aprobado_sin_id_reconocible_no_se_aplica(client, id_en_la_respuesta):
+    """El pago se registra con el id que devuelve Mercado Pago: si no tiene la
+    forma esperada, no hay con qué anotarlo y no se aplica."""
+    usuario = _unique("mp1_sinid")
+    _register(client, usuario)
+    pid = _pago(f"si-{usuario}", f"{usuario}:premium")
+    PAGOS[pid]["id"] = id_en_la_respuesta
+    antes = _get_user(usuario)
+    r = _aviso_ipn(client, pid)
+    assert r.status_code == 200, r.text[:300]
+    assert r.json().get("skipped") == "pago con forma inesperada", r.json()
+    assert _fin(_get_user(usuario)) == _fin(antes)
     assert _leer_pago(pid) == {}

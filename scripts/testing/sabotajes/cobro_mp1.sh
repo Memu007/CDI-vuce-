@@ -218,5 +218,31 @@ sabotaje $M "el pago de la renovación no se ata a su suscripción" \
   '            pay_resp = dict(pay_resp)' \
   "FAILED $T::test_una_renovacion_cuyo_pago_dice_otra_cuenta_no_se_aplica"
 
+# ── Devolución de los adversarios: el id del pago ──
+sabotaje $M "el id del aviso arma cualquier ruta" \
+  $'            if not _ID_COBRO_MP.fullmatch(payment_id):\n                logger.warning("Webhook MP: payment_id inválido %r", payment_id[:80])' \
+  $'            if False:\n                logger.warning("Webhook MP: payment_id inválido %r", payment_id[:80])' \
+  "FAILED $T::test_un_id_con_barras_no_llega_a_mercado_pago"
+sabotaje $M "el pago se anota con el id del aviso y no con el de Mercado Pago" \
+  '        canonico = pay_resp.get("id")' \
+  '        canonico = payment_id' \
+  "FAILED $T::test_el_mismo_pago_escrito_de_otra_forma_no_se_aplica_otra_vez[cero]"
+sabotaje $M "un pago aprobado sin id reconocible se anota igual" \
+  $'            return {"success": True, "skipped": "pago con forma inesperada"}' \
+  $'            payment_id = str(canonico)' \
+  "FAILED $T::test_un_pago_aprobado_sin_id_reconocible_no_se_aplica[nulo]"
+sabotaje $M "el último pago de antes del registro vuelve a aplicarse (usuario)" \
+  '            if db_user.last_payment_id == payment_id:' \
+  '            if False:' \
+  "FAILED $T::test_el_ultimo_pago_de_antes_del_registro_no_se_aplica_otra_vez[usuario]"
+sabotaje $M "el último pago de antes del registro vuelve a aplicarse (organización)" \
+  '                if db_org.last_payment_id == payment_id:' \
+  '                if False:' \
+  "FAILED $T::test_el_ultimo_pago_de_antes_del_registro_no_se_aplica_otra_vez[organizacion]"
+sabotaje $M "sin token, la renovación se da por procesada" \
+  '        if event_type in ("payment", "subscription_authorized_payment"):' \
+  $'        if event_type == "subscription_authorized_payment" and not MP_ACCESS_TOKEN:\n            return {"success": True, "skipped": "not a payment event"}\n        if event_type in ("payment", "subscription_authorized_payment"):' \
+  "FAILED $T::test_sin_token_el_aviso_de_una_renovacion_no_se_pierde"
+
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]
