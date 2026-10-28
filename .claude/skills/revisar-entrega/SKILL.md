@@ -64,6 +64,8 @@ Mirá el diff fuera de `docs/pm` vos misma: `git diff <base> <SHA> --stat`.
   («Devolución por la causa» en `ONBOARDING-PM.md`).
 - Lo que se le suma a la siguiente tarea queda escrito antes de activarla.
 - `NOW.md` y `DECISIONS.md` si corresponde.
+- Al aceptar la pieza entera (no una subpieza), su marca en `ROADMAP.md`
+  pasa a ✅ en el mismo commit; `avance.py` cuenta desde ahí.
 - Si la aceptás, integrá recién ahí la rama de esa Dev con `merge`.
 - **Higiene** (`ONBOARDING-PM.md`, «Higiene de los documentos»): en el mismo
   commit, lo cerrado sale del canal y los topes se respetan.

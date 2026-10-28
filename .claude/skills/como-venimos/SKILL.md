@@ -1,9 +1,9 @@
 ---
 name: como-venimos
-description: Para Emi, en cualquier sesión (PM principal, PM visual o Dev). Contesta en tres líneas quién tiene la pelota, qué sigue y qué tiene que decidir Emi, leyendo la rama y no la memoria del chat. No cambia nada.
+description: Para Emi, en cualquier sesión (PM principal, PM visual o Dev). Contesta en cuatro líneas quién tiene la pelota, qué sigue, qué tiene que decidir Emi y el avance, leyendo la rama y no la memoria del chat. No cambia nada.
 ---
 
-# /como-venimos — el estado en tres líneas, para Emi
+# /como-venimos — el estado en cuatro líneas, para Emi
 
 Sólo lee. No integra, no commitea, no arranca nada.
 
@@ -51,6 +51,8 @@ decilo. Si alguna avisó que necesita compactar, decilo con su `/compact`.
 - **La pelota la tiene:** PM (revisando …) / Dev (haciendo …) / Emi (decidir …).
 - **Sigue:** la próxima pieza de la cola.
 - **Vos decidís:** lo pendiente de Emi, o «nada por ahora».
+- **Avance:** la primera línea de `python3 docs/pm/herramientas/avance.py`
+  (piezas aceptadas sobre el total del roadmap; aceptada no es publicada).
 
 Si dos fuentes no coinciden (por ejemplo, `NOW.md` dice una tarea activa y
-`PARA-DEV.md` otra), agregá una cuarta línea que lo diga.
+`PARA-DEV.md` otra), agregá una línea más que lo diga.
