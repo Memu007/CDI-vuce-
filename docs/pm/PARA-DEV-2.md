@@ -44,6 +44,62 @@ repositorio.** Las pruebas usan sintéticos con la misma forma.
   primero las devoluciones que lleguen (DESTINO-1 ya está arriba), después
   D41.
 
+## DESPACHO-1b: devolución, sobre `e59e1a8` (2026-10-28 17:40 UTC)
+
+Permisos bien: el adversario (Sonnet alto) no cruzó clientes ni dueños, y
+los campos metidos en el cuerpo se ignoran. Va con la D41, después de las
+18:00, encima de la cadena. Además de las tres medias que ya declaraste:
+
+1. **Un PDF chico llena la memoria (alta, no declarada).** Reproducido por
+   la PM sobre `e59e1a8`, con `leer_despacho` sola: 10 hojas con un flujo
+   flate distinto de 70 MB cada una (0,79 MB de PDF) dan un pico de
+   806 MB; 2 hojas, 244 MB. Por la API, el adversario vio 2,2 GB con un
+   PDF de 2,2 MB y 30 hojas, y la memoria no vuelve. **Causa:** los topes
+   miden después de pagar. `contenido.get_data()` descomprime la hoja
+   entera para ver si pasa de `_MAX_CONTENIDO_PAGINA`, y eso hasta 200
+   hojas. **La familia:** cada tope (hojas, bytes descomprimidos en total,
+   largo de línea, columnas, renglones) corta antes de gastar. La prueba:
+   ese PDF sintético se rechaza o se lee con la memoria acotada, medida
+   en un proceso aparte.
+2. **La lectura cuadrática frena también a las facturas.** Corre en los
+   4 hilos de `_pool_lectura_pdf()`, los mismos del lector de facturas, y
+   el 504 no corta el hilo: cuatro despachos de 156 KB dejaron una factura
+   chica de otro usuario en 504. Entra en el arreglo de la cuadrática; la
+   prueba mide el tope, no un tiempo.
+3. **El peso infinito es de la misma causa que el 1:** el tope mira cada
+   número, no lo que se calcula con ellos. Reproducido por la PM:
+   `renglon_para_catalogo` con `cantidad=1e-320` y `kilo_neto=5` da
+   `peso_unitario: inf`, y `json.dumps` falla igual que el 500 del
+   catálogo. Todo valor derivado pasa por el mismo tope.
+4. **Guardar empeora un producto que ya estaba (no declarada).** En
+   `client_memory.py`, `_incr_avg` cuenta el promedio anterior vacío como
+   0 con el peso de todas las veces: un producto sin peso, guardado otra
+   vez con 2 kg, queda en 1 kg (y el valor, a la mitad). Con despachos
+   sin peso es el caso común. Lo arreglás vos, con su prueba: el anterior
+   vacío no promedia. Que el origen sea el último y no el frecuente va a
+   riesgos.
+5. **La fusión de NCM distinto tiene un caso más.** Verificado por la PM:
+   «… TIPO A» y «… TIPO B» dan similitud 1,0 (las palabras de una letra
+   no cuentan) contra el umbral 0,8, así que el respaldo por descripción
+   las junta aunque el NCM sea otro. Y `_norm_desc` corta en 200
+   caracteres: dos productos con el mismo texto de arancel adelante se
+   juntan. En un despacho la posición SIM manda; la prueba lleva los dos
+   casos.
+6. **Valor unitario en otra divisa (hipótesis, sin reproducir):** el
+   catálogo no guarda la divisa del FOB del despacho y la promedia con
+   las demás. Verificalo; si es así, proponé qué hacer como D42.
+7. **Pruebas que no ven el defecto.** Reproducido por la PM: sin el tope
+   numérico (`if valor < 0:`) o sin el chequeo de hoja pesada,
+   `test_despacho1b.py` da `50 passed`. El adversario suma: el tope de
+   200 hojas, el margen de columna `+2`, la captura de
+   `LecturaPdfDemasiadoLarga`, el commit único (rollback ante error de
+   base) y `_sin_nul`. Un caso por cada uno, rojo con su sabotaje.
+
+Riesgos, sin arreglo en esta pieza: más de 500 renglones (la pantalla manda
+todo junto y el servidor dice «cargalos en partes»); guardar no tiene
+`@limiter.limit`; renglones de «Información Adicional» que caerían en la
+descripción (sin despacho real para probarlo).
+
 ## DESTINO-1: devolución de pruebas, sobre `f887b4a` (2026-10-28 17:25 UTC)
 
 Informe `eacf591`. El producto está bien: el adversario (Sonnet alto) no
@@ -81,38 +137,44 @@ error. Reproducido por la PM sobre `f887b4a`: agregando
   los dos rojos de tiempos de `4ce6d22`, te lo escribo acá. Acepto con las
   pruebas; integro después de ORG-1. Nada se publica antes.
 
-## ORG-1: lo que suma el revisor, y D40 (2026-10-28 17:05 UTC)
+## ORG-1: aceptada sobre `4ce6d22`, con ORG-1b y DESPACHO-1a (2026-10-28 17:45 UTC)
 
-Recibida en `3aaa3c4` (informe `de4d788`). Suite de la PM sobre `4ce6d22`:
-`2 failed, 3902 passed`; los dos rojos son de tiempos y no de ORG-1
-(`test_excel2`, el de siempre; `test_excel1_lectura` tardó 11 s contra 8,
-y con la máquina a carga 11 en 4 núcleos falla igual sobre la base
-aceptada: 13,5 s). El veredicto, cuando termine el segundo adversario.
-Seguí con `/entregar` en tu orden sin esperarlo.
+Integrada en la rama de la PM (merge `cda3320`). Evidencia en
+`REPRODUCCION-ORG-1-2026-10-28.md`. Los guardas del producto están bien;
+faltan pruebas y un 500. Todo va **encima de la cadena**, en los commits de
+la D40, después de las 18:00 y antes de publicar.
 
 - **D40: (1)**, decidido por la PM. Al invitar, el email que ya tiene cuenta
   da 400 y no ocupa lugar (misma respuesta en este estudio o en otro). Al
   registrarse con una invitación, las otras pendientes del mismo email en
   ese estudio quedan usadas.
-- **Sumá, en los mismos commits de la D40** (reproducido por la PM sobre
-  `4ce6d22`, Postgres 16):
-  1. *Reingreso del sacado.* Hoy: dos invitaciones al mismo email, X entra
-     con la primera, el dueño lo saca, X cambia su email en el perfil y
-     entra de nuevo con la segunda (`200`, vuelve a ver el estudio). La
-     regla 2 de la D40 lo cierra; la prueba es ese recorrido entero y
-     tiene que dar 400 o «invitación usada». Que el perfil cambie el email
-     sin verificar va a riesgos: no es de esta pieza.
-  2. *Email que el registro rechaza.* Invitar `josé@example.com` o
-     `ana@estudio` da 200 y ocupa un lugar 7 días, pero registrarse con ese
-     email da 400. Al invitar se valida con la misma regla que el
+- **Sumá, con la D40** (reproducido por la PM sobre `4ce6d22`):
+  1. *Reingreso del sacado* (Postgres 16): dos invitaciones al mismo email,
+     X entra con la primera, el dueño lo saca, X cambia su email en el
+     perfil y entra con la segunda (`200`). La regla 2 de la D40 lo cierra;
+     la prueba es el recorrido entero. El email del perfil sin verificar va
+     a riesgos.
+  2. *Email que el registro rechaza*: invitar `josé@example.com` o
+     `ana@estudio` da 200 y ocupa lugar. Al invitar, la misma regla que el
      registro: 400 y no ocupa lugar.
-  3. *Prueba que falta.* Sin `- set(emails_miembros)` (`main.py:9682`),
-     `test_org1.py` da `46 passed`. Caso: dos pendientes al mismo email,
-     entra con una, la otra no ocupa lugar.
-- Rojo antes, en SQLite y Postgres 16, un sabotaje por regla. Commits
-  aparte encima de la cadena, como `6b9762e`.
-- Al aceptar integro hasta `4ce6d22`; `6b9762e`, `3aaa3c4` y la D40 entran
-  con la última pieza de la cadena. Nada se publica antes.
+  3. *Email largo*: en Postgres 16, invitar un email de 101 caracteres da
+     **500** (`Invitation.email` es `String(100)`); de 100, 200. Tiene que
+     dar 400 con la regla del 2. **Causa:** el largo lo frena la base, no
+     la ruta; revisá los otros campos de la invitación.
+  4. *Pruebas de los guardas.* Con cada uno de estos cambios
+     `test_org1.py` + `test_despacho1a.py` siguen en `59 passed`
+     (reproducidos por la PM: el filtro por estudio de `/mine`, el 403 al
+     que no es dueño y el borrar de otro estudio; los demás, del revisor):
+     invitar sin estudio (400), invitar sin ser dueño (403), «ya es
+     miembro» con y sin filtro por estudio, pendientes menos miembros (sin
+     `- set(emails_miembros)`), la validación de «@», el vencimiento de 7
+     días, validar con el estudio borrado (404), sacar a alguien de otro
+     estudio, sacar sin estudio (400), sacar no borra al usuario, `/mine`
+     filtra los miembros por estudio, `is_owner`, y el texto «última vez»
+     de DESPACHO-1a. Un caso por guarda, rojo con su sabotaje, en SQLite;
+     los de base, también en Postgres 16.
+- Al aceptar la última pieza de la cadena entran `6b9762e`, `3aaa3c4` y
+  estos arreglos. Nada se publica antes.
 
 ## D38 y D39 (2026-10-28 14:00 UTC): sobre `2b93071` y `30c0e97`
 
@@ -167,149 +229,18 @@ este orden.
   pruebas sigue en riesgos.
 - Toca todas las rutas: revisión fuerte.
 
-## D36 y D37 (2026-10-28): (2) por ahora, y Emi dijo que sí a tus (1)
+## D35 a D37 (2026-10-28)
 
-En ABUSO-1 no se tocó la comparación del email ni los middlewares; el aviso
-«Event loop is closed» queda a la vista, sin `filterwarnings`. Tus (1) son
-EMAIL-1 y CONEXIONES-1 (arriba). Decidido por la PM.
-
-## D35 (2026-10-28): (1) en las cinco, sobre `e25e87c`
-
-Decidido por la PM; Emi confirma de día los números (b) y el supuesto del
-proxy (a). Seguí con S4, S6 y C9 sin esperarla.
-
-- **a (1):** un solo helper para `login_attempts`, `reset_attempts` y
-  slowapi; toma la **última** IP de X-Forwarded-For, saltos configurables
-  (default 1); sin el header, `client.host`. La línea de log en el 429 del
-  login (IP tomada y cantidad de entradas del XFF) es **obligatoria**: es lo
-  único que valida el supuesto después de publicar.
-- **b (1):** tus números. Escribí en el informe por qué alcanzan (por
-  ejemplo, tres invitados de ORG-1 de la misma oficina en una hora quedan
-  bajo 5/hora). El tope de 16 KB va en S5, como dijiste.
-- **c (1):** los mensajes quedan. En el informe, la enumeración de S6 figura
-  como **mitigada por el límite, no cerrada** (se cierra con la verificación
-  de email, que es otra pieza).
-- **d (1):** sin sesión se guardan sólo `pricing_cta_clicked`,
-  `hero_cta_clicked` y `register_pending_verify`, en una lista explícita y
-  con límite; cualquier otra acción sin sesión no se guarda.
-- **e (1):** los contadores de login y de recuperación pasan a una tabla.
-  Con memoria, las pruebas de ABUSO-1 dan verde y el abuso sigue abierto al
-  reciclar el worker. `--max-requests` del Dockerfile no se toca.
-  Condiciones, antes de construirla:
-  - incremento atómico (C6 ya mostró carreras con pedidos en paralelo):
-    una prueba con pedidos simultáneos en PG16;
-  - tamaño acotado: las filas vencidas se borran al escribir o al arrancar;
-  - se crea al arranque con el mismo patrón `_migrate_*` de DISCO-1 y
-    OBSERVABILIDAD-1, en PG16 y SQLite;
-  - un solo camino, haya o no `REDIS_URL`;
-  - **commit propio** para la tabla, así la migración se revisa sola.
-  El 5/min de slowapi en el login queda en memoria (slowapi no guarda en
-  SQL): lo que importa es el bloqueo de 15 minutos en la tabla. Anotalo en
-  riesgos.
-- **recover-username y mayúsculas:** entra, porque ya tocás esa ruta:
-  comparar el email sin distinguir mayúsculas, con su prueba. Si dos cuentas
-  pueden tener el mismo email cambiando sólo mayúsculas, no lo toques y
-  abrí la **D36**.
-
-Revisión fuerte (autenticación y migración).
+Cerradas. Quedan resumidas en `DECISIONS.md` («D35 a D37 de la Dev MARIA»).
 
 ## D28 a D34 (2026-10-28)
 
 Cerradas. Quedan resumidas en `DECISIONS.md` («D28 a D34 de la Dev MARIA»).
 
-## ORG-1 — tarea activa
+## Lo encargado de las piezas entregadas, todavía en revisión
 
-Invitaciones al estudio (`ROADMAP.md`, Fase 2; C7 de
-`AUDITORIA-2026-10-06.md`). **Toca permisos: revisión fuerte.** Diff de
-revisión desde la punta de mi rama. Trae mi rama antes de arrancar.
-
-**Alcance:** las invitaciones funcionan sin 500, quedan atadas al email
-invitado y respetan el tope de usuarios del plan. **No entra** lo demás de
-la fila 7 de `REPRODUCCION-ARGON-2026-10-24.md` (miembros que no ven los
-clientes del estudio, cancelar sobre el usuario, cobros del miembro raso,
-el trial al sacar un miembro, vaciar el email): espera la decisión de Emi.
-Si para que ORG-1 funcione hace falta algo de eso, es una D.
-
-El código: `invite_to_organization` y `validate_invitation` en
-`proyecto_maria/main.py` (~9480 y ~9540), el registro con `invite_token`
-(~2898-2921), `Invitation` en `database/models.py` y el plan en
-`services/billing_service.py`.
-
-1. **Premisa primero.** Reproducí el 500 en Postgres antes de arreglar.
-   Mi sospecha, sin correr: `expires_at` es `DateTime(timezone=True)` y se
-   compara con `datetime.utcnow()`, sin zona; en Postgres vuelve con zona y
-   la comparación revienta, en SQLite no. Hay Postgres 16 instalado en el
-   contenedor (`/usr/lib/postgresql/16`). Si es otra cosa, decímelo con la
-   salida.
-2. **Sin 500 en las dos bases.** Validar, registrarse con invitación y una
-   invitación vencida dan la respuesta de hoy en SQLite y en Postgres. Los
-   registros viejos de SQLite vienen sin zona: también. Una prueba que sólo
-   corre en SQLite no distingue este defecto: corré contra un Postgres
-   local, o inyectá un `expires_at` con zona.
-3. **Atada al email.** Al registrarse con `invite_token`, el email del
-   registro (con `strip().lower()`, como lo guarda la invitación) tiene que
-   ser el invitado. Si no coincide o falta: 400 y la invitación **no** se
-   gasta. Una cuenta que ya existe y se suma por invitación no entra: hoy
-   sólo existe el camino del registro.
-4. **Tope del plan.** Sale de `billing_service.get_plan(org.plan or
-   "premium")["users"]`, nunca un 3 escrito a mano. Cuentan los usuarios con
-   el `organization_id` del estudio (el dueño también). Al invitar: 400 si
-   miembros más invitaciones pendientes sin vencer llegan al tope. Al
-   registrarse: 400 si los miembros ya llegaron, sin gastar la invitación.
-   Sacar un miembro libera el lugar (ya lo hace).
-5. **Un solo uso, de verdad.** Hoy el usuario y el «accepted» se guardan en
-   dos commits: dos registros a la vez con el mismo token pasan los dos. La
-   invitación se gasta en la misma transacción que el alta, con una
-   actualización condicionada a `status = 'pending'`, y se comprueba que
-   tocó una fila. Contame qué deja una carrera de dos registros a la vez; si
-   en SQLite no se puede provocar, decilo.
-
-**Pruebas:** por punto, casos de la familia y no un solo ejemplo; las
-guardas (una invitación válida del email correcto con lugar entra igual que
-hoy); un sabotaje por punto que vuelva a lo de hoy; corré
-`scripts/testing/ataque_aislamiento.sh`. Suite completa sobre el SHA que
-entregás.
-
-**No se toca:** el alta sin invitación, el cobro y los planes, lo que ve
-cada miembro.
-
-**Tu cupo:** hasta el 28/10 a las 18:00 UTC no tenés subagentes ni
-`/code-review`. Programá, armá casos y sabotajes ya; `/entregar` espera a
-que vuelva el cupo. Yo sumo un adversario de permisos en mi revisión.
-
-**Puede pausarse:** le pregunto a Emi si tres errores del TXT de la
-auditoría (8.1, 9.2 y 8.2) van antes. Si dice que sí, te aviso acá y ORG-1
-queda donde esté.
-
-**DESTINO-1: empezala ya** (2026-10-28 02:00 UTC), mientras esperás el
-cupo; antes decía «apenas entregues». En commits aparte, **encima** de lo
-que hoy es ORG-1, ORG-1b y DESPACHO-1a: esa entrega nombra su propio SHA
-(el último de esas tres piezas, antes de cualquier commit de DESTINO-1),
-con su suite sobre ese SHA, y DESTINO-1 se entrega aparte, con su
-`/entregar`, cuando esté. Si al volver el cupo DESTINO-1 está a medias,
-primero entregás ORG-1 y después seguís. Datos que llegaron el 28/10
-(`PREGUNTAS-DESPACHANTE.md`, «Respuestas del 2026-10-28»):
-
-- `GANANCIASOP3` deja de ser `COMERC` fijo. Por operación, con cambio por
-  ítem como hoy `IVAADICIONAL1`, se elige el destino y salen **los dos
-  códigos juntos**, sólo en estos pares: comercialización o reventa
-  `COMERC` + `NO_VALIDA`; bien de uso de la empresa `BDEUSO` + `IVAAD2`;
-  bien de uso de una persona `USOPAR` + `IVAAD1`. Por defecto,
-  comercialización.
-- Hoy «uso particular» sale `COMERC` + `IVAAD1`, un par fuera de la lista:
-  eso se corrige. Un dato guardado con el valor viejo (`iva_adicional`
-  `IVAAD1`) se lee como bien de uso de una persona.
-- `maria_golden_anon.TXT` (2025, aceptado por el MARIA) trae `COMERC` +
-  `IVAAD1`: el golden no se toca; si una prueba lo compara campo a campo,
-  avisá antes de cambiarla. Le pregunto al despachante (pregunta 7).
-- Pruebas: los tres pares en el TXT, el defecto, el cambio por ítem, un
-  valor que no es ninguno de los tres (error, no se genera), y un sabotaje
-  por par. Es un campo de impuestos: revisión fuerte.
-
-Después: **SUFIJOS-2**, **SEGURO-1**, **DESPACHO-1b**, **DATOS-1** y
-**DISCO-1**, **OBSERVABILIDAD-1** y **SESION-1** (hechas, sin entregar)
-y **ABUSO-1** (abajo, empezala ya). PESO-NETO-1 y PRORRATEO-1 siguen esperando al
-despachante.
+Lo de ORG-1, ORG-1b, DESPACHO-1a y DESTINO-1 (aceptadas o con devolución
+arriba) salió del canal: `git show 1f648c3:docs/pm/PARA-DEV-2.md`.
 
 ### ABUSO-1 — hecha, sin entregar (encargada 2026-10-28 10:00 UTC)
 
@@ -596,69 +527,6 @@ con lo que no depende de ella.
 
 Pruebas: los tres casos, uno que hoy está bien y sigue igual, y un sabotaje
 por regla. Toca el TXT: el golden no se toca.
-
-### DESPACHO-1a — pieza nueva del roadmap; hacela mientras esperás el cupo
-
-Emi sumó **DESPACHO-1** el 28/10 (`ROADMAP.md`, Fase 1c, fila 5): subir un
-despacho ya oficializado (OM-1993-A) para armar el catálogo del cliente. Los
-ejemplos llegaron el 28/10 pero son reales y sin tapar: no los vas a ver.
-Su forma, sin datos, está en `DESPACHOS-FORMA.md`; la lectura se hace
-después de DESTINO-1, SUFIJOS-2 y SEGURO-1, con un sintético armado desde
-ahí.
-
-Lo que no depende del ejemplo, ahora, como **DESPACHO-1a**:
-
-- **Bajar el catálogo de un cliente en Excel** desde la pantalla de
-  catálogo: un renglón por producto del historial del cliente
-  (`ClientProductHistoryModel`) con posición, descripción, origen, valor
-  unitario, cantidad y peso promedio, veces usado y última vez.
-- Sólo los productos de ese cliente y de ese dueño (`_get_owned_client`);
-  un cliente ajeno da el mismo 404 que hoy.
-- Celdas que empiezan con `=`, `+`, `-` o `@` se escriben como texto (sin
-  fórmulas): las descripciones vienen de facturas de terceros.
-- La posición sale como texto, con ceros y letra como está guardada.
-- Pruebas: aislamiento (otro dueño, otro cliente), la celda con `=`, un
-  catálogo vacío, y que el archivo se abre con openpyxl y trae lo guardado.
-  Un sabotaje por cada una. Línea en `CHANGELOG.md`.
-- Commits separados sobre ORG-1b; se entrega en el mismo `/entregar` que
-  ORG-1 y ORG-1b, pero en su propio apartado del informe con su diff
-  propio, como hiciste con ORG-1b.
-
-Si al mirar encontrás que la descarga ya existe o que el catálogo del
-cliente no es ese modelo, avisá antes de construir.
-
-### Tu aviso del 27/10 (`de8d175`, sin entregar)
-
-Leído. Está bien esperar el cupo: no la reviso hasta tu `/entregar`. Los
-supuestos reversibles los miro en la revisión.
-
-- **D26: (a) por ahora.** Cancelar una pendiente es un endpoint nuevo y no
-  está en el roadmap; se lo propongo a Emi con tu recomendación (b). No lo
-  empieces sin mi aviso.
-- **D27: (b), como ORG-1b.** Entra en la línea de ORG-1 del roadmap
-  («invitaciones que funcionan»): sin esto, el punto 3 deja al invitado con
-  un 400 evitable. Decidido por la PM.
-
-### ORG-1b — hacela ahora, mientras esperás el cupo
-
-En `landing.html`, cuando `/api/invitations/{token}` responde válida:
-
-1. El email del registro se completa con `data.email` y queda de sólo
-   lectura (`readOnly`, no `disabled`, para que viaje en el envío). Una
-   línea cerca dice que es el email al que te invitaron.
-2. Si `data.email` viene vacío, o no hay `invite`, o el token no es válido,
-   el campo queda como hoy: vacío y editable.
-3. El servidor no cambia: el 400 del punto 3 sigue siendo la guarda.
-
-**Pruebas:** en un navegador (Playwright), con datos sintéticos: invitación
-válida (email completo y de sólo lectura, el registro entra), sin `invite` y
-con token inválido (campo editable y vacío), y una invitación válida con el
-email cambiado a mano en el DOM (sigue el 400). Un sabotaje que saque el
-completado y dé rojo. Una línea en `CHANGELOG.md`.
-
-**Entrega:** commits aparte encima de `ddfc798`, en el mismo `/entregar` que
-ORG-1, con su propio SHA de producto en la tabla, para que pueda revisarla
-separada.
 
 ## Qué pasó el 2026-10-24
 
