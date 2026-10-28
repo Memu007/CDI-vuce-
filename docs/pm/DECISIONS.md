@@ -251,3 +251,12 @@ sólo tres acciones en lista explícita; (e) los contadores de login y
 recuperación van a una tabla con incremento atómico, tamaño acotado y
 migración `_migrate_*` en commit propio. D36 y D37 (2) por ahora; sus (1)
 son EMAIL-1 y CONEXIONES-1, que Emi aprobó.
+
+## 2026-10-28 — OBSERVABILIDAD-1: la métrica guarda el molde de la ruta (PM)
+
+Decidido por la PM, amplía la D34 (a). Al volver a grabar la métrica, la
+pieza dejaba en `api_logs` (y en `/api/dev/stats`) el camino crudo, con
+tokens de invitación, hashes de presupuestos públicos y CUIT. Se guarda el
+molde de la ruta, y `<sin ruta>` si no coincide ninguna. Sin eso,
+OBSERVABILIDAD-1 no se publica. Evidencia en
+`REPRODUCCION-OBSERVABILIDAD-1-2026-10-28.md`.

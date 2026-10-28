@@ -35,7 +35,8 @@ repositorio.** Las pruebas usan sintéticos con la misma forma.
 1. DESPACHO-1b (devolución y D41). 2. DISCO-1 (devolución). 3. SESION-1
 (devolución, abajo). 4. ABUSO-1 (devolución, abajo). 5. SUFIJOS-2
 (devolución, abajo) y lo que se suma de SEGURO-1. 6. EMAIL-1: la D45 y el
-mutante. 7. CONEXIONES-1: la D46. Cada una con su rojo, su sabotaje y
+mutante. 7. CONEXIONES-1: la D46. 8. OBSERVABILIDAD-1 (devolución,
+abajo). Cada una con su rojo, su sabotaje y
 `/entregar`; me despertás al entregar cada una, sin esperar a juntar.
 
 - **D45 (EMAIL-1): (1), decidido por la PM.** El tope por correo se
@@ -46,6 +47,37 @@ mutante. 7. CONEXIONES-1: la D46. Cada una con su rojo, su sabotaje y
   Esperás a que `api_logs` tenga todos los pedidos, un control que cancele
   el `close` y tenga que dar rojo, y cortes en vuelo de verdad. Hasta
   entonces la D37 sigue abierta.
+
+## OBSERVABILIDAD-1: devolución, sobre `39be45e` (2026-10-28 18:40 UTC)
+
+Evidencia en `REPRODUCCION-OBSERVABILIDAD-1-2026-10-28.md`. La migración
+cumple lo pedido: sólo agrega, dos arranques no cambian nada y si falla la
+app arranca. **Causa de la devolución:** la pieza vuelve a grabar la
+métrica sin mirar qué graba, y eso no se puede publicar así.
+
+1. **Lo que graba la métrica, decidido por la PM (dentro de esta pieza).**
+   Reproducido por la PM: `MetricsMiddleware` guarda el camino crudo y
+   `/api/dev/stats` lo muestra; ahí quedan el token de invitación entero,
+   el hash de un presupuesto público, la preferencia de pago, el nombre de
+   archivo y el CUIT. Que guarde el molde de la ruta
+   (`/api/invitations/{token}`), y un pedido que no coincide con ninguna
+   ruta guarde `<sin ruta>`. Rojo antes del arreglo: cada ruta de la app
+   con parámetro en el camino guarda su molde, sacada de la lista de rutas
+   de la app y no de una lista a mano, más un camino que no existe. Un
+   sabotaje que vuelva al camino crudo y dé rojo.
+2. **El lock exclusivo dura sólo el `ALTER`.** Hoy el `ALTER` y el índice
+   van en la misma transacción, y el adversario midió unos 0,6 s por millón
+   de filas con la tabla trabada para leer y escribir. Separalos: columna en
+   una transacción y el índice en otra, cada una con su `lock_timeout`.
+3. **El log dice la verdad:** «agregada columna» y «agregado índice» se
+   imprimen después del commit de cada uno.
+4. **A riesgos, sin cambiar:** la espera de 5 s detrás de otra transacción
+   (frena a los que llegan detrás y reintenta en el próximo arranque); un
+   índice inválido o parcial que se da por bueno; un camino de más de 200
+   caracteres que pierde su métrica en Postgres.
+
+Postgres 16 y SQLite. Línea en `CHANGELOG.md`. Commits aparte y su propio
+`/entregar`.
 
 ## SESION-1: devolución, sobre `895ee73` (2026-10-28 17:58 UTC)
 
@@ -168,8 +200,8 @@ Toca el TXT: el golden no se toca.
 - **D40 y los arreglos de ORG-1 después de las piezas: sí.** Van encima de
   la cadena igual; no se integra nada hasta aceptar ORG-1.
 - **Recibidas** SUFIJOS-2 (`bd76f9f`, devolución arriba), SEGURO-1
-  (`5dfaf47`, aceptada arriba) y DESPACHO-1b (`e59e1a8`, devolución
-  arriba).
+  (`5dfaf47`, aceptada arriba), DESPACHO-1b (`e59e1a8`, devolución
+  arriba) y OBSERVABILIDAD-1 (`39be45e`, devolución arriba).
 
 ## EMAIL-1: aceptada sobre `2b93071` (2026-10-28 17:46 UTC)
 
