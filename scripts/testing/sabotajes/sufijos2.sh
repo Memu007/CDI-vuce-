@@ -136,7 +136,7 @@ sabotaje $G "un dígito que no es ASCII junto a un número pasa" \
   "test_un_numero_que_cambiaria_no_se_genera[AF(1\xbd)-]"
 sabotaje $G "un dígito que no es ASCII junto a un punto se toma como pegado a un número" \
   'v in "0123456789" for v in' 'v in "0123456789.," for v in' \
-  "test_lo_que_no_cambia_un_numero_sale_como_antes[AF(2.5 X٣.٥)--AF(2,5 X   )-]"
+  "test_lo_que_no_cambia_un_numero_sale_como_antes[AF(2.5 X\u0663.\u0665)--AF(2,5 X   )-]"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
