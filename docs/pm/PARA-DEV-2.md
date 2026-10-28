@@ -36,7 +36,7 @@ repositorio.** Las pruebas usan sintéticos con la misma forma.
 (devolución, abajo). 4. ABUSO-1 (devolución, abajo). 5. SUFIJOS-2
 (devolución, abajo) y lo que se suma de SEGURO-1. 6. EMAIL-1: la D45 y el
 mutante. 7. CONEXIONES-1: la D46. 8. OBSERVABILIDAD-1 (devolución,
-abajo). Cada una con su rojo, su sabotaje y
+abajo). 9. ORG-1 + D40 (devolución, abajo). Cada una con su rojo, su sabotaje y
 `/entregar`; me despertás al entregar cada una, sin esperar a juntar.
 
 - **D45 (EMAIL-1): (1), decidido por la PM.** El tope por correo se
@@ -47,6 +47,40 @@ abajo). Cada una con su rojo, su sabotaje y
   Esperás a que `api_logs` tenga todos los pedidos, un control que cancele
   el `close` y tenga que dar rojo, y cortes en vuelo de verdad. Hasta
   entonces la D37 sigue abierta.
+
+## ORG-1 + D40: devolución, sobre `b358827` (2026-10-28 18:50 UTC)
+
+Evidencia en `REPRODUCCION-ORG-1-D40-2026-10-28.md`. Lo que la D40 cierra
+está bien: normalización, carrera en Postgres, tope en el registro y el
+sacado que no vuelve. **Causa de la devolución:** las reglas de la D40
+tienen filtros que ninguna prueba distingue, y el «Sumá» 4 de la
+aceptación de ORG-1 no llegó. Cada punto, rojo antes del arreglo y con su
+sabotaje:
+
+1. **El «Sumá» 4 entero**, un caso por guarda (la lista está en la
+   aceptación de ORG-1, abajo). Reproducido por la PM: con el control de
+   dueño al invitar en `if False`, o sin el filtro por estudio al sacar,
+   las pruebas de ORG-1 siguen en `81 passed`.
+2. **Una invitación vencida queda vencida.** Sin `status == "pending"` en
+   el `UPDATE` del registro, `92 passed` (corrida de la PM): falta el caso
+   del mismo email con una vencida y una pendiente.
+3. **El orden de los mensajes.** Con el estudio lleno, invitar un email que
+   ya tiene cuenta da «Ese email ya tiene una cuenta…», no el del tope.
+4. **El `UPDATE` va en la misma transacción que la cuenta,** con una prueba
+   secuencial (hoy sólo la de carrera lo distingue).
+5. **Lugar muerto, decidido por la PM.** Una invitación pendiente cuyo
+   email ya tiene cuenta en CDI (en cualquier estudio o en ninguno) no
+   ocupa lugar: no se puede usar nunca. Generaliza la regla de la D40.
+   Reproducido por la PM: (A) el invitado se registra sin el link y su
+   pendiente ocupa lugar hasta que el dueño la borra; (C) X tiene
+   pendientes en A y en B, entra con la de A, y la de B queda ocupando
+   lugar en B. Los dos, rojos, y la familia: cualquier camino por el que
+   un email pendiente llegue a tener cuenta.
+6. **A riesgos:** el modo `REGISTER_TEST_EMAIL_REPLACE`; invitar dice si un
+   email tiene cuenta, sin límite de pedidos; cambiar el email del perfil
+   no pide verificarlo (lo llevo a Emi como seguridad, no lo arreglás acá).
+
+SQLite y Postgres 16, CHANGELOG, commits separados y `/entregar`.
 
 ## OBSERVABILIDAD-1: devolución, sobre `39be45e` (2026-10-28 18:40 UTC)
 
@@ -201,7 +235,8 @@ Toca el TXT: el golden no se toca.
   la cadena igual; no se integra nada hasta aceptar ORG-1.
 - **Recibidas** SUFIJOS-2 (`bd76f9f`, devolución arriba), SEGURO-1
   (`5dfaf47`, aceptada arriba), DESPACHO-1b (`e59e1a8`, devolución
-  arriba) y OBSERVABILIDAD-1 (`39be45e`, devolución arriba).
+  arriba), OBSERVABILIDAD-1 (`39be45e`, devolución arriba) y ORG-1 + D40
+  (`b358827`, devolución arriba).
 
 ## EMAIL-1: aceptada sobre `2b93071` (2026-10-28 17:46 UTC)
 
