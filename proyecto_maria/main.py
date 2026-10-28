@@ -9972,6 +9972,54 @@ def _control_de_monto_mp(sdk, pay_resp: dict, update: dict, external_ref: str) -
     return esperado, None
 
 
+class _CobroMPIlegible(Exception):
+    """Mercado Pago no contestó el cobro autorizado: 503 y reintenta."""
+
+
+class _CobroMPFormaInesperada(Exception):
+    """El cobro autorizado no tiene la forma esperada: no se aplica nada."""
+
+
+_ID_COBRO_MP = re.compile(r"[0-9A-Za-z_-]{1,64}")
+
+
+def _leer_cobro_autorizado_mp(cobro_id: str) -> dict:
+    """GET /authorized_payments/{id} de Mercado Pago: el cobro de una
+    renovación de suscripción. El SDK (mercadopago 2.2.0) no lo trae. El
+    id llega en un aviso que puede no venir firmado: sólo letras, números,
+    «-» y «_», para que no cambie la ruta que se pide."""
+    if not isinstance(cobro_id, str) or not _ID_COBRO_MP.fullmatch(cobro_id):
+        raise _CobroMPFormaInesperada(f"id de cobro inválido: {str(cobro_id)[:80]!r}")
+    try:
+        with httpx.Client(timeout=10) as cliente:
+            resp = cliente.get(f"https://api.mercadopago.com/authorized_payments/{cobro_id}",
+                               headers={"Authorization": f"Bearer {MP_ACCESS_TOKEN}"})
+    except httpx.HTTPError as e:
+        raise _CobroMPIlegible(f"{cobro_id}: {type(e).__name__}") from e
+    if resp.status_code != 200:
+        raise _CobroMPIlegible(f"{cobro_id}: HTTP {resp.status_code}")
+    try:
+        return resp.json()
+    except ValueError as e:
+        raise _CobroMPFormaInesperada(f"{cobro_id}: la respuesta no es JSON") from e
+
+
+def _pago_del_cobro_mp(cobro) -> tuple:
+    """(id del pago, id de la suscripción, estado del pago) de un cobro
+    autorizado, según la documentación pública de Mercado Pago (COBRO-MP-1,
+    D30: no se pudo confirmar contra un aviso real). Lo que no tenga esa
+    forma levanta _CobroMPFormaInesperada y no se aplica nada."""
+    if not isinstance(cobro, dict):
+        raise _CobroMPFormaInesperada("el cobro no es un objeto")
+    suscripcion_id, pago = cobro.get("preapproval_id"), cobro.get("payment")
+    if not isinstance(suscripcion_id, str) or not suscripcion_id:
+        raise _CobroMPFormaInesperada("el cobro no dice de qué suscripción es")
+    if not isinstance(pago, dict) or not isinstance(pago.get("id"), (str, int)) \
+            or isinstance(pago.get("id"), bool) or not str(pago.get("id")):
+        raise _CobroMPFormaInesperada("el cobro no dice qué pago lo cobró")
+    return str(pago["id"]), suscripcion_id, pago.get("status")
+
+
 async def _registrar_pago_mp(session, payment_id: str, cuenta: str, update: dict, pay_resp: dict,
                              control: tuple) -> str | None:
     """Anota el pago en mp_pagos_aplicados, en la misma transacción que el
@@ -10130,14 +10178,32 @@ async def mercadopago_webhook(request: Request):
                 logger.warning("Webhook MP: sin firma y sin IPN válida, rechazado")
                 raise HTTPException(status_code=401, detail="Firma o IPN requerida")
             logger.info("Webhook MP (IPN): topic=%s id=%s", topic, payment_id)
-            if topic == "payment":
-                event_type = "payment"
+            if topic in ("payment", "subscription_authorized_payment"):
+                event_type = topic
             elif topic == "merchant_order":
                 return {"success": True, "skipped": "merchant_order, esperando payment"}
             else:
                 return {"success": True, "skipped": f"topic={topic}"}
 
         logger.info("Webhook MP recibido: type=%s payment_id=%s", event_type, payment_id)
+
+        # Renovación de una suscripción: el aviso trae el cobro autorizado; de
+        # ahí sale el pago, que se aplica como cualquier otro, controlado
+        # contra el monto de la suscripción (COBRO-MP-1, paso 4).
+        suscripcion_del_cobro = None
+        if event_type == "subscription_authorized_payment" and payment_id and MP_ACCESS_TOKEN:
+            try:
+                payment_id, suscripcion_del_cobro, estado_cobro = _pago_del_cobro_mp(
+                    _leer_cobro_autorizado_mp(payment_id))
+            except _CobroMPIlegible as e:
+                logger.warning("Webhook MP: no se pudo leer el cobro autorizado %s", e)
+                raise HTTPException(status_code=503, detail="No se pudo leer el cobro. MP reintentará.")
+            except _CobroMPFormaInesperada as e:
+                logger.warning("Webhook MP: cobro autorizado con forma inesperada, no se aplica: %s", e)
+                return {"success": True, "skipped": "cobro autorizado con forma inesperada"}
+            if estado_cobro != "approved":
+                return {"success": True, "skipped": f"cobro status={estado_cobro}"}
+            event_type = "payment"
 
         if event_type != "payment":
             return {"success": True, "skipped": "not a payment event"}
@@ -10152,6 +10218,23 @@ async def mercadopago_webhook(request: Request):
 
         if pay_resp.get("status") != "approved":
             return {"success": True, "skipped": f"status={pay_resp.get('status')}"}
+
+        if suscripcion_del_cobro:
+            # El pago de una renovación puede no traer la referencia: la tiene
+            # la suscripción. El control del monto la vuelve a comparar.
+            pay_resp = {**pay_resp, "preapproval_id": suscripcion_del_cobro}
+            if not pay_resp.get("external_reference"):
+                resp_sus = sdk.preapproval().get(suscripcion_del_cobro)
+                if not isinstance(resp_sus, dict) or resp_sus.get("status") != 200:
+                    logger.warning("Webhook MP: no se pudo leer la suscripción %s", suscripcion_del_cobro)
+                    raise HTTPException(status_code=503, detail="No se pudo leer la suscripción. MP reintentará.")
+                sus = resp_sus.get("response")
+                ref = sus.get("external_reference") if isinstance(sus, dict) else None
+                if not isinstance(ref, str) or not ref:
+                    logger.warning("Webhook MP: suscripción %s con forma inesperada (sin referencia), no se aplica",
+                                   suscripcion_del_cobro)
+                    return {"success": True, "skipped": "suscripción con forma inesperada"}
+                pay_resp["external_reference"] = ref
 
         external_ref = pay_resp.get("external_reference", "")
         logger.info("Webhook MP: pago aprobado payment_id=%s external_ref=%s",
