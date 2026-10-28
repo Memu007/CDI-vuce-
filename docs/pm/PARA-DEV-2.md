@@ -192,11 +192,55 @@ primero entregás ORG-1 y después seguís. Datos que llegaron el 28/10
   valor que no es ninguno de los tres (error, no se genera), y un sabotaje
   por par. Es un campo de impuestos: revisión fuerte.
 
-Después: **SUFIJOS-2**, **SEGURO-1** y **DESPACHO-1b** (hechas, sin
-entregar) y **DATOS-1** (abajo, empezala ya). PESO-NETO-1 y PRORRATEO-1
-siguen esperando al despachante.
+Después: **SUFIJOS-2**, **SEGURO-1**, **DESPACHO-1b** y **DATOS-1**
+(hechas, sin entregar) y **DISCO-1** (abajo, empezala ya). PESO-NETO-1 y
+PRORRATEO-1 siguen esperando al despachante.
 
-### DATOS-1 — empezala ya (2026-10-28 06:00 UTC)
+### DISCO-1 — empezala ya (2026-10-28 07:00 UTC)
+
+DATOS-1 quedó hecha (`c996ad4`). Sigue la tuya de la Fase 3 que es sólo
+código: **DISCO-1**, hallazgo D4 de `AUDITORIA-2026-10-06.md`. BACKUP-1
+(D1) queda para después: necesita algo fuera de Railway y eso lo decide
+Emi. En commits aparte encima de `c996ad4`, con su propio `/entregar`
+después del de DATOS-1.
+
+- **El problema:** el historial de NCM de cada despachante
+  (`load_ncm_historial` / `save_ncm_historial`, `main.py` cerca de la línea
+  9032) vive en `ncm_historial_<usuario>.json` dentro de `DATA_DIR`, en el
+  disco de Railway, que se borra en cada publicación. Lo usan sugerir NCM
+  (fuente «historial»), `/api/ncm/guardar-uso` y `/api/ncm/import-historial`.
+- **Premisa primero:** confirmalo con el código (que `DATA_DIR` no es un
+  volumen que sobreviva; no ves las variables de Railway, decilo como
+  supuesto) y hacé la lista de todo lo demás que se escribe en `DATA_DIR`
+  (`descargas/`, `generated/`, `localStorage_backup.json`…), con una línea
+  por cada uno: si es un dato del usuario que se pierde o un archivo de paso.
+  **Sólo el historial de NCM entra en DISCO-1**; lo otro va a «riesgos» y,
+  si hay algo que se pierde y duele, me lo proponés.
+- **Qué hacer:** el historial pasa a la base, por dueño, con el mismo
+  comportamiento que hoy: misma clave (la descripción tal como se guarda),
+  `ncm` y `count`, incrementa al confirmar de nuevo, actualiza el NCM si
+  cambió, la importación suma igual que hoy y cuenta igual los duplicados.
+  Tabla nueva solamente, sin tocar las existentes. Dos confirmaciones
+  simultáneas de la misma descripción no pierden ninguna cuenta (hoy el
+  archivo pierde una: no copies eso). Un dueño nunca ve ni pisa el
+  historial de otro.
+- **Lo que ya está en disco:** si al arrancar hay archivos
+  `ncm_historial_*.json`, se pasan a la base una sola vez (correr dos veces
+  no duplica cuentas) y el archivo no se vuelve a leer después. Un archivo
+  roto no frena el arranque: va al log.
+- **Migración:** como se crean hoy las tablas nuevas; probada en Postgres
+  16 descartable (el 55432) desde una base con el esquema de `c996ad4` y
+  datos, además de SQLite. Decí en el informe qué pasa en producción la
+  primera vez que arranca.
+
+Pruebas: guardar, sugerir e importar con el historial en la base; que
+sobrevive a borrar `DATA_DIR` (lo que hoy pasa en cada publicación); dos
+dueños separados; dos confirmaciones a la vez; la carga de los archivos
+viejos, dos veces; un archivo roto. Un sabotaje por regla. Línea en
+`CHANGELOG.md`. Toca datos de los usuarios y migración: revisión fuerte.
+Si alguna de estas reglas choca con el código, preguntá en la **D33**.
+
+### DATOS-1 — hecha, sin entregar (encargada 2026-10-28 06:00 UTC)
 
 DESPACHO-1b quedó hecha. Lo que te queda en las Fases 1c y 2 espera a
 alguien de afuera (PESO-NETO-1, MARIA-6 y PRORRATEO-1 al despachante,
