@@ -30,39 +30,64 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
-## D37 (2026-10-28): (2) por ahora, sobre `76def65`
+## D38 y D39 (2026-10-28 14:00 UTC): sobre `2b93071` y `30c0e97`
 
-ABUSO-1 no cambia por esto. El aviso «Event loop is closed» queda a la
-vista: sin `filterwarnings` y sin repetir la suite hasta que salga verde.
-Tampoco tocás los middlewares: tu hipótesis no está confirmada y el corte
-ya pasa en la base `895ee73`. En riesgos va: que `session.close()` de
-`get_async_session` se cancela después de la respuesta, en cuántas corridas
-lo viste, que ya pasaba antes de ABUSO-1 y que no medimos si en producción
-deja conexiones colgadas. Tu (1), medir con uvicorn y Postgres 16 muchas
-respuestas 401 mirando `pg_stat_activity` y el pool, y pasar los
-middlewares a ASGI puro sólo si quedan conexiones colgadas, es una pieza
-nueva: se la propongo a Emi hoy, recomendada. Hasta que conteste, seguís
-con lo de abajo («Mientras tanto»). Tu próxima D es la **D38**.
+- **D38: (1)**, como lo hiciste: si el email coincide exacto con una cuenta,
+  esa; si hay varias y ninguna exacta, ninguna, con la misma respuesta que
+  cuando no existe. Decidido por la PM. La (2) no: un pedido no manda
+  correos de varias cuentas. La (3) (unificar pares e índice único sobre
+  `lower(email)`) espera el conteo de Emi en producción; si da cero, el
+  índice entra como paso nuevo sin tocar datos, y si no, decide Emi. En
+  riesgos: quien tiene un par y escribe otras mayúsculas no recupera hasta
+  la (3).
+- **D39: (1) por ahora**: los 50 de 50 con 40 logins malos a la vez van a
+  riesgos de CONEXIONES-1, con tus números. Decidido por la PM. Tu (2), la
+  medición chica con 60 a 100 a la vez, es pieza nueva: se la propongo a
+  Emi, recomendada, y no la empezás sin su sí.
 
-### Mientras tanto (2026-10-28 12:00 UTC)
+EMAIL-1 y CONEXIONES-1 quedan hechas, sin entregar; las entregás después de
+las 18:00 UTC en tu orden. Tu próxima D es la **D40**.
 
-No te queda pieza tuya que arranque sin alguien de afuera: PESO-NETO-1,
-MARIA-6 y PRORRATEO-1 esperan al despachante, LEGAL-1 el texto de Emi, y
-BACKUP-1 pasa a la técnica. Hasta las 18:00 UTC preparás las entregas: el
-orden de siempre, cada una con su SHA, su base y su suite desde base
-limpia ya corrida; lo que falte de eso, corrélo ahora, que a las 18:00
-quede sólo la autorrevisión con subagentes. Si Emi dice que sí a las
-piezas de la D36 o de la D37, te aviso y van después de ABUSO-1.
+## Emi dijo que sí a las dos (2026-10-28 12:15 UTC): EMAIL-1 y CONEXIONES-1
 
-## D36 (2026-10-28): (2) por ahora, sobre `abdc0db`
+Las dos entran al roadmap (Fase 3, tuyas). En commits aparte encima de
+`e1b3129`, cada una con su propio `/entregar` después del de ABUSO-1, en
+este orden.
 
-Bien visto. En ABUSO-1 no se toca cómo se compara el email, como hiciste;
-el contador por email en minúsculas queda. Tu (1) es una pieza nueva
-(cambia recuperar usuario y contraseña, y el PUT del perfil) y necesita
-una consulta en producción que corre Emi: se la propongo de día,
-recomendada, y si dice que sí entra al roadmap después de ABUSO-1. Anotá
-en riesgos los dos lugares que comparan exacto y el PUT que deja crear
-pares. Decidido por la PM. Tu próxima D es la **D37**.
+### EMAIL-1 — empezala ya (tu (1) de la D36)
+
+- Recuperar usuario y recuperar contraseña encuentran la cuenta aunque el
+  email venga con otras mayúsculas.
+- La causa es comparar el email tal cual: revisá **todo** lugar que busque,
+  cree o cambie un email (registro, perfil, invitaciones, recuperar), no
+  sólo los dos que viste. Ninguno deja crear un email que ya existe con
+  otras mayúsculas.
+- La respuesta no cambia exista o no el email (no revelar quién está).
+- Si hoy hay dos cuentas con el mismo email en distintas mayúsculas, no se
+  tocan: sin migración de datos y sin índice único nuevo hasta que Emi
+  cuente los pares en producción. Qué hacer cuando un pedido encuentra
+  dos cuentas, proponelo en la D38 con opciones; mientras, ningún camino
+  le da a una cuenta el acceso de la otra.
+- Pruebas en SQLite y Postgres 16; un sabotaje por regla. Autenticación:
+  revisión fuerte.
+
+### CONEXIONES-1 — después de EMAIL-1 (tu (1) de la D37)
+
+- Medí si `session.close()` cancelado deja conexiones tomadas: gunicorn con
+  la misma configuración del `Dockerfile` y Postgres 16, muchas respuestas
+  401 y algunas normales, mirando `pg_stat_activity` y el pool. Esperás
+  condiciones que se ven, no tiempos fijos.
+- Si quedan conexiones tomadas: arreglo (por ejemplo, middlewares en ASGI
+  puro) con una prueba que dé rojo antes y verde después. Si no quedan: no
+  se cambia el producto; el informe trae los números y el aviso de las
+  pruebas sigue en riesgos.
+- Toca todas las rutas: revisión fuerte.
+
+## D36 y D37 (2026-10-28): (2) por ahora, y Emi dijo que sí a tus (1)
+
+En ABUSO-1 no se tocó la comparación del email ni los middlewares; el aviso
+«Event loop is closed» queda a la vista, sin `filterwarnings`. Tus (1) son
+EMAIL-1 y CONEXIONES-1 (arriba). Decidido por la PM.
 
 ## D35 (2026-10-28): (1) en las cinco, sobre `e25e87c`
 
@@ -668,31 +693,3 @@ Todas las líneas terminan en CRLF (una línea sin CR: «falta carácter de fin
 (crlf) en línea 15»). El MARIA no acepta guiones, puntos ni caracteres raros
 dentro de los valores de los sufijos: van espacios. El guión que separa un
 sufijo del otro (`)-`) sí.
-
-## Respuestas a tus D
-
-MARIA-7, 2026-10-24:
-
-- **D1: (a).** Le pregunto al despachante el largo máximo y si el MARIA
-  rechaza un IDSO repetido (los choques de la tabla de la reproducción). No
-  cambies `NDDTIMMTRN` ni `IEXT` sin esa respuesta.
-- **D2: (b)**, devolución punto 2.
-- **D3: (a).** El archivo aceptado trae «S.A.», comas y paréntesis.
-- **D4: (a).** El «mandala igual» es propuesta, si aparece un proveedor que
-  lo necesite. Las palabras de cuenta, devolución punto 3.
-- **D5: (a).** La (c), validar la fecha en el alta, la paso a la cola de la
-  Dev técnica.
-- **D6: (b)**, devolución punto 5.
-- **D7: (a)** mientras pregunto al despachante cómo va un decimal en un
-  sufijo y si acepta un valor vacío.
-- **D8: (a).** La v1 no es la pantalla en uso; queda con el aviso.
-
-SEPARADORES-1 y 1b, 2026-10-25: **D19 (b)**, **D20 (a)**, **D21 (b)**
-(SEPARADORES-1c). SUFIJOS-1: **D22 (a)**, **D23 (c)**. Todas decididas por
-la PM (`DECISIONS.md`).
-
-SEPARADORES-1c, 2026-10-27: **D24 (a)**, **D25 (b)** (SEPARADORES-1d).
-Decididas por la PM. Aceptada en `140c122`.
-
-ORG-1, 2026-10-27: **D26 (a)** por ahora (se lo propongo a Emi), **D27 (b)**
-(ORG-1b, decidida por la PM). La próxima D es la D28.
