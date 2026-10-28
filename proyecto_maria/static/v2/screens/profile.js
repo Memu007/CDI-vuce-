@@ -360,9 +360,11 @@
             billingNextWrap.hidden = false;
             billingNextEl.textContent = formatDateAr(trialEnd);
             if (nextLabel) {
+                // «Próximo cobro» sólo si hay una suscripción que se renueva (COBRO-MP-2).
+                const vencida = new Date(trialEnd) <= new Date();
                 if (status === 'trial') nextLabel.textContent = 'Trial vence';
-                else if (status === 'active') nextLabel.textContent = 'Próximo cobro';
-                else if (status === 'canceled') nextLabel.textContent = 'Servicio activo hasta';
+                else if (status === 'active') nextLabel.textContent = (b && b.renueva) ? 'Próximo cobro' : 'Activo hasta';
+                else if (status === 'canceled') nextLabel.textContent = vencida ? 'Venció el' : 'Servicio activo hasta';
                 else nextLabel.textContent = 'Fecha';
             }
         }
@@ -397,11 +399,11 @@
                 body: JSON.stringify({ plan: plan })
             });
             const data = await res.json().catch(() => ({}));
-            if (data && data.init_point) {
+            if (res.ok && data && data.init_point) {
                 window.location.href = data.init_point;
                 return;
             }
-            CDI.toast('Error', 'No se pudo iniciar el cobro.', 'error');
+            CDI.toast('Error', (data && typeof data.detail === 'string' && data.detail) || 'No se pudo iniciar el cobro.', 'error');
         } catch (err) {
             CDI.toast('Error', String(err.message || err), 'error');
         }
@@ -455,11 +457,19 @@
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success) throw new Error((data && data.detail) || 'No se pudo reactivar');
             if (data.needs_checkout) {
-                CDI.toast('Reactivar plan', 'Tu período pagado terminó. Te llevamos al checkout.', 'info');
+                // Antes de pagar, se dice cuándo cobra y qué suma (COBRO-MP-2, D7.3).
+                const seguir = await CDI.confirm({
+                    title: 'Reactivar plan',
+                    lead: 'Se crea una suscripción nueva en Mercado Pago.',
+                    text: data.message || 'Tu período pagado terminó. Te llevamos al checkout.',
+                    acceptText: 'Ir a pagar',
+                    cancelText: 'Volver'
+                });
+                if (!seguir) return;
                 await openCheckout();
                 return;
             }
-            CDI.toast('Plan reactivado', 'Sigue activo hasta el próximo cobro.', 'success');
+            CDI.toast('Prueba reactivada', 'Sigue hasta el fin de la prueba.', 'success');
             CDI.track('billing_reactivated');
             await loadBilling();
         } catch (err) {

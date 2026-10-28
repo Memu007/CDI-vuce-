@@ -109,13 +109,28 @@ def _expire_extra_ops(user) -> None:
         user.extra_ops_expires_at = None
 
 
+def tiene_acceso(cuenta, ahora: datetime | None = None) -> bool:
+    """trial y active tienen acceso; canceled, hasta el fin del período ya
+    pagado (COBRO-MP-2, C2); el resto, no."""
+    status = getattr(cuenta, "billing_status", "none")
+    if status in ("trial", "active"):
+        return True
+    if status != "canceled":
+        return False
+    fin = getattr(cuenta, "trial_ends_at", None)
+    if fin is None:
+        return False
+    if fin.tzinfo is None:
+        fin = fin.replace(tzinfo=timezone.utc)
+    return fin > (ahora or datetime.now(timezone.utc))
+
+
 def can_create_operation(user) -> Tuple[bool, str | None]:
     """Chequea si el usuario puede crear una operación según su plan.
 
     Devuelve (ok, razón).
     """
-    status = getattr(user, "billing_status", "none")
-    if status not in ("trial", "active"):
+    if not tiene_acceso(user):
         return False, "No tenés una suscripción activa o trial vigente."
 
     # Limpiar créditos extra vencidos antes de evaluar.

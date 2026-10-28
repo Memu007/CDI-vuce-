@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: cancelar también cancela en Mercado Pago y no se paga dos veces (COBRO-MP-2)
+
+- **fix(cobro):** cancelar en CDI cancela la suscripción en Mercado Pago y la cuenta sigue hasta el fin del período; si Mercado Pago no confirma, no se cancela nada y se avisa. Con una suscripción vigente, el checkout no deja pagar otra; si la vieja no se pudo cobrar, se cancela antes de crear la nueva.
+- Un pago suma 30 días desde el fin de la prueba o del período, sin perder días. Reactivar una suscripción cancelada lleva a pagar y lo dice antes; sin el token de Mercado Pago, fuera de pruebas, no hay pago simulado ni «cuenta activada».
+
 ## 2026-10-28 · fix: una operación se cuenta una vez, al generar su MARIA, y el corte dice por qué (COBRO-CORTE-1)
 
 - **fix(cobro):** la operación se crea y se cuenta la primera vez que se genera el MARIA de su id; regenerarla o guardarla después no cuenta otra vez (hasta 10 versiones distintas por id). Con el tope lleno se sigue validando y bajando lo ya contado. La cuenta se bloquea mientras se cuenta: dos pedidos a la vez no pasan el tope ni repiten el número de operación.

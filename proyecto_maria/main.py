@@ -1797,7 +1797,8 @@ def _detalle_402(entidad, razon_del_plan=None, vencio=None):
 
     El code no cambia respecto de antes (los tests de G7 lo leen):
     past_due/canceled con pago real de MP → SUBSCRIPTION_PAST_DUE; sin pago
-    real → TRIAL_EXPIRED; trial/active sin cupo → PLAN_LIMIT_EXCEEDED. Una
+    real → TRIAL_EXPIRED; trial/active (o canceled antes del fin del período)
+    sin cupo → PLAN_LIMIT_EXCEEDED. Una
     cuenta sin suscripción (none) tiene su propio code, SUBSCRIPTION_INACTIVE.
     """
     estado = entidad.billing_status
@@ -1813,12 +1814,12 @@ def _detalle_402(entidad, razon_del_plan=None, vencio=None):
             code = "TRIAL_EXPIRED"
             que = "tu suscripción" if vencio == "active" else "tu prueba gratis"
             message = f"Venció {que}. Suscribite para seguir usando CDI."
+    elif billing_service.tiene_acceso(entidad):
+        code = "PLAN_LIMIT_EXCEEDED"
+        message = razon_del_plan or "Alcanzaste el límite de operaciones de tu plan."
     elif estado == "canceled":
         code = "SUBSCRIPTION_PAST_DUE" if pago_real else "TRIAL_EXPIRED"
         message = "Cancelaste tu suscripción. Reactivala para seguir usando CDI."
-    elif estado in ("trial", "active"):
-        code = "PLAN_LIMIT_EXCEEDED"
-        message = razon_del_plan or "Alcanzaste el límite de operaciones de tu plan."
     else:
         code = "SUBSCRIPTION_INACTIVE"
         message = "No tenés una suscripción activa. Suscribite para seguir usando CDI."
@@ -1885,7 +1886,7 @@ async def require_billing_vigente(
 
     entidad, _ = await _get_billing_entity(db, db_user)
     vencio = await _vencer_y_guardar(db, entidad)
-    if entidad.billing_status not in ("trial", "active"):
+    if not billing_service.tiene_acceso(entidad):
         raise HTTPException(status_code=402, detail=_detalle_402(entidad, vencio=vencio))
     return db_user
 
@@ -2111,9 +2112,11 @@ async def cancel_billing(
 ):
     """Cancela la suscripción del usuario.
 
-    No corta el servicio inmediatamente: deja `billing_status='canceled'` pero
-    mantiene `trial_ends_at` como fecha hasta cuándo el user ya pagó (o cuándo
-    vence el trial). Cuando esa fecha pase, get_current_user lo marca past_due.
+    Si hay una suscripción de Mercado Pago, primero se cancela allá; si no se
+    puede, no se cambia nada en CDI (COBRO-MP-2, C2). No corta el servicio:
+    deja `billing_status='canceled'` y `trial_ends_at` como la fecha hasta la
+    que ya pagó (o en la que vence la prueba); hasta esa fecha sigue
+    generando (billing_service.tiene_acceso).
     """
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
@@ -2125,6 +2128,17 @@ async def cancel_billing(
             status_code=409,
             detail=f"No se puede cancelar desde el estado actual: {db_user.billing_status}",
         )
+
+    if db_user.mp_preapproval_id:
+        no_se_pudo = "No se pudo cancelar en Mercado Pago; tu plan sigue igual. Probá de nuevo en unos minutos."
+        if not billing_service.is_configured():
+            raise HTTPException(status_code=503, detail=no_se_pudo)
+        try:
+            await run_in_threadpool(_cancelar_suscripcion_mp, db_user.mp_preapproval_id)
+        except _SuscripcionMPError as e:
+            print(f"⚠️ No se pudo cancelar la suscripción de {db_user.username} en MP: {e}")
+            raise HTTPException(status_code=503, detail=no_se_pudo)
+        db_user.mp_preapproval_id = None
 
     db_user.billing_status = "canceled"
     await db.commit()
@@ -2143,9 +2157,11 @@ async def reactivate_billing(
 ):
     """Reactiva una suscripción cancelada.
 
-    Si el `trial_ends_at` aún está en el futuro → simplemente vuelve a 'active'
-    (no hay que cobrar de nuevo, el user ya pagó hasta esa fecha).
-    Si ya venció → marca past_due y el front debe abrir el checkout.
+    Si ya venció → past_due y el front abre el checkout. Si no venció:
+    una prueba vuelve a 'trial' sin cobrar; un plan pagado con Mercado Pago
+    sigue 'canceled' hasta que se pague una suscripción nueva, que cobra
+    ahora y suma 30 días desde el fin del período ya pagado (COBRO-MP-2,
+    D7.3). Reactivar nunca deja la cuenta 'active' sin un pago.
     """
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
@@ -2168,14 +2184,26 @@ async def reactivate_billing(
             "message": "Tu período pagado ya terminó. Activá el plan para continuar.",
         }
 
-    db_user.billing_status = "active"
+    if db_user.payment_provider == "mercadopago":
+        return {
+            "success": True,
+            "billing_status": "canceled",
+            "needs_checkout": True,
+            "service_until": end.isoformat(),
+            "message": (
+                "Para reactivar se crea una suscripción nueva en Mercado Pago: te cobra ahora "
+                f"y suma 30 días desde el {end.strftime('%d/%m/%Y')}, fin del período ya pagado."
+            ),
+        }
+
+    db_user.billing_status = "trial"
     await db.commit()
-    print(f"🔄 User reactivó suscripción: {db_user.username}")
+    print(f"🔄 User reactivó la prueba: {db_user.username}")
     return {
         "success": True,
-        "billing_status": "active",
+        "billing_status": "trial",
         "needs_checkout": False,
-        "service_until": db_user.trial_ends_at.isoformat() if db_user.trial_ends_at else None,
+        "service_until": end.isoformat(),
     }
 
 
@@ -3234,6 +3262,10 @@ async def billing_me(user=Depends(get_current_user), db: AsyncSession = Depends(
         "clients_limit": plan["clients"],
         "users_limit": plan["users"],
         "organization_id": db_user.organization_id,
+        # «Próximo cobro» sólo si hay una suscripción que se renueva (D7.3). El id
+        # se guarda al abrir el checkout, antes de pagar: hace falta un pago de MP.
+        "renueva": (billing_entity.billing_status == "active" and bool(db_user.mp_preapproval_id)
+                    and getattr(billing_entity, "payment_provider", None) == "mercadopago"),
     }
 
 
@@ -9986,7 +10018,7 @@ pending_payments = {}
 @app.get("/api/payments/demo-checkout/{preference_id}")
 async def demo_checkout_page(preference_id: str):
     """Página de checkout demo cuando no hay credenciales MP"""
-    if preference_id not in pending_payments:
+    if not _demo_permitida() or preference_id not in pending_payments:
         raise HTTPException(status_code=404, detail="Pago no encontrado")
     
     payment = pending_payments[preference_id]
@@ -10033,8 +10065,8 @@ async def demo_checkout_page(preference_id: str):
 
 @app.post("/api/payments/demo-confirm/{preference_id}")
 async def demo_confirm_payment(preference_id: str):
-    """Confirma un pago demo"""
-    if preference_id not in pending_payments:
+    """Confirma un pago demo: no cobra ni cambia la cuenta."""
+    if not _demo_permitida() or preference_id not in pending_payments:
         raise HTTPException(status_code=404, detail="Pago no encontrado")
     
     pending_payments[preference_id]["status"] = "approved"
@@ -10042,7 +10074,16 @@ async def demo_confirm_payment(preference_id: str):
 
 @app.get("/api/payments/success")
 async def payment_success(preference_id: str = None, payment_id: str = None, demo: bool = False):
-    """Página de éxito después del pago"""
+    """Página de vuelta después del pago. No dice que la cuenta se activó:
+    eso lo hace el aviso de Mercado Pago (COBRO-MP-2, D9)."""
+    if demo:
+        titulo = "Pago de prueba"
+        lineas = ("Esto fue un pago de prueba: no se cobró nada y tu cuenta no cambió.",)
+    else:
+        titulo = "¡Recibimos tu pago!"
+        lineas = ("Tu cuenta se actualiza cuando Mercado Pago confirma el pago.",
+                  "Puede tardar unos minutos.")
+    parrafos = "\n            ".join(f"<p>{l}</p>" for l in lineas)
     html = """
     <!DOCTYPE html>
     <html>
@@ -10060,17 +10101,13 @@ async def payment_success(preference_id: str = None, payment_id: str = None, dem
     <body>
         <div class="success-box">
             <div class="checkmark">✅</div>
-            <h1>¡Pago Exitoso!</h1>
-            <p>Tu cuenta Premium ha sido activada.</p>
-            <p>Ya podés acceder a todas las funcionalidades.</p>
+            <h1>__TITULO__</h1>
+            __PARRAFOS__
             <a href="/dashboard" class="btn">Ir al Dashboard</a>
         </div>
-        <script>
-            localStorage.setItem('user_plan', 'premium');
-        </script>
     </body>
     </html>
-    """
+    """.replace("__TITULO__", titulo).replace("__PARRAFOS__", parrafos)
     return HTMLResponse(content=html)
 
 @app.get("/api/payments/failure")
@@ -10217,6 +10254,60 @@ def _leer_cobro_autorizado_mp(cobro_id: str) -> dict:
         raise _CobroMPFormaInesperada(f"{cobro_id}: la respuesta no es JSON") from e
 
 
+class _SuscripcionMPError(Exception):
+    """No se pudo leer o cancelar una suscripción en Mercado Pago: no se
+    cambia nada en CDI (COBRO-MP-2)."""
+
+
+_ESTADOS_SUSCRIPCION_MP = {"pending", "authorized", "paused", "cancelled"}
+
+
+def _pedir_suscripcion_mp(metodo: str, sid: str, cuerpo: dict | None = None) -> str:
+    """GET o PUT /preapproval/{id}; devuelve el estado que contesta Mercado
+    Pago. Se usa httpx y no el SDK: en mercadopago 2.2.0 PreApproval.update
+    arma la ruta sin la barra antes del id."""
+    if not isinstance(sid, str) or not _ID_COBRO_MP.fullmatch(sid):
+        raise _SuscripcionMPError(f"id de suscripción inválido: {str(sid)[:80]!r}")
+    try:
+        with httpx.Client(timeout=10) as cliente:
+            resp = cliente.request(metodo, f"https://api.mercadopago.com/preapproval/{sid}",
+                                   headers={"Authorization": f"Bearer {billing_service._access_token()}"},
+                                   json=cuerpo)
+    except httpx.HTTPError as e:
+        raise _SuscripcionMPError(f"{metodo} {sid}: {type(e).__name__}") from e
+    if resp.status_code != 200:
+        raise _SuscripcionMPError(f"{metodo} {sid}: HTTP {resp.status_code}")
+    try:
+        estado = resp.json().get("status")
+    except (ValueError, AttributeError) as e:
+        raise _SuscripcionMPError(f"{metodo} {sid}: respuesta ilegible") from e
+    if estado not in _ESTADOS_SUSCRIPCION_MP:
+        raise _SuscripcionMPError(f"{metodo} {sid}: estado desconocido {str(estado)[:40]!r}")
+    return estado
+
+
+def _leer_suscripcion_mp(sid: str) -> str:
+    return _pedir_suscripcion_mp("GET", sid)
+
+
+def _cancelar_suscripcion_mp(sid: str) -> None:
+    """Cancela la suscripción en Mercado Pago. Si el PUT falla o no contesta
+    «cancelled», se pregunta el estado: si ya estaba cancelada, alcanza."""
+    try:
+        if _pedir_suscripcion_mp("PUT", sid, {"status": "cancelled"}) == "cancelled":
+            return
+    except _SuscripcionMPError:
+        pass
+    if _leer_suscripcion_mp(sid) != "cancelled":
+        raise _SuscripcionMPError(f"{sid}: sigue sin cancelar")
+
+
+def _demo_permitida() -> bool:
+    """El checkout de prueba existe sólo en desarrollo y pruebas; si falta la
+    variable, no hay demo (COBRO-MP-2, D7.4)."""
+    return os.getenv("ENVIRONMENT") in ("development", "test", "testing")
+
+
 def _pago_del_cobro_mp(cobro) -> tuple:
     """(id del pago, id de la suscripción) de un cobro autorizado, según la
     documentación pública de Mercado Pago (COBRO-MP-1, D30: no se pudo
@@ -10278,16 +10369,18 @@ async def _guardar_pago_mp(session) -> bool:
 
 
 def _extender_periodo(cuenta, update: dict) -> None:
-    """Un pago de plan suma 30 días desde el fin del período si la cuenta
-    sigue activa, y desde hoy si no: pagar antes de que venza no pierde los
-    días que quedaban (COBRO-MP-1)."""
+    """Un pago de plan suma 30 días desde el fin del período si todavía no
+    venció (prueba, activa o cancelada con días por delante), y desde hoy si
+    no: pagar antes de que venza no pierde los días que quedaban (COBRO-MP-1;
+    COBRO-MP-2, D7.1)."""
     if update.get("action") == "topup" or "trial_ends_at" not in update:
         return
     ahora = datetime.now(timezone.utc)
     fin = getattr(cuenta, "trial_ends_at", None)
     if fin is not None and fin.tzinfo is None:
         fin = fin.replace(tzinfo=timezone.utc)
-    desde = fin if (getattr(cuenta, "billing_status", None) == "active" and fin and fin > ahora) else ahora
+    vigente = getattr(cuenta, "billing_status", None) in ("trial", "active", "canceled")
+    desde = fin if (vigente and fin and fin > ahora) else ahora
     update["trial_ends_at"] = desde + timedelta(days=30)
 
 
@@ -10640,8 +10733,10 @@ async def billing_checkout(
 
     org_id = db_user.organization_id or None
 
-    # Modo demo cuando no hay credenciales
+    # Modo demo cuando no hay credenciales, sólo en desarrollo y pruebas (D7.4)
     if not billing_service.is_configured():
+        if not _demo_permitida():
+            raise HTTPException(status_code=503, detail="Los pagos no están disponibles en este momento. Probá más tarde.")
         demo_id = f"demo_{uuid.uuid4().hex[:8]}"
         pending_payments[demo_id] = {
             "status": "pending",
@@ -10657,6 +10752,37 @@ async def billing_checkout(
             "init_point": f"/api/payments/demo-checkout/{demo_id}",
             "message": "Modo demo - MP_ACCESS_TOKEN no configurado",
         }
+
+    # Una sola suscripción (COBRO-MP-2, C4 y D7.2): con una autorizada y la
+    # cuenta vigente no se paga dos veces; si no, la vieja se cancela antes
+    # de crear la nueva. Si no se sabe cómo está o no se puede cancelar, no
+    # se crea nada.
+    sid_viejo = db_user.mp_preapproval_id
+    if sid_viejo:
+        no_disponible = "No pudimos confirmar tu suscripción actual con Mercado Pago. Probá de nuevo en unos minutos."
+        try:
+            estado_mp = await run_in_threadpool(_leer_suscripcion_mp, sid_viejo)
+        except _SuscripcionMPError as e:
+            print(f"⚠️ Checkout de {username}: no se pudo leer la suscripción en MP: {e}")
+            raise HTTPException(status_code=503, detail=no_disponible)
+        if estado_mp == "authorized":
+            entidad, _ = await _get_billing_entity(db, db_user)
+            fin = entidad.trial_ends_at
+            if fin is not None and fin.tzinfo is None:
+                fin = fin.replace(tzinfo=timezone.utc)
+            if entidad.billing_status in ("trial", "active") and fin and fin > datetime.now(timezone.utc):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Ya tenés una suscripción activa en Mercado Pago; se renueva sola al fin del período.",
+                )
+        if estado_mp != "cancelled":
+            try:
+                await run_in_threadpool(_cancelar_suscripcion_mp, sid_viejo)
+            except _SuscripcionMPError as e:
+                print(f"⚠️ Checkout de {username}: no se pudo cancelar la suscripción vieja en MP: {e}")
+                raise HTTPException(status_code=503, detail=no_disponible)
+        db_user.mp_preapproval_id = None
+        await db.commit()
 
     try:
         checkout = billing_service.create_checkout(db_user, plan_id, org_id=org_id)
