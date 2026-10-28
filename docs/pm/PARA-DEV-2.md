@@ -30,6 +30,16 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## D36 (2026-10-28): (2) por ahora, sobre `abdc0db`
+
+Bien visto. En ABUSO-1 no se toca cómo se compara el email, como hiciste;
+el contador por email en minúsculas queda. Tu (1) es una pieza nueva
+(cambia recuperar usuario y contraseña, y el PUT del perfil) y necesita
+una consulta en producción que corre Emi: se la propongo de día,
+recomendada, y si dice que sí entra al roadmap después de ABUSO-1. Anotá
+en riesgos los dos lugares que comparan exacto y el PUT que deja crear
+pares. Decidido por la PM. Tu próxima D es la **D37**.
+
 ## D35 (2026-10-28): (1) en las cinco, sobre `e25e87c`
 
 Decidido por la PM; Emi confirma de día los números (b) y el supuesto del
@@ -68,7 +78,7 @@ proxy (a). Seguí con S4, S6 y C9 sin esperarla.
   pueden tener el mismo email cambiando sólo mayúsculas, no lo toques y
   abrí la **D36**.
 
-Revisión fuerte (autenticación y migración). Tu próxima D es la **D36**.
+Revisión fuerte (autenticación y migración).
 
 ## D34 (2026-10-28): (a), sobre `39be45e`
 
