@@ -212,7 +212,8 @@ def _mb_de_entorno(nombre: str, defecto: float) -> int:
         valor = float(os.getenv(nombre, "") or defecto)
     except (TypeError, ValueError):
         valor = defecto
-    if not math.isfinite(valor) or valor <= 0:
+    # 1e308 es finito, pero en bytes ya no: daba OverflowError (EXCEL-2b).
+    if not math.isfinite(valor * 1024 * 1024) or valor <= 0:
         valor = defecto
     return int(valor * 1024 * 1024)
 
