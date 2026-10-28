@@ -1515,12 +1515,15 @@ async def request_password_reset(request: PasswordResetRequest, req: Request, db
     """Solicita un link de recuperación de contraseña"""
     clave = f"reset:{get_client_ip(req)}"
 
-    # Rate limiting: desde el quinto pedido de la IP, bloqueo de 15 minutos
+    # Rate limiting: desde el quinto pedido de la IP, bloqueo de 15 minutos.
+    # Se suma antes de seguir: los que llegan a la vez que el quinto y pasaron
+    # el chequeo ven una cuenta mayor que el tope y también se cortan.
     espera = await limites_auth.segundos_bloqueado(clave)
+    if not espera and await limites_auth.sumar_fallo(clave, tope=5) > 5:
+        espera = await limites_auth.segundos_bloqueado(clave)
     if espera:
         log_429(req, "reset bloqueado")
         raise HTTPException(status_code=429, detail=f"Demasiados intentos. Intente en {espera // 60 + 1} minutos.")
-    await limites_auth.sumar_fallo(clave)
     
     # 1. Buscar usuario
     result = await db.execute(select(User).where(User.email == request.email))
