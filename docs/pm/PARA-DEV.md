@@ -27,6 +27,48 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
+## COBRO: lo que encontró el adversario antes de tu `/entregar` (2026-10-28 17:05 UTC)
+
+No es un veredicto: el informe de COBRO no llegó. El adversario Opus atacó
+`b3ac325..dda9f5b` y la PM reprodujo A–D en SQLite (`/tmp/cdi-pm/wt-cobro-o`)
+y A también sobre la base. Arreglalos **antes** de entregar las tres COBRO,
+en commits aparte encima de `dda9f5b`, rojo antes y un sabotaje por regla.
+Todo decidido por la PM.
+
+- **A. Regresión de COBRO-MP-1 (alta).** Un pago aplicado antes de que
+  existiera `mp_pagos_aplicados` se vuelve a aplicar con cada aviso IPN
+  sin firma (`?topic=payment&id=<id>`): en `dda9f5b` la cuenta past_due
+  queda `active` 30 días más y con el contador en 0; en la base respondía
+  `skipped: payment_id ya procesado`. Ningún pago anterior al despliegue
+  se puede volver a aplicar, sea el último o uno más viejo. Elegí cómo
+  (cargar la tabla desde `last_payment_id` en la migración, no aplicar un
+  pago aprobado antes del período vigente, o las dos) y decilo en el
+  informe. Prueba: un pago aplicado por el código viejo, reenviado.
+- **B. `/generate_maria_export` no cuenta (media).** Con el tope lleno, la
+  importación da 402 y la exportación sale cinco veces con 200. La D4 b es
+  «el MARIA de un operation_id»: la exportación también cuenta, con la
+  misma regla de una vez por operación.
+- **C. past_due no puede cancelar (media).** `/api/billing/cancel` da 409
+  y la suscripción `authorized` sigue cobrando cuando la tarjeta vuelve.
+  Desde past_due se puede cancelar: cancela en Mercado Pago, la cuenta
+  queda `canceled` y no gana acceso.
+- **D. Dos checkouts a la vez (media/alta).** Dos pedidos simultáneos
+  crean dos suscripciones en Mercado Pago y CDI guarda una sola; cancelar
+  deja la otra cobrando. El checkout bloquea la fila de la cuenta (como
+  el conteo), el segundo no crea otra, y el botón de `profile.js`
+  (`openCheckout`) se deshabilita como el de `app_v2.js`. Prueba de la
+  carrera en Postgres 16.
+- **E. Reactivar una prueba con recarga (baja).** Queda `canceled` con
+  `needs_checkout` y el texto «período ya pagado», que es falso. Vuelve a
+  `trial` con sus días, como una prueba sin recarga.
+- **A riesgos, no ahora:** el webhook que no bloquea la fila mientras un
+  pedido la vence (F, base); el aviso `payment` de renovación antes que
+  `subscription_authorized_payment` con monto de panel menor; el aviso sin
+  `external_reference` que da 400 antes de deduplicar; `precio_esperado`
+  sin vencimiento (D29).
+
+El adversario Sonnet de COBRO sigue: si suma algo, va abajo de esto.
+
 ## Veredicto de ORDEN-1 (2026-10-28 16:45 UTC): devolución
 
 Sobre `0d89c20`. Evidencia en `REPRODUCCION-ORDEN-1-2026-10-28.md`. El
@@ -358,7 +400,8 @@ supuestos de Mercado Pago que no pudiste ver sin red: los estados, que una
 2. La devolución de ORDEN-1 (arriba): justo después de EXCEL-2b, antes
    que lo demás. El agregado de GUARDAR-2 va en un commit de pruebas con
    EXCEL-2b.
-3. COBRO-MP-1: hecha; subila ya y se entrega después de EXCEL-2b.
+3. COBRO-MP-1: hecha; se entrega después de ORDEN-1, con A–E de arriba
+   arreglados.
 4. COBRO-CORTE-1: hecha; se entrega después de COBRO-MP-1.
 5. COBRO-MP-2: hecha; subila ya y se entrega después de COBRO-CORTE-1.
 6. AISLAMIENTO-2 y LIMPIEZA-1: hechas; se entregan después de COBRO-MP-2.
