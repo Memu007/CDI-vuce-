@@ -7,7 +7,7 @@ negativos propios en worktrees limpios (`/tmp/cdi-pm/wt-3f` y
 Gemini. **No corrió un adversario con contexto nuevo:** sin presupuesto de
 subagentes hasta el 2026-10-28 18:00 UTC.
 
-**BORRADOR, revisión en curso: no hay veredicto todavía.** Veredicto previsto: EXCEL-3f, **aceptada**. Lo único que cambia el FOB es el
+Veredicto: EXCEL-3f, **aceptada**. Lo único que cambia el FOB es el
 plural, y se comporta igual que su singular en la base. Todo lo demás sólo
 suma un aviso que nombra la fila. H1-bis tapa la clave de `--base` en todas
 las formas de escribirla que probé. Con esto **EXCEL-3 queda cerrada**: lo
@@ -17,14 +17,16 @@ que sigue abierto son riesgos anotados, no tareas.
 
 | Qué | Resultado |
 |---|---|
-| Suite completa sobre `8c63c37`, worktree limpio | SUITE |
-| `cliente1c.sh 8c63c37` (H1-bis) | CLIENTE1C |
-| `excel3.sh 8c63c37`, sólo los 39 sabotajes de 3f y los reapuntados (3d, 3c R1, 3b-3#1) | EXCEL3 |
+| Suite completa sobre `8c63c37`, worktree limpio | `1 failed, 3844 passed, 102 skipped, 2 xfailed, 94 warnings in 494.34s`. El rojo es el de `test_excel2` (observación 3), no de 3f |
+| `cliente1c.sh 8c63c37` (H1-bis) | 44 ROJO, `sabotajes sin rojo: 0`, `rc=0` (con el script de `8c63c37`; una primera corrida con el script viejo de la rama de PM se descartó) |
+| `excel3.sh 8c63c37`, sólo los 39 sabotajes de 3f y los reapuntados (3d, 3c R1, 3b-3#1) | 3b-3#1, 3c R1 y 3d: 23 ROJO; 3f: 16 ROJO; `sabotajes sin rojo: 0`, `rc=0` en los tres tramos (39 de 39) |
 | Trece negativos propios × `.xlsx` y `.xls`, en la base y en la entrega | 26 passed en cada SHA; tabla abajo |
 
 El `excel3.sh` entero (112) lo corrió la Dev en dos tramos; la PM corrió una
-copia que sólo agrega, al principio de `sabotaje()`, un filtro por nombre
-(`^(3f|3d|3c R1|3b-3#1)`): el resto del script es igual byte a byte.
+copia que sólo agrega, al principio de `sabotaje()`, un filtro por nombre:
+el resto del script es igual byte a byte. En tres tramos, porque el primero
+(`^(3f|3d|3c R1|3b-3#1)`) se cortó por el límite de 30 min de la tarea en
+segundo plano a los 13: después `^(3f)` (16) y `^(3d)` (12, dos repetidos).
 
 ## Negativos propios
 
@@ -57,10 +59,14 @@ muestra (`semaforo.js`): no se pierde en silencio.
 2. **Aviso de menos:** «Transporte interno» con origen y «DHL» solo no
    llevan aviso. No cambian el FOB; queda anotado.
 3. **`test_excel2::test_ocho_libros_con_la_primera_hoja_al_borde_del_tope…`**
-   está al borde del corte de 30 s de `file_security.py` (la Dev lo midió
-   1 de 5 en rojo también en la base). No es de 3f. Una subida normal que
-   tarda ~30 s en una máquina de 4 núcleos también es para mirar en
-   producción: va como seguimiento.
+   da rojo en este contenedor (4 núcleos, carga ~0,9 sin nada más
+   corriendo): en la suite y 6 de 6 corrido solo, alternando base y
+   entrega. La subida normal tardó 32,71 / 31,36 / 30,83 s en `89a0fde` y
+   30,71 / 30,91 / 31,50 s en `8c63c37`, contra el corte de 30 s de
+   `file_security.py`. Igual en la base: **no es de 3f**. La Dev lo vio 1
+   de 5. Va como seguimiento después de ORDEN-1 (diagnóstico y D, sin
+   subir el corte ni aflojar la prueba): en producción una subida normal
+   puede esperar ~30 s detrás de ocho pesadas.
 
 ## Riesgos de la Dev
 
