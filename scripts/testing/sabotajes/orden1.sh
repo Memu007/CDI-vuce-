@@ -175,6 +175,9 @@ sabotaje $A "otro usuario recupera la operación" \
 sabotaje $A "la clave vieja sin pestaña no se borra" \
   "FALLA: la clave vieja sin pestaña no se descarta" \
   '            try { localStorage.removeItem(clave); } catch (_) {}' ''
+sabotaje $A "el sobre de hoy sin dueño no se borra" \
+  "FALLA: el borrador de hoy sin dueño no se descarta" \
+  "typeof parsed.user !== 'string' || !parsed.user || " ''
 
 # Edad: 7 días.
 export CASOS=g
@@ -184,6 +187,12 @@ sabotaje $A "un borrador de más de 7 días se recupera" \
 sabotaje $A "vence a los 6 días y no a los 7" \
   "FALLA: un borrador de hace casi 7 días no se recupera" \
   'const BORRADOR_VENCE_MS = 7 * 24' 'const BORRADOR_VENCE_MS = 6 * 24'
+# Adversario Sonnet alto: el vencido no se recupera pero tampoco se borra; el
+# sin dueño se sigue borrando.
+sabotaje $A "el vencido no se borra al barrer" \
+  "FALLA: el borrador de hace más de 7 días no se borra al barrer" \
+  $' || Date.now() - savedAt > BORRADOR_VENCE_MS) {\n            try { localStorage.removeItem(clave); } catch (_) {}\n            return null;\n        }' \
+  $') {\n            try { localStorage.removeItem(clave); } catch (_) {}\n            return null;\n        }\n        if (Date.now() - savedAt > BORRADOR_VENCE_MS) return null;'
 
 # Pestaña que murió sin pagehide.
 export CASOS=h
@@ -202,6 +211,19 @@ sabotaje $A "la propia se recupera sólo si se cerró con pagehide" \
 sabotaje $A "toda pestaña anterior se da por viva" \
   "FALLA: la pestaña restaurada no recupera su operación" \
   '            .catch(() => true)' '            .then(() => true, () => true)'
+# Adversario Sonnet alto: la pestaña no retiene su propio lock.
+sabotaje $A "la pestaña no retiene su lock" \
+  "FALLA: la pestaña duplicada tomó la operación de la original, que sigue abierta" \
+  "        try { navigator.locks.request(BORRADOR_PESTANA + ':' + pestana, () => new Promise(() => {})).catch(() => {}); } catch (_) {}" ''
+
+# Sin usuario al abrir: se vuelve a pedir hasta tenerlo.
+export CASOS=j
+sabotaje $A "el usuario se pide una sola vez al abrir" \
+  "FALLA: con la consulta del usuario caída al abrir, la operación no se guarda" \
+  '        const usuarioListo = cargarUsuarioHastaTenerlo();' '        const usuarioListo = loadCurrentUser();'
+sabotaje $A "el reintento da por cargado al usuario aunque falló" \
+  "FALLA: con la consulta del usuario caída al abrir, la operación no se guarda" \
+  '        return !!currentUser;' '        return true;'
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

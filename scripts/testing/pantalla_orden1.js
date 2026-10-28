@@ -12,7 +12,8 @@
 //  (e) arrastrar después de una acción masiva: Ctrl+Z no vuelve el orden, y
 //      la selección sigue a los productos;
 //  (f) la operación es de quien la dejó: otro usuario en la misma computadora
-//      no la ve, y la clave vieja sin pestaña no se muestra a nadie;
+//      no la ve, y la clave vieja sin pestaña o el sobre de hoy sin dueño no
+//      se muestran a nadie y se borran;
 //  (g) un borrador de más de 7 días no se recupera y se borra; uno de casi 7
 //      días, sí;
 //  (h) la operación de una pestaña que murió sin avisar (sin pagehide) hace 4
@@ -354,6 +355,11 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     // La clave de antes de ORDEN-1: la operación sola, sin pestaña ni dueño.
     await enElSitio(ctx, it => localStorage.setItem('cdi_v2_state', JSON.stringify(
       { operacion: { numero_factura: 'VIEJA-SIN-PESTANA' }, items: [it] })), prod('Producto viejo', '84714900100D', 1, 1));
+    // Un sobre de hoy, cerrado y con pestaña, pero sin dueño: se descarta por
+    // no tener dueño, no por la edad.
+    await enElSitio(ctx, it => localStorage.setItem('cdi_v2_state:sin-dueno', JSON.stringify(
+      { v: 1, savedAt: Date.now(), closed: true, state: { operacion: { numero_factura: 'SIN-DUENO' }, items: [it] } })),
+      prod('Producto sin dueño', '84714900100D', 1, 1));
     const usuarioB = await nuevoUsuario(ctx, 'ord1h');
     const pb = await abrir(ctx);
     if ((await pb.evaluate(() => CDI.currentUser.username)) !== usuarioB) falla('la sesión no pasó al segundo usuario');
@@ -365,6 +371,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     await cerrar(pb);
     await cerrar(pb2);
     if ((await guardadas(ctx)).includes('VIEJA-SIN-PESTANA')) falla('la clave vieja sin pestaña no se descarta');
+    if ((await guardadas(ctx)).includes('SIN-DUENO')) falla('el borrador de hoy sin dueño no se descarta');
     await entrar(ctx, a);
     const pa = await abrir(ctx);
     const ra = await recuperada(pa);
