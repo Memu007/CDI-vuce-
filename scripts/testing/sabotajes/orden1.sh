@@ -104,6 +104,11 @@ export ENVIRONMENT=development GEMINI_API_KEY=test-key \
 export BASE_URL="http://127.0.0.1:$PUERTO"
 correr() {
   rm -f "$TMPD/local.db"
+  # Con el puerto ocupado, /health lo contestaría otro servidor y la pantalla
+  # mediría otro producto.
+  if (exec 3<>"/dev/tcp/127.0.0.1/$PUERTO") 2>/dev/null; then
+    echo "FALLA: el puerto $PUERTO ya está ocupado"; return 1
+  fi
   DATABASE_URL="sqlite+aiosqlite:///$TMPD/local.db" "$PY" -m uvicorn proyecto_maria.main:app \
     --host 127.0.0.1 --port "$PUERTO" >"$TMPD/api.log" 2>&1 &
   API=$!
@@ -234,10 +239,151 @@ sabotaje $A "el reintento no espera entre pedidos" \
 export CASOS=k
 sabotaje $A "la pestaña no mira si la sesión cambió desde que abrió" \
   "FALLA: la operación cargada antes de saber el usuario se guardó a nombre de quien entró después" \
-  '                if (getCsrfToken() !== sesionAlAbrir) sesionAjena = true;' ''
-sabotaje $A "una sesión ajena sigue guardando y recuperando" \
-  "FALLA: la operación cargada antes de saber el usuario se guardó a nombre de quien entró después" \
-  '        if (sesionAjena) return null;' ''
+  'if (sesionAntes !== sesionAlAbrir || getCsrfToken() !== sesionAlAbrir) {' 'if (false) {'
+sabotaje $A "al abrir con otra sesión no se avisa" \
+  "FALLA: entró otro usuario mientras la pestaña reintentaba y la pestaña no avisa" \
+  $'sesionAjena = true;\n                    avisarBorrador(\'ajena\', AVISO_AJENA);' 'sesionAjena = true;'
+
+# Devolución 20:08. Otro usuario entra con la pestaña abierta: no se guarda a
+# nombre de nadie y se avisa.
+export CASOS=l
+sabotaje $A "la sesión que cambió se confirma sin mirar el usuario" \
+  "FALLA: lo que cargó B en la pestaña de A se guardó a nombre de " \
+  '        if (username !== duenoPestana) {' '        if (false) {'
+sabotaje $A "la pestaña guarda sin mirar si la sesión cambió" \
+  "FALLA: lo que cargó B en la pestaña de A se guardó a nombre de " \
+  '        if (getCsrfToken() !== sesionDelDueno) {' '        if (false) {'
+sabotaje $A "otro usuario entra y la pestaña no avisa" \
+  "FALLA: la pestaña dejó de guardar y no lo avisa" \
+  $'            sesionAjena = true;\n            avisarBorrador(\'ajena\', ' \
+  $'            sesionAjena = true;\n            (() => {})(\'ajena\', '
+# Lo mismo, pasando por la sesión cerrada.
+export CASOS=n
+sabotaje $A "sale A, entra B y la sesión se confirma sin mirar el usuario" \
+  "FALLA: salió A, entró B y lo cargado se guardó a nombre de " \
+  '        if (username !== duenoPestana) {' '        if (false) {'
+
+# El mismo usuario sale y vuelve a entrar: sigue guardando, sin aviso.
+export CASOS=m
+sabotaje $A "la sesión nueva del dueño no se recuerda" \
+  "FALLA: el mismo usuario volvió a entrar y la pestaña dejó de guardar" \
+  '        sesionDelDueno = sesion;' ''
+export CASOS=m2
+sabotaje $A "el aviso de sesión cerrada no se va al volver a entrar" \
+  "FALLA: el mismo usuario volvió a entrar y la pestaña sigue avisando que no guarda" \
+  "        if (avisoBorrador === 'sinsesion' || avisoBorrador === 'red') avisarBorrador(null);" ''
+
+# Con otro usuario adentro, la pestaña del dueño no borra lo que él dejó.
+export CASOS=y
+sabotaje $A "la pestaña borra el borrador con cualquier sesión" \
+  "FALLA: entró otro usuario y la pestaña del dueño borró su operación" \
+  '        if (!usuarioActual()) return;' ''
+
+# Salir y volver desde la caché del navegador.
+export CASOS=o
+sabotaje $A "pagehide no marca la pestaña cerrada" \
+  "FALLA: pagehide no la marca cerrada" \
+  '        if (enFlujo()) guardarBorrador(true);' '        if (enFlujo()) guardarBorrador(false);'
+sabotaje $A "al volver de la caché no se marca en uso" \
+  "FALLA: al volver de la caché no queda en uso" \
+  '        if (e.persisted) guardarBorrador(false);' ''
+sabotaje $A "al volver de la caché se marca en uso sin mirar la sesión" \
+  "FALLA: volvió de la caché con otro usuario y la marcó en uso" \
+  '        if (e.persisted) guardarBorrador(false);' \
+  '        if (e.persisted && enFlujo()) try { localStorage.setItem(claveBorrador, JSON.stringify({ v: 1, user: duenoPestana, savedAt: Date.now(), closed: false, state: CDI.state })); } catch (_) {}'
+
+# Usuario lento o caído al recargar: la operación vuelve cuando llega; si
+# mientras tanto se cargó otra, no se pisa y se avisa.
+export CASOS=p
+sabotaje $A "si el usuario llega tarde, la operación no se recupera" \
+  "la operación no vuelve a la pestaña que recargó" \
+  '                    usuarioListo.then(() => CDI.borrador.buscar()).then(b => {' \
+  '                    Promise.resolve(null).then(b => {'
+sabotaje $A "la recuperación tardía pisa la operación cargada mientras" \
+  "FALLA: la operación de antes de recargar pisó la que se cargó mientras" \
+  '|| (CDI.state && CDI.state.items && CDI.state.items.length > 0)' '|| false'
+sabotaje $A "la operación de antes queda guardada sin aviso" \
+  "FALLA: la operación de antes de recargar quedó guardada y la pestaña no lo avisa" \
+  "CDI.borrador.avisar('pendiente', " "(() => {})('pendiente', "
+
+# El navegador sin lugar: se avisa.
+export CASOS=q
+sabotaje $A "sin lugar en el navegador no se avisa" \
+  "FALLA: el navegador no tiene lugar para guardar la operación y la pestaña no avisa" \
+  "avisarBorrador('lleno', 'El navegador no tiene lugar para guardar" \
+  "(() => {})('lleno', 'El navegador no tiene lugar para guardar"
+
+# Devolución 20:08, vuelta 2. El usuario llega tarde y la pestaña no está
+# vacía: no se mueve de pantalla ni pisa lo que hay, y la de antes se avisa.
+export CASOS=z
+sabotaje $A "el usuario tarde recupera aunque la pestaña esté fuera de la carga" \
+  "FALLA: el usuario llegó tarde y la pestaña se fue de la pantalla en que estaba" \
+  "const ocupada = currentScreen !== 'upload'" "const ocupada = false"
+# Lo mismo con una subida en curso.
+export CASOS=z2
+sabotaje $A "el usuario tarde recupera aunque haya una subida en curso" \
+  "FALLA: el usuario llegó con una subida en curso y la operación de antes de recargar se perdió" \
+  '|| (CDI.subidaEnCurso && CDI.subidaEnCurso());' '|| false;'
+sabotaje $U "la carga no dice que hay una subida en curso" \
+  "FALLA: el usuario llegó con una subida en curso y la operación de antes de recargar se perdió" \
+  'CDI.subidaEnCurso = () => subiendo > 0;' 'CDI.subidaEnCurso = () => false;'
+# Recargar sin lugar en el navegador: se avisa y el borrador queda.
+export CASOS=z3
+sabotaje $A "sin lugar al recuperar no se avisa" \
+  "FALLA: al recargar sin lugar en el navegador" \
+  "avisarBorrador('lleno', 'El navegador no tiene lugar para recuperar" \
+  "(() => {})('lleno', 'El navegador no tiene lugar para recuperar"
+# La consulta del usuario no contesta nunca: se corta y se avisa.
+export CASOS=z4
+sabotaje $A "la consulta de la sesión no tiene tope" \
+  "FALLA: cambió la sesión, la consulta del usuario no contesta y en 20 s la pestaña no avisa" \
+  "{ credentials: 'same-origin', signal: corte.signal }" "{ credentials: 'same-origin' }"
+
+# Con la sesión vencida (401) no se reintenta.
+export CASOS=r
+sabotaje $A "un 401 no marca la sesión vencida" \
+  "FALLA: con la sesión vencida la pestaña reintenta la consulta del usuario" \
+  "            if (err && err.message === 'unauthorized') sinSesion = true;" ''
+sabotaje $A "el reintento no corta con la sesión vencida" \
+  "FALLA: con la sesión vencida la pestaña reintenta la consulta del usuario" \
+  ' && !sinSesion; espera' '; espera'
+
+# Con la red cortada al abrir, se reintenta.
+export CASOS=s
+sabotaje $A "un corte de red da por cargado al usuario" \
+  "FALLA: con la consulta del usuario cortada al abrir, la pestaña no la vuelve a pedir" \
+  '        return !!currentUser;' '        return true;'
+
+# La espera entre pedidos: de 1 a 30 segundos.
+export CASOS=t
+sabotaje $A "la espera crece sin tope" \
+  "FALLA: en 200 s de reloj la consulta del usuario se pidió" \
+  'Math.min(espera * 2, 30000)' 'espera * 2'
+sabotaje $A "la espera no crece" \
+  "FALLA: en 200 s de reloj la consulta del usuario se pidió" \
+  'Math.min(espera * 2, 30000)' 'Math.min(espera, 30000)'
+
+# La operación terminada se borra, al cerrar y con la pestaña abierta.
+export CASOS=v
+sabotaje $A "al cerrar no se borra la operación terminada" \
+  "FALLA: la operación terminada queda guardada al cerrar la pestaña" \
+  $'        if (enFlujo()) guardarBorrador(true);\n        else borrarBorrador();' \
+  '        if (enFlujo()) guardarBorrador(true);'
+sabotaje $A "con la pestaña abierta no se borra la operación terminada" \
+  "FALLA: la operación terminada queda guardada con la pestaña abierta" \
+  $'            // Se borra sólo el de esta pestaña: la operación terminó o se canceló\n            borrarBorrador();' \
+  '            // sabotaje: no se borra'
+
+# Sobres de otra versión y vencidos de otro usuario.
+export CASOS=w
+sabotaje $A "se acepta un sobre de otra versión" \
+  "FALLA: se recupera un sobre de otra versión" \
+  'parsed.v !== 1 || ' ''
+sabotaje $A "el vencido se borra sólo si es del usuario" \
+  "FALLA: el borrador vencido de otro usuario no se borra al barrer" \
+  ' || Date.now() - savedAt > BORRADOR_VENCE_MS) {' ') {' \
+  '        if (parsed.user !== user) return null;' \
+  $'        if (parsed.user !== user) return null;\n        if (Date.now() - savedAt > BORRADOR_VENCE_MS) { try { localStorage.removeItem(clave); } catch (_) {} return null; }'
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
