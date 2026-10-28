@@ -140,7 +140,7 @@ def origen_icu():
     sql(PG_URL, f'DROP DATABASE IF EXISTS "{nombre}" WITH (FORCE)')
 
 
-def correr(*args, origen=None, **env_extra):
+def correr(*args, origen=None, cwd=None, **env_extra):
     env = {k: v for k, v in os.environ.items()
            if not k.startswith(("COPIA_", "PG")) and k != "BACKUP1A_PG_URL"}
     env["COPIA_PG_BIN"] = PG_BIN
@@ -149,7 +149,7 @@ def correr(*args, origen=None, **env_extra):
     env["COPIA_PRUEBA_URL"] = PG_URL
     env.update(env_extra)
     return subprocess.run([sys.executable, str(SCRIPT), *args], env=env, capture_output=True,
-                          text=True, timeout=300)
+                          text=True, timeout=300, cwd=cwd)
 
 
 def volcar_de_nuevo(origen: str, archivo: Path) -> None:
@@ -412,10 +412,15 @@ def test_enviar_no_lleva_una_copia_que_cambio(origen, tmp_path):
 @pytest.mark.parametrize("destino, dice", [
     ("s3://cubo/copias", "COPIA_DESTINO: enviar a un servicio no está soportado"),
     ("relativo/copias", "COPIA_DESTINO tiene que ser una carpeta local"),
+    ("{tmp}/no_existe", "COPIA_DESTINO tiene que ser una carpeta local"),
     ("", "falta la variable COPIA_DESTINO"),
 ])
 def test_enviar_solo_a_una_carpeta_local(origen, tmp_path, destino, dice):
     archivo = tmp_path / "copia.dump"
     _copiar_ok(origen, archivo)
-    r = correr("enviar", str(archivo), COPIA_DESTINO=destino)
+    # La carpeta relativa existe desde donde se corre: lo que la rechaza es
+    # que no sea la ruta entera.
+    (tmp_path / "relativo" / "copias").mkdir(parents=True)
+    r = correr("enviar", str(archivo), COPIA_DESTINO=destino.replace("{tmp}", str(tmp_path)), cwd=tmp_path)
     assert r.returncode == 1 and dice in r.stderr, r.stdout + r.stderr
+    assert sorted(p.name for p in (tmp_path / "relativo" / "copias").iterdir()) == []
