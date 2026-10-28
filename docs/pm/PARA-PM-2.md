@@ -2,30 +2,132 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## DATOS-1: en curso, D5 frenada por la D32 (2026-10-28)
+## DATOS-1: hecha, **sin entregar** (2026-10-28)
 
-Encima de `e59e1a8`. Sigo con D2 (`/health`) y D6 (`dev_detail`), que no
-dependen de la D32. **D5 la empiezo cuando contestes la D32.**
+Encima de DESPACHO-1b (`e59e1a8`) y del merge de tu rama con la D32 (a)
+(`d01f95c`): producto y `CHANGELOG.md` `7d09c6f`; casos `4416076`; prueba en
+Postgres y sabotajes `162d277`; arreglo de los casos, que gastaban el cupo
+de `test_user`, `c996ad4`. **SHA probado: `c996ad4`.** Para ver sólo esta
+pieza: `git diff d01f95c..c996ad4`. Va en su propio `/entregar`,
+después del de DESPACHO-1b, con subagentes, `/code-review` y
+`/security-review` cuando vuelva el cupo. **No hace falta que la revises
+todavía.** La D32 está contestada (a) en `0a6e887`: es lo que hice.
 
-**Premisa de D5: confirmada** en Postgres 16.15 descartable (127.0.0.1:55432),
-sobre `e7c7af0`, con un usuario, un cliente, una operación y su presupuesto
-compartido (`POST /api/quotes/share`):
+- **D5 / D32 (a), borrar un cliente con presupuesto compartido**
+  (`delete_cliente`, `main.py`): antes de borrar las operaciones del
+  cliente, borra los presupuestos compartidos de esas operaciones (y sólo
+  de esas), en la misma transacción que el cliente. Si algo falla a mitad,
+  el rollback que ya estaba deja todo como antes.
+  - **En Postgres** (`scripts/testing/datos1_postgres.py`, 16.15 local y
+    descartable): sobre el código anterior (`d01f95c`) el dueño recibe
+    **500** y no se borra nada («fallas: 3»); sobre `162d277`, 200, no
+    quedan cliente, operaciones ni presupuestos, el link da 404 y siguen
+    andando el presupuesto de otro cliente del mismo dueño y el de otro
+    dueño («fallas: 0»). Otro dueño recibe 404 y el presupuesto sigue. Una
+    falla simulada al borrar el cliente da 500 y no borra nada.
+  - **Pantalla** (`clientes.js`, la v2, que ya avisaba qué se borra): ahora
+    dice «…y dejarán de andar los links de presupuestos que compartiste.
+    Esta acción no se puede deshacer.». La vieja (`app.js`) no avisa nada y
+    no se tocó, como dijiste.
+- **D2, `/health`:** sin base responde **503** con `database: "error"` y
+  `status: "degraded"`, sin `db_error`. El texto del error va al log
+  (`logging.exception`). Con base, 200 igual que antes. `railway.json` no se
+  tocó; `/admin/health/detailed` tampoco.
+- **D6, los 500:** los dos manejadores (el de `HTTPException` 500 y el de
+  excepciones no manejadas) devuelven sólo el mensaje amigable y
+  `code: "internal_error"`; el detalle, con su traza, va al log. Los 4xx
+  siguen con su `detail` tal cual (hay prueba con uno de la app y otro
+  armado). `finalize.js` mostraba `dev_detail` en el aviso: ahora muestra
+  `detail` y corta en 200 caracteres en vez de 100, porque el mensaje
+  amigable mide 131.
+- **Archivos de producto:** `proyecto_maria/main.py`,
+  `proyecto_maria/static/v2/screens/clientes.js`,
+  `proyecto_maria/static/v2/screens/finalize.js` y `CHANGELOG.md`.
 
-- `DELETE /api/clientes/{id}` responde **500** y el cliente, la operación y
-  el presupuesto quedan. El log de Postgres: `update or delete on table
-  "operations" violates foreign key constraint "public_quotes_operation_id_fkey"
-  on table "public_quotes"`.
-- Sin presupuesto compartido, el mismo borrado responde 200 y borra cliente
-  y operación: el único bloqueo es `public_quotes`.
-- Qué apunta al cliente: `operations`, `ncm_notes` y
-  `client_product_history` (el borrado ya las limpia). Qué apunta a sus
-  operaciones: `operation_items` (las limpia), `public_quotes` (no) y
-  `api_logs.operation_id` (nada en el código la llena).
-- **El bloqueo no se va solo:** un presupuesto vencido sólo se borra cuando
-  alguien abre el link (`quote_router.py`, «Lazy cleanup»). Un cliente que
-  alguna vez compartió un presupuesto no se puede borrar nunca.
-- La respuesta del 500 trae `"dev_detail":"No se pudo eliminar el cliente…"`:
-  es D6.
+**Qué hace Railway con una publicación nueva si la base no contesta (no
+verificado: `docs.railway.com` está bloqueado desde acá).** Según
+`railway.json`, Railway prueba `/health` al publicar, con 60 s de tope, y no
+pasa el tráfico a la publicación nueva hasta que responda 200. Pero lo que
+pasa de verdad acá es otra cosa, y eso sí lo vi: **si la base no contesta al
+arrancar, la app ni siquiera levanta.** `init_db` corre en el arranque sin
+`try`, uvicorn sale con código 3 y `/health` no contesta nunca. La
+publicación nueva falla y, hasta donde sé, queda la anterior. El 503 sólo
+cambia algo si la base se cae con la app ya andando: ahí `/health` lo dice,
+pero Railway, hasta donde sé, no vuelve a mirar `/health` después de
+publicar, así que no la reinicia por eso. Lo útil del 503 es para quien
+mire `/health` desde afuera (un monitor), no para Railway.
+
+**Puertas** (sobre `c996ad4`, salvo Postgres, smoke y ataque, que corrí
+sobre `162d277`: entre los dos sólo cambia `tests/test_datos1.py`):
+
+| Puerta | Resultado |
+|---|---|
+| `tests/test_datos1.py` | 9 passed (en rojo sobre el código anterior: 4 fallas por el motivo de la tarea) |
+| Suite completa (`--timeout=120`) y `compileall`, `c996ad4` | `3836 passed, 336 skipped, 2 xfailed, 95 warnings in 497.50s (0:08:17)`, pytest salida 0; `compileall 0` |
+| Suite completa sobre `162d277` (antes del arreglo) | `6 failed, 3830 passed, 336 skipped, 2 xfailed`, salida 1: abajo |
+| `scripts/testing/datos1_postgres.py` (Postgres 16 local, base `datos1a`) | `d01f95c`: «fallas: 3», salida 1 (500 al borrar). `162d277`: «fallas: 0», salida 0 |
+| Sabotajes `scripts/testing/sabotajes/datos1.sh c996ad4` | 12 líneas ROJO, «sabotajes sin rojo: 0», salida 0 |
+| `smoke_friccion.sh` (puerto 8862) | salida 0, «OK · telemetría + alias session/state + by-cuit protegido» |
+| `ataque_aislamiento.sh` (puerto 8863) | salida 0, «PUERTA G3 PASADA. Ningún despachante ve datos de otro.» |
+
+El primer intento del ataque salió 1 por entorno: el script busca
+`./venv/bin/python` y, si no está, usa `python3` del sistema, que no tiene
+`fastapi` (`ModuleNotFoundError: No module named 'fastapi'`). Con el venv
+en el `PATH`, salida 0.
+
+**La suite sobre `162d277` salió en rojo por mis casos, no por el
+producto.** Seis casos de otros archivos
+(`test_op_code_and_fill_if_empty.py`, `test_operations_manual.py` y cuatro
+de `test_prelaunch_block1.py::TestOperacionManual`) recibían **402**
+«Alcanzaste el límite de 15 operaciones del plan Premium». Las pruebas de
+borrado de `test_datos1.py` creaban operaciones como `test_user`, que
+comparte toda la suite, y le gastaban 4 de su cupo: lo medí al final de una
+corrida de ese archivo solo, 4 sobre `162d277` y 0 sobre `c996ad4`, sin
+clientes, operaciones ni presupuestos sobrantes. El arreglo (`c996ad4`):
+cada prueba usa dueños propios y borra al terminar lo que creó. Con eso,
+suite en verde y los 12 sabotajes siguen en rojo.
+
+**Sabotajes (12, uno por regla), todos en rojo:** `/health` sin base sigue
+en 200; `/health` vuelve a mostrar el error de la base; `/health` no deja
+el error en el log; cada 500 vuelve a mandar `dev_detail` (uno por
+manejador); cada 500 no deja el detalle en el log (uno por manejador); los
+4xx pierden su motivo; no se borran los presupuestos del cliente; se
+borran también los ajenos; el borrado no es una sola transacción; otro
+dueño puede borrar el cliente.
+
+**Comandos:**
+
+```bash
+git diff d01f95c..c996ad4 --stat        # 7 archivos
+python -m pytest -q --no-cov -p no:randomly tests/test_datos1.py
+#   9 passed
+PY=<venv>/bin/python scripts/testing/sabotajes/datos1.sh c996ad4
+#   12 líneas ROJO y al final «sabotajes sin rojo: 0»
+python scripts/testing/datos1_postgres.py postgresql://cdi@127.0.0.1:<puerto>/<base>
+#   8 líneas OK y «fallas: 0» (sólo acepta un Postgres local)
+```
+
+**Riesgos y lo que no hice:**
+- **Un link compartido deja de andar** cuando se borra su cliente (es la
+  D32 (a)): quien lo abra ve 404. Está en `CHANGELOG.md` y la pantalla v2
+  lo avisa; la vieja no.
+- **Previo, fuera de la pieza:** si alguien de un equipo cargó operaciones
+  sobre el cliente, el borrado sólo toca las del dueño. En Postgres, las de
+  otro miembro seguirían bloqueando el borrado del cliente por la clave
+  foránea (500 y nada borrado). No lo probé.
+- Los 502 y 503 de la app siguen pasando su `detail` tal cual: D6 habla de
+  los 500 y no los toqué.
+- La falla a mitad está probada con una falla simulada al borrar el
+  cliente, el último paso. No probé una caída de la base a mitad.
+- El texto nuevo de la pantalla no lo vi en el navegador: está en el código
+  (`clientes.js:1816`) y no tiene prueba automática.
+- **Fuera de la pieza: la suite está cerca del límite de `test_user`.** El
+  resto de los archivos ya le gasta por lo menos 11 de sus 15 operaciones
+  (con mis 4, caían). Un caso nuevo que cree unas pocas operaciones como
+  `test_user` va a romper casos ajenos, con un 402 que no apunta al
+  culpable. No lo toqué.
+- Sin correr todavía: subagentes, `/code-review` y `/security-review`.
+  Vuelven a las 18:00 UTC.
 
 ## DESPACHO-1b: hecha, **sin entregar** (2026-10-28)
 
@@ -858,6 +960,6 @@ PY=<venv>/bin/python scripts/testing/sabotajes/despacho1a.sh 51890cd
 - **El 400 «es para otro email»** dice que el email escrito no es el
   invitado. No dice cuál es. Hace falta el token para preguntar.
 
-Última vuelta: Wed Oct 28 06:03:02 UTC 2026
+Última vuelta: Wed Oct 28 06:36:43 UTC 2026
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 contestada (a) en 3da0a8b, costos en riesgos. DATOS-1 (D5 borrar cliente con presupuesto, D2 /health 503, D6 sin dev_detail) en curso encima de e59e1a8, su propio /entregar después del de DESPACHO-1b; D5 frenada por la D32 (abierta: qué pasa con el presupuesto compartido; recomiendo a, borrarlo); D2 y D6 en curso. Postgres 16 descartable en /tmp/cdi-pg55432, puerto 55432, base datos1a. Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review) y DESPACHO-1b; timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. La próxima D es la D33. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 contestada (a) en 3da0a8b, costos en riesgos. DATOS-1 (D5+D32 (a) borrar cliente borra sus presupuestos compartidos, D2 /health 503, D6 sin dev_detail) hecha y subida SIN ENTREGAR encima de d01f95c: producto 7d09c6f, casos 4416076, Postgres y sabotajes 162d277, arreglo de casos que gastaban el cupo de test_user c996ad4; SHA probado c996ad4 (test_datos1 9 passed; sabotajes datos1.sh 12/12; suite 3836 passed, 336 skipped, 2 xfailed, 0 failed; datos1_postgres.py fallas 0; smoke y aislamiento 0 sobre 162d277); su propio /entregar después del de DESPACHO-1b, con /security-review. Postgres 16 descartable en /tmp/cdi-pg55432, puerto 55432, base datos1a. Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review), DESPACHO-1b y DATOS-1; timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. La próxima D es la D33. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
