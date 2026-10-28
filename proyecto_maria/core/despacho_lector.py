@@ -25,6 +25,7 @@ from __future__ import annotations
 import asyncio
 import io
 import json
+import logging
 import math
 import os
 import re
@@ -43,8 +44,6 @@ _MAX_PAGINAS = 200
 # Cada flujo del PDF descomprimido (contenido, fuentes, mapas de caracteres).
 # Generoso: una fuente incrustada puede pesar unos MB.
 _MAX_FLUJO = 8 * 1024 * 1024
-# Formularios (XObject) que se abren al leer una hoja.
-_MAX_FORMULARIOS = 20
 # Texto de todas las hojas juntas. Un despacho de 200 hojas tiene menos de 1 MB.
 _MAX_TEXTO = 4 * 1024 * 1024
 # Una línea de un despacho tiene menos de 300 caracteres y menos de 10 rótulos.
@@ -275,7 +274,7 @@ def _hojas_del_pdf(data: bytes) -> tuple[str, list[str], bool]:
         "jbig2_maximum_output_length", "stream_decoding_work_maximum_length")}
     avisos = []
     salteadas = False
-    with apply_configuration(**topes, xform_maximum_invocations_per_extraction=_MAX_FORMULARIOS):
+    with apply_configuration(**topes):
         try:
             reader = PdfReader(io.BytesIO(data))
             paginas = list(reader.pages)
@@ -305,7 +304,8 @@ def _hojas_del_pdf(data: bytes) -> tuple[str, list[str], bool]:
                 continue
             largo += len(texto)
             if largo > _MAX_TEXTO:
-                avisos.append(f"El texto del PDF es demasiado largo: leí hasta la hoja {n - 1}.")
+                avisos.append("El texto de la primera hoja es demasiado largo: no leí ninguna." if n == 1
+                              else f"El texto del PDF es demasiado largo: leí hasta la hoja {n - 1}.")
                 salteadas = True
                 break
             textos.append(texto)
@@ -336,7 +336,7 @@ def _leer_texto(texto: str) -> dict:
     bloque = None  # el ítem o subítem que se está leyendo
     item = None
     en_sufijos = False
-    bloques = 0  # ítems y subítems leídos
+    hay_mas = False  # quedaron ítems sin leer por el tope de renglones
 
     i = 0
     while i < len(lineas):
@@ -361,12 +361,11 @@ def _leer_texto(texto: str) -> dict:
                 valores = _valores_por_columna(lineas[j], columnas)
                 i = j + 1
             nombres = [r for _, r in columnas]
-            if _INICIO_ITEM in nombres or (_INICIO_SUBITEM in nombres and item is not None):
-                bloques += 1
-                if bloques > MAX_RENGLONES:
-                    avisos.append(f"El despacho tiene más de {MAX_RENGLONES} ítems y subítems: "
-                                  f"leí sólo los primeros {MAX_RENGLONES}.")
-                    break
+            # Se corta antes de un ítem nuevo, para no separar un ítem de sus
+            # subítems; los de un ítem con muchos se cortan al final.
+            if _INICIO_ITEM in nombres and sum(len(it["subitems"]) or 1 for it in items) >= MAX_RENGLONES:
+                hay_mas = True
+                break
             if _INICIO_ITEM in nombres:
                 item = _nuevo_bloque("item", valores.get(_INICIO_ITEM))
                 items.append(item)
@@ -421,6 +420,10 @@ def _leer_texto(texto: str) -> dict:
                 renglones.append(_renglon(sub, padre=it))
         else:
             renglones.append(_renglon(it))
+    if hay_mas or len(renglones) > MAX_RENGLONES:
+        avisos.append(f"El despacho tiene más de {MAX_RENGLONES} ítems y subítems: "
+                      f"leí sólo los primeros {MAX_RENGLONES}.")
+        renglones = renglones[:MAX_RENGLONES]
     return {"renglones": renglones, "divisa": divisa, "avisos": avisos}
 
 
@@ -513,6 +516,27 @@ class PdfDemasiadoPesado(Exception):
 _SEMAFOROS: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
 
 
+_FINAL_DE_ERRORES = 2000
+
+
+async def _escribir(entrada, data: bytes) -> None:
+    try:
+        entrada.write(data)
+        await entrada.drain()
+    except (BrokenPipeError, ConnectionResetError):
+        pass  # el lector salió antes de leer todo: lo dice su código de salida
+    finally:
+        entrada.close()
+
+
+async def _final(flujo, tope: int) -> bytes:
+    """Los últimos `tope` bytes del flujo, sin juntarlo entero."""
+    final = b""
+    while bloque := await flujo.read(64 * 1024):
+        final = (final + bloque)[-tope:]
+    return final
+
+
 async def leer_despacho_aparte(data: bytes, limite_s: float) -> dict:
     """`leer_despacho` en otro proceso, con la memoria topeada y un tiempo
     máximo. Si pasa del tiempo, el proceso se mata (un hilo no se puede
@@ -534,7 +558,10 @@ async def leer_despacho_aparte(data: bytes, limite_s: float) -> dict:
                 stderr=asyncio.subprocess.PIPE, cwd=str(Path(__file__).resolve().parents[2]),
                 env=entorno)
             try:
-                salida, errores = await proceso.communicate(data)
+                _, salida, errores = await asyncio.gather(
+                    _escribir(proceso.stdin, data), proceso.stdout.read(),
+                    _final(proceso.stderr, _FINAL_DE_ERRORES))
+                await proceso.wait()
             finally:
                 if proceso.returncode is None:
                     proceso.kill()
@@ -544,7 +571,7 @@ async def leer_despacho_aparte(data: bytes, limite_s: float) -> dict:
     codigo, salida, errores = await asyncio.wait_for(correr(), timeout=limite_s)
     if codigo == _SALIDA_SIN_MEMORIA:
         raise PdfDemasiadoPesado(AVISO_SIN_MEMORIA)
-    final = errores.decode("utf-8", "replace")[-2000:]
+    final = errores.decode("utf-8", "replace")
     if codigo != 0:
         raise RuntimeError(f"el lector de despachos salió con {codigo}: {final}")
     try:
@@ -566,6 +593,7 @@ def _main() -> int:
         resource.setrlimit(resource.RLIMIT_AS, (tope, duro))
     except (ImportError, ValueError, OSError) as e:
         print(f"lector de despachos sin tope de memoria: {e}", file=sys.stderr)
+    logging.getLogger("pypdf").setLevel(logging.ERROR)  # un aviso por objeto roto
     try:
         data = sys.stdin.buffer.read()
         sys.stdout.write(json.dumps(leer_despacho(data), ensure_ascii=False))
