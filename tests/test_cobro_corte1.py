@@ -271,6 +271,32 @@ def test_la_organizacion_impaga_corta_a_su_miembro_aunque_el_usuario_diga_active
     assert _operaciones(u) == []
 
 
+@pytest.mark.parametrize("estado", list(ESTADOS))
+def test_regenerar_lo_ya_contado_con_la_cuenta_que_no_esta_al_dia_da_402(cuenta, estado):
+    # Lo ya contado no pasa por el tope, pero sí por el estado.
+    c, u = cuenta()
+    assert _generar(c).status_code == 200
+    campos, code, _, _ = ESTADOS[estado]
+    _fijar(u, **campos)
+    r = _generar(c, flete=8000.0)
+    assert r.status_code == 402, r.text
+    assert r.json()["detail"]["code"] == code
+    assert len(_operaciones(u)[0]["extra"]["maria_hashes"]) == 1
+
+
+@pytest.mark.parametrize("estado", list(ESTADOS))
+def test_guardar_lo_ya_generado_con_la_cuenta_que_no_esta_al_dia_da_402(cuenta, estado):
+    c, u = cuenta()
+    assert _generar(c).status_code == 200
+    cid = _cliente(c)
+    campos, code, _, _ = ESTADOS[estado]
+    _fijar(u, **campos)
+    r = _guardar(c, cid, ARCHIVO_A)
+    assert r.status_code == 402, r.text
+    assert r.json()["detail"]["code"] == code
+    assert _operaciones(u)[0]["cliente"] is None
+
+
 # ------------------------------------------------------------ cuándo se cuenta
 
 
