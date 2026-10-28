@@ -244,5 +244,24 @@ sabotaje $M "sin token, la renovación se da por procesada" \
   $'        if event_type == "subscription_authorized_payment" and not MP_ACCESS_TOKEN:\n            return {"success": True, "skipped": "not a payment event"}\n        if event_type in ("payment", "subscription_authorized_payment"):' \
   "FAILED $T::test_sin_token_el_aviso_de_una_renovacion_no_se_pierde"
 
+# A: ningún pago de antes del registro se vuelve a aplicar, sea o no el último.
+C=proyecto_maria/database/connection.py
+sabotaje $M "sin el control de fecha, un pago viejo se aplica otra vez" \
+  '            control = await _control_de_fecha_mp(session, pay_resp, control)' \
+  '            pass' \
+  "FAILED $T::test_un_pago_viejo_que_no_es_el_ultimo_no_se_aplica_otra_vez[usuario]"
+sabotaje $M "una fecha sin zona se acepta" \
+  '    if aprobado is None or aprobado.tzinfo is None:' \
+  '    if aprobado is None:' \
+  "FAILED $T::test_un_pago_sin_fecha_de_aprobacion_legible_no_se_aplica[sin_zona]"
+sabotaje $C "el inicio del registro es siempre ahora" \
+  '    conn.execute(inicio.insert().values(id=1, desde=desde or datetime.now(timezone.utc)))' \
+  '    conn.execute(inicio.insert().values(id=1, desde=datetime.now(timezone.utc)))' \
+  "FAILED $T::test_el_inicio_del_registro_es_el_primer_pago_registrado_y_no_se_mueve"
+sabotaje $C "el inicio del registro se mueve al rearrancar" \
+  $'    if conn.execute(select(inicio.c.id).where(inicio.c.id == 1)).first() is not None:\n        return\n' \
+  $'    conn.execute(inicio.delete())\n' \
+  "el inicio del registro se movió al rearrancar"
+
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]
