@@ -285,7 +285,8 @@ def test_s6_recuperar_usuario_tiene_limite_por_ip(reloj):
 
 def test_s6_recuperar_usuario_corta_en_silencio_por_email(token, monkeypatch):
     """Tres pedidos por hora para un mismo email, cuente como venga escrito;
-    el cuarto contesta lo mismo pero no manda el mail."""
+    el cuarto contesta lo mismo pero no manda el mail. Desde EMAIL-1 cada
+    variante encuentra la cuenta y el mail va a la dirección guardada."""
     enviados = []
     monkeypatch.setattr(main_mod, "send_email", lambda to, *a, **k: enviados.append(to) or True)
     email = f"{token[0]}@ejemplo.test"
@@ -293,10 +294,10 @@ def test_s6_recuperar_usuario_corta_en_silencio_por_email(token, monkeypatch):
     for variante in (email.upper(), email.capitalize(), email):
         r = c.post(RECUPERAR, json={"email": variante}, headers=_xff(_ip()))
         assert r.status_code == 200 and r.json() == {"message": MSJ_RECUPERAR}, r.text
-    assert enviados == [email]
+    assert enviados == [email] * 3
     r = c.post(RECUPERAR, json={"email": email}, headers=_xff(_ip()))
     assert r.status_code == 200 and r.json() == {"message": MSJ_RECUPERAR}, r.text
-    assert enviados == [email], "el cuarto pedido de la hora mandó el mail"
+    assert enviados == [email] * 3, "el cuarto pedido de la hora mandó el mail"
 
 
 def _registrar(c, real):
