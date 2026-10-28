@@ -267,7 +267,19 @@ sabotaje_pg "sugerir sin rollback si falla el catálogo del proveedor" \
 sabotaje_pg "importar sin el bloqueo por dueño" \
   $'    if not IS_SQLITE:\n        from sqlalchemy import text as sa_text\n        await db.execute(sa_text("SELECT pg_advisory_xact_lock' \
   $'    if False:\n        from sqlalchemy import text as sa_text\n        await db.execute(sa_text("SELECT pg_advisory_xact_lock' \
-  "FALLA | dos importaciones a la vez en orden contrario, vuelta 0: [(500,"
+  "FALLA | dos importaciones a la vez en orden contrario, vuelta 0: [200, 500]" \
+  "FALLA | la carga del archivo de A espera a la importación de A: terminó"
+sabotaje_pg "importar sin tomar el bloqueo (la carga sí lo toma)" \
+  $'    await _bloquear_historial(db, owner_username)\n' '' \
+  "FALLA | dos importaciones a la vez en orden contrario, vuelta 0: [200, 500]" \
+  "FALLA | la carga del archivo de A espera a la importación de A: terminó"
+sabotaje_pg "cargar archivos viejos sin tomar el bloqueo" \
+  $'    await _bloquear_historial(db, dueno)\n' '' \
+  "FALLA | la carga del archivo de A espera a la importación de A: terminó"
+sabotaje_pg "el bloqueo sin el dueño en la clave" \
+  'f"ncm_historial:{owner_username}"' '"ncm_historial:"' \
+  "FALLA | la importación de B no espera el bloqueo de A: esperó" \
+  "FALLA | la carga del archivo de B no espera el bloqueo de A: esperó"
 sabotaje_pg "importar todo en una sola sentencia (Postgres)" \
   '_HISTORIAL_FILAS_POR_SENTENCIA = 150' '_HISTORIAL_FILAS_POR_SENTENCIA = 10**6' \
   "FALLA | importar 7000 filas en Postgres: 500"

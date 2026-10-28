@@ -23,6 +23,8 @@ Comprueba:
 - un NUL o un texto de más da 400, no 500, y no guarda nada;
 - importar 7000 filas entra en tandas, y dos importaciones a la vez con las
   mismas filas en orden contrario no se traban;
+- importar y cargar archivos viejos toman el bloqueo de su dueño: la carga
+  espera a una importación del mismo dueño, y las de otro dueño no esperan;
 - arrancar otra vez, aunque vuelva un archivo, no duplica cuentas;
 - borrar DATA_DIR no borra el historial.
 
@@ -31,6 +33,7 @@ tiene que poder crear bases):
   python scripts/testing/disco1_postgres.py postgresql://cdi@127.0.0.1:55432/postgres [SHA anterior]
 """
 import concurrent.futures
+import hashlib
 import json
 import logging
 import os
@@ -38,6 +41,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import uuid
 from urllib.parse import urlparse
 
@@ -125,6 +129,13 @@ with TestClient(m.app, raise_server_exceptions=False) as c:
             r = c.post("/api/ncm/guardar-uso", json={"descripcion": "Junta sintetica", "ncm": "4016.93.00"})
             assert r.status_code == 200, r.text
 print("vieja ok")
+'''
+
+# La carga de archivos viejos del arranque, sola, en un proceso aparte.
+CARGAR = r'''
+import asyncio
+import proyecto_maria.main as m
+asyncio.run(m._migrate_ncm_historial_archivos())
 '''
 
 
@@ -327,9 +338,107 @@ try:
         for vuelta in range(3):
             with concurrent.futures.ThreadPoolExecutor(2) as ex:
                 rs = list(ex.map(importar, (descs, descs[::-1])))
+            # Los códigos ordenados: cuál de las dos pierde cambia de una vuelta a otra.
             chequear([r.status_code for r in rs] == [200, 200],
                      f"dos importaciones a la vez en orden contrario, vuelta {vuelta}: "
-                     f"{[(r.status_code, r.text[:120]) for r in rs]}")
+                     f"{sorted(r.status_code for r in rs)} {[r.text[:120] for r in rs]}")
+
+        # Cada camino que escribe el historial en tandas (importar y la carga
+        # de archivos viejos) toma el bloqueo de su dueño, y el de otro dueño
+        # no lo espera. Una importación de A queda a mitad de camino con su
+        # bloqueo tomado: otra conexión tiene sin confirmar una fila que esa
+        # importación también escribe. Las sesiones van por Bearer, sin
+        # cookie, para que cada pedido sea de su dueño aunque vayan a la vez.
+        tokens = {}
+        for u in (A, B):
+            c.cookies.clear()
+            r = c.post("/auth/login", json={"username": u, "password": CLAVE})
+            tokens[u] = {"Authorization": f"Bearer {r.json()['access_token']}"}
+        c.cookies.clear()
+
+        def importar_de(u, descs):
+            csv = "descripcion,ncm\n" + "".join(f"{d},8413.19.00\n" for d in descs)
+            return c.post("/api/ncm/import-historial", headers=tokens[u],
+                          files={"file": ("h.csv", csv.encode(), "text/csv")})
+
+        def esperar(que, hasta=120):
+            """Hasta que `que()` dé algo, o None si pasa `hasta` segundos."""
+            fin = time.monotonic() + hasta
+            while time.monotonic() < fin:
+                r = que()
+                if r:
+                    return r
+                time.sleep(0.05)
+            return None
+
+        def en_espera(tipo):
+            # Sólo las esperas de esta base: pg_locks es de todo el servidor y
+            # otra corrida en el mismo Postgres daría un «esperó» falso.
+            return sql("select count(*) from pg_locks l join pg_stat_activity a using (pid)"
+                       " where a.datname = current_database() and l.locktype = %s and not l.granted",
+                       tipo)[0][0]
+
+        def cargar_archivos():
+            """La carga del arranque, en otro proceso con su propia conexión."""
+            # La salida va a un archivo: un caño lleno también lo frenaría.
+            salida = open(os.path.join(TMP, f"carga_{len(procesos)}.log"), "w")
+            return subprocess.Popen([py, "-c", CARGAR], cwd=REPO, env={**os.environ, "PYTHONPATH": REPO},
+                                    stdout=salida, stderr=subprocess.STDOUT)
+
+        trabada = "Pieza sintetica trabada"
+        de_a = [f"Pieza sintetica a{i}" for i in range(300)] + [trabada]
+        tenedor = psycopg2.connect(URL_BASE)
+        procesos = []
+        ex = concurrent.futures.ThreadPoolExecutor(2)
+        try:
+            with tenedor.cursor() as cur:
+                cur.execute("insert into ncm_historial (owner_username, clave, descripcion, ncm, count) "
+                            "values (%s, %s, %s, '8413.19.00', 1)",
+                            (A, hashlib.sha256(trabada.encode()).hexdigest(), trabada))
+            imp_a = ex.submit(importar_de, A, de_a)
+            chequear(esperar(lambda: en_espera("transactionid")) and not imp_a.done(),
+                     "la importación de A queda esperando la fila sin confirmar, con su bloqueo tomado")
+
+            # Otro dueño no espera: importa y carga su archivo viejo.
+            imp_b = ex.submit(importar_de, B, [f"Pieza sintetica b{i}" for i in range(300)])
+            fin_b = esperar(lambda: "terminó" if imp_b.done() else
+                            ("esperó" if en_espera("advisory") else None))
+            chequear(fin_b == "terminó" and imp_b.result().status_code == 200,
+                     f"la importación de B no espera el bloqueo de A: {fin_b} "
+                     f"{imp_b.result().status_code if imp_b.done() else ''}")
+            archivo(B, {f"Arandela sintetica b{i}": {"ncm": "7318.22.00", "count": 2} for i in range(300)})
+            carga = cargar_archivos()
+            procesos.append(carga)
+            fin_cb = esperar(lambda: "terminó" if carga.poll() is not None else
+                             ("esperó" if en_espera("advisory") else None))
+            chequear(fin_cb == "terminó" and carga.returncode == 0
+                     and sum(1 for f in filas(B) if f[0].startswith("Arandela sintetica b")) == 300,
+                     f"la carga del archivo de B no espera el bloqueo de A: {fin_cb} {carga.returncode}")
+
+            # El mismo dueño sí espera: la carga de A queda en el bloqueo.
+            archivo(A, {f"Arandela sintetica a{i}": {"ncm": "7318.22.00", "count": 2} for i in range(300)})
+            carga = cargar_archivos()
+            procesos.append(carga)
+            fin_ca = esperar(lambda: "esperó" if en_espera("advisory") else
+                             ("terminó" if carga.poll() is not None else None))
+            chequear(fin_ca == "esperó" and carga.poll() is None and not imp_a.done(),
+                     f"la carga del archivo de A espera a la importación de A: {fin_ca}")
+
+            tenedor.rollback()
+            r = imp_a.result(timeout=120)
+            carga.wait(timeout=120)
+            ya_a = {f[0] for f in filas(A)}
+            chequear(r.status_code == 200 and carga.returncode == 0 and set(de_a) <= ya_a
+                     and {f"Arandela sintetica a{i}" for i in range(300)} <= ya_a,
+                     f"al soltarse, las dos de A terminan: {r.status_code} {carga.returncode} "
+                     f"{len(set(de_a) - ya_a)} {len({f'Arandela sintetica a{i}' for i in range(300)} - ya_a)}")
+        finally:
+            # Primero se suelta la fila: si algo falló a mitad, lo que espera termina.
+            tenedor.close()
+            for p in procesos:
+                if p.poll() is None:
+                    p.kill()
+            ex.shutdown(wait=True)
 
     # --- otro arranque, con el archivo de A de vuelta
     shutil.copy(os.path.join(DATA_DIR, f"ncm_historial_{A}.json.migrado"),
