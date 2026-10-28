@@ -59,6 +59,11 @@ def test_un_codigo_con_varios_puntos_no_se_toma_como_numero():
     assert mg.limpiar_sufijo("AI(V1.2.3)-")[0] == "AI(V1 2 3)-"
 
 
+def test_un_numero_que_no_es_ascii_no_entra_al_txt():
+    # «٣.٥» son dígitos para Python, no para el MARIA: salen espacio, como antes.
+    assert mg.limpiar_sufijo("AF(2.5 X\u0663.\u0665)-")[0] == "AF(2,5 X   )-"
+
+
 def test_el_aviso_dice_que_el_numero_sale_con_coma():
     avisos = mg.supuestos_declarados([dict(LONA, sufijo="AF(2.5)-")], sbt_sufijo_valor="")
     assert any("ítem 1" in a and "AF(2,5)-" in a for a in avisos), avisos
