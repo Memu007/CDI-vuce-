@@ -2,261 +2,215 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ABUSO-1: S5 hecho; sigo con la D35 (1) que contestaste (2026-10-28)
+## ABUSO-1: hecha, **sin entregar** (2026-10-28)
 
-**Estado.** Tu D35 llegó en `f600ed4` y la integré (merge `ddc1b61`). Sigo
-con a, b, d y e, en ese orden de riesgo: primero D35a y S4. **No hace falta
-que la revises todavía**: va en su propio `/entregar`, después del de
-SESION-1.
+**Estado.** La D35 está hecha entera, como la contestaste en `f600ed4`, con
+S5 adentro. Va en su propio `/entregar`, después del de SESION-1, con
+subagentes, `/code-review high` y `/security-review` cuando vuelva el cupo.
+**No hace falta que la revises todavía.** SHA probado: `43916a7`. Para ver
+sólo esta pieza: `git diff c702655..43916a7 -- . ':!docs'`.
 
-**S5, ya hecho** (sin depender de la D35d):
+### Decisiones
+
+**D36** la contestaste en `eaee1b1`: (2) por ahora; va a riesgos. **D37** es nueva.
+
+**D37. Un `await session.close()` cancelado al terminar el pedido (de
+antes, hallazgo nuevo).** En las pruebas aparece a veces
+`PytestUnhandledThreadExceptionWarning: Exception in thread …
+(_connection_worker_thread) … RuntimeError: Event loop is closed`. Lo rastreé
+con un plugin que registra cada operación de aiosqlite cancelada
+(`$S/plug/rastro_aiosqlite.py`):
+
+- La cancelada es el `await session.close()` del `finally` de
+  `get_async_session` (`database/connection.py:107`), al cerrar la sesión de
+  la dependencia después de mandar la respuesta.
+- **Ya pasaba antes de ABUSO-1.** Sobre la base `895ee73`
+  (static + auth_login + sesion1, 34 passed) se cancela en 2 de 2 corridas
+  (`$S/rastrobase_1.log`, `_2.log`: «=== CANCELADA close en
+  tests/test_auth_login.py::test_login_email_inexistente»), pero la
+  advertencia no apareció en 4 de 4 (`$S/warnbase_*.log`).
+- Con ABUSO-1, la advertencia aparece en 1 de cada 3 corridas, más o menos
+  (`$S/warn_*.log`), en pruebas distintas cada vez. ABUSO-1 abre más
+  conexiones aiosqlite en el camino del 401 y del 429 (la tabla), y el hilo
+  del worker de aiosqlite llega a terminar después de que `TestClient` cerró
+  su loop.
+- **Quién cancela no lo confirmé.** Mi hipótesis es `BaseHTTPMiddleware`
+  (`MetricsMiddleware`, `main.py:1664`, y `CSRFMiddleware`, `:1782`), que en
+  starlette 1.10 corta la tarea de la ruta cuando termina la respuesta. No
+  lo probé sacando los middlewares.
+- **En producción no lo medí.** Con uvicorn el loop es uno solo, así que la
+  advertencia no aplica. Lo que no sé es si un `close` cancelado deja una
+  conexión de Postgres afuera del pool.
+
+1. **(recomendada)** Una pieza aparte y chica, después de esta tanda:
+   uvicorn + PG16 con muchos 401 seguidos, mirando `pg_stat_activity` y el
+   pool. Si quedan conexiones colgadas, pasar esos dos middlewares a ASGI
+   puros. ABUSO-1 no lo toca: es de antes y tocaría `get_db` o los
+   middlewares.
+2. Dejarlo como riesgo, sin pieza.
+
+Mientras tanto no lo oculto: la advertencia queda visible en la suite.
+
+### SHAs
 
 | SHA | Qué |
 |---|---|
-| `584b8d1` | producto y `CHANGELOG.md`: tope de 16 KB en `/api/ui/event` y `/api/session/state` (lee por partes y corta, haya o no `Content-Length`; lo que se pasa da 413 y no se guarda) y deja de escribirse `logs/ui_events.jsonl` |
-| `25158c6` | `tests/test_abuso1.py`, arnés de dos motores y `scripts/testing/sabotajes/abuso1.sh` (5 sabotajes) |
-| `8c37653` | `HANDOFF.md:57` y el texto del `CHANGELOG.md` |
+| `584b8d1` | S5: tope de 16 KB en `/api/ui/event` y `/api/session/state` (lee por partes y corta, haya o no `Content-Length`; lo que se pasa da 413 y no se guarda); deja de escribirse `logs/ui_events.jsonl` |
+| `25158c6`, `8c37653` | S5: pruebas y sabotajes; `HANDOFF.md:57` y `CHANGELOG.md` |
+| `ca7eee9` | D35a: un solo helper de IP (`core/rate_limit.py`) para slowapi y los contadores: la última de `X-Forwarded-For`, descontando `TRUSTED_PROXY_HOPS` (1 por defecto); el 429 del login deja en el log la IP y cuántas entradas traía |
+| `790dd8e` | D35e: tabla `limites_auth` (`clave`, `cuenta`, `bloqueado_hasta`, `vence`), sola en su commit |
+| `a3abd92` | D35b, d y e: login y reset pasan a la tabla; límites de registro, recuperar usuario y eventos; sin sesión, sólo las tres acciones de la landing; `_migrate_limites_auth` borra las vencidas al arrancar |
+| `a2fc7f0` | pruebas de todo lo anterior |
+| `777ebc8` | arreglo: recuperar contraseña con pedidos simultáneos (hallazgo 1) |
+| `74ccb76` | pruebas de pedidos simultáneos, arnés en los dos motores y un sabotaje por regla |
+| `44b43db` | arreglo: una IP de más de 120 caracteres (hallazgo 2) |
+| `43916a7` | pruebas y sabotajes de la IP larga |
 
-Corrido sobre `25158c6`:
+Archivos de producto: `proyecto_maria/core/limites_auth.py` (nuevo),
+`core/rate_limit.py`, `database/models.py`, `main.py`, `HANDOFF.md`,
+`CHANGELOG.md`.
+
+### Qué quedó, regla por regla
+
+| Ruta | Límite | Dónde vive |
+|---|---|---|
+| `/auth/login` | 5 fallos por IP → 15 min; vencido el bloqueo, un fallo más vuelve a bloquear; la cuenta se olvida a las 24 h sin fallos; el login correcto la borra | tabla |
+| `/auth/login` | 5 por minuto (slowapi) | memoria, sin cambios |
+| `/auth/request-password-reset` | el 5.º pedido por IP → 15 min | tabla |
+| `/auth/register` | 5 por hora y 20 por día por IP | tabla |
+| `/auth/recover-username` | 5 cada 15 min por IP (429) y 3 por hora por email (en silencio: misma respuesta, no busca ni manda) | tabla |
+| `/api/ui/event`, `/api/session/state` | 120 por minuto por IP, cada una; 16 KB por evento; sin sesión, sólo `pricing_cta_clicked`, `hero_cta_clicked` y `register_pending_verify` | memoria (slowapi) |
+
+**Tabla.** Cada escritura es un único `INSERT … ON CONFLICT DO UPDATE …
+RETURNING` en su propia transacción: dos pedidos simultáneos no leen la
+misma cuenta. Antes de escribir se borran las vencidas, y al arrancar
+también (`_migrate_limites_auth`, con el patrón de las otras `_migrate_*`).
+Un solo camino, haya o no Redis. `--max-requests` no se tocó.
+
+**Por qué alcanzan los números.**
+
+- **Registro, 5 por hora.** Los tres invitados de ORG-1 desde una oficina
+  son 3. Una demo con más de 5 altas desde la misma red en una hora choca:
+  es la opción 2 de la D35b, que no elegiste.
+- **Recuperar usuario, 5 cada 15 min.** Quien se olvidó el usuario prueba
+  uno o dos emails. El de 3 por hora por email frena que alguien le llene la
+  casilla a otro.
+- **Eventos, 120 por minuto.** El front manda un evento por clic: los 14
+  `track(…)` de `static/v2/app_v2.js` y el de `landing.html:561`; ninguno
+  por temporizador, scroll ni tecla. 120 son dos clics por segundo durante
+  un minuto. Detrás de un NAT con mucha gente, el tope se comparte (riesgos).
+
+**S6 queda mitigada, no cerrada.** Los mensajes del registro siguen
+distinguiendo «Usuario ya existe» y «Email ya registrado» (D35c): con 20
+por día por IP, enumerar sigue siendo posible, sólo que lento.
+
+### Hallazgos nuevos, cada uno con su rojo antes del arreglo
+
+**1. Recuperar contraseña dejaba pasar pedidos simultáneos.** El código
+chequeaba el bloqueo y después sumaba: 20 pedidos a la vez pasaban todos.
+Rojo sobre `74ccb76` con el producto de `a3abd92`, en los dos motores:
+
+```
+INFO  | concurrencia: 20 recuperar contraseña simultáneos → [200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200, 200], cuenta 20
+FALLA | concurrencia: 20 recuperar contraseña simultáneos pasan 5
+pg: FALLAS: 1                    (sqlite: FALLAS: 1, la misma)
+```
+
+Con `777ebc8` se suma antes de seguir, y el que ve una cuenta mayor que el
+tope también se corta: `[200, 200, 200, 200, 200, 429 × 15]`.
+
+**2. Una IP de más de 120 caracteres daba 500 en Postgres.** La IP sale de
+`X-Forwarded-For` y la columna `clave` es de 120. Rojo sobre `43916a7` con
+el producto de `74ccb76`, en PG16 (`$S/motores_pg_larga_rojo.log`):
+
+```
+login, reset, recuperar, registro → [500, 500, 500, 500]; 5 logins más → [500, 500, 500, 500, 429]
+FALLA | una IP larga no rompe las rutas con contador
+FALLA | una IP larga también se bloquea al quinto fallo
+pg: FALLAS: 2
+```
+
+En SQLite no da 500: SQLite no respeta el largo de la columna. Ahí el rojo
+lo dan los sabotajes: guardar la clave cortada sin hash hace que dos IPs
+largas con el mismo comienzo se pisen. Con `44b43db`, una clave de más de
+120 se guarda como sus primeros 50 caracteres, «:» y su sha256 (115 en
+total).
+
+### Puertas, sobre `43916a7`
 
 | Qué | Salida |
 |---|---|
-| `tests/test_abuso1.py` sobre `e25e87c` (rojo antes) | `10 failed, 3 warnings in 2.75s` |
-| `tests/test_abuso1.py` + `tests/test_static_endpoints.py` | `22 passed, 3 warnings in 2.03s` |
-| `abuso1.sh 25158c6` | `sabotajes sin rojo: 0` (5 en rojo, cada uno por su motivo) |
-| `abuso1_motores.py sqlite` | `sqlite: FALLAS: 6`: S4a, S4b, S6, C9 y «un evento sin sesión con una acción cualquiera no se guarda» en las dos rutas. Las seis son de la D35 |
-| `abuso1_motores.py pg` (PG16, 55432) | `pg: FALLAS: 6`, las mismas |
+| `tests/test_abuso1.py` sobre la base, con las pruebas nuevas (rojo antes, `$S/rojo_d35.log`) | `25 failed, 19 passed, 3 warnings in 11.65s` |
+| `tests/test_abuso1.py` | `58 passed, 3 warnings in 26.99s` |
+| `abuso1.sh 43916a7` | 27 `ROJO`, ninguno `ROJO?`; `sabotajes sin rojo: 0`, `salida 0` |
+| `abuso1_motores.py sqlite` | `sqlite: todo OK` |
+| `abuso1_motores.py pg` (PG16, 55432) | `pg: todo OK` |
+| `sesion1_motores.py sqlite` y `pg` | `sqlite: todo OK`, `pg: todo OK` |
+| suite completa (`$S/suite_43916a7.log`) | `3930 passed, 336 skipped, 2 xfailed, 94 warnings in 543.33s (0:09:03)`. Entre las advertencias, las 32 `SAWarning` de conexiones aiosqlite que ya estaban en la base; la advertencia de hilo de la D37 no salió en esta corrida (0) |
 
-Los OK de 5 MB dicen, en los dos motores, «da 413 y no se guarda». El
-cliente ve «connection reset»: el servidor contesta 413 y cierra sin leer los
-5 MB. Por eso el arnés toma el código del log del servidor.
-
-No corrí la suite completa ni el smoke sobre `25158c6`: van en el `/entregar`.
-
-### Decisiones
-
-**D36. Emails que difieren sólo en mayúsculas.** Me pediste comparar sin
-mayúsculas en `/auth/recover-username` y, si dos cuentas pueden tener el
-mismo email cambiando sólo mayúsculas, no tocarlo y abrir esta D. **Pueden:**
-
-- `users.email` es `unique` (`models.py:25`), y en Postgres eso distingue
-  mayúsculas: `Ana@x.com` y `ana@x.com` entran las dos.
-- El registro (`main.py:2922`) y el alta del admin (`:9806`) comparan con
-  `func.lower`, pero el PUT del perfil (`:2001`) busca el duplicado con
-  `User.email == raw_email`: pasa el email a minúsculas y compara contra lo
-  guardado tal cual. Si otra cuenta tiene `Ana@x.com`, el PUT deja guardar
-  `ana@x.com`.
-- `proyecto_maria/scripts/migrate_to_postgres.py:48` copia el email como
-  venga, con mayúsculas.
-
-`/auth/request-password-reset` tiene la misma comparación exacta. Con dos
-cuentas así, «la primera que coincida» puede mandarle el usuario o el link
-de la otra cuenta al dueño de la casilla, que de hecho es el mismo; el
-problema es elegir una sola.
-
-1. **(recomendada)** En una pieza aparte, después de ABUSO-1: recuperar
-   usuario y recuperar contraseña comparan sin mayúsculas y mandan **todas**
-   las cuentas que coincidan a esa casilla (es la misma casilla: no filtra
-   nada a un tercero); y el PUT del perfil busca el duplicado con
-   `func.lower`, para que no se creen más. Antes, una consulta de sólo
-   lectura en producción, que corre Emi, cuenta cuántos pares hay.
-2. Dejarlo como está: quien escriba su email con otras mayúsculas que las
-   guardadas no recupera nada, y el PUT sigue dejando crear pares.
-3. Pasar a minúsculas los emails guardados con una migración de datos. Si
-   ya hay pares, choca con la `unique` y hay que decidir a mano cuál queda.
-
-Mientras tanto, en ABUSO-1 no toco cómo se compara el email. El límite de
-3 por hora por email sí cuenta sin mayúsculas (la clave del contador va en
-minúsculas): si no, cambiar una letra lo esquivaría.
-
-
-Encima de SESION-1 (`895ee73`) y de tu merge `c702655`, sin cambios de
-producto. Por ahora sólo pruebas: `b08dbc0` (reproducción en dos motores) y
-`scripts/testing/abuso1_reciclado.sh` (el reciclado del worker, D35e).
-
-### Decisiones
-
-**D35. Cómo se cierran S4, S6 y C9.** Hay cinco partes. Sin la a, la b y la
-e no puedo arreglar S4, S6 ni C9. La c y la d cambian lo que ve el cliente o
-Emi. Recomiendo la (1) en todas.
-
-**D35a. Qué IP se toma detrás del proxy de Railway.** No lo pude mirar:
-`docs.railway.com` no está en la red de esta sesión. Mi supuesto es que el
-proxy de Railway es el que conecta y **agrega** la IP del cliente al final
-de `X-Forwarded-For`. Hoy el código toma la **primera**, que es la que
-escribe el cliente.
-
-1. **(recomendada)** Un solo helper, usado por `login_attempts`,
-   `reset_attempts` y slowapi, que toma la **última** IP de
-   `X-Forwarded-For` (la que puso el proxy). Cuántos saltos se descuentan
-   es configurable, con 1 por defecto. Sin `X-Forwarded-For` usa
-   `client.host`.
-2. `X-Real-IP`. No sé si Railway lo manda; si no lo manda, se vuelve a la
-   opción 1.
-3. Que uvicorn reescriba la IP con `FORWARDED_ALLOW_IPS="*"`. **No sirve:**
-   si confía en todos, uvicorn 0.54 toma la primera de la lista
-   (`uvicorn/middleware/proxy_headers.py:176-177`), y esa la escribe el
-   cliente.
-
-Qué pasa con la opción 1 si el supuesto falla:
-
-| Si Railway… | Resultado |
-|---|---|
-| pisa `X-Forwarded-For` con la IP del cliente | igual funciona |
-| no manda `X-Forwarded-For` | todos comparten la IP del proxy y 5 fallos de cualquiera bloquean el login de todos por 15 min; **hoy pasa lo mismo**, no empeora |
-| tiene Cloudflare delante (`docs/guides/01_PROYECTO.md:280` lo nombra «para frontend») | la última IP es la del borde de Cloudflare: el bloqueo pasa a ser por ciudad. Hoy, en ese caso, la IP se falsifica |
-
-Cómo saberlo sin mirar Railway: propongo que el 429 del login deje en el
-log la IP que tomó y cuántas entradas traía `X-Forwarded-For`. Si después
-del deploy todas las IPs son iguales, el supuesto falló.
-
-**D35b. Los números.** Todos son por IP real.
-
-1. **(recomendada)**
-
-   | Ruta | Límite |
-   |---|---|
-   | `/auth/register` | 5 por hora y 20 por día |
-   | `/auth/recover-username` | 5 cada 15 min, y además 3 por hora por email. El de email es silencioso: misma respuesta genérica y no manda el mail, así no revela si existe |
-   | `/api/ui/event` y `/api/session/state` | 120 por minuto cada una |
-   | Login | sigue como está: 5 por minuto y 5 fallos → 15 min |
-   | Pedir el reset | sigue como está: el 5.º intento → 15 min |
-
-   El tope del cuerpo de 16 KB no depende de la D35: va en S5 como supuesto
-   reversible, porque `props` ya se recorta a 8000.
-2. Más laxos (registro 20 por hora), si Emi espera altas en grupo desde una
-   misma oficina o en una demo.
-3. Los que diga Emi.
-
-**D35c. Qué dice el registro si el email o el usuario ya existen.** Hoy
-devuelve 400 «Usuario ya existe» y 400 «Email ya registrado. Usa otro email
-o ingresa con tu cuenta existente.». Además, con
-`EMAIL_VERIFICATION_REQUIRED=false` (`HANDOFF.md:72`, la beta) un alta
-exitosa devuelve el token al instante, así que **el éxito ya distingue**.
-Un mensaje genérico no esconde nada.
-
-1. **(recomendada)** Dejar los mensajes y frenar con el límite de la D35b.
-2. Prender la verificación de email y contestar siempre «si el email es
-   válido te llega un mail». Cierra la enumeración, pero necesita SMTP en
-   producción (no lo puedo ver) y cambia el flujo de la beta. Sería otra
-   pieza.
-3. Un mensaje ambiguo («No se pudo registrar con esos datos»). No cierra
-   nada y es peor para el que se equivocó.
-
-**D35d. Eventos sin sesión.** Tu prueba dice «un evento sin sesión no se
-guarda». Pero `landing.html:555` manda sin sesión `pricing_cta_clicked`,
-`hero_cta_clicked` y `register_pending_verify`, y los KPIs del panel los
-cuentan.
-
-1. **(recomendada)** Sin sesión se guardan sólo esas tres acciones, con el
-   límite de la D35b; cualquier otra acción, no.
-2. Ningún evento sin sesión, como dice la prueba. Desde el deploy esos KPIs
-   de la landing quedan en 0.
-
-**D35e. El reciclado del worker borra los contadores (hallazgo nuevo).**
-El `Dockerfile:67-73` corre gunicorn con `--max-requests 1000`. Sin
-`REDIS_URL`, los contadores de login, de reset y de slowapi viven en la
-memoria del worker, y el worker se reinicia cada 1000 a 1050 pedidos de
-cualquiera. Lo probé con `--max-requests 20` (`$S/abuso1_reciclado.log`):
-
-```
-7 logins fallidos: 401 401 401 401 401 429 429
-25 pedidos a /health: hechos
-workers arrancados: 2
-login fallido después: 401
-FALLA: el reciclado borró el bloqueo
-```
-
-Con 1000 pedidos baratos a `/health` (unos segundos), el bloqueo se va. Con
-la D35a arreglada, **todos los límites de ABUSO-1 se esquivan así**.
-
-1. **(recomendada)** Los contadores de autenticación (login, reset,
-   registro, recuperar) pasan a una tabla chica en la base, que se crea al
-   arrancar como las demás. Los de eventos quedan en memoria: si se borran,
-   entran más filas, pero de tamaño acotado. Agranda ABUSO-1 y toca datos,
-   así que va con revisión fuerte.
-2. Sacar `--max-requests` del Dockerfile. Es barato, pero los contadores
-   igual se borran en cada deploy o caída, y si había una fuga de memoria
-   que eso tapaba, vuelve.
-3. Dejarlo como riesgo y hacerlo en otra pieza. ABUSO-1 cumpliría tus
-   pruebas, pero el abuso seguiría abierto.
-
-### Premisa: se reproduce todo, en SQLite y en PG16 (55432)
-
-**Qué limitador hay hoy y con qué clave cuenta.** Las dos funciones de
-`core/rate_limit.py` (`_get_forwarded_address`, que es la clave de slowapi,
-y `get_client_ip`) toman la **primera** IP de `X-Forwarded-For`; sin ese
-encabezado, `client.host`. El almacenamiento es `MemoryStorage`, porque no
-hay `REDIS_URL`.
-
-| Ruta | Límite hoy | Clave |
-|---|---|---|
-| `/auth/login` | 5 por minuto (slowapi) + 5 fallos → 15 min (`login_attempts`, en memoria) | primera de XFF |
-| `/auth/request-password-reset` | el 5.º intento → 15 min (`reset_attempts`) | primera de XFF |
-| `/auth/reset-password` | 5 por minuto | primera de XFF |
-| `/auth/resend-verification` | 3 por minuto | primera de XFF |
-| `/auth/register`, `/auth/recover-username`, `/api/ui/event`, `/api/session/state` | **ninguno** | — |
-
-**Cómo se reprodujo.** `scripts/testing/abuso1_motores.py` levanta uvicorn
-con `--no-proxy-headers`. Así `client.host` es el que conecta, como en
-Railway. Simula al proxy poniendo la IP real **al final** de
-`X-Forwarded-For`. Cada chequeo dice lo que tiene que pasar con el abuso
-cerrado.
-
-Lo corrí de a un motor: la primera vez los dos escribían a la vez en
-`logs/ui_events.jsonl` y los bytes salían mezclados. La salida es igual en
-los dos motores, salvo la última línea (`$S/abuso1_premisa_sqlite.log` y
-`_pg.log`):
-
-```
-INFO  | S4a: 30 logins fallidos rotando X-Forwarded-For: [401]
-FALLA | S4a: rotar la IP inventada no esquiva el bloqueo de login
-INFO  | S4b: login correcto de la víctima después: 429 ''
-FALLA | S4b: inventar la IP de otro no lo bloquea
-INFO  | S5 /api/ui/event: 5 MB sin sesión → 200, JSONL +5243100 bytes, filas [(None, 8000)]
-FALLA | S5 /api/ui/event: un evento de 5 MB sin sesión no se guarda
-INFO  | S5 /api/ui/event: 5 MB con sesión → 200, JSONL +5243109 bytes, filas [('ab1_eventos', 8000)]
-FALLA | S5 /api/ui/event: un evento de 5 MB con sesión no se guarda
-INFO  | S5 /api/ui/event: evento chico sin sesión con una acción inventada → 200, filas [(None, 41)]
-FALLA | S5 /api/ui/event: un evento sin sesión con una acción cualquiera no se guarda
-OK    | S5 /api/ui/event: un evento chico con sesión se guarda a su nombre ([('ab1_eventos', 41)])
-(las mismas cinco líneas para /api/session/state)
-INFO  | S6: 30 pedidos de recuperar usuario desde una IP: [200]
-FALLA | S6: recuperar usuario tiene límite por IP
-INFO  | S6: registrar un usuario que existe → 400 'Usuario ya existe'
-INFO  | S6: registrar un email que existe → 400 'Email ya registrado. Usa otro email o ingresa con tu cuenta existente.'
-INFO  | C9: 30 registros desde una IP: [200], altas: 30
-INFO  | C9: estado de las altas: [('trial', 30)]
-FALLA | C9: registrarse tiene límite por IP
-sqlite: FALLAS: 10        pg: FALLAS: 10
-```
-
-Qué muestra:
-
-- **S4.** Rotar la IP inventada nunca llega al 429, y 8 logins con la IP de
-  la víctima la dejan afuera. Todo esto con el supuesto de la D35a.
-- **S5.** Cada pedido de 5 MB suma 5 MB a un JSONL que ningún código lee:
-  sólo lo nombra `HANDOFF.md:57`, y la IP que guarda es la del proxy.
-  Además, cada pedido guarda una fila de 8000 caracteres.
-- **S6 y C9.** Sin límite ninguno de los dos. Cada alta da 14 días de prueba.
+No corrí todavía: `smoke_friccion.sh`, `ataque_aislamiento.sh`, subagentes,
+`/code-review` ni `/security-review`. Van en el `/entregar`.
 
 ### Riesgos y fuera de alcance
 
-- **Fila 14 de Argon** (el login exitoso reinicia el contador; bloqueo
-  perpetuo del pedido de reset): no la toco. La opción 1 de la D35e la
-  dejaría igual: sólo cambia dónde vive el contador, no cuándo se borra.
-- **X1** (sugerencias de NCM sin tope): no la toco.
-- **`scripts/testing/sesion1_motores.py`** esquiva el límite de login
-  mandando una IP inventada distinta en cada pedido. Con S4 arreglado
-  deja de servir, y lo ajusto en esta pieza.
-- **`recover-username` y mayúsculas:** lo arreglo en esta pieza, como dijiste
-  en la D35. Si dos cuentas pueden tener el mismo email cambiando sólo
-  mayúsculas, no lo toco y abro la D36.
-- **Un token revocado sigue firmando eventos.** `_jwt_sub_from_token_text`
-  (eventos de uso) mira la firma y el vencimiento, pero no la revocación:
-  después de cerrar sesión, ese token puede seguir guardando eventos a nombre
-  del usuario hasta que vence. Sólo afecta la telemetría. Es de antes y no lo
-  toco.
+- **El límite de 5 por minuto del login sigue en memoria** (slowapi), como
+  pediste: el reciclado del worker lo borra. El bloqueo de 5 fallos sí está
+  en la tabla.
+- **Login: chequea y después suma.** Con pedidos paralelos pasan algunos
+  fallos de más antes del bloqueo; cada uno queda contado y el siguiente
+  pedido ve el bloqueo. En reset sí lo arreglé, porque ahí el tope es el
+  pedido mismo.
+- **`logging_middleware` sigue tomando la primera IP** de
+  `X-Forwarded-For` para el log de acceso. No decide nada; sólo el log.
+- **Si Railway no manda `X-Forwarded-For`** (corrección a lo que dije en la
+  D35a): sin el encabezado se usa `client.host`, el proxy, y todos comparten
+  el contador. Pero si el cliente manda su propio `X-Forwarded-For` y
+  Railway no lo toca, la última entrada la escribe el cliente y la IP se
+  falsifica. El log del 429 del login (IP y cantidad de entradas) es lo que
+  lo muestra después del deploy.
+- **La tabla crece con IPs inventadas** si el cliente controla la última
+  entrada (el caso anterior): una fila por IP, que se borra al vencer.
+- **Menos entradas que saltos:** con `TRUSTED_PROXY_HOPS` mayor que las
+  entradas, se toma la primera (`partes[0]`), que la escribe el cliente.
+- **Los límites de registro, recuperar usuario y eventos se apagan con
+  `limiter.enabled`**; login y reset se aplican siempre.
+- **120 por minuto compartido detrás de un NAT.** Una oficina grande en una
+  IP comparte el tope de eventos; lo que se pasa da 429 y no se guarda.
+- **Recuperar por email no cuenta si la IP ya se pasó:** el 429 por IP
+  corta antes.
+- **Los registros rechazados cuentan** para el tope por hora y por día.
+- **El olvido de los fallos del login es de 24 h deslizantes:** cada fallo
+  lo corre 24 h.
+- **Un token revocado sigue firmando eventos** hasta que vence
+  (`_jwt_sub_from_token_text` no mira la revocación). Sólo telemetría; es de
+  antes.
+- **Emails que difieren sólo en mayúsculas** (D36, (2) por ahora). Dos
+  cuentas pueden tener el mismo email cambiando sólo mayúsculas
+  (`users.email` es `unique` y en Postgres distingue mayúsculas). Comparan
+  exacto `/auth/request-password-reset` (`main.py:1529`) y
+  `/auth/recover-username` (`:1591`): quien escribe su email con otras
+  mayúsculas no recupera nada. El PUT del perfil (`:2027`) busca el
+  duplicado con `User.email == raw_email` (ya en minúsculas) y deja crear
+  pares. El contador de 3 por hora por email sí va en minúsculas.
+- **`close` cancelado de `get_db`:** D37.
+- **Fila 14 de Argon y X1:** fuera de alcance, no los toqué.
+
+### Supuestos reversibles
+
+- El 413 corta a los 16 KB por evento, aunque `props` ya se recortaba a 8000.
+- La clave de una IP larga es su comienzo y su sha256 (hallazgo 2).
+- La clave del contador por email es el sha256 del email, no el email, para
+  no guardar emails en la tabla.
+
+### Comandos
+
+```bash
+git fetch origin claude/dev-maria && git checkout --detach 43916a7
+# venv con requirements; Postgres descartable en 55432
+PY=python bash scripts/testing/sabotajes/abuso1.sh 43916a7   # «sabotajes sin rojo: 0»
+python scripts/testing/abuso1_motores.py sqlite              # «sqlite: todo OK»
+python scripts/testing/abuso1_motores.py pg postgresql://cdi@127.0.0.1:55432/postgres   # «pg: todo OK»
+```
 
 ## SESION-1: hecha, **sin entregar** (2026-10-28)
 
@@ -1687,6 +1641,6 @@ PY=<venv>/bin/python scripts/testing/sabotajes/despacho1a.sh 51890cd
 - **El 400 «es para otro email»** dice que el email escrito no es el
   invitado. No dice cuál es. Hace falta el token para preguntar.
 
-Última vuelta: Wed Oct 28 10:27:33 UTC 2026
+Última vuelta: Wed Oct 28 11:29:47 UTC 2026
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 contestada (a) en 3da0a8b, costos en riesgos. DATOS-1 (D5+D32 (a) borrar cliente borra sus presupuestos compartidos, D2 /health 503, D6 sin dev_detail) hecha y subida SIN ENTREGAR encima de d01f95c: producto 7d09c6f, casos 4416076, Postgres y sabotajes 162d277, arreglo de casos que gastaban el cupo de test_user c996ad4; SHA probado c996ad4 (test_datos1 9 passed; sabotajes datos1.sh 12/12; suite 3836 passed, 336 skipped, 2 xfailed, 0 failed; datos1_postgres.py fallas 0; smoke y aislamiento 0 sobre 162d277); su propio /entregar después del de DESPACHO-1b, con /security-review. Postgres 16 descartable en /tmp/cdi-pg55432, puerto 55432, base datos1a. DISCO-1 (historial de NCM de DATA_DIR a la tabla ncm_historial por dueño; carga única de archivos viejos a .migrado) hecha SIN ENTREGAR encima de c996ad4 y del merge cf84a76 (PM 1f6e0de): producto bd53fc4, casos y sabotajes 0f1161a, Postgres y textos de sabotajes 88b22c8; SHA probado 88b22c8 (test_disco1 11 passed; sabotajes disco1.sh 20/20; suite 3847 passed, 336 skipped, 2 xfailed, 0 failed; disco1_postgres.py fallas 0 y con sabotaje de carrera fallas 1; smoke y aislamiento 0); D33 contestada (a) en a3efc3a, riesgo anotado en DISCO-1; va en su propio /entregar, con subagentes, /code-review high y /security-review. OBSERVABILIDAD-1 (api_logs.owner_username nullable con su índice al arrancar, helper _migrate_add_api_logs_owner_column en main.py; si falla, log y la app sigue) hecha SIN ENTREGAR encima de 88b22c8: producto y CHANGELOG 8b1ce3b, casos, arnés y sabotajes 7ae35ab, merge de la PM 39be45e; SHA probado 39be45e (test_observabilidad1 8 passed; observabilidad1_arranque.py con Postgres 55432 38 OK fallas 0; sabotajes observabilidad1.sh con PG_URL 16/16 sobre 7ae35ab; suite 3855 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D34 contestada (a) en 486e655 (sólo la columna; la métrica sigue sin dueño); va en su propio /entregar después del de DISCO-1, con subagentes, /code-review high y /security-review. SESION-1 (S3: revocar_sesiones nunca escribe NULL en active_jti; change-password cierra las otras y conserva la propia; reset cierra todas; /auth/logout y /logout revocan el token sólo si es el vigente; PUT /api/user/profile pide current_password si cambia el email, 400) hecha SIN ENTREGAR encima de 39be45e y del merge f5160d7 (PM 486e655): producto y CHANGELOG 7dfe144, casos, motores, pantalla y sabotajes 014a3e4, arreglo 4c1ae09 (jti_de_la_request en vez de request.state: la suite sobre 014a3e4 dio 1 failed en test_auth_invalid_plan), sabotajes ajustados 895ee73; SHA probado 895ee73 (test_sesion1 17 casos, rojo en base 11 failed; sesion1_motores.py sqlite y pg 26 OK, todo OK, rojo en base FALLAS 12; sabotajes sesion1.sh 19/19; pantalla 3/3; suite 3872 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); va en su propio /entregar después del de OBSERVABILIDAD-1, con subagentes, /code-review high y /security-review. ABUSO-1 (S4 IP de login desde XFF, S5 eventos sin tope, S6 recuperar usuario sin límite, C9 registro sin límite) en curso encima de 895ee73 y del merge c702655: premisa con scripts/testing/abuso1_motores.py (b08dbc0) y abuso1_reciclado.sh. S5 hecho: producto y CHANGELOG 584b8d1 (tope 16 KB, 413, sin logs/ui_events.jsonl), casos, arnés y sabotajes 25158c6, HANDOFF 8c37653; sobre 25158c6 abuso1.sh sabotajes sin rojo 0, motores sqlite y pg FALLAS 6 (S4a, S4b, S6, C9, anónimo en las dos rutas: todas de la D35). D35 contestada por la PM en f600ed4 (merge ddc1b61): (1) en las cinco. a: un helper con la última IP de XFF, saltos configurables (1), log obligatorio en el 429 del login con IP tomada y cantidad de entradas. b: registro 5/hora y 20/día, recuperar 5 cada 15 min por IP y 3/hora por email silencioso, eventos 120/min por ruta; justificar en el informe. c: los mensajes quedan; S6 mitigada, no cerrada. d: anónimos sólo pricing_cta_clicked, hero_cta_clicked y register_pending_verify, lista explícita con límite. e: contadores de login y recuperación en tabla, incremento atómico con prueba en paralelo en PG16, filas vencidas se borran, _migrate_* al arrancar, un solo camino con o sin REDIS_URL, commit propio para la tabla; el 5/min de slowapi queda en memoria (riesgo). recover-username compara email sin mayúsculas con prueba; si dos cuentas pueden diferir sólo en mayúsculas, no tocar y abrir D36. Ajustar sesion1_motores.py y tests/test_static_endpoints.py:74. Riesgo anotado: _jwt_sub_from_token_text no mira revocación. ABUSO-1 va con su propio /entregar después del de SESION-1, revisión fuerte. D36 (emails que difieren sólo en mayúsculas) escrita y sin contestar; en ABUSO-1 no se toca la comparación del email. La próxima D es la D37. Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review), DESPACHO-1b, DATOS-1, DISCO-1, OBSERVABILIDAD-1 y SESION-1; timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 contestada (a) en 3da0a8b, costos en riesgos. DATOS-1 (D5+D32 (a) borrar cliente borra sus presupuestos compartidos, D2 /health 503, D6 sin dev_detail) hecha y subida SIN ENTREGAR encima de d01f95c: producto 7d09c6f, casos 4416076, Postgres y sabotajes 162d277, arreglo de casos que gastaban el cupo de test_user c996ad4; SHA probado c996ad4 (test_datos1 9 passed; sabotajes datos1.sh 12/12; suite 3836 passed, 336 skipped, 2 xfailed, 0 failed; datos1_postgres.py fallas 0; smoke y aislamiento 0 sobre 162d277); su propio /entregar después del de DESPACHO-1b, con /security-review. Postgres 16 descartable en /tmp/cdi-pg55432, puerto 55432, base datos1a. DISCO-1 (historial de NCM de DATA_DIR a la tabla ncm_historial por dueño; carga única de archivos viejos a .migrado) hecha SIN ENTREGAR encima de c996ad4 y del merge cf84a76 (PM 1f6e0de): producto bd53fc4, casos y sabotajes 0f1161a, Postgres y textos de sabotajes 88b22c8; SHA probado 88b22c8 (test_disco1 11 passed; sabotajes disco1.sh 20/20; suite 3847 passed, 336 skipped, 2 xfailed, 0 failed; disco1_postgres.py fallas 0 y con sabotaje de carrera fallas 1; smoke y aislamiento 0); D33 contestada (a) en a3efc3a, riesgo anotado en DISCO-1; va en su propio /entregar, con subagentes, /code-review high y /security-review. OBSERVABILIDAD-1 (api_logs.owner_username nullable con su índice al arrancar, helper _migrate_add_api_logs_owner_column en main.py; si falla, log y la app sigue) hecha SIN ENTREGAR encima de 88b22c8: producto y CHANGELOG 8b1ce3b, casos, arnés y sabotajes 7ae35ab, merge de la PM 39be45e; SHA probado 39be45e (test_observabilidad1 8 passed; observabilidad1_arranque.py con Postgres 55432 38 OK fallas 0; sabotajes observabilidad1.sh con PG_URL 16/16 sobre 7ae35ab; suite 3855 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D34 contestada (a) en 486e655 (sólo la columna; la métrica sigue sin dueño); va en su propio /entregar después del de DISCO-1, con subagentes, /code-review high y /security-review. SESION-1 (S3: revocar_sesiones nunca escribe NULL en active_jti; change-password cierra las otras y conserva la propia; reset cierra todas; /auth/logout y /logout revocan el token sólo si es el vigente; PUT /api/user/profile pide current_password si cambia el email, 400) hecha SIN ENTREGAR encima de 39be45e y del merge f5160d7 (PM 486e655): producto y CHANGELOG 7dfe144, casos, motores, pantalla y sabotajes 014a3e4, arreglo 4c1ae09 (jti_de_la_request en vez de request.state: la suite sobre 014a3e4 dio 1 failed en test_auth_invalid_plan), sabotajes ajustados 895ee73; SHA probado 895ee73 (test_sesion1 17 casos, rojo en base 11 failed; sesion1_motores.py sqlite y pg 26 OK, todo OK, rojo en base FALLAS 12; sabotajes sesion1.sh 19/19; pantalla 3/3; suite 3872 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); va en su propio /entregar después del de OBSERVABILIDAD-1, con subagentes, /code-review high y /security-review. ABUSO-1 (D35 (1) en las cinco, de f600ed4: IP desde XFF con TRUSTED_PROXY_HOPS, contadores de login y recuperación en la tabla limites_auth, registro 5/hora y 20/día, recuperar 5/15 min por IP y 3/hora por email, eventos 120/min, anónimos con lista explícita) hecha y subida SIN ENTREGAR encima de 895ee73: S5 584b8d1, 25158c6, 8c37653; IP ca7eee9; tabla 790dd8e; producto a3abd92; pruebas a2fc7f0; arreglo de concurrencia en reset 777ebc8 y sus pruebas 74ccb76; IP larga en la clave 44b43db y sus pruebas 43916a7; SHA probado 43916a7 (test_abuso1 58 passed, rojo en base 25 failed; abuso1_motores.py y sesion1_motores.py sqlite y pg todo OK; sabotajes abuso1.sh 27 ROJO, sin rojo 0; suite 3930 passed, 336 skipped, 2 xfailed, 0 failed); ver solo la pieza con git diff c702655..43916a7 -- . ':!docs'. D36 contestada (2) en eaee1b1: no se toca la comparación del email; en riesgos los dos lugares que comparan exacto y el PUT que deja crear pares. D37 abierta (close cancelado de conexiones con PG / advertencia de hilo; recomiendo pieza aparte); no bloquea. La próxima D es la D38. Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review), DESPACHO-1b, DATOS-1, DISCO-1, OBSERVABILIDAD-1, SESION-1 y ABUSO-1 (revisión fuerte, /security-review, smoke y ataque_aislamiento); timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
