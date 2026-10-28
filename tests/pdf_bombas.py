@@ -77,6 +77,42 @@ def muchas_fuentes(fuentes, kb):
     return _pdf(armar)
 
 
+def trabajo(hojas=20, operaciones=14000):
+    """`hojas` hojas que comparten un contenido de menos de 512 KB con
+    `operaciones` operaciones de texto: el PDF pesa unos 50 KB y cada hoja
+    queda debajo del tope de bytes, pero leerla cuesta casi un segundo."""
+    lineas = b"".join(b"BT /F1 9 Tf %d %d Td (XX) Tj ET\n" % (i % 800, i % 500) for i in range(operaciones))
+
+    def armar(add, objs):
+        z = zlib.compress(lineas, 9)
+        c = add(b"<< /Length %d /Filter /FlateDecode >>\nstream\n" % len(z) + z + b"\nendstream")
+        return _hojas(add, objs, [c] * hojas)
+    return _pdf(armar)
+
+
+def run_length(mb):
+    """Una hoja cuyo contenido, con RunLengthDecode, se infla a `mb` MB (128
+    espacios cada dos bytes), y después una hoja normal. Los topes de pypdf
+    no son sólo para Flate."""
+    def armar(add, objs):
+        crudo = b"BT /F1 9 Tf 20 500 Td (HOJA INFLADA) Tj ET\n"
+        data = bytes([len(crudo) - 1]) + crudo + b"\x81 " * ((mb << 20) // 128) + b"\x80"
+        inflada = add(b"<< /Length %d /Filter /RunLengthDecode >>\nstream\n" % len(data) + data
+                      + b"\nendstream")
+        return _hojas(add, objs, [inflada, _flujo(add, b"BT /F1 9 Tf 20 500 Td (HOJA NORMAL) Tj ET\n", 0)])
+    return _pdf(armar)
+
+
+def texto_largo(hojas, lineas=100, ancho=4000):
+    """`hojas` hojas con `lineas` líneas de `ancho` letras cada una, en letra
+    de un punto: cada hoja da unos 400 000 caracteres de texto."""
+    def armar(add, objs):
+        fila = b"X" * ancho
+        contenido = b"".join(b"BT /F1 1 Tf 0 %d Td (%s) Tj ET\n" % (590 - 5 * i, fila) for i in range(lineas))
+        return _hojas(add, objs, [_flujo(add, contenido, 0) for _ in range(hojas)])
+    return _pdf(armar)
+
+
 # Corre en un python nuevo: arma la bomba, la lee con `leer_despacho_aparte`
 # e imprime el resultado y la memoria máxima del proceso que leyó y la propia.
 MEDIR = r"""

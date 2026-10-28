@@ -353,8 +353,9 @@ def _subir(client, cid, data=None):
                                        "application/pdf")})
 
 
-def _guardar(client, cid, renglones):
-    return client.post(f"/api/clientes/{cid}/catalogo/despacho/guardar", json={"renglones": renglones})
+def _guardar(client, cid, renglones, divisa="USD"):
+    return client.post(f"/api/clientes/{cid}/catalogo/despacho/guardar",
+                       json={"renglones": renglones, "divisa": divisa})
 
 
 def _catalogo(client, cid):
@@ -949,4 +950,362 @@ def test_el_lector_no_hereda_los_secretos_del_proceso(monkeypatch):
     monkeypatch.setattr(despacho_lector.asyncio, "create_subprocess_exec", mirar)
     r = asyncio.run(despacho_lector.leer_despacho_aparte(_despacho(), 60))
     assert r["renglones"], r
-    assert entornos and set(entornos[0]) <= {"PATH", "HOME", "LANG", "LC_ALL", "PYTHONUSERBASE"}
+    assert entornos and set(entornos[0]) <= {"PATH", "HOME", "LANG", "LC_ALL", "PYTHONUSERBASE",
+                                             "PYTHON_DOTENV_DISABLED"}
+    # El lector de facturas carga el .env al importarse: el hijo no lo lee.
+    assert entornos[0]["PYTHON_DOTENV_DISABLED"] == "1"
+
+
+# --- DESPACHO-1b, devolución 20:07 -----------------------------------------
+
+def test_un_pdf_que_da_mucho_trabajo_deja_de_leerse_por_tiempo_de_cpu():
+    """20 hojas que comparten un contenido de 14 000 operaciones pesan 50 KB y
+    costaban casi un segundo cada una: el tope de bytes no las frenaba."""
+    from proyecto_maria.core.despacho_lector import leer_despacho
+    from tests.pdf_bombas import trabajo
+    leido = leer_despacho(trabajo(60), 0.5)
+    [aviso] = [a for a in leido["avisos"] if a.startswith("El PDF da demasiado trabajo: leí hasta la hoja ")]
+    assert int(aviso.rsplit(" ", 1)[1].rstrip(".")) < 60, aviso
+
+
+def test_el_lector_aparte_usa_el_tope_de_cpu_que_recibe():
+    from proyecto_maria.core.despacho_lector import leer_despacho_aparte
+    from tests.pdf_bombas import trabajo
+    leido = asyncio.run(leer_despacho_aparte(trabajo(60), 120, limite_cpu_s=0.5))
+    assert any(a.startswith("El PDF da demasiado trabajo") for a in leido["avisos"]), leido["avisos"]
+
+
+def test_el_lector_aparte_tiene_tope_de_cpu_sin_pedirlo():
+    """40 hojas de casi un segundo: sin tope, el lector seguía unos 40 s."""
+    from proyecto_maria.core.despacho_lector import leer_despacho_aparte
+    from tests.pdf_bombas import trabajo
+    leido = asyncio.run(leer_despacho_aparte(trabajo(40), 120))
+    assert any(a.startswith("El PDF da demasiado trabajo") for a in leido["avisos"]), leido["avisos"]
+
+
+# El lector se reemplaza por uno falso: «cuenta» se anota en una carpeta y
+# mira cuántos hay anotados a la vez; «espera» no termina hasta que aparece
+# el archivo «soltar»; «rapido» contesta enseguida; «lista» contesta una
+# lista; «sale5» sale con 5 sin leer lo que le mandan.
+_HIJO_FALSO = r"""
+import json, os, sys, time
+carpeta, modo = sys.argv[1], sys.argv[2]
+if modo == "cuenta":
+    yo = os.path.join(carpeta, str(os.getpid()))
+    open(yo, "w").close()
+    vivos, fin = 0, time.monotonic() + 0.3
+    while time.monotonic() < fin:
+        vivos = max(vivos, len(os.listdir(carpeta)))
+        time.sleep(0.01)
+    os.remove(yo)
+    print(json.dumps({"vivos": vivos}))
+elif modo == "espera":
+    hasta = time.monotonic() + 30
+    while not os.path.exists(os.path.join(carpeta, "soltar")) and time.monotonic() < hasta:
+        time.sleep(0.01)
+    print(json.dumps({"renglones": []}))
+elif modo == "rapido":
+    print(json.dumps({"renglones": []}))
+elif modo == "lista":
+    print("[]")
+elif modo == "sale5":
+    sys.exit(5)
+"""
+
+
+def _lector_falso(monkeypatch, carpeta, modos):
+    from proyecto_maria.core import despacho_lector
+    real = asyncio.create_subprocess_exec
+
+    async def falso(*args, **kwargs):
+        return await real(sys.executable, "-c", _HIJO_FALSO, str(carpeta), modos.pop(0), **kwargs)
+
+    monkeypatch.setattr(despacho_lector.asyncio, "create_subprocess_exec", falso)
+
+
+def test_como_mucho_dos_lectores_a_la_vez(monkeypatch, tmp_path):
+    from proyecto_maria.core.despacho_lector import leer_despacho_aparte
+    _lector_falso(monkeypatch, tmp_path, ["cuenta"] * 5)
+
+    async def cinco():
+        return await asyncio.gather(*(leer_despacho_aparte(b"%PDF", 30, clave=f"usuario {n}")
+                                      for n in range(5)))
+
+    assert max(r["vivos"] for r in asyncio.run(cinco())) == 2
+
+
+def test_un_usuario_lee_un_despacho_a_la_vez_y_no_frena_a_otro(monkeypatch, tmp_path):
+    """Dos pedidos lentos del mismo usuario ocupaban los dos lugares y el de
+    otro usuario esperaba hasta el tiempo máximo."""
+    from proyecto_maria.core.despacho_lector import LectorOcupado, leer_despacho_aparte
+    _lector_falso(monkeypatch, tmp_path, ["espera", "rapido", "rapido"])
+
+    async def caso():
+        lento = asyncio.create_task(leer_despacho_aparte(b"%PDF", 30, clave="usuario a"))
+        await asyncio.sleep(0)  # que arranque y tome su lugar
+        with pytest.raises(LectorOcupado):
+            await leer_despacho_aparte(b"%PDF", 30, clave="usuario a")
+        otro = await leer_despacho_aparte(b"%PDF", 30, clave="usuario b")
+        (tmp_path / "soltar").touch()
+        await lento
+        # Al terminar, el mismo usuario puede leer otra vez.
+        return otro, await leer_despacho_aparte(b"%PDF", 30, clave="usuario a")
+
+    assert asyncio.run(caso()) == ({"renglones": []}, {"renglones": []})
+
+
+def test_leer_con_otra_lectura_en_curso_da_429(auth_override, client, monkeypatch):
+    from proyecto_maria.core import despacho_lector
+    claves = []
+
+    async def ocupado(data, limite_s, clave=None, **kwargs):
+        claves.append(clave)
+        raise despacho_lector.LectorOcupado(despacho_lector.AVISO_OCUPADO)
+
+    monkeypatch.setattr(despacho_lector, "leer_despacho_aparte", ocupado)
+    cid = _crear_cliente(client)
+    r = _subir(client, cid)
+    assert r.status_code == 429, r.text
+    assert r.json() == {"detail": despacho_lector.AVISO_OCUPADO, "code": "lector_ocupado"}
+    assert claves == [auth_override["username"]]
+
+
+def test_un_lector_que_no_devuelve_un_objeto_es_un_error(monkeypatch, tmp_path):
+    from proyecto_maria.core.despacho_lector import leer_despacho_aparte
+    _lector_falso(monkeypatch, tmp_path, ["lista"])
+    with pytest.raises(RuntimeError, match="no devolvió un resultado"):
+        asyncio.run(leer_despacho_aparte(b"%PDF", 30))
+
+
+def test_un_lector_que_sale_sin_leer_todo_dice_con_que_salio(monkeypatch, tmp_path):
+    """8 MB no entran en el caño: escribir después de que el lector salió es
+    un caño roto, y lo que importa es con qué salió."""
+    from proyecto_maria.core.despacho_lector import leer_despacho_aparte
+    _lector_falso(monkeypatch, tmp_path, ["sale5"])
+    with pytest.raises(RuntimeError, match="salió con 5"):
+        asyncio.run(leer_despacho_aparte(b"%PDF" + b"x" * (8 << 20), 30))
+
+
+def test_sin_memoria_al_abrir_el_pdf_no_se_disfraza_de_pdf_roto(monkeypatch):
+    """El proceso que lee sale con su código de «sin memoria» sólo si la
+    MemoryError le llega."""
+    import pypdf
+    from proyecto_maria.core.despacho_lector import leer_despacho
+
+    def sin_memoria(*args, **kwargs):
+        raise MemoryError
+
+    monkeypatch.setattr(pypdf, "PdfReader", sin_memoria)
+    with pytest.raises(MemoryError):
+        leer_despacho(b"%PDF")
+
+
+@solo_linux
+def test_una_hoja_que_se_infla_con_run_length_se_saltea():
+    """Sin el tope de RunLength, pypdf deja inflar hasta 75 MB: con 70 MB el
+    lector pasaba de 180 MB y el PDF entero se rechazaba."""
+    medido = _medir_aparte("run_length", 70)
+    assert "resultado" in medido, medido
+    assert "No leí la hoja 1: es demasiado pesada." in medido["resultado"]["avisos"], medido
+    assert medido["lector_mb"] < 100, medido
+
+
+def test_los_topes_de_pypdf_cubren_todos_los_filtros(monkeypatch):
+    """Todos los topes de salida de pypdf (de cada filtro) y los de largo y
+    trabajo de un flujo, no sólo los de Flate."""
+    import dataclasses
+
+    import pypdf
+    from pypdf._configuration import Configuration
+    from proyecto_maria.core.despacho_lector import _MAX_FLUJO, texto_del_pdf
+    pedidos = []
+    real = pypdf.apply_configuration
+
+    def mirar(**topes):
+        pedidos.append(topes)
+        return real(**topes)
+
+    monkeypatch.setattr(pypdf, "apply_configuration", mirar)
+    texto_del_pdf(_despacho())
+    hacen_falta = {f.name for f in dataclasses.fields(Configuration)
+                   if f.name.endswith("_maximum_output_length")}
+    hacen_falta |= {"maximum_declared_stream_length", "stream_decoding_work_maximum_length"}
+    assert len(pedidos) == 1 and {k for k, v in pedidos[0].items() if v == _MAX_FLUJO} >= hacen_falta, pedidos
+
+
+def test_un_valor_a_la_izquierda_de_todos_los_rotulos_va_al_primero():
+    from proyecto_maria.core.despacho_lector import _valores_por_columna
+    assert _valores_por_columna("X", [(10, "A"), (30, "B")]) == {"A": "X"}
+
+
+def test_el_tope_de_texto_de_verdad_corta_en_la_hoja_10():
+    """Sin parchar el tope: 11 hojas de unos 400 000 caracteres."""
+    from proyecto_maria.core.despacho_lector import texto_del_pdf
+    from tests.pdf_bombas import texto_largo
+    _, avisos = texto_del_pdf(texto_largo(11))
+    assert avisos == ["El texto del PDF es demasiado largo: leí hasta la hoja 10."]
+
+
+def test_guardar_justo_el_tope_de_renglones_se_guarda(auth_override, client):
+    from proyecto_maria.core.despacho_lector import MAX_RENGLONES
+    cid = _crear_cliente(client)
+    r = _guardar(client, cid, [_renglon(f"TAPA INVENTADA {n}", "3926.90.90.000A")
+                               for n in range(MAX_RENGLONES)])
+    assert r.status_code == 200, r.text
+    assert r.json()["guardados"] == MAX_RENGLONES
+
+
+# Identidad: el mismo producto es el mismo NCM (sin mirar puntos) y la misma
+# descripción entera.
+
+def test_el_mismo_ncm_con_o_sin_puntos_es_el_mismo_producto(auth_override, client):
+    cid = _crear_cliente(client)
+    for posicion in ("8471.49.00", "84714900", "8471.4900"):
+        assert _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", posicion)]).status_code == 200
+    productos = _catalogo(client, cid)
+    assert [(p["ncm"], p["veces_usado"]) for p in productos] == [("84714900", 3)], productos
+
+
+def test_lo_aprendido_con_puntos_y_el_despacho_son_el_mismo_producto(auth_override, client):
+    cid = _crear_cliente(client)
+    r = client.post(f"/api/clientes/{cid}/catalogo/productos/learn", json={"items": [
+        {"ncm": "8471.49.00", "descripcion": "TAPA INVENTADA VERDE", "origen": "BR"}]})
+    assert r.status_code == 200, r.text
+    assert _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", "8471.49.00.000A")]).status_code == 200
+    productos = _catalogo(client, cid)
+    assert [p["veces_usado"] for p in productos] == [2], productos
+
+
+def test_dos_textos_largos_con_el_mismo_comienzo_no_se_funden(auth_override, client):
+    """La descripción normalizada se corta en 200: dos renglones con los
+    mismos 275 caracteres adelante quedaban en una fila con el peso mezclado."""
+    cid = _crear_cliente(client)
+    comienzo = ("MANUFACTURA INVENTADA DE PLASTICO " * 9)[:275]
+    a, b = _renglon(comienzo + " TAPA", "3926.90.90.000A"), _renglon(comienzo + " CAJA", "3926.90.90.000A")
+    b["kilo_neto"] = 500.0
+    assert _guardar(client, cid, [a, b]).status_code == 200
+    productos = _catalogo(client, cid)
+    assert sorted((p["veces_usado"], p["peso_unitario_avg"]) for p in productos) == [
+        (1, 0.1), (1, 50.0)], productos
+
+
+# Promedios: cada uno cuenta sólo los usos que trajeron ese valor.
+
+def test_el_promedio_no_cuenta_los_usos_sin_valor(auth_override, client):
+    """Sin valor, después 2 kg y 3 de valor, después 4 kg y 6: da 3 y 4,5.
+    Antes daba 2,67 y 4."""
+    cid = _crear_cliente(client)
+    for kilo, valor in ((None, None), (20.0, 3.0), (40.0, 6.0)):
+        renglon = _renglon("TAPA INVENTADA VERDE", "3926.90.90.000A")
+        renglon.update(kilo_neto=kilo, valor_unitario=valor)
+        assert _guardar(client, cid, [renglon]).status_code == 200
+    [producto] = _catalogo(client, cid)
+    assert (producto["veces_usado"], producto["peso_unitario_avg"], producto["valor_unitario_avg"]) == (
+        3, 3.0, 4.5), producto
+
+
+def test_el_historial_de_operaciones_tampoco_cuenta_los_usos_sin_valor(auth_override, client):
+    from proyecto_maria.services.client_service import ClientService
+    cid = _crear_cliente(client)
+    base = {"ncm": "39269090", "descripcion": "TAPA INVENTADA VERDE"}
+    for extra in ({}, {"peso_unitario": 2.0, "valor_unitario": 3.0, "cantidad": 10.0},
+                  {"peso_unitario": 4.0, "valor_unitario": 6.0, "cantidad": 10.0}):
+        asyncio.run(ClientService.update_product_history(cid, [{**base, **extra}]))
+
+    async def fila():
+        async with AsyncSessionLocal() as s:
+            return (await s.execute(select(ClientProductHistory).where(
+                ClientProductHistory.client_id == cid))).scalar_one()
+    f = asyncio.run(fila())
+    assert (f.veces_usado, f.peso_unitario_avg, f.valor_unitario_avg, f.cantidad_avg) == (3, 3.0, 4.5, 10.0)
+
+
+# Topes: lo que no es un número de verdad no se guarda, y lo guardado antes
+# no rompe el catálogo.
+
+def test_aprender_un_peso_infinito_no_lo_guarda_y_el_catalogo_anda(auth_override, client):
+    cid = _crear_cliente(client)
+    r = client.post(f"/api/clientes/{cid}/catalogo/productos/learn", json={"items": [
+        {"ncm": "39269090", "descripcion": "TAPA INVENTADA VERDE", "peso_unitario": "inf",
+         "valor_unitario": "inf"}]})
+    assert r.status_code == 200, r.text
+    [producto] = _catalogo(client, cid)
+    assert (producto["peso_unitario_avg"], producto["valor_unitario_avg"]) == (0.0, None), producto
+
+
+def test_un_infinito_guardado_antes_no_rompe_el_catalogo_y_se_arregla(auth_override, client):
+    cid = _crear_cliente(client)
+
+    async def meter():
+        async with AsyncSessionLocal() as s:
+            s.add(ClientProductHistory(
+                id=str(uuid.uuid4()), owner_username=auth_override["username"], client_id=cid,
+                ncm="39269090", descripcion="TAPA INVENTADA VERDE",
+                descripcion_normalizada="tapa inventada verde", peso_unitario_avg=float("inf"),
+                origen_frecuente="BR", valor_unitario_avg=float("inf"), veces_usado=4))
+            await s.commit()
+    asyncio.run(meter())
+    [producto] = _catalogo(client, cid)
+    assert (producto["peso_unitario_avg"], producto["valor_unitario_avg"]) == (None, None), producto
+    r = client.post(f"/api/clientes/{cid}/catalogo/productos/learn", json={"items": [
+        {"ncm": "39269090", "descripcion": "TAPA INVENTADA VERDE", "peso_unitario": 2,
+         "valor_unitario": 3}]})
+    assert r.status_code == 200, r.text
+    [producto] = _catalogo(client, cid)
+    assert (producto["peso_unitario_avg"], producto["valor_unitario_avg"]) == (2.0, 3.0), producto
+
+
+@pytest.mark.parametrize("peso", ["inf", "nan", -1, "1e400", "dos"])
+def test_cambiar_el_peso_a_algo_que_no_es_un_peso_da_400(auth_override, client, peso):
+    cid = _crear_cliente(client)
+    assert _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", "3926.90.90.000A")]).status_code == 200
+    [producto] = _catalogo(client, cid)
+    r = client.put(f"/api/clientes/{cid}/catalogo/productos/{producto['id']}",
+                   json={"peso_unitario_avg": peso})
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == "El peso tiene que ser un número positivo."
+    assert _catalogo(client, cid)[0]["peso_unitario_avg"] == 0.1
+
+
+def test_cambiar_el_peso_a_cero_lo_borra(auth_override, client):
+    cid = _crear_cliente(client)
+    assert _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", "3926.90.90.000A")]).status_code == 200
+    [producto] = _catalogo(client, cid)
+    r = client.put(f"/api/clientes/{cid}/catalogo/productos/{producto['id']}", json={"peso_unitario_avg": 0})
+    assert r.status_code == 200, r.text
+    assert _catalogo(client, cid)[0]["peso_unitario_avg"] == 0.0
+
+
+def test_guardar_una_mitad_de_par_suelta_da_422(auth_override, client):
+    """«\\ud800» es JSON válido pero no se puede escribir: daba 500."""
+    cid = _crear_cliente(client)
+    cuerpo = ('{"divisa": "USD", "renglones": [{"posicion_sim": "3926.90.90.000A", '
+              '"descripcion": "TAPA \\ud800 INVENTADA", "origen": "BR"}]}')
+    r = client.post(f"/api/clientes/{cid}/catalogo/despacho/guardar", content=cuerpo,
+                    headers={"Content-Type": "application/json"})
+    assert r.status_code == 422, r.text
+    assert r.json()["errores"] == [
+        {"renglon": 1, "problemas": ["La descripción tiene un carácter que no se puede guardar."]}]
+    assert _contar(ClientProductHistory, client_id=cid) == 0
+
+
+# D47: el catálogo guarda el valor unitario en dólares.
+
+@pytest.mark.parametrize("divisa", ["EUR", None], ids=["en euros", "sin divisa"])
+def test_guardar_un_despacho_que_no_esta_en_dolares_no_guarda_el_valor(auth_override, client, divisa):
+    cid = _crear_cliente(client)
+    r = _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", "3926.90.90.000A")], divisa=divisa)
+    assert r.status_code == 200, r.text
+    assert r.json()["avisos"] == [
+        {"renglon": 1, "aviso": "No guardé el valor unitario: el despacho no está en dólares."}]
+    [producto] = _catalogo(client, cid)
+    assert (producto["valor_unitario_avg"], producto["peso_unitario_avg"]) == (None, 0.1), producto
+
+
+@pytest.mark.parametrize("divisa", ["USD", "DOL"])
+def test_guardar_un_despacho_en_dolares_guarda_el_valor(auth_override, client, divisa):
+    cid = _crear_cliente(client)
+    r = _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", "3926.90.90.000A")], divisa=divisa)
+    assert r.status_code == 200, r.text
+    assert r.json()["avisos"] == []
+    assert _catalogo(client, cid)[0]["valor_unitario_avg"] == 2.0
