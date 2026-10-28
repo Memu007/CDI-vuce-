@@ -327,8 +327,9 @@ def ref_de_la_factura(numero_factura: str) -> str:
 
 # Un sufijo es una serie de «CC(valor)-» y «CCNN-». Dentro del valor el
 # MARIA sólo acepta letras, números, espacios y la coma de un número con
-# decimales (24/10: rechazó guiones y puntos; SUFIJOS-2). Entre un sufijo y otro va «-», como en el archivo aceptado; un
-# espacio, una coma o nada entre dos sufijos se toma como separación
+# decimales (24/10: rechazó guiones y puntos; SUFIJOS-2). Entre un sufijo y
+# otro va «-», como en el archivo aceptado; un espacio, una coma o nada entre
+# dos sufijos se toma como separación
 # (devolución de MARIA-7: antes «AA(ROJO) AB(AZUL)» salía «AA(ROJO  AB AZUL)»).
 _UN_SUFIJO = re.compile(r"([A-Za-z]{2})(?:\(([^()]*)\)|([0-9]{2}))")
 _ENTRE_SUFIJOS = re.compile(r"[\s,;\-]*")
