@@ -174,6 +174,19 @@ flete y seguro (`MARTFOB`, `MARTFLE`, `MARTASS`); no hay campo de ajustes:
 |---|---|---|
 | 5 | Si PRORRATEO-1 escribe algo en el TXT o sólo muestra el reparto | no arranca; los ajustes no cambian el TXT (D12) |
 
+Una más (2026-10-28), para DESPACHO-1 (armar el catálogo del cliente con
+despachos ya oficializados):
+
+> 6. Un despacho ya oficializado, ¿cómo lo bajás del sistema (PDF, otro
+>    archivo)? ¿Me pasás uno o dos así, con nombres, CUIT y montos tapados?
+>    Y para el catálogo de productos de un cliente: ¿los despachantes usan
+>    algún formato o programa para guardarlo o pasárselo, o con un Excel
+>    alcanza?
+
+| Pregunta | Qué decide | Mientras tanto |
+|---|---|---|
+| 6 | Qué archivo lee DESPACHO-1 y en qué formato se baja el catálogo | DESPACHO-1 no arranca; el catálogo se bajaría en Excel |
+
 ## El mensaje que se mandó (2026-10-06)
 
 Emi (2026-10-06): la versión anterior era demasiado técnica. Tenía los
