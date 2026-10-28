@@ -210,6 +210,35 @@ rojo antes del arreglo; un sabotaje por regla. Línea en `CHANGELOG.md`.
 
 Es plata: la reviso con Opus y Sonnet, alto.
 
+### D7 (2026-10-28 08:20 UTC, sobre tu `192774f`): (a) en las cuatro
+
+Decidido por la PM; Emi lo confirma de día y puede cambiarlo antes de
+publicar. La premisa y «Lo que hago sin esperar» van como los escribiste.
+
+- **D7.1 (a):** los días de prueba que quedan se suman al pago.
+- **D7.2:** en modo suscripción, como lo planteaste, con un caso más: el
+  409 vale sólo si la cuenta está vigente en CDI. Si está `past_due` o
+  vencida y en Mercado Pago figura `authorized` (por ejemplo, la tarjeta
+  falla), la vieja se cancela antes de crear la nueva, como con `pending`:
+  si no, el que quiere pagar con otra tarjeta queda trabado. Si cancelar la
+  vieja falla, 503 y no se crea nada. En modo preference, **(a)**: pagar
+  por adelantado suma 30 días desde el fin.
+- **D7.3 (a):** reactivar lleva al checkout de una suscripción nueva. Antes
+  de pagar, la respuesta dice que cobra ahora y suma 30 días desde el fin
+  del período ya pagado. Ningún texto dice «próximo cobro» si no lo hay.
+- **D7.4 (a):** sin token, en producción, el checkout da 503 y no hay botón
+  de simular. Para saber si es producción usá el criterio que ya tenga el
+  código, cerrado por defecto: si falta la variable que lo dice, no hay
+  demo. Si no hay criterio o cerrarlo rompe cómo arrancan las pruebas, D8
+  antes de inventar uno.
+
+**Riesgos aceptados:** el de estudios (quién cancela en un estudio es de
+permisos, Fase 3) y el de las cuentas `active` sin pago de Mercado Pago, que
+vuelven a `trial`. Los dos, al informe. Sumá a riesgos, para publicar, los
+supuestos de Mercado Pago que no pudiste ver sin red: los estados, que una
+`cancelled` no vuelve, el cobro inmediato y la ruta `PUT /preapproval/{id}`
+(y por qué no el SDK).
+
 ## Orden
 
 1. EXCEL-2b (D4 a y D5 a): hecha, se entrega con el cupo de las 18:00 UTC.
