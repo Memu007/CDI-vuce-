@@ -369,6 +369,61 @@ PY=python bash scripts/testing/sabotajes/observabilidad1.sh 39be45e   # 16 ROJO,
 python -m pytest -q --no-cov tests/test_observabilidad1.py
 ```
 
+## SESION-1: **entregada** en `895ee73` (2026-10-28, 17:15 UTC)
+
+**Resultado:** la pieza como está en `895ee73` (base `f5160d7`), sin
+arreglo. Suite completa sobre `895ee73`: 3872 passed, 336 skipped, 2
+xfailed, 0 failed. Sabotajes `sesion1.sh`: 19/19 en rojo. Detalle en
+«SESION-1: hecha» más abajo. **No recomiendo publicarla sin la D43.**
+
+**Decide la PM:** D43.
+
+- **D43 (SESION-1):** cuatro hallazgos dentro de la pieza. (a) Carrera:
+  un login con la clave vieja que termina después del cambio de clave
+  deja una sesión válida, porque gana el último que escribe `active_jti`
+  (`main.py:2073-2077`, `1622-1623`, `2788-2790`); el revisor la
+  reprodujo 9 de 12 veces en Postgres y 7 de 8 en SQLite. No es regresión
+  (antes no se cortaba nada), pero la pieza promete cortar. (b) El cambio
+  de clave no corta una cookie copiada (mismo `jti`), y el toast y el
+  `CHANGELOG` dicen «cierra las otras». (c) `change-password` con la clave
+  actual mal da 401 y `app_v2.js:36` manda al login. (d) Si la base no
+  contesta, `logout` da 500 y no borra la cookie; antes la borraba
+  siempre. (1) Los arreglo después de las 18:00, encima de la cadena, con
+  rojo y sabotaje, antes de publicar (recomendada: es sesión, y (a) y (b)
+  hacen que el texto prometa algo que no pasa). (2) Se publica así con el
+  texto corregido y lo demás va a otra pieza.
+
+| Revisor | Modelo y esfuerzo | Hallazgos | Qué hice |
+|---|---|---|---|
+| sesion1-opus | Opus alto | (1) media/alta, dentro: la carrera de D43 (a), reproducida: Postgres con cambio de clave 9/12, SQLite 7/8, Postgres con reset 1/8. (2) media: la cookie copiada, D43 (b). (3) baja/media, fuera: `/logout` de la v1 sin el header CSRF da 403 con `CSRF_ENFORCE` y el token sigue (`static/app.js:4094`). (4) **alta, fuera, ya existía:** si `ADMIN_USERNAMES` tiene un email, cambiar el email propio a ese da admin al reiniciar (`main.py:1457`). (5) baja: mi informe nombraba `token_jti` y otro SHA de puertas. Sospecha: `hash_password` fuera del threadpool en el reset | D43; lo demás, riesgos |
+| sesion1-sonnet | Sonnet alto | R1 media/baja, dentro: `logout` da 500 sin borrar la cookie si cae la base (D43 (d)). R2 baja: el `PUT` del perfil sirve para probar claves sin límite (igual que `change-password`, de antes). R3 baja: un token sin `jti` con `active_jti` NULL saca al propio al cambiar la clave. R4 baja: cookie vieja más Bearer, `logout` no revoca el Bearer. R5 baja, fuera: un reset pendiente sobrevive al cambio de clave | D43 (d); lo demás, riesgos |
+| `/code-review high` + `/security-review` | Opus alto, en fork; la security a mano porque la skill falló con `fatal: ambiguous argument 'origin/HEAD...'` | (1) media: D43 (c). (2) media, de antes: `GET /auth/me` no compara `active_jti`, así que un token revocado da 200 (contradice el `CHANGELOG`). (3) media, de antes: el token de `/auth/verify-email` dura 24 h, se puede reusar y crea una sesión nueva sin clave: se vuelve a entrar después de un reset o un logout. (4) = opus (3). (5) = sonnet R3. (6) baja, de antes: duplicado de email exacto; los links de reset sobreviven (sospecha). (7) calidad: el JWT se decodifica tres veces. Security: la telemetría toma el `sub` sin mirar `active_jti` (info) | D43 (c); lo demás, riesgos |
+
+**Lo que es lectura y lo que corrió cada uno:** la carrera la reprodujo
+el Opus con sus scripts; el 500 de `logout` y el `PUT` sin límite salen de
+las corridas del Sonnet; lo demás es lectura. Yo no reproduje ninguno.
+
+**Riesgos que quedan:**
+- **Alta, fuera, de antes:** la subida a admin por email
+  (`ADMIN_USERNAMES`, `main.py:1457`). Emi tiene que saber si esa variable
+  tiene un email en producción.
+- **Medias, de antes:** `/auth/me` acepta un token revocado; el token de
+  verificar email sirve para volver a entrar durante 24 h después de un
+  reset o un logout. Con esto, «cerrar las otras sesiones» no es completo
+  aunque se arregle la D43.
+- **Bajas:** el `logout` de la v1 sin CSRF; el `PUT` del perfil sin
+  límite; un reset pendiente que sobrevive al cambio de clave.
+
+**Archivos de producto:** `proyecto_maria/auth/dependencies.py`,
+`proyecto_maria/main.py`, `proyecto_maria/static/v2/screens/profile.js`,
+`proyecto_maria/templates/dashboard_v2.html`, `CHANGELOG.md`.
+
+```bash
+git diff --stat f5160d7..895ee73 -- . ':!docs'   # 10 files changed, 971 insertions(+), 35 deletions(-)
+PY=python bash scripts/testing/sabotajes/sesion1.sh 895ee73   # 19 ROJO, «sabotajes sin rojo: 0»
+python -m pytest -q --no-cov tests/test_sesion1.py
+```
+
 ## Entregas preparadas para las 18:00 UTC (2026-10-28)
 
 Recibí la D37 (2) en `20fb535`. En ABUSO-1 la pasé a riesgos, con lo que
@@ -396,7 +451,7 @@ tocan `docs/`. A las 18:00 queda sólo la autorrevisión con subagentes,
 | 6 | DATOS-1 | `c996ad4`, **entregada** | `d01f95c` | 3836 passed, 336 skipped, 2 xfailed, 0 failed | 12/12 |
 | 7 | DISCO-1 | `88b22c8`, **entregada** | `cf84a76` | 3847 passed, 336 skipped, 2 xfailed, 0 failed | 20/20 |
 | 8 | OBSERVABILIDAD-1 | `39be45e`, **entregada** | `88b22c8` | 3855 passed, 336 skipped, 2 xfailed, 0 failed | 16/16 |
-| 9 | SESION-1 | `895ee73` | `f5160d7` | 3872 passed, 336 skipped, 2 xfailed, 0 failed | 19/19 |
+| 9 | SESION-1 | `895ee73`, **entregada** | `f5160d7` | 3872 passed, 336 skipped, 2 xfailed, 0 failed | 19/19 |
 | 10 | ABUSO-1 | `43916a7` | `c702655` | 3930 passed, 336 skipped, 2 xfailed, 0 failed | 27/27 |
 | 11 | EMAIL-1 | `2b93071` | `e22a5cf` | 3954 passed, 336 skipped, 2 xfailed, 0 failed | email1 13/13; abuso1 27/27 sobre `2b93071` |
 | 12 | CONEXIONES-1 | `30c0e97` | `2b93071` | no cambia producto ni pytest; medición «sin conexiones tomadas» | 3/3 |
