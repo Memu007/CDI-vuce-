@@ -123,6 +123,26 @@ sabotaje $F "la cabeza de una imagen sin comprimir no se lee" $B \
 sabotaje $F "la cabeza de una imagen comprimida no se lee" $B \
   "FAILED $B::test_una_imagen_de_verdad_no_cuenta" \
   '    return zlib.decompressobj(-15).decompress(datos, 44)' '    return b""'
+# Las otras hojas y los ítems leen en el mismo carril que la hoja (punto 2
+# de la devolución): con el pool pesado fijo, la subida chica los manda atrás.
+sabotaje $M "las otras hojas se leen en los hilos pesados" $B \
+  "AssertionError: ('_otras_hojas_con_datos'" \
+  $'                _otras_hojas_con_datos, temp_filename, engine,\n                limite=min(10.0, _excel_read_timeout_s()), que="el Excel", pool=_pool_lectura_excel_carril(liviano),' \
+  $'                _otras_hojas_con_datos, temp_filename, engine,\n                limite=min(10.0, _excel_read_timeout_s()), que="el Excel", pool=_pool_lectura_excel(),'
+sabotaje $M "los ítems se arman en los hilos pesados" $B \
+  "AssertionError: ('extract_items_from_excel'" \
+  $'            extract_items_from_excel, df, file.filename, descartes, extras,\n            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel_carril(liviano),' \
+  $'            extract_items_from_excel, df, file.filename, descartes, extras,\n            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),'
+# Punto 4: ante la duda, pesado; el tope de lecturas; el umbral enorme.
+sabotaje $F "un índice que no se puede leer va al carril liviano" $B \
+  "FAILED $B::test_un_indice_que_no_se_puede_leer_va_al_pesado" \
+  $'    except Exception:\n        return False\n\n\ndef _abrir_excel' $'    except Exception:\n        return True\n\n\ndef _abrir_excel'
+sabotaje $F "el tope de lecturas de cabezas sube a 100000" $B \
+  "FAILED $B::test_no_se_leen_mas_de_20_cabezas_de_imagen" \
+  '_LIVIANO_IMAGENES_LECTURAS = 20' '_LIVIANO_IMAGENES_LECTURAS = 100000'
+sabotaje $F "un umbral que no entra en bytes vuelve a dar 500" $B \
+  "FAILED $B::test_un_umbral_enorme_no_rompe_la_subida[1e308-2097152]" \
+  '    if not math.isfinite(valor * 1024 * 1024) or valor <= 0:' '    if not math.isfinite(valor) or valor <= 0:'
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
