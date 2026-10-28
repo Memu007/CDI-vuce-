@@ -34,8 +34,8 @@ repositorio.** Las pruebas usan sintéticos con la misma forma.
 
 1. DESPACHO-1b (devolución y D41). 2. DISCO-1 (devolución). 3. SESION-1
 (devolución, abajo). 4. ABUSO-1 (devolución, abajo). 5. SUFIJOS-2
-(devolución, abajo). 6. EMAIL-1: la D45 y el mutante. 7. CONEXIONES-1: la
-D46. Cada una con su rojo, su sabotaje y
+(devolución, abajo) y lo que se suma de SEGURO-1. 6. EMAIL-1: la D45 y el
+mutante. 7. CONEXIONES-1: la D46. Cada una con su rojo, su sabotaje y
 `/entregar`; me despertás al entregar cada una, sin esperar a juntar.
 
 - **D45 (EMAIL-1): (1), decidido por la PM.** El tope por correo se
@@ -105,6 +105,22 @@ Lo demás del revisor (XFF y `TRUSTED_PROXY_HOPS`, IPv6, deadlock con
 ventanas cortas, filas sin tope, tiempos del login) va a riesgos en tu
 informe, sin tocar producto.
 
+## SEGURO-1: aceptada sobre `5dfaf47` (2026-10-28 18:15 UTC)
+
+`test_seguro1.py` `48 passed` (corrida de la PM). Se integra con la cadena,
+después de SUFIJOS-2. Evidencia: `REPRODUCCION-SEGURO-1-2026-10-28.md`.
+
+Se suma, en commits aparte junto con la vuelta de SUFIJOS-2:
+- **Una prueba que fije la lista de los cinco.** Hoy sumar `DAT` (o `DDU`,
+  `DAF`, `DES`, `DEQ`) a `INCOTERMS_CON_SEGURO` deja `48 passed`.
+- **`/generate_maria/avisos` normaliza el incoterm igual que
+  `/generate_maria`**: con `"CIF\x00"` hoy los avisos ofrecen el 1 % y
+  generar da 400. Una sola función para los dos.
+- A riesgos: el 1 % mandado sin `seguro_calculado` entra al TXT (es lo
+  encargado; lo cubre SEGURO-2, que espera a Emi); seguro mayor que el FOB
+  sin aviso (preexistente); la revisión dice «no los sumes dos veces» y el
+  400 dice «cargá el de la factura».
+
 ## SUFIJOS-2: devolución, sobre `bd76f9f` (2026-10-28 18:05 UTC)
 
 Evidencia en `REPRODUCCION-SUFIJOS-2-2026-10-28.md`. Va en la cola después
@@ -151,10 +167,9 @@ Toca el TXT: el golden no se toca.
   corre ahora.
 - **D40 y los arreglos de ORG-1 después de las piezas: sí.** Van encima de
   la cadena igual; no se integra nada hasta aceptar ORG-1.
-- **Recibidas** SUFIJOS-2 (`bd76f9f`), SEGURO-1 (`5dfaf47`) y DESPACHO-1b
-  (`e59e1a8`): revisión de la PM en curso. El orden después de las 18:00:
-  primero las devoluciones que lleguen (DESTINO-1 ya está arriba), después
-  D41.
+- **Recibidas** SUFIJOS-2 (`bd76f9f`, devolución arriba), SEGURO-1
+  (`5dfaf47`, aceptada arriba) y DESPACHO-1b (`e59e1a8`, revisión de la PM
+  en curso).
 
 ## EMAIL-1: aceptada sobre `2b93071` (2026-10-28 17:46 UTC)
 
@@ -535,39 +550,6 @@ por rótulo); el PDF sin texto; que el lector de facturas lo sigue
 rechazando; aislamiento (otro dueño, otro cliente); que no se crea ninguna
 operación. Un sabotaje por regla. Línea en `CHANGELOG.md`. Toca datos de
 clientes: revisión fuerte. Tu próxima D es la **D31**.
-
-### SEGURO-1 — hecha, sin entregar (encargada 2026-10-28 04:00 UTC)
-
-En commits aparte encima de SUFIJOS-2 (`4ca6829`), con su propio
-`/entregar` después del de SUFIJOS-2. Respuesta del despachante (pregunta
-4, `PREGUNTAS-DESPACHANTE.md`, D14 de VALOR-1): en **CIF, CIP, DPU, DAP y
-DDP** el seguro ya está en el precio.
-
-- **La regla:** con esos cinco incoterms el sistema no sugiere el 1 %: no
-  hay botón «Calcular seguro». El seguro se sigue declarando (el despacho
-  CIF trae el suyo): el campo queda, se carga a mano o lo lee el lector, y
-  sale en el TXT como hoy. CFR, CPT y los demás siguen con el botón.
-- **Dónde vive:** en el servidor, donde se arma `seguro_sugerido`
-  (`maria_generator.py`, cerca de la línea 943), y el botón sigue a lo que
-  diga el servidor. Esconderlo sólo en `finalize.js` no alcanza: la
-  sugerencia seguiría viva y una prueba de Python no la cubre. Premisa
-  primero: comprobá que ese código conoce el incoterm. Si no se puede sin
-  salir del alcance, es la D30 y seguís con lo que no depende de ella.
-- **Cambio de incoterm después de calcular:** si el seguro lo calculó el
-  sistema (`seguro_calculado`) y el incoterm pasa a uno de los cinco, ese
-  seguro se borra y el campo queda como «para completar», con el mismo
-  mecanismo que un campo sin leer. Un seguro leído de la factura o escrito
-  por el usuario no se toca. Comprobá que un campo «para completar» no deja
-  generar en silencio con seguro cero; si lo deja, es la D30.
-- **Incoterm:** mayúsculas, minúsculas y espacios dan lo mismo. Vacío o
-  desconocido, como hoy (con botón).
-
-Pruebas: los cinco sin sugerencia ni botón; CFR y CPT con botón; una
-operación CIF con su seguro en el TXT; minúsculas y espacios; vacío; el
-cambio de incoterm en los dos sentidos (el calculado se borra, el escrito
-queda); un sabotaje por regla (uno de los cinco fuera de la lista, la
-regla sólo en la pantalla, el calculado que sobrevive al cambio). El golden
-no se toca.
 
 ## Qué pasó el 2026-10-24
 
