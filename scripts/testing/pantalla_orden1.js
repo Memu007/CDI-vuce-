@@ -438,30 +438,36 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     await ctx.close();
   }
 
-  // (j) La consulta del usuario da 500 durante los primeros 2 segundos (todas:
-  // la del tour también la pide) y después anda.
+  // (j) La consulta del usuario da 500 (todas: la del tour también la pide)
+  // desde que abre hasta 3 segundos después de cargar la operación, así la
+  // primera de la app falla seguro, y después anda.
   if (corre('j')) {
     const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
     const usuario = await nuevoUsuario(ctx, 'ord1j');
-    let fallidas = 0, hasta = Infinity;
+    let caida = true, fallidas = 0;
     await ctx.route('**/auth/current_user', ruta => {
-      if (Date.now() < hasta) { fallidas++; return ruta.fulfill({ status: 500, body: 'error de prueba' }); }
+      if (caida) { fallidas++; return ruta.fulfill({ status: 500, body: 'error de prueba' }); }
       return ruta.continue();
     });
     const p = await ctx.newPage();
     p.on('dialog', d => d.accept().catch(() => {}));
-    hasta = Date.now() + 2000;
     await p.goto(base + '/dashboard');
     await p.waitForFunction(() => window.CDI && CDI.goTo && CDI.api && document.querySelector('.screen.is-active'));
-    if (fallidas === 0) falla('la consulta del usuario no pasó por la falla de prueba');
     await cargar(p, 'SIN-USUARIO-1', [prod('Producto con el usuario caído', '84714900100D', 2, 10)]);
+    await p.waitForTimeout(3000);
+    caida = false;
+    // Esperando 1, 2, 4… segundos, en unos 3 s son la de la app, dos
+    // reintentos y la del tour; un reintento sin espera serían cientos.
+    if (fallidas > 8) falla('la pestaña martilla la consulta del usuario: ' + fallidas + ' pedidos en la caída');
+    const llego = await p.waitForFunction(() => CDI.currentUser, null, { timeout: 40000 }).then(() => true, () => false);
+    if (!llego) falla('con la consulta del usuario caída al abrir, la pestaña no la vuelve a pedir');
     await esperarBorradores(p, ['SIN-USUARIO-1'], 'con la consulta del usuario caída al abrir, la operación no se guarda');
     const dueno = await p.evaluate(() => {
       const k = Object.keys(localStorage).find(k => k.startsWith('cdi_v2_state') && (localStorage.getItem(k) || '').includes('"SIN-USUARIO-1"'));
       return JSON.parse(localStorage.getItem(k)).user;
     });
     if (dueno !== usuario) falla('la operación se guardó con otro dueño: ' + dueno);
-    console.log('OK con la consulta del usuario caída al abrir, la operación se guarda con su dueño');
+    console.log('OK con la consulta del usuario caída al abrir, la operación se guarda con su dueño (' + fallidas + ' pedidos en la caída)');
     await ctx.close();
   }
 

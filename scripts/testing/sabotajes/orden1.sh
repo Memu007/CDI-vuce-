@@ -219,11 +219,25 @@ sabotaje $A "la pestaña no retiene su lock" \
 # Sin usuario al abrir: se vuelve a pedir hasta tenerlo.
 export CASOS=j
 sabotaje $A "el usuario se pide una sola vez al abrir" \
-  "FALLA: con la consulta del usuario caída al abrir, la operación no se guarda" \
+  "FALLA: con la consulta del usuario caída al abrir, la pestaña no la vuelve a pedir" \
   '        const usuarioListo = cargarUsuarioHastaTenerlo();' '        const usuarioListo = loadCurrentUser();'
+# Con un 500 la consulta sale por «if (!res.ok)», no por el «return» del final.
 sabotaje $A "el reintento da por cargado al usuario aunque falló" \
-  "FALLA: con la consulta del usuario caída al abrir, la operación no se guarda" \
-  '        return !!currentUser;' '        return true;'
+  "FALLA: con la consulta del usuario caída al abrir, la pestaña no la vuelve a pedir" \
+  '            if (!res.ok) return;' '            if (!res.ok) return true;'
+sabotaje $A "el reintento no espera entre pedidos" \
+  "FALLA: la pestaña martilla la consulta del usuario" \
+  'for (let espera = 1000; ' 'for (let espera = 0; ' \
+  'espera = Math.min(espera * 2, 30000))' 'espera = 0)'
+
+# Otro usuario entra en el mismo navegador mientras la pestaña reintenta.
+export CASOS=k
+sabotaje $A "la pestaña no mira si la sesión cambió desde que abrió" \
+  "FALLA: la operación cargada antes de saber el usuario se guardó a nombre de quien entró después" \
+  '                if (getCsrfToken() !== sesionAlAbrir) sesionAjena = true;' ''
+sabotaje $A "una sesión ajena sigue guardando y recuperando" \
+  "FALLA: la operación cargada antes de saber el usuario se guardó a nombre de quien entró después" \
+  '        if (sesionAjena) return null;' ''
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
