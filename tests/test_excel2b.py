@@ -8,6 +8,7 @@ no puede burlar esa medida: ante cualquier duda va al carril pesado.
 """
 import io
 import struct
+import sys
 import threading
 import zipfile
 import zlib
@@ -423,3 +424,139 @@ def test_una_entrada_que_no_se_puede_descomprimir_no_corta_la_medida():
     assert xml + info.file_size + imagen > 2 * 2**20  # sin descontar la imagen, no entra
     assert xml + info.file_size <= 2 * 2**20  # descontándola, entra
     assert fs._excel_liviano(bytes(libro), ".xlsx") is True
+
+
+# ------------------------------------- guardas de la medida (devolución, punto 2)
+
+def _resto(libro):
+    with zipfile.ZipFile(io.BytesIO(libro)) as z:
+        return sum(i.file_size for i in z.infolist())
+
+
+def _umbral_exacto(monkeypatch, bytes_):
+    """EXCEL_LIVIANO_MB que da exactamente `bytes_` de umbral: dividir por
+    2**20 no redondea."""
+    monkeypatch.setenv("EXCEL_LIVIANO_MB", repr(bytes_ / 2**20))
+    assert fs._mb_de_entorno("EXCEL_LIVIANO_MB", 2) == bytes_
+
+
+def _guardada(libro, nombre, datos, flags=0):
+    """Agrega `nombre` sin comprimir y, si hace falta, le marca bits de
+    flag en el índice central y en el encabezado local."""
+    buf = io.BytesIO(libro)
+    with zipfile.ZipFile(buf, "a") as z:
+        z.writestr(nombre, datos, compress_type=zipfile.ZIP_STORED)
+    b = bytearray(buf.getvalue())
+    if flags:
+        with zipfile.ZipFile(io.BytesIO(bytes(b))) as z:
+            info = z.getinfo(nombre)
+        central = None
+        i = b.find(b"PK\x01\x02")
+        while i >= 0:
+            largo = struct.unpack_from("<H", b, i + 28)[0]
+            if bytes(b[i + 46:i + 46 + largo]) == nombre.encode():
+                central = i
+            i = b.find(b"PK\x01\x02", i + 4)
+        struct.pack_into("<H", b, central + 8, struct.unpack_from("<H", b, central + 8)[0] | flags)
+        struct.pack_into("<H", b, info.header_offset + 6,
+                         struct.unpack_from("<H", b, info.header_offset + 6)[0] | flags)
+    return bytes(b)
+
+
+def test_la_cabeza_de_una_imagen_no_descomprime_mas_de_44_bytes(monkeypatch):
+    """De lo comprimido se descomprimen 44 bytes, no los 16 KiB enteros (que
+    con ceros dan varios MB) recortados después."""
+    salidas = []
+    original = zlib.decompressobj
+
+    class _Medida:
+        def __init__(self, *a):
+            self._d = original(*a)
+
+        def decompress(self, datos, *a):
+            r = self._d.decompress(datos, *a)
+            if sys._getframe(1).f_code.co_name == "_cabeza_de":
+                salidas.append(len(r))
+            return r
+
+        def __getattr__(self, nombre):
+            return getattr(self._d, nombre)
+    monkeypatch.setattr(zlib, "decompressobj", _Medida)
+    libro = _con_entradas(_normal(), ("xl/media/image1.png", PNG + bytes(3 * 2**20)))
+    assert fs._excel_liviano(libro, ".xlsx") is True
+    assert salidas and max(salidas) <= 44, salidas
+
+
+def test_una_imagen_que_no_entra_en_el_presupuesto_no_corta_las_que_siguen(monkeypatch):
+    """La más grande (11 MiB) no se puede descontar; la que sigue (3 MiB) sí,
+    y con eso el libro entra."""
+    libro = _con_entradas(_normal(), ("xl/media/image1.png", PNG + bytes(11 * 2**20)),
+                          ("xl/media/image2.png", PNG + bytes(3 * 2**20)))
+    _umbral_exacto(monkeypatch, _resto(libro) - len(PNG) - 3 * 2**20)
+    assert fs._excel_liviano(libro, ".xlsx") is True
+
+
+def test_las_imagenes_se_miran_de_la_mas_grande_a_la_mas_chica():
+    """Veinte entradas chicas que no son imagen y un logo de 3 MiB: si se
+    mirara de menor a mayor, las 20 lecturas se gastarían en las chicas."""
+    chicas = [(f"xl/media/otro{i}.bin", b"x" * 1024) for i in range(20)]
+    libro = _con_entradas(_normal(), *chicas, ("xl/media/image1.png", PNG + bytes(3 * 2**20)))
+    assert fs._excel_liviano(libro, ".xlsx") is True
+
+
+def test_una_entrada_cifrada_no_se_descuenta():
+    """Con el bit de cifrado, lo que se lee no es la imagen sino su cifrado:
+    aunque empiece como un PNG, sigue contando."""
+    sin_cifrar = _guardada(_normal(), "xl/media/image1.png", PNG + bytes(3 * 2**20))
+    assert fs._excel_liviano(sin_cifrar, ".xlsx") is True
+    cifrada = _guardada(_normal(), "xl/media/image1.png", PNG + bytes(3 * 2**20), flags=0x1)
+    assert zipfile.ZipFile(io.BytesIO(cifrada)).getinfo("xl/media/image1.png").flag_bits & 0x1
+    assert fs._excel_liviano(cifrada, ".xlsx") is False
+
+
+def test_una_cabeza_sin_la_firma_del_encabezado_local_no_cuenta_como_imagen():
+    """El índice central apunta adentro de los datos de una entrada, donde hay
+    un encabezado falso (sin «PK\\x03\\x04») seguido de un PNG: no se lee."""
+    nombre = "xl/media/image1.png"
+    falso = b"NOPE" + bytes(22) + struct.pack("<HH", 0, 0)
+    libro = bytearray(_guardada(_normal(), nombre, falso + PNG + bytes(3 * 2**20)))
+    with zipfile.ZipFile(io.BytesIO(bytes(libro))) as z:
+        info = z.getinfo(nombre)
+    i = libro.find(b"PK\x01\x02")
+    while i >= 0:
+        largo = struct.unpack_from("<H", libro, i + 28)[0]
+        if bytes(libro[i + 46:i + 46 + largo]) == nombre.encode():
+            struct.pack_into("<I", libro, i + 42, info.header_offset + 30 + len(nombre))
+        i = libro.find(b"PK\x01\x02", i + 4)
+    with zipfile.ZipFile(io.BytesIO(bytes(libro))) as z:
+        assert z.getinfo(nombre).header_offset == info.header_offset + 30 + len(nombre)
+    assert fs._excel_liviano(bytes(libro), ".xlsx") is False
+
+
+def test_un_libro_justo_en_el_umbral_va_al_liviano(monkeypatch):
+    libro = _normal()
+    _umbral_exacto(monkeypatch, _resto(libro))
+    assert fs._excel_liviano(libro, ".xlsx") is True
+    _umbral_exacto(monkeypatch, _resto(libro) - 1)
+    assert fs._excel_liviano(libro, ".xlsx") is False
+
+
+def test_un_xls_justo_en_el_umbral_va_al_liviano():
+    assert fs._excel_liviano(b"x" * (2 * 2**20), ".xls") is True
+    assert fs._excel_liviano(b"x" * (2 * 2**20 + 1), ".xls") is False
+
+
+def test_un_libro_que_queda_justo_en_el_umbral_sin_la_imagen_va_al_liviano(monkeypatch):
+    imagen = PNG + bytes(3 * 2**20)
+    libro = _con_entradas(_normal(), ("xl/media/image1.png", imagen))
+    _umbral_exacto(monkeypatch, _resto(libro) - len(imagen))
+    assert fs._excel_liviano(libro, ".xlsx") is True
+    _umbral_exacto(monkeypatch, _resto(libro) - len(imagen) - 1)
+    assert fs._excel_liviano(libro, ".xlsx") is False
+
+
+def test_una_imagen_de_10_mib_justos_se_descuenta():
+    justa = _con_entradas(_normal(), ("xl/media/image1.png", PNG + bytes(10 * 2**20 - len(PNG))))
+    assert fs._excel_liviano(justa, ".xlsx") is True
+    pasada = _con_entradas(_normal(), ("xl/media/image1.png", PNG + bytes(10 * 2**20 - len(PNG) + 1)))
+    assert fs._excel_liviano(pasada, ".xlsx") is False

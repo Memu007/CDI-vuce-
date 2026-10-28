@@ -204,3 +204,22 @@ def test_guardar_otro_ncm_con_la_misma_descripcion_en_otro_cliente_no_pisa_al_pr
     assert _guardar(client, otro, [{"pieza": "8471.30.12", "ncm": "8471.30.12", "descripcion": DESC}]).status_code == 200
     assert _historial(otro) == {DESC: "8471.30.12"}
     assert _historial(cid) == {DESC: "84714900"}
+
+
+def test_guardar_uso_con_un_cliente_no_le_sugiere_a_otro_como_suyo(client, monkeypatch):
+    """El historial liviano (load_ncm_historial) es del despachante: después de
+    guardar-uso con A, sugerir con B puede traerlo como «historial», pero
+    nunca con scope «cliente» (devolución de EXCEL-2b, punto 3)."""
+    cid, otro = _dos_clientes_iguales(client)
+    desc = f"MONITOR {_unique()}"
+    r = client.post("/api/ncm/guardar-uso", json={"descripcion": desc, "ncm": SIM, "client_id": cid})
+    assert r.status_code == 200 and r.json().get("success") is not False, r.text
+    monkeypatch.setattr(main_mod, "_suggest_ncm_with_gemini", lambda *a, **k: [])
+
+    def sugerir(c):
+        r = client.post("/api/ncm/sugerir", json={"descripcion": desc, "client_id": c})
+        assert r.status_code == 200, r.text
+        return [(s["source"], s.get("scope"), s["ncm"]) for s in r.json()["sugerencias"]]
+    # A sí lo recibe como suyo: el caso distingue.
+    assert sugerir(cid)[0] == ("historial", "cliente", "84714900")
+    assert sugerir(otro) == [("historial", None, SIM)]
