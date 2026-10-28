@@ -176,8 +176,11 @@ def test_no_se_mezclan_los_productos_de_otro_cliente_ni_de_otro_dueno(auth_overr
     def descripciones(cid):
         return [f[1] for f in _hoja(_bajar(client, cid)).iter_rows(min_row=2, values_only=True)]
 
-    assert descripciones(cid_a) == ["DEL CLIENTE A"]
-    assert descripciones(cid_b) == ["DEL CLIENTE B"]
+    a, b = descripciones(cid_a), descripciones(cid_b)
+    assert "DEL CLIENTE B" not in a, f"el Excel del cliente A trae productos de otro cliente: {a}"
+    assert "DE OTRO DUENO" not in a, f"el Excel del cliente A trae productos de otro dueño: {a}"
+    assert a == ["DEL CLIENTE A"]
+    assert b == ["DEL CLIENTE B"]
 
 
 def test_sin_sesion_da_401(client):
