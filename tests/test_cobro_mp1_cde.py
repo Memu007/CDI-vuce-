@@ -142,3 +142,17 @@ def test_una_cuenta_vieja_pagada_con_un_pago_rechazado_sigue_yendo_al_checkout(c
     cuerpo = client.post("/api/billing/reactivate").json()
     assert cuerpo["billing_status"] == "canceled", f"una cuenta pagada volvió como prueba: {cuerpo}"
     assert cuerpo["needs_checkout"] is True, cuerpo
+
+
+def test_una_prueba_con_un_pago_de_plan_rechazado_vuelve_a_la_prueba(client):
+    # La otra cara: un plan rechazado (monto que no cierra) tampoco es un plan.
+    usuario = _unique("cde_prueba_rech")
+    _register(client, usuario)
+    pid = _pago(f"rech-{usuario}", f"{usuario}:premium", monto=1.0)
+    assert _aviso_ipn(client, pid).status_code == 200
+    assert _get_user(usuario)["billing_status"] == "trial", "el pago de 1 peso se aplicó"
+    _entrar(client, usuario)
+    assert client.post("/api/billing/cancel").status_code == 200
+    cuerpo = client.post("/api/billing/reactivate").json()
+    assert cuerpo["billing_status"] == "trial", f"un plan rechazado cuenta como plan: {cuerpo}"
+    assert cuerpo["needs_checkout"] is False, cuerpo
