@@ -30,9 +30,63 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## DESPACHO-1b: devolución, sobre `09e16f3`, y D47 y D48 (2026-10-28 20:07 UTC)
+
+Evidencia en `REPRODUCCION-DESPACHO-1b-vuelta-2026-10-28.md`. Bien: la
+memoria del hijo con tope, el lector fuera del pool de las facturas, el
+anterior vacío que no promedia y `despacho1b.sh` 30 de 30. **Causa de la
+devolución:** tres de los siete puntos cambiaron el ejemplo y no la causa.
+Cada punto, rojo antes del arreglo y con su sabotaje:
+
+1. **Trabajo y turnos, no sólo bytes.** Reproducido por la PM: un PDF de
+   49 KB (20 hojas que comparten un contenido de 500 KB con unas 14 000
+   operaciones) ocupa el hijo 23,5 s con 76 MB. Dos de esos y un despacho
+   normal de otro usuario: `A,B,C -> TimeoutError×3 10.0s`. **La familia:**
+   el hijo corta por trabajo (operaciones, texto o CPU, lo que elijas,
+   medido) y un usuario no puede ocupar todos los lugares del lector. La
+   prueba: ese PDF se corta rápido y el despacho del otro usuario entra.
+2. **La identidad del producto (punto 5 de la devolución anterior).**
+   Reproducido: dos renglones del mismo NCM con los primeros 275
+   caracteres iguales quedan en una fila (`veces_usado` 2, peso 25,5,
+   mezcla de 1 y 50), porque `_norm_desc` corta en 200. Y el NCM con
+   puntos no se une: «8471.49.00», «84714900» y «8471.4900» quedan en
+   tres filas (regresión de `solo_mismo_ncm`). **La familia:** dos
+   productos son el mismo sólo si el NCM normalizado y la descripción
+   entera coinciden; nada se compara cortado o con formato distinto.
+3. **El promedio (punto 4 anterior).** Reproducido: sin valor, después
+   (2, 3), después (4, 6) da peso 2,67 y valor 4,0 en vez de 3 y 4,5:
+   `_incr_avg` divide por `veces_usado`, que cuenta usos sin valor. **La
+   familia:** cada promedio cuenta sólo los usos que trajeron ese valor.
+   `client_service.py:371` hace la misma cuenta: mismo arreglo, con su
+   prueba.
+4. **Todo valor que entra al catálogo pasa el mismo tope.** Reproducido:
+   `catalogo/productos/learn` guarda `inf` y desde ahí el GET del catálogo
+   da 500 (`Out of range float values are not JSON compliant: inf`) para
+   siempre. Es anterior a la pieza, pero es la misma causa que el punto 3
+   de la devolución anterior. Y un `\ud800` suelto en el JSON de guardar
+   da 500: lo del lector (tu 2b), en la otra entrada.
+5. **Mutantes vivos del adversario**, un caso por cada uno que dé rojo con
+   su sabotaje: el número de hijos a la vez, el `except MemoryError` al
+   abrir, un tope de pypdf que no sea Flate, `columnas[max(k,0)]`,
+   `_MAX_TEXTO` sin parchar la prueba, el borde de 500 renglones,
+   `isinstance(resultado, dict)` y `BrokenPipe`.
+
+- **D47: (b), decidido por la PM.** Si la divisa no es USD o no se
+  encontró, no se guarda `valor_unitario` y ese renglón avisa; lo demás
+  se guarda. La (a) queda para proponer como pieza propia.
+- **D48: (a), decidido por la PM, como pieza RENDIMIENTO-1c, la próxima
+  después de esta devolución.** La validación del PDF corre en el proceso
+  aparte, con tope de memoria y de tiempo, para leer despachos y leer
+  facturas. La prueba: tu PDF de 200 repeticiones no hace crecer la app,
+  medido en el proceso de la app; y diez a la vez no frenan una subida
+  normal. Está en producción: la publicación la decide Emi.
+- Riesgos, sin arreglo acá: el hijo carga `.env` por
+  `pdf_extractor.py:16-18` (declaralo; si se arregla con una línea, va).
+
 ## Orden después de las 18:00, y D45 y D46 (2026-10-28 17:58 UTC)
 
-1. DESPACHO-1b (devolución y D41). 2. DISCO-1 (devolución). 3. SESION-1
+1. DESPACHO-1b (devolución de las 20:15, arriba). 1b. RENDIMIENTO-1c
+(D48, arriba). 2. DISCO-1 (devolución). 3. SESION-1
 (devolución, abajo). 4. ABUSO-1 (devolución, abajo). 5. SUFIJOS-2
 (devolución, abajo) y lo que se suma de SEGURO-1. 6. EMAIL-1: la D45 y el
 mutante. 7. CONEXIONES-1: la D46. 8. OBSERVABILIDAD-1 (devolución,
@@ -314,62 +368,6 @@ se acepte DESPACHO-1b (está debajo). Evidencia en
    algo lo llenara (hoy nada); la copia de `system_backups`
    (`client_migration`) guarda datos del cliente borrado; los 502 con
    `{err}`. La copia de `system_backups` la paso yo a Emi.
-
-## DESPACHO-1b: devolución, sobre `e59e1a8` (2026-10-28 17:40 UTC)
-
-Permisos bien: el adversario (Sonnet alto) no cruzó clientes ni dueños, y
-los campos metidos en el cuerpo se ignoran. Va con la D41, después de las
-18:00, encima de la cadena. Además de las tres medias que ya declaraste:
-
-1. **Un PDF chico llena la memoria (alta, no declarada).** Reproducido por
-   la PM sobre `e59e1a8`, con `leer_despacho` sola: 10 hojas con un flujo
-   flate distinto de 70 MB cada una (0,79 MB de PDF) dan un pico de
-   806 MB; 2 hojas, 244 MB. Por la API, el adversario vio 2,2 GB con un
-   PDF de 2,2 MB y 30 hojas, y la memoria no vuelve. **Causa:** los topes
-   miden después de pagar. `contenido.get_data()` descomprime la hoja
-   entera para ver si pasa de `_MAX_CONTENIDO_PAGINA`, y eso hasta 200
-   hojas. **La familia:** cada tope (hojas, bytes descomprimidos en total,
-   largo de línea, columnas, renglones) corta antes de gastar. La prueba:
-   ese PDF sintético se rechaza o se lee con la memoria acotada, medida
-   en un proceso aparte.
-2. **La lectura cuadrática frena también a las facturas.** Corre en los
-   4 hilos de `_pool_lectura_pdf()`, los mismos del lector de facturas, y
-   el 504 no corta el hilo: cuatro despachos de 156 KB dejaron una factura
-   chica de otro usuario en 504. Entra en el arreglo de la cuadrática; la
-   prueba mide el tope, no un tiempo.
-3. **El peso infinito es de la misma causa que el 1:** el tope mira cada
-   número, no lo que se calcula con ellos. Reproducido por la PM:
-   `renglon_para_catalogo` con `cantidad=1e-320` y `kilo_neto=5` da
-   `peso_unitario: inf`, y `json.dumps` falla igual que el 500 del
-   catálogo. Todo valor derivado pasa por el mismo tope.
-4. **Guardar empeora un producto que ya estaba (no declarada).** En
-   `client_memory.py`, `_incr_avg` cuenta el promedio anterior vacío como
-   0 con el peso de todas las veces: un producto sin peso, guardado otra
-   vez con 2 kg, queda en 1 kg (y el valor, a la mitad). Con despachos
-   sin peso es el caso común. Lo arreglás vos, con su prueba: el anterior
-   vacío no promedia. Que el origen sea el último y no el frecuente va a
-   riesgos.
-5. **La fusión de NCM distinto tiene un caso más.** Verificado por la PM:
-   «… TIPO A» y «… TIPO B» dan similitud 1,0 (las palabras de una letra
-   no cuentan) contra el umbral 0,8, así que el respaldo por descripción
-   las junta aunque el NCM sea otro. Y `_norm_desc` corta en 200
-   caracteres: dos productos con el mismo texto de arancel adelante se
-   juntan. En un despacho la posición SIM manda; la prueba lleva los dos
-   casos.
-6. **Valor unitario en otra divisa (hipótesis, sin reproducir):** el
-   catálogo no guarda la divisa del FOB del despacho y la promedia con
-   las demás. Verificalo; si es así, proponé qué hacer como D42.
-7. **Pruebas que no ven el defecto.** Reproducido por la PM: sin el tope
-   numérico (`if valor < 0:`) o sin el chequeo de hoja pesada,
-   `test_despacho1b.py` da `50 passed`. El adversario suma: el tope de
-   200 hojas, el margen de columna `+2`, la captura de
-   `LecturaPdfDemasiadoLarga`, el commit único (rollback ante error de
-   base) y `_sin_nul`. Un caso por cada uno, rojo con su sabotaje.
-
-Riesgos, sin arreglo en esta pieza: más de 500 renglones (la pantalla manda
-todo junto y el servidor dice «cargalos en partes»); guardar no tiene
-`@limiter.limit`; renglones de «Información Adicional» que caerían en la
-descripción (sin despacho real para probarlo).
 
 ## DESTINO-1: aceptada sobre `f887b4a` con `b9881fb` (2026-10-28 17:52 UTC)
 
