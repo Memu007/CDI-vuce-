@@ -506,6 +506,8 @@ def test_el_lector_de_facturas_sigue_rechazando_el_despacho(auth_override, clien
     monkeypatch.setattr("proyecto_maria.core.ai_quota.enforce_pdf_quota", lambda _: None)
     monkeypatch.setattr("proyecto_maria.core.despacho_lector.leer_despacho",
                         lambda _: pytest.fail("el lector de facturas usó el de despachos"))
+    monkeypatch.setattr("proyecto_maria.core.despacho_lector.leer_despacho_aparte",
+                        lambda *_: pytest.fail("el lector de facturas usó el de despachos"))
     r = client.post("/upload_pdf/public",
                     files={"file": ("despacho.pdf", io.BytesIO(_despacho()), "application/pdf")})
     assert r.status_code == 422, r.text
@@ -805,3 +807,80 @@ def test_guardar_otra_vez_con_peso_no_lo_promedia_con_el_vacio(auth_override, cl
     [producto] = _catalogo(client, cid)
     assert (producto["veces_usado"], producto["peso_unitario_avg"], producto["valor_unitario_avg"]) == (
         2, 2.0, 3.0), producto
+
+
+# --- DESPACHO-1b, code-review: el tope cuenta renglones, no bloques --------
+
+def _subitem_solo(n=1):
+    return "\n".join(["Nº Subitem", f"{n:04d}", f"SUBITEM INVENTADO {n}", "VALOR MERCADERIA",
+                      "Unitario en Divisa    Unidad        Cantidad Unidades",
+                      "5,00                  UNIDAD        2,00"])
+
+
+def _item_con_subitems(cuantos=1):
+    """Un ítem con subítems: da un renglón por subítem y ninguno propio."""
+    return "\n".join([_item_solo(), *(_subitem_solo(n) for n in range(1, cuantos + 1))])
+
+
+def test_300_items_con_un_subitem_son_300_renglones_sin_aviso():
+    """Son 600 bloques pero 300 renglones: antes cortaba a los 250 ítems."""
+    from proyecto_maria.core.despacho_lector import leer_texto
+    leido = leer_texto("\n".join(_item_con_subitems() for _ in range(300)))
+    assert len(leido["renglones"]) == 300
+    assert not any("más de 500" in a for a in leido["avisos"]), leido["avisos"]
+
+
+@pytest.mark.parametrize("solos", [499, 0])
+def test_mas_de_500_renglones_con_subitems_lee_los_primeros_500(solos):
+    """499 ítems solos y uno con dos subítems, o uno solo con 501 subítems:
+    501 renglones."""
+    from proyecto_maria.core.despacho_lector import leer_texto
+    leido = leer_texto("\n".join([_item_solo()] * solos + [_item_con_subitems(2 if solos else 501)]))
+    aviso = "El despacho tiene más de 500 ítems y subítems: leí sólo los primeros 500."
+    assert aviso in leido["avisos"], leido["avisos"]
+    assert len(leido["renglones"]) == 500
+
+
+def test_si_la_primera_hoja_pasa_el_tope_del_texto_no_dice_hoja_0(monkeypatch):
+    from proyecto_maria.core import despacho_lector
+    from tests.pdf_bombas import hojas
+    monkeypatch.setattr(despacho_lector, "_MAX_TEXTO", 3)
+    texto, avisos = despacho_lector.texto_del_pdf(hojas([("HOJA UNO", 0), ("HOJA DOS", 0)]))
+    assert avisos == ["El texto de la primera hoja es demasiado largo: no leí ninguna."]
+    assert texto == ""
+
+
+# Corre en un python nuevo: el lector se reemplaza por uno que escribe
+# 300 MB de errores y sale con 1. Imprime el error y la memoria propia: la de
+# /proc (VmHWM), porque `ru_maxrss` arranca con la del que lo lanzó (pytest).
+_ERRORES_LARGOS = r"""
+import asyncio, json, re, sys
+from proyecto_maria.core import despacho_lector
+real = asyncio.create_subprocess_exec
+async def ruidoso(*args, **kwargs):
+    codigo = ("import sys\nfor _ in range(300): sys.stderr.write('x' * (1 << 20))\n"
+              "sys.stderr.write('FIN DEL ERROR'); sys.exit(1)")
+    return await real(sys.executable, "-c", codigo, **kwargs)
+asyncio.create_subprocess_exec = ruidoso
+try:
+    asyncio.run(despacho_lector.leer_despacho_aparte(b"%PDF", 120))
+    error = None
+except RuntimeError as e:
+    error = str(e)
+propio_kb = int(re.search(r"VmHWM:\s+(\d+)", open("/proc/self/status").read()).group(1))
+print(json.dumps({"error": error, "propio_mb": propio_kb // 1024}))
+"""
+
+
+@solo_linux
+def test_los_errores_del_lector_no_se_juntan_enteros_en_memoria():
+    """El que lanza al lector se queda con el final de sus errores, no con
+    todos: 300 MB de errores no pasan por su memoria."""
+    r = subprocess.run([sys.executable, "-c", _ERRORES_LARGOS], capture_output=True, text=True,
+                       cwd=_REPO, timeout=120,
+                       env={"PATH": os.environ.get("PATH", ""), "PYTHONPATH": str(_REPO)})
+    assert r.returncode == 0, r.stderr[-2000:]
+    medido = json.loads(r.stdout)
+    assert medido["error"].startswith("el lector de despachos salió con 1: "), medido["error"][:200]
+    assert medido["error"].endswith("FIN DEL ERROR")
+    assert medido["propio_mb"] < 100, medido["propio_mb"]

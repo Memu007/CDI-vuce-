@@ -130,11 +130,20 @@ sabotaje "sin el tope del largo de línea" "$LECTOR" \
   "if False:" \
   "test_una_linea_de_mas_de_2000_caracteres_no_se_lee[2001-True]"
 no_debe "sin el tope del largo de línea" "$ULTIMA" "test_una_linea_de_mas_de_2000_caracteres_no_se_lee[2000-False]"
-sabotaje "sin el tope de 500 ítems" "$LECTOR" \
-  "if bloques > MAX_RENGLONES:" \
+sabotaje "sin el tope de 500 renglones" "$LECTOR" \
+  "if hay_mas or len(renglones) > MAX_RENGLONES:" \
   "if False:" \
-  "test_mas_de_500_items_lee_los_primeros_500[501-True]"
-no_debe "sin el tope de 500 ítems" "$ULTIMA" "test_mas_de_500_items_lee_los_primeros_500[500-False]"
+  "test_mas_de_500_items_lee_los_primeros_500[501-True]" \
+  "test_mas_de_500_renglones_con_subitems_lee_los_primeros_500[0]"
+no_debe "sin el tope de 500 renglones" "$ULTIMA" "test_mas_de_500_items_lee_los_primeros_500[500-False]"
+sabotaje "el tope cuenta el ítem además de sus subítems" "$LECTOR" \
+  'sum(len(it["subitems"]) or 1 for it in items)' \
+  'sum(1 + len(it["subitems"]) for it in items)' \
+  "test_300_items_con_un_subitem_son_300_renglones_sin_aviso"
+sabotaje "la primera hoja larga dice hoja 0" "$LECTOR" \
+  '"El texto de la primera hoja es demasiado largo: no leí ninguna." if n == 1' \
+  '"El texto de la primera hoja es demasiado largo: no leí ninguna." if n == 0' \
+  "test_si_la_primera_hoja_pasa_el_tope_del_texto_no_dice_hoja_0"
 sabotaje "la elección sin los dos de margen" "$LECTOR" \
   "k = bisect_right(inicios, inicio + 2) - 1" \
   "k = bisect_right(inicios, inicio) - 1" \
@@ -147,9 +156,19 @@ sabotaje "no se mata al lector que tarda" "$LECTOR" \
   "                    pass" \
   "test_leer_que_tarda_demasiado_da_504_y_mata_al_lector"
 sabotaje "la ruta no ataja el tiempo" proyecto_maria/main.py \
-  "    except TimeoutError:" \
-  "    except LookupError:" \
+  "        resultado = await leer_despacho_aparte(contents, _pdf_read_timeout_s())
+    except TimeoutError:" \
+  "        resultado = await leer_despacho_aparte(contents, _pdf_read_timeout_s())
+    except LookupError:" \
   "test_leer_que_tarda_demasiado_da_504_y_mata_al_lector"
+sabotaje "los errores del lector se juntan enteros" "$LECTOR" \
+  "                _, salida, errores = await asyncio.gather(
+                    _escribir(proceso.stdin, data), proceso.stdout.read(),
+                    _final(proceso.stderr, _FINAL_DE_ERRORES))
+                await proceso.wait()" \
+  "                salida, errores = await proceso.communicate(data)
+                errores = errores[-_FINAL_DE_ERRORES:]" \
+  "test_los_errores_del_lector_no_se_juntan_enteros_en_memoria"
 sabotaje "la ruta no ataja el PDF pesado" proyecto_maria/main.py \
   "    except PdfDemasiadoPesado as e:" \
   "    except LookupError as e:" \
