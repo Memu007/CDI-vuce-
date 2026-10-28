@@ -11,6 +11,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - Registro: 5 por hora y 20 por día por IP. Recuperar usuario: 5 cada 15 minutos por IP y, por email, 3 por hora (el resto contesta lo mismo sin mandar el mail). Eventos de uso: 120 por minuto por ruta, y sin sesión se guardan sólo los de la landing y el registro.
 - Los intentos de login, recuperar contraseña, registro y recuperar usuario se cuentan en la base (tabla `limites_auth`) y no en la memoria de cada proceso: un reinicio ya no los borra. La cuenta de fallos se olvida a las 24 horas sin fallos.
 - Recuperar contraseña: los pedidos que llegan a la vez ya no pasan el tope de 5 (antes, 20 simultáneos desde una IP pasaban los 20).
+- Una IP de más de 120 caracteres en X-Forwarded-For ya no da error 500 en login, recuperar contraseña, recuperar usuario y registro (en Postgres), y sigue contando para el límite.
 
 ## 2026-10-28 · fix: los límites contra abuso cuentan la IP real (ABUSO-1, S4)
 

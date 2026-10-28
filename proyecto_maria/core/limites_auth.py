@@ -7,6 +7,7 @@ intento queda contado aunque la ruta después conteste 401, y es un único
 INSERT ... ON CONFLICT DO UPDATE ... RETURNING: dos pedidos simultáneos no
 leen la misma cuenta. Antes de escribir se borran las filas vencidas.
 """
+import hashlib
 import time
 
 from sqlalchemy import and_, case, delete, select
@@ -20,6 +21,15 @@ _T = LimiteAuth.__table__
 
 def _ahora() -> float:
     return time.time()
+
+
+def _clave(clave: str) -> str:
+    """La columna tiene 120 caracteres y la IP sale de X-Forwarded-For, que
+    puede traer cualquier cosa: una clave más larga se guarda como su comienzo
+    y su sha256, que la sigue distinguiendo."""
+    if len(clave) <= 120:
+        return clave
+    return clave[:50] + ":" + hashlib.sha256(clave.encode()).hexdigest()
 
 
 def _insert():
@@ -37,6 +47,7 @@ async def purgar_vencidas() -> None:
 
 async def segundos_bloqueado(clave: str) -> int:
     """Segundos que le quedan al bloqueo de `clave`; 0 si no está bloqueada."""
+    clave = _clave(clave)
     ahora = _ahora()
     async with _conn.engine.connect() as conn:
         hasta = (await conn.execute(
@@ -53,6 +64,7 @@ async def sumar_fallo(clave: str, tope: int = 5, bloqueo: float = 15 * 60,
     uno y bloquea de nuevo. Así, más de `tope` quiere decir que el fallo llegó
     con el bloqueo puesto, aunque haya pasado el chequeo previo a la vez que
     otros."""
+    clave = _clave(clave)
     ahora = _ahora()
     vencido = and_(_T.c.bloqueado_hasta > 0, _T.c.bloqueado_hasta <= ahora)
     nueva = case((vencido, tope), else_=_T.c.cuenta + 1)
@@ -70,6 +82,7 @@ async def sumar_fallo(clave: str, tope: int = 5, bloqueo: float = 15 * 60,
 async def contar(clave: str, ventana: float) -> int:
     """Suma un pedido en una ventana fija de `ventana` segundos que arranca
     con el primero, y devuelve cuántos van (este incluido)."""
+    clave = _clave(clave)
     ahora = _ahora()
     ins = _insert().values(clave=clave, cuenta=1, bloqueado_hasta=0.0, vence=ahora + ventana)
     ins = ins.on_conflict_do_update(index_elements=[_T.c.clave], set_={
@@ -81,5 +94,6 @@ async def contar(clave: str, ventana: float) -> int:
 
 
 async def limpiar(clave: str) -> None:
+    clave = _clave(clave)
     async with _conn.engine.begin() as conn:
         await conn.execute(delete(_T).where(_T.c.clave == clave))
