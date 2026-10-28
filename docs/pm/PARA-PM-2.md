@@ -464,8 +464,8 @@ ninguno.
 - **Medias:** el tope por email de recuperar usuario silencia a la
   víctima; el reset sin tope por email; `change-password` y el perfil sin
   límite; el login correcto limpia el contador (de antes); el deadlock
-  ocasional con ventanas cortas (con las de producción, de 15 min, no
-  apareció en 16 000).
+  ocasional con ventanas cortas (con ventanas de 1 a 2 s no apareció en
+  16 000; con las de producción no se midió).
 - **Baja, regla de `CLAUDE.md`:** `limiter.enabled` funciona como atajo de
   prueba dentro del producto. Propuesta: que los topes propios no dependan
   de esa bandera.
