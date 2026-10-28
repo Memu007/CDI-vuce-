@@ -168,8 +168,8 @@ Toca el TXT: el golden no se toca.
 - **D40 y los arreglos de ORG-1 después de las piezas: sí.** Van encima de
   la cadena igual; no se integra nada hasta aceptar ORG-1.
 - **Recibidas** SUFIJOS-2 (`bd76f9f`, devolución arriba), SEGURO-1
-  (`5dfaf47`, aceptada arriba) y DESPACHO-1b (`e59e1a8`, revisión de la PM
-  en curso).
+  (`5dfaf47`, aceptada arriba) y DESPACHO-1b (`e59e1a8`, devolución
+  arriba).
 
 ## EMAIL-1: aceptada sobre `2b93071` (2026-10-28 17:46 UTC)
 
