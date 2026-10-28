@@ -2,6 +2,59 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## SUFIJOS-2: hecha, **sin entregar** (2026-10-28)
+
+Commits encima de `4905cd8`: casos en rojo `a12aae3`; producto y
+`CHANGELOG.md` `79dc0c6`; sabotajes `b5c63c8`; un caso más en rojo
+`34ff7f0`, su arreglo `0118f5f` y su sabotaje `f2e09d8`; el comentario en
+líneas cortas `4ca6829`. **SHA probado: `4ca6829`.** Sabotajes 9/9 en rojo
+(`scripts/testing/sabotajes/sufijos2.sh`) y suite completa en `4ca6829`:
+3731 passed, 336 skipped, 2 xfailed, 0 failed. Va en su propio `/entregar`, después del de DESTINO-1, cuando
+vuelva el cupo. **No hace falta que la revises todavía.** Tiene una
+decisión: D29, abajo.
+
+- **Sufijo libre:** un número con decimales sale con coma. `AF(2.5)` sale
+  `AF(2,5)`. Un punto o una coma cuentan como decimal sólo entre dígitos y
+  una sola vez: `V1.2.3` sale `V1 2 3`, como antes, y `ROJO, AZUL` sale con
+  espacio. Vale también para la propuesta que arma el arancel.
+- **Sufijo que pide número** (los `Z`, ver D29) con decimales: no se
+  genera. El error dice dónde (operación, ítem, sub-ítem o renglón) y cuál
+  sufijo, y llega como 400.
+- **Ninguno vacío:** `AA()`, `AA(   )` o `AA(--)` (que queda vacío al
+  limpiar) no se generan. Mismo tipo de error.
+- **Lo que sigue igual:** los `Z` enteros con la forma del archivo aceptado
+  (`ZA(016384)`…) y los sufijos que ya traían coma. El golden no cambió:
+  `git diff 4905cd8..4ca6829 -- tests/fixtures` sale vacío.
+- **Una prueba existente cambió:**
+  `tests/test_sufijos1.py::test_un_codigo_con_el_valor_vacio_es_un_codigo_que_falta`
+  esperaba que `AA( )` generara con el aviso de un código que falta. La
+  regla nueva dice que no se genera: ahora es
+  `test_un_codigo_con_el_valor_vacio_no_se_genera`.
+- **Archivos de producto:** `proyecto_maria/core/maria_generator.py` y
+  `proyecto_maria/core/sufijos_arca.py`.
+
+**La premisa.** Que la coma no rompe el campo sí se sabe desde el repo: el
+TXT es `CLAVE=valor` por línea, y el archivo real de 2026 ya trae una coma
+en `LDDTNOMFOD`. El paréntesis se toma entero, en el generador y en
+`despachante.js`, así que la coma de adentro no parte el sufijo. Cuáles
+piden número **no** se sabe desde el repo: es la D29.
+
+**Rojo encontrado en la autorrevisión.** `\d` en Python también toma
+dígitos que no son ASCII. Con eso, `٣.٥` salía `٣,٥` en el TXT. Primero el
+caso en rojo (`34ff7f0`), después el arreglo con `[0-9]` (`0118f5f`) y su
+sabotaje.
+
+**Riesgos y lo que no hice:**
+- En un sufijo libre, `1.234` con punto de miles sale `1,234`, que se lee
+  como 1 con decimales. No hay forma de distinguirlos.
+- En un `Z`, `1.234` da error y no se lee como 1234. Es a propósito: no se
+  adivina.
+- Fuera de alcance, sin tocar: un `Z` con texto (`16 GB`, `2 5`) pasa; el
+  generador no rellena con ceros a seis dígitos como el archivo aceptado.
+  Si querés, lo propongo como pieza.
+- Sin correr todavía: subagentes, `/code-review` y `/security-review`.
+  Vuelven a las 18:00 UTC.
+
 ## DESTINO-1: hecha, **sin entregar** (2026-10-28)
 
 Producto `7526be9`, pruebas y sabotajes hasta `f887b4a`, encima de
@@ -31,6 +84,29 @@ encuentren y entrego con el timbre. Subo ahora para que el trabajo no se
 pierda si el contenedor muere. **No hace falta que la revises todavía.**
 
 ## Decisiones
+
+**D29 — cuáles sufijos «piden número».** El despachante dijo «sin
+decimales», pero ni el repo ni la tabla de ARCA (`sufijos_arca.json.gz`,
+07/10/2026) dicen qué sufijo es numérico: la tabla no trae tipo de dato.
+Lo que sí muestra la tabla: los libres son de dos letras y empiezan sólo con
+`A` o con `Z`.
+- Los `A`: 55 descripciones, 2339 entradas. Son texto: marca, modelo,
+  versión, código de producto.
+- Los `Z`: 442 descripciones, 9478 entradas. Son magnitudes o cantidades:
+  peso, ancho, hilos por cm, cilindrada, año.
+- En algunos `Z` ARCA ya elige la unidad para no usar decimales: «en
+  décimas de mm», «milésimas de quilates».
+- El archivo aceptado trae `ZA(016384)`, `ZB(004400)` y otros: enteros.
+
+El supuesto quedó en una línea, `PIDE_NUMERO = ("Z",)`.
+
+- **(a) Recomiendo esta.** Los `Z` piden número y los `A` son libres, como
+  está. Es lo que muestran la tabla y el archivo aceptado, y se revierte en
+  una línea. El costo: unas 90 descripciones `Z` (1459 entradas: quilates
+  promedio, ppm, %, g/m2) pueden traer decimales naturales. Con (a) esas no
+  generan hasta que se escriben enteras, y el error dice cuál es.
+- **(b)** Otra lista, confirmada por el despachante (pregunta nueva). Hasta
+  que conteste, queda (a).
 
 **D28 — contestada (a) en `be1cac2`.** DESTINO-1 rompe seis pruebas que
 comparan el golden entero. No
@@ -521,6 +597,6 @@ PY=<venv>/bin/python scripts/testing/sabotajes/despacho1a.sh 51890cd
 - **El 400 «es para otro email»** dice que el email escrito no es el
   invitado. No dice cuál es. Hace falta el token para preguntar.
 
-Última vuelta: Wed Oct 28 02:50:30 UTC 2026
+Última vuelta: Wed Oct 28 03:22:06 UTC 2026
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed, 2026-10-28 02:29 UTC). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed); ocho pruebas comparan el golden, no seis. Pendiente: el 28/10 después de las 18:00 UTC, primero /entregar de ORG-1, ORG-1b y DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, levantar Postgres 55432 para org1_postgres.py y apagarlo después), timbre «Dev MARIA: entregué ORG-1, ORG-1b y DESPACHO-1a en <SHA>»; después /entregar de DESTINO-1 aparte (informe: supuestos reversibles —COMERC/BDEUSO/USOPAR no se aceptan como entrada, textos «destino de la mercadería»—; rojo previo ajeno de pantalla_maria4.js por ruta chromium-1194 y falta de comprador_cuit; nueve scripts con la ruta vieja de chromium). Después SUFIJOS-2 y SEGURO-1 (la PM las detalla). PESO-NETO-1 y PRORRATEO-1 esperan al despachante; DESPACHO-1 después de esas. La próxima D es la D29. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed); ocho pruebas comparan el golden, no seis. SUFIJOS-2 hecha y subida SIN ENTREGAR encima de 4905cd8: producto 79dc0c6+0118f5f+4ca6829, SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 336 skipped, 2 xfailed, 0 failed); D29 abierta (qué sufijos piden número; supuesto PIDE_NUMERO=("Z",), recomiendo a); cambió test_sufijos1::test_un_codigo_con_el_valor_vacio_no_se_genera. Pendiente: el 28/10 después de las 18:00 UTC, primero /entregar de ORG-1, ORG-1b y DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), timbre «Dev MARIA: entregué ORG-1, ORG-1b y DESPACHO-1a en <SHA>»; después /entregar de DESTINO-1 aparte (supuestos reversibles COMERC/BDEUSO/USOPAR, rojo previo ajeno de pantalla_maria4.js, nueve scripts con ruta vieja de chromium); después /entregar de SUFIJOS-2. Después SEGURO-1 (la PM la detalla). PESO-NETO-1 y PRORRATEO-1 esperan al despachante; DESPACHO-1 después. La próxima D es la D30. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
