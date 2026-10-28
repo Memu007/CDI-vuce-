@@ -196,11 +196,12 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-10-28 17:00 UTC: sesiones bajo 170k (técnica 108k, MARIA 143k), las dos trabajando. Sin entregas nuevas ni D abiertas desde las 16:35: MARIA con D40 y los 3 hallazgos de ORG-1; la técnica con EXCEL-2b y COBRO A–E. Corren los Sonnet de ORG-1, COBRO, EXCEL-2b y DESTINO-1, y los sabotajes de DESTINO-1.
+
 2026-10-28 16:35 UTC: Emi: «hay que gastar cupo» (reinicio 18:00 UTC). Devs a /entregar ya. GUARDAR-2 aceptada e integrada (adversario Sonnet alto y suite sobre 0d89c20, sólo el rojo conocido de test_excel2). ORDEN-1: devolución (16:45). Decidido por la PM: adversarios ya, sin esperar informes, sobre EXCEL-2b b3ac325, COBRO dda9f5b y ORG-1 4ce6d22. Emi: sí o no a la medición chica de la D39.
 
 2026-10-28 14:00 UTC: sesiones bajo 170k (técnica 137k, MARIA 118k), las dos esperan el cupo de las 18:00. MARIA terminó EMAIL-1 (2b93071, suite 3954 passed) y CONEXIONES-1 (30c0e97: sin conexiones colgadas, sin cambio de producto), sin entregar. D38 (1) y D39 (1) por ahora, decididas por la PM; la medición chica de la D39 se le propone a Emi. La técnica, BACKUP-1a subida en 70f6d3d.
 
-2026-10-28 13:00 UTC: sesiones bajo 170k (técnica 137k, MARIA 139k). Sin D abiertas. MARIA tiene EMAIL-1 en su clon (sin subir) y mide CONEXIONES-1: sin conexiones colgadas en la primera corrida, arma los sabotajes del medidor. La técnica, BACKUP-1a en la rama hasta `9d2d4bb`: sabotajes y suites corriendo; entrega con el cupo de las 18:00. Emi: contar los pares de email, destino de la copia, textos legales.
 
 ## Medición
 
