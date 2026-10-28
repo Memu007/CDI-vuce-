@@ -495,3 +495,25 @@ def test_guardar_con_un_id_que_no_es_un_maria_no_lo_toma_como_archivo(cuenta):
     ops = _operaciones(u)
     assert [o["archivo"] for o in ops] == [None, None], ops
     assert _leer(u)["ops"] == 2
+
+
+def test_el_conteo_vence_la_cuenta_que_vencio_despues_del_corte(cuenta):
+    # Toda ruta que cuenta pasa antes por el corte, que ya vence la cuenta en
+    # otra transacción: si vence entre el corte y el conteo, el conteo la mira
+    # de nuevo con la fila bloqueada. Se llama directo porque por la ruta ese
+    # instante no se puede fijar.
+    from fastapi import HTTPException
+
+    _, u = cuenta(org=True)
+    _fijar(u, de_la_org=True, billing_status="trial", trial_ends_at=AHORA - timedelta(days=1))
+
+    async def _contar():
+        async with AsyncSessionLocal() as db:
+            await main._contar_operacion_bloqueada(db, u)
+            await db.commit()
+
+    with pytest.raises(HTTPException) as e:
+        _correr(_contar())
+    assert e.value.status_code == 402
+    assert e.value.detail["code"] == "TRIAL_EXPIRED", e.value.detail
+    assert _leer(u, de_la_org=True) == {"ops": 0, "extra": 0, "estado": "past_due"}
