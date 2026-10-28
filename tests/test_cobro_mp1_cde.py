@@ -17,7 +17,7 @@ import pytest
 
 from proyecto_maria.services import billing_service
 from tests.test_cobro_mp2 import (  # noqa: F401
-    PEDIDOS, SUS, _aviso_ipn, _cerca, _fin, _leer, _mp, _pago, _suscripto,
+    PAGOS, PEDIDOS, SUS, _aviso_ipn, _cerca, _fin, _leer, _mp, _pago, _suscripto,
 )
 from tests.test_prelaunch_block2 import _get_user, _register, _set_user, _unique, client  # noqa: F401
 
@@ -126,4 +126,19 @@ def test_una_cuenta_vieja_pagada_sin_registro_sigue_yendo_al_checkout(client):
     assert client.post("/api/billing/cancel").status_code == 200
     cuerpo = client.post("/api/billing/reactivate").json()
     assert cuerpo["billing_status"] == "canceled", cuerpo
+    assert cuerpo["needs_checkout"] is True, cuerpo
+
+
+def test_una_cuenta_vieja_pagada_con_un_pago_rechazado_sigue_yendo_al_checkout(client):
+    # El aviso de un pago de antes del registro (el IPN va sin firma: lo
+    # puede mandar cualquiera que sepa el id) deja una fila rechazada. Un
+    # rechazo no dice nada del plan: decide payment_provider, como sin filas.
+    usuario, _ = _suscripto(client, "cde_vieja_rech")
+    viejo = _pago(f"viejo-{usuario}", f"{usuario}:premium")
+    PAGOS[viejo]["date_approved"] = "2020-03-01T10:00:00.000-03:00"
+    assert _aviso_ipn(client, viejo).status_code == 200
+    _entrar(client, usuario)
+    assert client.post("/api/billing/cancel").status_code == 200
+    cuerpo = client.post("/api/billing/reactivate").json()
+    assert cuerpo["billing_status"] == "canceled", f"una cuenta pagada volvió como prueba: {cuerpo}"
     assert cuerpo["needs_checkout"] is True, cuerpo
