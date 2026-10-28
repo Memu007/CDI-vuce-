@@ -278,3 +278,12 @@ otro. D32: (b), libros chicos pero caros al carril pesado por una medida
 previa a leer, como pieza aparte EXCEL-2c al final de la cola de la Dev
 técnica. Topes de entorno: un valor que no da un tope usable (no finito,
 no positivo o 0 en bytes) usa el defecto.
+
+## 2026-10-28 — Rutinas de las Devs cada 3 horas (Emi)
+
+Emi, 28/10 («Dale»): las rutinas de la Dev MARIA y de la Dev técnica pasan
+de cada hora a cada 3 horas (minutos 35 y 15). La de la PM principal sigue
+cada hora. El canal principal son los avisos entre sesiones (la Dev avisa
+al entregar; la PM la despierta con el veredicto); la vuelta horaria de la
+PM es la red que despierta a una Dev parada. Se vuelve atrás con
+`update_trigger`.
