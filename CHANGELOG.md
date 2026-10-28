@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: el email de la cuenta se busca sin mirar mayúsculas (EMAIL-1)
+
+- Recuperar usuario, recuperar contraseña y entrar con el email encuentran la cuenta aunque el email venga con otras mayúsculas o espacios; el correo sale a la dirección guardada. La respuesta es la misma exista o no.
+- El perfil ya no deja cambiar el email a uno que otra cuenta tiene con otras mayúsculas, y no reescribe el email si sólo cambian las mayúsculas.
+- Si dos cuentas viejas comparten el email con distintas mayúsculas, no se tocan: gana la que coincide exacto; si ninguna coincide exacto no se elige ninguna (no sale correo y el login pide el email exacto o el usuario).
+
 ## 2026-10-28 · fix: límites en registro, recuperar usuario y eventos (ABUSO-1, S6 y C9)
 
 - Registro: 5 por hora y 20 por día por IP. Recuperar usuario: 5 cada 15 minutos por IP y, por email, 3 por hora (el resto contesta lo mismo sin mandar el mail). Eventos de uso: 120 por minuto por ruta, y sin sesión se guardan sólo los de la landing y el registro.

@@ -1505,6 +1505,29 @@ app.router.lifespan_context = lifespan
 class PasswordResetRequest(BaseModel):
     email: str
 
+
+async def _cuenta_por_email(db: AsyncSession, email: str):
+    """La cuenta de ese email, sin mirar mayúsculas ni espacios (EMAIL-1).
+
+    Puede haber cuentas de antes que comparten el email con distintas
+    mayúsculas. Entre ellas gana la que coincide exacto; si ninguna coincide
+    exacto, no se elige ninguna (D38): así un pedido nunca le manda a una
+    cuenta lo de otra.
+    """
+    email = (email or "").strip()
+    if not email:
+        return None
+    exacta = await db.execute(select(User).where(User.email == email))
+    cuenta = exacta.scalars().first()
+    if cuenta:
+        return cuenta
+    res = await db.execute(select(User).where(func.lower(User.email) == func.lower(email)).limit(2))
+    cuentas = res.scalars().all()
+    if len(cuentas) > 1:
+        logging.warning("EMAIL-1: el email pedido es de más de una cuenta (mayúsculas distintas); no se elige ninguna")
+        return None
+    return cuentas[0] if cuentas else None
+
 class PasswordResetConfirm(BaseModel):
     token: str
     new_password: str
@@ -1526,8 +1549,7 @@ async def request_password_reset(request: PasswordResetRequest, req: Request, db
         raise HTTPException(status_code=429, detail=f"Demasiados intentos. Intente en {espera // 60 + 1} minutos.")
     
     # 1. Buscar usuario
-    result = await db.execute(select(User).where(User.email == request.email))
-    user = result.scalars().first()
+    user = await _cuenta_por_email(db, request.email)
     
     if not user:
         # Por seguridad, no decimos si el email existe o no, pero simulamos éxito
@@ -1588,8 +1610,7 @@ async def recover_username(request: RecoverUsernameRequest, req: Request, db: As
             return mensaje
 
     # 1. Buscar usuario por email
-    result = await db.execute(select(User).where(User.email == request.email))
-    user = result.scalars().first()
+    user = await _cuenta_por_email(db, request.email)
     
     if not user:
         # Por seguridad, no revelar si el email existe
@@ -1989,7 +2010,10 @@ async def update_user_profile(
     # contraseña actual, antes de tocar cualquier otro campo. La pantalla de
     # perfil siempre manda el email, así que sólo se pide si cambió.
     raw_email = str(body.get("email") or "").strip().lower()
-    if "email" in body and raw_email != (u.email or "").strip().lower():
+    # Igual sin mirar mayúsculas no es un cambio: el email guardado queda como
+    # está (EMAIL-1: una cuenta vieja con mayúsculas no se reescribe).
+    cambia_email = "email" in body and raw_email != (u.email or "").strip().lower()
+    if cambia_email:
         if raw_email and not re.match(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", raw_email):
             raise HTTPException(status_code=400, detail="Email no válido")
         current_password = body.get("current_password")
@@ -2022,9 +2046,11 @@ async def update_user_profile(
             u.cuit = digits
 
     # Email editable para contacto/login
-    if "email" in body:
+    if cambia_email:
         if raw_email:
-            dup = await db.execute(select(User).where(User.email == raw_email, User.username != u.username))
+            dup = await db.execute(
+                select(User).where(func.lower(User.email) == raw_email, User.username != u.username)
+            )
             if dup.scalars().first():
                 raise HTTPException(status_code=400, detail="Ese email ya está en uso por otro usuario")
         u.email = raw_email or None
@@ -2771,6 +2797,8 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
         select(User).where((User.username == username) | (User.email == username))
     )
     user = result.scalars().first()
+    if not user and "@" in (username or ""):
+        user = await _cuenta_por_email(db, username)
     
     # Función auxiliar para manejar fallo y rate limit
     # (desde el quinto fallo de la IP, bloqueo de 15 minutos)
@@ -2966,23 +2994,26 @@ async def register(request: RegisterRequest, req: Request, background_tasks: Bac
     if request.email:
         clean_email = request.email.strip().lower()
         result = await db.execute(select(User).where(func.lower(User.email) == clean_email))
-        existing_email_user = result.scalars().first()
-        if existing_email_user:
+        existing_email_users = result.scalars().all()
+        if existing_email_users:
             if _is_replaceable_register_test_email(clean_email):
-                old_email = existing_email_user.email
-                existing_email_user.email = _archived_test_email(
-                    clean_email,
-                    existing_email_user.username,
-                )
-                existing_email_user.is_verified = False
+                # Todas las cuentas con ese email, con las mayúsculas que sean:
+                # si quedara una, la nueva repetiría su email (EMAIL-1).
+                for existing_email_user in existing_email_users:
+                    old_email = existing_email_user.email
+                    existing_email_user.email = _archived_test_email(
+                        clean_email,
+                        existing_email_user.username,
+                    )
+                    existing_email_user.is_verified = False
+                    logging.warning(
+                        "test register replace: email liberado para nueva alta "
+                        "%s (usuario anterior: %s, email anterior: %s)",
+                        clean_email,
+                        existing_email_user.username,
+                        old_email,
+                    )
                 await db.commit()
-                logging.warning(
-                    "test register replace: email liberado para nueva alta "
-                    "%s (usuario anterior: %s, email anterior: %s)",
-                    clean_email,
-                    existing_email_user.username,
-                    old_email,
-                )
             else:
                 raise HTTPException(status_code=400, detail="Email ya registrado. Usa otro email o ingresa con tu cuenta existente.")
         request.email = clean_email
