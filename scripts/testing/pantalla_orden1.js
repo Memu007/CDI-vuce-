@@ -95,15 +95,24 @@ const orden = p => p.evaluate(() => CDI.state.items.map(it => it.descripcion));
 const filas = p => p.$$eval('#ncmTbody tr:not(.row-sub) td.col-desc', tds => tds.map(td => td.textContent.trim()));
 
 // Arrastre real: botón apretado sobre el agarre de la fila y soltado sobre otra.
+// Da false si no hay agarre o si el navegador no llegó a empezar el arrastre
+// (dragstart que la pantalla no canceló).
 async function arrastrar(p, desde, hacia) {
   const agarre = await p.locator(desde + ' .drag-grip').boundingBox({ timeout: 3000 }).catch(() => null);
   if (!agarre) return false;
   const destino = await p.locator(hacia).boundingBox({ timeout: 3000 });
+  await p.evaluate(() => {
+    if (!window.__arrastresContados) {
+      window.__arrastresContados = true;
+      window.addEventListener('dragstart', e => { if (!e.defaultPrevented) window.__arrastres++; });
+    }
+    window.__arrastres = 0;
+  });
   await p.mouse.move(agarre.x + agarre.width / 2, agarre.y + agarre.height / 2);
   await p.mouse.down();
   await p.mouse.move(destino.x + destino.width / 2, destino.y + destino.height / 2, { steps: 10 });
   await p.mouse.up();
-  return true;
+  return (await p.evaluate(() => window.__arrastres)) > 0;
 }
 const fila = i => '#ncmTbody tr[data-index="' + i + '"]';
 const grupo = g => '#ncmTbody tr.row-grouped[data-grupo-id="' + g + '"]';
@@ -136,6 +145,8 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     const ctx = await nuevoContexto('ord1a');
     const p1 = await abrir(ctx);
     await cargar(p1, 'ORD-A', [prod('Producto de la pestaña A', '84714900100D', 2, 10)]);
+    // Sin esto la segunda se abre antes de que la primera guarde y no hay qué tomar.
+    await esperarBorradores(p1, ['ORD-A'], 'la primera pestaña no guardó su operación');
     const p2 = await abrir(ctx);
     if (await recuperada(p2)) falla('la segunda pestaña tomó la operación de la primera, que sigue abierta');
     await cargar(p2, 'ORD-B', [prod('Producto de la pestaña B', '84714900100D', 3, 20)]);
