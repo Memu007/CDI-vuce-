@@ -172,7 +172,7 @@ ataques() {
     'OperationModel.id == operation_id,
             OperationModel.owner_username == username,' \
     'OperationModel.id == operation_id,' \
-    "Cambiar el estado de la operación de Ana" "El estado de la operación de Ana quedó como estaba"
+    "Cambiar el estado de la operación de Ana" "Beto cambió el estado de la operación de Ana"
   ataque $M "operaciones: agrupar no mira el dueño" \
     'OperationModel.owner_username == username,
             OperationItemModel.id.in_(item_ids),' \
@@ -182,7 +182,7 @@ ataques() {
     'OperationModel.owner_username == username,
             OperationItemModel.grupo_id == grupo_id,' \
     'OperationItemModel.grupo_id == grupo_id,' \
-    "Desagrupar los ítems de Ana" "Los ítems de Ana siguen en su grupo"
+    "Desagrupar los ítems de Ana" "Beto tocó el grupo de Ana"
   ataque proyecto_maria/routers/quote_router.py "presupuesto: compartir no mira el dueño" \
     '            Operation.owner_username == user["username"]' \
     '            True' \
