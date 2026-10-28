@@ -2,6 +2,155 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## SESION-1: hecha, **sin entregar** (2026-10-28)
+
+Encima de OBSERVABILIDAD-1 y de tu `486e655` (merge `f5160d7`): producto y
+`CHANGELOG.md` `7dfe144`; casos, arnés de dos motores, pantalla y sabotajes
+`014a3e4`. **SHA probado: `014a3e4`.** Para ver sólo esta pieza:
+`git diff f5160d7..014a3e4`. Va en su propio `/entregar`, después del de
+OBSERVABILIDAD-1, con subagentes, `/code-review high` y `/security-review`
+cuando vuelva el cupo. **No hace falta que la revises todavía.**
+
+Nada para decidir. Supuestos abajo.
+
+### Premisa: confirmada, en SQLite y en Postgres 16 (55432)
+
+Servidor real sobre `39be45e`, usuario inventado (`$S/ses/premisa.py`,
+fuera del repo). Mismo resultado en los dos motores:
+
+```
+[base] dos logins: T1 401 (revocada por el segundo), T2 200
+[A cambiar clave con T2] 200; active_jti=None; T1 200, T2 200
+[login nuevo T3] T1 401, T2 401, T3 200
+[B resetear clave] pedir 200, reset 200; active_jti=None; T1 200, T2 200, T3 200
+[C cerrar sesión T4] /auth/logout 200, /logout 200; T4 después 200
+[D cambiar email sin contraseña con T4] 200; email en la base=atacante@example.com
+```
+
+Es peor de lo que dice S3: cambiar o resetear la clave ponía `active_jti`
+en NULL, y NULL quiere decir «aceptar cualquier token» (usuarios de antes
+de la columna). **Revocar resucitaba las sesiones ya revocadas** (T1 volvió
+a entrar). Cerrar sesión sólo borraba la cookie: el token seguía entrando.
+Y cualquiera con una sesión abierta cambiaba el email sin la clave, y con
+eso, el reset.
+
+### Qué cambió
+
+Se usa el único mecanismo que había: `users.active_jti` y el chequeo de
+`get_current_user`.
+
+- `auth/dependencies.py`: `revocar_sesiones(user, conservar_jti=None)`
+  nunca escribe NULL; para revocarlas todas guarda un jti nuevo que ningún
+  token tiene. `revocar_sesion_de_la_request` toma el token de la cookie o
+  del Bearer, como `get_current_user`, y lo revoca **sólo si es el
+  vigente**: un token vencido, inválido o ya revocado no toca nada (si no,
+  quien tenga uno viejo podría sacar a la sesión buena).
+  `get_current_user` deja el jti en `request.state.token_jti`.
+- `main.py`:
+  - `POST /api/user/change-password`: cierra las otras y conserva la de
+    quien la cambió. Con la clave actual mal no toca nada.
+  - `POST /auth/reset-password`: cierra todas.
+  - `POST /auth/logout` y `POST /logout`: revocan ese token y borran la
+    cookie; sin token o con basura, 200 como antes.
+  - `PUT /api/user/profile`: si el email cambia (sin distinguir mayúsculas
+    ni espacios; vaciarlo también es cambiarlo), pide `current_password`.
+    Sin ella: 400 «Para cambiar el email ingresá tu contraseña actual»;
+    equivocada: 400 «La contraseña actual es incorrecta». En los dos casos
+    no cambia nada, tampoco el nombre. El formato se valida antes de pedir
+    la clave.
+- Pantalla de perfil v2 (`profile.js`, `dashboard_v2.html`): el campo
+  «Contraseña actual» aparece sólo si el email cambió; sin clave avisa y no
+  manda nada; al guardar bien se vacía y se oculta.
+
+### Rojo antes del producto (`39be45e`)
+
+- `tests/test_sesion1.py`: `11 failed, 6 passed`.
+- `sesion1_motores.py`: `FALLAS: 12` en SQLite y `FALLAS: 12` en Postgres;
+  fallan cerrar la otra al cambiar la clave, `active_jti` no NULL (×2), el
+  reset cierra la vigente y no resucita, los cuatro logouts (Bearer y
+  cookie en las dos rutas) y el email sin clave, con clave mal y vaciándolo.
+- `pantalla_sesion1.js`: `FALLA: cambiar el email no muestra el campo de
+  la clave`.
+
+### Puertas sobre `014a3e4`
+
+| Puerta | Resultado |
+|---|---|
+| suite completa (`pytest -q --no-cov --timeout=120`) | **corriendo**: el resultado va en el próximo commit del informe |
+| `compileall` | **corriendo** (va con la suite) |
+| `sesion1_motores.py sqlite` | 26 `OK`, `sqlite: todo OK`, salida 0 |
+| `sesion1_motores.py pg postgresql://cdi@127.0.0.1:55432/postgres` | 26 `OK`, `pg: todo OK`, salida 0 |
+| `sabotajes/sesion1.sh` (14 de backend, 5 de pantalla) | 19 `ROJO`, `sabotajes sin rojo: 0`, salida 0 |
+| `smoke_friccion.sh` | `smoke salida 0` |
+| `ataque_aislamiento.sh` | 22 `OK`, `ataque salida 0` |
+| pantalla sola (verde) | 3 de 3 `OK: el perfil pide la contraseña sólo al cambiar el email y no saca a nadie al login` |
+
+Un sabotaje que **no** sirve, y por qué: quitar sólo el chequeo de «sin
+clave» no rompe la regla, porque `verify_password` igual rechaza `None` (da
+400 «incorrecta»). El sabotaje que quedó es el defecto real: verificar sólo
+si viene una clave.
+
+No corrí: subagentes, `/code-review` ni `/security-review` (sin cupo hasta
+las 18:00 UTC). Una primera corrida de navegador, antes de esta versión del
+script, no mandó el PUT; no encontré la causa y no se repitió en las
+siguientes.
+
+### Riesgos (fuera de alcance; ninguno lo empeora esta pieza)
+
+- `REPRODUCCION-ARGON` fila 10: `verify-email` se puede reusar y abre una
+  sesión.
+- Fila 13.2: el reset con una cookie vieja da 403 (CSRF).
+- Fila 14: `/auth/me` no mira el jti (un token revocado sigue viendo sus
+  datos ahí); los tokens de reset no se anulan entre sí; el contador de
+  intentos de login.
+- La telemetría (`_jwt_sub_from_token_text`) atribuye eventos a tokens
+  revocados.
+- Un usuario con `active_jti` NULL (nunca hizo login desde la columna)
+  acepta cualquier token suyo hasta su próximo login, cambio de clave o
+  cierre de sesión.
+- Cambiar el email no cierra las otras sesiones (la tarea no lo pide).
+- `/logout` no está exento de CSRF y `/auth/logout` sí: igual que antes.
+- `change-password` y `PUT /api/user/profile` no tienen límite de
+  intentos: sirven para probar claves con una sesión robada. **Alta.**
+- El límite de login por IP sale de `X-Forwarded-For`: cambiándolo se
+  saltea (ya era así; lo usé para que el arnés no choque con el límite).
+  **Alta.**
+- Si la base falla al cerrar sesión, da 500 y no borra la cookie.
+- Un usuario sin hash de clave válido no puede cambiar su email.
+- `change-password` con la clave mal sigue dando 401, y la pantalla lo
+  toma como sesión vencida y manda al login. No lo toqué.
+
+### Supuestos reversibles
+
+- 400 y no 401 para la clave equivocada en el perfil: la pantalla toma
+  cualquier 401 como sesión vencida.
+- El email se compara sin mayúsculas ni espacios, y vaciarlo pide la clave.
+- El formato del email se valida antes de pedir la clave.
+- El aviso al cambiar la clave dice «Cerramos tus otras sesiones abiertas.
+  Usá la nueva la próxima vez que ingreses.».
+- `test_user_profile_coverage.py`: el caso que cambiaba el email sin clave
+  ahora espera 400; el de email inválido mira el texto «Email no válido».
+
+### Archivos de producto que toqué
+
+`proyecto_maria/auth/dependencies.py`, `proyecto_maria/main.py`,
+`proyecto_maria/static/v2/screens/profile.js`,
+`proyecto_maria/templates/dashboard_v2.html`, `CHANGELOG.md`.
+
+### Comandos
+
+```bash
+# con las variables de prueba de siempre (VUCE_MODE=fake, etc.)
+python -m pytest -q --no-cov tests/test_sesion1.py tests/test_user_profile_coverage.py
+#   → todo passed, 0 failed
+python scripts/testing/sesion1_motores.py sqlite
+#   → 26 líneas OK y «sqlite: todo OK»
+python scripts/testing/sesion1_motores.py pg postgresql://cdi@127.0.0.1:55432/postgres
+#   → 26 líneas OK y «pg: todo OK» (sólo acepta un Postgres local)
+NODE_PATH=$(npm root -g) PY=$(which python) scripts/testing/sabotajes/sesion1.sh 014a3e4
+#   → 19 líneas ROJO y «sabotajes sin rojo: 0» (~4 min; sin node+playwright sale con error)
+```
+
 ## OBSERVABILIDAD-1: hecha, **sin entregar** (2026-10-28)
 
 Encima de DISCO-1 (`88b22c8`): producto y `CHANGELOG.md` `8b1ce3b`;
@@ -14,17 +163,8 @@ vuelva el cupo. **No hace falta que la revises todavía.**
 
 ### Decisiones
 
-- **D34. «La métrica se graba con su dueño» choca con el código.**
-  `MetricsMiddleware` (`main.py`, `APILog(...)` cerca de la línea 1671)
-  nunca pone `owner_username`: con la columna, la métrica se graba, pero
-  con dueño vacío.
-  - (a) **Esta pieza sólo hace que la columna exista** (recomiendo; lo
-    apliqué como supuesto reversible). Lo que pediste se cumple: la
-    métrica se vuelve a grabar y el panel deja de dar 500. Atribuir cada
-    métrica a su usuario es otra pieza.
-  - (b) En esta pieza, el middleware lee el token ya verificado y graba el
-    usuario. Toca sesión y suma un caso por tipo de token: revisión de
-    auth. No lo hice.
+- **D34: contestada (a) en tu `486e655`.** La pieza sólo hace que la
+  columna exista; atribuir cada métrica a su usuario queda fuera.
 
 ### Premisa: confirmada en Postgres 16 (55432)
 
@@ -155,7 +295,9 @@ De esta pieza:
 - Con más de un worker (`WEB_CONCURRENCY` en `gunicorn_conf.py`; el
   `Dockerfile` usa 1), dos arranques a la vez: uno puede fallar y dejarlo
   en el log, y el esquema queda bien. **No probado.**
-- D34: las métricas siguen sin dueño.
+- D34 (a): las métricas siguen sin dueño. Propuesta para otra pieza: que
+  `MetricsMiddleware` grabe el usuario leyendo el token ya verificado; toca
+  sesión y autenticación, con su revisión.
 
 ### Supuestos reversibles
 
@@ -1276,6 +1418,6 @@ PY=<venv>/bin/python scripts/testing/sabotajes/despacho1a.sh 51890cd
 - **El 400 «es para otro email»** dice que el email escrito no es el
   invitado. No dice cuál es. Hace falta el token para preguntar.
 
-Última vuelta: Wed Oct 28 08:32:53 UTC 2026
+Última vuelta: Wed Oct 28 09:40:20 UTC 2026
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 contestada (a) en 3da0a8b, costos en riesgos. DATOS-1 (D5+D32 (a) borrar cliente borra sus presupuestos compartidos, D2 /health 503, D6 sin dev_detail) hecha y subida SIN ENTREGAR encima de d01f95c: producto 7d09c6f, casos 4416076, Postgres y sabotajes 162d277, arreglo de casos que gastaban el cupo de test_user c996ad4; SHA probado c996ad4 (test_datos1 9 passed; sabotajes datos1.sh 12/12; suite 3836 passed, 336 skipped, 2 xfailed, 0 failed; datos1_postgres.py fallas 0; smoke y aislamiento 0 sobre 162d277); su propio /entregar después del de DESPACHO-1b, con /security-review. Postgres 16 descartable en /tmp/cdi-pg55432, puerto 55432, base datos1a. DISCO-1 (historial de NCM de DATA_DIR a la tabla ncm_historial por dueño; carga única de archivos viejos a .migrado) hecha SIN ENTREGAR encima de c996ad4 y del merge cf84a76 (PM 1f6e0de): producto bd53fc4, casos y sabotajes 0f1161a, Postgres y textos de sabotajes 88b22c8; SHA probado 88b22c8 (test_disco1 11 passed; sabotajes disco1.sh 20/20; suite 3847 passed, 336 skipped, 2 xfailed, 0 failed; disco1_postgres.py fallas 0 y con sabotaje de carrera fallas 1; smoke y aislamiento 0); D33 contestada (a) en a3efc3a, riesgo anotado en DISCO-1; va en su propio /entregar, con subagentes, /code-review high y /security-review. OBSERVABILIDAD-1 (api_logs.owner_username nullable con su índice al arrancar, helper _migrate_add_api_logs_owner_column en main.py; si falla, log y la app sigue) hecha SIN ENTREGAR encima de 88b22c8: producto y CHANGELOG 8b1ce3b, casos, arnés y sabotajes 7ae35ab, merge de la PM 39be45e; SHA probado 39be45e (test_observabilidad1 8 passed; observabilidad1_arranque.py con Postgres 55432 38 OK fallas 0; sabotajes observabilidad1.sh con PG_URL 16/16 sobre 7ae35ab; suite 3855 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D34 abierta (la métrica sigue sin dueño porque MetricsMiddleware no lo pone: recomiendo (a) sólo la columna); va en su propio /entregar después del de DISCO-1, con subagentes, /code-review high y /security-review. Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review), DESPACHO-1b, DATOS-1, DISCO-1 y OBSERVABILIDAD-1; timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. La próxima D es la D35. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1, ORG-1b y DESPACHO-1a listas y subidas SIN ENTREGAR sobre 4ce6d22 (suite 4ce6d22: 3670 passed, 0 failed). DESTINO-1 hecha y subida SIN ENTREGAR: producto 7526be9, pruebas hasta f887b4a (sabotajes destino1.sh 15/15; suite f887b4a 3697 passed, 0 failed). SUFIJOS-2 hecha y subida SIN ENTREGAR: SHA probado 4ca6829 (sabotajes sufijos2.sh 9/9; suite 3731 passed, 0 failed); D29 contestada (a). SEGURO-1 hecha y subida SIN ENTREGAR: SHA probado 371cde2 (sabotajes seguro1.sh 10/10; suite a08de1f 3777 passed, 0 failed); D30 contestada (a), riesgo «seguro 0 en el TXT si nadie lo completa»; SEGURO-2 no se empieza hasta verla en PARA-DEV-2. DESPACHO-1b hecha y subida SIN ENTREGAR encima de SEGURO-1 y del merge 49f8e29: producto 0591722, pruebas e59e1a8, SHA probado e59e1a8 (50 casos; sabotajes despacho1b.sh 24/24; suite 3827 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D31 contestada (a) en 3da0a8b, costos en riesgos. DATOS-1 (D5+D32 (a) borrar cliente borra sus presupuestos compartidos, D2 /health 503, D6 sin dev_detail) hecha y subida SIN ENTREGAR encima de d01f95c: producto 7d09c6f, casos 4416076, Postgres y sabotajes 162d277, arreglo de casos que gastaban el cupo de test_user c996ad4; SHA probado c996ad4 (test_datos1 9 passed; sabotajes datos1.sh 12/12; suite 3836 passed, 336 skipped, 2 xfailed, 0 failed; datos1_postgres.py fallas 0; smoke y aislamiento 0 sobre 162d277); su propio /entregar después del de DESPACHO-1b, con /security-review. Postgres 16 descartable en /tmp/cdi-pg55432, puerto 55432, base datos1a. DISCO-1 (historial de NCM de DATA_DIR a la tabla ncm_historial por dueño; carga única de archivos viejos a .migrado) hecha SIN ENTREGAR encima de c996ad4 y del merge cf84a76 (PM 1f6e0de): producto bd53fc4, casos y sabotajes 0f1161a, Postgres y textos de sabotajes 88b22c8; SHA probado 88b22c8 (test_disco1 11 passed; sabotajes disco1.sh 20/20; suite 3847 passed, 336 skipped, 2 xfailed, 0 failed; disco1_postgres.py fallas 0 y con sabotaje de carrera fallas 1; smoke y aislamiento 0); D33 contestada (a) en a3efc3a, riesgo anotado en DISCO-1; va en su propio /entregar, con subagentes, /code-review high y /security-review. OBSERVABILIDAD-1 (api_logs.owner_username nullable con su índice al arrancar, helper _migrate_add_api_logs_owner_column en main.py; si falla, log y la app sigue) hecha SIN ENTREGAR encima de 88b22c8: producto y CHANGELOG 8b1ce3b, casos, arnés y sabotajes 7ae35ab, merge de la PM 39be45e; SHA probado 39be45e (test_observabilidad1 8 passed; observabilidad1_arranque.py con Postgres 55432 38 OK fallas 0; sabotajes observabilidad1.sh con PG_URL 16/16 sobre 7ae35ab; suite 3855 passed, 336 skipped, 2 xfailed, 0 failed; smoke y aislamiento 0); D34 contestada (a) en 486e655 (sólo la columna; la métrica sigue sin dueño); va en su propio /entregar después del de DISCO-1, con subagentes, /code-review high y /security-review. SESION-1 (S3: revocar_sesiones nunca escribe NULL en active_jti; change-password cierra las otras y conserva la propia; reset cierra todas; /auth/logout y /logout revocan el token sólo si es el vigente; PUT /api/user/profile pide current_password si cambia el email, 400) hecha SIN ENTREGAR encima de 39be45e y del merge f5160d7 (PM 486e655): producto y CHANGELOG 7dfe144, casos, motores, pantalla y sabotajes 014a3e4; SHA probado 014a3e4 (test_sesion1 17 casos, rojo en base 11 failed; sesion1_motores.py sqlite y pg 26 OK, todo OK, rojo en base FALLAS 12; sabotajes sesion1.sh 19/19; pantalla 3/3; suite corriendo, sin resultado todavía; smoke y aislamiento 0); va en su propio /entregar después del de OBSERVABILIDAD-1, con subagentes, /code-review high y /security-review. Pendiente: el 28/10 después de las 18:00 UTC, en orden, /entregar de ORG-1+ORG-1b+DESPACHO-1a sobre 4ce6d22 (subagentes hasta alto, /code-review high, /security-review, Postgres 55432 para org1_postgres.py), DESTINO-1, SUFIJOS-2, SEGURO-1 (con /security-review), DESPACHO-1b, DATOS-1, DISCO-1, OBSERVABILIDAD-1 y SESION-1; timbre «Dev MARIA: entregué <PIEZA> en <SHA>». PESO-NETO-1 y PRORRATEO-1 esperan al despachante. La próxima D es la D35. Nunca main, sin push --force, sin datos reales del 24/10 ni despachos del 28/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
