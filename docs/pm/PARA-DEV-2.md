@@ -30,6 +30,56 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## D36 (2026-10-28): (2) por ahora, sobre `abdc0db`
+
+Bien visto. En ABUSO-1 no se toca cómo se compara el email, como hiciste;
+el contador por email en minúsculas queda. Tu (1) es una pieza nueva
+(cambia recuperar usuario y contraseña, y el PUT del perfil) y necesita
+una consulta en producción que corre Emi: se la propongo de día,
+recomendada, y si dice que sí entra al roadmap después de ABUSO-1. Anotá
+en riesgos los dos lugares que comparan exacto y el PUT que deja crear
+pares. Decidido por la PM. Tu próxima D es la **D37**.
+
+## D35 (2026-10-28): (1) en las cinco, sobre `e25e87c`
+
+Decidido por la PM; Emi confirma de día los números (b) y el supuesto del
+proxy (a). Seguí con S4, S6 y C9 sin esperarla.
+
+- **a (1):** un solo helper para `login_attempts`, `reset_attempts` y
+  slowapi; toma la **última** IP de X-Forwarded-For, saltos configurables
+  (default 1); sin el header, `client.host`. La línea de log en el 429 del
+  login (IP tomada y cantidad de entradas del XFF) es **obligatoria**: es lo
+  único que valida el supuesto después de publicar.
+- **b (1):** tus números. Escribí en el informe por qué alcanzan (por
+  ejemplo, tres invitados de ORG-1 de la misma oficina en una hora quedan
+  bajo 5/hora). El tope de 16 KB va en S5, como dijiste.
+- **c (1):** los mensajes quedan. En el informe, la enumeración de S6 figura
+  como **mitigada por el límite, no cerrada** (se cierra con la verificación
+  de email, que es otra pieza).
+- **d (1):** sin sesión se guardan sólo `pricing_cta_clicked`,
+  `hero_cta_clicked` y `register_pending_verify`, en una lista explícita y
+  con límite; cualquier otra acción sin sesión no se guarda.
+- **e (1):** los contadores de login y de recuperación pasan a una tabla.
+  Con memoria, las pruebas de ABUSO-1 dan verde y el abuso sigue abierto al
+  reciclar el worker. `--max-requests` del Dockerfile no se toca.
+  Condiciones, antes de construirla:
+  - incremento atómico (C6 ya mostró carreras con pedidos en paralelo):
+    una prueba con pedidos simultáneos en PG16;
+  - tamaño acotado: las filas vencidas se borran al escribir o al arrancar;
+  - se crea al arranque con el mismo patrón `_migrate_*` de DISCO-1 y
+    OBSERVABILIDAD-1, en PG16 y SQLite;
+  - un solo camino, haya o no `REDIS_URL`;
+  - **commit propio** para la tabla, así la migración se revisa sola.
+  El 5/min de slowapi en el login queda en memoria (slowapi no guarda en
+  SQL): lo que importa es el bloqueo de 15 minutos en la tabla. Anotalo en
+  riesgos.
+- **recover-username y mayúsculas:** entra, porque ya tocás esa ruta:
+  comparar el email sin distinguir mayúsculas, con su prueba. Si dos cuentas
+  pueden tener el mismo email cambiando sólo mayúsculas, no lo toques y
+  abrí la **D36**.
+
+Revisión fuerte (autenticación y migración).
+
 ## D34 (2026-10-28): (a), sobre `39be45e`
 
 (a), como ya aplicaste: OBSERVABILIDAD-1 sólo hace que la columna y su
