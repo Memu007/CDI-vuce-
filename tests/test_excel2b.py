@@ -280,3 +280,62 @@ def test_el_libro_que_dice_ser_chico_se_rechaza_rapido_en_el_carril_liviano(hilo
     assert r.status_code == 400, r.text[:300]
     assert "column 49999" in r.text, r.text[:300]
     assert hilos == [("validar", hilos[0][1])] and hilos[0][1].startswith("validar-excel-liviano"), hilos
+
+
+@pytest.fixture
+def hilos_de_lectura(monkeypatch):
+    """En qué hilo corre cada paso de la lectura: la hoja, las otras hojas y
+    los ítems (devolución de EXCEL-2b, punto 2)."""
+    vistos = {}
+
+    def espiar(que, funcion):
+        def envuelta(*a, **k):
+            vistos.setdefault(que, threading.current_thread().name)
+            return funcion(*a, **k)
+        return envuelta
+    for que in ("_leer_excel_ruta", "_otras_hojas_con_datos", "extract_items_from_excel"):
+        monkeypatch.setattr(main, que, espiar(que, getattr(main, que)))
+    return vistos
+
+
+PASOS = ["_leer_excel_ruta", "_otras_hojas_con_datos", "extract_items_from_excel"]
+
+
+def test_la_subida_chica_lee_las_otras_hojas_y_los_items_en_los_hilos_livianos(hilos_de_lectura):
+    r = _subir(_normal())
+    assert r.status_code == 200, r.text[:300]
+    assert sorted(hilos_de_lectura) == sorted(PASOS), hilos_de_lectura
+    for paso in PASOS:
+        assert hilos_de_lectura[paso].startswith("lectura-excel-liviano_"), (paso, hilos_de_lectura)
+
+
+def test_la_subida_grande_lee_las_otras_hojas_y_los_items_en_los_hilos_pesados(hilos_de_lectura, monkeypatch):
+    # El mismo libro, medido grande: llega hasta los ítems por el carril pesado.
+    monkeypatch.setenv("EXCEL_LIVIANO_MB", "0.001")
+    r = _subir(_normal())
+    assert r.status_code == 200, r.text[:300]
+    assert sorted(hilos_de_lectura) == sorted(PASOS), hilos_de_lectura
+    for paso in PASOS:
+        assert hilos_de_lectura[paso].startswith("lectura-excel_"), (paso, hilos_de_lectura)
+
+
+def test_un_indice_que_no_se_puede_leer_va_al_pesado():
+    """Pasa el control del fin de índice, pero zipfile no lo puede leer: ante
+    la duda, carril pesado (punto 4 de la devolución)."""
+    libro = bytearray(_normal())
+    i = libro.find(b"PK\x01\x02")
+    libro[i:i + 4] = b"XX\x01\x02"
+    with pytest.raises(zipfile.BadZipFile):
+        zipfile.ZipFile(io.BytesIO(bytes(libro)))
+    assert fs._excel_liviano(bytes(libro), ".xlsx") is False
+
+
+@pytest.mark.parametrize("valor", ["1e308", "1e300"])
+def test_un_umbral_enorme_no_rompe_la_subida(monkeypatch, valor):
+    """EXCEL_LIVIANO_MB=1e308 daba 500 en toda subida de Excel: en bytes no
+    entra en un entero. Un valor así vale lo que vale mal escrito, el de
+    defecto (punto 4 de la devolución)."""
+    monkeypatch.setenv("EXCEL_LIVIANO_MB", valor)
+    assert fs._mb_de_entorno("EXCEL_LIVIANO_MB", 2) in (2 * 2**20, int(float(valor) * 2**20))
+    r = _subir(_normal())
+    assert r.status_code == 200, r.text[:300]
