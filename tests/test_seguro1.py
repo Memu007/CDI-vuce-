@@ -206,3 +206,14 @@ def test_de_cif_a_cfr_vuelve_el_boton_y_no_pone_nada_solo():
     r = _pantalla({"incoterm": "CFR"}, "", VALOR)
     assert r["els"]["valorCalcularSeguro"]["hidden"] is False
     assert "seguro" not in r["op"]
+
+
+@pytest.mark.parametrize("incoterm", ["CIF", "CFR"])
+def test_sin_respuesta_de_los_avisos_no_se_ofrece_dejarlo(incoterm):
+    # Los avisos dieron 400 o no llegaron: la pantalla no sabe si el
+    # incoterm lleva el seguro en el precio. «Dejar» sacaría la marca y el
+    # 1 % saldría en un TXT CIF; cuando los avisos contesten, se decide.
+    op = {"incoterm": incoterm, "seguro": SUGERIDO, "seguro_calculado": True}
+    r = _pantalla(op, "", {"error": "No se pudieron hacer las cuentas: mirá los avisos."})
+    assert r["els"]["valorDejarSeguro"]["hidden"] is True
+    assert r["op"] == op

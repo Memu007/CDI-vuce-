@@ -114,6 +114,11 @@ sabotaje $F "el borrado deja el seguro como completado" \
   "op.campos_completados = op.campos_completados.filter(c => c !== 'seguro');" '' \
   "test_el_calculado_se_borra_al_pasar_a_cif_y_queda_para_completar[con_cuentas]"
 
+# 4. Sin respuesta de los avisos no se ofrece dejar el calculado (revisión).
+sabotaje $F "sin respuesta de los avisos se ofrece dejarlo" \
+  'valor.error !== SIN_CUENTAS &&' '' \
+  "test_sin_respuesta_de_los_avisos_no_se_ofrece_dejarlo[CIF]"
+
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
