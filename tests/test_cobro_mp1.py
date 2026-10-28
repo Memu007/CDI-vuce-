@@ -458,3 +458,295 @@ def test_dos_avisos_del_mismo_pago_a_la_vez_se_aplican_una_sola_vez(client, monk
     assert salteados.count("payment_id ya procesado") == 1 and salteados.count(None) == 1, salteados
     assert (_get_user(usuario)["extra_ops_remaining"] or 0) == antes + 10
     assert _leer_pago(pid)["estado"] == "aplicado"
+
+
+# ── Paso 4: renovaciones de la suscripción (D30 a) ───────────────────
+# El cobro autorizado (/authorized_payments/{id}) tiene la forma de la
+# documentación pública de Mercado Pago; no se pudo confirmar contra un
+# aviso real. Si la respuesta no tiene la forma esperada, no se aplica nada.
+
+COBROS: dict = {}
+_LEER_COBRO_REAL = []
+
+
+@pytest.fixture(autouse=True)
+def _cobros(monkeypatch):
+    import proyecto_maria.main as main_mod
+    COBROS.clear()
+    if not _LEER_COBRO_REAL:
+        _LEER_COBRO_REAL.append(getattr(main_mod, "_leer_cobro_autorizado_mp", None))
+
+    def _leer(cobro_id):
+        if cobro_id not in COBROS:
+            raise main_mod._CobroMPIlegible(cobro_id)
+        return COBROS[cobro_id]
+    monkeypatch.setattr(main_mod, "_leer_cobro_autorizado_mp", _leer, raising=False)
+
+
+def _renovacion(usuario: str, monto: float = 30000.0, estado_pago: str = "approved", sufijo: str = "1"):
+    """Una renovación: la suscripción, el cobro autorizado y su pago. El pago
+    de una renovación no siempre trae la referencia: la tiene la suscripción."""
+    pre = f"pre-{usuario}"
+    SUSCRIPCIONES[pre] = {"id": pre, "status": "authorized", "external_reference": f"{usuario}:premium",
+                          "auto_recurring": {"transaction_amount": 30000.0, "currency_id": "ARS"}}
+    pid = f"prn{sufijo}-{usuario}"
+    PAGOS[pid] = {"id": pid, "status": estado_pago, "external_reference": "", "transaction_amount": monto,
+                  "currency_id": "ARS", "payer": {"id": "payer-1"}}
+    cobro = f"cob{sufijo}-{usuario}"
+    COBROS[cobro] = {"id": cobro, "preapproval_id": pre, "type": "scheduled", "status": "processed",
+                     "transaction_amount": monto, "currency_id": "ARS",
+                     "payment": {"id": pid, "status": estado_pago, "status_detail": "accredited"}}
+    return cobro, pid
+
+
+def _aviso_cobro(client, cobro: str):
+    client.cookies.clear()
+    return client.post(f"/api/payments/webhook?topic=subscription_authorized_payment&id={cobro}")
+
+
+def _aviso_cobro_firmado(client, cobro: str):
+    import hashlib
+    import hmac
+    client.cookies.clear()
+    ts, req_id = "1700000000", "req-cobro"
+    v1 = hmac.new(b"secreto-de-prueba", f"id:{cobro};request-id:{req_id};ts:{ts};".encode(),
+                  hashlib.sha256).hexdigest()
+    return client.post("/api/payments/webhook",
+                       content=json.dumps({"type": "subscription_authorized_payment", "data": {"id": cobro}}),
+                       headers={"x-signature": f"ts={ts},v1={v1}", "x-request-id": req_id,
+                                "content-type": "application/json"})
+
+
+@pytest.mark.parametrize("aviso", [_aviso_cobro, _aviso_cobro_firmado], ids=["ipn", "firmado"])
+def test_una_renovacion_extiende_el_periodo_una_sola_vez(client, aviso):
+    usuario = _unique("mp4_ren")
+    _register(client, usuario)
+    fin_actual = datetime.now(timezone.utc) + timedelta(days=2)
+    _set_user(usuario, billing_status="active", plan="premium", trial_ends_at=fin_actual)
+    cobro, pid = _renovacion(usuario)
+    r = aviso(client, cobro)
+    assert r.status_code == 200 and r.json().get("skipped") is None, r.text
+    nuevo = _fin(_get_user(usuario))
+    assert abs((nuevo - (fin_actual + timedelta(days=30))).total_seconds()) < 120, nuevo
+    assert _leer_pago(pid)["estado"] == "aplicado"
+    # el mismo cobro otra vez, y su pago avisado como pago: no suma de nuevo
+    PAGOS[pid]["metadata"] = {"preapproval_id": f"pre-{usuario}"}
+    PAGOS[pid]["external_reference"] = f"{usuario}:premium"
+    for r in (aviso(client, cobro), _aviso_ipn(client, pid)):
+        assert r.status_code == 200, r.text
+    assert abs((_fin(_get_user(usuario)) - nuevo).total_seconds()) < 1
+
+
+def test_una_renovacion_vuelve_a_activar_una_cuenta_vencida(client):
+    usuario = _unique("mp4_venc")
+    _register(client, usuario)
+    _vencida(usuario)
+    cobro, _ = _renovacion(usuario)
+    assert _aviso_cobro(client, cobro).status_code == 200
+    assert _get_user(usuario)["billing_status"] == "active"
+
+
+def test_una_renovacion_de_menos_queda_rechazada(client):
+    usuario = _unique("mp4_menos")
+    _register(client, usuario)
+    _vencida(usuario)
+    cobro, pid = _renovacion(usuario, monto=1000.0)
+    assert _aviso_cobro(client, cobro).status_code == 200
+    assert _get_user(usuario)["billing_status"] == "past_due"
+    assert _leer_pago(pid)["estado"] == "rechazado"
+
+
+def test_un_cobro_no_aprobado_no_hace_nada(client):
+    usuario = _unique("mp4_rech")
+    _register(client, usuario)
+    _vencida(usuario)
+    cobro, pid = _renovacion(usuario, estado_pago="rejected")
+    r = _aviso_cobro(client, cobro)
+    assert r.status_code == 200 and "rejected" in r.json().get("skipped", ""), r.text
+    assert _get_user(usuario)["billing_status"] == "past_due"
+    assert _leer_pago(pid) == {}
+
+
+@pytest.mark.parametrize("romper", [
+    lambda c: c.pop("payment"),
+    lambda c: c.pop("preapproval_id"),
+    lambda c: c.update(payment="123"),
+    lambda c: c["payment"].pop("id"),
+    lambda c: c.update(preapproval_id={"id": "x"}),
+    lambda c: c["payment"].update(id=True),
+    lambda c: c["payment"].update(id=""),
+], ids=["sin_pago", "sin_suscripcion", "pago_no_es_objeto", "pago_sin_id", "suscripcion_no_es_texto",
+        "pago_id_booleano", "pago_id_vacio"])
+def test_un_cobro_con_forma_inesperada_no_aplica_nada(client, romper, caplog):
+    """D30: si la respuesta no tiene la forma esperada, no se aplica nada y
+    se loguea."""
+    usuario = _unique("mp4_forma")
+    _register(client, usuario)
+    _vencida(usuario)
+    cobro, pid = _renovacion(usuario)
+    romper(COBROS[cobro])
+    with caplog.at_level("WARNING", logger="mp_webhook"):
+        r = _aviso_cobro(client, cobro)
+    assert r.status_code == 200, r.text
+    assert "forma inesperada" in r.json().get("skipped", ""), r.json()
+    assert _get_user(usuario)["billing_status"] == "past_due"
+    assert _leer_pago(pid) == {}
+    assert any("forma inesperada" in m for m in caplog.messages), caplog.messages
+
+
+def test_si_mercado_pago_no_contesta_el_cobro_reintenta(client):
+    usuario = _unique("mp4_503")
+    _register(client, usuario)
+    _vencida(usuario)
+    cobro, pid = _renovacion(usuario)
+    COBROS.clear()
+    assert _aviso_cobro(client, cobro).status_code == 503
+    assert _leer_pago(pid) == {}
+
+
+def test_leer_un_cobro_no_arma_una_ruta_con_lo_que_mande_cualquiera(monkeypatch):
+    """El id del cobro llega en un aviso sin firma: no puede cambiar la ruta
+    que se le pide a Mercado Pago."""
+    import proyecto_maria.main as main_mod
+    pedidos = []
+
+    class _Cliente:
+        def __init__(self, *a, **k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def get(self, url, **k):
+            pedidos.append(url)
+            raise AssertionError("no tendría que pedir nada")
+
+    monkeypatch.setattr(main_mod.httpx, "Client", _Cliente)
+    funcion = _LEER_COBRO_REAL[0]
+    for malo in ("../v1/payments/1", "1?x=2", "1/2", "", "a" * 80):
+        with pytest.raises(main_mod._CobroMPFormaInesperada):
+            funcion(malo)
+    assert pedidos == []
+
+
+@pytest.mark.parametrize("referencia", [None, "", 123])
+def test_una_renovacion_de_una_suscripcion_sin_referencia_no_aplica_nada(client, referencia):
+    usuario = _unique("mp4_sinref")
+    _register(client, usuario)
+    _vencida(usuario)
+    cobro, pid = _renovacion(usuario)
+    SUSCRIPCIONES[f"pre-{usuario}"]["external_reference"] = referencia
+    r = _aviso_cobro(client, cobro)
+    assert r.status_code == 200 and "forma inesperada" in r.json().get("skipped", ""), r.text
+    assert _get_user(usuario)["billing_status"] == "past_due"
+    assert _leer_pago(pid) == {}
+
+
+def test_una_renovacion_con_el_id_de_pago_numerico_se_aplica(client):
+    """Mercado Pago manda los ids de pago como números."""
+    import time
+    usuario = _unique("mp4_num")
+    _register(client, usuario)
+    _vencida(usuario)
+    cobro, pid = _renovacion(usuario)
+    numero = time.time_ns()
+    PAGOS[str(numero)] = {**PAGOS.pop(pid), "id": numero}
+    COBROS[cobro]["payment"]["id"] = numero
+    r = _aviso_cobro(client, cobro)
+    assert r.status_code == 200 and r.json().get("skipped") is None, r.text
+    assert _get_user(usuario)["billing_status"] == "active"
+    assert _leer_pago(str(numero))["estado"] == "aplicado"
+
+
+def test_si_no_se_puede_leer_la_suscripcion_de_una_renovacion_reintenta(client):
+    usuario = _unique("mp4_susf")
+    _register(client, usuario)
+    _vencida(usuario)
+    cobro, pid = _renovacion(usuario)
+    SUSCRIPCIONES.clear()
+    assert _aviso_cobro(client, cobro).status_code == 503
+    assert _leer_pago(pid) == {}
+    assert _get_user(usuario)["billing_status"] == "past_due"
+
+
+def test_una_renovacion_cuyo_pago_dice_otra_cuenta_no_se_aplica(client):
+    """La suscripción del cobro es de una cuenta y el pago dice otra: no se
+    aplica a ninguna de las dos y queda rechazado."""
+    usuario = _unique("mp4_otra")
+    otro = _unique("mp4_otro")
+    for u in (usuario, otro):
+        _register(client, u)
+        _vencida(u)
+    cobro, pid = _renovacion(usuario)
+    PAGOS[pid]["external_reference"] = f"{otro}:premium"
+    assert _aviso_cobro(client, cobro).status_code == 200
+    assert _get_user(usuario)["billing_status"] == "past_due"
+    assert _get_user(otro)["billing_status"] == "past_due"
+    fila = _leer_pago(pid)
+    assert fila["estado"] == "rechazado" and "otra cuenta" in fila["motivo"], fila
+
+
+def _httpx_simulado(monkeypatch, responder):
+    """httpx de main con un transporte simulado: el TestClient sigue usando el
+    httpx de verdad."""
+    import types
+    import httpx
+    import proyecto_maria.main as main_mod
+    pedidos = []
+
+    def _handler(request):
+        pedidos.append(request)
+        return responder(request)
+
+    def _cliente(**kw):
+        return httpx.Client(transport=httpx.MockTransport(_handler), **kw)
+    monkeypatch.setattr(main_mod, "httpx", types.SimpleNamespace(Client=_cliente, HTTPError=httpx.HTTPError))
+    monkeypatch.setattr(main_mod, "_leer_cobro_autorizado_mp", _LEER_COBRO_REAL[0])
+    return pedidos
+
+
+def test_leer_un_cobro_pide_su_ruta_con_el_token(monkeypatch):
+    import httpx
+    import proyecto_maria.main as main_mod
+    pedidos = _httpx_simulado(monkeypatch, lambda r: httpx.Response(200, json={"id": "cob-1"}))
+    assert main_mod._leer_cobro_autorizado_mp("cob-1") == {"id": "cob-1"}
+    assert [str(p.url) for p in pedidos] == ["https://api.mercadopago.com/authorized_payments/cob-1"]
+    assert pedidos[0].headers["authorization"] == "Bearer TEST-fake"
+
+
+def _contesta_500(request):
+    import httpx
+    return httpx.Response(500, json={})
+
+
+def _sin_conexion(request):
+    import httpx
+    raise httpx.ConnectError("simulado: sin conexión", request=request)
+
+
+def _contesta_html(request):
+    import httpx
+    return httpx.Response(200, content=b"<html>no</html>")
+
+
+@pytest.mark.parametrize("responder, esperado", [
+    (_contesta_500, 503), (_sin_conexion, 503), (_contesta_html, 200),
+], ids=["http_500", "sin_conexion", "no_es_json"])
+def test_el_cobro_que_mercado_pago_no_contesta_bien_no_aplica_nada(client, monkeypatch, responder, esperado):
+    """De punta a punta con la lectura real: 500 o sin conexión → 503 para
+    que Mercado Pago reintente; una respuesta que no es JSON → no se aplica."""
+    usuario = _unique("mp4_http")
+    _register(client, usuario)
+    _vencida(usuario)
+    cobro, pid = _renovacion(usuario)
+    pedidos = _httpx_simulado(monkeypatch, responder)
+    r = _aviso_cobro(client, cobro)
+    assert r.status_code == esperado, r.text
+    if esperado == 200:
+        assert "forma inesperada" in r.json().get("skipped", ""), r.json()
+    assert len(pedidos) == 1
+    assert _get_user(usuario)["billing_status"] == "past_due"
+    assert _leer_pago(pid) == {}
