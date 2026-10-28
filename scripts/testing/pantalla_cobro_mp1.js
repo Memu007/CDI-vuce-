@@ -24,12 +24,12 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   const aceptar = page.locator('#cdiConfirmAccept');
 
   // Abre el perfil con el estado de cobro forzado.
-  async function perfilCon(estado) {
+  async function perfilCon(estado, extra) {
     await page.unroute('**/api/billing/me');
     await page.route('**/api/billing/me', route => route.fulfill({
       status: 200, contentType: 'application/json',
       body: JSON.stringify({ billing_status: estado, plan: 'premium', trial_ends_at: '2026-10-20T00:00:00Z',
-                             ops_used_this_period: 3, ops_limit: 50, extra_ops_remaining: 0 }) }));
+                             ops_used_this_period: 3, ops_limit: 50, extra_ops_remaining: 0, ...(extra || {}) }) }));
     await page.goto(base + '/dashboard');
     await page.waitForFunction(() => window.CDI && CDI.openProfileModal);
     await page.evaluate(() => CDI.openProfileModal());
@@ -83,6 +83,16 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   const ac = await confirmacionDeCancelar('active');
   if (!ac.t.includes('ya pagado')) falla('active: la confirmación no dice el período ya pagado: «' + ac.t + '»');
   console.log('OK | active: la confirmación dice el período ya pagado');
+
+  // Cancelada que reactivó y abrió el checkout: tiene una suscripción que
+  // cancelar, y se ve «Cancelar plan». Sin suscripción, no.
+  await perfilCon('canceled', { suscripcion_abierta: true });
+  const ca = await confirmacionDeCancelar('canceled con suscripción abierta');
+  if (!ca.t.includes('ya pagado')) falla('canceled con suscripción abierta: la confirmación no dice el período ya pagado: «' + ca.t + '»');
+  console.log('OK | canceled con suscripción abierta: se ve «Cancelar plan»');
+  await perfilCon('canceled', { suscripcion_abierta: false });
+  if (await cancelar.isVisible()) falla('canceled sin suscripción: se ve «Cancelar plan»');
+  console.log('OK | canceled sin suscripción: no se ve «Cancelar plan»');
 
   // D. Dos clics en «Activar plan»: un solo checkout, y el botón deshabilitado mientras espera.
   await perfilCon('past_due');

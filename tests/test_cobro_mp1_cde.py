@@ -191,3 +191,17 @@ def test_cancelada_sin_suscripcion_no_se_cancela_otra_vez(client):
     r = client.post("/api/billing/cancel")
     assert r.status_code == 409, r.text
     assert len(PEDIDOS) == pedidos, "cancelar dos veces vuelve a llamar a Mercado Pago"
+
+
+@pytest.mark.parametrize("estado, con_suscripcion, abierta", [
+    ("canceled", True, True), ("canceled", False, False), ("active", True, False), ("past_due", True, False),
+], ids=["cancelada_con_checkout", "cancelada_sin", "activa", "impaga"])
+def test_billing_me_dice_si_una_cancelada_tiene_una_suscripcion_abierta(client, estado, con_suscripcion, abierta):
+    # El perfil muestra «Cancelar plan» a una cuenta cancelada sólo si tiene
+    # una suscripción que cancelar.
+    usuario, sid = _suscripto(client, "cde_me", billing_status=estado)
+    if not con_suscripcion:
+        _set_user(usuario, mp_preapproval_id=None)
+    r = client.get("/api/billing/me")
+    assert r.status_code == 200, r.text
+    assert r.json().get("suscripcion_abierta") is abierta, r.json()
