@@ -16,7 +16,7 @@ import uuid
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 import proyecto_maria.database.connection as conn
 import proyecto_maria.main as main_mod
@@ -40,9 +40,14 @@ def _sin_limites(monkeypatch):
     monkeypatch.setenv("EMAIL_VERIFICATION_REQUIRED", "false")
     from proyecto_maria.core.rate_limit import limiter
     limiter.enabled = False
-    main_mod.login_attempts.clear()
-    main_mod.reset_attempts.clear()
+    asyncio.run(_vaciar_limites())
     yield
+
+
+async def _vaciar_limites():
+    async with conn.AsyncSessionLocal() as s:
+        await s.execute(text("delete from limites_auth"))
+        await s.commit()
 
 
 def _http():

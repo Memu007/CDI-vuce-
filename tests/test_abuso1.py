@@ -6,11 +6,18 @@ obligatoria) guardaban cualquier cuerpo: cada pedido de 5 MB sumaba 5 MB a
 en `telemetry_events`. Ahora el cuerpo tiene un tope de 16 KB (lo que se pasa
 da 413 y no se guarda) y el JSONL ya no se escribe.
 
+S4: los límites tomaban la primera IP de X-Forwarded-For, que la escribe el
+cliente; ahora toman la última, la que agrega el proxy. S6 y C9: recuperar
+usuario y el registro no tenían límite. Los contadores de login, reset,
+registro y recuperar viven en la tabla `limites_auth`. Los eventos tienen 120
+por minuto por ruta y, sin sesión, se guardan sólo los de una lista.
+
 Acá corre en SQLite; el mismo recorrido contra un servidor real, en Postgres y
 en SQLite, está en `scripts/testing/abuso1_motores.py`.
 """
 import asyncio
 import os
+import time
 import uuid
 
 import pytest
@@ -43,11 +50,16 @@ def _limites_limpios(monkeypatch):
     antes = limiter.enabled
     limiter.enabled = True
     limiter.reset()
-    main_mod.login_attempts.clear()
-    main_mod.reset_attempts.clear()
+    asyncio.run(_vaciar_limites())
     yield
     limiter.reset()
     limiter.enabled = antes
+
+
+async def _vaciar_limites():
+    async with conn.AsyncSessionLocal() as s:
+        await s.execute(text("delete from limites_auth"))
+        await s.commit()
 
 
 def _filas(accion):
@@ -73,8 +85,9 @@ def _cuerpo(accion, total):
 def token():
     u = "ab1t_" + uuid.uuid4().hex[:8]
     with TestClient(app) as c:
-        r = c.post("/auth/register", json={"username": u, "password": CLAVE,
-                                           "email": f"{u}@ejemplo.test", "name": "Ab"})
+        r = c.post("/auth/register", headers={"X-Forwarded-For": _ip()},
+                   json={"username": u, "password": CLAVE,
+                         "email": f"{u}@ejemplo.test", "name": "Ab"})
         assert r.status_code == 200, r.text
         return u, r.json()["access_token"]
 
@@ -133,3 +146,246 @@ def test_s5_un_evento_chico_se_guarda_y_no_escribe_el_jsonl(ruta, token):
     assert r.status_code == 200 and r.json()["ok"] is True, r.text
     assert [u for u, _ in _filas(a)] == [token[0]]
     assert _tamano_jsonl() == antes
+
+
+# --- S4, S6, C9 y eventos (D35) -------------------------------------------
+# Cada caso usa IPs sintéticas propias (rango de documentación 2001:db8::/32)
+# que llegan como la última entrada de X-Forwarded-For, como las agrega el
+# proxy de Railway; así los contadores de un caso no tocan los de otro.
+
+
+def _ip():
+    h = uuid.uuid4().hex
+    return f"2001:db8::{h[:4]}:{h[4:8]}"
+
+
+def _xff(real, inventada=None):
+    return {"X-Forwarded-For": f"{inventada}, {real}" if inventada else real}
+
+
+def _req(xffs, host="10.0.0.1"):
+    from starlette.requests import Request
+    return Request({"type": "http", "method": "GET", "path": "/", "client": (host, 1234),
+                    "headers": [(b"x-forwarded-for", v.encode()) for v in xffs]})
+
+
+@pytest.mark.parametrize("xffs,saltos,esperada", [
+    (["203.0.113.1, 198.51.100.2"], None, "198.51.100.2"),
+    (["203.0.113.1, 198.51.100.2"], "2", "203.0.113.1"),
+    (["203.0.113.1, 198.51.100.2"], "0", "10.0.0.1"),
+    (["198.51.100.2"], "2", "198.51.100.2"),
+    (["203.0.113.1", "198.51.100.2"], None, "198.51.100.2"),
+    ([" , 198.51.100.3, "], None, "198.51.100.3"),
+    ([" ,  "], None, "10.0.0.1"),
+    ([], None, "10.0.0.1"),
+    (["203.0.113.1, 198.51.100.2"], "abc", "198.51.100.2"),
+    (["203.0.113.1, 198.51.100.2"], "-1", "198.51.100.2"),
+])
+def test_s4_la_ip_es_la_ultima_de_x_forwarded_for(xffs, saltos, esperada, monkeypatch):
+    from proyecto_maria.core.rate_limit import get_client_ip
+    if saltos is None:
+        monkeypatch.delenv("TRUSTED_PROXY_HOPS", raising=False)
+    else:
+        monkeypatch.setenv("TRUSTED_PROXY_HOPS", saltos)
+    assert get_client_ip(_req(xffs)) == esperada
+
+
+def _login(c, usuario, clave, real, inventada=None):
+    return c.post("/auth/login", json={"username": usuario, "password": clave},
+                  headers=_xff(real, inventada))
+
+
+def test_s4a_una_ip_inventada_no_esquiva_el_bloqueo_del_login():
+    """Con el limitador por minuto apagado queda sólo el bloqueo por fallos:
+    cinco fallos desde la misma IP real bloquean aunque cada pedido invente
+    otra IP al principio de X-Forwarded-For."""
+    from proyecto_maria.core.rate_limit import limiter
+    limiter.enabled = False
+    real, c = _ip(), TestClient(app)
+    codigos = [_login(c, "nadie_" + uuid.uuid4().hex[:6], "x", real, _ip()).status_code for _ in range(5)]
+    assert codigos == [401] * 5
+    r = _login(c, "nadie", "x", real, _ip())
+    assert r.status_code == 429 and "Demasiados intentos fallidos" in r.text, (r.status_code, r.text)
+
+
+def test_s4b_una_ip_inventada_no_bloquea_a_otro(token):
+    from proyecto_maria.core.rate_limit import limiter
+    limiter.enabled = False
+    victima, atacante, c = _ip(), _ip(), TestClient(app)
+    for _ in range(6):
+        _login(c, "nadie", "x", atacante, victima)
+    r = _login(c, token[0], CLAVE, victima)
+    assert r.status_code == 200, (r.status_code, r.text)
+
+
+def test_s4_el_limite_por_minuto_del_login_cuenta_la_ip_real(token):
+    """El 5/minuto de slowapi en el login: seis logins correctos desde la misma
+    IP real, inventando otra cada vez; el sexto da 429."""
+    real, c = _ip(), TestClient(app)
+    codigos = [_login(c, token[0], CLAVE, real, _ip()).status_code for _ in range(6)]
+    assert codigos == [200] * 5 + [429], codigos
+
+
+def test_s4_el_429_del_login_deja_ip_y_entradas_en_el_log(caplog):
+    from proyecto_maria.core.rate_limit import limiter
+    limiter.enabled = False
+    real, c = _ip(), TestClient(app)
+    for _ in range(5):
+        _login(c, "nadie", "x", real, _ip())
+    with caplog.at_level("WARNING", logger="proyecto_maria.core.rate_limit"):
+        r = _login(c, "nadie", "x", real, "203.0.113.9")
+    assert r.status_code == 429, r.text
+    lineas = [x.getMessage() for x in caplog.records if x.name == "proyecto_maria.core.rate_limit"]
+    assert any(f"ip={real}" in m and "entradas_xff=2" in m and "/auth/login" in m for m in lineas), lineas
+
+
+RECUPERAR = "/auth/recover-username"
+MSJ_RECUPERAR = "Si el email está registrado, te enviamos tu nombre de usuario."
+
+
+@pytest.fixture
+def reloj(monkeypatch):
+    """Reloj de los contadores, fijo y movible. Se pide después de la primera
+    aserción de comportamiento para que, sin el arreglo, el caso falle por lo
+    que mide y no por el import."""
+    def mover(segundos=0.0):
+        from proyecto_maria.core import limites_auth
+        if not hasattr(mover, "t"):
+            mover.t = limites_auth._ahora()
+        mover.t += segundos
+        monkeypatch.setattr(limites_auth, "_ahora", lambda: mover.t)
+    return mover
+
+
+def test_s6_recuperar_usuario_tiene_limite_por_ip(reloj):
+    real, c = _ip(), TestClient(app)
+    codigos = [c.post(RECUPERAR, json={"email": f"n{i}@ejemplo.test"}, headers=_xff(real, _ip())).status_code
+               for i in range(6)]
+    assert codigos == [200] * 5 + [429], codigos
+    reloj()
+    reloj(15 * 60 + 1)
+    r = c.post(RECUPERAR, json={"email": "n7@ejemplo.test"}, headers=_xff(real))
+    assert r.status_code == 200, r.text
+
+
+def test_s6_recuperar_usuario_corta_en_silencio_por_email(token, monkeypatch):
+    """Tres pedidos por hora para un mismo email, cuente como venga escrito;
+    el cuarto contesta lo mismo pero no manda el mail."""
+    enviados = []
+    monkeypatch.setattr(main_mod, "send_email", lambda to, *a, **k: enviados.append(to) or True)
+    email = f"{token[0]}@ejemplo.test"
+    c = TestClient(app)
+    for variante in (email.upper(), email.capitalize(), email):
+        r = c.post(RECUPERAR, json={"email": variante}, headers=_xff(_ip()))
+        assert r.status_code == 200 and r.json() == {"message": MSJ_RECUPERAR}, r.text
+    assert enviados == [email]
+    r = c.post(RECUPERAR, json={"email": email}, headers=_xff(_ip()))
+    assert r.status_code == 200 and r.json() == {"message": MSJ_RECUPERAR}, r.text
+    assert enviados == [email], "el cuarto pedido de la hora mandó el mail"
+
+
+def _registrar(c, real):
+    u = "ab1r_" + uuid.uuid4().hex[:8]
+    return c.post("/auth/register", headers=_xff(real, _ip()),
+                  json={"username": u, "password": CLAVE, "email": f"{u}@ejemplo.test", "name": "Ab"})
+
+
+def test_c9_registro_cinco_por_hora(reloj):
+    real, c = _ip(), TestClient(app)
+    codigos = [_registrar(c, real).status_code for _ in range(6)]
+    assert codigos == [200] * 5 + [429], codigos
+    reloj()
+    reloj(3600 + 1)
+    r = _registrar(c, real)
+    assert r.status_code == 200, r.text
+
+
+def test_c9_registro_veinte_por_dia(reloj):
+    real, c = _ip(), TestClient(app)
+    for hora in range(4):
+        codigos = [_registrar(c, real).status_code for _ in range(5)]
+        assert codigos == [200] * 5, (hora, codigos)
+        if hora == 0:
+            reloj()
+        reloj(3600 + 1)
+    r = _registrar(c, real)
+    assert r.status_code == 429, (r.status_code, r.text)
+    reloj(24 * 3600)
+    assert _registrar(c, real).status_code == 200
+
+
+def _filas_marca(marca):
+    async def _correr():
+        async with conn.AsyncSessionLocal() as s:
+            r = await s.execute(text(
+                "select owner_username, action from telemetry_events where props like :m"), {"m": f"%{marca}%"})
+            return [tuple(x) for x in r.all()]
+    return asyncio.run(_correr())
+
+
+@pytest.mark.parametrize("ruta,otra", [RUTAS, RUTAS[::-1]])
+def test_eventos_120_por_minuto_por_ruta(ruta, otra, token):
+    real, c = _ip(), TestClient(app)
+    h = {"Authorization": f"Bearer {token[1]}"}
+    codigos = [c.post(ruta, json={"action": "ab1_lote"}, headers={**h, **_xff(real, _ip())}).status_code
+               for _ in range(121)]
+    assert codigos.count(200) == 120 and codigos[-1] == 429, (codigos.count(200), codigos[-3:])
+    r = c.post(otra, json={"action": "ab1_lote"}, headers={**h, **_xff(real)})
+    assert r.status_code == 200, r.text
+
+
+@pytest.mark.parametrize("ruta", RUTAS)
+@pytest.mark.parametrize("accion", ("pricing_cta_clicked", "hero_cta_clicked", "register_pending_verify"))
+def test_eventos_sin_sesion_permitidos_se_guardan(ruta, accion):
+    marca = uuid.uuid4().hex
+    r = TestClient(app).post(ruta, json={"action": accion, "marca": marca}, headers=_xff(_ip()))
+    assert r.status_code == 200 and r.json()["ok"] is True, r.text
+    assert _filas_marca(marca) == [(None, accion)]
+
+
+@pytest.mark.parametrize("ruta", RUTAS)
+@pytest.mark.parametrize("accion", ("click", "pricing_cta_clicked_x", "Hero_CTA_clicked", ""))
+def test_eventos_sin_sesion_no_permitidos_no_se_guardan(ruta, accion, token):
+    marca = uuid.uuid4().hex
+    c = TestClient(app)
+    r = c.post(ruta, json={"action": accion, "marca": marca}, headers=_xff(_ip()))
+    assert r.status_code == 200 and r.json()["ok"] is False, r.text
+    assert _filas_marca(marca) == []
+    # La misma acción con sesión sí se guarda: lo que corta es la falta de sesión.
+    r = c.post(ruta, json={"action": accion or "x", "marca": marca}, headers={
+        "Authorization": f"Bearer {token[1]}", **_xff(_ip())})
+    assert r.json()["ok"] is True and [u for u, _ in _filas_marca(marca)] == [token[0]], r.text
+
+
+def _filas_limites(*claves):
+    async def _correr():
+        async with conn.AsyncSessionLocal() as s:
+            r = await s.execute(text("select clave from limites_auth"))
+            return sorted(c for (c,) in r.all() if c in claves)
+    return asyncio.run(_correr())
+
+
+def _sembrar_limites(**vence_en):
+    """Inserta filas con `vence` a tantos segundos de ahora (negativo: vencida)."""
+    async def _correr():
+        async with conn.AsyncSessionLocal() as s:
+            for clave, seg in vence_en.items():
+                await s.execute(text(
+                    "insert into limites_auth (clave, cuenta, bloqueado_hasta, vence) values (:c, 9, 0, :v)"),
+                    {"c": clave, "v": time.time() + seg})
+            await s.commit()
+    asyncio.run(_correr())
+
+
+def test_tabla_las_vencidas_se_borran_al_escribir():
+    _sembrar_limites(ab1_vieja=-1, ab1_viva=600)
+    r = TestClient(app).post(RECUPERAR, json={"email": "n@ejemplo.test"}, headers=_xff(_ip()))
+    assert r.status_code == 200, r.text
+    assert _filas_limites("ab1_vieja", "ab1_viva") == ["ab1_viva"]
+
+
+def test_tabla_las_vencidas_se_borran_al_arrancar():
+    _sembrar_limites(ab1_vieja=-1, ab1_viva=600)
+    with TestClient(app):
+        pass
+    assert _filas_limites("ab1_vieja", "ab1_viva") == ["ab1_viva"]

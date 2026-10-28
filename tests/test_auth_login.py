@@ -11,10 +11,10 @@ import pytest
 import jwt as pyjwt
 import asyncio
 
-from proyecto_maria.main import app, login_attempts, hash_password, SECRET_KEY, ALGORITHM
+from proyecto_maria.main import app, hash_password, SECRET_KEY, ALGORITHM
 from proyecto_maria.database.connection import AsyncSessionLocal
 from proyecto_maria.database.models import User
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, text
 
 
 # ── helpers ──────────────────────────────────────────────────────────
@@ -53,6 +53,12 @@ async def _ensure_login_test_user(username="logintest", email="logintest@example
         await session.commit()
 
 
+async def _vaciar_limites():
+    async with AsyncSessionLocal() as session:
+        await session.execute(text("delete from limites_auth"))
+        await session.commit()
+
+
 async def _cleanup_login_test_user(username="logintest"):
     async with AsyncSessionLocal() as session:
         await session.execute(delete(User).where(User.username == username))
@@ -64,9 +70,9 @@ async def _cleanup_login_test_user(username="logintest"):
 @pytest.fixture(autouse=True)
 def _clean_rate_limits():
     """Limpiar rate limits entre tests para que no interfieran."""
-    login_attempts.clear()
+    _run_async(_vaciar_limites())
     yield
-    login_attempts.clear()
+    _run_async(_vaciar_limites())
 
 
 @pytest.fixture(autouse=True)
