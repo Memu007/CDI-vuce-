@@ -500,7 +500,8 @@ async def validate_file_upload(
             raise HTTPException(400, PDF_DEMASIADO_PESADO)
         except Exception:
             logger.exception("validar el PDF en el proceso aparte falló")
-            raise HTTPException(400, "Invalid PDF file: no pudimos abrirlo")
+            # Falla nuestra, no del archivo: el que sube no puede arreglarla.
+            raise HTTPException(500, "No pudimos revisar el PDF. Probá de nuevo en un rato.")
         if "error" in resultado:
             raise HTTPException(400, f"Invalid PDF file: {resultado['error']}")
 
