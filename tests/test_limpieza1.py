@@ -70,11 +70,13 @@ def test_no_queda_un_camino_de_publicacion_a_google_cloud():
     """
     archivos = subprocess.run(["git", "ls-files", "-z"], cwd=REPO, capture_output=True,
                               check=True).stdout.decode().split("\0")
-    yo = Path(__file__).resolve().relative_to(REPO).as_posix()
+    # Esta prueba y sus sabotajes nombran a Google Cloud para buscarlo.
+    propios = {Path(__file__).resolve().relative_to(REPO).as_posix(),
+               "scripts/testing/sabotajes/limpieza1.sh"}
     excluidos = ("docs/archive/", "viejo/", "venv/")
     hallados = []
     for rel in filter(None, archivos):
-        if rel == yo or rel.startswith(excluidos) or rel.endswith((".md", ".txt")):
+        if rel in propios or rel.startswith(excluidos) or rel.endswith((".md", ".txt")):
             continue
         if GOOGLE_CLOUD.search(rel):
             hallados.append(rel)
