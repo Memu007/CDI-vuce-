@@ -54,31 +54,31 @@ revisión. **Con esto EXCEL-3 queda cerrada.**
   hilos, CPU) y proponé el arreglo con una D. Sin subir el corte de 30 s ni
   aflojar la prueba.
 
-## ORDEN-1 (tarea activa, 2026-10-28)
+## ORDEN-1 (en revisión) y tus D (2026-10-28)
 
-Seguí con **ORDEN-1**
-(`ROADMAP.md`, Fase 1c; pedido de la reunión del 24/10, `DECISIONS.md`):
+Recibida en `cdc9c57` (código `0d89c20`). Es de pantalla y del borrador
+del navegador: la reproduzco ahora y sumo un adversario sobre los
+borradores (computadora compartida, pérdida de productos) cuando haya
+presupuesto, hoy después de las 18:00 UTC. Mientras, no la integro.
 
-- En la pantalla de revisión, los productos se reordenan arrastrando.
-- El orden que queda es el que se guarda y el que sale en el TXT y en el
-  Excel, con los números de ítem corridos. Comprobá primero cómo se
-  numeran hoy y cómo se agrupan los subítems (MARIA-8,
-  `maria_generator.py`, «orden de su primer renglón»): el orden nuevo no
-  puede separar subítems de su ítem ni cambiar nada más del TXT. Sin tocar
-  `maria_generator.py`; si hace falta, D antes.
-- Guardar con otro orden y volver a abrir conserva el orden; dos
-  pestañas a la vez no pierden productos.
-- Pruebas: el TXT con el orden cambiado igual al original salvo el orden
-  de los ítems; los subítems juntos; recargar conserva el orden; un
-  sabotaje por cada una.
+- **D1: (a).** El orden vive en el borrador de cada pestaña. Una columna
+  que nadie lee es una migración sin uso; si algún día una pantalla
+  reabre operaciones del servidor, la posición entra en esa pieza.
+- **D2: (a). Tenías razón:** «el Excel» lo puse yo sin comprobar que v2
+  lo tuviera. Se cumple con la tabla y el TXT. Un Excel de la operación
+  en v2 no entra al roadmap salvo que Emi lo pida.
+- **D3: (a).** El centavo puede cambiar de ítem, el total no. Queda el
+  xfail con su motivo.
+
+Decidido por la PM.
 
 ## GUARDAR-2 (en revisión)
 
 Recibida en `cef45ce` (informe `cb42e8f`). Toca lectura por dueño: la
 reviso con adversario cuando haya presupuesto (hoy, después de las 18:00
-UTC). Si vuelve con devolución, va antes que ORDEN-1.
+UTC). Si vuelve con devolución, va antes que lo que estés haciendo.
 
 ## Orden
 
-1. ORDEN-1 (arriba).
-2. El rojo de `test_excel2` (diagnóstico y D).
+1. El rojo de `test_excel2` (diagnóstico y D), ahora.
+2. Si GUARDAR-2 u ORDEN-1 vuelven con devolución, esa va primero.
