@@ -27,6 +27,56 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
+## Veredicto de ORDEN-1 (2026-10-28 16:45 UTC): devolución
+
+Sobre `0d89c20`. Evidencia en `REPRODUCCION-ORDEN-1-2026-10-28.md`. El
+reordenado aguantó todo (grupos, subítems, 800 ítems, TXT). Lo que vuelve es
+el borrador por pestaña. **La causa:** `recuperarBorrador` adopta cualquier
+clave de localStorage sin mirar de quién es, cuán vieja es ni si su
+pestaña sigue viva. Reproducido:
+
+1. A deja dos operaciones a medias, sale y cierra; B entra en la misma
+   computadora y cada pestaña nueva le muestra una de A (la base mostraba
+   una; la pieza, todas en cola).
+2. Los borradores cerrados no vencen: vuelven de a uno, incluso uno de
+   40 días.
+3. Una pestaña duplicada (sessionStorage copiado) adopta la clave de la
+   original viva; editan las dos y quedan dos versiones.
+
+Lo que pido, con la familia y no sólo estos tres ejemplos:
+
+- **Dueño:** el sobre guarda el usuario; sólo lo recupera ese usuario. La
+  clave vieja sin pestaña no tiene dueño: se descarta, no se muestra
+  (decidido por la PM).
+- **Edad:** un borrador guardado hace más de 7 días no se recupera y se
+  borra al barrer.
+- **Pestaña viva:** la duplicada no toma la operación de una viva; la
+  recarga y la restauración después de un cierre sin `pagehide` siguen
+  recuperando la suya. El método lo elegís vos.
+- **Pruebas:** rojo antes de cada regla y un sabotaje por regla, con dos
+  usuarios, una edad al borde y una duplicada. Además, que distingan los
+  dos mutantes que hoy pasan: `BORRADOR_HUERFANO_MS` enorme (recuperar el
+  de una pestaña muerta sin `pagehide`) y quitar el `selectedRows.add` de
+  `reorderItems`.
+- **No lo arregles (a riesgos):** pestaña congelada más de 3 minutos; dos
+  filas del mismo renglón que se funden en un ítem del TXT (MARIA-8,
+  queda como está); `draggable` colgado al soltar fuera de la tabla; el
+  borrador de A sigue en localStorage después de su salida (sólo que B ya
+  no lo ve).
+
+Commits aparte encima de `0d89c20`, informe nuevo. Tus D:
+
+- **D1: (a).** El orden vive en el borrador de cada pestaña. Una columna
+  que nadie lee es una migración sin uso; si algún día una pantalla
+  reabre operaciones del servidor, la posición entra en esa pieza.
+- **D2: (a). Tenías razón:** «el Excel» lo puse yo sin comprobar que v2
+  lo tuviera. Se cumple con la tabla y el TXT. Un Excel de la operación
+  en v2 no entra al roadmap salvo que Emi lo pida.
+- **D3: (a).** El centavo puede cambiar de ítem, el total no. Queda el
+  xfail con su motivo.
+
+Decidido por la PM.
+
 ## Veredicto de GUARDAR-2 (2026-10-28 16:35 UTC): aceptada
 
 Sobre `cef45ce` (informe `cb42e8f`). Evidencia en
@@ -130,24 +180,6 @@ criterio de EXCEL-2 ya aceptado (D26 a: ocho libros armados y la normal da
   Toca `file_security.py` y `main.py`: revisión fuerte con adversario
   (cupo, hoy después de las 18:00 UTC).
 - **D5: (a).** La prueba afirma también `dt` < 5 s, en la misma pieza.
-
-Decidido por la PM.
-
-## ORDEN-1 (en revisión) y tus D (2026-10-28)
-
-Recibida en `cdc9c57` (código `0d89c20`). Es de pantalla y del borrador
-del navegador: la reproduzco ahora y sumo un adversario sobre los
-borradores (computadora compartida, pérdida de productos): en curso desde
-las 16:20 UTC. Mientras, no la integro.
-
-- **D1: (a).** El orden vive en el borrador de cada pestaña. Una columna
-  que nadie lee es una migración sin uso; si algún día una pantalla
-  reabre operaciones del servidor, la posición entra en esa pieza.
-- **D2: (a). Tenías razón:** «el Excel» lo puse yo sin comprobar que v2
-  lo tuviera. Se cumple con la tabla y el TXT. Un Excel de la operación
-  en v2 no entra al roadmap salvo que Emi lo pida.
-- **D3: (a).** El centavo puede cambiar de ítem, el total no. Queda el
-  xfail con su motivo.
 
 Decidido por la PM.
 
@@ -323,8 +355,9 @@ supuestos de Mercado Pago que no pudiste ver sin red: los estados, que una
 ## Orden
 
 1. EXCEL-2b (D4 a y D5 a): hecha, entregala ya (hay cupo desde las 16:20 UTC).
-2. Si ORDEN-1 vuelve con devolución, esa va primero. El agregado de
-   GUARDAR-2 (arriba) va en un commit de pruebas con EXCEL-2b.
+2. La devolución de ORDEN-1 (arriba): justo después de EXCEL-2b, antes
+   que lo demás. El agregado de GUARDAR-2 va en un commit de pruebas con
+   EXCEL-2b.
 3. COBRO-MP-1: hecha; subila ya y se entrega después de EXCEL-2b.
 4. COBRO-CORTE-1: hecha; se entrega después de COBRO-MP-1.
 5. COBRO-MP-2: hecha; subila ya y se entrega después de COBRO-CORTE-1.
