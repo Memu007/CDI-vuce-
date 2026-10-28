@@ -299,9 +299,6 @@ sabotaje $A "si el usuario llega tarde, la operación no se recupera" \
   "la operación no vuelve a la pestaña que recargó" \
   '                    usuarioListo.then(() => CDI.borrador.buscar()).then(b => {' \
   '                    Promise.resolve(null).then(b => {'
-sabotaje $A "la recuperación tardía pisa la operación cargada mientras" \
-  "FALLA: la operación de antes de recargar pisó la que se cargó mientras" \
-  '|| (CDI.state && CDI.state.items && CDI.state.items.length > 0)' '|| false'
 sabotaje $A "la operación de antes queda guardada sin aviso" \
   "FALLA: la operación de antes de recargar quedó guardada y la pestaña no lo avisa" \
   "CDI.borrador.avisar('pendiente', " "(() => {})('pendiente', "
@@ -338,6 +335,19 @@ export CASOS=z4
 sabotaje $A "la consulta de la sesión no tiene tope" \
   "FALLA: cambió la sesión, la consulta del usuario no contesta y en 20 s la pestaña no avisa" \
   "{ credentials: 'same-origin', signal: corte.signal }" "{ credentials: 'same-origin' }"
+# En la carga de archivos con una operación cargada mientras esperaba: no se
+# pisa. En (p) la carga lleva a review y la pantalla ya tapa este mutante.
+export CASOS=z5
+sabotaje $A "la recuperación tardía pisa la operación cargada mientras" \
+  "FALLA: el usuario llegó tarde a la carga de archivos y la operación de antes pisó la cargada" \
+  '|| (CDI.state && CDI.state.items && CDI.state.items.length > 0)' '|| false'
+
+# Entra otro usuario con la primera consulta en camino y la consulta sale con
+# la sesión nueva: la sesión se compara también al volver la respuesta.
+export CASOS=z8
+sabotaje $A "la primera consulta no mira si la sesión cambió mientras volvía" \
+  "FALLA: entró otro usuario con la primera consulta del usuario en camino y lo cargado se guardó a nombre de él" \
+  ' || getCsrfToken() !== sesionAlAbrir' ''
 
 # Con la sesión vencida (401) no se reintenta.
 export CASOS=r

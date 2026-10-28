@@ -951,6 +951,119 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     await ctx.close();
   }
 
+  // (z5) Mientras espera al usuario se carga otra y se vuelve a la carga de
+  // archivos (como «Subir una factura» de Clientes): la pantalla es la de
+  // carga, pero la pestaña no está vacía y no se pisa.
+  if (corre('z5')) {
+    const ctx = await nuevoContexto('ord1z5');
+    const t = await abrir(ctx);
+    await recargarLento(ctx, t, 'ANTES-DE-RECARGAR');
+    await cargar(t, 'CARGADA-Y-EN-LA-CARGA', [prod('Producto cargado mientras', '84714900100D', 2, 10)]);
+    await t.evaluate(() => CDI.goTo('upload'));
+    await t.waitForFunction(() => CDI.currentUser, null, { timeout: 20000 });
+    await t.locator('#avisoBorrador').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+    const f = await t.evaluate(() => (CDI.state.operacion || {}).numero_factura);
+    if (f !== 'CARGADA-Y-EN-LA-CARGA') falla('el usuario llegó tarde a la carga de archivos y la operación de antes pisó la cargada: ' + f);
+    if (!(await guardadas(ctx)).includes('ANTES-DE-RECARGAR')) falla('la operación de antes de recargar se perdió');
+    if (!/Quedó guardada la operación/.test(await t.locator('#avisoBorrador').textContent())) falla('la operación de antes de recargar quedó guardada y la pestaña no lo avisa');
+    console.log('OK si el usuario llega tarde y la carga de archivos tiene una operación, no la pisa y avisa');
+    await ctx.close();
+  }
+
+  // (z6) Mientras espera al usuario se abre el diálogo de archivos y se elige
+  // uno después de que llegó: la operación de antes de recargar no se pierde.
+  if (corre('z6')) {
+    const ctx = await nuevoContexto('ord1z6');
+    const t = await abrir(ctx);
+    await t.route('**/upload_pdf/public', ruta => ruta.fulfill({ status: 200, contentType: 'application/json',
+      body: JSON.stringify({ filename: 'demo.pdf', operacion: Object.assign({ numero_factura: 'DEL-PDF' }, OPERACION),
+        items: [prod('Producto del PDF', '84714900100D', 2, 10)] }) }).catch(() => {}));
+    await recargarLento(ctx, t, 'ANTES-DE-ELEGIR');
+    const [dialogo] = await Promise.all([t.waitForEvent('filechooser', { timeout: 5000 }), t.locator('#uploadDropzone').click()]);
+    await t.waitForFunction(() => CDI.currentUser, null, { timeout: 20000 });
+    await t.waitForTimeout(500);
+    await dialogo.setFiles({ name: 'demo.pdf', mimeType: 'application/pdf', buffer: Buffer.from('%PDF-1.4\n%demo\n') });
+    await t.waitForFunction(() => ((CDI.state || {}).operacion || {}).numero_factura === 'DEL-PDF', null, { timeout: 10000 })
+      .catch(async () => falla('la subida no termina: queda ' + await t.evaluate(() => ((CDI.state || {}).operacion || {}).numero_factura)));
+    await esperarBorradores(t, ['DEL-PDF'], 'la operación del PDF no se guarda');
+    if (!(await guardadas(ctx)).includes('ANTES-DE-ELEGIR')) falla('se abrió el diálogo de archivos antes de que llegara el usuario y la operación de antes de recargar se perdió: ' + JSON.stringify(await guardadas(ctx)));
+    const aviso = await avisa(t) ? await t.locator('#avisoBorrador').textContent() : '';
+    if (!/Quedó guardada la operación/.test(aviso)) falla('se abrió el diálogo de archivos antes de que llegara el usuario y la pestaña no avisa que quedó guardada la de antes: «' + aviso + '»');
+    console.log('OK si se abre el diálogo de archivos antes de que llegue el usuario, la de antes queda guardada y se avisa');
+    await ctx.close();
+  }
+
+  // (z7) Al recargar, la consulta del usuario da error o no contesta: la
+  // pestaña avisa que no guarda y, cuando la consulta vuelve, recupera.
+  if (corre('z7')) {
+    const ctx = await nuevoContexto('ord1z7');
+    for (const caida of [true, false]) {
+      const que = caida ? 'la consulta del usuario da error' : 'la consulta del usuario no contesta';
+      const factura = caida ? 'CON-ERROR' : 'SIN-RESPUESTA';
+      const t = await abrir(ctx);
+      await cargar(t, factura, [prod('Producto de ' + factura, '84714900100D', 2, 10)]);
+      await esperarBorradores(t, [factura], 'la operación ' + factura + ' no se guarda');
+      let soltar;
+      const suelta = new Promise(r => { soltar = r; });
+      await t.route('**/auth/current_user', async ruta => {
+        if (caida) return ruta.fulfill({ status: 500, body: 'error de prueba' });
+        await suelta;
+        return ruta.continue().catch(() => {});
+      });
+      await t.reload();
+      await t.waitForFunction(() => window.CDI && CDI.goTo && document.querySelector('.screen.is-active'));
+      const avisó = await t.locator('#avisoBorrador').waitFor({ state: 'visible', timeout: 8000 }).then(() => true, () => false);
+      if (!avisó) falla('al recargar ' + que + ' y en 8 s la pestaña no avisa que no guarda');
+      const texto = await t.locator('#avisoBorrador').textContent();
+      if (!/no guarda/.test(texto)) falla('al recargar ' + que + ' y la pestaña avisa otra cosa: ' + texto);
+      await t.unroute('**/auth/current_user');
+      const llegó = await t.waitForFunction(() => CDI.currentUser, null, { timeout: 30000 }).then(() => true, () => false);
+      soltar();
+      if (!llegó) falla('al recargar ' + que + ' y cuando vuelve a contestar la pestaña no se entera en 30 s');
+      const volvió = await t.waitForFunction(f => ((CDI.state || {}).operacion || {}).numero_factura === f, factura, { timeout: 5000 }).then(() => true, () => false);
+      if (!volvió) falla('al recargar ' + que + ', cuando vuelve a contestar la operación no vuelve');
+      if (await avisa(t)) falla('al recargar ' + que + ', cuando vuelve a contestar sigue el aviso: ' + await t.locator('#avisoBorrador').textContent());
+      await cerrar(t);
+      console.log('OK al recargar si ' + que + ', la pestaña avisa y después recupera');
+    }
+    await ctx.close();
+  }
+
+  // (z8) Entra otro usuario mientras la primera consulta del usuario está en
+  // camino y la consulta sale con la sesión nueva (las cookies se leen al
+  // salir, no al pedirla): lo cargado no se guarda a nombre del que entró.
+  if (corre('z8')) {
+    const ctx = await nuevoContexto('ord1z8');
+    // Se retienen todas las consultas del usuario que salgan antes de soltar:
+    // la pestaña hace más de una al abrir.
+    let soltar, pedida;
+    const suelta = new Promise(r => { soltar = r; });
+    const llego = new Promise(r => { pedida = r; });
+    const t = await ctx.newPage();
+    t.on('dialog', d => d.accept().catch(() => {}));
+    await t.route('**/auth/current_user', async ruta => {
+      pedida();
+      await suelta;
+      const cookie = (await ctx.cookies()).map(c => c.name + '=' + c.value).join('; ');
+      const resp = await ruta.fetch({ headers: Object.assign({}, ruta.request().headers(), { cookie }) });
+      return ruta.fulfill({ response: resp }).catch(() => {});
+    });
+    await t.goto(base + '/dashboard');
+    await llego;
+    await t.waitForFunction(() => window.CDI && CDI.goTo && document.querySelector('.screen.is-active'));
+    await cargar(t, 'DE-A', [prod('Producto de A', '84714900100D', 2, 10)]);
+    const otro = await nuevoUsuario(ctx, 'ord1z8b');
+    soltar();
+    await t.waitForFunction(() => CDI.currentUser, null, { timeout: 10000 });
+    await t.waitForTimeout(INTERVALO_MS + 500);
+    const sobres = await sobresDe(t, 'DE-A');
+    if (sobres.some(s => s.user === otro)) falla('entró otro usuario con la primera consulta del usuario en camino y lo cargado se guardó a nombre de él: ' + JSON.stringify(sobres));
+    const aviso = await avisa(t) ? await t.locator('#avisoBorrador').textContent() : '';
+    if (!/Entró otro usuario/.test(aviso)) falla('entró otro usuario con la primera consulta del usuario en camino y la pestaña no avisa: «' + aviso + '»');
+    console.log('OK si entra otro usuario con la primera consulta en camino, no guarda a su nombre y avisa');
+    await ctx.close();
+  }
+
   await b.close();
   console.log('OK: ORDEN-1 en el navegador');
 })().catch(e => falla(e.message));
