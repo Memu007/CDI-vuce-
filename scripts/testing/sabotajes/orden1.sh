@@ -76,6 +76,9 @@ sabotaje $G "los renglones de la misma posición no se juntan (subítems separad
 sabotaje $G "el ítem de la posición sale en su último renglón" \
   "FAILED $T::test_el_txt_reordenado_es_el_original_salvo_el_orden_de_los_items" \
   'if juntos_de[n_renglon][0] == n_renglon:' 'if juntos_de[n_renglon][-1] == n_renglon:'
+sabotaje $G "los ítems no quedan numerados corridos" \
+  "FAILED $T::test_los_items_quedan_numerados_corridos" \
+  '        lines.append(f"NARTEXT={idx:04d}")' '        lines.append(f"NARTEXT={idx + 1:04d}")'
 
 # ----------------------------------------------------- la carga de archivos
 # Empezar otra operación borra el borrador de esta pestaña y no el de otras.
