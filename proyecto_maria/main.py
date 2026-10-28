@@ -92,6 +92,7 @@ from proyecto_maria.routers import admin_router, quote_router
 from proyecto_maria.services import billing_service
 from proyecto_maria.auth.dependencies import (
     get_current_user,
+    jti_de_la_request,
     revocar_sesion_de_la_request,
     revocar_sesiones,
 )
@@ -2073,7 +2074,7 @@ async def change_password(
 
     db_user.password = await run_in_threadpool(hash_password, body.new_password)
     # Cierra las otras sesiones y conserva la de quien la cambió.
-    revocar_sesiones(db_user, getattr(request.state, "token_jti", None))
+    revocar_sesiones(db_user, jti_de_la_request(request))
     await db.commit()
     print(f"🔒 Password cambiada por el propio user: {db_user.username}")
     return {"success": True, "message": "Contraseña actualizada"}

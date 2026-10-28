@@ -69,6 +69,20 @@ def revocar_sesiones(user: User, conservar_jti: str | None = None) -> None:
     user.active_jti = conservar_jti or uuid.uuid4().hex
 
 
+def jti_de_la_request(request: Request) -> str | None:
+    """El jti del token con el que se llama (cookie o Bearer), o None si no hay
+    token o no es válido. Para que cambiar la contraseña conserve la sesión de
+    quien la cambia."""
+    token = _token_de_la_request(request)
+    if not token:
+        return None
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+    except jwt.PyJWTError:
+        return None
+    return payload.get("jti")
+
+
 async def revocar_sesion_de_la_request(request: Request, db: AsyncSession) -> None:
     """Cerrar sesión: revoca el token con el que se llama, si es la sesión
     vigente. Un token inválido, vencido o ya revocado no toca nada, así no
@@ -133,8 +147,6 @@ async def get_current_user(request: Request, response: Response, db: AsyncSessio
     token_jti = payload.get("jti")
     if user.active_jti is not None and token_jti != user.active_jti:
         raise HTTPException(status_code=401, detail="Token revocado")
-    # Para que cambiar la contraseña conserve la sesión de quien la cambia.
-    request.state.token_jti = token_jti
 
     trial_end = user.trial_ends_at
     if trial_end is not None and trial_end.tzinfo is None:
