@@ -230,7 +230,7 @@ sabotaje $M "3b-3#3 la especificación copiada tapa el subtotal" \
   '            rotulo = descripcion_propia or next(' '            rotulo = descripcion or next(' \
   "${B}una_especificacion_combinada_que_alcanza_al_subtotal_no_lo_vuelve_producto"
 sabotaje $M "3b-3#1 la descripción copiada tapa el rótulo del flete" \
-  '            cargo = descripcion_propia or next(' '            cargo = descripcion or next(' \
+  '            cargo = descripcion_propia or rotulo_aparte' '            cargo = descripcion or rotulo_aparte' \
   "${B}una_descripcion_combinada_que_alcanza_al_flete_no_lo_vuelve_producto"
 sabotaje $M "3b-3#2 una nota de descuento sin precio abre un grupo" \
   '                    if "%" in cargo or _monto_de_la_linea() < 0 or not valor_unitario:' \
@@ -245,7 +245,7 @@ sabotaje $M "3c R1 con algo copiado, un producto con «Payment» queda sin leer"
                 no_es_mercaderia = bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo))' \
   "${B}un_producto_con_una_palabra_de_cargo_y_su_descripcion_se_lee[payment_handling-origen_combinado]"
 sabotaje $M "3c R1 con una palabra de cargo alcanza" \
-  '            and all(len(p) == 1 or p in _PALABRAS_DE_CARGO' '            and any(len(p) == 1 or p in _PALABRAS_DE_CARGO' \
+  '    if all(len(p) == 1 or p in de_cargo' '    if any(len(p) == 1 or p in de_cargo' \
   "${B}un_producto_con_una_palabra_de_cargo_y_su_descripcion_se_lee[payment_handling-origen_combinado]"
 sabotaje $M "3c R1 «fee» no es palabra de cargo" \
   '"incoterms", "delivery", "term", "terms", "fee", "fees", "premium",' \
@@ -316,10 +316,10 @@ sabotaje $M "3d con algo copiado, el flete tiene que ser sólo el flete" \
 sabotaje $M "3d el flete dudoso no se avisa" \
   '                            flete_dudoso.append((_ + 2, cargo))' '                            pass' \
   "${B}un_producto_que_empieza_como_el_flete_con_el_origen_combinado_se_lee_como_flete_avisado[Freight elevator DEMO]"
+# Desde EXCEL-3f el aviso del rótulo con el origen copiado lo pone el bloque de D22.
 sabotaje $M "3d el rótulo dudoso entra como producto común" \
-  'match(cargo):
-                    dudosa = cargo' 'match(cargo):
-                    pass' \
+  $'                    and (_FILA_QUE_NO_ES_MERCADERIA_RE.match(descripcion_propia)\n                         or _dice_solo_un_cargo(descripcion_propia))):' \
+  '                    and _dice_solo_un_cargo(descripcion_propia)):' \
   "${B}un_cargo_con_palabras_de_mas_no_cambia_el_fob_sin_un_aviso_con_su_fila[Gastos administrativos-origen_rotulo_en_descripcion]"
 sabotaje $M "3d las dudosas no llegan al aviso" \
   '        extras["dudosas"] = dudosas' '        pass' \
@@ -419,6 +419,66 @@ sabotaje $M "3e el renglón con «-» bajo la combinada pierde el código de arr
 sabotaje $M "3e el seguro con la descripción copiada vuelve a entrar por el grupo" \
   'descripcion == grupo[0] and not cargo)' 'descripcion == grupo[0])' \
   "${B}un_cargo_no_entra_como_producto_aunque_venga_una_combinada[descripcion-insurance]"
+
+# ------------------------------------------------------------------ EXCEL-3f
+sabotaje $M "3f el plural no es un cargo («Seguros» entra sin aviso)" \
+  'r"freights?|fletes?|insurances?|seguros?|payments?|pagos?|bank' \
+  'r"freight|flete|insurance|seguro|payment|pago|bank' \
+  "${B}un_cargo_en_plural_o_fee_no_cambia_el_fob_sin_un_aviso_con_su_fila[Seguros-sin_combinar_rotulo_en_descripcion]"
+sabotaje $M "3f «Fee» solo no es un cargo" \
+  '|delivery\s+terms?|fees?")' '|delivery\s+terms?")' \
+  "${B}un_cargo_en_plural_o_fee_no_cambia_el_fob_sin_un_aviso_con_su_fila[Fee-sin_combinar_rotulo_en_descripcion]"
+sabotaje $M "3f «Fletes» no se lee como flete" \
+  'r"^\s*(?:freights?|fletes?|shipping\s+(?:costs?|charges?))\b"' \
+  'r"^\s*(?:freight|flete|shipping\s+(?:cost|charges?))\b"' \
+  "${B}un_cargo_en_plural_se_lee_como_en_singular[Fletes-Flete-sin_combinar_rotulo_en_descripcion]"
+sabotaje $M "3f «Freights» con más texto no es sólo un cargo" \
+  $'_PALABRAS_DE_CARGO = {\n    "freight", "freights",' $'_PALABRAS_DE_CARGO = {\n    "freight",' \
+  "${B}un_cargo_en_plural_se_lee_como_en_singular[Freights-Freight-origen_rotulo_en_descripcion]"
+sabotaje $M "3f D22 un cargo con su propio origen entra sin aviso" \
+  '            if (not no_es_mercaderia and not dudosa and not pieza and descripcion_propia' \
+  '            if (False and not no_es_mercaderia and not dudosa and not pieza and descripcion_propia' \
+  "${B}una_fila_con_origen_propio_que_es_un_cargo_entra_con_el_aviso_de_su_fila[Insurance-xlsx]"
+sabotaje $M "3f D22 «Gastos administrativos» con su origen entra sin aviso" \
+  $'                    and (_FILA_QUE_NO_ES_MERCADERIA_RE.match(descripcion_propia)\n                         or _dice_solo_un_cargo(descripcion_propia))):' \
+  '                    and _dice_solo_un_cargo(descripcion_propia)):' \
+  "${B}una_fila_con_origen_propio_que_es_un_cargo_entra_con_el_aviso_de_su_fila[Gastos administrativos-xlsx]"
+DICE='    return any(p in _PALABRAS_QUE_SON_UN_CARGO for p in palabras or ())'
+sabotaje $M "3f H4 un cargo que no viene primero entra sin aviso" \
+  "$DICE" '    return False' \
+  "${B}un_cargo_que_no_viene_primero_entra_con_el_aviso_de_su_fila[Ocean freight-origen_rotulo_en_descripcion]"
+sabotaje $M "3f H4 de más: «Container» o «A2» se avisan como cargo" \
+  "$DICE" '    return palabras is not None' \
+  "${B}un_producto_con_una_palabra_de_cargo_no_lleva_el_aviso[Container-origen_rotulo_en_descripcion]"
+sabotaje $M "3f H4 «Insurance container» con el origen combinado sale del FOB" \
+  'def _palabras_de_cargo(texto: str, de_cargo=_PALABRAS_DE_CARGO)' \
+  'def _palabras_de_cargo(texto: str, de_cargo=_PALABRAS_DE_CARGO_QUE_NO_VIENE_PRIMERO)' \
+  "${B}un_cargo_que_dice_algo_mas_con_el_origen_combinado_no_sale_del_fob[Insurance container]"
+sabotaje $M "3f D22 una fila con su NCM lleva el aviso de cargo" \
+  'not dudosa and not pieza and descripcion_propia' 'not dudosa and descripcion_propia' \
+  "${B}una_fila_con_su_ncm_no_lleva_el_aviso_de_cargo[descripcion-xlsx]"
+sabotaje $M "3f H1 un cargo en Item con su NCM lleva el aviso" \
+  $'not dudosa and not pieza\n                    and (_es_solo_un_cargo(rotulo_aparte)' \
+  $'not dudosa\n                    and (_es_solo_un_cargo(rotulo_aparte)' \
+  "${B}una_fila_con_su_ncm_no_lleva_el_aviso_de_cargo[en_item-xlsx]"
+APARTE='                    and (_es_solo_un_cargo(rotulo_aparte) or _dice_solo_un_cargo(rotulo_aparte))):'
+sabotaje $M "3f H1 «Freight» en Item con la descripción escrita entra sin aviso" \
+  "$APARTE" '                    and False):' \
+  "${B}un_cargo_en_item_con_la_descripcion_escrita_otra_vez_se_avisa[Freight-xlsx]"
+sabotaje $M "3f H1 «Delivery terms» en Item entra sin aviso" \
+  "$APARTE" '                    and _dice_solo_un_cargo(rotulo_aparte)):' \
+  "${B}un_cargo_en_item_con_la_descripcion_escrita_otra_vez_se_avisa[Delivery terms-xlsx]"
+sabotaje $M "3f el aviso del rótulo de Item pasa a la fila que copia la descripción" \
+  $'            no_es_mercaderia_en[_] = (no_es_mercaderia, dudosa)\n' \
+  $'            no_es_mercaderia_en[_] = (no_es_mercaderia, dudosa or (not no_es_mercaderia and (_es_solo_un_cargo(rotulo_aparte) or _dice_solo_un_cargo(rotulo_aparte)) and rotulo_aparte))\n' \
+  "${B}el_aviso_del_cargo_en_item_no_pasa_a_la_fila_que_copia_la_descripcion[Freight-xlsx]"
+sabotaje $M "3f H3 «Freight 1x40HQ» en Item entra sin aviso" \
+  $'"lcl",\n}' $'"lcl",\n} - {"hq", "hc"}' \
+  "${B}el_flete_con_texto_de_contenedor_en_las_medidas_no_entra_en_silencio[Freight 1x40HQ-20'-xlsx]"
+sabotaje $M "3f H5 el aviso del flete vuelve a «de la fila 3, 4»" \
+  "                    + f\" de la{'s' if len(filas) > 1 else ''} {_filas_del_aviso(filas)} de la planilla;\"" \
+  "                    + f\" de la fila {', '.join(str(f) for f in filas[:5])} de la planilla;\"" \
+  "${B}el_aviso_del_flete_dice_cuantas_filas_hay[2-de las filas 3, 4 de la planilla]"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

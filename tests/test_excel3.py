@@ -985,7 +985,7 @@ def test_un_producto_comun_con_el_origen_combinado_no_lleva_el_aviso_del_cargo()
         [2, "Widget B", None, 3, 100, 300],
     ], ("C2:C3",))
     assert _total(data["items"]) == 350, data["items"]
-    assert "empieza como un cargo" not in _avisos(data), data["avisos_mapeo"]
+    assert "un cargo y entraron como producto" not in _avisos(data), data["avisos_mapeo"]
 
 
 @pytest.mark.parametrize("producto", ["Freight elevator DEMO", "Shipping cost calculator scale"])
@@ -1084,7 +1084,7 @@ def test_los_avisos_nombran_hasta_cinco_filas_y_cuentan_el_resto():
     data = _leer_combinado([PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500]] + gastos, ("C2:C9",))
     avisos = _avisos(data)
     assert _total(data["items"]) == 4200, data["items"]
-    assert ("7 renglón(es) empiezan como un cargo y entraron como producto: fila 3 («Gastos administrativos 2»), "
+    assert ("7 renglón(es) parecen un cargo y entraron como producto: fila 3 («Gastos administrativos 2»), "
             "fila 4 («Gastos administrativos 3»)") in avisos, avisos
     assert "fila 7 («Gastos administrativos 6») y 2 más;" in avisos and "Gastos administrativos 7" not in avisos, avisos
 
@@ -1311,3 +1311,251 @@ def test_un_renglon_con_una_medida_escrita_en_texto_sigue_siendo_del_grupo(largo
     assert data["items"][1]["descripcion"].endswith(f"largo {largo}" + ("" if largo in ("1,5m", "2 m²") else " m")), data["items"]
     assert _total(data["items"]) == 38, data["items"]
     assert data["filas_descartadas_numeros"] == [], data
+
+
+# ------------------------------------------------------------------ EXCEL-3f
+# D21 (b), D22 (b), la familia H4, H1 (la descripción repetida a mano), H3
+# (texto de contenedor en las medidas) y H5 (el aviso de flete sin «y N más»).
+
+def _nombra_su_fila(data, fila, rotulo):
+    assert f"fila {fila} («{rotulo}»)" in _avisos(data), data["avisos_mapeo"]
+
+
+CARGOS_EN_PLURAL = ["Fletes", "Freights", "Seguros", "Insurances", "Payments", "Pagos", "Incoterms",
+                    "Shipping costs", "Bank fee", "Bank fees", "Fee", "Fees", "Gasto"]
+
+
+@pytest.mark.parametrize("forma", list(FORMAS_DEL_CARGO))
+@pytest.mark.parametrize("rotulo", CARGOS_EN_PLURAL)
+def test_un_cargo_en_plural_o_fee_no_cambia_el_fob_sin_un_aviso_con_su_fila(rotulo, forma):
+    """D21 (b): «Fletes», «Seguros», «Bank fee» o «Fee» son lo mismo que el
+    cargo en singular: sin combinadas quedan sin leer (el flete, como flete);
+    con algo copiado, sin leer o con el aviso de su fila. En la base entraban
+    al FOB (4750) sin aviso."""
+    filas, combinar = FORMAS_DEL_CARGO[forma]
+    data = _leer_combinado([PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500]] + filas(rotulo), combinar)
+    _el_cargo_no_cambia_el_fob_sin_nombrar_su_fila(data, 4, rotulo, 3550, 1200)
+    if forma.startswith("sin_combinar"):
+        assert 4 in data["filas_descartadas_numeros"] + data["operacion"].get("filas_excel_flete", []), data
+
+
+def _como_se_leyo(data, rotulo):
+    op = data["operacion"]
+    return (_total(data["items"]), data["filas_descartadas_numeros"], op.get("flete"),
+            op.get("filas_excel_flete"), f"fila 4 («{rotulo}»)" in _avisos(data))
+
+
+@pytest.mark.parametrize("forma", list(FORMAS_DEL_CARGO))
+@pytest.mark.parametrize("plural, singular", [
+    ("Fletes", "Flete"), ("Freights", "Freight"), ("Seguros", "Seguro"), ("Insurances", "Insurance"),
+    ("Payments", "Payment"), ("Pagos", "Pago"), ("Incoterms", "Incoterm"),
+    ("Shipping costs", "Shipping cost"), ("Bank fees", "Bank charges"), ("Fees", "Bank charges"),
+    ("Gasto", "Gastos"),
+])
+def test_un_cargo_en_plural_se_lee_como_en_singular(plural, singular, forma):
+    """D21 (b): el plural (y «fee») da lo mismo que el singular en cada forma:
+    flete, sin leer o con el aviso de su fila."""
+    filas, combinar = FORMAS_DEL_CARGO[forma]
+    base = [PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500]]
+    assert (_como_se_leyo(_leer_combinado(base + filas(plural), combinar), plural)
+            == _como_se_leyo(_leer_combinado(base + filas(singular), combinar), singular))
+
+
+@pytest.mark.parametrize("formato", ["xlsx", "xls"])
+@pytest.mark.parametrize("rotulo", ["Gastos administrativos", "Insurance", "Bank fees", "Ocean freight"])
+def test_una_fila_con_origen_propio_que_es_un_cargo_entra_con_el_aviso_de_su_fila(rotulo, formato):
+    """D22 (b): con su propio origen la fila no pasa por el filtro de lo que
+    no es mercadería; entra, como en la base, pero con el aviso de su fila."""
+    data = _leer_en(formato, [PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500],
+                              [2, rotulo, "China", 1, 1200, 1200]], ())
+    assert _total(data["items"]) == 4700 and not data["filas_descartadas_numeros"], data
+    _nombra_su_fila(data, 3, rotulo)
+
+
+@pytest.mark.parametrize("formato", ["xlsx", "xls"])
+def test_gastos_administrativos_con_el_origen_combinado_sigue_con_el_aviso_de_su_fila(formato):
+    data = _leer_en(formato, [PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500],
+                              [2, "Gastos administrativos", None, 1, 1200, 1200]], ("C2:C3",))
+    assert _total(data["items"]) == 4700, data["items"]
+    _nombra_su_fila(data, 3, "Gastos administrativos")
+
+
+@pytest.mark.parametrize("formato", ["xlsx", "xls"])
+@pytest.mark.parametrize("rotulo", ["Insurance", "Bank charges", "Ocean freight", "Freight 1x40HQ"])
+def test_un_cargo_en_item_con_medidas_bajo_la_especificacion_combinada_entra_con_aviso(rotulo, formato):
+    """D22 (b), la copia con medidas: «Insurance» en Item, la especificación
+    combinada y medidas 2 x 10 es un renglón del grupo; entra, como en la
+    base, pero con el aviso de su fila."""
+    data = _leer_en(formato, [RENGLONES_PVC, PRODUCTO_H1, [rotulo, "-", None, 2, 10, 1, 20, 2, 40]],
+                    ("C2:C3",))
+    assert _total(data["items"]) == 70 and not data["filas_descartadas_numeros"], data
+    _nombra_su_fila(data, 3, rotulo)
+
+
+@pytest.mark.parametrize("formato", ["xlsx", "xls"])
+@pytest.mark.parametrize("nota", ["Freight included", "Handling equipment", "A2", "#3"])
+def test_una_nota_en_item_que_dice_algo_mas_que_un_cargo_no_lleva_el_aviso(nota, formato):
+    """El aviso de D22 y H1 mira lo que dice Item entero: una nota o un número
+    de renglón no es un cargo."""
+    for filas, combinar in (
+        ([RENGLONES_PVC, PRODUCTO_H1, [nota, "-", None, 2, 10, 1, 20, 2, 40]], ("C2:C3",)),
+        ([RENGLONES_PVC, PRODUCTO_H1, [nota, "-", "LONA DEMO", 2, 10, 1, 20, 2, 40]], ()),
+    ):
+        data = _leer_en(formato, filas, combinar)
+        assert _total(data["items"]) == 70, data["items"]
+        assert "«" + nota + "»" not in _avisos(data), data["avisos_mapeo"]
+
+
+CARGOS_QUE_NO_VIENEN_PRIMERO = ["Ocean freight", "Sea freight", "Air freight", "Packing charges",
+                                "Inland freight", "Courier DHL", "Comisión bancaria", "THC", "2. Insurance"]
+
+
+@pytest.mark.parametrize("forma", list(FORMAS_DEL_CARGO))
+@pytest.mark.parametrize("rotulo", CARGOS_QUE_NO_VIENEN_PRIMERO)
+def test_un_cargo_que_no_viene_primero_entra_con_el_aviso_de_su_fila(rotulo, forma):
+    """H4: el cargo que no es la primera palabra no sale del FOB (como en la
+    base), pero se avisa con su fila."""
+    filas, combinar = FORMAS_DEL_CARGO[forma]
+    data = _leer_combinado([PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500]] + filas(rotulo), combinar)
+    assert "flete" not in data["operacion"], data["operacion"]
+    if forma in ("origen_rotulo_en_item", "sin_combinar_rotulo_en_item"):
+        # Sin descripción la fila ya quedaba sin leer, con su aviso: sigue así.
+        assert _total(data["items"]) == 3550 and data["filas_descartadas_numeros"] == [4], data
+        return
+    assert _total(data["items"]) == 4750 and not data["filas_descartadas_numeros"], data
+    _nombra_su_fila(data, 4, rotulo)
+
+
+@pytest.mark.parametrize("formato", ["xlsx", "xls"])
+@pytest.mark.parametrize("rotulo", ["Ocean freight", "2. Insurance"])
+def test_un_cargo_que_no_viene_primero_tambien_se_avisa_en_xls(rotulo, formato):
+    filas, combinar = FORMAS_DEL_CARGO["origen_rotulo_en_descripcion"]
+    data = _leer_en(formato, [PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500]] + filas(rotulo), combinar)
+    assert _total(data["items"]) == 4750, data["items"]
+    _nombra_su_fila(data, 4, rotulo)
+
+
+@pytest.mark.parametrize("forma", ["origen_rotulo_en_descripcion", "sin_combinar_rotulo_en_descripcion"])
+@pytest.mark.parametrize("producto", ["Power bank 10000mAh", "Air fryer DEMO", "Packing tape DEMO",
+                                      "Courier bag DEMO", "Sea salt DEMO", "Bank card reader",
+                                      "Feeder DEMO", "Container"])
+def test_un_producto_con_una_palabra_de_cargo_no_lleva_el_aviso(producto, forma):
+    """La familia H4 no avisa un producto que sólo comparte una palabra."""
+    filas, combinar = FORMAS_DEL_CARGO[forma]
+    data = _leer_combinado([PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500]] + filas(producto), combinar)
+    assert _total(data["items"]) == 4750, data["items"]
+    assert "«" + producto + "»" not in _avisos(data), data["avisos_mapeo"]
+
+
+@pytest.mark.parametrize("formato", ["xlsx", "xls"])
+@pytest.mark.parametrize("rotulo", ["Freight", "Insurance", "Ocean freight", "Bank charges",
+                                    "Delivery terms"])
+def test_un_cargo_en_item_con_la_descripcion_escrita_otra_vez_se_avisa(rotulo, formato):
+    """H1: «Freight» en Item y «LONA DEMO» escrita otra vez en la descripción,
+    medidas «/»: en la base entraba con FOB 1230 sin aviso. Entra o se lee
+    como cargo, pero nunca en silencio."""
+    data = _leer_en(formato, [RENGLONES_PVC, PRODUCTO_H1,
+                              [rotulo, "-", "LONA DEMO", "/", "/", "-", 1, 1200, 1200]], ())
+    op = data["operacion"]
+    if 3 in op.get("filas_excel_flete", []) or 3 in data["filas_descartadas_numeros"]:
+        assert _total(data["items"]) == 30, data["items"]
+    else:
+        assert _total(data["items"]) == 1230, data["items"]
+        _nombra_su_fila(data, 3, rotulo)
+
+
+@pytest.mark.parametrize("formato", ["xlsx", "xls"])
+@pytest.mark.parametrize("rotulo", ["Freight", "Ocean freight"])
+def test_el_aviso_del_cargo_en_item_no_pasa_a_la_fila_que_copia_la_descripcion(rotulo, formato):
+    """El rótulo de Item es de su fila: la de abajo, que copia «LONA DEMO» de
+    la combinada y tiene su propio número en Item, no se nombra como cargo."""
+    data = _leer_en(formato, [RENGLONES_PVC, [rotulo, "DT-1", "LONA DEMO", 2, 10, 1, 20, 1.5, 30],
+                              [2, "DT-2", None, 2, 10, 1, 20, 1.5, 30]], ("C2:C3",))
+    assert _total(data["items"]) == 60, data["items"]
+    _nombra_su_fila(data, 2, rotulo)
+    assert "fila 3 (" not in _avisos(data), data["avisos_mapeo"]
+
+
+@pytest.mark.parametrize("formato", ["xlsx", "xls"])
+@pytest.mark.parametrize("medida", ["1x40HQ", "20'", "40'HC"])
+@pytest.mark.parametrize("rotulo", ["Freight", "Freight 1x40HQ"])
+def test_el_flete_con_texto_de_contenedor_en_las_medidas_no_entra_en_silencio(rotulo, medida, formato):
+    """H3: «1x40HQ», «20'» o «40'HC» en las medidas cuentan como medida (20'
+    puede ser un largo en pies). «Freight» en Item con la especificación
+    combinada: o es el flete, o entra con el aviso de su fila."""
+    data = _leer_en(formato, [RENGLONES_PVC, PRODUCTO_H1,
+                              [rotulo, "-", None, medida, medida, "-", 1, 1200, 1200]], ("C2:C3",))
+    op = data["operacion"]
+    if 3 in op.get("filas_excel_flete", []):
+        assert _total(data["items"]) == 30 and op["flete"] == 1200, (data["items"], op)
+    else:
+        assert _total(data["items"]) == 1230, data["items"]
+        _nombra_su_fila(data, 3, rotulo)
+
+
+@pytest.mark.parametrize("formato", ["xlsx", "xls"])
+@pytest.mark.parametrize("medida", ["1x40HQ", "20'", "40'HC"])
+def test_el_flete_en_la_descripcion_con_texto_de_contenedor_sigue_siendo_flete(medida, formato):
+    data = _leer_en(formato, [RENGLONES_PVC, PRODUCTO_H1,
+                              [2, "-", "Freight", medida, medida, "-", 1, 1200, 1200]], ())
+    assert _total(data["items"]) == 30, data["items"]
+    assert (data["operacion"]["flete"], data["operacion"]["filas_excel_flete"]) == (1200, [3]), data["operacion"]
+
+
+@pytest.mark.parametrize("cuantas, filas", [
+    (1, "de la fila 3 de la planilla"),
+    (2, "de las filas 3, 4 de la planilla"),
+    (7, "de las filas 3, 4, 5, 6, 7 y 2 más de la planilla"),
+])
+def test_el_aviso_del_flete_dice_cuantas_filas_hay(cuantas, filas):
+    """H5: con más de cinco filas de flete el aviso dice «y N más», como los
+    otros avisos de filas; con una sola, «de la fila N», como antes."""
+    data = _leer([PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500]]
+                 + [[None, "Freight", None, 1, 100, 100]] * cuantas)
+    assert data["operacion"]["filas_excel_flete"] == list(range(3, 3 + cuantas)), data["operacion"]
+    monto = f"{100 * cuantas:,.2f}".replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+    assert f"Flete: se leyó {monto} {filas}; no entra como producto." in _avisos(data), data["avisos_mapeo"]
+
+
+@pytest.mark.parametrize("rotulo", ["Freight container 40HQ", "Freight express", "Freight packing"])
+def test_un_flete_que_dice_algo_mas_con_el_origen_combinado_sigue_con_su_aviso(rotulo):
+    """/code-review de EXCEL-3f: las palabras nuevas de la familia H4
+    («container», «express», «packing», «hq») sólo suman avisos. Con el
+    origen combinado el flete que dice algo más sigue leído como flete con el
+    aviso de su fila, como en la base."""
+    filas, combinar = FORMAS_DEL_CARGO["origen_rotulo_en_descripcion"]
+    data = _leer_combinado([PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500]] + filas(rotulo), combinar)
+    assert data["operacion"]["filas_excel_flete"] == [4], data["operacion"]
+    assert (f"1 renglón(es) se leyeron como flete y dicen algo más: fila 4 («{rotulo}»); "
+            "si alguno es un producto, cargalo en la revisión.") in _avisos(data), data["avisos_mapeo"]
+
+
+@pytest.mark.parametrize("rotulo", ["Insurance container", "Seguro express", "Handling DHL"])
+def test_un_cargo_que_dice_algo_mas_con_el_origen_combinado_no_sale_del_fob(rotulo):
+    """Lo mismo para el seguro o los gastos: con el origen combinado y algo
+    más que el cargo, entran con el aviso de su fila, como en la base; no
+    quedan sin leer."""
+    filas, combinar = FORMAS_DEL_CARGO["origen_rotulo_en_descripcion"]
+    data = _leer_combinado([PROFORMA, [1, "LAPTOP DEMO", "China", 10, 350, 3500]] + filas(rotulo), combinar)
+    assert _total(data["items"]) == 4750 and not data["filas_descartadas_numeros"], data
+    _nombra_su_fila(data, 4, rotulo)
+
+
+@pytest.mark.parametrize("formato", ["xlsx", "xls"])
+@pytest.mark.parametrize("filas", [
+    [["NCM", "Description", "Origin", "Qty", "Unit price", "Amount"],
+     ["8471.30.00", "LAPTOP DEMO", "China", 10, 350, 3500],
+     ["8470.50.00", "Payment terminal POS", None, 1, 1200, 1200]],
+    [["NCM", "Description", "Origin", "Qty", "Unit price", "Amount"],
+     ["8471.30.00", "LAPTOP DEMO", "China", 10, 350, 3500],
+     ["8428.10.00", "Ocean freight", "China", 1, 1200, 1200]],
+    [["Item", "NCM", "Description", "Qty", "Unit price", "Amount"],
+     [1, "8471.30.00", "LAPTOP DEMO", 10, 350, 3500],
+     ["Freight", "8428.10.00", "ELEVADOR DEMO", 1, 1200, 1200]],
+], ids=["descripcion", "no_viene_primero", "en_item"])
+def test_una_fila_con_su_ncm_no_lleva_el_aviso_de_cargo(filas, formato):
+    """/code-review de EXCEL-3f: con su propia NCM la fila es mercadería (como
+    en la base, sin aviso); el aviso de D22 y H1 es para la que no la tiene."""
+    data = _leer_en(formato, filas, ())
+    assert _total(data["items"]) == 4700 and not data["filas_descartadas_numeros"], data
+    assert "parecen un cargo" not in _avisos(data), data["avisos_mapeo"]

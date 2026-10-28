@@ -20,6 +20,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - Validar o usar una invitación ya no da error 500 en Postgres. La invitación sólo sirve para registrarse con el email invitado, y el estudio no pasa de los usuarios de su plan (el dueño incluido; al invitar cuentan también las invitaciones pendientes sin vencer).
 - La invitación se gasta en la misma transacción que el alta y sólo si seguía pendiente: dos registros a la vez con el mismo enlace dejan un usuario y un 400, no dos altas ni un 500.
 
+## 2026-10-27 · fix: un cargo en plural, que no viene primero o en Item con otra descripción se avisa con su fila (EXCEL-3f)
+
+- **fix(excel):** «Fletes», «Seguros», «Bank fees» o «Fee» se leen como el cargo en singular. «Ocean freight», «Courier DHL», «2. Insurance», un cargo con su propio origen o «Freight» en Item con la descripción escrita otra vez entran al FOB como antes, pero con un aviso que nombra su fila. Una fila con su propia NCM no lleva ese aviso.
+- El aviso del flete nombra todas sus filas como los demás («filas 3, 4, … y N más»).
+- **fix(datos):** el error del script de fechas de inicio de actividad tapa la clave de la base como la escriba SQLAlchemy o el driver: con un espacio y otro carácter escapado en la misma clave, %XX en minúscula, «+» o escapes de Python y JSON (H1-bis).
+
 ## 2026-10-27 · fix: miles mal formados en cantidades, precios y pesos; aviso por más de dos decimales (SEPARADORES-1d)
 
 - La factura y la planilla dejan sin leer una cantidad, un precio o un peso que sólo se puede leer como miles mal armados («0.500.000»), como ya hacían con el flete y el seguro: queda vacío y la revisión lo marca, en vez de llegar por mil al TXT.
