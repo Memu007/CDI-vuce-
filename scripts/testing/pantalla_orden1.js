@@ -26,6 +26,20 @@
 //  (k) si otro usuario entra en el mismo navegador mientras la pestaña
 //      reintenta, la operación cargada no se guarda a su nombre ni él la
 //      recupera.
+//  (l) a (n) si otro usuario entra después (con o sin salir el primero), lo
+//      que se carga no se guarda y la pestaña lo avisa; si sale y vuelve a
+//      entrar el mismo, sigue guardando;
+//  (o) al volver de la caché del navegador queda en uso, salvo que haya
+//      entrado otro;
+//  (p) al recargar con la consulta del usuario lenta o caída, la operación
+//      vuelve cuando llega el usuario, sin pisar otra cargada mientras;
+//  (q) sin lugar en el navegador, avisa;
+//  (r) a (t) los reintentos de la consulta del usuario: no con 401, sí con un
+//      corte de red, de 1 a 30 segundos;
+//  (u) al recargar toma su borrador aunque haya otro cerrado más nuevo;
+//  (v) la operación terminada se borra; (w) se barren el vencido de otro
+//      usuario y el sobre de otra versión;
+//  (y) con otro usuario adentro, la pestaña del dueño no borra lo suyo.
 // Datos inventados. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_orden1.js
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
@@ -495,6 +509,310 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     const r = await recuperada(q);
     if (r) falla('quien entró después recupera la operación cargada antes de saber el usuario: ' + r);
     console.log('OK si otro usuario entra mientras la pestaña reintenta, la operación no queda a su nombre');
+    await ctx.close();
+  }
+
+  // Lo que la pestaña guardó de una factura: [{ user, closed, savedAt }].
+  const sobresDe = (p, factura) => p.evaluate(f => Object.keys(localStorage)
+    .filter(k => k.startsWith('cdi_v2_state') && (localStorage.getItem(k) || '').includes('"' + f + '"'))
+    .map(k => { try { const s = JSON.parse(localStorage.getItem(k)); return { user: s.user, closed: s.closed, savedAt: s.savedAt }; } catch (_) { return { user: '?' }; } }), factura);
+  const avisa = p => p.locator('#avisoBorrador').isVisible();
+  // Espera a que el guardado periódico acabe de pasar (cambia savedAt), así lo
+  // que sigue tiene casi 2,5 s antes del próximo.
+  async function trasUnGuardado(p, factura) {
+    const antes = ((await sobresDe(p, factura))[0] || {}).savedAt;
+    const ok = await p.waitForFunction(([f, a]) => Object.keys(localStorage).some(k => {
+      const t = localStorage.getItem(k) || '';
+      if (!k.startsWith('cdi_v2_state') || !t.includes('"' + f + '"')) return false;
+      try { return JSON.parse(t).savedAt !== a; } catch (_) { return false; }
+    }), [factura, antes], { timeout: 2 * INTERVALO_MS }).then(() => true, () => false);
+    if (!ok) falla('el guardado periódico no vuelve a guardar ' + factura);
+  }
+  const transicion = (p, tipo) => p.evaluate(t => window.dispatchEvent(new PageTransitionEvent(t, { persisted: true })), tipo);
+  // Un sobre armado a mano, del usuario y de la edad que se pida.
+  const sembrar = (ctx, sobre, factura) => enElSitio(ctx, ([s, f]) => {
+    s.state = { operacion: { numero_factura: f }, items: [{ descripcion: 'Producto de ' + f, cantidad: 1 }] };
+    localStorage.setItem('cdi_v2_state:sembrado-' + f, JSON.stringify(s));
+  }, [sobre, factura]);
+
+  // (l) Otro usuario entra en el mismo navegador después de que la pestaña ya
+  // conoce a su dueño; lo que se carga después no es del dueño.
+  if (corre('l')) {
+    const ctx = await nuevoContexto('ord1la');
+    const t = await abrir(ctx);
+    const otro = await nuevoUsuario(ctx, 'ord1lb');
+    await cargar(t, 'DE-B', [prod('Producto cargado por B en la pestaña de A', '84714900100D', 2, 10)]);
+    await t.waitForTimeout(2 * INTERVALO_MS);
+    const sobres = await sobresDe(t, 'DE-B');
+    if (sobres.length) falla('lo que cargó B en la pestaña de A se guardó a nombre de ' + sobres.map(s => s.user).join(', '));
+    if (!(await avisa(t))) falla('la pestaña dejó de guardar y no lo avisa');
+    const rb = await recuperada(await abrir(ctx));
+    if (rb) falla('B recupera lo cargado en la pestaña de A: ' + rb);
+    console.log('OK si entra otro usuario, la pestaña no guarda lo que se carga y lo avisa (' + otro + ')');
+    await ctx.close();
+  }
+
+  // (m) El mismo usuario sale y vuelve a entrar: la pestaña sigue guardando.
+  if (corre('m')) {
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    const usuario = await nuevoUsuario(ctx, 'ord1m');
+    const t = await abrir(ctx);
+    // Sin esperar, el pedido de conectores del arranque cae entre la salida y
+    // la entrada, da 401 y la pantalla se va al login (eso ya era así).
+    await t.waitForLoadState('networkidle');
+    const salida = await ctx.request.post(base + '/auth/logout');
+    if (!salida.ok()) falla('no se pudo salir: ' + salida.status());
+    await entrar(ctx, usuario);
+    await cargar(t, 'MISMO-A', [prod('Producto del mismo usuario', '84714900100D', 2, 10)]);
+    await esperarBorradores(t, ['MISMO-A'], 'el mismo usuario volvió a entrar y la pestaña dejó de guardar');
+    const sobres = await sobresDe(t, 'MISMO-A');
+    if (sobres.some(s => s.user !== usuario)) falla('la operación se guardó con otro dueño: ' + JSON.stringify(sobres));
+    if (await avisa(t)) falla('el mismo usuario volvió a entrar y la pestaña avisa que no guarda');
+    console.log('OK si el mismo usuario sale y vuelve a entrar, la pestaña sigue guardando sin aviso');
+    await ctx.close();
+  }
+
+  // (n) Sale uno y entra otro.
+  if (corre('n')) {
+    const ctx = await nuevoContexto('ord1na');
+    const t = await abrir(ctx);
+    await t.waitForLoadState('networkidle');  // como en (m)
+    await ctx.request.post(base + '/auth/logout');
+    await nuevoUsuario(ctx, 'ord1nb');
+    await cargar(t, 'DE-B-TRAS-SALIR', [prod('Producto cargado por B', '84714900100D', 2, 10)]);
+    await t.waitForTimeout(2 * INTERVALO_MS);
+    const sobres = await sobresDe(t, 'DE-B-TRAS-SALIR');
+    if (sobres.length) falla('salió A, entró B y lo cargado se guardó a nombre de ' + sobres.map(s => s.user).join(', '));
+    if (!(await avisa(t))) falla('salió A, entró B, la pestaña dejó de guardar y no lo avisa');
+    console.log('OK si sale uno y entra otro, la pestaña no guarda y lo avisa');
+    await ctx.close();
+  }
+
+  // (o) Vuelve desde la caché del navegador (pageshow con persisted). El
+  // bfcache de verdad no se puede pedir en esta prueba (Playwright lo apaga y
+  // el Web Lock de la pestaña lo impide), así que se mandan los eventos.
+  if (corre('o')) {
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    const usuario = await nuevoUsuario(ctx, 'ord1oa');
+    const t = await abrir(ctx);
+    await cargar(t, 'VUELVE', [prod('Producto de la que vuelve', '84714900100D', 2, 10)]);
+    await esperarBorradores(t, ['VUELVE'], 'la operación no se guarda');
+    await trasUnGuardado(t, 'VUELVE');
+    await transicion(t, 'pagehide');
+    if (!(await sobresDe(t, 'VUELVE')).every(s => s.closed === true)) falla('pagehide no la marca cerrada');
+    await transicion(t, 'pageshow');
+    await t.waitForTimeout(300);
+    const vuelta = await sobresDe(t, 'VUELVE');
+    if (!vuelta.length || vuelta.some(s => s.closed !== false || s.user !== usuario)) falla('al volver de la caché no queda en uso: ' + JSON.stringify(vuelta));
+    // Se va a la caché, entra otro y vuelve: queda cerrada a nombre del dueño.
+    await trasUnGuardado(t, 'VUELVE');
+    await transicion(t, 'pagehide');
+    await nuevoUsuario(ctx, 'ord1ob');
+    await transicion(t, 'pageshow');
+    await t.waitForTimeout(2 * INTERVALO_MS);
+    const ajena = await sobresDe(t, 'VUELVE');
+    if (ajena.length !== 1 || ajena[0].closed !== true || ajena[0].user !== usuario) falla('volvió de la caché con otro usuario y la marcó en uso: ' + JSON.stringify(ajena));
+    if (!(await avisa(t))) falla('volvió de la caché con otro usuario y no avisa que dejó de guardar');
+    console.log('OK al volver de la caché queda en uso; con otro usuario queda cerrada a nombre del dueño y avisa');
+    await ctx.close();
+  }
+
+  // (p) Recargar con la consulta del usuario lenta (6 s) o caída (500 durante
+  // 5 s): la operación vuelve cuando llega el usuario. Si mientras tanto se
+  // cargó otra, no se pisa: la de antes queda guardada y se avisa.
+  if (corre('p')) {
+    const ctx = await nuevoContexto('ord1p');
+    const recargarCon = async (t, factura, demora) => {
+      await cargar(t, factura, [prod('Producto de ' + factura, '84714900100D', 2, 10)]);
+      await esperarBorradores(t, [factura], 'la operación ' + factura + ' no se guarda');
+      const hasta = Date.now() + demora.ms;
+      await ctx.route('**/auth/current_user', async ruta => {
+        if (Date.now() >= hasta) return ruta.continue().catch(() => {});
+        if (demora.caida) return ruta.fulfill({ status: 500, body: 'error de prueba' });
+        await new Promise(r => setTimeout(r, hasta - Date.now()));
+        return ruta.continue().catch(() => {});
+      });
+      await t.reload();
+      await t.waitForFunction(() => window.CDI && CDI.goTo && document.querySelector('.screen.is-active'));
+    };
+    for (const demora of [{ ms: 6000 }, { ms: 5000, caida: true }]) {
+      const que = demora.caida ? 'con la consulta del usuario caída' : 'con la consulta del usuario lenta';
+      const factura = demora.caida ? 'CAIDA-AL-RECARGAR' : 'LENTA-AL-RECARGAR';
+      const t = await abrir(ctx);
+      await recargarCon(t, factura, demora);
+      const volvio = await t.waitForFunction(() => CDI.state && CDI.state.items && CDI.state.items.length > 0,
+        null, { timeout: demora.ms + 15000 }).then(() => true, () => false);
+      await ctx.unroute('**/auth/current_user');
+      if (!volvio) falla(que + ', la operación no vuelve a la pestaña que recargó (pantalla ' + await pantalla(t) + ')');
+      const f = await t.evaluate(() => (CDI.state.operacion || {}).numero_factura);
+      if (f !== factura) falla(que + ', vuelve otra operación: ' + f);
+      await t.waitForFunction(() => document.querySelector('.screen.is-active').dataset.screen === 'review', null, { timeout: 3000 }).catch(() => {});
+      if (await pantalla(t) !== 'review') falla(que + ', la operación vuelve pero la pantalla queda en ' + await pantalla(t));
+      await cerrar(t);
+      console.log('OK ' + que + ' al recargar, la operación vuelve cuando llega el usuario');
+    }
+    // Mientras espera al usuario, se carga otra: no se pisa.
+    const t = await abrir(ctx);
+    await recargarCon(t, 'ANTES-DE-RECARGAR', { ms: 6000 });
+    await cargar(t, 'CARGADA-MIENTRAS', [prod('Producto cargado mientras', '84714900100D', 2, 10)]);
+    await t.waitForFunction(() => CDI.currentUser, null, { timeout: 20000 });
+    await ctx.unroute('**/auth/current_user');
+    await t.waitForTimeout(INTERVALO_MS + 500);
+    const f = await t.evaluate(() => (CDI.state.operacion || {}).numero_factura);
+    if (f !== 'CARGADA-MIENTRAS') falla('la operación de antes de recargar pisó la que se cargó mientras: ' + f);
+    const hay = await guardadas(ctx);
+    if (!hay.includes('ANTES-DE-RECARGAR')) falla('la operación de antes de recargar se perdió: ' + JSON.stringify(hay));
+    if (!(await avisa(t))) falla('la operación de antes de recargar quedó guardada y la pestaña no lo avisa');
+    console.log('OK si mientras espera al usuario se carga otra, la de antes queda guardada y se avisa');
+    await ctx.close();
+  }
+
+  // (q) El navegador no tiene lugar para el borrador: se avisa.
+  if (corre('q')) {
+    const ctx = await nuevoContexto('ord1q');
+    await ctx.addInitScript(() => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (k, v) {
+        if (String(k).startsWith('cdi_v2_state')) throw new DOMException('lleno', 'QuotaExceededError');
+        return original.call(this, k, v);
+      };
+    });
+    const t = await abrir(ctx);
+    await cargar(t, 'SIN-LUGAR', [prod('Producto sin lugar', '84714900100D', 2, 10)]);
+    const ok = await t.locator('#avisoBorrador').waitFor({ state: 'visible', timeout: 2 * INTERVALO_MS }).then(() => true, () => false);
+    if (!ok) falla('el navegador no tiene lugar para guardar la operación y la pestaña no avisa');
+    console.log('OK sin lugar en el navegador, la pestaña avisa que no guarda');
+    await ctx.close();
+  }
+
+  // (r) Con la sesión vencida (401) la consulta del usuario no se reintenta:
+  // la app ya manda al login. Se corta esa navegación para contar.
+  if (corre('r')) {
+    const ctx = await nuevoContexto('ord1r');
+    let pedidos = 0;
+    await ctx.route('**/auth/current_user', ruta => { pedidos++; return ruta.fulfill({ status: 401, body: '{}' }); });
+    await ctx.route(u => u.pathname === '/' && u.searchParams.has('next'), ruta => ruta.abort());
+    const p = await ctx.newPage();
+    p.on('dialog', d => d.accept().catch(() => {}));
+    await p.goto(base + '/dashboard');
+    await p.waitForTimeout(8000);
+    // La de la app y la del tour; un reintento con 401 haría 4 o más.
+    if (pedidos > 3) falla('con la sesión vencida la pestaña reintenta la consulta del usuario: ' + pedidos + ' pedidos en 8 s');
+    console.log('OK con la sesión vencida no se reintenta (' + pedidos + ' pedidos)');
+    await ctx.close();
+  }
+
+  // (s) Como (j), pero la consulta se corta (error de red) en vez de dar 500.
+  if (corre('s')) {
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    const usuario = await nuevoUsuario(ctx, 'ord1s');
+    let caida = true;
+    await ctx.route('**/auth/current_user', ruta => (caida ? ruta.abort() : ruta.continue()));
+    const p = await ctx.newPage();
+    p.on('dialog', d => d.accept().catch(() => {}));
+    await p.goto(base + '/dashboard');
+    await p.waitForFunction(() => window.CDI && CDI.goTo && CDI.api && document.querySelector('.screen.is-active'));
+    await cargar(p, 'SIN-RED', [prod('Producto con la red cortada', '84714900100D', 2, 10)]);
+    await p.waitForTimeout(3000);
+    caida = false;
+    const llego = await p.waitForFunction(() => CDI.currentUser, null, { timeout: 40000 }).then(() => true, () => false);
+    if (!llego) falla('con la consulta del usuario cortada al abrir, la pestaña no la vuelve a pedir');
+    await esperarBorradores(p, ['SIN-RED'], 'con la consulta del usuario cortada al abrir, la operación no se guarda');
+    const sobres = await sobresDe(p, 'SIN-RED');
+    if (sobres.some(s => s.user !== usuario)) falla('la operación se guardó con otro dueño: ' + JSON.stringify(sobres));
+    console.log('OK con la consulta del usuario cortada al abrir, la pestaña la vuelve a pedir');
+    await ctx.close();
+  }
+
+  // (t) Los reintentos esperan 1, 2, 4… segundos, hasta 30: en 200 segundos
+  // de reloj son 1 + 10. Con el reloj de la página adelantado a mano.
+  if (corre('t')) {
+    const ctx = await nuevoContexto('ord1t');
+    let pedidos = 0;
+    await ctx.route('**/auth/current_user', ruta => { pedidos++; return ruta.abort(); });
+    const p = await ctx.newPage();
+    await p.clock.install();
+    p.on('dialog', d => d.accept().catch(() => {}));
+    await p.goto(base + '/dashboard');
+    await p.waitForFunction(() => window.CDI && CDI.goTo && document.querySelector('.screen.is-active'));
+    for (let s = 0; s < 200; s++) {
+      await p.clock.runFor(1000);
+      await p.waitForTimeout(20);
+    }
+    // Con el tour son 12; sin tope de 30 s, 9; sin crecer, cientos.
+    if (pedidos < 11 || pedidos > 13) falla('en 200 s de reloj la consulta del usuario se pidió ' + pedidos + ' veces; se esperan 12 (1 + 10 reintentos + el tour)');
+    console.log('OK los reintentos crecen hasta 30 s (' + pedidos + ' pedidos en 200 s)');
+    await ctx.close();
+  }
+
+  // (u) Al recargar, la pestaña toma su propio borrador aunque haya otro
+  // cerrado más nuevo: espera a que se libere el lock de la pestaña anterior.
+  if (corre('u')) {
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    const usuario = await nuevoUsuario(ctx, 'ord1u');
+    const t = await abrir(ctx);
+    await cargar(t, 'PROPIA', [prod('Producto de la que recarga', '84714900100D', 2, 10)]);
+    await esperarBorradores(t, ['PROPIA'], 'la operación no se guarda');
+    await sembrar(ctx, { v: 1, user: usuario, savedAt: Date.now() + MIN, closed: true }, 'OTRA-MAS-NUEVA');
+    await t.reload();
+    const r = await recuperada(t);
+    if (r !== 'PROPIA') falla('al recargar, la pestaña no toma su propio borrador: toma ' + r);
+    console.log('OK al recargar, la pestaña toma el suyo y no el cerrado más nuevo');
+    await ctx.close();
+  }
+
+  // (v) Una operación terminada (la pestaña volvió a la carga) se borra: al
+  // cerrar antes del próximo guardado y con la pestaña abierta.
+  if (corre('v')) {
+    const ctx = await nuevoContexto('ord1v');
+    const t1 = await abrir(ctx);
+    await cargar(t1, 'TERMINADA-1', [prod('Producto terminado', '84714900100D', 2, 10)]);
+    await esperarBorradores(t1, ['TERMINADA-1'], 'la operación no se guarda');
+    await trasUnGuardado(t1, 'TERMINADA-1');
+    await t1.evaluate(() => CDI.goTo('upload'));
+    await cerrar(t1);
+    if ((await guardadas(ctx)).includes('TERMINADA-1')) falla('la operación terminada queda guardada al cerrar la pestaña');
+    const t2 = await abrir(ctx);
+    await cargar(t2, 'TERMINADA-2', [prod('Producto terminado', '84714900100D', 2, 10)]);
+    await esperarBorradores(t2, ['TERMINADA-2'], 'la operación no se guarda');
+    await t2.evaluate(() => CDI.goTo('upload'));
+    await t2.waitForTimeout(2 * INTERVALO_MS);
+    if ((await guardadas(ctx)).includes('TERMINADA-2')) falla('la operación terminada queda guardada con la pestaña abierta');
+    console.log('OK una operación terminada se borra, al cerrar y con la pestaña abierta');
+    await ctx.close();
+  }
+
+  // (w) El borrador vencido de otro usuario se barre igual. (x) Un sobre de
+  // otra versión no se recupera y se borra.
+  if (corre('w')) {
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    const usuario = await nuevoUsuario(ctx, 'ord1w');
+    await sembrar(ctx, { v: 1, user: 'otro_usuario_inventado', savedAt: Date.now() - 8 * DIA, closed: true }, 'VENCIDA-DE-OTRO');
+    await sembrar(ctx, { v: 2, user: usuario, savedAt: Date.now(), closed: true }, 'OTRA-VERSION');
+    const t = await abrir(ctx);
+    const r = await recuperada(t);
+    if (r) falla('se recupera un sobre de otra versión: ' + r);
+    const hay = await guardadas(ctx);
+    if (hay.includes('VENCIDA-DE-OTRO')) falla('el borrador vencido de otro usuario no se borra al barrer');
+    if (hay.includes('OTRA-VERSION')) falla('el sobre de otra versión no se borra al barrer');
+    console.log('OK el vencido de otro usuario y el sobre de otra versión se borran');
+    await ctx.close();
+  }
+
+  // (y) Entra otro usuario y en la pestaña del dueño se vuelve a la carga de
+  // archivos: la operación que el dueño dejó guardada no se borra.
+  if (corre('y')) {
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    const usuario = await nuevoUsuario(ctx, 'ord1ya');
+    const t = await abrir(ctx);
+    await cargar(t, 'DEL-DUENO', [prod('Producto del dueño', '84714900100D', 2, 10)]);
+    await esperarBorradores(t, ['DEL-DUENO'], 'la operación del dueño no se guarda');
+    await nuevoUsuario(ctx, 'ord1yb');
+    await t.evaluate(() => CDI.goTo('upload'));
+    await t.waitForTimeout(2 * INTERVALO_MS);
+    const quedan = await sobresDe(t, 'DEL-DUENO');
+    if (quedan.length !== 1 || quedan[0].user !== usuario) falla('entró otro usuario y la pestaña del dueño borró su operación: ' + JSON.stringify(quedan));
+    console.log('OK con otro usuario adentro, la pestaña del dueño no borra lo que él dejó guardado');
     await ctx.close();
   }
 
