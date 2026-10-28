@@ -10,6 +10,20 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(sugerencia):** si el historial del cliente tiene el NCM de 8 dígitos y el catálogo del proveedor tiene, para el mismo producto (la misma descripción, no una parecida), la SIM completa que empieza con esos 8, el autorrelleno (`/api/catalog/lookup`) y `/api/ncm/sugerir` traen la del proveedor. Desde GUARDAR-1 llegaba `84714900` y la pantalla marcaba incompleto lo que antes llegaba listo. Sin migración.
 
+## 2026-10-28 · feat: el catálogo del cliente se baja en Excel (DESPACHO-1a)
+
+- En la pestaña Catálogo del cliente, «Descargar en Excel» baja los productos aprendidos de ese cliente, un renglón por producto y en el mismo orden que la pantalla: posición (como texto, con ceros y letra), descripción, origen, valor unitario, cantidad y peso promedio, veces usado y última vez.
+- Un texto que empieza con =, +, - o @ queda como texto, no como fórmula.
+
+## 2026-10-27 · feat: el registro con invitación viene con el email invitado (ORG-1b)
+
+- Al abrir el enlace de una invitación válida, el email del registro ya viene completo con el email invitado y no se puede cambiar; una línea lo explica. Sin invitación válida, el campo queda como antes.
+
+## 2026-10-27 · fix: invitaciones al estudio sin 500, atadas al email, con tope del plan y de un solo uso (ORG-1)
+
+- Validar o usar una invitación ya no da error 500 en Postgres. La invitación sólo sirve para registrarse con el email invitado, y el estudio no pasa de los usuarios de su plan (el dueño incluido; al invitar cuentan también las invitaciones pendientes sin vencer).
+- La invitación se gasta en la misma transacción que el alta y sólo si seguía pendiente: dos registros a la vez con el mismo enlace dejan un usuario y un 400, no dos altas ni un 500.
+
 ## 2026-10-27 · fix: un cargo en plural, que no viene primero o en Item con otra descripción se avisa con su fila (EXCEL-3f)
 
 - **fix(excel):** «Fletes», «Seguros», «Bank fees» o «Fee» se leen como el cargo en singular. «Ocean freight», «Courier DHL», «2. Insurance», un cargo con su propio origen o «Freight» en Item con la descripción escrita otra vez entran al FOB como antes, pero con un aviso que nombra su fila. Una fila con su propia NCM no lleva ese aviso.
