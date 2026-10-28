@@ -18,7 +18,9 @@ FILTROS_LARGOS = {"--deselect", "--ignore", "--ignore-glob", "--lf", "--last-fai
                   "--sw", "--stepwise", "--sw-skip", "--stepwise-skip"}
 FILTROS_CORTOS = {"-k", "-m"}
 
-GOOGLE_CLOUD = re.compile(r"\bgcloud\b|cloudbuild|setup_gcp|deploy-cloud-run|google-github-actions")
+# gcr.io y docker.pkg.dev: subir la imagen a Google sin pasar por gcloud.
+GOOGLE_CLOUD = re.compile(r"\bgcloud\b|cloudbuild|setup_gcp|deploy-cloud-run|google-github-actions"
+                          r"|gcr\.io|docker\.pkg\.dev")
 
 
 def _filtros(tokens):
@@ -57,6 +59,8 @@ def test_ci_yml_no_deselecciona_en_ningun_paso():
     assert "--deselect" not in texto and "--ignore" not in texto, (
         "ci.yml saca pruebas con --deselect o --ignore"
     )
+    # PYTEST_ADDOPTS suma opciones al comando sin que se vean en el run.
+    assert "PYTEST_ADDOPTS" not in texto, "ci.yml le pasa opciones a pytest por PYTEST_ADDOPTS"
 
 
 def test_no_queda_un_camino_de_publicacion_a_google_cloud():
