@@ -38,11 +38,24 @@
             throw new Error('unauthorized');
         }
         if (res.status === 402) {
-            // Plan vencido o sin suscripción activa: mostrar modal con CTA a pagar.
+            // Impago, vencido, cancelado o tope del plan: el modal dice la
+            // razón que manda el servidor (COBRO-CORTE-1).
+            let detail = null;
+            try { detail = (await res.clone().json()).detail; } catch (_) {}
+            const motivo = (detail && typeof detail === 'object') ? detail : {};
+            const titulos = {
+                PLAN_LIMIT_EXCEEDED: 'Llegaste al tope de tu plan',
+                SUBSCRIPTION_PAST_DUE: 'Tenés un pago pendiente',
+                SUBSCRIPTION_INACTIVE: 'No tenés una suscripción activa',
+            };
+            const titulo = motivo.billing_status === 'canceled' ? 'Cancelaste tu suscripción'
+                : (titulos[motivo.code] || 'Tu plan venció');
+            const lead = motivo.message || (typeof detail === 'string' && detail) ||
+                'Necesitás renovar tu suscripción para seguir usando CDI.';
             if (CDI.confirm) {
                 CDI.confirm({
-                    title: 'Tu plan venció',
-                    lead: 'Necesitás renovar tu suscripción para seguir usando CDI.',
+                    title: titulo,
+                    lead: lead,
                     text: 'Después de pagar podés volver a usar todas las funciones.',
                     acceptText: 'Ir a pagar',
                     cancelText: 'Volver',
@@ -57,7 +70,9 @@
                     }
                 });
             }
-            throw new Error('payment_required');
+            const err = new Error('payment_required');
+            err.motivo = lead;
+            throw err;
         }
         return res;
     }
