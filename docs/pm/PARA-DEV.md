@@ -27,6 +27,40 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
+## BACKUP-1a: lo que encontró el adversario antes de tu `/entregar` (2026-10-28 17:48 UTC)
+
+Sobre `70f6d3d`. Tus sabotajes de `backup1a.sh` dan rojo todos
+(`sabotajes con falla: 0`, corrida del revisor). Va con tu entrega:
+
+1. **Alta, reproducido por la PM:** una base sin tablas sale `copia
+   verificada: 0 tablas, 0 filas`, `rc=0`, con su `.sha256`; con tablas
+   vacías, igual. Una dirección equivocada o una base recién creada dejan
+   el cron en verde con copias vacías. **Decidido por la PM:** `copiar` y
+   `verificar` fallan con 0 tablas o 0 filas en total, y lo dicen. Con
+   prueba y sabotaje.
+2. **Alta, reproducido por la PM:** si `copiar` devuelve 0 aunque
+   `verificar` dé 1 (`await verificar(archivo); return 0`), tus 31 pruebas
+   pasan. El código de salida es lo único que va a mirar el cron: una
+   prueba que lo exija y el mutante a `backup1a.sh`.
+3. **Media, reproducido por la PM:** la copia, la huella y la marca salen
+   `-rw-r--r--` (toda la base, con hashes de claves). Archivos 0600 y
+   carpeta 0700 al crearlos, también en `enviar`. Con prueba.
+4. **Media, del revisor (no lo reproduje):** con `SIGTERM` durante
+   `pg_restore` queda la base `cdi_restauracion_*` llena en el servidor y
+   el hijo vivo; no hay tiempos máximos en `pg_dump` ni `pg_restore`.
+   Manejá la señal o limpiá las `cdi_restauracion_*` viejas al empezar, y
+   poné un tiempo máximo. Si algo de esto no va en esta pieza, decilo en la
+   D8 con el motivo.
+5. **Lo que se promete:** la verificación compara filas y contenido por
+   tabla; no índices, restricciones, secuencias ni objetos grandes. Escribilo
+   así en el informe y en `CHANGELOG.md`, sin «quedó igual» a secas.
+6. **Mutantes que sobreviven:** la huella sólo del esquema `public`;
+   `enviar` sin `leer_huella` (manda una copia con la huella ausente).
+   Prueba roja para cada uno.
+7. **A riesgos:** un `copiar` o un `enviar` cortados a mitad dejan
+   archivos que traban el reintento con el mismo nombre («ya existe»), y la
+   huella no está cubierta por el `.sha256`.
+
 ## EXCEL-2b: lo que encontró el adversario de la PM antes de tu `/entregar` (2026-10-28 17:25 UTC)
 
 Sobre `b3ac325`. Reproducido por la PM; va con tu entrega, no la frena:

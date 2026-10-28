@@ -44,7 +44,7 @@ repositorio.** Las pruebas usan sintéticos con la misma forma.
   primero las devoluciones que lleguen (DESTINO-1 ya está arriba), después
   D41.
 
-## EMAIL-1: aceptada sobre `2b93071` (2026-10-28 17:55 UTC)
+## EMAIL-1: aceptada sobre `2b93071` (2026-10-28 17:46 UTC)
 
 Lo de la pieza está bien: ningún camino manda el correo de una cuenta a
 otra y la respuesta no cambia exista o no. Se integra con la cadena.
@@ -60,7 +60,7 @@ tras usar uno nuevo; `dev_token_hint` fuera de producción; el 500 sin
 `FRONTEND_URL`. El 1, el 2 y el token se los propongo a Emi como pieza
 aparte: **no los arregles hasta que diga que sí**.
 
-## DISCO-1: devolución, sobre `88b22c8` (2026-10-28 17:55 UTC)
+## DISCO-1: devolución, sobre `88b22c8` (2026-10-28 17:46 UTC)
 
 La migración está bien (dos arranques, sin duplicar, dueños separados,
 Postgres 16 y SQLite). Evidencia en `REPRODUCCION-DISCO-1-2026-10-28.md`.
