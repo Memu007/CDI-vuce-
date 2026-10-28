@@ -96,6 +96,69 @@ def test_no_se_leen_mas_de_20_cabezas_de_imagen():
     assert fs._excel_liviano(libro, ".xlsx") is False
 
 
+def test_una_imagen_guardada_sin_comprimir_tampoco_cuenta():
+    libro = _con_entradas(_normal())
+    buf = io.BytesIO(libro)
+    with zipfile.ZipFile(buf, "a") as z:
+        z.writestr("xl/media/image1.png", PNG + bytes(3 * 2**20), compress_type=zipfile.ZIP_STORED)
+    assert fs._excel_liviano(buf.getvalue(), ".xlsx") is True
+
+
+def _bloques_vacios(k):
+    """k entradas DEFLATE hechas sólo de bloques vacíos, 9,5 MiB en total:
+    no dan un byte hasta el final, así que sacarles la cabeza con zipfile
+    obliga a descomprimirlas enteras. Cada una declara 2,5 MiB."""
+    vacio = bytes([2, 8, 32, 128, 0])  # cuatro bloques fijos vacíos, 10 bits cada uno
+    crudo = vacio * (int(9.5 * 2**20) // k // len(vacio))
+    assert zlib.decompressobj(-15).decompress(crudo) == b""  # ni un byte de cabeza
+    buf = io.BytesIO(_con_entradas(_normal()))
+    with zipfile.ZipFile(buf, "a") as z:
+        for i in range(k):
+            z.writestr(f"xl/media/x{i}.bin", crudo, compress_type=zipfile.ZIP_STORED)
+    b = bytearray(buf.getvalue())
+    i = b.find(b"PK\x01\x02")
+    while i >= 0:
+        largo = struct.unpack_from("<H", b, i + 28)[0]
+        if bytes(b[i + 46:i + 46 + largo]).startswith(b"xl/media/x"):
+            local = struct.unpack_from("<I", b, i + 42)[0]
+            for metodo, tamano in ((i + 10, i + 24), (local + 8, local + 22)):
+                struct.pack_into("<H", b, metodo, zipfile.ZIP_DEFLATED)
+                struct.pack_into("<I", b, tamano, int(2.5 * 2**20))
+        i = b.find(b"PK\x01\x02", i + 4)
+    return bytes(b)
+
+
+def test_las_cabezas_de_imagen_no_descomprimen_la_entrada_entera(monkeypatch):
+    """La medida corre en el hilo del servidor: por cada candidata se mira
+    una porción acotada de lo comprimido, no la entrada entera."""
+    libro = _bloques_vacios(20)
+    assert len(libro) < 10 * 2**20
+    with zipfile.ZipFile(io.BytesIO(libro)) as z:
+        info = z.getinfo("xl/media/x0.bin")
+        assert info.compress_type == zipfile.ZIP_DEFLATED and info.compress_size > 400_000
+    entrada = []
+    real_obj, real_dec = zlib.decompressobj, zlib.decompress
+
+    class Contado:
+        def __init__(self, *a, **k):
+            self._d = real_obj(*a, **k)
+
+        def decompress(self, datos, *a, **k):
+            entrada.append(len(datos))
+            return self._d.decompress(datos, *a, **k)
+
+        def __getattr__(self, nombre):
+            return getattr(self._d, nombre)
+
+    def contado(datos, *a, **k):
+        entrada.append(len(datos))
+        return real_dec(datos, *a, **k)
+    monkeypatch.setattr(zlib, "decompressobj", Contado)
+    monkeypatch.setattr(zlib, "decompress", contado)
+    assert fs._excel_liviano(libro, ".xlsx") is False
+    assert sum(entrada) <= 2**20, f"se descomprimieron {sum(entrada)} bytes en el hilo del servidor"
+
+
 def _indice_largo():
     """Un libro chico con 2000 entradas vacías: su índice pasa de 128 KiB."""
     libro = _con_entradas(_normal(), *[(f"xl/x/{i:060d}.txt", b"") for i in range(2000)])
