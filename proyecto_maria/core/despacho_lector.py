@@ -580,6 +580,22 @@ def leer_despacho(data: bytes, limite_cpu_s: float = _MAX_CPU_LECTURA) -> dict:
     return resultado
 
 
+def validar_pdf(data: bytes) -> dict:
+    """Lo que mira la subida de un PDF: si está encriptado y cuántas hojas
+    tiene. Uno que no se abre da {"error": el motivo}."""
+    from pypdf import PdfReader
+
+    try:
+        pdf = PdfReader(io.BytesIO(data))
+        if pdf.is_encrypted:
+            return {"encriptado": True, "paginas": 0}  # contar hojas de uno encriptado ya falla
+        return {"encriptado": False, "paginas": len(pdf.pages)}
+    except MemoryError:
+        raise
+    except Exception as e:
+        return {"error": str(e)}
+
+
 class PdfDemasiadoPesado(Exception):
     """La lectura pasó del tope de memoria del proceso que lee."""
 
@@ -594,6 +610,11 @@ _LEYENDO: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
 
 
 _FINAL_DE_ERRORES = 2000
+
+# Validar PDFs al subirlos: lugares propios, aparte de los de leer despachos.
+_VALIDANDO_A_LA_VEZ = 2
+# Por loop: (semáforo, {clave: [candado, pedidos de esa clave en curso]}).
+_VALIDANDO: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
 
 
 async def _escribir(entrada, data: bytes) -> None:
@@ -639,7 +660,37 @@ async def leer_despacho_aparte(data: bytes, limite_s: float, clave: str | None =
         leyendo.discard(clave)
 
 
-async def _leer_aparte(data: bytes, limite_s: float, semaforo, limite_cpu_s: float) -> dict:
+async def validar_pdf_aparte(data: bytes, limite_s: float, clave: str | None = None) -> dict:
+    """`validar_pdf` en otro proceso, con el tope de memoria del lector y un
+    tiempo máximo que incluye la espera (TimeoutError). Si pasa de la
+    memoria, PdfDemasiadoPesado. Como mucho `_VALIDANDO_A_LA_VEZ` a la vez.
+    Con `clave`, las de una misma clave van de a una y esperan su turno: diez
+    PDFs pesados de un usuario ocupan un solo lugar y no frenan a otro."""
+    loop = asyncio.get_running_loop()
+    estado = _VALIDANDO.get(loop)
+    if estado is None:
+        estado = _VALIDANDO[loop] = (asyncio.Semaphore(_VALIDANDO_A_LA_VEZ), {})
+    semaforo, filas = estado
+    if clave is None:
+        return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, "validar")
+    fila = filas.setdefault(clave, [asyncio.Lock(), 0])
+    fila[1] += 1
+    hasta = loop.time() + limite_s
+    try:
+        await asyncio.wait_for(fila[0].acquire(), timeout=limite_s)
+        try:
+            return await _leer_aparte(data, max(hasta - loop.time(), 0.0), semaforo,
+                                      _MAX_CPU_LECTURA, "validar")
+        finally:
+            fila[0].release()
+    finally:
+        fila[1] -= 1
+        if not fila[1]:
+            del filas[clave]
+
+
+async def _leer_aparte(data: bytes, limite_s: float, semaforo, limite_cpu_s: float,
+                       modo: str = "leer") -> dict:
     entorno = {k: os.environ[k] for k in ("PATH", "HOME", "LANG", "LC_ALL", "PYTHONUSERBASE")
                if k in os.environ}
     # El lector de facturas carga el .env al importarse: el hijo no lo lee.
@@ -648,7 +699,7 @@ async def _leer_aparte(data: bytes, limite_s: float, semaforo, limite_cpu_s: flo
     async def correr():
         async with semaforo:
             proceso = await asyncio.create_subprocess_exec(
-                sys.executable, "-m", __name__, repr(float(limite_cpu_s)),
+                sys.executable, "-m", __name__, repr(float(limite_cpu_s)), modo,
                 stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE, cwd=str(Path(__file__).resolve().parents[2]),
                 env=entorno)
@@ -679,8 +730,9 @@ async def _leer_aparte(data: bytes, limite_s: float, semaforo, limite_cpu_s: flo
 
 
 def _main() -> int:
-    """El proceso que lee: el PDF por la entrada, el resultado en JSON por la
-    salida. Sale con `_SALIDA_SIN_MEMORIA` si pasa del tope de memoria."""
+    """El proceso que lee (o valida, con el modo «validar»): el PDF por la
+    entrada, el resultado en JSON por la salida. Sale con
+    `_SALIDA_SIN_MEMORIA` si pasa del tope de memoria."""
     try:
         import resource
         _, duro = resource.getrlimit(resource.RLIMIT_AS)
@@ -691,8 +743,10 @@ def _main() -> int:
     logging.getLogger("pypdf").setLevel(logging.ERROR)  # un aviso por objeto roto
     try:
         limite_cpu_s = float(sys.argv[1]) if len(sys.argv) > 1 else _MAX_CPU_LECTURA
+        modo = sys.argv[2] if len(sys.argv) > 2 else "leer"
         data = sys.stdin.buffer.read()
-        sys.stdout.write(json.dumps(leer_despacho(data, limite_cpu_s), ensure_ascii=False))
+        resultado = validar_pdf(data) if modo == "validar" else leer_despacho(data, limite_cpu_s)
+        sys.stdout.write(json.dumps(resultado, ensure_ascii=False))
         sys.stdout.flush()
     except MemoryError:
         return _SALIDA_SIN_MEMORIA

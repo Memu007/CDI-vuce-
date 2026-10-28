@@ -7,6 +7,7 @@ Prevents:
 - Malicious File Upload (CWE-434)
 """
 
+import logging
 import os
 import re
 import io
@@ -17,6 +18,8 @@ try:
     import magic  # python-magic
 except ImportError:
     magic = None
+
+logger = logging.getLogger(__name__)
 
 # Allowed file extensions
 ALLOWED_EXTENSIONS = {
@@ -112,15 +115,6 @@ def validate_file_path(base_dir: str, filename: str) -> Path:
         )
 
     return requested
-
-
-def _abrir_pdf(contents: bytes) -> tuple:
-    """(¿encriptado?, cantidad de páginas). Con pypdf, sucesor de PyPDF2."""
-    from pypdf import PdfReader
-    pdf = PdfReader(io.BytesIO(contents))
-    if pdf.is_encrypted:
-        return True, 0  # contar páginas de uno encriptado ya falla
-    return False, len(pdf.pages)
 
 
 def partes_del_xlsx(z) -> tuple:
@@ -398,6 +392,9 @@ def _abrir_excel(contents: bytes, file_ext: str) -> int:
     return _contar_hojas_excel(contents, file_ext)
 
 
+PDF_DEMASIADO_PESADO = "El PDF es demasiado pesado para abrirlo. Probá con otro archivo."
+
+
 def _pdf_validate_timeout_s() -> float:
     """Mal escrito, en 0 o negativo, vale 30 s (RENDIMIENTO-1b)."""
     import math
@@ -411,7 +408,8 @@ def _pdf_validate_timeout_s() -> float:
 async def validate_file_upload(
     file: UploadFile,
     file_type: str,
-    max_size: Optional[int] = None
+    max_size: Optional[int] = None,
+    clave: Optional[str] = None,
 ) -> bytes:
     """
     Validate uploaded file for security.
@@ -426,6 +424,7 @@ async def validate_file_upload(
         file: Uploaded file
         file_type: Expected file type ('pdf', 'excel', 'csv')
         max_size: Maximum file size in bytes (optional, uses default)
+        clave: el usuario que sube: sus PDFs se validan de a uno
 
     Returns:
         File contents as bytes
@@ -487,33 +486,31 @@ async def validate_file_upload(
 
     # Additional validation for PDFs
     if file_type == 'pdf':
+        # Abrir un PDF armado puede ocupar más de 1 GB: va en otro proceso,
+        # con la memoria topeada y tiempo máximo (RENDIMIENTO-1 y 1c).
+        from proyecto_maria.core.despacho_lector import PdfDemasiadoPesado, validar_pdf_aparte
         try:
-            # Abrir el PDF es sincrónico: va en otro hilo y con tiempo máximo,
-            # para que un PDF pesado o armado no frene al resto (RENDIMIENTO-1).
-            import asyncio
-            try:
-                encriptado, paginas = await asyncio.wait_for(
-                    asyncio.to_thread(_abrir_pdf, contents),
-                    timeout=_pdf_validate_timeout_s(),
-                )
-            except asyncio.TimeoutError:
-                raise HTTPException(
-                    400,
-                    "No pudimos abrir el PDF: tardó demasiado. Probá con otro archivo.",
-                )
+            resultado = await validar_pdf_aparte(contents, _pdf_validate_timeout_s(), clave=clave)
+        except TimeoutError:
+            raise HTTPException(
+                400,
+                "No pudimos abrir el PDF: tardó demasiado. Probá con otro archivo.",
+            )
+        except PdfDemasiadoPesado:
+            raise HTTPException(400, PDF_DEMASIADO_PESADO)
+        except Exception:
+            logger.exception("validar el PDF en el proceso aparte falló")
+            raise HTTPException(400, "Invalid PDF file: no pudimos abrirlo")
+        if "error" in resultado:
+            raise HTTPException(400, f"Invalid PDF file: {resultado['error']}")
 
-            # Check if encrypted
-            if encriptado:
-                raise HTTPException(400, "Encrypted PDFs are not allowed")
+        # Check if encrypted
+        if resultado["encriptado"]:
+            raise HTTPException(400, "Encrypted PDFs are not allowed")
 
-            # Check if valid PDF (has pages)
-            if paginas == 0:
-                raise HTTPException(400, "PDF has no pages")
-
-        except HTTPException:
-            raise
-        except Exception as e:
-            raise HTTPException(400, f"Invalid PDF file: {str(e)}")
+        # Check if valid PDF (has pages)
+        if resultado["paginas"] == 0:
+            raise HTTPException(400, "PDF has no pages")
 
     # Additional validation for Excel
     if file_type == 'excel':

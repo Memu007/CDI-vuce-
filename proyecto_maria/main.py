@@ -4232,7 +4232,7 @@ async def upload_pdf_public(
     try:
         from proyecto_maria.security.file_security import validate_file_upload, sanitize_filename
         max_upload_bytes = _get_max_upload_bytes()
-        contents = await validate_file_upload(file, 'pdf', max_size=max_upload_bytes)
+        contents = await validate_file_upload(file, 'pdf', max_size=max_upload_bytes, clave=user["username"])
 
         if not lectura_automatica_disponible():
             # Sin lector con IA: cero productos, sin descontar cuota, y un
@@ -8244,7 +8244,8 @@ async def leer_despacho_para_catalogo(
 
     from proyecto_maria.security.file_security import validate_file_upload
     from proyecto_maria.core.despacho_lector import LectorOcupado, PdfDemasiadoPesado, leer_despacho_aparte
-    contents = await validate_file_upload(file, 'pdf', max_size=_get_max_upload_bytes())
+    contents = await validate_file_upload(file, 'pdf', max_size=_get_max_upload_bytes(),
+                                      clave=user["username"])
     # En otro proceso, con la memoria topeada: si tarda demasiado se mata, y
     # no se queda ocupando un hilo de los que comparten todas las lecturas.
     try:

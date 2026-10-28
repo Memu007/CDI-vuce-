@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: un PDF armado no infla la app al subirlo (RENDIMIENTO-1c)
+
+- Validar un PDF al subir una factura o leer un despacho corre en un proceso aparte con tope de 256 MB y de tiempo: uno que se infla da 400 «El PDF es demasiado pesado para abrirlo» en vez de ocupar más de 1 GB de la app.
+- Las validaciones de un mismo usuario van de a una: diez PDFs pesados de uno no frenan la subida de otro.
+
 ## 2026-10-28 · fix: el despacho no traba al lector ni mezcla productos (DESPACHO-1b, devolución 20:07)
 
 - Leer un despacho tiene tope de 10 s de CPU, aunque se pase en medio de una hoja (avisa hasta qué hoja leyó), y cada usuario lee uno a la vez (429 si ya está leyendo otro); el lector no carga el `.env`.
