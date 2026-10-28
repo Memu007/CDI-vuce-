@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · feat: copia de la base que se restaura y se compara antes de darla por buena (BACKUP-1a)
+
+- **feat(datos):** `scripts/datos/copia_base.py` saca la copia de Postgres (`pg_dump -Fc`), la restaura en una base descartable y compara, tabla por tabla, la cantidad de filas y un resumen del contenido; si no da igual, sale con error y no la marca como verificada.
+- `enviar` lleva sólo una copia verificada y sin cambios a una carpeta local de prueba. Adónde va de verdad y cuándo corre lo define Emi; todavía no corre en producción.
+
 ## 2026-10-28 · chore: la CI corre la suite entera y se borra el camino a Google Cloud (LIMPIEZA-1)
 
 - **chore(ci):** la CI ya no excluye a mano las 10 pruebas de presupuestos públicos, CSRF y el botón de NCM automático; una prueba falla si vuelve a sacar alguna.
