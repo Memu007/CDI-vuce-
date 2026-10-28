@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Negativos de COBRO-MP-1 (pasos 1 a 4 y D31): cada sabotaje deshace una línea
 # de la pieza y tests/test_cobro_mp1.py tiene que ponerse roja por ese motivo.
+# La devolución del 2026-10-28 (B a E) se mide con tests/test_cobro_corte1.py
+# (B), tests/test_cobro_mp1_cde.py (C y E), la carrera de D en un Postgres 16
+# descartable (scripts/testing/cobro_mp1d_postgres.py, con con_pg16.sh) y la
+# pantalla del perfil (scripts/testing/pantalla_cobro_mp1.js; PUERTO, 8854).
 # Los «sin_rojo» deshacen algo que no es la garantía y la prueba tiene que
 # seguir en verde (D31: lo que frena el doble cobro es la clave primaria, no
 # mirar antes).
@@ -262,6 +266,102 @@ sabotaje $C "el inicio del registro se mueve al rearrancar" \
   $'    if conn.execute(select(inicio.c.id).where(inicio.c.id == 1)).first() is not None:\n        return\n' \
   $'    conn.execute(inicio.delete())\n' \
   "el inicio del registro se movió al rearrancar"
+
+# ── Devolución del 2026-10-28: B, C, D y E ──
+# B: la exportación cuenta la operación (tests/test_cobro_corte1.py).
+T=tests/test_cobro_corte1.py
+sabotaje $M "B: la exportación no cuenta la operación" \
+  $'        await _contar_maria(db, user["username"], filename, txt_content,\n                            len(request.items or []))\n\n        with open(filepath, \'w\', encoding=\'utf-8\') as f:' \
+  $'        with open(filepath, \'w\', encoding=\'utf-8\') as f:' \
+  "la exportación no cuenta la operación"
+
+# C y E: cancelar desde past_due y reactivar una prueba con recarga.
+T=tests/test_cobro_mp1_cde.py
+sabotaje $M "C: past_due no puede cancelar" \
+  '    if db_user.billing_status not in ("trial", "active", "past_due"):' \
+  '    if db_user.billing_status not in ("trial", "active"):' \
+  "past_due no se puede cancelar"
+sabotaje $M "C: cancelar desde past_due deja los días que quedaban" \
+  '            db_user.trial_ends_at = ahora' \
+  '            pass' \
+  "cancelar desde past_due da acceso"
+sabotaje $M "E: decide payment_provider aunque haya pagos registrados" \
+  $'    if not filas:\n        return db_user.payment_provider == "mercadopago"\n' \
+  $'    return db_user.payment_provider == "mercadopago"\n' \
+  "una prueba con recarga no vuelve a la prueba"
+sabotaje $M "E: la recarga cuenta como plan pagado" \
+  '    return any(estado == "aplicado" and tipo != "topup" for tipo, estado in filas)' \
+  '    return any(estado == "aplicado" for tipo, estado in filas)' \
+  "una prueba con recarga no vuelve a la prueba"
+
+# D, el backend: la carrera de dos checkouts en un Postgres 16 descartable.
+T=scripts/testing/cobro_mp1d_postgres.py
+correr() {
+  PY="$PY" timeout 300 scripts/testing/con_pg16.sh bash -c '"$0" "$1" "$BACKUP1A_PG_URL"' "$PY" "$T" 2>&1
+}
+git checkout -q -- proyecto_maria/
+if ! correr >/dev/null; then
+  echo "BASE  | la carrera en Postgres ya está en rojo (o no hay Postgres 16): no se puede medir D"; FALLAS=$((FALLAS+1))
+else
+  echo "BASE  | la carrera en Postgres, en verde"
+  sabotaje $M "D: el checkout no bloquea la cuenta" \
+    '    result = await db.execute(select(User).where(User.username == username).with_for_update())' \
+    '    result = await db.execute(select(User).where(User.username == username))' \
+    "FALLA | sin suscripción anterior: queda una sola suscripción viva en Mercado Pago"
+fi
+
+# C y D en el perfil: la pantalla, con la API levantada desde el worktree y
+# una base vacía en cada corrida.
+P=proyecto_maria/static/v2/screens/profile.js
+PUERTO="${PUERTO:-8854}"
+API=""
+trap '[ -n "$API" ] && kill $API 2>/dev/null; git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1; rm -f -- "$TMPD/local.db" "$TMPD/api.log"; rmdir "$TMPD"' EXIT
+correr() {
+  rm -f -- "$TMPD/local.db"
+  ENVIRONMENT=development JWT_SECRET_KEY=clave-inventada-solo-local-0123456789abcdef \
+  EMAIL_VERIFICATION_REQUIRED=false ARCA_NOVEDADES_XML_URL=http://127.0.0.1:9/x \
+  ARCA_NOVEDADES_WEB_URL=http://127.0.0.1:9/x DATABASE_URL="sqlite+aiosqlite:///$TMPD/local.db" \
+    "$PY" -m uvicorn proyecto_maria.main:app --host 127.0.0.1 --port "$PUERTO" >"$TMPD/api.log" 2>&1 &
+  API=$!
+  for _ in $(seq 1 60); do curl -fsS "http://127.0.0.1:$PUERTO/health" >/dev/null 2>&1 && break; sleep 1; done
+  if ! curl -fsS "http://127.0.0.1:$PUERTO/health" >/dev/null 2>&1; then
+    echo "FALLA: la API no levantó"; tail -5 "$TMPD/api.log"; kill $API 2>/dev/null; wait $API 2>/dev/null; API=""; return 1
+  fi
+  local codigo
+  BASE_URL="http://127.0.0.1:$PUERTO" node scripts/testing/pantalla_cobro_mp1.js 2>&1; codigo=$?
+  kill $API 2>/dev/null; wait $API 2>/dev/null; API=""
+  return $codigo
+}
+git checkout -q -- proyecto_maria/
+if ! correr >/dev/null; then
+  echo "BASE  | la pantalla ya está en rojo sin sabotaje: no se puede medir nada"; correr | grep FALLA; FALLAS=$((FALLAS+1))
+else
+  echo "BASE  | la pantalla, en verde"
+  sabotaje $P "C: past_due no muestra «Cancelar plan»" \
+    "        if (status === 'trial' || status === 'active' || status === 'past_due') {" \
+    "        if (status === 'trial' || status === 'active') {" \
+    "FALLA: past_due: no se ve «Cancelar plan»"
+  sabotaje $P "C: la confirmación de past_due promete el período ya pagado" \
+    "        const vencido = billingStatusEl && billingStatusEl.dataset.status === 'past_due';" \
+    "        const vencido = false;" \
+    "FALLA: past_due: la confirmación promete el período ya pagado"
+  sabotaje $P "C: el botón de aceptar vuelve a confirmText" \
+    "            acceptText: 'Sí, cancelar'," \
+    "            confirmText: 'Sí, cancelar'," \
+    "FALLA: past_due: el botón de aceptar dice"
+  sabotaje $P "D: openCheckout no deshabilita el botón" \
+    "            boton.disabled = true;" \
+    "" \
+    "FALLA: el botón «Activar plan» no se deshabilita mientras pide el checkout"
+  sabotaje $P "D: «Activar plan» no le pasa el botón a openCheckout" \
+    "billingActivateBtn.addEventListener('click', () => openCheckout(billingActivateBtn));" \
+    "billingActivateBtn.addEventListener('click', () => openCheckout());" \
+    "FALLA: el botón «Activar plan» no se deshabilita mientras pide el checkout"
+  sabotaje $P "D: el botón no vuelve después del error" \
+    "                boton.disabled = false;" \
+    "" \
+    "FALLA: el botón «Activar plan» no vuelve a su estado después del error"
+fi
 
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]
