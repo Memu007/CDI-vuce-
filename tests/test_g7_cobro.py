@@ -100,10 +100,11 @@ async def _set_trial_ends_at(username: str, when: datetime):
 
 
 # ---------------------------------------------------------------------------
-# G7.1 — Cobro: webhook de pago aprobado lleva al usuario a `active` (+30 d).
+# G7.1 — Cobro: webhook de pago aprobado lleva al usuario a `active` (fin + 30 d).
 # ---------------------------------------------------------------------------
 def test_g7_1_cobro_aprobado_activa_el_plan(client, monkeypatch):
-    """trial --(webhook payment approved)--> active con trial_ends_at a +30 d.
+    """trial --(webhook payment approved)--> active con trial_ends_at al fin de
+    la prueba + 30 d: los días de prueba que quedan se suman (COBRO-MP-2, D7.1).
 
     SDK de MP mockeado: no se toca ninguna cuenta real ni webhook a producción.
     """
@@ -116,6 +117,12 @@ def test_g7_1_cobro_aprobado_activa_el_plan(client, monkeypatch):
 
     antes = _me(client)
     assert antes["billing_status"] == "trial", antes
+    fin_prueba = datetime.fromisoformat(antes["trial_ends_at"])
+    if fin_prueba.tzinfo is None:
+        fin_prueba = fin_prueba.replace(tzinfo=timezone.utc)
+    # La prueba recién empieza: si su fin no estuviera lejos, «fin de la prueba
+    # + 30» y «ahora + 30» no se distinguirían.
+    assert fin_prueba > datetime.now(timezone.utc) + timedelta(days=1), antes
 
     with patch.object(main.mercadopago, "SDK", return_value=_mock_sdk_approved(uname)):
         wh = client.post(f"/api/payments/webhook?id=999000111&topic=payment")
@@ -124,12 +131,11 @@ def test_g7_1_cobro_aprobado_activa_el_plan(client, monkeypatch):
 
     despues = _me(client)
     assert despues["billing_status"] == "active", despues
-    # trial_ends_at debe quedar ~+30 d (proceso setea now + 30 días).
+    # trial_ends_at queda en el fin de la prueba + 30 d, no en ahora + 30 d.
     fin = datetime.fromisoformat(despues["trial_ends_at"])
     if fin.tzinfo is None:  # la API puede devolverlo naive (SQLite)
         fin = fin.replace(tzinfo=timezone.utc)
-    delta_dias = (fin - datetime.now(timezone.utc)).days
-    assert 29 <= delta_dias <= 30, f"trial_ends_at a {delta_dias} días, esperaba ~30"
+    assert abs(fin - (fin_prueba + timedelta(days=30))) < timedelta(minutes=5), (fin, fin_prueba)
 
 
 # ---------------------------------------------------------------------------
