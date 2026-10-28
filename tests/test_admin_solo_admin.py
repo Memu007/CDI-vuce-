@@ -4,22 +4,31 @@ La prueba no lleva una lista de rutas escrita a mano: recorre las rutas que la
 app publica (su esquema OpenAPI, que incluye los routers montados) y elige las
 de administración por dónde viven o cómo están marcadas:
 
-- todo lo que cuelga de /api/admin/, /api/dev/ o /dev/;
+- todo lo que cuelga de /api/admin/, /api/dev/ o /dev/, y esas tres rutas
+  exactas, sin la barra final;
 - toda función global (actúa sobre el sistema, no sobre un estudio) marcada
   con tags=["admin"], esté donde esté.
 
 Para cada una, un usuario común recibe 403 y un pedido sin sesión 401. Si a
 cualquiera se le saca require_admin, el usuario común pasa el control y la
-prueba lo nombra.
+prueba lo nombra. Un WebSocket bajo esas rutas no tiene que aceptar la conexión
+de un usuario común ni de alguien sin sesión (AISLAMIENTO-2).
 """
+import anyio
 import pytest
-from fastapi.routing import APIRoute
-from starlette.routing import Mount, Route
+from fastapi.routing import APIRoute, APIWebSocketRoute
+from starlette.routing import Mount, Route, WebSocketRoute
 from fastapi.testclient import TestClient
 
 from proyecto_maria import main
 
 PREFIJOS_ADMIN = ("/api/admin/", "/api/dev/", "/dev/")
+
+
+def _es_de_admin(ruta):
+    """Cuelga de un prefijo de admin, o es el prefijo exacto sin la barra."""
+    return ruta.startswith(PREFIJOS_ADMIN) or ruta.rstrip("/") + "/" in PREFIJOS_ADMIN
+
 
 USUARIO_COMUN = {
     "username": "comun_admin1", "roles": ["operador"],
@@ -46,7 +55,7 @@ def _rutas_de_admin():
     rutas = set()
     for ruta, operaciones in esquema["paths"].items():
         for metodo, op in operaciones.items():
-            if ruta.startswith(PREFIJOS_ADMIN) or "admin" in (op.get("tags") or []):
+            if _es_de_admin(ruta) or "admin" in (op.get("tags") or []):
                 rutas.add((metodo.upper(), ruta))
     # Las rutas propias de la app que se esconden del esquema
     # (include_in_schema=False) no aparecen arriba: se suman acá.
@@ -54,12 +63,55 @@ def _rutas_de_admin():
     # pasan por las dependencias de FastAPI ni salen en el esquema (ADMIN-2).
     for r in main.app.routes:
         if isinstance(r, APIRoute) and not r.include_in_schema:
-            if r.path.startswith(PREFIJOS_ADMIN) or "admin" in (r.tags or []):
+            if _es_de_admin(r.path) or "admin" in (r.tags or []):
                 rutas.update((m, r.path) for m in r.methods if m != "HEAD")
         elif isinstance(r, Route) and not isinstance(r, APIRoute):
-            if r.path.startswith(PREFIJOS_ADMIN):
+            if _es_de_admin(r.path):
                 rutas.update((m, r.path) for m in (r.methods or {"GET"}) if m != "HEAD")
     return sorted(rutas)
+
+
+def _websockets_de_admin():
+    """WebSockets bajo rutas de admin: no son Route y el recorrido de arriba
+    no los ve."""
+    return sorted(
+        r.path for r in main.app.routes
+        if isinstance(r, (WebSocketRoute, APIWebSocketRoute)) and _es_de_admin(r.path)
+    )
+
+
+def _acepta_websocket(ruta):
+    """True si la app manda websocket.accept. Se mira lo que manda la app y no
+    lo que ve un cliente de prueba: el de Starlette levanta el error de un
+    WebSocket que acepta y enseguida falla como si no lo hubiera aceptado.
+    Cerrarla, negarla o fallar antes de aceptar no es aceptar."""
+    concreta = _concreta(ruta)
+    scope = {
+        "type": "websocket", "asgi": {"version": "3.0"}, "scheme": "ws",
+        "http_version": "1.1", "path": concreta, "raw_path": concreta.encode(),
+        "root_path": "", "query_string": b"", "headers": [(b"host", b"testserver")],
+        "client": ("testclient", 50000), "server": ("testserver", 80),
+        "subprotocols": [], "state": {},
+    }
+    entradas = [{"type": "websocket.connect"}]
+    enviados = []
+
+    async def receive():
+        return entradas.pop(0) if entradas else {"type": "websocket.disconnect", "code": 1000}
+
+    async def send(mensaje):
+        enviados.append(mensaje["type"])
+
+    async def conectar():
+        # Uno que acepta y se queda mandando no traba la prueba.
+        with anyio.move_on_after(5):
+            await main.app(scope, receive, send)
+
+    try:
+        anyio.run(conectar)
+    except Exception:
+        pass
+    return "websocket.accept" in enviados
 
 
 def _montajes_sobre_admin():
@@ -134,6 +186,21 @@ def test_usuario_comun_recibe_403_en_toda_ruta_de_admin(rutas):
 def test_ninguna_app_montada_sobre_rutas_de_admin(rutas):
     malas = _montajes_sobre_admin()
     assert not malas, f"apps montadas sobre rutas de admin, sin require_admin: {malas}"
+
+
+def test_websocket_de_admin_no_acepta_a_un_usuario_comun(rutas):
+    _con_usuario(USUARIO_COMUN)
+    try:
+        abiertos = [r for r in _websockets_de_admin() if _acepta_websocket(r)]
+    finally:
+        main.app.dependency_overrides.pop(main.get_current_user, None)
+    assert not abiertos, f"WebSockets de admin que aceptan a un usuario común: {abiertos}"
+
+
+def test_websocket_de_admin_no_acepta_sin_sesion(rutas):
+    # El nombre apaga el atajo de autenticación de pytest (conftest).
+    abiertos = [r for r in _websockets_de_admin() if _acepta_websocket(r)]
+    assert not abiertos, f"WebSockets de admin que aceptan sin sesión: {abiertos}"
 
 
 def test_sin_sesion_recibe_401_en_toda_ruta_de_admin(rutas):
