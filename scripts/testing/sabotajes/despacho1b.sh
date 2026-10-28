@@ -1,10 +1,8 @@
 #!/usr/bin/env bash
-# Negativos de DESPACHO-1b: cada sabotaje deshace una regla de la lectura de
-# despachos para el catálogo y tests/test_despacho1b.py (o, los de la
-# pantalla, scripts/testing/pantalla_despacho1b.js) tiene que fallar por ese
-# motivo.
+# Negativos de DESPACHO-1b (la devolución y la D41): cada sabotaje deshace
+# un arreglo y tests/test_despacho1b.py tiene que fallar por ese motivo.
 #
-# uso: PY=/ruta/al/venv/bin/python [PUERTO=8854] scripts/testing/sabotajes/despacho1b.sh [SHA]
+# uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/despacho1b.sh [SHA]
 # Trabaja en un worktree descartable con su propia SQLite y sin terceros: no
 # toca tu copia ni datos compartidos. Sale con error si un sabotaje no
 # encuentra su patrón o no pone rojo donde tiene que ponerlo.
@@ -12,34 +10,21 @@ set -uo pipefail
 REPO="$(git rev-parse --show-toplevel)"
 SHA="$(git -C "$REPO" rev-parse "${1:-HEAD}")"
 PY="${PY:-python}"
-PUERTO="${PUERTO:-8854}"
 TMPD="$(mktemp -d)"; WT="$TMPD/wt"
 git -C "$REPO" worktree add --detach "$WT" "$SHA" >/dev/null || exit 2
-API=""
-trap '[ -n "$API" ] && kill $API 2>/dev/null; git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$TMPD"' EXIT
+trap 'git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$TMPD"' EXIT
 cd "$WT"
 export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
        DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=.
-export BASE_URL="http://127.0.0.1:$PUERTO"
 FALLAS=0
+LECTOR=proyecto_maria/core/despacho_lector.py
+T=tests/test_despacho1b.py
 
 pytest_d1b() {
   rm -f test.db
   DATABASE_URL=sqlite+aiosqlite:///./test.db ENVIRONMENT=test \
-    "$PY" -m pytest -q --no-cov -p no:randomly -p no:cacheprovider tests/test_despacho1b.py 2>&1
+    "$PY" -m pytest -q --no-cov --timeout=120 -p no:randomly -p no:cacheprovider "$T" 2>&1
 }
-
-levantar() {
-  rm -f local.db
-  ENVIRONMENT=development DATABASE_URL=sqlite+aiosqlite:///./local.db \
-  JWT_SECRET_KEY=clave-inventada-solo-local-0123456789abcdef EMAIL_VERIFICATION_REQUIRED=false \
-  ARCA_NOVEDADES_XML_URL=http://127.0.0.1:9/x ARCA_NOVEDADES_WEB_URL=http://127.0.0.1:9/x \
-    "$PY" -m uvicorn proyecto_maria.main:app --host 127.0.0.1 --port "$PUERTO" >"$TMPD/api.log" 2>&1 &
-  API=$!
-  for _ in $(seq 1 60); do curl -fsS "$BASE_URL/health" >/dev/null 2>&1 && return 0; sleep 1; done
-  echo "BASE  | la API no levantó"; tail -20 "$TMPD/api.log"; exit 1
-}
-pantalla() { PY="$PY" node scripts/testing/pantalla_despacho1b.js 2>&1; }
 
 aplicar() {
   "$PY" - "$1" "$2" "$3" <<'PYEOF'
@@ -61,132 +46,168 @@ juzgar() {
   for esperado in "$@"; do
     if ! grep -qF -- "$esperado" <<<"$salida"; then
       echo "ROJO? | $nombre: rojo (salida $codigo), pero sin «$esperado»"
-      grep -E "^(FAILED|FALLA|E )" <<<"$salida" | head -8; FALLAS=$((FALLAS+1)); return
+      grep -E "^FAILED" <<<"$salida" | head -5; FALLAS=$((FALLAS+1)); return
     fi
   done
   echo "ROJO  | $nombre: $(printf '«%s» ' "$@")"
 }
 
-# sabotaje <archivo> <nombre> <texto original> <texto saboteado> <lo que el rojo tiene que decir>...
-# El de la pantalla (sabotaje_pantalla) es igual, pero juzga con el navegador.
-_sabotear() {
-  local prueba="$1" archivo="$2" nombre="$3" viejo="$4" nuevo="$5"; shift 5
+# no_debe <nombre> <salida> <lo que el rojo no tiene que decir>...
+no_debe() {
+  local nombre="$1" salida="$2"; shift 2
+  for prohibido in "$@"; do
+    if grep -qF -- "$prohibido" <<<"$salida"; then
+      echo "ANCHO | $nombre: también «$prohibido»"; FALLAS=$((FALLAS+1))
+    fi
+  done
+}
+
+# sabotaje <nombre> <archivo> <texto original> <texto saboteado> <casos en rojo>...
+sabotaje() {
+  local nombre="$1" archivo="$2" viejo="$3" nuevo="$4" salida codigo; shift 4
   git checkout -q -- proyecto_maria/
   if ! aplicar "$archivo" "$viejo" "$nuevo"; then
     echo "ROTO  | $nombre: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1)); return
   fi
-  local salida codigo
-  salida="$($prueba)"; codigo=$?
-  juzgar "$nombre" "$salida" "$codigo" "$@"
+  salida="$(pytest_d1b)"; codigo=$?
+  juzgar "$nombre" "$salida" "$codigo" "${@/#/FAILED $T::}"
+  ULTIMA="$salida"
   git checkout -q -- proyecto_maria/
 }
-sabotaje() { _sabotear pytest_d1b "$@"; }
-sabotaje_pantalla() { _sabotear pantalla "$@"; }
-
-L=proyecto_maria/core/despacho_lector.py
-M=proyecto_maria/main.py
-T=tests/test_despacho1b.py
 
 # Sin sabotaje tiene que estar en verde: si no, cualquier «ROJO» de abajo
 # sería del rojo que ya había.
-if ! pytest_d1b >"$TMPD/base.log"; then
-  echo "BASE  | las pruebas ya están en rojo sin sabotaje: no se puede medir nada"; grep -E "^FAILED" "$TMPD/base.log"; exit 1
+if ! salida="$(pytest_d1b)"; then
+  echo "BASE  | test_despacho1b.py ya está en rojo sin sabotaje: no se puede medir nada"
+  grep -E "^FAILED|passed|failed" <<<"$salida"; exit 1
 fi
-levantar
-if ! pantalla >"$TMPD/base_pantalla.log"; then
-  echo "BASE  | la pantalla ya está en rojo sin sabotaje"; grep FALLA "$TMPD/base_pantalla.log"; exit 1
-fi
+echo "BASE  | verde sin sabotaje en $SHA"
 
-# --- La lectura: por rótulo, sin rellenar y marcando lo que falta
-sabotaje $L "el subítem toma lo que le falta del ítem" \
-  $'    campos = bloque["campos"]\n    avisos = list(bloque["avisos"])' \
-  $'    campos = {**(padre["campos"] if padre else {}), **bloque["campos"]}\n    avisos = list(bloque["avisos"])' \
-  "FAILED $T::test_lo_que_falta_queda_marcado_y_no_se_rellena" "assert 30.0 is None"
-sabotaje $L "lo que falta no se marca" \
-  '    renglon["faltantes"] = [c for c in CAMPOS' '    renglon["faltantes"] = [c for c in () if c in CAMPOS' \
-  "FAILED $T::test_lo_que_falta_queda_marcado_y_no_se_rellena" "assert [] == ['kilo_neto']"
-sabotaje $L "se lee por posición y no por rótulo" \
-  $'        for col, rotulo in columnas:\n            if col <= inicio + 2:\n                elegida = rotulo' \
-  $'        for col, rotulo in columnas[len(valores):len(valores) + 1]:\n            elegida = rotulo' \
-  "FAILED $T::test_un_valor_vacio_no_corre_los_de_al_lado"
-sabotaje $L "se aceptan números con otra forma" \
-  '_NUMERO_AR = re.compile(r"^\d{1,3}(?:\.\d{3})+(?:,\d+)?$|^\d+(?:,\d+)?$")' \
-  '_NUMERO_AR = re.compile(r"^[\d.,]+$")' \
-  "FAILED $T::test_numeros_con_punto_de_miles_y_coma_decimal[12.5-None]"
-sabotaje $L "un número que no se entiende se lee igual" \
-  '        valor = numero_ar(crudo)' \
-  '        valor = numero_ar(crudo) if numero_ar(crudo) is not None else float(crudo.replace(",", ""))' \
-  "FAILED $T::test_un_numero_con_otra_forma_queda_faltante_con_aviso"
-sabotaje $L "los subítems no se separan" \
-  '        if it["subitems"]:' '        if False and it["subitems"]:' \
-  "FAILED $T::test_con_subitems_sale_un_renglon_por_subitem"
-sabotaje $L "la posición heredada no se avisa" \
-  $'            heredados.append("posicion_sim")\n' '' \
-  "FAILED $T::test_con_subitems_sale_un_renglon_por_subitem" "['origen'] == ['posicion_sim', 'origen']"
-sabotaje $L "la divisa es la del flete" \
-  '"Divisa FOB Total"' '"Divisa Flete Total"' \
-  "FAILED $T::test_la_divisa_es_la_del_fob_y_no_la_del_flete" "'USD' == 'EUR'"
-sabotaje $L "un sufijo con espacios no se lee" \
-  '(?:\((.*?)\)|(\d{2}))' '(?:\(([^ )]*?)\)|(\d{2}))' \
-  "FAILED $T::test_sufijos_con_y_sin_parentesis"
-sabotaje $L "un escaneado no avisa" \
-  '    if not texto.strip():' '    if False:' \
-  "FAILED $T::test_pdf_sin_texto_avisa_y_no_devuelve_renglones" "FAILED $T::test_leer_un_escaneado_avisa"
-sabotaje $L "sin kilo se inventa el peso" \
-  '    peso = kilo / cantidad if kilo and cantidad else None' \
-  '    peso = kilo / cantidad if kilo and cantidad else 0.5' \
-  "FAILED $T::test_guardar_sin_kilo_no_inventa_el_peso" "assert 0.5 in (0, 0.0, None)"
+# 1) La memoria: cada tope corta antes de gastar, medido en un proceso aparte.
+sabotaje "el lector sin tope de memoria" "$LECTOR" \
+  "_MAX_MEMORIA_HIJO = 256 * 1024 * 1024" \
+  "_MAX_MEMORIA_HIJO = 1 << 40" \
+  "test_un_pdf_que_llena_la_memoria_se_rechaza" \
+  "test_leer_un_pdf_que_llena_la_memoria_avisa"
+sabotaje "el lector no avisa que se quedó sin memoria" "$LECTOR" \
+  "    except MemoryError:
+        return _SALIDA_SIN_MEMORIA" \
+  "    except ImportError:
+        return _SALIDA_SIN_MEMORIA" \
+  "test_un_pdf_que_llena_la_memoria_se_rechaza" \
+  "test_leer_un_pdf_que_llena_la_memoria_avisa"
+sabotaje "una hoja que se queda sin memoria se saltea" "$LECTOR" \
+  "            except MemoryError:
+                raise
+            except LimitReachedError:" \
+  "            except LimitReachedError:" \
+  "test_un_pdf_que_llena_la_memoria_se_rechaza"
+sabotaje "los flujos sin tope" "$LECTOR" \
+  "_MAX_FLUJO = 8 * 1024 * 1024" \
+  "_MAX_FLUJO = 1 << 40" \
+  "test_hojas_que_se_inflan_se_saltean_sin_gastar_memoria"
+sabotaje "sin el chequeo de la hoja pesada" "$LECTOR" \
+  "contenido is not None and len(contenido.get_data()) > _MAX_CONTENIDO_PAGINA" \
+  "False" \
+  "test_una_hoja_pesada_se_saltea_y_las_demas_se_leen"
+sabotaje "sin el tope de 200 hojas" "$LECTOR" \
+  "if len(paginas) > _MAX_PAGINAS:" \
+  "if False:" \
+  "test_mas_de_200_hojas_lee_las_primeras_200"
+sabotaje "sin el tope del texto" "$LECTOR" \
+  "if largo > _MAX_TEXTO:" \
+  "if False:" \
+  "test_el_texto_de_todas_las_hojas_tiene_tope"
 
-# --- Aislamiento
-sabotaje $M "leer no mira de quién es el cliente" \
-  $'    await _get_owned_client(db, client_id, user["username"])\n\n    from proyecto_maria.security.file_security import validate_file_upload\n    from proyecto_maria.core.despacho_lector import leer_despacho' \
-  $'    from proyecto_maria.security.file_security import validate_file_upload\n    from proyecto_maria.core.despacho_lector import leer_despacho' \
-  "FAILED $T::test_otro_dueno_no_lee_ni_guarda_en_un_cliente_ajeno" "assert 200 == 404"
-sabotaje $M "guardar no mira de quién es el cliente" \
-  $'    await _get_owned_client(db, client_id, username)\n\n    from proyecto_maria.core.despacho_lector import MAX_RENGLONES' \
-  $'    from proyecto_maria.core.despacho_lector import MAX_RENGLONES' \
-  "FAILED $T::test_otro_dueno_no_lee_ni_guarda_en_un_cliente_ajeno" "assert 200 == 404"
+# 2) La lectura cuadrática: la prueba mide el tope, no un tiempo.
+sabotaje "sin el tope de 40 rótulos" "$LECTOR" \
+  "if len(encontrados) > _MAX_COLUMNAS:" \
+  "if False:" \
+  "test_una_linea_con_mas_de_40_rotulos_no_se_lee[41-True]"
+no_debe "sin el tope de 40 rótulos" "$ULTIMA" "test_una_linea_con_mas_de_40_rotulos_no_se_lee[40-False]"
+sabotaje "sin el tope del largo de línea" "$LECTOR" \
+  "if any(len(l) > _MAX_LARGO_LINEA for l in lineas):" \
+  "if False:" \
+  "test_una_linea_de_mas_de_2000_caracteres_no_se_lee[2001-True]"
+no_debe "sin el tope del largo de línea" "$ULTIMA" "test_una_linea_de_mas_de_2000_caracteres_no_se_lee[2000-False]"
+sabotaje "sin el tope de 500 ítems" "$LECTOR" \
+  "if bloques > MAX_RENGLONES:" \
+  "if False:" \
+  "test_mas_de_500_items_lee_los_primeros_500[501-True]"
+no_debe "sin el tope de 500 ítems" "$ULTIMA" "test_mas_de_500_items_lee_los_primeros_500[500-False]"
+sabotaje "la elección sin los dos de margen" "$LECTOR" \
+  "k = bisect_right(inicios, inicio + 2) - 1" \
+  "k = bisect_right(inicios, inicio) - 1" \
+  "test_muchos_rotulos_reparten_igual_que_pocos"
 
-# --- Guardar: todo o nada, con tope, sin TXT ni operación
-sabotaje $M "se guarda lo que está bien y se descarta el resto" \
-  $'    if errores:\n        return JSONResponse(status_code=422' $'    if errores and not listos:\n        return JSONResponse(status_code=422' \
-  "FAILED $T::test_guardar_es_todo_o_nada" "assert 200 == 422"
-sabotaje $M "guardar acepta una lista vacía" \
-  '    if not isinstance(renglones, list) or not renglones:' '    if not isinstance(renglones, list):' \
-  "FAILED $T::test_guardar_sin_renglones_da_400[cuerpo1]"
-sabotaje $M "guardar no tiene tope" \
-  '    if len(renglones) > MAX_RENGLONES:' '    if False:' \
-  "FAILED $T::test_guardar_mas_del_tope_da_400" "assert 200 == 400"
-sabotaje $M "leer acepta lo que no es PDF" \
-  "    contents = await validate_file_upload(file, 'pdf', max_size=_get_max_upload_bytes())"$'\n    try:\n        resultado = await _leer_pdf_aparte(leer_despacho' \
-  $'    contents = await file.read()\n    try:\n        resultado = await _leer_pdf_aparte(leer_despacho' \
-  "FAILED $T::test_leer_rechaza_lo_que_no_es_pdf"
-sabotaje $M "guardar arma un TXT" \
-  $'    try:\n        for campos in listos:' $'    generate_maria_txt(listos)\n    try:\n        for campos in listos:' \
-  "FAILED $T::test_nunca_arma_un_txt" "armó un TXT"
-sabotaje $M "guardar crea una operación" \
-  $'                db, owner_username=username, client_id=client_id, **campos)\n        await db.commit()' \
-  $'                db, owner_username=username, client_id=client_id, **campos)\n        db.add(OperationModel(owner_username=username, client_id=client_id))\n        await db.commit()' \
-  "FAILED $T::test_guardar_lo_revisado_queda_en_el_catalogo_del_cliente" "_contar(Operation) == operaciones"
-sabotaje proyecto_maria/pdf_extractor.py "el lector de facturas acepta despachos" \
-  '    if (clase["tipo"] != "factura_comercial" or' '    if (clase["tipo"] not in ("factura_comercial", "despacho_aduanero") or' \
-  "FAILED $T::test_el_lector_de_facturas_sigue_rechazando_el_despacho"
+# 3) El proceso aparte: si tarda, 504 y se mata; si se queda sin memoria, aviso.
+sabotaje "no se mata al lector que tarda" "$LECTOR" \
+  "                    proceso.kill()
+                    await proceso.wait()" \
+  "                    pass" \
+  "test_leer_que_tarda_demasiado_da_504_y_mata_al_lector"
+sabotaje "la ruta no ataja el tiempo" proyecto_maria/main.py \
+  "    except TimeoutError:" \
+  "    except LookupError:" \
+  "test_leer_que_tarda_demasiado_da_504_y_mata_al_lector"
+sabotaje "la ruta no ataja el PDF pesado" proyecto_maria/main.py \
+  "    except PdfDemasiadoPesado as e:" \
+  "    except LookupError as e:" \
+  "test_leer_un_pdf_que_llena_la_memoria_avisa"
 
-# --- La pantalla (en el navegador, con la API andando; JS y CSS se leen en cada pedido)
-J=proyecto_maria/static/v2/screens/clientes.js
-sabotaje_pantalla $J "el botón no está conectado" \
-  $'        if (despachoBtn) despachoBtn.addEventListener(\'click\', onDespachoElegir);\n' '' \
-  "FALLA: 1280 px: el botón no abre el selector de archivo"
-sabotaje_pantalla $J "el faltante no se marca" \
-  "(falta ? ' is-faltante' : '')" "''" \
-  "FALLA: 1280 px: lo marcado como faltante es []"
-sabotaje_pantalla $J "se guarda al leer, sin revisar" \
-  '            renderDespacho(data);' '            renderDespacho(data); await onDespachoGuardar();' \
-  "FALLA: 1280 px: se pidió guardar antes de tocar «Guardar en el catálogo»"
-sabotaje_pantalla proyecto_maria/static/v2/app_v2.css "el panel es más ancho que la pantalla" \
-  $'.cx-despacho {\n    margin: 0 0 var(--s-4);' $'.cx-despacho {\n    min-width: 1400px;\n    margin: 0 0 var(--s-4);' \
-  "FALLA: 1280 px: el panel mide 1400 px"
+# 4) Los números y el peso por unidad.
+sabotaje "los números sin tope" "$LECTOR" \
+  "if not (0 <= valor < _MAX_NUMERO):" \
+  "if not (0 <= valor):" \
+  "test_guardar_un_numero_del_tope_para_arriba_da_422[cantidad]" \
+  "test_guardar_un_numero_del_tope_para_arriba_da_422[valor_unitario]" \
+  "test_guardar_un_numero_del_tope_para_arriba_da_422[kilo_neto]"
+sabotaje "sin el chequeo del peso" "$LECTOR" \
+  "if peso is not None and not (math.isfinite(peso) and peso <= _MAX_NUMERO):" \
+  "if False:" \
+  "test_un_peso_por_unidad_infinito_no_se_guarda[1.0-1e-320]" \
+  "test_un_peso_por_unidad_infinito_no_se_guarda[900000000000.0-1e-300]" \
+  "test_un_peso_por_unidad_infinito_no_se_guarda[100000000000.0-1e-05]"
+sabotaje "el peso sin el tope" "$LECTOR" \
+  "math.isfinite(peso) and peso <= _MAX_NUMERO" \
+  "math.isfinite(peso)" \
+  "test_un_peso_por_unidad_infinito_no_se_guarda[100000000000.0-1e-05]"
+no_debe "el peso sin el tope" "$ULTIMA" \
+  "test_un_peso_por_unidad_infinito_no_se_guarda[1.0-1e-320]" \
+  "test_un_peso_por_unidad_infinito_no_se_guarda[900000000000.0-1e-300]"
 
-git checkout -q -- proyecto_maria/
+# 5) Guardar: todo o nada, sin NUL, sin promediar con el vacío y sin sumar a
+# un producto de otro NCM.
+sabotaje "un commit por renglón" proyecto_maria/main.py \
+  "solo_mismo_ncm=True, **campos)
+        await db.commit()" \
+  "solo_mismo_ncm=True, **campos)
+            await db.commit()" \
+  "test_guardar_si_falla_la_base_no_guarda_ninguno"
+sabotaje "guardar sin sacar el NUL" proyecto_maria/main.py \
+  "renglones = _sin_nul(body.get(\"renglones\"))" \
+  "renglones = body.get(\"renglones\")" \
+  "test_guardar_saca_el_nul_de_los_textos"
+sabotaje "promedia con el valor vacío" proyecto_maria/services/client_memory.py \
+  "            if not prev:
+                return new_value
+" \
+  "" \
+  "test_guardar_otra_vez_con_peso_no_lo_promedia_con_el_vacio"
+sabotaje "la ruta usa el respaldo por descripción" proyecto_maria/main.py \
+  "client_id=client_id, solo_mismo_ncm=True, **campos)" \
+  "client_id=client_id, **campos)" \
+  "test_guardar_no_funde_productos_con_ncm_distinto" \
+  "test_guardar_no_toca_un_producto_que_ya_estaba_con_otro_ncm" \
+  "test_guardar_no_funde_descripciones_casi_iguales_con_ncm_distinto[tipo a y tipo b]" \
+  "test_guardar_no_funde_descripciones_casi_iguales_con_ncm_distinto[mismo texto largo adelante]"
+no_debe "la ruta usa el respaldo por descripción" "$ULTIMA" "test_guardar_con_el_mismo_ncm_sigue_sumando"
+sabotaje "el upsert ignora solo_mismo_ncm" proyecto_maria/services/client_memory.py \
+  "if existing is None and not solo_mismo_ncm:" \
+  "if existing is None:" \
+  "test_guardar_no_funde_productos_con_ncm_distinto" \
+  "test_guardar_no_toca_un_producto_que_ya_estaba_con_otro_ncm"
+no_debe "el upsert ignora solo_mismo_ncm" "$ULTIMA" "test_guardar_con_el_mismo_ncm_sigue_sumando"
+
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]

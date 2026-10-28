@@ -14,7 +14,12 @@ El despacho es sintético, armado acá con la forma de
 `docs/pm/DESPACHOS-FORMA.md` y valores inventados."""
 import asyncio
 import io
+import json
+import os
+import subprocess
+import sys
 import uuid
+from pathlib import Path
 
 import pytest
 from sqlalchemy import func, select
@@ -506,3 +511,297 @@ def test_el_lector_de_facturas_sigue_rechazando_el_despacho(auth_override, clien
     assert r.status_code == 422, r.text
     assert r.json()["code"] == "documento_no_admitido"
     assert "items" not in r.json()
+
+
+# --- D41: las tres medias de la revisión (2026-10-28) ----------------------
+
+@pytest.mark.parametrize("rotulos, rechaza", [(40, False), (41, True)])
+def test_una_linea_con_mas_de_40_rotulos_no_se_lee(rotulos, rechaza):
+    """Una línea con miles de rótulos trababa el lector de PDF que comparten
+    todos. Ahora la cantidad de rótulos tiene tope: el tope se prueba, no un
+    tiempo."""
+    from proyecto_maria.core.despacho_lector import leer_texto
+    texto = "Nº Item " + "Tipo " * (rotulos - 1) + "\n" + "0001  " + "x  " * (rotulos - 1) + "\n"
+    leido = leer_texto(texto)
+    aviso = "Una línea tiene más de 40 rótulos: no parece un despacho."
+    assert (leido["avisos"] == [aviso]) is rechaza, leido["avisos"]
+    assert len(leido["renglones"]) == (0 if rechaza else 1)
+
+
+def test_muchos_rotulos_reparten_igual_que_pocos():
+    """El arreglo no cambia a qué rótulo va cada valor: uno que asoma dos
+    columnas a la izquierda sigue en la suya, y uno que pisa la columna
+    siguiente con un solo espacio se corta donde ella empieza."""
+    from proyecto_maria.core.despacho_lector import _rotulos_de_linea, _valores_por_columna
+    columnas = _rotulos_de_linea(
+        "Nº Item    Posición SIM / Código AFIP    Total Kg. Neto    Origen Pais / Provincia")
+    assert [c for c, _ in columnas] == [0, 11, 41, 59]
+
+    def linea(*valores):
+        texto = ""
+        for columna, valor in valores:
+            texto = texto.ljust(columna) + valor
+        return texto
+
+    esperado = {"Nº Item": "0001", "Posición SIM / Código AFIP": "8471.30.12.000W",
+                "Total Kg. Neto": "12,500", "Origen Pais / Provincia": "310 BRASIL"}
+    # El kilo asoma dos a la izquierda de su rótulo.
+    assert _valores_por_columna(
+        linea((0, "0001"), (11, "8471.30.12.000W"), (39, "12,500"), (59, "310 BRASIL")),
+        columnas) == esperado
+    # El kilo llega pegado al origen, con un solo espacio en la columna 58.
+    assert _valores_por_columna(
+        linea((0, "0001"), (11, "8471.30.12.000W"), (52, "12,500 310 BRASIL")),
+        columnas) == esperado
+
+
+@pytest.mark.parametrize("kilo, cantidad", [(1.0, 1e-320), (9e11, 1e-300), (1e11, 1e-5)])
+def test_un_peso_por_unidad_infinito_no_se_guarda(auth_override, client, kilo, cantidad):
+    """Kilo dividido cantidad no puede dar infinito: antes se guardaba y el
+    catálogo del cliente daba 500 (infinito no es JSON). Tampoco más del tope
+    de cualquier número del renglón (1e16 con el último par)."""
+    cid = _crear_cliente(client)
+    renglones = _subir(client, cid).json()["renglones"]
+    renglones[1].update(kilo_neto=kilo, cantidad=cantidad)
+    r = _guardar(client, cid, renglones)
+    assert r.status_code == 422, r.text
+    assert [e["renglon"] for e in r.json()["errores"]] == [2]
+    assert any(p.startswith("El peso por unidad") for p in r.json()["errores"][0]["problemas"]), r.text
+    assert _contar(ClientProductHistory, client_id=cid) == 0
+    assert _catalogo(client, cid) == []
+
+
+def _renglon(descripcion, posicion):
+    return {"posicion_sim": posicion, "descripcion": descripcion, "origen": "BR",
+            "cantidad": 10.0, "valor_unitario": 2.0, "kilo_neto": 1.0}
+
+
+def test_guardar_no_funde_productos_con_ncm_distinto(auth_override, client):
+    """La misma descripción con otra posición es otro producto: antes el
+    respaldo por descripción lo sumaba al de la otra posición, que quedaba con
+    su NCM, y «guardados» lo contaba igual."""
+    cid = _crear_cliente(client)
+    r = _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", "3926.90.90.000A"),
+                               _renglon("TAPA INVENTADA VERDE", "8471.30.12.000W")])
+    assert r.status_code == 200, r.text
+    assert r.json()["guardados"] == 2
+    productos = _catalogo(client, cid)
+    assert sorted((p["ncm"], p["veces_usado"]) for p in productos) == [
+        ("39269090", 1), ("84713012", 1)], productos
+
+
+def test_guardar_no_toca_un_producto_que_ya_estaba_con_otro_ncm(auth_override, client):
+    cid = _crear_cliente(client)
+    assert _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", "3926.90.90.000A")]).status_code == 200
+    r = _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", "8471.30.12.000W")])
+    assert r.status_code == 200, r.text
+    productos = {p["ncm"]: p for p in _catalogo(client, cid)}
+    assert set(productos) == {"39269090", "84713012"}, productos
+    assert productos["39269090"]["veces_usado"] == 1
+
+
+def test_guardar_con_el_mismo_ncm_sigue_sumando(auth_override, client):
+    """El arreglo no cambia lo que ya andaba: misma posición y misma
+    descripción es el mismo producto."""
+    cid = _crear_cliente(client)
+    for _ in range(2):
+        assert _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", "3926.90.90.000A")]).status_code == 200
+    productos = _catalogo(client, cid)
+    assert [(p["ncm"], p["veces_usado"]) for p in productos] == [("39269090", 2)], productos
+
+
+@pytest.mark.parametrize("descripciones", [
+    # Las palabras de una letra no cuentan: la similitud da 1,0.
+    ("TAPA INVENTADA DE PLASTICO TIPO A", "TAPA INVENTADA DE PLASTICO TIPO B"),
+    # La descripción normalizada se corta en 200: el resto no se compara.
+    ("LAS DEMAS MANUFACTURAS INVENTADAS " * 7 + "TAPA", "LAS DEMAS MANUFACTURAS INVENTADAS " * 7 + "CAJA"),
+], ids=["tipo a y tipo b", "mismo texto largo adelante"])
+def test_guardar_no_funde_descripciones_casi_iguales_con_ncm_distinto(auth_override, client, descripciones):
+    """En un despacho la posición SIM manda: dos descripciones que el respaldo
+    por descripción daría por iguales siguen siendo dos productos."""
+    cid = _crear_cliente(client)
+    r = _guardar(client, cid, [_renglon(descripciones[0], "3926.90.90.000A"),
+                               _renglon(descripciones[1], "8471.30.12.000W")])
+    assert r.status_code == 200, r.text
+    productos = _catalogo(client, cid)
+    assert sorted((p["ncm"], p["veces_usado"]) for p in productos) == [
+        ("39269090", 1), ("84713012", 1)], productos
+
+
+# --- DESPACHO-1b, devolución: cada tope corta antes de gastar --------------
+
+_REPO = Path(__file__).resolve().parents[1]
+
+
+def _medir_aparte(bomba, *args):
+    """Arma la bomba y la lee con `leer_despacho_aparte` en un python nuevo y
+    chico: la memoria del proceso que lee se mide sin la de pytest."""
+    from tests.pdf_bombas import MEDIR
+    r = subprocess.run([sys.executable, "-c", MEDIR, bomba, *map(str, args)], capture_output=True,
+                       text=True, cwd=_REPO, timeout=120,
+                       env={"PATH": os.environ.get("PATH", ""), "PYTHONPATH": str(_REPO)})
+    assert r.returncode == 0, r.stderr[-2000:]
+    return json.loads(r.stdout)
+
+
+solo_linux = pytest.mark.skipif(sys.platform != "linux", reason="el tope de memoria es de Linux")
+
+
+@solo_linux
+def test_hojas_que_se_inflan_se_saltean_sin_gastar_memoria():
+    """10 hojas de 70 MB descomprimidos cada una, en un PDF de menos de 1 MB:
+    antes la lectura llegaba a 800 MB. Cada hoja corta al pasar el tope de un
+    flujo y se avisa; el proceso que lee no pasa de 100 MB."""
+    medido = _medir_aparte("hojas_pesadas", 10, 70)
+    assert "resultado" in medido, medido
+    assert medido["resultado"]["avisos"] == [
+        f"No leí la hoja {n}: es demasiado pesada." for n in range(1, 11)], medido
+    assert medido["resultado"]["sin_texto"] is False
+    assert medido["lector_mb"] < 100, medido
+
+
+@solo_linux
+def test_un_pdf_que_llena_la_memoria_se_rechaza():
+    """1000 fuentes de 500 KB: cada flujo pasa el tope por flujo, pero todos
+    juntos no. Lo corta el tope de memoria del proceso que lee: se rechaza
+    con un aviso y la memoria queda acotada."""
+    from proyecto_maria.core.despacho_lector import AVISO_SIN_MEMORIA
+    medido = _medir_aparte("muchas_fuentes", 1000, 500)
+    assert medido.get("pesado") == AVISO_SIN_MEMORIA, medido
+    assert medido["lector_mb"] < 300, medido
+
+
+def test_una_hoja_pesada_se_saltea_y_las_demas_se_leen():
+    from proyecto_maria.core.despacho_lector import texto_del_pdf
+    from tests.pdf_bombas import hojas
+    texto, avisos = texto_del_pdf(hojas([("HOJA UNO", 0), ("HOJA DOS", 2 << 20), ("HOJA TRES", 0)]))
+    assert avisos == ["No leí la hoja 2: es demasiado pesada."]
+    assert "HOJA UNO" in texto and "HOJA TRES" in texto and "HOJA DOS" not in texto
+
+
+def test_mas_de_200_hojas_lee_las_primeras_200():
+    from proyecto_maria.core.despacho_lector import texto_del_pdf
+    from tests.pdf_bombas import hojas
+    texto, avisos = texto_del_pdf(hojas([(f"HOJA {n:03d}", 0) for n in range(1, 202)]))
+    assert avisos == ["El PDF tiene 201 hojas: leí las primeras 200."]
+    assert "HOJA 200" in texto and "HOJA 201" not in texto
+
+
+def test_el_texto_de_todas_las_hojas_tiene_tope(monkeypatch):
+    from proyecto_maria.core import despacho_lector
+    from tests.pdf_bombas import hojas
+    data = hojas([("HOJA UNO", 0), ("HOJA DOS", 0), ("HOJA TRES", 0)])
+    una, _ = despacho_lector.texto_del_pdf(hojas([("HOJA UNO", 0)]))
+    # Entran la primera y la segunda; la tercera pasa del tope.
+    monkeypatch.setattr(despacho_lector, "_MAX_TEXTO", 2 * len(una) + 1)
+    texto, avisos = despacho_lector.texto_del_pdf(data)
+    assert avisos == ["El texto del PDF es demasiado largo: leí hasta la hoja 2."]
+    assert "HOJA DOS" in texto and "HOJA TRES" not in texto
+
+
+@pytest.mark.parametrize("largo, rechaza", [(2000, False), (2001, True)])
+def test_una_linea_de_mas_de_2000_caracteres_no_se_lee(largo, rechaza):
+    from proyecto_maria.core.despacho_lector import leer_texto
+    leido = leer_texto(_item_solo() + "\n" + "X" * largo)
+    aviso = "Una línea pasa de 2000 caracteres: no parece un despacho."
+    assert (aviso in leido["avisos"]) is rechaza, leido["avisos"]
+    assert len(leido["renglones"]) == (0 if rechaza else 1)
+
+
+@pytest.mark.parametrize("items, avisa", [(500, False), (501, True)])
+def test_mas_de_500_items_lee_los_primeros_500(items, avisa):
+    from proyecto_maria.core.despacho_lector import leer_texto
+    leido = leer_texto("\n".join(_item_solo() for _ in range(items)))
+    aviso = "El despacho tiene más de 500 ítems y subítems: leí sólo los primeros 500."
+    assert (aviso in leido["avisos"]) is avisa, leido["avisos"]
+    assert len(leido["renglones"]) == 500
+
+
+def test_leer_que_tarda_demasiado_da_504_y_mata_al_lector(auth_override, client, monkeypatch):
+    """El proceso que lee se mata al pasar el tiempo: no queda ocupando nada.
+    El lector se reemplaza por uno que no termina nunca."""
+    real = asyncio.create_subprocess_exec
+    procesos = []
+
+    async def lector_colgado(*args, **kwargs):
+        proceso = await real(sys.executable, "-c", "import time; time.sleep(60)", **kwargs)
+        procesos.append(proceso)
+        return proceso
+
+    monkeypatch.setattr(asyncio, "create_subprocess_exec", lector_colgado)
+    monkeypatch.setenv("PDF_READ_TIMEOUT_S", "1")
+    cid = _crear_cliente(client)
+    r = _subir(client, cid)
+    assert r.status_code == 504, r.text
+    assert r.json()["code"] == "lectura_pdf_demasiado_larga"
+    assert len(procesos) == 1 and procesos[0].returncode == -9
+
+
+@solo_linux
+def test_leer_un_pdf_que_llena_la_memoria_avisa(auth_override, client):
+    from proyecto_maria.core.despacho_lector import AVISO_SIN_MEMORIA
+    from tests.pdf_bombas import muchas_fuentes
+    cid = _crear_cliente(client)
+    r = _subir(client, cid, muchas_fuentes(1000, 500))
+    assert r.status_code == 200, r.text
+    assert r.json()["renglones"] == [] and r.json()["avisos"] == [AVISO_SIN_MEMORIA]
+    assert r.json()["sin_texto"] is False
+
+
+@pytest.mark.parametrize("campo", ["cantidad", "valor_unitario", "kilo_neto"])
+def test_guardar_un_numero_del_tope_para_arriba_da_422(auth_override, client, campo):
+    cid = _crear_cliente(client)
+    renglon = _renglon("TAPA INVENTADA VERDE", "3926.90.90.000A")
+    renglon[campo] = 1e12
+    r = _guardar(client, cid, [renglon])
+    assert r.status_code == 422, r.text
+    assert r.json()["errores"][0]["problemas"][0].endswith("tiene que ser un número positivo.")
+    assert _contar(ClientProductHistory, client_id=cid) == 0
+
+
+def test_guardar_si_falla_la_base_no_guarda_ninguno(auth_override, client, monkeypatch):
+    """El segundo renglón falla al escribir: el primero tampoco queda."""
+    from proyecto_maria.services import client_memory
+    real = client_memory.upsert_client_product_history
+    llamadas = []
+
+    async def falla_el_segundo(*args, **kwargs):
+        llamadas.append(kwargs["descripcion"])
+        if len(llamadas) == 2:
+            raise RuntimeError("la base no anda")
+        return await real(*args, **kwargs)
+
+    monkeypatch.setattr(client_memory, "upsert_client_product_history", falla_el_segundo)
+    cid = _crear_cliente(client)
+    r = _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", "3926.90.90.000A"),
+                               _renglon("CAJA INVENTADA AZUL", "8471.30.12.000W")])
+    assert r.status_code == 500, r.text
+    assert len(llamadas) == 2
+    assert _contar(ClientProductHistory, client_id=cid) == 0
+
+
+def test_guardar_saca_el_nul_de_los_textos(auth_override, client):
+    """Postgres no acepta NUL en un texto; con el NUL afuera, el origen es
+    uno de la tabla."""
+    cid = _crear_cliente(client)
+    renglon = _renglon("TAPA INVENTADA\x00 VERDE", "3926.90.90.000A")
+    renglon["origen"] = "B\x00R"
+    r = _guardar(client, cid, [renglon])
+    assert r.status_code == 200, r.text
+    assert [(p["descripcion"], p["origen"]) for p in _catalogo(client, cid)] == [
+        ("TAPA INVENTADA VERDE", "BR")]
+
+
+def test_guardar_otra_vez_con_peso_no_lo_promedia_con_el_vacio(auth_override, client):
+    """Un producto guardado sin peso ni valor, guardado otra vez con 2 kg por
+    unidad y 3 de valor, queda con 2 y 3: antes, con 1 y 1,5."""
+    cid = _crear_cliente(client)
+    sin = _renglon("TAPA INVENTADA VERDE", "3926.90.90.000A")
+    sin.update(kilo_neto=None, valor_unitario=None)
+    con = _renglon("TAPA INVENTADA VERDE", "3926.90.90.000A")
+    con.update(kilo_neto=20.0, valor_unitario=3.0)
+    assert _guardar(client, cid, [sin]).status_code == 200
+    assert _guardar(client, cid, [con]).status_code == 200
+    [producto] = _catalogo(client, cid)
+    assert (producto["veces_usado"], producto["peso_unitario_avg"], producto["valor_unitario_avg"]) == (
+        2, 2.0, 3.0), producto
