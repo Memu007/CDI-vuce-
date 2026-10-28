@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · fix: la sugerencia de NCM no pierde la SIM completa del proveedor (GUARDAR-2, D32 b)
+
+- **fix(sugerencia):** si el historial del cliente tiene el NCM de 8 dígitos y el catálogo del proveedor tiene, para el mismo producto (la misma descripción, no una parecida), la SIM completa que empieza con esos 8, el autorrelleno (`/api/catalog/lookup`) y `/api/ncm/sugerir` traen la del proveedor. Desde GUARDAR-1 llegaba `84714900` y la pantalla marcaba incompleto lo que antes llegaba listo. Sin migración.
+
 ## 2026-10-27 · fix: un cargo en plural, que no viene primero o en Item con otra descripción se avisa con su fila (EXCEL-3f)
 
 - **fix(excel):** «Fletes», «Seguros», «Bank fees» o «Fee» se leen como el cargo en singular. «Ocean freight», «Courier DHL», «2. Insurance», un cargo con su propio origen o «Freight» en Item con la descripción escrita otra vez entran al FOB como antes, pero con un aviso que nombra su fila. Una fila con su propia NCM no lleva ese aviso.
