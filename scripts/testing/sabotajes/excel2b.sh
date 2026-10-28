@@ -143,6 +143,21 @@ sabotaje $F "el tope de lecturas de cabezas sube a 100000" $B \
 sabotaje $F "un umbral que no entra en bytes vuelve a dar 500" $B \
   "FAILED $B::test_un_umbral_enorme_no_rompe_la_subida[1e308-2097152]" \
   '    if not math.isfinite(valor * 1024 * 1024) or valor <= 0:' '    if not math.isfinite(valor) or valor <= 0:'
+# Hallazgos del adversario Sonnet alto: el cuarto tope, la cuenta exacta de
+# lecturas y una entrada que no se puede descomprimir.
+sabotaje $F "el tope de lo descomprimido vuelve a su propia lectura" $B \
+  "FAILED $B::test_ningun_tope_de_excel_enorme_rompe_la_subida[EXCEL_MAX_DESCOMPRIMIDO_MB]" \
+  '    return _mb_de_entorno("EXCEL_MAX_DESCOMPRIMIDO_MB", 100)' \
+  $'    import math\n    try:\n        valor = float(os.getenv("EXCEL_MAX_DESCOMPRIMIDO_MB", "") or 100)\n    except (TypeError, ValueError):\n        valor = 100.0\n    if not math.isfinite(valor) or valor <= 0:\n        valor = 100.0\n    return int(valor * 1024 * 1024)'
+sabotaje $F "el tope de lecturas de cabezas baja a 19" $B \
+  "FAILED $B::test_se_leen_exactamente_20_cabezas_de_imagen" \
+  '_LIVIANO_IMAGENES_LECTURAS = 20' '_LIVIANO_IMAGENES_LECTURAS = 19'
+sabotaje $F "el tope de lecturas de cabezas sube a 21" $B \
+  "FAILED $B::test_se_leen_exactamente_20_cabezas_de_imagen" \
+  '_LIVIANO_IMAGENES_LECTURAS = 20' '_LIVIANO_IMAGENES_LECTURAS = 21'
+sabotaje $F "una entrada que no se descomprime corta la medida" $B \
+  "FAILED $B::test_una_entrada_que_no_se_puede_descomprimir_no_corta_la_medida" \
+  $'                except Exception:\n                    continue' $'                except ZeroDivisionError:\n                    continue'
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
