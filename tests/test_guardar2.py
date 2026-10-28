@@ -177,3 +177,30 @@ def test_el_historial_de_otro_cliente_del_mismo_despachante_no_se_usa(client, mo
     r = client.post("/api/ncm/sugerir", json={"descripcion": DESC, "client_id": otro})
     assert r.status_code == 200, r.text
     assert r.json()["sugerencias"] == []
+
+
+def _dos_clientes_iguales(client):
+    cid = _cliente(client)
+    ficha = client.get(f"/api/clientes/{cid}").json()
+    r = client.post("/api/clientes", json={"nombre": ficha["nombre"], "cuit": ficha["cuit"]})
+    assert r.status_code == 200, r.text
+    return cid, r.json()["cliente"]["id"]
+
+
+def test_guardar_el_mismo_ncm_en_otro_cliente_le_crea_su_propio_historial(client):
+    """Lo que guarda un cliente no actualiza la fila de otro del mismo
+    despachante, aunque el NCM y la descripción coincidan (adversario Sonnet
+    alto: los filtros por cliente del guardado no tenían prueba)."""
+    cid, otro = _dos_clientes_iguales(client)
+    assert _guardar(client, cid, [{"pieza": SIM, "ncm": SIM, "descripcion": DESC}]).status_code == 200
+    assert _guardar(client, otro, [{"pieza": SIM, "ncm": SIM, "descripcion": DESC}]).status_code == 200
+    assert _historial(otro) == {DESC: "84714900"}
+    assert _historial(cid) == {DESC: "84714900"}
+
+
+def test_guardar_otro_ncm_con_la_misma_descripcion_en_otro_cliente_no_pisa_al_primero(client):
+    cid, otro = _dos_clientes_iguales(client)
+    assert _guardar(client, cid, [{"pieza": SIM, "ncm": SIM, "descripcion": DESC}]).status_code == 200
+    assert _guardar(client, otro, [{"pieza": "8471.30.12", "ncm": "8471.30.12", "descripcion": DESC}]).status_code == 200
+    assert _historial(otro) == {DESC: "8471.30.12"}
+    assert _historial(cid) == {DESC: "84714900"}

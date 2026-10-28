@@ -339,3 +339,49 @@ def test_un_umbral_enorme_no_rompe_la_subida(monkeypatch, valor, bytes_):
     assert fs._mb_de_entorno("EXCEL_LIVIANO_MB", 2) == bytes_
     r = _subir(_normal())
     assert r.status_code == 200, r.text[:300]
+
+
+@pytest.mark.parametrize("variable", ["EXCEL_LIVIANO_MB", "EXCEL_MAX_TEXTOS_MB",
+                                      "EXCEL_MAX_PRIMERA_HOJA_MB", "EXCEL_MAX_DESCOMPRIMIDO_MB"])
+def test_ningun_tope_de_excel_enorme_rompe_la_subida(monkeypatch, variable):
+    """Los cuatro topes de Excel en MB: 1e308 no entra en bytes y vale el de
+    defecto. EXCEL_MAX_DESCOMPRIMIDO_MB tenía su propia lectura y daba 400
+    «cannot convert float infinity to integer» (adversario Sonnet alto)."""
+    monkeypatch.setenv(variable, "1e308")
+    r = _subir(_normal())
+    assert r.status_code == 200, r.text[:300]
+
+
+def test_se_leen_exactamente_20_cabezas_de_imagen(monkeypatch):
+    """El tope de lecturas es 20, no «alguno»: con 40 candidatas se miran 20
+    cabezas, ni una más ni una menos."""
+    leidas = []
+    original = fs._cabeza_de
+
+    def _contar(contents, info):
+        leidas.append(info.filename)
+        return original(contents, info)
+    monkeypatch.setattr(fs, "_cabeza_de", _contar)
+    imagenes = [(f"xl/media/image{i}.png", PNG + bytes(110 * 1024)) for i in range(40)]
+    assert fs._excel_liviano(_con_entradas(_normal(), *imagenes), ".xlsx") is False
+    assert len(leidas) == 20, len(leidas)
+
+
+def test_una_entrada_que_no_se_puede_descomprimir_no_corta_la_medida():
+    """Una entrada con el DEFLATE roto no es imagen y sigue contando, pero no
+    impide descontar la imagen buena que viene después."""
+    corrupta = "xl/media/image2.png"
+    libro = bytearray(_con_entradas(_normal(), (corrupta, bytes(int(1.2 * 2**20))),
+                                    ("xl/media/image1.png", PNG + bytes(2**20))))
+    with zipfile.ZipFile(io.BytesIO(bytes(libro))) as z:
+        info = z.getinfo(corrupta)
+        xml = sum(i.file_size for i in z.infolist() if not i.filename.startswith("xl/media/"))
+        imagen = z.getinfo("xl/media/image1.png").file_size
+    inicio = info.header_offset + 30 + len(corrupta.encode())
+    libro[inicio] = 0x06  # bloque de tipo 3: no existe
+    with pytest.raises(zlib.error):
+        zlib.decompressobj(-15).decompress(bytes(libro[inicio:inicio + 16]), 44)
+    assert info.file_size > imagen  # se mira antes que la imagen buena
+    assert xml + info.file_size + imagen > 2 * 2**20  # sin descontar la imagen, no entra
+    assert xml + info.file_size <= 2 * 2**20  # descontándola, entra
+    assert fs._excel_liviano(bytes(libro), ".xlsx") is True
