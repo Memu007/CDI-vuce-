@@ -228,5 +228,31 @@ sabotaje "el upsert ignora solo_mismo_ncm" proyecto_maria/services/client_memory
   "test_guardar_no_toca_un_producto_que_ya_estaba_con_otro_ncm"
 no_debe "el upsert ignora solo_mismo_ncm" "$ULTIMA" "test_guardar_con_el_mismo_ncm_sigue_sumando"
 
+# Lo que encontró el adversario: dos lecturas que daban 500.
+sabotaje "el lector sin el tope de los números" "$LECTOR" \
+  "elif not valor < _MAX_NUMERO:" \
+  "elif False:" \
+  "test_un_numero_del_tope_para_arriba_queda_faltante_y_leer_no_da_500[cantidad infinita]" \
+  "test_un_numero_del_tope_para_arriba_queda_faltante_y_leer_no_da_500[kilo en el tope]"
+sabotaje "el lector sólo frena el infinito" "$LECTOR" \
+  "elif not valor < _MAX_NUMERO:" \
+  "elif not math.isfinite(valor):" \
+  "test_un_numero_del_tope_para_arriba_queda_faltante_y_leer_no_da_500[unitario en el tope]"
+no_debe "el lector sólo frena el infinito" "$ULTIMA" \
+  "test_un_numero_del_tope_para_arriba_queda_faltante_y_leer_no_da_500[cantidad infinita]"
+sabotaje "el tope del lector deja afuera el máximo" "$LECTOR" \
+  "elif not valor < _MAX_NUMERO:" \
+  "elif not valor <= _MAX_NUMERO:" \
+  "test_un_numero_del_tope_para_arriba_queda_faltante_y_leer_no_da_500[cantidad en el tope]"
+sabotaje "el medio par llega a la salida" "$LECTOR" \
+  "texto = _MEDIO_PAR.sub(\"\\ufffd\", pagina.extract_text(extraction_mode=\"layout\") or \"\")" \
+  "texto = pagina.extract_text(extraction_mode=\"layout\") or \"\"" \
+  "test_un_caracter_suelto_que_no_es_unicode_avisa_y_leer_no_da_500"
+sabotaje "el lector hereda todo el entorno" "$LECTOR" \
+  "entorno = {k: os.environ[k] for k in (\"PATH\", \"HOME\", \"LANG\", \"LC_ALL\", \"PYTHONUSERBASE\")
+               if k in os.environ}" \
+  "entorno = dict(os.environ)" \
+  "test_el_lector_no_hereda_los_secretos_del_proceso"
+
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]

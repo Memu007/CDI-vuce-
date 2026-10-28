@@ -30,16 +30,25 @@ from proyecto_maria.database.models import ClientProductHistory, Operation
 
 # --- Un PDF mínimo con texto en columnas ------------------------------------
 
-def _pdf(paginas):
+def _pdf(paginas, a_unicode=None):
     """`paginas`: lista de hojas; cada hoja, lista de líneas; cada línea, lista
-    de (columna, texto). Courier 9: cada columna mide 5,4 puntos."""
+    de (columna, texto). Courier 9: cada columna mide 5,4 puntos. `a_unicode`:
+    {byte: código Unicode en hexa} que la fuente dice para esos bytes."""
     objs = []
 
     def add(b):
         objs.append(b)
         return len(objs)
 
-    fuente = add(b"<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding >>")
+    extra = b""
+    if a_unicode:
+        cmap = (b"/CIDInit /ProcSet findresource begin 12 dict begin begincmap\n"
+                b"/CMapName /X def /CMapType 2 def\n1 begincodespacerange <00> <FF> endcodespacerange\n"
+                b"%d beginbfchar\n" % len(a_unicode)
+                + b"".join(b"<%02X> <%s>\n" % (k, v.encode()) for k, v in a_unicode.items())
+                + b"endbfchar\nendcmap end end")
+        extra = b" /ToUnicode %d 0 R" % add(b"<< /Length %d >>\nstream\n" % len(cmap) + cmap + b"\nendstream")
+    fuente = add(b"<< /Type /Font /Subtype /Type1 /BaseFont /Courier /Encoding /WinAnsiEncoding%s >>" % extra)
     raiz = add(b"")
     hojas = []
     for lineas in paginas:
@@ -884,3 +893,60 @@ def test_los_errores_del_lector_no_se_juntan_enteros_en_memoria():
     assert medido["error"].startswith("el lector de despachos salió con 1: "), medido["error"][:200]
     assert medido["error"].endswith("FIN DEL ERROR")
     assert medido["propio_mb"] < 100, medido["propio_mb"]
+
+
+# --- Lo que encontró el adversario de la devolución -------------------------
+
+@pytest.mark.parametrize("campo, rotulo, numero", [
+    ("cant", "cantidad", "9" * 400),
+    ("cant", "cantidad", "1.000.000.000.000,00"),
+    ("unitario", "valor_unitario", "1.000.000.000.000,00"),
+    ("kilo", "kilo_neto", "1000000000000,00"),  # sin puntos: la columna mide 18
+], ids=["cantidad infinita", "cantidad en el tope", "unitario en el tope", "kilo en el tope"])
+def test_un_numero_del_tope_para_arriba_queda_faltante_y_leer_no_da_500(
+        auth_override, client, campo, rotulo, numero):
+    """El lector usa el mismo tope que guardar: «9» × 400 era infinito y la
+    respuesta, un 500."""
+    texto = _item_solo(**{campo: numero})
+    cid = _crear_cliente(client)
+    r = _subir(client, cid, _pdf_con_texto(texto.splitlines()))
+    assert r.status_code == 200, r.text
+    renglon = r.json()["renglones"][0]
+    assert renglon[rotulo] is None and rotulo in renglon["faltantes"]
+    assert any("pasa del máximo" in a for a in renglon["avisos"]), renglon["avisos"]
+
+
+def test_justo_debajo_del_tope_se_lee():
+    from proyecto_maria.core.despacho_lector import leer_texto
+    r = leer_texto(_item_solo(cant="999.999.999.999,00"))["renglones"][0]
+    assert r["cantidad"] == 999999999999.0 and r["avisos"] == []
+
+
+def test_un_caracter_suelto_que_no_es_unicode_avisa_y_leer_no_da_500(auth_override, client):
+    """Una fuente que dice que «Z» es la mitad de un par (D800): escribir ese
+    texto en UTF-8 fallaba en el lector y la respuesta era un 500."""
+    texto = _item_solo().replace("COSA INVENTADA", "COSA Z INVENTADA")
+    cid = _crear_cliente(client)
+    r = _subir(client, cid, _pdf([[[(0, l)] for l in texto.splitlines()]], a_unicode={0x5A: "D800"}))
+    assert r.status_code == 200, r.text
+    renglon = r.json()["renglones"][0]
+    assert renglon["descripcion"] == "COSA \ufffd INVENTADA"
+    assert any("no se pudieron leer" in a for a in renglon["avisos"]), renglon["avisos"]
+
+
+def test_el_lector_no_hereda_los_secretos_del_proceso(monkeypatch):
+    import asyncio
+    from proyecto_maria.core import despacho_lector
+    monkeypatch.setenv("SECRET_KEY", "secreto-inventado")
+    monkeypatch.setenv("DATABASE_URL", "postgresql://inventada")
+    entornos = []
+    real = asyncio.create_subprocess_exec
+
+    async def mirar(*args, **kwargs):
+        entornos.append(kwargs.get("env"))
+        return await real(*args, **kwargs)
+
+    monkeypatch.setattr(despacho_lector.asyncio, "create_subprocess_exec", mirar)
+    r = asyncio.run(despacho_lector.leer_despacho_aparte(_despacho(), 60))
+    assert r["renglones"], r
+    assert entornos and set(entornos[0]) <= {"PATH", "HOME", "LANG", "LC_ALL", "PYTHONUSERBASE"}
