@@ -2,151 +2,177 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## EXCEL-2b, vuelta de tu revisión sobre `b3ac325` (más el agregado de GUARDAR-2)
+## ORDEN-1, vuelta de tu devolución del 2026-10-28 16:45 UTC sobre `0d89c20`
+
+### Decisiones
+
+- **D1. Con la consulta del usuario caída al abrir, el mismo usuario vuelve
+  a entrar en otra pestaña: esta pestaña deja de autoguardar hasta
+  recargarla.** Mientras no se sabe quién abrió la pestaña, el único indicio
+  de que la sesión cambió es el token CSRF, y un login nuevo lo cambia aunque
+  sea la misma persona. Lo encontró el adversario Sonnet (hallazgo 1).
+  - (a) Queda así: es el lado seguro. Lo cargado no se guarda a nombre de
+    otro. La pestaña sigue andando y puede generar; sólo pierde el
+    autoguardado, y lo cargado se pierde si se cierra sin terminar.
+  - (b) Si el usuario que vuelve es el mismo que tenía la pestaña cuando se
+    abrió, seguir guardando. No se puede saber: al abrir no hubo usuario.
+    Habría que guardar el usuario de la última sesión en sessionStorage, y
+    eso es otro dato que hay que mantener.
+  - **Recomiendo (a).** Pasa sólo si el servidor está caído al abrir y la
+    persona vuelve a entrar en ese rato. (b) agrega un estado nuevo para un
+    caso raro. Con (a), corrijo la línea del `CHANGELOG` que dice «la
+    operación se sigue guardando» en la próxima entrega que toque ese archivo.
+
+Lo demás de la devolución: lo hice como lo pediste. Los supuestos van abajo.
 
 | Qué | SHA |
 |---|---|
-| Pruebas: en qué hilo leen las otras hojas y los ítems, índice ilegible, umbral enorme (rojo: `EXCEL_LIVIANO_MB=1e308` da 500) | `271c0db` |
-| Pruebas: la aserción del umbral enorme ya no desborda ella misma | `f5f8f75` |
-| **Producto:** un tope en MB que no entra en bytes vale el de defecto; CHANGELOG con lo medido | `ce3ac05` |
-| Pruebas: GUARDAR-2, dos clientes del mismo despachante no comparten historial | `f567adb` |
-| Sabotajes de los puntos 2 y 4 | `83871a5` |
-| Pruebas: hallazgos del adversario Sonnet (rojo: `EXCEL_MAX_DESCOMPRIMIDO_MB=1e308` da 400) | `43fd20d` |
-| **Producto:** el cuarto tope pasa por la misma lectura | `cedb3ff` |
-| Sabotajes de esos hallazgos | `606dda5` |
+| Pruebas: dueño, edad y pestaña viva; rojo antes de cada regla | `0fa30bf` |
+| **Producto:** el sobre guarda el usuario, vence a los 7 días y la duplicada no toma la operación de la viva | `36aba87` |
+| Sabotajes de dueño, edad, pestaña viva y los dos mutantes | `6da850e` |
+| Pruebas: con la consulta del usuario caída al abrir, la operación se guarda igual (rojo del adversario) | `699c3eb` |
+| **Producto:** sin usuario al abrir, la pestaña lo vuelve a pedir y sigue autoguardando | `29c1999` |
+| Pruebas: el sobre de hoy sin dueño se borra; sabotajes que faltaban | `aa174e1` |
+| Pruebas: si otro usuario entra mientras la pestaña reintenta, la operación no queda a su nombre (caso k, rojo) | `6fd3de7` |
+| **Producto:** la pestaña sin usuario no guarda lo cargado a nombre de quien entra después | `1de46b4` |
+| Pruebas: el caso j mira el reintento de la pestaña; los sabotajes de j y k apuntan bien | `973a1ed` |
 | Informe | este commit |
 
-Entre `606dda5` y este informe van `0fa30bf`, `36aba87` y `6da850e` (la vuelta
-de ORDEN-1), `836da59` (patrones de `cobro_mp1.sh` que perdió MP-2, sólo
-sabotajes) y `630652d` (merge de tu rama hasta `47e7110`, sin `PARA-DEV.md`).
-No son de esta pieza: los informo en la entrega siguiente. Las puertas de esta
-tabla corrieron sobre `606dda5`, sin ellos.
+Entre esos commits van también los de COBRO-MP-1 (A, B, C, D y E) y el merge
+de tu rama hasta `d0ef0a1` (`eebd3c9`). COBRO no entra en esta entrega: la
+informo aparte. Ver «COBRO-MP-1, en curso».
 
-Archivo de producto tocado en esta vuelta: `proyecto_maria/security/file_security.py`
+Archivo de producto tocado en esta vuelta: `proyecto_maria/static/v2/app_v2.js`
 (y `CHANGELOG.md`).
 
-**Resultado.** Cerré los puntos 2 a 5 y el agregado de GUARDAR-2, cada uno con
-su prueba y su sabotaje. **El punto 1 no está cerrado:** los libros chicos pero
-caros de leer siguen entrando al carril liviano. Lo decidís vos en la **D32**.
+### Qué hace ahora
 
-## Decisiones
+- **Dueño.** El sobre del borrador guarda el usuario. Al abrir, sólo se
+  recupera el del mismo usuario. Un sobre sin dueño se borra, sea la clave
+  vieja sin pestaña o un sobre de hoy sin `user`.
+- **Edad.** Un sobre de más de 7 días no se recupera y se borra al barrer.
+  Uno de casi 7 días, sí.
+- **Pestaña viva.** Cada pestaña retiene un lock con su clave. La duplicada
+  no toma la operación de una pestaña viva. La recarga y la restauración
+  recuperan la suya. Una pestaña que murió sin `pagehide` se da por muerta a
+  los 3 minutos (`BORRADOR_HUERFANO_MS`).
+- **Sin usuario al abrir.** Si `/auth/current_user` falla al abrir, la
+  pestaña lo vuelve a pedir. Espera de 1 a 30 segundos entre pedidos, hasta
+  tenerlo. Mientras tanto no recupera ni guarda. Cuando llega el usuario,
+  guarda lo cargado a su nombre.
+- **Otra sesión en el medio.** Si cambió el token CSRF desde que abrió la
+  pestaña, o si llega un usuario distinto del dueño, la pestaña deja de
+  recuperar y de guardar hasta recargarla. Lo mismo después de un 401.
 
-**D32. Libros chicos en bytes pero caros de leer (tu punto 1).** No lo arreglé
-en esta pieza. Los números:
+### Supuestos (reversibles)
 
-| Forma | Quién | Tamaño | Lectura |
-|---|---|---|---|
-| Celda en la fila 1.048.576, columna G | PM | 1496 bytes | 5,2 s, 400 MB |
-| Lo mismo con `<dimension>` hasta la columna IV | adversario de la PM | — | 179 s, 6,4 GB |
-| `styles.xml` repetido | adversario de la PM | 4,6 KB comprimido | 19,9 s |
-| Celda en la fila 1.048.576, columna AZ | yo, sobre `bdc902d` | 1578 bytes | 10,25 s, 1476 MB |
-| Dos de esas trampas delante de una subida normal | yo | — | la normal tarda 5,5 s (más que el tope de D5) |
+1. **Sin usuario al abrir, se reintenta.** No lo pediste. Lo agregué porque
+   el adversario mostró que tu regla de dueño rompía algo que andaba: con
+   `/auth/current_user` caído al abrir, la pestaña no autoguardaba nunca.
+   Antes de ORDEN-1 guardaba igual.
+2. **Sesión ajena.** Es consecuencia del punto 1. Mientras se reintenta, si
+   otro usuario entra en el mismo navegador, lo cargado quedaba a su nombre
+   (caso k, rojo en `6fd3de7`).
+3. **Tope de 30 s entre reintentos.** Sin tope, la espera crecía sin fin;
+   con 1 s fijo, la pestaña martillaba al servidor caído. Hay un sabotaje
+   para cada lado.
 
-Lo lento ya estaba en la base. Lo nuevo es que ahora ocupa el carril de las
-subidas normales.
+### Puertas
 
-- **(a)** Riesgo aceptado: se entrega así y el CHANGELOG dice que el carril
-  liviano protege del tamaño, no de la densidad.
-- **(b)** En el hilo liviano, antes de leer, se recorre la primera hoja (2 MiB
-  como mucho, porque entró al carril) buscando la fila y la columna más altas
-  en `r="…"` y en `<dimension>`. También se cuentan los `<xf` de `styles.xml`
-  y las entradas del `sst`. Si alguno pasa su tope, la lectura va al carril
-  pesado. El `.xls` lee siempre en el pesado.
-- **(c)** Sólo el `.xls` va siempre al pesado.
-
-**Recomiendo (b).** Es la única que devuelve la garantía de D5 frente a las
-formas medidas, y cuesta milisegundos. Su límite: es una heurística, cierra
-las formas conocidas y no las que falten descubrir. Si elegís (b), va como
-pieza propia, con rojo primero: un caso por forma (celda lejana, `<dimension>`,
-estilos, `sst`, `.xls`) y un sabotaje por tope. No la metí acá porque cambia
-el producto en un lugar que no estaba en tu devolución, y prefiero que lo
-decidas con los números a la vista.
-
-## Tus puntos
-
-1. **Densidad:** la D32, arriba.
-2. **En qué carril leen las otras hojas y los ítems:** casos en `271c0db`.
-   Sabotajes en `83871a5`: `_otras_hojas_con_datos` con
-   `pool=_pool_lectura_excel()` y `extract_items_from_excel` en el pool
-   pesado. Los dos dan rojo.
-3. **`excel2b.sh` salía con 1:** arreglado en `bdc902d`, que ya iba en la entrega de `d2de9fb`, posterior a `b3ac325`. La
-   prueba de D5 afirma el tiempo antes que los carriles, así que el sabotaje
-   dice «esperó detrás de las pesadas». Corrida de hoy, más abajo.
-4. **`1e308` y los dos mutantes:**
-   - `EXCEL_LIVIANO_MB=1e308`: arreglado en `ce3ac05`. El control se hace
-     sobre los bytes (`math.isfinite`); si no entra, vale el de defecto.
-   - El adversario Sonnet encontró el mismo error en el cuarto tope:
-     `EXCEL_MAX_DESCOMPRIMIDO_MB=1e308` daba 400 «cannot convert float
-     infinity to integer» en toda subida de Excel. Tenía su propia lectura.
-     Arreglado en `cedb3ff`: los cuatro topes pasan por `_mb_de_entorno`.
-     Prueba parametrizada con las cuatro variables.
-   - `except Exception: return True`: lo mata el caso del índice ilegible
-     (`271c0db`), con su sabotaje.
-   - `_LIVIANO_IMAGENES_LECTURAS` de 20 a 100000: sabotaje en `83871a5`. En
-     `606dda5` sumé 19 y 21, con una prueba que cuenta exactamente 20
-     lecturas.
-5. **CHANGELOG:** dice 1,5 y 1,7 s, lo medido (`ce3ac05`).
-
-**GUARDAR-2 (tu agregado).** `f567adb`: dos clientes del mismo despachante, con
-igual nombre y CUIT, no comparten historial ni en `/api/catalog/lookup` ni en
-`/api/ncm/sugerir`. El adversario Sonnet vio que faltaba el otro sentido, el
-guardado: en `43fd20d`, guardar el mismo NCM en el otro cliente le crea su
-propio historial, y guardar otro NCM con la misma descripción no pisa al
-primero. Sin cambio de producto: los filtros ya estaban. Dos sabotajes en
-`606dda5`, uno por filtro.
-
-## Hallazgos de la revisión
-
-Adversario Sonnet, esfuerzo alto, sobre `83871a5`:
-
-| Sev. | Hallazgo | Qué hice |
+| Puerta | SHA | Resultado |
 |---|---|---|
-| MEDIA | `EXCEL_MAX_DESCOMPRIMIDO_MB=1e308` da 400 en toda subida de Excel | Rojo en `43fd20d`, arreglo en `cedb3ff`, sabotaje en `606dda5` |
-| MEDIA | GUARDAR-2 no probaba el guardado cruzado entre clientes | Dos casos en `43fd20d`, dos sabotajes en `606dda5` |
-| MEDIA, preexistente | `MAX_UPLOAD_MB` (`main.py:4084-4089`): con `inf` o `1e308` da 500; con `nan`, ValueError; con `-0`, tope 0 | A riesgos. Fuera de la pieza |
-| BAJA | Nada distinguía 19 o 21 lecturas de cabezas de imagen | Prueba que cuenta exactamente 20 (`43fd20d`) y sabotajes con 19 y 21 |
-| BAJA | Nada distinguía si el `except` de la cabeza de imagen cortaba la medida | Prueba con una entrada DEFLATE rota (`43fd20d`) y sabotaje que lo cambia a `ZeroDivisionError` |
-| BAJA | Los topes absurdos se aceptan: `1e300` es un número de 307 cifras; `1e-9` da 0 bytes | A riesgos |
+| Sabotajes (`scripts/testing/sabotajes/orden1.sh`) | `973a1ed` | 31 en ROJO, «sabotajes sin rojo: 0», «salida 0» |
+| Pantalla completa (`scripts/testing/pantalla_orden1.js`) | `d316db2` | «OK: ORDEN-1 en el navegador», «salida 0» |
+| Suite completa | `d316db2` | «4199 passed, 121 skipped, 3 xfailed in 590.02s», «salida 0» |
+| `/code-review high` y `/security-review` | — | **no corridos en esta vuelta**: corrió sólo el adversario Sonnet alto, como dice «Cuántos y quién los corre» para una vuelta |
 
-El adversario no verificó el sabotaje de D5 ni los tiempos del CHANGELOG.
+Los dos mutantes que pediste, con lo que dice el rojo:
 
-**No corridos en esta vuelta:** el adversario Opus, `/code-review` y
-`/security-review`. Es una devolución sin dinero, sesión ni permisos, y por
-eso alcanza un Sonnet alto. Los cuatro sí corrieron en la entrega de `d2de9fb`.
+- `BORRADOR_HUERFANO_MS` enorme: «FALLA: no se recupera la operación de una
+  pestaña que murió sin avisar».
+- Quitar el `selectedRows.add` de `reorderItems`: «FALLA: al arrastrar, la
+  selección no sigue a los productos».
 
-## Puertas (sobre `606dda5`)
+La suite y la pantalla corren sobre `d316db2`, que es `973a1ed` más COBRO.
+COBRO no toca `app_v2.js`.
 
-| Puerta | Salida |
-|---|---|
-| Rojo antes del arreglo de `cedb3ff` | «FAILED tests/test_excel2b.py::test_ningun_tope_de_excel_enorme_rompe_la_subida[EXCEL_MAX_DESCOMPRIMIDO_MB]», «400 {"detail":"Invalid Excel file: cannot convert float infinity to integer"}», «1 failed, 48 passed» |
-| `pytest tests/test_excel*.py tests/test_guardar2.py` después | «1193 passed, 3 warnings in 138.19s», salida 0 |
-| `excel2b.sh 606dda5` | 25 «ROJO», «sabotajes sin rojo: 0», salida 0 |
-| `guardar2.sh 606dda5` | 12 ROJO, «sabotajes con falla: 0», salida 0 |
-| Suite completa, worktree limpio en `606dda5` | `4178 passed, 121 skipped, 3 xfailed in 586.81s (0:09:46)`, salida 0 |
-| `compileall -q proyecto_maria` | salida 0 |
-| `smoke_friccion.sh` contra la API levantada en `606dda5` | «==> OK · telemetría + alias session/state + by-cuit protegido», salida 0 |
+### Adversario (Sonnet, esfuerzo alto, sobre `973a1ed`)
 
-## Comandos
+| # | Severidad | Hallazgo | Qué hice |
+|---|---|---|---|
+| 1 | MEDIA | Con la consulta caída al abrir, el mismo usuario vuelve a entrar en otra pestaña: la pestaña deja de autoguardar (falso positivo del CSRF, `app_v2.js:343-345`). Ninguna prueba lo cubre | **D1** |
+| 2 | BAJA | Una consulta del usuario que tarda más de 4 s, con un login en el medio, deja la pestaña como sesión ajena | riesgo |
+| 3 | MEDIA | La pestaña ajena sigue mostrando la operación de A, pero `CDI.currentUser` pasa a ser B, y `finalize.js:790` usa el CUIT de B al generar | riesgo, con propuesta |
+| 4 | MEDIA (cobertura) | Ninguna prueba cubre la rama `user.username !== duenoPestana` ni el corte por 401 (`sinSesion`) | riesgo, con propuesta |
+| 5 | — | Los casos j y k distinguen el defecto | — |
+| 6 | BAJA | Una carrera en `adoptarBorrador` deja `user: null`. No la reprodujo | riesgo |
+
+Antes, en esta misma vuelta, el adversario encontró el rojo de `699c3eb`
+(supuesto 1).
+
+### Riesgos
+
+Los que pediste, sin arreglar:
+
+- **Pestaña congelada más de 3 minutos.** Su operación la puede tomar otra
+  pestaña.
+- **MARIA-8.** Dos filas del mismo renglón se funden en un ítem del TXT.
+  Queda como está.
+- **`draggable` colgado.** Queda así si se suelta fuera de la tabla.
+- **El borrador de A sigue en localStorage después de su salida.** B ya no
+  lo ve.
+
+Del adversario:
+
+- **Hallazgo 2.** Una consulta lenta deja la pestaña sin autoguardado hasta
+  recargarla. Es el lado seguro.
+- **Hallazgo 3.** Propuesta: cuando la sesión es ajena, la pestaña avisa y
+  no deja generar hasta recargarla. Toca `finalize.js`, que no está en esta
+  pieza.
+- **Hallazgo 4.** Propuesta: un caso de pantalla para cada rama y su
+  sabotaje. No los hice por tiempo. Hoy cada rama es una línea que lee un
+  dato del servidor.
+- **Hallazgo 6.** Sin reproducción.
+
+### Errores míos en esta vuelta
+
+- En medio de la vuelta, mi copia quedó con el HEAD separado en `6da850e`.
+  Ni yo ni `orden1.sh` hicimos ese checkout; probablemente fue el
+  adversario. Volví la rama a su lugar con fast-forward, sin perder commits,
+  y le pedí al adversario que trabajara sólo en su worktree.
+- El primer caso j era débil: la caída de 2 s por reloj podía verla sólo
+  `tour.js`, no la pestaña. Lo rehice en `973a1ed`. Ahora mira que la
+  pestaña vuelve a pedir el usuario.
+- El sabotaje «el reintento da por cargado al usuario aunque falló» apuntaba
+  a otro `return`. Ahora cambia `if (!res.ok) return;` por
+  `if (!res.ok) return true;` (`973a1ed`).
+
+### COBRO-MP-1, en curso (no se entrega acá)
+
+Commiteado, sin informe:
+
+- A: `d7edcfe`, `292eca1` y `b44c25e`; sabotajes en `8ca00f7`.
+- B: `c3a05a7` y `85a32e6`.
+- C y E: rojo en `86687fa`, producto en `4b3ebbd`.
+- D, backend: rojo de la carrera en Postgres 16 en `aaa20f0`, producto en
+  `d316db2`.
+- C y D en el perfil: pantalla en rojo en `3b38dc2`, `profile.js` en
+  `12ec020`.
+- Sabotajes de B, C, D y E: `c73a286`.
+
+`3b38dc2`, `12ec020` y `c73a286` quedan fuera de la suite y la pantalla de
+esta entrega: tocan `profile.js` y scripts de prueba, no `app_v2.js`.
+
+Antes de entregar COBRO me falta correr los sabotajes, los adversarios, las
+revisiones y escribir el informe.
+
+### Comandos
 
 ```bash
-git fetch origin claude/dev-tecnica && git checkout 606dda5
-export GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares
-PY=$PM_DIR/venv/bin/python scripts/testing/sabotajes/excel2b.sh    # 25 «ROJO», «sabotajes sin rojo: 0»
-PY=$PM_DIR/venv/bin/python scripts/testing/sabotajes/guardar2.sh   # 12 «ROJO», «sabotajes con falla: 0»
-EXCEL_MAX_DESCOMPRIMIDO_MB=1e308 $PM_DIR/venv/bin/python -m pytest -q --no-cov tests/test_excel2b.py -k enorme   # passed
+git fetch origin claude/dev-tecnica && git checkout --detach 973a1ed
+PY=<venv>/bin/python scripts/testing/sabotajes/orden1.sh 973a1ed
+#   tiene que terminar en «sabotajes sin rojo: 0» y «salida 0»
+#   (31 líneas «ROJO  |», entre ellas las de los dos mutantes de arriba)
 ```
 
-## Riesgos y lo no corrido
-
-- **D32**, arriba: hasta que la decidas, un libro chico armado para ser lento
-  le hace esperar a la subida normal.
-- `MAX_UPLOAD_MB` con `inf`, `nan` o `-0` (preexistente, `main.py:4084-4089`).
-- Los topes de Excel aceptan valores absurdos pero finitos: `1e-9` da un tope
-  de 0 bytes y toda subida de Excel va al pesado o se rechaza.
-- `ataque_aislamiento.sh`: no corrido. Esta vuelta no toca sesión ni permisos;
-  GUARDAR-2 sólo suma pruebas sobre filtros que ya existían.
-- Sigue sin commitear en mi árbol la vuelta de ORDEN-1 (`app_v2.js`,
-  `pantalla_orden1.js`). No está en este SHA. Va en su propia entrega,
-  después de esta.
-
-/compact conservar: Dev 1 (técnica), rama claude/dev-tecnica. EXCEL-2b entregada en este commit (D32 abierta). Sigue, en orden: devolución de ORDEN-1 (cambios sin commitear en app_v2.js y pantalla_orden1.js), COBRO-MP-1 (A–E), COBRO-CORTE-1, COBRO-MP-2, AISLAMIENTO-2, LIMPIEZA-1, BACKUP-1a (7 puntos). Informes en el scratchpad (informe_*.md); push y aviso a la PM principal por cada uno.
+/compact conservar: Dev 1 (técnica), sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica, rutina trig_011UpBfwEu9TUzoNUrviqoP5, aviso a la PM principal (session_01B7FVQspcEHF7PqNv797wNM). ORDEN-1 (vuelta) entregada en este commit (D1 abierta). Sigue, en orden: COBRO-MP-1 (A–E commiteadas; faltan adversarios, revisiones e informe), COBRO-CORTE-1, COBRO-MP-2, AISLAMIENTO-2, LIMPIEZA-1, BACKUP-1a (7 puntos). Informes en el scratchpad (informe_*.md); push y aviso por cada uno.
