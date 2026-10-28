@@ -577,6 +577,58 @@ PY=python scripts/testing/sabotajes/conexiones1.sh postgresql://<usuario>@127.0.
 #   tres «OK    |» y «FALLAS 0»
 ```
 
+## DESTINO-1 (devolución de pruebas): **entregada** en `b9881fb` (2026-10-28, 17:29 UTC)
+
+**Resultado:** un solo commit de pruebas, `b9881fb`, encima de la cadena
+(base `17a23a5`). No toca el producto. Tiene 5 casos nuevos en
+`tests/test_destino1.py` y 4 sabotajes nuevos en `destino1.sh`. En cada caso
+el destino elegido es distinto del de la operación.
+
+- `tests/test_destino1.py` sobre `b9881fb`: `32 passed`.
+- `PY=python bash scripts/testing/sabotajes/destino1.sh b9881fb`: 19 de 19
+  en rojo, «sabotajes sin rojo: 0».
+- La suite completa no se corrió: el commit sólo suma pruebas.
+
+**Decide la PM:** el punto 2(b) (abajo). Contradice tu devolución: con el
+producto actual, el grupo que pediste como válido da error.
+
+| Lo pedido | Caso | Sabotaje que lo pone en rojo (texto copiado del log) |
+|---|---|---|
+| 1. dos renglones de la misma posición | `test_dos_renglones_de_la_misma_posicion_salen_con_su_destino` | `item.pop('iva_adicional')` → «los renglones juntados pierden su destino»: `('COMERC', 'NO_VALIDA')` |
+| 2(a). grupo con el mismo destino explícito | `test_un_grupo_con_el_mismo_destino_sale_con_ese_destino` | `combined.pop('iva_adicional')` → «el grupo pierde su destino»: `('COMERC', 'NO_VALIDA')` |
+| 2(b). grupo con el primero explícito y el resto vacío | `test_un_grupo_con_el_primero_elegido_y_el_resto_vacio_no_se_genera` | (es la regla de `un grupo con destinos distintos se genera`, que ya estaba: `DID NOT RAISE`) |
+| 3. grupo de reventa en una operación de bien de uso de una persona | `test_un_grupo_de_reventa_no_sale_como_bien_de_una_persona` (ni `USOPAR` ni `IVAAD1` en todo el TXT) | `combined['iva_adicional'] = 'IVAAD1'` → «el grupo sale como bien de uso de una persona»: `('USOPAR', 'IVAAD1')` |
+| 4. ítem con sub-ítems y destino en el ítem | `test_un_item_con_subitems_sale_con_el_destino_del_item` | el ítem con sub-ítems toma el de la operación → `('COMERC', 'NO_VALIDA')` |
+
+**Contradicción, punto 2(b):** pediste como válido «el primero explícito con
+el resto vacío». En el producto, vacío quiere decir «el de la operación»: así
+lo define DESTINO-1 y así lo prueba
+`test_un_item_sin_destino_toma_el_por_defecto_aunque_otro_cambie`. Entonces
+ese grupo tiene dos destinos, y el generador lo frena con «Grupo 1: todos los
+ítems deben tener el mismo destino». No lo cambié: el caso prueba que **no se
+genera**. Si querés que el vacío herede el destino del primero del grupo, es
+un cambio de producto: decímelo como D y va con su rojo. Mi recomendación es
+dejarlo así. Heredar en silencio puede declarar mal un ítem que el usuario
+dejó en «igual que la operación».
+
+**Riesgos que quedan:** los tres de tu devolución, sin tocar producto, porque
+ya estaban antes de la pieza o hace falta armar el body a mano:
+- un `iva_adicional` falso por ítem (`false`, `0`, `[]`) se toma como «igual
+  que la operación»;
+- el 400 por destino inválido devuelve el valor entero (100 000 caracteres
+  vuelven en el mensaje; los otros mensajes recortan a 20);
+- `/generate_maria/avisos` no valida el destino, así que el error recién
+  aparece al generar.
+
+**La premisa:** el golden de 2025 trae `COMERC` con `IVAAD1`. Si la
+pregunta 7 dice otra cosa, se reabre la tabla (D28).
+
+```bash
+git show --stat b9881fb                                        # 2 files changed, 56 insertions(+), 1 deletion(-); sin producto
+python -m pytest -q --no-cov tests/test_destino1.py            # 32 passed
+PY=python bash scripts/testing/sabotajes/destino1.sh b9881fb   # 19 ROJO, «sabotajes sin rojo: 0»
+```
+
 ## Entregas preparadas para las 18:00 UTC (2026-10-28)
 
 Recibí la D37 (2) en `20fb535`. En ABUSO-1 la pasé a riesgos, con lo que
