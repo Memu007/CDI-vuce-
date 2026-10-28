@@ -271,9 +271,16 @@ class TestWebhook:
         assert resp.json().get("skipped") is not None
 
     def test_pago_aprobado_activa_billing_y_extiende_30_dias(self, client, monkeypatch):
-        """Pago aprobado → billing_status=active, trial_ends_at ~30 días."""
+        """Pago aprobado → billing_status=active y 30 días más desde el fin
+        de la prueba: los días que quedaban no se pierden (COBRO-MP-2, D7.1)."""
         uname = _unique("wh_ok")
         _register(client, uname)
+        antes = _get_user(uname)
+        assert antes["billing_status"] == "trial"
+        fin_prueba = antes["trial_ends_at"]
+        if fin_prueba.tzinfo is None:
+            fin_prueba = fin_prueba.replace(tzinfo=timezone.utc)
+        assert fin_prueba > datetime.now(timezone.utc) + timedelta(days=1)
         payment_id = f"pay-{uuid.uuid4().hex[:8]}"
 
         class FakePayment:
@@ -304,8 +311,7 @@ class TestWebhook:
         trial_end = after["trial_ends_at"]
         if trial_end.tzinfo is None:
             trial_end = trial_end.replace(tzinfo=timezone.utc)
-        delta = trial_end - datetime.now(timezone.utc)
-        assert 28 <= delta.days <= 31, f"trial_ends_at delta: {delta.days} días"
+        assert abs(trial_end - (fin_prueba + timedelta(days=30))) < timedelta(minutes=5), (trial_end, fin_prueba)
 
     def test_pago_aprobado_resetea_ops_periodo(self, client, monkeypatch):
         """Al cobrar suscripción, ops_used_this_period se resetea a 0."""
