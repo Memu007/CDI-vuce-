@@ -30,6 +30,15 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## D34 (2026-10-28): (a), sobre `39be45e`
+
+(a), como ya aplicaste: OBSERVABILIDAD-1 sólo hace que la columna y su
+índice existan. Que `MetricsMiddleware` grabe el dueño leyendo el token
+toca sesión y autenticación: es otra pieza, no entra acá. Anotala en
+«riesgos» como propuesta (una línea: qué haría y qué toca). Donde la tarea
+decía «la métrica se graba con su dueño», vale «la métrica se graba y no
+falla». Decidido por la PM. Tu próxima D es la **D35**.
+
 ## D33 (2026-10-28): (a), sobre `88b22c8`
 
 Para el código, (a): no se cambia nada. El cargador de los
@@ -203,10 +212,43 @@ primero entregás ORG-1 y después seguís. Datos que llegaron el 28/10
   por par. Es un campo de impuestos: revisión fuerte.
 
 Después: **SUFIJOS-2**, **SEGURO-1**, **DESPACHO-1b**, **DATOS-1** y
-**DISCO-1** (hechas, sin entregar) y **OBSERVABILIDAD-1** (abajo, empezala
-ya). PESO-NETO-1 y PRORRATEO-1 siguen esperando al despachante.
+**DISCO-1** y **OBSERVABILIDAD-1** (hechas, sin entregar) y **SESION-1**
+(abajo, empezala ya). PESO-NETO-1 y PRORRATEO-1 siguen esperando al
+despachante.
 
-### OBSERVABILIDAD-1 — empezala ya (2026-10-28 08:00 UTC)
+### SESION-1 — empezala ya (2026-10-28 09:00 UTC)
+
+OBSERVABILIDAD-1 quedó hecha (`39be45e`). Lo tuyo que queda espera a gente
+de afuera, así que te paso otra pieza de la Fase 3 que era de la técnica:
+**SESION-1**, el hallazgo S3 de `AUDITORIA-2026-10-06.md`. Decidido por la
+PM; dentro del roadmap. En commits aparte encima de `39be45e`, con su
+propio `/entregar` después del de OBSERVABILIDAD-1.
+
+- **El problema (S3):** resetear o cambiar la contraseña revive las
+  sesiones viejas, incluso las ya revocadas; cerrar sesión no revoca; con
+  una sesión robada se cambia el email sin contraseña y se toma la cuenta.
+- **Premisa primero:** reproducí cada parte sobre `39be45e` (PG16 en el
+  55432 y SQLite) antes de tocar nada, y decí dónde vive hoy la revocación
+  (jti, versión de token, lo que haya) y qué rutas cambian contraseña o
+  email. Si alguna parte ya no se reproduce, decilo con la prueba.
+- **Qué hacer:** cambiar o resetear la contraseña y cerrar sesión revocan
+  de verdad las sesiones que corresponden (las otras, y en cerrar sesión la
+  propia), y una revocada no vuelve; cambiar el email pide la contraseña
+  actual. Usá el mecanismo de revocación que ya exista; si no hay uno o hay
+  dos que compiten, preguntá en la **D35** antes de inventar otro.
+- **Fuera de alcance:** los hallazgos vecinos de Argon
+  (`REPRODUCCION-ARGON-2026-10-24.md`, filas 10, 13.2 y 14: link de
+  verificación reutilizable, reset con cookie vieja, contador de intentos,
+  tokens de reset paralelos, `/auth/me` y el jti). Si tu cambio arregla
+  alguno de paso, decilo; si no, una línea por cada uno a «riesgos». No
+  los arregles a propósito: eso lo prioriza Emi.
+
+Pruebas: cada parte de S3 en PG16 y SQLite, con la sesión vieja que ya no
+entra después de cada acción y la sesión nueva que sí; cambiar el email sin
+contraseña o con una equivocada falla y no cambia nada; un sabotaje por
+regla. Línea en `CHANGELOG.md`. Es autenticación: revisión fuerte.
+
+### OBSERVABILIDAD-1 — hecha, sin entregar (encargada 2026-10-28 08:00 UTC)
 
 DISCO-1 quedó hecha (`88b22c8`). Lo tuyo que queda espera a alguien de
 afuera (BACKUP-1 a Emi: dónde se guarda la copia fuera de Railway). Te paso
@@ -241,7 +283,7 @@ DISCO-1.
 
 Pruebas: en Postgres 16 desde una base sin la columna y con filas, la
 columna y el índice quedan, las filas viejas siguen, la métrica se graba
-con su dueño, y dos arranques seguidos no cambian nada; en SQLite igual;
+(dueño: ver D34), y dos arranques seguidos no cambian nada; en SQLite igual;
 una falla simulada de la migración no frena el arranque. Un sabotaje por
 regla. Línea en `CHANGELOG.md`. Es una migración: revisión fuerte.
 
