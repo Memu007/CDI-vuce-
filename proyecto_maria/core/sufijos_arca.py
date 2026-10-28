@@ -183,17 +183,25 @@ def faltan(consulta: dict, presentes: Iterable[str]) -> list[str]:
 COMPLETA = (("AA", ("marca",)), ("AB", ("modelo",)), ("AI", ("codigo_parte",)))
 
 
-def solo_letras_numeros_espacios(texto) -> str:
-    """Letras sin tilde, números y espacios; lo demás, espacio (el MARIA
-    rechazó guiones y puntos el 24/10)."""
+# Un número con decimales: un solo punto o coma entre dígitos, que no sea
+# parte de una cadena como «1.2.3» (un código, no un número).
+_DECIMAL = r"(?<!\d)(?<!\d[.,])(\d+)[.,](\d+)(?![.,]?\d)"
+_DECIMAL_O_SIGNO = re.compile(rf"{_DECIMAL}|[^A-Za-z0-9 ]")
+
+
+def caracteres_del_maria(texto) -> str:
+    """Letras sin tilde, números, espacios y la coma de un número con
+    decimales; lo demás, espacio. El MARIA rechazó guiones y puntos el 24/10
+    y el despachante confirmó el 28/10 que un número puede llevar coma
+    (SUFIJOS-2): «2.5» sale «2,5», no «2 5», que es otro número."""
     sin_tildes = "".join(c for c in unicodedata.normalize("NFKD", str(texto or ""))
                          if not unicodedata.combining(c))
-    return re.sub(r"[^A-Za-z0-9 ]", " ", sin_tildes)
+    return _DECIMAL_O_SIGNO.sub(lambda m: f"{m[1]},{m[2]}" if m[1] else " ", sin_tildes)
 
 
 def valor_de_sufijo(texto) -> str:
     """El valor tal como entra entre paréntesis, sin espacios de más."""
-    return " ".join(solo_letras_numeros_espacios(texto).split())
+    return " ".join(caracteres_del_maria(texto).split())
 
 
 def proponer(item: dict, consulta: dict | None, tope: int = 120) -> dict:

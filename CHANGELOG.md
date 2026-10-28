@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-28 · feat: los sufijos de valor aceptan la coma de un número y frenan los vacíos (SUFIJOS-2)
+
+- En un sufijo de código libre, un número con decimales sale con coma: «AF(2.5)» sale «AF(2,5)», no «AF(2 5)».
+- Un sufijo que pide número (los que empiezan con Z) con decimales, o uno vacío como «AA()», no genera el TXT: el aviso dice en qué producto y cuál es.
+
 ## 2026-10-28 · feat: el destino de la mercadería sale de a pares en el TXT (DESTINO-1)
 
 - En la pantalla de validación, «Destino de la mercadería» ofrece comercialización o reventa (por defecto), bien de uso de la empresa o bien de uso de una persona, por operación y con cambio por producto.

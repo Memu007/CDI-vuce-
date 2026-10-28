@@ -326,22 +326,29 @@ def ref_de_la_factura(numero_factura: str) -> str:
 
 
 # Un sufijo es una serie de «CC(valor)-» y «CCNN-». Dentro del valor el
-# MARIA sólo acepta letras, números y espacios (24/10: rechazó guiones y
-# puntos). Entre un sufijo y otro va «-», como en el archivo aceptado; un
+# MARIA sólo acepta letras, números, espacios y la coma de un número con
+# decimales (24/10: rechazó guiones y puntos; SUFIJOS-2). Entre un sufijo y otro va «-», como en el archivo aceptado; un
 # espacio, una coma o nada entre dos sufijos se toma como separación
 # (devolución de MARIA-7: antes «AA(ROJO) AB(AZUL)» salía «AA(ROJO  AB AZUL)»).
 _UN_SUFIJO = re.compile(r"([A-Za-z]{2})(?:\(([^()]*)\)|([0-9]{2}))")
 _ENTRE_SUFIJOS = re.compile(r"[\s,;\-]*")
 SUFIJO_MAXIMO = 120  # el mismo tope que valida /generate_maria
+# Los códigos que piden un número (SUFIJOS-2, supuesto de la D29): en la tabla
+# de ARCA del 07/10/2026 los libres que empiezan con Z son todos magnitudes o
+# cantidades (peso, %, capacidad, cantidad…) y los que empiezan con A son
+# texto (marca, modelo, código); el archivo aceptado de 2026 los trae enteros.
+PIDE_NUMERO = ("Z",)
 
 
 def limpiar_sufijo(sufijo: str, donde: str = "") -> tuple[str, bool]:
     """El sufijo partido en sus códigos, cada uno con su valor reducido a
-    letras, números y espacios (lo demás, espacio; una letra con tilde, sin
-    tilde) y separados con «-»; el «-» final, si vino. Devuelve también si
-    cambió algo, para avisarlo. Lo que no se puede partir en códigos (un
-    paréntesis sin cerrar, un «(» dentro del valor) no se adivina: error
-    con `donde` (qué producto y qué sufijo)."""
+    letras, números, espacios y la coma de un número con decimales (lo
+    demás, espacio; una letra con tilde, sin tilde) y separados con «-»; el
+    «-» final, si vino. Devuelve también si cambió algo, para avisarlo. Lo
+    que no se puede partir en códigos (un paréntesis sin cerrar, un «(»
+    dentro del valor), un valor vacío o un número con decimales en un código
+    que pide número no se adivinan: error con `donde` (qué producto y qué
+    sufijo)."""
     sufijo = str(sufijo or "")
     partes, pos = [], _ENTRE_SUFIJOS.match(sufijo).end()
     while pos < len(sufijo):
@@ -350,11 +357,26 @@ def limpiar_sufijo(sufijo: str, donde: str = "") -> tuple[str, bool]:
             raise ValueError(
                 f"Sufijo de valor{donde}: «{sufijo[:80]}» no se puede separar en códigos "
                 f"(cerca de «{sufijo[pos:pos + 20]}»). Cada uno va como AA(valor) o CA00, "
-                f"separados con un guion, y dentro del paréntesis van sólo letras, números "
-                f"y espacios. Así no se genera el TXT."
+                f"separados con un guion, y dentro del paréntesis van sólo letras, números, "
+                f"espacios y la coma de un número. Así no se genera el TXT."
             )
         codigo, valor, numero = uno.groups()
-        partes.append(codigo + (f"({sufijos_arca.solo_letras_numeros_espacios(valor)})" if numero is None else numero))
+        if numero is not None:
+            partes.append(codigo + numero)
+        else:
+            valor = sufijos_arca.caracteres_del_maria(valor)
+            if not valor.strip():
+                raise ValueError(
+                    f"Sufijo de valor{donde}: «{uno[0][:40]}» está vacío. Escribí el valor o "
+                    f"sacá el código. Así no se genera el TXT."
+                )
+            if "," in valor and codigo.upper().startswith(PIDE_NUMERO):
+                raise ValueError(
+                    f"Sufijo de valor{donde}: «{uno[0][:40]}» pide un número sin decimales y no "
+                    f"se redondea solo. Escribilo entero, sin punto ni coma. Así no se genera "
+                    f"el TXT."
+                )
+            partes.append(f"{codigo}({valor})")
         pos = _ENTRE_SUFIJOS.match(sufijo, uno.end()).end()
     final = "-" if partes and _ENTRE_SUFIJOS.fullmatch(sufijo[-1]) else ""
     limpio = "-".join(partes) + final
@@ -377,7 +399,8 @@ def _aviso_de_sufijo(donde: str, sufijo) -> list:
     if not cambio:
         return []
     return [f"Sufijo de valor{donde}: entre un código y otro va un guion y dentro de los "
-            f"paréntesis van sólo letras, números y espacios; sale «{limpio[:80]}»."]
+            f"paréntesis van sólo letras, números, espacios y la coma de un número; "
+            f"sale «{limpio[:80]}»."]
 
 
 def usa_el_sufijo_de_la_operacion(items) -> bool:
@@ -1528,8 +1551,8 @@ def generate_maria_txt(operation_id: str, items: list,
         #
         # Referencia real con dos sub-ítems:
         # `tests/fixtures/maria_golden_subitems_anon.TXT`.
-        # Dentro de los valores, sólo letras, números y espacios (MARIA-7;
-        # los supuestos avisan lo que se cambió).
+        # Dentro de los valores, sólo letras, números, espacios y la coma de
+        # un número (MARIA-7, SUFIJOS-2; los supuestos avisan lo que se cambió).
         if renglones:
             # Un sub-ítem por renglón (MARIA-8), con lo de su renglón: el FOB
             # al centavo, el unitario y el sufijo propio o el de la operación.
