@@ -10,6 +10,7 @@ repositorio.
 
 | Decisión | Fecha | En una línea |
 |---|---|---|
+| **DESPACHO-1 entra al roadmap** | 2026-10-28 | Emi: «Sí, hay que sumarlo»: subir despachos ya oficializados para armar y editar el catálogo de cada cliente y poder bajarlo. Pieza de la Dev MARIA en la Fase 1c, después de ORG-1; espera un despacho de ejemplo del despachante. No arma TXT ni operación |
 | **Emi autoriza guardar las tres ramas de esta retoma en GitHub** | 2026-10-20 | Ante la pregunta explícita de guardar las ramas del resumen sin modificar el sitio, Emi respondió «dale. y. anotalo asi. la prox. pm sabe». Abarca `codex/pm-retoma-txt` (incluida esta nota y el cierre PM), `codex/maria5d-unit-kg` (`254531b`) y `codex/doc1-block-invalid-pdf` (`fe0a101`) en `Memu007/CDI-vuce-`, y sus borradores de revisión. No volver a pedir permiso para este guardado ya autorizado. No autoriza fusionar a main, desplegar en Railway ni aceptar precisión del lector real. |
 | **DOC-1: bloquear el TXT incorrecto; no sumar exportación completa** | 2026-10-19 | Emi eligió «Primero bloquear el TXT incorrecto» al decidir sobre EC02. Reconocer/rechazar documentos no admitidos y frenar destinaciones EC* en el flujo de importación. Sin generar exportaciones, inventar factura ni cambiar campos del formato MARIA. |
 | **AFIP/WSAA y VUCE quedan simulados** | 2026-09-04 | Excluidos del alcance por decisión de producto. No se auditan ni se trabajan |
