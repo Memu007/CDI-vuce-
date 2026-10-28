@@ -112,6 +112,17 @@ sabotaje $F "las imágenes se descuentan sin tope" $B \
 sabotaje $F "las cabezas de imagen se leen sin tope de lecturas" $B \
   "FAILED $B::test_no_se_leen_mas_de_20_cabezas_de_imagen" \
   '            for info in candidatas[:_LIVIANO_IMAGENES_LECTURAS]:' '            for info in candidatas:'
+# La cabeza se lee desde los bytes subidos, con tope de lo comprimido.
+sabotaje $F "la cabeza vuelve a descomprimir la entrada entera" $B \
+  "se descomprimieron" \
+  '    datos = contents[inicio:inicio + min(info.compress_size, _LIVIANO_CABEZA_COMPRIMIDA)]' \
+  '    datos = contents[inicio:inicio + info.compress_size]'
+sabotaje $F "la cabeza de una imagen sin comprimir no se lee" $B \
+  "FAILED $B::test_una_imagen_guardada_sin_comprimir_tampoco_cuenta" \
+  '        return datos[:44]' '        return b""'
+sabotaje $F "la cabeza de una imagen comprimida no se lee" $B \
+  "FAILED $B::test_una_imagen_de_verdad_no_cuenta" \
+  '    return zlib.decompressobj(-15).decompress(datos, 44)' '    return b""'
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
