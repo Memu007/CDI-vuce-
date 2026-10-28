@@ -226,6 +226,19 @@ def test_s4_el_limite_por_minuto_del_login_cuenta_la_ip_real(token):
     assert codigos == [200] * 5 + [429], codigos
 
 
+def test_s4_el_login_correcto_borra_los_fallos(token):
+    """Cuatro fallos, un login correcto, cuatro fallos más: no bloquea, porque
+    el correcto vuelve la cuenta a cero."""
+    from proyecto_maria.core.rate_limit import limiter
+    limiter.enabled = False
+    real, c = _ip(), TestClient(app)
+    for _ in range(2):
+        codigos = [_login(c, token[0], "mal", real).status_code for _ in range(4)]
+        assert codigos == [401] * 4, codigos
+        r = _login(c, token[0], CLAVE, real)
+        assert r.status_code == 200, (r.status_code, r.text)
+
+
 def test_s4_el_429_del_login_deja_ip_y_entradas_en_el_log(caplog):
     from proyecto_maria.core.rate_limit import limiter
     limiter.enabled = False
@@ -377,9 +390,12 @@ def _sembrar_limites(**vence_en):
     asyncio.run(_correr())
 
 
-def test_tabla_las_vencidas_se_borran_al_escribir():
+@pytest.mark.parametrize("ruta", ("/auth/recover-username", "/auth/request-password-reset"))
+def test_tabla_las_vencidas_se_borran_al_escribir(ruta):
+    """Recuperar usuario cuenta pedidos y recuperar contraseña suma fallos:
+    las dos escrituras borran antes las vencidas."""
     _sembrar_limites(ab1_vieja=-1, ab1_viva=600)
-    r = TestClient(app).post(RECUPERAR, json={"email": "n@ejemplo.test"}, headers=_xff(_ip()))
+    r = TestClient(app).post(ruta, json={"email": "n@ejemplo.test"}, headers=_xff(_ip()))
     assert r.status_code == 200, r.text
     assert _filas_limites("ab1_vieja", "ab1_viva") == ["ab1_viva"]
 
@@ -389,3 +405,51 @@ def test_tabla_las_vencidas_se_borran_al_arrancar():
     with TestClient(app):
         pass
     assert _filas_limites("ab1_vieja", "ab1_viva") == ["ab1_viva"]
+
+
+RESET = "/auth/request-password-reset"
+
+
+def test_reset_cinco_y_despues_uno_cada_quince_minutos(reloj):
+    """Lo que ya hacía en memoria: cinco pedidos, bloqueo de 15 minutos, y
+    vencido el bloqueo pasa uno solo antes de volver a bloquear."""
+    real, c = _ip(), TestClient(app)
+    codigos = [c.post(RESET, json={"email": f"n{i}@ejemplo.test"}, headers=_xff(real, _ip())).status_code
+               for i in range(6)]
+    assert codigos == [200] * 5 + [429], codigos
+    reloj()
+    reloj(15 * 60 + 1)
+    codigos = [c.post(RESET, json={"email": f"m{i}@ejemplo.test"}, headers=_xff(real)).status_code
+               for i in range(2)]
+    assert codigos == [200, 429], codigos
+
+
+def test_reset_pedidos_simultaneos_no_pasan_el_tope():
+    """Veinte pedidos a la vez desde una IP: pasan cinco, como en fila."""
+    import httpx
+    real = _ip()
+
+    async def _correr():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+            rs = await asyncio.gather(*(c.post(RESET, json={"email": f"s{i}@ejemplo.test"}, headers=_xff(real))
+                                        for i in range(20)))
+            return sorted(r.status_code for r in rs)
+    codigos = asyncio.run(_correr())
+    assert codigos == [200] * 5 + [429] * 15, codigos
+
+
+def test_c9_registros_simultaneos_no_pasan_el_tope():
+    """Veinte registros a la vez desde una IP: pasan cinco, como en fila."""
+    import httpx
+    real = _ip()
+
+    async def _correr():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+            rs = await asyncio.gather(*(c.post("/auth/register", headers=_xff(real), json={
+                "username": f"ab1s_{uuid.uuid4().hex[:8]}", "password": CLAVE,
+                "email": f"ab1s_{uuid.uuid4().hex[:8]}@ejemplo.test", "name": "Ab"}) for _ in range(20)))
+            return sorted(r.status_code for r in rs)
+    codigos = asyncio.run(_correr())
+    assert codigos == [200] * 5 + [429] * 15, codigos

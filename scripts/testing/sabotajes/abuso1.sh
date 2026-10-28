@@ -4,6 +4,13 @@
 # S5: un evento de más de 16 KB da 413 y no se guarda, venga o no
 # Content-Length; uno de hasta 16 KB se guarda; ninguno escribe
 # logs/ui_events.jsonl.
+# S4: la IP es la última de X-Forwarded-For; el 429 del login deja la IP en el
+# log; el login correcto borra los fallos.
+# S6 y C9: recuperar usuario (5 cada 15 min por IP, 3 por hora por email en
+# silencio), registro (5 por hora y 20 por día), recuperar contraseña sin
+# pasar el tope con pedidos simultáneos.
+# Eventos: 120 por minuto por ruta; sin sesión, sólo los de la lista.
+# Tabla: las vencidas se borran al escribir y al arrancar; contar es atómico.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/abuso1.sh [SHA]
 # Trabaja en un worktree descartable con su propia SQLite y sin terceros: no
@@ -97,6 +104,81 @@ sabotaje $M "vuelve la escritura a logs/ui_events.jsonl" \
   $'        try:\n            await _persist_ui_telemetry_row(db, username, payload)' \
   $'        os.makedirs(os.path.join(basedir, "logs"), exist_ok=True)\n        with open(os.path.join(basedir, "logs", "ui_events.jsonl"), "a", encoding="utf-8") as fh:\n            fh.write(_json.dumps(payload) + "\\n")\n        try:\n            await _persist_ui_telemetry_row(db, username, payload)' \
   "FAILED $T::test_s5_un_evento_chico_se_guarda_y_no_escribe_el_jsonl[/api/ui/event]" "assert _tamano_jsonl() == antes"
+
+R=proyecto_maria/core/rate_limit.py
+L=proyecto_maria/core/limites_auth.py
+
+# --- S4: la IP es la última de X-Forwarded-For
+sabotaje $R "vuelve la primera IP de X-Forwarded-For" \
+  '        return partes[0] if len(partes) < saltos else partes[-saltos]' '        return partes[0]' \
+  "FAILED $T::test_s4a_una_ip_inventada_no_esquiva_el_bloqueo_del_login" \
+  "FAILED $T::test_s4b_una_ip_inventada_no_bloquea_a_otro" \
+  "FAILED $T::test_s4_la_ip_es_la_ultima_de_x_forwarded_for"
+sabotaje $M "el 429 del login no deja la IP en el log" \
+  '        log_429(request, "login bloqueado")' '        pass' \
+  "FAILED $T::test_s4_el_429_del_login_deja_ip_y_entradas_en_el_log"
+sabotaje $M "el login correcto no borra los fallos" \
+  '    await limites_auth.limpiar(clave_intentos)' '    pass' \
+  "FAILED $T::test_s4_el_login_correcto_borra_los_fallos" "[401, 401, 429, 429]"
+
+# --- S6: recuperar usuario
+sabotaje $M "recuperar usuario sin límite por IP" \
+  '15 * 60) > 5:' '15 * 60) > 10**6:' \
+  "FAILED $T::test_s6_recuperar_usuario_tiene_limite_por_ip" "[200, 200, 200, 200, 200, 200]"
+sabotaje $M "recuperar usuario: 4 por hora por email" \
+  '3600) > 3:' '3600) > 4:' \
+  "FAILED $T::test_s6_recuperar_usuario_corta_en_silencio_por_email" "el cuarto pedido de la hora mandó el mail"
+sabotaje $M "recuperar usuario: pasado el tope por email busca y manda igual" \
+  $'3600) > 3:\n            return mensaje' $'3600) > 3:\n            pass' \
+  "FAILED $T::test_s6_recuperar_usuario_corta_en_silencio_por_email" "el cuarto pedido de la hora mandó el mail"
+sabotaje $M "recuperar usuario: la clave por email distingue mayúsculas" \
+  'request.email.strip().lower().encode()' 'request.email.strip().encode()' \
+  "FAILED $T::test_s6_recuperar_usuario_corta_en_silencio_por_email" "el cuarto pedido de la hora mandó el mail"
+
+# --- C9: registro
+sabotaje $M "registro: 6 por hora" \
+  '"registro:h:{ip}", 3600) > 5' '"registro:h:{ip}", 3600) > 6' \
+  "FAILED $T::test_c9_registro_cinco_por_hora" "FAILED $T::test_c9_registros_simultaneos_no_pasan_el_tope"
+sabotaje $M "registro: 21 por día" \
+  '24 * 3600) > 20' '24 * 3600) > 21' \
+  "FAILED $T::test_c9_registro_veinte_por_dia" "(200, "
+
+# --- Recuperar contraseña: pedidos simultáneos y bloqueo vencido
+sabotaje $M "recuperar contraseña vuelve a chequear y después sumar" \
+  'sumar_fallo(clave, tope=5) > 5:' 'sumar_fallo(clave, tope=5) > 10**6:' \
+  "FAILED $T::test_reset_pedidos_simultaneos_no_pasan_el_tope"
+sabotaje $L "vencido el bloqueo, la cuenta sigue en vez de volver al tope" \
+  '    nueva = case((vencido, tope), else_=_T.c.cuenta + 1)' '    nueva = _T.c.cuenta + 1' \
+  "FAILED $T::test_reset_cinco_y_despues_uno_cada_quince_minutos" "[429, 429]"
+
+# --- Eventos
+sabotaje $M "eventos: 121 por minuto en /api/ui/event" \
+  $'@limiter.limit("120/minute")\nasync def ui_event' $'@limiter.limit("121/minute")\nasync def ui_event' \
+  "FAILED $T::test_eventos_120_por_minuto_por_ruta[/api/ui/event-/api/session/state]"
+sabotaje $M "eventos: sin sesión se guarda cualquier acción" \
+  '            if accion not in _UI_EVENT_SIN_SESION:' '            if False:' \
+  "FAILED $T::test_eventos_sin_sesion_no_permitidos_no_se_guardan[click-/api/ui/event]"
+sabotaje $M "eventos: hero_cta_clicked sale de la lista" \
+  '"pricing_cta_clicked", "hero_cta_clicked", ' '"pricing_cta_clicked", ' \
+  "FAILED $T::test_eventos_sin_sesion_permitidos_se_guardan[hero_cta_clicked-/api/session/state]"
+
+# --- Tabla: vencidas y atomicidad
+sabotaje $L "contar no borra las vencidas" \
+  $'        "cuenta": _T.c.cuenta + 1,\n    }).returning(_T.c.cuenta)\n    async with _conn.engine.begin() as conn:\n        await conn.execute(delete(_T).where(_T.c.vence <= ahora))\n' \
+  $'        "cuenta": _T.c.cuenta + 1,\n    }).returning(_T.c.cuenta)\n    async with _conn.engine.begin() as conn:\n' \
+  "FAILED $T::test_tabla_las_vencidas_se_borran_al_escribir[/auth/recover-username]" \
+  "FAILED $T::test_s6_recuperar_usuario_tiene_limite_por_ip"
+sabotaje $L "sumar_fallo no borra las vencidas" \
+  $'        await conn.execute(delete(_T).where(_T.c.vence <= ahora))\n        return (await conn.execute(ins)).scalar_one()\n\n\nasync def contar' \
+  $'        return (await conn.execute(ins)).scalar_one()\n\n\nasync def contar' \
+  "FAILED $T::test_tabla_las_vencidas_se_borran_al_escribir[/auth/request-password-reset]"
+sabotaje $M "al arrancar no se borran las vencidas" \
+  '    await _migrate_limites_auth()' '    pass' \
+  "FAILED $T::test_tabla_las_vencidas_se_borran_al_arrancar"
+sabotaje $L "contar lee y después escribe" \
+  $'    ins = ins.on_conflict_do_update(index_elements=[_T.c.clave], set_={\n        "cuenta": _T.c.cuenta + 1,\n    })' \
+  $'    async with _conn.engine.connect() as conn:\n        leida = (await conn.execute(select(_T.c.cuenta).where(_T.c.clave == clave, _T.c.vence > ahora))).scalar() or 0\n    ins = ins.on_conflict_do_update(index_elements=[_T.c.clave], set_={\n        "cuenta": leida + 1,\n    })' \
+  "FAILED $T::test_c9_registros_simultaneos_no_pasan_el_tope"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

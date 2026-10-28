@@ -9,7 +9,13 @@ el código de antes del arreglo da FALLA, y esa FALLA es la reproducción.
    cliente puede ver el corte de la conexión) y no se guarda ni en la tabla ni
    en logs/ui_events.jsonl; uno sin sesión tampoco se guarda;
 3. S6: recuperar usuario tiene límite;
-4. C9: registrarse tiene límite (cada alta da 14 días de prueba).
+4. C9: registrarse tiene límite (cada alta da 14 días de prueba);
+5. la tabla `limites_auth` existe al arrancar y cuenta sin perder pedidos
+   simultáneos (INSERT ... ON CONFLICT atómico);
+6. recuperar usuario corta en silencio al cuarto pedido de la hora para un
+   mismo email, venga de la IP que venga;
+7. los eventos tienen 120 por minuto por ruta, y sin sesión se guardan los de
+   la lista.
 
 El servidor corre con --no-proxy-headers: así request.client.host es la
 dirección del que conecta, como en Railway, donde el que conecta es su proxy
@@ -27,6 +33,7 @@ los dos motores escriben el mismo logs/ui_events.jsonl.
 """
 import json
 import os
+import threading
 import socket
 import sqlite3
 import subprocess
@@ -275,6 +282,90 @@ def c9_registro():
     chequear(429 in codigos, "C9: registrarse tiene límite por IP")
 
 
+def tabla():
+    if MOTOR == "pg":
+        f = sql("select column_name from information_schema.columns where table_name = 'limites_auth'")
+    else:
+        f = sql("select name from pragma_table_info('limites_auth')")
+    columnas = sorted(c for (c,) in f)
+    print(f"INFO  | tabla limites_auth al arrancar: {columnas}")
+    chequear(columnas == ["bloqueado_hasta", "clave", "cuenta", "vence"], "la tabla limites_auth existe al arrancar")
+
+
+def simultaneos(n, pedido):
+    """Larga `n` pedidos a la vez (arrancan juntos con una barrera) y devuelve
+    los códigos."""
+    barrera, codigos = threading.Barrier(n), [None] * n
+
+    def uno(i):
+        barrera.wait()
+        codigos[i] = pedido(i)[0]
+    hilos = [threading.Thread(target=uno, args=(i,)) for i in range(n)]
+    for h in hilos:
+        h.start()
+    for h in hilos:
+        h.join(120)
+    return codigos
+
+
+def cuenta(clave):
+    f = sql("select cuenta from limites_auth where clave = %s", clave)
+    return f[0][0] if f else None
+
+
+def concurrencia():
+    # Registro: cada pedido suma uno, pase o no; los que ven 1..5 pasan.
+    ip = "198.51.100.70"
+    codigos = simultaneos(20, lambda i: registrar(f"ab1_sim_{i}", ip))
+    c = cuenta(f"registro:h:{ip}")
+    print(f"INFO  | concurrencia: 20 registros simultáneos → {sorted(codigos)}, cuenta {c}")
+    chequear(c == 20 and codigos.count(200) == 5 and codigos.count(429) == 15,
+             "concurrencia: 20 registros simultáneos cuentan 20 y pasan 5")
+
+    # Recuperar contraseña: los que pasan el chequeo a la vez suman y se cortan
+    # si la cuenta pasa de cinco; los que llegan con el bloqueo no suman.
+    ip = "198.51.100.71"
+    codigos = simultaneos(20, lambda i: pedir("/auth/request-password-reset",
+                                              {"email": f"nadie{i}@example.com"}, ip=ip))
+    c = cuenta(f"reset:{ip}")
+    print(f"INFO  | concurrencia: 20 recuperar contraseña simultáneos → {sorted(codigos)}, cuenta {c}")
+    chequear(codigos.count(200) == 5 and codigos.count(429) == 15 and c is not None and 5 <= c <= 20,
+             "concurrencia: 20 recuperar contraseña simultáneos pasan 5")
+
+
+def s6_por_email():
+    s, b = registrar("ab1_mail", "203.0.113.15")
+    assert s == 200, (s, b)
+    respuestas = [pedir("/auth/recover-username", {"email": "ab1_mail@example.com"}, ip=f"203.0.113.{20 + n}")
+                  for n in range(4)]
+    print(f"INFO  | S6: 4 recuperar usuario para un email desde 4 IPs → "
+          f"{[(s, sorted(b)) for s, b in respuestas]}")
+    # Sin SMTP, el modo dev devuelve el usuario cuando busca y no puede mandar:
+    # el cuarto no busca, así que no lo trae.
+    chequear([s for s, _ in respuestas] == [200] * 4
+             and ["dev_username_hint" in b for _, b in respuestas] == [True, True, True, False]
+             and len({b["message"] for _, b in respuestas}) == 1,
+             "S6: el cuarto pedido de la hora para un email contesta lo mismo y no busca ni manda")
+
+
+def eventos():
+    s, b = registrar("ab1_lote", "203.0.113.16")
+    assert s == 200, (s, b)
+    token = pedir("/auth/login", {"username": "ab1_lote", "password": CLAVE}, ip="203.0.113.16")[1]["access_token"]
+    ip = "203.0.113.17"
+    codigos = [pedir("/api/ui/event", {"action": "ab1_lote"}, ip=ip, token=token)[0] for _ in range(121)]
+    otra = pedir("/api/session/state", {"action": "ab1_lote"}, ip=ip, token=token)[0]
+    print(f"INFO  | eventos: 121 a /api/ui/event → 200×{codigos.count(200)}, último {codigos[-1]}; la otra ruta {otra}")
+    chequear(codigos.count(200) == 120 and codigos[-1] == 429 and otra == 200,
+             "eventos: 120 por minuto por ruta")
+    for ruta in ("/api/ui/event", "/api/session/state"):
+        marca = uuid.uuid4().hex
+        s, b = pedir(ruta, {"action": "hero_cta_clicked", "m": marca}, ip="203.0.113.18")
+        f = sql("select owner_username, action from telemetry_events where props like %s", f"%{marca}%")
+        chequear(s == 200 and b.get("ok") is True and f == [(None, "hero_cta_clicked")],
+                 f"eventos {ruta}: uno de la lista sin sesión se guarda ({f})")
+
+
 proc = None
 jsonl_original = tam_jsonl()
 try:
@@ -282,6 +373,10 @@ try:
         admin(f'create database "{NOMBRE}"')
     proc = arrancar()
     print(f"motor: {MOTOR}, servidor en :{PUERTO}")
+    tabla()
+    concurrencia()
+    s6_por_email()
+    eventos()
     s4_login()
     s5_eventos()
     s6_recuperar()
