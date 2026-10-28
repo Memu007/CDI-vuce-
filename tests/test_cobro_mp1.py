@@ -567,6 +567,25 @@ def test_un_cobro_no_aprobado_no_hace_nada(client):
     assert _leer_pago(pid) == {}
 
 
+@pytest.mark.parametrize("estado_en_el_cobro", [None, "in_process"], ids=["sin_estado", "pendiente"])
+def test_lo_que_decide_es_el_estado_del_pago_y_no_el_que_copia_el_cobro(client, estado_en_el_cobro):
+    """El cobro trae una copia del estado del pago y su forma no se confirmó
+    contra un aviso real (D30): si falta o quedó vieja y el pago está
+    aprobado, la renovación se cobró y se aplica."""
+    usuario = _unique("mp4_estado")
+    _register(client, usuario)
+    _vencida(usuario)
+    cobro, pid = _renovacion(usuario)
+    if estado_en_el_cobro is None:
+        COBROS[cobro]["payment"].pop("status")
+    else:
+        COBROS[cobro]["payment"]["status"] = estado_en_el_cobro
+    r = _aviso_cobro(client, cobro)
+    assert r.status_code == 200 and r.json().get("skipped") is None, r.text
+    assert _get_user(usuario)["billing_status"] == "active"
+    assert _leer_pago(pid)["estado"] == "aplicado"
+
+
 @pytest.mark.parametrize("romper", [
     lambda c: c.pop("payment"),
     lambda c: c.pop("preapproval_id"),
