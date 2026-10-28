@@ -218,7 +218,8 @@ ESTADOS = {
                        "TRIAL_EXPIRED", "Venció tu prueba gratis", "past_due"),
     "suscripcion_vencida": ({"billing_status": "active", "trial_ends_at": AHORA - timedelta(days=10)},
                             "TRIAL_EXPIRED", "Venció tu suscripción", "past_due"),
-    "cancelada": ({"billing_status": "canceled"},
+    # COBRO-MP-2: la cancelada sigue hasta el fin del período; después, se corta.
+    "cancelada": ({"billing_status": "canceled", "trial_ends_at": AHORA - timedelta(days=1)},
                   "TRIAL_EXPIRED", "Cancelaste tu suscripción", "canceled"),
 }
 
@@ -259,6 +260,14 @@ def test_la_suscripcion_dentro_de_la_gracia_genera(cuenta):
     _fijar(u, billing_status="active", trial_ends_at=AHORA - timedelta(days=3))
     assert _generar(c).status_code == 200
     assert _leer(u)["estado"] == "active"
+
+
+def test_la_cancelada_genera_hasta_el_fin_del_periodo(cuenta):
+    """COBRO-MP-2 (C2): cancelar no corta lo que ya se pagó."""
+    c, u = cuenta()
+    _fijar(u, billing_status="canceled", trial_ends_at=AHORA + timedelta(days=5))
+    assert _generar(c).status_code == 200
+    assert _leer(u)["estado"] == "canceled"
 
 
 def test_la_organizacion_impaga_corta_a_su_miembro_aunque_el_usuario_diga_active(cuenta):
