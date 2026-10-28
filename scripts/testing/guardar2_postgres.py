@@ -7,7 +7,9 @@ SIM completa en el catálogo del proveedor:
 2. `/api/ncm/sugerir` la trae primero;
 3. con otra NCM en el proveedor, queda la del cliente;
 4. si la consulta al catálogo del proveedor falla en la base, la del cliente
-   no se pierde.
+   no se pierde;
+5. el catálogo del proveedor de otro despachante no cambia la SIM, y un
+   client_id ajeno no trae su historial.
 
 uso (con un Postgres local y descartable, nunca el de producción):
   python scripts/testing/guardar2_postgres.py postgresql://cdi@127.0.0.1:55432/<base vacía>
@@ -88,6 +90,47 @@ with TestClient(main_mod.app, raise_server_exceptions=False) as c:
     autorrelleno, sug = caso("84713012100K")
     chequear(autorrelleno == ("cliente", "84714900"), f"con otra NCM en el proveedor queda la del cliente ({autorrelleno})")
     chequear([n for _, n in sug][:2] == ["84714900", "84713012100K"], f"y la sugerencia trae las dos ({sug})")
+
+    # Por dueño: otro despachante, con su sesión, tiene la SIM en su catálogo
+    # de un proveedor que el primero no cargó. Mismo cliente HTTP (un solo
+    # bucle para el pool de la base): se cambia la cookie de sesión.
+    sesion1 = dict(c.cookies)
+
+    def como(sesion):
+        c.cookies.clear()
+        c.cookies.update(sesion)
+        return c
+
+    c.cookies.clear()
+    usuario2 = f"g2o_{uuid.uuid4().hex[:8]}"
+    r = c.post("/auth/register", json={"username": usuario2, "password": "SecureP@ss1",
+                                       "email": f"{usuario2}@example.com", "name": usuario2})
+    chequear(r.status_code == 200, f"registro del otro despachante ({r.status_code})")
+    sesion2 = dict(c.cookies)
+    proveedor = f"Proveedor {uuid.uuid4().hex[:6]}"
+    r = como(sesion2).post(f"/api/catalog/{proveedor.lower().replace(' ', '_')}/productos", json={
+        "vendor_name": proveedor, "productos": [{"descripcion": "COMPUTADORA PORTATIL", "ncm": SIM}]})
+    chequear(r.status_code == 200, f"catálogo del otro despachante ({r.status_code})")
+    r = como(sesion1).post("/api/clientes", json={"nombre": "Cliente de prueba", "cuit": "30999999995"})
+    cid = r.json()["cliente"]["id"]
+    c.post(f"/api/clientes/{cid}/operaciones", json={"items": [{"pieza": SIM, "descripcion": "COMPUTADORA PORTATIL"}]})
+
+    def pedir(quien):
+        r = quien.post("/api/catalog/lookup", json={"items": [{"descripcion": "COMPUTADORA PORTATIL"}],
+                                                    "vendor_name": proveedor, "client_id": cid})
+        item = r.json()["items"][0] if r.status_code == 200 else {}
+        r = quien.post("/api/ncm/sugerir", json={"descripcion": "COMPUTADORA PORTATIL",
+                                                 "client_id": cid, "vendor_name": proveedor})
+        sug = [(s["source"], s["ncm"]) for s in r.json().get("sugerencias", [])] if r.status_code == 200 else []
+        return (item.get("source"), item.get("ncm")), sug
+
+    autorrelleno, sug = pedir(como(sesion1))
+    chequear(autorrelleno == ("cliente", "84714900") and sug == [("historial", "84714900")],
+             f"el catálogo de otro despachante no cambia la SIM ({autorrelleno} {sug})")
+    autorrelleno, sug = pedir(como(sesion2))
+    chequear(autorrelleno == ("proveedor", SIM) and sug == [("proveedor", SIM)],
+             f"el historial de un cliente ajeno no se usa ({autorrelleno} {sug})")
+    como(sesion1)
 
     # Si la consulta al catálogo del proveedor falla en la base, la sugerencia
     # del cliente no se pierde (en Postgres la transacción queda abortada).
