@@ -79,8 +79,10 @@ sabotaje $G "el incoterm sin normalizar" \
 
 # 2. La regla vive en el servidor, no sólo en la pantalla.
 sabotaje $M "el servidor no le pasa el incoterm a las cuentas" \
-  '            incoterm=request.incoterm,
-' '' \
+  'ajustes_deducir=request.ajustes_deducir,
+            incoterm=request.incoterm,
+' 'ajustes_deducir=request.ajustes_deducir,
+' \
   "test_los_avisos_traen_la_regla_del_servidor[CIF]"
 sabotaje $F "la pantalla decide por su cuenta con el incoterm" \
   'const enElPrecio = !!(valor && valor.seguro_en_el_precio);' \
