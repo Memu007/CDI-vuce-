@@ -1,0 +1,129 @@
+"""COBRO-MP-1, C y E (PARA-DEV.md, devolución del 2026-10-28).
+
+C: desde past_due se puede cancelar. Si quedó una suscripción en Mercado
+Pago, se cancela allá (si no, cobra cuando la tarjeta vuelve); la cuenta
+queda «canceled» y no gana acceso por cancelar.
+
+E: reactivar una prueba que sólo hizo una recarga vuelve a la prueba con
+sus días, como una prueba sin recarga. La recarga no es un plan pagado.
+
+Mercado Pago simulado con la infraestructura de COBRO-MP-2.
+"""
+import json
+import types
+from datetime import datetime, timedelta, timezone
+
+import pytest
+
+from proyecto_maria.services import billing_service
+from tests.test_cobro_mp2 import (  # noqa: F401
+    PEDIDOS, SUS, _aviso_ipn, _cerca, _fin, _leer, _mp, _pago, _suscripto,
+)
+from tests.test_prelaunch_block2 import _get_user, _register, _set_user, _unique, client  # noqa: F401
+
+
+def _puts_cancelar(sid: str) -> list:
+    return [p for p in PEDIDOS if p.method == "PUT" and p.url.path.endswith(f"/preapproval/{sid}")]
+
+
+def _con_acceso(usuario: dict) -> bool:
+    return billing_service.tiene_acceso(types.SimpleNamespace(
+        billing_status=usuario["billing_status"], trial_ends_at=_fin(usuario)))
+
+
+# --- C: cancelar desde past_due ---
+
+@pytest.mark.parametrize("dias", [-10, 10], ids=["vencida", "con_dias"])
+@pytest.mark.parametrize("con_suscripcion", [True, False], ids=["con_suscripcion", "sin_suscripcion"])
+def test_desde_past_due_se_cancela_y_no_gana_acceso(client, dias, con_suscripcion):
+    usuario, sid = _suscripto(client, "cde_pd", billing_status="past_due", dias=dias)
+    if not con_suscripcion:
+        _set_user(usuario, mp_preapproval_id=None)
+    r = client.post("/api/billing/cancel")
+    assert r.status_code == 200, f"past_due no se puede cancelar: {r.status_code} {r.text}"
+    despues = _leer(usuario)
+    assert despues["billing_status"] == "canceled", despues
+    assert despues["mp_preapproval_id"] is None, despues
+    if con_suscripcion:
+        assert _puts_cancelar(sid), "cancelar desde past_due no cancela la suscripción en Mercado Pago"
+        assert SUS[sid] == "cancelled"
+    else:
+        assert not _puts_cancelar(sid)
+    assert not _con_acceso(despues), f"cancelar desde past_due da acceso: {despues}"
+
+
+def test_past_due_cancelada_al_reactivar_va_al_checkout(client):
+    _suscripto(client, "cde_pdre", billing_status="past_due", dias=10)
+    assert client.post("/api/billing/cancel").status_code == 200
+    r = client.post("/api/billing/reactivate")
+    assert r.status_code == 200, r.text
+    cuerpo = r.json()
+    assert cuerpo["billing_status"] == "past_due", cuerpo
+    assert cuerpo["needs_checkout"] is True, cuerpo
+
+
+def test_si_mp_no_cancela_past_due_queda_como_estaba(client):
+    from tests.test_cobro_mp2 import FALLA, _contesta_500
+    usuario, sid = _suscripto(client, "cde_pd500", billing_status="past_due", dias=-3)
+    FALLA["PUT"] = _contesta_500
+    r = client.post("/api/billing/cancel")
+    assert r.status_code == 503, r.text
+    despues = _leer(usuario)
+    assert despues["billing_status"] == "past_due", despues
+    assert despues["mp_preapproval_id"] == sid
+
+
+# --- E: reactivar una prueba que hizo una recarga ---
+
+def _entrar(client, usuario: str) -> None:
+    # el aviso de Mercado Pago llega sin sesión: _aviso_ipn borra las cookies
+    r = client.post("/auth/login", json={"username": usuario, "password": "SecureP@ss1"})
+    assert r.status_code == 200, r.text
+
+
+def _recargar(client, usuario: str) -> None:
+    pid = _pago(f"rec-{usuario}", f"{usuario}:topup", monto=float(billing_service.TOPUP_PRICE_ARS))
+    assert _aviso_ipn(client, pid).status_code == 200
+    assert _get_user(usuario)["extra_ops_remaining"], "la recarga no se aplicó"
+
+
+def test_reactivar_una_prueba_con_recarga_vuelve_a_la_prueba(client):
+    usuario = _unique("cde_prueba_rec")
+    _register(client, usuario)
+    _recargar(client, usuario)
+    fin = _fin(_leer(usuario))
+    _entrar(client, usuario)
+    assert client.post("/api/billing/cancel").status_code == 200
+    r = client.post("/api/billing/reactivate")
+    assert r.status_code == 200, r.text
+    cuerpo = r.json()
+    texto = json.dumps(cuerpo, ensure_ascii=False)
+    assert cuerpo["billing_status"] == "trial", f"una prueba con recarga no vuelve a la prueba: {texto}"
+    assert cuerpo["needs_checkout"] is False, texto
+    assert "ya pagado" not in texto, texto
+    despues = _leer(usuario)
+    assert despues["billing_status"] == "trial", despues
+    assert _cerca(_fin(despues), fin)
+
+
+def test_un_plan_pagado_con_recarga_sigue_yendo_al_checkout(client):
+    usuario = _unique("cde_plan_rec")
+    _register(client, usuario)
+    plan = _pago(f"plan-{usuario}", f"{usuario}:premium")
+    assert _aviso_ipn(client, plan).status_code == 200
+    assert _get_user(usuario)["billing_status"] == "active"
+    _recargar(client, usuario)
+    _entrar(client, usuario)
+    assert client.post("/api/billing/cancel").status_code == 200
+    cuerpo = client.post("/api/billing/reactivate").json()
+    assert cuerpo["billing_status"] == "canceled", cuerpo
+    assert cuerpo["needs_checkout"] is True, cuerpo
+
+
+def test_una_cuenta_vieja_pagada_sin_registro_sigue_yendo_al_checkout(client):
+    # Pagó antes de que existiera mp_pagos_aplicados: no tiene filas.
+    _suscripto(client, "cde_vieja")
+    assert client.post("/api/billing/cancel").status_code == 200
+    cuerpo = client.post("/api/billing/reactivate").json()
+    assert cuerpo["billing_status"] == "canceled", cuerpo
+    assert cuerpo["needs_checkout"] is True, cuerpo
