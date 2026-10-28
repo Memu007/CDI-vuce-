@@ -163,7 +163,7 @@ def test_los_avisos_traen_las_cuentas_y_dicen_que_el_casillero_va_al_txt_mas_ade
     assert data["valor"] == {
         "fob_factura": 1387.5, "ajustes_incluir": 0.0, "ajustes_deducir": 87.5,
         "fob_casillero": 1300.0, "flete": 7925.0, "seguro": 12.4, "seguro_sugerido": 93.13,
-        "base_seguro": "FOB de la factura",
+        "base_seguro": "FOB de la factura", "seguro_en_el_precio": False,
     }
     # Que no parezca que ya se descuenta (respuesta de la PM a D12).
     assert ("El TXT todavía lleva el FOB de la factura (DOL 1.387,50); el FOB casillero con los ajustes "
@@ -310,7 +310,7 @@ def _pantalla(op, despues, valor=None, salida_propia=False):
     nombres = ["ajusteMalEscrito", "importeEscrito", "cuentasViejas", "enlazarValor", "otroDeducir",
                "usarDescuento", "calcularSeguro", "seguroSinLeer", "pintarValor", "firmaDelPedido",
                "buildMariaRequest", "numeroDeFactura", "toNumber", "subitemsDelPedido", "ajusteDelPedido",
-               "montoDelPedido", "dejarSeguro"]
+               "montoDelPedido", "dejarSeguro", "borrarSeguroCalculado"]
     codigo = ("let ultimoValor = null; let cuentasCon = null; let avisosSeq = 0; let valorEnlazado = false;\n"
               "let lastValidation = null; let semaforos = 0;\n"
               "CDI.semaforo = { refresh() { semaforos++; } };\n"
@@ -500,7 +500,7 @@ def _avisos(despues):
              "CDI.api = () => new Promise(ok => pendientes.push(ok));\n"
              "function contestar(i, okHttp, data) { pendientes[i]({ok: okHttp, json: async () => data}); }\n")
     codigo = stubs + _funciones("finalize.js", ["ajusteMalEscrito", "importeEscrito", "otroDeducir", "pintarValor",
-                                                "seguroSinLeer", "firmaDelPedido", "refrescarAvisos",
+                                                "borrarSeguroCalculado", "seguroSinLeer", "firmaDelPedido", "refrescarAvisos",
                                                 "avisosDeLosMontos", "alCentavoDelTxt"]) + (
         f"\n(async () => {{ {despues}; await new Promise(r => setTimeout(r, 0));"
         " console.log(JSON.stringify({ultimoValor, cuentasCon, error: els.valorError.textContent,"

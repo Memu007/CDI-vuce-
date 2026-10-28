@@ -242,7 +242,8 @@ def test_al_entrar_a_validar_no_quedan_las_cuentas_de_antes():
     stubs = ("let ultimoValor = null; let cuentasCon = null; let vLoading = null;\n"
              "function enlazarAvisos() {} function enlazarValor() {} function init() {}\n")
     codigo = stubs + _funciones("finalize.js", ["ajusteMalEscrito", "importeEscrito", "otroDeducir", "seguroSinLeer",
-                                                "ajusteDelPedido", "pintarValor", "onEnterValidating"]) + (
+                                                "ajusteDelPedido", "pintarValor", "borrarSeguroCalculado",
+                                                "onEnterValidating"]) + (
         f"\npintarValor({json.dumps(VALOR)}, 'firma de otra operación');"
         "\nonEnterValidating();"
         "\nconsole.log(JSON.stringify({ultimoValor, cuentasCon, cuentas: els.valorCuentas.innerHTML,"
