@@ -2,7 +2,11 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ORG-1 y ORG-1b: listas, **sin entregar** (2026-10-27)
+## ORG-1, ORG-1b y DESPACHO-1a: listas, **sin entregar** (2026-10-28)
+
+**DESPACHO-1a está hecha** (producto `e438dad`, probado en `51890cd`), en
+commits aparte sobre ORG-1b. Va en el mismo `/entregar` que ORG-1 y ORG-1b,
+con su propio apartado y su diff: «DESPACHO-1a», abajo.
 
 **ORG-1b (D27 b) está hecha**, en commits aparte, con su propio SHA de
 producto (`f8616cf`). Va en el mismo `/entregar` que ORG-1. Detalle en
@@ -43,7 +47,9 @@ toca producto. Para ver sólo ORG-1b: `git diff 373ef55..5d42909`.
 Toqué estos archivos de producto:
 - `proyecto_maria/main.py` (ORG-1)
 - `proyecto_maria/templates/landing.html` (ORG-1b)
-- `CHANGELOG.md` (las dos)
+- `CHANGELOG.md` (las tres)
+- `proyecto_maria/main.py`, `proyecto_maria/templates/dashboard_v2.html` y
+  `proyecto_maria/static/v2/screens/clientes.js` (DESPACHO-1a)
 
 ## 1. La premisa: confirmada
 
@@ -192,7 +198,134 @@ La captura a 390 px se ve bien. El campo de sólo lectura se ve igual que uno
 editable; lo explica la línea de abajo. No le cambié el estilo, porque no lo
 pediste.
 
-## Puertas
+## DESPACHO-1a: el catálogo del cliente en Excel
+
+En la pestaña Catálogo del cliente, arriba de «Productos aprendidos», hay un
+botón «Descargar en Excel». Baja `GET /api/clientes/{id}/catalogo/productos.xlsx`:
+- un renglón por producto de `ClientProductHistory` de ese cliente y ese
+  dueño, en el orden de la pantalla (el último usado primero);
+- columnas: Posición, Descripción, Origen, Valor unitario promedio,
+  Cantidad promedio, Peso unitario promedio, Veces usado, Última vez;
+- un cliente ajeno o que no existe da el mismo 404 que
+  `/catalogo/productos` (`_get_owned_client`); sin sesión, 401;
+- todo texto se escribe como texto. El que empieza con `=`, `+`, `-` o
+  `@` además lleva el apóstrofo invisible (`quotePrefix`), así sigue
+  siendo texto si alguien edita la celda;
+- la posición va como texto y con formato de texto (`@`), tal como está
+  guardada: `01012100`, `0402100Z`, `0101.21.00`.
+
+Toqué `proyecto_maria/main.py` (el endpoint y `_catalogo_xlsx`),
+`proyecto_maria/templates/dashboard_v2.html` (el botón),
+`proyecto_maria/static/v2/screens/clientes.js` (la descarga) y
+`CHANGELOG.md`.
+
+| Pieza | SHA |
+|---|---|
+| Casos en rojo antes del producto | `ee82997` |
+| **Producto y `CHANGELOG.md`** | **`e438dad`** |
+| Prueba en el navegador y sabotajes (14, uno por motivo); ajuste del mensaje del caso de aislamiento | `51890cd` |
+| **SHA probado** | **`51890cd`** |
+
+Su diff propio parte del merge de tu rama que trajo la tarea:
+`git diff fe1571c..51890cd`.
+
+**Rojo antes del producto:**
+- `tests/test_despacho1a.py` contra `fe1571c`: `13 failed, 5 warnings in 0.70s`;
+  todos por la ruta que no existía (`{"detail":"Not Found"}`).
+- `pantalla_despacho1a.js` contra `fe1571c`:
+  `FALLA: 1280 px: no se ve «Descargar en Excel»`, salida 1.
+
+**Los casos** (`tests/test_despacho1a.py`, 13 con los parametrizados):
+- el archivo se abre con openpyxl y trae lo guardado, fila por fila y en
+  orden;
+- la posición como texto, con ceros y letra;
+- el catálogo vacío trae sólo los encabezados;
+- `=HYPERLINK(...)`, `+1+1`, `-2+3` y `@SUMA(A1)` en la descripción, y
+  `=1` en el origen, quedan como texto con `quotePrefix`;
+- caracteres de control en la descripción no rompen la descarga;
+- el nombre del archivo es ASCII aunque el cliente se llame
+  «Ñandú Café — … 🚢»;
+- otro dueño recibe el mismo 404 que el catálogo de la pantalla, y en el
+  cuerpo no aparece el producto;
+- un cliente que no existe da 404;
+- no se mezclan productos de otro cliente ni de otro dueño;
+- sin sesión da 401.
+
+**En el navegador** (`scripts/testing/pantalla_despacho1a.js`, API local y
+datos inventados, 1280 y 390 px): carga dos productos, uno con `=1+1` en
+la descripción, abre el catálogo, aprieta el botón, baja el archivo y lo
+lee con openpyxl. Compara las descripciones con la pantalla y las
+posiciones con la API, y exige que sean texto. Salida:
+`OK 1280 px: «catalogo_cliente_inventado_d1a_1280.xlsx» trae ["=1+1 NOTEBOOK INVENTADA","CABALLO INVENTADO"], posiciones ["8471.30.12","0101.21.00"], todo como texto`,
+y lo mismo a 390 px.
+
+**Sabotajes** (`scripts/testing/sabotajes/despacho1a.sh 51890cd`): salida
+0, `sabotajes sin rojo: 0`. Sin sabotaje, las pruebas y la pantalla dan
+verde.
+
+| Sabotaje | Rojo (copiado de la salida) |
+|---|---|
+| no se mira de quién es el cliente | `test_otro_dueno_recibe_el_mismo_404_que_en_el_catalogo`, «assert 200 == 404» |
+| la consulta no filtra por dueño | `test_no_se_mezclan_…`, «trae productos de otro dueño» |
+| la consulta no filtra por cliente | `test_no_se_mezclan_…`, «trae productos de otro cliente» |
+| se puede bajar sin sesión | `test_sin_sesion_da_401`, «assert 404 == 401» |
+| «=» queda como fórmula | `test_una_descripcion_con_formula_queda_como_texto[=HYPERLINK…]`, «assert 'f' == 's'» |
+| sin el apóstrofo invisible | `…[+1+1]` y `…[@SUMA(A1)]`, «quotePrefix» |
+| la posición sólo de dígitos sale como número | `test_la_posicion_sale_como_texto_con_ceros_y_letra`, «1012100» |
+| la posición sin formato de texto | `test_la_posicion_…`, «number_format» |
+| el orden no es el de la pantalla | `test_el_archivo_se_abre_y_trae_lo_guardado`, «TELEFONO INVENTADO» |
+| cantidad y peso cruzados | `test_el_archivo_…`, «450.25» |
+| el catálogo vacío sale sin encabezados | `test_un_catalogo_vacio_trae_solo_los_encabezados` |
+| no se limpian los caracteres de control | `test_una_descripcion_con_caracteres_de_control_…`, «IllegalCharacterError» |
+| el nombre del archivo va como viene | `test_el_nombre_del_archivo_es_ascii`, «UnicodeEncodeError» |
+| el botón no está conectado | `FALLA: 1280 px: el botón no bajó nada` |
+
+En la primera vuelta, el sabotaje «no filtra por cliente» dio rojo, pero
+el mensaje de pytest cambiaba según las pruebas de antes en la misma base.
+Le puse al caso un mensaje propio para cada fuga (`51890cd`). El rojo es
+el mismo, ahora se lee.
+
+**Puertas de DESPACHO-1a, sobre `51890cd`:**
+
+| Puerta | Resultado |
+|---|---|
+| Las 12 de `tests/` que tocan clientes, catálogo o DESPACHO-1a | `249 passed, 3 warnings in 71.12s (0:01:11)` |
+| `compileall -q proyecto_maria` | `compile-ok` (rc 0) |
+| `node --check …/clientes.js` | `js-ok` |
+| `pantalla_despacho1a.js` | `OK 1280 px …` y `OK 390 px …`, salida 0 |
+| `sabotajes/despacho1a.sh 51890cd` | `sabotajes sin rojo: 0`, salida 0 |
+
+**Sin correr todavía**, para el `/entregar` del 28/10 a las 18:00 UTC: la
+suite completa sobre el SHA final, `smoke_friccion.sh`,
+`ataque_aislamiento.sh` (no cubre esta ruta nueva: el aislamiento de esta
+ruta lo cubren los casos y tres sabotajes), subagentes, `/code-review high`
+y `/security-review`.
+
+**Supuestos reversibles:**
+- Se limpian los caracteres de control que Excel no acepta. Sin eso, la
+  descarga da 500 con una descripción así.
+- El nombre del archivo, en ASCII: `catalogo_<nombre>.xlsx`. El servidor
+  y la pantalla lo arman cada uno, con el mismo criterio.
+- El apóstrofo invisible (`quotePrefix`) en lo que empieza con
+  `=`, `+`, `-` o `@`.
+- La fecha como fecha de Excel, `dd/mm/yyyy`, y el día en UTC, igual que
+  la pantalla (`slice(0, 10)`).
+- El texto del botón, «Descargar en Excel», y el toast «Descarga iniciada.».
+
+**Riesgos de DESPACHO-1a:**
+- **Empates en «última vez».** En Postgres, los productos aprendidos en un
+  mismo pedido llevan el mismo `now()`. El orden entre ellos no está fijado,
+  ni en la pantalla ni en el Excel, y puede salir distinto entre una y
+  otro. No lo arreglé: cambiaría también la consulta de la pantalla.
+- **Un texto de más de 32767 caracteres** se escribe entero; Excel lo corta
+  al abrirlo o se queja. No lo vi en el catálogo; no lo traté.
+- **Un promedio NaN** se escribiría como NaN. El aprendizaje no debería
+  dejarlo; no lo traté.
+- **A 390 px el tablero ya se corre 133 px de costado**, con o sin el botón
+  (lo medí también sacando el botón). El botón se ve entero. No es de esta
+  pieza y no lo toqué.
+
+## Puertas de ORG-1 y ORG-1b
 
 | Puerta | Resultado |
 |---|---|
@@ -298,7 +431,33 @@ el Chromium de Playwright:
 PY=<venv>/bin/python scripts/testing/sabotajes/org1b.sh 5d42909
 ```
 
-## Riesgos
+Este muestra sólo lo de DESPACHO-1a:
+
+```bash
+git diff fe1571c..51890cd
+```
+
+Este tiene que dar `13 passed`:
+
+```bash
+python -m pytest -q --no-cov -p no:randomly tests/test_despacho1a.py
+```
+
+Este tiene que terminar con `OK 1280 px …` y `OK 390 px …`, y salida 0. Va
+contra una API local levantada con datos inventados:
+
+```bash
+BASE_URL=http://127.0.0.1:<puerto> PY=<venv>/bin/python node scripts/testing/pantalla_despacho1a.js
+```
+
+Este tiene que dar `sabotajes sin rojo: 0` y salida 0. Arma su propio
+worktree, su SQLite y su API en el puerto 8853:
+
+```bash
+PY=<venv>/bin/python scripts/testing/sabotajes/despacho1a.sh 51890cd
+```
+
+## Riesgos de ORG-1 y ORG-1b
 
 - **ORG-1b: una invitación a un email que la pantalla no acepta queda sin
   salida.** Invitar sólo exige una «@» (`a@b` entra). La pantalla, al
@@ -320,6 +479,6 @@ PY=<venv>/bin/python scripts/testing/sabotajes/org1b.sh 5d42909
 - **El 400 «es para otro email»** dice que el email escrito no es el
   invitado. No dice cuál es. Hace falta el token para preguntar.
 
-Última vuelta: Tue Oct 27 22:08:04 UTC 2026
+Última vuelta: Wed Oct 28 00:30:47 UTC 2026
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1 lista y subida SIN ENTREGAR (producto e43810b, sabotajes 18f7f25, carrera PG ddfc798; suite 18f7f25 1 failed conocido de test_excel2, 3323 passed). ORG-1b (D27 b) lista y subida SIN ENTREGAR (prueba 9ad42e4, producto f8616cf, sabotajes b7a7927, arreglo de la prueba 5d42909; sabotajes 7/7). D26 (a) por ahora: no empezar sin aviso de la PM. Pendiente: el 28/10 después de las 18:00 UTC, un solo /entregar de ORG-1 y ORG-1b con subagentes (hasta alto), /code-review high y /security-review; reproducir lo que encuentren, actualizar este informe y timbre «Dev MARIA: entregué ORG-1 y ORG-1b en <SHA>». Después, apagar el Postgres local (puerto 55432). Apenas entregues: DESTINO-1, PESO-NETO-1, PRORRATEO-1 esperan datos del despachante. La próxima D es la D28. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, PM principal session_01B7FVQspcEHF7PqNv797wNM, rutina horaria minuto 35. ORG-1 lista y subida SIN ENTREGAR (producto e43810b, sabotajes 18f7f25, carrera PG ddfc798; suite 18f7f25 1 failed conocido de test_excel2, 3323 passed). ORG-1b (D27 b) lista y subida SIN ENTREGAR (prueba 9ad42e4, producto f8616cf, sabotajes b7a7927, arreglo 5d42909; sabotajes 7/7). DESPACHO-1a lista y subida SIN ENTREGAR (casos ee82997, producto e438dad, pantalla y sabotajes 51890cd; sabotajes 14/14; 249 passed en clientes/catálogo). D26 (a) por ahora: no empezar sin aviso. DESPACHO-1 no se empieza (espera ejemplo del despachante). Pendiente: el 28/10 después de las 18:00 UTC, un solo /entregar de ORG-1, ORG-1b y DESPACHO-1a con subagentes (hasta alto), /code-review high y /security-review; reproducir lo que encuentren, suite completa en el SHA final, actualizar este informe y timbre «Dev MARIA: entregué ORG-1, ORG-1b y DESPACHO-1a en <SHA>». Después, apagar el Postgres local (puerto 55432). Apenas entregues: DESTINO-1, PESO-NETO-1, PRORRATEO-1 esperan datos del despachante. La próxima D es la D28. Nunca main, sin push --force, sin datos reales del 24/10, nada se publica sin el «dale» de Emi para el SHA, sin Gemini en pruebas, subagentes hasta esfuerzo alto, sin advisor.
