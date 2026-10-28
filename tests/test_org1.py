@@ -451,3 +451,27 @@ def test_carrera_dos_invitaciones_por_el_ultimo_lugar(monkeypatch):
     assert len(_miembros(est.org_id)) == 2
     estados = sorted([_invitacion(tok_a)["status"], _invitacion(tok_b)["status"]])
     assert estados == ["accepted", "pending"]
+
+
+# ---------------------------------------------------------------- email que el registro no acepta
+
+@pytest.mark.parametrize("malo", ["ana@estudio", "josé@x.com", "a b@x.com", "@x.com", "ana@.com",
+                                  "a" * 95 + "@x.com"])
+def test_invitar_un_email_que_el_registro_rechaza_400_sin_ocupar_lugar(monkeypatch, malo):
+    """La invitación fija el email (ORG-1b): si el registro no lo acepta, nadie puede usarla
+    y ocuparía un lugar 7 días. Se rechaza al invitar, con el mismo criterio que el registro."""
+    _tope(monkeypatch, 2)
+    est = Estudio()
+    r = est.invitar(malo)
+    assert r.status_code == 400, r.text
+    assert "formato" in r.json()["detail"], r.text
+    # No quedó pendiente: el único lugar libre sigue libre.
+    est.invitar_ok(_email())
+
+
+def test_todo_email_que_se_puede_invitar_se_puede_registrar(monkeypatch):
+    _tope(monkeypatch, 10)
+    est = Estudio()
+    for bueno in ("Ana.Perez+cdi@Mi-Estudio.com.ar", " x_y%z@a.io "):
+        tok = est.invitar_ok(bueno)
+        assert _registrar(bueno.strip(), tok).status_code == 200
