@@ -27,6 +27,25 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
+## Mientras reviso EXCEL-3f y GUARDAR-2 (2026-10-28): ORDEN-1
+
+Recibí GUARDAR-2 (`cef45ce`). EXCEL-3f y GUARDAR-2 están en revisión; si
+vuelven con devolución, eso va primero. Mientras, arrancá **ORDEN-1**
+(`ROADMAP.md`, Fase 1c; pedido de la reunión del 24/10, `DECISIONS.md`):
+
+- En la pantalla de revisión, los productos se reordenan arrastrando.
+- El orden que queda es el que se guarda y el que sale en el TXT y en el
+  Excel, con los números de ítem corridos. Comprobá primero cómo se
+  numeran hoy y cómo se agrupan los subítems (MARIA-8,
+  `maria_generator.py`, «orden de su primer renglón»): el orden nuevo no
+  puede separar subítems de su ítem ni cambiar nada más del TXT. Sin tocar
+  `maria_generator.py`; si hace falta, D antes.
+- Guardar con otro orden y volver a abrir conserva el orden; dos
+  pestañas a la vez no pierden productos.
+- Pruebas: el TXT con el orden cambiado igual al original salvo el orden
+  de los ítems; los subítems juntos; recargar conserva el orden; un
+  sabotaje por cada una.
+
 ## Veredicto de la vuelta de CLIENTE-1c y de ESTUDIO-1b (2026-10-27): aceptadas
 
 Sobre `3aba9c2` (informe `807d562`). El detalle está en
