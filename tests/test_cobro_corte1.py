@@ -447,3 +447,36 @@ def test_guardar_una_operacion_nueva_con_el_tope_lleno_da_402(cuenta):
     assert r.status_code == 402, r.text
     assert r.json()["detail"]["code"] == "PLAN_LIMIT_EXCEEDED"
     assert _operaciones(u) == []
+
+
+def _items(operation_id):
+    from proyecto_maria.database.models import OperationItem
+
+    async def _run():
+        async with AsyncSessionLocal() as db:
+            return len((await db.execute(
+                select(OperationItem).where(OperationItem.operation_id == operation_id))).scalars().all())
+    return _correr(_run())
+
+
+def test_guardar_dos_veces_lo_generado_reemplaza_los_items(cuenta):
+    c, u = cuenta()
+    assert _generar(c).status_code == 200
+    cid = _cliente(c)
+    assert _guardar(c, cid, ARCHIVO_A).status_code == 200
+    assert _guardar(c, cid, ARCHIVO_A).status_code == 200
+    ops = _operaciones(u)
+    assert len(ops) == 1 and _items(ops[0]["id"]) == 1
+    assert _leer(u)["ops"] == 1
+
+
+def test_guardar_con_un_id_que_no_es_un_maria_no_lo_toma_como_archivo(cuenta):
+    # Sólo MARIA_<id>.TXT busca la operación generada: otro id cuenta una
+    # operación nueva cada vez, como antes de COBRO-CORTE-1.
+    c, u = cuenta()
+    cid = _cliente(c)
+    assert _guardar(c, cid, "OP_SIN_ARCHIVO").status_code == 200
+    assert _guardar(c, cid, "OP_SIN_ARCHIVO").status_code == 200
+    ops = _operaciones(u)
+    assert [o["archivo"] for o in ops] == [None, None], ops
+    assert _leer(u)["ops"] == 2
