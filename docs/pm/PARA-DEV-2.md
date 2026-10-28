@@ -30,6 +30,17 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## D31 (2026-10-28): (a), sobre `e59e1a8`
+
+El catálogo guarda lo que ya tiene columna; sufijos, unidad, posición
+completa y divisa se ven en la revisión y no se guardan. Sin migración y
+sin tocar el catálogo de DESPACHO-1a. Anotá en el informe de DESPACHO-1b,
+en «riesgos», los dos costos que nombraste: el valor unitario sin divisa y
+dos subítems que sólo difieren en sufijos fundidos en un producto. Guardar
+lo demás (tu (b)) es una migración sobre datos de clientes y no está en el
+roadmap: si hace falta, se la propongo a Emi cuando haya un uso (por
+ejemplo, sugerir sufijos al armar una operación). Decidido por la PM.
+
 ## D30 (2026-10-28): (a) por ahora, sobre `371cde2`
 
 SEGURO-1 se entrega como está: un seguro «para completar» avisa en pantalla
@@ -169,10 +180,47 @@ primero entregás ORG-1 y después seguís. Datos que llegaron el 28/10
   valor que no es ninguno de los tres (error, no se genera), y un sabotaje
   por par. Es un campo de impuestos: revisión fuerte.
 
-Después: **SUFIJOS-2** y **SEGURO-1** (hechas, sin entregar) y
-**DESPACHO-1b** (abajo, empezala ya). PESO-NETO-1 y PRORRATEO-1 siguen esperando al despachante.
+Después: **SUFIJOS-2**, **SEGURO-1** y **DESPACHO-1b** (hechas, sin
+entregar) y **DATOS-1** (abajo, empezala ya). PESO-NETO-1 y PRORRATEO-1
+siguen esperando al despachante.
 
-### DESPACHO-1b (lectura y pantalla) — empezala ya (2026-10-28 05:00 UTC)
+### DATOS-1 — empezala ya (2026-10-28 06:00 UTC)
+
+DESPACHO-1b quedó hecha. Lo que te queda en las Fases 1c y 2 espera a
+alguien de afuera (PESO-NETO-1, MARIA-6 y PRORRATEO-1 al despachante,
+LEGAL-1 al texto de Emi), así que seguís con la primera tuya de la Fase 3
+(`ROADMAP.md`): **DATOS-1**, hallazgos D5, D2 y D6 de
+`AUDITORIA-2026-10-06.md`. En commits aparte encima de DESPACHO-1b
+(`e59e1a8`), con su propio `/entregar` después del de DESPACHO-1b.
+
+- **D5, borrar un cliente con presupuesto compartido:** hoy da error en
+  Postgres, así que no se puede cumplir un pedido de borrado de datos.
+  Premisa primero: reproducilo en Postgres 16 descartable (el 55432 de
+  ORG-1) y mirá qué tablas apuntan al cliente. Borrar el cliente tiene que
+  funcionar, sólo para su dueño (`_get_owned_client`, otro dueño 404). Si
+  para eso hay que elegir entre borrar el presupuesto o dejarlo sin
+  cliente, es la **D32**: no la elijas vos, porque pierde datos.
+- **D2, `/health` honesto:** con la base caída responde 503, no 200, y no
+  muestra el texto del error al público (va al log). Railway usa `/health`
+  para dar por buena una publicación (`railway.json`, 60 s): comprobá con
+  el código qué pasa al arrancar (el comentario de `main.py` cerca de la
+  línea 664 quiere que la app arranque «rota» para diagnosticar) y decí en
+  el informe qué hace Railway con una publicación nueva si la base no
+  contesta. `railway.json` no se toca. `/admin/health/detailed` queda fuera.
+- **D6, sin detalles de error al público:** los dos manejadores de 500 de
+  `main.py` (cerca de las líneas 412 y 440) dejan de devolver `dev_detail`,
+  siempre: el detalle ya va al log, y no depende de detectar producción.
+  Los 4xx siguen con su `detail` como hoy. Premisa primero: qué JS lee
+  `dev_detail`, y que siga funcionando sin él.
+
+Pruebas: el borrado en Postgres con presupuesto compartido (y que otro
+dueño no puede); `/health` 200 con base y 503 sin ella, sin texto del
+error; un `HTTPException` 500 y una excepción no manejada sin `dev_detail`,
+con el detalle en el log; un 4xx igual que hoy. Un sabotaje por regla. Línea en `CHANGELOG.md`. Toca datos y
+lo que se muestra al público: revisión fuerte y `/security-review`. Tu
+próxima D es la **D32**.
+
+### DESPACHO-1b — hecha, sin entregar (encargada 2026-10-28 05:00 UTC)
 
 SEGURO-1 quedó hecha. Mientras esperás el cupo de las 18:00 UTC, la lectura
 de DESPACHO-1 (`ROADMAP.md`, Fase 1c, fila 7), en commits aparte encima de

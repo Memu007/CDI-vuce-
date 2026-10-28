@@ -139,7 +139,7 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | ⚪ AISLAMIENTO-2 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | ⚪ LIMPIEZA-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | ⚪ OBSERVABILIDAD-1 | Dev técnica | La columna `api_logs.owner_username` que falta en producción, con migración probada en Postgres descartable |
-| ⚪ DATOS-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
+| 🔵 DATOS-1 | Dev MARIA | Borrar un cliente con presupuesto; `/health` honesto; sin detalles de error al público (D5, D2, D6 de `AUDITORIA-2026-10-06.md`) |
 | ⚪ BACKUP-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
 | ⚪ DISCO-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
 | ⚪ AUDITORIA-FINAL | PM | Ver `AUDITORIA-2026-10-06.md` |
