@@ -30,6 +30,80 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## Orden después de las 18:00, y D45 y D46 (2026-10-28 17:58 UTC)
+
+1. DESPACHO-1b (devolución y D41). 2. DISCO-1 (devolución). 3. SESION-1
+(devolución, abajo). 4. ABUSO-1 (devolución, abajo). 5. EMAIL-1: la D45 y
+el mutante. 6. CONEXIONES-1: la D46. Cada una con su rojo, su sabotaje y
+`/entregar`; me despertás al entregar cada una, sin esperar a juntar.
+
+- **D45 (EMAIL-1): (1), decidido por la PM.** El tope por correo se
+  normaliza igual en Python y en la base; rojo en Postgres 16 con «İ» y con
+  otra letra de la misma familia (minúscula distinta en Python y en PG),
+  sabotaje que lo rompa, y la prueba de `_cuenta_por_email` que ya te pedí.
+- **D46 (CONEXIONES-1): (1), decidido por la PM, al final de la cola.**
+  Esperás a que `api_logs` tenga todos los pedidos, un control que cancele
+  el `close` y tenga que dar rojo, y cortes en vuelo de verdad. Hasta
+  entonces la D37 sigue abierta.
+
+## SESION-1: devolución, sobre `895ee73` (2026-10-28 17:58 UTC)
+
+Evidencia en `REPRODUCCION-SESION-1-2026-10-28.md`. Reproduje la carrera y
+la cookie copiada de tu D43, y además que el link de verificación del
+correo vuelve a abrir sesión después de un logout o un cambio de clave (y
+se reusa), que `/auth/me` y `/ui_event` aceptan un token revocado, y que con
+`active_jti` en NULL el token de verificación sirve como Bearer.
+
+**La causa:** la revocación se mira sólo en `get_current_user`. Todo camino
+que emite sesión o decodifica un token por su cuenta la saltea; y el login
+escribe `active_jti` sin comprobar que la clave con la que entró siga
+vigente. **D43: (1), decidido por la PM.** Pido:
+
+1. Un solo lugar que decide si un token vale (firma, tipo, `jti` contra
+   `active_jti`) y que usen todos: `get_current_user`, `/auth/me`, la
+   telemetría, el logout. El token de verificación no sirve como sesión.
+2. Verify-email: no abre sesión, o la abre sólo si el token no se usó y es
+   posterior al último cambio de clave o logout. Un uso.
+3. La carrera (D43 a): el login escribe `active_jti` sólo si el hash de la
+   clave sigue siendo el que validó (escritura condicional o relectura en la
+   misma transacción). Rojo en SQLite y en PG con el login en vuelo.
+4. Cambio de clave (D43 b): rota el `jti` y le da cookie nueva a quien
+   cambió; la copia queda afuera. Si no, el aviso y el CHANGELOG no dicen
+   «cierra las otras».
+5. D43 (c): clave actual mal en change-password no da 401 (no manda al
+   login). D43 (d): el logout borra la cookie aunque falle la base.
+6. Tope de intentos sobre `current_password` en `PUT` del perfil y en
+   change-password.
+7. Pruebas que maten estos mutantes, que hoy dan `31 passed`: sacar
+   `user.active_jti is not None and` de `revocar_sesion_de_la_request`;
+   decodificar sin verificar la firma; y los tres del revisor Sonnet (header
+   que le gana a la cookie, sin validar el tipo de `current_password`,
+   perfil que no pide la clave si el correo anterior estaba vacío).
+8. El informe sin `request.state.token_jti`, que no existe.
+
+Pedí un caso de la familia, no sólo los ejemplos: buscá cualquier otro
+`decode` de JWT o emisión de cookie fuera del lugar único y que dé rojo.
+`ADMIN_USERNAMES` (main.py:1457) no lo tocás: se lo llevo a Emi.
+
+## ABUSO-1: devolución, sobre `43916a7` (2026-10-28 17:58 UTC)
+
+Evidencia en `REPRODUCCION-ABUSO-1-2026-10-28.md`. **D44: (1), decidido
+por la PM**: el login usa la conexión del pedido, no una segunda; rojo con
+logins malos concurrentes en PG que hoy agota el pool, y `/health`
+respondiendo. Además:
+
+1. Las pruebas no distinguen la duración: bloqueo de 15 min a 60 s y la
+   ventana del tope de recuperar de 3600 a 60 dan `63 passed`. Casos «a los
+   14 min sigue bloqueado, a los 16 no» y lo mismo para la ventana.
+2. Claves de 121 a 300 caracteres en PG (el revisor vio
+   `StringDataRightTruncationError` con 200) y el mutante `len(clave) <=
+   300` muerto.
+3. El 500 de `/auth/recover-username` con un surrogate suelto en el correo.
+
+Lo demás del revisor (XFF y `TRUSTED_PROXY_HOPS`, IPv6, deadlock con
+ventanas cortas, filas sin tope, tiempos del login) va a riesgos en tu
+informe, sin tocar producto.
+
 ## D41 y el orden de lo que queda (2026-10-28 17:20 UTC)
 
 - **D41 (DESPACHO-1b): (1), decidido por la PM.** Las tres medias
