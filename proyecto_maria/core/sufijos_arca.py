@@ -184,8 +184,9 @@ COMPLETA = (("AA", ("marca",)), ("AB", ("modelo",)), ("AI", ("codigo_parte",)))
 
 
 # Un número con decimales: un solo punto o coma entre dígitos, que no sea
-# parte de una cadena como «1.2.3» (un código, no un número).
-_DECIMAL = r"(?<!\d)(?<!\d[.,])(\d+)[.,](\d+)(?![.,]?\d)"
+# parte de una cadena como «1.2.3» (un código, no un número). [0-9] y no \d,
+# que en Python también toma dígitos que no son ASCII.
+_DECIMAL = r"(?<![0-9])(?<![0-9][.,])([0-9]+)[.,]([0-9]+)(?![.,]?[0-9])"
 _DECIMAL_O_SIGNO = re.compile(rf"{_DECIMAL}|[^A-Za-z0-9 ]")
 
 
