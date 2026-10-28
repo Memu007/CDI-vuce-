@@ -2399,6 +2399,23 @@ def dashboard(request: Request):
         return HTMLResponse(f"<h1>Error loading dashboard</h1><pre>{e}</pre>", status_code=500)
 
 
+# Tope del cuerpo de un evento de telemetría (ABUSO-1, S5). Los eventos reales
+# pesan menos de 1 KB; lo que pasa de esto da 413 y no se guarda.
+_UI_EVENT_MAX_BYTES = 16 * 1024
+
+
+async def _leer_cuerpo_con_tope(request: Request, tope: int):
+    """Devuelve el cuerpo o None si pasa de `tope` bytes. Lee por partes y
+    corta apenas se pasa, venga o no Content-Length."""
+    partes, total = [], 0
+    async for parte in request.stream():
+        total += len(parte)
+        if total > tope:
+            return None
+        partes.append(parte)
+    return b"".join(partes)
+
+
 @app.post("/api/ui/event")
 @app.post("/api/session/state")
 async def ui_event(request: Request, db: AsyncSession = Depends(get_db)):
@@ -2406,7 +2423,8 @@ async def ui_event(request: Request, db: AsyncSession = Depends(get_db)):
 
     Acepta JSON (o blob sendBeacon) con: version, screen, action, duration_ms,
     ts y metadata libre. No es critico: si algo falla, no se interrumpe el flow
-    del usuario. Se loggea como JSONL en `logs/ui_events.jsonl`.
+    del usuario. Se guarda sólo en la tabla `telemetry_events`; un cuerpo de
+    más de 16 KB da 413 y no se guarda.
 
     Ruta duplicada `/api/session/state` por compatibilidad con clientes legacy.
 
@@ -2414,7 +2432,9 @@ async def ui_event(request: Request, db: AsyncSession = Depends(get_db)):
     sale de Bearer o de la cookie HttpOnly de sesión cuando existe.
     """
     try:
-        raw = await request.body()
+        raw = await _leer_cuerpo_con_tope(request, _UI_EVENT_MAX_BYTES)
+        if raw is None:
+            return JSONResponse({"ok": False, "detail": "Evento demasiado grande"}, status_code=413)
         import json as _json
         payload = {}
         if raw:
@@ -2431,22 +2451,6 @@ async def ui_event(request: Request, db: AsyncSession = Depends(get_db)):
         if not username:
             raw_cookie = request.cookies.get("access_token") or ""
             username = _jwt_sub_from_token_text(raw_cookie)
-
-        event = {
-            "ts_server": datetime.now(timezone.utc).isoformat(),
-            "owner_username": username,
-            "ip": request.client.host if request.client else None,
-            "ua": request.headers.get("user-agent", "")[:200],
-            "payload": payload,
-        }
-
-        logs_dir = os.path.join(basedir, "logs")
-        try:
-            os.makedirs(logs_dir, exist_ok=True)
-            with open(os.path.join(logs_dir, "ui_events.jsonl"), "a", encoding="utf-8") as fh:
-                fh.write(_json.dumps(event, ensure_ascii=False) + "\n")
-        except Exception as disk_err:
-            print(f"[ui_event] no se pudo escribir log: {disk_err}")
 
         try:
             await _persist_ui_telemetry_row(db, username, payload)
