@@ -347,14 +347,7 @@ def _contar_hojas_excel(contents: bytes, file_ext: str) -> int:
 
 def _excel_max_descomprimido_bytes() -> int:
     """EXCEL_MAX_DESCOMPRIMIDO_MB, 100 por defecto (EXCEL-1)."""
-    import math
-    try:
-        valor = float(os.getenv("EXCEL_MAX_DESCOMPRIMIDO_MB", "") or 100)
-    except (TypeError, ValueError):
-        valor = 100.0
-    if not math.isfinite(valor) or valor <= 0:
-        valor = 100.0
-    return int(valor * 1024 * 1024)
+    return _mb_de_entorno("EXCEL_MAX_DESCOMPRIMIDO_MB", 100)
 
 
 def _excel_descomprimido_bytes(contents: bytes) -> int:
