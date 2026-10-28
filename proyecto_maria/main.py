@@ -9259,13 +9259,22 @@ def _es_utf8(texto: str) -> bool:
     return True
 
 
-def _en_tandas_por_clave(filas: list[dict]):
-    """Las filas en orden de clave y de a `_HISTORIAL_FILAS_POR_SENTENCIA`.
-    Dos escrituras del mismo dueño toman los bloqueos en el mismo orden y
-    así no se traban entre sí en Postgres."""
-    filas = sorted(filas, key=lambda f: f["clave"])
+def _en_tandas(filas: list[dict]):
+    """Las filas de a `_HISTORIAL_FILAS_POR_SENTENCIA`, en el orden en que
+    vienen: el id sigue ese orden y sugerir recorre el historial por id."""
     for i in range(0, len(filas), _HISTORIAL_FILAS_POR_SENTENCIA):
         yield filas[i:i + _HISTORIAL_FILAS_POR_SENTENCIA]
+
+
+async def _bloquear_historial(db: AsyncSession, owner_username: str) -> None:
+    """En Postgres, una escritura de muchas filas del historial por dueño a
+    la vez, hasta el commit. Dos importaciones con las mismas filas en otro
+    orden se trababan entre sí (deadlock). SQLite ya escribe de a una."""
+    from proyecto_maria.database.connection import IS_SQLITE
+    if not IS_SQLITE:
+        from sqlalchemy import text as sa_text
+        await db.execute(sa_text("SELECT pg_advisory_xact_lock(hashtext(:k))"),
+                         {"k": f"ncm_historial:{owner_username}"})
 
 
 def _clave_ncm_historial(descripcion: str) -> str:
@@ -9314,7 +9323,8 @@ async def _guardar_historial_importado(db: AsyncSession, owner_username: str, nu
     """Importar: lo nuevo entra con cuenta 1; lo que ya estaba toma la NCM del
     archivo y conserva su cuenta. `nuevas` es `{descripción: ncm}`."""
     filas = [_fila_ncm_historial(owner_username, d, n) for d, n in nuevas.items()]
-    for tanda in _en_tandas_por_clave(filas):
+    await _bloquear_historial(db, owner_username)
+    for tanda in _en_tandas(filas):
         ins = _insert_ncm_historial().values(tanda)
         await db.execute(ins.on_conflict_do_update(
             index_elements=["owner_username", "clave"], set_={"ncm": ins.excluded.ncm},
@@ -9363,7 +9373,7 @@ async def _cargar_archivo_historial(db: AsyncSession, ruta: str, por_nombre: dic
         if not desc.strip() or not isinstance(ncm, str) or not ncm.strip():
             salteadas += 1
             continue
-        if "\x00" in desc + ncm or not _es_utf8(desc + ncm):
+        if _problema_historial(desc, ncm):
             invalidas += 1
             continue
         count = entrada.get("count", 1)
@@ -9372,15 +9382,16 @@ async def _cargar_archivo_historial(db: AsyncSession, ruta: str, por_nombre: dic
         filas.append(_fila_ncm_historial(dueno, desc, ncm, count))
     # Si ya está cargado (otro arranque, el archivo volvió), no se toca: las
     # cuentas no se duplican y lo confirmado después no se pisa.
-    for tanda in _en_tandas_por_clave(filas):
+    await _bloquear_historial(db, dueno)
+    for tanda in _en_tandas(filas):
         ins = _insert_ncm_historial().values(tanda)
         await db.execute(ins.on_conflict_do_nothing(index_elements=["owner_username", "clave"]))
     await db.commit()
     if salteadas:
         logging.warning("[DISCO-1] %s: %d entradas sin descripción o sin NCM no se cargaron", nombre, salteadas)
     if invalidas:
-        logging.warning("[DISCO-1] %s: %d entradas con un carácter nulo o que no es texto válido "
-                        "no se cargaron", nombre, invalidas)
+        logging.warning("[DISCO-1] %s: %d entradas más largas que el tope, con un carácter "
+                        "nulo o que no es texto válido no se cargaron", nombre, invalidas)
     try:
         os.replace(ruta, _ruta_migrado_libre(ruta))
     except OSError as e:
@@ -9760,10 +9771,6 @@ async def guardar_uso_ncm(
     if problema:
         raise HTTPException(status_code=400, detail=problema)
 
-    # Guardar o incrementar contador (y actualizar la NCM si cambió). Se
-    # confirma antes de las memorias de abajo: su rollback no lo deshace.
-    await _sumar_uso_ncm(db, user["username"], descripcion, ncm)
-
     # Las memorias persistentes usan la NCM base: obligan a volver a confirmar
     # la posición SIM/DC en VUCE en lugar de reutilizar una letra antigua.
     ncm_base = _ncm_suggestion_key(ncm)
@@ -9774,8 +9781,16 @@ async def guardar_uso_ncm(
     # Nunca aceptar un client_id ajeno sólo porque vino desde el navegador.
     # La memoria es por despachante y por cliente; esta verificación también
     # evita crear una relación persistente con un cliente de otro usuario.
+    # Va antes de escribir: un pedido que contesta error no suma la
+    # confirmación (reintentarlo sumaba otra vez).
     if client_id:
+        if "\x00" in client_id or not _es_utf8(client_id):
+            raise HTTPException(status_code=400, detail="El cliente tiene un carácter que no es texto válido.")
         await _get_owned_client(db, client_id, user["username"])
+
+    # Guardar o incrementar contador (y actualizar la NCM si cambió). Se
+    # confirma antes de las memorias de abajo: su rollback no lo deshace.
+    await _sumar_uso_ncm(db, user["username"], descripcion, ncm)
 
     try:
         wrote_client = False

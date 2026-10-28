@@ -10,6 +10,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - Si falla la memoria del cliente o el catálogo del proveedor, sugerir sigue con el historial (en Postgres se perdía todo).
 - Confirmar o importar una descripción de más de 2000 caracteres, una NCM de más de 20 o un carácter que la base no guarda da 400 claro; en la importación, el archivo entero y nombrando la fila. Los archivos viejos saltean esas entradas y un `.migrado` anterior ya no se pisa.
+- Importar respeta el orden del archivo para sugerir, y dos importaciones del mismo usuario a la vez ya no se traban en Postgres. Confirmar con un cliente ajeno o con un carácter inválido da error sin sumar la confirmación.
 
 ## 2026-10-28 · fix: leer y guardar un despacho sin trabar ni romper el catálogo (DESPACHO-1b, D41)
 
