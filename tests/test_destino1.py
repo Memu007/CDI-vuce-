@@ -95,13 +95,13 @@ NO_VALIDOS = ["IVAAD3", "IVAAD", "COMERC", "BDEUSO", "USOPAR", "uso particular"]
 
 @pytest.mark.parametrize("valor", NO_VALIDOS)
 def test_un_destino_por_operacion_que_no_esta_en_la_tabla_no_genera(valor):
-    with pytest.raises(ValueError, match="Destino de la mercadería .* no válido"):
+    with pytest.raises(ValueError, match="Operación: destino de la mercadería .* no válido"):
         _gen(iva_adicional=valor)
 
 
 @pytest.mark.parametrize("valor", NO_VALIDOS)
 def test_un_destino_por_item_que_no_esta_en_la_tabla_no_genera(valor):
-    with pytest.raises(ValueError, match="Ítem 1: Destino de la mercadería .* no válido"):
+    with pytest.raises(ValueError, match="Ítem 1: destino de la mercadería .* no válido"):
         _gen([dict(ITEM_BASE, iva_adicional=valor)])
 
 
@@ -117,5 +117,5 @@ def test_por_la_ruta_cada_destino_sale_con_su_par(iva, ganancias):
 def test_por_la_ruta_un_destino_que_no_esta_en_la_tabla_da_400_sin_archivo():
     r = _generar(item={"iva_adicional": "BDEUSO"})
     assert r.status_code == 400, r.text[:400]
-    assert "Destino de la mercadería «BDEUSO» no válido" in r.text, r.text[:400]
+    assert "Ítem 1: destino de la mercadería «BDEUSO» no válido" in r.text, r.text[:400]
     assert "content" not in r.json()
