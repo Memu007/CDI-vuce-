@@ -204,7 +204,10 @@ try:
         chequear(("u", "UNIQUE (owner_username, clave)") in restr
                  and ("f", "FOREIGN KEY (owner_username) REFERENCES users(username)") in restr,
                  f"clave única por dueño y descripción, y clave foránea a users: {sorted(restr)}")
-        chequear(conteos() == antes, "las demás tablas conservan sus filas")
+        # Sólo las que ya estaban: la versión nueva puede crear otras vacías.
+        despues = conteos()
+        chequear({t: despues.get(t) for t in antes} == antes, "las demás tablas conservan sus filas: "
+                 f"{ {t: (n, despues.get(t)) for t, n in antes.items() if despues.get(t) != n} }")
 
         chequear(filas(A) == [("Bomba sintetica", "8413.70.90", 2), ("Valvula sintetica", "8481.80.95", 1)],
                  f"el archivo de A se cargó con sus cuentas: {filas(A)}")
@@ -259,6 +262,46 @@ try:
         chequear(all(r.status_code == 200 for r in rs) and ("Rodamiento sintetico", "8482.10.10", n) in filas(A),
                  f"{n} confirmaciones a la vez cuentan {n}: {[r.status_code for r in rs if r.status_code != 200]} "
                  f"{[f for f in filas(A) if f[0] == 'Rodamiento sintetico']}")
+
+        # Si falla la memoria del cliente o la del proveedor, sugerir sigue
+        # con lo demás: en Postgres, un error atrapado sin rollback deja la
+        # transacción abortada y el historial se perdía sin aviso.
+        cliente = sql("select id from clients where owner_username=%s", A)[0][0]
+        prov = "Proveedor DISCO1 sintetico"
+        r = c.post("/api/ncm/guardar-uso", json={"descripcion": "Compresor sintetico", "ncm": "8414.80.11",
+                                                 "client_id": cliente, "vendor_name": prov})
+        chequear(r.status_code == 200, f"confirmar con cliente y proveedor: {r.status_code} {r.text[:160]}")
+
+        def fuentes(**extra):
+            r = c.post("/api/ncm/sugerir", json={"descripcion": "Compresor sintetico", **extra})
+            assert r.status_code == 200, r.text
+            return [(s["source"], s.get("scope")) for s in r.json()["sugerencias"]]
+        chequear(fuentes(client_id=cliente, vendor_name=prov) == [("historial", "cliente")],
+                 f"con todo sano, la del cliente: {fuentes(client_id=cliente, vendor_name=prov)}")
+
+        def con_columna_rota(tabla, columna, que):
+            sql(f"alter table {tabla} rename column {columna} to roto_disco1")
+            try:
+                return que()
+            finally:
+                sql(f"alter table {tabla} rename column roto_disco1 to {columna}")
+        f = con_columna_rota("client_product_history", "descripcion_normalizada",
+                             lambda: fuentes(client_id=cliente))
+        chequear(f == [("historial", None)], f"falla la memoria del cliente: sigue el historial: {f}")
+        f = con_columna_rota("vendor_catalog_products", "product_key", lambda: fuentes(vendor_name=prov))
+        chequear(f == [("historial", None)], f"falla el catálogo del proveedor: sigue el historial: {f}")
+        f = con_columna_rota("client_product_history", "descripcion_normalizada",
+                             lambda: fuentes(client_id=cliente, vendor_name=prov))
+        chequear(f == [("proveedor", "proveedor")], f"falla la memoria del cliente: sigue el proveedor: {f}")
+
+        # Un NUL o una descripción de más: 400 claro, no 500 de la base.
+        antes_a = filas(A)
+        for desc, ncm, que in (("Bomba\x00sintetica", "8413.70.10", "un NUL en la descripción"),
+                               ("Bomba sintetica", "8413.70.10\x00", "un NUL en la NCM"),
+                               ("B" * 2001, "8413.70.10", "una descripción de 2001 caracteres")):
+            r = c.post("/api/ncm/guardar-uso", json={"descripcion": desc, "ncm": ncm})
+            chequear(r.status_code == 400, f"{que} da 400: {r.status_code} {r.text[:160]}")
+        chequear(filas(A) == antes_a, "y no se guarda nada")
 
     # --- otro arranque, con el archivo de A de vuelta
     shutil.copy(os.path.join(DATA_DIR, f"ncm_historial_{A}.json.migrado"),

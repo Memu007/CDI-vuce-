@@ -153,9 +153,9 @@ sabotaje "un archivo roto frena el arranque" 3 \
   $'    finally:\n        pass' \
   "FAILED $T::test_un_archivo_roto_va_al_log_y_no_frena_a_los_demas" "JSONDecodeError"
 sabotaje "las entradas salteadas no van al log" 1 \
-  $'        logging.warning("[DISCO-1] %s: %d entradas sin NCM no se cargaron", nombre, salteadas)' \
+  $'        logging.warning("[DISCO-1] %s: %d entradas sin descripción o sin NCM no se cargaron", nombre, salteadas)' \
   $'        pass' \
-  "FAILED $T::test_un_archivo_roto_va_al_log_y_no_frena_a_los_demas" "entradas sin NCM"
+  "FAILED $T::test_un_archivo_roto_va_al_log_y_no_frena_a_los_demas" "entradas sin descripción o sin NCM"
 sabotaje "una entrada sin NCM se carga igual" 1 \
   'if not desc.strip() or not isinstance(ncm, str) or not ncm.strip():' 'if False:' \
   "FAILED $T::test_un_archivo_roto_va_al_log_y_no_frena_a_los_demas"
@@ -165,6 +165,91 @@ sabotaje "un nombre ambiguo se le carga al primero" 1 \
 sabotaje "el arranque no carga los archivos" 1 \
   $'    await _migrate_ncm_historial_archivos()\n' '' \
   "FAILED $T::test_el_arranque_carga_los_archivos" "assert [] == [1]"
+
+# --- devolución de DISCO-1
+sabotaje "la carga sin orden" 1 \
+  $'        .where(NcmHistorial.owner_username == owner_username)\n        .order_by(NcmHistorial.id)' \
+  $'        .where(NcmHistorial.owner_username == owner_username)' \
+  "FAILED $T::test_sugerir_recorre_el_historial_en_el_orden_en_que_se_agrego"
+sabotaje "todo el archivo en una sola sentencia" 1 \
+  '_HISTORIAL_FILAS_POR_SENTENCIA = 150' '_HISTORIAL_FILAS_POR_SENTENCIA = 10**6' \
+  "FAILED $T::test_importar_muchas_filas_va_en_tandas" "too many SQL variables"
+sabotaje "una cuenta cero o negativa se carga tal cual" 1 \
+  'not isinstance(count, int) or count < 1:' 'not isinstance(count, int):' \
+  "FAILED $T::test_un_archivo_viejo_con_cuenta_cero_o_negativa_carga_cuenta_uno" "'Codo sintetico cero', '7307.19.00', 0"
+sabotaje "una descripción en blanco se carga" 1 \
+  'if not desc.strip() or not isinstance(ncm, str)' 'if not isinstance(ncm, str)' \
+  "FAILED $T::test_un_archivo_viejo_con_descripcion_en_blanco_no_la_carga"
+sabotaje "el archivo cargado se borra" 1 \
+  'os.replace(ruta, _ruta_migrado_libre(ruta))' 'os.remove(ruta)' \
+  "FAILED $T::test_el_archivo_cargado_queda_como_migrado_con_su_contenido" "FileNotFoundError"
+sabotaje "un .migrado anterior se pisa" 1 \
+  $'    while os.path.exists(destino):' $'    while False:' \
+  "FAILED $T::test_un_migrado_anterior_no_se_pisa" "FileNotFoundError"
+sabotaje "importar sin ordenar por clave" 1 \
+  'filas = sorted(filas, key=lambda f: f["clave"])' 'filas = list(filas)' \
+  "FAILED $T::test_importar_escribe_las_filas_en_orden_de_clave" "las filas no se escriben en orden de clave"
+sabotaje "sin tope de descripción" 1 \
+  '_HISTORIAL_MAX_DESCRIPCION = 2000' '_HISTORIAL_MAX_DESCRIPCION = 10**9' \
+  "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[BBBB" \
+  "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[BBBB"
+sabotaje "sin tope de NCM" 1 \
+  '_HISTORIAL_MAX_NCM = 20' '_HISTORIAL_MAX_NCM = 10**9' \
+  "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[Bomba sintetica-888" \
+  "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[Bomba sintetica-8413.70.10.0000000000000"
+sabotaje "el tope no deja entrar el máximo" 1 \
+  '        if len(texto) > tope:' '        if len(texto) >= tope:' \
+  "FAILED $T::test_confirmar_en_el_tope_entra"
+sabotaje "el NUL pasa" 1 \
+  $'        if "\\x00" in texto:' $'        if False:' \
+  "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[Bomba\\x00sintetica" \
+  "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[Bomba sintetica-8413.70.10\\x00" \
+  "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[Bomba\\x00sintetica"
+sabotaje "medio par UTF-16 pasa" 1 \
+  $'        if not _es_utf8(texto):\n            return' $'        if False:\n            return' \
+  "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[Bomba\\ud800sintetica" \
+  "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[Bomba\\ud800sintetica"
+sabotaje "confirmar no revisa" 1 \
+  $'    problema = _problema_historial(descripcion, ncm)\n    if problema:' $'    problema = None\n    if problema:' \
+  "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[Bomba\\x00sintetica"
+sabotaje "importar no revisa" 1 \
+  $'            problema = _problema_historial(desc, ncm)\n            if problema:' $'            problema = None\n            if problema:' \
+  "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[Bomba\\x00sintetica"
+sabotaje "la fila mala va a errores y lo demás se guarda" 1 \
+  $'        except HTTPException:\n            raise\n        except Exception as exc:\n            errores.append' \
+  $'        except Exception as exc:\n            errores.append' \
+  "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[BBBB" "assert 200 == 400"
+sabotaje "un archivo viejo con un carácter que la base no guarda se carga" 1 \
+  'if "\x00" in desc + ncm or not _es_utf8(desc + ncm):' 'if False:' \
+  "FAILED $T::test_un_archivo_viejo_con_caracteres_que_la_base_no_guarda_los_saltea"
+
+# Postgres: con la transacción abortada, sugerir sin rollback no sugiere nada.
+# SQLite no aborta la transacción: sólo se ve contra un Postgres local.
+sabotaje_pg() {
+  local nombre="$1" viejo="$2" nuevo="$3"; shift 3
+  if [ -z "${PG_URL:-}" ]; then
+    echo "SIN PG| $nombre: falta PG_URL (un Postgres local y descartable)"; SIN_PG=$((SIN_PG+1)); return
+  fi
+  git checkout -q -- proyecto_maria/
+  if ! aplicar "$M" "$viejo" "$nuevo"; then
+    echo "ROTO  | $nombre: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1)); return
+  fi
+  local salida codigo
+  salida="$(timeout 900 "$PY" scripts/testing/disco1_postgres.py "$PG_URL" 2>&1)"; codigo=$?
+  juzgar "$nombre" "$salida" "$codigo" "$@"
+  git checkout -q -- proyecto_maria/
+}
+SIN_PG=0
+sabotaje_pg "sugerir sin rollback si falla la memoria del cliente" \
+  $'            await db.rollback()\n            logging.warning("ncm suggestion client memory unavailable: %s", err)' \
+  $'            logging.warning("ncm suggestion client memory unavailable: %s", err)' \
+  "FALLA | falla la memoria del cliente: sigue el historial: []" \
+  "FALLA | falla la memoria del cliente: sigue el proveedor: []"
+sabotaje_pg "sugerir sin rollback si falla el catálogo del proveedor" \
+  $'            await db.rollback()\n            logging.warning("ncm suggestion vendor catalog unavailable: %s", err)' \
+  $'            logging.warning("ncm suggestion vendor catalog unavailable: %s", err)' \
+  "FALLA | falla el catálogo del proveedor: sigue el historial: []"
+[ "$SIN_PG" -eq 0 ] || echo "sabotajes de Postgres sin correr: $SIN_PG"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
