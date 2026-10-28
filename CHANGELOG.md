@@ -21,13 +21,16 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - **fix(orden):** si alguien sale y entra con otro usuario, o la sesión se cierra, la pestaña deja de guardar la operación y lo dice en un aviso arriba; si vuelve a entrar el mismo usuario, sigue guardando.
 - La operación de antes de recargar vuelve aunque la consulta del usuario tarde; también avisa cuando el navegador no tiene lugar para guardarla.
 
+## 2026-10-28 · fix: un solo pedido de pago a la vez por cuenta (COBRO-MP-1 D)
+
+- **fix(cobro):** dos pedidos de pago a la vez dejan una sola suscripción viva en Mercado Pago, la que CDI guarda; cancelar mientras corre uno espera y cancela también la que ese pedido creó.
+- «Activar plan» queda deshabilitado mientras espera el pedido y mientras el navegador va a Mercado Pago, así un segundo clic no pide otro pago.
+
 ## 2026-10-28 · fix: se puede cancelar un plan vencido y una prueba con recarga se reactiva como prueba (COBRO-MP-1 C y E)
 
 - **fix(cobro):** desde «plan vencido» se puede cancelar: se cancela también en Mercado Pago, así no vuelve a cobrar cuando la tarjeta pasa, y la cuenta no gana días por cancelar.
 - Reactivar una prueba que sólo compró una recarga la vuelve a la prueba con sus días; ya no pide pagar ni dice «período ya pagado».
 - Un pago rechazado no cuenta como historial de pagos: una cuenta que pagó el plan antes del registro sigue yendo al checkout al reactivar.
-- Dos pedidos de pago a la vez de la misma cuenta dejan una sola suscripción viva en Mercado Pago, la que CDI guarda: el segundo espera al primero (D).
-- Cancelar mientras corre un pedido de pago espera a que termine y cancela también la suscripción que ese pedido creó.
 
 ## 2026-10-28 · fix: la exportación también cuenta la operación, una vez por id (COBRO-MP-1 B)
 

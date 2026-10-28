@@ -411,17 +411,28 @@
             });
             const data = await res.json().catch(() => ({}));
             if (res.ok && data && data.init_point) {
+                if (boton) {
+                    // Si vuelve con «Atrás» y el navegador restaura la página
+                    // tal cual, el botón no queda trabado en «Abriendo…».
+                    window.addEventListener('pageshow', (ev) => {
+                        if (ev.persisted) {
+                            boton.disabled = false;
+                            boton.textContent = textoBoton;
+                        }
+                    }, { once: true });
+                }
                 window.location.href = data.init_point;
                 return;
             }
             CDI.toast('Error', (data && typeof data.detail === 'string' && data.detail) || 'No se pudo iniciar el cobro.', 'error');
         } catch (err) {
             CDI.toast('Error', String(err.message || err), 'error');
-        } finally {
-            if (boton) {
-                boton.disabled = false;
-                boton.textContent = textoBoton;
-            }
+        }
+        // Sólo se rehabilita si no va a Mercado Pago: otro clic durante la
+        // redirección pediría un segundo checkout y cancelaría este.
+        if (boton) {
+            boton.disabled = false;
+            boton.textContent = textoBoton;
         }
     }
 
