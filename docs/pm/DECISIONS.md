@@ -295,3 +295,9 @@ terminen)», por el uso y una entrega de otro proyecto. Las rutinas de la PM
 principal y de las dos Devs quedan apagadas. Cada Dev termina la pieza en
 curso, sube el informe y frena; la PM no revisa hasta retomar. Se retoma
 cuando Emi lo diga, prendiendo las rutinas con `update_trigger`.
+
+## 2026-10-28 — Se levanta la pausa (Emi)
+
+Emi, 28/10 a la noche: «volver a trabajar tranqui», porque su entrega del
+otro proyecto pasó al martes. Se prenden de nuevo las tres rutinas con la
+misma frecuencia (PM cada hora, Devs cada 3 horas).
