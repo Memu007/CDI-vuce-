@@ -33,8 +33,10 @@ repositorio.** Las pruebas usan sintéticos con la misma forma.
 ## Orden después de las 18:00, y D45 y D46 (2026-10-28 17:58 UTC)
 
 1. DESPACHO-1b (devolución y D41). 2. DISCO-1 (devolución). 3. SESION-1
-(devolución, abajo). 4. ABUSO-1 (devolución, abajo). 5. EMAIL-1: la D45 y
-el mutante. 6. CONEXIONES-1: la D46. Cada una con su rojo, su sabotaje y
+(devolución, abajo). 4. ABUSO-1 (devolución, abajo). 5. SUFIJOS-2
+(devolución, abajo) y lo que se suma de SEGURO-1. 6. EMAIL-1: la D45 y el
+mutante. 7. CONEXIONES-1: la D46. 8. OBSERVABILIDAD-1 (devolución,
+abajo). 9. ORG-1 + D40 (devolución, abajo). Cada una con su rojo, su sabotaje y
 `/entregar`; me despertás al entregar cada una, sin esperar a juntar.
 
 - **D45 (EMAIL-1): (1), decidido por la PM.** El tope por correo se
@@ -45,6 +47,71 @@ el mutante. 6. CONEXIONES-1: la D46. Cada una con su rojo, su sabotaje y
   Esperás a que `api_logs` tenga todos los pedidos, un control que cancele
   el `close` y tenga que dar rojo, y cortes en vuelo de verdad. Hasta
   entonces la D37 sigue abierta.
+
+## ORG-1 + D40: devolución, sobre `b358827` (2026-10-28 18:50 UTC)
+
+Evidencia en `REPRODUCCION-ORG-1-D40-2026-10-28.md`. Lo que la D40 cierra
+está bien: normalización, carrera en Postgres, tope en el registro y el
+sacado que no vuelve. **Causa de la devolución:** las reglas de la D40
+tienen filtros que ninguna prueba distingue, y el «Sumá» 4 de la
+aceptación de ORG-1 no llegó. Cada punto, rojo antes del arreglo y con su
+sabotaje:
+
+1. **El «Sumá» 4 entero**, un caso por guarda (la lista está en la
+   aceptación de ORG-1, abajo). Reproducido por la PM: con el control de
+   dueño al invitar en `if False`, o sin el filtro por estudio al sacar,
+   las pruebas de ORG-1 siguen en `81 passed`.
+2. **Una invitación vencida queda vencida.** Sin `status == "pending"` en
+   el `UPDATE` del registro, `92 passed` (corrida de la PM): falta el caso
+   del mismo email con una vencida y una pendiente.
+3. **El orden de los mensajes.** Con el estudio lleno, invitar un email que
+   ya tiene cuenta da «Ese email ya tiene una cuenta…», no el del tope.
+4. **El `UPDATE` va en la misma transacción que la cuenta,** con una prueba
+   secuencial (hoy sólo la de carrera lo distingue).
+5. **Lugar muerto, decidido por la PM.** Una invitación pendiente cuyo
+   email ya tiene cuenta en CDI (en cualquier estudio o en ninguno) no
+   ocupa lugar: no se puede usar nunca. Generaliza la regla de la D40.
+   Reproducido por la PM: (A) el invitado se registra sin el link y su
+   pendiente ocupa lugar hasta que el dueño la borra; (C) X tiene
+   pendientes en A y en B, entra con la de A, y la de B queda ocupando
+   lugar en B. Los dos, rojos, y la familia: cualquier camino por el que
+   un email pendiente llegue a tener cuenta.
+6. **A riesgos:** el modo `REGISTER_TEST_EMAIL_REPLACE`; invitar dice si un
+   email tiene cuenta, sin límite de pedidos; cambiar el email del perfil
+   no pide verificarlo (lo llevo a Emi como seguridad, no lo arreglás acá).
+
+SQLite y Postgres 16, CHANGELOG, commits separados y `/entregar`.
+
+## OBSERVABILIDAD-1: devolución, sobre `39be45e` (2026-10-28 18:40 UTC)
+
+Evidencia en `REPRODUCCION-OBSERVABILIDAD-1-2026-10-28.md`. La migración
+cumple lo pedido: sólo agrega, dos arranques no cambian nada y si falla la
+app arranca. **Causa de la devolución:** la pieza vuelve a grabar la
+métrica sin mirar qué graba, y eso no se puede publicar así.
+
+1. **Lo que graba la métrica, decidido por la PM (dentro de esta pieza).**
+   Reproducido por la PM: `MetricsMiddleware` guarda el camino crudo y
+   `/api/dev/stats` lo muestra; ahí quedan el token de invitación entero,
+   el hash de un presupuesto público, la preferencia de pago, el nombre de
+   archivo y el CUIT. Que guarde el molde de la ruta
+   (`/api/invitations/{token}`), y un pedido que no coincide con ninguna
+   ruta guarde `<sin ruta>`. Rojo antes del arreglo: cada ruta de la app
+   con parámetro en el camino guarda su molde, sacada de la lista de rutas
+   de la app y no de una lista a mano, más un camino que no existe. Un
+   sabotaje que vuelva al camino crudo y dé rojo.
+2. **El lock exclusivo dura sólo el `ALTER`.** Hoy el `ALTER` y el índice
+   van en la misma transacción, y el adversario midió unos 0,6 s por millón
+   de filas con la tabla trabada para leer y escribir. Separalos: columna en
+   una transacción y el índice en otra, cada una con su `lock_timeout`.
+3. **El log dice la verdad:** «agregada columna» y «agregado índice» se
+   imprimen después del commit de cada uno.
+4. **A riesgos, sin cambiar:** la espera de 5 s detrás de otra transacción
+   (frena a los que llegan detrás y reintenta en el próximo arranque); un
+   índice inválido o parcial que se da por bueno; un camino de más de 200
+   caracteres que pierde su métrica en Postgres.
+
+Postgres 16 y SQLite. Línea en `CHANGELOG.md`. Commits aparte y su propio
+`/entregar`.
 
 ## SESION-1: devolución, sobre `895ee73` (2026-10-28 17:58 UTC)
 
@@ -104,6 +171,59 @@ Lo demás del revisor (XFF y `TRUSTED_PROXY_HOPS`, IPv6, deadlock con
 ventanas cortas, filas sin tope, tiempos del login) va a riesgos en tu
 informe, sin tocar producto.
 
+## SEGURO-1: aceptada sobre `5dfaf47` (2026-10-28 18:15 UTC)
+
+`test_seguro1.py` `48 passed` (corrida de la PM). Se integra con la cadena,
+después de SUFIJOS-2. Evidencia: `REPRODUCCION-SEGURO-1-2026-10-28.md`.
+
+Se suma, en commits aparte junto con la vuelta de SUFIJOS-2:
+- **Una prueba que fije la lista de los cinco.** Hoy sumar `DAT` (o `DDU`,
+  `DAF`, `DES`, `DEQ`) a `INCOTERMS_CON_SEGURO` deja `48 passed`.
+- **`/generate_maria/avisos` normaliza el incoterm igual que
+  `/generate_maria`**: con `"CIF\x00"` hoy los avisos ofrecen el 1 % y
+  generar da 400. Una sola función para los dos.
+- A riesgos: el 1 % mandado sin `seguro_calculado` entra al TXT (es lo
+  encargado; lo cubre SEGURO-2, que espera a Emi); seguro mayor que el FOB
+  sin aviso (preexistente); la revisión dice «no los sumes dos veces» y el
+  400 dice «cargá el de la factura».
+
+## SUFIJOS-2: devolución, sobre `bd76f9f` (2026-10-28 18:05 UTC)
+
+Evidencia en `REPRODUCCION-SUFIJOS-2-2026-10-28.md`. Va en la cola después
+de ABUSO-1 y antes de EMAIL-1.
+
+**Causa.** La detección de «cambiaría de valor» mira el texto crudo con una
+lista de signos ASCII; la limpieza que va al TXT (`caracteres_del_maria`)
+hace NFKD y pasa a espacio todo lo que no es letra ni número. Lo que la
+limpieza cambia y la lista no nombra sale cambiado sin frenar: `ZA(−5)` →
+`ZA( 5)`, `AJ(½)` → `AJ(1 2)`, `AJ(1E-3)` y `AJ(1E+3)` → `AJ(1E 3)` los
+dos, `AJ(１.５００)` → `AJ(1 500)`, `ZA(10%)` → `ZA(10 )`.
+
+Se pide:
+
+1. **Un solo criterio, sobre lo que sale.** Que la decisión compare el
+   valor que escribió el usuario con el que va al TXT (después de NFKD y de
+   la limpieza), no una lista de signos sobre el texto crudo. Lo que cambia
+   un número, frena con el aviso de hoy.
+2. **Fechas, decidido por la PM:** la pieza no pidió frenar fechas y antes
+   pasaban. Una fecha `dd/mm/aaaa`, `dd.mm.aaaa` o `dd-mm-aaaa` sale
+   `dd mm aaaa` sin frenar, igual con los tres separadores. Hoy
+   `AR(31/12/2026)` y `AR(31.12.2026)` dan error y `AR(31-12-2026)` pasa.
+   Sumá la pregunta a `PREGUNTAS-DESPACHANTE.md` (cómo se escribe una fecha
+   en un sufijo); no se espera la respuesta.
+3. **Z, sólo dígitos:** en un sufijo que pide número, cualquier carácter
+   que no sea un dígito ASCII (incluidos `%`, espacio entre dígitos, letras
+   de ancho completo) frena. Hoy `ZA(10%)` y `ZA(1 500)` pasan.
+4. **Caso de la familia, en rojo antes del arreglo:** menos Unicode, raya,
+   `- 5`, ancho completo, `½`, `1⁄2`, `1 / 2`, `1E-3` contra `1E+3`, `10⁻³`,
+   `1'500`, `%`, y uno que no esté en esta lista.
+5. **Los siete mutantes que sobreviven** (en la reproducción), cada uno con
+   la prueba que lo mata.
+6. A riesgos, sin cambiar: `AJ(1,500)` pasa sin aviso (el sistema no lo
+   cambia); `AK`, `AI` y `AW` pasan `15.3` a `15,3`.
+
+Toca el TXT: el golden no se toca.
+
 ## D41 y el orden de lo que queda (2026-10-28 17:20 UTC)
 
 - **D41 (DESPACHO-1b): (1), decidido por la PM.** Las tres medias
@@ -113,10 +233,10 @@ informe, sin tocar producto.
   corre ahora.
 - **D40 y los arreglos de ORG-1 después de las piezas: sí.** Van encima de
   la cadena igual; no se integra nada hasta aceptar ORG-1.
-- **Recibidas** SUFIJOS-2 (`bd76f9f`), SEGURO-1 (`5dfaf47`) y DESPACHO-1b
-  (`e59e1a8`): revisión de la PM en curso. El orden después de las 18:00:
-  primero las devoluciones que lleguen (DESTINO-1 ya está arriba), después
-  D41.
+- **Recibidas** SUFIJOS-2 (`bd76f9f`, devolución arriba), SEGURO-1
+  (`5dfaf47`, aceptada arriba), DESPACHO-1b (`e59e1a8`, devolución
+  arriba), OBSERVABILIDAD-1 (`39be45e`, devolución arriba) y ORG-1 + D40
+  (`b358827`, devolución arriba).
 
 ## EMAIL-1: aceptada sobre `2b93071` (2026-10-28 17:46 UTC)
 
@@ -497,63 +617,6 @@ por rótulo); el PDF sin texto; que el lector de facturas lo sigue
 rechazando; aislamiento (otro dueño, otro cliente); que no se crea ninguna
 operación. Un sabotaje por regla. Línea en `CHANGELOG.md`. Toca datos de
 clientes: revisión fuerte. Tu próxima D es la **D31**.
-
-### SEGURO-1 — hecha, sin entregar (encargada 2026-10-28 04:00 UTC)
-
-En commits aparte encima de SUFIJOS-2 (`4ca6829`), con su propio
-`/entregar` después del de SUFIJOS-2. Respuesta del despachante (pregunta
-4, `PREGUNTAS-DESPACHANTE.md`, D14 de VALOR-1): en **CIF, CIP, DPU, DAP y
-DDP** el seguro ya está en el precio.
-
-- **La regla:** con esos cinco incoterms el sistema no sugiere el 1 %: no
-  hay botón «Calcular seguro». El seguro se sigue declarando (el despacho
-  CIF trae el suyo): el campo queda, se carga a mano o lo lee el lector, y
-  sale en el TXT como hoy. CFR, CPT y los demás siguen con el botón.
-- **Dónde vive:** en el servidor, donde se arma `seguro_sugerido`
-  (`maria_generator.py`, cerca de la línea 943), y el botón sigue a lo que
-  diga el servidor. Esconderlo sólo en `finalize.js` no alcanza: la
-  sugerencia seguiría viva y una prueba de Python no la cubre. Premisa
-  primero: comprobá que ese código conoce el incoterm. Si no se puede sin
-  salir del alcance, es la D30 y seguís con lo que no depende de ella.
-- **Cambio de incoterm después de calcular:** si el seguro lo calculó el
-  sistema (`seguro_calculado`) y el incoterm pasa a uno de los cinco, ese
-  seguro se borra y el campo queda como «para completar», con el mismo
-  mecanismo que un campo sin leer. Un seguro leído de la factura o escrito
-  por el usuario no se toca. Comprobá que un campo «para completar» no deja
-  generar en silencio con seguro cero; si lo deja, es la D30.
-- **Incoterm:** mayúsculas, minúsculas y espacios dan lo mismo. Vacío o
-  desconocido, como hoy (con botón).
-
-Pruebas: los cinco sin sugerencia ni botón; CFR y CPT con botón; una
-operación CIF con su seguro en el TXT; minúsculas y espacios; vacío; el
-cambio de incoterm en los dos sentidos (el calculado se borra, el escrito
-queda); un sabotaje por regla (uno de los cinco fuera de la lista, la
-regla sólo en la pantalla, el calculado que sobrevive al cambio). El golden
-no se toca.
-
-### SUFIJOS-2 — hecha, sin entregar (encargada 2026-10-28 03:00 UTC)
-
-DESTINO-1 ya está hecha y el cupo vuelve a las 18:00 UTC: mientras tanto,
-SUFIJOS-2, en commits aparte encima de DESTINO-1 (`4905cd8`), con su propio
-`/entregar` después del de DESTINO-1. Respuesta del despachante (pregunta 2,
-`PREGUNTAS-DESPACHANTE.md`):
-
-- **Sufijo de código libre:** un número puede llevar coma. Hoy `AF(2.5)`
-  sale `AF(2 5)`: el número cambia. Tiene que salir `AF(2,5)`.
-- **Sufijo que pide número:** sin decimales. Uno con decimales no se
-  redondea en silencio: aviso que nombra el ítem y el sufijo, y no se genera.
-- **Ninguno vacío:** `AA()` hoy pasa. Mismo aviso, no se genera.
-
-Premisa primero:
-- comprobá en el código, o en el catálogo de sufijos que ya tenga, cuáles
-  piden número;
-- comprobá que una coma no rompe el formato del campo en el TXT.
-
-Si alguna de las dos no se puede saber desde el repo, es la D29 y seguís
-con lo que no depende de ella.
-
-Pruebas: los tres casos, uno que hoy está bien y sigue igual, y un sabotaje
-por regla. Toca el TXT: el golden no se toca.
 
 ## Qué pasó el 2026-10-24
 

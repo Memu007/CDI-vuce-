@@ -251,3 +251,30 @@ sólo tres acciones en lista explícita; (e) los contadores de login y
 recuperación van a una tabla con incremento atómico, tamaño acotado y
 migración `_migrate_*` en commit propio. D36 y D37 (2) por ahora; sus (1)
 son EMAIL-1 y CONEXIONES-1, que Emi aprobó.
+
+## 2026-10-28 — OBSERVABILIDAD-1: la métrica guarda el molde de la ruta (PM)
+
+Decidido por la PM, amplía la D34 (a). Al volver a grabar la métrica, la
+pieza dejaba en `api_logs` (y en `/api/dev/stats`) el camino crudo, con
+tokens de invitación, hashes de presupuestos públicos y CUIT. Se guarda el
+molde de la ruta, y `<sin ruta>` si no coincide ninguna. Sin eso,
+OBSERVABILIDAD-1 no se publica. Evidencia en
+`REPRODUCCION-OBSERVABILIDAD-1-2026-10-28.md`.
+
+## 2026-10-28 — ORG-1: la pendiente de un email con cuenta no ocupa lugar (PM)
+
+Decidido por la PM, generaliza la D40. Una invitación pendiente cuyo email
+ya tiene cuenta en CDI (en cualquier estudio o en ninguno) no se puede usar
+y no cuenta para el tope de usuarios del estudio. Evidencia en
+`REPRODUCCION-ORG-1-D40-2026-10-28.md`.
+
+## 2026-10-28 — EXCEL-2b: el historial liviano de sugerir es del despachante; D32 (b) como EXCEL-2c (PM)
+
+`/api/ncm/sugerir` muestra el historial liviano (`load_ncm_historial`) del
+despachante a cualquiera de sus clientes, con `source: historial`. Queda
+así: es el historial del propio usuario, ya existía y el NCM depende del
+producto. Lo que es de un cliente (`scope: cliente`) no se le muestra a
+otro. D32: (b), libros chicos pero caros al carril pesado por una medida
+previa a leer, como pieza aparte EXCEL-2c al final de la cola de la Dev
+técnica. Topes de entorno: un valor que no da un tope usable (no finito,
+no positivo o 0 en bytes) usa el defecto.
