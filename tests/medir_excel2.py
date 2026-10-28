@@ -99,7 +99,7 @@ def test_linea_de_tiempo(monkeypatch):
     async def _todo():
         entradas = 0
         listas = asyncio.Event()
-        validar = fs.validate_file_upload
+        validar = fs.validar_con_carril
 
         async def observar(file, *a, **k):
             nonlocal entradas
@@ -109,7 +109,7 @@ def test_linea_de_tiempo(monkeypatch):
                 if entradas == 8:
                     listas.set()
             return await validar(file, *a, **k)
-        monkeypatch.setattr(fs, "validate_file_upload", observar)
+        monkeypatch.setattr(fs, "validar_con_carril", observar)
 
         transporte = httpx.ASGITransport(app=main.app)
         async with httpx.AsyncClient(transport=transporte, base_url="http://test", timeout=600) as c:
@@ -124,12 +124,15 @@ def test_linea_de_tiempo(monkeypatch):
 
     asyncio.run(_todo())
     # Un hilo vencido sigue trabajando: se lo espera para que la línea lo muestre.
-    for pool in (fs._POOL_VALIDAR_EXCEL, main._POOL_LECTURA_EXCEL):
+    for pool in (fs._POOL_VALIDAR_EXCEL, fs._POOL_VALIDAR_EXCEL_LIVIANO,
+                 main._POOL_LECTURA_EXCEL, main._POOL_LECTURA_EXCEL_LIVIANO):
         if pool is not None:
             pool.submit(lambda: None).result()
             pool.shutdown(wait=True)
     fs._POOL_VALIDAR_EXCEL = None
     main._POOL_LECTURA_EXCEL = None
+    fs._POOL_VALIDAR_EXCEL_LIVIANO = None
+    main._POOL_LECTURA_EXCEL_LIVIANO = None
     for fila in log:
         print(*fila, sep="\t")
 

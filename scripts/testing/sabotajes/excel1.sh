@@ -49,7 +49,7 @@ L=tests/test_excel1_lectura.py
 sabotaje $M "el Excel v2 se vuelve a leer en el hilo del servidor" \
   '        df = await _leer_pdf_aparte(
             _leer_excel_ruta, temp_filename, engine, tuple((mapping or {}).items()),
-            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
+            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel_carril(liviano),
         )
 ' \
   '        df = _leer_excel_ruta(temp_filename, engine, tuple((mapping or {}).items()))
@@ -61,7 +61,7 @@ sabotaje $M "leer un Excel pierde el tiempo máximo" \
   "FAILED $T::test_leer_un_excel_tiene_tiempo_maximo[ncm_import_historial]"
 sabotaje $F "validar el Excel vuelve al hilo del servidor" \
   'asyncio.get_running_loop().run_in_executor(
-                        _pool_validar_excel(), _abrir_excel, contents, file_ext
+                        _pool_validar_excel_carril(liviano), _abrir_excel, contents, file_ext
                     ),' \
   'asyncio.sleep(0, _abrir_excel(contents, file_ext)),' \
   "FAILED $T::test_health_responde_mientras_se_valida_un_excel"
@@ -102,7 +102,7 @@ sabotaje $M "el mapeo aprendido vuelve a pisar el precio unitario" \
   '            if False:' \
   "FAILED $L::test_mapeo_aprendido_no_pisa_el_precio_unitario_ni_el_peso_neto"
 sabotaje $F "validar el Excel vuelve a los hilos compartidos" \
-  '                        _pool_validar_excel(), _abrir_excel, contents, file_ext' \
+  '                        _pool_validar_excel_carril(liviano), _abrir_excel, contents, file_ext' \
   '                        None, _abrir_excel, contents, file_ext' \
   "FAILED $L::test_validar_el_excel_usa_su_propio_grupo_de_hilos"
 sabotaje $M "la fila de ejemplo de la plantilla vuelve a entrar" \
