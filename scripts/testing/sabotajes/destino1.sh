@@ -26,7 +26,8 @@ FALLAS=0
 # Las de DESTINO-1 y las que comparan el golden (D28 a: el golden no se toca
 # y esas pruebas esperan USOPAR en su GANANCIASOP3).
 PRUEBAS="tests/test_destino1.py tests/test_generar_maria_txt.py tests/test_maria1b_controles.py
-         tests/test_punta_a_punta1.py tests/test_maria4_despachante.py tests/test_maria_supuestos.py"
+         tests/test_punta_a_punta1.py tests/test_maria4_despachante.py tests/test_maria_supuestos.py
+         tests/test_maria3_antes_de_generar.py"
 pytest_d1() {
   rm -f test.db
   # shellcheck disable=SC2086
@@ -128,7 +129,8 @@ sabotaje $G "bien de uso de una persona sale COMERC (lo de antes)" \
   "$TABLA" "${TABLA/\"IVAAD1\": \"USOPAR\"/\"IVAAD1\": \"COMERC\"}" \
   "FAILED $T::test_cada_destino_por_operacion_sale_con_su_par[IVAAD1-USOPAR]" \
   "pares fuera de la tabla del despachante: {'0001': ('COMERC', 'IVAAD1')}" \
-  "FAILED tests/test_generar_maria_txt.py::test_golden_reproduce_estructura_real"
+  "FAILED tests/test_generar_maria_txt.py::test_golden_reproduce_estructura_real" \
+  "FAILED tests/test_maria3_antes_de_generar.py::test_el_archivo_real_de_2025_sale_identico_con_la_procedencia_de_la_pantalla"
 sabotaje $G "comercialización sale USOPAR" \
   "$TABLA" "${TABLA/\"NO_VALIDA\": \"COMERC\"/\"NO_VALIDA\": \"USOPAR\"}" \
   "FAILED $T::test_cada_destino_por_operacion_sale_con_su_par[NO_VALIDA-COMERC]" \

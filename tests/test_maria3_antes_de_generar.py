@@ -24,7 +24,7 @@ from proyecto_maria.core.maria_generator import (
     supuestos_declarados,
     validate_for_kit_maria,
 )
-from tests.test_generar_maria_txt import GOLDEN_INPUTS, _GOLDEN_PATH
+from tests.test_generar_maria_txt import GOLDEN_INPUTS, _GOLDEN_PATH, golden_con_destino
 from tests.test_maria4_despachante import _valor
 from tests.test_maria_subitems import COMUN, ITEM_BASE, REFERENCIA, SUF_A, SUF_B
 
@@ -187,7 +187,8 @@ def test_el_archivo_real_de_2025_sale_identico_con_la_procedencia_de_la_pantalla
     r = client.post("/generate_maria", json=cuerpo)
     assert r.status_code == 200, r.text
     with open(_GOLDEN_PATH, "r", newline="") as f:
-        esperado = f.read().replace("NDDTIMMIOE=30999999990", "NDDTIMMIOE=30999999995")
+        # DESTINO-1 (D28 a): todo igual salvo el GANANCIASOP3, que dice USOPAR.
+        esperado = golden_con_destino(f.read()).replace("NDDTIMMIOE=30999999990", "NDDTIMMIOE=30999999995")
     assert r.json()["content"] == esperado
 
 
