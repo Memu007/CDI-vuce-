@@ -110,7 +110,8 @@ sabotaje "una huella que no se entiende llega a la base" "huella_que_no_se_entie
   reemplazar $C 'if not re.fullmatch(r"[A-Z0-9_]+", str(datos.get("codificacion", ""))):' 'if False:'
 
 echo "== no pisar"
-sabotaje "copiar pisa una copia que existe" "no_pisa_una_copia" "error: ya existe|copia anterior" \
+# Sin este control, _fijar igual no pisa: el rojo es que falta el aviso de antes de copiar.
+sabotaje "copiar no avisa antes de copiar" "no_pisa_una_copia" "'no se pisa una copia' in 'error: ya existe /" \
   reemplazar $C 'raise Falla(f"ya existe {ruta}: no se pisa una copia")' 'pass'
 sabotaje "_fijar pisa" "fijar_no_pisa" "DID NOT RAISE" \
   reemplazar $C 'os.link(temporal, ruta)' 'shutil.copyfile(temporal, ruta)'
