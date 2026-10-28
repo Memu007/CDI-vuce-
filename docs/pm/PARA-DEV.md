@@ -64,60 +64,24 @@ no vuelve), el barrido de vencidos de otro usuario y `parsed.v !== 1`.
   a la pieza); localStorage lleno falla sin aviso (si el aviso del corte
   lo cubre con una línea, va).
 
-## Veredicto de EXCEL-2b, vuelta (2026-10-28 19:20 UTC): devolución
+## Veredicto de EXCEL-2b, vuelta 2 (2026-10-28 20:30 UTC): aceptada
 
-Sobre `606dda5` (informe `a81bb1f`). Evidencia en
-`REPRODUCCION-EXCEL-2b-vuelta-2026-10-28.md`. Corrí `excel2b.sh` (25
-ROJO, ninguno sin rojo) y mutantes míos contra todas las pruebas de Excel y
-GUARDAR-2. Lo de la revisión anterior (puntos 2 a 5) queda bien. Es una
-devolución chica; va **antes de seguir con COBRO-MP-1**, en la misma pieza.
+Sobre `03336f1` (informe `5a6ef01`). Evidencia en
+`REPRODUCCION-EXCEL-2b-vuelta2-2026-10-28.md`. `excel2b.sh` dio 37 ROJO y
+ninguno sin rojo; los topes con `0`, `-3`, `abc`, `0.0000009` y `0.5` MB
+dan un tope usable; mis mutantes de topes, guardas y bordes mueren todos.
+**Aceptada, sin integrar**: tu rama intercala ORDEN-1 y COBRO sin aceptar.
 
-**Causa:** el arreglo del tope tapó el ejemplo (`1e308`) y no la familia:
-un número de entorno que no da un tope usable. Y varias guardas del carril
-liviano no tienen un caso que las distinga.
-
-1. **El tope en cero (reproducido).** `EXCEL_MAX_DESCOMPRIMIDO_MB=1e-9` da
-   `_mb_de_entorno` = 0; `EXCEL_MAX_ELEMENTOS_ESTILOS=0.5` da
-   `_elementos_de_entorno` = 0. Con tope 0 no entra ningún Excel. Vos lo
-   pusiste como BAJA en riesgos; es la misma causa que el `1e308`.
-   **Decidido por la PM:** todo tope que lee la subida de Excel desde el
-   entorno (los cuatro de `_mb_de_entorno`, `_elementos_de_entorno` y
-   `MAX_UPLOAD_MB` en `main.py`) usa el defecto si el valor no es finito, si
-   no es positivo o si en bytes o elementos da 0. Un caso por lector, con
-   `1e-9`, `0.5`, `inf`, `nan` y `-0`; el mutante `valor <= 0` → `valor <
-   0` tiene que dar rojo.
-2. **Guardas sin caso (mutantes de la PM, 1201 verdes cada uno):**
-   - la cabeza se descomprime sin `max_length` (`decompress(datos, 44)` →
-     `decompress(datos)[:44]`);
-   - `continue` → `break` en el presupuesto de imágenes;
-   - el orden de imágenes de mayor a menor (`reverse=True` → `False`);
-   - las entradas cifradas no se excluyen (`and not info.flag_bits &
-     0x1`);
-   - no se mira la firma del encabezado local (`PK\x03\x04`).
-
-   El adversario vio además que los bordes sobreviven en `test_excel2b`:
-   `resto <= umbral`, `len(contents) <= umbral` del `.xls`, `resto -
-   descontado <= umbral` y `descontado + info.file_size >
-   _LIVIANO_IMAGENES_MAX` (cada `<=` a `<`, el `>` a `>=`). Un caso por
-   guarda, al borde exacto donde corresponda, y su sabotaje en
-   `excel2b.sh`.
-3. **GUARDAR-2 en `/api/ncm/sugerir` (reproducido).** El historial liviano
-   (`load_ncm_historial`, `main.py` cerca de la 9517) es por despachante y
-   ya existía: después de `guardar-uso` con el cliente A, `sugerir` con el
-   cliente B devuelve ese NCM con `source: historial`. No es fuga entre
-   despachantes. **Decidido por la PM:** queda así (es el historial del
-   propio despachante y el NCM depende del producto). Corregí en tu informe
-   lo que dice que `sugerir` no comparte historial, y sumá un caso: después
-   de `guardar-uso` con A, `sugerir` con B nunca trae una sugerencia con
-   `scope: cliente`; sí puede traer la de `historial`.
-4. **D32: (b), como pieza aparte, EXCEL-2c. Decidido por la PM.** Antes de
-   leer, la fila y columna máximas (`r=` y `<dimension>`), la cuenta de
-   `<xf` en `styles.xml` y de entradas del `sst`; por encima de un tope, el
-   libro va al carril pesado. Rojo primero, un caso por forma y un
-   sabotaje por tope. Va al final de la cola. Hasta entonces, el CHANGELOG
-   y tus riesgos dicen el límite con su número.
-
-Riesgos que anoto, no los arregles: topes enormes hasta `1e302` se aceptan.
+- Supuesto aceptado: `MAX_UPLOAD_MB` inválido da 10 MB también al PDF, y
+  un negativo da 10 MB en vez de 413.
+- Riesgos anotados, no los arregles: topes hasta `1e302` se aceptan; un
+  tope de 1 a 10 bytes (`1e-6` MB) traba toda subida con mensaje claro.
+- **EXCEL-2c (D32 b, decidido por la PM), al final de la cola:** antes de
+  leer, la fila y columna máximas (`r=` y `<dimension>`), la cuenta de
+  `<xf` en `styles.xml` y de entradas del `sst`; por encima de un tope, el
+  libro va al carril pesado. Rojo primero, un caso por forma y un sabotaje
+  por tope. Hasta entonces, el CHANGELOG y tus riesgos dicen el límite con
+  su número.
 
 ## BACKUP-1a: lo que encontró el adversario antes de tu `/entregar` (2026-10-28 17:48 UTC)
 
@@ -472,13 +436,12 @@ supuestos de Mercado Pago que no pudiste ver sin red: los estados, que una
 
 ## Orden
 
-1. EXCEL-2b, vuelta 2: entregada (`5a6ef01`), en revisión.
-2. La devolución de ORDEN-1 de las 20:08 (arriba): ahora, antes de seguir
-   con COBRO-MP-1.
-3. COBRO-MP-1: hecha; se entrega después de ORDEN-1, con A–E de arriba
+1. La devolución de ORDEN-1 de las 20:08 (arriba): ahora, antes de seguir
+   con COBRO-MP-1. (EXCEL-2b quedó aceptada a las 20:30.)
+2. COBRO-MP-1: hecha; se entrega después de ORDEN-1, con A–E de arriba
    arreglados.
-4. COBRO-CORTE-1: hecha; se entrega después de COBRO-MP-1.
-5. COBRO-MP-2: hecha; subila ya y se entrega después de COBRO-CORTE-1.
-6. AISLAMIENTO-2 y LIMPIEZA-1: hechas; se entregan después de COBRO-MP-2.
-7. BACKUP-1a (arriba).
-8. EXCEL-2c (la D32 b, arriba).
+3. COBRO-CORTE-1: hecha; se entrega después de COBRO-MP-1.
+4. COBRO-MP-2: hecha; subila ya y se entrega después de COBRO-CORTE-1.
+5. AISLAMIENTO-2 y LIMPIEZA-1: hechas; se entregan después de COBRO-MP-2.
+6. BACKUP-1a (arriba).
+7. EXCEL-2c (la D32 b, arriba).
