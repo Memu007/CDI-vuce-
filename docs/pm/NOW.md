@@ -196,7 +196,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-28 15:00 UTC: sesiones bajo 170k (técnica 140k, MARIA 138k). Sin entregas ni D abiertas; MARIA pasó D38 y D39 a su informe (70f2ca5). Las dos esperan el cupo de las 18:00. Emi: sí o no a la medición chica de la D39.
+2026-10-28 16:00 UTC (igual que a las 15:00): sesiones bajo 170k (técnica 108k, MARIA 143k). Sin entregas ni D abiertas; MARIA pasó D38 y D39 a su informe (70f2ca5). Las dos esperan el cupo de las 18:00. Emi: sí o no a la medición chica de la D39.
 
 2026-10-28 14:00 UTC: sesiones bajo 170k (técnica 137k, MARIA 118k), las dos esperan el cupo de las 18:00. MARIA terminó EMAIL-1 (2b93071, suite 3954 passed) y CONEXIONES-1 (30c0e97: sin conexiones colgadas, sin cambio de producto), sin entregar. D38 (1) y D39 (1) por ahora, decididas por la PM; la medición chica de la D39 se le propone a Emi. La técnica, BACKUP-1a subida en 70f6d3d.
 
