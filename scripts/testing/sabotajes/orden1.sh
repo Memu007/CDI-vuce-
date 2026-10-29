@@ -242,7 +242,7 @@ sabotaje $A "la pestaña no mira si la sesión cambió desde que abrió" \
   'if (sesionAntes !== sesionAlAbrir || getCsrfToken() !== sesionAlAbrir) {' 'if (false) {'
 sabotaje $A "al abrir con otra sesión no se avisa" \
   "FALLA: entró otro usuario mientras la pestaña reintentaba y la pestaña no avisa" \
-  $'sesionAjena = true;\n                    avisarBorrador(\'ajena\', AVISO_AJENA);' 'sesionAjena = true;'
+  '                    marcarAjena();' '                    sesionAjena = true;'
 
 # Devolución 20:08. Otro usuario entra con la pestaña abierta: no se guarda a
 # nombre de nadie y se avisa.
@@ -250,13 +250,17 @@ export CASOS=l
 sabotaje $A "la sesión que cambió se confirma sin mirar el usuario" \
   "FALLA: lo que cargó B en la pestaña de A se guardó a nombre de " \
   '        if (username !== duenoPestana) {' '        if (false) {'
-sabotaje $A "la pestaña guarda sin mirar si la sesión cambió" \
-  "FALLA: lo que cargó B en la pestaña de A se guardó a nombre de " \
-  '        if (getCsrfToken() !== sesionDelDueno) {' '        if (false) {'
 sabotaje $A "otro usuario entra y la pestaña no avisa" \
   "FALLA: la pestaña dejó de guardar y no lo avisa" \
-  $'            sesionAjena = true;\n            avisarBorrador(\'ajena\', ' \
-  $'            sesionAjena = true;\n            (() => {})(\'ajena\', '
+  $'        if (username !== duenoPestana) {\n            marcarAjena();' \
+  $'        if (username !== duenoPestana) {\n            sesionAjena = true;'
+# El guardián de usuarioActual: en (l) no se ve, porque al cargar el semáforo
+# valida con un POST y el freno de api() ya tapa la pestaña. z28 entra con la
+# operación ya validada.
+export CASOS=z28
+sabotaje $A "la pestaña guarda sin mirar si la sesión cambió" \
+  "FALLA: entró otro usuario y la pestaña de A no escribe nada y lo que cambió después se guardó a nombre de " \
+  '        if (getCsrfToken() !== sesionDelDueno) {' '        if (false) {'
 # Lo mismo, pasando por la sesión cerrada.
 export CASOS=n
 sabotaje $A "sale A, entra B y la sesión se confirma sin mirar el usuario" \
@@ -271,7 +275,7 @@ sabotaje $A "la sesión nueva del dueño no se recuerda" \
 export CASOS=m2
 sabotaje $A "el aviso de sesión cerrada no se va al volver a entrar" \
   "FALLA: el mismo usuario volvió a entrar y la pestaña sigue avisando que no guarda" \
-  "        if (avisoBorrador === 'sinsesion' || avisoBorrador === 'red') avisarBorrador(null);" ''
+  "        if (['sinsesion', 'red', 'comprobando'].includes(avisoBorrador)) avisarBorrador(null);" ''
 
 # Con otro usuario adentro, la pestaña del dueño no borra lo que él dejó.
 export CASOS=y
@@ -297,11 +301,11 @@ sabotaje $A "al volver de la caché se marca en uso sin mirar la sesión" \
 export CASOS=p
 sabotaje $A "si el usuario llega tarde, la operación no se recupera" \
   "la operación no vuelve a la pestaña que recargó" \
-  '                    usuarioListo.then(() => CDI.borrador.buscar()).then(b => {' \
-  '                    Promise.resolve(null).then(b => {'
+  '                    usuarioListo.then(() => CDI.borrador.buscar()).then(b => b && adoptarTarde(b))' \
+  '                    Promise.resolve(null).then(b => b && adoptarTarde(b))'
 sabotaje $A "la operación de antes queda guardada sin aviso" \
   "FALLA: la operación de antes de recargar quedó guardada y la pestaña no lo avisa" \
-  "CDI.borrador.avisar('pendiente', " "(() => {})('pendiente', "
+  "avisarBorrador('pendiente', " "(() => {})('pendiente', "
 
 # El navegador sin lugar: se avisa.
 export CASOS=q
@@ -417,7 +421,7 @@ sabotaje $A "el vencido se borra sólo si es del usuario" \
 
 # La sesión cambia mientras la duplicada mira si la original vive: no
 # adopta la operación de A con otro usuario ni la deja sin dueño.
-ADOPTA=$'    function adoptarBorrador(b) {\n        const user = usuarioActual();\n        if (!user) return null;\n'
+ADOPTA=$'    function adoptarBorrador(b) {\n        const user = usuarioActual();\n        if (!user) {\n            if (duenoPestana && !sesionAjena) {\n                recuperarAlConfirmar = true;\n                avisarBorrador(\'comprobando\', \'Comprobando la sesión antes de recuperar la operación guardada…\');\n            }\n            return null;\n        }\n'
 export CASOS=z9
 sabotaje $A "adoptar no mira si cambió la sesión (como antes del arreglo)" \
   "FALLA: entró otro usuario mientras la duplicada miraba si la original vive, al abrir y la pestaña le muestra a" \

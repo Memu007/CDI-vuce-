@@ -1581,6 +1581,37 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     await ctx.close();
   }
 
+  // (z28) Como (l), pero sin escrituras: al cargar, el semáforo valida con un
+  // POST y el freno de api() ya tapa la pestaña. Acá B entra con la operación
+  // ya validada y lo que cambia queda en la pestaña: el que no guarda es
+  // usuarioActual.
+  if (corre('z28')) {
+    const que = 'entró otro usuario y la pestaña de A no escribe nada';
+    const ctx = await nuevoContexto('ord1z28');
+    const t = await abrir(ctx);
+    await cargar(t, 'DE-A-Z28', [prod('Producto cargado por A', '84714900100D', 2, 10)]);
+    await esperarBorradores(t, ['DE-A-Z28'], que + ', pero antes de que entre no guarda la operación de A');
+    await t.waitForLoadState('networkidle');
+    await t.evaluate(() => {
+      const api = CDI.api;
+      window.__escribe = [];
+      CDI.api = (path, o) => {
+        if (!['GET', 'HEAD', 'OPTIONS'].includes(((o && o.method) || 'GET').toUpperCase())) window.__escribe.push(path);
+        return api(path, o);
+      };
+    });
+    const otro = await nuevoUsuario(ctx, 'ord1z28b');
+    await t.evaluate(() => { CDI.state.operacion.numero_factura = 'DE-B-Z28'; });
+    await t.waitForTimeout(2 * INTERVALO_MS);
+    const escribe = await t.evaluate(() => window.__escribe);
+    if (escribe.length) falla(que + ' y quiso escribir: ' + escribe.join(', ') + ' (el caso ya no mide usuarioActual)');
+    const sobres = await sobresDe(t, 'DE-B-Z28');
+    if (sobres.length) falla(que + ' y lo que cambió después se guardó a nombre de ' + sobres.map(s => s.user).join(', '));
+    if (!(await avisa(t))) falla(que + ' y no avisa que dejó de guardar');
+    console.log('OK ' + que + ': no guarda lo que cambia y lo avisa (' + otro + ')');
+    await ctx.close();
+  }
+
   await b.close();
   console.log('OK: ORDEN-1 en el navegador');
 })().catch(e => falla(e.message));
