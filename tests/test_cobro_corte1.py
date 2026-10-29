@@ -547,19 +547,46 @@ def test_la_exportacion_cuenta_una_vez_por_operacion(cuenta):
     assert _exportar(c, flete=200.0).status_code == 200
     assert _leer(u)["ops"] == 1, "volver a exportar la misma operación cuenta otra vez"
     ops = _operaciones(u)
-    assert [o["archivo"] for o in ops] == ["MARIA_EXPORT_FAC_CORTE1EXP.TXT"], ops
+    assert [o["archivo"] for o in ops] == [r.json()["filename"]], ops
     assert len(ops[0]["extra"]["maria_hashes"]) == 2, ops
 
 
 def test_con_el_tope_lleno_la_exportacion_nueva_da_402_y_la_ya_contada_sale(cuenta):
     c, u = cuenta()
-    assert _exportar(c).status_code == 200
+    archivo = _exportar(c).json()["filename"]
     _fijar(u, billing_status="active", trial_ends_at=AHORA + timedelta(days=20),
            ops_used_this_period=15, extra_ops_remaining=0)
     assert _exportar(c, flete=300.0).status_code == 200
     r = _exportar(c, operation_id="FAC_CORTE1EXPNUEVA")
     assert r.status_code == 402, r.text
     assert r.json()["detail"]["code"] == "PLAN_LIMIT_EXCEEDED", r.json()
-    assert c.get("/download/MARIA_EXPORT_FAC_CORTE1EXPNUEVA.TXT").status_code == 404
+    assert c.get("/download/" + archivo.replace("FAC_CORTE1EXP", "FAC_CORTE1EXPNUEVA")).status_code == 404
     assert _leer(u)["ops"] == 15
     assert len(_operaciones(u)) == 1
+
+
+@pytest.mark.parametrize("largo", [43, 44, 50, 60])
+def test_la_exportacion_con_un_id_largo_cuenta_una_vez(cuenta, largo):
+    # COBRO-MP-1 vuelta 2, g: con 44 a 50 caracteres el archivo no se
+    # reconocía como un MARIA y cada exportación contaba otra operación.
+    c, u = cuenta()
+    operation_id = ("FAC" + "9" * largo)[:largo]
+    r = _exportar(c, operation_id=operation_id)
+    assert r.status_code == 200, r.text
+    assert _exportar(c, operation_id=operation_id, flete=200.0).status_code == 200
+    assert _leer(u)["ops"] == 1, "volver a exportar el mismo id largo cuenta otra vez"
+    cid = _cliente(c)
+    assert _guardar(c, cid, r.json()["filename"]).status_code == 200
+    assert _leer(u)["ops"] == 1, "guardar la exportación de id largo cuenta otra vez"
+    assert len(_operaciones(u)) == 1
+
+
+def test_una_importacion_con_id_export_no_reusa_la_exportacion(cuenta):
+    # g: la importación «EXPORT_<x>» y la exportación «<x>» daban el mismo
+    # archivo: la segunda completaba la operación de la primera sin contar.
+    c, u = cuenta()
+    assert _exportar(c, operation_id="FAC_CORTE1X").status_code == 200
+    r = _generar(c, operation_id="EXPORT_FAC_CORTE1X")
+    assert r.status_code == 200, r.text
+    assert _leer(u)["ops"] == 2, "la importación reusó la operación de la exportación"
+    assert len({o["archivo"] for o in _operaciones(u)}) == 2, _operaciones(u)

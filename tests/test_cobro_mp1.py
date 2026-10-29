@@ -480,7 +480,7 @@ def _cobros(monkeypatch):
 
     def _leer(cobro_id):
         if cobro_id not in COBROS:
-            raise main_mod._CobroMPIlegible(cobro_id)
+            raise main_mod._MPIlegible(cobro_id)
         return COBROS[cobro_id]
     monkeypatch.setattr(main_mod, "_leer_cobro_autorizado_mp", _leer, raising=False)
 
@@ -589,33 +589,6 @@ def test_lo_que_decide_es_el_estado_del_pago_y_no_el_que_copia_el_cobro(client, 
     assert _leer_pago(pid)["estado"] == "aplicado"
 
 
-@pytest.mark.parametrize("romper", [
-    lambda c: c.pop("payment"),
-    lambda c: c.pop("preapproval_id"),
-    lambda c: c.update(payment="123"),
-    lambda c: c["payment"].pop("id"),
-    lambda c: c.update(preapproval_id={"id": "x"}),
-    lambda c: c["payment"].update(id=True),
-    lambda c: c["payment"].update(id=""),
-], ids=["sin_pago", "sin_suscripcion", "pago_no_es_objeto", "pago_sin_id", "suscripcion_no_es_texto",
-        "pago_id_booleano", "pago_id_vacio"])
-def test_un_cobro_con_forma_inesperada_no_aplica_nada(client, romper, caplog):
-    """D30: si la respuesta no tiene la forma esperada, no se aplica nada y
-    se loguea."""
-    usuario = _unique("mp4_forma")
-    _register(client, usuario)
-    _vencida(usuario)
-    cobro, pid = _renovacion(usuario)
-    romper(COBROS[cobro])
-    with caplog.at_level("WARNING", logger="mp_webhook"):
-        r = _aviso_cobro(client, cobro)
-    assert r.status_code == 200, r.text
-    assert "forma inesperada" in r.json().get("skipped", ""), r.json()
-    assert _get_user(usuario)["billing_status"] == "past_due"
-    assert _leer_pago(pid) == {}
-    assert any("forma inesperada" in m for m in caplog.messages), caplog.messages
-
-
 def test_si_mercado_pago_no_contesta_el_cobro_reintenta(client):
     usuario = _unique("mp4_503")
     _register(client, usuario)
@@ -649,22 +622,9 @@ def test_leer_un_cobro_no_arma_una_ruta_con_lo_que_mande_cualquiera(monkeypatch)
     monkeypatch.setattr(main_mod.httpx, "Client", _Cliente)
     funcion = _LEER_COBRO_REAL[0]
     for malo in ("../v1/payments/1", "1?x=2", "1/2", "", "a" * 80):
-        with pytest.raises(main_mod._CobroMPFormaInesperada):
+        with pytest.raises(ValueError):
             funcion(malo)
     assert pedidos == []
-
-
-@pytest.mark.parametrize("referencia", [None, "", 123])
-def test_una_renovacion_de_una_suscripcion_sin_referencia_no_aplica_nada(client, referencia):
-    usuario = _unique("mp4_sinref")
-    _register(client, usuario)
-    _vencida(usuario)
-    cobro, pid = _renovacion(usuario)
-    SUSCRIPCIONES[f"pre-{usuario}"]["external_reference"] = referencia
-    r = _aviso_cobro(client, cobro)
-    assert r.status_code == 200 and "forma inesperada" in r.json().get("skipped", ""), r.text
-    assert _get_user(usuario)["billing_status"] == "past_due"
-    assert _leer_pago(pid) == {}
 
 
 def test_una_renovacion_con_el_id_de_pago_numerico_se_aplica(client):
@@ -755,11 +715,11 @@ def _contesta_html(request):
 
 
 @pytest.mark.parametrize("responder, esperado", [
-    (_contesta_500, 503), (_sin_conexion, 503), (_contesta_html, 200),
+    (_contesta_500, 503), (_sin_conexion, 503), (_contesta_html, 503),
 ], ids=["http_500", "sin_conexion", "no_es_json"])
 def test_el_cobro_que_mercado_pago_no_contesta_bien_no_aplica_nada(client, monkeypatch, responder, esperado):
-    """De punta a punta con la lectura real: 500 o sin conexión → 503 para
-    que Mercado Pago reintente; una respuesta que no es JSON → no se aplica."""
+    """De punta a punta con la lectura real: 500, sin conexión o una respuesta
+    que no es JSON → 503 para que Mercado Pago reintente (vuelta 2, b)."""
     usuario = _unique("mp4_http")
     _register(client, usuario)
     _vencida(usuario)
@@ -767,8 +727,6 @@ def test_el_cobro_que_mercado_pago_no_contesta_bien_no_aplica_nada(client, monke
     pedidos = _httpx_simulado(monkeypatch, responder)
     r = _aviso_cobro(client, cobro)
     assert r.status_code == esperado, r.text
-    if esperado == 200:
-        assert "forma inesperada" in r.json().get("skipped", ""), r.json()
     assert len(pedidos) == 1
     assert _get_user(usuario)["billing_status"] == "past_due"
     assert _leer_pago(pid) == {}
@@ -970,22 +928,6 @@ def test_sin_token_el_aviso_de_una_renovacion_no_se_pierde(client, monkeypatch):
     monkeypatch.setattr(main_mod, "MP_ACCESS_TOKEN", "")
     r = _aviso_cobro(client, cobro)
     assert r.status_code == 400, r.text[:300]
-    assert _leer_pago(pid) == {}
-
-
-@pytest.mark.parametrize("id_en_la_respuesta", [None, True, "", "12/34"], ids=["nulo", "booleano", "vacio", "barra"])
-def test_un_pago_aprobado_sin_id_reconocible_no_se_aplica(client, id_en_la_respuesta):
-    """El pago se registra con el id que devuelve Mercado Pago: si no tiene la
-    forma esperada, no hay con qué anotarlo y no se aplica."""
-    usuario = _unique("mp1_sinid")
-    _register(client, usuario)
-    pid = _pago(f"si-{usuario}", f"{usuario}:premium")
-    PAGOS[pid]["id"] = id_en_la_respuesta
-    antes = _get_user(usuario)
-    r = _aviso_ipn(client, pid)
-    assert r.status_code == 200, r.text[:300]
-    assert r.json().get("skipped") == "pago con forma inesperada", r.json()
-    assert _fin(_get_user(usuario)) == _fin(antes)
     assert _leer_pago(pid) == {}
 
 

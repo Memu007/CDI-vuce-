@@ -414,8 +414,9 @@ class TestWebhook:
         after = _get_user(uname)
         assert after["billing_status"] == "trial"
 
-    def test_pago_usuario_inexistente_400(self, client, monkeypatch):
-        """Pago de usuario inexistente → 400 (MP reintenta)."""
+    def test_pago_usuario_inexistente_queda_rechazado(self, client, monkeypatch):
+        """Pago de usuario inexistente → 200 con fila «rechazado»: reintentar
+        no lo arregla (COBRO-MP-1 vuelta 2, b)."""
         class FakePayNoUser:
             def get(self, pid):
                 return {
@@ -437,7 +438,8 @@ class TestWebhook:
         body = {"type": "payment", "data": {"id": f"pay-{uuid.uuid4().hex[:8]}"}}
         resp = self._wh_post(client, body, monkeypatch, secret="", is_prod=False,
                              mp_token="TEST-fake", sdk_cls=FakeSDKNoUser)
-        assert resp.status_code == 400
+        assert resp.status_code == 200, resp.text
+        assert "rechazado" in resp.json().get("skipped", ""), resp.json()
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -603,7 +605,8 @@ class TestTopup:
         assert 28 <= delta.days <= 31
 
     def test_topup_no_supera_max_100(self, client, monkeypatch):
-        """Top-up no puede llevar extra_ops_remaining por encima de 100."""
+        """Una recarga que pasaría de 100 no se acredita a medias: queda
+        rechazada y no suma (COBRO-MP-1 vuelta 2, f)."""
         uname = _unique("tu_cap")
         _register(client, uname)
         _set_user(uname, billing_status="active", extra_ops_remaining=95)
@@ -634,11 +637,12 @@ class TestTopup:
         monkeypatch.setattr(main_mod.mercadopago, "SDK", FakeSDKCap)
 
         body = {"type": "payment", "data": {"id": payment_id}}
-        client.post("/api/payments/webhook", content=json.dumps(body),
-                    headers={"content-type": "application/json"})
+        r = client.post("/api/payments/webhook", content=json.dumps(body),
+                        headers={"content-type": "application/json"})
+        assert r.status_code == 200 and "rechazado" in r.json().get("skipped", ""), r.text
 
         after = _get_user(uname)
-        assert after["extra_ops_remaining"] == 100  # cap: min(95+10, 100)
+        assert after["extra_ops_remaining"] == 95
 
     def test_topup_creditos_expiran_30_dias(self):
         """process_payment para topup setea expiry a now+30d."""
