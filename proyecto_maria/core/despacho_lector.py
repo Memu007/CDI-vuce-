@@ -793,14 +793,16 @@ def origen_para_catalogo(valor) -> tuple[str | None, str | None]:
 
     if not isinstance(valor, (str, type(None))):
         return None, "El origen tiene que ser el código de dos letras."
-    origen = (valor or "").strip().upper() or None
-    if origen and _MEDIO_PAR.search(origen):
+    escrito = (valor or "").strip()
+    if _MEDIO_PAR.search(escrito):
         # No se repite en el mensaje: no se puede mandar en la respuesta.
         return None, "El origen tiene un carácter que no se puede guardar."
-    # pais_reconocido normaliza con NFKD: «ＢＲ» o «ÉS» pasarían y se guardarían así.
-    if origen and not (len(origen) == 2 and origen.isascii() and origen.isalpha() and pais_reconocido(origen)):
-        return None, f"No reconozco el origen «{origen}»: usá el código de dos letras."
-    return origen, None
+    # Se mira antes de pasar a mayúsculas («ıt» sería «IT») y pais_reconocido
+    # normaliza con NFKD («ＢＲ» o «ÉS» pasarían): sólo dos letras ASCII.
+    if escrito and not (len(escrito) == 2 and escrito.isascii() and escrito.isalpha()
+                        and pais_reconocido(escrito.upper())):
+        return None, f"No reconozco el origen «{escrito}»: usá el código de dos letras."
+    return escrito.upper() or None, None
 
 
 def renglon_para_catalogo(renglon) -> tuple[dict | None, list[str]]:
