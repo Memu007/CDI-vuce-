@@ -7,6 +7,7 @@ const path = require('node:path');
 
 const base = process.env.BASE_URL;
 const fixture = process.env.FIXTURE;
+const clientesCsv = process.env.CLIENTES_CSV;
 const out = process.env.OUT;
 if (!base || !fixture || !out) throw new Error('Faltan BASE_URL, FIXTURE u OUT');
 fs.mkdirSync(path.join(out, 'shots'), { recursive: true });
@@ -109,7 +110,9 @@ async function humanFill(page, selector, value, delay = 70) {
   await sleep(1800);
   await shot('review');
 
-  // 4. Revisión: incoterm y fecha tipeados a mano
+  // 4. Revisión: proveedor, incoterm y fecha tipeados a mano
+  await humanFill(page, '#f_vendedor_nombre', 'Shenzhen Bright Electronics Co.', 45);
+  await sleep(300);
   await humanFill(page, '#f_incoterm', 'FOB');
   await sleep(400);
   await humanFill(page, '#f_fecha_emision', '20/10/2026');
@@ -175,6 +178,91 @@ async function humanFill(page, selector, value, delay = 70) {
   await shot('ready');
   const preview = await page.$eval('#readyPreview', (el) => el.textContent.slice(0, 300));
   console.log('preview', preview);
+
+  // 8. Tablero de operaciones: estado y canal editables
+  await page.click('[data-action="go-cockpit"]');
+  await page.waitForSelector('#ckTableBody tr');
+  mark('cockpit');
+  await sleep(1500);
+  await shot('cockpit');
+  await page.selectOption('#ckTableBody .ck-estado-select', 'oficializada');
+  await sleep(1200);
+  await page.selectOption('#ckTableBody .ck-estado-select', 'canal');
+  await sleep(900);
+  const canal = page.locator('#ckTableBody .ck-canal-select').first();
+  if (await canal.count()) { await canal.selectOption('verde'); await sleep(1200); }
+  mark('cockpit_done');
+  await shot('cockpit_done');
+
+  // 9. Ficha del cliente: historial, CSV, plantilla Excel y catálogo
+  await page.click('[data-action="go-clientes"]');
+  await page.waitForSelector('.cx-card');
+  mark('clientes');
+  await sleep(1300);
+  await shot('clientes');
+  await page.locator('.cx-card', { hasText: 'Importadora del Sur' }).first().click();
+  await page.waitForSelector('#cxKebabBtn');
+  await page.waitForSelector('.cx-ops-item');
+  mark('cliente');
+  await sleep(1600);
+  await shot('cliente');
+  await page.click('#cxKebabBtn');
+  await page.waitForSelector('#cxKebabMenu.is-open');
+  mark('cliente_menu');
+  await sleep(1500);
+  await shot('cliente_menu');
+  const descarga = page.waitForEvent('download');
+  await page.click('#cxKebabMenu [data-kaction="csv"]');
+  const archivoCsv = await descarga;
+  console.log('descarga', archivoCsv.suggestedFilename());
+  await sleep(1200);
+  await page.click('#cxTabCatalogo');
+  await page.waitForSelector('[data-panel="catalogo"]:not([hidden])');
+  mark('cliente_catalogo');
+  await sleep(2200);
+  await shot('cliente_catalogo');
+
+  // 10. Mi catálogo aprendido: corregir la NCM de un producto y guardar
+  await page.click('#goCatalogoBtn');
+  await page.waitForSelector('#catalogoDrawer:not([hidden])');
+  await page.waitForSelector('.catalogo-vendor-card');
+  mark('catalogo');
+  await sleep(1300);
+  await page.locator('.catalogo-vendor-card').first().click();
+  await page.waitForSelector('.catalogo-product-row');
+  await sleep(1300);
+  await shot('catalogo');
+  const ncmInput = page.locator('.catalogo-product-row').nth(2).locator('input[data-field="ncm"]');
+  await ncmInput.click();
+  await ncmInput.fill('');
+  await ncmInput.pressSequentially('84713019', { delay: 60 });
+  await sleep(500);
+  await page.locator('.catalogo-product-row').nth(2).locator('[data-action="save-product"]').click();
+  await sleep(1400);
+  mark('catalogo_done');
+  await shot('catalogo_done');
+  // El ícono de borrar proveedor queda sobre el botón de cerrar: click directo.
+  await page.evaluate(() => document.getElementById('catalogoDrawerClose').click());
+  await page.waitForSelector('#catalogoDrawer[hidden]', { state: 'attached' });
+  await sleep(500);
+
+  // 11. Traer mis clientes desde la planilla que ya usa el estudio
+  if (clientesCsv) {
+    await page.click('#cxImportBtn');
+    await page.waitForSelector('#importClientesModal:not([hidden])');
+    mark('import');
+    await sleep(1000);
+    await page.setInputFiles('#importFileInput', clientesCsv);
+    await page.waitForSelector('#importPreviewStep:not([hidden])');
+    mark('import_preview');
+    await sleep(2000);
+    await shot('import_preview');
+    await page.click('#importConfirm');
+    await page.waitForSelector('#importDoneStep:not([hidden])');
+    mark('import_done');
+    await sleep(2000);
+    await shot('import_done');
+  }
   mark('end');
 
   fs.writeFileSync(path.join(out, 'marks.json'), JSON.stringify(marks, null, 2));

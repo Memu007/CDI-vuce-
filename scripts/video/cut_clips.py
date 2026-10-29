@@ -17,11 +17,20 @@ m = {x["name"]: x["t"] for x in json.loads((out / "marks.json").read_text())}
 # nombre: velocidad, [(inicio, fin), …]
 CLIPS = {
     "subir":   (1.0,  [(m["upload_excel"] - 0.2, m["picker"] + 0.5), (m["review"] - 0.7, m["review"] + 0.75)]),
-    "revisar": (1.5,  [(m["review"] + 0.6, m["ncm"] - 0.05)]),
+    "revisar": (1.8,  [(m["review"] + 0.6, m["ncm"] - 0.05)]),
     "ncm":     (1.15, [(m["ncm"] + 0.9, m["ncm_done"] + 0.15)]),
     "validar": (1.25, [(m["validating"] + 0.15, m["validating_done"] + 0.15)]),
-    "listo":   (1.0,  [(m["ready"] - 0.15, m["end"] - 0.05)]),
+    "listo":   (1.0,  [(m["ready"] - 0.15, m["cockpit"] - 0.4 if "cockpit" in m else m["end"] - 0.05)]),
 }
+# Versión larga: tablero, ficha del cliente, catálogos e importación de clientes.
+if "cockpit" in m:
+    CLIPS.update({
+        "tablero":  (1.3,  [(m["cockpit"] + 0.3, m["cockpit_done"] + 0.3)]),
+        "cliente":  (1.2,  [(m["clientes"] + 0.3, m["cliente"] + 1.4), (m["cliente_menu"] - 0.1, m["cliente_menu"] + 2.4)]),
+        "columnas": (1.0,  [(m["cliente_catalogo"] - 0.2, m["cliente_catalogo"] + 2.2)]),
+        "catalogo": (1.3,  [(m["catalogo"] + 1.2, m["catalogo_done"] + 0.6)]),
+        "importar": (1.2,  [(m["import"] - 0.2, m["import_done"] + 1.6)]),
+    })
 
 shutil.rmtree(clips_dir, ignore_errors=True)
 for name, (speed, segments) in CLIPS.items():

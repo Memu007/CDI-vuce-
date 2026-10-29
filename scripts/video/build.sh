@@ -14,7 +14,7 @@ SERVER_PID=""
 cleanup() { [[ -n "$SERVER_PID" ]] && kill "$SERVER_PID" 2>/dev/null || true; [[ "${KEEP_WORK:-0}" == 1 ]] || rm -rf "$WORK"; }
 trap cleanup EXIT
 
-"$PYTHON" scripts/video/make_fixture.py "$WORK/factura_proveedor.xlsx"
+"$PYTHON" scripts/video/make_fixture.py "$WORK/factura_proveedor.xlsx" "$WORK/clientes.csv"
 PORT="$("$PYTHON" -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')"
 PYTHONPATH=. DATABASE_URL="sqlite+aiosqlite:///$WORK/cdi_video.db" CDI_DATA_DIR="$WORK/data" \
 ENVIRONMENT=testing EMAIL_VERIFICATION_REQUIRED=false VUCE_CI_ENABLED=false VUCE_MODE=api GEMINI_API_KEY= MP_ACCESS_TOKEN= \
@@ -22,7 +22,7 @@ ENVIRONMENT=testing EMAIL_VERIFICATION_REQUIRED=false VUCE_CI_ENABLED=false VUCE
 SERVER_PID=$!
 curl --fail --silent --retry 40 --retry-connrefused --retry-delay 1 --retry-max-time 90 "http://127.0.0.1:$PORT/health" >/dev/null
 
-BASE_URL="http://127.0.0.1:$PORT" FIXTURE="$WORK/factura_proveedor.xlsx" OUT="$WORK/out" node scripts/video/capture.js
+BASE_URL="http://127.0.0.1:$PORT" FIXTURE="$WORK/factura_proveedor.xlsx" CLIENTES_CSV="$WORK/clientes.csv" OUT="$WORK/out" node scripts/video/capture.js
 "$PYTHON" scripts/video/cut_clips.py "$WORK/out" "$WORK/clips"
 mkdir -p "$(dirname "$OUT_MP4")"
 WORK="$WORK" OUT_MP4="$OUT_MP4" node scripts/video/render.js
