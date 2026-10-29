@@ -365,8 +365,9 @@ def test_confirmar_con_un_cliente_que_no_sirve_no_suma(client, duenos, client_id
 def test_confirmar_en_el_tope_entra(client, duenos):
     a = duenos()
     _como(a)
-    _confirmar(client, "B" * 2000, "8" * 20)
-    assert _filas(a["username"]) == [("B" * 2000, "8" * 20, 1)]
+    # Un NCM de 20 caracteres no es un NCM (DESPACHO-1b): el más largo que entra.
+    _confirmar(client, "B" * 2000, "8471.49.00.100D")
+    assert _filas(a["username"]) == [("B" * 2000, "8471.49.00.100D", 1)]
 
 
 @pytest.mark.parametrize("desc,ncm,dice", [
