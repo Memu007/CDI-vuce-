@@ -151,8 +151,8 @@ sabotaje $M "la suscripción de otra cuenta vale" \
   '        if False:' \
   "FAILED $T1::test_la_suscripcion_de_otra_cuenta_no_vale"
 sabotaje $M "una suscripción ilegible se rechaza en vez de reintentar" \
-  $'_consultar_mp(lambda: sdk.preapproval().get(str(suscripcion_id)),\n                                    f"suscripción {suscripcion_id}")' \
-  '(sdk.preapproval().get(str(suscripcion_id)).get("response") or {})' \
+  $'_consultar_mp(lambda: sdk.preapproval().get(suscripcion_id),\n                                    f"suscripción {suscripcion_id}")' \
+  '(sdk.preapproval().get(suscripcion_id).get("response") or {})' \
   "FAILED $T1::test_si_no_se_puede_leer_la_suscripcion_mercado_pago_reintenta"
 sabotaje $M "el rechazo no se guarda" \
   '    if await _guardar_pago_mp(session):' \
@@ -187,8 +187,8 @@ sabotaje $M "el aviso IPN de una renovación se ignora" \
   '            if topic in ("payment",):' \
   "FAILED $T1::test_una_renovacion_extiende_el_periodo_una_sola_vez[ipn]"
 sabotaje $M "vuelve a decidir el estado que copia el cobro" \
-  '    suscripcion_id = cobro.get("preapproval_id")' \
-  $'    if cobro.get("status") != "approved":\n        raise _MPIlegible("cobro no aprobado")\n    suscripcion_id = cobro.get("preapproval_id")' \
+  '    return pago_id, _id_mp(cobro.get("preapproval_id"))' \
+  $'    if cobro.get("status") != "approved":\n        raise _MPIlegible("cobro no aprobado")\n    return pago_id, _id_mp(cobro.get("preapproval_id"))' \
   "FAILED $T1::test_lo_que_decide_es_el_estado_del_pago_y_no_el_que_copia_el_cobro[sin_estado]"
 sabotaje $M "el id del cobro arma cualquier ruta" \
   '_ID_COBRO_MP = re.compile(r"[0-9A-Za-z_-]{1,64}")' \
@@ -210,10 +210,22 @@ sabotaje $M "un cobro sin suscripción se aplica" \
   '        if renovacion and not suscripcion_del_cobro:' \
   '        if False:' \
   "FAILED $V::test_un_cobro_con_su_pago_y_sin_suscripcion_legible_queda_rechazado[sin_suscripcion]"
-sabotaje $M "una suscripción que no es texto se toma" \
-  '(suscripcion_id if isinstance(suscripcion_id, str) and suscripcion_id else None)' \
-  '(suscripcion_id or None)' \
-  "FAILED $V::test_un_cobro_con_su_pago_y_sin_suscripcion_legible_queda_rechazado[suscripcion_no_es_texto]"
+sabotaje $M "la suscripción del cobro no se valida" \
+  '    return pago_id, _id_mp(cobro.get("preapproval_id"))' \
+  '    return pago_id, cobro.get("preapproval_id")' \
+  "FAILED $V::test_una_renovacion_sin_referencia_y_con_un_id_de_suscripcion_que_no_sirve_queda_rechazada[con_ruta]"
+sabotaje $M "un id de suscripción del pago que no sirve se pide igual" \
+  '    suscripcion_id = _id_mp(leido)' \
+  '    suscripcion_id = leido' \
+  "FAILED $V::test_un_pago_con_un_id_de_suscripcion_que_no_sirve_queda_rechazado[metadata_con_ruta]"
+sabotaje $M "un id de suscripción del pago que no sirve se ignora" \
+  '    if leido and not suscripcion_id:' \
+  '    if False:' \
+  "FAILED $V::test_un_pago_con_un_id_de_suscripcion_que_no_sirve_queda_rechazado[metadata_con_ruta]"
+sabotaje $M "un id booleano pasa" \
+  '    if isinstance(valor, bool) or not isinstance(valor, (str, int)):' \
+  '    if not isinstance(valor, (str, int)):' \
+  "FAILED $V::test_un_pago_aprobado_sin_id_reconocible_reintenta[booleano]"
 sabotaje $M "la renovación no toma la referencia de la suscripción" \
   '                pay_resp["external_reference"] = sus.get("external_reference")' \
   '                pass' \
