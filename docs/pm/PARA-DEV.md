@@ -105,17 +105,87 @@ caso.
   esta vuelta no se corrieron (Emi había frenado): sin ellas no se acepta.
 
 
-## Tus D8–D10 de COBRO-MP-1 (2026-10-29 01:00 UTC)
+## Veredicto de COBRO-MP-1 (2026-10-29 01:41 UTC): devolución
 
-COBRO-MP-1 (`784e793`) llegó; la reviso yo, sin apuro. Las D, decididas
-por la PM:
+Sobre `784e793` (informe `0a8a87a`). Evidencia en
+`REPRODUCCION-COBRO-MP-1-2026-10-29.md`. Tus 7 pruebas dieron
+`220 passed` y `cobro_mp1.sh` 68 ROJO, sin sabotajes con falla, como tu
+informe. Aguanta: la carrera D en Postgres, los formatos de fecha, los
+reenvíos, montos y moneda, cancelar desde `past_due` sin ganar acceso, el
+panel. Lo que vuelve, por causa. Para cada una: rojo antes del arreglo,
+un caso por miembro de la familia (no sólo el ejemplo) y un sabotaje.
 
-- **D8: (a).** Las consultas a Mercado Pago a un hilo con tope es una tarea
-  aparte, después de esta tanda; no entra en COBRO-MP-1. Queda anotada.
-- **D9: (b).** 503, para que Mercado Pago reintente. Va en la próxima vuelta
-  de COBRO-MP-1, con su rojo antes y su sabotaje.
-- **D10: (a).** Riesgo aceptado: recargar lo arregla. Que el `CHANGELOG` no
-  prometa otra cosa.
+**a. Dos pagos distintos de la misma cuenta a la vez: se cobran dos y se
+acredita uno** (negativo de la PM, en PG16: dos recargas suman 10, dos
+planes suman 30 días). El aviso lee `User` y `Organization` sin candado y
+el segundo guardado pisa al primero. Ya era así en la base, pero es lo que
+la pieza promete. La prueba va en Postgres (SQLite no ve el candado):
+usuario y organización, recarga y plan; `cobro_mp1d_postgres.py` sigue en
+verde; sabotaje: sin el candado, el caso queda rojo. El script de la PM
+está en el documento de reproducción, por si te sirve.
+
+**b. Una regla para todo lo que se lee de Mercado Pago.** Hoy, si la
+consulta del pago da 401, 403 o 404, el aviso contesta 200 `skipped` y el
+pago se pierde sin rastro (el SDK no levanta excepción en 4xx); y
+`external_reference`, `payer` o `card` en `null` dan 500. La regla:
+
+- **No se pudo leer** (consulta con error, sin id de pago, la renovación
+  que todavía no dice qué pago fue: tu D9 b, `_CobroMPIlegible`): 503 y una
+  línea de log. Mercado Pago reintenta; nada se pierde callado.
+- **Se leyó y no sirve** (campos en `null` o de otro tipo, monto, moneda,
+  fecha): fila `rechazado` con su motivo y 200. Nunca 500, y nunca 503: un
+  aviso que no va a cambiar no se reintenta para siempre.
+
+Casos: cada código 4xx y cada campo en `null`. El usuario `org` también
+tiene que poder pagar (hoy 400 «external_reference desconocida»).
+
+**c. El checkout cancela una suscripción que ya cobró.** Volver de Mercado
+Pago antes del aviso, con la cuenta `past_due` o cancelada, y tocar otra
+vez «Activar plan» cancela la `authorized` recién pagada y crea otra (sin
+débito automático, o dos cobros). **Decidido por la PM, afina D7.2:** si
+la vieja está `authorized` y tiene un cobro aprobado que CDI todavía no
+aplicó, o todavía no tuvo su primer cobro, no se cancela: 409 con «Tu
+pago se está confirmando; probá en unos minutos». Si su último cobro
+falló (la tarjeta que no pasa, el caso de D7.2), se cancela como ahora.
+`test_sin_cuenta_vigente_la_vieja_se_cancela_antes_de_crear` cambia su
+condición, no se invierte. Si Mercado Pago no deja distinguir esos casos
+con lo que ya consulta el código, D11 antes de inventar.
+
+**d. La prueba D31 en Postgres está muerta.** `cobro_mp1_postgres.py` no
+pone `date_approved`; desde A todo pago se rechaza antes de la carrera
+(«fallas: 4»), y el script de sabotajes no la corre. Que vuelva a probar
+el mismo pago dos veces a la vez y que entre al script.
+
+**e. Sin la fila `InicioRegistroPagosMP`, el corte se abre:** cambiar el
+503 por seguir de largo da verde. Caso y sabotaje. Lo mismo con los
+otros mutantes vivos de Sonnet (margen del corte de A, sobrepago,
+`past_due` como vigente, prefijo `org:` del registro, orden y tope del
+panel): cada uno muere o el informe dice por qué no importa.
+
+**f. Recarga con el tope de 100:** se cobra, no acredita nada (con 95,
+acredita 5) y queda `aplicado`. Mínimo en esta vuelta: con el tope lleno
+no se arma el link (con su razón), y un pago que no se pudo acreditar
+entero no queda `aplicado` callado: lo ve Emi en el panel.
+
+**g. B y el panel, bajas, de esta pieza:** la pantalla v1 cuenta 2 por
+exportación con cliente elegido; un id de 44 a 50 caracteres cuenta doble
+(`MARIA_EXPORT_{id[:50]}`); una importación con id `EXPORT_<x>` reusa la
+operación de `<x>`. La causa común es el espacio de ids: que no choquen.
+El texto del panel de rechazados nombra también la fecha.
+
+**No entra ahora:**
+- «Cancelar plan» en una organización actúa sobre la fila del usuario (el
+  dueño cancela y la org sigue `active`; un miembro «cancela» y sigue
+  cobrando): va en **COBRO-MP-2** antes de entregarla, porque es C2
+  (cancelar cancela de verdad). Rojo antes, como el resto.
+- Una recarga revive extras vencidos; cancelar mientras llega el primer
+  pago deja la cuenta con su mes y sin suscripción; `_pago_un_plan_mp` con
+  una prueba que sólo recargó: riesgos en el informe, sin cambio.
+- D8 (a) y D10 (a), como estaban: el `CHANGELOG` no promete que el botón
+  se rehabilite.
+
+**Puertas:** es plata. Suite completa, `/code-review` y `/security-review`
+sobre el SHA que entregues. La reviso con Opus y Sonnet, alto.
 
 ## Veredicto de EXCEL-2b, vuelta 2 (2026-10-28 20:30 UTC): aceptada
 
@@ -318,46 +388,6 @@ criterio de EXCEL-2 ya aceptado (D26 a: ocho libros armados y la normal da
 
 Decidido por la PM.
 
-## COBRO-MP-1 — hecha, sin entregar (encargada 2026-10-28 04:00 UTC)
-
-EXCEL-2b quedó hecha y espera el cupo de las 18:00 UTC. Mientras, retomá
-COBRO-MP-1 en commits aparte encima de EXCEL-2b, con su propio `/entregar`
-después del de EXCEL-2b. EXCEL-2b se entrega sobre su propio SHA.
-
-**Es una retoma.** Los pasos 1 a 4 están hechos y en pausa desde el 07/10
-en `origin/claude/dev1-tecnica`, de `3d3f712` a `f5f06ee`: producto,
-pruebas, el caso contra Postgres y el paso 4 (renovaciones). Las
-respuestas D28 a D31 de ese día (`074a50b`, `git show 074a50b`) siguen
-valiendo. `MP_PREAPPROVAL_PLAN_ID_*` está en Railway
-(`DECISIONS.md`), así que el paso 4 corre en producción.
-
-- **La base se movió tres semanas** (ORG-1 tocó planes y organizaciones;
-  el cobro puede haber cambiado). Traelos commit por commit. Cada prueba
-  que entonces estuvo en rojo antes del arreglo se vuelve a ver en rojo
-  sobre la base nueva: un verde viejo no prueba nada acá.
-- **Lo que no se negocia (D31):** que no se aplique dos veces lo frena el
-  índice único de la base, no mirar antes de insertar; si el insert choca
-  (`IntegrityError`), se responde `skipped` sin tocar la cuenta; una prueba
-  manda dos avisos del mismo `payment_id` a la vez (`asyncio.gather`) y se
-  aplica uno solo; el `create_all` de la tabla, contra un Postgres local, o
-  declarado «no corrido».
-- Un pago rechazado por monto lo ve Emi (D29 de entonces, condición 3).
-- Nada contra Mercado Pago real.
-- Tu próxima D es la **D6** (no reuses los números de octubre).
-
-Es plata: la reviso con Opus y Sonnet, alto.
-
-## COBRO-MP-1: subila ya (2026-10-28 05:00 UTC)
-
-Está hecha en `f54d8a9`, pero sólo en tu contenedor (rama local
-`cobro-mp-1`). Si el contenedor se recicla, se pierde. Subila ya a
-`claude/dev-tecnica`, sin force push, aunque la entrega espere al cupo.
-EXCEL-2b se sigue entregando sobre su propio SHA (`b3ac325`). Los dos
-riesgos que proponés como piezas aparte (dos pagos a la vez de una cuenta
-dan una sola extensión; un aviso de renovación sin suscripción puede
-quedar rechazado para siempre) se los llevo a Emi de día: anotalos en el
-informe, en «riesgos».
-
 ## COBRO-CORTE-1 — hecha, sin entregar (encargada 2026-10-28 05:00 UTC)
 
 En commits aparte encima de COBRO-MP-1 (`f54d8a9`), con su propio
@@ -491,10 +521,10 @@ supuestos de Mercado Pago que no pudiste ver sin red: los estados, que una
 
 1. ORDEN-1, vuelta 3: la devolución de arriba, ahora. (EXCEL-2b quedó
    aceptada a las 20:30.)
-2. COBRO-MP-1: entregada en `784e793`; la PM la revisa. Si vuelve con
-   devolución, va antes que lo de abajo.
+2. COBRO-MP-1, vuelta 2: la devolución de arriba, después de ORDEN-1.
 3. COBRO-CORTE-1: hecha; se entrega después de COBRO-MP-1.
-4. COBRO-MP-2: hecha; subila ya y se entrega después de COBRO-CORTE-1.
+4. COBRO-MP-2: hecha; suma la cancelación de organizaciones (arriba) y
+   se entrega después de COBRO-CORTE-1.
 5. AISLAMIENTO-2 y LIMPIEZA-1: hechas; se entregan después de COBRO-MP-2.
 6. BACKUP-1a (arriba).
 7. EXCEL-2c (la D32 b, arriba).
