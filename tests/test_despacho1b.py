@@ -25,7 +25,7 @@ import pytest
 from sqlalchemy import func, select
 
 from proyecto_maria.database.connection import AsyncSessionLocal
-from proyecto_maria.database.models import ClientProductHistory, Operation
+from proyecto_maria.database.models import ClientProductHistory, NcmHistorial, Operation, VendorCatalogProduct
 
 
 # --- Un PDF mínimo con texto en columnas ------------------------------------
@@ -2034,3 +2034,83 @@ def test_una_operacion_con_un_producto_que_no_se_guarda_lo_dice(auth_override, c
     assert r.status_code == 200, r.text
     assert r.json()["historial_guardado"] is False, r.json()
     assert _contar(ClientProductHistory, client_id=cid) == 0
+
+
+# Los hallazgos del adversario sobre 7e96b32.
+
+@pytest.mark.parametrize("cuerpo", [
+    {"items": [1]}, {"items": ["x"]}, {"items": [None]}, {"items": [[]]},
+    {"items": "x"}, {"items": {"a": 1}}, [1],
+], ids=["numero", "texto", "nulo", "lista", "items texto", "items objeto", "cuerpo lista"])
+def test_una_operacion_con_productos_que_no_son_objetos_da_400(auth_override, client, cuerpo):
+    """Antes: 500 con el texto de la excepción."""
+    cid = _crear_cliente(client)
+    r = _operacion(client, cid, cuerpo=json.dumps(cuerpo))
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == "Cada producto tiene que ser un objeto."
+    assert _contar(Operation, client_id=cid) == 0
+
+
+def _guardar_uso(client, cid, **otros):
+    descripcion = f"TAPA INVENTADA {uuid.uuid4().hex[:8]}"
+    cuerpo = {"descripcion": descripcion, "ncm": "3926.90.90", "client_id": cid, **otros}
+    return descripcion, _crudo(client, "/api/ncm/guardar-uso", cuerpo)
+
+
+@pytest.mark.parametrize("campo", ["origen", "vendor_name"])
+def test_confirmar_un_ncm_con_medio_par_da_400_y_no_guarda_nada(auth_override, client, campo):
+    """Antes: 200, el historial sumaba el uso y el catálogo se perdía callado."""
+    cid = _crear_cliente(client)
+    descripcion, r = _guardar_uso(client, cid, **{campo: "B\ud800"})
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == "Hay un carácter que no se puede guardar."
+    assert _contar(NcmHistorial, descripcion=descripcion) == 0
+    assert _catalogo(client, cid) == []
+
+
+def test_confirmar_un_ncm_saca_el_nul_del_origen_y_del_proveedor(auth_override, client):
+    cid = _crear_cliente(client)
+    proveedor = f"PROVEEDOR INVENTADO {uuid.uuid4().hex[:8]}"
+    descripcion, r = _guardar_uso(client, cid, origen="B\x00R", vendor_name=proveedor[:5] + "\x00" + proveedor[5:])
+    assert r.status_code == 200 and r.json() == {"success": True}, r.text
+    assert [(p["descripcion"], p["origen"]) for p in _catalogo(client, cid)] == [(descripcion, "BR")]
+    assert _contar(VendorCatalogProduct, vendor_nombre=proveedor) == 1
+
+
+@pytest.mark.parametrize("ncm", ["pedido 20240115 nro", "39269090X", "1234"],
+                         ids=["texto con 8 digitos", "letra sin sim", "corto"])
+def test_confirmar_algo_que_no_es_un_ncm_da_400_y_no_guarda_nada(auth_override, client, ncm):
+    """Antes «pedido 20240115 nro» quedaba en el catálogo como 20240115."""
+    cid = _crear_cliente(client)
+    descripcion, r = _guardar_uso(client, cid, ncm=ncm)
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == "El NCM no es válido: tiene que tener sus 8 dígitos."
+    assert _contar(NcmHistorial, descripcion=descripcion) == 0
+    assert _catalogo(client, cid) == []
+
+
+@pytest.mark.parametrize("origen, detalle", [
+    (["a"], "No reconozco el origen «['A']»: usá el código de dos letras."),
+    ("XYZ", "No reconozco el origen «XYZ»: usá el código de dos letras."),
+    ("123", "No reconozco el origen «123»: usá el código de dos letras."),
+    ("ZZ", "No reconozco el origen «ZZ»: usá el código de dos letras."),
+    ("china", "No reconozco el origen «CHINA»: usá el código de dos letras."),
+], ids=["lista", "tres letras", "numeros", "pais que no existe", "nombre"])
+def test_cambiar_el_origen_valida_igual_que_guardar(auth_override, client, origen, detalle):
+    cid = _crear_cliente(client)
+    pid = _provisorio(client, cid)
+    antes = _catalogo(client, cid)
+    r = _cambiar(client, cid, pid, {"origen": origen})
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == detalle
+    assert _catalogo(client, cid) == antes
+
+
+@pytest.mark.parametrize("origen, guardado", [(" br ", "BR"), ("B\x00R", "BR"), ("", "XX"), (None, "XX")],
+                         ids=["minusculas", "nul", "vacio", "nulo"])
+def test_cambiar_el_origen_guarda_el_codigo_en_mayusculas(auth_override, client, origen, guardado):
+    cid = _crear_cliente(client)
+    pid = _provisorio(client, cid)
+    r = _cambiar(client, cid, pid, {"origen": origen})
+    assert r.status_code == 200, r.text
+    assert [p["origen"] for p in _catalogo(client, cid)] == [guardado]
