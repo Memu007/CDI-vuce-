@@ -459,15 +459,17 @@ sabotaje $M "C: /billing/me dice abierta a cualquier cancelada" \
 sabotaje $M "D13: el checkout cancela la autorizada vieja" \
   $'            raise HTTPException(\n                status_code=409,\n                detail="Tu suscripción' \
   $'            if False: raise HTTPException(\n                status_code=409,\n                detail="Tu suscripción' \
-  "FAILED $T::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[impaga] - assert 200 == 409"
+  "assert 200 == 409"
 sabotaje $M "D13: sin cuenta vigente, el 409 dice que se renueva sola" \
   '            if entidad.billing_status in ("trial", "active") and fin and fin > datetime.now(timezone.utc):' \
   '            if True:' \
-  "FAILED $T::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[impaga] - AssertionError"
-sabotaje $M "D13: después de cancelar el plan, el checkout sigue frenado" \
-  '        if estado_mp == "authorized":' \
-  '        if estado_mp in ("authorized", "cancelled"):' \
-  "FAILED $T::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[impaga] - assert 409 == 200"
+  "assert 'cancelá el plan primero' in 'Ya tenés una suscripción activa en Mercado Pago; se renueva sola"
+# La salida que nombra el 409 tiene que existir: una cuenta cancelada con la
+# autorizada guardada puede cancelarla.
+sabotaje $M "D13: la cancelada no puede cancelar la autorizada que la frena" \
+  'cancelada_con_suscripcion = db_user.billing_status == "canceled" and db_user.mp_preapproval_id' \
+  'cancelada_con_suscripcion = False' \
+  "FAILED $T::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[cancelada_vieja]"
 
 # Las carreras, en un Postgres 16 descartable: D (dos checkouts) y, de la
 # vuelta 2, a (dos pagos de la misma cuenta) y D31 (el mismo pago dos veces).
