@@ -471,6 +471,11 @@ export CASOS=z19
 sabotaje $A "el aviso de otro usuario lo pisa cualquier otro" \
   "FALLA: entró otro usuario antes de la primera consulta y la pestaña avisa otra cosa" \
   "        if (avisoBorrador === 'ajena' && motivo !== 'ajena') return;"$'\n' ''
+# A vuelve a entrar en la espera: la duplicada confirma la sesión nueva.
+export CASOS=z12
+sabotaje $A "la sesión confirmada no se recuerda" \
+  "FALLA: A volvió a entrar (otra sesión) mientras la duplicada miraba si la original vive y la duplicada no confirma la sesión nueva en 15 s" \
+  $'        sesionDelDueno = sesion;\n' ''
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

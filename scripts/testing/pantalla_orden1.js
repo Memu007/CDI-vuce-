@@ -1101,7 +1101,13 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     const otro = await nuevoUsuario(ctx, 'ord1z8b');
     soltar();
     await t.waitForFunction(() => CDI.currentUser, null, { timeout: 10000 });
-    await t.waitForTimeout(INTERVALO_MS + 500);
+    // Hasta que avise o guarde a nombre del otro: guardar puede llevar un
+    // guardado periódico más la consulta de la sesión nueva.
+    for (const hasta = Date.now() + 4 * INTERVALO_MS; Date.now() < hasta;) {
+      if (/Entró otro usuario/.test(await t.locator('#avisoBorrador').textContent())
+        || (await sobresDe(t, 'DE-A')).some(s => s.user === otro)) break;
+      await t.waitForTimeout(200);
+    }
     const sobres = await sobresDe(t, 'DE-A');
     if (sobres.some(s => s.user === otro)) falla('entró otro usuario con la primera consulta del usuario en camino y lo cargado se guardó a nombre de él: ' + JSON.stringify(sobres));
     const aviso = await avisa(t) ? await t.locator('#avisoBorrador').textContent() : '';
