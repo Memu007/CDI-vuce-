@@ -415,6 +415,63 @@ sabotaje $A "el vencido se borra sólo si es del usuario" \
   '        if (parsed.user !== user) return null;' \
   $'        if (parsed.user !== user) return null;\n        if (Date.now() - savedAt > BORRADOR_VENCE_MS) { try { localStorage.removeItem(clave); } catch (_) {} return null; }'
 
+# La sesión cambia mientras la duplicada mira si la original vive: no
+# adopta la operación de A con otro usuario ni la deja sin dueño.
+ADOPTA=$'    function adoptarBorrador(b) {\n        const user = usuarioActual();\n        if (!user) return null;\n'
+export CASOS=z9
+sabotaje $A "adoptar no mira si cambió la sesión (como antes del arreglo)" \
+  "FALLA: entró otro usuario mientras la duplicada miraba si la original vive, al abrir y la pestaña le muestra a" \
+  "$ADOPTA" $'    function adoptarBorrador(b) {\n        const user = usuarioActual();\n'
+export CASOS=z10
+sabotaje $A "adoptar no mira si cambió la sesión y guarda a nombre del dueño de la pestaña" \
+  "FALLA: entró otro usuario mientras la duplicada miraba si la original vive, con el usuario tarde y la pestaña le muestra a" \
+  "$ADOPTA" $'    function adoptarBorrador(b) {\n        const user = duenoPestana;\n'
+export CASOS=z11
+sabotaje $A "adoptar no mira si cambió la sesión (como antes), con la sesión cerrada" \
+  "FALLA: se cerró la sesión mientras la duplicada miraba si la original vive y la operación que A dejó guardada quedó con otro dueño o se borró: [null]" \
+  "$ADOPTA" $'    function adoptarBorrador(b) {\n        const user = usuarioActual();\n'
+
+# Tocar la pestaña de cualquier forma antes de que llegue el usuario frena la
+# recuperación tardía: cada evento por separado.
+TOQUES="['pointerdown', 'click', 'keydown', 'drop']"
+export CASOS=z13
+sabotaje $A "un clic sin puntero no cuenta como tocar la pestaña" \
+  "FALLA: se tocó la pestaña (un clic sin puntero) antes de que llegara el usuario" \
+  "$TOQUES" "['pointerdown', 'keydown', 'drop']"
+export CASOS=z14
+sabotaje $A "una tecla no cuenta como tocar la pestaña" \
+  "FALLA: se tocó la pestaña (una tecla) antes de que llegara el usuario" \
+  "$TOQUES" "['pointerdown', 'click', 'drop']"
+export CASOS=z15
+sabotaje $A "soltar un archivo no cuenta como tocar la pestaña" \
+  "FALLA: se tocó la pestaña (soltar un archivo que no es factura) antes de que llegara el usuario" \
+  "$TOQUES" "['pointerdown', 'click', 'keydown']"
+export CASOS=z16
+sabotaje $A "apretar el mouse no cuenta como tocar la pestaña" \
+  "FALLA: se tocó la pestaña (apretar el mouse sin soltar) antes de que llegara el usuario" \
+  "$TOQUES" "['click', 'keydown', 'drop']"
+
+# Con la sesión cerrada se pregunta una vez por sesión, no en cada guardado.
+export CASOS=z17
+sabotaje $A "no se recuerda qué sesión ya se revisó" \
+  "FALLA: con la sesión cerrada la pestaña pregunta quién es en cada guardado" \
+  $'        sesionRevisada = sesion;\n' ''
+
+# Con la red cortada se pregunta cada 10 s y, cuando vuelve, se reintenta.
+export CASOS=z18
+sabotaje $A "con la red cortada no se espera para volver a preguntar" \
+  "FALLA: con la red cortada la pestaña pregunta quién es en cada guardado" \
+  ' || Date.now() < revisarDesde' ''
+sabotaje $A "después de un error de red no se vuelve a preguntar" \
+  "FALLA: la red volvió y en 15 s la pestaña no vuelve a guardar" \
+  $'                sesionRevisada = null;\n                revisarDesde' '                revisarDesde'
+
+# El aviso de otro usuario no lo pisa el de la red.
+export CASOS=z19
+sabotaje $A "el aviso de otro usuario lo pisa cualquier otro" \
+  "FALLA: entró otro usuario antes de la primera consulta y la pestaña avisa otra cosa" \
+  "        if (avisoBorrador === 'ajena' && motivo !== 'ajena') return;"$'\n' ''
+
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
