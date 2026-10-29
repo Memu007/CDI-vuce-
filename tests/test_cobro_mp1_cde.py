@@ -214,8 +214,8 @@ def test_billing_me_dice_si_una_cancelada_tiene_una_suscripcion_abierta(client, 
 # --- D13 (c): una autorizada vieja no se cancela desde el checkout ---
 
 @pytest.mark.parametrize("billing_status, dias", [
-    ("past_due", -10), ("active", -3), ("canceled", 20),
-], ids=["impaga", "vencida_en_gracia", "cancelada_vieja"])
+    ("past_due", -10), ("active", -1), ("active", -3), ("canceled", 20),
+], ids=["impaga", "renovacion_tardia", "vencida_en_gracia", "cancelada_vieja"])
 def test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando(client, billing_status, dias):
     usuario, sid = _suscripto(client, "cde_d13", billing_status=billing_status, dias=dias)
     r = client.post("/api/billing/checkout", json={"plan": "premium"})
@@ -234,3 +234,23 @@ def test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando(c
     assert r.status_code == 200, r.text
     assert [t for t, _ in CREADAS] == ["preapproval"]
     assert _leer(usuario)["mp_preapproval_id"] == r.json()["preapproval_id"] != sid
+
+
+# --- j: una suscripción que Mercado Pago no conoce no traba la cuenta ---
+
+def test_si_mp_no_conoce_la_suscripcion_vieja_el_checkout_crea_la_nueva(client):
+    usuario, sid = _suscripto(client, "cde_404", billing_status="past_due", dias=-10)
+    del SUS[sid]  # Mercado Pago contesta 404
+    r = client.post("/api/billing/checkout", json={"plan": "premium"})
+    assert r.status_code == 200, r.text
+    assert [t for t, _ in CREADAS] == ["preapproval"]
+    assert _leer(usuario)["mp_preapproval_id"] == r.json()["preapproval_id"] != sid
+
+
+def test_si_mp_no_conoce_la_suscripcion_cancelar_sigue(client):
+    usuario, sid = _suscripto(client, "cde_404c")
+    del SUS[sid]
+    r = client.post("/api/billing/cancel")
+    assert r.status_code == 200, r.text
+    assert _leer(usuario)["billing_status"] == "canceled"
+    assert _leer(usuario)["mp_preapproval_id"] is None

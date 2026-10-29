@@ -134,12 +134,12 @@ def test_un_pago_aprobado_sin_id_reconocible_reintenta(client, id_en_la_respuest
 
 # ── b: se leyó y no sirve → rechazado, 200 ───────────────────────────
 
-@pytest.mark.parametrize("referencia", [None, 123, "", "x", "a:b:c:d", "org:x:y:z", "v2:enterprise"],
-                         ids=["nula", "numero", "vacia", "sin_dos_puntos", "cuatro_partes", "org_cuatro_partes",
+@pytest.mark.parametrize("referencia", [123, "x", "a:b:c:d", "org:x:y:z", "v2:enterprise"],
+                         ids=["numero", "sin_dos_puntos", "cuatro_partes", "org_cuatro_partes",
                               "plan_desconocido"])
 def test_un_pago_con_referencia_que_no_sirve_queda_rechazado(client, referencia):
-    """Antes: 500 con la referencia nula (Mercado Pago reintenta sin fin) y
-    400 con una desconocida. El pago está aprobado: Emi lo tiene que ver."""
+    """Antes: 400 con una referencia desconocida. El pago está aprobado: Emi
+    lo tiene que ver. Sin referencia reintenta (test_cobro_mp1_h.py)."""
     pid = _pago(f"pr-{_unique('v2')}", "")
     PAGOS[pid]["external_reference"] = referencia
     r = _aviso_ipn(client, pid)
@@ -160,8 +160,9 @@ def test_un_pago_de_una_cuenta_que_no_existe_queda_rechazado(client, cuenta):
     assert fila.get("estado") == "rechazado" and "no existe" in (fila.get("motivo") or ""), fila
 
 
-@pytest.mark.parametrize("referencia", [None, "", 123], ids=["nula", "vacia", "numero"])
-def test_una_renovacion_de_una_suscripcion_sin_referencia_queda_rechazada(client, referencia):
+def test_una_renovacion_de_una_suscripcion_con_referencia_que_no_sirve_queda_rechazada(client):
+    """Sin referencia reintenta (test_cobro_mp1_h.py)."""
+    referencia = 123
     usuario = _unique("v2_sinref")
     _register(client, usuario)
     _vencida(usuario)
@@ -181,9 +182,9 @@ def test_una_renovacion_de_una_suscripcion_sin_referencia_queda_rechazada(client
     lambda c: c.update(preapproval_id="a" * 65),
 ], ids=["sin_suscripcion", "suscripcion_no_es_texto", "suscripcion_nula", "suscripcion_con_ruta",
         "suscripcion_larga"])
-def test_un_cobro_con_su_pago_y_sin_suscripcion_legible_queda_rechazado(client, romper):
-    """El pago trae su referencia y el precio del plan: sólo lo frena que el
-    cobro no diga de qué suscripción es."""
+def test_un_cobro_sin_suscripcion_legible_se_acredita_como_su_pago(client, romper):
+    """El pago trae su referencia y el precio del plan: se acredita como si
+    llegara su aviso, que no depende del cobro (COBRO-MP-1, h; D17)."""
     usuario = _unique("v2_cobs")
     _register(client, usuario)
     _vencida(usuario)
@@ -191,24 +192,28 @@ def test_un_cobro_con_su_pago_y_sin_suscripcion_legible_queda_rechazado(client, 
     PAGOS[pid]["external_reference"] = f"{usuario}:premium"
     romper(COBROS[cobro])
     r = _aviso_cobro(client, cobro)
-    assert r.status_code == 200, r.text[:300]
-    assert _get_user(usuario)["billing_status"] == "past_due"
-    assert _leer_pago(pid).get("estado") == "rechazado", _leer_pago(pid)
+    assert r.status_code == 200 and r.json().get("skipped") is None, r.text[:300]
+    assert _get_user(usuario)["billing_status"] == "active"
+    assert _leer_pago(pid).get("estado") == "aplicado", _leer_pago(pid)
 
 
 @pytest.mark.parametrize("suscripcion", ["../v1/payments/1", {"id": "x"}], ids=["con_ruta", "no_es_texto"])
-def test_una_renovacion_sin_referencia_y_con_un_id_de_suscripcion_que_no_sirve_queda_rechazada(client, suscripcion):
+def test_una_renovacion_sin_referencia_y_con_un_id_de_suscripcion_que_no_sirve_reintenta(client, suscripcion):
     """Sin referencia en el pago, la suscripción del cobro se pediría a
-    Mercado Pago: si no es un id, no se pide y queda rechazado."""
+    Mercado Pago: si no es un id, no se pide. No se sabe de qué cuenta es:
+    reintenta sin anotar nada (COBRO-MP-1, h)."""
     usuario = _unique("v2_rsid")
     _register(client, usuario)
     _vencida(usuario)
     cobro, pid = _renovacion(usuario)
     COBROS[cobro]["preapproval_id"] = suscripcion
+    if isinstance(suscripcion, str):
+        # si la pidiera, Mercado Pago simulado la contestaría con su cuenta
+        SUSCRIPCIONES[suscripcion] = SUSCRIPCIONES[f"pre-{usuario}"]
     r = _aviso_cobro(client, cobro)
-    assert r.status_code == 200, r.text[:300]
+    assert r.status_code == 503, r.text[:300]
     assert _get_user(usuario)["billing_status"] == "past_due"
-    assert _leer_pago(pid).get("estado") == "rechazado", _leer_pago(pid)
+    assert _leer_pago(pid) == {}
 
 
 @pytest.mark.parametrize("donde,valor", [
