@@ -177,7 +177,10 @@ def test_una_renovacion_de_una_suscripcion_sin_referencia_queda_rechazada(client
     lambda c: c.pop("preapproval_id"),
     lambda c: c.update(preapproval_id={"id": "x"}),
     lambda c: c.update(preapproval_id=None),
-], ids=["sin_suscripcion", "suscripcion_no_es_texto", "suscripcion_nula"])
+    lambda c: c.update(preapproval_id="../v1/payments/1"),
+    lambda c: c.update(preapproval_id="a" * 65),
+], ids=["sin_suscripcion", "suscripcion_no_es_texto", "suscripcion_nula", "suscripcion_con_ruta",
+        "suscripcion_larga"])
 def test_un_cobro_con_su_pago_y_sin_suscripcion_legible_queda_rechazado(client, romper):
     """El pago trae su referencia y el precio del plan: sólo lo frena que el
     cobro no diga de qué suscripción es."""
@@ -191,6 +194,32 @@ def test_un_cobro_con_su_pago_y_sin_suscripcion_legible_queda_rechazado(client, 
     assert r.status_code == 200, r.text[:300]
     assert _get_user(usuario)["billing_status"] == "past_due"
     assert _leer_pago(pid).get("estado") == "rechazado", _leer_pago(pid)
+
+
+@pytest.mark.parametrize("donde,valor", [
+    ("metadata", "../v1/payments/1"),
+    ("metadata", {"id": "x"}),
+    ("pago", "../v1/payments/1"),
+    ("transaccion", "a" * 65),
+], ids=["metadata_con_ruta", "metadata_no_es_texto", "pago_con_ruta", "transaccion_larga"])
+def test_un_pago_con_un_id_de_suscripcion_que_no_sirve_queda_rechazado(client, donde, valor):
+    """El id de la suscripción se leyó y no es un id: no va a la URL de
+    Mercado Pago ni da 503, queda rechazado (COBRO-MP-1, b)."""
+    usuario = _unique("v2_susid")
+    _register(client, usuario)
+    _vencida(usuario)
+    pid = _pago(f"psi-{usuario}", f"{usuario}:premium")
+    if donde == "metadata":
+        PAGOS[pid]["metadata"] = {"preapproval_id": valor}
+    elif donde == "pago":
+        PAGOS[pid]["preapproval_id"] = valor
+    else:
+        PAGOS[pid]["point_of_interaction"] = {"transaction_data": {"subscription_id": valor}}
+    r = _aviso_ipn(client, pid)
+    assert r.status_code == 200, r.text[:300]
+    assert _get_user(usuario)["billing_status"] == "past_due"
+    fila = _leer_pago(pid)
+    assert fila.get("estado") == "rechazado" and "suscripción" in (fila.get("motivo") or ""), fila
 
 
 @pytest.mark.parametrize("campo", ["payer", "card", "card.payment_method"])
