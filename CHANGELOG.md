@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-29 · fix: una renovación de Mercado Pago no se pierde por el orden de sus avisos (COBRO-MP-1, vuelta 3)
+
+- **fix(cobro):** si un aviso de pago todavía no dice de qué cuenta es (o el cobro llega con su pago pendiente), se responde para que Mercado Pago reintente en vez de anotarlo como rechazado: el otro aviso del mismo pago lo acredita una sola vez.
+- Si Mercado Pago ya no conoce la suscripción guardada (404), «Activar plan» y «Cancelar plan» siguen en vez de dar error.
+
 ## 2026-10-29 · fix: el checkout no cancela una suscripción de Mercado Pago que sigue activa (COBRO-MP-1, D13)
 
 - **fix(cobro):** con la cuenta impaga, vencida o cancelada y una suscripción todavía autorizada en Mercado Pago, «Activar plan» ya no la cancela para crear otra (podía ser un pago recién hecho): avisa que esperes unos minutos o que canceles el plan primero.
