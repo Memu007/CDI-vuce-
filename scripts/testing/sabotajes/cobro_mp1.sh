@@ -7,8 +7,8 @@
 # descartable (scripts/testing/cobro_mp1d_postgres.py, con con_pg16.sh) y la
 # pantalla del perfil (scripts/testing/pantalla_cobro_mp1.js; PUERTO, 8854).
 # La del 2026-10-29 (vuelta 2, a a g) con tests/test_cobro_mp1_vuelta2.py,
-# tests/test_cobro_corte1.py (g), la carrera de a y de D31 en Postgres
-# (scripts/testing/cobro_mp1_postgres.py) y la pantalla v1
+# tests/test_cobro_corte1.py (g), la carrera de a y de D31 y los datos que no entran en
+# su columna (b) en Postgres (scripts/testing/cobro_mp1_postgres.py) y la pantalla v1
 # (scripts/testing/pantalla_cobro_mp1_v2.js).
 # Los «sin_rojo» deshacen algo que no es la garantía y la prueba tiene que
 # seguir en verde (D31: lo que frena el doble cobro es la clave primaria, no
@@ -206,10 +206,6 @@ sabotaje $M "una respuesta que no es JSON rompe" \
   $'    except ValueError as e:\n        raise _MPIlegible(f"cobro {cobro_id}: la respuesta no es JSON")' \
   $'    except KeyError as e:\n        raise _MPIlegible(f"cobro {cobro_id}: la respuesta no es JSON")' \
   "FAILED $T1::test_el_cobro_que_mercado_pago_no_contesta_bien_no_aplica_nada[no_es_json]"
-sabotaje $M "un id de pago booleano pasa" \
-  ' or isinstance(pago_id, bool)' \
-  '' \
-  "FAILED $V::test_una_renovacion_que_todavia_no_dice_que_pago_fue_reintenta[pago_id_booleano]"
 sabotaje $M "un cobro sin suscripción se aplica" \
   '        if renovacion and not suscripcion_del_cobro:' \
   '        if False:' \
@@ -307,8 +303,8 @@ sabotaje $M "b: una referencia desconocida no queda rechazada" \
   '                return {"success": True, "skipped": "x"}' \
   "FAILED $V::test_un_pago_con_referencia_que_no_sirve_queda_rechazado[nula]"
 sabotaje $M "b: el formato viejo sin payer da 500" \
-  'str(billing_service._objeto(pay_resp, "payer").get("id", "") or payment_id)' \
-  'str(pay_resp.get("payer").get("id", "") or payment_id)' \
+  '"payment_customer_id": billing_service.cliente_mp(pay_resp),' \
+  '"payment_customer_id": str(pay_resp.get("payer").get("id", "")),' \
   "FAILED $V::test_el_formato_viejo_con_barra_y_sin_payer_se_aplica"
 sabotaje $B "b: el usuario «org» no puede pagar" \
   '    elif len(parts) == 2 and parts[0]:' \
@@ -363,29 +359,25 @@ sabotaje $H "e: el panel no nombra la fecha" \
 
 # ── Vuelta 2, f: el tope de 100 operaciones extra ──
 sabotaje $M "f: una recarga que no entra se suma" \
-  '                if vigentes + update["extra_ops_remaining"] > billing_service.EXTRA_OPS_MAX:' \
+  '                if not entra:' \
   '                if False:' \
   "FAILED $V::test_una_recarga_que_no_entra_queda_rechazada_y_no_suma[95-usuario]"
-sabotaje $M "f: una recarga que llega justo a 100 se rechaza" \
-  '                if vigentes + update["extra_ops_remaining"] > billing_service.EXTRA_OPS_MAX:' \
-  '                if vigentes + update["extra_ops_remaining"] >= billing_service.EXTRA_OPS_MAX:' \
+sabotaje $B "f: una recarga que llega justo a 100 se rechaza" \
+  '<= EXTRA_OPS_MAX, vigentes' \
+  '< EXTRA_OPS_MAX, vigentes' \
   "FAILED $V::test_una_recarga_que_entra_suma_entera[llega_justo_a_100]"
-sabotaje $M "f: el webhook cuenta los extras vencidos" \
-  '                billing_service._expire_extra_ops(cuenta)' \
-  '                pass' \
+sabotaje $B "f: la recarga cuenta los extras vencidos" \
+  $'    _expire_extra_ops(cuenta)\n    vigentes = cuenta.extra_ops_remaining or 0' \
+  '    vigentes = cuenta.extra_ops_remaining or 0' \
   "FAILED $V::test_una_recarga_que_entra_suma_entera[los_vencidos_no_cuentan]"
 sabotaje $M "f: con el tope lleno se arma el link" \
-  '    if vigentes + billing_service.TOPUP_OPS > billing_service.EXTRA_OPS_MAX:' \
-  '    if False:' \
+  $'    if not entra:\n        raise HTTPException(status_code=409' \
+  $'    if False:\n        raise HTTPException(status_code=409' \
   "FAILED $V::test_con_el_tope_lleno_no_se_arma_el_link_de_recarga[95-usuario]"
 sabotaje $M "f: el link mira los extras del usuario y no los de su organización" \
-  '    vigentes = entidad.extra_ops_remaining or 0' \
-  '    vigentes = db_user.extra_ops_remaining or 0' \
+  'recarga_entra(entidad)' \
+  'recarga_entra(db_user)' \
   "FAILED $V::test_con_el_tope_lleno_no_se_arma_el_link_de_recarga[95-organizacion]"
-sabotaje $M "f: el link cuenta los extras vencidos" \
-  '    billing_service._expire_extra_ops(entidad)' \
-  '    pass' \
-  "FAILED $V::test_con_los_extras_vencidos_se_puede_recargar[usuario]"
 
 # ── Devolución del 2026-10-28: B, C, D y E ──
 # B: la exportación cuenta la operación (tests/test_cobro_corte1.py).
@@ -490,6 +482,36 @@ else
     $'    except IntegrityError:\n        await session.rollback()\n        return False' \
     $'    except IntegrityError:\n        await session.rollback()\n        return True' \
     "FALLA | el mismo pago dos veces a la vez: uno aplicado y otro salteado"
+  # b: lo leído de Mercado Pago que no entra en su columna. SQLite no aplica
+  # los largos ni rechaza NUL: sólo se ve en Postgres.
+  sabotaje $M "b: la cuenta inexistente larga no entra en la fila" \
+    'cuenta=cuenta[:200],' 'cuenta=cuenta,' \
+    "FALLA | un pago con la cuenta inexistente larga queda rechazado"
+  sabotaje $M "b: lo leído de Mercado Pago se guarda con NUL" \
+    'return _guardable_en_pg(resp["response"])' 'return resp["response"]' \
+    "FALLA | un pago con la moneda con NUL queda rechazado"
+  sabotaje $M "b: sólo se limpia lo que no es un objeto" \
+    $'    if isinstance(valor, dict):\n        return {clave: _guardable_en_pg(v)' \
+    $'    if False:\n        return {clave: _guardable_en_pg(v)' \
+    "FALLA | un pago con la moneda con NUL queda rechazado"
+  sabotaje $M "b: un surrogate suelto se guarda" \
+    '_NO_GUARDABLE_EN_PG = re.compile("[\x00\ud800-\udfff]")' \
+    '_NO_GUARDABLE_EN_PG = re.compile("[\x00]")' \
+    "FALLA | un pago con la cuenta inexistente con un surrogate queda rechazado"
+  sabotaje $B "b: el pagador largo no entra en la fila" \
+    '"") or "")[:100]' '"") or "")' \
+    "FALLA | un pago con el pagador largo queda aplicado"
+  sabotaje $B "b: los últimos 4 largos no entran en la fila" \
+    'return str(last4)[-4:]' 'return str(last4)' \
+    "FALLA | un pago con los últimos 4 largos queda aplicado"
+  sabotaje $B "b: la marca larga no entra en la fila" \
+    'return marca[:20] if isinstance(marca, str) and marca else None' \
+    'return marca if isinstance(marca, str) and marca else None' \
+    "FALLA | un pago con la marca larga queda aplicado"
+  sabotaje $B "b: una marca que no es texto se guarda" \
+    'return marca[:20] if isinstance(marca, str) and marca else None' \
+    'return marca[:20] if marca else None' \
+    "FALLA | un pago con la marca en una lista queda aplicado"
 fi
 
 # Las pantallas, con la API levantada desde el worktree y una base vacía en
