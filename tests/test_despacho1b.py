@@ -446,6 +446,8 @@ def test_guardar_sin_kilo_no_inventa_el_peso(auth_override, client):
     ({"posicion_sim": "8471"}, "Falta la posición SIM"),
     ({"origen": "ZZ"}, "No reconozco el origen"),
     ({"origen": "CHINA"}, "No reconozco el origen"),
+    ({"origen": "ＢＲ"}, "No reconozco el origen"),
+    ({"origen": "ÉS"}, "No reconozco el origen"),
     ({"cantidad": "10"}, "La cantidad no es un número."),
     ({"valor_unitario": -1}, "El valor unitario tiene que ser un número positivo."),
     ({"kilo_neto": True}, "El kilo neto no es un número."),
@@ -2040,8 +2042,9 @@ def test_una_operacion_con_un_producto_que_no_se_guarda_lo_dice(auth_override, c
 
 @pytest.mark.parametrize("cuerpo", [
     {"items": [1]}, {"items": ["x"]}, {"items": [None]}, {"items": [[]]},
-    {"items": "x"}, {"items": {"a": 1}}, [1],
-], ids=["numero", "texto", "nulo", "lista", "items texto", "items objeto", "cuerpo lista"])
+    {"items": "x"}, {"items": {"a": 1}}, [1], {"items": {}}, {"items": 0}, {"items": ""},
+], ids=["numero", "texto", "nulo", "lista", "items texto", "items objeto", "cuerpo lista",
+        "items objeto vacio", "items cero", "items texto vacio"])
 def test_una_operacion_con_productos_que_no_son_objetos_da_400(auth_override, client, cuerpo):
     """Antes: 500 con el texto de la excepción."""
     cid = _crear_cliente(client)
@@ -2049,6 +2052,24 @@ def test_una_operacion_con_productos_que_no_son_objetos_da_400(auth_override, cl
     assert r.status_code == 400, r.text
     assert r.json()["detail"] == "Cada producto tiene que ser un objeto."
     assert _contar(Operation, client_id=cid) == 0
+
+
+@pytest.mark.parametrize("resumen", [[1], "x", 3], ids=["lista", "texto", "numero"])
+def test_una_operacion_con_un_resumen_que_no_es_un_objeto_da_400(auth_override, client, resumen):
+    """Antes: 500 con el texto de la excepción."""
+    cid = _crear_cliente(client)
+    r = _operacion(client, cid, cuerpo=json.dumps({"items": [], "resumen": resumen}))
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == "El resumen tiene que ser un objeto."
+    assert _contar(Operation, client_id=cid) == 0
+
+
+@pytest.mark.parametrize("cuerpo", [{}, {"items": None, "resumen": None}], ids=["sin nada", "nulos"])
+def test_una_operacion_sin_productos_ni_resumen_se_guarda_vacia(auth_override, client, cuerpo):
+    cid = _crear_cliente(client)
+    r = _operacion(client, cid, cuerpo=json.dumps(cuerpo))
+    assert r.status_code == 200, r.text
+    assert _contar(Operation, client_id=cid) == 1
 
 
 def _guardar_uso(client, cid, **otros):
@@ -2090,12 +2111,15 @@ def test_confirmar_algo_que_no_es_un_ncm_da_400_y_no_guarda_nada(auth_override, 
 
 
 @pytest.mark.parametrize("origen, detalle", [
-    (["a"], "No reconozco el origen «['A']»: usá el código de dos letras."),
+    (["a"], "El origen tiene que ser el código de dos letras."),
+    (12, "El origen tiene que ser el código de dos letras."),
+    ("ＢＲ", "No reconozco el origen «ＢＲ»: usá el código de dos letras."),
+    ("ÉS", "No reconozco el origen «ÉS»: usá el código de dos letras."),
     ("XYZ", "No reconozco el origen «XYZ»: usá el código de dos letras."),
     ("123", "No reconozco el origen «123»: usá el código de dos letras."),
     ("ZZ", "No reconozco el origen «ZZ»: usá el código de dos letras."),
     ("china", "No reconozco el origen «CHINA»: usá el código de dos letras."),
-], ids=["lista", "tres letras", "numeros", "pais que no existe", "nombre"])
+], ids=["lista", "numero", "ancho completo", "acento", "tres letras", "numeros", "pais que no existe", "nombre"])
 def test_cambiar_el_origen_valida_igual_que_guardar(auth_override, client, origen, detalle):
     cid = _crear_cliente(client)
     pid = _provisorio(client, cid)
