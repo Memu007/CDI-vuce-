@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-29 · feat: video de presentación con pantallas reales
+
+- **feat(marketing):** `proyecto_maria/static/v2/media/cdi-presentacion.mp4` (21 s, 1080p, sin audio) muestra el recorrido real Excel → Revisar → NCM → Validar → MARIA.TXT con datos ficticios. Se regenera con `./scripts/video/build.sh`. No está embebido en la landing todavía.
+
 ## 2026-10-24 · feat: alta de cliente con lo que pide el MARIA (CLIENTE-1)
 
 - **feat(clientes):** razón social, CUIT, domicilio e inicio de actividad a la vista y marcados «lo pide el MARIA»; email y teléfono en «Más datos». Se guarda sin ellos, con un aviso de cuáles faltan; el detalle muestra el inicio de actividad.
