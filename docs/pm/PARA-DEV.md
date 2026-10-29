@@ -41,25 +41,32 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
-## D13 y D14 de COBRO-MP-1, vuelta 2 (2026-10-29 06:40 UTC)
+## D15 y D16 de ORDEN-1b; D13 (c) ya (2026-10-29 08:30 UTC)
 
-La entrega (`999b27a`, informe `069b190`) llegó. La reviso entera cuando
-esté el arreglo de D14; estas dos van ya para que no te frenen.
+Llegaron ORDEN-1b (`6c459d2`, informe `d24eb43`) y D14 (`4ef59f4`). Reviso
+las dos entregas enteras: la vuelta 2 de COBRO-MP-1 (`999b27a` más
+`4ef59f4`) y ORDEN-1b. Estas respuestas van ya para que no te frenen.
 
-- **D14: (a).** Los dos arreglos de la prueba van en un commit de pruebas
-  aparte, encima del informe y antes de ORDEN-1b. Sin tocar el producto.
-  La barrera tiene que cruzar a los dos después de la consulta previa y
-  antes de `_registrar_pago_mp`. El script tiene que mostrar las líneas
-  «FALLA» de Postgres. Volvé a correr `cobro_mp1.sh` completo sobre ese
-  SHA y repetí a mano el sabotaje de D31 cinco veces: las cinco en rojo.
-  Avisame con una línea en `PARA-PM.md` (el SHA y la salida) y seguí con
-  ORDEN-1b.
-- **D13: (c), decidido por la PM.** Usa sólo lo verificado. El error cae
-  del lado seguro: un cliente queda frenado unos minutos, con la salida a
-  la vista, en vez de perder sin aviso una suscripción que ya cobró. El
-  paso de más para la tarjeta que no pasa (D7.2) se acepta. No la hagas
-  ahora. Va en la próxima vuelta de COBRO-MP-1, después de ORDEN-1b y de
-  mi veredicto sobre esta vuelta, con su rojo antes y su sabotaje.
+- **D15: (c), decidido por la PM.** Coincido: un reintento puede tapar
+  justo lo que todavía no entendemos. En un commit de pruebas,
+  `orden1b.sh` guarda fuera de la carpeta temporal el log de la API de
+  cada `ROJO?` y de cada `ROTO`, y dice dónde quedó. Sin reintentos. Yo
+  corro el lote por mi lado; si el `ROJO?` aparece, lo diagnosticamos con
+  ese log.
+- **D16: (a) para ORDEN-1b.** El criterio era la pestaña y ahí se cumple.
+  Exigir CSRF en el logout del servidor no está en el roadmap: se lo
+  propongo a Emi de día. No lo hagas sin que esté en `ROADMAP.md`.
+- **D13 (c): empezala ahora**, sin esperar mis veredictos, para no quedarte
+  sin tarea. Es la próxima vuelta de COBRO-MP-1. Lo que te pida al revisar
+  la vuelta 2 se suma a esa misma vuelta. Una suscripción vieja
+  `authorized` en una cuenta que ya no es la actual recibe 409 con el texto
+  de salida. Usa sólo lo verificado: el error cae del lado seguro (un
+  cliente frenado unos minutos, con la salida a la vista, en vez de perder
+  sin aviso una suscripción que ya cobró). El paso de más para la tarjeta
+  que no pasa (D7.2) se acepta. Rojo antes, arreglo y sabotaje, en commits
+  separados. No la entregues hasta mi veredicto de la vuelta 2.
+
+Orden: el commit de D15, después D13 (c).
 
 ## Veredicto de ORDEN-1, vuelta 3 (2026-10-29 03:31 UTC): aceptada
 
