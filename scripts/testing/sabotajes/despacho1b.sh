@@ -442,6 +442,16 @@ sabotaje "DOL no es dólar" proyecto_maria/main.py \
   "in (\"USD\",)" \
   "test_guardar_un_despacho_en_dolares_guarda_el_valor[DOL]"
 no_debe "DOL no es dólar" "$ULTIMA" "test_guardar_un_despacho_en_dolares_guarda_el_valor[USD]"
+sabotaje "la divisa no recorta los espacios" proyecto_maria/main.py \
+  'body["divisa"].strip().upper() in' \
+  'body["divisa"].upper() in' \
+  "test_guardar_un_despacho_en_dolares_guarda_el_valor[ usd ]"
+no_debe "la divisa no recorta los espacios" "$ULTIMA" "test_guardar_un_despacho_en_dolares_guarda_el_valor[dol]"
+sabotaje "la divisa distingue minúsculas" proyecto_maria/main.py \
+  'body["divisa"].strip().upper() in' \
+  'body["divisa"].strip() in' \
+  "test_guardar_un_despacho_en_dolares_guarda_el_valor[dol]"
+no_debe "la divisa distingue minúsculas" "$ULTIMA" "test_guardar_un_despacho_en_dolares_guarda_el_valor[USD]"
 
 # Vuelta 4: una regla de identidad en las cinco vías.
 C=proyecto_maria/services/client_memory.py
