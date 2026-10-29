@@ -90,6 +90,21 @@ def trabajo(hojas=20, operaciones=14000):
     return _pdf(armar)
 
 
+def parseo_caro(hojas=200, renglones=500):
+    """`hojas` hojas que comparten `renglones` líneas de 40 rótulos
+    («Tipo Lista Estado Unidad» diez veces): entender el texto de una hoja
+    cuesta unas tres veces lo que extraerlo, así que el tope de CPU que
+    cubría sólo la extracción dejaba gastar varias veces más (DESPACHO-1b)."""
+    lineas = b"".join(b"BT /F1 9 Tf 10 %d Td (%s) Tj ET\n" % (i, b"Tipo Lista Estado Unidad " * 10)
+                      for i in range(renglones))
+
+    def armar(add, objs):
+        z = zlib.compress(lineas, 9)
+        c = add(b"<< /Length %d /Filter /FlateDecode >>\nstream\n" % len(z) + z + b"\nendstream")
+        return _hojas(add, objs, [c] * hojas)
+    return _pdf(armar)
+
+
 def una_hoja_cara(kb=80):
     """Una sola hoja con `kb` KB de saltos de renglón («T*»): pesa poco y
     queda debajo del tope de bytes, pero leerla cuesta el cuadrado de lo que
@@ -123,18 +138,22 @@ def texto_largo(hojas, lineas=100, ancho=4000):
 
 
 # Corre en un python nuevo: arma la bomba, la lee con `leer_despacho_aparte`
-# e imprime el resultado y la memoria máxima del proceso que leyó y la propia.
+# e imprime el resultado, la memoria máxima del proceso que leyó y la propia, y
+# la CPU que gastó el que leyó. LIMITE_CPU cambia su tope de CPU.
 MEDIR = r"""
-import asyncio, json, resource, sys
+import asyncio, json, os, resource, sys
 from tests import pdf_bombas
 from proyecto_maria.core import despacho_lector
 data = getattr(pdf_bombas, sys.argv[1])(*map(int, sys.argv[2:]))
 try:
-    r = asyncio.run(despacho_lector.leer_despacho_aparte(data, 120))
+    tope = {"limite_cpu_s": float(os.environ["LIMITE_CPU"])} if "LIMITE_CPU" in os.environ else {}
+    r = asyncio.run(despacho_lector.leer_despacho_aparte(data, 120, **tope))
     salida = {"resultado": {k: r.get(k) for k in ("renglones", "sin_texto", "avisos")}}
 except despacho_lector.PdfDemasiadoPesado as e:
     salida = {"pesado": str(e)}
 salida["lector_mb"] = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss // 1024
 salida["propio_mb"] = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss // 1024
+hijos = resource.getrusage(resource.RUSAGE_CHILDREN)
+salida["lector_cpu_s"] = hijos.ru_utime + hijos.ru_stime
 print(json.dumps(salida))
 """

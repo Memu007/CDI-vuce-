@@ -645,13 +645,13 @@ def test_guardar_no_funde_descripciones_casi_iguales_con_ncm_distinto(auth_overr
 _REPO = Path(__file__).resolve().parents[1]
 
 
-def _medir_aparte(bomba, *args):
+def _medir_aparte(bomba, *args, entorno=None):
     """Arma la bomba y la lee con `leer_despacho_aparte` en un python nuevo y
     chico: la memoria del proceso que lee se mide sin la de pytest."""
     from tests.pdf_bombas import MEDIR
     r = subprocess.run([sys.executable, "-c", MEDIR, bomba, *map(str, args)], capture_output=True,
                        text=True, cwd=_REPO, timeout=120,
-                       env={"PATH": os.environ.get("PATH", ""), "PYTHONPATH": str(_REPO)})
+                       env={"PATH": os.environ.get("PATH", ""), "PYTHONPATH": str(_REPO), **(entorno or {})})
     assert r.returncode == 0, r.stderr[-2000:]
     return json.loads(r.stdout)
 
@@ -1431,10 +1431,473 @@ def test_guardar_un_despacho_que_no_esta_en_dolares_no_guarda_el_valor(auth_over
     assert (producto["valor_unitario_avg"], producto["peso_unitario_avg"]) == (None, 0.1), producto
 
 
-@pytest.mark.parametrize("divisa", ["USD", "DOL"])
+# La divisa se compara sin espacios en las puntas ni mayúsculas.
+@pytest.mark.parametrize("divisa", ["USD", "DOL", " usd ", "dol"])
 def test_guardar_un_despacho_en_dolares_guarda_el_valor(auth_override, client, divisa):
     cid = _crear_cliente(client)
     r = _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", "3926.90.90.000A")], divisa=divisa)
     assert r.status_code == 200, r.text
     assert r.json()["avisos"] == []
     assert _catalogo(client, cid)[0]["valor_unitario_avg"] == 2.0
+
+
+# --- DESPACHO-1b, vuelta 4: un producto es una fila, por cualquier vía ------
+#
+# Las cuatro vías que escriben el catálogo del cliente (aprender, guardar una
+# operación, guardar un despacho y cambiar un producto) usan la misma regla:
+# el mismo NCM de 8 dígitos y la misma descripción, sin mirar mayúsculas,
+# espacios de más ni la forma Unicode, son el mismo producto.
+
+import unicodedata  # noqa: E402
+
+_URL_CATALOGO = "/api/clientes/{}/catalogo/productos"
+# El mismo producto escrito de dos formas.
+_F1 = ("3926.90.90", unicodedata.normalize("NFC", "CAÑO INVENTADO VERDE"))
+_F2 = ("3926909000", unicodedata.normalize("NFD", "caño  inventado verde"))
+
+
+def _producto(ncm, descripcion, **otros):
+    return {"ncm": ncm, "descripcion": descripcion, "origen": "BR",
+            "cantidad": 10, "valor_unitario": 2, "peso_unitario": 0.1, **otros}
+
+
+def _aprender(client, cid, *items):
+    return client.post(_URL_CATALOGO.format(cid) + "/learn", json={"items": list(items)})
+
+
+def _cupo(valor=None):
+    """Las operaciones del período del usuario de prueba, o las vuelve a `valor`."""
+    from proyecto_maria.database.models import User
+
+    async def _ir():
+        async with AsyncSessionLocal() as s:
+            u = (await s.execute(select(User).where(User.username == "test_user"))).scalars().first()
+            if u is None:
+                return None
+            if valor is not None:
+                u.ops_used_this_period = valor
+                await s.commit()
+            return u.ops_used_this_period
+    return asyncio.run(_ir())
+
+
+def _operacion(client, cid, *items, cuerpo=None):
+    """Guarda una operación sin gastarle el cupo a las pruebas que siguen."""
+    antes = _cupo()
+    try:
+        url = f"/api/clientes/{cid}/operaciones"
+        if cuerpo is not None:
+            return client.post(url, content=cuerpo, headers={"Content-Type": "application/json"})
+        return client.post(url, json={
+            "source": "pdf_v2", "currency": "USD", "resumen": {"items": len(items), "valor_total": 100},
+            "items": [{"pieza": "P1", **i} for i in items]})
+    finally:
+        _cupo(antes or 0)
+
+
+def _crudo(client, url, cuerpo, metodo="post"):
+    """Un cuerpo JSON con escapes que `json=` no manda, como medio par."""
+    return getattr(client, metodo)(url, content=json.dumps(cuerpo),
+                                   headers={"Content-Type": "application/json"})
+
+
+def _por_aprender(client, cid, ncm, descripcion):
+    return _aprender(client, cid, _producto(ncm, descripcion))
+
+
+def _por_operacion(client, cid, ncm, descripcion):
+    return _operacion(client, cid, _producto(ncm, descripcion))
+
+
+def _por_guardar(client, cid, ncm, descripcion):
+    return _guardar(client, cid, [_renglon(descripcion, ncm)])
+
+
+def _provisorio(client, cid):
+    """Un producto que después se cambia: el id de uno con otro NCM y otra
+    descripción."""
+    descripcion = f"PROVISORIO INVENTADO {uuid.uuid4().hex[:8]}"
+    assert _guardar(client, cid, [_renglon(descripcion, "8471.30.12")]).status_code == 200
+    return next(p["id"] for p in _catalogo(client, cid) if p["descripcion"] == descripcion)
+
+
+def _cambiar(client, cid, pid, cambios):
+    return client.put(_URL_CATALOGO.format(cid) + f"/{pid}", json=cambios)
+
+
+def _por_cambio(client, cid, ncm, descripcion):
+    return _cambiar(client, cid, _provisorio(client, cid), {"ncm": ncm, "descripcion": descripcion})
+
+
+_VIAS = {"aprender": _por_aprender, "operacion": _por_operacion,
+         "guardar": _por_guardar, "cambio": _por_cambio}
+
+
+@pytest.mark.parametrize("primera, segunda", [(a, b) for a in _VIAS for b in _VIAS])
+def test_el_mismo_producto_por_dos_vias_queda_en_una_fila(auth_override, client, primera, segunda):
+    """La primera vía escribe el producto; la segunda, el mismo con otro
+    formato: NCM de 10 dígitos sin puntos, minúsculas, dos espacios y la Ñ
+    descompuesta. Cambiar un producto para que quede igual a otro da 409 y
+    no toca nada."""
+    cid = _crear_cliente(client)
+    r = _VIAS[primera](client, cid, *_F1)
+    assert r.status_code == 200, r.text
+    r = _VIAS[segunda](client, cid, *_F2)
+    productos = _catalogo(client, cid)
+    iguales = [(p["ncm"], p["veces_usado"]) for p in productos if p["ncm"] == "39269090"]
+    if segunda == "cambio":
+        assert r.status_code == 409, r.text
+        assert r.json()["detail"] == "Ya hay otro producto igual en el catálogo."
+        assert iguales == [("39269090", 1)] and len(productos) == 2, productos
+    else:
+        assert r.status_code == 200, r.text
+        assert iguales == [("39269090", 2)] and len(productos) == 1, productos
+
+
+@pytest.mark.parametrize("ncm, descripcion", [
+    ("39269090", "tapa inventada verde"),
+    ("39269090", " TAPA  INVENTADA\tVERDE "),
+    ("3926.90.90", "TAPA INVENTADA VERDE"),
+    ("3926-90-90", "TAPA INVENTADA VERDE"),
+    ("3926 90 90", "TAPA INVENTADA VERDE"),
+    (" 39269090 ", "TAPA INVENTADA VERDE"),
+    ("3926909000", "TAPA INVENTADA VERDE"),
+    ("3926.90.90.000A", "TAPA INVENTADA VERDE"),
+    ("39269090000a", "TAPA INVENTADA VERDE"),
+], ids=["minusculas", "espacios", "puntos", "guiones", "espacios en el ncm", "puntas del ncm",
+        "10 digitos", "sim", "sim en minuscula"])
+def test_cada_forma_del_mismo_producto_suma_a_la_misma_fila(auth_override, client, ncm, descripcion):
+    cid = _crear_cliente(client)
+    assert _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", "3926.90.90")]).status_code == 200
+    r = _aprender(client, cid, _producto(ncm, descripcion))
+    assert r.status_code == 200 and r.json()["aprendidos"] == 1, r.text
+    assert [(p["ncm"], p["veces_usado"]) for p in _catalogo(client, cid)] == [("39269090", 2)]
+
+
+def test_la_n_compuesta_y_la_descompuesta_son_el_mismo_producto(auth_override, client):
+    cid = _crear_cliente(client)
+    for forma in ("NFC", "NFD"):
+        r = _guardar(client, cid, [_renglon(unicodedata.normalize(forma, "CAÑO INVENTADO"), "3926.90.90")])
+        assert r.status_code == 200, r.text
+    assert [p["veces_usado"] for p in _catalogo(client, cid)] == [2]
+
+
+@pytest.mark.parametrize("otra", ["CANO INVENTADO VERDE", "CAÑO INVENTADO, VERDE", "CAÑO-INVENTADO VERDE"],
+                         ids=["sin tilde", "con coma", "con guion"])
+def test_otra_tilde_u_otra_puntuacion_es_otro_producto(auth_override, client, otra):
+    """Supuesto aceptado: sólo se unen las formas Unicode de lo mismo."""
+    cid = _crear_cliente(client)
+    r = _aprender(client, cid, _producto("39269090", "CAÑO INVENTADO VERDE"), _producto("39269090", otra))
+    assert r.status_code == 200 and r.json()["aprendidos"] == 2, r.text
+    assert sorted(p["veces_usado"] for p in _catalogo(client, cid)) == [1, 1]
+
+
+_PREFIJO = ("MANUFACTURA INVENTADA DE PLASTICO " * 9)[:275]
+
+
+@pytest.mark.parametrize("via", ["aprender", "operacion"])
+def test_dos_descripciones_que_comparten_275_caracteres_son_dos_productos(auth_override, client, via):
+    """Antes el respaldo por descripción las unía: dos usos y peso 250,5."""
+    cid = _crear_cliente(client)
+    for final, peso in (("ALFA", 500), ("BETA", 1)):
+        item = _producto("39269090", _PREFIJO + final, peso_unitario=peso)
+        r = _aprender(client, cid, item) if via == "aprender" else _operacion(client, cid, item)
+        assert r.status_code == 200, r.text
+    productos = _catalogo(client, cid)
+    assert sorted((p["veces_usado"], p["peso_unitario_avg"]) for p in productos) == [(1, 1.0), (1, 500.0)]
+
+
+def test_aprender_con_10_digitos_y_guardar_el_despacho_da_una_fila(auth_override, client):
+    cid = _crear_cliente(client)
+    assert _aprender(client, cid, _producto("3926909000", "TAPA INVENTADA VERDE")).json()["aprendidos"] == 1
+    assert _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", "3926.90.90.000A")]).status_code == 200
+    assert [(p["ncm"], p["veces_usado"]) for p in _catalogo(client, cid)] == [("39269090", 2)]
+
+
+# Lo que no es un NCM no entra, por ninguna vía.
+
+_ARABIGO = "٣٩٢٦٩٠٩٠"
+_ANCHO = "３９２６９０９０"
+_AVISO_DIGITOS = "El NCM tiene que estar escrito con dígitos del 0 al 9."
+
+
+@pytest.mark.parametrize("ncm", [_ARABIGO, _ANCHO, "3926.٩٠.90"], ids=["arabigo", "ancho completo", "mezclado"])
+@pytest.mark.parametrize("via", ["aprender", "operacion", "cambio", "guardar-uso"])
+def test_un_ncm_con_otros_digitos_da_400_por_cada_via(auth_override, client, via, ncm):
+    cid = _crear_cliente(client)
+    pid = _provisorio(client, cid) if via == "cambio" else None
+    antes = _catalogo(client, cid)
+    operaciones = _contar(Operation, client_id=cid)
+    if via == "aprender":
+        r = _aprender(client, cid, _producto(ncm, "TAPA INVENTADA VERDE"))
+    elif via == "operacion":
+        r = _operacion(client, cid, _producto(ncm, "TAPA INVENTADA VERDE"))
+    elif via == "cambio":
+        r = _cambiar(client, cid, pid, {"ncm": ncm})
+    else:
+        r = client.post("/api/ncm/guardar-uso", json={
+            "descripcion": f"TAPA INVENTADA {uuid.uuid4().hex[:8]}", "ncm": ncm, "client_id": cid})
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == _AVISO_DIGITOS
+    assert _catalogo(client, cid) == antes
+    assert _contar(Operation, client_id=cid) == operaciones
+
+
+@pytest.mark.parametrize("ncm", [_ARABIGO, _ANCHO])
+def test_guardar_un_despacho_con_otros_digitos_marca_el_renglon(auth_override, client, ncm):
+    cid = _crear_cliente(client)
+    r = _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", ncm)])
+    assert r.status_code == 422, r.text
+    assert r.json()["errores"] == [{"renglon": 1, "problemas": [
+        "Falta la posición SIM o no tiene sus 8 dígitos."]}]
+    assert _catalogo(client, cid) == []
+
+
+@pytest.mark.parametrize("item", ["39269090", 7, None, ["39269090", "TAPA"]],
+                         ids=["texto", "numero", "nulo", "lista"])
+def test_aprender_un_item_que_no_es_un_objeto_da_400(auth_override, client, item):
+    cid = _crear_cliente(client)
+    r = client.post(_URL_CATALOGO.format(cid) + "/learn",
+                    json={"items": [_producto("39269090", "TAPA INVENTADA VERDE"), item]})
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == "Cada producto tiene que ser un objeto."
+    assert _catalogo(client, cid) == []
+
+
+@pytest.mark.parametrize("campo", ["ncm", "descripcion", "origen", "pieza", "clave"])
+def test_aprender_con_medio_par_da_400(auth_override, client, campo):
+    cid = _crear_cliente(client)
+    item = _producto("39269090", "TAPA INVENTADA VERDE", pieza="P1")
+    if campo == "clave":
+        item["\ud800"] = "x"
+    else:
+        item[campo] = item[campo] + "\ud800"
+    r = _crudo(client, _URL_CATALOGO.format(cid) + "/learn", {"items": [item]})
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == "Hay un carácter que no se puede guardar."
+    assert _catalogo(client, cid) == []
+
+
+@pytest.mark.parametrize("campo", ["ncm", "descripcion", "origen", "pieza", "unidad"])
+def test_una_operacion_con_medio_par_da_400_y_no_queda(auth_override, client, campo):
+    cid = _crear_cliente(client)
+    item = {"pieza": "P1", **_producto("39269090", "TAPA INVENTADA VERDE"), "unidad": "UN"}
+    item[campo] += "\ud800"
+    cuerpo = json.dumps({"source": "pdf_v2", "currency": "USD",
+                         "resumen": {"items": 1, "valor_total": 100}, "items": [item]})
+    r = _operacion(client, cid, cuerpo=cuerpo)
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == "Hay un carácter que no se puede guardar."
+    assert _contar(Operation, client_id=cid) == 0
+    assert _catalogo(client, cid) == []
+
+
+@pytest.mark.parametrize("campo", ["ncm", "origen", "descripcion"])
+def test_cambiar_con_medio_par_da_400(auth_override, client, campo):
+    cid = _crear_cliente(client)
+    pid = _provisorio(client, cid)
+    antes = _catalogo(client, cid)
+    valor = {"ncm": "39269090", "origen": "BR", "descripcion": "TAPA"}[campo] + "\ud800"
+    r = _crudo(client, _URL_CATALOGO.format(cid) + f"/{pid}", {campo: valor}, metodo="put")
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == "Hay un carácter que no se puede guardar."
+    assert _catalogo(client, cid) == antes
+
+
+@pytest.mark.parametrize("cuantos, estado", [(500, 200), (501, 400)])
+def test_aprender_tiene_tope_de_500_productos(auth_override, client, cuantos, estado):
+    cid = _crear_cliente(client)
+    r = _aprender(client, cid, *[_producto("39269090", f"TAPA INVENTADA {n}") for n in range(cuantos)])
+    assert r.status_code == estado, r.text
+    if estado == 400:
+        assert r.json()["detail"] == "Son más de 500 productos: cargalos en partes."
+        assert _catalogo(client, cid) == []
+
+
+# Cambiar un producto valida igual que guardarlo.
+
+@pytest.mark.parametrize("cambios, detalle", [
+    ({"descripcion": ""}, "Falta la descripción."),
+    ({"descripcion": "  \t "}, "Falta la descripción."),
+    ({"descripcion": "\x00" * 300_000}, "Falta la descripción."),
+    ({"descripcion": "X" * 2001}, "La descripción pasa de 2000 caracteres."),
+    ({"peso_unitario_avg": "1_000"}, "El peso tiene que ser un número positivo."),
+    ({"peso_unitario_avg": "٣"}, "El peso tiene que ser un número positivo."),
+    ({"ncm": _ARABIGO}, _AVISO_DIGITOS),
+], ids=["vacia", "espacios", "nul", "larga", "guion bajo", "peso arabigo", "ncm arabigo"])
+def test_cambiar_un_producto_valida_igual_que_guardar(auth_override, client, cambios, detalle):
+    cid = _crear_cliente(client)
+    pid = _provisorio(client, cid)
+    antes = _catalogo(client, cid)
+    r = _cambiar(client, cid, pid, cambios)
+    assert r.status_code == 400, r.text
+    assert r.json()["detail"] == detalle
+    assert _catalogo(client, cid) == antes
+
+
+def test_cambiar_un_producto_guarda_la_forma_de_la_regla(auth_override, client):
+    cid = _crear_cliente(client)
+    pid = _provisorio(client, cid)
+    r = _cambiar(client, cid, pid, {"ncm": "3926.90.90.000A", "descripcion": "  TAPA   NUEVA "})
+    assert r.status_code == 200, r.text
+    assert (r.json()["producto"]["ncm"], r.json()["producto"]["descripcion"]) == ("39269090", "TAPA NUEVA")
+
+
+def test_cambiar_un_producto_a_si_mismo_no_es_un_choque(auth_override, client):
+    cid = _crear_cliente(client)
+    pid = _provisorio(client, cid)
+    [producto] = _catalogo(client, cid)
+    r = _cambiar(client, cid, pid, {"ncm": "8471.30.12", "descripcion": producto["descripcion"].lower()})
+    assert r.status_code == 200, r.text
+
+
+# Un solo borde para cada tope: el valor del borde queda afuera y avisa.
+
+def test_un_peso_por_unidad_justo_en_el_tope_marca_el_renglon(auth_override, client):
+    cid = _crear_cliente(client)
+    renglon = {**_renglon("TAPA INVENTADA VERDE", "3926.90.90"), "kilo_neto": 5e11, "cantidad": 0.5}
+    r = _guardar(client, cid, [renglon])
+    assert r.status_code == 422, r.text
+    assert r.json()["errores"][0]["problemas"] == [
+        "El peso por unidad no se puede calcular: revisá la cantidad y el kilo neto."]
+    assert _catalogo(client, cid) == []
+
+
+def test_un_producto_nuevo_no_guarda_valores_fuera_del_tope(auth_override, client):
+    """La fila nueva pasa cada valor por la misma regla que la que suma."""
+    cid = _crear_cliente(client)
+    r = _crudo(client, _URL_CATALOGO.format(cid) + "/learn", {"items": [
+        _producto("39269090", "TAPA INVENTADA VERDE", peso_unitario=1e12, valor_unitario="Infinity",
+              cantidad=-3)]})
+    assert r.status_code == 200 and r.json()["aprendidos"] == 1, r.text
+    [p] = _catalogo(client, cid)
+    assert (p["peso_unitario_avg"], p["valor_unitario_avg"], p["cantidad_avg"]) == (0.0, None, None), p
+
+
+# La base sostiene la identidad.
+
+def test_seis_guardados_a_la_vez_dejan_una_fila(auth_override, client):
+    import httpx
+    from proyecto_maria.main import app
+    cid = _crear_cliente(client)
+    cuerpo = {"renglones": [_renglon("TAPA INVENTADA VERDE", "3926.90.90")], "divisa": "USD"}
+
+    async def _todas():
+        transport = httpx.ASGITransport(app=app)
+        async with httpx.AsyncClient(transport=transport, base_url="http://t") as c:
+            return await asyncio.gather(*[
+                c.post(f"/api/clientes/{cid}/catalogo/despacho/guardar", json=cuerpo) for _ in range(6)])
+    respuestas = asyncio.run(_todas())
+    assert [r.status_code for r in respuestas] == [200] * 6, [r.text for r in respuestas]
+    assert [p["veces_usado"] for p in _catalogo(client, cid)] == [6]
+
+
+def _base_vieja(tmp_path, filas):
+    """Una base SQLite con la tabla de antes (sin `clave`) y estas filas."""
+    import sqlite3
+    ruta = tmp_path / "vieja.db"
+    con = sqlite3.connect(ruta)
+    con.execute("""CREATE TABLE client_product_history (
+        id VARCHAR(36) PRIMARY KEY, owner_username VARCHAR(50), client_id VARCHAR(36) NOT NULL,
+        ncm VARCHAR(10) NOT NULL, descripcion TEXT NOT NULL, descripcion_normalizada VARCHAR(200),
+        peso_unitario_avg FLOAT, origen_frecuente VARCHAR(3), valor_unitario_avg FLOAT,
+        cantidad_avg FLOAT, veces_peso INTEGER, veces_valor INTEGER, veces_cantidad INTEGER,
+        veces_usado INTEGER, primera_vez DATETIME, ultima_vez DATETIME)""")
+    for f in filas:
+        con.execute("INSERT INTO client_product_history VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
+            f["id"], "dueno", "c1", f["ncm"], f["descripcion"], "", f.get("peso", 0.0), f.get("origen", "BR"),
+            f.get("valor"), None, f.get("veces_peso"), f.get("veces_valor"), None, f["veces"],
+            f["primera"], f["ultima"]))
+    con.commit()
+    con.close()
+    return ruta
+
+
+def _correr_migracion(monkeypatch, ruta):
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from proyecto_maria.database import connection
+    from proyecto_maria.main import _migrate_product_history_clave
+    motor = create_async_engine(f"sqlite+aiosqlite:///{ruta}")
+    monkeypatch.setattr(connection, "engine", motor)
+    monkeypatch.setattr(connection, "IS_SQLITE", True)
+    try:
+        asyncio.run(_migrate_product_history_clave())
+    finally:
+        asyncio.run(motor.dispose())
+
+
+def _filas(ruta):
+    import sqlite3
+    con = sqlite3.connect(ruta)
+    con.row_factory = sqlite3.Row
+    filas = [dict(f) for f in con.execute("SELECT * FROM client_product_history ORDER BY id")]
+    con.close()
+    return filas
+
+
+def test_la_migracion_une_los_duplicados_y_es_idempotente(monkeypatch, tmp_path):
+    ruta = _base_vieja(tmp_path, [
+        {"id": "a", "ncm": "3926.90.90", "descripcion": "TAPA INVENTADA", "peso": 1.0, "veces_peso": 1,
+         "valor": 2.0, "veces_valor": 2, "veces": 2, "primera": "2026-01-01 00:00:00",
+         "ultima": "2026-02-01 00:00:00", "origen": "CN"},
+        {"id": "b", "ncm": "39269090", "descripcion": "tapa  inventada", "peso": 4.0, "veces_peso": 3,
+         "valor": None, "veces_valor": 0, "veces": 3, "primera": "2026-01-15 00:00:00",
+         "ultima": "2026-03-01 00:00:00", "origen": "BR"},
+        {"id": "c", "ncm": "39269090", "descripcion": "TAPA DISTINTA", "veces": 1,
+         "primera": "2026-01-01 00:00:00", "ultima": "2026-01-01 00:00:00"},
+        {"id": "d", "ncm": "P1", "descripcion": "NO ES UN NCM", "veces": 1,
+         "primera": "2026-01-01 00:00:00", "ultima": "2026-01-01 00:00:00"},
+    ])
+    _correr_migracion(monkeypatch, ruta)
+    filas = {f["id"]: f for f in _filas(ruta)}
+    assert set(filas) == {"b", "c", "d"}, filas  # queda la más reciente
+    b = filas["b"]
+    assert (b["veces_usado"], b["veces_peso"], b["peso_unitario_avg"]) == (5, 4, 3.25)
+    assert (b["veces_valor"], b["valor_unitario_avg"], b["origen_frecuente"]) == (2, 2.0, "BR")
+    assert (b["primera_vez"], b["ultima_vez"]) == ("2026-01-01 00:00:00", "2026-03-01 00:00:00")
+    assert b["clave"] and filas["c"]["clave"] and b["clave"] != filas["c"]["clave"]
+    assert filas["d"]["clave"] is None  # lo que no es un producto no tiene clave
+    _correr_migracion(monkeypatch, ruta)
+    assert _filas(ruta) == list(sorted(filas.values(), key=lambda f: f["id"]))
+    import sqlite3
+    con = sqlite3.connect(ruta)
+    with pytest.raises(sqlite3.IntegrityError):
+        con.execute("INSERT INTO client_product_history (id, owner_username, client_id, ncm, descripcion, clave)"
+                    " VALUES ('e', 'dueno', 'c1', '39269090', 'TAPA INVENTADA', ?)", (b["clave"],))
+    con.close()
+
+
+def test_la_migracion_que_falla_no_sigue_callada(monkeypatch, tmp_path):
+    import sqlite3
+    ruta = tmp_path / "rota.db"
+    # Una tabla a la que le falta una columna que la migración lee.
+    con = sqlite3.connect(ruta)
+    con.execute("CREATE TABLE client_product_history (id VARCHAR(36) PRIMARY KEY, ncm VARCHAR(10))")
+    con.execute("INSERT INTO client_product_history VALUES ('a', '39269090')")
+    con.commit()
+    con.close()
+    with pytest.raises(Exception):
+        _correr_migracion(monkeypatch, ruta)
+
+
+# El tope de CPU cubre el proceso que lee entero.
+
+@solo_linux
+def test_el_tope_de_cpu_cubre_entender_el_texto():
+    """200 hojas de 33 KB que comparten 500 renglones de rótulos: extraer el
+    texto cabe en el tope, entenderlo no. Antes, con 2 s de tope, el proceso
+    que lee gastaba más de 9 s."""
+    medido = _medir_aparte("parseo_caro", 200, 500, entorno={"LIMITE_CPU": "2"})
+    assert "resultado" in medido, medido
+    assert medido["lector_cpu_s"] < 3.5, medido
+    assert medido["resultado"]["renglones"] == []
+    assert any(a.startswith("El PDF da demasiado trabajo") for a in medido["resultado"]["avisos"]), medido
+
+
+def test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado():
+    from proyecto_maria.core.despacho_lector import AVISO_SIN_TEXTO, leer_despacho
+    from tests.pdf_bombas import una_hoja_cara
+    r = leer_despacho(una_hoja_cara(80), limite_cpu_s=0.05)
+    assert r["sin_texto"] is False, r
+    assert AVISO_SIN_TEXTO not in r["avisos"]
+    assert r["avisos"] == ["El PDF da demasiado trabajo: leí hasta la hoja 0."], r
