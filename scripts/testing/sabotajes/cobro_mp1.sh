@@ -414,6 +414,14 @@ else
     "if (ev.persisted) window.location.reload();" \
     "" \
     "FALLA: volver de Mercado Pago con «Atrás» no recarga la página"
+  sabotaje $APP "D: otro botón pide un segundo checkout mientras hay uno en curso" \
+    "        if (checkoutEnCurso) return false;" \
+    "" \
+    "FALLA: «Activar plan ahora» y después «Activar plan» pidieron 2 checkouts"
+  sabotaje $APP "D: un checkout fallido deja trabados los demás" \
+    "        checkoutEnCurso = false;" \
+    "" \
+    "FALLA: «Activar plan»: el navegador no va a Mercado Pago"
 fi
 
 echo "sabotajes con falla: $FALLAS"
