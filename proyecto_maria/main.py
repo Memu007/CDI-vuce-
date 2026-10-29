@@ -7743,21 +7743,17 @@ async def save_client_operation(
             desc_raw = str(item.get("descripcion") or "").strip()
             if not ncm_raw or not desc_raw:
                 continue
-            try:
-                campos = dict(
-                    owner_username=username,
-                    client_id=client_id,
-                    ncm=ncm_raw,
-                    descripcion=desc_raw,
-                    origen=str(item.get("origen") or "").strip() or None,
-                    valor_unitario=float(item.get("valor_unitario") or 0) or None,
-                    cantidad=float(item.get("cantidad") or 0) or None,
-                    peso_unitario=float(item.get("peso_unitario") or 0) or None,
-                )
-            except (TypeError, ValueError):
-                historial_guardado = False
-                continue
-            productos.append(campos)
+            # Los números van crudos: el historial decide cuáles entran.
+            productos.append(dict(
+                owner_username=username,
+                client_id=client_id,
+                ncm=ncm_raw,
+                descripcion=desc_raw,
+                origen=str(item.get("origen") or "").strip() or None,
+                valor_unitario=item.get("valor_unitario"),
+                cantidad=item.get("cantidad"),
+                peso_unitario=item.get("peso_unitario"),
+            ))
         for campos in sorted(productos, key=orden_de_escritura):
             if not await _historial_de_un_producto(db, upsert_client_product_history, **campos):
                 historial_guardado = False
@@ -8326,20 +8322,24 @@ async def learn_client_catalogo_productos(
         desc = str(item.get("descripcion") or "").strip()
         if not ncm or not desc:
             continue
-        try:
-            campos = dict(
-                owner_username=username,
-                client_id=client_id,
-                ncm=ncm,
-                descripcion=desc,
-                origen=str(item.get("origen") or "").strip() or None,
-                valor_unitario=float(item.get("valor_unitario") or 0) or None,
-                cantidad=float(item.get("cantidad") or 0) or None,
-                peso_unitario=float(item.get("peso_unitario") or 0) or None,
-            )
+        numeros = [item.get(campo) for campo in ("valor_unitario", "cantidad", "peso_unitario")]
+        try:  # lo que no es un número deja afuera al producto
+            for numero in numeros:
+                float(numero or 0)
         except (TypeError, ValueError, OverflowError):  # 10**400 no entra en un float
             continue
-        productos.append(campos)
+        # Van crudos: «1_000» pasa por float() pero el historial no lo toma.
+        valor, cantidad, peso = numeros
+        productos.append(dict(
+            owner_username=username,
+            client_id=client_id,
+            ncm=ncm,
+            descripcion=desc,
+            origen=str(item.get("origen") or "").strip() or None,
+            valor_unitario=valor,
+            cantidad=cantidad,
+            peso_unitario=peso,
+        ))
 
     updated = 0
     for campos in sorted(productos, key=orden_de_escritura):
