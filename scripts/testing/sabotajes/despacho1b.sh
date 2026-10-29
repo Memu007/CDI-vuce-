@@ -780,16 +780,22 @@ no_debe "el PUT guarda el origen vacío" "$ULTIMA" "$MAY[minusculas]"
 # Code-review sobre 0c3a059: el origen es texto y ASCII en guardar y en el PUT.
 TODO_O_NADA=test_guardar_es_todo_o_nada
 sabotaje "el origen sin isascii" "$LECTOR" \
-  'origen.isascii() and ' \
+  'escrito.isascii() and ' \
   '' \
-  "$TODO_O_NADA[cambio5-No reconozco el origen]" "$TODO_O_NADA[cambio6-No reconozco el origen]" \
-  "$ORI[ancho completo]" "$ORI[acento]"
+  "$TODO_O_NADA[ancho completo]" "$TODO_O_NADA[acento]" "$TODO_O_NADA[i sin punto]" \
+  "$ORI[ancho completo]" "$ORI[acento]" "$ORI[i sin punto]"
+sabotaje "el origen se mira en mayúsculas" "$LECTOR" \
+  '    escrito = (valor or "").strip()
+' \
+  '    escrito = (valor or "").strip().upper()
+' \
+  "$TODO_O_NADA[i sin punto]" "$ORI[nombre]" "$ORI[i sin punto]" "$ORI[ese aguda]"
 sabotaje "el origen que no es texto" "$LECTOR" \
   '    if not isinstance(valor, (str, type(None))):
         return None, "El origen tiene que ser el código de dos letras."
 ' \
   '' \
-  "$ORI[lista]" "$ORI[numero]"
+  "$TODO_O_NADA[origen numero]" "$ORI[lista]" "$ORI[numero]"
 
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
