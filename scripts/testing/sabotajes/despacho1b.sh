@@ -695,13 +695,46 @@ sabotaje "operación sin revisar objetos" proyecto_maria/main.py \
 ' \
   '' \
   "$OBJ[numero]" "$OBJ[texto]" "$OBJ[nulo]" "$OBJ[lista]" \
-  "$OBJ[items texto]" "$OBJ[items objeto]" "$OBJ[cuerpo lista]"
+  "$OBJ[items texto]" "$OBJ[items objeto]" \
+  "$OBJ[items objeto vacio]" "$OBJ[items cero]" "$OBJ[items texto vacio]"
 no_debe "operación sin revisar objetos" "$ULTIMA" "test_aprender_un_item_que_no_es_un_objeto_da_400"
 sabotaje "operación revisa sólo la lista" proyecto_maria/main.py \
   'not isinstance(items, list) or not all(isinstance(item, dict) for item in items)' \
   'not isinstance(items, list)' \
   "$OBJ[numero]" "$OBJ[texto]" "$OBJ[nulo]" "$OBJ[lista]"
 no_debe "operación revisa sólo la lista" "$ULTIMA" "$OBJ[items texto]" "$OBJ[cuerpo lista]"
+sabotaje "operación con un cuerpo que no es objeto" proyecto_maria/main.py \
+  '        if not isinstance(data, dict):
+            raise HTTPException(status_code=400, detail=_AVISO_NO_ES_OBJETO)
+        # Faltar' \
+  '        # Faltar' \
+  "$OBJ[cuerpo lista]"
+sabotaje "operación con ítems vacíos de otro tipo" proyecto_maria/main.py \
+  '        items = data.get("items")
+        items = [] if items is None else items
+' \
+  '        items = data.get("items") or []
+' \
+  "$OBJ[items objeto vacio]" "$OBJ[items cero]" "$OBJ[items texto vacio]"
+no_debe "operación con ítems vacíos de otro tipo" "$ULTIMA" "$OBJ[numero]"
+VACIA=test_una_operacion_sin_productos_ni_resumen_se_guarda_vacia
+sabotaje "operación sin ítems no es vacía" proyecto_maria/main.py \
+  '        items = [] if items is None else items
+' \
+  '' \
+  "$VACIA[sin nada]" "$VACIA[nulos]"
+sabotaje "operación sin resumen no es vacía" proyecto_maria/main.py \
+  '        resumen = {} if resumen is None else resumen
+' \
+  '' \
+  "$VACIA[sin nada]" "$VACIA[nulos]"
+RES=test_una_operacion_con_un_resumen_que_no_es_un_objeto_da_400
+sabotaje "operación sin revisar el resumen" proyecto_maria/main.py \
+  '        if not isinstance(resumen, dict):
+            raise HTTPException(status_code=400, detail="El resumen tiene que ser un objeto.")
+' \
+  '' \
+  "$RES[lista]" "$RES[texto]" "$RES[numero]"
 sabotaje "confirmar sin medio par" proyecto_maria/main.py \
   '    # Lo que la base no puede guardar se rechaza antes de sumar el uso.
     if tiene_medio_par(data):' \
@@ -744,6 +777,19 @@ sabotaje "el PUT guarda el origen vacío" proyecto_maria/main.py \
   'row.origen_frecuente = origen' \
   "$MAY[vacio]" "$MAY[nulo]"
 no_debe "el PUT guarda el origen vacío" "$ULTIMA" "$MAY[minusculas]"
+# Code-review sobre 0c3a059: el origen es texto y ASCII en guardar y en el PUT.
+TODO_O_NADA=test_guardar_es_todo_o_nada
+sabotaje "el origen sin isascii" "$LECTOR" \
+  'origen.isascii() and ' \
+  '' \
+  "$TODO_O_NADA[cambio5-No reconozco el origen]" "$TODO_O_NADA[cambio6-No reconozco el origen]" \
+  "$ORI[ancho completo]" "$ORI[acento]"
+sabotaje "el origen que no es texto" "$LECTOR" \
+  '    if not isinstance(valor, (str, type(None))):
+        return None, "El origen tiene que ser el código de dos letras."
+' \
+  '' \
+  "$ORI[lista]" "$ORI[numero]"
 
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
