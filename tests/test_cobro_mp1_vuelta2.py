@@ -196,6 +196,21 @@ def test_un_cobro_con_su_pago_y_sin_suscripcion_legible_queda_rechazado(client, 
     assert _leer_pago(pid).get("estado") == "rechazado", _leer_pago(pid)
 
 
+@pytest.mark.parametrize("suscripcion", ["../v1/payments/1", {"id": "x"}], ids=["con_ruta", "no_es_texto"])
+def test_una_renovacion_sin_referencia_y_con_un_id_de_suscripcion_que_no_sirve_queda_rechazada(client, suscripcion):
+    """Sin referencia en el pago, la suscripción del cobro se pediría a
+    Mercado Pago: si no es un id, no se pide y queda rechazado."""
+    usuario = _unique("v2_rsid")
+    _register(client, usuario)
+    _vencida(usuario)
+    cobro, pid = _renovacion(usuario)
+    COBROS[cobro]["preapproval_id"] = suscripcion
+    r = _aviso_cobro(client, cobro)
+    assert r.status_code == 200, r.text[:300]
+    assert _get_user(usuario)["billing_status"] == "past_due"
+    assert _leer_pago(pid).get("estado") == "rechazado", _leer_pago(pid)
+
+
 @pytest.mark.parametrize("donde,valor", [
     ("metadata", "../v1/payments/1"),
     ("metadata", {"id": "x"}),
