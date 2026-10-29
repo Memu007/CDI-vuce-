@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-10-29 · feat: video de presentación con pantallas reales
 
-- **feat(marketing):** `proyecto_maria/static/v2/media/cdi-presentacion.mp4` (21 s, 1080p, sin audio) muestra el recorrido real Excel → Revisar → NCM → Validar → MARIA.TXT con datos ficticios. Se regenera con `./scripts/video/build.sh`. No está embebido en la landing todavía.
+- **feat(marketing):** `proyecto_maria/static/v2/media/cdi-presentacion.mp4` (40 s, 1080p, sin audio) muestra con datos ficticios el recorrido real Excel → Revisar → NCM → Validar → MARIA.TXT y después el tablero de operaciones, la ficha del cliente (historial, CSV, plantilla Excel), los catálogos de columnas y productos editables y «Traer mis clientes». `cdi-presentacion-corto.mp4` (22 s) tiene sólo los 5 pasos. Se regeneran con `./scripts/video/build.sh`. No están embebidos en la landing todavía.
 
 ## 2026-10-24 · feat: alta de cliente con lo que pide el MARIA (CLIENTE-1)
 
