@@ -421,7 +421,7 @@ else
   sabotaje $APP "D: un checkout fallido deja trabados los demás" \
     "        checkoutEnCurso = false;" \
     "" \
-    "FALLA: «Activar plan»: el navegador no va a Mercado Pago"
+    "FALLA: después de un checkout fallido, «Activar plan» no vuelve a pedirlo"
 fi
 
 echo "sabotajes con falla: $FALLAS"

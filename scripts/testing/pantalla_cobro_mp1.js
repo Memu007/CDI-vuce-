@@ -121,6 +121,15 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   if (pedidos.length !== 1) falla('dos clics en «Activar plan» pidieron ' + pedidos.length + ' checkouts');
   console.log('OK | dos clics en «Activar plan»: un checkout, botón deshabilitado mientras espera');
 
+  // Después del error, sin recargar la página, otro clic vuelve a pedir el
+  // checkout: el que falló no deja trabados a los demás botones.
+  await Promise.all([
+    page.waitForRequest('**/api/billing/checkout', { timeout: 5000 })
+      .catch(() => falla('después de un checkout fallido, «Activar plan» no vuelve a pedirlo')),
+    activar.click(),
+  ]);
+  console.log('OK | después de un checkout fallido, «Activar plan» vuelve a pedirlo');
+
   // Con el checkout creado, el botón queda deshabilitado mientras el navegador
   // va a Mercado Pago: otro clic pediría un segundo checkout, que cancela la
   // suscripción adonde está yendo. Vale para los tres botones que lo piden.
