@@ -312,3 +312,11 @@ tranqui. Si se estira un poquito más, no hay problema… pero que no se salten
 nada. Prioridad es tener un código que se sienta hecho por un senior».
 Queda escrito arriba de `PARA-DEV.md` y `PARA-DEV-2.md` («Ritmo y calidad»).
 Las fechas se re-estiman después de la primera sesión con el despachante.
+
+## 2026-10-29 — Pausa hasta el domingo 1/11 (Emi)
+
+Emi, 29/10 a la mañana: «frenamos hasta el domingo con el proyecto». Las
+rutinas de la PM principal y de las dos Devs quedan apagadas. Cada Dev frena
+ya: corta lo que corre en segundo plano y sube lo que tenga a medias como
+trabajo en curso, sin entregar. La PM no revisa hasta retomar. Se retoma
+cuando Emi lo diga, prendiendo las rutinas con `update_trigger`.
