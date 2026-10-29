@@ -700,8 +700,10 @@ def test_leer_un_cobro_pide_su_ruta_con_el_token(monkeypatch):
 
 
 def _contesta_500(request):
+    """Un 500 con el cobro bueno en el cuerpo: si no se mirara el estado, se
+    aplicaría."""
     import httpx
-    return httpx.Response(500, json={})
+    return httpx.Response(500, json=COBROS[request.url.path.rsplit("/", 1)[-1]])
 
 
 def _sin_conexion(request):
