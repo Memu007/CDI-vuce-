@@ -12,10 +12,13 @@ Comprueba, con Mercado Pago simulado:
    de otro tipo, con NUL o con un surrogate suelto) no da 500: el pago queda
    aplicado o rechazado (vuelta 2, b).
 
-Para que la carrera pase de verdad, el primer aviso que lee la cuenta espera
-a ver al otro: o el otro también la leyó (no hubo candado) o Postgres lo
-muestra esperando un lock (pg_stat_activity). Si no ve ninguna de las dos en
-5 s, el caso no probó la carrera y falla.
+Para que la carrera pase de verdad, el primer aviso que busca su pago en
+mp_pagos_aplicados espera a ver al otro: o el otro también lo buscó (no hubo
+candado sobre la cuenta) o Postgres lo muestra esperando un lock
+(pg_stat_activity). Esperar ahí, y no al leer la cuenta, deja a los dos con
+la búsqueda hecha y ninguno guardado: sin candado, la única que puede frenar
+el mismo pago dos veces es la clave primaria (D14). Si no ve ninguna de las
+dos en 5 s, el caso no probó la carrera y falla.
 
 uso (con un Postgres local y descartable, nunca el de producción):
   python scripts/testing/cobro_mp1_postgres.py postgresql://cdi@127.0.0.1:55432/cdi_prueba
@@ -103,10 +106,10 @@ def extra(usuario):
     return sql("select coalesce(extra_ops_remaining, 0) from users where username=%s", usuario)[0][0]
 
 
-# Dentro del aviso, el primero que lee la cuenta espera a ver al otro.
+# Dentro del aviso, el primero que busca su pago ya anotado espera a ver al otro.
 LLEGADAS = []
 VISTO = []
-_execute_original = AsyncSession.execute
+_get_original = AsyncSession.get
 
 
 def _en_el_aviso():
@@ -130,18 +133,16 @@ async def _esperar_al_otro():
     VISTO.append("nada")
 
 
-async def _execute_con_carrera(self, statement, *args, **kwargs):
-    resultado = await _execute_original(self, statement, *args, **kwargs)
-    tabla = getattr(getattr(statement, "column_descriptions", [{}])[0].get("entity"), "__tablename__", None) \
-        if getattr(statement, "is_select", False) else None
-    if tabla in ("users", "organizations") and _en_el_aviso():
+async def _get_con_carrera(self, entidad, *args, **kwargs):
+    resultado = await _get_original(self, entidad, *args, **kwargs)
+    if getattr(entidad, "__tablename__", None) == "mp_pagos_aplicados" and _en_el_aviso():
         LLEGADAS.append(1)
         if len(LLEGADAS) == 1:
             await _esperar_al_otro()
     return resultado
 
 
-AsyncSession.execute = _execute_con_carrera
+AsyncSession.get = _get_con_carrera
 
 
 def ipn(pid):

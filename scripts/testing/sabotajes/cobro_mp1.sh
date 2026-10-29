@@ -67,7 +67,7 @@ sabotaje() {
   elif grep -qF -- "$esperado" <<<"$salida"; then
     echo "ROJO  | $nombre: dice «$esperado»"
   else
-    echo "ROJO? | $nombre: rojo (salida $codigo), pero sin «$esperado»"; grep -E "^(E |FAILED)" <<<"$salida" | head -5; FALLAS=$((FALLAS+1))
+    echo "ROJO? | $nombre: rojo (salida $codigo), pero sin «$esperado»"; grep -E "^(E |FAILED|FALLA)" <<<"$salida" | head -5; FALLAS=$((FALLAS+1))
   fi
 }
 
@@ -81,7 +81,7 @@ sin_rojo() {
   if salida="$(correr)"; then
     echo "VERDE | $nombre: sigue en verde, como tiene que ser ($(tail -1 <<<"$salida"))"
   else
-    echo "ROJO! | $nombre: se puso rojo y no tenía que"; grep -E "^(E |FAILED)" <<<"$salida" | head -5; FALLAS=$((FALLAS+1))
+    echo "ROJO! | $nombre: se puso rojo y no tenía que"; grep -E "^(E |FAILED|FALLA)" <<<"$salida" | head -5; FALLAS=$((FALLAS+1))
   fi
 }
 
@@ -406,7 +406,7 @@ sabotaje $M "g: la exportación usa el prefijo de la importación" \
 sabotaje $M "g: un id largo de la exportación no se reconoce" \
   '_ARCHIVO_MARIA = re.compile(r"MARIA(?:_|-EXPORT_)[A-Za-z0-9_-]{1,50}\.TXT")' \
   '_ARCHIVO_MARIA = re.compile(r"MARIA_[A-Za-z0-9_-]{1,50}\.TXT")' \
-  "volver a exportar el mismo id largo cuenta otra vez"
+  "guardar la exportación de id largo cuenta otra vez"
 
 # C y E: cancelar desde past_due y reactivar una prueba con recarga.
 T=tests/test_cobro_mp1_cde.py
