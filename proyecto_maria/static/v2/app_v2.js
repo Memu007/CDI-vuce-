@@ -793,9 +793,10 @@
     /* ---------- 10. Bootstrap ---------- */
     // Si la persona ya tocó la pestaña (un clic, una tecla, soltar un
     // archivo), la recuperación tardía no la cambia: puede tener abierto el
-    // diálogo de archivos o haber elegido algo.
+    // diálogo de archivos o haber elegido algo. 'click' cubre la activación
+    // sin puntero (tecnología asistiva o programática).
     let pestanaTocada = false;
-    ['pointerdown', 'keydown', 'drop'].forEach(ev =>
+    ['pointerdown', 'click', 'keydown', 'drop'].forEach(ev =>
         document.addEventListener(ev, () => { pestanaTocada = true; }, true));
     document.addEventListener('DOMContentLoaded', () => {
         try { localStorage.removeItem(CLIENTE_KEY); } catch (_) {}
@@ -1055,13 +1056,16 @@
         if (parsed.user !== user) return null;
         const state = parsed.state;
         if (!state || !Array.isArray(state.items) || state.items.length === 0) return null;
-        return { clave, savedAt, closed: !!parsed.closed, state };
+        return { clave, user: parsed.user, savedAt, closed: !!parsed.closed, state };
     }
 
     // Si el navegador no tiene lugar, el borrador queda donde estaba y se avisa.
+    // Si la sesión cambió desde que se buscó (mientras se miraba si la pestaña
+    // anterior vive o llegaba el usuario), no se toca: puede ser de otro.
     function adoptarBorrador(b) {
+        if (usuarioActual() !== b.user) return null;
         try {
-            localStorage.setItem(claveBorrador, JSON.stringify({ v: 1, user: usuarioActual(), savedAt: Date.now(), closed: false, state: b.state }));
+            localStorage.setItem(claveBorrador, JSON.stringify({ v: 1, user: b.user, savedAt: Date.now(), closed: false, state: b.state }));
         } catch (_) {
             avisarBorrador('lleno', 'El navegador no tiene lugar para recuperar la operación guardada: liberá espacio y recargá la página.');
             return null;

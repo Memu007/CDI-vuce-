@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-29 · fix: una pestaña duplicada no pierde la operación de otra si cambia la sesión (ORDEN-1, vuelta 3)
+
+- **fix(orden):** si mientras una pestaña busca la operación que dejaste entra otro usuario, se cierra la sesión o volvés a entrar, ya no se la muestra al otro usuario ni la deja sin dueño: queda guardada a tu nombre.
+- Un clic sin mouse (con el teclado o un lector de pantalla) también cuenta como tocar la pestaña: la operación de antes de recargar no la pisa.
+
 ## 2026-10-28 · fix: una cuenta cancelada que reabrió el checkout puede cancelar la suscripción nueva (COBRO-MP-1)
 
 - **fix(cobro):** si reactivó un plan pagado, abrió el checkout y el primer cobro no entró, «Cancelar plan» vuelve a aparecer y cancela en Mercado Pago la suscripción nueva; antes daba 409 y la suscripción seguía viva.
