@@ -9,7 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-10-29 · fix: un producto es una sola fila en el catálogo del cliente (DESPACHO-1b, vuelta 4)
 
 - Aprender, cargar una operación, guardar un despacho, cambiar un producto y confirmar un NCM usan la misma regla: NCM de 8 dígitos y la descripción sin mirar mayúsculas, espacios ni forma Unicode. La base no deja dos filas iguales y el arranque une las que ya estaban repetidas.
-- Un NCM con dígitos arábigos o de ancho completo, un carácter que no se puede guardar o un ítem que no es un producto da 400; cambiar un producto para que quede igual a otro da 409; aprender acepta hasta 500 productos.
+- Un NCM con dígitos arábigos o de ancho completo, un carácter que no se puede guardar o un ítem que no es un producto da 400; cambiar un producto para que quede igual a otro da 409; aprender acepta hasta 500 productos. Un peso o valor de 1e12 o más, o escrito como «1_000» o «٣», no entra en el promedio; al guardar un despacho, el renglón vuelve marcado con el motivo.
 - El tope de CPU del despacho cubre leer y entender el texto, y vuelve a cortar si el primer corte se pierde.
 
 ## 2026-10-28 · fix: un PDF armado no infla la app al subirlo (RENDIMIENTO-1c)
