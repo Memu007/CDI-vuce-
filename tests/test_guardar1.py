@@ -13,7 +13,7 @@ import pytest
 from tests.test_prelaunch_block2 import _register, _unique, client  # noqa: F401
 from proyecto_maria.database.connection import get_async_session
 from proyecto_maria.services.client_memory import (
-    NCM_HISTORIAL_MAX, lookup_client_memory, ncm_para_historial,
+    lookup_client_memory, ncm_para_historial,
 )
 
 SIM = "84714900100D"
@@ -22,7 +22,7 @@ SIM = "84714900100D"
 @pytest.mark.parametrize("entra, sale", [
     (SIM, "84714900"),
     ("8471.49.00.100D", "84714900"),
-    ("8471.49.00", "8471.49.00"),
+    ("8471.49.00", "84714900"),
     ("84714900", "84714900"),
     ("  84714900  ", "84714900"),
     ("ABCDEFGHIJKLMN", None),
@@ -31,7 +31,7 @@ SIM = "84714900100D"
 ])
 def test_la_forma_del_ncm_que_guarda_el_historial(entra, sale):
     assert ncm_para_historial(entra) == sale
-    assert sale is None or len(sale) <= NCM_HISTORIAL_MAX
+    assert sale is None or len(sale) == 8
 
 
 def _sql(consulta, **params):
@@ -69,7 +69,7 @@ def test_guardar_con_la_sim_completa_deja_el_ncm_en_el_historial(client):
     piezas = sorted(p for (p,) in _sql("select pieza from operation_items where operation_id=:o",
                                        o=r.json()["operation_id"]))
     assert piezas == ["8471.30.12", SIM]
-    assert _historial(cid) == {"COMPUTADORA PORTATIL": "84714900", "TABLETA": "8471.30.12"}
+    assert _historial(cid) == {"COMPUTADORA PORTATIL": "84714900", "TABLETA": "84713012"}
 
 
 def test_la_sugerencia_del_cliente_devuelve_el_ncm_de_la_sim(client):

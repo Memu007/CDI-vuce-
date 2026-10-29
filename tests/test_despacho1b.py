@@ -1307,6 +1307,8 @@ def test_un_infinito_guardado_antes_no_rompe_el_catalogo_y_se_arregla(auth_overr
                 origen_frecuente="BR", valor_unitario_avg=float("inf"), veces_usado=4))
             await s.commit()
     asyncio.run(meter())
+    from proyecto_maria.main import _migrate_product_history_clave
+    asyncio.run(_migrate_product_history_clave())  # el arranque le pone la clave a la fila vieja
     [producto] = _catalogo(client, cid)
     assert (producto["peso_unitario_avg"], producto["valor_unitario_avg"]) == (None, None), producto
     r = client.post(f"/api/clientes/{cid}/catalogo/productos/learn", json={"items": [
@@ -1529,8 +1531,12 @@ def _por_cambio(client, cid, ncm, descripcion):
     return _cambiar(client, cid, _provisorio(client, cid), {"ncm": ncm, "descripcion": descripcion})
 
 
+def _por_guardar_uso(client, cid, ncm, descripcion):
+    return client.post("/api/ncm/guardar-uso", json={"descripcion": descripcion, "ncm": ncm, "client_id": cid})
+
+
 _VIAS = {"aprender": _por_aprender, "operacion": _por_operacion,
-         "guardar": _por_guardar, "cambio": _por_cambio}
+         "guardar": _por_guardar, "cambio": _por_cambio, "guardar-uso": _por_guardar_uso}
 
 
 @pytest.mark.parametrize("primera, segunda", [(a, b) for a in _VIAS for b in _VIAS])
@@ -1901,3 +1907,25 @@ def test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado():
     assert r["sin_texto"] is False, r
     assert AVISO_SIN_TEXTO not in r["avisos"]
     assert r["avisos"] == ["El PDF da demasiado trabajo: leí hasta la hoja 0."], r
+
+
+def test_un_corte_por_cpu_que_se_traga_un_finalizador_vuelve_a_cortar():
+    # Si la señal cae dentro de un callback de weakref, Python ignora la
+    # excepción: con un solo disparo, la hoja se leía sin tope.
+    import time
+    from proyecto_maria.core.despacho_lector import _DemasiadoTrabajo, _tope_de_cpu
+    cortes = 0
+    inicio = time.process_time()
+    try:
+        with _tope_de_cpu(0.02):
+            while time.process_time() - inicio < 2:
+                try:
+                    sum(range(10_000))
+                except _DemasiadoTrabajo:
+                    if cortes:
+                        raise
+                    cortes += 1  # el que se tragó el finalizador
+    except _DemasiadoTrabajo:
+        cortes += 1
+    assert cortes == 2, cortes
+    assert time.process_time() - inicio < 1
