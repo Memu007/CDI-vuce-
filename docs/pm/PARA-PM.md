@@ -330,3 +330,5 @@ authorized vieja en cuenta no vigente), sin entregar hasta el veredicto de
 la vuelta 2; lo que pida ahí se suma a esta vuelta. Después CORTE-1, MP-2
 (suma la cancelación de organizaciones), AIS2, LIM, BACKUP-1a y EXCEL-2c.
 Nada se publica sin el «dale» de Emi; nunca main.
+
+**Pausa del 2026-10-29 (Emi frena hasta el 1/11), sin entregar:** COBRO-MP-1 vuelta 3 quedó en f56f830 (producto 8eba7ca; pruebas 24dc074, 9f12789, 054c8fa, f56f830). `/code-review high` hecho y `/security-review` sin hallazgos. Corté a mitad los sabotajes, la suite y el adversario Sonnet alto: al retomar se corren de nuevo, después PG16 y el informe.
