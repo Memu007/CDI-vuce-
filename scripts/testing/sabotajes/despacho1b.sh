@@ -226,8 +226,7 @@ sabotaje "la clave sin el NCM" proyecto_maria/services/client_memory.py \
   'f"{misma}"' \
   "test_guardar_no_funde_productos_con_ncm_distinto" \
   "test_guardar_no_toca_un_producto_que_ya_estaba_con_otro_ncm" \
-  "test_guardar_no_funde_descripciones_casi_iguales_con_ncm_distinto[tipo a y tipo b]" \
-  "test_guardar_no_funde_descripciones_casi_iguales_con_ncm_distinto[mismo texto largo adelante]"
+  "test_aprender_con_puntos_suma_al_producto_del_despacho_y_no_a_otro"
 no_debe "la clave sin el NCM" "$ULTIMA" "test_guardar_con_el_mismo_ncm_sigue_sumando"
 
 # Lo que encontró el adversario: dos lecturas que daban 500.
@@ -628,6 +627,22 @@ sabotaje "un corte por CPU parece escaneado" "$LECTOR" \
         salteadas = True' \
   '        avisos.append(f"El PDF da demasiado trabajo: leí hasta la hoja {len(textos)}.")' \
   "test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado"
+sabotaje "extraer se lleva el tope entero" "$LECTOR" \
+  "_hojas_del_pdf(data, limite_cpu_s * _PARTE_PARA_EXTRAER)" \
+  "_hojas_del_pdf(data, limite_cpu_s)" \
+  "test_las_hojas_leidas_antes_del_corte_dan_sus_productos"
+no_debe "extraer se lleva el tope entero" "$ULTIMA" "test_el_tope_de_cpu_cubre_entender_el_texto"
+
+# Vuelta 4, autorrevisión: el largo se mide como se guarda y la respuesta de
+# la operación dice si quedó algo sin guardar.
+sabotaje "el largo se mide antes de NFC" "$LECTOR" \
+  'elif len(unicodedata.normalize("NFC", descripcion)) > _MAX_DESCRIPCION:' \
+  'elif len(descripcion) > _MAX_DESCRIPCION:' \
+  "test_guardar_una_descripcion_que_crece_al_normalizar_da_422"
+sabotaje "la operación no avisa lo que no guardó" proyecto_maria/main.py \
+  "            if not await _historial_de_un_producto(db, upsert_client_product_history, **campos):" \
+  "            if await _historial_de_un_producto(db, upsert_client_product_history, **campos) is None:" \
+  "test_una_operacion_con_un_producto_que_no_se_guarda_lo_dice"
 
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
