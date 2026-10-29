@@ -127,10 +127,10 @@ async function duplicar(ctx, id, lenta) {
   await p.addInitScript(id => {
     if (window.name !== 'cdi-prueba-pestana') { window.name = 'cdi-prueba-pestana'; sessionStorage.setItem('cdi_v2_tab', id); }
     const pedir = navigator.locks.request.bind(navigator.locks);
-    navigator.locks.request = (nombre, opciones, f) => {
-      if (!(opciones && opciones.signal)) return pedir(nombre, opciones, f);
+    navigator.locks.request = (...args) => {
+      if (!(args[1] && args[1].signal)) return pedir(...args);
       window.__esperando = true;
-      return new Promise(r => { window.__seguir = r; }).then(() => pedir(nombre, opciones, f));
+      return new Promise(r => { window.__seguir = r; }).then(() => pedir(...args));
     };
   }, id);
   if (lenta) {
@@ -1134,6 +1134,9 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     const { p: p2, conectores } = await duplicar(ctx, id1, lenta);
     const mira = await p2.waitForFunction(() => window.__esperando, null, { timeout: 20000 }).then(() => true, () => false);
     if (!mira) falla('la pestaña duplicada no llega a mirar si la original sigue viva');
+    const retiene = await p2.evaluate(async () => (await navigator.locks.query()).held
+      .some(l => l.name === 'cdi_v2_tab:' + sessionStorage.getItem('cdi_v2_tab')));
+    if (!retiene) falla('la pestaña duplicada no retiene el lock de su propio id');
     // Si la sesión cambia antes, ese pedido con 401 la manda a entrar antes
     // de terminar de mirar y el caso no prueba nada.
     if (!(await conectores)) falla('la pestaña duplicada no pide los conectores del tablero en 20 s');
@@ -1178,7 +1181,8 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     const { ctx, usuario, p2, r } = await cambiaEnLaEspera('ord1z12', false, (ctx, usuario) => entrar(ctx, usuario));
     // Si la duplicada la tomó, la vuelve a guardar a nombre de A al confirmar la sesión.
     if (r) await esperarBorradores(p2, ['OP-DE-A'], que + ' y la duplicada no guarda la operación que tomó');
-    await p2.waitForTimeout(INTERVALO_MS);
+    const confirmada = await p2.waitForFunction(() => CDI.borrador.usuario(), null, { timeout: 15000 }).then(() => true, () => false);
+    if (!confirmada) falla(que + ' y la duplicada no confirma la sesión nueva en 15 s');
     await nadaSePerdio(ctx, usuario, que);
     if (!r) {
       const r3 = await recuperada(await abrir(ctx));
