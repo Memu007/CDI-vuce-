@@ -120,7 +120,8 @@ async function abrir(ctx, pestana) {
 // viva (el lock que pide pestanaViva con signal): marca window.__esperando y
 // sigue cuando la prueba llama a window.__seguir(). Con `lenta`, el usuario
 // llega a los 10 s, después de la espera del arranque. No espera la pantalla:
-// aparece recién después de mirar.
+// aparece recién después de mirar. Devuelve también cuándo llegan los
+// conectores del tablero, que se piden con api() y un 401 manda al login.
 async function duplicar(ctx, id, lenta) {
   const p = await ctx.newPage();
   await p.addInitScript(id => {
@@ -140,8 +141,9 @@ async function duplicar(ctx, id, lenta) {
     });
   }
   p.on('dialog', d => d.accept().catch(() => {}));
+  const conectores = p.waitForResponse(r => r.url().includes('/api/system/connectors'), { timeout: 20000 }).then(() => true, () => false);
   await p.goto(base + '/dashboard');
-  return p;
+  return { p, conectores };
 }
 
 async function cargar(p, factura, items) {
@@ -1122,14 +1124,19 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
   async function cambiaEnLaEspera(nombre, lenta, cambiar) {
     const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
     const usuario = await nuevoUsuario(ctx, nombre);
-    await dejarAMedias(ctx, 'OP-DE-A');
+    // Primero la abierta: si OP-DE-A ya estuviera cerrada, la tomaría ella.
     const p1 = await abrir(ctx);
     await cargar(p1, 'OP-P1', [prod('Producto de la pestaña abierta', '84714900100D', 2, 10)]);
     await esperarBorradores(p1, ['OP-P1'], 'la operación de la pestaña abierta no se guarda');
+    await dejarAMedias(ctx, 'OP-DE-A');
+    if (JSON.stringify(await sobresEn(ctx, 'OP-DE-A')) !== JSON.stringify([usuario])) falla('OP-DE-A no quedó guardada a nombre de A antes de duplicar');
     const id1 = await p1.evaluate(() => sessionStorage.getItem('cdi_v2_tab'));
-    const p2 = await duplicar(ctx, id1, lenta);
+    const { p: p2, conectores } = await duplicar(ctx, id1, lenta);
     const mira = await p2.waitForFunction(() => window.__esperando, null, { timeout: 20000 }).then(() => true, () => false);
     if (!mira) falla('la pestaña duplicada no llega a mirar si la original sigue viva');
+    // Si la sesión cambia antes, ese pedido con 401 la manda a entrar antes
+    // de terminar de mirar y el caso no prueba nada.
+    if (!(await conectores)) falla('la pestaña duplicada no pide los conectores del tablero en 20 s');
     await cambiar(ctx, usuario);
     await p2.evaluate(() => window.__seguir());
     // Sin sesión, un pedido de la app con 401 la manda a entrar: se va del
