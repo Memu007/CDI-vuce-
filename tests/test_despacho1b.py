@@ -1906,6 +1906,26 @@ def test_la_migracion_une_la_fila_sin_clave_que_dejo_la_version_anterior(monkeyp
     assert filas[0]["clave"]
 
 
+def test_la_migracion_reescribe_claves_cruzadas(monkeypatch, tmp_path):
+    """Dos productos con la clave del otro (por ejemplo, de una regla
+    anterior) y el índice ya creado: escribir una clave antes de vaciar la
+    otra choca con el índice."""
+    from proyecto_maria.services.client_memory import identidad_del_producto
+    clave_x = identidad_del_producto("39269090", "TAPA X")[2]
+    clave_y = identidad_del_producto("39269090", "TAPA Y")[2]
+    ruta = _base_vieja(tmp_path, [])
+    _correr_migracion(monkeypatch, ruta)
+    import sqlite3
+    con = sqlite3.connect(ruta)
+    for id_, desc, clave in (("x", "TAPA X", clave_y), ("y", "TAPA Y", clave_x)):
+        con.execute("INSERT INTO client_product_history (id, owner_username, client_id, ncm, descripcion,"
+                    " clave, veces_usado) VALUES (?, 'dueno', 'c1', '39269090', ?, ?, 1)", (id_, desc, clave))
+    con.commit()
+    con.close()
+    _correr_migracion(monkeypatch, ruta)
+    assert [(f["id"], f["clave"]) for f in _filas(ruta)] == [("x", clave_x), ("y", clave_y)]
+
+
 def test_la_migracion_que_falla_no_sigue_callada(monkeypatch, tmp_path):
     import sqlite3
     ruta = tmp_path / "rota.db"
