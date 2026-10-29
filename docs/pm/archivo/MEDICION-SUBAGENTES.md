@@ -77,3 +77,11 @@ Cierre24Oct: clean_dependencies ejecutó grupoall sobredddcf6d. Baseline37verdes
 obsoletos con count0. PM verificó motivos14/23/28 directamente.0sobrevivientes
 entre terminadas; no42/42. Modelo/esfuerzo heredados; uso tokens no disponible.
 PMmidió además499900xf admitidos460MB/9.18s, no límite universal. CI/e2everdes.
+
+### 2026-10-29
+
+| Fecha | Pieza | Quién lo usó | Modelo y esfuerzo | Hallazgos | Reproducidos | Nuevos |
+|---|---|---|---|---|---|---|
+| 2026-10-29 | DESPACHO-1b vuelta 3 (`1f5480e`) | PM | Sonnet alto (180k tokens, 63 herramientas, 37 min) | 11 y 10 mutantes vivos con consecuencia | 8 por la PM con sus pruebas (concurrencia, `learn` que mezcla, 10 dígitos, NFC/NFD, dígitos Unicode, CPU del parseo, PUT, 1e12) | 9 (todos menos el tope por esquema y el candado por proceso, que la Dev declaró a medias) |
+| 2026-10-29 | ORDEN-1 vuelta 2 (`86c9d84`) | PM | Opus alto (136k tokens, 47 herramientas, 24 min) | ver `REPRODUCCION-ORDEN-1-vuelta2-2026-10-29.md` | ídem | ídem |
+| 2026-10-29 | ORDEN-1 vuelta 2 (`86c9d84`) | PM | Sonnet alto (126k tokens, 54 herramientas, 31 min) | ver `REPRODUCCION-ORDEN-1-vuelta2-2026-10-29.md` | ídem | ídem |
