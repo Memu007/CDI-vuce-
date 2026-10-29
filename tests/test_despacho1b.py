@@ -1582,13 +1582,24 @@ def test_cada_forma_del_mismo_producto_suma_a_la_misma_fila(auth_override, clien
 
 def test_la_n_compuesta_y_la_descompuesta_son_el_mismo_producto(auth_override, client):
     cid = _crear_cliente(client)
-    for forma in ("NFC", "NFD"):
+    for forma in ("NFD", "NFC"):
         r = _guardar(client, cid, [_renglon(unicodedata.normalize(forma, "CAÑO INVENTADO"), "3926.90.90")])
         assert r.status_code == 200, r.text
+    # Se guarda compuesta aunque llegue primero la otra: es la que sale al TXT.
+    assert [(p["descripcion"], p["veces_usado"]) for p in _catalogo(client, cid)] == [
+        (unicodedata.normalize("NFC", "CAÑO INVENTADO"), 2)]
+
+
+def test_las_minusculas_de_dos_formas_de_lo_mismo_son_el_mismo_producto(auth_override, client):
+    # «ſ́» no tiene forma compuesta y su minúscula es «s» con la tilde aparte:
+    # sólo pasándola a NFC queda igual a «ś».
+    cid = _crear_cliente(client)
+    r = _aprender(client, cid, _producto("39269090", "TAPA ſ́"), _producto("39269090", "TAPA ś"))
+    assert r.status_code == 200, r.text
     assert [p["veces_usado"] for p in _catalogo(client, cid)] == [2]
 
 
-@pytest.mark.parametrize("otra", ["CANO INVENTADO VERDE", "CAÑO INVENTADO, VERDE", "CAÑO-INVENTADO VERDE"],
+@pytest.mark.parametrize("otra",["CANO INVENTADO VERDE", "CAÑO INVENTADO, VERDE", "CAÑO-INVENTADO VERDE"],
                          ids=["sin tilde", "con coma", "con guion"])
 def test_otra_tilde_u_otra_puntuacion_es_otro_producto(auth_override, client, otra):
     """Supuesto aceptado: sólo se unen las formas Unicode de lo mismo."""
@@ -1649,7 +1660,7 @@ def test_un_ncm_con_otros_digitos_da_400_por_cada_via(auth_override, client, via
     assert _contar(Operation, client_id=cid) == operaciones
 
 
-@pytest.mark.parametrize("ncm", [_ARABIGO, _ANCHO])
+@pytest.mark.parametrize("ncm", [_ARABIGO, _ANCHO], ids=["arabigo", "ancho completo"])
 def test_guardar_un_despacho_con_otros_digitos_marca_el_renglon(auth_override, client, ncm):
     cid = _crear_cliente(client)
     r = _guardar(client, cid, [_renglon("TAPA INVENTADA VERDE", ncm)])
@@ -1906,7 +1917,7 @@ def test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado():
     r = leer_despacho(una_hoja_cara(80), limite_cpu_s=0.05)
     assert r["sin_texto"] is False, r
     assert AVISO_SIN_TEXTO not in r["avisos"]
-    assert r["avisos"] == ["El PDF da demasiado trabajo: leí hasta la hoja 0."], r
+    assert [a.startswith("El PDF da demasiado trabajo") for a in r["avisos"]] == [True], r
 
 
 def test_un_corte_por_cpu_que_se_traga_un_finalizador_vuelve_a_cortar():

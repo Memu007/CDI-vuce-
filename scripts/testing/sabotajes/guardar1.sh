@@ -53,11 +53,11 @@ if ! "$PY" -m pytest -q --no-cov -p no:cacheprovider $T >/dev/null 2>&1; then
 fi
 
 sabotaje $C "el historial vuelve a guardar la SIM completa" \
-  '    ncm = ncm_para_historial(ncm) or ""' \
-  '    ncm = (ncm or "").strip()' \
+  '    ncm8 = ncm_para_historial(ncm)' \
+  '    ncm8 = str(ncm).strip()' \
   "FAILED $T::test_guardar_con_la_sim_completa_deja_el_ncm_en_el_historial"
 sabotaje $C "la SIM se corta a 10 caracteres" \
-  '    return digitos[:8] if len(digitos) >= 8 else None' \
+  '    return digitos[:8]' \
   '    return ncm[:10]' \
   "FAILED $T::test_la_forma_del_ncm_que_guarda_el_historial[84714900100D-84714900]"
 sabotaje $M "el historial vuelve a ir en el mismo commit que la operación" \

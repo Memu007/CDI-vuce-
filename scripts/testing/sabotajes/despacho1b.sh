@@ -184,25 +184,29 @@ sabotaje "los números sin tope" "$LECTOR" \
   "test_guardar_un_numero_del_tope_para_arriba_da_422[valor_unitario]" \
   "test_guardar_un_numero_del_tope_para_arriba_da_422[kilo_neto]"
 sabotaje "sin el chequeo del peso" "$LECTOR" \
-  "if peso is not None and not (math.isfinite(peso) and peso <= _MAX_NUMERO):" \
+  "if peso is not None and not (math.isfinite(peso) and peso < _MAX_NUMERO):" \
   "if False:" \
   "test_un_peso_por_unidad_infinito_no_se_guarda[1.0-1e-320]" \
   "test_un_peso_por_unidad_infinito_no_se_guarda[900000000000.0-1e-300]" \
   "test_un_peso_por_unidad_infinito_no_se_guarda[100000000000.0-1e-05]"
 sabotaje "el peso sin el tope" "$LECTOR" \
-  "math.isfinite(peso) and peso <= _MAX_NUMERO" \
+  "math.isfinite(peso) and peso < _MAX_NUMERO" \
   "math.isfinite(peso)" \
   "test_un_peso_por_unidad_infinito_no_se_guarda[100000000000.0-1e-05]"
 no_debe "el peso sin el tope" "$ULTIMA" \
   "test_un_peso_por_unidad_infinito_no_se_guarda[1.0-1e-320]" \
   "test_un_peso_por_unidad_infinito_no_se_guarda[900000000000.0-1e-300]"
+sabotaje "el tope del peso deja afuera el máximo" "$LECTOR" \
+  "peso < _MAX_NUMERO" \
+  "peso <= _MAX_NUMERO" \
+  "test_un_peso_por_unidad_justo_en_el_tope_marca_el_renglon"
 
 # 5) Guardar: todo o nada, sin NUL, sin promediar con el vacío y sin sumar a
 # un producto de otro NCM.
 sabotaje "un commit por renglón" proyecto_maria/main.py \
-  "solo_mismo_ncm=True, **campos)
+  "client_id=client_id, **campos)
         await db.commit()" \
-  "solo_mismo_ncm=True, **campos)
+  "client_id=client_id, **campos)
             await db.commit()" \
   "test_guardar_si_falla_la_base_no_guarda_ninguno"
 sabotaje "guardar sin sacar el NUL" proyecto_maria/main.py \
@@ -217,20 +221,14 @@ sabotaje "promedia con el valor vacío" proyecto_maria/services/client_memory.py
         return nuevo / 2, 2
 " \
   "test_guardar_otra_vez_con_peso_no_lo_promedia_con_el_vacio"
-sabotaje "la ruta usa el respaldo por descripción" proyecto_maria/main.py \
-  "client_id=client_id, solo_mismo_ncm=True, **campos)" \
-  "client_id=client_id, **campos)" \
+sabotaje "la clave sin el NCM" proyecto_maria/services/client_memory.py \
+  'f"{ncm8}\x1f{misma}"' \
+  'f"{misma}"' \
   "test_guardar_no_funde_productos_con_ncm_distinto" \
   "test_guardar_no_toca_un_producto_que_ya_estaba_con_otro_ncm" \
   "test_guardar_no_funde_descripciones_casi_iguales_con_ncm_distinto[tipo a y tipo b]" \
   "test_guardar_no_funde_descripciones_casi_iguales_con_ncm_distinto[mismo texto largo adelante]"
-no_debe "la ruta usa el respaldo por descripción" "$ULTIMA" "test_guardar_con_el_mismo_ncm_sigue_sumando"
-sabotaje "el upsert ignora solo_mismo_ncm" proyecto_maria/services/client_memory.py \
-  "if existing is None and not solo_mismo_ncm:" \
-  "if existing is None:" \
-  "test_guardar_no_funde_productos_con_ncm_distinto" \
-  "test_guardar_no_toca_un_producto_que_ya_estaba_con_otro_ncm"
-no_debe "el upsert ignora solo_mismo_ncm" "$ULTIMA" "test_guardar_con_el_mismo_ncm_sigue_sumando"
+no_debe "la clave sin el NCM" "$ULTIMA" "test_guardar_con_el_mismo_ncm_sigue_sumando"
 
 # Lo que encontró el adversario: dos lecturas que daban 500.
 sabotaje "el lector sin el tope de los números" "$LECTOR" \
@@ -350,19 +348,20 @@ sabotaje "el caño roto tapa el código de salida" "$LECTOR" \
   "test_un_lector_que_sale_sin_leer_todo_dice_con_que_salio"
 
 # Devolución 20:07: identidad del producto.
-sabotaje "el NCM se guarda con puntos" "$LECTOR" \
-  "ncm = re.sub(r\"\\D\", \"\", posicion)[:8] if _POSICION.match(posicion) else None" \
-  "ncm = posicion[:10] if _POSICION.match(posicion) else None" \
+sabotaje "el lector guarda el NCM con puntos" "$LECTOR" \
+  "    ncm = ncm_para_historial(posicion)" \
+  "    ncm = posicion[:10] if _POSICION.match(posicion) else None" \
   "test_el_mismo_ncm_con_o_sin_puntos_es_el_mismo_producto"
-sabotaje "el upsert compara el NCM tal cual" proyecto_maria/services/client_memory.py \
-  "        ncm_sin_puntos == re.sub(r\"\\D\", \"\", ncm)," \
-  "        ClientProductHistory.ncm == ncm," \
-  "test_lo_aprendido_con_puntos_y_el_despacho_son_el_mismo_producto" \
-  "test_aprender_con_puntos_suma_al_producto_del_despacho_y_no_a_otro"
-sabotaje "el upsert compara la descripción cortada" proyecto_maria/services/client_memory.py \
-  "            if _misma_descripcion(row.descripcion) == buscada:" \
-  "            if row.descripcion_normalizada == desc_norm:" \
-  "test_dos_textos_largos_con_el_mismo_comienzo_no_se_funden"
+sabotaje "el lector vuelve a la regla vieja del NCM" "$LECTOR" \
+  "    ncm = ncm_para_historial(posicion)" \
+  "    ncm = re.sub(r\"\\D\", \"\", posicion)[:8] if _POSICION.match(posicion) else None" \
+  "test_guardar_un_despacho_con_otros_digitos_marca_el_renglon[arabigo]" \
+  "test_guardar_un_despacho_con_otros_digitos_marca_el_renglon[ancho completo]"
+sabotaje "la clave compara la descripción cortada" proyecto_maria/services/client_memory.py \
+  '    misma = unicodedata.normalize("NFC", descripcion.casefold())' \
+  '    misma = unicodedata.normalize("NFC", descripcion.casefold())[:200]' \
+  "test_dos_textos_largos_con_el_mismo_comienzo_no_se_funden" \
+  "test_dos_descripciones_que_comparten_275_caracteres_son_dos_productos[aprender]"
 
 # Devolución 20:07: los promedios y los topes.
 sabotaje "el promedio cuenta los usos sin valor" proyecto_maria/services/client_memory.py \
@@ -444,6 +443,191 @@ sabotaje "DOL no es dólar" proyecto_maria/main.py \
   "in (\"USD\",)" \
   "test_guardar_un_despacho_en_dolares_guarda_el_valor[DOL]"
 no_debe "DOL no es dólar" "$ULTIMA" "test_guardar_un_despacho_en_dolares_guarda_el_valor[USD]"
+
+# Vuelta 4: una regla de identidad en las cinco vías.
+C=proyecto_maria/services/client_memory.py
+M=proyecto_maria/main.py
+F=test_cada_forma_del_mismo_producto_suma_a_la_misma_fila
+sabotaje "la clave distingue mayúsculas" "$C" \
+  'unicodedata.normalize("NFC", descripcion.casefold())' \
+  'unicodedata.normalize("NFC", descripcion)' \
+  "$F[minusculas]"
+sabotaje "la clave sin NFC" "$C" \
+  '    misma = unicodedata.normalize("NFC", descripcion.casefold())' \
+  '    misma = descripcion.casefold()' \
+  "test_las_minusculas_de_dos_formas_de_lo_mismo_son_el_mismo_producto"
+no_debe "la clave sin NFC" "$ULTIMA" "test_la_n_compuesta_y_la_descompuesta_son_el_mismo_producto"
+sabotaje "la descripción sin NFC" "$C" \
+  '    texto = unicodedata.normalize("NFC", texto)' \
+  '    pass' \
+  "test_la_n_compuesta_y_la_descompuesta_son_el_mismo_producto"
+sabotaje "la descripción no junta los espacios" "$C" \
+  're.sub(r"\s+", " ", str(descripcion or "")' \
+  're.sub(r" ", " ", str(descripcion or "")' \
+  "$F[espacios]"
+sabotaje "el NCM no acepta guiones" "$C" \
+  '_NCM = re.compile(r"[0-9]+(?:[.\- ][0-9]+)*[A-Z]?")' \
+  '_NCM = re.compile(r"[0-9]+(?:[. ][0-9]+)*[A-Z]?")' \
+  "$F[guiones]"
+sabotaje "el NCM no acepta puntos" "$C" \
+  '_NCM = re.compile(r"[0-9]+(?:[.\- ][0-9]+)*[A-Z]?")' \
+  '_NCM = re.compile(r"[0-9]+(?:[\- ][0-9]+)*[A-Z]?")' \
+  "$F[puntos]"
+sabotaje "el NCM no acepta espacios" "$C" \
+  '_NCM = re.compile(r"[0-9]+(?:[.\- ][0-9]+)*[A-Z]?")' \
+  '_NCM = re.compile(r"[0-9]+(?:[.\-][0-9]+)*[A-Z]?")' \
+  "$F[espacios en el ncm]"
+sabotaje "el NCM sin recortar las puntas" "$C" \
+  '    ncm = str(ncm).strip().upper()' \
+  '    ncm = str(ncm).upper()' \
+  "$F[puntas del ncm]"
+sabotaje "el NCM sólo de 8 dígitos" "$C" \
+  '    if not 8 <= len(digitos) <= 11 or (ncm[-1].isalpha() and len(digitos) != 11):' \
+  '    if len(digitos) != 8:' \
+  "$F[10 digitos]" "$F[sim]" \
+  "test_aprender_con_10_digitos_y_guardar_el_despacho_da_una_fila"
+sabotaje "la letra SIM en minúscula no es la misma" "$C" \
+  '    ncm = str(ncm).strip().upper()' \
+  '    ncm = str(ncm).strip()' \
+  "$F[sim en minuscula]"
+
+# Vuelta 4: la base sostiene la identidad.
+sabotaje "sin el índice único" proyecto_maria/database/models.py \
+  '"owner_username", "client_id", "clave", unique=True),' \
+  '"owner_username", "client_id", "clave", unique=False),' \
+  "test_seis_guardados_a_la_vez_dejan_una_fila"
+sabotaje "la fila recién creada suma otra vez" "$C" \
+  '    if insertada:
+        return existing' \
+  '    pass' \
+  "test_seis_guardados_a_la_vez_dejan_una_fila"
+sabotaje "un producto nuevo guarda el peso sin tope" "$C" \
+  '            peso_unitario_avg=valor_para_promedio(peso_unitario) or 0.0,' \
+  '            peso_unitario_avg=peso_unitario or 0.0,' \
+  "test_un_producto_nuevo_no_guarda_valores_fuera_del_tope"
+sabotaje "la migración no une" "$M" \
+  '            if len(grupo) < 2:' \
+  '            if True:' \
+  "test_la_migracion_une_los_duplicados_y_es_idempotente"
+sabotaje "la migración cuenta filas, no usos" "$M" \
+  '"veces_usado": sum(max(f["veces_usado"] or 1, 1) for f in grupo)}' \
+  '"veces_usado": len(grupo)}' \
+  "test_la_migracion_une_los_duplicados_y_es_idempotente"
+sabotaje "la migración deja la fila más vieja" "$M" \
+  '            queda = max(grupo, key=lambda f: (' \
+  '            queda = min(grupo, key=lambda f: (' \
+  "test_la_migracion_une_los_duplicados_y_es_idempotente"
+sabotaje "la migración promedia sin pesar los usos" "$M" \
+  'cambios[promedio] = sum(v * n for v, n in usos if n) / total if total else None' \
+  'cambios[promedio] = sum(v for v, n in usos if n) / sum(1 for _, n in usos if n) if total else None' \
+  "test_la_migracion_une_los_duplicados_y_es_idempotente"
+sabotaje "la migración que falla se calla" "$M" \
+  'async def _migrate_product_history_clave():' \
+  'async def _migrate_product_history_clave():
+    try:
+        await _sin_atajar()
+    except Exception as e:
+        print(repr(e))
+
+
+async def _sin_atajar():' \
+  "test_la_migracion_que_falla_no_sigue_callada"
+
+# Vuelta 4: los NCM con otros dígitos y lo que no es un producto, por vía.
+O=test_un_ncm_con_otros_digitos_da_400_por_cada_via
+sabotaje "aprender no mira los dígitos" "$M" \
+  '_AVISO_MEDIO_PAR)
+    if any(tiene_digito_no_ascii(' \
+  '_AVISO_MEDIO_PAR)
+    if False and any(tiene_digito_no_ascii(' \
+  "$O[aprender-arabigo]" "$O[aprender-ancho completo]" "$O[aprender-mezclado]"
+no_debe "aprender no mira los dígitos" "$ULTIMA" "$O[operacion-arabigo]"
+sabotaje "/operaciones no mira los dígitos" "$M" \
+  '        if any(tiene_digito_no_ascii(' \
+  '        if False and any(tiene_digito_no_ascii(' \
+  "$O[operacion-arabigo]" "$O[operacion-ancho completo]" "$O[operacion-mezclado]"
+sabotaje "el cambio no mira los dígitos" "$M" \
+  '        if tiene_digito_no_ascii(str(body["ncm"])):' \
+  '        if False:' \
+  "$O[cambio-arabigo]" "$O[cambio-ancho completo]" "$O[cambio-mezclado]"
+sabotaje "guardar-uso no mira los dígitos" "$M" \
+  '    if tiene_digito_no_ascii(ncm):' \
+  '    if False:' \
+  "$O[guardar-uso-arabigo]" "$O[guardar-uso-ancho completo]" "$O[guardar-uso-mezclado]"
+sabotaje "los dígitos de ancho completo pasan" "$C" \
+  '    return any(c.isdigit() and not "0" <= c <= "9" for c in texto)' \
+  '    return any(c.isdigit() and not "0" <= c <= "9" and not "０" <= c <= "９" for c in texto)' \
+  "$O[aprender-ancho completo]" "$O[guardar-uso-ancho completo]"
+no_debe "los dígitos de ancho completo pasan" "$ULTIMA" "$O[aprender-arabigo]"
+sabotaje "aprender acepta lo que no es objeto" "$M" \
+  '    if not all(isinstance(item, dict) for item in items):' \
+  '    if False:' \
+  "test_aprender_un_item_que_no_es_un_objeto_da_400[texto]" \
+  "test_aprender_un_item_que_no_es_un_objeto_da_400[lista]"
+sabotaje "aprender no mira el medio par" "$M" \
+  'tiene_medio_par, upsert_client_product_history,
+    )
+    if tiene_medio_par(body):' \
+  'tiene_medio_par, upsert_client_product_history,
+    )
+    if False:' \
+  "test_aprender_con_medio_par_da_400[origen]" "test_aprender_con_medio_par_da_400[clave]"
+sabotaje "/operaciones no mira el medio par" "$M" \
+  '        if tiene_medio_par(data):' \
+  '        if False:' \
+  "test_una_operacion_con_medio_par_da_400_y_no_queda[unidad]"
+sabotaje "el cambio no mira el medio par" "$M" \
+  'tiene_digito_no_ascii, tiene_medio_par, valor_para_promedio,
+    )
+    if tiene_medio_par(body):' \
+  'tiene_digito_no_ascii, tiene_medio_par, valor_para_promedio,
+    )
+    if False:' \
+  "test_cambiar_con_medio_par_da_400[origen]"
+sabotaje "aprender acepta 501" "$M" \
+  '    if len(items) > 500:' \
+  '    if len(items) > 501:' \
+  "test_aprender_tiene_tope_de_500_productos[501-400]"
+no_debe "aprender acepta 501" "$ULTIMA" "test_aprender_tiene_tope_de_500_productos[500-200]"
+
+# Vuelta 4: el cambio valida igual que guardar.
+V=test_cambiar_un_producto_valida_igual_que_guardar
+sabotaje "el cambio guarda la descripción como viene" "$M" \
+  '            row.descripcion = descripcion_del_producto(body["descripcion"])' \
+  '            row.descripcion = str(body["descripcion"]).strip()' \
+  "$V[vacia]" "$V[larga]" "test_cambiar_un_producto_guarda_la_forma_de_la_regla"
+sabotaje "el cambio no recalcula la clave" "$M" \
+  '    row.clave = producto[2] if producto else None' \
+  '    pass' \
+  "test_el_mismo_producto_por_dos_vias_queda_en_una_fila[cambio-guardar]"
+sabotaje "el choque del cambio da 500" "$M" \
+  '    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409' \
+  '    except LookupError:
+        await db.rollback()
+        raise HTTPException(status_code=409' \
+  "test_el_mismo_producto_por_dos_vias_queda_en_una_fila[guardar-cambio]"
+no_debe "el choque del cambio da 500" "$ULTIMA" "test_cambiar_un_producto_a_si_mismo_no_es_un_choque"
+
+# Vuelta 4: el tope de CPU cubre el hijo entero.
+sabotaje "entender el texto sin tope de CPU" "$LECTOR" \
+  '        with _tope_de_cpu(limite_cpu_s - (time.process_time() - inicio)):' \
+  '        with _tope_de_cpu(1e9):' \
+  "test_el_tope_de_cpu_cubre_entender_el_texto"
+sabotaje "entender el texto no descuenta lo gastado" "$LECTOR" \
+  '        with _tope_de_cpu(limite_cpu_s - (time.process_time() - inicio)):' \
+  '        with _tope_de_cpu(limite_cpu_s):' \
+  "test_el_tope_de_cpu_cubre_entender_el_texto"
+sabotaje "el temporizador de CPU no se repite" "$LECTOR" \
+  '    signal.setitimer(signal.ITIMER_PROF, max(segundos, 0.001), 0.05)' \
+  '    signal.setitimer(signal.ITIMER_PROF, max(segundos, 0.001))' \
+  "test_un_corte_por_cpu_que_se_traga_un_finalizador_vuelve_a_cortar"
+sabotaje "un corte por CPU parece escaneado" "$LECTOR" \
+  '        avisos.append(f"El PDF da demasiado trabajo: leí hasta la hoja {len(textos)}.")
+        salteadas = True' \
+  '        avisos.append(f"El PDF da demasiado trabajo: leí hasta la hoja {len(textos)}.")' \
+  "test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado"
 
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
