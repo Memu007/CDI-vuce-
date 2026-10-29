@@ -9,6 +9,8 @@
 # base vacía y CSRF_ENFORCE=true, como en producción; z21 y z23 hacen como
 # un servidor que no lo exige.
 # Sale con error si un sabotaje no encuentra su patrón o no pone rojo.
+# Un rojo por otro motivo deja el log de la API y la salida de la pantalla en
+# una carpeta que sobrevive a la corrida: se diagnostica, no se reintenta.
 set -uo pipefail
 REPO="$(git rev-parse --show-toplevel)"
 SHA="$(git -C "$REPO" rev-parse "${1:-HEAD}")"
@@ -20,6 +22,19 @@ API=""
 trap '[ -n "$API" ] && kill $API 2>/dev/null; git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$TMPD"' EXIT
 cd "$WT"
 FALLAS=0
+GUARDADOS=""
+
+# guardar <salida>: copia lo que hace falta para entender un rojo dudoso.
+guardar() {
+  [ -n "$GUARDADOS" ] || GUARDADOS="$(mktemp -d "${TMPDIR:-/tmp}/orden1b-logs.XXXXXX")"
+  local base="$GUARDADOS/$FALLAS"
+  printf '%s\n' "$1" >"$base-pantalla.log"
+  if cp "$TMPD/api.log" "$base-api.log" 2>/dev/null; then
+    echo "      guardados: $base-api.log y $base-pantalla.log"
+  else
+    echo "      guardado: $base-pantalla.log (la API no llegó a arrancar)"
+  fi
+}
 
 # sabotaje <archivo> <nombre> <lo que el rojo tiene que decir> <viejo> <nuevo> [<viejo> <nuevo> ...]
 # Cada <viejo> tiene que aparecer una sola vez en el archivo.
@@ -45,6 +60,7 @@ PYEOF
     echo "ROJO  | $nombre: dice «$esperado»"
   else
     echo "ROJO? | $nombre: rojo (salida $codigo), pero sin «$esperado»"; grep -E "FALLA" <<<"$salida" | head -3; FALLAS=$((FALLAS+1))
+    guardar "$salida"
   fi
 }
 
@@ -53,7 +69,7 @@ export ENVIRONMENT=development GEMINI_API_KEY=test-key CSRF_ENFORCE=true \
        ARCA_NOVEDADES_XML_URL=http://127.0.0.1:9/x ARCA_NOVEDADES_WEB_URL=http://127.0.0.1:9/x
 export BASE_URL="http://127.0.0.1:$PUERTO"
 correr() {
-  rm -f "$TMPD/local.db"
+  rm -f "$TMPD/local.db" "$TMPD/api.log"
   # Con el puerto ocupado, /health lo contestaría otro servidor y la pantalla
   # mediría otro producto.
   if (exec 3<>"/dev/tcp/127.0.0.1/$PUERTO") 2>/dev/null; then
