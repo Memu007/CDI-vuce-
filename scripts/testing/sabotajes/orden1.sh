@@ -98,7 +98,7 @@ sabotaje $U "empezar otra operación borra la clave vieja y no el borrador de la
 
 # ------------------------------------------------------------- la pantalla
 git checkout -q -- proyecto_maria/
-export ENVIRONMENT=development GEMINI_API_KEY=test-key \
+export ENVIRONMENT=development GEMINI_API_KEY=test-key CSRF_ENFORCE=true \
        JWT_SECRET_KEY=clave-inventada-solo-local-0123456789abcdef EMAIL_VERIFICATION_REQUIRED=false \
        ARCA_NOVEDADES_XML_URL=http://127.0.0.1:9/x ARCA_NOVEDADES_WEB_URL=http://127.0.0.1:9/x
 export BASE_URL="http://127.0.0.1:$PUERTO"
@@ -474,7 +474,7 @@ sabotaje $A "el aviso de otro usuario lo pisa cualquier otro" \
 # A vuelve a entrar en la espera: la duplicada confirma la sesión nueva.
 export CASOS=z12
 sabotaje $A "la sesión confirmada no se recuerda" \
-  "FALLA: A volvió a entrar (otra sesión) mientras la duplicada miraba si la original vive y la duplicada no confirma la sesión nueva en 15 s" \
+  "FALLA: A volvió a entrar (otra sesión) mientras la duplicada miraba si la original vive y la duplicada no recupera la operación al confirmar la sesión" \
   $'        sesionDelDueno = sesion;\n' ''
 
 git checkout -q -- proyecto_maria/

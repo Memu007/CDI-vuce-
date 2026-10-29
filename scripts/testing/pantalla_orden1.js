@@ -57,9 +57,15 @@
 //  (z17) y (z18) con la sesión cerrada o la red cortada, pregunta quién es
 //      una vez y no en cada guardado; (z19) el aviso de otro usuario no lo
 //      pisa el de la red.
+//  (z20) a (z24) ORDEN-1b: si entra otro usuario en el mismo navegador, la
+//      pestaña de A no genera, no guarda un cliente ni cierra la sesión del
+//      otro, aunque el servidor no exija CSRF, y se tapa; si A sale y vuelve
+//      a entrar, sigue trabajando. (z12) avisa
+//      mientras comprueba la sesión y recupera la operación al confirmarla.
 // Datos inventados. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_orden1.js
-const { chromium } = require('/opt/node-tools/node_modules/playwright');
+// El servidor corre con CSRF_ENFORCE=true, como en producción.
+const { chromium, request } = require('/opt/node-tools/node_modules/playwright');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 const base = process.env.BASE_URL || 'http://127.0.0.1:8771';
 const INTERVALO_MS = 2500;  // el guardado periódico de app_v2.js
@@ -80,6 +86,8 @@ const TEL_1 = prod('Telefono demo uno', '85171300100F', 7, 99.97, { grupo_id: 7 
 const TEL_2 = prod('Telefono demo dos', '85171300100F', 2, 55.51, { grupo_id: 7 });
 
 const CLAVE = 'Clave-Inventada-123';
+// La cookie CSRF de la sesión del contexto: el servidor de la prueba la exige.
+const csrf = async ctx => ((await ctx.cookies(base)).find(c => c.name === 'csrf_token') || {}).value || '';
 // Registra un usuario y deja abierta su sesión en el contexto; devuelve el nombre.
 async function nuevoUsuario(ctx, nombre) {
   const p = await ctx.newPage();
@@ -89,7 +97,8 @@ async function nuevoUsuario(ctx, nombre) {
     { data: { username: usuario, password: CLAVE, email: nombre + id + '@ejemplo.test' } });
   if (!r.ok()) falla('no se pudo registrar el usuario de prueba: ' + r.status());
   // Sin el CUIT del despachante no se genera el TXT (ESTUDIO-1); inventado.
-  const perfil = await p.request.put(base + '/api/user/profile', { data: { cuit: '20999999998' } });
+  const perfil = await p.request.put(base + '/api/user/profile',
+    { data: { cuit: '20999999998' }, headers: { 'X-CSRF-Token': await csrf(ctx) } });
   if (!perfil.ok()) falla('no se pudo cargar el CUIT del perfil: ' + perfil.status());
   await p.close();
   return usuario;
@@ -116,8 +125,8 @@ async function abrir(ctx, pestana) {
   return p;
 }
 
-// Duplica la pestaña `id` y la frena justo antes de mirar si la original sigue
-// viva (el lock que pide pestanaViva con signal): marca window.__esperando y
+// Duplica la pestaña `id` y la frena justo antes de mirar por primera vez si la
+// original sigue viva (el lock que pide pestanaViva con signal): marca window.__esperando y
 // sigue cuando la prueba llama a window.__seguir(). Con `lenta`, el usuario
 // llega a los 10 s, después de la espera del arranque. No espera la pantalla:
 // aparece recién después de mirar. Devuelve también cuándo llegan los
@@ -128,7 +137,7 @@ async function duplicar(ctx, id, lenta) {
     if (window.name !== 'cdi-prueba-pestana') { window.name = 'cdi-prueba-pestana'; sessionStorage.setItem('cdi_v2_tab', id); }
     const pedir = navigator.locks.request.bind(navigator.locks);
     navigator.locks.request = (...args) => {
-      if (!(args[1] && args[1].signal)) return pedir(...args);
+      if (!(args[1] && args[1].signal) || window.__esperando) return pedir(...args);
       window.__esperando = true;
       return new Promise(r => { window.__seguir = r; }).then(() => pedir(...args));
     };
@@ -1127,7 +1136,9 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
   // si la original sigue viva y, mientras, cambia la sesión. Después busca
   // otra operación y encuentra OP-DE-A, que A dejó cerrada: no la adopta con
   // otro usuario, no la borra y no deja nada guardado sin dueño.
-  async function cambiaEnLaEspera(nombre, lenta, cambiar) {
+  // `alSeguir(p2)`, si está, corre antes de que la duplicada siga y devuelve
+  // lo que corre apenas sigue.
+  async function cambiaEnLaEspera(nombre, lenta, cambiar, alSeguir) {
     const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
     const usuario = await nuevoUsuario(ctx, nombre);
     // Primero la abierta: si OP-DE-A ya estuviera cerrada, la tomaría ella.
@@ -1147,7 +1158,9 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     // de terminar de mirar y el caso no prueba nada.
     if (!(await conectores)) falla('la pestaña duplicada no pide los conectores del tablero en 20 s');
     await cambiar(ctx, usuario);
+    const siguio = alSeguir ? await alSeguir(p2) : null;
     await p2.evaluate(() => window.__seguir());
+    if (siguio) await siguio();
     // Sin sesión, un pedido de la app con 401 la manda a entrar: se va del
     // tablero y no hay nada que recuperar.
     let enTablero = null;
@@ -1182,19 +1195,24 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     console.log('OK ' + que + ': la operación de A queda guardada con su dueño');
     await ctx.close();
   }
+  // (z12) D11 de ORDEN-1b: la duplicada no puede adoptar hasta confirmar la
+  // sesión nueva; mientras, lo avisa, y al confirmarla la recupera.
   if (corre('z12')) {
     const que = 'A volvió a entrar (otra sesión) mientras la duplicada miraba si la original vive';
-    const { ctx, usuario, p2, r } = await cambiaEnLaEspera('ord1z12', false, (ctx, usuario) => entrar(ctx, usuario));
-    // Si la duplicada la tomó, la vuelve a guardar a nombre de A al confirmar la sesión.
-    if (r) await esperarBorradores(p2, ['OP-DE-A'], que + ' y la duplicada no guarda la operación que tomó');
-    const confirmada = await p2.waitForFunction(() => CDI.borrador.usuario(), null, { timeout: 15000 }).then(() => true, () => false);
-    if (!confirmada) falla(que + ' y la duplicada no confirma la sesión nueva en 15 s');
+    let aviso = null;
+    const { ctx, usuario, p2, r } = await cambiaEnLaEspera('ord1z12', false, (ctx, usuario) => entrar(ctx, usuario), async p2 => {
+      const soltar = await retenerUsuario(p2);
+      return async () => {
+        aviso = await p2.waitForFunction(() => /Comprobando la sesión/.test(document.getElementById('avisoBorrador').textContent), null, { timeout: 15000 })
+          .then(() => true, () => false);
+        soltar();
+      };
+    });
+    if (!aviso) falla(que + ' y la duplicada no avisa que está comprobando la sesión');
+    if (r !== 'OP-DE-A') falla(que + ' y la duplicada no recupera la operación al confirmar la sesión: recupera ' + r);
+    await esperarBorradores(p2, ['OP-DE-A'], que + ' y la duplicada no guarda la operación que tomó');
     await nadaSePerdio(ctx, usuario, que);
-    if (!r) {
-      const r3 = await recuperada(await abrir(ctx));
-      if (r3 !== 'OP-DE-A') falla(que + ' y otra pestaña no recupera la operación: recupera ' + r3);
-    }
-    console.log('OK ' + que + ': no pierde la operación (' + (r ? 'la toma la duplicada' : 'la recupera otra pestaña') + ')');
+    console.log('OK ' + que + ': avisa que comprueba la sesión y, al confirmarla, recupera la operación');
     await ctx.close();
   }
 
@@ -1298,6 +1316,202 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     const aviso = await avisa(t) ? await t.locator('#avisoBorrador').textContent() : '';
     if (!/Entró otro usuario/.test(aviso)) falla('entró otro usuario antes de la primera consulta y la pestaña avisa otra cosa: «' + aviso + '»');
     console.log('OK si entra otro usuario antes de los 4 s del arranque, el aviso dice que entró otro');
+    await ctx.close();
+  }
+
+  // (z20) a (z24) ORDEN-1b: lo que la pestaña manda al servidor. La pestaña
+  // es de A; entra B en el mismo navegador y la pestaña de A intenta escribir.
+  // Lo que A y B tienen en el servidor, mirado con una sesión aparte. Cada
+  // mirada entra con otra IP inventada, para no gastar el límite de 5
+  // entradas por minuto que usan los casos.
+  let miradas = 0;
+  async function enElServidor(usuario) {
+    const r = await request.newContext({ baseURL: base, extraHTTPHeaders: { 'X-Forwarded-For': '192.0.2.' + (++miradas % 250 + 1) } });
+    const login = await r.post('/auth/login', { data: { username: usuario, password: CLAVE } });
+    if (!login.ok()) falla('no se pudo entrar como ' + usuario + ' para mirar el servidor: ' + login.status());
+    const ops = await (await r.get('/api/operations')).json();
+    const cobro = await (await r.get('/api/billing/me')).json();
+    const clientes = await (await r.get('/api/clientes')).text();
+    await r.dispose();
+    return { operaciones: ops.total, cobradas: cobro.ops_used_this_period, clientes };
+  }
+  const tapada = p => p.evaluate(() => { const d = document.getElementById('pestanaAjena'); return !!(d && d.open); });
+  // Los pedidos que escriben y salen de la pestaña, por ruta.
+  const contarEscrituras = p => {
+    const salen = [];
+    p.on('request', r => { if (!['GET', 'HEAD', 'OPTIONS'].includes(r.method())) salen.push(new URL(r.url()).pathname); });
+    return salen;
+  };
+  // Deja la operación en «Validación», lista para generar, mientras la sesión
+  // todavía es de A.
+  async function listaParaGenerar(p, factura) {
+    await cargar(p, factura, [prod('Producto de ' + factura, '84714900100D', 2, 10)]);
+    await p.evaluate(() => CDI.goTo('validating'));
+    await p.locator('#validatingGenerate').waitFor({ state: 'visible', timeout: 10000 });
+    await p.waitForFunction(() => !document.getElementById('validatingGenerate').disabled, null, { timeout: 15000 });
+    await p.fill('#sbtSufijoValor', 'AA(DemoPouchs)-CA00-');
+  }
+  // Aprieta «Generar» por programa (un diálogo modal no lo frena) y espera
+  // cómo termina: 'generado', 'error: <texto>', 'tapada' o null.
+  async function apretarGenerar(p) {
+    await p.evaluate(() => document.getElementById('validatingGenerate').click());
+    for (const hasta = Date.now() + 25000; Date.now() < hasta;) {
+      const fin = await p.evaluate(() => {
+        const visible = id => { const el = document.getElementById(id); return !!(el && !el.hidden && el.offsetParent); };
+        if (visible('readyDone')) return 'generado';
+        if (visible('readyError')) return 'error: ' + document.getElementById('readyErrorText').textContent.trim();
+        return null;
+      });
+      if (fin) return (await tapada(p)) ? 'tapada, ' + fin : fin;
+      if (await tapada(p)) return 'tapada';
+      await p.waitForTimeout(200);
+    }
+    return null;
+  }
+  // Retiene /auth/current_user de la pestaña hasta soltar(); con `ms`, sólo
+  // lo demora.
+  async function retenerUsuario(p, ms) {
+    let soltar;
+    const suelta = ms ? null : new Promise(r => { soltar = r; });
+    await p.route('**/auth/current_user', async ruta => {
+      await (suelta || new Promise(r => setTimeout(r, ms)));
+      return ruta.continue().catch(() => {});
+    });
+    return () => soltar && soltar();
+  }
+  async function nadaEnElServidor(a, otro, que, cliente) {
+    for (const u of [a, otro]) {
+      const s = await enElServidor(u);
+      if (s.operaciones || s.cobradas) falla(que + ' y quedó una operación en la cuenta de ' + (u === a ? 'A' : 'B') + ': ' + s.operaciones + ' creadas, ' + s.cobradas + ' cobradas');
+      if (cliente && s.clientes.includes(cliente)) falla(que + ' y el cliente quedó en la cuenta de ' + (u === a ? 'A' : 'B'));
+    }
+  }
+  // Como un servidor que no exige CSRF: cada escritura llega con el token de
+  // la cookie de ahora, sea cual sea el que mandó la pestaña.
+  async function sinCsrf(ctx, p) {
+    await p.route(r => !/^\/(static|health)/.test(new URL(r).pathname), async ruta => {
+      const pedido = ruta.request();
+      if (['GET', 'HEAD', 'OPTIONS'].includes(pedido.method())) return ruta.fallback();
+      const token = ((await ctx.cookies()).find(c => c.name === 'csrf_token') || {}).value;
+      return ruta.fallback({ headers: Object.assign({}, pedido.headers(), { 'x-csrf-token': token || '' }) });
+    });
+  }
+  const generarConOtro = (nombre, que, antes, espera) => async () => {
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    const a = await nuevoUsuario(ctx, nombre);
+    const t = await abrir(ctx);
+    await listaParaGenerar(t, 'GEN-' + nombre);
+    const soltar = antes ? await antes(t) : () => {};
+    const otro = await nuevoUsuario(ctx, nombre + 'b');
+    if (espera) await espera(t);
+    const salen = contarEscrituras(t);
+    const fin = await apretarGenerar(t);
+    soltar();
+    await nadaEnElServidor(a, otro, que, null);
+    const generados = salen.filter(x => x === '/generate_maria').length;
+    await ctx.close();
+    return { fin, generados };
+  };
+  // (z20) Generar con B adentro: (i) enseguida, antes de que la pestaña se
+  // entere (pregunta quién es, no sale y se tapa); (ii) con el aviso ya en
+  // pantalla (no sale); (iii) sin poder comprobar quién es (error).
+  if (corre('z20')) {
+    let que = 'entró otro usuario y la pestaña de A generó enseguida';
+    let r = await generarConOtro('ord1z20a', que, t => retenerUsuario(t, 3000))();
+    if (r.generados) falla(que + ' y el pedido de generar salió de la pestaña ' + r.generados + ' vez/veces');
+    if (!/^tapada/.test(r.fin || '')) falla(que + ' y la pestaña no se tapa: ' + r.fin);
+    console.log('OK ' + que + ': el pedido no sale y la pestaña se tapa');
+
+    que = 'entró otro usuario, la pestaña de A ya lo avisa y genera';
+    r = await generarConOtro('ord1z20b', que, null, t => t.waitForFunction(() =>
+      /Entró otro usuario/.test(document.getElementById('avisoBorrador').textContent), null, { timeout: 4 * INTERVALO_MS }))();
+    if (r.generados) falla(que + ' y el pedido de generar salió de la pestaña ' + r.generados + ' vez/veces');
+    if (!/^tapada/.test(r.fin || '')) falla(que + ' y la pestaña no está tapada: ' + r.fin);
+    console.log('OK ' + que + ': el pedido no sale y la pestaña está tapada');
+
+    que = 'entró otro usuario y la pestaña de A genera sin poder comprobar quién es';
+    r = await generarConOtro('ord1z20c', que, t => retenerUsuario(t))();
+    if (!/^error: .*No se pudo comprobar la sesión/.test(r.fin || '')) falla(que + ' y no muestra el error: ' + r.fin);
+    console.log('OK ' + que + ': no se crea ni se cobra nada y avisa el error');
+  }
+
+  // (z21) Otra familia de escritura: guardar un cliente con B adentro, con
+  // un servidor que no exige CSRF.
+  if (corre('z21')) {
+    const que = 'entró otro usuario y la pestaña de A guardó un cliente';
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    const a = await nuevoUsuario(ctx, 'ord1z21');
+    const t = await abrir(ctx);
+    await t.waitForLoadState('networkidle');
+    await sinCsrf(ctx, t);
+    const soltar = await retenerUsuario(t, 3000);
+    const otro = await nuevoUsuario(ctx, 'ord1z21b');
+    const cliente = 'Cliente demo ' + otro;
+    const res = await t.evaluate(n => CDI.api('/api/clientes', { method: 'POST', body: JSON.stringify({ nombre: n }) })
+      .then(r => 'status ' + r.status, e => 'error: ' + e.message), cliente);
+    soltar();
+    await nadaEnElServidor(a, otro, que, cliente);
+    if (!(await tapada(t))) falla(que + ' (' + res + ') y la pestaña no se tapa');
+    console.log('OK ' + que + ': no queda en ninguna cuenta y la pestaña se tapa');
+    await ctx.close();
+  }
+
+  // (z22) A sale y vuelve a entrar y genera enseguida: la pestaña confirma
+  // que sigue siendo A y genera, sin taparse.
+  if (corre('z22')) {
+    const que = 'A salió, volvió a entrar y generó enseguida';
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    const a = await nuevoUsuario(ctx, 'ord1z22');
+    const t = await abrir(ctx);
+    await t.waitForLoadState('networkidle');  // como en (m)
+    await listaParaGenerar(t, 'GEN-Z22');
+    const soltar = await retenerUsuario(t, 3000);
+    const salida = await ctx.request.post(base + '/auth/logout');
+    if (!salida.ok()) falla('no se pudo salir: ' + salida.status());
+    await entrar(ctx, a);
+    const fin = await apretarGenerar(t);
+    soltar();
+    if (fin !== 'generado') falla(que + ' y no generó: ' + fin);
+    const s = await enElServidor(a);
+    if (s.operaciones !== 1) falla(que + ' y A tiene ' + s.operaciones + ' operaciones en el servidor');
+    console.log('OK ' + que + ': genera sin falsos bloqueos');
+    await ctx.close();
+  }
+
+  // (z23) Lo mismo que (z20) con un servidor que no exige CSRF (desarrollo,
+  // o producción si se apaga): el freno es de la pestaña, no del servidor.
+  if (corre('z23')) {
+    const que = 'con un servidor que no exige CSRF, entró otro usuario y la pestaña de A generó enseguida';
+    const r = await generarConOtro('ord1z23', que, async t => {
+      await sinCsrf(t.context(), t);
+      return retenerUsuario(t, 3000);
+    })();
+    if (r.generados) falla(que + ' y el pedido de generar salió de la pestaña ' + r.generados + ' vez/veces');
+    if (!/^tapada/.test(r.fin || '')) falla(que + ' y la pestaña no se tapa: ' + r.fin);
+    console.log('OK ' + que + ': el pedido no sale y la pestaña se tapa');
+  }
+
+  // (z24) Salir desde la pestaña de A con B adentro, antes de que se entere:
+  // la sesión de B sigue abierta.
+  if (corre('z24')) {
+    const que = 'entró otro usuario y A apretó «Salir» en su pestaña';
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    await nuevoUsuario(ctx, 'ord1z24');
+    const t = await abrir(ctx);
+    await t.waitForLoadState('networkidle');
+    const soltar = await retenerUsuario(t, 3000);
+    await nuevoUsuario(ctx, 'ord1z24b');
+    const salidas = contarEscrituras(t);
+    await t.evaluate(() => { CDI.logout(); });
+    await t.waitForFunction(() => {
+      const d = document.getElementById('pestanaAjena');
+      return (d && d.open) || location.pathname !== '/dashboard';
+    }, null, { timeout: 25000 }).catch(() => {});
+    soltar();
+    const sigue = await ctx.request.get(base + '/auth/current_user');
+    if (!sigue.ok()) falla(que + ' y cerró la sesión de B (' + sigue.status() + '; salió ' + salidas.join(', ') + ')');
+    if (!(await tapada(t))) falla(que + ' y la pestaña no se tapa');
+    console.log('OK ' + que + ': la sesión de B sigue abierta y la pestaña se tapa');
     await ctx.close();
   }
 
