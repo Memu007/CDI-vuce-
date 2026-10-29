@@ -6,6 +6,7 @@
 # (B), tests/test_cobro_mp1_cde.py (C y E), la carrera de D en un Postgres 16
 # descartable (scripts/testing/cobro_mp1d_postgres.py, con con_pg16.sh) y la
 # pantalla del perfil (scripts/testing/pantalla_cobro_mp1.js; PUERTO, 8854).
+# La vuelta 3 (h) con tests/test_cobro_mp1_h.py; j y D13 (c) con tests/test_cobro_mp1_cde.py.
 # La del 2026-10-29 (vuelta 2, a a g) con tests/test_cobro_mp1_vuelta2.py,
 # tests/test_cobro_corte1.py (g), la carrera de a y de D31 y los datos que no entran en
 # su columna (b) en Postgres (scripts/testing/cobro_mp1_postgres.py) y la pantalla v1
@@ -206,14 +207,10 @@ sabotaje $M "una respuesta que no es JSON rompe" \
   $'    except ValueError as e:\n        raise _MPIlegible(f"cobro {cobro_id}: la respuesta no es JSON")' \
   $'    except KeyError as e:\n        raise _MPIlegible(f"cobro {cobro_id}: la respuesta no es JSON")' \
   "FAILED $T1::test_el_cobro_que_mercado_pago_no_contesta_bien_no_aplica_nada[no_es_json]"
-sabotaje $M "un cobro sin suscripción se aplica" \
-  '        if renovacion and not suscripcion_del_cobro:' \
-  '        if False:' \
-  "FAILED $V::test_un_cobro_con_su_pago_y_sin_suscripcion_legible_queda_rechazado[sin_suscripcion]"
 sabotaje $M "la suscripción del cobro no se valida" \
   '    return pago_id, _id_mp(cobro.get("preapproval_id"))' \
   '    return pago_id, cobro.get("preapproval_id")' \
-  "FAILED $V::test_una_renovacion_sin_referencia_y_con_un_id_de_suscripcion_que_no_sirve_queda_rechazada[con_ruta]"
+  "FAILED $V::test_una_renovacion_sin_referencia_y_con_un_id_de_suscripcion_que_no_sirve_reintenta[con_ruta]"
 sabotaje $M "un id de suscripción del pago que no sirve se pide igual" \
   '    suscripcion_id = _id_mp(leido)' \
   '    suscripcion_id = leido' \
@@ -227,12 +224,12 @@ sabotaje $M "un id booleano pasa" \
   '    if not isinstance(valor, (str, int)):' \
   "FAILED $V::test_un_pago_aprobado_sin_id_reconocible_reintenta[booleano]"
 sabotaje $M "la renovación no toma la referencia de la suscripción" \
-  '                pay_resp["external_reference"] = sus.get("external_reference")' \
-  '                pass' \
+  '            pay_resp = {**pay_resp, "external_reference": sus.get("external_reference")}' \
+  '            pass' \
   "FAILED $T1::test_una_renovacion_extiende_el_periodo_una_sola_vez[ipn]"
 sabotaje $M "la suscripción ilegible de una renovación no reintenta" \
-  $'_consultar_mp(lambda: sdk.preapproval().get(suscripcion_del_cobro),\n                                    f"suscripción {suscripcion_del_cobro}")' \
-  '(sdk.preapproval().get(suscripcion_del_cobro).get("response") or {})' \
+  '_consultar_mp(lambda: sdk.preapproval().get(suscripcion), f"suscripción {suscripcion}")' \
+  '(sdk.preapproval().get(suscripcion).get("response") or {})' \
   "FAILED $T1::test_si_no_se_puede_leer_la_suscripcion_de_una_renovacion_reintenta"
 sabotaje $M "el pago de la renovación no se ata a su suscripción" \
   '            pay_resp = {**pay_resp, "preapproval_id": suscripcion_del_cobro}' \
@@ -313,7 +310,7 @@ sabotaje $M "b: una referencia que no es texto da 500" \
 sabotaje $M "b: una referencia desconocida no queda rechazada" \
   '                motivo = f"external_reference desconocida: {str(external_ref)[:80]!r}"' \
   '                return {"success": True, "skipped": "x"}' \
-  "FAILED $V::test_un_pago_con_referencia_que_no_sirve_queda_rechazado[nula]"
+  "FAILED $V::test_un_pago_con_referencia_que_no_sirve_queda_rechazado[sin_dos_puntos]"
 sabotaje $M "b: el formato viejo sin payer da 500" \
   '"payment_customer_id": billing_service.cliente_mp(pay_resp),' \
   '"payment_customer_id": str(pay_resp.get("payer").get("id", "")),' \
@@ -390,6 +387,38 @@ sabotaje $M "f: el link mira los extras del usuario y no los de su organización
   'recarga_entra(entidad)' \
   'recarga_entra(db_user)' \
   "FAILED $V::test_con_el_tope_lleno_no_se_arma_el_link_de_recarga[95-organizacion]"
+
+# ── Vuelta 3, h: lo que todavía no dice de qué cuenta es reintenta ──
+T="tests/test_cobro_mp1_h.py $V"
+H3T=tests/test_cobro_mp1_h.py
+sabotaje $M "h: sin cuenta queda rechazado (la regla de la vuelta 2)" \
+  '        sin_cuenta = external_ref in (None, "")' \
+  '        sin_cuenta = False' \
+  "FAILED $H3T::test_los_dos_avisos_de_una_renovacion_la_acreditan_una_vez[pago_sin_nada-pago_primero-usuario]"
+sabotaje $M "h: un cobro sin suscripción queda rechazado (la regla de la vuelta 2)" \
+  $'        motivo = None\n        update = None if sin_cuenta else' \
+  $'        motivo = "el cobro no dice de qué suscripción es" if renovacion and not suscripcion_del_cobro else None\n        update = None if sin_cuenta or motivo else' \
+  'if update is None and not sin_cuenta:' 'if update is None and not sin_cuenta and not motivo:' \
+  "FAILED $V::test_un_cobro_sin_suscripcion_legible_se_acredita_como_su_pago[sin_suscripcion]"
+sabotaje $M "h: una referencia vacía queda rechazada" \
+  '        sin_cuenta = external_ref in (None, "")' \
+  '        sin_cuenta = external_ref is None' \
+  "FAILED $H3T::test_sin_referencia_ni_en_el_pago_ni_en_la_suscripcion_reintenta[pago-vacia]"
+sabotaje $M "h: la suscripción no se lee del pago" \
+  '        suscripcion = suscripcion_del_cobro or _suscripcion_del_pago_mp(pay_resp)[1]' \
+  '        suscripcion = suscripcion_del_cobro' \
+  "FAILED $H3T::test_los_dos_avisos_de_una_renovacion_la_acreditan_una_vez[cobro_sin_suscripcion-pago_con_metadata-pago_primero-usuario]"
+sabotaje $M "h: un cobro con su pago pendiente no reintenta" \
+  '            if renovacion and pay_resp.get("status") in ("pending", "in_process", "authorized"):' \
+  '            if False:' \
+  "FAILED $H3T::test_un_cobro_con_el_pago_pendiente_no_se_pierde[pending-pago_sin_nada-usuario]"
+sabotaje $M "h: un cobro con su pago en proceso no reintenta" \
+  '("pending", "in_process", "authorized")' '("pending", "authorized")' \
+  "FAILED $H3T::test_un_cobro_con_el_pago_pendiente_no_se_pierde[in_process-pago_sin_nada-usuario]"
+sabotaje $M "h: un pago sin cuenta que el otro aviso ya aplicó reintenta igual" \
+  $'    if await session.get(PagoMercadoPagoAplicado, str(payment_id)) is not None:\n        return {"success": True, "skipped": "payment_id ya procesado"}\n    raise _MPIlegible(f"el pago {payment_id} todavía' \
+  $'    raise _MPIlegible(f"el pago {payment_id} todavía' \
+  "FAILED $H3T::test_un_pago_sin_cuenta_que_otro_aviso_ya_aplico_no_reintenta_mas"
 
 # ── Devolución del 2026-10-28: B, C, D y E ──
 # B: la exportación cuenta la operación (tests/test_cobro_corte1.py).
@@ -470,6 +499,12 @@ sabotaje $M "D13: la cancelada no puede cancelar la autorizada que la frena" \
   'cancelada_con_suscripcion = db_user.billing_status == "canceled" and db_user.mp_preapproval_id' \
   'cancelada_con_suscripcion = False' \
   "FAILED $T::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[cancelada_vieja]"
+
+# j: Mercado Pago no conoce la suscripción guardada.
+sabotaje $M "j: un 404 de Mercado Pago deja el checkout en 503" \
+  $'    if resp.status_code == 404 and metodo == "GET":\n' \
+  $'    if False:\n' \
+  "FAILED $T::test_si_mp_no_conoce_la_suscripcion_vieja_el_checkout_crea_la_nueva"
 
 # Las carreras, en un Postgres 16 descartable: D (dos checkouts) y, de la
 # vuelta 2, a (dos pagos de la misma cuenta) y D31 (el mismo pago dos veces).
