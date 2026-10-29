@@ -452,6 +452,7 @@ def test_guardar_sin_kilo_no_inventa_el_peso(auth_override, client):
     ({"valor_unitario": -1}, "El valor unitario tiene que ser un número positivo."),
     ({"kilo_neto": True}, "El kilo neto no es un número."),
     pytest.param({"origen": "ıt"}, "No reconozco el origen", id="i sin punto"),
+    pytest.param({"origen": "ﬁ"}, "No reconozco el origen", id="ligadura"),
     pytest.param({"origen": 12}, "El origen tiene que ser el código de dos letras.", id="origen numero"),
 ])
 def test_guardar_es_todo_o_nada(auth_override, client, cambio, problema):
@@ -2121,11 +2122,12 @@ def test_confirmar_algo_que_no_es_un_ncm_da_400_y_no_guarda_nada(auth_override, 
     ("123", "No reconozco el origen «123»: usá el código de dos letras."),
     ("ZZ", "No reconozco el origen «ZZ»: usá el código de dos letras."),
     ("china", "No reconozco el origen «china»: usá el código de dos letras."),
-    # En mayúsculas serían «IT» y «SS»: el código se mira como se escribió.
+    # En mayúsculas serían «IT», «FI» y «SS»: el código se mira como se escribió.
     ("ıt", "No reconozco el origen «ıt»: usá el código de dos letras."),
+    ("ﬁ", "No reconozco el origen «ﬁ»: usá el código de dos letras."),
     ("ß", "No reconozco el origen «ß»: usá el código de dos letras."),
 ], ids=["lista", "numero", "ancho completo", "acento", "tres letras", "numeros", "pais que no existe", "nombre",
-        "i sin punto", "ese aguda"])
+        "i sin punto", "ligadura", "ese aguda"])
 def test_cambiar_el_origen_valida_igual_que_guardar(auth_override, client, origen, detalle):
     cid = _crear_cliente(client)
     pid = _provisorio(client, cid)

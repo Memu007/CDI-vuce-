@@ -728,6 +728,14 @@ sabotaje "operación sin resumen no es vacía" proyecto_maria/main.py \
 ' \
   '' \
   "$VACIA[sin nada]" "$VACIA[nulos]"
+sabotaje "operación vacía cuenta un producto" proyecto_maria/main.py \
+  'total_items=int(resumen.get("items", len(items))),' \
+  'total_items=int(resumen.get("items", len(items) + 1)),' \
+  "$VACIA[sin nada]" "$VACIA[nulos]"
+sabotaje "operación vacía con valor" proyecto_maria/main.py \
+  'total_value=float(resumen.get("valor_total", 0) or 0),' \
+  'total_value=float(resumen.get("valor_total", 0) or 1),' \
+  "$VACIA[sin nada]" "$VACIA[nulos]"
 RES=test_una_operacion_con_un_resumen_que_no_es_un_objeto_da_400
 sabotaje "operación sin revisar el resumen" proyecto_maria/main.py \
   '        if not isinstance(resumen, dict):
@@ -789,7 +797,8 @@ sabotaje "el origen se mira en mayúsculas" "$LECTOR" \
 ' \
   '    escrito = (valor or "").strip().upper()
 ' \
-  "$TODO_O_NADA[i sin punto]" "$ORI[nombre]" "$ORI[i sin punto]" "$ORI[ese aguda]"
+  "$TODO_O_NADA[i sin punto]" "$TODO_O_NADA[ligadura]" "$ORI[nombre]" "$ORI[i sin punto]" "$ORI[ligadura]" \
+  "$ORI[ese aguda]"
 sabotaje "el origen que no es texto" "$LECTOR" \
   '    if not isinstance(valor, (str, type(None))):
         return None, "El origen tiene que ser el código de dos letras."
