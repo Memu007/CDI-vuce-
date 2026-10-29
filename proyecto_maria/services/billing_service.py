@@ -321,11 +321,20 @@ def process_payment(payment_info: dict[str, Any]) -> dict[str, Any] | None:
     if payment_info.get("status") != "approved":
         return None
 
-    external_ref = payment_info.get("external_reference", "")
-    if ":" not in external_ref:
+    external_ref = payment_info.get("external_reference")
+    if not isinstance(external_ref, str):
         return None
+    parts = external_ref.split(":")
+    if len(parts) == 3 and parts[0] == "org" and parts[1]:
+        cuenta = {"org_id": parts[1]}
+    elif len(parts) == 2 and parts[0]:
+        # «org:premium» es el plan del usuario «org» (COBRO-MP-1, b).
+        cuenta = {"username": parts[0]}
+    else:
+        return None
+    kind = parts[-1]
 
-    payer_id = str(payment_info.get("payer", {}).get("id", "") or "")
+    payer_id = str(_objeto(payment_info, "payer").get("id", "") or "")
     payment_id = str(payment_info.get("id", "") or "")
     now = datetime.now(timezone.utc)
 
@@ -334,19 +343,8 @@ def process_payment(payment_info: dict[str, Any]) -> dict[str, Any] | None:
         "payment_customer_id": payer_id or payment_id,
         "payment_method_last4": _last4_from_payment(payment_info),
         "payment_method_brand": _brand_from_payment(payment_info),
+        **cuenta,
     }
-
-    # Formato org: {org_id}:{kind}
-    if external_ref.startswith("org:"):
-        parts = external_ref.split(":")
-        if len(parts) != 3:
-            return None
-        org_id, kind = parts[1], parts[2]
-        base_update["org_id"] = org_id
-    else:
-        # Formato individual: {username}:{kind}
-        username, kind = external_ref.split(":", 1)
-        base_update["username"] = username
 
     if kind == "topup":
         return {
@@ -371,8 +369,14 @@ def process_payment(payment_info: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+def _objeto(datos: dict[str, Any], campo: str) -> dict[str, Any]:
+    """Un dato secundario del pago, que Mercado Pago puede mandar en null."""
+    valor = datos.get(campo)
+    return valor if isinstance(valor, dict) else {}
+
+
 def _last4_from_payment(payment_info: dict[str, Any]) -> str | None:
-    card = payment_info.get("card", {})
+    card = _objeto(payment_info, "card")
     last4 = card.get("last_four_digits") or card.get("last4")
     if last4:
         return str(last4)
@@ -380,5 +384,5 @@ def _last4_from_payment(payment_info: dict[str, Any]) -> str | None:
 
 
 def _brand_from_payment(payment_info: dict[str, Any]) -> str | None:
-    card = payment_info.get("card", {})
-    return card.get("payment_method", {}).get("name") or card.get("network")
+    card = _objeto(payment_info, "card")
+    return _objeto(card, "payment_method").get("name") or card.get("network")

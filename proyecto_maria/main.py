@@ -4954,7 +4954,9 @@ async def generate_maria_export_endpoint(
         
         # Guardar archivo temporal en la carpeta propia del usuario (ver
         # _user_downloads_dir): el nombre sale del nro de factura y es adivinable.
-        filename = f"MARIA_EXPORT_{safe_id}.TXT"
+        # «MARIA-EXPORT_», con guion: con «_» la importación del id
+        # «EXPORT_<x>» daba el mismo archivo y la misma operación (COBRO-MP-1, g).
+        filename = f"MARIA-EXPORT_{safe_id}.TXT"
         filepath = os.path.join(_user_downloads_dir(user["username"]), filename)
 
         # Cuenta como /generate_maria: la primera vez que se genera este id;
@@ -5922,7 +5924,9 @@ async def _next_op_code(db: AsyncSession, owner_username: str) -> str:
 
 # Contenidos distintos que admite un mismo MARIA_<id>.TXT (COBRO-CORTE-1, D4 b).
 MARIA_REGENERACIONES = 10
-_ARCHIVO_MARIA = re.compile(r"MARIA_[A-Za-z0-9_-]{1,50}\.TXT")
+# Los dos nombres que arman /generate_maria y /generate_maria_export, con el
+# id recortado a 50 (COBRO-MP-1, g).
+_ARCHIVO_MARIA = re.compile(r"MARIA(?:_|-EXPORT_)[A-Za-z0-9_-]{1,50}\.TXT")
 
 
 async def _operacion_maria(db: AsyncSession, owner_username: str, archivo: str):
@@ -10331,9 +10335,24 @@ async def payment_pending():
     """
     return HTMLResponse(content=html)
 
-class _SuscripcionMPIlegible(Exception):
-    """No se pudo leer la suscripción en Mercado Pago: se responde 503 y
-    Mercado Pago reintenta; el pago no queda rechazado para siempre."""
+class _MPIlegible(Exception):
+    """No se pudo leer algo de Mercado Pago (el pago, el cobro o la
+    suscripción): se responde 503 y Mercado Pago reintenta. Lo que se leyó y
+    no sirve no es esto: queda rechazado, a la vista de Emi (COBRO-MP-1, b)."""
+
+
+def _consultar_mp(llamada, que: str) -> dict:
+    """El objeto que devuelve una lectura del SDK de Mercado Pago. En un 4xx
+    el SDK (mercadopago 2.2.0) no levanta: devuelve el estado. Con el token
+    vencido contesta 401 a todo, y eso no es un pago rechazado."""
+    try:
+        resp = llamada()
+    except Exception as e:
+        raise _MPIlegible(f"{que}: {type(e).__name__}") from e
+    if not isinstance(resp, dict) or resp.get("status") != 200 or not isinstance(resp.get("response"), dict):
+        estado = resp.get("status") if isinstance(resp, dict) else type(resp).__name__
+        raise _MPIlegible(f"{que}: {str(estado)[:40]}")
+    return resp["response"]
 
 
 def _monto_mp(valor) -> float | None:
@@ -10358,10 +10377,8 @@ def _control_de_monto_mp(sdk, pay_resp: dict, update: dict, external_ref: str) -
     suscripcion_id = meta.get("preapproval_id") or pay_resp.get("preapproval_id") or datos.get("subscription_id")
 
     if suscripcion_id:
-        resp = sdk.preapproval().get(str(suscripcion_id))
-        if not isinstance(resp, dict) or resp.get("status") != 200 or not isinstance(resp.get("response"), dict):
-            raise _SuscripcionMPIlegible(str(suscripcion_id))
-        suscripcion = resp["response"]
+        suscripcion = _consultar_mp(lambda: sdk.preapproval().get(str(suscripcion_id)),
+                                    f"suscripción {suscripcion_id}")
         if suscripcion.get("external_reference") != external_ref:
             return None, f"la suscripción {suscripcion_id} es de otra cuenta"
         recurrente = suscripcion.get("auto_recurring") if isinstance(suscripcion.get("auto_recurring"), dict) else {}
@@ -10387,14 +10404,6 @@ def _control_de_monto_mp(sdk, pay_resp: dict, update: dict, external_ref: str) -
     return esperado, None
 
 
-class _CobroMPIlegible(Exception):
-    """Mercado Pago no contestó el cobro autorizado: 503 y reintenta."""
-
-
-class _CobroMPFormaInesperada(Exception):
-    """El cobro autorizado no tiene la forma esperada: no se aplica nada."""
-
-
 # Ids de Mercado Pago (cobros y pagos) que llegan en un aviso que puede no
 # venir firmado: sólo esto, para que no cambien la ruta que se le pide.
 _ID_COBRO_MP = re.compile(r"[0-9A-Za-z_-]{1,64}")
@@ -10406,19 +10415,19 @@ def _leer_cobro_autorizado_mp(cobro_id: str) -> dict:
     id llega en un aviso que puede no venir firmado: sólo letras, números,
     «-» y «_», para que no cambie la ruta que se pide."""
     if not isinstance(cobro_id, str) or not _ID_COBRO_MP.fullmatch(cobro_id):
-        raise _CobroMPFormaInesperada(f"id de cobro inválido: {str(cobro_id)[:80]!r}")
+        raise ValueError(f"id de cobro inválido: {str(cobro_id)[:80]!r}")
     try:
         with httpx.Client(timeout=10) as cliente:
             resp = cliente.get(f"https://api.mercadopago.com/authorized_payments/{cobro_id}",
                                headers={"Authorization": f"Bearer {MP_ACCESS_TOKEN}"})
     except httpx.HTTPError as e:
-        raise _CobroMPIlegible(f"{cobro_id}: {type(e).__name__}") from e
+        raise _MPIlegible(f"cobro {cobro_id}: {type(e).__name__}") from e
     if resp.status_code != 200:
-        raise _CobroMPIlegible(f"{cobro_id}: HTTP {resp.status_code}")
+        raise _MPIlegible(f"cobro {cobro_id}: HTTP {resp.status_code}")
     try:
         return resp.json()
     except ValueError as e:
-        raise _CobroMPFormaInesperada(f"{cobro_id}: la respuesta no es JSON") from e
+        raise _MPIlegible(f"cobro {cobro_id}: la respuesta no es JSON") from e
 
 
 class _SuscripcionMPError(Exception):
@@ -10476,20 +10485,17 @@ def _demo_permitida() -> bool:
 
 
 def _pago_del_cobro_mp(cobro) -> tuple:
-    """(id del pago, id de la suscripción) de un cobro autorizado, según la
-    documentación pública de Mercado Pago (COBRO-MP-1, D30: no se pudo
-    confirmar contra un aviso real). Lo que no tenga esa forma levanta
-    _CobroMPFormaInesperada y no se aplica nada. El estado no se toma del
-    cobro: lo decide el pago, que se lee después."""
-    if not isinstance(cobro, dict):
-        raise _CobroMPFormaInesperada("el cobro no es un objeto")
-    suscripcion_id, pago = cobro.get("preapproval_id"), cobro.get("payment")
-    if not isinstance(suscripcion_id, str) or not suscripcion_id:
-        raise _CobroMPFormaInesperada("el cobro no dice de qué suscripción es")
-    if not isinstance(pago, dict) or not isinstance(pago.get("id"), (str, int)) \
-            or isinstance(pago.get("id"), bool) or not str(pago.get("id")):
-        raise _CobroMPFormaInesperada("el cobro no dice qué pago lo cobró")
-    return str(pago["id"]), suscripcion_id
+    """(id del pago, id de la suscripción o None) de un cobro autorizado,
+    según la documentación pública de Mercado Pago (COBRO-MP-1, D30: no se
+    pudo confirmar contra un aviso real). Sin el pago no hay qué registrar:
+    _MPIlegible, y Mercado Pago reintenta hasta que el cobro lo diga. El
+    estado no se toma del cobro: lo decide el pago, que se lee después."""
+    pago = cobro.get("payment") if isinstance(cobro, dict) else None
+    pago_id = pago.get("id") if isinstance(pago, dict) else None
+    if not isinstance(pago_id, (str, int)) or isinstance(pago_id, bool) or not _ID_COBRO_MP.fullmatch(str(pago_id)):
+        raise _MPIlegible("el cobro todavía no dice qué pago lo cobró")
+    suscripcion_id = cobro.get("preapproval_id")
+    return str(pago_id), (suscripcion_id if isinstance(suscripcion_id, str) and suscripcion_id else None)
 
 
 async def _registrar_pago_mp(session, payment_id: str, cuenta: str, update: dict, pay_resp: dict,
@@ -10548,6 +10554,15 @@ async def _rechazar_pago_mp(session, payment_id: str, cuenta: str, motivo: str) 
     if await _guardar_pago_mp(session):
         logging.getLogger("mp_webhook").warning("Webhook MP: pago %s de %s RECHAZADO: %s", payment_id, cuenta, motivo)
     return {"success": True, "skipped": f"pago rechazado: {motivo}"}
+
+
+async def _rechazar_sin_cuenta_mp(session, payment_id: str, cuenta: str, update: dict, pay_resp: dict,
+                                  motivo: str) -> dict:
+    """Un pago aprobado que no se puede aplicar a ninguna cuenta queda
+    rechazado, a la vista de Emi: reintentar no lo arregla (COBRO-MP-1, b)."""
+    if await _registrar_pago_mp(session, payment_id, cuenta, update, pay_resp, (None, motivo)) is None:
+        return {"success": True, "skipped": "payment_id ya procesado"}
+    return await _rechazar_pago_mp(session, payment_id, cuenta, motivo)
 
 
 async def _guardar_pago_mp(session) -> bool:
@@ -10639,9 +10654,10 @@ async def mercadopago_webhook(request: Request):
       - user.payment_customer_id = <id del payer MP>
 
     HTTP status:
-      - 200 → procesado OK (MP no reintenta).
-      - 400 → datos inválidos o usuario no existe (MP reintenta, alerta).
+      - 200 → aplicado, o rechazado y anotado en mp_pagos_aplicados (MP no reintenta).
+      - 400 → aviso sin id de pago o sin token (MP reintenta, alerta).
       - 401 → firma inválida (MP no reintenta, ataque).
+      - 503 → no se pudo leer Mercado Pago (MP reintenta).
       - 500 → bug inesperado (MP reintenta).
     """
     import logging
@@ -10700,198 +10716,122 @@ async def mercadopago_webhook(request: Request):
         # Renovación de una suscripción: el aviso trae el cobro autorizado; de
         # ahí sale el pago, que se aplica como cualquier otro, controlado
         # contra el monto de la suscripción (COBRO-MP-1, paso 4).
-        suscripcion_del_cobro = None
+        renovacion, suscripcion_del_cobro = False, None
         if event_type == "subscription_authorized_payment":
-            try:
-                payment_id, suscripcion_del_cobro = _pago_del_cobro_mp(
-                    _leer_cobro_autorizado_mp(payment_id))
-            except _CobroMPIlegible as e:
-                logger.warning("Webhook MP: no se pudo leer el cobro autorizado %s", e)
-                raise HTTPException(status_code=503, detail="No se pudo leer el cobro. MP reintentará.")
-            except _CobroMPFormaInesperada as e:
-                logger.warning("Webhook MP: cobro autorizado con forma inesperada, no se aplica: %s", e)
-                return {"success": True, "skipped": "cobro autorizado con forma inesperada"}
-            event_type = "payment"
+            payment_id, suscripcion_del_cobro = _pago_del_cobro_mp(_leer_cobro_autorizado_mp(payment_id))
+            renovacion, event_type = True, "payment"
 
         if event_type != "payment":
             return {"success": True, "skipped": "not a payment event"}
 
         sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
-        payment_info = sdk.payment().get(payment_id)
-        pay_resp = payment_info.get("response", {}) if isinstance(payment_info, dict) else {}
+        pay_resp = _consultar_mp(lambda: sdk.payment().get(payment_id), f"pago {payment_id}")
 
         if pay_resp.get("status") != "approved":
             return {"success": True, "skipped": f"status={pay_resp.get('status')}"}
 
         # El pago se registra con el id que devuelve Mercado Pago: «0123» y
         # «123» son el mismo pago para su API y no pueden aplicarse dos veces.
+        # Sin ese id no hay con qué registrarlo: que Mercado Pago reintente.
         canonico = pay_resp.get("id")
         payment_id = str(canonico) if isinstance(canonico, (str, int)) and not isinstance(canonico, bool) else ""
         if not _ID_COBRO_MP.fullmatch(payment_id):
-            logger.warning("Webhook MP: pago aprobado sin id reconocible, no se aplica")
-            return {"success": True, "skipped": "pago con forma inesperada"}
+            raise _MPIlegible(f"pago aprobado sin id reconocible: {str(canonico)[:80]!r}")
 
-        if suscripcion_del_cobro:
+        motivo = None
+        if renovacion and not suscripcion_del_cobro:
+            motivo = "el cobro no dice de qué suscripción es"
+        elif suscripcion_del_cobro:
             # El pago de una renovación puede no traer la referencia: la tiene
             # la suscripción. El control del monto la vuelve a comparar.
             pay_resp = {**pay_resp, "preapproval_id": suscripcion_del_cobro}
             if not pay_resp.get("external_reference"):
-                resp_sus = sdk.preapproval().get(suscripcion_del_cobro)
-                if not isinstance(resp_sus, dict) or resp_sus.get("status") != 200:
-                    logger.warning("Webhook MP: no se pudo leer la suscripción %s", suscripcion_del_cobro)
-                    raise HTTPException(status_code=503, detail="No se pudo leer la suscripción. MP reintentará.")
-                sus = resp_sus.get("response")
-                ref = sus.get("external_reference") if isinstance(sus, dict) else None
-                if not isinstance(ref, str) or not ref:
-                    logger.warning("Webhook MP: suscripción %s con forma inesperada (sin referencia), no se aplica",
-                                   suscripcion_del_cobro)
-                    return {"success": True, "skipped": "suscripción con forma inesperada"}
-                pay_resp["external_reference"] = ref
+                sus = _consultar_mp(lambda: sdk.preapproval().get(suscripcion_del_cobro),
+                                    f"suscripción {suscripcion_del_cobro}")
+                pay_resp["external_reference"] = sus.get("external_reference")
 
-        external_ref = pay_resp.get("external_reference", "")
-        logger.info("Webhook MP: pago aprobado payment_id=%s external_ref=%s",
-                    payment_id, external_ref)
+        external_ref = pay_resp.get("external_reference")
+        logger.info("Webhook MP: pago aprobado payment_id=%s external_ref=%s", payment_id, external_ref)
 
-        # Soportar formato viejo username|plan y nuevo username:plan / username:topup
+        update = None if motivo else billing_service.process_payment(pay_resp)
+        if update is None and not motivo:
+            if isinstance(external_ref, str) and "|" in external_ref:
+                # Formato viejo «usuario|plan».
+                username, plan = external_ref.split("|", 1)
+                update = {
+                    "username": username,
+                    "action": "subscription",
+                    "plan": plan if plan in billing_service.PLANS else "premium",
+                    "billing_status": "active",
+                    "trial_ends_at": datetime.now(timezone.utc) + timedelta(days=30),
+                    "payment_provider": "mercadopago",
+                    "payment_customer_id": str(billing_service._objeto(pay_resp, "payer").get("id", "") or payment_id),
+                }
+            else:
+                motivo = f"external_reference desconocida: {str(external_ref)[:80]!r}"
+
         async for session in get_async_session():
-            update = billing_service.process_payment(pay_resp)
-            if update is None:
-                if "|" in external_ref:
-                    username, plan = external_ref.split("|", 1)
-                    update = {
-                        "username": username,
-                        "action": "subscription",
-                        "plan": plan if plan in billing_service.PLANS else "premium",
-                        "billing_status": "active",
-                        "trial_ends_at": datetime.now(timezone.utc) + timedelta(days=30),
-                        "payment_provider": "mercadopago",
-                        "payment_customer_id": str(pay_resp.get("payer", {}).get("id", "") or payment_id),
-                    }
-                else:
-                    logger.warning("Webhook MP: external_reference no reconocida: %s", external_ref)
-                    raise HTTPException(status_code=400, detail="external_reference desconocida")
+            if motivo:
+                return await _rechazar_sin_cuenta_mp(session, payment_id, str(external_ref or "")[:200],
+                                                     update or {}, pay_resp, motivo)
 
-            username = update.get("username")
             org_id = update.get("org_id")
-            try:
-                control = _control_de_monto_mp(sdk, pay_resp, update, external_ref)
-            except _SuscripcionMPIlegible as e:
-                logger.warning("Webhook MP: no se pudo leer la suscripción %s del pago %s", e, payment_id)
-                raise HTTPException(status_code=503, detail="No se pudo leer la suscripción. MP reintentará.")
+            cuenta_ref = f"org:{org_id}" if org_id else update["username"]
+            control = _control_de_monto_mp(sdk, pay_resp, update, external_ref)
             control = await _control_de_fecha_mp(session, pay_resp, control)
 
-            if org_id:
-                # Pago de organización: actualizar la org, no el user
-                result = await session.execute(select(Organization).where(Organization.id == org_id))
-                db_org = result.scalars().first()
-                if not db_org:
-                    logger.warning("Webhook MP: org '%s' no existe en DB", org_id)
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Organización '{org_id}' no existe. MP reintentará."
-                    )
-
-                # Cada pago se aplica una sola vez (COBRO-MP-1). El último pago
-                # de antes del registro sólo quedó en last_payment_id.
-                if db_org.last_payment_id == payment_id:
-                    logger.info("Webhook MP: payment_id=%s ya procesado para org %s", payment_id, org_id)
-                    return {"success": True, "skipped": "payment_id ya procesado"}
-                estado = await _registrar_pago_mp(session, payment_id, f"org:{org_id}", update, pay_resp, control)
-                if estado is None:
-                    logger.info("Webhook MP: payment_id=%s ya procesado para org %s", payment_id, org_id)
-                    return {"success": True, "skipped": "payment_id ya procesado"}
-                if estado == "rechazado":
-                    return await _rechazar_pago_mp(session, payment_id, f"org:{org_id}", control[1])
-                _extender_periodo(db_org, update)
-
-                db_org.last_payment_id = payment_id
-                db_org.plan = update.get("plan", db_org.plan)
-                db_org.billing_status = update.get("billing_status", db_org.billing_status)
-                if "trial_ends_at" in update:
-                    db_org.trial_ends_at = update["trial_ends_at"]
-                if "ops_used_this_period" in update:
-                    db_org.ops_used_this_period = update["ops_used_this_period"]
-                if "extra_ops_remaining" in update:
-                    total = (db_org.extra_ops_remaining or 0) + update["extra_ops_remaining"]
-                    db_org.extra_ops_remaining = min(total, billing_service.EXTRA_OPS_MAX)
-                if "billing_period_started_at" in update:
-                    db_org.billing_period_started_at = update["billing_period_started_at"]
-                if "last_topup_at" in update:
-                    db_org.last_topup_at = update["last_topup_at"]
-                if "extra_ops_expires_at" in update:
-                    db_org.extra_ops_expires_at = update["extra_ops_expires_at"]
-                if "payment_provider" in update:
-                    db_org.payment_provider = update["payment_provider"]
-                if "payment_customer_id" in update:
-                    db_org.payment_customer_id = update["payment_customer_id"]
-                if "payment_method_last4" in update and update["payment_method_last4"]:
-                    db_org.payment_method_last4 = update["payment_method_last4"]
-                if "payment_method_brand" in update and update["payment_method_brand"]:
-                    db_org.payment_method_brand = update["payment_method_brand"]
-
-                if not await _guardar_pago_mp(session):
-                    return {"success": True, "skipped": "payment_id ya procesado"}
-                logger.info("Webhook MP: pago sincronizado org=%s action=%s payment_id=%s",
-                            org_id, update.get("action"), payment_id)
-                break
-
-            # Pago individual: actualizar el user (flujo existente)
-            result = await session.execute(select(User).where(User.username == username))
-            db_user = result.scalars().first()
-
-            if not db_user:
-                logger.warning("Webhook MP: usuario '%s' no existe en DB", username)
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Usuario '{username}' no existe. MP reintentará."
-                )
+            # El candado sobre la cuenta pone en fila los pagos distintos que
+            # llegan a la vez: sin él, los dos leen el mismo estado y el
+            # segundo pisa al primero (COBRO-MP-1, a).
+            consulta = (select(Organization).where(Organization.id == org_id) if org_id
+                        else select(User).where(User.username == update["username"]))
+            cuenta = (await session.execute(consulta.with_for_update())).scalars().first()
+            if cuenta is None:
+                return await _rechazar_sin_cuenta_mp(session, payment_id, cuenta_ref, update, pay_resp,
+                                                     f"la cuenta {cuenta_ref} no existe")
 
             # Cada pago se aplica una sola vez (COBRO-MP-1). El último pago
             # de antes del registro sólo quedó en last_payment_id.
-            if db_user.last_payment_id == payment_id:
-                logger.info("Webhook MP: payment_id=%s ya procesado para %s", payment_id, username)
+            if cuenta.last_payment_id == payment_id:
+                logger.info("Webhook MP: payment_id=%s ya procesado para %s", payment_id, cuenta_ref)
                 return {"success": True, "skipped": "payment_id ya procesado"}
-            estado = await _registrar_pago_mp(session, payment_id, username, update, pay_resp, control)
+            if update.get("action") == "topup" and not control[1]:
+                billing_service._expire_extra_ops(cuenta)
+                vigentes = cuenta.extra_ops_remaining or 0
+                if vigentes + update["extra_ops_remaining"] > billing_service.EXTRA_OPS_MAX:
+                    control = (control[0], f"la recarga no entra: ya tiene {vigentes} operaciones extra "
+                                           f"y el tope es {billing_service.EXTRA_OPS_MAX}")
+            estado = await _registrar_pago_mp(session, payment_id, cuenta_ref, update, pay_resp, control)
             if estado is None:
-                logger.info("Webhook MP: payment_id=%s ya procesado para %s", payment_id, username)
+                logger.info("Webhook MP: payment_id=%s ya procesado para %s", payment_id, cuenta_ref)
                 return {"success": True, "skipped": "payment_id ya procesado"}
             if estado == "rechazado":
-                return await _rechazar_pago_mp(session, payment_id, username, control[1])
-            _extender_periodo(db_user, update)
+                return await _rechazar_pago_mp(session, payment_id, cuenta_ref, control[1])
+            _extender_periodo(cuenta, update)
 
-            db_user.last_payment_id = payment_id
-            db_user.plan = update.get("plan", db_user.plan)
-            db_user.billing_status = update.get("billing_status", db_user.billing_status)
-            if "trial_ends_at" in update:
-                db_user.trial_ends_at = update["trial_ends_at"]
-            if "payment_provider" in update:
-                db_user.payment_provider = update["payment_provider"]
-            if "payment_customer_id" in update:
-                db_user.payment_customer_id = update["payment_customer_id"]
-            if "payment_method_last4" in update and update["payment_method_last4"]:
-                db_user.payment_method_last4 = update["payment_method_last4"]
-            if "payment_method_brand" in update and update["payment_method_brand"]:
-                db_user.payment_method_brand = update["payment_method_brand"]
-            if "ops_used_this_period" in update:
-                db_user.ops_used_this_period = update["ops_used_this_period"]
+            cuenta.last_payment_id = payment_id
+            for campo in ("plan", "billing_status", "trial_ends_at", "ops_used_this_period",
+                          "billing_period_started_at", "last_topup_at", "extra_ops_expires_at",
+                          "payment_provider", "payment_customer_id"):
+                if campo in update:
+                    setattr(cuenta, campo, update[campo])
+            for campo in ("payment_method_last4", "payment_method_brand"):
+                if update.get(campo):
+                    setattr(cuenta, campo, update[campo])
             if "extra_ops_remaining" in update:
-                total = (db_user.extra_ops_remaining or 0) + update["extra_ops_remaining"]
-                db_user.extra_ops_remaining = min(total, billing_service.EXTRA_OPS_MAX)
-            if "billing_period_started_at" in update:
-                db_user.billing_period_started_at = update["billing_period_started_at"]
-            if "last_topup_at" in update:
-                db_user.last_topup_at = update["last_topup_at"]
-            if "extra_ops_expires_at" in update:
-                db_user.extra_ops_expires_at = update["extra_ops_expires_at"]
+                cuenta.extra_ops_remaining = (cuenta.extra_ops_remaining or 0) + update["extra_ops_remaining"]
 
             if not await _guardar_pago_mp(session):
                 return {"success": True, "skipped": "payment_id ya procesado"}
-            logger.info("Webhook MP: pago sincronizado user=%s action=%s payment_id=%s",
-                        username, update.get("action"), payment_id)
+            logger.info("Webhook MP: pago sincronizado %s action=%s payment_id=%s",
+                        cuenta_ref, update.get("action"), payment_id)
             break
 
         return {"success": True}
 
+    except _MPIlegible as e:
+        logger.warning("Webhook MP: no se pudo leer Mercado Pago (%s); reintentará", e)
+        raise HTTPException(status_code=503, detail="No se pudo leer Mercado Pago. MP reintentará.")
     except HTTPException:
         raise
     except Exception as e:
@@ -10917,9 +10857,17 @@ async def billing_topup(
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    org_id = db_user.organization_id or None
+    # Una recarga que no entra en el tope se rechazaría al pagarla: no se
+    # arma el link (COBRO-MP-1, f).
+    entidad, es_org = await _get_billing_entity(db, db_user)
+    billing_service._expire_extra_ops(entidad)
+    vigentes = entidad.extra_ops_remaining or 0
+    if vigentes + billing_service.TOPUP_OPS > billing_service.EXTRA_OPS_MAX:
+        raise HTTPException(status_code=409, detail=(
+            f"Ya tenés {vigentes} operaciones extra y el tope es {billing_service.EXTRA_OPS_MAX}: "
+            f"una recarga de {billing_service.TOPUP_OPS} no entra. Usá las que tenés y volvé a recargar."))
     try:
-        checkout = billing_service.create_topup_checkout(db_user, org_id=org_id)
+        checkout = billing_service.create_topup_checkout(db_user, org_id=entidad.id if es_org else None)
         return {"success": True, **checkout}
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))

@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-29 · fix: Mercado Pago no cobra dos veces y cuenta bien las operaciones (COBRO-MP-1, vuelta 2)
+
+- **fix(cobro):** dos pagos de la misma cuenta al mismo tiempo se acreditan los dos; si no se puede leer Mercado Pago se responde para que reintente, y un pago que no sirve queda anotado como rechazado en el panel de desarrollo.
+- La recarga no se ofrece si ya tenés el tope de 100 operaciones extra, y te dice por qué; un pago que no entra en el tope queda rechazado a la vista, no aplicado a medias.
+- Una exportación con cliente elegido cuenta una sola operación en la pantalla v1, y los nombres de archivo de exportación ya no chocan con los de importación.
+
 ## 2026-10-29 · fix: una pestaña duplicada no pierde la operación de otra si cambia la sesión (ORDEN-1, vuelta 3)
 
 - **fix(orden):** si mientras una pestaña busca la operación que dejaste entra otro usuario, se cierra la sesión o volvés a entrar, ya no se la muestra al otro usuario ni la deja sin dueño: queda guardada a tu nombre.

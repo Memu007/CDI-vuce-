@@ -407,7 +407,8 @@
                 window.location.href = data.init_point;
                 return;
             }
-            CDI.toast('Error', 'No se pudo iniciar el top-up.', 'error');
+            // Con el tope de operaciones extra lleno, el 409 dice por qué no hay link.
+            CDI.toast('Error', (data && typeof data.detail === 'string' && data.detail) || 'No se pudo iniciar el top-up.', 'error');
         } catch (err) {
             CDI.toast('Error', String(err.message || err), 'error');
         }
