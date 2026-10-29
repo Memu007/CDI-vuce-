@@ -4,6 +4,10 @@ C: desde past_due se puede cancelar. Si quedó una suscripción en Mercado
 Pago, se cancela allá (si no, cobra cuando la tarjeta vuelve); la cuenta
 queda «canceled» y no gana acceso por cancelar.
 
+D13 (c): con una suscripción autorizada y la cuenta no vigente, el checkout
+no la cancela por su cuenta: puede ser un pago recién hecho cuyo aviso
+todavía no llegó. Contesta 409 y la salida es cancelar el plan.
+
 E: reactivar una prueba que sólo hizo una recarga vuelve a la prueba con
 sus días, como una prueba sin recarga. La recarga no es un plan pagado.
 
@@ -17,7 +21,7 @@ import pytest
 
 from proyecto_maria.services import billing_service
 from tests.test_cobro_mp2 import (  # noqa: F401
-    PAGOS, PEDIDOS, SUS, _aviso_ipn, _cerca, _fin, _leer, _mp, _pago, _suscripto,
+    CREADAS, PAGOS, PEDIDOS, SUS, _aviso_ipn, _cerca, _fin, _leer, _mp, _pago, _suscripto,
 )
 from tests.test_prelaunch_block2 import _get_user, _register, _set_user, _unique, client  # noqa: F401
 
@@ -205,3 +209,28 @@ def test_billing_me_dice_si_una_cancelada_tiene_una_suscripcion_abierta(client, 
     r = client.get("/api/billing/me")
     assert r.status_code == 200, r.text
     assert r.json().get("suscripcion_abierta") is abierta, r.json()
+
+
+# --- D13 (c): una autorizada vieja no se cancela desde el checkout ---
+
+@pytest.mark.parametrize("billing_status, dias", [
+    ("past_due", -10), ("active", -3), ("canceled", 20),
+], ids=["impaga", "vencida_en_gracia", "cancelada_vieja"])
+def test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando(client, billing_status, dias):
+    usuario, sid = _suscripto(client, "cde_d13", billing_status=billing_status, dias=dias)
+    r = client.post("/api/billing/checkout", json={"plan": "premium"})
+    assert r.status_code == 409, r.text
+    assert "cancelá el plan primero" in r.json()["detail"], r.json()
+    assert _puts_cancelar(sid) == [], PEDIDOS
+    assert CREADAS == []
+    assert SUS[sid] == "authorized"
+    assert _leer(usuario)["mp_preapproval_id"] == sid
+
+    # La salida que nombra el 409: cancelar desde el perfil y volver a pagar.
+    r = client.post("/api/billing/cancel")
+    assert r.status_code == 200, r.text
+    assert SUS[sid] == "cancelled"
+    r = client.post("/api/billing/checkout", json={"plan": "premium"})
+    assert r.status_code == 200, r.text
+    assert [t for t, _ in CREADAS] == ["preapproval"]
+    assert _leer(usuario)["mp_preapproval_id"] == r.json()["preapproval_id"] != sid

@@ -261,12 +261,9 @@ def test_el_segundo_checkout_con_una_vigente_se_frena(client):
 
 @pytest.mark.parametrize("estado_mp, billing_status, dias, cancela", [
     ("pending", "active", 20, True),
-    ("authorized", "past_due", -10, True),
-    ("authorized", "active", -3, True),       # vencida, dentro de la gracia
-    ("authorized", "canceled", 20, True),     # cancelada antes de COBRO-MP-2
     ("paused", "past_due", -10, True),
     ("cancelled", "past_due", -10, False),
-], ids=["pending", "impaga", "vencida_en_gracia", "cancelada_vieja", "pausada", "ya_cancelada"])
+], ids=["pending", "pausada", "ya_cancelada"])
 def test_sin_cuenta_vigente_la_vieja_se_cancela_antes_de_crear(client, estado_mp, billing_status, dias, cancela):
     usuario, sid = _suscripto(client, "mp2_vieja", estado_mp=estado_mp,
                               billing_status=billing_status, dias=dias)
@@ -281,12 +278,12 @@ def test_sin_cuenta_vigente_la_vieja_se_cancela_antes_de_crear(client, estado_mp
 
 @pytest.mark.parametrize("falla", ["PUT_500", "PUT_sin_conexion"])
 def test_si_no_se_puede_cancelar_la_vieja_no_se_crea_nada(client, falla):
-    usuario, sid = _suscripto(client, "mp2_viejafalla", billing_status="past_due", dias=-10)
+    usuario, sid = _suscripto(client, "mp2_viejafalla", estado_mp="pending", billing_status="past_due", dias=-10)
     FALLA["PUT"] = _contesta_500 if falla == "PUT_500" else _sin_conexion
     r = client.post("/api/billing/checkout", json={"plan": "premium"})
     assert r.status_code == 503, r.text
     assert CREADAS == []
-    assert SUS[sid] == "authorized"
+    assert SUS[sid] == "pending"
     assert _leer(usuario)["mp_preapproval_id"] == sid
 
 

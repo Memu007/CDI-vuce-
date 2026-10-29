@@ -188,7 +188,7 @@ with TestClient(main_mod.app) as c:
     SUS.clear()
     CREADAS.clear()
     vieja = f"vieja-{uuid.uuid4().hex[:8]}"
-    SUS[vieja] = "authorized"
+    SUS[vieja] = "pending"
     sql("update users set billing_status = 'past_due', payment_provider = 'mercadopago', "
         "mp_preapproval_id = %s, trial_ends_at = now() - interval '2 days' where username = %s",
         vieja, usuario)
