@@ -202,7 +202,9 @@
     let telemetryMuted = false;
 
     function track(action, extra) {
-        if (telemetryMuted) return;
+        // Sale con fetch directo, sin el freno de api(): con la sesión
+        // cambiada se pierde el evento antes que mandarlo a nombre de otro.
+        if (telemetryMuted || getCsrfToken() !== (sesionDelDueno || sesionAlAbrir)) return;
         const payload = Object.assign({
             version: 'v2',
             screen: currentScreen || 'boot',

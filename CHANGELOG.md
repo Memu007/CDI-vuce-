@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-10-29 · fix: una pestaña vieja no escribe a nombre del usuario que entró después (ORDEN-1b)
 
-- **fix(orden):** si entra otro usuario en el mismo navegador, la pestaña del anterior no genera, no guarda ni cierra la sesión del otro: antes de escribir pregunta quién es, y si es otro se tapa y pide recargar. Si volvés a entrar vos, sigue sin trabar.
+- **fix(orden):** si entra otro usuario en el mismo navegador, la pestaña del anterior no genera, no guarda, no manda telemetría ni cierra la sesión del otro: antes de escribir pregunta quién es, y si es otro se tapa y pide recargar. Si volvés a entrar vos, sigue sin trabar.
 - La pestaña que no pudo recuperar la operación porque la sesión estaba cambiando lo avisa y la recupera cuando confirma que la sesión es tuya.
 - Con la sesión cerrada, escribir manda al login como antes; si no puede comprobar quién es, «Salir» lo avisa en vez de ir al inicio con la sesión abierta.
 
