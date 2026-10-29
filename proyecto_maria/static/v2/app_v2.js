@@ -672,8 +672,14 @@
        clic pediría un segundo checkout, que cancela la suscripción adonde va
        (COBRO-MP-1, D). Sólo vuelve a su estado si el checkout falla; entonces
        devuelve false. Si vuelve con «Atrás» y el navegador restaura la página
-       de su caché, se recarga: el botón y el estado de cobro quedaron viejos. */
+       de su caché, se recarga: el botón y el estado de cobro quedaron viejos.
+       Lo mismo vale entre botones: el aviso de arriba y el perfil pueden estar
+       a la vista a la vez, y mientras uno pide el checkout el otro no hace
+       nada. */
+    let checkoutEnCurso = false;
     async function irAlCheckout(plan, boton) {
+        if (checkoutEnCurso) return false;
+        checkoutEnCurso = true;
         const textoBoton = boton.textContent;
         boton.disabled = true;
         boton.textContent = 'Abriendo…';
@@ -698,6 +704,7 @@
         if (CDI.toast) CDI.toast('Error', motivo, 'error');
         boton.disabled = false;
         boton.textContent = textoBoton;
+        checkoutEnCurso = false;
         return false;
     }
 
