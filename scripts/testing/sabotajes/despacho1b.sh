@@ -686,5 +686,64 @@ sabotaje "la operación no avisa lo que no guardó" proyecto_maria/main.py \
   "            if await _historial_de_un_producto(db, upsert_client_product_history, **campos) is None:" \
   "test_una_operacion_con_un_producto_que_no_se_guarda_lo_dice"
 
+# Vuelta 4, adversario sobre 7e96b32: la operación, confirmar un NCM y el
+# cambio de origen validan como guardar.
+OBJ=test_una_operacion_con_productos_que_no_son_objetos_da_400
+sabotaje "operación sin revisar objetos" proyecto_maria/main.py \
+  '        if not isinstance(items, list) or not all(isinstance(item, dict) for item in items):
+            raise HTTPException(status_code=400, detail=_AVISO_NO_ES_OBJETO)
+' \
+  '' \
+  "$OBJ[numero]" "$OBJ[texto]" "$OBJ[nulo]" "$OBJ[lista]" \
+  "$OBJ[items texto]" "$OBJ[items objeto]" "$OBJ[cuerpo lista]"
+no_debe "operación sin revisar objetos" "$ULTIMA" "test_aprender_un_item_que_no_es_un_objeto_da_400"
+sabotaje "operación revisa sólo la lista" proyecto_maria/main.py \
+  'not isinstance(items, list) or not all(isinstance(item, dict) for item in items)' \
+  'not isinstance(items, list)' \
+  "$OBJ[numero]" "$OBJ[texto]" "$OBJ[nulo]" "$OBJ[lista]"
+no_debe "operación revisa sólo la lista" "$ULTIMA" "$OBJ[items texto]" "$OBJ[cuerpo lista]"
+sabotaje "confirmar sin medio par" proyecto_maria/main.py \
+  '    # Lo que la base no puede guardar se rechaza antes de sumar el uso.
+    if tiene_medio_par(data):' \
+  '    if False:' \
+  "test_confirmar_un_ncm_con_medio_par_da_400_y_no_guarda_nada"
+sabotaje "confirmar deja el NUL del origen" proyecto_maria/main.py \
+  'origin = _sin_nul(str(data.get("origen") or "")).strip()' \
+  'origin = str(data.get("origen") or "").strip()' \
+  "test_confirmar_un_ncm_saca_el_nul_del_origen_y_del_proveedor"
+sabotaje "confirmar deja el NUL del proveedor" proyecto_maria/main.py \
+  'vendor_name = _sin_nul(str(data.get("vendor_name") or "")).strip()' \
+  'vendor_name = str(data.get("vendor_name") or "").strip()' \
+  "test_confirmar_un_ncm_saca_el_nul_del_origen_y_del_proveedor"
+NONCM=test_confirmar_algo_que_no_es_un_ncm_da_400_y_no_guarda_nada
+sabotaje "confirmar con la clave de sugerir" proyecto_maria/main.py \
+  '    ncm_base = ncm_para_historial(ncm)
+' \
+  '    ncm_base = _ncm_suggestion_key(ncm)
+' \
+  "$NONCM[texto con 8 digitos]" "$NONCM[letra sin sim]" "$NONCM[corto]"
+ORI=test_cambiar_el_origen_valida_igual_que_guardar
+MAY=test_cambiar_el_origen_guarda_el_codigo_en_mayusculas
+sabotaje "el PUT no valida el origen" proyecto_maria/main.py \
+  '        origen, problema = origen_para_catalogo(body["origen"])
+        if problema:
+            raise HTTPException(status_code=400, detail=problema)
+        row.origen_frecuente = origen or "XX"
+' \
+  '        row.origen_frecuente = str(body["origen"]).strip()[:3] or "XX"
+' \
+  "$ORI[lista]" "$ORI[tres letras]" "$ORI[numeros]" "$ORI[pais que no existe]" "$ORI[nombre]" \
+  "$MAY[minusculas]" "$MAY[nulo]"
+sabotaje "el PUT no saca el NUL" proyecto_maria/main.py \
+  'body = _sin_nul(body) if isinstance(body, dict) else {}' \
+  'body = body if isinstance(body, dict) else {}' \
+  "$MAY[nul]"
+no_debe "el PUT no saca el NUL" "$ULTIMA" "$MAY[minusculas]"
+sabotaje "el PUT guarda el origen vacío" proyecto_maria/main.py \
+  'row.origen_frecuente = origen or "XX"' \
+  'row.origen_frecuente = origen' \
+  "$MAY[vacio]" "$MAY[nulo]"
+no_debe "el PUT guarda el origen vacío" "$ULTIMA" "$MAY[minusculas]"
+
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]

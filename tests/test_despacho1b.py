@@ -2114,3 +2114,5 @@ def test_cambiar_el_origen_guarda_el_codigo_en_mayusculas(auth_override, client,
     r = _cambiar(client, cid, pid, {"origen": origen})
     assert r.status_code == 200, r.text
     assert [p["origen"] for p in _catalogo(client, cid)] == [guardado]
+    # La fila, no sólo la respuesta: la pantalla muestra «XX» también para un NULL.
+    assert _contar(ClientProductHistory, client_id=cid, origen_frecuente=guardado) == 1
