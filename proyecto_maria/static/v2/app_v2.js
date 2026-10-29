@@ -42,10 +42,7 @@
             }
         }
         const res = await fetch(path, Object.assign({}, options, { headers, credentials: 'same-origin' }));
-        if (res.status === 401) {
-            window.location.href = '/?next=' + encodeURIComponent(window.location.pathname + window.location.search);
-            throw new Error('unauthorized');
-        }
+        if (res.status === 401) irAlLogin();
         if (res.status === 402) {
             // Impago, vencido, cancelado o tope del plan: el modal dice la
             // razón que manda el servidor (COBRO-CORTE-1).
@@ -86,12 +83,22 @@
         return res;
     }
 
+    function irAlLogin() {
+        window.location.href = '/?next=' + encodeURIComponent(window.location.pathname + window.location.search);
+        throw new Error('unauthorized');
+    }
+
     async function logout() {
         try {
             await api('/auth/logout', { method: 'POST' });
-        } catch (_) {
+        } catch (e) {
             // La sesión es de otro: no se cierra y la pestaña queda tapada.
             if (sesionAjena) return;
+            // No salió el pedido: la sesión sigue abierta.
+            if (e.message === ERROR_SIN_SESION) {
+                toast('No se pudo cerrar la sesión', e.message, 'error');
+                return;
+            }
         }
         window.location.href = '/';
     }
@@ -1020,7 +1027,8 @@
     // Antes de una escritura, con la sesión cambiada.
     async function sesionEsDelDueno() {
         const sesion = getCsrfToken();
-        const { user } = await consultarUsuario().catch(() => ({}));
+        const { status, user } = await consultarUsuario().catch(() => ({}));
+        if (status === 401) irAlLogin();
         return !!(user && duenoPestana !== null && confirmarSesion(user.username, sesion));
     }
 
