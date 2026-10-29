@@ -183,6 +183,30 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
     .catch(() => falla('past_due: no sale el aviso con «Activar plan ahora»'));
   await sigueDeshabilitado('Activar plan ahora', '#billingBannerCta', () => page.click('#billingBannerCta'));
 
+  // Con el aviso y el perfil a la vista hay dos botones que piden el checkout:
+  // mientras uno lo pide, el otro no pide un segundo.
+  await page.unroute('**/api/billing/checkout');
+  const cruzados = [];
+  let soltarCruce;
+  const sueltoCruce = new Promise(r => { soltarCruce = r; });
+  await page.route('**/api/billing/checkout', async route => {
+    cruzados.push(1);
+    await sueltoCruce;
+    route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ detail: 'checkout de prueba' }) });
+  });
+  await perfilCon('past_due');
+  await page.locator('#billingBannerCta').waitFor({ state: 'visible', timeout: 10000 })
+    .catch(() => falla('past_due: no sale el aviso con «Activar plan ahora»'));
+  await page.evaluate(() => document.getElementById('billingBannerCta').click());
+  await page.waitForFunction(() => document.getElementById('billingBannerCta').disabled, null, { timeout: 5000 })
+    .catch(() => falla('«Activar plan ahora» no se deshabilita mientras pide el checkout'));
+  await page.evaluate(() => document.getElementById('pfBillingActivate').click());
+  soltarCruce();
+  await page.waitForFunction(() => !document.getElementById('billingBannerCta').disabled, null, { timeout: 5000 })
+    .catch(() => falla('«Activar plan ahora» no vuelve a su estado después del error'));
+  if (cruzados.length !== 1) falla('«Activar plan ahora» y después «Activar plan» pidieron ' + cruzados.length + ' checkouts');
+  console.log('OK | «Activar plan ahora» y «Activar plan» a la vez: un checkout');
+
   await b.close();
   console.log('pantalla COBRO-MP-1: OK');
 })().catch(e => falla(String(e && e.stack || e)));
