@@ -45,6 +45,18 @@
 //      pantalla o subiendo un archivo, la operación de antes no la pisa;
 //  (z3) al recargar sin lugar en el navegador, avisa; (z4) si la consulta
 //      del usuario no contesta, avisa.
+//  (z5) a (z8) al recargar con el usuario lento: lo que se hace mientras
+//      (otra carga, elegir un archivo) no lo pisa la operación de antes; con
+//      la consulta caída avisa; si entra otro usuario no guarda a su nombre;
+//  (z9) a (z12) si cambia la sesión (entra otro, se cierra, vuelve a
+//      entrar el mismo) mientras una pestaña duplicada mira si la
+//      original vive, no adopta la operación de otro ni deja sobres sin dueño;
+//  (z13) a (z16) tocar la pestaña de cualquier forma (clic sin puntero,
+//      tecla, soltar un archivo, apretar el mouse) antes de que llegue el
+//      usuario frena la recuperación tardía;
+//  (z17) y (z18) con la sesión cerrada o la red cortada, pregunta quién es
+//      una vez y no en cada guardado; (z19) el aviso de otro usuario no lo
+//      pisa el de la red.
 // Datos inventados. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_orden1.js
 const { chromium } = require('/opt/node-tools/node_modules/playwright');
@@ -101,6 +113,34 @@ async function abrir(ctx, pestana) {
   // El banner de la prueba gratis aparece con el usuario y corre la tabla
   // hacia abajo: sin esperarlo, el mouse aprieta sobre la fila de arriba.
   await p.waitForFunction(() => CDI.currentUser);
+  return p;
+}
+
+// Duplica la pestaña `id` y la frena justo antes de mirar si la original sigue
+// viva (el lock que pide pestanaViva con signal): marca window.__esperando y
+// sigue cuando la prueba llama a window.__seguir(). Con `lenta`, el usuario
+// llega a los 10 s, después de la espera del arranque. No espera la pantalla:
+// aparece recién después de mirar.
+async function duplicar(ctx, id, lenta) {
+  const p = await ctx.newPage();
+  await p.addInitScript(id => {
+    if (window.name !== 'cdi-prueba-pestana') { window.name = 'cdi-prueba-pestana'; sessionStorage.setItem('cdi_v2_tab', id); }
+    const pedir = navigator.locks.request.bind(navigator.locks);
+    navigator.locks.request = (nombre, opciones, f) => {
+      if (!(opciones && opciones.signal)) return pedir(nombre, opciones, f);
+      window.__esperando = true;
+      return new Promise(r => { window.__seguir = r; }).then(() => pedir(nombre, opciones, f));
+    };
+  }, id);
+  if (lenta) {
+    const hasta = Date.now() + 10000;
+    await p.route('**/auth/current_user', async ruta => {
+      await new Promise(r => setTimeout(r, Math.max(0, hasta - Date.now())));
+      return ruta.continue().catch(() => {});
+    });
+  }
+  p.on('dialog', d => d.accept().catch(() => {}));
+  await p.goto(base + '/dashboard');
   return p;
 }
 
@@ -1065,6 +1105,182 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     const aviso = await avisa(t) ? await t.locator('#avisoBorrador').textContent() : '';
     if (!/Entró otro usuario/.test(aviso)) falla('entró otro usuario con la primera consulta del usuario en camino y la pestaña no avisa: «' + aviso + '»');
     console.log('OK si entra otro usuario con la primera consulta en camino, no guarda a su nombre y avisa');
+    await ctx.close();
+  }
+
+  // Lo guardado en el navegador, mirado desde una página que no corre la app.
+  const sobresEn = (ctx, factura) => enElSitio(ctx, f => Object.keys(localStorage)
+    .filter(k => k.startsWith('cdi_v2_state') && (localStorage.getItem(k) || '').includes('"' + f + '"'))
+    .map(k => { try { return JSON.parse(localStorage.getItem(k)).user; } catch (_) { return '?'; } }), factura);
+  const sinDueno = ctx => enElSitio(ctx, () => Object.keys(localStorage).filter(k => k.startsWith('cdi_v2_state'))
+    .filter(k => { try { const u = JSON.parse(localStorage.getItem(k)).user; return typeof u !== 'string' || !u; } catch (_) { return true; } }));
+
+  // (z9) a (z12) La duplicada de una pestaña abierta (con OP-P1) espera a ver
+  // si la original sigue viva y, mientras, cambia la sesión. Después busca
+  // otra operación y encuentra OP-DE-A, que A dejó cerrada: no la adopta con
+  // otro usuario, no la borra y no deja nada guardado sin dueño.
+  async function cambiaEnLaEspera(nombre, lenta, cambiar) {
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    const usuario = await nuevoUsuario(ctx, nombre);
+    await dejarAMedias(ctx, 'OP-DE-A');
+    const p1 = await abrir(ctx);
+    await cargar(p1, 'OP-P1', [prod('Producto de la pestaña abierta', '84714900100D', 2, 10)]);
+    await esperarBorradores(p1, ['OP-P1'], 'la operación de la pestaña abierta no se guarda');
+    const id1 = await p1.evaluate(() => sessionStorage.getItem('cdi_v2_tab'));
+    const p2 = await duplicar(ctx, id1, lenta);
+    const mira = await p2.waitForFunction(() => window.__esperando, null, { timeout: 20000 }).then(() => true, () => false);
+    if (!mira) falla('la pestaña duplicada no llega a mirar si la original sigue viva');
+    await cambiar(ctx, usuario);
+    await p2.evaluate(() => window.__seguir());
+    // Sin sesión, un pedido de la app con 401 la manda a entrar: se va del
+    // tablero y no hay nada que recuperar.
+    let enTablero = null;
+    for (const hasta = Date.now() + 30000; enTablero === null && Date.now() < hasta;) {
+      enTablero = await p2.evaluate(() => !location.pathname.startsWith('/dashboard') ? false
+        : (window.CDI && document.querySelector('.screen.is-active') ? true : null)).catch(() => null);
+      if (enTablero === null) await p2.waitForTimeout(200);
+    }
+    if (enTablero === null) falla('la pestaña duplicada no muestra ninguna pantalla en 30 s');
+    return { ctx, usuario, p2, r: enTablero ? await recuperada(p2).catch(() => null) : null };
+  }
+  async function nadaSePerdio(ctx, usuario, que) {
+    const duenos = await sobresEn(ctx, 'OP-DE-A');
+    if (!duenos.length || duenos.some(u => u !== usuario)) falla(que + ' y la operación que A dejó guardada quedó con otro dueño o se borró: ' + JSON.stringify(duenos));
+    const sin = await sinDueno(ctx);
+    if (sin.length) falla(que + ' y quedó guardado un sobre sin dueño: ' + sin.join(', '));
+  }
+  const entraOtro = (nombre, lenta, que) => async () => {
+    let otro;
+    const { ctx, usuario, r } = await cambiaEnLaEspera(nombre, lenta, async ctx => { otro = await nuevoUsuario(ctx, nombre + 'b'); });
+    if (r) falla(que + ' y la pestaña le muestra a ' + otro + ' la operación de A: ' + r);
+    await nadaSePerdio(ctx, usuario, que);
+    console.log('OK ' + que + ': no adopta la operación de A ni la deja sin dueño');
+    await ctx.close();
+  };
+  if (corre('z9')) await entraOtro('ord1z9', false, 'entró otro usuario mientras la duplicada miraba si la original vive, al abrir')();
+  if (corre('z10')) await entraOtro('ord1z10', true, 'entró otro usuario mientras la duplicada miraba si la original vive, con el usuario tarde')();
+  if (corre('z11')) {
+    const que = 'se cerró la sesión mientras la duplicada miraba si la original vive';
+    const { ctx, usuario } = await cambiaEnLaEspera('ord1z11', false, ctx => ctx.clearCookies());
+    await nadaSePerdio(ctx, usuario, que);
+    console.log('OK ' + que + ': la operación de A queda guardada con su dueño');
+    await ctx.close();
+  }
+  if (corre('z12')) {
+    const que = 'A volvió a entrar (otra sesión) mientras la duplicada miraba si la original vive';
+    const { ctx, usuario, p2, r } = await cambiaEnLaEspera('ord1z12', false, (ctx, usuario) => entrar(ctx, usuario));
+    // Si la duplicada la tomó, la vuelve a guardar a nombre de A al confirmar la sesión.
+    if (r) await esperarBorradores(p2, ['OP-DE-A'], que + ' y la duplicada no guarda la operación que tomó');
+    await p2.waitForTimeout(INTERVALO_MS);
+    await nadaSePerdio(ctx, usuario, que);
+    if (!r) {
+      const r3 = await recuperada(await abrir(ctx));
+      if (r3 !== 'OP-DE-A') falla(que + ' y otra pestaña no recupera la operación: recupera ' + r3);
+    }
+    console.log('OK ' + que + ': no pierde la operación (' + (r ? 'la toma la duplicada' : 'la recupera otra pestaña') + ')');
+    await ctx.close();
+  }
+
+  // (z13) a (z16) Mientras espera al usuario, la pestaña se toca de cualquier
+  // forma: la recuperación tardía no la cambia y avisa que quedó guardada.
+  const tocadaAntesDelUsuario = (nombre, como, tocar) => async () => {
+    const ctx = await nuevoContexto(nombre);
+    const t = await abrir(ctx);
+    await recargarLento(ctx, t, 'ANTES-DE-TOCAR');
+    await tocar(t);
+    await t.waitForFunction(() => CDI.currentUser, null, { timeout: 20000 });
+    await t.locator('#avisoBorrador').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+    if (await pantalla(t) !== 'upload') falla('se tocó la pestaña (' + como + ') antes de que llegara el usuario y la recuperación tardía la cambió a ' + await pantalla(t));
+    if (!(await guardadas(ctx)).includes('ANTES-DE-TOCAR')) falla('se tocó la pestaña (' + como + ') y la operación de antes de recargar se perdió');
+    const aviso = await avisa(t) ? await t.locator('#avisoBorrador').textContent() : '';
+    if (!/Quedó guardada la operación/.test(aviso)) falla('se tocó la pestaña (' + como + ') y no avisa que quedó guardada la de antes: «' + aviso + '»');
+    console.log('OK si se toca la pestaña (' + como + ') antes de que llegue el usuario, no la cambia y avisa');
+    await ctx.close();
+  };
+  if (corre('z13')) await tocadaAntesDelUsuario('ord1z13', 'un clic sin puntero', t =>
+    t.evaluate(() => document.getElementById('uploadDropzone').click()))();
+  if (corre('z14')) await tocadaAntesDelUsuario('ord1z14', 'una tecla', t => t.keyboard.press('Tab'))();
+  if (corre('z15')) await tocadaAntesDelUsuario('ord1z15', 'soltar un archivo que no es factura', t => t.evaluate(() => {
+    const dt = new DataTransfer();
+    dt.items.add(new File(['no es una factura'], 'notas.txt', { type: 'text/plain' }));
+    document.getElementById('uploadDropzone').dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, dataTransfer: dt }));
+  }))();
+  if (corre('z16')) await tocadaAntesDelUsuario('ord1z16', 'apretar el mouse sin soltar', async t => {
+    const caja = await t.locator('#uploadDropzone').boundingBox();
+    await t.mouse.move(caja.x + caja.width / 2, caja.y + caja.height / 2);
+    await t.mouse.down();
+  })();
+
+  // (z17) Se cierra la sesión: la pestaña pregunta quién es una vez, no en
+  // cada guardado.
+  if (corre('z17')) {
+    const ctx = await nuevoContexto('ord1z17');
+    const t = await abrir(ctx);
+    await t.waitForLoadState('networkidle');  // como en (m)
+    await cargar(t, 'SESION-CERRADA', [prod('Producto con la sesión cerrada', '84714900100D', 2, 10)]);
+    await esperarBorradores(t, ['SESION-CERRADA'], 'la operación no se guarda');
+    let consultas = 0;
+    t.on('request', r => { if (r.url().endsWith('/auth/current_user')) consultas++; });
+    await ctx.clearCookies();
+    await t.waitForTimeout(4 * INTERVALO_MS);
+    if (consultas > 2) falla('con la sesión cerrada la pestaña pregunta quién es en cada guardado: ' + consultas + ' consultas en 10 s');
+    if (!(await avisa(t))) falla('se cerró la sesión y la pestaña no avisa que no guarda');
+    console.log('OK con la sesión cerrada la pestaña pregunta una vez (' + consultas + ' consultas en 10 s)');
+    await ctx.close();
+  }
+
+  // (z18) Cambia la sesión con la red cortada: pregunta una vez cada 10 s y,
+  // cuando la red vuelve, confirma la sesión, guarda y saca el aviso.
+  if (corre('z18')) {
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    const usuario = await nuevoUsuario(ctx, 'ord1z18');
+    const t = await abrir(ctx);
+    await t.waitForLoadState('networkidle');  // como en (m)
+    await cargar(t, 'RED-CORTADA', [prod('Producto con la red cortada', '84714900100D', 2, 10)]);
+    await esperarBorradores(t, ['RED-CORTADA'], 'la operación no se guarda');
+    let consultas = 0;
+    await t.route('**/auth/current_user', ruta => { consultas++; return ruta.abort(); });
+    await entrar(ctx, usuario);  // otra sesión del mismo: la pestaña pregunta quién es
+    await t.waitForTimeout(9000);
+    if (consultas > 2) falla('con la red cortada la pestaña pregunta quién es en cada guardado: ' + consultas + ' consultas en 9 s');
+    const aviso = await avisa(t) ? await t.locator('#avisoBorrador').textContent() : '';
+    if (!/No se pudo comprobar la sesión/.test(aviso)) falla('con la red cortada la pestaña no avisa que no guarda: «' + aviso + '»');
+    const antes = (await sobresDe(t, 'RED-CORTADA'))[0].savedAt;
+    await t.unroute('**/auth/current_user');
+    const guarda = await t.waitForFunction(([a]) => Object.keys(localStorage).some(k => {
+      const s = localStorage.getItem(k) || '';
+      return k.startsWith('cdi_v2_state') && s.includes('"RED-CORTADA"') && JSON.parse(s).savedAt !== a;
+    }), [antes], { timeout: 15000 }).then(() => true, () => false);
+    if (!guarda) falla('la red volvió y en 15 s la pestaña no vuelve a guardar');
+    if (await avisa(t)) falla('la red volvió, la pestaña guarda y sigue el aviso: ' + await t.locator('#avisoBorrador').textContent());
+    console.log('OK con la red cortada pregunta cada 10 s (' + consultas + ' en 9 s) y, cuando vuelve, guarda y saca el aviso');
+    await ctx.close();
+  }
+
+  // (z19) Entra otro usuario antes de que llegue la primera consulta y antes
+  // de los 4 s del arranque: el aviso de otro usuario no lo pisa el de la red.
+  if (corre('z19')) {
+    const ctx = await nuevoContexto('ord1z19');
+    let soltar, pedida;
+    const suelta = new Promise(r => { soltar = r; });
+    const llego = new Promise(r => { pedida = r; });
+    const t = await ctx.newPage();
+    t.on('dialog', d => d.accept().catch(() => {}));
+    await t.route('**/auth/current_user', async ruta => {
+      pedida();
+      await suelta;
+      return ruta.continue().catch(() => {});
+    });
+    const desde = Date.now();
+    await t.goto(base + '/dashboard');
+    await llego;
+    await nuevoUsuario(ctx, 'ord1z19b');
+    soltar();
+    if (Date.now() - desde > 3000) falla('el otro usuario tardó ' + (Date.now() - desde) + ' ms en entrar: la prueba no llega antes de los 4 s del arranque');
+    await t.waitForFunction(() => window.CDI && document.querySelector('.screen.is-active'), null, { timeout: 10000 });
+    const aviso = await avisa(t) ? await t.locator('#avisoBorrador').textContent() : '';
+    if (!/Entró otro usuario/.test(aviso)) falla('entró otro usuario antes de la primera consulta y la pestaña avisa otra cosa: «' + aviso + '»');
+    console.log('OK si entra otro usuario antes de los 4 s del arranque, el aviso dice que entró otro');
     await ctx.close();
   }
 
