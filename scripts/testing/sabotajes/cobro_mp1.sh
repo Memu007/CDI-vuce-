@@ -6,7 +6,8 @@
 # (B), tests/test_cobro_mp1_cde.py (C y E), la carrera de D en un Postgres 16
 # descartable (scripts/testing/cobro_mp1d_postgres.py, con con_pg16.sh) y la
 # pantalla del perfil (scripts/testing/pantalla_cobro_mp1.js; PUERTO, 8854).
-# La vuelta 3 (h) con tests/test_cobro_mp1_h.py; j y D13 (c) con tests/test_cobro_mp1_cde.py.
+# La vuelta 3 (h) con tests/test_cobro_mp1_h.py; i con tests/test_cobro_mp1_i.py y los cortes
+# de Postgres; j y D13 (c) con tests/test_cobro_mp1_cde.py.
 # La del 2026-10-29 (vuelta 2, a a g) con tests/test_cobro_mp1_vuelta2.py,
 # tests/test_cobro_corte1.py (g), la carrera de a y de D31 y los datos que no entran en
 # su columna (b) en Postgres (scripts/testing/cobro_mp1_postgres.py) y la pantalla v1
@@ -419,6 +420,45 @@ sabotaje $M "h: un pago sin cuenta que el otro aviso ya aplicó reintenta igual"
   $'    if await session.get(PagoMercadoPagoAplicado, str(payment_id)) is not None:\n        return {"success": True, "skipped": "payment_id ya procesado"}\n    raise _MPIlegible(f"el pago {payment_id} todavía' \
   $'    raise _MPIlegible(f"el pago {payment_id} todavía' \
   "FAILED $H3T::test_un_pago_sin_cuenta_que_otro_aviso_ya_aplico_no_reintenta_mas"
+
+# ── Vuelta 3, i: lo que el aviso deja en la cuenta y lo que no deja pasar ──
+I3=tests/test_cobro_mp1_i.py
+T="$I3 $V"
+sabotaje $M "i: pagar no reinicia las operaciones del período" \
+  '"trial_ends_at", "ops_used_this_period",' '"trial_ends_at",' \
+  "FAILED $I3::test_pagar_el_plan_reinicia_la_cuota_del_periodo"
+sabotaje $M "i: pagar no reinicia el inicio del período" \
+  '"billing_period_started_at", "last_topup_at",' '"last_topup_at",' \
+  "FAILED $I3::test_pagar_el_plan_reinicia_la_cuota_del_periodo"
+sabotaje $M "i: la recarga no guarda su vencimiento" \
+  '"last_topup_at", "extra_ops_expires_at",' '"last_topup_at",' \
+  "FAILED $I3::test_una_recarga_vence_a_los_30_dias"
+sabotaje $M "i: la prueba vigente no cuenta como tiempo pagado" \
+  'in ("trial", "active", "canceled")' 'in ("active", "canceled")' \
+  "FAILED $I3::test_pagar_durante_la_prueba_extiende_desde_el_fin"
+sabotaje $M "i: el tope de recargas frena un plan" \
+  'if update.get("action") == "topup" and not control[1]:' 'if not control[1]:' \
+  "FAILED $I3::test_el_tope_de_recargas_no_frena_un_plan"
+sabotaje $B "i: una recarga que pasa a 101 entra" \
+  'return vigentes + TOPUP_OPS <= EXTRA_OPS_MAX, vigentes' \
+  'return vigentes + TOPUP_OPS <= EXTRA_OPS_MAX + 1, vigentes' \
+  "FAILED $V::test_una_recarga_que_no_entra_queda_rechazada_y_no_suma[91-usuario]"
+sabotaje $M "i: un monto de cero cuenta como monto" \
+  'monto > 0 else None' 'monto >= 0 else None' \
+  "FAILED $I3::test_una_suscripcion_de_monto_cero_no_se_aplica"
+sabotaje $M "i: un pago sin moneda pasa" \
+  'if moneda != "ARS":' 'if moneda and moneda != "ARS":' \
+  "FAILED $I3::test_un_pago_sin_moneda_no_se_aplica[None]"
+sabotaje $B "i: se guardan los primeros 4 y no los últimos" \
+  'return str(last4)[-4:]' 'return str(last4)[:4]' \
+  "FAILED $I3::test_se_guardan_los_ultimos_4_y_la_marca"
+sabotaje $M "i: la marca no se guarda" \
+  'for campo in ("payment_method_last4", "payment_method_brand"):' 'for campo in ("payment_method_last4",):' \
+  "FAILED $I3::test_se_guardan_los_ultimos_4_y_la_marca"
+T=$T1
+sabotaje $M "i: una fecha de aprobación sin zona pasa" \
+  '    if aprobado is None or aprobado.tzinfo is None:' '    if aprobado is None:' \
+  "FAILED $T1::test_un_pago_sin_fecha_de_aprobacion_legible_no_se_aplica[sin_zona]"
 
 # ── Devolución del 2026-10-28: B, C, D y E ──
 # B: la exportación cuenta la operación (tests/test_cobro_corte1.py).
