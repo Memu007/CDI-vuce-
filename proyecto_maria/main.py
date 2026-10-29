@@ -10506,7 +10506,7 @@ def _pago_del_cobro_mp(cobro) -> tuple:
     estado no se toma del cobro: lo decide el pago, que se lee después."""
     pago = cobro.get("payment") if isinstance(cobro, dict) else None
     pago_id = pago.get("id") if isinstance(pago, dict) else None
-    if not isinstance(pago_id, (str, int)) or isinstance(pago_id, bool) or not _ID_COBRO_MP.fullmatch(str(pago_id)):
+    if not isinstance(pago_id, (str, int)) or not _ID_COBRO_MP.fullmatch(str(pago_id)):
         raise _MPIlegible("el cobro todavía no dice qué pago lo cobró")
     suscripcion_id = cobro.get("preapproval_id")
     return str(pago_id), (suscripcion_id if isinstance(suscripcion_id, str) and suscripcion_id else None)
