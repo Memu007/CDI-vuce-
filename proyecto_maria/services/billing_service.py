@@ -109,6 +109,14 @@ def _expire_extra_ops(user) -> None:
         user.extra_ops_expires_at = None
 
 
+def recarga_entra(cuenta) -> tuple[bool, int]:
+    """Si una recarga más entra en el tope, y cuántas extra vigentes tiene la
+    cuenta: las vencidas no cuentan (COBRO-MP-1, f)."""
+    _expire_extra_ops(cuenta)
+    vigentes = cuenta.extra_ops_remaining or 0
+    return vigentes + TOPUP_OPS <= EXTRA_OPS_MAX, vigentes
+
+
 def tiene_acceso(cuenta, ahora: datetime | None = None) -> bool:
     """trial y active tienen acceso; canceled, hasta el fin del período ya
     pagado (COBRO-MP-2, C2); el resto, no."""
@@ -334,13 +342,11 @@ def process_payment(payment_info: dict[str, Any]) -> dict[str, Any] | None:
         return None
     kind = parts[-1]
 
-    payer_id = str(_objeto(payment_info, "payer").get("id", "") or "")
-    payment_id = str(payment_info.get("id", "") or "")
     now = datetime.now(timezone.utc)
 
     base_update = {
         "payment_provider": "mercadopago",
-        "payment_customer_id": payer_id or payment_id,
+        "payment_customer_id": cliente_mp(payment_info),
         "payment_method_last4": _last4_from_payment(payment_info),
         "payment_method_brand": _brand_from_payment(payment_info),
         **cuenta,
@@ -375,14 +381,22 @@ def _objeto(datos: dict[str, Any], campo: str) -> dict[str, Any]:
     return valor if isinstance(valor, dict) else {}
 
 
+# Lo que se copia del pago a la cuenta entra en sus columnas: un dato más
+# largo o de otro tipo da 500 en Postgres y Mercado Pago reintenta sin fin
+# (COBRO-MP-1, b).
+def cliente_mp(payment_info: dict[str, Any]) -> str:
+    return str(_objeto(payment_info, "payer").get("id", "") or payment_info.get("id", "") or "")[:100]
+
+
 def _last4_from_payment(payment_info: dict[str, Any]) -> str | None:
     card = _objeto(payment_info, "card")
     last4 = card.get("last_four_digits") or card.get("last4")
-    if last4:
-        return str(last4)
+    if isinstance(last4, (str, int)) and not isinstance(last4, bool):
+        return str(last4)[-4:] or None
     return None
 
 
 def _brand_from_payment(payment_info: dict[str, Any]) -> str | None:
     card = _objeto(payment_info, "card")
-    return _objeto(card, "payment_method").get("name") or card.get("network")
+    marca = _objeto(card, "payment_method").get("name") or card.get("network")
+    return marca[:20] if isinstance(marca, str) and marca else None

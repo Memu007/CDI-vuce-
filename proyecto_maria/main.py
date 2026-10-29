@@ -10352,7 +10352,23 @@ def _consultar_mp(llamada, que: str) -> dict:
     if not isinstance(resp, dict) or resp.get("status") != 200 or not isinstance(resp.get("response"), dict):
         estado = resp.get("status") if isinstance(resp, dict) else type(resp).__name__
         raise _MPIlegible(f"{que}: {str(estado)[:40]}")
-    return resp["response"]
+    return _guardable_en_pg(resp["response"])
+
+
+_NO_GUARDABLE_EN_PG = re.compile("[\x00\ud800-\udfff]")
+
+
+def _guardable_en_pg(valor):
+    """Lo leído de Mercado Pago, con los caracteres que Postgres no acepta
+    (NUL y surrogates sueltos) cambiados por «\ufffd»: si no, el pago da 500 y
+    Mercado Pago lo reintenta sin fin (COBRO-MP-1, b)."""
+    if isinstance(valor, str):
+        return _NO_GUARDABLE_EN_PG.sub("\ufffd", valor)
+    if isinstance(valor, dict):
+        return {clave: _guardable_en_pg(v) for clave, v in valor.items()}
+    if isinstance(valor, list):
+        return [_guardable_en_pg(v) for v in valor]
+    return valor
 
 
 def _monto_mp(valor) -> float | None:
@@ -10512,7 +10528,7 @@ async def _registrar_pago_mp(session, payment_id: str, cuenta: str, update: dict
     esperado, motivo = control
     estado = "rechazado" if motivo else "aplicado"
     session.add(PagoMercadoPagoAplicado(
-        payment_id=str(payment_id), cuenta=cuenta,
+        payment_id=str(payment_id), cuenta=cuenta[:200],
         tipo="topup" if update.get("action") == "topup" else str(update.get("plan") or ""),
         monto=_monto_mp(pay_resp.get("transaction_amount")),
         moneda=str(pay_resp.get("currency_id") or "")[:10] or None,
@@ -10765,14 +10781,14 @@ async def mercadopago_webhook(request: Request):
                     "billing_status": "active",
                     "trial_ends_at": datetime.now(timezone.utc) + timedelta(days=30),
                     "payment_provider": "mercadopago",
-                    "payment_customer_id": str(billing_service._objeto(pay_resp, "payer").get("id", "") or payment_id),
+                    "payment_customer_id": billing_service.cliente_mp(pay_resp),
                 }
             else:
                 motivo = f"external_reference desconocida: {str(external_ref)[:80]!r}"
 
         async for session in get_async_session():
             if motivo:
-                return await _rechazar_sin_cuenta_mp(session, payment_id, str(external_ref or "")[:200],
+                return await _rechazar_sin_cuenta_mp(session, payment_id, str(external_ref or ""),
                                                      update or {}, pay_resp, motivo)
 
             org_id = update.get("org_id")
@@ -10796,9 +10812,8 @@ async def mercadopago_webhook(request: Request):
                 logger.info("Webhook MP: payment_id=%s ya procesado para %s", payment_id, cuenta_ref)
                 return {"success": True, "skipped": "payment_id ya procesado"}
             if update.get("action") == "topup" and not control[1]:
-                billing_service._expire_extra_ops(cuenta)
-                vigentes = cuenta.extra_ops_remaining or 0
-                if vigentes + update["extra_ops_remaining"] > billing_service.EXTRA_OPS_MAX:
+                entra, vigentes = billing_service.recarga_entra(cuenta)
+                if not entra:
                     control = (control[0], f"la recarga no entra: ya tiene {vigentes} operaciones extra "
                                            f"y el tope es {billing_service.EXTRA_OPS_MAX}")
             estado = await _registrar_pago_mp(session, payment_id, cuenta_ref, update, pay_resp, control)
@@ -10860,9 +10875,8 @@ async def billing_topup(
     # Una recarga que no entra en el tope se rechazaría al pagarla: no se
     # arma el link (COBRO-MP-1, f).
     entidad, es_org = await _get_billing_entity(db, db_user)
-    billing_service._expire_extra_ops(entidad)
-    vigentes = entidad.extra_ops_remaining or 0
-    if vigentes + billing_service.TOPUP_OPS > billing_service.EXTRA_OPS_MAX:
+    entra, vigentes = billing_service.recarga_entra(entidad)
+    if not entra:
         raise HTTPException(status_code=409, detail=(
             f"Ya tenés {vigentes} operaciones extra y el tope es {billing_service.EXTRA_OPS_MAX}: "
             f"una recarga de {billing_service.TOPUP_OPS} no entra. Usá las que tenés y volvé a recargar."))
