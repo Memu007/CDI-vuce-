@@ -41,42 +41,81 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
-## Veredicto de ORDEN-1, vuelta (2026-10-28 20:08 UTC): devolución
+## Veredicto de ORDEN-1, vuelta 2 (2026-10-29 01:10 UTC): devolución
 
-Sobre `973a1ed` (informe `a036aba`). Evidencia en
-`REPRODUCCION-ORDEN-1-vuelta-2026-10-28.md`. Dueño, edad y pestaña viva
-andan en los casos que probaste. **Causa:** el usuario de la pestaña se
-fija una vez y la sesión no se vuelve a mirar antes de guardar o de
-recuperar; y la recuperación depende de una sola espera. Reproducido por
-la PM:
+Sobre `86c9d84` (informe en tu `PARA-PM.md` de esa vuelta). Evidencia en
+`REPRODUCCION-ORDEN-1-vuelta2-2026-10-29.md`. `orden1.sh` dio 64 ROJO y
+ninguno sin rojo, como tu informe.
+Lo de la vuelta anterior anda: la sesión se mira antes de guardar, la
+recarga lenta recupera o avisa, y el corte se ve en `#avisoBorrador`.
 
-1. A abre la pestaña; B entra en el mismo navegador; en la pestaña se
-   carga una operación. Queda guardada a nombre de A, la pestaña sigue
-   guardando y A la recupera después. El informe y el `CHANGELOG` dicen
-   que deja de autoguardar: corregí la línea.
-2. Con `/auth/current_user` lenta (6 s) o con 500 durante 5 s, la recarga
-   muestra la pantalla vacía y la operación aparece en otra pestaña.
+**Causa que sigue:** la recuperación decide con el usuario de antes de una
+espera. `buscarBorrador` toma el usuario, espera `pestanaViva` (1,5 s si
+hay una pestaña duplicada) y después `adoptarBorrador` escribe con
+`usuarioActual()` y borra el sobre original. Si en esa espera entra otro
+usuario (reproducido por la PM y por los dos adversarios):
 
-**La familia, con un caso cada una:** otro usuario entra después de la
-primera respuesta buena; sale y vuelve a entrar el mismo usuario (no debe
-cortar: hoy rota el CSRF y la pestaña deja de guardar sin aviso); salida y
-entrada de otro; `pageshow` desde el historial; recarga con el usuario
-lento o caído, que recupera cuando el usuario llega o avisa a la vista.
-Cuando la pestaña deja de guardar, lo avisa a la vista.
+- el sobre queda con `user: null` y el de A se borra; la primera pestaña
+  que se abre, de A o de B, lo barre como sin dueño. La operación de A se
+  pierde sin vuelta;
+- la pestaña le muestra a B la operación de A en review, con el aviso de
+  otro usuario.
 
-**Pruebas:** rojo antes de cada regla y que distingan los mutantes vivos
-de los dos adversarios: la rama del dueño distinto, `sinSesion` (las dos
-líneas), `return !!currentUser` → `true`, el tope de 30 s y el
-crecimiento de la espera, `ESPERA_PESTANA_MS`, `pageshow`, los
-`borrarBorrador()` del `pagehide` y del intervalo (la operación terminada
-no vuelve), el barrido de vencidos de otro usuario y `parsed.v !== 1`.
+Pasa en el arranque y en la recuperación tardía. Es tu A9, pero no es
+BAJA: toda pestaña duplicada espera el candado 1,5 s por diseño, y la
+pérdida no tiene vuelta.
 
-- **D1: (a), decidido por la PM**, con dos condiciones: el mismo usuario
-  que vuelve a entrar no corta, y cuando corta, avisa a la vista.
-- A riesgos, sin arreglo acá: generar el TXT desde la pestaña cuenta en
-  las operaciones de la sesión de ese momento (`finalize.js:667`, anterior
-  a la pieza); localStorage lleno falla sin aviso (si el aviso del corte
-  lo cubre con una línea, va).
+**La familia, con un caso cada una:** después de cada espera del camino de
+recuperación (candado, usuario, consulta), no se escribe ni se borra nada
+si el usuario de ahora no es el que se tomó al empezar, y nunca se escribe
+un sobre sin usuario. Casos: entra B durante la espera, en el arranque y en
+la tardía; se cierra la sesión durante la espera; A sale y vuelve a entrar
+durante la espera (no pierde nada). Rojo antes, y un sabotaje que quite esa
+comprobación (hoy `user: duenoPestana` en `adoptarBorrador` pasa a, p y z3).
+
+**Sabotajes que faltan**, mutantes vivos con consecuencia:
+
+- sin `sesionRevisada = sesion;`: con 401, las consultas en 20 s pasan de 1
+  a 8 (medido por el adversario);
+- `revisarDesde` sin el freno de 10 s: con la red cortada, de 2 a 8
+  (medido);
+- el aviso de otro usuario deja de ser pegajoso: pasa a «No se pudo
+  comprobar la sesión» (medido);
+- sin `sesionRevisada = null` en el `catch` de `revisarSesion`: después de
+  un error de red no vuelve a preguntar y la pestaña no guarda más aunque
+  vuelva la red (lectura de código: escribí el caso que lo muestre).
+
+**Pestaña tocada:** cuenta cualquier interacción. Hoy un `click()` sin
+`pointerdown` (tecnologías de asistencia, extensiones) no la marca: la
+recuperación tardía la lleva a review y la operación que se elige después
+pisa la de antes sin aviso (reproducido por el adversario). Un caso con
+`click()` y uno con tecla; hoy quitar `keydown` o `drop` no lo ve ningún
+caso.
+
+- **Supuestos:** «cualquier toque desactiva la recuperación tardía»,
+  aceptado. `ESPERA_USUARIO_MS` 4 s y `ESPERA_SESION_MS` 10 s, aceptados,
+  decidido por la PM; el informe y el `CHANGELOG` dicen que con una sesión
+  que tarda más de 10 s la pestaña no guarda y avisa.
+- **A riesgos, sin arreglo acá:** A2 (el mismo usuario que sale y vuelve a
+  entrar con la primera consulta en camino ve «Entró otro usuario»: no
+  guarda y avisa, del lado seguro), `/logout` no rota el CSRF, bfcache
+  simulado, `subiendo--` y el aviso `lleno` que se va sin prueba.
+- **Puertas de la vuelta 3:** toca sesión, así que van `/code-review` y
+  `/security-review`, y la suite completa sobre el SHA que entregues. En
+  esta vuelta no se corrieron (Emi había frenado): sin ellas no se acepta.
+
+
+## Tus D8–D10 de COBRO-MP-1 (2026-10-29 01:15 UTC)
+
+COBRO-MP-1 (`784e793`) llegó; la reviso yo, sin apuro. Las D, decididas
+por la PM:
+
+- **D8: (a).** Las consultas a Mercado Pago a un hilo con tope es una tarea
+  aparte, después de esta tanda; no entra en COBRO-MP-1. Queda anotada.
+- **D9: (b).** 503, para que Mercado Pago reintente. Va en la próxima vuelta
+  de COBRO-MP-1, con su rojo antes y su sabotaje.
+- **D10: (a).** Riesgo aceptado: recargar lo arregla. Que el `CHANGELOG` no
+  prometa otra cosa.
 
 ## Veredicto de EXCEL-2b, vuelta 2 (2026-10-28 20:30 UTC): aceptada
 
@@ -450,10 +489,10 @@ supuestos de Mercado Pago que no pudiste ver sin red: los estados, que una
 
 ## Orden
 
-1. La devolución de ORDEN-1 de las 20:08 (arriba): ahora, antes de seguir
-   con COBRO-MP-1. (EXCEL-2b quedó aceptada a las 20:30.)
-2. COBRO-MP-1: hecha; se entrega después de ORDEN-1, con A–E de arriba
-   arreglados.
+1. ORDEN-1, vuelta 3: la devolución de arriba, ahora. (EXCEL-2b quedó
+   aceptada a las 20:30.)
+2. COBRO-MP-1: entregada en `784e793`; la PM la revisa. Si vuelve con
+   devolución, va antes que lo de abajo.
 3. COBRO-CORTE-1: hecha; se entrega después de COBRO-MP-1.
 4. COBRO-MP-2: hecha; subila ya y se entrega después de COBRO-CORTE-1.
 5. AISLAMIENTO-2 y LIMPIEZA-1: hechas; se entregan después de COBRO-MP-2.
