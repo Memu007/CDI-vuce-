@@ -384,6 +384,7 @@ class ClientProductHistory(Base):
     __tablename__ = "client_product_history"
     __table_args__ = (
         Index("ix_cph_owner_client", "owner_username", "client_id"),
+        Index("ux_cph_owner_client_clave", "owner_username", "client_id", "clave", unique=True),
     )
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -398,6 +399,9 @@ class ClientProductHistory(Base):
     ncm = Column(String(10), nullable=False)
     descripcion = Column(Text, nullable=False)
     descripcion_normalizada = Column(String(200), nullable=True)
+    # El producto (NCM de 8 dígitos y descripción): una fila por cliente.
+    # Vacía en las filas que no son un producto.
+    clave = Column(String(64), nullable=True)
 
     peso_unitario_avg = Column(Float, default=0.0)
     origen_frecuente = Column(String(3), default="XX")

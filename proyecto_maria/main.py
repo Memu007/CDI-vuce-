@@ -1327,6 +1327,85 @@ async def _migrate_add_product_history_counts():
         print(f"⚠️ Migracion veces por valor (no critica): {mig_err!r}")
 
 
+async def _migrate_product_history_clave():
+    """Una fila por producto en client_product_history (DESPACHO-1b): agrega
+    `clave`, une las filas del mismo producto en la más reciente y crea el
+    índice único. Si falla, el arranque se detiene: sin el índice, guardar el
+    catálogo duplicaría filas."""
+    from sqlalchemy import text
+    from proyecto_maria.database.connection import engine, IS_SQLITE
+    from proyecto_maria.services.client_memory import _usos, identidad_del_producto
+
+    async with engine.begin() as conn:
+        if IS_SQLITE:
+            res = await conn.exec_driver_sql("PRAGMA table_info(client_product_history)")
+            existing = {row[1] for row in res.fetchall()}
+        else:
+            res = await conn.exec_driver_sql(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_name = 'client_product_history'"
+            )
+            existing = {row[0] for row in res.fetchall()}
+        if not existing:
+            return
+        if "clave" not in existing:
+            await conn.exec_driver_sql(
+                "ALTER TABLE client_product_history ADD COLUMN clave VARCHAR(64)")
+            print("✅ Migracion: agregada columna client_product_history.clave")
+
+        filas = (await conn.execute(text(
+            "SELECT id, owner_username, client_id, ncm, descripcion, clave, veces_usado,"
+            " peso_unitario_avg, veces_peso, valor_unitario_avg, veces_valor,"
+            " cantidad_avg, veces_cantidad, primera_vez, ultima_vez"
+            " FROM client_product_history"))).mappings().all()
+        grupos: dict = {}
+        for fila in filas:
+            producto = identidad_del_producto(fila["ncm"], fila["descripcion"])
+            clave = producto[2] if producto else None
+            if clave != fila["clave"]:
+                await conn.execute(text(
+                    "UPDATE client_product_history SET clave = :clave WHERE id = :id"),
+                    {"clave": clave, "id": fila["id"]})
+            if clave:
+                grupos.setdefault((fila["owner_username"], fila["client_id"], clave), []).append(fila)
+
+        unidas = 0
+        for grupo in grupos.values():
+            if len(grupo) < 2:
+                continue
+            queda = max(grupo, key=lambda f: (
+                f["ultima_vez"] is not None, f["ultima_vez"] if f["ultima_vez"] is not None else "", f["id"]))
+            cambios = {"id": queda["id"],
+                       "veces_usado": sum(max(f["veces_usado"] or 1, 1) for f in grupo)}
+            for promedio, veces in (("peso_unitario_avg", "veces_peso"),
+                                    ("valor_unitario_avg", "veces_valor"),
+                                    ("cantidad_avg", "veces_cantidad")):
+                usos = [(f[promedio], _usos(f[promedio], f[veces], f["veces_usado"])) for f in grupo]
+                total = sum(n for _, n in usos)
+                cambios[veces] = total
+                cambios[promedio] = sum(v * n for v, n in usos if n) / total if total else None
+            cambios["peso_unitario_avg"] = cambios["peso_unitario_avg"] or 0.0
+            cambios["primera_vez"] = min((f["primera_vez"] for f in grupo if f["primera_vez"] is not None),
+                                         default=None)
+            cambios["ultima_vez"] = queda["ultima_vez"]
+            await conn.execute(text(
+                "UPDATE client_product_history SET veces_usado = :veces_usado,"
+                " peso_unitario_avg = :peso_unitario_avg, veces_peso = :veces_peso,"
+                " valor_unitario_avg = :valor_unitario_avg, veces_valor = :veces_valor,"
+                " cantidad_avg = :cantidad_avg, veces_cantidad = :veces_cantidad,"
+                " primera_vez = :primera_vez, ultima_vez = :ultima_vez WHERE id = :id"), cambios)
+            for fila in grupo:
+                if fila["id"] != queda["id"]:
+                    await conn.execute(text("DELETE FROM client_product_history WHERE id = :id"),
+                                       {"id": fila["id"]})
+                    unidas += 1
+        await conn.exec_driver_sql(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ux_cph_owner_client_clave"
+            " ON client_product_history (owner_username, client_id, clave)")
+        if unidas:
+            print(f"✅ Migracion: {unidas} filas repetidas de client_product_history unidas")
+
+
 async def _migrate_limites_auth() -> None:
     """Borra los contadores de intentos vencidos de `limites_auth` (ABUSO-1).
     La tabla la crea `init_db`; las escrituras también borran los vencidos,
@@ -1430,6 +1509,7 @@ async def lifespan(app: FastAPI):
     await _migrate_add_grupo_id_column()
     await _migrate_add_unidad_column()
     await _migrate_add_product_history_counts()
+    await _migrate_product_history_clave()
     await _migrate_add_api_logs_owner_column()
     await _migrate_create_telemetry_events_table()
     # Organizaciones: crear tabla orgs primero, luego FK en users, luego invitations
@@ -7525,14 +7605,20 @@ def _sin_nul(valor):
     return valor
 
 
-async def _historial_de_un_producto(db, upsert, **campos) -> bool:
+_AVISO_DIGITOS = "El NCM tiene que estar escrito con dígitos del 0 al 9."
+_AVISO_MEDIO_PAR = "Hay un carácter que no se puede guardar."
+
+
+async def _historial_de_un_producto(db, upsert, **campos) -> bool | None:
     """Un producto al historial, en su propio savepoint: si la base lo
-    rechaza, se pierde sólo ese y no los demás de la operación."""
+    rechaza, se pierde sólo ese y no los demás de la operación.
+
+    True si lo guardó, None si no es un producto y False si falló."""
     try:
         async with db.begin_nested():
             entrada = await upsert(db, **campos)
             await db.flush()
-        return entrada is not None
+        return True if entrada is not None else None
     except Exception:
         logging.exception("historial del cliente: no se guardó client_id=%s ncm=%s",
                           campos.get("client_id"), campos.get("ncm"))
@@ -7551,10 +7637,17 @@ async def save_client_operation(
     username = user["username"]
     client = await _get_owned_client(db, client_id, username)
 
+    from proyecto_maria.services.client_memory import tiene_digito_no_ascii, tiene_medio_par
+
     try:
         data = _sin_nul(await request.json())
         resumen = data.get("resumen", {}) or {}
         items = data.get("items", []) or []
+        # Lo que el historial rechazaría se rechaza antes de guardar nada.
+        if tiene_medio_par(data):
+            raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
+        if any(tiene_digito_no_ascii(str(item.get("ncm") or item.get("pieza") or "")) for item in items):
+            raise HTTPException(status_code=400, detail=_AVISO_DIGITOS)
 
         op_code = await _next_op_code(db, username)
 
@@ -7632,8 +7725,11 @@ async def save_client_operation(
     # respuesta lo dice (historial_guardado).
     historial_guardado = True
     try:
-        from proyecto_maria.services.client_memory import upsert_client_product_history
+        from proyecto_maria.services.client_memory import (
+            orden_de_escritura, upsert_client_product_history,
+        )
 
+        productos = []
         for item in items:
             ncm_raw = str(item.get("ncm") or item.get("pieza") or "").strip()
             desc_raw = str(item.get("descripcion") or "").strip()
@@ -7653,7 +7749,9 @@ async def save_client_operation(
             except (TypeError, ValueError):
                 historial_guardado = False
                 continue
-            if not await _historial_de_un_producto(db, upsert_client_product_history, **campos):
+            productos.append(campos)
+        for campos in sorted(productos, key=orden_de_escritura):
+            if await _historial_de_un_producto(db, upsert_client_product_history, **campos) is False:
                 historial_guardado = False
         await db.commit()
     except Exception:
@@ -8201,10 +8299,20 @@ async def learn_client_catalogo_productos(
     items = _sin_nul(body.get("items")) if isinstance(body, dict) else None
     if not isinstance(items, list):
         raise HTTPException(status_code=400, detail="Se requiere body.items como lista")
+    if len(items) > 500:
+        raise HTTPException(status_code=400, detail="Son más de 500 productos: cargalos en partes.")
+    if not all(isinstance(item, dict) for item in items):
+        raise HTTPException(status_code=400, detail="Cada producto tiene que ser un objeto.")
 
-    from proyecto_maria.services.client_memory import upsert_client_product_history
+    from proyecto_maria.services.client_memory import (
+        orden_de_escritura, tiene_digito_no_ascii, tiene_medio_par, upsert_client_product_history,
+    )
+    if tiene_medio_par(body):
+        raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
+    if any(tiene_digito_no_ascii(str(item.get("ncm") or item.get("pieza") or "")) for item in items):
+        raise HTTPException(status_code=400, detail=_AVISO_DIGITOS)
 
-    updated = 0
+    productos = []
     for item in items:
         ncm = str(item.get("ncm") or item.get("pieza") or "").strip()
         desc = str(item.get("descripcion") or "").strip()
@@ -8223,7 +8331,11 @@ async def learn_client_catalogo_productos(
             )
         except (TypeError, ValueError, OverflowError):  # 10**400 no entra en un float
             continue
-        updated += await _historial_de_un_producto(db, upsert_client_product_history, **campos)
+        productos.append(campos)
+
+    updated = 0
+    for campos in sorted(productos, key=orden_de_escritura):
+        updated += await _historial_de_un_producto(db, upsert_client_product_history, **campos) is True
 
     await db.commit()
     return {"success": True, "cliente_id": client_id, "aprendidos": updated}
@@ -8305,12 +8417,10 @@ async def guardar_despacho_en_catalogo(
             "detail": "Hay productos sin completar: no guardé ninguno.",
             "code": "renglones_incompletos", "errores": errores})
 
+    from proyecto_maria.services.client_memory import orden_de_escritura
     try:
-        for campos in listos:
-            # Lo que trae el despacho es de su posición: no se suma a un producto
-            # de otro NCM por parecido de descripción.
-            await upsert_client_product_history(
-                db, owner_username=username, client_id=client_id, solo_mismo_ncm=True, **campos)
+        for campos in sorted(listos, key=orden_de_escritura):
+            await upsert_client_product_history(db, owner_username=username, client_id=client_id, **campos)
         await db.commit()
     except Exception:
         await db.rollback()
@@ -8344,16 +8454,19 @@ async def update_client_catalogo_producto(
 
     if not isinstance(body, dict):
         body = {}
-    from proyecto_maria.services.client_memory import _MEDIO_PAR, valor_para_promedio
-    textos = [str(body[k]) for k in ("ncm", "origen", "descripcion") if k in body]
-    if any(_MEDIO_PAR.search(t) for t in textos):
-        raise HTTPException(status_code=400, detail="Hay un carácter que no se puede guardar.")
+    from proyecto_maria.services.client_memory import (
+        descripcion_del_producto, identidad_del_producto, ncm_para_historial,
+        tiene_digito_no_ascii, tiene_medio_par, valor_para_promedio,
+    )
+    if tiene_medio_par(body):
+        raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
     if "ncm" in body:
+        if tiene_digito_no_ascii(str(body["ncm"])):
+            raise HTTPException(status_code=400, detail=_AVISO_DIGITOS)
         # La posición SIM completa no entra en la columna: antes se cortaba a
         # 10 caracteres y quedaba un código que no existe (GUARDAR-1).
-        from proyecto_maria.services.client_memory import ncm_para_historial
         ncm_nuevo = ncm_para_historial(body["ncm"])
-        if ncm_nuevo is None or len(re.sub(r"\D", "", ncm_nuevo)) < 8:
+        if ncm_nuevo is None:
             raise HTTPException(status_code=400, detail="El NCM no es válido: tiene que tener sus 8 dígitos.")
         row.ncm = ncm_nuevo
     if "origen" in body:
@@ -8372,10 +8485,19 @@ async def update_client_catalogo_producto(
             row.peso_unitario_avg, row.veces_peso = peso, 1
     if "descripcion" in body:
         from proyecto_maria.core.catalog_service import _normalize as _cat_normalize
-        row.descripcion = str(body["descripcion"]).strip()
+        try:
+            row.descripcion = descripcion_del_producto(body["descripcion"])
+        except ValueError as e:
+            raise HTTPException(status_code=400, detail=str(e))
         row.descripcion_normalizada = _cat_normalize(row.descripcion)[:200]
+    producto = identidad_del_producto(row.ncm, row.descripcion)
+    row.clave = producto[2] if producto else None
 
-    await db.commit()
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail="Ya hay otro producto igual en el catálogo.")
     await db.refresh(row)
     return {"success": True, "producto": _product_history_to_dict(row)}
 
@@ -9824,6 +9946,9 @@ async def guardar_uso_ncm(
     ncm = data.get("ncm", "").strip()
     if not descripcion or not ncm:
         return {"success": False}
+    from proyecto_maria.services.client_memory import tiene_digito_no_ascii
+    if tiene_digito_no_ascii(ncm):
+        raise HTTPException(status_code=400, detail=_AVISO_DIGITOS)
     problema = _problema_historial(descripcion, ncm)
     if problema:
         raise HTTPException(status_code=400, detail=problema)

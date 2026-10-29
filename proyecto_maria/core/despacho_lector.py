@@ -295,7 +295,8 @@ def _tope_de_cpu(segundos: float):
             raise _DemasiadoTrabajo
 
     anterior = signal.signal(signal.SIGPROF, cortar)
-    signal.setitimer(signal.ITIMER_PROF, max(segundos, 0.001))
+    # Se repite: si la señal cae en un finalizador, Python ignora la excepción.
+    signal.setitimer(signal.ITIMER_PROF, max(segundos, 0.001), 0.05)
     try:
         yield
     finally:
@@ -568,13 +569,22 @@ def _renglon(bloque: dict, padre: dict | None = None) -> dict:
 
 
 def leer_despacho(data: bytes, limite_cpu_s: float = _MAX_CPU_LECTURA) -> dict:
-    """Renglones del catálogo de un PDF de despacho. No guarda nada."""
+    """Renglones del catálogo de un PDF de despacho. No guarda nada. El tope
+    de CPU cubre extraer el texto y entenderlo."""
+    import time
+
+    inicio = time.process_time()
     texto, avisos, salteadas = _hojas_del_pdf(data, limite_cpu_s)
     if not texto.strip():
         # Si quedaron hojas sin leer, no se sabe si es escaneado.
         return {"renglones": [], "divisa": None, "sin_texto": not salteadas,
                 "avisos": avisos if salteadas else avisos + [AVISO_SIN_TEXTO]}
-    resultado = leer_texto(texto)
+    try:
+        with _tope_de_cpu(limite_cpu_s - (time.process_time() - inicio)):
+            resultado = leer_texto(texto)
+    except _DemasiadoTrabajo:
+        return {"renglones": [], "divisa": None, "sin_texto": False,
+                "avisos": avisos + ["El PDF da demasiado trabajo: no pude leer sus productos."]}
     resultado["avisos"] = avisos + resultado["avisos"]
     resultado["sin_texto"] = False
     return resultado
@@ -777,14 +787,15 @@ def renglon_para_catalogo(renglon) -> tuple[dict | None, list[str]]:
     sirve con su posición SIM (o el NCM de 8 dígitos) y su descripción; el
     origen, si viene, tiene que ser un país de la tabla."""
     from proyecto_maria.core.maria_generator import pais_reconocido
+    from proyecto_maria.services.client_memory import ncm_para_historial
 
     if not isinstance(renglon, dict):
         return None, ["El renglón no tiene la forma esperada."]
     problemas = []
     posicion = str(renglon.get("posicion_sim") or "").strip().upper()
-    # Los 8 dígitos, sin puntos: «8471.49.00», «84714900» y «8471.4900» son
-    # el mismo NCM.
-    ncm = re.sub(r"\D", "", posicion)[:8] if _POSICION.match(posicion) else None
+    # La misma regla que el resto del catálogo: «8471.49.00», «84714900» y
+    # «8471.49.00.100D» son el mismo NCM.
+    ncm = ncm_para_historial(posicion)
     if not ncm:
         problemas.append("Falta la posición SIM o no tiene sus 8 dígitos.")
     descripcion = re.sub(r"\s+", " ", str(renglon.get("descripcion") or "")).strip()
@@ -808,7 +819,7 @@ def renglon_para_catalogo(renglon) -> tuple[dict | None, list[str]]:
     # El catálogo guarda el peso por unidad: el kilo neto del renglón dividido
     # la cantidad, si están los dos.
     peso = kilo / cantidad if kilo and cantidad else None
-    if peso is not None and not (math.isfinite(peso) and peso <= _MAX_NUMERO):
+    if peso is not None and not (math.isfinite(peso) and peso < _MAX_NUMERO):
         # Una cantidad ínfima da un peso infinito, que no se puede mostrar.
         return None, ["El peso por unidad no se puede calcular: revisá la cantidad y el kilo neto."]
     return {"ncm": ncm, "descripcion": descripcion, "origen": origen,
