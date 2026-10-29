@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-29 · fix: una pestaña vieja no escribe a nombre del usuario que entró después (ORDEN-1b)
+
+- **fix(orden):** si entra otro usuario en el mismo navegador, la pestaña del anterior no genera, no guarda ni cierra la sesión del otro: antes de escribir pregunta quién es, y si es otro se tapa y pide recargar. Si volvés a entrar vos, sigue sin trabar.
+- La pestaña que no pudo recuperar la operación porque la sesión estaba cambiando lo avisa y la recupera cuando confirma que la sesión es tuya.
+
 ## 2026-10-29 · fix: Mercado Pago no cobra dos veces y cuenta bien las operaciones (COBRO-MP-1, vuelta 2)
 
 - **fix(cobro):** dos pagos de la misma cuenta al mismo tiempo se acreditan los dos; si no se puede leer Mercado Pago se responde para que reintente, y un pago que no sirve queda anotado como rechazado en el panel de desarrollo, también si trae un dato que no entra en la base.
