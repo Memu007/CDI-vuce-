@@ -41,6 +41,26 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
+## D13 y D14 de COBRO-MP-1, vuelta 2 (2026-10-29 06:40 UTC)
+
+La entrega (`999b27a`, informe `069b190`) llegó. La reviso entera cuando
+esté el arreglo de D14; estas dos van ya para que no te frenen.
+
+- **D14: (a).** Los dos arreglos de la prueba van en un commit de pruebas
+  aparte, encima del informe y antes de ORDEN-1b. Sin tocar el producto.
+  La barrera tiene que cruzar a los dos después de la consulta previa y
+  antes de `_registrar_pago_mp`. El script tiene que mostrar las líneas
+  «FALLA» de Postgres. Volvé a correr `cobro_mp1.sh` completo sobre ese
+  SHA y repetí a mano el sabotaje de D31 cinco veces: las cinco en rojo.
+  Avisame con una línea en `PARA-PM.md` (el SHA y la salida) y seguí con
+  ORDEN-1b.
+- **D13: (c), decidido por la PM.** Usa sólo lo verificado. El error cae
+  del lado seguro: un cliente queda frenado unos minutos, con la salida a
+  la vista, en vez de perder sin aviso una suscripción que ya cobró. El
+  paso de más para la tarjeta que no pasa (D7.2) se acepta. No la hagas
+  ahora. Va en la próxima vuelta de COBRO-MP-1, después de ORDEN-1b y de
+  mi veredicto sobre esta vuelta, con su rojo antes y su sabotaje.
+
 ## Veredicto de ORDEN-1, vuelta 3 (2026-10-29 03:31 UTC): aceptada
 
 Sobre `f7fbb72` (producto `92bbaa2`). Evidencia en
