@@ -44,111 +44,99 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
-## DISCO-1, vuelta: devolución sobre `a6c82f5`, sólo pruebas e informe (2026-10-28 20:58 UTC)
+## DESPACHO-1b: devolución, sobre `1f5480e` (2026-10-29 01:00 UTC)
 
-Evidencia en `REPRODUCCION-DISCO-1-vuelta-2026-10-28.md`. El producto queda
-como está: los rollbacks, los topes, el NUL, el `.migrado` libre y el
-bloqueo por dueño están bien, y el adversario de la PM no sacó altas ni
-fugas entre dueños. Va **antes** que DESPACHO-1b: es chica.
+Evidencia en `REPRODUCCION-DESPACHO-1b-vuelta2-2026-10-29.md`. Bien: el
+candado por usuario (timeout, error al lanzar y cancelación), el tope de
+CPU entre hojas, `_usos` por valor, la D47 (b) y `despacho1b.sh` 67 de 67.
+Va **primero**: RENDIMIENTO-1c espera.
 
-- **Supuesto 1, decidido por la PM: el bloqueo por dueño en vez de
-  ordenar, aceptado.** Supuestos 2 y 3, aceptados.
-- **El 400 de guardar-uso queda como está, decidido por la PM.**
+**Causa de la devolución:** dos causas de la vuelta anterior siguen, en
+lugares que la vuelta no tocó, y aparece una nueva. Cada punto, rojo antes
+del arreglo y con su sabotaje:
 
-**Causa de la devolución:** el bloqueo por dueño tiene dos lugares y una
-clave, y las pruebas sólo ven uno de los lugares y no ven la clave.
-Reproducido por la PM en Postgres 16, los dos con «fallas: 0»:
+1. **La identidad del producto vale en una sola vía.** `guardar` usa «NCM
+   normalizado y descripción entera»; `learn`, `/operaciones` y el PUT no.
+   Reproducido por la PM: un `learn` del producto largo con peso 500 cae en
+   la fila de otro producto con los mismos 275 caracteres iniciales (queda
+   con 2 usos y peso 250,5); un NCM de 10 dígitos por `learn` y después
+   `guardar` dejan 2 filas (al revés, 1: depende del orden); la misma
+   descripción con acentos compuestos y descompuestos, 2 filas; un NCM con
+   guiones por `learn` y por `guardar`, 2 filas. **La familia:** una sola
+   regla de identidad, la misma función en las cuatro vías, con el NCM
+   llevado a una sola forma y la descripción en una sola forma Unicode.
+   La prueba: un caso parametrizado por cada par de vías (la primera
+   escribe, la segunda escribe el mismo producto con otro formato) que
+   exige **una** fila.
+2. **Lo que no es un NCM no entra, por ninguna vía.** Dígitos arábigos o de
+   ancho completo dan hoy 200 y filas con un NCM que no existe: 400. Lo
+   mismo un ítem de `learn` que no es objeto (hoy 500) y un `\ud800` suelto
+   en cualquier texto de cualquier vía (`/operaciones` da 500; `learn`, 200
+   con 0 aprendidos y sin decir por qué).
+3. **Nueva: la identidad la tiene que sostener la base.** Reproducido en
+   SQLite: seis `guardar` a la vez del mismo renglón dejan seis filas y
+   seis 200. Lo dispara un doble clic o dos pestañas. **La familia:** dos
+   escrituras del mismo producto a la vez, en dos procesos, dejan una
+   fila con los dos usos. El mecanismo lo elegís vos; la prueba, en
+   Postgres 16 con dos procesos. Los duplicados que ya existan se unen en
+   la migración, y esa migración, si falla, se nota: no imprime y sigue.
+4. **El tope de trabajo cubre todo el hijo.** El informe dice «el hijo
+   corta a los 10 s de CPU» y no es así: el tope cubre la extracción de
+   hojas, no el parseo de después. Reproducido: un PDF de 42 KB (200 hojas
+   que comparten 4000 líneas) usa 19,6 s de CPU con aviso «leí hasta la
+   hoja 70». Es la causa de la vuelta anterior, en la otra etapa. La
+   prueba mide CPU del hijo entero con un PDF así.
+5. **El PUT valida igual que `guardar`.** Hoy acepta descripción vacía, NUL
+   con 300 000 caracteres, peso `"1_000"` y NCM arábigo; y un PUT que deja
+   dos filas iguales tiene que unirlas o dar 409, lo que elijas. `learn`
+   lleva el mismo tope de ítems que `guardar`.
+6. **Un solo borde para cada tope.** Peso y valor usan reglas distintas
+   para 1e12 (uno `<=`, otro `>=`): un peso de 1e12 justo da 200 sin aviso
+   y se pierde. Una regla, y el valor fuera del tope avisa.
+7. **Mutantes vivos con consecuencia** (del adversario de la PM), un caso
+   cada uno: `valor_para_promedio` quitado en la fila nueva (guarda `inf`),
+   el control de `\ud800` en NCM y origen del PUT, `casefold` y el colapso
+   de espacios, los espacios del NCM, la divisa con espacios o minúscula,
+   `salteadas = True` tras el corte, y la migración (idempotente y que
+   falle a la vista).
+8. **El informe dice lo que pasa.** Una afirmación como la del punto 4 se
+   sostiene con una medida, no con el nombre de la variable.
 
-1. **La carga de archivos viejos sin `_bloquear_historial`** sobrevive a la
-   suite, al script de Postgres y a `disco1.sh`.
-2. **La clave sin el dueño (`"ncm_historial:"`)** sobrevive igual: frenaría
-   las importaciones de todos los estudios entre sí y nada lo ve.
+- **Supuestos:** que tildes o puntuación distintas no se unan, aceptado;
+  la misma letra escrita compuesta o descompuesta no es una tilde
+  distinta (punto 1). El peso a mano como un uso, aceptado. La divisa: el
+  código acepta « usd »; que el supuesto y la prueba digan lo mismo que
+  el código.
+- **Las filas viejas pesan por `veces_usado`, decidido por la PM: queda
+  así.** Es la mejor cuenta que hay para el promedio guardado. A riesgos.
+- **A riesgos, sin arreglo acá:** `learn` de 100 ítems contra 5000 filas
+  tarda 19 s; la consulta de la migración no filtra por esquema; el
+  candado por usuario es por proceso; `update_product_history` sólo lo
+  llama una prueba (si sobra, decilo en el informe).
 
-**La familia:** cada camino que escribe el historial en tandas toma el
-bloqueo de **su** dueño, y dos dueños distintos no se esperan. Una prueba
-en Postgres por cada uno, roja con su mutante y sumada a `disco1.sh`. Por
-ejemplo, la carga de archivos viejos a la vez que una importación del mismo
-dueño, y un dueño que termina mientras otro tiene tomado el suyo.
+## DISCO-1: aceptada sobre `5c46e36` (2026-10-29 01:00 UTC)
 
-3. **El sabotaje «importar sin el bloqueo por dueño» da ROJO?**: el texto
-   esperado pide el 500 en primer lugar, y el orden cambia de una vuelta a
-   otra (en la vuelta 2 de la PM vino segundo). Que acepte el 500 en
-   cualquier posición.
-4. **El informe, con la medida del adversario:**
-   - El riesgo del 400 está mal medido. La regresión es sólo «cliente sin
-     proveedor y descripción de 2001 o más».
-   - Con cliente y proveedor, de 301 a 2000 caracteres ya se perdían en
-     silencio la memoria del cliente y el catálogo, con 200, desde antes
-     de la pieza (`product_key` es `String(300)`). Va a riesgos como
-     anterior, sin arreglo acá.
-   - guardar-uso espera mientras importa el mismo dueño (9,3 s con 60 000
-     filas, sin `lock_timeout`). Va a riesgos.
-   - La carga descarta para siempre lo que no pasa los topes, y el log no
-     dice cuál. Va a riesgos.
+Evidencia en `REPRODUCCION-DISCO-1-vuelta2-2026-10-29.md`: `disco1.sh` 46
+ROJO y dos mutantes propios de la PM (otra clave, el bloqueo después de
+las tandas) mueren. **No se integra todavía:** `5c46e36` está encima de
+`1f5480e`. Entra con la aceptación de DESPACHO-1b, después de correr
+`disco1.sh` sobre ese SHA. No hay que tocar nada.
 
-## DESPACHO-1b: devolución, sobre `09e16f3`, y D47 y D48 (2026-10-28 20:07 UTC)
+## Orden desde el 2026-10-29
 
-Evidencia en `REPRODUCCION-DESPACHO-1b-vuelta-2026-10-28.md`. Bien: la
-memoria del hijo con tope, el lector fuera del pool de las facturas, el
-anterior vacío que no promedia y `despacho1b.sh` 30 de 30. **Causa de la
-devolución:** tres de los siete puntos cambiaron el ejemplo y no la causa.
-Cada punto, rojo antes del arreglo y con su sabotaje:
+1. DESPACHO-1b (devolución, arriba). 2. RENDIMIENTO-1c (la D48, abajo).
+3. SESION-1. 4. ABUSO-1. 5. SUFIJOS-2 y lo que se suma de SEGURO-1.
+6. EMAIL-1: la D45 y el mutante. 7. CONEXIONES-1: la D46.
+8. OBSERVABILIDAD-1. 9. ORG-1 + D40. Las devoluciones están abajo. Cada
+una con su rojo, su sabotaje y `/entregar`; me despertás al entregar cada
+una, sin esperar a juntar.
 
-1. **Trabajo y turnos, no sólo bytes.** Reproducido por la PM: un PDF de
-   49 KB (20 hojas que comparten un contenido de 500 KB con unas 14 000
-   operaciones) ocupa el hijo 23,5 s con 76 MB. Dos de esos y un despacho
-   normal de otro usuario: `A,B,C -> TimeoutError×3 10.0s`. **La familia:**
-   el hijo corta por trabajo (operaciones, texto o CPU, lo que elijas,
-   medido) y un usuario no puede ocupar todos los lugares del lector. La
-   prueba: ese PDF se corta rápido y el despacho del otro usuario entra.
-2. **La identidad del producto (punto 5 de la devolución anterior).**
-   Reproducido: dos renglones del mismo NCM con los primeros 275
-   caracteres iguales quedan en una fila (`veces_usado` 2, peso 25,5,
-   mezcla de 1 y 50), porque `_norm_desc` corta en 200. Y el NCM con
-   puntos no se une: «8471.49.00», «84714900» y «8471.4900» quedan en
-   tres filas (regresión de `solo_mismo_ncm`). **La familia:** dos
-   productos son el mismo sólo si el NCM normalizado y la descripción
-   entera coinciden; nada se compara cortado o con formato distinto.
-3. **El promedio (punto 4 anterior).** Reproducido: sin valor, después
-   (2, 3), después (4, 6) da peso 2,67 y valor 4,0 en vez de 3 y 4,5:
-   `_incr_avg` divide por `veces_usado`, que cuenta usos sin valor. **La
-   familia:** cada promedio cuenta sólo los usos que trajeron ese valor.
-   `client_service.py:371` hace la misma cuenta: mismo arreglo, con su
-   prueba.
-4. **Todo valor que entra al catálogo pasa el mismo tope.** Reproducido:
-   `catalogo/productos/learn` guarda `inf` y desde ahí el GET del catálogo
-   da 500 (`Out of range float values are not JSON compliant: inf`) para
-   siempre. Es anterior a la pieza, pero es la misma causa que el punto 3
-   de la devolución anterior. Y un `\ud800` suelto en el JSON de guardar
-   da 500: lo del lector (tu 2b), en la otra entrada.
-5. **Mutantes vivos del adversario**, un caso por cada uno que dé rojo con
-   su sabotaje: el número de hijos a la vez, el `except MemoryError` al
-   abrir, un tope de pypdf que no sea Flate, `columnas[max(k,0)]`,
-   `_MAX_TEXTO` sin parchar la prueba, el borde de 500 renglones,
-   `isinstance(resultado, dict)` y `BrokenPipe`.
-
-- **D47: (b), decidido por la PM.** Si la divisa no es USD o no se
-  encontró, no se guarda `valor_unitario` y ese renglón avisa; lo demás
-  se guarda. La (a) queda para proponer como pieza propia.
-- **D48: (a), decidido por la PM, como pieza RENDIMIENTO-1c, la próxima
-  después de esta devolución.** La validación del PDF corre en el proceso
-  aparte, con tope de memoria y de tiempo, para leer despachos y leer
-  facturas. La prueba: tu PDF de 200 repeticiones no hace crecer la app,
-  medido en el proceso de la app; y diez a la vez no frenan una subida
-  normal. Está en producción: la publicación la decide Emi.
-- Riesgos, sin arreglo acá: el hijo carga `.env` por
-  `pdf_extractor.py:16-18` (declaralo; si se arregla con una línea, va).
-
-## Orden después de las 18:00, y D45 y D46 (2026-10-28 17:58 UTC)
-
-0. DISCO-1, vuelta (devolución de las 20:58, arriba). 1. DESPACHO-1b
-(devolución de las 20:15, arriba). 1b. RENDIMIENTO-1c (D48, arriba). 3. SESION-1
-(devolución, abajo). 4. ABUSO-1 (devolución, abajo). 5. SUFIJOS-2
-(devolución, abajo) y lo que se suma de SEGURO-1. 6. EMAIL-1: la D45 y el
-mutante. 7. CONEXIONES-1: la D46. 8. OBSERVABILIDAD-1 (devolución,
-abajo). 9. ORG-1 + D40 (devolución, abajo). Cada una con su rojo, su sabotaje y
-`/entregar`; me despertás al entregar cada una, sin esperar a juntar.
-
+- **D48: (a), decidido por la PM, como pieza RENDIMIENTO-1c.** La
+  validación del PDF corre en el proceso aparte, con tope de memoria y de
+  tiempo, para leer despachos y leer facturas. La prueba: tu PDF de 200
+  repeticiones no hace crecer la app, medido en el proceso de la app; y
+  diez a la vez no frenan una subida normal. Está en producción: la
+  publicación la decide Emi.
 - **D45 (EMAIL-1): (1), decidido por la PM.** El tope por correo se
   normaliza igual en Python y en la base; rojo en Postgres 16 con «İ» y con
   otra letra de la misma familia (minúscula distinta en Python y en PG),
