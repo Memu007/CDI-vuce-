@@ -1752,6 +1752,19 @@ def test_cambiar_un_producto_valida_igual_que_guardar(auth_override, client, cam
     assert _catalogo(client, cid) == antes
 
 
+@pytest.mark.parametrize("via", [_aprender, _operacion], ids=["learn", "operacion"])
+def test_aprender_ignora_los_numeros_con_otros_digitos(auth_override, client, via):
+    """float() lee «1_000» como 1000 y «٣» como 3; el resto del catálogo no
+    los toma por números. El producto se aprende sin esos valores."""
+    cid = _crear_cliente(client)
+    r = via(client, cid, _producto("3926.90.90", "TAPA INVENTADA VERDE",
+                                   peso_unitario="1_000", valor_unitario="٣", cantidad="１０"))
+    assert r.status_code == 200, r.text
+    [producto] = _catalogo(client, cid)
+    assert (producto["peso_unitario_avg"], producto["valor_unitario_avg"], producto["cantidad_avg"]) == (
+        0.0, None, None), producto
+
+
 def test_cambiar_un_producto_guarda_la_forma_de_la_regla(auth_override, client):
     cid = _crear_cliente(client)
     pid = _provisorio(client, cid)
