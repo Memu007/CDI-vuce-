@@ -62,6 +62,10 @@ _SALIDA_SIN_MEMORIA = 3
 # que comparten un contenido de 500 KB pesan 50 KB y costaban 23 s. Un
 # despacho de 200 hojas llenas cuesta menos de 3 s.
 _MAX_CPU_LECTURA = 10.0
+# Extraer el texto puede usar esta parte del tope. El resto queda para
+# entender lo que se leyó: si extraer se lo lleva entero, se pierden los
+# productos de las hojas que sí se leyeron.
+_PARTE_PARA_EXTRAER = 0.8
 
 AVISO_SIN_TEXTO = (
     "El PDF no tiene texto que se pueda leer: parece escaneado. Pedí el "
@@ -574,7 +578,7 @@ def leer_despacho(data: bytes, limite_cpu_s: float = _MAX_CPU_LECTURA) -> dict:
     import time
 
     inicio = time.process_time()
-    texto, avisos, salteadas = _hojas_del_pdf(data, limite_cpu_s)
+    texto, avisos, salteadas = _hojas_del_pdf(data, limite_cpu_s * _PARTE_PARA_EXTRAER)
     if not texto.strip():
         # Si quedaron hojas sin leer, no se sabe si es escaneado.
         return {"renglones": [], "divisa": None, "sin_texto": not salteadas,
@@ -801,7 +805,7 @@ def renglon_para_catalogo(renglon) -> tuple[dict | None, list[str]]:
     descripcion = re.sub(r"\s+", " ", str(renglon.get("descripcion") or "")).strip()
     if not descripcion:
         problemas.append("Falta la descripción.")
-    elif len(descripcion) > _MAX_DESCRIPCION:
+    elif len(unicodedata.normalize("NFC", descripcion)) > _MAX_DESCRIPCION:  # se guarda en NFC
         problemas.append(f"La descripción pasa de {_MAX_DESCRIPCION} caracteres.")
     if _MEDIO_PAR.search(descripcion):
         problemas.append("La descripción tiene un carácter que no se puede guardar.")

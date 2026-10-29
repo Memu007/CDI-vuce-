@@ -7609,16 +7609,14 @@ _AVISO_DIGITOS = "El NCM tiene que estar escrito con dígitos del 0 al 9."
 _AVISO_MEDIO_PAR = "Hay un carácter que no se puede guardar."
 
 
-async def _historial_de_un_producto(db, upsert, **campos) -> bool | None:
+async def _historial_de_un_producto(db, upsert, **campos) -> bool:
     """Un producto al historial, en su propio savepoint: si la base lo
-    rechaza, se pierde sólo ese y no los demás de la operación.
-
-    True si lo guardó, None si no es un producto y False si falló."""
+    rechaza, se pierde sólo ese y no los demás de la operación."""
     try:
         async with db.begin_nested():
             entrada = await upsert(db, **campos)
             await db.flush()
-        return True if entrada is not None else None
+        return entrada is not None
     except Exception:
         logging.exception("historial del cliente: no se guardó client_id=%s ncm=%s",
                           campos.get("client_id"), campos.get("ncm"))
@@ -7751,7 +7749,7 @@ async def save_client_operation(
                 continue
             productos.append(campos)
         for campos in sorted(productos, key=orden_de_escritura):
-            if await _historial_de_un_producto(db, upsert_client_product_history, **campos) is False:
+            if not await _historial_de_un_producto(db, upsert_client_product_history, **campos):
                 historial_guardado = False
         await db.commit()
     except Exception:
@@ -8335,7 +8333,7 @@ async def learn_client_catalogo_productos(
 
     updated = 0
     for campos in sorted(productos, key=orden_de_escritura):
-        updated += await _historial_de_un_producto(db, upsert_client_product_history, **campos) is True
+        updated += await _historial_de_un_producto(db, upsert_client_product_history, **campos)
 
     await db.commit()
     return {"success": True, "cliente_id": client_id, "aprendidos": updated}
