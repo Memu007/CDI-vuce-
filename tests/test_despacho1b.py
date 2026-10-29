@@ -1884,6 +1884,28 @@ def test_la_migracion_une_los_duplicados_y_es_idempotente(monkeypatch, tmp_path)
     con.close()
 
 
+def test_la_migracion_une_la_fila_sin_clave_que_dejo_la_version_anterior(monkeypatch, tmp_path):
+    """Con el índice ya creado, la versión anterior (en un despliegue de a
+    partes) guarda el mismo producto sin clave. El arranque siguiente la une;
+    antes, escribirle la clave chocaba con el índice y el arranque se caía."""
+    ruta = _base_vieja(tmp_path, [
+        {"id": "a", "ncm": "39269090", "descripcion": "TAPA INVENTADA", "veces": 2,
+         "primera": "2026-01-01 00:00:00", "ultima": "2026-02-01 00:00:00"},
+    ])
+    _correr_migracion(monkeypatch, ruta)
+    import sqlite3
+    con = sqlite3.connect(ruta)
+    con.execute("INSERT INTO client_product_history (id, owner_username, client_id, ncm, descripcion,"
+                " veces_usado, primera_vez, ultima_vez) VALUES ('b', 'dueno', 'c1', '39269090',"
+                " 'Tapa Inventada', 1, '2026-03-01 00:00:00', '2026-03-01 00:00:00')")
+    con.commit()
+    con.close()
+    _correr_migracion(monkeypatch, ruta)
+    filas = _filas(ruta)
+    assert [(f["id"], f["veces_usado"]) for f in filas] == [("b", 3)], filas
+    assert filas[0]["clave"]
+
+
 def test_la_migracion_que_falla_no_sigue_callada(monkeypatch, tmp_path):
     import sqlite3
     ruta = tmp_path / "rota.db"
