@@ -98,9 +98,7 @@ sabotaje $M "reactivar una prueba la deja activa" \
     await db.commit()"
 sabotaje $M "reactivar lo pagado no pasa por el checkout" \
   "FAILED $T::test_reactivar_lo_pagado_lleva_al_checkout_y_dice_que_cobra_ahora" \
-  "    if db_user.payment_provider == \"mercadopago\":
-        return {" "    if False:
-        return {"
+  "    if await _pago_un_plan_mp(db, db_user):" "    if False:"
 
 # --- Una sola suscripción (C4, D7.2)
 sabotaje $M "sin el 409 con una suscripción vigente" \
