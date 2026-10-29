@@ -82,7 +82,7 @@ SIN_CONSULTA=($'            if (getCsrfToken() !== (sesionDelDueno || sesionAlAb
 
 export CASOS=z20
 sabotaje $A "la escritura sale sin preguntar quién es" \
-  "FALLA: entró otro usuario y la pestaña de A generó enseguida y el pedido de generar salió de la pestaña" \
+  "FALLA: entró otro usuario y la pestaña de A generó enseguida y quedó una operación en la cuenta de B" \
   "${SIN_CONSULTA[@]}"
 sabotaje $A "la pestaña de otro usuario no se tapa" \
   "FALLA: entró otro usuario y la pestaña de A generó enseguida y la pestaña no se tapa" \

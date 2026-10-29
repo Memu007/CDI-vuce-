@@ -1513,7 +1513,8 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     soltar();
     const sigue = await ctx.request.get(base + '/auth/current_user');
     if (!sigue.ok()) falla(que + ' y cerró la sesión de B (' + sigue.status() + '; salió ' + salidas.join(', ') + ')');
-    if (!(await tapada(t))) falla(que + ' y la pestaña no se tapa');
+    // Si fue al inicio, la página de la pestaña ya no está para preguntarle.
+    if (!(await tapada(t).catch(() => false))) falla(que + ' y la pestaña no se tapa');
     console.log('OK ' + que + ': la sesión de B sigue abierta y la pestaña se tapa');
     await ctx.close();
   }
