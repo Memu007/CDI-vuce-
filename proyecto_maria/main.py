@@ -10388,10 +10388,13 @@ def _control_de_monto_mp(sdk, pay_resp: dict, update: dict, external_ref: str) -
     meta = pay_resp.get("metadata") if isinstance(pay_resp.get("metadata"), dict) else {}
     interaccion = pay_resp.get("point_of_interaction") if isinstance(pay_resp.get("point_of_interaction"), dict) else {}
     datos = interaccion.get("transaction_data") if isinstance(interaccion.get("transaction_data"), dict) else {}
-    suscripcion_id = meta.get("preapproval_id") or pay_resp.get("preapproval_id") or datos.get("subscription_id")
+    leido = meta.get("preapproval_id") or pay_resp.get("preapproval_id") or datos.get("subscription_id")
+    suscripcion_id = _id_mp(leido)
 
+    if leido and not suscripcion_id:
+        return None, f"id de suscripción inválido: {str(leido)[:40]!r}"
     if suscripcion_id:
-        suscripcion = _consultar_mp(lambda: sdk.preapproval().get(str(suscripcion_id)),
+        suscripcion = _consultar_mp(lambda: sdk.preapproval().get(suscripcion_id),
                                     f"suscripción {suscripcion_id}")
         if suscripcion.get("external_reference") != external_ref:
             return None, f"la suscripción {suscripcion_id} es de otra cuenta"
@@ -10418,9 +10421,17 @@ def _control_de_monto_mp(sdk, pay_resp: dict, update: dict, external_ref: str) -
     return esperado, None
 
 
-# Ids de Mercado Pago (cobros y pagos) que llegan en un aviso que puede no
-# venir firmado: sólo esto, para que no cambien la ruta que se le pide.
+# Ids de Mercado Pago (cobros, pagos y suscripciones) que llegan en un aviso
+# que puede no venir firmado, o en lo que se lee después: sólo esto, para que
+# no cambien la ruta que se le pide.
 _ID_COBRO_MP = re.compile(r"[0-9A-Za-z_-]{1,64}")
+
+
+def _id_mp(valor) -> str | None:
+    """Un id leído de Mercado Pago como texto, o None si no es un id."""
+    if isinstance(valor, bool) or not isinstance(valor, (str, int)):
+        return None
+    return str(valor) if _ID_COBRO_MP.fullmatch(str(valor)) else None
 
 
 def _leer_cobro_autorizado_mp(cobro_id: str) -> dict:
@@ -10505,11 +10516,10 @@ def _pago_del_cobro_mp(cobro) -> tuple:
     _MPIlegible, y Mercado Pago reintenta hasta que el cobro lo diga. El
     estado no se toma del cobro: lo decide el pago, que se lee después."""
     pago = cobro.get("payment") if isinstance(cobro, dict) else None
-    pago_id = pago.get("id") if isinstance(pago, dict) else None
-    if not isinstance(pago_id, (str, int)) or not _ID_COBRO_MP.fullmatch(str(pago_id)):
+    pago_id = _id_mp(pago.get("id")) if isinstance(pago, dict) else None
+    if not pago_id:
         raise _MPIlegible("el cobro todavía no dice qué pago lo cobró")
-    suscripcion_id = cobro.get("preapproval_id")
-    return str(pago_id), (suscripcion_id if isinstance(suscripcion_id, str) and suscripcion_id else None)
+    return pago_id, _id_mp(cobro.get("preapproval_id"))
 
 
 async def _registrar_pago_mp(session, payment_id: str, cuenta: str, update: dict, pay_resp: dict,
@@ -10748,8 +10758,8 @@ async def mercadopago_webhook(request: Request):
         # «123» son el mismo pago para su API y no pueden aplicarse dos veces.
         # Sin ese id no hay con qué registrarlo: que Mercado Pago reintente.
         canonico = pay_resp.get("id")
-        payment_id = str(canonico) if isinstance(canonico, (str, int)) and not isinstance(canonico, bool) else ""
-        if not _ID_COBRO_MP.fullmatch(payment_id):
+        payment_id = _id_mp(canonico)
+        if not payment_id:
             raise _MPIlegible(f"pago aprobado sin id reconocible: {str(canonico)[:80]!r}")
 
         motivo = None
