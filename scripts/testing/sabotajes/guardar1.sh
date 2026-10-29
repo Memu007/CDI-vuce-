@@ -85,7 +85,7 @@ sabotaje $M "la moneda vuelve a no recortarse" \
   '            currency=data.get("currency") or "USD",' \
   "FAILED $T::test_datos_largos_de_la_operacion_no_impiden_guardarla"
 sabotaje $M "aprender vuelve a contar lo que no guardó" \
-  '        return entrada is not None' \
+  '        return True if entrada is not None else None' \
   '        return True' \
   "FAILED $T::test_aprender_no_cuenta_lo_que_no_guardo"
 
