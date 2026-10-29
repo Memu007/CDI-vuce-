@@ -301,10 +301,32 @@ PY=python bash scripts/testing/sabotajes/orden1b.sh 6c459d2 | grep -E '^(ROJO|RO
 PY=python bash scripts/testing/sabotajes/orden1.sh 6c459d2 | grep -E '^(ROTO|ROJO\?|VERDE)|sabotajes sin rojo'
 ```
 
+## D15 (c) hecha en 3e30db2
+
+`orden1b.sh` copia el log de la API y la salida de la pantalla de cada
+`ROJO?` a una carpeta `orden1b-logs.XXXXXX` en `$TMPDIR` (o `/tmp`), que
+sobrevive a la limpieza, y dice dónde quedó. Sin reintento. Un `ROTO` no
+tiene log: el patrón falla antes de levantar la API, así que no hay nada
+que guardar. Lo probé con una copia descartable que espera un texto falso
+en el primer sabotaje de z20. Salida exacta:
+
+```
+ROJO? | la escritura sale sin preguntar quién es: rojo (salida 1), pero sin «texto que no aparece»
+FALLA: entró otro usuario y la pestaña de A generó enseguida y quedó una operación en la cuenta de B: 1 creadas, 1 cobradas
+      guardados: /tmp/orden1b-logs.k18eUD/1-api.log y /tmp/orden1b-logs.k18eUD/1-pantalla.log
+sabotajes sin rojo: 1
+```
+
+Después del trap, `1-api.log` tenía 85 líneas y `1-pantalla.log`, 1. No
+corrí la versión commiteada entera de punta a punta.
+
+D16 (a): no toco el CSRF del logout. Sigo con D13 (c), sin entregarla
+hasta tu veredicto de la vuelta 2.
+
 /compact conservar: Dev 1, rama claude/dev-tecnica. ORDEN-1b entregada en
-6c459d2 (informe en el commit de arriba): espera veredicto con D15 (rojo
-dudoso de z23 en orden1b.sh, recomiendo c: guardar el log) y D16 (logout
-exento de CSRF en el servidor, recomiendo a y pieza en la cola). D14 (a)
-hecha en 4ef59f4. Sigue COBRO-MP-1 con D13 (c), después de tu veredicto;
-después CORTE-1, MP-2 (suma la cancelación de organizaciones), AIS2, LIM,
-BACKUP-1a y EXCEL-2c. Nada se publica sin el «dale» de Emi; nunca main.
+6c459d2 y COBRO-MP-1 vuelta 2 en revisión de la PM. D15 (c) hecha en
+3e30db2; D16 (a), sin tocar. En curso: D13 (c) en COBRO-MP-1 (409 a una
+authorized vieja en cuenta no vigente), sin entregar hasta el veredicto de
+la vuelta 2; lo que pida ahí se suma a esta vuelta. Después CORTE-1, MP-2
+(suma la cancelación de organizaciones), AIS2, LIM, BACKUP-1a y EXCEL-2c.
+Nada se publica sin el «dale» de Emi; nunca main.
