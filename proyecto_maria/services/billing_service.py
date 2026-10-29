@@ -391,8 +391,8 @@ def cliente_mp(payment_info: dict[str, Any]) -> str:
 def _last4_from_payment(payment_info: dict[str, Any]) -> str | None:
     card = _objeto(payment_info, "card")
     last4 = card.get("last_four_digits") or card.get("last4")
-    if isinstance(last4, (str, int)) and not isinstance(last4, bool):
-        return str(last4)[-4:] or None
+    if last4:
+        return str(last4)[-4:]
     return None
 
 

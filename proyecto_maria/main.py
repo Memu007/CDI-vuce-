@@ -10366,8 +10366,6 @@ def _guardable_en_pg(valor):
         return _NO_GUARDABLE_EN_PG.sub("\ufffd", valor)
     if isinstance(valor, dict):
         return {clave: _guardable_en_pg(v) for clave, v in valor.items()}
-    if isinstance(valor, list):
-        return [_guardable_en_pg(v) for v in valor]
     return valor
 
 
