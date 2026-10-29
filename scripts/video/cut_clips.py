@@ -16,7 +16,7 @@ m = {x["name"]: x["t"] for x in json.loads((out / "marks.json").read_text())}
 
 # nombre: velocidad, [(inicio, fin), …]
 CLIPS = {
-    "subir":   (1.0,  [(m["upload_excel"] - 0.2, m["picker"] + 0.5), (m["review"] - 0.7, m["review"] + 0.75)]),
+    "subir":   (1.0,  [(m["pdf"] - 0.9, m["pdf"] + 1.7), (m["upload_excel"] - 0.15, m["picker"] + 0.5), (m["review"] - 0.7, m["review"] + 0.75)]),
     "revisar": (1.8,  [(m["review"] + 0.6, m["ncm"] - 0.05)]),
     "ncm":     (1.15, [(m["ncm"] + 0.9, m["ncm_done"] + 0.15)]),
     "validar": (1.25, [(m["validating"] + 0.15, m["validating_done"] + 0.15)]),

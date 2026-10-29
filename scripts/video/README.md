@@ -13,9 +13,10 @@ alta un usuario y dos clientes ficticios (CUIT `30-00000000-7`, `30-00000001-5`)
 graba con Playwright el recorrido real Excel → Revisar → NCM → Validar → MARIA.TXT
 y las pantallas de después (`capture.js`), corta los tramos con `cut_clips.py` y compone tarjetas + ventana con
 `composer.html` + `render.js` (cuadro por cuadro en Chromium, codificado con ffmpeg).
-No toca Gemini, VUCE, MercadoPago ni producción. Por eso no se graba la lectura de
-PDF: en la app pasa por Gemini y acá no hay clave; con `GEMINI_API_KEY` en el entorno
-se podría agregar una escena con un PDF de factura ficticio.
+No toca Gemini, VUCE, MercadoPago ni producción. La escena 01 muestra la carga de un
+PDF de factura ficticio (`factura.html`, convertido con Chromium) hasta «Subiendo…»;
+la lectura en sí pasa por Gemini y sin clave falla, así que el corte es antes y el
+recorrido sigue con el Excel.
 
 Los textos del video están en `render.js` (`scenes`); los estilos, en `composer.html`.
 Para embeberlo en la landing: `<video src="/static/v2/media/cdi-presentacion.mp4"

@@ -45,6 +45,14 @@ async function humanFill(page, selector, value, delay = 70) {
     timezoneId: 'America/Argentina/Buenos_Aires',
     recordVideo: { dir: path.join(out, 'video'), size: { width: 1440, height: 900 } },
   });
+  // Factura ficticia en PDF (sólo para mostrar la carga: sin clave de Gemini no se lee).
+  const pdfPath = path.join(out, 'factura_SBE-2026-0417.pdf');
+  {
+    const aux = await browser.newPage();
+    await aux.goto('file://' + path.join(__dirname, 'factura.html'));
+    await aux.pdf({ path: pdfPath, format: 'A4', printBackground: true });
+    await aux.close();
+  }
   const page = await ctx.newPage();
   t0 = Date.now();
   page.setDefaultTimeout(20000);
@@ -95,6 +103,16 @@ async function humanFill(page, selector, value, delay = 70) {
   mark('upload');
   await shot('upload');
   await sleep(600);
+  // PDF: se ve el arrastre y «Procesando PDF…». La respuesta se demora para que
+  // el estado quede en pantalla; después la lectura falla (sin Gemini) y se corta ahí.
+  await page.route((url) => url.pathname === '/upload_pdf/public', async (route) => { await sleep(3500); await route.continue(); });
+  await page.setInputFiles('#uploadFileInput', pdfPath);
+  await page.waitForSelector('#uploadProgress:not([hidden])');
+  mark('pdf');
+  await sleep(2400);
+  mark('pdf_fin');
+  await page.waitForSelector('#uploadProgress[hidden]', { state: 'attached' });
+  await sleep(400);
   await page.click('#uploadFormatExcel');
   mark('upload_excel');
   await sleep(900);
