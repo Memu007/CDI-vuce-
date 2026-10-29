@@ -800,7 +800,7 @@ def origen_para_catalogo(valor) -> tuple[str | None, str | None]:
     # Se mira antes de pasar a mayúsculas («ıt» sería «IT») y pais_reconocido
     # normaliza con NFKD («ＢＲ» o «ÉS» pasarían): sólo dos letras ASCII.
     if escrito and not (len(escrito) == 2 and escrito.isascii() and escrito.isalpha()
-                        and pais_reconocido(escrito.upper())):
+                        and pais_reconocido(escrito)):
         return None, f"No reconozco el origen «{escrito}»: usá el código de dos letras."
     return escrito.upper() or None, None
 
