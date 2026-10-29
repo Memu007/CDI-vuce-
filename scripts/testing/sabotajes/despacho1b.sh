@@ -520,6 +520,17 @@ sabotaje "la migración promedia sin pesar los usos" "$M" \
   'cambios[promedio] = sum(v * n for v, n in usos if n) / total if total else None' \
   'cambios[promedio] = sum(v for v, n in usos if n) / sum(1 for _, n in usos if n) if total else None' \
   "test_la_migracion_une_los_duplicados_y_es_idempotente"
+sabotaje "la migración escribe la clave antes de unir" "$M" \
+  '                cambian[fila["id"]] = clave' \
+  '                await conn.execute(text(
+                    "UPDATE client_product_history SET clave = :clave WHERE id = :id"),
+                    {"clave": clave, "id": fila["id"]})' \
+  "test_la_migracion_une_la_fila_sin_clave_que_dejo_la_version_anterior" \
+  "test_la_migracion_reescribe_claves_cruzadas"
+sabotaje "la migración no vacía las claves que cambian" "$M" \
+  '        for id_ in cambian:' \
+  '        for id_ in ():' \
+  "test_la_migracion_reescribe_claves_cruzadas"
 sabotaje "la migración que falla se calla" "$M" \
   'async def _migrate_product_history_clave():' \
   'async def _migrate_product_history_clave():
