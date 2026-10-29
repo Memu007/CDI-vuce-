@@ -1359,13 +1359,12 @@ async def _migrate_product_history_clave():
             " cantidad_avg, veces_cantidad, primera_vez, ultima_vez"
             " FROM client_product_history"))).mappings().all()
         grupos: dict = {}
+        cambian: dict = {}
         for fila in filas:
             producto = identidad_del_producto(fila["ncm"], fila["descripcion"])
             clave = producto[2] if producto else None
             if clave != fila["clave"]:
-                await conn.execute(text(
-                    "UPDATE client_product_history SET clave = :clave WHERE id = :id"),
-                    {"clave": clave, "id": fila["id"]})
+                cambian[fila["id"]] = clave
             if clave:
                 grupos.setdefault((fila["owner_username"], fila["client_id"], clave), []).append(fila)
 
@@ -1399,6 +1398,17 @@ async def _migrate_product_history_clave():
                     await conn.execute(text("DELETE FROM client_product_history WHERE id = :id"),
                                        {"id": fila["id"]})
                     unidas += 1
+        # Las claves se escriben después de unir, y primero se vacían las que
+        # cambian: con el índice ya creado, una clave nueva puede ser la vieja
+        # de otra fila que todavía no se actualizó.
+        for id_ in cambian:
+            await conn.execute(text(
+                "UPDATE client_product_history SET clave = NULL WHERE id = :id"), {"id": id_})
+        for id_, clave in cambian.items():
+            if clave:
+                await conn.execute(text(
+                    "UPDATE client_product_history SET clave = :clave WHERE id = :id"),
+                    {"clave": clave, "id": id_})
         await conn.exec_driver_sql(
             "CREATE UNIQUE INDEX IF NOT EXISTS ux_cph_owner_client_clave"
             " ON client_product_history (owner_username, client_id, clave)")
