@@ -10,6 +10,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(orden):** si mientras una pestaña busca la operación que dejaste entra otro usuario, se cierra la sesión o volvés a entrar, ya no se la muestra al otro usuario ni la deja sin dueño: queda guardada a tu nombre.
 - Un clic sin mouse (con el teclado o un lector de pantalla) también cuenta como tocar la pestaña: la operación de antes de recargar no la pisa.
+- Si la consulta de quién es el usuario tarda más de 10 s, la pestaña no guarda la operación y lo avisa; vuelve a guardar cuando la consulta contesta.
 
 ## 2026-10-28 · fix: una cuenta cancelada que reabrió el checkout puede cancelar la suscripción nueva (COBRO-MP-1)
 
