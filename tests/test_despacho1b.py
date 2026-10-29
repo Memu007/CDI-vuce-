@@ -446,11 +446,13 @@ def test_guardar_sin_kilo_no_inventa_el_peso(auth_override, client):
     ({"posicion_sim": "8471"}, "Falta la posición SIM"),
     ({"origen": "ZZ"}, "No reconozco el origen"),
     ({"origen": "CHINA"}, "No reconozco el origen"),
-    ({"origen": "ＢＲ"}, "No reconozco el origen"),
-    ({"origen": "ÉS"}, "No reconozco el origen"),
+    pytest.param({"origen": "ＢＲ"}, "No reconozco el origen", id="ancho completo"),
+    pytest.param({"origen": "ÉS"}, "No reconozco el origen", id="acento"),
     ({"cantidad": "10"}, "La cantidad no es un número."),
     ({"valor_unitario": -1}, "El valor unitario tiene que ser un número positivo."),
     ({"kilo_neto": True}, "El kilo neto no es un número."),
+    pytest.param({"origen": "ıt"}, "No reconozco el origen", id="i sin punto"),
+    pytest.param({"origen": 12}, "El origen tiene que ser el código de dos letras.", id="origen numero"),
 ])
 def test_guardar_es_todo_o_nada(auth_override, client, cambio, problema):
     cid = _crear_cliente(client)
@@ -2069,7 +2071,7 @@ def test_una_operacion_sin_productos_ni_resumen_se_guarda_vacia(auth_override, c
     cid = _crear_cliente(client)
     r = _operacion(client, cid, cuerpo=json.dumps(cuerpo))
     assert r.status_code == 200, r.text
-    assert _contar(Operation, client_id=cid) == 1
+    assert _contar(Operation, client_id=cid, total_items=0, total_value=0) == 1
 
 
 def _guardar_uso(client, cid, **otros):
@@ -2118,8 +2120,12 @@ def test_confirmar_algo_que_no_es_un_ncm_da_400_y_no_guarda_nada(auth_override, 
     ("XYZ", "No reconozco el origen «XYZ»: usá el código de dos letras."),
     ("123", "No reconozco el origen «123»: usá el código de dos letras."),
     ("ZZ", "No reconozco el origen «ZZ»: usá el código de dos letras."),
-    ("china", "No reconozco el origen «CHINA»: usá el código de dos letras."),
-], ids=["lista", "numero", "ancho completo", "acento", "tres letras", "numeros", "pais que no existe", "nombre"])
+    ("china", "No reconozco el origen «china»: usá el código de dos letras."),
+    # En mayúsculas serían «IT» y «SS»: el código se mira como se escribió.
+    ("ıt", "No reconozco el origen «ıt»: usá el código de dos letras."),
+    ("ß", "No reconozco el origen «ß»: usá el código de dos letras."),
+], ids=["lista", "numero", "ancho completo", "acento", "tres letras", "numeros", "pais que no existe", "nombre",
+        "i sin punto", "ese aguda"])
 def test_cambiar_el_origen_valida_igual_que_guardar(auth_override, client, origen, detalle):
     cid = _crear_cliente(client)
     pid = _provisorio(client, cid)
