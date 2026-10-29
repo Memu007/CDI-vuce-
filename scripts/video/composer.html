@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="es"><head><meta charset="utf-8"><title>CDI promo</title>
+<style>
+  html,body{margin:0;background:#fbfbfd;width:1920px;height:1080px;overflow:hidden;font-family:Inter,"Inter Display",system-ui,sans-serif;color:#1d1d1f;-webkit-font-smoothing:antialiased}
+  #stage{position:relative;width:1920px;height:1080px;overflow:hidden;background:#fbfbfd}
+  .bg{position:absolute;inset:0;background:
+      radial-gradient(900px 600px at 78% 40%, rgba(0,102,204,.10), transparent 70%),
+      radial-gradient(700px 500px at 12% 90%, rgba(0,102,204,.06), transparent 70%),
+      linear-gradient(180deg,#fbfbfd 0%,#f3f5f9 100%)}
+  .scene{position:absolute;inset:0;opacity:0;will-change:opacity}
+  /* tarjetas */
+  .card{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;padding:0 0 0 180px}
+  .eyebrow{display:inline-flex;align-items:center;gap:10px;font-size:22px;font-weight:600;letter-spacing:.2px;color:#1d1d1f;border:1px solid #e5e5ea;background:#fff;border-radius:999px;padding:10px 20px;margin-bottom:34px}
+  .eyebrow .dot{width:10px;height:10px;border-radius:50%;background:#34c759}
+  .h1{font-size:92px;line-height:1.04;font-weight:700;letter-spacing:-2.5px;margin:0}
+  .h1 .accent{display:block;color:#0066cc;font-weight:600}
+  .h1 .muted{display:block;color:#6e6e73;font-weight:500}
+  .sub{margin-top:30px;font-size:30px;color:#6e6e73;font-weight:400;max-width:1200px;line-height:1.35}
+  .brand{position:absolute;left:180px;bottom:96px;font-size:26px;font-weight:700;color:#1d1d1f}
+  .brand .by{font-weight:500;color:#6e6e73}
+  /* escenas de pantalla real */
+  .copy{position:absolute;left:112px;top:0;height:1080px;width:430px;display:flex;flex-direction:column;justify-content:center}
+  .step{font-size:120px;line-height:1;font-weight:700;color:#0066cc;letter-spacing:-5px;opacity:.95}
+  .title{font-size:50px;line-height:1.1;font-weight:700;letter-spacing:-1.4px;margin-top:22px}
+  .desc{font-size:24px;line-height:1.4;color:#6e6e73;margin-top:22px}
+  .win{position:absolute;left:592px;top:130px;width:1248px;border-radius:16px;background:#fff;box-shadow:0 30px 80px rgba(0,0,0,.14),0 6px 18px rgba(0,0,0,.06);overflow:hidden;transform-origin:50% 50%}
+  .bar{height:40px;background:#f5f5f7;border-bottom:1px solid #e5e5ea;display:flex;align-items:center;padding:0 16px;gap:8px;position:relative}
+  .bar i{width:12px;height:12px;border-radius:50%;display:block}
+  .bar .t{position:absolute;left:0;right:0;text-align:center;font-size:14px;color:#6e6e73;font-family:ui-monospace,Menlo,monospace}
+  .win img{display:block;width:1248px;height:780px;object-fit:cover}
+  .steps{position:absolute;left:592px;bottom:62px;display:flex;gap:10px}
+  .steps b{height:6px;width:60px;border-radius:999px;background:#e5e5ea}
+  .steps b.on{background:#0066cc}
+</style></head>
+<body><div id="stage"><div class="bg"></div></div>
+<script>
+const stage = document.getElementById('stage');
+const FPS = 30;
+let SCENES = [];
+const ease = (x) => 1 - Math.pow(1 - Math.min(Math.max(x, 0), 1), 3);
+const clamp01 = (x) => Math.min(Math.max(x, 0), 1);
+
+function card(s) {
+  const el = document.createElement('div');
+  el.className = 'scene card';
+  el.innerHTML = `
+    ${s.eyebrow ? `<div class="eyebrow"><span class="dot"></span>${s.eyebrow}</div>` : ''}
+    <h1 class="h1">${s.lines.map((l, i) => `<span class="${l.cls || ''}" data-line="${i}">${l.text}</span>`).join('')}</h1>
+    ${s.sub ? `<div class="sub">${s.sub}</div>` : ''}
+    ${s.brand ? `<div class="brand">CDI · Despachos <span class="by">· by Ynera</span></div>` : ''}`;
+  return el;
+}
+function clip(s) {
+  const el = document.createElement('div');
+  el.className = 'scene';
+  el.innerHTML = `
+    <div class="copy"><div class="step">${s.step}</div><div class="title">${s.title}</div><div class="desc">${s.desc}</div></div>
+    <div class="win"><div class="bar"><i style="background:#ff5f57"></i><i style="background:#febc2e"></i><i style="background:#28c840"></i><span class="t">CDI · Despachos</span></div><img></div>
+    <div class="steps">${[1,2,3,4,5].map((n) => `<b class="${n <= s.n ? 'on' : ''}"></b>`).join('')}</div>`;
+  return el;
+}
+
+window.init = async function (config) {
+  SCENES = config.scenes;
+  for (const s of SCENES) {
+    s.el = s.type === 'card' ? card(s) : clip(s);
+    stage.appendChild(s.el);
+    if (s.type === 'clip') {
+      s.frames = [];
+      for (let i = 0; i < s.count; i++) {
+        const img = new Image();
+        img.src = `${config.clipsDir}/${s.clip}/${String(i).padStart(4, '0')}.png`;
+        s.frames.push(img);
+      }
+      await Promise.all(s.frames.map((img) => img.decode()));
+      s.img = s.el.querySelector('img');
+    }
+  }
+  await document.fonts.ready;
+  return SCENES.length;
+};
+
+window.seek = async function (t) {
+  for (const s of SCENES) {
+    const lt = t - s.start;
+    const visible = lt >= 0 && t < s.end;
+    s.el.style.opacity = visible ? String(ease(lt / s.fade)) : '0';
+    s.el.style.visibility = visible ? 'visible' : 'hidden';
+    if (!visible) continue;
+    if (s.type === 'card') {
+      s.el.querySelectorAll('[data-line]').forEach((line, i) => {
+        const k = ease((lt - 0.25 - i * 0.35) / 0.6);
+        line.style.opacity = k; line.style.transform = `translateY(${(1 - k) * 22}px)`; line.style.display = 'block';
+      });
+      const sub = s.el.querySelector('.sub'); if (sub) { const k = ease((lt - 0.9) / 0.6); sub.style.opacity = k; sub.style.transform = `translateY(${(1 - k) * 16}px)`; }
+      const eb = s.el.querySelector('.eyebrow'); if (eb) { const k = ease(lt / 0.5); eb.style.opacity = k; }
+      const br = s.el.querySelector('.brand'); if (br) { const k = ease((lt - 1.1) / 0.6); br.style.opacity = k; }
+    } else {
+      const idx = Math.min(Math.max(Math.floor(lt * FPS), 0), s.count - 1);
+      const f = s.frames[idx];
+      if (s.img.src !== f.src) s.img.src = f.src;
+      const win = s.el.querySelector('.win');
+      const k = ease(lt / 0.7);
+      const dur = s.end - s.start;
+      win.style.transform = `translateY(${(1 - k) * 28}px) scale(${1 + 0.025 * clamp01(lt / dur)})`;
+      [['.step', 0.05], ['.title', 0.2], ['.desc', 0.35]].forEach(([sel, d]) => {
+        const e = s.el.querySelector(sel); const kk = ease((lt - d) / 0.6);
+        e.style.opacity = kk; e.style.transform = `translateY(${(1 - kk) * 18}px)`;
+      });
+    }
+  }
+  if (document.fonts.ready) await document.fonts.ready;
+  const imgs = Array.from(document.querySelectorAll('.win img')).filter((i) => i.src);
+  await Promise.all(imgs.map((i) => i.decode().catch(() => {})));
+  return true;
+};
+</script></body></html>
