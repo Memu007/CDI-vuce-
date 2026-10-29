@@ -179,10 +179,13 @@ def test_una_renovacion_de_una_suscripcion_sin_referencia_queda_rechazada(client
     lambda c: c.update(preapproval_id=None),
 ], ids=["sin_suscripcion", "suscripcion_no_es_texto", "suscripcion_nula"])
 def test_un_cobro_con_su_pago_y_sin_suscripcion_legible_queda_rechazado(client, romper):
+    """El pago trae su referencia y el precio del plan: sólo lo frena que el
+    cobro no diga de qué suscripción es."""
     usuario = _unique("v2_cobs")
     _register(client, usuario)
     _vencida(usuario)
-    cobro, pid = _renovacion(usuario)
+    cobro, pid = _renovacion(usuario, monto=45000.0)
+    PAGOS[pid]["external_reference"] = f"{usuario}:premium"
     romper(COBROS[cobro])
     r = _aviso_cobro(client, cobro)
     assert r.status_code == 200, r.text[:300]
