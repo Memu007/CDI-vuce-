@@ -520,6 +520,27 @@ sabotaje "la migración promedia sin pesar los usos" "$M" \
   'cambios[promedio] = sum(v * n for v, n in usos if n) / total if total else None' \
   'cambios[promedio] = sum(v for v, n in usos if n) / sum(1 for _, n in usos if n) if total else None' \
   "test_la_migracion_une_los_duplicados_y_es_idempotente"
+D=test_aprender_ignora_los_numeros_con_otros_digitos
+sabotaje "learn convierte los números con float()" "$M" \
+  '            valor_unitario=valor,
+            cantidad=cantidad,
+            peso_unitario=peso,' \
+  '            valor_unitario=float(valor or 0) or None,
+            cantidad=float(cantidad or 0) or None,
+            peso_unitario=float(peso or 0) or None,' \
+  "$D[learn]"
+no_debe "learn convierte los números con float()" "$ULTIMA" "$D[operacion]"
+sabotaje "la operación convierte los números con float()" "$M" \
+  '                valor_unitario=item.get("valor_unitario"),' \
+  '                valor_unitario=float(item.get("valor_unitario") or 0) or None,' \
+  "$D[operacion]"
+no_debe "la operación convierte los números con float()" "$ULTIMA" "$D[learn]"
+sabotaje "learn aprende el producto con un valor que no es un número" "$M" \
+  '                float(numero or 0)' \
+  '                pass' \
+  "test_aprender_un_entero_enorme_no_da_500[peso_unitario]" \
+  "test_aprender_un_entero_enorme_no_da_500[valor_unitario]" \
+  "test_aprender_un_entero_enorme_no_da_500[cantidad]"
 sabotaje "la migración escribe la clave antes de unir" "$M" \
   '                cambian[fila["id"]] = clave' \
   '                await conn.execute(text(
