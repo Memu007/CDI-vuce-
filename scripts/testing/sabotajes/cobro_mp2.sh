@@ -107,10 +107,8 @@ sabotaje $M "sin el 409 con una suscripción vigente" \
   "FAILED $T::test_el_segundo_checkout_con_una_vigente_se_frena" \
   "            if entidad.billing_status in (\"trial\", \"active\") and fin and fin > datetime.now(timezone.utc):" \
   "            if False:"
-sabotaje $M "el 409 vale aunque la cuenta no esté vigente" \
-  "FAILED $T::test_sin_cuenta_vigente_la_vieja_se_cancela_antes_de_crear[impaga]" \
-  "            if entidad.billing_status in (\"trial\", \"active\") and fin and fin > datetime.now(timezone.utc):" \
-  "            if True:"
+# El 409 de la autorizada sin cuenta vigente (D13 de COBRO-MP-1) se sabotea
+# en cobro_mp1.sh.
 sabotaje $M "la vieja no se cancela antes de crear la nueva" \
   "FAILED $T::test_sin_cuenta_vigente_la_vieja_se_cancela_antes_de_crear[pending]" \
   "        if estado_mp != \"cancelled\":" "        if False:"

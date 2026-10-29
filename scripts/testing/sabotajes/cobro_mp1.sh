@@ -455,6 +455,20 @@ sabotaje $M "C: /billing/me dice abierta a cualquier cancelada" \
   '        "suscripcion_abierta": db_user.billing_status == "canceled",' \
   "cancelada_sin"
 
+# D13 (c): una autorizada sin cuenta vigente frena el checkout y sale cancelando.
+sabotaje $M "D13: el checkout cancela la autorizada vieja" \
+  $'            raise HTTPException(\n                status_code=409,\n                detail="Tu suscripción' \
+  $'            if False: raise HTTPException(\n                status_code=409,\n                detail="Tu suscripción' \
+  "FAILED $T::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[impaga] - assert 200 == 409"
+sabotaje $M "D13: sin cuenta vigente, el 409 dice que se renueva sola" \
+  '            if entidad.billing_status in ("trial", "active") and fin and fin > datetime.now(timezone.utc):' \
+  '            if True:' \
+  "FAILED $T::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[impaga] - AssertionError"
+sabotaje $M "D13: después de cancelar el plan, el checkout sigue frenado" \
+  '        if estado_mp == "authorized":' \
+  '        if estado_mp in ("authorized", "cancelled"):' \
+  "FAILED $T::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[impaga] - assert 409 == 200"
+
 # Las carreras, en un Postgres 16 descartable: D (dos checkouts) y, de la
 # vuelta 2, a (dos pagos de la misma cuenta) y D31 (el mismo pago dos veces).
 correr() {
