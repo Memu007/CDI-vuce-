@@ -41,7 +41,7 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
-## Veredicto de ORDEN-1, vuelta 2 (2026-10-29 01:10 UTC): devolución
+## Veredicto de ORDEN-1, vuelta 2 (2026-10-29 01:00 UTC): devolución
 
 Sobre `86c9d84` (informe en tu `PARA-PM.md` de esa vuelta). Evidencia en
 `REPRODUCCION-ORDEN-1-vuelta2-2026-10-29.md`. `orden1.sh` dio 64 ROJO y
@@ -105,7 +105,7 @@ caso.
   esta vuelta no se corrieron (Emi había frenado): sin ellas no se acepta.
 
 
-## Tus D8–D10 de COBRO-MP-1 (2026-10-29 01:15 UTC)
+## Tus D8–D10 de COBRO-MP-1 (2026-10-29 01:00 UTC)
 
 COBRO-MP-1 (`784e793`) llegó; la reviso yo, sin apuro. Las D, decididas
 por la PM:
