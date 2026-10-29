@@ -2,313 +2,309 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## COBRO-MP-1, vuelta 2: entregada en `999b27a` (informe en el commit de arriba)
+## D14 de COBRO-MP-1: hecha en `4ef59f4`
 
-**Resultado.** Están a, b, d, e, f y g de tu devolución del 2026-10-29
-01:41 UTC, cada una con su rojo antes y sus sabotajes. La c no la
-implementé: con lo que hoy consulta el código no se distinguen los casos de
-tu regla, así que va como **D13**, como pediste («D11 antes de inventar»;
-D11 y D12 ya eran de ORDEN-1).
+Hice D14 (a) en un commit de pruebas, sin tocar el producto:
 
-**Una puerta en rojo:** los sabotajes terminan en «sabotajes con falla: 2».
-Los dos son defectos de la prueba, no del producto: un texto esperado mal
-elegido y una carrera que en 2 de 6 corridas (la del lote y 1 de 5 a mano)
-no mide la clave de D31. No los arreglé (pediste el informe sin código
-nuevo): van como **D14**.
+- La barrera de `cobro_mp1_postgres.py` cruza a los dos avisos después de
+  buscar el pago en `mp_pagos_aplicados` y antes de `_registrar_pago_mp`.
+- Los rojos dudosos de `cobro_mp1.sh` muestran las líneas `FALLA` de
+  Postgres.
 
-Lo que decidís vos: **D13** y **D14**. D11 y D12 de ORDEN-1 ya las contestaste
-(`PARA-DEV.md`, ORDEN-1b): las atiendo en ORDEN-1b, que va en commits
-aparte, después de este informe.
+Las corridas, sobre `4ef59f4`:
+
+- Base de `cobro_mp1_postgres.py`: `fallas: 0`.
+- `cobro_mp1.sh` completo: 108 `ROJO`, 5 `BASE`, el `VERDE` de control
+  esperado («sin mirar antes de insertar: sigue en verde, como tiene que
+  ser») y `sabotajes con falla: 0`, salida 0.
+- El sabotaje de D31, a mano, dio rojo las 5 veces: `FALLA | el mismo pago
+  dos veces a la vez: uno aplicado y otro salteado ([200, 200], [None,
+  None])`.
+
+D13 (c) va en la próxima vuelta de COBRO-MP-1, después de tu veredicto de
+ORDEN-1b, con su rojo antes y su sabotaje.
+
+## ORDEN-1b: entregada en `6c459d2` (informe en el commit de arriba)
+
+**Resultado.** Se cumple el criterio en los casos que pediste: ninguna
+escritura sale a nombre de otro usuario desde una pestaña cuyo dueño ya no
+es el de la sesión.
+
+- Generar con B adentro no crea ni cobra nada en ninguna cuenta.
+- Guardar un cliente, que es de otra familia de escritura, tampoco.
+- Pasa lo mismo con un servidor que no exige CSRF.
+- «Salir» desde la pestaña de A no cierra la sesión de B.
+- La telemetría no sale a nombre de B.
+- Cuando A sale y vuelve a entrar, la pestaña sigue guardando y generando
+  sin falsos bloqueos.
+- D11: la duplicada que no pudo adoptar avisa «Comprobando la sesión…» y
+  recupera la operación cuando confirma la sesión.
+
+**Una puerta con un rojo dudoso:** el lote de `orden1b.sh` terminó en
+`sabotajes sin rojo: 1`. Fue z23 saboteado: dio rojo, pero por
+«`apiRequestContext.post: socket hang up`» en vez de por el motivo. Lo
+reproduje solo cuatro veces y las cuatro dio el rojo correcto. Lo trato como
+rojo de entorno con causa no demostrada (detalle en D15).
+
+Lo que decidís vos: **D15** y **D16**.
 
 | Qué | SHA |
 |---|---|
-| Base: merge de tu rama (veredicto `2e1a855`) | `8e6a993` |
-| Pruebas: casos de a, b, d, e, f y g, en rojo | `9a16147` |
-| Producto: a, b, f y g | `3919cf5` |
-| Pruebas: sabotajes de la vuelta 2 y D31 en Postgres | `b3f5edb` |
-| Pruebas: un dato que no entra en su columna de Postgres, nueve casos en rojo | `5289dc6` |
-| Producto: lo leído se guarda aunque no entre en su columna; el tope en un solo lugar | `26c12ed` |
-| Producto: sin caminos que ningún dato recorre | `3c7f1e1` |
-| Pruebas: el cobro sin suscripción legible se rechaza por eso y no por el monto | `a4a67ec` |
-| Producto: sale el control del id de pago booleano | `1ba3f7e` |
-| Pruebas: sabotajes del tope y de Postgres | `dbac021` |
-| Pruebas: id de suscripción que no es un id, en rojo | `e9fd805` |
-| Producto: el id de suscripción se valida antes de pedirlo (`/code-review high`, hallazgo 5) | `ad46a16` |
-| Pruebas: la renovación sin referencia, en rojo sobre `e9fd805` | `bec9a8c` |
-| Pruebas: sabotajes de la validación de ids | `999b27a` |
-| Informe | este commit |
+| Base: D14 | `4ef59f4` |
+| Pruebas: z12, z20 a z24, en rojo | `95643e3` |
+| Producto: el freno, el diálogo, «Salir» y D11 | `9a309a3` |
+| Pruebas: z25 y z26, regresiones que encontró el `/code-review` | `ee27d5e` |
+| Producto: con la sesión cerrada va al login; «Salir» avisa si no pudo | `91b25f2` |
+| Pruebas: z27, telemetría (del adversario) | `267ef10` |
+| Producto: la telemetría con el freno | `68a2f37` |
+| Pruebas: arreglos de z24 y del texto esperado de z20 en `orden1b.sh` | `629042d` |
+| Pruebas: z28 y los patrones de `orden1.sh` que movió ORDEN-1b | `6c459d2` |
+
+Dato menor: el mensaje de `95643e3` dice que el rojo fue «sobre `4ef59f4`».
+En realidad lo corrí sobre `be25008`, una versión anterior del mismo commit
+de pruebas. Las dos tienen el mismo producto: `git diff be25008 4ef59f4 --
+proyecto_maria` sale vacío.
 
 ## Decisiones
 
-**D13. Volver de Mercado Pago antes del aviso y tocar otra vez «Activar
-plan» (causa c).**
+**D15. El rojo dudoso de z23 en el lote de `orden1b.sh`.**
 
-Tu regla pide distinguir, para una suscripción vieja `authorized`:
+Qué pasó:
 
-- tiene un cobro aprobado que CDI no aplicó, o todavía no tuvo su primer
-  cobro → 409 «Tu pago se está confirmando; probá en unos minutos»;
-- su último cobro falló → se cancela como ahora.
+- En el lote, el sabotaje que quita la consulta dio rojo, pero no por el
+  motivo: dio «socket hang up» en un `post` de la prueba (registro, entrada
+  o la mirada al servidor), no en la pestaña.
+- El log de esa API no quedó: el `trap` del script borra la carpeta
+  temporal.
+- Ese lote corría junto con la suite y la pantalla completa.
+- Aislado, en el mismo SHA, con el mismo sabotaje y su log guardado, dio el
+  rojo correcto 4 de 4: «FALLA: con un servidor que no exige CSRF, entró
+  otro usuario y la pestaña de A generó enseguida y quedó una operación en
+  la cuenta de B: 1 creadas, 1 cobradas».
+- En esas cuatro corridas, el log de la API no muestra ninguna caída. La
+  única línea de error es la de ARCA novedades, que no tiene red y es
+  esperada.
+- En la corrida anterior, sobre `629042d`, el mismo sabotaje dio `ROJO`.
 
-El checkout (`main.py:10945-10973`) lee de la suscripción vieja sólo su
-`status` (`_leer_suscripcion_mp`). Con eso no se distinguen los tres
-casos: los tres dicen `authorized`. Para distinguirlos hay que leer algo
-que el código hoy no consulta y que nunca verificamos contra Mercado Pago
-real:
-
-- (a) El bloque `summarized` de la suscripción (`charged_quantity`,
-  `last_charged_date`, `semaphore`). Está en la documentación, sin
-  verificar, igual que lo de D30.
-- (b) Buscar los cobros de la suscripción
-  (`/authorized_payments/search?preapproval_id=…`) y mirar el último.
-  También sin verificar.
-- (c) Con lo ya verificado: si la vieja está `authorized` y la cuenta no
-  está vigente, 409 siempre, con un texto que ofrezca la salida: «Tu
-  suscripción en Mercado Pago sigue activa. Si acabás de pagar, esperá
-  unos minutos; si querés cambiar la tarjeta, cancelá el plan primero.»
-  «Cancelar plan» ya cancela la suscripción en Mercado Pago.
-- (d) Dejarlo como está: el riesgo de la c sigue abierto.
-
-Recomiendo **(c)**. Usa sólo lo que ya se lee. Si se equivoca, el cliente
-queda trabado unos minutos con una salida a la vista, en vez de perder
-callado una suscripción que ya cobró. Lo que cambia contra tu regla: el
-caso de la tarjeta que no pasa (D7.2) ya no se resuelve solo; el cliente
-cancela y vuelve a activar, un paso más. (a) y (b) dependen de campos sin
-verificar: si Mercado Pago no los trae, la decisión cae en el lado
-equivocado sin que nadie lo vea. Si elegís (a) o (b), antes hace falta
-una lectura contra Mercado Pago real, que yo no puedo hacer.
-
-**D14. Los dos sabotajes que no dan su rojo.**
-
-1. «g: un id largo de la exportación no se reconoce»
-   (`cobro_mp1.sh:406-409`). Da rojo por el motivo correcto: «E
-   AssertionError: guardar la exportación de id largo cuenta otra vez»
-   (`tests/test_cobro_corte1.py:580`). El script espera el texto del
-   assert anterior (línea 577), que con este sabotaje pasa: volver a
-   exportar no depende de reconocer el nombre. Arreglo: cambiar el texto
-   esperado, una línea.
-2. «D31: sin candado y la clave repetida se da por guardada»
-   (`cobro_mp1.sh:492-497`). En el lote dio rojo sin «FALLA | el mismo
-   pago dos veces a la vez: uno aplicado y otro salteado». Esa salida no
-   quedó guardada: el script sólo copia líneas de pytest. A mano, con el
-   mismo sabotaje sobre `999b27a`, 4 de 5 corridas dan el rojo esperado y
-   1 da `OK … ([200, 200], ['payment_id ya procesado', None])`. La barrera
-   de `scripts/testing/cobro_mp1_postgres.py:121-145` suelta al primero
-   apenas leyó la cuenta, y a veces el primero guarda antes de que el
-   segundo registre el pago: el segundo lo ve en la consulta previa y no
-   llega a la clave. El producto queda bien en las dos ramas. Lo que pasa
-   es que la prueba no siempre mide la clave. Arreglo: que la barrera
-   cruce a los dos después de esa consulta y antes de
-   `_registrar_pago_mp`, y que el script muestre las líneas «FALLA» de
-   las pruebas de Postgres.
+Mi hipótesis, sin demostrar: una conexión reutilizada que el servidor cierra
+justo cuando la prueba la vuelve a usar, más probable con carga.
 
 Opciones:
 
-- (a) Los arreglo en un commit de pruebas aparte, encima de este informe
-  y antes de ORDEN-1b, y vuelvo a correr el script de sabotajes completo.
-- (b) Van en la próxima vuelta de COBRO-MP-1, junto con lo que digas de
-  D13.
+- **(a)** Aceptar la puerta así, con el rojo dudoso documentado.
+- **(b)** Que `orden1b.sh` guarde el log de la API de cada `ROJO?` y que
+  la prueba reintente una vez sólo sus propios pedidos (no los de la
+  pestaña) cuando el servidor corta la conexión. Va en un commit de
+  pruebas, con un sabotaje que muestre que el reintento no tapa un rojo del
+  producto.
+- **(c)** Sólo guardar el log de cada `ROJO?`, sin reintento, para
+  diagnosticarlo la próxima vez que aparezca.
 
-Recomiendo **(a)**. Mientras no esté, el comando 3 de abajo da rojo.
-Además, D31 queda medido sólo a veces. Mientras decidís, sigo con
-ORDEN-1b.
+**Recomiendo (c).** Un reintento es justamente lo que puede esconder un
+problema que todavía no entiendo. Con el log, la próxima aparición dice si
+el servidor se cayó o cortó la conexión.
+
+**D16. `/auth/logout` está exento de CSRF en el servidor.**
+
+`main.py` (~1652) lo deja afuera de la verificación. Por eso, con B
+adentro, lo único que impide que la pestaña de A cierre la sesión de B es
+el freno de la pestaña (z24). El criterio de ORDEN-1b habla de la pestaña y
+ahí se cumple. No es una fuga de datos: el peor caso es que B quede afuera
+y tenga que volver a entrar.
+
+Opciones:
+
+- **(a)** Dejarlo así.
+- **(b)** Una pieza aparte para que el servidor exija CSRF en el logout,
+  con su rojo antes. Revisaría primero quién llama al logout sin el header:
+  la v1 no manda CSRF.
+
+**Recomiendo (a) por ahora y (b) en la cola**, detrás de lo que ya está
+priorizado: el impacto es una molestia, no datos ni plata.
 
 ## Qué cambió, por causa
 
-**a. Dos pagos distintos de la misma cuenta a la vez.** El aviso toma la
-cuenta (`User` u `Organization`) con `with_for_update`. Rojo sobre
-`8e6a993` en `cobro_mp1_postgres.py`, PG16: «fallas: 4», las cuatro de a
-(dos recargas y dos planes a la vez, de usuario y de organización, suman
-uno). Verde: «fallas: 0». Sabotaje: sin el candado, el script vuelve a
-rojo. `cobro_mp1d_postgres.py` sigue en verde.
+**El freno: `api()`, en `app_v2.js`.** Antes de cada escritura (todo lo que
+no es GET, HEAD ni OPTIONS), la pestaña compara el token CSRF de la cookie
+con el de su dueño. El de su dueño es el que ya confirmó o, si todavía no
+confirmó ninguno, el que leyó al abrir.
 
-**b. Una regla para lo que se lee de Mercado Pago.**
+- Si son iguales, la escritura sale sin consulta extra.
+- Si son distintos, pregunta `/auth/current_user`:
+  - si sigue siendo el dueño, adopta el token nuevo y la escritura sale
+    (A salió y volvió a entrar);
+  - si es otro usuario, la escritura no sale y la pestaña se tapa;
+  - si no se puede comprobar, la escritura no sale y muestra «No se pudo
+    comprobar la sesión. Recargá la página.»;
+  - si el servidor dice 401, va al login.
 
-- No se pudo leer (excepción del SDK, cualquier status distinto de 200,
-  sin id de pago, la renovación que todavía no dice qué pago fue): 503 y
-  una línea de log (`_consultar_mp`, `_MPIlegible`).
-- Se leyó y no sirve (referencia desconocida, cuenta que no existe, cobro
-  sin suscripción, id de suscripción que no es un id, campos en `null` o
-  de otro tipo, monto, moneda, fecha): fila `rechazado` con su motivo y
-  200.
-- Un dato secundario en `null` (`payer`, `card`) no frena un pago bueno:
-  se aplica.
-- Lo leído que no entra en su columna de Postgres (largo, NUL, surrogate
-  suelto) se recorta o se reemplaza (`_guardable_en_pg`): antes daba 500.
-- Los ids de suscripción que trae el cobro, la metadata, el pago o la
-  transacción se validan con la misma forma que los de cobro y pago
-  (`_id_mp`) antes de armar la URL de Mercado Pago.
-- El usuario `org` paga su plan.
+**Tu pista del CSRF.** La apliqué en una forma equivalente, porque al pie de
+la letra trababa a A cuando vuelve a entrar:
 
-Rojos:
-- `9a16147` sobre `8e6a993`: «60 failed, 156 passed» en los 4 archivos
-  (a, b, e, f y g juntos).
-- `5289dc6`: «FALLA | un pago a una cuenta que no existe, con la
-  referencia larga queda rechazado (500, [])» y, arreglado ese, ocho más
-  del tipo «FALLA | un pago con la marca larga queda aplicado (500, [])»
-  («fallas: 8»).
-- `a4a67ec`: el caso del cobro sin suscripción legible lo frenaba el
-  monto; con el control sacado, «assert 'active' == 'past_due'».
-- `e9fd805`: «assert 503 == 200» en los seis casos del id de suscripción.
-- `bec9a8c` sobre `e9fd805`: «assert 503 == 200» en `[con_ruta]`.
+- Con el freno aprobado, el header que sale es el token ya validado. Entre
+  la consulta y la lectura de la cookie no hay `await`.
+- Si la cookie cambia antes del envío, un servidor con `CSRF_ENFORCE`
+  rechaza el pedido, porque el header ya no coincide con la cookie.
+- Sin `CSRF_ENFORCE` frena sólo la consulta. Para eso están z21 y z23: hacen
+  como un servidor que no lo exige.
 
-**c.** D13, sin cambio.
+**La pestaña tapada.** El diálogo `#pestanaAjena` dice «Entró otro usuario»
+y «Esta pestaña ya no puede guardar nada. Recargá la página para seguir con
+el usuario que entró.», con el botón «Recargar». Escape no lo cierra.
+`marcarAjena()` es el único lugar que lo abre: lo usan el freno y el
+chequeo que ya existía.
 
-**d. D31 en Postgres.** `cobro_mp1_postgres.py` pone `date_approved` y
-vuelve a probar el mismo pago dos veces a la vez. Entra a
-`cobro_mp1.sh`: sin el candado y con la clave repetida dada por guardada,
-queda rojo.
+**«Salir».** Con la sesión de otro, no hace nada, porque la pestaña ya está
+tapada. Si no pudo comprobar la sesión, avisa «No se pudo cerrar la sesión»
+y no simula haber salido.
 
-**e. Los mutantes vivos.** Cada uno tiene su caso
-(`tests/test_cobro_mp1_vuelta2.py`) y su sabotaje:
-- sin la fila `InicioRegistroPagosMP`, no se aplica nada (503);
-- el corte del registro no tiene margen;
-- pagar de más se aplica;
-- `past_due` con fin por delante suma desde hoy;
-- el registro de un pago de organización lleva `org:`;
-- el panel muestra los últimos 200 rechazados, del más nuevo al más viejo;
-- el panel nombra todos los motivos.
+**Telemetría.** No sale si el token no es el del dueño.
 
-**f. La recarga con el tope de 100.** El tope está en un solo lugar
-(`billing_service.recarga_entra`). Con el tope lleno, `/api/billing/topup`
-contesta 409 con la razón y la pantalla la muestra. Un pago de recarga que
-no entra queda `rechazado` y no suma: lo ve Emi en el panel. Con los
-extras vencidos se puede recargar.
+**D11.** Cuando la duplicada todavía no sabe quién es el usuario, avisa
+«Comprobando la sesión antes de recuperar la operación guardada…» y anota
+que tiene que recuperar. Al confirmar la sesión, busca el borrador y lo
+adopta con la misma regla de antes (`adoptarTarde`, que salió de
+`DOMContentLoaded` para no duplicarla).
 
-**g. Ids de exportación y panel.**
-- La exportación se llama `MARIA-EXPORT_<id>.TXT`: no choca con una
-  importación de `EXPORT_<id>` y un id de 44 a 50 caracteres cuenta una
-  vez.
-- La pantalla v1 genera primero y guarda el historial con el archivo
-  devuelto: cuenta una sola operación. Rojo en
-  `pantalla_cobro_mp1_v2.js`: «guardar GROUPED_… → generar».
-- El texto del panel de rechazados nombra la fecha.
+**Limpieza.** `irAlLogin()` es la única copia de la redirección al login, y
+`consultarUsuario()` la única de la consulta con tope de tiempo. Las dos ya
+existían duplicadas.
+
+**Casos nuevos en `pantalla_orden1.js`:**
+
+| Caso | Qué prueba |
+|---|---|
+| z20 | generar con B adentro, en tres momentos |
+| z21 | guardar un cliente con B adentro, sin CSRF |
+| z22 | A sale, vuelve a entrar y genera |
+| z23 | z20 con un servidor que no exige CSRF |
+| z24 | «Salir» con B adentro |
+| z25 | con la sesión cerrada, va al login |
+| z26 | «Salir» sin poder comprobar |
+| z27 | telemetría |
+| z28 | el guardián de `usuarioActual` |
+
+`orden1b.sh` tiene 14 sabotajes, uno por motivo. En `orden1.sh` actualicé
+los patrones que ORDEN-1b movió.
+
+**Un VERDE que explico.** Al cargar, el semáforo hace un POST a
+`/api/validate/smart`. Ese POST pasa por el freno y deja confirmado el token
+del dueño. Por eso el sabotaje «l» de `orden1.sh` necesitó su propio caso,
+z28.
 
 ## Riesgos
 
-Ninguno lo arreglé: o está fuera de la tarea o el arreglo cuesta más que lo
-que evita. Severidad entre paréntesis.
+No arreglé ninguno de estos; la severidad va entre paréntesis.
 
-- **Exportaciones viejas (baja, transitoria).** Una operación guardada
-  como `MARIA_EXPORT_<x>.TXT` antes del cambio de nombre no se reconoce:
-  regenerar esa exportación cuenta una operación más, una vez.
-- **Lo permanente reintenta (media).** Un pago aprobado sin id, un cobro
-  sin pago y un 404 de Mercado Pago dan 503: es tu regla b («no se pudo
-  leer»), pero Mercado Pago reintenta hasta rendirse y Emi no ve fila en
-  el panel, sólo el log. Incluye un `preapproval_id` de la metadata que
-  Mercado Pago no encuentra.
-- **`metadata.preapproval_id` no se usa si el cobro no trae el suyo
-  (media, D30).** Una renovación cuyo cobro no dice de qué suscripción es
-  queda rechazada, aunque el pago traiga el id en la metadata. Depende de
-  la forma real del cobro, que no verificamos.
-- **Links de recarga de más (baja a media).** El tope se mira al armar
-  el link, no se reserva. El adversario armó 12 links desde 0 extras y
-  los pagó: 10 `aplicado`, 2 `rechazado`, la cuenta en 100. El tope no se
-  pasa, pero el cliente pagó dos y Emi devuelve a mano.
-- **La suscripción se pide dos veces (baja).** En una renovación sin
-  referencia, el aviso lee la suscripción para la referencia y otra vez
-  en el control del monto, con llamadas que bloquean.
-- **`recarga_entra` vence extras (baja).** Llama a `_expire_extra_ops`,
-  que modifica la cuenta. En el webhook el vencimiento se guarda aunque la
-  recarga se rechace; en `billing_topup` depende de otro commit.
-- **Una organización huérfana en `billing_topup` (baja).** Si la cuenta
-  dice `organization_id` y la organización no existe, la recarga va al
-  usuario, como el resto de `_get_billing_entity`.
-- **La pantalla v1 sigue con `GROUPED_` (baja).** El guardado del Excel
-  agrupado de v1 no cambió de nombre: no choca con `MARIA-EXPORT_`.
-- **La cuenta inexistente ahora da 200 (cambio de contrato).** Antes
-  daba 400; ahora queda `rechazado` con 200, según la regla b.
-- **Un id mal formado que se leyó reintenta (media).** Lo encontró el
-  segundo adversario: un `payment.id` del cobro o un `id` del pago que no
-  es un id da 503 sin fila, y Mercado Pago reintenta. Sin id no hay clave
-  para la fila; se podría registrar el rechazo con el id del cobro. Con ids
-  reales casi no pasa. Si lo querés distinto, decímelo y va con su rojo.
-- **`_id_mp` acepta `0`, `-` y negativos (baja).** Se piden a Mercado
-  Pago y dan 503 si no existen.
-- **El webhook con un cuerpo que no es un objeto da 500 (baja, previo).**
-  `_verify_mp_webhook_signature` hace `body.get("data", {}).get(...)`.
-- **El botón de recarga sigue visible con el tope lleno (baja).** El 409
-  aparece al tocarlo, con la razón.
-- **El aviso devuelve sin commit con el candado tomado (baja, previo).**
-  La sesión lo suelta al cerrarse; no lo medí.
-- **Los que pediste:** una recarga revive extras vencidos; cancelar
-  mientras llega el primer pago deja la cuenta con su mes y sin
-  suscripción; `_pago_un_plan_mp` con una prueba que sólo recargó. Sin
-  cambio.
+**Lo que trae ORDEN-1b:**
+
+- **(media)** Sin `CSRF_ENFORCE`, entre que el freno aprueba y el pedido
+  sale hay una ventana de microsegundos. Si en ese instante cambia la
+  cookie, el pedido sale con la sesión nueva. Con `CSRF_ENFORCE`, el
+  servidor lo rechaza. **En Railway no verifiqué `CSRF_ENFORCE`**: por
+  defecto vale `true` si `IS_PRODUCTION`, y eso depende de `ENVIRONMENT`.
+- **(media)** `/auth/logout` exento de CSRF en el servidor: es D16.
+- **(baja)** El freno es del cliente, no del servidor. Una v1 abierta, que
+  no manda CSRF ni tiene freno, sigue escribiendo a nombre de quien esté en
+  la cookie. Es previo a esta pieza.
+- **(baja)** Los GET no pasan por el freno. La pestaña de A puede leer datos
+  de B hasta que se tapa. Un GET con efectos tampoco queda cubierto. El
+  criterio habla de escrituras.
+- **(baja)** `CDI.currentUser` queda con A en una pestaña ya tapada. Es
+  cosmético: la pestaña no puede guardar.
+- **(baja)** «Comprobando…» puede pisar un momento al aviso de sesión
+  cerrada.
+- **(baja)** En cockpit o clientes, el diálogo aparece recién en la primera
+  escritura o en el chequeo periódico, no al instante.
+- **(baja)** Una primera carga con `current_user` caído puede tapar la
+  pestaña de más con «Entró otro usuario» cuando el usuario era el mismo. Se
+  arregla recargando.
+- **(baja)** Algunos POST de sólo lectura, como `/api/validate/smart`, hacen
+  la consulta a `current_user` cuando el token cambió. Es una consulta de
+  más, no un bloqueo.
+
+**De antes:**
+
+- `X-Forwarded-For` es falseable, y la prueba lo usa para no gastar el
+  límite de entradas. Es una propiedad del entorno de prueba.
+- La telemetría da 403 con `CSRF_ENFORCE`; es previo.
+- Con g saboteado, `test_cobro_corte1.py:577` no falla.
+- z7 fue intermitente en ORDEN-1.
 
 ## Hallazgos de la revisión
 
 | Fuente | Modelo y esfuerzo | Hallazgo | Qué hice |
 |---|---|---|---|
-| Adversario sobre `b3f5edb` | Sonnet, alto | 1. Un dato largo, con NUL o surrogate da 500 en Postgres | Arreglado: rojo `5289dc6`, arreglo `26c12ed` |
-| | | 2. `transaction_amount = 10**5000` da 500 | Descartado: el JSON de Mercado Pago no puede traer un entero así; `json.loads` lo rechaza («Exceeds the limit (4300 digits)») |
-| | | 3. Links de recarga de más | Riesgo |
-| | | 4. Exportaciones viejas | Riesgo |
-| | | 5. Un 404 da 503 | Riesgo (regla b) |
-| | | 6. `return` con el candado tomado | Riesgo, previo |
-| `/security-review` sobre `8e6a993..dbac021` | Sonnet | Sin hallazgos con confianza ≥ 7 | — |
-| `/code-review high` sobre `8e6a993..dbac021` | Opus, alto | 1. Exportaciones viejas | Riesgo |
-| | | 2. Lo permanente reintenta | Riesgo |
-| | | 3. `metadata.preapproval_id` (D30) | Riesgo |
-| | | 4. El guardado del historial antes de los avisos | Descartado: `saveOperationToHistory` atrapa el error del `fetch`, y los ítems son los mismos que el servidor acaba de aceptar para generar |
-| | | 5. Id de suscripción sin validar en la URL | Arreglado: rojo `e9fd805` y `bec9a8c`, arreglo `ad46a16` |
-| | | 6. La suscripción se pide dos veces | Riesgo |
-| | | 7. Links de recarga de más | Riesgo |
-| | | 8. `recarga_entra` vence extras | Riesgo |
-| | | 9. Sale el `min(…, 100)` al aplicar | Descartado: el único que suma extras es la recarga, y `recarga_entra` la rechaza antes; el borde de 100 tiene sabotaje |
-| Adversario sobre `5289dc6..999b27a` | Sonnet, alto | 1. Un id de pago mal formado en el cobro (`"../x"`, `"12 34"`, `1.5`, una lista, 65 caracteres) da 503 siempre, sin fila; igual un `pay_resp.id` que no sirve | Riesgo, dentro de «Lo permanente reintenta»: es el mismo 503 que ya fija `test_un_pago_aprobado_sin_id_reconocible_reintenta`, sin código nuevo por tu decisión |
-| | | 2. `_id_mp(0)` da `"0"`, y `"-"` o un negativo pasan: se piden a Mercado Pago y dan 503 si no los conoce | Riesgo (baja): la ruta no sale de su segmento; los ids reales pasan y los mal formados se rechazan |
-| | | 3. `POST /api/payments/webhook` con firma y cuerpo `[]` o `{"data": 5}` da 500 en vez de 401 | Riesgo (baja), previo a la vuelta: no cobra nada |
-| | | 4. Sin sabotaje propio para un `billing_topup` que lea los extras sin `recarga_entra` | Descartado: el endpoint llama al helper (dos sabotajes en el endpoint, uno en el helper); es un mutante de otra implementación |
-| | | Lo que no rompió: ningún id llegó al SDK sin pasar por `_id_mp` (espía sobre `_Pagos.get` y `_Suscripciones.get`); ninguna suscripción de otra cuenta se aplicó; 17 sabotajes de ids, `recarga_entra` y renovación en rojo | — |
+| `/code-review high` | Opus, alto | #1 y #2: con la sesión cerrada la escritura no iba al login, y «Salir» simulaba salir sin poder comprobar | Arreglados con su rojo antes: z25 y z26 (`ee27d5e`), arreglo en `91b25f2` |
+| `/code-review high` | Opus, alto | #3: la falsa «Entró otro usuario» con la primera carga caída | Riesgo (baja) |
+| `/code-review high` | Opus, alto | #4: no quedó registrado en mis notas y no lo recuperé | — |
+| `/code-review high` | Opus, alto | #5: consultas duplicadas a `current_user` | Riesgo (baja) |
+| `/code-review high` | Opus, alto | #6: que el servidor ate la escritura al token | Ya pasa con `CSRF_ENFORCE`; riesgo de Railway arriba |
+| `/code-review high` | Opus, alto | #7: `irAlCheckout` tapa `ERROR_SIN_SESION` con su propio toast | Lo dejé: el mensaje se ve igual; es de COBRO |
+| `/code-review high` | Opus, alto | #8: `confirmarSesion` puede arrancar la recuperación desde una escritura | Lo dejé: la recuperación respeta `adoptarTarde`, que no pisa una pestaña ocupada |
+| `/code-review high` | Opus, alto | #9: la espera está duplicada | Arreglado: `consultarUsuario()` |
+| Adversario | Sonnet, alto | La telemetría salía a nombre de B | Arreglado con su rojo antes: z27 (`267ef10`), arreglo en `68a2f37` |
+| Adversario | Sonnet, alto | #5 a #8: «Comprobando…» pisa al aviso, Escape, el diálogo tarda en cockpit o clientes, la ventana de microsegundos | Riesgos de arriba. Escape: `cancel` hace `preventDefault`, así que no se cierra en Chromium; en otros navegadores no lo probé |
+| Adversario | Sonnet, alto | Fuera del criterio: GET con datos de B, `CDI.currentUser`, `goToLegacy` borra `cdi_ui`, POST de sólo lectura | Riesgos (baja); `goToLegacy` es previo |
+| `/security-review` | Opus, alto | Sin hallazgos con confianza ≥ 8 sobre `4ef59f4..6c459d2` | — |
 
 ## Archivos de producto tocados
 
-`proyecto_maria/main.py`, `proyecto_maria/services/billing_service.py`,
-`proyecto_maria/static/app.js`, `proyecto_maria/static/v2/screens/profile.js`,
-`proyecto_maria/templates/dev_dashboard.html` y `CHANGELOG.md`.
+- `proyecto_maria/static/v2/app_v2.js`
+- `proyecto_maria/templates/dashboard_v2.html`
+- `CHANGELOG.md`
 
-## Puertas, sobre `999b27a`
+## Puertas, sobre `6c459d2`
 
 | Puerta | Salida |
 |---|---|
-| Suite completa (SQLite, worktree limpio) | `==== 4345 passed, 121 skipped, 3 xfailed, 101 warnings in 607.31s (0:10:07) ====` |
-| Pruebas de cobro (13 archivos) | `================= 359 passed, 4 warnings in 123.89s (0:02:03) ==================`, salida 0 |
-| `cobro_mp1_postgres.py` en PG16 | 29 líneas `OK`, `fallas: 0`, salida 0 |
-| `cobro_mp1d_postgres.py` en PG16 | 14 líneas `OK`, `fallas: 0`, salida 0 |
-| `scripts/testing/sabotajes/cobro_mp1.sh` | **rojo:** `sabotajes con falla: 2`, salida 1. 106 `ROJO`, 2 `ROJO?` (D14) y el `VERDE` de control esperado («sin mirar antes de insertar: sigue en verde, como tiene que ser») |
-| `/code-review high` | 9 hallazgos, tabla de arriba, sobre `dbac021`; el 5 arreglado |
-| `/security-review` | sin hallazgos ≥ 7, sobre `dbac021` |
+| Suite completa (SQLite, worktree limpio, `--timeout=120`) | `4345 passed, 121 skipped, 3 xfailed in 673.65s`, salida 0 |
+| `pantalla_orden1.js` completa (todos los casos), con `CSRF_ENFORCE=true` | 60 líneas `OK` (cierra con «OK: ORDEN-1 en el navegador»), ninguna `FALLA`, salida 0 |
+| `scripts/testing/sabotajes/orden1b.sh` (lote) | 13 `ROJO`, 1 `ROJO?` (z23, D15), `sabotajes sin rojo: 1`, salida 1 |
+| z23 saboteado, solo, 4 veces | rojo correcto 4 de 4; detalle en D15 |
+| `scripts/testing/sabotajes/orden1.sh` | 76 `ROJO`, `sabotajes sin rojo: 0`, salida 0 |
+| `ataque_aislamiento.sh` | `Bloqueado: 47 · Fugas: 0 · Sin probar: 0`, «PUERTA G3 PASADA», salida 0 |
+| `/code-review high` | 9 hallazgos, tabla de arriba; #1, #2 y #9 arreglados |
+| `/security-review` | sin hallazgos ≥ 8 |
 
-**No corrí:** smoke y ataque de aislamiento (no toca sesión ni
-permisos); `/code-review high` y `/security-review` de nuevo sobre
-`ad46a16..999b27a`, que es el arreglo del hallazgo 5 y sus pruebas; ese
-tramo lo revisó el segundo adversario.
+**El rojo antes** (`95643e3`, sobre el producto sin el freno):
 
-**Incidente de entorno:** la primera corrida de los sabotajes se cortó
-porque el adversario borró su worktree temporal (`/tmp/tmp.…/wt`), al
-tomarlo por suyo; lo confirmó él. No es un rojo del producto. La relancé
-con `TMPDIR` en mi carpeta de trabajo y otro puerto, sobre el mismo
-`999b27a`; la de la tabla es esa. Las pruebas de cobro que había corrido
-antes (351 passed) eran anteriores a `ad46a16` y no cuentan: las de la
-tabla son sobre `999b27a`.
+- «FALLA: entró otro usuario y la pestaña de A generó enseguida y quedó una
+  operación en la cuenta de B: 1 creadas, 1 cobradas»
+- «FALLA: entró otro usuario y la pestaña de A guardó un cliente y el
+  cliente quedó en la cuenta de B»
+- «FALLA: con un servidor que no exige CSRF, entró otro usuario y la
+  pestaña de A generó enseguida y quedó una operación en la cuenta de B: 1
+  creadas, 1 cobradas»
+- «FALLA: entró otro usuario y A apretó «Salir» en su pestaña y cerró la
+  sesión de B (401; salió /auth/logout)»
+- «FALLA: A volvió a entrar (otra sesión) mientras la duplicada miraba si
+  la original vive y la duplicada no avisa que está comprobando la sesión»
+
+z22 ya pasaba: es el caso de no bloquear de más.
+
+**No corrí:**
+
+- `smoke_friccion.sh`: no toqué el backend.
+- `/code-review` y `/security-review` de nuevo sobre `629042d..6c459d2`:
+  ese tramo son sólo pruebas.
+- El diálogo y Escape en Firefox o Safari: sólo probé Chromium.
 
 ## Comandos
 
 ```bash
 git fetch origin claude/dev-tecnica && git checkout --detach origin/claude/dev-tecnica
-E="GEMINI_API_KEY=test-key ENVIRONMENT=test VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares"
-# 1. Los casos de la vuelta: tiene que dar «N passed», 0 failed
-env $E python -m pytest -q --no-cov tests/test_cobro_mp1_vuelta2.py tests/test_cobro_mp1.py tests/test_cobro_corte1.py tests/test_prelaunch_block2.py | grep -E 'passed|failed'
-# 2. Postgres: tiene que terminar en «fallas: 0»
-PY=python scripts/testing/con_pg16.sh bash -c 'python scripts/testing/cobro_mp1_postgres.py "$BACKUP1A_PG_URL"'
-# 3. Sabotajes: hoy da las dos líneas ROJO? de D14 y «sabotajes con falla: 2» (la de D31, a veces no); ninguna ROTO, ROJO! ni «la prueba no lo vio»
-PY=python PUERTO=8854 bash scripts/testing/sabotajes/cobro_mp1.sh 999b27a | grep -E '^(ROTO|ROJO[?!])|no lo vio|sabotajes con falla'
+# 1. Sabotajes de ORDEN-1b (levanta su propia API con CSRF_ENFORCE=true en el 8875):
+#    14 ROJO y «sabotajes sin rojo: 0»; un ROJO? de z23 por «socket hang up» es D15
+PY=python bash scripts/testing/sabotajes/orden1b.sh 6c459d2 | grep -E '^(ROJO|ROTO|VERDE)|sabotajes sin rojo'
+# 2. Sabotajes de ORDEN-1 con los patrones nuevos (puerto 8853): «sabotajes sin rojo: 0»
+PY=python bash scripts/testing/sabotajes/orden1.sh 6c459d2 | grep -E '^(ROTO|ROJO\?|VERDE)|sabotajes sin rojo'
 ```
 
-/compact conservar: Dev 1, rama claude/dev-tecnica. COBRO-MP-1 vuelta 2
-entregada en 999b27a (informe en el commit de arriba): espera veredicto con
-D13 (c del checkout, recomiendo c) y D14 (los dos sabotajes en rojo
-dudoso, recomiendo a). En curso ORDEN-1b (PARA-DEV.md, D11 y
-D12), en commits aparte. Después CORTE-1, MP-2 (suma la cancelación de
-organizaciones), AIS2, LIM, BACKUP-1a y EXCEL-2c. Nada se publica sin el
-«dale» de Emi; nunca main.
+/compact conservar: Dev 1, rama claude/dev-tecnica. ORDEN-1b entregada en
+6c459d2 (informe en el commit de arriba): espera veredicto con D15 (rojo
+dudoso de z23 en orden1b.sh, recomiendo c: guardar el log) y D16 (logout
+exento de CSRF en el servidor, recomiendo a y pieza en la cola). D14 (a)
+hecha en 4ef59f4. Sigue COBRO-MP-1 con D13 (c), después de tu veredicto;
+después CORTE-1, MP-2 (suma la cancelación de organizaciones), AIS2, LIM,
+BACKUP-1a y EXCEL-2c. Nada se publica sin el «dale» de Emi; nunca main.
