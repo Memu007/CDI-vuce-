@@ -41,69 +41,53 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
-## Veredicto de ORDEN-1, vuelta 2 (2026-10-29 01:00 UTC): devolución
+## Veredicto de ORDEN-1, vuelta 3 (2026-10-29 03:31 UTC): aceptada
 
-Sobre `86c9d84` (informe en tu `PARA-PM.md` de esa vuelta). Evidencia en
-`REPRODUCCION-ORDEN-1-vuelta2-2026-10-29.md`. `orden1.sh` dio 64 ROJO y
-ninguno sin rojo, como tu informe.
-Lo de la vuelta anterior anda: la sesión se mira antes de guardar, la
-recarga lenta recupera o avisa, y el corte se ve en `#avisoBorrador`.
+Sobre `f7fbb72` (producto `92bbaa2`). Evidencia en
+`REPRODUCCION-ORDEN-1-vuelta3-2026-10-29.md`. `orden1.sh`: 76 ROJO y ninguno sin rojo, como tu informe.
+El arreglo ataca la causa: sin usuario confirmado, `adoptarBorrador` no
+escribe ni borra. Dos adversarios con ejemplos distintos del de la
+devolución (recuperación tardía con la original cerrada, B o cierre de
+sesión entre buscar y adoptar, dos restauradas a la vez) no perdieron ni
+mezclaron nada; cuatro mutantes nuevos dieron rojo; z8 sin el arreglo da
+rojo. Buen trabajo.
 
-**Causa que sigue:** la recuperación decide con el usuario de antes de una
-espera. `buscarBorrador` toma el usuario, espera `pestanaViva` (1,5 s si
-hay una pestaña duplicada) y después `adoptarBorrador` escribe con
-`usuarioActual()` y borra el sobre original. Si en esa espera entra otro
-usuario (reproducido por la PM y por los dos adversarios):
+**Integración:** tu rama tiene commits de COBRO-MP-1, que tiene una
+devolución abierta, intercalados con los de ORDEN-1. La integro junto con
+COBRO-MP-1 cuando se acepte; no hace falta que separes nada.
 
-- el sobre queda con `user: null` y el de A se borra; la primera pestaña
-  que se abre, de A o de B, lo barre como sin dueño. La operación de A se
-  pierde sin vuelta;
-- la pestaña le muestra a B la operación de A en review, con el aviso de
-  otro usuario.
+- **D11:** (a), se acepta el riesgo. El aviso que falta va en ORDEN-1b.
+- **D12:** es real y pesa más de lo que parecía: el adversario la
+  reprodujo. Con «Entró otro usuario…» en pantalla, Generar desde la
+  pestaña de A crea y cobra la operación en la cuenta de B, y el TXT con el
+  CUIT y la factura de A queda descargable desde la cuenta de B. Viene de
+  antes de ORDEN-1. Va como ORDEN-1b (abajo), decidido por la PM: arreglo
+  de esta pieza, no cuenta aparte.
 
-Pasa en el arranque y en la recuperación tardía. Es tu A9, pero no es
-BAJA: toda pestaña duplicada espera el candado 1,5 s por diseño, y la
-pérdida no tiene vuelta.
+## ORDEN-1b — ahora (encargada 2026-10-29 03:31 UTC)
 
-**La familia, con un caso cada una:** después de cada espera del camino de
-recuperación (candado, usuario, consulta), no se escribe ni se borra nada
-si el usuario de ahora no es el que se tomó al empezar, y nunca se escribe
-un sobre sin usuario. Casos: entra B durante la espera, en el arranque y en
-la tardía; se cierra la sesión durante la espera; A sale y vuelve a entrar
-durante la espera (no pierde nada). Rojo antes, y un sabotaje que quite esa
-comprobación (hoy `user: duenoPestana` en `adoptarBorrador` pasa a, p y z3).
+**Causa:** una pestaña que ya no es de la sesión del navegador sigue
+mandando escrituras al servidor, y salen con la cookie de quien entró
+después. El aviso frena el guardado local, no lo que va al servidor.
 
-**Sabotajes que faltan**, mutantes vivos con consecuencia:
+**Criterio:** ninguna escritura sale a nombre de otro usuario desde una
+pestaña cuyo dueño ya no es el de la sesión. Casos, rojo antes:
 
-- sin `sesionRevisada = sesion;`: con 401, las consultas en 20 s pasan de 1
-  a 8 (medido por el adversario);
-- `revisarDesde` sin el freno de 10 s: con la red cortada, de 2 a 8
-  (medido);
-- el aviso de otro usuario deja de ser pegajoso: pasa a «No se pudo
-  comprobar la sesión» (medido);
-- sin `sesionRevisada = null` en el `catch` de `revisarSesion`: después de
-  un error de red no vuelve a preguntar y la pestaña no guarda más aunque
-  vuelva la red (lectura de código: escribí el caso que lo muestre).
+- Generar con B adentro: no se crea ni se cobra nada en ninguna cuenta;
+- una escritura más de otra familia, por ejemplo guardar un cliente o un
+  producto del catálogo;
+- A sale y vuelve a entrar: A sigue trabajando, sin falsos bloqueos;
+- la pestaña que no pudo adoptar por falta de usuario (D11) lo avisa y
+  recupera cuando la sesión se confirma.
 
-**Pestaña tocada:** cuenta cualquier interacción. Hoy un `click()` sin
-`pointerdown` (tecnologías de asistencia, extensiones) no la marca: la
-recuperación tardía la lleva a review y la operación que se elige después
-pisa la de antes sin aviso (reproducido por el adversario). Un caso con
-`click()` y uno con tecla; hoy quitar `keydown` o `drop` no lo ve ningún
-caso.
+Pista, no obligación: si la pestaña manda el `csrf_token` que leyó al
+abrir en vez del de la cookie actual, el servidor ya rechaza el pedido
+(la cookie rota en cada login). Mejor que el servidor lo frene a que lo
+frene sólo la pantalla. La pantalla, además, tapa la operación y ofrece
+recargar.
 
-- **Supuestos:** «cualquier toque desactiva la recuperación tardía»,
-  aceptado. `ESPERA_USUARIO_MS` 4 s y `ESPERA_SESION_MS` 10 s, aceptados,
-  decidido por la PM; el informe y el `CHANGELOG` dicen que con una sesión
-  que tarda más de 10 s la pestaña no guarda y avisa.
-- **A riesgos, sin arreglo acá:** A2 (el mismo usuario que sale y vuelve a
-  entrar con la primera consulta en camino ve «Entró otro usuario»: no
-  guarda y avisa, del lado seguro), `/logout` no rota el CSRF, bfcache
-  simulado, `subiendo--` y el aviso `lleno` que se va sin prueba.
-- **Puertas de la vuelta 3:** toca sesión, así que van `/code-review` y
-  `/security-review`, y la suite completa sobre el SHA que entregues. En
-  esta vuelta no se corrieron (Emi había frenado): sin ellas no se acepta.
-
+Toca sesión y dinero: `/code-review` y `/security-review`, la suite
+completa sobre el SHA que entregues, y sabotajes del freno.
 
 ## Veredicto de COBRO-MP-1 (2026-10-29 01:41 UTC): devolución
 
@@ -519,9 +503,8 @@ supuestos de Mercado Pago que no pudiste ver sin red: los estados, que una
 
 ## Orden
 
-1. ORDEN-1, vuelta 3: la devolución de arriba, ahora. (EXCEL-2b quedó
-   aceptada a las 20:30.)
-2. COBRO-MP-1, vuelta 2: la devolución de arriba, después de ORDEN-1.
+1. ORDEN-1b (arriba), ahora. ORDEN-1 quedó aceptada.
+2. COBRO-MP-1, vuelta 2: la devolución de arriba, después de ORDEN-1b.
 3. COBRO-CORTE-1: hecha; se entrega después de COBRO-MP-1.
 4. COBRO-MP-2: hecha; suma la cancelación de organizaciones (arriba) y
    se entrega después de COBRO-CORTE-1.
