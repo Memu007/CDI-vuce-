@@ -60,7 +60,9 @@
 //  (z20) a (z24) ORDEN-1b: si entra otro usuario en el mismo navegador, la
 //      pestaña de A no genera, no guarda un cliente ni cierra la sesión del
 //      otro, aunque el servidor no exija CSRF, y se tapa; si A sale y vuelve
-//      a entrar, sigue trabajando. (z12) avisa
+//      a entrar, sigue trabajando. (z25) con la sesión cerrada, una escritura
+//      va al login; (z26) «Salir» sin poder comprobar quién es no va al
+//      inicio como si hubiera salido. (z12) avisa
 //      mientras comprueba la sesión y recupera la operación al confirmarla.
 // Datos inventados. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_orden1.js
@@ -1512,6 +1514,47 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     if (!sigue.ok()) falla(que + ' y cerró la sesión de B (' + sigue.status() + '; salió ' + salidas.join(', ') + ')');
     if (!(await tapada(t))) falla(que + ' y la pestaña no se tapa');
     console.log('OK ' + que + ': la sesión de B sigue abierta y la pestaña se tapa');
+    await ctx.close();
+  }
+
+  // (z25) Con la sesión cerrada en otra pestaña, una escritura manda al
+  // login, como antes de ORDEN-1b.
+  if (corre('z25')) {
+    const que = 'A salió en otra pestaña y guardó un cliente en esta';
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    await nuevoUsuario(ctx, 'ord1z25');
+    const t = await abrir(ctx);
+    await t.waitForLoadState('networkidle');
+    const salida = await ctx.request.post(base + '/auth/logout');
+    if (!salida.ok()) falla('no se pudo salir: ' + salida.status());
+    const res = await t.evaluate(() => CDI.api('/api/clientes', { method: 'POST', body: JSON.stringify({ nombre: 'Cliente demo' }) })
+      .then(r => 'status ' + r.status, e => 'error: ' + e.message)).catch(() => 'navegó');
+    await t.waitForURL(u => u.pathname === '/', { timeout: 15000 }).catch(() => {});
+    if (!/[?&]next=%2Fdashboard/.test(t.url())) falla(que + ' y no fue al login (' + res + '; está en ' + t.url() + ')');
+    console.log('OK ' + que + ': va al login');
+    await ctx.close();
+  }
+
+  // (z26) A salió y volvió a entrar y aprieta «Salir» sin que la pestaña
+  // pueda comprobar quién es: no va al inicio como si hubiera salido.
+  if (corre('z26')) {
+    const que = 'A volvió a entrar y apretó «Salir» sin poder comprobar quién es';
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    const a = await nuevoUsuario(ctx, 'ord1z26');
+    const t = await abrir(ctx);
+    await t.waitForLoadState('networkidle');
+    const soltar = await retenerUsuario(t);
+    const salida = await ctx.request.post(base + '/auth/logout');
+    if (!salida.ok()) falla('no se pudo salir: ' + salida.status());
+    await entrar(ctx, a);
+    await t.evaluate(() => { CDI.logout(); });
+    await t.waitForFunction(() => location.pathname !== '/dashboard' ||
+      /No se pudo cerrar la sesión/.test(document.getElementById('toastHost').textContent), null, { timeout: 25000 }).catch(() => {});
+    soltar();
+    const sigue = (await ctx.request.get(base + '/auth/current_user')).ok();
+    if (new URL(t.url()).pathname !== '/dashboard') falla(que + ' y fue al inicio ' + (sigue ? 'con la sesión abierta' : 'cerrando la sesión'));
+    if (!/No se pudo cerrar la sesión/.test(await t.evaluate(() => document.getElementById('toastHost').textContent))) falla(que + ' y no avisa que no la cerró');
+    console.log('OK ' + que + ': se queda y avisa que no cerró la sesión');
     await ctx.close();
   }
 
