@@ -62,7 +62,8 @@
 //      otro, aunque el servidor no exija CSRF, y se tapa; si A sale y vuelve
 //      a entrar, sigue trabajando. (z25) con la sesión cerrada, una escritura
 //      va al login; (z26) «Salir» sin poder comprobar quién es no va al
-//      inicio como si hubiera salido. (z12) avisa
+//      inicio como si hubiera salido; (z27) no manda telemetría a nombre
+//      del otro. (z12) avisa
 //      mientras comprueba la sesión y recupera la operación al confirmarla.
 // Datos inventados. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_orden1.js
@@ -1555,6 +1556,27 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     if (new URL(t.url()).pathname !== '/dashboard') falla(que + ' y fue al inicio ' + (sigue ? 'con la sesión abierta' : 'cerrando la sesión'));
     if (!/No se pudo cerrar la sesión/.test(await t.evaluate(() => document.getElementById('toastHost').textContent))) falla(que + ' y no avisa que no la cerró');
     console.log('OK ' + que + ': se queda y avisa que no cerró la sesión');
+    await ctx.close();
+  }
+
+  // (z27) La telemetría escribe con fetch directo, sin pasar por api(): con
+  // B adentro, la pestaña de A no la manda.
+  if (corre('z27')) {
+    const que = 'entró otro usuario y la pestaña de A mandó telemetría';
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    await nuevoUsuario(ctx, 'ord1z27');
+    const t = await abrir(ctx);
+    await t.waitForLoadState('networkidle');
+    const salen = contarEscrituras(t);
+    const telemetria = () => salen.filter(x => x === '/api/session/state').length;
+    await t.evaluate(() => CDI.track('prueba_orden1b'));
+    await t.waitForTimeout(500);
+    if (telemetria() !== 1) falla('la pestaña de A no manda telemetría con su propia sesión: ' + telemetria());
+    await nuevoUsuario(ctx, 'ord1z27b');
+    await t.evaluate(() => CDI.track('prueba_orden1b'));
+    await t.waitForTimeout(500);
+    if (telemetria() !== 1) falla(que + ' a nombre de B');
+    console.log('OK ' + que + ': no sale');
     await ctx.close();
   }
 

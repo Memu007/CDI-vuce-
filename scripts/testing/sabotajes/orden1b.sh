@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Negativos de ORDEN-1b: cada sabotaje deshace un freno de la pestaña cuyo
 # dueño ya no es el de la sesión, y la pantalla (scripts/testing/pantalla_orden1.js,
-# casos z12 y z20 a z26) tiene que fallar por ese motivo.
+# casos z12 y z20 a z27) tiene que fallar por ese motivo.
 #
 # uso: PY=/ruta/al/venv/bin/python [PUERTO=8875] scripts/testing/sabotajes/orden1b.sh [SHA]
 # Trabaja en un worktree descartable con SQLite propia y sin terceros: no toca
@@ -71,7 +71,7 @@ correr() {
   kill $API 2>/dev/null; wait $API 2>/dev/null; API=""
   return $codigo
 }
-export CASOS=z12,z20,z21,z22,z23,z24,z25,z26
+export CASOS=z12,z20,z21,z22,z23,z24,z25,z26,z27
 if ! correr >/dev/null; then
   echo "BASE  | la pantalla ya está en rojo sin sabotaje: no se puede medir nada"; correr | grep FALLA; exit 1
 fi
@@ -126,6 +126,11 @@ export CASOS=z26
 sabotaje $A "salir sin poder comprobar quién es va al inicio" \
   "FALLA: A volvió a entrar y apretó «Salir» sin poder comprobar quién es y fue al inicio con la sesión abierta" \
   $'            if (e.message === ERROR_SIN_SESION) {\n                toast(\'No se pudo cerrar la sesión\', e.message, \'error\');\n                return;\n            }\n' ''
+
+export CASOS=z27
+sabotaje $A "la telemetría sale con la sesión de otro" \
+  "FALLA: entró otro usuario y la pestaña de A mandó telemetría a nombre de B" \
+  '        if (telemetryMuted || getCsrfToken() !== (sesionDelDueno || sesionAlAbrir)) return;' '        if (telemetryMuted) return;'
 
 # D11: la duplicada que no pudo adoptar lo avisa y recupera al confirmar.
 export CASOS=z12
