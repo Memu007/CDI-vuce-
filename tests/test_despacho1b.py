@@ -1911,6 +1911,24 @@ def test_el_tope_de_cpu_cubre_entender_el_texto():
     assert any(a.startswith("El PDF da demasiado trabajo") for a in medido["resultado"]["avisos"]), medido
 
 
+def test_las_hojas_leidas_antes_del_corte_dan_sus_productos():
+    """Las dos hojas del despacho y después una hoja cara: el corte deja tope
+    para entender lo que ya se leyó. Antes, extraer se llevaba el tope entero
+    y se perdían los productos de las hojas leídas."""
+    from pypdf import PdfReader, PdfWriter
+    from proyecto_maria.core.despacho_lector import leer_despacho
+    from tests.pdf_bombas import una_hoja_cara
+    pdf = PdfWriter()
+    for data in (_despacho(), una_hoja_cara(80)):
+        for hoja in PdfReader(io.BytesIO(data)).pages:
+            pdf.add_page(hoja)
+    salida = io.BytesIO()
+    pdf.write(salida)
+    r = leer_despacho(salida.getvalue(), limite_cpu_s=1.0)
+    assert r["renglones"] == _leer()["renglones"], r["avisos"]
+    assert r["avisos"][0] == "El PDF da demasiado trabajo: leí hasta la hoja 2.", r["avisos"]
+
+
 def test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado():
     from proyecto_maria.core.despacho_lector import AVISO_SIN_TEXTO, leer_despacho
     from tests.pdf_bombas import una_hoja_cara
@@ -1940,3 +1958,24 @@ def test_un_corte_por_cpu_que_se_traga_un_finalizador_vuelve_a_cortar():
         cortes += 1
     assert cortes == 2, cortes
     assert time.process_time() - inicio < 1
+
+
+def test_guardar_una_descripcion_que_crece_al_normalizar_da_422(auth_override, client):
+    """1500 «क़» descompuestos: el tope miraba el largo antes de pasar a NFC,
+    que los deja en 3000. Pasaba la validación, el historial no la guardaba y
+    la respuesta decía 200 con un guardado."""
+    cid = _crear_cliente(client)
+    r = _guardar(client, cid, [_renglon("क़" * 1500, "3926.90.90")])
+    assert r.status_code == 422, r.text
+    assert r.json()["errores"] == [{"renglon": 1, "problemas": ["La descripción pasa de 2000 caracteres."]}], r.text
+    assert _contar(ClientProductHistory, client_id=cid) == 0
+
+
+def test_una_operacion_con_un_producto_que_no_se_guarda_lo_dice(auth_override, client):
+    """«1234» no es un NCM: el historial no lo guarda y la respuesta tiene que
+    decirlo, como antes de esta pieza."""
+    cid = _crear_cliente(client)
+    r = _operacion(client, cid, {"pieza": "1234", "descripcion": "TAPA INVENTADA VERDE"})
+    assert r.status_code == 200, r.text
+    assert r.json()["historial_guardado"] is False, r.json()
+    assert _contar(ClientProductHistory, client_id=cid) == 0
