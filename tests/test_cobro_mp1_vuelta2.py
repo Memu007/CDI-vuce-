@@ -456,7 +456,7 @@ def test_con_los_extras_vencidos_se_puede_recargar(client, preferencias, cuenta)
 
 
 @pytest.mark.parametrize("cuenta", ["usuario", "organizacion"])
-@pytest.mark.parametrize("extras", [95, 100])
+@pytest.mark.parametrize("extras", [91, 95, 100])
 def test_una_recarga_que_no_entra_queda_rechazada_y_no_suma(client, cuenta, extras):
     """Antes se cobraba y quedaba «aplicado» acreditando 5 o nada."""
     usuario = _unique("v2_recno")

@@ -9,8 +9,8 @@ Comprueba, con Mercado Pago simulado:
    candado sobre la cuenta, el segundo guardado pisa al primero;
 5. que un pago que no alcanza queda «rechazado» y no toca la cuenta;
 6. que un dato que se leyó de Mercado Pago y no entra en su columna (largo,
-   de otro tipo, con NUL o con un surrogate suelto) no da 500: el pago queda
-   aplicado o rechazado (vuelta 2, b).
+   de otro tipo, con NUL, también anidado, o con un surrogate suelto) no da
+   500: el pago queda aplicado o rechazado (vuelta 2, b; vuelta 3, i).
 
 Para que la carrera pase de verdad, el primer aviso que busca su pago en
 mp_pagos_aplicados espera a ver al otro: o el otro también lo buscó (no hubo
@@ -246,8 +246,17 @@ with TestClient(main_mod.app) as c:
         "la marca larga": ("aplicado", {"card": {"network": "v" * 30}}),
         "la marca en una lista": ("aplicado", {"card": {"network": ["visa"]}}),
         "el pagador largo": ("aplicado", {"payer": {"id": "9" * 300}}),
+        "el pagador con NUL": ("aplicado", {"payer": {"id": "p\x00"}}),
+        "los últimos 4 con NUL": ("aplicado", {"card": {"last_four_digits": "12\x0034"}}),
+        "la marca con NUL": ("aplicado", {"card": {"payment_method": {"name": "vi\x00sa"}}}),
+        # se guardan cortados: moneda, aprobado_en y motivo
+        "la moneda larga": ("rechazado", {"currency_id": "X" * 11}),
+        "la fecha larga": ("rechazado", {"date_approved": datetime.now(timezone.utc).isoformat() + "x" * 30}),
+        "el monto ilegible largo": ("rechazado", {"transaction_amount": "1" * 400}),
     }
     for nombre, (estado, cambio) in raros.items():
+        # cada caso, con lugar para una recarga más (el tope es 100)
+        sql("update users set extra_ops_remaining = 0 where username = %s returning 1", usuario)
         pid = pago(f"px{len(PAGOS)}-{uuid.uuid4().hex[:8]}", f"{usuario}:topup", recarga)
         PAGOS[pid].update(cambio)
         r = c.post(ipn(pid))

@@ -893,7 +893,7 @@ def test_un_pago_viejo_queda_a_la_vista_del_admin(client):
     assert "antes de que empezara el registro" in (fila.get("motivo") or ""), fila
 
 
-@pytest.mark.parametrize("fecha", [None, "", "ayer", "2026-10-28T10:00:00"],
+@pytest.mark.parametrize("fecha", [None, "", "ayer", "sin_zona"],
                          ids=["sin_fecha", "vacia", "ilegible", "sin_zona"])
 def test_un_pago_sin_fecha_de_aprobacion_legible_no_se_aplica(client, fecha):
     """Sin la fecha no se sabe si es anterior al registro: no se aplica."""
@@ -903,11 +903,15 @@ def test_un_pago_sin_fecha_de_aprobacion_legible_no_se_aplica(client, fecha):
     pid = _pago(f"pf-{usuario}", f"{usuario}:premium")
     if fecha is None:
         PAGOS[pid].pop("date_approved", None)
+    elif fecha == "sin_zona":
+        # de ahora: sin zona, no la frena el corte del registro sino la zona
+        PAGOS[pid]["date_approved"] = datetime.now(timezone.utc).replace(tzinfo=None).isoformat()
     else:
         PAGOS[pid]["date_approved"] = fecha
     assert _aviso_ipn(client, pid).status_code == 200
     assert _get_user(usuario)["billing_status"] == "past_due", "se aplicó un pago sin fecha de aprobación legible"
-    assert _leer_pago(pid).get("estado") == "rechazado", _leer_pago(pid)
+    fila = _leer_pago(pid)
+    assert (fila.get("estado"), fila.get("motivo")) == ("rechazado", "sin fecha de aprobación legible"), fila
 
 
 def test_un_pago_nuevo_se_aplica(client):
