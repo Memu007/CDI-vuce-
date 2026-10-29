@@ -7,7 +7,10 @@ Comprueba, con Mercado Pago simulado:
 4. que dos pagos distintos de la misma cuenta a la vez se acreditan los dos
    (vuelta 2, a): recarga y plan, de un usuario y de una organización. Sin
    candado sobre la cuenta, el segundo guardado pisa al primero;
-5. que un pago que no alcanza queda «rechazado» y no toca la cuenta.
+5. que un pago que no alcanza queda «rechazado» y no toca la cuenta;
+6. que un dato que se leyó de Mercado Pago y no entra en su columna (largo,
+   de otro tipo, con NUL o con un surrogate suelto) no da 500: el pago queda
+   aplicado o rechazado (vuelta 2, b).
 
 Para que la carrera pase de verdad, el primer aviso que lee la cuenta espera
 a ver al otro: o el otro también la leyó (no hubo candado) o Postgres lo
@@ -230,6 +233,26 @@ with TestClient(main_mod.app) as c:
     fila = sql("select estado, monto_esperado, motivo from mp_pagos_aplicados where payment_id=%s", m)
     chequear(r.status_code == 200 and extra(usuario) == antes and fila and fila[0][0] == "rechazado",
              f"un pago que no alcanza queda rechazado y no suma ({r.status_code}, {fila})")
+
+    # Un caso por columna: cada dato raro, solo, en un pago que si no, se aplicaría.
+    raros = {
+        "la cuenta inexistente larga": ("rechazado", {"external_reference": f"{'x' * 250}:topup"}),
+        "la cuenta inexistente con NUL": ("rechazado", {"external_reference": f"{usuario}\x00:topup"}),
+        "la cuenta inexistente con un surrogate": ("rechazado", {"external_reference": f"{usuario}\ud800:topup"}),
+        "la moneda con NUL": ("rechazado", {"currency_id": "AR\x00S"}),
+        "la fecha con NUL": ("rechazado", {"date_approved": datetime.now(timezone.utc).isoformat() + "\x00"}),
+        "los últimos 4 largos": ("aplicado", {"card": {"last_four_digits": "123456789"}}),
+        "la marca larga": ("aplicado", {"card": {"network": "v" * 30}}),
+        "la marca en una lista": ("aplicado", {"card": {"network": ["visa"]}}),
+        "el pagador largo": ("aplicado", {"payer": {"id": "9" * 300}}),
+    }
+    for nombre, (estado, cambio) in raros.items():
+        pid = pago(f"px{len(PAGOS)}-{uuid.uuid4().hex[:8]}", f"{usuario}:topup", recarga)
+        PAGOS[pid].update(cambio)
+        r = c.post(ipn(pid))
+        fila = sql("select estado from mp_pagos_aplicados where payment_id=%s", pid)
+        chequear(r.status_code == 200 and fila == [(estado,)],
+                 f"un pago con {nombre} queda {estado} ({r.status_code}, {fila})")
 
 print(f"fallas: {len(FALLAS)}")
 sys.exit(1 if FALLAS else 0)
