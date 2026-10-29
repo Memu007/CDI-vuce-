@@ -347,10 +347,11 @@ sabotaje "el caño roto tapa el código de salida" "$LECTOR" \
   "test_un_lector_que_sale_sin_leer_todo_dice_con_que_salio"
 
 # Devolución 20:07: identidad del producto.
-sabotaje "el lector guarda el NCM con puntos" "$LECTOR" \
+sabotaje "el lector no acepta el NCM de 10 dígitos" "$LECTOR" \
   "    ncm = ncm_para_historial(posicion)" \
   "    ncm = posicion[:10] if _POSICION.match(posicion) else None" \
-  "test_el_mismo_ncm_con_o_sin_puntos_es_el_mismo_producto"
+  "test_el_mismo_producto_por_dos_vias_queda_en_una_fila[guardar-guardar]" \
+  "test_el_mismo_producto_por_dos_vias_queda_en_una_fila[aprender-guardar]"
 sabotaje "el lector vuelve a la regla vieja del NCM" "$LECTOR" \
   "    ncm = ncm_para_historial(posicion)" \
   "    ncm = re.sub(r\"\\D\", \"\", posicion)[:8] if _POSICION.match(posicion) else None" \
@@ -375,9 +376,16 @@ sabotaje "el historial de operaciones cuenta los usos sin valor" proyecto_maria/
 sabotaje "el promedio acepta infinitos" proyecto_maria/services/client_memory.py \
   "    if not math.isfinite(valor) or valor <= 0 or valor >= _MAX_VALOR:" \
   "    if valor <= 0:" \
-  "test_aprender_un_peso_infinito_no_lo_guarda_y_el_catalogo_anda" \
-  "test_cambiar_el_peso_a_algo_que_no_es_un_peso_da_400[inf]" \
-  "test_cambiar_el_peso_a_algo_que_no_es_un_peso_da_400[1e400]"
+  "test_un_infinito_guardado_antes_no_rompe_el_catalogo_y_se_arregla" \
+  "test_cambiar_el_peso_a_algo_que_no_es_un_peso_da_400[1e400]" \
+  "test_un_producto_nuevo_no_guarda_valores_fuera_del_tope"
+sabotaje "el promedio acepta números con otros dígitos" proyecto_maria/services/client_memory.py \
+  "        if not _DECIMAL.fullmatch(valor):" \
+  "        if False:" \
+  "test_aprender_ignora_los_numeros_con_otros_digitos[learn]" \
+  "test_aprender_ignora_los_numeros_con_otros_digitos[operacion]" \
+  "test_cambiar_un_producto_valida_igual_que_guardar[guion bajo]" \
+  "test_cambiar_un_producto_valida_igual_que_guardar[peso arabigo]"
 sabotaje "el catálogo manda el infinito guardado" proyecto_maria/main.py \
   "    return valor if valor is None or math.isfinite(valor) else None" \
   "    return valor" \
@@ -425,7 +433,7 @@ sabotaje "guardar no mira la mitad de par" "$LECTOR" \
         problemas.append" \
   "test_guardar_una_mitad_de_par_suelta_da_422"
 sabotaje "el origen con mitad de par se repite" "$LECTOR" \
-  "    if origen and _MEDIO_PAR.search(origen):" \
+  "    if _MEDIO_PAR.search(escrito):" \
   "    if False:" \
   "test_guardar_un_origen_con_mitad_de_par_da_422[solo]" \
   "test_guardar_un_origen_con_mitad_de_par_da_422[con una letra]"
@@ -489,7 +497,7 @@ sabotaje "el NCM no acepta espacios" "$C" \
 sabotaje "el NCM sin recortar las puntas" "$C" \
   '    ncm = str(ncm).strip().upper()' \
   '    ncm = str(ncm).upper()' \
-  "$F[puntas del ncm]"
+  "test_cambiar_un_producto_guarda_la_forma_de_la_regla"
 sabotaje "el NCM sólo de 8 dígitos" "$C" \
   '    if not 8 <= len(digitos) <= 11 or (ncm[-1].isalpha() and len(digitos) != 11):' \
   '    if len(digitos) != 8:' \

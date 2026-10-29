@@ -1773,7 +1773,7 @@ def test_aprender_ignora_los_numeros_con_otros_digitos(auth_override, client, vi
 def test_cambiar_un_producto_guarda_la_forma_de_la_regla(auth_override, client):
     cid = _crear_cliente(client)
     pid = _provisorio(client, cid)
-    r = _cambiar(client, cid, pid, {"ncm": "3926.90.90.000A", "descripcion": "  TAPA   NUEVA "})
+    r = _cambiar(client, cid, pid, {"ncm": " 3926.90.90.000A ", "descripcion": "  TAPA   NUEVA "})
     assert r.status_code == 200, r.text
     assert (r.json()["producto"]["ncm"], r.json()["producto"]["descripcion"]) == ("39269090", "TAPA NUEVA")
 
