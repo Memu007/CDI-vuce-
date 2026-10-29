@@ -69,7 +69,7 @@ sabotaje $M "editar vuelve a cortar a 10 caracteres" \
   '        row.ncm = str(body["ncm"]).strip()[:10]' \
   "FAILED $T::test_editar_un_producto_con_la_sim_completa_no_deja_un_codigo_cortado"
 sabotaje $M "editar vuelve a aceptar cualquier cosa" \
-  '            raise HTTPException(status_code=400, detail="El NCM no es válido: tiene que tener sus 8 dígitos.")' \
+  '            raise HTTPException(status_code=400, detail=_AVISO_NCM_INVALIDO)' \
   '            pass' \
   "FAILED $T::test_editar_un_producto_con_la_sim_completa_no_deja_un_codigo_cortado"
 sabotaje $M "el contador del plan vuelve a ir después de guardar la operación" \
@@ -85,7 +85,7 @@ sabotaje $M "la moneda vuelve a no recortarse" \
   '            currency=data.get("currency") or "USD",' \
   "FAILED $T::test_datos_largos_de_la_operacion_no_impiden_guardarla"
 sabotaje $M "aprender vuelve a contar lo que no guardó" \
-  '        return True if entrada is not None else None' \
+  '        return entrada is not None' \
   '        return True' \
   "FAILED $T::test_aprender_no_cuenta_lo_que_no_guardo"
 
