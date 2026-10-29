@@ -10941,10 +10941,10 @@ async def billing_checkout(
             "message": "Modo demo - MP_ACCESS_TOKEN no configurado",
         }
 
-    # Una sola suscripción (COBRO-MP-2, C4 y D7.2): con una autorizada y la
-    # cuenta vigente no se paga dos veces; si no, la vieja se cancela antes
-    # de crear la nueva. Si no se sabe cómo está o no se puede cancelar, no
-    # se crea nada.
+    # Una sola suscripción (COBRO-MP-2, C4; COBRO-MP-1, D13): una autorizada
+    # no se cancela desde acá, porque puede ser un pago cuyo aviso no llegó;
+    # la salida es cancelar el plan. Las demás se cancelan antes de crear la
+    # nueva. Si no se sabe cómo está o no se puede cancelar, no se crea nada.
     sid_viejo = db_user.mp_preapproval_id
     if sid_viejo:
         no_disponible = "No pudimos confirmar tu suscripción actual con Mercado Pago. Probá de nuevo en unos minutos."
@@ -10963,6 +10963,11 @@ async def billing_checkout(
                     status_code=409,
                     detail="Ya tenés una suscripción activa en Mercado Pago; se renueva sola al fin del período.",
                 )
+            raise HTTPException(
+                status_code=409,
+                detail="Tu suscripción en Mercado Pago sigue activa. Si acabás de pagar, esperá unos minutos; "
+                       "si querés cambiar la tarjeta, cancelá el plan primero.",
+            )
         if estado_mp != "cancelled":
             try:
                 await run_in_threadpool(_cancelar_suscripcion_mp, sid_viejo)

@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-10-29 · fix: el checkout no cancela una suscripción de Mercado Pago que sigue activa (COBRO-MP-1, D13)
+
+- **fix(cobro):** con la cuenta impaga, vencida o cancelada y una suscripción todavía autorizada en Mercado Pago, «Activar plan» ya no la cancela para crear otra (podía ser un pago recién hecho): avisa que esperes unos minutos o que canceles el plan primero.
+
 ## 2026-10-29 · fix: una pestaña vieja no escribe a nombre del usuario que entró después (ORDEN-1b)
 
 - **fix(orden):** si entra otro usuario en el mismo navegador, la pestaña del anterior no genera, no guarda, no manda telemetría ni cierra la sesión del otro: antes de escribir pregunta quién es, y si es otro se tapa y pide recargar. Si volvés a entrar vos, sigue sin trabar.
