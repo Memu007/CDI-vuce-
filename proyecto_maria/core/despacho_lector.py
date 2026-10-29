@@ -786,11 +786,24 @@ def _numero_del_renglon(valor, nombre, problemas):
     return float(valor)
 
 
+def origen_para_catalogo(valor) -> tuple[str | None, str | None]:
+    """El origen que se guarda en el catálogo (None si no vino) o por qué no
+    sirve: tiene que ser el código de dos letras de un país de la tabla."""
+    from proyecto_maria.core.maria_generator import pais_reconocido
+
+    origen = str(valor or "").strip().upper() or None
+    if origen and _MEDIO_PAR.search(origen):
+        # No se repite en el mensaje: no se puede mandar en la respuesta.
+        return None, "El origen tiene un carácter que no se puede guardar."
+    if origen and not (len(origen) == 2 and origen.isalpha() and pais_reconocido(origen)):
+        return None, f"No reconozco el origen «{origen}»: usá el código de dos letras."
+    return origen, None
+
+
 def renglon_para_catalogo(renglon) -> tuple[dict | None, list[str]]:
     """Lo que se guarda de un renglón revisado, o lo que le falta. Un renglón
     sirve con su posición SIM (o el NCM de 8 dígitos) y su descripción; el
     origen, si viene, tiene que ser un país de la tabla."""
-    from proyecto_maria.core.maria_generator import pais_reconocido
     from proyecto_maria.services.client_memory import ncm_para_historial
 
     if not isinstance(renglon, dict):
@@ -809,12 +822,9 @@ def renglon_para_catalogo(renglon) -> tuple[dict | None, list[str]]:
         problemas.append(f"La descripción pasa de {_MAX_DESCRIPCION} caracteres.")
     if _MEDIO_PAR.search(descripcion):
         problemas.append("La descripción tiene un carácter que no se puede guardar.")
-    origen = str(renglon.get("origen") or "").strip().upper() or None
-    if origen and _MEDIO_PAR.search(origen):
-        # No se repite en el mensaje: no se puede mandar en la respuesta.
-        problemas.append("El origen tiene un carácter que no se puede guardar.")
-    elif origen and not (len(origen) == 2 and origen.isalpha() and pais_reconocido(origen)):
-        problemas.append(f"No reconozco el origen «{origen}»: usá el código de dos letras.")
+    origen, problema = origen_para_catalogo(renglon.get("origen"))
+    if problema:
+        problemas.append(problema)
     cantidad = _numero_del_renglon(renglon.get("cantidad"), "La cantidad", problemas)
     unitario = _numero_del_renglon(renglon.get("valor_unitario"), "El valor unitario", problemas)
     kilo = _numero_del_renglon(renglon.get("kilo_neto"), "El kilo neto", problemas)

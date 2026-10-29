@@ -7617,6 +7617,7 @@ def _sin_nul(valor):
 
 _AVISO_DIGITOS = "El NCM tiene que estar escrito con dígitos del 0 al 9."
 _AVISO_MEDIO_PAR = "Hay un carácter que no se puede guardar."
+_AVISO_NO_ES_OBJETO = "Cada producto tiene que ser un objeto."
 
 
 async def _historial_de_un_producto(db, upsert, **campos) -> bool:
@@ -7649,8 +7650,10 @@ async def save_client_operation(
 
     try:
         data = _sin_nul(await request.json())
+        items = (data.get("items") or []) if isinstance(data, dict) else None
+        if not isinstance(items, list) or not all(isinstance(item, dict) for item in items):
+            raise HTTPException(status_code=400, detail=_AVISO_NO_ES_OBJETO)
         resumen = data.get("resumen", {}) or {}
-        items = data.get("items", []) or []
         # Lo que el historial rechazaría se rechaza antes de guardar nada.
         if tiene_medio_par(data):
             raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
@@ -8306,7 +8309,7 @@ async def learn_client_catalogo_productos(
     if len(items) > 500:
         raise HTTPException(status_code=400, detail="Son más de 500 productos: cargalos en partes.")
     if not all(isinstance(item, dict) for item in items):
-        raise HTTPException(status_code=400, detail="Cada producto tiene que ser un objeto.")
+        raise HTTPException(status_code=400, detail=_AVISO_NO_ES_OBJETO)
 
     from proyecto_maria.services.client_memory import (
         orden_de_escritura, tiene_digito_no_ascii, tiene_medio_par, upsert_client_product_history,
@@ -8460,8 +8463,8 @@ async def update_client_catalogo_producto(
     if not row:
         raise HTTPException(status_code=404, detail="Producto no encontrado")
 
-    if not isinstance(body, dict):
-        body = {}
+    body = _sin_nul(body) if isinstance(body, dict) else {}
+    from proyecto_maria.core.despacho_lector import origen_para_catalogo
     from proyecto_maria.services.client_memory import (
         descripcion_del_producto, identidad_del_producto, ncm_para_historial,
         tiene_digito_no_ascii, tiene_medio_par, valor_para_promedio,
@@ -8478,7 +8481,10 @@ async def update_client_catalogo_producto(
             raise HTTPException(status_code=400, detail="El NCM no es válido: tiene que tener sus 8 dígitos.")
         row.ncm = ncm_nuevo
     if "origen" in body:
-        row.origen_frecuente = str(body["origen"]).strip()[:3] or "XX"
+        origen, problema = origen_para_catalogo(body["origen"])
+        if problema:
+            raise HTTPException(status_code=400, detail=problema)
+        row.origen_frecuente = origen or "XX"
     if "peso_unitario_avg" in body:
         peso = body["peso_unitario_avg"]
         # Vacío o cero lo borra; «false» no es un peso (False == 0).
@@ -9954,7 +9960,9 @@ async def guardar_uso_ncm(
     ncm = data.get("ncm", "").strip()
     if not descripcion or not ncm:
         return {"success": False}
-    from proyecto_maria.services.client_memory import tiene_digito_no_ascii
+    from proyecto_maria.services.client_memory import (
+        ncm_para_historial, tiene_digito_no_ascii, tiene_medio_par,
+    )
     if tiene_digito_no_ascii(ncm):
         raise HTTPException(status_code=400, detail=_AVISO_DIGITOS)
     problema = _problema_historial(descripcion, ncm)
@@ -9963,10 +9971,12 @@ async def guardar_uso_ncm(
 
     # Las memorias persistentes usan la NCM base: obligan a volver a confirmar
     # la posición SIM/DC en VUCE en lugar de reutilizar una letra antigua.
-    ncm_base = _ncm_suggestion_key(ncm)
+    ncm_base = ncm_para_historial(ncm)
+    if ncm_base is None:
+        raise HTTPException(status_code=400, detail="El NCM no es válido: tiene que tener sus 8 dígitos.")
     client_id = str(data.get("client_id") or "").strip()
-    vendor_name = str(data.get("vendor_name") or "").strip()
-    origin = str(data.get("origen") or "").strip()
+    vendor_name = _sin_nul(str(data.get("vendor_name") or "")).strip()
+    origin = _sin_nul(str(data.get("origen") or "")).strip()
 
     # Nunca aceptar un client_id ajeno sólo porque vino desde el navegador.
     # La memoria es por despachante y por cliente; esta verificación también
@@ -9977,6 +9987,9 @@ async def guardar_uso_ncm(
         if "\x00" in client_id or not _es_utf8(client_id):
             raise HTTPException(status_code=400, detail="El cliente tiene un carácter que no es texto válido.")
         await _get_owned_client(db, client_id, user["username"])
+    # Lo que la base no puede guardar se rechaza antes de sumar el uso.
+    if tiene_medio_par(data):
+        raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
 
     # Guardar o incrementar contador (y actualizar la NCM si cambió). Se
     # confirma antes de las memorias de abajo: su rollback no lo deshace.
@@ -9984,14 +9997,14 @@ async def guardar_uso_ncm(
 
     try:
         wrote_client = False
-        if client_id and len(ncm_base) == 8:
+        if client_id:
             from proyecto_maria.services.client_memory import upsert_client_product_history
             entry = await upsert_client_product_history(
                 db, user["username"], client_id, ncm_base, descripcion, origen=origin or None
             )
             wrote_client = entry is not None
 
-        if vendor_name and len(ncm_base) == 8:
+        if vendor_name:
             from proyecto_maria.core import catalog_service as catalog_svc
             await catalog_svc.save_products(
                 db, vendor_name,
