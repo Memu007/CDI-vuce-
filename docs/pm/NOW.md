@@ -201,6 +201,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-10-29 05:25 UTC: La técnica avisó que la vuelta 2 de COBRO-MP-1 ya tiene el código en `999b27a` y sus puertas corriendo. Decidido por la PM: entrega el informe, sin código nuevo, y sigue con ORDEN-1b en commits aparte. Se revisan en paralelo.
+
 2026-10-29 04:55 UTC: Sin entregas nuevas. MARIA sigue la vuelta 4 de DESPACHO-1b (hasta `bd14302`); técnica en ORDEN-1b. Contexto bajo 135k.
 
 2026-10-29 03:55 UTC: Sin entregas nuevas. MARIA en DESPACHO-1b vuelta 4 (arreglos hasta `7e96b32`); técnica arrancando ORDEN-1b. Contexto bajo 134k.
