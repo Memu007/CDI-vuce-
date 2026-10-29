@@ -791,11 +791,14 @@ def origen_para_catalogo(valor) -> tuple[str | None, str | None]:
     sirve: tiene que ser el código de dos letras de un país de la tabla."""
     from proyecto_maria.core.maria_generator import pais_reconocido
 
-    origen = str(valor or "").strip().upper() or None
+    if not isinstance(valor, (str, type(None))):
+        return None, "El origen tiene que ser el código de dos letras."
+    origen = (valor or "").strip().upper() or None
     if origen and _MEDIO_PAR.search(origen):
         # No se repite en el mensaje: no se puede mandar en la respuesta.
         return None, "El origen tiene un carácter que no se puede guardar."
-    if origen and not (len(origen) == 2 and origen.isalpha() and pais_reconocido(origen)):
+    # pais_reconocido normaliza con NFKD: «ＢＲ» o «ÉS» pasarían y se guardarían así.
+    if origen and not (len(origen) == 2 and origen.isascii() and origen.isalpha() and pais_reconocido(origen)):
         return None, f"No reconozco el origen «{origen}»: usá el código de dos letras."
     return origen, None
 

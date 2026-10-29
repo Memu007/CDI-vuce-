@@ -7618,6 +7618,7 @@ def _sin_nul(valor):
 _AVISO_DIGITOS = "El NCM tiene que estar escrito con dígitos del 0 al 9."
 _AVISO_MEDIO_PAR = "Hay un carácter que no se puede guardar."
 _AVISO_NO_ES_OBJETO = "Cada producto tiene que ser un objeto."
+_AVISO_NCM_INVALIDO = "El NCM no es válido: tiene que tener sus 8 dígitos."
 
 
 async def _historial_de_un_producto(db, upsert, **campos) -> bool:
@@ -7650,10 +7651,17 @@ async def save_client_operation(
 
     try:
         data = _sin_nul(await request.json())
-        items = (data.get("items") or []) if isinstance(data, dict) else None
+        if not isinstance(data, dict):
+            raise HTTPException(status_code=400, detail=_AVISO_NO_ES_OBJETO)
+        # Faltar o venir en null es lo mismo que vacío; otro tipo es un error.
+        items = data.get("items")
+        items = [] if items is None else items
         if not isinstance(items, list) or not all(isinstance(item, dict) for item in items):
             raise HTTPException(status_code=400, detail=_AVISO_NO_ES_OBJETO)
-        resumen = data.get("resumen", {}) or {}
+        resumen = data.get("resumen")
+        resumen = {} if resumen is None else resumen
+        if not isinstance(resumen, dict):
+            raise HTTPException(status_code=400, detail="El resumen tiene que ser un objeto.")
         # Lo que el historial rechazaría se rechaza antes de guardar nada.
         if tiene_medio_par(data):
             raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
@@ -8478,7 +8486,7 @@ async def update_client_catalogo_producto(
         # 10 caracteres y quedaba un código que no existe (GUARDAR-1).
         ncm_nuevo = ncm_para_historial(body["ncm"])
         if ncm_nuevo is None:
-            raise HTTPException(status_code=400, detail="El NCM no es válido: tiene que tener sus 8 dígitos.")
+            raise HTTPException(status_code=400, detail=_AVISO_NCM_INVALIDO)
         row.ncm = ncm_nuevo
     if "origen" in body:
         origen, problema = origen_para_catalogo(body["origen"])
@@ -9973,7 +9981,7 @@ async def guardar_uso_ncm(
     # la posición SIM/DC en VUCE en lugar de reutilizar una letra antigua.
     ncm_base = ncm_para_historial(ncm)
     if ncm_base is None:
-        raise HTTPException(status_code=400, detail="El NCM no es válido: tiene que tener sus 8 dígitos.")
+        raise HTTPException(status_code=400, detail=_AVISO_NCM_INVALIDO)
     client_id = str(data.get("client_id") or "").strip()
     vendor_name = _sin_nul(str(data.get("vendor_name") or "")).strip()
     origin = _sin_nul(str(data.get("origen") or "")).strip()
