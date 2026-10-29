@@ -201,6 +201,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-10-29 02:56 UTC: Sin entregas nuevas. MARIA en DESPACHO-1b vuelta 4 (rojos en `c66f7e7`, arreglando); técnica en ORDEN-1 vuelta 3 (`f7fbb72`, corre 76 sabotajes en segundo plano). Contexto bajo 125k.
+
 2026-10-29 01:56 UTC: Sin entregas nuevas. MARIA en DESPACHO-1b vuelta 4 (pruebas rojas) y técnica en ORDEN-1 vuelta 3; contexto de las tres sesiones bajo 141k.
 
 2026-10-29 01:41 UTC: **COBRO-MP-1 de la técnica vuelve con devolución sobre `784e793`.** Lo grave: dos pagos distintos de la misma cuenta a la vez se cobran los dos y se acredita uno; si Mercado Pago contesta con error al consultar un pago, el pago se pierde sin rastro; y volver al checkout antes del aviso cancela la suscripción recién cobrada (la PM afinó D7.2: con un cobro aprobado sin aplicar, 409 y no se cancela). También la prueba en Postgres del pago repetido estaba muerta. La cancelación en organizaciones (preexistente) va en COBRO-MP-2. Acta en `REPRODUCCION-COBRO-MP-1-2026-10-29.md`; técnica despertada (sigue ORDEN-1 vuelta 3 y después esta).
