@@ -9,12 +9,13 @@ Sólo lee. No integra, no commitea, no arranca nada.
 
 ## Canales
 
-Con dos Devs hay dos canales, y cada Dev usa sólo el suyo:
+Con varias Devs hay un canal por Dev, y cada Dev usa sólo el suyo:
 
 | | PM escribe | la Dev contesta | rama de la Dev |
 |---|---|---|---|
 | Dev 1 | `PARA-DEV.md` | `PARA-PM.md` | la de `NOW.md`, «Quién hace qué» |
 | Dev 2 | `PARA-DEV-2.md` | `PARA-PM-2.md` | la de `NOW.md`, «Quién hace qué» |
+| Dev N | `PARA-DEV-N.md` | `PARA-PM-N.md` | la de `NOW.md`, «Quién hace qué» |
 
 La PM escribe en su propia rama (`NOW.md`); cada Dev la trae con `merge`.
 Nunca se toma una tarea ni se escribe en el canal de la otra Dev.
@@ -22,8 +23,8 @@ Nunca se toma una tarea ni se escribe en el canal de la otra Dev.
 ## 1. Leer, desde las ramas
 
 Las ramas son las que registra `docs/pm/NOW.md`. Lo de abajo es para la Dev
-1; con dos Devs, se repite para la Dev 2 con su rama y su canal
-(`PARA-DEV-2.md` y `PARA-PM-2.md`), y se contesta una línea de pelota por
+1; con más Devs, se repite para cada una con su rama y su canal
+(`PARA-DEV-N.md` y `PARA-PM-N.md`), y se contesta una línea de pelota por
 Dev.
 
 ```bash

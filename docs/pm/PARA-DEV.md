@@ -17,6 +17,18 @@ una persona senior, no generado a las apuradas.
   código muerto ni duplicado, y comentarios sólo donde explican un porqué.
 - Mejor una entrega más tarde que una devolución.
 
+## Se retoma el 04/11, con el método nuevo (PM)
+
+Emi levantó la pausa por 3 días, hasta el sábado 07/11 a la tarde. Traé mi
+rama con `merge` y leé lo que cambió: `CLAUDE.md` §6 (código como lo dejaría
+una senior), «Código de producto sólo con camino de hoy» en
+`ONBOARDING-PM.md`, `COLA-LIMPIEZA.md` y `/entregar`. Desde ahora cada
+entrega lleva la salida entera de `docs/pm/herramientas/chequeo-6.py <base>
+<SHA>`, con cada `AVISO` arreglado o explicado en una línea. Lo que ya
+estaba escrito antes del 04/11 no se reescribe: su aviso se explica como
+«ya escrito, va a la cola de limpieza» y tu informe propone la línea; la
+PM la pasa a `COLA-LIMPIEZA.md`. Lo nuevo de la vuelta sí cumple §6.
+
 ## Cómo trabajás
 
 `AGENTS.md`, `CLAUDE.md`, `docs/pm/ONBOARDING-DEV.md` y los comandos
@@ -41,154 +53,128 @@ principal con `send_message` (sesión en `NOW.md`, «Quién hace qué»),
 **Datos reales:** la proforma de la reunión del 2026-10-24 tiene datos de
 un cliente: no entra al repositorio. Las pruebas usan sintéticos.
 
-## Veredicto de ORDEN-1, vuelta 3 (2026-10-29 03:31 UTC): aceptada
+## Veredictos de COBRO-MP-1 vuelta 2 y de ORDEN-1b (2026-10-29 09:44 UTC): devolución las dos
 
-Sobre `f7fbb72` (producto `92bbaa2`). Evidencia en
-`REPRODUCCION-ORDEN-1-vuelta3-2026-10-29.md`. `orden1.sh`: 76 ROJO y ninguno sin rojo, como tu informe.
-El arreglo ataca la causa: sin usuario confirmado, `adoptarBorrador` no
-escribe ni borra. Dos adversarios con ejemplos distintos del de la
-devolución (recuperación tardía con la original cerrada, B o cierre de
-sesión entre buscar y adoptar, dos restauradas a la vez) no perdieron ni
-mezclaron nada; cuatro mutantes nuevos dieron rojo; z8 sin el arreglo da
-rojo. Buen trabajo.
+**Orden:** primero COBRO-MP-1 vuelta 3 (ya estás en D13 c), después
+ORDEN-1b vuelta 2. Nada se integra en esta vuelta.
 
-**Integración:** tu rama tiene commits de COBRO-MP-1, que tiene una
-devolución abierta, intercalados con los de ORDEN-1. La integro junto con
-COBRO-MP-1 cuando se acepte; no hace falta que separes nada.
+### COBRO-MP-1, vuelta 2: devolución
 
-- **D11:** (a), se acepta el riesgo. El aviso que falta va en ORDEN-1b.
-- **D12:** es real y pesa más de lo que parecía: el adversario la
-  reprodujo. Con «Entró otro usuario…» en pantalla, Generar desde la
-  pestaña de A crea y cobra la operación en la cuenta de B, y el TXT con el
-  CUIT y la factura de A queda descargable desde la cuenta de B. Viene de
-  antes de ORDEN-1. Va como ORDEN-1b (abajo), decidido por la PM: arreglo
-  de esta pieza, no cuenta aparte.
+Sobre `999b27a` y `4ef59f4`. Evidencia en
+`REPRODUCCION-COBRO-MP-1-vuelta2-2026-10-29.md`. `cobro_mp1.sh`: 108 ROJO, 5 BASE y ningún sabotaje con falla, y
+`cobro_mp1_postgres.py` «fallas: 0», como tu informe. Aguanta lo
+que pedí en a, d, e y f: dos pagos a la vez en Postgres, el 503 y su
+reintento aplicado una vez, 15 cuerpos raros sin 500, el panel con 403 y
+sin XSS, la atomicidad si `_extender_periodo` falla.
 
-## ORDEN-1b — ahora (encargada 2026-10-29 03:31 UTC)
+**h. Alta, regresión de esta vuelta: una renovación se cobra y no se
+acredita.** Causa: un aviso de pago que todavía no se puede atribuir a una
+cuenta (sin `external_reference`, o un cobro que no dice de qué suscripción
+es) ahora queda `rechazado` para siempre y ocupa su `payment_id`. El otro
+aviso del mismo pago (`payment` y `subscription_authorized_payment` lo
+comparten) llega después y lo encuentra «ya procesado». En `784e793` el
+primero daba 400 y Mercado Pago reintentaba; ahora queda `past_due` sin
+reintento. Reproducido en los dos SHAs, tabla en la reproducción.
 
-**Causa:** una pestaña que ya no es de la sesión del navegador sigue
-mandando escrituras al servidor, y salen con la cookie de quien entró
-después. El aviso frena el guardado local, no lo que va al servidor.
+Parte es mía: la regla b mandaba a `rechazado` lo que «se leyó y no
+sirve», y no dije de qué lado cae «todavía no sé de quién es». Cae del lado
+del 503: es «no se pudo leer todavía». La regla queda así: lo que no se
+pudo atribuir no es `rechazado` terminal ni bloquea el otro aviso del mismo
+pago; lo que se ve en el panel sigue a la vista. No depende de la forma real
+de los avisos (D30): sea cual sea, el primer aviso que llega no puede
+cerrarle la puerta al segundo.
 
-**Criterio:** ninguna escritura sale a nombre de otro usuario desde una
-pestaña cuyo dueño ya no es el de la sesión. Casos, rojo antes:
+Casos, rojo antes: los dos órdenes del par; cobro pendiente y después
+`payment` aprobado (en `784e793` también fallaba, con 400; entra igual,
+es la misma familia); con y sin `metadata.preapproval_id`; usuario y
+organización. Pista, no obligación: resolver la cuenta desde la suscripción
+(`metadata.preapproval_id`, `preapproval_id`, `subscription_id`) antes de
+rendirse. Sabotaje: volver a la regla de esta vuelta da rojo.
 
-- Generar con B adentro: no se crea ni se cobra nada en ninguna cuenta;
-- una escritura más de otra familia, por ejemplo guardar un cliente o un
-  producto del catálogo;
-- A sale y vuelve a entrar: A sigue trabajando, sin falsos bloqueos;
-- la pestaña que no pudo adoptar por falta de usuario (D11) lo avisa y
-  recupera cuando la sesión se confirma.
+**i. Huecos de prueba en código de esta vuelta.** Cada uno muere con una
+prueba o el informe dice por qué no importa:
+- el bucle único de `setattr`: sacar `ops_used_this_period`,
+  `billing_period_started_at` o `extra_ops_expires_at` deja todo verde
+  (pagar y seguir bloqueado por cuota);
+- `trial` fuera de lo vigente en `_extender_periodo`; el tope de recargas
+  aplicado a planes; el borde en 91 (hoy se prueba 90 + 10);
+- `_guardable_en_pg` no limpia valores anidados: NUL en `payer.id` o en
+  la tarjeta da 500 en Postgres 16 (reproducido por el adversario). Éste es
+  defecto, no sólo prueba;
+- los cortes de `moneda`, `aprobado_en` y `motivo` sin prueba en Postgres;
+- monto `>= 0`, moneda `None` y fecha sin zona pasan;
+- los últimos 4 al revés o sin guardar la marca (baja).
 
-Pista, no obligación: si la pestaña manda el `csrf_token` que leyó al
-abrir en vez del de la cookie actual, el servidor ya rechaza el pedido
-(la cookie rota en cada login). Mejor que el servidor lo frene a que lo
-frene sólo la pantalla. La pantalla, además, tapa la operación y ofrece
-recargar.
+**D13 (c), como te la di:** una suscripción vieja `authorized` en una
+cuenta que ya no es la actual recibe 409 con el texto de salida; el paso
+de más para la tarjeta que no pasa (D7.2) se acepta. Rojo antes, arreglo y
+sabotaje, en commits separados. Va en esta misma vuelta 3.
 
-Toca sesión y dinero: `/code-review` y `/security-review`, la suite
-completa sobre el SHA que entregues, y sabotajes del freno.
-
-## Veredicto de COBRO-MP-1 (2026-10-29 01:41 UTC): devolución
-
-Sobre `784e793` (informe `0a8a87a`). Evidencia en
-`REPRODUCCION-COBRO-MP-1-2026-10-29.md`. Tus 7 pruebas dieron
-`220 passed` y `cobro_mp1.sh` 68 ROJO, sin sabotajes con falla, como tu
-informe. Aguanta: la carrera D en Postgres, los formatos de fecha, los
-reenvíos, montos y moneda, cancelar desde `past_due` sin ganar acceso, el
-panel. Lo que vuelve, por causa. Para cada una: rojo antes del arreglo,
-un caso por miembro de la familia (no sólo el ejemplo) y un sabotaje.
-
-**a. Dos pagos distintos de la misma cuenta a la vez: se cobran dos y se
-acredita uno** (negativo de la PM, en PG16: dos recargas suman 10, dos
-planes suman 30 días). El aviso lee `User` y `Organization` sin candado y
-el segundo guardado pisa al primero. Ya era así en la base, pero es lo que
-la pieza promete. La prueba va en Postgres (SQLite no ve el candado):
-usuario y organización, recarga y plan; `cobro_mp1d_postgres.py` sigue en
-verde; sabotaje: sin el candado, el caso queda rojo. El script de la PM
-está en el documento de reproducción, por si te sirve.
-
-**b. Una regla para todo lo que se lee de Mercado Pago.** Hoy, si la
-consulta del pago da 401, 403 o 404, el aviso contesta 200 `skipped` y el
-pago se pierde sin rastro (el SDK no levanta excepción en 4xx); y
-`external_reference`, `payer` o `card` en `null` dan 500. La regla:
-
-- **No se pudo leer** (consulta con error, sin id de pago, la renovación
-  que todavía no dice qué pago fue: tu D9 b, `_CobroMPIlegible`): 503 y una
-  línea de log. Mercado Pago reintenta; nada se pierde callado.
-- **Se leyó y no sirve** (campos en `null` o de otro tipo, monto, moneda,
-  fecha): fila `rechazado` con su motivo y 200. Nunca 500, y nunca 503: un
-  aviso que no va a cambiar no se reintenta para siempre.
-
-Casos: cada código 4xx y cada campo en `null`. El usuario `org` también
-tiene que poder pagar (hoy 400 «external_reference desconocida»).
-
-**c. El checkout cancela una suscripción que ya cobró.** Volver de Mercado
-Pago antes del aviso, con la cuenta `past_due` o cancelada, y tocar otra
-vez «Activar plan» cancela la `authorized` recién pagada y crea otra (sin
-débito automático, o dos cobros). **Decidido por la PM, afina D7.2:** si
-la vieja está `authorized` y tiene un cobro aprobado que CDI todavía no
-aplicó, o todavía no tuvo su primer cobro, no se cancela: 409 con «Tu
-pago se está confirmando; probá en unos minutos». Si su último cobro
-falló (la tarjeta que no pasa, el caso de D7.2), se cancela como ahora.
-`test_sin_cuenta_vigente_la_vieja_se_cancela_antes_de_crear` cambia su
-condición, no se invierte. Si Mercado Pago no deja distinguir esos casos
-con lo que ya consulta el código, D11 antes de inventar.
-
-**d. La prueba D31 en Postgres está muerta.** `cobro_mp1_postgres.py` no
-pone `date_approved`; desde A todo pago se rechaza antes de la carrera
-(«fallas: 4»), y el script de sabotajes no la corre. Que vuelva a probar
-el mismo pago dos veces a la vez y que entre al script.
-
-**e. Sin la fila `InicioRegistroPagosMP`, el corte se abre:** cambiar el
-503 por seguir de largo da verde. Caso y sabotaje. Lo mismo con los
-otros mutantes vivos de Sonnet (margen del corte de A, sobrepago,
-`past_due` como vigente, prefijo `org:` del registro, orden y tope del
-panel): cada uno muere o el informe dice por qué no importa.
-
-**f. Recarga con el tope de 100:** se cobra, no acredita nada (con 95,
-acredita 5) y queda `aplicado`. Mínimo en esta vuelta: con el tope lleno
-no se arma el link (con su razón), y un pago que no se pudo acreditar
-entero no queda `aplicado` callado: lo ve Emi en el panel.
-
-**g. B y el panel, bajas, de esta pieza:** la pantalla v1 cuenta 2 por
-exportación con cliente elegido; un id de 44 a 50 caracteres cuenta doble
-(`MARIA_EXPORT_{id[:50]}`); una importación con id `EXPORT_<x>` reusa la
-operación de `<x>`. La causa común es el espacio de ids: que no choquen.
-El texto del panel de rechazados nombra también la fecha.
+**j. Se suma a D13 (c):** `active` con fin de hace un día, dentro de la
+gracia: si la renovación llegó tarde y el cliente toca «Activar», hoy se
+cancela la que acaba de renovar. Y si Mercado Pago contesta 404 por la
+suscripción vieja, el checkout queda en 503 para siempre.
 
 **No entra ahora:**
-- «Cancelar plan» en una organización actúa sobre la fila del usuario (el
-  dueño cancela y la org sigue `active`; un miembro «cancela» y sigue
-  cobrando): va en **COBRO-MP-2** antes de entregarla, porque es C2
-  (cancelar cancela de verdad). Rojo antes, como el resto.
-- Una recarga revive extras vencidos; cancelar mientras llega el primer
-  pago deja la cuenta con su mes y sin suscripción; `_pago_un_plan_mp` con
-  una prueba que sólo recargó: riesgos en el informe, sin cambio.
-- D8 (a) y D10 (a), como estaban: el `CHANGELOG` no promete que el botón
-  se rehabilite.
+- En una organización, un segundo miembro crea otra suscripción para la
+  misma org (dos cobros por mes), además de lo de «Cancelar plan» que ya
+  estaba: los dos van en **COBRO-MP-2** antes de entregarla («una sola
+  suscripción» y C2). Rojo antes.
+- «Próximo cobro» con una suscripción que nunca se autorizó: riesgo en el
+  informe, o en COBRO-MP-2 si cae de paso.
+- Lecturas síncronas a Mercado Pago que frenan el servidor, el aviso sin
+  límite de pedidos y el IPN sin firma: se los propongo a Emi; no los
+  toques.
 
-**Puertas:** es plata. Suite completa, `/code-review` y `/security-review`
-sobre el SHA que entregues. La reviso con Opus y Sonnet, alto.
+Siguen de la vuelta 1, sin cambio: una recarga que revive extras
+vencidos, cancelar mientras llega el primer pago y `_pago_un_plan_mp` con
+una prueba que sólo recargó quedan como riesgos en el informe; D8 (a) y
+D10 (a) como estaban. La devolución de la vuelta 1 está en
+`REPRODUCCION-COBRO-MP-1-2026-10-29.md` y en el historial de este archivo.
 
-## Veredicto de EXCEL-2b, vuelta 2 (2026-10-28 20:30 UTC): aceptada
+Puertas como la vuelta pasada: suite completa, `/code-review` y
+`/security-review` sobre el SHA que entregues.
 
-Sobre `03336f1` (informe `5a6ef01`). Evidencia en
-`REPRODUCCION-EXCEL-2b-vuelta2-2026-10-28.md`. `excel2b.sh` dio 37 ROJO y
-ninguno sin rojo; los topes con `0`, `-3`, `abc`, `0.0000009` y `0.5` MB
-dan un tope usable; mis mutantes de topes, guardas y bordes mueren todos.
-**Aceptada, sin integrar**: tu rama intercala ORDEN-1 y COBRO sin aceptar.
+### ORDEN-1b: devolución de pruebas
 
-- Supuesto aceptado: `MAX_UPLOAD_MB` inválido da 10 MB también al PDF, y
-  un negativo da 10 MB en vez de 413.
-- Riesgos anotados, no los arregles: topes hasta `1e302` se aceptan; un
-  tope de 1 a 10 bytes (`1e-6` MB) traba toda subida con mensaje claro.
-- **EXCEL-2c (D32 b, decidido por la PM), al final de la cola:** antes de
-  leer, la fila y columna máximas (`r=` y `<dimension>`), la cuenta de
-  `<xf` en `styles.xml` y de entradas del `sst`; por encima de un tope, el
-  libro va al carril pesado. Rojo primero, un caso por forma y un sabotaje
-  por tope. Hasta entonces, el CHANGELOG y tus riesgos dicen el límite con
-  su número.
+Sobre `6c459d2`. Evidencia en `REPRODUCCION-ORDEN-1b-2026-10-29.md`.
+`orden1b.sh`: 14 ROJO y ningún sabotaje sin rojo, como tu informe.
+`orden1.sh`: 76 ROJO, sin rojo 0. El producto aguanta: dos adversarios no hicieron escribir a
+una pestaña como otro usuario, ni perder datos, ni trabarla (PUT, DELETE,
+PATCH, FormData, ráfagas, `ENVIRONMENT=production`). Lo que vuelve es la
+red.
+
+El criterio no cambia: ninguna escritura sale a nombre de otro usuario
+desde una pestaña cuyo dueño ya no es el de la sesión. D15 (c) quedó hecha
+en `3e30db2`. D16 (a): el CSRF en el logout del servidor se lo propongo a
+Emi; no lo hagas sin que esté en `ROADMAP.md`.
+
+**Causa:** las condiciones que sostienen el freno no tienen una prueba
+que falle sin ellas. `retenerUsuario` usa `route.continue()`, y Playwright
+pega las cookies al continuar: la suite nunca produce «la respuesta dice A
+y la cookie ya es de B». Y toda escritura de la suite es POST. Reproducido
+por la PM: sin la comparación de cookie de `confirmarSesion`, la pestaña de
+A guarda un cliente en la cuenta de B (`E7 clientes A: [] B: [ 'E7-escrito' ]`);
+con el freno sólo para POST, z12 y z20–z28 dan 13 OK.
+
+Pido una prueba por condición del freno, cada una con su sabotaje que da
+rojo:
+- la comparación de cookie en `confirmarSesion` (respuesta vieja, cookie
+  nueva);
+- la guarda `sesionAjena` de `confirmarSesion` (primera carga «ajena» y
+  escritura después);
+- PUT, DELETE y PATCH, no sólo POST;
+- la salida del diálogo: «Recargar» recarga y Escape no lo cierra;
+- el aviso «Comprobando la sesión…» se va al recuperar.
+
+Al aceptar pruebo otro mutante distinto de éstos. Producto, bajas: el
+«Comprobando…» que queda fijo si la sesión ya se había cerrado, y la rama
+`else` de `loadCurrentUser` que pisa `currentUser` con el de B tras el
+checkout. Cada una se arregla o el informe dice por qué no.
+
+**Fuera de la pieza, se lo llevo a Emi:** con `CSRF_ENFORCE=true`,
+`/api/session/state` da 403 (no está exento y `track()` no manda el
+header): la telemetría v2 no llega. No la toques.
 
 ## BACKUP-1a: lo que encontró el adversario antes de tu `/entregar` (2026-10-28 17:48 UTC)
 
@@ -266,31 +252,6 @@ Todo decidido por la PM.
 
 El adversario Sonnet de COBRO sigue: si suma algo, va abajo de esto.
 
-## Veredicto de GUARDAR-2 (2026-10-28 16:35 UTC): aceptada
-
-Sobre `cef45ce` (informe `cb42e8f`). Evidencia en
-`REPRODUCCION-GUARDAR-2-2026-10-28.md`: suite sobre `0d89c20` con un solo
-rojo, el de `test_excel2` que arregla EXCEL-2b; adversario Sonnet alto con
-Postgres 16 (16 OK). No hubo fuga entre despachantes ni SIM de otro
-producto. Integro tu rama hasta `cb42e8f`. Tus supuestos quedan aceptados.
-
-- **Un agregado, sólo pruebas, en un commit aparte que se entrega con
-  EXCEL-2b:** ninguna prueba distingue que se borre el filtro por
-  `client_id` en `lookup_client_memory` (`services/client_memory.py`). Lo
-  reproduje: sin esa línea, `test_guardar1.py` + `test_guardar2.py` dan
-  39 verdes. Falta el caso de dos clientes **del mismo despachante** con
-  igual nombre y CUIT, historial sólo en uno: el otro no recibe la
-  sugerencia, ni en `/api/ncm/sugerir` ni en `/api/catalog/lookup`. Con su
-  sabotaje (borrar esa línea → rojo). No cambiás código de producto.
-- **Riesgos que anoto, no los arregles ahora (preexistentes):**
-  1. con el catálogo caído, `/api/catalog/lookup` da 500 y se pierde
-     también la sugerencia del cliente (`match_items` sin `try` propio);
-     en `/api/ncm/sugerir` sí queda la del cliente;
-  2. `_vendor_key` da `""` para proveedores sin letras latinas: dentro del
-     mismo despachante comparten catálogo y ahora uno completa la SIM del
-     otro (misma descripción, mismos 8 dígitos);
-  3. mismos 8 dígitos y otra SIM: se sugiere la del catálogo (D32 b).
-
 ## BACKUP-1a — después de LIMPIEZA-1 (2026-10-28 12:00 UTC)
 
 Primero **subí LIMPIEZA-1 a tu rama ya** (commits aparte, encima de
@@ -321,56 +282,6 @@ arranque y vos tenés menos entregas en cola. Decidido por la PM.
 - Commits aparte encima de LIMPIEZA-1, con su propio `/entregar` después
   del de LIMPIEZA-1. Toca datos: revisión fuerte. Si algo choca, preguntá
   en la **D8**.
-
-## Veredicto de EXCEL-3f (con H1-bis) (2026-10-28): aceptada
-
-Sobre `8c63c37` (informe `0557f03`). El detalle está en
-`REPRODUCCION-EXCEL-3f-2026-10-28.md`. Corrí la suite desde base limpia,
-`cliente1c.sh` entero (44 ROJO), los 39 sabotajes de 3f y los que
-reapuntaste de `excel3.sh` (todos en rojo) y trece negativos míos en
-`.xlsx` y `.xls`, en la base y en la entrega. Mi adversario no corrió
-(presupuesto). Integro tu rama hasta `8e744a0`, sin GUARDAR-2, que sigue en
-revisión. **Con esto EXCEL-3 queda cerrada.**
-
-- **Bien:** H1-bis tapa la clave en todas las formas que probé; D21 (b),
-  D22 (b), H5, la descripción repetida a mano y el texto de contenedor, con
-  sus sabotajes. Lo único que cambia el FOB es el plural, y se comporta como
-  su singular en la base. Tus supuestos y tus riesgos quedan aceptados.
-- **Riesgos que anoto, no los arregles:** «Seguros para puerta» sin origen
-  sale del FOB con su fila nombrada (ya pasaba con el singular); «Transporte
-  interno» con origen y «DHL» solo no llevan aviso (no cambian el FOB).
-- **Un rojo que no es tuyo, para después de ORDEN-1:**
-  `test_excel2.py::test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_a_una_subida_normal`.
-  En mi contenedor (4 núcleos) da rojo siempre: en la suite y 6 de 6 corrido
-  solo, 3 en la base `89a0fde` y 3 en `8c63c37`. La subida normal tarda
-  30,7 a 32,7 s y da 400 («tardó demasiado»). Vos lo viste 1 de 5. Lo que
-  importa es que en producción una subida normal puede esperar ~30 s detrás
-  de ocho pesadas. Pedido: diagnosticá dónde se van los 30 s (cola,
-  hilos, CPU) y proponé el arreglo con una D. Sin subir el corte de 30 s ni
-  aflojar la prueba.
-
-## Tu diagnóstico de `test_excel2` y D4-D5 (2026-10-28): EXCEL-2b, ahora
-
-Recibido en `b5a50d1` (medición `ff03efe`). Diagnóstico aceptado: los 30 s
-son cola detrás de las pesadas, no trabajo de la subida normal. Es el
-criterio de EXCEL-2 ya aceptado (D26 a: ocho libros armados y la normal da
-200), así que arreglarlo está dentro del roadmap y no va a ABUSO-1.
-
-- **D4: (a), carril liviano.** Pieza **EXCEL-2b**, ahora. Condiciones:
-  - el umbral se mide una vez, sobre las partes XML descomprimidas (no las
-    imágenes), con valor por defecto en el código y variable de entorno;
-  - el tope de 10 MiB y el resto de los cortes de EXCEL-2 no se tocan;
-  - sin límite de frecuencia: eso es ABUSO-1;
-  - un caso que muestre que un libro que dice ser chico y no lo es no
-    entra al carril liviano (el umbral no se puede burlar desde el libro);
-  - sabotajes que manden la normal al carril pesado y que salteen la
-    medida del umbral;
-  - (b) y (c) no entran ahora.
-  Toca `file_security.py` y `main.py`: revisión fuerte con adversario
-  (cupo, hoy después de las 18:00 UTC).
-- **D5: (a).** La prueba afirma también `dt` < 5 s, en la misma pieza.
-
-Decidido por la PM.
 
 ## COBRO-CORTE-1 — hecha, sin entregar (encargada 2026-10-28 05:00 UTC)
 
@@ -503,11 +414,15 @@ supuestos de Mercado Pago que no pudiste ver sin red: los estados, que una
 
 ## Orden
 
-1. ORDEN-1b (arriba), ahora. ORDEN-1 quedó aceptada.
-2. COBRO-MP-1, vuelta 2: la devolución de arriba, después de ORDEN-1b.
+1. COBRO-MP-1, vuelta 3: la devolución de arriba, con D13 (c), ahora.
+2. ORDEN-1b, vuelta 2: las pruebas de arriba, apenas entregues la 1.
 3. COBRO-CORTE-1: hecha; se entrega después de COBRO-MP-1.
-4. COBRO-MP-2: hecha; suma la cancelación de organizaciones (arriba) y
-   se entrega después de COBRO-CORTE-1.
+4. COBRO-MP-2: hecha; suma la cancelación de organizaciones y la segunda
+   suscripción de una org (arriba), y se entrega después de COBRO-CORTE-1.
 5. AISLAMIENTO-2 y LIMPIEZA-1: hechas; se entregan después de COBRO-MP-2.
 6. BACKUP-1a (arriba).
-7. EXCEL-2c (la D32 b, arriba).
+7. EXCEL-2c (D32 b, decidido por la PM): antes de leer, la fila y columna
+   máximas (`r=` y `<dimension>`), la cuenta de `<xf` en `styles.xml` y de
+   entradas del `sst`; por encima de un tope, el libro va al carril pesado.
+   Rojo primero, un caso por forma y un sabotaje por tope. Hasta entonces,
+   el CHANGELOG y tus riesgos dicen el límite con su número.
