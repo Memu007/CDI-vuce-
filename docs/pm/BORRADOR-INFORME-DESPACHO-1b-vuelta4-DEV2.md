@@ -36,6 +36,51 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 | `bb913d0` | test: `despacho1b.sh` al día con el código de la vuelta (cuatro sabotajes no distinguían) y uno nuevo para `_DECIMAL`; el caso del PUT manda el NCM con espacios |
 | este | docs: informe y CHANGELOG |
 
+## `CLAUDE.md` §6: `chequeo-6.py 1f5480e bb913d0`
+
+Todo el código de esta vuelta es de antes del 04/11; no lo reescribí, como pide tu canal. De `bb913d0` a la cabeza sólo cambian documentos.
+
+```
+chequeo-6 1f5480e..bb913d0: avisos para mirar, no un veredicto
+producto +496/−242
+  AVISO producto suma 254 líneas netas: el informe dice por qué (§6: más de 20)
+arnés +1877/−71
+historia (grep de §6, sin líneas movidas):
+  AVISO historia en proyecto_maria/main.py:1331: """Una fila por producto en client_product_history (DESPACHO-1b): agrega
+  AVISO historia en proyecto_maria/security/file_security.py:490: # con la memoria topeada y tiempo máximo (RENDIMIENTO-1 y 1c).
+  AVISO historia en proyecto_maria/services/client_memory.py:12: escriben usan esa regla y la base no deja dos filas iguales (DESPACHO-1b).
+archivos de producto:
+  proyecto_maria/core/despacho_lector.py: 766 → 850
+  AVISO comentario nuevo de 3 líneas: proyecto_maria/core/despacho_lector.py:65 (§6: una o dos)
+  AVISO comentario nuevo de 5 líneas: proyecto_maria/core/despacho_lector.py:678 (§6: una o dos)
+  AVISO comentario nuevo de 3 líneas: proyecto_maria/core/despacho_lector.py:747 (§6: una o dos)
+  proyecto_maria/database/models.py: 574 → 578
+  proyecto_maria/main.py: 11177 → 11332
+  AVISO función nueva de 87 líneas: proyecto_maria/main.py:1330 _migrate_product_history_clave (§6: ~60)
+  AVISO comentario nuevo de 3 líneas: proyecto_maria/main.py:1401 (§6: una o dos)
+  AVISO comentario nuevo de 4 líneas: proyecto_maria/main.py:1331 (§6: una o dos)
+  proyecto_maria/security/file_security.py: 581 → 579
+  proyecto_maria/services/client_memory.py: 285 → 298
+avisos: 10
+```
+
+El rango trae también RENDIMIENTO-1c (`ccf5d8c`, `843cc08`), que no está en `1f5480e`: es todo `file_security.py` y +97/−44 por commit. Lo de esta pieza suma +430/−229 por commit (`eb4e615` +312/−159 y siete arreglos de revisión).
+
+Cada aviso:
+- **254 netas.** Unas 200 son de esta pieza. Las cinco vías pasaban por cuatro reglas distintas. Para unirlas restaron −229, pero hubo que sumar tres cosas que no estaban: la migración que une los duplicados ya guardados (87 líneas), la escritura con `ON CONFLICT` y `FOR UPDATE` contra el índice, y la validación del PUT y de la operación. Las 53 netas de RENDIMIENTO-1c se explican en su entrega.
+- **Historia, tres:** ya escrito, va a la cola de limpieza. La de `file_security.py:490` es de RENDIMIENTO-1c.
+- **Comentarios de 3 a 5 líneas, seis:** ya escrito, va a la cola de limpieza.
+- **`_migrate_product_history_clave`, 87 líneas:** ya escrito, va a la cola de limpieza. Se parte en leer las filas, unir y escribir las claves.
+
+Líneas que propongo para `COLA-LIMPIEZA.md`:
+- `proyecto_maria/main.py:1330` `_migrate_product_history_clave` (87 líneas): partir en leer, unir y escribir claves; su docstring nombra la pieza.
+- `proyecto_maria/core/despacho_lector.py:65`, `:678`, `:747` y `main.py:1401`: comentarios de 3 a 5 líneas, a una o dos con el porqué.
+- `proyecto_maria/services/client_memory.py:12`: el docstring del módulo nombra la pieza.
+
+Lo que el chequeo no mide, mirado a ojo:
+- **Un chequeo en un solo lugar:** falla. La validación del producto se llama desde guardar y desde el PUT (riesgo 8 del code-review). Va a la cola: «`main.py`, guardar el despacho y el PUT del catálogo validan el producto por separado; una función que valide un renglón».
+- **Un caso por causa:** las familias van como datos de un caso (`dos_vias`, `otros_digitos`, `medio_par`). Los dos casos de la forma Unicode miran causas distintas. Uno mira qué forma se guarda; el otro, que la NFC vaya después de pasar a minúsculas.
+
 ## Comandos para reproducir
 
 ```bash
@@ -272,4 +317,4 @@ Sobre `bd14302`, salvo `guardar1.sh` (sobre `4034cdd`, que sólo cambia ese scri
   - Dos casos quedan sin un sabotaje propio que los tire solos: `test_el_mismo_ncm_con_o_sin_puntos_es_el_mismo_producto` (lo sostiene también la normalización de `identidad_del_producto`) y `test_aprender_un_peso_infinito_no_lo_guarda_y_el_catalogo_anda` (dos capas: `_DECIMAL` e `isfinite`). Sacar una sola capa no los distingue.
 - **La corrida vieja sobre `bd14302` se cortó por el tope de tiempo de las tareas de fondo**, en el sabotaje 74 de los 86 que le quedaban, sin otra falla que esas cuatro. No la repetí: la puerta es la corrida completa del script corregido sobre `bb913d0`.
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP cada 3 h. Entregada sin veredicto: DESPACHO-1b vuelta 4 en {SHA}. Apenas entregada: RENDIMIENTO-1c (ccf5d8c, 033cb11, 843cc08, 7dd008f) con sabotajes rendimiento1c.sh, rendimiento1.sh y despacho1b.sh, suite, adversario Opus alto e informe con la D49 (el vendedor de la factura abre el PDF en la app). Después SESION-1 → ABUSO-1 → SUFIJOS-2 → EMAIL-1 (D45) → CONEXIONES-1 (D46) → OBSERVABILIDAD-1 → ORG-1+D40. Nunca main; nada se publica sin el «dale» de Emi para el SHA; sin secretos ni datos reales; Devs hasta esfuerzo alto, sin Fable; sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP cada 2 h (minuto 35, horario de Argentina). Entregada sin veredicto: DESPACHO-1b vuelta 4 en {SHA}. Apenas entregada: RENDIMIENTO-1c (ccf5d8c, 033cb11, 843cc08, 7dd008f) con sabotajes rendimiento1c.sh, rendimiento1.sh y despacho1b.sh, suite, adversario Opus alto e informe con la D49 (el vendedor de la factura abre el PDF en la app). Después SESION-1 → ABUSO-1 → SUFIJOS-2 → EMAIL-1 (D45) → CONEXIONES-1 (D46) → OBSERVABILIDAD-1 → ORG-1+D40. Nunca main; nada se publica sin el «dale» de Emi para el SHA; sin secretos ni datos reales; Devs hasta esfuerzo alto, sin Fable; sin advisor.
