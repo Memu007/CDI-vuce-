@@ -424,6 +424,9 @@ sabotaje $M "h: un cobro con su pago pendiente no reintenta" \
 sabotaje $M "h: un cobro con su pago en proceso no reintenta" \
   '("pending", "in_process", "authorized")' '("pending", "authorized")' \
   "FAILED $H3T::test_un_cobro_con_el_pago_pendiente_no_se_pierde[in_process-pago_sin_nada-usuario]"
+sabotaje $M "h: un cobro con su pago autorizado no reintenta" \
+  '("pending", "in_process", "authorized")' '("pending", "in_process")' \
+  "FAILED $H3T::test_un_cobro_con_el_pago_pendiente_no_se_pierde[authorized-pago_sin_nada-usuario]"
 sabotaje $M "h: un pago sin cuenta que el otro aviso ya aplicó reintenta igual" \
   $'    if await session.get(PagoMercadoPagoAplicado, str(payment_id)) is not None:\n        return {"success": True, "skipped": "payment_id ya procesado"}\n    raise _MPIlegible(f"el pago {payment_id} todavía' \
   $'    raise _MPIlegible(f"el pago {payment_id} todavía' \

@@ -104,7 +104,7 @@ def test_si_ningun_aviso_dice_de_quien_es_no_queda_rechazado(client, tipo):
 
 @pytest.mark.parametrize("tipo", ["usuario", "organizacion"])
 @pytest.mark.parametrize("pago_dice", ["nada", "metadata"], ids=["pago_sin_nada", "pago_con_metadata"])
-@pytest.mark.parametrize("pendiente", ["pending", "in_process"])
+@pytest.mark.parametrize("pendiente", ["pending", "in_process", "authorized"])
 def test_un_cobro_con_el_pago_pendiente_no_se_pierde(client, tipo, pago_dice, pendiente):
     """El cobro llega con su pago todavía pendiente y después el pago se
     aprueba. Si el cobro contestara 200, no volvería: con un pago que solo no
