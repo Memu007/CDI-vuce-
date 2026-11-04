@@ -10599,8 +10599,7 @@ async def _rechazar_sin_cuenta_mp(session, payment_id: str, cuenta: str, update:
 
 
 def _con_referencia_mp(sdk, pay_resp: dict, suscripcion_del_cobro) -> dict:
-    """Una renovación puede no traer la referencia: la tiene la suscripción,
-    y el control del monto compara contra esa misma suscripción."""
+    """Una renovación puede no traer la referencia: se toma de su suscripción."""
     if suscripcion_del_cobro:
         pay_resp = {**pay_resp, "preapproval_id": suscripcion_del_cobro}
     suscripcion = suscripcion_del_cobro or _suscripcion_del_pago_mp(pay_resp)[1]
