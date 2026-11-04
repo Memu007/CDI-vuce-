@@ -207,6 +207,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-11-04 21:56 UTC: Sin entregas. MARIA corre los sabotajes sobre `bb913d0` (~3 h; borrador con chequeo-6 en `b3e945c`); técnica rehace lo de §6 en el webhook de COBRO-MP-1. Uso semanal «allowed» en las tres; contexto 139k, 114k, 115k.
+
 2026-11-04 21:43 UTC: **Se retoma por 3 días, hasta el 07/11 21:30 UTC (Emi); se corta antes si el uso semanal llega al 50 % en dos días o menos.** Método al día con el Second Brain hasta el 31/10 (`58e1ce3`: CLAUDE.md §6, `chequeo-6.py`, COLA-LIMPIEZA, sin medición a mano). Las tres rutinas, prendidas cada 2 h en horario de Argentina (PM min 55, técnica 15, MARIA 35). Las dos Devs despertadas: MARIA repite los sabotajes de DESPACHO-1b vuelta 4 sobre `bb913d0` y entrega; técnica sigue COBRO-MP-1 vuelta 3 + D13 (c). Las dos entregan con la salida de `chequeo-6.py`.
 
 2026-10-29 10:37 UTC: Pausa hasta el domingo 1/11 (Emi): rutinas apagadas, Devs frenadas con lo suyo subido a medias.
