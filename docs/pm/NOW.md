@@ -207,6 +207,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-11-04 23:57 UTC: Sin entregas. MARIA (`df2c40b`) y técnica (remoto `88de6ce`, trabajo local) esperan sus corridas de sabotaje. Uso semanal «allowed».
+
 2026-11-04 22:20 UTC: **Emi respondió lo pendiente.** `8b45207` probada y funciona. Entran al roadmap COBRO-MP-3 (seguridad del cobro) y CSRF-1 para la técnica, CATALOGO-LARGO-1 y SEGURO-2 para MARIA, en las colas de sus canales. Fechas re-estimadas: dos semanas más, piloto hasta el 07/02. Claves: las cambia Emi más adelante.
 
 2026-11-04 21:56 UTC: Sin entregas. MARIA corre los sabotajes sobre `bb913d0` (~3 h; borrador con chequeo-6 en `b3e945c`); técnica rehace lo de §6 en el webhook de COBRO-MP-1. Uso semanal «allowed» en las tres; contexto 139k, 114k, 115k.
