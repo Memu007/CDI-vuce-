@@ -213,8 +213,8 @@ sabotaje $M "la suscripción del cobro no se valida" \
   '    return pago_id, cobro.get("preapproval_id")' \
   "FAILED $V::test_una_renovacion_sin_referencia_y_con_un_id_de_suscripcion_que_no_sirve_reintenta[con_ruta]"
 sabotaje $M "un id de suscripción del pago que no sirve se pide igual" \
-  '    suscripcion_id = _id_mp(leido)' \
-  '    suscripcion_id = leido' \
+  '    return leido, _id_mp(leido)' \
+  '    return leido, leido' \
   "FAILED $V::test_un_pago_con_un_id_de_suscripcion_que_no_sirve_queda_rechazado[metadata_con_ruta]"
 sabotaje $M "un id de suscripción del pago que no sirve se ignora" \
   '    if leido and not suscripcion_id:' \
@@ -231,7 +231,7 @@ sabotaje $M "la renovación no toma la referencia de la suscripción" \
 sabotaje $M "la suscripción ilegible de una renovación no reintenta" \
   '_consultar_mp(lambda: sdk.preapproval().get(suscripcion), f"suscripción {suscripcion}")' \
   '(sdk.preapproval().get(suscripcion).get("response") or {})' \
-  "FAILED $T1::test_si_no_se_puede_leer_la_suscripcion_de_una_renovacion_reintenta"
+  "FAILED $V::test_si_no_se_puede_leer_la_suscripcion_reintenta[excepcion-renovacion]"
 sabotaje $M "el pago de la renovación no se ata a su suscripción" \
   '        pay_resp = {**pay_resp, "preapproval_id": suscripcion_del_cobro}' \
   '        pay_resp = dict(pay_resp)' \
@@ -393,7 +393,7 @@ sabotaje $M "f: el link mira los extras del usuario y no los de su organización
 T="tests/test_cobro_mp1_h.py $V"
 H3T=tests/test_cobro_mp1_h.py
 sabotaje $M "h: sin cuenta queda rechazado (la regla de la vuelta 2)" \
-  '        sin_cuenta = external_ref in (None, "")' \
+  '        sin_cuenta = not external_ref' \
   '        sin_cuenta = False' \
   "FAILED $H3T::test_los_dos_avisos_de_una_renovacion_la_acreditan_una_vez[pago_sin_nada-pago_primero-usuario]"
 sabotaje $M "h: un cobro sin suscripción queda rechazado (la regla de la vuelta 2)" \
