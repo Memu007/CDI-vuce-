@@ -1,8 +1,8 @@
 # NOW — CDI
 
-Actualizado: 2026-10-25. Estado vigente; la historia está en Git.
+Actualizado: 2026-11-04. Estado vigente; la historia está en Git.
 
-Método al día con CAMBIOS.md del secondbrain hasta 2026-10-21 (aplicado 2026-10-24).
+Método al día con CAMBIOS.md del secondbrain hasta 2026-10-31 (aplicado 2026-11-04).
 
 **Publicado 2026-10-24 20:33 UTC:** `main` = `8b45207` (EXCEL-3 + CLIENTE-1),
 con «dale 8b45207» de Emi; avance limpio sobre `dddcf6d`. Evidencia: CI
@@ -133,8 +133,10 @@ Desde el 2026-10-24 (Emi: Codex deja CDI; dos Devs nuevas en Claude).
 | Rol | Sesión | Rutina | Rama | Esfuerzo |
 |---|---|---|---|---|
 | PM principal | session_01B7FVQspcEHF7PqNv797wNM | trig_01TvMmGfSLDfbcJrf66ZZ7YK (min 55) | claude/practical-shannon-szpwkn | — |
-| Dev MARIA (Dev 2) | session_01C8gCBjvn36wnYC6qG2Sixi | trig_01WmrC3ALqBXkD9UBv6dFGbP (cada 3 h, min 35) | claude/dev-maria | alto |
-| Dev técnica (Dev 1) | session_018yxeKHYQKFA3qJ2WJmQru7 | trig_011UpBfwEu9TUzoNUrviqoP5 (cada 3 h, min 15) | claude/dev-tecnica | medio |
+| Dev MARIA (Dev 2) | session_01C8gCBjvn36wnYC6qG2Sixi | trig_01WmrC3ALqBXkD9UBv6dFGbP (min 35) | claude/dev-maria | alto |
+| Dev técnica (Dev 1) | session_018yxeKHYQKFA3qJ2WJmQru7 | trig_011UpBfwEu9TUzoNUrviqoP5 (min 15) | claude/dev-tecnica | medio |
+
+Rutinas: cada 2 h de 8 a 22 y a las 2 y a las 5, hora de Argentina (`ONBOARDING-PM.md`, «Modo automático»).
 
 Canales: Dev MARIA lee `PARA-DEV-2.md` y contesta en `PARA-PM-2.md`; Dev
 técnica lee `PARA-DEV.md` y contesta en `PARA-PM.md`. **Sin PM visual:** la
@@ -188,7 +190,7 @@ Congeladas desde el 2026-10-06 hasta el **2026-10-27** (`DECISIONS.md`,
 ## Método
 
 Al día con `CAMBIOS.md` del Second Brain (`Memu007/ynerasecondbrain`) hasta
-**2026-10-06 (noche)**, commit `faa8a3a`.
+**2026-10-31**, commit `7fd495f`.
 
 ## Sumar una Dev
 
@@ -230,10 +232,6 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 2026-10-28 23:33 UTC: **Emi: el plan sigue en tres meses, sin apurar; la prioridad es calidad de senior y no saltear pasos («si se estira un poquito más, no hay problema»).** Anotado arriba de los dos canales de Dev («Ritmo y calidad») y en `DECISIONS.md`; avisado a las dos Devs. La técnica corre `/code-review high` y `/security-review` de COBRO-MP-1 antes de entregarla.
 
 2026-10-28 23:18 UTC: **Pausa levantada (Emi: «volver a trabajar tranqui», su otra entrega pasó al martes).** Las tres rutinas prendidas de nuevo (PM min 55 cada hora; Devs cada 3 h, min 35 y 15). Sigue: revisar lo que las Devs dejaron y seguir las colas.
-
-## Medición
-
-`archivo/MEDICION-SUBAGENTES.md` y `archivo/MEDICION-CONSEJERO.md`.
 
 ## /compact conservar de la PM principal
 
