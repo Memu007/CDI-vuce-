@@ -10336,10 +10336,8 @@ async def payment_pending():
     return HTMLResponse(content=html)
 
 class _MPIlegible(Exception):
-    """No se pudo leer algo de Mercado Pago (el pago, el cobro o la
-    suscripción), o un pago todavía no dice de qué cuenta es: se responde 503
-    y Mercado Pago reintenta. Lo que se leyó y no sirve no es esto: queda
-    rechazado, a la vista de Emi (COBRO-MP-1, b y h)."""
+    """Algo de Mercado Pago no se pudo leer o todavía no dice de qué cuenta
+    es: 503 para que reintente. Lo leído que no sirve se rechaza, no es esto."""
 
 
 def _consultar_mp(llamada, que: str) -> dict:
@@ -10484,8 +10482,8 @@ def _pedir_suscripcion_mp(metodo: str, sid: str, cuerpo: dict | None = None) -> 
     except httpx.HTTPError as e:
         raise _SuscripcionMPError(f"{metodo} {sid}: {type(e).__name__}") from e
     if resp.status_code == 404 and metodo == "GET":
-        # Mercado Pago no la conoce: no puede cobrar. Si fuera un error, el
-        # checkout y cancelar quedarían en 503 para siempre (COBRO-MP-1, j).
+        # Mercado Pago no la conoce, así que no puede cobrar; tomarlo como
+        # error dejaría el checkout y cancelar en 503 para siempre.
         return "cancelled"
     if resp.status_code != 200:
         raise _SuscripcionMPError(f"{metodo} {sid}: HTTP {resp.status_code}")
@@ -10600,10 +10598,21 @@ async def _rechazar_sin_cuenta_mp(session, payment_id: str, cuenta: str, update:
     return await _rechazar_pago_mp(session, payment_id, cuenta, motivo)
 
 
+def _con_referencia_mp(sdk, pay_resp: dict, suscripcion_del_cobro) -> dict:
+    """Una renovación puede no traer la referencia: la tiene la suscripción.
+    El control del monto la vuelve a comparar."""
+    if suscripcion_del_cobro:
+        pay_resp = {**pay_resp, "preapproval_id": suscripcion_del_cobro}
+    suscripcion = suscripcion_del_cobro or _suscripcion_del_pago_mp(pay_resp)[1]
+    if suscripcion and pay_resp.get("external_reference") in (None, ""):
+        sus = _consultar_mp(lambda: sdk.preapproval().get(suscripcion), f"suscripción {suscripcion}")
+        pay_resp = {**pay_resp, "external_reference": sus.get("external_reference")}
+    return pay_resp
+
+
 async def _sin_cuenta_todavia_mp(session, payment_id: str) -> dict:
-    """Un pago aprobado que todavía no dice de qué cuenta es no se registra:
-    el otro aviso del mismo pago (el cobro o el pago) puede decirlo. Si ya se
-    registró por el otro, no hay nada que reintentar (COBRO-MP-1, h)."""
+    """Sin cuenta no se registra: el otro aviso del mismo pago puede traerla.
+    Si ese ya lo registró, no hay nada que reintentar."""
     from proyecto_maria.database.models import PagoMercadoPagoAplicado
     if await session.get(PagoMercadoPagoAplicado, str(payment_id)) is not None:
         return {"success": True, "skipped": "payment_id ya procesado"}
@@ -10773,9 +10782,8 @@ async def mercadopago_webhook(request: Request):
         pay_resp = _consultar_mp(lambda: sdk.payment().get(payment_id), f"pago {payment_id}")
 
         if pay_resp.get("status") != "approved":
-            # El aviso del pago, cuando se apruebe, puede no decir de qué
-            # cuenta es: el cobro reintenta hasta que el pago se decida
-            # (COBRO-MP-1, h).
+            # El aviso del pago puede no decir de qué cuenta es: el cobro
+            # reintenta hasta que el pago se decida.
             if renovacion and pay_resp.get("status") in ("pending", "in_process", "authorized"):
                 raise _MPIlegible(f"el pago {payment_id} del cobro está {pay_resp.get('status')}")
             return {"success": True, "skipped": f"status={pay_resp.get('status')}"}
@@ -10788,15 +10796,7 @@ async def mercadopago_webhook(request: Request):
         if not payment_id:
             raise _MPIlegible(f"pago aprobado sin id reconocible: {str(canonico)[:80]!r}")
 
-        # El pago de una renovación puede no traer la referencia: la tiene la
-        # suscripción, que dice el cobro o el mismo pago. El control del monto
-        # la vuelve a comparar.
-        if suscripcion_del_cobro:
-            pay_resp = {**pay_resp, "preapproval_id": suscripcion_del_cobro}
-        suscripcion = suscripcion_del_cobro or _suscripcion_del_pago_mp(pay_resp)[1]
-        if suscripcion and pay_resp.get("external_reference") in (None, ""):
-            sus = _consultar_mp(lambda: sdk.preapproval().get(suscripcion), f"suscripción {suscripcion}")
-            pay_resp = {**pay_resp, "external_reference": sus.get("external_reference")}
+        pay_resp = _con_referencia_mp(sdk, pay_resp, suscripcion_del_cobro)
 
         external_ref = pay_resp.get("external_reference")
         logger.info("Webhook MP: pago aprobado payment_id=%s external_ref=%s", payment_id, external_ref)
@@ -10969,10 +10969,8 @@ async def billing_checkout(
             "message": "Modo demo - MP_ACCESS_TOKEN no configurado",
         }
 
-    # Una sola suscripción (COBRO-MP-2, C4; COBRO-MP-1, D13): una autorizada
-    # no se cancela desde acá, porque puede ser un pago cuyo aviso no llegó;
-    # la salida es cancelar el plan. Las demás se cancelan antes de crear la
-    # nueva. Si no se sabe cómo está o no se puede cancelar, no se crea nada.
+    # Una sola suscripción. La autorizada no se cancela acá (puede ser un pago
+    # cuyo aviso no llegó); las demás sí, y si eso falla no se crea nada.
     sid_viejo = db_user.mp_preapproval_id
     if sid_viejo:
         no_disponible = "No pudimos confirmar tu suscripción actual con Mercado Pago. Probá de nuevo en unos minutos."
