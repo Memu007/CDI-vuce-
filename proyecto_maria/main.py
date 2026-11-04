@@ -10336,8 +10336,8 @@ async def payment_pending():
     return HTMLResponse(content=html)
 
 class _MPIlegible(Exception):
-    """Algo de Mercado Pago no se pudo leer o todavía no dice de qué cuenta
-    es: 503 para que reintente. Lo leído que no sirve se rechaza, no es esto."""
+    """Lo de Mercado Pago no se pudo leer o todavía no alcanza para decidir
+    (sin cuenta, sin id, pago pendiente): 503 para que reintente."""
 
 
 def _consultar_mp(llamada, que: str) -> dict:
@@ -10599,8 +10599,8 @@ async def _rechazar_sin_cuenta_mp(session, payment_id: str, cuenta: str, update:
 
 
 def _con_referencia_mp(sdk, pay_resp: dict, suscripcion_del_cobro) -> dict:
-    """Una renovación puede no traer la referencia: la tiene la suscripción.
-    El control del monto la vuelve a comparar."""
+    """Una renovación puede no traer la referencia: la tiene la suscripción,
+    y el control del monto compara contra esa misma suscripción."""
     if suscripcion_del_cobro:
         pay_resp = {**pay_resp, "preapproval_id": suscripcion_del_cobro}
     suscripcion = suscripcion_del_cobro or _suscripcion_del_pago_mp(pay_resp)[1]
@@ -10970,7 +10970,7 @@ async def billing_checkout(
         }
 
     # Una sola suscripción. La autorizada no se cancela acá (puede ser un pago
-    # cuyo aviso no llegó); las demás sí, y si eso falla no se crea nada.
+    # cuyo aviso no llegó); las demás sí. Si no se puede leer o cancelar, nada.
     sid_viejo = db_user.mp_preapproval_id
     if sid_viejo:
         no_disponible = "No pudimos confirmar tu suscripción actual con Mercado Pago. Probá de nuevo en unos minutos."
