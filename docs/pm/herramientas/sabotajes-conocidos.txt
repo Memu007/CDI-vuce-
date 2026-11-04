@@ -1,0 +1,5 @@
+# Sabotajes vencidos: su texto ancla ya no está una sola vez en el código, y
+# no pueden dar rojo aunque la protección siga («Publicar» en ONBOARDING-PM.md).
+# Una línea por guion. Los dos primeros campos son fijos (el selector lee el segundo); el resto, libre:
+#   vencido <guion> <fecha> <dueño: la Dev que lo arregla> <salida: retirarlo o reescribirlo> <por qué; evidencia>
+# El selector de sabotajes antes de publicar no lo elige y lo nombra.

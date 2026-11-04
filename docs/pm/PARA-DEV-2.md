@@ -17,6 +17,18 @@ una persona senior, no generado a las apuradas.
   código muerto ni duplicado, y comentarios sólo donde explican un porqué.
 - Mejor una entrega más tarde que una devolución.
 
+## Se retoma el 04/11, con el método nuevo (PM)
+
+Emi levantó la pausa por 3 días, hasta el sábado 07/11 a la tarde. Traé mi
+rama con `merge` y leé lo que cambió: `CLAUDE.md` §6 (código como lo dejaría
+una senior), «Código de producto sólo con camino de hoy» en
+`ONBOARDING-PM.md`, `COLA-LIMPIEZA.md` y `/entregar`. Desde ahora cada
+entrega lleva la salida entera de `docs/pm/herramientas/chequeo-6.py <base>
+<SHA>`, con cada `AVISO` arreglado o explicado en una línea. Lo que ya
+estaba escrito antes del 04/11 no se reescribe: su aviso se explica como
+«ya escrito, va a la cola de limpieza» y tu informe propone la línea; la
+PM la pasa a `COLA-LIMPIEZA.md`. Lo nuevo de la vuelta sí cumple §6.
+
 ## Cómo trabajás
 
 `AGENTS.md`, `CLAUDE.md`, `docs/pm/ONBOARDING-DEV.md` y los comandos

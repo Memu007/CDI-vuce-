@@ -1,8 +1,8 @@
 # NOW — CDI
 
-Actualizado: 2026-10-25. Estado vigente; la historia está en Git.
+Actualizado: 2026-11-04. Estado vigente; la historia está en Git.
 
-Método al día con CAMBIOS.md del secondbrain hasta 2026-10-21 (aplicado 2026-10-24).
+Método al día con CAMBIOS.md del secondbrain hasta 2026-10-31 (aplicado 2026-11-04).
 
 **Publicado 2026-10-24 20:33 UTC:** `main` = `8b45207` (EXCEL-3 + CLIENTE-1),
 con «dale 8b45207» de Emi; avance limpio sobre `dddcf6d`. Evidencia: CI
@@ -133,8 +133,10 @@ Desde el 2026-10-24 (Emi: Codex deja CDI; dos Devs nuevas en Claude).
 | Rol | Sesión | Rutina | Rama | Esfuerzo |
 |---|---|---|---|---|
 | PM principal | session_01B7FVQspcEHF7PqNv797wNM | trig_01TvMmGfSLDfbcJrf66ZZ7YK (min 55) | claude/practical-shannon-szpwkn | — |
-| Dev MARIA (Dev 2) | session_01C8gCBjvn36wnYC6qG2Sixi | trig_01WmrC3ALqBXkD9UBv6dFGbP (cada 3 h, min 35) | claude/dev-maria | alto |
-| Dev técnica (Dev 1) | session_018yxeKHYQKFA3qJ2WJmQru7 | trig_011UpBfwEu9TUzoNUrviqoP5 (cada 3 h, min 15) | claude/dev-tecnica | medio |
+| Dev MARIA (Dev 2) | session_01C8gCBjvn36wnYC6qG2Sixi | trig_01WmrC3ALqBXkD9UBv6dFGbP (min 35) | claude/dev-maria | alto |
+| Dev técnica (Dev 1) | session_018yxeKHYQKFA3qJ2WJmQru7 | trig_011UpBfwEu9TUzoNUrviqoP5 (min 15) | claude/dev-tecnica | medio |
+
+Rutinas: cada 2 h de 8 a 22 y a las 2 y a las 5, hora de Argentina (`ONBOARDING-PM.md`, «Modo automático»).
 
 Canales: Dev MARIA lee `PARA-DEV-2.md` y contesta en `PARA-PM-2.md`; Dev
 técnica lee `PARA-DEV.md` y contesta en `PARA-PM.md`. **Sin PM visual:** la
@@ -188,7 +190,7 @@ Congeladas desde el 2026-10-06 hasta el **2026-10-27** (`DECISIONS.md`,
 ## Método
 
 Al día con `CAMBIOS.md` del Second Brain (`Memu007/ynerasecondbrain`) hasta
-**2026-10-06 (noche)**, commit `faa8a3a`.
+**2026-10-31**, commit `7fd495f`.
 
 ## Sumar una Dev
 
@@ -205,32 +207,12 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
-2026-10-29 09:45 UTC: **Las dos entregas de la técnica vuelven con devolución.** COBRO-MP-1 vuelta 2 (`4ef59f4`): aguantan los arreglos, pero un aviso de pago que no se puede atribuir queda «rechazado» para siempre y traba el aviso que lo acompaña (sale en parte de la regla b de la PM, ya corregida). ORDEN-1b (`6c459d2`): el producto aguanta; faltan sabotajes que pongan rojo cada condición del freno. Actas en `REPRODUCCION-COBRO-MP-1-vuelta2-2026-10-29.md` y `REPRODUCCION-ORDEN-1b-2026-10-29.md`. Técnica: COBRO vuelta 3 con D13 (c), después las pruebas de ORDEN-1b. Nada se integra. La vuelta de las 08:55 no tuvo novedades.
+2026-11-04 21:43 UTC: **Se retoma por 3 días, hasta el 07/11 21:30 UTC (Emi); se corta antes si el uso semanal llega al 50 % en dos días o menos.** Método al día con el Second Brain hasta el 31/10 (`58e1ce3`: CLAUDE.md §6, `chequeo-6.py`, COLA-LIMPIEZA, sin medición a mano). Las tres rutinas, prendidas cada 2 h en horario de Argentina (PM min 55, técnica 15, MARIA 35). Las dos Devs despertadas: MARIA repite los sabotajes de DESPACHO-1b vuelta 4 sobre `bb913d0` y entrega; técnica sigue COBRO-MP-1 vuelta 3 + D13 (c). Las dos entregan con la salida de `chequeo-6.py`.
 
-2026-10-29 08:30 UTC: La técnica entregó ORDEN-1b (`6c459d2`) y D14 (`4ef59f4`). Contestadas D15 (c) y D16 (a), con la pieza aparte propuesta a Emi; arranca D13 (c). Reviso ORDEN-1b y COBRO-MP-1 vuelta 2.
+2026-10-29 10:37 UTC: Pausa hasta el domingo 1/11 (Emi): rutinas apagadas, Devs frenadas con lo suyo subido a medias.
 
-2026-10-29 07:56 UTC: Sin entregas nuevas. MARIA corre 132 sabotajes sobre `bb913d0`; técnica sigue con D14 y los sabotajes de ORDEN-1b, sin push todavía. Contexto bajo 125k.
-
-2026-10-29 06:57 UTC: Sin entregas nuevas. MARIA cierra DESPACHO-1b vuelta 4 (sabotajes al día en `bb913d0`, corre la suite); técnica corre el arreglo de D14 y orden1b.sh. Contexto bajo 118k. Recortadas las vueltas sin novedad.
-
-2026-10-29 06:40 UTC: La técnica entregó la vuelta 2 de COBRO-MP-1 (`999b27a`, informe `069b190`). D14 (a): arregla dos pruebas antes de ORDEN-1b. D13 (c), decidido por la PM: una suscripción vieja todavía activa en Mercado Pago da 409 con la salida a la vista. La reviso entera con el arreglo de D14.
-
-2026-10-29 05:25 UTC: La técnica avisó que la vuelta 2 de COBRO-MP-1 ya tiene el código en `999b27a` y sus puertas corriendo. Decidido por la PM: entrega el informe, sin código nuevo, y sigue con ORDEN-1b en commits aparte. Se revisan en paralelo.
-
-2026-10-29 03:31 UTC: ORDEN-1 vuelta 3 aceptada sobre `f7fbb72` (76 sabotajes rojos; dos adversarios sin altas). Integración diferida: la rama técnica intercala COBRO-MP-1 sin aceptar. La D12 resultó media (Generar desde la pestaña ajena cobra y guarda en la cuenta de B): ORDEN-1b encargada a la técnica, ya.
-
-2026-10-29 01:41 UTC: **COBRO-MP-1 de la técnica vuelve con devolución sobre `784e793`.** Lo grave: dos pagos distintos de la misma cuenta a la vez se cobran los dos y se acredita uno; si Mercado Pago contesta con error al consultar un pago, el pago se pierde sin rastro; y volver al checkout antes del aviso cancela la suscripción recién cobrada (la PM afinó D7.2: con un cobro aprobado sin aplicar, 409 y no se cancela). También la prueba en Postgres del pago repetido estaba muerta. La cancelación en organizaciones (preexistente) va en COBRO-MP-2. Acta en `REPRODUCCION-COBRO-MP-1-2026-10-29.md`; técnica despertada (sigue ORDEN-1 vuelta 3 y después esta).
-
-2026-10-29 01:06 UTC: **Revisadas las tres entregas que dejaron las Devs.** MARIA: DISCO-1 aceptada sobre `5c46e36`, sin integrar (está encima de DESPACHO-1b; se integra con la vuelta que se acepte, después de correr `disco1.sh` de nuevo); DESPACHO-1b devolución sobre `1f5480e` (la identidad del producto vale en una sola vía, guardados simultáneos duplican, el tope de CPU no cubre el parseo). Técnica: ORDEN-1 devolución sobre `86c9d84` (la recuperación escribe con el usuario de después de esperar el candado: la operación de A se pierde y B la ve). Actas en `REPRODUCCION-*-2026-10-29.md`; las dos Devs despertadas. A las 00:56 llegó COBRO-MP-1 de la técnica (`784e793`): D8–D10 decididas por la PM («Para Emi», 8); la revisión sigue: las puertas de la PM corren y Opus y Sonnet alto atacan; un negativo de la PM ya da rojo (dos pagos distintos de la misma cuenta a la vez: se registran los dos y se acredita uno).
-
-2026-10-28 23:33 UTC: **Emi: el plan sigue en tres meses, sin apurar; la prioridad es calidad de senior y no saltear pasos («si se estira un poquito más, no hay problema»).** Anotado arriba de los dos canales de Dev («Ritmo y calidad») y en `DECISIONS.md`; avisado a las dos Devs. La técnica corre `/code-review high` y `/security-review` de COBRO-MP-1 antes de entregarla.
-
-2026-10-28 23:18 UTC: **Pausa levantada (Emi: «volver a trabajar tranqui», su otra entrega pasó al martes).** Las tres rutinas prendidas de nuevo (PM min 55 cada hora; Devs cada 3 h, min 35 y 15). Sigue: revisar lo que las Devs dejaron y seguir las colas.
-
-## Medición
-
-`archivo/MEDICION-SUBAGENTES.md` y `archivo/MEDICION-CONSEJERO.md`.
+2026-10-29 09:45 UTC: Las dos entregas de la técnica volvieron con devolución: COBRO-MP-1 vuelta 2 (`4ef59f4`, un aviso no atribuible queda rechazado para siempre) y ORDEN-1b (`6c459d2`, faltan sabotajes por condición del freno). Actas `REPRODUCCION-COBRO-MP-1-vuelta2-2026-10-29.md` y `REPRODUCCION-ORDEN-1b-2026-10-29.md`. Nada integrado.
 
 ## /compact conservar de la PM principal
 
-/compact conservar: 09:45 UTC: COBRO-MP-1 vuelta 2 devolución sobre 4ef59f4 (h alta: aviso no atribuible queda rechazado para siempre y traba el par; arreglo de la regla b; i pruebas; j suma a D13 c) y ORDEN-1b devolución de pruebas sobre 6c459d2 (un sabotaje por condición del freno: cookie, sesionAjena, verbos no POST, salida del diálogo, limpieza de Comprobando). Actas REPRODUCCION-COBRO-MP-1-vuelta2 y REPRODUCCION-ORDEN-1b. Nada integrado. Técnica: COBRO vuelta 3 + D13 (c) ya, ORDEN-1b vuelta 2 apenas entregue; próxima D técnica D17. Para Emi de día: telemetría v2 403 por CSRF; línea de seguridad en el roadmap (lecturas síncronas a MP, límite de pedidos, IPN sin firma); D16 (b) CSRF en el logout. Antes, 01:41: COBRO-MP-1 devolución sobre 784e793 (commit 2e1a855; causas a–g en PARA-DEV.md: candado de cuenta en el webhook, regla 503/rechazado para lecturas de MP, D7.2 afinada con 409 si hay cobro aprobado sin aplicar, D31 Postgres muerta, mutantes vivos, recarga con tope, ids de B); cancelar en org va en COBRO-MP-2; técnica despertada. Worktrees /tmp/cdi-pm/* por borrar con git worktree remove. Antes: DISCO-1 aceptada sin integrar (5c46e36; integrar con la próxima DESPACHO-1b aceptada, tras correr disco1.sh con PG_URL y rol cdi); DESPACHO-1b devolución sobre 1f5480e; Emi 28/10: sin apurar, calidad de senior, no saltear pasos; el plan se puede estirar (re-estimar fechas después de la primera sesión con el despachante). Soy la PM principal de CDI (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK min 55). Producto Memu007/CDI-vuce-, clon /home/user/cdi-vuce-, mi rama claude/practical-shannon-szpwkn (nunca main; cada push a main publica). main = 8b45207 (publicada 24/10; falta que Emi la pruebe). Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi, rutina cada 3 h min 35, rama claude/dev-maria, alto; canal PARA-DEV-2/PARA-PM-2; su cabeza lleva RENDIMIENTO-1c a medias: nunca integrar su cabeza). Orden de MARIA: DESPACHO-1b vuelta 4 → RENDIMIENTO-1c (D48 (a)) → SESION-1 → ABUSO-1 → SUFIJOS-2+SEGURO-1 → EMAIL-1 (D45) → CONEXIONES-1 (D46) → OBSERVABILIDAD-1 → ORG-1+D40. Aceptadas de MARIA: ORG-1 ✅, DESTINO-1 ✅, SEGURO-1, DATOS-1, EMAIL-1, DISCO-1 (sin integrar las de encima de lo no aceptado). Próxima D de MARIA: D49. Dev técnica (session_018yxeKHYQKFA3qJ2WJmQru7, rutina cada 3 h min 15, rama claude/dev-tecnica, canal PARA-DEV/PARA-PM): EXCEL-3 ✅, GUARDAR-2 integradas; EXCEL-2b ✅ aceptada sin integrar (03336f1, be260b7); orden: COBRO-MP-1 vuelta 3 + D13 c → ORDEN-1b vuelta 2 → COBRO-CORTE-1 → COBRO-MP-2 → AISLAMIENTO-2 y LIMPIEZA-1 → BACKUP-1a → EXCEL-2c (D32 b); plata: Opus+Sonnet alto; próxima D técnica: D17. Revisión: adversarios por riesgo, hallazgos se reproducen; al aceptar REPRODUCCION y ✅ en el mismo commit. Herramientas: venv /tmp/cdi-pm/venv; Postgres 16 descartable en 55462 rol cdi; sabotajes con until-loops en segundo plano, nunca sleep. Para Emi (12 a 00 UTC): pieza de seguridad; propuesta de pieza por la pérdida muda de memoria del cliente y catálogo (product_key String(300)); SEGURO-2; probar 8b45207; revocar la clave de Anthropic de scripts/utils/cambiar_ai.sh:62 (nunca copiar su valor) y rotar Gemini; re-estimar fechas. Los tres despachos reales sólo en el scratchpad; TXT y proforma reales nunca en el repo. Reglas de Emi: nada fuera del roadmap; Devs hasta alto, sin Fable; consejero sólo mío; castellano llano; publicar sólo con «dale <SHA>» de día; usar date -u.
+/compact conservar: 2026-11-04 21:43 UTC SE RETOMA por 3 días (Emi, 04/11 21:36): hasta el 2026-11-07 21:30 UTC; si el límite semanal llega al 50 % antes del 2026-11-06 21:30 UTC, cortar todo (rutinas apagadas, Devs frenadas, avisar). No veo el porcentaje exacto: mirar rate_limit_info seven_day de las tres sesiones (allowed_warning = cortar) y pedirle a Emi que avise. Semana desde 04/11 18:00 UTC. Método al día con el Second Brain hasta el 31/10 (7fd495f) en 58e1ce3: §6 de CLAUDE.md, chequeo-6.py en cada informe, COLA-LIMPIEZA, camino de hoy, sin medición. Soy la PM principal de CDI (session_01B7FVQspcEHF7PqNv797wNM, rutina trig_01TvMmGfSLDfbcJrf66ZZ7YK, cada 2 h 8–22 más 2 y 5 ARG, min 55). Producto Memu007/CDI-vuce-, clon /home/user/cdi-vuce-, mi rama claude/practical-shannon-szpwkn (nunca main; cada push a main publica). main = 8b45207 (publicada 24/10; falta que Emi la pruebe). Dev MARIA (session_01C8gCBjvn36wnYC6qG2Sixi, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP min 35, rama claude/dev-maria, alto; canal PARA-DEV-2/PARA-PM-2; nunca integrar su cabeza): repite los sabotajes de DESPACHO-1b vuelta 4 sobre bb913d0 (iba 95/132, ninguno falló; borrador BORRADOR-INFORME-DESPACHO-1b-vuelta4-DEV2.md) y entrega; después RENDIMIENTO-1c (D48 a) → SESION-1 → ABUSO-1 → SUFIJOS-2+SEGURO-1 → EMAIL-1 (D45) → CONEXIONES-1 (D46) → OBSERVABILIDAD-1 → ORG-1+D40. DISCO-1 aceptada sin integrar (5c46e36; integrar con la DESPACHO-1b aceptada, tras correr disco1.sh con PG_URL y rol cdi). Próxima D de MARIA: D49. Dev técnica (session_018yxeKHYQKFA3qJ2WJmQru7, rutina trig_011UpBfwEu9TUzoNUrviqoP5 min 15, rama claude/dev-tecnica, canal PARA-DEV/PARA-PM): COBRO-MP-1 vuelta 3 + D13 (c) → ORDEN-1b vuelta 2 → COBRO-CORTE-1 → COBRO-MP-2 → AISLAMIENTO-2 y LIMPIEZA-1 → BACKUP-1a → EXCEL-2c (D32 b); EXCEL-2b aceptada sin integrar (03336f1, be260b7); plata: Opus+Sonnet alto; próxima D técnica: D17. Revisión: /revisar-entrega, chequeo-6 contra el informe, adversarios por riesgo, hallazgos se reproducen; al aceptar REPRODUCCION y ✅ en el mismo commit. Herramientas: venv /tmp/cdi-pm/venv; Postgres 16 descartable en 55462 rol cdi; sabotajes con until-loops en segundo plano, nunca sleep. Para Emi (12 a 00 UTC): telemetría v2 403 por CSRF; línea de seguridad en el roadmap (lecturas síncronas a MP, límite de pedidos, IPN sin firma); D16 (b) CSRF en el logout; pieza de seguridad; product_key String(300); SEGURO-2; probar 8b45207; revocar la clave de Anthropic de scripts/utils/cambiar_ai.sh:62 (nunca copiar su valor) y rotar Gemini; re-estimar fechas. Los tres despachos reales sólo en el scratchpad; TXT y proforma reales nunca en el repo. Reglas de Emi: nada fuera del roadmap; Devs hasta alto, sin Fable; consejero sólo mío; castellano llano; publicar sólo con «dale <SHA>» de día; usar date -u.

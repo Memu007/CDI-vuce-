@@ -1,22 +1,23 @@
 ---
 name: respondio
-description: Dev. Retomar el ciclo después de que la PM escribió en PARA-DEV.md - traer la rama Dev, integrar sus commits y hacer lo que dice. Usalo cuando te despierte tu rutina horaria o la PM principal.
+description: Dev. Retomar el ciclo después de que la PM escribió en PARA-DEV.md - traer la rama Dev, integrar sus commits y hacer lo que dice. Usalo cuando te despierte tu rutina o la PM principal.
 ---
 
 # /respondio — retomar después de la PM
 
 Las reglas están en `CLAUDE.md` y `docs/pm/ONBOARDING-DEV.md`. Acá va sólo el
 orden. «Tu canal» es el de la tabla: `PARA-DEV.md` para la Dev 1,
-`PARA-DEV-2.md` para la Dev 2.
+`PARA-DEV-N.md` para la Dev N.
 
 ## Canales
 
-Con dos Devs hay dos canales, y cada Dev usa sólo el suyo:
+Con varias Devs hay un canal por Dev, y cada Dev usa sólo el suyo:
 
 | | PM escribe | la Dev contesta | rama de la Dev |
 |---|---|---|---|
 | Dev 1 | `PARA-DEV.md` | `PARA-PM.md` | la de `NOW.md`, «Quién hace qué» |
 | Dev 2 | `PARA-DEV-2.md` | `PARA-PM-2.md` | la de `NOW.md`, «Quién hace qué» |
+| Dev N | `PARA-DEV-N.md` | `PARA-PM-N.md` | la de `NOW.md`, «Quién hace qué» |
 
 La PM escribe en su propia rama (`NOW.md`); cada Dev la trae con `merge`.
 Nunca se toma una tarea ni se escribe en el canal de la otra Dev.
@@ -29,7 +30,7 @@ git log --oneline HEAD..origin/<rama de la PM>
 ```
 
 - **Nada nuevo de la PM:** decilo en una línea y terminá. Si te disparó la
-  rutina, no hagas nada más: vuelve a preguntar en una hora.
+  rutina, no hagas nada más: vuelve a preguntar en la próxima vuelta.
 - **Hay commits:** seguí.
 
 ## 2. Integrar

@@ -312,3 +312,36 @@ tranqui. Si se estira un poquito más, no hay problema… pero que no se salten
 nada. Prioridad es tener un código que se sienta hecho por un senior».
 Queda escrito arriba de `PARA-DEV.md` y `PARA-DEV-2.md` («Ritmo y calidad»).
 Las fechas se re-estiman después de la primera sesión con el despachante.
+
+## 2026-10-29 — Pausa hasta el domingo 1/11 (Emi)
+
+Emi, 29/10 a la mañana: «frenamos hasta el domingo con el proyecto». Las
+rutinas de la PM principal y de las dos Devs quedan apagadas. Cada Dev frena
+ya: corta lo que corre en segundo plano y sube lo que tenga a medias como
+trabajo en curso, sin entregar. La PM no revisa hasta retomar. Se retoma
+cuando Emi lo diga, prendiendo las rutinas con `update_trigger`.
+
+## 2026-11-04 — Se retoma por 3 días, con corte por uso (Emi)
+
+Emi, 04/11 a las 18:36 de Argentina: «Continua por 3 días … revisa el
+secondbrain que cambiamos cosas, actualizate vos y a las devs y arranca. Si
+ves que en 2 días o menos llega al 50% de uso del límite semanal corta». Se
+trabaja hasta el **sábado 07/11, ~18:30 de Argentina**. Si el uso semanal
+llega al 50 % antes del viernes 06/11 a las ~18:30, la PM corta todo:
+apaga las tres rutinas, frena a las Devs y le avisa a Emi. La PM no ve un
+porcentaje exacto: mira en cada vuelta el estado del límite de cada sesión
+(`get_session`) y le pide a Emi que avise si su pantalla marca 50 %.
+
+## 2026-11-04 — Método al día con el secondbrain hasta 2026-10-31 (PM)
+
+Se aplican las entradas de `CAMBIOS.md` del 2026-10-22 al 2026-10-31, como
+el 2026-10-24 (mismo pedido de Emi: «actualizate»). Entra `CLAUDE.md` §6
+(código como lo dejaría una senior) con `herramientas/chequeo-6.py`
+(producto `proyecto_maria/`; arnés `scripts/testing/` y `tests/`), el camino
+de hoy para sumar código, los sabotajes vencidos, `COLA-LIMPIEZA.md` y un
+canal por Dev; sale la medición a mano de subagentes y consejero. **Reemplaza
+la fila «Rutinas de las Devs cada 3 horas» del 2026-10-28:** las tres
+rutinas pasan a cada 2 horas de 8 a 22 y a las 2 y a las 5 de Argentina (PM
+minuto 55, técnica 15, MARIA 35); son menos vueltas que antes en total (la
+PM bajaba de 24 a 10 por día). Siguen sin aplicarse el consejero para las
+Devs, Fable como subagente y el «muy alto» para las Devs.
