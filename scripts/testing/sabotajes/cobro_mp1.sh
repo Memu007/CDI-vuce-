@@ -408,7 +408,11 @@ sabotaje $M "h: una referencia vacía queda rechazada" \
 sabotaje $M "h: una referencia vacía que no es texto no toma la de la suscripción" \
   'if suscripcion and not pay_resp.get("external_reference"):' \
   'if suscripcion and pay_resp.get("external_reference") in (None, ""):' \
-  "FAILED $H3T::test_una_referencia_vacia_de_otro_tipo_toma_la_de_la_suscripcion[cero]"
+  "FAILED $H3T::test_una_referencia_vacia_de_otro_tipo_toma_la_de_la_suscripcion[pago-cero]"
+sabotaje $M "h: una referencia vacía que no es texto queda rechazada" \
+  '        sin_cuenta = not external_ref' \
+  '        sin_cuenta = external_ref in (None, "")' \
+  "FAILED $H3T::test_sin_referencia_ni_en_el_pago_ni_en_la_suscripcion_reintenta[pago-cero]"
 sabotaje $M "h: la suscripción no se lee del pago" \
   '    suscripcion = suscripcion_del_cobro or _suscripcion_del_pago_mp(pay_resp)[1]' \
   '    suscripcion = suscripcion_del_cobro' \

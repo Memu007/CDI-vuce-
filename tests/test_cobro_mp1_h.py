@@ -133,7 +133,7 @@ def test_un_pago_sin_cuenta_que_otro_aviso_ya_aplico_no_reintenta_mas(client):
     _acreditada_una_vez(leer, pid)
 
 
-@pytest.mark.parametrize("referencia", [None, ""], ids=["nula", "vacia"])
+@pytest.mark.parametrize("referencia", [None, "", 0, []], ids=["nula", "vacia", "cero", "lista"])
 @pytest.mark.parametrize("aviso", ["pago", "cobro"])
 def test_sin_referencia_ni_en_el_pago_ni_en_la_suscripcion_reintenta(client, aviso, referencia):
     """Antes: rechazado, y el otro aviso del mismo pago ya no entraba."""
@@ -147,10 +147,11 @@ def test_sin_referencia_ni_en_el_pago_ni_en_la_suscripcion_reintenta(client, avi
 
 
 @pytest.mark.parametrize("referencia", [0, False, [], {}], ids=["cero", "falso", "lista", "objeto"])
-def test_una_referencia_vacia_de_otro_tipo_toma_la_de_la_suscripcion(client, referencia):
+@pytest.mark.parametrize("aviso", ["pago", "cobro"])
+def test_una_referencia_vacia_de_otro_tipo_toma_la_de_la_suscripcion(client, aviso, referencia):
     usuario, buena, leer = _cuenta_vencida(client, "usuario")
     cobro, pid = _renovacion_de(usuario, buena, "metadata", "suscripcion")
     PAGOS[pid]["external_reference"] = referencia
-    r = _aviso_ipn(client, pid)
+    r = _aviso_ipn(client, pid) if aviso == "pago" else _aviso_cobro(client, cobro)
     assert r.status_code == 200 and r.json().get("skipped") is None, r.text[:300]
     _acreditada_una_vez(leer, pid)
