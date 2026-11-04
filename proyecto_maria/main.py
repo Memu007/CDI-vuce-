@@ -10604,7 +10604,7 @@ def _con_referencia_mp(sdk, pay_resp: dict, suscripcion_del_cobro) -> dict:
     if suscripcion_del_cobro:
         pay_resp = {**pay_resp, "preapproval_id": suscripcion_del_cobro}
     suscripcion = suscripcion_del_cobro or _suscripcion_del_pago_mp(pay_resp)[1]
-    if suscripcion and pay_resp.get("external_reference") in (None, ""):
+    if suscripcion and not pay_resp.get("external_reference"):
         sus = _consultar_mp(lambda: sdk.preapproval().get(suscripcion), f"suscripción {suscripcion}")
         pay_resp = {**pay_resp, "external_reference": sus.get("external_reference")}
     return pay_resp
@@ -10800,7 +10800,7 @@ async def mercadopago_webhook(request: Request):
 
         external_ref = pay_resp.get("external_reference")
         logger.info("Webhook MP: pago aprobado payment_id=%s external_ref=%s", payment_id, external_ref)
-        sin_cuenta = external_ref in (None, "")
+        sin_cuenta = not external_ref
 
         motivo = None
         update = None if sin_cuenta else billing_service.process_payment(pay_resp)
