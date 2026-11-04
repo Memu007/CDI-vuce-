@@ -225,16 +225,16 @@ sabotaje $M "un id booleano pasa" \
   '    if not isinstance(valor, (str, int)):' \
   "FAILED $V::test_un_pago_aprobado_sin_id_reconocible_reintenta[booleano]"
 sabotaje $M "la renovación no toma la referencia de la suscripción" \
-  '            pay_resp = {**pay_resp, "external_reference": sus.get("external_reference")}' \
-  '            pass' \
+  '        pay_resp = {**pay_resp, "external_reference": sus.get("external_reference")}' \
+  '        pass' \
   "FAILED $T1::test_una_renovacion_extiende_el_periodo_una_sola_vez[ipn]"
 sabotaje $M "la suscripción ilegible de una renovación no reintenta" \
   '_consultar_mp(lambda: sdk.preapproval().get(suscripcion), f"suscripción {suscripcion}")' \
   '(sdk.preapproval().get(suscripcion).get("response") or {})' \
   "FAILED $T1::test_si_no_se_puede_leer_la_suscripcion_de_una_renovacion_reintenta"
 sabotaje $M "el pago de la renovación no se ata a su suscripción" \
-  '            pay_resp = {**pay_resp, "preapproval_id": suscripcion_del_cobro}' \
-  '            pay_resp = dict(pay_resp)' \
+  '        pay_resp = {**pay_resp, "preapproval_id": suscripcion_del_cobro}' \
+  '        pay_resp = dict(pay_resp)' \
   "FAILED $T1::test_una_renovacion_cuyo_pago_dice_otra_cuenta_no_se_aplica"
 
 # ── Devolución de los adversarios: el id del pago ──
@@ -406,8 +406,8 @@ sabotaje $M "h: una referencia vacía queda rechazada" \
   '        sin_cuenta = external_ref is None' \
   "FAILED $H3T::test_sin_referencia_ni_en_el_pago_ni_en_la_suscripcion_reintenta[pago-vacia]"
 sabotaje $M "h: la suscripción no se lee del pago" \
-  '        suscripcion = suscripcion_del_cobro or _suscripcion_del_pago_mp(pay_resp)[1]' \
-  '        suscripcion = suscripcion_del_cobro' \
+  '    suscripcion = suscripcion_del_cobro or _suscripcion_del_pago_mp(pay_resp)[1]' \
+  '    suscripcion = suscripcion_del_cobro' \
   "FAILED $H3T::test_los_dos_avisos_de_una_renovacion_la_acreditan_una_vez[cobro_sin_suscripcion-pago_con_metadata-pago_primero-usuario]"
 sabotaje $M "h: un cobro con su pago pendiente no reintenta" \
   '            if renovacion and pay_resp.get("status") in ("pending", "in_process", "authorized"):' \
