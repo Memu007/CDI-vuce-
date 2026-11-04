@@ -144,3 +144,13 @@ def test_sin_referencia_ni_en_el_pago_ni_en_la_suscripcion_reintenta(client, avi
     assert r.status_code == 503, r.text[:300]
     assert _leer_pago(pid) == {}
     assert leer()["billing_status"] == "past_due"
+
+
+@pytest.mark.parametrize("referencia", [0, False, [], {}], ids=["cero", "falso", "lista", "objeto"])
+def test_una_referencia_vacia_de_otro_tipo_toma_la_de_la_suscripcion(client, referencia):
+    usuario, buena, leer = _cuenta_vencida(client, "usuario")
+    cobro, pid = _renovacion_de(usuario, buena, "metadata", "suscripcion")
+    PAGOS[pid]["external_reference"] = referencia
+    r = _aviso_ipn(client, pid)
+    assert r.status_code == 200 and r.json().get("skipped") is None, r.text[:300]
+    _acreditada_una_vez(leer, pid)
