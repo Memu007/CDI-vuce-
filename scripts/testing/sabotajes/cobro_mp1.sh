@@ -402,9 +402,13 @@ sabotaje $M "h: un cobro sin suscripción queda rechazado (la regla de la vuelta
   'if update is None and not sin_cuenta:' 'if update is None and not sin_cuenta and not motivo:' \
   "FAILED $V::test_un_cobro_sin_suscripcion_legible_se_acredita_como_su_pago[sin_suscripcion]"
 sabotaje $M "h: una referencia vacía queda rechazada" \
-  '        sin_cuenta = external_ref in (None, "")' \
+  '        sin_cuenta = not external_ref' \
   '        sin_cuenta = external_ref is None' \
   "FAILED $H3T::test_sin_referencia_ni_en_el_pago_ni_en_la_suscripcion_reintenta[pago-vacia]"
+sabotaje $M "h: una referencia vacía que no es texto no toma la de la suscripción" \
+  'if suscripcion and not pay_resp.get("external_reference"):' \
+  'if suscripcion and pay_resp.get("external_reference") in (None, ""):' \
+  "FAILED $H3T::test_una_referencia_vacia_de_otro_tipo_toma_la_de_la_suscripcion[cero]"
 sabotaje $M "h: la suscripción no se lee del pago" \
   '    suscripcion = suscripcion_del_cobro or _suscripcion_del_pago_mp(pay_resp)[1]' \
   '    suscripcion = suscripcion_del_cobro' \
@@ -615,6 +619,17 @@ else
     'return marca[:20] if isinstance(marca, str) and marca else None' \
     'return marca[:20] if marca else None' \
     "FALLA | un pago con la marca en una lista queda aplicado"
+  sabotaje $M "i: la moneda larga no entra en la fila" \
+    'moneda=str(pay_resp.get("currency_id") or "")[:10] or None' \
+    'moneda=str(pay_resp.get("currency_id") or "") or None' \
+    "FALLA | un pago con la moneda larga queda rechazado"
+  sabotaje $M "i: la fecha larga no entra en la fila" \
+    'aprobado_en=str(pay_resp.get("date_approved") or "")[:40] or None' \
+    'aprobado_en=str(pay_resp.get("date_approved") or "") or None' \
+    "FALLA | un pago con la fecha larga queda rechazado"
+  sabotaje $M "i: el motivo largo no entra en la fila" \
+    'motivo=(motivo or None) and motivo[:300]' 'motivo=motivo or None' \
+    "FALLA | un pago con el monto ilegible largo queda rechazado"
 fi
 
 # Las pantallas, con la API levantada desde el worktree y una base vacía en
