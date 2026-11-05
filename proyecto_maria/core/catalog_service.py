@@ -342,14 +342,12 @@ async def save_products(
 
     vendor_id = _vendor_key(vendor_name)
 
-    for prod in productos_in:
-        _validar_largo((prod.get("descripcion") or "").strip())
-
     saved = 0
     updated = 0
 
     for prod in productos_in:
         desc = (prod.get("descripcion") or "").strip()
+        _validar_largo(desc)
         ncm = (prod.get("ncm") or prod.get("pieza") or "").strip()
         origen = (prod.get("origen") or "").strip()
 
