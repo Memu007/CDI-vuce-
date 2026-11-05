@@ -752,9 +752,8 @@
             renderReady();
             // A la vez y best-effort. Toast reemplaza al anterior: si la operación ya
             // avisó algo (que puede ser un error), el aviso del catálogo no lo tapa.
-            const operacion = armarOperacion(items, data);
             let avisoDeLaOperacion = false;
-            saveOperationToHistory(items, data, operacion).then(r => {
+            saveOperationToHistory(items, data).then(r => {
                 avisoDeLaOperacion = (!r.ok && r.reason !== 'sin_cliente') || r.historial_guardado === false;
             }).catch(err => {
                 console.warn('[history] no se pudo guardar operacion', err);
@@ -1244,8 +1243,8 @@
         return { cliente, opCode, body };
     }
 
-    async function saveOperationToHistory(items, mariaData, armada = armarOperacion(items, mariaData)) {
-        const { cliente, opCode, body } = armada;
+    async function saveOperationToHistory(items, mariaData) {
+        const { cliente, opCode, body } = armarOperacion(items, mariaData);
         if (!cliente || !cliente.id) {
             console.warn('[history] no hay cliente activo, no se guarda al historial');
             return { ok: false, reason: 'sin_cliente' };
