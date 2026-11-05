@@ -103,9 +103,13 @@ if [ -n "$PG_URL" ]; then
     echo "BASE  | la prueba en Postgres ya está en rojo sin sabotaje"; FALLAS=$((FALLAS+1))
   else
     sabotaje $M "el arranque no pasa las columnas a text" \
-      '                await conn.exec_driver_sql(f"ALTER TABLE vendor_catalog_products ALTER COLUMN {columna} TYPE TEXT")' \
-      '                pass' \
+      '            await conn.exec_driver_sql(f"ALTER TABLE vendor_catalog_products ALTER COLUMN {columna} TYPE TEXT")' \
+      '            pass' \
       "FALLA | primer arranque: las columnas son text"
+    sabotaje $M "el arranque sigue si la migración falla" \
+      $'    if IS_SQLITE:\n        return\n    async with engine.begin() as conn:' \
+      $'    if IS_SQLITE:\n        return\n    with __import__("contextlib").suppress(Exception):\n      async with engine.begin() as conn:' \
+      "FALLA | con la tabla tomada el arranque falla"
   fi
 else
   echo "SALTO | sin PG_URL: la migración no se midió"

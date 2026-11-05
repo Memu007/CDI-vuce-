@@ -21,6 +21,7 @@ uso (con un Postgres local y descartable, nunca el de producción; el usuario
 tiene que poder crear bases):
   python scripts/testing/catalogo_largo1_postgres.py postgresql://cdi@127.0.0.1:5432/postgres [SHA anterior]
 """
+import asyncio
 import contextlib
 import os
 import shutil
@@ -162,6 +163,8 @@ try:
                 arranco = True
         except Exception:
             arranco = False
+            # Como el proceso que muere: el pool del arranque fallido no se reusa.
+            asyncio.run(engine.dispose(close=False))
     finally:
         tomada.close()
     chequear(not arranco and columnas()[0][1] == "character varying",
