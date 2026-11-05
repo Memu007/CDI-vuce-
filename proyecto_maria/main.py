@@ -1906,14 +1906,15 @@ import secrets as _csrf_secrets
 CSRF_COOKIE_NAME = "csrf_token"
 CSRF_HEADER_NAME = "x-csrf-token"
 _CSRF_SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
-# Paths donde NO aplica: el caller no es un browser con sesion por cookie.
-_CSRF_EXEMPT_PREFIXES = (
+# Rutas públicas que no actúan con la sesión: una cookie vieja no tiene que trabarlas.
+# Van exactas para que ninguna otra ruta que se les parezca quede sin control.
+_CSRF_EXEMPT_PATHS = frozenset({
     "/auth/login",
     "/auth/register",
-    "/auth/verify-email",
-    "/static",
-    "/health",
-)
+    "/auth/request-password-reset",
+    "/auth/recover-username",
+    "/auth/reset-password",
+})
 
 
 def _csrf_enforce_enabled() -> bool:
@@ -1946,11 +1947,7 @@ class CSRFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         method = request.method.upper()
         path = request.url.path
-        if (
-            method in _CSRF_SAFE_METHODS
-            or path.startswith(_CSRF_EXEMPT_PREFIXES)
-            or "webhook" in path
-        ):
+        if method in _CSRF_SAFE_METHODS or path in _CSRF_EXEMPT_PATHS:
             return await call_next(request)
 
         # Solo nos importa si la sesion va por cookie. Sin cookie de sesion,
