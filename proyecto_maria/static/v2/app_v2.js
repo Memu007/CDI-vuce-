@@ -90,7 +90,11 @@
 
     async function logout() {
         try {
-            await api('/auth/logout', { method: 'POST' });
+            const res = await api('/auth/logout', { method: 'POST' });
+            if (!res.ok) {
+                toast('No se pudo cerrar la sesión', 'El servidor no lo aceptó (' + res.status + '). La sesión sigue abierta.', 'error');
+                return;
+            }
         } catch (e) {
             // La sesión es de otro: no se cierra y la pestaña queda tapada.
             if (sesionAjena) return;
