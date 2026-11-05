@@ -9690,7 +9690,7 @@ async def delete_ncm_nota(
 _HISTORIAL_FILAS_POR_SENTENCIA = 150
 
 # Tope de la NCM del historial, el de las columnas de NCM del resto de la
-# base (String(20)). Sin tope, 30 MB entraban en una sola confirmación.
+# base (String(20)).
 _HISTORIAL_MAX_NCM = 20
 
 

@@ -21,6 +21,7 @@ on-demand al construir get_vendor/get_vendor_by_id.
 """
 
 from __future__ import annotations
+import hashlib
 import re
 import unicodedata
 from datetime import datetime, timezone
@@ -74,10 +75,13 @@ def _normalize(text: str) -> str:
 
 
 def clave_de_producto(descripcion: str) -> str:
-    """Clave del producto en el catálogo. Lo que normaliza a vacío (CJK, emoji)
-    usa el texto en NFC sin mayúsculas ni espacios de más, para tener la suya."""
+    """Clave del producto en el catálogo. Lo que normaliza a vacío (CJK, emoji) usa
+    un resumen del texto: entra en el índice único y «~» no sale de _normalize."""
     clave = _normalize(descripcion)
-    return clave or " ".join(unicodedata.normalize("NFC", descripcion).lower().split())
+    if clave:
+        return clave
+    texto = " ".join(unicodedata.normalize("NFC", descripcion).lower().split())
+    return "~" + hashlib.sha256(texto.encode("utf-8", "surrogatepass")).hexdigest()[:40]
 
 
 def _vendor_key(vendor_name: str) -> str:
