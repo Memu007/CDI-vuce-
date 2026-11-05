@@ -653,6 +653,8 @@ _FINAL_DE_ERRORES = 2000
 _VALIDANDO_A_LA_VEZ = 2
 # Por loop: (semáforo, {clave: [candado, pedidos de esa clave en curso]}).
 _VALIDANDO: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
+# El texto del vendedor es opcional: con lugares propios no frena validar.
+_SACANDO_TEXTO: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
 
 
 async def _escribir(entrada, data: bytes) -> None:
@@ -708,9 +710,10 @@ async def validar_pdf_aparte(data: bytes, limite_s: float, clave: str | None = N
     Con `clave`, las de una misma clave van de a una y esperan su turno: diez
     PDFs pesados de un usuario ocupan un solo lugar y no frenan a otro."""
     loop = asyncio.get_running_loop()
-    estado = _VALIDANDO.get(loop)
+    lugares = _SACANDO_TEXTO if modo == "texto" else _VALIDANDO
+    estado = lugares.get(loop)
     if estado is None:
-        estado = _VALIDANDO[loop] = (asyncio.Semaphore(_VALIDANDO_A_LA_VEZ), {})
+        estado = lugares[loop] = (asyncio.Semaphore(_VALIDANDO_A_LA_VEZ), {})
     semaforo, filas = estado
     hasta = loop.time() + limite_s
     if clave is None:
@@ -786,9 +789,8 @@ async def _leer_aparte(data: bytes, limite_s: float, semaforo, limite_cpu_s: flo
 
 
 def _main() -> int:
-    """El proceso aparte, en uno de los `_MODOS`: el PDF por la entrada, el
-    resultado en JSON por la salida. Sale con `_SALIDA_DEMASIADO_PESADO` si
-    pasa del tope de memoria o, al validar o sacar el texto, del de CPU."""
+    """El proceso aparte, en uno de los `_MODOS`: el PDF por la entrada y el JSON
+    por la salida, o `_SALIDA_DEMASIADO_PESADO` si pasa de un tope."""
     try:
         import resource
         _, duro = resource.getrlimit(resource.RLIMIT_AS)
