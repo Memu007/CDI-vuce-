@@ -33,3 +33,7 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - Seguridad, para que la PM la evalúe como pieza: `GET /auth/verify-email`
   deja la sesión de la cuenta dueña del link; con su propio link, un atacante
   podría hacer entrar a la víctima en la cuenta del atacante. No reproducido.
+- Orden de locks del conteo (sospechado, sin reproducir): la ruta manual con
+  extras vencidas escribe la organización antes de bloquear el usuario
+  (`_expire_extra_ops`), y aceptar invitación toma la organización y después
+  el usuario; `_cuenta_bloqueada` va usuario → organización.
