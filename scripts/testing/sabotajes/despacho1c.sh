@@ -50,6 +50,7 @@ F=proyecto_maria/static/v2/screens/finalize.js
 N=proyecto_maria/static/v2/screens/ncm.js
 V=test_lo_que_normaliza_a_vacio_no_cruza_el_historial
 A=test_lo_que_no_quedo_en_la_memoria_se_avisa
+X=test_ninguna_falla_deja_un_exito_a_la_vista
 
 if ! "${PRUEBA[@]}" >/dev/null 2>&1; then
   echo "BASE  | la prueba ya está en rojo sin sabotaje: no se puede medir nada"; exit 1
@@ -68,21 +69,50 @@ sabotaje $F "guardar la operación no avisa lo que no quedó en la memoria" \
   '                if (false) {' \
   "FAILED $T::$A[no-guardado-listo-con-cliente]"
 sabotaje $F "«Cliente guardado» tapa el aviso" \
-  '        if (guardado.historial_guardado !== false && CDI.toast) {' \
+  '        if (!sinMemoria && CDI.toast) {' \
   '        if (CDI.toast) {' \
   "FAILED $T::$A[no-guardado-asignar-cliente]"
 sabotaje $F "lo guardado ya no dice «Cliente guardado»" \
-  '        if (guardado.historial_guardado !== false && CDI.toast) {' \
+  '        if (!sinMemoria && CDI.toast) {' \
   '        if (false) {' \
   "FAILED $T::$A[guardado-asignar-cliente]"
 sabotaje $N "confirmar la posición no avisa lo que no quedó en la memoria" \
-  '            if (res.ok && data.historial_guardado === false && CDI.toast) {' \
+  '            if ((!res.ok || data.historial_guardado === false) && CDI.toast) {' \
   '            if (false) {' \
   "FAILED $T::$A[no-guardado-confirmar-ncm]"
 sabotaje $N "confirmar la posición avisa aunque no llegue el dato" \
-  '            if (res.ok && data.historial_guardado === false && CDI.toast) {' \
-  '            if (res.ok && data.historial_guardado !== true && CDI.toast) {' \
+  '            if ((!res.ok || data.historial_guardado === false) && CDI.toast) {' \
+  '            if ((!res.ok || data.historial_guardado !== true) && CDI.toast) {' \
   "FAILED $T::$A[sin-dato-confirmar-ncm]"
+
+sabotaje $F "una falla al guardar cierra el panel y dice «Cliente guardado»" \
+  '        if (!guardado.ok) return;' \
+  '' \
+  "FAILED $T::$X[asignar-cliente-500]"
+sabotaje $F "una falla al guardar deja abierta la caja de éxito anterior" \
+  '        if (caja) caja.hidden = true;' \
+  '' \
+  "FAILED $T::$X[listo-con-cliente-500]"
+sabotaje $F "el plan vencido no avisa que no se guardó" \
+  "                avisarNoGuardado('No se guardó al cliente', err.motivo || 'Plan vencido o límite alcanzado', 'error');" \
+  '' \
+  "FAILED $T::$X[listo-con-cliente-402]"
+sabotaje $F "la caja no dice lo que no quedó en la memoria" \
+  "            'Operación asociada a ' + nombre + (sinMemoria" \
+  "            'Operación asociada a ' + nombre + (false" \
+  "FAILED $T::$X[asignar-cliente-no-guardado]"
+sabotaje $F "aprender el catálogo no avisa un 400" \
+  '            if ((!res.ok || data.historial_guardado === false) && CDI.toast) {' \
+  '            if ((data.historial_guardado === false) && CDI.toast) {' \
+  "FAILED $T::$X[aprender-400]"
+sabotaje $F "aprender el catálogo no avisa historial_guardado false" \
+  '            if ((!res.ok || data.historial_guardado === false) && CDI.toast) {' \
+  '            if ((!res.ok) && CDI.toast) {' \
+  "FAILED $T::$X[aprender-no-guardado]"
+sabotaje $N "confirmar la posición no avisa un 400" \
+  '            if ((!res.ok || data.historial_guardado === false) && CDI.toast) {' \
+  '            if ((res.ok && data.historial_guardado === false) && CDI.toast) {' \
+  "FAILED $T::$X[confirmar-ncm-400]"
 
 git checkout -q -- proyecto_maria/
 echo "fallas: $FALLAS"
