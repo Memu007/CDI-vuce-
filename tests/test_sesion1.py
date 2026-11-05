@@ -153,21 +153,44 @@ def test_cambiar_clave_mal_no_revoca_nada():
     assert _entra(t) == 200
 
 
-def test_cambiar_clave_revoca_en_el_mismo_commit_que_la_clave(monkeypatch):
-    """Si el token nuevo no llega a emitirse, la clave cambiada ya cerró las
-    sesiones: no hay un momento con la clave nueva y los tokens viejos."""
-    u, _ = _usuario()
+@pytest.mark.parametrize("ruta", ["cambiar la clave", "cambiar el email"])
+@pytest.mark.parametrize("en_el_medio", ["reset", "otro cambio de clave"])
+def test_lo_que_cambia_la_clave_mientras_otro_valida_le_gana(monkeypatch, ruta, en_el_medio):
+    """El dueño resetea o cambia la clave justo después de que otro pedido
+    validó la actual: gana el del medio y el otro no guarda nada ni recibe token."""
+    u, mail = _usuario()
     t = _login(u)
-    _poner(u, active_jti=None)
+    real, tokens_del_medio = main_mod.verify_password, []
 
-    async def sin_sesion_nueva(*_):
-        return None
+    def validar(clave, hash_guardado):
+        ok = real(clave, hash_guardado)
+        monkeypatch.setattr(main_mod, "verify_password", real)
+        if en_el_medio == "reset":
+            _resetear(u, mail, CLAVE3)
+        else:
+            r = _http().post("/api/user/change-password", headers=_bearer(t),
+                             json={"current_password": CLAVE, "new_password": CLAVE3})
+            assert r.status_code == 200, r.text
+            tokens_del_medio.append(r.json()["access_token"])
+        return ok
 
-    monkeypatch.setattr(main_mod, "abrir_sesion", sin_sesion_nueva)
-    r = _http().post("/api/user/change-password", headers=_bearer(t),
-                     json={"current_password": CLAVE, "new_password": CLAVE2})
-    assert r.status_code == 200, r.text
-    assert _entra(t) == 401, "la clave cambió y el token viejo sigue entrando"
+    monkeypatch.setattr(main_mod, "verify_password", validar)
+    metodo, url, cuerpo = {
+        "cambiar la clave": ("post", "/api/user/change-password",
+                             {"current_password": CLAVE, "new_password": CLAVE2}),
+        "cambiar el email": ("put", "/api/user/profile",
+                             {"name": "Otro", "email": f"atacante-{u}@example.com", "current_password": CLAVE}),
+    }[ruta]
+    c = _http()
+    r = c.request(metodo, url, headers=_bearer(t), json=cuerpo)
+    assert r.status_code == 409, r.text
+    assert "access_token" not in r.json() and "access_token" not in c.cookies
+    assert (_fila(u).email, _fila(u).name) == (mail, "Ses")
+    assert _entra(t) == 401
+    assert [_entra(x) for x in tokens_del_medio] == [200] * len(tokens_del_medio)
+    for vieja in (CLAVE, CLAVE2):
+        assert _http().post("/auth/login", json={"username": u, "password": vieja}).status_code == 401, vieja
+    assert _entra(_login(u, CLAVE3)) == 200
 
 
 def test_el_login_no_pisa_una_clave_que_cambio_mientras_validaba(monkeypatch):
@@ -453,6 +476,30 @@ def test_ningun_lugar_acepta_un_token_que_no_es_la_sesion_vigente():
             assert _rutas_que_leen_la_sesion(token) == [(401, 401, False)] * 2, nombre
     finally:
         _borrar_eventos(u)
+
+
+def test_un_token_sin_vencimiento_no_es_una_sesion():
+    import jwt
+    from proyecto_maria.config import get_settings
+    u, _ = _usuario()
+    _login(u)
+    s = get_settings()
+    token = jwt.encode({"sub": u, "jti": _fila(u).active_jti}, s.jwt_secret, algorithm=s.jwt_algorithm)
+    assert _entra(token) == 401
+
+
+def test_se_firma_y_se_verifica_con_la_misma_clave(monkeypatch):
+    """La clave sale de un solo lugar: si cambia, lo que se firma después
+    se verifica con ella (con dos lugares, JWT_SECRET_KEY vacía daba login
+    200 y todas las demás rutas 401)."""
+    from proyecto_maria.config import get_settings
+    monkeypatch.setattr(get_settings(), "jwt_secret", "otra-clave-sintetica-de-mas-de-32-caracteres")
+    u, _ = _usuario()
+    assert _entra(_login(u)) == 200
+    _poner(u, is_verified=False)
+    r = _http().get("/auth/verify-email", params={"token": main_mod.build_email_verification_token(u)},
+                    follow_redirects=False)
+    assert r.status_code in (302, 303, 307) and _fila(u).is_verified, r.text
 
 
 def test_la_cookie_le_gana_al_header():
