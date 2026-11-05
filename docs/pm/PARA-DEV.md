@@ -61,10 +61,11 @@ A la cola de limpieza, no acá: las dos posibles inversiones de orden de locks
 (ruta manual con extras vencidas; aceptar invitación), sin reproducir.
 C10 queda como puerta de publicación con Emi.
 
-**CSRF-3:** en revisión, veredicto aparte.
+**CSRF-3: aceptada** sobre `9fe55d4` (2026-11-05 19:20 UTC), integrada. Evidencia: `docs/pm/REPRODUCCION-CSRF-3-2026-11-05.md`. Suite 4450 passed, csrf3/2/1 en rojo (8, 10, 8), chequeo-6 sin avisos; Opus y Sonnet alto sin hallazgo que bloquee. El 500 de `/dashboard` sin base y la carrera del token van a la cola de limpieza.
 
 **Tu orden:** la devolución de COBRO-CORTE-1 → COBRO-MP-2 → COBRO-MP-3 →
-AISLAMIENTO-2 / LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. Próxima D: D62.
+AISLAMIENTO-2 / LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. Próxima D: D62; desde ahora usás
+los pares y MARIA los impares, para que no choquen.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
