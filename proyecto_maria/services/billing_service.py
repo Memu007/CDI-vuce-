@@ -139,7 +139,8 @@ def vigente(fin: datetime | None, ahora: datetime | None = None) -> bool:
 def cancelar_corta_acceso(cuenta, ahora: datetime | None = None) -> bool:
     """Cancelar deja canceled, que da acceso sólo hasta trial_ends_at: corta a
     quien hoy no lo tiene y a quien ya pasó esa fecha (gracia, prueba vencida)."""
-    return not (tiene_acceso(cuenta, ahora) and vigente(getattr(cuenta, "trial_ends_at", None), ahora))
+    ahora = ahora or datetime.now(timezone.utc)
+    return not tiene_acceso(cuenta, ahora) or not vigente(getattr(cuenta, "trial_ends_at", None), ahora)
 
 
 def can_create_operation(user) -> Tuple[bool, str | None]:

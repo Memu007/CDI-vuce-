@@ -2114,10 +2114,10 @@ async def cancel_billing(
     """Cancela la suscripción del usuario.
 
     Si hay una suscripción de Mercado Pago, primero se cancela allá; si no se
-    puede, no se cambia nada en CDI (COBRO-MP-2, C2). No corta el servicio:
-    deja `billing_status='canceled'` y `trial_ends_at` como la fecha hasta la
-    que ya pagó (o en la que vence la prueba); hasta esa fecha sigue
-    generando (billing_service.tiene_acceso). Con una suscripción abierta se
+    puede, no se cambia nada en CDI. Deja `billing_status='canceled'`, que
+    sigue generando hasta `trial_ends_at` (billing_service.tiene_acceso): la
+    cuenta en gracia o con la prueba vencida queda sin acceso
+    (billing_service.cancelar_corta_acceso). Con una suscripción abierta se
     cancela desde cualquier estado, sin ganar acceso: si no, cobra cuando la
     tarjeta vuelve y el checkout no tiene salida.
 
@@ -2148,12 +2148,13 @@ async def cancel_billing(
         db_user.mp_preapproval_id = None
 
     ahora = datetime.now(timezone.utc)
-    if billing_service.cancelar_corta_acceso(db_user, ahora) and billing_service.vigente(db_user.trial_ends_at, ahora):
+    if not billing_service.tiene_acceso(db_user, ahora) and billing_service.vigente(db_user.trial_ends_at, ahora):
         # canceled da acceso hasta trial_ends_at: quien no lo tenía no lo gana.
         db_user.trial_ends_at = ahora
     db_user.billing_status = "canceled"
     await db.commit()
-    print(f"🚪 User canceló suscripción: {db_user.username} (servicio activo hasta {db_user.trial_ends_at})")
+    hasta = db_user.trial_ends_at if billing_service.tiene_acceso(db_user) else "sin acceso"
+    print(f"🚪 User canceló suscripción: {db_user.username} (servicio hasta: {hasta})")
     return {
         "success": True,
         "billing_status": "canceled",
