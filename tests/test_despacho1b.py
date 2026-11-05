@@ -22,7 +22,7 @@ import uuid
 from pathlib import Path
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 
 from proyecto_maria.database.connection import AsyncSessionLocal
 from proyecto_maria.database.models import ClientProductHistory, NcmHistorial, Operation, VendorCatalogProduct
@@ -372,6 +372,17 @@ def _contar(modelo, **filtro):
                 q = q.where(getattr(modelo, campo) == valor)
             return (await s.execute(q)).scalar_one()
     return asyncio.run(_c())
+
+
+def _borrar(modelo, **filtro):
+    async def _b():
+        async with AsyncSessionLocal() as s:
+            q = delete(modelo)
+            for campo, valor in filtro.items():
+                q = q.where(getattr(modelo, campo) == valor)
+            await s.execute(q)
+            await s.commit()
+    asyncio.run(_b())
 
 
 def _como_otro(auth_override):
@@ -2121,15 +2132,20 @@ def test_confirmar_un_ncm_dice_si_no_guardo_el_historial(auth_override, client, 
     async def falla(*args, **kwargs):
         raise RuntimeError("la base no anda")
 
-    otros = {"descripcion": "\u0958" * 2000} if causa == "crece al normalizar" else {}
-    if not otros:
+    if causa == "crece al normalizar":
+        descripcion = "\u0958" * 2000
+    else:
+        descripcion = f"TAPA INVENTADA {uuid.uuid4().hex[:8]}"
         monkeypatch.setattr(client_memory, "upsert_client_product_history", falla)
     cid = _crear_cliente(client)
-    descripcion, r = _guardar_uso(client, cid, **otros)
-    descripcion = otros.get("descripcion", descripcion)
-    assert r.status_code == 200 and r.json() == {"success": True, "historial_guardado": False}, r.text
-    assert _contar(NcmHistorial, descripcion=descripcion) == 1
-    assert _catalogo(client, cid) == []
+    try:
+        _, r = _guardar_uso(client, cid, descripcion=descripcion)
+        assert r.status_code == 200 and r.json() == {"success": True, "historial_guardado": False}, r.text
+        assert _contar(NcmHistorial, descripcion=descripcion) == 1
+        assert _catalogo(client, cid) == []
+    finally:
+        # Sin letras latinas, la descripción normalizada queda vacía y se sugeriría para cualquier consulta.
+        _borrar(NcmHistorial, descripcion=descripcion)
 
 
 @pytest.mark.parametrize("ncm", ["pedido 20240115 nro", "39269090X", "1234"],
