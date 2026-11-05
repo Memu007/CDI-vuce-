@@ -77,12 +77,12 @@ sabotaje $F "lo guardado ya no dice «Cliente guardado»" \
   '        if (false) {' \
   "FAILED $T::$A[guardado-asignar-cliente]"
 sabotaje $N "confirmar la posición no avisa lo que no quedó en la memoria" \
-  '            if ((!res.ok || data.historial_guardado === false) && CDI.toast) {' \
-  '            if (false) {' \
+  '        if (!guardado && CDI.toast) {' \
+  '        if (false) {' \
   "FAILED $T::$A[no-guardado-confirmar-ncm]"
 sabotaje $N "confirmar la posición avisa aunque no llegue el dato" \
-  '            if ((!res.ok || data.historial_guardado === false) && CDI.toast) {' \
-  '            if ((!res.ok || data.historial_guardado !== true) && CDI.toast) {' \
+  'guardado = res.ok && data.historial_guardado !== false;' \
+  'guardado = res.ok && data.historial_guardado === true;' \
   "FAILED $T::$A[sin-dato-confirmar-ncm]"
 
 sabotaje $F "una falla al guardar cierra el panel y dice «Cliente guardado»" \
@@ -102,24 +102,24 @@ sabotaje $F "la caja no dice lo que no quedó en la memoria" \
   "            'Operación asociada a ' + nombre + (false" \
   "FAILED $T::$X[asignar-cliente-no-guardado]"
 sabotaje $F "aprender el catálogo no avisa un 400" \
-  '            if (!res.ok && CDI.toast) {' \
-  '            if (false && CDI.toast) {' \
+  '            return res.ok;' \
+  '            return true;' \
   "FAILED $T::$X[aprender-400]"
 sabotaje $F "guardar y aprender a la vez: el aviso del catálogo tapa el error" \
-  '            }).then(() => saveOperationToHistory(items, data, operacion)).catch(err => {' \
-  '            }); saveOperationToHistory(items, data, operacion).catch(err => {' \
+  'if (!aprendido && !avisoDeLaOperacion && CDI.toast) {' \
+  'if (!aprendido && CDI.toast) {' \
   "FAILED $T::$X[listo-con-vendedor-500]"
 sabotaje $F "reintentar después de crear el cliente lo crea otra vez" \
-  '            if (clienteCreadoAca && activo.id === clienteCreadoAca) {' \
+  '            if (clienteCreadoAca) {' \
   '            if (false) {' \
   "FAILED $T::$X[crear-reintento-500]"
 sabotaje $N "confirmar la posición no avisa un 400" \
-  '            if ((!res.ok || data.historial_guardado === false) && CDI.toast) {' \
-  '            if ((res.ok && data.historial_guardado === false) && CDI.toast) {' \
+  'guardado = res.ok && data.historial_guardado !== false;' \
+  'guardado = data.historial_guardado !== false;' \
   "FAILED $T::$X[confirmar-ncm-400]"
 sabotaje $F "la operación se arma recién al guardarla" \
-  '            }).then(() => saveOperationToHistory(items, data, operacion)).catch(err => {' \
-  '            }).then(() => saveOperationToHistory(items, data)).catch(err => {' \
+  'saveOperationToHistory(items, data, operacion).then(r => {' \
+  'saveOperationToHistory(items, data).then(r => {' \
   "FAILED $T::test_se_guarda_la_operacion_que_se_genero[otro-cliente]"
 
 git checkout -q -- proyecto_maria/
