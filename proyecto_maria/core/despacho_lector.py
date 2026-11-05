@@ -685,8 +685,9 @@ async def leer_despacho_aparte(data: bytes, limite_s: float, clave: str | None =
     """`leer_despacho` en otro proceso, con la memoria topeada y un tiempo
     máximo. Si pasa del tiempo, el proceso se mata (un hilo no se puede
     cortar desde afuera) y levanta TimeoutError; si pasa de la memoria,
-    PdfDemasiadoPesado. Como mucho `_HIJOS_A_LA_VEZ` a la vez: la espera
-    cuenta dentro del tiempo máximo. Con `clave`, una sola lectura por clave
+    PdfDemasiadoPesado. Como mucho `_HIJOS_A_LA_VEZ` a la vez: espera un
+    lugar hasta `limite_s` (SinLugar) y después el proceso tiene `limite_s`
+    entero, como `validar_pdf_aparte`. Con `clave`, una sola lectura por clave
     a la vez: la segunda levanta LectorOcupado, así un usuario no ocupa todos
     los lugares. Es por proceso de la app: con varios procesos, cada uno
     tiene los suyos."""
@@ -700,7 +701,8 @@ async def leer_despacho_aparte(data: bytes, limite_s: float, clave: str | None =
             raise LectorOcupado(AVISO_OCUPADO)
         leyendo.add(clave)
     try:
-        return await _leer_aparte(data, limite_s, semaforo, limite_cpu_s)
+        return await _leer_aparte(data, limite_s, semaforo, limite_cpu_s, "leer",
+                                  loop.time() + limite_s)
     finally:
         leyendo.discard(clave)
 
@@ -741,9 +743,8 @@ async def validar_pdf_aparte(data: bytes, limite_s: float, clave: str | None = N
 
 
 async def _leer_aparte(data: bytes, limite_s: float, semaforo, limite_cpu_s: float,
-                       modo: str = "leer", hasta: float | None = None) -> dict:
-    """Sin `hasta`, la espera por un lugar cuenta dentro de `limite_s`. Con
-    `hasta`, se espera un lugar hasta ese momento y el proceso tiene `limite_s`."""
+                       modo: str, hasta: float) -> dict:
+    """Espera un lugar hasta `hasta` y después el proceso tiene `limite_s`."""
     entorno = {k: os.environ[k] for k in ("PATH", "HOME", "LANG", "LC_ALL", "PYTHONUSERBASE")
                if k in os.environ}
     # El lector de facturas carga el .env al importarse: el hijo no lo lee.
@@ -767,15 +768,12 @@ async def _leer_aparte(data: bytes, limite_s: float, semaforo, limite_cpu_s: flo
         return proceso.returncode, salida, errores
 
     loop = asyncio.get_running_loop()
-    espera_aparte = hasta is not None
-    hasta = hasta if espera_aparte else loop.time() + limite_s
     try:
         await asyncio.wait_for(semaforo.acquire(), timeout=hasta - loop.time())
     except TimeoutError:
         raise SinLugar from None
     try:
-        corrida = limite_s if espera_aparte else hasta - loop.time()
-        codigo, salida, errores = await asyncio.wait_for(correr(), timeout=corrida)
+        codigo, salida, errores = await asyncio.wait_for(correr(), timeout=limite_s)
     finally:
         semaforo.release()
     if codigo == _SALIDA_DEMASIADO_PESADO:
