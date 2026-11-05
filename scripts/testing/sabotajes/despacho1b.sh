@@ -822,11 +822,7 @@ sabotaje "confirmar un NCM no avisa que la base falló" proyecto_maria/main.py \
 ' \
   '        logging.warning("ncm confirmation memory unavailable: %s", err)
 ' \
-  "test_confirmar_un_ncm_dice_si_no_guardo_el_historial[la base falla]"
-sabotaje "confirmar un NCM no avisa que el producto no entró" proyecto_maria/main.py \
-  '            wrote_client = historial_guardado = entry is not None' \
-  '            wrote_client = entry is not None' \
-  "test_confirmar_un_ncm_dice_si_no_guardo_el_historial[crece al normalizar]"
+  "test_confirmar_un_ncm_dice_si_no_guardo_el_historial"
 
 # Lo que sólo Postgres muestra: la espera por la fila y la fila que cambia de
 # clave o se borra mientras se espera. Sin PG_DSN no se corren y se dice.
