@@ -156,6 +156,22 @@ def test_lo_que_saca_el_hijo_vuelve_entero(unicode, queda):
     assert asyncio.run(leer_despacho_aparte(pdf, 30))["renglones"][0]["descripcion"] == esperado
 
 
+@pytest.mark.parametrize("modo", ["texto", "leer"])
+def test_el_hijo_escribe_utf8_aunque_su_salida_no_lo_sea(modo):
+    """El hijo hereda LANG y LC_ALL de la app: con un locale que no es UTF-8
+    (acá, PYTHONIOENCODING), una letra fuera de Latin-1 lo tiraba abajo."""
+    from tests.test_despacho1b import _item_solo, _pdf
+    texto = _item_solo().replace("COSA INVENTADA", "COSA Z INVENTADA")
+    pdf = _pdf([[[(0, l)] for l in texto.splitlines()]], a_unicode={0x5A: "4E2D"})
+    entorno = {"PATH": os.environ["PATH"], "PYTHONIOENCODING": "latin-1",
+               "PYTHON_DOTENV_DISABLED": "1"}
+    r = subprocess.run([sys.executable, "-m", "proyecto_maria.core.despacho_lector", "30", modo],
+                       input=pdf, capture_output=True, env=entorno, timeout=60,
+                       cwd=Path(__file__).resolve().parents[1])
+    assert r.returncode == 0, r.stderr.decode(errors="replace")[-300:]
+    assert "COSA 中 INVENTADA" in r.stdout.decode("utf-8")
+
+
 def test_lo_que_vuelve_del_texto_tiene_tope():
     """Un PDF de 1 KB con 120 000 letras: a la app vuelven 64 K."""
     import asyncio
