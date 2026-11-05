@@ -203,4 +203,4 @@ def test_un_validador_que_se_cae_es_un_error_nuestro(monkeypatch, caplog):
         asyncio.run(validate_file_upload(_Subida(hojas([("UNO", 0)])), "pdf"))
     assert e.value.status_code == 500, e.value.detail
     assert "Invalid PDF" not in e.value.detail
-    assert "salió con 7" in caplog.text
+    assert "el validador de PDF salió con 7" in caplog.text
