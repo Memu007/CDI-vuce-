@@ -197,30 +197,33 @@ def test_cancelada_sin_suscripcion_no_se_cancela_otra_vez(client):
     assert len(PEDIDOS) == pedidos, "cancelar dos veces vuelve a llamar a Mercado Pago"
 
 
-@pytest.mark.parametrize("estado, con_suscripcion, abierta", [
-    ("canceled", True, True), ("canceled", False, False), ("active", True, True), ("past_due", True, True),
-    ("none", True, True), ("none", False, False), (None, True, True), ("desconocido", True, True),
+@pytest.mark.parametrize("estado, con_suscripcion, abierta, corta", [
+    ("canceled", True, True, False), ("canceled", False, False, False), ("active", True, True, False),
+    ("past_due", True, True, True), ("none", True, True, True), ("none", False, False, True),
+    (None, True, True, True), ("desconocido", True, True, True),
 ], ids=["cancelada_con_checkout", "cancelada_sin", "activa", "impaga", "sin_plan_con", "sin_plan_sin",
         "sin_estado", "desconocido"])
-def test_billing_me_dice_si_hay_una_suscripcion_abierta(client, estado, con_suscripcion, abierta):
+def test_billing_me_dice_si_hay_una_suscripcion_abierta(client, estado, con_suscripcion, abierta, corta):
     # Con una suscripción abierta el perfil muestra «Cancelar plan», sea cual
-    # sea el estado: si no, el 409 del checkout no tiene salida.
+    # sea el estado: si no, el 409 del checkout no tiene salida. Con 20 días
+    # pagos, cancelar sólo los conserva quien hoy tiene acceso.
     usuario, sid = _suscripto(client, "cde_me", billing_status=estado)
     if not con_suscripcion:
         _set_user(usuario, mp_preapproval_id=None)
     r = client.get("/api/billing/me")
     assert r.status_code == 200, r.text
     assert r.json().get("suscripcion_abierta") is abierta, r.json()
+    assert r.json().get("cancelar_corta_acceso") is corta, r.json()
 
 
 # --- D13 (c): una autorizada vieja no se cancela desde el checkout ---
 
-@pytest.mark.parametrize("billing_status, dias", [
-    ("past_due", -10), ("active", -1), ("active", -3), ("canceled", 20),
-    ("none", 10), (None, 10), ("expired", -5), ("desconocido", 10),
+@pytest.mark.parametrize("billing_status, dias, corta", [
+    ("past_due", -10, True), ("active", -1, True), ("active", -3, True), ("canceled", 20, False),
+    ("none", 10, True), (None, 10, True), ("expired", -5, True), ("desconocido", 10, True),
 ], ids=["impaga", "renovacion_tardia", "vencida_en_gracia", "cancelada_vieja",
         "sin_plan", "sin_estado", "expired", "desconocido"])
-def test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando(client, billing_status, dias):
+def test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando(client, billing_status, dias, corta):
     usuario, sid = _suscripto(client, "cde_d13", billing_status=billing_status, dias=dias)
     tenia_acceso = _con_acceso(_leer(usuario))
     r = client.post("/api/billing/checkout", json={"plan": "premium"})
@@ -233,12 +236,13 @@ def test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando(c
 
     # La salida que nombra el 409: cancelar desde el perfil y volver a pagar.
     # El perfil avisa antes lo que cancelar va a hacer con el acceso.
-    corta = client.get("/api/billing/me").json().get("cancelar_corta_acceso")
+    perfil = client.get("/api/billing/me").json()
+    assert perfil.get("cancelar_corta_acceso") is corta, f"el perfil promete otra cosa: {perfil}"
     r = client.post("/api/billing/cancel")
     assert r.status_code == 200, r.text
     assert SUS[sid] == "cancelled"
     despues = _leer(usuario)
-    assert corta is (not _con_acceso(despues)), f"el perfil dijo corta={corta}: {despues}"
+    assert _con_acceso(despues) is not corta, f"el perfil dijo corta={corta}: {despues}"
     assert tenia_acceso or not _con_acceso(despues), f"cancelar da acceso: {despues}"
     r = client.post("/api/billing/checkout", json={"plan": "premium"})
     assert r.status_code == 200, r.text

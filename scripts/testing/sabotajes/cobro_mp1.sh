@@ -501,7 +501,7 @@ sabotaje $M "C: cancelar desde past_due deja los días que quedaban" \
   '        pass' \
   "cancelar desde past_due da acceso"
 sabotaje $M "C: sólo past_due pierde los días al cancelar" \
-  '    if billing_service.cancelar_corta_acceso(db_user, ahora) and billing_service.vigente(db_user.trial_ends_at, ahora):' \
+  '    if not billing_service.tiene_acceso(db_user, ahora) and billing_service.vigente(db_user.trial_ends_at, ahora):' \
   '    if db_user.billing_status == "past_due" and billing_service.vigente(db_user.trial_ends_at, ahora):' \
   "cancelar da acceso"
 sabotaje $M "E: decide payment_provider aunque haya pagos registrados" \
@@ -558,7 +558,7 @@ sabotaje $M "C: /billing/me dice que corta sólo con past_due" \
   "FAILED tests/test_cobro_mp1_cde.py::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[sin_plan]"
 
 sabotaje $B "C: cancelar_corta_acceso no ve la cuenta que ya pasó su fecha" \
-  '    return not (tiene_acceso(cuenta, ahora) and vigente(getattr(cuenta, "trial_ends_at", None), ahora))' \
+  '    return not tiene_acceso(cuenta, ahora) or not vigente(getattr(cuenta, "trial_ends_at", None), ahora)' \
   '    return not tiene_acceso(cuenta, ahora)' \
   "FAILED tests/test_cobro_mp1_cde.py::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[renovacion_tardia]"
 
