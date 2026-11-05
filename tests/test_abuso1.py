@@ -368,8 +368,10 @@ def test_eventos_sin_sesion_no_permitidos_no_se_guardan(ruta, accion, token):
     assert r.status_code == 200 and r.json()["ok"] is False, r.text
     assert _filas_marca(marca) == []
     # La misma acción con sesión sí se guarda: lo que corta es la falta de sesión.
+    # Otros casos entran con el mismo usuario y eso revoca el token del registro.
+    vigente = _login(c, token[0], CLAVE, _ip()).json()["access_token"]
     r = c.post(ruta, json={"action": accion or "x", "marca": marca}, headers={
-        "Authorization": f"Bearer {token[1]}", **_xff(_ip())})
+        "Authorization": f"Bearer {vigente}", **_xff(_ip())})
     assert r.json()["ok"] is True and [u for u, _ in _filas_marca(marca)] == [token[0]], r.text
 
 

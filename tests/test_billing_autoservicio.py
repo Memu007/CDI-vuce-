@@ -90,14 +90,14 @@ def test_change_password_ok(client):
     assert login.status_code == 200, login.text
 
 
-def test_change_password_wrong_current_returns_401(client):
-    """Si la pass actual es incorrecta → 401 (defensa session-hijack)."""
+def test_change_password_wrong_current_returns_400(client):
+    """Si la pass actual es incorrecta → 400: no es una sesión vencida, no manda al login."""
     _register(client, "userpass2", with_card=False)
     resp = client.post("/api/user/change-password", json={
         "current_password": "passwordIncorrecta",
         "new_password": "nuevapass456",
     })
-    assert resp.status_code == 401
+    assert resp.status_code == 400
     assert "incorrecta" in resp.json()["detail"].lower()
 
 
