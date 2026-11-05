@@ -1687,7 +1687,11 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         method = request.method.upper()
         path = request.url.path
         if method in _CSRF_SAFE_METHODS or path in _CSRF_EXEMPT_PATHS:
-            return await call_next(request)
+            response = await call_next(request)
+            # Una sesión válida sin csrf_token no podría escribir hasta volver a entrar.
+            if getattr(request.state, "sesion_valida", False) and not request.cookies.get(CSRF_COOKIE_NAME):
+                set_csrf_cookie(response)
+            return response
 
         # Solo nos importa si la sesion va por cookie. Sin cookie de sesion,
         # el caller usa Bearer (API/tests) y no es atacable via CSRF.
