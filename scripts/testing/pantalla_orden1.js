@@ -564,7 +564,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     await cargar(p, 'DE-A-SIN-USUARIO', [prod('Producto de A con el usuario caído', '84714900100D', 2, 10)]);
     const otro = await nuevoUsuario(ctx, 'ord1kb');
     caida = false;
-    await p.waitForFunction(() => document.getElementById('pestanaAjena').open, null, { timeout: 40000 });
+    const tapada = await p.waitForFunction(() => document.getElementById('pestanaAjena').open, null, { timeout: 40000 }).then(() => true, () => false);
     await p.waitForTimeout(2 * INTERVALO_MS);
     const ajenos = (await borradores(p)).filter(x => (x.texto || '').includes('"DE-A-SIN-USUARIO"'))
       .map(x => { try { return JSON.parse(x.texto).user; } catch (_) { return '?'; } });
@@ -574,6 +574,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     if (r) falla('quien entró después recupera la operación cargada antes de saber el usuario: ' + r);
     const aviso = await p.locator('#avisoBorrador').isVisible() ? await p.locator('#avisoBorrador').textContent() : '';
     if (!/Entró otro usuario/.test(aviso)) falla('entró otro usuario mientras la pestaña reintentaba y la pestaña no avisa que no guarda: «' + aviso + '»');
+    if (!tapada) falla('entró otro usuario mientras la pestaña reintentaba y la pestaña no se tapa');
     console.log('OK si otro usuario entra mientras la pestaña reintenta, la operación no queda a su nombre');
     await ctx.close();
   }
@@ -1117,7 +1118,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     await cargar(t, 'DE-A', [prod('Producto de A', '84714900100D', 2, 10)]);
     const otro = await nuevoUsuario(ctx, 'ord1z8b');
     soltar();
-    await t.waitForFunction(() => document.getElementById('pestanaAjena').open, null, { timeout: 10000 });
+    const tapada = await t.waitForFunction(() => document.getElementById('pestanaAjena').open, null, { timeout: 10000 }).then(() => true, () => false);
     // Hasta que avise o guarde a nombre del otro: guardar puede llevar un
     // guardado periódico más la consulta de la sesión nueva.
     for (const hasta = Date.now() + 4 * INTERVALO_MS; Date.now() < hasta;) {
@@ -1129,6 +1130,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     if (sobres.some(s => s.user === otro)) falla('entró otro usuario con la primera consulta del usuario en camino y lo cargado se guardó a nombre de él: ' + JSON.stringify(sobres));
     const aviso = await avisa(t) ? await t.locator('#avisoBorrador').textContent() : '';
     if (!/Entró otro usuario/.test(aviso)) falla('entró otro usuario con la primera consulta del usuario en camino y la pestaña no avisa: «' + aviso + '»');
+    if (!tapada) falla('entró otro usuario con la primera consulta del usuario en camino y la pestaña no se tapa');
     console.log('OK si entra otro usuario con la primera consulta en camino, no guarda a su nombre y avisa');
     await ctx.close();
   }

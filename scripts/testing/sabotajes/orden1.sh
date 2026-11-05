@@ -239,10 +239,10 @@ sabotaje $A "el reintento no espera entre pedidos" \
 export CASOS=k
 sabotaje $A "la pestaña no mira si la sesión cambió desde que abrió" \
   "FALLA: la operación cargada antes de saber el usuario se guardó a nombre de quien entró después" \
-  'if (sesionAntes !== sesionAlAbrir || getCsrfToken() !== sesionAlAbrir) {' 'if (false) {'
+  'if (sesionAntes !== sesionAlAbrir || getCsrfToken() !== sesionAlAbrir) marcarAjena();' ''
 sabotaje $A "al abrir con otra sesión no se avisa" \
   "FALLA: entró otro usuario mientras la pestaña reintentaba y la pestaña no avisa" \
-  '                    marcarAjena();' '                    sesionAjena = true;'
+  'getCsrfToken() !== sesionAlAbrir) marcarAjena();' 'getCsrfToken() !== sesionAlAbrir) sesionAjena = true;'
 
 # Devolución 20:08. Otro usuario entra con la pestaña abierta: no se guarda a
 # nombre de nadie y se avisa.
@@ -271,7 +271,7 @@ sabotaje $A "sale A, entra B y la sesión se confirma sin mirar el usuario" \
 export CASOS=m
 sabotaje $A "la sesión nueva del dueño no se recuerda" \
   "FALLA: el mismo usuario volvió a entrar y la pestaña dejó de guardar" \
-  '        sesionDelDueno = sesion;' ''
+  '        sesionDelDueno = sesion;' '        if (!currentUser) sesionDelDueno = sesion;'
 export CASOS=m2
 sabotaje $A "el aviso de sesión cerrada no se va al volver a entrar" \
   "FALLA: el mismo usuario volvió a entrar y la pestaña sigue avisando que no guarda" \
@@ -371,7 +371,7 @@ sabotaje $A "la primera consulta colgada no se corta" \
   "api('/auth/current_user', { signal: corte.signal })" "api('/auth/current_user')"
 sabotaje $A "el aviso de espera no se va cuando llega el usuario" \
   "FALLA: al recargar la consulta del usuario da error, cuando vuelve a contestar sigue el aviso" \
-  "                    if (avisoBorrador === 'red') avisarBorrador(null);" ''
+  "['sinsesion', 'red', 'comprobando'].includes(avisoBorrador)" "['sinsesion', 'comprobando'].includes(avisoBorrador)"
 
 # Con la sesión vencida (401) no se reintenta.
 export CASOS=r
@@ -380,7 +380,7 @@ sabotaje $A "un 401 no marca la sesión vencida" \
   "            if (err && err.message === 'unauthorized') sinSesion = true;" ''
 sabotaje $A "el reintento no corta con la sesión vencida" \
   "FALLA: con la sesión vencida la pestaña reintenta la consulta del usuario" \
-  ' && !sinSesion; espera' '; espera'
+  ' && !sinSesion && !sesionAjena; espera' ' && !sesionAjena; espera'
 
 # Con la red cortada al abrir, se reintenta.
 export CASOS=s
@@ -479,7 +479,7 @@ sabotaje $A "el aviso de otro usuario lo pisa cualquier otro" \
 export CASOS=z12
 sabotaje $A "la sesión confirmada no se recuerda" \
   "FALLA: A volvió a entrar (otra sesión) mientras la duplicada miraba si la original vive y la duplicada no recupera la operación al confirmar la sesión" \
-  $'        sesionDelDueno = sesion;\n' ''
+  '        sesionDelDueno = sesion;' '        if (!currentUser) sesionDelDueno = sesion;'
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
