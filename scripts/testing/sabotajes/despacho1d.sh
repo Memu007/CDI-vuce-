@@ -84,6 +84,16 @@ sabotaje $N "«Memoria activada» aparece aunque el guardado falle" \
   'if (guardado) avisarMemoriaActivada(cliente, op);' \
   'avisarMemoriaActivada(cliente, op);' \
   "FAILED $T::$A[no-guardado-asignar-ncm]"
+sabotaje $N "guardar-uso rechazado vuelve a contar como guardado" \
+  'guardado = res.ok && data.success === true && data.historial_guardado !== false;' \
+  'guardado = res.ok && data.historial_guardado !== false;' \
+  "FAILED $T::$X[asignar-ncm-rechazado]"
+sabotaje $F "la operación que no se arma vuelve a quedar callada" \
+  "                avisoDeLaOperacion = true;
+                CDI.toast && CDI.toast('No se guardó al cliente'," \
+  "                avisoDeLaOperacion = true;
+                false && CDI.toast('No se guardó al cliente'," \
+  "FAILED $T::test_si_la_operacion_no_se_arma_se_avisa"
 
 git checkout -q -- proyecto_maria/
 echo "fallas: $FALLAS"
