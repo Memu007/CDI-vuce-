@@ -206,6 +206,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+2026-11-05 21:57 UTC, rutina: límite semanal `allowed` en las tres sesiones. Técnica rehace COBRO-CORTE-1; MARIA sigue con SESION-1; DESPACHO-1d (`528961b`) en reproducción, sin D abiertas fuera de D69.
+
 2026-11-05 22:00 UTC: **COBRO-CORTE-1 vuelve otra vez** (`0b9ccde`): lo de la vuelta anterior está, pero se cobra antes de entregar (falla al escribir el TXT: 500 y el reintento cuenta otra, reproducido) y una respuesta tardía le pasa el id a la carga siguiente (Opus y Sonnet por separado). Más, a cero: NUL/surrogate en el id da 500, aviso de borrar cliente, candado en `delete_cliente`. CATALOGO-LARGO-2: sí de Emi (21:41).
 
 2026-11-05 21:35 UTC: **RENDIMIENTO-1d aceptada** (`558c941`, MARIA): la salida del hijo ya no pierde texto (surrogate suelto o locale que no es UTF-8); tope de 64 K y fila por usuario con caso y sabotaje (12 ROJO). Mi ejemplo distinto, rojo en la base. Sin integrar, por lo mismo que `ca87d82`. Sigue DESPACHO-1d.
