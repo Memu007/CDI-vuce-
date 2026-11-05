@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: el catálogo del proveedor guarda entero el origen y el nombre del proveedor (CATALOGO-LARGO-2)
+
+- Un origen como «TAIWAN» o un proveedor de más de 200 caracteres se guardan enteros en el catálogo, al cambiar un producto y al confirmar un NCM; antes, en Postgres, daban 500 o «guardado» sin guardar.
+- Una descripción sin letras latinas ni dígitos (por ejemplo «螺丝» o un emoji) se guarda con su propia clave y no se cruza con otra.
+- Confirmar un NCM cuenta el tope de 2000 caracteres de la descripción igual que el catálogo.
+
 ## 2026-11-05 · fix: una sesión vale sólo si es la vigente, en todos lados (SESION-1, devolución)
 
 - Un solo lugar decide si un token es una sesión: lo usan las páginas, `/auth/me`, la telemetría y cerrar sesión. El link para verificar el email ya no abre sesión: después de verificar hay que entrar.

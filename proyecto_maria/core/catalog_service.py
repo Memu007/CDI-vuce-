@@ -73,6 +73,14 @@ def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip()
 
 
+def clave_de_producto(descripcion: str) -> str:
+    """Clave del producto en el catálogo. Sin letras latinas ni dígitos (CJK,
+    emoji) la normalización queda vacía: la clave es el texto en NFC sin
+    mayúsculas ni espacios de más, para que cada uno tenga la suya."""
+    clave = _normalize(descripcion)
+    return clave or " ".join(unicodedata.normalize("NFC", descripcion).lower().split())
+
+
 def _vendor_key(vendor_name: str) -> str:
     """Genera la clave del proveedor (slug)."""
     return re.sub(r"\s+", "_", _normalize(vendor_name))[:60]
@@ -266,7 +274,7 @@ async def match_items(
             "producto_key": None,
         }
 
-        desc_key = _normalize(desc)
+        desc_key = clave_de_producto(desc)
         if desc_key in productos:
             prod = productos[desc_key]
             result.update({
@@ -354,9 +362,7 @@ async def save_products(
         if not desc:
             continue
 
-        product_key = _normalize(desc)
-        if not product_key:
-            continue
+        product_key = clave_de_producto(desc)
 
         unidad = prod.get("unidad_medida")
         precio = prod.get("valor_unitario")
@@ -482,8 +488,8 @@ async def update_product(
 
     new_key = product_key
     if new_desc:
-        candidate = _normalize(new_desc)
-        if candidate and candidate != product_key:
+        candidate = clave_de_producto(new_desc)
+        if candidate != product_key:
             colision_stmt = select(VendorCatalogProduct).where(
                 VendorCatalogProduct.owner_username == owner_username,
                 VendorCatalogProduct.vendor_id == vendor_id,

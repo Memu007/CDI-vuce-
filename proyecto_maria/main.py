@@ -1240,8 +1240,9 @@ async def _migrate_widen_pieza_column():
 
 
 async def _migrate_catalogo_sin_tope():
-    """Lleva product_key y descripcion del catálogo a text: el tope lo pone MAX_DESCRIPCION como 400.
-    Si falla, el arranque se detiene: con el tope viejo, guardar-uso respondería sin guardar."""
+    """Lleva product_key, descripcion, origen y vendor_nombre del catálogo a text: el tope de la
+    descripción lo pone MAX_DESCRIPCION como 400. Si falla, el arranque se detiene: con el tope
+    viejo, guardar-uso respondería sin guardar."""
     from proyecto_maria.database.connection import engine, IS_SQLITE
 
     if IS_SQLITE:
@@ -1252,7 +1253,7 @@ async def _migrate_catalogo_sin_tope():
         await conn.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
         res = await conn.exec_driver_sql(
             "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() "
-            "AND table_name = 'vendor_catalog_products' AND column_name IN ('product_key', 'descripcion') "
+            "AND table_name = 'vendor_catalog_products' AND column_name IN ('product_key', 'descripcion', 'origen', 'vendor_nombre') "
             "AND character_maximum_length IS NOT NULL"
         )
         for (columna,) in res.fetchall():
@@ -9689,20 +9690,20 @@ async def delete_ncm_nota(
 # parámetros de los SQLite viejos.
 _HISTORIAL_FILAS_POR_SENTENCIA = 150
 
-# Topes de lo que se guarda en el historial. La descripción, el mismo de un
-# renglón del despacho (`despacho_lector._MAX_DESCRIPCION`); la NCM, el de
-# las columnas de NCM del resto de la base (String(20)). Sin tope, 30 MB
-# entraban en una sola confirmación.
-_HISTORIAL_MAX_DESCRIPCION = 2000
+# Tope de la NCM del historial, el de las columnas de NCM del resto de la
+# base (String(20)). Sin tope, 30 MB entraban en una sola confirmación.
 _HISTORIAL_MAX_NCM = 20
 
 
 def _problema_historial(descripcion: str, ncm: str) -> str | None:
     """Por qué el historial no puede guardar este par, o None. Postgres no
-    guarda el carácter nulo y ninguna base guarda medio par UTF-16."""
-    for que, texto, tope in (("La descripción", descripcion, _HISTORIAL_MAX_DESCRIPCION),
-                             ("La NCM", ncm, _HISTORIAL_MAX_NCM)):
-        if len(texto) > tope:
+    guarda el carácter nulo y ninguna base guarda medio par UTF-16. La
+    descripción se cuenta en NFC, como en el catálogo y la memoria del cliente."""
+    for que, texto, largo, tope in (
+            ("La descripción", descripcion, len(unicodedata.normalize("NFC", descripcion)),
+             catalog_svc.MAX_DESCRIPCION),
+            ("La NCM", ncm, len(ncm), _HISTORIAL_MAX_NCM)):
+        if largo > tope:
             return f"{que} pasa de {tope} caracteres."
         if "\x00" in texto:
             return f"{que} tiene un carácter nulo."
@@ -10238,10 +10239,6 @@ async def guardar_uso_ncm(
     problema = _problema_historial(descripcion, ncm)
     if problema:
         raise HTTPException(status_code=400, detail=problema)
-    try:
-        catalog_svc.validar_largo(descripcion)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
     # Las memorias persistentes usan la NCM base: obligan a volver a confirmar
     # la posición SIM/DC en VUCE en lugar de reutilizar una letra antigua.
