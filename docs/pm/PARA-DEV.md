@@ -58,6 +58,10 @@ y se la propongo a Emi. Mientras, una organización `active` en sus días de
 gracia, con la fila del miembro con días, ve «dejás de usar CDI» y sigue con
 acceso al cancelar.
 
+Al integrar `885ee89` entraron también tus commits de COBRO-CORTE-1,
+COBRO-MP-2, AISLAMIENTO-2, LIMPIEZA-1 y BACKUP-1a, que están debajo. No
+quedan aceptadas por eso y tu orden no cambia.
+
 La pieza queda ✅ y se integra a mi rama hasta `885ee89`, junto con
 ORDEN-1b.
 
