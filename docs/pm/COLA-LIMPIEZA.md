@@ -15,3 +15,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   `main.py:1401`: comentarios de 3 a 5 líneas, a una o dos con el porqué.
 - La migración del historial deja el NCM y la descripción como estaban
   escritos (`'3926 90 90'`) en la fila que queda: dejarlos canónicos.
+- `scripts/testing/pantalla_orden1.js:280`: la función anónima del arnés
+  (1520 líneas) se parte por grupo de casos; los sabotajes de `orden1.sh` y
+  `orden1b.sh` se reanclan en la misma pieza.
