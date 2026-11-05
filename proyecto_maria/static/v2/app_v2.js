@@ -100,7 +100,7 @@
             if (sesionAjena) return;
             // Salvo un 401 (ya no había sesión), el cierre no se confirmó.
             if (e.message !== 'unauthorized') {
-                const motivo = e.message === ERROR_SIN_SESION ? e.message : 'No hubo respuesta del servidor. La sesión sigue abierta.';
+                const motivo = e.message === ERROR_SIN_SESION ? e.message : 'El cierre no se confirmó. La sesión sigue abierta.';
                 toast('No se pudo cerrar la sesión', motivo, 'error');
                 return;
             }

@@ -1681,9 +1681,6 @@ def set_csrf_cookie(response: Response) -> None:
     )
 
 
-_CSRF_LOGOUT_PATHS = ("/auth/logout", "/logout")
-
-
 class CSRFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         method = request.method.upper()
@@ -1695,9 +1692,9 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         ):
             return await call_next(request)
 
-        # Sin cookie de sesion el caller usa Bearer y no es atacable via CSRF.
-        # Cerrar sesión sí: su efecto son los Set-Cookie de la respuesta.
-        if request.cookies.get("access_token") or path in _CSRF_LOGOUT_PATHS:
+        # Solo nos importa si la sesion va por cookie. Sin cookie de sesion,
+        # el caller usa Bearer (API/tests) y no es atacable via CSRF.
+        if request.cookies.get("access_token"):
             cookie_token = request.cookies.get(CSRF_COOKIE_NAME)
             header_token = request.headers.get(CSRF_HEADER_NAME)
             valid = (
@@ -2908,10 +2905,12 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
     }
 
 @app.post("/auth/logout")
-async def logout(response: Response):
+async def logout(request: Request, response: Response):
     """Cierra sesión eliminando la cookie"""
-    response.delete_cookie("access_token")
-    response.delete_cookie(CSRF_COOKIE_NAME)
+    # Un form de otro sitio llega sin cookies y sin pasar por CSRF: no tiene que borrar nada.
+    if request.cookies.get("access_token"):
+        response.delete_cookie("access_token")
+        response.delete_cookie(CSRF_COOKIE_NAME)
     return {"message": "Sesión cerrada"}
 
 # ============== BACKUP/RESTORE LOCALSTORAGE ==============
@@ -9802,10 +9801,9 @@ async def get_auth_me(authorization: str = Header(None), db: AsyncSession = Depe
 
 # /logout is called by the frontend (app.js), must delete the auth cookie
 @app.post("/logout")
-def logout_root(response: Response):
-    """Cierra sesión eliminando la cookie (alias de /auth/logout)"""
-    response.delete_cookie("access_token")
-    return {"message": "Sesión cerrada"}
+async def logout_root(request: Request, response: Response):
+    """Alias de /auth/logout"""
+    return await logout(request, response)
 
 @app.get("/features_integration.js")
 def features_integration_js():

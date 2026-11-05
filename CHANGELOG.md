@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-11-05 · fix: cerrar sesión desde otro sitio ya no borra la sesión (CSRF-1, vuelta 2)
 
-- **fix(seguridad):** `/auth/logout` y `/logout` piden el token CSRF aunque no llegue la cookie de sesión, así un formulario de otro sitio no puede cerrarle la sesión a nadie. «Salir» sin respuesta del servidor avisa y no lleva al inicio con la sesión abierta.
+- **fix(seguridad):** `/auth/logout` y `/logout` sólo borran cookies si llegó la de sesión: un formulario de otro sitio, que llega sin cookies, ya no cierra la sesión, esté o no exigido el token CSRF. El alias delega en `/auth/logout` y ahora también borra `csrf_token`. Si el cierre no se confirma, «Salir» avisa y no lleva al inicio.
 
 ## 2026-11-05 · fix: con CSRF exigido, la telemetría de la página llega y cerrar sesión pide el token (CSRF-1)
 
