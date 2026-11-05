@@ -83,6 +83,9 @@ sabotaje $L "el hijo devuelve las mitades de par sueltas" \
   '_MEDIO_PAR.sub("\ufffd", json.dumps(resultado, ensure_ascii=False))' \
   'json.dumps(resultado, ensure_ascii=False)' \
   "FAILED $T::test_lo_que_saca_el_hijo_vuelve_entero[DCFF"
+sabotaje $L "el hijo escribe con la codificación del locale" \
+  'sys.stdout.buffer.write(salida.encode("utf-8"))' 'sys.stdout.write(salida)' \
+  "FAILED $T::test_el_hijo_escribe_utf8_aunque_su_salida_no_lo_sea[texto]"
 sabotaje $L "el turno del usuario no se suelta" \
   'fila[0].release()' 'pass' \
   "FAILED $T::test_dos_del_mismo_usuario_uno_tras_otro_y_a_la_vez"
