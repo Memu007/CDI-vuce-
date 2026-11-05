@@ -207,6 +207,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-11-05 05:56 UTC: sin entregas nuevas. MARIA en DESPACHO-1b vuelta 5 (b5fb03a, sin informe); técnica en COBRO-MP-1 vuelta 4 (informe a medias). Límite semanal «allowed» en las tres; contexto 139k y 138k.
+
 2026-11-05 05:20 UTC: **ORDEN-1b vuelta 2: devolución corta, sólo de pruebas.** El producto se sostiene (24 + 76 sabotajes en rojo). Falta un caso: si la lectura de la cookie en `loadCurrentUser` se mueve después de la respuesta, el arnés sigue verde y al volver del pago se escribe a nombre de otro usuario. Lo reproduje. D50 (a), a la cola. El contenedor se reinició a las ~04:30 y la revisión se relanzó.
 
 2026-11-05 02:40 UTC: **DESPACHO-1b vuelta 4: devolución por una causa.** Si otro pedido cambia la clave o borra la fila mientras se escribe, el uso se pierde (guardar-uso contesta éxito igual). Lo demás se sostiene: migración en Postgres, aislamiento, 8 puntos. Rojo de entorno aparte: `test_excel2…al_borde_del_tope` falla también en `1f5480e`.
