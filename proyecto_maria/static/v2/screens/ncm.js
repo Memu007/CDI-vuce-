@@ -1846,7 +1846,7 @@
                 })
             });
             const data = await res.json().catch(() => ({}));
-            guardado = res.ok && data.success === true && data.historial_guardado !== false;
+            guardado = data.success === true && data.historial_guardado !== false;
         } catch (_) { /* red caída o plan vencido: el mismo aviso */ }
         if (!guardado && CDI.toast) {
             CDI.toast('No se guardó en la memoria de productos',
