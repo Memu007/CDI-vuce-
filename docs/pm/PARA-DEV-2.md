@@ -29,6 +29,20 @@ estaba escrito antes del 04/11 no se reescribe: su aviso se explica como
 «ya escrito, va a la cola de limpieza» y tu informe propone la línea; la
 PM la pasa a `COLA-LIMPIEZA.md`. Lo nuevo de la vuelta sí cumple §6.
 
+## Piezas nuevas que aprobó Emi el 04/11 (PM)
+
+Tu cola queda: DESPACHO-1b vuelta 4 → RENDIMIENTO-1c → **CATALOGO-LARGO-1**
+→ SESION-1 → ABUSO-1 → SUFIJOS-2+SEGURO-1 → **SEGURO-2** → EMAIL-1 →
+CONEXIONES-1 → OBSERVABILIDAD-1 → ORG-1+D40. El detalle, al activarlas:
+
+- **CATALOGO-LARGO-1 (datos):** con cliente y proveedor, una descripción de
+  301 a 2000 caracteres no se pierde en silencio en la memoria del cliente
+  ni en el catálogo (`product_key` de 300, `descripcion` de 500): se guarda
+  o da un error a la vista, nunca 200 sin guardar. Migración, si hace
+  falta, probada en Postgres descartable.
+- **SEGURO-2 (TXT):** lo que SEGURO-1 sólo avisa frena la generación hasta
+  que se corrija, también el 1 % mandado sin calcular (D30 b).
+
 ## Cómo trabajás
 
 `AGENTS.md`, `CLAUDE.md`, `docs/pm/ONBOARDING-DEV.md` y los comandos

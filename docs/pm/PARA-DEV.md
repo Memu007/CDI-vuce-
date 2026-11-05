@@ -29,6 +29,22 @@ estaba escrito antes del 04/11 no se reescribe: su aviso se explica como
 «ya escrito, va a la cola de limpieza» y tu informe propone la línea; la
 PM la pasa a `COLA-LIMPIEZA.md`. Lo nuevo de la vuelta sí cumple §6.
 
+## Piezas nuevas que aprobó Emi el 04/11 (PM)
+
+Tu cola queda: COBRO-MP-1 vuelta 3 + D13 (c) → ORDEN-1b vuelta 2 →
+**CSRF-1** → COBRO-CORTE-1 → COBRO-MP-2 → **COBRO-MP-3** →
+AISLAMIENTO-2/LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. El detalle de cada una te
+lo escribo al activarla; esto es lo que tiene que pasar:
+
+- **CSRF-1 (chica):** con `CSRF_ENFORCE=true`, la telemetría v2 que manda la
+  página llega (hoy `/api/session/state` da 403) y un pedido sin token desde
+  otro origen no; cerrar sesión pide el token (D16 b) y el botón de la
+  página sigue funcionando. Rojo antes en cada uno.
+- **COBRO-MP-3 (plata, revisión fuerte):** las consultas a Mercado Pago no
+  frenan el servidor (D8 a: un hilo con tope, sugerencia); el aviso de pago
+  tiene límite de pedidos; un aviso sin firma verificable no cambia nada.
+  Sin Mercado Pago real.
+
 ## Cómo trabajás
 
 `AGENTS.md`, `CLAUDE.md`, `docs/pm/ONBOARDING-DEV.md` y los comandos

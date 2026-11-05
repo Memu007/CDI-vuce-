@@ -345,3 +345,17 @@ rutinas pasan a cada 2 horas de 8 a 22 y a las 2 y a las 5 de Argentina (PM
 minuto 55, técnica 15, MARIA 35); son menos vueltas que antes en total (la
 PM bajaba de 24 a 10 por día). Siguen sin aplicarse el consejero para las
 Devs, Fable como subagente y el «muy alto» para las Devs.
+
+## 2026-11-04 — Respuestas de Emi a lo pendiente (Emi)
+
+Emi, 04/11 ~19:10 de Argentina. **Claves:** las cambia ella más adelante,
+«ahora está en prueba»; sigue pendiente. **`8b45207`** (publicada el 24/10):
+la probó y funciona bien. **Seguridad del cobro:** «si vamos a cobrar por
+Mercado Pago, sí; hay que hacer los webhooks y todo lo que haga falta»:
+entra COBRO-MP-3 (técnica, después de COBRO-MP-2). **Arreglos chicos de
+seguridad:** sí: CSRF-1 (técnica: telemetría v2 con CSRF y el logout, D16
+b). **Pieza por la descripción larga que se pierde:** sí: CATALOGO-LARGO-1
+(MARIA, después de RENDIMIENTO-1c). **SEGURO-2:** sí (D30 b; MARIA, después
+de SUFIJOS-2 y SEGURO-1). **Re-estimar fechas:** sí: dos semanas más, el
+piloto cierra el 07/02 (`ROADMAP.md`). Orden de las colas: decidido por la
+PM.

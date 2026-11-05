@@ -16,10 +16,16 @@ seguridad, esfuerzo medio).
 | Semanas | Fechas | Fase | Está lista cuando… |
 |---|---|---|---|
 | 1 y 2 | 26/10 al 08/11 | **1b · El TXT entra al MARIA sin tocarlo** | la factura de lonas del 24/10, subida tal como vino, da un TXT que el MARIA carga sin errores (subítems, sufijos, unidades, flete, ajustes) |
-| 3 y 4 | 09/11 al 22/11 | **1c · Pruebas con el despachante** y sufijos automáticos | el despachante prueba 3 o 4 operaciones reales en dos sesiones (cada 15 días) y no corrige nada a mano salvo lo que decide él |
-| 5 y 6 | 23/11 al 06/12 | **2 · El cobro** con Mercado Pago | pagás con tu tarjeta y ves alta, cobro, cancelación y corte |
-| 7 a 9 | 07/12 al 27/12 | **3 · Seguridad y datos, a fondo** | una auditoría nueva y completa no encuentra nada grave, y está publicado |
-| 10 a 13 | 28/12 al 24/01 | **4 · Piloto** con 3 a 5 estudios | tres estudios presentaron un MARIA hecho con CDI |
+| 3 y 4 | 16/11 al 29/11 | **1c · Pruebas con el despachante** y sufijos automáticos | el despachante prueba 3 o 4 operaciones reales en dos sesiones (cada 15 días) y no corrige nada a mano salvo lo que decide él |
+| 5 a 7 | 30/11 al 20/12 | **2 · El cobro** con Mercado Pago | pagás con tu tarjeta y ves alta, cobro, cancelación y corte |
+| 8 a 10 | 21/12 al 10/01 | **3 · Seguridad y datos, a fondo** | una auditoría nueva y completa no encuentra nada grave, y está publicado |
+| 11 a 14 | 11/01 al 07/02 | **4 · Piloto** con 3 a 5 estudios | tres estudios presentaron un MARIA hecho con CDI |
+
+**Fechas re-estimadas el 04/11 (Emi: «dale»):** dos semanas más que el plan
+del 24/10. Una por la pausa del 29/10 al 04/11; otra en el cobro, por la
+línea de seguridad de Mercado Pago que Emi sumó el 04/11. El piloto, que
+cerraba el 24/01, cierra el 07/02. Se vuelven a mirar después de la primera
+sesión con el despachante.
 
 **Lo que hacés vos:**
 - **Esta semana:** el «dale» para publicar la mejora del Excel (EXCEL-2,
@@ -102,6 +108,7 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 | 5 | ⏳ PESO-NETO-1 | El peso neto sale del packing list cuando la factura sólo trae bruto; si no hay packing list, el aviso de hoy | un packing list, tapado, de cualquier operación (las lonas no tienen; mientras, el aviso de hoy) |
 | 6 | ⏳ MARIA-6 | Identificadores y sufijos como en los archivos reales del despachante (M7, M11) | sus archivos TXT reales (los despachos del 28/10 muestran los sufijos, no el TXT) |
 | 7 | 🔵 DESPACHO-1 | Sumada por Emi el 28/10; ubicada por la PM (Emi: «acomodalo dónde digas»): después de ORG-1, detrás de las piezas que hacen entrar el TXT; como todas esperan al despachante, se hace la primera que tenga lo suyo; tiene que estar lista antes del piloto (28/12), porque es lo que facilita sumar estudios. Para que un despachante que viene de otro sistema arme rápido el catálogo de sus clientes con despachos que ya tiene, y después haga el predespacho en CDI con ese catálogo. El despacho oficializado es el formulario OM-1993-A SIM que el despachante imprime y firma después de oficializar en el MARIA; trae por ítem y subítem la posición SIM, los sufijos, el origen, la procedencia, el estado, la unidad, la cantidad, el FOB y el peso neto (normativa de ARCA, búsqueda del 28/10). Subir un despacho ya oficializado para armar el catálogo del cliente: se lee por renglón la posición SIM, la descripción, los sufijos, el origen, la unidad, el valor unitario y el peso; se revisa y se edita en pantalla antes de guardar en el catálogo de ese cliente; el catálogo del cliente se puede bajar en Excel, o en el formato que usen los despachantes si la pregunta 6 trae uno. Nunca arma un TXT ni una operación (el lector de facturas sigue rechazando despachos); lo que no se encontró queda marcado, no se rellena | tres despachos oficializados del despachante, del 28/10 (los reales sólo fuera del repo; las pruebas usan un sintético con la forma de `DESPACHOS-FORMA.md`) |
+| 8 | ⚪ SEGURO-2 | Sumada por Emi el 04/11 (D30 b): lo que SEGURO-1 sólo avisa frena la generación hasta que se corrija, también el 1 % mandado sin calcular | respuesta del despachante del 28/10 |
 
 **Dev técnica:**
 
@@ -116,20 +123,21 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 **Cierre de la Fase 1c (cierra G4):** dos sesiones con el despachante, 3 o
 4 operaciones reales cargadas en el MARIA sin corregir el TXT a mano.
 
-### Fase 2 — Cobro (semanas 5 y 6)
+### Fase 2 — Cobro (semanas 5 a 7)
 
 | Pieza | Quién | Qué arregla |
 |---|---|---|
 | 🔵 COBRO-MP-1 | Dev técnica | Aviso de pago verificado, aplicado una vez, con el monto controlado; las renovaciones extienden el período (C3, D8) |
 | 🔵 COBRO-CORTE-1 | Dev técnica | Quien no paga no genera ni gasta Gemini; contar una vez por operación sin pasarse del tope (también con guardados a la vez); el aviso dice la razón real (C1, C5, C6; D4 b N = 10, D5 a, D6 a) |
 | 🔵 COBRO-MP-2 | Dev técnica | Cancelar también en Mercado Pago sin perder días pagados, una sola suscripción, reactivar pagando (C2, C4, C8, D9) |
+| ⚪ COBRO-MP-3 | Dev técnica | Sumada por Emi el 04/11: las consultas a Mercado Pago no frenan el servidor (D8 a); el aviso de pago tiene límite de pedidos; un aviso sin firma verificable no cambia nada |
 | ⏳ PRORRATEO-1 | Dev MARIA | El reparto ítem por ítem de ajustes, seguro y flete hasta el FOB casillero, con las sumas exactas al centavo (segunda etapa acordada el 24/10) |
 | ✅ ORG-1 | Dev MARIA | Invitaciones que funcionan, tope de usuarios del plan, atadas al email (C7) |
 | ⏳ LEGAL-1 | Dev MARIA | Términos y privacidad con el texto de Emi; aviso de que CDI es un asistente y el despachante revisa; cómo pedir el borrado de datos (X5) |
 
 **Cierre:** publicar; el pago chico de Emi recorre todo el ciclo (cierra G7).
 
-### Fase 3 — Seguridad y datos, a fondo (semanas 7 a 9)
+### Fase 3 — Seguridad y datos, a fondo (semanas 8 a 10)
 
 Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 
@@ -142,6 +150,8 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | 🔵 AISLAMIENTO-2 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | 🔵 LIMPIEZA-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | 🔵 OBSERVABILIDAD-1 | Dev MARIA | La columna `api_logs.owner_username` que falta en producción, con migración probada en Postgres descartable |
+| ⚪ CATALOGO-LARGO-1 | Dev MARIA | Sumada por Emi el 04/11: una descripción larga (301 a 2000 caracteres) no se pierde en silencio en la memoria del cliente ni en el catálogo (`product_key` de 300); con migración probada en Postgres descartable si hace falta |
+| ⚪ CSRF-1 | Dev técnica | Sumada por Emi el 04/11: con el control CSRF prendido, la telemetría de la página llega y cerrar sesión pide el token (D16 b) |
 | ✅ DATOS-1 | Dev MARIA | Borrar un cliente con presupuesto; `/health` honesto; sin detalles de error al público (D5, D2, D6 de `AUDITORIA-2026-10-06.md`) |
 | 🔵 BACKUP-1 | Dev técnica (pasada por la PM el 28/10) | Ver `AUDITORIA-2026-10-06.md`. BACKUP-1a: copia y restauración probada; el destino fuera de Railway y dónde se programa esperan a Emi |
 | 🔵 DISCO-1 | Dev MARIA | El historial de NCM de cada estudio pasa del disco de Railway a la base (D4 de `AUDITORIA-2026-10-06.md`) |
@@ -150,7 +160,7 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 **Cierre:** publicar y probar volver atrás (cierra G3 y G6). Recién ahí
 entra el primer estudio nuevo.
 
-### Fase 4 — Piloto (semanas 10 a 13)
+### Fase 4 — Piloto (semanas 11 a 14)
 
 Con el kit `wave1_*`. Los estudios más tolerantes, no los más grandes; el
 despachante de la prueba, primero. Cierra G8.
