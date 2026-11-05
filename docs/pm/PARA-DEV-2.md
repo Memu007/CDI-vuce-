@@ -77,45 +77,18 @@ despacho1b 138, disco1 46 y catalogolargo1 12 en rojo; suite con Postgres
 piezas con devolución abierta (SESION-1, ABUSO-1, OBSERVABILIDAD-1, SUFIJOS-2,
 ORG-1). No tenés que hacer nada por esto: seguí con RENDIMIENTO-1d.
 
-## RENDIMIENTO-1d: devolución corta, sobre `aaed661` (2026-11-05 20:15 UTC, PM)
+## RENDIMIENTO-1d: aceptada sobre `558c941`, sin integrar (2026-11-05 21:35 UTC, PM)
 
-Va antes que DESPACHO-1d: terminá el paso en que estás de DESPACHO-1d,
-dejalo commiteado sin entregar, y volvé acá. Acta:
-`docs/pm/REPRODUCCION-RENDIMIENTO-1d-2026-11-05.md`.
+Las tres cosas quedan: la salida del hijo no pierde texto (también con un
+locale que no es UTF-8, bien visto), el tope de 64 K y la fila por usuario
+tienen caso y sabotaje. Probé otro ejemplo: `DBFF` con «€», `DFFF` con un
+emoji en un par válido, y el hijo en `ascii` y `cp1252`. Verde en `558c941`,
+rojo en la base. Acta: `REPRODUCCION-RENDIMIENTO-1d-v2-2026-11-05.md`.
 
-**Causa.** Lo que vuelve del proceso aparte se pierde según cómo se escribe.
-Un PDF cuyo texto trae un surrogate suelto (`\ud800`) hace fallar
-`json.dumps(..., ensure_ascii=False)` al `stdout` del hijo
-(`despacho_lector.py:810`): el hijo sale con 1 y el vendedor queda vacío. En
-`f5d227c` el mismo PDF daba `'ACME TRADING CO LTD'`; en `aaed661` da `None`.
-Es una regresión de la pieza.
-
-Pido:
-
-1. Que ningún texto que el hijo pueda extraer se pierda al volver, en los dos
-   modos (`texto` y `leer`). Un caso de la familia con datos: surrogate suelto,
-   y al menos otro texto que no sea UTF-8 válido o que rompa la
-   serialización. Rojo primero sobre `aaed661`.
-2. Un caso que distinga el tope de 64 K: hoy sacar el recorte, o ponerlo en
-   64 MB, pasa 12 de 12. (El adversario lo logró con un PDF de 891 bytes: 120
-   líneas de 1000 «A».)
-3. Un caso con dos pedidos del mismo usuario, uno detrás del otro y a la
-   vez, que dé rojo si no se suelta la fila por usuario o si no se borra la
-   entrada (`fila[0].release()`, `del filas[clave]`): hoy los dos sabotajes
-   pasan.
-
-En el informe, el rojo de cada uno con su arreglo o caso revertido.
-
-**D63:** (a), como recomendás: el tope de 8 MB por flujo vale también para el
-texto del vendedor.
-**D67:** (b), pieza aparte y chica, después de SESION-1. No entra acá.
-
-**Tus propuestas.** La de `CLAUDE.md` §5 es cierta (verifiqué `ci.yml:45`: no
-hay `--deselect`) pero ese archivo no es mío ni tuyo: va a la cola de
-limpieza para que lo decida Emi. `tmp_path` en
-`test_maria1b_devolucion` y `test_excel2.py:512`: a la cola de limpieza.
-
-Orden: RENDIMIENTO-1d (esta vuelta) → DESPACHO-1d → SESION-1 → resto.
+- Se integra junto con `ca87d82`, por lo mismo: lo de abajo sin aceptar.
+- D67 repetida: de acuerdo con «D67 (id a 60)». Tu próxima es D69.
+- Hallazgo 2 de tu `/code-review` (par partido en dos glifos): queda así.
+- **Sigue DESPACHO-1d**, que ya tenés hecho: cerralo con `/entregar`.
 
 ## DESPACHO-1c: aceptada sobre `fbbb2ad`, sin integrar todavía (2026-11-05 19:05 UTC, PM)
 
