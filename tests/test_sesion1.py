@@ -386,6 +386,24 @@ def test_la_clave_actual_tiene_tope_de_intentos():
     assert _entra(_login(u)) == 200, "el tope cambió la clave"
 
 
+def test_el_tope_de_la_clave_actual_vale_para_pedidos_a_la_vez():
+    """Veinte cambios de clave equivocados a la vez: llegan a probarse a lo
+    sumo cinco, el resto da 429 sin mirar la clave."""
+    import httpx
+    u, _ = _usuario()
+    t = _login(u)
+
+    async def rafaga():
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://t") as c:
+            return await asyncio.gather(*(
+                c.post("/api/user/change-password", headers=_bearer(t),
+                       json={"current_password": f"otra-cosa-{i}!", "new_password": CLAVE2})
+                for i in range(20)))
+
+    codigos = sorted(r.status_code for r in asyncio.run(rafaga()))
+    assert codigos.count(400) <= 5 and set(codigos) <= {400, 429}, codigos
+
+
 # --- un solo lugar decide si un token vale -----------------------------------
 
 def _token_firmado(payload, clave=None):
