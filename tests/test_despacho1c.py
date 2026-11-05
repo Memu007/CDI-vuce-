@@ -60,6 +60,8 @@ def test_lo_que_no_quedo_en_la_memoria_se_avisa(escenario, guardado):
     avisos = [t for t in toasts if t["tipo"] == "warning"]
     if guardado:
         assert avisos == [], toasts
+        if escenario == "asignar-cliente":
+            assert toasts and toasts[-1]["titulo"] == "Cliente guardado", toasts
     else:
         # toast reemplaza al anterior: el aviso tiene que ser lo último a la vista
-        assert toasts and toasts[-1]["tipo"] == "warning", toasts
+        assert toasts and toasts[-1]["tipo"] == "warning" and "memoria" in toasts[-1]["titulo"], toasts

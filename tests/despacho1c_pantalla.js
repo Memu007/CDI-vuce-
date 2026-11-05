@@ -62,10 +62,12 @@ function armar(fuente, extraCDI) {
   return { CDI, node, handlers, toasts, llamadas, ponerCliente: c => { cliente = c; } };
 }
 
+// Sin red real todo sigue en microtareas, y setImmediate corre recién con esa cola vacía:
+// una vuelta después de ver la llamada, la pantalla ya procesó la respuesta.
 const vaciar = () => new Promise(r => setImmediate(r));
 async function esperarRed(app, url) {
-  for (let i = 0; i < 50 && !app.llamadas.some(u => u.endsWith(url)); i++) await vaciar();
-  for (let i = 0; i < 20; i++) await vaciar();
+  let i = 0;
+  do await vaciar(); while (++i < 50 && !app.llamadas.some(u => u.endsWith(url)));
   if (!app.llamadas.some(u => u.endsWith(url))) throw new Error('la pantalla no llamó a ' + url);
 }
 

@@ -56,12 +56,12 @@ if ! "${PRUEBA[@]}" >/dev/null 2>&1; then
 fi
 
 sabotaje $M "la consulta vacía se compara igual" \
-  '        if desc_norm and guardada and (desc_norm in guardada or guardada in desc_norm):' \
-  '        if guardada and (desc_norm in guardada or guardada in desc_norm):' \
+  '        historial = await load_ncm_historial(db, user["username"]) if desc_norm else {}' \
+  '        historial = await load_ncm_historial(db, user["username"])' \
   "FAILED $T::$V[consulta-japones]"
 sabotaje $M "la fila guardada vacía se compara igual" \
-  '        if desc_norm and guardada and (desc_norm in guardada or guardada in desc_norm):' \
-  '        if desc_norm and (desc_norm in guardada or guardada in desc_norm):' \
+  '        if guardada and (desc_norm in guardada or guardada in desc_norm):' \
+  '        if (desc_norm in guardada or guardada in desc_norm):' \
   "FAILED $T::$V[guardada-japones]"
 sabotaje $F "guardar la operación no avisa lo que no quedó en la memoria" \
   '                if (data.historial_guardado === false) {' \
@@ -71,6 +71,10 @@ sabotaje $F "«Cliente guardado» tapa el aviso" \
   '        if (guardado.historial_guardado !== false && CDI.toast) {' \
   '        if (CDI.toast) {' \
   "FAILED $T::$A[no-guardado-asignar-cliente]"
+sabotaje $F "lo guardado ya no dice «Cliente guardado»" \
+  '        if (guardado.historial_guardado !== false && CDI.toast) {' \
+  '        if (false) {' \
+  "FAILED $T::$A[guardado-asignar-cliente]"
 sabotaje $N "confirmar la posición no avisa lo que no quedó en la memoria" \
   '            if (res.ok && data.historial_guardado === false && CDI.toast) {' \
   '            if (false) {' \
