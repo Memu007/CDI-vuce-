@@ -58,15 +58,15 @@ def _token_de_la_request(request: Request) -> str | None:
     return token or None
 
 
-def revocar_sesiones(user: User, conservar_jti: str | None = None) -> None:
-    """Revoca todas las sesiones del usuario salvo, si se pide, la del jti dado.
+def revocar_sesiones(user: User) -> None:
+    """Revoca todas las sesiones del usuario.
 
     El mecanismo es `active_jti`: sólo entra el token con ese jti. Nunca se
     escribe NULL, porque NULL quiere decir «aceptar cualquier token» (usuarios
     de antes de la columna) y revocar resucitaría todas las sesiones viejas.
     Para revocarlas todas se guarda un jti nuevo que ningún token tiene.
     """
-    user.active_jti = conservar_jti or uuid.uuid4().hex
+    user.active_jti = uuid.uuid4().hex
 
 
 def datos_del_token(token: str) -> dict | None:
