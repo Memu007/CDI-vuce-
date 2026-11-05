@@ -79,7 +79,8 @@ def test_lo_que_no_quedo_en_la_memoria_se_avisa(escenario, guardado):
 
 
 FALLAS = {"500": {"status": 500}, "409": {"status": 409}, "402": 402, "red": "red", "no-guardado": False}
-FALLAS_MEMORIA = {"400": {"status": 400}, "402": 402, "red": "red", "no-guardado": False}
+FALLAS_MEMORIA = {"400": {"status": 400}, "402": 402, "red": "red", "no-guardado": False,
+                  "rechazado": {"success": False}}
 CON_PANEL = ("asignar-cliente", "crear-reintento")
 
 
@@ -134,6 +135,11 @@ def test_la_operacion_no_espera_al_catalogo(catalogo, operacion):
         de_la_operacion = ultimo.get("titulo") == "No se guardó al cliente" or (
             ultimo.get("detalle") or "").startswith("La operación se guardó")
         assert de_la_operacion, vista
+
+
+def test_si_la_operacion_no_se_arma_se_avisa():
+    vista = pantalla("listo-no-arma", True)
+    assert vista["toasts"] and vista["toasts"][-1]["tipo"] == "error", vista
 
 
 @pytest.mark.parametrize("vendedor", ["Ñandú " * 20, "a" * 61, "x" * 59 + " y", "Proveedor Sintético"],

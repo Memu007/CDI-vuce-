@@ -151,6 +151,19 @@ const escenarios = {
     await esperarRed(app, '/operaciones');
     return app;
   },
+  // Listo con cliente: generar el TXT anda y armar la operación lanza antes de mandarla.
+  'listo-no-arma': async () => {
+    let lecturas = 0;
+    const app = armar('finalize.js', { despachante: { valores() {
+      if (++lecturas > 1) throw new Error('falla sintética');
+      return {};
+    } } });
+    app.ponerCliente({ id: 7, nombre: 'Cliente Sintético' });
+    app.CDI.state.items = [Object.assign({}, ITEM, { pieza: '9403.60.00.000 A' })];
+    app.handlers.ready.onEnter();
+    await esperarRed(app, '/generate_maria');
+    return app;
+  },
   // Listo con vendedor: aprende los productos en el catálogo del proveedor.
   aprender: async () => {
     const app = armar('finalize.js');
