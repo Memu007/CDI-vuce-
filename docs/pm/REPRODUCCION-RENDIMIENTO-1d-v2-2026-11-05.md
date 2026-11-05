@@ -45,8 +45,9 @@ corrió, y ya no hace falta.
   proceso aparte, y lo cubren los 27 casos y los 12 sabotajes de arriba.
 - Subagentes adversariales: no, por el tamaño; la causa ya la habían atacado
   en la devolución.
-- `rendimiento1c.sh` y `rendimiento1.sh` sobre `558c941` estaban corriendo al
-  escribir esto; el resultado va abajo cuando termine.
+- `rendimiento1c.sh` y `rendimiento1.sh` sobre `558c941`, corridos después:
+  `rendimiento1c` 17 sabotajes, `sabotajes con falla: 0`; `rendimiento1` 11
+  sabotajes, `sabotajes con falla: 0`.
 
 ## Hallazgo 2 del `/code-review` de la Dev
 
