@@ -90,13 +90,16 @@
 
     async function logout() {
         try {
-            await api('/auth/logout', { method: 'POST' });
+            const res = await api('/auth/logout', { method: 'POST' });
+            if (!res.ok) {
+                toast('No se pudo cerrar la sesión', 'El servidor no lo aceptó (' + res.status + '). La sesión sigue abierta.', 'error');
+                return;
+            }
         } catch (e) {
-            // La sesión es de otro: no se cierra y la pestaña queda tapada.
-            if (sesionAjena) return;
-            // No salió el pedido: la sesión sigue abierta.
-            if (e.message === ERROR_SIN_SESION) {
-                toast('No se pudo cerrar la sesión', e.message, 'error');
+            // Salvo un 401 (ya no había sesión), el cierre no se confirmó.
+            if (e.message !== 'unauthorized') {
+                const motivo = e.message === ERROR_SIN_SESION ? e.message : 'El cierre no se confirmó. La sesión sigue abierta.';
+                toast('No se pudo cerrar la sesión', motivo, 'error');
                 return;
             }
         }
@@ -217,7 +220,7 @@
             fetch(TELEMETRY_ENDPOINT, {
                 method: 'POST',
                 credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
                 body: body,
                 keepalive: true
             }).catch(() => { telemetryMuted = true; });

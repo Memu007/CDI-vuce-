@@ -1910,7 +1910,6 @@ _CSRF_SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 _CSRF_EXEMPT_PREFIXES = (
     "/auth/login",
     "/auth/register",
-    "/auth/logout",
     "/auth/verify-email",
     "/static",
     "/health",
@@ -3210,8 +3209,10 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
 async def logout(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     """Cierra sesión: revoca el token y elimina la cookie"""
     await revocar_sesion_de_la_request(request, db)
-    response.delete_cookie("access_token")
-    response.delete_cookie(CSRF_COOKIE_NAME)
+    # Un form de otro sitio llega sin cookies y sin pasar por CSRF: no tiene que borrar nada.
+    if request.cookies.get("access_token"):
+        response.delete_cookie("access_token")
+        response.delete_cookie(CSRF_COOKIE_NAME)
     return {"message": "Sesión cerrada"}
 
 # ============== BACKUP/RESTORE LOCALSTORAGE ==============
@@ -10528,10 +10529,8 @@ async def get_auth_me(authorization: str = Header(None), db: AsyncSession = Depe
 # /logout is called by the frontend (app.js), must delete the auth cookie
 @app.post("/logout")
 async def logout_root(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
-    """Cierra sesión: revoca el token y elimina la cookie (alias de /auth/logout)"""
-    await revocar_sesion_de_la_request(request, db)
-    response.delete_cookie("access_token")
-    return {"message": "Sesión cerrada"}
+    """Alias de /auth/logout"""
+    return await logout(request, response, db)
 
 @app.get("/features_integration.js")
 def features_integration_js():

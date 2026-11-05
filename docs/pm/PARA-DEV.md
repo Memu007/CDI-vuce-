@@ -3,45 +3,42 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Veredicto de CSRF-1 (2026-11-05 12:35 UTC): devolución corta por una causa. Va primero
+## Veredicto de CSRF-1 vuelta 2 (2026-11-05 15:05 UTC): aceptada. Seguís con CSRF-2
 
-Sobre `b1c9d70`. Evidencia: `docs/pm/REPRODUCCION-CSRF-1-2026-11-05.md`. La
-telemetría con token llega y `csrf1.sh` da 5 ROJO, sin fallas.
+Sobre `9e37673`. Evidencia: `docs/pm/REPRODUCCION-CSRF-1-v2-2026-11-05.md`.
+Medí lo mismo que vos:
+- `test_csrf` + `test_prelaunch_block1` dan `59 passed` con enforce en `true` y en `false`.
+- `csrf1.sh` da 8 ROJO y `orden1b.sh` 29 ROJO, sin fallas.
+- chequeo-6 da 0 avisos.
 
-**Causa:** el middleware pide el token sólo si llega la cookie de sesión,
-porque supone que un pedido sin ella no puede hacer daño. Cerrar sesión es
-la excepción: su efecto son los `Set-Cookie` de la respuesta. Desde otro
-sitio la cookie `SameSite=Strict` no viaja, el middleware no pide nada y la
-respuesta borra la sesión. Lo reproduje: `POST /auth/logout` sin cookies, con
-`Origin` ajeno y `CSRF_ENFORCE=true`, da `200` con los dos `Set-Cookie` de
-borrado. El adversario lo hizo en Chromium con un `<form>` en otro origen:
-`despues 401`. Tu caso pega la cookie a un pedido de otro origen, cosa que un
-navegador no hace; por eso queda verde. Lo que pido:
+Los dos adversarios, Opus y Sonnet, no encontraron nada que bloquee:
+- un `<form>` real desde otro sitio, en 16 variantes, no cerró la sesión;
+- sus sabotajes del `if`, del alias y del endpoint que nunca borra dan rojo.
 
-- Que un POST a una ruta que cierra sesión, sin token válido, no borre la
-  sesión, llegue o no la cookie. La familia: `/auth/logout` y el alias
-  `/logout`.
-- El caso con el pedido como lo manda un navegador desde otro sitio (sin
-  cookies), por las dos rutas; su rojo en `b1c9d70` y su sabotaje en
-  `csrf1.sh`. `test_security.py:647` cierra sesión con Bearer: que siga
-  diciendo algo cierto.
-- «Salir» lleva al inicio sólo si el cierre se confirmó. Hoy, con la red
-  cortada, va a `/` con la sesión abierta (`route.abort` sobre
-  `/auth/logout`: `current_user 200`). Ya pasaba, pero es la función que
-  cambiaste y la promesa de tu informe. Una fase del arnés con el pedido
-  cortado.
+**Tu supuesto del alias:** aceptado. Que `/logout` delegue y borre
+`csrf_token` queda hecho en esta pieza y sale de la lista de CSRF-2.
 
-**D56:** (b), como CSRF-2, chica, apenas aceptada CSRF-1 y antes de
-COBRO-CORTE-1. Decidido por la PM, con el sí de Emi del 04/11 a los arreglos
-chicos de seguridad. Lleva: la telemetría de la landing, las escrituras de la
-pantalla vieja (`app.js`, con su `/logout`, y que el alias borre
-`csrf_token`), las rutas públicas de recuperación de cuenta que dan 403 con
-una cookie vieja y `"webhook"` en cualquier parte de la ruta. El detalle está
-en el acta.
-**D57:** (a). Si querés, el aviso puede decir cómo salir (volver a entrar),
-pero no es criterio.
+**Se suma a CSRF-2**, antes de activarla:
+- Una prueba que exija que el alias `/logout` cierre de verdad: con cookie y
+  token, 200 y las dos cookies borradas.
+  - Hoy, un alias que devuelve 200 sin llamar a `logout` deja `8 passed`
+    (lo reprodujo el adversario Opus).
+  - La pantalla vieja depende de él.
+- Lo demás de CSRF-2 sigue como está en el veredicto anterior (en Git, `f0951c9`):
+  - la telemetría de la landing;
+  - las escrituras de `app.js`;
+  - la recuperación de cuenta con cookie vieja;
+  - `"webhook"` en cualquier parte de la ruta. El adversario Sonnet lo
+    reprodujo de nuevo: `DELETE /api/catalog/x/productos/abc-webhook` da 200
+    con cookie y sin token.
+- Lo mismo vale para los prefijos con `startswith` (`/healthx`,
+  `/staticx`, `/auth/loginx`): hoy dan 404, pero entran en la misma causa.
+  Un caso con la familia como datos.
 
-**Tu orden:** CSRF-1 vuelta 2 → CSRF-2 → COBRO-CORTE-1 → …
+La pieza queda ✅ y se integra a mi rama hasta `c536184`.
+
+**Tu orden:** CSRF-2 → COBRO-CORTE-1 → COBRO-MP-2 → COBRO-MP-3 →
+AISLAMIENTO-2 / LIMPIEZA-1 → BACKUP-1a → EXCEL-2c.
 
 ## Veredicto de COBRO-MP-1 vuelta 5 (2026-11-05 12:55 UTC): aceptada
 
@@ -64,22 +61,6 @@ quedan aceptadas por eso y tu orden no cambia.
 
 La pieza queda ✅ y se integra a mi rama hasta `885ee89`, junto con
 ORDEN-1b.
-
-## Veredicto de ORDEN-1b vuelta 4 (2026-11-05 12:15 UTC): aceptada
-
-Sobre `f5e9fac`. Evidencia: `docs/pm/REPRODUCCION-ORDEN-1b-v4-2026-11-05.md`.
-`orden1b.sh` 28 ROJO y `orden1.sh` 76 ROJO, sin sabotajes sin rojo; el
-producto no lee `X-Prueba-Consulta`. Mi ataque fue distinto del tuyo: atrasé
-el `fetch` del tour en `screens/tour.js` y no en el arnés. Con M3 da rojo con
-1,5 s y con 3 s.
-
-Una observación, que no es devolución: sin sabotaje y con el tour en 3 s, la
-fila `topup_success, primero tour` falla con «la relectura salió antes de que
-la pestaña cargara el usuario». Falla con su propio mensaje y no da un verde
-falso. No hay que hacer nada.
-
-La pieza queda ✅ en el roadmap. Integrada junto con COBRO-MP-1 vuelta 5.
-D50 sigue en la cola.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 

@@ -97,6 +97,7 @@ const TEL_2 = prod('Telefono demo dos', '85171300100F', 2, 55.51, { grupo_id: 7 
 const CLAVE = 'Clave-Inventada-123';
 // La cookie CSRF de la sesión del contexto: el servidor de la prueba la exige.
 const csrf = async ctx => ((await ctx.cookies(base)).find(c => c.name === 'csrf_token') || {}).value || '';
+const salir = async ctx => ctx.request.post(base + '/auth/logout', { headers: { 'X-CSRF-Token': await csrf(ctx) } });
 // Registra un usuario y deja abierta su sesión en el contexto; devuelve el nombre.
 async function nuevoUsuario(ctx, nombre) {
   const p = await ctx.newPage();
@@ -628,7 +629,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     // Sin esperar, el pedido de conectores del arranque cae entre la salida y
     // la entrada, da 401 y la pantalla se va al login (eso ya era así).
     await t.waitForLoadState('networkidle');
-    const salida = await ctx.request.post(base + '/auth/logout');
+    const salida = await salir(ctx);
     if (!salida.ok()) falla('no se pudo salir: ' + salida.status());
     await entrar(ctx, usuario);
     await cargar(t, 'MISMO-A', [prod('Producto del mismo usuario', '84714900100D', 2, 10)]);
@@ -645,7 +646,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     const ctx = await nuevoContexto('ord1na');
     const t = await abrir(ctx);
     await t.waitForLoadState('networkidle');  // como en (m)
-    await ctx.request.post(base + '/auth/logout');
+    await salir(ctx);
     await nuevoUsuario(ctx, 'ord1nb');
     await cargar(t, 'DE-B-TRAS-SALIR', [prod('Producto cargado por B', '84714900100D', 2, 10)]);
     await t.waitForTimeout(2 * INTERVALO_MS);
@@ -1478,7 +1479,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     await t.waitForLoadState('networkidle');  // como en (m)
     await listaParaGenerar(t, 'GEN-Z22');
     const soltar = await retenerUsuario(t, 3000);
-    const salida = await ctx.request.post(base + '/auth/logout');
+    const salida = await salir(ctx);
     if (!salida.ok()) falla('no se pudo salir: ' + salida.status());
     await entrar(ctx, a);
     const fin = await apretarGenerar(t);
@@ -1536,7 +1537,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     await nuevoUsuario(ctx, 'ord1z25');
     const t = await abrir(ctx);
     await t.waitForLoadState('networkidle');
-    const salida = await ctx.request.post(base + '/auth/logout');
+    const salida = await salir(ctx);
     if (!salida.ok()) falla('no se pudo salir: ' + salida.status());
     const res = await t.evaluate(() => CDI.api('/api/clientes', { method: 'POST', body: JSON.stringify({ nombre: 'Cliente demo' }) })
       .then(r => 'status ' + r.status, e => 'error: ' + e.message)).catch(() => 'navegó');
@@ -1555,7 +1556,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     const t = await abrir(ctx);
     await t.waitForLoadState('networkidle');
     const soltar = await retenerUsuario(t);
-    const salida = await ctx.request.post(base + '/auth/logout');
+    const salida = await salir(ctx);
     if (!salida.ok()) falla('no se pudo salir: ' + salida.status());
     await entrar(ctx, a);
     await t.evaluate(() => { CDI.logout(); });
@@ -1564,8 +1565,8 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     soltar();
     const sigue = (await ctx.request.get(base + '/auth/current_user')).ok();
     if (new URL(t.url()).pathname !== '/dashboard') falla(que + ' y fue al inicio ' + (sigue ? 'con la sesión abierta' : 'cerrando la sesión'));
-    if (!/No se pudo cerrar la sesión/.test(await t.evaluate(() => document.getElementById('toastHost').textContent))) falla(que + ' y no avisa que no la cerró');
-    console.log('OK ' + que + ': se queda y avisa que no cerró la sesión');
+    if (!/No se pudo cerrar la sesión[^]*No se pudo comprobar la sesión/.test(await t.evaluate(() => document.getElementById('toastHost').textContent))) falla(que + ' y no avisa que no pudo comprobar la sesión');
+    console.log('OK ' + que + ': se queda y avisa que no pudo comprobar la sesión');
     await ctx.close();
   }
 
@@ -1668,7 +1669,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     const t = await abrir(ctx);
     await t.waitForLoadState('networkidle');
     const r = await retenerRespuestas(t);
-    const salida = await ctx.request.post(base + '/auth/logout');
+    const salida = await salir(ctx);
     if (!salida.ok()) falla('no se pudo salir: ' + salida.status());
     await entrar(ctx, a);
     const cliente = 'Cliente demo ' + a;
