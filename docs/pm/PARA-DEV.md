@@ -3,6 +3,46 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## Veredicto de CSRF-1 (2026-11-05 12:35 UTC): devolución corta por una causa. Va primero
+
+Sobre `b1c9d70`. Evidencia: `docs/pm/REPRODUCCION-CSRF-1-2026-11-05.md`. La
+telemetría con token llega y `csrf1.sh` da 5 ROJO, sin fallas.
+
+**Causa:** el middleware pide el token sólo si llega la cookie de sesión,
+porque supone que un pedido sin ella no puede hacer daño. Cerrar sesión es
+la excepción: su efecto son los `Set-Cookie` de la respuesta. Desde otro
+sitio la cookie `SameSite=Strict` no viaja, el middleware no pide nada y la
+respuesta borra la sesión. Lo reproduje: `POST /auth/logout` sin cookies, con
+`Origin` ajeno y `CSRF_ENFORCE=true`, da `200` con los dos `Set-Cookie` de
+borrado. El adversario lo hizo en Chromium con un `<form>` en otro origen:
+`despues 401`. Tu caso pega la cookie a un pedido de otro origen, cosa que un
+navegador no hace; por eso queda verde. Lo que pido:
+
+- Que un POST a una ruta que cierra sesión, sin token válido, no borre la
+  sesión, llegue o no la cookie. La familia: `/auth/logout` y el alias
+  `/logout`.
+- El caso con el pedido como lo manda un navegador desde otro sitio (sin
+  cookies), por las dos rutas; su rojo en `b1c9d70` y su sabotaje en
+  `csrf1.sh`. `test_security.py:647` cierra sesión con Bearer: que siga
+  diciendo algo cierto.
+- «Salir» lleva al inicio sólo si el cierre se confirmó. Hoy, con la red
+  cortada, va a `/` con la sesión abierta (`route.abort` sobre
+  `/auth/logout`: `current_user 200`). Ya pasaba, pero es la función que
+  cambiaste y la promesa de tu informe. Una fase del arnés con el pedido
+  cortado.
+
+**D56:** (b), como CSRF-2, chica, apenas aceptada CSRF-1 y antes de
+COBRO-CORTE-1. Decidido por la PM, con el sí de Emi del 04/11 a los arreglos
+chicos de seguridad. Lleva: la telemetría de la landing, las escrituras de la
+pantalla vieja (`app.js`, con su `/logout`, y que el alias borre
+`csrf_token`), las rutas públicas de recuperación de cuenta que dan 403 con
+una cookie vieja y `"webhook"` en cualquier parte de la ruta. El detalle está
+en el acta.
+**D57:** (a). Si querés, el aviso puede decir cómo salir (volver a entrar),
+pero no es criterio.
+
+**Tu orden:** CSRF-1 vuelta 2 → CSRF-2 → COBRO-CORTE-1 → …
+
 ## Veredicto de COBRO-MP-1 vuelta 4 (2026-11-05 09:55 UTC): devolución corta por una causa
 
 La vuelta 5 (`736fed6`) está en revisión: el veredicto va a ir acá arriba.
@@ -35,7 +75,7 @@ La guarda ya era así; el texto no, por eso no queda para después.
 **D53:** (a): ya pasaba en la base, y ahora la respuesta lo dice.
 **D54:** (a), a la cola de limpieza.
 
-**Tu orden:** CSRF-1 ahora; si la vuelta 5 trae devolución, esa va primero.
+**Tu orden:** la de CSRF-1, arriba; si la vuelta 5 trae devolución, esa va primero.
 
 ## Veredicto de ORDEN-1b vuelta 4 (2026-11-05 12:15 UTC): aceptada
 
@@ -52,7 +92,7 @@ falso. No hay que hacer nada.
 
 La pieza queda ✅ en el roadmap. Se integra a mi rama junto con COBRO-MP-1
 vuelta 5, porque sus commits están intercalados y esa sigue en revisión
-(`cobro_mp1.sh` corriendo). **Seguí con CSRF-1 ya**, sin esperar ese veredicto.
+(`cobro_mp1.sh` corriendo). Siguió CSRF-1 (veredicto arriba).
 D50 sigue en la cola.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
@@ -84,7 +124,7 @@ PM la pasa a `COLA-LIMPIEZA.md`. Lo nuevo de la vuelta sí cumple §6.
 ## Piezas nuevas que aprobó Emi el 04/11 (PM)
 
 Tu cola queda: COBRO-MP-1 vuelta 3 + D13 (c) → ORDEN-1b vuelta 2 →
-**CSRF-1** → COBRO-CORTE-1 → COBRO-MP-2 → **COBRO-MP-3** →
+**CSRF-1** → CSRF-2 → COBRO-CORTE-1 → COBRO-MP-2 → **COBRO-MP-3** →
 AISLAMIENTO-2/LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. El detalle de cada una te
 lo escribo al activarla; esto es lo que tiene que pasar:
 
