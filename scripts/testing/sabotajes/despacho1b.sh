@@ -92,10 +92,10 @@ sabotaje "el lector sin tope de memoria" "$LECTOR" \
   "test_un_pdf_que_llena_la_memoria_se_rechaza" \
   "test_leer_un_pdf_que_llena_la_memoria_avisa"
 sabotaje "el lector no avisa que se quedó sin memoria" "$LECTOR" \
-  "    except MemoryError:
-        return _SALIDA_SIN_MEMORIA" \
-  "    except ImportError:
-        return _SALIDA_SIN_MEMORIA" \
+  "    except (MemoryError, _DemasiadoTrabajo):
+        return _SALIDA_DEMASIADO_PESADO" \
+  "    except (ImportError, _DemasiadoTrabajo):
+        return _SALIDA_DEMASIADO_PESADO" \
   "test_un_pdf_que_llena_la_memoria_se_rechaza" \
   "test_leer_un_pdf_que_llena_la_memoria_avisa"
 sabotaje "una hoja que se queda sin memoria se saltea" "$LECTOR" \
