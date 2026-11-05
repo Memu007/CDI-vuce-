@@ -194,14 +194,14 @@ sabotaje "las tandas reordenan por clave" 1 \
 # En confirmar, 2001 letras también las frena el tope del catálogo: ahí el del
 # historial lo distingue catalogolargo1.sh, con un texto que en NFC achica.
 sabotaje "sin tope de descripción" 1 \
-  '_HISTORIAL_MAX_DESCRIPCION = 2000' '_HISTORIAL_MAX_DESCRIPCION = 10**9' \
+  '             catalog_svc.MAX_DESCRIPCION),' '             10**9),' \
   "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[BBBB"
 sabotaje "sin tope de NCM" 1 \
   '_HISTORIAL_MAX_NCM = 20' '_HISTORIAL_MAX_NCM = 10**9' \
   "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[Bomba sintetica-888" \
   "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[Bomba sintetica-8413.70.10.0000000000000"
 sabotaje "el tope no deja entrar el máximo" 1 \
-  '        if len(texto) > tope:' '        if len(texto) >= tope:' \
+  '        if largo > tope:' '        if largo >= tope:' \
   "FAILED $T::test_confirmar_en_el_tope_entra"
 sabotaje "el NUL pasa" 1 \
   $'        if "\\x00" in texto:' $'        if False:' \

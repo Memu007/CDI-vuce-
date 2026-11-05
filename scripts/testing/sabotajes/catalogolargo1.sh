@@ -25,10 +25,10 @@ T=tests/test_catalogo_largo1.py
 PRUEBA=("$PY" -m pytest -q --no-cov -p no:cacheprovider "$T")
 PRUEBA_PG=("$PY" -I scripts/testing/catalogo_largo1_postgres.py "$PG_URL")
 
-# sabotaje <archivo> <nombre> <texto original> <texto saboteado> <lo que el rojo tiene que decir>
+# sabotaje <archivo> <nombre> <texto original> <texto saboteado> <lo que el rojo tiene que decir>...
 # Corre la prueba de "${CORRE[@]}".
 sabotaje() {
-  local archivo="$1" nombre="$2" viejo="$3" nuevo="$4" esperado="$5"
+  local archivo="$1" nombre="$2" viejo="$3" nuevo="$4" esperado falta=""; shift 4
   git checkout -q -- proyecto_maria/
   if ! "$PY" - "$archivo" "$viejo" "$nuevo" <<'PYEOF'
 import sys
@@ -43,10 +43,13 @@ PYEOF
   salida="$("${CORRE[@]}" 2>&1)"; codigo=$?
   if [ "$codigo" -eq 0 ]; then
     echo "VERDE | $nombre: la prueba no lo vio"; FALLAS=$((FALLAS+1))
-  elif grep -qF -- "$esperado" <<<"$salida"; then
-    echo "ROJO  | $nombre: dice «$esperado»"
+    return
+  fi
+  for esperado in "$@"; do grep -qF -- "$esperado" <<<"$salida" || falta="$esperado"; done
+  if [ -z "$falta" ]; then
+    echo "ROJO  | $nombre: dice «$*»"
   else
-    echo "ROJO? | $nombre: rojo (salida $codigo), pero sin «$esperado»"
+    echo "ROJO? | $nombre: rojo (salida $codigo), pero sin «$falta»"
     grep -E "^E |^FALLA" <<<"$salida" | head -5; FALLAS=$((FALLAS+1))
   fi
 }
@@ -75,18 +78,16 @@ sabotaje $CS "cambiar un producto no controla el largo" \
   '        validar_largo(val)' \
   '        pass' \
   "FAILED $T::test_cambiar_un_producto_respeta_el_tope_y_alcanza_claves_largas"
-sabotaje $M "guardar-uso no controla el largo en NFC" \
-  '        catalog_svc.validar_largo(descripcion)' \
-  '        pass' \
-  "FAILED $T::test_guardar_uso_guarda_en_las_dos_memorias_o_da_400[nfc-que-crece]"
-sabotaje $M "el historial mide el largo en NFC" \
-  '        if len(texto) > tope:' \
-  '        if len(unicodedata.normalize("NFC", texto)) > tope:' \
-  "FAILED $T::test_importar_el_historial_mide_el_texto_como_lo_guarda"
-sabotaje $M "guardar-uso no controla el largo como lo guarda el historial" \
-  '_HISTORIAL_MAX_DESCRIPCION = 2000' \
-  '_HISTORIAL_MAX_DESCRIPCION = 10**9' \
-  "FAILED $T::test_guardar_uso_guarda_en_las_dos_memorias_o_da_400[nfd-que-achica]"
+sabotaje $M "el historial y guardar-uso miden el largo sin pasar a NFC" \
+  '            ("La descripción", descripcion, len(unicodedata.normalize("NFC", descripcion)),' \
+  '            ("La descripción", descripcion, len(descripcion),' \
+  "FAILED $T::test_guardar_uso_guarda_en_las_dos_memorias_o_da_400[nfd-que-achica]" \
+  "FAILED $T::test_importar_el_historial_respeta_el_tope[nfc-que-crece]"
+sabotaje $M "el historial y guardar-uso no tienen el tope del catálogo" \
+  '             catalog_svc.MAX_DESCRIPCION),' \
+  '             10**9),' \
+  "FAILED $T::test_guardar_uso_guarda_en_las_dos_memorias_o_da_400[nfc-que-crece]" \
+  "FAILED $T::test_importar_el_historial_respeta_el_tope[2001]"
 sabotaje $M "el catálogo da 500 en vez de 400 al guardar" \
   $'    except ValueError as e:\n        raise HTTPException(status_code=400, detail=str(e))\n    except Exception as e:\n        logging.exception("catalog_save error")' \
   $'    except Exception as e:\n        logging.exception("catalog_save error")' \
