@@ -727,11 +727,11 @@ else
   sabotaje $P "C: sólo past_due no promete el período ya pagado" \
     "        const corta = billingStatusEl && billingStatusEl.dataset.corta === '1';" \
     "        const corta = billingStatusEl && billingStatusEl.dataset.status === 'past_due';" \
-    "FALLA: none con suscripción abierta: la confirmación promete el período ya pagado"
-  sabotaje $P "C: el pago pendiente se le dice a quien no tiene plan" \
+    "FALLA: canceled vencida con suscripción abierta: la confirmación promete el período ya pagado"
+  sabotaje $P "C: el pago pendiente se le dice a quien no está en past_due" \
     "        const pendiente = corta && billingStatusEl.dataset.status === 'past_due';" \
     "        const pendiente = corta;" \
-    "FALLA: none con suscripción abierta: la confirmación habla de un pago pendiente"
+    "FALLA: canceled vencida con suscripción abierta: la confirmación habla de un pago pendiente"
   sabotaje $P "C: el botón de aceptar vuelve a confirmText" \
     "            acceptText: 'Sí, cancelar'," \
     "            confirmText: 'Sí, cancelar'," \
