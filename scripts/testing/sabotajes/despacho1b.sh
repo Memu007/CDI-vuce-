@@ -842,6 +842,7 @@ sabotaje_pg() {
   fi
   salida="$("$PY" scripts/testing/despacho1b_postgres.py "$PG_DSN" 2>&1)"; codigo=$?
   juzgar "$nombre" "$salida" "$codigo" "${@/#/FALLA | }"
+  ULTIMA="$salida"
   git checkout -q -- proyecto_maria/
 }
 NO_CORRIDOS=0
@@ -856,6 +857,17 @@ sabotaje_pg "el upsert no reintenta si la fila se fue" \
   "aprender, la fila cambia de clave mientras espera" "aprender, la fila se borra mientras espera" \
   "guardar, la fila cambia de clave mientras espera" "guardar, la fila se borra mientras espera" \
   "guardar-uso, la fila cambia de clave mientras espera" "guardar-uso, la fila se borra mientras espera"
+sabotaje_pg "el upsert intenta 2 veces" \
+  '    for _ in range(3):' \
+  '    for _ in range(2):' \
+  "operacion, el producto no queda en 3 intentos" "aprender, el producto no queda en 3 intentos" \
+  "guardar, el producto no queda en 3 intentos" "guardar-uso, el producto no queda en 3 intentos"
+sabotaje_pg "el upsert que no pudo guardar se calla" \
+  '        raise RuntimeError("el producto cambió en cada intento de guardarlo")' \
+  '        return None' \
+  "guardar, el producto no queda en 3 intentos"
+[ -n "${PG_DSN:-}" ] && no_debe "el upsert que no pudo guardar se calla" "$ULTIMA" \
+  "FALLA | operacion, el producto" "FALLA | aprender, el producto" "FALLA | guardar-uso, el producto"
 echo "sin Postgres, no corridos: $NO_CORRIDOS"
 
 echo "sabotajes sin rojo: $FALLAS"

@@ -18,7 +18,10 @@ Comprueba:
   mismo producto escrito de dos formas a la vez: queda una fila con todos
   los usos y ningún pedido falla;
 - dos aprendizajes a la vez con los mismos productos en orden contrario no
-  se traban.
+  se traban;
+- si la fila no queda en ninguno de los 3 intentos, guardar da 500, la
+  operación y guardar-uso responden historial_guardado false y aprender no
+  lo cuenta.
 
 uso (con un Postgres local y descartable, nunca el de producción; el usuario
 tiene que poder crear bases):
@@ -153,12 +156,10 @@ def esperan_un_bloqueo(n):
     return False
 
 
-def fila_que_se_va(c):
-    """Una conexión traba la fila de un producto; otra la cambia de clave o la
-    borra y queda en cola; una vía escribe el mismo producto y queda detrás.
-    Al soltarse, la vía no encuentra la fila: tiene que crearla otra vez."""
+def vias_de(c):
+    """Las vías que escriben un producto con descripción d en el catálogo del cliente."""
     catalogo = f"/api/clientes/{CID}/catalogo/productos"
-    vias = {
+    return {
         "operacion": lambda d: c.post(f"/api/clientes/{CID}/operaciones", json={
             "source": "pdf_v2", "currency": "USD", "resumen": {"items": 1, "valor_total": 100},
             "items": [{"pieza": "P1", **producto("3926.90.90", d)}]}),
@@ -169,6 +170,14 @@ def fila_que_se_va(c):
         "guardar-uso": lambda d: c.post("/api/ncm/guardar-uso", json={
             "descripcion": d, "ncm": "3926.90.90", "client_id": CID}),
     }
+
+
+def fila_que_se_va(c):
+    """Una conexión traba la fila de un producto; otra la cambia de clave o la
+    borra y queda en cola; una vía escribe el mismo producto y queda detrás.
+    Al soltarse, la vía no encuentra la fila: tiene que crearla otra vez."""
+    catalogo = f"/api/clientes/{CID}/catalogo/productos"
+    vias = vias_de(c)
     cambios = {
         "cambia de clave": lambda d, pid: c.put(f"{catalogo}/{pid}", json={"descripcion": d + " OTRA"}),
         "se borra": lambda d, pid: c.delete(f"{catalogo}/{pid}"),
@@ -200,6 +209,34 @@ def fila_que_se_va(c):
                      and filas == [(1,)],
                      f"{via}, la fila {cambio} mientras espera: el uso queda en una fila nueva: "
                      f"en cola {en_cola}, {r_otro.status_code} {r.status_code} {r.text[:160]} {filas}")
+
+
+def nunca_queda(c):
+    """Un trigger descarta la fila cada vez que se intenta crear: el producto
+    no queda nunca y cada vía tiene que decirlo, después de 3 intentos."""
+    sql("create sequence intentos_d1b")
+    sql("create function descartar_d1b() returns trigger language plpgsql as"
+        " $$ begin perform nextval('intentos_d1b'); return null; end $$")
+    sql("create trigger descartar_d1b before insert on client_product_history for each row"
+        " when (new.descripcion like 'NUNCA QUEDA %%') execute function descartar_d1b()")
+    esperado = {"guardar": lambda r: r.status_code == 500,
+                "operacion": lambda r: r.status_code == 200 and r.json()["historial_guardado"] is False,
+                "guardar-uso": lambda r: r.status_code == 200 and r.json()["historial_guardado"] is False,
+                "aprender": lambda r: r.status_code == 200 and r.json()["aprendidos"] == 0}
+    try:
+        for via, escribir in vias_de(c).items():
+            d = f"NUNCA QUEDA {via}".upper()
+            antes = sql("select nextval('intentos_d1b')")[0][0]
+            r = escribir(d)
+            intentos = sql("select nextval('intentos_d1b')")[0][0] - antes - 1
+            filas = sql("select 1 from client_product_history where descripcion=%s", d)
+            chequear(esperado[via](r) and intentos == 3 and not filas,
+                     f"{via}, el producto no queda en 3 intentos: lo dice: "
+                     f"{r.status_code} {r.text[:160]}, intentos {intentos}, filas {len(filas)}")
+    finally:
+        sql("drop trigger descartar_d1b on client_product_history")
+        sql("drop function descartar_d1b()")
+        sql("drop sequence intentos_d1b")
 
 
 try:
@@ -334,6 +371,7 @@ try:
                        " where client_id=%s and descripcion like 'VALVULA INVENTADA %%'", CID)
         chequear(valvulas == [(40, 6, 6)], f"cada válvula, una fila con 6 usos: {valvulas}")
         fila_que_se_va(c)
+        nunca_queda(c)
 finally:
     subprocess.run(["git", "-C", REPO, "worktree", "remove", "--force", WT], capture_output=True)
     try:
