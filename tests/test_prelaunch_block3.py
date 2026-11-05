@@ -764,9 +764,9 @@ class TestJWTSecretUnificado:
             "Los tokens se firmarían con una clave y se verificarían con otra."
         )
 
-    def test_token_generado_por_login_es_verificable_por_decode_token(self, client):
-        """Un token emitido por /auth/login puede ser verificado por jwt_utils.decode_token."""
-        from proyecto_maria.auth.jwt_utils import decode_token
+    def test_token_generado_por_login_es_verificable_por_datos_del_token(self, client):
+        """Un token emitido por /auth/login lo abre datos_del_token (settings.jwt_secret)."""
+        from proyecto_maria.auth.dependencies import datos_del_token
         uname = _unique("jwt_uni")
         _register_and_login(client, uname)
         login = client.post("/auth/login", json={
@@ -774,20 +774,9 @@ class TestJWTSecretUnificado:
             "password": "SecureP@ss1",
         })
         assert login.status_code == 200, f"Login falló: {login.text}"
-        token = login.json().get("access_token")
-        assert token, "No se recibió access_token"
-
-        # decode_token usa settings.jwt_secret — debe poder verificarlo
-        try:
-            payload = decode_token(token)
-        except Exception as e:
-            pytest.fail(
-                f"decode_token falló con el token emitido por login: {e}\n"
-                "Probable causa: dual-secret bug — login firma con una clave "
-                "y decode_token verifica con otra."
-            )
-        assert payload.get("sub") or payload.get("username") or payload.get("user_id"), (
-            "El payload del token no contiene identificador de usuario"
+        payload = datos_del_token(login.json()["access_token"])
+        assert payload and payload.get("sub") == uname, (
+            "login firma con una clave y datos_del_token verifica con otra"
         )
 
     def test_config_lee_jwt_secret_key_con_prioridad(self, monkeypatch):

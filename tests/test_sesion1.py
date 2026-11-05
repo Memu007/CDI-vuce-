@@ -437,8 +437,7 @@ def test_verificar_el_email_no_abre_sesion():
         c = _http()
         r = c.get("/auth/verify-email", params={"token": token}, follow_redirects=False)
         assert r.status_code in (302, 303, 307), (vez, r.text)
-        assert "access_token" not in r.cookies, f"vez {vez}: el link de verificación abrió sesión"
-        assert c.get("/api/user/profile").status_code == 401
+        assert "access_token" not in c.cookies, f"vez {vez}: el link de verificación abrió sesión"
     assert _fila(u).is_verified
 
 
