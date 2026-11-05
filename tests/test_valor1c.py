@@ -121,12 +121,13 @@ def test_el_boton_de_dejarlo_esta_enlazado():
 
 def _generar_en_pantalla(detalle):
     """generateMaria de verdad, con un servidor que contesta `detalle`."""
-    stubs = ("let generateInFlight = false; let lastMaria = null; let sbtError = null;\n"
+    stubs = ("let generateInFlight = false; let pedidaMientrasOtra = false; let lastMaria = null;\n"
+             "let sbtError = null; let lastValidation = null;\n"
              "let fueA = null; let mostrado = null; CDI.goTo = p => { fueA = p; }; CDI.track = () => {};\n"
              "function showReadyError(m) { mostrado = m; } function buildMariaRequest() { return {}; }\n"
              "CDI.state.items = [{}]; console.error = () => {};\n"
              f"CDI.api = async () => ({{ok: false, statusText: 'x', json: async () => ({{detail: {json.dumps(detalle)}}})}});\n")
-    codigo = stubs + _funciones("finalize.js", ["generateMaria"]) + (
+    codigo = stubs + _funciones("finalize.js", ["generateMaria", "fotoDeLaPantalla"]) + (
         "\ngenerateMaria().then(() => console.log(JSON.stringify({fueA, mostrado})));")
     return _correr(codigo, {})
 
