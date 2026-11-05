@@ -90,11 +90,11 @@ sabotaje $F "una falla al guardar cierra el panel y dice «Cliente guardado»" \
   '' \
   "FAILED $T::$X[asignar-cliente-500]"
 sabotaje $F "una falla al guardar deja abierta la caja de éxito anterior" \
-  '        if (caja) caja.hidden = true;' \
+  "        hide(\$('readyClientSuccess'));" \
   '' \
   "FAILED $T::$X[listo-con-cliente-500]"
 sabotaje $F "el plan vencido no avisa que no se guardó" \
-  "                avisarNoGuardado('No se guardó al cliente', err.motivo || 'Plan vencido o límite alcanzado', 'error');" \
+  "                CDI.toast && CDI.toast('No se guardó al cliente', err.motivo || 'Plan vencido o límite alcanzado', 'error');" \
   '' \
   "FAILED $T::$X[listo-con-cliente-402]"
 sabotaje $F "la caja no dice lo que no quedó en la memoria" \
@@ -102,13 +102,17 @@ sabotaje $F "la caja no dice lo que no quedó en la memoria" \
   "            'Operación asociada a ' + nombre + (false" \
   "FAILED $T::$X[asignar-cliente-no-guardado]"
 sabotaje $F "aprender el catálogo no avisa un 400" \
-  '            if ((!res.ok || data.historial_guardado === false) && CDI.toast) {' \
-  '            if ((data.historial_guardado === false) && CDI.toast) {' \
+  '            if (!res.ok && CDI.toast) {' \
+  '            if (false && CDI.toast) {' \
   "FAILED $T::$X[aprender-400]"
-sabotaje $F "aprender el catálogo no avisa historial_guardado false" \
-  '            if ((!res.ok || data.historial_guardado === false) && CDI.toast) {' \
-  '            if ((!res.ok) && CDI.toast) {' \
-  "FAILED $T::$X[aprender-no-guardado]"
+sabotaje $F "guardar y aprender a la vez: el aviso del catálogo tapa el error" \
+  '            }).then(() => saveOperationToHistory(items, data)).catch(err => {' \
+  '            }); saveOperationToHistory(items, data).catch(err => {' \
+  "FAILED $T::$X[listo-con-vendedor-500]"
+sabotaje $F "reintentar después de crear el cliente lo crea otra vez" \
+  '            if (clienteCreadoAca && activo.id === clienteCreadoAca) {' \
+  '            if (false) {' \
+  "FAILED $T::$X[crear-reintento-500]"
 sabotaje $N "confirmar la posición no avisa un 400" \
   '            if ((!res.ok || data.historial_guardado === false) && CDI.toast) {' \
   '            if ((res.ok && data.historial_guardado === false) && CDI.toast) {' \
