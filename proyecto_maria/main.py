@@ -1248,27 +1248,24 @@ async def _migrate_widen_pieza_column():
 
 
 async def _migrate_catalogo_sin_tope():
-    """Lleva product_key y descripcion del catálogo a text: el tope de largo lo
-    pone catalog_service.MAX_DESCRIPCION, para que se vea como un 400."""
+    """Lleva product_key y descripcion del catálogo a text: el tope lo pone MAX_DESCRIPCION como 400.
+    Si falla, el arranque se detiene: con el tope viejo, guardar-uso respondería sin guardar."""
     from proyecto_maria.database.connection import engine, IS_SQLITE
 
     if IS_SQLITE:
         return
-    try:
-        async with engine.begin() as conn:
-            # Si otra conexión tiene tomada la tabla, falla al rato y reintenta
-            # en el próximo arranque, en vez de colgarlo.
-            await conn.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
-            res = await conn.exec_driver_sql(
-                "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() "
-                "AND table_name = 'vendor_catalog_products' AND column_name IN ('product_key', 'descripcion') "
-                "AND character_maximum_length IS NOT NULL"
-            )
-            for (columna,) in res.fetchall():
-                await conn.exec_driver_sql(f"ALTER TABLE vendor_catalog_products ALTER COLUMN {columna} TYPE TEXT")
-                print(f"✅ Migracion: vendor_catalog_products.{columna} pasa a TEXT")
-    except Exception as mig_err:
-        print(f"⚠️ Migracion catalogo_sin_tope (no critica): {mig_err!r}")
+    async with engine.begin() as conn:
+        # Si otra conexión tiene tomada la tabla, falla rápido y el reinicio
+        # lo vuelve a intentar, en vez de colgar el arranque.
+        await conn.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
+        res = await conn.exec_driver_sql(
+            "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() "
+            "AND table_name = 'vendor_catalog_products' AND column_name IN ('product_key', 'descripcion') "
+            "AND character_maximum_length IS NOT NULL"
+        )
+        for (columna,) in res.fetchall():
+            await conn.exec_driver_sql(f"ALTER TABLE vendor_catalog_products ALTER COLUMN {columna} TYPE TEXT")
+            print(f"✅ Migracion: vendor_catalog_products.{columna} pasa a TEXT")
 
 
 async def _migrate_add_grupo_id_column():

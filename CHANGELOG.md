@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-11-05 · fix: una descripción larga se guarda o da error (CATALOGO-LARGO-1)
 
-- La memoria del cliente y el catálogo del proveedor guardan descripciones de hasta 2000 caracteres; una más larga da 400 a la vista en vez de responder bien sin guardar. El arranque pasa las dos columnas del catálogo a texto sin tope.
+- La memoria del cliente y el catálogo del proveedor guardan descripciones de hasta 2000 caracteres; una más larga da 400 a la vista en vez de responder bien sin guardar. El arranque pasa las dos columnas del catálogo a texto sin tope; si no puede, no arranca.
 
 ## 2026-11-05 · fix: un uso no se pierde si el producto cambia mientras se guarda (DESPACHO-1b)
 
