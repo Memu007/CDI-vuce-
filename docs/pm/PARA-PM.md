@@ -2,6 +2,142 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## ORDEN-1b vuelta 3, entregada en `f22f48b` (informe en el commit de arriba)
+
+**Resultado.** El arnés ahora fija que `loadCurrentUser` lee la cookie de
+sesión antes de pedir `/auth/current_user`. Caso nuevo `z35`: la relectura de
+la vuelta del pago (`success` y `topup_success`, como datos del mismo caso)
+sale con la cookie de A y se retiene con `route.fetch()`; entra B, se suelta
+la respuesta (que el caso comprueba que es de A) y la pestaña intenta guardar
+un cliente. Sin sabotaje: no queda en ninguna cuenta y la pestaña avisa
+que entró otro. Con la lectura movida abajo del `try/finally`, el sabotaje
+da ROJO en las dos vueltas del pago, cada una medida sola. Producto: nada (`producto +0/−0`).
+
+**Lo que decidís vos: D55.** Las D51 a D54 de COBRO-MP-1 vuelta 4 siguen
+abiertas, abajo.
+
+### Decisiones
+
+**D55. Los reintentos de la primera carga no van en `z35`.** Pediste
+sumarlos como datos «si los cubrís». No los sumé porque no distinguen este
+defecto: en la primera carga la pestaña todavía no tiene dueño, y el freno que
+ataja una cookie nueva ahí es `getCsrfToken() !== sesionAlAbrir`, no
+`sesionAntes` (app_v2.js:395 compara las dos contra `sesionAlAbrir`). Por
+el código, con la lectura movida abajo esas filas siguen verdes; no lo corrí.
+Ese otro freno ya lo cubren `k` y `z8` de `orden1.sh`.
+
+- **(a)** Así: `z35` sólo con las dos vueltas del pago.
+- **(b)** Sumar las filas igual, sabiendo que no ponen rojo con este
+  sabotaje.
+
+**Recomiendo (a).** Una fila que no distingue el defecto no prueba nada y
+suma una espera más al arnés.
+
+### SHAs (desde `ffed989`)
+
+| SHA | Qué |
+|---|---|
+| `6e87684` | test: caso `z35` y su sabotaje en `orden1b.sh` |
+| `374348b` | test: `z34` y `z35` como funciones propias (`vueltaConOtroAdentro`, `respuestaDeAConOtroAdentro`, con `vueltaDelPago` común), fuera de la anónima |
+| `f22f48b` | test: `z35` comprueba que la respuesta retenida es de A; `VUELTA=<billing>` deja una sola fila y el sabotaje mide cada vuelta del pago |
+| (este) | docs: informe |
+
+Archivos: `scripts/testing/pantalla_orden1.js` y
+`scripts/testing/sabotajes/orden1b.sh`. Nada de producto.
+
+### Cómo retiene la respuesta
+
+- La primera relectura con la pestaña ya cargada se retiene; la carga y las
+  relecturas que vienen después pasan.
+- `route.fetch()` sale enseguida con las cookies de ese momento, las de A.
+  `route.continue()` pondría las del momento en que se suelta, las de B: el
+  adversario lo probó y con `continue()` el sabotaje da verde.
+- Si la respuesta retenida no es de A, el caso falla con «la relectura
+  retenida no es de A». Ese rojo lo vi en el primer intento: una segunda
+  relectura, posterior a la entrada de B, también pasaba por el handler y
+  contestaba B. Por eso sólo se retiene la primera.
+
+### Puertas
+
+| Puerta | Sobre | Resultado |
+|---|---|---|
+| `orden1b.sh` | `f22f48b` | base verde; 26 ROJO, entre ellos «la sesión de la respuesta se lee cuando ya llegó (success)» y «(topup_success)», los dos con «…y el cliente quedó en la cuenta de B»; «sabotajes sin rojo: 0», salida 0 |
+| `orden1.sh` | `f22f48b` | base verde (el arnés entero, sin `CASOS`); 76 ROJO; «sabotajes sin rojo: 0», salida 0 |
+| Suite completa | `374348b` | `4415 passed, 121 skipped, 3 xfailed in 650.56s`, salida 0 |
+| `compileall -q proyecto_maria` | `f22f48b` | 0 |
+| chequeo-6 `ffed989..f22f48b` | `f22f48b` | 1 aviso, abajo |
+| Historia (grep de §6) | `f22f48b` | vacío |
+
+La suite corrió sobre `374348b` y vale para `f22f48b`: entre los dos sólo
+cambian los dos archivos del arnés, y ninguna prueba de `tests/` ni la CI los
+usa (`grep -rn 'pantalla_orden1\|orden1b.sh' tests/ .github/` da vacío).
+
+### chequeo-6
+
+```
+chequeo-6 ffed989..f22f48b: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +58/−14
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  AVISO creció una función de más de 150: scripts/testing/pantalla_orden1.js:281 <anónima> 1520 → 1552, 19 en su propio cuerpo (§6: lo nuevo va aparte)
+avisos: 1
+```
+
+**El AVISO queda, y no es crecimiento propio.** Medido con `medir_js` y
+`padres` del mismo chequeo, las líneas de la anónima que no están en ninguna
+función anidada pasan de **1040** (`ffed989`) a **1034** (`f22f48b`): bajan 6.
+El chequeo compara las funciones anidadas por nombre y orden; `vueltaDelPago`
+es nueva pero está armada con líneas que ya estaban en `z34`, así que el
+chequeo no la cuenta como agregada y le carga su largo a la anónima. Partir
+la anónima ya está en la cola (D50).
+
+### Revisiones
+
+| Quién | Modelo y esfuerzo | Sobre | Hallazgo | Qué hice |
+|---|---|---|---|---|
+| `/code-review high` | esta sesión, alto | `374348b` | El sabotaje sólo veía la fila `success` (z35 corta en la primera que falla) | `VUELTA` en el arnés y un sabotaje por vuelta (`f22f48b`) |
+| `/code-review high` | | | `ruta.fetch()` sin `catch`: una falla de red terminaba en el tope de 15 s, con un mensaje que no la nombra | El `catch` llama a `falla` |
+| `/code-review high` | | | `z35` no comprobaba su premisa: si la retenida contestara B, mediría lo mismo que `z34` | Aserción de que el `username` es el de A |
+| `/code-review high` | | | El AVISO de chequeo-6 | Explicado arriba |
+| `/code-review high` | | | `vueltaDelPago` se parece a `retenerRespuestas` y `retenerUsuario` | Queda: retienen otra cosa (respuestas de escritura, el usuario sin soltar) con otro contrato |
+| `/code-review high` | | | El booleano `conCookieDeA` | Queda: estilo |
+| `/code-review high` | | | La premisa de `z34` no se comprueba | Queda: su propio sabotaje daría verde si `continue()` no pusiera la cookie de B |
+| `adversario-sonnet-alto` | Sonnet, alto | `374348b` | Sin defectos que bloqueen. `z35` verde sin sabotaje y rojo en 6 de 6 corridas con el texto esperado; con `continue()` el sabotaje da verde; `fulfill` no pisa cookies. Menores: sólo `success` (arreglado), `fetch` sin `catch` (arreglado), 429 del login si se corre muchas veces contra la misma API (entorno) | Lo que bloqueaba, en `f22f48b` |
+| Seguridad | subagente Sonnet, con las instrucciones de `/security-review` | `ffed989..f22f48b` | «Sin hallazgos»: sólo archivos de prueba, ni producto, ni variables que lea el producto, ni secretos | — |
+
+La revisión de seguridad no fue el skill completo con su filtro de falsos
+positivos en paralelo: fue un subagente con sus instrucciones, porque el diff
+no tiene producto.
+
+### Riesgos
+
+- **Bajo.** `z35` depende de que la vuelta del pago relea el usuario (a los
+  4000 y 2000 ms, `handleBillingReturn`). El caso espera esa relectura, no
+  un tiempo fijo: si la espera cambia sigue midiendo, y si la relectura
+  desaparece falla con «la pestaña no vuelve a leer el usuario en 15 s».
+- **Bajo, de entorno.** Corrido muchas veces contra la misma API, el login
+  da 429. Los scripts de sabotaje levantan una API nueva por corrida.
+- Lo que no tocás vos ni yo: las lecturas GET siguen sin pasar por el freno
+  (lo anotaste fuera de la pieza).
+
+### Comandos para reproducir
+
+```bash
+# 1. Sabotajes de la pieza: ROJO en «(success)» y «(topup_success)», y «sabotajes sin rojo: 0»
+PY=venv/bin/python PUERTO=8875 scripts/testing/sabotajes/orden1b.sh f22f48b
+# 2. El arnés entero en verde (la base del script) y «sabotajes sin rojo: 0»
+PY=venv/bin/python PUERTO=8853 scripts/testing/sabotajes/orden1.sh f22f48b
+# 3. Números de §6: 1 aviso, el de arriba
+python docs/pm/herramientas/chequeo-6.py ffed989 f22f48b
+```
+
+### Archivos de producto tocados
+
+Ninguno.
+
+---
+
 ## COBRO-MP-1 vuelta 4, entregada en `9161e0a` (informe en el commit de arriba)
 
 **Resultado.** Toda cuenta con una suscripción de Mercado Pago abierta
@@ -284,8 +420,8 @@ git diff 54dabb7 9e23484 -- proyecto_maria/ | grep '^+' | grep -E '[A-Z]{4,}(-[A
 `proyecto_maria/main.py`, `proyecto_maria/services/billing_service.py`,
 `proyecto_maria/static/v2/screens/profile.js` y `CHANGELOG.md`.
 
-/compact conservar: Dev 1, rama claude/dev-tecnica. COBRO-MP-1 vuelta 4
-entregada en 9161e0a y en revisión de la PM, con D51-D54 para decidir.
-Apenas entregué: ORDEN-1b vuelta 3 (caso y sabotaje: la cookie leída
-después de la respuesta en loadCurrentUser, reteniendo con route.fetch()).
-Nada se publica sin el «dale» de Emi; nunca main.
+/compact conservar: Dev 1, rama claude/dev-tecnica. ORDEN-1b vuelta 3
+entregada en f22f48b (informe en el commit de arriba), con D55 para decidir.
+COBRO-MP-1 vuelta 4 en 9161e0a sigue en revisión, con D51-D54. Lo que sigue
+en la cola (CSRF-1) no está activado: espero el veredicto. Nada se publica sin el
+«dale» de Emi; nunca main.
