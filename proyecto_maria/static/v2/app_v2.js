@@ -392,15 +392,9 @@
             }
             if (duenoPestana === null) {
                 duenoPestana = user.username || '';
-                if (sesionAntes !== sesionAlAbrir || getCsrfToken() !== sesionAlAbrir) {
-                    marcarAjena();
-                } else {
-                    sesionDelDueno = sesionAlAbrir;
-                    if (avisoBorrador === 'red') avisarBorrador(null);
-                }
-            } else if (!confirmarSesion(user.username, sesionAntes)) {
-                return !!currentUser;
+                if (sesionAntes !== sesionAlAbrir || getCsrfToken() !== sesionAlAbrir) marcarAjena();
             }
+            if (!confirmarSesion(user.username || '', sesionAntes)) return !!currentUser;
             currentUser = user;
             CDI.currentUser = user;
             // Banner de billing (trial / past_due / activar plan).
@@ -427,9 +421,10 @@
     }
 
     // Un 500 o un corte al abrir no deja la pestaña sin dueño para siempre:
-    // reintenta de 1 a 30 segundos; un 401 corta, porque ya manda al login.
+    // reintenta de 1 a 30 segundos; un 401 o una pestaña ajena cortan, porque
+    // ya mandan al login o a recargar.
     async function cargarUsuarioHastaTenerlo() {
-        for (let espera = 1000; !(await loadCurrentUser()) && !sinSesion; espera = Math.min(espera * 2, 30000)) {
+        for (let espera = 1000; !(await loadCurrentUser()) && !sinSesion && !sesionAjena; espera = Math.min(espera * 2, 30000)) {
             await new Promise(r => setTimeout(r, espera));
         }
     }
