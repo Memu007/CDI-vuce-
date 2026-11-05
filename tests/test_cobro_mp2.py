@@ -409,3 +409,32 @@ def test_billing_me_dice_si_hay_proximo_cobro(client, estado, con_suscripcion, p
     r = client.get("/api/billing/me")
     assert r.status_code == 200, r.text
     assert r.json().get("renueva") is renueva, r.json()
+
+
+# --- Una sola suscripción por organización ---
+
+@pytest.mark.parametrize("estado_mp, org_status, dias, codigo", [
+    ("authorized", "active", 20, 409),
+    ("authorized", "past_due", -10, 409),
+    ("pending", "active", 20, 200),
+    ("paused", "past_due", -10, 200),
+], ids=["autorizada_vigente", "autorizada_vencida", "pending", "pausada"])
+def test_otro_miembro_no_abre_una_segunda_suscripcion_de_la_org(client, estado_mp, org_status, dias, codigo):
+    from tests.test_cobro_mp1 import _org
+    primero, sid = _suscripto(client, "mp2_orgA", estado_mp=estado_mp)
+    org_id = _org(primero, billing_status=org_status, plan="premium",
+                  trial_ends_at=datetime.now(timezone.utc) + timedelta(days=dias))
+    _set_user(primero, organization_id=org_id)
+    segundo = _unique("mp2_orgB")
+    _register(client, segundo)
+    _set_user(segundo, organization_id=org_id)
+    r = client.post("/api/billing/checkout", json={"plan": "premium"})
+    assert r.status_code == codigo, r.text
+    if codigo == 409:
+        assert CREADAS == [] and SUS[sid] == "authorized"
+        assert _leer(primero)["mp_preapproval_id"] == sid
+        assert primero in r.json()["detail"], "el 409 dice quién la puede cancelar"
+    else:
+        assert SUS[sid] == "cancelled" and [t for t, _ in CREADAS] == ["preapproval"]
+        assert _leer(primero)["mp_preapproval_id"] is None
+        assert _leer(segundo)["mp_preapproval_id"] == r.json()["preapproval_id"]

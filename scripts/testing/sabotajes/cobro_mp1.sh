@@ -578,12 +578,12 @@ sabotaje $B "C: cancelar_corta_acceso no ve la cuenta que ya pasó su fecha" \
 
 # D13 (c): una autorizada sin cuenta vigente frena el checkout y sale cancelando.
 sabotaje $M "D13: el checkout cancela la autorizada vieja" \
-  $'            raise HTTPException(\n                status_code=409,\n                detail="Tu suscripción' \
-  $'            if False: raise HTTPException(\n                status_code=409,\n                detail="Tu suscripción' \
+  $'        raise HTTPException(\n            status_code=409,\n            detail="Tu suscripción' \
+  $'        if False: raise HTTPException(\n            status_code=409,\n            detail="Tu suscripción' \
   "assert 200 == 409"
 sabotaje $M "D13: sin cuenta vigente, el 409 dice que se renueva sola" \
-  '            if entidad.billing_status in ("trial", "active") and fin and fin > datetime.now(timezone.utc):' \
-  '            if True:' \
+  '        if entidad.billing_status in ("trial", "active") and fin and fin > datetime.now(timezone.utc):' \
+  '        if True:' \
   "assert 'cancelá el plan primero' in 'Ya tenés una suscripción activa en Mercado Pago; se renueva sola"
 # La salida que nombra el 409 tiene que existir en cada estado: la cuenta
 # con la autorizada guardada puede cancelarla.
@@ -610,8 +610,8 @@ if ! correr >/dev/null; then
 else
   echo "BASE  | la carrera de D en Postgres, en verde"
   sabotaje $M "D: el checkout no bloquea la cuenta" \
-    '    result = await db.execute(select(User).where(User.username == username).with_for_update())' \
-    '    result = await db.execute(select(User).where(User.username == username))' \
+    '.order_by(User.username).with_for_update()' \
+    '.order_by(User.username)' \
     "FALLA | sin suscripción anterior: queda una sola suscripción viva en Mercado Pago"
   sabotaje $M "D: cancelar no espera al checkout en curso" \
     '    result = await db.execute(select(User).where(User.username == user["username"]).with_for_update())' \

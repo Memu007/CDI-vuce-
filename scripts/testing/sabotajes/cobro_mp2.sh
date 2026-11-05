@@ -2,7 +2,8 @@
 # Negativos de COBRO-MP-2: cada sabotaje deshace una regla de la pieza y la
 # prueba (tests/test_cobro_mp2.py, con Mercado Pago simulado, y el caso de la
 # cancelada en tests/test_cobro_corte1.py) tiene que fallar en el caso de esa
-# regla.
+# regla. Los cruces entre miembros de una organización corren al final en un
+# Postgres 16 descartable (scripts/testing/cobro_mp2_postgres.py).
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/cobro_mp2.sh [SHA]
 # Trabaja en un worktree descartable con SQLite propia y sin terceros: no toca
@@ -103,28 +104,37 @@ sabotaje $M "reactivar lo pagado no pasa por el checkout" \
 # --- Una sola suscripción (C4, D7.2)
 sabotaje $M "sin el 409 con una suscripción vigente" \
   "FAILED $T::test_el_segundo_checkout_con_una_vigente_se_frena" \
-  "            if entidad.billing_status in (\"trial\", \"active\") and fin and fin > datetime.now(timezone.utc):" \
-  "            if False:"
+  "        if entidad.billing_status in (\"trial\", \"active\") and fin and fin > datetime.now(timezone.utc):" \
+  "        if False:"
 # El 409 de la autorizada sin cuenta vigente (D13 de COBRO-MP-1) se sabotea
 # en cobro_mp1.sh.
 sabotaje $M "la vieja no se cancela antes de crear la nueva" \
   "FAILED $T::test_sin_cuenta_vigente_la_vieja_se_cancela_antes_de_crear[pending]" \
-  "        if estado_mp != \"cancelled\":" "        if False:"
+  "    if estado_mp != \"cancelled\":" "    if False:"
 sabotaje $M "la vieja ya cancelada se vuelve a cancelar" \
   "FAILED $T::test_sin_cuenta_vigente_la_vieja_se_cancela_antes_de_crear[ya_cancelada]" \
-  "        if estado_mp != \"cancelled\":" "        if True:"
+  "    if estado_mp != \"cancelled\":" "    if True:"
 sabotaje $M "si no se puede cancelar la vieja, se crea igual" \
   "FAILED $T::test_si_no_se_puede_cancelar_la_vieja_no_se_crea_nada" \
   "vieja en MP: {e}\")
-                raise HTTPException(status_code=503, detail=no_disponible)" "vieja en MP: {e}\")"
+            raise HTTPException(status_code=503, detail=no_disponible)" "vieja en MP: {e}\")"
 sabotaje $M "si no se sabe cómo está la vieja, se crea igual" \
   "FAILED $T::test_si_no_se_sabe_como_esta_la_suscripcion_no_se_crea_otra" \
   "suscripción en MP: {e}\")
-            raise HTTPException(status_code=503, detail=no_disponible)" "suscripción en MP: {e}\")
-            estado_mp = \"cancelled\""
+        raise HTTPException(status_code=503, detail=no_disponible)" "suscripción en MP: {e}\")
+        estado_mp = \"cancelled\""
 sabotaje $M "un estado desconocido de Mercado Pago se acepta" \
   "FAILED $T::test_si_no_se_sabe_como_esta_la_suscripcion_no_se_crea_otra[estado_desconocido]" \
   "    if estado not in _ESTADOS_SUSCRIPCION_MP:" "    if False:"
+
+# --- Una sola suscripción por organización
+sabotaje $M "el checkout no mira las suscripciones de los otros miembros" \
+  "FAILED $T::test_otro_miembro_no_abre_una_segunda_suscripcion_de_la_org[pending]" \
+  "    cuentas = [db_user] + [u for u in filas if u is not db_user and org_id and u.organization_id == org_id]" \
+  "    cuentas = [db_user]"
+sabotaje $M "el 409 de la autorizada de otro miembro no dice de quién es" \
+  "FAILED $T::test_otro_miembro_no_abre_una_segunda_suscripcion_de_la_org[autorizada_vencida]" \
+  "        if cuenta is not db_user:" "        if False:"
 
 # --- Un pago no pierde días (D7.1)
 sabotaje $M "el pago suma desde el fin sólo si está activa" \
@@ -171,6 +181,28 @@ sabotaje $M "renueva con un checkout sin pagar" \
   "FAILED $T::test_billing_me_dice_si_hay_proximo_cobro[checkout_sin_pagar]" \
   "
                     and getattr(billing_entity, \"payment_provider\", None) == \"mercadopago\")," "),"
+
+# Los cruces entre miembros, en un Postgres 16 descartable.
+correr() {
+  PY="$PY" timeout 300 scripts/testing/con_pg16.sh bash -c '"$0" "$1" "$BACKUP1A_PG_URL"' "$PY" "$T" 2>&1
+}
+T=scripts/testing/cobro_mp2_postgres.py
+git checkout -q -- proyecto_maria/
+if ! correr >/dev/null; then
+  echo "BASE  | los cruces en Postgres ya están en rojo (o no hay Postgres 16): no se pueden medir"; FALLAS=$((FALLAS+1))
+else
+  echo "BASE  | los cruces en Postgres, en verde"
+  sabotaje $M "dos miembros pagan a la vez sin bloquear la organización" \
+    "FALLA | dos miembros pagan a la vez: queda una sola suscripción viva en Mercado Pago" \
+    "        await db.execute(select(Organization.id).where(Organization.id == org_id).with_for_update())" \
+    "        await db.execute(select(Organization.id).where(Organization.id == org_id))"
+  sabotaje $M "el checkout bloquea la organización antes que a los miembros" \
+    "FALLA | un miembro genera mientras otro paga: nadie queda cortado por deadlock" \
+    "    nombres = {username, *((await db.execute(otros_con_sid)).scalars().all() if org_previa else ())}" \
+    "    nombres = {username, *((await db.execute(otros_con_sid)).scalars().all() if org_previa else ())}
+    if org_previa:
+        await db.execute(select(Organization.id).where(Organization.id == org_previa).with_for_update())"
+fi
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"
