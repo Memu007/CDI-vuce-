@@ -32,7 +32,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database.models import ClientProductHistory
-from ..core.catalog_service import MAX_DESCRIPCION, _normalize, _similarity  # reuso de normalizador
+from ..core.catalog_service import _normalize, _similarity, validar_largo  # reuso de normalizador
 
 FUZZY_THRESHOLD = 0.80
 # Lo que se guarda como promedio: más grande no es un valor de verdad.
@@ -137,8 +137,7 @@ def descripcion_del_producto(descripcion) -> str:
     if _MEDIO_PAR.search(texto):
         raise ValueError("Hay un carácter que no se puede guardar.")
     texto = unicodedata.normalize("NFC", texto)
-    if len(texto) > MAX_DESCRIPCION:
-        raise ValueError(f"La descripción pasa de {MAX_DESCRIPCION} caracteres.")
+    validar_largo(texto)
     return texto
 
 

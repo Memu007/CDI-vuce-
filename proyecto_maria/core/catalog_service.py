@@ -39,11 +39,12 @@ from proyecto_maria.database.models import VendorCatalogProduct
 FUZZY_THRESHOLD = 0.80
 
 # La descripción más larga que guardan el catálogo y la memoria del cliente,
-# medida en NFC, la forma en que se guarda.
+# medida en NFC, la forma en que la guarda la memoria del cliente: así lo que
+# entra en una entra en la otra.
 MAX_DESCRIPCION = 2000
 
 
-def _validar_largo(descripcion: str) -> None:
+def validar_largo(descripcion: str) -> None:
     if len(unicodedata.normalize("NFC", descripcion)) > MAX_DESCRIPCION:
         raise ValueError(f"La descripción pasa de {MAX_DESCRIPCION} caracteres.")
 
@@ -347,7 +348,7 @@ async def save_products(
 
     for prod in productos_in:
         desc = (prod.get("descripcion") or "").strip()
-        _validar_largo(desc)
+        validar_largo(desc)
         ncm = (prod.get("ncm") or prod.get("pieza") or "").strip()
         origen = (prod.get("origen") or "").strip()
 
@@ -462,7 +463,7 @@ async def update_product(
     new_desc = row.descripcion or ""
     if "descripcion_original" in updates and updates["descripcion_original"] is not None:
         val = str(updates["descripcion_original"]).strip()
-        _validar_largo(val)
+        validar_largo(val)
         if val:
             new_desc = val
 
