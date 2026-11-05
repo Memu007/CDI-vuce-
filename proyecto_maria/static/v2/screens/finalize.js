@@ -750,13 +750,20 @@
                 duration_ms: dur
             });
             renderReady();
-            // Best-effort, en orden: toast reemplaza al anterior, y el aviso de la
-            // operación (que puede ser un error) es lo que tiene que quedar a la vista.
+            // A la vez y best-effort. Toast reemplaza al anterior: si la operación ya
+            // avisó algo (que puede ser un error), el aviso del catálogo no lo tapa.
             const operacion = armarOperacion(items, data);
-            saveCatalogLearn(items).catch(err => {
-                console.warn('[catalog] no se pudo aprender', err);
-            }).then(() => saveOperationToHistory(items, data, operacion)).catch(err => {
+            let avisoDeLaOperacion = false;
+            saveOperationToHistory(items, data, operacion).then(r => {
+                avisoDeLaOperacion = (!r.ok && r.reason !== 'sin_cliente') || r.historial_guardado === false;
+            }).catch(err => {
                 console.warn('[history] no se pudo guardar operacion', err);
+            });
+            saveCatalogLearn(items).then(aprendido => {
+                if (!aprendido && !avisoDeLaOperacion && CDI.toast) {
+                    CDI.toast('Algunos productos no quedaron en la memoria',
+                        'La operación está lista, pero la próxima vez esos productos no se van a sugerir solos.', 'warning');
+                }
             });
         } catch (err) {
             console.error('[ready] generate error', err);
@@ -1091,9 +1098,10 @@
         }
         if (btn) btn.disabled = true;
         try {
-            // Ya se creó en este panel y falló el guardado: se reintenta sin crear otro.
-            const activo = (CDI.getClienteActivo && CDI.getClienteActivo()) || {};
-            if (clienteCreadoAca && activo.id === clienteCreadoAca) {
+            // Ya se creó en este panel y falló el guardado (aunque después se haya
+            // probado asignar otro): se reintenta con ese, sin crear otro.
+            if (clienteCreadoAca) {
+                CDI.setClienteActivo(clienteCreadoAca);
                 await reSaveOperationAndClosePanel('create');
                 return;
             }
@@ -1131,7 +1139,7 @@
                 return;
             }
             CDI.clientesCache = [];
-            clienteCreadoAca = out.cliente.id;
+            clienteCreadoAca = out.cliente;
             CDI.setClienteActivo(out.cliente);
             await reSaveOperationAndClosePanel('create');
         } catch (err) {
@@ -1308,10 +1316,11 @@
     // Expongo para que el panel huérfano u otro lugar pueda forzar un reintento.
     CDI.saveOperationToHistory = saveOperationToHistory;
 
+    // true si aprendió o no había nada para aprender.
     async function saveCatalogLearn(items) {
         const op = (CDI.state && CDI.state.operacion) || {};
         const vendorName = String(op.vendedor_nombre || '').trim();
-        if (!vendorName || !Array.isArray(items) || !items.length) return;
+        if (!vendorName || !Array.isArray(items) || !items.length) return true;
 
         const productos = items.map(it => ({
             descripcion: String(it.descripcion || '').trim(),
@@ -1320,13 +1329,13 @@
             unidad_medida: String(it.unidad_medida || '').trim(),
         })).filter(p => p.descripcion && p.ncm);
 
-        if (!productos.length) return;
+        if (!productos.length) return true;
 
         // Derivar vendor_id slug (mismo criterio que backend: alfanumerico lowercased sin acentos)
         const vendor_id = vendorName
             .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
             .toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
-            .slice(0, 64) || 'proveedor';
+            .slice(0, 60) || 'proveedor';
         try {
             const res = await CDI.api('/api/catalog/' + encodeURIComponent(vendor_id) + '/productos', {
                 method: 'POST',
@@ -1334,10 +1343,6 @@
                 body: JSON.stringify({ vendor_name: vendorName, productos }),
             });
             const data = await res.json().catch(() => ({}));
-            if (!res.ok && CDI.toast) {
-                CDI.toast('Algunos productos no quedaron en la memoria',
-                    'La operación está lista, pero la próxima vez esos productos no se van a sugerir solos.', 'warning');
-            }
             if (res.ok) {
                 CDI.track('catalog_learn', {
                     vendor_id,
@@ -1346,7 +1351,10 @@
                     updated: data && data.updated || 0,
                 });
             }
-        } catch (_) { /* best-effort */ }
+            return res.ok;
+        } catch (_) {
+            return false;
+        }
     }
 
     function trimPreview(text, maxLines) {
