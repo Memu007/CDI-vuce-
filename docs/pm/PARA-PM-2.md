@@ -2,6 +2,200 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## DESPACHO-1c: **entregada** en `5199709` (2026-11-05), con tus CSRF-1 y CSRF-2 integradas
+
+| Pieza | Resultado | Qué decidís |
+|---|---|---|
+| DESPACHO-1c (D51 b + D52 b) | Las tres pantallas que guardan en la memoria de productos avisan cuando el servidor contesta `historial_guardado: false`; «Cliente guardado» ya no tapa ese aviso. Una consulta o una fila del historial que normalizan a vacío ya no se cruzan con todo. | D57 |
+| RENDIMIENTO-1c v2, DESPACHO-1b v6, CATALOGO-LARGO-1 | Sin cambios desde `ca87d82` (abajo). Este es el timbre que no te mandé en su momento. | D53–D56, abajo |
+
+**Ojo para publicar, sigue igual:** desde `96052c8` esta rama tiene `e0b8626` (COBRO-CORTE-1, COBRO-MP-2, AISLAMIENTO-2, LIMPIEZA-1 y BACKUP-1a, sin aceptar). Ningún SHA mío desde `96052c8`, `5199709` incluido, sirve para publicar hasta que esas cinco estén ✅. El último sin ese código es `ca87d82`, que no tiene DESPACHO-1c.
+
+**Numeración:** mis D llegan a D57. En `640036a` usaste «D59» para la otra Dev; si las D son una sola serie, D58 quedó sin usar. No cambia nada mío.
+
+### Decisiones
+
+- **D57. Si guardar la operación falla, «Cliente guardado» tapa el error.** En el panel de cliente sin asignar, `reSaveOperationAndClosePanel` (`finalize.js:1171`) muestra «Cliente guardado» salvo que llegue `historial_guardado: false`. Cuando el guardado entero falla, `saveOperationToHistory` muestra su error y devuelve `{ok: false}` sin ese campo, así que el éxito sale después y reemplaza el error (un toast reemplaza al anterior). Antes de esta pieza pasaba lo mismo, porque el éxito salía siempre: no lo empeoré, pero queda al lado de lo que toqué. Lo encontraron por separado `/code-review` y el adversario.
+  - (a) Dejarlo.
+  - (b) La guarda pasa a `guardado.ok && guardado.historial_guardado !== false`, con un escenario más en el arnés (`/operaciones` con 500) y su sabotaje.
+  - **Recomiendo (b), como devolución chica de esta pieza.** Es una condición en la línea que ya cambié; la dejé afuera porque D51 pide el aviso de `false`, no el del error.
+
+D53 y D54 siguen sin decidir y no las hice. El hallazgo 4 de abajo (un 400 de guardar-uso no se avisa) es la D53.
+
+### SHAs (base `d25c263`)
+
+| SHA | Qué |
+|---|---|
+| `58f2aed` | test: rojos del aviso de memoria sin guardar y de la descripción que normaliza a vacío |
+| `98d6222` | fix: avisar lo que no quedó en la memoria y no cruzar descripciones vacías (+ `CHANGELOG.md`) |
+| `336e5fb` | test: `despacho1c.sh`, sabotajes de las dos guardas de sugerir y de los tres avisos |
+| `3095033` | refactor: una consulta que normaliza a vacío no lee el historial (hallazgo 7) |
+| `71598bd` | test: el aviso se reconoce por su título, lo guardado sigue diciendo «Cliente guardado» y el arnés sin vueltas fijas (hallazgos 5 y 6) |
+| `1e8ee4d` | test: la respuesta sin `historial_guardado` no avisa |
+| `04d88a5` | merge de tu rama: CSRF-1 (ver «Merge», abajo) |
+| `a7ed7b6` | test: cada caso arranca con el limitador apagado |
+| `5199709` | merge de tu rama: CSRF-2 hasta `72f92ba` |
+| este | docs: informe |
+
+**Archivos de producto de esta pieza:** `proyecto_maria/main.py` (`sugerir_ncm`, paso 3), `proyecto_maria/static/v2/screens/finalize.js` (`reSaveOperationAndClosePanel`, `saveOperationToHistory`), `proyecto_maria/static/v2/screens/ncm.js` (`saveNcmUsage`) y `CHANGELOG.md`.
+
+**Cómo queda:**
+- `sugerir_ncm`: si la consulta normaliza a vacío no lee el historial; una fila guardada que normaliza a vacío no se compara. Lo idéntico no latino («日本語の製品» contra «日本語の製品») tampoco se sugiere: es lo literal de D52 (b), lo marca el hallazgo 2.
+- Operación con cliente activo: con `false`, aviso «Algunos productos no quedaron en la memoria».
+- Panel de cliente sin asignar: con `false`, ese aviso queda a la vista y no sale «Cliente guardado»; con `true` o sin el campo, «Cliente guardado» como antes.
+- Confirmar una posición: con `false`, aviso «No se guardó en la memoria de productos».
+- Sin el campo en la respuesta, ninguna pantalla avisa.
+
+**Pruebas:** `tests/test_despacho1c.py` tiene dos casos. Uno es para sugerir, con la familia como datos: fila guardada japonesa o sólo de signos, consulta japonesa o devanagari, y una que sí coincide y se sigue sugiriendo. El otro corre las tres pantallas reales con un DOM falso (`tests/despacho1c_pantalla.js`): tres escenarios por `true`/`false`/sin dato. El arnés espera a ver la llamada a la red, como condición, sin vueltas fijas.
+
+### Comandos
+
+```bash
+git checkout 5199709
+# «14 passed»
+<entorno de la suite> python -m pytest -q --no-cov tests/test_despacho1c.py
+# 7 ROJO y «fallas: 0»
+PY=<venv>/bin/python scripts/testing/sabotajes/despacho1c.sh 5199709
+```
+
+### Puertas
+
+Sobre `5199709` (en un worktree limpio en ese SHA), salvo donde dice otro:
+
+| Puerta | SHA | Salida exacta |
+|---|---|---|
+| `pytest -q --no-cov --timeout=300` (suite completa) | `5199709` | `4806 passed, 355 skipped, 3 xfailed, 103 warnings in 652.79s`, salida 0 |
+| suite con el entorno de la CI (`ENVIRONMENT=testing`, `EMAIL_VERIFICATION_REQUIRED=false`) | `5199709` | `4806 passed, 355 skipped, 3 xfailed, 100 warnings in 645.92s`, salida 0 |
+| `compileall -q proyecto_maria tests` | `5199709` | salida 0. Avisa `SyntaxWarning: invalid escape sequence '\-'` en `pdf_extractor.py:927` y `:936`; eso viene de antes y no lo toqué |
+| `tests/test_despacho1c.py` | `5199709` | `14 passed, 3 warnings in 2.02s` |
+| `despacho1c.sh` | `1e8ee4d` | 7 ROJO, «fallas: 0», salida 0. Después de ese SHA cambiaron `tests/conftest.py` y los merges de CSRF; ninguno toca `sugerir_ncm`, `finalize.js`, `ncm.js` ni el arnés (`git diff 1e8ee4d 5199709` sobre esos archivos da vacío) |
+| `despacho1b.sh` con `PG_DSN` | `515821a` | 138 ROJO, «sin Postgres, no corridos: 0», «sabotajes sin rojo: 0», salida 0 |
+| tus `csrf1.sh` y `csrf2.sh`, en copias adaptadas (ver «Merge») | `5199709` | csrf1 da 8 ROJO y csrf2 da 10 ROJO, con «sabotajes con falla: 0» y salida 0 en los dos. Los scripts originales dan 7 ROJO + 1 ROTO y 9 ROJO + 1 ROTO |
+
+### Revisiones
+
+`/code-review high` sobre `d25c263..336e5fb`, 8 hallazgos:
+
+| # | Hallazgo | Estado |
+|---|---|---|
+| 1 | `finalize.js:1171`: si guardar falla, «Cliente guardado» tapa el error | D57 (anterior, al lado) |
+| 2 | `main.py`: una descripción sólo no latina no se sugiere ni para el mismo texto | riesgo bajo; es lo literal de D52 (b) |
+| 3 | `main.py`, guardar-uso: con una descripción que normaliza a vacío contesta `historial_guardado: true`, aunque esa fila nunca se va a sugerir (el catálogo salta la clave vacía y la memoria del cliente da similitud 0) | riesgo bajo, nuevo: el aviso no sale en un caso donde la memoria no va a servir |
+| 4 | `ncm.js:1842`: con un 400 de guardar-uso no se guarda nada y no se avisa | es la D53, sin decidir |
+| 5 | el test no comprobaba «Cliente guardado» ni el título del aviso | arreglado en `71598bd` |
+| 6 | espera fija de 20 vueltas en el arnés | arreglado en `71598bd` |
+| 7 | la consulta vacía leía todo el historial | arreglado en `3095033` |
+| 8 | el chequeo de `historial_guardado === false` queda en `finalize.js` y en `ncm.js`, con textos distintos | riesgo de §6: son dos pantallas sin código común (`saveNcmUsage` no pasa por `saveOperationToHistory`) y los textos dicen cosas distintas. Unirlas sería un helper en `app_v2.js` para dos líneas; lo dejo para `COLA-LIMPIEZA.md` si te parece |
+
+Adversario Sonnet, esfuerzo alto (`adversario-sonnet-alto`), sobre `336e5fb`:
+
+| | Hallazgo | Estado |
+|---|---|---|
+| A (media) | = hallazgo 1 | D57 |
+| B (baja) | el dashboard v1 (`app.js:3741`, `3924`) no lee el flag | riesgo: no lo toqué. D51 nombra «la pantalla» y lo leí como la v2, que es la que guarda con cliente activo; si el v1 todavía se usa, es otra pieza chica |
+| C (baja) | = hallazgo 2 | riesgo |
+| D (baja) | una fila corta («a», «1») coincide por `in` con casi cualquier consulta | existía antes de D52; riesgo, no lo toqué |
+| huecos | el arnés no cubre las rutas `create` del panel (`orphanCreateClick`) ni «Usar cliente existente» | riesgo: pasan por la misma `reSaveOperationAndClosePanel` que `asignar-cliente` |
+
+### Chequeo §6 (`docs/pm/herramientas/chequeo-6.py`), entero
+
+```
+chequeo-6 d25c263..1e8ee4d: avisos para mirar, no un veredicto
+producto +27/−10
+arnés +279/−0
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  proyecto_maria/main.py: 12043 → 12045
+  proyecto_maria/static/v2/screens/finalize.js: 1390 → 1400
+  proyecto_maria/static/v2/screens/ncm.js: 2336 → 2341
+avisos: 0
+---
+chequeo-6 1e8ee4d..04d88a5: avisos para mirar, no un veredicto
+producto +16/−14
+arnés +207/−13
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  proyecto_maria/main.py: 12045 → 12044
+  proyecto_maria/static/v2/app_v2.js: 1199 → 1202
+avisos: 0
+---
+chequeo-6 04d88a5..a7ed7b6: avisos para mirar, no un veredicto
+producto +0/−0
+arnés +8/−0
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+avisos: 0
+---
+chequeo-6 a7ed7b6..5199709: avisos para mirar, no un veredicto
+producto +37/−11
+  AVISO producto suma 26 líneas netas: el informe dice por qué (§6: más de 20)
+arnés +218/−74
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  proyecto_maria/main.py: 12044 → 12041
+  proyecto_maria/static/csrf.js: nuevo, 27
+avisos: 1
+---
+```
+
+El AVISO de `a7ed7b6..5199709` es tu CSRF-2: el producto de ese merge es línea por línea el de `6e71766..72f92ba` (lo comparé con `diff` sobre las líneas `+`/`−`), sin nada mío.
+
+### Lo que no corrí
+
+La imagen Docker de producción, el smoke y el ataque de aislamiento: DESPACHO-1c no toca sesión, permisos ni datos de otros. Los sabotajes de CSRF tal cual vienen dan un ROTO cada uno; los conté en las copias adaptadas: ver «Merge».
+
+---
+
+## Merge con tu rama, después de `ca87d82` (2026-11-05)
+
+Traje tu rama dos veces: `96052c8` (hasta `885ee89`, con COBRO-MP-1, ORDEN-1b y EXCEL-2b) y `a8c235d` (sólo `NOW.md` y `PARA-DEV.md`). El primero rompió cuatro cosas; las cuatro tienen arreglo y las puertas de abajo corren sobre `515821a`, que tiene el mismo código que `a8c235d`.
+
+**Ojo para publicar:** desde `96052c8` esta rama tiene `e0b8626`, o sea el código sin aceptar que nombra tu `NOW.md` de las 13:05: COBRO-CORTE-1, COBRO-MP-2, AISLAMIENTO-2, LIMPIEZA-1 y BACKUP-1a. Ningún SHA mío a partir de `96052c8` sirve para publicar hasta que esas cinco piezas estén ✅. Si querés mis tres piezas sin ese código, el último SHA mío anterior al merge es `ca87d82`.
+
+| SHA | Qué |
+|---|---|
+| `96052c8` | merge de tu rama. Conflictos: los imports de `main.py` (se unieron las dos listas) y `CHANGELOG.md` (se unieron las entradas) |
+| `6c8159a` | fix: `validar_con_carril` vuelve a recibir y pasar `clave`. La resolución automática del merge dejó `clave` sin definir en `file_security.py`, lo que daba `NameError` (500) en cada subida de PDF. Producto +3/−2 |
+| `e90a978` | test: los usuarios de `test_disco1.py` se crean con `plan="premium", billing_status="active"`, porque COBRO-CORTE-1 (`require_billing_vigente`) daba 402 en `/upload_pdf/public`. **Para que lo mires:** `test_guardar2.py:205` pasa a `{DESC: "84713012"}`, porque la regla de identidad de DESPACHO-1b guarda el NCM en 8 dígitos y el caso esperaba la forma con puntos |
+| `515821a` | test: el caso de las diez subidas espera a que las diez bombas de A entren a validar (ver abajo) |
+| `a8c235d` | merge de tu rama, sólo docs |
+
+**El caso de las diez tenía una carrera.** Lanzaba la subida de B sin comprobar que las diez bombas de A estuvieran ya en la fila, y B podía llegar antes que ellas. Lo vi con `rendimiento1c.sh`: el sabotaje de la fila por usuario daba VERDE. Ahora el caso cuenta las entradas a `validar_pdf_aparte` y espera la condición observable «10 de 10». Tiene un tope de tiempo y no usa espera fija. El assert es el mismo de antes.
+
+| Arnés | Sabotaje de la fila | Ruta | Bombas sin terminar cuando B responde | demora de B | Resultado |
+|---|---|---|---|---|---|
+| viejo | puesto | factura | 6 | 1.94 s | VERDE (no lo veía) |
+| nuevo | puesto | factura | 0 | 5.06 s | rojo «factura: B esperó detrás de las bombas de A» |
+| nuevo | sin sabotaje | factura | 10 | 0.14 s | pasa |
+| nuevo | sin sabotaje | despacho | 10 | 0.28 s | pasa |
+
+**Riesgo fuera de alcance (propuesta):** `main.py:8048` llama a `logger.warning("[fill-if-empty] …")`, pero `logger` no está definido en `main.py` (pyflakes: «undefined name 'logger'»). Viene de `b88da9c`, que ya estaba antes del merge. Si esa rama se ejecuta, da `NameError` en lugar del aviso. No lo toqué; propongo una línea en `COLA-LIMPIEZA.md` o una pieza chica.
+
+**Chequeo §6 del arreglo del merge** (`docs/pm/herramientas/chequeo-6.py 96052c8 515821a`), entero:
+
+```
+chequeo-6 96052c8..515821a: avisos para mirar, no un veredicto
+producto +3/−2
+arnés +9/−8
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  proyecto_maria/security/file_security.py: 692 → 693
+avisos: 0
+```
+
+
+### Merge con CSRF-1 y CSRF-2 (después de DESPACHO-1c)
+
+| SHA | Qué |
+|---|---|
+| `04d88a5` | merge de tu rama hasta `6e71766` (CSRF-1). Conflicto en `main.py`, `logout_root`: quedó tu alias (`"""Alias de /auth/logout"""`, delega en `logout`) con la firma de SESION-1, o sea `return await logout(request, response, db)`. `logout` sigue revocando la sesión, así que borrar mi `revocar_sesion_de_la_request` del alias no pierde nada |
+| `a7ed7b6` | test: una fixture `autouse` en `tests/conftest.py` apaga el limitador al empezar cada caso (`monkeypatch`, que lo deja como estaba al terminar). Con el tope de registros por IP, `test_csrf.py` y `test_prelaunch_block1.py` daban 429 corridos solos: dependían de que un caso anterior dejara el limitador apagado. Los casos que miden un tope lo prenden ellos. Producto +0/−0 |
+| `5199709` | merge de tu rama hasta `72f92ba` (CSRF-2). Sólo conflicto en `CHANGELOG.md` (se unieron las entradas). El producto del merge es exactamente el tuyo |
+
+**Tus sabotajes de CSRF no corren sobre una rama con SESION-1.** `csrf1.sh` y `csrf2.sh` buscan `    return await logout(request, response)`, y acá la línea termina en `, db)`. Sobre `5199709` cada uno dio un ROTO: «patrón no encontrado una sola vez (0)», en «el alias borra la cookie por su cuenta» (csrf1) y en «el alias responde sin cerrar la sesión» (csrf2). Todos los demás dieron ROJO. No es un defecto de producto. Corrí copias en mi scratchpad con ese único cambio en el patrón; el diff contra tus scripts es una línea en cada uno. Cuando integres SESION-1, esos dos patrones tienen que cambiar igual: no los toqué en el repo porque los scripts son tuyos.
+
+---
+
 ## Tres entregas en `ca87d82` (2026-11-05): RENDIMIENTO-1c vuelta 2, DESPACHO-1b vuelta 6 y CATALOGO-LARGO-1
 
 | Pieza | Resultado | Qué decidís |
