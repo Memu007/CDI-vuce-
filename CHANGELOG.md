@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · chore: repositorio ordenado (LIMPIEZA-1, adelantada por Emi)
+
+- **chore(repo):** se borra lo que ya no corre ni se cita: todo lo de Google Cloud (CDI es sólo Railway, decisión del 2026-10-07), la `static/` de la raíz, `clients.json`, el script de migración desde JSON, `tests/old/`, `landing_legacy.html`, los informes de carga, los planes de otras herramientas (`.specify/`, `plans/`), la documentación duplicada o de chat (`docs/fixes`, `docs/misc`, `docs/guides`, `proyecto_maria/documentacion_tecnica`) y los scripts huérfanos de `scripts/`. Nada del producto cambia; todo queda en Git.
+- **docs(repo):** README nuevo con el stack real, cómo correr en local, cómo correr las pruebas y dónde está cada cosa; reemplaza a `QUICK_START.md`, `ARCHITECTURE.md` y `setup.sh`. Los planes de valuación pasan a `docs/negocio/`. `.gitignore` sin entradas personales.
+
 ## 2026-10-24 · feat: alta de cliente con lo que pide el MARIA (CLIENTE-1)
 
 - **feat(clientes):** razón social, CUIT, domicilio e inicio de actividad a la vista y marcados «lo pide el MARIA»; email y teléfono en «Más datos». Se guarda sin ellos, con un aviso de cuáles faltan; el detalle muestra el inicio de actividad.
