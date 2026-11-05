@@ -207,6 +207,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-11-05 19:58 UTC: vuelta. Límite semanal `allowed` en las tres; contextos 131k, 112k y 128k. Sin entregas nuevas: MARIA arma el informe de RENDIMIENTO-1d; técnica corre sus puertas de la devolución de COBRO-CORTE-1 (`da8effc`, sin subir). Mi `despacho1b.sh` sobre `ca87d82` va 115 de 138, todo rojo.
+
 2026-11-05 19:05 UTC: **DESPACHO-1c aceptada** (`fbbb2ad`): 39 casos, `despacho1c.sh` 16 ROJO, mis ejemplos 403/503/422 en verde; se integra cuando acepte `ca87d82`, que viene adentro. Lo del adversario (la operación espera al catálogo, red caída o 402 sin aviso, id de proveedor a 60, segundo cliente al reintentar, cartel que queda) va a la subpieza DESPACHO-1d, después de RENDIMIENTO-1d.
 
 2026-11-05 19:20 UTC: **CSRF-3 aceptada** (`9fe55d4`): 4450 passed, sabotajes csrf3/2/1 en rojo, sin avisos; integrada. MARIA entregó la devolución de DESPACHO-1c en `fbbb2ad`: en revisión. La reproducción de `ca87d82` sigue.
@@ -240,8 +242,6 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 2026-11-05 05:20 UTC: **ORDEN-1b vuelta 2: devolución corta, sólo de pruebas.** El producto se sostiene (24 + 76 sabotajes en rojo). Falta un caso: si la lectura de la cookie en `loadCurrentUser` se mueve después de la respuesta, el arnés sigue verde y al volver del pago se escribe a nombre de otro usuario. Lo reproduje. D50 (a), a la cola. El contenedor se reinició a las ~04:30 y la revisión se relanzó.
 
 2026-11-05 02:40 UTC: **DESPACHO-1b vuelta 4: devolución por una causa.** Si otro pedido cambia la clave o borra la fila mientras se escribe, el uso se pierde (guardar-uso contesta éxito igual). Lo demás se sostiene: migración en Postgres, aislamiento, 8 puntos. Rojo de entorno aparte: `test_excel2…al_borde_del_tope` falla también en `1f5480e`.
-
-2026-11-05 01:57 UTC: Sin entregas. MARIA en el sabotaje 105 de 132 sobre `03296d4`; técnica trabaja la devolución. Uso semanal «allowed» en las tres.
 
 ## /compact conservar de la PM principal
 
