@@ -13,6 +13,23 @@
 const { chromium } = require('playwright');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
 
+// Cancelada que reactivó y abrió el checkout: tiene una suscripción que
+// cancelar, y se ve «Cancelar plan». Sin suscripción, no.
+async function cancelada(perfilCon, confirmacionDeCancelar, cancelar) {
+  await perfilCon('canceled', { suscripcion_abierta: true, cancelar_corta_acceso: false });
+  const ca = await confirmacionDeCancelar('canceled con suscripción abierta');
+  if (!ca.t.includes('ya pagado')) falla('canceled con suscripción abierta: la confirmación no dice el período ya pagado: «' + ca.t + '»');
+  console.log('OK | canceled con suscripción abierta: se ve «Cancelar plan»');
+  // Ya vencida, cancelar no le deja días: no se le prometen.
+  await perfilCon('canceled', { suscripcion_abierta: true, cancelar_corta_acceso: true });
+  const cv = await confirmacionDeCancelar('canceled vencida con suscripción abierta');
+  if (cv.t.includes('ya pagado')) falla('canceled vencida con suscripción abierta: la confirmación promete el período ya pagado: «' + cv.t + '»');
+  console.log('OK | canceled vencida con suscripción abierta: no se promete el período ya pagado');
+  await perfilCon('canceled', { suscripcion_abierta: false });
+  if (await cancelar.isVisible()) falla('canceled sin suscripción: se ve «Cancelar plan»');
+  console.log('OK | canceled sin suscripción: no se ve «Cancelar plan»');
+}
+
 // Sin período pagado y con una suscripción abierta: se ve «Cancelar plan»,
 // que es la salida del 409 del checkout, sin prometer el período ya pagado.
 async function salidaSinPeriodo(perfilCon, confirmacionDeCancelar, cancelar) {
@@ -101,21 +118,7 @@ async function salidaSinPeriodo(perfilCon, confirmacionDeCancelar, cancelar) {
   if (!ac.t.includes('ya pagado')) falla('active: la confirmación no dice el período ya pagado: «' + ac.t + '»');
   console.log('OK | active: la confirmación dice el período ya pagado');
 
-  // Cancelada que reactivó y abrió el checkout: tiene una suscripción que
-  // cancelar, y se ve «Cancelar plan». Sin suscripción, no.
-  await perfilCon('canceled', { suscripcion_abierta: true, cancelar_corta_acceso: false });
-  const ca = await confirmacionDeCancelar('canceled con suscripción abierta');
-  if (!ca.t.includes('ya pagado')) falla('canceled con suscripción abierta: la confirmación no dice el período ya pagado: «' + ca.t + '»');
-  console.log('OK | canceled con suscripción abierta: se ve «Cancelar plan»');
-  // Ya vencida, cancelar no le deja días: no se le prometen.
-  await perfilCon('canceled', { suscripcion_abierta: true, cancelar_corta_acceso: true });
-  const cv = await confirmacionDeCancelar('canceled vencida con suscripción abierta');
-  if (cv.t.includes('ya pagado')) falla('canceled vencida con suscripción abierta: la confirmación promete el período ya pagado: «' + cv.t + '»');
-  console.log('OK | canceled vencida con suscripción abierta: no se promete el período ya pagado');
-  await perfilCon('canceled', { suscripcion_abierta: false });
-  if (await cancelar.isVisible()) falla('canceled sin suscripción: se ve «Cancelar plan»');
-  console.log('OK | canceled sin suscripción: no se ve «Cancelar plan»');
-
+  await cancelada(perfilCon, confirmacionDeCancelar, cancelar);
   await salidaSinPeriodo(perfilCon, confirmacionDeCancelar, cancelar);
 
   // D. Dos clics en «Activar plan»: un solo checkout, y el botón deshabilitado mientras espera.
