@@ -997,7 +997,7 @@
     // antes del pedido; si cambió mientras tanto, no se sabe de quién es).
     function confirmarSesion(username, sesion) {
         if (sesionAjena || getCsrfToken() !== sesion) return false;
-        if ((username || '') !== duenoPestana) {
+        if (username !== duenoPestana) {
             marcarAjena();
             return false;
         }
