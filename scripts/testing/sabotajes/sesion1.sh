@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-# Negativos de SESION-1: cada sabotaje deshace una regla (cambiar o resetear la
-# contraseña y cerrar sesión revocan, una revocada no vuelve, cambiar el email
-# pide la contraseña, la pantalla la pide sólo si el email cambió) y
-# tests/test_sesion1.py, tests/test_user_profile_coverage.py o
-# scripts/testing/pantalla_sesion1.js tienen que fallar por ese motivo.
+# Negativos de SESION-1: cada sabotaje deshace una regla (un solo lugar decide
+# si un token es la sesión vigente, verificar el email no abre sesión, el login
+# no pisa una clave que cambió, cambiar o resetear la contraseña y cerrar sesión
+# revocan, una revocada no vuelve, la contraseña actual da 400 y tiene tope,
+# cambiar el email la pide, la pantalla la pide sólo si el email cambió) y
+# tests/test_sesion1.py, tests/test_user_profile_coverage.py,
+# scripts/testing/pantalla_sesion1.js o, con PG_DSN, sesion1_motores.py pg
+# tienen que fallar por ese motivo.
 #
-# uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/sesion1.sh [SHA]
+# uso: PY=/ruta/al/venv/bin/python [PG_DSN=postgresql://u@127.0.0.1:<puerto>/<base>] \
+#        scripts/testing/sabotajes/sesion1.sh [SHA]
 # Trabaja en un worktree descartable con su propia SQLite y sin terceros: no
 # toca tu copia ni datos compartidos. Los de pantalla levantan uvicorn en un
 # puerto libre y necesitan node con playwright (NODE_PATH); sin eso se cuentan
@@ -108,69 +112,118 @@ elif ! pantalla_s1 >"$TMPD/base_pantalla.log"; then
   echo "BASE  | la pantalla ya está en rojo sin sabotaje"; cat "$TMPD/base_pantalla.log"; exit 1
 fi
 
-# --- cambiar la contraseña: cierra las otras, conserva la propia
-sabotaje pytest $M "cambiar la clave vuelve a poner active_jti en NULL" \
-  '    revocar_sesiones(db_user, jti_de_la_request(request))' '    db_user.active_jti = None' \
-  "FAILED $T::test_cambiar_clave_revoca_las_otras_y_conserva_la_propia" "la otra sesión sigue entrando después de cambiar la clave"
-sabotaje pytest $M "cambiar la clave cierra también la propia" \
-  '    revocar_sesiones(db_user, jti_de_la_request(request))' '    revocar_sesiones(db_user)' \
-  "FAILED $T::test_cambiar_clave_revoca_las_otras_y_conserva_la_propia" "cambiar la clave cerró la sesión de quien la cambió" \
-  "FAILED $T::test_cambiar_clave_con_cookie_conserva_el_navegador"
+# --- un solo lugar decide si un token es la sesión vigente
+sabotaje pytest $D "un usuario con jti no lo compara" \
+  'if user.active_jti is not None and payload.get("jti") != user.active_jti:' \
+  'if payload.get("jti") != user.active_jti:' \
+  "FAILED $T::test_cambiar_clave_rota_la_sesion_de_quien_la_cambia" "FAILED $T::test_cerrar_sesion_de_un_usuario_sin_jti_revoca"
+sabotaje pytest $D "abrir el token sin verificar la firma" \
+  'jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])' \
+  'jwt.decode(token, options={"verify_signature": False})' \
+  "FAILED $T::test_ningun_lugar_acepta_un_token_que_no_es_la_sesion_vigente" "otra firma"
+sabotaje pytest $D "el token de verificar el email vale como sesión" \
+  'if payload is None or payload.get("type") is not None or not payload.get("sub"):' \
+  'if payload is None or not payload.get("sub"):' \
+  "FAILED $T::test_ningun_lugar_acepta_un_token_que_no_es_la_sesion_vigente" "verificación de email"
+sabotaje pytest $D "el header le gana a la cookie" \
+  $'    token = request.cookies.get("access_token")\n    if not token:\n        auth_header = request.headers.get("Authorization")\n        if auth_header and auth_header.startswith("Bearer "):\n            token = auth_header\n' \
+  $'    token = request.headers.get("Authorization") or request.cookies.get("access_token")\n' \
+  "FAILED $T::test_la_cookie_le_gana_al_header"
+sabotaje pytest $M "verificar el email abre sesión" \
+  $'    await db.commit()\n    return RedirectResponse(url=f"{get_frontend_url()}/dashboard?verified=true")\n' \
+  $'    await db.commit()\n    ir = RedirectResponse(url=f"{get_frontend_url()}/dashboard?verified=true")\n    await abrir_sesion(ir, db, user, user.password)\n    return ir\n' \
+  "FAILED $T::test_verificar_el_email_no_abre_sesion" "vez 1: el link de verificación abrió sesión"
+
+# --- el login: la escritura del jti mira que la clave siga siendo la validada
+sabotaje pytest $M "el login escribe el jti aunque la clave haya cambiado" \
+  'User.username == user.username, User.password == hash_validado).values(active_jti=jti))' \
+  'User.username == user.username).values(active_jti=jti))' \
+  "FAILED $T::test_el_login_no_pisa_una_clave_que_cambio_mientras_validaba"
+
+# --- cambiar la contraseña: cierra todas y devuelve un token nuevo
+sabotaje pytest $M "cambiar la clave no revoca junto con la clave" \
+  $'    revocar_sesiones(db_user)\n    await db.commit()\n    # Quien' $'    await db.commit()\n    # Quien' \
+  "FAILED $T::test_cambiar_clave_revoca_en_el_mismo_commit_que_la_clave" "la clave cambió y el token viejo sigue entrando"
+sabotaje pytest $M "cambiar la clave no emite un token nuevo" \
+  '    token = await abrir_sesion(response, db, db_user, db_user.password)' '    token = None' \
+  "FAILED $T::test_cambiar_clave_rota_la_sesion_de_quien_la_cambia" "FAILED $T::test_cambiar_clave_con_cookie_conserva_el_navegador"
 
 # --- resetear la contraseña: cierra todas
 sabotaje pytest $M "resetear la clave vuelve a poner active_jti en NULL" \
   $'    revocar_sesiones(user)\n' $'    user.active_jti = None\n' \
   "FAILED $T::test_resetear_clave_revoca_todas_las_sesiones" "la sesión vigente sigue entrando después del reset"
 
-# --- una revocada no vuelve: revocar todas nunca escribe NULL
-sabotaje pytest $D "revocar todas escribe NULL y resucita las viejas" \
-  '    user.active_jti = conservar_jti or uuid.uuid4().hex' '    user.active_jti = conservar_jti' \
+# --- una revocada no vuelve: revocar nunca escribe NULL
+sabotaje pytest $D "revocar escribe NULL y resucita las viejas" \
+  '    user.active_jti = uuid.uuid4().hex' '    user.active_jti = None' \
   "FAILED $T::test_una_sesion_revocada_no_vuelve" "FAILED $T::test_resetear_clave_revoca_todas_las_sesiones"
 
 # --- cerrar sesión: revoca el token con el que se llama, y sólo si es el vigente
-sabotaje pytest $M "/auth/logout sólo borra la cookie" \
-  $'    """Cierra sesión: revoca el token y elimina la cookie"""\n    await revocar_sesion_de_la_request(request, db)\n' \
-  $'    """Cierra sesión: revoca el token y elimina la cookie"""\n' \
-  "FAILED $T::test_cerrar_sesion_con_bearer_revoca_la_propia[/auth/logout]" "/auth/logout: el token sigue entrando después de cerrar sesión"
-sabotaje pytest $M "/logout sólo borra la cookie" \
-  $'(alias de /auth/logout)"""\n    await revocar_sesion_de_la_request(request, db)\n' \
-  $'(alias de /auth/logout)"""\n' \
-  "FAILED $T::test_cerrar_sesion_con_bearer_revoca_la_propia[/logout]" "/logout: el token sigue entrando después de cerrar sesión"
-sabotaje pytest $D "cerrar sesión no mira la cookie" \
-  $'    token = _token_de_la_request(request)\n    if not token:\n        return\n' \
-  $'    auth = request.headers.get("Authorization") or ""\n    token = auth[7:] if auth.startswith("Bearer ") else None\n    if not token:\n        return\n' \
-  "FAILED $T::test_cerrar_sesion_con_cookie_revoca_la_propia" "la cookie robada sigue entrando después de cerrar sesión"
+sabotaje pytest $M "cerrar sesión sólo borra la cookie" \
+  $'    try:\n        await revocar_sesion_de_la_request(request, db)\n    except Exception:\n' \
+  $'    try:\n        pass\n    except Exception:\n' \
+  "FAILED $T::test_cerrar_sesion_con_bearer_revoca_la_propia[/auth/logout]" "FAILED $T::test_cerrar_sesion_con_bearer_revoca_la_propia[/logout]" \
+  "FAILED $T::test_cerrar_sesion_con_cookie_revoca_la_propia[/auth/logout]"
+sabotaje pytest $M "cerrar sesión sin base no borra la cookie" \
+  $'    try:\n        await revocar_sesion_de_la_request(request, db)\n    except Exception:\n        # Sin base no se revoca, pero el navegador igual sale.\n        logging.getLogger(__name__).exception("logout: no se pudo revocar la sesión")\n' \
+  $'    await revocar_sesion_de_la_request(request, db)\n' \
+  "FAILED $T::test_cerrar_sesion_borra_la_cookie_aunque_falle_la_base"
 sabotaje pytest $D "cerrar sesión con un token revocado saca la vigente" \
-  $'    if user.active_jti is not None and payload.get("jti") != user.active_jti:\n        return\n' '' \
+  $'    sesion = await sesion_de_la_request(request, db)\n    if sesion is None:\n        return\n    revocar_sesiones(sesion[0])\n' \
+  $'    token = _token_de_la_request(request)\n    payload = datos_del_token(token) if token else None\n    user = payload and (await db.execute(select(User).where(User.username == payload.get("sub")))).scalars().first()\n    if not user:\n        return\n    revocar_sesiones(user)\n' \
   "FAILED $T::test_cerrar_sesion_con_un_token_revocado_no_saca_la_vigente" "un token ya revocado cerró la sesión vigente"
 
-# --- cambiar el email pide la contraseña actual
-# Quitar sólo el chequeo de «sin clave» no basta para romper la regla:
-# verify_password igual rechaza None. El defecto real es verificar sólo si
-# viene una clave.
-sabotaje pytest $M "cambiar el email sin clave no verifica nada" \
-  $'        if not isinstance(current_password, str) or not current_password:\n            raise HTTPException(status_code=400, detail="Para cambiar el email ingresá tu contraseña actual")\n        # 400 y no 401: el frontend toma cualquier 401 como sesión vencida y\n        # manda al login.\n        if not await run_in_threadpool' \
-  '        if current_password and not await run_in_threadpool' \
-  "FAILED $T::test_cambiar_email_sin_clave_falla_y_no_cambia_nada" "assert 200 == 400"
-sabotaje pytest $M "cambiar el email acepta cualquier contraseña" \
-  $'        if not await run_in_threadpool(verify_password, current_password, u.password):\n            raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta")\n' '' \
-  "FAILED $T::test_cambiar_email_con_clave_equivocada_falla_y_no_cambia_nada" "assert 200 == 400"
+# --- la contraseña actual: 400, con tope de intentos
+sabotaje pytest $M "la clave actual acepta cualquier cosa" \
+  $'    if not await run_in_threadpool(verify_password, clave, hash_guardado):\n' $'    if False:\n' \
+  "FAILED $T::test_cambiar_email_con_clave_equivocada_falla_y_no_cambia_nada" "FAILED $T::test_cambiar_clave_mal_no_revoca_nada"
 sabotaje pytest $M "la clave equivocada da 401 y manda al login" \
   'raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta")' \
   'raise HTTPException(status_code=401, detail="La contraseña actual es incorrecta")' \
-  "FAILED $T::test_cambiar_email_con_clave_equivocada_falla_y_no_cambia_nada" "assert 401 == 400"
+  "FAILED $T::test_cambiar_email_con_clave_equivocada_falla_y_no_cambia_nada" "FAILED $T::test_cambiar_clave_mal_no_revoca_nada" "assert 401 == 400"
+sabotaje pytest $M "la clave equivocada no suma al tope" \
+  $'        await limites_auth.sumar_fallo(clave_intentos)\n' '' \
+  "FAILED $T::test_la_clave_actual_tiene_tope_de_intentos"
+
+# --- cambiar el email pide la contraseña actual
+sabotaje pytest $M "cambiar el email sin clave no verifica nada" \
+  $'        if not isinstance(current_password, str) or not current_password:\n            raise HTTPException(status_code=400, detail="Para cambiar el email ingresá tu contraseña actual")\n        await verificar_clave_actual(u.username, current_password, u.password)\n' \
+  $'        if current_password:\n            await verificar_clave_actual(u.username, current_password, u.password)\n' \
+  "FAILED $T::test_cambiar_email_sin_clave_falla_y_no_cambia_nada" "assert 200 == 400"
+sabotaje pytest $M "la clave actual no se mira si es texto" \
+  'if not isinstance(current_password, str) or not current_password:' 'if not current_password:' \
+  "FAILED $T::test_perfil_rechaza_una_clave_actual_que_no_es_texto"
+sabotaje pytest $M "un email vacío antes no pide la clave" \
+  'cambia_email = "email" in body and raw_email != (u.email or "").strip().lower()' \
+  'cambia_email = "email" in body and bool(u.email) and raw_email != u.email.strip().lower()' \
+  "FAILED $T::test_perfil_pide_la_clave_aunque_el_email_estuviera_vacio"
 sabotaje pytest $M "vaciar el email no pide la contraseña" \
-  'if "email" in body and raw_email != (u.email or "").strip().lower():' \
-  'if raw_email and raw_email != (u.email or "").strip().lower():' \
+  'cambia_email = "email" in body and raw_email != (u.email or "").strip().lower()' \
+  'cambia_email = bool(raw_email) and raw_email != (u.email or "").strip().lower()' \
   "FAILED $T::test_vaciar_el_email_tambien_pide_la_clave" "assert 200 == 400"
 sabotaje pytest $M "el mismo email en mayúsculas pide la contraseña" \
-  'if "email" in body and raw_email != (u.email or "").strip().lower():' \
-  'if "email" in body and body.get("email") != u.email:' \
+  'cambia_email = "email" in body and raw_email != (u.email or "").strip().lower()' \
+  'cambia_email = "email" in body and body.get("email") != u.email' \
   "FAILED $T::test_guardar_el_perfil_con_el_mismo_email_no_pide_clave" "assert 400 == 200"
 sabotaje pytest $M "un email mal escrito pide la contraseña en vez de rechazarse" \
-  $'        if raw_email and not re.match(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$", raw_email):\n            raise HTTPException(status_code=400, detail="Email no válido")\n        current_password' \
-  '        current_password' \
+  $'            raise HTTPException(status_code=400, detail="Email no válido")\n' '' \
   "FAILED tests/test_user_profile_coverage.py::test_update_user_profile_email_invalido_400" "Email no válido"
+
+# --- la carrera del login en Postgres: sólo con un Postgres local y descartable
+if [ -n "${PG_DSN:-}" ]; then
+  git checkout -q -- proyecto_maria/
+  if aplicar $M 'User.username == user.username, User.password == hash_validado).values(active_jti=jti))' \
+                'User.username == user.username).values(active_jti=jti))'; then
+    salida="$("$PY" scripts/testing/sesion1_motores.py pg "$PG_DSN" 2>&1)"; codigo=$?
+    juzgar "pg: el login escribe el jti aunque la clave haya cambiado" "$salida" "$codigo" \
+      "FALLA | 6. el login con la clave vieja no abre sesión"
+  else
+    echo "ROTO  | pg: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1))
+  fi
+  git checkout -q -- proyecto_maria/
+else
+  echo "NO CORRIDO | pg: sin PG_DSN la carrera del login en Postgres no se sabotea"
+fi
 
 # --- la pantalla de perfil
 if [ "$CON_PANTALLA" -eq 1 ]; then

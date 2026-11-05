@@ -153,6 +153,23 @@ def test_cambiar_clave_mal_no_revoca_nada():
     assert _entra(t) == 200
 
 
+def test_cambiar_clave_revoca_en_el_mismo_commit_que_la_clave(monkeypatch):
+    """Si el token nuevo no llega a emitirse, la clave cambiada ya cerró las
+    sesiones: no hay un momento con la clave nueva y los tokens viejos."""
+    u, _ = _usuario()
+    t = _login(u)
+    _poner(u, active_jti=None)
+
+    async def sin_sesion_nueva(*_):
+        return None
+
+    monkeypatch.setattr(main_mod, "abrir_sesion", sin_sesion_nueva)
+    r = _http().post("/api/user/change-password", headers=_bearer(t),
+                     json={"current_password": CLAVE, "new_password": CLAVE2})
+    assert r.status_code == 200, r.text
+    assert _entra(t) == 401, "la clave cambió y el token viejo sigue entrando"
+
+
 def test_el_login_no_pisa_una_clave_que_cambio_mientras_validaba(monkeypatch):
     """Un reset entra entre que el login validó la clave y escribe el jti: el
     login no abre sesión con la clave vieja ni pisa el jti del reset."""

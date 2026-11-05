@@ -2,13 +2,17 @@
 
 tests/test_sesion1.py cubre lo mismo con TestClient sobre SQLite; acá se
 levanta la app de verdad, con su base propia y descartable, y se recorre:
-1. cambiar la contraseña cierra las otras sesiones y conserva la propia;
+1. cambiar la contraseña cierra todas las sesiones y devuelve un token nuevo;
 2. resetearla cierra todas, también la vigente;
 3. cerrar sesión (/auth/logout y /logout, con Bearer o con cookie) revoca ese
    token, y un token ya revocado no saca a la sesión vigente;
 4. cambiar el email sin la contraseña, con una equivocada o vaciándolo falla
    y no cambia nada; con la correcta cambia; guardar el mismo email no la pide;
-5. ninguna sesión revocada vuelve a entrar.
+5. ninguna sesión revocada vuelve a entrar;
+6. (sólo pg) un cambio de clave que entra entre que el login validó la clave
+   y escribe el jti gana: el login da 401 y no pisa el jti. La fila queda
+   bloqueada hasta ver al login esperándola en pg_stat_activity. En SQLite lo
+   cubre tests/test_sesion1.py.
 Antes de cambiar y de resetear se pone active_jti en NULL (como un usuario de
 antes de la columna), que es el caso en el que revocar resucitaba sesiones.
 
@@ -24,6 +28,7 @@ import sqlite3
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -169,17 +174,17 @@ def recorrer():
     # 1. cambiar la contraseña
     t1, t2 = login(P1), login(P1)
     sql("update users set active_jti=NULL where username=%s", U)
-    s, _ = pedir("/api/user/change-password", {"current_password": P1, "new_password": P2}, token=t2)
+    s, b = pedir("/api/user/change-password", {"current_password": P1, "new_password": P2}, token=t2)
     chequear(s == 200, f"cambiar la clave da 200 ({s})")
     chequear(entra(t1) == 401, "cambiar la clave cierra la otra sesión")
-    chequear(entra(t2) == 200, "cambiar la clave conserva la sesión de quien la cambió")
+    chequear(entra(t2) == 401, "cambiar la clave cierra también el token con el que se cambió")
+    chequear(entra(b.get("access_token")) == 200, "quien cambió la clave sigue con el token nuevo")
     chequear(active_jti() is not None, "después de cambiar la clave active_jti no queda NULL")
-    revocadas.append(t1)
+    revocadas += [t1, t2, b.get("access_token")]
 
     # 2. resetear la contraseña
     t3 = login(P2)
-    chequear((entra(t3), entra(t2)) == (200, 401), "el login nuevo entra y revoca la anterior")
-    revocadas.append(t2)
+    chequear(entra(t3) == 200, "el login nuevo entra")
     sql("update users set active_jti=NULL where username=%s", U)
     s, _ = pedir("/auth/request-password-reset", {"email": MAIL})
     tok = sql("select token from password_reset_tokens where user_username=%s and is_used=%s", U, False)[0][0]
@@ -231,6 +236,38 @@ def recorrer():
     # 5. ninguna revocada vuelve
     chequear([entra(x) for x in revocadas] == [401] * len(revocadas),
              f"ninguna de las {len(revocadas)} sesiones revocadas vuelve a entrar")
+
+    if MOTOR == "pg":
+        carrera_del_login()
+    else:
+        print("NO CORRIDO | 6. la carrera del login: en SQLite la cubre tests/test_sesion1.py")
+
+
+def carrera_del_login():
+    con = psycopg2.connect(URL)
+    respuesta = {}
+    try:
+        cur = con.cursor()
+        cur.execute("select 1 from users where username=%s for update", (U,))
+        hilo = threading.Thread(target=lambda: respuesta.update(r=pedir(
+            "/auth/login", {"username": U, "password": P3})))
+        hilo.start()
+        esperando, limite = False, time.monotonic() + 60
+        while not esperando and hilo.is_alive() and time.monotonic() < limite:
+            esperando = bool(sql("select 1 from pg_stat_activity where datname=%s and wait_event_type='Lock'"
+                                 " and query ilike 'update users%%'", NOMBRE))
+            time.sleep(0.05)
+        chequear(esperando, "6. el login validó la clave y espera la fila para escribir el jti")
+        cur.execute("update users set password='hash-de-otra-clave', active_jti='jti-del-cambio'"
+                    " where username=%s", (U,))
+        con.commit()
+        hilo.join(60)
+    finally:
+        con.close()
+    s, b = respuesta.get("r", (None, {}))
+    chequear(s == 401 and "access_token" not in b,
+             f"6. el login con la clave vieja no abre sesión después del cambio ({s})")
+    chequear(active_jti() == "jti-del-cambio", f"6. el login no pisó el jti del cambio ({active_jti()!r})")
 
 
 proc = None
