@@ -65,6 +65,11 @@
 //      inicio como si hubiera salido; (z27) no manda telemetría a nombre
 //      del otro. (z12) avisa
 //      mientras comprueba la sesión y recupera la operación al confirmarla.
+//  (z29) la respuesta de «quién es» que llega cuando ya entró otro no
+//      autoriza la escritura; (z30) la pestaña tapada al abrir no escribe;
+//  (z31) PUT, DELETE y PATCH con otro adentro no salen; (z32) Escape no
+//      destapa la pestaña y «Recargar» recarga; (z34) al volver del pago no
+//      toma los datos del otro.
 // Datos inventados. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_orden1.js
 // El servidor corre con CSRF_ENFORCE=true, como en producción.
@@ -1213,6 +1218,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     });
     if (!aviso) falla(que + ' y la duplicada no avisa que está comprobando la sesión');
     if (r !== 'OP-DE-A') falla(que + ' y la duplicada no recupera la operación al confirmar la sesión: recupera ' + r);
+    if (/Comprobando/.test(await p2.locator('#avisoBorrador').textContent())) falla(que + ' y, ya recuperada, sigue diciendo que comprueba la sesión');
     await esperarBorradores(p2, ['OP-DE-A'], que + ' y la duplicada no guarda la operación que tomó');
     await nadaSePerdio(ctx, usuario, que);
     console.log('OK ' + que + ': avisa que comprueba la sesión y, al confirmarla, recupera la operación');
@@ -1609,6 +1615,161 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     if (sobres.length) falla(que + ' y lo que cambió después se guardó a nombre de ' + sobres.map(s => s.user).join(', '));
     if (!(await avisa(t))) falla(que + ' y no avisa que dejó de guardar');
     console.log('OK ' + que + ': no guarda lo que cambia y lo avisa (' + otro + ')');
+    await ctx.close();
+  }
+
+  // Retiene /auth/current_user ya contestado por el servidor, con la sesión
+  // de ese momento, hasta soltar(). Lo que la pestaña pide después de
+  // cerrar() ni se pregunta hasta soltarResto().
+  async function retenerRespuestas(p) {
+    let soltar, soltarResto, cerrado = false, traidas = 0;
+    const suelta = new Promise(r => { soltar = r; }), resto = new Promise(r => { soltarResto = r; });
+    await p.evaluate(() => {
+      const f = window.fetch;
+      window.__consultas = 0;
+      window.fetch = (u, o) => { if (/\/auth\/current_user$/.test(String(u))) window.__consultas++; return f(u, o); };
+    });
+    await p.route('**/auth/current_user', async ruta => {
+      if (cerrado) { await resto; return ruta.continue().catch(() => {}); }
+      const respuesta = await ruta.fetch();
+      traidas++;
+      await suelta;
+      return ruta.fulfill({ response: respuesta }).catch(() => {});
+    });
+    // Todas las consultas que hizo la pestaña ya tienen la respuesta del servidor.
+    const contestadas = async () => {
+      for (const hasta = Date.now() + 15000; traidas < await p.evaluate(() => window.__consultas);) {
+        if (Date.now() > hasta) falla('el servidor no contestó las consultas de la pestaña en 15 s');
+        await p.waitForTimeout(50);
+      }
+    };
+    return { contestadas, cerrar: () => { cerrado = true; }, soltar, soltarResto };
+  }
+  const guardarCliente = (p, nombre) => p.evaluate(n => CDI.api('/api/clientes', { method: 'POST', body: JSON.stringify({ nombre: n }) })
+    .then(r => 'status ' + r.status, e => 'error: ' + e.message), nombre);
+
+  // (z29) A sale y vuelve a entrar y guarda un cliente; la pestaña pregunta
+  // quién es, el servidor contesta «A» y entra B antes de que llegue: la
+  // respuesta ya no dice de quién es la sesión de ahora.
+  if (corre('z29')) {
+    const que = 'la pestaña de A preguntó quién es, entró otro usuario antes de la respuesta y guardó un cliente';
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    const a = await nuevoUsuario(ctx, 'ord1z29');
+    const t = await abrir(ctx);
+    await t.waitForLoadState('networkidle');
+    const r = await retenerRespuestas(t);
+    const salida = await ctx.request.post(base + '/auth/logout');
+    if (!salida.ok()) falla('no se pudo salir: ' + salida.status());
+    await entrar(ctx, a);
+    const cliente = 'Cliente demo ' + a;
+    const res = guardarCliente(t, cliente);
+    await t.waitForFunction(() => window.__consultas > 0);
+    await r.contestadas();
+    r.cerrar();
+    const otro = await nuevoUsuario(ctx, 'ord1z29b');
+    r.soltar();
+    const fin = await res;
+    r.soltarResto();
+    await nadaEnElServidor(a, otro, que, cliente);
+    if (!/No se pudo comprobar la sesión/.test(fin)) falla(que + ' y no avisa el error: ' + fin);
+    console.log('OK ' + que + ': no queda en ninguna cuenta y avisa el error');
+    await ctx.close();
+  }
+
+  // Abre la pestaña de A y, antes de que sepa quién es, entra B: la primera
+  // respuesta ya dice B y la pestaña se tapa.
+  async function abrirYEntraOtro(nombre) {
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    const a = await nuevoUsuario(ctx, nombre);
+    const t = await ctx.newPage();
+    const soltar = await retenerUsuario(t);
+    await t.goto(base + '/dashboard');
+    await t.waitForFunction(() => window.CDI && CDI.api);
+    const otro = await nuevoUsuario(ctx, nombre + 'b');
+    soltar();
+    await t.waitForFunction(() => { const d = document.getElementById('pestanaAjena'); return d && d.open; }, null, { timeout: 15000 })
+      .catch(() => falla('entró otro usuario antes de que la pestaña de A supiera quién es y no se tapa'));
+    return { ctx, a, otro, t };
+  }
+
+  // (z30) Tapada desde la primera carga, la pestaña guarda un cliente: la
+  // sesión de ahora es la del usuario que contestó, pero no es la del dueño.
+  if (corre('z30')) {
+    const que = 'la pestaña de A quedó tapada al abrir y guardó un cliente';
+    const { ctx, a, otro, t } = await abrirYEntraOtro('ord1z30');
+    const cliente = 'Cliente demo ' + otro;
+    const fin = await guardarCliente(t, cliente);
+    await nadaEnElServidor(a, otro, que, cliente);
+    if (!/Entró otro usuario/.test(fin)) falla(que + ' y no avisa que entró otro: ' + fin);
+    console.log('OK ' + que + ': no queda en ninguna cuenta');
+    await ctx.close();
+  }
+
+  // (z31) Las otras escrituras con B adentro, por las rutas de la app: no
+  // sale ninguna de la pestaña de A.
+  if (corre('z31')) {
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    await nuevoUsuario(ctx, 'ord1z31');
+    const t = await abrir(ctx);
+    await t.waitForLoadState('networkidle');
+    await nuevoUsuario(ctx, 'ord1z31b');
+    const salen = contarEscrituras(t);
+    for (const [metodo, ruta, cuerpo] of [
+      ['PUT', '/api/clientes/1', { nombre: 'Cliente demo' }],
+      ['DELETE', '/api/clientes/1'],
+      ['PATCH', '/api/operations/1/estado', { estado: 'oficializada' }],
+    ]) {
+      const fin = await t.evaluate(([m, r, c]) => CDI.api(r, Object.assign({ method: m }, c ? { body: JSON.stringify(c) } : {}))
+        .then(x => 'status ' + x.status, e => 'error: ' + e.message), [metodo, ruta, cuerpo]);
+      if (salen.includes(ruta)) falla('entró otro usuario y la pestaña de A mandó ' + metodo + ' ' + ruta + ' (' + fin + ')');
+      console.log('OK entró otro usuario y la pestaña de A no manda ' + metodo + ' ' + ruta);
+    }
+    await ctx.close();
+  }
+
+  // (z32) La pestaña tapada no se destapa con Escape, y «Recargar» recarga.
+  if (corre('z32')) {
+    const { ctx, t } = await abrirYEntraOtro('ord1z32');
+    for (const vez of [1, 2]) {
+      await t.keyboard.press('Escape');
+      if (!(await tapada(t))) falla('la pestaña tapada se destapa con Escape (vez ' + vez + ')');
+    }
+    const recarga = t.waitForEvent('load', { timeout: 10000 }).then(() => true, () => false);
+    await t.locator('#pestanaAjenaRecargar').click();
+    if (!(await recarga)) falla('la pestaña tapada no recarga con «Recargar»');
+    console.log('OK la pestaña tapada no se destapa con Escape y recarga con «Recargar»');
+    await ctx.close();
+  }
+
+  // (z34) Al volver del pago, la pestaña de A vuelve a leer el usuario; si
+  // entró B, no toma sus datos.
+  if (corre('z34')) {
+    const que = 'A volvió del pago con B adentro';
+    const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
+    const a = await nuevoUsuario(ctx, 'ord1z34');
+    const t = await ctx.newPage();
+    await t.goto(base + '/dashboard?billing=success');
+    await t.waitForFunction(() => window.CDI && CDI.currentUser);
+    // La lectura de después del pago termina cuando corre esta marca.
+    await t.evaluate(() => {
+      const f = window.fetch;
+      window.fetch = (u, o) => {
+        const pedido = f(u, o);
+        if (!/loadCurrentUser/.test(new Error().stack)) return pedido;
+        return pedido.then(res => {
+          const json = res.json.bind(res);
+          res.json = () => json().finally(() => setTimeout(() => { window.__leido = true; }));
+          return res;
+        });
+      };
+    });
+    const otro = await nuevoUsuario(ctx, 'ord1z34b');
+    await t.waitForFunction(() => window.__leido, null, { timeout: 15000 })
+      .catch(() => falla(que + ', pero la pestaña no vuelve a leer el usuario en 15 s'));
+    const visto = await t.evaluate(() => [CDI.currentUser.username, document.getElementById('userName').textContent]);
+    if (visto.some(v => v.includes(otro))) falla(que + ' y la pestaña tomó los datos de B: ' + visto.join(', '));
+    if (!(await tapada(t))) falla(que + ' y la pestaña no se tapa');
+    console.log('OK ' + que + ': no toma los datos de B y se tapa');
     await ctx.close();
   }
 

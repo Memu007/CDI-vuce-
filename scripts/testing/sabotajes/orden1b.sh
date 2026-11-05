@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Negativos de ORDEN-1b: cada sabotaje deshace un freno de la pestaña cuyo
 # dueño ya no es el de la sesión, y la pantalla (scripts/testing/pantalla_orden1.js,
-# casos z12 y z20 a z27) tiene que fallar por ese motivo.
+# casos z12, z20 a z27, z29 a z32 y z34) tiene que fallar por ese motivo.
 #
 # uso: PY=/ruta/al/venv/bin/python [PUERTO=8875] scripts/testing/sabotajes/orden1b.sh [SHA]
 # Trabaja en un worktree descartable con SQLite propia y sin terceros: no toca
@@ -87,7 +87,7 @@ correr() {
   kill $API 2>/dev/null; wait $API 2>/dev/null; API=""
   return $codigo
 }
-export CASOS=z12,z20,z21,z22,z23,z24,z25,z26,z27
+export CASOS=z12,z20,z21,z22,z23,z24,z25,z26,z27,z29,z30,z31,z32,z34
 if ! correr >/dev/null; then
   echo "BASE  | la pantalla ya está en rojo sin sabotaje: no se puede medir nada"; correr | grep FALLA; exit 1
 fi
@@ -156,6 +156,41 @@ sabotaje $A "la duplicada que no puede adoptar no avisa" \
 sabotaje $A "la duplicada no recupera al confirmar la sesión" \
   "FALLA: A volvió a entrar (otra sesión) mientras la duplicada miraba si la original vive y la duplicada no recupera la operación al confirmar la sesión" \
   '                recuperarAlConfirmar = true;'$'\n' ''
+
+sabotaje $A "la duplicada ya recuperada sigue diciendo que comprueba la sesión" \
+  "FALLA: A volvió a entrar (otra sesión) mientras la duplicada miraba si la original vive y, ya recuperada, sigue diciendo que comprueba la sesión" \
+  "if (['sinsesion', 'red', 'comprobando'].includes(avisoBorrador))" "if (['sinsesion', 'red'].includes(avisoBorrador))"
+
+CONFIRMA="if (sesionAjena || getCsrfToken() !== sesion) return false;"
+export CASOS=z29
+sabotaje $A "la respuesta vieja de quién es autoriza con la sesión de otro" \
+  "FALLA: la pestaña de A preguntó quién es, entró otro usuario antes de la respuesta y guardó un cliente y el cliente quedó en la cuenta de B" \
+  "$CONFIRMA" "if (sesionAjena) return false;"
+
+export CASOS=z30
+sabotaje $A "la pestaña tapada al abrir escribe con la sesión de otro" \
+  "FALLA: la pestaña de A quedó tapada al abrir y guardó un cliente y el cliente quedó en la cuenta de B" \
+  "$CONFIRMA" "if (getCsrfToken() !== sesion) return false;"
+
+export CASOS=z31
+for verbo in PUT DELETE PATCH; do
+  sabotaje $A "$verbo sale sin preguntar quién es" \
+    "FALLA: entró otro usuario y la pestaña de A mandó $verbo " \
+    "if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {" "if (!['GET', 'HEAD', 'OPTIONS', '$verbo'].includes(method)) {"
+done
+
+export CASOS=z32
+sabotaje $A "Escape destapa la pestaña" \
+  "FALLA: la pestaña tapada se destapa con Escape" \
+  "        dialogo.addEventListener('cancel', e => e.preventDefault());"$'\n' ''
+sabotaje $A "«Recargar» no recarga" \
+  "FALLA: la pestaña tapada no recarga con «Recargar»" \
+  "        document.getElementById('pestanaAjenaRecargar').addEventListener('click', () => window.location.reload());"$'\n' ''
+
+export CASOS=z34
+sabotaje $A "al volver del pago toma los datos del otro" \
+  "FALLA: A volvió del pago con B adentro y la pestaña tomó los datos de B" \
+  $'            } else if (!confirmarSesion(user.username, sesionAntes)) {\n                return !!currentUser;\n            }' $'            } else {\n                confirmarSesion(user.username, sesionAntes);\n            }'
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
