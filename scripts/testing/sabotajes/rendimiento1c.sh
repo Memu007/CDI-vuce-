@@ -93,16 +93,16 @@ sabotaje $DL "esperar un lugar libre vuelve a culpar al archivo" \
   '    except TimeoutError:
         raise SinLugar from None
     try:
-        corrida' \
+        codigo, salida, errores' \
   '    except TimeoutError:
         raise
     try:
-        corrida' \
+        codigo, salida, errores' \
   "(['b', 'c'], (400, 'No pudimos abrir el PDF: tardó demasiado"
 sabotaje $DL "la espera por un lugar se descuenta del tiempo para validar" \
   'await asyncio.wait_for(correr(), timeout=limite_s)' \
   'await asyncio.wait_for(correr(), timeout=hasta - loop.time())' \
-  'FAILED tests/test_rendimiento1c.py::test_esperar_casi_todo_el_tope_no_culpa_al_archivo[menos-que-un-pdf]'
+  'FAILED tests/test_rendimiento1c.py::test_esperar_casi_todo_el_tope_no_culpa_al_archivo[validar-menos-que-un-pdf]'
 sabotaje $DL "validar no corre bajo el tope de CPU" \
   '        with _tope_de_cpu(limite_cpu_s):
             pdf = PdfReader' \

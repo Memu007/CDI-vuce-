@@ -305,32 +305,61 @@ class _Ocupante:
 TOPE = 2.0
 
 
+async def _validar_a(normal):
+    from fastapi import HTTPException
+
+    from proyecto_maria.security.file_security import validate_file_upload
+    try:
+        await validate_file_upload(_Subida(normal), "pdf", clave="a")
+        return "pasó"
+    except HTTPException as e:
+        return "sin lugar" if e.status_code == 503 else (e.status_code, e.detail)
+
+
+async def _leer_a(normal):
+    from proyecto_maria.core import despacho_lector
+    try:
+        await despacho_lector.leer_despacho_aparte(normal, TOPE, clave="a")
+        return "pasó"
+    except despacho_lector.SinLugar:
+        return "sin lugar"
+    except TimeoutError:
+        return "venció leyendo"
+
+
+# vía: (cómo la llaman B y C, sus lugares, cómo la pide A)
+_VIAS = {
+    "validar": ("validar_pdf_aparte", lambda dl, loop: dl._VALIDANDO[loop][0], _validar_a),
+    "leer": ("leer_despacho_aparte", lambda dl, loop: dl._SEMAFOROS[loop], _leer_a),
+}
+
+
 @pytest.mark.parametrize("libera_antes_del_tope, esperado", [
-    (0.5, {"pasó"}),            # esperó casi todo el tope
-    (0.08, {"pasó"}),           # deja menos de lo que tarda un PDF normal
-    (0.0, {"pasó", 503}),       # el tope justo
-    (-0.2, {503}),              # no hubo lugar a tiempo
+    (0.5, {"pasó"}),                # esperó casi todo el tope
+    (0.08, {"pasó"}),               # deja menos de lo que tarda un PDF normal
+    (0.0, {"pasó", "sin lugar"}),   # el tope justo
+    (-0.2, {"sin lugar"}),          # no hubo lugar a tiempo
 ], ids=["casi-todo", "menos-que-un-pdf", "justo", "pasado"])
-def test_esperar_casi_todo_el_tope_no_culpa_al_archivo(monkeypatch, libera_antes_del_tope, esperado):
+@pytest.mark.parametrize("via", list(_VIAS))
+def test_esperar_casi_todo_el_tope_no_culpa_al_archivo(monkeypatch, via, libera_antes_del_tope, esperado):
     """B y C ocupan los dos lugares y los liberan cerca del tope de A. A, con un
-    PDF normal, se valida con su tiempo entero o recibe el 503 de «sin lugar»:
-    nunca el 400 que lo manda a cambiar de archivo."""
+    PDF normal, se valida o se lee con su tiempo entero o se queda sin lugar:
+    nunca vence por lo que esperó ni se lo manda a cambiar de archivo."""
     import asyncio
     import time
 
-    from fastapi import HTTPException
-
     from proyecto_maria.core import despacho_lector
-    from proyecto_maria.security.file_security import validate_file_upload
     from tests.pdf_bombas import hojas
 
+    nombre, lugares, pide_a = _VIAS[via]
+    lanzar = getattr(despacho_lector, nombre)
     monkeypatch.setenv("PDF_VALIDATE_TIMEOUT_S", str(TOPE))
     normal = hojas([("UNO", 0)])
     real = asyncio.create_subprocess_exec
 
     async def escenario():
         t = time.monotonic()
-        assert await despacho_lector.validar_pdf_aparte(normal, 30) == {"encriptado": False, "paginas": 1}
+        assert isinstance(await lanzar(normal, 30), dict)
         assert time.monotonic() - t > 0.08, "un PDF normal tarda menos que lo que deja el caso"
         loop = asyncio.get_running_loop()
         libre = asyncio.Event()
@@ -339,9 +368,8 @@ def test_esperar_casi_todo_el_tope_no_culpa_al_archivo(monkeypatch, libera_antes
             return _Ocupante(libre)
 
         monkeypatch.setattr(asyncio, "create_subprocess_exec", ocupa)
-        ocupan = [asyncio.create_task(despacho_lector.validar_pdf_aparte(normal, 30, clave=u))
-                  for u in ("b", "c")]
-        semaforo = despacho_lector._VALIDANDO[loop][0]
+        ocupan = [asyncio.create_task(lanzar(normal, 30, clave=u)) for u in ("b", "c")]
+        semaforo = lugares(despacho_lector, loop)
 
         async def ocupados():
             while not semaforo.locked():
@@ -350,11 +378,7 @@ def test_esperar_casi_todo_el_tope_no_culpa_al_archivo(monkeypatch, libera_antes
         await asyncio.wait_for(ocupados(), 5)
         monkeypatch.setattr(asyncio, "create_subprocess_exec", real)
         loop.call_at(loop.time() + TOPE - libera_antes_del_tope, libre.set)
-        try:
-            await validate_file_upload(_Subida(normal), "pdf", clave="a")
-            resultado = "pasó"
-        except HTTPException as e:
-            resultado = e.status_code if e.status_code == 503 else (e.status_code, e.detail)
+        resultado = await pide_a(normal)
         libre.set()
         await asyncio.gather(*ocupan, return_exceptions=True)
         return resultado

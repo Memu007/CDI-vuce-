@@ -76,10 +76,13 @@ sabotaje $L "el texto vuelve a la app sin tope" \
   'extraer_texto_pdf_seguro(data)[:_MAX_TEXTO_VENDEDOR]' \
   'extraer_texto_pdf_seguro(data)' \
   "texto: la app creció"
+# el caso de la espera es uno solo para validar y leer, y vive con el de validar
+CORRE=("$PY" -m pytest -q --no-cov -p no:cacheprovider
+       tests/test_rendimiento1c.py::test_esperar_casi_todo_el_tope_no_culpa_al_archivo)
 sabotaje $L "esperar lugar para leer un despacho se descuenta del tope" \
   'await asyncio.wait_for(correr(), timeout=limite_s)' \
   'await asyncio.wait_for(correr(), timeout=limite_s if modo != "leer" else hasta - loop.time())' \
-  "test_esperar_para_leer_un_despacho_no_se_cobra_al_pdf[menos-que-un-pdf]"
+  "[leer-menos-que-un-pdf] - AssertionError: venció leyendo"
 
 git checkout -q -- proyecto_maria/
 echo "fallas: $FALLAS"
