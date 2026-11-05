@@ -82,11 +82,11 @@ sin_corte process_operation "FAILED $T::test_una_cuenta_que_no_esta_al_dia_no_ge
   $'):\n    """\n    Recibe los datos de una operación, los valida y genera el Excel.'
 sin_corte upload_pdf "FAILED $T::test_una_cuenta_que_no_esta_al_dia_no_genera_ni_gasta_gemini[impaga-upload_pdf]" \
   $'):\n    """\n    Sube y procesa un archivo PDF'
-# generate_maria tiene además el corte del conteo; lo ya contado sólo lo frena
-# la dependencia.
-sin_corte generate_maria "FAILED $T::test_regenerar_lo_ya_contado_con_la_cuenta_que_no_esta_al_dia_da_402[impaga]" \
+# Las dos que generan MARIA tienen además el corte del conteo; lo ya contado
+# sólo lo frena la dependencia.
+sin_corte generate_maria "FAILED $T::test_regenerar_lo_ya_contado_con_la_cuenta_que_no_esta_al_dia_da_402[impaga-importacion]" \
   $'):\n    """\n    Genera archivo TXT en formato MARIA para el sistema SIM de AFIP.'
-sin_corte generate_maria_export "FAILED $T::test_una_cuenta_que_no_esta_al_dia_no_genera_ni_gasta_gemini[impaga-generate_maria_export]" \
+sin_corte generate_maria_export "FAILED $T::test_regenerar_lo_ya_contado_con_la_cuenta_que_no_esta_al_dia_da_402[impaga-exportacion]" \
   $'    db: AsyncSession = Depends(get_db),\n):\n    """\n    Genera archivo TXT en formato MARIA para EXPORTACIÓN.'
 sin_corte migraciones_analizar "FAILED $T::test_una_cuenta_que_no_esta_al_dia_no_genera_ni_gasta_gemini[impaga-migraciones_analizar]" \
   $'    db: AsyncSession = Depends(get_db),\n):\n    """Analiza un CSV/Excel sin crear ni modificar clientes."""'

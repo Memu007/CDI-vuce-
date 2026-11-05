@@ -295,14 +295,16 @@ def test_el_estudio_con_la_prueba_vencida_no_genera_ni_gasta_gemini(cuenta, gemi
     assert _leer(u, de_la_org=True)["estado"] == "past_due"
 
 
+@pytest.mark.parametrize("ruta", ["importacion", "exportacion"])
 @pytest.mark.parametrize("estado", list(ESTADOS))
-def test_regenerar_lo_ya_contado_con_la_cuenta_que_no_esta_al_dia_da_402(cuenta, estado):
+def test_regenerar_lo_ya_contado_con_la_cuenta_que_no_esta_al_dia_da_402(cuenta, estado, ruta):
     # Lo ya contado no pasa por el tope, pero sí por el estado.
+    generar = _generar if ruta == "importacion" else _exportar
     c, u = cuenta()
-    assert _generar(c).status_code == 200
+    assert generar(c).status_code == 200
     campos, code, _, _ = ESTADOS[estado]
     _fijar(u, **campos)
-    r = _generar(c, flete=8000.0)
+    r = generar(c, flete=8000.0)
     assert r.status_code == 402, r.text
     assert r.json()["detail"]["code"] == code
     assert len(_operaciones(u)[0]["extra"]["maria_hashes"]) == 1
