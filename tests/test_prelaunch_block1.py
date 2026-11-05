@@ -211,7 +211,7 @@ class TestLoginLogout:
             "username": uname,
             "password": "SecureP@ss1",
         })
-        res = anon_client.post("/auth/logout")
+        res = anon_client.post("/auth/logout", headers={"X-CSRF-Token": anon_client.cookies.get("csrf_token")})
         assert res.status_code == 200
         assert res.json()["message"] == "Sesión cerrada"
 

@@ -131,7 +131,8 @@ sabotaje $A "salir no pregunta quién es y cierra la sesión del otro" \
   "${SIN_CONSULTA[@]}"
 sabotaje $A "salir con la sesión de otro deja la pestaña y va al inicio" \
   "FALLA: entró otro usuario y A apretó «Salir» en su pestaña y la pestaña no se tapa" \
-  '            if (sesionAjena) return;'$'\n' ''
+  "            if (e.message !== 'unauthorized') {" \
+  "            if (e.message !== 'unauthorized' && e.message !== ERROR_AJENA) {"
 
 export CASOS=z25
 sabotaje $A "con la sesión cerrada, la escritura no va al login" \
@@ -141,7 +142,11 @@ sabotaje $A "con la sesión cerrada, la escritura no va al login" \
 export CASOS=z26
 sabotaje $A "salir sin poder comprobar quién es va al inicio" \
   "FALLA: A volvió a entrar y apretó «Salir» sin poder comprobar quién es y fue al inicio con la sesión abierta" \
-  $'            if (e.message === ERROR_SIN_SESION) {\n                toast(\'No se pudo cerrar la sesión\', e.message, \'error\');\n                return;\n            }\n' ''
+  "            if (e.message !== 'unauthorized') {" \
+  "            if (e.message !== 'unauthorized' && e.message !== ERROR_SIN_SESION) {"
+sabotaje $A "salir sin poder comprobar quién es no dice por qué" \
+  "FALLA: A volvió a entrar y apretó «Salir» sin poder comprobar quién es y no avisa que no pudo comprobar la sesión" \
+  "const motivo = e.message === ERROR_SIN_SESION ? e.message :" "const motivo ="
 
 export CASOS=z27
 sabotaje $A "la telemetría sale con la sesión de otro" \

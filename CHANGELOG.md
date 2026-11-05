@@ -6,6 +6,14 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: cerrar sesión desde otro sitio ya no borra la sesión (CSRF-1, vuelta 2)
+
+- **fix(seguridad):** `/auth/logout` y `/logout` sólo borran cookies si llegó la de sesión: un formulario de otro sitio, que llega sin cookies, ya no cierra la sesión, esté o no exigido el token CSRF. El alias delega en `/auth/logout` y ahora también borra `csrf_token`. Si el cierre no se confirma, «Salir» avisa y no lleva al inicio.
+
+## 2026-11-05 · fix: con CSRF exigido, la telemetría de la página llega y cerrar sesión pide el token (CSRF-1)
+
+- **fix(seguridad):** la telemetría de la pantalla nueva manda el token CSRF, así deja de rechazarse con 403; cerrar sesión (`/auth/logout`) ya no está exento y sin el token da 403. El botón «Salir» lo manda y, si el servidor rechaza el cierre, lo avisa en vez de llevar al inicio con la sesión abierta.
+
 ## 2026-11-05 · fix: el aviso de cancelar mira la organización (COBRO-MP-1, vuelta 5)
 
 - **fix(cobro):** en una cuenta con organización, la confirmación de «Cancelar plan» dice si se corta el acceso según el estado de la organización, que es el que muestra el perfil y el que da el acceso, y no según la fila del usuario.

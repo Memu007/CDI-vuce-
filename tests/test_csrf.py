@@ -92,3 +92,32 @@ def test_logout_borra_csrf_cookie(cookie_client):
     )
     assert resp.status_code == 200
     assert not cookie_client.cookies.get("csrf_token")
+
+
+@pytest.mark.parametrize("ruta,con_token,esperado", [
+    ("/auth/logout", False, 403),
+    ("/auth/logout", True, 200),
+    ("/api/session/state", False, 403),
+    ("/api/session/state", True, 200),
+])
+def test_enforce_pide_token_a_logout_y_telemetria(cookie_client, monkeypatch, ruta, con_token, esperado):
+    monkeypatch.setenv("CSRF_ENFORCE", "true")
+    headers = {"Origin": "https://otro-sitio.example"}
+    if con_token:
+        headers = {"X-CSRF-Token": cookie_client.cookies.get("csrf_token")}
+    resp = cookie_client.post(ruta, json={"event": "csrf1", "payload": {}}, headers=headers)
+    assert resp.status_code == esperado, resp.text
+    cerro = ruta == "/auth/logout" and esperado == 200
+    assert bool(cookie_client.cookies.get("access_token")) != cerro
+
+
+@pytest.mark.parametrize("enforce", ["true", "false"])
+@pytest.mark.parametrize("ruta", ["/auth/logout", "/logout"])
+def test_logout_desde_otro_sitio_no_borra_la_sesion(monkeypatch, ruta, enforce):
+    # Así llega un <form> de otro sitio: la cookie SameSite=Strict no viaja,
+    # pero el navegador sí aplica los Set-Cookie de borrado de la respuesta.
+    monkeypatch.setenv("CSRF_ENFORCE", enforce)
+    resp = TestClient(app).post(ruta, headers={"Origin": "https://otro-sitio.example"})
+    assert resp.status_code == 200, resp.text
+    borrados = resp.headers.get("set-cookie", "")
+    assert "access_token" not in borrados and "csrf_token" not in borrados, borrados
