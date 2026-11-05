@@ -207,6 +207,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-11-05 01:45 UTC: **COBRO-MP-1 vuelta 3: devolución por una causa.** Una cuenta en `none`/`expired` con suscripción abierta queda sin salida (regresión de D13 c); lo demás se sostiene (suite `4407 passed`). D17 aceptado; D18 (a) hasta D30 (riesgo: cambiar un precio con suscripciones vivas puede dejar una renovación en `past_due`).
+
 2026-11-05 01:10 UTC: **Llegó COBRO-MP-1 vuelta 3** (técnica, `9048b6a`, informe `9298ab6`). La PM la reproduce con un adversario Opus alto. D17 (supuesto) y D18 (pago sin suscripción tapa la renovación; la Dev recomienda c) esperan veredicto.
 
 2026-11-04 23:57 UTC: Sin entregas. MARIA (`df2c40b`) y técnica (remoto `88de6ce`, trabajo local) esperan sus corridas de sabotaje. Uso semanal «allowed».
