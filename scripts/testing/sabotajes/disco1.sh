@@ -191,9 +191,10 @@ sabotaje "las tandas reordenan por clave" 1 \
   $'    filas = sorted(filas, key=lambda f: f["clave"])\n    for i in range(0, len(filas), _HISTORIAL_FILAS_POR_SENTENCIA):' \
   "FAILED $T::test_importar_respeta_el_orden_del_archivo_para_sugerir" \
   "FAILED $T::test_un_archivo_viejo_se_carga_en_su_orden"
+# En confirmar, 2001 letras también las frena el tope del catálogo: ahí el del
+# historial lo distingue catalogolargo1.sh, con un texto que en NFC achica.
 sabotaje "sin tope de descripción" 1 \
   '_HISTORIAL_MAX_DESCRIPCION = 2000' '_HISTORIAL_MAX_DESCRIPCION = 10**9' \
-  "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[BBBB" \
   "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[BBBB"
 sabotaje "sin tope de NCM" 1 \
   '_HISTORIAL_MAX_NCM = 20' '_HISTORIAL_MAX_NCM = 10**9' \

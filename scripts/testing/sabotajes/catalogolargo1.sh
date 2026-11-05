@@ -83,6 +83,10 @@ sabotaje $M "el historial mide el largo en NFC" \
   '        if len(texto) > tope:' \
   '        if len(unicodedata.normalize("NFC", texto)) > tope:' \
   "FAILED $T::test_importar_el_historial_mide_el_texto_como_lo_guarda"
+sabotaje $M "guardar-uso no controla el largo como lo guarda el historial" \
+  '_HISTORIAL_MAX_DESCRIPCION = 2000' \
+  '_HISTORIAL_MAX_DESCRIPCION = 10**9' \
+  "FAILED $T::test_guardar_uso_guarda_en_las_dos_memorias_o_da_400[nfd-que-achica]"
 sabotaje $M "el catálogo da 500 en vez de 400 al guardar" \
   $'    except ValueError as e:\n        raise HTTPException(status_code=400, detail=str(e))\n    except Exception as e:\n        logging.exception("catalog_save error")' \
   $'    except Exception as e:\n        logging.exception("catalog_save error")' \
