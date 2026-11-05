@@ -69,6 +69,46 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## RENDIMIENTO-1d: devolución corta, sobre `aaed661` (2026-11-05 20:15 UTC, PM)
+
+Va antes que DESPACHO-1d: terminá el paso en que estás de DESPACHO-1d,
+dejalo commiteado sin entregar, y volvé acá. Acta:
+`docs/pm/REPRODUCCION-RENDIMIENTO-1d-2026-11-05.md`.
+
+**Causa.** Lo que vuelve del proceso aparte se pierde según cómo se escribe.
+Un PDF cuyo texto trae un surrogate suelto (`\ud800`) hace fallar
+`json.dumps(..., ensure_ascii=False)` al `stdout` del hijo
+(`despacho_lector.py:810`): el hijo sale con 1 y el vendedor queda vacío. En
+`f5d227c` el mismo PDF daba `'ACME TRADING CO LTD'`; en `aaed661` da `None`.
+Es una regresión de la pieza.
+
+Pido:
+
+1. Que ningún texto que el hijo pueda extraer se pierda al volver, en los dos
+   modos (`texto` y `leer`). Un caso de la familia con datos: surrogate suelto,
+   y al menos otro texto que no sea UTF-8 válido o que rompa la
+   serialización. Rojo primero sobre `aaed661`.
+2. Un caso que distinga el tope de 64 K: hoy sacar el recorte, o ponerlo en
+   64 MB, pasa 12 de 12. (El adversario lo logró con un PDF de 891 bytes: 120
+   líneas de 1000 «A».)
+3. Un caso con dos pedidos del mismo usuario, uno detrás del otro y a la
+   vez, que dé rojo si no se suelta la fila por usuario o si no se borra la
+   entrada (`fila[0].release()`, `del filas[clave]`): hoy los dos sabotajes
+   pasan.
+
+En el informe, el rojo de cada uno con su arreglo o caso revertido.
+
+**D63:** (a), como recomendás: el tope de 8 MB por flujo vale también para el
+texto del vendedor.
+**D67:** (b), pieza aparte y chica, después de SESION-1. No entra acá.
+
+**Tus propuestas.** La de `CLAUDE.md` §5 es cierta (verifiqué `ci.yml:45`: no
+hay `--deselect`) pero ese archivo no es mío ni tuyo: va a la cola de
+limpieza para que lo decida Emi. `tmp_path` en
+`test_maria1b_devolucion` y `test_excel2.py:512`: a la cola de limpieza.
+
+Orden: RENDIMIENTO-1d (esta vuelta) → DESPACHO-1d → SESION-1 → resto.
+
 ## DESPACHO-1c: aceptada sobre `fbbb2ad`, sin integrar todavía (2026-11-05 19:05 UTC, PM)
 
 Evidencia: `REPRODUCCION-DESPACHO-1c-v2-2026-11-05.md`. Se sostienen 39
