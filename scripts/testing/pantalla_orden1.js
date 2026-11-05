@@ -1764,19 +1764,23 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     // con un header que dice cuál es, y sólo se retiene la relectura.
     await t.addInitScript(() => {
       const programar = window.setTimeout, f = window.fetch;
-      let enRelectura = false;
+      let enRelectura = false, leida = null, marcarLeida;
       window.__relecturaLeida = false;
       window.setTimeout = (fn, ...resto) => programar(fn && fn.name === 'loadCurrentUser'
         ? () => { enRelectura = true; try { return fn(); } finally { enRelectura = false; } } : fn, ...resto);
-      window.fetch = (u, o = {}) => {
+      window.fetch = async (u, o = {}) => {
         if (!/\/auth\/current_user$/.test(String(u))) return f(u, o);
         const cual = enRelectura ? 'relectura' : /checkDemoForceTour/.test(new Error().stack) ? 'tour' : 'carga';
+        // Otra consulta (el autoguardado, por ejemplo) vería a B antes y taparía este freno con otro.
+        const primera = cual === 'relectura' && !leida;
+        if (!primera && leida) await leida;
         const pedido = f(u, { ...o, headers: { ...o.headers, 'X-Prueba-Consulta': cual } });
-        if (cual !== 'relectura') return pedido;
+        if (!primera) return pedido;
+        leida = new Promise(r => { marcarLeida = r; });
         return pedido.then(res => {
           const json = res.json.bind(res);
           // Después de la lectura, para que la pestaña termine de procesarla.
-          res.json = () => json().finally(() => programar(() => { window.__relecturaLeida = true; }));
+          res.json = () => json().finally(() => programar(() => { window.__relecturaLeida = true; marcarLeida(); }));
           return res;
         });
       };
