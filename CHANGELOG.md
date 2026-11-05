@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: una letra que no es Unicode no borra el texto de la factura (RENDIMIENTO-1d, devolución)
+
+- Si una fuente del PDF dice que una letra es media letra Unicode, el texto que se saca aparte vuelve con «�» en su lugar en vez de perderse entero, y el vendedor se sigue adivinando.
+
 ## 2026-11-05 · fix: la operación se guarda sin esperar al catálogo (DESPACHO-1d)
 
 - Al generar, guardar la operación y aprender el catálogo van a la vez: si el catálogo no responde, la operación igual queda guardada y su aviso no se tapa. Red caída o plan vencido al confirmar un NCM o aprender el catálogo avisan como un error del servidor.
