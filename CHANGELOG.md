@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: la operación se guarda sin esperar al catálogo (DESPACHO-1d)
+
+- Al generar, guardar la operación y aprender el catálogo van a la vez: si el catálogo no responde, la operación igual queda guardada y su aviso no se tapa. Red caída o plan vencido al confirmar un NCM o aprender el catálogo avisan como un error del servidor.
+- El id del proveedor se corta en 60 caracteres. Reintentar después de crear un cliente no crea otro. «Guardamos este NCM» sólo aparece si se guardó.
+
 ## 2026-11-05 · fix: una sesión sin token CSRF lo recibe sola (CSRF-3)
 
 - **fix(seguridad):** si la sesión es válida y le falta la cookie `csrf_token`, la próxima lectura autenticada se la emite; la pantalla v2 ya la trae al abrir y escribe sin volver a entrar. Una sesión vencida, revocada o ausente no recibe nada, y un token que ya está no se cambia.
