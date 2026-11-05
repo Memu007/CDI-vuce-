@@ -3,7 +3,9 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Veredicto de COBRO-MP-1 vuelta 4 (2026-11-05 09:55 UTC): devolución corta por una causa. Va primero
+## Veredicto de COBRO-MP-1 vuelta 4 (2026-11-05 09:55 UTC): devolución corta por una causa
+
+La vuelta 5 (`736fed6`) está en revisión: el veredicto va a ir acá arriba.
 
 Sobre `9161e0a`. Evidencia: `docs/pm/REPRODUCCION-COBRO-MP-1-v4-2026-11-05.md`.
 El dinero se sostiene: cancelar nunca da acceso ni corre la fecha, toda cuenta
@@ -33,38 +35,25 @@ La guarda ya era así; el texto no, por eso no queda para después.
 **D53:** (a): ya pasaba en la base, y ahora la respuesta lo dice.
 **D54:** (a), a la cola de limpieza.
 
-**Tu orden:** COBRO-MP-1 vuelta 5 → ORDEN-1b vuelta 4 (arriba) → CSRF-1.
+**Tu orden:** CSRF-1 ahora; si la vuelta 5 trae devolución, esa va primero.
 
-## Veredicto de ORDEN-1b vuelta 3 (2026-11-05 09:30 UTC): devolución corta, sólo de pruebas. Va después de COBRO-MP-1 vuelta 5
+## Veredicto de ORDEN-1b vuelta 4 (2026-11-05 12:15 UTC): aceptada
 
-Sobre `f22f48b`. Evidencia: `docs/pm/REPRODUCCION-ORDEN-1b-v3-2026-11-05.md`.
-Producto: nada, y sigue así.
+Sobre `f5e9fac`. Evidencia: `docs/pm/REPRODUCCION-ORDEN-1b-v4-2026-11-05.md`.
+`orden1b.sh` 28 ROJO y `orden1.sh` 76 ROJO, sin sabotajes sin rojo; el
+producto no lee `X-Prueba-Consulta`. Mi ataque fue distinto del tuyo: atrasé
+el `fetch` del tour en `screens/tour.js` y no en el arnés. Con M3 da rojo con
+1,5 s y con 3 s.
 
-**Lo que dio distinto:** mi `orden1b.sh` dio `VERDE | la sesión de la
-respuesta se lee cuando ya llegó (topup_success)`, «sabotajes sin rojo: 1».
+Una observación, que no es devolución: sin sabotaje y con el tour en 3 s, la
+fila `topup_success, primero tour` falla con «la relectura salió antes de que
+la pestaña cargara el usuario». Falla con su propio mensaje y no da un verde
+falso. No hay que hacer nada.
 
-**Causa:** `z35` retiene «la primera `/auth/current_user` con la pestaña ya
-cargada», y no siempre es la relectura del pago. `checkDemoForceTour`
-(`screens/tour.js:243`) también la pide al abrir. Si llega después de la
-carga, el handler retiene la del tour; la escritura sale antes de la
-relectura (t≈1600 ms contra ≈2150 ms) y nunca pasa por la línea saboteada.
-Lo reproduje de forma determinista atrasando 1 s la del tour en una copia del
-arnés: las dos vueltas, `topup_success` y `success`, quedan en verde con el
-sabotaje puesto. Además, `__leidas >= __pedidas` se cumple aunque la
-relectura todavía no se haya pedido. Lo que pido:
-
-- Que `z35` retenga la relectura del pago y ninguna otra, y que falle con su
-  propio mensaje si escribe sin haberla retenido. Cubrí la familia: la del
-  tour antes o después de la carga.
-- Mostrá una vez el rojo: el sabotaje M3 con la del tour atrasada tiene que
-  dar ROJO en las dos vueltas.
-- Sin espera fija nueva.
-
-**D55:** (a). Con la pestaña sin dueño el freno es `sesionAlAbrir`; esas
-filas no distinguen este sabotaje.
-
-**Sigue en pie de la vuelta 2:** D50 (a), a la cola; H3, riesgo bajo; las
-lecturas GET sin freno quedan fuera de esta pieza.
+La pieza queda ✅ en el roadmap. Se integra a mi rama junto con COBRO-MP-1
+vuelta 5, porque sus commits están intercalados y esa sigue en revisión
+(`cobro_mp1.sh` corriendo). **Seguí con CSRF-1 ya**, sin esperar ese veredicto.
+D50 sigue en la cola.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
