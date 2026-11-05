@@ -3,6 +3,43 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## Veredicto de ORDEN-1b vuelta 2 (2026-11-05 05:20 UTC): devolución corta, sólo de pruebas
+
+Sobre `8b087fd`. Evidencia: `docs/pm/REPRODUCCION-ORDEN-1b-v2-2026-11-05.md`.
+El producto se sostiene: `orden1b.sh` 24 ROJO, `orden1.sh` 76 ROJO, los dos
+«sabotajes sin rojo: 0»; chequeo-6 igual a tu informe; dos pestañas de A con
+una de B, y B que entra y sale, frenan bien.
+
+**Causa:** la comparación «respuesta vieja, cookie nueva» que pedí está fijada
+en `sesionEsDelDueno` (z29), pero no en `loadCurrentUser`. Si
+`const sesionAntes = getCsrfToken();` (app_v2.js:381) se lee después de la
+respuesta, el arnés entero sigue verde (67 OK). Mientras tanto, la vuelta del
+pago toma la cookie de B como del dueño y la pestaña de A escribe a nombre
+de B: un cliente guardado queda en la cuenta de B. Lo reproduje: sobre
+`8b087fd` el cliente no queda en ninguna cuenta; con ese cambio queda en la
+de B. Lo que pido:
+
+- Un caso en el arnés: la relectura de la vuelta del pago sale con la cookie
+  de A (retenela con `route.fetch()`, no con `continue()`, que repega las
+  cookies), entra B, se suelta la respuesta y la pestaña intenta escribir.
+  Si cubrís también los reintentos de la primera carga, que vayan como datos
+  del mismo caso.
+- Su sabotaje en `orden1b.sh`: mover esa lectura abajo del `try/finally`. Que
+  dé rojo.
+- Va después de la devolución de COBRO-MP-1 vuelta 4, que es la primera.
+  Producto: nada.
+
+**D50:** (a), a la cola de limpieza. La entrada no estaba: la escribí yo en
+`COLA-LIMPIEZA.md`. El caso nuevo va como función aparte, no dentro de la
+anónima de :280.
+
+**H3:** queda como riesgo bajo, no medio. El perfil vuelve a pedir
+`/api/billing/me`; lo viejo es sólo el banner.
+
+**Fuera de esta pieza, para que conste:** las lecturas GET no pasan por el
+freno (la pestaña de A ve clientes y perfil de B hasta que intenta escribir).
+Ya estaba en la base. No lo toques; si hace falta, lo propongo como pieza.
+
 ## Veredicto de COBRO-MP-1 vuelta 3 (2026-11-05 01:45 UTC): devolución por una causa
 
 Sobre `9048b6a`. Evidencia: `docs/pm/REPRODUCCION-COBRO-MP-1-v3-2026-11-05.md`.
