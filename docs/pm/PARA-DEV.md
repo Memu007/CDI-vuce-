@@ -3,72 +3,79 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Veredicto de ORDEN-1b vuelta 2 (2026-11-05 05:20 UTC): devolución corta, sólo de pruebas
+## Veredicto de CSRF-1 (2026-11-05 12:35 UTC): devolución corta por una causa. Va primero
 
-Sobre `8b087fd`. Evidencia: `docs/pm/REPRODUCCION-ORDEN-1b-v2-2026-11-05.md`.
-El producto se sostiene: `orden1b.sh` 24 ROJO, `orden1.sh` 76 ROJO, los dos
-«sabotajes sin rojo: 0»; chequeo-6 igual a tu informe; dos pestañas de A con
-una de B, y B que entra y sale, frenan bien.
+Sobre `b1c9d70`. Evidencia: `docs/pm/REPRODUCCION-CSRF-1-2026-11-05.md`. La
+telemetría con token llega y `csrf1.sh` da 5 ROJO, sin fallas.
 
-**Causa:** la comparación «respuesta vieja, cookie nueva» que pedí está fijada
-en `sesionEsDelDueno` (z29), pero no en `loadCurrentUser`. Si
-`const sesionAntes = getCsrfToken();` (app_v2.js:381) se lee después de la
-respuesta, el arnés entero sigue verde (67 OK). Mientras tanto, la vuelta del
-pago toma la cookie de B como del dueño y la pestaña de A escribe a nombre
-de B: un cliente guardado queda en la cuenta de B. Lo reproduje: sobre
-`8b087fd` el cliente no queda en ninguna cuenta; con ese cambio queda en la
-de B. Lo que pido:
+**Causa:** el middleware pide el token sólo si llega la cookie de sesión,
+porque supone que un pedido sin ella no puede hacer daño. Cerrar sesión es
+la excepción: su efecto son los `Set-Cookie` de la respuesta. Desde otro
+sitio la cookie `SameSite=Strict` no viaja, el middleware no pide nada y la
+respuesta borra la sesión. Lo reproduje: `POST /auth/logout` sin cookies, con
+`Origin` ajeno y `CSRF_ENFORCE=true`, da `200` con los dos `Set-Cookie` de
+borrado. El adversario lo hizo en Chromium con un `<form>` en otro origen:
+`despues 401`. Tu caso pega la cookie a un pedido de otro origen, cosa que un
+navegador no hace; por eso queda verde. Lo que pido:
 
-- Un caso en el arnés: la relectura de la vuelta del pago sale con la cookie
-  de A (retenela con `route.fetch()`, no con `continue()`, que repega las
-  cookies), entra B, se suelta la respuesta y la pestaña intenta escribir.
-  Si cubrís también los reintentos de la primera carga, que vayan como datos
-  del mismo caso.
-- Su sabotaje en `orden1b.sh`: mover esa lectura abajo del `try/finally`. Que
-  dé rojo.
-- Va después de la devolución de COBRO-MP-1 vuelta 4, que es la primera.
-  Producto: nada.
+- Que un POST a una ruta que cierra sesión, sin token válido, no borre la
+  sesión, llegue o no la cookie. La familia: `/auth/logout` y el alias
+  `/logout`.
+- El caso con el pedido como lo manda un navegador desde otro sitio (sin
+  cookies), por las dos rutas; su rojo en `b1c9d70` y su sabotaje en
+  `csrf1.sh`. `test_security.py:647` cierra sesión con Bearer: que siga
+  diciendo algo cierto.
+- «Salir» lleva al inicio sólo si el cierre se confirmó. Hoy, con la red
+  cortada, va a `/` con la sesión abierta (`route.abort` sobre
+  `/auth/logout`: `current_user 200`). Ya pasaba, pero es la función que
+  cambiaste y la promesa de tu informe. Una fase del arnés con el pedido
+  cortado.
 
-**D50:** (a), a la cola de limpieza. La entrada no estaba: la escribí yo en
-`COLA-LIMPIEZA.md`. El caso nuevo va como función aparte, no dentro de la
-anónima de :280.
+**D56:** (b), como CSRF-2, chica, apenas aceptada CSRF-1 y antes de
+COBRO-CORTE-1. Decidido por la PM, con el sí de Emi del 04/11 a los arreglos
+chicos de seguridad. Lleva: la telemetría de la landing, las escrituras de la
+pantalla vieja (`app.js`, con su `/logout`, y que el alias borre
+`csrf_token`), las rutas públicas de recuperación de cuenta que dan 403 con
+una cookie vieja y `"webhook"` en cualquier parte de la ruta. El detalle está
+en el acta.
+**D57:** (a). Si querés, el aviso puede decir cómo salir (volver a entrar),
+pero no es criterio.
 
-**H3:** queda como riesgo bajo, no medio. El perfil vuelve a pedir
-`/api/billing/me`; lo viejo es sólo el banner.
+**Tu orden:** CSRF-1 vuelta 2 → CSRF-2 → COBRO-CORTE-1 → …
 
-**Fuera de esta pieza, para que conste:** las lecturas GET no pasan por el
-freno (la pestaña de A ve clientes y perfil de B hasta que intenta escribir).
-Ya estaba en la base. No lo toques; si hace falta, lo propongo como pieza.
+## Veredicto de COBRO-MP-1 vuelta 5 (2026-11-05 12:55 UTC): aceptada
 
-## Veredicto de COBRO-MP-1 vuelta 3 (2026-11-05 01:45 UTC): devolución por una causa
+Sobre `736fed6`. Evidencia: `docs/pm/REPRODUCCION-COBRO-MP-1-v5-2026-11-05.md`.
+El caso nuevo da `2 failed` en `9161e0a` y `4 passed` en `736fed6`; suite
+`4419 passed`; `cobro_mp1.sh` 148 ROJO, sin fallas. Mis seis filas, con otros
+estados de la organización y de la fila, y una organización que no existe,
+fallan donde tienen que fallar en `9161e0a` y pasan en `736fed6`. El
+adversario no encontró nada nuevo que bloquee.
 
-Sobre `9048b6a`. Evidencia: `docs/pm/REPRODUCCION-COBRO-MP-1-v3-2026-11-05.md`.
-h, i, j y D13 (c) se sostienen: 307 de cobro, Postgres 35 OK, suite completa
-`4407 passed`, y los sabotajes repetidos a mano dan rojo.
+Lo que queda es D51: que cancelar con organización actúe sobre la cuenta que
+da el acceso y que sólo pueda hacerlo quien corresponda. Va como pieza aparte
+y se la propongo a Emi. Mientras, una organización `active` en sus días de
+gracia, con la fila del miembro con días, ve «dejás de usar CDI» y sigue con
+acceso al cancelar.
 
-**Causa (regresión de esta vuelta):** el 409 de D13 (c) manda a cancelar, pero
-cancelar sólo acepta `trial`/`active`/`past_due`/`canceled`. Con
-`billing_status` `none` (el valor por defecto de la migración), `None` o
-`expired` y una suscripción `authorized`, el checkout da 409, cancelar da 409
-«No se puede cancelar desde el estado actual» y la cuenta no tiene salida. En
-`4ef59f4` el checkout la sacaba. Lo que pido:
+La pieza queda ✅ y se integra a mi rama hasta `885ee89`, junto con
+ORDEN-1b.
 
-- Toda cuenta con una suscripción abierta en Mercado Pago tiene salida, sea
-  cual sea su `billing_status`, y la pantalla le muestra cómo.
-- Un caso con la familia como datos: `none`, `None`, `expired` y un estado
-  desconocido, por checkout → cancelar → checkout; su rojo en `9048b6a` y su
-  sabotaje.
-- La salida de `chequeo-6.py` contra esta vuelta, y una línea por cada `AVISO`
-  de `app_v2.js` y `pantalla_orden1.js`: si es tuyo o vino de un merge.
+## Veredicto de ORDEN-1b vuelta 4 (2026-11-05 12:15 UTC): aceptada
 
-**D17:** aceptado tal cual. Sólo para que conste: el camino ilegible saltea el
-control cruzado suscripción↔cuenta; es lo mismo que hace el aviso de pago solo.
+Sobre `f5e9fac`. Evidencia: `docs/pm/REPRODUCCION-ORDEN-1b-v4-2026-11-05.md`.
+`orden1b.sh` 28 ROJO y `orden1.sh` 76 ROJO, sin sabotajes sin rojo; el
+producto no lee `X-Prueba-Consulta`. Mi ataque fue distinto del tuyo: atrasé
+el `fetch` del tour en `screens/tour.js` y no en el arnés. Con M3 da rojo con
+1,5 s y con 3 s.
 
-**D18:** decidido por la PM, (a) hasta conocer D30. Sólo pasa si cambia el
-precio en PLANS con suscripciones vivas, y eso no ocurre antes del piloto. Si
-D30 muestra pagos de suscripción sin el id, va (b′): 503 sólo para un pago con
-referencia, sin `metadata.precio_esperado` y sin suscripción. Es más angosta y
-no necesita una columna nueva. Queda como riesgo en `NOW.md`.
+Una observación, que no es devolución: sin sabotaje y con el tour en 3 s, la
+fila `topup_success, primero tour` falla con «la relectura salió antes de que
+la pestaña cargara el usuario». Falla con su propio mensaje y no da un verde
+falso. No hay que hacer nada.
+
+La pieza queda ✅ en el roadmap. Integrada junto con COBRO-MP-1 vuelta 5.
+D50 sigue en la cola.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
@@ -99,7 +106,7 @@ PM la pasa a `COLA-LIMPIEZA.md`. Lo nuevo de la vuelta sí cumple §6.
 ## Piezas nuevas que aprobó Emi el 04/11 (PM)
 
 Tu cola queda: COBRO-MP-1 vuelta 3 + D13 (c) → ORDEN-1b vuelta 2 →
-**CSRF-1** → COBRO-CORTE-1 → COBRO-MP-2 → **COBRO-MP-3** →
+**CSRF-1** → CSRF-2 → COBRO-CORTE-1 → COBRO-MP-2 → **COBRO-MP-3** →
 AISLAMIENTO-2/LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. El detalle de cada una te
 lo escribo al activarla; esto es lo que tiene que pasar:
 

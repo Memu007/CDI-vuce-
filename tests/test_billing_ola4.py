@@ -65,6 +65,7 @@ def test_webhook_payment_parses_subscription():
     payment = {
         "id": "123",
         "status": "approved",
+        "date_approved": datetime.now(timezone.utc).isoformat(),
         "external_reference": "alice:premium",
         "payer": {"id": "payer-1"},
         "card": {"last_four_digits": "1234", "payment_method": {"name": "visa"}},
@@ -80,6 +81,7 @@ def test_webhook_payment_parses_topup():
     payment = {
         "id": "456",
         "status": "approved",
+        "date_approved": datetime.now(timezone.utc).isoformat(),
         "external_reference": "bob:topup",
         "payer": {"id": "payer-2"},
     }
@@ -93,6 +95,7 @@ def test_webhook_payment_404_unknown_reference():
     payment = {
         "id": "789",
         "status": "approved",
+        "date_approved": datetime.now(timezone.utc).isoformat(),
         "external_reference": "bad",
         "payer": {"id": "payer-3"},
     }

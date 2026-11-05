@@ -64,6 +64,8 @@
             <button type="button" class="billing-banner-cta" id="billingBannerCta">Activar plan</button>
             <button type="button" class="billing-banner-close" id="billingBannerClose" aria-label="Cerrar aviso" hidden>&times;</button>
         </div>
+        <!-- Aviso de la operación en curso: la pestaña no la puede guardar (sesión de otro usuario, sin sesión, sin red o sin lugar). Lo maneja app_v2.js. -->
+        <div class="billing-banner is-urgent" id="avisoBorrador" role="status" aria-live="polite" hidden></div>
 
         <main class="main">
             <div class="fake-source-banner" id="fakeSourceBanner" role="status" aria-live="polite" hidden>
@@ -1343,6 +1345,20 @@
             <footer class="cx-modal-footer">
                 <button type="button" class="btn btn-ghost" id="cdiConfirmCancel">Cancelar</button>
                 <button type="button" class="btn btn-primary" id="cdiConfirmAccept">Aceptar</button>
+            </footer>
+        </div>
+    </dialog>
+
+    <dialog class="cx-modal cdi-confirm-modal" id="pestanaAjena" aria-labelledby="pestanaAjenaTitle" aria-describedby="pestanaAjenaText">
+        <div class="cx-modal-shell">
+            <header class="cx-modal-header">
+                <h3 class="cx-modal-title" id="pestanaAjenaTitle">Entró otro usuario</h3>
+            </header>
+            <div class="cx-modal-body">
+                <p class="cdi-confirm-text" id="pestanaAjenaText">Esta pestaña ya no puede guardar nada. Recargá la página para seguir con el usuario que entró.</p>
+            </div>
+            <footer class="cx-modal-footer">
+                <button type="button" class="btn btn-primary" id="pestanaAjenaRecargar">Recargar</button>
             </footer>
         </div>
     </dialog>

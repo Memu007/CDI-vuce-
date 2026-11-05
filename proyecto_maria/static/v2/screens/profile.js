@@ -99,7 +99,7 @@
         billingUsageWrap = $('pfBillingUsageWrap');
         billingUsageEl = $('pfBillingUsage');
         billingTopupBtn = $('pfBillingTopup');
-        if (billingActivateBtn) billingActivateBtn.addEventListener('click', () => openCheckout('activate'));
+        if (billingActivateBtn) billingActivateBtn.addEventListener('click', () => CDI.irAlCheckout(planElegido(), billingActivateBtn));
         if (billingReactivateBtn) billingReactivateBtn.addEventListener('click', reactivateBilling);
         if (billingCancelBtn) billingCancelBtn.addEventListener('click', cancelBilling);
         if (billingTopupBtn) billingTopupBtn.addEventListener('click', openTopup);
@@ -363,6 +363,8 @@
             canceled: 'Cancelado'
         };
         billingStatusEl.textContent = labels[status] || status;
+        billingStatusEl.dataset.status = status;
+        billingStatusEl.dataset.corta = (b && b.cancelar_corta_acceso) ? '1' : '';
         billingSummary.textContent = labels[status] || status;
 
         // Mostrar uso del mes siempre.
@@ -386,9 +388,11 @@
             billingNextWrap.hidden = false;
             billingNextEl.textContent = formatDateAr(trialEnd);
             if (nextLabel) {
+                // «Próximo cobro» sólo si hay una suscripción que se renueva (COBRO-MP-2).
+                const vencida = new Date(trialEnd) <= new Date();
                 if (status === 'trial') nextLabel.textContent = 'Trial vence';
-                else if (status === 'active') nextLabel.textContent = 'Próximo cobro';
-                else if (status === 'canceled') nextLabel.textContent = 'Servicio activo hasta';
+                else if (status === 'active') nextLabel.textContent = (b && b.renueva) ? 'Próximo cobro' : 'Activo hasta';
+                else if (status === 'canceled') nextLabel.textContent = vencida ? 'Venció el' : 'Servicio activo hasta';
                 else nextLabel.textContent = 'Fecha';
             }
         }
@@ -401,7 +405,10 @@
         }
 
         // Botones por estado.
-        if (status === 'trial' || status === 'active') {
+        // past_due también cancela: si no, la suscripción cobra cuando la tarjeta vuelve.
+        // Con una suscripción abierta se cancela en cualquier estado.
+        if (status === 'trial' || status === 'active' || status === 'past_due'
+            || (b && b.suscripcion_abierta)) {
             if (billingCancelBtn) billingCancelBtn.hidden = false;
         }
         if (status === 'past_due' || status === 'none') {
@@ -415,22 +422,8 @@
         }
     }
 
-    async function openCheckout() {
-        try {
-            const plan = billingPlanSelect && !billingPlanSelect.hidden ? billingPlanSelect.value : 'premium';
-            const res = await CDI.api('/api/billing/checkout', {
-                method: 'POST',
-                body: JSON.stringify({ plan: plan })
-            });
-            const data = await res.json().catch(() => ({}));
-            if (data && data.init_point) {
-                window.location.href = data.init_point;
-                return;
-            }
-            CDI.toast('Error', 'No se pudo iniciar el cobro.', 'error');
-        } catch (err) {
-            CDI.toast('Error', String(err.message || err), 'error');
-        }
+    function planElegido() {
+        return billingPlanSelect && !billingPlanSelect.hidden ? billingPlanSelect.value : 'premium';
     }
 
     async function openTopup() {
@@ -441,18 +434,24 @@
                 window.location.href = data.init_point;
                 return;
             }
-            CDI.toast('Error', 'No se pudo iniciar el top-up.', 'error');
+            // Con el tope de operaciones extra lleno, el 409 dice por qué no hay link.
+            CDI.toast('Error', (data && typeof data.detail === 'string' && data.detail) || 'No se pudo iniciar el top-up.', 'error');
         } catch (err) {
             CDI.toast('Error', String(err.message || err), 'error');
         }
     }
 
     async function cancelBilling() {
+        const corta = billingStatusEl && billingStatusEl.dataset.corta === '1';
+        const pendiente = corta && billingStatusEl.dataset.status === 'past_due';
         const ok = await CDI.confirm({
             title: 'Cancelar plan',
             lead: '¿Seguro que querés cancelar?',
-            text: 'Vas a poder seguir usando CDI hasta el fin del período ya pagado. Después no se renueva automáticamente. Podés reactivar cuando quieras.',
-            confirmText: 'Sí, cancelar',
+            text: corta
+                ? (pendiente ? 'Tu plan tiene un pago pendiente. ' : '')
+                    + 'Al cancelar no se cobra más y dejás de usar CDI hasta que actives un plan.'
+                : 'Vas a poder seguir usando CDI hasta el fin del período ya pagado. Después no se renueva automáticamente. Podés reactivar cuando quieras.',
+            acceptText: 'Sí, cancelar',
             cancelText: 'Volver'
         });
         if (!ok) return;
@@ -481,19 +480,25 @@
             const data = await res.json().catch(() => ({}));
             if (!res.ok || !data.success) throw new Error((data && data.detail) || 'No se pudo reactivar');
             if (data.needs_checkout) {
-                CDI.toast('Reactivar plan', 'Tu período pagado terminó. Te llevamos al checkout.', 'info');
-                await openCheckout();
-                return;
+                // Antes de pagar, se dice cuándo cobra y qué suma (COBRO-MP-2, D7.3).
+                const seguir = await CDI.confirm({
+                    title: 'Reactivar plan',
+                    lead: 'Se crea una suscripción nueva en Mercado Pago.',
+                    text: data.message || 'Tu período pagado terminó. Te llevamos al checkout.',
+                    acceptText: 'Ir a pagar',
+                    cancelText: 'Volver'
+                });
+                if (seguir && await CDI.irAlCheckout(planElegido(), billingReactivateBtn)) return;
+            } else {
+                CDI.toast('Prueba reactivada', 'Sigue hasta el fin de la prueba.', 'success');
+                CDI.track('billing_reactivated');
+                await loadBilling();
             }
-            CDI.toast('Plan reactivado', 'Sigue activo hasta el próximo cobro.', 'success');
-            CDI.track('billing_reactivated');
-            await loadBilling();
         } catch (err) {
             CDI.toast('Error', String(err.message || err), 'error');
-        } finally {
-            billingReactivateBtn.disabled = false;
-            billingReactivateBtn.textContent = 'Reactivar plan';
         }
+        billingReactivateBtn.disabled = false;
+        billingReactivateBtn.textContent = 'Reactivar plan';
     }
 
     CDI.openProfileModal = open;

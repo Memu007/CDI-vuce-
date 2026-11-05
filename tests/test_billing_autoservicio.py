@@ -2,7 +2,8 @@
 
 Cubre los 3 endpoints nuevos + cambio de password:
 - POST /api/user/change-password (OK + 401 con pass actual mala + 400 short)
-- POST /api/billing/cancel (OK desde trial/active + 409 desde none/canceled)
+- POST /api/billing/cancel (OK desde trial/active + 409 desde none/canceled sin
+  suscripción abierta)
 - POST /api/billing/reactivate (vigente → active, vencido → past_due+needs_checkout)
 
 NO testea integración real con MercadoPago (sandbox requerido). Eso vive en
@@ -177,8 +178,8 @@ def test_cancel_twice_returns_409(client):
 # ---------- Reactivar plan ----------
 
 
-def test_reactivate_with_active_period_returns_active(client):
-    """Cancelar y reactivar mientras el trial sigue vigente → vuelve a active."""
+def test_reactivate_with_active_period_returns_trial(client):
+    """Cancelar y reactivar mientras el trial sigue vigente → vuelve a trial, no a active (COBRO-MP-2, C8)."""
     _register(client, "react1", with_card=True)
     cancel = client.post("/api/billing/cancel")
     assert cancel.status_code == 200
@@ -186,7 +187,7 @@ def test_reactivate_with_active_period_returns_active(client):
     resp = client.post("/api/billing/reactivate")
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    assert body["billing_status"] == "active"
+    assert body["billing_status"] == "trial"
     assert body["needs_checkout"] is False
 
 

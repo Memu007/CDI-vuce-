@@ -732,8 +732,10 @@
                     CDI.goTo('validating');
                     throw new Error(detail);
                 }
-                // Los controles de antes de generar llegan como {errors: [...]}.
-                const texto = (detail && Array.isArray(detail.errors)) ? detail.errors.join(' ') : detail;
+                // Los controles de antes de generar llegan como {errors: [...]};
+                // el tope de regeneraciones de un mismo id, como {code, message}.
+                const texto = (detail && Array.isArray(detail.errors)) ? detail.errors.join(' ')
+                    : (detail && typeof detail === 'object' && detail.message) ? detail.message : detail;
                 throw new Error(texto || 'No se pudo generar el archivo');
             }
             lastMaria = {
@@ -759,7 +761,8 @@
         } catch (err) {
             console.error('[ready] generate error', err);
             CDI.track('maria_generate_error', { message: String(err && err.message || err) });
-            showReadyError(String(err && err.message || err));
+            // Un 402 trae la razón (impago, vencido, tope); el modal ya salió.
+            showReadyError(String((err && err.motivo) || (err && err.message) || err));
         } finally {
             generateInFlight = false;
         }
@@ -785,8 +788,11 @@
         const incoterm = (op.incoterm || '').toString().trim().toUpperCase();
 
         const factura = numeroDeFactura(op);
+        // Sin factura, el id sale de cuándo se cargó la operación: regenerar
+        // la misma no la cuenta otra vez (COBRO-CORTE-1).
+        const cargada = (CDI.state && CDI.state.uploadedAt) || new Date().toISOString();
         const operation_id = factura ? ('FAC_' + factura.replace(/[^a-zA-Z0-9_-]/g, '')) :
-            ('OP_' + new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14));
+            ('OP_' + String(cargada).replace(/[^0-9]/g, '').slice(0, 17));
 
         const items = (CDI.state.items || []).map((it, i) => ({
             pieza: String(it.pieza || '').trim(),

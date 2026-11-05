@@ -576,3 +576,39 @@ class Invitation(Base):
     expires_at = Column(DateTime(timezone=True), nullable=False)
 
     org = relationship("Organization", back_populates="invitations")
+
+
+class PagoMercadoPagoAplicado(Base):
+    """Cada pago de Mercado Pago que llegó a una cuenta, una sola vez.
+
+    Antes sólo se recordaba el último pago (`last_payment_id`): alternando
+    dos pagos viejos reales, cualquiera renovaba una cuenta sin pagar
+    (COBRO-MP-1, D8). La clave es el id del pago: un reenvío no se aplica.
+    Un pago que no alcanza queda «rechazado» con su motivo, para que el
+    admin lo vea en /dev/dashboard: es un cliente que pagó y no recibió nada.
+    """
+    __tablename__ = "mp_pagos_aplicados"
+
+    payment_id = Column(String(100), primary_key=True)
+    cuenta = Column(String(200), nullable=False, index=True)  # usuario u «org:<id>»
+    tipo = Column(String(40), nullable=False)  # plan o «topup»
+    monto = Column(Float, nullable=True)
+    moneda = Column(String(10), nullable=True)
+    aprobado_en = Column(String(40), nullable=True)  # date_approved de MP, tal cual
+    estado = Column(String(20), nullable=False, default="aplicado")  # «aplicado» o «rechazado»
+    monto_esperado = Column(Float, nullable=True)
+    motivo = Column(String(300), nullable=True)  # por qué se rechazó
+    aplicado_en = Column(DateTime(timezone=True), server_default=func.now())
+
+
+class InicioRegistroPagosMP(Base):
+    """Desde cuándo mp_pagos_aplicados anota cada pago (COBRO-MP-1, A).
+
+    Un pago aplicado antes no tiene fila: si no es el último de la cuenta,
+    last_payment_id tampoco lo frena. El webhook no aplica un pago aprobado
+    antes de este momento. Una sola fila (id=1), sembrada por init_db.
+    """
+    __tablename__ = "mp_registro_pagos_inicio"
+
+    id = Column(Integer, primary_key=True)
+    desde = Column(DateTime(timezone=True), nullable=False)

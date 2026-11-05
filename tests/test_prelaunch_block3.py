@@ -451,6 +451,7 @@ class TestLoggingSeguro:
                     "response": {
                         "id": pid,
                         "status": "approved",
+                        "date_approved": datetime.now(timezone.utc).isoformat(),
                         "external_reference": f"{uname}:premium",
                         "payer": {"id": "payer-log"},
                         "card": {
@@ -545,6 +546,7 @@ class TestLoggingSeguro:
                     "response": {
                         "id": pid,
                         "status": "approved",
+                        "date_approved": datetime.now(timezone.utc).isoformat(),
                         "external_reference": f"{uname}:premium",
                         "payer": {"id": "payer-ok"},
                     },

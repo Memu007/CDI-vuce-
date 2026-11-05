@@ -117,7 +117,7 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 | 0 | ✅ EXCEL-2b | Carril liviano: una subida chica no espera en cola detrás de libros pesados (vuelve a cumplir el criterio D26 a de EXCEL-2, ya aceptada; arreglo de esa pieza, no cuenta aparte; D4 y D5 de la técnica, 28/10) |
 | 1 | ✅ GUARDAR-2 | La sugerencia de posición: si el historial del cliente tiene 8 dígitos y el proveedor la SIM completa que empieza con esos 8, gana la del proveedor (D32 b; sin migración; Postgres descartable) |
 | 2 | ✅ ORDEN-1 | Reordenar los productos arrastrando, en la pantalla de revisión |
-| 2b | 🔵 ORDEN-1b | Una pestaña que ya no es de la sesión del navegador no manda escrituras al servidor a nombre de quien entró después (D12 de ORDEN-1; arreglo de esa pieza, no cuenta aparte; decidido por la PM, 29/10) |
+| 2b | ✅ ORDEN-1b | Una pestaña que ya no es de la sesión del navegador no manda escrituras al servidor a nombre de quien entró después (D12 de ORDEN-1; arreglo de esa pieza, no cuenta aparte; decidido por la PM, 29/10) |
 | 3 | COBRO-MP-1 | Primera pieza de la Fase 2 (ver abajo) |
 
 **Cierre de la Fase 1c (cierra G4):** dos sesiones con el despachante, 3 o
@@ -127,7 +127,7 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 
 | Pieza | Quién | Qué arregla |
 |---|---|---|
-| 🔵 COBRO-MP-1 | Dev técnica | Aviso de pago verificado, aplicado una vez, con el monto controlado; las renovaciones extienden el período (C3, D8) |
+| ✅ COBRO-MP-1 | Dev técnica | Aviso de pago verificado, aplicado una vez, con el monto controlado; las renovaciones extienden el período (C3, D8) |
 | 🔵 COBRO-CORTE-1 | Dev técnica | Quien no paga no genera ni gasta Gemini; contar una vez por operación sin pasarse del tope (también con guardados a la vez); el aviso dice la razón real (C1, C5, C6; D4 b N = 10, D5 a, D6 a) |
 | 🔵 COBRO-MP-2 | Dev técnica | Cancelar también en Mercado Pago sin perder días pagados, una sola suscripción, reactivar pagando (C2, C4, C8, D9) |
 | ⚪ COBRO-MP-3 | Dev técnica | Sumada por Emi el 04/11: las consultas a Mercado Pago no frenan el servidor (D8 a); el aviso de pago tiene límite de pedidos; un aviso sin firma verificable no cambia nada |
@@ -151,7 +151,8 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | 🔵 LIMPIEZA-1 | Dev técnica | Ver `AUDITORIA-2026-10-06.md` |
 | 🔵 OBSERVABILIDAD-1 | Dev MARIA | La columna `api_logs.owner_username` que falta en producción, con migración probada en Postgres descartable |
 | ⚪ CATALOGO-LARGO-1 | Dev MARIA | Sumada por Emi el 04/11: una descripción larga (301 a 2000 caracteres) no se pierde en silencio en la memoria del cliente ni en el catálogo (`product_key` de 300); con migración probada en Postgres descartable si hace falta |
-| ⚪ CSRF-1 | Dev técnica | Sumada por Emi el 04/11: con el control CSRF prendido, la telemetría de la página llega y cerrar sesión pide el token (D16 b) |
+| 🔵 CSRF-1 | Dev técnica | Sumada por Emi el 04/11: con el control CSRF prendido, la telemetría de la página llega y cerrar sesión pide el token (D16 b) |
+| ⚪ CSRF-2 | Dev técnica | Con el control CSRF prendido, la landing, la pantalla vieja y la recuperación de cuenta siguen andando, y `webhook` en la ruta no saltea el control (D56 b de CSRF-1; decidido por la PM el 05/11 con el sí de Emi del 04/11 a los arreglos chicos de seguridad) |
 | ✅ DATOS-1 | Dev MARIA | Borrar un cliente con presupuesto; `/health` honesto; sin detalles de error al público (D5, D2, D6 de `AUDITORIA-2026-10-06.md`) |
 | 🔵 BACKUP-1 | Dev técnica (pasada por la PM el 28/10) | Ver `AUDITORIA-2026-10-06.md`. BACKUP-1a: copia y restauración probada; el destino fuera de Railway y dónde se programa esperan a Emi |
 | 🔵 DISCO-1 | Dev MARIA | El historial de NCM de cada estudio pasa del disco de Railway a la base (D4 de `AUDITORIA-2026-10-06.md`) |

@@ -124,6 +124,129 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - En un sufijo de código libre, un número con decimales sale con coma: «AF(2.5)» sale «AF(2,5)», no «AF(2 5)».
 - Un sufijo que pide número (los que empiezan con Z) con decimales, o uno vacío como «AA()», no genera el TXT: el aviso dice en qué producto y cuál es.
 
+## 2026-11-05 · fix: el aviso de cancelar mira la organización (COBRO-MP-1, vuelta 5)
+
+- **fix(cobro):** en una cuenta con organización, la confirmación de «Cancelar plan» dice si se corta el acceso según el estado de la organización, que es el que muestra el perfil y el que da el acceso, y no según la fila del usuario.
+
+## 2026-11-05 · fix: toda cuenta con una suscripción de Mercado Pago abierta puede cancelarla (COBRO-MP-1, vuelta 4)
+
+- **fix(cobro):** «Cancelar plan» aparece y funciona con una suscripción abierta sea cual sea el estado de la cuenta (sin plan, vencida u otro), así el checkout que la nombra tiene salida; cancelar no da acceso a quien no lo tenía.
+- **fix(cobro):** la confirmación de cancelar promete «el período ya pagado» sólo si cancelar no corta el acceso, como lo decide el servidor; «pago pendiente» queda para el plan vencido.
+- **fix(cobro):** esa confirmación ya no promete días a la cuenta en gracia ni a la de prueba vencida: cancelar las deja sin acceso, y su respuesta ya no trae `service_until`.
+
+## 2026-11-05 · fix: al volver del pago, la pestaña no toma los datos de otro usuario que entró (ORDEN-1b, vuelta 2)
+
+- **fix(sesión):** si mientras se volvía de Mercado Pago entró otro usuario en el mismo navegador, la pestaña ya no muestra su nombre ni sus datos, y se tapa en cuanto intenta guardar o escribir.
+- Lo mismo al abrir: si otro usuario entró antes de que la pestaña supiera de quién es, se tapa sin mostrar su nombre ni sus datos.
+
+## 2026-10-29 · fix: una renovación de Mercado Pago no se pierde por el orden de sus avisos (COBRO-MP-1, vuelta 3)
+
+- **fix(cobro):** si un aviso de pago todavía no dice de qué cuenta es (o el cobro llega con su pago pendiente), se responde para que Mercado Pago reintente en vez de anotarlo como rechazado: el otro aviso del mismo pago lo acredita una sola vez.
+- Si Mercado Pago ya no conoce la suscripción guardada (404), «Activar plan» y «Cancelar plan» siguen en vez de dar error.
+
+## 2026-10-29 · fix: el checkout no cancela una suscripción de Mercado Pago que sigue activa (COBRO-MP-1, D13)
+
+- **fix(cobro):** con la cuenta impaga, vencida o cancelada y una suscripción todavía autorizada en Mercado Pago, «Activar plan» ya no la cancela para crear otra (podía ser un pago recién hecho): avisa que esperes unos minutos o que canceles el plan primero.
+
+## 2026-10-29 · fix: una pestaña vieja no escribe a nombre del usuario que entró después (ORDEN-1b)
+
+- **fix(orden):** si entra otro usuario en el mismo navegador, la pestaña del anterior no genera, no guarda, no manda telemetría ni cierra la sesión del otro: antes de escribir pregunta quién es, y si es otro se tapa y pide recargar. Si volvés a entrar vos, sigue sin trabar.
+- La pestaña que no pudo recuperar la operación porque la sesión estaba cambiando lo avisa y la recupera cuando confirma que la sesión es tuya.
+- Con la sesión cerrada, escribir manda al login como antes; si no puede comprobar quién es, «Salir» lo avisa en vez de ir al inicio con la sesión abierta.
+
+## 2026-10-29 · fix: Mercado Pago no cobra dos veces y cuenta bien las operaciones (COBRO-MP-1, vuelta 2)
+
+- **fix(cobro):** dos pagos de la misma cuenta al mismo tiempo se acreditan los dos; si no se puede leer Mercado Pago se responde para que reintente, y un pago que no sirve queda anotado como rechazado en el panel de desarrollo, también si trae un dato que no entra en la base.
+- Si ya tenés el tope de 100 operaciones extra, la recarga no arma el link de pago y te dice por qué; un pago que no entra en el tope queda rechazado a la vista, no aplicado a medias.
+- Una exportación con cliente elegido cuenta una sola operación en la pantalla v1, y los nombres de archivo de exportación ya no chocan con los de importación.
+
+## 2026-10-29 · fix: una pestaña duplicada no pierde la operación de otra si cambia la sesión (ORDEN-1, vuelta 3)
+
+- **fix(orden):** si mientras una pestaña busca la operación que dejaste entra otro usuario, se cierra la sesión o volvés a entrar, ya no se la muestra al otro usuario ni la deja sin dueño: queda guardada a tu nombre.
+- Un clic sin mouse (con el teclado o un lector de pantalla) también cuenta como tocar la pestaña: la operación de antes de recargar no la pisa.
+- Si la consulta de quién es el usuario tarda más de 10 s, la pestaña no guarda la operación y lo avisa; vuelve a guardar cuando la consulta contesta.
+
+## 2026-10-28 · fix: una cuenta cancelada que reabrió el checkout puede cancelar la suscripción nueva (COBRO-MP-1)
+
+- **fix(cobro):** si reactivó un plan pagado, abrió el checkout y el primer cobro no entró, «Cancelar plan» vuelve a aparecer y cancela en Mercado Pago la suscripción nueva; antes daba 409 y la suscripción seguía viva.
+
+## 2026-10-28 · fix: la operación recuperada tarde no pisa lo que se está haciendo (ORDEN-1, vuelta 2)
+
+- **fix(orden):** si el usuario tarda en llegar al recargar y mientras tanto se cambió de pantalla o se empezó a subir un archivo, la operación de antes queda guardada y se avisa, sin mover la pantalla.
+- Avisa también cuando la pestaña abre con otro usuario, cuando la consulta de la sesión no contesta en 10 s y cuando el navegador no tiene lugar para recuperar la operación.
+- Tampoco la pisa si ya se tocó la pestaña (por ejemplo, con el diálogo de archivos abierto); y si el usuario no llega en 4 s, avisa que no guarda hasta que llegue.
+
+## 2026-10-28 · fix: la pestaña comprueba la sesión antes de guardar y avisa cuando no guarda (ORDEN-1, devolución 20:08)
+
+- **fix(orden):** si alguien sale y entra con otro usuario, o la sesión se cierra, la pestaña deja de guardar la operación y lo dice en un aviso arriba; si vuelve a entrar el mismo usuario, sigue guardando.
+- La operación de antes de recargar vuelve aunque la consulta del usuario tarde; también avisa cuando el navegador no tiene lugar para guardarla.
+
+## 2026-10-28 · fix: un solo pedido de pago a la vez por cuenta (COBRO-MP-1 D)
+
+- **fix(cobro):** dos pedidos de pago a la vez dejan una sola suscripción viva en Mercado Pago, la que CDI guarda; cancelar mientras corre uno espera y cancela también la que ese pedido creó.
+- «Activar plan», «Reactivar plan» y el «Activar plan» del aviso de arriba quedan deshabilitados mientras esperan el pedido y mientras el navegador va a Mercado Pago, así un segundo clic, en ese botón o en otro, no pide otro pago. Volver de Mercado Pago con «Atrás» recarga la página.
+
+## 2026-10-28 · fix: se puede cancelar un plan vencido y una prueba con recarga se reactiva como prueba (COBRO-MP-1 C y E)
+
+- **fix(cobro):** desde «plan vencido» se puede cancelar: se cancela también en Mercado Pago, así no vuelve a cobrar cuando la tarjeta pasa, y la cuenta no gana días por cancelar.
+- Reactivar una prueba que sólo compró una recarga la vuelve a la prueba con sus días; ya no pide pagar ni dice «período ya pagado».
+- Un pago rechazado no cuenta como historial de pagos: una cuenta que pagó el plan antes del registro sigue yendo al checkout al reactivar.
+
+## 2026-10-28 · fix: la exportación también cuenta la operación, una vez por id (COBRO-MP-1 B)
+
+- **fix(cobro):** generar el MARIA de exportación cuenta como el de importación: la primera vez de cada operación; con el tope lleno, la nueva da 402 y la ya contada sigue saliendo.
+
+## 2026-10-28 · fix: un pago de Mercado Pago de antes del registro no se vuelve a aplicar (COBRO-MP-1 A)
+
+- **fix(cobro):** un pago aprobado antes de que empezara el registro de pagos (o sin fecha de aprobación legible) no renueva ni reactiva la cuenta aunque se reenvíe; queda rechazado, a la vista en los pagos rechazados del admin.
+
+## 2026-10-28 · fix: la operación sin terminar es de quien la dejó y vence a los 7 días (ORDEN-1, devolución)
+
+- **fix(borrador):** al abrir sólo se recupera una operación del mismo usuario y de hace menos de 7 días; las más viejas se borran. Una pestaña duplicada no toma la operación de la original mientras sigue abierta; al recargar o restaurar se recupera la propia.
+- Si al abrir no se puede saber quién es el usuario (error del servidor o corte), la pestaña lo vuelve a pedir y la operación se sigue guardando.
+- Si mientras tanto otro usuario entra en el mismo navegador, lo cargado en esa pestaña no se guarda a su nombre ni él lo recupera.
+
+## 2026-10-28 · feat: copia de la base que se restaura y se compara antes de darla por buena (BACKUP-1a)
+
+- **feat(datos):** `scripts/datos/copia_base.py` saca la copia de Postgres (`pg_dump -Fc`), la restaura en una base descartable y compara, tabla por tabla, la cantidad de filas y un resumen del contenido; si no da igual, sale con error y no la marca como verificada.
+- `enviar` lleva sólo una copia verificada y sin cambios a una carpeta local de prueba. Adónde va de verdad y cuándo corre lo define Emi; todavía no corre en producción.
+
+## 2026-10-28 · chore: la CI corre la suite entera y se borra el camino a Google Cloud (LIMPIEZA-1)
+
+- **chore(ci):** la CI ya no excluye a mano las 10 pruebas de presupuestos públicos, CSRF y el botón de NCM automático; una prueba falla si vuelve a sacar alguna.
+- Se borran `cloudbuild.yaml`, `setup_gcp.sh`, `scripts/deployment/deploy-cloud-run.sh` y las cinco guías de Google Cloud: el sitio se publica sólo por Railway.
+
+## 2026-10-28 · fix: los roles guardados como texto no dan administrador por una parte (AISLAMIENTO-2)
+
+- **fix(permisos):** si la columna de roles guarda un texto o un objeto en vez de una lista, «administrador» o {"admin": false} ya no cuentan como admin, ni en las rutas de administración ni en require_role. Un texto vale como un único rol entero.
+
+## 2026-10-28 · fix: cancelar también cancela en Mercado Pago y no se paga dos veces (COBRO-MP-2)
+
+- **fix(cobro):** cancelar en CDI cancela la suscripción en Mercado Pago y la cuenta sigue hasta el fin del período; si Mercado Pago no confirma, no se cancela nada y se avisa. Con una suscripción vigente, el checkout no deja pagar otra; si la vieja no se pudo cobrar, se cancela antes de crear la nueva.
+- Un pago suma 30 días desde el fin de la prueba o del período, sin perder días. Reactivar una suscripción cancelada lleva a pagar y lo dice antes; sin el token de Mercado Pago, fuera de pruebas, no hay pago simulado ni «cuenta activada».
+
+## 2026-10-28 · fix: una operación se cuenta una vez, al generar su MARIA, y el corte dice por qué (COBRO-CORTE-1)
+
+- **fix(cobro):** la operación se crea y se cuenta la primera vez que se genera el MARIA de su id; regenerarla o guardarla después no cuenta otra vez (hasta 10 versiones distintas por id). Con el tope lleno se sigue validando y bajando lo ya contado. La cuenta se bloquea mientras se cuenta: dos pedidos a la vez no pasan el tope ni repiten el número de operación.
+- Una cuenta impaga, vencida o cancelada ya no lee facturas en PDF, ni sugiere NCM, ni arma el Excel o el MARIA, ni importa clientes, ni guarda. Cada 402 dice su razón: pago pendiente, prueba o suscripción vencida, cancelada o tope del plan.
+
+## 2026-10-28 · fix: cada pago de Mercado Pago se aplica una sola vez y por su monto (COBRO-MP-1)
+
+- **fix(cobro):** un pago se anota por su `payment_id` y no se vuelve a aplicar aunque el aviso llegue repetido, alternado con otro o dos a la vez. Pagar con la cuenta activa extiende desde el fin del período; vencida, desde hoy.
+- El monto y la moneda se comparan con el precio del link cuando se armó (o con el de la suscripción en Mercado Pago); si no coinciden, no se aplica y Emi lo ve en el panel. Las renovaciones de una suscripción ahora extienden el período (antes se ignoraban).
+- El pago se reconoce por el id que da Mercado Pago (escrito de otra forma, «0123» o «123#a», no se aplica otra vez); un id con barras se rechaza sin consultarlo, y el último pago de antes de este cambio tampoco se reaplica.
+
+## 2026-10-28 · fix: una subida chica de Excel no espera detrás de las pesadas (EXCEL-2b)
+
+- **fix(excel):** un libro chico (hasta 2 MiB de XML descomprimido sin contar las imágenes; un `.xls`, por su tamaño; umbral en `EXCEL_LIVIANO_MB`) valida y se lee en hilos propios. Antes esperaba ~30 s detrás de ocho planillas pesadas; medido ahora, 1,5 y 1,7 s. Ante cualquier duda (índice largo, zip64, un índice que no se puede leer, algo que no es zip) va al carril de siempre.
+- Un tope de subida que no sirve vale el de defecto: los cuatro de Excel en MB, `EXCEL_MAX_ELEMENTOS_ESTILOS` y `MAX_UPLOAD_MB`, si no son un número finito o si en bytes o elementos dan 0 (`1e308`, `inf`, `nan`, `-0`, `1e-9`). Antes daban error o un tope de 0. Medio MB sí es un tope (512 KiB).
+- Límite conocido hasta EXCEL-2c: un libro de 1,5 KB armado para ser lento (una celda en la fila 1.048.576) entra al carril liviano y tarda unos 10 s y 1,5 GB en leerse; mientras tanto, una subida normal espera.
+
+## 2026-10-28 · feat: reordenar productos arrastrando, también los grupos, y cada pestaña con su borrador (ORDEN-1)
+
+- **feat(revisión):** en la tabla de productos un grupo se arrastra entero y se puede soltar un producto sobre él; el orden que queda es el del pedido y el del TXT, con los ítems numerados corridos. Ctrl+Z después de arrastrar ya no vuelve el orden viejo.
+- **fix(borrador):** cada pestaña guarda su operación en su propia clave: dos pestañas abiertas no se pisan y la que queda en la carga de archivos no borra la de otra. Al abrir, se recupera la propia o la más reciente de una pestaña cerrada.
+
 ## 2026-10-28 · feat: el destino de la mercadería sale de a pares en el TXT (DESTINO-1)
 
 - En la pantalla de validación, «Destino de la mercadería» ofrece comercialización o reventa (por defecto), bien de uso de la empresa o bien de uso de una persona, por operación y con cambio por producto.

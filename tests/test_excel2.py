@@ -741,15 +741,18 @@ def test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_
     async def _todo():
         entradas = 0
         listas = asyncio.Event()
-        validar = file_security.validate_file_upload
+        validar = file_security.validar_con_carril
         async def observar(file, *args, **kwargs):
             nonlocal entradas
-            if file.filename == "pesada.xlsx":
+            nombre = file.filename
+            if nombre == "pesada.xlsx":
                 entradas += 1
                 if entradas == 8:
                     listas.set()
-            return await validar(file, *args, **kwargs)
-        monkeypatch.setattr(file_security, "validate_file_upload", observar)
+            contents, liviano = await validar(file, *args, **kwargs)
+            carriles.add((nombre, liviano))
+            return contents, liviano
+        monkeypatch.setattr(file_security, "validar_con_carril", observar)
         transporte = httpx.ASGITransport(app=main.app)
         async with httpx.AsyncClient(transport=transporte, base_url="http://test", timeout=600) as c:
             def subir(contenido, nombre):
@@ -763,9 +766,16 @@ def test_ocho_libros_con_la_primera_hoja_al_borde_del_tope_no_dejan_sin_lectura_
             assert entradas == 8
             return r, dt
 
+    carriles = set()
     r, dt = asyncio.run(_todo())
     print(f"XML: {tamano} bytes; zip: {len(armado)} bytes; entradas: 8; normal: {r.status_code} en {dt:.1f} s")
+    # El tiempo va primero: si la normal espera detrás de las pesadas, su
+    # validación puede no terminar y su carril no llega a anotarse.
+    assert dt < 5, f"la subida normal tardó {dt:.1f} s: esperó detrás de las pesadas"
     assert r.status_code == 200, f"la subida normal dio {r.status_code} a los {dt:.1f} s: {r.text[:200]}"
+    # Las pesadas van al carril pesado y la normal al liviano (EXCEL-2b): si
+    # no, el tiempo de la normal no prueba nada.
+    assert carriles == {("pesada.xlsx", False), ("normal.xlsx", True)}, carriles
 
 
 def test_la_pantalla_muestra_el_aviso_del_csv():
