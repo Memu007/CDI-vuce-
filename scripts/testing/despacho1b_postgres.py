@@ -142,6 +142,66 @@ def filas_de(cid):
                " where client_id=%s order by ncm, descripcion", cid)
 
 
+def esperan_un_bloqueo(n):
+    """Hasta que n conexiones de la base esperan un bloqueo (60 s como mucho)."""
+    hasta = time.monotonic() + 60
+    while time.monotonic() < hasta:
+        if sql("select count(*) from pg_stat_activity where datname=%s and wait_event_type='Lock'",
+               BASE)[0][0] >= n:
+            return True
+        time.sleep(0.01)
+    return False
+
+
+def fila_que_se_va(c):
+    """Una conexión traba la fila de un producto; otra la cambia de clave o la
+    borra y queda en cola; una vía escribe el mismo producto y queda detrás.
+    Al soltarse, la vía no encuentra la fila: tiene que crearla otra vez."""
+    catalogo = f"/api/clientes/{CID}/catalogo/productos"
+    vias = {
+        "operacion": lambda d: c.post(f"/api/clientes/{CID}/operaciones", json={
+            "source": "pdf_v2", "currency": "USD", "resumen": {"items": 1, "valor_total": 100},
+            "items": [{"pieza": "P1", **producto("3926.90.90", d)}]}),
+        "aprender": lambda d: c.post(catalogo + "/learn", json={"items": [producto("3926.90.90", d)]}),
+        "guardar": lambda d: c.post(f"/api/clientes/{CID}/catalogo/despacho/guardar", json={
+            "renglones": [{"posicion_sim": "3926.90.90.000A", "descripcion": d, "origen": "BR",
+                           "cantidad": 10.0, "valor_unitario": 2.0, "kilo_neto": 1.0}], "divisa": "USD"}),
+        "guardar-uso": lambda d: c.post("/api/ncm/guardar-uso", json={
+            "descripcion": d, "ncm": "3926.90.90", "client_id": CID}),
+    }
+    cambios = {
+        "cambia de clave": lambda d, pid: c.put(f"{catalogo}/{pid}", json={"descripcion": d + " OTRA"}),
+        "se borra": lambda d, pid: c.delete(f"{catalogo}/{pid}"),
+    }
+    for via, escribir in vias.items():
+        for cambio, cambiar in cambios.items():
+            d = f"TAPA CARRERA {via} {cambio}".upper()
+            clave = identidad_del_producto("3926.90.90", d)[2]
+            assert vias["aprender"](d).status_code == 200
+            (pid,), = sql("select id from client_product_history where client_id=%s and clave=%s", CID, clave)
+            traba = psycopg2.connect(URL_BASE)
+            try:
+                with traba.cursor() as cur:
+                    cur.execute("select 1 from client_product_history where id=%s for update", (pid,))
+                with concurrent.futures.ThreadPoolExecutor(2) as ex:
+                    otro = ex.submit(cambiar, d, pid)
+                    en_cola = esperan_un_bloqueo(1)
+                    escrito = ex.submit(escribir, d)
+                    en_cola = en_cola and esperan_un_bloqueo(2)
+                    traba.rollback()
+                    r, r_otro = escrito.result(timeout=120), otro.result(timeout=120)
+            finally:
+                traba.close()
+            filas = sql("select veces_usado from client_product_history where client_id=%s and clave=%s",
+                        CID, clave)
+            cuerpo = r.json() if r.status_code == 200 else {}
+            guardado = cuerpo.get("historial_guardado", True) and cuerpo.get("aprendidos", 1) == 1
+            chequear(en_cola and r_otro.status_code == 200 and r.status_code == 200 and guardado
+                     and filas == [(1,)],
+                     f"{via}, la fila {cambio} mientras espera: el uso queda en una fila nueva: "
+                     f"en cola {en_cola}, {r_otro.status_code} {r.status_code} {r.text[:160]} {filas}")
+
+
 try:
     admin(f'create database "{BASE}"')
     py = sys.executable
@@ -273,6 +333,7 @@ try:
         valvulas = sql("select count(*), min(veces_usado), max(veces_usado) from client_product_history"
                        " where client_id=%s and descripcion like 'VALVULA INVENTADA %%'", CID)
         chequear(valvulas == [(40, 6, 6)], f"cada válvula, una fila con 6 usos: {valvulas}")
+        fila_que_se_va(c)
 finally:
     subprocess.run(["git", "-C", REPO, "worktree", "remove", "--force", WT], capture_output=True)
     try:

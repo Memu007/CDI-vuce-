@@ -2107,9 +2107,25 @@ def test_confirmar_un_ncm_saca_el_nul_del_origen_y_del_proveedor(auth_override, 
     cid = _crear_cliente(client)
     proveedor = f"PROVEEDOR INVENTADO {uuid.uuid4().hex[:8]}"
     descripcion, r = _guardar_uso(client, cid, origen="B\x00R", vendor_name=proveedor[:5] + "\x00" + proveedor[5:])
-    assert r.status_code == 200 and r.json() == {"success": True}, r.text
+    assert r.status_code == 200 and r.json() == {"success": True, "historial_guardado": True}, r.text
     assert [(p["descripcion"], p["origen"]) for p in _catalogo(client, cid)] == [(descripcion, "BR")]
     assert _contar(VendorCatalogProduct, vendor_nombre=proveedor) == 1
+
+
+def test_confirmar_un_ncm_dice_si_no_guardo_el_historial(auth_override, client, monkeypatch):
+    """Si el historial del cliente no se escribe, la respuesta lo dice; el uso
+    del NCM ya quedó confirmado."""
+    from proyecto_maria.services import client_memory
+
+    async def falla(*args, **kwargs):
+        raise RuntimeError("la base no anda")
+
+    monkeypatch.setattr(client_memory, "upsert_client_product_history", falla)
+    cid = _crear_cliente(client)
+    descripcion, r = _guardar_uso(client, cid)
+    assert r.status_code == 200 and r.json() == {"success": True, "historial_guardado": False}, r.text
+    assert _contar(NcmHistorial, descripcion=descripcion) == 1
+    assert _catalogo(client, cid) == []
 
 
 @pytest.mark.parametrize("ncm", ["pedido 20240115 nro", "39269090X", "1234"],

@@ -3,6 +3,8 @@
 # un arreglo y tests/test_despacho1b.py tiene que fallar por ese motivo.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/despacho1b.sh [SHA]
+# Con PG_DSN=postgresql://… (un Postgres descartable) corre además los que
+# sólo se ven en Postgres, con scripts/testing/despacho1b_postgres.py.
 # Trabaja en un worktree descartable con su propia SQLite y sin terceros: no
 # toca tu copia ni datos compartidos. Sale con error si un sabotaje no
 # encuentra su patrón o no pone rojo donde tiene que ponerlo.
@@ -813,6 +815,42 @@ sabotaje "el origen que no es texto" "$LECTOR" \
 ' \
   '' \
   "$TODO_O_NADA[origen numero]" "$ORI[lista]" "$ORI[numero]"
+
+sabotaje "confirmar un NCM no avisa que no guardó el historial" proyecto_maria/main.py \
+  '        historial_guardado = False
+' \
+  '' \
+  test_confirmar_un_ncm_dice_si_no_guardo_el_historial
+
+# Lo que sólo Postgres muestra: la espera por la fila y la fila que cambia de
+# clave o se borra mientras se espera. Sin PG_DSN no se corren y se dice.
+MEMORIA=proyecto_maria/services/client_memory.py
+sabotaje_pg() {
+  local nombre="$1" viejo="$2" nuevo="$3" salida codigo; shift 3
+  if [ -z "${PG_DSN:-}" ]; then
+    echo "NO CORRIDO | $nombre: falta PG_DSN"; NO_CORRIDOS=$((NO_CORRIDOS+1)); return
+  fi
+  git checkout -q -- proyecto_maria/
+  if ! aplicar "$MEMORIA" "$viejo" "$nuevo"; then
+    echo "ROTO  | $nombre: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1)); return
+  fi
+  salida="$("$PY" scripts/testing/despacho1b_postgres.py "$PG_DSN" 2>&1)"; codigo=$?
+  juzgar "$nombre" "$salida" "$codigo" "${@/#/FALLA | }"
+  git checkout -q -- proyecto_maria/
+}
+NO_CORRIDOS=0
+sabotaje_pg "el upsert no espera la fila" \
+  '    ).with_for_update().execution_options(populate_existing=True)' \
+  '    ).execution_options(populate_existing=True)' \
+  "dos procesos guardan y aprenden el mismo producto a la vez: una fila con 16 usos"
+sabotaje_pg "el upsert no reintenta si la fila se fue" \
+  '    for _ in range(3):' \
+  '    for _ in range(1):' \
+  "operacion, la fila cambia de clave mientras espera" "operacion, la fila se borra mientras espera" \
+  "aprender, la fila cambia de clave mientras espera" "aprender, la fila se borra mientras espera" \
+  "guardar, la fila cambia de clave mientras espera" "guardar, la fila se borra mientras espera" \
+  "guardar-uso, la fila cambia de clave mientras espera" "guardar-uso, la fila se borra mientras espera"
+echo "sin Postgres, no corridos: $NO_CORRIDOS"
 
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]
