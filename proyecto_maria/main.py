@@ -10011,7 +10011,7 @@ async def guardar_uso_ncm(
             entry = await upsert_client_product_history(
                 db, user["username"], client_id, ncm_base, descripcion, origen=origin or None
             )
-            wrote_client = entry is not None
+            wrote_client = historial_guardado = entry is not None
 
         if vendor_name:
             from proyecto_maria.core import catalog_service as catalog_svc

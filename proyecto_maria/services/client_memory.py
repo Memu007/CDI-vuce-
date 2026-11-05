@@ -233,7 +233,7 @@ async def upsert_client_product_history(
         if existing is not None:
             break
     else:
-        raise RuntimeError("el producto cambió tres veces mientras se guardaba")
+        raise RuntimeError("el producto cambió en cada intento de guardarlo")
     if insertada:
         return existing
 
