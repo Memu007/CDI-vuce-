@@ -8,6 +8,7 @@ let operacionIdActual = '';
 // Una respuesta que llega después de empezar otra carga no le anota su id a ésa.
 let cargaActual = 0;
 function nuevaCarga() { operacionIdActual = ''; cargaActual++; }
+function anotarOperacion(carga, id) { if (carga === cargaActual) operacionIdActual = id; }
 const UPLOAD_COOLDOWN_MS = 5000; // 5 segundos entre uploads
 let uploadCooldownTimer = null;
 
@@ -3391,7 +3392,7 @@ async function generateMariaTxt() {
             throw new Error(data.detail?.errors?.join(', ') || data.detail || 'Error generando MARIA');
         }
 
-        if (carga === cargaActual) operacionIdActual = data.operacion_id || '';
+        anotarOperacion(carga, data.operacion_id || '');
         await saveOperationToHistory(items, data.operacion_id || '', carga);
 
         // MARIA-4: lo que el sistema declaró por defecto y los avisos del
@@ -3752,10 +3753,7 @@ async function saveOperationToHistory(items, operacionId = operacionIdActual, ca
             body: JSON.stringify({ operacion_id: operacionId, resumen, items })
         });
         // Guardar antes de generar crea la operación: generar después la completa, no cuenta otra.
-        if (res.ok) {
-            const id = (await res.json()).operation_id || operacionId;
-            if (carga === cargaActual) operacionIdActual = id;
-        }
+        if (res.ok) anotarOperacion(carga, (await res.json()).operation_id || operacionId);
     } catch (e) {
         console.error('📊 Error saving operation:', e);
     }
