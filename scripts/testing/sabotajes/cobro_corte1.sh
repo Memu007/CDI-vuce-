@@ -165,7 +165,7 @@ sabotaje $M "guardar toma la operación generada de otra cuenta" \
   $'        OperationModel.owner_username == owner_username,\n        OperationModel.generated_file == archivo,' \
   $'        OperationModel.generated_file == archivo,'
 sabotaje $M "guardar le saca la operación a otro cliente" \
-  "FAILED $T::test_la_misma_factura_guardada_en_otro_cliente_no_le_saca_la_operacion_al_primero" \
+  "FAILED $T::test_guardar_en_otro_cliente_no_le_saca_la_operacion" \
   '            operation = await _operacion_maria(db, username, archivo, client_id)' \
   '            operation = await _operacion_maria(db, username, archivo)'
 sabotaje $M "guardar no reusa la operación generada sin cliente" \
