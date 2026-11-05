@@ -553,13 +553,23 @@ sabotaje $M "C: /billing/me dice abierta sólo a la cancelada" \
   '        "suscripcion_abierta": db_user.billing_status == "canceled" and bool(db_user.mp_preapproval_id),' \
   "sin_plan_con"
 sabotaje $M "C: /billing/me nunca dice que cancelar corta el acceso" \
-  '        "cancelar_corta_acceso": billing_service.cancelar_corta_acceso(db_user),' \
+  '        "cancelar_corta_acceso": billing_service.cancelar_corta_acceso(billing_entity),' \
   '        "cancelar_corta_acceso": False,' \
   "FAILED tests/test_cobro_mp1_cde.py::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[impaga]"
 sabotaje $M "C: /billing/me dice que corta sólo con past_due" \
-  '        "cancelar_corta_acceso": billing_service.cancelar_corta_acceso(db_user),' \
+  '        "cancelar_corta_acceso": billing_service.cancelar_corta_acceso(billing_entity),' \
   '        "cancelar_corta_acceso": db_user.billing_status == "past_due",' \
   "FAILED tests/test_cobro_mp1_cde.py::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[sin_plan]"
+
+# Con organización, el aviso mira la cuenta que da el acceso: cada dirección por separado.
+sabotaje $M "C: /billing/me avisa por la fila del usuario y no por su organización" \
+  '        "cancelar_corta_acceso": billing_service.cancelar_corta_acceso(billing_entity),' \
+  '        "cancelar_corta_acceso": billing_service.cancelar_corta_acceso(db_user),' \
+  "FAILED tests/test_cobro_mp1_cde.py::test_cancelar_avisa_por_la_cuenta_que_da_el_acceso[org_impaga_fila_en_prueba]"
+sabotaje $M "C: /billing/me dice que corta si corta la fila del usuario, aunque la organización siga" \
+  '        "cancelar_corta_acceso": billing_service.cancelar_corta_acceso(billing_entity),' \
+  '        "cancelar_corta_acceso": billing_service.cancelar_corta_acceso(billing_entity) or billing_service.cancelar_corta_acceso(db_user),' \
+  "FAILED tests/test_cobro_mp1_cde.py::test_cancelar_avisa_por_la_cuenta_que_da_el_acceso[org_activa_fila_impaga]"
 
 sabotaje $B "C: cancelar_corta_acceso no ve la cuenta que ya pasó su fecha" \
   '    return not tiene_acceso(cuenta, ahora) or not vigente(getattr(cuenta, "trial_ends_at", None), ahora)' \

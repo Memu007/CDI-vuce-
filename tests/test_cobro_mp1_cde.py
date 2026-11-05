@@ -20,6 +20,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from proyecto_maria.services import billing_service
+from tests.test_cobro_mp1 import _leer_org, _org
 from tests.test_cobro_mp2 import (  # noqa: F401
     CREADAS, PAGOS, PEDIDOS, SUS, _aviso_ipn, _cerca, _fin, _leer, _mp, _pago, _suscripto,
 )
@@ -214,6 +215,28 @@ def test_billing_me_dice_si_hay_una_suscripcion_abierta(client, estado, con_susc
     assert r.status_code == 200, r.text
     assert r.json().get("suscripcion_abierta") is abierta, r.json()
     assert r.json().get("cancelar_corta_acceso") is corta, r.json()
+
+
+@pytest.mark.parametrize("de_la_org, de_la_fila, corta", [
+    (("past_due", -10), ("trial", 10), True), (("active", 20), ("past_due", -30), False),
+    (None, ("past_due", -30), True), (None, ("active", 20), False),
+], ids=["org_impaga_fila_en_prueba", "org_activa_fila_impaga", "sin_org_impaga", "sin_org_activa"])
+def test_cancelar_avisa_por_la_cuenta_que_da_el_acceso(client, de_la_org, de_la_fila, corta):
+    # Con organización, el acceso y la pantalla salen de la organización, no
+    # de la fila del usuario: el aviso de cancelar tiene que mirar la misma.
+    usuario, sid = _suscripto(client, "cde_org", billing_status=de_la_fila[0], dias=de_la_fila[1])
+    leer = lambda: _leer(usuario)  # noqa: E731
+    if de_la_org:
+        estado, dias = de_la_org
+        org_id = _org(usuario, billing_status=estado, plan="premium",
+                      trial_ends_at=datetime.now(timezone.utc) + timedelta(days=dias))
+        _set_user(usuario, organization_id=org_id)
+        leer = lambda: _leer_org(org_id)  # noqa: E731
+    perfil = client.get("/api/billing/me").json()
+    assert perfil.get("cancelar_corta_acceso") is corta, f"el perfil promete otra cosa: {perfil}"
+    r = client.post("/api/billing/cancel")
+    assert r.status_code == 200, r.text
+    assert _con_acceso(leer()) is not corta, f"cancelar dejó otro acceso (corta={corta}): {leer()}"
 
 
 # --- D13 (c): una autorizada vieja no se cancela desde el checkout ---
