@@ -74,9 +74,8 @@ def _normalize(text: str) -> str:
 
 
 def clave_de_producto(descripcion: str) -> str:
-    """Clave del producto en el catálogo. Sin letras latinas ni dígitos (CJK,
-    emoji) la normalización queda vacía: la clave es el texto en NFC sin
-    mayúsculas ni espacios de más, para que cada uno tenga la suya."""
+    """Clave del producto en el catálogo. Lo que normaliza a vacío (CJK, emoji)
+    usa el texto en NFC sin mayúsculas ni espacios de más, para tener la suya."""
     clave = _normalize(descripcion)
     return clave or " ".join(unicodedata.normalize("NFC", descripcion).lower().split())
 

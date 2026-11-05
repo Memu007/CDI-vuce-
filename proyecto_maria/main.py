@@ -1240,9 +1240,8 @@ async def _migrate_widen_pieza_column():
 
 
 async def _migrate_catalogo_sin_tope():
-    """Lleva product_key, descripcion, origen y vendor_nombre del catálogo a text: el tope de la
-    descripción lo pone MAX_DESCRIPCION como 400. Si falla, el arranque se detiene: con el tope
-    viejo, guardar-uso respondería sin guardar."""
+    """Lleva product_key, descripcion, origen y vendor_nombre del catálogo a text. Si falla, el
+    arranque se detiene: con el tope viejo, guardar-uso respondería sin guardar."""
     from proyecto_maria.database.connection import engine, IS_SQLITE
 
     if IS_SQLITE:
