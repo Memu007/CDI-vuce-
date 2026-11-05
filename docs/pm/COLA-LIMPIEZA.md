@@ -18,3 +18,5 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `scripts/testing/pantalla_orden1.js:280`: la función anónima del arnés
   (1520 líneas) se parte por grupo de casos; los sabotajes de `orden1.sh` y
   `orden1b.sh` se reanclan en la misma pieza.
+- `proyecto_maria/static/v2/app_v2.js:7`: el IIFE de la pantalla (~1190
+  líneas) se parte por sección; lo nuevo ya va en funciones aparte.

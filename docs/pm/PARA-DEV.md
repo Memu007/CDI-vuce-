@@ -3,7 +3,39 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Veredicto de ORDEN-1b vuelta 3 (2026-11-05 09:30 UTC): devolución corta, sólo de pruebas
+## Veredicto de COBRO-MP-1 vuelta 4 (2026-11-05 09:55 UTC): devolución corta por una causa. Va primero
+
+Sobre `9161e0a`. Evidencia: `docs/pm/REPRODUCCION-COBRO-MP-1-v4-2026-11-05.md`.
+El dinero se sostiene: cancelar nunca da acceso ni corre la fecha, toda cuenta
+con suscripción abierta sale, `cobro_mp1.sh` 146 ROJO y sin fallas, suite
+`4415 passed`. La devolución de la vuelta 3 queda resuelta.
+
+**Causa (nueva de esta vuelta):** la confirmación de cancelar no mira la misma
+cuenta que la pantalla. `/billing/me` muestra el estado de la organización
+(`billing_entity`), pero `cancelar_corta_acceso(db_user)` (`main.py:3321`)
+mira la fila del usuario. Lo reproduje: organización `past_due` vencida,
+dueño con fila `trial` +10 y suscripción abierta → `corta: False`. La
+pantalla promete «vas a poder seguir usando CDI hasta el fin del período» y
+la cuenta queda sin acceso. En `9048b6a` decía «dejás de usar CDI». Al revés
+también: organización `active` +20 y fila `past_due` vencida → dice que corta
+y la organización sigue 20 días. Lo que pido:
+
+- Que lo que promete la confirmación salga de la misma cuenta cuyo acceso
+  muestra la pantalla.
+- Un caso con la familia como datos: organización y fila del usuario en
+  estados distintos, en las dos direcciones, más una cuenta sin
+  organización. Su rojo en `9161e0a` y su sabotaje en `cobro_mp1.sh`.
+- Quién puede cancelar lo de una organización no se decide acá (D51).
+
+**D51:** (a), pieza aparte, salvo el texto de arriba, que va en esta vuelta.
+La guarda ya era así; el texto no, por eso no queda para después.
+**D52:** (a), confirmado.
+**D53:** (a): ya pasaba en la base, y ahora la respuesta lo dice.
+**D54:** (a), a la cola de limpieza.
+
+**Tu orden:** COBRO-MP-1 vuelta 5 → ORDEN-1b vuelta 4 (arriba) → CSRF-1.
+
+## Veredicto de ORDEN-1b vuelta 3 (2026-11-05 09:30 UTC): devolución corta, sólo de pruebas. Va después de COBRO-MP-1 vuelta 5
 
 Sobre `f22f48b`. Evidencia: `docs/pm/REPRODUCCION-ORDEN-1b-v3-2026-11-05.md`.
 Producto: nada, y sigue así.
@@ -33,36 +65,6 @@ filas no distinguen este sabotaje.
 
 **Sigue en pie de la vuelta 2:** D50 (a), a la cola; H3, riesgo bajo; las
 lecturas GET sin freno quedan fuera de esta pieza.
-
-## Veredicto de COBRO-MP-1 vuelta 3 (2026-11-05 01:45 UTC): devolución por una causa
-
-Sobre `9048b6a`. Evidencia: `docs/pm/REPRODUCCION-COBRO-MP-1-v3-2026-11-05.md`.
-h, i, j y D13 (c) se sostienen: 307 de cobro, Postgres 35 OK, suite completa
-`4407 passed`, y los sabotajes repetidos a mano dan rojo.
-
-**Causa (regresión de esta vuelta):** el 409 de D13 (c) manda a cancelar, pero
-cancelar sólo acepta `trial`/`active`/`past_due`/`canceled`. Con
-`billing_status` `none` (el valor por defecto de la migración), `None` o
-`expired` y una suscripción `authorized`, el checkout da 409, cancelar da 409
-«No se puede cancelar desde el estado actual» y la cuenta no tiene salida. En
-`4ef59f4` el checkout la sacaba. Lo que pido:
-
-- Toda cuenta con una suscripción abierta en Mercado Pago tiene salida, sea
-  cual sea su `billing_status`, y la pantalla le muestra cómo.
-- Un caso con la familia como datos: `none`, `None`, `expired` y un estado
-  desconocido, por checkout → cancelar → checkout; su rojo en `9048b6a` y su
-  sabotaje.
-- La salida de `chequeo-6.py` contra esta vuelta, y una línea por cada `AVISO`
-  de `app_v2.js` y `pantalla_orden1.js`: si es tuyo o vino de un merge.
-
-**D17:** aceptado tal cual. Sólo para que conste: el camino ilegible saltea el
-control cruzado suscripción↔cuenta; es lo mismo que hace el aviso de pago solo.
-
-**D18:** decidido por la PM, (a) hasta conocer D30. Sólo pasa si cambia el
-precio en PLANS con suscripciones vivas, y eso no ocurre antes del piloto. Si
-D30 muestra pagos de suscripción sin el id, va (b′): 503 sólo para un pago con
-referencia, sin `metadata.precio_esperado` y sin suscripción. Es más angosta y
-no necesita una columna nueva. Queda como riesgo en `NOW.md`.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
