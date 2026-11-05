@@ -60,6 +60,7 @@ B=proyecto_maria/services/billing_service.py
 A=proyecto_maria/static/v2/app_v2.js
 F=proyecto_maria/static/v2/screens/finalize.js
 U=proyecto_maria/static/v2/screens/upload.js
+V1=proyecto_maria/static/app.js
 
 # ------------------------------------------------------------- el servidor
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
@@ -190,8 +191,8 @@ sabotaje $M "borrar el cliente borra sus operaciones" \
   $'            operacion.client_id = None\n' $'            await db.delete(operacion)\n            continue\n'
 sabotaje $M "se escribe el archivo antes de contar" \
   "FAILED $T::test_con_el_tope_lleno_se_valida_y_se_baja_lo_ya_contado" \
-  $'        operacion_id, filename = await _contar_maria(\n            db, user["username"], request.operacion_id, txt_content,\n            len(request.items or []), f"MARIA_{safe_id}")\n' \
-  $'        with open(os.path.join(_user_downloads_dir(user["username"]), f"MARIA_{safe_id}.TXT"), \'w\') as f:\n            f.write(txt_content)\n        operacion_id, filename = await _contar_maria(\n            db, user["username"], request.operacion_id, txt_content,\n            len(request.items or []), f"MARIA_{safe_id}")\n'
+  $'        operacion_id, filename = await _contar_maria(\n            db, user["username"], request.operacion_id, txt_content, txt_content,\n            len(request.items or []), f"MARIA_{safe_id}")\n' \
+  $'        with open(os.path.join(_user_downloads_dir(user["username"]), f"MARIA_{safe_id}.TXT"), \'w\') as f:\n            f.write(txt_content)\n        operacion_id, filename = await _contar_maria(\n            db, user["username"], request.operacion_id, txt_content, txt_content,\n            len(request.items or []), f"MARIA_{safe_id}")\n'
 sabotaje $B "la fecha de las recargas sin zona no se toma como UTC" \
   "FAILED $T::test_con_el_tope_lleno_el_extra_paga_la_operacion_nueva" \
   $'    if expires is not None and expires.tzinfo is None:\n        expires = expires.replace(tzinfo=timezone.utc)' \
@@ -241,12 +242,28 @@ sabotaje $M "guardar en otro cliente no mueve la operación" \
   '                setattr(operation, campo, valor)' \
   $'                if campo != "client_id":\n                    setattr(operation, campo, valor)'
 
+sabotaje $M "un id que la base no guarda se busca igual" \
+  "FAILED $T::test_un_id_que_la_base_no_guarda_es_una_operacion_nueva" \
+  '    if not operacion_id or _NO_GUARDABLE_EN_PG.search(operacion_id):' '    if not operacion_id:'
+
 # El conteo vuelve a mirar el estado con la cuenta bloqueada. Toda ruta que
 # cuenta pasa antes por el corte, así que su prueba llama al conteo directo.
 sabotaje $M "el conteo no vence la cuenta" \
   "FAILED $T::test_el_conteo_vence_la_cuenta_que_vencio_despues_del_corte" \
   $'    _vencer_si_corresponde(entidad)\n    ok, reason = billing_service.can_create_operation(entidad)\n    if not ok:\n        detalle' \
   $'    ok, reason = billing_service.can_create_operation(entidad)\n    if not ok:\n        detalle' 
+
+sabotaje $M "se confirma el conteo antes de escribir" \
+  "FAILED $T::test_lo_no_entregado_no_queda_cobrado[importacion_al_escribir]" \
+  $'    try:\n        # newline' $'    await db.commit()\n    try:\n        # newline'
+sabotaje $M "lo escrito a medias queda en las descargas" \
+  "FAILED $T::test_lo_no_entregado_no_queda_cobrado[exportacion_al_escribir]" \
+  $'            os.remove(ruta)' $'            pass'
+sabotaje $M "los supuestos se arman después de contar" \
+  "FAILED $T::test_lo_no_entregado_no_queda_cobrado[importacion_despues_de_contar]" \
+  $'        supuestos = _supuestos_maria(request, items, gastos)\n' '' \
+  $'        return {\n            "success": True,\n            "operacion_id": operacion_id,\n            "filename": filename,' \
+  $'        supuestos = _supuestos_maria(request, items, gastos)\n        return {\n            "success": True,\n            "operacion_id": operacion_id,\n            "filename": filename,'
 
 # ------------------------------------------------------------- la pantalla
 git checkout -q -- proyecto_maria/
@@ -309,10 +326,32 @@ sabotaje $A "el 402 no trae su razón como mensaje" \
   '            const err = new Error(lead);' "            const err = new Error('payment_required');"
 sabotaje $F "generar no manda la operación de la pantalla" \
   "FALLA: regenerar manda la operación que devolvió la primera" \
-  "        body.operacion_id = (CDI.state && CDI.state.operacionId) || '';" "        body.operacion_id = '';"
+  "        body.operacion_id = carga.operacionId || '';" "        body.operacion_id = '';"
 sabotaje $F "guardar no anota la operación que devolvió" \
   "FALLA: guardar antes de generar" \
-  "            CDI.state.operacionId = data.operation_id || '';" ''
+  "                carga.operacionId = data.operation_id || '';" ''
+# Una respuesta tardía se anota en la carga que la pidió, no en la que está en pantalla.
+sabotaje $F "v2: generar anota en la carga de la pantalla" \
+  "FALLA: v2, generar: la respuesta tardía le anotó" \
+  "            carga.operacionId = data.operacion_id || '';" "            CDI.state.operacionId = data.operacion_id || '';"
+sabotaje $F "v2: guardar anota en la carga de la pantalla" \
+  "FALLA: v2, guardar: la respuesta tardía le anotó" \
+  "                carga.operacionId = data.operation_id || '';" "                CDI.state.operacionId = data.operation_id || '';"
+sabotaje $F "v2: generar guarda con la carga de la pantalla" \
+  "FALLA: v2, generar: la respuesta tardía no se guardó en el cliente de su carga" \
+  "            saveOperationToHistory(items, data, carga).catch(" "            saveOperationToHistory(items, data).catch("
+sabotaje $F "v2: el guardado toma el cliente de la pantalla" \
+  "FALLA: v2, generar: la respuesta tardía no se guardó en el cliente de su carga" \
+  "        const cliente = carga.clienteActivo || null;" "        const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;"
+sabotaje $V1 "v1: generar anota en la carga nueva" \
+  "FALLA: v1, generar: la respuesta tardía le anotó" \
+  "        if (carga === cargaActual) operacionIdActual = data.operacion_id || '';" "        operacionIdActual = data.operacion_id || '';"
+sabotaje $V1 "v1: guardar anota en la carga nueva" \
+  "FALLA: v1, guardar: la respuesta tardía le anotó" \
+  "            if (carga === cargaActual) operacionIdActual = id;" "            operacionIdActual = id;"
+sabotaje $V1 "v1: cancelar no empieza otra carga" \
+  "FALLA: v1, generar: la respuesta tardía le anotó" \
+  "function nuevaCarga() { operacionIdActual = ''; cargaActual++; }" "function nuevaCarga() { operacionIdActual = ''; }"
 sabotaje $U "una operación nueva arrastra el id de la anterior" \
   "FALLA: una operación nueva manda un operacion_id vacío" \
   "            operacionId: null, operationSavedFor: null, orphanDismissedFor: null," \
@@ -356,6 +395,13 @@ PYEOF
     "FALLA | tope" \
     $'        .with_for_update()\n        .execution_options(populate_existing=True)\n    )\n    db_user' \
     $'        .with_for_update()\n    )\n    db_user'
+  sabotaje $M "borrar cliente no espera el candado de la cuenta" \
+    "FALLA | borrar cliente" \
+    $'        await _cuenta_bloqueada(db, username)\n        op_rows = await db.execute(' \
+    $'        op_rows = await db.execute('
+  sabotaje $M "Postgres recibe el id que no puede comparar" \
+    "FALLA | id con NUL" \
+    '    if not operacion_id or _NO_GUARDABLE_EN_PG.search(operacion_id):' '    if not operacion_id:'
 fi
 
 git checkout -q -- proyecto_maria/

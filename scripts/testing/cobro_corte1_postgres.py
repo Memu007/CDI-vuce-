@@ -7,7 +7,10 @@ mira el tope, se cuenta y se calcula el op_code:
 2. con lugar, las dos cuentan y tienen op_code distinto;
 3. dos regeneraciones distintas de una operación con nueve: una entra, la otra es
    otra operación y se cuenta;
-4. dos miembros de un estudio con una libre: pasa uno (la cuenta es la org).
+4. dos miembros de un estudio con una libre: pasa uno (la cuenta es la org);
+5. un id de operación con NUL o con un surrogate suelto es una operación nueva,
+   al generar, al exportar y al guardar;
+6. borrar un cliente espera el candado de la cuenta.
 
 Para que la carrera pase de verdad, el primero que calcula su op_code (ya
 contado, sin commit) o lee la operación que regenera espera a ver al otro: o el otro también llegó ahí (no
@@ -23,6 +26,7 @@ import asyncio
 import json
 import os
 import sys
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from urllib.parse import urlparse
@@ -45,9 +49,17 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 import proyecto_maria.main as main_mod  # noqa: E402
 from proyecto_maria.core.rate_limit import limiter  # noqa: E402
+from tests.test_cobro_corte1 import _cliente, _generar, _guardar  # noqa: E402
 from tests.test_maria7_rechazos_24_10 import _pedido  # noqa: E402
 
 limiter.enabled = False
+# Como EXPORT de test_maria1b_devolucion, que no se importa: su conftest cambia la base a SQLite.
+EXPORTACION = dict(
+    operation_id="FAC_PG5EXP", cuit_exportador="20111111112", exportador_nombre="EXPORTADORA DEMO",
+    comprador_nombre="COMPRADOR DEMO", comprador_id="X1",
+    items=[{"ncm": "84798999900H", "descripcion": "MAQUINA DEMO", "cantidad": 1,
+            "valor_unitario": 5000, "peso_kg": 1220}],
+)
 CLAVE = "Clave-Inventada-123"
 FALLAS = []
 
@@ -62,6 +74,15 @@ def sql(consulta, *args):
     with psycopg2.connect(URL) as con, con.cursor() as cur:
         cur.execute(consulta, args)
         return cur.fetchall() if cur.description else None
+
+
+def llega(condicion, segundos=5):
+    fin = time.monotonic() + segundos
+    while time.monotonic() < fin:
+        if condicion():
+            return True
+        time.sleep(0.01)
+    return False
 
 
 def esperando_un_lock():
@@ -212,6 +233,42 @@ with TestClient(main_mod.app) as c:
              f"org {ops_de('organizations', 'id', org)})")
     chequear(ops_de("users", "username", admin) == 0 and ops_de("users", "username", miembro) == 0,
              "estudio: los usuarios no cuentan, cuenta la organización")
+
+    class ConToken:
+        """Los ayudantes de test_cobro_corte1 con el token de una cuenta."""
+        def __init__(self, token):
+            self.h = {"Authorization": f"Bearer {token}"}
+
+        def post(self, url, json):
+            return c.post(url, json=json, headers=self.h)
+
+    # 5. Un id que Postgres no acepta: en las tres rutas es una operación nueva, no un 500.
+    rutas = {
+        "generar": lambda ct, oid: _generar(ct, operacion_id=oid),
+        "exportar": lambda ct, oid: ct.post("/generate_maria_export", json={**EXPORTACION, "operacion_id": oid}),
+        "guardar": lambda ct, oid: _guardar(ct, _cliente(ct), "MARIA_FAC_PG5.TXT", oid),
+    }
+    for ruta, enviar in rutas.items():
+        for nombre, raro in (("NUL", "a\x00b"), ("surrogate", "a\ud800b")):
+            u, t = entrar()
+            r = enviar(ConToken(t), raro)
+            chequear(r.status_code == 200 and ops_de("users", "username", u) == 1 and len(operaciones(u)) == 1,
+                     f"id con {nombre} al {ruta}: una operación nueva y contada ({r.status_code}, "
+                     f"{ops_de('users', 'username', u)}, {len(operaciones(u))} operaciones)")
+
+    # 6. Borrar un cliente reescribe sus operaciones: espera el mismo candado que generar.
+    u, t = entrar()
+    cliente = _cliente(ConToken(t))
+    with psycopg2.connect(URL) as con, con.cursor() as cur:
+        cur.execute("select 1 from users where username = %s for update", (u,))
+        with ThreadPoolExecutor(1) as hilo:
+            borrado = hilo.submit(c.delete, f"/api/clientes/{cliente}", headers={"Authorization": f"Bearer {t}"})
+            espero = llega(lambda: esperando_un_lock() or borrado.done())
+            espero = espero and not borrado.done()
+            con.rollback()
+            r = borrado.result()
+    chequear(espero and r.status_code == 200,
+             f"borrar cliente: espera el candado de la cuenta (esperó {espero}, {r.status_code})")
 
 print(f"fallas: {len(FALLAS)}")
 sys.exit(1 if FALLAS else 0)

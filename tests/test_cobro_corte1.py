@@ -596,7 +596,7 @@ def test_sin_sesion_las_rutas_que_cuentan_dan_401(cuenta):
         "require_billing_vigente": lambda db: main.require_billing_vigente(user=nadie, db=db),
         "require_active_billing": lambda db: main.require_active_billing(None, user=nadie, db=db),
         "_contar_operacion_bloqueada": lambda db: main._contar_operacion_bloqueada(db, nadie["username"]),
-        "_contar_maria": lambda db: main._contar_maria(db, nadie["username"], "", "X", 1, "MARIA_X"),
+        "_contar_maria": lambda db: main._contar_maria(db, nadie["username"], "", "X", "X", 1, "MARIA_X"),
     }
 
     async def _codigo(paso):
@@ -645,6 +645,23 @@ def test_guardar_sin_una_operacion_generada_cuenta_cada_vez(cuenta, operacion_id
         assert r.status_code == 200, r.text
     assert [o["archivo"] for o in _operaciones(u)] == [None, None]
     assert _leer(u)["ops"] == 2
+
+
+IDS_QUE_NO_SE_GUARDAN = {"nul": "a\x00b", "surrogate": "a\ud800b"}
+ENVIAR_ID = {
+    "generar": lambda c, oid: _generar(c, operacion_id=oid),
+    "exportar": lambda c, oid: _exportar(c, operacion_id=oid),
+    "guardar": lambda c, oid: _guardar(c, _cliente(c), "MARIA_FAC_RARO.TXT", oid),
+}
+
+
+@pytest.mark.parametrize("ruta", list(ENVIAR_ID))
+@pytest.mark.parametrize("oid", list(IDS_QUE_NO_SE_GUARDAN))
+def test_un_id_que_la_base_no_guarda_es_una_operacion_nueva(cuenta, ruta, oid):
+    c, u = cuenta()
+    r = ENVIAR_ID[ruta](c, IDS_QUE_NO_SE_GUARDAN[oid])
+    assert r.status_code == 200, r.text
+    assert _leer(u)["ops"] == 1 and len(_operaciones(u)) == 1
 
 
 def test_guardar_con_la_operacion_de_otra_cuenta_no_la_toca(cuenta):
@@ -787,3 +804,43 @@ def test_una_importacion_con_id_export_no_reusa_la_exportacion(cuenta):
     assert r.status_code == 200, r.text
     assert _leer(u)["ops"] == 2, "la importación reusó la operación de la exportación"
     assert len({o["archivo"] for o in _operaciones(u)}) == 2, _operaciones(u)
+
+
+def _escritura_que_falla(ruta, mode="r", *a, **k):
+    """Escribe una parte y se queda sin disco: el archivo queda creado."""
+    f = open(ruta, mode, *a, **k)
+    if "w" in mode:
+        f.write("MARIA a medias")
+        f.close()
+        raise OSError("disco lleno")
+    return f
+
+
+def _supuestos_que_fallan(*a, **k):
+    raise RuntimeError("falla después de contar")
+
+
+# (ruta, nombre en main que falla después de contar, su reemplazo)
+LO_QUE_FALLA = {
+    "importacion_al_escribir": ("importacion", "open", _escritura_que_falla),
+    "importacion_despues_de_contar": ("importacion", "_supuestos_maria", _supuestos_que_fallan),
+    "exportacion_al_escribir": ("exportacion", "open", _escritura_que_falla),
+}
+
+
+@pytest.mark.parametrize("caso", list(LO_QUE_FALLA))
+def test_lo_no_entregado_no_queda_cobrado(cuenta, monkeypatch, caso):
+    ruta, nombre, reemplazo = LO_QUE_FALLA[caso]
+    pedir = _generar if ruta == "importacion" else _exportar
+    c, u = cuenta()
+    with monkeypatch.context() as m:
+        m.setattr(main, nombre, reemplazo, raising=False)
+        r = pedir(c)
+    assert r.status_code == 500, r.text
+    assert _leer(u)["ops"] == 0, "lo que no se entregó quedó contado"
+    assert _operaciones(u) == [] and _archivos(u) == []
+
+    r = pedir(c)
+    assert r.status_code == 200, r.text
+    assert _leer(u)["ops"] == 1 and len(_operaciones(u)) == 1
+    assert _archivos(u) == [r.json()["filename"]]
