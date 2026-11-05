@@ -270,6 +270,13 @@ sabotaje $M "regenerar escribe sobre lo ya entregado" \
 sabotaje $M "un commit fallido deja el archivo nuevo" \
   "FAILED $T::test_regenerar_con_una_falla_deja_entero_lo_ya_entregado[al_confirmar]" \
   '            os.link(ruta, respaldo)' '            pass'
+sabotaje $M "se deshace la base antes de devolver el archivo" \
+  "FAILED $T::test_regenerar_con_una_falla_deja_entero_lo_ya_entregado[al_confirmar_y_deshacer]" \
+  $'        # Los archivos antes que el rollback: si éste también falla, lo entregado ya volvió.\n' $'        await db.rollback()\n' \
+  $'            os.remove(ruta)\n        await db.rollback()\n        raise' $'            os.remove(ruta)\n        raise'
+sabotaje $M "se restaura un anterior que no es de esta regeneración" \
+  "FAILED $T::test_regenerar_con_una_falla_deja_entero_lo_ya_entregado[al_escribir_con_un_anterior_viejo]" \
+  $'        if enlazado:\n            os.replace(respaldo, ruta)' $'        if not nuevo and os.path.exists(respaldo):\n            os.replace(respaldo, ruta)'
 
 # ------------------------------------------------------------- la pantalla
 git checkout -q -- proyecto_maria/
@@ -338,10 +345,10 @@ sabotaje $F "guardar no anota la operación que devolvió" \
   "                carga.operacionId = data.operation_id || '';" ''
 # Una respuesta tardía se anota en la carga que la pidió, no en la que está en pantalla.
 sabotaje $F "v2: generar anota en la carga de la pantalla" \
-  "FALLA: v2, generar: la respuesta tardía le anotó" \
+  "FALLA: v2, generar: la carga nueva quedó con la operación" \
   "            carga.operacionId = data.operacion_id || '';" "            CDI.state.operacionId = data.operacion_id || '';"
 sabotaje $F "v2: guardar anota en la carga de la pantalla" \
-  "FALLA: v2, guardar: la respuesta tardía le anotó" \
+  "FALLA: v2, guardar: la carga nueva quedó con la operación" \
   "                carga.operacionId = data.operation_id || '';" "                CDI.state.operacionId = data.operation_id || '';"
 sabotaje $F "v2: generar guarda con la carga de la pantalla" \
   "FALLA: v2, generar: la respuesta tardía no se guardó en el cliente de su carga" \
@@ -355,11 +362,22 @@ sabotaje $F "v2: la respuesta tardía marca lista la carga nueva" \
 sabotaje $F "v2: el guardado toma el cliente de la pantalla" \
   "FALLA: v2, generar: la respuesta tardía no se guardó en el cliente de su carga" \
   "        const cliente = carga.clienteActivo || null;" "        const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;"
+# La carga nueva que llega a «Listo» mientras la anterior espera genera cuando ésa vuelve, y no hereda su error.
+sabotaje $F "v2: la carga nueva en «Listo» no genera" \
+  "FALLA: v2, la carga nueva en «Listo» y la anterior vuelve bien: no terminó" \
+  "        if (generateInFlight) { pedidaMientrasOtra = true; return; }" "        if (generateInFlight) return;"
+sabotaje $F "v2: el error de la anterior cambia de paso a la carga nueva" \
+  "FALLA: v2, la carga nueva en «Listo» y la anterior vuelve con un error" \
+  $'            if (fallo && carga !== CDI.state) return;\n' ''
+sabotaje $F "v2: la anterior sin red le muestra el error a la carga nueva" \
+  "FALLA: v2, la carga nueva en «Listo» y la anterior se queda sin red: la carga nueva muestra el error" \
+  "            if (carga === CDI.state) showReadyError(String(err && err.message || err));" \
+  "            showReadyError(String(err && err.message || err));"
 sabotaje $V1 "v1: generar anota en la carga nueva" \
-  "FALLA: v1, generar: la respuesta tardía le anotó" \
+  "FALLA: v1, generar: la carga nueva quedó con la operación" \
   "        anotarOperacion(carga, data.operacion_id || '');" "        operacionIdActual = data.operacion_id || '';"
 sabotaje $V1 "v1: guardar anota en la carga nueva" \
-  "FALLA: v1, guardar: la respuesta tardía le anotó" \
+  "FALLA: v1, guardar: la carga nueva quedó con la operación" \
   "        if (res.ok) anotarOperacion(carga, (await res.json()).operation_id || operacionId);" \
   "        if (res.ok) operacionIdActual = (await res.json()).operation_id || operacionId;"
 sabotaje $V1 "v1: el guardado toma el cliente del selector al responder" \
@@ -367,7 +385,7 @@ sabotaje $V1 "v1: el guardado toma el cliente del selector al responder" \
   "    if (!carga.cliente) {" "    if (!clientSelect.value) {" \
   '/api/clientes/${carga.cliente}/operaciones' '/api/clientes/${clientSelect.value}/operaciones'
 sabotaje $V1 "v1: cancelar no empieza otra carga" \
-  "FALLA: v1, generar: la respuesta tardía le anotó" \
+  "FALLA: v1, generar: la carga nueva quedó con la operación" \
   "function nuevaCarga() { operacionIdActual = ''; cargaActual++; }" "function nuevaCarga() { operacionIdActual = ''; }"
 sabotaje $U "una operación nueva arrastra el id de la anterior" \
   "FALLA: una operación nueva manda un operacion_id vacío" \
@@ -414,12 +432,12 @@ PYEOF
     $'        .with_for_update()\n    )\n    db_user'
   sabotaje $M "borrar cliente no espera el candado de la cuenta" \
     "FALLA | borrar cliente" \
-    $'        await _cuenta_bloqueada(db, username)\n        # Después del candado' \
-    $'        # Después del candado'
+    $'        client = await _cliente_con_cuenta_bloqueada(db, client_id, username)\n        op_rows' \
+    $'        client = await _get_owned_client(db, client_id, username)\n        op_rows'
   sabotaje $M "el guardado mira el cliente antes del candado" \
     "FALLA | guardar en un cliente que se borró" \
-    $'        await _cuenta_bloqueada(db, username)\n        client = await _get_owned_client(db, client_id, username)' \
-    $'        client = await _get_owned_client(db, client_id, username)\n        await _cuenta_bloqueada(db, username)'
+    $'        client = await _cliente_con_cuenta_bloqueada(db, client_id, username)\n        operation' \
+    $'        client = await _get_owned_client(db, client_id, username)\n        await _cuenta_bloqueada(db, username)\n        operation'
   sabotaje $M "Postgres recibe el id que no puede comparar" \
     "FALLA | id con NUL" \
     '    if not operacion_id or _NO_GUARDABLE_EN_PG.search(operacion_id):' '    if not operacion_id:'
