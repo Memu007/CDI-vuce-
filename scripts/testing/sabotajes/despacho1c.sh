@@ -106,8 +106,8 @@ sabotaje $F "aprender el catálogo no avisa un 400" \
   '            if (false && CDI.toast) {' \
   "FAILED $T::$X[aprender-400]"
 sabotaje $F "guardar y aprender a la vez: el aviso del catálogo tapa el error" \
-  '            }).then(() => saveOperationToHistory(items, data)).catch(err => {' \
-  '            }); saveOperationToHistory(items, data).catch(err => {' \
+  '            }).then(() => saveOperationToHistory(items, data, operacion)).catch(err => {' \
+  '            }); saveOperationToHistory(items, data, operacion).catch(err => {' \
   "FAILED $T::$X[listo-con-vendedor-500]"
 sabotaje $F "reintentar después de crear el cliente lo crea otra vez" \
   '            if (clienteCreadoAca && activo.id === clienteCreadoAca) {' \
@@ -117,6 +117,10 @@ sabotaje $N "confirmar la posición no avisa un 400" \
   '            if ((!res.ok || data.historial_guardado === false) && CDI.toast) {' \
   '            if ((res.ok && data.historial_guardado === false) && CDI.toast) {' \
   "FAILED $T::$X[confirmar-ncm-400]"
+sabotaje $F "la operación se arma recién al guardarla" \
+  '            }).then(() => saveOperationToHistory(items, data, operacion)).catch(err => {' \
+  '            }).then(() => saveOperationToHistory(items, data)).catch(err => {' \
+  "FAILED $T::test_se_guarda_la_operacion_que_se_genero[otro-cliente]"
 
 git checkout -q -- proyecto_maria/
 echo "fallas: $FALLAS"
