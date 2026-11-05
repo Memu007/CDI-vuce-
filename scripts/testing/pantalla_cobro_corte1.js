@@ -14,6 +14,98 @@ const LONA = { pieza: '39211390900F', descripcion: 'Lona de PVC gris', origen: '
 const CARGADA = '2026-10-28T05:00:00.123Z';
 const ID = 'OP_20261028050000123';
 
+const VIEJA = 'la-operacion-de-la-carga-anterior';
+const BIEN = { success: true, operacion_id: VIEJA, operation_id: VIEJA, filename: 'MARIA_TARDE.TXT', content: 'X', warnings: [], supuestos: [] };
+
+// Cada caso pide algo, empieza otra carga mientras la respuesta está retenida y la suelta.
+function casosTardios({ page, v1, clienteId, cargar, pedirTxt }) {
+  async function cargaNuevaV2() {
+    await page.evaluate(() => CDI.goTo('upload'));
+    await page.click('#uploadManualBtn');
+    await cargar(null);
+  }
+  async function armarV1() {
+    await v1.evaluate(id => {
+      document.getElementById('groupingSection').classList.remove('hidden');
+      document.getElementById('clientSelectorGrouping').value = id;
+      window.currentItems = [{ pieza: '39219019900Z', codigo_parte: 'L1', descripcion: 'Lona de PVC gris',
+                               cantidad: 750, valor_unitario: 1.85, peso_unitario: 0.62, origen: 'CN' }];
+      displayItemsForGrouping(window.currentItems, { '3921': window.currentItems });
+      document.getElementById('op_numero_factura').value = 'FAC_TARDE';
+    }, clienteId);
+  }
+  const v1Comun = { p: v1,
+    pedir: async () => { await armarV1(); v1.generada = v1.evaluate(() => generateMariaTxt()); },
+    otraCarga: () => v1.evaluate(() => cancelGrouping()),
+    terminada: () => v1.generada,
+    anotada: () => v1.evaluate(() => operacionIdActual) };
+  return [
+    { que: 'v2, generar', p: page, retenida: '**/generate_maria',
+      pedir: async () => { await cargaNuevaV2();
+        await page.evaluate(id => CDI.setClienteActivo({ id, nombre: 'Cliente de prueba' }), clienteId);
+        await pedirTxt(); },
+      // La carga nueva sin cliente: la respuesta tardía se guarda igual en el de la suya.
+      otraCarga: async () => { await cargaNuevaV2(); await page.evaluate(() => CDI.setClienteActivo(null)); },
+      guardado: () => page.waitForRequest(r => r.method() === 'POST' &&
+        r.url().endsWith('/api/clientes/' + clienteId + '/operaciones'), { timeout: 15000 }),
+      terminada: () => page.waitForFunction(() => !document.getElementById('readyDone').hidden, null, { timeout: 15000 }),
+      anotada: () => page.evaluate(() => CDI.state.operacionId) },
+    { que: 'v2, guardar', p: page, retenida: '**/api/clientes/*/operaciones',
+      pedir: async () => { await cargaNuevaV2();
+        await page.evaluate(id => {
+          CDI.setClienteActivo({ id, nombre: 'Cliente de prueba' });
+          window.guardado = CDI.saveOperationToHistory(CDI.state.items, { filename: 'MARIA_TARDE.TXT' });
+        }, clienteId); },
+      otraCarga: cargaNuevaV2,
+      terminada: () => page.evaluate(() => window.guardado),
+      anotada: () => page.evaluate(() => CDI.state.operacionId) },
+    { que: 'v1, generar', retenida: '**/generate_maria', ...v1Comun },
+    { que: 'v1, guardar', retenida: '**/api/clientes/*/operaciones', inmediata: '**/generate_maria', ...v1Comun },
+  ];
+}
+
+// Una respuesta que llega cuando ya empezó otra carga no le anota su operación a ésa.
+async function respuestaTardia({ ctx, page, base, token, clienteId, cargar, pedirTxt }) {
+  const v1 = await ctx.newPage();
+  // La v1 manda a la portada si no encuentra el token en localStorage.
+  await v1.addInitScript(t => localStorage.setItem('access_token', t), token);
+  v1.on('dialog', d => d.accept());
+  await v1.goto(base + '/dashboard?v=1');
+  await v1.waitForFunction(id => typeof generateMariaTxt === 'function' &&
+    [...document.querySelectorAll('#clientSelectorGrouping option')].some(o => o.value === id), clienteId, { timeout: 15000 })
+    .catch(() => falla('la v1 no muestra el cliente en el selector'));
+  const responder = route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(BIEN) });
+  const aTiempo = (p, que) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error(que)), 15000))]);
+  for (const c of casosTardios({ page, v1, clienteId, cargar, pedirTxt })) {
+    let soltar, pedida;
+    const suelta = new Promise(r => { soltar = r; });
+    const llego = new Promise(r => { pedida = r; });
+    await c.p.route(c.retenida, async route => {
+      if (route.request().method() !== 'POST') return route.continue();
+      pedida();
+      await suelta;
+      responder(route);
+    });
+    if (c.inmediata) await c.p.route(c.inmediata, responder);
+    await c.pedir();
+    await aTiempo(llego, c.que + ': el pedido no salió').catch(e => falla(e.message));
+    await c.otraCarga();
+    const guardado = c.guardado && c.guardado().catch(() => null);
+    soltar();
+    await aTiempo(c.terminada(), c.que + ': no terminó').catch(e => falla(e.message));
+    if (guardado) {
+      const r = await guardado;
+      const mandada = r && (r.postDataJSON() || {}).operacion_id;
+      if (mandada !== VIEJA) falla(c.que + ': la respuesta tardía no se guardó en el cliente de su carga con su operación (mandó «' + mandada + '»)');
+    }
+    const anotada = await c.anotada();
+    if (anotada) falla(c.que + ': la respuesta tardía le anotó a la carga nueva la operación «' + anotada + '»');
+    await c.p.unroute(c.retenida);
+    if (c.inmediata) await c.p.unroute(c.inmediata);
+    console.log('OK | ' + c.que + ': la respuesta tardía no toca la carga nueva');
+  }
+}
+
 (async () => {
   const b = await chromium.launch();
   const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
@@ -148,95 +240,7 @@ const ID = 'OP_20261028050000123';
   if (await usadas() - antes !== 1) falla(que + ': guardar y generar contaron ' + (await usadas() - antes));
   console.log('OK | ' + que + ': generar completa la guardada y cuenta 1');
 
-  // 5. Una respuesta que llega cuando ya empezó otra carga no le anota su operación a ésa.
-  await respuestaTardia();
-  async function respuestaTardia() {
-    const v1 = await ctx.newPage();
-    // La v1 manda a la portada si no encuentra el token en localStorage.
-    await v1.addInitScript(t => localStorage.setItem('access_token', t), (await reg.json()).access_token);
-    v1.on('dialog', d => d.accept());
-    await v1.goto(base + '/dashboard?v=1');
-    await v1.waitForFunction(id => typeof generateMariaTxt === 'function' &&
-      [...document.querySelectorAll('#clientSelectorGrouping option')].some(o => o.value === id), guardada.clienteId, { timeout: 15000 })
-      .catch(() => falla('la v1 no muestra el cliente en el selector'));
-    const VIEJA = 'la-operacion-de-la-carga-anterior';
-    const bien = { success: true, operacion_id: VIEJA, operation_id: VIEJA, filename: 'MARIA_TARDE.TXT', content: 'X', warnings: [], supuestos: [] };
-    async function cargaNuevaV2() {
-      await page.evaluate(() => CDI.goTo('upload'));
-      await page.click('#uploadManualBtn');
-      await cargar(null);
-    }
-    async function armarV1() {
-      await v1.evaluate(id => {
-        document.getElementById('groupingSection').classList.remove('hidden');
-        document.getElementById('clientSelectorGrouping').value = id;
-        window.currentItems = [{ pieza: '39219019900Z', codigo_parte: 'L1', descripcion: 'Lona de PVC gris',
-                                 cantidad: 750, valor_unitario: 1.85, peso_unitario: 0.62, origen: 'CN' }];
-        displayItemsForGrouping(window.currentItems, { '3921': window.currentItems });
-        document.getElementById('op_numero_factura').value = 'FAC_TARDE';
-      }, guardada.clienteId);
-    }
-    const RESPUESTA_TARDIA = [
-      { que: 'v2, generar', p: page, retenida: '**/generate_maria',
-        pedir: async () => { await cargaNuevaV2();
-          await page.evaluate(id => CDI.setClienteActivo({ id, nombre: 'Cliente de prueba' }), guardada.clienteId);
-          await pedirTxt(); },
-        // La carga nueva sin cliente: la respuesta tardía se guarda igual en el de la suya.
-        otraCarga: async () => { await cargaNuevaV2(); await page.evaluate(() => CDI.setClienteActivo(null)); },
-        guardado: () => page.waitForRequest(r => r.method() === 'POST' &&
-          r.url().endsWith('/api/clientes/' + guardada.clienteId + '/operaciones'), { timeout: 15000 }),
-        terminada: () => page.waitForFunction(() => !document.getElementById('readyDone').hidden, null, { timeout: 15000 }),
-        anotada: () => page.evaluate(() => CDI.state.operacionId) },
-      { que: 'v2, guardar', p: page, retenida: '**/api/clientes/*/operaciones',
-        pedir: async () => { await cargaNuevaV2();
-          await page.evaluate(id => {
-            CDI.setClienteActivo({ id, nombre: 'Cliente de prueba' });
-            window.guardado = CDI.saveOperationToHistory(CDI.state.items, { filename: 'MARIA_TARDE.TXT' });
-          }, guardada.clienteId); },
-        otraCarga: cargaNuevaV2,
-        terminada: () => page.evaluate(() => window.guardado),
-        anotada: () => page.evaluate(() => CDI.state.operacionId) },
-      { que: 'v1, generar', p: v1, retenida: '**/generate_maria',
-        pedir: async () => { await armarV1(); v1.generada = v1.evaluate(() => generateMariaTxt()); },
-        otraCarga: () => v1.evaluate(() => cancelGrouping()),
-        terminada: () => v1.generada,
-        anotada: () => v1.evaluate(() => operacionIdActual) },
-      { que: 'v1, guardar', p: v1, retenida: '**/api/clientes/*/operaciones', inmediata: '**/generate_maria',
-        pedir: async () => { await armarV1(); v1.generada = v1.evaluate(() => generateMariaTxt()); },
-        otraCarga: () => v1.evaluate(() => cancelGrouping()),
-        terminada: () => v1.generada,
-        anotada: () => v1.evaluate(() => operacionIdActual) },
-    ];
-    for (const c of RESPUESTA_TARDIA) {
-      let soltar, pedida;
-      const suelta = new Promise(r => { soltar = r; });
-      const llego = new Promise(r => { pedida = r; });
-      await c.p.route(c.retenida, async route => {
-        if (route.request().method() !== 'POST') return route.continue();
-        pedida();
-        await suelta;
-        route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(bien) });
-      });
-      if (c.inmediata) await c.p.route(c.inmediata, route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(bien) }));
-      const aTiempo = (p, que) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error(que)), 15000))]);
-      await c.pedir();
-      await aTiempo(llego, c.que + ': el pedido no salió').catch(e => falla(e.message));
-      await c.otraCarga();
-      const guardado = c.guardado && c.guardado().catch(() => null);
-      soltar();
-      await aTiempo(c.terminada(), c.que + ': no terminó').catch(e => falla(e.message));
-      if (guardado) {
-        const r = await guardado;
-        const mandada = r && (r.postDataJSON() || {}).operacion_id;
-        if (mandada !== VIEJA) falla(c.que + ': la respuesta tardía no se guardó en el cliente de su carga con su operación (mandó «' + mandada + '»)');
-      }
-      const anotada = await c.anotada();
-      if (anotada) falla(c.que + ': la respuesta tardía le anotó a la carga nueva la operación «' + anotada + '»');
-      await c.p.unroute(c.retenida);
-      if (c.inmediata) await c.p.unroute(c.inmediata);
-      console.log('OK | ' + c.que + ': la respuesta tardía no toca la carga nueva');
-    }
-  }
+  await respuestaTardia({ ctx, page, base, token: (await reg.json()).access_token, clienteId: guardada.clienteId, cargar, pedirTxt });
 
   await b.close();
   console.log('pantalla COBRO-CORTE-1: OK');
