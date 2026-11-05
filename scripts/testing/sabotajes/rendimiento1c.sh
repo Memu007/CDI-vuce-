@@ -110,7 +110,7 @@ sabotaje $DL "validar no corre bajo el tope de CPU" \
             pdf = PdfReader' \
   'FAILED tests/test_rendimiento1c.py::test_validar_tiene_tope_de_cpu'
 sabotaje $DL "el proceso aparte no le pasa el tope a validar" \
-  'validar_pdf(data, limite_cpu_s)' 'validar_pdf(data)' \
+  '_MODOS[modo][0](data, limite_cpu_s)' '_MODOS[modo][0](data)' \
   'FAILED tests/test_rendimiento1c.py::test_validar_tiene_tope_de_cpu'
 sabotaje $DL "pasar el tope de CPU no sale como demasiado pesado" \
   'except (MemoryError, _DemasiadoTrabajo):' 'except MemoryError:' \
