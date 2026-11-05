@@ -21,6 +21,8 @@
     let lastMaria = null;         // { filename, download_url, content }
     let validatingInFlight = false;
     let generateInFlight = false;
+    // Una carga nueva que llega a «Listo» mientras otra espera su respuesta genera cuando ésa vuelve.
+    let pedidaMientrasOtra = false;
 
     function $(id) { return document.getElementById(id); }
     function show(el) { if (el) el.hidden = false; }
@@ -650,7 +652,7 @@
     }
 
     async function generateMaria() {
-        if (generateInFlight) return;
+        if (generateInFlight) { pedidaMientrasOtra = true; return; }
         generateInFlight = true;
         if (CDI.estudios) await CDI.estudios.listo();
 
@@ -675,7 +677,10 @@
             });
             const data = await res.json();
             const dur = Date.now() - startedAt;
-            if (!res.ok || !data || data.success === false) {
+            const fallo = !res.ok || !data || data.success === false;
+            // El error de una carga que ya no está en pantalla no la cambia de paso.
+            if (fallo && carga !== CDI.state) return;
+            if (fallo) {
                 const detail = (data && (data.detail || data.message)) || res.statusText;
                 // El error de un subítem (su sufijo incluido) va bajo ese
                 // subítem, en el paso de NCM (SUBITEMS-1, MARIA-9).
@@ -725,9 +730,12 @@
         } catch (err) {
             console.error('[ready] generate error', err);
             CDI.track('maria_generate_error', { message: String(err && err.message || err) });
-            showReadyError(String(err && err.message || err));
+            if (carga === CDI.state) showReadyError(String(err && err.message || err));
         } finally {
             generateInFlight = false;
+            const otra = pedidaMientrasOtra && carga !== CDI.state;
+            pedidaMientrasOtra = false;
+            if (otra) generateMaria();
         }
     }
 
@@ -1367,6 +1375,8 @@
             lastMaria = null;
             lastValidation = null;
             lastValidationTs = 0;
+            // Fuera de «Listo», la carga que esperaba no genera sola.
+            pedidaMientrasOtra = false;
         }
     });
 
