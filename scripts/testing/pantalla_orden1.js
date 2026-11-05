@@ -1797,7 +1797,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
 
   // (z34) Al volver del pago, la pestaña de A vuelve a leer el usuario; si
   // entró B, no toma sus datos.
-  if (corre('z34')) {
+  async function vueltaConOtroAdentro() {
     const que = 'A volvió del pago con B adentro';
     const { ctx, otro, t } = await vueltaDelPago('ord1z34', 'success', false, que);
     await noTomoDatos(t, otro, que);
@@ -1807,7 +1807,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
 
   // (z35) La relectura de la vuelta del pago contesta A, pero B entró antes
   // de que la pestaña la leyera: esa respuesta no autoriza escribir.
-  if (corre('z35')) {
+  async function respuestaDeAConOtroAdentro() {
     for (const billing of ['success', 'topup_success']) {
       const que = 'la relectura de la vuelta del pago (' + billing + ') contestó A, entró B antes de leerla y la pestaña guardó un cliente';
       const { ctx, a, otro, t } = await vueltaDelPago('ord1z35', billing, true, que);
@@ -1819,6 +1819,9 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
       await ctx.close();
     }
   }
+
+  if (corre('z34')) await vueltaConOtroAdentro();
+  if (corre('z35')) await respuestaDeAConOtroAdentro();
 
   await b.close();
   console.log('OK: ORDEN-1 en el navegador');
