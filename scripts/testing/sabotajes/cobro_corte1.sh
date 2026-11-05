@@ -345,10 +345,11 @@ sabotaje $F "v2: el guardado toma el cliente de la pantalla" \
   "        const cliente = carga.clienteActivo || null;" "        const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;"
 sabotaje $V1 "v1: generar anota en la carga nueva" \
   "FALLA: v1, generar: la respuesta tardía le anotó" \
-  "        if (carga === cargaActual) operacionIdActual = data.operacion_id || '';" "        operacionIdActual = data.operacion_id || '';"
+  "        anotarOperacion(carga, data.operacion_id || '');" "        operacionIdActual = data.operacion_id || '';"
 sabotaje $V1 "v1: guardar anota en la carga nueva" \
   "FALLA: v1, guardar: la respuesta tardía le anotó" \
-  "            if (carga === cargaActual) operacionIdActual = id;" "            operacionIdActual = id;"
+  "        if (res.ok) anotarOperacion(carga, (await res.json()).operation_id || operacionId);" \
+  "        if (res.ok) operacionIdActual = (await res.json()).operation_id || operacionId;"
 sabotaje $V1 "v1: cancelar no empieza otra carga" \
   "FALLA: v1, generar: la respuesta tardía le anotó" \
   "function nuevaCarga() { operacionIdActual = ''; cargaActual++; }" "function nuevaCarga() { operacionIdActual = ''; }"
