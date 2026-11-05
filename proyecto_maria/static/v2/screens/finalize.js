@@ -752,9 +752,10 @@
             renderReady();
             // Best-effort, en orden: toast reemplaza al anterior, y el aviso de la
             // operación (que puede ser un error) es lo que tiene que quedar a la vista.
+            const operacion = armarOperacion(items, data);
             saveCatalogLearn(items).catch(err => {
                 console.warn('[catalog] no se pudo aprender', err);
-            }).then(() => saveOperationToHistory(items, data)).catch(err => {
+            }).then(() => saveOperationToHistory(items, data, operacion)).catch(err => {
                 console.warn('[history] no se pudo guardar operacion', err);
             });
         } catch (err) {
@@ -1192,19 +1193,10 @@
         CDI.track && CDI.track('op_orphan_resolved', { via: via });
     }
 
-    async function saveOperationToHistory(items, mariaData) {
+    // Lee el cliente y la operación en el momento: quien guarda más tarde la arma antes.
+    function armarOperacion(items, mariaData) {
         const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
-        if (!cliente || !cliente.id) {
-            console.warn('[history] no hay cliente activo, no se guarda al historial');
-            return { ok: false, reason: 'sin_cliente' };
-        }
         const opCode = (mariaData && mariaData.filename) || null;
-        // Idempotencia: si ya guardamos esta misma operación para este mismo
-        // cliente, no la re-posteamos (cubre re-entry a Listo, F5 suave, etc.).
-        const savedFor = (CDI.state && CDI.state.operationSavedFor) || null;
-        if (savedFor && savedFor.cliente_id === cliente.id && savedFor.op_code === opCode) {
-            return { ok: true, reason: 'ya_guardada' };
-        }
         const stats = (lastValidation && lastValidation.estadisticas) || {};
         const op = (CDI.state && CDI.state.operacion) || {};
         const total_valor = Number(stats.total_valor_usd || 0);
@@ -1241,6 +1233,21 @@
                 unidad: it.unidad || null
             }))
         };
+        return { cliente, opCode, body };
+    }
+
+    async function saveOperationToHistory(items, mariaData, armada = armarOperacion(items, mariaData)) {
+        const { cliente, opCode, body } = armada;
+        if (!cliente || !cliente.id) {
+            console.warn('[history] no hay cliente activo, no se guarda al historial');
+            return { ok: false, reason: 'sin_cliente' };
+        }
+        // Idempotencia: si ya guardamos esta misma operación para este mismo
+        // cliente, no la re-posteamos (cubre re-entry a Listo, F5 suave, etc.).
+        const savedFor = (CDI.state && CDI.state.operationSavedFor) || null;
+        if (savedFor && savedFor.cliente_id === cliente.id && savedFor.op_code === opCode) {
+            return { ok: true, reason: 'ya_guardada' };
+        }
         try {
             const res = await CDI.api(
                 '/api/clientes/' + encodeURIComponent(cliente.id) + '/operaciones',
