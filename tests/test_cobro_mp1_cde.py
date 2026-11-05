@@ -244,6 +244,7 @@ def test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando(c
     despues = _leer(usuario)
     assert _con_acceso(despues) is not corta, f"el perfil dijo corta={corta}: {despues}"
     assert tenia_acceso or not _con_acceso(despues), f"cancelar da acceso: {despues}"
+    assert (r.json()["service_until"] is None) is corta, f"servicio hasta: {r.json()}"
     r = client.post("/api/billing/checkout", json={"plan": "premium"})
     assert r.status_code == 200, r.text
     assert [t for t, _ in CREADAS] == ["preapproval"]

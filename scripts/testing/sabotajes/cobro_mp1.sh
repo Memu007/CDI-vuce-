@@ -501,9 +501,13 @@ sabotaje $M "C: cancelar desde past_due deja los días que quedaban" \
   '        pass' \
   "cancelar desde past_due da acceso"
 sabotaje $M "C: sólo past_due pierde los días al cancelar" \
-  '    if not billing_service.tiene_acceso(db_user, ahora) and billing_service.vigente(db_user.trial_ends_at, ahora):' \
-  '    if db_user.billing_status == "past_due" and billing_service.vigente(db_user.trial_ends_at, ahora):' \
+  '    corta = billing_service.cancelar_corta_acceso(db_user, ahora)' \
+  '    corta = db_user.billing_status == "past_due"' \
   "cancelar da acceso"
+sabotaje $M "C: cancelar promete servicio hasta una fecha sin acceso" \
+  '    hasta = None if corta else db_user.trial_ends_at' \
+  '    hasta = db_user.trial_ends_at' \
+  "FAILED tests/test_cobro_mp1_cde.py::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[renovacion_tardia]"
 sabotaje $M "E: decide payment_provider aunque haya pagos registrados" \
   $'    if not tipos:\n        return db_user.payment_provider == "mercadopago"\n' \
   $'    return db_user.payment_provider == "mercadopago"\n' \
