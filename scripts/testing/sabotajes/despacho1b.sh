@@ -57,6 +57,9 @@ juzgar() {
 # no_debe <nombre> <salida> <lo que el rojo no tiene que decir>...
 no_debe() {
   local nombre="$1" salida="$2"; shift 2
+  if [ -z "$salida" ]; then
+    echo "VACÍO | $nombre: no hay salida que mirar"; FALLAS=$((FALLAS+1)); return
+  fi
   for prohibido in "$@"; do
     if grep -qF -- "$prohibido" <<<"$salida"; then
       echo "ANCHO | $nombre: también «$prohibido»"; FALLAS=$((FALLAS+1))
@@ -67,6 +70,7 @@ no_debe() {
 # sabotaje <nombre> <archivo> <texto original> <texto saboteado> <casos en rojo>...
 sabotaje() {
   local nombre="$1" archivo="$2" viejo="$3" nuevo="$4" salida codigo; shift 4
+  ULTIMA=""
   git checkout -q -- proyecto_maria/
   if ! aplicar "$archivo" "$viejo" "$nuevo"; then
     echo "ROTO  | $nombre: el sabotaje no encontró su patrón"; FALLAS=$((FALLAS+1)); return
@@ -833,6 +837,7 @@ sabotaje "confirmar un NCM no avisa que no era un producto" proyecto_maria/main.
 MEMORIA=proyecto_maria/services/client_memory.py
 sabotaje_pg() {
   local nombre="$1" viejo="$2" nuevo="$3" salida codigo; shift 3
+  ULTIMA=""
   if [ -z "${PG_DSN:-}" ]; then
     echo "NO CORRIDO | $nombre: falta PG_DSN"; NO_CORRIDOS=$((NO_CORRIDOS+1)); return
   fi
@@ -866,8 +871,13 @@ sabotaje_pg "el upsert que no pudo guardar se calla" \
   '        raise RuntimeError("el producto cambió en cada intento de guardarlo")' \
   '        return None' \
   "guardar, el producto no queda en 3 intentos"
-[ -n "${PG_DSN:-}" ] && no_debe "el upsert que no pudo guardar se calla" "$ULTIMA" \
-  "FALLA | operacion, el producto" "FALLA | aprender, el producto" "FALLA | guardar-uso, el producto"
+# Las otras vías siguen avisando: su chequeo tiene que estar y en OK.
+if [ -n "${PG_DSN:-}" ]; then
+  for via in operacion aprender guardar-uso; do
+    grep -qF -- "OK    | $via, el producto no queda en 3 intentos" <<<"$ULTIMA" \
+      || { echo "ANCHO | el upsert que no pudo guardar se calla: $via no quedó en OK"; FALLAS=$((FALLAS+1)); }
+  done
+fi
 echo "sin Postgres, no corridos: $NO_CORRIDOS"
 
 echo "sabotajes sin rojo: $FALLAS"
