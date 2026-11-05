@@ -394,7 +394,7 @@
                 duenoPestana = user.username || '';
                 if (sesionAntes !== sesionAlAbrir || getCsrfToken() !== sesionAlAbrir) marcarAjena();
             }
-            if (!confirmarSesion(user.username || '', sesionAntes)) return !!currentUser;
+            if (!confirmarSesion(user.username, sesionAntes)) return !!currentUser;
             currentUser = user;
             CDI.currentUser = user;
             // Banner de billing (trial / past_due / activar plan).
@@ -997,7 +997,7 @@
     // antes del pedido; si cambió mientras tanto, no se sabe de quién es).
     function confirmarSesion(username, sesion) {
         if (sesionAjena || getCsrfToken() !== sesion) return false;
-        if (username !== duenoPestana) {
+        if ((username || '') !== duenoPestana) {
             marcarAjena();
             return false;
         }
