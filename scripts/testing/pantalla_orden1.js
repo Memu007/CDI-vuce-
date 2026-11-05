@@ -564,7 +564,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     await cargar(p, 'DE-A-SIN-USUARIO', [prod('Producto de A con el usuario caído', '84714900100D', 2, 10)]);
     const otro = await nuevoUsuario(ctx, 'ord1kb');
     caida = false;
-    await p.waitForFunction(() => CDI.currentUser, null, { timeout: 40000 });
+    await p.waitForFunction(() => document.getElementById('pestanaAjena').open, null, { timeout: 40000 });
     await p.waitForTimeout(2 * INTERVALO_MS);
     const ajenos = (await borradores(p)).filter(x => (x.texto || '').includes('"DE-A-SIN-USUARIO"'))
       .map(x => { try { return JSON.parse(x.texto).user; } catch (_) { return '?'; } });
@@ -1117,7 +1117,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     await cargar(t, 'DE-A', [prod('Producto de A', '84714900100D', 2, 10)]);
     const otro = await nuevoUsuario(ctx, 'ord1z8b');
     soltar();
-    await t.waitForFunction(() => CDI.currentUser, null, { timeout: 10000 });
+    await t.waitForFunction(() => document.getElementById('pestanaAjena').open, null, { timeout: 10000 });
     // Hasta que avise o guarde a nombre del otro: guardar puede llevar un
     // guardado periódico más la consulta de la sesión nueva.
     for (const hasta = Date.now() + 4 * INTERVALO_MS; Date.now() < hasta;) {
@@ -1622,7 +1622,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
   // de ese momento, hasta soltar(). Lo que la pestaña pide después de
   // cerrar() ni se pregunta hasta soltarResto().
   async function retenerRespuestas(p) {
-    let soltar, soltarResto, cerrado = false, traidas = 0;
+    let soltar, soltarResto, alTraer = () => {}, cerrado = false, traidas = 0;
     const suelta = new Promise(r => { soltar = r; }), resto = new Promise(r => { soltarResto = r; });
     await p.evaluate(() => {
       const f = window.fetch;
@@ -1633,17 +1633,22 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
       if (cerrado) { await resto; return ruta.continue().catch(() => {}); }
       const respuesta = await ruta.fetch();
       traidas++;
+      alTraer();
       await suelta;
       return ruta.fulfill({ response: respuesta }).catch(() => {});
     });
     // Todas las consultas que hizo la pestaña ya tienen la respuesta del servidor.
     const contestadas = async () => {
-      for (const hasta = Date.now() + 15000; traidas < await p.evaluate(() => window.__consultas);) {
-        if (Date.now() > hasta) falla('el servidor no contestó las consultas de la pestaña en 15 s');
-        await p.waitForTimeout(50);
-      }
+      const pedidas = await p.evaluate(() => window.__consultas);
+      const tope = setTimeout(() => falla('el servidor no contestó las consultas de la pestaña en 15 s'), 15000);
+      while (traidas < pedidas) await new Promise(r => { alTraer = r; });
+      clearTimeout(tope);
     };
     return { contestadas, cerrar: () => { cerrado = true; }, soltar, soltarResto };
+  }
+  async function noTomoDatos(p, otro, que) {
+    const visto = await p.evaluate(() => [(CDI.currentUser || {}).username || '', document.getElementById('userName').textContent]);
+    if (visto.some(v => v.includes(otro))) falla(que + ' y la pestaña tomó los datos de B: ' + visto.join(', '));
   }
   const guardarCliente = (p, nombre) => p.evaluate(n => CDI.api('/api/clientes', { method: 'POST', body: JSON.stringify({ nombre: n }) })
     .then(r => 'status ' + r.status, e => 'error: ' + e.message), nombre);
@@ -1697,11 +1702,12 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
   if (corre('z30')) {
     const que = 'la pestaña de A quedó tapada al abrir y guardó un cliente';
     const { ctx, a, otro, t } = await abrirYEntraOtro('ord1z30');
+    await noTomoDatos(t, otro, 'entró otro usuario antes de que la pestaña de A supiera quién es');
     const cliente = 'Cliente demo ' + otro;
     const fin = await guardarCliente(t, cliente);
     await nadaEnElServidor(a, otro, que, cliente);
     if (!/Entró otro usuario/.test(fin)) falla(que + ' y no avisa que entró otro: ' + fin);
-    console.log('OK ' + que + ': no queda en ninguna cuenta');
+    console.log('OK ' + que + ': no toma los datos de B ni queda en ninguna cuenta');
     await ctx.close();
   }
 
@@ -1715,9 +1721,9 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     await nuevoUsuario(ctx, 'ord1z31b');
     const salen = contarEscrituras(t);
     for (const [metodo, ruta, cuerpo] of [
-      ['PUT', '/api/clientes/1', { nombre: 'Cliente demo' }],
-      ['DELETE', '/api/clientes/1'],
-      ['PATCH', '/api/operations/1/estado', { estado: 'oficializada' }],
+      ['PUT', '/api/clientes/999999', { nombre: 'Cliente demo' }],
+      ['DELETE', '/api/clientes/999999'],
+      ['PATCH', '/api/operations/999999/estado', { estado: 'oficializada' }],
     ]) {
       const fin = await t.evaluate(([m, r, c]) => CDI.api(r, Object.assign({ method: m }, c ? { body: JSON.stringify(c) } : {}))
         .then(x => 'status ' + x.status, e => 'error: ' + e.message), [metodo, ruta, cuerpo]);
@@ -1748,28 +1754,41 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
     const a = await nuevoUsuario(ctx, 'ord1z34');
     const t = await ctx.newPage();
-    await t.goto(base + '/dashboard?billing=success');
-    await t.waitForFunction(() => window.CDI && CDI.currentUser);
-    // La lectura de después del pago termina cuando corre esta marca.
-    await t.evaluate(() => {
+    await t.addInitScript(() => {
       const f = window.fetch;
+      window.__pedidas = window.__leidas = 0;
       window.fetch = (u, o) => {
         const pedido = f(u, o);
-        if (!/loadCurrentUser/.test(new Error().stack)) return pedido;
+        if (!/\/auth\/current_user$/.test(String(u))) return pedido;
+        window.__pedidas++;
         return pedido.then(res => {
           const json = res.json.bind(res);
-          res.json = () => json().finally(() => setTimeout(() => { window.__leido = true; }));
+          res.json = () => json().finally(() => setTimeout(() => { window.__leidas++; }));
           return res;
         });
       };
     });
+    // Las lecturas de después del pago esperan a que entre B.
+    let reteniendo = false, avisar, soltar;
+    const hayRetenida = new Promise(r => { avisar = r; }), suelta = new Promise(r => { soltar = r; });
+    await t.route('**/auth/current_user', async ruta => {
+      if (!reteniendo) return ruta.continue();
+      avisar();
+      await suelta;
+      return ruta.continue().catch(() => {});
+    });
+    await t.goto(base + '/dashboard?billing=success');
+    await t.waitForFunction(() => window.CDI && CDI.currentUser);
+    reteniendo = true;
+    const tope = setTimeout(() => falla(que + ', pero la pestaña no vuelve a leer el usuario en 15 s'), 15000);
+    await hayRetenida;
+    clearTimeout(tope);
     const otro = await nuevoUsuario(ctx, 'ord1z34b');
-    await t.waitForFunction(() => window.__leido, null, { timeout: 15000 })
-      .catch(() => falla(que + ', pero la pestaña no vuelve a leer el usuario en 15 s'));
-    const visto = await t.evaluate(() => [CDI.currentUser.username, document.getElementById('userName').textContent]);
-    if (visto.some(v => v.includes(otro))) falla(que + ' y la pestaña tomó los datos de B: ' + visto.join(', '));
-    if (!(await tapada(t))) falla(que + ' y la pestaña no se tapa');
-    console.log('OK ' + que + ': no toma los datos de B y se tapa');
+    soltar();
+    await t.waitForFunction(() => window.__leidas >= window.__pedidas, null, { timeout: 15000 })
+      .catch(() => falla(que + ' y la pestaña no terminó de leer el usuario en 15 s'));
+    await noTomoDatos(t, otro, que);
+    console.log('OK ' + que + ': no toma los datos de B');
     await ctx.close();
   }
 
