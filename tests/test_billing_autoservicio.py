@@ -2,7 +2,8 @@
 
 Cubre los 3 endpoints nuevos + cambio de password:
 - POST /api/user/change-password (OK + 401 con pass actual mala + 400 short)
-- POST /api/billing/cancel (OK desde trial/active + 409 desde none/canceled)
+- POST /api/billing/cancel (OK desde trial/active + 409 desde none/canceled sin
+  suscripción abierta)
 - POST /api/billing/reactivate (vigente → active, vencido → past_due+needs_checkout)
 
 NO testea integración real con MercadoPago (sandbox requerido). Eso vive en

@@ -548,6 +548,14 @@ sabotaje $M "C: /billing/me dice abierta sólo a la cancelada" \
   '        "suscripcion_abierta": bool(db_user.mp_preapproval_id),' \
   '        "suscripcion_abierta": db_user.billing_status == "canceled" and bool(db_user.mp_preapproval_id),' \
   "sin_plan_con"
+sabotaje $M "C: /billing/me nunca dice que cancelar corta el acceso" \
+  '        "cancelar_corta_acceso": not billing_service.tiene_acceso(db_user),' \
+  '        "cancelar_corta_acceso": False,' \
+  "FAILED tests/test_cobro_mp1_cde.py::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[impaga]"
+sabotaje $M "C: /billing/me dice que corta sólo con past_due" \
+  '        "cancelar_corta_acceso": not billing_service.tiene_acceso(db_user),' \
+  '        "cancelar_corta_acceso": db_user.billing_status == "past_due",' \
+  "FAILED tests/test_cobro_mp1_cde.py::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[sin_plan]"
 
 # D13 (c): una autorizada sin cuenta vigente frena el checkout y sale cancelando.
 sabotaje $M "D13: el checkout cancela la autorizada vieja" \
@@ -700,13 +708,21 @@ else
     "            || (status === 'canceled' && b && b.suscripcion_abierta)) {" \
     "FALLA: none con suscripción abierta: no se ve «Cancelar plan»"
   sabotaje $P "C: la confirmación de past_due promete el período ya pagado" \
-    "        const vencido = billingStatusEl && !['trial', 'active', 'canceled'].includes(billingStatusEl.dataset.status);" \
-    "        const vencido = false;" \
+    "        const corta = billingStatusEl && billingStatusEl.dataset.corta === '1';" \
+    "        const corta = false;" \
     "FALLA: past_due: la confirmación promete el período ya pagado"
+  sabotaje $P "C: la promesa vuelve a seguir el nombre del estado" \
+    "        const corta = billingStatusEl && billingStatusEl.dataset.corta === '1';" \
+    "        const corta = billingStatusEl && !['trial', 'active', 'canceled'].includes(billingStatusEl.dataset.status);" \
+    "FALLA: canceled vencida con suscripción abierta: la confirmación promete el período ya pagado"
   sabotaje $P "C: sólo past_due no promete el período ya pagado" \
-    "        const vencido = billingStatusEl && !['trial', 'active', 'canceled'].includes(billingStatusEl.dataset.status);" \
-    "        const vencido = billingStatusEl && billingStatusEl.dataset.status === 'past_due';" \
+    "        const corta = billingStatusEl && billingStatusEl.dataset.corta === '1';" \
+    "        const corta = billingStatusEl && billingStatusEl.dataset.status === 'past_due';" \
     "FALLA: none con suscripción abierta: la confirmación promete el período ya pagado"
+  sabotaje $P "C: el pago pendiente se le dice a quien no tiene plan" \
+    "        const pendiente = corta && billingStatusEl.dataset.status === 'past_due';" \
+    "        const pendiente = corta;" \
+    "FALLA: none con suscripción abierta: la confirmación habla de un pago pendiente"
   sabotaje $P "C: el botón de aceptar vuelve a confirmText" \
     "            acceptText: 'Sí, cancelar'," \
     "            confirmText: 'Sí, cancelar'," \

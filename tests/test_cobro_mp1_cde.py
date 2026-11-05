@@ -232,6 +232,9 @@ def test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando(c
     assert _leer(usuario)["mp_preapproval_id"] == sid
 
     # La salida que nombra el 409: cancelar desde el perfil y volver a pagar.
+    # El perfil sabe si cancelar corta el acceso, como lo decide el servidor.
+    me = client.get("/api/billing/me").json()
+    assert me.get("cancelar_corta_acceso") is (not tenia_acceso), me
     r = client.post("/api/billing/cancel")
     assert r.status_code == 200, r.text
     assert SUS[sid] == "cancelled"
