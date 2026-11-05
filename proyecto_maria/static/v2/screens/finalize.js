@@ -756,7 +756,10 @@
             saveOperationToHistory(items, data).then(r => {
                 avisoDeLaOperacion = (!r.ok && r.reason !== 'sin_cliente') || r.historial_guardado === false;
             }).catch(err => {
-                console.warn('[history] no se pudo guardar operacion', err);
+                console.warn('[history] no se pudo armar la operacion', err);
+                avisoDeLaOperacion = true;
+                CDI.toast && CDI.toast('No se guardó al cliente',
+                    'La operación no quedó en el historial. Volvé a Listo y reintentá.', 'error');
             });
             saveCatalogLearn(items).then(aprendido => {
                 if (!aprendido && !avisoDeLaOperacion && CDI.toast) {
@@ -1200,7 +1203,7 @@
         CDI.track && CDI.track('op_orphan_resolved', { via: via });
     }
 
-    // Lee el cliente y la operación en el momento: quien guarda más tarde la arma antes.
+    // Lee el cliente y la operación en el momento en que se llama.
     function armarOperacion(items, mariaData) {
         const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
         const opCode = (mariaData && mariaData.filename) || null;
