@@ -33,7 +33,8 @@ const ID = 'OP_20261028050000123';
   // devuelve el status y el operation_id que mandó la pantalla.
   async function generar() {
     await page.goto(base + '/dashboard');
-    await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.api);
+    // El arranque elige su pantalla sin esperar: hasta que lo hace, pisaría la de la prueba.
+    await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.api && document.querySelector('.screen.is-active'));
     await page.evaluate(([op, item, cargada]) => {
       CDI.state = CDI.state || {};
       CDI.state.operacion = op;

@@ -1948,7 +1948,11 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         method = request.method.upper()
         path = request.url.path
         if method in _CSRF_SAFE_METHODS or path in _CSRF_EXEMPT_PATHS:
-            return await call_next(request)
+            response = await call_next(request)
+            # Una sesión válida sin csrf_token no podría escribir hasta volver a entrar.
+            if getattr(request.state, "sesion_valida", False) and not request.cookies.get(CSRF_COOKIE_NAME):
+                set_csrf_cookie(response)
+            return response
 
         # Solo nos importa si la sesion va por cookie. Sin cookie de sesion,
         # el caller usa Bearer (API/tests) y no es atacable via CSRF.
@@ -2025,13 +2029,8 @@ async def _get_billing_entity(db: AsyncSession, db_user: User):
 
 
 def _vencer_si_corresponde(entidad, ahora=None):
-    """Pasa a past_due una cuenta vencida y dice qué venció ("trial",
-    "active") o None. No hace commit.
-
-    - trial vencido: sin gracia (nadie pagó todavía).
-    - active vencido: con BILLING_GRACE_DAYS_ACTIVE días de gracia (G7.3), para
-      no cortar por un webhook de renovación que llegó tarde.
-    """
+    """Pasa a past_due una cuenta vencida y dice qué venció ("trial", "active") o None.
+    Sólo la suscripción tiene gracia: un webhook de renovación puede llegar tarde."""
     ahora = ahora or datetime.now(timezone.utc)
     fin = entidad.trial_ends_at
     if fin is None:
@@ -2051,14 +2050,8 @@ def _vencer_si_corresponde(entidad, ahora=None):
 
 
 def _detalle_402(entidad, razon_del_plan=None, vencio=None):
-    """El detail del 402 con la razón real: impago, vencido, cancelado o tope.
-
-    El code no cambia respecto de antes (los tests de G7 lo leen):
-    past_due/canceled con pago real de MP → SUBSCRIPTION_PAST_DUE; sin pago
-    real → TRIAL_EXPIRED; trial/active (o canceled antes del fin del período)
-    sin cupo → PLAN_LIMIT_EXCEEDED. Una
-    cuenta sin suscripción (none) tiene su propio code, SUBSCRIPTION_INACTIVE.
-    """
+    """El detail del 402 con la razón real: impago, vencido, cancelado, sin suscripción o tope.
+    Los code son los que ya lee la pantalla; el texto es el que distingue la razón."""
     estado = entidad.billing_status
     pago_real = getattr(entidad, "payment_provider", None) == "mercadopago"
     if estado == "past_due":
@@ -2085,14 +2078,8 @@ def _detalle_402(entidad, razon_del_plan=None, vencio=None):
 
 
 async def _cuenta_bloqueada(db: AsyncSession, username: str):
-    """Bloquea (SELECT … FOR UPDATE) la fila del usuario y, si tiene, la de su
-    organización, siempre en ese orden. Devuelve (db_user, entidad de cobro) o
-    None si el usuario no existe. El lock dura hasta el commit o rollback.
-
-    populate_existing: la sesión del pedido ya cargó al usuario en
-    get_current_user; sin esto se usarían los contadores leídos antes del lock.
-    SQLite ignora FOR UPDATE (serializa las escrituras por su cuenta).
-    """
+    """Bloquea usuario y organización, siempre en ese orden, hasta el commit o rollback.
+    populate_existing: sin él, valen los contadores que get_current_user leyó antes del lock."""
     result = await db.execute(
         select(User)
         .where(User.username == username)
@@ -2130,11 +2117,8 @@ async def require_billing_vigente(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Dependencia: corta por estado (vencido, impago, cancelado o sin
-    suscripción → 402). No mira el tope del plan: va en las rutas que gastan
-    Gemini o generan valor; el tope se mira sólo donde se cuenta una
-    operación (COBRO-CORTE-1, D5 a).
-    """
+    """402 si la cuenta no está al día. No mira el tope: ese se mira sólo donde se
+    cuenta, así lo ya contado se puede seguir validando y bajando."""
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
     if not db_user:
@@ -2174,13 +2158,8 @@ async def require_active_billing(
 
 
 async def _contar_operacion_bloqueada(db: AsyncSession, username: str):
-    """Con la cuenta bloqueada: vence, mira el tope y cuenta. No hace commit:
-    el que llama crea la operación y hace un solo commit (D6 a).
-
-    Devuelve la entidad contada, o None si no hay fila del usuario (sólo en
-    testing, el mismo atajo que require_active_billing). Con el tope lleno o
-    la cuenta no vigente guarda el vencimiento, libera el lock y tira 402.
-    """
+    """Con la cuenta bloqueada: vence, mira el tope y cuenta; el que llama hace el único
+    commit. Si no puede contar, guarda el vencimiento, suelta el lock y tira 402."""
     cuenta = await _cuenta_bloqueada(db, username)
     if cuenta is None:
         if os.getenv("ENVIRONMENT") == "testing":
@@ -2724,7 +2703,7 @@ async def view_public_quote(request: Request, hash: str):
     )
 
 @app.get("/dashboard", response_class=HTMLResponse)
-def dashboard(request: Request):
+async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     """Sirve el dashboard.
 
     Feature flag para la beta:
@@ -2734,6 +2713,12 @@ def dashboard(request: Request):
 
     v2 queda como default. v1 es opt-in durante la transicion.
     """
+    # Con la sesión abierta, la página llega con su csrf_token: la pestaña
+    # reconoce su sesión desde que abre y toma cualquier cambio como otro login.
+    try:
+        await get_current_user(request, Response(), db)
+    except HTTPException:
+        pass
     try:
         qv = (request.query_params.get("v") or "").strip()
         cookie_ui = (request.cookies.get("cdi_ui") or "").strip().lower()
@@ -3729,7 +3714,7 @@ async def create_manual_operation(
     total_weight = sum(float(it.get("peso_unitario", 0) or 0) * float(it.get("cantidad", 0) or 0) for it in items_raw)
 
     # Contar, calcular el op_code y crear la operación con la cuenta bloqueada,
-    # en un solo commit (COBRO-CORTE-1, D6 a).
+    # en un solo commit.
     await _contar_operacion_bloqueada(db, username)
     op_code = await _next_op_code(db, username)
 
@@ -5136,7 +5121,7 @@ async def generate_maria_endpoint(
         filepath = os.path.join(_user_downloads_dir(user["username"]), filename)
 
         # La primera vez que se genera este id se cuenta la operación; con
-        # el tope lleno, 402 sin escribir el archivo (COBRO-CORTE-1).
+        # el tope lleno, 402 sin escribir el archivo.
         await _contar_maria(db, user["username"], filename, txt_content,
                             len(request.items or []))
 
@@ -6254,7 +6239,7 @@ async def _next_op_code(db: AsyncSession, owner_username: str) -> str:
     return f"OP-{max_num + 1:06d}"
 
 
-# Contenidos distintos que admite un mismo MARIA_<id>.TXT (COBRO-CORTE-1, D4 b).
+# Contenidos distintos que admite un mismo MARIA_<id>.TXT.
 MARIA_REGENERACIONES = 10
 # Los dos nombres que arman /generate_maria y /generate_maria_export, con el
 # id recortado a 50 (COBRO-MP-1, g).
@@ -6277,14 +6262,8 @@ async def _operacion_maria(db: AsyncSession, owner_username: str, archivo: str):
 
 async def _contar_maria(db: AsyncSession, username: str, archivo: str,
                         contenido: str, total_items: int) -> None:
-    """Cuenta la operación la primera vez que se genera su MARIA (D4 b).
-
-    Con la cuenta bloqueada (D6 a): si el usuario no tiene operación con ese
-    archivo, mira el tope, cuenta y la crea con su op_code, en un solo commit.
-    Si ya la tiene, no cuenta: anota la huella del contenido, hasta
-    MARIA_REGENERACIONES distintas (409 la siguiente). Va antes de escribir
-    el archivo: un 402 o un 409 no lo pisa.
-    """
+    """Cuenta la operación la primera vez que se genera su MARIA; regenerarla sólo anota
+    la huella. Va antes de escribir el archivo, así un 402 o un 409 no lo pisa."""
     import hashlib
 
     huella = hashlib.sha256(contenido.encode("utf-8")).hexdigest()
@@ -7959,11 +7938,7 @@ async def save_client_operation(
     _cobro=Depends(require_billing_vigente),
 ):
     """Guarda una operación en el historial del cliente.
-
-    Si es la de un MARIA ya generado (operation_id MARIA_<id>.TXT), completa
-    esa operación y no cuenta otra; si no, cuenta una con el tope y la cuenta
-    bloqueados, en el mismo commit (COBRO-CORTE-1, D4 b y D6 a).
-    """
+    La de un MARIA ya generado ya está contada: se completa sin contar otra."""
     username = user["username"]
     client = await _get_owned_client(db, client_id, username)
 

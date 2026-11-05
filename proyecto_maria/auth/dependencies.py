@@ -147,6 +147,8 @@ async def get_current_user(request: Request, response: Response, db: AsyncSessio
     token_jti = payload.get("jti")
     if user.active_jti is not None and token_jti != user.active_jti:
         raise HTTPException(status_code=401, detail="Token revocado")
+    # CSRFMiddleware le emite el csrf_token a esta sesión si le falta.
+    request.state.sesion_valida = True
 
     trial_end = user.trial_ends_at
     if trial_end is not None and trial_end.tzinfo is None:

@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: una sesión sin token CSRF lo recibe sola (CSRF-3)
+
+- **fix(seguridad):** si la sesión es válida y le falta la cookie `csrf_token`, la próxima lectura autenticada se la emite; la pantalla v2 ya la trae al abrir y escribe sin volver a entrar. Una sesión vencida, revocada o ausente no recibe nada, y un token que ya está no se cambia.
+
 ## 2026-11-05 · fix: esperar para leer un despacho no le quita tiempo al PDF (RENDIMIENTO-1d, D55 b)
 
 - Si los dos lugares del lector están ocupados, leer un despacho espera un lugar y después tiene su tiempo entero, como validar. Antes, un despacho normal que conseguía lugar sobre el final vencía leyendo y la persona veía «tardó demasiado».

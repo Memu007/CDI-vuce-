@@ -45,7 +45,7 @@
         if (res.status === 401) irAlLogin();
         if (res.status === 402) {
             // Impago, vencido, cancelado o tope del plan: el modal dice la
-            // razón que manda el servidor (COBRO-CORTE-1).
+            // razón que manda el servidor.
             let detail = null;
             try { detail = (await res.clone().json()).detail; } catch (_) {}
             const motivo = (detail && typeof detail === 'object') ? detail : {};
