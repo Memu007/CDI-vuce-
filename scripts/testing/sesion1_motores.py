@@ -13,6 +13,8 @@ levanta la app de verdad, con su base propia y descartable, y se recorre:
    y escribe el jti gana: el login da 401 y no pisa el jti. La fila queda
    bloqueada hasta ver al login esperándola en pg_stat_activity. En SQLite lo
    cubre tests/test_sesion1.py.
+7. (sólo pg) por cada ruta que cuenta intentos, más pedidos a la vez que
+   conexiones tiene el pool: ninguno da 500 y otro usuario entra en menos de 2 s.
 Antes de cambiar y de resetear se pone active_jti en NULL (como un usuario de
 antes de la columna), que es el caso en el que revocar resucitaba sesiones.
 
@@ -148,8 +150,8 @@ def pedir(ruta, cuerpo=None, token=None, cookie=None, metodo=None):
             return e.code, {}
 
 
-def login(clave):
-    s, b = pedir("/auth/login", {"username": U, "password": clave})
+def login(clave, usuario=U):
+    s, b = pedir("/auth/login", {"username": usuario, "password": clave})
     assert s == 200, (s, b)
     return b["access_token"]
 
@@ -239,8 +241,10 @@ def recorrer():
 
     if MOTOR == "pg":
         carrera_del_login()
+        contar_no_agota_el_pool()
     else:
         print("NO CORRIDO | 6. la carrera del login: en SQLite la cubre tests/test_sesion1.py")
+        print("NO CORRIDO | 7. el pool: SQLite no tiene pool de conexiones que agotar")
 
 
 def carrera_del_login():
@@ -268,6 +272,52 @@ def carrera_del_login():
     chequear(s == 401 and "access_token" not in b,
              f"6. el login con la clave vieja no abre sesión después del cambio ({s})")
     chequear(active_jti() == "jti-del-cambio", f"6. el login no pisó el jti del cambio ({active_jti()!r})")
+
+
+# El pool de la app es de 20 + 30 conexiones.
+A_LA_VEZ = 60
+
+
+def contar_no_agota_el_pool():
+    # La carrera del login dejó a U con una clave que nadie sabe.
+    atacado, otro = "ses1_motor_pool", "ses1_motor_otro"
+    for u in (atacado, otro):
+        s, b = pedir("/auth/register", {"username": u, "password": P1, "email": f"{u}@example.com", "name": u})
+        assert s == 200, (s, b)
+    t = login(P1, atacado)
+    for metodo, ruta, cuerpo, con_token in (
+        ("PUT", "/api/user/profile", {"email": "pool@example.com", "current_password": "mala-1!"}, True),
+        ("POST", "/api/user/change-password", {"current_password": "mala-1!", "new_password": P1}, True),
+        ("POST", "/auth/login", {"username": atacado, "password": "mala-1!"}, False),
+        ("POST", "/auth/request-password-reset", {"email": "nadie@example.com"}, False),
+    ):
+        sql("delete from limites_auth")
+        largada = threading.Barrier(A_LA_VEZ + 1)
+        estados = []
+
+        def uno():
+            largada.wait()
+            try:
+                estados.append(pedir(ruta, cuerpo, token=t if con_token else None, metodo=metodo)[0])
+            except OSError as e:
+                estados.append(type(e).__name__)
+        hilos = [threading.Thread(target=uno) for _ in range(A_LA_VEZ)]
+        for h in hilos:
+            h.start()
+        largada.wait()
+        inicio = time.monotonic()
+        try:
+            s_otro = pedir("/auth/login", {"username": otro, "password": P1})[0]
+        except OSError as e:
+            s_otro = type(e).__name__
+        demora = time.monotonic() - inicio
+        for h in hilos:
+            h.join(120)
+        cuenta = {x: estados.count(x) for x in set(estados)}
+        chequear(len(estados) == A_LA_VEZ and 500 not in cuenta and all(isinstance(x, int) for x in cuenta),
+                 f"7. {A_LA_VEZ} {metodo} {ruta} a la vez: ningún 500 ({cuenta})")
+        chequear(s_otro == 200 and demora < 2,
+                 f"7. con {ruta} a la vez otro usuario entra en menos de 2 s ({s_otro}, {demora:.1f} s)")
 
 
 proc = None
