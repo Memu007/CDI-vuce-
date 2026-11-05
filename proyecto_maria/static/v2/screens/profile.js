@@ -378,10 +378,10 @@
         }
 
         // Botones por estado.
-        // past_due también cancela: si no, la suscripción cobra cuando la tarjeta vuelve (COBRO-MP-1, C).
-        // Una cancelada que abrió el checkout tiene una suscripción nueva que cancelar.
+        // past_due también cancela: si no, la suscripción cobra cuando la tarjeta vuelve.
+        // Con una suscripción abierta se cancela en cualquier estado.
         if (status === 'trial' || status === 'active' || status === 'past_due'
-            || (status === 'canceled' && b && b.suscripcion_abierta)) {
+            || (b && b.suscripcion_abierta)) {
             if (billingCancelBtn) billingCancelBtn.hidden = false;
         }
         if (status === 'past_due' || status === 'none') {
@@ -415,8 +415,8 @@
     }
 
     async function cancelBilling() {
-        // Desde past_due no hay período pagado: se corta al cancelar.
-        const vencido = billingStatusEl && billingStatusEl.dataset.status === 'past_due';
+        // Fuera de trial, active y canceled no hay período pagado: se corta al cancelar.
+        const vencido = billingStatusEl && !['trial', 'active', 'canceled'].includes(billingStatusEl.dataset.status);
         const ok = await CDI.confirm({
             title: 'Cancelar plan',
             lead: '¿Seguro que querés cancelar?',

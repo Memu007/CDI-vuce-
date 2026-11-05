@@ -2117,9 +2117,9 @@ async def cancel_billing(
     puede, no se cambia nada en CDI (COBRO-MP-2, C2). No corta el servicio:
     deja `billing_status='canceled'` y `trial_ends_at` como la fecha hasta la
     que ya pagó (o en la que vence la prueba); hasta esa fecha sigue
-    generando (billing_service.tiene_acceso). Desde past_due también se
-    cancela, sin ganar acceso: si no, la suscripción vieja cobra cuando la
-    tarjeta vuelve (COBRO-MP-1, C).
+    generando (billing_service.tiene_acceso). Con una suscripción abierta se
+    cancela desde cualquier estado, sin ganar acceso: si no, cobra cuando la
+    tarjeta vuelve y el checkout no tiene salida.
 
     Toma la fila como el checkout: si uno está en curso, espera a que guarde
     la suscripción nueva y la cancela; si no, quedaría cobrando sin que CDI
@@ -2130,10 +2130,7 @@ async def cancel_billing(
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    # Una cuenta cancelada que reactivó y abrió el checkout tiene la
-    # suscripción nueva guardada hasta el primer cobro: se puede cancelar.
-    cancelada_con_suscripcion = db_user.billing_status == "canceled" and db_user.mp_preapproval_id
-    if db_user.billing_status not in ("trial", "active", "past_due") and not cancelada_con_suscripcion:
+    if db_user.billing_status not in ("trial", "active", "past_due") and not db_user.mp_preapproval_id:
         raise HTTPException(
             status_code=409,
             detail=f"No se puede cancelar desde el estado actual: {db_user.billing_status}",
@@ -2150,8 +2147,8 @@ async def cancel_billing(
             raise HTTPException(status_code=503, detail=no_se_pudo)
         db_user.mp_preapproval_id = None
 
-    if db_user.billing_status == "past_due":
-        # canceled da acceso hasta trial_ends_at: past_due no lo tenía.
+    if not billing_service.tiene_acceso(db_user):
+        # canceled da acceso hasta trial_ends_at: quien no lo tenía no lo gana.
         ahora = datetime.now(timezone.utc)
         fin = db_user.trial_ends_at
         if fin is not None and (fin if fin.tzinfo else fin.replace(tzinfo=timezone.utc)) > ahora:
@@ -3321,9 +3318,9 @@ async def billing_me(user=Depends(get_current_user), db: AsyncSession = Depends(
         # se guarda al abrir el checkout, antes de pagar: hace falta un pago de MP.
         "renueva": (billing_entity.billing_status == "active" and bool(db_user.mp_preapproval_id)
                     and getattr(billing_entity, "payment_provider", None) == "mercadopago"),
-        # Cancelada con la suscripción de un checkout nuevo: el perfil le
-        # muestra «Cancelar plan», como /api/billing/cancel (COBRO-MP-1).
-        "suscripcion_abierta": db_user.billing_status == "canceled" and bool(db_user.mp_preapproval_id),
+        # Con una suscripción abierta el perfil muestra «Cancelar plan», como
+        # /api/billing/cancel, sea cual sea el estado.
+        "suscripcion_abierta": bool(db_user.mp_preapproval_id),
     }
 
 
