@@ -1,9 +1,9 @@
 // COBRO-CORTE-1 en el navegador local, contra el servidor local (sin terceros).
-// Sin factura, generar dos veces la misma operación manda el mismo id (el de
-// cuándo se cargó) y el servidor la cuenta una vez. Un 402 dice su razón en
-// el modal y en el error de la generación; el 409 de regeneraciones, su
-// mensaje. Los 402 y el 409 se fuerzan con page.route: las pruebas del
-// servidor cubren cuándo salen de verdad.
+// La pantalla manda la operación del servidor: regenerar manda la que devolvió
+// la primera generación y cuenta una vez; una carga nueva manda un id vacío y
+// cuenta otra; guardar antes de generar anota la operación y generar la
+// completa. Un 402 dice su razón en el modal y en el error de la generación;
+// los 402 se fuerzan con page.route: las pruebas del servidor cubren cuándo salen.
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_cobro_corte1.js
 const { chromium } = require('playwright');
@@ -29,27 +29,31 @@ const ID = 'OP_20261028050000123';
   const titulo = page.locator('#cdiConfirmTitle');
   const lead = page.locator('#cdiConfirmLead');
 
-  // Carga la operación (sin factura, cargada en CARGADA), pide el TXT y
-  // devuelve el status y el operation_id que mandó la pantalla.
-  async function generar() {
-    await page.goto(base + '/dashboard');
-    // El arranque elige su pantalla sin esperar: hasta que lo hace, pisaría la de la prueba.
-    await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.api && document.querySelector('.screen.is-active'));
+  // Pone la operación en la pantalla sin tocar su operacionId.
+  async function cargar(cargada) {
     await page.evaluate(([op, item, cargada]) => {
       CDI.state = CDI.state || {};
       CDI.state.operacion = op;
       CDI.state.items = [item];
-      CDI.state.uploadedAt = cargada;
-      CDI.goTo('validating');
-    }, [OP, LONA, CARGADA]);
+      if (cargada) CDI.state.uploadedAt = cargada;
+    }, [OP, LONA, cargada]);
+  }
+
+  // Pide el TXT desde «validating», sin recargar: recargar fuera del flujo pierde la operación.
+  async function generar() {
+    await page.evaluate(() => CDI.goTo('validating'));
     await page.waitForFunction(() => !document.getElementById('validatingGenerate').disabled, null, { timeout: 15000 })
       .catch(async () => falla('no deja generar: ' + await page.$eval('#validatingIssues', el => el.textContent.trim().slice(0, 400))));
     await page.fill('#sbtSufijoValor', 'AA(1)-CA00-');
     const resp = page.waitForResponse(r => r.url().endsWith('/generate_maria') && r.request().method() === 'POST', { timeout: 15000 });
     await page.click('#validatingGenerate');
     const r = await resp.catch(() => falla('no se pidió el TXT'));
-    return { status: r.status(), texto: (await r.text()).slice(0, 300),
-             operation_id: JSON.parse(r.request().postData() || '{}').operation_id };
+    const texto = await r.text();
+    const pedido = JSON.parse(r.request().postData() || '{}');
+    let devuelta = '';
+    try { devuelta = JSON.parse(texto).operacion_id || ''; } catch (_) {}
+    return { status: r.status(), texto: texto.slice(0, 300), operation_id: pedido.operation_id,
+             mandada: pedido.operacion_id, devuelta };
   }
 
   async function usadas() {
@@ -58,19 +62,38 @@ const ID = 'OP_20261028050000123';
     return (await r.json()).ops_used_this_period;
   }
 
-  // 1. Regenerar sin factura manda el mismo id y no cuenta otra vez.
-  const antes = await usadas();
+  await page.goto(base + '/dashboard');
+  // El arranque elige su pantalla sin esperar: hasta que lo hace, pisaría la de la prueba.
+  await page.waitForFunction(() => window.CDI && CDI.goTo && CDI.api && document.querySelector('.screen.is-active'));
+
+  // 1. Regenerar manda la operación que devolvió la primera y no cuenta otra vez.
+  let antes = await usadas();
+  await cargar(CARGADA);
   const g1 = await generar();
   if (g1.status !== 200) falla('la primera generación dio ' + g1.status + ': ' + g1.texto);
+  if (g1.mandada !== '') falla('la primera generación mandó operacion_id «' + g1.mandada + '»');
+  if (!g1.devuelta) falla('la primera generación no devolvió operacion_id: ' + g1.texto);
+  if (g1.operation_id !== ID) falla('el id sin factura no sale de cuándo se cargó: ' + g1.operation_id);
   const g2 = await generar();
   if (g2.status !== 200) falla('la segunda generación dio ' + g2.status + ': ' + g2.texto);
-  if (g1.operation_id !== ID) falla('el id sin factura no sale de cuándo se cargó: ' + g1.operation_id);
-  if (g2.operation_id !== g1.operation_id) falla('regenerar mandó otro id: ' + g1.operation_id + ' y ' + g2.operation_id);
-  const despues = await usadas();
-  if (despues - antes !== 1) falla('dos generaciones del mismo id contaron ' + (despues - antes));
-  console.log('OK | regenerar sin factura: mismo id (' + ID + ') y cuenta 1');
+  if (g2.mandada !== g1.devuelta) falla('regenerar manda la operación que devolvió la primera: mandó «' + g2.mandada + '», no «' + g1.devuelta + '»');
+  if (g2.operation_id !== g1.operation_id) falla('el id sin factura no sale de cuándo se cargó: ' + g1.operation_id + ' y ' + g2.operation_id);
+  if (await usadas() - antes !== 1) falla('dos generaciones de la misma operación contaron ' + (await usadas() - antes));
+  console.log('OK | regenerar: manda la operación de la primera y cuenta 1');
 
-  // 2. Un 402 dice su razón.
+  // 2. Una carga nueva es otra operación: manda un id vacío y cuenta.
+  antes = await usadas();
+  await page.evaluate(() => CDI.goTo('upload'));
+  await page.click('#uploadManualBtn');
+  await cargar(null);
+  const g3 = await generar();
+  if (g3.status !== 200) falla('la generación de la carga nueva dio ' + g3.status + ': ' + g3.texto);
+  if (g3.mandada !== '') falla('una operación nueva manda un operacion_id vacío: mandó «' + g3.mandada + '»');
+  if (g3.devuelta === g1.devuelta) falla('la carga nueva quedó en la operación anterior');
+  if (await usadas() - antes !== 1) falla('la carga nueva contó ' + (await usadas() - antes));
+  console.log('OK | carga nueva: operacion_id vacío y cuenta 1');
+
+  // 3. Un 402 dice su razón.
   async function con402(detail, tituloEsperado, que) {
     await page.route('**/generate_maria', route => route.fulfill({
       status: 402, contentType: 'application/json', body: JSON.stringify({ detail }) }));
@@ -97,15 +120,28 @@ const ID = 'OP_20261028050000123';
                  message: 'Alcanzaste el límite de 15 operaciones del plan Básico. Comprá un top-up o actualizá a Premium.' },
                'Llegaste al tope de tu plan', 'cancelada con el tope');
 
-  // 3. El 409 de regeneraciones muestra su mensaje.
-  const msg409 = 'Esta operación ya se generó 10 veces con datos distintos, el máximo. Si es otra operación, cargala como nueva.';
-  await page.route('**/generate_maria', route => route.fulfill({
-    status: 409, contentType: 'application/json',
-    body: JSON.stringify({ detail: { code: 'MARIA_REGENERACIONES_AGOTADAS', message: msg409 } }) }));
-  await generar();
-  await errorGeneracion.waitFor({ state: 'visible', timeout: 5000 }).catch(() => falla('409: no sale el error de la generación'));
-  if ((await errorGeneracion.innerText()).trim() !== msg409) falla('409: el error de la generación dice «' + (await errorGeneracion.innerText()).trim() + '»');
-  console.log('OK | 409: su mensaje');
+  // 4. Guardar antes de generar crea la operación; generar después la completa y no cuenta otra.
+  const que = 'guardar antes de generar';
+  antes = await usadas();
+  await page.evaluate(() => CDI.goTo('upload'));
+  await page.click('#uploadManualBtn');
+  await cargar(null);
+  const guardada = await page.evaluate(async () => {
+    const r = await CDI.api('/api/clientes', { method: 'POST', body: JSON.stringify({ nombre: 'Cliente de prueba', cuit: '30999999995' }) });
+    const d = await r.json();
+    if (!d.cliente) return { error: JSON.stringify(d).slice(0, 200) };
+    CDI.setClienteActivo(d.cliente);
+    const out = await CDI.saveOperationToHistory(CDI.state.items, {});
+    return { out, operacionId: CDI.state.operacionId };
+  });
+  if (guardada.error) falla(que + ': no se creó el cliente: ' + guardada.error);
+  if (!guardada.out || !guardada.out.ok) falla(que + ': el guardado falló: ' + JSON.stringify(guardada.out));
+  if (!guardada.operacionId) falla(que + ': la pantalla no anotó la operación que devolvió el guardado');
+  const g4 = await generar();
+  if (g4.status !== 200) falla(que + ': la generación dio ' + g4.status + ': ' + g4.texto);
+  if (g4.mandada !== guardada.operacionId) falla(que + ': generar mandó «' + g4.mandada + '», no la guardada «' + guardada.operacionId + '»');
+  if (await usadas() - antes !== 1) falla(que + ': guardar y generar contaron ' + (await usadas() - antes));
+  console.log('OK | ' + que + ': generar completa la guardada y cuenta 1');
 
   await b.close();
   console.log('pantalla COBRO-CORTE-1: OK');

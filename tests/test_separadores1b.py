@@ -209,7 +209,8 @@ def test_un_ajuste_ilegible_se_dice_en_las_cuentas_y_sin_seguro_calculado_no_fre
     sin = client.post("/generate_maria", json=_pedido())
     con = client.post("/generate_maria", json={**_pedido(), "ajustes_deducir": "3.480"})
     assert sin.status_code == con.status_code == 200, con.text
-    assert con.content == sin.content
+    # Cada generación es otra operación, con su id y su archivo: se compara el TXT.
+    assert [con.json()[k] for k in ("content", "warnings")] == [sin.json()[k] for k in ("content", "warnings")]
 
 
 def test_con_el_seguro_calculado_un_ajuste_ilegible_frena_hasta_que_se_elija(client):

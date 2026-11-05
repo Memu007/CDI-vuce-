@@ -1,3 +1,4 @@
+import contextlib
 import pytest
 import tempfile
 from fastapi.testclient import TestClient
@@ -178,20 +179,52 @@ def auth_headers():
     return {"Authorization": "Bearer test-token"}
 
 
-@pytest.fixture
-def auth_override():
-    """Autentica los endpoints sobreescribiendo la dependencia get_current_user.
-
-    Crea la fila de test_user si falta. Devuelve el dict de user falso por si
-    el test quiere inspeccionarlo. Al terminar limpia el override y retira lo
-    que la prueba le contó a test_user (ver _retirar_lo_contado).
-    """
-    from proyecto_maria.main import get_current_user
+@contextlib.contextmanager
+def cuenta_de_prueba(username):
+    """La fila del usuario que simula una prueba: generar cuenta en su cuenta y el plan
+    tiene tope, así que al salir le devuelve el cupo y retira las operaciones de MARIA nuevas."""
     from proyecto_maria.database.connection import AsyncSessionLocal
     from proyecto_maria.database.models import User as DBUser
     from proyecto_maria.database.models import Operation as DBOperation, OperationItem as DBOperationItem
     from sqlalchemy import delete, select, update
-    import asyncio
+
+    async def _crear():
+        async with AsyncSessionLocal() as session:
+            u = (await session.execute(select(DBUser).where(DBUser.username == username))).scalars().first()
+            if not u:
+                u = DBUser(username=username, password="dummy_password_hash", name=username,
+                           email=f"{username}@test.cdi", plan="premium", billing_status="active",
+                           is_verified=True)
+                session.add(u)
+                await session.commit()
+            return u.ops_used_this_period or 0, set(
+                (await session.execute(select(DBOperation.id).where(
+                    DBOperation.owner_username == username))).scalars())
+
+    async def _retirar(usadas, previas):
+        async with AsyncSessionLocal() as session:
+            nuevas = [i for i in (await session.execute(select(DBOperation.id).where(
+                DBOperation.owner_username == username,
+                DBOperation.generated_file.is_not(None)))).scalars() if i not in previas]
+            if nuevas:
+                await session.execute(delete(DBOperationItem).where(DBOperationItem.operation_id.in_(nuevas)))
+                await session.execute(delete(DBOperation).where(DBOperation.id.in_(nuevas)))
+            await session.execute(update(DBUser).where(DBUser.username == username)
+                                  .values(ops_used_this_period=usadas))
+            await session.commit()
+
+    usadas, previas = asyncio.run(_crear())
+    try:
+        yield
+    finally:
+        asyncio.run(_retirar(usadas, previas))
+
+
+@pytest.fixture
+def auth_override():
+    """Autentica los endpoints sobreescribiendo get_current_user con test_user, que
+    existe en la base (cuenta_de_prueba). Devuelve el dict por si la prueba lo mira."""
+    from proyecto_maria.main import get_current_user
 
     fake_user = {
         "username": "test_user",
@@ -208,49 +241,10 @@ def auth_override():
         "team_owner_username": None,
         "effective_owner": "test_user",
     }
-    
-    async def _ensure_test_user_exists():
-        async with AsyncSessionLocal() as session:
-            res = await session.execute(select(DBUser).where(DBUser.username == "test_user"))
-            u = res.scalars().first()
-            if not u:
-                u = DBUser(
-                    username="test_user",
-                    password="dummy_password_hash",
-                    name="Test User",
-                    email="test_user@test.cdi",
-                    plan="premium",
-                    billing_status="active",
-                    is_verified=True,
-                )
-                session.add(u)
-                await session.commit()
-            return u.ops_used_this_period or 0, set(
-                (await session.execute(select(DBOperation.id).where(
-                    DBOperation.owner_username == "test_user"))).scalars())
-
-    # test_user es compartido y su plan tiene tope de operaciones, y generar
-    # el MARIA de un id cuenta (COBRO-CORTE-1): al terminar, cada prueba le
-    # devuelve el cupo y retira las operaciones de MARIA que creó, para que
-    # un id fijo no acumule regeneraciones de otras pruebas.
-    async def _retirar_lo_contado(usadas, previas):
-        async with AsyncSessionLocal() as session:
-            nuevas = [i for i in (await session.execute(select(DBOperation.id).where(
-                DBOperation.owner_username == "test_user",
-                DBOperation.generated_file.is_not(None)))).scalars() if i not in previas]
-            if nuevas:
-                await session.execute(delete(DBOperationItem).where(DBOperationItem.operation_id.in_(nuevas)))
-                await session.execute(delete(DBOperation).where(DBOperation.id.in_(nuevas)))
-            await session.execute(update(DBUser).where(DBUser.username == "test_user")
-                                  .values(ops_used_this_period=usadas))
-            await session.commit()
-
-    usadas, previas = asyncio.run(_ensure_test_user_exists())
-
-    app.dependency_overrides[get_current_user] = lambda: fake_user
-    yield fake_user
-    app.dependency_overrides.pop(get_current_user, None)
-    asyncio.run(_retirar_lo_contado(usadas, previas))
+    with cuenta_de_prueba("test_user"):
+        app.dependency_overrides[get_current_user] = lambda: fake_user
+        yield fake_user
+        app.dependency_overrides.pop(get_current_user, None)
 
 @pytest.fixture(autouse=True)
 def reset_environment():

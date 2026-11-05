@@ -59,6 +59,7 @@ M=proyecto_maria/main.py
 B=proyecto_maria/services/billing_service.py
 A=proyecto_maria/static/v2/app_v2.js
 F=proyecto_maria/static/v2/screens/finalize.js
+U=proyecto_maria/static/v2/screens/upload.js
 
 # ------------------------------------------------------------- el servidor
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
@@ -119,10 +120,17 @@ sabotaje $M "el impago se avisa como vencido" \
   "FAILED $T::test_una_cuenta_que_no_esta_al_dia_no_genera_ni_gasta_gemini[impaga-ncm_sugerir]" \
   '            code = "SUBSCRIPTION_PAST_DUE"'$'\n''            message = ("Tenés un pago pendiente de tu suscripción. "' \
   '            code = "TRIAL_EXPIRED"'$'\n''            message = ("Tenés un pago pendiente de tu suscripción. "'
-sabotaje $M "la prueba vencida se avisa como suscripción" \
-  "FAILED $T::test_una_cuenta_que_no_esta_al_dia_no_genera_ni_gasta_gemini[prueba_vencida-ncm_sugerir]" \
-  '            que = "tu suscripción" if vencio == "active" else "tu prueba gratis"' \
-  '            que = "tu prueba gratis" if vencio == "active" else "tu suscripción"'
+# La razón sale del estado, no de si este pedido fue el que venció la cuenta.
+sabotaje $M "el pedido que vence la cuenta da otra razón" \
+  "FAILED $T::test_la_razon_del_402_es_la_misma_en_el_segundo_pedido[suscripcion_vencida]" \
+  $'    if _vencer_si_corresponde(entidad):\n        try:' \
+  $'    entidad._vencio = _vencer_si_corresponde(entidad)\n    if entidad._vencio:\n        try:' \
+  '            message = "Venció tu prueba gratis. Suscribite para seguir usando CDI."' \
+  '            message = "Venció tu suscripción." if getattr(entidad, "_vencio", None) == "active" else "Venció tu prueba gratis. Suscribite para seguir usando CDI."'
+sabotaje $B "el plan legado da error" \
+  "FAILED $T::test_el_plan_legado_trial_genera_exporta_y_guarda" \
+  '    return PLANS.get(getattr(user, "plan", None) or "premium") or PLANS["premium"]' \
+  '    return PLANS[getattr(user, "plan", None) or "premium"]' 
 sabotaje $M "la cancelada no dice que canceló" \
   "FAILED $T::test_una_cuenta_que_no_esta_al_dia_no_genera_ni_gasta_gemini[cancelada-ncm_sugerir]" \
   '        message = "Cancelaste tu suscripción. Reactivala para seguir usando CDI."' \
@@ -131,23 +139,68 @@ sabotaje $M "la cuenta sin suscripción se avisa como tope" \
   "FAILED $T::test_el_aviso_de_la_cuenta_sin_suscripcion_no_habla_del_tope" \
   '        code = "SUBSCRIPTION_INACTIVE"' '        code = "PLAN_LIMIT_EXCEEDED"'
 
-# Cuándo se cuenta (D4 b).
+# Cuándo se cuenta: la identidad es la operación de CDI, no el nro de factura.
 sabotaje $M "cada generación crea y cuenta otra operación" \
-  "FAILED $T::test_generar_cuenta_una_vez_por_id_y_crea_la_operacion" \
-  '    if operacion is None:' '    if True:'
+  "FAILED $T::test_generar_cuenta_una_vez_por_operacion_y_la_crea" \
+  '    if operacion is not None and (huella in huellas or len(huellas) < MARIA_REGENERACIONES):' \
+  '    if False:'
+sabotaje $M "generar no cuenta en la cuenta" \
+  "FAILED $T::test_generar_cuenta_una_vez_por_operacion_y_la_crea" \
+  $'    await _contar_en_la_cuenta(db, cuenta[1])\n    nuevo_id' $'    pass\n    nuevo_id'
 sabotaje $M "generar no suma al contador" \
-  "FAILED $T::test_generar_cuenta_una_vez_por_id_y_crea_la_operacion" \
+  "FAILED $T::test_generar_cuenta_una_vez_por_operacion_y_la_crea" \
   '    billing_service.record_operation_created(entidad)' '    pass'
-sabotaje $M "regenerar el mismo contenido gasta una de las 10" \
-  "FAILED $T::test_el_mismo_id_no_pasa_de_10_contenidos_distintos" \
-  '    if huella in huellas:' '    if False:'
-sabotaje $M "el mismo id pasa de 10 contenidos" \
-  "FAILED $T::test_el_mismo_id_no_pasa_de_10_contenidos_distintos" \
-  '    if len(huellas) >= MARIA_REGENERACIONES:' '    if len(huellas) > MARIA_REGENERACIONES:'
+sabotaje $M "el mismo resultado gasta una de las 10" \
+  "FAILED $T::test_el_mismo_resultado_no_gasta_una_de_las_10" \
+  'huella in huellas or ' ''
+sabotaje $M "la fecha de emisión cambia el resultado" \
+  "FAILED $T::test_el_mismo_resultado_no_gasta_una_de_las_10" \
+  '_FECHA_DE_EMISION.sub(r"\1", contenido)' 'contenido'
+sabotaje $M "el tope de regeneraciones no es 10" \
+  "FAILED $T::test_la_11_distinta_es_una_operacion_nueva_contada" \
+  'MARIA_REGENERACIONES = 10' 'MARIA_REGENERACIONES = 11'
+sabotaje $M "la 11.ª distinta reusa la operación" \
+  "FAILED $T::test_la_11_distinta_es_una_operacion_nueva_contada" \
+  'len(huellas) < MARIA_REGENERACIONES' 'len(huellas) <= MARIA_REGENERACIONES'
+sabotaje $M "dos operaciones con la misma factura comparten el archivo" \
+  "FAILED $T::test_dos_operaciones_nunca_comparten_una_fila" \
+  'f"{nombre}_{nuevo_id[:8]}.TXT"' 'f"{nombre}.TXT"' \
+  'f"{nombre}_{operacion.id[:8]}.TXT"' 'f"{nombre}.TXT"'
+sabotaje $M "se reusa la operación de otra cuenta" \
+  "FAILED $T::test_guardar_con_la_operacion_de_otra_cuenta_no_la_toca" \
+  $'        OperationModel.owner_username == username,\n    ))' $'    ))'
+sabotaje $M "borrar el cliente borra sus operaciones" \
+  "FAILED $T::test_borrar_el_cliente_no_recuenta_lo_generado" \
+  $'            operacion.client_id = None\n' $'            await db.delete(operacion)\n            continue\n'
 sabotaje $M "se escribe el archivo antes de contar" \
   "FAILED $T::test_con_el_tope_lleno_se_valida_y_se_baja_lo_ya_contado" \
-  $'        await _contar_maria(db, user["username"], filename, txt_content,\n                            len(request.items or []))\n\n        # newline="": el archivo lleva los CRLF tal cual, sin traducir (MARIA-7).\n        with open(filepath, \'w\', encoding=\'utf-8\', newline=\'\') as f:\n            f.write(txt_content)\n' \
-  $'        with open(filepath, \'w\', encoding=\'utf-8\', newline=\'\') as f:\n            f.write(txt_content)\n        await _contar_maria(db, user["username"], filename, txt_content,\n                            len(request.items or []))\n'
+  $'        operacion_id, filename = await _contar_maria(\n            db, user["username"], request.operacion_id, txt_content,\n            len(request.items or []), f"MARIA_{safe_id}")\n' \
+  $'        with open(os.path.join(_user_downloads_dir(user["username"]), f"MARIA_{safe_id}.TXT"), \'w\') as f:\n            f.write(txt_content)\n        operacion_id, filename = await _contar_maria(\n            db, user["username"], request.operacion_id, txt_content,\n            len(request.items or []), f"MARIA_{safe_id}")\n'
+sabotaje $B "la fecha de las recargas sin zona no se toma como UTC" \
+  "FAILED $T::test_con_el_tope_lleno_el_extra_paga_la_operacion_nueva" \
+  $'    if expires is not None and expires.tzinfo is None:\n        expires = expires.replace(tzinfo=timezone.utc)' \
+  $'    if False:\n        pass'
+sabotaje $M "cuenta el usuario y no su organización" \
+  "FAILED $T::test_la_organizacion_es_la_que_cuenta" \
+  $'        if org:\n            return db_user, org' $'        if org:\n            return db_user, db_user'
+
+# Sin usuario en la base, cada paso que cuenta da 401: ningún atajo por entorno.
+ATAJO=$'        if os.getenv("ENVIRONMENT", "").startswith("test"):\n'
+NO_ESTA=$'        raise HTTPException(status_code=401, detail="Usuario no encontrado")\n'
+VIGENTE=$'\n    entidad, _ = await _get_billing_entity(db, db_user)\n    await _vencer_y_guardar(db, entidad)\n    if not billing_service.tiene_acceso'
+ACTIVA=$'\n    entidad, _ = await _get_billing_entity(db, db_user)\n    await _vencer_y_guardar(db, entidad)\n    ok, reason'
+COMO_ANTES=$'            return User(username=user["username"], plan="premium", billing_status="active")\n'
+for paso in vigente activa bloqueada maria; do
+  case $paso in
+    vigente)   viejo="$NO_ESTA$VIGENTE"; atajo="$COMO_ANTES" ;;
+    activa)    viejo="$NO_ESTA$ACTIVA"; atajo="$COMO_ANTES" ;;
+    bloqueada) viejo="$NO_ESTA    return await _contar_en_la_cuenta"; atajo=$'            return None\n' ;;
+    maria)     viejo="$NO_ESTA"$'\n    operacion = await _operacion_del_usuario'; atajo=$'            return "", nombre\n' ;;
+  esac
+  sabotaje $M "el paso $paso deja pasar sin usuario en pruebas" \
+    "FAILED $T::test_sin_sesion_las_rutas_que_cuentan_dan_401" "$viejo" "$ATAJO$atajo$viejo"
+done
+
 sabotaje $B "la fecha de las recargas sin zona no se toma como UTC" \
   "FAILED $T::test_con_el_tope_lleno_el_extra_paga_la_operacion_nueva" \
   $'    if expires is not None and expires.tzinfo is None:\n        expires = expires.replace(tzinfo=timezone.utc)' \
@@ -160,34 +213,24 @@ sabotaje $M "cuenta el usuario y no su organización" \
 sabotaje $M "guardar no busca la operación generada" \
   "FAILED $T::test_guardar_despues_de_generar_no_cuenta_dos_veces" \
   '        if operation is not None:' '        if False:'
-sabotaje $M "guardar toma la operación generada de otra cuenta" \
-  "FAILED $T::test_guardar_con_el_archivo_de_otra_cuenta_no_toca_su_operacion" \
-  $'        OperationModel.owner_username == owner_username,\n        OperationModel.generated_file == archivo,' \
-  $'        OperationModel.generated_file == archivo,'
-sabotaje $M "guardar le saca la operación a otro cliente" \
-  "FAILED $T::test_guardar_en_otro_cliente_no_le_saca_la_operacion" \
-  '            operation = await _operacion_maria(db, username, archivo, client_id)' \
-  '            operation = await _operacion_maria(db, username, archivo)'
-sabotaje $M "guardar no reusa la operación generada sin cliente" \
-  "FAILED $T::test_guardar_despues_de_generar_no_cuenta_dos_veces" \
-  '        query = query.where(sa_or(OperationModel.client_id.is_(None),' \
-  '        query = query.where(sa_or(False,'
-sabotaje $M "guardar sin haber generado no cuenta" \
-  "FAILED $T::test_guardar_sin_haber_generado_cuenta_una" \
+sabotaje $M "guardar sin una operación generada no cuenta" \
+  "FAILED $T::test_guardar_sin_una_operacion_generada_cuenta_cada_vez" \
   $'        else:\n            await _contar_operacion_bloqueada(db, username)' $'        else:\n            pass'
-sabotaje $M "guardar toma cualquier id como archivo MARIA" \
-  "FAILED $T::test_guardar_con_un_id_que_no_es_un_maria_no_lo_toma_como_archivo" \
-  '        if not _ARCHIVO_MARIA.fullmatch(archivo):' '        if False:'
 sabotaje $M "guardar dos veces suma los ítems" \
   "FAILED $T::test_guardar_dos_veces_lo_generado_reemplaza_los_items" \
-  $'            await db.execute(\n                sa_delete(OperationItemModel).where(\n                    OperationItemModel.operation_id == operation.id\n                )\n            )' \
-  '            pass'
+  $'            await db.execute(\n                sa_delete(OperationItemModel).where(\n                    OperationItemModel.operation_id == operation.id\n                )\n            )\n        else:' \
+  $'            pass\n        else:'
+sabotaje $M "guardar en otro cliente no mueve la operación" \
+  "FAILED $T::test_guardar_en_otro_cliente_mueve_la_operacion" \
+  '                setattr(operation, campo, valor)' \
+  $'                if campo != "client_id":\n                    setattr(operation, campo, valor)'
 
 # El conteo vuelve a mirar el estado con la cuenta bloqueada. Toda ruta que
 # cuenta pasa antes por el corte, así que su prueba llama al conteo directo.
 sabotaje $M "el conteo no vence la cuenta" \
   "FAILED $T::test_el_conteo_vence_la_cuenta_que_vencio_despues_del_corte" \
-  $'    vencio = _vencer_si_corresponde(entidad)\n    ok, reason' $'    vencio = None\n    ok, reason'
+  $'    _vencer_si_corresponde(entidad)\n    ok, reason = billing_service.can_create_operation(entidad)\n    if not ok:\n        detalle' \
+  $'    ok, reason = billing_service.can_create_operation(entidad)\n    if not ok:\n        detalle' 
 
 # ------------------------------------------------------------- la pantalla
 git checkout -q -- proyecto_maria/
@@ -245,17 +288,19 @@ sabotaje $A "el modal no muestra el mensaje del servidor" \
   "FALLA: tope: el modal dice" \
   "            const lead = motivo.message || (typeof detail === 'string' && detail) ||" \
   "            const lead = (typeof detail === 'string' && detail) ||"
-sabotaje $A "el 402 no le pasa su razón a la generación" \
+sabotaje $A "el 402 no trae su razón como mensaje" \
   "FALLA: tope: el error de la generación dice" \
-  '            err.motivo = lead;' '            err.motivo = "";'
-sabotaje $F "la generación no muestra la razón del 402" \
-  "FALLA: tope: el error de la generación dice" \
-  '            showReadyError(String((err && err.motivo) || (err && err.message) || err));' \
-  '            showReadyError(String((err && err.message) || err));'
-sabotaje $F "el 409 no muestra su mensaje" \
-  "FALLA: 409: el error de la generación dice" \
-  "(detail && typeof detail === 'object' && detail.message) ? detail.message : detail;" \
-  "(false) ? detail.message : detail;"
+  '            const err = new Error(lead);' "            const err = new Error('payment_required');"
+sabotaje $F "generar no manda la operación de la pantalla" \
+  "FALLA: regenerar manda la operación que devolvió la primera" \
+  "        body.operacion_id = (CDI.state && CDI.state.operacionId) || '';" "        body.operacion_id = '';"
+sabotaje $F "guardar no anota la operación que devolvió" \
+  "FALLA: guardar antes de generar" \
+  "            CDI.state.operacionId = data.operation_id || '';" ''
+sabotaje $U "una operación nueva arrastra el id de la anterior" \
+  "FALLA: una operación nueva manda un operacion_id vacío" \
+  "            operacionId: null, operationSavedFor: null, orphanDismissedFor: null," \
+  "            operationSavedFor: null, orphanDismissedFor: null," 
 
 # ------------------------------------------------------ el lock (Postgres)
 git checkout -q -- proyecto_maria/

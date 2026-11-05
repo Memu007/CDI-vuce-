@@ -5,11 +5,12 @@ Dos /generate_maria a la vez, con la fila de la cuenta bloqueada mientras se
 mira el tope, se cuenta y se calcula el op_code:
 1. con una operación libre en el plan, pasa una y la otra da 402 (tope);
 2. con lugar, las dos cuentan y tienen op_code distinto;
-3. el mismo operation_id dos veces es una sola operación, contada una vez;
+3. dos regeneraciones distintas de una operación con nueve: una entra, la otra es
+   otra operación y se cuenta;
 4. dos miembros de un estudio con una libre: pasa uno (la cuenta es la org).
 
 Para que la carrera pase de verdad, el primero que calcula su op_code (ya
-contado, sin commit) espera a ver al otro: o el otro también llegó ahí (no
+contado, sin commit) o lee la operación que regenera espera a ver al otro: o el otro también llegó ahí (no
 hubo lock) o Postgres lo muestra esperando un lock (pg_stat_activity). Si no
 ve ninguna de las dos en 5 s, el caso no probó la carrera y falla.
 
@@ -19,6 +20,7 @@ uso (con un Postgres local y descartable, nunca el de producción):
 La base tiene que estar vacía: el script crea las tablas.
 """
 import asyncio
+import json
 import os
 import sys
 import uuid
@@ -67,14 +69,13 @@ def esperando_un_lock():
                   where datname = current_database() and wait_event_type = 'Lock'""")[0][0]
 
 
-# El primero que calcula su op_code espera a ver al otro (ver arriba).
+# El primero que calcula su op_code o lee la operación espera a ver al otro (ver arriba).
 LLEGADAS = []
 VISTO = []
 _op_code_original = main_mod._next_op_code
 
 
-async def _op_code_con_carrera(db, owner_username):
-    codigo = await _op_code_original(db, owner_username)
+async def _esperar_al_otro():
     LLEGADAS.append(1)
     for _ in range(500):
         if len(LLEGADAS) >= 2:
@@ -86,10 +87,27 @@ async def _op_code_con_carrera(db, owner_username):
         await asyncio.sleep(0.01)
     else:
         VISTO.append("nada")
+
+
+async def _op_code_con_carrera(db, owner_username):
+    codigo = await _op_code_original(db, owner_username)
+    await _esperar_al_otro()
     return codigo
 
 
 main_mod._next_op_code = _op_code_con_carrera
+_operacion_original = main_mod._operacion_del_usuario
+
+
+async def _operacion_con_carrera(db, username, operacion_id):
+    """Con un operacion_id, el primero que lee la operación espera a ver al otro."""
+    operacion = await _operacion_original(db, username, operacion_id)
+    if operacion_id:
+        await _esperar_al_otro()
+    return operacion
+
+
+main_mod._operacion_del_usuario = _operacion_con_carrera
 
 
 def ops_de(tabla, campo, valor):
@@ -117,15 +135,18 @@ with TestClient(main_mod.app) as c:
         return nombre, r.json()["access_token"]
 
     def a_la_vez(*pedidos):
-        """Manda los pedidos (token, operation_id) a la vez y devuelve las
-        respuestas en el mismo orden."""
+        """Manda los pedidos (token, operation_id[, operacion_id, valor unitario]) a la vez
+        y devuelve las respuestas en el mismo orden."""
         LLEGADAS.clear()
         VISTO.clear()
 
         def generar(pedido):
-            token, operation_id = pedido
+            token, operation_id, operacion_id, valor = (*pedido, "", None)[:4]
             cuerpo = _pedido()
             cuerpo["operation_id"] = operation_id
+            cuerpo["operacion_id"] = operacion_id
+            if valor:
+                cuerpo["items"][0]["valor_unitario"] = valor
             return c.post("/generate_maria", json=cuerpo, headers={"Authorization": f"Bearer {token}"})
 
         with ThreadPoolExecutor(len(pedidos)) as hilos:
@@ -160,14 +181,23 @@ with TestClient(main_mod.app) as c:
              f"op_code: las dos cuentan con código distinto ({[r.status_code for r in rs]}, "
              f"{ops_de('users', 'username', u)}, {codigos})")
 
-    # 3. El mismo id: una operación, contada una vez.
+    # 3. Una operación con nueve contenidos y dos distintos a la vez: entra uno, el otro cuenta.
     u, t = entrar()
-    rs = a_la_vez((t, "FAC_PG3"), (t, "FAC_PG3"))
+    r = c.post("/generate_maria", json={**_pedido(), "operation_id": "FAC_PG3"},
+               headers={"Authorization": f"Bearer {t}"})
+    assert r.status_code == 200, r.text
+    op = r.json()["operacion_id"]
+    sql("update operations set extra = %s where id = %s",
+        json.dumps({"maria_hashes": [f"h{i}" for i in range(9)]}), op)
+    rs = a_la_vez((t, "FAC_PG3", op, 1.85), (t, "FAC_PG3", op, 1.95))
     hubo_carrera("mismo id")
-    chequear([r.status_code for r in rs] == [200, 200] and ops_de("users", "username", u) == 1
-             and operaciones(u) == [("OP-000001", "MARIA_FAC_PG3.TXT")],
-             f"mismo id: una operación contada una vez ({[r.status_code for r in rs]}, "
-             f"{ops_de('users', 'username', u)}, {operaciones(u)})")
+    huellas = sql("select json_array_length(extra::json -> 'maria_hashes') from operations where id = %s", op)[0][0]
+    devueltas = sorted(r.json().get("operacion_id") == op for r in rs if r.status_code == 200)
+    chequear([r.status_code for r in rs] == [200, 200] and ops_de("users", "username", u) == 2
+             and len(operaciones(u)) == 2 and huellas == 10 and devueltas == [False, True],
+             f"mismo id: una entra con la décima, la otra es otra operación contada "
+             f"({[r.status_code for r in rs]}, {ops_de('users', 'username', u)}, {len(operaciones(u))} operaciones, "
+             f"{huellas} huellas)")
 
     # 4. Dos miembros del estudio con una libre: pasa uno.
     admin, t_admin = entrar(org=True)
