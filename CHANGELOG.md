@@ -9,6 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-11-05 · fix: toda cuenta con una suscripción de Mercado Pago abierta puede cancelarla (COBRO-MP-1, vuelta 4)
 
 - **fix(cobro):** «Cancelar plan» aparece y funciona con una suscripción abierta sea cual sea el estado de la cuenta (sin plan, vencida u otro), así el checkout que la nombra tiene salida; cancelar no da acceso a quien no lo tenía.
+- **fix(cobro):** la confirmación de cancelar promete «el período ya pagado» sólo si cancelar no corta el acceso, como lo decide el servidor; «pago pendiente» queda para el plan vencido.
 
 ## 2026-11-05 · fix: al volver del pago, la pestaña no toma los datos de otro usuario que entró (ORDEN-1b, vuelta 2)
 

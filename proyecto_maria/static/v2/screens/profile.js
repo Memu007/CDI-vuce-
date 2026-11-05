@@ -338,6 +338,7 @@
         };
         billingStatusEl.textContent = labels[status] || status;
         billingStatusEl.dataset.status = status;
+        billingStatusEl.dataset.corta = (b && b.cancelar_corta_acceso) ? '1' : '';
         billingSummary.textContent = labels[status] || status;
 
         // Mostrar uso del mes siempre.
@@ -415,13 +416,14 @@
     }
 
     async function cancelBilling() {
-        // Fuera de trial, active y canceled no hay período pagado: se corta al cancelar.
-        const vencido = billingStatusEl && !['trial', 'active', 'canceled'].includes(billingStatusEl.dataset.status);
+        const corta = billingStatusEl && billingStatusEl.dataset.corta === '1';
+        const pendiente = corta && billingStatusEl.dataset.status === 'past_due';
         const ok = await CDI.confirm({
             title: 'Cancelar plan',
             lead: '¿Seguro que querés cancelar?',
-            text: vencido
-                ? 'Tu plan tiene un pago pendiente. Al cancelar no se cobra más y dejás de usar CDI hasta que actives un plan.'
+            text: corta
+                ? (pendiente ? 'Tu plan tiene un pago pendiente. ' : '')
+                    + 'Al cancelar no se cobra más y dejás de usar CDI hasta que actives un plan.'
                 : 'Vas a poder seguir usando CDI hasta el fin del período ya pagado. Después no se renueva automáticamente. Podés reactivar cuando quieras.',
             acceptText: 'Sí, cancelar',
             cancelText: 'Volver'

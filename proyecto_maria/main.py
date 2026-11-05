@@ -3321,6 +3321,8 @@ async def billing_me(user=Depends(get_current_user), db: AsyncSession = Depends(
         # Con una suscripción abierta el perfil muestra «Cancelar plan», como
         # /api/billing/cancel, sea cual sea el estado.
         "suscripcion_abierta": bool(db_user.mp_preapproval_id),
+        # Lo mismo que decide /api/billing/cancel: el perfil no promete días que no da.
+        "cancelar_corta_acceso": not billing_service.tiene_acceso(db_user),
     }
 
 
