@@ -2151,8 +2151,8 @@ async def reactivate_billing(
     Si ya venció → past_due y el front abre el checkout. Si no venció:
     una prueba vuelve a 'trial' sin cobrar; un plan pagado con Mercado Pago
     sigue 'canceled' hasta que se pague una suscripción nueva, que cobra
-    ahora y suma 30 días desde el fin del período ya pagado (COBRO-MP-2,
-    D7.3). Reactivar nunca deja la cuenta 'active' sin un pago.
+    ahora y suma 30 días desde el fin del período ya pagado. Reactivar nunca
+    deja la cuenta 'active' sin un pago.
     """
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
@@ -3284,7 +3284,7 @@ async def billing_me(user=Depends(get_current_user), db: AsyncSession = Depends(
         "clients_limit": plan["clients"],
         "users_limit": plan["users"],
         "organization_id": db_user.organization_id,
-        # «Próximo cobro» sólo si hay una suscripción que se renueva (D7.3). El id
+        # «Próximo cobro» sólo si hay una suscripción que se renueva. El id
         # se guarda al abrir el checkout, antes de pagar: hace falta un pago de MP.
         "renueva": (billing_entity.billing_status == "active" and bool(db_user.mp_preapproval_id)
                     and getattr(billing_entity, "payment_provider", None) == "mercadopago"),
@@ -10187,7 +10187,7 @@ async def demo_confirm_payment(preference_id: str):
 @app.get("/api/payments/success")
 async def payment_success(preference_id: str = None, payment_id: str = None, demo: bool = False):
     """Página de vuelta después del pago. No dice que la cuenta se activó:
-    eso lo hace el aviso de Mercado Pago (COBRO-MP-2, D9)."""
+    eso lo hace el aviso de Mercado Pago."""
     if demo:
         titulo = "Pago de prueba"
         lineas = ("Esto fue un pago de prueba: no se cobró nada y tu cuenta no cambió.",)
@@ -10405,7 +10405,7 @@ def _leer_cobro_autorizado_mp(cobro_id: str) -> dict:
 
 class _SuscripcionMPError(Exception):
     """No se pudo leer o cancelar una suscripción en Mercado Pago: no se
-    cambia nada en CDI (COBRO-MP-2)."""
+    cambia nada en CDI."""
 
 
 _ESTADOS_SUSCRIPCION_MP = {"pending", "authorized", "paused", "cancelled"}
@@ -10457,7 +10457,7 @@ def _cancelar_suscripcion_mp(sid: str) -> None:
 
 def _demo_permitida() -> bool:
     """El checkout de prueba existe sólo en desarrollo y pruebas; si falta la
-    variable, no hay demo (COBRO-MP-2, D7.4)."""
+    variable, no hay demo."""
     return os.getenv("ENVIRONMENT") in ("development", "test", "testing")
 
 
@@ -10575,8 +10575,7 @@ async def _guardar_pago_mp(session) -> bool:
 def _extender_periodo(cuenta, update: dict) -> None:
     """Un pago de plan suma 30 días desde el fin del período si todavía no
     venció (prueba, activa o cancelada con días por delante), y desde hoy si
-    no: pagar antes de que venza no pierde los días que quedaban (COBRO-MP-1;
-    COBRO-MP-2, D7.1)."""
+    no: pagar antes de que venza no pierde los días que quedaban."""
     if update.get("action") == "topup" or "trial_ends_at" not in update:
         return
     ahora = datetime.now(timezone.utc)
@@ -10947,7 +10946,7 @@ async def billing_checkout(
         if not set((await db.execute(otros_con_sid)).scalars().all()) <= nombres:
             raise HTTPException(status_code=409, detail="Otro miembro de tu organización está pagando. Probá de nuevo en unos minutos.")
 
-    # Modo demo cuando no hay credenciales, sólo en desarrollo y pruebas (D7.4)
+    # Modo demo cuando no hay credenciales, sólo en desarrollo y pruebas
     if not billing_service.is_configured():
         if not _demo_permitida():
             raise HTTPException(status_code=503, detail="Los pagos no están disponibles en este momento. Probá más tarde.")

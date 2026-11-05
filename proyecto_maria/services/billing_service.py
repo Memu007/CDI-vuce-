@@ -124,7 +124,7 @@ def recarga_entra(cuenta) -> tuple[bool, int]:
 
 def tiene_acceso(cuenta, ahora: datetime | None = None) -> bool:
     """trial y active tienen acceso; canceled, hasta el fin del período ya
-    pagado (COBRO-MP-2, C2); el resto, no."""
+    pagado; el resto, no."""
     status = getattr(cuenta, "billing_status", "none")
     if status in ("trial", "active"):
         return True
