@@ -8,7 +8,9 @@ let operacionIdActual = '';
 // Una respuesta que llega después de empezar otra carga no le anota su id a ésa.
 let cargaActual = 0;
 function nuevaCarga() { operacionIdActual = ''; cargaActual++; }
-function anotarOperacion(carga, id) { if (carga === cargaActual) operacionIdActual = id; }
+// El cliente se toma al pedir: la respuesta tardía se guarda en el de su carga.
+function cargaEnCurso() { return { n: cargaActual, cliente: (clientSelect && clientSelect.value) || '' }; }
+function anotarOperacion(carga, id) { if (carga.n === cargaActual) operacionIdActual = id; }
 const UPLOAD_COOLDOWN_MS = 5000; // 5 segundos entre uploads
 let uploadCooldownTimer = null;
 
@@ -3379,7 +3381,7 @@ async function generateMariaTxt() {
             };
         }
 
-        const carga = cargaActual;
+        const carga = cargaEnCurso();
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -3732,10 +3734,10 @@ async function refreshMappingStatusHint(){
     } catch(_){ }
 }
 
-async function saveOperationToHistory(items, operacionId = operacionIdActual, carga = cargaActual) {
+async function saveOperationToHistory(items, operacionId = operacionIdActual, carga = cargaEnCurso()) {
     
     // Guardar siempre que hay cliente seleccionado (toggle es opcional)
-    if (!clientSelect || !clientSelect.value) {
+    if (!carga.cliente) {
         return;
     }
     
@@ -3747,7 +3749,7 @@ async function saveOperationToHistory(items, operacionId = operacionIdActual, ca
     
     
     try {
-        const res = await fetch(`/api/clientes/${clientSelect.value}/operaciones`, {
+        const res = await fetch(`/api/clientes/${carga.cliente}/operaciones`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ operacion_id: operacionId, resumen, items })

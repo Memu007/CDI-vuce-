@@ -9,6 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-11-05 · fix: lo que no se entrega no se cobra (COBRO-CORTE-1)
 
 - **fix(cobro):** generar cuenta la operación sólo si el archivo quedó escrito. Una respuesta que llega cuando ya empezó otra carga no le pone su operación a la nueva y, en v2, se guarda en el cliente de su carga. Un id de operación con caracteres que la base no guarda es una operación nueva, no un error. Borrar un cliente espera a la generación en curso de la cuenta, y su aviso dice que las operaciones quedan «Sin cliente».
+- **fix(cobro):** regenerar con una falla deja entero el archivo ya entregado. La respuesta tardía se guarda con el cliente y los valores de su carga también en v1, y en v2 no marca «Listo» la carga nueva. Un guardado que esperaba al borrado de su cliente da 404.
 
 ## 2026-11-05 · fix: cancelar y reactivar en una organización actúan sobre el plan del estudio (COBRO-MP-2)
 

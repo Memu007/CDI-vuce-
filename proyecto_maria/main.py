@@ -5952,17 +5952,32 @@ async def _contar_maria(db: AsyncSession, username: str, operacion_id: str, cont
 async def _escribir_y_confirmar(db: AsyncSession, username: str, archivo: str, txt: str):
     """El conteo se confirma sólo con el archivo escrito: lo que no se entrega no queda cobrado."""
     ruta = os.path.join(_user_downloads_dir(username), archivo)
+    temporal, respaldo = ruta + ".parcial", ruta + ".anterior"
     nuevo = not os.path.exists(ruta)
     try:
         # newline="": el archivo lleva los CRLF tal cual, sin traducir.
-        with open(ruta, "w", encoding="utf-8", newline="") as f:
+        with open(temporal, "w", encoding="utf-8", newline="") as f:
             f.write(txt)
+        if not nuevo:
+            # Otro nombre del archivo ya entregado, para devolverlo si el commit falla;
+            # uno que quedó de un proceso cortado se descarta.
+            if os.path.exists(respaldo):
+                os.remove(respaldo)
+            os.link(ruta, respaldo)
+        # El reemplazo es atómico: el archivo ya entregado nunca queda a medias.
+        os.replace(temporal, ruta)
         await db.commit()
     except BaseException:
         await db.rollback()
-        if nuevo and os.path.exists(ruta):
+        if not nuevo and os.path.exists(respaldo):
+            os.replace(respaldo, ruta)
+        elif nuevo and os.path.exists(ruta):
             os.remove(ruta)
         raise
+    finally:
+        for resto in (temporal, respaldo):
+            if os.path.exists(resto):
+                os.remove(resto)
 
 
 async def _get_owned_client(
@@ -7278,11 +7293,12 @@ async def delete_cliente(
     email.
     """
     username = user["username"]
-    client = await _get_owned_client(db, client_id, username)
 
     try:
         # Reescribe extra de sus operaciones: sin el candado de generar, pisaría una huella nueva.
         await _cuenta_bloqueada(db, username)
+        # Después del candado: un borrado o un guardado que esperaba ve el cliente ya borrado.
+        client = await _get_owned_client(db, client_id, username)
         op_rows = await db.execute(
             sa_select(OperationModel).where(
                 OperationModel.client_id == client_id,
@@ -7584,7 +7600,6 @@ async def save_client_operation(
     """Guarda una operación en el historial del cliente. Con el operacion_id de una del usuario,
     ya contada, la completa y la pasa a este cliente; sin él, cuenta y crea otra."""
     username = user["username"]
-    client = await _get_owned_client(db, client_id, username)
 
     try:
         data = _sin_nul(await request.json())
@@ -7594,6 +7609,7 @@ async def save_client_operation(
         # Con la cuenta bloqueada, como al generar: un guardado y una
         # generación de la misma operación a la vez no crean dos.
         await _cuenta_bloqueada(db, username)
+        client = await _get_owned_client(db, client_id, username)
         operation = await _operacion_del_usuario(db, username, str(data.get("operacion_id") or ""))
         # Lo que viene de afuera se recorta al largo de la columna: en
         # Postgres un dato más largo tira abajo el guardado (GUARDAR-1).

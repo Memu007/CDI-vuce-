@@ -652,6 +652,7 @@
     async function generateMaria() {
         if (generateInFlight) return;
         generateInFlight = true;
+        if (CDI.estudios) await CDI.estudios.listo();
 
         const items = (CDI.state && CDI.state.items) || [];
         if (!items.length) {
@@ -662,7 +663,7 @@
 
         // Una carga nueva reemplaza CDI.state: la respuesta tardía se anota en la suya.
         const carga = CDI.state;
-        if (CDI.estudios) await CDI.estudios.listo();   // ESTUDIO-1
+        const foto = fotoDeLaPantalla();
         const body = buildMariaRequest();
         // Regenerar la misma operación no la cuenta otra vez: el servidor la reconoce por su id.
         body.operacion_id = carga.operacionId || '';
@@ -707,20 +708,14 @@
                 throw new Error(texto || 'No se pudo generar el archivo');
             }
             carga.operacionId = data.operacion_id || '';
-            lastMaria = {
-                filename: data.filename,
-                download_url: data.download_url,
-                content: data.content || '',
-                warnings: data.warnings || []
-            };
             CDI.track('maria_generated', {
                 items: items.length,
                 filename: data.filename,
                 duration_ms: dur
             });
-            renderReady();
+            if (carga === CDI.state) mostrarListo(data);
             // Best-effort: guardar en historial del cliente activo (si hay)
-            saveOperationToHistory(items, data, carga).catch(err => {
+            saveOperationToHistory(items, data, carga, foto).catch(err => {
                 console.warn('[history] no se pudo guardar operacion', err);
             });
             // Best-effort: aprender productos en catalogo del proveedor
@@ -734,6 +729,17 @@
         } finally {
             generateInFlight = false;
         }
+    }
+
+    // Lo que muestra «Listo» es de la carga en pantalla: una respuesta tardía no lo pisa.
+    function mostrarListo(data) {
+        lastMaria = {
+            filename: data.filename,
+            download_url: data.download_url,
+            content: data.content || '',
+            warnings: data.warnings || []
+        };
+        renderReady();
     }
 
     // La cabecera que controla el servidor antes de generar (MARIA-1b), tal
@@ -1143,7 +1149,13 @@
         CDI.track && CDI.track('op_orphan_resolved', { via: via });
     }
 
-    async function saveOperationToHistory(items, mariaData, carga) {
+    // Totales y valores del despachante, tomados al pedir: la carga nueva no los pisa.
+    function fotoDeLaPantalla() {
+        return { stats: (lastValidation && lastValidation.estadisticas) || {},
+                 maria: CDI.despachante ? CDI.despachante.valores() : {} };
+    }
+
+    async function saveOperationToHistory(items, mariaData, carga, foto = fotoDeLaPantalla()) {
         carga = carga || (CDI.state = CDI.state || {});
         const cliente = carga.clienteActivo || null;
         if (!cliente || !cliente.id) {
@@ -1157,7 +1169,7 @@
         if (savedFor && savedFor.cliente_id === cliente.id && savedFor.op_code === opCode) {
             return { ok: true, reason: 'ya_guardada' };
         }
-        const stats = (lastValidation && lastValidation.estadisticas) || {};
+        const stats = foto.stats;
         const op = carga.operacion || {};
         const total_valor = Number(stats.total_valor_usd || 0);
         const total_peso = Number(stats.total_peso_kg || 0);
@@ -1178,7 +1190,7 @@
                 // MARIA-4: para proponer el último banco y la última empresa.
                 maria: Object.assign(
                     { banco_bcra: '', empresa_digitalizacion: '', iva_adicional: '' },
-                    CDI.despachante ? CDI.despachante.valores() : {},
+                    foto.maria,
                     { items: items.map(it => ({ estado: it.estado || null, iva_adicional: it.iva_adicional || null })) }
                 )
             },
