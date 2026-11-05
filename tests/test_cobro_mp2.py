@@ -491,14 +491,48 @@ def test_en_una_org_un_miembro_que_no_la_abrio_no_la_cancela(client):
     assert _leer(nombres["abrio"])["mp_preapproval_id"] == sid
 
 
-def test_en_una_org_reactivar_lo_pagado_lleva_al_checkout(client):
+@pytest.mark.parametrize("tipo, queda", [("premium", "canceled"), ("topup", "trial")])
+def test_en_una_org_reactivar_lo_pagado_lleva_al_checkout(client, tipo, queda):
+    """Los pagos de la org se anotan como «org:<id>»: una recarga sola no es un plan."""
+    from proyecto_maria.database.models import PagoMercadoPagoAplicado
     from tests.test_cobro_mp1 import _leer_org
     nombres, sid, org_id, fin = _org_con_suscripcion(client, "duena")
+
+    async def _pago():
+        async for db in get_async_session():
+            db.add(PagoMercadoPagoAplicado(payment_id=_unique("pago"), cuenta=f"org:{org_id}", tipo=tipo))
+            await db.commit()
+            return
+    asyncio.new_event_loop().run_until_complete(_pago())
     assert client.post("/api/billing/cancel").status_code == 200
     r = client.post("/api/billing/reactivate")
     assert r.status_code == 200, r.text
-    assert r.json()["needs_checkout"] is True and r.json()["billing_status"] == "canceled", r.json()
-    assert _leer_org(org_id)["billing_status"] == "canceled"
+    assert r.json()["needs_checkout"] is (queda == "canceled") and r.json()["billing_status"] == queda, r.json()
+    assert _leer_org(org_id)["billing_status"] == queda
+
+
+def test_si_una_de_varias_no_se_cancela_la_cancelada_no_queda_anotada(client):
+    from tests.test_cobro_mp1 import _leer_org
+    nombres, sid, org_id, _ = _org_con_suscripcion(client, "duena")
+    otra = f"sus-{nombres['miembro']}"
+    SUS[otra] = "pending"
+    _set_user(nombres["miembro"], mp_preapproval_id=otra)
+    # Se cancelan en orden de usuario: falla la segunda.
+    falla, cancela = sorted([(nombres["abrio"], sid), (nombres["miembro"], otra)], reverse=True)
+
+    def _falla_una(request):
+        s = _RUTA_SUS.fullmatch(str(request.url)).group(1)
+        if s == falla[1]:
+            return httpx.Response(500, json={})
+        if request.method == "PUT":
+            SUS[s] = "cancelled"
+        return httpx.Response(200, json={"id": s, "status": SUS[s]})
+    FALLA["PUT"] = FALLA["GET"] = _falla_una
+    r = client.post("/api/billing/cancel")
+    assert r.status_code == 503, r.text
+    assert _leer_org(org_id)["billing_status"] == "active"
+    assert SUS[cancela[1]] == "cancelled" and _leer(cancela[0])["mp_preapproval_id"] is None
+    assert SUS[falla[1]] != "cancelled" and _leer(falla[0])["mp_preapproval_id"] == falla[1]
 
 
 def test_no_se_saca_del_estudio_a_quien_abrio_la_suscripcion(client):

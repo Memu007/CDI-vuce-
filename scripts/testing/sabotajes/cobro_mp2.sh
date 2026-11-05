@@ -155,6 +155,13 @@ sabotaje $M "en una org, reactivar mira al usuario y no a la org" \
     if entidad.billing_status != \"canceled\":" "    entidad, es_org = db_user, False
 
     if entidad.billing_status != \"canceled\":"
+sabotaje $M "si una de varias no se cancela, las canceladas siguen anotadas" \
+  "FAILED $T::test_si_una_de_varias_no_se_cancela_la_cancelada_no_queda_anotada" \
+  "            await db.commit()
+            raise HTTPException(status_code=503, detail=no_se_pudo)" "            raise HTTPException(status_code=503, detail=no_se_pudo)"
+sabotaje $M "en una org, los pagos se buscan con el nombre del usuario" \
+  "FAILED $T::test_en_una_org_reactivar_lo_pagado_lleva_al_checkout[topup-trial]" \
+  "f\"org:{entidad.id}\" if es_org else db_user.username):" "db_user.username):"
 sabotaje $M "se saca del estudio a quien abrió la suscripción" \
   "FAILED $T::test_no_se_saca_del_estudio_a_quien_abrio_la_suscripcion" \
   "    if member.mp_preapproval_id:" "    if False:"
