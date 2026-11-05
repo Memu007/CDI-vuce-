@@ -113,10 +113,11 @@ elif ! pantalla_s1 >"$TMPD/base_pantalla.log"; then
 fi
 
 # --- un solo lugar decide si un token es la sesión vigente
-sabotaje pytest $D "un usuario con jti no lo compara" \
+sabotaje pytest $D "un usuario sin jti (de antes de la columna) no entra" \
   'if user.active_jti is not None and payload.get("jti") != user.active_jti:' \
   'if payload.get("jti") != user.active_jti:' \
-  "FAILED $T::test_cambiar_clave_rota_la_sesion_de_quien_la_cambia" "FAILED $T::test_cerrar_sesion_de_un_usuario_sin_jti_revoca"
+  "FAILED $T::test_cambiar_clave_rota_la_sesion_de_quien_la_cambia" "FAILED $T::test_cambiar_clave_con_cookie_conserva_el_navegador" \
+  "FAILED $T::test_cambiar_clave_revoca_en_el_mismo_commit_que_la_clave" "FAILED $T::test_cerrar_sesion_de_un_usuario_sin_jti_revoca"
 sabotaje pytest $D "abrir el token sin verificar la firma" \
   'jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])' \
   'jwt.decode(token, options={"verify_signature": False})' \
@@ -182,8 +183,12 @@ sabotaje pytest $M "la clave equivocada da 401 y manda al login" \
   'raise HTTPException(status_code=401, detail="La contraseña actual es incorrecta")' \
   "FAILED $T::test_cambiar_email_con_clave_equivocada_falla_y_no_cambia_nada" "FAILED $T::test_cambiar_clave_mal_no_revoca_nada" "assert 401 == 400"
 sabotaje pytest $M "la clave equivocada no suma al tope" \
-  $'        await limites_auth.sumar_fallo(clave_intentos)\n' '' \
+  $'    if not espera and await limites_auth.sumar_fallo(clave_intentos) > 5:\n        espera = await limites_auth.segundos_bloqueado(clave_intentos)\n' '' \
   "FAILED $T::test_la_clave_actual_tiene_tope_de_intentos"
+sabotaje pytest $M "el intento se cuenta después de probar la clave" \
+  $'    if not espera and await limites_auth.sumar_fallo(clave_intentos) > 5:\n        espera = await limites_auth.segundos_bloqueado(clave_intentos)\n    if espera:\n        raise HTTPException(status_code=429, detail=f"Demasiados intentos fallidos. Intente de nuevo en {espera} segundos.")\n    if not await run_in_threadpool(verify_password, clave, hash_guardado):\n' \
+  $'    if espera:\n        raise HTTPException(status_code=429, detail=f"Demasiados intentos fallidos. Intente de nuevo en {espera} segundos.")\n    if not await run_in_threadpool(verify_password, clave, hash_guardado):\n        await limites_auth.sumar_fallo(clave_intentos)\n' \
+  "FAILED $T::test_el_tope_de_la_clave_actual_vale_para_pedidos_a_la_vez"
 
 # --- cambiar el email pide la contraseña actual
 sabotaje pytest $M "cambiar el email sin clave no verifica nada" \
@@ -206,7 +211,7 @@ sabotaje pytest $M "el mismo email en mayúsculas pide la contraseña" \
   'cambia_email = "email" in body and body.get("email") != u.email' \
   "FAILED $T::test_guardar_el_perfil_con_el_mismo_email_no_pide_clave" "assert 400 == 200"
 sabotaje pytest $M "un email mal escrito pide la contraseña en vez de rechazarse" \
-  $'            raise HTTPException(status_code=400, detail="Email no válido")\n' '' \
+  $'            raise HTTPException(status_code=400, detail="Email no válido")\n' $'            pass\n' \
   "FAILED tests/test_user_profile_coverage.py::test_update_user_profile_email_invalido_400" "Email no válido"
 
 # --- la carrera del login en Postgres: sólo con un Postgres local y descartable

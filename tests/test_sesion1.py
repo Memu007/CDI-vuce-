@@ -482,6 +482,7 @@ def test_cerrar_sesion_de_un_usuario_sin_jti_revoca():
     u, _ = _usuario()
     t = _login(u)
     _poner(u, active_jti=None)
+    assert _entra(t) == 200
     assert _http().post("/auth/logout", headers=_bearer(t)).status_code == 200
     assert _entra(t) == 401
 
