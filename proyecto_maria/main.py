@@ -1247,6 +1247,27 @@ async def _migrate_widen_pieza_column():
         print(f"⚠️ Migracion widen_pieza (no critica): {mig_err!r}")
 
 
+async def _migrate_catalogo_sin_tope():
+    """Lleva product_key y descripcion del catálogo a text: el tope de largo lo
+    pone catalog_service.MAX_DESCRIPCION, para que se vea como un 400."""
+    from proyecto_maria.database.connection import engine, IS_SQLITE
+
+    if IS_SQLITE:
+        return
+    try:
+        async with engine.begin() as conn:
+            res = await conn.exec_driver_sql(
+                "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() "
+                "AND table_name = 'vendor_catalog_products' AND column_name IN ('product_key', 'descripcion') "
+                "AND character_maximum_length IS NOT NULL"
+            )
+            for (columna,) in res.fetchall():
+                await conn.exec_driver_sql(f"ALTER TABLE vendor_catalog_products ALTER COLUMN {columna} TYPE TEXT")
+                print(f"✅ Migracion: vendor_catalog_products.{columna} pasa a TEXT")
+    except Exception as mig_err:
+        print(f"⚠️ Migracion catalogo_sin_tope (no critica): {mig_err!r}")
+
+
 async def _migrate_add_grupo_id_column():
     """Agrega columna grupo_id a operation_items para agrupar ítems (unidades clasificatorias)."""
     from proyecto_maria.database.connection import engine, IS_SQLITE
@@ -1516,6 +1537,7 @@ async def lifespan(app: FastAPI):
     await _migrate_add_client_fecha_inic_activ()
     await _migrate_sync_operations_columns()
     await _migrate_widen_pieza_column()
+    await _migrate_catalogo_sin_tope()
     await _migrate_add_grupo_id_column()
     await _migrate_add_unidad_column()
     await _migrate_add_product_history_counts()
@@ -9430,20 +9452,20 @@ async def delete_ncm_nota(
 # parámetros de los SQLite viejos.
 _HISTORIAL_FILAS_POR_SENTENCIA = 150
 
-# Topes de lo que se guarda en el historial. La descripción, el mismo de un
-# renglón del despacho (`despacho_lector._MAX_DESCRIPCION`); la NCM, el de
-# las columnas de NCM del resto de la base (String(20)). Sin tope, 30 MB
-# entraban en una sola confirmación.
-_HISTORIAL_MAX_DESCRIPCION = 2000
+# Tope de la NCM del historial: el de las columnas de NCM del resto de la
+# base (String(20)). La descripción usa el del catálogo, medido en NFC.
 _HISTORIAL_MAX_NCM = 20
 
 
 def _problema_historial(descripcion: str, ncm: str) -> str | None:
     """Por qué el historial no puede guardar este par, o None. Postgres no
     guarda el carácter nulo y ninguna base guarda medio par UTF-16."""
-    for que, texto, tope in (("La descripción", descripcion, _HISTORIAL_MAX_DESCRIPCION),
-                             ("La NCM", ncm, _HISTORIAL_MAX_NCM)):
-        if len(texto) > tope:
+    from proyecto_maria.core.catalog_service import MAX_DESCRIPCION
+
+    largo_desc = len(unicodedata.normalize("NFC", descripcion))
+    for que, texto, largo, tope in (("La descripción", descripcion, largo_desc, MAX_DESCRIPCION),
+                                    ("La NCM", ncm, len(ncm), _HISTORIAL_MAX_NCM)):
+        if largo > tope:
             return f"{que} pasa de {tope} caracteres."
         if "\x00" in texto:
             return f"{que} tiene un carácter nulo."
@@ -11218,6 +11240,8 @@ async def catalog_save_products(
         )
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logging.exception("catalog_save error")
         raise HTTPException(status_code=500, detail=str(e))
@@ -11259,7 +11283,7 @@ async def catalog_get_vendor(
 
 def _validate_product_key(product_key: str) -> None:
     """Sanity-check defensivo de la clave de producto que llega por path."""
-    if not product_key or len(product_key) > 500:
+    if not product_key or len(product_key) > catalog_svc.MAX_DESCRIPCION:
         raise HTTPException(status_code=400, detail="product_key inválido")
 
 
@@ -11291,6 +11315,8 @@ async def catalog_update_product(
         return {"success": True, "vendor_id": vendor_id, "producto": updated}
     except HTTPException:
         raise
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logging.exception("catalog_update_product error")
         raise HTTPException(status_code=500, detail=str(e))

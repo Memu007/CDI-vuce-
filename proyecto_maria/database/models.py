@@ -448,8 +448,8 @@ class VendorCatalogProduct(Base):
     vendor_id = Column(String(100), nullable=False)
     vendor_nombre = Column(String(200), nullable=True)
 
-    product_key = Column(String(300), nullable=False)
-    descripcion = Column(String(500), nullable=True)
+    product_key = Column(Text, nullable=False)
+    descripcion = Column(Text, nullable=True)
     ncm = Column(String(20), nullable=True)
     origen = Column(String(5), nullable=True)
     valor_unitario = Column(Float, nullable=True)

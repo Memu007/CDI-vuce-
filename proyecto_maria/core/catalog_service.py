@@ -38,6 +38,16 @@ from proyecto_maria.database.models import VendorCatalogProduct
 # descripciones de facturas tienen ruido (marcas, codigos) y perdemos matches.
 FUZZY_THRESHOLD = 0.80
 
+# La descripción más larga que guardan el catálogo y la memoria del cliente,
+# medida en NFC, la forma en que se guarda.
+MAX_DESCRIPCION = 2000
+
+
+def _validar_largo(descripcion: str) -> None:
+    if len(unicodedata.normalize("NFC", descripcion)) > MAX_DESCRIPCION:
+        raise ValueError(f"La descripción pasa de {MAX_DESCRIPCION} caracteres.")
+
+
 # Patron valido para vendor_id (slug generado por _vendor_key).
 _VENDOR_ID_RE = re.compile(r"^[a-z0-9_]{1,60}$")
 
@@ -332,6 +342,9 @@ async def save_products(
 
     vendor_id = _vendor_key(vendor_name)
 
+    for prod in productos_in:
+        _validar_largo((prod.get("descripcion") or "").strip())
+
     saved = 0
     updated = 0
 
@@ -451,6 +464,7 @@ async def update_product(
     new_desc = row.descripcion or ""
     if "descripcion_original" in updates and updates["descripcion_original"] is not None:
         val = str(updates["descripcion_original"]).strip()
+        _validar_largo(val)
         if val:
             new_desc = val
 
