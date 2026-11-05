@@ -5,9 +5,11 @@ de las columnas y el corte no se ve.
    versión anterior (un worktree, e099744 por defecto): registra un usuario,
    un cliente y guarda un producto de 300 caracteres en el catálogo de un
    proveedor, lo más largo que esa versión acepta.
-2. Arranca la versión nueva sobre la misma base, dos veces.
+2. Arranca la versión nueva sobre la misma base: una con la tabla tomada por
+   otra conexión y dos sin.
 
 Comprueba:
+- que con la tabla tomada el arranque falla en vez de seguir con el corte;
 - que product_key y descripcion del catálogo pasan a text y la fila vieja
   queda igual, y que arrancar otra vez no cambia nada;
 - que guardar-uso con una descripción de 301, 501 y 2000 caracteres responde
@@ -149,6 +151,21 @@ try:
         def __exit__(self, *exc):
             self.portal.call(engine.dispose)
             return super().__exit__(*exc)
+
+    # Con la tabla tomada por otra conexión, la migración no puede pasar las
+    # columnas a text: el arranque tiene que fallar, no seguir con el corte.
+    tomada = psycopg2.connect(URL_BASE)
+    try:
+        tomada.cursor().execute("select 1 from vendor_catalog_products limit 1")
+        try:
+            with Arranque(main_mod.app, raise_server_exceptions=False):
+                arranco = True
+        except Exception:
+            arranco = False
+    finally:
+        tomada.close()
+    chequear(not arranco and columnas()[0][1] == "character varying",
+             f"con la tabla tomada el arranque falla en vez de seguir con las columnas cortas: {columnas()}")
 
     for vez in ("primer", "segundo"):
         with Arranque(main_mod.app, raise_server_exceptions=False):
