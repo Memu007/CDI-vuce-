@@ -2112,17 +2112,21 @@ def test_confirmar_un_ncm_saca_el_nul_del_origen_y_del_proveedor(auth_override, 
     assert _contar(VendorCatalogProduct, vendor_nombre=proveedor) == 1
 
 
-def test_confirmar_un_ncm_dice_si_no_guardo_el_historial(auth_override, client, monkeypatch):
+@pytest.mark.parametrize("causa", ["la base falla", "crece al normalizar"])
+def test_confirmar_un_ncm_dice_si_no_guardo_el_historial(auth_override, client, monkeypatch, causa):
     """Si el historial del cliente no se escribe, la respuesta lo dice; el uso
-    del NCM ya quedó confirmado."""
+    del NCM ya quedó confirmado. 2000 U+0958 pasan el tope y en NFC son 4000."""
     from proyecto_maria.services import client_memory
 
     async def falla(*args, **kwargs):
         raise RuntimeError("la base no anda")
 
-    monkeypatch.setattr(client_memory, "upsert_client_product_history", falla)
+    otros = {"descripcion": "\u0958" * 2000} if causa == "crece al normalizar" else {}
+    if not otros:
+        monkeypatch.setattr(client_memory, "upsert_client_product_history", falla)
     cid = _crear_cliente(client)
-    descripcion, r = _guardar_uso(client, cid)
+    descripcion, r = _guardar_uso(client, cid, **otros)
+    descripcion = otros.get("descripcion", descripcion)
     assert r.status_code == 200 and r.json() == {"success": True, "historial_guardado": False}, r.text
     assert _contar(NcmHistorial, descripcion=descripcion) == 1
     assert _catalogo(client, cid) == []

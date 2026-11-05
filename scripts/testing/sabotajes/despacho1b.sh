@@ -7,7 +7,7 @@
 # sólo se ven en Postgres, con scripts/testing/despacho1b_postgres.py.
 # Trabaja en un worktree descartable con su propia SQLite y sin terceros: no
 # toca tu copia ni datos compartidos. Sale con error si un sabotaje no
-# encuentra su patrón o no pone rojo donde tiene que ponerlo.
+# encuentra su patrón, no pone rojo donde tiene que ponerlo o no se corrió.
 set -uo pipefail
 REPO="$(git rev-parse --show-toplevel)"
 SHA="$(git -C "$REPO" rev-parse "${1:-HEAD}")"
@@ -816,11 +816,17 @@ sabotaje "el origen que no es texto" "$LECTOR" \
   '' \
   "$TODO_O_NADA[origen numero]" "$ORI[lista]" "$ORI[numero]"
 
-sabotaje "confirmar un NCM no avisa que no guardó el historial" proyecto_maria/main.py \
-  '        historial_guardado = False
+sabotaje "confirmar un NCM no avisa que la base falló" proyecto_maria/main.py \
+  '        logging.warning("ncm confirmation memory unavailable: %s", err)
+        historial_guardado = False
 ' \
-  '' \
-  test_confirmar_un_ncm_dice_si_no_guardo_el_historial
+  '        logging.warning("ncm confirmation memory unavailable: %s", err)
+' \
+  "test_confirmar_un_ncm_dice_si_no_guardo_el_historial[la base falla]"
+sabotaje "confirmar un NCM no avisa que el producto no entró" proyecto_maria/main.py \
+  '            wrote_client = historial_guardado = entry is not None' \
+  '            wrote_client = entry is not None' \
+  "test_confirmar_un_ncm_dice_si_no_guardo_el_historial[crece al normalizar]"
 
 # Lo que sólo Postgres muestra: la espera por la fila y la fila que cambia de
 # clave o se borra mientras se espera. Sin PG_DSN no se corren y se dice.
@@ -853,4 +859,4 @@ sabotaje_pg "el upsert no reintenta si la fila se fue" \
 echo "sin Postgres, no corridos: $NO_CORRIDOS"
 
 echo "sabotajes sin rojo: $FALLAS"
-[ "$FALLAS" -eq 0 ]
+[ "$FALLAS" -eq 0 ] && [ "$NO_CORRIDOS" -eq 0 ]
