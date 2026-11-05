@@ -630,7 +630,7 @@ class TestAuthenticationFailures:
         print("Note: Implement JWT expiration testing with time manipulation")
 
     def test_logout_invalidates_token(self):
-        """Test that logout properly invalidates the token"""
+        """Cerrar sesión borra cookies; el JWT es stateless y no se invalida."""
         # Login
         login_response = client.post("/auth/login", json={
             "username": "demo",
@@ -643,7 +643,7 @@ class TestAuthenticationFailures:
         token = login_response.json()["access_token"]
         headers = {"Authorization": f"Bearer {token}"}
 
-        # Logout
+        # Sin cookie csrf_token no hay token que mandar: con CSRF_ENFORCE da 403.
         logout_response = client.post("/logout", headers=headers)
 
         # Try to use token after logout
