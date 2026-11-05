@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Negativos de RENDIMIENTO-1c: cada sabotaje vuelve a validar el PDF en el
 # proceso de la app, saca la fila por usuario, cuenta hojas antes de mirar
-# si está encriptado o culpa al PDF cuando el validador se cae, y la prueba tiene que ponerse roja.
+# si está encriptado, culpa al PDF cuando el validador se cae o cuando no hubo
+# lugar, o deja de topear la espera, y la prueba tiene que ponerse roja.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/rendimiento1c.sh [SHA]
 # Trabaja en un worktree descartable: no toca tu copia ni datos compartidos.
@@ -69,6 +70,42 @@ sabotaje $FS "un validador que se cae vuelve a ser un PDF inválido" \
   'raise HTTPException(500, "No pudimos revisar el PDF. Probá de nuevo en un rato.")' \
   'raise HTTPException(400, "Invalid PDF file: no pudimos abrirlo")' \
   'FAILED tests/test_rendimiento1c.py::test_un_validador_que_se_cae_es_un_error_nuestro'
+sabotaje proyecto_maria/main.py "la lectura de despachos no pasa el usuario" \
+  'max_size=_get_max_upload_bytes(),
+                                      clave=user["username"])' \
+  'max_size=_get_max_upload_bytes())' \
+  'despacho: B esperó detrás de las bombas de A'
+sabotaje $DL "esperar el turno del usuario no tiene tiempo máximo" \
+  'await asyncio.wait_for(fila[0].acquire(), timeout=limite_s)' \
+  'await fila[0].acquire()' \
+  'FAILED tests/test_rendimiento1c.py::test_esperar_un_lugar_no_culpa_al_archivo'
+sabotaje $DL "sin tope de validaciones a la vez" \
+  '_VALIDANDO_A_LA_VEZ = 2' '_VALIDANDO_A_LA_VEZ = 1000' \
+  "(['b', 'c'], 'pasó')"
+sabotaje $DL "la fila del usuario no se borra" \
+  '        if not fila[1]:
+            del filas[clave]' \
+  '        if not fila[1]:
+            pass' \
+  "(['b', 'c'], {'"
+sabotaje $DL "esperar un lugar libre vuelve a culpar al archivo" \
+  '        if not lanzado:' '        if False:' \
+  "(['b', 'c'], (400, 'No pudimos abrir el PDF: tardó demasiado"
+sabotaje $DL "esperar el turno del usuario vuelve a culpar al archivo" \
+  '        except TimeoutError:
+            raise SinLugar from None
+        try:' \
+  '        except TimeoutError:
+            raise
+        try:' \
+  "(['a'], (400, 'No pudimos abrir el PDF: tardó demasiado"
+sabotaje $FS "sin lugar vuelve a ser un 400" \
+  'raise HTTPException(503, "Hay muchos PDFs en revisión. Probá de nuevo en un rato.")' \
+  'raise HTTPException(400, "No pudimos abrir el PDF: tardó demasiado. Probá con otro archivo.")' \
+  "(['b', 'c'], (400, 'No pudimos abrir el PDF: tardó demasiado"
+sabotaje $DL "quedarse sin memoria en C vuelve a ser un PDF inválido" \
+  'except (MemoryError, SystemError) as e:' 'except MemoryError as e:' \
+  'DID NOT RAISE'
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"
