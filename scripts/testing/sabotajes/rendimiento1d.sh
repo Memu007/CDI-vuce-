@@ -76,6 +76,10 @@ sabotaje $L "el texto vuelve a la app sin tope" \
   'extraer_texto_pdf_seguro(data)[:_MAX_TEXTO_VENDEDOR]' \
   'extraer_texto_pdf_seguro(data)' \
   "texto: la app creció"
+sabotaje $L "esperar lugar para leer un despacho se descuenta del tope" \
+  'await asyncio.wait_for(correr(), timeout=limite_s)' \
+  'await asyncio.wait_for(correr(), timeout=limite_s if modo != "leer" else hasta - loop.time())' \
+  "test_esperar_para_leer_un_despacho_no_se_cobra_al_pdf[menos-que-un-pdf]"
 
 git checkout -q -- proyecto_maria/
 echo "fallas: $FALLAS"

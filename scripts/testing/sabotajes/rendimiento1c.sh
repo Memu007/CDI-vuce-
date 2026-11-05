@@ -53,9 +53,9 @@ sabotaje $FS "validar el PDF vuelve al proceso de la app" \
   'FAILED tests/test_rendimiento1c.py::test_un_pdf_que_se_infla_no_hace_crecer_la_app'
 sabotaje $DL "sin fila por usuario: todas las validaciones comparten los dos lugares" \
   '    if clave is None:
-        return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, "validar", hasta)' \
+        return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, modo, hasta)' \
   '    if True:
-        return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, "validar", hasta)' \
+        return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, modo, hasta)' \
   'B esperó detrás de las bombas de A'
 sabotaje proyecto_maria/main.py "la subida de facturas no pasa el usuario" \
   "max_size=max_upload_bytes, clave=user[\"username\"])" \
@@ -100,8 +100,8 @@ sabotaje $DL "esperar un lugar libre vuelve a culpar al archivo" \
         corrida' \
   "(['b', 'c'], (400, 'No pudimos abrir el PDF: tardó demasiado"
 sabotaje $DL "la espera por un lugar se descuenta del tiempo para validar" \
-  'corrida = limite_s if espera_aparte else hasta - loop.time()' \
-  'corrida = hasta - loop.time()' \
+  'await asyncio.wait_for(correr(), timeout=limite_s)' \
+  'await asyncio.wait_for(correr(), timeout=hasta - loop.time())' \
   'FAILED tests/test_rendimiento1c.py::test_esperar_casi_todo_el_tope_no_culpa_al_archivo[menos-que-un-pdf]'
 sabotaje $DL "validar no corre bajo el tope de CPU" \
   '        with _tope_de_cpu(limite_cpu_s):
