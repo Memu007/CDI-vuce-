@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: lo que no quedó en la memoria de productos se avisa (DESPACHO-1c)
+
+- Guardar una operación o confirmar una posición SIM muestra un aviso si los productos no quedaron en la memoria para sugerirse la próxima vez; el «Cliente guardado» ya no lo tapa.
+- Una descripción sin letras ni números latinos (por ejemplo, en japonés) ya no se sugiere para cualquier producto ni recibe sugerencias de productos ajenos.
+
 ## 2026-11-05 · fix: un PDF sano que esperó turno no se rechaza (RENDIMIENTO-1c, vuelta 2)
 
 - Al subir un PDF, la espera por un lugar ya no se descuenta del tiempo para validarlo: o se valida, o recibe 503 «Hay muchos PDFs en revisión». Validar también tiene tope de 10 s de CPU: uno que lo pasa da 400 «El PDF es demasiado pesado para abrirlo».

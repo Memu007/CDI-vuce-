@@ -1828,7 +1828,7 @@
         try {
             const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
             const operacion = (CDI.state && CDI.state.operacion) || {};
-            await CDI.api('/api/ncm/guardar-uso', {
+            const res = await CDI.api('/api/ncm/guardar-uso', {
                 method: 'POST',
                 body: JSON.stringify({
                     descripcion: descripcion,
@@ -1838,6 +1838,11 @@
                     vendor_name: String(operacion.vendedor_nombre || '').trim() || null
                 })
             });
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.historial_guardado === false && CDI.toast) {
+                CDI.toast('No se guardó en la memoria de productos',
+                    'La posición quedó en esta operación, pero la próxima vez no se va a sugerir sola.', 'warning');
+            }
         } catch (_) { /* best effort */ }
     }
 

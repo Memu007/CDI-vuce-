@@ -1158,7 +1158,7 @@
 
     async function reSaveOperationAndClosePanel(via) {
         const items = (CDI.state && CDI.state.items) || [];
-        await saveOperationToHistory(items, lastMaria || {});
+        const guardado = await saveOperationToHistory(items, lastMaria || {});
         const panel = document.getElementById('readyOrphanPanel');
         if (panel) panel.hidden = true;
         const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
@@ -1167,11 +1167,14 @@
             via === 'assign' ? 'Cliente asignado a esta operación' : 'Cliente creado con éxito',
             'Operación asociada a ' + nombre + '. La próxima factura con este CUIT se detecta sola.'
         );
-        CDI.toast && CDI.toast(
-            'Cliente guardado',
-            'La próxima factura con este CUIT se detecta sola. Operación asociada a ' + nombre + '.',
-            'success'
-        );
+        // toast reemplaza al anterior: no tapar el aviso de lo que no quedó en la memoria.
+        if (guardado.historial_guardado !== false && CDI.toast) {
+            CDI.toast(
+                'Cliente guardado',
+                'La próxima factura con este CUIT se detecta sola. Operación asociada a ' + nombre + '.',
+                'success'
+            );
+        }
         CDI.track && CDI.track('op_orphan_resolved', { via: via });
     }
 
@@ -1237,7 +1240,14 @@
                     cliente_id: cliente.id,
                     items: items.length
                 });
-                return { ok: true, cliente_id: cliente.id };
+                if (data.historial_guardado === false) {
+                    CDI.toast && CDI.toast(
+                        'Algunos productos no quedaron en la memoria',
+                        'La operación se guardó, pero la próxima vez esos productos no se van a sugerir solos.',
+                        'warning'
+                    );
+                }
+                return { ok: true, cliente_id: cliente.id, historial_guardado: data.historial_guardado };
             }
             // Error real: mostrar al user en vez de silenciar.
             // El servidor ya no manda el detalle técnico (DATOS-1, D6): queda en su log.

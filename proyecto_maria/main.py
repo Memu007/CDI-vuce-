@@ -10250,7 +10250,9 @@ async def sugerir_ncm(
         logging.warning("ncm suggestion history unavailable: %s", err)
         historial = {}
     for desc_guardada, ncm_data in historial.items():
-        if desc_norm in normalizar_desc(desc_guardada) or normalizar_desc(desc_guardada) in desc_norm:
+        guardada = normalizar_desc(desc_guardada)
+        # '' está dentro de cualquier texto: sin letras ni números latinos no hay con qué comparar.
+        if desc_norm and guardada and (desc_norm in guardada or guardada in desc_norm):
             add_suggestion({
                 "ncm": ncm_data.get("ncm", ""),
                 "desc": desc_guardada[:50],
