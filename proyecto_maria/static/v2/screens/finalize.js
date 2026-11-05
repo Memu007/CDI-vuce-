@@ -750,13 +750,12 @@
                 duration_ms: dur
             });
             renderReady();
-            // Best-effort: guardar en historial del cliente activo (si hay)
-            saveOperationToHistory(items, data).catch(err => {
-                console.warn('[history] no se pudo guardar operacion', err);
-            });
-            // Best-effort: aprender productos en catalogo del proveedor
+            // Best-effort, en orden: toast reemplaza al anterior, y el aviso de la
+            // operación (que puede ser un error) es lo que tiene que quedar a la vista.
             saveCatalogLearn(items).catch(err => {
                 console.warn('[catalog] no se pudo aprender', err);
+            }).then(() => saveOperationToHistory(items, data)).catch(err => {
+                console.warn('[history] no se pudo guardar operacion', err);
             });
         } catch (err) {
             console.error('[ready] generate error', err);
@@ -877,6 +876,7 @@
     }
 
     function renderReady() {
+        hide($('readyClientSuccess'));
         hide(rGenerating);
         hide(rError);
         show(rDone);
@@ -935,6 +935,7 @@
         if (wasDismissed) { panel.hidden = true; return; }
 
         panel.hidden = false;
+        clienteCreadoAca = null;
         // Reset del form interno por si quedó abierto antes
         const form = document.getElementById('readyOrphanCreateForm');
         if (form) form.hidden = true;
@@ -945,6 +946,7 @@
         try { CDI.track && CDI.track('op_orphan_panel_shown'); } catch (_) {}
     }
 
+    let clienteCreadoAca = null;
     let _orphanListenersWired = false;
     function setupOrphanPanelListeners() {
         if (_orphanListenersWired) return;
@@ -1088,6 +1090,12 @@
         }
         if (btn) btn.disabled = true;
         try {
+            // Ya se creó en este panel y falló el guardado: se reintenta sin crear otro.
+            const activo = (CDI.getClienteActivo && CDI.getClienteActivo()) || {};
+            if (clienteCreadoAca && activo.id === clienteCreadoAca) {
+                await reSaveOperationAndClosePanel('create');
+                return;
+            }
             // Pre-check: si ya existe un cliente con este CUIT, ofrecer usar ese.
             if (cuit) {
                 const existente = await lookupClienteByCuit(cuit);
@@ -1122,6 +1130,7 @@
                 return;
             }
             CDI.clientesCache = [];
+            clienteCreadoAca = out.cliente.id;
             CDI.setClienteActivo(out.cliente);
             await reSaveOperationAndClosePanel('create');
         } catch (err) {
@@ -1181,13 +1190,6 @@
             );
         }
         CDI.track && CDI.track('op_orphan_resolved', { via: via });
-    }
-
-    // Lo que no quedó guardado no puede dejar a la vista un éxito anterior.
-    function avisarNoGuardado(titulo, detalle, tipo) {
-        const caja = document.getElementById('readyClientSuccess');
-        if (caja) caja.hidden = true;
-        CDI.toast && CDI.toast(titulo, detalle, tipo);
     }
 
     async function saveOperationToHistory(items, mariaData) {
@@ -1253,7 +1255,7 @@
                     items: items.length
                 });
                 if (data.historial_guardado === false) {
-                    avisarNoGuardado(
+                    CDI.toast && CDI.toast(
                         'Algunos productos no quedaron en la memoria',
                         'La operación se guardó, pero la próxima vez esos productos no se van a sugerir solos.',
                         'warning'
@@ -1270,7 +1272,7 @@
                 status: res.status,
                 detail: String(msg).slice(0, 120)
             });
-            avisarNoGuardado(
+            CDI.toast && CDI.toast(
                 'No se guardó al cliente',
                 'La operación no quedó en el historial de ' + (cliente.nombre || 'el cliente') + '. Detalle: ' + String(msg).slice(0, 200),
                 'error'
@@ -1279,7 +1281,7 @@
         } catch (err) {
             if (err && err.message === 'payment_required') {
                 console.warn('[history] save_client_operation: 402 payment required');
-                avisarNoGuardado('No se guardó al cliente', err.motivo || 'Plan vencido o límite alcanzado', 'error');
+                CDI.toast && CDI.toast('No se guardó al cliente', err.motivo || 'Plan vencido o límite alcanzado', 'error');
                 return { ok: false, reason: 'payment_required', error: 'Plan vencido o límite alcanzado' };
             }
             console.error('[history] save_client_operation excepción:', err);
@@ -1287,7 +1289,7 @@
                 cliente_id: cliente.id,
                 detail: String(err && err.message || err).slice(0, 120)
             });
-            avisarNoGuardado(
+            CDI.toast && CDI.toast(
                 'No se guardó al cliente',
                 'Error de red al guardar la operación al historial. Volvé a Listo y reintentá.',
                 'error'
@@ -1325,7 +1327,7 @@
                 body: JSON.stringify({ vendor_name: vendorName, productos }),
             });
             const data = await res.json().catch(() => ({}));
-            if ((!res.ok || data.historial_guardado === false) && CDI.toast) {
+            if (!res.ok && CDI.toast) {
                 CDI.toast('Algunos productos no quedaron en la memoria',
                     'La operación está lista, pero la próxima vez esos productos no se van a sugerir solos.', 'warning');
             }
