@@ -8,7 +8,7 @@ Veredicto: **devolución por dos causas** sobre `0b9ccde` (base `375edbc`).
 |---|---|
 | `pytest tests/test_cobro_corte1.py` en `0b9ccde` | `82 passed, 5 warnings in 64.20s` |
 | `chequeo-6.py 375edbc 0b9ccde` | `producto +131/−149`, `arnés +575/−260`, historia vacío, `avisos: 0` |
-| `cobro_corte1.sh` con Postgres | corriendo al escribir esto (18 ROJO hasta ahora, de 60); el resultado va abajo |
+| `cobro_corte1.sh` con Postgres | 60 sabotajes, `sabotajes con falla: 0`; las tres bases en verde |
 | Reintento tras falla de escritura, Postgres local | `1.er pedido (falla al escribir): 500 ops 1` / `reintento sin operacion_id: 200 ops 2` / `filas: MARIA_FAC_W1_2e78fb6c.TXT, MARIA_FAC_W1_2d601b03.TXT` |
 
 El script del reintento es de la adversaria Sonnet; lo corrí yo contra mi

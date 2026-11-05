@@ -90,43 +90,24 @@ rojo en la base. Acta: `REPRODUCCION-RENDIMIENTO-1d-v2-2026-11-05.md`.
 - Hallazgo 2 de tu `/code-review` (par partido en dos glifos): queda así.
 - **Sigue DESPACHO-1d**, que ya tenés hecho: cerralo con `/entregar`.
 
-## DESPACHO-1c: aceptada sobre `fbbb2ad`, sin integrar todavía (2026-11-05 19:05 UTC, PM)
+## DESPACHO-1d: aceptada sobre `528961b`, sin integrar (2026-11-05 22:45 UTC, PM)
 
-Evidencia: `REPRODUCCION-DESPACHO-1c-v2-2026-11-05.md`. Se sostienen 39
-casos, `despacho1c.sh` 16 ROJO con `fallas: 0`, y mis ejemplos de la familia
-(403, 503 y 422) también dejan el error a la vista. Se integra apenas acepte
-`ca87d82` (RENDIMIENTO-1c v2, DESPACHO-1b v6 y CATALOGO-LARGO-1), que viene
-dentro de `fbbb2ad`; sus pruebas siguen corriendo de mi lado y no tenés que
-tocar nada de eso.
+Acta: `REPRODUCCION-DESPACHO-1d-2026-11-05.md`. Coincide con tu informe:
+`test_despacho1c.py` 83 passed, `despacho1d.sh` 9 y `despacho1c.sh` 15
+sabotajes con `fallas: 0`, chequeo-6 `+64/−45` con los dos AVISOs del
+envoltorio del módulo (explicados). Mi ejemplo distinto: siete nombres de
+proveedor (200 «é», 59 letras más «ñb», sólo emoji, sólo CJK, «İstanbul»
+largo, «ǅ» repetido) dan siempre un id que cumple `is_valid_vendor_id`. Un
+adversario con contexto nuevo no encontró nada que frene; lo que marcó ya
+estaba antes (va al acta).
 
-**Orden:** terminar RENDIMIENTO-1d (con D55 b) → **DESPACHO-1d** → SESION-1 →
-el resto de la cola. CATALOGO-LARGO-2 entra sólo si Emi dice que sí.
+- **D69: (a)**, como lo entregaste. Decidido por la PM.
+- Se integra junto con `ca87d82`, por lo mismo: lo de abajo sin aceptar.
+- **CATALOGO-LARGO-2: Emi dijo que sí.** Va después de SESION-1. Tu próxima
+  D es D71.
+- **Sigue SESION-1**, que ya entregaste en `c429307`: la reviso ahora.
 
-- **D63:** anotada (es la D58 de RENDIMIENTO-1d con su número nuevo).
-- **D65: (b), en DESPACHO-1d.** **D67: (b), en DESPACHO-1d.**
-- **CJK y emoji a CATALOGO-LARGO-2:** de acuerdo.
-- Los dos AVISOs de chequeo-6 quedan explicados. Partir `finalize.js` por
-  pantalla va a la cola de limpieza.
-
-### DESPACHO-1d (subpieza chica, puerta para publicar)
-
-Lo encontró el adversario sobre `fbbb2ad`. Pido comportamiento:
-
-- **La operación nunca espera al catálogo.** Si aprender el catálogo no
-  vuelve o falla, la operación igual se guarda y lo último a la vista es el
-  resultado de la operación.
-- **Red caída o 402 al confirmar NCM o al aprender el catálogo dan aviso**
-  (D65), como ya pasa con 500 y 400: en la misma familia del caso existente.
-- **El id de proveedor nunca pasa de 60** (D67), la regla del servidor.
-- **Crear A (falla), asignar B (falla), crear otra vez nunca crea un segundo
-  cliente**, y un caso que dé rojo si se saca el reinicio de
-  `clienteCreadoAca`.
-- **El cartel «Guardamos este NCM» nunca queda a la vista cuando el guardado
-  falló.**
-
-Cada punto, rojo primero sobre `fbbb2ad`.
-
-### Pieza propuesta a Emi: CATALOGO-LARGO-2 (después de SESION-1, sólo si dice que sí)
+### CATALOGO-LARGO-2: sí de Emi (05/11 21:41), va después de SESION-1
 
 Misma familia que CATALOGO-LARGO-1: lo que no entra en la columna se pierde
 sin aviso.
