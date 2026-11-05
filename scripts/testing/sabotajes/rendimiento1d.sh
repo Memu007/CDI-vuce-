@@ -75,7 +75,21 @@ sabotaje $L "el texto ocupa los lugares de validar" \
 sabotaje $L "el texto vuelve a la app sin tope" \
   'extraer_texto_pdf_seguro(data)[:_MAX_TEXTO_VENDEDOR]' \
   'extraer_texto_pdf_seguro(data)' \
-  "texto: la app creció"
+  "FAILED $T::test_lo_que_vuelve_del_texto_tiene_tope"
+sabotaje $L "el tope del texto que vuelve no es de 64 K" \
+  '_MAX_TEXTO_VENDEDOR = 64 * 1024' '_MAX_TEXTO_VENDEDOR = 64 * 1024 * 1024' \
+  "FAILED $T::test_lo_que_vuelve_del_texto_tiene_tope"
+sabotaje $L "el hijo devuelve las mitades de par sueltas" \
+  '_MEDIO_PAR.sub("\ufffd", json.dumps(resultado, ensure_ascii=False))' \
+  'json.dumps(resultado, ensure_ascii=False)' \
+  "FAILED $T::test_lo_que_saca_el_hijo_vuelve_entero[DCFF"
+sabotaje $L "el turno del usuario no se suelta" \
+  'fila[0].release()' 'pass' \
+  "FAILED $T::test_dos_del_mismo_usuario_uno_tras_otro_y_a_la_vez"
+sabotaje $L "la fila del usuario no se borra" \
+  $'        if not fila[1]:\n            del filas[clave]' \
+  $'        if not fila[1]:\n            pass' \
+  "FAILED $T::test_dos_del_mismo_usuario_uno_tras_otro_y_a_la_vez"
 # el caso de la espera es uno solo para validar y leer, y vive con el de validar
 CORRE=("$PY" -m pytest -q --no-cov -p no:cacheprovider
        tests/test_rendimiento1c.py::test_esperar_casi_todo_el_tope_no_culpa_al_archivo)
