@@ -225,7 +225,6 @@ def test_billing_me_dice_si_hay_una_suscripcion_abierta(client, estado, con_susc
         "sin_plan", "sin_estado", "expired", "desconocido"])
 def test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando(client, billing_status, dias, corta):
     usuario, sid = _suscripto(client, "cde_d13", billing_status=billing_status, dias=dias)
-    tenia_acceso = _con_acceso(_leer(usuario))
     r = client.post("/api/billing/checkout", json={"plan": "premium"})
     assert r.status_code == 409, r.text
     assert "cancelá el plan primero" in r.json()["detail"], r.json()
@@ -242,8 +241,7 @@ def test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando(c
     assert r.status_code == 200, r.text
     assert SUS[sid] == "cancelled"
     despues = _leer(usuario)
-    assert _con_acceso(despues) is not corta, f"el perfil dijo corta={corta}: {despues}"
-    assert tenia_acceso or not _con_acceso(despues), f"cancelar da acceso: {despues}"
+    assert _con_acceso(despues) is not corta, f"cancelar dejó otro acceso (corta={corta}): {despues}"
     assert (r.json()["service_until"] is None) is corta, f"servicio hasta: {r.json()}"
     r = client.post("/api/billing/checkout", json={"plan": "premium"})
     assert r.status_code == 200, r.text

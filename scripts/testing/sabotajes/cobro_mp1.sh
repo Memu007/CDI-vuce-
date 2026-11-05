@@ -503,7 +503,7 @@ sabotaje $M "C: cancelar desde past_due deja los días que quedaban" \
 sabotaje $M "C: sólo past_due pierde los días al cancelar" \
   '    corta = billing_service.cancelar_corta_acceso(db_user, ahora)' \
   '    corta = db_user.billing_status == "past_due"' \
-  "cancelar da acceso"
+  "AssertionError: cancelar dejó otro acceso (corta=True)"
 sabotaje $M "C: cancelar promete servicio hasta una fecha sin acceso" \
   '    hasta = None if corta else db_user.trial_ends_at' \
   '    hasta = db_user.trial_ends_at' \
