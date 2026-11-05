@@ -1935,10 +1935,8 @@ def set_csrf_cookie(response: Response) -> None:
 
 
 async def abrir_sesion(response: Response, db: AsyncSession, user: User, hash_validado: str) -> str | None:
-    """Emite el token de sesión, lo deja como el único vigente y pone las cookies.
-
-    Devuelve None, sin tocar nada, si la contraseña del usuario ya no es la que
-    se validó: un cambio de clave en el medio gana sobre este login."""
+    """Emite el token, lo deja como único vigente y pone las cookies. None, sin
+    tocar nada, si la clave ya no es la validada: un cambio en el medio gana."""
     jti = uuid.uuid4().hex
     vence = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     token = jwt.encode({"sub": user.username, "plan": user.plan, "exp": vence, "jti": jti},
@@ -2328,11 +2326,14 @@ async def verificar_clave_actual(username: str, clave: str, hash_guardado: str) 
     """La contraseña actual que piden el perfil y el cambio de clave, con tope
     de intentos compartido: una sesión robada no puede probar claves."""
     clave_intentos = f"pwd:{username}"
+    # Se cuenta antes de probar la clave: los pedidos que llegan a la vez y
+    # pasan juntos el chequeo ven una cuenta mayor que el tope.
     espera = await limites_auth.segundos_bloqueado(clave_intentos)
+    if not espera and await limites_auth.sumar_fallo(clave_intentos) > 5:
+        espera = await limites_auth.segundos_bloqueado(clave_intentos)
     if espera:
         raise HTTPException(status_code=429, detail=f"Demasiados intentos fallidos. Intente de nuevo en {espera} segundos.")
     if not await run_in_threadpool(verify_password, clave, hash_guardado):
-        await limites_auth.sumar_fallo(clave_intentos)
         # 400 y no 401: el frontend toma cualquier 401 como sesión vencida.
         raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta")
     await limites_auth.limpiar(clave_intentos)

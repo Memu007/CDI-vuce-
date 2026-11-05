@@ -95,9 +95,8 @@ async def sesion_de_la_request(request: Request, db: AsyncSession) -> tuple[User
 
 
 async def revocar_sesion_de_la_request(request: Request, db: AsyncSession) -> None:
-    """Cerrar sesión: revoca el token con el que se llama, si es la sesión
-    vigente. Uno inválido o ya revocado no toca nada, así no puede sacar a la
-    sesión que sí vale."""
+    """Revoca el token con el que se llama sólo si es la sesión vigente: uno
+    viejo o inválido no puede sacar a la que sí vale."""
     sesion = await sesion_de_la_request(request, db)
     if sesion is None:
         return
