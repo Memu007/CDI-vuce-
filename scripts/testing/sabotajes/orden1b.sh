@@ -199,15 +199,18 @@ sabotaje $A "al volver del pago toma los datos del otro" \
   "$LEE" "confirmarSesion(user.username, sesionAntes);"
 
 export CASOS=z35
-# z35 corta en la primera fila que falla: cada vuelta del pago se mide sola.
+# z35 corta en la primera fila que falla: cada vuelta del pago, con el tour
+# antes o después de la carga, se mide sola.
 for VUELTA in success topup_success; do
-  export VUELTA
-  sabotaje $A "la sesión de la respuesta se lee cuando ya llegó ($VUELTA)" \
-    "FALLA: la relectura de la vuelta del pago ($VUELTA) contestó A, entró B antes de leerla y la pestaña guardó un cliente y el cliente quedó en la cuenta de B" \
-    "            const sesionAntes = getCsrfToken();"$'\n' '' \
-    "            if (duenoPestana === null) {" $'            const sesionAntes = getCsrfToken();\n            if (duenoPestana === null) {'
+  for PRIMERO in tour carga; do
+    export VUELTA PRIMERO
+    sabotaje $A "la sesión de la respuesta se lee cuando ya llegó ($VUELTA, primero $PRIMERO)" \
+      "FALLA: la relectura de la vuelta del pago ($VUELTA, primero $PRIMERO) contestó A, entró B antes de leerla y la pestaña guardó un cliente y el cliente quedó en la cuenta de B" \
+      "            const sesionAntes = getCsrfToken();"$'\n' '' \
+      "            if (duenoPestana === null) {" $'            const sesionAntes = getCsrfToken();\n            if (duenoPestana === null) {'
+  done
 done
-unset VUELTA
+unset VUELTA PRIMERO
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

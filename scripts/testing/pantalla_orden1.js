@@ -1754,30 +1754,47 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
 
   // Abre la vuelta del pago de A y retiene la relectura del usuario hasta que
   // entra B. Con `conCookieDeA` la consulta llega al servidor enseguida, con
-  // la sesión de A; si no, sale al soltarla, con la de B.
-  async function vueltaDelPago(nombre, billing, conCookieDeA, que) {
+  // la sesión de A; si no, sale al soltarla, con la de B. `primero` ('tour' o
+  // 'carga') fija cuál de las otras dos consultas de quién es llega antes.
+  async function vueltaDelPago(nombre, billing, conCookieDeA, que, primero) {
     const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
     const a = await nuevoUsuario(ctx, nombre);
     const t = await ctx.newPage();
+    // El tour y la carga también piden /auth/current_user: cada pedido sale
+    // con un header que dice cuál es, y sólo se retiene la relectura.
     await t.addInitScript(() => {
-      const f = window.fetch;
-      window.__pedidas = window.__leidas = 0;
-      window.fetch = (u, o) => {
-        const pedido = f(u, o);
-        if (!/\/auth\/current_user$/.test(String(u))) return pedido;
-        window.__pedidas++;
+      const programar = window.setTimeout, f = window.fetch;
+      let enRelectura = false;
+      window.__relecturaLeida = false;
+      window.setTimeout = (fn, ...resto) => programar(fn && fn.name === 'loadCurrentUser'
+        ? () => { enRelectura = true; try { return fn(); } finally { enRelectura = false; } } : fn, ...resto);
+      window.fetch = (u, o = {}) => {
+        if (!/\/auth\/current_user$/.test(String(u))) return f(u, o);
+        const cual = enRelectura ? 'relectura' : /checkDemoForceTour/.test(new Error().stack) ? 'tour' : 'carga';
+        const pedido = f(u, { ...o, headers: { ...o.headers, 'X-Prueba-Consulta': cual } });
+        if (cual !== 'relectura') return pedido;
         return pedido.then(res => {
           const json = res.json.bind(res);
-          res.json = () => json().finally(() => setTimeout(() => { window.__leidas++; }));
+          // Después de la lectura, para que la pestaña termine de procesarla.
+          res.json = () => json().finally(() => programar(() => { window.__relecturaLeida = true; }));
           return res;
         });
       };
     });
-    // Se retiene la primera relectura con A adentro; la carga y las que vienen después pasan.
+    const cual = r => r.headers()['x-prueba-consulta'];
+    let tourListo;
+    const tourTermino = new Promise(r => { tourListo = r; });
+    t.on('requestfinished', r => { if (cual(r) === 'tour') tourListo(); });
     let avisar, soltar, retenida = false;
     const hayRetenida = new Promise(r => { avisar = r; }), suelta = new Promise(r => { soltar = r; });
     await t.route('**/auth/current_user', async ruta => {
-      if (retenida || !(await t.evaluate(() => !!(window.CDI && CDI.currentUser)).catch(() => false))) return ruta.continue();
+      const esta = cual(ruta.request());
+      if (esta === 'carga' && primero === 'tour') await tourTermino;
+      if (esta === 'tour' && primero === 'carga') {
+        await t.waitForFunction(() => !!(window.CDI && CDI.currentUser), null, { timeout: 15000 })
+          .catch(() => falla(que + ', pero la pestaña no cargó el usuario antes del tour'));
+      }
+      if (esta !== 'relectura' || retenida) return ruta.continue().catch(() => {});
       retenida = true;
       // route.continue() pone las cookies del momento en que se suelta.
       const respuesta = conCookieDeA ? await ruta.fetch().catch(e => falla(que + ' y la relectura no llegó al servidor: ' + e.message)) : null;
@@ -1793,8 +1810,9 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     clearTimeout(tope);
     const otro = await nuevoUsuario(ctx, nombre + 'b');
     soltar();
-    await t.waitForFunction(() => window.__leidas >= window.__pedidas, null, { timeout: 15000 })
-      .catch(() => falla(que + ' y la pestaña no terminó de leer el usuario en 15 s'));
+    // Sin esto la escritura podría salir antes de que la pestaña lea la relectura.
+    await t.waitForFunction(() => window.__relecturaLeida, null, { timeout: 15000 })
+      .catch(() => falla(que + ' y la pestaña no leyó la relectura del pago en 15 s: no se escribe sin medirla'));
     return { ctx, a, otro, t };
   }
 
@@ -1811,10 +1829,12 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
   // (z35) La relectura de la vuelta del pago contesta A, pero B entró antes
   // de que la pestaña la leyera: esa respuesta no autoriza escribir.
   async function respuestaDeAConOtroAdentro() {
-    // VUELTA=<billing> deja una sola fila, para que el sabotaje vea cada una.
-    for (const billing of ['success', 'topup_success'].filter(v => !process.env.VUELTA || v === process.env.VUELTA)) {
-      const que = 'la relectura de la vuelta del pago (' + billing + ') contestó A, entró B antes de leerla y la pestaña guardó un cliente';
-      const { ctx, a, otro, t } = await vueltaDelPago('ord1z35', billing, true, que);
+    // VUELTA=<billing> y PRIMERO=<tour|carga> dejan una sola fila, para que el sabotaje vea cada una.
+    const filas = ['success', 'topup_success'].flatMap(billing => ['tour', 'carga'].map(primero => ({ billing, primero })))
+      .filter(f => (!process.env.VUELTA || f.billing === process.env.VUELTA) && (!process.env.PRIMERO || f.primero === process.env.PRIMERO));
+    for (const { billing, primero } of filas) {
+      const que = 'la relectura de la vuelta del pago (' + billing + ', primero ' + primero + ') contestó A, entró B antes de leerla y la pestaña guardó un cliente';
+      const { ctx, a, otro, t } = await vueltaDelPago('ord1z35', billing, true, que, primero);
       const cliente = 'Cliente demo ' + a;
       const fin = await guardarCliente(t, cliente);
       await nadaEnElServidor(a, otro, que, cliente);
