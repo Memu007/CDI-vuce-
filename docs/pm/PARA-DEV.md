@@ -3,42 +3,37 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Veredicto de CSRF-1 vuelta 2 (2026-11-05 15:05 UTC): aceptada. Seguís con CSRF-2
+## Veredicto de CSRF-2 (2026-11-05 15:15 UTC): aceptada. Seguís con CSRF-3
 
-Sobre `9e37673`. Evidencia: `docs/pm/REPRODUCCION-CSRF-1-v2-2026-11-05.md`.
-Medí lo mismo que vos:
-- `test_csrf` + `test_prelaunch_block1` dan `59 passed` con enforce en `true` y en `false`.
-- `csrf1.sh` da 8 ROJO y `orden1b.sh` 29 ROJO, sin fallas.
-- chequeo-6 da 0 avisos.
+Sobre `fcd1072`. Evidencia: `docs/pm/REPRODUCCION-CSRF-2-2026-11-05.md`.
+- `70 passed` con enforce en `true` y en `false`; `csrf2.sh` 10 ROJO y
+  `csrf1.sh` 8 ROJO, sin fallas; chequeo-6 1 AVISO, explicado en el informe.
+- Opus recorrió en Chromium con enforce prendido la landing, v2, v1 con
+  sesión, la verificación de mail y el reset: ninguna escritura real dio 403.
+- Sonnet probó 20 formas de colarse en el conjunto exacto: todas 403.
 
-Los dos adversarios, Opus y Sonnet, no encontraron nada que bloquee:
-- un `<form>` real desde otro sitio, en 16 variantes, no cerró la sesión;
-- sus sabotajes del `if`, del alias y del endpoint que nunca borra dan rojo.
+**D58:** (a), a la cola de limpieza.
+**D59:** (a). Va como pieza chica **CSRF-3**, ya, antes de COBRO-CORTE-1:
+- una sesión con `access_token` válido y sin cookie `csrf_token` la recibe
+  sola, sin volver a entrar, y la escritura siguiente pasa;
+- sin sesión no se emite nada;
+- la familia como datos: cookie ausente, vacía, y sesión vencida (esta
+  última no recibe token).
+Producción hoy no tiene CSRF; al publicar, todas las sesiones abiertas
+quedan sin la cookie. Decidido por la PM con el sí de Emi del 04/11 a los
+arreglos chicos de seguridad.
+**D60:** (b), nada por ahora. Opus abrió v1 con sesión y anda; le pregunto a
+Emi si alguien la usa.
+**Tu supuesto de `/auth/register`:** aceptado.
 
-**Tu supuesto del alias:** aceptado. Que `/logout` delegue y borre
-`csrf_token` queda hecho en esta pieza y sale de la lista de CSRF-2.
+Lo que encontraron y no es de esta pieza, a la cola: el «Simular Pago» del
+checkout demo sin token (sólo en desarrollo), `--root-path` y el login CSRF
+por `GET /auth/verify-email`.
 
-**Se suma a CSRF-2**, antes de activarla:
-- Una prueba que exija que el alias `/logout` cierre de verdad: con cookie y
-  token, 200 y las dos cookies borradas.
-  - Hoy, un alias que devuelve 200 sin llamar a `logout` deja `8 passed`
-    (lo reprodujo el adversario Opus).
-  - La pantalla vieja depende de él.
-- Lo demás de CSRF-2 sigue como está en el veredicto anterior (en Git, `f0951c9`):
-  - la telemetría de la landing;
-  - las escrituras de `app.js`;
-  - la recuperación de cuenta con cookie vieja;
-  - `"webhook"` en cualquier parte de la ruta. El adversario Sonnet lo
-    reprodujo de nuevo: `DELETE /api/catalog/x/productos/abc-webhook` da 200
-    con cookie y sin token.
-- Lo mismo vale para los prefijos con `startswith` (`/healthx`,
-  `/staticx`, `/auth/loginx`): hoy dan 404, pero entran en la misma causa.
-  Un caso con la familia como datos.
+La pieza queda ✅ y se integra a mi rama hasta `c44bf84`.
 
-La pieza queda ✅ y se integra a mi rama hasta `c536184`.
-
-**Tu orden:** CSRF-2 → COBRO-CORTE-1 → COBRO-MP-2 → COBRO-MP-3 →
-AISLAMIENTO-2 / LIMPIEZA-1 → BACKUP-1a → EXCEL-2c.
+**Tu orden:** CSRF-3 → COBRO-CORTE-1 → COBRO-MP-2 → COBRO-MP-3 →
+AISLAMIENTO-2 / LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. Próxima D: D61.
 
 ## Veredicto de COBRO-MP-1 vuelta 5 (2026-11-05 12:55 UTC): aceptada
 

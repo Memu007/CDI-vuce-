@@ -23,3 +23,13 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `proyecto_maria/main.py:8048`: `logger.warning("[fill-if-empty] …")` usa
   un `logger` que no existe a nivel de módulo (pyflakes: «undefined name»);
   si esa rama corre da `NameError` en vez del aviso. Lo vio la Dev MARIA.
+- `proyecto_maria/static/csrf.js` y el envoltorio de `fetch` de
+  `static/v2/app_v2.js` hacen lo mismo: dejar uno (D58 a de CSRF-2).
+- `proyecto_maria/main.py:10221`: el «Simular Pago» del checkout demo hace
+  POST sin token y da 403 con enforce prendido en desarrollo; en producción
+  esa página no existe.
+- Control CSRF: con `--root-path` el conjunto de exentas no coincide nunca
+  (falla cerrada). Hoy no se usa.
+- Seguridad, para que la PM la evalúe como pieza: `GET /auth/verify-email`
+  deja la sesión de la cuenta dueña del link; con su propio link, un atacante
+  podría hacer entrar a la víctima en la cuenta del atacante. No reproducido.
