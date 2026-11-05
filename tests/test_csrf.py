@@ -92,3 +92,20 @@ def test_logout_borra_csrf_cookie(cookie_client):
     )
     assert resp.status_code == 200
     assert not cookie_client.cookies.get("csrf_token")
+
+
+@pytest.mark.parametrize("ruta,con_token,esperado", [
+    ("/auth/logout", False, 403),
+    ("/auth/logout", True, 200),
+    ("/api/session/state", False, 403),
+    ("/api/session/state", True, 200),
+])
+def test_enforce_pide_token_a_logout_y_telemetria(cookie_client, monkeypatch, ruta, con_token, esperado):
+    monkeypatch.setenv("CSRF_ENFORCE", "true")
+    headers = {"Origin": "https://otro-sitio.example"}
+    if con_token:
+        headers = {"X-CSRF-Token": cookie_client.cookies.get("csrf_token")}
+    resp = cookie_client.post(ruta, json={"event": "csrf1", "payload": {}}, headers=headers)
+    assert resp.status_code == esperado, resp.text
+    cerro = ruta == "/auth/logout" and esperado == 200
+    assert bool(cookie_client.cookies.get("access_token")) != cerro
