@@ -44,9 +44,9 @@ ENVIRONMENT=testing EMAIL_VERIFICATION_REQUIRED=false \
 ./scripts/testing/e2e_maria.sh       # recorrido real en navegador (necesita Node 22)
 ```
 
-La CI (`.github/workflows/ci.yml`) corre las dos cosas, pero deselecciona
-algunos tests con falla vieja: no es una red de seguridad completa y Railway
-no la espera para publicar.
+La CI (`.github/workflows/ci.yml`) corre las dos cosas en cada pull request a
+`main`, pero Railway no la espera para publicar: empujar a `main` publica aunque
+la CI esté roja.
 
 ## Producción
 
