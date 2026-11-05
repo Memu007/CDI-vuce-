@@ -5,7 +5,7 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 
 ## DESPACHO-1b, devolución sobre `1f5480e`: **entregada** en `{SHA}` (2026-10-29)
 
-**Resultado:** los 8 puntos están arreglados. Cada uno tiene su rojo antes del arreglo, sobre el producto viejo, y su sabotaje. `despacho1b.sh` da {SAB}. La suite completa da `4284 passed, 336 skipped, 2 xfailed, 96 warnings in 677.94s (0:11:17)`, salida 0. En Postgres 16, dos procesos que guardan y aprenden el mismo producto a la vez dejan una fila con los 16 usos.
+**Resultado:** los 8 puntos están arreglados. Cada uno tiene su rojo antes del arreglo, sobre el producto viejo, y su sabotaje. `despacho1b.sh` da {SAB}. La suite completa da `4284 passed, 336 skipped, 2 xfailed, 94 warnings in 492.06s (0:08:12)`, salida 0. En Postgres 16, dos procesos que guardan y aprenden el mismo producto a la vez dejan una fila con los 16 usos.
 
 **Nada para decidir.** No abro ninguna D; la próxima libre sigue siendo la D49. Los supuestos reversibles están abajo.
 
@@ -293,7 +293,7 @@ Sobre `bd14302`, salvo `guardar1.sh` (sobre `4034cdd`, que sólo cambia ese scri
 | `despacho1b.sh` (copia congelada) | {SAB} |
 | `disco1.sh` (copia congelada, sobre `bd14302`; toqué `tests/test_disco1.py`) | 39 ROJO, «sabotajes sin rojo: 0», salida 0. **No corrí** los 7 de Postgres («falta PG_URL»): son del bloqueo por dueño de DISCO-1, que esta vuelta no toca |
 | `guardar1.sh` | 12 ROJO, «sabotajes con falla: 0», salida 0 (sobre `4034cdd`) |
-| suite completa, base limpia | `4284 passed, 336 skipped, 2 xfailed, 96 warnings in 677.94s (0:11:17)`, salida 0 |
+| suite completa, base limpia (sobre `03296d4`) | `4284 passed, 336 skipped, 2 xfailed, 94 warnings in 492.06s (0:08:12)`, salida 0 |
 | `compileall -q proyecto_maria` | salida 0, sin texto |
 | Postgres 16, `despacho1b_postgres.py` | «fallas: 0», salida 0 (sobre `bd14302`, arriba) |
 | No corrido | smoke y ataque de aislamiento: la pieza no toca sesión ni permisos |
