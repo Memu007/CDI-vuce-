@@ -1773,13 +1773,16 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
         });
       };
     });
-    // Lo que se pide antes de tener a A es la carga y pasa; lo de después espera a que entre B.
-    let avisar, soltar;
+    // Se retiene la primera relectura con A adentro; la carga y las que vienen después pasan.
+    let avisar, soltar, retenida = false;
     const hayRetenida = new Promise(r => { avisar = r; }), suelta = new Promise(r => { soltar = r; });
     await t.route('**/auth/current_user', async ruta => {
-      if (!(await t.evaluate(() => !!(window.CDI && CDI.currentUser)).catch(() => false))) return ruta.continue();
+      if (retenida || !(await t.evaluate(() => !!(window.CDI && CDI.currentUser)).catch(() => false))) return ruta.continue();
+      retenida = true;
       // route.continue() pone las cookies del momento en que se suelta.
-      const respuesta = conCookieDeA ? await ruta.fetch() : null;
+      const respuesta = conCookieDeA ? await ruta.fetch().catch(e => falla(que + ' y la relectura no llegó al servidor: ' + e.message)) : null;
+      // Si contestara B, mediría lo mismo que vueltaConOtroAdentro.
+      if (respuesta && (await respuesta.json()).username !== a) falla(que + ', pero la relectura retenida no es de A');
       avisar();
       await suelta;
       return (respuesta ? ruta.fulfill({ response: respuesta }) : ruta.continue()).catch(() => {});
@@ -1808,7 +1811,8 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
   // (z35) La relectura de la vuelta del pago contesta A, pero B entró antes
   // de que la pestaña la leyera: esa respuesta no autoriza escribir.
   async function respuestaDeAConOtroAdentro() {
-    for (const billing of ['success', 'topup_success']) {
+    // VUELTA=<billing> deja una sola fila, para que el sabotaje vea cada una.
+    for (const billing of ['success', 'topup_success'].filter(v => !process.env.VUELTA || v === process.env.VUELTA)) {
       const que = 'la relectura de la vuelta del pago (' + billing + ') contestó A, entró B antes de leerla y la pestaña guardó un cliente';
       const { ctx, a, otro, t } = await vueltaDelPago('ord1z35', billing, true, que);
       const cliente = 'Cliente demo ' + a;
