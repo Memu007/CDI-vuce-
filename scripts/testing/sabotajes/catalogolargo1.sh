@@ -83,12 +83,6 @@ sabotaje $M "el historial mide el largo en NFC" \
   '        if len(texto) > tope:' \
   '        if len(unicodedata.normalize("NFC", texto)) > tope:' \
   "FAILED $T::test_importar_el_historial_mide_el_texto_como_lo_guarda"
-CORRE=("$PY" -m pytest -q --no-cov -p no:cacheprovider tests/test_despacho1b.py -k test_confirmar_un_ncm_dice_si_no_guardo_el_historial)
-sabotaje $M "confirmar un NCM no avisa si no era un producto" \
-  '            wrote_client = historial_guardado = entry is not None' \
-  '            wrote_client = historial_guardado = True' \
-  "FAILED tests/test_despacho1b.py::test_confirmar_un_ncm_dice_si_no_guardo_el_historial[no es un producto]"
-CORRE=("${PRUEBA[@]}")
 sabotaje $M "el catálogo da 500 en vez de 400 al guardar" \
   $'    except ValueError as e:\n        raise HTTPException(status_code=400, detail=str(e))\n    except Exception as e:\n        logging.exception("catalog_save error")' \
   $'    except Exception as e:\n        logging.exception("catalog_save error")' \

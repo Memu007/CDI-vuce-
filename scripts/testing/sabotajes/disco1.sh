@@ -192,7 +192,7 @@ sabotaje "las tandas reordenan por clave" 1 \
   "FAILED $T::test_importar_respeta_el_orden_del_archivo_para_sugerir" \
   "FAILED $T::test_un_archivo_viejo_se_carga_en_su_orden"
 sabotaje "sin tope de descripción" 1 \
-  '    largo_desc = len(unicodedata.normalize("NFC", descripcion))' '    largo_desc = 0' \
+  '_HISTORIAL_MAX_DESCRIPCION = 2000' '_HISTORIAL_MAX_DESCRIPCION = 10**9' \
   "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[BBBB" \
   "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[BBBB"
 sabotaje "sin tope de NCM" 1 \
@@ -200,7 +200,7 @@ sabotaje "sin tope de NCM" 1 \
   "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[Bomba sintetica-888" \
   "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[Bomba sintetica-8413.70.10.0000000000000"
 sabotaje "el tope no deja entrar el máximo" 1 \
-  '        if largo > tope:' '        if largo >= tope:' \
+  '        if len(texto) > tope:' '        if len(texto) >= tope:' \
   "FAILED $T::test_confirmar_en_el_tope_entra"
 sabotaje "el NUL pasa" 1 \
   $'        if "\\x00" in texto:' $'        if False:' \
