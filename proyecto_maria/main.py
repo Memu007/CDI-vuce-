@@ -1649,7 +1649,6 @@ _CSRF_SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
 _CSRF_EXEMPT_PREFIXES = (
     "/auth/login",
     "/auth/register",
-    "/auth/logout",
     "/auth/verify-email",
     "/static",
     "/health",

@@ -217,7 +217,7 @@
             fetch(TELEMETRY_ENDPOINT, {
                 method: 'POST',
                 credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
                 body: body,
                 keepalive: true
             }).catch(() => { telemetryMuted = true; });
