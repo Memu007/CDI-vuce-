@@ -152,7 +152,8 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 | 🔵 OBSERVABILIDAD-1 | Dev MARIA | La columna `api_logs.owner_username` que falta en producción, con migración probada en Postgres descartable |
 | ⚪ CATALOGO-LARGO-1 | Dev MARIA | Sumada por Emi el 04/11: una descripción larga (301 a 2000 caracteres) no se pierde en silencio en la memoria del cliente ni en el catálogo (`product_key` de 300); con migración probada en Postgres descartable si hace falta |
 | ✅ CSRF-1 | Dev técnica | Sumada por Emi el 04/11: con el control CSRF prendido, la telemetría de la página llega y cerrar sesión pide el token (D16 b) |
-| ⚪ CSRF-2 | Dev técnica | Con el control CSRF prendido, la landing, la pantalla vieja y la recuperación de cuenta siguen andando, y `webhook` en la ruta no saltea el control (D56 b de CSRF-1; decidido por la PM el 05/11 con el sí de Emi del 04/11 a los arreglos chicos de seguridad) |
+| ✅ CSRF-2 | Dev técnica | Con el control CSRF prendido, la landing, la pantalla vieja y la recuperación de cuenta siguen andando, y `webhook` en la ruta no saltea el control (D56 b de CSRF-1; decidido por la PM el 05/11 con el sí de Emi del 04/11 a los arreglos chicos de seguridad) |
+| ⚪ CSRF-3 | Dev técnica | Una sesión abierta sin la cookie `csrf_token` la recibe sola y puede seguir escribiendo sin volver a entrar (D59 a de CSRF-2; decidido por la PM el 05/11 con el sí de Emi del 04/11 a los arreglos chicos de seguridad) |
 | ✅ DATOS-1 | Dev MARIA | Borrar un cliente con presupuesto; `/health` honesto; sin detalles de error al público (D5, D2, D6 de `AUDITORIA-2026-10-06.md`) |
 | 🔵 BACKUP-1 | Dev técnica (pasada por la PM el 28/10) | Ver `AUDITORIA-2026-10-06.md`. BACKUP-1a: copia y restauración probada; el destino fuera de Railway y dónde se programa esperan a Emi |
 | 🔵 DISCO-1 | Dev MARIA | El historial de NCM de cada estudio pasa del disco de Railway a la base (D4 de `AUDITORIA-2026-10-06.md`) |
