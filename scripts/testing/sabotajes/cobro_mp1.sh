@@ -8,6 +8,8 @@
 # pantalla del perfil (scripts/testing/pantalla_cobro_mp1.js; PUERTO, 8854).
 # La vuelta 3 (h) con tests/test_cobro_mp1_h.py; i con tests/test_cobro_mp1_i.py y los cortes
 # de Postgres; j y D13 (c) con tests/test_cobro_mp1_cde.py.
+# La vuelta 4 (cancelar con una suscripción abierta desde cualquier estado) con
+# tests/test_cobro_mp1_cde.py y la pantalla del perfil.
 # La del 2026-10-29 (vuelta 2, a a g) con tests/test_cobro_mp1_vuelta2.py,
 # tests/test_cobro_corte1.py (g), la carrera de a y de D31 y los datos que no entran en
 # su columna (b) en Postgres (scripts/testing/cobro_mp1_postgres.py) y la pantalla v1
@@ -491,13 +493,17 @@ sabotaje $M "g: un id largo de la exportación no se reconoce" \
 # C y E: cancelar desde past_due y reactivar una prueba con recarga.
 T=tests/test_cobro_mp1_cde.py
 sabotaje $M "C: past_due no puede cancelar" \
-  '    if db_user.billing_status not in ("trial", "active", "past_due") and not cancelada_con_suscripcion:' \
-  '    if db_user.billing_status not in ("trial", "active") and not cancelada_con_suscripcion:' \
+  '    if db_user.billing_status not in ("trial", "active", "past_due") and not db_user.mp_preapproval_id:' \
+  '    if db_user.billing_status not in ("trial", "active") and not db_user.mp_preapproval_id:' \
   "past_due no se puede cancelar"
 sabotaje $M "C: cancelar desde past_due deja los días que quedaban" \
   '            db_user.trial_ends_at = ahora' \
   '            pass' \
   "cancelar desde past_due da acceso"
+sabotaje $M "C: sólo past_due pierde los días al cancelar" \
+  '    if not billing_service.tiene_acceso(db_user):' \
+  '    if db_user.billing_status == "past_due":' \
+  "cancelar da acceso"
 sabotaje $M "E: decide payment_provider aunque haya pagos registrados" \
   $'    if not tipos:\n        return db_user.payment_provider == "mercadopago"\n' \
   $'    return db_user.payment_provider == "mercadopago"\n' \
@@ -517,23 +523,31 @@ sabotaje $M "E: un rechazo saca la decisión de payment_provider" \
   $'               PagoMercadoPagoAplicado.estado == "aplicado")\n    )).scalars().all()\n    if not tipos and not (await db.execute(select(PagoMercadoPagoAplicado.payment_id).where(PagoMercadoPagoAplicado.cuenta == db_user.username))).first():' \
   "una cuenta pagada volvió como prueba"
 
-# La cancelada que reabrió el checkout (hallazgo del adversario Opus).
+# Con una suscripción abierta se cancela desde cualquier estado.
 sabotaje $M "C: una cancelada con suscripción nueva no puede cancelarla" \
-  ' and not cancelada_con_suscripcion:' \
+  ' and not db_user.mp_preapproval_id:' \
   ':' \
   "la suscripción nueva no se puede cancelar"
+sabotaje $M "C: sólo la cancelada con suscripción puede cancelarla" \
+  ' and not db_user.mp_preapproval_id:' \
+  ' and not (db_user.billing_status == "canceled" and db_user.mp_preapproval_id):' \
+  "No se puede cancelar desde el estado actual: none"
 sabotaje $M "C: una cancelada sin suscripción vuelve a cancelar" \
-  '    cancelada_con_suscripcion = db_user.billing_status == "canceled" and db_user.mp_preapproval_id' \
-  '    cancelada_con_suscripcion = db_user.billing_status == "canceled"' \
+  ' and not db_user.mp_preapproval_id:' \
+  ' and not (db_user.mp_preapproval_id or db_user.billing_status == "canceled"):' \
   "assert 200 == 409"
 sabotaje $M "C: /billing/me nunca dice que hay suscripción abierta" \
-  '        "suscripcion_abierta": db_user.billing_status == "canceled" and bool(db_user.mp_preapproval_id),' \
+  '        "suscripcion_abierta": bool(db_user.mp_preapproval_id),' \
   '        "suscripcion_abierta": False,' \
   "cancelada_con_checkout"
 sabotaje $M "C: /billing/me dice abierta a cualquier cancelada" \
-  '        "suscripcion_abierta": db_user.billing_status == "canceled" and bool(db_user.mp_preapproval_id),' \
-  '        "suscripcion_abierta": db_user.billing_status == "canceled",' \
+  '        "suscripcion_abierta": bool(db_user.mp_preapproval_id),' \
+  '        "suscripcion_abierta": db_user.billing_status == "canceled" or bool(db_user.mp_preapproval_id),' \
   "cancelada_sin"
+sabotaje $M "C: /billing/me dice abierta sólo a la cancelada" \
+  '        "suscripcion_abierta": bool(db_user.mp_preapproval_id),' \
+  '        "suscripcion_abierta": db_user.billing_status == "canceled" and bool(db_user.mp_preapproval_id),' \
+  "sin_plan_con"
 
 # D13 (c): una autorizada sin cuenta vigente frena el checkout y sale cancelando.
 sabotaje $M "D13: el checkout cancela la autorizada vieja" \
@@ -544,11 +558,11 @@ sabotaje $M "D13: sin cuenta vigente, el 409 dice que se renueva sola" \
   '            if entidad.billing_status in ("trial", "active") and fin and fin > datetime.now(timezone.utc):' \
   '            if True:' \
   "assert 'cancelá el plan primero' in 'Ya tenés una suscripción activa en Mercado Pago; se renueva sola"
-# La salida que nombra el 409 tiene que existir: una cuenta cancelada con la
-# autorizada guardada puede cancelarla.
+# La salida que nombra el 409 tiene que existir en cada estado: la cuenta
+# con la autorizada guardada puede cancelarla.
 sabotaje $M "D13: la cancelada no puede cancelar la autorizada que la frena" \
-  'cancelada_con_suscripcion = db_user.billing_status == "canceled" and db_user.mp_preapproval_id' \
-  'cancelada_con_suscripcion = False' \
+  ' and not db_user.mp_preapproval_id:' \
+  ' and not (db_user.mp_preapproval_id and db_user.billing_status != "canceled"):' \
   "FAILED $T::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[cancelada_vieja]"
 
 # j: Mercado Pago no conoce la suscripción guardada.
@@ -674,17 +688,25 @@ else
     "        if (status === 'trial' || status === 'active'" \
     "FALLA: past_due: no se ve «Cancelar plan»"
   sabotaje $P "C: una cancelada con suscripción abierta no ve «Cancelar plan»" \
-    "            || (status === 'canceled' && b && b.suscripcion_abierta)) {" \
+    "            || (b && b.suscripcion_abierta)) {" \
     "            || false) {" \
     "FALLA: canceled con suscripción abierta: no se ve «Cancelar plan»"
   sabotaje $P "C: cualquier cancelada ve «Cancelar plan»" \
-    "            || (status === 'canceled' && b && b.suscripcion_abierta)) {" \
+    "            || (b && b.suscripcion_abierta)) {" \
     "            || (status === 'canceled')) {" \
     "FALLA: canceled sin suscripción: se ve «Cancelar plan»"
+  sabotaje $P "C: sólo una cancelada con suscripción abierta ve «Cancelar plan»" \
+    "            || (b && b.suscripcion_abierta)) {" \
+    "            || (status === 'canceled' && b && b.suscripcion_abierta)) {" \
+    "FALLA: none con suscripción abierta: no se ve «Cancelar plan»"
   sabotaje $P "C: la confirmación de past_due promete el período ya pagado" \
-    "        const vencido = billingStatusEl && billingStatusEl.dataset.status === 'past_due';" \
+    "        const vencido = billingStatusEl && !['trial', 'active', 'canceled'].includes(billingStatusEl.dataset.status);" \
     "        const vencido = false;" \
     "FALLA: past_due: la confirmación promete el período ya pagado"
+  sabotaje $P "C: sólo past_due no promete el período ya pagado" \
+    "        const vencido = billingStatusEl && !['trial', 'active', 'canceled'].includes(billingStatusEl.dataset.status);" \
+    "        const vencido = billingStatusEl && billingStatusEl.dataset.status === 'past_due';" \
+    "FALLA: none con suscripción abierta: la confirmación promete el período ya pagado"
   sabotaje $P "C: el botón de aceptar vuelve a confirmText" \
     "            acceptText: 'Sí, cancelar'," \
     "            confirmText: 'Sí, cancelar'," \

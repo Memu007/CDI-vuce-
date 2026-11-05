@@ -198,11 +198,13 @@ def test_cancelada_sin_suscripcion_no_se_cancela_otra_vez(client):
 
 
 @pytest.mark.parametrize("estado, con_suscripcion, abierta", [
-    ("canceled", True, True), ("canceled", False, False), ("active", True, False), ("past_due", True, False),
-], ids=["cancelada_con_checkout", "cancelada_sin", "activa", "impaga"])
-def test_billing_me_dice_si_una_cancelada_tiene_una_suscripcion_abierta(client, estado, con_suscripcion, abierta):
-    # El perfil muestra «Cancelar plan» a una cuenta cancelada sólo si tiene
-    # una suscripción que cancelar.
+    ("canceled", True, True), ("canceled", False, False), ("active", True, True), ("past_due", True, True),
+    ("none", True, True), ("none", False, False), (None, True, True), ("desconocido", True, True),
+], ids=["cancelada_con_checkout", "cancelada_sin", "activa", "impaga", "sin_plan_con", "sin_plan_sin",
+        "sin_estado", "desconocido"])
+def test_billing_me_dice_si_hay_una_suscripcion_abierta(client, estado, con_suscripcion, abierta):
+    # Con una suscripción abierta el perfil muestra «Cancelar plan», sea cual
+    # sea el estado: si no, el 409 del checkout no tiene salida.
     usuario, sid = _suscripto(client, "cde_me", billing_status=estado)
     if not con_suscripcion:
         _set_user(usuario, mp_preapproval_id=None)
@@ -215,9 +217,12 @@ def test_billing_me_dice_si_una_cancelada_tiene_una_suscripcion_abierta(client, 
 
 @pytest.mark.parametrize("billing_status, dias", [
     ("past_due", -10), ("active", -1), ("active", -3), ("canceled", 20),
-], ids=["impaga", "renovacion_tardia", "vencida_en_gracia", "cancelada_vieja"])
+    ("none", 10), (None, 10), ("expired", -5), ("desconocido", 10),
+], ids=["impaga", "renovacion_tardia", "vencida_en_gracia", "cancelada_vieja",
+        "sin_plan", "sin_estado", "expired", "desconocido"])
 def test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando(client, billing_status, dias):
     usuario, sid = _suscripto(client, "cde_d13", billing_status=billing_status, dias=dias)
+    tenia_acceso = _con_acceso(_leer(usuario))
     r = client.post("/api/billing/checkout", json={"plan": "premium"})
     assert r.status_code == 409, r.text
     assert "cancelá el plan primero" in r.json()["detail"], r.json()
@@ -230,6 +235,7 @@ def test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando(c
     r = client.post("/api/billing/cancel")
     assert r.status_code == 200, r.text
     assert SUS[sid] == "cancelled"
+    assert tenia_acceso or not _con_acceso(_leer(usuario)), f"cancelar da acceso: {_leer(usuario)}"
     r = client.post("/api/billing/checkout", json={"plan": "premium"})
     assert r.status_code == 200, r.text
     assert [t for t, _ in CREADAS] == ["preapproval"]

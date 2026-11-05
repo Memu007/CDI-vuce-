@@ -96,6 +96,17 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   if (await cancelar.isVisible()) falla('canceled sin suscripción: se ve «Cancelar plan»');
   console.log('OK | canceled sin suscripción: no se ve «Cancelar plan»');
 
+  // Sin período pagado y con una suscripción abierta: se ve «Cancelar plan»,
+  // que es la salida del 409 del checkout, sin prometer el período ya pagado.
+  for (const estado of ['none', null, 'expired', 'desconocido']) {
+    await perfilCon(estado, { suscripcion_abierta: true });
+    const c = await confirmacionDeCancelar(estado + ' con suscripción abierta');
+    if (c.t.includes('ya pagado')) falla(estado + ' con suscripción abierta: la confirmación promete el período ya pagado: «' + c.t + '»');
+    await perfilCon(estado, { suscripcion_abierta: false });
+    if (await cancelar.isVisible()) falla(estado + ' sin suscripción: se ve «Cancelar plan»');
+  }
+  console.log('OK | none, null, expired y desconocido: «Cancelar plan» sólo con una suscripción abierta');
+
   // D. Dos clics en «Activar plan»: un solo checkout, y el botón deshabilitado mientras espera.
   await perfilCon('past_due');
   if (!await activar.isVisible()) falla('past_due: no se ve «Activar plan»');
