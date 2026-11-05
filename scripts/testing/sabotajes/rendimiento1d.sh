@@ -72,6 +72,10 @@ sabotaje $L "el texto ocupa los lugares de validar" \
   'lugares = _SACANDO_TEXTO if modo == "texto" else _VALIDANDO' \
   'lugares = _VALIDANDO' \
   "assert 503 == "
+sabotaje $L "el texto vuelve a la app sin tope" \
+  'extraer_texto_pdf_seguro(data)[:_MAX_TEXTO_VENDEDOR]' \
+  'extraer_texto_pdf_seguro(data)' \
+  "texto: la app creció"
 
 git checkout -q -- proyecto_maria/
 echo "fallas: $FALLAS"
