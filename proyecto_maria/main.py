@@ -1788,7 +1788,7 @@ def _vencer_si_corresponde(entidad, ahora=None):
     return None
 
 
-def _detalle_402(entidad, razon_del_plan=None, vencio=None):
+def _detalle_402(entidad, razon_del_plan=None):
     """El detail del 402 con la razón real: impago, vencido, cancelado, sin suscripción o tope.
     Los code son los que ya lee la pantalla; el texto es el que distingue la razón."""
     estado = entidad.billing_status
@@ -1802,8 +1802,7 @@ def _detalle_402(entidad, razon_del_plan=None, vencio=None):
             # Sin pago de Mercado Pago, en producción sólo vence una prueba:
             # el active sin MP sale de simulate-charge o de los usuarios demo.
             code = "TRIAL_EXPIRED"
-            que = "tu suscripción" if vencio == "active" else "tu prueba gratis"
-            message = f"Venció {que}. Suscribite para seguir usando CDI."
+            message = "Venció tu prueba gratis. Suscribite para seguir usando CDI."
     elif billing_service.tiene_acceso(entidad):
         code = "PLAN_LIMIT_EXCEEDED"
         message = razon_del_plan or "Alcanzaste el límite de operaciones de tu plan."
@@ -1842,14 +1841,12 @@ async def _cuenta_bloqueada(db: AsyncSession, username: str):
 
 
 async def _vencer_y_guardar(db: AsyncSession, entidad):
-    vencio = _vencer_si_corresponde(entidad)
-    if vencio:
+    if _vencer_si_corresponde(entidad):
         try:
             await db.commit()
             await db.refresh(entidad)
         except Exception:
             await db.rollback()
-    return vencio
 
 
 async def require_billing_vigente(
@@ -1861,14 +1858,12 @@ async def require_billing_vigente(
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
     if not db_user:
-        if os.getenv("ENVIRONMENT") == "testing":
-            return User(username=user["username"], plan="premium", billing_status="active")
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
 
     entidad, _ = await _get_billing_entity(db, db_user)
-    vencio = await _vencer_y_guardar(db, entidad)
+    await _vencer_y_guardar(db, entidad)
     if not billing_service.tiene_acceso(entidad):
-        raise HTTPException(status_code=402, detail=_detalle_402(entidad, vencio=vencio))
+        raise HTTPException(status_code=402, detail=_detalle_402(entidad))
     return db_user
 
 
@@ -1884,15 +1879,13 @@ async def require_active_billing(
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
     if not db_user:
-        if os.getenv("ENVIRONMENT") == "testing":
-            return User(username=user["username"], plan="premium", billing_status="active")
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
 
     entidad, _ = await _get_billing_entity(db, db_user)
-    vencio = await _vencer_y_guardar(db, entidad)
+    await _vencer_y_guardar(db, entidad)
     ok, reason = billing_service.can_create_operation(entidad)
     if not ok:
-        raise HTTPException(status_code=402, detail=_detalle_402(entidad, reason, vencio))
+        raise HTTPException(status_code=402, detail=_detalle_402(entidad, reason))
     return db_user
 
 
@@ -1901,18 +1894,16 @@ async def _contar_operacion_bloqueada(db: AsyncSession, username: str):
     commit. Si no puede contar, guarda el vencimiento, suelta el lock y tira 402."""
     cuenta = await _cuenta_bloqueada(db, username)
     if cuenta is None:
-        if os.getenv("ENVIRONMENT") == "testing":
-            return None
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
     return await _contar_en_la_cuenta(db, cuenta[1])
 
 
 async def _contar_en_la_cuenta(db: AsyncSession, entidad):
     """El conteo de _contar_operacion_bloqueada, con la cuenta ya bloqueada."""
-    vencio = _vencer_si_corresponde(entidad)
+    _vencer_si_corresponde(entidad)
     ok, reason = billing_service.can_create_operation(entidad)
     if not ok:
-        detalle = _detalle_402(entidad, reason, vencio)
+        detalle = _detalle_402(entidad, reason)
         await db.commit()
         raise HTTPException(status_code=402, detail=detalle)
     billing_service.record_operation_created(entidad)
@@ -3101,7 +3092,7 @@ async def register(request: RegisterRequest, background_tasks: BackgroundTasks, 
             await db.rollback()
             raise HTTPException(status_code=400, detail="Esta invitación ya fue usada")
 
-        tope = billing_service.get_plan(invite_org.plan or "premium")["users"]
+        tope = billing_service.plan_de_la_cuenta(invite_org)["users"]
         if len(await _emails_de_miembros(db, invite_org.id)) >= tope:
             await db.rollback()  # la invitación queda pendiente
             raise HTTPException(status_code=400, detail=f"El estudio ya tiene los {tope} usuarios de su plan.")
@@ -3274,7 +3265,7 @@ async def billing_me(user=Depends(get_current_user), db: AsyncSession = Depends(
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     billing_entity, is_org = await _get_billing_entity(db, db_user)
-    plan = billing_service.get_plan(billing_entity.plan or "premium")
+    plan = billing_service.plan_de_la_cuenta(billing_entity)
     return {
         "billing_status": billing_entity.billing_status or "none",
         "trial_ends_at": billing_entity.trial_ends_at.isoformat() if billing_entity.trial_ends_at else None,
@@ -4337,6 +4328,8 @@ class MariaRequest(BaseModel):
     """Request para generar archivo MARIA TXT."""
     operation_id: str
     items: list
+    # La operación de CDI que ya generó este resultado; vacío, una nueva.
+    operacion_id: str = ""
     # Sin moneda ni incoterm no se inventan DOL ni FOB: el control lo marca
     # (MARIA-1b).
     moneda: str = ""
@@ -4778,15 +4771,12 @@ async def generate_maria_endpoint(
         if not safe_id:
             safe_id = f"OP_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
-        # Guardar archivo temporal en la carpeta propia del usuario, no suelto
-        # en DATA_DIR: el nombre sale del nro de factura y es adivinable.
-        filename = f"MARIA_{safe_id}.TXT"
+        # Con el tope lleno, 402 sin escribir el archivo. Va en la carpeta propia
+        # del usuario, no suelta en DATA_DIR: el nombre sale del nro de factura.
+        operacion_id, filename = await _contar_maria(
+            db, user["username"], request.operacion_id, txt_content,
+            len(request.items or []), f"MARIA_{safe_id}")
         filepath = os.path.join(_user_downloads_dir(user["username"]), filename)
-
-        # La primera vez que se genera este id se cuenta la operación; con
-        # el tope lleno, 402 sin escribir el archivo.
-        await _contar_maria(db, user["username"], filename, txt_content,
-                            len(request.items or []))
 
         # newline="": el archivo lleva los CRLF tal cual, sin traducir (MARIA-7).
         with open(filepath, 'w', encoding='utf-8', newline='') as f:
@@ -4821,6 +4811,7 @@ async def generate_maria_endpoint(
 
         return {
             "success": True,
+            "operacion_id": operacion_id,
             "filename": filename,
             "download_url": f"/download/{filename}",
             "content": txt_content,  # También devolver contenido para preview
@@ -4844,6 +4835,7 @@ async def generate_maria_endpoint(
 class MariaExportRequest(BaseModel):
     operation_id: str
     items: list
+    operacion_id: str = ""
     moneda: str = "DOL"
     incoterm: str = "FOB"
     cuit_exportador: str = ""
@@ -4931,17 +4923,12 @@ async def generate_maria_export_endpoint(
         if not safe_id:
             safe_id = f"EXP_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
-        # Guardar archivo temporal en la carpeta propia del usuario (ver
-        # _user_downloads_dir): el nombre sale del nro de factura y es adivinable.
-        # «MARIA-EXPORT_», con guion: con «_» la importación del id
-        # «EXPORT_<x>» daba el mismo archivo y la misma operación (COBRO-MP-1, g).
-        filename = f"MARIA-EXPORT_{safe_id}.TXT"
+        # Cuenta como /generate_maria. «MARIA-EXPORT_», con guion: con «_» sería
+        # el nombre de la importación del id «EXPORT_<x>».
+        operacion_id, filename = await _contar_maria(
+            db, user["username"], request.operacion_id, txt_content,
+            len(request.items or []), f"MARIA-EXPORT_{safe_id}")
         filepath = os.path.join(_user_downloads_dir(user["username"]), filename)
-
-        # Cuenta como /generate_maria: la primera vez que se genera este id;
-        # con el tope lleno, 402 sin escribir el archivo (COBRO-MP-1, B).
-        await _contar_maria(db, user["username"], filename, txt_content,
-                            len(request.items or []))
 
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(txt_content)
@@ -4949,6 +4936,7 @@ async def generate_maria_export_endpoint(
         return {
             "success": True,
             "tipo": "exportacion",
+            "operacion_id": operacion_id,
             "filename": filename,
             "download_url": f"/download/{filename}",
             "content": txt_content
@@ -5901,74 +5889,56 @@ async def _next_op_code(db: AsyncSession, owner_username: str) -> str:
     return f"OP-{max_num + 1:06d}"
 
 
-# Contenidos distintos que admite un mismo MARIA_<id>.TXT.
+# Contenidos distintos que admite una operación; el siguiente es otra operación.
 MARIA_REGENERACIONES = 10
-# Los dos nombres que arman /generate_maria y /generate_maria_export, con el
-# id recortado a 50 (COBRO-MP-1, g).
-_ARCHIVO_MARIA = re.compile(r"MARIA(?:_|-EXPORT_)[A-Za-z0-9_-]{1,50}\.TXT")
+# La exportación pone la fecha del día: sin sacarla, regenerar mañana sería otro contenido.
+_FECHA_DE_EMISION = re.compile(r"(CCPL=FECHAEMISIONFACT\r?\n)MCPL=[^\r\n]*")
 
 
-async def _operacion_maria(db: AsyncSession, owner_username: str, archivo: str,
-                           client_id: str | None = None):
-    """La operación más vieja del usuario con ese MARIA_<id>.TXT, o None.
-    Con client_id, sólo una sin cliente o de ese: la de otro cliente no se le saca."""
-    query = sa_select(OperationModel).where(
-        OperationModel.owner_username == owner_username,
-        OperationModel.generated_file == archivo,
-    )
-    if client_id is not None:
-        query = query.where(sa_or(OperationModel.client_id.is_(None),
-                                  OperationModel.client_id == client_id))
-    result = await db.execute(
-        query
-        .order_by(OperationModel.created_at.asc(), OperationModel.id.asc())
-        .limit(1)
-    )
+async def _operacion_del_usuario(db: AsyncSession, username: str, operacion_id: str):
+    if not operacion_id:
+        return None
+    result = await db.execute(sa_select(OperationModel).where(
+        OperationModel.id == operacion_id,
+        OperationModel.owner_username == username,
+    ))
     return result.scalars().first()
 
 
-async def _contar_maria(db: AsyncSession, username: str, archivo: str,
-                        contenido: str, total_items: int) -> None:
-    """Cuenta la operación la primera vez que se genera su MARIA; regenerarla sólo anota
-    la huella. Va antes de escribir el archivo, así un 402 o un 409 no lo pisa."""
+async def _contar_maria(db: AsyncSession, username: str, operacion_id: str,
+                        contenido: str, total_items: int, nombre: str) -> tuple[str, str]:
+    """Devuelve (id de la operación, archivo). Un contenido ya visto en la operación o uno de
+    sus primeros diez no cuenta; si no, es otra operación y se cuenta antes de escribir nada."""
     import hashlib
 
-    huella = hashlib.sha256(contenido.encode("utf-8")).hexdigest()
+    huella = hashlib.sha256(_FECHA_DE_EMISION.sub(r"\1", contenido).encode("utf-8")).hexdigest()
     cuenta = await _cuenta_bloqueada(db, username)
     if cuenta is None:
-        if os.getenv("ENVIRONMENT") == "testing":
-            return
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
 
-    operacion = await _operacion_maria(db, username, archivo)
-    if operacion is None:
-        await _contar_en_la_cuenta(db, cuenta[1])
-        db.add(OperationModel(
-            id=str(uuid.uuid4()),
-            owner_username=username,
-            op_code=await _next_op_code(db, username),
-            source="maria",
-            generated_file=archivo,
-            total_items=total_items,
-            extra={"maria_hashes": [huella]},
-        ))
+    operacion = await _operacion_del_usuario(db, username, operacion_id)
+    huellas = list(((operacion.extra or {}) if operacion else {}).get("maria_hashes") or [])
+    if operacion is not None and (huella in huellas or len(huellas) < MARIA_REGENERACIONES):
+        if huella not in huellas:
+            operacion.extra = {**(operacion.extra or {}), "maria_hashes": huellas + [huella]}
+        operacion.generated_file = f"{nombre}_{operacion.id[:8]}.TXT"
         await db.commit()
-        return
+        return operacion.id, operacion.generated_file
 
-    huellas = list((operacion.extra or {}).get("maria_hashes") or [])
-    if huella in huellas:
-        await db.commit()  # libera el lock
-        return
-    if len(huellas) >= MARIA_REGENERACIONES:
-        await db.commit()  # libera el lock; no hubo cambios
-        raise HTTPException(status_code=409, detail={
-            "code": "MARIA_REGENERACIONES_AGOTADAS",
-            "message": (f"Esta operación ya se generó {MARIA_REGENERACIONES} veces "
-                        "con datos distintos, el máximo. Si es otra operación, "
-                        "cargala como nueva."),
-        })
-    operacion.extra = {**(operacion.extra or {}), "maria_hashes": huellas + [huella]}
+    await _contar_en_la_cuenta(db, cuenta[1])
+    nuevo_id = str(uuid.uuid4())
+    operacion = OperationModel(
+        id=nuevo_id,
+        owner_username=username,
+        op_code=await _next_op_code(db, username),
+        source="maria",
+        generated_file=f"{nombre}_{nuevo_id[:8]}.TXT",
+        total_items=total_items,
+        extra={"maria_hashes": [huella]},
+    )
+    db.add(operacion)
     await db.commit()
+    return nuevo_id, operacion.generated_file
 
 
 async def _get_owned_client(
@@ -7008,8 +6978,7 @@ async def create_cliente(
     # Límite de clientes por plan.
     user_result = await db.execute(select(User).where(User.username == username))
     db_user = user_result.scalars().first()
-    plan_name = db_user.plan if db_user else "premium"
-    plan = billing_service.get_plan(plan_name)
+    plan = billing_service.plan_de_la_cuenta(db_user)
     clients_limit = plan["clients"]
     if clients_limit is not None:
         count_res = await db.execute(sa_select(sa_func.count(ClientModel.id)).where(
@@ -7277,34 +7246,31 @@ async def delete_cliente(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Elimina cliente + CASCADE de operaciones y sus items.
+    """Elimina el cliente y el detalle de sus operaciones. Las operaciones quedan sin cliente:
+    ya se contaron, y borrarlas dejaría volver a contar lo mismo al regenerarlo.
 
     Hard delete: una baja lógica colisionaría con el UNIQUE
     (owner_username, email) si el user recrea un cliente con el mismo
-    email. Las operaciones del cliente sí se borran físicamente.
+    email.
     """
     username = user["username"]
     client = await _get_owned_client(db, client_id, username)
 
     try:
-        # CASCADE: operation_items → operations del cliente (solo del user).
         op_rows = await db.execute(
-            sa_select(OperationModel.id).where(
+            sa_select(OperationModel).where(
                 OperationModel.client_id == client_id,
                 OperationModel.owner_username == username,
             )
         )
-        op_ids = [row[0] for row in op_rows.fetchall()]
-        if op_ids:
+        operaciones = op_rows.scalars().all()
+        for operacion in operaciones:
+            operacion.client_id = None
+            operacion.extra = {k: v for k, v in (operacion.extra or {}).items() if k != "resumen"}
+        if operaciones:
             await db.execute(
                 sa_delete(OperationItemModel).where(
-                    OperationItemModel.operation_id.in_(op_ids)
-                )
-            )
-            await db.execute(
-                sa_delete(OperationModel).where(
-                    OperationModel.id.in_(op_ids),
-                    OperationModel.owner_username == username,
+                    OperationItemModel.operation_id.in_([o.id for o in operaciones])
                 )
             )
 
@@ -7328,8 +7294,8 @@ async def delete_cliente(
         await db.commit()
         return {
             "success": True,
-            "message": "Cliente y operaciones eliminados",
-            "operaciones_eliminadas": len(op_ids),
+            "message": "Cliente eliminado",
+            "operaciones_sin_cliente": len(operaciones),
         }
     except HTTPException:
         raise
@@ -7589,8 +7555,8 @@ async def save_client_operation(
     db: AsyncSession = Depends(get_db),
     _cobro=Depends(require_billing_vigente),
 ):
-    """Guarda una operación en el historial del cliente.
-    La de un MARIA ya generado, sin cliente o de éste, ya está contada: no cuenta otra."""
+    """Guarda una operación en el historial del cliente. Con el operacion_id de una del usuario,
+    ya contada, la completa y la pasa a este cliente; sin él, cuenta y crea otra."""
     username = user["username"]
     client = await _get_owned_client(db, client_id, username)
 
@@ -7599,15 +7565,10 @@ async def save_client_operation(
         resumen = data.get("resumen", {}) or {}
         items = data.get("items", []) or []
 
-        archivo = str(data.get("operation_id") or "")
-        if not _ARCHIVO_MARIA.fullmatch(archivo):
-            archivo = None
-        operation = None
-        if archivo:
-            # Con la cuenta bloqueada, como al generar: un guardado y una
-            # generación del mismo id a la vez no crean dos operaciones.
-            await _cuenta_bloqueada(db, username)
-            operation = await _operacion_maria(db, username, archivo, client_id)
+        # Con la cuenta bloqueada, como al generar: un guardado y una
+        # generación de la misma operación a la vez no crean dos.
+        await _cuenta_bloqueada(db, username)
+        operation = await _operacion_del_usuario(db, username, str(data.get("operacion_id") or ""))
         # Lo que viene de afuera se recorta al largo de la columna: en
         # Postgres un dato más largo tira abajo el guardado (GUARDAR-1).
         campos = dict(
@@ -7618,7 +7579,6 @@ async def save_client_operation(
             currency=str(data.get("currency") or "USD")[:3],
         )
         if operation is not None:
-            # Ya se contó al generar: se completa y sus ítems se reemplazan.
             for campo, valor in campos.items():
                 setattr(operation, campo, valor)
             operation.extra = {**(operation.extra or {}), "resumen": resumen}
@@ -7633,7 +7593,6 @@ async def save_client_operation(
                 id=str(uuid.uuid4()),
                 owner_username=username,
                 op_code=await _next_op_code(db, username),
-                generated_file=archivo,
                 extra={"resumen": resumen},
                 **campos,
             )
@@ -9940,7 +9899,7 @@ async def get_my_organization(
         for m in members.scalars().all()
     ]
 
-    plan_def = billing_service.get_plan(org.plan or "premium")
+    plan_def = billing_service.plan_de_la_cuenta(org)
     return {
         "organization": {
             "id": org.id,
@@ -10008,7 +9967,7 @@ async def invite_to_organization(
     # Tope del plan: miembros (el dueño también) más los emails con una
     # invitación pendiente sin vencer. Volver a invitar a un email que ya
     # tiene una pendiente no ocupa otro lugar.
-    tope = billing_service.get_plan(org.plan or "premium")["users"]
+    tope = billing_service.plan_de_la_cuenta(org)["users"]
     emails_miembros = await _emails_de_miembros(db, org.id)
     ahora = datetime.now(timezone.utc)
     pendientes = await db.execute(

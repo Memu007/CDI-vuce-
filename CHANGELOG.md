@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: la operación se reconoce por su id, no por el número de factura (COBRO-CORTE-1)
+
+- **fix(cobro):** generar y guardar devuelven el id de la operación y la pantalla lo manda de vuelta: regenerar el mismo contenido no gasta una de las 10, la 11.ª distinta es una operación nueva y contada, dos operaciones con la misma factura no comparten fila y borrar el cliente ya no recuenta. Guardar en otro cliente mueve la operación. El 402 siempre dice su razón, una cuenta con el plan viejo «trial» genera, y las rutas que cuentan piden sesión también en pruebas.
+
 ## 2026-11-05 · fix: un miembro de una organización no abre una segunda suscripción (COBRO-MP-2)
 
 - **fix(cobro):** el checkout mira también las suscripciones que abrieron los otros miembros de la organización: si una está autorizada da 409 y dice quién la abrió; si está pendiente o pausada, la cancela antes de crear la nueva. Dos miembros pagando a la vez no dejan dos suscripciones vivas.

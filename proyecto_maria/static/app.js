@@ -3,6 +3,8 @@ let itemCounter = 0;
 
 // Rate limiting para prevenir error 429 de Gemini API
 let lastUploadTimestamp = 0;
+// El servidor reconoce la operación por este id: regenerar o guardar la misma no cuenta otra.
+let operacionIdActual = '';
 const UPLOAD_COOLDOWN_MS = 5000; // 5 segundos entre uploads
 let uploadCooldownTimer = null;
 
@@ -1343,6 +1345,7 @@ function hideLoading() {
 
 // === NUEVA FUNCIONALIDAD: MOSTRAR AGRUPACIÓN ===
 function showGrouping(items, sourceType) {
+    operacionIdActual = '';
     
     // Ocultar formularios principales
     operationForm.classList.add('hidden');
@@ -3332,6 +3335,7 @@ async function generateMariaTxt() {
             endpoint = '/generate_maria_export';
             payload = {
                 operation_id: operacionData.numero_factura || `EXP${Date.now()}`.slice(0, 12),
+                operacion_id: operacionIdActual,
                 items: items,
                 moneda: operacionData.moneda || 'DOL',
                 incoterm: operacionData.incoterm || 'FOB',
@@ -3347,6 +3351,7 @@ async function generateMariaTxt() {
             endpoint = '/generate_maria';
             payload = {
                 operation_id: operacionData.numero_factura || `OP${Date.now()}`.slice(0, 10),
+                operacion_id: operacionIdActual,
                 items: items,
                 moneda: operacionData.moneda || 'DOL',
                 incoterm: operacionData.incoterm || 'FOB',
@@ -3382,10 +3387,8 @@ async function generateMariaTxt() {
             throw new Error(data.detail?.errors?.join(', ') || data.detail || 'Error generando MARIA');
         }
 
-        // El historial se guarda después de generar, con el archivo que
-        // devolvió el servidor: así completa la operación que contó el MARIA
-        // en vez de contar otra (COBRO-MP-1, g).
-        await saveOperationToHistory(items, data.filename);
+        operacionIdActual = data.operacion_id || '';
+        await saveOperationToHistory(items);
 
         // MARIA-4: lo que el sistema declaró por defecto y los avisos del
         // generador se muestran antes de pegar el TXT en el Kit.
@@ -3443,6 +3446,7 @@ async function generateMariaTxt() {
 }
 
 function cancelGrouping() {
+    operacionIdActual = '';
     // Volver a la interfaz principal
     document.getElementById('groupingSection').classList.add('hidden');
 
@@ -3723,7 +3727,7 @@ async function refreshMappingStatusHint(){
     } catch(_){ }
 }
 
-async function saveOperationToHistory(items, operationId = `GROUPED_${Date.now()}`) {
+async function saveOperationToHistory(items) {
     
     // Guardar siempre que hay cliente seleccionado (toggle es opcional)
     if (!clientSelect || !clientSelect.value) {
@@ -3741,8 +3745,10 @@ async function saveOperationToHistory(items, operationId = `GROUPED_${Date.now()
         const res = await fetch(`/api/clientes/${clientSelect.value}/operaciones`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ operation_id: operationId, resumen, items })
+            body: JSON.stringify({ operacion_id: operacionIdActual, resumen, items })
         });
+        // Guardar antes de generar crea la operación: generar después la completa, no cuenta otra.
+        if (res.ok) operacionIdActual = (await res.json()).operation_id || operacionIdActual;
     } catch (e) {
         console.error('📊 Error saving operation:', e);
     }

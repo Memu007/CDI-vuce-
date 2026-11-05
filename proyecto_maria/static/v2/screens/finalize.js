@@ -662,6 +662,8 @@
 
         if (CDI.estudios) await CDI.estudios.listo();   // ESTUDIO-1
         const body = buildMariaRequest();
+        // Regenerar la misma operación no la cuenta otra vez: el servidor la reconoce por su id.
+        body.operacion_id = (CDI.state && CDI.state.operacionId) || '';
         try {
             const startedAt = Date.now();
             const res = await CDI.api('/generate_maria', {
@@ -698,12 +700,11 @@
                     CDI.goTo('validating');
                     throw new Error(detail);
                 }
-                // Los controles de antes de generar llegan como {errors: [...]};
-                // el tope de regeneraciones de un mismo id, como {code, message}.
-                const texto = (detail && Array.isArray(detail.errors)) ? detail.errors.join(' ')
-                    : (detail && typeof detail === 'object' && detail.message) ? detail.message : detail;
+                // Los controles de antes de generar llegan como {errors: [...]}.
+                const texto = (detail && Array.isArray(detail.errors)) ? detail.errors.join(' ') : detail;
                 throw new Error(texto || 'No se pudo generar el archivo');
             }
+            CDI.state.operacionId = data.operacion_id || '';
             lastMaria = {
                 filename: data.filename,
                 download_url: data.download_url,
@@ -727,8 +728,7 @@
         } catch (err) {
             console.error('[ready] generate error', err);
             CDI.track('maria_generate_error', { message: String(err && err.message || err) });
-            // Un 402 trae la razón (impago, vencido, tope); el modal ya salió.
-            showReadyError(String((err && err.motivo) || (err && err.message) || err));
+            showReadyError(String(err && err.message || err));
         } finally {
             generateInFlight = false;
         }
@@ -754,8 +754,8 @@
         const incoterm = (op.incoterm || '').toString().trim().toUpperCase();
 
         const factura = numeroDeFactura(op);
-        // Sin factura, el id sale de cuándo se cargó la operación: regenerar
-        // la misma no la cuenta otra vez.
+        // Sin factura, el id sale de cuándo se cargó la operación: regenerarla
+        // deja el mismo nombre de archivo, que es con lo que se reconoce lo ya guardado.
         const cargada = (CDI.state && CDI.state.uploadedAt) || new Date().toISOString();
         const operation_id = factura ? ('FAC_' + factura.replace(/[^a-zA-Z0-9_-]/g, '')) :
             ('OP_' + String(cargada).replace(/[^0-9]/g, '').slice(0, 17));
@@ -1160,6 +1160,7 @@
         const total_peso = Number(stats.total_peso_kg || 0);
         const body = {
             operation_id: opCode,
+            operacion_id: (CDI.state && CDI.state.operacionId) || '',
             source: 'pdf_v2',
             currency: (op.moneda || 'USD').toString().toUpperCase(),
             comprador_domicilio: op.comprador_domicilio || '',
@@ -1198,6 +1199,8 @@
             const data = await res.json().catch(() => ({}));
             if (res.ok && data && data.success) {
                 CDI.state = CDI.state || {};
+                // Guardar antes de generar crea la operación: generar después la completa, no cuenta otra.
+                CDI.state.operacionId = data.operation_id || '';
                 CDI.state.operationSavedFor = { cliente_id: cliente.id, op_code: opCode };
                 CDI.track('operation_saved_to_history', {
                     cliente_id: cliente.id,
@@ -1222,7 +1225,7 @@
             );
             return { ok: false, reason: 'http_error', error: msg };
         } catch (err) {
-            if (err && err.message === 'payment_required') {
+            if (err && err.code === 'payment_required') {
                 console.warn('[history] save_client_operation: 402 payment required');
                 return { ok: false, reason: 'payment_required', error: 'Plan vencido o límite alcanzado' };
             }

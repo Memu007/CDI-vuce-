@@ -77,8 +77,9 @@
                     }
                 });
             }
-            const err = new Error('payment_required');
-            err.motivo = lead;
+            // La razón como mensaje: quien muestra err.message dice por qué, no un código.
+            const err = new Error(lead);
+            err.code = 'payment_required';
             throw err;
         }
         return res;

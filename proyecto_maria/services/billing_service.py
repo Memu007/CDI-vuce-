@@ -78,6 +78,11 @@ def get_plan(plan_id: str) -> dict[str, Any]:
     return plan
 
 
+def plan_de_la_cuenta(user) -> dict[str, Any]:
+    # Una cuenta con un plan que ya no existe («trial» de antes) cuenta como Premium.
+    return PLANS.get(getattr(user, "plan", None) or "premium") or PLANS["premium"]
+
+
 def plans_public() -> list[dict[str, Any]]:
     """Lista de planes seguros para exponer al frontend."""
     return [
@@ -154,8 +159,7 @@ def can_create_operation(user) -> Tuple[bool, str | None]:
     # Limpiar créditos extra vencidos antes de evaluar.
     _expire_extra_ops(user)
 
-    plan_id = getattr(user, "plan", "premium") or "premium"
-    plan = get_plan(plan_id)
+    plan = plan_de_la_cuenta(user)
     ops_limit = plan["ops"]
 
     # Premium (u otros ilimitados)
@@ -174,9 +178,7 @@ def can_create_operation(user) -> Tuple[bool, str | None]:
 
 def record_operation_created(user):
     """Incrementa contadores y consume extra_ops si hace falta."""
-    # Ola 4 MVP: solo existe Premium, fallback a premium.
-    plan_id = getattr(user, "plan", "premium") or "premium"
-    plan = get_plan(plan_id)
+    plan = plan_de_la_cuenta(user)
     ops_limit = plan["ops"]
 
     used = int(getattr(user, "ops_used_this_period", 0) or 0)
