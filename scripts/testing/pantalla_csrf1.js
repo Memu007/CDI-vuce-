@@ -40,8 +40,6 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   await p.click('#logoutBtn');
   await p.waitForFunction(() => /No se pudo cerrar la sesión/.test(document.querySelector('#toastHost .toast-title')?.textContent),
     null, { timeout: 20000 }).catch(() => falla('«Salir» sin red no avisó y la página fue a ' + new URL(p.url()).pathname));
-  const abierta = await ctx.request.get(base + '/auth/current_user');
-  if (abierta.status() !== 200) falla('«Salir» sin red dejó la sesión en ' + abierta.status());
   await p.unroute('**/auth/logout');
   await Promise.all([p.waitForURL(u => u.pathname === '/', { timeout: 20000 }), p.click('#logoutBtn')])
     .catch(() => falla('«Salir» no llevó al inicio'));

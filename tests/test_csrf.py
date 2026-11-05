@@ -74,8 +74,7 @@ def test_enforce_bloquea_header_invalido(cookie_client, monkeypatch):
 
 
 def test_enforce_no_afecta_bearer_sin_cookie(monkeypatch, sin_bypass_de_test):
-    # Sin cookie de sesion el middleware no aplica (no es atacable via CSRF),
-    # salvo al cerrar sesión: lo cubre el último caso.
+    # Sin cookie de sesion el middleware no aplica (no es atacable via CSRF).
     # Necesita `sin_bypass_de_test`: bajo pytest la app autentica sola cuando no
     # hay token, y el nombre de este test no matchea los patrones que apagan ese
     # atajo (VUCE-3). Sin apagarlo, el pedido entra igual y da 200 en vez de 401.
@@ -112,11 +111,13 @@ def test_enforce_pide_token_a_logout_y_telemetria(cookie_client, monkeypatch, ru
     assert bool(cookie_client.cookies.get("access_token")) != cerro
 
 
+@pytest.mark.parametrize("enforce", ["true", "false"])
 @pytest.mark.parametrize("ruta", ["/auth/logout", "/logout"])
-def test_enforce_logout_desde_otro_sitio_no_borra_la_sesion(monkeypatch, ruta):
+def test_logout_desde_otro_sitio_no_borra_la_sesion(monkeypatch, ruta, enforce):
     # Así llega un <form> de otro sitio: la cookie SameSite=Strict no viaja,
     # pero el navegador sí aplica los Set-Cookie de borrado de la respuesta.
-    monkeypatch.setenv("CSRF_ENFORCE", "true")
+    monkeypatch.setenv("CSRF_ENFORCE", enforce)
     resp = TestClient(app).post(ruta, headers={"Origin": "https://otro-sitio.example"})
-    assert resp.status_code == 403, resp.text
-    assert "access_token" not in resp.headers.get("set-cookie", "")
+    assert resp.status_code == 200, resp.text
+    borrados = resp.headers.get("set-cookie", "")
+    assert "access_token" not in borrados and "csrf_token" not in borrados, borrados

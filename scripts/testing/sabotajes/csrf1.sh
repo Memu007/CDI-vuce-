@@ -94,9 +94,12 @@ sabotaje pantalla $A "«Salir» sale sin el token" \
 sabotaje pantalla $A "«Salir» rechazado lleva al inicio igual" \
   "FALLA: «Salir» rechazado no avisó y la página fue a /" \
   "            if (!res.ok) {" "            if (false) {"
-sabotaje pytest_csrf $M "cerrar sesión sin cookie vuelve a pasar sin token" \
-  "FAILED tests/test_csrf.py::test_enforce_logout_desde_otro_sitio_no_borra_la_sesion[/auth/logout]" \
-  ' or path in _CSRF_LOGOUT_PATHS' ''
+sabotaje pytest_csrf $M "cerrar sesión borra las cookies aunque no llegue la de sesión" \
+  "FAILED tests/test_csrf.py::test_logout_desde_otro_sitio_no_borra_la_sesion[/auth/logout-false]" \
+  $'    if request.cookies.get("access_token"):\n        response.delete_cookie' $'    if True:\n        response.delete_cookie'
+sabotaje pytest_csrf $M "el alias borra la cookie por su cuenta" \
+  "FAILED tests/test_csrf.py::test_logout_desde_otro_sitio_no_borra_la_sesion[/logout-false]" \
+  '    return await logout(request, response)' $'    response.delete_cookie("access_token")\n    return {}'
 sabotaje pantalla $A "«Salir» sin red lleva al inicio igual" \
   "FALLA: «Salir» sin red no avisó y la página fue a /" \
   "            if (e.message !== 'unauthorized') {" "            if (e.message === ERROR_SIN_SESION) {"
