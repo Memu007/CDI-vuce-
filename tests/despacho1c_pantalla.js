@@ -1,11 +1,15 @@
-// Pantallas reales con un DOM falso y sin red: qué avisos quedan a la vista
-// cuando el servidor contesta historial_guardado. Uso: node despacho1c_pantalla.js <escenario> <true|false|null>
-// null: la respuesta no trae el campo.
+// Pantallas reales con un DOM falso y sin red: qué queda a la vista según lo que
+// contesta el servidor al guardar. Uso: node despacho1c_pantalla.js <escenario> <respuesta>
+// respuesta: true|false|null es historial_guardado (null: sin el campo); {"status": N}
+// contesta ese error; "red" es la red caída y 402 el plan vencido (CDI.api lanza).
 const vm = require('node:vm'), fs = require('node:fs'), path = require('node:path');
 const V2 = path.join(__dirname, '..', 'proyecto_maria', 'static', 'v2');
 const [escenario, flag] = process.argv.slice(2);
 const flagJson = JSON.parse(flag);
-const conFlag = c => (flagJson === null ? c : Object.assign({ historial_guardado: flagJson }, c));
+const esFalla = flagJson !== null && typeof flagJson !== 'boolean';
+const conFlag = c => (flagJson === null ? c : esFalla ? flagJson : Object.assign({ historial_guardado: flagJson }, c));
+// qué guardado contesta la respuesta pedida; los demás contestan bien
+const DESTINO = { 'confirmar-ncm': '/api/ncm/guardar-uso', aprender: '/productos' }[escenario] || '/operaciones';
 
 class Node {
   constructor(id) {
@@ -29,9 +33,11 @@ function armar(fuente, extraCDI) {
   const node = id => { if (!nodes.has(id)) nodes.set(id, new Node(id)); return nodes.get(id); };
   const respuestas = {
     '/generate_maria': { success: true, filename: 'MARIA_SINTETICA.TXT', content: 'x' },
-    '/operaciones': conFlag({ success: true, operation_id: 1 }),
-    '/api/ncm/guardar-uso': conFlag({ success: true }),
+    '/operaciones': { success: true, operation_id: 1 },
+    '/api/ncm/guardar-uso': { success: true },
+    '/productos': { success: true, productos_nuevos: 1 },
   };
+  respuestas[DESTINO] = conFlag(respuestas[DESTINO]);
   let cliente = null;
   const CDI = Object.assign({
     state: { items: [], operacion: {} },
@@ -44,6 +50,9 @@ function armar(fuente, extraCDI) {
       llamadas.push(url);
       const clave = Object.keys(respuestas).find(k => url.endsWith(k));
       const cuerpo = clave ? respuestas[clave] : { success: true };
+      if (cuerpo === 'red') throw new TypeError('Failed to fetch');
+      if (cuerpo === 402) throw Object.assign(new Error('payment_required'), { motivo: 'Tu plan venció' });
+      if (cuerpo.status) return { ok: false, status: cuerpo.status, json: async () => ({ detail: 'falla sintética' }) };
       return { ok: true, status: 200, json: async () => cuerpo };
     },
   }, extraCDI);
@@ -60,6 +69,9 @@ function armar(fuente, extraCDI) {
   for (const archivo of ['montos_ar.js', 'screens/' + fuente]) {
     vm.runInContext(fs.readFileSync(path.join(V2, archivo), 'utf8'), contexto);
   }
+  const caja = node('readyClientSuccess');
+  caja.children['[data-client-success-title]'] = [new Node()];
+  caja.children['[data-client-success-text]'] = [new Node()];
   for (const fn of events.DOMContentLoaded || []) fn();
   return { CDI, node, handlers, toasts, llamadas, ponerCliente: c => { cliente = c; } };
 }
@@ -76,13 +88,25 @@ async function esperarRed(app, url) {
 const ITEM = { descripcion: 'Mesa de madera sintética', cantidad: 1, pieza: '', origen: 'CN', valor_unitario: 1 };
 
 const escenarios = {
-  // Listo con cliente activo: guarda la operación sola después de generar.
+  // Listo con cliente activo: guarda la operación sola después de generar. La caja
+  // de éxito de una operación anterior sigue abierta.
   'listo-con-cliente': async () => {
     const app = armar('finalize.js');
     app.ponerCliente({ id: 7, nombre: 'Cliente Sintético' });
     app.CDI.state.items = [Object.assign({}, ITEM, { pieza: '9403.60.00.000 A' })];
+    app.node('readyClientSuccess').hidden = false;
     app.handlers.ready.onEnter();
     await esperarRed(app, '/operaciones');
+    return app;
+  },
+  // Listo con vendedor: aprende los productos en el catálogo del proveedor.
+  aprender: async () => {
+    const app = armar('finalize.js');
+    app.ponerCliente({ id: 7, nombre: 'Cliente Sintético' });
+    app.CDI.state.items = [Object.assign({}, ITEM, { pieza: '9403.60.00.000 A' })];
+    app.CDI.state.operacion = { vendedor_nombre: 'Proveedor Sintético' };
+    app.handlers.ready.onEnter();
+    await esperarRed(app, '/productos');
     return app;
   },
   // Listo sin cliente: el panel asigna uno y vuelve a guardar.
@@ -119,5 +143,10 @@ const escenarios = {
 };
 
 escenarios[escenario]().then(app => {
-  process.stdout.write(JSON.stringify({ toasts: app.toasts }));
+  const caja = app.node('readyClientSuccess'), [titulo] = caja.querySelectorAll('[data-client-success-title]');
+  const [texto] = caja.querySelectorAll('[data-client-success-text]');
+  process.stdout.write(JSON.stringify({
+    toasts: app.toasts, panelAbierto: !app.node('readyOrphanPanel').hidden,
+    caja: caja.hidden ? null : { titulo: titulo.textContent, texto: texto.textContent },
+  }));
 }, err => { console.error(err && err.stack || err); process.exit(2); });
