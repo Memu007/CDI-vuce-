@@ -48,10 +48,9 @@ sabotaje $M "el PDF se vuelve a leer en el hilo del servidor" \
   'result = process_pdf(contents)' \
   'FAILED tests/test_rendimiento1.py::test_health_responde_mientras_se_lee_un_pdf'
 sabotaje $M "el texto del PDF se vuelve a leer en el hilo del servidor" \
-  'pdf_text = await _leer_pdf_aparte(
-                    extraer_texto_pdf_seguro, contents, limite=_pdf_vendor_timeout_s()
-                )' \
-  'pdf_text = extraer_texto_pdf_seguro(contents)' \
+  'leido = await validar_pdf_aparte(
+                    contents, _pdf_vendor_timeout_s(), clave=user["username"], modo="texto")' \
+  'leido = {"texto": __import__("proyecto_maria.pdf_extractor", fromlist=["x"]).extraer_texto_pdf_seguro(contents)}' \
   'FAILED tests/test_rendimiento1.py::test_health_responde_mientras_se_lee_el_texto_del_pdf'
 sabotaje $M "Gemini vuelve a correr en el hilo del servidor" \
   '                asyncio.to_thread(_suggest_ncm_with_gemini, descripcion, 5 - len(sugerencias)),' \
@@ -76,8 +75,8 @@ sabotaje proyecto_maria/core/despacho_lector.py "vuelve a contar páginas antes 
                 return {"encriptado": True, "paginas": 0}' \
   'FAILED tests/test_rendimiento1.py::test_pdf_encriptado_dice_que_esta_encriptado'
 sabotaje $M "el texto del vendedor sin tiempo máximo" \
-  'extraer_texto_pdf_seguro, contents, limite=_pdf_vendor_timeout_s()' \
-  'extraer_texto_pdf_seguro, contents' \
+  'contents, _pdf_vendor_timeout_s(), clave=user["username"], modo="texto")' \
+  'contents, 3600.0, clave=user["username"], modo="texto")' \
   'FAILED tests/test_rendimiento1.py::test_texto_del_vendedor_tiene_tiempo_maximo'
 sabotaje $M "las lecturas de PDF vuelven al grupo de hilos compartido" \
   'futuro = loop.run_in_executor(pool or _pool_lectura_pdf(), _correr_lectura, funcion, *args)' \

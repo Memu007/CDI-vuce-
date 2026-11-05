@@ -84,10 +84,9 @@ def test_health_responde_mientras_se_lee_un_pdf(monkeypatch):
 
 def test_health_responde_mientras_se_lee_el_texto_del_pdf(monkeypatch):
     """El texto crudo (para adivinar el vendedor) también se lee aparte."""
-    import proyecto_maria.pdf_extractor as ext
     monkeypatch.setattr(main, "process_pdf",
                         lambda *_: {"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "items": [{"descripcion": "x"}], "operacion": {}})
-    monkeypatch.setattr(ext, "extraer_texto_pdf_seguro", lambda *_: (_bloquear(), "")[1])
+    _texto_lento(monkeypatch)
     demora, r = asyncio.run(_health_mientras(_subir))
     assert r.status_code == 200, r.text[:200]
     assert demora < 0.5, f"/health tardó {demora:.2f} s mientras se leía el texto"
@@ -183,24 +182,37 @@ def test_ya_no_se_usa_pyPDF2_ni_python_jose():
         assert not usa, (archivo, usa and usa.group(0))
 
 
-def _validacion_lenta(monkeypatch):
-    """Validar tarda LENTO_S, venga de donde venga: el proceso aparte que
-    valida duerme (y anota cuándo se lanzó), y validar en este proceso
-    retiene el hilo."""
+def _aparte_lento(monkeypatch, modo, salida):
+    """El proceso aparte, en `modo`, duerme LENTO_S (y anota cuándo se lanzó)
+    antes de contestar `salida`."""
+    import json
     import sys
-    from proyecto_maria.core import despacho_lector
-    monkeypatch.setattr(despacho_lector, "validar_pdf",
-                        lambda *_: (_bloquear(), {"encriptado": False, "paginas": 1})[1])
     real = asyncio.create_subprocess_exec
 
     async def _lento(*args, **kw):
-        if args[-1] != "validar":
+        if args[-1] != modo:
             return await real(*args, **kw)
         INICIO["t"] = time.monotonic()
-        dormir = ("import sys,time; sys.stdin.buffer.read(); time.sleep(%r); "
-                  "print('{\"encriptado\": false, \"paginas\": 1}')" % LENTO_S)
+        dormir = ("import sys,time; sys.stdin.buffer.read(); time.sleep(%r); print(%r)"
+                  % (LENTO_S, json.dumps(salida)))
         return await real(sys.executable, "-c", dormir, **kw)
     monkeypatch.setattr(asyncio, "create_subprocess_exec", _lento)
+
+
+def _validacion_lenta(monkeypatch):
+    """Validar tarda LENTO_S, venga de donde venga: el proceso aparte duerme
+    y validar en este proceso retiene el hilo."""
+    from proyecto_maria.core import despacho_lector
+    monkeypatch.setattr(despacho_lector, "validar_pdf",
+                        lambda *_: (_bloquear(), {"encriptado": False, "paginas": 1})[1])
+    _aparte_lento(monkeypatch, "validar", {"encriptado": False, "paginas": 1})
+
+
+def _texto_lento(monkeypatch):
+    """Sacar el texto del vendedor tarda LENTO_S, venga de donde venga."""
+    import proyecto_maria.pdf_extractor as ext
+    monkeypatch.setattr(ext, "extraer_texto_pdf_seguro", lambda *_: (_bloquear(), "")[1])
+    _aparte_lento(monkeypatch, "texto", {"texto": ""})
 
 
 def test_health_responde_mientras_se_valida_el_pdf(monkeypatch):
@@ -250,12 +262,11 @@ def test_tiempo_de_validacion_mal_escrito_no_rechaza_todo(monkeypatch):
 def test_texto_del_vendedor_tiene_tiempo_maximo(monkeypatch):
     """La adivinanza del vendedor es opcional: si tarda, se sigue sin ella, y
     con un tiempo propio más corto que el de la lectura del PDF."""
-    import proyecto_maria.pdf_extractor as ext
     monkeypatch.setenv("PDF_READ_TIMEOUT_S", "30")
     monkeypatch.setenv("PDF_VENDOR_TIMEOUT_S", "0.3")
     monkeypatch.setattr(main, "process_pdf",
                         lambda *_: {"documento": {"tipo": "factura_comercial", "operacion": "importacion", "destinacion": ""}, "items": [{"descripcion": "x"}], "operacion": {}})
-    monkeypatch.setattr(ext, "extraer_texto_pdf_seguro", lambda *_: (_bloquear(), "")[1])
+    _texto_lento(monkeypatch)
     r, demora = _subir_y_medir()
     assert r.status_code == 200, r.text[:200]
     assert demora < LENTO_S, f"respondió a los {demora:.2f} s"

@@ -68,3 +68,28 @@ def test_el_texto_del_vendedor_no_hace_crecer_la_app():
     # Sin vendedor, la factura sigue: la adivinanza es opcional.
     assert m["bomba"] == [200, None], m
     assert m["crecio_mb"] < 150, f"la app creció {m['crecio_mb']} MB: {m}"
+
+
+def test_el_texto_corta_cada_flujo_que_se_infla():
+    """Una fuente de 40 MB al inflarse: el tope por flujo la corta en 8 MB,
+    sin esperar al tope de memoria del proceso aparte."""
+    import tracemalloc
+    from proyecto_maria.core.despacho_lector import texto_plano_del_pdf
+    from tests.pdf_bombas import muchas_fuentes
+    pdf = muchas_fuentes(1, 40 * 1024)
+    tracemalloc.start()
+    try:
+        texto_plano_del_pdf(pdf)
+        pico_mb = tracemalloc.get_traced_memory()[1] >> 20
+    finally:
+        tracemalloc.stop()
+    assert pico_mb < 50, f"sacar el texto llegó a {pico_mb} MB"
+
+
+def test_el_texto_tiene_tope_de_cpu():
+    """Dos hojas que cuestan casi un segundo de CPU cada una: con tope de
+    0,2 s el texto se corta, en vez de esperar al tiempo máximo del vendedor."""
+    from proyecto_maria.core.despacho_lector import _DemasiadoTrabajo, texto_plano_del_pdf
+    from tests.pdf_bombas import trabajo
+    with pytest.raises(_DemasiadoTrabajo):
+        texto_plano_del_pdf(trabajo(hojas=2), limite_cpu_s=0.2)
