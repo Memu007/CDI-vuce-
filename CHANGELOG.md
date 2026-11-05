@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: el texto de una factura se saca aparte (RENDIMIENTO-1d)
+
+- **fix(seguridad):** sacar el texto de la factura para adivinar el vendedor corre en el proceso aparte de la validación, con su tope de memoria, de CPU y por flujo. Un PDF que pasa la validación y se infla al leer sus fuentes ya no hace crecer la app más de 1 GB: la factura sigue, sin vendedor adivinado.
+
 ## 2026-11-05 · fix: con CSRF exigido, la landing y la pantalla vieja escriben y la recuperación de cuenta anda (CSRF-2)
 
 - **fix(seguridad):** el control CSRF exenta sólo rutas exactas (login, registro y las tres de recuperación de cuenta): ya no saltea rutas que empiezan parecido ni las que dicen «webhook». `static/csrf.js` agrega el token a las escrituras de la landing y de la pantalla vieja, incluido su «Salir».
