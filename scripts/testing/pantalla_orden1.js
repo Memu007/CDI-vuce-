@@ -1639,9 +1639,8 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     });
     // Todas las consultas que hizo la pestaña ya tienen la respuesta del servidor.
     const contestadas = async () => {
-      const pedidas = await p.evaluate(() => window.__consultas);
       const tope = setTimeout(() => falla('el servidor no contestó las consultas de la pestaña en 15 s'), 15000);
-      while (traidas < pedidas) await new Promise(r => { alTraer = r; });
+      while (traidas < await p.evaluate(() => window.__consultas)) await new Promise(r => { alTraer = r; });
       clearTimeout(tope);
     };
     return { contestadas, cerrar: () => { cerrado = true; }, soltar, soltarResto };
@@ -1768,18 +1767,16 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
         });
       };
     });
-    // Las lecturas de después del pago esperan a que entre B.
-    let reteniendo = false, avisar, soltar;
+    // La primera carga pasa; las lecturas de después del pago esperan a que entre B.
+    let vistas = 0, avisar, soltar;
     const hayRetenida = new Promise(r => { avisar = r; }), suelta = new Promise(r => { soltar = r; });
     await t.route('**/auth/current_user', async ruta => {
-      if (!reteniendo) return ruta.continue();
+      if (++vistas === 1) return ruta.continue();
       avisar();
       await suelta;
       return ruta.continue().catch(() => {});
     });
     await t.goto(base + '/dashboard?billing=success');
-    await t.waitForFunction(() => window.CDI && CDI.currentUser);
-    reteniendo = true;
     const tope = setTimeout(() => falla(que + ', pero la pestaña no vuelve a leer el usuario en 15 s'), 15000);
     await hayRetenida;
     clearTimeout(tope);

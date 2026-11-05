@@ -188,15 +188,15 @@ sabotaje $A "«Recargar» no recarga" \
   "        document.getElementById('pestanaAjenaRecargar').addEventListener('click', () => window.location.reload());"$'\n' ''
 
 export CASOS=z30
-LEE="if (!confirmarSesion(user.username || '', sesionAntes)) return !!currentUser;"
+LEE="if (!confirmarSesion(user.username, sesionAntes)) return !!currentUser;"
 sabotaje $A "la pestaña tapada al abrir toma los datos del otro" \
   "FALLA: entró otro usuario antes de que la pestaña de A supiera quién es y la pestaña tomó los datos de B" \
-  "$LEE" "if (!sesionAjena && !confirmarSesion(user.username || '', sesionAntes)) return !!currentUser;"
+  "$LEE" "if (!sesionAjena && !confirmarSesion(user.username, sesionAntes)) return !!currentUser;"
 
 export CASOS=z34
 sabotaje $A "al volver del pago toma los datos del otro" \
   "FALLA: A volvió del pago con B adentro y la pestaña tomó los datos de B" \
-  "$LEE" "confirmarSesion(user.username || '', sesionAntes);"
+  "$LEE" "confirmarSesion(user.username, sesionAntes);"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"
