@@ -197,7 +197,7 @@ async def upsert_client_product_history(
     # Dos pedidos a la vez con el mismo producto: el índice único deja entrar
     # uno y el otro espera a que termine para sumarle.
     insertar = pg_insert if db.get_bind().dialect.name == "postgresql" else sqlite_insert
-    nueva = await db.execute(
+    alta = (
         insertar(ClientProductHistory.__table__).values(
             id=str(uuid.uuid4()),
             owner_username=owner_username,
@@ -220,14 +220,20 @@ async def upsert_client_product_history(
             index_elements=["owner_username", "client_id", "clave"],
         ).returning(ClientProductHistory.id)
     )
-    insertada = nueva.first() is not None
-    existing = (await db.execute(
-        sa_select(ClientProductHistory).where(
-            ClientProductHistory.owner_username == owner_username,
-            ClientProductHistory.client_id == client_id,
-            ClientProductHistory.clave == clave,
-        ).with_for_update().execution_options(populate_existing=True)
-    )).scalar_one()
+    fila = sa_select(ClientProductHistory).where(
+        ClientProductHistory.owner_username == owner_username,
+        ClientProductHistory.client_id == client_id,
+        ClientProductHistory.clave == clave,
+    ).with_for_update().execution_options(populate_existing=True)
+    # Mientras se espera la fila, otro pedido puede cambiarle la clave o
+    # borrarla: entonces no aparece y se vuelve a insertar.
+    for _ in range(3):
+        insertada = (await db.execute(alta)).first() is not None
+        existing = (await db.execute(fila)).scalar_one_or_none()
+        if existing is not None:
+            break
+    else:
+        raise RuntimeError("el producto cambió tres veces mientras se guardaba")
     if insertada:
         return existing
 

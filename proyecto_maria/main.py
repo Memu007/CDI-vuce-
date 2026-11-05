@@ -10003,6 +10003,7 @@ async def guardar_uso_ncm(
     # confirma antes de las memorias de abajo: su rollback no lo deshace.
     await _sumar_uso_ncm(db, user["username"], descripcion, ncm)
 
+    historial_guardado = True
     try:
         wrote_client = False
         if client_id:
@@ -10024,8 +10025,9 @@ async def guardar_uso_ncm(
     except Exception as err:
         await db.rollback()
         logging.warning("ncm confirmation memory unavailable: %s", err)
+        historial_guardado = False
 
-    return {"success": True}
+    return {"success": True, "historial_guardado": historial_guardado}
 
 @app.post("/api/ncm/import-historial")
 async def import_ncm_historial(

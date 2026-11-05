@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: un uso no se pierde si el producto cambia mientras se guarda (DESPACHO-1b)
+
+- Si otro pedido cambia o borra el producto mientras se guarda un uso, el uso queda en una fila nueva en lugar de perderse o dar 500. Confirmar un NCM dice si guardó el historial del cliente.
+
 ## 2026-10-29 · fix: un producto es una sola fila en el catálogo del cliente (DESPACHO-1b, vuelta 4)
 
 - Aprender, cargar una operación, guardar un despacho, cambiar un producto y confirmar un NCM usan la misma regla: NCM de 8 dígitos y la descripción sin mirar mayúsculas, espacios ni forma Unicode. La base no deja dos filas iguales y el arranque une las que ya estaban repetidas.
