@@ -3,63 +3,56 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Veredicto de COBRO-CORTE-1 (2026-11-05 18:10 UTC): devolución por una causa
+## Veredicto de COBRO-CORTE-1, vuelta (2026-11-05 22:00 UTC): devolución por dos causas
 
-Sobre `75c6476`. Evidencia: `docs/pm/REPRODUCCION-COBRO-CORTE-1-2026-11-05.md`.
-El corte por estado está bien: Opus y Sonnet recorrieron todas las rutas que
-gastan Gemini o escriben el TXT, y las cinco carreras en Postgres dieron bien.
-Lo que vuelve es el conteo.
+Sobre `0b9ccde`. Evidencia: `docs/pm/REPRODUCCION-COBRO-CORTE-1-v2-2026-11-05.md`.
+Lo de la vuelta anterior está cumplido: identidad por operación, sin 409,
+borrar cliente no recuenta, 402 igual dos veces, `trial` sin 500, sin atajo
+`testing`, D61 b. Los casos (82) y el chequeo-6 (`+131/−149`, 0 avisos) dan
+como dijiste. Lo que vuelve son dos bordes de esa identidad nueva.
 
-**La causa.** El id que arma la pantalla con el número de factura
-(`FAC_<factura>`, saneado) hace de identidad de la operación, y el guardado
-reemplaza lo que encuentra con ese id. Lo reproduje:
-- dos operaciones distintas con factura `0001` al mismo cliente: queda una,
-  con los ítems de la segunda, y no se cuenta (`OP-000001` pisado);
-- `A-1/2` y `A-12` dan el mismo archivo;
-- después de 10 contenidos, 409 para siempre en ese id; en exportación pasa
-  con el mismo contenido en días distintos, porque el TXT lleva la fecha
-  (`maria_generator_export.py:159`);
-- borrar el cliente y regenerar cuenta otra vez.
+**Causa 1: se cobra antes de entregar.** `_contar_maria` confirma el conteo y
+la fila antes de escribir el TXT (`main.py:4776`, `:4928`). Si algo falla
+después, la persona recibe un 500 sin archivo ni `operacion_id`, y el
+reintento cuenta otra. Lo reproduje en Postgres con la escritura fallando en
+el primer pedido: `500 ops 1`, reintento `200 ops 2`, dos filas. En `375edbc`
+el mismo reintento daba `ops 1`.
+Pido: lo que no se entregó no queda cobrado. Familia: falla al escribir el
+TXT, excepción del generador después de contar, y lo mismo en exportación.
 
-**Lo que pido, como comportamiento, con la familia como datos:**
-1. Dos operaciones distintas nunca comparten una fila del historial y cada
-   una cuenta. Familia: mismo número de dos proveedores, ids que el saneo
-   junta, sin número de factura, dos miembros de la misma organización.
-2. Regenerar la misma operación con el mismo resultado nunca gasta una de
-   las 10, también en exportación con otro día. Nunca un callejón sin
-   salida: pasado el tope, la usuaria honesta tiene cómo hacer una operación
-   nueva con esa factura sin borrar el cliente. *Sugerencia:* que la 11.ª
-   distinta sea una operación nueva contada en vez de un 409.
-3. Lo ya contado no se vuelve a contar por borrar el cliente.
-4. Cuántas generaciones distintas saca, como mucho, una operación pagada,
-   dicho en el código con su número y probado.
-5. El 402 nunca muestra un código crudo (`clientes.js:449` y `:628` dicen
-   «payment_required»); la razón no cambia entre el primer pedido y el
-   segundo; un `plan` legado (`trial`, el default de `User.plan`) nunca da
-   400 ni 500 al generar, exportar o guardar.
-6. El atajo `ENVIRONMENT == "testing"` pasó de 1 lugar a 4. Que las rutas
-   que cuentan no lo tengan.
+**Causa 2: una respuesta tardía escribe el id en la carga que sigue.**
+`finalize.js` asigna `CDI.state.operacionId` cuando vuelve `/generate_maria`
+y cuando vuelve el guardado al cliente, sin mirar si la carga sigue siendo la
+misma. Si la persona empieza otra carga en esa ventana, la nueva hereda el id:
+no se cuenta y pisa la fila y el archivo de la anterior. Lo reprodujeron por
+separado Opus y Sonnet, demorando la respuesta con `page.route`: `ops antes 3
+despues 3`, una sola fila para dos facturas.
+Pido: una respuesta sólo escribe en la carga que la pidió. Familia: respuesta
+de generar, respuesta del guardado, y v1 (`app.js:3390`, `:3751`, mismo
+patrón, no corrido). Esas líneas las agregaste vos: son tuyas; el resto de
+`saveOperationToHistory` y `reSave…` sigue siendo de MARIA.
 
-Un caso por punto, rojo antes en `75c6476`, y su sabotaje. Uno de la familia
-del punto 1 lo pruebo yo con un ejemplo que no está acá.
+**Además, chicos (a cero, como pidió Emi para seguridad y datos):**
+3. Un `operacion_id` que la base no acepta (NUL, surrogate suelto) da 500 en
+   Postgres en `/generate_maria`, en exportación con surrogate y en el
+   guardado. No cobra, pero el 500 devuelve `dev_detail` con SQL en test.
+   Pido: un id que no es de una operación propia es operación nueva, nunca
+   500, en las tres rutas. En SQLite no se ve: el caso corre en Postgres.
+4. El aviso de borrar cliente (`clientes.js:1594`) dice que se borra el
+   historial de operaciones, y quedan como «Sin cliente». Que diga lo que pasa.
+5. `delete_cliente` reescribe `extra` sin `_cuenta_bloqueada`. Plausible, no
+   reproducido: una huella pisada es una regeneración gratis. Que tome el
+   mismo candado.
 
-**D4 b se corrige por esta evidencia** (decidido por la PM, reversible): se
-sigue contando al generar, pero la identidad no puede ser el texto de la
-factura.
+Un caso por causa con la familia como datos, rojo antes en `0b9ccde`, y su
+sabotaje. Uno de cada familia lo pruebo yo con otro ejemplo.
 
-**D61: (b), mover sin devolver cupo** (decidido por la PM, reversible; se lo
-digo a Emi). Guardar en B lo que se generó y guardó en A mueve la operación a
-B; `ops_used` nunca baja, así que no hay camino que devuelva cupo. Lo que sí
-es otra operación para otro importador entra por el punto 1.
-
-**Reparto con MARIA.** `reSaveOperationAndClosePanel` (`finalize.js:1127`),
-que muestra «Cliente asignado» aunque el guardado dé 402, es la misma función
-que le devuelvo a MARIA en DESPACHO-1c. Es de ella: no la toques. Los textos
-de `clientes.js` y `app_v2.js` son tuyos.
-
-A la cola de limpieza, no acá: las dos posibles inversiones de orden de locks
-(ruta manual con extras vencidas; aceptar invitación), sin reproducir.
-C10 queda como puerta de publicación con Emi.
+**Quedan como están** (decidido por la PM): el mensaje del tope que le dice a
+Premium «actualizá a Premium» (previo; cola de limpieza); los dos relojes del
+inicio de período, dentro del riesgo de 1 s ya aceptado; pestañas abiertas
+durante una publicación que no mandan el id, mismo riesgo declarado.
+`d528a67` (comentarios sin historia) y `9213536` llegaron después de la
+entrega: entran en la próxima vuelta.
 
 **CSRF-3: aceptada** sobre `9fe55d4` (2026-11-05 19:20 UTC), integrada. Evidencia: `docs/pm/REPRODUCCION-CSRF-3-2026-11-05.md`. Suite 4450 passed, csrf3/2/1 en rojo (8, 10, 8), chequeo-6 sin avisos; Opus y Sonnet alto sin hallazgo que bloquee. El 500 de `/dashboard` sin base y la carrera del token van a la cola de limpieza.
 
