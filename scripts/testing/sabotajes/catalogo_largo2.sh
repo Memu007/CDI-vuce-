@@ -74,12 +74,12 @@ sabotaje $MO "el proveedor vuelve a tener tope de 200" \
   '    vendor_nombre = Column(String(200), nullable=True)' \
   "FAILED $T::test_el_origen_y_el_proveedor_no_tienen_tope_en_la_base" "AssertionError: vendor_nombre"
 sabotaje $CS "sin letras latinas la clave queda vacía" \
-  '    return clave or " ".join(unicodedata.normalize("NFC", descripcion).lower().split())' \
-  '    return clave' \
+  '    return "~" + hashlib.sha256(texto.encode("utf-8", "surrogatepass")).hexdigest()[:40]' \
+  '    return ""' \
   "FAILED $T::${SIN}[catalogo]" "FAILED $T::${SIN}[guardar-uso]"
 sabotaje $CS "la clave junta ß con ss y ﬁ con fi" \
-  '    return clave or " ".join(unicodedata.normalize("NFC", descripcion).lower().split())' \
-  '    return clave or " ".join(unicodedata.normalize("NFC", descripcion).casefold().split())' \
+  '    texto = " ".join(unicodedata.normalize("NFC", descripcion).lower().split())' \
+  '    texto = " ".join(unicodedata.normalize("NFC", descripcion).casefold().split())' \
   "FAILED $T::${SIN}[catalogo]" "FAILED $T::${SIN}[guardar-uso]"
 sabotaje $CS "guardar en el catálogo usa la clave vieja" \
   '        product_key = clave_de_producto(desc)' \
@@ -108,6 +108,11 @@ if [ -n "$PG_URL" ]; then
       "AND column_name IN ('product_key', 'descripcion', 'origen', 'vendor_nombre') " \
       "AND column_name IN ('product_key', 'descripcion', 'origen') " \
       "FALLA | primer arranque: las columnas son text" "FALLA | el catálogo guarda enteros el origen"
+    sabotaje $CS "sin letras latinas la clave es el texto entero y no entra en el índice" \
+      '    return "~" + hashlib.sha256(texto.encode("utf-8", "surrogatepass")).hexdigest()[:40]' \
+      '    return texto' \
+      "FALLA | 2000 caracteres CJK por catálogo" "FALLA | 2000 caracteres CJK por guardar-uso" \
+      "FALLA | 2000 caracteres CJK por cambiar la descripción"
   fi
 else
   echo "SALTO | sin PG_URL: la migración no se midió"
