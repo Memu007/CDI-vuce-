@@ -395,9 +395,7 @@
             }
             if (duenoPestana === null) {
                 duenoPestana = user.username || '';
-                // Sin token al abrir, el servidor emite uno con la primera respuesta
-                // autenticada: no es otra sesión, y confirmarSesion lo pide estable.
-                if (sesionAlAbrir !== '' && (sesionAntes !== sesionAlAbrir || getCsrfToken() !== sesionAlAbrir)) marcarAjena();
+                if (sesionAntes !== sesionAlAbrir || getCsrfToken() !== sesionAlAbrir) marcarAjena();
             }
             if (!confirmarSesion(user.username, sesionAntes)) return !!currentUser;
             currentUser = user;

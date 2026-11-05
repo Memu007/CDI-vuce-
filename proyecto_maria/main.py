@@ -2423,7 +2423,7 @@ async def view_public_quote(request: Request, hash: str):
     )
 
 @app.get("/dashboard", response_class=HTMLResponse)
-def dashboard(request: Request):
+async def dashboard(request: Request, db: AsyncSession = Depends(get_db)):
     """Sirve el dashboard.
 
     Feature flag para la beta:
@@ -2433,6 +2433,12 @@ def dashboard(request: Request):
 
     v2 queda como default. v1 es opt-in durante la transicion.
     """
+    # Con la sesión abierta, la página llega con su csrf_token: la pestaña
+    # reconoce su sesión desde que abre y toma cualquier cambio como otro login.
+    try:
+        await get_current_user(request, Response(), db)
+    except HTTPException:
+        pass
     try:
         qv = (request.query_params.get("v") or "").strip()
         cookie_ui = (request.cookies.get("cdi_ui") or "").strip().lower()

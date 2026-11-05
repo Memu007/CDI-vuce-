@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-11-05 · fix: una sesión sin token CSRF lo recibe sola (CSRF-3)
 
-- **fix(seguridad):** si la sesión es válida y le falta la cookie `csrf_token`, la próxima lectura autenticada se la emite, y la pantalla v2 escribe sin volver a entrar. Una sesión vencida, revocada o ausente no recibe nada, y un token que ya está no se cambia.
+- **fix(seguridad):** si la sesión es válida y le falta la cookie `csrf_token`, la próxima lectura autenticada se la emite; la pantalla v2 ya la trae al abrir y escribe sin volver a entrar. Una sesión vencida, revocada o ausente no recibe nada, y un token que ya está no se cambia.
 
 ## 2026-11-05 · fix: con CSRF exigido, la landing y la pantalla vieja escriben y la recuperación de cuenta anda (CSRF-2)
 
