@@ -68,17 +68,27 @@ sabotaje $CS "el tope no deja entrar el máximo" \
   '    if len(unicodedata.normalize("NFC", descripcion)) >= MAX_DESCRIPCION:' \
   "FAILED $T::test_guardar_en_el_catalogo_respeta_el_tope[2000]"
 sabotaje $CS "guardar en el catálogo no controla el largo" \
-  '        _validar_largo(desc)' \
+  '        validar_largo(desc)' \
   '        pass' \
   "FAILED $T::test_guardar_en_el_catalogo_respeta_el_tope[2001]"
 sabotaje $CS "cambiar un producto no controla el largo" \
-  '        _validar_largo(val)' \
+  '        validar_largo(val)' \
   '        pass' \
   "FAILED $T::test_cambiar_un_producto_respeta_el_tope_y_alcanza_claves_largas"
-sabotaje $M "guardar-uso mide el largo sin pasar a NFC" \
-  '    largo_desc = len(unicodedata.normalize("NFC", descripcion))' \
-  '    largo_desc = len(descripcion)' \
-  "FAILED $T::test_guardar_uso_guarda_en_las_dos_memorias_o_da_400[nfd-que-achica]"
+sabotaje $M "guardar-uso no controla el largo en NFC" \
+  '        catalog_svc.validar_largo(descripcion)' \
+  '        pass' \
+  "FAILED $T::test_guardar_uso_guarda_en_las_dos_memorias_o_da_400[nfc-que-crece]"
+sabotaje $M "el historial mide el largo en NFC" \
+  '        if len(texto) > tope:' \
+  '        if len(unicodedata.normalize("NFC", texto)) > tope:' \
+  "FAILED $T::test_importar_el_historial_mide_el_texto_como_lo_guarda"
+CORRE=("$PY" -m pytest -q --no-cov -p no:cacheprovider tests/test_despacho1b.py -k test_confirmar_un_ncm_dice_si_no_guardo_el_historial)
+sabotaje $M "confirmar un NCM no avisa si no era un producto" \
+  '            wrote_client = historial_guardado = entry is not None' \
+  '            wrote_client = historial_guardado = True' \
+  "FAILED tests/test_despacho1b.py::test_confirmar_un_ncm_dice_si_no_guardo_el_historial[no es un producto]"
+CORRE=("${PRUEBA[@]}")
 sabotaje $M "el catálogo da 500 en vez de 400 al guardar" \
   $'    except ValueError as e:\n        raise HTTPException(status_code=400, detail=str(e))\n    except Exception as e:\n        logging.exception("catalog_save error")' \
   $'    except Exception as e:\n        logging.exception("catalog_save error")' \

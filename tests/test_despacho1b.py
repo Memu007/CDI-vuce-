@@ -2123,7 +2123,8 @@ def test_confirmar_un_ncm_saca_el_nul_del_origen_y_del_proveedor(auth_override, 
     assert _contar(VendorCatalogProduct, vendor_nombre=proveedor) == 1
 
 
-def test_confirmar_un_ncm_dice_si_no_guardo_el_historial(auth_override, client, monkeypatch):
+@pytest.mark.parametrize("causa", ["la base falla", "no es un producto"])
+def test_confirmar_un_ncm_dice_si_no_guardo_el_historial(auth_override, client, monkeypatch, causa):
     """Si el historial del cliente no se escribe, la respuesta lo dice; el uso
     del NCM ya quedó confirmado."""
     from proyecto_maria.services import client_memory
@@ -2131,8 +2132,12 @@ def test_confirmar_un_ncm_dice_si_no_guardo_el_historial(auth_override, client, 
     async def falla(*args, **kwargs):
         raise RuntimeError("la base no anda")
 
+    async def no_guarda(*args, **kwargs):
+        return None
+
     descripcion = f"TAPA INVENTADA {uuid.uuid4().hex[:8]}"
-    monkeypatch.setattr(client_memory, "upsert_client_product_history", falla)
+    monkeypatch.setattr(client_memory, "upsert_client_product_history",
+                        falla if causa == "la base falla" else no_guarda)
     cid = _crear_cliente(client)
     try:
         _, r = _guardar_uso(client, cid, descripcion=descripcion)

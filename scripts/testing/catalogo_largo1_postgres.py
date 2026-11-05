@@ -19,6 +19,7 @@ uso (con un Postgres local y descartable, nunca el de producción; el usuario
 tiene que poder crear bases):
   python scripts/testing/catalogo_largo1_postgres.py postgresql://cdi@127.0.0.1:5432/postgres [SHA anterior]
 """
+import contextlib
 import os
 import shutil
 import subprocess
@@ -67,7 +68,8 @@ def admin(consulta):
 
 
 def sql(consulta, *args):
-    with psycopg2.connect(URL_BASE) as con, con.cursor() as cur:
+    # El with de psycopg2 cierra la transacción, no la conexión.
+    with contextlib.closing(psycopg2.connect(URL_BASE)) as con, con, con.cursor() as cur:
         cur.execute(consulta, args)
         return cur.fetchall()
 
