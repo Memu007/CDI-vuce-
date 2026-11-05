@@ -9,6 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-11-05 · fix: una letra que no es Unicode no borra el texto de la factura (RENDIMIENTO-1d, devolución)
 
 - Si una fuente del PDF dice que una letra es media letra Unicode, el texto que se saca aparte vuelve con «�» en su lugar en vez de perderse entero, y el vendedor se sigue adivinando.
+- Si el servidor corre con un idioma que no es UTF-8, una letra como «中» tampoco hace caer la lectura.
 
 ## 2026-11-05 · fix: la operación se guarda sin esperar al catálogo (DESPACHO-1d)
 

@@ -807,8 +807,10 @@ def _main() -> int:
         modo = sys.argv[2] if len(sys.argv) > 2 else "leer"
         data = sys.stdin.buffer.read()
         resultado = _MODOS[modo][0](data, limite_cpu_s)
-        # Una mitad de par suelta no se puede escribir en UTF-8, ni la app guardarla.
-        sys.stdout.write(_MEDIO_PAR.sub("\ufffd", json.dumps(resultado, ensure_ascii=False)))
+        # Una mitad de par suelta no se puede escribir en UTF-8, ni la app guardarla;
+        # en bytes, porque el locale heredado puede no ser UTF-8.
+        salida = _MEDIO_PAR.sub("\ufffd", json.dumps(resultado, ensure_ascii=False))
+        sys.stdout.buffer.write(salida.encode("utf-8"))
         sys.stdout.flush()
     except (MemoryError, _DemasiadoTrabajo):
         return _SALIDA_DEMASIADO_PESADO
