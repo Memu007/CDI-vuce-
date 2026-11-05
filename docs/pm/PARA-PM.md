@@ -2,6 +2,173 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## CSRF-1, entregada en `b1c9d70` (informe en el commit de arriba)
+
+**Resultado.** Con `CSRF_ENFORCE=true` la telemetría v2 llega: `track()`
+manda `X-CSRF-Token` y `/api/session/state` da 200. Antes daba 403. Un pedido
+sin token desde otro origen da 403, tanto a la telemetría como a
+`/auth/logout`. Cerrar sesión ahora pide el token (D16 b): `/auth/logout`
+dejó de estar exento. El botón «Salir» sigue funcionando: lleva al inicio y
+`/auth/current_user` da 401. Si el servidor rechaza el cierre, «Salir» lo
+avisa y no lleva al inicio con la sesión abierta. Antes daba 403 en silencio,
+iba a `/` y la sesión quedaba abierta; lo encontraron el `/code-review` y el
+adversario. Producto `+6/−3`, en `main.py` y `app_v2.js`.
+
+### Decisiones
+
+- **D56. Dos clientes más mandan POST sin token y con enforce dan 403.** Ya
+  pasaba antes de esta pieza, que no los toca:
+  - la telemetría de la landing (`landing.html:561`, `/api/ui/event`), sólo
+    cuando la persona tiene sesión abierta;
+  - el `/logout` de la pantalla vieja (`app.js:4085`).
+
+  (a) Arreglarlos en esta pieza.
+  (b) Pieza aparte, chica.
+
+  **Recomiendo (b).** La tarea nombra la telemetría v2 y el botón de la
+  página. Sumar dos pantallas más agranda el diff sin que nadie haya pedido
+  ese comportamiento.
+- **D57. Una sesión sin la cookie `csrf_token` no se puede cerrar.** La
+  cookie sólo se emite en login, register, verify-email y crear
+  organización (`main.py:2894`, `3185`, `3243`, `9920`). Tiene el mismo
+  `max_age` que `access_token`, así que no medí cuándo falta en la práctica:
+  el caso la borra a mano. Sin ella, «Salir» ahora avisa en vez de llevar al
+  inicio con la sesión abierta, pero no cierra.
+
+  (a) Dejarlo así: riesgo bajo.
+  (b) Pieza aparte: que un GET autenticado vuelva a emitir la cookie si falta.
+
+  **Recomiendo (a), y (b) si aparece en soporte.** No lo hice: es
+  funcionalidad fuera de la tarea y toca sesión.
+
+### SHAs (desde `885ee89`)
+
+| SHA | Qué |
+|---|---|
+| `1a77aae` | test: caso parametrizado `test_enforce_pide_token_a_logout_y_telemetria` (con y sin token, `Origin` de otro sitio), `pantalla_csrf1.js` (la telemetría de la página llega y «Salir» cierra con enforce), `sabotajes/csrf1.sh`, y el ayudante `salir()` de `pantalla_orden1.js` con token |
+| `f32ea2f` | fix: `track()` manda el token; `/auth/logout` sale de las exenciones; `CHANGELOG.md` |
+| `c01ca26` | test: «Salir» rechazado tiene que avisar (fase nueva en `pantalla_csrf1.js` y sabotaje 5); `test_prelaunch_block1` cierra sesión con token; el PID de la API en la trampa y el aviso si `/health` no contesta, en `csrf1.sh` |
+| `b1c9d70` | fix: `logout()` avisa y no navega si el servidor no acepta el cierre; `CHANGELOG.md` |
+| (este) | docs: informe |
+
+### Rojos antes, en `885ee89`
+
+Copié el caso y la pantalla de `b1c9d70` sobre un worktree de `885ee89`.
+
+Corrí `pytest tests/test_csrf.py`:
+
+```
+FAILED tests/test_csrf.py::test_enforce_pide_token_a_logout_y_telemetria[/auth/logout-False-403]
+=================== 1 failed, 10 passed, 5 warnings in 4.79s ===================
+```
+
+La fila de la telemetría sin token ya da 403 en la base, porque la ruta ya
+exigía el token. Lo que faltaba era que la página lo mandara. Eso lo mide el
+navegador.
+
+`pantalla_csrf1.js` con API `CSRF_ENFORCE=true`:
+
+```
+FALLA: «Salir» rechazado no avisó y la página fue a /
+```
+
+Con la fase de «Salir» rechazado sacada, para ver la telemetría sola:
+
+```
+FALLA: la telemetría de la página dio 403
+```
+
+Sobre `b1c9d70`, la pantalla completa da `OK: CSRF-1 en el navegador` en la
+base de `csrf1.sh`.
+
+### Sabotajes (`csrf1.sh b1c9d70`)
+
+```
+ROJO  | cerrar sesión vuelve a estar exento: dice «FAILED tests/test_csrf.py::test_enforce_pide_token_a_logout_y_telemetria[/auth/logout-False-403]»
+ROJO  | la telemetría se exenta en vez de mandar el token: dice «FAILED tests/test_csrf.py::test_enforce_pide_token_a_logout_y_telemetria[/api/session/state-False-403]»
+ROJO  | la telemetría de la página sale sin el token: dice «FALLA: la telemetría de la página dio 403»
+ROJO  | «Salir» sale sin el token: dice «FALLA: «Salir» no llevó al inicio»
+ROJO  | «Salir» rechazado lleva al inicio igual: dice «FALLA: «Salir» rechazado no avisó y la página fue a /»
+sabotajes con falla: 0
+```
+
+### Puertas
+
+| Puerta | Sobre | Resultado |
+|---|---|---|
+| `csrf1.sh` | `b1c9d70` | dos bases en verde, cinco ROJO con su texto, «sabotajes con falla: 0», salida 0 |
+| Suite completa, worktree limpio | `b1c9d70` | `4423 passed, 121 skipped, 3 xfailed, 101 warnings in 643.06s (0:10:43)`, salida 0 |
+| `orden1.sh` (usa `salir()` de `pantalla_orden1.js`) | `b1c9d70` | bases en verde, 76 ROJO, «sabotajes sin rojo: 0», salida 0 |
+| `orden1b.sh` | `b1c9d70` | base en verde, 28 ROJO, «sabotajes sin rojo: 0», salida 0 |
+| `test_prelaunch_block1` + `test_csrf`, con `CSRF_ENFORCE` en `false` y en `true` | `c01ca26` | `55 passed` las dos |
+| `smoke_friccion.sh`, API con `CSRF_ENFORCE=true` | `b1c9d70` | `==> OK · telemetría + alias session/state + by-cuit protegido`, salida 0 |
+| `compileall -q proyecto_maria` | `b1c9d70` | salida 0 |
+| chequeo-6 `885ee89..b1c9d70` | `b1c9d70` | 0 avisos, abajo |
+| Historia (grep de §6) | `b1c9d70` | vacío |
+
+No corrí Safari ni Firefox, sólo Chromium. Tampoco corrí
+`ataque_aislamiento.sh`: cubre clientes y descargas, y la pieza toca sólo la
+exención de `/auth/logout` y dos llamadas de la página.
+
+### chequeo-6
+
+```
+chequeo-6 885ee89..b1c9d70: avisos para mirar, no un veredicto
+producto +6/−3
+arnés +169/−7
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  proyecto_maria/main.py: 11307 → 11306
+  proyecto_maria/static/v2/app_v2.js: 1199 → 1203
+avisos: 0
+```
+
+### Revisiones
+
+| Quién | Modelo y esfuerzo | Sobre | Hallazgo | Qué hice |
+|---|---|---|---|---|
+| `/code-review high` | esta sesión, alto | `885ee89..f32ea2f` | 1. La telemetría de la landing va sin token | D56 |
+| | | | 2. `logout()` ignora el 403 y lleva al inicio con la sesión abierta | Arreglado en `b1c9d70`, con su rojo (sabotaje 5) |
+| | | | 3. El `/logout` de v1 va sin token | D56. Ya daba 403 antes |
+| | | | 4. Sin cookie `csrf_token` no hay cómo cerrar sesión | D57 |
+| | | | 5. La trampa de `csrf1.sh` no veía el PID de la API (subshell) | Arreglado en `c01ca26` |
+| | | | 6. Si `/health` no contesta, el script corre igual sin avisar | Arreglado en `c01ca26` |
+| | | | 7. El header repetido en `track()` y en `api()` | Queda. `track()` no pasa por `api()` a propósito, y el comentario de ahí dice por qué. Las dos leen el mismo `getCsrfToken()`: no es un chequeo repetido |
+| | | | 8. El `Origin` de los negativos no lo lee el servidor | Queda porque la tarea dice «desde otro origen». Lo que rechaza es la falta de token |
+| | | | 9. Sólo se mira la primera telemetría | Todas salen del mismo `track()` |
+| `adversario-sonnet-alto` | Sonnet, alto | `f32ea2f` | 1. Medio: el mismo «Salir» silencioso; lo reprodujo (`POST /auth/logout 403`, URL `/`, `current_user` 200) | Arreglado en `b1c9d70` |
+| | | | 2. Bajo: `test_prelaunch_block1` cierra sesión sin token y con enforce da rojo | Arreglado en `c01ca26`. Con `false` y `true`: `55 passed` |
+| | | | 3. Bajo, ya existía: v1 `/logout` | D56 |
+| | | | Los cuatro sabotajes de entonces dan rojo. En v2 no encontró otros POST que den 403: `POST /api/session/state 200` ×5. Tampoco nada que deje entrar a quien no debe | — |
+| Seguridad | subagente Sonnet, con las instrucciones de `/security-review` | `885ee89..b1c9d70` | «Sin hallazgos». Descartó XSS en el aviso nuevo porque `toast()` pone título y texto con `textContent` | Lo comprobé en `app_v2.js:236-257` |
+
+### Riesgos
+
+- **Bajo, D57.** Sin cookie `csrf_token`, «Salir» avisa y no cierra.
+- **Bajo, D56.** Con enforce, la telemetría de la landing (con sesión) y el
+  «Salir» de la pantalla vieja siguen dando 403, como antes.
+- El sabotaje 4 (sin token en `api()`) rompe todas las escrituras de la
+  página, no sólo el logout. El rojo se distingue igual por el texto.
+- `CSRF_ENFORCE` sigue como esté en Railway. Esta pieza no lo prende.
+
+### Comandos para reproducir
+
+```bash
+# 1. Sabotajes: dos bases en verde, cinco ROJO, «sabotajes con falla: 0»
+PY=venv/bin/python scripts/testing/sabotajes/csrf1.sh b1c9d70
+# 2. El caso: 11 passed
+python -m pytest -q --no-cov tests/test_csrf.py
+# 3. Números de §6: 0 avisos
+python docs/pm/herramientas/chequeo-6.py 885ee89 b1c9d70
+```
+
+### Archivos de producto tocados
+
+`proyecto_maria/main.py` y `proyecto_maria/static/v2/app_v2.js` (y
+`CHANGELOG.md`).
+
+---
+
 ## COBRO-MP-1 vuelta 5, entregada en `736fed6` (informe en el commit de arriba)
 
 **Resultado.** Lo que promete la confirmación de cancelar sale de la misma
@@ -151,181 +318,7 @@ python docs/pm/herramientas/chequeo-6.py 3bfd1e1 736fed6
 ---
 
 
-## ORDEN-1b vuelta 4, entregada en `f5e9fac` (informe en el commit de arriba)
-
-**Resultado.** `z35` retiene la relectura de la vuelta del pago y ninguna
-otra consulta a `/auth/current_user`. La familia va como datos del mismo
-caso: las dos vueltas del pago (`success`, `topup_success`) por el orden
-entre el tour y la carga (`primero tour`, `primero carga`), cuatro filas. Si
-el caso escribe sin haber retenido la relectura, o la retiene antes de que la
-pestaña tenga usuario, falla con su propio mensaje. El sabotaje M3 da ROJO en
-las cuatro filas, y con la consulta del tour atrasada 3 s el caso viejo daba
-VERDE y el nuevo falla. Mientras se retiene la relectura, las otras consultas
-del usuario (el autoguardado, cada 2500 ms) esperan a que la pestaña la lea:
-sin eso, con 3 s entre que entra B y se suelta la relectura, el sabotaje daba
-VERDE 4 de 4. Sin espera fija nueva en el arnés. Producto: nada (el
-`producto +3/−2` del chequeo-6 de abajo es el de COBRO-MP-1, que cae en el
-medio del rango).
-
-**Nada para decidir.** D55 quedó en (a), como lo decidiste. D50 (partir la
-anónima) sigue en la cola.
-
-### SHAs (desde `f22f48b`)
-
-| SHA | Qué |
-|---|---|
-| `69d6c3b` | merge de tu rama (veredicto de la vuelta 3) |
-| `72dd8e3` | test: cada consulta lleva su marca (`relectura`, `tour`, `carga`) y sólo se retiene la `relectura`; `PRIMERO=tour\|carga` fija el orden; el caso falla si escribe sin haberla leído; `orden1b.sh` mide las cuatro filas |
-| `f246b18` | test: al retener, la pestaña tiene que tener usuario; tope de 15 s para el tour; la falla de red del tour corta el caso; `VUELTA`/`PRIMERO` que no dejan fila fallan |
-| `f5e9fac` | test: mientras se retiene la relectura, toda otra consulta a `/auth/current_user` espera a que la pestaña la haya leído (hallazgo del adversario) |
-| (este) | docs: informe de las dos piezas |
-
-Archivos: `scripts/testing/pantalla_orden1.js` y
-`scripts/testing/sabotajes/orden1b.sh`. Nada de producto.
-
-### Cómo distingue cuál consulta es
-
-Al abrir la pantalla hay tres lecturas de `/auth/current_user`: la del tour
-(`checkDemoForceTour`, `fetch` directo), la de la carga (`loadCurrentUser`
-desde `cargarUsuarioHastaTenerlo`) y la relectura del pago
-(`handleBillingReturn`, `setTimeout(loadCurrentUser, 4000|2000)`).
-
-- La relectura se reconoce por el `setTimeout` que la programa, no por el
-  orden de llegada. El tour, por su pila. Cada consulta sale con la marca en
-  el header `X-Prueba-Consulta` y el handler retiene sólo la `relectura`.
-- El orden entre tour y carga lo fija el caso: con `primero tour`, la carga
-  espera a que termine la del tour (tope de 15 s, con su mensaje).
-- Antes de escribir, el caso espera a que la relectura se haya leído; si no,
-  falla con «…y la pestaña no leyó la relectura del pago en 15 s: no se escribe sin medirla».
-- Mientras retiene la relectura, toda otra consulta a `/auth/current_user`
-  espera a que la pestaña la haya leído (`f5e9fac`).
-
-### Rojo una vez
-
-**Sabotaje M3, las cuatro filas** (salida de `orden1b.sh` sobre `f5e9fac`,
-copiadas):
-
-```
-ROJO  | la sesión de la respuesta se lee cuando ya llegó (success, primero tour): dice «FALLA: la relectura de la vuelta del pago (success, primero tour) contestó A, entró B antes de leerla y la pestaña guardó un cliente y el cliente quedó en la cuenta de B»
-ROJO  | la sesión de la respuesta se lee cuando ya llegó (success, primero carga): dice «FALLA: la relectura de la vuelta del pago (success, primero carga) contestó A, entró B antes de leerla y la pestaña guardó un cliente y el cliente quedó en la cuenta de B»
-ROJO  | la sesión de la respuesta se lee cuando ya llegó (topup_success, primero tour): dice «FALLA: la relectura de la vuelta del pago (topup_success, primero tour) contestó A, entró B antes de leerla y la pestaña guardó un cliente y el cliente quedó en la cuenta de B»
-ROJO  | la sesión de la respuesta se lee cuando ya llegó (topup_success, primero carga): dice «FALLA: la relectura de la vuelta del pago (topup_success, primero carga) contestó A, entró B antes de leerla y la pestaña guardó un cliente y el cliente quedó en la cuenta de B»
-```
-
-**El hallazgo del adversario que motivó `f5e9fac`.** El autoguardado
-consulta `/auth/current_user` cada 2500 ms. Si una de esas consultas salía
-con B adentro antes de soltar la relectura, la pestaña se tapaba por ese otro
-camino y el sabotaje M3 no llegaba a medirse. Lo reproduje con copias del
-arnés con 3 s entre que entra B y se suelta la relectura, M3 puesto,
-`topup_success`, `primero carga`, cuatro corridas de cada una:
-
-```
-== viejo_tras            (f246b18 + 3 s)
-1 VERDE
-2 VERDE
-3 VERDE
-4 VERDE
-== nuevo_tras            (f5e9fac + 3 s)
-1 ROJO FALLA: la relectura de la vuelta del pago (topup_success, primero carga) contestó A, entró B antes de leerla y la pestaña guardó un cliente y el cliente quedó en la cuenta de B
-```
-
-Las corridas 2 a 4 de `nuevo_tras` dicen, letra por letra, lo mismo que la 1.
-
-Sin el sabotaje, `f5e9fac` + 3 s da verde: `z35`, las cuatro filas, dos
-corridas, `exit=0` las dos. Los 3 s son sólo de la contraprueba y no entran
-al repositorio. En el arnés que se corre de verdad la ventana es la de
-`nuevoUsuario(B)`, alrededor de 1 s, por eso en mis corridas de `f246b18`
-salía rojo; con una máquina más lenta podía salir verde.
-
-**El de la vuelta anterior, con el tour atrasado** (sigue igual en
-`f5e9fac`): con `72dd8e3` y el tour atrasado 3 s el sabotaje daba
-`VERDE … la prueba no lo vio`; desde `f246b18` el caso se niega a medir con
-«…pero la relectura salió antes de que la pestaña cargara el usuario».
-
-### Puertas
-
-| Puerta | Sobre | Resultado |
-|---|---|---|
-| `orden1b.sh` | `f5e9fac` | base verde; 28 ROJO, entre ellos las cuatro filas de `z35` de arriba; «sabotajes sin rojo: 0», salida 0 |
-| `orden1.sh` (su base corre el arnés entero sin `CASOS`) | `f5e9fac` | base verde; 76 ROJO, «sabotajes sin rojo: 0», salida 0 |
-| Suite completa, worktree limpio | `736fed6` (contiene `f5e9fac`) | `4419 passed, 121 skipped, 3 xfailed, 100 warnings in 679.05s (0:11:19)`, salida 0 |
-| `compileall -q proyecto_maria` | `736fed6` | salida 0 |
-| `z34` y `z35` sin sabotaje | `f5e9fac` | las 5 filas OK, `exit=0` |
-| chequeo-6 `f22f48b..f5e9fac` | `f5e9fac` | 1 aviso, abajo |
-| Historia (grep de §6) | `f5e9fac` | vacío |
-
-### chequeo-6
-
-```
-chequeo-6 f22f48b..f5e9fac: avisos para mirar, no un veredicto
-producto +3/−2
-arnés +94/−26
-historia (grep de §6, sin líneas movidas): vacío
-archivos de producto:
-  proyecto_maria/main.py: 11306 → 11307
-  AVISO creció una función de más de 150: scripts/testing/pantalla_orden1.js:281 <anónima> 1552 → 1584, 1 en su propio cuerpo (§6: lo nuevo va aparte)
-avisos: 1
-```
-
-El `producto +3/−2` y `main.py` son de COBRO-MP-1 (`96ce417`), que cae entre
-`f22f48b` y `f5e9fac`. `f246b18..f5e9fac` solo da `arnés +43/−6` y 0 avisos.
-
-**El AVISO queda.** Lo nuevo está en `vueltaDelPago` y
-`respuestaDeAConOtroAdentro`, funciones propias; el largo de la anónima
-cuenta las anidadas. Su cuerpo propio crece 1 línea, que no ubiqué. Partirla
-sigue en la cola (D50).
-
-### Revisiones
-
-| Quién | Modelo y esfuerzo | Sobre | Hallazgo | Qué hice |
-|---|---|---|---|---|
-| `/code-review high` | esta sesión, alto | `72dd8e3` | 1. Sin el chequeo de que la pestaña ya tiene usuario, con el tour lento la relectura se retiene sin dueño y el sabotaje puede dar verde | Reproducido arriba; arreglado en `f246b18` |
-| | | | 2. `await tourTermino` sin tope ni falla propia | Tope de 15 s con su mensaje y `requestfailed` llama a `falla` (`f246b18`). Espera la consulta, no un tiempo |
-| | | | 3. El tour se reconoce por `checkDemoForceTour` en la pila | Queda, como riesgo: si se renombra, la fila `primero tour` se pasa del tope y falla; no da verde |
-| | | | 4. La relectura se reconoce por `fn.name === 'loadCurrentUser'` en el `setTimeout` | Queda, como riesgo: si cambia, no se retiene nada y falla con «no vuelve a leer el usuario en 15 s» |
-| | | | 5. `VUELTA`/`PRIMERO` mal escritos dejan cero filas y `z35` da verde sin correr | Falla con «VUELTA o PRIMERO no dejan ninguna fila de z35» (`f246b18`) |
-| | | | 6. Si la relectura contesta no-ok, `__relecturaLeida` no se pone y el mensaje apunta a otra causa | Queda: el rojo es correcto, el texto confunde |
-| | | | 7. El spread de `o.headers` perdería un objeto `Headers` | No es real acá: `api()` arma un objeto plano y el tour no pasa headers |
-| | | | 8. La dimensión tour/carga duplica las corridas y no cambiaría el camino | Queda: pediste la familia, y la contraprueba del tour atrasado muestra que el orden sí cambia lo que se mide |
-| `adversario-sonnet-alto` | Sonnet, alto | `f246b18` | 1. Otra consulta (el autoguardado) puede ver a B antes de que se suelte la relectura y tapar la pestaña por otro camino: verde intermitente del sabotaje | Reproducido arriba (VERDE 4 de 4 con 3 s); arreglado en `f5e9fac` |
-| | | | 2. Renombrar `checkDemoForceTour` | Mismo riesgo que el 3 del code-review |
-| | | | 3. Un rojo de entorno se puede leer como rojo del caso, y `continue().catch(() => {})` traga errores de la ruta | Queda, como riesgo bajo: traga el error de una ruta ya cerrada; si la relectura no llega, el caso falla por su tope |
-| `/code-review high` | esta sesión, alto | `f246b18..f5e9fac` | 4. Si la relectura falla, se aborta o contesta no-ok, `leida` no se resuelve y las otras consultas quedan colgadas | Queda, como riesgo bajo: termina en rojo («no leyó la relectura en 15 s»), nunca en verde |
-| | | | 5. Mientras una consulta espera `leida`, se ignora su `AbortSignal`; si la espera pasara los 10 s de `ESPERA_SESION_MS`, `sesionEsDelDueno` daría false por el aborto y el sabotaje podría pasar verde | Queda, como riesgo bajo: hace falta una espera de más de 10 s y `nuevoUsuario(B)` tarda alrededor de 1 s; M3 dio rojo 4 de 4 en la serie y en `orden1b.sh` |
-| Seguridad | subagente Sonnet, con las instrucciones de `/security-review` | `f22f48b..f246b18` y `f246b18..f5e9fac` | «Sin hallazgos» las dos veces: sólo archivos de prueba; el producto no lee `X-Prueba-Consulta`, `VUELTA` ni `PRIMERO` (grep en `proyecto_maria/`: 0) | — |
-
-### Riesgos
-
-- **Bajo.** El caso reconoce el tour y la relectura por los nombres de sus
-  funciones. Si se renombran, falla fuerte; no da verde en silencio.
-- **Bajo.** Los 4 y 5 del code-review de `f5e9fac`: un rojo colgado si la
-  relectura falla, y un verde posible sólo si la espera pasa de 10 s.
-- **Bajo, de entorno.** El adversario corrió `orden1b.sh 72dd8e3` y le dio
-  `ModuleNotFoundError: No module named 'proyecto_maria'`. No lo diagnostiqué;
-  mis corridas de `orden1b.sh` desde la raíz del repositorio arrancan bien.
-- **Bajo, de entorno.** Corrido muchas veces contra la misma API, el login
-  da 429. Los scripts de sabotaje levantan una API nueva por corrida.
-- **Bajo.** El header `X-Prueba-Consulta` llega al servidor en las corridas
-  del arnés; el producto no lo lee.
-- Siguen en pie de la vuelta 2: D50 a la cola; H3 riesgo bajo; las lecturas
-  GET sin freno, fuera de la pieza.
-
-### Comandos para reproducir
-
-```bash
-# 1. Sabotajes de la pieza: ROJO en las cuatro filas de z35 y «sabotajes sin rojo: 0»
-PY=venv/bin/python PUERTO=8875 scripts/testing/sabotajes/orden1b.sh f5e9fac
-# 2. El arnés entero en verde (la base del script) y «sabotajes sin rojo: 0»
-PY=venv/bin/python PUERTO=8853 scripts/testing/sabotajes/orden1.sh f5e9fac
-# 3. Números de §6: 1 aviso, el de arriba
-python docs/pm/herramientas/chequeo-6.py f22f48b f5e9fac
-```
-
-### Archivos de producto tocados
-
-Ninguno.
-
-/compact conservar: Dev 1, rama claude/dev-tecnica. COBRO-MP-1 vuelta 5
-entregada en 736fed6 y ORDEN-1b vuelta 4 en f5e9fac (informe en el commit de
-arriba), las dos sin D para decidir. Sigue CSRF-1, en tu orden. Nada se publica
-sin el «dale» de Emi; nunca main.
+/compact conservar: Dev 1, rama claude/dev-tecnica. CSRF-1 entregada en
+b1c9d70 (informe en el commit de arriba), con D56 y D57 para decidir.
+COBRO-MP-1 vuelta 5 sigue en revisión (736fed6); si trae devolución, va primero.
+Sigue COBRO-CORTE-1, en tu orden. Nada se publica sin el «dale» de Emi; nunca main.
