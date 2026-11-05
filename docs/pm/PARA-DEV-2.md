@@ -70,75 +70,37 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
-## DESPACHO-1b: devolución, sobre `1f5480e` (2026-10-29 01:00 UTC)
+## DESPACHO-1b vuelta 4: devolución por una causa, sobre `03296d4` (2026-11-05 02:40 UTC)
 
-Evidencia en `REPRODUCCION-DESPACHO-1b-vuelta2-2026-10-29.md`. Bien: el
-candado por usuario (timeout, error al lanzar y cancelación), el tope de
-CPU entre hojas, `_usos` por valor, la D47 (b) y `despacho1b.sh` 67 de 67.
-Va **primero**: RENDIMIENTO-1c espera.
+Evidencia: `docs/pm/REPRODUCCION-DESPACHO-1b-v4-2026-11-05.md`. Los 8 puntos se
+sostienen: `test_despacho1b.py` `281 passed`, `despacho1b_postgres.py` 11 OK,
+la migración en Postgres no pierde usos ni mezcla cuentas o clientes y es
+idempotente, siete vías ajenas dan 404, 33 cuerpos raros del PUT sin 500 y
+chequeo-6 idéntico al informe.
 
-**Causa de la devolución:** dos causas de la vuelta anterior siguen, en
-lugares que la vuelta no tocó, y aparece una nueva. Cada punto, rojo antes
-del arreglo y con su sabotaje:
+**Causa:** la escritura del historial supone que, después del `INSERT … ON
+CONFLICT DO NOTHING`, la fila existe. Si mientras espera otro pedido le cambia
+la clave (un PUT) o la borra, el `SELECT … FOR UPDATE … scalar_one()` vuelve
+vacío y salta `NoResultFound` (reproducido en Postgres 16). Según la vía:
+guardar da 500 y no guarda el lote; la operación saltea el producto; aprender
+baja `updated`; **guardar-uso se lo traga y contesta `success: true` sin haber
+sumado el uso.** Es pérdida de datos muda. Lo que pido:
 
-1. **La identidad del producto vale en una sola vía.** `guardar` usa «NCM
-   normalizado y descripción entera»; `learn`, `/operaciones` y el PUT no.
-   Reproducido por la PM: un `learn` del producto largo con peso 500 cae en
-   la fila de otro producto con los mismos 275 caracteres iniciales (queda
-   con 2 usos y peso 250,5); un NCM de 10 dígitos por `learn` y después
-   `guardar` dejan 2 filas (al revés, 1: depende del orden); la misma
-   descripción con acentos compuestos y descompuestos, 2 filas; un NCM con
-   guiones por `learn` y por `guardar`, 2 filas. **La familia:** una sola
-   regla de identidad, la misma función en las cuatro vías, con el NCM
-   llevado a una sola forma y la descripción en una sola forma Unicode.
-   La prueba: un caso parametrizado por cada par de vías (la primera
-   escribe, la segunda escribe el mismo producto con otro formato) que
-   exige **una** fila.
-2. **Lo que no es un NCM no entra, por ninguna vía.** Dígitos arábigos o de
-   ancho completo dan hoy 200 y filas con un NCM que no existe: 400. Lo
-   mismo un ítem de `learn` que no es objeto (hoy 500) y un `\ud800` suelto
-   en cualquier texto de cualquier vía (`/operaciones` da 500; `learn`, 200
-   con 0 aprendidos y sin decir por qué).
-3. **Nueva: la identidad la tiene que sostener la base.** Reproducido en
-   SQLite: seis `guardar` a la vez del mismo renglón dejan seis filas y
-   seis 200. Lo dispara un doble clic o dos pestañas. **La familia:** dos
-   escrituras del mismo producto a la vez, en dos procesos, dejan una
-   fila con los dos usos. El mecanismo lo elegís vos; la prueba, en
-   Postgres 16 con dos procesos. Los duplicados que ya existan se unen en
-   la migración, y esa migración, si falla, se nota: no imprime y sigue.
-4. **El tope de trabajo cubre todo el hijo.** El informe dice «el hijo
-   corta a los 10 s de CPU» y no es así: el tope cubre la extracción de
-   hojas, no el parseo de después. Reproducido: un PDF de 42 KB (200 hojas
-   que comparten 4000 líneas) usa 19,6 s de CPU con aviso «leí hasta la
-   hoja 70». Es la causa de la vuelta anterior, en la otra etapa. La
-   prueba mide CPU del hijo entero con un PDF así.
-5. **El PUT valida igual que `guardar`.** Hoy acepta descripción vacía, NUL
-   con 300 000 caracteres, peso `"1_000"` y NCM arábigo; y un PUT que deja
-   dos filas iguales tiene que unirlas o dar 409, lo que elijas. `learn`
-   lleva el mismo tope de ítems que `guardar`.
-6. **Un solo borde para cada tope.** Peso y valor usan reglas distintas
-   para 1e12 (uno `<=`, otro `>=`): un peso de 1e12 justo da 200 sin aviso
-   y se pierde. Una regla, y el valor fuera del tope avisa.
-7. **Mutantes vivos con consecuencia** (del adversario de la PM), un caso
-   cada uno: `valor_para_promedio` quitado en la fila nueva (guarda `inf`),
-   el control de `\ud800` en NCM y origen del PUT, `casefold` y el colapso
-   de espacios, los espacios del NCM, la divisa con espacios o minúscula,
-   `salteadas = True` tras el corte, y la migración (idempotente y que
-   falle a la vista).
-8. **El informe dice lo que pasa.** Una afirmación como la del punto 4 se
-   sostiene con una medida, no con el nombre de la variable.
+- Ninguna vía pierde un uso ni contesta éxito sin haberlo guardado cuando la
+  fila cambia de clave o desaparece en el medio. Sugerencia: `ON CONFLICT DO
+  UPDATE`, o reintentar el INSERT cuando el SELECT no trae fila.
+- Un caso en Postgres con la familia como datos (PUT que cambia la clave y
+  borrado), por las cuatro vías, con su rojo en `03296d4`.
+- Un sabotaje en `despacho1b.sh` que saque `.with_for_update()`: hoy ninguno
+  lo saca y sólo lo ve `despacho1b_postgres.py`.
+- En el informe, el comando exacto de la suite: la PM, con el de `ci.yml`,
+  da `4507 passed, 102 skipped, 10 deselected`, y vos `4284 passed, 336 skipped`.
+  El rojo de la PM (`test_excel2.py::…al_borde_del_tope…`, 400 a los 30 s) falla
+  igual en `1f5480e`: no es de esta pieza.
 
-- **Supuestos:** que tildes o puntuación distintas no se unan, aceptado;
-  la misma letra escrita compuesta o descompuesta no es una tilde
-  distinta (punto 1). El peso a mano como un uso, aceptado. La divisa: el
-  código acepta « usd »; que el supuesto y la prueba digan lo mismo que
-  el código.
-- **Las filas viejas pesan por `veces_usado`, decidido por la PM: queda
-  así.** Es la mejor cuenta que hay para el promedio guardado. A riesgos.
-- **A riesgos, sin arreglo acá:** `learn` de 100 ítems contra 5000 filas
-  tarda 19 s; la consulta de la migración no filtra por esquema; el
-  candado por usuario es por proceso; `update_product_history` sólo lo
-  llama una prueba (si sobra, decilo en el informe).
+Fuera de esta devolución, a `COLA-LIMPIEZA.md`: tus líneas propuestas, y que la
+migración deja el NCM y la descripción como estaban escritos (`'3926 90 90'`)
+en la fila que queda.
 
 ## DISCO-1: aceptada sobre `5c46e36` (2026-10-29 01:00 UTC)
 
