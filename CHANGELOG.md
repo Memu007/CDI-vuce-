@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: con CSRF exigido, la landing y la pantalla vieja escriben y la recuperación de cuenta anda (CSRF-2)
+
+- **fix(seguridad):** el control CSRF exenta sólo rutas exactas (login, registro y las tres de recuperación de cuenta): ya no saltea rutas que empiezan parecido ni las que dicen «webhook». `static/csrf.js` agrega el token a las escrituras de la landing y de la pantalla vieja, incluido su «Salir».
+
 ## 2026-11-05 · fix: cerrar sesión desde otro sitio ya no borra la sesión (CSRF-1, vuelta 2)
 
 - **fix(seguridad):** `/auth/logout` y `/logout` sólo borran cookies si llegó la de sesión: un formulario de otro sitio, que llega sin cookies, ya no cierra la sesión, esté o no exigido el token CSRF. El alias delega en `/auth/logout` y ahora también borra `csrf_token`. Si el cierre no se confirma, «Salir» avisa y no lleva al inicio.
