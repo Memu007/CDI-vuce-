@@ -6,10 +6,8 @@ from proyecto_maria.database.connection import AsyncSessionLocal
 from proyecto_maria.database.models import User
 from proyecto_maria.auth.jwt_utils import create_access_token
 
-class MockRequest:
-    def __init__(self, token):
-        self.cookies = {}
-        self.headers = {"Authorization": f"Bearer {token}"}
+def MockRequest(token):
+    return Request({"type": "http", "headers": [(b"authorization", f"Bearer {token}".encode())]})
 
 class MockResponse:
     pass
