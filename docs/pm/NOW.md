@@ -207,6 +207,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-11-05 16:05 UTC: vuelta. Límite semanal `allowed` en las tres; contextos bajo 135k. MARIA entregó RENDIMIENTO-1c v2, DESPACHO-1b v6 y CATALOGO-LARGO-1 en `ca87d82` (sigue con DESPACHO-1c): reproduciendo con Postgres 16 descartable y dos adversarios. Técnica en CSRF-3.
+
 2026-11-05 15:15 UTC: **CSRF-2 aceptada** (`fcd1072`). Con el control prendido, landing, v2, v1 con sesión, verificación y reset andan (Opus en Chromium); 20 formas de colarse dan 403 (Sonnet); 10 + 8 sabotajes en rojo, `70 passed` en los dos modos. ✅; integrada hasta `c44bf84`. D59 a → pieza nueva CSRF-3 (sesiones abiertas reciben el token solas), antes de COBRO-CORTE-1. D60: pregunto a Emi si alguien usa la pantalla vieja.
 
 2026-11-05 15:05 UTC: **CSRF-1 aceptada** (vuelta 2, `9e37673`). Cerrar sesión desde otro sitio ya no borra la sesión: 8 + 29 sabotajes en rojo, `59 passed` con enforce en `true` y `false`; Opus y Sonnet sin bloqueantes (16 `<form>` reales en Chromium no cerraron nada). ✅ en el roadmap; integrada hasta `c536184` (sólo commits de CSRF-1). A CSRF-2 se suma una prueba de que el alias `/logout` cierra de verdad y los prefijos con `startswith`. Técnica sigue con CSRF-2.
