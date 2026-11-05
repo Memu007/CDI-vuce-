@@ -1785,17 +1785,24 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     let tourListo;
     const tourTermino = new Promise(r => { tourListo = r; });
     t.on('requestfinished', r => { if (cual(r) === 'tour') tourListo(); });
+    t.on('requestfailed', r => { if (cual(r) === 'tour' && primero === 'tour') falla(que + ', pero la consulta del tour falló'); });
     let avisar, soltar, retenida = false;
     const hayRetenida = new Promise(r => { avisar = r; }), suelta = new Promise(r => { soltar = r; });
     await t.route('**/auth/current_user', async ruta => {
       const esta = cual(ruta.request());
-      if (esta === 'carga' && primero === 'tour') await tourTermino;
+      if (esta === 'carga' && primero === 'tour') {
+        const tope = setTimeout(() => falla(que + ', pero el tour no consultó el usuario en 15 s'), 15000);
+        await tourTermino;
+        clearTimeout(tope);
+      }
       if (esta === 'tour' && primero === 'carga') {
         await t.waitForFunction(() => !!(window.CDI && CDI.currentUser), null, { timeout: 15000 })
           .catch(() => falla(que + ', pero la pestaña no cargó el usuario antes del tour'));
       }
       if (esta !== 'relectura' || retenida) return ruta.continue().catch(() => {});
       retenida = true;
+      // Sin dueño todavía, otro freno ataja la cookie nueva y el caso no mediría este.
+      if (!(await t.evaluate(() => !!(window.CDI && CDI.currentUser)))) falla(que + ', pero la relectura salió antes de que la pestaña cargara el usuario');
       // route.continue() pone las cookies del momento en que se suelta.
       const respuesta = conCookieDeA ? await ruta.fetch().catch(e => falla(que + ' y la relectura no llegó al servidor: ' + e.message)) : null;
       // Si contestara B, mediría lo mismo que vueltaConOtroAdentro.
@@ -1832,6 +1839,7 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     // VUELTA=<billing> y PRIMERO=<tour|carga> dejan una sola fila, para que el sabotaje vea cada una.
     const filas = ['success', 'topup_success'].flatMap(billing => ['tour', 'carga'].map(primero => ({ billing, primero })))
       .filter(f => (!process.env.VUELTA || f.billing === process.env.VUELTA) && (!process.env.PRIMERO || f.primero === process.env.PRIMERO));
+    if (!filas.length) falla('VUELTA o PRIMERO no dejan ninguna fila de z35');
     for (const { billing, primero } of filas) {
       const que = 'la relectura de la vuelta del pago (' + billing + ', primero ' + primero + ') contestó A, entró B antes de leerla y la pestaña guardó un cliente';
       const { ctx, a, otro, t } = await vueltaDelPago('ord1z35', billing, true, que, primero);
