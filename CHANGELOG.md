@@ -14,6 +14,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **fix(seguridad):** el control CSRF exenta sólo rutas exactas (login, registro y las tres de recuperación de cuenta): ya no saltea rutas que empiezan parecido ni las que dicen «webhook». `static/csrf.js` agrega el token a las escrituras de la landing y de la pantalla vieja, incluido su «Salir».
 
+## 2026-11-05 · fix: ninguna falla al guardar deja un éxito a la vista (DESPACHO-1c, devolución)
+
+- Si asignar el cliente o guardar la operación falla (error del servidor, plan vencido, red caída o la memoria sin guardar), se cierra el «Cliente guardado» de antes y lo último que se ve es el error; el panel queda abierto para reintentar.
+- Confirmar una posición SIM o aprender los productos del proveedor avisa también cuando el servidor rechaza el pedido.
+
 ## 2026-11-05 · fix: lo que no quedó en la memoria de productos se avisa (DESPACHO-1c)
 
 - Guardar una operación o confirmar una posición SIM muestra un aviso si los productos no quedaron en la memoria para sugerirse la próxima vez; el «Cliente guardado» ya no lo tapa.
