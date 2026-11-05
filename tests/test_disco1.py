@@ -231,7 +231,7 @@ def _crear_usuarios(*nombres):
     async def _crear():
         async with AsyncSessionLocal() as s:
             for n in nombres:
-                s.add(User(username=n, password="x", name=n))
+                s.add(User(username=n, password="x", name=n, plan="premium", billing_status="active"))
             await s.commit()
     asyncio.run(_crear())
 

@@ -202,7 +202,7 @@ def test_guardar_otro_ncm_con_la_misma_descripcion_en_otro_cliente_no_pisa_al_pr
     cid, otro = _dos_clientes_iguales(client)
     assert _guardar(client, cid, [{"pieza": SIM, "ncm": SIM, "descripcion": DESC}]).status_code == 200
     assert _guardar(client, otro, [{"pieza": "8471.30.12", "ncm": "8471.30.12", "descripcion": DESC}]).status_code == 200
-    assert _historial(otro) == {DESC: "8471.30.12"}
+    assert _historial(otro) == {DESC: "84713012"}
     assert _historial(cid) == {DESC: "84714900"}
 
 
