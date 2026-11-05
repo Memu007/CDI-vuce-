@@ -69,6 +69,58 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## SESION-1: devolución, sobre `c429307` (2026-11-05 23:30 UTC, PM)
+
+Acta: `REPRODUCCION-SESION-1-v2-2026-11-05.md`. Tus puertas coinciden: 29
+passed (12 rojos en la base), motores pg OK, 29 sabotajes en rojo, chequeo-6
+`+108/−257` sin avisos. Mi negativo (once tokens ajenos o falsificados, cookie
+basura más Bearer de otro) da todo 401 y distingue en la base. Lo que la pieza
+promete aguanta. Vuelve por dos causas que reproduje:
+
+**1. Lo que se autoriza con la clave actual no queda atado a esa clave.**
+`change_password` y el cambio de email validan contra el hash leído al entrar
+y guardan con un UPDATE por id. Si el dueño resetea en el medio, el reset se
+pierde, el atacante queda con una clave suya y, en el cambio de clave, sale
+con un token vigente (`abrir_sesion` recibe el hash que él mismo escribió).
+Es lo que cerraste en el login, en las rutas que validan la clave actual.
+Pido:
+- en toda ruta que valida la clave actual, si la clave guardada cambió desde
+  la validación no se guarda nada y no se emite token (mismo código para las
+  dos rutas);
+- un caso con las rutas como datos: el reset entra justo después de validar,
+  y después la clave del reset entra, la del atacante no y ningún token suyo
+  vive. Que dos cambios a la vez no den 200 con un token ya muerto.
+
+**2. El tope abre una segunda conexión con la del pedido ya tomada.**
+`limites_auth` usa `engine.connect()`/`begin()` mientras la sesión de
+`get_db` tiene la suya. Con 40 `PUT /api/user/profile` a la vez y la clave
+mala: `{400: 3, 500: 37}`, y otro usuario esperó 29,4 s. En la base, `{400:
+40}` y 0,6 s. Pido:
+- que contar intentos no pueda agotar el pool, en cada llamada a
+  `limites_auth` desde un pedido que ya tiene la base (el perfil, el cambio de
+  clave, el login y el pedido de reset);
+- un caso en Postgres con más pedidos a la vez que conexiones del pool: ningún
+  500 y otro usuario entra en menos de 2 s. Las rutas van como datos.
+
+**Menores que entran acá** (son de `datos_del_token`, que escribiste vos):
+firmar y verificar con la misma clave, desde el mismo lugar (con
+`JWT_SECRET_KEY=""` hoy el login da 200 y todo lo demás 401), y que un token
+sin `exp` no sea una sesión.
+
+- **D71: (b)**, como pieza chica aparte después de SESION-1. Decidido por la PM.
+- **Tus propuestas**: sacar `create_access_token` y unificar el secreto
+  entran con los menores. Borrar `pwd:` al reset y que el cambio de email
+  apague `is_verified` van a la cola como propuestas, igual que el arreglo de
+  `smoke_friccion.sh`. El logout de v1 sin `X-CSRF-Token` (403 con CSRF
+  activo) espera D60 de Emi.
+- **Suite**: me dio `5 failed` en `test_despacho1b.py` y
+  `test_rendimiento1c.py`, igual en la base. `pypdf>=6.19.0` instaló `6.21.4`,
+  que corta antes con su propio error. No es de SESION-1. Proponé en una D si
+  se fija la versión o se adaptan las pruebas; va después de esta vuelta.
+- Mis sabotajes de `csrf3.sh` los actualizo yo cuando acepte.
+- **Orden:** esta vuelta primero, después CATALOGO-LARGO-2 (vi que ya
+  avanzaste: entregala igual, la reviso cuando llegue). Tu próxima D es D73.
+
 ## `ca87d82`: aceptadas RENDIMIENTO-1c, DESPACHO-1b, CATALOGO-LARGO-1 y DISCO-1, sin integrar (2026-11-05 20:45 UTC, PM)
 
 Acta: `REPRODUCCION-MARIA-ca87d82-2026-11-05.md`. Todo coincide con tu informe:
@@ -90,43 +142,24 @@ rojo en la base. Acta: `REPRODUCCION-RENDIMIENTO-1d-v2-2026-11-05.md`.
 - Hallazgo 2 de tu `/code-review` (par partido en dos glifos): queda así.
 - **Sigue DESPACHO-1d**, que ya tenés hecho: cerralo con `/entregar`.
 
-## DESPACHO-1c: aceptada sobre `fbbb2ad`, sin integrar todavía (2026-11-05 19:05 UTC, PM)
+## DESPACHO-1d: aceptada sobre `528961b`, sin integrar (2026-11-05 22:45 UTC, PM)
 
-Evidencia: `REPRODUCCION-DESPACHO-1c-v2-2026-11-05.md`. Se sostienen 39
-casos, `despacho1c.sh` 16 ROJO con `fallas: 0`, y mis ejemplos de la familia
-(403, 503 y 422) también dejan el error a la vista. Se integra apenas acepte
-`ca87d82` (RENDIMIENTO-1c v2, DESPACHO-1b v6 y CATALOGO-LARGO-1), que viene
-dentro de `fbbb2ad`; sus pruebas siguen corriendo de mi lado y no tenés que
-tocar nada de eso.
+Acta: `REPRODUCCION-DESPACHO-1d-2026-11-05.md`. Coincide con tu informe:
+`test_despacho1c.py` 83 passed, `despacho1d.sh` 9 y `despacho1c.sh` 15
+sabotajes con `fallas: 0`, chequeo-6 `+64/−45` con los dos AVISOs del
+envoltorio del módulo (explicados). Mi ejemplo distinto: siete nombres de
+proveedor (200 «é», 59 letras más «ñb», sólo emoji, sólo CJK, «İstanbul»
+largo, «ǅ» repetido) dan siempre un id que cumple `is_valid_vendor_id`. Un
+adversario con contexto nuevo no encontró nada que frene; lo que marcó ya
+estaba antes (va al acta).
 
-**Orden:** terminar RENDIMIENTO-1d (con D55 b) → **DESPACHO-1d** → SESION-1 →
-el resto de la cola. CATALOGO-LARGO-2 entra sólo si Emi dice que sí.
+- **D69: (a)**, como lo entregaste. Decidido por la PM.
+- Se integra junto con `ca87d82`, por lo mismo: lo de abajo sin aceptar.
+- **CATALOGO-LARGO-2: Emi dijo que sí.** Va después de SESION-1. Tu próxima
+  D es D71.
+- SESION-1: ver arriba.
 
-- **D63:** anotada (es la D58 de RENDIMIENTO-1d con su número nuevo).
-- **D65: (b), en DESPACHO-1d.** **D67: (b), en DESPACHO-1d.**
-- **CJK y emoji a CATALOGO-LARGO-2:** de acuerdo.
-- Los dos AVISOs de chequeo-6 quedan explicados. Partir `finalize.js` por
-  pantalla va a la cola de limpieza.
-
-### DESPACHO-1d (subpieza chica, puerta para publicar)
-
-Lo encontró el adversario sobre `fbbb2ad`. Pido comportamiento:
-
-- **La operación nunca espera al catálogo.** Si aprender el catálogo no
-  vuelve o falla, la operación igual se guarda y lo último a la vista es el
-  resultado de la operación.
-- **Red caída o 402 al confirmar NCM o al aprender el catálogo dan aviso**
-  (D65), como ya pasa con 500 y 400: en la misma familia del caso existente.
-- **El id de proveedor nunca pasa de 60** (D67), la regla del servidor.
-- **Crear A (falla), asignar B (falla), crear otra vez nunca crea un segundo
-  cliente**, y un caso que dé rojo si se saca el reinicio de
-  `clienteCreadoAca`.
-- **El cartel «Guardamos este NCM» nunca queda a la vista cuando el guardado
-  falló.**
-
-Cada punto, rojo primero sobre `fbbb2ad`.
-
-### Pieza propuesta a Emi: CATALOGO-LARGO-2 (después de SESION-1, sólo si dice que sí)
+### CATALOGO-LARGO-2: sí de Emi (05/11 21:41), va después de SESION-1
 
 Misma familia que CATALOGO-LARGO-1: lo que no entra en la columna se pierde
 sin aviso.
@@ -226,45 +259,6 @@ métrica sin mirar qué graba, y eso no se puede publicar así.
 
 Postgres 16 y SQLite. Línea en `CHANGELOG.md`. Commits aparte y su propio
 `/entregar`.
-
-## SESION-1: devolución, sobre `895ee73` (2026-10-28 17:58 UTC)
-
-Evidencia en `REPRODUCCION-SESION-1-2026-10-28.md`. Reproduje la carrera y
-la cookie copiada de tu D43, y además que el link de verificación del
-correo vuelve a abrir sesión después de un logout o un cambio de clave (y
-se reusa), que `/auth/me` y `/ui_event` aceptan un token revocado, y que con
-`active_jti` en NULL el token de verificación sirve como Bearer.
-
-**La causa:** la revocación se mira sólo en `get_current_user`. Todo camino
-que emite sesión o decodifica un token por su cuenta la saltea; y el login
-escribe `active_jti` sin comprobar que la clave con la que entró siga
-vigente. **D43: (1), decidido por la PM.** Pido:
-
-1. Un solo lugar que decide si un token vale (firma, tipo, `jti` contra
-   `active_jti`) y que usen todos: `get_current_user`, `/auth/me`, la
-   telemetría, el logout. El token de verificación no sirve como sesión.
-2. Verify-email: no abre sesión, o la abre sólo si el token no se usó y es
-   posterior al último cambio de clave o logout. Un uso.
-3. La carrera (D43 a): el login escribe `active_jti` sólo si el hash de la
-   clave sigue siendo el que validó (escritura condicional o relectura en la
-   misma transacción). Rojo en SQLite y en PG con el login en vuelo.
-4. Cambio de clave (D43 b): rota el `jti` y le da cookie nueva a quien
-   cambió; la copia queda afuera. Si no, el aviso y el CHANGELOG no dicen
-   «cierra las otras».
-5. D43 (c): clave actual mal en change-password no da 401 (no manda al
-   login). D43 (d): el logout borra la cookie aunque falle la base.
-6. Tope de intentos sobre `current_password` en `PUT` del perfil y en
-   change-password.
-7. Pruebas que maten estos mutantes, que hoy dan `31 passed`: sacar
-   `user.active_jti is not None and` de `revocar_sesion_de_la_request`;
-   decodificar sin verificar la firma; y los tres del revisor Sonnet (header
-   que le gana a la cookie, sin validar el tipo de `current_password`,
-   perfil que no pide la clave si el correo anterior estaba vacío).
-8. El informe sin `request.state.token_jti`, que no existe.
-
-Pedí un caso de la familia, no sólo los ejemplos: buscá cualquier otro
-`decode` de JWT o emisión de cookie fuera del lugar único y que dé rojo.
-`ADMIN_USERNAMES` (main.py:1457) no lo tocás: se lo llevo a Emi.
 
 ## ABUSO-1: devolución, sobre `43916a7` (2026-10-28 17:58 UTC)
 
