@@ -2261,46 +2261,19 @@ async def view_public_quote(request: Request, hash: str):
 
 @app.get("/dashboard", response_class=HTMLResponse)
 def dashboard(request: Request):
-    """Sirve el dashboard.
+    """Sirve el dashboard (v2, la única interfaz).
 
-    Feature flag para la beta:
-      - Query `?v=1` => setea cookie cdi_ui=v1 y sirve dashboard.html (legacy).
-      - Query `?v=2` => borra la cookie y sirve dashboard_v2.html (default).
-      - Sino, si la cookie `cdi_ui` vale "v1" sirve v1, caso contrario v2.
-
-    v2 queda como default. v1 es opt-in durante la transicion.
+    La v1 (`dashboard.html` + `static/app.js`) se retiró el 2026-11-05. Quien
+    todavía tenga la cookie `cdi_ui=v1` de la transición recibe v2 y la cookie
+    se borra; `?v=1` y `?v=2` se ignoran.
     """
     try:
-        qv = (request.query_params.get("v") or "").strip()
-        cookie_ui = (request.cookies.get("cdi_ui") or "").strip().lower()
-
-        if qv == "1":
-            use_v2 = False
-            set_cookie = "v1"
-        elif qv == "2":
-            use_v2 = True
-            set_cookie = "clear"
-        else:
-            use_v2 = (cookie_ui != "v1")
-            set_cookie = None
-
-        template_name = "dashboard_v2.html" if use_v2 else "dashboard.html"
         response = templates.TemplateResponse(
-            name=template_name,
+            name="dashboard_v2.html",
             request=request,
             context={"version": PROJECT_VERSION},
         )
-
-        # Persistir eleccion del query param (~180 dias)
-        if set_cookie == "v1":
-            response.set_cookie(
-                key="cdi_ui",
-                value="v1",
-                max_age=60 * 60 * 24 * 180,
-                path="/",
-                samesite="lax",
-            )
-        elif set_cookie == "clear":
+        if request.cookies.get("cdi_ui"):
             response.delete_cookie(key="cdi_ui", path="/")
         return response
     except Exception as e:
@@ -2384,16 +2357,6 @@ def reset_password_page():
 def estilos_landing():
     """Sirve el CSS de la landing page"""
     return FileResponse(os.path.join(basedir, "proyecto_maria", "static", "estilos_landing.css"), media_type="text/css")
-
-@app.get("/app.css")
-def app_css():
-    """Sirve el CSS de la aplicación"""
-    return FileResponse(os.path.join(basedir, "proyecto_maria", "static", "app.css"), media_type="text/css")
-
-@app.get("/app.js")
-def app_js():
-    """Sirve el JS de la aplicación"""
-    return FileResponse(os.path.join(basedir, "proyecto_maria", "static", "app.js"), media_type="application/javascript")
 
 @app.get("/app_fixed.js")
 def app_fixed_js():
@@ -8689,17 +8652,12 @@ async def get_auth_me(authorization: str = Header(None), db: AsyncSession = Depe
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Token inválido o corrupto")
 
-# /logout is called by the frontend (app.js), must delete the auth cookie
+# /logout lo llama el frontend; tiene que borrar la cookie de sesión
 @app.post("/logout")
 def logout_root(response: Response):
     """Cierra sesión eliminando la cookie (alias de /auth/logout)"""
     response.delete_cookie("access_token")
     return {"message": "Sesión cerrada"}
-
-@app.get("/features_integration.js")
-def features_integration_js():
-    """Sirve un JS vacío para evitar errores 404 y conflictos de variables"""
-    return FileResponse(os.path.join(basedir, "proyecto_maria", "static", "dummy_features.js"), media_type="application/javascript")
 
 # ============================================================================
 # ORGANIZACIONES (estudios) — multi-usuario con billing compartido
