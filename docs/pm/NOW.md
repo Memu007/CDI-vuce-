@@ -206,6 +206,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+2026-11-05 23:55 UTC: vuelta. Límite semanal `allowed` en las tres; contexto 120k/135k/137k de 200k. Técnica rehace COBRO-CORTE-1 (corre sabotajes sobre `fbea636`), MARIA rehace SESION-1; ninguna entrega nueva ni D abierta. Una sesión del chat suelto de Emi armó LIMPIEZA-1 y el retiro de la UI v1 en `ccr-39e9acae-e1hve5` (`085ec1d`); no integrado: espera que Emi me lo confirme a mí y que cierre SESION-1. Si se va la v1, D60 se cierra.
+
 2026-11-05 23:30 UTC: **SESION-1 vuelve con devolución** (`c429307`, MARIA). Lo prometido aguanta: 29 passed, 29 sabotajes en rojo, mi negativo de once tokens ajenos da 401 y distingue. Dos causas reproducidas: un reset del dueño no gana contra un cambio de clave o de email ya validado (el atacante sale con token vigente), y el tope de la clave actual abre una segunda conexión: 40 pedidos a la vez dan `{400: 3, 500: 37}` y otro usuario espera 29 s (base: 0,6 s). D71 (b) pieza aparte. Suite `5 failed` también en la base: `pypdf 6.21.4` sin tope cambió el error de los PDF bomba; no es de la pieza, va en una D de MARIA.
 
 2026-11-05 22:45 UTC: **DESPACHO-1d aceptada** (`528961b`, MARIA): 83 casos, 24 sabotajes sin falla, mi ejemplo de siete nombres de proveedor raros bien; D69 (a). Sin integrar, por lo mismo que `ca87d82`. El acta de COBRO-CORTE-1 suma sus 60 sabotajes, sin falla. MARIA entregó SESION-1 (`c429307`): la reviso.
