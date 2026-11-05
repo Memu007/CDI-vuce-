@@ -46,3 +46,13 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - Avisos de guardado de la v2: duran 4 s sin marca fija; «Volvé a Listo y
   reintentá» confunde porque entrar a Listo regenera; `ERROR_AJENA` y
   `ERROR_SIN_SESION` se muestran como «Error de red».
+- `CLAUDE.md` §5 dice que la CI deselecciona tests de presupuestos, pero
+  `ci.yml:45` corre `python -m pytest --no-cov` sin `--deselect`. Lo corrige
+  quien pueda tocar `CLAUDE.md` (decide Emi).
+- `test_maria1b_devolucion` y `test_excel2.py:512` usan una ruta fija en
+  `/tmp`: pasarlas a `tmp_path`.
+- `_migrate_add_user_cuit_column` (`main.py:470`) no tiene `lock_timeout`: el
+  arranque espera detrás de un `sugerir` que tiene abierta la transacción
+  mientras habla con Gemini (medido: 28,5 s).
+- `api_logs.endpoint` es `String(200)`: un PUT o DELETE con clave larga pierde
+  su métrica («value too long»).
