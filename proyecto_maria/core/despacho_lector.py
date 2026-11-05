@@ -56,7 +56,7 @@ _MAX_COLUMNAS = 40
 # normal usa menos de 100 MB.
 _MAX_MEMORIA_HIJO = 256 * 1024 * 1024
 _HIJOS_A_LA_VEZ = 2
-_SALIDA_SIN_MEMORIA = 3
+_SALIDA_DEMASIADO_PESADO = 3
 # Tiempo de CPU del proceso que lee, medido entre hoja y hoja. Cada hoja
 # cuesta según sus operaciones de texto, no según lo que pesa el PDF: 20 hojas
 # que comparten un contenido de 500 KB pesan 50 KB y costaban 23 s. Un
@@ -594,16 +594,18 @@ def leer_despacho(data: bytes, limite_cpu_s: float = _MAX_CPU_LECTURA) -> dict:
     return resultado
 
 
-def validar_pdf(data: bytes) -> dict:
+def validar_pdf(data: bytes, limite_cpu_s: float = _MAX_CPU_LECTURA) -> dict:
     """Lo que mira la subida de un PDF: si está encriptado y cuántas hojas
-    tiene. Uno que no se abre da {"error": el motivo}."""
+    tiene. Uno que no se abre da {"error": el motivo}; uno que gasta
+    `limite_cpu_s` de CPU, `_DemasiadoTrabajo`."""
     from pypdf import PdfReader
 
     try:
-        pdf = PdfReader(io.BytesIO(data))
-        if pdf.is_encrypted:
-            return {"encriptado": True, "paginas": 0}  # contar hojas de uno encriptado ya falla
-        return {"encriptado": False, "paginas": len(pdf.pages)}
+        with _tope_de_cpu(limite_cpu_s):
+            pdf = PdfReader(io.BytesIO(data))
+            if pdf.is_encrypted:
+                return {"encriptado": True, "paginas": 0}  # contar hojas de uno encriptado ya falla
+            return {"encriptado": False, "paginas": len(pdf.pages)}
     except (MemoryError, SystemError) as e:
         # Bajo el tope de memoria, una función en C de pypdf puede fallar con SystemError.
         raise MemoryError from e
@@ -680,9 +682,10 @@ async def leer_despacho_aparte(data: bytes, limite_s: float, clave: str | None =
 
 
 async def validar_pdf_aparte(data: bytes, limite_s: float, clave: str | None = None) -> dict:
-    """`validar_pdf` en otro proceso, con el tope de memoria del lector y un
-    tiempo máximo que incluye la espera (TimeoutError). Si pasa de la
-    memoria, PdfDemasiadoPesado. Como mucho `_VALIDANDO_A_LA_VEZ` a la vez.
+    """`validar_pdf` en otro proceso, con los topes de memoria y de CPU del
+    lector (PdfDemasiadoPesado). Espera un lugar hasta `limite_s` (SinLugar)
+    y después el proceso tiene `limite_s` entero (TimeoutError): la espera no
+    se le cobra al archivo. Como mucho `_VALIDANDO_A_LA_VEZ` a la vez.
     Con `clave`, las de una misma clave van de a una y esperan su turno: diez
     PDFs pesados de un usuario ocupan un solo lugar y no frenan a otro."""
     loop = asyncio.get_running_loop()
@@ -690,19 +693,18 @@ async def validar_pdf_aparte(data: bytes, limite_s: float, clave: str | None = N
     if estado is None:
         estado = _VALIDANDO[loop] = (asyncio.Semaphore(_VALIDANDO_A_LA_VEZ), {})
     semaforo, filas = estado
+    hasta = loop.time() + limite_s
     if clave is None:
-        return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, "validar")
+        return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, "validar", hasta)
     fila = filas.setdefault(clave, [asyncio.Lock(), 0])
     fila[1] += 1
-    hasta = loop.time() + limite_s
     try:
         try:
             await asyncio.wait_for(fila[0].acquire(), timeout=limite_s)
         except TimeoutError:
             raise SinLugar from None
         try:
-            return await _leer_aparte(data, max(hasta - loop.time(), 0.0), semaforo,
-                                      _MAX_CPU_LECTURA, "validar")
+            return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, "validar", hasta)
         finally:
             fila[0].release()
     finally:
@@ -712,40 +714,44 @@ async def validar_pdf_aparte(data: bytes, limite_s: float, clave: str | None = N
 
 
 async def _leer_aparte(data: bytes, limite_s: float, semaforo, limite_cpu_s: float,
-                       modo: str = "leer") -> dict:
+                       modo: str = "leer", hasta: float | None = None) -> dict:
+    """Sin `hasta`, la espera por un lugar cuenta dentro de `limite_s`. Con
+    `hasta`, se espera un lugar hasta ese momento y el proceso tiene `limite_s`."""
     entorno = {k: os.environ[k] for k in ("PATH", "HOME", "LANG", "LC_ALL", "PYTHONUSERBASE")
                if k in os.environ}
     # El lector de facturas carga el .env al importarse: el hijo no lo lee.
     entorno["PYTHON_DOTENV_DISABLED"] = "1"
-    lanzado = False
 
     async def correr():
-        nonlocal lanzado
-        async with semaforo:
-            lanzado = True
-            proceso = await asyncio.create_subprocess_exec(
-                sys.executable, "-m", __name__, repr(float(limite_cpu_s)), modo,
-                stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE, cwd=str(Path(__file__).resolve().parents[2]),
-                env=entorno)
-            try:
-                _, salida, errores = await asyncio.gather(
-                    _escribir(proceso.stdin, data), proceso.stdout.read(),
-                    _final(proceso.stderr, _FINAL_DE_ERRORES))
+        proceso = await asyncio.create_subprocess_exec(
+            sys.executable, "-m", __name__, repr(float(limite_cpu_s)), modo,
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE, cwd=str(Path(__file__).resolve().parents[2]),
+            env=entorno)
+        try:
+            _, salida, errores = await asyncio.gather(
+                _escribir(proceso.stdin, data), proceso.stdout.read(),
+                _final(proceso.stderr, _FINAL_DE_ERRORES))
+            await proceso.wait()
+        finally:
+            if proceso.returncode is None:
+                proceso.kill()
                 await proceso.wait()
-            finally:
-                if proceso.returncode is None:
-                    proceso.kill()
-                    await proceso.wait()
-            return proceso.returncode, salida, errores
+        return proceso.returncode, salida, errores
 
+    loop = asyncio.get_running_loop()
+    espera_aparte = hasta is not None
+    hasta = hasta if espera_aparte else loop.time() + limite_s
     try:
-        codigo, salida, errores = await asyncio.wait_for(correr(), timeout=limite_s)
+        await asyncio.wait_for(semaforo.acquire(), timeout=hasta - loop.time())
     except TimeoutError:
-        if not lanzado:
-            raise SinLugar from None
-        raise
-    if codigo == _SALIDA_SIN_MEMORIA:
+        raise SinLugar from None
+    try:
+        corrida = limite_s if espera_aparte else hasta - loop.time()
+        codigo, salida, errores = await asyncio.wait_for(correr(), timeout=corrida)
+    finally:
+        semaforo.release()
+    if codigo == _SALIDA_DEMASIADO_PESADO:
         raise PdfDemasiadoPesado(AVISO_SIN_MEMORIA)
     final = errores.decode("utf-8", "replace")
     quien = "el validador de PDF" if modo == "validar" else "el lector de despachos"
@@ -763,7 +769,8 @@ async def _leer_aparte(data: bytes, limite_s: float, semaforo, limite_cpu_s: flo
 def _main() -> int:
     """El proceso que lee (o valida, con el modo «validar»): el PDF por la
     entrada, el resultado en JSON por la salida. Sale con
-    `_SALIDA_SIN_MEMORIA` si pasa del tope de memoria."""
+    `_SALIDA_DEMASIADO_PESADO` si pasa del tope de memoria o, al validar, del
+    de CPU."""
     try:
         import resource
         _, duro = resource.getrlimit(resource.RLIMIT_AS)
@@ -776,11 +783,12 @@ def _main() -> int:
         limite_cpu_s = float(sys.argv[1]) if len(sys.argv) > 1 else _MAX_CPU_LECTURA
         modo = sys.argv[2] if len(sys.argv) > 2 else "leer"
         data = sys.stdin.buffer.read()
-        resultado = validar_pdf(data) if modo == "validar" else leer_despacho(data, limite_cpu_s)
+        resultado = (validar_pdf(data, limite_cpu_s) if modo == "validar"
+                     else leer_despacho(data, limite_cpu_s))
         sys.stdout.write(json.dumps(resultado, ensure_ascii=False))
         sys.stdout.flush()
-    except MemoryError:
-        return _SALIDA_SIN_MEMORIA
+    except (MemoryError, _DemasiadoTrabajo):
+        return _SALIDA_DEMASIADO_PESADO
     return 0
 
 

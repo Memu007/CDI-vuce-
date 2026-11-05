@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: un PDF sano que esperó turno no se rechaza (RENDIMIENTO-1c, vuelta 2)
+
+- Al subir un PDF, la espera por un lugar ya no se descuenta del tiempo para validarlo: o se valida, o recibe 503 «Hay muchos PDFs en revisión». Validar también tiene tope de 10 s de CPU: uno que lo pasa da 400 «El PDF es demasiado pesado para abrirlo».
+
 ## 2026-11-05 · fix: una descripción larga se guarda o da error (CATALOGO-LARGO-1)
 
 - La memoria del cliente y el catálogo del proveedor guardan descripciones de hasta 2000 caracteres; una más larga da 400 a la vista en vez de responder bien sin guardar. El arranque pasa las dos columnas del catálogo a texto sin tope; si no puede, no arranca.
