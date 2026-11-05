@@ -98,7 +98,7 @@
         } catch (e) {
             // Salvo un 401 (ya no había sesión), el cierre no se confirmó.
             if (e.message !== 'unauthorized') {
-                const motivo = [ERROR_AJENA, ERROR_SIN_SESION].includes(e.message) ? e.message : 'El cierre no se confirmó. La sesión sigue abierta.';
+                const motivo = e.message === ERROR_SIN_SESION ? e.message : 'El cierre no se confirmó. La sesión sigue abierta.';
                 toast('No se pudo cerrar la sesión', motivo, 'error');
                 return;
             }
