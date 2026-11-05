@@ -5908,14 +5908,19 @@ MARIA_REGENERACIONES = 10
 _ARCHIVO_MARIA = re.compile(r"MARIA(?:_|-EXPORT_)[A-Za-z0-9_-]{1,50}\.TXT")
 
 
-async def _operacion_maria(db: AsyncSession, owner_username: str, archivo: str):
-    """La operación del usuario creada al generar ese MARIA_<id>.TXT, o None."""
+async def _operacion_maria(db: AsyncSession, owner_username: str, archivo: str,
+                           client_id: str | None = None):
+    """La operación del usuario creada al generar ese MARIA_<id>.TXT, o None.
+    Con client_id, sólo una sin cliente o de ese: la de otro cliente no se le saca."""
+    query = sa_select(OperationModel).where(
+        OperationModel.owner_username == owner_username,
+        OperationModel.generated_file == archivo,
+    )
+    if client_id is not None:
+        query = query.where(sa_or(OperationModel.client_id.is_(None),
+                                  OperationModel.client_id == client_id))
     result = await db.execute(
-        sa_select(OperationModel)
-        .where(
-            OperationModel.owner_username == owner_username,
-            OperationModel.generated_file == archivo,
-        )
+        query
         .order_by(OperationModel.created_at.asc(), OperationModel.id.asc())
         .limit(1)
     )
@@ -7602,7 +7607,7 @@ async def save_client_operation(
             # Con la cuenta bloqueada, como al generar: un guardado y una
             # generación del mismo id a la vez no crean dos operaciones.
             await _cuenta_bloqueada(db, username)
-            operation = await _operacion_maria(db, username, archivo)
+            operation = await _operacion_maria(db, username, archivo, client_id)
         # Lo que viene de afuera se recorta al largo de la columna: en
         # Postgres un dato más largo tira abajo el guardado (GUARDAR-1).
         campos = dict(

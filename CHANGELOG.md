@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: guardar la misma factura en otro cliente no le saca la operación al primero (COBRO-CORTE-1)
+
+- **fix(cobro):** guardar un MARIA ya generado completa la operación sólo si no tiene cliente o es del mismo; si es de otro cliente, se cuenta y se crea una nueva. El aviso de una cuenta cancelada que todavía tiene período y llegó al tope se titula «Llegaste al tope de tu plan».
+
 ## 2026-11-05 · fix: una sesión sin token CSRF lo recibe sola (CSRF-3)
 
 - **fix(seguridad):** si la sesión es válida y le falta la cookie `csrf_token`, la próxima lectura autenticada se la emite; la pantalla v2 ya la trae al abrir y escribe sin volver a entrar. Una sesión vencida, revocada o ausente no recibe nada, y un token que ya está no se cambia.
