@@ -127,7 +127,7 @@ subida tal como vino, da un TXT que el MARIA carga sin errores.
 
 | Pieza | Quién | Qué arregla |
 |---|---|---|
-| 🔵 COBRO-MP-1 | Dev técnica | Aviso de pago verificado, aplicado una vez, con el monto controlado; las renovaciones extienden el período (C3, D8) |
+| ✅ COBRO-MP-1 | Dev técnica | Aviso de pago verificado, aplicado una vez, con el monto controlado; las renovaciones extienden el período (C3, D8) |
 | 🔵 COBRO-CORTE-1 | Dev técnica | Quien no paga no genera ni gasta Gemini; contar una vez por operación sin pasarse del tope (también con guardados a la vez); el aviso dice la razón real (C1, C5, C6; D4 b N = 10, D5 a, D6 a) |
 | 🔵 COBRO-MP-2 | Dev técnica | Cancelar también en Mercado Pago sin perder días pagados, una sola suscripción, reactivar pagando (C2, C4, C8, D9) |
 | ⚪ COBRO-MP-3 | Dev técnica | Sumada por Emi el 04/11: las consultas a Mercado Pago no frenan el servidor (D8 a); el aviso de pago tiene límite de pedidos; un aviso sin firma verificable no cambia nada |
