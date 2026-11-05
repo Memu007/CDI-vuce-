@@ -2077,55 +2077,57 @@ async def cancel_billing(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Cancela la suscripción del usuario.
+    """Cancela la suscripción de la cuenta que paga: el usuario o su organización.
 
-    Si hay una suscripción de Mercado Pago, primero se cancela allá; si no se
-    puede, no se cambia nada en CDI. Deja `billing_status='canceled'`, que
-    sigue generando hasta `trial_ends_at` (billing_service.tiene_acceso): la
+    Primero se cancelan en Mercado Pago todas las suscripciones de la cuenta;
+    si una no se puede, no se cambia nada en CDI. Deja `billing_status='canceled'`,
+    que sigue generando hasta `trial_ends_at` (billing_service.tiene_acceso): la
     cuenta en gracia o con la prueba vencida queda sin acceso
     (billing_service.cancelar_corta_acceso). Con una suscripción abierta se
     cancela desde cualquier estado, sin ganar acceso: si no, cobra cuando la
     tarjeta vuelve y el checkout no tiene salida.
 
-    Toma la fila como el checkout: si uno está en curso, espera a que guarde
-    la suscripción nueva y la cancela; si no, quedaría cobrando sin que CDI
-    la conozca.
+    Bloquea como el checkout: si uno está en curso, espera a que guarde la
+    suscripción nueva y la cancela; si no, quedaría cobrando sin que CDI la conozca.
     """
-    result = await db.execute(select(User).where(User.username == user["username"]).with_for_update())
-    db_user = result.scalars().first()
-    if not db_user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    db_user, org, con_sid = await _cuenta_con_suscripciones(db, user["username"])
+    entidad = org or db_user
+    # Cancelar el plan de un estudio lo corta para todos sus miembros.
+    if org and db_user.username != org.owner_username and db_user not in con_sid:
+        raise HTTPException(status_code=403, detail="Sólo quien administra el estudio o quien abrió "
+                                                    "la suscripción puede cancelar el plan.")
 
-    if db_user.billing_status not in ("trial", "active", "past_due") and not db_user.mp_preapproval_id:
+    if entidad.billing_status not in ("trial", "active", "past_due") and not con_sid:
         raise HTTPException(
             status_code=409,
-            detail=f"No se puede cancelar desde el estado actual: {db_user.billing_status}",
+            detail=f"No se puede cancelar desde el estado actual: {entidad.billing_status}",
         )
 
-    if db_user.mp_preapproval_id:
-        no_se_pudo = "No se pudo cancelar en Mercado Pago; tu plan sigue igual. Probá de nuevo en unos minutos."
-        if not billing_service.is_configured():
-            raise HTTPException(status_code=503, detail=no_se_pudo)
+    no_se_pudo = "No se pudo cancelar en Mercado Pago; tu plan sigue igual. Probá de nuevo en unos minutos."
+    if con_sid and not billing_service.is_configured():
+        raise HTTPException(status_code=503, detail=no_se_pudo)
+    for cuenta in con_sid:
         try:
-            await run_in_threadpool(_cancelar_suscripcion_mp, db_user.mp_preapproval_id)
+            await run_in_threadpool(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id)
         except _SuscripcionMPError as e:
-            print(f"⚠️ No se pudo cancelar la suscripción de {db_user.username} en MP: {e}")
+            print(f"⚠️ No se pudo cancelar la suscripción de {cuenta.username} en MP: {e}")
             raise HTTPException(status_code=503, detail=no_se_pudo)
-        db_user.mp_preapproval_id = None
+    for cuenta in con_sid:
+        cuenta.mp_preapproval_id = None
 
     ahora = datetime.now(timezone.utc)
-    corta = billing_service.cancelar_corta_acceso(db_user, ahora)
-    if corta and billing_service.vigente(db_user.trial_ends_at, ahora):
+    corta = billing_service.cancelar_corta_acceso(entidad, ahora)
+    if corta and billing_service.vigente(entidad.trial_ends_at, ahora):
         # canceled da acceso hasta trial_ends_at: quien no lo tenía no lo gana.
-        db_user.trial_ends_at = ahora
-    db_user.billing_status = "canceled"
+        entidad.trial_ends_at = ahora
+    entidad.billing_status = "canceled"
     await db.commit()
-    hasta = None if corta else db_user.trial_ends_at
+    hasta = None if corta else entidad.trial_ends_at
     print(f"🚪 User canceló suscripción: {db_user.username} (servicio hasta: {hasta or 'sin acceso'})")
     return {"success": True, "billing_status": "canceled", "service_until": hasta and hasta.isoformat()}
 
 
-async def _pago_un_plan_mp(db: AsyncSession, db_user) -> bool:
+async def _pago_un_plan_mp(db: AsyncSession, entidad, cuenta_ref: str) -> bool:
     """Si la cuenta pagó un plan con Mercado Pago. Una recarga sola no es un
     plan: la prueba que recargó vuelve a la prueba (COBRO-MP-1, E). Sin
     ningún pago aplicado en mp_pagos_aplicados (pagó antes del registro)
@@ -2133,11 +2135,11 @@ async def _pago_un_plan_mp(db: AsyncSession, db_user) -> bool:
     from proyecto_maria.database.models import PagoMercadoPagoAplicado
     tipos = (await db.execute(
         select(PagoMercadoPagoAplicado.tipo)
-        .where(PagoMercadoPagoAplicado.cuenta == db_user.username,
+        .where(PagoMercadoPagoAplicado.cuenta == cuenta_ref,
                PagoMercadoPagoAplicado.estado == "aplicado")
     )).scalars().all()
     if not tipos:
-        return db_user.payment_provider == "mercadopago"
+        return entidad.payment_provider == "mercadopago"
     return any(tipo != "topup" for tipo in tipos)
 
 
@@ -2158,15 +2160,16 @@ async def reactivate_billing(
     db_user = result.scalars().first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    entidad, es_org = await _get_billing_entity(db, db_user)
 
-    if db_user.billing_status != "canceled":
+    if entidad.billing_status != "canceled":
         raise HTTPException(status_code=409, detail="La suscripción no está cancelada")
 
-    end = db_user.trial_ends_at
+    end = entidad.trial_ends_at
     if end is not None and end.tzinfo is None:
         end = end.replace(tzinfo=timezone.utc)
     if end is None or end < datetime.now(timezone.utc):
-        db_user.billing_status = "past_due"
+        entidad.billing_status = "past_due"
         await db.commit()
         return {
             "success": True,
@@ -2175,7 +2178,7 @@ async def reactivate_billing(
             "message": "Tu período pagado ya terminó. Activá el plan para continuar.",
         }
 
-    if await _pago_un_plan_mp(db, db_user):
+    if await _pago_un_plan_mp(db, entidad, f"org:{entidad.id}" if es_org else db_user.username):
         return {
             "success": True,
             "billing_status": "canceled",
@@ -2187,7 +2190,7 @@ async def reactivate_billing(
             ),
         }
 
-    db_user.billing_status = "trial"
+    entidad.billing_status = "trial"
     await db.commit()
     print(f"🔄 User reactivó la prueba: {db_user.username}")
     return {
@@ -10079,10 +10082,16 @@ async def remove_member(
     if username == org.owner_username:
         raise HTTPException(status_code=400, detail="No podés removerte a vos mismo del estudio")
 
-    member = await db.execute(select(User).where(User.username == username, User.organization_id == org.id))
+    # Bloqueada como en el checkout: no se saca a alguien mientras abre la suscripción.
+    member = await db.execute(
+        select(User).where(User.username == username, User.organization_id == org.id).with_for_update())
     member = member.scalars().first()
     if not member:
         raise HTTPException(status_code=404, detail="Ese usuario no es miembro del estudio")
+    if member.mp_preapproval_id:
+        # Fuera del estudio seguiría cobrándole al estudio, y otra suscripción cobraría doble.
+        raise HTTPException(status_code=409, detail=f"{username} abrió la suscripción del estudio en "
+                                                    "Mercado Pago. Para sacarle del estudio, primero cancelá el plan.")
 
     member.organization_id = None
     await db.commit()
@@ -10864,6 +10873,35 @@ async def billing_topup(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+async def _cuenta_con_suscripciones(db: AsyncSession, username: str):
+    """Bloquea al usuario, a los otros miembros de su org con suscripción y a la
+    org, en el orden de _cuenta_bloqueada. Devuelve (usuario, org o None, filas con suscripción)."""
+    org_previa = (await db.execute(select(User.organization_id).where(User.username == username))).scalar()
+    otros_con_sid = select(User.username).where(
+        User.organization_id == org_previa, User.username != username, User.mp_preapproval_id.isnot(None))
+    nombres = {username, *((await db.execute(otros_con_sid)).scalars().all() if org_previa else ())}
+    filas = (await db.execute(
+        select(User).where(User.username.in_(nombres)).order_by(User.username)
+        .with_for_update().execution_options(populate_existing=True)
+    )).scalars().all()
+    db_user = next((u for u in filas if u.username == username), None)
+    if not db_user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    org_id = db_user.organization_id or None
+    if org_id != (org_previa or None):
+        raise HTTPException(status_code=409, detail="Tu cuenta cambió de organización. Probá de nuevo.")
+    org = None
+    if org_id:
+        org = (await db.execute(
+            select(Organization).where(Organization.id == org_id)
+            .with_for_update().execution_options(populate_existing=True)
+        )).scalars().first()
+        if not set((await db.execute(otros_con_sid)).scalars().all()) <= nombres:
+            raise HTTPException(status_code=409, detail="Otro miembro de tu organización está pagando. Probá de nuevo en unos minutos.")
+    con_sid = [u for u in filas if u.mp_preapproval_id and (u is db_user or u.organization_id == org_id)]
+    return db_user, org, con_sid
+
+
 async def _cerrar_suscripcion_vieja(db: AsyncSession, db_user, cuenta) -> None:
     """Antes de crear otra: la autorizada no se cancela (puede ser un pago cuyo
     aviso no llegó); las demás sí. Si no se puede leer o cancelar, 503."""
@@ -10923,28 +10961,10 @@ async def billing_checkout(
     if plan_id not in billing_service.PLANS:
         raise HTTPException(status_code=400, detail=f"Plan invalido: {plan_id}")
 
-    # La fila queda bloqueada hasta guardar la suscripción nueva: un segundo
-    # checkout a la vez espera y ve la del primero (COBRO-MP-1 D).
-    # En una organización también los miembros con suscripción y después la org,
-    # en el orden de _cuenta_bloqueada: usuarios (por nombre) y org.
-    org_previa = (await db.execute(select(User.organization_id).where(User.username == username))).scalar()
-    otros_con_sid = select(User.username).where(
-        User.organization_id == org_previa, User.username != username, User.mp_preapproval_id.isnot(None))
-    nombres = {username, *((await db.execute(otros_con_sid)).scalars().all() if org_previa else ())}
-    filas = (await db.execute(
-        select(User).where(User.username.in_(nombres)).order_by(User.username).with_for_update()
-    )).scalars().all()
-    db_user = next((u for u in filas if u.username == username), None)
-    if not db_user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-
-    org_id = db_user.organization_id or None
-    if org_id != (org_previa or None):
-        raise HTTPException(status_code=409, detail="Tu cuenta cambió de organización. Probá de nuevo.")
-    if org_id:
-        await db.execute(select(Organization.id).where(Organization.id == org_id).with_for_update())
-        if not set((await db.execute(otros_con_sid)).scalars().all()) <= nombres:
-            raise HTTPException(status_code=409, detail="Otro miembro de tu organización está pagando. Probá de nuevo en unos minutos.")
+    # Bloqueada hasta guardar la suscripción nueva: un segundo checkout a la vez
+    # espera y ve la del primero.
+    db_user, org, con_sid = await _cuenta_con_suscripciones(db, username)
+    org_id = org.id if org else None
 
     # Modo demo cuando no hay credenciales, sólo en desarrollo y pruebas
     if not billing_service.is_configured():
@@ -10968,10 +10988,8 @@ async def billing_checkout(
 
     # Una sola suscripción por cuenta que paga: en una organización cuentan
     # también las que abrieron los otros miembros.
-    cuentas = [db_user] + [u for u in filas if u is not db_user and org_id and u.organization_id == org_id]
-    for cuenta in cuentas:
-        if cuenta.mp_preapproval_id:
-            await _cerrar_suscripcion_vieja(db, db_user, cuenta)
+    for cuenta in con_sid:
+        await _cerrar_suscripcion_vieja(db, db_user, cuenta)
 
     try:
         checkout = billing_service.create_checkout(db_user, plan_id, org_id=org_id)
