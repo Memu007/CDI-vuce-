@@ -2080,8 +2080,9 @@ async def cancel_billing(
     """Cancela la suscripción de la cuenta que paga: el usuario o su organización.
 
     Primero se cancelan en Mercado Pago todas las suscripciones de la cuenta;
-    si una no se puede, no se cambia nada en CDI. Deja `billing_status='canceled'`,
-    que sigue generando hasta `trial_ends_at` (billing_service.tiene_acceso): la
+    si una no se puede, el plan no cambia y sólo se olvidan las ya canceladas.
+    Deja `billing_status='canceled'`, que sigue generando hasta `trial_ends_at`
+    (billing_service.tiene_acceso): la
     cuenta en gracia o con la prueba vencida queda sin acceso
     (billing_service.cancelar_corta_acceso). Con una suscripción abierta se
     cancela desde cualquier estado, sin ganar acceso: si no, cobra cuando la
@@ -2111,8 +2112,9 @@ async def cancel_billing(
             await run_in_threadpool(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id)
         except _SuscripcionMPError as e:
             print(f"⚠️ No se pudo cancelar la suscripción de {cuenta.username} en MP: {e}")
+            # Una cancelada en Mercado Pago no vuelve: anotada, el perfil diría que renueva.
+            await db.commit()
             raise HTTPException(status_code=503, detail=no_se_pudo)
-    for cuenta in con_sid:
         cuenta.mp_preapproval_id = None
 
     ahora = datetime.now(timezone.utc)
