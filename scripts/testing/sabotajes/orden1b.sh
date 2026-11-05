@@ -145,7 +145,7 @@ sabotaje $A "salir sin poder comprobar quién es va al inicio" \
   "            if (e.message !== 'unauthorized') {" \
   "            if (e.message !== 'unauthorized' && e.message !== ERROR_SIN_SESION) {"
 sabotaje $A "salir sin poder comprobar quién es no dice por qué" \
-  "FALLA: A volvió a entrar y apretó «Salir» sin poder comprobar quién es y no dice por qué" \
+  "FALLA: A volvió a entrar y apretó «Salir» sin poder comprobar quién es y no avisa que no pudo comprobar la sesión" \
   "const motivo = e.message === ERROR_SIN_SESION ? e.message :" "const motivo ="
 
 export CASOS=z27
