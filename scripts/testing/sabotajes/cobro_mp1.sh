@@ -497,12 +497,12 @@ sabotaje $M "C: past_due no puede cancelar" \
   '    if db_user.billing_status not in ("trial", "active") and not db_user.mp_preapproval_id:' \
   "past_due no se puede cancelar"
 sabotaje $M "C: cancelar desde past_due deja los días que quedaban" \
-  '            db_user.trial_ends_at = ahora' \
-  '            pass' \
+  '        db_user.trial_ends_at = ahora' \
+  '        pass' \
   "cancelar desde past_due da acceso"
 sabotaje $M "C: sólo past_due pierde los días al cancelar" \
-  '    if not billing_service.tiene_acceso(db_user):' \
-  '    if db_user.billing_status == "past_due":' \
+  '    if billing_service.cancelar_corta_acceso(db_user, ahora) and billing_service.vigente(db_user.trial_ends_at, ahora):' \
+  '    if db_user.billing_status == "past_due" and billing_service.vigente(db_user.trial_ends_at, ahora):' \
   "cancelar da acceso"
 sabotaje $M "E: decide payment_provider aunque haya pagos registrados" \
   $'    if not tipos:\n        return db_user.payment_provider == "mercadopago"\n' \
@@ -549,13 +549,18 @@ sabotaje $M "C: /billing/me dice abierta sólo a la cancelada" \
   '        "suscripcion_abierta": db_user.billing_status == "canceled" and bool(db_user.mp_preapproval_id),' \
   "sin_plan_con"
 sabotaje $M "C: /billing/me nunca dice que cancelar corta el acceso" \
-  '        "cancelar_corta_acceso": not billing_service.tiene_acceso(db_user),' \
+  '        "cancelar_corta_acceso": billing_service.cancelar_corta_acceso(db_user),' \
   '        "cancelar_corta_acceso": False,' \
   "FAILED tests/test_cobro_mp1_cde.py::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[impaga]"
 sabotaje $M "C: /billing/me dice que corta sólo con past_due" \
-  '        "cancelar_corta_acceso": not billing_service.tiene_acceso(db_user),' \
+  '        "cancelar_corta_acceso": billing_service.cancelar_corta_acceso(db_user),' \
   '        "cancelar_corta_acceso": db_user.billing_status == "past_due",' \
   "FAILED tests/test_cobro_mp1_cde.py::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[sin_plan]"
+
+sabotaje $B "C: cancelar_corta_acceso no ve la cuenta que ya pasó su fecha" \
+  '    return not (tiene_acceso(cuenta, ahora) and vigente(getattr(cuenta, "trial_ends_at", None), ahora))' \
+  '    return not tiene_acceso(cuenta, ahora)' \
+  "FAILED tests/test_cobro_mp1_cde.py::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[renovacion_tardia]"
 
 # D13 (c): una autorizada sin cuenta vigente frena el checkout y sale cancelando.
 sabotaje $M "D13: el checkout cancela la autorizada vieja" \

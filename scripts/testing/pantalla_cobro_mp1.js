@@ -24,6 +24,7 @@ async function cancelada(perfilCon, confirmacionDeCancelar, cancelar) {
   await perfilCon('canceled', { suscripcion_abierta: true, cancelar_corta_acceso: true });
   const cv = await confirmacionDeCancelar('canceled vencida con suscripción abierta');
   if (cv.t.includes('ya pagado')) falla('canceled vencida con suscripción abierta: la confirmación promete el período ya pagado: «' + cv.t + '»');
+  if (cv.t.includes('pago pendiente')) falla('canceled vencida con suscripción abierta: la confirmación habla de un pago pendiente: «' + cv.t + '»');
   console.log('OK | canceled vencida con suscripción abierta: no se promete el período ya pagado');
   await perfilCon('canceled', { suscripcion_abierta: false });
   if (await cancelar.isVisible()) falla('canceled sin suscripción: se ve «Cancelar plan»');
