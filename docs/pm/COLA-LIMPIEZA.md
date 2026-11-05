@@ -20,3 +20,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   `orden1b.sh` se reanclan en la misma pieza.
 - `proyecto_maria/static/v2/app_v2.js:7`: el IIFE de la pantalla (~1190
   líneas) se parte por sección; lo nuevo ya va en funciones aparte.
+- `proyecto_maria/main.py:8048`: `logger.warning("[fill-if-empty] …")` usa
+  un `logger` que no existe a nivel de módulo (pyflakes: «undefined name»);
+  si esa rama corre da `NameError` en vez del aviso. Lo vio la Dev MARIA.

@@ -207,6 +207,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 ## Última vuelta
 
+2026-11-05 13:58 UTC: Vuelta sin entregas cerradas. Límite semanal `allowed` en las tres sesiones; contexto bien. MARIA termina de sumar a su informe el merge con mi rama (arregló un `NameError` del merge en `file_security.py` y una carrera del caso de las diez subidas) y corre sabotajes sobre `515821a`; técnica corre la suite y ORDEN-1 sobre `9e37673` (CSRF-1 vuelta 2) antes de subir. A la cola de limpieza: el `logger` inexistente de `main.py:8048`.
+
 2026-11-05 13:05 UTC: **La integración de `885ee89` trajo código no aceptado.** COBRO-MP-1 y ORDEN-1b están encima de commits de COBRO-CORTE-1, COBRO-MP-2, AISLAMIENTO-2, LIMPIEZA-1 y BACKUP-1a (siguen 🔵, sin revisar). No se revierte: las Devs traen esta rama y un revert les borraría su código. Desde `e0b8626` ningún SHA de esta rama se le propone a Emi para publicar hasta que esas cinco estén ✅; el último sin código no aceptado es `9018d77`. LIMPIEZA-1 cambia `ci.yml` (+5/−19): el CI de esta rama ya corre con eso. EXCEL-2b ya quedó integrada en ese rango.
 
 2026-11-05 12:55 UTC: **COBRO-MP-1 aceptada** (vuelta 5, `736fed6`): 148 sabotajes en rojo, suite `4419 passed`, 6 negativos míos y el adversario sin nada que bloquee. ✅ en el roadmap; integrada con ORDEN-1b hasta `885ee89` (sin CSRF-1, que volvió con devolución). Queda para Emi la pieza D51: cancelar con organización tiene que actuar sobre la cuenta que da el acceso, y sólo quien corresponda.
