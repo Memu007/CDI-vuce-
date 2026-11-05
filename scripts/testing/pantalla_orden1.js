@@ -1565,8 +1565,10 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     soltar();
     const sigue = (await ctx.request.get(base + '/auth/current_user')).ok();
     if (new URL(t.url()).pathname !== '/dashboard') falla(que + ' y fue al inicio ' + (sigue ? 'con la sesión abierta' : 'cerrando la sesión'));
-    if (!/No se pudo cerrar la sesión/.test(await t.evaluate(() => document.getElementById('toastHost').textContent))) falla(que + ' y no avisa que no la cerró');
-    console.log('OK ' + que + ': se queda y avisa que no cerró la sesión');
+    const aviso = await t.evaluate(() => document.getElementById('toastHost').textContent);
+    if (!/No se pudo cerrar la sesión/.test(aviso)) falla(que + ' y no avisa que no la cerró');
+    if (!/No se pudo comprobar la sesión/.test(aviso)) falla(que + ' y no dice por qué: ' + aviso);
+    console.log('OK ' + que + ': se queda y avisa que no pudo comprobar la sesión');
     await ctx.close();
   }
 

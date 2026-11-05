@@ -144,6 +144,9 @@ sabotaje $A "salir sin poder comprobar quién es va al inicio" \
   "FALLA: A volvió a entrar y apretó «Salir» sin poder comprobar quién es y fue al inicio con la sesión abierta" \
   "            if (e.message !== 'unauthorized') {" \
   "            if (e.message !== 'unauthorized' && e.message !== ERROR_SIN_SESION) {"
+sabotaje $A "salir sin poder comprobar quién es no dice por qué" \
+  "FALLA: A volvió a entrar y apretó «Salir» sin poder comprobar quién es y no dice por qué" \
+  "const motivo = e.message === ERROR_SIN_SESION ? e.message :" "const motivo ="
 
 export CASOS=z27
 sabotaje $A "la telemetría sale con la sesión de otro" \
