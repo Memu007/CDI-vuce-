@@ -2,6 +2,234 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## DESPACHO-1c devolución: **entregada** en `fbbb2ad` (2026-11-05), D57 (b) ampliada y D53 (b)
+
+| Pieza | Resultado | Qué decidís |
+|---|---|---|
+| DESPACHO-1c devolución | Ninguna falla al guardar deja un éxito a la vista. La familia es `/operaciones` con 500, 402, 409, la red caída y `historial_guardado: false`, en cuatro pantallas: asignar cliente, crear cliente, Listo con cliente y Listo con proveedor. En todas, lo último a la vista es el error o el aviso. El panel queda abierto para reintentar, y la caja «Cliente guardado» de una operación anterior se cierra. Confirmar una posición y aprender el catálogo avisan con un 400. Reintentar en el panel después de crear un cliente vuelve a guardar en ese cliente, sin crear otro. La operación se guarda como se generó, aunque mientras aprende el catálogo la persona cambie de cliente o de operación. | D63, D65 y D67 (propuestas, no te frenan) |
+
+**Ojo para publicar, sigue igual:** esta rama tiene `e0b8626` (COBRO-CORTE-1, COBRO-MP-2, AISLAMIENTO-2, LIMPIEZA-1 y BACKUP-1a, sin aceptar). Ningún SHA mío desde `96052c8`, `fbbb2ad` incluido, sirve para publicar hasta que esas cinco estén ✅.
+
+**Archivos de producto:** `proyecto_maria/static/v2/screens/finalize.js` (`generateMaria`, `renderReady`, `renderOrphanPanel`, `orphanCreateSubmit`, `reSaveOperationAndClosePanel`, `saveOperationToHistory`, `saveCatalogLearn`), `proyecto_maria/static/v2/screens/ncm.js` (`saveNcmUsage`) y `CHANGELOG.md`.
+
+### Decisiones
+
+- **D63 es la D58 de RENDIMIENTO-1d con su número nuevo.** Va en esa entrega, no acá.
+- **D65. La red caída o el plan vencido (402) al confirmar una posición o al aprender el catálogo no avisan nada** (`saveNcmUsage` y `saveCatalogLearn` lo mandan sólo a la consola; `CDI.api` lanza en los dos). D53 nombra el 400 y el `false`, y es lo que hice. Esos dos quedan callados, igual que antes. El 402 igual muestra el modal de `CDI.api`.
+  - (a) Dejarlo así.
+  - (b) Que también avisen, con dos entradas más en la familia y su sabotaje.
+  - **Recomiendo (b), como pieza chica aparte.** La persona no pierde la operación, pero cree que el producto quedó en la memoria.
+- **D67. Un proveedor de nombre largo nunca aprende su catálogo.** Lo medí. El navegador arma la clave de la dirección con tope de 64 letras (`finalize.js:1329`, `.slice(0, 64)`). El servidor sólo acepta hasta 60 (`catalog_service.py:52`, `^[a-z0-9_]{1,60}$`) y da 400. Con «Proveedor Sintetico de Muebles y Accesorios para el Hogar Internacional SA» la clave queda en 64 y no pasa. Lo que guarda no cambia de clave: el servidor la vuelve a armar del nombre, con tope 60. La premisa que traía (que caía en otra clave) era falsa. Desde esta pieza, ese 400 avisa con el toast «Algunos productos no quedaron en la memoria»; antes no avisaba nada.
+  - (a) Dejarlo.
+  - (b) Cortar en 60 en el navegador, con un caso de la familia y su sabotaje.
+  - **Recomiendo (b), como pieza chica aparte.** Es una línea, y hoy esos proveedores ven el aviso en cada operación.
+
+### Lo que preguntaste: CJK o emoji que normalizan a vacío
+
+**Me parece aceptable por ahora, y lo dejo para CATALOGO-LARGO-2.** Dos descripciones sólo CJK o emoji iguales no se sugieren entre sí: se pierde una sugerencia, pero no se cruza nada. Lo grave de esa familia es otra cosa, y es el segundo criterio de CATALOGO-LARGO-2: una descripción que normaliza a vacío contesta `historial_guardado: true` sin haber guardado. Arreglar las dos juntas pide cambiar la regla de identidad (qué cuenta como «el mismo producto»), y eso toca las cinco vías de DESPACHO-1b.
+
+### Lo que no hice como estaba pedido, con evidencia
+
+**D53 pedía avisar con `historial_guardado: false` también al aprender el catálogo. Ese endpoint nunca manda ese campo.** `POST /api/catalog/{vendor_id}/productos` contesta esto (`proyecto_maria/core/catalog_service.py:421`, el final de `save_products`):
+
+```
+    return {
+        "vendor_id": vendor_id,
+        "vendor_nombre": vendor_name,
+        "productos_nuevos": saved,
+        "productos_actualizados": updated,
+        "total_en_catalogo": int(total),
+        "owner_username": owner_username,
+    }
+```
+
+Por eso aprender avisa con cualquier respuesta que no sea 2xx, y no mira `historial_guardado`. Saqué el caso `aprender-no-guardado` que había escrito en `e76ac4b`: lo que probaba era una respuesta que el servidor no da.
+
+### SHAs (base `03bdc9f`, el merge con RENDIMIENTO-1d hasta `d307a3f`)
+
+| SHA | Qué |
+|---|---|
+| `e76ac4b` | test: rojo. Una falla al guardar deja un éxito a la vista |
+| `f486068` | fix: ninguna falla al guardar deja un éxito a la vista |
+| `10f6b31` | test: un sabotaje por cada línea del arreglo |
+| `e47c8d9` | docs: CHANGELOG |
+| `c52ebce` | test: rojo. La caja vieja, el aviso del catálogo que tapa el error y el cliente creado dos veces (los encontró el primer adversario) |
+| `c865010` | fix: el error de la operación queda a la vista, la caja vieja se cierra y reintentar no crea otro cliente |
+| `6a97ed0` | test: sabotajes al día con el orden, la caja y el reintento |
+| `c671a50` | test: el catálogo contesta último y su sabotaje vuelve al orden de antes |
+| `1f023dc` | docs: CHANGELOG |
+| `3c7bcc9` | test: rojo. Cambiar de cliente o de operación mientras se aprende el catálogo cambia lo que se guarda (hallazgo 1 del adversario) |
+| `d382d1e` | fix: la operación se arma al generar y se guarda así |
+| `163bce1` | test: sabotaje de la operación armada al generar |
+| `fbbb2ad` | docs: CHANGELOG |
+| este | docs: informe |
+
+**Rojo de `e76ac4b`** (sobre el producto de `5199709`), `13 failed, 15 passed, 3 warnings in 3.23s`:
+
+```
+FAILED ...test_ninguna_falla_deja_un_exito_a_la_vista[asignar-cliente-500]
+FAILED ...[asignar-cliente-409]
+FAILED ...[asignar-cliente-402]
+FAILED ...[asignar-cliente-red]
+FAILED ...[asignar-cliente-no-guardado]
+FAILED ...[listo-con-cliente-500]
+FAILED ...[listo-con-cliente-409]
+FAILED ...[listo-con-cliente-402]
+FAILED ...[listo-con-cliente-red]
+FAILED ...[listo-con-cliente-no-guardado]
+FAILED ...[aprender-400]
+FAILED ...[aprender-no-guardado]
+FAILED ...[confirmar-ncm-400]
+```
+
+(`aprender-no-guardado` se fue después; ver arriba).
+
+**Rojo de `3c7bcc9`** (sobre el producto de `c865010`), `2 failed, 37 passed, 3 warnings in 3.23s`:
+
+| Caso | Qué dice |
+|---|---|
+| `[sale]` (sale de Listo mientras aprende) | `"operaciones":[]`: la operación no se guardaba |
+| `[otro-cliente]` (cambia de cliente y de operación mientras aprende) | `"operaciones":[{"url":"/api/clientes/9/operaciones","factura":"OTRA"}]`: se guardaba otra operación en otro cliente |
+
+**Rojo de `c52ebce`** (sobre el producto de `f486068`), `8 failed, 29 passed, 5 warnings in 3.67s`:
+
+| Caso | Qué dice |
+|---|---|
+| `[guardado-listo-con-cliente]` y `[sin-dato-listo-con-cliente]` | `assert {'titulo': '', 'texto': ''} is None`: la caja de una operación anterior sigue abierta |
+| `crear-reintento` con 500, 409, 402 y red | `'clientesCreados': 2`: reintentar creaba otro cliente |
+| `listo-con-vendedor` con 500 y 409 | el aviso del catálogo era lo último a la vista y tapaba el error de la operación |
+
+`listo-con-vendedor` con 402 y con la red caída no daban rojo en `c52ebce`, porque el catálogo calla los errores de red (D65). Pasan ahora porque la operación se guarda después de aprender.
+
+### Cómo queda
+
+- **Listo:** primero aprende el catálogo y después guarda la operación, así el aviso de la operación es lo último. La operación (cliente, encabezado y renglones) se arma al generar, antes de aprender, y se guarda esa.
+- **Entrar a Listo** cierra la caja «Cliente guardado» que haya quedado de antes.
+- **Panel:** si guardar falla, el panel queda abierto y no sale «Cliente asignado / creado». Con `false`, la caja lo dice y no sale el toast «Cliente guardado».
+- **Reintentar después de crear un cliente en el panel** guarda en ese cliente sin crear otro. Sólo se reconoce el cliente que creó ese mismo panel: asignar otro o cambiar de cliente no cuenta como reintento.
+- **Un 402** ahora avisa también con un toast, además del modal de `CDI.api`.
+- **Confirmar una posición** avisa con cualquier respuesta que no sea 2xx o con `false`. **Aprender el catálogo** avisa con cualquier respuesta que no sea 2xx.
+
+**Pruebas:** `tests/test_despacho1c.py`, `test_ninguna_falla_deja_un_exito_a_la_vista`, un caso con la familia como datos: cuatro pantallas por cinco fallas, más aprender con 400 y confirmar con 400 y con `false`. Otro caso, `test_se_guarda_la_operacion_que_se_genero`, cambia de cliente o sale de Listo mientras aprende. Corre las pantallas reales en `tests/despacho1c_pantalla.js`. El arnés no tiene esperas fijas: espera a ver la llamada y a que no quede ninguna respuesta en curso. En `listo-con-vendedor` el catálogo contesta último (cinco vueltas de la cola, no un reloj), que es el peor orden. Sin eso, el sabotaje del orden daba verde.
+
+### Comandos
+
+```bash
+git checkout fbbb2ad
+# «39 passed»
+<entorno de la suite> python -m pytest -q --no-cov tests/test_despacho1c.py
+# 16 ROJO y «fallas: 0»
+PY=<venv>/bin/python scripts/testing/sabotajes/despacho1c.sh fbbb2ad
+```
+
+### Puertas
+
+Todas sobre `fbbb2ad`, en worktrees limpios en ese SHA, una después de la otra:
+
+| Puerta | Salida exacta |
+|---|---|
+| `pytest -q --no-cov --timeout=300` (suite completa) | `4835 passed, 355 skipped, 3 xfailed, 102 warnings in 670.17s`, salida 0 |
+| suite con el entorno de la CI (`ENVIRONMENT=testing`, `EMAIL_VERIFICATION_REQUIRED=false`, las 10 `--deselect` de `ci.yml`) | `4825 passed, 355 skipped, 10 deselected, 3 xfailed, 101 warnings in 669.80s`, salida 0 |
+| `compileall -q proyecto_maria` | salida 0 |
+| `despacho1c.sh fbbb2ad` | 16 ROJO, «fallas: 0», salida 0 |
+
+Los dieciséis rojos, copiados de la salida:
+
+```
+ROJO  | la consulta vacía se compara igual: dice «FAILED tests/test_despacho1c.py::test_lo_que_normaliza_a_vacio_no_cruza_el_historial[consulta-japones]»
+ROJO  | la fila guardada vacía se compara igual: dice «FAILED tests/test_despacho1c.py::test_lo_que_normaliza_a_vacio_no_cruza_el_historial[guardada-japones]»
+ROJO  | guardar la operación no avisa lo que no quedó en la memoria: dice «FAILED tests/test_despacho1c.py::test_lo_que_no_quedo_en_la_memoria_se_avisa[no-guardado-listo-con-cliente]»
+ROJO  | «Cliente guardado» tapa el aviso: dice «FAILED tests/test_despacho1c.py::test_lo_que_no_quedo_en_la_memoria_se_avisa[no-guardado-asignar-cliente]»
+ROJO  | lo guardado ya no dice «Cliente guardado»: dice «FAILED tests/test_despacho1c.py::test_lo_que_no_quedo_en_la_memoria_se_avisa[guardado-asignar-cliente]»
+ROJO  | confirmar la posición no avisa lo que no quedó en la memoria: dice «FAILED tests/test_despacho1c.py::test_lo_que_no_quedo_en_la_memoria_se_avisa[no-guardado-confirmar-ncm]»
+ROJO  | confirmar la posición avisa aunque no llegue el dato: dice «FAILED tests/test_despacho1c.py::test_lo_que_no_quedo_en_la_memoria_se_avisa[sin-dato-confirmar-ncm]»
+ROJO  | una falla al guardar cierra el panel y dice «Cliente guardado»: dice «FAILED tests/test_despacho1c.py::test_ninguna_falla_deja_un_exito_a_la_vista[asignar-cliente-500]»
+ROJO  | una falla al guardar deja abierta la caja de éxito anterior: dice «FAILED tests/test_despacho1c.py::test_ninguna_falla_deja_un_exito_a_la_vista[listo-con-cliente-500]»
+ROJO  | el plan vencido no avisa que no se guardó: dice «FAILED tests/test_despacho1c.py::test_ninguna_falla_deja_un_exito_a_la_vista[listo-con-cliente-402]»
+ROJO  | la caja no dice lo que no quedó en la memoria: dice «FAILED tests/test_despacho1c.py::test_ninguna_falla_deja_un_exito_a_la_vista[asignar-cliente-no-guardado]»
+ROJO  | aprender el catálogo no avisa un 400: dice «FAILED tests/test_despacho1c.py::test_ninguna_falla_deja_un_exito_a_la_vista[aprender-400]»
+ROJO  | guardar y aprender a la vez: el aviso del catálogo tapa el error: dice «FAILED tests/test_despacho1c.py::test_ninguna_falla_deja_un_exito_a_la_vista[listo-con-vendedor-500]»
+ROJO  | reintentar después de crear el cliente lo crea otra vez: dice «FAILED tests/test_despacho1c.py::test_ninguna_falla_deja_un_exito_a_la_vista[crear-reintento-500]»
+ROJO  | confirmar la posición no avisa un 400: dice «FAILED tests/test_despacho1c.py::test_ninguna_falla_deja_un_exito_a_la_vista[confirmar-ncm-400]»
+ROJO  | la operación se arma recién al guardarla: dice «FAILED tests/test_despacho1c.py::test_se_guarda_la_operacion_que_se_genero[otro-cliente]»
+fallas: 0
+```
+
+### Revisiones
+
+Dos vueltas de adversario, `adversario-sonnet-alto` (Sonnet, alto), y `/code-review high`.
+
+**Primera vuelta del adversario, sobre `10f6b31`** (28 passed, los 14 sabotajes de entonces en ROJO):
+
+| # | Sev. | Hallazgo | Qué hice |
+|---|---|---|---|
+| 1 | Alta | Guardar y aprender a la vez: el aviso del catálogo tapa el error de la operación | Arreglado en `c865010`, rojo en `c52ebce` |
+| 2 | Media | Con el panel abierto, reintentar «crear» sin CUIT crea otro cliente (2 POST `/api/clientes`) | Arreglado en `c865010`, rojo en `c52ebce` |
+| 3 | Media-baja | La caja «Cliente guardado» de una operación anterior queda a la vista | Arreglado en `c865010`, rojo en `c52ebce` |
+| 4 | Baja | El error dura un toast de 4 s | Riesgo |
+| 5 | Baja | `sin_cliente` en el panel calla | Riesgo: no lo veo alcanzable |
+
+**`/code-review high` sobre `03bdc9f..e47c8d9`:** los mismos 1 a 3, más:
+
+| Hallazgo | Qué hice |
+|---|---|
+| Mirar `historial_guardado` al aprender es código muerto | Lo saqué (ver «Lo que no hice como estaba pedido») |
+| El tope de 64 contra 60 en la clave del proveedor | D67, medido |
+| La red caída calla al confirmar y al aprender | D65 |
+| `ya_guardada` tapa un aviso anterior | Riesgo |
+| Un 402 muestra el modal y el toast | Riesgo |
+| La misma condición en `ncm.js` y `finalize.js` (§6) | Queda: son dos pantallas con su propio toast; unirlas pide un módulo compartido que hoy no existe. Propuesta para la cola |
+
+**Segunda vuelta del adversario, sobre `1f023dc`:** no encontró ningún camino con un éxito a la vista después de una falla, y todas sus mutaciones dieron rojo.
+
+| # | Sev. | Hallazgo | Qué hice |
+|---|---|---|---|
+| 1 | Media | La operación se leía después de aprender: cambiar de cliente mientras tanto guardaba otra operación en otro cliente, y salir de Listo no la guardaba. Lo introduje yo en `c865010` | Arreglado en `d382d1e`, rojo en `3c7bcc9`, sabotaje en `163bce1` |
+| 2 | Media-baja | Un catálogo colgado frena la operación: `CDI.api` no tiene tope de tiempo. Leído del código | Riesgo |
+| 3 | Media-baja | La red caída y el 402 callan al confirmar y al aprender. Ya estaba así | D65, ampliada al 402 |
+| 4 | Baja | Reintentar ignora lo que se editó en el formulario | Riesgo |
+| 5 | Baja | Crear, fallar, asignar otro, fallar y crear sin CUIT hace un segundo cliente; ningún caso lo ve | Riesgo |
+
+No corrí `/security-review`: la pieza no toca dinero, sesión, permisos ni datos del servidor, sólo pantallas que muestran lo que el servidor contesta.
+
+### Chequeo §6 (`docs/pm/herramientas/chequeo-6.py 03bdc9f fbbb2ad`), entero
+
+```
+chequeo-6 03bdc9f..fbbb2ad: avisos para mirar, no un veredicto
+producto +45/−19
+  AVISO producto suma 26 líneas netas: el informe dice por qué (§6: más de 20)
+arnés +187/−21
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  proyecto_maria/static/v2/screens/finalize.js: 1400 → 1426
+  AVISO creció una función de más de 150: proyecto_maria/static/v2/screens/finalize.js:9 <anónima> 1392 → 1418, 44 en su propio cuerpo (§6: lo nuevo va aparte)
+  proyecto_maria/static/v2/screens/ncm.js: 2341 → 2341
+avisos: 2
+```
+
+**El segundo AVISO queda:** la «función anónima» de más de 150 líneas es la IIFE que envuelve todo `finalize.js`. Todo lo nuevo va dentro de funciones que ya estaban, más una variable del módulo (`clienteCreadoAca`). **Propuesta para `COLA-LIMPIEZA.md`:** partir `finalize.js` (1419 líneas) por pantalla.
+
+**El primer AVISO, por qué suma 26 netas:** son el reintento (6), la caja que dice lo que no quedó en la memoria (5), el aviso del catálogo (4), el toast del 402 (1) y `armarOperacion` (7), que saca la lectura de la operación de `saveOperationToHistory` para hacerla al generar. Lo demás son líneas que cambiaron.
+
+### Riesgos
+
+- **La operación espera al catálogo.** `CDI.api` no tiene tope de tiempo: si el catálogo se cuelga, la operación no se guarda hasta que conteste (hallazgo 2, leído del código, no medido). Si contesta tarde, se guarda la operación que se generó, aunque la persona haya cambiado de cliente.
+- **El error dura lo que dura un toast**, unos 4 s. El panel queda abierto, pero en Listo con cliente no queda ninguna marca fija de que no se guardó.
+- **Un 402 muestra el modal y el toast a la vez.**
+- **`ya_guardada` tapa un aviso anterior.** Si la operación ya se guardó con `false` y se vuelve a guardar, sale como guardada sin el aviso.
+- **`sin_cliente` en el panel no avisa.** No lo veo alcanzable: asignar y crear ponen el cliente antes de guardar.
+- **Que `clienteCreadoAca` se reinicie al volver a abrir el panel no lo ve ningún caso.** Tampoco el camino crear, fallar, asignar otro, fallar y crear de nuevo sin CUIT, que hace un segundo cliente (hallazgo 5).
+- **Reintentar después de crear ignora lo que se editó en el formulario** y guarda en el cliente creado (hallazgo 4).
+- **Un 500 del catálogo devuelve `detail=str(e)`.** Es del servidor y no lo toqué.
+- **La v1 (`app.js`) no la toqué.**
+
+### Lo que no corrí
+
+- La pantalla en un navegador de verdad. El arnés corre `finalize.js` y `ncm.js` reales sobre un DOM falso: ve qué toast y qué caja quedan, no cómo se ven.
+- `smoke_friccion.sh` y `ataque_aislamiento.sh`: la pieza sólo toca JS de pantalla, no el servidor, la sesión ni los permisos.
+- Postgres: la pieza no toca la base.
+- La pantalla vieja (`static/app.js`, v1): no la toqué y no la miré.
+
 ## DESPACHO-1c: **entregada** en `5199709` (2026-11-05), con tus CSRF-1 y CSRF-2 integradas
 
 | Pieza | Resultado | Qué decidís |
