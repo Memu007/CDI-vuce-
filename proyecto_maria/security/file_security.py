@@ -512,13 +512,14 @@ async def validate_file_upload(
     clave: Optional[str] = None,
 ) -> bytes:
     """Valida y devuelve los bytes. Ver validar_con_carril."""
-    return (await validar_con_carril(file, file_type, max_size))[0]
+    return (await validar_con_carril(file, file_type, max_size, clave))[0]
 
 
 async def validar_con_carril(
     file: UploadFile,
     file_type: str,
-    max_size: Optional[int] = None
+    max_size: Optional[int] = None,
+    clave: Optional[str] = None,
 ) -> tuple:
     """
     Validate uploaded file for security.
