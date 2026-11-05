@@ -66,15 +66,15 @@ echo "BASE  | en verde"
 # --- Cancelar (C2)
 sabotaje $M "cancelar no llama a Mercado Pago" \
   "FAILED $T::test_cancelar_cancela_la_suscripcion_en_mp_y_sigue_hasta_el_fin" \
-  "            await run_in_threadpool(_cancelar_suscripcion_mp, db_user.mp_preapproval_id)" "            pass"
+  "            await run_in_threadpool(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id)" "            pass"
 sabotaje $M "si Mercado Pago falla, se cancela igual en CDI" \
   "FAILED $T::test_si_mp_no_cancela_no_se_cancela_a_medias" \
   "en MP: {e}\")
             raise HTTPException(status_code=503, detail=no_se_pudo)" "en MP: {e}\")"
 sabotaje $M "sin token, se cancela igual en CDI" \
   "FAILED $T::test_sin_token_no_cancela_una_suscripcion_a_medias" \
-  "        if not billing_service.is_configured():
-            raise HTTPException(status_code=503, detail=no_se_pudo)" ""
+  "    if con_sid and not billing_service.is_configured():
+        raise HTTPException(status_code=503, detail=no_se_pudo)" ""
 sabotaje $M "si el PUT falla no se pregunta el estado" \
   "FAILED $T::test_si_mp_ya_la_tenia_cancelada_cancelar_sigue" \
   "    except _SuscripcionMPError:
@@ -84,9 +84,9 @@ sabotaje $M "si el PUT falla no se pregunta el estado" \
     if _leer_suscripcion_mp(sid)"
 sabotaje $M "cancelar sin suscripción llama a Mercado Pago" \
   "FAILED $T::test_cancelar_sin_suscripcion_no_llama_a_mp" \
-  "    if db_user.mp_preapproval_id:
-        no_se_pudo" "    if True:
-        no_se_pudo"
+  "    for cuenta in con_sid:
+        try:" "    for cuenta in con_sid or [db_user]:
+        try:"
 sabotaje $B "la cancelada no sigue hasta el fin del período" \
   "FAILED $T2::test_la_cancelada_genera_hasta_el_fin_del_periodo" \
   "    return fin > (ahora or datetime.now(timezone.utc))" "    return False"
@@ -94,12 +94,12 @@ sabotaje $B "la cancelada no sigue hasta el fin del período" \
 # --- Reactivar pagando (C8, D9, D7.3)
 sabotaje $M "reactivar una prueba la deja activa" \
   "FAILED $T::test_cancelar_y_reactivar_una_prueba_no_la_activa" \
-  "    db_user.billing_status = \"trial\"
-    await db.commit()" "    db_user.billing_status = \"active\"
+  "    entidad.billing_status = \"trial\"
+    await db.commit()" "    entidad.billing_status = \"active\"
     await db.commit()"
 sabotaje $M "reactivar lo pagado no pasa por el checkout" \
   "FAILED $T::test_reactivar_lo_pagado_lleva_al_checkout_y_dice_que_cobra_ahora" \
-  "    if await _pago_un_plan_mp(db, db_user):" "    if False:"
+  "    if await _pago_un_plan_mp(db, entidad, f\"org:{entidad.id}\" if es_org else db_user.username):" "    if False:"
 
 # --- Una sola suscripción (C4, D7.2)
 sabotaje $M "sin el 409 con una suscripción vigente" \
@@ -130,11 +130,34 @@ sabotaje $M "un estado desconocido de Mercado Pago se acepta" \
 # --- Una sola suscripción por organización
 sabotaje $M "el checkout no mira las suscripciones de los otros miembros" \
   "FAILED $T::test_otro_miembro_no_abre_una_segunda_suscripcion_de_la_org[pending]" \
-  "    cuentas = [db_user] + [u for u in filas if u is not db_user and org_id and u.organization_id == org_id]" \
-  "    cuentas = [db_user]"
+  "(u is db_user or u.organization_id == org_id)]" "u is db_user]"
 sabotaje $M "el 409 de la autorizada de otro miembro no dice de quién es" \
   "FAILED $T::test_otro_miembro_no_abre_una_segunda_suscripcion_de_la_org[autorizada_vencida]" \
   "        if cuenta is not db_user:" "        if False:"
+sabotaje $M "la suscripción de un miembro no le cobra a la org" \
+  "FAILED $T::test_otro_miembro_no_abre_una_segunda_suscripcion_de_la_org[pending]" \
+  "create_checkout(db_user, plan_id, org_id=org_id)" "create_checkout(db_user, plan_id, org_id=None)"
+sabotaje $M "si el PUT contesta sin cancelar, se da por cancelada" \
+  "FAILED $T::test_si_mp_no_cancela_no_se_cancela_a_medias[contesta_sin_cancelar]" \
+  "{\"status\": \"cancelled\"}) == \"cancelled\":" "{\"status\": \"cancelled\"}):"
+
+# --- Cancelar y reactivar en una organización
+sabotaje $M "en una org, cancelar cambia al usuario y no a la org" \
+  "FAILED $T::test_en_una_org_cancelar_cancela_la_suscripcion_y_sigue_hasta_el_fin" \
+  "    entidad = org or db_user" "    entidad = db_user"
+sabotaje $M "en una org, cualquier miembro cancela el plan" \
+  "FAILED $T::test_en_una_org_un_miembro_que_no_la_abrio_no_la_cancela" \
+  "    if org and db_user.username != org.owner_username and db_user not in con_sid:" "    if False:"
+sabotaje $M "en una org, reactivar mira al usuario y no a la org" \
+  "FAILED $T::test_en_una_org_reactivar_lo_pagado_lleva_al_checkout" \
+  "    entidad, es_org = await _get_billing_entity(db, db_user)
+
+    if entidad.billing_status != \"canceled\":" "    entidad, es_org = db_user, False
+
+    if entidad.billing_status != \"canceled\":"
+sabotaje $M "se saca del estudio a quien abrió la suscripción" \
+  "FAILED $T::test_no_se_saca_del_estudio_a_quien_abrio_la_suscripcion" \
+  "    if member.mp_preapproval_id:" "    if False:"
 
 # --- Un pago no pierde días (D7.1)
 sabotaje $M "el pago suma desde el fin sólo si está activa" \
@@ -194,8 +217,9 @@ else
   echo "BASE  | los cruces en Postgres, en verde"
   sabotaje $M "dos miembros pagan a la vez sin bloquear la organización" \
     "FALLA | dos miembros pagan a la vez: queda una sola suscripción viva en Mercado Pago" \
-    "        await db.execute(select(Organization.id).where(Organization.id == org_id).with_for_update())" \
-    "        await db.execute(select(Organization.id).where(Organization.id == org_id))"
+    "            .with_for_update().execution_options(populate_existing=True)
+        )).scalars().first()" "            .execution_options(populate_existing=True)
+        )).scalars().first()"
   sabotaje $M "el checkout bloquea la organización antes que a los miembros" \
     "FALLA | un miembro genera mientras otro paga: nadie queda cortado por deadlock" \
     "    nombres = {username, *((await db.execute(otros_con_sid)).scalars().all() if org_previa else ())}" \

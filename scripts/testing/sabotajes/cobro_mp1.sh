@@ -493,24 +493,24 @@ sabotaje $M "g: un id largo de la exportación no se reconoce" \
 # C y E: cancelar desde past_due y reactivar una prueba con recarga.
 T=tests/test_cobro_mp1_cde.py
 sabotaje $M "C: past_due no puede cancelar" \
-  '    if db_user.billing_status not in ("trial", "active", "past_due") and not db_user.mp_preapproval_id:' \
-  '    if db_user.billing_status not in ("trial", "active") and not db_user.mp_preapproval_id:' \
+  '    if entidad.billing_status not in ("trial", "active", "past_due") and not con_sid:' \
+  '    if entidad.billing_status not in ("trial", "active") and not con_sid:' \
   "past_due no se puede cancelar"
 sabotaje $M "C: cancelar desde past_due deja los días que quedaban" \
-  '        db_user.trial_ends_at = ahora' \
+  '        entidad.trial_ends_at = ahora' \
   '        pass' \
   "cancelar desde past_due da acceso"
 sabotaje $M "C: sólo past_due pierde los días al cancelar" \
-  '    corta = billing_service.cancelar_corta_acceso(db_user, ahora)' \
-  '    corta = db_user.billing_status == "past_due"' \
+  '    corta = billing_service.cancelar_corta_acceso(entidad, ahora)' \
+  '    corta = entidad.billing_status == "past_due"' \
   "AssertionError: cancelar dejó otro acceso (corta=True)"
 sabotaje $M "C: cancelar promete servicio hasta una fecha sin acceso" \
-  '    hasta = None if corta else db_user.trial_ends_at' \
-  '    hasta = db_user.trial_ends_at' \
+  '    hasta = None if corta else entidad.trial_ends_at' \
+  '    hasta = entidad.trial_ends_at' \
   "FAILED tests/test_cobro_mp1_cde.py::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[renovacion_tardia]"
 sabotaje $M "E: decide payment_provider aunque haya pagos registrados" \
-  $'    if not tipos:\n        return db_user.payment_provider == "mercadopago"\n' \
-  $'    return db_user.payment_provider == "mercadopago"\n' \
+  $'    if not tipos:\n        return entidad.payment_provider == "mercadopago"\n' \
+  $'    return entidad.payment_provider == "mercadopago"\n' \
   "una prueba con recarga no vuelve a la prueba"
 sabotaje $M "E: la recarga cuenta como plan pagado" \
   '    return any(tipo != "topup" for tipo in tipos)' \
@@ -524,7 +524,7 @@ sabotaje $M "E: un pago rechazado cuenta como plan" \
 # payment_provider.
 sabotaje $M "E: un rechazo saca la decisión de payment_provider" \
   $'               PagoMercadoPagoAplicado.estado == "aplicado")\n    )).scalars().all()\n    if not tipos:' \
-  $'               PagoMercadoPagoAplicado.estado == "aplicado")\n    )).scalars().all()\n    if not tipos and not (await db.execute(select(PagoMercadoPagoAplicado.payment_id).where(PagoMercadoPagoAplicado.cuenta == db_user.username))).first():' \
+  $'               PagoMercadoPagoAplicado.estado == "aplicado")\n    )).scalars().all()\n    if not tipos and not (await db.execute(select(PagoMercadoPagoAplicado.payment_id).where(PagoMercadoPagoAplicado.cuenta == cuenta_ref))).first():' \
   "una cuenta pagada volvió como prueba"
 
 # Con una suscripción abierta se cancela desde cualquier estado.
@@ -610,12 +610,12 @@ if ! correr >/dev/null; then
 else
   echo "BASE  | la carrera de D en Postgres, en verde"
   sabotaje $M "D: el checkout no bloquea la cuenta" \
-    '.order_by(User.username).with_for_update()' \
+    $'.order_by(User.username)\n        .with_for_update()' \
     '.order_by(User.username)' \
     "FALLA | sin suscripción anterior: queda una sola suscripción viva en Mercado Pago"
   sabotaje $M "D: cancelar no espera al checkout en curso" \
-    '    result = await db.execute(select(User).where(User.username == user["username"]).with_for_update())' \
-    '    result = await db.execute(select(User).where(User.username == user["username"]))' \
+    '    db_user, org, con_sid = await _cuenta_con_suscripciones(db, user["username"])' \
+    '    db_user = (await db.execute(select(User).where(User.username == user["username"]))).scalars().first(); org = None; con_sid = [db_user] if db_user.mp_preapproval_id else []' \
     "FALLA | cancelar durante un checkout: no queda ninguna suscripción viva en Mercado Pago"
 fi
 T=scripts/testing/cobro_mp1_postgres.py

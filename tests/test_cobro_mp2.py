@@ -64,6 +64,11 @@ def _sin_conexion(request):
     raise httpx.ConnectError("simulado: sin conexión", request=request)
 
 
+def _contesta_sin_cancelar(request):
+    sid = _RUTA_SUS.fullmatch(str(request.url)).group(1)
+    return httpx.Response(200, json={"id": sid, "status": SUS[sid]})
+
+
 class _Creador:
     def __init__(self, tipo):
         self.tipo = tipo
@@ -170,7 +175,8 @@ def test_cancelar_cancela_la_suscripcion_en_mp_y_sigue_hasta_el_fin(client):
     assert r.json()["service_until"]
 
 
-@pytest.mark.parametrize("responder", [_contesta_500, _sin_conexion], ids=["http_500", "sin_conexion"])
+@pytest.mark.parametrize("responder", [_contesta_500, _sin_conexion, _contesta_sin_cancelar],
+                         ids=["http_500", "sin_conexion", "contesta_sin_cancelar"])
 def test_si_mp_no_cancela_no_se_cancela_a_medias(client, responder):
     usuario, sid = _suscripto(client, "mp2_canfalla")
     FALLA["PUT"] = responder
@@ -436,5 +442,70 @@ def test_otro_miembro_no_abre_una_segunda_suscripcion_de_la_org(client, estado_m
         assert primero in r.json()["detail"], "el 409 dice quién la puede cancelar"
     else:
         assert SUS[sid] == "cancelled" and [t for t, _ in CREADAS] == ["preapproval"]
+        assert CREADAS[0][1]["external_reference"] == f"org:{org_id}:premium", "le cobra a la org"
         assert _leer(primero)["mp_preapproval_id"] is None
         assert _leer(segundo)["mp_preapproval_id"] == r.json()["preapproval_id"]
+
+
+def _org_con_suscripcion(client, quien_entra: str):
+    """Org activa: la dueña A y B, que abrió la suscripción; C, un miembro más.
+    La sesión queda en quien_entra («duena», «abrio» o «miembro»): se registra último."""
+    from tests.test_cobro_mp1 import _org
+    nombres = {k: _unique(f"mp2_{k}") for k in ("duena", "abrio", "miembro")}
+    for k in sorted(nombres, key=lambda k: k == quien_entra):
+        _register(client, nombres[k])
+    sid = f"sus-{nombres['abrio']}"
+    SUS[sid] = "authorized"
+    fin = datetime.now(timezone.utc) + timedelta(days=20)
+    # El pago de Mercado Pago se le aplica a la org (webhook, org_id).
+    org_id = _org(nombres["duena"], billing_status="active", plan="premium", trial_ends_at=fin,
+                  payment_provider="mercadopago")
+    for k, u in nombres.items():
+        _set_user(u, organization_id=org_id, billing_status="trial",
+                  trial_ends_at=datetime.now(timezone.utc) + timedelta(days=3))
+    _set_user(nombres["abrio"], mp_preapproval_id=sid)
+    return nombres, sid, org_id, fin
+
+
+@pytest.mark.parametrize("quien", ["duena", "abrio"])
+def test_en_una_org_cancelar_cancela_la_suscripcion_y_sigue_hasta_el_fin(client, quien):
+    from tests.test_cobro_mp1 import _leer_org
+    nombres, sid, org_id, fin = _org_con_suscripcion(client, quien)
+    r = client.post("/api/billing/cancel")
+    assert r.status_code == 200, r.text
+    assert SUS[sid] == "cancelled", "Mercado Pago sigue cobrando"
+    org = _leer_org(org_id)
+    assert org["billing_status"] == "canceled"
+    assert _cerca(_fin(org), fin), "la org pierde días pagados"
+    assert _cerca(_fin({"trial_ends_at": r.json()["service_until"]}), fin), r.json()
+    assert _leer(nombres["abrio"])["mp_preapproval_id"] is None
+    assert client.get("/api/billing/me").json()["billing_status"] == "canceled"
+
+
+def test_en_una_org_un_miembro_que_no_la_abrio_no_la_cancela(client):
+    from tests.test_cobro_mp1 import _leer_org
+    nombres, sid, org_id, _ = _org_con_suscripcion(client, "miembro")
+    r = client.post("/api/billing/cancel")
+    assert r.status_code == 403, r.text
+    assert SUS[sid] == "authorized" and _leer_org(org_id)["billing_status"] == "active"
+    assert _leer(nombres["abrio"])["mp_preapproval_id"] == sid
+
+
+def test_en_una_org_reactivar_lo_pagado_lleva_al_checkout(client):
+    from tests.test_cobro_mp1 import _leer_org
+    nombres, sid, org_id, fin = _org_con_suscripcion(client, "duena")
+    assert client.post("/api/billing/cancel").status_code == 200
+    r = client.post("/api/billing/reactivate")
+    assert r.status_code == 200, r.text
+    assert r.json()["needs_checkout"] is True and r.json()["billing_status"] == "canceled", r.json()
+    assert _leer_org(org_id)["billing_status"] == "canceled"
+
+
+def test_no_se_saca_del_estudio_a_quien_abrio_la_suscripcion(client):
+    nombres, sid, org_id, _ = _org_con_suscripcion(client, "duena")
+    r = client.delete(f"/api/organizations/members/{nombres['abrio']}")
+    assert r.status_code == 409, r.text
+    assert nombres["abrio"] in r.json()["detail"]
+    assert SUS[sid] == "authorized"
+    assert client.post("/api/billing/checkout", json={"plan": "premium"}).status_code == 409
+    assert CREADAS == []
