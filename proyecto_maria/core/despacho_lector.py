@@ -613,14 +613,19 @@ def validar_pdf(data: bytes, limite_cpu_s: float = _MAX_CPU_LECTURA) -> dict:
         return {"error": str(e)}
 
 
+# El vendedor está en las primeras 80 líneas (`detect_vendor_from_text`); un PDF de
+# 1 KB puede dar millones de caracteres de texto, y todos cruzarían a la app.
+_MAX_TEXTO_VENDEDOR = 64 * 1024
+
+
 def texto_plano_del_pdf(data: bytes, limite_cpu_s: float = _MAX_CPU_LECTURA) -> dict:
-    """{"texto": `extraer_texto_pdf_seguro`}, con los topes por flujo del lector."""
+    """{"texto": el principio de `extraer_texto_pdf_seguro`}, con los topes por flujo del lector."""
     from pypdf import apply_configuration
 
     from proyecto_maria.pdf_extractor import extraer_texto_pdf_seguro
 
     with apply_configuration(**_TOPES), _tope_de_cpu(limite_cpu_s):
-        return {"texto": extraer_texto_pdf_seguro(data)}
+        return {"texto": extraer_texto_pdf_seguro(data)[:_MAX_TEXTO_VENDEDOR]}
 
 
 # Lo que puede hacer el proceso aparte, y cómo se lo nombra si se cae.
