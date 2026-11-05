@@ -660,10 +660,12 @@
             return;
         }
 
+        // Una carga nueva reemplaza CDI.state: la respuesta tardía se anota en la suya.
+        const carga = CDI.state;
         if (CDI.estudios) await CDI.estudios.listo();   // ESTUDIO-1
         const body = buildMariaRequest();
         // Regenerar la misma operación no la cuenta otra vez: el servidor la reconoce por su id.
-        body.operacion_id = (CDI.state && CDI.state.operacionId) || '';
+        body.operacion_id = carga.operacionId || '';
         try {
             const startedAt = Date.now();
             const res = await CDI.api('/generate_maria', {
@@ -704,7 +706,7 @@
                 const texto = (detail && Array.isArray(detail.errors)) ? detail.errors.join(' ') : detail;
                 throw new Error(texto || 'No se pudo generar el archivo');
             }
-            CDI.state.operacionId = data.operacion_id || '';
+            carga.operacionId = data.operacion_id || '';
             lastMaria = {
                 filename: data.filename,
                 download_url: data.download_url,
@@ -718,7 +720,7 @@
             });
             renderReady();
             // Best-effort: guardar en historial del cliente activo (si hay)
-            saveOperationToHistory(items, data).catch(err => {
+            saveOperationToHistory(items, data, carga).catch(err => {
                 console.warn('[history] no se pudo guardar operacion', err);
             });
             // Best-effort: aprender productos en catalogo del proveedor
@@ -1141,8 +1143,9 @@
         CDI.track && CDI.track('op_orphan_resolved', { via: via });
     }
 
-    async function saveOperationToHistory(items, mariaData) {
-        const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
+    async function saveOperationToHistory(items, mariaData, carga) {
+        carga = carga || (CDI.state = CDI.state || {});
+        const cliente = carga.clienteActivo || null;
         if (!cliente || !cliente.id) {
             console.warn('[history] no hay cliente activo, no se guarda al historial');
             return { ok: false, reason: 'sin_cliente' };
@@ -1150,17 +1153,17 @@
         const opCode = (mariaData && mariaData.filename) || null;
         // Idempotencia: si ya guardamos esta misma operación para este mismo
         // cliente, no la re-posteamos (cubre re-entry a Listo, F5 suave, etc.).
-        const savedFor = (CDI.state && CDI.state.operationSavedFor) || null;
+        const savedFor = carga.operationSavedFor || null;
         if (savedFor && savedFor.cliente_id === cliente.id && savedFor.op_code === opCode) {
             return { ok: true, reason: 'ya_guardada' };
         }
         const stats = (lastValidation && lastValidation.estadisticas) || {};
-        const op = (CDI.state && CDI.state.operacion) || {};
+        const op = carga.operacion || {};
         const total_valor = Number(stats.total_valor_usd || 0);
         const total_peso = Number(stats.total_peso_kg || 0);
         const body = {
             operation_id: opCode,
-            operacion_id: (CDI.state && CDI.state.operacionId) || '',
+            operacion_id: carga.operacionId || '',
             source: 'pdf_v2',
             currency: (op.moneda || 'USD').toString().toUpperCase(),
             comprador_domicilio: op.comprador_domicilio || '',
@@ -1198,10 +1201,9 @@
             );
             const data = await res.json().catch(() => ({}));
             if (res.ok && data && data.success) {
-                CDI.state = CDI.state || {};
                 // Guardar antes de generar crea la operación: generar después la completa, no cuenta otra.
-                CDI.state.operacionId = data.operation_id || '';
-                CDI.state.operationSavedFor = { cliente_id: cliente.id, op_code: opCode };
+                carga.operacionId = data.operation_id || '';
+                carga.operationSavedFor = { cliente_id: cliente.id, op_code: opCode };
                 CDI.track('operation_saved_to_history', {
                     cliente_id: cliente.id,
                     items: items.length

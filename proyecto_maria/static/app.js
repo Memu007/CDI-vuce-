@@ -5,6 +5,9 @@ let itemCounter = 0;
 let lastUploadTimestamp = 0;
 // El servidor reconoce la operación por este id: regenerar o guardar la misma no cuenta otra.
 let operacionIdActual = '';
+// Una respuesta que llega después de empezar otra carga no le anota su id a ésa.
+let cargaActual = 0;
+function nuevaCarga() { operacionIdActual = ''; cargaActual++; }
 const UPLOAD_COOLDOWN_MS = 5000; // 5 segundos entre uploads
 let uploadCooldownTimer = null;
 
@@ -1345,7 +1348,7 @@ function hideLoading() {
 
 // === NUEVA FUNCIONALIDAD: MOSTRAR AGRUPACIÓN ===
 function showGrouping(items, sourceType) {
-    operacionIdActual = '';
+    nuevaCarga();
     
     // Ocultar formularios principales
     operationForm.classList.add('hidden');
@@ -3375,6 +3378,7 @@ async function generateMariaTxt() {
             };
         }
 
+        const carga = cargaActual;
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -3387,8 +3391,8 @@ async function generateMariaTxt() {
             throw new Error(data.detail?.errors?.join(', ') || data.detail || 'Error generando MARIA');
         }
 
-        operacionIdActual = data.operacion_id || '';
-        await saveOperationToHistory(items);
+        if (carga === cargaActual) operacionIdActual = data.operacion_id || '';
+        await saveOperationToHistory(items, data.operacion_id || '', carga);
 
         // MARIA-4: lo que el sistema declaró por defecto y los avisos del
         // generador se muestran antes de pegar el TXT en el Kit.
@@ -3446,7 +3450,7 @@ async function generateMariaTxt() {
 }
 
 function cancelGrouping() {
-    operacionIdActual = '';
+    nuevaCarga();
     // Volver a la interfaz principal
     document.getElementById('groupingSection').classList.add('hidden');
 
@@ -3727,7 +3731,7 @@ async function refreshMappingStatusHint(){
     } catch(_){ }
 }
 
-async function saveOperationToHistory(items) {
+async function saveOperationToHistory(items, operacionId = operacionIdActual, carga = cargaActual) {
     
     // Guardar siempre que hay cliente seleccionado (toggle es opcional)
     if (!clientSelect || !clientSelect.value) {
@@ -3745,10 +3749,13 @@ async function saveOperationToHistory(items) {
         const res = await fetch(`/api/clientes/${clientSelect.value}/operaciones`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ operacion_id: operacionIdActual, resumen, items })
+            body: JSON.stringify({ operacion_id: operacionId, resumen, items })
         });
         // Guardar antes de generar crea la operación: generar después la completa, no cuenta otra.
-        if (res.ok) operacionIdActual = (await res.json()).operation_id || operacionIdActual;
+        if (res.ok) {
+            const id = (await res.json()).operation_id || operacionId;
+            if (carga === cargaActual) operacionIdActual = id;
+        }
     } catch (e) {
         console.error('📊 Error saving operation:', e);
     }

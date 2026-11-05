@@ -4776,21 +4776,16 @@ async def generate_maria_endpoint(
         if not safe_id:
             safe_id = f"OP_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
-        # Con el tope lleno, 402 sin escribir el archivo. Va en la carpeta propia
-        # del usuario, no suelta en DATA_DIR: el nombre sale del nro de factura.
-        operacion_id, filename = await _contar_maria(
-            db, user["username"], request.operacion_id, txt_content,
-            len(request.items or []), f"MARIA_{safe_id}")
-        filepath = os.path.join(_user_downloads_dir(user["username"]), filename)
-
-        # newline="": el archivo lleva los CRLF tal cual, sin traducir (MARIA-7).
-        with open(filepath, 'w', encoding='utf-8', newline='') as f:
-            f.write(txt_content)
-        
         # Campos que el sistema declaró sin preguntar. No bloquean, pero el
         # despachante los tiene que ver antes de pegar el TXT en el Kit: un
         # valor asumido en silencio se descubre recién en la aduana.
         supuestos = _supuestos_maria(request, items, gastos)
+
+        # Con el tope lleno, 402 sin escribir el archivo. Va en la carpeta propia
+        # del usuario, no suelta en DATA_DIR: el nombre sale del nro de factura.
+        operacion_id, filename = await _contar_maria(
+            db, user["username"], request.operacion_id, txt_content, txt_content,
+            len(request.items or []), f"MARIA_{safe_id}")
 
         # Generó: el estudio, o el CUIT del perfil, pasa a ser lo último
         # usado (se preselecciona). Si no se puede anotar, el TXT igual se
@@ -4932,12 +4927,8 @@ async def generate_maria_export_endpoint(
         # el nombre de la importación del id «EXPORT_<x>».
         operacion_id, filename = await _contar_maria(
             db, user["username"], request.operacion_id, _FECHA_DE_EMISION.sub(r"\1", txt_content),
-            len(request.items or []), f"MARIA-EXPORT_{safe_id}")
-        filepath = os.path.join(_user_downloads_dir(user["username"]), filename)
+            txt_content, len(request.items or []), f"MARIA-EXPORT_{safe_id}")
 
-        with open(filepath, 'w', encoding='utf-8') as f:
-            f.write(txt_content)
-        
         return {
             "success": True,
             "tipo": "exportacion",
@@ -5901,7 +5892,8 @@ _FECHA_DE_EMISION = re.compile(r"(CCPL=FECHAEMISIONFACT\r?\n)MCPL=[^\r\n]*")
 
 
 async def _operacion_del_usuario(db: AsyncSession, username: str, operacion_id: str):
-    if not operacion_id:
+    # Un id que Postgres no puede comparar no es de ninguna operación.
+    if not operacion_id or _NO_GUARDABLE_EN_PG.search(operacion_id):
         return None
     result = await db.execute(sa_select(OperationModel).where(
         OperationModel.id == operacion_id,
@@ -5920,10 +5912,10 @@ def _del_periodo(operacion, cuenta) -> bool:
             >= inicio.replace(tzinfo=inicio.tzinfo or timezone.utc, microsecond=0))
 
 
-async def _contar_maria(db: AsyncSession, username: str, operacion_id: str,
-                        contenido: str, total_items: int, nombre: str) -> tuple[str, str]:
-    """Devuelve (id de la operación, archivo). Un contenido ya visto en la operación o uno de
-    sus primeros diez no cuenta; si no, es otra operación y se cuenta antes de escribir nada."""
+async def _contar_maria(db: AsyncSession, username: str, operacion_id: str, contenido: str,
+                        txt: str, total_items: int, nombre: str) -> tuple[str, str]:
+    """Cuenta, escribe el TXT y devuelve (id de la operación, archivo). Un contenido ya visto en
+    la operación o uno de sus primeros diez no cuenta; si no, es otra operación y se cuenta."""
     import hashlib
 
     huella = hashlib.sha256(contenido.encode("utf-8")).hexdigest()
@@ -5938,7 +5930,7 @@ async def _contar_maria(db: AsyncSession, username: str, operacion_id: str,
         if huella not in huellas:
             operacion.extra = {**(operacion.extra or {}), "maria_hashes": huellas + [huella]}
         operacion.generated_file = f"{nombre}_{operacion.id[-8:]}.TXT"
-        await db.commit()
+        await _escribir_y_confirmar(db, username, operacion.generated_file, txt)
         return operacion.id, operacion.generated_file
 
     await _contar_en_la_cuenta(db, cuenta[1])
@@ -5953,8 +5945,24 @@ async def _contar_maria(db: AsyncSession, username: str, operacion_id: str,
         extra={"maria_hashes": [huella]},
     )
     db.add(operacion)
-    await db.commit()
+    await _escribir_y_confirmar(db, username, operacion.generated_file, txt)
     return nuevo_id, operacion.generated_file
+
+
+async def _escribir_y_confirmar(db: AsyncSession, username: str, archivo: str, txt: str):
+    """El conteo se confirma sólo con el archivo escrito: lo que no se entrega no queda cobrado."""
+    ruta = os.path.join(_user_downloads_dir(username), archivo)
+    nuevo = not os.path.exists(ruta)
+    try:
+        # newline="": el archivo lleva los CRLF tal cual, sin traducir.
+        with open(ruta, "w", encoding="utf-8", newline="") as f:
+            f.write(txt)
+        await db.commit()
+    except BaseException:
+        await db.rollback()
+        if nuevo and os.path.exists(ruta):
+            os.remove(ruta)
+        raise
 
 
 async def _get_owned_client(
@@ -7273,6 +7281,8 @@ async def delete_cliente(
     client = await _get_owned_client(db, client_id, username)
 
     try:
+        # Reescribe extra de sus operaciones: sin el candado de generar, pisaría una huella nueva.
+        await _cuenta_bloqueada(db, username)
         op_rows = await db.execute(
             sa_select(OperationModel).where(
                 OperationModel.client_id == client_id,
