@@ -10895,6 +10895,48 @@ async def billing_topup(
         raise HTTPException(status_code=400, detail=str(e))
 
 
+async def _cerrar_suscripcion_vieja(db: AsyncSession, db_user, cuenta) -> None:
+    """Antes de crear otra: la autorizada no se cancela (puede ser un pago cuyo
+    aviso no llegó); las demás sí. Si no se puede leer o cancelar, 503."""
+    sid_viejo = cuenta.mp_preapproval_id
+    username = db_user.username
+    no_disponible = "No pudimos confirmar tu suscripción actual con Mercado Pago. Probá de nuevo en unos minutos."
+    try:
+        estado_mp = await run_in_threadpool(_leer_suscripcion_mp, sid_viejo)
+    except _SuscripcionMPError as e:
+        print(f"⚠️ Checkout de {username}: no se pudo leer la suscripción en MP: {e}")
+        raise HTTPException(status_code=503, detail=no_disponible)
+    if estado_mp == "authorized":
+        if cuenta is not db_user:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Tu organización ya tiene una suscripción en Mercado Pago, de {cuenta.username}. "
+                       "Se renueva sola; para cambiar la tarjeta, la tiene que cancelar quien la abrió.",
+            )
+        entidad, _ = await _get_billing_entity(db, db_user)
+        fin = entidad.trial_ends_at
+        if fin is not None and fin.tzinfo is None:
+            fin = fin.replace(tzinfo=timezone.utc)
+        if entidad.billing_status in ("trial", "active") and fin and fin > datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=409,
+                detail="Ya tenés una suscripción activa en Mercado Pago; se renueva sola al fin del período.",
+            )
+        raise HTTPException(
+            status_code=409,
+            detail="Tu suscripción en Mercado Pago sigue activa. Si acabás de pagar, esperá unos minutos; "
+                   "si querés cambiar la tarjeta, cancelá el plan primero.",
+        )
+    if estado_mp != "cancelled":
+        try:
+            await run_in_threadpool(_cancelar_suscripcion_mp, sid_viejo)
+        except _SuscripcionMPError as e:
+            print(f"⚠️ Checkout de {username}: no se pudo cancelar la suscripción vieja en MP: {e}")
+            raise HTTPException(status_code=503, detail=no_disponible)
+    # Sin commit todavía: soltaría el bloqueo antes de crear la nueva.
+    cuenta.mp_preapproval_id = None
+
+
 @app.post("/api/billing/checkout")
 async def billing_checkout(
     request: PlanCheckoutRequest,
@@ -10914,12 +10956,26 @@ async def billing_checkout(
 
     # La fila queda bloqueada hasta guardar la suscripción nueva: un segundo
     # checkout a la vez espera y ve la del primero (COBRO-MP-1 D).
-    result = await db.execute(select(User).where(User.username == username).with_for_update())
-    db_user = result.scalars().first()
+    # En una organización también los miembros con suscripción y después la org,
+    # en el orden de _cuenta_bloqueada: usuarios (por nombre) y org.
+    org_previa = (await db.execute(select(User.organization_id).where(User.username == username))).scalar()
+    otros_con_sid = select(User.username).where(
+        User.organization_id == org_previa, User.username != username, User.mp_preapproval_id.isnot(None))
+    nombres = {username, *((await db.execute(otros_con_sid)).scalars().all() if org_previa else ())}
+    filas = (await db.execute(
+        select(User).where(User.username.in_(nombres)).order_by(User.username).with_for_update()
+    )).scalars().all()
+    db_user = next((u for u in filas if u.username == username), None)
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     org_id = db_user.organization_id or None
+    if org_id != (org_previa or None):
+        raise HTTPException(status_code=409, detail="Tu cuenta cambió de organización. Probá de nuevo.")
+    if org_id:
+        await db.execute(select(Organization.id).where(Organization.id == org_id).with_for_update())
+        if not set((await db.execute(otros_con_sid)).scalars().all()) <= nombres:
+            raise HTTPException(status_code=409, detail="Otro miembro de tu organización está pagando. Probá de nuevo en unos minutos.")
 
     # Modo demo cuando no hay credenciales, sólo en desarrollo y pruebas (D7.4)
     if not billing_service.is_configured():
@@ -10941,39 +10997,12 @@ async def billing_checkout(
             "message": "Modo demo - MP_ACCESS_TOKEN no configurado",
         }
 
-    # Una sola suscripción. La autorizada no se cancela acá (puede ser un pago
-    # cuyo aviso no llegó); las demás sí. Si no se puede leer o cancelar, nada.
-    sid_viejo = db_user.mp_preapproval_id
-    if sid_viejo:
-        no_disponible = "No pudimos confirmar tu suscripción actual con Mercado Pago. Probá de nuevo en unos minutos."
-        try:
-            estado_mp = await run_in_threadpool(_leer_suscripcion_mp, sid_viejo)
-        except _SuscripcionMPError as e:
-            print(f"⚠️ Checkout de {username}: no se pudo leer la suscripción en MP: {e}")
-            raise HTTPException(status_code=503, detail=no_disponible)
-        if estado_mp == "authorized":
-            entidad, _ = await _get_billing_entity(db, db_user)
-            fin = entidad.trial_ends_at
-            if fin is not None and fin.tzinfo is None:
-                fin = fin.replace(tzinfo=timezone.utc)
-            if entidad.billing_status in ("trial", "active") and fin and fin > datetime.now(timezone.utc):
-                raise HTTPException(
-                    status_code=409,
-                    detail="Ya tenés una suscripción activa en Mercado Pago; se renueva sola al fin del período.",
-                )
-            raise HTTPException(
-                status_code=409,
-                detail="Tu suscripción en Mercado Pago sigue activa. Si acabás de pagar, esperá unos minutos; "
-                       "si querés cambiar la tarjeta, cancelá el plan primero.",
-            )
-        if estado_mp != "cancelled":
-            try:
-                await run_in_threadpool(_cancelar_suscripcion_mp, sid_viejo)
-            except _SuscripcionMPError as e:
-                print(f"⚠️ Checkout de {username}: no se pudo cancelar la suscripción vieja en MP: {e}")
-                raise HTTPException(status_code=503, detail=no_disponible)
-        # Sin commit todavía: soltaría el bloqueo antes de crear la nueva.
-        db_user.mp_preapproval_id = None
+    # Una sola suscripción por cuenta que paga: en una organización cuentan
+    # también las que abrieron los otros miembros.
+    cuentas = [db_user] + [u for u in filas if u is not db_user and org_id and u.organization_id == org_id]
+    for cuenta in cuentas:
+        if cuenta.mp_preapproval_id:
+            await _cerrar_suscripcion_vieja(db, db_user, cuenta)
 
     try:
         checkout = billing_service.create_checkout(db_user, plan_id, org_id=org_id)

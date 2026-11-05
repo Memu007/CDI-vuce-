@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: un miembro de una organización no abre una segunda suscripción (COBRO-MP-2)
+
+- **fix(cobro):** el checkout mira también las suscripciones que abrieron los otros miembros de la organización: si una está autorizada da 409 y dice quién la abrió; si está pendiente o pausada, la cancela antes de crear la nueva. Dos miembros pagando a la vez no dejan dos suscripciones vivas.
+
 ## 2026-11-05 · fix: guardar la misma factura en otro cliente no le saca la operación al primero (COBRO-CORTE-1)
 
 - **fix(cobro):** guardar un MARIA ya generado completa la operación sólo si no tiene cliente o es del mismo; si es de otro cliente, se cuenta y se crea una nueva. El aviso de una cuenta cancelada que todavía tiene período y llegó al tope se titula «Llegaste al tope de tu plan».
