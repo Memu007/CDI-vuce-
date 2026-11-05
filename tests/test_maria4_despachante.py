@@ -84,15 +84,6 @@ def test_supuestos_leen_el_origen_como_el_generador():
     assert "estado de la mercadería: en el/los ítem(s) 1" in texto
 
 
-def test_la_pantalla_vieja_muestra_los_avisos_de_generate_maria():
-    """Devolución de la PM: la v1 muestra warnings y supuestos de la respuesta."""
-    import pathlib
-    fuente = (pathlib.Path(__file__).resolve().parents[1] / "proyecto_maria" / "static" / "app.js").read_text(encoding="utf-8")
-    tramo = fuente[fuente.index("endpoint = '/generate_maria';"):]
-    tramo = tramo[:tramo.index("window.location.href = data.download_url")]
-    assert "data.supuestos" in tramo and "data.warnings" in tramo
-
-
 def test_estado_distinto_en_cada_producto():
     items = [dict(ITEM_BASE, estado=2), dict(ITEM_BASE, estado=6)]
     assert _cartuso(_gen(items)) == ["2", "6"]

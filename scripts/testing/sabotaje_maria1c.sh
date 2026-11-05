@@ -74,9 +74,5 @@ caso "marca_lo_ausente" "FAILED $T::test_lo_que_no_estaba_o_se_leyo_no_se_marca[
 reemplazar $F "                        operacion_data['campos_sin_leer'] = _campos_sin_leer(operacion, decimal)" "                        operacion_data['campos_sin_leer'] = []"
 caso "directo_sin_marca" "FAILED $T::test_flete_y_seguro_ilegibles_se_marcan[pdf_directo]"
 
-# 4. la pantalla vieja vuelve a reponer cantidad 1
-reemplazar proyecto_maria/static/app.js "data-field=\"cantidad\"]')?.value) || 0;" "data-field=\"cantidad\"]')?.value) || 1;"
-caso "vieja_cantidad_1" "FAILED $T::test_la_pantalla_vieja_no_repone_cantidad_ni_origen"
-
 if [ "$FALLAS" -ne 0 ]; then echo "SABOTAJES CON FALLA: $FALLAS"; exit 1; fi
-echo "OK: los 4 sabotajes dan rojo por la razón esperada"
+echo "OK: los 3 sabotajes dan rojo por la razón esperada"

@@ -248,14 +248,18 @@ class TestAutoNCMButtonRemovalValidation:
         """El JS real no contiene funciones de Auto NCM.
 
         VUCE-3: la ruta original (`/Users/Emi/CDI/static/script.js`) era de la
-        máquina de un desarrollador. Se apunta al JS real: `static/app.js`. El flag
-        de settings `autoNcmEnabled` no cuenta como función y no matchea estos
-        patrones (que exigen definición o llamada con paréntesis).
+        máquina de un desarrollador. Se apunta al JS real: todo `static/v2/`
+        (la v1, `static/app.js`, se retiró el 2026-11-05).
         """
         repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        js_path = os.path.join(repo, "proyecto_maria", "static", "app.js")
-        with open(js_path, encoding="utf-8") as f:
-            js_content = f.read()
+        js_dir = os.path.join(repo, "proyecto_maria", "static", "v2")
+        js_content = ""
+        for root, _dirs, files in os.walk(js_dir):
+            for name in files:
+                if name.endswith(".js"):
+                    with open(os.path.join(root, name), encoding="utf-8") as f:
+                        js_content += f.read() + "\n"
+        assert js_content, "no se encontró JS en static/v2"
 
         forbidden_function_patterns = [
             'function.*autoNcm',
