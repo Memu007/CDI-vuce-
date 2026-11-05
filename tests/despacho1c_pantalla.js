@@ -1,17 +1,20 @@
 // Pantallas reales con un DOM falso y sin red: qué queda a la vista según lo que
-// contesta el servidor al guardar. Uso: node despacho1c_pantalla.js <escenario> <respuesta>
+// contesta el servidor al guardar. Uso: node despacho1c_pantalla.js <escenario> <respuesta> [opciones]
 // respuesta: true|false|null es historial_guardado (null: sin el campo); {"status": N}
-// contesta ese error; "red" es la red caída y 402 el plan vencido (CDI.api lanza).
+// contesta ese error; "red" es la red caída, 402 el plan vencido (CDI.api lanza) y
+// "colgado" no vuelve nunca. opciones: {"catalogo": respuesta del catálogo, "vendedor": nombre}.
 const vm = require('node:vm'), fs = require('node:fs'), path = require('node:path');
 const V2 = path.join(__dirname, '..', 'proyecto_maria', 'static', 'v2');
 const [escenario, flag] = process.argv.slice(2);
 const flagJson = JSON.parse(flag);
+const opciones = JSON.parse(process.argv[4] || '{}');
 const esFalla = flagJson !== null && typeof flagJson !== 'boolean';
 const conFlag = c => (flagJson === null ? c : esFalla ? flagJson : Object.assign({ historial_guardado: flagJson }, c));
 // qué guardados contestan la respuesta pedida; los demás contestan bien
 const DESTINOS = {
-  'confirmar-ncm': ['/api/ncm/guardar-uso'], aprender: ['/productos'],
-  'listo-con-vendedor': ['/operaciones', '/productos'], 'listo-y-cambia': [],
+  'confirmar-ncm': ['/api/ncm/guardar-uso'], 'asignar-ncm': ['/api/ncm/guardar-uso'], aprender: ['/productos'],
+  'listo-con-vendedor': 'catalogo' in opciones ? ['/operaciones'] : ['/operaciones', '/productos'],
+  'listo-y-cambia': [], 'crear-asignar-crear': ['/operaciones'], 'crear-y-otra': [],
 }[escenario] || ['/operaciones'];
 
 class Node {
@@ -32,7 +35,7 @@ class Node {
 }
 
 function armar(fuente, extraCDI) {
-  const nodes = new Map(), handlers = {}, events = {}, toasts = [], llamadas = [], operaciones = [];
+  const nodes = new Map(), handlers = {}, events = {}, toasts = [], llamadas = [], operaciones = [], hints = [];
   let enCurso = 0;
   const node = id => { if (!nodes.has(id)) nodes.set(id, new Node(id)); return nodes.get(id); };
   const respuestas = {
@@ -43,12 +46,14 @@ function armar(fuente, extraCDI) {
     '/api/clientes': { success: true, cliente: { id: 8, nombre: 'Cliente Nuevo Sintético' } },
   };
   for (const d of DESTINOS) respuestas[d] = conFlag(respuestas[d]);
+  if ('catalogo' in opciones) respuestas['/productos'] = opciones.catalogo;
+  let clientesNuevos = 0;
   let cliente = null;
   const CDI = Object.assign({
     state: { items: [], operacion: {} },
     registerScreen: (n, h) => { handlers[n] = h; },
     escapeHtml: v => String(v ?? ''), formatNcm: v => String(v ?? ''), formatMoney: v => String(v),
-    track() {}, goTo() {},
+    track() {}, goTo() {}, hint: clave => hints.push(clave),
     toast: (titulo, detalle, tipo) => toasts.push({ titulo, detalle, tipo }),
     getClienteActivo: () => cliente, setClienteActivo: c => { cliente = c; },
     api: async (url, opciones) => {
@@ -61,7 +66,12 @@ function armar(fuente, extraCDI) {
       }
       enCurso--;
       const clave = Object.keys(respuestas).find(k => url.endsWith(k));
-      const cuerpo = clave ? respuestas[clave] : { success: true };
+      let cuerpo = clave ? respuestas[clave] : { success: true };
+      if (clave === '/api/clientes') {
+        const id = 8 + clientesNuevos++;
+        cuerpo = { success: true, cliente: { id, nombre: 'Cliente Nuevo Sintético' } };
+      }
+      if (cuerpo === 'colgado') return new Promise(() => {});
       if (cuerpo === 'red') throw new TypeError('Failed to fetch');
       if (cuerpo === 402) throw Object.assign(new Error('payment_required'), { motivo: 'Tu plan venció' });
       if (cuerpo.status) return { ok: false, status: cuerpo.status, json: async () => ({ detail: 'falla sintética' }) };
@@ -85,7 +95,7 @@ function armar(fuente, extraCDI) {
   caja.children['[data-client-success-title]'] = [new Node()];
   caja.children['[data-client-success-text]'] = [new Node()];
   for (const fn of events.DOMContentLoaded || []) fn();
-  return { CDI, node, handlers, toasts, llamadas, operaciones, enCurso: () => enCurso, ponerCliente: c => { cliente = c; } };
+  return { CDI, node, handlers, toasts, llamadas, operaciones, hints, enCurso: () => enCurso, ponerCliente: c => { cliente = c; } };
 }
 
 // Sin red real todo sigue en microtareas, y setImmediate corre recién con esa cola vacía:
@@ -99,6 +109,35 @@ async function esperarRed(app, url, veces = 1) {
 }
 
 const ITEM = { descripcion: 'Mesa de madera sintética', cantidad: 1, pieza: '', origen: 'CN', valor_unitario: 1 };
+const click = (app, id) => { for (const fn of app.node(id).listeners.click || []) fn({}); };
+const enter = n => { for (const fn of [...(n.listeners.keydown || [])]) fn({ key: 'Enter', target: n, preventDefault() {} }); };
+
+// Listo sin cliente: el panel de la operación sin cliente ya está a la vista.
+async function listoSinCliente(extraCDI) {
+  const app = armar('finalize.js', extraCDI);
+  app.CDI.state.items = [Object.assign({}, ITEM, { pieza: '9403.60.00.000 A' })];
+  app.handlers.ready.onEnter();
+  await esperarRed(app, '/generate_maria');
+  app.node('orphanCreateNombre').value = 'Cliente Nuevo Sintético';
+  return app;
+}
+
+// Paso de NCM con la posición SIM completa en la fila 0.
+function pasoNcm() {
+  const app = armar('ncm.js');
+  app.ponerCliente({ id: 7, nombre: 'Cliente Sintético' });
+  app.CDI.state.items = [Object.assign({}, ITEM)];
+  const sim = new Node(), dc = new Node(), fila = new Node(), campos = new Node();
+  sim.value = '94036000000'; dc.value = 'A';
+  sim.attrs['data-row'] = '0'; dc.attrs['data-row'] = '0';
+  campos.children['.ncm-input'] = [sim]; campos.children['.sim-dc-input'] = [dc];
+  for (const n of [sim, dc]) n.ancestors = { '.sim-position-fields': campos, tr: fila };
+  const tbody = app.node('ncmTbody');
+  tbody.children['.ncm-input'] = [sim]; tbody.children['.sim-dc-input'] = [dc];
+  app.handlers.ncm.onEnter();
+  if (!(sim.listeners.blur || []).length) throw new Error('la tabla no enganchó el blur');
+  return { app, sim };
+}
 
 const escenarios = {
   // Listo con cliente activo: guarda la operación sola después de generar. La caja
@@ -117,7 +156,7 @@ const escenarios = {
     const app = armar('finalize.js');
     app.ponerCliente({ id: 7, nombre: 'Cliente Sintético' });
     app.CDI.state.items = [Object.assign({}, ITEM, { pieza: '9403.60.00.000 A' })];
-    app.CDI.state.operacion = { vendedor_nombre: 'Proveedor Sintético' };
+    app.CDI.state.operacion = { vendedor_nombre: opciones.vendedor || 'Proveedor Sintético' };
     app.handlers.ready.onEnter();
     await esperarRed(app, '/productos');
     return app;
@@ -150,15 +189,35 @@ const escenarios = {
   },
   // Listo sin cliente: el panel crea uno sin CUIT y, si el guardado falla, se reintenta.
   'crear-reintento': async () => {
-    const app = armar('finalize.js');
-    app.CDI.state.items = [Object.assign({}, ITEM, { pieza: '9403.60.00.000 A' })];
-    app.handlers.ready.onEnter();
-    await esperarRed(app, '/generate_maria');
-    app.node('orphanCreateNombre').value = 'Cliente Nuevo Sintético';
+    const app = await listoSinCliente();
     for (let vez = 1; vez <= 2 && !app.node('readyOrphanPanel').hidden; vez++) {
-      for (const fn of app.node('orphanCreateSaveBtn').listeners.click || []) fn({});
+      click(app, 'orphanCreateSaveBtn');
       await esperarRed(app, '/operaciones', vez);
     }
+    return app;
+  },
+  // Crear A y asignar B fallan al guardar; después se vuelve a tocar crear.
+  'crear-asignar-crear': async () => {
+    const app = await listoSinCliente({
+      openClientePicker: ({ onSelect }) => onSelect({ id: 7, nombre: 'Cliente Sintético' }),
+    });
+    for (const [vez, boton] of [[1, 'orphanCreateSaveBtn'], [2, 'orphanAssignBtn'], [3, 'orphanCreateSaveBtn']]) {
+      click(app, boton);
+      await esperarRed(app, '/operaciones', vez);
+    }
+    return app;
+  },
+  // Crear guarda bien; la operación siguiente, otra vez sin cliente, crea otro.
+  'crear-y-otra': async () => {
+    const app = await listoSinCliente();
+    click(app, 'orphanCreateSaveBtn');
+    await esperarRed(app, '/operaciones');
+    app.ponerCliente(null);
+    app.CDI.state.operationSavedFor = null;
+    app.handlers.ready.onEnter();
+    await esperarRed(app, '/generate_maria', 2);
+    click(app, 'orphanCreateSaveBtn');
+    await esperarRed(app, '/operaciones', 2);
     return app;
   },
   // Listo sin cliente: el panel asigna uno y vuelve a guardar.
@@ -175,20 +234,18 @@ const escenarios = {
   },
   // Paso de NCM: completar la posición SIM y salir del campo la confirma.
   'confirmar-ncm': async () => {
-    const app = armar('ncm.js');
-    app.ponerCliente({ id: 7, nombre: 'Cliente Sintético' });
-    app.CDI.state.items = [Object.assign({}, ITEM)];
-    const sim = new Node(), dc = new Node(), fila = new Node(), campos = new Node();
-    sim.value = '94036000000'; dc.value = 'A';
-    sim.attrs['data-row'] = '0'; dc.attrs['data-row'] = '0';
-    campos.children['.ncm-input'] = [sim]; campos.children['.sim-dc-input'] = [dc];
-    for (const n of [sim, dc]) n.ancestors = { '.sim-position-fields': campos, tr: fila };
-    const tbody = app.node('ncmTbody');
-    tbody.children['.ncm-input'] = [sim]; tbody.children['.sim-dc-input'] = [dc];
-    app.handlers.ncm.onEnter();
-    if (!(sim.listeners.blur || []).length) throw new Error('la tabla no enganchó el blur');
+    const { app, sim } = pasoNcm();
     // render() vuelve a enganchar sobre el mismo nodo falso: se dispara lo que había.
     for (const fn of [...sim.listeners.blur]) fn({ target: sim });
+    await esperarRed(app, '/api/ncm/guardar-uso');
+    return app;
+  },
+  // Paso de NCM: Enter abre el buscador y Enter con la posición escrita la asigna.
+  'asignar-ncm': async () => {
+    const { app, sim } = pasoNcm();
+    enter(sim);
+    app.node('spotSearch').value = '94036000000A';
+    enter(app.node('spotSearch'));
     await esperarRed(app, '/api/ncm/guardar-uso');
     return app;
   },
@@ -201,6 +258,7 @@ escenarios[escenario]().then(app => {
     toasts: app.toasts, panelAbierto: !app.node('readyOrphanPanel').hidden,
     clientesCreados: app.llamadas.filter(u => u.endsWith('/api/clientes')).length,
     operaciones: app.operaciones.map(o => ({ url: o.url, factura: o.resumen.numero_factura })),
+    catalogo: app.llamadas.filter(u => u.includes('/api/catalog/')), hints: app.hints,
     caja: caja.hidden ? null : { titulo: titulo.textContent, texto: texto.textContent },
   }));
 }, err => { console.error(err && err.stack || err); process.exit(2); });
