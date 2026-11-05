@@ -614,7 +614,7 @@ def validar_pdf(data: bytes, limite_cpu_s: float = _MAX_CPU_LECTURA) -> dict:
 
 
 class PdfDemasiadoPesado(Exception):
-    """La lectura pasó del tope de memoria del proceso que lee."""
+    """El proceso que lee pasó del tope de memoria o, al validar, del de CPU."""
 
 
 class LectorOcupado(Exception):
