@@ -79,6 +79,10 @@ sabotaje $N "confirmar la posición no avisa lo que no quedó en la memoria" \
   '            if (res.ok && data.historial_guardado === false && CDI.toast) {' \
   '            if (false) {' \
   "FAILED $T::$A[no-guardado-confirmar-ncm]"
+sabotaje $N "confirmar la posición avisa aunque no llegue el dato" \
+  '            if (res.ok && data.historial_guardado === false && CDI.toast) {' \
+  '            if (res.ok && data.historial_guardado !== true && CDI.toast) {' \
+  "FAILED $T::$A[sin-dato-confirmar-ncm]"
 
 git checkout -q -- proyecto_maria/
 echo "fallas: $FALLAS"

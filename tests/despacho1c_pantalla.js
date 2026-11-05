@@ -1,9 +1,11 @@
 // Pantallas reales con un DOM falso y sin red: qué avisos quedan a la vista
-// cuando el servidor contesta historial_guardado. Uso: node despacho1c_pantalla.js <escenario> <true|false>
+// cuando el servidor contesta historial_guardado. Uso: node despacho1c_pantalla.js <escenario> <true|false|null>
+// null: la respuesta no trae el campo.
 const vm = require('node:vm'), fs = require('node:fs'), path = require('node:path');
 const V2 = path.join(__dirname, '..', 'proyecto_maria', 'static', 'v2');
 const [escenario, flag] = process.argv.slice(2);
-const historialGuardado = flag === 'true';
+const flagJson = JSON.parse(flag);
+const conFlag = c => (flagJson === null ? c : Object.assign({ historial_guardado: flagJson }, c));
 
 class Node {
   constructor(id) {
@@ -27,8 +29,8 @@ function armar(fuente, extraCDI) {
   const node = id => { if (!nodes.has(id)) nodes.set(id, new Node(id)); return nodes.get(id); };
   const respuestas = {
     '/generate_maria': { success: true, filename: 'MARIA_SINTETICA.TXT', content: 'x' },
-    '/operaciones': { success: true, operation_id: 1, historial_guardado: historialGuardado },
-    '/api/ncm/guardar-uso': { success: true, historial_guardado: historialGuardado },
+    '/operaciones': conFlag({ success: true, operation_id: 1 }),
+    '/api/ncm/guardar-uso': conFlag({ success: true }),
   };
   let cliente = null;
   const CDI = Object.assign({

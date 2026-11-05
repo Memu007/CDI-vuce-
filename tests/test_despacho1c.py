@@ -50,7 +50,7 @@ PANTALLA = Path(__file__).with_name("despacho1c_pantalla.js")
 
 
 @pytest.mark.parametrize("escenario", ["listo-con-cliente", "asignar-cliente", "confirmar-ncm"])
-@pytest.mark.parametrize("guardado", [True, False], ids=["guardado", "no-guardado"])
+@pytest.mark.parametrize("guardado", [True, False, None], ids=["guardado", "no-guardado", "sin-dato"])
 def test_lo_que_no_quedo_en_la_memoria_se_avisa(escenario, guardado):
     salida = subprocess.run(["node", str(PANTALLA), escenario, json.dumps(guardado)],
                             capture_output=True, text=True, timeout=60)
@@ -58,7 +58,7 @@ def test_lo_que_no_quedo_en_la_memoria_se_avisa(escenario, guardado):
     toasts = json.loads(salida.stdout)["toasts"]
 
     avisos = [t for t in toasts if t["tipo"] == "warning"]
-    if guardado:
+    if guardado is not False:
         assert avisos == [], toasts
         if escenario == "asignar-cliente":
             assert toasts and toasts[-1]["titulo"] == "Cliente guardado", toasts
