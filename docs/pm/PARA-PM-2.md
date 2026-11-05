@@ -2,322 +2,354 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
+## DESPACHO-1b, devolución v4 sobre `03296d4`: **entregada** en `b5fb03a` (2026-11-05)
 
-## DESPACHO-1b, devolución sobre `1f5480e`: **entregada** en `03296d4` (2026-11-05)
+**Resultado:** si mientras se espera la fila otro pedido le cambia la clave o la borra, ninguna de las cuatro vías pierde el uso ni contesta éxito sin guardarlo. El upsert vuelve a insertar hasta 3 veces; si las 3 fallan, sale un error (500), nunca un 200 mudo. En Postgres 16, con la familia como datos (PUT que cambia la clave y DELETE, por operación, aprender, guardar y guardar-uso), `despacho1b_postgres.py` da «fallas: 8» con el producto de `03296d4` y «fallas: 0» con el de `b5fb03a`. Además, confirmar un NCM devuelve `historial_guardado: false` cuando la base falla o el producto no entra (la descripción crece al normalizarla): antes contestaba sólo `{"success": true}`. `despacho1b.sh` con `PG_DSN`: 136 ROJO, «sabotajes sin rojo: 0», «sin Postgres, no corridos: 0». Suite, con el comando de `ci.yml` y con el mío: «4278 passed» y «4288 passed», sin fallas.
 
-**Resultado:** los 8 puntos están arreglados. Cada uno tiene su rojo antes del arreglo, sobre el producto viejo, y su sabotaje. `despacho1b.sh` da 132 ROJO y «sabotajes sin rojo: 0» sobre `03296d4`. La suite completa da `4284 passed, 336 skipped, 2 xfailed, 94 warnings in 492.06s (0:08:12)`, salida 0. En Postgres 16, dos procesos que guardan y aprenden el mismo producto a la vez dejan una fila con los 16 usos.
+### Decisiones
 
-**Nada para decidir.** No abro ninguna D; la próxima libre sigue siendo la D49. Los supuestos reversibles están abajo.
+- **D51. La pantalla no lee `historial_guardado`.** El backend lo devuelve en la operación y, ahora, en confirmar un NCM. La UI no lo muestra: si no se guardó, el usuario no se entera.
+  - (a) Dejarlo así: el dato queda en la respuesta y en el registro.
+  - (b) Pieza aparte y chica: un aviso en la pantalla cuando llega `false`.
+  - **Recomiendo (b), después de CATALOGO-LARGO-1.** Es un cambio de pantalla, fuera de esta devolución.
 
-**Qué trae el diff contra `1f5480e`, además de esta pieza:**
-- tus docs (`docs/pm/`, `CLAUDE.md`);
-- DISCO-1 (`5c46e36`), aceptada y sin integrar;
-- RENDIMIENTO-1c (`ccf5d8c`, `033cb11`, `843cc08` y `7dd008f`), **sin entregar**. Toca `file_security.py`. Viene después de esta pieza, como dice tu canal.
+- **D52. Una descripción sin letras latinas se sugiere para cualquier consulta.** `normalizar_desc` (`main.py:9626`) deja sólo `a-z0-9`: «日本語の製品», «क़क़» o «--- …» quedan en `''`. El paso 3 de `sugerir_ncm` compara con `desc_norm in normalizar_desc(guardada)`, y `'' in x` es siempre verdadero, así que esa fila del historial sale como sugerencia «historial» para cualquier producto. Esto existe desde `a77e6ad` (2026-10-07). Lo encontré porque mi caso nuevo dejaba una fila así en la base de prueba.
+  - (a) Dejarlo así.
+  - (b) Pieza aparte y chica: ignorar en esa comparación las descripciones que normalizadas quedan vacías, con su caso.
+  - **Recomiendo (b).** Es un defecto de sugerir, no de esta devolución: no lo toqué.
 
-**Archivos de producto de esta pieza:** `services/client_memory.py`, `main.py`, `core/despacho_lector.py` y `database/models.py`.
+Estas D no me frenan: sigo con CATALOGO-LARGO-1.
+
+### SHAs
 
 | SHA | Qué |
 |---|---|
-| `c66f7e7` | test: rojos antes del arreglo |
-| `eb4e615` | fix: una regla de identidad y la base la sostiene |
-| `dc1c610`, `ba9e42a`, `789815c` | test: guardar-uso como quinta vía, NFC, sabotajes por punto, arnés de Postgres 16 |
-| `697ffb6` → `669bac0` → `daefd4b` | rojo → fix → sabotajes: el corte por CPU conserva lo leído, el largo se mide en NFC y la operación avisa lo que no guardó (autorrevisión) |
-| `7b1f4bd`, `178e5fe` → `9dca44f` → `bdf8eac` | rojo → fix → sabotajes: la migración escribe las claves después de unir (code-review, hallazgo 1) |
-| `9d67853` → `ae2ab9a` → `7e96b32` | rojo → fix → sabotajes: learn y la operación pasan los números crudos (code-review, hallazgo 2) |
-| `7a34520` | test: sabotajes de la divisa con espacios y en minúscula (punto 7) |
-| `91726ad` | docs: CHANGELOG de la vuelta |
-| `c55bd32` → `e035fc9` | rojo → fix: la operación con productos que no son objetos, confirmar NCM y el PUT validan como guardar (adversario, hallazgos 1, 2, 3 y 5) |
-| `4ea1cb4` | test: DISCO-1, el tope de confirmar entra con el NCM válido más largo (`8471.49.00.100D`) |
-| `0c3a059` | test: el origen vacío del cambio deja «XX» en la fila; sabotajes de la operación, confirmar y el PUT |
-| `b11809f` → `fca1878` → `4081221` | rojo → fix → sabotajes: el origen es ASCII, la operación rechaza un resumen o ítems de otro tipo, constante del aviso del NCM (code-review 2) |
-| `f86005f` → `f5b8a93` → `17386a1`, `e9173de` | rojo → fix → sabotajes: el origen se valida como se escribió («ıt» entraba como IT), el origen «ﬁ», la operación vacía guarda ceros (code-review 3) |
-| `bd14302` | refactor: `pais_reconocido` ya pasa a mayúsculas (code-review 4, hallazgo 7) |
-| `4034cdd` | test: `guardar1.sh`, los sabotajes de editar y de aprender buscan el código de ahora |
-| `bb913d0` | test: `despacho1b.sh` al día con el código de la vuelta (cuatro sabotajes no distinguían) y uno nuevo para `_DECIMAL`; el caso del PUT manda el NCM con espacios |
-| `03296d4` | test: las hojas leídas antes del corte se miden con un entender que cuesta 50 ms (el sabotaje del tope de entender salía VERDE) |
-| este | docs: informe y CHANGELOG |
+| `576dc8d` | test: en Postgres, la fila que cambia de clave o se borra mientras se espera, por las cuatro vías (rojo en `03296d4`) |
+| `aeae73b` | fix: el upsert vuelve a insertar si la fila se fue; confirmar un NCM devuelve `historial_guardado` |
+| `b39d746` | fix: confirmar un NCM avisa también cuando el producto no entra (code-review, hallazgo 2) |
+| `57c46f0` | test: `historial_guardado` con la base caída y con el producto que no entra; sabotajes de Postgres; sin `PG_DSN` el script de sabotajes no da verde |
+| `b5fb03a` | test: el caso `[crece al normalizar]` retira la fila del historial que crea (abajo, «Una prueba que ensuciaba la base») |
+| este | docs: informe |
 
-## `CLAUDE.md` §6: `chequeo-6.py 1f5480e 03296d4`
+**Archivos de producto:** `services/client_memory.py` (`upsert_client_product_history`) y `main.py` (`guardar_uso_ncm`). `producto +19/−11`, más 4 de CHANGELOG. Grep de historia de §6: vacío.
 
-Todo el código de esta vuelta es de antes del 04/11; no lo reescribí, como pide tu canal. De `bb913d0` a `03296d4` sólo cambia `tests/test_despacho1b.py` (+14/−3, la diferencia del arnés); de ahí a la cabeza, documentos. Ese cambio es del 05/11: le rige §6 y el chequeo no le marca avisos.
+### Por qué un reintento y no `ON CONFLICT DO UPDATE`
+
+Con READ COMMITTED, `INSERT … ON CONFLICT DO NOTHING` no espera la fila trabada, y el `SELECT … FOR UPDATE` que sigue vuelve vacío si la fila cambió de clave o se borró mientras esperaba. El arreglo deja el par INSERT y SELECT y lo repite hasta 3 veces. `DO UPDATE` serviría, pero no hay una forma portable (Postgres y SQLite) de saber si la fila se insertó o se actualizó, y el código lo necesita para sumar bien el uso. Tres intentos alcanzan salvo que otro pedido cambie la misma fila tres veces seguidas en el medio; ese caso da 500, no un éxito falso. Lo razoné por código: **no lo corrí**.
+
+### Rojos antes del arreglo
+
+`despacho1b_postgres.py` con el producto de `03296d4` y los casos de `576dc8d`:
 
 ```
-chequeo-6 1f5480e..03296d4: avisos para mirar, no un veredicto
-producto +496/−242
-  AVISO producto suma 254 líneas netas: el informe dice por qué (§6: más de 20)
-arnés +1888/−71
+FALLA | operacion, la fila cambia de clave mientras espera: el uso queda en una fila nueva: en cola True, 200 200 {"success":true,"operation_id":"be621347-98f1-4988-a7ed-badbed20ae67","op_code":"OP-000001","historial_guardado":false} []
+FALLA | operacion, la fila se borra mientras espera: el uso queda en una fila nueva: en cola True, 200 200 {"success":true,"operation_id":"7136632d-597c-44f8-a782-bfb9bdf8ebe0","op_code":"OP-000002","historial_guardado":false} []
+FALLA | aprender, la fila cambia de clave mientras espera: el uso queda en una fila nueva: en cola True, 200 200 {"success":true,"cliente_id":"008e07c6-c457-4995-b686-3f9ea5a3b2d2","aprendidos":0} []
+FALLA | aprender, la fila se borra mientras espera: el uso queda en una fila nueva: en cola True, 200 200 {"success":true,"cliente_id":"008e07c6-c457-4995-b686-3f9ea5a3b2d2","aprendidos":0} []
+FALLA | guardar, la fila cambia de clave mientras espera: el uso queda en una fila nueva: en cola True, 200 500 {"detail":"No pudimos procesar tu solicitud. Probá de nuevo en unos segundos. Si vuelve a pasar, escribinos a hola@ynera.com.ar y te ayudamos.","code":"internal []
+FALLA | guardar, la fila se borra mientras espera: el uso queda en una fila nueva: en cola True, 200 500 {"detail":"No pudimos procesar tu solicitud. Probá de nuevo en unos segundos. Si vuelve a pasar, escribinos a hola@ynera.com.ar y te ayudamos.","code":"internal []
+FALLA | guardar-uso, la fila cambia de clave mientras espera: el uso queda en una fila nueva: en cola True, 200 200 {"success":true} []
+FALLA | guardar-uso, la fila se borra mientras espera: el uso queda en una fila nueva: en cola True, 200 200 {"success":true} []
+fallas: 8
+```
+
+El mismo script con el producto de `aeae73b` da los 8 en OK y «fallas: 0». Por ejemplo:
+
+```
+OK    | guardar-uso, la fila se borra mientras espera: el uso queda en una fila nueva: en cola True, 200 200 {"success":true,"historial_guardado":true} [(1,)]
+```
+
+Hallazgo 2 del code-review (`historial_guardado` en `true` aunque el producto no entre), con el caso de `57c46f0` sobre el producto de `aeae73b`, `[crece al normalizar]`:
+
+```
+E   AssertionError: {"success":true,"historial_guardado":true}
+```
+
+### Una prueba que ensuciaba la base
+
+El caso `[crece al normalizar]` de `57c46f0` dejaba en `test.db` una fila del historial con 2000 «क़». Por la D52, `test_ncm_sugerir_catalog.py`, corrido después, la recibía como sugerencia para cualquier consulta. Con los tests afectados sobre `57c46f0`: «11 failed, 371 passed». `b5fb03a` borra esa fila en un `finally`, también si el caso falla. Sobre `b5fb03a`, los mismos archivos dan «382 passed». El producto no cambió.
+
+### Sabotajes nuevos
+
+En `despacho1b.sh`:
+
+| Sabotaje | Qué rompe | Qué tiene que dar rojo |
+|---|---|---|
+| el upsert no espera la fila | saca `.with_for_update()` | «dos procesos guardan y aprenden el mismo producto a la vez: una fila con 16 usos» (Postgres) |
+| el upsert no reintenta si la fila se fue | `range(3)` → `range(1)` | las 8 combinaciones (4 vías × cambio de clave o borrado), en Postgres |
+| confirmar un NCM no avisa que la base falló | saca `historial_guardado = False` del `except` | `test_confirmar_un_ncm_dice_si_no_guardo_el_historial[la base falla]` |
+| confirmar un NCM no avisa que el producto no entró | `historial_guardado` deja de seguir a `entry` | `…[crece al normalizar]` |
+
+Los dos de Postgres corren sólo con `PG_DSN`. Sin `PG_DSN` imprimen «NO CORRIDO» y el script sale con error, para que no parezca verde.
+
+Las cuatro líneas de los sabotajes nuevos, de `despacho1b.sh b5fb03a` con `PG_DSN` (136 ROJO en total):
+
+```
+ROJO  | confirmar un NCM no avisa que la base falló: «FAILED tests/test_despacho1b.py::test_confirmar_un_ncm_dice_si_no_guardo_el_historial[la base falla]» 
+ROJO  | confirmar un NCM no avisa que el producto no entró: «FAILED tests/test_despacho1b.py::test_confirmar_un_ncm_dice_si_no_guardo_el_historial[crece al normalizar]» 
+ROJO  | el upsert no espera la fila: «FALLA | dos procesos guardan y aprenden el mismo producto a la vez: una fila con 16 usos» 
+ROJO  | el upsert no reintenta si la fila se fue: «FALLA | operacion, la fila cambia de clave mientras espera» «FALLA | operacion, la fila se borra mientras espera» «FALLA | aprender, la fila cambia de clave mientras espera» «FALLA | aprender, la fila se borra mientras espera» «FALLA | guardar, la fila cambia de clave mientras espera» «FALLA | guardar, la fila se borra mientras espera» «FALLA | guardar-uso, la fila cambia de clave mientras espera» «FALLA | guardar-uso, la fila se borra mientras espera» 
+```
+
+### La suite: los dos comandos
+
+Las dos corren sobre `b5fb03a`, en un worktree limpio:
+
+- **El comando de `ci.yml`** (sus variables y sus 10 `--deselect`, con `-rs`): «4278 passed, 336 skipped, 10 deselected, 2 xfailed, 94 warnings in 501.79s», sale con 0.
+- **Mi comando** (`--timeout=300`, SQLite nueva, con `-rs`): «4288 passed, 336 skipped, 2 xfailed, 92 warnings in 506.64s», sale con 0. Son los mismos tests: 4278 + 10 deseleccionados = 4288.
+
+**Los 336 saltos, contra los 102 de la base de `/entregar`:** comparé los motivos de `-rs` y son los mismos en las dos corridas. 234 son de `tests/test_excel3.py`: «could not import 'xlwt'». `xlwt` no está en `requirements.txt`, así que la CI, que instala de ahí, también los saltea. Los otros 102 son los motivos viejos de la base (python-magic, routers que no están montados, tests marcados «needs update»…). No toqué nada de eso: está fuera de la pieza.
+
+La primera corrida del comando de `ci.yml` quedó cortada al 52 % porque la tarea de fondo llegó a su tope de 2 h (iba en cadena detrás de los sabotajes). No la cuento: la puerta es la corrida completa de arriba.
+
+### Autorrevisión
+
+**Adversario (Sonnet, esfuerzo alto),** sobre `aeae73b`. Cada hallazgo lo reproduje antes de decidir. Confirmó que no hay doble suma ni pérdida en las 8 combinaciones.
+
+| # | Hallazgo | Qué hice |
+|---|---|---|
+| 1 | Un sabotaje buscaba un patrón que aparecía dos veces | Arreglado en `57c46f0` |
+| 2 | La UI no lee `historial_guardado` | D51 |
+| 3 | Agotar los 3 intentos | Razonado por código, no corrido. Da 500 |
+| 4 | Sin `PG_DSN`, el script de sabotajes salía con 0 | Arreglado en `57c46f0` (sale con error si `NO_CORRIDOS` > 0) |
+| 5 | `catalog_service.save_products` también hace un SELECT y después un INSERT, y puede chocar igual | Riesgo. Propuesta: va a CATALOGO-LARGO-1, que toca ese catálogo |
+
+**`/code-review high`** sobre `4931eb2..b39d746`:
+
+| # | Hallazgo | Qué hice |
+|---|---|---|
+| 1 | La UI no lee el flag | D51 |
+| 2 | `historial_guardado` en `true` con `entry` en `None` (el producto no entra) | Arreglado en `b39d746`, con rojo antes (arriba) |
+| 3 | Da `false` si falla sólo el catálogo del proveedor | No es defecto: los dos se confirman en el mismo `commit` (`save_products`, `catalog_service.py:399`). Si falla el del proveedor, el `rollback` deshace también el del cliente, así que `false` es cierto |
+| 4 | El reintento vuelve a insertar la clave vieja, no la nueva | Es lo pedido: el uso es del producto que se confirmó |
+| 5 | Agotar los intentos da `RuntimeError`, o sea 500 | Se acepta: es un error a la vista, no un éxito falso |
+| 6 | `DO UPDATE` sería más simple | No, por lo explicado arriba |
+| 7 | `esperan_un_bloqueo` (en el script de Postgres) no filtra por la tabla | Riesgo menor de la prueba: en la base descartable no hay otros bloqueos |
+| 8 | Sin Postgres, el script salía con 0 | Arreglado en `57c46f0` |
+| 9 | El SELECT se repite aunque el INSERT haya insertado | Menor: es una lectura por intento, y la fila hace falta igual |
+
+**`/security-review`:** el comando falló (`fatal: ambiguous argument 'origin/HEAD...'`, el clon no tiene `origin/HEAD`). Lo hice a mano sobre `4931eb2..b5fb03a`. No encontré nada. Los valores salen de la sesión y del cuerpo ya validado. Las consultas van por SQLAlchemy con parámetros. El flag nuevo no expone datos. No cambia quién puede escribir qué.
+
+### `CLAUDE.md` §6: `chequeo-6.py 4931eb2 b5fb03a`
+
+```
+chequeo-6 4931eb2..b5fb03a: avisos para mirar, no un veredicto
+producto +19/−11
+arnés +145/−4
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  proyecto_maria/main.py: 11332 → 11334
+  proyecto_maria/services/client_memory.py: 298 → 304
+avisos: 0
+```
+
+### Para la cola de limpieza (propuestas)
+
+- `despacho_lector.py`: el despacho se abre dos veces (una para validar y otra para leer, en dos procesos). Es el hallazgo 7 de RENDIMIENTO-1c.
+- `catalog_service.save_products`: el SELECT y después el INSERT pueden chocar con otro pedido igual que el upsert del cliente (adversario, hallazgo 5), si CATALOGO-LARGO-1 no lo cubre.
+
+### Riesgos
+
+- Agotar los 3 intentos: no lo corrí.
+- `historial_guardado` no se ve en la pantalla (D51).
+
+### Puertas
+
+| Puerta | SHA | Salida |
+|---|---|---|
+| `despacho1b_postgres.py`, Postgres 16 descartable | `03296d4` (producto) | «fallas: 8» |
+| `despacho1b_postgres.py` | `b5fb03a` | «fallas: 0» |
+| `despacho1b.sh` con `PG_DSN` | `b5fb03a` | 136 ROJO, «sabotajes sin rojo: 0», «sin Postgres, no corridos: 0» |
+| tests afectados (`test_despacho1b`, `test_guardar1`, `test_disco1`, `test_pa1_textos`, `test_ncm_sugerir_catalog`) | `57c46f0` | «11 failed, 371 passed» (la fila de arriba) |
+| tests afectados | `b5fb03a` | «382 passed, 5 warnings in 59.24s» |
+| `compileall` | `b5fb03a` | «SALIDA compile 0», sin otras líneas |
+| suite, comando de `ci.yml` | `b5fb03a` | «4278 passed, 336 skipped, 10 deselected, 2 xfailed», sale con 0 |
+| suite, mi comando | `b5fb03a` | «4288 passed, 336 skipped, 2 xfailed», sale con 0 |
+
+**Lo que no corrí:** agotar los 3 intentos, el smoke y el ataque de aislamiento. Este cambio no toca sesión ni permisos.
+
+### Comandos para reproducir
+
+```bash
+git checkout b5fb03a
+# Postgres 16 descartable; DSN de ejemplo
+python scripts/testing/despacho1b_postgres.py postgresql://cdi@127.0.0.1:55432/postgres     # «fallas: 0»
+git checkout 03296d4 -- proyecto_maria && python scripts/testing/despacho1b_postgres.py postgresql://cdi@127.0.0.1:55432/postgres; git checkout b5fb03a -- proyecto_maria   # «fallas: 8»
+PG_DSN=postgresql://cdi@127.0.0.1:55432/postgres bash scripts/testing/sabotajes/despacho1b.sh b5fb03a   # «sabotajes sin rojo: 0», «sin Postgres, no corridos: 0»
+bash scripts/testing/sabotajes/despacho1b.sh b5fb03a                     # sin PG_DSN: «NO CORRIDO» ×2, sale con error
+```
+
+## RENDIMIENTO-1c (D48 a): **entregada** en `3f0ed57` (2026-11-05)
+
+**Resultado:** validar un PDF corre en el proceso aparte del lector, con un tope de 256 MB y 30 s de tiempo, al subir una factura y al leer un despacho. El PDF de 200 repeticiones hacía crecer la app 1029 MB (medido en su proceso); ahora la hace crecer 0 MB y devuelve 400 «El PDF es demasiado pesado para abrirlo. Probá con otro archivo.». Si un usuario sube diez PDFs pesados a la vez, la factura de otro usuario termina en 0,17 s, con las diez todavía en fila. Si no hay lugar para validar dentro del tiempo máximo, la respuesta es 503 «Hay muchos PDFs en revisión. Probá de nuevo en un rato.» y no un 400 que culpa al archivo. `rendimiento1c.sh`: 13 ROJO, «sabotajes con falla: 0», sobre `3f0ed57`. Suite completa sobre `3f0ed57`: «4286 passed, 336 skipped, 2 xfailed».
+
+Esta entrega no toca DESPACHO-1b (arriba), salvo el texto del error en modo validar (ver «Qué cambió después de `03296d4`»).
+
+### Decisiones
+
+- **D49. El vendedor de la factura y `process_pdf` siguen abriendo el PDF dentro de la app.** `extraer_texto_pdf_seguro` (vendedor heurístico) y `process_pdf` leen el texto en el proceso de la app. Eso pasa después de validar, así que el PDF de 200 repeticiones no llega ahí. Lo que sí podría llegar es un PDF que pasa la validación y se infla al extraer el texto: no lo medí.
+  - (a) Dejarlo así.
+  - (b) Pieza aparte: extraer el texto también en el proceso aparte, con el mismo tope.
+  - **Recomiendo (b), después de CATALOGO-LARGO-1.** El mecanismo ya existe. Lo que falta es la prueba con un PDF que se infle al extraer, no al contar hojas.
+- **D50. Los cupos de validación se pueden ocupar con dos cuentas.** Hay dos lugares para toda la app y cada validación puede durar hasta 30 s. En modo validar no hay tope de CPU. Dos cuentas que suben, una y otra vez, PDFs que tardan sin inflarse frenan las validaciones de todos hasta 30 s cada vez.
+  - (a) Dejarlo así: el limitador por cuenta ya acota cuántas subidas hace cada una.
+  - (b) Tope de CPU de 10 s también en validar, el mismo que ya tiene el lector. Un PDF normal valida en unos 125 ms.
+  - (c) Más lugares (4, uno por CPU).
+  - **Recomiendo (b).** Reduce el bloqueo de 30 s a ~10 s, reusa lo que ya existe y no suma memoria. Con (c), el peor caso pasa a ser 4 × 256 MB.
+  - Lo que midió el adversario, para dimensionar: con PDFs que se inflan (cortan rápido por memoria), cada cuenta atacante suma unos 0,4 s de espera a los demás; para llegar a 30 s harían falta unas 75 cuentas. El caso caro es el de PDFs lentos que no se inflan, que es el de arriba. Desde `5819029`, el que se queda sin lugar recibe 503 y no un 400.
+
+Ninguna de las dos me frena: sigo con CATALOGO-LARGO-1.
+
+### SHAs
+
+| SHA | Qué |
+|---|---|
+| `ccf5d8c` | fix: validar un PDF corre en un proceso aparte con tope de memoria |
+| `033cb11` | test: el PDF que se infla no hace crecer la app y diez de uno no frenan a otro; RENDIMIENTO-1 y DESPACHO-1b simulan la validación lenta en el proceso aparte |
+| `843cc08` → `7dd008f` | fix → test: si el validador se cae, 500 y no «PDF inválido»; las diez se miden por orden, no por reloj |
+| `9fd6bd0` | refactor: el comentario de la validación no nombra piezas (chequeo-6) |
+| `a341966` → `a4d2310` | fix → test: el registro dice «el validador de PDF» cuando falla la validación (code-review, hallazgo 10) |
+| `5819029` → `3f0ed57` | fix → test: esperar lugar da 503 y no culpa al archivo; quedarse sin memoria dentro de pypdf (SystemError) es «demasiado pesado»; la prueba de diez también con despachos; 8 sabotajes nuevos (adversario) |
+| este | docs: informe |
+
+**Archivos de producto:** `core/despacho_lector.py`, `security/file_security.py` y `main.py`. En `main.py`, sólo las dos llamadas que pasan `clave=user["username"]`.
+
+### Qué cambió después de `03296d4`
+
+`9fd6bd0` cambia sólo un comentario. `5819029` suma `SinLugar` (subclase de `TimeoutError`) en `validar_pdf_aparte` y `_leer_aparte`: en modo leer el despacho sigue cayendo en el mismo `except TimeoutError` de `main.py` (504), así que esa respuesta no cambia; en `validar_pdf`, un `SystemError` pasa a ser `MemoryError`. `a341966` cambia el texto de los tres `RuntimeError` de `_leer_aparte`: dicen «el validador de PDF» en modo validar y siguen diciendo «el lector de despachos» en modo leer. `tests/test_despacho1b.py:902` exige ese texto en modo leer y pasa (`301 passed, 3 warnings in 82.37s (0:01:22)`, `test_rendimiento1c.py` + `test_rendimiento1.py` + `test_despacho1b.py`, sobre `3f0ed57`). `despacho1b.sh` entero corre sobre `b5fb03a`, que contiene `3f0ed57` (DESPACHO-1b, arriba). Antes había corrido a mano, sobre `3f0ed57`, los dos sabotajes que caen en `_leer_aparte` (verde sin sabotaje, rojo con él):
+
+```
+un resultado que no es objeto pasa      → FAILED tests/test_despacho1b.py::test_un_lector_que_no_devuelve_un_objeto_es_un_error
+el caño roto tapa el código de salida   → FAILED tests/test_despacho1b.py::test_un_lector_que_sale_sin_leer_todo_dice_con_que_salio
+```
+
+### `CLAUDE.md` §6: `chequeo-6.py ccf5d8c^ 3f0ed57`
+
+La base `ccf5d8c^` incluye DESPACHO-1b vuelta 4, que se commiteó en el medio. Por eso el chequeo cuenta las dos piezas juntas. **Sólo RENDIMIENTO-1c: `producto +126/−53`** (suma de `ccf5d8c`, `843cc08`, `9fd6bd0`, `a341966` y `5819029`, sacada de `git show --numstat`; CHANGELOG incluido). Son 73 líneas netas, más de 20. El porqué: hacen falta el modo validar del proceso aparte, `validar_pdf_aparte` con cupos y la fila por usuario, y separar en `validate_file_upload` los casos tiempo, pesado, caído y sin lugar. Lo que salió de `file_security.py` (el pypdf en la app) es lo que resta.
+
+```
+chequeo-6 ccf5d8c^..3f0ed57: avisos para mirar, no un veredicto
+producto +520/−246
+  AVISO producto suma 274 líneas netas: el informe dice por qué (§6: más de 20)
+arnés +1868/−69
 historia (grep de §6, sin líneas movidas):
   AVISO historia en proyecto_maria/main.py:1331: """Una fila por producto en client_product_history (DESPACHO-1b): agrega
-  AVISO historia en proyecto_maria/security/file_security.py:490: # con la memoria topeada y tiempo máximo (RENDIMIENTO-1 y 1c).
   AVISO historia en proyecto_maria/services/client_memory.py:12: escriben usan esa regla y la base no deja dos filas iguales (DESPACHO-1b).
 archivos de producto:
-  proyecto_maria/core/despacho_lector.py: 766 → 850
+  proyecto_maria/core/despacho_lector.py: 766 → 867
   AVISO comentario nuevo de 3 líneas: proyecto_maria/core/despacho_lector.py:65 (§6: una o dos)
-  AVISO comentario nuevo de 5 líneas: proyecto_maria/core/despacho_lector.py:678 (§6: una o dos)
-  AVISO comentario nuevo de 3 líneas: proyecto_maria/core/despacho_lector.py:747 (§6: una o dos)
+  AVISO comentario nuevo de 5 líneas: proyecto_maria/core/despacho_lector.py:683 (§6: una o dos)
+  AVISO comentario nuevo de 3 líneas: proyecto_maria/core/despacho_lector.py:764 (§6: una o dos)
   proyecto_maria/database/models.py: 574 → 578
   proyecto_maria/main.py: 11177 → 11332
   AVISO función nueva de 87 líneas: proyecto_maria/main.py:1330 _migrate_product_history_clave (§6: ~60)
   AVISO comentario nuevo de 3 líneas: proyecto_maria/main.py:1401 (§6: una o dos)
   AVISO comentario nuevo de 4 líneas: proyecto_maria/main.py:1331 (§6: una o dos)
-  proyecto_maria/security/file_security.py: 581 → 579
+  proyecto_maria/security/file_security.py: 581 → 582
   proyecto_maria/services/client_memory.py: 285 → 298
-avisos: 10
+avisos: 9
 ```
 
-El rango trae también RENDIMIENTO-1c (`ccf5d8c`, `843cc08`), que no está en `1f5480e`: es todo `file_security.py` y +97/−44 por commit. Lo de esta pieza suma +430/−229 por commit (`eb4e615` +312/−159 y siete arreglos de revisión).
+Cada AVISO:
+- **Historia en `main.py:1331` y `client_memory.py:12`; función de 87 líneas en `main.py:1330`; comentarios en `main.py:1331` y `main.py:1401`; comentario en `despacho_lector.py:65`:** son de DESPACHO-1b vuelta 4 y se explicaron en su informe (`git show 03296d4:docs/pm/PARA-PM-2.md`).
+- **Comentarios de 5 y 3 líneas en `despacho_lector.py:683` y `:764`:** son los docstrings de `validar_pdf_aparte` y `_main`, de `ccf5d8c` (28/10), escritos antes del 04/11. Quedan como están y van a la cola de limpieza.
+- **Producto 274 netas:** el porqué de esta pieza está arriba (73 netas). El resto es DESPACHO-1b.
 
-Cada aviso:
-- **254 netas.** Unas 200 son de esta pieza. Las cinco vías pasaban por cuatro reglas distintas. Para unirlas restaron −229, pero hubo que sumar tres cosas que no estaban: la migración que une los duplicados ya guardados (87 líneas), la escritura con `ON CONFLICT` y `FOR UPDATE` contra el índice, y la validación del PUT y de la operación. Las 53 netas de RENDIMIENTO-1c se explican en su entrega.
-- **Historia, tres:** ya escrito, va a la cola de limpieza. La de `file_security.py:490` es de RENDIMIENTO-1c.
-- **Comentarios de 3 a 5 líneas, seis:** ya escrito, va a la cola de limpieza.
-- **`_migrate_product_history_clave`, 87 líneas:** ya escrito, va a la cola de limpieza. Se parte en leer las filas, unir y escribir las claves.
-
-Líneas que propongo para `COLA-LIMPIEZA.md`:
-- `proyecto_maria/main.py:1330` `_migrate_product_history_clave` (87 líneas): partir en leer, unir y escribir claves; su docstring nombra la pieza.
-- `proyecto_maria/core/despacho_lector.py:65`, `:678`, `:747` y `main.py:1401`: comentarios de 3 a 5 líneas, a una o dos con el porqué.
-- `proyecto_maria/services/client_memory.py:12`: el docstring del módulo nombra la pieza.
-
-Lo que el chequeo no mide, mirado a ojo:
-- **Un chequeo en un solo lugar:** falla. La validación del producto se llama desde guardar y desde el PUT (riesgo 8 del code-review). Va a la cola: «`main.py`, guardar el despacho y el PUT del catálogo validan el producto por separado; una función que valide un renglón».
-- **Un caso por causa:** las familias van como datos de un caso (`dos_vias`, `otros_digitos`, `medio_par`). Los dos casos de la forma Unicode miran causas distintas. Uno mira qué forma se guarda; el otro, que la NFC vaya después de pasar a minúsculas.
-
-## Comandos para reproducir
+### Comandos para reproducir
 
 ```bash
-git checkout 03296d4
+git checkout 3f0ed57
 export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares ENVIRONMENT=test DATABASE_URL=sqlite+aiosqlite:///./test.db
-python -m pytest -q --no-cov tests/test_despacho1b.py      # `281 passed, 3 warnings in 47.30s`
-bash scripts/testing/sabotajes/despacho1b.sh 03296d4           # al final: «sabotajes sin rojo: 0»
-DATABASE_URL=postgresql+asyncpg://…/descartable python scripts/testing/despacho1b_postgres.py   # al final: «fallas: 0»
+python -m pytest -q --no-cov tests/test_rendimiento1c.py            # 6 passed
+bash scripts/testing/sabotajes/rendimiento1c.sh 3f0ed57             # 13 ROJO; «sabotajes con falla: 0»
+bash scripts/testing/sabotajes/rendimiento1.sh 3f0ed57              # 11 ROJO; «sabotajes con falla: 0»
+python -c "import sys; sys.path.insert(0,'tests'); import test_rendimiento1c as t; print(t._correr('memoria'))"   # 'crecio_mb': 0
+git checkout ccf5d8c^ -- proyecto_maria && python -m pytest -q --no-cov tests/test_rendimiento1c.py -k infla; git checkout 3f0ed57 -- proyecto_maria   # rojo: «la app creció 1029 MB»
 ```
 
-## Punto por punto
+### Rojo antes del arreglo
 
-1. **Una identidad en todas las vías.**
-   - `identidad_del_producto` (client_memory.py) es la única regla: NCM llevado a 8 dígitos (sin puntos, guiones, espacios ni letra SIM) y descripción en NFC, sin mayúsculas (`casefold`) y con los espacios juntados. La clave es el sha256 de las dos.
-   - La usan las cinco vías que escriben el catálogo: aprender, la operación, guardar el despacho, guardar-uso y el cambio (PUT). Sumé guardar-uso, que la devolución no nombraba y también escribe.
-   - **Caso por cada par de vías:** `test_el_mismo_producto_por_dos_vias_queda_en_una_fila` está parametrizado por los 20 pares ordenados de vías. La primera escribe y la segunda escribe el mismo producto con otro formato. Exige una fila.
-   - **Los cuatro reproducidos por la PM:**
-     - los 275 caracteres: `test_dos_descripciones_que_comparten_275_caracteres_son_dos_productos`;
-     - 10 dígitos y después guardar: `test_aprender_con_10_digitos_y_guardar_el_despacho_da_una_fila`;
-     - compuesta y descompuesta: `test_la_n_compuesta_y_la_descompuesta_son_el_mismo_producto` y `test_las_minusculas_de_dos_formas_de_lo_mismo_son_el_mismo_producto`;
-     - guiones: `test_cada_forma_del_mismo_producto_suma_a_la_misma_fila[guiones]`.
-   - **Supuesto aceptado:** otra tilde u otra puntuación es otro producto (`test_otra_tilde_u_otra_puntuacion_es_otro_producto`).
-2. **Lo que no es un NCM no entra.**
-   - Dígitos arábigos, de ancho completo o mezclados dan 400 en las cinco vías (`test_un_ncm_con_otros_digitos_da_400_por_cada_via`, 15 casos). Al guardar un despacho, ese renglón vuelve marcado con el motivo (`test_guardar_un_despacho_con_otros_digitos_marca_el_renglon`).
-   - Un ítem de learn que no es objeto da 400 y no 500: `test_aprender_un_item_que_no_es_un_objeto_da_400` (texto, lista, número y null).
-   - Un `\ud800` en cualquier texto da 400 y nada queda guardado: `test_aprender_con_medio_par_da_400`, `test_una_operacion_con_medio_par_da_400_y_no_queda` y `test_cambiar_con_medio_par_da_400` (NCM, origen y descripción).
-   - **La operación** da 400 «Cada producto tiene que ser un objeto.» si `items` no es una lista de objetos (número, texto, null, lista, `"x"`, `{"a": 1}`, `{}`, `0`, `""`, `false`) o si el cuerpo es una lista. Antes: 500 con el texto de la excepción (`test_una_operacion_con_productos_que_no_son_objetos_da_400`). Un `resumen` que no es objeto también da 400 (`test_una_operacion_con_un_resumen_que_no_es_un_objeto_da_400`). Sin productos ni resumen se guarda vacía, con los totales en cero (`test_una_operacion_sin_productos_ni_resumen_se_guarda_vacia`).
-   - **Confirmar un NCM** (`/api/ncm/guardar-uso`) pasa por `ncm_para_historial`, como guardar: «pedido 20240115 nro», «39269090X» y «1234» dan 400 y no guardan nada (`test_confirmar_algo_que_no_es_un_ncm_da_400_y_no_guarda_nada`). Antes, el primero quedaba en el catálogo como 20240115. Un medio par en el origen o el proveedor da 400 (`test_confirmar_un_ncm_con_medio_par_da_400_y_no_guarda_nada`) y el NUL se saca (`test_confirmar_un_ncm_saca_el_nul_del_origen_y_del_proveedor`).
-3. **La base sostiene la identidad.**
-   - Columna `clave` con el índice único `ux_cph_owner_client_clave`. Se escribe con `INSERT … ON CONFLICT DO NOTHING` y después `SELECT … FOR UPDATE`: el que llega segundo suma a la fila del primero.
-   - **SQLite:** seis guardados a la vez dejan una fila con seis usos (`test_seis_guardados_a_la_vez_dejan_una_fila`). En el rojo eran `[1, 1, 1, 1, 1, 1]`.
-   - **Postgres 16, dos procesos** (`scripts/testing/despacho1b_postgres.py`), salida sobre `bd14302` (`4034cdd` sólo cambia `guardar1.sh`):
-     ```
-     OK    | la base de 1f5480e no tiene clave
-     OK    | la versión anterior aprendió una fila: [('b2434a54-…',)]
-     OK    | la migración une el producto en la fila más reciente, suma 4 usos y pondera el peso (0,1×1 + 0,4×3)/4: [('3926.90.90', 'CAÑO INVENTADO VERDE', '04069ff7…', 4, 0.32500000000000007, 4, 2.0, 1), ('SIN-CLASIF', 'ALGO SIN NCM', None, 1, None, None, None, None)]
-     OK    | crea el índice único: [('CREATE UNIQUE INDEX ux_cph_owner_client_clave ON public.client_product_history USING btree (owner_username, client_id, clave)',)]
-     OK    | arrancar otra vez no cambia nada: […la misma fila…]
-     OK    | dos procesos guardan y aprenden el mismo producto a la vez: una fila con 16 usos: ['200'] [(16,)]
-     OK    | dos aprendizajes en orden contrario, vuelta 0: [200, 200] []
-     OK    | dos aprendizajes en orden contrario, vuelta 1: [200, 200] []
-     OK    | dos aprendizajes en orden contrario, vuelta 2: [200, 200] []
-     OK    | cada válvula, una fila con 6 usos: [(40, 6, 6)]
-     fallas: 0
-     salida 0
-     ```
-     La base de partida es una de `1f5480e` con el mismo producto en NFC y en NFD.
-   - **La migración** (`_migrate_product_history_clave`) une los duplicados en la fila más reciente. Suma los usos y pondera cada promedio por sus usos. Escribe las claves recién después de unir y vacía antes las que cambian; dos claves cruzadas no chocan con el índice.
-   - **Idempotente:** `test_la_migracion_une_los_duplicados_y_es_idempotente`. Casos de borde: `test_la_migracion_une_la_fila_sin_clave_que_dejo_la_version_anterior` y `test_la_migracion_reescribe_claves_cruzadas`.
-   - **Si falla, se nota:** el arranque se corta con el error. Ya no imprime y sigue (`test_la_migracion_que_falla_no_sigue_callada`).
-4. **El tope de CPU cubre el hijo entero.**
-   - Extraer las hojas y entender el texto comparten los 10 s: extraer se lleva una parte y entender, lo que queda.
-   - El corte llega con `setitimer(ITIMER_PROF)`. Se repite cada 0,05 s por si un `finally` de pypdf se traga el primero.
-   - **Medido en `7e96b32`** con el PDF de la forma del tuyo (200 hojas × 500 renglones, `tests/pdf_bombas.py`, `parseo_caro`), CPU propia del hijo:
-     ```
-     lector_cpu_s 10.134  lector_mb 48  pared 10.37 s
-     avisos: «El texto del PDF es demasiado largo: leí hasta la hoja 33.», «El PDF da demasiado trabajo: no pude leer sus productos.»
-     ```
-     Vos mediste 19,6 s antes. En el rojo, el caso daba `assert 8.500733 < 3.5` con un tope de prueba de 3 s: entender el texto no tenía tope.
-   - **Casos:**
-     - `test_el_tope_de_cpu_cubre_entender_el_texto`;
-     - `test_las_hojas_leidas_antes_del_corte_dan_sus_productos`;
-     - `test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado`;
-     - `test_un_corte_por_cpu_que_se_traga_un_finalizador_vuelve_a_cortar`.
-5. **El PUT valida igual que guardar.**
-   - Pasa por las mismas funciones que guardar.
-   - **Lo que rechaza con 400** (`test_cambiar_un_producto_valida_igual_que_guardar`, 7 casos): descripción vacía, NUL, más de 200 caracteres después de normalizar, NCM arábigo y peso «1_000».
-   - **El origen** pasa por `origen_para_catalogo` (despacho_lector.py:789), la misma regla de guardar un despacho: dos letras ASCII de un país de la tabla, miradas como se escribieron y recién después pasadas a mayúsculas. «XYZ», «123», «ZZ», «china», una lista, un número, «ÉS», «ＢＲ», «ıt», «ſe» y «ﬁ» dan 400 (`test_cambiar_el_origen_valida_igual_que_guardar`, y los mismos en `test_guardar_es_todo_o_nada`). «ıt» importa porque `"ıt".upper()` es «IT»: el control viejo miraba después de pasar a mayúsculas. « br » y «B\x00R» guardan «BR»; vacío o null dejan «XX» en la fila (`test_cambiar_el_origen_guarda_el_codigo_en_mayusculas`).
-   - **Lo que guarda:** la forma de la regla (`test_cambiar_un_producto_guarda_la_forma_de_la_regla`), con su clave recalculada.
-   - **Choques:** si queda igual a otra fila, 409 (`test_el_mismo_producto_por_dos_vias_queda_en_una_fila[cambio-*]`). Cambiarse a sí mismo no es un choque (`test_cambiar_un_producto_a_si_mismo_no_es_un_choque`).
-   - **Tope de learn:** 500 ítems, el mismo que guardar. Con 500 da 200 y con 501, 400 (`test_aprender_tiene_tope_de_500_productos`).
-6. **Un solo borde.**
-   - `valor_para_promedio` acepta lo que es menor que 1e12 y es la única regla para peso, valor y cantidad en todas las vías.
-   - Al guardar un despacho, un peso o valor de 1e12 o más marca el renglón con el motivo y da 422 todo o nada (`test_un_peso_por_unidad_justo_en_el_tope_marca_el_renglon`). En el rojo, 1e12 justo daba 200 sin aviso.
-   - Learn y la operación aprenden el producto sin ese valor. Si la operación no guarda un producto, lo dice (`test_una_operacion_con_un_producto_que_no_se_guarda_lo_dice`).
-7. **Mutantes**, cada uno con su caso y su sabotaje en `despacho1b.sh`:
-
-   | Mutante | Sabotaje | Caso que se pone rojo |
-   |---|---|---|
-   | `valor_para_promedio` quitado en la fila nueva | «un producto nuevo guarda el peso sin tope» | `test_un_producto_nuevo_no_guarda_valores_fuera_del_tope` |
-   | `\ud800` en NCM y origen del PUT | «el cambio no mira el medio par» | `test_cambiar_con_medio_par_da_400[ncm]`, `[origen]` |
-   | `casefold` | «la clave distingue mayúsculas» | `test_cada_forma_del_mismo_producto_suma_a_la_misma_fila[minusculas]` |
-   | colapso de espacios | «la descripción no junta los espacios» | `…[espacios]` |
-   | espacios del NCM | «el NCM no acepta espacios», «el NCM sin recortar las puntas» | `…[espacios en el ncm]`, `…[puntas del ncm]` |
-   | divisa con espacios | «la divisa no recorta los espacios» | `test_guardar_un_despacho_en_dolares_guarda_el_valor[ usd ]` (y no `[dol]`) |
-   | divisa en minúscula | «la divisa distingue minúsculas» | `…[dol]` (y no `[USD]`) |
-   | `salteadas = True` tras el corte | «un corte por CPU parece escaneado» | `test_un_corte_por_cpu_en_la_primera_hoja_no_dice_que_es_escaneado` |
-   | migración que no une | «la migración no une», «… cuenta filas, no usos», «… deja la fila más vieja», «… promedia sin pesar los usos» | `test_la_migracion_une_los_duplicados_y_es_idempotente` |
-   | migración que choca | «la migración escribe la clave antes de unir», «… no vacía las claves que cambian» | `…une_la_fila_sin_clave…`, `…reescribe_claves_cruzadas` |
-   | migración callada | «la migración que falla se calla» | `test_la_migracion_que_falla_no_sigue_callada` |
-
-   La divisa: el supuesto, la prueba y el código dicen lo mismo. Se compara sin espacios en las puntas y sin mayúsculas (main.py:8412). `USD`, `DOL`, « usd » y `dol` guardan el valor; `EUR` y sin divisa, no.
-8. **Cada afirmación lleva su medida.** La CPU, la concurrencia en Postgres y el rojo están copiados de su salida; los casos están nombrados.
-
-## Rojo antes del arreglo
-
-Corrido en un worktree limpio en `c66f7e7`: los casos nuevos sobre el producto de `1f5480e`, guardado en `rojo_repetido.txt`.
+Sobre el producto de `ccf5d8c^`, con los casos de `033cb11`, el PDF de 200 repeticiones dio `la app creció 1029 MB`. Los dos hallazgos del adversario que arreglé dieron rojo antes del arreglo, con los casos de `3f0ed57` sobre el producto de `a4d2310`: `AssertionError: (['b', 'c'], (400, 'No pudimos abrir el PDF: tardó demasiado. Probá con otro archivo.'))` y `Failed: DID NOT RAISE MemoryError` (`2 failed, 4 passed, 3 warnings in 26.85s`). Las salidas de los dos scripts de sabotaje sobre `3f0ed57`:
 
 ```
-62 failed, 160 passed, 5 warnings in 96.93s
+ROJO  | validar el PDF vuelve al proceso de la app: dice «FAILED tests/test_rendimiento1c.py::test_un_pdf_que_se_infla_no_hace_crecer_la_app»
+ROJO  | sin fila por usuario: todas las validaciones comparten los dos lugares: dice «B esperó detrás de las bombas de A»
+ROJO  | la subida de facturas no pasa el usuario: dice «B esperó detrás de las bombas de A»
+ROJO  | vuelve a contar páginas antes de mirar si está encriptado: dice «FAILED tests/test_rendimiento1c.py::test_validar_aparte_devuelve_lo_mismo_que_antes»
+ROJO  | un validador que se cae vuelve a ser un PDF inválido: dice «FAILED tests/test_rendimiento1c.py::test_un_validador_que_se_cae_es_un_error_nuestro»
+ROJO  | la lectura de despachos no pasa el usuario: dice «despacho: B esperó detrás de las bombas de A»
+ROJO  | esperar el turno del usuario no tiene tiempo máximo: dice «FAILED tests/test_rendimiento1c.py::test_esperar_un_lugar_no_culpa_al_archivo»
+ROJO  | sin tope de validaciones a la vez: dice «(['b', 'c'], 'pasó')»
+ROJO  | la fila del usuario no se borra: dice «(['b', 'c'], {'»
+ROJO  | esperar un lugar libre vuelve a culpar al archivo: dice «(['b', 'c'], (400, 'No pudimos abrir el PDF: tardó demasiado»
+ROJO  | esperar el turno del usuario vuelve a culpar al archivo: dice «(['a'], (400, 'No pudimos abrir el PDF: tardó demasiado»
+ROJO  | sin lugar vuelve a ser un 400: dice «(['b', 'c'], (400, 'No pudimos abrir el PDF: tardó demasiado»
+ROJO  | quedarse sin memoria en C vuelve a ser un PDF inválido: dice «DID NOT RAISE»
+sabotajes con falla: 0
+SALIDA r1c 0
+ROJO  | el PDF se vuelve a leer en el hilo del servidor: dice «FAILED tests/test_rendimiento1.py::test_health_responde_mientras_se_lee_un_pdf»
+ROJO  | el texto del PDF se vuelve a leer en el hilo del servidor: dice «FAILED tests/test_rendimiento1.py::test_health_responde_mientras_se_lee_el_texto_del_pdf»
+ROJO  | Gemini vuelve a correr en el hilo del servidor: dice «FAILED tests/test_rendimiento1.py::test_health_responde_mientras_gemini_sugiere_ncm»
+ROJO  | la lectura pierde el tiempo máximo: dice «FAILED tests/test_rendimiento1.py::test_lectura_con_tiempo_maximo_y_error_claro»
+ROJO  | validar el PDF vuelve al hilo del servidor: dice «FAILED tests/test_rendimiento1.py::test_health_responde_mientras_se_valida_el_pdf»
+ROJO  | validar el PDF pierde el tiempo máximo: dice «FAILED tests/test_rendimiento1.py::test_validar_el_pdf_tiene_tiempo_maximo»
+ROJO  | vuelve a contar páginas antes de mirar si está encriptado: dice «FAILED tests/test_rendimiento1.py::test_pdf_encriptado_dice_que_esta_encriptado»
+ROJO  | el texto del vendedor sin tiempo máximo: dice «FAILED tests/test_rendimiento1.py::test_texto_del_vendedor_tiene_tiempo_maximo»
+ROJO  | las lecturas de PDF vuelven al grupo de hilos compartido: dice «FAILED tests/test_rendimiento1.py::test_pdfs_lentos_no_traban_a_ncm_ni_a_la_validacion»
+ROJO  | un error de tiempo del lector pasa por lectura lenta: dice «FAILED tests/test_rendimiento1.py::test_error_de_tiempo_adentro_del_lector_no_es_lectura_lenta»
+ROJO  | Gemini sin tiempo máximo: dice «FAILED tests/test_rendimiento1.py::test_gemini_sin_respuesta_no_cuelga_la_sugerencia»
+sabotajes con falla: 0
+SALIDA r1 0
 ```
 
-Las 62 fallas son de casos nuevos, y cada una es una aserción sobre el defecto:
-- 26× `assert 200 == 400`;
-- 6× `assert ([] == [('39269090', 2)]`;
-- 4× `assert 500 == 400`;
-- 4× `assert 200 == 409`;
-- `assert [1, 1, 1, 1, 1, 1] == [6]` (seis guardados);
-- `assert [(2, 250.5)] == [(1, 1.0), (1, 500.0)]` (los 275 caracteres);
-- `assert 8.500733 < 3.5` (el tope de CPU sobre el texto);
-- `ImportError: cannot import name '_migrate_product_history_clave'` (la migración no existía);
-- `AttributeError: 'str' object has no attribute 'get'` y sus variantes (ítems de learn que no son objeto).
+### Autorrevisión
 
-Una corrida anterior (`rojo_v4`, 92 fallas) no la cito: no salió de un árbol limpio y tenía 30 fallas de tests viejos.
+**`/code-review high` sobre `ccf5d8c^..9fd6bd0`.**
 
-**Rojos de las vueltas de revisión**, cada uno con los casos nuevos sobre el producto de antes de su arreglo:
+| # | Hallazgo | Qué hice |
+|---|---|---|
+| 1 | En modo validar no hay tope de CPU | Riesgo; D50 (b) |
+| 2 | Dos cuentas ocupan los dos lugares y frenan todas las validaciones hasta 30 s | D50 |
+| 3 | La fila por usuario no tiene largo máximo y guarda los cuerpos en memoria | Riesgo: era igual antes, y lo acotan el limitador y el tope de tamaño de subida |
+| 4 | Un despacho con un árbol de hojas pesado da 400 «demasiado pesado» en vez de 200 con AVISO_SIN_MEMORIA | Riesgo de UX. Si lo pesado es el texto, el despacho sigue pasando por la rama vieja |
+| 5, 6 | El validador que se cae daba 400 «Invalid PDF file»; las diez se medían por reloj | Arreglado en `843cc08` y `7dd008f` |
+| 7 | El despacho se abre dos veces (validar y leer, en dos procesos) | Riesgo: unos 125 ms más por despacho. A la cola de limpieza |
+| 8 | Dos esquemas de concurrencia: la validación espera en fila y el lector da 429 | A propósito: subir una factura no debería rebotar. Leer un despacho ya daba 429 |
+| 9 | Dos mensajes de «demasiado pesado» | A propósito: uno es de factura y otro de despacho |
+| 10 | El registro decía «lector de despachos» también en modo validar | Arreglado en `a341966`, con rojo en `a4d2310` antes (`assert 'el validador de PDF salió con 7' in '...el lector de despachos salió con 7'`) |
 
-| Rojo | Sobre | Salida | Ejemplos |
-|---|---|---|---|
-| `c55bd32` (adversario) | `7e96b32` | `21 failed, 1 passed, 240 deselected, 3 warnings in 3.10s` | `assert 500 == 400` en la operación, con «'str' object has no attribute 'get'»; confirmar «pedido 20240115 nro» daba 200 |
-| `b11809f` (code-review 2) | `0c3a059` | `12 failed, 28 passed, 235 deselected, 3 warnings in 9.11s` | el PUT guardaba «ÉS» y «ＢＲ»; `{"items": {}}` daba 200; un resumen lista daba 500 |
-| `f86005f` (code-review 3) | `4081221` | `4 failed, 27 passed, 248 deselected, 3 warnings in 8.84s` | «ſe», «ıt» y «china» en el PUT, y `test_guardar_es_todo_o_nada[i sin punto]` |
+**Adversario (Opus, esfuerzo alto):**
 
-Verdes después de cada arreglo, sobre `tests/test_despacho1b.py` y los archivos que toca: `340 passed, 3 warnings in 73.63s` (`e035fc9`), `296 passed, 3 warnings in 72.42s` (`fca1878`) y `300 passed, 3 warnings in 72.27s` (`f5b8a93`).
+Revisó `9fd6bd0`. Cada hallazgo lo reproduje antes de decidir.
 
-## Autorrevisión
+| # | Hallazgo | Qué hice |
+|---|---|---|
+| A1 | Esperar un lugar libre (o el turno del usuario) más que el tiempo máximo daba 400 «tardó demasiado. Probá con otro archivo», que culpa a un archivo que ni se abrió | Arreglado en `5819029`: 503 «Hay muchos PDFs en revisión». Rojo antes, arriba |
+| A1b | Los dos lugares son para toda la app: las cuentas atacantes hacen esperar a las demás | D50, con su medición |
+| A2a | Un PDF válido de 9,1 MB (2500 hojas × 70 enlaces) ahora se rechaza por el tope de 256 MB | Riesgo: es el tope pedido. Una factura real no tiene esa forma |
+| A2b | Sin memoria dentro de una función en C de pypdf sale `SystemError`, y su texto interno llegaba al usuario como PDF inválido | Arreglado en `5819029`: pasa a «demasiado pesado». Rojo antes, arriba |
+| A3a–d | Sabotajes que daban verde: la lectura de despachos sin usuario, el turno del usuario sin tiempo máximo, sin tope de lugares, la fila que no se borra | Casos y sabotajes en `3f0ed57` |
+| A4 | Sin tope de CPU al validar; si matan al worker con SIGKILL, el hijo queda huérfano hasta su tiempo máximo; memoria del contenedor hasta 4 workers × 2 × 256 MB; el camino nunca corrió en la imagen Docker de producción | Riesgos, abajo |
 
-| Quién | Modelo y esfuerzo | Sobre | Hallazgos | Qué pasó |
-|---|---|---|---|---|
-| Yo, el diff entero | — | `daefd4b` | el corte por CPU tiraba lo leído; el largo se medía antes de NFC; la operación callaba lo que no guardaba | rojo `697ffb6`, fix `669bac0`, sabotajes `daefd4b` |
-| Adversario | Sonnet alto | `ba9e42a` | ninguno: lo cortó un reinicio del contenedor antes de escribir | relanzado abajo |
-| `/code-review high` | — | `daefd4b` | 10 (abajo) | 1 y 2 arreglados con su rojo; el resto, riesgos |
-| `/security-review` | — | `9dca44f` | ninguna vulnerabilidad | — |
-| Adversario | Sonnet alto | `7e96b32` | 5 (abajo) | 1, 2, 3 y 5 arreglados con su rojo (`c55bd32` → `e035fc9`); 4, a riesgos |
-| `/code-review high` (2) | — | `7e96b32..0c3a059` | 10 | 2, 4, 5, 8 y 9 arreglados (`b11809f` → `fca1878`); 10 en este commit; el resto, riesgos |
-| `/code-review high` (3) | — | `0c3a059..4081221` | 10 | 4, 7, 8 y 9 arreglados (`f86005f` → `f5b8a93`, `17386a1`, `e9173de`); 10 en este commit; el resto, riesgos |
-| `/code-review high` (4) | — | `4081221..17386a1` | 8 | 3, 5 y 7 arreglados (`e9173de`, `bd14302`); 8 en este commit; el resto, riesgos |
-| `/security-review` (2) | Opus, esfuerzo por defecto (subagente general) | `9db0002..bd14302`, `proyecto_maria/` | ninguna vulnerabilidad sobre el umbral | revisó SQL parametrizado en la migración, el upsert, el dueño en cada endpoint, el 409 sin fuga entre dueños, XSS y el proceso hijo sin shell |
+### Riesgos, sin arreglo en esta pieza
 
-**Hallazgos del code-review:**
-1. La migración escribía la clave antes de unir y chocaba con el índice. **Arreglado** (`9dca44f`).
-2. Learn y la operación convertían con `float()` y aprendían «1_000» y «٣». Rojo: `assert (1000.0, 3.0, 10.0) == (0.0, None, None)`. **Arreglado** (`ae2ab9a`): pasan el número crudo y `valor_para_promedio` lo rechaza.
-3. a 10. Van a riesgos.
+- **Costo por subida:** validar aparte suma unos 125 ms por PDF chico (medí 126, 120 y 132 ms); importar pypdf se lleva 53. Es para toda factura y todo despacho.
+- **D49 y D50**, arriba.
+- **Hallazgos 3, 4 y 7** de la tabla del code-review.
+- **A2a:** un PDF legítimo muy grande en estructura se rechaza.
+- **A4:** huérfanos con SIGKILL al worker (viven hasta 30 s); el peor caso de memoria del contenedor, según cuántos workers corran en Railway; **no lo probé en la imagen Docker de producción**: si `RLIMIT_AS` o el `exec` del hijo se comportan distinto ahí, se ve al publicar.
 
-**Hallazgos del adversario sobre `7e96b32`** (Sonnet alto, en un worktree propio): aguantaron la identidad en las 16 combinaciones de vías, la migración, Postgres, el tope de CPU (10,15 s como máximo) y los bordes en 1e12.
-1. La operación con un ítem que no es objeto daba 500 con el texto de la excepción. **Arreglado.**
-2. Confirmar NCM con medio par o NUL en `origen` o `vendor_name` daba 200 y no guardaba nada. **Arreglado.**
-3. El PUT guardaba el origen con NUL (500 en Postgres) y aceptaba orígenes que guardar rechaza («Non», «['a»). **Arreglado.**
-4. Un cuerpo que es una lista con medio par da 500 en las cinco vías. **Riesgo**, abajo.
-5. Confirmar NCM aceptaba cualquier texto con 8 dígitos. **Arreglado** con `ncm_para_historial`.
+### Puertas
 
-**Code-review 2, 3 y 4, lo arreglado:**
-- El PUT guardaba «ＢＲ» o «ÉS» tal cual: `pais_reconocido` normaliza con NFKD (2-2). Ahora sólo ASCII.
-- El control ASCII miraba después de pasar a mayúsculas: «ıt» entraba como IT (3-4). Ahora mira lo escrito; «ﬁ» (que crece a «FI») también tiene caso (4-3).
-- Un `resumen` que no es objeto daba 500 (2-4); `{"items": {}}`, `0`, `""` y `false` pasaban (2-5).
-- El mensaje del origen repetía la representación de Python de una lista (2-8): ahora dice «El origen tiene que ser el código de dos letras.».
-- El aviso del NCM inválido estaba copiado en dos lugares (2-9): es una constante.
-- Ningún sabotaje probaba los totales de la operación vacía (4-5), los ids de los sabotajes eran posicionales (3-8) y el origen que no es texto no se probaba en guardar (3-7).
-- `upper` doble (4-7).
+| Puerta | SHA | Salida |
+|---|---|---|
+| `test_rendimiento1c.py` + `test_rendimiento1.py` + `test_despacho1b.py` | `3f0ed57` | `301 passed, 3 warnings in 82.37s (0:01:22)` |
+| `rendimiento1c.sh` | `3f0ed57` | 13 ROJO, `sabotajes con falla: 0`, salida 0 |
+| `rendimiento1.sh` | `3f0ed57` | 11 ROJO, `sabotajes con falla: 0`, salida 0 |
+| dos sabotajes de `despacho1b.sh` a mano | `3f0ed57` | 1 passed sin sabotaje y 1 failed con él, en cada uno |
+| suite completa, desde un worktree limpio | `3f0ed57` | `4286 passed, 336 skipped, 2 xfailed, 93 warnings in 504.16s (0:08:24)`, con mi comando, sin `-rs` (los dos comandos, sobre `b5fb03a`, en DESPACHO-1b arriba) |
+| `compileall` | `3f0ed57` | «SALIDA compile 0» (dos `SyntaxWarning` viejos de `pdf_extractor.py:927` y `:936`, que esta pieza no toca) |
 
-## Supuestos reversibles
+**Lo que no corrí:** la imagen Docker de producción, el smoke y el ataque de aislamiento. La pieza no toca sesión ni permisos, y el `main.py` sólo pasa el usuario.
 
-- **Confirmar un NCM inválido da 400 y no aprende nada.** Antes, un NCM sin 8 dígitos igual sumaba en el historial del dueño; sólo se salteaban las memorias del cliente y del proveedor (code-review 2, hallazgo 7). Lo leí como el punto 2, «por ninguna vía». Si querés que el historial del dueño lo siga contando, es volver a separar ese paso.
-- Una operación sin productos ni resumen se guarda vacía, con totales en cero.
-
-- «1_000» y «٣» como peso en learn o en la operación: el producto se aprende sin ese valor, igual que con un infinito. Al guardar un despacho, el renglón vuelve marcado.
-- El type hint de `upsert` sigue diciendo `Optional[float]`, pero ahora recibe el valor crudo (texto o número) y lo valida `valor_para_promedio`. No lo cambié para no ensanchar el diff.
-
-## Riesgos, sin arreglo en esta pieza
-
-- **Tuyos, quedan así:**
-  - las filas viejas pesan por `veces_usado`;
-  - learn de 100 ítems contra 5000 filas tarda 19 s;
-  - la consulta de la migración no filtra por esquema;
-  - el candado de lectura es por proceso.
-- **`update_product_history` sobra.** Nada del producto lo llama: sólo `tests/test_despacho1b.py:1262` y `tests/old/`. Si alguien lo llamara hoy, escribiría filas sin `clave` ni dueño, fuera de la regla y del índice (un NULL no choca). Propuesta para otra pieza: borrarlo junto con sus pruebas.
-- **Del code-review:**
-  - 3: el semáforo de 2 lugares es global; va a RENDIMIENTO-1c.
-  - 4: `process_pdf` parsea dentro del proceso; va a RENDIMIENTO-1c.
-  - 5: un DELETE a la vez que un guardado. Va en un savepoint, todo o nada: no queda nada a medias. Bajo.
-  - 6: un SIGPROF justo en el `finally` del tope. Rarísimo, y el temporizador se apaga igual.
-  - 7: la migración recorre la tabla en cada arranque. Es lineal, y una tabla sin duplicados no escribe nada.
-  - 8: la validación está repetida entre guardar y el PUT. Llaman a las mismas funciones, pero desde dos lugares.
-  - 9: un NCM con otros dígitos rechaza el pedido entero. Es lo que pide el punto 2.
-  - 10: leer un despacho levanta dos procesos.
-- **Del adversario:**
-  - Hallazgo 4: un cuerpo que es una lista con un medio par da 500 en las cinco vías. Lo agarra el manejador global del 422 al armar el mensaje, antes de llegar al endpoint. Baja: nada se guarda.
-  - La operación no tiene tope de ítems: 5000 tardan 24 s. Learn y guardar sí lo tienen (500).
-  - Learn y la operación con un valor de 1e12 aprenden el producto sin ese valor y no lo dicen por renglón. Es el supuesto aceptado.
-  - Confirmar con un `ncm` o una `descripcion` que no son texto da 500. Ya pasaba en `1f5480e` (también code-review 2, hallazgo 6).
-  - Un PUT que cambia la clave entre el INSERT y el FOR UPDATE de otra vía dejaría un `NoResultFound`. No lo reproduje.
-  - Un posible deadlock entre borrar un cliente y aprender a la vez. No lo probé.
-- **De los code-review 2, 3 y 4:**
-  - **La pantalla del catálogo** (clientes.js:1427) acepta tres letras y precarga «XX». El PUT ahora da 400 a «CHN» o «XX», como pide el punto 5, y la pantalla muestra «No se pudo guardar» sin el motivo y deja escrito lo rechazado (2-1). Media para el uso; es del frontend. Propuesta para otra pieza: `maxlength="2"` y mostrar el detalle del 400.
-  - **El origen en aprender, la operación y confirmar NCM** se guarda sin validar, cortado a tres letras: «China» queda «CHI» y «br» queda en minúsculas (2-3, 3-1, 4-1). El arreglo natural es llamar a `origen_para_catalogo` en `upsert_client_product_history`, pero cambia qué aprenden tres vías que el punto 5 no nombra. Lo propongo como pieza aparte.
-  - `int()` y `float()` del resumen y de los campos de un ítem de la operación dan 500 con un valor que no es número; con una operación vacía, también un `null` en el resumen (3-2, 3-3, 4-4). `save_client_operation` devuelve `str(e)[:200]` en ese 500, que el security-review anotó fuera de alcance.
-  - `pais_reconocido` es difuso; un conjunto ISO2 sería más claro (3-5).
-  - El 400 de un cuerpo que no es objeto habla de «productos» (3-6).
-  - `_origen_desde_factura` (pdf_extractor.py:2081) pasa a mayúsculas sin mirar ASCII. Es de las facturas, fuera de la pieza (4-2).
-  - El 400 del origen repite lo escrito sin tope de largo ni filtro de caracteres de control (4-6). Baja: es la respuesta al mismo que lo mandó.
-
-## Puertas
-
-Sobre `bd14302`, salvo `guardar1.sh` (sobre `4034cdd`, que sólo cambia ese script). `tests/test_despacho1b.py`, `despacho1b.sh` y la suite, sobre `03296d4`. De `bd14302` a `03296d4` sólo cambian `guardar1.sh`, `despacho1b.sh`, un valor de un caso del PUT, la prueba de las hojas leídas antes del corte, el CHANGELOG y este informe: ningún archivo de producto.
-
-| Puerta | Salida |
-|---|---|
-| `tests/test_despacho1b.py` | `281 passed, 3 warnings in 47.30s`, salida 0 (sobre `03296d4`) |
-| `despacho1b.sh` (copia congelada) | BASE «verde sin sabotaje en 03296d4c69ec37bf9eacea31e73f0eb40c1d7ea2», 132 ROJO, «sabotajes sin rojo: 0». Corrió desacoplado: no guardé el código de salida del proceso |
-| `disco1.sh` (copia congelada, sobre `bd14302`; toqué `tests/test_disco1.py`) | 39 ROJO, «sabotajes sin rojo: 0», salida 0. **No corrí** los 7 de Postgres («falta PG_URL»): son del bloqueo por dueño de DISCO-1, que esta vuelta no toca |
-| `guardar1.sh` | 12 ROJO, «sabotajes con falla: 0», salida 0 (sobre `4034cdd`) |
-| suite completa, base limpia (sobre `03296d4`) | `4284 passed, 336 skipped, 2 xfailed, 94 warnings in 492.06s (0:08:12)`, salida 0 |
-| `compileall -q proyecto_maria` | salida 0, sin texto |
-| Postgres 16, `despacho1b_postgres.py` | «fallas: 0», salida 0 (sobre `bd14302`, arriba) |
-| No corrido | smoke y ataque de aislamiento: la pieza no toca sesión ni permisos |
-
-## Incidentes
-
-- Un reinicio del contenedor mató al primer adversario antes de que escribiera hallazgos.
-- Un script de sabotajes editado mientras corría. Desde entonces corro una copia congelada.
-- **Postgres sobre `bd14302`, dos intentos fallidos antes del bueno**, los dos míos y de entorno:
-  - el primero, porque corrí la copia del arnés desde mi carpeta temporal, donde un `bisect.py` mío tapaba al de la biblioteca;
-  - el segundo, porque esa copia estaba fuera del repositorio y no encontraba el paquete.
-  El tercero corrió desde el árbol de `bd14302`: «fallas: 0».
-- **`guardar1.sh` sobre `bd14302`** dio «sabotajes con falla: 2»: dos patrones ROTO, que no encontraban el código. El de aprender estaba roto desde `669bac0`, dentro de esta vuelta, y no lo vi. El de editar lo rompí en `e035fc9`. Los dos se arreglaron en `4034cdd`, y sobre ese SHA da «sabotajes con falla: 0».
-- **Un reinicio del contenedor cortó `despacho1b.sh` en el sabotaje 45 de 131**, con los 45 en ROJO y ninguna falla. Lo retomé con otra copia congelada, idéntica salvo un contador que saltea los primeros 45 sin correrlos. La copia vuelve a comprobar el verde de base. Las dos salidas van juntas en la tabla de puertas.
-
-- **`despacho1b.sh` sobre `bd14302` dio cuatro sabotajes sin rojo, y el defecto es mío:** el script no siguió el código de `fca1878`, `f5b8a93` y `eb4e615`.
-  - «el lector guarda el NCM con puntos» (ROJO?): el código ya no guardaba con puntos, el sabotaje caía por otro motivo (422 «Falta la posición SIM…» en 5 casos `dos_vias[*-guardar]`). Ahora se llama «el lector no acepta el NCM de 10 dígitos» y espera esos casos.
-  - «el promedio acepta infinitos» (ROJO?): el caso esperado lo frena antes `_DECIMAL`. Ahora espera los tres que sí lo ven (`un_infinito_guardado_antes…`, `…no_es_un_peso_da_400[1e400]`, `un_producto_nuevo_no_guarda_valores_fuera_del_tope`).
-  - «el origen con mitad de par se repite» (ROTO): buscaba el patrón viejo.
-  - «el NCM sin recortar las puntas» (VERDE): ningún caso mandaba espacios al PUT. El caso `test_cambiar_un_producto_guarda_la_forma_de_la_regla` ahora manda `" 3926.90.90.000A "`. Con el sabotaje cae con `400` «El NCM no es válido: tiene que tener sus 8 dígitos.»; sin él, pasa.
-  - `_DECIMAL` no tenía sabotaje: sumé «el promedio acepta números con otros dígitos», que hace caer `aprender_ignora_los_numeros_con_otros_digitos[learn|operacion]` y `cambiar_un_producto_valida_igual_que_guardar[guion bajo|peso arabigo]`.
-  - Dos casos quedan sin un sabotaje propio que los tire solos: `test_el_mismo_ncm_con_o_sin_puntos_es_el_mismo_producto` (lo sostiene también la normalización de `identidad_del_producto`) y `test_aprender_un_peso_infinito_no_lo_guarda_y_el_catalogo_anda` (dos capas: `_DECIMAL` e `isfinite`). Sacar una sola capa no los distingue.
-- **`despacho1b.sh` sobre `bb913d0` dio un VERDE, y el defecto es de la prueba:** «extraer se lleva el tope entero: la prueba no lo vio». El sabotaje deja a entender el texto con 1 ms de tope, pero el temporizador de CPU corta recién al tick siguiente (4 ms o más) y el texto de prueba se entiende en unos 3,1 ms (medido). `test_las_hojas_leidas_antes_del_corte_dan_sus_productos` pasaba igual. En `03296d4` la prueba hace que entender cueste 50 ms de CPU. Repetida 5 veces: 5 verdes sin sabotaje y 5 rojos con él. El producto no cambia.
-- **Las dos corridas sobre `bb913d0` se cortaron en el sabotaje 96**, con los 95 anteriores en ROJO. A la primera la cortó el tope de 2 h de las tareas de fondo; desde ahí corro desacoplado. A la segunda, un reinicio del contenedor. El 96 solo dio ROJO, «4 failed, 277 passed, 3 warnings in 46.30s»: los cortes vinieron del entorno. Retomé desde el 96 con una copia congelada que saltea los anteriores sin correrlos. Ahí salió el VERDE de arriba. La puerta es la corrida completa sobre `03296d4`.
-- **La corrida vieja sobre `bd14302` se cortó por el tope de tiempo de las tareas de fondo**, en el sabotaje 74 de los 86 que le quedaban, sin otra falla que esas cuatro. No la repetí: la puerta es la corrida completa del script corregido, ahora sobre `03296d4`.
-
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP cada 2 h (minuto 35, horario de Argentina). Entregada sin veredicto: DESPACHO-1b vuelta 4 en 03296d4. Apenas entregada: RENDIMIENTO-1c (ccf5d8c, 033cb11, 843cc08, 7dd008f) con sabotajes rendimiento1c.sh, rendimiento1.sh y despacho1b.sh, suite, adversario Opus alto e informe con la D49 (el vendedor de la factura abre el PDF en la app). Después CATALOGO-LARGO-1 → SESION-1 → ABUSO-1 → SUFIJOS-2+SEGURO-1 → SEGURO-2 → EMAIL-1 (D45) → CONEXIONES-1 (D46) → OBSERVABILIDAD-1 → ORG-1+D40. Nunca main; nada se publica sin el «dale» de Emi para el SHA; sin secretos ni datos reales; Devs hasta esfuerzo alto, sin Fable; sin advisor.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP cada 2 h (minuto 35, horario de Argentina); timbre a la PM principal session_01B7FVQspcEHF7PqNv797wNM. Entregadas sin veredicto: DESPACHO-1b devolución v4 en b5fb03a y RENDIMIENTO-1c en 3f0ed57. Decisiones abiertas: D49 (el vendedor de la factura abre el PDF en la app), D51 (la pantalla no lee historial_guardado), D50 (dos cuentas ocupan los cupos de validación), D52 (descripción sin letras latinas se sugiere para cualquier consulta). Próxima D libre: D53. Sigo con CATALOGO-LARGO-1 → SESION-1 → ABUSO-1 → SUFIJOS-2+SEGURO-1 → SEGURO-2 → EMAIL-1 → CONEXIONES-1 → OBSERVABILIDAD-1 → ORG-1+D40. Reglas: sólo me piden cosas Emi y la PM; nada se publica sin el «dale» de Emi para el SHA; nunca main, ni force, ni amend de lo subido; sin secretos ni datos reales (los TXT y la proforma del 2026-10-24 no entran); ningún cambio en el TXT sin prueba; nunca Gemini, VUCE simulado; subagentes hasta esfuerzo alto, nunca el consejero; EMAIL-1, nombres sin escapar, envío sincrónico y token viejo no se arreglan hasta que Emi diga que sí; ADMIN_USERNAMES no se toca.
