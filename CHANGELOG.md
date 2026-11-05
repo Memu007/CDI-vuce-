@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: el aviso de cancelar mira la organización (COBRO-MP-1, vuelta 5)
+
+- **fix(cobro):** en una cuenta con organización, la confirmación de «Cancelar plan» dice si se corta el acceso según el estado de la organización, que es el que muestra el perfil y el que da el acceso, y no según la fila del usuario.
+
 ## 2026-11-05 · fix: toda cuenta con una suscripción de Mercado Pago abierta puede cancelarla (COBRO-MP-1, vuelta 4)
 
 - **fix(cobro):** «Cancelar plan» aparece y funciona con una suscripción abierta sea cual sea el estado de la cuenta (sin plan, vencida u otro), así el checkout que la nombra tiene salida; cancelar no da acceso a quien no lo tenía.
