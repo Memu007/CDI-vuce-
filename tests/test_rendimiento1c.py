@@ -270,3 +270,115 @@ def test_quedarse_sin_memoria_en_c_es_demasiado_pesado(monkeypatch):
     monkeypatch.setattr(pypdf, "PdfReader", sin_memoria)
     with pytest.raises(MemoryError):
         validar_pdf(b"%PDF-1.4")
+
+
+class _Ocupante:
+    """Un hijo que valida hasta que `libre` se prende (o lo matan)."""
+
+    def __init__(self, libre):
+        self.libre, self.returncode = libre, None
+        self.stdin = self.stdout = self.stderr = self
+
+    def write(self, _):
+        pass
+
+    async def drain(self):
+        pass
+
+    def close(self):
+        pass
+
+    async def read(self, *_):
+        await self.libre.wait()
+        return b""
+
+    async def wait(self):
+        await self.libre.wait()
+        self.returncode = 0
+        return 0
+
+    def kill(self):
+        self.libre.set()
+
+
+TOPE = 2.0
+
+
+@pytest.mark.parametrize("libera_antes_del_tope, esperado", [
+    (0.5, {"pasó"}),            # esperó casi todo el tope
+    (0.08, {"pasó"}),           # deja menos de lo que tarda un PDF normal
+    (0.0, {"pasó", 503}),       # el tope justo
+    (-0.2, {503}),              # no hubo lugar a tiempo
+], ids=["casi-todo", "menos-que-un-pdf", "justo", "pasado"])
+def test_esperar_casi_todo_el_tope_no_culpa_al_archivo(monkeypatch, libera_antes_del_tope, esperado):
+    """B y C ocupan los dos lugares y los liberan cerca del tope de A. A, con un
+    PDF normal, se valida con su tiempo entero o recibe el 503 de «sin lugar»:
+    nunca el 400 que lo manda a cambiar de archivo."""
+    import asyncio
+    import time
+
+    from fastapi import HTTPException
+
+    from proyecto_maria.core import despacho_lector
+    from proyecto_maria.security.file_security import validate_file_upload
+    from tests.pdf_bombas import hojas
+
+    monkeypatch.setenv("PDF_VALIDATE_TIMEOUT_S", str(TOPE))
+    normal = hojas([("UNO", 0)])
+    real = asyncio.create_subprocess_exec
+
+    async def escenario():
+        t = time.monotonic()
+        assert await despacho_lector.validar_pdf_aparte(normal, 30) == {"encriptado": False, "paginas": 1}
+        assert time.monotonic() - t > 0.08, "un PDF normal tarda menos que lo que deja el caso"
+        loop = asyncio.get_running_loop()
+        libre = asyncio.Event()
+
+        async def ocupa(*_, **__):
+            return _Ocupante(libre)
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", ocupa)
+        ocupan = [asyncio.create_task(despacho_lector.validar_pdf_aparte(normal, 30, clave=u))
+                  for u in ("b", "c")]
+        semaforo = despacho_lector._VALIDANDO[loop][0]
+        while not semaforo.locked():
+            await asyncio.sleep(0)
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", real)
+        loop.call_at(loop.time() + TOPE - libera_antes_del_tope, libre.set)
+        try:
+            await validate_file_upload(_Subida(normal), "pdf", clave="a")
+            resultado = "pasó"
+        except HTTPException as e:
+            resultado = e.status_code if e.status_code == 503 else (e.status_code, e.detail)
+        libre.set()
+        await asyncio.gather(*ocupan, return_exceptions=True)
+        return resultado
+
+    resultado = asyncio.run(escenario())
+    assert resultado in esperado, resultado
+
+
+def test_validar_tiene_tope_de_cpu(monkeypatch):
+    """Un PDF que da más trabajo que el tope de CPU se corta y es «demasiado
+    pesado»; uno normal, con el mismo tope, pasa."""
+    import asyncio
+
+    from fastapi import HTTPException
+
+    from proyecto_maria.core import despacho_lector
+    from proyecto_maria.security.file_security import validate_file_upload
+    from tests.pdf_bombas import hojas
+
+    # Validarlo gasta unos 0.25 s de CPU y menos de 100 MB.
+    trabajoso = pdf_que_se_infla(repeticiones=10, claves=50_000)
+    monkeypatch.setattr(despacho_lector, "_MAX_CPU_LECTURA", 0.05)
+
+    async def subir(data):
+        try:
+            await validate_file_upload(_Subida(data), "pdf")
+            return "pasó"
+        except HTTPException as e:
+            return e.status_code, e.detail
+
+    assert asyncio.run(subir(hojas([("UNO", 0)]))) == "pasó"
+    assert asyncio.run(subir(trabajoso)) == (400, PESADO)
