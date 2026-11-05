@@ -487,7 +487,7 @@ async def validate_file_upload(
     # Additional validation for PDFs
     if file_type == 'pdf':
         # Abrir un PDF armado puede ocupar más de 1 GB: va en otro proceso,
-        # con la memoria topeada y tiempo máximo (RENDIMIENTO-1 y 1c).
+        # con la memoria topeada y tiempo máximo.
         from proyecto_maria.core.despacho_lector import PdfDemasiadoPesado, validar_pdf_aparte
         try:
             resultado = await validar_pdf_aparte(contents, _pdf_validate_timeout_s(), clave=clave)
