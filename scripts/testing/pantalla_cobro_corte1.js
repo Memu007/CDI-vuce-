@@ -93,6 +93,9 @@ const ID = 'OP_20261028050000123';
   await con402({ code: 'TRIAL_EXPIRED', billing_status: 'canceled',
                  message: 'Cancelaste tu suscripción. Reactivala para seguir usando CDI.' },
                'Cancelaste tu suscripción', 'cancelada');
+  await con402({ code: 'PLAN_LIMIT_EXCEEDED', billing_status: 'canceled',
+                 message: 'Alcanzaste el límite de 15 operaciones del plan Básico. Comprá un top-up o actualizá a Premium.' },
+               'Llegaste al tope de tu plan', 'cancelada con el tope');
 
   // 3. El 409 de regeneraciones muestra su mensaje.
   const msg409 = 'Esta operación ya se generó 10 veces con datos distintos, el máximo. Si es otra operación, cargala como nueva.';

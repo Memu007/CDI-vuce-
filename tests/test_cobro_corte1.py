@@ -119,8 +119,8 @@ def _generar(c, operation_id=ID_A, flete=7925.0):
     return c.post("/generate_maria", json=pedido)
 
 
-def _cliente(c):
-    r = c.post("/api/clientes", json={"nombre": "Importadora Inventada", "cuit": "30999999995"})
+def _cliente(c, cuit="30999999995"):
+    r = c.post("/api/clientes", json={"nombre": "Importadora Inventada", "cuit": cuit})
     assert r.status_code == 200, r.text
     return r.json()["cliente"]["id"]
 
@@ -462,6 +462,20 @@ def test_guardar_con_el_archivo_de_otra_cuenta_no_toca_su_operacion(cuenta):
     ops_a = _operaciones(ua)
     assert len(ops_a) == 1 and ops_a[0]["cliente"] is None, ops_a
     assert _operaciones(ub)[0]["id"] != ops_a[0]["id"]
+
+
+def test_la_misma_factura_guardada_en_otro_cliente_no_le_saca_la_operacion_al_primero(cuenta):
+    c, u = cuenta()
+    assert _generar(c).status_code == 200
+    a, b = _cliente(c), _cliente(c, cuit="30711111118")
+    assert _guardar(c, a, ARCHIVO_A).status_code == 200
+    assert _generar(c, flete=8000.0).status_code == 200
+    for _ in range(2):
+        r = _guardar(c, b, ARCHIVO_A)
+        assert r.status_code == 200, r.text
+    ops = _operaciones(u)
+    assert sorted(o["cliente"] for o in ops) == sorted([a, b]), ops
+    assert _leer(u)["ops"] == 2
 
 
 def test_guardar_una_operacion_nueva_con_el_tope_lleno_da_402(cuenta):

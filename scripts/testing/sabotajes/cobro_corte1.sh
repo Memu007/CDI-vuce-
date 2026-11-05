@@ -162,8 +162,16 @@ sabotaje $M "guardar no busca la operación generada" \
   '        if operation is not None:' '        if False:'
 sabotaje $M "guardar toma la operación generada de otra cuenta" \
   "FAILED $T::test_guardar_con_el_archivo_de_otra_cuenta_no_toca_su_operacion" \
-  $'            OperationModel.owner_username == owner_username,\n            OperationModel.generated_file == archivo,' \
-  $'            OperationModel.generated_file == archivo,'
+  $'        OperationModel.owner_username == owner_username,\n        OperationModel.generated_file == archivo,' \
+  $'        OperationModel.generated_file == archivo,'
+sabotaje $M "guardar le saca la operación a otro cliente" \
+  "FAILED $T::test_la_misma_factura_guardada_en_otro_cliente_no_le_saca_la_operacion_al_primero" \
+  '            operation = await _operacion_maria(db, username, archivo, client_id)' \
+  '            operation = await _operacion_maria(db, username, archivo)'
+sabotaje $M "guardar no reusa la operación generada sin cliente" \
+  "FAILED $T::test_guardar_despues_de_generar_no_cuenta_dos_veces" \
+  '        query = query.where(sa_or(OperationModel.client_id.is_(None),' \
+  '        query = query.where(sa_or(False,'
 sabotaje $M "guardar sin haber generado no cuenta" \
   "FAILED $T::test_guardar_sin_haber_generado_cuenta_una" \
   $'        else:\n            await _contar_operacion_bloqueada(db, username)' $'        else:\n            pass'
@@ -227,8 +235,12 @@ sabotaje $A "el impago se titula como tope" \
   "                SUBSCRIPTION_PAST_DUE: 'Llegaste al tope de tu plan',"
 sabotaje $A "la cancelada se titula como vencida" \
   "FALLA: cancelada: el modal se titula" \
-  "            const titulo = motivo.billing_status === 'canceled' ? 'Cancelaste tu suscripción'" \
-  "            const titulo = motivo.billing_status === 'cancelada' ? 'Cancelaste tu suscripción'"
+  "            const cancelo = motivo.billing_status === 'canceled' && motivo.code !== 'PLAN_LIMIT_EXCEEDED';" \
+  "            const cancelo = motivo.billing_status === 'cancelada' && motivo.code !== 'PLAN_LIMIT_EXCEEDED';"
+sabotaje $A "la cancelada con el tope se titula como cancelada" \
+  "FALLA: cancelada con el tope: el modal se titula" \
+  "            const cancelo = motivo.billing_status === 'canceled' && motivo.code !== 'PLAN_LIMIT_EXCEEDED';" \
+  "            const cancelo = motivo.billing_status === 'canceled';"
 sabotaje $A "el modal no muestra el mensaje del servidor" \
   "FALLA: tope: el modal dice" \
   "            const lead = motivo.message || (typeof detail === 'string' && detail) ||" \
