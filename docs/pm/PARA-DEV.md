@@ -3,42 +3,36 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Veredicto de ORDEN-1b vuelta 2 (2026-11-05 05:20 UTC): devolución corta, sólo de pruebas
+## Veredicto de ORDEN-1b vuelta 3 (2026-11-05 09:30 UTC): devolución corta, sólo de pruebas
 
-Sobre `8b087fd`. Evidencia: `docs/pm/REPRODUCCION-ORDEN-1b-v2-2026-11-05.md`.
-El producto se sostiene: `orden1b.sh` 24 ROJO, `orden1.sh` 76 ROJO, los dos
-«sabotajes sin rojo: 0»; chequeo-6 igual a tu informe; dos pestañas de A con
-una de B, y B que entra y sale, frenan bien.
+Sobre `f22f48b`. Evidencia: `docs/pm/REPRODUCCION-ORDEN-1b-v3-2026-11-05.md`.
+Producto: nada, y sigue así.
 
-**Causa:** la comparación «respuesta vieja, cookie nueva» que pedí está fijada
-en `sesionEsDelDueno` (z29), pero no en `loadCurrentUser`. Si
-`const sesionAntes = getCsrfToken();` (app_v2.js:381) se lee después de la
-respuesta, el arnés entero sigue verde (67 OK). Mientras tanto, la vuelta del
-pago toma la cookie de B como del dueño y la pestaña de A escribe a nombre
-de B: un cliente guardado queda en la cuenta de B. Lo reproduje: sobre
-`8b087fd` el cliente no queda en ninguna cuenta; con ese cambio queda en la
-de B. Lo que pido:
+**Lo que dio distinto:** mi `orden1b.sh` dio `VERDE | la sesión de la
+respuesta se lee cuando ya llegó (topup_success)`, «sabotajes sin rojo: 1».
 
-- Un caso en el arnés: la relectura de la vuelta del pago sale con la cookie
-  de A (retenela con `route.fetch()`, no con `continue()`, que repega las
-  cookies), entra B, se suelta la respuesta y la pestaña intenta escribir.
-  Si cubrís también los reintentos de la primera carga, que vayan como datos
-  del mismo caso.
-- Su sabotaje en `orden1b.sh`: mover esa lectura abajo del `try/finally`. Que
-  dé rojo.
-- Va después de la devolución de COBRO-MP-1 vuelta 4, que es la primera.
-  Producto: nada.
+**Causa:** `z35` retiene «la primera `/auth/current_user` con la pestaña ya
+cargada», y no siempre es la relectura del pago. `checkDemoForceTour`
+(`screens/tour.js:243`) también la pide al abrir. Si llega después de la
+carga, el handler retiene la del tour; la escritura sale antes de la
+relectura (t≈1600 ms contra ≈2150 ms) y nunca pasa por la línea saboteada.
+Lo reproduje de forma determinista atrasando 1 s la del tour en una copia del
+arnés: las dos vueltas, `topup_success` y `success`, quedan en verde con el
+sabotaje puesto. Además, `__leidas >= __pedidas` se cumple aunque la
+relectura todavía no se haya pedido. Lo que pido:
 
-**D50:** (a), a la cola de limpieza. La entrada no estaba: la escribí yo en
-`COLA-LIMPIEZA.md`. El caso nuevo va como función aparte, no dentro de la
-anónima de :280.
+- Que `z35` retenga la relectura del pago y ninguna otra, y que falle con su
+  propio mensaje si escribe sin haberla retenido. Cubrí la familia: la del
+  tour antes o después de la carga.
+- Mostrá una vez el rojo: el sabotaje M3 con la del tour atrasada tiene que
+  dar ROJO en las dos vueltas.
+- Sin espera fija nueva.
 
-**H3:** queda como riesgo bajo, no medio. El perfil vuelve a pedir
-`/api/billing/me`; lo viejo es sólo el banner.
+**D55:** (a). Con la pestaña sin dueño el freno es `sesionAlAbrir`; esas
+filas no distinguen este sabotaje.
 
-**Fuera de esta pieza, para que conste:** las lecturas GET no pasan por el
-freno (la pestaña de A ve clientes y perfil de B hasta que intenta escribir).
-Ya estaba en la base. No lo toques; si hace falta, lo propongo como pieza.
+**Sigue en pie de la vuelta 2:** D50 (a), a la cola; H3, riesgo bajo; las
+lecturas GET sin freno quedan fuera de esta pieza.
 
 ## Veredicto de COBRO-MP-1 vuelta 3 (2026-11-05 01:45 UTC): devolución por una causa
 
