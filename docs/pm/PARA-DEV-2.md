@@ -69,69 +69,61 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
-## Veredictos del 2026-11-05 10:00 UTC: dos devoluciones cortas (PM)
+## Veredicto de DESPACHO-1c y respuestas D53–D57 (2026-11-05 18:20 UTC, PM)
 
-**Orden:** RENDIMIENTO-1c vuelta 2 → DESPACHO-1b vuelta 6 → terminar
-CATALOGO-LARGO-1 → **DESPACHO-1c** (D51 b + D52 b) → **RENDIMIENTO-1d** (D49
-b) → SESION-1 y el resto de la cola. Las devoluciones van primero aunque
-CATALOGO-LARGO-1 esté a medias. D52 no la adelanto a CATALOGO-LARGO-1: es
-vieja (`a77e6ad`) y cortar una pieza de Emi con commits subidos cuesta más.
-**Nada se integra todavía:** `b5fb03a` contiene `3f0ed57` (RENDIMIENTO-1c) y
-`5c46e36` (DISCO-1); entran juntas cuando acepte RENDIMIENTO-1c y DESPACHO-1b,
-después de correr `disco1.sh` con PG. Próxima D tuya: D53.
+**Orden:** DESPACHO-1c devolución → terminar RENDIMIENTO-1d (con D55 b) →
+SESION-1 → el resto de la cola. CATALOGO-LARGO-2 entra sólo si Emi dice que sí. RENDIMIENTO-1c v2, DESPACHO-1b v6 y
+CATALOGO-LARGO-1 sobre `ca87d82`: sus sabotajes y la suite siguen corriendo
+de mi lado; el veredicto va aparte apenas terminen. Hasta ahora todo
+coincide (`rendimiento1c.sh` 17 ROJO, `rendimiento1.sh` 11, `despacho1b_postgres`
+22 OK con `fallas: 0`, y `despacho1b.sh` 97 de 138 en rojo antes de que se me
+cortara por tiempo). No hace falta que toques nada de esas tres.
 
-### RENDIMIENTO-1c sobre `3f0ed57`: devolución por una causa
+### DESPACHO-1c sobre `5199709`: devolución por una causa
 
-Evidencia: `REPRODUCCION-RENDIMIENTO-1c-2026-11-05.md`. Se sostienen el rojo
-(1031 MB → 0), `rendimiento1c.sh` 13 ROJO, `rendimiento1.sh` 11 ROJO, la suite
-(`4510 passed`) y chequeo-6.
+Evidencia: `REPRODUCCION-DESPACHO-1c-2026-11-05.md`. Se sostienen 14 casos,
+`despacho1c.sh` 7 ROJO y chequeo-6 sin avisos.
 
-**Causa:** la espera en la fila se le cobra al PDF. `validar_pdf_aparte` le
-pasa al hijo `max(hasta - loop.time(), 0.0)`, y `_leer_aparte` marca
-`lanzado = True` al entrar al semáforo. Tras una espera larga el hijo arranca
-con poco tiempo, vence con un `TimeoutError` común y la persona recibe 400
-«tardó demasiado. Probá con otro archivo.», que culpa a un archivo sano.
-Reproducido con tope 2: `C: (400, 'No pudimos abrir el PDF: tardó demasiado…')`.
+**Causa:** una falla de guardado puede quedar tapada por un éxito en la
+pantalla. Lo que pido es comportamiento:
 
-- Un PDF normal nunca recibe 400 por haber esperado: o se valida, o recibe
-  el 503 de «sin lugar». *Sugerencia:* separar el tiempo de espera del de
-  corrida (el hijo, una vez lanzado, tiene su tope entero), o tratar el
-  tiempo restante corto como `SinLugar`.
-- Un caso con la familia como datos: espera casi todo el tope, espera el tope
-  justo, y espera que deja menos de lo que tarda un PDF normal; rojo en
-  `3f0ed57`, y su sabotaje.
-- **D50: (b), decidido por la PM, en esta misma vuelta:** tope de CPU de 10 s
-  también en validar, con su caso y su sabotaje. La premisa de (a) es falsa:
-  el limitador es por IP (`rate_limit.py:68`, 3000 por minuto en
-  `config.py:28`) y `enforce_pdf_quota` (`main.py:4336`) corre después de
-  validar, así que nada acota por cuenta antes de ocupar un lugar.
-- El conteo propio del informe da `+126/−53`; la PM mide `+137/−54` con el
-  CHANGELOG. Revisalo en el informe de la vuelta.
+- **Ninguna falla de guardado deja un éxito a la vista**, en el panel de
+  cliente sin asignar y en la caja fija. La familia, como datos de un caso:
+  `/operaciones` con 500, con **402** (cuenta vencida: es la respuesta nueva
+  de COBRO-CORTE-1), con 409, con la red caída, y `historial_guardado: false`.
+  En todos, lo último que ve la persona es el error. Va rojo primero en
+  `5199709` y con su sabotaje. **D57: (b), ampliada así.**
+  `reSaveOperationAndClosePanel` es tuya; a la Dev técnica le dije que no la
+  toque.
+- **D53: (b), en esta misma devolución.** `saveNcmUsage` (`ncm.js`) y
+  aprender el catálogo (`finalize.js`) muestran el aviso con un 400 y con
+  `historial_guardado: false`. Va en el mismo caso de la familia.
+- Dos descripciones sólo CJK o emoji iguales normalizan a vacío y no se
+  cruzan entre sí. Decime en el informe si eso es aceptable o si lo dejás
+  para CATALOGO-LARGO-2. No es criterio de aceptación.
 
-### DESPACHO-1b vuelta 5 sobre `b5fb03a`: la causa está, falta fijar el borde
+### Las otras D
 
-Evidencia: `REPRODUCCION-DESPACHO-1b-v5-2026-11-05.md`. `despacho1b_postgres.py`
-`fallas: 8` → `0`, la familia PUT/DELETE por las cuatro vías, sin doble suma ni
-fila ajena, el sabotaje de `with_for_update`, `despacho1b.sh` 136 ROJO y la
-suite (`4512 passed`). Devolución sólo de pruebas y del informe:
+- **D54: (a), decidido por la PM.** Que el arranque corte si la migración no
+  puede: la tabla es chica, el `ALTER` no la reescribe y ya hay precedente.
+- **D55: (b), decidido por la PM, dentro de RENDIMIENTO-1d.** Leer un despacho
+  sigue el mismo patrón que validar, con su caso de la familia y su sabotaje.
+- **D56: (a), decidido por la PM.** Que cada mitad tenga su respuesta.
+- **Numeración:** las D son una sola serie para las dos Devs y D58 quedó sin
+  usar. Para que no choquen, desde ahora vos usás los impares desde D63 y la
+  técnica los pares desde D62.
 
-- **Ninguna prueba llega a agotar los 3 intentos.** Con `range(2)`,
-  `despacho1b_postgres.py` sigue en `fallas: 0`; cambiar el `else: raise` por
-  `return None` haría que guardar conteste 200 sin guardar, sin rojo. Pido un
-  caso en Postgres que agote los intentos y fije qué contesta cada vía
-  (guardar 500; operación y guardar-uso `historial_guardado: false`; aprender
-  sin contarlo), y sabotajes sobre el 3 y sobre el `else`. *Sugerencia:* un
-  trigger `BEFORE INSERT` que cree la fila y uno `AFTER INSERT FOR EACH
-  STATEMENT` que la borre; los intentos, con una secuencia.
-- La frase «si las 3 fallan, sale un error (500), nunca un 200 mudo» es
-  cierta sólo para guardar: corregila en el informe.
-- **D51: (b), D52: (b), decididos por la PM**, juntas como DESPACHO-1c,
-  después de CATALOGO-LARGO-1. D52 en los dos sentidos: la fila guardada que
-  normaliza a vacío se sugiere para todo, y una consulta que normaliza a
-  vacío recibe las primeras 5 del historial.
-- **D49: (b), decidido por la PM**, como RENDIMIENTO-1d (arreglo chico de
-  seguridad, Emi los aprobó el 04/11), con la prueba de un PDF que se infle
-  al extraer el texto.
+### Pieza propuesta a Emi: CATALOGO-LARGO-2 (después de SESION-1, sólo si dice que sí)
+
+Es la misma familia que CATALOGO-LARGO-1, que encontró el adversario Opus y
+ya estaba escrita: lo que no entra en la columna se pierde sin aviso.
+
+- Un origen de más de 5 caracteres (por ejemplo «TAIWAN») o un proveedor de
+  más de 200 nunca dan 200 sin guardar ni 500. Se guardan enteros o reciben
+  un 400 con el motivo a la vista.
+- Una descripción que normaliza a vacío nunca contesta
+  `historial_guardado: true` sin haber guardado.
+- El tope de 2000 se cuenta igual en los dos lugares.
 
 ## DISCO-1: aceptada sobre `5c46e36` (2026-10-29 01:00 UTC)
 

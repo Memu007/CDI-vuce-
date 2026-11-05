@@ -3,59 +3,69 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Veredicto de CSRF-2 (2026-11-05 15:15 UTC): aceptada. Seguís con CSRF-3
+## Veredicto de COBRO-CORTE-1 (2026-11-05 18:10 UTC): devolución por una causa
 
-Sobre `fcd1072`. Evidencia: `docs/pm/REPRODUCCION-CSRF-2-2026-11-05.md`.
-- `70 passed` con enforce en `true` y en `false`; `csrf2.sh` 10 ROJO y
-  `csrf1.sh` 8 ROJO, sin fallas; chequeo-6 1 AVISO, explicado en el informe.
-- Opus recorrió en Chromium con enforce prendido la landing, v2, v1 con
-  sesión, la verificación de mail y el reset: ninguna escritura real dio 403.
-- Sonnet probó 20 formas de colarse en el conjunto exacto: todas 403.
+Sobre `75c6476`. Evidencia: `docs/pm/REPRODUCCION-COBRO-CORTE-1-2026-11-05.md`.
+El corte por estado está bien: Opus y Sonnet recorrieron todas las rutas que
+gastan Gemini o escriben el TXT, y las cinco carreras en Postgres dieron bien.
+Lo que vuelve es el conteo.
 
-**D58:** (a), a la cola de limpieza.
-**D59:** (a). Va como pieza chica **CSRF-3**, ya, antes de COBRO-CORTE-1:
-- una sesión con `access_token` válido y sin cookie `csrf_token` la recibe
-  sola, sin volver a entrar, y la escritura siguiente pasa;
-- sin sesión no se emite nada;
-- la familia como datos: cookie ausente, vacía, y sesión vencida (esta
-  última no recibe token).
-Producción hoy no tiene CSRF; al publicar, todas las sesiones abiertas
-quedan sin la cookie. Decidido por la PM con el sí de Emi del 04/11 a los
-arreglos chicos de seguridad.
-**D60:** (b), nada por ahora. Opus abrió v1 con sesión y anda; le pregunto a
-Emi si alguien la usa.
-**Tu supuesto de `/auth/register`:** aceptado.
+**La causa.** El id que arma la pantalla con el número de factura
+(`FAC_<factura>`, saneado) hace de identidad de la operación, y el guardado
+reemplaza lo que encuentra con ese id. Lo reproduje:
+- dos operaciones distintas con factura `0001` al mismo cliente: queda una,
+  con los ítems de la segunda, y no se cuenta (`OP-000001` pisado);
+- `A-1/2` y `A-12` dan el mismo archivo;
+- después de 10 contenidos, 409 para siempre en ese id; en exportación pasa
+  con el mismo contenido en días distintos, porque el TXT lleva la fecha
+  (`maria_generator_export.py:159`);
+- borrar el cliente y regenerar cuenta otra vez.
 
-Lo que encontraron y no es de esta pieza, a la cola: el «Simular Pago» del
-checkout demo sin token (sólo en desarrollo), `--root-path` y el login CSRF
-por `GET /auth/verify-email`.
+**Lo que pido, como comportamiento, con la familia como datos:**
+1. Dos operaciones distintas nunca comparten una fila del historial y cada
+   una cuenta. Familia: mismo número de dos proveedores, ids que el saneo
+   junta, sin número de factura, dos miembros de la misma organización.
+2. Regenerar la misma operación con el mismo resultado nunca gasta una de
+   las 10, también en exportación con otro día. Nunca un callejón sin
+   salida: pasado el tope, la usuaria honesta tiene cómo hacer una operación
+   nueva con esa factura sin borrar el cliente. *Sugerencia:* que la 11.ª
+   distinta sea una operación nueva contada en vez de un 409.
+3. Lo ya contado no se vuelve a contar por borrar el cliente.
+4. Cuántas generaciones distintas saca, como mucho, una operación pagada,
+   dicho en el código con su número y probado.
+5. El 402 nunca muestra un código crudo (`clientes.js:449` y `:628` dicen
+   «payment_required»); la razón no cambia entre el primer pedido y el
+   segundo; un `plan` legado (`trial`, el default de `User.plan`) nunca da
+   400 ni 500 al generar, exportar o guardar.
+6. El atajo `ENVIRONMENT == "testing"` pasó de 1 lugar a 4. Que las rutas
+   que cuentan no lo tengan.
 
-La pieza queda ✅ y se integra a mi rama hasta `c44bf84`.
+Un caso por punto, rojo antes en `75c6476`, y su sabotaje. Uno de la familia
+del punto 1 lo pruebo yo con un ejemplo que no está acá.
 
-**Tu orden:** CSRF-3 → COBRO-CORTE-1 → COBRO-MP-2 → COBRO-MP-3 →
-AISLAMIENTO-2 / LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. Próxima D: D61.
+**D4 b se corrige por esta evidencia** (decidido por la PM, reversible): se
+sigue contando al generar, pero la identidad no puede ser el texto de la
+factura.
 
-## Veredicto de COBRO-MP-1 vuelta 5 (2026-11-05 12:55 UTC): aceptada
+**D61: (b), mover sin devolver cupo** (decidido por la PM, reversible; se lo
+digo a Emi). Guardar en B lo que se generó y guardó en A mueve la operación a
+B; `ops_used` nunca baja, así que no hay camino que devuelva cupo. Lo que sí
+es otra operación para otro importador entra por el punto 1.
 
-Sobre `736fed6`. Evidencia: `docs/pm/REPRODUCCION-COBRO-MP-1-v5-2026-11-05.md`.
-El caso nuevo da `2 failed` en `9161e0a` y `4 passed` en `736fed6`; suite
-`4419 passed`; `cobro_mp1.sh` 148 ROJO, sin fallas. Mis seis filas, con otros
-estados de la organización y de la fila, y una organización que no existe,
-fallan donde tienen que fallar en `9161e0a` y pasan en `736fed6`. El
-adversario no encontró nada nuevo que bloquee.
+**Reparto con MARIA.** `reSaveOperationAndClosePanel` (`finalize.js:1127`),
+que muestra «Cliente asignado» aunque el guardado dé 402, es la misma función
+que le devuelvo a MARIA en DESPACHO-1c. Es de ella: no la toques. Los textos
+de `clientes.js` y `app_v2.js` son tuyos.
 
-Lo que queda es D51: que cancelar con organización actúe sobre la cuenta que
-da el acceso y que sólo pueda hacerlo quien corresponda. Va como pieza aparte
-y se la propongo a Emi. Mientras, una organización `active` en sus días de
-gracia, con la fila del miembro con días, ve «dejás de usar CDI» y sigue con
-acceso al cancelar.
+A la cola de limpieza, no acá: las dos posibles inversiones de orden de locks
+(ruta manual con extras vencidas; aceptar invitación), sin reproducir.
+C10 queda como puerta de publicación con Emi.
 
-Al integrar `885ee89` entraron también tus commits de COBRO-CORTE-1,
-COBRO-MP-2, AISLAMIENTO-2, LIMPIEZA-1 y BACKUP-1a, que están debajo. No
-quedan aceptadas por eso y tu orden no cambia.
+**CSRF-3:** en revisión, veredicto aparte.
 
-La pieza queda ✅ y se integra a mi rama hasta `885ee89`, junto con
-ORDEN-1b.
+**Tu orden:** la devolución de COBRO-CORTE-1 → COBRO-MP-2 → COBRO-MP-3 →
+AISLAMIENTO-2 / LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. Próxima D: D62; desde ahora usás
+los pares y MARIA los impares, para que no choquen.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
@@ -352,41 +362,6 @@ arranque y vos tenés menos entregas en cola. Decidido por la PM.
 - Commits aparte encima de LIMPIEZA-1, con su propio `/entregar` después
   del de LIMPIEZA-1. Toca datos: revisión fuerte. Si algo choca, preguntá
   en la **D8**.
-
-## COBRO-CORTE-1 — hecha, sin entregar (encargada 2026-10-28 05:00 UTC)
-
-En commits aparte encima de COBRO-MP-1 (`f54d8a9`), con su propio
-`/entregar` después del de COBRO-MP-1. Arregla C1, C5 y C6
-(`AUDITORIA-2026-10-06.md`). Tu análisis de entonces está en `62b1d14`;
-las decisiones, en `efef997` (ahí se llamaron D4 a D6 y siguen valiendo):
-
-- **Cuándo se cuenta (D4 b, N = 10):** la primera vez que se genera el
-  MARIA de un `operation_id` del usuario se crea la operación y se cuenta.
-  Las descargas siguientes del mismo id no cuentan, y `finalize.js` guarda
-  con ese id (no uno nuevo). Un mismo id no pasa de 10 regeneraciones con
-  contenido distinto.
-- **El corte (D5 a):** en las rutas que gastan Gemini o generan valor, sólo
-  por estado (vencido o impago → 402). El tope del plan, sólo donde se
-  cuenta una operación.
-- **Carreras (D6 a):** `SELECT … FOR UPDATE` de la fila de la cuenta
-  (usuario u organización) mientras se mira el tope, se cuenta y se
-  calcula el `op_code`, en una sola transacción, sin migración. El índice
-  único `(owner_username, op_code)` es una pieza aparte, más adelante.
-- **El aviso:** dice la razón real (impago, vencido o tope).
-
-Premisa primero: la base se movió tres semanas desde `62b1d14` (ORG-1,
-COBRO-MP-1). Comprobá que las rutas y líneas que nombraste siguen siendo
-esas antes de tocar nada. Cada prueba se ve en rojo antes del arreglo.
-
-Pruebas: una cuenta impaga y una vencida no generan ni suben a Gemini
-(402 con su razón); una paga con el tope lleno puede validar y bajar lo ya
-contado; regenerar el mismo id no cuenta y la 11.ª distinta se frena;
-guardar después de generar no cuenta dos veces; pedidos al mismo tiempo
-contra un Postgres local no pasan el tope ni repiten `op_code` (o
-declarado «no corrido»). Un sabotaje por regla. Nada contra Mercado Pago
-real. Tu próxima D es la **D6** de esta numeración.
-
-Es plata: la reviso con Opus y Sonnet, alto.
 
 ## COBRO-MP-2: subila ya (2026-10-28 10:00 UTC)
 
