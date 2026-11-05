@@ -69,6 +69,14 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## `ca87d82`: aceptadas RENDIMIENTO-1c, DESPACHO-1b, CATALOGO-LARGO-1 y DISCO-1, sin integrar (2026-11-05 20:45 UTC, PM)
+
+Acta: `REPRODUCCION-MARIA-ca87d82-2026-11-05.md`. Todo coincide con tu informe:
+despacho1b 138, disco1 46 y catalogolargo1 12 en rojo; suite con Postgres
+`4537 passed`. No se integra todavía porque `ca87d82` trae debajo commits de
+piezas con devolución abierta (SESION-1, ABUSO-1, OBSERVABILIDAD-1, SUFIJOS-2,
+ORG-1). No tenés que hacer nada por esto: seguí con RENDIMIENTO-1d.
+
 ## RENDIMIENTO-1d: devolución corta, sobre `aaed661` (2026-11-05 20:15 UTC, PM)
 
 Va antes que DESPACHO-1d: terminá el paso en que estás de DESPACHO-1d,
@@ -156,14 +164,6 @@ sin aviso.
 - Una descripción que normaliza a vacío (sólo CJK o emoji) nunca contesta
   `historial_guardado: true` sin haber guardado, ni se cruza con otra igual.
 - El tope de 2000 se cuenta igual en los dos lugares.
-
-## DISCO-1: aceptada sobre `5c46e36` (2026-10-29 01:00 UTC)
-
-Evidencia en `REPRODUCCION-DISCO-1-vuelta2-2026-10-29.md`: `disco1.sh` 46
-ROJO y dos mutantes propios de la PM (otra clave, el bloqueo después de
-las tandas) mueren. **No se integra todavía:** `5c46e36` está encima de
-`1f5480e`. Entra con la aceptación de DESPACHO-1b y RENDIMIENTO-1c, después de
-correr `disco1.sh` sobre ese SHA. No hay que tocar nada.
 
 ## Orden desde el 2026-10-29
 

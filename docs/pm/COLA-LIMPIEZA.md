@@ -51,3 +51,8 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   quien pueda tocar `CLAUDE.md` (decide Emi).
 - `test_maria1b_devolucion` y `test_excel2.py:512` usan una ruta fija en
   `/tmp`: pasarlas a `tmp_path`.
+- `_migrate_add_user_cuit_column` (`main.py:470`) no tiene `lock_timeout`: el
+  arranque espera detrás de un `sugerir` que tiene abierta la transacción
+  mientras habla con Gemini (medido: 28,5 s).
+- `api_logs.endpoint` es `String(200)`: un PUT o DELETE con clave larga pierde
+  su métrica («value too long»).
