@@ -5910,7 +5910,7 @@ _ARCHIVO_MARIA = re.compile(r"MARIA(?:_|-EXPORT_)[A-Za-z0-9_-]{1,50}\.TXT")
 
 async def _operacion_maria(db: AsyncSession, owner_username: str, archivo: str,
                            client_id: str | None = None):
-    """La operación del usuario creada al generar ese MARIA_<id>.TXT, o None.
+    """La operación más vieja del usuario con ese MARIA_<id>.TXT, o None.
     Con client_id, sólo una sin cliente o de ese: la de otro cliente no se le saca."""
     query = sa_select(OperationModel).where(
         OperationModel.owner_username == owner_username,
@@ -7590,7 +7590,7 @@ async def save_client_operation(
     _cobro=Depends(require_billing_vigente),
 ):
     """Guarda una operación en el historial del cliente.
-    La de un MARIA ya generado ya está contada: se completa sin contar otra."""
+    La de un MARIA ya generado, sin cliente o de éste, ya está contada: no cuenta otra."""
     username = user["username"]
     client = await _get_owned_client(db, client_id, username)
 
