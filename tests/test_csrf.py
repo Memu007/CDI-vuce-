@@ -85,13 +85,36 @@ def test_enforce_no_afecta_bearer_sin_cookie(monkeypatch, sin_bypass_de_test):
     assert resp.status_code == 401  # rebota por auth, no por CSRF
 
 
-def test_logout_borra_csrf_cookie(cookie_client):
-    resp = cookie_client.post(
-        "/auth/logout",
-        headers={"X-CSRF-Token": cookie_client.cookies.get("csrf_token") or ""},
-    )
-    assert resp.status_code == 200
+@pytest.mark.parametrize("ruta", ["/auth/logout", "/logout"])
+def test_logout_con_token_borra_las_dos_cookies(cookie_client, monkeypatch, ruta):
+    monkeypatch.setenv("CSRF_ENFORCE", "true")
+    resp = cookie_client.post(ruta, headers={"X-CSRF-Token": cookie_client.cookies.get("csrf_token")})
+    assert resp.status_code == 200, resp.text
+    assert not cookie_client.cookies.get("access_token")
     assert not cookie_client.cookies.get("csrf_token")
+
+
+RUTAS_SIN_TOKEN = [
+    ("DELETE", "/api/catalog/x/productos/abc-webhook", None, False),
+    ("POST", "/api/payments/webhook/x", {}, False),
+    ("POST", "/healthx", {}, False),
+    ("POST", "/staticx", {}, False),
+    ("POST", "/auth/loginx", {}, False),
+    ("POST", "/auth/login", {"username": "nadie", "password": "x"}, True),
+    ("POST", "/auth/request-password-reset", {"email": "nadie@test.cdi"}, True),
+    ("POST", "/auth/recover-username", {"email": "nadie@test.cdi"}, True),
+    ("POST", "/auth/reset-password", {"token": "x", "new_password": "otraClave123"}, True),
+]
+
+
+@pytest.mark.parametrize("metodo,ruta,cuerpo,exenta", RUTAS_SIN_TOKEN, ids=[f"{m} {r}" for m, r, _, _ in RUTAS_SIN_TOKEN])
+def test_sin_token_solo_pasan_las_rutas_exentas_exactas(cookie_client, monkeypatch, metodo, ruta, cuerpo, exenta):
+    # Con una cookie de sesión vieja, las rutas públicas que no usan la sesión
+    # tienen que andar; cualquier otra ruta, aunque se le parezca, pide el token.
+    monkeypatch.setenv("CSRF_ENFORCE", "true")
+    resp = cookie_client.request(metodo, ruta, json=cuerpo)
+    pidio_token = resp.json().get("code") == "csrf_failed"
+    assert pidio_token != exenta, f"{metodo} {ruta} sin token dio {resp.status_code}: {resp.text}"
 
 
 @pytest.mark.parametrize("ruta,con_token,esperado", [
