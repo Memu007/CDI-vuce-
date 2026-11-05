@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Negativos de ORDEN-1b: cada sabotaje deshace un freno de la pestaña cuyo
 # dueño ya no es el de la sesión, y la pantalla (scripts/testing/pantalla_orden1.js,
-# casos z12, z20 a z27, z29 a z32 y z34) tiene que fallar por ese motivo.
+# casos z12, z20 a z27, z29 a z32, z34 y z35) tiene que fallar por ese motivo.
 #
 # uso: PY=/ruta/al/venv/bin/python [PUERTO=8875] scripts/testing/sabotajes/orden1b.sh [SHA]
 # Trabaja en un worktree descartable con SQLite propia y sin terceros: no toca
@@ -87,7 +87,7 @@ correr() {
   kill $API 2>/dev/null; wait $API 2>/dev/null; API=""
   return $codigo
 }
-export CASOS=z12,z20,z21,z22,z23,z24,z25,z26,z27,z29,z30,z31,z32,z34
+export CASOS=z12,z20,z21,z22,z23,z24,z25,z26,z27,z29,z30,z31,z32,z34,z35
 if ! correr >/dev/null; then
   echo "BASE  | la pantalla ya está en rojo sin sabotaje: no se puede medir nada"; correr | grep FALLA; exit 1
 fi
@@ -197,6 +197,12 @@ export CASOS=z34
 sabotaje $A "al volver del pago toma los datos del otro" \
   "FALLA: A volvió del pago con B adentro y la pestaña tomó los datos de B" \
   "$LEE" "confirmarSesion(user.username, sesionAntes);"
+
+export CASOS=z35
+sabotaje $A "la sesión de la respuesta se lee cuando ya llegó" \
+  "FALLA: la relectura de la vuelta del pago (success) contestó A, entró B antes de leerla y la pestaña guardó un cliente y el cliente quedó en la cuenta de B" \
+  "            const sesionAntes = getCsrfToken();"$'\n' '' \
+  "            if (duenoPestana === null) {" $'            const sesionAntes = getCsrfToken();\n            if (duenoPestana === null) {'
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes sin rojo: $FALLAS"

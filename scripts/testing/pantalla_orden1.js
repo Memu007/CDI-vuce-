@@ -69,7 +69,8 @@
 //      autoriza la escritura; (z30) la pestaña tapada al abrir no escribe;
 //  (z31) PUT, DELETE y PATCH con otro adentro no salen; (z32) Escape no
 //      destapa la pestaña y «Recargar» recarga; (z34) al volver del pago no
-//      toma los datos del otro.
+//      toma los datos del otro; (z35) ni escribe con la respuesta de A que
+//      llega cuando ya entró B.
 // Datos inventados. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_orden1.js
 // El servidor corre con CSRF_ENFORCE=true, como en producción.
@@ -1751,12 +1752,12 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     await ctx.close();
   }
 
-  // (z34) Al volver del pago, la pestaña de A vuelve a leer el usuario; si
-  // entró B, no toma sus datos.
-  if (corre('z34')) {
-    const que = 'A volvió del pago con B adentro';
+  // Abre la vuelta del pago de A y retiene la relectura del usuario hasta que
+  // entra B. Con `conCookieDeA` la consulta llega al servidor enseguida, con
+  // la sesión de A; si no, sale al soltarla, con la de B.
+  async function vueltaDelPago(nombre, billing, conCookieDeA, que) {
     const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
-    const a = await nuevoUsuario(ctx, 'ord1z34');
+    const a = await nuevoUsuario(ctx, nombre);
     const t = await ctx.newPage();
     await t.addInitScript(() => {
       const f = window.fetch;
@@ -1777,21 +1778,46 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     const hayRetenida = new Promise(r => { avisar = r; }), suelta = new Promise(r => { soltar = r; });
     await t.route('**/auth/current_user', async ruta => {
       if (!(await t.evaluate(() => !!(window.CDI && CDI.currentUser)).catch(() => false))) return ruta.continue();
+      // route.continue() pone las cookies del momento en que se suelta.
+      const respuesta = conCookieDeA ? await ruta.fetch() : null;
       avisar();
       await suelta;
-      return ruta.continue().catch(() => {});
+      return (respuesta ? ruta.fulfill({ response: respuesta }) : ruta.continue()).catch(() => {});
     });
-    await t.goto(base + '/dashboard?billing=success');
+    await t.goto(base + '/dashboard?billing=' + billing);
     const tope = setTimeout(() => falla(que + ', pero la pestaña no vuelve a leer el usuario en 15 s'), 15000);
     await hayRetenida;
     clearTimeout(tope);
-    const otro = await nuevoUsuario(ctx, 'ord1z34b');
+    const otro = await nuevoUsuario(ctx, nombre + 'b');
     soltar();
     await t.waitForFunction(() => window.__leidas >= window.__pedidas, null, { timeout: 15000 })
       .catch(() => falla(que + ' y la pestaña no terminó de leer el usuario en 15 s'));
+    return { ctx, a, otro, t };
+  }
+
+  // (z34) Al volver del pago, la pestaña de A vuelve a leer el usuario; si
+  // entró B, no toma sus datos.
+  if (corre('z34')) {
+    const que = 'A volvió del pago con B adentro';
+    const { ctx, otro, t } = await vueltaDelPago('ord1z34', 'success', false, que);
     await noTomoDatos(t, otro, que);
     console.log('OK ' + que + ': no toma los datos de B');
     await ctx.close();
+  }
+
+  // (z35) La relectura de la vuelta del pago contesta A, pero B entró antes
+  // de que la pestaña la leyera: esa respuesta no autoriza escribir.
+  if (corre('z35')) {
+    for (const billing of ['success', 'topup_success']) {
+      const que = 'la relectura de la vuelta del pago (' + billing + ') contestó A, entró B antes de leerla y la pestaña guardó un cliente';
+      const { ctx, a, otro, t } = await vueltaDelPago('ord1z35', billing, true, que);
+      const cliente = 'Cliente demo ' + a;
+      const fin = await guardarCliente(t, cliente);
+      await nadaEnElServidor(a, otro, que, cliente);
+      if (!/Entró otro usuario/.test(fin)) falla(que + ' y no avisa que entró otro: ' + fin);
+      console.log('OK ' + que + ': no queda en ninguna cuenta y avisa que entró otro');
+      await ctx.close();
+    }
   }
 
   await b.close();
