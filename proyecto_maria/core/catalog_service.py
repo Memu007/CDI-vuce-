@@ -38,9 +38,8 @@ from proyecto_maria.database.models import VendorCatalogProduct
 # descripciones de facturas tienen ruido (marcas, codigos) y perdemos matches.
 FUZZY_THRESHOLD = 0.80
 
-# La descripción más larga que guardan el catálogo y la memoria del cliente,
-# medida en NFC, la forma en que la guarda la memoria del cliente: así lo que
-# entra en una entra en la otra.
+# Tope común del catálogo y la memoria del cliente, medido en NFC como guarda
+# la memoria: lo que entra en una entra en la otra.
 MAX_DESCRIPCION = 2000
 
 
