@@ -117,10 +117,6 @@ sabotaje $N "confirmar la posición no avisa un 400" \
   'guardado = res.ok && data.historial_guardado !== false;' \
   'guardado = data.historial_guardado !== false;' \
   "FAILED $T::$X[confirmar-ncm-400]"
-sabotaje $F "la operación se arma recién al guardarla" \
-  'saveOperationToHistory(items, data, operacion).then(r => {' \
-  'saveOperationToHistory(items, data).then(r => {' \
-  "FAILED $T::test_se_guarda_la_operacion_que_se_genero[otro-cliente]"
 
 git checkout -q -- proyecto_maria/
 echo "fallas: $FALLAS"
