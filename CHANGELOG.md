@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · feat: se retira la interfaz vieja (v1); la CI mira la suite entera
+
+- **feat(ui):** `/dashboard` sirve siempre la v2. Se van `dashboard.html`, `static/app.js` y `app.css`; `?v=1` y la cookie `cdi_ui` ya no cambian la pantalla. Ninguna ruta de API cambia.
+- **ci:** la suite corre completa: los diez tests excluidos desde julio ya pasaban. Se destapan veinte tests que esperaban `python-magic`, instalado hace tiempo.
+
 ## 2026-11-05 · chore: repositorio ordenado (LIMPIEZA-1, adelantada por Emi)
 
 - **chore(repo):** se borra lo que ya no corre ni se cita: todo lo de Google Cloud (CDI es sólo Railway, decisión del 2026-10-07), la `static/` de la raíz, `clients.json`, el script de migración desde JSON, `tests/old/`, `landing_legacy.html`, los informes de carga, los planes de otras herramientas (`.specify/`, `plans/`), la documentación duplicada o de chat (`docs/fixes`, `docs/misc`, `docs/guides`, `proyecto_maria/documentacion_tecnica`) y los scripts huérfanos de `scripts/`. Nada del producto cambia; todo queda en Git.
