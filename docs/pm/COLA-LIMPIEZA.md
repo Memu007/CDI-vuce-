@@ -37,3 +37,7 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   extras vencidas escribe la organización antes de bloquear el usuario
   (`_expire_extra_ops`), y aceptar invitación toma la organización y después
   el usuario; `_cuenta_bloqueada` va usuario → organización.
+- `GET /dashboard` valida la sesión contra la base: si la base no responde,
+  da 500 en vez de servir la página (riesgo declarado en CSRF-3).
+- Carrera al abrir la v2 con dos respuestas que emiten `csrf_token`: queda el
+  último `Set-Cookie`. No reproducida como fuga.
