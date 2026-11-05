@@ -754,8 +754,8 @@
         const incoterm = (op.incoterm || '').toString().trim().toUpperCase();
 
         const factura = numeroDeFactura(op);
-        // Sin factura, el id sale de cuándo se cargó la operación: regenerarla
-        // deja el mismo nombre de archivo, que es con lo que se reconoce lo ya guardado.
+        // Sin factura, el nombre del archivo sale de cuándo se cargó la operación,
+        // así regenerarla no lo cambia. La operación se reconoce por operacionId.
         const cargada = (CDI.state && CDI.state.uploadedAt) || new Date().toISOString();
         const operation_id = factura ? ('FAC_' + factura.replace(/[^a-zA-Z0-9_-]/g, '')) :
             ('OP_' + String(cargada).replace(/[^0-9]/g, '').slice(0, 17));

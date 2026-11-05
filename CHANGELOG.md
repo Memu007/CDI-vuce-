@@ -8,7 +8,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ## 2026-11-05 · fix: la operación se reconoce por su id, no por el número de factura (COBRO-CORTE-1)
 
-- **fix(cobro):** generar y guardar devuelven el id de la operación y la pantalla lo manda de vuelta: regenerar el mismo contenido no gasta una de las 10, la 11.ª distinta es una operación nueva y contada, dos operaciones con la misma factura no comparten fila y borrar el cliente ya no recuenta. Guardar en otro cliente mueve la operación. El 402 siempre dice su razón, una cuenta con el plan viejo «trial» genera, y las rutas que cuentan piden sesión también en pruebas.
+- **fix(cobro):** generar y guardar devuelven el id de la operación y la pantalla lo manda de vuelta: regenerar el mismo contenido no gasta una de las 10, la 11.ª distinta es una operación nueva y contada, dos operaciones con la misma factura no comparten fila y borrar el cliente ya no recuenta. Guardar en otro cliente mueve la operación. El 402 siempre dice su razón, una cuenta con el plan viejo «trial» genera, y las rutas que cuentan piden sesión también en pruebas. Las regeneraciones que le quedaban a una operación no pasan al período siguiente, dos operaciones manuales no comparten el nombre del archivo y, en la importación, otra fecha de factura es otro resultado.
 
 ## 2026-11-05 · fix: un miembro de una organización no abre una segunda suscripción (COBRO-MP-2)
 

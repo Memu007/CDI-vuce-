@@ -4926,7 +4926,7 @@ async def generate_maria_export_endpoint(
         # Cuenta como /generate_maria. «MARIA-EXPORT_», con guion: con «_» sería
         # el nombre de la importación del id «EXPORT_<x>».
         operacion_id, filename = await _contar_maria(
-            db, user["username"], request.operacion_id, txt_content,
+            db, user["username"], request.operacion_id, _FECHA_DE_EMISION.sub(r"\1", txt_content),
             len(request.items or []), f"MARIA-EXPORT_{safe_id}")
         filepath = os.path.join(_user_downloads_dir(user["username"]), filename)
 
@@ -5905,23 +5905,34 @@ async def _operacion_del_usuario(db: AsyncSession, username: str, operacion_id: 
     return result.scalars().first()
 
 
+def _del_periodo(operacion, cuenta) -> bool:
+    """Las regeneraciones que le quedaban a una operación de un período anterior no pasan a éste."""
+    inicio, creada = cuenta.billing_period_started_at, operacion.created_at
+    if inicio is None or creada is None:
+        return True
+    # A segundos: SQLite guarda created_at sin fracción y la del mismo segundo parecería anterior.
+    return (creada.replace(tzinfo=creada.tzinfo or timezone.utc)
+            >= inicio.replace(tzinfo=inicio.tzinfo or timezone.utc, microsecond=0))
+
+
 async def _contar_maria(db: AsyncSession, username: str, operacion_id: str,
                         contenido: str, total_items: int, nombre: str) -> tuple[str, str]:
     """Devuelve (id de la operación, archivo). Un contenido ya visto en la operación o uno de
     sus primeros diez no cuenta; si no, es otra operación y se cuenta antes de escribir nada."""
     import hashlib
 
-    huella = hashlib.sha256(_FECHA_DE_EMISION.sub(r"\1", contenido).encode("utf-8")).hexdigest()
+    huella = hashlib.sha256(contenido.encode("utf-8")).hexdigest()
     cuenta = await _cuenta_bloqueada(db, username)
     if cuenta is None:
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
 
     operacion = await _operacion_del_usuario(db, username, operacion_id)
     huellas = list(((operacion.extra or {}) if operacion else {}).get("maria_hashes") or [])
-    if operacion is not None and (huella in huellas or len(huellas) < MARIA_REGENERACIONES):
+    if operacion is not None and (huella in huellas or (len(huellas) < MARIA_REGENERACIONES
+                                                        and _del_periodo(operacion, cuenta[1]))):
         if huella not in huellas:
             operacion.extra = {**(operacion.extra or {}), "maria_hashes": huellas + [huella]}
-        operacion.generated_file = f"{nombre}_{operacion.id[:8]}.TXT"
+        operacion.generated_file = f"{nombre}_{operacion.id[-8:]}.TXT"
         await db.commit()
         return operacion.id, operacion.generated_file
 
@@ -5932,7 +5943,7 @@ async def _contar_maria(db: AsyncSession, username: str, operacion_id: str,
         owner_username=username,
         op_code=await _next_op_code(db, username),
         source="maria",
-        generated_file=f"{nombre}_{nuevo_id[:8]}.TXT",
+        generated_file=f"{nombre}_{nuevo_id[-8:]}.TXT",
         total_items=total_items,
         extra={"maria_hashes": [huella]},
     )
