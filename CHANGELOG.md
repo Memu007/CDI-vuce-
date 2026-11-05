@@ -17,7 +17,8 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-11-05 · fix: ninguna falla al guardar deja un éxito a la vista (DESPACHO-1c, devolución)
 
 - Si asignar el cliente o guardar la operación falla (error del servidor, plan vencido, red caída o la memoria sin guardar), se cierra el «Cliente guardado» de antes y lo último que se ve es el error; el panel queda abierto para reintentar.
-- Confirmar una posición SIM o aprender los productos del proveedor avisa también cuando el servidor rechaza el pedido.
+- Confirmar una posición SIM o aprender los productos del proveedor avisa también cuando el servidor rechaza el pedido. Con proveedor, la operación se guarda después de aprender el catálogo, para que su error no quede tapado.
+- Reintentar después de crear un cliente en el panel vuelve a guardar en ese cliente, sin crear otro.
 
 ## 2026-11-05 · fix: lo que no quedó en la memoria de productos se avisa (DESPACHO-1c)
 
