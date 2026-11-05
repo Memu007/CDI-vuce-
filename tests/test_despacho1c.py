@@ -55,7 +55,11 @@ def test_lo_que_no_quedo_en_la_memoria_se_avisa(escenario, guardado):
     salida = subprocess.run(["node", str(PANTALLA), escenario, json.dumps(guardado)],
                             capture_output=True, text=True, timeout=60)
     assert salida.returncode == 0, salida.stderr[-800:]
-    toasts = json.loads(salida.stdout)["toasts"]
+    vista = json.loads(salida.stdout)
+    toasts = vista["toasts"]
+    if escenario == "listo-con-cliente":
+        # la caja «Cliente guardado» es de la operación anterior
+        assert vista["caja"] is None, vista
 
     avisos = [t for t in toasts if t["tipo"] == "warning"]
     if guardado is not False:
@@ -69,11 +73,13 @@ def test_lo_que_no_quedo_en_la_memoria_se_avisa(escenario, guardado):
 
 FALLAS = {"500": {"status": 500}, "409": {"status": 409}, "402": 402, "red": "red", "no-guardado": False}
 FALLAS_MEMORIA = {"400": {"status": 400}, "no-guardado": False}
+CON_PANEL = ("asignar-cliente", "crear-reintento")
 
 
 @pytest.mark.parametrize("escenario, falla", [
-    *[(e, f) for e in ("asignar-cliente", "listo-con-cliente") for f in FALLAS],
-    *[(e, f) for e in ("aprender", "confirmar-ncm") for f in FALLAS_MEMORIA],
+    *[(e, f) for e in (*CON_PANEL, "listo-con-cliente", "listo-con-vendedor") for f in FALLAS],
+    ("aprender", "400"),
+    *[("confirmar-ncm", f) for f in FALLAS_MEMORIA],
 ])
 def test_ninguna_falla_deja_un_exito_a_la_vista(escenario, falla):
     respuesta = {**FALLAS, **FALLAS_MEMORIA}[falla]
@@ -83,6 +89,8 @@ def test_ninguna_falla_deja_un_exito_a_la_vista(escenario, falla):
     vista = json.loads(salida.stdout)
     toasts, caja = vista["toasts"], vista["caja"]
 
+    # reintentar después de crear el cliente no lo crea otra vez
+    assert vista["clientesCreados"] == (escenario == "crear-reintento"), vista
     # toast reemplaza al anterior: lo último que queda es lo que se ve
     tipo = "warning" if falla in ("no-guardado", "400") else "error"
     assert toasts and toasts[-1]["tipo"] == tipo, vista
@@ -91,4 +99,4 @@ def test_ninguna_falla_deja_un_exito_a_la_vista(escenario, falla):
     else:
         assert caja is None, vista
         # el panel sigue abierto para reintentar
-        assert vista["panelAbierto"] == (escenario == "asignar-cliente"), vista
+        assert vista["panelAbierto"] == (escenario in CON_PANEL), vista

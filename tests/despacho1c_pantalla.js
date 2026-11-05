@@ -8,8 +8,11 @@ const [escenario, flag] = process.argv.slice(2);
 const flagJson = JSON.parse(flag);
 const esFalla = flagJson !== null && typeof flagJson !== 'boolean';
 const conFlag = c => (flagJson === null ? c : esFalla ? flagJson : Object.assign({ historial_guardado: flagJson }, c));
-// qué guardado contesta la respuesta pedida; los demás contestan bien
-const DESTINO = { 'confirmar-ncm': '/api/ncm/guardar-uso', aprender: '/productos' }[escenario] || '/operaciones';
+// qué guardados contestan la respuesta pedida; los demás contestan bien
+const DESTINOS = {
+  'confirmar-ncm': ['/api/ncm/guardar-uso'], aprender: ['/productos'],
+  'listo-con-vendedor': ['/operaciones', '/productos'],
+}[escenario] || ['/operaciones'];
 
 class Node {
   constructor(id) {
@@ -36,8 +39,9 @@ function armar(fuente, extraCDI) {
     '/operaciones': { success: true, operation_id: 1 },
     '/api/ncm/guardar-uso': { success: true },
     '/productos': { success: true, productos_nuevos: 1 },
+    '/api/clientes': { success: true, cliente: { id: 8, nombre: 'Cliente Nuevo Sintético' } },
   };
-  respuestas[DESTINO] = conFlag(respuestas[DESTINO]);
+  for (const d of DESTINOS) respuestas[d] = conFlag(respuestas[d]);
   let cliente = null;
   const CDI = Object.assign({
     state: { items: [], operacion: {} },
@@ -79,10 +83,11 @@ function armar(fuente, extraCDI) {
 // Sin red real todo sigue en microtareas, y setImmediate corre recién con esa cola vacía:
 // una vuelta después de ver la llamada, la pantalla ya procesó la respuesta.
 const vaciar = () => new Promise(r => setImmediate(r));
-async function esperarRed(app, url) {
+async function esperarRed(app, url, veces = 1) {
+  const hechas = () => app.llamadas.filter(u => u.endsWith(url)).length;
   let i = 0;
-  do await vaciar(); while (++i < 50 && !app.llamadas.some(u => u.endsWith(url)));
-  if (!app.llamadas.some(u => u.endsWith(url))) throw new Error('la pantalla no llamó a ' + url);
+  do await vaciar(); while (++i < 50 && hechas() < veces);
+  if (hechas() < veces) throw new Error('la pantalla no llamó ' + veces + ' veces a ' + url);
 }
 
 const ITEM = { descripcion: 'Mesa de madera sintética', cantidad: 1, pieza: '', origen: 'CN', valor_unitario: 1 };
@@ -107,6 +112,30 @@ const escenarios = {
     app.CDI.state.operacion = { vendedor_nombre: 'Proveedor Sintético' };
     app.handlers.ready.onEnter();
     await esperarRed(app, '/productos');
+    return app;
+  },
+  // Listo con cliente y vendedor: guarda la operación y aprende el catálogo a la vez.
+  'listo-con-vendedor': async () => {
+    const app = armar('finalize.js');
+    app.ponerCliente({ id: 7, nombre: 'Cliente Sintético' });
+    app.CDI.state.items = [Object.assign({}, ITEM, { pieza: '9403.60.00.000 A' })];
+    app.CDI.state.operacion = { vendedor_nombre: 'Proveedor Sintético' };
+    app.handlers.ready.onEnter();
+    await esperarRed(app, '/operaciones');
+    await esperarRed(app, '/productos');
+    return app;
+  },
+  // Listo sin cliente: el panel crea uno sin CUIT y, si el guardado falla, se reintenta.
+  'crear-reintento': async () => {
+    const app = armar('finalize.js');
+    app.CDI.state.items = [Object.assign({}, ITEM, { pieza: '9403.60.00.000 A' })];
+    app.handlers.ready.onEnter();
+    await esperarRed(app, '/generate_maria');
+    app.node('orphanCreateNombre').value = 'Cliente Nuevo Sintético';
+    for (let vez = 1; vez <= 2 && !app.node('readyOrphanPanel').hidden; vez++) {
+      for (const fn of app.node('orphanCreateSaveBtn').listeners.click || []) fn({});
+      await esperarRed(app, '/operaciones', vez);
+    }
     return app;
   },
   // Listo sin cliente: el panel asigna uno y vuelve a guardar.
@@ -147,6 +176,7 @@ escenarios[escenario]().then(app => {
   const [texto] = caja.querySelectorAll('[data-client-success-text]');
   process.stdout.write(JSON.stringify({
     toasts: app.toasts, panelAbierto: !app.node('readyOrphanPanel').hidden,
+    clientesCreados: app.llamadas.filter(u => u.endsWith('/api/clientes')).length,
     caja: caja.hidden ? null : { titulo: titulo.textContent, texto: texto.textContent },
   }));
 }, err => { console.error(err && err.stack || err); process.exit(2); });
