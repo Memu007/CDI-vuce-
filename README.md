@@ -30,7 +30,9 @@ PYTHONPATH=. uvicorn proyecto_maria.main:app --host 127.0.0.1 --port 8000 --relo
 ```
 
 Abrí <http://127.0.0.1:8000/>. Sin `GEMINI_API_KEY` todo funciona salvo la
-lectura de PDF. Las tablas se crean solas al arrancar; no hay migraciones
+lectura de PDF. Las tablas se crean solas al arrancar y los cambios de esquema
+corren en ese mismo arranque, dentro de `main.py` (funciones `_migrate_*`,
+cada una verifica si ya está aplicada); no hay herramienta de migraciones
 aparte. `start_server.sh` arranca con Gunicorn, como en producción.
 
 ## Pruebas
