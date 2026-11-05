@@ -32,7 +32,7 @@
             // Si la sesión del navegador cambió desde la que se confirmó para
             // la pestaña, la escritura no sale hasta saber que es del mismo
             // usuario: si entró otro, saldría a su nombre. No depende de que
-            // el servidor exija CSRF (ORDEN-1b).
+            // el servidor exija CSRF.
             if (getCsrfToken() !== (sesionDelDueno || sesionAlAbrir) && !(await sesionEsDelDueno())) {
                 throw new Error(sesionAjena ? ERROR_AJENA : ERROR_SIN_SESION);
             }
@@ -398,8 +398,8 @@
                     sesionDelDueno = sesionAlAbrir;
                     if (avisoBorrador === 'red') avisarBorrador(null);
                 }
-            } else {
-                confirmarSesion(user.username, sesionAntes);
+            } else if (!confirmarSesion(user.username, sesionAntes)) {
+                return !!currentUser;
             }
             currentUser = user;
             CDI.currentUser = user;

@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: al volver del pago, la pestaña no toma los datos de otro usuario que entró (ORDEN-1b, vuelta 2)
+
+- **fix(sesión):** si mientras se volvía de Mercado Pago entró otro usuario en el mismo navegador, la pestaña ya no muestra su nombre ni sus datos: se tapa, como cualquier pestaña ajena.
+
 ## 2026-10-29 · fix: una renovación de Mercado Pago no se pierde por el orden de sus avisos (COBRO-MP-1, vuelta 3)
 
 - **fix(cobro):** si un aviso de pago todavía no dice de qué cuenta es (o el cobro llega con su pago pendiente), se responde para que Mercado Pago reintente en vez de anotarlo como rechazado: el otro aviso del mismo pago lo acredita una sola vez.
