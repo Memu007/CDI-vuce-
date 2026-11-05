@@ -2,8 +2,9 @@
 # Negativos de CSRF-3: cada sabotaje deshace una regla de la emisión del token a
 # una sesión que no lo tiene, y la prueba que la cubre tiene que fallar por ese
 # motivo. Qué sesión lo recibe lo mide tests/test_csrf.py; que la página v2 sin
-# cookie csrf_token escriba sin el aviso de otro usuario, scripts/testing/pantalla_csrf3.js
-# contra una API con CSRF_ENFORCE=true.
+# cookie csrf_token escriba sin el aviso de otro usuario, y que lo avise si otro entra
+# antes de saber quién es, scripts/testing/pantalla_csrf3.js contra una API con
+# CSRF_ENFORCE=true.
 #
 # uso: PY=/ruta/al/venv/bin/python [PUERTO=8878] scripts/testing/sabotajes/csrf3.sh [SHA]
 PANTALLA=pantalla_csrf3.js
@@ -16,21 +17,24 @@ MARCA=$'    # CSRFMiddleware le emite el csrf_token a esta sesión si le falta.\
 REVOCADO=$'    if user.active_jti is not None and token_jti != user.active_jti:\n        raise HTTPException(status_code=401, detail="Token revocado")\n'
 EMITE='            if getattr(request.state, "sesion_valida", False) and not request.cookies.get(CSRF_COOKIE_NAME):'
 sabotaje pytest_csrf $D "la sesión se marca válida antes de mirar si está revocada" \
-  "FAILED $CASO[revocada]" "$REVOCADO$MARCA" "$MARCA$REVOCADO"
+  "FAILED $CASO[revocada-/auth/current_user]" "$REVOCADO$MARCA" "$MARCA$REVOCADO"
 sabotaje pytest_csrf $D "la sesión se marca válida antes de verificar la firma" \
-  "FAILED $CASO[vencida]" '    if token.startswith("Bearer "):' "    request.state.sesion_valida = True"$'\n''    if token.startswith("Bearer "):'
+  "FAILED $CASO[vencida-/auth/current_user]" '    if token.startswith("Bearer "):' "    request.state.sesion_valida = True"$'\n''    if token.startswith("Bearer "):'
 sabotaje pytest_csrf $M "el token se emite sin sesión" \
-  "FAILED $CASO[sin_sesion]" "$EMITE" '            if not request.cookies.get(CSRF_COOKIE_NAME):'
+  "FAILED $CASO[sin_sesion-/auth/current_user]" "$EMITE" '            if not request.cookies.get(CSRF_COOKIE_NAME):'
 sabotaje pytest_csrf $M "el token se cambia aunque la sesión ya lo tenga" \
-  "FAILED $CASO[presente]" "$EMITE" '            if getattr(request.state, "sesion_valida", False):'
+  "FAILED $CASO[presente-/auth/current_user]" "$EMITE" '            if getattr(request.state, "sesion_valida", False):'
 sabotaje pytest_csrf $M "una cookie csrf_token vacía cuenta como token" \
-  "FAILED $CASO[vacia]" "$EMITE" '            if getattr(request.state, "sesion_valida", False) and CSRF_COOKIE_NAME not in request.cookies:'
+  "FAILED $CASO[vacia-/auth/current_user]" "$EMITE" '            if getattr(request.state, "sesion_valida", False) and CSRF_COOKIE_NAME not in request.cookies:'
 sabotaje pytest_csrf $M "la sesión sin token no lo recibe" \
-  "FAILED $CASO[ausente]" "$EMITE" '            if False:'
-sabotaje pantalla proyecto_maria/static/v2/app_v2.js "el token recién emitido se toma por otro usuario" \
-  "FALLA: la página avisó que entró otro usuario" \
-  "if (sesionAlAbrir !== '' && (sesionAntes !== sesionAlAbrir || getCsrfToken() !== sesionAlAbrir)) marcarAjena();" \
-  "if (sesionAntes !== sesionAlAbrir || getCsrfToken() !== sesionAlAbrir) marcarAjena();"
+  "FAILED $CASO[ausente-/auth/current_user]" "$EMITE" '            if False:'
+sabotaje pytest_csrf $M "la página v2 abre sin el token" \
+  "FAILED $CASO[ausente-/dashboard]" \
+  '        await get_current_user(request, Response(), db)' '        pass'
+sabotaje pantalla proyecto_maria/static/v2/app_v2.js "la pestaña no mira si el token cambió" \
+  "FALLA: entró otro usuario y la pestaña no lo avisó" \
+  "if (sesionAntes !== sesionAlAbrir || getCsrfToken() !== sesionAlAbrir) marcarAjena();" \
+  "if (sesionAntes !== sesionAlAbrir) marcarAjena();"
 
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]

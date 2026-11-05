@@ -166,8 +166,9 @@ SESIONES_SIN_TOKEN_CSRF = {
 }
 
 
+@pytest.mark.parametrize("ruta", ["/auth/current_user", "/dashboard"])
 @pytest.mark.parametrize("caso", SESIONES_SIN_TOKEN_CSRF)
-def test_sesion_sin_token_csrf_lo_recibe_y_escribe(cookie_client, monkeypatch, sin_bypass_de_test, caso):
+def test_sesion_sin_token_csrf_lo_recibe_y_escribe(cookie_client, monkeypatch, sin_bypass_de_test, caso, ruta):
     # Una sesión válida que perdió su csrf_token lo recupera en la próxima
     # pedida autenticada; si lo tiene no se le cambia, y sin sesión no se emite.
     monkeypatch.setenv("CSRF_ENFORCE", "true")
@@ -178,8 +179,8 @@ def test_sesion_sin_token_csrf_lo_recibe_y_escribe(cookie_client, monkeypatch, s
         cliente.cookies.set("access_token", sesion(token))
     if csrf is not None:
         cliente.cookies.set("csrf_token", csrf)
-    resp = cliente.get("/auth/current_user")
-    assert resp.status_code == (200 if valida else 401), resp.text
+    resp = cliente.get(ruta)
+    assert resp.status_code == (200 if valida or ruta == "/dashboard" else 401), resp.text
     nuevo = resp.cookies.get("csrf_token")
     assert bool(nuevo) == recibe, resp.headers.get("set-cookie")
     if recibe:
