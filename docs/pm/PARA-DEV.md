@@ -43,39 +43,23 @@ pero no es criterio.
 
 **Tu orden:** CSRF-1 vuelta 2 → CSRF-2 → COBRO-CORTE-1 → …
 
-## Veredicto de COBRO-MP-1 vuelta 4 (2026-11-05 09:55 UTC): devolución corta por una causa
+## Veredicto de COBRO-MP-1 vuelta 5 (2026-11-05 12:55 UTC): aceptada
 
-La vuelta 5 (`736fed6`) está en revisión: el veredicto va a ir acá arriba.
+Sobre `736fed6`. Evidencia: `docs/pm/REPRODUCCION-COBRO-MP-1-v5-2026-11-05.md`.
+El caso nuevo da `2 failed` en `9161e0a` y `4 passed` en `736fed6`; suite
+`4419 passed`; `cobro_mp1.sh` 148 ROJO, sin fallas. Mis seis filas, con otros
+estados de la organización y de la fila, y una organización que no existe,
+fallan donde tienen que fallar en `9161e0a` y pasan en `736fed6`. El
+adversario no encontró nada nuevo que bloquee.
 
-Sobre `9161e0a`. Evidencia: `docs/pm/REPRODUCCION-COBRO-MP-1-v4-2026-11-05.md`.
-El dinero se sostiene: cancelar nunca da acceso ni corre la fecha, toda cuenta
-con suscripción abierta sale, `cobro_mp1.sh` 146 ROJO y sin fallas, suite
-`4415 passed`. La devolución de la vuelta 3 queda resuelta.
+Lo que queda es D51: que cancelar con organización actúe sobre la cuenta que
+da el acceso y que sólo pueda hacerlo quien corresponda. Va como pieza aparte
+y se la propongo a Emi. Mientras, una organización `active` en sus días de
+gracia, con la fila del miembro con días, ve «dejás de usar CDI» y sigue con
+acceso al cancelar.
 
-**Causa (nueva de esta vuelta):** la confirmación de cancelar no mira la misma
-cuenta que la pantalla. `/billing/me` muestra el estado de la organización
-(`billing_entity`), pero `cancelar_corta_acceso(db_user)` (`main.py:3321`)
-mira la fila del usuario. Lo reproduje: organización `past_due` vencida,
-dueño con fila `trial` +10 y suscripción abierta → `corta: False`. La
-pantalla promete «vas a poder seguir usando CDI hasta el fin del período» y
-la cuenta queda sin acceso. En `9048b6a` decía «dejás de usar CDI». Al revés
-también: organización `active` +20 y fila `past_due` vencida → dice que corta
-y la organización sigue 20 días. Lo que pido:
-
-- Que lo que promete la confirmación salga de la misma cuenta cuyo acceso
-  muestra la pantalla.
-- Un caso con la familia como datos: organización y fila del usuario en
-  estados distintos, en las dos direcciones, más una cuenta sin
-  organización. Su rojo en `9161e0a` y su sabotaje en `cobro_mp1.sh`.
-- Quién puede cancelar lo de una organización no se decide acá (D51).
-
-**D51:** (a), pieza aparte, salvo el texto de arriba, que va en esta vuelta.
-La guarda ya era así; el texto no, por eso no queda para después.
-**D52:** (a), confirmado.
-**D53:** (a): ya pasaba en la base, y ahora la respuesta lo dice.
-**D54:** (a), a la cola de limpieza.
-
-**Tu orden:** la de CSRF-1, arriba; si la vuelta 5 trae devolución, esa va primero.
+La pieza queda ✅ y se integra a mi rama hasta `885ee89`, junto con
+ORDEN-1b.
 
 ## Veredicto de ORDEN-1b vuelta 4 (2026-11-05 12:15 UTC): aceptada
 
@@ -90,9 +74,7 @@ fila `topup_success, primero tour` falla con «la relectura salió antes de que
 la pestaña cargara el usuario». Falla con su propio mensaje y no da un verde
 falso. No hay que hacer nada.
 
-La pieza queda ✅ en el roadmap. Se integra a mi rama junto con COBRO-MP-1
-vuelta 5, porque sus commits están intercalados y esa sigue en revisión
-(`cobro_mp1.sh` corriendo). Siguió CSRF-1 (veredicto arriba).
+La pieza queda ✅ en el roadmap. Integrada junto con COBRO-MP-1 vuelta 5.
 D50 sigue en la cola.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
