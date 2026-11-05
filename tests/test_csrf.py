@@ -145,3 +145,47 @@ def test_logout_desde_otro_sitio_no_borra_la_sesion(monkeypatch, ruta, enforce):
     assert resp.status_code == 200, resp.text
     borrados = resp.headers.get("set-cookie", "")
     assert "access_token" not in borrados and "csrf_token" not in borrados, borrados
+
+
+def _token_firmado(token_valido, **cambios):
+    import jwt
+    from proyecto_maria.config import get_settings
+    s = get_settings()
+    datos = jwt.decode(token_valido, s.jwt_secret, algorithms=[s.jwt_algorithm])
+    return "Bearer " + jwt.encode({**datos, **cambios}, s.jwt_secret, algorithm=s.jwt_algorithm)
+
+
+SESIONES_SIN_TOKEN_CSRF = {
+    # caso: (cómo queda la cookie de sesión, valor de la cookie csrf_token o None, sesión válida, recibe token)
+    "ausente": (lambda t: f"Bearer {t}", None, True, True),
+    "vacia": (lambda t: f"Bearer {t}", "", True, True),
+    "presente": (lambda t: f"Bearer {t}", "token-de-antes", True, False),
+    "vencida": (lambda t: _token_firmado(t, exp=1), None, False, False),
+    "revocada": (lambda t: _token_firmado(t, jti="otra-sesion"), None, False, False),
+    "sin_sesion": (None, None, False, False),
+}
+
+
+@pytest.mark.parametrize("ruta", ["/auth/current_user", "/dashboard"])
+@pytest.mark.parametrize("caso", SESIONES_SIN_TOKEN_CSRF)
+def test_sesion_sin_token_csrf_lo_recibe_y_escribe(cookie_client, monkeypatch, sin_bypass_de_test, caso, ruta):
+    # Una sesión válida que perdió su csrf_token lo recupera en la próxima
+    # pedida autenticada; si lo tiene no se le cambia, y sin sesión no se emite.
+    monkeypatch.setenv("CSRF_ENFORCE", "true")
+    sesion, csrf, valida, recibe = SESIONES_SIN_TOKEN_CSRF[caso]
+    token = cookie_client.cookies.get("access_token").strip('"').split(" ")[1]
+    cliente = TestClient(app)
+    if sesion:
+        cliente.cookies.set("access_token", sesion(token))
+    if csrf is not None:
+        cliente.cookies.set("csrf_token", csrf)
+    resp = cliente.get(ruta)
+    assert resp.status_code == (200 if valida or ruta == "/dashboard" else 401), resp.text
+    nuevo = resp.cookies.get("csrf_token")
+    assert bool(nuevo) == recibe, resp.headers.get("set-cookie")
+    if recibe:
+        cliente.cookies.clear()
+        cliente.cookies.set("access_token", sesion(token))
+        cliente.cookies.set("csrf_token", nuevo)
+        escritura = cliente.post("/api/backup/localStorage", json={"x": 1}, headers={"X-CSRF-Token": nuevo})
+        assert escritura.status_code == 200, escritura.text

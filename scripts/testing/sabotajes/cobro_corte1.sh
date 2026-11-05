@@ -87,7 +87,7 @@ sin_corte upload_pdf "FAILED $T::test_una_cuenta_que_no_esta_al_dia_no_genera_ni
 sin_corte generate_maria "FAILED $T::test_regenerar_lo_ya_contado_con_la_cuenta_que_no_esta_al_dia_da_402[impaga]" \
   $'):\n    """\n    Genera archivo TXT en formato MARIA para el sistema SIM de AFIP.'
 sin_corte generate_maria_export "FAILED $T::test_una_cuenta_que_no_esta_al_dia_no_genera_ni_gasta_gemini[impaga-generate_maria_export]" \
-  $'):\n    """\n    Genera archivo TXT en formato MARIA para EXPORTACIÓN.'
+  $'    db: AsyncSession = Depends(get_db),\n):\n    """\n    Genera archivo TXT en formato MARIA para EXPORTACIÓN.'
 sin_corte migraciones_analizar "FAILED $T::test_una_cuenta_que_no_esta_al_dia_no_genera_ni_gasta_gemini[impaga-migraciones_analizar]" \
   $'    db: AsyncSession = Depends(get_db),\n):\n    """Analiza un CSV/Excel sin crear ni modificar clientes."""'
 sin_corte migraciones_confirmar "FAILED $T::test_una_cuenta_que_no_esta_al_dia_no_genera_ni_gasta_gemini[impaga-migraciones_confirmar]" \
@@ -97,10 +97,10 @@ sin_corte "guardar en el cliente" "FAILED $T::test_guardar_lo_ya_generado_con_la
 sin_corte ncm_sugerir "FAILED $T::test_una_cuenta_que_no_esta_al_dia_no_genera_ni_gasta_gemini[impaga-ncm_sugerir]" \
   $'    db: AsyncSession = Depends(get_db),\n):\n    """Sugiere hasta 5 NCM'
 
-sabotaje $M "la dependencia deja pasar impaga y cancelada" \
+sabotaje $B "la dependencia deja pasar la impaga" \
   "FAILED $T::test_una_cuenta_que_no_esta_al_dia_no_genera_ni_gasta_gemini[impaga-ncm_sugerir]" \
-  '    if entidad.billing_status not in ("trial", "active"):' \
-  '    if entidad.billing_status not in ("trial", "active", "past_due", "canceled"):'
+  '    if status in ("trial", "active"):' \
+  '    if status in ("trial", "active", "past_due"):'
 
 # Cuándo vence (el trial sin gracia, la suscripción con 7 días).
 sabotaje $M "el trial vencido no vence" \

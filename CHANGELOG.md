@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: una sesión sin token CSRF lo recibe sola (CSRF-3)
+
+- **fix(seguridad):** si la sesión es válida y le falta la cookie `csrf_token`, la próxima lectura autenticada se la emite; la pantalla v2 ya la trae al abrir y escribe sin volver a entrar. Una sesión vencida, revocada o ausente no recibe nada, y un token que ya está no se cambia.
+
 ## 2026-11-05 · fix: con CSRF exigido, la landing y la pantalla vieja escriben y la recuperación de cuenta anda (CSRF-2)
 
 - **fix(seguridad):** el control CSRF exenta sólo rutas exactas (login, registro y las tres de recuperación de cuenta): ya no saltea rutas que empiezan parecido ni las que dicen «webhook». `static/csrf.js` agrega el token a las escrituras de la landing y de la pantalla vieja, incluido su «Salir».

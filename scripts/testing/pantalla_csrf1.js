@@ -15,17 +15,19 @@ function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
   const reg = await ctx.request.post(base + '/auth/register', { data: { ...cuenta, email: 'csrf1' + id + '@ejemplo.test' } });
   if (!reg.ok()) falla('no se pudo registrar: ' + reg.status());
 
-  // Sin cookie CSRF el servidor rechaza el cierre: «Salir» tiene que decirlo y no llevar al inicio.
-  await ctx.clearCookies({ name: 'csrf_token' });
+  // Sin el header CSRF el servidor rechaza el cierre: «Salir» tiene que decirlo y no llevar al inicio.
   const p0 = await ctx.newPage();
+  await p0.route('**/auth/logout', r => {
+    const headers = { ...r.request().headers() };
+    delete headers['x-csrf-token'];
+    r.continue({ headers });
+  });
   await p0.goto(base + '/dashboard');
   await p0.waitForFunction(() => window.CDI && CDI.currentUser);
   await p0.click('#logoutBtn');
   await p0.waitForFunction(() => /No se pudo cerrar la sesión/.test(document.querySelector('#toastHost .toast-title')?.textContent),
     null, { timeout: 20000 }).catch(() => falla('«Salir» rechazado no avisó y la página fue a ' + new URL(p0.url()).pathname));
   await p0.close();
-  const login = await ctx.request.post(base + '/auth/login', { data: cuenta });
-  if (!login.ok()) falla('no se pudo volver a entrar: ' + login.status());
 
   const p = await ctx.newPage();
   const telemetria = p.waitForResponse(r => new URL(r.url()).pathname === '/api/session/state', { timeout: 20000 });
