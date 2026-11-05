@@ -137,6 +137,21 @@ def texto_largo(hojas, lineas=100, ancho=4000):
     return _pdf(armar)
 
 
+def texto_que_se_infla(llamadas=280, saltos=100_000):
+    """Una hoja que dibuja `llamadas` veces un formulario de `saltos` saltos de
+    línea: pesa unos KB y da `llamadas` × `saltos` caracteres de texto."""
+    def armar(add, objs):
+        z = zlib.compress(b"BT /F1 9 Tf 0 0 Td (" + b"\\n" * saltos + b") Tj ET\n", 9)
+        forma = add(b"<< /Type /XObject /Subtype /Form /BBox [0 0 100 100] /Resources << /Font << "
+                    b"/F1 << /Type /Font /Subtype /Type1 /BaseFont /Courier >> >> >> /Length %d "
+                    b"/Filter /FlateDecode >>\nstream\n" % len(z) + z + b"\nendstream")
+        hoja = _flujo(add, b"q /X Do Q\n" * llamadas, 0)
+        catalogo = _hojas(add, objs, [hoja])
+        objs[-2] = objs[-2].replace(b">> >> /Contents", b">> /XObject << /X %d 0 R >> >> /Contents" % forma)
+        return catalogo
+    return _pdf(armar)
+
+
 # Corre en un python nuevo: arma la bomba, la lee con `leer_despacho_aparte`
 # e imprime el resultado, la memoria máxima del proceso que leyó y la propia, y
 # la CPU que gastó el que leyó. LIMITE_CPU cambia su tope de CPU.
