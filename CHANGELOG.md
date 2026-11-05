@@ -12,6 +12,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 - Un NCM con dígitos arábigos o de ancho completo, un carácter que no se puede guardar o un ítem que no es un producto da 400; cambiar un producto para que quede igual a otro da 409; aprender acepta hasta 500 productos. Cambiar un producto y confirmar un NCM validan como guardar un despacho: el origen tiene que ser un país de dos letras y el NCM, de 8 dígitos; una operación con productos o resumen que no son objetos da 400 y no 500. Un peso o valor de 1e12 o más, o escrito como «1_000» o «٣», no entra en el promedio; al guardar un despacho, el renglón vuelve marcado con el motivo.
 - El tope de CPU del despacho cubre leer y entender el texto, y vuelve a cortar si el primer corte se pierde.
 
+## 2026-11-05 · fix: esperar lugar para revisar un PDF no culpa al archivo (RENDIMIENTO-1c)
+
+- Si un PDF no consigue lugar a tiempo para revisarse, porque hay muchos en revisión o el mismo usuario ya tiene uno, la respuesta es 503 «probá de nuevo» y no el 400 que manda a cambiar de archivo.
+- Un PDF que deja sin memoria a pypdf en una función en C da «demasiado pesado» y no un «Invalid PDF file» con texto interno.
+
 ## 2026-10-28 · fix: un PDF armado no infla la app al subirlo (RENDIMIENTO-1c)
 
 - Validar un PDF al subir una factura o leer un despacho corre en un proceso aparte con tope de 256 MB y de tiempo: uno que se infla da 400 «El PDF es demasiado pesado para abrirlo» en vez de ocupar más de 1 GB de la app.

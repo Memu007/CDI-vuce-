@@ -604,8 +604,9 @@ def validar_pdf(data: bytes) -> dict:
         if pdf.is_encrypted:
             return {"encriptado": True, "paginas": 0}  # contar hojas de uno encriptado ya falla
         return {"encriptado": False, "paginas": len(pdf.pages)}
-    except MemoryError:
-        raise
+    except (MemoryError, SystemError) as e:
+        # Bajo el tope de memoria, una función en C de pypdf puede fallar con SystemError.
+        raise MemoryError from e
     except Exception as e:
         return {"error": str(e)}
 
@@ -616,6 +617,10 @@ class PdfDemasiadoPesado(Exception):
 
 class LectorOcupado(Exception):
     """El mismo usuario ya tiene una lectura en curso."""
+
+
+class SinLugar(TimeoutError):
+    """Se acabó el tiempo esperando un lugar, antes de empezar con el PDF."""
 
 
 _SEMAFOROS: "weakref.WeakKeyDictionary" = weakref.WeakKeyDictionary()
@@ -691,7 +696,10 @@ async def validar_pdf_aparte(data: bytes, limite_s: float, clave: str | None = N
     fila[1] += 1
     hasta = loop.time() + limite_s
     try:
-        await asyncio.wait_for(fila[0].acquire(), timeout=limite_s)
+        try:
+            await asyncio.wait_for(fila[0].acquire(), timeout=limite_s)
+        except TimeoutError:
+            raise SinLugar from None
         try:
             return await _leer_aparte(data, max(hasta - loop.time(), 0.0), semaforo,
                                       _MAX_CPU_LECTURA, "validar")
@@ -709,9 +717,12 @@ async def _leer_aparte(data: bytes, limite_s: float, semaforo, limite_cpu_s: flo
                if k in os.environ}
     # El lector de facturas carga el .env al importarse: el hijo no lo lee.
     entorno["PYTHON_DOTENV_DISABLED"] = "1"
+    lanzado = False
 
     async def correr():
+        nonlocal lanzado
         async with semaforo:
+            lanzado = True
             proceso = await asyncio.create_subprocess_exec(
                 sys.executable, "-m", __name__, repr(float(limite_cpu_s)), modo,
                 stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
@@ -728,7 +739,12 @@ async def _leer_aparte(data: bytes, limite_s: float, semaforo, limite_cpu_s: flo
                     await proceso.wait()
             return proceso.returncode, salida, errores
 
-    codigo, salida, errores = await asyncio.wait_for(correr(), timeout=limite_s)
+    try:
+        codigo, salida, errores = await asyncio.wait_for(correr(), timeout=limite_s)
+    except TimeoutError:
+        if not lanzado:
+            raise SinLugar from None
+        raise
     if codigo == _SALIDA_SIN_MEMORIA:
         raise PdfDemasiadoPesado(AVISO_SIN_MEMORIA)
     final = errores.decode("utf-8", "replace")

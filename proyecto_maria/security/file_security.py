@@ -488,9 +488,12 @@ async def validate_file_upload(
     if file_type == 'pdf':
         # Abrir un PDF armado puede ocupar más de 1 GB: va en otro proceso,
         # con la memoria topeada y tiempo máximo.
-        from proyecto_maria.core.despacho_lector import PdfDemasiadoPesado, validar_pdf_aparte
+        from proyecto_maria.core.despacho_lector import (
+            PdfDemasiadoPesado, SinLugar, validar_pdf_aparte)
         try:
             resultado = await validar_pdf_aparte(contents, _pdf_validate_timeout_s(), clave=clave)
+        except SinLugar:
+            raise HTTPException(503, "Hay muchos PDFs en revisión. Probá de nuevo en un rato.")
         except TimeoutError:
             raise HTTPException(
                 400,
