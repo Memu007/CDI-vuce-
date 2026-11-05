@@ -80,19 +80,20 @@ async def memoria():
         return {"normales": normales, "bombas": bombas, "antes_mb": antes, "crecio_mb": pico_mb() - antes}
 
 async def diez_y_uno(ruta):
-    real = asyncio.create_subprocess_exec
-    hijos = []
+    from proyecto_maria.core import despacho_lector
+    real = despacho_lector.validar_pdf_aparte
+    entradas = []
     async def contar(*a, **k):
-        hijos.append(1)
+        entradas.append(1)
         return await real(*a, **k)
-    asyncio.create_subprocess_exec = contar
+    despacho_lector.validar_pdf_aparte = contar
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=main.app), base_url="http://t",
                                  timeout=120) as c:
         ruta = {"factura": FACTURA, "despacho": DESPACHO}[ruta]
         bombas = [asyncio.create_task(subir(c, ruta, BOMBA, "a")) for _ in range(10)]
         limite = time.monotonic() + 60
-        while not hijos:  # la primera bomba de A ya está validándose
-            assert time.monotonic() < limite, "ninguna validación empezó"
+        while len(entradas) < 10:  # las diez bombas de A ya esperan o validan
+            assert time.monotonic() < limite, f"entraron a validar {len(entradas)} de 10"
             await asyncio.sleep(0.01)
         t0 = time.monotonic()
         r = await subir(c, ruta, NORMAL, "b")
