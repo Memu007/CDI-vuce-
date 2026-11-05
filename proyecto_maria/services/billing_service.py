@@ -101,7 +101,7 @@ def _expire_extra_ops(user) -> None:
     """Si los créditos extra ya vencieron, los resetea a 0."""
     expires = getattr(user, "extra_ops_expires_at", None)
     # La columna que agrega la migración de arranque es TIMESTAMP sin zona
-    # (y SQLite no la guarda): se lee como UTC (COBRO-CORTE-1).
+    # (y SQLite no la guarda): se lee como UTC.
     if expires is not None and expires.tzinfo is None:
         expires = expires.replace(tzinfo=timezone.utc)
     if expires and datetime.now(timezone.utc) > expires:

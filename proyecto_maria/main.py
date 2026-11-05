@@ -1872,7 +1872,7 @@ async def require_billing_vigente(
     """Dependencia: corta por estado (vencido, impago, cancelado o sin
     suscripción → 402). No mira el tope del plan: va en las rutas que gastan
     Gemini o generan valor; el tope se mira sólo donde se cuenta una
-    operación (COBRO-CORTE-1, D5 a).
+    operación.
     """
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
@@ -3405,7 +3405,7 @@ async def create_manual_operation(
     total_weight = sum(float(it.get("peso_unitario", 0) or 0) * float(it.get("cantidad", 0) or 0) for it in items_raw)
 
     # Contar, calcular el op_code y crear la operación con la cuenta bloqueada,
-    # en un solo commit (COBRO-CORTE-1, D6 a).
+    # en un solo commit.
     await _contar_operacion_bloqueada(db, username)
     op_code = await _next_op_code(db, username)
 
@@ -4799,7 +4799,7 @@ async def generate_maria_endpoint(
         filepath = os.path.join(_user_downloads_dir(user["username"]), filename)
 
         # La primera vez que se genera este id se cuenta la operación; con
-        # el tope lleno, 402 sin escribir el archivo (COBRO-CORTE-1).
+        # el tope lleno, 402 sin escribir el archivo.
         await _contar_maria(db, user["username"], filename, txt_content,
                             len(request.items or []))
 
@@ -5916,7 +5916,7 @@ async def _next_op_code(db: AsyncSession, owner_username: str) -> str:
     return f"OP-{max_num + 1:06d}"
 
 
-# Contenidos distintos que admite un mismo MARIA_<id>.TXT (COBRO-CORTE-1, D4 b).
+# Contenidos distintos que admite un mismo MARIA_<id>.TXT.
 MARIA_REGENERACIONES = 10
 # Los dos nombres que arman /generate_maria y /generate_maria_export, con el
 # id recortado a 50 (COBRO-MP-1, g).
@@ -7609,7 +7609,7 @@ async def save_client_operation(
 
     Si es la de un MARIA ya generado (operation_id MARIA_<id>.TXT), completa
     esa operación y no cuenta otra; si no, cuenta una con el tope y la cuenta
-    bloqueados, en el mismo commit (COBRO-CORTE-1, D4 b y D6 a).
+    bloqueados, en el mismo commit.
     """
     username = user["username"]
     client = await _get_owned_client(db, client_id, username)

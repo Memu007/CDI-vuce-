@@ -755,7 +755,7 @@
 
         const factura = numeroDeFactura(op);
         // Sin factura, el id sale de cuándo se cargó la operación: regenerar
-        // la misma no la cuenta otra vez (COBRO-CORTE-1).
+        // la misma no la cuenta otra vez.
         const cargada = (CDI.state && CDI.state.uploadedAt) || new Date().toISOString();
         const operation_id = factura ? ('FAC_' + factura.replace(/[^a-zA-Z0-9_-]/g, '')) :
             ('OP_' + String(cargada).replace(/[^0-9]/g, '').slice(0, 17));
