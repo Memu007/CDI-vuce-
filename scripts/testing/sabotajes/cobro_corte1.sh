@@ -142,16 +142,19 @@ sabotaje $M "la cuenta sin suscripción se avisa como tope" \
 # Cuándo se cuenta: la identidad es la operación de CDI, no el nro de factura.
 sabotaje $M "cada generación crea y cuenta otra operación" \
   "FAILED $T::test_generar_cuenta_una_vez_por_operacion_y_la_crea" \
-  '    if operacion is not None and (huella in huellas or len(huellas) < MARIA_REGENERACIONES):' \
-  '    if False:'
+  '    if operacion is not None and (huella in huellas or (len(huellas)' \
+  '    if False and (huella in huellas or (len(huellas)'
 sabotaje $M "generar no cuenta en la cuenta" \
   "FAILED $T::test_generar_cuenta_una_vez_por_operacion_y_la_crea" \
   $'    await _contar_en_la_cuenta(db, cuenta[1])\n    nuevo_id' $'    pass\n    nuevo_id'
 sabotaje $M "generar no suma al contador" \
   "FAILED $T::test_generar_cuenta_una_vez_por_operacion_y_la_crea" \
   '    billing_service.record_operation_created(entidad)' '    pass'
-sabotaje $M "el mismo resultado gasta una de las 10" \
+sabotaje $M "el mismo resultado ocupa otra de las 10" \
   "FAILED $T::test_el_mismo_resultado_no_gasta_una_de_las_10" \
+  '        if huella not in huellas:' '        if True:'
+sabotaje $M "con las 10 llenas, el mismo resultado cuenta otra operación" \
+  "FAILED $T::test_la_11_distinta_es_una_operacion_nueva_contada" \
   'huella in huellas or ' ''
 sabotaje $M "la fecha de emisión cambia el resultado" \
   "FAILED $T::test_el_mismo_resultado_no_gasta_una_de_las_10" \
