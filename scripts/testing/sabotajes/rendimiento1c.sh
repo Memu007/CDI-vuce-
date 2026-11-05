@@ -2,7 +2,8 @@
 # Negativos de RENDIMIENTO-1c: cada sabotaje vuelve a validar el PDF en el
 # proceso de la app, saca la fila por usuario, cuenta hojas antes de mirar
 # si está encriptado, culpa al PDF cuando el validador se cae o cuando no hubo
-# lugar, o deja de topear la espera, y la prueba tiene que ponerse roja.
+# lugar, deja de topear la espera, le cobra la espera al PDF o valida sin tope
+# de CPU, y la prueba tiene que ponerse roja.
 #
 # uso: PY=/ruta/al/venv/bin/python scripts/testing/sabotajes/rendimiento1c.sh [SHA]
 # Trabaja en un worktree descartable: no toca tu copia ni datos compartidos.
@@ -52,19 +53,19 @@ sabotaje $FS "validar el PDF vuelve al proceso de la app" \
   'FAILED tests/test_rendimiento1c.py::test_un_pdf_que_se_infla_no_hace_crecer_la_app'
 sabotaje $DL "sin fila por usuario: todas las validaciones comparten los dos lugares" \
   '    if clave is None:
-        return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, "validar")' \
+        return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, "validar", hasta)' \
   '    if True:
-        return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, "validar")' \
+        return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, "validar", hasta)' \
   'B esperó detrás de las bombas de A'
 sabotaje proyecto_maria/main.py "la subida de facturas no pasa el usuario" \
   "max_size=max_upload_bytes, clave=user[\"username\"])" \
   'max_size=max_upload_bytes)' \
   'B esperó detrás de las bombas de A'
 sabotaje $DL "vuelve a contar páginas antes de mirar si está encriptado" \
-  '        if pdf.is_encrypted:
-            return {"encriptado": True, "paginas": 0}' \
-  '        if len(pdf.pages) < 0:
-            return {"encriptado": True, "paginas": 0}' \
+  '            if pdf.is_encrypted:
+                return {"encriptado": True, "paginas": 0}' \
+  '            if len(pdf.pages) < 0:
+                return {"encriptado": True, "paginas": 0}' \
   'FAILED tests/test_rendimiento1c.py::test_validar_aparte_devuelve_lo_mismo_que_antes'
 sabotaje $FS "un validador que se cae vuelve a ser un PDF inválido" \
   'raise HTTPException(500, "No pudimos revisar el PDF. Probá de nuevo en un rato.")' \
@@ -89,8 +90,31 @@ sabotaje $DL "la fila del usuario no se borra" \
             pass' \
   "(['b', 'c'], {'"
 sabotaje $DL "esperar un lugar libre vuelve a culpar al archivo" \
-  '        if not lanzado:' '        if False:' \
+  '    except TimeoutError:
+        raise SinLugar from None
+    try:
+        corrida' \
+  '    except TimeoutError:
+        raise
+    try:
+        corrida' \
   "(['b', 'c'], (400, 'No pudimos abrir el PDF: tardó demasiado"
+sabotaje $DL "la espera por un lugar se descuenta del tiempo para validar" \
+  'corrida = limite_s if espera_aparte else hasta - loop.time()' \
+  'corrida = hasta - loop.time()' \
+  'FAILED tests/test_rendimiento1c.py::test_esperar_casi_todo_el_tope_no_culpa_al_archivo[menos-que-un-pdf]'
+sabotaje $DL "validar no corre bajo el tope de CPU" \
+  '        with _tope_de_cpu(limite_cpu_s):
+            pdf = PdfReader' \
+  '        if True:
+            pdf = PdfReader' \
+  'FAILED tests/test_rendimiento1c.py::test_validar_tiene_tope_de_cpu'
+sabotaje $DL "el proceso aparte no le pasa el tope a validar" \
+  'validar_pdf(data, limite_cpu_s)' 'validar_pdf(data)' \
+  'FAILED tests/test_rendimiento1c.py::test_validar_tiene_tope_de_cpu'
+sabotaje $DL "pasar el tope de CPU no sale como demasiado pesado" \
+  'except (MemoryError, _DemasiadoTrabajo):' 'except MemoryError:' \
+  'FAILED tests/test_rendimiento1c.py::test_validar_tiene_tope_de_cpu'
 sabotaje $DL "esperar el turno del usuario vuelve a culpar al archivo" \
   '        except TimeoutError:
             raise SinLugar from None

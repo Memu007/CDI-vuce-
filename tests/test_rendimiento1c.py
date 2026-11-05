@@ -341,8 +341,12 @@ def test_esperar_casi_todo_el_tope_no_culpa_al_archivo(monkeypatch, libera_antes
         ocupan = [asyncio.create_task(despacho_lector.validar_pdf_aparte(normal, 30, clave=u))
                   for u in ("b", "c")]
         semaforo = despacho_lector._VALIDANDO[loop][0]
-        while not semaforo.locked():
-            await asyncio.sleep(0)
+
+        async def ocupados():
+            while not semaforo.locked():
+                await asyncio.sleep(0)
+
+        await asyncio.wait_for(ocupados(), 5)
         monkeypatch.setattr(asyncio, "create_subprocess_exec", real)
         loop.call_at(loop.time() + TOPE - libera_antes_del_tope, libre.set)
         try:

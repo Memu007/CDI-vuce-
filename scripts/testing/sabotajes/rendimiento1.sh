@@ -66,14 +66,14 @@ sabotaje proyecto_maria/security/file_security.py "validar el PDF vuelve al hilo
   '__import__("proyecto_maria.core.despacho_lector", fromlist=["x"]).validar_pdf(contents)' \
   'FAILED tests/test_rendimiento1.py::test_health_responde_mientras_se_valida_el_pdf'
 sabotaje proyecto_maria/core/despacho_lector.py "validar el PDF pierde el tiempo máximo" \
-  'return await _leer_aparte(data, max(hasta - loop.time(), 0.0), semaforo,' \
-  'return await _leer_aparte(data, 3600.0, semaforo,' \
+  'corrida = limite_s if espera_aparte else hasta - loop.time()' \
+  'corrida = 3600.0 if espera_aparte else hasta - loop.time()' \
   'FAILED tests/test_rendimiento1.py::test_validar_el_pdf_tiene_tiempo_maximo'
 sabotaje proyecto_maria/core/despacho_lector.py "vuelve a contar páginas antes de mirar si está encriptado" \
-  '        if pdf.is_encrypted:
-            return {"encriptado": True, "paginas": 0}' \
-  '        if len(pdf.pages) < 0:
-            return {"encriptado": True, "paginas": 0}' \
+  '            if pdf.is_encrypted:
+                return {"encriptado": True, "paginas": 0}' \
+  '            if len(pdf.pages) < 0:
+                return {"encriptado": True, "paginas": 0}' \
   'FAILED tests/test_rendimiento1.py::test_pdf_encriptado_dice_que_esta_encriptado'
 sabotaje $M "el texto del vendedor sin tiempo máximo" \
   'extraer_texto_pdf_seguro, contents, limite=_pdf_vendor_timeout_s()' \
