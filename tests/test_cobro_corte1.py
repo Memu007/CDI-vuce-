@@ -844,3 +844,31 @@ def test_lo_no_entregado_no_queda_cobrado(cuenta, monkeypatch, caso):
     assert r.status_code == 200, r.text
     assert _leer(u)["ops"] == 1 and len(_operaciones(u)) == 1
     assert _archivos(u) == [r.json()["filename"]]
+
+
+async def _commit_que_falla(self):
+    raise RuntimeError("la base se cayó al confirmar")
+
+
+# (dónde falla regenerar lo ya entregado, objeto, nombre, reemplazo)
+AL_REGENERAR = {
+    "al_escribir": (main, "open", _escritura_que_falla),
+    "al_confirmar": (main.AsyncSession, "commit", _commit_que_falla),
+}
+
+
+@pytest.mark.parametrize("caso", list(AL_REGENERAR))
+def test_regenerar_con_una_falla_deja_entero_lo_ya_entregado(cuenta, monkeypatch, caso):
+    objeto, nombre, reemplazo = AL_REGENERAR[caso]
+    c, u = cuenta()
+    r = _generar(c)
+    assert r.status_code == 200, r.text
+    oid, archivo = _oid(r), r.json()["filename"]
+    ruta = os.path.join(main._user_downloads_dir(u), archivo)
+    entregado, antes = open(ruta, "rb").read(), _operaciones(u)
+    with monkeypatch.context() as m:
+        m.setattr(objeto, nombre, reemplazo, raising=False)
+        r = _generar(c, flete=200.0, operacion_id=oid)
+    assert r.status_code == 500, r.text
+    assert open(ruta, "rb").read() == entregado, "el archivo ya entregado cambió con una regeneración que falló"
+    assert _archivos(u) == [archivo] and _operaciones(u) == antes and _leer(u)["ops"] == 1

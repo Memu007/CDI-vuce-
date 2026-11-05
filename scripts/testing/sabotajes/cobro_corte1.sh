@@ -264,6 +264,12 @@ sabotaje $M "los supuestos se arman después de contar" \
   $'        supuestos = _supuestos_maria(request, items, gastos)\n' '' \
   $'        return {\n            "success": True,\n            "operacion_id": operacion_id,\n            "filename": filename,' \
   $'        supuestos = _supuestos_maria(request, items, gastos)\n        return {\n            "success": True,\n            "operacion_id": operacion_id,\n            "filename": filename,'
+sabotaje $M "regenerar escribe sobre lo ya entregado" \
+  "FAILED $T::test_regenerar_con_una_falla_deja_entero_lo_ya_entregado[al_escribir]" \
+  '        with open(temporal, "w"' '        with open(ruta, "w"' $'        os.replace(temporal, ruta)\n' ''
+sabotaje $M "un commit fallido deja el archivo nuevo" \
+  "FAILED $T::test_regenerar_con_una_falla_deja_entero_lo_ya_entregado[al_confirmar]" \
+  '            os.link(ruta, respaldo)' '            pass'
 
 # ------------------------------------------------------------- la pantalla
 git checkout -q -- proyecto_maria/
@@ -339,7 +345,13 @@ sabotaje $F "v2: guardar anota en la carga de la pantalla" \
   "                carga.operacionId = data.operation_id || '';" "                CDI.state.operacionId = data.operation_id || '';"
 sabotaje $F "v2: generar guarda con la carga de la pantalla" \
   "FALLA: v2, generar: la respuesta tardía no se guardó en el cliente de su carga" \
-  "            saveOperationToHistory(items, data, carga).catch(" "            saveOperationToHistory(items, data).catch("
+  "            saveOperationToHistory(items, data, carga, foto).catch(" "            saveOperationToHistory(items, data, undefined, foto).catch("
+sabotaje $F "v2: el guardado toma los valores de la pantalla al responder" \
+  "FALLA: v2, generar: guardó los valores de la carga nueva" \
+  "            saveOperationToHistory(items, data, carga, foto).catch(" "            saveOperationToHistory(items, data, carga).catch("
+sabotaje $F "v2: la respuesta tardía marca lista la carga nueva" \
+  "FALLA: v2, generar: la respuesta tardía marcó lista la carga nueva" \
+  "            if (carga === CDI.state) mostrarListo(data);" "            mostrarListo(data);"
 sabotaje $F "v2: el guardado toma el cliente de la pantalla" \
   "FALLA: v2, generar: la respuesta tardía no se guardó en el cliente de su carga" \
   "        const cliente = carga.clienteActivo || null;" "        const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;"
@@ -350,6 +362,10 @@ sabotaje $V1 "v1: guardar anota en la carga nueva" \
   "FALLA: v1, guardar: la respuesta tardía le anotó" \
   "        if (res.ok) anotarOperacion(carga, (await res.json()).operation_id || operacionId);" \
   "        if (res.ok) operacionIdActual = (await res.json()).operation_id || operacionId;"
+sabotaje $V1 "v1: el guardado toma el cliente del selector al responder" \
+  "FALLA: v1, generar: la respuesta tardía no se guardó en el cliente de su carga" \
+  "    if (!carga.cliente) {" "    if (!clientSelect.value) {" \
+  '/api/clientes/${carga.cliente}/operaciones' '/api/clientes/${clientSelect.value}/operaciones'
 sabotaje $V1 "v1: cancelar no empieza otra carga" \
   "FALLA: v1, generar: la respuesta tardía le anotó" \
   "function nuevaCarga() { operacionIdActual = ''; cargaActual++; }" "function nuevaCarga() { operacionIdActual = ''; }"
@@ -398,8 +414,12 @@ PYEOF
     $'        .with_for_update()\n    )\n    db_user'
   sabotaje $M "borrar cliente no espera el candado de la cuenta" \
     "FALLA | borrar cliente" \
-    $'        await _cuenta_bloqueada(db, username)\n        op_rows = await db.execute(' \
-    $'        op_rows = await db.execute('
+    $'        await _cuenta_bloqueada(db, username)\n        # Después del candado' \
+    $'        # Después del candado'
+  sabotaje $M "el guardado mira el cliente antes del candado" \
+    "FALLA | guardar en un cliente que se borró" \
+    $'        await _cuenta_bloqueada(db, username)\n        client = await _get_owned_client(db, client_id, username)' \
+    $'        client = await _get_owned_client(db, client_id, username)\n        await _cuenta_bloqueada(db, username)'
   sabotaje $M "Postgres recibe el id que no puede comparar" \
     "FALLA | id con NUL" \
     '    if not operacion_id or _NO_GUARDABLE_EN_PG.search(operacion_id):' '    if not operacion_id:'

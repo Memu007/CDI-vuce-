@@ -39,16 +39,26 @@ function casosTardios({ page, v1, clienteId, cargar, pedirTxt }) {
     otraCarga: () => v1.evaluate(() => cancelGrouping()),
     terminada: () => v1.generada,
     anotada: () => v1.evaluate(() => operacionIdActual) };
+  const guardadoEn = (p, id) => () => p.waitForRequest(r => r.method() === 'POST' &&
+    r.url().endsWith('/api/clientes/' + id + '/operaciones'), { timeout: 15000 });
   return [
     { que: 'v2, generar', p: page, retenida: '**/generate_maria',
       pedir: async () => { await cargaNuevaV2();
         await page.evaluate(id => CDI.setClienteActivo({ id, nombre: 'Cliente de prueba' }), clienteId);
         await pedirTxt(); },
-      // La carga nueva sin cliente: la respuesta tardía se guarda igual en el de la suya.
-      otraCarga: async () => { await cargaNuevaV2(); await page.evaluate(() => CDI.setClienteActivo(null)); },
-      guardado: () => page.waitForRequest(r => r.method() === 'POST' &&
-        r.url().endsWith('/api/clientes/' + clienteId + '/operaciones'), { timeout: 15000 }),
-      terminada: () => page.waitForFunction(() => !document.getElementById('readyDone').hidden, null, { timeout: 15000 }),
+      // La carga nueva, sin cliente y con otros valores: la respuesta tardía se guarda
+      // en el cliente de la suya, con lo que tenía al pedir, y no la marca lista.
+      otraCarga: async () => { await cargaNuevaV2();
+        await page.evaluate(() => { CDI.setClienteActivo(null);
+          window.valoresDeAntes = CDI.despachante.valores;
+          CDI.despachante.valores = () => ({ de_la_carga_nueva: true }); }); },
+      guardado: guardadoEn(page, clienteId),
+      chequeo: async cuerpo => {
+        const nueva = await page.evaluate(() => { CDI.despachante.valores = window.valoresDeAntes;
+          return !document.getElementById('readyDone').hidden; });
+        if (((cuerpo.resumen || {}).maria || {}).de_la_carga_nueva) falla('v2, generar: guardó los valores de la carga nueva');
+        if (nueva) falla('v2, generar: la respuesta tardía marcó lista la carga nueva');
+      },
       anotada: () => page.evaluate(() => CDI.state.operacionId) },
     { que: 'v2, guardar', p: page, retenida: '**/api/clientes/*/operaciones',
       pedir: async () => { await cargaNuevaV2();
@@ -59,7 +69,9 @@ function casosTardios({ page, v1, clienteId, cargar, pedirTxt }) {
       otraCarga: cargaNuevaV2,
       terminada: () => page.evaluate(() => window.guardado),
       anotada: () => page.evaluate(() => CDI.state.operacionId) },
-    { que: 'v1, generar', retenida: '**/generate_maria', ...v1Comun },
+    // La carga nueva con el selector vacío: la respuesta tardía se guarda en el cliente de la suya.
+    { que: 'v1, generar', retenida: '**/generate_maria', ...v1Comun, guardado: guardadoEn(v1, clienteId),
+      otraCarga: () => v1.evaluate(() => { cancelGrouping(); document.getElementById('clientSelectorGrouping').value = ''; }) },
     { que: 'v1, guardar', retenida: '**/api/clientes/*/operaciones', inmediata: '**/generate_maria', ...v1Comun },
   ];
 }
@@ -92,10 +104,12 @@ async function respuestaTardia({ ctx, page, base, token, clienteId, cargar, pedi
     await c.otraCarga();
     const guardado = c.guardado && c.guardado().catch(() => null);
     soltar();
-    await aTiempo(c.terminada(), c.que + ': no terminó').catch(e => falla(e.message));
+    await aTiempo(c.terminada ? c.terminada() : guardado, c.que + ': no terminó').catch(e => falla(e.message));
     if (guardado) {
       const r = await guardado;
-      const mandada = r && (r.postDataJSON() || {}).operacion_id;
+      const cuerpo = (r && r.postDataJSON()) || {};
+      if (c.chequeo) await c.chequeo(cuerpo);
+      const mandada = cuerpo.operacion_id;
       if (mandada !== VIEJA) falla(c.que + ': la respuesta tardía no se guardó en el cliente de su carga con su operación (mandó «' + mandada + '»)');
     }
     const anotada = await c.anotada();

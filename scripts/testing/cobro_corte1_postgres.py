@@ -10,7 +10,8 @@ mira el tope, se cuenta y se calcula el op_code:
 4. dos miembros de un estudio con una libre: pasa uno (la cuenta es la org);
 5. un id de operación con NUL o con un surrogate suelto es una operación nueva,
    al generar, al exportar y al guardar;
-6. borrar un cliente espera el candado de la cuenta.
+6. borrar un cliente espera el candado de la cuenta;
+7. un guardado que esperaba detrás del borrado de su cliente da 404.
 
 Para que la carrera pase de verdad, el primero que calcula su op_code (ya
 contado, sin commit) o lee la operación que regenera espera a ver al otro: o el otro también llegó ahí (no
@@ -269,6 +270,22 @@ with TestClient(main_mod.app) as c:
             r = borrado.result()
     chequear(espero and r.status_code == 200,
              f"borrar cliente: espera el candado de la cuenta (esperó {espero}, {r.status_code})")
+
+    # 7. Un guardado que esperaba detrás del borrado de su cliente da 404, no un 500.
+    u, t = entrar()
+    cliente = _cliente(ConToken(t))
+    with psycopg2.connect(URL) as con, con.cursor() as cur:
+        cur.execute("select 1 from users where username = %s for update", (u,))
+        with ThreadPoolExecutor(1) as hilo:
+            guardado = hilo.submit(_guardar, ConToken(t), cliente, "MARIA_FAC_PG7.TXT")
+            espero = llega(lambda: esperando_un_lock() or guardado.done())
+            espero = espero and not guardado.done()
+            cur.execute("delete from clients where id = %s", (cliente,))
+            con.commit()
+            r = guardado.result()
+    chequear(espero and r.status_code == 404 and operaciones(u) == [],
+             f"guardar en un cliente que se borró mientras esperaba: 404 sin operación "
+             f"(esperó {espero}, {r.status_code}, {len(operaciones(u))} operaciones)")
 
 print(f"fallas: {len(FALLAS)}")
 sys.exit(1 if FALLAS else 0)
