@@ -4592,15 +4592,13 @@ async def upload_pdf_public(
         # Falla silenciosa: solo es una mejora opcional.
         if not operacion_data.get('vendedor_nombre'):
             try:
-                from proyecto_maria.pdf_extractor import (
-                    extraer_texto_pdf_seguro,
-                    detect_vendor_from_text,
-                )
-                # Es opcional: con un tiempo propio, más corto, y sólo con pypdf
-                # (pdfminer se cuelga con un PDF armado, RENDIMIENTO-1b).
-                pdf_text = await _leer_pdf_aparte(
-                    extraer_texto_pdf_seguro, contents, limite=_pdf_vendor_timeout_s()
-                )
+                from proyecto_maria.core.despacho_lector import validar_pdf_aparte
+                from proyecto_maria.pdf_extractor import detect_vendor_from_text
+                # Es opcional: con un tiempo propio, más corto, y en el proceso
+                # aparte, con sus topes de memoria y por flujo.
+                leido = await validar_pdf_aparte(
+                    contents, _pdf_vendor_timeout_s(), clave=user["username"], modo="texto")
+                pdf_text = leido["texto"]
                 detected = detect_vendor_from_text(pdf_text)
                 if detected:
                     operacion_data['vendedor_nombre'] = detected

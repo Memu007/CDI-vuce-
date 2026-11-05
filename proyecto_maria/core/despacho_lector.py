@@ -47,6 +47,11 @@ _MAX_PAGINAS = 200
 # Cada flujo del PDF descomprimido (contenido, fuentes, mapas de caracteres).
 # Generoso: una fuente incrustada puede pesar unos MB.
 _MAX_FLUJO = 8 * 1024 * 1024
+_TOPES = {clave: _MAX_FLUJO for clave in (
+    "maximum_declared_stream_length", "array_based_stream_maximum_output_length",
+    "zlib_maximum_output_length", "lzw_maximum_output_length",
+    "run_length_maximum_output_length", "brotli_maximum_output_length",
+    "jbig2_maximum_output_length", "stream_decoding_work_maximum_length")}
 # Texto de todas las hojas juntas. Un despacho de 200 hojas tiene menos de 1 MB.
 _MAX_TEXTO = 4 * 1024 * 1024
 # Una línea de un despacho tiene menos de 300 caracteres y menos de 10 rótulos.
@@ -316,17 +321,12 @@ def _hojas_del_pdf(data: bytes, limite_cpu_s: float = _MAX_CPU_LECTURA) -> tuple
 
     from pypdf import apply_configuration
 
-    topes = {clave: _MAX_FLUJO for clave in (
-        "maximum_declared_stream_length", "array_based_stream_maximum_output_length",
-        "zlib_maximum_output_length", "lzw_maximum_output_length",
-        "run_length_maximum_output_length", "brotli_maximum_output_length",
-        "jbig2_maximum_output_length", "stream_decoding_work_maximum_length")}
     avisos = []
     salteadas = False
     textos: list[str] = []
     hasta = time.process_time() + limite_cpu_s
     try:
-        with apply_configuration(**topes), _tope_de_cpu(limite_cpu_s):
+        with apply_configuration(**_TOPES), _tope_de_cpu(limite_cpu_s):
             salteadas = _leer_hojas(data, hasta, textos, avisos)
     except _DemasiadoTrabajo:
         avisos.append(f"El PDF da demasiado trabajo: leí hasta la hoja {len(textos)}.")
@@ -613,8 +613,25 @@ def validar_pdf(data: bytes, limite_cpu_s: float = _MAX_CPU_LECTURA) -> dict:
         return {"error": str(e)}
 
 
+def texto_plano_del_pdf(data: bytes, limite_cpu_s: float = _MAX_CPU_LECTURA) -> dict:
+    """{"texto": `extraer_texto_pdf_seguro`}, con los topes por flujo del lector."""
+    from pypdf import apply_configuration
+
+    from proyecto_maria.pdf_extractor import extraer_texto_pdf_seguro
+
+    with apply_configuration(**_TOPES), _tope_de_cpu(limite_cpu_s):
+        return {"texto": extraer_texto_pdf_seguro(data)}
+
+
+# Lo que puede hacer el proceso aparte, y cómo se lo nombra si se cae.
+_MODOS = {"leer": (leer_despacho, "el lector de despachos"),
+          "validar": (validar_pdf, "el validador de PDF"),
+          "texto": (texto_plano_del_pdf, "el lector de texto del PDF")}
+
+
 class PdfDemasiadoPesado(Exception):
-    """El proceso que lee pasó del tope de memoria o, al validar, del de CPU."""
+    """El proceso que lee pasó del tope de memoria o, al validar o sacar el
+    texto, del de CPU."""
 
 
 class LectorOcupado(Exception):
@@ -681,10 +698,12 @@ async def leer_despacho_aparte(data: bytes, limite_s: float, clave: str | None =
         leyendo.discard(clave)
 
 
-async def validar_pdf_aparte(data: bytes, limite_s: float, clave: str | None = None) -> dict:
-    """`validar_pdf` en otro proceso, con los topes de memoria y de CPU del
-    lector (PdfDemasiadoPesado). Espera un lugar hasta `limite_s` (SinLugar)
-    y después el proceso tiene `limite_s` entero (TimeoutError): la espera no
+async def validar_pdf_aparte(data: bytes, limite_s: float, clave: str | None = None,
+                             modo: str = "validar") -> dict:
+    """`validar_pdf` (con el modo «texto», `texto_plano_del_pdf`) en otro
+    proceso, con los topes de memoria y de CPU del lector
+    (PdfDemasiadoPesado). Espera un lugar hasta `limite_s` (SinLugar) y
+    después el proceso tiene `limite_s` entero (TimeoutError): la espera no
     se le cobra al archivo. Como mucho `_VALIDANDO_A_LA_VEZ` a la vez.
     Con `clave`, las de una misma clave van de a una y esperan su turno: diez
     PDFs pesados de un usuario ocupan un solo lugar y no frenan a otro."""
@@ -695,7 +714,7 @@ async def validar_pdf_aparte(data: bytes, limite_s: float, clave: str | None = N
     semaforo, filas = estado
     hasta = loop.time() + limite_s
     if clave is None:
-        return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, "validar", hasta)
+        return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, modo, hasta)
     fila = filas.setdefault(clave, [asyncio.Lock(), 0])
     fila[1] += 1
     try:
@@ -704,7 +723,7 @@ async def validar_pdf_aparte(data: bytes, limite_s: float, clave: str | None = N
         except TimeoutError:
             raise SinLugar from None
         try:
-            return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, "validar", hasta)
+            return await _leer_aparte(data, limite_s, semaforo, _MAX_CPU_LECTURA, modo, hasta)
         finally:
             fila[0].release()
     finally:
@@ -754,7 +773,7 @@ async def _leer_aparte(data: bytes, limite_s: float, semaforo, limite_cpu_s: flo
     if codigo == _SALIDA_DEMASIADO_PESADO:
         raise PdfDemasiadoPesado(AVISO_SIN_MEMORIA)
     final = errores.decode("utf-8", "replace")
-    quien = "el validador de PDF" if modo == "validar" else "el lector de despachos"
+    quien = _MODOS[modo][1]
     if codigo != 0:
         raise RuntimeError(f"{quien} salió con {codigo}: {final}")
     try:
@@ -767,10 +786,9 @@ async def _leer_aparte(data: bytes, limite_s: float, semaforo, limite_cpu_s: flo
 
 
 def _main() -> int:
-    """El proceso que lee (o valida, con el modo «validar»): el PDF por la
-    entrada, el resultado en JSON por la salida. Sale con
-    `_SALIDA_DEMASIADO_PESADO` si pasa del tope de memoria o, al validar, del
-    de CPU."""
+    """El proceso aparte, en uno de los `_MODOS`: el PDF por la entrada, el
+    resultado en JSON por la salida. Sale con `_SALIDA_DEMASIADO_PESADO` si
+    pasa del tope de memoria o, al validar o sacar el texto, del de CPU."""
     try:
         import resource
         _, duro = resource.getrlimit(resource.RLIMIT_AS)
@@ -783,8 +801,7 @@ def _main() -> int:
         limite_cpu_s = float(sys.argv[1]) if len(sys.argv) > 1 else _MAX_CPU_LECTURA
         modo = sys.argv[2] if len(sys.argv) > 2 else "leer"
         data = sys.stdin.buffer.read()
-        resultado = (validar_pdf(data, limite_cpu_s) if modo == "validar"
-                     else leer_despacho(data, limite_cpu_s))
+        resultado = _MODOS[modo][0](data, limite_cpu_s)
         sys.stdout.write(json.dumps(resultado, ensure_ascii=False))
         sys.stdout.flush()
     except (MemoryError, _DemasiadoTrabajo):
