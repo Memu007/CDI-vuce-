@@ -138,3 +138,50 @@ def test_el_texto_no_ocupa_los_lugares_de_validar(monkeypatch):
 
     for lentos in (["b", "c"], ["a"]):
         assert asyncio.run(escenario(lentos)) == "pasó", lentos
+
+
+@pytest.mark.parametrize("unicode, queda", [("D800", "�"), ("DCFF", "�"), ("4E2D", "中")])
+def test_lo_que_saca_el_hijo_vuelve_entero(unicode, queda):
+    """Una fuente que dice que «Z» es la mitad de un par: escrito en UTF-8, D800
+    tiraba abajo al hijo y DCFF salía como un byte que no es JSON; se perdía
+    todo. La mitad suelta vuelve como «�» y el resto queda."""
+    import asyncio
+
+    from proyecto_maria.core.despacho_lector import leer_despacho_aparte, validar_pdf_aparte
+    from tests.test_despacho1b import _item_solo, _pdf
+    texto = _item_solo().replace("COSA INVENTADA", "COSA Z INVENTADA")
+    pdf = _pdf([[[(0, l)] for l in texto.splitlines()]], a_unicode={0x5A: unicode})
+    esperado = f"COSA {queda} INVENTADA"
+    assert esperado in asyncio.run(validar_pdf_aparte(pdf, 30, modo="texto"))["texto"]
+    assert asyncio.run(leer_despacho_aparte(pdf, 30))["renglones"][0]["descripcion"] == esperado
+
+
+def test_lo_que_vuelve_del_texto_tiene_tope():
+    """Un PDF de 1 KB con 120 000 letras: a la app vuelven 64 K."""
+    import asyncio
+
+    from proyecto_maria.core.despacho_lector import validar_pdf_aparte
+    from tests.pdf_bombas import texto_largo
+    texto = asyncio.run(validar_pdf_aparte(texto_largo(1, lineas=120, ancho=1000), 30, modo="texto"))
+    assert len(texto["texto"]) == 64 * 1024
+
+
+@pytest.mark.parametrize("modo", ["validar", "texto"])
+def test_dos_del_mismo_usuario_uno_tras_otro_y_a_la_vez(modo):
+    """La fila del usuario se suelta al terminar y se borra cuando queda vacía."""
+    import asyncio
+
+    from proyecto_maria.core import despacho_lector
+    from tests.pdf_bombas import hojas
+    pdf = hojas([("UNO", 0)])
+
+    async def escenario():
+        def una():
+            return despacho_lector.validar_pdf_aparte(pdf, 5, clave="a", modo=modo)
+        resultados = [await una(), await una(), *await asyncio.gather(una(), una())]
+        lugares = despacho_lector._SACANDO_TEXTO if modo == "texto" else despacho_lector._VALIDANDO
+        return resultados, lugares[asyncio.get_running_loop()][1]
+
+    resultados, filas = asyncio.run(escenario())
+    assert all(r == resultados[0] for r in resultados) and "error" not in resultados[0], resultados
+    assert filas == {}
