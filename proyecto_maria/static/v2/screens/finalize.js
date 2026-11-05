@@ -1159,16 +1159,21 @@
     async function reSaveOperationAndClosePanel(via) {
         const items = (CDI.state && CDI.state.items) || [];
         const guardado = await saveOperationToHistory(items, lastMaria || {});
+        // El error ya está a la vista y el panel queda abierto para reintentar.
+        if (!guardado.ok) return;
         const panel = document.getElementById('readyOrphanPanel');
         if (panel) panel.hidden = true;
         const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;
         const nombre = (cliente && cliente.nombre) || 'cliente';
+        const sinMemoria = guardado.historial_guardado === false;
         showReadyClientSuccess(
             via === 'assign' ? 'Cliente asignado a esta operación' : 'Cliente creado con éxito',
-            'Operación asociada a ' + nombre + '. La próxima factura con este CUIT se detecta sola.'
+            'Operación asociada a ' + nombre + (sinMemoria
+                ? '. Algunos productos no quedaron en la memoria: la próxima vez no se van a sugerir solos.'
+                : '. La próxima factura con este CUIT se detecta sola.')
         );
         // toast reemplaza al anterior: no tapar el aviso de lo que no quedó en la memoria.
-        if (guardado.historial_guardado !== false && CDI.toast) {
+        if (!sinMemoria && CDI.toast) {
             CDI.toast(
                 'Cliente guardado',
                 'La próxima factura con este CUIT se detecta sola. Operación asociada a ' + nombre + '.',
@@ -1176,6 +1181,13 @@
             );
         }
         CDI.track && CDI.track('op_orphan_resolved', { via: via });
+    }
+
+    // Lo que no quedó guardado no puede dejar a la vista un éxito anterior.
+    function avisarNoGuardado(titulo, detalle, tipo) {
+        const caja = document.getElementById('readyClientSuccess');
+        if (caja) caja.hidden = true;
+        CDI.toast && CDI.toast(titulo, detalle, tipo);
     }
 
     async function saveOperationToHistory(items, mariaData) {
@@ -1241,7 +1253,7 @@
                     items: items.length
                 });
                 if (data.historial_guardado === false) {
-                    CDI.toast && CDI.toast(
+                    avisarNoGuardado(
                         'Algunos productos no quedaron en la memoria',
                         'La operación se guardó, pero la próxima vez esos productos no se van a sugerir solos.',
                         'warning'
@@ -1258,7 +1270,7 @@
                 status: res.status,
                 detail: String(msg).slice(0, 120)
             });
-            CDI.toast && CDI.toast(
+            avisarNoGuardado(
                 'No se guardó al cliente',
                 'La operación no quedó en el historial de ' + (cliente.nombre || 'el cliente') + '. Detalle: ' + String(msg).slice(0, 200),
                 'error'
@@ -1267,6 +1279,7 @@
         } catch (err) {
             if (err && err.message === 'payment_required') {
                 console.warn('[history] save_client_operation: 402 payment required');
+                avisarNoGuardado('No se guardó al cliente', err.motivo || 'Plan vencido o límite alcanzado', 'error');
                 return { ok: false, reason: 'payment_required', error: 'Plan vencido o límite alcanzado' };
             }
             console.error('[history] save_client_operation excepción:', err);
@@ -1274,7 +1287,7 @@
                 cliente_id: cliente.id,
                 detail: String(err && err.message || err).slice(0, 120)
             });
-            CDI.toast && CDI.toast(
+            avisarNoGuardado(
                 'No se guardó al cliente',
                 'Error de red al guardar la operación al historial. Volvé a Listo y reintentá.',
                 'error'
@@ -1312,6 +1325,10 @@
                 body: JSON.stringify({ vendor_name: vendorName, productos }),
             });
             const data = await res.json().catch(() => ({}));
+            if ((!res.ok || data.historial_guardado === false) && CDI.toast) {
+                CDI.toast('Algunos productos no quedaron en la memoria',
+                    'La operación está lista, pero la próxima vez esos productos no se van a sugerir solos.', 'warning');
+            }
             if (res.ok) {
                 CDI.track('catalog_learn', {
                     vendor_id,

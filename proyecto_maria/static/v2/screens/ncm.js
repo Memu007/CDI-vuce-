@@ -1839,7 +1839,7 @@
                 })
             });
             const data = await res.json().catch(() => ({}));
-            if (res.ok && data.historial_guardado === false && CDI.toast) {
+            if ((!res.ok || data.historial_guardado === false) && CDI.toast) {
                 CDI.toast('No se guardó en la memoria de productos',
                     'La posición quedó en esta operación, pero la próxima vez no se va a sugerir sola.', 'warning');
             }
