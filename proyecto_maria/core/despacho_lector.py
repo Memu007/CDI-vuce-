@@ -732,14 +732,15 @@ async def _leer_aparte(data: bytes, limite_s: float, semaforo, limite_cpu_s: flo
     if codigo == _SALIDA_SIN_MEMORIA:
         raise PdfDemasiadoPesado(AVISO_SIN_MEMORIA)
     final = errores.decode("utf-8", "replace")
+    quien = "el validador de PDF" if modo == "validar" else "el lector de despachos"
     if codigo != 0:
-        raise RuntimeError(f"el lector de despachos salió con {codigo}: {final}")
+        raise RuntimeError(f"{quien} salió con {codigo}: {final}")
     try:
         resultado = json.loads(salida)
     except ValueError as e:
-        raise RuntimeError(f"el lector de despachos no devolvió JSON: {final}") from e
+        raise RuntimeError(f"{quien} no devolvió JSON: {final}") from e
     if not isinstance(resultado, dict):
-        raise RuntimeError("el lector de despachos no devolvió un resultado")
+        raise RuntimeError(f"{quien} no devolvió un resultado")
     return resultado
 
 
