@@ -33,6 +33,7 @@ class Node {
 
 function armar(fuente, extraCDI) {
   const nodes = new Map(), handlers = {}, events = {}, toasts = [], llamadas = [];
+  let enCurso = 0;
   const node = id => { if (!nodes.has(id)) nodes.set(id, new Node(id)); return nodes.get(id); };
   const respuestas = {
     '/generate_maria': { success: true, filename: 'MARIA_SINTETICA.TXT', content: 'x' },
@@ -51,7 +52,10 @@ function armar(fuente, extraCDI) {
     toast: (titulo, detalle, tipo) => toasts.push({ titulo, detalle, tipo }),
     getClienteActivo: () => cliente, setClienteActivo: c => { cliente = c; },
     api: async (url) => {
-      llamadas.push(url);
+      llamadas.push(url); enCurso++;
+      // el peor caso de guardar y aprender a la vez: el catálogo contesta último
+      if (escenario === 'listo-con-vendedor' && url.endsWith('/productos')) for (let i = 0; i < 5; i++) await vaciar();
+      enCurso--;
       const clave = Object.keys(respuestas).find(k => url.endsWith(k));
       const cuerpo = clave ? respuestas[clave] : { success: true };
       if (cuerpo === 'red') throw new TypeError('Failed to fetch');
@@ -77,7 +81,7 @@ function armar(fuente, extraCDI) {
   caja.children['[data-client-success-title]'] = [new Node()];
   caja.children['[data-client-success-text]'] = [new Node()];
   for (const fn of events.DOMContentLoaded || []) fn();
-  return { CDI, node, handlers, toasts, llamadas, ponerCliente: c => { cliente = c; } };
+  return { CDI, node, handlers, toasts, llamadas, enCurso: () => enCurso, ponerCliente: c => { cliente = c; } };
 }
 
 // Sin red real todo sigue en microtareas, y setImmediate corre recién con esa cola vacía:
@@ -86,7 +90,7 @@ const vaciar = () => new Promise(r => setImmediate(r));
 async function esperarRed(app, url, veces = 1) {
   const hechas = () => app.llamadas.filter(u => u.endsWith(url)).length;
   let i = 0;
-  do await vaciar(); while (++i < 50 && hechas() < veces);
+  do await vaciar(); while (++i < 50 && (hechas() < veces || app.enCurso() > 0));
   if (hechas() < veces) throw new Error('la pantalla no llamó ' + veces + ' veces a ' + url);
 }
 
