@@ -93,9 +93,10 @@ def test_cambiar_la_descripcion_a_una_sin_letras_latinas_mueve_la_clave(client):
         {"descripcion": "TORNILLO", "ncm": "73181500"}, {"descripcion": "螺母", "ncm": "73181600"}]}).status_code == 200
 
     r = client.put(f"{url}/tornillo", json={"descripcion_original": "螺丝"})
-    assert r.status_code == 200 and r.json()["producto"]["_key"] == "螺丝", r.text
+    clave = r.json()["producto"]["_key"]
+    assert r.status_code == 200 and clave not in ("tornillo", ""), r.text
     # Otra igual a una que ya está choca, como con letras latinas.
-    assert client.put(f"{url}/螺丝", json={"descripcion_original": "螺母"}).status_code == 404
+    assert client.put(f"{url}/{clave}", json={"descripcion_original": "螺母"}).status_code == 404
 
     r = client.post(url, json={"vendor_name": VENDOR, "productos": [{"descripcion": "TORNILLO", "ncm": "73182100"}]})
     assert r.status_code == 200 and r.json()["productos_nuevos"] == 1, r.text

@@ -14,7 +14,9 @@ Comprueba:
 - que el origen «TAIWAN» y un proveedor de 220 caracteres se guardan enteros
   por el catálogo, por cambiar el origen y por guardar-uso con y sin cliente,
   y que guardar-uso con un cliente guarda también la memoria del cliente;
-- que guardar-uso de «螺丝» con proveedor y sin cliente guarda la fila.
+- que guardar-uso de «螺丝» con proveedor y sin cliente guarda la fila;
+- que 2000 caracteres CJK distintos se guardan por el catálogo, por
+  guardar-uso y por cambiar la descripción: la clave entra en el índice único.
 
 uso (con un Postgres local y descartable, nunca el de producción; el usuario
 tiene que poder crear bases):
@@ -52,6 +54,8 @@ VENDOR_ID = "proveedor_sintetico"
 LARGO = "Proveedor largo " + "x" * 204
 LARGO_ID = ("proveedor_largo_" + "x" * 204)[:60]
 NCM = "73181500"
+# Variados: repetidos, Postgres los comprime y entran en el índice igual.
+CJK_LARGO = "".join(chr(0x4E00 + i * 7) for i in range(2000))
 
 
 def chequear(ok, que):
@@ -162,7 +166,7 @@ try:
             asyncio.run(engine.dispose(close=False))
     finally:
         tomada.close()
-    chequear(not arranco and columnas()[0][1] == "character varying",
+    chequear(not arranco and {t for _, t, _ in columnas()} == {"character varying"},
              f"con la tabla tomada el arranque falla en vez de seguir con las columnas cortas: {columnas()}")
 
     for vez in ("primer", "segundo"):
@@ -199,6 +203,18 @@ try:
         chequear(r.status_code == 200 and r.json() == {"success": True, "historial_guardado": True}
                  and fila(VENDOR_ID, "螺丝") == [(VENDOR, NCM, None)],
                  f"guardar-uso de «螺丝» sin cliente guarda la fila: {r.status_code} {r.text[:120]}")
+
+        url = f"/api/catalog/{VENDOR_ID}/productos"
+        for via, desc in (("catálogo", CJK_LARGO[:-1] + "一"), ("guardar-uso", CJK_LARGO[1:] + "一"),
+                          ("cambiar la descripción", CJK_LARGO)):
+            if via == "catálogo":
+                r = c.post(url, json={"vendor_name": VENDOR, "productos": [{"descripcion": desc, "ncm": NCM}]})
+            elif via == "guardar-uso":
+                r = c.post("/api/ncm/guardar-uso", json={"descripcion": desc, "ncm": NCM, "vendor_name": VENDOR})
+            else:
+                r = c.put(f"{url}/tornillo", json={"descripcion_original": desc})
+            chequear(r.status_code == 200 and len(fila(VENDOR_ID, desc)) == 1,
+                     f"2000 caracteres CJK por {via} se guardan: {r.status_code} {r.text[:120]}")
 finally:
     subprocess.run(["git", "-C", REPO, "worktree", "remove", "--force", WT], capture_output=True)
     try:
