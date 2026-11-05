@@ -2,426 +2,330 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## ORDEN-1b vuelta 3, entregada en `f22f48b` (informe en el commit de arriba)
+## COBRO-MP-1 vuelta 5, entregada en `736fed6` (informe en el commit de arriba)
 
-**Resultado.** El arnés ahora fija que `loadCurrentUser` lee la cookie de
-sesión antes de pedir `/auth/current_user`. Caso nuevo `z35`: la relectura de
-la vuelta del pago (`success` y `topup_success`, como datos del mismo caso)
-sale con la cookie de A y se retiene con `route.fetch()`; entra B, se suelta
-la respuesta (que el caso comprueba que es de A) y la pestaña intenta guardar
-un cliente. Sin sabotaje: no queda en ninguna cuenta y la pestaña avisa
-que entró otro. Con la lectura movida abajo del `try/finally`, el sabotaje
-da ROJO en las dos vueltas del pago, cada una medida sola. Producto: nada (`producto +0/−0`).
+**Resultado.** Lo que promete la confirmación de cancelar sale de la misma
+cuenta cuyo acceso muestra la pantalla: `/billing/me` calcula
+`cancelar_corta_acceso` con `billing_entity` (la organización si hay, si no
+la fila del usuario), igual que el resto de la respuesta. Caso nuevo con la
+familia como datos: organización `past_due` vencida con fila `trial` +10,
+organización `active` +20 con fila `past_due` vencida, y dos cuentas sin
+organización. Las dos filas con organización dan ROJO en `9161e0a` y verde
+ahora. Producto `+3/−2`, en `main.py`.
 
-**Lo que decidís vos: D55.** Las D51 a D54 de COBRO-MP-1 vuelta 4 siguen
-abiertas, abajo.
+**Nada para decidir.** D51 (quién cancela lo de una organización) sigue
+siendo pieza aparte; abajo, en «Riesgos», los casos que deja abiertos, con lo
+que midió el adversario.
 
-### Decisiones
-
-**D55. Los reintentos de la primera carga no van en `z35`.** Pediste
-sumarlos como datos «si los cubrís». No los sumé porque no distinguen este
-defecto: en la primera carga la pestaña todavía no tiene dueño, y el freno que
-ataja una cookie nueva ahí es `getCsrfToken() !== sesionAlAbrir`, no
-`sesionAntes` (app_v2.js:395 compara las dos contra `sesionAlAbrir`). Por
-el código, con la lectura movida abajo esas filas siguen verdes; no lo corrí.
-Ese otro freno ya lo cubren `k` y `z8` de `orden1.sh`.
-
-- **(a)** Así: `z35` sólo con las dos vueltas del pago.
-- **(b)** Sumar las filas igual, sabiendo que no ponen rojo con este
-  sabotaje.
-
-**Recomiendo (a).** Una fila que no distingue el defecto no prueba nada y
-suma una espera más al arnés.
-
-### SHAs (desde `ffed989`)
+### SHAs (desde `3bfd1e1`, tu merge)
 
 | SHA | Qué |
 |---|---|
-| `6e87684` | test: caso `z35` y su sabotaje en `orden1b.sh` |
-| `374348b` | test: `z34` y `z35` como funciones propias (`vueltaConOtroAdentro`, `respuestaDeAConOtroAdentro`, con `vueltaDelPago` común), fuera de la anónima |
-| `f22f48b` | test: `z35` comprueba que la respuesta retenida es de A; `VUELTA=<billing>` deja una sola fila y el sabotaje mide cada vuelta del pago |
-| (este) | docs: informe |
+| `e0a54f7` | test: caso `test_cancelar_avisa_por_la_cuenta_que_da_el_acceso` (cuatro filas) y dos sabotajes en `cobro_mp1.sh`, uno por dirección; las anclas de los dos sabotajes viejos de `cancelar_corta_acceso` pasan a `billing_entity` |
+| `96ce417` | fix: `cancelar_corta_acceso(billing_entity)` en `/billing/me`; `CHANGELOG.md` |
+| `736fed6` | test: el caso mide sólo el aviso (ver «Revisiones», hallazgo del adversario) |
+| (este) | docs: informe de las dos piezas |
 
-Archivos: `scripts/testing/pantalla_orden1.js` y
-`scripts/testing/sabotajes/orden1b.sh`. Nada de producto.
+### Rojo en `9161e0a`
 
-### Cómo retiene la respuesta
+El caso de `736fed6` copiado sobre un worktree de `9161e0a`,
+`pytest tests/test_cobro_mp1_cde.py -k cancelar_avisa`:
 
-- La primera relectura con la pestaña ya cargada se retiene; la carga y las
-  relecturas que vienen después pasan.
-- `route.fetch()` sale enseguida con las cookies de ese momento, las de A.
-  `route.continue()` pondría las del momento en que se suelta, las de B: el
-  adversario lo probó y con `continue()` el sabotaje da verde.
-- Si la respuesta retenida no es de A, el caso falla con «la relectura
-  retenida no es de A». Ese rojo lo vi en el primer intento: una segunda
-  relectura, posterior a la entrada de B, también pasaba por el handler y
-  contestaba B. Por eso sólo se retiene la primera.
+```
+E   AssertionError: el perfil promete otra cosa: {'billing_status': 'past_due', 'trial_ends_at': '2026-10-26T10:20:51.876453', ...
+E   AssertionError: el perfil promete otra cosa: {'billing_status': 'active', 'trial_ends_at': '2026-11-25T10:20:52.444468', ...
+FAILED tests/test_cobro_mp1_cde.py::test_cancelar_avisa_por_la_cuenta_que_da_el_acceso[org_impaga_fila_en_prueba]
+FAILED tests/test_cobro_mp1_cde.py::test_cancelar_avisa_por_la_cuenta_que_da_el_acceso[org_activa_fila_impaga]
+============ 2 failed, 2 passed, 31 deselected, 5 warnings in 2.39s ============
+```
+
+Las dos filas sin organización pasan en `9161e0a`, como corresponde: ahí
+`billing_entity` y la fila son la misma cuenta. Están porque las pediste.
+
+### Sabotajes (`cobro_mp1.sh`)
+
+| Sabotaje | Qué cambia | Rojo esperado |
+|---|---|---|
+| «/billing/me avisa por la fila del usuario y no por su organización» | vuelve a `cancelar_corta_acceso(db_user)` | `…[org_impaga_fila_en_prueba]` |
+| «/billing/me dice que corta si corta la fila del usuario, aunque la organización siga» | `…(billing_entity) or …(db_user)` | `…[org_activa_fila_impaga]` |
+
+Las dos filas nuevas, copiadas de la salida sobre `96ce417`:
+
+```
+ROJO  | C: /billing/me avisa por la fila del usuario y no por su organización: dice «FAILED tests/test_cobro_mp1_cde.py::test_cancelar_avisa_por_la_cuenta_que_da_el_acceso[org_impaga_fila_en_prueba]»
+ROJO  | C: /billing/me dice que corta si corta la fila del usuario, aunque la organización siga: dice «FAILED tests/test_cobro_mp1_cde.py::test_cancelar_avisa_por_la_cuenta_que_da_el_acceso[org_activa_fila_impaga]»
+```
 
 ### Puertas
 
 | Puerta | Sobre | Resultado |
 |---|---|---|
-| `orden1b.sh` | `f22f48b` | base verde; 26 ROJO, entre ellos «la sesión de la respuesta se lee cuando ya llegó (success)» y «(topup_success)», los dos con «…y el cliente quedó en la cuenta de B»; «sabotajes sin rojo: 0», salida 0 |
-| `orden1.sh` | `f22f48b` | base verde (el arnés entero, sin `CASOS`); 76 ROJO; «sabotajes sin rojo: 0», salida 0 |
-| Suite completa | `374348b` | `4415 passed, 121 skipped, 3 xfailed in 650.56s`, salida 0 |
-| `compileall -q proyecto_maria` | `f22f48b` | 0 |
-| chequeo-6 `ffed989..f22f48b` | `f22f48b` | 1 aviso, abajo |
-| Historia (grep de §6) | `f22f48b` | vacío |
+| `cobro_mp1.sh` | `96ce417` | las cinco bases en verde; 148 ROJO, entre ellos los dos de arriba; el control «sin mirar antes de insertar» sigue en verde, como tiene que ser; «sabotajes con falla: 0», salida 0 |
+| Suite completa, worktree limpio | `96ce417` | `4419 passed, 121 skipped, 3 xfailed, 100 warnings in 928.88s (0:15:28)`, salida 0 |
+| Suite completa, worktree limpio | `736fed6` | `4419 passed, 121 skipped, 3 xfailed, 100 warnings in 679.05s (0:11:19)`, salida 0 |
+| `tests/test_cobro_mp1_cde.py` | `736fed6` | `35 passed, 3 warnings in 15.99s` |
+| `compileall -q proyecto_maria` | `736fed6` | salida 0 |
+| chequeo-6 `3bfd1e1..736fed6` (lo propio) | `736fed6` | 0 avisos, abajo |
+| Historia (grep de §6) | `736fed6` | vacío |
 
-La suite corrió sobre `374348b` y vale para `f22f48b`: entre los dos sólo
-cambian los dos archivos del arnés, y ninguna prueba de `tests/` ni la CI los
-usa (`grep -rn 'pantalla_orden1\|orden1b.sh' tests/ .github/` da vacío).
+`cobro_mp1.sh` corrió sobre `96ce417`. `736fed6` sólo borra las cinco
+líneas de después del aviso en el caso nuevo (y el import que quedó sin uso);
+los dos rojos nuevos salen de la aserción del aviso, que está antes y no
+cambió. Lo mostré otra vez a mano sobre `736fed6` con el primer sabotaje
+(`db_user`), en un worktree aparte:
+
+```
+FAILED tests/test_cobro_mp1_cde.py::test_cancelar_avisa_por_la_cuenta_que_da_el_acceso[org_impaga_fila_en_prueba]
+FAILED tests/test_cobro_mp1_cde.py::test_cancelar_avisa_por_la_cuenta_que_da_el_acceso[org_activa_fila_impaga]
+============ 2 failed, 2 passed, 31 deselected, 3 warnings in 1.74s ============
+```
+
+Son las dos filas con organización: con `db_user` fallan las dos
+direcciones; el script espera la primera.
 
 ### chequeo-6
 
 ```
-chequeo-6 ffed989..f22f48b: avisos para mirar, no un veredicto
-producto +0/−0
-arnés +58/−14
+chequeo-6 3bfd1e1..736fed6: avisos para mirar, no un veredicto
+producto +3/−2
+arnés +38/−6
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  AVISO creció una función de más de 150: scripts/testing/pantalla_orden1.js:281 <anónima> 1520 → 1552, 19 en su propio cuerpo (§6: lo nuevo va aparte)
-avisos: 1
+  proyecto_maria/main.py: 11306 → 11307
+avisos: 0
 ```
 
-**El AVISO queda, y no es crecimiento propio.** Medido con `medir_js` y
-`padres` del mismo chequeo, las líneas de la anónima que no están en ninguna
-función anidada pasan de **1040** (`ffed989`) a **1034** (`f22f48b`): bajan 6.
-El chequeo compara las funciones anidadas por nombre y orden; `vueltaDelPago`
-es nueva pero está armada con líneas que ya estaban en `z34`, así que el
-chequeo no la cuenta como agregada y le carga su largo a la anónima. Partir
-la anónima ya está en la cola (D50).
+Desde `9161e0a` (tu base de revisión) da además el AVISO de la anónima de
+`pantalla_orden1.js`, que es de ORDEN-1b y está explicado en su sección.
 
 ### Revisiones
 
 | Quién | Modelo y esfuerzo | Sobre | Hallazgo | Qué hice |
 |---|---|---|---|---|
-| `/code-review high` | esta sesión, alto | `374348b` | El sabotaje sólo veía la fila `success` (z35 corta en la primera que falla) | `VUELTA` en el arnés y un sabotaje por vuelta (`f22f48b`) |
-| `/code-review high` | | | `ruta.fetch()` sin `catch`: una falla de red terminaba en el tope de 15 s, con un mensaje que no la nombra | El `catch` llama a `falla` |
-| `/code-review high` | | | `z35` no comprobaba su premisa: si la retenida contestara B, mediría lo mismo que `z34` | Aserción de que el `username` es el de A |
-| `/code-review high` | | | El AVISO de chequeo-6 | Explicado arriba |
-| `/code-review high` | | | `vueltaDelPago` se parece a `retenerRespuestas` y `retenerUsuario` | Queda: retienen otra cosa (respuestas de escritura, el usuario sin soltar) con otro contrato |
-| `/code-review high` | | | El booleano `conCookieDeA` | Queda: estilo |
-| `/code-review high` | | | La premisa de `z34` no se comprueba | Queda: su propio sabotaje daría verde si `continue()` no pusiera la cookie de B |
-| `adversario-sonnet-alto` | Sonnet, alto | `374348b` | Sin defectos que bloqueen. `z35` verde sin sabotaje y rojo en 6 de 6 corridas con el texto esperado; con `continue()` el sabotaje da verde; `fulfill` no pisa cookies. Menores: sólo `success` (arreglado), `fetch` sin `catch` (arreglado), 429 del login si se corre muchas veces contra la misma API (entorno) | Lo que bloqueaba, en `f22f48b` |
-| Seguridad | subagente Sonnet, con las instrucciones de `/security-review` | `ffed989..f22f48b` | «Sin hallazgos»: sólo archivos de prueba, ni producto, ni variables que lea el producto, ni secretos | — |
-
-La revisión de seguridad no fue el skill completo con su filtro de falsos
-positivos en paralelo: fue un subagente con sus instrucciones, porque el diff
-no tiene producto.
+| `adversario-sonnet-alto` | Sonnet, alto | `96ce417` | 1. La segunda mitad del caso (el acceso después de cancelar) no distingue: con organización relee una organización que `cancel` no escribe. Lo probó: con `cancel` sin cambiar `billing_status`, las cuatro filas pasan | Lo reproduje leyendo el caso: en las cuatro filas el acceso ya coincidía antes de cancelar. Saqué esa mitad en `736fed6`; qué hace `cancel` con organización es D51 |
+| | | | 2. Con organización en gracia (`active`, venció ayer) y fila `trial`, el aviso dice que corta y la organización sigue con acceso, porque `cancel` no la toca | Riesgo de D51, abajo |
+| | | | 3. Con organización activa y fila `none` o `canceled` sin suscripción, la pantalla muestra «Cancelar» y da 409 | Ya existía. D51 |
+| | | | 4. `suscripcion_abierta` y `renueva` mezclan la organización con `mp_preapproval_id` de la fila | Ya existía. D51 |
+| | | | Las cinco mutaciones de la línea del aviso dan rojo en el archivo; los textos de los sabotajes están en sus rojos | — |
+| `/code-review high` | esta sesión, alto | `3bfd1e1..96ce417` | 1. `cancel` decide `corta` y `service_until` con `db_user` | D51 |
+| | | | 2. `cancel` no toca la organización | D51 |
+| | | | 3. La aserción de después es tautológica con organización | Al principio la dejé; el adversario mostró que tampoco distingue sin organización. Sacada en `736fed6` |
+| | | | 4. El botón se muestra y `cancel` da 409 | Ya existía. D51 |
+| | | | 5. `renueva` y `suscripcion_abierta` salen de `db_user` | Ya existía. D51 |
+| | | | 6. Las filas sin organización repiten otro caso | Quedan: las pediste en este caso |
+| | | | 7. Los sabotajes no rompen `cancel` | Por diseño: la vuelta cambia el aviso, no `cancel` |
+| Seguridad | subagente Sonnet, con las instrucciones de `/security-review` | `3bfd1e1..96ce417` | «Sin hallazgos» | — |
+| Seguridad | subagente Sonnet, con las instrucciones de `/security-review` | `96ce417..736fed6` | «Sin hallazgos»: sólo `pantalla_orden1.js` y `test_cobro_mp1_cde.py`; el producto no lee `X-Prueba-Consulta` (grep en `proyecto_maria/`: 0) | Lo reproduje |
 
 ### Riesgos
 
-- **Bajo.** `z35` depende de que la vuelta del pago relea el usuario (a los
-  4000 y 2000 ms, `handleBillingReturn`). El caso espera esa relectura, no
-  un tiempo fijo: si la espera cambia sigue midiendo, y si la relectura
-  desaparece falla con «la pestaña no vuelve a leer el usuario en 15 s».
-- **Bajo, de entorno.** Corrido muchas veces contra la misma API, el login
-  da 429. Los scripts de sabotaje levantan una API nueva por corrida.
-- Lo que no tocás vos ni yo: las lecturas GET siguen sin pasar por el freno
-  (lo anotaste fuera de la pieza).
+- **Medio, es D51.** Con organización, `cancel` sigue cambiando sólo la fila
+  del usuario. El aviso ahora dice lo que pasaría con la cuenta que da el
+  acceso, pero `cancel` no actúa sobre ella. El adversario lo midió con
+  organización `active` vencida ayer (gracia) y fila `trial`:
+  `promesa_corta=True status_pantalla=active cancel=200 org_antes=active acceso_org_antes=True org_despues=active acceso_org_despues=True fila_despues=canceled`.
+  La pantalla dice «dejás de usar CDI» y la organización sigue en gracia. La
+  respuesta de `cancel` (`service_until`, el log) también sale de la fila.
+- **Bajo, es D51.** Organización activa con fila `none` o `canceled` sin
+  suscripción: botón «Cancelar» y 409.
+- Ninguna fila del caso cubre organización `trial`, `canceled` o `none`, ni
+  un `organization_id` sin organización (ahí `_get_billing_entity` cae a la
+  fila). No las agregué: el aviso es una sola llamada con la entidad, y las
+  dos direcciones ya la fijan.
 
 ### Comandos para reproducir
 
 ```bash
-# 1. Sabotajes de la pieza: ROJO en «(success)» y «(topup_success)», y «sabotajes sin rojo: 0»
-PY=venv/bin/python PUERTO=8875 scripts/testing/sabotajes/orden1b.sh f22f48b
+# 1. Sabotajes: los dos nuevos en ROJO con su fila, y «sabotajes con falla: 0»
+PY=venv/bin/python scripts/testing/sabotajes/cobro_mp1.sh 736fed6
+# 2. El caso: 4 passed
+python -m pytest -q --no-cov tests/test_cobro_mp1_cde.py -k cancelar_avisa
+# 3. Números de §6: 0 avisos
+python docs/pm/herramientas/chequeo-6.py 3bfd1e1 736fed6
+```
+
+### Archivos de producto tocados
+
+`proyecto_maria/main.py` (y `CHANGELOG.md`).
+
+---
+
+
+## ORDEN-1b vuelta 4, entregada en `f5e9fac` (informe en el commit de arriba)
+
+**Resultado.** `z35` retiene la relectura de la vuelta del pago y ninguna
+otra consulta a `/auth/current_user`. La familia va como datos del mismo
+caso: las dos vueltas del pago (`success`, `topup_success`) por el orden
+entre el tour y la carga (`primero tour`, `primero carga`), cuatro filas. Si
+el caso escribe sin haber retenido la relectura, o la retiene antes de que la
+pestaña tenga usuario, falla con su propio mensaje. El sabotaje M3 da ROJO en
+las cuatro filas, y con la consulta del tour atrasada 3 s el caso viejo daba
+VERDE y el nuevo falla. Mientras se retiene la relectura, las otras consultas
+del usuario (el autoguardado, cada 2500 ms) esperan a que la pestaña la lea:
+sin eso, con 3 s entre que entra B y se suelta la relectura, el sabotaje daba
+VERDE 4 de 4. Sin espera fija nueva en el arnés. Producto: nada (el
+`producto +3/−2` del chequeo-6 de abajo es el de COBRO-MP-1, que cae en el
+medio del rango).
+
+**Nada para decidir.** D55 quedó en (a), como lo decidiste. D50 (partir la
+anónima) sigue en la cola.
+
+### SHAs (desde `f22f48b`)
+
+| SHA | Qué |
+|---|---|
+| `69d6c3b` | merge de tu rama (veredicto de la vuelta 3) |
+| `72dd8e3` | test: cada consulta lleva su marca (`relectura`, `tour`, `carga`) y sólo se retiene la `relectura`; `PRIMERO=tour\|carga` fija el orden; el caso falla si escribe sin haberla leído; `orden1b.sh` mide las cuatro filas |
+| `f246b18` | test: al retener, la pestaña tiene que tener usuario; tope de 15 s para el tour; la falla de red del tour corta el caso; `VUELTA`/`PRIMERO` que no dejan fila fallan |
+| `f5e9fac` | test: mientras se retiene la relectura, toda otra consulta a `/auth/current_user` espera a que la pestaña la haya leído (hallazgo del adversario) |
+| (este) | docs: informe de las dos piezas |
+
+Archivos: `scripts/testing/pantalla_orden1.js` y
+`scripts/testing/sabotajes/orden1b.sh`. Nada de producto.
+
+### Cómo distingue cuál consulta es
+
+Al abrir la pantalla hay tres lecturas de `/auth/current_user`: la del tour
+(`checkDemoForceTour`, `fetch` directo), la de la carga (`loadCurrentUser`
+desde `cargarUsuarioHastaTenerlo`) y la relectura del pago
+(`handleBillingReturn`, `setTimeout(loadCurrentUser, 4000|2000)`).
+
+- La relectura se reconoce por el `setTimeout` que la programa, no por el
+  orden de llegada. El tour, por su pila. Cada consulta sale con la marca en
+  el header `X-Prueba-Consulta` y el handler retiene sólo la `relectura`.
+- El orden entre tour y carga lo fija el caso: con `primero tour`, la carga
+  espera a que termine la del tour (tope de 15 s, con su mensaje).
+- Antes de escribir, el caso espera a que la relectura se haya leído; si no,
+  falla con «…y la pestaña no leyó la relectura del pago en 15 s: no se escribe sin medirla».
+- Mientras retiene la relectura, toda otra consulta a `/auth/current_user`
+  espera a que la pestaña la haya leído (`f5e9fac`).
+
+### Rojo una vez
+
+**Sabotaje M3, las cuatro filas** (salida de `orden1b.sh` sobre `f5e9fac`,
+copiadas):
+
+```
+ROJO  | la sesión de la respuesta se lee cuando ya llegó (success, primero tour): dice «FALLA: la relectura de la vuelta del pago (success, primero tour) contestó A, entró B antes de leerla y la pestaña guardó un cliente y el cliente quedó en la cuenta de B»
+ROJO  | la sesión de la respuesta se lee cuando ya llegó (success, primero carga): dice «FALLA: la relectura de la vuelta del pago (success, primero carga) contestó A, entró B antes de leerla y la pestaña guardó un cliente y el cliente quedó en la cuenta de B»
+ROJO  | la sesión de la respuesta se lee cuando ya llegó (topup_success, primero tour): dice «FALLA: la relectura de la vuelta del pago (topup_success, primero tour) contestó A, entró B antes de leerla y la pestaña guardó un cliente y el cliente quedó en la cuenta de B»
+ROJO  | la sesión de la respuesta se lee cuando ya llegó (topup_success, primero carga): dice «FALLA: la relectura de la vuelta del pago (topup_success, primero carga) contestó A, entró B antes de leerla y la pestaña guardó un cliente y el cliente quedó en la cuenta de B»
+```
+
+**El hallazgo del adversario que motivó `f5e9fac`.** El autoguardado
+consulta `/auth/current_user` cada 2500 ms. Si una de esas consultas salía
+con B adentro antes de soltar la relectura, la pestaña se tapaba por ese otro
+camino y el sabotaje M3 no llegaba a medirse. Lo reproduje con copias del
+arnés con 3 s entre que entra B y se suelta la relectura, M3 puesto,
+`topup_success`, `primero carga`, cuatro corridas de cada una:
+
+```
+== viejo_tras            (f246b18 + 3 s)
+1 VERDE
+2 VERDE
+3 VERDE
+4 VERDE
+== nuevo_tras            (f5e9fac + 3 s)
+1 ROJO FALLA: la relectura de la vuelta del pago (topup_success, primero carga) contestó A, entró B antes de leerla y la pestaña guardó un cliente y el cliente quedó en la cuenta de B
+```
+
+Las corridas 2 a 4 de `nuevo_tras` dicen, letra por letra, lo mismo que la 1.
+
+Sin el sabotaje, `f5e9fac` + 3 s da verde: `z35`, las cuatro filas, dos
+corridas, `exit=0` las dos. Los 3 s son sólo de la contraprueba y no entran
+al repositorio. En el arnés que se corre de verdad la ventana es la de
+`nuevoUsuario(B)`, alrededor de 1 s, por eso en mis corridas de `f246b18`
+salía rojo; con una máquina más lenta podía salir verde.
+
+**El de la vuelta anterior, con el tour atrasado** (sigue igual en
+`f5e9fac`): con `72dd8e3` y el tour atrasado 3 s el sabotaje daba
+`VERDE … la prueba no lo vio`; desde `f246b18` el caso se niega a medir con
+«…pero la relectura salió antes de que la pestaña cargara el usuario».
+
+### Puertas
+
+| Puerta | Sobre | Resultado |
+|---|---|---|
+| `orden1b.sh` | `f5e9fac` | base verde; 28 ROJO, entre ellos las cuatro filas de `z35` de arriba; «sabotajes sin rojo: 0», salida 0 |
+| `orden1.sh` (su base corre el arnés entero sin `CASOS`) | `f5e9fac` | base verde; 76 ROJO, «sabotajes sin rojo: 0», salida 0 |
+| Suite completa, worktree limpio | `736fed6` (contiene `f5e9fac`) | `4419 passed, 121 skipped, 3 xfailed, 100 warnings in 679.05s (0:11:19)`, salida 0 |
+| `compileall -q proyecto_maria` | `736fed6` | salida 0 |
+| `z34` y `z35` sin sabotaje | `f5e9fac` | las 5 filas OK, `exit=0` |
+| chequeo-6 `f22f48b..f5e9fac` | `f5e9fac` | 1 aviso, abajo |
+| Historia (grep de §6) | `f5e9fac` | vacío |
+
+### chequeo-6
+
+```
+chequeo-6 f22f48b..f5e9fac: avisos para mirar, no un veredicto
+producto +3/−2
+arnés +94/−26
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  proyecto_maria/main.py: 11306 → 11307
+  AVISO creció una función de más de 150: scripts/testing/pantalla_orden1.js:281 <anónima> 1552 → 1584, 1 en su propio cuerpo (§6: lo nuevo va aparte)
+avisos: 1
+```
+
+El `producto +3/−2` y `main.py` son de COBRO-MP-1 (`96ce417`), que cae entre
+`f22f48b` y `f5e9fac`. `f246b18..f5e9fac` solo da `arnés +43/−6` y 0 avisos.
+
+**El AVISO queda.** Lo nuevo está en `vueltaDelPago` y
+`respuestaDeAConOtroAdentro`, funciones propias; el largo de la anónima
+cuenta las anidadas. Su cuerpo propio crece 1 línea, que no ubiqué. Partirla
+sigue en la cola (D50).
+
+### Revisiones
+
+| Quién | Modelo y esfuerzo | Sobre | Hallazgo | Qué hice |
+|---|---|---|---|---|
+| `/code-review high` | esta sesión, alto | `72dd8e3` | 1. Sin el chequeo de que la pestaña ya tiene usuario, con el tour lento la relectura se retiene sin dueño y el sabotaje puede dar verde | Reproducido arriba; arreglado en `f246b18` |
+| | | | 2. `await tourTermino` sin tope ni falla propia | Tope de 15 s con su mensaje y `requestfailed` llama a `falla` (`f246b18`). Espera la consulta, no un tiempo |
+| | | | 3. El tour se reconoce por `checkDemoForceTour` en la pila | Queda, como riesgo: si se renombra, la fila `primero tour` se pasa del tope y falla; no da verde |
+| | | | 4. La relectura se reconoce por `fn.name === 'loadCurrentUser'` en el `setTimeout` | Queda, como riesgo: si cambia, no se retiene nada y falla con «no vuelve a leer el usuario en 15 s» |
+| | | | 5. `VUELTA`/`PRIMERO` mal escritos dejan cero filas y `z35` da verde sin correr | Falla con «VUELTA o PRIMERO no dejan ninguna fila de z35» (`f246b18`) |
+| | | | 6. Si la relectura contesta no-ok, `__relecturaLeida` no se pone y el mensaje apunta a otra causa | Queda: el rojo es correcto, el texto confunde |
+| | | | 7. El spread de `o.headers` perdería un objeto `Headers` | No es real acá: `api()` arma un objeto plano y el tour no pasa headers |
+| | | | 8. La dimensión tour/carga duplica las corridas y no cambiaría el camino | Queda: pediste la familia, y la contraprueba del tour atrasado muestra que el orden sí cambia lo que se mide |
+| `adversario-sonnet-alto` | Sonnet, alto | `f246b18` | 1. Otra consulta (el autoguardado) puede ver a B antes de que se suelte la relectura y tapar la pestaña por otro camino: verde intermitente del sabotaje | Reproducido arriba (VERDE 4 de 4 con 3 s); arreglado en `f5e9fac` |
+| | | | 2. Renombrar `checkDemoForceTour` | Mismo riesgo que el 3 del code-review |
+| | | | 3. Un rojo de entorno se puede leer como rojo del caso, y `continue().catch(() => {})` traga errores de la ruta | Queda, como riesgo bajo: traga el error de una ruta ya cerrada; si la relectura no llega, el caso falla por su tope |
+| `/code-review high` | esta sesión, alto | `f246b18..f5e9fac` | 4. Si la relectura falla, se aborta o contesta no-ok, `leida` no se resuelve y las otras consultas quedan colgadas | Queda, como riesgo bajo: termina en rojo («no leyó la relectura en 15 s»), nunca en verde |
+| | | | 5. Mientras una consulta espera `leida`, se ignora su `AbortSignal`; si la espera pasara los 10 s de `ESPERA_SESION_MS`, `sesionEsDelDueno` daría false por el aborto y el sabotaje podría pasar verde | Queda, como riesgo bajo: hace falta una espera de más de 10 s y `nuevoUsuario(B)` tarda alrededor de 1 s; M3 dio rojo 4 de 4 en la serie y en `orden1b.sh` |
+| Seguridad | subagente Sonnet, con las instrucciones de `/security-review` | `f22f48b..f246b18` y `f246b18..f5e9fac` | «Sin hallazgos» las dos veces: sólo archivos de prueba; el producto no lee `X-Prueba-Consulta`, `VUELTA` ni `PRIMERO` (grep en `proyecto_maria/`: 0) | — |
+
+### Riesgos
+
+- **Bajo.** El caso reconoce el tour y la relectura por los nombres de sus
+  funciones. Si se renombran, falla fuerte; no da verde en silencio.
+- **Bajo.** Los 4 y 5 del code-review de `f5e9fac`: un rojo colgado si la
+  relectura falla, y un verde posible sólo si la espera pasa de 10 s.
+- **Bajo, de entorno.** El adversario corrió `orden1b.sh 72dd8e3` y le dio
+  `ModuleNotFoundError: No module named 'proyecto_maria'`. No lo diagnostiqué;
+  mis corridas de `orden1b.sh` desde la raíz del repositorio arrancan bien.
+- **Bajo, de entorno.** Corrido muchas veces contra la misma API, el login
+  da 429. Los scripts de sabotaje levantan una API nueva por corrida.
+- **Bajo.** El header `X-Prueba-Consulta` llega al servidor en las corridas
+  del arnés; el producto no lo lee.
+- Siguen en pie de la vuelta 2: D50 a la cola; H3 riesgo bajo; las lecturas
+  GET sin freno, fuera de la pieza.
+
+### Comandos para reproducir
+
+```bash
+# 1. Sabotajes de la pieza: ROJO en las cuatro filas de z35 y «sabotajes sin rojo: 0»
+PY=venv/bin/python PUERTO=8875 scripts/testing/sabotajes/orden1b.sh f5e9fac
 # 2. El arnés entero en verde (la base del script) y «sabotajes sin rojo: 0»
-PY=venv/bin/python PUERTO=8853 scripts/testing/sabotajes/orden1.sh f22f48b
+PY=venv/bin/python PUERTO=8853 scripts/testing/sabotajes/orden1.sh f5e9fac
 # 3. Números de §6: 1 aviso, el de arriba
-python docs/pm/herramientas/chequeo-6.py ffed989 f22f48b
+python docs/pm/herramientas/chequeo-6.py f22f48b f5e9fac
 ```
 
 ### Archivos de producto tocados
 
 Ninguno.
 
----
-
-## COBRO-MP-1 vuelta 4, entregada en `9161e0a` (informe en el commit de arriba)
-
-**Resultado.** Toda cuenta con una suscripción de Mercado Pago abierta
-puede cancelarla, sea cual sea su estado (`none`, `None`, `expired`, uno
-desconocido), y el perfil le muestra «Cancelar plan». Cancelar no da acceso
-a quien no lo tenía. En la vuelta apareció un segundo defecto, del mismo
-origen: la confirmación prometía «el período ya pagado» siguiendo el nombre
-del estado, y a la cuenta en gracia o con la prueba vencida le prometía
-días que cancelar no da. Quedó arreglado: el perfil y `/billing/cancel`
-deciden con la misma función, `cancelar_corta_acceso`.
-
-Lo que decidís vos: **D51, D52, D53 y D54**. D17 y D18 quedan como las
-decidiste: D17 aceptado; D18 en (a) hasta conocer D30.
-
-## Decisiones
-
-**D51. Organización contra usuario.** `/billing/cancel` cambia la fila del
-usuario, pero el acceso de un miembro de organización lo da la organización
-(`billing_entity`). `cancelar_corta_acceso(db_user)` mira al usuario. Para
-un miembro, el aviso «corta / no corta» puede no coincidir con su acceso
-real. Esto ya era así antes de la vuelta: la guarda y la respuesta de
-cancel siempre miraron al usuario.
-
-- **(a)** Pieza aparte: decidir qué cancela un miembro (la suscripción de
-  la organización, la suya o ninguna) y probarlo con una organización.
-- **(b)** Resolverlo en esta vuelta.
-
-**Recomiendo (a).** Es una decisión de producto (quién puede cancelar lo
-de la organización), no un arreglo, y no la abrió esta vuelta.
-
-**D52. Cancelar desde `none`, `None`, `expired` o un estado desconocido deja
-`canceled`.** Con la suscripción abierta, cancelar la cierra en Mercado
-Pago y pasa la cuenta a `canceled` con `trial_ends_at` recortado a ahora,
-así que no gana acceso.
-
-- **(a)** Mantenerlo: un solo estado final para «canceló».
-- **(b)** Cerrar la suscripción y dejar el estado que tenía.
-
-**Recomiendo (a).** El acceso es el mismo (ninguno), y (b) suma una rama
-por estado que nadie mira.
-
-**D53. Una cuenta `active` en gracia (ya pasó `trial_ends_at`, todavía
-con acceso) lo pierde al cancelar.** Ya era así antes de la vuelta:
-`canceled` da acceso sólo hasta `trial_ends_at`. Lo nuevo es que la
-confirmación ahora lo dice, en vez de prometer «el período ya pagado».
-
-- **(a)** Mantenerlo: cancelar en gracia corta, y el aviso lo dice.
-- **(b)** Darle la gracia también a la cancelada.
-
-**Recomiendo (a).** La gracia existe para esperar un cobro; quien cancela
-ya no va a pagar.
-
-**D54. `app_v2.js:7` da AVISO de chequeo-6 desde `9048b6a`.** Es el IIFE,
-el archivo entero (1198 → 1193). El cambio es de ORDEN-1b vuelta 2, no de
-esta pieza; contra `54dabb7` no aparece.
-
-- **(a)** A la cola de limpieza, junto con D50.
-- **(b)** Partirlo ahora.
-
-**Recomiendo (a).** El archivo baja 5 líneas, y partir el IIFE toca todas
-las pantallas v2.
-
-## SHAs (desde `54dabb7`)
-
-| SHA | Qué |
-|---|---|
-| `f3ec5ec` | fix: toda cuenta con una suscripción abierta puede cancelarla |
-| `448b8f0` | test: la salida de la suscripción abierta, en cada estado |
-| `853f0d0` | refactor(test): la pantalla recorre los estados sin período pagado en una función aparte |
-| `74bf816` | fix: la confirmación de cancelar dice lo que el servidor decide |
-| `276f862` | test: la confirmación sigue a `cancelar_corta_acceso` |
-| `2f9c98f` | refactor(test): los casos de la cancelada van en su propia función de la pantalla |
-| `0bdeef6` | fix: `cancelar_corta_acceso` mira el acceso que queda después de cancelar |
-| `ba21290` | test: la bandera se compara con el acceso que queda |
-| `30eeca5` | refactor: cancelar compara el acceso de hoy con una sola hora |
-| `ccf8310` | test: el caso trae como dato si cancelar corta el acceso |
-| `faaf37f` | fix: cancelar decide con `cancelar_corta_acceso` y no promete servicio a quien corta |
-| `80f03a0` | test: cancelar no devuelve `service_until` a la cuenta que queda sin acceso |
-| `10f74c4` | test: el caso de D13 no repite su chequeo de acceso |
-| `9e23484` | test: los sabotajes de la confirmación esperan el primer estado que la pantalla mira |
-| `9161e0a` | merge de la rama de la PM (sólo `docs/pm/`) |
-
-**producto +40/−33** contra `54dabb7` (+46/−44 contra `9048b6a`, que
-incluye ORDEN-1b vuelta 2), en `main.py`, `billing_service.py` y
-`profile.js`, más 6 líneas en `CHANGELOG.md`. El arnés suma +129/−42.
-
-## Qué cambió
-
-- La guarda de `/billing/cancel` da 409 sólo si el estado no es `trial`,
-  `active` ni `past_due` **y** no hay suscripción abierta.
-- `/billing/me` trae dos campos nuevos, booleanos:
-  - `suscripcion_abierta`: hay `mp_preapproval_id`, en cualquier estado;
-  - `cancelar_corta_acceso`: lo mismo que decide cancel.
-- `billing_service.cancelar_corta_acceso(cuenta, ahora)`: cancelar corta a
-  quien hoy no tiene acceso y a quien ya pasó `trial_ends_at`. Una sola
-  `ahora` para las dos preguntas.
-- Cancel, si corta, recorta `trial_ends_at` a ahora (si seguía vigente),
-  devuelve `service_until: null` y el log dice «sin acceso».
-- El perfil muestra «Cancelar plan» con `suscripcion_abierta` en cualquier
-  estado. La confirmación sigue a `cancelar_corta_acceso`; «pago pendiente»
-  queda para `past_due`.
-
-## Rojo antes del arreglo
-
-**En `9048b6a`, con el caso de `448b8f0`** (`rojo_v4b`): 4 failed, 4
-passed, los cuatro de la causa.
-
-```
-FAILED tests/test_cobro_mp1_cde.py::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[sin_plan]
-FAILED tests/test_cobro_mp1_cde.py::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[sin_estado]
-FAILED tests/test_cobro_mp1_cde.py::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[expired]
-FAILED tests/test_cobro_mp1_cde.py::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[desconocido]
-E   assert 409 == 200
-```
-
-**En `9048b6a`, con el caso final de `10f74c4`**: 16 failed, 15 passed.
-Fallan los 8 parámetros de `test_billing_me_dice_si_hay_una_suscripcion_abierta`
-(«assert None is False», «assert False is True», «assert None is True») y
-8 de `test_sin_cuenta_vigente_…`, con «el perfil promete otra cosa». Con
-el campo nuevo, el caso falla en `/billing/me` antes de llegar al 409: por
-eso el rojo propio de la causa es el de `448b8f0`.
-
-**El helper revertido a `not tiene_acceso`** (`rojo_v4i`): 2 failed,
-`renovacion_tardia` y `vencida_en_gracia`. Es el rojo del segundo defecto.
-
-## Caso y sabotaje
-
-Un caso por causa, con la familia como datos:
-
-- `test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando`:
-  parámetros `billing_status`, `dias`, `corta`. Cada fila: el checkout da
-  409, cancel da 200, `service_until` coincide con `corta` y la cuenta no
-  gana acceso.
-- `test_billing_me_dice_si_hay_una_suscripcion_abierta`: parámetros
-  `estado`, `con_suscripcion`, `abierta`, `corta`.
-- `pantalla_cobro_mp1.js` recorre en el perfil los estados sin período
-  pagado y la cancelada: el botón y el texto de la confirmación.
-
-Sabotajes nuevos o reanclados en `cobro_mp1.sh`:
-
-| Sabotaje | Dónde |
-|---|---|
-| C: sólo past_due pierde los días al cancelar | `main.py` |
-| C: cancelar promete servicio hasta una fecha sin acceso | `main.py` |
-| C: sólo la cancelada con suscripción puede cancelarla | `main.py` |
-| C: /billing/me dice abierta sólo a la cancelada | `main.py` |
-| C: /billing/me nunca dice que cancelar corta el acceso | `main.py` |
-| C: /billing/me dice que corta sólo con past_due | `main.py` |
-| C: cancelar_corta_acceso no ve la cuenta que ya pasó su fecha | `billing_service.py` |
-| C: sólo una cancelada con suscripción abierta ve «Cancelar plan» | `profile.js` |
-| C: la promesa vuelve a seguir el nombre del estado | `profile.js` |
-| C: sólo past_due no promete el período ya pagado | `profile.js` |
-| C: el pago pendiente se le dice a quien no está en past_due | `profile.js` |
-
-**Corrida de `cobro_mp1.sh` sobre `9e23484`**: 5 BASE en verde (la base, la
-carrera de D en Postgres, los pagos a la vez en Postgres, la pantalla del
-perfil y la pantalla v1), 146 ROJO y 1 VERDE esperado («sin mirar antes de
-insertar: sigue en verde, como tiene que ser»). Última línea: «sabotajes con
-falla: 0», salida 0. Los tres de la confirmación:
-
-```
-ROJO  | C: la promesa vuelve a seguir el nombre del estado: dice «FALLA: canceled vencida con suscripción abierta: la confirmación promete el período ya pagado»
-ROJO  | C: sólo past_due no promete el período ya pagado: dice «FALLA: canceled vencida con suscripción abierta: la confirmación promete el período ya pagado»
-ROJO  | C: el pago pendiente se le dice a quien no está en past_due: dice «FALLA: canceled vencida con suscripción abierta: la confirmación habla de un pago pendiente»
-```
-
-Sobre `10f74c4` la misma corrida dio «sabotajes con falla: 2» (144 ROJO, 2
-ROJO?): esos dos esperaban la falla de `none`, pero la pantalla mira antes
-la cancelada vencida y corta ahí. Daban rojo por la causa correcta con otro
-texto. `9e23484` corrige el texto esperado. Queda que dos sabotajes distintos
-esperan la misma línea: la primera aserción que los dos rompen.
-
-## Puertas
-
-| Puerta | Sobre | Resultado |
-|---|---|---|
-| Suite completa | `9161e0a` | «4415 passed, 121 skipped, 3 xfailed in 641.82s (0:10:41)», salida 0 |
-| Suite completa | `10f74c4` | «4415 passed, 121 skipped, 3 xfailed in 634.26s (0:10:34)», salida 0 |
-| `cobro_mp1.sh` | `9e23484` | 146 ROJO, «sabotajes con falla: 0», salida 0 |
-| `cobro_mp2.sh` | `10f74c4` | 23 ROJO, «sabotajes con falla: 0», salida 0. De `10f74c4` a `9161e0a` sólo cambian `cobro_mp1.sh` y `docs/pm/`: no lo volví a correr. |
-| `compileall -q proyecto_maria` | `9161e0a` | salida 0 |
-| `smoke_friccion.sh` | `9161e0a` | «OK · telemetría + alias session/state + by-cuit protegido», salida 0 |
-| `ataque_aislamiento.sh` | | No corrido: la pieza no toca clientes ni descargas, que es lo que cubre. |
-| chequeo-6 | `9e23484` | Abajo, entero; `9161e0a` sólo suma `docs/pm/`. |
-
-`9161e0a` es el merge de la rama de la PM (`ae546a7`): trae sólo `docs/pm/`.
-
-## Revisiones
-
-| Quién | Modelo y esfuerzo | Sobre | Resultado |
-|---|---|---|---|
-| `adversario-sonnet-alto` | Sonnet, alto | `54dabb7..853f0d0` | Corrió a las 04:17 (18 herramientas, 243 s). Su texto llegó por handback y no lo recuperé entero; lo que señaló coincide con lo arreglado después (la confirmación siguiendo el nombre del estado). |
-| `/code-review high` 1 | | `54dabb7..853f0d0` | 3 hallazgos: `profile.js:419` trataba toda cancelada como período pagado (arreglado en `74bf816`…`ba21290`); `main.py:2133` none/expired pasan a canceled (D52); `main.py:2150` organización contra usuario (D51). |
-| `/code-review high` 2 | | hasta `ba21290` | Hallazgos arreglados en la vuelta; no conservo el detalle. |
-| `/code-review high` 3 | | hasta `ba21290` | Regla duplicada entre `/billing/me` y cancel, docstring viejo, dos relojes: arreglado en `30eeca5`, `faaf37f`, `80f03a0`. |
-| `/code-review high` 4 | | hasta `80f03a0` | Sin bugs de producto. El ancla del sabotaje de past_due esperaba un texto al que el caso ya no llega, y una aserción muerta: arreglados en `10f74c4`. El resto, abajo en riesgos. |
-| `/security-review` | Sonnet, alto | `54dabb7..10f74c4` | «No high-confidence vulnerabilities». Miró: ganar acceso al cancelar (lo impide el recorte), fechas nulas o sin zona, carreras (`with_for_update`), IDOR, XSS (textos constantes, sin `innerHTML`) y exposición (booleanos, sin el id de la suscripción). |
-
-`80f03a0..9e23484` es sólo de pruebas: no corrí un quinto code-review, y el `/security-review` no se volvió a correr después de `10f74c4`.
-
-## chequeo-6
-
-Contra `54dabb7`:
-
-```
-chequeo-6 54dabb7..9e23484: avisos para mirar, no un veredicto
-producto +40/−33
-arnés +129/−42
-historia (grep de §6, sin líneas movidas): vacío
-archivos de producto:
-  proyecto_maria/main.py: 11311 → 11306
-  proyecto_maria/services/billing_service.py: 402 → 412
-  proyecto_maria/static/v2/screens/profile.js: 585 → 587
-avisos: 0
-salida 0
-```
-
-Contra `9048b6a`:
-
-```
-chequeo-6 9048b6a..9e23484: avisos para mirar, no un veredicto
-producto +46/−44
-arnés +362/−52
-historia (grep de §6, sin líneas movidas): vacío
-archivos de producto:
-  proyecto_maria/main.py: 11311 → 11306
-  proyecto_maria/services/billing_service.py: 402 → 412
-  proyecto_maria/static/v2/app_v2.js: 1204 → 1199
-  AVISO creció una función de más de 150: proyecto_maria/static/v2/app_v2.js:7 <anónima> 1198 → 1193, 1 en su propio cuerpo (§6: lo nuevo va aparte)
-  proyecto_maria/static/v2/screens/profile.js: 585 → 587
-  AVISO creció una función de más de 150: scripts/testing/pantalla_orden1.js:280 <anónima> 1343 → 1520, 103 en su propio cuerpo (§6: lo nuevo va aparte)
-avisos: 2
-salida 0
-```
-
-- `app_v2.js:7`: D54.
-- `pantalla_orden1.js:280`: D50, ya decidido en (a).
-
-Los dos vienen de ORDEN-1b vuelta 2; esta pieza no toca esos archivos.
-
-## Riesgos
-
-- **Organización**: D51.
-- **Pago tardío**: esta vuelta no toca qué pasa si Mercado Pago avisa un
-  cobro después de cancelar; no lo volví a probar.
-- **503**: si Mercado Pago no cancela, no cambia nada en CDI, como antes.
-- **`dataset` viejo**: la confirmación lee `dataset.corta` de la última
-  carga de `/billing/me`. Si la fecha pasa con el perfil abierto, el texto
-  puede prometer días; el servidor igual corta bien.
-- **Filas redundantes**: `renovacion_tardia` (active, −1) y
-  `vencida_en_gracia` (active, −3) cubren la misma causa. Quedan como datos.
-- **Sin fila de `trial`** en la familia de D13: la prueba vigente la cubren
-  los casos de cancelar desde trial de `test_billing_autoservicio.py`.
-- **Commits intermedios**: entre `faaf37f` y `80f03a0` un sabotaje queda con
-  el ancla vieja, y hasta `10f74c4` otros dos esperan el texto de `none`.
-  En `9e23484` están bien.
-- **`service_until` sin zona**: se devuelve como está en la base. Viene de
-  antes.
-- **`ahora=None`** se normaliza sólo dentro del helper; `vigente` llamado
-  aparte usa su propio reloj. En cancel se le pasa la misma `ahora`.
-- `corta and vigente(...)` calcula `vigente` aunque ya se sepa; lo dejé
-  por claridad.
-
-## Comandos para reproducir
-
-```bash
-git fetch origin claude/dev-tecnica && git checkout 9161e0a
-# 1. El caso: 31 passed
-python -m pytest -q --no-cov tests/test_cobro_mp1_cde.py | tail -1
-# 2. Sabotajes de la pieza: «sabotajes con falla: 0»
-PY=python bash scripts/testing/sabotajes/cobro_mp1.sh 9e23484 | tail -1
-# 3. Números de §6: 0 avisos contra 54dabb7
-python docs/pm/herramientas/chequeo-6.py 54dabb7 9e23484
-# 4. Historia: vacío
-git diff 54dabb7 9e23484 -- proyecto_maria/ | grep '^+' | grep -E '[A-Z]{4,}(-[A-Z]{2,})*-[0-9]|caso [0-9]'
-```
-
-## Archivos de producto tocados
-
-`proyecto_maria/main.py`, `proyecto_maria/services/billing_service.py`,
-`proyecto_maria/static/v2/screens/profile.js` y `CHANGELOG.md`.
-
-/compact conservar: Dev 1, rama claude/dev-tecnica. ORDEN-1b vuelta 3
-entregada en f22f48b (informe en el commit de arriba), con D55 para decidir.
-COBRO-MP-1 vuelta 4 en 9161e0a sigue en revisión, con D51-D54. Lo que sigue
-en la cola (CSRF-1) no está activado: espero el veredicto. Nada se publica sin el
-«dale» de Emi; nunca main.
+/compact conservar: Dev 1, rama claude/dev-tecnica. COBRO-MP-1 vuelta 5
+entregada en 736fed6 y ORDEN-1b vuelta 4 en f5e9fac (informe en el commit de
+arriba), las dos sin D para decidir. Sigue CSRF-1, en tu orden. Nada se publica
+sin el «dale» de Emi; nunca main.
