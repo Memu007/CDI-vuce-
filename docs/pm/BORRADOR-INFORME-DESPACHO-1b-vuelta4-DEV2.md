@@ -34,17 +34,18 @@ Este archivo es mío y vos no lo tocás. Acá te informo.
 | `bd14302` | refactor: `pais_reconocido` ya pasa a mayúsculas (code-review 4, hallazgo 7) |
 | `4034cdd` | test: `guardar1.sh`, los sabotajes de editar y de aprender buscan el código de ahora |
 | `bb913d0` | test: `despacho1b.sh` al día con el código de la vuelta (cuatro sabotajes no distinguían) y uno nuevo para `_DECIMAL`; el caso del PUT manda el NCM con espacios |
+| `03296d4` | test: las hojas leídas antes del corte se miden con un entender que cuesta 50 ms (el sabotaje del tope de entender salía VERDE) |
 | este | docs: informe y CHANGELOG |
 
-## `CLAUDE.md` §6: `chequeo-6.py 1f5480e bb913d0`
+## `CLAUDE.md` §6: `chequeo-6.py 1f5480e 03296d4`
 
-Todo el código de esta vuelta es de antes del 04/11; no lo reescribí, como pide tu canal. De `bb913d0` a la cabeza sólo cambian documentos.
+Todo el código de esta vuelta es de antes del 04/11; no lo reescribí, como pide tu canal. De `bb913d0` a `03296d4` sólo cambia `tests/test_despacho1b.py` (+14/−3, la diferencia del arnés); de ahí a la cabeza, documentos. Ese cambio es del 05/11: le rige §6 y el chequeo no le marca avisos.
 
 ```
-chequeo-6 1f5480e..bb913d0: avisos para mirar, no un veredicto
+chequeo-6 1f5480e..03296d4: avisos para mirar, no un veredicto
 producto +496/−242
   AVISO producto suma 254 líneas netas: el informe dice por qué (§6: más de 20)
-arnés +1877/−71
+arnés +1888/−71
 historia (grep de §6, sin líneas movidas):
   AVISO historia en proyecto_maria/main.py:1331: """Una fila por producto en client_product_history (DESPACHO-1b): agrega
   AVISO historia en proyecto_maria/security/file_security.py:490: # con la memoria topeada y tiempo máximo (RENDIMIENTO-1 y 1c).
@@ -86,7 +87,7 @@ Lo que el chequeo no mide, mirado a ojo:
 ```bash
 git checkout {SHA}
 export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares ENVIRONMENT=test DATABASE_URL=sqlite+aiosqlite:///./test.db
-python -m pytest -q --no-cov tests/test_despacho1b.py      # `281 passed, 3 warnings in 94.53s (0:01:34)`
+python -m pytest -q --no-cov tests/test_despacho1b.py      # `281 passed, 3 warnings in 47.30s`
 bash scripts/testing/sabotajes/despacho1b.sh {SHA}           # al final: «sabotajes sin rojo: 0»
 DATABASE_URL=postgresql+asyncpg://…/descartable python scripts/testing/despacho1b_postgres.py   # al final: «fallas: 0»
 ```
@@ -284,11 +285,11 @@ Verdes después de cada arreglo, sobre `tests/test_despacho1b.py` y los archivos
 
 ## Puertas
 
-Sobre `bd14302`, salvo `guardar1.sh` (sobre `4034cdd`, que sólo cambia ese script). `tests/test_despacho1b.py` y `despacho1b.sh`, sobre `bb913d0`. De `bd14302` a `{SHA}` sólo cambian `guardar1.sh`, `despacho1b.sh`, un valor de un caso del PUT, el CHANGELOG y este informe: ningún archivo de producto.
+Sobre `bd14302`, salvo `guardar1.sh` (sobre `4034cdd`, que sólo cambia ese script). `tests/test_despacho1b.py`, `despacho1b.sh` y la suite, sobre `03296d4`. De `bd14302` a `{SHA}` sólo cambian `guardar1.sh`, `despacho1b.sh`, un valor de un caso del PUT, el CHANGELOG y este informe: ningún archivo de producto.
 
 | Puerta | Salida |
 |---|---|
-| `tests/test_despacho1b.py` | `281 passed, 3 warnings in 94.53s (0:01:34)` (sobre `bb913d0`) |
+| `tests/test_despacho1b.py` | `281 passed, 3 warnings in 47.30s`, salida 0 (sobre `03296d4`) |
 | `despacho1b.sh` (copia congelada) | {SAB} |
 | `disco1.sh` (copia congelada, sobre `bd14302`; toqué `tests/test_disco1.py`) | 39 ROJO, «sabotajes sin rojo: 0», salida 0. **No corrí** los 7 de Postgres («falta PG_URL»): son del bloqueo por dueño de DISCO-1, que esta vuelta no toca |
 | `guardar1.sh` | 12 ROJO, «sabotajes con falla: 0», salida 0 (sobre `4034cdd`) |
@@ -315,6 +316,8 @@ Sobre `bd14302`, salvo `guardar1.sh` (sobre `4034cdd`, que sólo cambia ese scri
   - «el NCM sin recortar las puntas» (VERDE): ningún caso mandaba espacios al PUT. El caso `test_cambiar_un_producto_guarda_la_forma_de_la_regla` ahora manda `" 3926.90.90.000A "`. Con el sabotaje cae con `400` «El NCM no es válido: tiene que tener sus 8 dígitos.»; sin él, pasa.
   - `_DECIMAL` no tenía sabotaje: sumé «el promedio acepta números con otros dígitos», que hace caer `aprender_ignora_los_numeros_con_otros_digitos[learn|operacion]` y `cambiar_un_producto_valida_igual_que_guardar[guion bajo|peso arabigo]`.
   - Dos casos quedan sin un sabotaje propio que los tire solos: `test_el_mismo_ncm_con_o_sin_puntos_es_el_mismo_producto` (lo sostiene también la normalización de `identidad_del_producto`) y `test_aprender_un_peso_infinito_no_lo_guarda_y_el_catalogo_anda` (dos capas: `_DECIMAL` e `isfinite`). Sacar una sola capa no los distingue.
+- **`despacho1b.sh` sobre `bb913d0` dio un VERDE, y el defecto es de la prueba:** «extraer se lleva el tope entero: la prueba no lo vio». El sabotaje deja a entender el texto con 1 ms de tope, pero el temporizador de CPU corta recién al tick siguiente (4 ms o más) y el texto de prueba se entiende en unos 3,1 ms (medido). `test_las_hojas_leidas_antes_del_corte_dan_sus_productos` pasaba igual. En `03296d4` la prueba hace que entender cueste 50 ms de CPU. Repetida 5 veces: 5 verdes sin sabotaje y 5 rojos con él. El producto no cambia.
+- **Las dos corridas sobre `bb913d0` se cortaron en el sabotaje 96**, con los 95 anteriores en ROJO. A la primera la cortó el tope de 2 h de las tareas de fondo; desde ahí corro desacoplado. A la segunda, un reinicio del contenedor. El 96 solo dio ROJO, «4 failed, 277 passed, 3 warnings in 46.30s»: los cortes vinieron del entorno. Retomé desde el 96 con una copia congelada que saltea los anteriores sin correrlos. Ahí salió el VERDE de arriba. La puerta es la corrida completa sobre `03296d4`.
 - **La corrida vieja sobre `bd14302` se cortó por el tope de tiempo de las tareas de fondo**, en el sabotaje 74 de los 86 que le quedaban, sin otra falla que esas cuatro. No la repetí: la puerta es la corrida completa del script corregido sobre `bb913d0`.
 
 /compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP cada 2 h (minuto 35, horario de Argentina). Entregada sin veredicto: DESPACHO-1b vuelta 4 en {SHA}. Apenas entregada: RENDIMIENTO-1c (ccf5d8c, 033cb11, 843cc08, 7dd008f) con sabotajes rendimiento1c.sh, rendimiento1.sh y despacho1b.sh, suite, adversario Opus alto e informe con la D49 (el vendedor de la factura abre el PDF en la app). Después SESION-1 → ABUSO-1 → SUFIJOS-2 → EMAIL-1 (D45) → CONEXIONES-1 (D46) → OBSERVABILIDAD-1 → ORG-1+D40. Nunca main; nada se publica sin el «dale» de Emi para el SHA; sin secretos ni datos reales; Devs hasta esfuerzo alto, sin Fable; sin advisor.
