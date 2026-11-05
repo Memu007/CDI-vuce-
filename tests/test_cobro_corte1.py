@@ -97,7 +97,7 @@ def _operaciones(username):
             filas = (await db.execute(
                 select(Operation).where(Operation.owner_username == username)
                 .order_by(Operation.created_at))).scalars().all()
-            return [{"id": o.id, "op_code": o.op_code, "archivo": o.generated_file,
+            return [{"id": o.id, "op_code": o.op_code, "archivo": o.generated_file, "creada": o.created_at,
                      "cliente": o.client_id, "source": o.source, "extra": dict(o.extra or {})}
                     for o in filas]
     return _correr(_run())
@@ -371,7 +371,7 @@ def test_generar_cuenta_una_vez_por_operacion_y_la_crea(cuenta):
     r = _generar(c)
     assert r.status_code == 200, r.text
     oid = _oid(r)
-    assert r.json()["filename"] == f"MARIA_{ID_A}_{oid[:8]}.TXT"
+    assert r.json()["filename"] == f"MARIA_{ID_A}_{oid[-8:]}.TXT"
     assert _leer(u)["ops"] == 1
     ops = _operaciones(u)
     assert len(ops) == 1, ops
@@ -441,6 +441,18 @@ def test_el_mismo_resultado_no_gasta_una_de_las_10(cuenta, monkeypatch):
     assert _leer(u)["ops"] == 2
 
 
+def test_otra_fecha_de_factura_en_la_importacion_gasta_una_de_las_10(cuenta):
+    c, u = cuenta()
+    oid = _oid(_generar(c))
+    pedido = _pedido()
+    pedido.update(operation_id=ID_A, operacion_id=oid, fecha_emision="01/01/2026")
+    otra = c.post("/generate_maria", json=pedido)
+    assert otra.status_code == 200, otra.text
+    assert _oid(otra) == oid
+    assert len(_operaciones(u)[0]["extra"]["maria_hashes"]) == 2
+    assert _leer(u)["ops"] == 1
+
+
 def test_borrar_el_cliente_no_recuenta_lo_generado(cuenta):
     c, u = cuenta()
     r = _generar(c)
@@ -476,6 +488,41 @@ def test_la_11_distinta_es_una_operacion_nueva_contada(cuenta):
 
     # Un contenido que ya se generó sigue saliendo de la primera, sin contar.
     assert _oid(_generar(c, flete=7925.0 + 3, operacion_id=oid)) == oid
+    assert _leer(u)["ops"] == 2
+
+
+@pytest.mark.parametrize("org", [False, True])
+def test_el_periodo_nuevo_no_hereda_las_regeneraciones(cuenta, org):
+    c, u = cuenta(org=org)
+    oid = _oid(_generar(c))
+    _fijar(u, de_la_org=org, billing_period_started_at=datetime.now(timezone.utc) + timedelta(minutes=1))
+    assert _oid(_generar(c, operacion_id=oid)) == oid
+    assert _leer(u, de_la_org=org)["ops"] == 1
+    nueva = _generar(c, flete=8000.0, operacion_id=oid)
+    assert nueva.status_code == 200, nueva.text
+    assert _oid(nueva) not in ("", oid)
+    assert _leer(u, de_la_org=org)["ops"] == 2
+    assert len(_operaciones(u)[0]["extra"]["maria_hashes"]) == 1
+
+
+def test_la_operacion_del_mismo_segundo_es_del_periodo(cuenta):
+    c, u = cuenta()
+    oid = _oid(_generar(c))
+    _fijar(u, billing_period_started_at=_operaciones(u)[0]["creada"].replace(microsecond=999999))
+    assert _oid(_generar(c, flete=8000.0, operacion_id=oid)) == oid
+    assert _leer(u)["ops"] == 1
+
+
+def test_dos_operaciones_manuales_no_comparten_el_archivo(cuenta):
+    c, u = cuenta()
+    cid = _cliente(c)
+    item = {"descripcion": "Lona de PVC gris", "cantidad": 750, "valor_unitario": 1.85}
+    manuales = [c.post("/api/operations/manual", json={"client_id": cid, "items": [item]}) for _ in range(2)]
+    assert all(m.status_code == 200 for m in manuales), [m.text for m in manuales]
+    ids = [o["id"] for o in _operaciones(u)]
+    assert len(ids) == 2 and all(i.startswith("MANUAL_") for i in ids), ids
+    archivos = [_generar(c, operacion_id=i).json()["filename"] for i in ids]
+    assert archivos[0] != archivos[1], archivos
     assert _leer(u)["ops"] == 2
 
 

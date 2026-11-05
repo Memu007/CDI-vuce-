@@ -155,7 +155,10 @@ sabotaje $M "el mismo resultado gasta una de las 10" \
   'huella in huellas or ' ''
 sabotaje $M "la fecha de emisión cambia el resultado" \
   "FAILED $T::test_el_mismo_resultado_no_gasta_una_de_las_10" \
-  '_FECHA_DE_EMISION.sub(r"\1", contenido)' 'contenido'
+  '_FECHA_DE_EMISION.sub(r"\1", txt_content)' 'txt_content'
+sabotaje $M "la fecha de la factura importada no cambia el resultado" \
+  "FAILED $T::test_otra_fecha_de_factura_en_la_importacion_gasta_una_de_las_10" \
+  'sha256(contenido.encode' 'sha256(_FECHA_DE_EMISION.sub(r"\1", contenido).encode'
 sabotaje $M "el tope de regeneraciones no es 10" \
   "FAILED $T::test_la_11_distinta_es_una_operacion_nueva_contada" \
   'MARIA_REGENERACIONES = 10' 'MARIA_REGENERACIONES = 11'
@@ -164,8 +167,18 @@ sabotaje $M "la 11.ª distinta reusa la operación" \
   'len(huellas) < MARIA_REGENERACIONES' 'len(huellas) <= MARIA_REGENERACIONES'
 sabotaje $M "dos operaciones con la misma factura comparten el archivo" \
   "FAILED $T::test_dos_operaciones_nunca_comparten_una_fila" \
-  'f"{nombre}_{nuevo_id[:8]}.TXT"' 'f"{nombre}.TXT"' \
-  'f"{nombre}_{operacion.id[:8]}.TXT"' 'f"{nombre}.TXT"'
+  'f"{nombre}_{nuevo_id[-8:]}.TXT"' 'f"{nombre}.TXT"' \
+  'f"{nombre}_{operacion.id[-8:]}.TXT"' 'f"{nombre}.TXT"'
+sabotaje $M "el archivo toma el comienzo del id" \
+  "FAILED $T::test_dos_operaciones_manuales_no_comparten_el_archivo" \
+  'f"{nombre}_{nuevo_id[-8:]}.TXT"' 'f"{nombre}_{nuevo_id[:8]}.TXT"' \
+  'f"{nombre}_{operacion.id[-8:]}.TXT"' 'f"{nombre}_{operacion.id[:8]}.TXT"'
+sabotaje $M "el período nuevo hereda las regeneraciones" \
+  "FAILED $T::test_el_periodo_nuevo_no_hereda_las_regeneraciones" \
+  $'\n                                                        and _del_periodo(operacion, cuenta[1])' ''
+sabotaje $M "la operación del mismo segundo parece de otro período" \
+  "FAILED $T::test_la_operacion_del_mismo_segundo_es_del_periodo" \
+  'inicio.tzinfo or timezone.utc, microsecond=0)' 'inicio.tzinfo or timezone.utc)'
 sabotaje $M "se reusa la operación de otra cuenta" \
   "FAILED $T::test_guardar_con_la_operacion_de_otra_cuenta_no_la_toca" \
   $'        OperationModel.owner_username == username,\n    ))' $'    ))'
