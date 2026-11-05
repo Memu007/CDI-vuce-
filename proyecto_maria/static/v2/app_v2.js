@@ -304,13 +304,6 @@
         });
     }
 
-    /* ---------- 5. Toggle a v1 ---------- */
-    function goToLegacy() {
-        document.cookie = 'cdi_ui=; Path=/; Max-Age=0; SameSite=Lax';
-        track('toggle_to_v1');
-        setTimeout(() => { window.location.href = '/dashboard'; }, 100);
-    }
-
     /* ---------- 6. Usuario actual (avatar + saludo) ---------- */
     let currentUser = null;
     async function loadCurrentUser() {
@@ -445,7 +438,6 @@
     CDI.logout = logout;
     CDI.goTo = goTo;
     CDI.goBack = goBack;
-    CDI.goToLegacy = goToLegacy;
     CDI.track = track;
     CDI.confirm = confirmDialog;
     // Exponemos toast como funcion y tambien con .success/.error/.info
@@ -720,10 +712,6 @@
         updateClientePill();
         setupFakeSourceBanner();
         track('session_start');
-
-        // El link "Volver a la version clasica" esta en el footer como
-        // #goLegacyBtn2 con onclick inline a CDI.goToLegacy() (ver
-        // dashboard_v2.html). No necesitamos listener aca.
 
         // Click en la pill de cliente -> abre el drawer
         document.addEventListener('click', (e) => {
