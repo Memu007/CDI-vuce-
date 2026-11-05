@@ -41,3 +41,8 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   da 500 en vez de servir la página (riesgo declarado en CSRF-3).
 - Carrera al abrir la v2 con dos respuestas que emiten `csrf_token`: queda el
   último `Set-Cookie`. No reproducida como fuga.
+- `static/v2/screens/finalize.js` es un solo IIFE de ~1400 líneas: partirlo
+  por pantalla (aviso de chequeo-6 en DESPACHO-1c).
+- Avisos de guardado de la v2: duran 4 s sin marca fija; «Volvé a Listo y
+  reintentá» confunde porque entrar a Listo regenera; `ERROR_AJENA` y
+  `ERROR_SIN_SESION` se muestran como «Error de red».

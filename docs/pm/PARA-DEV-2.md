@@ -69,60 +69,52 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
-## Veredicto de DESPACHO-1c y respuestas D53–D57 (2026-11-05 18:20 UTC, PM)
+## DESPACHO-1c: aceptada sobre `fbbb2ad`, sin integrar todavía (2026-11-05 19:05 UTC, PM)
 
-**Orden:** DESPACHO-1c devolución → terminar RENDIMIENTO-1d (con D55 b) →
-SESION-1 → el resto de la cola. CATALOGO-LARGO-2 entra sólo si Emi dice que sí. RENDIMIENTO-1c v2, DESPACHO-1b v6 y
-CATALOGO-LARGO-1 sobre `ca87d82`: sus sabotajes y la suite siguen corriendo
-de mi lado; el veredicto va aparte apenas terminen. Hasta ahora todo
-coincide (`rendimiento1c.sh` 17 ROJO, `rendimiento1.sh` 11, `despacho1b_postgres`
-22 OK con `fallas: 0`, y `despacho1b.sh` 97 de 138 en rojo antes de que se me
-cortara por tiempo). No hace falta que toques nada de esas tres.
+Evidencia: `REPRODUCCION-DESPACHO-1c-v2-2026-11-05.md`. Se sostienen 39
+casos, `despacho1c.sh` 16 ROJO con `fallas: 0`, y mis ejemplos de la familia
+(403, 503 y 422) también dejan el error a la vista. Se integra apenas acepte
+`ca87d82` (RENDIMIENTO-1c v2, DESPACHO-1b v6 y CATALOGO-LARGO-1), que viene
+dentro de `fbbb2ad`; sus pruebas siguen corriendo de mi lado y no tenés que
+tocar nada de eso.
 
-### DESPACHO-1c sobre `5199709`: devolución por una causa
+**Orden:** terminar RENDIMIENTO-1d (con D55 b) → **DESPACHO-1d** → SESION-1 →
+el resto de la cola. CATALOGO-LARGO-2 entra sólo si Emi dice que sí.
 
-Evidencia: `REPRODUCCION-DESPACHO-1c-2026-11-05.md`. Se sostienen 14 casos,
-`despacho1c.sh` 7 ROJO y chequeo-6 sin avisos.
+- **D63:** anotada (es la D58 de RENDIMIENTO-1d con su número nuevo).
+- **D65: (b), en DESPACHO-1d.** **D67: (b), en DESPACHO-1d.**
+- **CJK y emoji a CATALOGO-LARGO-2:** de acuerdo.
+- Los dos AVISOs de chequeo-6 quedan explicados. Partir `finalize.js` por
+  pantalla va a la cola de limpieza.
 
-**Causa:** una falla de guardado puede quedar tapada por un éxito en la
-pantalla. Lo que pido es comportamiento:
+### DESPACHO-1d (subpieza chica, puerta para publicar)
 
-- **Ninguna falla de guardado deja un éxito a la vista**, en el panel de
-  cliente sin asignar y en la caja fija. La familia, como datos de un caso:
-  `/operaciones` con 500, con **402** (cuenta vencida: es la respuesta nueva
-  de COBRO-CORTE-1), con 409, con la red caída, y `historial_guardado: false`.
-  En todos, lo último que ve la persona es el error. Va rojo primero en
-  `5199709` y con su sabotaje. **D57: (b), ampliada así.**
-  `reSaveOperationAndClosePanel` es tuya; a la Dev técnica le dije que no la
-  toque.
-- **D53: (b), en esta misma devolución.** `saveNcmUsage` (`ncm.js`) y
-  aprender el catálogo (`finalize.js`) muestran el aviso con un 400 y con
-  `historial_guardado: false`. Va en el mismo caso de la familia.
-- Dos descripciones sólo CJK o emoji iguales normalizan a vacío y no se
-  cruzan entre sí. Decime en el informe si eso es aceptable o si lo dejás
-  para CATALOGO-LARGO-2. No es criterio de aceptación.
+Lo encontró el adversario sobre `fbbb2ad`. Pido comportamiento:
 
-### Las otras D
+- **La operación nunca espera al catálogo.** Si aprender el catálogo no
+  vuelve o falla, la operación igual se guarda y lo último a la vista es el
+  resultado de la operación.
+- **Red caída o 402 al confirmar NCM o al aprender el catálogo dan aviso**
+  (D65), como ya pasa con 500 y 400: en la misma familia del caso existente.
+- **El id de proveedor nunca pasa de 60** (D67), la regla del servidor.
+- **Crear A (falla), asignar B (falla), crear otra vez nunca crea un segundo
+  cliente**, y un caso que dé rojo si se saca el reinicio de
+  `clienteCreadoAca`.
+- **El cartel «Guardamos este NCM» nunca queda a la vista cuando el guardado
+  falló.**
 
-- **D54: (a), decidido por la PM.** Que el arranque corte si la migración no
-  puede: la tabla es chica, el `ALTER` no la reescribe y ya hay precedente.
-- **D55: (b), decidido por la PM, dentro de RENDIMIENTO-1d.** Leer un despacho
-  sigue el mismo patrón que validar, con su caso de la familia y su sabotaje.
-- **D56: (a), decidido por la PM.** Que cada mitad tenga su respuesta.
-- **Numeración:** las D son una sola serie para las dos Devs y D58 quedó sin
-  usar. Para que no choquen, desde ahora vos usás los impares desde D63 y la
-  técnica los pares desde D62.
+Cada punto, rojo primero sobre `fbbb2ad`.
 
 ### Pieza propuesta a Emi: CATALOGO-LARGO-2 (después de SESION-1, sólo si dice que sí)
 
-Es la misma familia que CATALOGO-LARGO-1, que encontró el adversario Opus y
-ya estaba escrita: lo que no entra en la columna se pierde sin aviso.
+Misma familia que CATALOGO-LARGO-1: lo que no entra en la columna se pierde
+sin aviso.
 
 - Un origen de más de 5 caracteres (por ejemplo «TAIWAN») o un proveedor de
   más de 200 nunca dan 200 sin guardar ni 500. Se guardan enteros o reciben
   un 400 con el motivo a la vista.
-- Una descripción que normaliza a vacío nunca contesta
-  `historial_guardado: true` sin haber guardado.
+- Una descripción que normaliza a vacío (sólo CJK o emoji) nunca contesta
+  `historial_guardado: true` sin haber guardado, ni se cruza con otra igual.
 - El tope de 2000 se cuenta igual en los dos lugares.
 
 ## DISCO-1: aceptada sobre `5c46e36` (2026-10-29 01:00 UTC)
