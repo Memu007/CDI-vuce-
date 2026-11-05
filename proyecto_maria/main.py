@@ -2147,12 +2147,10 @@ async def cancel_billing(
             raise HTTPException(status_code=503, detail=no_se_pudo)
         db_user.mp_preapproval_id = None
 
-    if not billing_service.tiene_acceso(db_user):
+    ahora = datetime.now(timezone.utc)
+    if billing_service.cancelar_corta_acceso(db_user, ahora) and billing_service.vigente(db_user.trial_ends_at, ahora):
         # canceled da acceso hasta trial_ends_at: quien no lo tenía no lo gana.
-        ahora = datetime.now(timezone.utc)
-        fin = db_user.trial_ends_at
-        if fin is not None and (fin if fin.tzinfo else fin.replace(tzinfo=timezone.utc)) > ahora:
-            db_user.trial_ends_at = ahora
+        db_user.trial_ends_at = ahora
     db_user.billing_status = "canceled"
     await db.commit()
     print(f"🚪 User canceló suscripción: {db_user.username} (servicio activo hasta {db_user.trial_ends_at})")
@@ -3322,7 +3320,7 @@ async def billing_me(user=Depends(get_current_user), db: AsyncSession = Depends(
         # /api/billing/cancel, sea cual sea el estado.
         "suscripcion_abierta": bool(db_user.mp_preapproval_id),
         # Lo mismo que decide /api/billing/cancel: el perfil no promete días que no da.
-        "cancelar_corta_acceso": not billing_service.tiene_acceso(db_user),
+        "cancelar_corta_acceso": billing_service.cancelar_corta_acceso(db_user),
     }
 
 
