@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: esperar para leer un despacho no le quita tiempo al PDF (RENDIMIENTO-1d, D55 b)
+
+- Si los dos lugares del lector están ocupados, leer un despacho espera un lugar y después tiene su tiempo entero, como validar. Antes, un despacho normal que conseguía lugar sobre el final vencía leyendo y la persona veía «tardó demasiado».
+
 ## 2026-11-05 · fix: el texto de una factura se saca aparte (RENDIMIENTO-1d)
 
 - **fix(seguridad):** sacar el texto de la factura para adivinar el vendedor corre en el proceso aparte de la validación, con su tope de memoria, de CPU y por flujo. Un PDF que pasa la validación y se infla al leer sus fuentes ya no hace crecer la app más de 1 GB: la factura sigue, sin vendedor adivinado. Del texto vuelven a la app 64 K caracteres como mucho: un PDF de 1 KB que da 28 millones ya no la hace crecer 296 MB.
