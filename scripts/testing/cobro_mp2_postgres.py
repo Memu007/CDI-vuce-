@@ -192,12 +192,16 @@ with TestClient(main_mod.app) as c:
             except psycopg2.Error as e:
                 cortado.append(type(e).__name__)
                 con.rollback()
-            r = checkout.result()
+            try:
+                r = checkout.result()
+            except Exception as e:  # el TestClient relanza el error del servidor
+                cortado.append(type(e).__name__)
+                r = None
     finally:
         con.close()
     # Postgres corta a uno de los dos, el que detecte el ciclo: cualquiera es la misma falla.
     chequear(cortado == [] and r.status_code == 200,
-             f"{que}: nadie queda cortado por deadlock (genera: {cortado}; checkout: {r.status_code}, {r.text[:90]})")
+             f"{que}: nadie queda cortado por deadlock ({cortado}; checkout: {r and r.status_code}, {r and r.text[:90]})")
     chequear(SUS[vieja] == "cancelled", f"{que}: la pendiente del otro miembro queda cancelada ({SUS[vieja]})")
     vivas, guardadas = vivas_y_guardadas(org_id)
     chequear(len(vivas) == 1 and vivas == guardadas, f"{que}: una sola viva y es la que CDI guarda ({vivas} / {guardadas})")
