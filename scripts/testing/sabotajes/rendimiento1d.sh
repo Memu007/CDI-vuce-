@@ -68,6 +68,10 @@ sabotaje $L "el proceso aparte no sabe sacar el texto" \
   '"texto": (texto_plano_del_pdf, "el lector de texto del PDF")' \
   '"texto": (validar_pdf, "el lector de texto del PDF")' \
   "'normal': [200, None]"
+sabotaje $L "el texto ocupa los lugares de validar" \
+  'lugares = _SACANDO_TEXTO if modo == "texto" else _VALIDANDO' \
+  'lugares = _VALIDANDO' \
+  "assert 503 == "
 
 git checkout -q -- proyecto_maria/
 echo "fallas: $FALLAS"
