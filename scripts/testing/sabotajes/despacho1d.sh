@@ -85,7 +85,7 @@ sabotaje $N "«Memoria activada» aparece aunque el guardado falle" \
   'avisarMemoriaActivada(cliente, op);' \
   "FAILED $T::$A[no-guardado-asignar-ncm]"
 sabotaje $N "guardar-uso rechazado vuelve a contar como guardado" \
-  'guardado = res.ok && data.success === true && data.historial_guardado !== false;' \
+  'guardado = data.success === true && data.historial_guardado !== false;' \
   'guardado = res.ok && data.historial_guardado !== false;' \
   "FAILED $T::$X[asignar-ncm-rechazado]"
 sabotaje $F "la operación que no se arma vuelve a quedar callada" \

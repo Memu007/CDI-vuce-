@@ -81,8 +81,8 @@ sabotaje $N "confirmar la posición no avisa lo que no quedó en la memoria" \
   '        if (false) {' \
   "FAILED $T::$A[no-guardado-confirmar-ncm]"
 sabotaje $N "confirmar la posición avisa aunque no llegue el dato" \
-  'guardado = res.ok && data.historial_guardado !== false;' \
-  'guardado = res.ok && data.historial_guardado === true;' \
+  'guardado = data.success === true && data.historial_guardado !== false;' \
+  'guardado = data.success === true && data.historial_guardado === true;' \
   "FAILED $T::$A[sin-dato-confirmar-ncm]"
 
 sabotaje $F "una falla al guardar cierra el panel y dice «Cliente guardado»" \
@@ -114,7 +114,7 @@ sabotaje $F "reintentar después de crear el cliente lo crea otra vez" \
   '            if (false) {' \
   "FAILED $T::$X[crear-reintento-500]"
 sabotaje $N "confirmar la posición no avisa un 400" \
-  'guardado = res.ok && data.historial_guardado !== false;' \
+  'guardado = data.success === true && data.historial_guardado !== false;' \
   'guardado = data.historial_guardado !== false;' \
   "FAILED $T::$X[confirmar-ncm-400]"
 
