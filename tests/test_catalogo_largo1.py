@@ -1,9 +1,8 @@
 """CATALOGO-LARGO-1: una descripción de hasta 2000 caracteres se guarda en la
 memoria del cliente y en el catálogo del proveedor, o da error a la vista.
 
-El catálogo y la memoria del cliente miden el tope en NFC, la forma en que
-la memoria del cliente guarda. El historial de NCM guarda el texto tal cual
-y lo mide así. SQLite no controla el largo de las columnas: el corte de
+Las tres memorias miden el tope en NFC, la forma en que guarda la memoria
+del cliente: lo que entra en una entra en las otras. SQLite no controla el largo de las columnas: el corte de
 Postgres lo prueba scripts/testing/catalogo_largo1_postgres.py.
 """
 from urllib.parse import quote
@@ -21,19 +20,14 @@ CRECE = "\u0958" * 1001
 # e + acento agudo: 2002 caracteres que en NFC son 1001.
 ACHICA = "e\u0301" * 1001
 
-# (id, descripción, guardar-uso la guarda, el catálogo la guarda). Guardar-uso
-# también escribe el historial, que mide el texto tal cual: ACHICA no entra.
+# (id, descripción, se guarda): igual en guardar-uso, el catálogo y el historial.
 CASOS = [
-    ("2000", "x" * 2000, True, True),
-    ("nfd-que-achica", ACHICA, False, True),
-    ("2001", "x" * 2001, False, False),
-    ("nfc-que-crece", CRECE, False, False),
+    ("2000", "x" * 2000, True),
+    ("nfd-que-achica", ACHICA, True),
+    ("2001", "x" * 2001, False),
+    ("nfc-que-crece", CRECE, False),
 ]
-
-
-def _casos(columna):
-    return pytest.mark.parametrize("descripcion, guarda", [(c[1], c[columna]) for c in CASOS],
-                                   ids=[c[0] for c in CASOS])
+_casos = pytest.mark.parametrize("descripcion, guarda", [c[1:] for c in CASOS], ids=[c[0] for c in CASOS])
 
 
 def _catalogo(owner):
@@ -44,7 +38,7 @@ def _dueno(cid):
     return _sql("select owner_username from clients where id=:c", c=cid)[0][0]
 
 
-@_casos(2)
+@_casos
 def test_guardar_uso_guarda_en_las_dos_memorias_o_da_400(client, descripcion, guarda):
     cid = _cliente(client)
     owner = _dueno(cid)
@@ -63,7 +57,7 @@ def test_guardar_uso_guarda_en_las_dos_memorias_o_da_400(client, descripcion, gu
         assert _sql("select 1 from ncm_historial where owner_username=:o", o=owner) == []
 
 
-@_casos(3)
+@_casos
 def test_guardar_en_el_catalogo_respeta_el_tope(client, descripcion, guarda):
     owner = _dueno(_cliente(client))
     r = client.post(f"/api/catalog/{VENDOR_ID}/productos", json={
@@ -78,15 +72,18 @@ def test_guardar_en_el_catalogo_respeta_el_tope(client, descripcion, guarda):
         assert _catalogo(owner) == []
 
 
-def test_importar_el_historial_mide_el_texto_como_lo_guarda(client):
-    """El historial guarda la descripción sin normalizar: 1500 U+0958 entran,
-    aunque en NFC sean 3000."""
+@_casos
+def test_importar_el_historial_respeta_el_tope(client, descripcion, guarda):
     owner = _dueno(_cliente(client))
-    desc = "\u0958" * 1500
     r = client.post("/api/ncm/import-historial", files={
-        "file": ("h.csv", f"descripcion,ncm\n{desc},8413.70.10\n".encode("utf-8"), "text/csv")})
-    assert r.status_code == 200, r.text
-    assert _sql("select descripcion from ncm_historial where owner_username=:o", o=owner) == [(desc,)]
+        "file": ("h.csv", f"descripcion,ncm\n{descripcion},8413.70.10\n".encode("utf-8"), "text/csv")})
+    historial = _sql("select descripcion from ncm_historial where owner_username=:o", o=owner)
+    if guarda:
+        assert r.status_code == 200, r.text
+        assert historial == [(descripcion,)]
+    else:
+        assert r.status_code == 400 and "2000" in r.json()["detail"], r.text
+        assert historial == []
 
 
 def test_cambiar_un_producto_respeta_el_tope_y_alcanza_claves_largas(client):
