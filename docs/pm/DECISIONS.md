@@ -359,3 +359,7 @@ b). **Pieza por la descripción larga que se pierde:** sí: CATALOGO-LARGO-1
 de SUFIJOS-2 y SEGURO-1). **Re-estimar fechas:** sí: dos semanas más, el
 piloto cierra el 07/02 (`ROADMAP.md`). Orden de las colas: decidido por la
 PM.
+
+**2026-11-05 21:41 UTC, Emi en el chat de la PM principal:** «CATALOGO-LARGO-2
+sí, dale». Entra en la cola de MARIA después de SESION-1, como estaba
+propuesta.
