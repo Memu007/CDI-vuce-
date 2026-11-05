@@ -2148,18 +2148,15 @@ async def cancel_billing(
         db_user.mp_preapproval_id = None
 
     ahora = datetime.now(timezone.utc)
-    if not billing_service.tiene_acceso(db_user, ahora) and billing_service.vigente(db_user.trial_ends_at, ahora):
+    corta = billing_service.cancelar_corta_acceso(db_user, ahora)
+    if corta and billing_service.vigente(db_user.trial_ends_at, ahora):
         # canceled da acceso hasta trial_ends_at: quien no lo tenía no lo gana.
         db_user.trial_ends_at = ahora
     db_user.billing_status = "canceled"
     await db.commit()
-    hasta = db_user.trial_ends_at if billing_service.tiene_acceso(db_user) else "sin acceso"
-    print(f"🚪 User canceló suscripción: {db_user.username} (servicio hasta: {hasta})")
-    return {
-        "success": True,
-        "billing_status": "canceled",
-        "service_until": db_user.trial_ends_at.isoformat() if db_user.trial_ends_at else None,
-    }
+    hasta = None if corta else db_user.trial_ends_at
+    print(f"🚪 User canceló suscripción: {db_user.username} (servicio hasta: {hasta or 'sin acceso'})")
+    return {"success": True, "billing_status": "canceled", "service_until": hasta and hasta.isoformat()}
 
 
 async def _pago_un_plan_mp(db: AsyncSession, db_user) -> bool:
