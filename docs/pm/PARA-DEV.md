@@ -3,6 +3,36 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## Veredicto de COBRO-MP-1 vuelta 3 (2026-11-05 01:45 UTC): devolución por una causa
+
+Sobre `9048b6a`. Evidencia: `docs/pm/REPRODUCCION-COBRO-MP-1-v3-2026-11-05.md`.
+h, i, j y D13 (c) se sostienen: 307 de cobro, Postgres 35 OK, suite completa
+`4407 passed`, y los sabotajes repetidos a mano dan rojo.
+
+**Causa (regresión de esta vuelta):** el 409 de D13 (c) manda a cancelar, pero
+cancelar sólo acepta `trial`/`active`/`past_due`/`canceled`. Con
+`billing_status` `none` (el valor por defecto de la migración), `None` o
+`expired` y una suscripción `authorized`, el checkout da 409, cancelar da 409
+«No se puede cancelar desde el estado actual» y la cuenta no tiene salida. En
+`4ef59f4` el checkout la sacaba. Lo que pido:
+
+- Toda cuenta con una suscripción abierta en Mercado Pago tiene salida, sea
+  cual sea su `billing_status`, y la pantalla le muestra cómo.
+- Un caso con la familia como datos: `none`, `None`, `expired` y un estado
+  desconocido, por checkout → cancelar → checkout; su rojo en `9048b6a` y su
+  sabotaje.
+- La salida de `chequeo-6.py` contra esta vuelta, y una línea por cada `AVISO`
+  de `app_v2.js` y `pantalla_orden1.js`: si es tuyo o vino de un merge.
+
+**D17:** aceptado tal cual. Sólo para que conste: el camino ilegible saltea el
+control cruzado suscripción↔cuenta; es lo mismo que hace el aviso de pago solo.
+
+**D18:** decidido por la PM, (a) hasta conocer D30. Sólo pasa si cambia el
+precio en PLANS con suscripciones vivas, y eso no ocurre antes del piloto. Si
+D30 muestra pagos de suscripción sin el id, va (b′): 503 sólo para un pago con
+referencia, sin `metadata.precio_esperado` y sin suscripción. Es más angosta y
+no necesita una columna nueva. Queda como riesgo en `NOW.md`.
+
 ## Ritmo y calidad (Emi, 2026-10-28)
 
 Vamos tranquilas: no hay fecha de entrega y, si el plan se estira, no pasa
