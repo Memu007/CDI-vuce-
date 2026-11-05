@@ -1681,6 +1681,9 @@ def set_csrf_cookie(response: Response) -> None:
     )
 
 
+_CSRF_LOGOUT_PATHS = ("/auth/logout", "/logout")
+
+
 class CSRFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         method = request.method.upper()
@@ -1692,9 +1695,9 @@ class CSRFMiddleware(BaseHTTPMiddleware):
         ):
             return await call_next(request)
 
-        # Solo nos importa si la sesion va por cookie. Sin cookie de sesion,
-        # el caller usa Bearer (API/tests) y no es atacable via CSRF.
-        if request.cookies.get("access_token"):
+        # Sin cookie de sesion el caller usa Bearer y no es atacable via CSRF.
+        # Cerrar sesión sí: su efecto son los Set-Cookie de la respuesta.
+        if request.cookies.get("access_token") or path in _CSRF_LOGOUT_PATHS:
             cookie_token = request.cookies.get(CSRF_COOKIE_NAME)
             header_token = request.headers.get(CSRF_HEADER_NAME)
             valid = (

@@ -98,9 +98,10 @@
         } catch (e) {
             // La sesión es de otro: no se cierra y la pestaña queda tapada.
             if (sesionAjena) return;
-            // No salió el pedido: la sesión sigue abierta.
-            if (e.message === ERROR_SIN_SESION) {
-                toast('No se pudo cerrar la sesión', e.message, 'error');
+            // Salvo un 401 (ya no había sesión), el cierre no se confirmó.
+            if (e.message !== 'unauthorized') {
+                const motivo = e.message === ERROR_SIN_SESION ? e.message : 'No hubo respuesta del servidor. La sesión sigue abierta.';
+                toast('No se pudo cerrar la sesión', motivo, 'error');
                 return;
             }
         }
