@@ -29,7 +29,10 @@ sabotaje pantalla $J "csrf.js no pone el token" \
   "        if (!headers.has('X-CSRF-Token')) headers.set('X-CSRF-Token', decodeURIComponent(m[1]));" ""
 sabotaje pantalla $J "csrf.js manda el token a otro origen" \
   "FALLA: el token CSRF salió hacia otro origen" \
-  " || url.origin !== location.origin" ""
+  "url.origin !== location.origin || " ""
+sabotaje pantalla $J "csrf.js tira con un pedido mal armado" \
+  "FALLA: con una URL inválida fetch tiró antes de devolver la promesa" \
+  "        try { conHeader = conToken(input, init || {}); } catch (e) { /* sigue sin token */ }" "        conHeader = conToken(input, init || {});"
 sabotaje pantalla proyecto_maria/templates/landing.html "la landing no carga csrf.js" \
   "FALLA: la telemetría de la landing dio 403" \
   $'<script src="/static/csrf.js"></script>\n' ''
