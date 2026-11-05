@@ -249,11 +249,11 @@ sabotaje $A "al abrir con otra sesión no se avisa" \
 export CASOS=l
 sabotaje $A "la sesión que cambió se confirma sin mirar el usuario" \
   "FALLA: lo que cargó B en la pestaña de A se guardó a nombre de " \
-  "        if ((username || '') !== duenoPestana) {" '        if (false) {'
+  '        if (username !== duenoPestana) {' '        if (false) {'
 sabotaje $A "otro usuario entra y la pestaña no avisa" \
   "FALLA: la pestaña dejó de guardar y no lo avisa" \
-  $'        if ((username || \'\') !== duenoPestana) {\n            marcarAjena();' \
-  $'        if ((username || \'\') !== duenoPestana) {\n            sesionAjena = true;'
+  $'        if (username !== duenoPestana) {\n            marcarAjena();' \
+  $'        if (username !== duenoPestana) {\n            sesionAjena = true;'
 # El guardián de usuarioActual: en (l) no se ve, porque al cargar el semáforo
 # valida con un POST y el freno de api() ya tapa la pestaña. z28 entra con la
 # operación ya validada.
@@ -265,7 +265,7 @@ sabotaje $A "la pestaña guarda sin mirar si la sesión cambió" \
 export CASOS=n
 sabotaje $A "sale A, entra B y la sesión se confirma sin mirar el usuario" \
   "FALLA: salió A, entró B y lo cargado se guardó a nombre de " \
-  "        if ((username || '') !== duenoPestana) {" '        if (false) {'
+  '        if (username !== duenoPestana) {' '        if (false) {'
 
 # El mismo usuario sale y vuelve a entrar: sigue guardando, sin aviso.
 export CASOS=m

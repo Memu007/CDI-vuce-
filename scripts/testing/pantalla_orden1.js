@@ -1639,9 +1639,12 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
     });
     // Todas las consultas que hizo la pestaña ya tienen la respuesta del servidor.
     const contestadas = async () => {
+      // Cuenta las pedidas antes de leer traidas: una respuesta que llega
+      // durante el evaluate ya está sumada y no se espera un aviso perdido.
       const tope = setTimeout(() => falla('el servidor no contestó las consultas de la pestaña en 15 s'), 15000);
-      while (traidas < await p.evaluate(() => window.__consultas)) await new Promise(r => { alTraer = r; });
-      clearTimeout(tope);
+      try {
+        while (await p.evaluate(() => window.__consultas) > traidas) await new Promise(r => { alTraer = r; });
+      } finally { clearTimeout(tope); }
     };
     return { contestadas, cerrar: () => { cerrado = true; }, soltar, soltarResto };
   }
@@ -1767,11 +1770,11 @@ const bloques = (txt, tipo) => txt.split('\r\n\r\n').filter(b => b.startsWith('[
         });
       };
     });
-    // La primera carga pasa; las lecturas de después del pago esperan a que entre B.
-    let vistas = 0, avisar, soltar;
+    // Lo que se pide antes de tener a A es la carga y pasa; lo de después espera a que entre B.
+    let avisar, soltar;
     const hayRetenida = new Promise(r => { avisar = r; }), suelta = new Promise(r => { soltar = r; });
     await t.route('**/auth/current_user', async ruta => {
-      if (++vistas === 1) return ruta.continue();
+      if (!(await t.evaluate(() => !!(window.CDI && CDI.currentUser)).catch(() => false))) return ruta.continue();
       avisar();
       await suelta;
       return ruta.continue().catch(() => {});
