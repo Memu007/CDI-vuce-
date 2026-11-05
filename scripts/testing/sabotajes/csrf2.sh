@@ -24,6 +24,9 @@ sabotaje pytest_csrf $M "las exentas se comparan por prefijo" \
 sabotaje pytest_csrf $M "restablecer la clave vuelve a pedir el token" \
   "FAILED $EXENTAS[POST /auth/reset-password]" \
   $'    "/auth/reset-password",\n' ''
+sabotaje pytest_csrf $M "registrarse vuelve a pedir el token" \
+  "FAILED $EXENTAS[POST /auth/register]" \
+  $'    "/auth/register",\n' ''
 sabotaje pantalla $J "csrf.js no pone el token" \
   "FALLA: la telemetría de la landing dio 403" \
   "        if (!headers.has('X-CSRF-Token')) headers.set('X-CSRF-Token', decodeURIComponent(m[1]));" ""

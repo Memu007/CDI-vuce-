@@ -32,16 +32,25 @@ async function escribe(p, ruta, accion, nombre) {
   const token = (await reg.json()).access_token;
   if (!token) falla('el registro no devolvió access_token');
   await p.addInitScript(t => localStorage.setItem('access_token', t), token);
+  // La CSP corta en el navegador los pedidos a otro origen: se mira lo que csrf.js le pasa a fetch nativo.
+  await p.addInitScript(() => {
+    const nativo = window.fetch;
+    window.__pedidos = [];
+    window.fetch = function (input, init) {
+      window.__pedidos.push({ url: String(input), headers: [...new Headers((init || {}).headers).keys()] });
+      return nativo.apply(this, arguments);
+    };
+  });
   await p.goto(base + '/dashboard?v=1');
   await p.waitForFunction(() => typeof autoBackupLocalStorage === 'function' && typeof logout === 'function');
   await escribe(p, '/api/backup/localStorage', () => p.evaluate(() => autoBackupLocalStorage()), 'la copia de la pantalla vieja');
   // El token no sale de su sitio: un pedido a otro origen va sin él.
-  const ajenos = [];
-  await p.route('http://otro.ejemplo.test/**', r => { ajenos.push(r.request().headers()); r.fulfill({ status: 200, body: 'ok' }); });
-  await p.evaluate(() => fetch('http://otro.ejemplo.test/x', { method: 'POST', body: 'x' }).catch(() => {}));
-  if (!ajenos.length) falla('el pedido a otro origen no salió');
-  if (ajenos.some(h => JSON.stringify(h).toLowerCase().includes('x-csrf-token'))) falla('el token CSRF salió hacia otro origen');
-  await p.unroute('http://otro.ejemplo.test/**');
+  const ajenos = await p.evaluate(async () => {
+    await fetch('http://otro.ejemplo.test/x', { method: 'POST', body: 'x' }).catch(() => {});
+    return window.__pedidos.filter(q => q.url.startsWith('http://otro.ejemplo.test/'));
+  });
+  if (!ajenos.length) falla('csrf.js no le pasó a fetch el pedido a otro origen');
+  if (ajenos.some(q => q.headers.includes('x-csrf-token'))) falla('el token CSRF salió hacia otro origen');
   // Un pedido mal armado tiene que fallar como en fetch nativo: con la promesa, no antes.
   const rompe = await p.evaluate(() => { try { fetch('http://[', { method: 'POST' }).catch(() => {}); return ''; } catch (e) { return String(e); } });
   if (rompe) falla('con una URL inválida fetch tiró antes de devolver la promesa: ' + rompe);

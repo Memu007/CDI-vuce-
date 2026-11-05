@@ -101,6 +101,7 @@ RUTAS_SIN_TOKEN = [
     ("POST", "/staticx", {}, False),
     ("POST", "/auth/loginx", {}, False),
     ("POST", "/auth/login", {"username": "nadie", "password": "x"}, True),
+    ("POST", "/auth/register", {}, True),
     ("POST", "/auth/request-password-reset", {"email": "nadie@test.cdi"}, True),
     ("POST", "/auth/recover-username", {"email": "nadie@test.cdi"}, True),
     ("POST", "/auth/reset-password", {"token": "x", "new_password": "otraClave123"}, True),
