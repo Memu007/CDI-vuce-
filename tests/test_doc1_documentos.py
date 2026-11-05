@@ -46,7 +46,7 @@ def test_endpoint_rechaza_antes_de_heuristica(auth_override, client, monkeypatch
     monkeypatch.setattr(main, "lectura_automatica_disponible", lambda: True)
     monkeypatch.setattr(main, "process_pdf", lambda _: _respuesta(documento))
     monkeypatch.setattr("proyecto_maria.core.ai_quota.enforce_pdf_quota", lambda _: None)
-    monkeypatch.setattr("proyecto_maria.pdf_extractor.extraer_texto_pdf_seguro", lambda _: pytest.fail("heurística tras rechazo"))
+    monkeypatch.setattr("proyecto_maria.pdf_extractor.detect_vendor_from_text", lambda _: pytest.fail("heurística tras rechazo"))
     r = client.post("/upload_pdf/public", files={"file": ("factura.pdf", io.BytesIO(_pdf_en_blanco()), "application/pdf")})
     assert r.status_code == 422, r.text
     assert r.json()["code"] == "documento_no_admitido"

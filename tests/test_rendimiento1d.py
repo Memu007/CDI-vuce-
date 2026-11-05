@@ -93,3 +93,44 @@ def test_el_texto_tiene_tope_de_cpu():
     from tests.pdf_bombas import trabajo
     with pytest.raises(_DemasiadoTrabajo):
         texto_plano_del_pdf(trabajo(hojas=2), limite_cpu_s=0.2)
+
+
+def test_el_texto_no_ocupa_los_lugares_de_validar(monkeypatch):
+    """Sacar el texto del vendedor es opcional: aunque tarde, de otros
+    usuarios o del mismo, la validación de una subida no espera detrás."""
+    import asyncio
+
+    from proyecto_maria.core import despacho_lector
+    from proyecto_maria.security.file_security import validate_file_upload
+    from tests.pdf_bombas import hojas
+    from tests.test_rendimiento1c import _Subida
+
+    real = asyncio.create_subprocess_exec
+    monkeypatch.setenv("PDF_VALIDATE_TIMEOUT_S", "1")
+    normal = hojas([("UNO", 0)])
+
+    async def escenario(lentos):
+        lanzados = []
+
+        async def lento(*args, **kwargs):
+            lanzados.append(1)
+            return await real(sys.executable, "-c", "import time; time.sleep(60)", **kwargs)
+
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", lento)
+        ocupan = [asyncio.create_task(
+            despacho_lector.validar_pdf_aparte(normal, 30, clave=u, modo="texto")) for u in lentos]
+        while len(lanzados) < len(lentos):
+            await asyncio.sleep(0.01)
+        monkeypatch.setattr(asyncio, "create_subprocess_exec", real)
+        try:
+            await asyncio.wait_for(validate_file_upload(_Subida(normal), "pdf", clave="a"), 10)
+            resultado = "pasó"
+        except Exception as e:
+            resultado = getattr(e, "status_code", repr(e))
+        for tarea in ocupan:
+            tarea.cancel()
+        await asyncio.gather(*ocupan, return_exceptions=True)
+        return resultado
+
+    for lentos in (["b", "c"], ["a"]):
+        assert asyncio.run(escenario(lentos)) == "pasó", lentos
