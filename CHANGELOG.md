@@ -6,6 +6,12 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · fix: una sesión vale sólo si es la vigente, en todos lados (SESION-1, devolución)
+
+- Un solo lugar decide si un token es una sesión: lo usan las páginas, `/auth/me`, la telemetría y cerrar sesión. El link para verificar el email ya no abre sesión: después de verificar hay que entrar.
+- Cambiar la contraseña deja afuera toda otra copia del token y le da uno nuevo a quien la cambió; una clave actual equivocada da 400, y cinco seguidas (entre perfil y cambio de clave) bloquean 15 minutos. Un login que validó una clave que cambió en el medio no entra.
+- Cerrar sesión borra la cookie aunque la base no responda.
+
 ## 2026-11-05 · fix: una letra que no es Unicode no borra el texto de la factura (RENDIMIENTO-1d, devolución)
 
 - Si una fuente del PDF dice que una letra es media letra Unicode, el texto que se saca aparte vuelve con «�» en su lugar en vez de perderse entero, y el vendedor se sigue adivinando.

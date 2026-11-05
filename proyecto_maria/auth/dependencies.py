@@ -69,40 +69,39 @@ def revocar_sesiones(user: User, conservar_jti: str | None = None) -> None:
     user.active_jti = conservar_jti or uuid.uuid4().hex
 
 
-def jti_de_la_request(request: Request) -> str | None:
-    """El jti del token con el que se llama (cookie o Bearer), o None si no hay
-    token o no es válido. Para que cambiar la contraseña conserve la sesión de
-    quien la cambia."""
-    token = _token_de_la_request(request)
-    if not token:
-        return None
+def datos_del_token(token: str) -> dict | None:
+    """El contenido de un JWT nuestro con la firma y el vencimiento verificados,
+    o None. Es el único lugar que abre un token."""
     try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
     except jwt.PyJWTError:
         return None
-    return payload.get("jti")
+
+
+async def sesion_de_la_request(request: Request, db: AsyncSession) -> tuple[User, dict] | None:
+    """El usuario y el contenido del token si es la sesión vigente, o None.
+    Un token con `type` (el de verificar el email) no es una sesión."""
+    token = _token_de_la_request(request)
+    payload = datos_del_token(token) if token else None
+    if payload is None or payload.get("type") is not None or not payload.get("sub"):
+        return None
+    user = (await db.execute(select(User).where(User.username == payload["sub"]))).scalars().first()
+    if user is None:
+        return None
+    # NULL: usuario de antes de la columna, cualquier token suyo vale.
+    if user.active_jti is not None and payload.get("jti") != user.active_jti:
+        return None
+    return user, payload
 
 
 async def revocar_sesion_de_la_request(request: Request, db: AsyncSession) -> None:
     """Cerrar sesión: revoca el token con el que se llama, si es la sesión
-    vigente. Un token inválido, vencido o ya revocado no toca nada, así no
-    puede sacar a la sesión que sí vale."""
-    token = _token_de_la_request(request)
-    if not token:
+    vigente. Uno inválido o ya revocado no toca nada, así no puede sacar a la
+    sesión que sí vale."""
+    sesion = await sesion_de_la_request(request, db)
+    if sesion is None:
         return
-    try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
-    except jwt.PyJWTError:
-        return
-    username = payload.get("sub")
-    if not username:
-        return
-    user = (await db.execute(select(User).where(User.username == username))).scalars().first()
-    if user is None:
-        return
-    if user.active_jti is not None and payload.get("jti") != user.active_jti:
-        return
-    revocar_sesiones(user)
+    revocar_sesiones(sesion[0])
     await db.commit()
 
 
@@ -128,25 +127,10 @@ async def get_current_user(request: Request, response: Response, db: AsyncSessio
             }
         raise HTTPException(status_code=401, detail="No autenticado")
 
-    try:
-        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
-        username: str = payload.get("sub")
-        if username is None:
-            raise HTTPException(status_code=401, detail="Token inválido")
-    except jwt.PyJWTError:
-        raise HTTPException(status_code=401, detail="Token inválido o expirado")
-
-    result = await db.execute(select(User).where(User.username == username))
-    user = result.scalars().first()
-
-    if user is None:
-        raise HTTPException(status_code=401, detail="Usuario no encontrado")
-
-    # Validar jti contra active_jti (blacklist de tokens)
-    # NULL = backward compat: no bloquear usuarios pre-migración
-    token_jti = payload.get("jti")
-    if user.active_jti is not None and token_jti != user.active_jti:
-        raise HTTPException(status_code=401, detail="Token revocado")
+    sesion = await sesion_de_la_request(request, db)
+    if sesion is None:
+        raise HTTPException(status_code=401, detail="Sesión inválida o vencida")
+    user = sesion[0]
     # CSRFMiddleware le emite el csrf_token a esta sesión si le falta.
     request.state.sesion_valida = True
 

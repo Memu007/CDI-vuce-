@@ -1,5 +1,5 @@
 # admin_router imported at line 58
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Header, Request, Response, BackgroundTasks, Query
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form, Depends, Request, Response, BackgroundTasks, Query
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import RedirectResponse
@@ -93,7 +93,8 @@ from proyecto_maria.routers import admin_router, quote_router
 from proyecto_maria.services import billing_service
 from proyecto_maria.auth.dependencies import (
     get_current_user,
-    jti_de_la_request,
+    datos_del_token,
+    sesion_de_la_request,
     revocar_sesion_de_la_request,
     revocar_sesiones,
 )
@@ -144,6 +145,7 @@ security = HTTPBearer()
 # ============== Configuración de Base de Datos ==============
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy import update as sa_update
 from proyecto_maria.database.connection import get_async_session, init_db
 from proyecto_maria.database.models import User, Client, PasswordResetToken, Organization, Invitation, Estudio, UsoCuitPerfil, NcmHistorial
 import uuid
@@ -342,17 +344,6 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str
     user: dict
-
-def create_access_token(data: dict):
-    """Crea un token JWT con expiración y jti único (anti session fixation).
-    Devuelve (token, jti) para que el llamador pueda persistir el jti activo."""
-    to_encode = data.copy()
-    expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode["exp"] = expire
-    jti = uuid.uuid4().hex
-    to_encode["jti"] = jti
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt, jti
 
 app = FastAPI(
     title="Optimizador de Carga para Sistema MARIA",
@@ -1943,6 +1934,27 @@ def set_csrf_cookie(response: Response) -> None:
     )
 
 
+async def abrir_sesion(response: Response, db: AsyncSession, user: User, hash_validado: str) -> str | None:
+    """Emite el token de sesión, lo deja como el único vigente y pone las cookies.
+
+    Devuelve None, sin tocar nada, si la contraseña del usuario ya no es la que
+    se validó: un cambio de clave en el medio gana sobre este login."""
+    jti = uuid.uuid4().hex
+    vence = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    token = jwt.encode({"sub": user.username, "plan": user.plan, "exp": vence, "jti": jti},
+                       SECRET_KEY, algorithm=ALGORITHM)
+    hecho = await db.execute(sa_update(User).where(
+        User.username == user.username, User.password == hash_validado).values(active_jti=jti))
+    await db.commit()
+    if hecho.rowcount != 1:
+        return None
+    response.set_cookie(key="access_token", value=f"Bearer {token}", httponly=True,
+                        secure=IS_PRODUCTION, samesite="strict",
+                        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60)
+    set_csrf_cookie(response)
+    return token
+
+
 class CSRFMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         method = request.method.upper()
@@ -2245,10 +2257,7 @@ async def update_user_profile(
         current_password = body.get("current_password")
         if not isinstance(current_password, str) or not current_password:
             raise HTTPException(status_code=400, detail="Para cambiar el email ingresá tu contraseña actual")
-        # 400 y no 401: el frontend toma cualquier 401 como sesión vencida y
-        # manda al login.
-        if not await run_in_threadpool(verify_password, current_password, u.password):
-            raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta")
+        await verificar_clave_actual(u.username, current_password, u.password)
 
     # Name: string libre. NO escapamos en storage (el frontend escapa al renderizar);
     # asi evitamos doble-escape de '&', comillas, etc. y caracteres validos como
@@ -2315,6 +2324,20 @@ async def update_user_profile(
 # --- USER SECURITY: cambio de password (autenticado) ---
 
 
+async def verificar_clave_actual(username: str, clave: str, hash_guardado: str) -> None:
+    """La contraseña actual que piden el perfil y el cambio de clave, con tope
+    de intentos compartido: una sesión robada no puede probar claves."""
+    clave_intentos = f"pwd:{username}"
+    espera = await limites_auth.segundos_bloqueado(clave_intentos)
+    if espera:
+        raise HTTPException(status_code=429, detail=f"Demasiados intentos fallidos. Intente de nuevo en {espera} segundos.")
+    if not await run_in_threadpool(verify_password, clave, hash_guardado):
+        await limites_auth.sumar_fallo(clave_intentos)
+        # 400 y no 401: el frontend toma cualquier 401 como sesión vencida.
+        raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta")
+    await limites_auth.limpiar(clave_intentos)
+
+
 class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
@@ -2323,7 +2346,7 @@ class ChangePasswordRequest(BaseModel):
 @app.post("/api/user/change-password")
 async def change_password(
     body: ChangePasswordRequest,
-    request: Request,
+    response: Response,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
@@ -2346,16 +2369,15 @@ async def change_password(
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    is_valid = await run_in_threadpool(verify_password, body.current_password, db_user.password)
-    if not is_valid:
-        raise HTTPException(status_code=401, detail="La contraseña actual es incorrecta")
+    await verificar_clave_actual(db_user.username, body.current_password, db_user.password)
 
     db_user.password = await run_in_threadpool(hash_password, body.new_password)
-    # Cierra las otras sesiones y conserva la de quien la cambió.
-    revocar_sesiones(db_user, jti_de_la_request(request))
+    revocar_sesiones(db_user)
     await db.commit()
+    # Quien la cambió sigue con un token nuevo; una copia del suyo ya no entra.
+    token = await abrir_sesion(response, db, db_user, db_user.password)
     print(f"🔒 Password cambiada por el propio user: {db_user.username}")
-    return {"success": True, "message": "Contraseña actualizada"}
+    return {"success": True, "message": "Contraseña actualizada", "access_token": token}
 
 
 # --- BILLING: cancelar / reactivar plan (autoservicio) ---
@@ -2819,14 +2841,8 @@ async def _ui_event(request: Request, db: AsyncSession):
             except Exception:
                 payload = {"raw": raw.decode("utf-8", errors="replace")[:500]}
 
-        username = None
-        auth_header = request.headers.get("authorization") or ""
-        if auth_header.lower().startswith("bearer "):
-            username = _jwt_sub_from_token_text(auth_header.split(" ", 1)[1])
-
-        if not username:
-            raw_cookie = request.cookies.get("access_token") or ""
-            username = _jwt_sub_from_token_text(raw_cookie)
+        sesion = await sesion_de_la_request(request, db)
+        username = sesion[0].username if sesion else None
 
         if not username:
             accion = payload.get("action") if isinstance(payload, dict) else None
@@ -3133,6 +3149,7 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
             new_hash = await run_in_threadpool(hash_password, password)
             user.password = new_hash
             await db.commit()
+            stored_password = new_hash
             print(f"🔒 Password de {username} migrada a hash bcrypt")
         except Exception:
             pass
@@ -3160,22 +3177,10 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
     # Login exitoso: limpiar intentos fallidos
     await limites_auth.limpiar(clave_intentos)
     
-    token, jti = create_access_token({"sub": user.username, "plan": user.plan})
-    user.active_jti = jti
-    await db.commit()
+    token = await abrir_sesion(response, db, user, stored_password)
+    if token is None:
+        raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
-    # Set HttpOnly Cookie (Strict CSRF Protection)
-    response.set_cookie(
-        key="access_token",
-        value=f"Bearer {token}",
-        httponly=True,
-        secure=IS_PRODUCTION,  # True en producción con HTTPS
-        samesite="strict",  # Max protection against CSRF
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60
-    )
-    # Token CSRF legible para el front (double-submit cookie).
-    set_csrf_cookie(response)
-    
     return {
         "message": "Login exitoso",
         "access_token": token,
@@ -3190,7 +3195,11 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
 @app.post("/auth/logout")
 async def logout(request: Request, response: Response, db: AsyncSession = Depends(get_db)):
     """Cierra sesión: revoca el token y elimina la cookie"""
-    await revocar_sesion_de_la_request(request, db)
+    try:
+        await revocar_sesion_de_la_request(request, db)
+    except Exception:
+        # Sin base no se revoca, pero el navegador igual sale.
+        logging.getLogger(__name__).exception("logout: no se pudo revocar la sesión")
     # Un form de otro sitio llega sin cookies y sin pasar por CSRF: no tiene que borrar nada.
     if request.cookies.get("access_token"):
         response.delete_cookie("access_token")
@@ -3473,24 +3482,7 @@ async def register(request: RegisterRequest, req: Request, background_tasks: Bac
 
     # Modo sin verificacion: devolvemos token y cookie igual que antes para
     # no frenar demos/beta (EMAIL_VERIFICATION_REQUIRED=false).
-    access_token, jti = create_access_token({
-        "sub": request.username,
-        "plan": request.plan,
-        "roles": ["operador"],
-    })
-    new_user.active_jti = jti
-    await db.commit()
-
-    response.set_cookie(
-        key="access_token",
-        value=f"Bearer {access_token}",
-        httponly=True,
-        secure=IS_PRODUCTION,
-        samesite="strict",
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-    )
-    # Token CSRF legible para el front (double-submit cookie).
-    set_csrf_cookie(response)
+    access_token = await abrir_sesion(response, db, new_user, new_user.password)
 
     return {
         "message": "Usuario creado exitosamente",
@@ -3504,55 +3496,17 @@ async def register(request: RegisterRequest, req: Request, background_tasks: Bac
 
 @app.get("/auth/verify-email")
 async def verify_email(token: str, db: AsyncSession = Depends(get_db)):
-    """Endpoint para verificar email via link enviado por mail.
-
-    Ademas de marcar is_verified=True, loguea al user dejando la cookie
-    access_token. Sin esto el user llegaba al dashboard verificado pero
-    sin sesion, y todas las APIs devolvian 401 (no podia crear clientes,
-    subir PDFs, nada).
-    """
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        token_type = payload.get("type")
-
-        if token_type != "email_verification":
-            raise HTTPException(status_code=400, detail="Token inválido")
-
-        result = await db.execute(select(User).where(User.username == username))
-        user = result.scalars().first()
-
-        if not user:
-            raise HTTPException(status_code=404, detail="Usuario no encontrado")
-
-        user.is_verified = True
-        await db.commit()
-
-        access_token, jti = create_access_token({
-            "sub": user.username,
-            "plan": user.plan,
-            "roles": ["operador"],
-        })
-        user.active_jti = jti
-        await db.commit()
-
-        # Redirect a la UI real via FRONTEND_URL. En dev apunta al mismo server,
-        # en prod al dominio publico del frontend.
-        response = RedirectResponse(url=f"{get_frontend_url()}/dashboard?verified=true")
-        response.set_cookie(
-            key="access_token",
-            value=f"Bearer {access_token}",
-            httponly=True,
-            secure=IS_PRODUCTION,
-            samesite="strict",
-            max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        )
-        # Token CSRF legible para el front (double-submit cookie).
-        set_csrf_cookie(response)
-        return response
-
-    except jwt.PyJWTError:
+    """Marca el email como verificado y lleva al dashboard. No abre sesión: el
+    link viaja por mail y quien lo tenga no tiene que entrar a la cuenta."""
+    payload = datos_del_token(token)
+    if payload is None or payload.get("type") != "email_verification":
         raise HTTPException(status_code=400, detail="Token inválido o expirado")
+    user = (await db.execute(select(User).where(User.username == payload.get("sub")))).scalars().first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    user.is_verified = True
+    await db.commit()
+    return RedirectResponse(url=f"{get_frontend_url()}/dashboard?verified=true")
 
 
 @app.post("/auth/resend-verification")
@@ -5972,19 +5926,6 @@ def _fecha_inic_activ_sirve(guardada) -> bool:
 
 def _digits_only(raw: str | None, maxlen: int = 20) -> str:
     return "".join(ch for ch in (raw or "") if ch.isdigit())[:maxlen]
-
-
-def _jwt_sub_from_token_text(raw: str) -> str | None:
-    tok = raw.strip()
-    if tok.startswith("Bearer "):
-        tok = tok[7:].strip()
-    if not tok:
-        return None
-    try:
-        decoded = jwt.decode(tok, SECRET_KEY, algorithms=[ALGORITHM])
-        return decoded.get("sub")
-    except Exception:
-        return None
 
 
 async def _persist_ui_telemetry_row(db: AsyncSession, owner_username: str | None, payload: dict) -> None:
@@ -10467,34 +10408,13 @@ async def import_ncm_historial(
     return respuesta
 
 @app.get("/auth/me")
-async def get_auth_me(authorization: str = Header(None), db: AsyncSession = Depends(get_db)):
-    """Obtiene datos del usuario actual basado en el token"""
-    if not authorization:
+async def get_auth_me(request: Request, db: AsyncSession = Depends(get_db)):
+    """Obtiene datos del usuario de la sesión vigente."""
+    sesion = await sesion_de_la_request(request, db)
+    if sesion is None:
         raise HTTPException(status_code=401, detail="No autorizado")
-    
-    try:
-        token = authorization.replace("Bearer ", "")
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username = payload.get("sub")
-        
-        if not username:
-            raise HTTPException(status_code=401, detail="Token inválido: sin usuario")
-        
-        result = await db.execute(select(User).where(User.username == username))
-        user = result.scalars().first()
-        
-        if user:
-            return {
-                "username": username,
-                "plan": user.plan,
-                "roles": user.roles or []
-            }
-        else:
-            raise HTTPException(status_code=401, detail="Usuario no encontrado")
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expirado")
-    except jwt.InvalidTokenError:
-        raise HTTPException(status_code=401, detail="Token inválido o corrupto")
+    user = sesion[0]
+    return {"username": user.username, "plan": user.plan, "roles": user.roles or []}
 
 # /logout is called by the frontend (app.js), must delete the auth cookie
 @app.post("/logout")
@@ -10605,17 +10525,7 @@ async def create_organization(
             "org_name": org.name,
         }
 
-    access_token, jti = create_access_token({
-        "sub": req.username, "plan": "premium", "roles": ["operador"],
-    })
-    new_user.active_jti = jti
-    await db.commit()
-    response.set_cookie(
-        key="access_token", value=f"Bearer {access_token}",
-        httponly=True, secure=IS_PRODUCTION, samesite="strict",
-        max_age=ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-    )
-    set_csrf_cookie(response)
+    access_token = await abrir_sesion(response, db, new_user, new_user.password)
 
     return {
         "message": "Estudio creado exitosamente",
