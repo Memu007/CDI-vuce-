@@ -153,9 +153,9 @@ sabotaje "la elección sin los dos de margen" "$LECTOR" \
 
 # 3) El proceso aparte: si tarda, 504 y se mata; si se queda sin memoria, aviso.
 sabotaje "no se mata al lector que tarda" "$LECTOR" \
-  "                    proceso.kill()
-                    await proceso.wait()" \
-  "                    pass" \
+  "                proceso.kill()
+                await proceso.wait()" \
+  "                pass" \
   "test_leer_que_tarda_demasiado_da_504_y_mata_al_lector"
 sabotaje "la ruta no ataja el tiempo" proyecto_maria/main.py \
   "    except TimeoutError:
@@ -166,12 +166,12 @@ sabotaje "la ruta no ataja el tiempo" proyecto_maria/main.py \
             status_code=504," \
   "test_leer_que_tarda_demasiado_da_504_y_mata_al_lector"
 sabotaje "los errores del lector se juntan enteros" "$LECTOR" \
-  "                _, salida, errores = await asyncio.gather(
-                    _escribir(proceso.stdin, data), proceso.stdout.read(),
-                    _final(proceso.stderr, _FINAL_DE_ERRORES))
-                await proceso.wait()" \
-  "                salida, errores = await proceso.communicate(data)
-                errores = errores[-_FINAL_DE_ERRORES:]" \
+  "            _, salida, errores = await asyncio.gather(
+                _escribir(proceso.stdin, data), proceso.stdout.read(),
+                _final(proceso.stderr, _FINAL_DE_ERRORES))
+            await proceso.wait()" \
+  "            salida, errores = await proceso.communicate(data)
+            errores = errores[-_FINAL_DE_ERRORES:]" \
   "test_los_errores_del_lector_no_se_juntan_enteros_en_memoria"
 sabotaje "la ruta no ataja el PDF pesado" proyecto_maria/main.py \
   "    except PdfDemasiadoPesado as e:" \
