@@ -247,10 +247,20 @@
             operationSavedFor: null, orphanDismissedFor: null,
         });
         try { sessionStorage.removeItem('cdi.pending_create_client'); } catch (_) {}
-        try { localStorage.removeItem('cdi_v2_state'); } catch (_) {}
+        // El borrador de esta pestaña, no el de otras (ORDEN-1).
+        try { CDI.borrador.borrar(); } catch (_) {}
     }
 
+    // Mientras hay una subida en marcha (de elegir el archivo a que termina),
+    // el arranque no le pone encima la operación recuperada (ORDEN-1).
+    let subiendo = 0;
+    CDI.subidaEnCurso = () => subiendo > 0;
     async function handleFile(file) {
+        subiendo++;
+        try { return await subirArchivo(file); } finally { subiendo--; }
+    }
+
+    async function subirArchivo(file) {
         const ticket = ++uploadTicket;
         const format = currentFormat;
         clearCurrentOperation();

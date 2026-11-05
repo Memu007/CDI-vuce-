@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 import jwt
 import json
+import math
 import os
 import re
 import unicodedata
@@ -89,6 +90,7 @@ from proyecto_maria.core import sufijos_arca
 from proyecto_maria.routers import admin_router, quote_router
 from proyecto_maria.services import billing_service
 from proyecto_maria.auth.dependencies import get_current_user
+from proyecto_maria.auth.roles import roles_de
 
 # ============== Configuración de Autenticación ==============
 _DEFAULT_DEV_SECRET = "tu-clave-secreta-super-segura-cambiar-en-produccion"
@@ -1741,7 +1743,7 @@ def _admin_usernames() -> set:
 
 
 def _es_admin(user) -> bool:
-    return user["username"] in _admin_usernames() or "admin" in (user.get("roles") or [])
+    return user["username"] in _admin_usernames() or "admin" in roles_de(user)
 
 
 async def require_admin(user=Depends(get_current_user)):
@@ -1765,16 +1767,116 @@ async def _get_billing_entity(db: AsyncSession, db_user: User):
     return db_user, False
 
 
-async def require_active_billing(
-    request: Request,
+def _vencer_si_corresponde(entidad, ahora=None):
+    """Pasa a past_due una cuenta vencida y dice qué venció ("trial",
+    "active") o None. No hace commit.
+
+    - trial vencido: sin gracia (nadie pagó todavía).
+    - active vencido: con BILLING_GRACE_DAYS_ACTIVE días de gracia (G7.3), para
+      no cortar por un webhook de renovación que llegó tarde.
+    """
+    ahora = ahora or datetime.now(timezone.utc)
+    fin = entidad.trial_ends_at
+    if fin is None:
+        return None
+    if fin.tzinfo is None:
+        fin = fin.replace(tzinfo=timezone.utc)
+    if entidad.billing_status == "trial" and fin < ahora:
+        entidad.billing_status = "past_due"
+        return "trial"
+    if (
+        entidad.billing_status == "active"
+        and fin < ahora - timedelta(days=BILLING_GRACE_DAYS_ACTIVE)
+    ):
+        entidad.billing_status = "past_due"
+        return "active"
+    return None
+
+
+def _detalle_402(entidad, razon_del_plan=None, vencio=None):
+    """El detail del 402 con la razón real: impago, vencido, cancelado o tope.
+
+    El code no cambia respecto de antes (los tests de G7 lo leen):
+    past_due/canceled con pago real de MP → SUBSCRIPTION_PAST_DUE; sin pago
+    real → TRIAL_EXPIRED; trial/active (o canceled antes del fin del período)
+    sin cupo → PLAN_LIMIT_EXCEEDED. Una
+    cuenta sin suscripción (none) tiene su propio code, SUBSCRIPTION_INACTIVE.
+    """
+    estado = entidad.billing_status
+    pago_real = getattr(entidad, "payment_provider", None) == "mercadopago"
+    if estado == "past_due":
+        if pago_real:
+            code = "SUBSCRIPTION_PAST_DUE"
+            message = ("Tenés un pago pendiente de tu suscripción. "
+                       "Regularizalo para seguir usando CDI.")
+        else:
+            # Sin pago de Mercado Pago, en producción sólo vence una prueba:
+            # el active sin MP sale de simulate-charge o de los usuarios demo.
+            code = "TRIAL_EXPIRED"
+            que = "tu suscripción" if vencio == "active" else "tu prueba gratis"
+            message = f"Venció {que}. Suscribite para seguir usando CDI."
+    elif billing_service.tiene_acceso(entidad):
+        code = "PLAN_LIMIT_EXCEEDED"
+        message = razon_del_plan or "Alcanzaste el límite de operaciones de tu plan."
+    elif estado == "canceled":
+        code = "SUBSCRIPTION_PAST_DUE" if pago_real else "TRIAL_EXPIRED"
+        message = "Cancelaste tu suscripción. Reactivala para seguir usando CDI."
+    else:
+        code = "SUBSCRIPTION_INACTIVE"
+        message = "No tenés una suscripción activa. Suscribite para seguir usando CDI."
+    return {"message": message, "code": code, "billing_status": estado}
+
+
+async def _cuenta_bloqueada(db: AsyncSession, username: str):
+    """Bloquea (SELECT … FOR UPDATE) la fila del usuario y, si tiene, la de su
+    organización, siempre en ese orden. Devuelve (db_user, entidad de cobro) o
+    None si el usuario no existe. El lock dura hasta el commit o rollback.
+
+    populate_existing: la sesión del pedido ya cargó al usuario en
+    get_current_user; sin esto se usarían los contadores leídos antes del lock.
+    SQLite ignora FOR UPDATE (serializa las escrituras por su cuenta).
+    """
+    result = await db.execute(
+        select(User)
+        .where(User.username == username)
+        .with_for_update()
+        .execution_options(populate_existing=True)
+    )
+    db_user = result.scalars().first()
+    if not db_user:
+        return None
+    if db_user.organization_id:
+        result = await db.execute(
+            select(Organization)
+            .where(Organization.id == db_user.organization_id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        )
+        org = result.scalars().first()
+        if org:
+            return db_user, org
+    return db_user, db_user
+
+
+async def _vencer_y_guardar(db: AsyncSession, entidad):
+    vencio = _vencer_si_corresponde(entidad)
+    if vencio:
+        try:
+            await db.commit()
+            await db.refresh(entidad)
+        except Exception:
+            await db.rollback()
+    return vencio
+
+
+async def require_billing_vigente(
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Dependencia: exige que el usuario tenga billing activo/trial y que no
-    haya excedido el límite de operaciones del plan. Usar en endpoints que
-    crean operaciones o clientes.
-
-    Devuelve HTTP 402 Payment Required si está vencido o sin ops.
+    """Dependencia: corta por estado (vencido, impago, cancelado o sin
+    suscripción → 402). No mira el tope del plan: va en las rutas que gastan
+    Gemini o generan valor; el tope se mira sólo donde se cuenta una
+    operación (COBRO-CORTE-1, D5 a).
     """
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
@@ -1783,55 +1885,63 @@ async def require_active_billing(
             return User(username=user["username"], plan="premium", billing_status="active")
         raise HTTPException(status_code=401, detail="Usuario no encontrado")
 
-    # Corte por vencimiento. Chequear la entidad de billing (org o user).
-    #  - trial vencido: sin gracia (nadie pagó todavía).
-    #  - active vencido: con BILLING_GRACE_DAYS_ACTIVE días de gracia (G7.3), para no
-    #    cortar por un webhook de renovación que llegó tarde.
-    billing_entity, is_org = await _get_billing_entity(db, db_user)
-    now = datetime.now(timezone.utc)
-    trial_end = billing_entity.trial_ends_at
-    if trial_end is not None and trial_end.tzinfo is None:
-        trial_end = trial_end.replace(tzinfo=timezone.utc)
-
-    # get_current_user ya pasa a past_due un `trial` vencido. Acá cubrimos al
-    # `active` vencido pasada la gracia (y al `trial` por si se llega sin pasar por
-    # get_current_user, p. ej. billing por organización).
-    if trial_end is not None:
-        vencido_trial = billing_entity.billing_status == "trial" and trial_end < now
-        vencido_active = (
-            billing_entity.billing_status == "active"
-            and trial_end < now - timedelta(days=BILLING_GRACE_DAYS_ACTIVE)
-        )
-        if vencido_trial or vencido_active:
-            billing_entity.billing_status = "past_due"
-            try:
-                await db.commit()
-                await db.refresh(billing_entity)
-            except Exception:
-                await db.rollback()
-
-    ok, reason = billing_service.can_create_operation(billing_entity)
-    if not ok:
-        # 402 distinguible, para que Emi sepa la causa de un vistazo:
-        #  - past_due/canceled y pagó de verdad (payment_provider=="mercadopago",
-        #    lo setea el webhook real de MP; el registro con tarjeta deja
-        #    "simulated") → renovación impaga.
-        #  - past_due/canceled sin pago real → trial vencido (nunca pagó).
-        #  - trial/active vigente sin ops → límite del plan.
-        if billing_entity.billing_status in ("past_due", "canceled"):
-            pago_real = getattr(billing_entity, "payment_provider", None) == "mercadopago"
-            code = "SUBSCRIPTION_PAST_DUE" if pago_real else "TRIAL_EXPIRED"
-        else:
-            code = "PLAN_LIMIT_EXCEEDED"
-        raise HTTPException(
-            status_code=402,
-            detail={
-                "message": reason,
-                "code": code,
-                "billing_status": billing_entity.billing_status,
-            },
-        )
+    entidad, _ = await _get_billing_entity(db, db_user)
+    vencio = await _vencer_y_guardar(db, entidad)
+    if not billing_service.tiene_acceso(entidad):
+        raise HTTPException(status_code=402, detail=_detalle_402(entidad, vencio=vencio))
     return db_user
+
+
+async def require_active_billing(
+    request: Request,
+    user=Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Dependencia: estado vigente y cupo del plan (402 si no). Mira el tope
+    sin bloquear: las rutas que cuentan lo vuelven a mirar con la cuenta
+    bloqueada, en la misma transacción que cuentan.
+    """
+    result = await db.execute(select(User).where(User.username == user["username"]))
+    db_user = result.scalars().first()
+    if not db_user:
+        if os.getenv("ENVIRONMENT") == "testing":
+            return User(username=user["username"], plan="premium", billing_status="active")
+        raise HTTPException(status_code=401, detail="Usuario no encontrado")
+
+    entidad, _ = await _get_billing_entity(db, db_user)
+    vencio = await _vencer_y_guardar(db, entidad)
+    ok, reason = billing_service.can_create_operation(entidad)
+    if not ok:
+        raise HTTPException(status_code=402, detail=_detalle_402(entidad, reason, vencio))
+    return db_user
+
+
+async def _contar_operacion_bloqueada(db: AsyncSession, username: str):
+    """Con la cuenta bloqueada: vence, mira el tope y cuenta. No hace commit:
+    el que llama crea la operación y hace un solo commit (D6 a).
+
+    Devuelve la entidad contada, o None si no hay fila del usuario (sólo en
+    testing, el mismo atajo que require_active_billing). Con el tope lleno o
+    la cuenta no vigente guarda el vencimiento, libera el lock y tira 402.
+    """
+    cuenta = await _cuenta_bloqueada(db, username)
+    if cuenta is None:
+        if os.getenv("ENVIRONMENT") == "testing":
+            return None
+        raise HTTPException(status_code=401, detail="Usuario no encontrado")
+    return await _contar_en_la_cuenta(db, cuenta[1])
+
+
+async def _contar_en_la_cuenta(db: AsyncSession, entidad):
+    """El conteo de _contar_operacion_bloqueada, con la cuenta ya bloqueada."""
+    vencio = _vencer_si_corresponde(entidad)
+    ok, reason = billing_service.can_create_operation(entidad)
+    if not ok:
+        detalle = _detalle_402(entidad, reason, vencio)
+        await db.commit()
+        raise HTTPException(status_code=402, detail=detalle)
+    billing_service.record_operation_created(entidad)
+    return entidad
 
 
 # --- USER PROFILE ENDPOINTS ---
@@ -2003,29 +2113,66 @@ async def cancel_billing(
 ):
     """Cancela la suscripción del usuario.
 
-    No corta el servicio inmediatamente: deja `billing_status='canceled'` pero
-    mantiene `trial_ends_at` como fecha hasta cuándo el user ya pagó (o cuándo
-    vence el trial). Cuando esa fecha pase, get_current_user lo marca past_due.
+    Si hay una suscripción de Mercado Pago, primero se cancela allá; si no se
+    puede, no se cambia nada en CDI. Deja `billing_status='canceled'`, que
+    sigue generando hasta `trial_ends_at` (billing_service.tiene_acceso): la
+    cuenta en gracia o con la prueba vencida queda sin acceso
+    (billing_service.cancelar_corta_acceso). Con una suscripción abierta se
+    cancela desde cualquier estado, sin ganar acceso: si no, cobra cuando la
+    tarjeta vuelve y el checkout no tiene salida.
+
+    Toma la fila como el checkout: si uno está en curso, espera a que guarde
+    la suscripción nueva y la cancela; si no, quedaría cobrando sin que CDI
+    la conozca.
     """
-    result = await db.execute(select(User).where(User.username == user["username"]))
+    result = await db.execute(select(User).where(User.username == user["username"]).with_for_update())
     db_user = result.scalars().first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    if db_user.billing_status not in ("trial", "active"):
+    if db_user.billing_status not in ("trial", "active", "past_due") and not db_user.mp_preapproval_id:
         raise HTTPException(
             status_code=409,
             detail=f"No se puede cancelar desde el estado actual: {db_user.billing_status}",
         )
 
+    if db_user.mp_preapproval_id:
+        no_se_pudo = "No se pudo cancelar en Mercado Pago; tu plan sigue igual. Probá de nuevo en unos minutos."
+        if not billing_service.is_configured():
+            raise HTTPException(status_code=503, detail=no_se_pudo)
+        try:
+            await run_in_threadpool(_cancelar_suscripcion_mp, db_user.mp_preapproval_id)
+        except _SuscripcionMPError as e:
+            print(f"⚠️ No se pudo cancelar la suscripción de {db_user.username} en MP: {e}")
+            raise HTTPException(status_code=503, detail=no_se_pudo)
+        db_user.mp_preapproval_id = None
+
+    ahora = datetime.now(timezone.utc)
+    corta = billing_service.cancelar_corta_acceso(db_user, ahora)
+    if corta and billing_service.vigente(db_user.trial_ends_at, ahora):
+        # canceled da acceso hasta trial_ends_at: quien no lo tenía no lo gana.
+        db_user.trial_ends_at = ahora
     db_user.billing_status = "canceled"
     await db.commit()
-    print(f"🚪 User canceló suscripción: {db_user.username} (servicio activo hasta {db_user.trial_ends_at})")
-    return {
-        "success": True,
-        "billing_status": "canceled",
-        "service_until": db_user.trial_ends_at.isoformat() if db_user.trial_ends_at else None,
-    }
+    hasta = None if corta else db_user.trial_ends_at
+    print(f"🚪 User canceló suscripción: {db_user.username} (servicio hasta: {hasta or 'sin acceso'})")
+    return {"success": True, "billing_status": "canceled", "service_until": hasta and hasta.isoformat()}
+
+
+async def _pago_un_plan_mp(db: AsyncSession, db_user) -> bool:
+    """Si la cuenta pagó un plan con Mercado Pago. Una recarga sola no es un
+    plan: la prueba que recargó vuelve a la prueba (COBRO-MP-1, E). Sin
+    ningún pago aplicado en mp_pagos_aplicados (pagó antes del registro)
+    decide payment_provider, como antes: un rechazo no dice nada del plan."""
+    from proyecto_maria.database.models import PagoMercadoPagoAplicado
+    tipos = (await db.execute(
+        select(PagoMercadoPagoAplicado.tipo)
+        .where(PagoMercadoPagoAplicado.cuenta == db_user.username,
+               PagoMercadoPagoAplicado.estado == "aplicado")
+    )).scalars().all()
+    if not tipos:
+        return db_user.payment_provider == "mercadopago"
+    return any(tipo != "topup" for tipo in tipos)
 
 
 @app.post("/api/billing/reactivate")
@@ -2035,9 +2182,11 @@ async def reactivate_billing(
 ):
     """Reactiva una suscripción cancelada.
 
-    Si el `trial_ends_at` aún está en el futuro → simplemente vuelve a 'active'
-    (no hay que cobrar de nuevo, el user ya pagó hasta esa fecha).
-    Si ya venció → marca past_due y el front debe abrir el checkout.
+    Si ya venció → past_due y el front abre el checkout. Si no venció:
+    una prueba vuelve a 'trial' sin cobrar; un plan pagado con Mercado Pago
+    sigue 'canceled' hasta que se pague una suscripción nueva, que cobra
+    ahora y suma 30 días desde el fin del período ya pagado (COBRO-MP-2,
+    D7.3). Reactivar nunca deja la cuenta 'active' sin un pago.
     """
     result = await db.execute(select(User).where(User.username == user["username"]))
     db_user = result.scalars().first()
@@ -2060,14 +2209,26 @@ async def reactivate_billing(
             "message": "Tu período pagado ya terminó. Activá el plan para continuar.",
         }
 
-    db_user.billing_status = "active"
+    if await _pago_un_plan_mp(db, db_user):
+        return {
+            "success": True,
+            "billing_status": "canceled",
+            "needs_checkout": True,
+            "service_until": end.isoformat(),
+            "message": (
+                "Para reactivar se crea una suscripción nueva en Mercado Pago: te cobra ahora "
+                f"y suma 30 días desde el {end.strftime('%d/%m/%Y')}, fin del período ya pagado."
+            ),
+        }
+
+    db_user.billing_status = "trial"
     await db.commit()
-    print(f"🔄 User reactivó suscripción: {db_user.username}")
+    print(f"🔄 User reactivó la prueba: {db_user.username}")
     return {
         "success": True,
-        "billing_status": "active",
+        "billing_status": "trial",
         "needs_checkout": False,
-        "service_until": db_user.trial_ends_at.isoformat() if db_user.trial_ends_at else None,
+        "service_until": end.isoformat(),
     }
 
 
@@ -2141,6 +2302,29 @@ async def get_dev_wave1_kpis(
     """
     d = max(1, min(days, 120))
     return await _wave1_compute_kpis(db, days=d)
+
+
+@app.get("/api/dev/pagos-mp-rechazados", tags=["admin"])
+async def get_dev_pagos_mp_rechazados(
+    user=Depends(require_admin),
+    db: AsyncSession = Depends(get_db),
+):
+    """Pagos de Mercado Pago aprobados que no se aplicaron porque no
+    alcanzaban (COBRO-MP-1): cada uno es un cliente que pagó y no recibió
+    nada. Los últimos 200, sólo admin."""
+    from proyecto_maria.database.models import PagoMercadoPagoAplicado as _Pago
+    filas = (await db.execute(
+        select(_Pago).where(_Pago.estado == "rechazado")
+        .order_by(desc(_Pago.aplicado_en)).limit(200)
+    )).scalars().all()
+    return {"pagos": [
+        {
+            "payment_id": f.payment_id, "cuenta": f.cuenta, "tipo": f.tipo,
+            "monto": f.monto, "moneda": f.moneda, "monto_esperado": f.monto_esperado,
+            "motivo": f.motivo, "aprobado_en": f.aprobado_en,
+            "registrado_en": f.aplicado_en.isoformat() if f.aplicado_en else None,
+        } for f in filas
+    ]}
 
 
 # --- FINANCIALS & STATUS API (Quick Win) ---
@@ -3126,6 +3310,16 @@ async def billing_me(user=Depends(get_current_user), db: AsyncSession = Depends(
         "clients_limit": plan["clients"],
         "users_limit": plan["users"],
         "organization_id": db_user.organization_id,
+        # «Próximo cobro» sólo si hay una suscripción que se renueva (D7.3). El id
+        # se guarda al abrir el checkout, antes de pagar: hace falta un pago de MP.
+        "renueva": (billing_entity.billing_status == "active" and bool(db_user.mp_preapproval_id)
+                    and getattr(billing_entity, "payment_provider", None) == "mercadopago"),
+        # Con una suscripción abierta el perfil muestra «Cancelar plan», como
+        # /api/billing/cancel, sea cual sea el estado.
+        "suscripcion_abierta": bool(db_user.mp_preapproval_id),
+        # De la cuenta que da el acceso, la misma que muestra esta respuesta: el
+        # perfil no promete días que no da.
+        "cancelar_corta_acceso": billing_service.cancelar_corta_acceso(billing_entity),
     }
 
 
@@ -3212,7 +3406,9 @@ async def create_manual_operation(
     total_value = sum(float(it.get("valor_unitario", 0) or 0) * float(it.get("cantidad", 0) or 0) for it in items_raw)
     total_weight = sum(float(it.get("peso_unitario", 0) or 0) * float(it.get("cantidad", 0) or 0) for it in items_raw)
 
-    # Crear operación
+    # Contar, calcular el op_code y crear la operación con la cuenta bloqueada,
+    # en un solo commit (COBRO-CORTE-1, D6 a).
+    await _contar_operacion_bloqueada(db, username)
     op_code = await _next_op_code(db, username)
 
     operation = OperationModel(
@@ -3245,10 +3441,6 @@ async def create_manual_operation(
 
     await db.commit()
 
-    billing_entity, _ = await _get_billing_entity(db, db_user)
-    billing_service.record_operation_created(billing_entity)
-    await db.commit()
-
     return {
         "success": True,
         "operation_id": operation_id,
@@ -3264,6 +3456,7 @@ async def process_operation(
     request: Request,
     payload: OperationPayload,
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
 ):
     """
     Recibe los datos de una operación, los valida y genera el Excel.
@@ -3374,6 +3567,25 @@ def _pool_lectura_excel():
             hilos = 2
         _POOL_LECTURA_EXCEL = ThreadPoolExecutor(hilos, thread_name_prefix="lectura-excel")
     return _POOL_LECTURA_EXCEL
+
+
+# Carril liviano (EXCEL-2b): el libro que la validación midió chico se lee en
+# hilos propios y no espera detrás de las planillas pesadas.
+_POOL_LECTURA_EXCEL_LIVIANO = None
+
+
+def _pool_lectura_excel_carril(liviano: bool):
+    global _POOL_LECTURA_EXCEL_LIVIANO
+    if not liviano:
+        return _pool_lectura_excel()
+    if _POOL_LECTURA_EXCEL_LIVIANO is None:
+        from concurrent.futures import ThreadPoolExecutor
+        try:
+            hilos = max(1, int(os.getenv("EXCEL_READ_WORKERS", "2")))
+        except (TypeError, ValueError):
+            hilos = 2
+        _POOL_LECTURA_EXCEL_LIVIANO = ThreadPoolExecutor(hilos, thread_name_prefix="lectura-excel-liviano")
+    return _POOL_LECTURA_EXCEL_LIVIANO
 
 
 def _correr_lectura(funcion, *args):
@@ -3900,11 +4112,8 @@ async def _leer_pdf_aparte(funcion, *args, limite=None, que="el PDF", pool=None)
 
 
 def _get_max_upload_bytes() -> int:
-    try:
-        max_mb = float(os.getenv("MAX_UPLOAD_MB", "10"))
-    except (TypeError, ValueError):
-        max_mb = 10.0
-    return int(max_mb * 1024 * 1024)
+    from proyecto_maria.security.file_security import tope_de_entorno
+    return tope_de_entorno("MAX_UPLOAD_MB", 10, 1024 * 1024)
 
 
 
@@ -4011,6 +4220,7 @@ async def upload_pdf_public(
     request: Request,
     file: UploadFile = File(...),
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
 ):
     """
     Sube y procesa un archivo PDF para extraer items y datos de operación.
@@ -4385,6 +4595,7 @@ async def generate_maria_endpoint(
     request: MariaRequest,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    _cobro=Depends(require_billing_vigente),
 ):
     """
     Genera archivo TXT en formato MARIA para el sistema SIM de AFIP.
@@ -4589,6 +4800,11 @@ async def generate_maria_endpoint(
         filename = f"MARIA_{safe_id}.TXT"
         filepath = os.path.join(_user_downloads_dir(user["username"]), filename)
 
+        # La primera vez que se genera este id se cuenta la operación; con
+        # el tope lleno, 402 sin escribir el archivo (COBRO-CORTE-1).
+        await _contar_maria(db, user["username"], filename, txt_content,
+                            len(request.items or []))
+
         # newline="": el archivo lleva los CRLF tal cual, sin traducir (MARIA-7).
         with open(filepath, 'w', encoding='utf-8', newline='') as f:
             f.write(txt_content)
@@ -4663,6 +4879,8 @@ class MariaExportRequest(BaseModel):
 async def generate_maria_export_endpoint(
     request: MariaExportRequest,
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
+    db: AsyncSession = Depends(get_db),
 ):
     """
     Genera archivo TXT en formato MARIA para EXPORTACIÓN.
@@ -4732,8 +4950,15 @@ async def generate_maria_export_endpoint(
         
         # Guardar archivo temporal en la carpeta propia del usuario (ver
         # _user_downloads_dir): el nombre sale del nro de factura y es adivinable.
-        filename = f"MARIA_EXPORT_{safe_id}.TXT"
+        # «MARIA-EXPORT_», con guion: con «_» la importación del id
+        # «EXPORT_<x>» daba el mismo archivo y la misma operación (COBRO-MP-1, g).
+        filename = f"MARIA-EXPORT_{safe_id}.TXT"
         filepath = os.path.join(_user_downloads_dir(user["username"]), filename)
+
+        # Cuenta como /generate_maria: la primera vez que se genera este id;
+        # con el tope lleno, 402 sin escribir el archivo (COBRO-MP-1, B).
+        await _contar_maria(db, user["username"], filename, txt_content,
+                            len(request.items or []))
 
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(txt_content)
@@ -5693,6 +5918,77 @@ async def _next_op_code(db: AsyncSession, owner_username: str) -> str:
     return f"OP-{max_num + 1:06d}"
 
 
+# Contenidos distintos que admite un mismo MARIA_<id>.TXT (COBRO-CORTE-1, D4 b).
+MARIA_REGENERACIONES = 10
+# Los dos nombres que arman /generate_maria y /generate_maria_export, con el
+# id recortado a 50 (COBRO-MP-1, g).
+_ARCHIVO_MARIA = re.compile(r"MARIA(?:_|-EXPORT_)[A-Za-z0-9_-]{1,50}\.TXT")
+
+
+async def _operacion_maria(db: AsyncSession, owner_username: str, archivo: str):
+    """La operación del usuario creada al generar ese MARIA_<id>.TXT, o None."""
+    result = await db.execute(
+        sa_select(OperationModel)
+        .where(
+            OperationModel.owner_username == owner_username,
+            OperationModel.generated_file == archivo,
+        )
+        .order_by(OperationModel.created_at.asc(), OperationModel.id.asc())
+        .limit(1)
+    )
+    return result.scalars().first()
+
+
+async def _contar_maria(db: AsyncSession, username: str, archivo: str,
+                        contenido: str, total_items: int) -> None:
+    """Cuenta la operación la primera vez que se genera su MARIA (D4 b).
+
+    Con la cuenta bloqueada (D6 a): si el usuario no tiene operación con ese
+    archivo, mira el tope, cuenta y la crea con su op_code, en un solo commit.
+    Si ya la tiene, no cuenta: anota la huella del contenido, hasta
+    MARIA_REGENERACIONES distintas (409 la siguiente). Va antes de escribir
+    el archivo: un 402 o un 409 no lo pisa.
+    """
+    import hashlib
+
+    huella = hashlib.sha256(contenido.encode("utf-8")).hexdigest()
+    cuenta = await _cuenta_bloqueada(db, username)
+    if cuenta is None:
+        if os.getenv("ENVIRONMENT") == "testing":
+            return
+        raise HTTPException(status_code=401, detail="Usuario no encontrado")
+
+    operacion = await _operacion_maria(db, username, archivo)
+    if operacion is None:
+        await _contar_en_la_cuenta(db, cuenta[1])
+        db.add(OperationModel(
+            id=str(uuid.uuid4()),
+            owner_username=username,
+            op_code=await _next_op_code(db, username),
+            source="maria",
+            generated_file=archivo,
+            total_items=total_items,
+            extra={"maria_hashes": [huella]},
+        ))
+        await db.commit()
+        return
+
+    huellas = list((operacion.extra or {}).get("maria_hashes") or [])
+    if huella in huellas:
+        await db.commit()  # libera el lock
+        return
+    if len(huellas) >= MARIA_REGENERACIONES:
+        await db.commit()  # libera el lock; no hubo cambios
+        raise HTTPException(status_code=409, detail={
+            "code": "MARIA_REGENERACIONES_AGOTADAS",
+            "message": (f"Esta operación ya se generó {MARIA_REGENERACIONES} veces "
+                        "con datos distintos, el máximo. Si es otra operación, "
+                        "cargala como nueva."),
+        })
+    operacion.extra = {**(operacion.extra or {}), "maria_hashes": huellas + [huella]}
+    await db.commit()
+
+
 async def _get_owned_client(
     db: AsyncSession, client_id: str, username: str
 ) -> ClientModel:
@@ -6411,6 +6707,7 @@ async def _get_owned_migration_batch(
 async def analyze_client_migration(
     file: UploadFile = File(...),
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
     db: AsyncSession = Depends(get_db),
 ):
     """Analiza un CSV/Excel sin crear ni modificar clientes."""
@@ -6508,6 +6805,7 @@ def _migration_fill_empty(client: ClientModel, record: dict) -> tuple[dict, dict
 async def confirm_client_migration(
     batch_id: str,
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
     db: AsyncSession = Depends(get_db),
 ):
     """Confirma un preview. Es idempotente y nunca pisa datos existentes."""
@@ -7307,9 +7605,14 @@ async def save_client_operation(
     request: Request,
     user=Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
-    db_user: User = Depends(require_active_billing),
+    _cobro=Depends(require_billing_vigente),
 ):
-    """Guarda una operación en el historial del cliente."""
+    """Guarda una operación en el historial del cliente.
+
+    Si es la de un MARIA ya generado (operation_id MARIA_<id>.TXT), completa
+    esa operación y no cuenta otra; si no, cuenta una con el tope y la cuenta
+    bloqueados, en el mismo commit (COBRO-CORTE-1, D4 b y D6 a).
+    """
     username = user["username"]
     client = await _get_owned_client(db, client_id, username)
 
@@ -7318,22 +7621,46 @@ async def save_client_operation(
         resumen = data.get("resumen", {}) or {}
         items = data.get("items", []) or []
 
-        op_code = await _next_op_code(db, username)
-
-        operation = OperationModel(
-            id=str(uuid.uuid4()),
-            owner_username=username,
+        archivo = str(data.get("operation_id") or "")
+        if not _ARCHIVO_MARIA.fullmatch(archivo):
+            archivo = None
+        operation = None
+        if archivo:
+            # Con la cuenta bloqueada, como al generar: un guardado y una
+            # generación del mismo id a la vez no crean dos operaciones.
+            await _cuenta_bloqueada(db, username)
+            operation = await _operacion_maria(db, username, archivo)
+        # Lo que viene de afuera se recorta al largo de la columna: en
+        # Postgres un dato más largo tira abajo el guardado (GUARDAR-1).
+        campos = dict(
             client_id=client_id,
-            op_code=op_code,
-            # Lo que viene de afuera se recorta al largo de la columna: en
-            # Postgres un dato más largo tira abajo el guardado (GUARDAR-1).
             source=str(data.get("source") or "manual")[:50],
             total_items=int(resumen.get("items", len(items))),
             total_value=float(resumen.get("valor_total", 0) or 0),
             currency=str(data.get("currency") or "USD")[:3],
-            extra={"resumen": resumen},
         )
-        db.add(operation)
+        if operation is not None:
+            # Ya se contó al generar: se completa y sus ítems se reemplazan.
+            for campo, valor in campos.items():
+                setattr(operation, campo, valor)
+            operation.extra = {**(operation.extra or {}), "resumen": resumen}
+            await db.execute(
+                sa_delete(OperationItemModel).where(
+                    OperationItemModel.operation_id == operation.id
+                )
+            )
+        else:
+            await _contar_operacion_bloqueada(db, username)
+            operation = OperationModel(
+                id=str(uuid.uuid4()),
+                owner_username=username,
+                op_code=await _next_op_code(db, username),
+                generated_file=archivo,
+                extra={"resumen": resumen},
+                **campos,
+            )
+            db.add(operation)
+        op_code = operation.op_code
         await db.flush()  # para tener operation.id
 
         # Fill-if-empty: rellenar ficha del cliente con datos de carátula
@@ -7373,8 +7700,6 @@ async def save_client_operation(
         # guardaba nada (GUARDAR-1).
         # El contador del plan va en el mismo commit que la operación: si
         # falla, no queda una operación guardada sin contar y con un 500.
-        billing_entity, _ = await _get_billing_entity(db, db_user)
-        billing_service.record_operation_created(billing_entity)
         await db.commit()
         operation_id = operation.id
     except HTTPException:
@@ -8162,9 +8487,9 @@ async def upload_excel_v2(
     Review de v2. Si el usuario elige un cliente con `column_mapping`, las
     columnas se renombran a los canónicos antes de extraer.
     """
-    from proyecto_maria.security.file_security import validate_file_upload, sanitize_filename
+    from proyecto_maria.security.file_security import validar_con_carril, sanitize_filename
     max_upload_bytes = _get_max_upload_bytes()
-    contents = await validate_file_upload(file, 'excel', max_size=max_upload_bytes)
+    contents, liviano = await validar_con_carril(file, 'excel', max_size=max_upload_bytes)
 
     # Es una opción de API: omitida conserva True, no un checkbox desmarcado
     # (FastAPI >= 0.147 interpreta los bool Form ausentes como False).
@@ -8191,7 +8516,7 @@ async def upload_excel_v2(
         # En otro hilo y con tiempo máximo: no frena al resto (EXCEL-1).
         df = await _leer_pdf_aparte(
             _leer_excel_ruta, temp_filename, engine, tuple((mapping or {}).items()),
-            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
+            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel_carril(liviano),
         )
 
         # Mirar las otras hojas es sólo un aviso: si no alcanza su presupuesto
@@ -8200,7 +8525,7 @@ async def upload_excel_v2(
         try:
             otras_hojas, hojas_revisadas = await _leer_pdf_aparte(
                 _otras_hojas_con_datos, temp_filename, engine,
-                limite=min(10.0, _excel_read_timeout_s()), que="el Excel", pool=_pool_lectura_excel(),
+                limite=min(10.0, _excel_read_timeout_s()), que="el Excel", pool=_pool_lectura_excel_carril(liviano),
             )
         except Exception as e:
             logging.warning("upload_excel_v2: no se pudieron mirar las otras hojas: %s", e)
@@ -8282,7 +8607,7 @@ async def upload_excel_v2(
         extras: dict = {}
         items = await _leer_pdf_aparte(
             extract_items_from_excel, df, file.filename, descartes, extras,
-            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
+            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel_carril(liviano),
         )
         if not items:
             raise HTTPException(
@@ -9149,6 +9474,7 @@ async def propuesta_de_sufijos(data: dict, user=Depends(get_current_user)):
 async def sugerir_ncm(
     data: dict,
     user=Depends(get_current_user),
+    _cobro=Depends(require_billing_vigente),
     db: AsyncSession = Depends(get_db),
 ):
     """Sugiere hasta 5 NCM: memoria confirmada, código exacto o IA validada.
@@ -9857,7 +10183,7 @@ pending_payments = {}
 @app.get("/api/payments/demo-checkout/{preference_id}")
 async def demo_checkout_page(preference_id: str):
     """Página de checkout demo cuando no hay credenciales MP"""
-    if preference_id not in pending_payments:
+    if not _demo_permitida() or preference_id not in pending_payments:
         raise HTTPException(status_code=404, detail="Pago no encontrado")
     
     payment = pending_payments[preference_id]
@@ -9904,8 +10230,8 @@ async def demo_checkout_page(preference_id: str):
 
 @app.post("/api/payments/demo-confirm/{preference_id}")
 async def demo_confirm_payment(preference_id: str):
-    """Confirma un pago demo"""
-    if preference_id not in pending_payments:
+    """Confirma un pago demo: no cobra ni cambia la cuenta."""
+    if not _demo_permitida() or preference_id not in pending_payments:
         raise HTTPException(status_code=404, detail="Pago no encontrado")
     
     pending_payments[preference_id]["status"] = "approved"
@@ -9913,7 +10239,16 @@ async def demo_confirm_payment(preference_id: str):
 
 @app.get("/api/payments/success")
 async def payment_success(preference_id: str = None, payment_id: str = None, demo: bool = False):
-    """Página de éxito después del pago"""
+    """Página de vuelta después del pago. No dice que la cuenta se activó:
+    eso lo hace el aviso de Mercado Pago (COBRO-MP-2, D9)."""
+    if demo:
+        titulo = "Pago de prueba"
+        lineas = ("Esto fue un pago de prueba: no se cobró nada y tu cuenta no cambió.",)
+    else:
+        titulo = "¡Recibimos tu pago!"
+        lineas = ("Tu cuenta se actualiza cuando Mercado Pago confirma el pago.",
+                  "Puede tardar unos minutos.")
+    parrafos = "\n            ".join(f"<p>{l}</p>" for l in lineas)
     html = """
     <!DOCTYPE html>
     <html>
@@ -9931,17 +10266,13 @@ async def payment_success(preference_id: str = None, payment_id: str = None, dem
     <body>
         <div class="success-box">
             <div class="checkmark">✅</div>
-            <h1>¡Pago Exitoso!</h1>
-            <p>Tu cuenta Premium ha sido activada.</p>
-            <p>Ya podés acceder a todas las funcionalidades.</p>
+            <h1>__TITULO__</h1>
+            __PARRAFOS__
             <a href="/dashboard" class="btn">Ir al Dashboard</a>
         </div>
-        <script>
-            localStorage.setItem('user_plan', 'premium');
-        </script>
     </body>
     </html>
-    """
+    """.replace("__TITULO__", titulo).replace("__PARRAFOS__", parrafos)
     return HTMLResponse(content=html)
 
 @app.get("/api/payments/failure")
@@ -9999,6 +10330,316 @@ async def payment_pending():
     </html>
     """
     return HTMLResponse(content=html)
+
+class _MPIlegible(Exception):
+    """Lo de Mercado Pago no se pudo leer o todavía no alcanza para decidir
+    (sin cuenta, sin id, pago pendiente): 503 para que reintente."""
+
+
+def _consultar_mp(llamada, que: str) -> dict:
+    """El objeto que devuelve una lectura del SDK de Mercado Pago. En un 4xx
+    el SDK (mercadopago 2.2.0) no levanta: devuelve el estado. Con el token
+    vencido contesta 401 a todo, y eso no es un pago rechazado."""
+    try:
+        resp = llamada()
+    except Exception as e:
+        raise _MPIlegible(f"{que}: {type(e).__name__}") from e
+    if not isinstance(resp, dict) or resp.get("status") != 200 or not isinstance(resp.get("response"), dict):
+        estado = resp.get("status") if isinstance(resp, dict) else type(resp).__name__
+        raise _MPIlegible(f"{que}: {str(estado)[:40]}")
+    return _guardable_en_pg(resp["response"])
+
+
+_NO_GUARDABLE_EN_PG = re.compile("[\x00\ud800-\udfff]")
+
+
+def _guardable_en_pg(valor):
+    """Lo leído de Mercado Pago, con los caracteres que Postgres no acepta
+    (NUL y surrogates sueltos) cambiados por «\ufffd»: si no, el pago da 500 y
+    Mercado Pago lo reintenta sin fin (COBRO-MP-1, b)."""
+    if isinstance(valor, str):
+        return _NO_GUARDABLE_EN_PG.sub("\ufffd", valor)
+    if isinstance(valor, dict):
+        return {clave: _guardable_en_pg(v) for clave, v in valor.items()}
+    return valor
+
+
+def _monto_mp(valor) -> float | None:
+    try:
+        monto = float(valor)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return monto if math.isfinite(monto) and monto > 0 else None
+
+
+def _suscripcion_del_pago_mp(pay_resp: dict) -> tuple:
+    """(lo que el pago dice de su suscripción, ese id si es un id o None)."""
+    meta = pay_resp.get("metadata") if isinstance(pay_resp.get("metadata"), dict) else {}
+    interaccion = pay_resp.get("point_of_interaction") if isinstance(pay_resp.get("point_of_interaction"), dict) else {}
+    datos = interaccion.get("transaction_data") if isinstance(interaccion.get("transaction_data"), dict) else {}
+    leido = meta.get("preapproval_id") or pay_resp.get("preapproval_id") or datos.get("subscription_id")
+    return leido, _id_mp(leido)
+
+
+def _control_de_monto_mp(sdk, pay_resp: dict, update: dict, external_ref: str) -> tuple:
+    """(monto esperado, motivo del rechazo o None) de un pago aprobado
+    (COBRO-MP-1, D29):
+    - de una suscripción: el monto de la suscripción leída en Mercado Pago,
+      que es el del panel y no el de PLANS;
+    - de un link de pago: el precio guardado cuando se armó el link;
+    - de un link armado antes de guardar el precio: el precio de hoy.
+    """
+    meta = pay_resp.get("metadata") if isinstance(pay_resp.get("metadata"), dict) else {}
+    leido, suscripcion_id = _suscripcion_del_pago_mp(pay_resp)
+
+    if leido and not suscripcion_id:
+        return None, f"id de suscripción inválido: {str(leido)[:40]!r}"
+    if suscripcion_id:
+        suscripcion = _consultar_mp(lambda: sdk.preapproval().get(suscripcion_id),
+                                    f"suscripción {suscripcion_id}")
+        if suscripcion.get("external_reference") != external_ref:
+            return None, f"la suscripción {suscripcion_id} es de otra cuenta"
+        recurrente = suscripcion.get("auto_recurring") if isinstance(suscripcion.get("auto_recurring"), dict) else {}
+        esperado = _monto_mp(recurrente.get("transaction_amount"))
+        if esperado is None:
+            return None, f"la suscripción {suscripcion_id} no tiene monto"
+    else:
+        esperado = _monto_mp(meta.get("precio_esperado"))
+        if esperado is None:
+            if update.get("action") == "topup":
+                esperado = float(billing_service.TOPUP_PRICE_ARS)
+            else:
+                esperado = float(billing_service.PLANS.get(update.get("plan"), {}).get("price") or 0) or None
+            if esperado is None:
+                return None, f"el plan {update.get('plan')!r} no tiene precio"
+
+    moneda = pay_resp.get("currency_id")
+    if moneda != "ARS":
+        return esperado, f"se pagó en {moneda!r}, no en ARS"
+    pagado = _monto_mp(pay_resp.get("transaction_amount"))
+    if pagado is None or pagado + 0.005 < esperado:
+        return esperado, f"se pagaron {pay_resp.get('transaction_amount')} y el precio es {esperado:g}"
+    return esperado, None
+
+
+# Ids de Mercado Pago (cobros, pagos y suscripciones) que llegan en un aviso
+# que puede no venir firmado, o en lo que se lee después: sólo esto, para que
+# no cambien la ruta que se le pide.
+_ID_COBRO_MP = re.compile(r"[0-9A-Za-z_-]{1,64}")
+
+
+def _id_mp(valor) -> str | None:
+    """Un id leído de Mercado Pago como texto, o None si no es un id."""
+    if isinstance(valor, bool) or not isinstance(valor, (str, int)):
+        return None
+    return str(valor) if _ID_COBRO_MP.fullmatch(str(valor)) else None
+
+
+def _leer_cobro_autorizado_mp(cobro_id: str) -> dict:
+    """GET /authorized_payments/{id} de Mercado Pago: el cobro de una
+    renovación de suscripción. El SDK (mercadopago 2.2.0) no lo trae. El
+    id llega en un aviso que puede no venir firmado: sólo letras, números,
+    «-» y «_», para que no cambie la ruta que se pide."""
+    if not isinstance(cobro_id, str) or not _ID_COBRO_MP.fullmatch(cobro_id):
+        raise ValueError(f"id de cobro inválido: {str(cobro_id)[:80]!r}")
+    try:
+        with httpx.Client(timeout=10) as cliente:
+            resp = cliente.get(f"https://api.mercadopago.com/authorized_payments/{cobro_id}",
+                               headers={"Authorization": f"Bearer {MP_ACCESS_TOKEN}"})
+    except httpx.HTTPError as e:
+        raise _MPIlegible(f"cobro {cobro_id}: {type(e).__name__}") from e
+    if resp.status_code != 200:
+        raise _MPIlegible(f"cobro {cobro_id}: HTTP {resp.status_code}")
+    try:
+        return resp.json()
+    except ValueError as e:
+        raise _MPIlegible(f"cobro {cobro_id}: la respuesta no es JSON") from e
+
+
+class _SuscripcionMPError(Exception):
+    """No se pudo leer o cancelar una suscripción en Mercado Pago: no se
+    cambia nada en CDI (COBRO-MP-2)."""
+
+
+_ESTADOS_SUSCRIPCION_MP = {"pending", "authorized", "paused", "cancelled"}
+
+
+def _pedir_suscripcion_mp(metodo: str, sid: str, cuerpo: dict | None = None) -> str:
+    """GET o PUT /preapproval/{id}; devuelve el estado que contesta Mercado
+    Pago. Se usa httpx y no el SDK: en mercadopago 2.2.0 PreApproval.update
+    arma la ruta sin la barra antes del id."""
+    if not isinstance(sid, str) or not _ID_COBRO_MP.fullmatch(sid):
+        raise _SuscripcionMPError(f"id de suscripción inválido: {str(sid)[:80]!r}")
+    try:
+        with httpx.Client(timeout=10) as cliente:
+            resp = cliente.request(metodo, f"https://api.mercadopago.com/preapproval/{sid}",
+                                   headers={"Authorization": f"Bearer {billing_service._access_token()}"},
+                                   json=cuerpo)
+    except httpx.HTTPError as e:
+        raise _SuscripcionMPError(f"{metodo} {sid}: {type(e).__name__}") from e
+    if resp.status_code == 404 and metodo == "GET":
+        # Mercado Pago no la conoce, así que no puede cobrar; tomarlo como
+        # error dejaría el checkout y cancelar en 503 para siempre.
+        return "cancelled"
+    if resp.status_code != 200:
+        raise _SuscripcionMPError(f"{metodo} {sid}: HTTP {resp.status_code}")
+    try:
+        estado = resp.json().get("status")
+    except (ValueError, AttributeError) as e:
+        raise _SuscripcionMPError(f"{metodo} {sid}: respuesta ilegible") from e
+    if estado not in _ESTADOS_SUSCRIPCION_MP:
+        raise _SuscripcionMPError(f"{metodo} {sid}: estado desconocido {str(estado)[:40]!r}")
+    return estado
+
+
+def _leer_suscripcion_mp(sid: str) -> str:
+    return _pedir_suscripcion_mp("GET", sid)
+
+
+def _cancelar_suscripcion_mp(sid: str) -> None:
+    """Cancela la suscripción en Mercado Pago. Si el PUT falla o no contesta
+    «cancelled», se pregunta el estado: si ya estaba cancelada, alcanza."""
+    try:
+        if _pedir_suscripcion_mp("PUT", sid, {"status": "cancelled"}) == "cancelled":
+            return
+    except _SuscripcionMPError:
+        pass
+    if _leer_suscripcion_mp(sid) != "cancelled":
+        raise _SuscripcionMPError(f"{sid}: sigue sin cancelar")
+
+
+def _demo_permitida() -> bool:
+    """El checkout de prueba existe sólo en desarrollo y pruebas; si falta la
+    variable, no hay demo (COBRO-MP-2, D7.4)."""
+    return os.getenv("ENVIRONMENT") in ("development", "test", "testing")
+
+
+def _pago_del_cobro_mp(cobro) -> tuple:
+    """(id del pago, id de la suscripción o None) de un cobro autorizado,
+    según la documentación pública de Mercado Pago (COBRO-MP-1, D30: no se
+    pudo confirmar contra un aviso real). Sin el pago no hay qué registrar:
+    _MPIlegible, y Mercado Pago reintenta hasta que el cobro lo diga. El
+    estado no se toma del cobro: lo decide el pago, que se lee después."""
+    pago = cobro.get("payment") if isinstance(cobro, dict) else None
+    pago_id = _id_mp(pago.get("id")) if isinstance(pago, dict) else None
+    if not pago_id:
+        raise _MPIlegible("el cobro todavía no dice qué pago lo cobró")
+    return pago_id, _id_mp(cobro.get("preapproval_id"))
+
+
+async def _registrar_pago_mp(session, payment_id: str, cuenta: str, update: dict, pay_resp: dict,
+                             control: tuple) -> str | None:
+    """Anota el pago en mp_pagos_aplicados, en la misma transacción que el
+    cambio de la cuenta. Devuelve «aplicado» o «rechazado» (según el control
+    del monto), o None si ya había llegado: antes sólo se miraba el último
+    pago y alternando dos pagos viejos se renovaba gratis (COBRO-MP-1, D8).
+    Lo que garantiza que no se aplique dos veces es la clave primaria, al
+    guardar (_guardar_pago_mp); mirar antes sólo evita el trabajo."""
+    from proyecto_maria.database.models import PagoMercadoPagoAplicado
+    if await session.get(PagoMercadoPagoAplicado, str(payment_id)) is not None:
+        return None
+    esperado, motivo = control
+    estado = "rechazado" if motivo else "aplicado"
+    session.add(PagoMercadoPagoAplicado(
+        payment_id=str(payment_id), cuenta=cuenta[:200],
+        tipo="topup" if update.get("action") == "topup" else str(update.get("plan") or ""),
+        monto=_monto_mp(pay_resp.get("transaction_amount")),
+        moneda=str(pay_resp.get("currency_id") or "")[:10] or None,
+        aprobado_en=str(pay_resp.get("date_approved") or "")[:40] or None,
+        estado=estado, monto_esperado=esperado, motivo=(motivo or None) and motivo[:300],
+    ))
+    return estado
+
+
+async def _control_de_fecha_mp(session, pay_resp: dict, control: tuple) -> tuple:
+    """Un pago aprobado antes de que empezara el registro de pagos no se
+    aplica (COBRO-MP-1, A): el código viejo ya lo aplicó y, si no fue el
+    último de la cuenta, nada más lo recuerda. Sin una fecha legible tampoco:
+    no se sabe de cuándo es. Queda rechazado, a la vista del admin."""
+    from proyecto_maria.database.models import InicioRegistroPagosMP
+    esperado, motivo = control
+    if motivo:
+        return control
+    inicio = await session.get(InicioRegistroPagosMP, 1)
+    if inicio is None:
+        logging.getLogger("mp_webhook").error("Webhook MP: falta el inicio del registro de pagos (init_db)")
+        raise HTTPException(status_code=503, detail="Registro de pagos no inicializado. MP reintentará.")
+    desde = inicio.desde if inicio.desde.tzinfo else inicio.desde.replace(tzinfo=timezone.utc)
+    crudo = pay_resp.get("date_approved")
+    try:
+        aprobado = datetime.fromisoformat(crudo) if isinstance(crudo, str) else None
+    except ValueError:
+        aprobado = None
+    if aprobado is None or aprobado.tzinfo is None:
+        return esperado, "sin fecha de aprobación legible"
+    if aprobado < desde:
+        return esperado, f"aprobado antes de que empezara el registro de pagos ({desde.isoformat()})"
+    return control
+
+
+async def _rechazar_pago_mp(session, payment_id: str, cuenta: str, motivo: str) -> dict:
+    """Guarda el rechazo sin tocar la cuenta. Responde 200 para que Mercado
+    Pago no reintente: el pago no va a alcanzar la próxima vez tampoco."""
+    if await _guardar_pago_mp(session):
+        logging.getLogger("mp_webhook").warning("Webhook MP: pago %s de %s RECHAZADO: %s", payment_id, cuenta, motivo)
+    return {"success": True, "skipped": f"pago rechazado: {motivo}"}
+
+
+async def _rechazar_sin_cuenta_mp(session, payment_id: str, cuenta: str, update: dict, pay_resp: dict,
+                                  motivo: str) -> dict:
+    """Un pago aprobado que no se puede aplicar a ninguna cuenta queda
+    rechazado, a la vista de Emi: reintentar no lo arregla (COBRO-MP-1, b)."""
+    if await _registrar_pago_mp(session, payment_id, cuenta, update, pay_resp, (None, motivo)) is None:
+        return {"success": True, "skipped": "payment_id ya procesado"}
+    return await _rechazar_pago_mp(session, payment_id, cuenta, motivo)
+
+
+def _con_referencia_mp(sdk, pay_resp: dict, suscripcion_del_cobro) -> dict:
+    """Una renovación puede no traer la referencia: se toma de su suscripción."""
+    if suscripcion_del_cobro:
+        pay_resp = {**pay_resp, "preapproval_id": suscripcion_del_cobro}
+    suscripcion = suscripcion_del_cobro or _suscripcion_del_pago_mp(pay_resp)[1]
+    if suscripcion and not pay_resp.get("external_reference"):
+        sus = _consultar_mp(lambda: sdk.preapproval().get(suscripcion), f"suscripción {suscripcion}")
+        pay_resp = {**pay_resp, "external_reference": sus.get("external_reference")}
+    return pay_resp
+
+
+async def _sin_cuenta_todavia_mp(session, payment_id: str) -> dict:
+    """Sin cuenta no se registra: el otro aviso del mismo pago puede traerla.
+    Si ese ya lo registró, no hay nada que reintentar."""
+    from proyecto_maria.database.models import PagoMercadoPagoAplicado
+    if await session.get(PagoMercadoPagoAplicado, str(payment_id)) is not None:
+        return {"success": True, "skipped": "payment_id ya procesado"}
+    raise _MPIlegible(f"el pago {payment_id} todavía no dice de qué cuenta es")
+
+
+async def _guardar_pago_mp(session) -> bool:
+    """Commit del pago y de la cuenta juntos. Si otro aviso del mismo pago
+    llegó a la vez y ganó, la clave repetida lo frena: no se aplica dos veces."""
+    try:
+        await session.commit()
+        return True
+    except IntegrityError:
+        await session.rollback()
+        return False
+
+
+def _extender_periodo(cuenta, update: dict) -> None:
+    """Un pago de plan suma 30 días desde el fin del período si todavía no
+    venció (prueba, activa o cancelada con días por delante), y desde hoy si
+    no: pagar antes de que venza no pierde los días que quedaban (COBRO-MP-1;
+    COBRO-MP-2, D7.1)."""
+    if update.get("action") == "topup" or "trial_ends_at" not in update:
+        return
+    ahora = datetime.now(timezone.utc)
+    fin = getattr(cuenta, "trial_ends_at", None)
+    if fin is not None and fin.tzinfo is None:
+        fin = fin.replace(tzinfo=timezone.utc)
+    vigente = getattr(cuenta, "billing_status", None) in ("trial", "active", "canceled")
+    desde = fin if (vigente and fin and fin > ahora) else ahora
+    update["trial_ends_at"] = desde + timedelta(days=30)
+
 
 def _verify_mp_webhook_signature(request: Request, raw_body: bytes) -> bool:
     """Valida la firma HMAC-SHA256 del webhook MP.
@@ -10062,9 +10703,10 @@ async def mercadopago_webhook(request: Request):
       - user.payment_customer_id = <id del payer MP>
 
     HTTP status:
-      - 200 → procesado OK (MP no reintenta).
-      - 400 → datos inválidos o usuario no existe (MP reintenta, alerta).
+      - 200 → aplicado, o rechazado y anotado en mp_pagos_aplicados (MP no reintenta).
+      - 400 → aviso sin id de pago o sin token (MP reintenta, alerta).
       - 401 → firma inválida (MP no reintenta, ataque).
+      - 503 → no se pudo leer Mercado Pago (MP reintenta).
       - 500 → bug inesperado (MP reintenta).
     """
     import logging
@@ -10101,8 +10743,8 @@ async def mercadopago_webhook(request: Request):
                 logger.warning("Webhook MP: sin firma y sin IPN válida, rechazado")
                 raise HTTPException(status_code=401, detail="Firma o IPN requerida")
             logger.info("Webhook MP (IPN): topic=%s id=%s", topic, payment_id)
-            if topic == "payment":
-                event_type = "payment"
+            if topic in ("payment", "subscription_authorized_payment"):
+                event_type = topic
             elif topic == "merchant_order":
                 return {"success": True, "skipped": "merchant_order, esperando payment"}
             else:
@@ -10110,140 +10752,132 @@ async def mercadopago_webhook(request: Request):
 
         logger.info("Webhook MP recibido: type=%s payment_id=%s", event_type, payment_id)
 
+        # Sin token, un aviso de pago se rechaza para que Mercado Pago lo
+        # reintente; el id va en la ruta que se le pide: sólo la forma esperada.
+        if event_type in ("payment", "subscription_authorized_payment"):
+            if not payment_id or not MP_ACCESS_TOKEN:
+                logger.warning("Webhook MP: falta payment_id o MP_ACCESS_TOKEN")
+                raise HTTPException(status_code=400, detail="Falta payment_id o token")
+            if not _ID_COBRO_MP.fullmatch(payment_id):
+                logger.warning("Webhook MP: payment_id inválido %r", payment_id[:80])
+                raise HTTPException(status_code=400, detail="payment_id inválido")
+
+        # Renovación de una suscripción: el aviso trae el cobro autorizado; de
+        # ahí sale el pago, que se aplica como cualquier otro, controlado
+        # contra el monto de la suscripción (COBRO-MP-1, paso 4).
+        renovacion, suscripcion_del_cobro = False, None
+        if event_type == "subscription_authorized_payment":
+            payment_id, suscripcion_del_cobro = _pago_del_cobro_mp(_leer_cobro_autorizado_mp(payment_id))
+            renovacion, event_type = True, "payment"
+
         if event_type != "payment":
             return {"success": True, "skipped": "not a payment event"}
 
-        if not payment_id or not MP_ACCESS_TOKEN:
-            logger.warning("Webhook MP: falta payment_id o MP_ACCESS_TOKEN")
-            raise HTTPException(status_code=400, detail="Falta payment_id o token")
-
         sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
-        payment_info = sdk.payment().get(payment_id)
-        pay_resp = payment_info.get("response", {}) if isinstance(payment_info, dict) else {}
+        pay_resp = _consultar_mp(lambda: sdk.payment().get(payment_id), f"pago {payment_id}")
 
         if pay_resp.get("status") != "approved":
+            # El aviso del pago puede no decir de qué cuenta es: el cobro
+            # reintenta hasta que el pago se decida.
+            if renovacion and pay_resp.get("status") in ("pending", "in_process", "authorized"):
+                raise _MPIlegible(f"el pago {payment_id} del cobro está {pay_resp.get('status')}")
             return {"success": True, "skipped": f"status={pay_resp.get('status')}"}
 
-        external_ref = pay_resp.get("external_reference", "")
-        logger.info("Webhook MP: pago aprobado payment_id=%s external_ref=%s",
-                    payment_id, external_ref)
+        # El pago se registra con el id que devuelve Mercado Pago: «0123» y
+        # «123» son el mismo pago para su API y no pueden aplicarse dos veces.
+        # Sin ese id no hay con qué registrarlo: que Mercado Pago reintente.
+        canonico = pay_resp.get("id")
+        payment_id = _id_mp(canonico)
+        if not payment_id:
+            raise _MPIlegible(f"pago aprobado sin id reconocible: {str(canonico)[:80]!r}")
 
-        # Soportar formato viejo username|plan y nuevo username:plan / username:topup
+        pay_resp = _con_referencia_mp(sdk, pay_resp, suscripcion_del_cobro)
+
+        external_ref = pay_resp.get("external_reference")
+        logger.info("Webhook MP: pago aprobado payment_id=%s external_ref=%s", payment_id, external_ref)
+        sin_cuenta = not external_ref
+
+        motivo = None
+        update = None if sin_cuenta else billing_service.process_payment(pay_resp)
+        if update is None and not sin_cuenta:
+            if isinstance(external_ref, str) and "|" in external_ref:
+                # Formato viejo «usuario|plan».
+                username, plan = external_ref.split("|", 1)
+                update = {
+                    "username": username,
+                    "action": "subscription",
+                    "plan": plan if plan in billing_service.PLANS else "premium",
+                    "billing_status": "active",
+                    "trial_ends_at": datetime.now(timezone.utc) + timedelta(days=30),
+                    "payment_provider": "mercadopago",
+                    "payment_customer_id": billing_service.cliente_mp(pay_resp),
+                }
+            else:
+                motivo = f"external_reference desconocida: {str(external_ref)[:80]!r}"
+
         async for session in get_async_session():
-            update = billing_service.process_payment(pay_resp)
-            if update is None:
-                if "|" in external_ref:
-                    username, plan = external_ref.split("|", 1)
-                    update = {
-                        "username": username,
-                        "action": "subscription",
-                        "plan": plan if plan in billing_service.PLANS else "premium",
-                        "billing_status": "active",
-                        "trial_ends_at": datetime.now(timezone.utc) + timedelta(days=30),
-                        "payment_provider": "mercadopago",
-                        "payment_customer_id": str(pay_resp.get("payer", {}).get("id", "") or payment_id),
-                    }
-                else:
-                    logger.warning("Webhook MP: external_reference no reconocida: %s", external_ref)
-                    raise HTTPException(status_code=400, detail="external_reference desconocida")
+            if sin_cuenta:
+                return await _sin_cuenta_todavia_mp(session, payment_id)
+            if motivo:
+                return await _rechazar_sin_cuenta_mp(session, payment_id, str(external_ref or ""),
+                                                     update or {}, pay_resp, motivo)
 
-            username = update.get("username")
             org_id = update.get("org_id")
+            cuenta_ref = f"org:{org_id}" if org_id else update["username"]
+            control = _control_de_monto_mp(sdk, pay_resp, update, external_ref)
+            control = await _control_de_fecha_mp(session, pay_resp, control)
 
-            if org_id:
-                # Pago de organización: actualizar la org, no el user
-                result = await session.execute(select(Organization).where(Organization.id == org_id))
-                db_org = result.scalars().first()
-                if not db_org:
-                    logger.warning("Webhook MP: org '%s' no existe en DB", org_id)
-                    raise HTTPException(
-                        status_code=400,
-                        detail=f"Organización '{org_id}' no existe. MP reintentará."
-                    )
+            # El candado sobre la cuenta pone en fila los pagos distintos que
+            # llegan a la vez: sin él, los dos leen el mismo estado y el
+            # segundo pisa al primero (COBRO-MP-1, a).
+            consulta = (select(Organization).where(Organization.id == org_id) if org_id
+                        else select(User).where(User.username == update["username"]))
+            cuenta = (await session.execute(consulta.with_for_update())).scalars().first()
+            if cuenta is None:
+                return await _rechazar_sin_cuenta_mp(session, payment_id, cuenta_ref, update, pay_resp,
+                                                     f"la cuenta {cuenta_ref} no existe")
 
-                # Deduplicación
-                if db_org.last_payment_id == payment_id:
-                    logger.info("Webhook MP: payment_id=%s ya procesado para org %s", payment_id, org_id)
-                    return {"success": True, "skipped": "payment_id ya procesado"}
-
-                db_org.last_payment_id = payment_id
-                db_org.plan = update.get("plan", db_org.plan)
-                db_org.billing_status = update.get("billing_status", db_org.billing_status)
-                if "trial_ends_at" in update:
-                    db_org.trial_ends_at = update["trial_ends_at"]
-                if "ops_used_this_period" in update:
-                    db_org.ops_used_this_period = update["ops_used_this_period"]
-                if "extra_ops_remaining" in update:
-                    total = (db_org.extra_ops_remaining or 0) + update["extra_ops_remaining"]
-                    db_org.extra_ops_remaining = min(total, billing_service.EXTRA_OPS_MAX)
-                if "billing_period_started_at" in update:
-                    db_org.billing_period_started_at = update["billing_period_started_at"]
-                if "last_topup_at" in update:
-                    db_org.last_topup_at = update["last_topup_at"]
-                if "extra_ops_expires_at" in update:
-                    db_org.extra_ops_expires_at = update["extra_ops_expires_at"]
-                if "payment_provider" in update:
-                    db_org.payment_provider = update["payment_provider"]
-                if "payment_customer_id" in update:
-                    db_org.payment_customer_id = update["payment_customer_id"]
-                if "payment_method_last4" in update and update["payment_method_last4"]:
-                    db_org.payment_method_last4 = update["payment_method_last4"]
-                if "payment_method_brand" in update and update["payment_method_brand"]:
-                    db_org.payment_method_brand = update["payment_method_brand"]
-
-                await session.commit()
-                logger.info("Webhook MP: pago sincronizado org=%s action=%s payment_id=%s",
-                            org_id, update.get("action"), payment_id)
-                break
-
-            # Pago individual: actualizar el user (flujo existente)
-            result = await session.execute(select(User).where(User.username == username))
-            db_user = result.scalars().first()
-
-            if not db_user:
-                logger.warning("Webhook MP: usuario '%s' no existe en DB", username)
-                raise HTTPException(
-                    status_code=400,
-                    detail=f"Usuario '{username}' no existe. MP reintentará."
-                )
-
-            # Deduplicación: si ya procesamos este payment_id, saltear.
-            if db_user.last_payment_id == payment_id:
-                logger.info("Webhook MP: payment_id=%s ya procesado para %s", payment_id, username)
+            # Cada pago se aplica una sola vez (COBRO-MP-1). El último pago
+            # de antes del registro sólo quedó en last_payment_id.
+            if cuenta.last_payment_id == payment_id:
+                logger.info("Webhook MP: payment_id=%s ya procesado para %s", payment_id, cuenta_ref)
                 return {"success": True, "skipped": "payment_id ya procesado"}
+            if update.get("action") == "topup" and not control[1]:
+                entra, vigentes = billing_service.recarga_entra(cuenta)
+                if not entra:
+                    control = (control[0], f"la recarga no entra: ya tiene {vigentes} operaciones extra "
+                                           f"y el tope es {billing_service.EXTRA_OPS_MAX}")
+            estado = await _registrar_pago_mp(session, payment_id, cuenta_ref, update, pay_resp, control)
+            if estado is None:
+                logger.info("Webhook MP: payment_id=%s ya procesado para %s", payment_id, cuenta_ref)
+                return {"success": True, "skipped": "payment_id ya procesado"}
+            if estado == "rechazado":
+                return await _rechazar_pago_mp(session, payment_id, cuenta_ref, control[1])
+            _extender_periodo(cuenta, update)
 
-            db_user.last_payment_id = payment_id
-            db_user.plan = update.get("plan", db_user.plan)
-            db_user.billing_status = update.get("billing_status", db_user.billing_status)
-            if "trial_ends_at" in update:
-                db_user.trial_ends_at = update["trial_ends_at"]
-            if "payment_provider" in update:
-                db_user.payment_provider = update["payment_provider"]
-            if "payment_customer_id" in update:
-                db_user.payment_customer_id = update["payment_customer_id"]
-            if "payment_method_last4" in update and update["payment_method_last4"]:
-                db_user.payment_method_last4 = update["payment_method_last4"]
-            if "payment_method_brand" in update and update["payment_method_brand"]:
-                db_user.payment_method_brand = update["payment_method_brand"]
-            if "ops_used_this_period" in update:
-                db_user.ops_used_this_period = update["ops_used_this_period"]
+            cuenta.last_payment_id = payment_id
+            for campo in ("plan", "billing_status", "trial_ends_at", "ops_used_this_period",
+                          "billing_period_started_at", "last_topup_at", "extra_ops_expires_at",
+                          "payment_provider", "payment_customer_id"):
+                if campo in update:
+                    setattr(cuenta, campo, update[campo])
+            for campo in ("payment_method_last4", "payment_method_brand"):
+                if update.get(campo):
+                    setattr(cuenta, campo, update[campo])
             if "extra_ops_remaining" in update:
-                total = (db_user.extra_ops_remaining or 0) + update["extra_ops_remaining"]
-                db_user.extra_ops_remaining = min(total, billing_service.EXTRA_OPS_MAX)
-            if "billing_period_started_at" in update:
-                db_user.billing_period_started_at = update["billing_period_started_at"]
-            if "last_topup_at" in update:
-                db_user.last_topup_at = update["last_topup_at"]
-            if "extra_ops_expires_at" in update:
-                db_user.extra_ops_expires_at = update["extra_ops_expires_at"]
+                cuenta.extra_ops_remaining = (cuenta.extra_ops_remaining or 0) + update["extra_ops_remaining"]
 
-            await session.commit()
-            logger.info("Webhook MP: pago sincronizado user=%s action=%s payment_id=%s",
-                        username, update.get("action"), payment_id)
+            if not await _guardar_pago_mp(session):
+                return {"success": True, "skipped": "payment_id ya procesado"}
+            logger.info("Webhook MP: pago sincronizado %s action=%s payment_id=%s",
+                        cuenta_ref, update.get("action"), payment_id)
             break
 
         return {"success": True}
 
+    except _MPIlegible as e:
+        logger.warning("Webhook MP: no se pudo leer Mercado Pago (%s); reintentará", e)
+        raise HTTPException(status_code=503, detail="No se pudo leer Mercado Pago. MP reintentará.")
     except HTTPException:
         raise
     except Exception as e:
@@ -10269,9 +10903,16 @@ async def billing_topup(
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    org_id = db_user.organization_id or None
+    # Una recarga que no entra en el tope se rechazaría al pagarla: no se
+    # arma el link (COBRO-MP-1, f).
+    entidad, es_org = await _get_billing_entity(db, db_user)
+    entra, vigentes = billing_service.recarga_entra(entidad)
+    if not entra:
+        raise HTTPException(status_code=409, detail=(
+            f"Ya tenés {vigentes} operaciones extra y el tope es {billing_service.EXTRA_OPS_MAX}: "
+            f"una recarga de {billing_service.TOPUP_OPS} no entra. Usá las que tenés y volvé a recargar."))
     try:
-        checkout = billing_service.create_topup_checkout(db_user, org_id=org_id)
+        checkout = billing_service.create_topup_checkout(db_user, org_id=entidad.id if es_org else None)
         return {"success": True, **checkout}
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -10294,15 +10935,19 @@ async def billing_checkout(
     if plan_id not in billing_service.PLANS:
         raise HTTPException(status_code=400, detail=f"Plan invalido: {plan_id}")
 
-    result = await db.execute(select(User).where(User.username == username))
+    # La fila queda bloqueada hasta guardar la suscripción nueva: un segundo
+    # checkout a la vez espera y ve la del primero (COBRO-MP-1 D).
+    result = await db.execute(select(User).where(User.username == username).with_for_update())
     db_user = result.scalars().first()
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
     org_id = db_user.organization_id or None
 
-    # Modo demo cuando no hay credenciales
+    # Modo demo cuando no hay credenciales, sólo en desarrollo y pruebas (D7.4)
     if not billing_service.is_configured():
+        if not _demo_permitida():
+            raise HTTPException(status_code=503, detail="Los pagos no están disponibles en este momento. Probá más tarde.")
         demo_id = f"demo_{uuid.uuid4().hex[:8]}"
         pending_payments[demo_id] = {
             "status": "pending",
@@ -10319,18 +10964,54 @@ async def billing_checkout(
             "message": "Modo demo - MP_ACCESS_TOKEN no configurado",
         }
 
+    # Una sola suscripción. La autorizada no se cancela acá (puede ser un pago
+    # cuyo aviso no llegó); las demás sí. Si no se puede leer o cancelar, nada.
+    sid_viejo = db_user.mp_preapproval_id
+    if sid_viejo:
+        no_disponible = "No pudimos confirmar tu suscripción actual con Mercado Pago. Probá de nuevo en unos minutos."
+        try:
+            estado_mp = await run_in_threadpool(_leer_suscripcion_mp, sid_viejo)
+        except _SuscripcionMPError as e:
+            print(f"⚠️ Checkout de {username}: no se pudo leer la suscripción en MP: {e}")
+            raise HTTPException(status_code=503, detail=no_disponible)
+        if estado_mp == "authorized":
+            entidad, _ = await _get_billing_entity(db, db_user)
+            fin = entidad.trial_ends_at
+            if fin is not None and fin.tzinfo is None:
+                fin = fin.replace(tzinfo=timezone.utc)
+            if entidad.billing_status in ("trial", "active") and fin and fin > datetime.now(timezone.utc):
+                raise HTTPException(
+                    status_code=409,
+                    detail="Ya tenés una suscripción activa en Mercado Pago; se renueva sola al fin del período.",
+                )
+            raise HTTPException(
+                status_code=409,
+                detail="Tu suscripción en Mercado Pago sigue activa. Si acabás de pagar, esperá unos minutos; "
+                       "si querés cambiar la tarjeta, cancelá el plan primero.",
+            )
+        if estado_mp != "cancelled":
+            try:
+                await run_in_threadpool(_cancelar_suscripcion_mp, sid_viejo)
+            except _SuscripcionMPError as e:
+                print(f"⚠️ Checkout de {username}: no se pudo cancelar la suscripción vieja en MP: {e}")
+                raise HTTPException(status_code=503, detail=no_disponible)
+        # Sin commit todavía: soltaría el bloqueo antes de crear la nueva.
+        db_user.mp_preapproval_id = None
+
     try:
         checkout = billing_service.create_checkout(db_user, plan_id, org_id=org_id)
         # Guardamos el preapproval_id temporal hasta que el webhook confirme.
         if checkout.get("preapproval_id"):
             db_user.mp_preapproval_id = checkout["preapproval_id"]
             db_user.mp_plan_id = plan_id
-            await db.commit()
+        await db.commit()
         return {"success": True, **checkout}
     except HTTPException:
         raise
     except Exception as e:
         print(f"Error creando checkout MP: {e}")
+        # La vieja ya quedó cancelada en Mercado Pago: no se deja guardada.
+        await db.commit()
         raise HTTPException(status_code=500, detail=f"Error con MercadoPago: {e}")
 
 # SEGURIDAD: endpoints Bitcoin demo eliminados (eran simulaciones sin auth ni

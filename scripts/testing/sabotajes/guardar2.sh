@@ -91,6 +91,21 @@ sabotaje $CM "el historial de un cliente ajeno se usa" \
   $'    q = sa_select(ClientProductHistory).where(\n        ClientProductHistory.owner_username == owner_username,\n        ClientProductHistory.client_id == client_id,\n    )\n    result = await db.execute(q)\n    candidates' \
   $'    q = sa_select(ClientProductHistory).where(\n        ClientProductHistory.client_id == client_id,\n    )\n    result = await db.execute(q)\n    candidates' \
   "FAILED $T::test_el_historial_de_un_cliente_ajeno_no_se_usa"
+# Por cliente: dos clientes del mismo despachante no comparten historial.
+sabotaje $CM "el historial de otro cliente del mismo despachante se usa" \
+  $'        ClientProductHistory.client_id == client_id,\n    )\n    result = await db.execute(q)\n    candidates' \
+  $'    )\n    result = await db.execute(q)\n    candidates' \
+  "FAILED $T::test_el_historial_de_otro_cliente_del_mismo_despachante_no_se_usa"
+# Al guardar (adversario Sonnet alto): el NCM y la descripción buscan sólo en
+# el historial del mismo cliente.
+sabotaje $CM "guardar el mismo NCM actualiza la fila de otro cliente" \
+  $'        ClientProductHistory.client_id == client_id,\n        ClientProductHistory.ncm == ncm,' \
+  $'        ClientProductHistory.ncm == ncm,' \
+  "FAILED $T::test_guardar_el_mismo_ncm_en_otro_cliente_le_crea_su_propio_historial"
+sabotaje $CM "guardar la misma descripción pisa la fila de otro cliente" \
+  $'        q_all = sa_select(ClientProductHistory).where(\n            ClientProductHistory.owner_username == owner_username,\n            ClientProductHistory.client_id == client_id,' \
+  $'        q_all = sa_select(ClientProductHistory).where(\n            ClientProductHistory.owner_username == owner_username,' \
+  "FAILED $T::test_guardar_otro_ncm_con_la_misma_descripcion_en_otro_cliente_no_pisa_al_primero"
 
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]

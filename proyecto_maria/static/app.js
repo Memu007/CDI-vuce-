@@ -3370,20 +3370,6 @@ async function generateMariaTxt() {
             };
         }
 
-        // === NUEVO: GUARDAR EN HISTORIAL ANTES DE GENERAR ===
-        // Estrategia "Save First, Give File Later"
-        try {
-            if (clientSelect && clientSelect.value) {
-                // Pequeño feedback visual opcional
-                // showToast('Info', 'Guardando en historial...', 'info');
-                await saveOperationToHistory(items);
-            }
-        } catch (histError) {
-            console.warn('⚠️ Error guardando historial (no bloqueante):', histError);
-            // No bloqueamos la generación, pero avisamos en consola
-        }
-        // ====================================================
-
         const response = await fetch(endpoint, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -3395,6 +3381,11 @@ async function generateMariaTxt() {
         if (!response.ok) {
             throw new Error(data.detail?.errors?.join(', ') || data.detail || 'Error generando MARIA');
         }
+
+        // El historial se guarda después de generar, con el archivo que
+        // devolvió el servidor: así completa la operación que contó el MARIA
+        // en vez de contar otra (COBRO-MP-1, g).
+        await saveOperationToHistory(items, data.filename);
 
         // MARIA-4: lo que el sistema declaró por defecto y los avisos del
         // generador se muestran antes de pegar el TXT en el Kit.
@@ -3732,7 +3723,7 @@ async function refreshMappingStatusHint(){
     } catch(_){ }
 }
 
-async function saveOperationToHistory(items) {
+async function saveOperationToHistory(items, operationId = `GROUPED_${Date.now()}`) {
     
     // Guardar siempre que hay cliente seleccionado (toggle es opcional)
     if (!clientSelect || !clientSelect.value) {
@@ -3750,7 +3741,7 @@ async function saveOperationToHistory(items) {
         const res = await fetch(`/api/clientes/${clientSelect.value}/operaciones`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ operation_id: `GROUPED_${Date.now()}`, resumen, items })
+            body: JSON.stringify({ operation_id: operationId, resumen, items })
         });
     } catch (e) {
         console.error('📊 Error saving operation:', e);

@@ -49,7 +49,7 @@ L=tests/test_excel1_lectura.py
 sabotaje $M "el Excel v2 se vuelve a leer en el hilo del servidor" \
   '        df = await _leer_pdf_aparte(
             _leer_excel_ruta, temp_filename, engine, tuple((mapping or {}).items()),
-            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel(),
+            limite=_excel_read_timeout_s(), que="el Excel", pool=_pool_lectura_excel_carril(liviano),
         )
 ' \
   '        df = _leer_excel_ruta(temp_filename, engine, tuple((mapping or {}).items()))
@@ -61,7 +61,7 @@ sabotaje $M "leer un Excel pierde el tiempo máximo" \
   "FAILED $T::test_leer_un_excel_tiene_tiempo_maximo[ncm_import_historial]"
 sabotaje $F "validar el Excel vuelve al hilo del servidor" \
   'asyncio.get_running_loop().run_in_executor(
-                        _pool_validar_excel(), _abrir_excel, contents, file_ext
+                        _pool_validar_excel_carril(liviano), _abrir_excel, contents, file_ext
                     ),' \
   'asyncio.sleep(0, _abrir_excel(contents, file_ext)),' \
   "FAILED $T::test_health_responde_mientras_se_valida_un_excel"
@@ -102,7 +102,7 @@ sabotaje $M "el mapeo aprendido vuelve a pisar el precio unitario" \
   '            if False:' \
   "FAILED $L::test_mapeo_aprendido_no_pisa_el_precio_unitario_ni_el_peso_neto"
 sabotaje $F "validar el Excel vuelve a los hilos compartidos" \
-  '                        _pool_validar_excel(), _abrir_excel, contents, file_ext' \
+  '                        _pool_validar_excel_carril(liviano), _abrir_excel, contents, file_ext' \
   '                        None, _abrir_excel, contents, file_ext' \
   "FAILED $L::test_validar_el_excel_usa_su_propio_grupo_de_hilos"
 sabotaje $M "la fila de ejemplo de la plantilla vuelve a entrar" \
@@ -140,13 +140,14 @@ sabotaje $M "el total en la columna de código vuelve a entrar" \
   '            if _es_fila_de_total(rotulo or pieza):' \
   '            if _es_fila_de_total(descripcion):' \
   "FAILED $L::test_total_en_la_columna_de_codigo_no_entra"
+# Desde EXCEL-3c el filtro decide con el rótulo propio de la fila (cargo).
 sabotaje $M "el flete vuelve a entrar como producto" \
-  '        if not trae and _FILA_QUE_NO_ES_MERCADERIA_RE.match(item.descripcion or ""):' \
-  '        if False:' \
+  $'            else:\n                no_es_mercaderia = bool(_FILA_QUE_NO_ES_MERCADERIA_RE.match(cargo))' \
+  $'            else:\n                no_es_mercaderia = False' \
   "FAILED $L::test_total_flete_y_condiciones_no_son_productos"
 sabotaje $M "vuelve a descartarse todo producto sin NCM ni origen" \
-  '        if not trae and _FILA_QUE_NO_ES_MERCADERIA_RE.match(item.descripcion or ""):' \
-  '        if not trae and any(t for _f, t, _i in candidatos):' \
+  $'        if no_es_mercaderia:\n            descartes.append(fila)' \
+  $'        if no_es_mercaderia or (not item.pieza and item.origen == "XX"\n                                and any(c[4].pieza or c[4].origen != "XX" for c in candidatos)):\n            descartes.append(fila)' \
   "FAILED $L::test_productos_sin_ncm_ni_origen_entran_aunque_otra_fila_los_traiga"
 # Con MARIA-5 integrada (D23): entre «Peso (kg)» y «Peso (bruto)» decide el
 # rango del peso, no el orden de las columnas.
