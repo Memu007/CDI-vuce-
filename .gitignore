@@ -60,3 +60,7 @@ ejemplos/*.pdf
 node_modules/
 /package.json
 /package-lock.json
+
+# Carpetas locales de la máquina de Emi: no están en el repositorio y no deben entrar
+viejo/
+google-cloud-sdk/
