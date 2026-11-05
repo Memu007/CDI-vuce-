@@ -11,7 +11,7 @@ const conFlag = c => (flagJson === null ? c : esFalla ? flagJson : Object.assign
 // qué guardados contestan la respuesta pedida; los demás contestan bien
 const DESTINOS = {
   'confirmar-ncm': ['/api/ncm/guardar-uso'], aprender: ['/productos'],
-  'listo-con-vendedor': ['/operaciones', '/productos'],
+  'listo-con-vendedor': ['/operaciones', '/productos'], 'listo-y-cambia': [],
 }[escenario] || ['/operaciones'];
 
 class Node {
@@ -32,7 +32,7 @@ class Node {
 }
 
 function armar(fuente, extraCDI) {
-  const nodes = new Map(), handlers = {}, events = {}, toasts = [], llamadas = [];
+  const nodes = new Map(), handlers = {}, events = {}, toasts = [], llamadas = [], operaciones = [];
   let enCurso = 0;
   const node = id => { if (!nodes.has(id)) nodes.set(id, new Node(id)); return nodes.get(id); };
   const respuestas = {
@@ -51,10 +51,14 @@ function armar(fuente, extraCDI) {
     track() {}, goTo() {},
     toast: (titulo, detalle, tipo) => toasts.push({ titulo, detalle, tipo }),
     getClienteActivo: () => cliente, setClienteActivo: c => { cliente = c; },
-    api: async (url) => {
+    api: async (url, opciones) => {
       llamadas.push(url); enCurso++;
+      if (url.endsWith('/operaciones')) operaciones.push({ url, resumen: JSON.parse(opciones.body).resumen });
       // el peor caso de guardar y aprender a la vez: el catálogo contesta último
-      if (escenario === 'listo-con-vendedor' && url.endsWith('/productos')) for (let i = 0; i < 5; i++) await vaciar();
+      if (escenario.startsWith('listo-') && url.endsWith('/productos')) {
+        if (CDI.mientrasAprende) CDI.mientrasAprende();
+        for (let i = 0; i < 5; i++) await vaciar();
+      }
       enCurso--;
       const clave = Object.keys(respuestas).find(k => url.endsWith(k));
       const cuerpo = clave ? respuestas[clave] : { success: true };
@@ -81,7 +85,7 @@ function armar(fuente, extraCDI) {
   caja.children['[data-client-success-title]'] = [new Node()];
   caja.children['[data-client-success-text]'] = [new Node()];
   for (const fn of events.DOMContentLoaded || []) fn();
-  return { CDI, node, handlers, toasts, llamadas, enCurso: () => enCurso, ponerCliente: c => { cliente = c; } };
+  return { CDI, node, handlers, toasts, llamadas, operaciones, enCurso: () => enCurso, ponerCliente: c => { cliente = c; } };
 }
 
 // Sin red real todo sigue en microtareas, y setImmediate corre recién con esa cola vacía:
@@ -126,6 +130,21 @@ const escenarios = {
     app.CDI.state.operacion = { vendedor_nombre: 'Proveedor Sintético' };
     app.handlers.ready.onEnter();
     await esperarRed(app, '/operaciones');
+    await esperarRed(app, '/productos');
+    return app;
+  },
+  // Listo con vendedor: mientras aprende, la persona cambia de cliente o de operación
+  // (respuesta: el cliente nuevo, o null si sale de Listo con «Nueva operación»).
+  'listo-y-cambia': async () => {
+    const app = armar('finalize.js');
+    app.ponerCliente({ id: 7, nombre: 'Cliente Sintético' });
+    app.CDI.state.items = [Object.assign({}, ITEM, { pieza: '9403.60.00.000 A' })];
+    app.CDI.state.operacion = { vendedor_nombre: 'Proveedor Sintético', numero_factura: 'FA-1' };
+    app.CDI.mientrasAprende = () => {
+      app.ponerCliente(flagJson);
+      app.CDI.state.operacion = { numero_factura: 'OTRA' };
+    };
+    app.handlers.ready.onEnter();
     await esperarRed(app, '/productos');
     return app;
   },
@@ -181,6 +200,7 @@ escenarios[escenario]().then(app => {
   process.stdout.write(JSON.stringify({
     toasts: app.toasts, panelAbierto: !app.node('readyOrphanPanel').hidden,
     clientesCreados: app.llamadas.filter(u => u.endsWith('/api/clientes')).length,
+    operaciones: app.operaciones.map(o => ({ url: o.url, factura: o.resumen.numero_factura })),
     caja: caja.hidden ? null : { titulo: titulo.textContent, texto: texto.textContent },
   }));
 }, err => { console.error(err && err.stack || err); process.exit(2); });

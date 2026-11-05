@@ -100,3 +100,13 @@ def test_ninguna_falla_deja_un_exito_a_la_vista(escenario, falla):
         assert caja is None, vista
         # el panel sigue abierto para reintentar
         assert vista["panelAbierto"] == (escenario in CON_PANEL), vista
+
+
+@pytest.mark.parametrize("cambio", [None, {"id": 9, "nombre": "Otro Cliente Sintético"}], ids=["sale", "otro-cliente"])
+def test_se_guarda_la_operacion_que_se_genero(cambio):
+    salida = subprocess.run(["node", str(PANTALLA), "listo-y-cambia", json.dumps(cambio)],
+                            capture_output=True, text=True, timeout=60)
+    assert salida.returncode == 0, salida.stderr[-800:]
+    # cambiar de cliente o de operación mientras aprende no cambia lo que se guarda
+    assert json.loads(salida.stdout)["operaciones"] == [
+        {"url": "/api/clientes/7/operaciones", "factura": "FA-1"}], salida.stdout
