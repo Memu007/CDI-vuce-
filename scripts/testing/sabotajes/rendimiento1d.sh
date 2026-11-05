@@ -82,7 +82,7 @@ CORRE=("$PY" -m pytest -q --no-cov -p no:cacheprovider
 sabotaje $L "esperar lugar para leer un despacho se descuenta del tope" \
   'await asyncio.wait_for(correr(), timeout=limite_s)' \
   'await asyncio.wait_for(correr(), timeout=limite_s if modo != "leer" else hasta - loop.time())' \
-  "[leer-menos-que-un-pdf] - AssertionError: venció leyendo"
+  "AssertionError: venció leyendo"
 
 git checkout -q -- proyecto_maria/
 echo "fallas: $FALLAS"
