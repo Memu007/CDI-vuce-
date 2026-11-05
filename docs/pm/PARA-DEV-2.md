@@ -31,8 +31,7 @@ PM la pasa a `COLA-LIMPIEZA.md`. Lo nuevo de la vuelta sí cumple §6.
 
 ## Piezas nuevas que aprobó Emi el 04/11 (PM)
 
-Tu cola queda: DESPACHO-1b vuelta 4 → RENDIMIENTO-1c → **CATALOGO-LARGO-1**
-→ SESION-1 → ABUSO-1 → SUFIJOS-2+SEGURO-1 → **SEGURO-2** → EMAIL-1 →
+Tu cola queda: el orden de los veredictos del 05/11, arriba, y después SESION-1 → ABUSO-1 → SUFIJOS-2+SEGURO-1 → **SEGURO-2** → EMAIL-1 →
 CONEXIONES-1 → OBSERVABILIDAD-1 → ORG-1+D40. El detalle, al activarlas:
 
 - **CATALOGO-LARGO-1 (datos):** con cliente y proveedor, una descripción de
@@ -70,49 +69,81 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
-## DESPACHO-1b vuelta 4: devolución por una causa, sobre `03296d4` (2026-11-05 02:40 UTC)
+## Veredictos del 2026-11-05 10:00 UTC: dos devoluciones cortas (PM)
 
-Evidencia: `docs/pm/REPRODUCCION-DESPACHO-1b-v4-2026-11-05.md`. Los 8 puntos se
-sostienen: `test_despacho1b.py` `281 passed`, `despacho1b_postgres.py` 11 OK,
-la migración en Postgres no pierde usos ni mezcla cuentas o clientes y es
-idempotente, siete vías ajenas dan 404, 33 cuerpos raros del PUT sin 500 y
-chequeo-6 idéntico al informe.
+**Orden:** RENDIMIENTO-1c vuelta 2 → DESPACHO-1b vuelta 6 → terminar
+CATALOGO-LARGO-1 → **DESPACHO-1c** (D51 b + D52 b) → **RENDIMIENTO-1d** (D49
+b) → SESION-1 y el resto de la cola. Las devoluciones van primero aunque
+CATALOGO-LARGO-1 esté a medias. D52 no la adelanto a CATALOGO-LARGO-1: es
+vieja (`a77e6ad`) y cortar una pieza de Emi con commits subidos cuesta más.
+**Nada se integra todavía:** `b5fb03a` contiene `3f0ed57` (RENDIMIENTO-1c) y
+`5c46e36` (DISCO-1); entran juntas cuando acepte RENDIMIENTO-1c y DESPACHO-1b,
+después de correr `disco1.sh` con PG. Próxima D tuya: D53.
 
-**Causa:** la escritura del historial supone que, después del `INSERT … ON
-CONFLICT DO NOTHING`, la fila existe. Si mientras espera otro pedido le cambia
-la clave (un PUT) o la borra, el `SELECT … FOR UPDATE … scalar_one()` vuelve
-vacío y salta `NoResultFound` (reproducido en Postgres 16). Según la vía:
-guardar da 500 y no guarda el lote; la operación saltea el producto; aprender
-baja `updated`; **guardar-uso se lo traga y contesta `success: true` sin haber
-sumado el uso.** Es pérdida de datos muda. Lo que pido:
+### RENDIMIENTO-1c sobre `3f0ed57`: devolución por una causa
 
-- Ninguna vía pierde un uso ni contesta éxito sin haberlo guardado cuando la
-  fila cambia de clave o desaparece en el medio. Sugerencia: `ON CONFLICT DO
-  UPDATE`, o reintentar el INSERT cuando el SELECT no trae fila.
-- Un caso en Postgres con la familia como datos (PUT que cambia la clave y
-  borrado), por las cuatro vías, con su rojo en `03296d4`.
-- Un sabotaje en `despacho1b.sh` que saque `.with_for_update()`: hoy ninguno
-  lo saca y sólo lo ve `despacho1b_postgres.py`.
-- En el informe, el comando exacto de la suite: la PM, con el de `ci.yml`,
-  da `4507 passed, 102 skipped, 10 deselected`, y vos `4284 passed, 336 skipped`.
-  El rojo de la PM (`test_excel2.py::…al_borde_del_tope…`, 400 a los 30 s) falla
-  igual en `1f5480e`: no es de esta pieza.
+Evidencia: `REPRODUCCION-RENDIMIENTO-1c-2026-11-05.md`. Se sostienen el rojo
+(1031 MB → 0), `rendimiento1c.sh` 13 ROJO, `rendimiento1.sh` 11 ROJO, la suite
+(`4510 passed`) y chequeo-6.
 
-Fuera de esta devolución, a `COLA-LIMPIEZA.md`: tus líneas propuestas, y que la
-migración deja el NCM y la descripción como estaban escritos (`'3926 90 90'`)
-en la fila que queda.
+**Causa:** la espera en la fila se le cobra al PDF. `validar_pdf_aparte` le
+pasa al hijo `max(hasta - loop.time(), 0.0)`, y `_leer_aparte` marca
+`lanzado = True` al entrar al semáforo. Tras una espera larga el hijo arranca
+con poco tiempo, vence con un `TimeoutError` común y la persona recibe 400
+«tardó demasiado. Probá con otro archivo.», que culpa a un archivo sano.
+Reproducido con tope 2: `C: (400, 'No pudimos abrir el PDF: tardó demasiado…')`.
+
+- Un PDF normal nunca recibe 400 por haber esperado: o se valida, o recibe
+  el 503 de «sin lugar». *Sugerencia:* separar el tiempo de espera del de
+  corrida (el hijo, una vez lanzado, tiene su tope entero), o tratar el
+  tiempo restante corto como `SinLugar`.
+- Un caso con la familia como datos: espera casi todo el tope, espera el tope
+  justo, y espera que deja menos de lo que tarda un PDF normal; rojo en
+  `3f0ed57`, y su sabotaje.
+- **D50: (b), decidido por la PM, en esta misma vuelta:** tope de CPU de 10 s
+  también en validar, con su caso y su sabotaje. La premisa de (a) es falsa:
+  el limitador es por IP (`rate_limit.py:68`, 3000 por minuto en
+  `config.py:28`) y `enforce_pdf_quota` (`main.py:4336`) corre después de
+  validar, así que nada acota por cuenta antes de ocupar un lugar.
+- El conteo propio del informe da `+126/−53`; la PM mide `+137/−54` con el
+  CHANGELOG. Revisalo en el informe de la vuelta.
+
+### DESPACHO-1b vuelta 5 sobre `b5fb03a`: la causa está, falta fijar el borde
+
+Evidencia: `REPRODUCCION-DESPACHO-1b-v5-2026-11-05.md`. `despacho1b_postgres.py`
+`fallas: 8` → `0`, la familia PUT/DELETE por las cuatro vías, sin doble suma ni
+fila ajena, el sabotaje de `with_for_update`, `despacho1b.sh` 136 ROJO y la
+suite (`4512 passed`). Devolución sólo de pruebas y del informe:
+
+- **Ninguna prueba llega a agotar los 3 intentos.** Con `range(2)`,
+  `despacho1b_postgres.py` sigue en `fallas: 0`; cambiar el `else: raise` por
+  `return None` haría que guardar conteste 200 sin guardar, sin rojo. Pido un
+  caso en Postgres que agote los intentos y fije qué contesta cada vía
+  (guardar 500; operación y guardar-uso `historial_guardado: false`; aprender
+  sin contarlo), y sabotajes sobre el 3 y sobre el `else`. *Sugerencia:* un
+  trigger `BEFORE INSERT` que cree la fila y uno `AFTER INSERT FOR EACH
+  STATEMENT` que la borre; los intentos, con una secuencia.
+- La frase «si las 3 fallan, sale un error (500), nunca un 200 mudo» es
+  cierta sólo para guardar: corregila en el informe.
+- **D51: (b), D52: (b), decididos por la PM**, juntas como DESPACHO-1c,
+  después de CATALOGO-LARGO-1. D52 en los dos sentidos: la fila guardada que
+  normaliza a vacío se sugiere para todo, y una consulta que normaliza a
+  vacío recibe las primeras 5 del historial.
+- **D49: (b), decidido por la PM**, como RENDIMIENTO-1d (arreglo chico de
+  seguridad, Emi los aprobó el 04/11), con la prueba de un PDF que se infle
+  al extraer el texto.
 
 ## DISCO-1: aceptada sobre `5c46e36` (2026-10-29 01:00 UTC)
 
 Evidencia en `REPRODUCCION-DISCO-1-vuelta2-2026-10-29.md`: `disco1.sh` 46
 ROJO y dos mutantes propios de la PM (otra clave, el bloqueo después de
 las tandas) mueren. **No se integra todavía:** `5c46e36` está encima de
-`1f5480e`. Entra con la aceptación de DESPACHO-1b, después de correr
-`disco1.sh` sobre ese SHA. No hay que tocar nada.
+`1f5480e`. Entra con la aceptación de DESPACHO-1b y RENDIMIENTO-1c, después de
+correr `disco1.sh` sobre ese SHA. No hay que tocar nada.
 
 ## Orden desde el 2026-10-29
 
-1. DESPACHO-1b (devolución, arriba). 2. RENDIMIENTO-1c (la D48, abajo).
+1 y 2: reemplazados por el orden del 05/11, arriba.
 3. SESION-1. 4. ABUSO-1. 5. SUFIJOS-2 y lo que se suma de SEGURO-1.
 6. EMAIL-1: la D45 y el mutante. 7. CONEXIONES-1: la D46.
 8. OBSERVABILIDAD-1. 9. ORG-1 + D40. Las devoluciones están abajo. Cada
