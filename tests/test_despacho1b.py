@@ -1971,13 +1971,24 @@ def test_el_tope_de_cpu_cubre_entender_el_texto():
     assert any(a.startswith("El PDF da demasiado trabajo") for a in medido["resultado"]["avisos"]), medido
 
 
-def test_las_hojas_leidas_antes_del_corte_dan_sus_productos():
+def test_las_hojas_leidas_antes_del_corte_dan_sus_productos(monkeypatch):
     """Las dos hojas del despacho y después una hoja cara: el corte deja tope
-    para entender lo que ya se leyó. Antes, extraer se llevaba el tope entero
-    y se perdían los productos de las hojas leídas."""
+    para entender lo que ya se leyó."""
+    import time
     from pypdf import PdfReader, PdfWriter
+    from proyecto_maria.core import despacho_lector
     from proyecto_maria.core.despacho_lector import leer_despacho
     from tests.pdf_bombas import una_hoja_cara
+    leer_texto = despacho_lector.leer_texto
+
+    def entender_cuesta_50_ms(texto):
+        # El texto de prueba se entiende en ~3 ms, menos que un tick del
+        # temporizador de CPU: sin este gasto, quedarse sin tope no se nota.
+        inicio = time.process_time()
+        while time.process_time() - inicio < 0.05:
+            pass
+        return leer_texto(texto)
+    monkeypatch.setattr(despacho_lector, "leer_texto", entender_cuesta_50_ms)
     pdf = PdfWriter()
     for data in (_despacho(), una_hoja_cara(80)):
         for hoja in PdfReader(io.BytesIO(data)).pages:
