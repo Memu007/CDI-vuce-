@@ -15,8 +15,8 @@ PY="${PY:-python}"
 PUERTO="${PUERTO:-8878}"
 TMPD="$(mktemp -d)"; WT="$TMPD/wt"
 git -C "$REPO" worktree add --detach "$WT" "$SHA" >/dev/null || exit 2
-API=""
-trap '[ -n "$API" ] && kill $API 2>/dev/null; git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$TMPD"' EXIT
+# pantalla corre dentro de $(...): el PID de la API pasa por archivo para que la trampa lo vea.
+trap '[ -s "$TMPD/api.pid" ] && kill "$(cat "$TMPD/api.pid")" 2>/dev/null; git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1; rm -rf "$TMPD"' EXIT
 cd "$WT"
 FALLAS=0
 
@@ -35,11 +35,12 @@ pantalla() {
     ARCA_NOVEDADES_XML_URL=http://127.0.0.1:9/x ARCA_NOVEDADES_WEB_URL=http://127.0.0.1:9/x \
     DATABASE_URL="sqlite+aiosqlite:///$TMPD/local.db" "$PY" -m uvicorn proyecto_maria.main:app \
     --host 127.0.0.1 --port "$PUERTO" >"$TMPD/api.log" 2>&1 &
-  API=$!
-  for _ in $(seq 1 60); do curl -fsS "http://127.0.0.1:$PUERTO/health" >/dev/null 2>&1 && break; sleep 1; done
-  local codigo
-  BASE_URL="http://127.0.0.1:$PUERTO" node scripts/testing/pantalla_csrf1.js 2>&1; codigo=$?
-  kill $API 2>/dev/null; wait $API 2>/dev/null; API=""
+  local api=$! codigo=1
+  echo "$api" >"$TMPD/api.pid"
+  for _ in $(seq 1 60); do curl -fsS "http://127.0.0.1:$PUERTO/health" >/dev/null 2>&1 && codigo=0 && break; sleep 1; done
+  if [ "$codigo" -ne 0 ]; then echo "FALLA: la API no arrancó"; tail -5 "$TMPD/api.log"
+  else BASE_URL="http://127.0.0.1:$PUERTO" node scripts/testing/pantalla_csrf1.js 2>&1; codigo=$?; fi
+  kill "$api" 2>/dev/null; wait "$api" 2>/dev/null; : >"$TMPD/api.pid"
   return $codigo
 }
 
@@ -88,8 +89,11 @@ sabotaje pantalla $A "la telemetría de la página sale sin el token" \
   "FALLA: la telemetría de la página dio 403" \
   "'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() }" "'Content-Type': 'application/json' }"
 sabotaje pantalla $A "«Salir» sale sin el token" \
-  "FALLA: «Salir» llevó al inicio con la sesión abierta (200)" \
+  "FALLA: «Salir» no llevó al inicio" \
   "                if (csrf) headers['X-CSRF-Token'] = csrf;" ""
+sabotaje pantalla $A "«Salir» rechazado lleva al inicio igual" \
+  "FALLA: «Salir» rechazado no avisó y la página fue a /" \
+  "            if (!res.ok) {" "            if (false) {"
 
 echo "sabotajes con falla: $FALLAS"
 [ "$FALLAS" -eq 0 ]
