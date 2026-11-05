@@ -64,7 +64,8 @@ C10 queda como puerta de publicación con Emi.
 **CSRF-3:** en revisión, veredicto aparte.
 
 **Tu orden:** la devolución de COBRO-CORTE-1 → COBRO-MP-2 → COBRO-MP-3 →
-AISLAMIENTO-2 / LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. Próxima D: D62.
+AISLAMIENTO-2 / LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. Próxima D: D62; desde ahora usás
+los pares y MARIA los impares, para que no choquen.
 
 ## Ritmo y calidad (Emi, 2026-10-28)
 
