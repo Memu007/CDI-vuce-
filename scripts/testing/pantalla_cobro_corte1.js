@@ -169,6 +169,33 @@ async function respuestaTardia({ ctx, page, base, token, clienteId, cargar, pedi
   }
 }
 
+// Un doble clic en «Reintentar» genera y guarda una vez.
+async function reintentarConDobleClic({ page, clienteId, cargar, pedirTxt }) {
+  await page.evaluate(() => CDI.goTo('upload'));
+  await page.click('#uploadManualBtn');
+  await cargar(null);
+  await page.evaluate(id => CDI.setClienteActivo({ id, nombre: 'Cliente de prueba' }), clienteId);
+  await page.route('**/generate_maria', route => route.fulfill({ status: 500, contentType: 'application/json',
+    body: JSON.stringify({ detail: 'Falla inventada de la generación' }) }));
+  await pedirTxt();
+  const reintentar = page.locator('[data-action="retry-generate"]');
+  await reintentar.waitFor({ state: 'visible', timeout: 15000 }).catch(() => falla('reintentar: no sale el error'));
+  await page.unroute('**/generate_maria');
+  const pedidos = [];
+  const anotar = r => { if (r.method() === 'POST' && (r.url().endsWith('/generate_maria') ||
+    /\/api\/clientes\/[^/]+\/operaciones$/.test(r.url()))) pedidos.push(r.url().endsWith('/generate_maria') ? 'generar' : 'guardar'); };
+  page.on('request', anotar);
+  // Una segunda generación sale en la misma vuelta que el guardado de la primera, antes de su respuesta.
+  const guardado = page.waitForResponse(r => /\/api\/clientes\/[^/]+\/operaciones$/.test(r.url()) && r.request().method() === 'POST', { timeout: 15000 });
+  await reintentar.dblclick();
+  await page.waitForFunction(() => !document.getElementById('readyDone').hidden, null, { timeout: 15000 })
+    .catch(() => falla('reintentar: no terminó'));
+  await guardado.catch(() => falla('reintentar: no guardó'));
+  page.off('request', anotar);
+  if (pedidos.join(',') !== 'generar,guardar') falla('reintentar con doble clic pidió ' + pedidos.join(', '));
+  console.log('OK | reintentar con doble clic: genera y guarda una vez');
+}
+
 (async () => {
   const b = await chromium.launch();
   const ctx = await b.newContext({ viewport: { width: 1400, height: 1000 } });
@@ -305,30 +332,7 @@ async function respuestaTardia({ ctx, page, base, token, clienteId, cargar, pedi
   if (await usadas() - antes !== 1) falla(que + ': guardar y generar contaron ' + (await usadas() - antes));
   console.log('OK | ' + que + ': generar completa la guardada y cuenta 1');
 
-  // 5. Un doble clic en «Reintentar» genera y guarda una vez.
-  await page.evaluate(() => CDI.goTo('upload'));
-  await page.click('#uploadManualBtn');
-  await cargar(null);
-  await page.evaluate(id => CDI.setClienteActivo({ id, nombre: 'Cliente de prueba' }), guardada.clienteId);
-  await page.route('**/generate_maria', route => route.fulfill({ status: 500, contentType: 'application/json',
-    body: JSON.stringify({ detail: 'Falla inventada de la generación' }) }));
-  await pedirTxt();
-  const reintentar = page.locator('[data-action="retry-generate"]');
-  await reintentar.waitFor({ state: 'visible', timeout: 15000 }).catch(() => falla('reintentar: no sale el error'));
-  await page.unroute('**/generate_maria');
-  const pedidos = [];
-  const anotar = r => { if (r.method() === 'POST' && (r.url().endsWith('/generate_maria') ||
-    /\/api\/clientes\/[^/]+\/operaciones$/.test(r.url()))) pedidos.push(r.url().endsWith('/generate_maria') ? 'generar' : 'guardar'); };
-  page.on('request', anotar);
-  // Una segunda generación sale en la misma vuelta que el guardado de la primera, antes de su respuesta.
-  const guardado = page.waitForResponse(r => /\/api\/clientes\/[^/]+\/operaciones$/.test(r.url()) && r.request().method() === 'POST', { timeout: 15000 });
-  await reintentar.dblclick();
-  await page.waitForFunction(() => !document.getElementById('readyDone').hidden, null, { timeout: 15000 })
-    .catch(() => falla('reintentar: no terminó'));
-  await guardado.catch(() => falla('reintentar: no guardó'));
-  page.off('request', anotar);
-  if (pedidos.join(',') !== 'generar,guardar') falla('reintentar con doble clic pidió ' + pedidos.join(', '));
-  console.log('OK | reintentar con doble clic: genera y guarda una vez');
+  await reintentarConDobleClic({ page, clienteId: guardada.clienteId, cargar, pedirTxt });
 
   await respuestaTardia({ ctx, page, base, token: (await reg.json()).access_token, clienteId: guardada.clienteId, cargar, pedirTxt });
 
