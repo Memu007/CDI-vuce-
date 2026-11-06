@@ -21,6 +21,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import httpx # Para consultas externas async
+import requests
 from dotenv import load_dotenv
 
 # Cargar variables de entorno desde el directorio padre (CDI/.env)
@@ -11046,8 +11047,9 @@ async def billing_checkout(
         return {"success": True, **checkout}
     except HTTPException:
         raise
-    except _SuscripcionMPError as e:
-        print(f"⚠️ Checkout de {username}: {e}")
+    except (_SuscripcionMPError, requests.RequestException) as e:
+        # El SDK corta solo (requests) antes del tope: también es que MP no contestó.
+        print(f"⚠️ Checkout de {username}: {type(e).__name__}: {e}")
         await db.commit()
         raise HTTPException(status_code=503, detail="Mercado Pago no contestó. Probá de nuevo en unos minutos.")
     except Exception as e:
