@@ -729,7 +729,7 @@
         } catch (err) {
             console.error('[ready] generate error', err);
             CDI.track('maria_generate_error', { message: String(err && err.message || err) });
-            if (carga === CDI.state) showReadyError(String(err && err.message || err));
+            showReadyError(String(err && err.message || err));
         } finally {
             generateInFlight = false;
             const otra = pedidaMientrasOtra;
