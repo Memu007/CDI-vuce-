@@ -142,15 +142,22 @@ def test_un_mercado_pago_trabado_no_frena_el_servidor(client):
 
 
 def test_el_aviso_de_pago_tiene_limite_de_pedidos(client):
+    """Los avisos sin firma de una IP no le gastan el cupo a los firmados."""
     from proyecto_maria.core.rate_limit import limiter
+    ip = {"x-forwarded-for": "198.51.100.7"}
+
+    def _firmado(i):
+        aviso = aviso_firmado("otro", f"x{i}", SECRETO)
+        return client.post("/api/payments/webhook", content=aviso["content"], headers={**aviso["headers"], **ip})
     limiter.reset()
     limiter.enabled = True
     try:
-        codigos = [client.post("/api/payments/webhook", **aviso_firmado("otro", f"x{i}", SECRETO)).status_code
-                   for i in range(61)]
+        sin_firma = {client.post("/api/payments/webhook", content="x", headers=ip).status_code for _ in range(60)}
+        codigos = [_firmado(i).status_code for i in range(61)]
     finally:
         limiter.enabled = False
         limiter.reset()
+    assert sin_firma == {401}
     assert codigos[:60] == [200] * 60 and codigos[60] == 429, codigos
 
 
@@ -160,8 +167,11 @@ _SIN_FIRMA = {
     "json sin firma": {"url": "/api/payments/webhook",
                        "content": '{{"type": "payment", "data": {{"id": "{pid}"}}}}'},
     "firma con otra clave": {"url": "/api/payments/webhook", "otra_clave": True},
-    "cuerpo que no es un objeto": {"url": "/api/payments/webhook", "content": '["{pid}"]', "firma": True},
-    "data que no es un objeto": {"url": "/api/payments/webhook", "content": '{{"data": ["{pid}"]}}', "firma": True},
+    "cuerpo que no es un objeto": {"url": "/api/payments/webhook", "content": '["{pid}"]', "firma": b"ts=1,v1=00"},
+    "data que no es un objeto": {"url": "/api/payments/webhook", "content": '{{"data": ["{pid}"]}}',
+                                 "firma": b"ts=1,v1=00"},
+    "firma con letras no ascii": {"url": "/api/payments/webhook", "content": '{{"data": {{"id": "{pid}"}}}}',
+                                  "firma": "ts=1,v1=é".encode()},
 }
 
 
@@ -184,7 +194,7 @@ def test_un_aviso_sin_firma_verificable_no_cambia_nada(client, monkeypatch, secr
         if aviso.get("otra_clave"):
             r = client.post(aviso["url"], **aviso_firmado("payment", pid, "otra-clave"))
         else:
-            firma = {"x-signature": "ts=1,v1=00", "x-request-id": "r"} if aviso.get("firma") else {}
+            firma = {"x-signature": aviso["firma"], "x-request-id": "r"} if aviso.get("firma") else {}
             r = client.post(aviso["url"].format(pid=pid), content=aviso.get("content", "").format(pid=pid),
                             headers=firma)
         assert r.status_code == 401, (nombre, r.status_code, r.text[:200])

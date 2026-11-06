@@ -76,10 +76,11 @@ sabotaje $M "el checkout crea la suscripción fuera del hilo" "$TRABADO" \
   "        checkout = await _en_hilo_mp(billing_service.create_checkout, db_user, plan_id, org_id=org_id)" \
   "        checkout = billing_service.create_checkout(db_user, plan_id, org_id=org_id)"
 
-sabotaje $M "el aviso de pago sin límite de pedidos" \
-  "FAILED $T::test_el_aviso_de_pago_tiene_limite_de_pedidos" \
-  $'@app.post("/api/payments/webhook")\n@limiter.limit("60/minute")\n' \
-  $'@app.post("/api/payments/webhook")\n'
+LIMITE="FAILED $T::test_el_aviso_de_pago_tiene_limite_de_pedidos"
+CUENTA=$'        if limiter.enabled and not limiter.limiter.hit(_LIMITE_AVISOS_MP, "aviso_mp", get_client_ip(request)):\n            raise HTTPException(status_code=429, detail="Demasiados avisos")\n'
+sabotaje $M "el aviso de pago sin límite de pedidos" "$LIMITE" "$CUENTA" ""
+sabotaje $M "el límite cuenta también los avisos sin firma" "$LIMITE" "$CUENTA" "" \
+  $'@app.post("/api/payments/webhook")\n' $'@app.post("/api/payments/webhook")\n@limiter.limit("60/minute")\n'
 
 SIN_FIRMA="FAILED $T::test_un_aviso_sin_firma_verificable_no_cambia_nada"
 sabotaje $M "sin clave, en desarrollo, el aviso pasa sin verificar" "${SIN_FIRMA}[sin-secreto-dev]" \
@@ -97,6 +98,9 @@ sabotaje $M "un cuerpo que no es un objeto rompe la verificación" "'cuerpo que 
 sabotaje $M "un data que no es un objeto rompe la verificación" "'data que no es un objeto'" \
   "    data_id = str(data.get(\"id\", \"\")) if isinstance(data, dict) else \"\"" \
   "    data_id = str(data.get(\"id\", \"\")) if data else \"\""
+sabotaje $M "la firma se compara como texto" "'firma con letras no ascii'" \
+  "    return _hmac.compare_digest(expected.encode(), received_v1.encode())" \
+  "    return _hmac.compare_digest(expected, received_v1)"
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"
