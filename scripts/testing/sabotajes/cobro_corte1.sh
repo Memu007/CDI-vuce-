@@ -272,14 +272,17 @@ sabotaje $M "regenerar escribe sobre lo ya entregado" \
   '        with open(temporal, "w"' '        with open(ruta, "w"' $'        os.replace(temporal, ruta)\n' ''
 sabotaje $M "un commit fallido deja el archivo nuevo" \
   "FAILED $T::test_regenerar_con_una_falla_deja_entero_lo_ya_entregado[al_confirmar]" \
-  '            os.link(ruta, respaldo)' '            pass'
+  '            shutil.copyfile(ruta, respaldo)' '            pass'
+sabotaje $M "el respaldo es un enlace y no una copia" \
+  "FAILED $T::test_regenerar_funciona_en_un_disco_sin_enlaces" \
+  '            shutil.copyfile(ruta, respaldo)' '            os.link(ruta, respaldo)'
 sabotaje $M "se deshace la base antes de devolver el archivo" \
   "FAILED $T::test_regenerar_con_una_falla_deja_entero_lo_ya_entregado[al_confirmar_y_deshacer]" \
   $'        # Los archivos antes que el rollback: si éste también falla, lo entregado ya volvió.\n' $'        await db.rollback()\n' \
   $'            os.remove(ruta)\n        await db.rollback()\n        raise' $'            os.remove(ruta)\n        raise'
 sabotaje $M "se restaura un anterior que no es de esta regeneración" \
   "FAILED $T::test_regenerar_con_una_falla_deja_entero_lo_ya_entregado[al_escribir_con_un_anterior_viejo]" \
-  $'        if enlazado:\n            os.replace(respaldo, ruta)' $'        if not nuevo and os.path.exists(respaldo):\n            os.replace(respaldo, ruta)'
+  $'        if respaldado:\n            os.replace(respaldo, ruta)' $'        if not nuevo and os.path.exists(respaldo):\n            os.replace(respaldo, ruta)'
 
 # ------------------------------------------------------------- la pantalla
 git checkout -q -- proyecto_maria/
@@ -364,11 +367,20 @@ sabotaje $F "v2: la respuesta tardía marca lista la carga nueva" \
   "            if (carga === CDI.state) mostrarListo(data);" "            mostrarListo(data);"
 sabotaje $F "v2: el guardado toma el cliente de la pantalla" \
   "FALLA: v2, generar: la respuesta tardía no se guardó en el cliente de su carga" \
-  "        const cliente = carga.clienteActivo || null;" "        const cliente = (CDI.getClienteActivo && CDI.getClienteActivo()) || null;"
-# La carga nueva que llega a «Listo» mientras la anterior espera genera cuando ésa vuelve, y no hereda su error.
-sabotaje $F "v2: la carga nueva en «Listo» no genera" \
+  "        const cliente = foto.cliente;" "        const cliente = (CDI.state && CDI.state.clienteActivo) || null;"
+sabotaje $F "v2: el catálogo aprende en el proveedor de la pantalla" \
+  "no en el de su proveedor" \
+  "        const op = (carga && carga.operacion) || {};" "        const op = (CDI.state && CDI.state.operacion) || {};"
+# Lo que se pide mientras la anterior espera se genera cuando ésa vuelve, y no hereda su error.
+sabotaje $F "v2: lo pedido mientras otra espera no se genera" \
   "FALLA: v2, la carga nueva en «Listo» y la anterior vuelve bien: no terminó" \
   "        if (generateInFlight) { pedidaMientrasOtra = true; return; }" "        if (generateInFlight) return;"
+sabotaje $F "v2: al volver la anterior no se genera lo pedido" \
+  "FALLA: v2, la carga nueva en «Listo» y la anterior vuelve bien: no terminó" \
+  "            if (otra) onEnterReady();" ""
+sabotaje $F "v2: generar se deshabilita mientras otra espera" \
+  "no deja generar" \
+  "        vGenerate.disabled = errores.length > 0;" "        vGenerate.disabled = errores.length > 0 || generateInFlight;"
 sabotaje $F "v2: el error de la anterior cambia de paso a la carga nueva" \
   "FALLA: v2, la carga nueva en «Listo» y la anterior vuelve con un error" \
   $'            if (fallo && carga !== CDI.state) return;\n' ''

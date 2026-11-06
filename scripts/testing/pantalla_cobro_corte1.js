@@ -4,6 +4,8 @@
 // cuenta otra; guardar antes de generar anota la operación y generar la
 // completa. Un 402 dice su razón en el modal y en el error de la generación;
 // los 402 se fuerzan con page.route: las pruebas del servidor cubren cuándo salen.
+// Una respuesta tardía guarda, aprende y anota con la carga que la pidió, y lo
+// pedido mientras otra espera se genera cuando ésa vuelve.
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_cobro_corte1.js
 const { chromium } = require('playwright');
@@ -48,19 +50,23 @@ function casosTardios({ page, v1, clienteId, cargar, pedirTxt }) {
     otraCarga: () => v1.evaluate(() => cancelGrouping()),
     terminada: () => v1.generada,
     anotada: () => v1.evaluate(() => operacionIdActual) };
-  async function pedirV2() {
+  async function pedirV2(proveedor) {
     await cargaNuevaV2();
-    await page.evaluate(id => CDI.setClienteActivo({ id, nombre: 'Cliente de prueba' }), clienteId);
+    await page.evaluate(([id, prov]) => { CDI.setClienteActivo({ id, nombre: 'Cliente de prueba' });
+      if (prov) CDI.state.operacion.vendedor_nombre = prov; }, [clienteId, proveedor || '']);
     await pedirTxt();
   }
   const guardadoEn = (p, id) => () => p.waitForRequest(r => r.method() === 'POST' &&
     r.url().endsWith('/api/clientes/' + id + '/operaciones'), { timeout: 15000 });
   return [
-    { que: 'v2, generar', p: page, retenida: '**/generate_maria', pedir: pedirV2,
-      // La carga nueva, sin cliente y con otros valores: la respuesta tardía se guarda
-      // en el cliente de la suya, con lo que tenía al pedir, y no la marca lista.
+    { que: 'v2, generar', p: page, retenida: '**/generate_maria', pedir: () => pedirV2('Proveedor A SA'),
+      // La carga nueva, sin cliente, con otro proveedor y otros valores: la respuesta tardía se
+      // guarda en el cliente de la suya, con lo que tenía al pedir, aprende en el catálogo de su
+      // proveedor y no la marca lista.
+      catalogo: 'proveedor_a_sa',
       otraCarga: async () => { await cargaNuevaV2();
         await page.evaluate(() => { CDI.setClienteActivo(null);
+          CDI.state.operacion.vendedor_nombre = 'Proveedor B SA';
           window.valoresDeAntes = CDI.despachante.valores;
           CDI.despachante.valores = () => ({ de_la_carga_nueva: true }); }); },
       guardado: guardadoEn(page, clienteId),
@@ -70,6 +76,11 @@ function casosTardios({ page, v1, clienteId, cargar, pedirTxt }) {
         if (((cuerpo.resumen || {}).maria || {}).de_la_carga_nueva) falla('v2, generar: guardó los valores de la carga nueva');
         if (nueva) falla('v2, generar: la respuesta tardía marcó lista la carga nueva');
       },
+      anotada: () => page.evaluate(() => CDI.state.operacionId) },
+    // La misma carga cambia de cliente mientras espera: se guarda en el que tenía al pedir, como en v1.
+    { que: 'v2, generar y cambiar de cliente', p: page, retenida: '**/generate_maria', pedir: pedirV2,
+      otraCarga: () => page.evaluate(() => CDI.setClienteActivo(null)),
+      guardado: guardadoEn(page, clienteId), espera: VIEJA,
       anotada: () => page.evaluate(() => CDI.state.operacionId) },
     { que: 'v2, guardar', p: page, retenida: '**/api/clientes/*/operaciones',
       pedir: async () => { await cargaNuevaV2();
@@ -84,12 +95,12 @@ function casosTardios({ page, v1, clienteId, cargar, pedirTxt }) {
     { que: 'v1, generar', retenida: '**/generate_maria', ...v1Comun, guardado: guardadoEn(v1, clienteId),
       otraCarga: () => v1.evaluate(() => { cancelGrouping(); document.getElementById('clientSelectorGrouping').value = ''; }) },
     { que: 'v1, guardar', retenida: '**/api/clientes/*/operaciones', inmediata: '**/generate_maria', ...v1Comun },
-    // La carga nueva entra a «Listo» mientras la anterior espera: genera cuando ésa vuelve,
-    // y lo que le pasó a la anterior no se le muestra.
+    // La carga nueva pide su TXT con el botón mientras la anterior espera: genera cuando ésa
+    // vuelve, y lo que le pasó a la anterior no se le muestra.
     ...[['bien', 'vuelve bien'], ['error', 'vuelve con un error'], ['sinRed', 'se queda sin red']].map(([primera, como]) => ({
       que: 'v2, la carga nueva en «Listo» y la anterior ' + como, p: page, retenida: '**/generate_maria',
       primera, espera: NUEVA, pedir: pedirV2,
-      otraCarga: async () => { await cargaNuevaV2(); await page.evaluate(() => { CDI.setClienteActivo(null); CDI.goTo('ready'); }); },
+      otraCarga: async () => { await cargaNuevaV2(); await page.evaluate(() => CDI.setClienteActivo(null)); await pedirTxt(); },
       // Cuando sale el pedido de la carga nueva, la anterior ya terminó.
       segunda: async () => {
         const [en, error] = await page.evaluate(() => [document.querySelector('.screen.is-active').dataset.screen,
@@ -132,6 +143,8 @@ async function respuestaTardia({ ctx, page, base, token, clienteId, cargar, pedi
     await aTiempo(llego, c.que + ': el pedido no salió').catch(e => falla(e.message));
     await c.otraCarga();
     const guardado = c.guardado && c.guardado().catch(() => null);
+    const catalogo = c.catalogo && c.p.waitForRequest(r => r.method() === 'POST' &&
+      r.url().includes('/api/catalog/'), { timeout: 15000 }).catch(() => null);
     soltar();
     await aTiempo(c.terminada ? c.terminada() : guardado, c.que + ': no terminó').catch(e => falla(e.message));
     if (guardado) {
@@ -140,6 +153,10 @@ async function respuestaTardia({ ctx, page, base, token, clienteId, cargar, pedi
       if (c.chequeo) await c.chequeo(cuerpo);
       const mandada = cuerpo.operacion_id;
       if (mandada !== VIEJA) falla(c.que + ': la respuesta tardía no se guardó en el cliente de su carga con su operación (mandó «' + mandada + '»)');
+    }
+    if (catalogo) {
+      const r = await catalogo;
+      if (!r || !r.url().includes('/api/catalog/' + c.catalogo + '/')) falla(c.que + ': aprendió en «' + (r ? r.url() : 'ningún catálogo') + '», no en el de su proveedor');
     }
     const anotada = await c.anotada();
     if ((anotada || '') !== (c.espera || '')) falla(c.que + ': la carga nueva quedó con la operación «' + anotada + '», no «' + (c.espera || '') + '»');
@@ -179,7 +196,9 @@ async function respuestaTardia({ ctx, page, base, token, clienteId, cargar, pedi
   // Pide el TXT desde «validating», sin recargar: recargar fuera del flujo pierde la operación.
   async function pedirTxt() {
     await page.evaluate(() => CDI.goTo('validating'));
-    await page.waitForFunction(() => !document.getElementById('validatingGenerate').disabled, null, { timeout: 15000 })
+    // Con la validación ya pintada: antes, el botón todavía muestra el estado anterior.
+    await page.waitForFunction(() => !document.getElementById('validatingResults').hidden
+      && !document.getElementById('validatingGenerate').disabled, null, { timeout: 15000 })
       .catch(async () => falla('no deja generar: ' + await page.$eval('#validatingIssues', el => el.textContent.trim().slice(0, 400))));
     await page.fill('#sbtSufijoValor', 'AA(1)-CA00-');
     await page.click('#validatingGenerate');

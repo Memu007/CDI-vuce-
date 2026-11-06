@@ -828,6 +828,10 @@ async def _rollback_que_falla(self):
     raise RuntimeError("la base se cayó al deshacer")
 
 
+def _enlace_que_falla(*a, **k):
+    raise PermissionError("el disco no admite enlaces")
+
+
 # (ruta, objeto y nombre que falla después de contar, su reemplazo)
 LO_QUE_FALLA = {
     "importacion_al_escribir": ("importacion", main, "open", _escritura_que_falla),
@@ -863,6 +867,8 @@ AL_REGENERAR = {
     "al_confirmar_y_deshacer": ([(main.AsyncSession, "commit", _commit_que_falla),
                                  (main.AsyncSession, "rollback", _rollback_que_falla)], False),
     "al_escribir_con_un_anterior_viejo": ([(main, "open", _escritura_que_falla)], True),
+    "al_confirmar_sin_enlaces": ([(main.os, "link", _enlace_que_falla),
+                                  (main.AsyncSession, "commit", _commit_que_falla)], False),
 }
 
 
@@ -885,3 +891,14 @@ def test_regenerar_con_una_falla_deja_entero_lo_ya_entregado(cuenta, monkeypatch
     assert r.status_code == 500, r.text
     assert open(ruta, "rb").read() == entregado, "el archivo ya entregado cambió con una regeneración que falló"
     assert _archivos(u) == [archivo] and _operaciones(u) == antes and _leer(u)["ops"] == 1
+
+
+def test_regenerar_funciona_en_un_disco_sin_enlaces(cuenta, monkeypatch):
+    c, u = cuenta()
+    r = _generar(c)
+    assert r.status_code == 200, r.text
+    oid, archivo = _oid(r), r.json()["filename"]
+    monkeypatch.setattr(main.os, "link", _enlace_que_falla)
+    codigos = [_generar(c, flete=200.0 + i, operacion_id=oid).status_code for i in range(3)]
+    assert codigos == [200, 200, 200]
+    assert _archivos(u) == [archivo] and _leer(u)["ops"] == 1
