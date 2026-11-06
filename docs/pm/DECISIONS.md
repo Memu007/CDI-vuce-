@@ -402,3 +402,12 @@ COBRO-MP-2 con devolución sobre `4f1822f`. D62 (a): una pausada de otro
 miembro frena el checkout con 409, como una autorizada; la lista de estados
 que pagan va en un solo lugar. Sacar del estudio sólo se frena por la que paga.
 
+
+### 2026-11-06 12:06 UTC (Emi)
+
+Sí a la pieza nueva VALIDACION-1 (Dev técnica, después de COBRO-MP-2): la
+validación de una carga nunca muestra ni guarda lo de otra.
+
+### 2026-11-06 12:35 UTC (PM principal)
+
+CATALOGO-LARGO-2 aceptada sobre `d5bc7c1` (pruebas `b0bbd8c`), sin integrar por `e0b8626`. D84 a D87 (a); el aviso de qué producto no se aprendió va a CATALOGO-3. Acta: `REPRODUCCION-CATALOGO-LARGO-2-v2-2026-11-06.md`.
