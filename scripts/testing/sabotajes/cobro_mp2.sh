@@ -138,10 +138,7 @@ sabotaje $M "se cancela una pendiente antes de ver la autorizada de otro" \
   "FAILED $T::test_con_una_autorizada_de_otro_no_se_cancela_ninguna" \
   "    estados = [await _estado_suscripcion_vieja(db, db_user, cuenta) for cuenta in con_sid]
     vivas = [cuenta for cuenta, estado_mp in zip(con_sid, estados) if estado_mp != \"cancelled\"]" \
-  "    vivas = list(con_sid)" \
-  "            if i:
-                # Mientras" "            if True:
-                # Mientras"
+  "    vivas = list(con_sid)"
 sabotaje $M "en el checkout, si una no se cancela, las canceladas siguen anotadas" \
   "FAILED $T::test_si_una_de_varias_no_se_cancela_la_cancelada_no_queda_anotada" \
   "        # Las ya canceladas no vuelven: se guardan sin el sid.
@@ -151,10 +148,12 @@ sabotaje $M "en el checkout, la ya cancelada en Mercado Pago sigue anotada si ot
   "FAILED $T::test_si_una_no_se_cancela_la_ya_cancelada_en_mp_no_queda_anotada" \
   "    for cuenta in set(con_sid) - set(vivas):" "    for cuenta in ():"
 sabotaje $M "no se vuelve a mirar la siguiente después de cancelar una" \
-  "FAILED $T::test_la_que_se_autoriza_mientras_se_cancelan_las_otras_no_se_cancela" \
-  "            if i:
-                # Mientras" "            if False:
-                # Mientras"
+  "FAILED $T::test_la_que_se_autoriza_mientras_se_cancelan_las_otras_no_se_cancela[PUT]" \
+  "            await _estado_suscripcion_vieja(db, db_user, cuenta)" "            pass"
+sabotaje $M "la primera se cancela sin volver a mirarla después de leer las otras" \
+  "FAILED $T::test_la_que_se_autoriza_mientras_se_cancelan_las_otras_no_se_cancela[GET]" \
+  "        for cuenta in vivas:" "        for i, cuenta in enumerate(vivas):" \
+  "            await _estado_suscripcion_vieja(db, db_user, cuenta)" "            if i: await _estado_suscripcion_vieja(db, db_user, cuenta)"
 sabotaje $M "el 409 de la autorizada de otro miembro no dice de quién es" \
   "FAILED $T::test_otro_miembro_no_abre_una_segunda_suscripcion_de_la_org[autorizada_vencida]" \
   "        if cuenta is not db_user:" "        if False:"

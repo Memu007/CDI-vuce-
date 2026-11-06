@@ -513,15 +513,10 @@ def test_en_una_org_reactivar_lo_pagado_lleva_al_checkout(client, tipo, queda):
 
 
 def test_si_una_de_varias_no_se_cancela_la_cancelada_no_queda_anotada(client):
-    """El checkout, con dos pendientes que cancela antes de crear."""
+    """El checkout, con dos pendientes que cancela antes de crear: falla la segunda."""
     from tests.test_cobro_mp1 import _leer_org
-    nombres, sid, org_id, _ = _org_con_suscripcion(client, "duena")
-    SUS[sid] = "pending"
-    otra = f"sus-{nombres['miembro']}"
-    SUS[otra] = "pending"
-    _set_user(nombres["miembro"], mp_preapproval_id=otra)
-    # Se cancelan en orden de usuario: falla la segunda.
-    falla, cancela = sorted([(nombres["abrio"], sid), (nombres["miembro"], otra)], reverse=True)
+    nombres, sid, otra, org_id = _dos_pendientes(client)
+    cancela, falla = (nombres["abrio"], sid), (nombres["miembro"], otra)
 
     def _falla_una(request):
         s = _RUTA_SUS.fullmatch(str(request.url)).group(1)
@@ -599,29 +594,34 @@ def _dos_pendientes(client):
     SUS[sid] = SUS[otra] = "pending"
     _set_user(nombres["miembro"], mp_preapproval_id=otra)
     assert nombres["abrio"] < nombres["miembro"]
-    return nombres, sid, otra
+    return nombres, sid, otra, org_id
 
 
-def test_la_que_se_autoriza_mientras_se_cancelan_las_otras_no_se_cancela(client):
-    nombres, sid, otra = _dos_pendientes(client)
+# PUT: la del miembro se autoriza mientras se cancela la de quien abrió.
+# GET: la de quien abrió se autoriza mientras se lee la del miembro, antes de cancelar nada.
+@pytest.mark.parametrize("cuando", ["PUT", "GET"])
+def test_la_que_se_autoriza_mientras_se_cancelan_las_otras_no_se_cancela(client, cuando):
+    nombres, sid, otra, org_id = _dos_pendientes(client)
+    dispara, autoriza = (sid, otra) if cuando == "PUT" else (otra, sid)
 
     def _se_autoriza(request):
         s = _RUTA_SUS.fullmatch(str(request.url)).group(1)
         if request.method == "PUT":
             SUS[s] = "cancelled"
-            if s == sid:
-                SUS[otra] = "authorized"
+        if request.method == cuando and s == dispara:
+            SUS[autoriza] = "authorized"
         return httpx.Response(200, json={"id": s, "status": SUS[s]})
     FALLA["PUT"] = FALLA["GET"] = _se_autoriza
     r = client.post("/api/billing/checkout", json={"plan": "premium"})
     assert r.status_code == 409, r.text
-    assert SUS == {sid: "cancelled", otra: "authorized"} and CREADAS == []
-    assert _leer(nombres["abrio"])["mp_preapproval_id"] is None
+    assert SUS[autoriza] == "authorized" and CREADAS == []
+    assert SUS[dispara] == ("cancelled" if cuando == "PUT" else "pending")
+    assert _leer(nombres["abrio"])["mp_preapproval_id"] == (None if cuando == "PUT" else sid)
     assert _leer(nombres["miembro"])["mp_preapproval_id"] == otra
 
 
 def test_si_una_no_se_cancela_la_ya_cancelada_en_mp_no_queda_anotada(client):
-    nombres, sid, otra = _dos_pendientes(client)
+    nombres, sid, otra, org_id = _dos_pendientes(client)
     SUS[otra] = "cancelled"
 
     def _falla_la_primera(request):
