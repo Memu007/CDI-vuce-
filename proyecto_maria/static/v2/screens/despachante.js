@@ -1,9 +1,9 @@
 /* ============================================================
-   CDI v2 — Lo que decide el despachante (MARIA-4)
+   CDI v2 — Lo que decide el despachante
    En la pantalla de validación, antes de generar: banco, empresa de
    digitalización y destino de la mercadería por operación; estado de la
-   mercadería (y cambio de destino) por producto. MARIA-7: la unidad de la factura y la
-   estadística, por operación y con cambio por producto. SUFIJOS-1: el
+   mercadería (y cambio de destino) por producto. La unidad de la factura y la
+   estadística, por operación y con cambio por producto. El
    sufijo de valor de cada producto y la unidad estadística que pide su
    posición, del arancel de ARCA (POST /api/sufijos/propuesta).
 
@@ -28,7 +28,7 @@
     ];
     // El estado corresponde al origen: 1, 3 y 5 argentinos; 2, 4 y 6 importados.
     const ESTADOS_ARGENTINOS = ['1', '3', '5'];
-    // Destino de la mercadería (DESTINO-1): se guarda el código de
+    // Destino de la mercadería: se guarda el código de
     // IVAADICIONAL1; el servidor saca el de GANANCIASOP3 de la misma tabla
     // (IVA_ADICIONAL en core/maria_generator.py).
     const IVA = [
@@ -117,7 +117,7 @@
         if (clienteId() === cid) propuesta = nueva;
     }
 
-    // Lo que el arancel dice de cada producto (SUFIJOS-1): por fila, el
+    // Lo que el arancel dice de cada producto: por fila, el
     // sufijo propuesto y lo que falta; por posición, la unidad estadística.
     // Se pide de nuevo si cambian los productos, y otra vez si falló.
     // Lo que viaja al generar es lo que muestra la celda: sale de lo último
@@ -455,7 +455,7 @@
     // Las unidades de un producto como van al pedido: la suya o la de la
     // operación; la estadística sólo viaja si es kilos (si no, el servidor
     // usa la declarada). Si nadie la eligió, la de la posición cuando es
-    // kilos (SUFIJOS-1) y el producto no tiene sub-ítems (con sub-ítems,
+    // kilos y el producto no tiene sub-ítems (con sub-ítems,
     // kilos sólo sale si la factura también va en kilos); otra la avisa el
     // servidor. La del arancel, sólo si la nota de la fila la muestra.
     function unidadesDe(it, i) {
