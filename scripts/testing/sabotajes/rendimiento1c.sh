@@ -132,7 +132,7 @@ sabotaje $DL "quedarse sin memoria en C vuelve a ser un PDF inválido" \
   'DID NOT RAISE'
 sabotaje $DL "un tope propio de pypdf vuelve a ser un PDF inválido" \
   'except (MemoryError, SystemError, LimitReachedError) as e:' 'except (MemoryError, SystemError) as e:' \
-  'Invalid PDF file: Maximum page tree page entry limit exceeded!'
+  'test_un_pdf_que_se_infla_no_hace_crecer_la_app'
 
 git checkout -q -- proyecto_maria/
 echo "sabotajes con falla: $FALLAS"

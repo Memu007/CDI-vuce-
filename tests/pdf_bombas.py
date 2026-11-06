@@ -109,7 +109,8 @@ def una_hoja_cara(kb=500):
     """Una sola hoja con `kb` KB de renglones de una letra («(X) '»), debajo
     del tope de bytes por hoja: cada renglón cuesta lo mismo, así que leerla
     cuesta lo que pesa (500 KB, más de 1 s), sin depender de que pypdf sea
-    lento en alguna operación."""
+    lento en alguna operación. 500 es el punto justo: por encima de ~512 KB
+    corta el tope de contenido por hoja (otro camino), no el de CPU."""
     def armar(add, objs):
         return _hojas(add, objs, [_flujo(add, b"BT /F1 9 Tf 1 TL " + b"(X) ' " * (kb * 1024 // 6), 0, b"ET\n")])
     return _pdf(armar)
