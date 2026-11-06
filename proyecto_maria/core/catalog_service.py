@@ -39,14 +39,14 @@ from proyecto_maria.database.models import VendorCatalogProduct
 # descripciones de facturas tienen ruido (marcas, codigos) y perdemos matches.
 FUZZY_THRESHOLD = 0.80
 
-# Tope común del catálogo y la memoria del cliente, medido en NFC como guarda
-# la memoria: lo que entra en una entra en la otra.
+# Tope común del catálogo, la memoria del cliente y el historial, medido en NFC
+# como guarda la memoria: lo que entra en una entra en las otras.
 MAX_DESCRIPCION = 2000
 
 
-def validar_largo(descripcion: str) -> None:
-    if len(unicodedata.normalize("NFC", descripcion)) > MAX_DESCRIPCION:
-        raise ValueError(f"La descripción pasa de {MAX_DESCRIPCION} caracteres.")
+def validar_largo(texto: str, que: str = "La descripción") -> None:
+    if len(unicodedata.normalize("NFC", texto)) > MAX_DESCRIPCION:
+        raise ValueError(f"{que} pasa de {MAX_DESCRIPCION} caracteres.")
 
 
 # Patron valido para vendor_id (slug generado por _vendor_key).
@@ -351,6 +351,7 @@ async def save_products(
             "owner_username": owner_username,
         }
 
+    validar_largo(vendor_name, "El proveedor")
     vendor_id = _vendor_key(vendor_name)
 
     saved = 0
@@ -361,6 +362,7 @@ async def save_products(
         validar_largo(desc)
         ncm = (prod.get("ncm") or prod.get("pieza") or "").strip()
         origen = (prod.get("origen") or "").strip()
+        validar_largo(origen, "El origen")
 
         if not desc:
             continue
@@ -478,7 +480,9 @@ async def update_product(
     if "ncm" in updates and updates["ncm"] is not None:
         row.ncm = str(updates["ncm"]).strip() or None
     if "origen" in updates and updates["origen"] is not None:
-        row.origen = str(updates["origen"]).strip() or None
+        origen = str(updates["origen"]).strip()
+        validar_largo(origen, "El origen")
+        row.origen = origen or None
     if "precio_ref" in updates and updates["precio_ref"] is not None:
         try:
             row.valor_unitario = float(updates["precio_ref"])

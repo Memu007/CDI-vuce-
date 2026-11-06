@@ -205,7 +205,7 @@ async def upsert_client_product_history(
             descripcion_normalizada=_norm_desc(descripcion),
             clave=clave,
             peso_unitario_avg=valor_para_promedio(peso_unitario) or 0.0,
-            origen_frecuente=origen[:3] or "XX",
+            origen_frecuente=origen or "XX",
             valor_unitario_avg=valor_para_promedio(valor_unitario),
             cantidad_avg=valor_para_promedio(cantidad),
             veces_peso=1 if valor_para_promedio(peso_unitario) else 0,
@@ -246,7 +246,7 @@ async def upsert_client_product_history(
         existing.cantidad_avg, existing.veces_cantidad, usado, cantidad)
     existing.veces_usado = max(usado or 1, 1) + 1
     if origen:
-        existing.origen_frecuente = origen[:3]
+        existing.origen_frecuente = origen
     existing.ultima_vez = now
     # Si la descripcion normalizada estaba vacia (datos viejos), completarla.
     if not existing.descripcion_normalizada:

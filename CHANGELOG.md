@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-06 · fix: el origen se recuerda entero y proveedor u origen demasiado largos dan 400 (CATALOGO-LARGO-2)
+
+- La memoria del cliente guarda el origen entero («TAIWAN», «JAPON»): antes guardaba las tres primeras letras, y el TXT sugerido salía con otro país. El arranque amplía la columna en Postgres.
+- Un proveedor o un origen de más de 2000 caracteres da 400 con el motivo al guardar en el catálogo, cambiar un producto o confirmar un NCM, sin guardar nada; se cuentan igual que la descripción.
+
 ## 2026-11-06 · fix: lo que se valida con la clave actual no gana contra un cambio de clave en el medio, y contar intentos no traba la app (SESION-1, vuelta 2)
 
 - Cambiar la contraseña o el email después de validar la clave actual no guarda nada si la clave cambió mientras tanto (un reset del dueño gana): contesta 409 y no da un token. Dos cambios de clave a la vez: uno entra y el otro da 409.

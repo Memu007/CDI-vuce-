@@ -1235,7 +1235,7 @@ async def _migrate_widen_pieza_column():
 
 
 async def _migrate_catalogo_sin_tope():
-    """Lleva product_key, descripcion, origen y vendor_nombre del catálogo a text. Si falla, el
+    """Lleva a text las columnas del catálogo y el origen de la memoria del cliente. Si falla, el
     arranque se detiene: con el tope viejo, guardar-uso respondería sin guardar."""
     from proyecto_maria.database.connection import engine, IS_SQLITE
 
@@ -1246,13 +1246,14 @@ async def _migrate_catalogo_sin_tope():
         # lo vuelve a intentar, en vez de colgar el arranque.
         await conn.exec_driver_sql("SET LOCAL lock_timeout = '5s'")
         res = await conn.exec_driver_sql(
-            "SELECT column_name FROM information_schema.columns WHERE table_schema = current_schema() "
-            "AND table_name = 'vendor_catalog_products' AND column_name IN ('product_key', 'descripcion', 'origen', 'vendor_nombre') "
+            "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = current_schema() "
+            "AND ((table_name = 'vendor_catalog_products' AND column_name IN ('product_key', 'descripcion', 'origen', 'vendor_nombre')) "
+            "OR (table_name = 'client_product_history' AND column_name = 'origen_frecuente')) "
             "AND character_maximum_length IS NOT NULL"
         )
-        for (columna,) in res.fetchall():
-            await conn.exec_driver_sql(f"ALTER TABLE vendor_catalog_products ALTER COLUMN {columna} TYPE TEXT")
-            print(f"✅ Migracion: vendor_catalog_products.{columna} pasa a TEXT")
+        for tabla, columna in res.fetchall():
+            await conn.exec_driver_sql(f"ALTER TABLE {tabla} ALTER COLUMN {columna} TYPE TEXT")
+            print(f"✅ Migracion: {tabla}.{columna} pasa a TEXT")
 
 
 async def _migrate_add_grupo_id_column():
@@ -9708,13 +9709,14 @@ _HISTORIAL_MAX_NCM = 20
 def _problema_historial(descripcion: str, ncm: str) -> str | None:
     """Por qué el historial no puede guardar este par, o None. Postgres no
     guarda el carácter nulo y ninguna base guarda medio par UTF-16. La
-    descripción se cuenta en NFC, como en el catálogo y la memoria del cliente."""
-    for que, texto, largo, tope in (
-            ("La descripción", descripcion, len(unicodedata.normalize("NFC", descripcion)),
-             catalog_svc.MAX_DESCRIPCION),
-            ("La NCM", ncm, len(ncm), _HISTORIAL_MAX_NCM)):
-        if largo > tope:
-            return f"{que} pasa de {tope} caracteres."
+    descripción se cuenta con el tope del catálogo."""
+    try:
+        catalog_svc.validar_largo(descripcion)
+    except ValueError as e:
+        return str(e)
+    if len(ncm) > _HISTORIAL_MAX_NCM:
+        return f"La NCM pasa de {_HISTORIAL_MAX_NCM} caracteres."
+    for que, texto in (("La descripción", descripcion), ("La NCM", ncm)):
         if "\x00" in texto:
             return f"{que} tiene un carácter nulo."
         if not _es_utf8(texto):
@@ -10258,6 +10260,11 @@ async def guardar_uso_ncm(
     client_id = str(data.get("client_id") or "").strip()
     vendor_name = _sin_nul(str(data.get("vendor_name") or "")).strip()
     origin = _sin_nul(str(data.get("origen") or "")).strip()
+    try:
+        catalog_svc.validar_largo(vendor_name, "El proveedor")
+        catalog_svc.validar_largo(origin, "El origen")
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
     # Nunca aceptar un client_id ajeno sólo porque vino desde el navegador.
     # La memoria es por despachante y por cliente; esta verificación también

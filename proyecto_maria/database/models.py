@@ -404,7 +404,7 @@ class ClientProductHistory(Base):
     clave = Column(String(64), nullable=True)
 
     peso_unitario_avg = Column(Float, default=0.0)
-    origen_frecuente = Column(String(3), default="XX")
+    origen_frecuente = Column(Text, default="XX")
     veces_usado = Column(Integer, default=1)
 
     valor_unitario_avg = Column(Float, nullable=True)
@@ -426,8 +426,8 @@ class VendorCatalogProduct(Base):
 
     Reemplaza `product_catalog.json` que se perdia con cada deploy. Tenant
     aislado por `owner_username`. Para el mismo vendor, cada combinacion
-    (owner, vendor_id, product_key) es unica. `product_key` es la
-    descripcion normalizada (ver `catalog_service._normalize`).
+    (owner, vendor_id, product_key) es unica. `product_key` es la clave
+    de identidad del producto (ver `client_memory.identidad_del_producto`).
     """
     __tablename__ = "vendor_catalog_products"
     __table_args__ = (
