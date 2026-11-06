@@ -324,6 +324,16 @@ else
     "    nombres = {username, *((await db.execute(otros_con_sid)).scalars().all() if org_previa else ())}
     if org_previa:
         await db.execute(select(Organization.id).where(Organization.id == org_previa).with_for_update())"
+  sabotaje $M "el tope de Mercado Pago cuenta desde antes del candado" \
+    "FALLA | con el candado tomado más que el tope, Mercado Pago sano contesta (cancel): 503" \
+    $'    db_user, org, con_sid = await _cuenta_con_suscripciones(db, user["username"])\n    plazo = anyio.current_time() + _TOPE_MP\n    entidad = org or db_user\n' \
+    $'    plazo = anyio.current_time() + _TOPE_MP\n    db_user, org, con_sid = await _cuenta_con_suscripciones(db, user["username"])\n    entidad = org or db_user\n'
+  sabotaje $M "sacar a un miembro cuenta el tope desde antes del candado" \
+    "FALLA | con el candado tomado más que el tope, Mercado Pago sano contesta (sacar): 503" \
+    $'        raise HTTPException(status_code=404, detail="Ese usuario no es miembro del estudio")\n    plazo = anyio.current_time() + _TOPE_MP\n' \
+    $'        raise HTTPException(status_code=404, detail="Ese usuario no es miembro del estudio")\n' \
+    $'        raise HTTPException(status_code=403, detail="Solo el administrador puede remover miembros")\n' \
+    $'        raise HTTPException(status_code=403, detail="Solo el administrador puede remover miembros")\n    plazo = anyio.current_time() + _TOPE_MP\n'
 fi
 
 git checkout -q -- proyecto_maria/

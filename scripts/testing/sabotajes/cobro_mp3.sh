@@ -75,9 +75,11 @@ sabotaje $M "la recarga crea el cobro fuera del hilo" "$TRABADO" \
 sabotaje $M "el checkout crea la suscripción fuera del hilo" "$TRABADO" \
   "        checkout = await _en_hilo_mp(billing_service.create_checkout, db_user, plan_id, org_id=org_id)" \
   "        checkout = billing_service.create_checkout(db_user, plan_id, org_id=org_id)"
+sabotaje $M "la recarga con Mercado Pago cortado da 500" "FAILED $T::test_la_recarga_con_mercado_pago_cortado_da_503" \
+  $'    except requests.RequestException as e:\n        print(f"⚠️ Recarga de {db_user.username}: {type(e).__name__}: {e}")\n        raise HTTPException(status_code=503, detail="Mercado Pago no contestó. Probá de nuevo en unos minutos.")\n' ""
 
 LIMITE="FAILED $T::test_el_aviso_de_pago_tiene_limite_de_pedidos"
-CUENTA=$'        if limiter.enabled and not limiter.limiter.hit(_LIMITE_AVISOS_MP, "aviso_mp", get_client_ip(request)):\n            raise HTTPException(status_code=429, detail="Demasiados avisos")\n'
+CUENTA=$'    if limiter.enabled and not limiter.limiter.hit(_LIMITE_AVISOS_MP, "aviso_mp", get_client_ip(request)):\n        raise HTTPException(status_code=429, detail="Demasiados avisos")\n'
 sabotaje $M "el aviso de pago sin límite de pedidos" "$LIMITE" "$CUENTA" ""
 sabotaje $M "el límite cuenta también los avisos sin firma" "$LIMITE" "$CUENTA" "" \
   $'@app.post("/api/payments/webhook")\n' $'@app.post("/api/payments/webhook")\n@limiter.limit("60/minute")\n'
@@ -87,11 +89,11 @@ sabotaje $M "sin clave, en desarrollo, el aviso pasa sin verificar" "${SIN_FIRMA
   $'    if not MP_WEBHOOK_SECRET:\n        return False' \
   $'    if not MP_WEBHOOK_SECRET:\n        return not IS_PRODUCTION'
 sabotaje $M "se atiende un IPN por la URL, sin firma" "('ipn', 200" \
-  "        if not _verify_mp_webhook_signature(request, raw_body):" \
-  "        if request.query_params.get(\"topic\"):
-            raw_body = json.dumps({\"type\": request.query_params[\"topic\"],
-                                   \"data\": {\"id\": request.query_params.get(\"id\")}}).encode()
-        elif not _verify_mp_webhook_signature(request, raw_body):"
+  "    if not _verify_mp_webhook_signature(request, raw_body):" \
+  "    if request.query_params.get(\"topic\"):
+        raw_body = json.dumps({\"type\": request.query_params[\"topic\"],
+                               \"data\": {\"id\": request.query_params.get(\"id\")}}).encode()
+    elif not _verify_mp_webhook_signature(request, raw_body):"
 sabotaje $M "un cuerpo que no es un objeto rompe la verificación" "'cuerpo que no es un objeto'" \
   "    data = body.get(\"data\") if isinstance(body, dict) else None" \
   "    data = body.get(\"data\")"

@@ -8,6 +8,8 @@ serializa las escrituras y no muestra los cruces.
 2. Un miembro con una suscripción pendiente genera (bloquea su fila y después
    la de la organización, en el orden de la generación) mientras otro paga:
    el checkout espera y termina, sin que Postgres corte a nadie por deadlock.
+3. Cancelar, pagar, reactivar y sacar a un miembro esperan un candado tomado
+   más que el tope de Mercado Pago: con Mercado Pago sano contestan 200, no 503.
 
 uso (con un Postgres local y descartable, nunca el de producción):
   python scripts/testing/cobro_mp2_postgres.py postgresql://cdi@127.0.0.1:55432/cdi_prueba
@@ -215,6 +217,47 @@ with TestClient(main_mod.app) as c:
     chequear(SUS[vieja] == "cancelled", f"{que}: la pendiente del otro miembro queda cancelada ({SUS[vieja]})")
     vivas, guardadas = vivas_y_guardadas(org_id)
     chequear(len(vivas) == 1 and vivas == guardadas, f"{que}: una sola viva y es la que CDI guarda ({vivas} / {guardadas})")
+
+    que = "con el candado tomado más que el tope, Mercado Pago sano contesta"
+    tope, main_mod._TOPE_MP = main_mod._TOPE_MP, 1
+    try:
+        for ruta, estado_org, estado_sid in (("cancel", "active", "authorized"), ("checkout", "past_due", None),
+                                              ("reactivate", "canceled", "cancelled"), ("sacar", "active", "pending")):
+            SUS.clear()
+            duena, miembro = registrar(c, "mp2pg_t"), registrar(c, "mp2pg_m")
+            org_id = organizacion(duena, miembro)
+            sql("update organizations set billing_status = %s, trial_ends_at = now() + interval '10 days' "
+                "where id = %s", estado_org, org_id)
+            quien = miembro if ruta == "sacar" else duena
+            if estado_sid:
+                SUS[f"t-{org_id}"] = estado_sid
+                sql("update users set mp_preapproval_id = %s where username = %s", f"t-{org_id}", quien)
+            token = bearer(c, duena)
+            if ruta == "sacar":
+                candado, pedir = ("users", "username", miembro), (c.delete, f"/api/organizations/members/{miembro}")
+            else:
+                candado, pedir = ("organizations", "id", org_id), (c.post, f"/api/billing/{ruta}")
+            kw = {} if ruta == "sacar" else {"json": {"plan": "premium"}}
+            con = psycopg2.connect(URL)
+            try:
+                con.cursor().execute(f"select 1 from {candado[0]} where {candado[1]} = %s for update", (candado[2],))
+                with ThreadPoolExecutor(1) as hilo:
+                    pedido = hilo.submit(pedir[0], pedir[1], headers=token, **kw)
+                    espera = threading.Event()
+                    for _ in range(500):
+                        if pedido.done() or esperando_un_lock():
+                            break
+                        espera.wait(0.01)
+                    chequear(not pedido.done() and esperando_un_lock(), f"{que} ({ruta}): el pedido espera el candado")
+                    # Lo que se prueba es retener el candado más que el tope.
+                    espera.wait(main_mod._TOPE_MP + 0.5)
+                    con.commit()
+                    r = pedido.result()
+            finally:
+                con.close()
+            chequear(r.status_code == 200, f"{que} ({ruta}): {r.status_code} {r.text[:90]}")
+    finally:
+        main_mod._TOPE_MP = tope
 
 print(f"fallas: {len(FALLAS)}")
 sys.exit(1 if FALLAS else 0)

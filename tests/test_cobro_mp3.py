@@ -200,3 +200,15 @@ def test_un_aviso_sin_firma_verificable_no_cambia_nada(client, monkeypatch, secr
         assert r.status_code == 401, (nombre, r.status_code, r.text[:200])
     assert LLAMADAS == []
     assert _get_user(usuario) == antes
+
+
+def test_la_recarga_con_mercado_pago_cortado_da_503(client, monkeypatch):
+    """El SDK corta solo con un error de requests: es que Mercado Pago no contestó."""
+    import requests
+
+    def _corta(self, datos):
+        raise requests.exceptions.ConnectTimeout("simulado: Mercado Pago no contestó")
+    monkeypatch.setattr(_Creador, "create", _corta)
+    _register(client, _unique("mp3_rc"))
+    r = client.post("/api/billing/topup", json={})
+    assert r.status_code == 503, r.text
