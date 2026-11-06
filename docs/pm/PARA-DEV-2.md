@@ -31,7 +31,7 @@ PM la pasa a `COLA-LIMPIEZA.md`. Lo nuevo de la vuelta sí cumple §6.
 
 ## Piezas nuevas que aprobó Emi el 04/11 (PM)
 
-Tu cola queda: el orden de los veredictos del 05/11, arriba, y después SESION-1 → ABUSO-1 → SUFIJOS-2+SEGURO-1 → **SEGURO-2** → EMAIL-1 →
+Tu cola queda: CATALOGO-LARGO-2 → RESET-1 → PYPDF-1 → ABUSO-1 → SUFIJOS-2+SEGURO-1 → **SEGURO-2** → EMAIL-1 →
 CONEXIONES-1 → OBSERVABILIDAD-1 → ORG-1+D40. El detalle, al activarlas:
 
 - **CATALOGO-LARGO-1 (datos):** con cliente y proveedor, una descripción de
@@ -69,57 +69,119 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
-## SESION-1: devolución, sobre `c429307` (2026-11-05 23:30 UTC, PM)
+## RESET-1: aceptada sobre `02a21e7`, sin integrar (2026-11-06 PM)
 
-Acta: `REPRODUCCION-SESION-1-v2-2026-11-05.md`. Tus puertas coinciden: 29
-passed (12 rojos en la base), motores pg OK, 29 sabotajes en rojo, chequeo-6
-`+108/−257` sin avisos. Mi negativo (once tokens ajenos o falsificados, cookie
-basura más Bearer de otro) da todo 401 y distingue en la base. Lo que la pieza
-promete aguanta. Vuelve por dos causas que reproduje:
+Acta: `REPRODUCCION-RESET-1-2026-11-06.md`. Coincide con tu informe:
+`test_reset1.py` 6 passed (4 rojos en la base, 1 en `82130a8`), Postgres
+`fallas: 0` (base 3, `82130a8` 1), 8 sabotajes en rojo, chequeo-6 `+23/−15`
+sin avisos. La suite da `5 failed, 4951 passed`: los 5 de D73, que dan igual
+sobre la base. Probé un ejemplo distinto: el email va a otro y vuelve al
+original, y el link de antes sigue muerto (en la base revive). Dos
+adversarios con contexto nuevo no encontraron cómo entrar ni cómo trabar al
+dueño. Bien también que avisaras el orden y por qué.
 
-**1. Lo que se autoriza con la clave actual no queda atado a esa clave.**
-`change_password` y el cambio de email validan contra el hash leído al entrar
-y guardan con un UPDATE por id. Si el dueño resetea en el medio, el reset se
-pierde, el atacante queda con una clave suya y, en el cambio de clave, sale
-con un token vigente (`abrir_sesion` recibe el hash que él mismo escribió).
-Es lo que cerraste en el login, en las rutas que validan la clave actual.
-Pido:
-- en toda ruta que valida la clave actual, si la clave guardada cambió desde
-  la validación no se guarda nada y no se emite token (mismo código para las
-  dos rutas);
-- un caso con las rutas como datos: el reset entra justo después de validar,
-  y después la clave del reset entra, la del atacante no y ningún token suyo
-  vive. Que dos cambios a la vez no den 200 con un token ya muerto.
+- **D82:** (a), queda así. Decidido por la PM.
+- **D83:** (a), queda así: sólo corre con la variable prendida y con emails
+  de la lista de prueba. Decidido por la PM.
 
-**2. El tope abre una segunda conexión con la del pedido ya tomada.**
-`limites_auth` usa `engine.connect()`/`begin()` mientras la sesión de
-`get_db` tiene la suya. Con 40 `PUT /api/user/profile` a la vez y la clave
-mala: `{400: 3, 500: 37}`, y otro usuario esperó 29,4 s. En la base, `{400:
-40}` y 0,6 s. Pido:
-- que contar intentos no pueda agotar el pool, en cada llamada a
-  `limites_auth` desde un pedido que ya tiene la base (el perfil, el cambio de
-  clave, el login y el pedido de reset);
-- un caso en Postgres con más pedidos a la vez que conexiones del pool: ningún
-  500 y otro usuario entra en menos de 2 s. Las rutas van como datos.
+**Sigue igual:** primero esta devolución de CATALOGO-LARGO-2, después
+PYPDF-1 y después RESET-2 (en `ROADMAP.md`): el link vuelve en la respuesta
+sólo en el entorno de prueba, nunca por un `ENVIRONMENT` que falta.
 
-**Menores que entran acá** (son de `datos_del_token`, que escribiste vos):
-firmar y verificar con la misma clave, desde el mismo lugar (con
-`JWT_SECRET_KEY=""` hoy el login da 200 y todo lo demás 401), y que un token
-sin `exp` no sea una sesión.
+## CATALOGO-LARGO-2: devolución, sobre `ccfe640` (2026-11-06 PM)
 
-- **D71: (b)**, como pieza chica aparte después de SESION-1. Decidido por la PM.
-- **Tus propuestas**: sacar `create_access_token` y unificar el secreto
-  entran con los menores. Borrar `pwd:` al reset y que el cambio de email
-  apague `is_verified` van a la cola como propuestas, igual que el arreglo de
-  `smoke_friccion.sh`. El logout de v1 sin `X-CSRF-Token` (403 con CSRF
-  activo) espera D60 de Emi.
-- **Suite**: me dio `5 failed` en `test_despacho1b.py` y
-  `test_rendimiento1c.py`, igual en la base. `pypdf>=6.19.0` instaló `6.21.4`,
-  que corta antes con su propio error. No es de SESION-1. Proponé en una D si
-  se fija la versión o se adaptan las pruebas; va después de esta vuelta.
-- Mis sabotajes de `csrf3.sh` los actualizo yo cuando acepte.
-- **Orden:** esta vuelta primero, después CATALOGO-LARGO-2 (vi que ya
-  avanzaste: entregala igual, la reviso cuando llegue). Tu próxima D es D73.
+Lo central está bien. TAIWAN y CHILE llegan enteros al TXT (antes, «TAI» y
+«CHI» daban país mal o rechazo). Un texto de más de 2000 da 400 sin guardar
+nada. La migración de 200 000 filas no reescribe la tabla. Con HTML en origen
+o proveedor no hay XSS en v2. Vuelve por tres causas, las tres nuevas de la
+pieza. Acta: `REPRODUCCION-CATALOGO-LARGO-2-2026-11-06.md`.
+
+1. **Un texto que Postgres no puede guardar ahora rompe el lote entero.**
+   Antes, una descripción sin letras latinas se salteaba. Ahora entra a
+   insertar, así que un NUL o un medio par sustituto (`\ud800`) da 500 y se
+   pierde todo el lote, también los productos buenos.
+   - Lo reproduje en PG 16 con `POST /api/catalog/{id}/productos`, un ítem
+     latino más «🔩\ud800»: en `ccfe640` da 500 y el catálogo queda vacío; en
+     la base, 200 y se guarda el latino.
+   - Ese texto da hoy 400 con el mensaje del codec de Python
+     (`'utf-8' codec can't encode…`), y `vendor_name` en `null` o `false` da
+     500 (TypeError).
+   - **Pedido:** ninguna entrada mala da 500 ni pierde lo bueno del lote. Da
+     400 con un motivo para el usuario, o se limpia como ya hace
+     `_sin_nul`; elegí una regla y que valga en todos los campos.
+   - El caso lleva como datos NUL, medio par y `null` en descripción, origen
+     y proveedor, por el lote, `guardar-uso` y `PUT`, **en Postgres**.
+   - Es tu D79: (a), dentro de esta vuelta.
+2. **Una fila vieja cuya clave guardada no es la que calcula
+   `clave_de_producto` queda duplicada y sin poder editarse.**
+   - Ejemplo: clave latina con descripción CJK, que la base dejaba armar con
+     `PUT`. Guardar otra vez esa descripción crea una segunda fila `~…`.
+   - Después, cualquier `PUT` a la fila vieja da 404, porque `update_product`
+     recalcula la clave y choca con la nueva (`catalog_service.py:495-505`).
+     Quedan dos productos con la misma descripción y distinto NCM.
+   - **Pedido:** un producto tiene una sola fila, también con datos de antes
+     de la pieza, y la fila vieja sigue editable.
+   - El caso arma la fila con el camino de la base y lleva como datos CJK,
+     emoji y mezcla.
+3. **El arranque puede trabarse con un `guardar-uso` en curso, y el log
+   miente.**
+   - La migración toma `vendor_catalog_products` y después
+     `client_product_history` en una transacción; `guardar-uso` las toma al
+     revés. Eso da deadlock, se vuelve atrás todo y el arranque falla.
+   - El «✅ Migracion» se imprime antes del commit (`main.py:1244-1256`).
+   - **Pedido:** el arranque no se traba con escrituras en curso, y el log
+     dice «migrado» sólo si quedó guardado.
+   - La prueba va en PG. Si un caso con dos conexiones sale caro, alcanza con
+     mostrar el orden en el código y el rojo del log.
+
+Cada una con su rojo en la base o con el arreglo revertido, y `/entregar`
+entero.
+
+- **D76 y D77: anteriores a la pieza, no entran en esta vuelta.** Las dos
+  mezclan datos de verdad en facturas chinas: un proveedor sólo CJK comparte
+  catálogo con todos los demás, y «电线 2mm» con «钢管 2mm» se pisan el NCM sin
+  aviso. Se las propongo a Emi, recomendadas, como pieza **CATALOGO-3**,
+  junto con D78 y D80. No las empezás sin su sí.
+- **D78: (a)**, en CATALOGO-3. Hoy `historial_guardado: true` guarda una
+  fila que nunca se vuelve a encontrar.
+- **D79: (a)**, en esta vuelta (causa 1).
+- **D80:** en CATALOGO-3; el recorte a 3 de `pdf_extractor.py:574` va ahí.
+- **D81: queda.** No es XSS real, según los dos adversarios: `item.origen`
+  viene del archivo o de la tabla, y `updateField` corta en 3. Escapar ese
+  `value` va a `COLA-LIMPIEZA.md`. Decidido por la PM.
+- El tope de 2000 queda así.
+- **Tu orden: esta devolución primero**, después RESET-1. Tus próximas D
+  siguen en D82.
+
+## SESION-1: aceptada sobre `2e62761`, sin integrar (2026-11-06 PM)
+
+Acta: `REPRODUCCION-SESION-1-v3-2026-11-06.md`. Coincide con tu informe:
+`test_sesion1.py` 42 passed (13 rojos en la base), motores pg OK, 38 sabotajes
+en rojo, chequeo-6 `+95/−89` sin avisos, suite `4933 passed` con sólo las 5 de
+D73. Probé otro ejemplo del pool (40 `PUT` del perfil): ningún 500 y otro
+usuario entra al instante; en la base, 39 respuestas 500 y 29,5 s. Las dos
+causas quedan cerradas.
+
+- Se integra junto con `ca87d82`, por lo mismo: debajo vienen piezas sin
+  aceptar (ahora también CATALOGO-LARGO-2).
+- **D73:** no se fija una versión vieja a ciegas. Primero hay que ver qué
+  cambió en 6.21.4, que puede ser un arreglo de seguridad. Va como pieza chica
+  **PYPDF-1**, después de RESET-1. Decidido por la PM.
+- **D74: (a)**, se acepta así. Lo que queda (la conexión tomada durante
+  bcrypt, Gemini en `/api/ncm/sugerir` y la subida pública de PDF) entra en
+  CONEXIONES-1 con los números del acta. Decidido por la PM.
+- **D75: (a)**, a `COLA-LIMPIEZA.md`. Decidido por la PM.
+- **Pieza nueva RESET-1** (seguridad, chica; Emi: «arreglos chicos de
+  seguridad a cero»). Va después de CATALOGO-LARGO-2, antes de ABUSO-1. El
+  problema viene de antes: `reset_password` no invalida nada.
+  - Un link de reset pedido antes de que el dueño cambie la clave o el email
+    ya no sirve después de ese cambio.
+  - Un link usado una vez no sirve una segunda vez, tampoco con dos usos a la
+    vez (se consume atómico, probado en Postgres).
+  - El caso lleva los cambios como datos: cambio de clave, cambio de email,
+    otro reset y el mismo link dos veces.
+- Las anclas de `csrf3.sh` las actualizo yo al integrar.
+- **Sigue CATALOGO-LARGO-2**, como ya venías. Tus próximas D empiezan en D76.
 
 ## `ca87d82`: aceptadas RENDIMIENTO-1c, DESPACHO-1b, CATALOGO-LARGO-1 y DISCO-1, sin integrar (2026-11-05 20:45 UTC, PM)
 
@@ -158,18 +220,6 @@ estaba antes (va al acta).
 - **CATALOGO-LARGO-2: Emi dijo que sí.** Va después de SESION-1. Tu próxima
   D es D71.
 - SESION-1: ver arriba.
-
-### CATALOGO-LARGO-2: sí de Emi (05/11 21:41), va después de SESION-1
-
-Misma familia que CATALOGO-LARGO-1: lo que no entra en la columna se pierde
-sin aviso.
-
-- Un origen de más de 5 caracteres (por ejemplo «TAIWAN») o un proveedor de
-  más de 200 nunca dan 200 sin guardar ni 500. Se guardan enteros o reciben
-  un 400 con el motivo a la vista.
-- Una descripción que normaliza a vacío (sólo CJK o emoji) nunca contesta
-  `historial_guardado: true` sin haber guardado, ni se cruza con otra igual.
-- El tope de 2000 se cuenta igual en los dos lugares.
 
 ## Orden desde el 2026-10-29
 
@@ -279,22 +329,6 @@ Lo demás del revisor (XFF y `TRUSTED_PROXY_HOPS`, IPv6, deadlock con
 ventanas cortas, filas sin tope, tiempos del login) va a riesgos en tu
 informe, sin tocar producto.
 
-## SEGURO-1: aceptada sobre `5dfaf47` (2026-10-28 18:15 UTC)
-
-`test_seguro1.py` `48 passed` (corrida de la PM). Se integra con la cadena,
-después de SUFIJOS-2. Evidencia: `REPRODUCCION-SEGURO-1-2026-10-28.md`.
-
-Se suma, en commits aparte junto con la vuelta de SUFIJOS-2:
-- **Una prueba que fije la lista de los cinco.** Hoy sumar `DAT` (o `DDU`,
-  `DAF`, `DES`, `DEQ`) a `INCOTERMS_CON_SEGURO` deja `48 passed`.
-- **`/generate_maria/avisos` normaliza el incoterm igual que
-  `/generate_maria`**: con `"CIF\x00"` hoy los avisos ofrecen el 1 % y
-  generar da 400. Una sola función para los dos.
-- A riesgos: el 1 % mandado sin `seguro_calculado` entra al TXT (es lo
-  encargado; lo cubre SEGURO-2, que espera a Emi); seguro mayor que el FOB
-  sin aviso (preexistente); la revisión dice «no los sumes dos veces» y el
-  400 dice «cargá el de la factura».
-
 ## SUFIJOS-2: devolución, sobre `bd76f9f` (2026-10-28 18:05 UTC)
 
 Evidencia en `REPRODUCCION-SUFIJOS-2-2026-10-28.md`. Va en la cola después
@@ -346,112 +380,9 @@ Toca el TXT: el golden no se toca.
   arriba), OBSERVABILIDAD-1 (`39be45e`, devolución arriba) y ORG-1 + D40
   (`b358827`, devolución arriba).
 
-## EMAIL-1: aceptada sobre `2b93071` (2026-10-28 17:46 UTC)
+## D38 y D39 (2026-10-28)
 
-Lo de la pieza está bien: ningún camino manda el correo de una cuenta a
-otra y la respuesta no cambia exista o no. Se integra con la cadena.
-Evidencia en `REPRODUCCION-EMAIL-1-2026-10-28.md`. Sumá, encima de la
-cadena: una prueba que dé rojo si `if not email: return None` de
-`_cuenta_por_email` pasa a `if False:` (hoy `24 passed`).
-
-**A riesgos, sin tocar producto** (todo es de antes de la pieza): el nombre
-va sin escapar en el HTML de los dos correos de recuperación (phishing
-desde el remitente de CDI, reproducido); el envío síncrono delata la cuenta
-por tiempo y traba el worker; un token de recuperación viejo sigue valiendo
-tras usar uno nuevo; `dev_token_hint` fuera de producción; el 500 sin
-`FRONTEND_URL`. El 1, el 2 y el token se los propongo a Emi como pieza
-aparte: **no los arregles hasta que diga que sí**.
-
-## DATOS-1: aceptada sobre `c996ad4` (2026-10-28 17:41 UTC)
-
-El producto hace lo que pedía la D32 (a): sin fuga a otro dueño, una sola
-transacción, `/health` sin texto del error. Se integra con la cadena, cuando
-se acepte DESPACHO-1b (está debajo). Evidencia en
-`REPRODUCCION-DATOS-1-2026-10-28.md`. Sumá, encima de la cadena:
-
-1. **Un cliente con dos operaciones compartidas** (reproducido por la PM):
-   con `in_(op_ids[:1])` en el borrado de presupuestos, `test_datos1.py`
-   sigue en `9 passed`. Es el caso normal; la prueba tiene que tenerlo.
-2. **El orden presupuestos → operaciones** sólo lo frena
-   `datos1_postgres.py`, que no corre en la suite. Hacelo rojo en SQLite
-   (`PRAGMA foreign_keys=ON` en esa prueba) o decí por qué no se puede.
-3. **Verificá y proponé (D43):** una operación del cliente con
-   `owner_username` NULL (dato viejo) no entra en `op_ids`: el borrado dice
-   «eliminadas: 1», la operación queda y su presupuesto compartido sigue
-   accesible (revisor, Postgres 16; no lo reproduje). ¿Puede existir hoy
-   una fila así, según las migraciones? Si sí, proponé el arreglo.
-4. **A riesgos:** más de 32 767 operaciones dan 500 (límite de parámetros
-   del `in_`, ya existía); `api_logs.operation_id` frenaría el borrado si
-   algo lo llenara (hoy nada); la copia de `system_backups`
-   (`client_migration`) guarda datos del cliente borrado; los 502 con
-   `{err}`. La copia de `system_backups` la paso yo a Emi.
-
-## DESTINO-1: aceptada sobre `f887b4a` con `b9881fb` (2026-10-28 17:52 UTC)
-
-`test_destino1.py` `32 passed` y `destino1.sh b9881fb` 19 de 19 en rojo
-(corrida de la PM). Integrada `f887b4a` en la rama de la PM; `b9881fb`
-entra con la cadena. Evidencia: `REPRODUCCION-DESTINO-1-2026-10-28.md`.
-
-- **Punto 2(b), decidido por la PM: queda así.** Tenías razón: vacío es «el
-  de la operación», y ese grupo no se genera. No heredes el del primero.
-- Los tres riesgos y la premisa del golden quedan como los escribiste.
-
-## ORG-1: aceptada sobre `4ce6d22`, con ORG-1b y DESPACHO-1a (2026-10-28 17:38 UTC)
-
-Integrada en la rama de la PM (merge `cda3320`). Evidencia en
-`REPRODUCCION-ORG-1-2026-10-28.md`. Los guardas del producto están bien;
-faltan pruebas y un 500. Todo va **encima de la cadena**, en los commits de
-la D40, después de las 18:00 y antes de publicar.
-
-- **D40: (1)**, decidido por la PM. Al invitar, el email que ya tiene cuenta
-  da 400 y no ocupa lugar (misma respuesta en este estudio o en otro). Al
-  registrarse con una invitación, las otras pendientes del mismo email en
-  ese estudio quedan usadas.
-- **Sumá, con la D40** (reproducido por la PM sobre `4ce6d22`):
-  1. *Reingreso del sacado* (Postgres 16): dos invitaciones al mismo email,
-     X entra con la primera, el dueño lo saca, X cambia su email en el
-     perfil y entra con la segunda (`200`). La regla 2 de la D40 lo cierra;
-     la prueba es el recorrido entero. El email del perfil sin verificar va
-     a riesgos.
-  2. *Email que el registro rechaza*: invitar `josé@example.com` o
-     `ana@estudio` da 200 y ocupa lugar. Al invitar, la misma regla que el
-     registro: 400 y no ocupa lugar.
-  3. *Email largo*: en Postgres 16, invitar un email de 101 caracteres da
-     **500** (`Invitation.email` es `String(100)`); de 100, 200. Tiene que
-     dar 400 con la regla del 2. **Causa:** el largo lo frena la base, no
-     la ruta; revisá los otros campos de la invitación.
-  4. *Pruebas de los guardas.* Con cada uno de estos cambios
-     `test_org1.py` + `test_despacho1a.py` siguen en `59 passed`
-     (reproducidos por la PM: el filtro por estudio de `/mine`, el 403 al
-     que no es dueño y el borrar de otro estudio; los demás, del revisor):
-     invitar sin estudio (400), invitar sin ser dueño (403), «ya es
-     miembro» con y sin filtro por estudio, pendientes menos miembros (sin
-     `- set(emails_miembros)`), la validación de «@», el vencimiento de 7
-     días, validar con el estudio borrado (404), sacar a alguien de otro
-     estudio, sacar sin estudio (400), sacar no borra al usuario, `/mine`
-     filtra los miembros por estudio, `is_owner`, y el texto «última vez»
-     de DESPACHO-1a. Un caso por guarda, rojo con su sabotaje, en SQLite;
-     los de base, también en Postgres 16.
-- Al aceptar la última pieza de la cadena entran `6b9762e`, `3aaa3c4` y
-  estos arreglos. Nada se publica antes.
-
-## D38 y D39 (2026-10-28 14:00 UTC): sobre `2b93071` y `30c0e97`
-
-- **D38: (1)**, como lo hiciste: si el email coincide exacto con una cuenta,
-  esa; si hay varias y ninguna exacta, ninguna, con la misma respuesta que
-  cuando no existe. Decidido por la PM. La (2) no: un pedido no manda
-  correos de varias cuentas. La (3) (unificar pares e índice único sobre
-  `lower(email)`) espera el conteo de Emi en producción; si da cero, el
-  índice entra como paso nuevo sin tocar datos, y si no, decide Emi. En
-  riesgos: quien tiene un par y escribe otras mayúsculas no recupera hasta
-  la (3).
-- **D39: (1) por ahora**: los 50 de 50 con 40 logins malos a la vez van a
-  riesgos de CONEXIONES-1, con tus números. Decidido por la PM. Tu (2), la
-  medición chica con 60 a 100 a la vez, es pieza nueva: se la propongo a
-  Emi, recomendada, y no la empezás sin su sí.
-
-EMAIL-1 y CONEXIONES-1 quedan hechas, sin entregar; las entregás después de
-las 18:00 UTC en tu orden. Tu próxima D es la **D41**.
+Cerradas. Quedan resumidas en `DECISIONS.md` («D38 y D39 de la Dev MARIA»).
 
 ## Emi dijo que sí a las dos (2026-10-28 12:15 UTC): EMAIL-1 y CONEXIONES-1
 
@@ -482,7 +413,8 @@ Cerradas. Quedan resumidas en `DECISIONS.md` («D28 a D34 de la Dev MARIA»).
 ## Lo encargado de las piezas entregadas, todavía en revisión
 
 Lo de ORG-1, ORG-1b, DESPACHO-1a, DESTINO-1, DATOS-1, EMAIL-1 y DISCO-1 (aceptadas o con devolución
-arriba) salió del canal: `git show 1f648c3:docs/pm/PARA-DEV-2.md`.
+arriba) salió del canal: `git show 1f648c3:docs/pm/PARA-DEV-2.md`. Las actas de SEGURO-1,
+EMAIL-1, DATOS-1, DESTINO-1, ORG-1 y lo encargado de SESION-1: `git show 28d0422:docs/pm/PARA-DEV-2.md`.
 
 ### ABUSO-1 — hecha, sin entregar (encargada 2026-10-28 10:00 UTC)
 
@@ -524,38 +456,6 @@ Pruebas: cada hallazgo en rojo antes del arreglo, en PG16 y SQLite; una IP
 inventada en `X-Forwarded-For` no esquiva el límite ni bloquea a otro; un
 evento sin sesión o demasiado grande no se guarda; un sabotaje por regla.
 Línea en `CHANGELOG.md`. Es autenticación y registro: revisión fuerte.
-
-### SESION-1 — hecha, sin entregar (encargada 2026-10-28 09:00 UTC)
-
-OBSERVABILIDAD-1 quedó hecha (`39be45e`). Lo tuyo que queda espera a gente
-de afuera, así que te paso otra pieza de la Fase 3 que era de la técnica:
-**SESION-1**, el hallazgo S3 de `AUDITORIA-2026-10-06.md`. Decidido por la
-PM; dentro del roadmap. En commits aparte encima de `39be45e`, con su
-propio `/entregar` después del de OBSERVABILIDAD-1.
-
-- **El problema (S3):** resetear o cambiar la contraseña revive las
-  sesiones viejas, incluso las ya revocadas; cerrar sesión no revoca; con
-  una sesión robada se cambia el email sin contraseña y se toma la cuenta.
-- **Premisa primero:** reproducí cada parte sobre `39be45e` (PG16 en el
-  55432 y SQLite) antes de tocar nada, y decí dónde vive hoy la revocación
-  (jti, versión de token, lo que haya) y qué rutas cambian contraseña o
-  email. Si alguna parte ya no se reproduce, decilo con la prueba.
-- **Qué hacer:** cambiar o resetear la contraseña y cerrar sesión revocan
-  de verdad las sesiones que corresponden (las otras, y en cerrar sesión la
-  propia), y una revocada no vuelve; cambiar el email pide la contraseña
-  actual. Usá el mecanismo de revocación que ya exista; si no hay uno o hay
-  dos que compiten, preguntá en la **D35** antes de inventar otro.
-- **Fuera de alcance:** los hallazgos vecinos de Argon
-  (`REPRODUCCION-ARGON-2026-10-24.md`, filas 10, 13.2 y 14: link de
-  verificación reutilizable, reset con cookie vieja, contador de intentos,
-  tokens de reset paralelos, `/auth/me` y el jti). Si tu cambio arregla
-  alguno de paso, decilo; si no, una línea por cada uno a «riesgos». No
-  los arregles a propósito: eso lo prioriza Emi.
-
-Pruebas: cada parte de S3 en PG16 y SQLite, con la sesión vieja que ya no
-entra después de cada acción y la sesión nueva que sí; cambiar el email sin
-contraseña o con una equivocada falla y no cambia nada; un sabotaje por
-regla. Línea en `CHANGELOG.md`. Es autenticación: revisión fuerte.
 
 ### OBSERVABILIDAD-1 — hecha, sin entregar (encargada 2026-10-28 08:00 UTC)
 

@@ -56,3 +56,35 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   mientras habla con Gemini (medido: 28,5 s).
 - `api_logs.endpoint` es `String(200)`: un PUT o DELETE con clave larga pierde
   su métrica («value too long»).
+- `proyecto_maria/pdf_extractor.py:927` y `:936`: `'\-'` sin `r''` da
+  `SyntaxWarning` en `compileall` (Python 3.12).
+- Dos `get_db` iguales, en `proyecto_maria/main.py:165` y
+  `proyecto_maria/auth/dependencies.py:21`: dejar uno (D75 de MARIA).
+- `_escribir_y_confirmar` (`main.py`): un commit que llega a la base y tira
+  error en Python cobra sin entregar, y el reintento cobra otra vez (raro).
+- `delete_cliente` bloquea usuario y después organización; sacar a un miembro
+  del estudio, al revés: deadlock posible (500, sin pérdida de datos).
+- `proyecto_maria/static/app.js:1945`: `value="${item.origen}"` sin escapar.
+  Hoy no llega texto del catálogo ahí, pero escaparlo igual que la
+  descripción (D81 de MARIA).
+- `finalize.js`: Enter doble en «Reintentar» (`:1361-1366`) o en «Generar»
+  manda dos generaciones; no cobra otra vez (reusa `operacion_id`).
+- `CDI.api` sin timeout (`finalize.js:654`): una generación colgada deja la
+  carga siguiente en el spinner.
+- `_escribir_y_confirmar` (`main.py:5933-5941`): si falla el commit y también
+  restaurar `.anterior`, se pierde el archivo ya entregado (falla doble).
+- `con_pg16.sh` guarda su puerto en `PUERTO`, que pisa el exportado por
+  `cobro_corte1.sh`, `cobro_mp1.sh`, `cobro_mp2.sh` y `backup1a.sh`:
+  renombrar a `PG_PUERTO`.
+- `_migrate_catalogo_claves`: con choque, la fila que se mueve sale sin
+  `ORDER BY` y la otra queda con su clave latina; el log «quedan por un
+  choque» se repite en cada arranque.
+- `_migrate_product_history_clave` (`main.py:1464`): el índice único se crea
+  sin `lock_timeout`; un `guardar-uso` abierto traba el arranque.
+- `save_products` y `update_product` buscan y después insertan: lotes o `PUT`
+  iguales a la vez dan 500 y pierden el lote.
+- `/api/catalog/lookup`: 500 con medio par o campos que no son texto, y no
+  limpia el NUL como el guardado.
+- `_precio` acepta `True`, negativos y `"1_0"`.
+- Mensajes del NCM: con más de 2000 dice «pasa de 2000» aunque el tope es 20;
+  `guardar-uso` dice «La NCM» y el lote «El NCM».

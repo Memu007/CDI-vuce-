@@ -363,3 +363,47 @@ PM.
 **2026-11-05 21:41 UTC, Emi en el chat de la PM principal:** «CATALOGO-LARGO-2
 sí, dale». Entra en la cola de MARIA después de SESION-1, como estaba
 propuesta.
+
+## 2026-10-28 — D38 y D39 de la Dev MARIA (PM)
+
+Decidido por la PM; el texto entero está en `git show d79a8b8:docs/pm/PARA-DEV-2.md`.
+D38 (1): con email exacto, esa cuenta; con varias y ninguna exacta, ninguna,
+con la misma respuesta que si no existe. El índice sobre `lower(email)` espera
+el conteo de Emi en producción. D39 (1): los números de 40 logins malos a la
+vez van a riesgos de CONEXIONES-1; la medición de 60 a 100 se propone a Emi.
+
+## 2026-11-06 — CATALOGO-LARGO-2: devolución y D76 a D81 (PM)
+
+Vuelve por tres causas nuevas de la pieza: un NUL o medio par rompe el lote
+entero en PG, una fila vieja queda duplicada y sin editar, y la migración puede
+trabarse con `guardar-uso` y loguea antes del commit. D79 (a) en la vuelta.
+D76, D77, D78 y D80 van a Emi como pieza CATALOGO-3, recomendada. D81 queda:
+escapar el `value` va a la cola de limpieza.
+
+## 2026-11-06 — RESET-1 aceptada, D82 y D83, RESET-2 y la limpieza integrada (PM)
+
+RESET-1 aceptada sobre `02a21e7`, sin integrar. D82 (a): pedir un link nuevo
+no mata los anteriores. D83 (a): `_archived_test_email` no barre links. RESET-2
+sumada por la PM («a cero»): el link vuelve en la respuesta sólo en el entorno
+de prueba. La limpieza del repositorio (`07e7b5f`) se integra en `dd052d4`
+tras suite y sabotajes de CSRF-2 y COBRO-MP-1 en verde sobre `27b19d9`;
+cierra D60 (se retira la v1).
+
+### 2026-11-06 11:20 UTC (PM)
+
+COBRO-CORTE-1 aceptada sobre `ca50916`, sin integrar (debajo hay piezas
+técnicas sin aceptar desde `e0b8626`). Cuatro bajas a la cola de limpieza.
+La validación de 60 s que cruza cargas (`finalize.js:103-108`, de antes) se
+propone a Emi como pieza nueva.
+
+### 2026-11-06 11:40 UTC (PM)
+
+COBRO-MP-2 con devolución sobre `4f1822f`. D62 (a): una pausada de otro
+miembro frena el checkout con 409, como una autorizada; la lista de estados
+que pagan va en un solo lugar. Sacar del estudio sólo se frena por la que paga.
+
+
+### 2026-11-06 12:06 UTC (Emi)
+
+Sí a la pieza nueva VALIDACION-1 (Dev técnica, después de COBRO-MP-2): la
+validación de una carga nunca muestra ni guarda lo de otra.

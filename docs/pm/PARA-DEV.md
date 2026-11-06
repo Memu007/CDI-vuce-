@@ -3,60 +3,91 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
-## Veredicto de COBRO-CORTE-1, vuelta (2026-11-05 22:00 UTC): devolución por dos causas
+## Veredicto de COBRO-MP-2 (2026-11-06 PM): devolución
 
-Sobre `0b9ccde`. Evidencia: `docs/pm/REPRODUCCION-COBRO-CORTE-1-v2-2026-11-05.md`.
-Lo de la vuelta anterior está cumplido: identidad por operación, sin 409,
-borrar cliente no recuenta, 402 igual dos veces, `trial` sin 500, sin atajo
-`testing`, D61 b. Los casos (82) y el chequeo-6 (`+131/−149`, 0 avisos) dan
-como dijiste. Lo que vuelve son dos bordes de esa identidad nueva.
+Sobre `4f1822f`. Evidencia: `docs/pm/REPRODUCCION-COBRO-MP-2-2026-11-06.md`.
+Lo de una sola cuenta aguanta: Opus y Sonnet alto, por separado, no lograron
+cobro doble, servicio sin cobro ni días perdidos; tus casos dan `55 passed` y
+el guion de Postgres, 0 fallas. Vuelve por el estudio.
 
-**Causa 1: se cobra antes de entregar.** `_contar_maria` confirma el conteo y
-la fila antes de escribir el TXT (`main.py:4776`, `:4928`). Si algo falla
-después, la persona recibe un 500 sin archivo ni `operacion_id`, y el
-reintento cuenta otra. Lo reproduje en Postgres con la escritura fallando en
-el primer pedido: `500 ops 1`, reintento `200 ops 2`, dos filas. En `375edbc`
-el mismo reintento daba `ops 1`.
-Pido: lo que no se entregó no queda cobrado. Familia: falla al escribir el
-TXT, excepción del generador después de contar, y lo mismo en exportación.
+**Causa 1: quién puede tocar la suscripción que paga se decide distinto en
+cada ruta.** Cancelar dice «la dueña o quien abrió la que paga (autorizada o
+pausada)», pero:
+- reactivar no pide nada: un miembro deshace la cancelación de la dueña
+  (`200 trial`, lo reproduje);
+- el checkout de un miembro cancela la pausada que paga, que cancelar le
+  niega (D62);
+- sacar del estudio a quien sólo dejó una pendiente, o una ya cancelada en
+  MP, da 409 y la única salida es cancelar el plan que sí paga;
+- el 409 del checkout dice que sólo la cancela quien la abrió, y con el
+  estudio en `past_due` dice «Se renueva sola».
+Pido: una sola regla de qué suscripción paga y quién la toca, usada por
+cancelar, reactivar, checkout y sacar miembros. Sacar a alguien sólo se frena
+por la que paga; una pendiente suya se cancela en MP al sacarlo (503 sin
+sacarlo si MP no contesta). Familia como datos, un caso: dueña, quien abrió la
+que paga, otro miembro; contra cancelar, reactivar, checkout con pausada de
+otro y sacar con pendiente, cancelada o la que paga. Reactivar toma el mismo
+candado que cancelar (sugerencia: cierra también el pago que llega en medio).
 
-**Causa 2: una respuesta tardía escribe el id en la carga que sigue.**
-`finalize.js` asigna `CDI.state.operacionId` cuando vuelve `/generate_maria`
-y cuando vuelve el guardado al cliente, sin mirar si la carga sigue siendo la
-misma. Si la persona empieza otra carga en esa ventana, la nueva hereda el id:
-no se cuenta y pisa la fila y el archivo de la anterior. Lo reprodujeron por
-separado Opus y Sonnet, demorando la respuesta con `page.route`: `ops antes 3
-despues 3`, una sola fila para dos facturas.
-Pido: una respuesta sólo escribe en la carga que la pidió. Familia: respuesta
-de generar, respuesta del guardado, y v1 (`app.js:3390`, `:3751`, mismo
-patrón, no corrido). Esas líneas las agregaste vos: son tuyas; el resto de
-`saveOperationToHistory` y `reSave…` sigue siendo de MARIA.
+**Causa 2: lo que se muestra sale de quien mira, no de la cuenta que paga.**
+En un estudio con la de otro miembro autorizada, la dueña ve `renueva False,
+suscripcion_abierta False` («Activo hasta» y sin «Cancelar plan»). Pido:
+`billing_me` calcula «Próximo cobro» y «Cancelar plan» con la suscripción que
+paga el estudio, igual para todos los miembros. Caso con dueña, quien abrió y
+otro miembro.
 
-**Además, chicos (a cero, como pidió Emi para seguridad y datos):**
-3. Un `operacion_id` que la base no acepta (NUL, surrogate suelto) da 500 en
-   Postgres en `/generate_maria`, en exportación con surrogate y en el
-   guardado. No cobra, pero el 500 devuelve `dev_detail` con SQL en test.
-   Pido: un id que no es de una operación propia es operación nueva, nunca
-   500, en las tres rutas. En SQLite no se ve: el caso corre en Postgres.
-4. El aviso de borrar cliente (`clientes.js:1594`) dice que se borra el
-   historial de operaciones, y quedan como «Sin cliente». Que diga lo que pasa.
-5. `delete_cliente` reescribe `extra` sin `_cuenta_bloqueada`. Plausible, no
-   reproducido: una huella pisada es una regeneración gratis. Que tome el
-   mismo candado.
+**Causa 3: el estudio entero espera mientras se habla con MP, sin tope.** La
+creación por el SDK no tiene el `timeout=10` de las otras llamadas: con MP
+caído la espera pasa los 20 s que declaraste, y en ese tiempo no generan los
+miembros ni entra el aviso de pago. Pido: con MP sin contestar, el checkout y
+cancelar terminan en 503 dentro de un tope que digas, y nadie del estudio
+espera más que eso. Un caso con MP que no contesta.
 
-Un caso por causa con la familia como datos, rojo antes en `0b9ccde`, y su
-sabotaje. Uno de cada familia lo pruebo yo con otro ejemplo.
+**D62: (a), decidido por la PM.** Una pausada de otro miembro frena el
+checkout con 409, igual que una autorizada: cancelar ya la trata como la que
+paga, y con (b) un miembro sin permiso la cancela por el checkout (Opus lo
+reprodujo). Un estudio con una pausada abandonada no queda trabado: la dueña
+puede cancelarla. La lista de estados que «pagan» va una sola vez, en esta
+vuelta (§6: el chequeo que quedaría en dos lugares se pone una vez).
 
-**Quedan como están** (decidido por la PM): el mensaje del tope que le dice a
-Premium «actualizá a Premium» (previo; cola de limpieza); los dos relojes del
-inicio de período, dentro del riesgo de 1 s ya aceptado; pestañas abiertas
-durante una publicación que no mandan el id, mismo riesgo declarado.
-`d528a67` (comentarios sin historia) y `9213536` llegaron después de la
-entrega: entran en la próxima vuelta.
+**A la cola o al riesgo ya aceptado** (no los toques): estado de MP
+desconocido (`expired`) en 503 para siempre; «Próximo cobro» con una
+cancelada desde MP; los textos de antes (`SUBSCRIPTION_PAST_DUE`, «Tu prueba
+gratis terminó», «Cancelaste tu suscripción» al miembro).
+
+Rojo antes en `4f1822f`, sabotajes, suite y chequeo-6 sobre la vuelta. Uno de
+cada familia lo pruebo yo con otro ejemplo.
+
+## Veredicto de COBRO-CORTE-1, vuelta 4 (2026-11-06 PM): aceptada, sin integrar
+
+Sobre `ca50916`. Evidencia: `docs/pm/REPRODUCCION-COBRO-CORTE-1-v4-2026-11-06.md`.
+`test_cobro_corte1.py` da `98 passed`; tus sabotajes, 88 `ROJO` y
+`sabotajes con falla: 0`; la suite completa, `4284 passed, 335 skipped,
+3 xfailed`, rc=0. El chequeo-6 da los 3 avisos que explicaste. Opus y Sonnet
+alto no encontraron doble cobro ni datos de una carga en otra; lo de la
+devolución queda cerrado (la respuesta escribe en la carga que la pidió, B
+genera cuando vuelve A, regenerar no depende de `os.link`). No la integro
+todavía: tu rama lleva debajo piezas sin aceptar desde `e0b8626`.
+
+**A la cola de limpieza** (decidido por la PM, no son de esta pieza):
+Enter doble en «Reintentar» o «Generar» (dos generaciones, sin cobro extra),
+`CDI.api` sin timeout (spinner colgado), la falla doble commit + restaurar
+`.anterior`, y `PUERTO` de `con_pg16.sh` que pisa el de tus sabotajes
+(renombrar a `PG_PUERTO`; si tocás `backup1a.sh` en BACKUP-1a, hacelo ahí).
+
+**VALIDACION-1 (sí de Emi, 06/11), después de COBRO-MP-2:** la validación
+de una carga nunca muestra ni guarda lo de otra. Hoy `runValidation`
+(`finalize.js:103-108`) reusa `lastValidation` 60 s sin mirar de qué carga
+es: el panel de B muestra totales, errores y avisos de A, el historial de B
+se guarda con los totales de A y «Generar» se habilita por los errores de A.
+Pido: lo que se muestra, lo que se guarda y lo que habilita «Generar» salen
+siempre de la carga que se ve. Un caso con clics en la pantalla real, dos
+cargas distintas en menos de 60 s; familia como datos: panel, historial y
+botón. Rojo en la base y `/entregar` entero.
 
 **CSRF-3: aceptada** sobre `9fe55d4` (2026-11-05 19:20 UTC), integrada. Evidencia: `docs/pm/REPRODUCCION-CSRF-3-2026-11-05.md`. Suite 4450 passed, csrf3/2/1 en rojo (8, 10, 8), chequeo-6 sin avisos; Opus y Sonnet alto sin hallazgo que bloquee. El 500 de `/dashboard` sin base y la carrera del token van a la cola de limpieza.
 
-**Tu orden:** la devolución de COBRO-CORTE-1 → COBRO-MP-2 → COBRO-MP-3 →
+**Tu orden:** la devolución de COBRO-MP-2 → VALIDACION-1 → COBRO-MP-3 →
 AISLAMIENTO-2 / LIMPIEZA-1 → BACKUP-1a → EXCEL-2c. Próxima D: D62; desde ahora usás
 los pares y MARIA los impares, para que no choquen.
 
