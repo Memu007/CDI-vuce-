@@ -213,6 +213,7 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+2026-11-06 13:56 UTC: vuelta. Límite `allowed` en las tres; contexto 151k/139k/122k. Sin entregas nuevas: la técnica cierra la devolución de COBRO-MP-2 (`0fbfaff`, pruebas corriendo) y MARIA PYPDF-1 con D87 (`9204e26`, sabotajes corriendo). Limpieza: tandas 1 a 3 integradas hasta `c98213f`; queda quieta hasta VALIDACION-1 y PYPDF-1.
 2026-11-06 12:35 UTC: **CATALOGO-LARGO-2 aceptada** (`d5bc7c1`, pruebas `b0bbd8c`, MARIA, sin integrar por `e0b8626`): 40 passed, PG `fallas: 0`, 37 sabotajes en rojo sin falla, suite con sólo los 5 de D73; Opus y Sonnet alto sin 500 nuevo ni pérdida. D84 a D87 (a); seis bajas a la cola; el aviso de qué producto no se aprendió va a CATALOGO-3. Emi: sí a VALIDACION-1 (técnica, tras COBRO-MP-2) y a que la sesión de limpieza siga ordenando el repo en tandas chicas que reviso yo.
 2026-11-06 11:40 UTC: **COBRO-MP-2 vuelve con devolución** (`4f1822f`): una sola cuenta aguanta (55 passed, Postgres sin fallas, Opus y Sonnet sin cobro doble ni días perdidos). Vuelve por el estudio: reactivar sin permiso, checkout que cancela la pausada que paga, no se puede sacar a quien dejó una pendiente, «Próximo cobro» según quién mira, espera sin tope con MP caído. D62 (a).
 
@@ -238,7 +239,6 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
 
 2026-11-05 21:35 UTC: **RENDIMIENTO-1d aceptada** (`558c941`, MARIA): la salida del hijo ya no pierde texto (surrogate suelto o locale que no es UTF-8); tope de 64 K y fila por usuario con caso y sabotaje (12 ROJO). Mi ejemplo distinto, rojo en la base. Sin integrar, por lo mismo que `ca87d82`. Sigue DESPACHO-1d.
 
-2026-11-05 20:45 UTC: **`ca87d82` aceptada** (RENDIMIENTO-1c v2, DESPACHO-1b v6, CATALOGO-LARGO-1 y DISCO-1): sabotajes 138/46/12 en rojo, suite con Postgres `4537 passed`. ✅ CATALOGO-LARGO-1 y DISCO-1. **Sin integrar:** debajo vienen commits de SESION-1, ABUSO-1, OBSERVABILIDAD-1, SUFIJOS-2 y ORG-1, con devolución abierta. DESPACHO-1c (`fbbb2ad`) espera lo mismo.
 
 ## /compact conservar de la PM principal
 
