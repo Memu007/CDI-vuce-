@@ -106,7 +106,7 @@ if [ -n "$PG_URL" ]; then
       '        user = (await db.execute(select(User).where(
             User.username == user.username, User.email == user.email).with_for_update())).scalars().first()' \
       '        pass' \
-      "FALLA | el link pedido mientras se guarda el cambio de email no sirve"
+      "FALLA | el link pedido a la vez que el cambio de email no sirve"
   fi
 else
   echo "SALTO | sin PG_URL: los usos a la vez no se midieron"

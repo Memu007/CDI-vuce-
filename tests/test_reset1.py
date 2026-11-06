@@ -1,7 +1,8 @@
 """Un link para restablecer la contraseña sirve una sola vez y deja de servir
 cuando el dueño cambia la clave o el email, o usa otro link.
 
-Dos usos a la vez del mismo link, y un cambio de email a la vez que el reset,
+Dos usos a la vez del mismo link, y un cambio de email a la vez que el reset
+o que el pedido del link,
 están contra Postgres en `scripts/testing/reset1_postgres.py`.
 """
 import pytest
