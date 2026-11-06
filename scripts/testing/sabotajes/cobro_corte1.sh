@@ -374,6 +374,9 @@ sabotaje $F "v2: el guardado toma el cliente de la pantalla" \
 sabotaje $F "v2: sin cliente al pedir, el guardado no toma el que se le eligió a la carga" \
   "FALLA: v2, generar y elegir el cliente" \
   "        const cliente = foto.cliente || carga.clienteActivo || null;" "        const cliente = foto.cliente;"
+sabotaje $F "v2: el guardado prefiere el cliente elegido después de pedir" \
+  "FALLA: v2, generar y pasar a otro cliente" \
+  "        const cliente = foto.cliente || carga.clienteActivo || null;" "        const cliente = carga.clienteActivo || foto.cliente || null;"
 sabotaje $F "v2: un doble clic en Reintentar pide dos generaciones" \
   "FALLA: reintentar con doble clic pidió" \
   $'            // Oculta el error, y con él el botón: un segundo clic no pide otra generación.\n            onEnterReady();' \

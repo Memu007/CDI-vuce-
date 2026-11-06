@@ -80,7 +80,8 @@ function casosTardios({ page, v1, clienteId, cargar, pedirTxt }) {
       anotada: () => page.evaluate(() => CDI.state.operacionId) },
     // La misma carga cambia de cliente mientras espera: se guarda en el que tenía al pedir, como en v1.
     // Si al pedir no tenía, se guarda en el que se le eligió mientras esperaba.
-    ...[['cambiar de cliente', clienteId, null], ['elegir el cliente', null, clienteId]].map(([como, alPedir, despues]) => ({
+    ...[['sacar el cliente', clienteId, null], ['pasar a otro cliente', clienteId, 'otro-cliente'],
+        ['elegir el cliente', null, clienteId]].map(([como, alPedir, despues]) => ({
       que: 'v2, generar y ' + como, p: page, retenida: '**/generate_maria', pedir: () => pedirV2('', alPedir),
       otraCarga: () => page.evaluate(id => CDI.setClienteActivo(id ? { id, nombre: 'Cliente de prueba' } : null), despues),
       guardado: guardadoEn(page, clienteId), espera: VIEJA,
