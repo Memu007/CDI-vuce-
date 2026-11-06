@@ -2,270 +2,185 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## COBRO-CORTE-1, devolución de las 22:00, entregada en `8295bb5` (informe en el commit de arriba)
+## COBRO-CORTE-1, vuelta 3, entregada en `ca50916` (informe en el commit de arriba)
 
 | SHA | qué |
 |---|---|
-| `eed4f36` | producto: lo que no se entrega no se cobra, la respuesta tardía no toca la carga nueva, el id que Postgres no guarda, el aviso «Sin cliente» y el candado al borrar; CHANGELOG |
-| `441390d` | pruebas: un caso por causa y por punto, la pantalla y los sabotajes |
-| `c978a88` | producto (refactor sin cambio de comportamiento): en v1, «anotá el id si es de la carga actual» va una sola vez, en `anotarOperacion` |
-| `b285804`, `e7fcd6f` | pruebas: la respuesta tardía en su función, con los casos como datos |
-| `1fea5ba` | producto: regenerar con una falla no rompe lo entregado; la respuesta tardía guarda lo de su carga (cliente en v1, totales y valores en v2); borrar y guardar leen el cliente después del candado |
-| `892f487` | pruebas de `1fea5ba` |
-| `e487090` | producto: el archivo vuelve antes del rollback, un `.anterior` viejo no pisa lo entregado, la carga nueva en «Listo» genera; el par candado + cliente pasa a `_cliente_con_cuenta_bloqueada` |
-| `5466968` | pruebas de `e487090` |
-| `fbea636` | pruebas: el arnés de `test_valor1c` sigue a `generateMaria` (la suite daba 3 rojos sobre `892f487`, abajo) |
-| `92a981f` | merge de tu rama: no cambia nada fuera de `docs/pm` |
-| `555cd98` | pruebas: el primer commit fallido no deja el TXT en las descargas (un sabotaje daba VERDE, abajo) |
-| `8ef0752` | pruebas: tres sabotajes de la pantalla esperan el texto que da su rojo (daban ROJO?, abajo) |
-| `8295bb5` | merge de tu rama (vuelta de las 01:55): sólo `docs/pm/NOW.md` |
+| `178eb4a` | producto: la respuesta tardía aprende el catálogo en el proveedor de su carga; «Generar» ya no queda trabado mientras otra espera, y lo pedido se genera cuando ésa vuelve; el respaldo al regenerar es una copia, no un enlace; CHANGELOG |
+| `ffb2aca` | pruebas de `178eb4a`: pytest, pantalla con clics y sabotajes |
+| `3fe7ffd` | producto: el cliente elegido mientras la generación espera se usa al guardar; «Reintentar» pide una sola generación (dos hallazgos del adversario, abajo) |
+| `d9afd09` | pruebas de `3fe7ffd` y el contenido regenerado |
+| `6f186c5` | pruebas: el doble clic en «Reintentar» pasa a su propia función (AVISO de chequeo-6 sobre `d9afd09`) |
+| `d309be6` | pruebas: pasar a otro cliente mientras la generación espera, con su sabotaje (hallazgo del segundo `/code-review`) |
+| `b4cb5f9` | producto: se saca la guarda `carga === CDI.state` delante del error sin red de la generación anterior, que no tenía efecto observable (abajo, «Un sabotaje en verde») |
+| `86e2048` | pruebas: se retira el sabotaje de esa guarda |
+| `4b071ac` | merge de tu rama (`d26c404`), que trae la limpieza y retira la v1: se acepta el borrado de `static/app.js` y se descartan mis cambios a la v1; en el CHANGELOG, la entrada del corte deja de nombrar la v1 |
+| `ca50916` | pruebas: la pantalla y `cobro_corte1.sh` dejan los casos y los sabotajes de la v1 |
 
-Base: `7eda007` (tu rama con `d528a67` y `9213536`, como pediste).
-Producto `+122/−60`: suma 62 netas porque las dos causas se arreglan en tres
-lugares cada una (servidor, v2 y v1).
+Base de la vuelta: `633c383`, que era tu merge. Producto de la vuelta: `+23/−21`. Después del merge de `d26c404`, la v1 ya no existe: los cambios de esta pieza a `static/app.js` se fueron con el archivo.
 
-**Resultado.** Las dos causas, cerradas donde nacen:
+**Resultado.** Las tres cosas que pediste están cerradas:
 
-- **Causa 1.** El conteo se confirma sólo con el archivo escrito.
-  `_escribir_y_confirmar` (`main.py:5952`) escribe en `.parcial`, deja el
-  archivo ya entregado con otro nombre (hardlink a `.anterior`), reemplaza
-  atómico y recién ahí hace el commit. Si algo falla, primero vuelve el
-  archivo entregado (o se borra el nuevo) y después el rollback. Lo que puede
-  fallar después de contar (los supuestos) se arma antes.
-- **Causa 2.** La respuesta pertenece a la carga que la pidió.
-  - v2 (`finalize.js`) toma la carga, sus totales y los valores del
-    despachante al pedir. La respuesta anota el id, guarda y marca «Listo»
-    sólo en esa carga. Una carga nueva que llega a «Listo» mientras la anterior
-    espera genera cuando ésa vuelve, y el error de la anterior no le cambia el
-    paso ni se le muestra.
-  - v1 (`app.js`) toma la carga y el cliente al pedir: `anotarOperacion` anota
-    el id sólo si sigue en la misma carga.
+- **Causa 2.** Todo lo que hace la respuesta sale de la carga que la pidió.
+  - Al pedir, `fotoDeLaPantalla` toma el cliente, los totales y los valores del despachante.
+  - El historial guarda en ese cliente.
+  - `saveCatalogLearn(items, carga)` aprende en el proveedor de esa carga.
+  - Si al pedir no había cliente, toma el que se le eligió a esa misma carga mientras esperaba, nunca el de la carga que sigue.
+- **B ya no queda trabada.** «Generar» sólo se deshabilita por errores.
+  - Si B pide con A en espera, el pedido queda anotado (`pedidaMientrasOtra`).
+  - Cuando A vuelve, `onEnterReady()` genera con lo que hay en pantalla.
+  - El caso maneja la pantalla con clics.
+  - `pedidaMientrasOtra` tiene un camino real (el clic de B con A en espera) y su sabotaje da rojo, así que se queda.
+- **Sin enlaces.** `_escribir_y_confirmar` respalda lo ya entregado con `shutil.copyfile` en vez de `os.link`.
+  - Si el commit falla, la copia vuelve antes del rollback, como antes.
+  - Lo que cuesta: una copia del TXT por regeneración, que pesa pocos KB.
 
-**Nada para decidir.** Sin D. Supuestos reversibles:
+**Nada para decidir.** Sin D. Hay un supuesto reversible: con un doble clic en «Reintentar», el primer clic oculta el error, así que el segundo ya no encuentra el botón. No hay candado aparte.
 
-- un `.anterior` o un `.parcial` que quede de un proceso cortado se descarta en
-  la próxima regeneración del mismo archivo;
-- un id con NUL o con un surrogate es una operación nueva y contada, como un
-  id desconocido.
+### Cómo se cumple cada punto
 
-### Cómo se cumple cada causa y cada punto
-
-| | qué hace el producto | caso | sabotaje |
+| | qué hace el producto | caso | sabotaje (`cobro_corte1.sh`) |
 |---|---|---|---|
-| Causa 1: se cobra antes de entregar | `_escribir_y_confirmar`: escribir, reemplazar y recién ahí confirmar; los supuestos antes de contar | `test_lo_no_entregado_no_queda_cobrado`, familia como datos: `importacion_al_escribir`, `importacion_despues_de_contar`, `importacion_al_confirmar` y `exportacion_al_escribir` | «se confirma el conteo antes de escribir», «lo escrito a medias queda en las descargas», «un primer commit fallido deja el archivo en las descargas», «los supuestos se arman después de contar» |
-| Causa 1, al regenerar: lo ya entregado queda entero | `.parcial`, hardlink a `.anterior` y `os.replace`; si falla, vuelve el `.anterior` que enlazó esta regeneración, antes del rollback | `test_regenerar_con_una_falla_deja_entero_lo_ya_entregado`: `al_escribir`, `al_confirmar`, `al_confirmar_y_deshacer` (el rollback también falla) y `al_escribir_con_un_anterior_viejo` | «regenerar escribe sobre lo ya entregado», «un commit fallido deja el archivo nuevo», «se deshace la base antes de devolver el archivo», «se restaura un anterior que no es de esta regeneración» |
-| Causa 2: la respuesta tardía no escribe en la carga que sigue | v2: la carga, sus totales y sus valores se toman al pedir. v1: la carga y el cliente se toman al pedir | pantalla, `casosTardios` con siete casos como datos: v2 generar y guardar, v1 generar y guardar, y la carga nueva en «Listo» con la anterior que vuelve bien, con un error o sin red | nueve de v2 («generar anota en la carga de la pantalla», «guardar anota…», «generar guarda con la carga de la pantalla», «el guardado toma los valores de la pantalla al responder», «la respuesta tardía marca lista la carga nueva», «el guardado toma el cliente de la pantalla», «la carga nueva en «Listo» no genera», «el error de la anterior cambia de paso a la carga nueva», «la anterior sin red le muestra el error a la carga nueva») y cuatro de v1 («generar anota en la carga nueva», «guardar anota…», «el guardado toma el cliente del selector al responder», «cancelar no empieza otra carga») |
-| 3. un id con NUL o surrogate no da 500 | `_operacion_del_usuario` no busca en la base un id que Postgres no puede comparar (`_NO_GUARDABLE_EN_PG`) | `test_un_id_que_la_base_no_guarda_es_una_operacion_nueva` (generar, exportar, guardar × NUL, surrogate) y el caso 5 de `cobro_corte1_postgres.py`, que es donde el NUL da 500 | «un id que la base no guarda se busca igual», «Postgres recibe el id que no puede comparar» |
-| 4. el aviso dice «Sin cliente» | `clientes.js`: «Sus operaciones quedan en el historial como «Sin cliente», sin el detalle de sus ítems. Se borran sus productos aprendidos y notas NCM. Esta acción no se puede deshacer.» | sin caso: es un texto | — |
-| 5. `delete_cliente` toma el candado | `delete_cliente` y `save_client_operation` usan `_cliente_con_cuenta_bloqueada`: candado y después el cliente | caso 6 de Postgres (borrar espera el candado) y caso 7 (el guardado que esperaba detrás del borrado de su cliente da 404 sin operación, no un 500 por la FK) | «borrar cliente no espera el candado de la cuenta», «el guardado mira el cliente antes del candado» |
+| Causa 2: historial, catálogo y cliente de la carga que pidió | `fotoDeLaPantalla` con `cliente`; `saveOperationToHistory` usa `foto.cliente \|\| carga.clienteActivo`; `saveCatalogLearn(items, carga)` | pantalla, `casosTardios`: «v2, generar» (el catálogo aprende en su proveedor y el historial va a su cliente), «v2, generar y sacar el cliente», «… pasar a otro cliente» y «… elegir el cliente» | «v2: el guardado toma el cliente de la pantalla», «v2: el guardado prefiere el cliente elegido después de pedir», «v2: sin cliente al pedir, el guardado no toma el que se le eligió a la carga», «v2: el catálogo aprende en el proveedor de la pantalla» |
+| B genera cuando A vuelve | `vGenerate.disabled` sólo por errores; sin el corte de `onGenerate`; el `finally` llama a `onEnterReady()` si se pidió otra | pantalla, «v2, la carga nueva en «Listo» y la anterior vuelve bien / con un error», con clics en «Generar» | «v2: generar se deshabilita mientras otra espera», «v2: lo pedido mientras otra espera no se genera», «v2: al volver la anterior no se genera lo pedido» |
+| Un doble clic en «Reintentar» pide una vez | «Reintentar» llama a `onEnterReady()`, que oculta el error y el botón | pantalla, `reintentarConDobleClic` | «v2: un doble clic en Reintentar pide dos generaciones» |
+| Regenerar sin enlaces | `shutil.copyfile(ruta, respaldo)` | `test_regenerar_funciona_en_un_disco_sin_enlaces` (tres regeneraciones con `os.link` fallando dan 200, el archivo tiene lo regenerado y cuenta 1) y `al_confirmar_sin_enlaces` en `test_regenerar_con_una_falla_deja_entero_lo_ya_entregado` | «el respaldo es un enlace y no una copia», «regenerar deja el archivo ya entregado» y el que ya estaba, «un commit fallido deja el archivo nuevo», con el ancla nueva |
+
+`al_confirmar_sin_enlaces` no distingue nada por sí solo: con la copia, `os.link` ya no se llama. Lo dejo como la guarda que pediste («sin perder lo ya entregado si el commit falla»): si alguien vuelve a enlazar, ese caso prueba que el commit fallido no rompe lo entregado.
 
 ### Puertas
 
 | Puerta | SHA | Salida |
 |---|---|---|
-| suite completa | `555cd98` | `4498 passed, 121 skipped, 3 xfailed, 101 warnings in 610.16s (0:10:10)`, salida 0; `compileall` salida 0 |
-| suite completa | `fbea636` | `4497 passed, 121 skipped, 3 xfailed, 101 warnings in 631.93s (0:10:31)`, salida 0; `compileall` salida 0 |
-| suite completa | `892f487` | `3 failed, 4492 passed, 121 skipped, 3 xfailed`: los tres de `test_valor1c` con «ReferenceError: fotoDeLaPantalla is not defined» (su arnés extrae `generateMaria` sola). Arreglado en `fbea636` |
-| `test_cobro_corte1.py` + `test_valor1c.py` | `555cd98` | 126 passed, 7 warnings |
-| sabotajes `cobro_corte1.sh`, con Postgres | `8295bb5` | 85 `ROJO`, 0 `ROJO?`, 0 `VERDE`, 0 `ROTO`; «sabotajes con falla: 0», salida 0 |
-| sabotajes `cobro_corte1.sh`, con Postgres | `555cd98` | 82 `ROJO`, 3 `ROJO?`; «sabotajes con falla: 3», salida 1 (abajo) |
-| `/code-review high` | `e7fcd6f..892f487` | 9 hallazgos, abajo |
-| `/security-review` | `7eda007..HEAD`, producto | sin hallazgos |
+| suite completa | `ca50916` | `4518 passed, 101 skipped, 3 xfailed, 101 warnings in 604.99s (0:10:04)`, salida 0 |
+| sabotajes `cobro_corte1.sh`, con Postgres | `ca50916` | `sabotajes con falla: 0`, salida 0: 88 ROJO (57 de pytest, 25 de la pantalla, 6 del lock en Postgres), ningún VERDE ni ROTO; las tres bases «en verde» |
+| pantalla `pantalla_cobro_corte1.js` | `ca50916` | `pantalla COBRO-CORTE-1: OK`, salida 0; también «BASE  | la pantalla en verde» dentro de los sabotajes |
+| `test_cobro_corte1.py` | `ca50916` | `98 passed in 68.35s` |
+| `/code-review high` | `633c383..ffb2aca` y `ffb2aca..6f186c5` | abajo |
+| `/security-review` | `633c383..6f186c5`, producto | sin hallazgos de confianza alta |
+| chequeo-6 | `d26c404..ca50916` | `avisos: 3`, con su porqué abajo (salida entera abajo) |
 
-De `555cd98` a `8295bb5` sólo cambian `cobro_corte1.sh` (+4/−3) y `NOW.md`:
-la suite y las pruebas de la pieza corridas sobre `555cd98` valen para el
-producto entregado, que es el mismo.
+Todo se corrió sobre `ca50916`, el SHA que entrego, que ya trae tu limpieza.
 
-`smoke_friccion.sh` y `ataque_aislamiento.sh`: no corridos. La pieza no toca
-permisos: borrar y guardar siguen filtrando el cliente por dueño, ahora
-después del candado.
+`smoke_friccion.sh` y `ataque_aislamiento.sh`: no corridos. La pieza no toca permisos ni sesión: el guardado sigue validando en el servidor que el cliente sea del dueño.
 
 ### Rojo antes
 
-Pruebas de `fbea636` sobre el producto de `7eda007`:
-`12 failed, 113 passed`, salida 1.
+Cada caso nuevo, con el producto de antes (`8295bb5`, o `178eb4a` para los dos hallazgos del adversario):
 
-- `test_un_id_que_la_base_no_guarda_es_una_operacion_nueva`:
-  - `[surrogate-generar]` da 400 con «'utf-8' codec can't encode character '\ud800'…»;
-  - `[surrogate-exportar]` y `[surrogate-guardar]` dan 500.
-- `test_lo_no_entregado_no_queda_cobrado`, filas `[importacion_al_escribir]`,
-  `[importacion_despues_de_contar]` y `[exportacion_al_escribir]`, con «lo que no se
-  entregó quedó contado / assert 1 == 0».
-- `test_regenerar_con_una_falla_deja_entero_lo_ya_entregado`, filas `[al_escribir]`
-  y `[al_escribir_con_un_anterior_viejo]`, con «el archivo ya entregado cambió con
-  una regeneración que falló».
-- 4 de arnés: `test_sin_sesion_las_rutas_que_cuentan_dan_401` («_contar_maria() takes
-  6 positional arguments but 7 were given») y 3 de `test_valor1c` («no está
-  fotoDeLaPantalla en finalize.js»). No son el defecto: muestran que la prueba
-  llama al producto nuevo.
+| caso | producto | rojo |
+|---|---|---|
+| «v2, generar», el catálogo | `8295bb5` | `FALLA: v2, generar: aprendió en «http://127.0.0.1:8871/api/catalog/proveedor_b_sa/productos», no en el de su proveedor`, `SALIDA=1` |
+| «v2, generar y sacar el cliente» (entonces se llamaba «cambiar de cliente») | `8295bb5` | `FALLA: v2, generar y cambiar de cliente: la respuesta tardía no se guardó en el cliente de su carga con su operación (mandó «undefined»)` |
+| «v2, la carga nueva en «Listo»…», con clics | `8295bb5` | `FALLA: no deja generar: ` (B trabada) |
+| `test_regenerar_funciona_en_un_disco_sin_enlaces` | `8295bb5` | `E   assert [500, 500, 500] == [200, 200, 200]` |
+| «v2, generar y elegir el cliente» | `178eb4a` | `FALLA: v2, generar y elegir el cliente: la respuesta tardía no se guardó en el cliente de su carga con su operación (mandó «undefined»)` |
+| `reintentarConDobleClic` | `178eb4a` | `FALLA: reintentar con doble clic pidió generar, guardar, generar, guardar` |
 
-Lo que pasa en la base y por qué:
+Con el producto de `ca50916`, los seis dan `OK` o pasan.
 
-- Las filas NUL de pytest pasan porque SQLite acepta el NUL. El punto 3 se ve
-  en Postgres.
-- `al_confirmar`, `al_confirmar_y_deshacer` e `importacion_al_confirmar` (ésta,
-  corrida aparte con las pruebas de `555cd98`: `3 failed, 1 passed` en la
-  familia) pasan porque cuidan defectos que nacieron en esta vuelta: en la base
-  el commit iba antes de escribir. Los sostiene su sabotaje.
+**«v2, generar y pasar a otro cliente»** cubre un hueco de las pruebas, no del producto, así que no tiene rojo sobre un producto viejo. El rojo es con el producto actual y la precedencia invertida (`carga.clienteActivo || foto.cliente`):
 
-No corridos: el rojo antes de Postgres (casos 5 a 7) contra `7eda007` y el de
-la pantalla contra la base. Lo que sí hay, sobre SHAs intermedios de esta
-vuelta:
+- «sacar el cliente» seguía en `OK`: no veía el defecto.
+- El caso nuevo da `FALLA: v2, generar y pasar a otro cliente: la respuesta tardía no se guardó en el cliente de su carga con su operación (mandó «undefined»)` y `SALIDA=1`.
 
-- `e7fcd6f`:
-  - pantalla: «FALLA: v2, generar: guardó los valores de la carga nueva» y
-    «FALLA: v1, generar: la respuesta tardía no se guardó en el cliente de su
-    carga con su operación (mandó «undefined»)»;
-  - Postgres: «FALLA | guardar en un cliente que se borró mientras esperaba: 404
-    sin operación (esperó True, 500, 0 operaciones)».
-- `892f487`:
-  - `test_regenerar…`: 2 failed, 2 passed;
-  - pantalla: «FALLA: v2, la carga nueva en «Listo» y la anterior vuelve bien: no terminó».
-
-### Lo que encontraron los sabotajes
-
-La primera corrida, sobre `fbea636`, dio
-«VERDE | lo escrito a medias queda en las descargas: la prueba no lo vio».
-
-- El sabotaje sacaba el borrado del archivo final en el `except`. Desde
-  `1fea5ba` se escribe primero en `.parcial`, así que la falla al escribir ya
-  no crea ese archivo.
-- Ese borrado sólo actúa cuando falla el commit de una primera generación, y
-  ninguna fila lo probaba. Sin él, el TXT quedaba en las descargas sin contar.
-- En `555cd98`:
-  - la fila `importacion_al_confirmar` cubre esa falla, con el sabotaje nuevo
-    «un primer commit fallido deja el archivo en las descargas»;
-  - el sabotaje viejo pasa a sacar la limpieza del `.parcial`, que es lo que
-    su nombre dice.
-- Corridos a mano antes del commit:
-  - el nuevo da `1 failed` en `[importacion_al_confirmar]`;
-  - el viejo da `4 failed`, entre ellos `[exportacion_al_escribir]`.
-
-Esa corrida además se cortó por un error mío: edité el script mientras bash lo
-ejecutaba y dio «syntax error near unexpected token» en la línea 317, salida 2.
-No cuenta. Desde ahí, ninguna corrida tuvo el árbol tocado mientras corría.
-
-La de `555cd98` dio tres `ROJO?`: el sabotaje rompía lo que debía y el
-caso lo vio, pero con otro texto que el esperado. Reproducidos uno por uno:
-
-- «v2: generar anota en la carga de la pantalla»: la carga vieja guarda sin
-  id y salta antes el chequeo del guardado: «FALLA: v2, generar: la respuesta
-  tardía no se guardó en el cliente de su carga con su operación (mandó «»)».
-- «v2: la anterior sin red le muestra el error a la carga nueva»: el texto
-  real dice «la anterior se queda sin red», no el nombre del caso.
-- «v1: guardar anota en la carga nueva»: generar también guarda, así que lo ve
-  antes «FALLA: v1, generar: la carga nueva quedó con la operación». Corrido
-  sólo el caso de guardar, da por su cuenta «FALLA: v1, guardar: la carga nueva
-  quedó con la operación «la-operacion-de-la-carga-anterior», no «»».
-
-`8ef0752` cambia sólo esos tres textos esperados; sobre `8295bb5` los tres dan
-`ROJO` con el texto nuevo.
+Ése es su sabotaje en `cobro_corte1.sh`.
 
 ### Hallazgos de la autorrevisión
 
-Adversario Sonnet alto (uno solo, como pide la vuelta), sobre `eed4f36`:
+**Adversario: uno solo, Sonnet alto, sobre `178eb4a`**, porque es la vuelta de una devolución de plata. Reproduje lo que dijo antes de anotarlo.
 
 | # | hallazgo | qué hice |
 |---|---|---|
-| 1 | regenerar con la escritura fallando pisa el TXT ya entregado (reproducido: 1745 bytes pasan a 5) | arreglado en `1fea5ba` (`.parcial`, hardlink y reemplazo atómico); caso y sabotajes en `892f487` |
-| 2 | guardar contra un cliente que se borra a la vez da 500 por la FK (reproducido en Postgres: 13 de 18) | arreglado en `1fea5ba`: el cliente se lee después del candado y da 404; caso 7 de Postgres |
-| 3 | v2: el guardado tardío toma la validación y los valores de la carga nueva | arreglado en `1fea5ba`: se toman al pedir; caso y sabotaje en `892f487` |
-| 4 | `PATCH /api/operations/{id}/estado`, agrupar y desagrupar dan 500 con NUL en Postgres | queda como riesgo: no cuentan ni exponen nada, y sólo le pasa a quien manda el NUL |
-| 5 (plausible) | `CancelledError` durante el commit, con el commit ya en el servidor: cobra sin entregar | queda como riesgo: no se pudo disparar y el cliente tampoco recibe la respuesta |
-| 6 (plausible) | v1: el guardado tardío toma el cliente del selector al responder | arreglado en `1fea5ba` (`carga.cliente`); caso y sabotaje en `892f487` |
+| A1 | dos clics en «Generar» piden dos generaciones | Con `dblclick` y con `Enter` se genera una vez y los totales quedan bien (`valor_total [1387.5]`). Sólo pasa con dos `click()` sincrónicos desde JS: la segunda generación sale y el guardado queda con los totales en cero (`valor_total [0]`). Un clic real lleva a «Listo», donde el botón ya no está. Va a riesgos; no hay código para esto. La segunda generación reusa la operación por su id y no cuenta. |
+| A2 | un doble clic en «Reintentar» pide dos generaciones | reproducido (rojo arriba), arreglado en `3fe7ffd` |
+| A3 | `os.link` con un `.anterior` que es el mismo archivo da `SameFileError` | no aplica: `os.link` sale en `178eb4a` y nunca se publicó |
+| A4 | `al_confirmar_sin_enlaces` no distingue nada | cierto; queda como guarda, arriba |
 
-`/code-review high` (Opus, alto) sobre `e7fcd6f..892f487`:
+**`/code-review high` sobre `633c383..ffb2aca`**
 
 | # | hallazgo | qué hice |
 |---|---|---|
-| 1 | el rollback iba antes de devolver el archivo: si fallaba, se perdía lo entregado | arreglado en `e487090`; fila `al_confirmar_y_deshacer` y su sabotaje |
-| 2 | la carga nueva en «Listo» quedaba en el spinner por `generateInFlight` (regresión mía) | arreglado en `e487090` con `pedidaMientrasOtra`; tres casos de la pantalla |
-| 3 | si fallaba el `.parcial`, se restauraba un `.anterior` viejo | arreglado en `e487090` con `enlazado`; fila `al_escribir_con_un_anterior_viejo` |
-| 4 | el error de una carga reemplazada llegaba a la carga nueva | arreglado en `e487090`: guarda en el `catch`; dos casos de la pantalla |
-| 5 | v1 (`app.js:3408`): la respuesta tardía muestra el alert de supuestos, «¡Generado!» y la descarga | queda como riesgo: v1, y no anota ni guarda nada en la carga nueva |
-| 6 | el `FOR UPDATE` queda tomado tras el 404 hasta cerrar la sesión | descartado: son milisegundos, en la misma petición |
-| 7 | en un volumen sin hardlinks, `os.link` falla y toda regeneración da 500 | queda como riesgo, abajo |
-| 8 | altura: fotos de globales sueltos en v2 | a la cola de limpieza |
-| 9 | el par candado + cliente estaba repetido en dos rutas | arreglado en `e487090`: `_cliente_con_cuenta_bloqueada` |
+| 1 | sin cliente al pedir, el guardado no toma el que se elige mientras espera (también lo vio el adversario) | reproducido (rojo arriba), arreglado en `3fe7ffd` |
+| 2 y 3 | pedir otra vez la misma carga mientras espera la regenera | riesgo, abajo |
+| 4 | `SameFileError` con `os.link` | no aplica (A3) |
+| 5 | `pedidaMientrasOtra` | es la guarda pedida, con camino real y sabotaje |
+| 6 a 10 | un caso que faltaba (6), uno falso (7) y tres cosméticos (8 a 10) | el 6, agregado; los demás, sin cambio |
 
-`/security-review` a mano sobre el producto `7eda007..HEAD`: sin hallazgos.
-Los nombres `.parcial` y `.anterior` salen del archivo de la operación, que
-arma el servidor, dentro de la carpeta del usuario.
+**`/code-review high` sobre `ffb2aca..6f186c5`**
+
+| # | hallazgo | qué hice |
+|---|---|---|
+| 1 | el mismo que el 2 y el 3 de la primera tanda | riesgo, abajo |
+| 2 | sacar el cliente no distingue la precedencia del guardado | confirmado: con la precedencia invertida daba `OK`. Caso «pasar a otro cliente» y sabotaje en `d309be6` |
+| 3 | en `reintentarConDobleClic`, una segunda generación que saliera después del guardado se escaparía del registro | Con el sabotaje aplicado corrí el caso 6 veces y las 6 dio `FALLA: reintentar con doble clic pidió …`: tres con `generar, guardar, generar, guardar` y tres con `generar, guardar, generar`. La segunda generación sale siempre antes de la respuesta del guardado; el comentario del caso lo dice. Sin cambio. |
+| 4 | un comportamiento que es el pedido | sin cambio |
+| 5 a 7 | `open().read()` en `tests/test_cobro_corte1.py:902`, `cargaNuevaV2` repetida, predicados duplicados en `anotar` | nits de pruebas, sin cambio |
 
 ### Riesgos
 
-- **Hardlinks** (code-review #7): si las descargas viven en un volumen sin
-  hardlinks, toda regeneración da 500 y no cobra. Railway usa un disco local
-  que los soporta, pero no lo probé allí.
-- Un `.anterior` o `.parcial` de un proceso cortado queda en disco hasta la
-  próxima regeneración. Sólo lo ve su dueño.
-- Borrar un cliente toma el candado de la cuenta y de la org, y la escritura a
-  disco ocurre con el candado tomado: los pedidos de la misma cuenta esperan
-  esos milisegundos.
-- `CancelledError` con el commit ya en el servidor (adversario #5).
-- `PATCH /estado`, agrupar y desagrupar dan 500 con NUL en Postgres
-  (adversario #4).
-- La fila NUL × guardar de pytest no distingue el defecto en SQLite. Lo
-  distingue el caso 5 de Postgres.
-- v1: la respuesta tardía igual muestra sus avisos y descarga (code-review #5).
-- El `onLeave` de «Listo» que limpia la carga pedida no tiene caso propio.
-- Observación, no de esta pieza: con pedidos en paralelo sobre SQLite, la API
-  registra «database is locked» al escribir el historial del cliente
-  (`main.py:7593`, existe desde `7e9c989`). Es una escritura que puede fallar
-  sin cortar el guardado, y aparece también en la pantalla sin sabotaje (2 veces,
-  en verde).
+- **El doble clic sincrónico en «Generar»** (A1): dos pedidos al servidor y un guardado con los totales en cero. No hay doble cobro. Con clics reales no pasa.
+- **Pedir otra vez la misma carga mientras espera** (code-review 2 y 3): se regenera la misma operación, que no cuenta otra vez. Con un 402, el modal sale dos veces.
+- **B genera con lo que hay en pantalla al volver A.** Si el usuario cambió algo entre su clic y la vuelta de A, sale lo nuevo, que es lo que ve.
+- **Siguen en la cola, decididos por vos:** el commit que tira error en Python y los candados de `delete_cliente`. El alert de v1 se fue con la v1.
+
+### Un sabotaje en verde
+
+El sabotaje que sacaba la guarda `carga === CDI.state`, puesta delante del error sin red de la generación anterior, daba VERDE. La causa es que el `finally` de esa generación llama a `onEnterReady()` en el mismo tick, y eso oculta el error antes de que se vea. La guarda no tenía efecto observable, así que `b4cb5f9` la saca y `86e2048` retira su sabotaje. Ninguno de los dos cambia el comportamiento, y por eso no llevan línea en el CHANGELOG.
+
+### Lo que no salió limpio
+
+- La suite pasó, pero trae un `PytestUnhandledThreadExceptionWarning` en `test_estudio1b.py::test_un_estudio_id_escrito_como_vacio_da_400_y_no_cae_al_perfil[/generate_maria/avisos-  ]`: un hilo de aiosqlite le contesta a un event loop ya cerrado (`RuntimeError: Event loop is closed`). Es un aviso, no una falla, y sale de un test que esta pieza no toca.
+- La primera corrida de sabotajes sobre `d309be6` y la primera sobre `ca50916` terminaron en «BASE  | la pantalla ya está en rojo sin sabotaje» y `FALLA: la API no levantó`. La causa está en el arnés, no en el producto: `scripts/testing/con_pg16.sh` guarda el puerto de su Postgres en `PUERTO`, y si `PUERTO` venía exportado, `cobro_corte1.sh` recibe el puerto del Postgres y levanta la API encima de él. La corrida que vale (arriba) fija el puerto de la API dentro del comando que recibe `con_pg16.sh`.
+- **Hallazgo fuera de la pieza:** el mismo choque afecta a `cobro_mp1.sh`, `cobro_mp2.sh` y `backup1a.sh` cuando quien llama a `con_pg16.sh` ya tiene `PUERTO` en el entorno; sin eso, la variable no pasa al comando y no hay choque. El arreglo es renombrar la variable interna de `con_pg16.sh` (por ejemplo, `PG_PUERTO`). No lo toqué: va con BACKUP-1a o a la cola, como decidas.
+- Los sabotajes sobre `86e2048` los corté yo con el merge, por eso salieron con 143. No cuentan: valen los de `ca50916`.
+- `/security-review` cubre `633c383..6f186c5`. De ahí al SHA entregado, el producto sólo saca una guarda de la UI (`b4cb5f9`) y el merge trae tu limpieza, que no revisé como seguridad.
 
 ### chequeo-6
 
+Uso `d26c404` como base: `633c383` no es ancestro de tu rama, y desde ahí el rango contaría tu limpieza como mía. Lo que mide es lo que mi rama suma sobre la tuya: las tres vueltas de COBRO-CORTE-1 y COBRO-MP-2.
+
 ```
-chequeo-6 7eda007..8295bb5: avisos para mirar, no un veredicto
-producto +122/−60
-  AVISO producto suma 62 líneas netas: el informe dice por qué (§6: más de 20)
-arnés +417/−13
+chequeo-6 d26c404..ca50916: avisos para mirar, no un veredicto
+producto +351/−261
+  AVISO producto suma 90 líneas netas: el informe dice por qué (§6: más de 20)
+arnés +1541/−298
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/main.py: 11302 → 11333
-  proyecto_maria/static/app.js: 6765 → 6772
-  AVISO creció una función de más de 150: proyecto_maria/static/app.js:3263 generateMariaTxt 190 → 191, 1 en su propio cuerpo (§6: lo nuevo va aparte)
+  proyecto_maria/main.py: 11237 → 11293
+  proyecto_maria/services/billing_service.py: 412 → 414
+  proyecto_maria/static/v2/app_v2.js: 1190 → 1192
   proyecto_maria/static/v2/screens/clientes.js: 1984 → 1984
-  proyecto_maria/static/v2/screens/finalize.js: 1360 → 1384
-  AVISO creció una función de más de 150: proyecto_maria/static/v2/screens/finalize.js:9 <anónima> 1352 → 1376, 6 en su propio cuerpo (§6: lo nuevo va aparte)
-  AVISO función nueva de 74 líneas: scripts/testing/pantalla_cobro_corte1.js:30 casosTardios (§6: ~60)
-avisos: 4
-salida 0
+  proyecto_maria/static/v2/screens/finalize.js: 1357 → 1387
+  AVISO creció una función de más de 150: proyecto_maria/static/v2/screens/finalize.js:9 <anónima> 1349 → 1379, 6 en su propio cuerpo (§6: lo nuevo va aparte)
+  proyecto_maria/static/v2/screens/profile.js: 587 → 587
+  proyecto_maria/static/v2/screens/upload.js: 718 → 718
+  AVISO función nueva de 67 líneas: scripts/testing/pantalla_cobro_corte1.js:33 casosTardios (§6: ~60)
+avisos: 3
 ```
 
-Por qué queda cada AVISO:
-
-- las 62 netas: las dos causas en servidor, v2 y v1 (arriba);
-- `generateMariaTxt`: la línea nueva toma la carga antes del fetch, y lo
-  demás ya salió a `anotarOperacion`. Partir la función va a la cola de limpieza;
-- `<anónima>` es el envoltorio del módulo de `finalize.js`, no una función;
-- `casosTardios`: son los siete casos como datos, uno por línea de la tabla.
+- **90 líneas netas de producto:** es lo acumulado de las tres vueltas de COBRO-CORTE-1 y de COBRO-MP-2, que todavía no están en tu rama. Esta vuelta sola es `+23/−21`.
+- **`finalize.js:9 <anónima>`:** es el IIFE que envuelve el archivo entero, no una función de lógica. Lo nuevo está en funciones propias dentro de él.
+- **`casosTardios`, 67 líneas:** es una lista de casos escritos como datos (§6, «un caso por causa»), y se achicó al sacar la v1. Partirla separaría casos que comparten `cargaNuevaV2` y `pedirV2`.
 
 ### Para reproducir
 
 ```bash
-git checkout 8295bb5
-# 1. «126 passed, 7 warnings»
-DATABASE_URL=sqlite+aiosqlite:///./t.db GEMINI_API_KEY=test-key ENVIRONMENT=test python -m pytest -q --no-cov tests/test_cobro_corte1.py tests/test_valor1c.py
+git checkout ca50916
+# 1. todo «passed»
+DATABASE_URL=sqlite+aiosqlite:///./t.db GEMINI_API_KEY=test-key ENVIRONMENT=test python -m pytest -q --no-cov tests/test_cobro_corte1.py
 # 2. todo ROJO y «sabotajes con falla: 0»; sin PG, la parte de Postgres dice «NO CORRIDO»
-PY=$(which python) PG=postgresql://<usuario>@127.0.0.1:<puerto> scripts/testing/sabotajes/cobro_corte1.sh 8295bb5
-# 3. «avisos: 4»
-python docs/pm/herramientas/chequeo-6.py 7eda007 8295bb5
+PY=$(which python) PG=postgresql://<usuario>@127.0.0.1:<puerto> scripts/testing/sabotajes/cobro_corte1.sh ca50916
+# 3. «avisos: 3», los de arriba
+python docs/pm/herramientas/chequeo-6.py d26c404 ca50916
 ```
 
 ### Archivos de producto tocados
 
-`proyecto_maria/main.py` (generar, exportar, guardar, borrar cliente),
-`proyecto_maria/static/app.js`,
-`proyecto_maria/static/v2/screens/finalize.js`,
-`proyecto_maria/static/v2/screens/clientes.js` (sólo el texto del aviso) y
-`CHANGELOG.md`.
+- `proyecto_maria/main.py` (`_escribir_y_confirmar`)
+- `proyecto_maria/static/v2/screens/finalize.js`
+- `CHANGELOG.md`
 
 ---
 
-/compact conservar: Dev 1, rama claude/dev-tecnica. COBRO-CORTE-1
-(devolución 22:00) entregada en 8295bb5 (informe en el commit de arriba), sin
-D. Sigue COBRO-MP-2 (D62), empezando por los rojos de sus sabotajes. Nada se
-publica sin el «dale» de Emi; nunca main.
+/compact conservar: Dev 1, rama claude/dev-tecnica. COBRO-CORTE-1 (vuelta 3) entregada en ca50916, sobre tu merge d26c404 (informe en el commit de arriba), sin D. Sigue COBRO-MP-2 (D62), empezando por los rojos de sus sabotajes. Nada se publica sin el «dale» de Emi; nunca main.
