@@ -119,3 +119,29 @@ sed -n '3178,3183p' /home/user/CDI-vuce-/proyecto_maria/main.py
   lugares) y `CHANGELOG.md`.
 
 /compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP, aviso a la PM session_01B7FVQspcEHF7PqNv797wNM priority next. RESET-2 ENTREGADA: producto 249cfd4 (helper _pista_dev_habilitada: token/usuario de reset vuelven en la respuesta sólo con IS_TESTING, nunca con ENVIRONMENT ausente), pruebas+sabotaje 99d3f69, informe en el commit siguiente, SHA 99d3f69. Antes entregué PYPDF-1 (f3bd528, informe 7417fe8) sin integrar. Decisiones abiertas para la PM: D91 (ALTA, fuera de alcance: login con ENVIRONMENT ausente deja entrar demo/demo123 como admin y entrar con el hash como contraseña — main.py:3181 y demo en lifespan 1608; recomiendo pieza chica que gate en prueba), D92 (webhook MP main.py:11294 y link de reset en stdout, misma raíz), D93 (test_reset_flow.py manual ahora necesita ENVIRONMENT=testing). Próxima D libre D94. Sigue: ABUSO-1 (orden del roadmap tras RESET-2). Reglas de Emi: nada se publica sin su «dale» para el SHA (no propongo SHA; la rama lleva e0b8626 no aceptada), nunca main, nunca force/amend de lo ya pusheado (rehíce 249cfd4/99d3f69 porque eran locales, sobre el pusheado 7417fe8), sin secretos ni datos reales, subagentes hasta alto sin Fable, no uso advisor, Postgres local 55432. conftest pisa ENVIRONMENT a 'testing'.
+
+---
+
+## ABUSO-1 (en pausa por el corte, sin commitear nada)
+
+Arranqué la investigación; **no toqué producto ni pruebas** (sólo leí código y
+reproduje en un PG descartable local). Dónde quedó cada punto de la devolución
+sobre `43916a7`, contra HEAD actual:
+
+- **D44 (2ª conexión del login):** ya está arreglado por `ce7cd9d` (SESION-1
+  v2: `limites_auth` usa la conexión del pedido). Falta: una prueba de
+  concurrencia en PG que lo pruebe (verde en HEAD) y un sabotaje que devuelva
+  la 2ª conexión.
+- **Punto 1 (duración de bloqueos):** abierto. Las pruebas mueven el reloj
+  justo pasado el tope, así que el mutante `bloqueo=60` sobrevive. Falta:
+  casos «a los 14 min sigue 429, a los 16 pasa» (bloqueo de 15 min) y el
+  equivalente para la ventana de recuperar (3600 s), con la fixture `reloj`.
+- **Punto 2 (claves 121-300 en PG):** por confirmar el mecanismo exacto;
+  `hash_password` usa `bcrypt.hashpw`, que en bcrypt moderno **levanta** con
+  >72 bytes → probable 500 en registro/reset/cambio. Falta reproducir y topear
+  el largo antes de la base + matar el mutante `len(clave) <= 300`.
+- **Punto 3 (surrogate 500 en recover-username):** abierto. `main.py:1791`
+  `request.email...encode()` levanta `UnicodeEncodeError` con un surrogate
+  suelto → 500. Falta hacerlo a prueba de surrogates + caso.
+
+Retomo con `/respondio` cuando se levante el corte. Próxima D: D94.
