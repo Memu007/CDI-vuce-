@@ -64,3 +64,6 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   error en Python cobra sin entregar, y el reintento cobra otra vez (raro).
 - `delete_cliente` bloquea usuario y después organización; sacar a un miembro
   del estudio, al revés: deadlock posible (500, sin pérdida de datos).
+- `proyecto_maria/static/app.js:1945`: `value="${item.origen}"` sin escapar.
+  Hoy no llega texto del catálogo ahí, pero escaparlo igual que la
+  descripción (D81 de MARIA).

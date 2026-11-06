@@ -18,8 +18,8 @@ y en la base no pasaba.
 | lo mismo en la base | `9 failed, 87 passed` (distingue) |
 | `cobro_corte1_postgres.py` | rc=0, `fallas: 0`, 18 OK |
 | `chequeo-6.py 7eda007 8295bb5` | `producto +122/−60`, historia vacía, `avisos: 4`, los cuatro explicados en el informe |
-| sabotajes | se anotan al terminar |
-| suite completa | se anota al terminar |
+| `sabotajes/cobro_corte1.sh 8295bb5` | 85 `ROJO`, `sabotajes con falla: 0`, salida 0 |
+| suite completa en `8295bb5` | `4264 passed, 355 skipped, 3 xfailed` en 507 s, rc=0 |
 
 ## Adversarios (contexto nuevo, sin red)
 
