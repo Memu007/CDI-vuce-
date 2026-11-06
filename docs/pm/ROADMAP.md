@@ -146,7 +146,8 @@ Sin cambios respecto del 2026-10-07, más OBSERVABILIDAD-1:
 |---|---|---|
 | ✅ SESION-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ RESET-1 | Dev MARIA | Sumada por la PM el 06/11 («arreglos chicos de seguridad a cero», Emi): un link de reset deja de servir después de un cambio de clave o email y después de usarse una vez, también con dos usos a la vez |
-| 🔵 RESET-2 | Dev MARIA | Sumada por la PM el 06/11 («arreglos chicos de seguridad a cero», Emi): el pedido de reset devuelve el link en la respuesta sólo en el entorno de prueba; un `ENVIRONMENT` que falta o es otro no lo devuelve |
+| ✅ RESET-2 | Dev MARIA | Sumada por la PM el 06/11 («arreglos chicos de seguridad a cero», Emi): el pedido de reset devuelve el link en la respuesta sólo en el entorno de prueba; un `ENVIRONMENT` que falta o es otro no lo devuelve |
+| 🔵 ENTORNO-1 | Dev MARIA | Sumada por la PM el 06/11 («arreglos chicos de seguridad a cero», Emi; D91/D92): con `ENVIRONMENT` ausente o desconocido no se abre ninguna puerta de desarrollo (login con la contraseña guardada, usuarios demo, webhook de MP sin firma, link de reset por stdout) |
 | ✅ PYPDF-1 | Dev MARIA | Sumada por la PM el 06/11 (D73 de MARIA): ver qué cambió en pypdf 6.21.4, que rompe 5 pruebas, y fijar la versión o adaptar las pruebas según eso |
 | 🔵 ABUSO-1 | Dev MARIA | Ver `AUDITORIA-2026-10-06.md` |
 | ✅ EMAIL-1 | Dev MARIA | Sumada por Emi el 28/10 (D36 de MARIA): recuperar usuario y contraseña encuentran el email con otras mayúsculas; ningún alta ni cambio crea un email repetido con otras mayúsculas; los pares que ya existan no se tocan hasta que Emi los cuente |

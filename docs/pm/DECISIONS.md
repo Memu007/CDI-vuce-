@@ -415,3 +415,7 @@ CATALOGO-LARGO-2 aceptada sobre `d5bc7c1` (pruebas `b0bbd8c`), sin integrar por 
 ### 2026-11-06 14:40 UTC (PM principal)
 
 PYPDF-1 aceptada sobre `974263e`, sin integrar por `e0b8626`: pypdf 6.21.4 como mínimo, sin fijar una versión vieja. D89 (a) y D90 (a). Acta: `REPRODUCCION-PYPDF-1-2026-11-06.md`.
+
+### 2026-11-06 15:00 UTC (PM principal)
+
+RESET-2 aceptada sobre `99d3f69`, sin integrar por `e0b8626`. D93 (a). D91/D92, decidido por la PM bajo «arreglos chicos de seguridad a cero» (Emi): pieza ENTORNO-1 para MARIA después de ABUSO-1; con `ENVIRONMENT` ausente o desconocido no se abre ninguna puerta de desarrollo. A Emi: confirmar que Railway tiene `ENVIRONMENT=production` exacto. Acta: `REPRODUCCION-RESET-2-2026-11-06.md`.
