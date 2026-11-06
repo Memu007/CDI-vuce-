@@ -69,8 +69,8 @@ sabotaje $M "cancelar no llama a Mercado Pago" \
   "            await run_in_threadpool(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id)" "            pass"
 sabotaje $M "si Mercado Pago falla, se cancela igual en CDI" \
   "FAILED $T::test_si_mp_no_cancela_no_se_cancela_a_medias" \
-  "en MP: {e}\")
-            raise HTTPException(status_code=503, detail=no_se_pudo)" "en MP: {e}\")"
+  "            await db.commit()
+            raise HTTPException(status_code=503, detail=no_se_pudo)" "            await db.commit()"
 sabotaje $M "sin token, se cancela igual en CDI" \
   "FAILED $T::test_sin_token_no_cancela_una_suscripcion_a_medias" \
   "    if con_sid and not billing_service.is_configured():

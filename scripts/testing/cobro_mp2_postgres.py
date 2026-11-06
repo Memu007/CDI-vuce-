@@ -3,8 +3,8 @@ serializa las escrituras y no muestra los cruces.
 
 1. Dos miembros de la misma organización pagan a la vez: tiene que quedar una
    sola suscripción viva en Mercado Pago (simulado), y es la que CDI guarda.
-   El primero que bloquea la organización espera a ver al otro esperando el
-   lock; si no lo ve en 5 s, el caso no probó el cruce y falla.
+   El primero que bloquea la organización y vuelve a mirar los miembros espera
+   ahí a ver al otro esperando el lock; si no lo ve en 5 s, no probó el cruce.
 2. Un miembro con una suscripción pendiente genera (bloquea su fila y después
    la de la organización, en el orden de la generación) mientras otro paga:
    el checkout espera y termina, sin que Postgres corte a nadie por deadlock.
@@ -76,6 +76,7 @@ def esperando_un_lock():
 
 CRUCE = []      # vacío: sin gancho; con un elemento: el caso 1 está corriendo
 EN_ORG = []
+LEYO_ORG = set()  # pedidos que ya leyeron la organización y van a mirar los miembros
 VISTO = []
 _execute_original = AsyncSession.execute
 
@@ -91,8 +92,17 @@ async def _execute_con_cruce(self, statement, *args, **kwargs):
     resultado = await _execute_original(self, statement, *args, **kwargs)
     tabla = getattr(getattr(statement, "column_descriptions", [{}])[0].get("entity"), "__tablename__", None) \
         if getattr(statement, "is_select", False) else None
-    if not CRUCE or tabla != "organizations" or not _en_checkout():
+    if not CRUCE or not _en_checkout():
         return resultado
+    # La pausa va después de volver a mirar los miembros: de ahí al guardado
+    # sólo protege el lock de la organización.
+    pedido = asyncio.current_task()
+    if tabla == "organizations":
+        LEYO_ORG.add(pedido)
+        return resultado
+    if pedido not in LEYO_ORG:
+        return resultado
+    LEYO_ORG.discard(pedido)
     EN_ORG.append(1)
     if len(EN_ORG) == 1:
         for _ in range(500):
