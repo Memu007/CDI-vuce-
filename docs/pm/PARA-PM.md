@@ -2,152 +2,188 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## COBRO-CORTE-1, vuelta 3, entregada en `ca50916` (informe en el commit de arriba)
+## COBRO-MP-2, entregada en `4f1822f` (informe en el commit de arriba)
+
+### Decisiones
+
+**D62. Una suscripción pausada de otro miembro, en el checkout de un miembro.** Hoy el checkout la cancela antes de crear la nueva, igual que una pendiente.
+
+- (a) Frenar con 409, como con una autorizada.
+- (b) Dejarlo como está.
+
+Recomiendo **(b)**: una pausada no cobra, y la nueva la reemplaza. Con (a), un estudio con una pausada abandonada queda sin poder pagar hasta que quien la abrió la cancele. Si elegís (b), propongo además unificar en una sola lista los estados que el checkout y cancelar tratan como «paga» (hoy están escritos en dos lugares); va a la cola de limpieza, no a esta pieza.
+
+### Resultado
+
+Lo que pediste está cerrado: C2, C4, C8/D9 y D7.1 a D7.4, también en un estudio (cancelar, reactivar y la segunda suscripción).
+
+- **Cancelar** cancela primero en Mercado Pago (`PUT /preapproval/{id}` con `{"status":"cancelled"}`) y después en CDI. La cuenta sigue hasta el fin del período. Si Mercado Pago no cancela, o no hay token, no se toca nada en CDI y se contesta 503.
+- **Una sola suscripción.** El 409 vale sólo con la cuenta vigente. Si la cuenta está vencida o en `past_due` y hay una vieja, se cancela antes de crear la nueva; si no se puede, 503 y no se crea nada. En un estudio se miran las de todos los miembros antes de cancelar ninguna, y una autorizada de otro frena con 409 y dice de quién es.
+- **Un pago no hace perder días:** suma 30 días desde el fin del período (o de la prueba) si todavía no venció, y desde hoy si venció. Vale también en modo preference.
+- **Reactivar** lo pagado lleva al checkout, y la pantalla dice que cobra ahora y que suma 30 días desde el fin. Reactivar una prueba no la activa. Sin token, nunca dice «activada» ni cambia la cuenta.
+- **Sin token, fuera de desarrollo o pruebas:** 503 y sin demo. El criterio es `_demo_permitida()`.
+- **«Próximo cobro»** sale sólo si hay una suscripción de Mercado Pago que se renueva.
+
+### SHAs
 
 | SHA | qué |
 |---|---|
-| `178eb4a` | producto: la respuesta tardía aprende el catálogo en el proveedor de su carga; «Generar» ya no queda trabado mientras otra espera, y lo pedido se genera cuando ésa vuelve; el respaldo al regenerar es una copia, no un enlace; CHANGELOG |
-| `ffb2aca` | pruebas de `178eb4a`: pytest, pantalla con clics y sabotajes |
-| `3fe7ffd` | producto: el cliente elegido mientras la generación espera se usa al guardar; «Reintentar» pide una sola generación (dos hallazgos del adversario, abajo) |
-| `d9afd09` | pruebas de `3fe7ffd` y el contenido regenerado |
-| `6f186c5` | pruebas: el doble clic en «Reintentar» pasa a su propia función (AVISO de chequeo-6 sobre `d9afd09`) |
-| `d309be6` | pruebas: pasar a otro cliente mientras la generación espera, con su sabotaje (hallazgo del segundo `/code-review`) |
-| `b4cb5f9` | producto: se saca la guarda `carga === CDI.state` delante del error sin red de la generación anterior, que no tenía efecto observable (abajo, «Un sabotaje en verde») |
-| `86e2048` | pruebas: se retira el sabotaje de esa guarda |
-| `4b071ac` | merge de tu rama (`d26c404`), que trae la limpieza y retira la v1: se acepta el borrado de `static/app.js` y se descartan mis cambios a la v1; en el CHANGELOG, la entrada del corte deja de nombrar la v1 |
-| `ca50916` | pruebas: la pantalla y `cobro_corte1.sh` dejan los casos y los sabotajes de la v1 |
+| `7200b82`, `b35d66a`, `b68979a` | pruebas, antes del producto: C2, C4, C8/D9, D7.1 y D7.3 |
+| `a5d4aa7` | producto: cancelar en Mercado Pago, una sola suscripción, sumar desde el fin, demo sólo en desarrollo; CHANGELOG |
+| `a4ad212`, `512a028`, `dda9f5b` | sabotajes de `a5d4aa7` y D7.1 en `test_g7_cobro` |
+| `836da59`, `2fd9b7b` | cinco sabotajes de `cobro_mp1.sh` siguen al código nuevo |
+| `3d0c8e7` | producto: un miembro del estudio no abre una segunda suscripción; CHANGELOG |
+| `3ee1521`, `9213536` | pruebas de `3d0c8e7`, en pytest y en Postgres (el deadlock) |
+| `d528a67` | producto: los comentarios dejan de nombrar la pieza (historia de §6) |
+| `767e139` | producto: cancelar y reactivar en un estudio; CHANGELOG |
+| `f6865b7` | pruebas de `767e139`: cancelar, reactivar y sacar miembros |
+| `7ffb1a6`, `7c065ab` | si una de varias no se cancela, las canceladas dejan de figurar (producto, pruebas) |
+| `381d0eb`, `8cbfbd6`, `f023b4f` | el checkout lee todas antes de cancelar ninguna (prueba del cruce, producto y CHANGELOG, pruebas) |
+| `efb7253`, `b183c34` | no se cancela ni se saca a quien no corresponde (producto y CHANGELOG, pruebas) |
+| `e2e8963`, `e12e535` | al cancelar, la que cobra va última (producto, pruebas) |
+| `11708b0`, `2a878cd` | se relee cada una justo antes de cancelarla (producto, pruebas) |
+| `5a3c766`, `4f1822f` | el 403 nombra la que paga; un estado no textual de Mercado Pago da 503 (producto, pruebas) |
 
-Base de la vuelta: `633c383`, que era tu merge. Producto de la vuelta: `+23/−21`. Después del merge de `d26c404`, la v1 ya no existe: los cambios de esta pieza a `static/app.js` se fueron con el archivo.
+Tus commits intercalados son `a3efc3a`, `192774f`, `4e7896d`, `6a07e7d` y `1bdb7a0`.
 
-**Resultado.** Las tres cosas que pediste están cerradas:
+**Producto de la pieza: `+415/−195`, 220 netas** (suma de los diez commits de producto). Por qué suma más de 20: la pieza agrega tres cosas que no existían, cancelar en Mercado Pago con su manejo de error (`_pedir_suscripcion_mp`, `_cancelar_suscripcion_mp`), el control de una sola suscripción por cuenta que paga, contando a los miembros del estudio (`_estado_suscripcion_vieja` y el bloque del checkout), y la regla de sumar desde el fin (`_extender_periodo`). Lo que se sacó fue la demo sin condición y los dos caminos de reactivar.
 
-- **Causa 2.** Todo lo que hace la respuesta sale de la carga que la pidió.
-  - Al pedir, `fotoDeLaPantalla` toma el cliente, los totales y los valores del despachante.
-  - El historial guarda en ese cliente.
-  - `saveCatalogLearn(items, carga)` aprende en el proveedor de esa carga.
-  - Si al pedir no había cliente, toma el que se le eligió a esa misma carga mientras esperaba, nunca el de la carga que sigue.
-- **B ya no queda trabada.** «Generar» sólo se deshabilita por errores.
-  - Si B pide con A en espera, el pedido queda anotado (`pedidaMientrasOtra`).
-  - Cuando A vuelve, `onEnterReady()` genera con lo que hay en pantalla.
-  - El caso maneja la pantalla con clics.
-  - `pedidaMientrasOtra` tiene un camino real (el clic de B con A en espera) y su sabotaje da rojo, así que se queda.
-- **Sin enlaces.** `_escribir_y_confirmar` respalda lo ya entregado con `shutil.copyfile` en vez de `os.link`.
-  - Si el commit falla, la copia vuelve antes del rollback, como antes.
-  - Lo que cuesta: una copia del TXT por regeneración, que pesa pocos KB.
-
-**Nada para decidir.** Sin D. Hay un supuesto reversible: con un doble clic en «Reintentar», el primer clic oculta el error, así que el segundo ya no encuentra el botón. No hay candado aparte.
+Última vuelta (`8a1dcdd..4f1822f`): producto `+29/−11`.
 
 ### Cómo se cumple cada punto
 
-| | qué hace el producto | caso | sabotaje (`cobro_corte1.sh`) |
-|---|---|---|---|
-| Causa 2: historial, catálogo y cliente de la carga que pidió | `fotoDeLaPantalla` con `cliente`; `saveOperationToHistory` usa `foto.cliente \|\| carga.clienteActivo`; `saveCatalogLearn(items, carga)` | pantalla, `casosTardios`: «v2, generar» (el catálogo aprende en su proveedor y el historial va a su cliente), «v2, generar y sacar el cliente», «… pasar a otro cliente» y «… elegir el cliente» | «v2: el guardado toma el cliente de la pantalla», «v2: el guardado prefiere el cliente elegido después de pedir», «v2: sin cliente al pedir, el guardado no toma el que se le eligió a la carga», «v2: el catálogo aprende en el proveedor de la pantalla» |
-| B genera cuando A vuelve | `vGenerate.disabled` sólo por errores; sin el corte de `onGenerate`; el `finally` llama a `onEnterReady()` si se pidió otra | pantalla, «v2, la carga nueva en «Listo» y la anterior vuelve bien / con un error», con clics en «Generar» | «v2: generar se deshabilita mientras otra espera», «v2: lo pedido mientras otra espera no se genera», «v2: al volver la anterior no se genera lo pedido» |
-| Un doble clic en «Reintentar» pide una vez | «Reintentar» llama a `onEnterReady()`, que oculta el error y el botón | pantalla, `reintentarConDobleClic` | «v2: un doble clic en Reintentar pide dos generaciones» |
-| Regenerar sin enlaces | `shutil.copyfile(ruta, respaldo)` | `test_regenerar_funciona_en_un_disco_sin_enlaces` (tres regeneraciones con `os.link` fallando dan 200, el archivo tiene lo regenerado y cuenta 1) y `al_confirmar_sin_enlaces` en `test_regenerar_con_una_falla_deja_entero_lo_ya_entregado` | «el respaldo es un enlace y no una copia», «regenerar deja el archivo ya entregado» y el que ya estaba, «un commit fallido deja el archivo nuevo», con el ancla nueva |
+Casos en `tests/test_cobro_mp2.py` salvo que diga otro archivo; sabotajes en `scripts/testing/sabotajes/cobro_mp2.sh`.
 
-`al_confirmar_sin_enlaces` no distingue nada por sí solo: con la copia, `os.link` ya no se llama. Lo dejo como la guarda que pediste («sin perder lo ya entregado si el commit falla»): si alguien vuelve a enlazar, ese caso prueba que el commit fallido no rompe lo entregado.
+| punto | qué hace el producto | caso | sabotaje |
+|---|---|---|---|
+| C2: cancela en MP y sigue hasta el fin | `cancel_billing` llama a `_cancelar_suscripcion_mp` antes de escribir; `billing_service` deja generar hasta `period_end` | `test_cancelar_cancela_la_suscripcion_en_mp_y_sigue_hasta_el_fin`; `test_cobro_corte1.py::test_la_cancelada_genera_hasta_el_fin_del_periodo` | «cancelar no llama a Mercado Pago», «la cancelada no sigue hasta el fin del período» |
+| C2: si MP falla, nada a medias | 503 sin escribir; si el PUT falla se pregunta el estado, y una ya cancelada en MP sigue | `test_si_mp_no_cancela_no_se_cancela_a_medias` (con `[contesta_sin_cancelar]`), `test_si_mp_ya_la_tenia_cancelada_cancelar_sigue`, `test_sin_token_no_cancela_una_suscripcion_a_medias`, `test_cancelar_sin_suscripcion_no_llama_a_mp` | «si Mercado Pago falla, se cancela igual en CDI», «sin token, se cancela igual en CDI», «si el PUT falla no se pregunta el estado», «si el PUT contesta sin cancelar, se da por cancelada», «cancelar sin suscripción llama a Mercado Pago» |
+| C8/D9 y D7.3: reactivar | lo pagado va al checkout; una prueba no se activa; el texto dice que cobra ahora y suma 30 días desde el fin | `test_cancelar_y_reactivar_una_prueba_no_la_activa`, `test_reactivar_lo_pagado_lleva_al_checkout_y_dice_que_cobra_ahora` | «reactivar una prueba la deja activa», «reactivar lo pagado no pasa por el checkout» |
+| C4 y D7.2: el 409 sólo vigente | `billing_checkout` frena si la cuenta está vigente y hay una abierta, también en modo preference | `test_el_segundo_checkout_con_una_vigente_se_frena`, `test_modo_preference_con_suscripcion_vigente_tambien_se_frena` | «sin el 409 con una suscripción vigente» |
+| D7.2: sin vigencia, la vieja se cancela antes | `_estado_suscripcion_vieja` lee el estado; pendiente o pausada se cancela; ya cancelada no se vuelve a cancelar; si falla o no se sabe, 503 sin crear | `test_sin_cuenta_vigente_la_vieja_se_cancela_antes_de_crear` (`[pending]`, `[ya_cancelada]`), `test_si_no_se_puede_cancelar_la_vieja_no_se_crea_nada`, `test_si_no_se_sabe_como_esta_la_suscripcion_no_se_crea_otra` (`[estado_desconocido]`, `[estado_lista]`) | «la vieja no se cancela antes de crear la nueva», «la vieja ya cancelada se vuelve a cancelar», «si no se puede cancelar la vieja, se crea igual», «si no se sabe cómo está la vieja, se crea igual», «un estado desconocido de Mercado Pago se acepta», «un estado que no es texto rompe con un 500» |
+| D7.1: el pago suma desde el fin | `_extender_periodo` suma 30 días desde `period_end` si no venció | `test_un_pago_suma_desde_el_fin_del_periodo` | «el pago suma desde el fin sólo si está activa» |
+| D7.4: sin token no hay demo | `_demo_permitida()` en checkout, en la página de la demo y al confirmarla | `test_sin_token_fuera_de_desarrollo_no_hay_demo` (`[sin_variable]`), `test_la_demo_no_dice_activada_ni_cambia_la_cuenta`, `test_la_pagina_de_exito_sin_token_no_dice_activada` | «el checkout sin token da demo fuera de pruebas», «sin la variable de entorno hay demo», «la página de la demo abre fuera de pruebas», «confirmar la demo funciona fuera de pruebas», «la vuelta del pago dice «activada»», «la vuelta de la demo dice «activada»» |
+| «Próximo cobro» | `renueva` en `billing_me` | `test_billing_me_dice_si_hay_proximo_cobro` | «renueva sin suscripción», «renueva con un checkout sin pagar» |
+| Estudio: segunda suscripción | el checkout lee las de todos los miembros antes de cancelar ninguna; una autorizada de otro da 409 con su nombre; una que se autoriza mientras se cancelan las otras no se cancela | `test_otro_miembro_no_abre_una_segunda_suscripcion_de_la_org` (4), `test_con_una_autorizada_de_otro_no_se_cancela_ninguna`, `test_la_que_se_autoriza_mientras_se_cancelan_las_otras_no_se_cancela` (`[PUT]`, `[GET]`), `test_si_una_no_se_cancela_la_ya_cancelada_en_mp_no_queda_anotada` | «el checkout no mira las suscripciones de los otros miembros», «se cancela una pendiente antes de ver la autorizada de otro», «en el checkout, si una no se cancela, las canceladas siguen anotadas», «en el checkout, la ya cancelada en Mercado Pago sigue anotada si otra falla», «no se vuelve a mirar la siguiente después de cancelar una», «la primera se cancela sin volver a mirarla después de leer las otras», «el 409 de la autorizada de otro miembro no dice de quién es», «la suscripción de un miembro no le cobra a la org»; en Postgres, «dos miembros pagan a la vez sin bloquear la organización» y «el checkout bloquea la organización antes que a los miembros» |
+| Estudio: cancelar | cambia la org, no al usuario; sólo la dueña o quien abrió la que paga (autorizada o pausada); la que cobra se cancela última; si una falla, las canceladas dejan de figurar | `test_en_una_org_cancelar_cancela_la_suscripcion_y_sigue_hasta_el_fin` (con `[abrio-paused]`), `test_en_una_org_un_miembro_que_no_la_abrio_no_la_cancela`, `test_un_miembro_cuya_suscripcion_no_paga_no_cancela_el_plan_del_estudio` (`[pending-403]`, `[cancelled-403]`, y la lectura que falla da 503), `test_al_cancelar_la_que_paga_se_cancela_ultima` (3), `test_si_una_de_varias_no_se_cancela_la_cancelada_no_queda_anotada` | «en una org, cancelar cambia al usuario y no a la org», «en una org, cualquier miembro cancela el plan», «en una org, un miembro con una pendiente propia cancela el plan», «en una org, quien abrió una suscripción pausada no la cancela», «al cancelar, la que paga no va última», «en una org, si no se lee la del miembro, cancela igual», «si una de varias no se cancela, las canceladas siguen anotadas» |
+| Estudio: reactivar y miembros | reactivar mira la org; los pagos se buscan por la org; no se saca del estudio a quien abrió una suscripción | `test_en_una_org_reactivar_lo_pagado_lleva_al_checkout` (con `[topup-trial]`), `test_no_se_saca_del_estudio_a_quien_abrio_la_suscripcion` | «en una org, reactivar mira al usuario y no a la org», «en una org, los pagos se buscan con el nombre del usuario», «se saca del estudio a quien abrió la suscripción» |
 
 ### Puertas
 
 | Puerta | SHA | Salida |
 |---|---|---|
-| suite completa | `ca50916` | `4518 passed, 101 skipped, 3 xfailed, 101 warnings in 604.99s (0:10:04)`, salida 0 |
-| sabotajes `cobro_corte1.sh`, con Postgres | `ca50916` | `sabotajes con falla: 0`, salida 0: 88 ROJO (57 de pytest, 25 de la pantalla, 6 del lock en Postgres), ningún VERDE ni ROTO; las tres bases «en verde» |
-| pantalla `pantalla_cobro_corte1.js` | `ca50916` | `pantalla COBRO-CORTE-1: OK`, salida 0; también «BASE  | la pantalla en verde» dentro de los sabotajes |
-| `test_cobro_corte1.py` | `ca50916` | `98 passed in 68.35s` |
-| `/code-review high` | `633c383..ffb2aca` y `ffb2aca..6f186c5` | abajo |
-| `/security-review` | `633c383..6f186c5`, producto | sin hallazgos de confianza alta |
-| chequeo-6 | `d26c404..ca50916` | `avisos: 3`, con su porqué abajo (salida entera abajo) |
+| suite completa, desde un worktree limpio | `4f1822f` | `4528 passed, 101 skipped, 3 xfailed, 102 warnings in 608.15s (0:10:08)`, salida 0 |
+| `compileall -q proyecto_maria` | `4f1822f` | salida 0 |
+| sabotajes `cobro_mp2.sh`, con Postgres | `4f1822f` | 45 ROJO, 0 `ROJO?`, 0 VERDE, 0 ROTO; las dos bases en verde (pytest y los cruces en Postgres); `sabotajes con falla: 0`, `salida 0` |
+| pruebas de cobro (`test_cobro_mp1*.py`, `test_cobro_mp2.py`, `test_cobro_corte1.py`) | `4f1822f` | `374 passed, 3 warnings in 165.66s (0:02:45)` |
+| `/code-review high` | `7200b82^..b183c34` | abajo |
+| `/security-review` | `8a1dcdd..4f1822f` | sin hallazgos de confianza 8 o más |
+| chequeo-6 | `6f79edf..4f1822f` y por commit | abajo |
 
-Todo se corrió sobre `ca50916`, el SHA que entrego, que ya trae tu limpieza.
-
-`smoke_friccion.sh` y `ataque_aislamiento.sh`: no corridos. La pieza no toca permisos ni sesión: el guardado sigue validando en el servidor que el cliente sea del dueño.
+`smoke_friccion.sh` y `ataque_aislamiento.sh`: no corridos. La pieza no cambia quién ve qué datos: los permisos que toca (quién cancela el plan de un estudio) tienen sus propios casos y sabotajes arriba, y `ataque_aislamiento.sh` cubre clientes y descargas, que la pieza no toca.
 
 ### Rojo antes
 
-Cada caso nuevo, con el producto de antes (`8295bb5`, o `178eb4a` para los dos hallazgos del adversario):
+Cada rojo sale de correr las pruebas del tramo contra el producto de antes. Sólo en el primer tramo las pruebas están commiteadas antes del producto. En la segunda suscripción (`3ee1521` después de `3d0c8e7`), en el estudio (`f6865b7` después de `767e139`) y en los tramos siguientes, el commit de pruebas va después del de producto. Los rojos, copiados de la salida:
 
-| caso | producto | rojo |
+| tramo | producto de antes | rojo |
 |---|---|---|
-| «v2, generar», el catálogo | `8295bb5` | `FALLA: v2, generar: aprendió en «http://127.0.0.1:8871/api/catalog/proveedor_b_sa/productos», no en el de su proveedor`, `SALIDA=1` |
-| «v2, generar y sacar el cliente» (entonces se llamaba «cambiar de cliente») | `8295bb5` | `FALLA: v2, generar y cambiar de cliente: la respuesta tardía no se guardó en el cliente de su carga con su operación (mandó «undefined»)` |
-| «v2, la carga nueva en «Listo»…», con clics | `8295bb5` | `FALLA: no deja generar: ` (B trabada) |
-| `test_regenerar_funciona_en_un_disco_sin_enlaces` | `8295bb5` | `E   assert [500, 500, 500] == [200, 200, 200]` |
-| «v2, generar y elegir el cliente» | `178eb4a` | `FALLA: v2, generar y elegir el cliente: la respuesta tardía no se guardó en el cliente de su carga con su operación (mandó «undefined»)` |
-| `reintentarConDobleClic` | `178eb4a` | `FALLA: reintentar con doble clic pidió generar, guardar, generar, guardar` |
-
-Con el producto de `ca50916`, los seis dan `OK` o pasan.
-
-**«v2, generar y pasar a otro cliente»** cubre un hueco de las pruebas, no del producto, así que no tiene rojo sobre un producto viejo. El rojo es con el producto actual y la precedencia invertida (`carga.clienteActivo || foto.cliente`):
-
-- «sacar el cliente» seguía en `OK`: no veía el defecto.
-- El caso nuevo da `FALLA: v2, generar y pasar a otro cliente: la respuesta tardía no se guardó en el cliente de su carga con su operación (mandó «undefined»)` y `SALIDA=1`.
-
-Ése es su sabotaje en `cobro_corte1.sh`.
+| primer tramo (`tests/test_cobro_mp2.py` en `b68979a`) | `b68979a` | `32 failed, 2 passed, 5 warnings in 11.06s`: todos menos `test_cancelar_sin_suscripcion_no_llama_a_mp` y `[ya_cancelada]`; los motivos son `assert 200 == 503`, `assert 200 == 409`, el checkout que crea «nueva-1», `'activada'` en la página y la suma de `timedelta(days=30)` |
+| segunda suscripción de otro miembro | `main.py` de `3d0c8e7^`, con las pruebas de `3ee1521` | `4 failed, 31 passed, 5 warnings in 12.71s`: `test_otro_miembro_no_abre_una_segunda_suscripcion_de_la_org` en `[autorizada_vigente]`, `[autorizada_vencida]`, `[pending]` y `[pausada]` |
+| cancelar y reactivar en un estudio | `d528a67` | `5 failed, 36 passed in 19.01s`: cancelar en `[duena]` y `[abrio]`, el 403 de un miembro que no la abrió, reactivar y no sacar a quien abrió |
+| la autorización durante la cancelación, la cancelada en MP, el miembro con una pendiente | `8a1dcdd` | `3 failed, 45 passed, 3 warnings in 24.35s`: `assert 200 == 409` (se creó «nueva-1»), `assert 'sus-mp2_miembro_…' is None`, `assert 200 == 403` con `{"success":true,"billing_status":"canceled",...}` |
+| la que paga va última | antes de `e2e8963` | `3 failed, 1 passed, 49 deselected`, en `[duena-pendiente]`, `[abrio-pendiente]` y `[duena-autorizada]` |
+| releer antes de cancelar | antes de `11708b0` | `[GET]`: `assert 200 == 409`; `1 failed, 3 passed, 50 deselected, 3 warnings in 5.03s` |
+| el 403 nombra la que paga | antes de `5a3c766` | `AssertionError: {"detail":"Sólo quien administra el estudio o quien abrió la suscripción puede cancelar el plan."}`; `2 failed, 2 passed, 50 deselected, 3 warnings in 4.14s` |
+| estado no textual | antes de `5a3c766` | `E   TypeError: unhashable type: 'list'` en `[estado_lista]`; `1 failed, 3 passed, 51 deselected, 3 warnings in 2.45s` |
 
 ### Hallazgos de la autorrevisión
 
-**Adversario: uno solo, Sonnet alto, sobre `178eb4a`**, porque es la vuelta de una devolución de plata. Reproduje lo que dijo antes de anotarlo.
+Reproduje cada uno antes de anotarlo.
+
+**Adversario Opus, esfuerzo alto, sobre `b183c34`** (corrió también los cruces en Postgres: `fallas: 0`)
 
 | # | hallazgo | qué hice |
 |---|---|---|
-| A1 | dos clics en «Generar» piden dos generaciones | Con `dblclick` y con `Enter` se genera una vez y los totales quedan bien (`valor_total [1387.5]`). Sólo pasa con dos `click()` sincrónicos desde JS: la segunda generación sale y el guardado queda con los totales en cero (`valor_total [0]`). Un clic real lleva a «Listo», donde el botón ya no está. Va a riesgos; no hay código para esto. La segunda generación reusa la operación por su id y no cuenta. |
-| A2 | un doble clic en «Reintentar» pide dos generaciones | reproducido (rojo arriba), arreglado en `3fe7ffd` |
-| A3 | `os.link` con un `.anterior` que es el mismo archivo da `SameFileError` | no aplica: `os.link` sale en `178eb4a` y nunca se publicó |
-| A4 | `al_confirmar_sin_enlaces` no distingue nada | cierto; queda como guarda, arriba |
+| 1 | cancelar un estudio con varias suscripciones podía cortar primero la que cobra | arreglado en `e2e8963`, con su rojo arriba |
+| 2 | `reactivate_billing` no pide permiso de dueña | riesgo, abajo |
+| 3 | entre leer las suscripciones y cancelarlas, una se puede autorizar | arreglado en `11708b0` (se relee cada una justo antes); queda la ventana mínima, abajo |
+| 4 | un 404 de Mercado Pago se toma como cancelada | riesgo, abajo |
+| 5 | los textos | riesgo y D62 |
 
-**`/code-review high` sobre `633c383..ffb2aca`**
-
-| # | hallazgo | qué hice |
-|---|---|---|
-| 1 | sin cliente al pedir, el guardado no toma el que se elige mientras espera (también lo vio el adversario) | reproducido (rojo arriba), arreglado en `3fe7ffd` |
-| 2 y 3 | pedir otra vez la misma carga mientras espera la regenera | riesgo, abajo |
-| 4 | `SameFileError` con `os.link` | no aplica (A3) |
-| 5 | `pedidaMientrasOtra` | es la guarda pedida, con camino real y sabotaje |
-| 6 a 10 | un caso que faltaba (6), uno falso (7) y tres cosméticos (8 a 10) | el 6, agregado; los demás, sin cambio |
-
-**`/code-review high` sobre `ffb2aca..6f186c5`**
+**Adversario Sonnet, esfuerzo alto, sobre `b183c34`**
 
 | # | hallazgo | qué hice |
 |---|---|---|
-| 1 | el mismo que el 2 y el 3 de la primera tanda | riesgo, abajo |
-| 2 | sacar el cliente no distingue la precedencia del guardado | confirmado: con la precedencia invertida daba `OK`. Caso «pasar a otro cliente» y sabotaje en `d309be6` |
-| 3 | en `reintentarConDobleClic`, una segunda generación que saliera después del guardado se escaparía del registro | Con el sabotaje aplicado corrí el caso 6 veces y las 6 dio `FALLA: reintentar con doble clic pidió …`: tres con `generar, guardar, generar, guardar` y tres con `generar, guardar, generar`. La segunda generación sale siempre antes de la respuesta del guardado; el comentario del caso lo dice. Sin cambio. |
-| 4 | un comportamiento que es el pedido | sin cambio |
-| 5 a 7 | `open().read()` en `tests/test_cobro_corte1.py:902`, `cargaNuevaV2` repetida, predicados duplicados en `anotar` | nits de pruebas, sin cambio |
+| 1 | el mismo que el 1 de Opus | arreglado en `e2e8963` |
+| 2 | la pausada de otro miembro se cancela en el checkout | D62 |
+| 3 | una pendiente abandonada impide sacar del estudio a quien la abrió | riesgo, abajo |
+| 4 | `reactivate_billing` sin permiso ni lock | riesgo, abajo |
+| 5 | la guarda del 409 de `cancel_billing` no tiene prueba | declarado, abajo |
+
+**`/code-review high` sobre `7200b82^..b183c34`**
+
+| # | hallazgo | qué hice |
+|---|---|---|
+| 1 | la pausada de otro miembro | D62 |
+| 2 | releer antes de cancelar | arreglado en `11708b0` |
+| 3 | un GET que falla bloquea cancelar | riesgo, abajo |
+| 4 | una cancelada conserva su id | bajo: no cobra, y el checkout siguiente la ve cancelada y no la toca |
+| 5 | una pendiente que se autoriza antes del PUT | bajo: el PUT la cancela antes de que cobre el primer mes |
+| 6 | el 403 decía «quien abrió la suscripción» a un miembro que abrió una | arreglado en `5a3c766` |
+| 7 | se mantienen los locks mientras se espera a Mercado Pago | riesgo, abajo |
+| 8 | los estados que «pagan», escritos en dos lugares | D62 |
+| 9 | pruebas duplicadas | arreglado en parte (`_dos_pendientes`) |
+
+**Adversario Sonnet, esfuerzo alto, sobre el arreglo (`8a1dcdd..2a878cd`)**: puso 12 sabotajes propios y los 12 dieron rojo.
+
+| # | hallazgo | qué hice |
+|---|---|---|
+| 1 | queda una ventana entre la relectura y el PUT | riesgo, abajo |
+| 2 | si falla el GET, cancelar da 503 | deliberado: sin saber cómo está, no se cancela a medias |
+| 3 | un estado de Mercado Pago que no es texto da 500 | arreglado en `5a3c766` |
+| 4 | dos miembros que pagan a la vez | riesgo, abajo |
+| 5 | la misma carrera, en cancelar | riesgo, abajo |
+| 6 | la pausada de otro | D62 |
+
+**`/security-review`, Sonnet alto, sobre `8a1dcdd..4f1822f`:** sin hallazgos de confianza 8 o más.
 
 ### Riesgos
 
-- **El doble clic sincrónico en «Generar»** (A1): dos pedidos al servidor y un guardado con los totales en cero. No hay doble cobro. Con clics reales no pasa.
-- **Pedir otra vez la misma carga mientras espera** (code-review 2 y 3): se regenera la misma operación, que no cuenta otra vez. Con un 402, el modal sale dos veces.
-- **B genera con lo que hay en pantalla al volver A.** Si el usuario cambió algo entre su clic y la vuelta de A, sale lo nuevo, que es lo que ve.
-- **Siguen en la cola, decididos por vos:** el commit que tira error en Python y los candados de `delete_cliente`. El alert de v1 se fue con la v1.
+**Aceptados por vos:**
 
-### Un sabotaje en verde
+- El de estudios: el plan de un estudio lo cancela la dueña o quien abrió la suscripción que paga.
+- Las cuentas `active` sin pago vuelven a `trial`.
+- Los supuestos sobre Mercado Pago: los estados son `pending`, `authorized`, `paused` y `cancelled`; una cancelada no vuelve; el cobro es inmediato; se cancela con `PUT /preapproval/{id}` y `{"status":"cancelled"}` por httpx. No se usa el SDK porque en `mercadopago==2.2.0` `PreApproval.update` arma la ruta sin la barra antes del id.
+- «Próximo cobro» sale con una suscripción que nunca se autorizó: `renueva` mira `billing_status == "active"`, `mp_preapproval_id` y `payment_provider == "mercadopago"` (`main.py:3267-3270`).
 
-El sabotaje que sacaba la guarda `carga === CDI.state`, puesta delante del error sin red de la generación anterior, daba VERDE. La causa es que el `finally` de esa generación llama a `onEnterReady()` en el mismo tick, y eso oculta el error antes de que se vea. La guarda no tenía efecto observable, así que `b4cb5f9` la saca y `86e2048` retira su sabotaje. Ninguno de los dos cambia el comportamiento, y por eso no llevan línea en el CHANGELOG.
+**Nuevos, para que los veas:**
+
+- **La guarda del 409 de `cancel_billing`** (cancelar una cuenta ya cancelada) no tiene caso ni sabotaje.
+- **Un 404 de Mercado Pago se toma como cancelada.** Si el id es de otra cuenta de MP o se borró, CDI la da por cancelada sin que lo esté.
+- **Los locks se mantienen mientras se espera a Mercado Pago**, hasta unos 20 s en el peor caso (dos llamadas con su timeout). Otra acción de cobro de la misma cuenta espera ese tiempo.
+- **`reactivate_billing` no pide ser dueña ni toma lock.** Hoy no hace daño: lo pagado va al checkout, que sí controla. Sólo cambia el texto que se muestra.
+- **Una pendiente abandonada impide sacar del estudio a quien la abrió**, hasta que alguien la cancele.
+- **Dos miembros que pagan a la vez**, o la misma carrera en cancelar: el lock de la org lo cubre en Postgres (los dos sabotajes de arriba); en SQLite, que no tiene `FOR UPDATE`, no.
+- **La ventana entre la relectura y el PUT** sigue abierta, de milisegundos. Cerrarla del todo pide que Mercado Pago acepte un «cancelar si sigue pendiente», y su API no lo tiene.
+- **Si falla el GET de una suscripción, cancelar da 503**, aunque las demás se pudieran cancelar. Es a propósito.
 
 ### Lo que no salió limpio
 
-- La suite pasó, pero trae un `PytestUnhandledThreadExceptionWarning` en `test_estudio1b.py::test_un_estudio_id_escrito_como_vacio_da_400_y_no_cae_al_perfil[/generate_maria/avisos-  ]`: un hilo de aiosqlite le contesta a un event loop ya cerrado (`RuntimeError: Event loop is closed`). Es un aviso, no una falla, y sale de un test que esta pieza no toca.
-- La primera corrida de sabotajes sobre `d309be6` y la primera sobre `ca50916` terminaron en «BASE  | la pantalla ya está en rojo sin sabotaje» y `FALLA: la API no levantó`. La causa está en el arnés, no en el producto: `scripts/testing/con_pg16.sh` guarda el puerto de su Postgres en `PUERTO`, y si `PUERTO` venía exportado, `cobro_corte1.sh` recibe el puerto del Postgres y levanta la API encima de él. La corrida que vale (arriba) fija el puerto de la API dentro del comando que recibe `con_pg16.sh`.
-- **Hallazgo fuera de la pieza:** el mismo choque afecta a `cobro_mp1.sh`, `cobro_mp2.sh` y `backup1a.sh` cuando quien llama a `con_pg16.sh` ya tiene `PUERTO` en el entorno; sin eso, la variable no pasa al comando y no hay choque. El arreglo es renombrar la variable interna de `con_pg16.sh` (por ejemplo, `PG_PUERTO`). No lo toqué: va con BACKUP-1a o a la cola, como decidas.
-- Los sabotajes sobre `86e2048` los corté yo con el merge, por eso salieron con 143. No cuentan: valen los de `ca50916`.
-- `/security-review` cubre `633c383..6f186c5`. De ahí al SHA entregado, el producto sólo saca una guarda de la UI (`b4cb5f9`) y el merge trae tu limpieza, que no revisé como seguridad.
+- La suite pasó con salida 0, pero el log trae 451 líneas `Task was destroyed but it is pending!`, de tareas de aiosqlite que quedan abiertas al cerrar el event loop. No las comparé con la cantidad en la base, así que no sé si esta pieza agrega alguna.
 
 ### chequeo-6
 
-Uso `d26c404` como base: `633c383` no es ancestro de tu rama, y desde ahí el rango contaría tu limpieza como mía. Lo que mide es lo que mi rama suma sobre la tuya: las tres vueltas de COBRO-CORTE-1 y COBRO-MP-2.
+Uso como base `6f79edf`, tu última vuelta, que es lo que vas a medir. Ese rango trae también COBRO-CORTE-1 vuelta 3 (`ca50916`), que todavía no está en tu rama; `a5d4aa7`, en cambio, ya lo está, así que no cuenta acá. Los avisos de `finalize.js` y de `casosTardios` son de COBRO-CORTE-1, con su porqué en el informe de esa entrega. El de las 108 netas suma las dos piezas: 69 son de esta (los nueve commits de producto desde `3d0c8e7`, sumados con `git show --numstat`) y 39 de COBRO-CORTE-1. El porqué de las de esta pieza está en «Producto de la pieza».
 
 ```
-chequeo-6 d26c404..ca50916: avisos para mirar, no un veredicto
-producto +351/−261
-  AVISO producto suma 90 líneas netas: el informe dice por qué (§6: más de 20)
-arnés +1541/−298
+chequeo-6 6f79edf..4f1822f: avisos para mirar, no un veredicto
+producto +372/−264
+  AVISO producto suma 108 líneas netas: el informe dice por qué (§6: más de 20)
+arnés +1672/−302
 historia (grep de §6, sin líneas movidas): vacío
 archivos de producto:
-  proyecto_maria/main.py: 11237 → 11293
+  proyecto_maria/main.py: 11237 → 11311
   proyecto_maria/services/billing_service.py: 412 → 414
   proyecto_maria/static/v2/app_v2.js: 1190 → 1192
   proyecto_maria/static/v2/screens/clientes.js: 1984 → 1984
@@ -159,28 +195,48 @@ archivos de producto:
 avisos: 3
 ```
 
-- **90 líneas netas de producto:** es lo acumulado de las tres vueltas de COBRO-CORTE-1 y de COBRO-MP-2, que todavía no están en tu rama. Esta vuelta sola es `+23/−21`.
-- **`finalize.js:9 <anónima>`:** es el IIFE que envuelve el archivo entero, no una función de lógica. Lo nuevo está en funciones propias dentro de él.
-- **`casosTardios`, 67 líneas:** es una lista de casos escritos como datos (§6, «un caso por causa»), y se achicó al sacar la v1. Partirla separaría casos que comparten `cargaNuevaV2` y `pedirV2`.
+**La última vuelta, entera:**
+
+```
+chequeo-6 8a1dcdd..4f1822f: avisos para mirar, no un veredicto
+producto +29/−11
+arnés +161/−34
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  proyecto_maria/main.py: 11293 → 11311
+avisos: 0
+```
+
+**Por commit de producto.** Medir toda la pieza desde `7200b82^` arrastra CORTE-1, CSRF, ORDEN, MP-1 y la limpieza, y da 66 avisos que no son de esta pieza. Medido commit por commit, sólo dos tienen avisos:
+
+- **`a5d4aa7`, 15 avisos.**
+  - Suma 151 netas: el porqué está arriba, en «Producto de la pieza».
+  - 11 de historia (los comentarios nombraban «COBRO-MP-2» y las D): los sacó `d528a67`. Hoy `grep -rn 'COBRO-MP-2\|D7\.' proyecto_maria/ --include=*.py --include=*.js` da vacío.
+  - 3 comentarios de 3 o 4 líneas. El del checkout quedó en dos (`main.py:10983`). Quedan dos docstrings de 3 líneas:
+    - `_pedir_suscripcion_mp` (`main.py:10424`): la tercera línea dice por qué se usa httpx y no el SDK, que el código no muestra.
+    - `_extender_periodo` (`main.py:10585`): dice desde cuándo suma en cada caso, que es la regla D7.1.
+- **`3d0c8e7`, 1 aviso:** suma 29 netas, porque el checkout pasa de mirar al usuario a mirar a todos los miembros del estudio, con su lectura y su lock.
+- Los otros ocho commits de producto dan `avisos: 0`.
 
 ### Para reproducir
 
 ```bash
-git checkout ca50916
+git checkout 4f1822f
 # 1. todo «passed»
-DATABASE_URL=sqlite+aiosqlite:///./t.db GEMINI_API_KEY=test-key ENVIRONMENT=test python -m pytest -q --no-cov tests/test_cobro_corte1.py
-# 2. todo ROJO y «sabotajes con falla: 0»; sin PG, la parte de Postgres dice «NO CORRIDO»
-PY=$(which python) PG=postgresql://<usuario>@127.0.0.1:<puerto> scripts/testing/sabotajes/cobro_corte1.sh ca50916
-# 3. «avisos: 3», los de arriba
-python docs/pm/herramientas/chequeo-6.py d26c404 ca50916
+DATABASE_URL=sqlite+aiosqlite:///./t.db GEMINI_API_KEY=test-key ENVIRONMENT=test python -m pytest -q --no-cov tests/test_cobro_mp2.py tests/test_cobro_corte1.py
+# 2. todo ROJO y «sabotajes con falla: 0»; sin Postgres 16, la parte de Postgres da BASE en rojo y cuenta una falla
+PY=$(which python) scripts/testing/sabotajes/cobro_mp2.sh 4f1822f
+# 3. «avisos: 0»
+python docs/pm/herramientas/chequeo-6.py 8a1dcdd 4f1822f
 ```
 
 ### Archivos de producto tocados
 
-- `proyecto_maria/main.py` (`_escribir_y_confirmar`)
-- `proyecto_maria/static/v2/screens/finalize.js`
+- `proyecto_maria/main.py` (`cancel_billing`, `reactivate_billing`, `billing_me`, `billing_checkout`, `_pedir_suscripcion_mp`, `_cancelar_suscripcion_mp`, `_estado_suscripcion_vieja`, `_extender_periodo`, `_demo_permitida` y las rutas de la demo)
+- `proyecto_maria/services/billing_service.py`
+- `proyecto_maria/static/v2/screens/profile.js`
 - `CHANGELOG.md`
 
 ---
 
-/compact conservar: Dev 1, rama claude/dev-tecnica. COBRO-CORTE-1 (vuelta 3) entregada en ca50916, sobre tu merge d26c404 (informe en el commit de arriba), sin D. Sigue COBRO-MP-2 (D62), empezando por los rojos de sus sabotajes. Nada se publica sin el «dale» de Emi; nunca main.
+/compact conservar: Dev 1, rama claude/dev-tecnica. COBRO-MP-2 entregada en 4f1822f (informe en el commit de arriba), con D62. Sigue COBRO-MP-3. Nada se publica sin el «dale» de Emi; nunca main.
