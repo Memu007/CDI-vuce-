@@ -467,10 +467,11 @@ def _org_con_suscripcion(client, quien_entra: str):
     return nombres, sid, org_id, fin
 
 
-@pytest.mark.parametrize("quien", ["duena", "abrio"])
-def test_en_una_org_cancelar_cancela_la_suscripcion_y_sigue_hasta_el_fin(client, quien):
+@pytest.mark.parametrize("quien, estado", [("duena", "authorized"), ("abrio", "authorized"), ("abrio", "paused")])
+def test_en_una_org_cancelar_cancela_la_suscripcion_y_sigue_hasta_el_fin(client, quien, estado):
     from tests.test_cobro_mp1 import _leer_org
     nombres, sid, org_id, fin = _org_con_suscripcion(client, quien)
+    SUS[sid] = estado
     r = client.post("/api/billing/cancel")
     assert r.status_code == 200, r.text
     assert SUS[sid] == "cancelled", "Mercado Pago sigue cobrando"
@@ -562,3 +563,65 @@ def test_no_se_saca_del_estudio_a_quien_abrio_la_suscripcion(client):
     assert SUS[sid] == "authorized"
     assert client.post("/api/billing/checkout", json={"plan": "premium"}).status_code == 409
     assert CREADAS == []
+
+
+def _dos_pendientes(client):
+    """La org de _org_con_suscripcion con dos pendientes: la de quien abrió y la del
+    miembro, que se cancelan en ese orden. La sesión queda en la dueña."""
+    nombres, sid, org_id, _ = _org_con_suscripcion(client, "duena")
+    otra = f"sus-{nombres['miembro']}"
+    SUS[sid] = SUS[otra] = "pending"
+    _set_user(nombres["miembro"], mp_preapproval_id=otra)
+    assert nombres["abrio"] < nombres["miembro"]
+    return nombres, sid, otra
+
+
+def test_la_que_se_autoriza_mientras_se_cancelan_las_otras_no_se_cancela(client):
+    nombres, sid, otra = _dos_pendientes(client)
+
+    def _se_autoriza(request):
+        s = _RUTA_SUS.fullmatch(str(request.url)).group(1)
+        if request.method == "PUT":
+            SUS[s] = "cancelled"
+            if s == sid:
+                SUS[otra] = "authorized"
+        return httpx.Response(200, json={"id": s, "status": SUS[s]})
+    FALLA["PUT"] = FALLA["GET"] = _se_autoriza
+    r = client.post("/api/billing/checkout", json={"plan": "premium"})
+    assert r.status_code == 409, r.text
+    assert SUS == {sid: "cancelled", otra: "authorized"} and CREADAS == []
+    assert _leer(nombres["abrio"])["mp_preapproval_id"] is None
+    assert _leer(nombres["miembro"])["mp_preapproval_id"] == otra
+
+
+def test_si_una_no_se_cancela_la_ya_cancelada_en_mp_no_queda_anotada(client):
+    nombres, sid, otra = _dos_pendientes(client)
+    SUS[otra] = "cancelled"
+
+    def _falla_la_primera(request):
+        s = _RUTA_SUS.fullmatch(str(request.url)).group(1)
+        if request.method == "PUT":
+            return httpx.Response(500, json={})
+        return httpx.Response(200, json={"id": s, "status": SUS[s]})
+    FALLA["PUT"] = FALLA["GET"] = _falla_la_primera
+    r = client.post("/api/billing/checkout", json={"plan": "premium"})
+    assert r.status_code == 503, r.text
+    assert _leer(nombres["abrio"])["mp_preapproval_id"] == sid
+    assert _leer(nombres["miembro"])["mp_preapproval_id"] is None
+
+
+@pytest.mark.parametrize("lectura, codigo", [("pending", 403), ("cancelled", 403), (_contesta_500, 503)])
+def test_un_miembro_cuya_suscripcion_no_paga_no_cancela_el_plan_del_estudio(client, lectura, codigo):
+    from tests.test_cobro_mp1 import _leer_org
+    nombres, sid, org_id, _ = _org_con_suscripcion(client, "miembro")
+    SUS[sid] = "pending"
+    assert client.post("/api/billing/checkout", json={"plan": "premium"}).status_code == 200
+    assert _leer(nombres["miembro"])["mp_preapproval_id"] == "nueva-1"
+    queda = "pending" if callable(lectura) else lectura
+    SUS["nueva-1"] = queda
+    if callable(lectura):
+        FALLA["GET"] = lectura
+    r = client.post("/api/billing/cancel")
+    assert r.status_code == codigo, r.text
+    assert _leer_org(org_id)["billing_status"] == "active" and SUS["nueva-1"] == queda
+    assert _leer(nombres["miembro"])["mp_preapproval_id"] == "nueva-1"
