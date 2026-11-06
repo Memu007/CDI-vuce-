@@ -152,5 +152,10 @@ else
 fi
 git checkout -q -- proyecto_maria/
 
+sabotaje $M "la pista de dev vuelve con ENVIRONMENT que falta (RESET-2)" \
+  'return not email_sent and IS_TESTING' \
+  'return not email_sent and not IS_PRODUCTION' \
+  "FAILED tests/test_email1.py::test_la_pista_de_dev_solo_en_el_entorno_de_prueba"
+
 echo "sabotajes sin rojo: $FALLAS"
 [ "$FALLAS" -eq 0 ]

@@ -156,6 +156,7 @@ def test_la_respuesta_no_cambia_exista_o_no(ruta, monkeypatch, _limpio):
     un email que existe con otras mayúsculas, uno que no existe y uno que
     coincide con un par sin coincidir exacto."""
     monkeypatch.setattr(main_mod, "IS_PRODUCTION", True)
+    monkeypatch.setattr(main_mod, "IS_TESTING", False)
     monkeypatch.setenv("FRONTEND_URL", "https://cdi.ejemplo.test")
     d = _dominio()
     _cuenta(f"eva@{d}")
@@ -202,6 +203,22 @@ def test_par_sin_exacto_no_manda_nada(ruta, pista, _limpio):
     assert r.status_code == 200 and pista not in r.json(), r.text
     assert _limpio == []
     assert _tokens_de(a) == set() and _tokens_de(b) == set()
+
+
+@pytest.mark.parametrize("ruta, pista", ((RESET, "dev_token_hint"), (RECUPERAR, "dev_username_hint")))
+def test_la_pista_de_dev_solo_en_el_entorno_de_prueba(ruta, pista, monkeypatch, _limpio):
+    """Sin SMTP, la pista de desarrollo (el token de reset o el usuario) vuelve
+    en la respuesta sólo en el entorno de prueba (RESET-2). Si ENVIRONMENT
+    falta, no es producción pero tampoco es prueba: el token no se filtra."""
+    d = _dominio()
+    _cuenta(f"gise@{d}")
+    # ENVIRONMENT ausente o 'development': ni producción ni prueba.
+    monkeypatch.setattr(main_mod, "IS_PRODUCTION", False)
+    monkeypatch.setattr(main_mod, "IS_TESTING", False)
+    with TestClient(app) as c:
+        r = c.post(ruta, headers=_ip(), json={"email": f"gise@{d}"})
+    assert r.status_code == 200, r.text
+    assert pista not in r.json(), r.json()
 
 
 def test_par_login():
