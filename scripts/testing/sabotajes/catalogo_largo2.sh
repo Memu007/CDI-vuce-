@@ -99,6 +99,22 @@ sabotaje $CS "guardar en el catálogo no mide el origen" \
   '
 ' \
   "FAILED $T::${TOPE}[catalogo-origen]"
+sabotaje $CS "una fila sin descripción se mide antes de saltarla" \
+  '        if not desc:
+            continue
+        validar_largo(desc)' \
+  '        validar_largo(desc)
+        validar_largo((prod.get("origen") or "").strip(), "El origen")
+        if not desc:
+            continue' \
+  "FAILED $T::test_una_fila_sin_descripcion_no_frena_el_lote_por_su_origen"
+sabotaje $CM "la memoria del cliente no mide el origen" \
+  '        validar_largo(origen, "El origen")
+    except ValueError:' \
+  '        pass
+    except ValueError:' \
+  "FAILED $T::test_la_memoria_del_cliente_no_guarda_un_origen_de_mas_de_2000[aprender]" \
+  "FAILED $T::test_la_memoria_del_cliente_no_guarda_un_origen_de_mas_de_2000[operacion]"
 sabotaje $CS "cambiar el origen no lo mide" \
   '        validar_largo(origen, "El origen")
         row.origen' \
