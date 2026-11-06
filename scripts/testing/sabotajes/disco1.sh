@@ -20,10 +20,12 @@ export GEMINI_API_KEY=test-key VUCE_MODE=fake TARIFAR_MODE=fake AFIP_MODE=fake \
        DOLARAPI_BASE=http://127.0.0.1:9/v1/dolares PYTHONPATH=.
 FALLAS=0
 
+# SOLO=<prueba> corre sólo esa: un sabotaje que deja la SQLite bloqueada cuelga
+# las pruebas siguientes y el corte por tiempo se come el resumen con su FAILED.
 pytest_d1() {
   rm -f test.db
   DATABASE_URL=sqlite+aiosqlite:///./test.db ENVIRONMENT=test \
-    "$PY" -m pytest -q --no-cov -p no:randomly -p no:cacheprovider tests/test_disco1.py 2>&1
+    "$PY" -m pytest -q --no-cov -p no:randomly -p no:cacheprovider "${SOLO:-tests/test_disco1.py}" 2>&1
 }
 
 # aplicar <archivo> <viejo> <nuevo> [<viejo> <nuevo>]...: cada patrón tiene
@@ -105,7 +107,7 @@ sabotaje "el historial no se filtra por dueño" 1 \
   "FAILED $T::test_un_dueno_no_ve_ni_pisa_el_historial_de_otro" "b ve el historial de a"
 
 # --- dos confirmaciones a la vez: leer, sumar en Python y escribir pierde cuentas
-sabotaje "confirmar lee y después escribe" 1 \
+SOLO="$T::test_confirmaciones_a_la_vez_no_pierden_cuentas" sabotaje "confirmar lee y después escribe" 1 \
   $'    ins = _insert_ncm_historial().values(**_fila_ncm_historial(owner_username, descripcion, ncm))\n    await db.execute(ins.on_conflict_do_update(\n        index_elements=["owner_username", "clave"],\n        set_={"ncm": ins.excluded.ncm, "count": NcmHistorial.count + 1},\n    ))\n    await db.commit()' \
   $'    fila = (await db.execute(select(NcmHistorial).where(\n        NcmHistorial.owner_username == owner_username,\n        NcmHistorial.clave == _clave_ncm_historial(descripcion)))).scalar_one_or_none()\n    if fila is None:\n        db.add(NcmHistorial(**_fila_ncm_historial(owner_username, descripcion, ncm)))\n    else:\n        fila.count, fila.ncm = fila.count + 1, ncm\n    await db.commit()' \
   "FAILED $T::test_confirmaciones_a_la_vez_no_pierden_cuentas"
