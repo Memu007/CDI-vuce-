@@ -69,6 +69,27 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
+## RESET-2: aceptada sobre `99d3f69`, sin integrar (2026-11-06 PM)
+
+Reproducido: `test_email1` + `test_reset1` `32 passed`, rojo con la puerta
+vieja `2 failed`, y un negativo propio con `ENVIRONMENT` ausente,
+`development`, `test` y `Testing`: ninguno da la pista. Acta:
+`REPRODUCCION-RESET-2-2026-11-06.md`.
+
+- **D91 y D92: decidido por la PM, pieza nueva ENTORNO-1** (seguridad chica,
+  Emi: «a cero»). Va **después de ABUSO-1**, sin cortarla. Comportamiento
+  pedido: con `ENVIRONMENT` ausente o con un valor que no sea uno conocido,
+  no se abre ninguna puerta de desarrollo: el login no acepta la contraseña
+  guardada tal cual, no se crean usuarios demo, el webhook de MP sin secreto
+  no acepta firmas cualquiera y el link de reset no sale por stdout. Prueba:
+  un caso por causa, con la familia de valores de `ENVIRONMENT` como datos,
+  y el rojo con cada puerta vieja. Sugerencia (no es criterio): un solo
+  lugar que diga «esto es desarrollo» y que exija el valor explícito.
+  Revisión más fuerte: toca autenticación y dinero.
+- **D93: (a).** El script manual usa `ENVIRONMENT=testing`; no se toca.
+
+Tu orden: ABUSO-1 → ENTORNO-1 → el resto de la cola. Próxima D: D94.
+
 ## PYPDF-1: aceptada sobre `974263e`, sin integrar (2026-11-06 PM)
 
 Acta: `REPRODUCCION-PYPDF-1-2026-11-06.md`. Coincide con tu informe: las
