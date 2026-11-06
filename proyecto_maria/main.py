@@ -2093,14 +2093,11 @@ async def cancel_billing(
     Bloquea como el checkout: si uno está en curso, espera a que guarde la
     suscripción nueva y la cancela; si no, quedaría cobrando sin que CDI la conozca.
     """
+    plazo = anyio.current_time() + _TOPE_MP
     db_user, org, con_sid = await _cuenta_con_suscripciones(db, user["username"])
     entidad = org or db_user
-    # Cancelar el plan de un estudio lo corta para todos sus miembros.
-    sin_permiso = HTTPException(status_code=403, detail="Sólo quien administra el estudio o quien abrió "
-                                                        "la suscripción que lo paga puede cancelar el plan.")
-    miembro = org and db_user.username != org.owner_username
-    if miembro and db_user not in con_sid:
-        raise sin_permiso
+    no_se_pudo = "No se pudo cancelar en Mercado Pago; tu plan sigue igual. Probá de nuevo en unos minutos."
+    paga = await _quien_toca_el_plan(db_user, org, con_sid, "cancelar el plan", no_se_pudo, plazo)
 
     if entidad.billing_status not in ("trial", "active", "past_due") and not con_sid:
         raise HTTPException(
@@ -2108,21 +2105,10 @@ async def cancel_billing(
             detail=f"No se puede cancelar desde el estado actual: {entidad.billing_status}",
         )
 
-    no_se_pudo = "No se pudo cancelar en Mercado Pago; tu plan sigue igual. Probá de nuevo en unos minutos."
-    if con_sid and not billing_service.is_configured():
-        raise HTTPException(status_code=503, detail=no_se_pudo)
-    try:
-        paga = {cuenta: await _en_hilo_mp(_leer_suscripcion_mp, cuenta.mp_preapproval_id)
-                in ("authorized", "paused") for cuenta in con_sid}
-    except _SuscripcionMPError:
-        raise HTTPException(status_code=503, detail=no_se_pudo)
-    # Una pendiente propia no es la que paga el estudio.
-    if miembro and not paga[db_user]:
-        raise sin_permiso
     # La que paga va última: si otra falla, el plan sigue cobrando, como dice el 503.
     for cuenta in sorted(con_sid, key=paga.get):
         try:
-            await _en_hilo_mp(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id)
+            await _en_hilo_mp(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)
         except _SuscripcionMPError as e:
             print(f"⚠️ No se pudo cancelar la suscripción de {cuenta.username} en MP: {e}")
             # Una cancelada en Mercado Pago no vuelve: anotada, el perfil diría que renueva.
@@ -2171,11 +2157,10 @@ async def reactivate_billing(
     ahora y suma 30 días desde el fin del período ya pagado. Reactivar nunca
     deja la cuenta 'active' sin un pago.
     """
-    result = await db.execute(select(User).where(User.username == user["username"]))
-    db_user = result.scalars().first()
-    if not db_user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    entidad, es_org = await _get_billing_entity(db, db_user)
+    plazo = anyio.current_time() + _TOPE_MP
+    db_user, org, con_sid = await _cuenta_con_suscripciones(db, user["username"])
+    await _quien_toca_el_plan(db_user, org, con_sid, "reactivar el plan", _NO_SE_CONFIRMA_SUSCRIPCION, plazo)
+    entidad, es_org = org or db_user, org is not None
 
     if entidad.billing_status != "canceled":
         raise HTTPException(status_code=409, detail="La suscripción no está cancelada")
@@ -3247,6 +3232,10 @@ async def billing_me(user=Depends(get_current_user), db: AsyncSession = Depends(
 
     billing_entity, is_org = await _get_billing_entity(db, db_user)
     plan = billing_service.plan_de_la_cuenta(billing_entity)
+    # En un estudio, la suscripción la abrió uno solo y es la de todos.
+    hay_sid = bool(db_user.mp_preapproval_id) or (is_org and (await db.execute(
+        select(User.username).where(User.organization_id == billing_entity.id, User.mp_preapproval_id.isnot(None))
+        .limit(1))).first() is not None)
     return {
         "billing_status": billing_entity.billing_status or "none",
         "trial_ends_at": billing_entity.trial_ends_at.isoformat() if billing_entity.trial_ends_at else None,
@@ -3267,11 +3256,11 @@ async def billing_me(user=Depends(get_current_user), db: AsyncSession = Depends(
         "organization_id": db_user.organization_id,
         # «Próximo cobro» sólo si hay una suscripción que se renueva. El id
         # se guarda al abrir el checkout, antes de pagar: hace falta un pago de MP.
-        "renueva": (billing_entity.billing_status == "active" and bool(db_user.mp_preapproval_id)
+        "renueva": (billing_entity.billing_status == "active" and hay_sid
                     and getattr(billing_entity, "payment_provider", None) == "mercadopago"),
         # Con una suscripción abierta el perfil muestra «Cancelar plan», como
         # /api/billing/cancel, sea cual sea el estado.
-        "suscripcion_abierta": bool(db_user.mp_preapproval_id),
+        "suscripcion_abierta": hay_sid,
         # De la cuenta que da el acceso, la misma que muestra esta respuesta: el
         # perfil no promete días que no da.
         "cancelar_corta_acceso": billing_service.cancelar_corta_acceso(billing_entity),
@@ -10080,6 +10069,7 @@ async def remove_member(
 
     if user["username"] != org.owner_username:
         raise HTTPException(status_code=403, detail="Solo el administrador puede remover miembros")
+    plazo = anyio.current_time() + _TOPE_MP
 
     if username == org.owner_username:
         raise HTTPException(status_code=400, detail="No podés removerte a vos mismo del estudio")
@@ -10091,9 +10081,20 @@ async def remove_member(
     if not member:
         raise HTTPException(status_code=404, detail="Ese usuario no es miembro del estudio")
     if member.mp_preapproval_id:
-        # Fuera del estudio seguiría cobrándole al estudio, y otra suscripción cobraría doble.
-        raise HTTPException(status_code=409, detail=f"{username} abrió la suscripción del estudio en "
-                                                    "Mercado Pago. Para sacarle del estudio, primero cancelá el plan.")
+        no_se_pudo = (f"No se pudo confirmar en Mercado Pago la suscripción de {username}; sigue en el estudio. "
+                      "Probá de nuevo en unos minutos.")
+        try:
+            estado_mp = await _en_hilo_mp(_leer_suscripcion_mp, member.mp_preapproval_id, hasta=plazo)
+            if estado_mp in _ESTADOS_QUE_PAGAN:
+                # Fuera del estudio seguiría cobrándole al estudio, y otra suscripción cobraría doble.
+                raise HTTPException(status_code=409, detail=f"{username} abrió la suscripción del estudio en "
+                                                            "Mercado Pago. Para sacarle del estudio, primero cancelá el plan.")
+            if estado_mp != "cancelled":
+                await _en_hilo_mp(_cancelar_suscripcion_mp, member.mp_preapproval_id, hasta=plazo)
+        except _SuscripcionMPError as e:
+            print(f"⚠️ No se pudo cerrar la suscripción de {username} al sacarle del estudio: {e}")
+            raise HTTPException(status_code=503, detail=no_se_pudo)
+        member.mp_preapproval_id = None
 
     member.organization_id = None
     await db.commit()
@@ -10296,8 +10297,21 @@ async def payment_pending():
 _HILOS_MP = anyio.CapacityLimiter(8)
 
 
-async def _en_hilo_mp(fn, *args, **kw):
-    return await anyio.to_thread.run_sync(functools.partial(fn, *args, **kw), limiter=_HILOS_MP)
+# Segundos que espera a Mercado Pago quien cancela, reactiva, paga o saca a alguien.
+_TOPE_MP = 15
+
+
+async def _en_hilo_mp(fn, *args, hasta: float | None = None, **kw):
+    """Con `hasta` (un anyio.current_time()), pasado ese momento se deja de esperar
+    y es _SuscripcionMPError; el hilo sigue hasta que httpx o el SDK lo corten."""
+    llamada = functools.partial(fn, *args, **kw)
+    if hasta is None:
+        return await anyio.to_thread.run_sync(llamada, limiter=_HILOS_MP)
+    try:
+        with anyio.fail_after(max(hasta - anyio.current_time(), 0)):
+            return await anyio.to_thread.run_sync(llamada, limiter=_HILOS_MP, abandon_on_cancel=True)
+    except TimeoutError as e:
+        raise _SuscripcionMPError(f"{getattr(fn, '__name__', 'mp')}: Mercado Pago no contestó a tiempo") from e
 
 
 class _MPIlegible(Exception):
@@ -10431,6 +10445,8 @@ class _SuscripcionMPError(Exception):
 
 
 _ESTADOS_SUSCRIPCION_MP = {"pending", "authorized", "paused", "cancelled"}
+# La que paga el estudio: una pausada vuelve a cobrar si la tarjeta vuelve.
+_ESTADOS_QUE_PAGAN = ("authorized", "paused")
 
 
 def _pedir_suscripcion_mp(metodo: str, sid: str, cuerpo: dict | None = None) -> str:
@@ -10439,6 +10455,8 @@ def _pedir_suscripcion_mp(metodo: str, sid: str, cuerpo: dict | None = None) -> 
     arma la ruta sin la barra antes del id."""
     if not isinstance(sid, str) or not _ID_COBRO_MP.fullmatch(sid):
         raise _SuscripcionMPError(f"id de suscripción inválido: {str(sid)[:80]!r}")
+    if not billing_service.is_configured():
+        raise _SuscripcionMPError(f"{metodo} {sid}: sin token de Mercado Pago")
     try:
         with httpx.Client(timeout=10) as cliente:
             resp = cliente.request(metodo, f"https://api.mercadopago.com/preapproval/{sid}",
@@ -10901,21 +10919,41 @@ async def _cuenta_con_suscripciones(db: AsyncSession, username: str):
 _NO_SE_CONFIRMA_SUSCRIPCION = "No pudimos confirmar tu suscripción actual con Mercado Pago. Probá de nuevo en unos minutos."
 
 
-async def _estado_suscripcion_vieja(db: AsyncSession, db_user, cuenta) -> str:
-    """El estado en Mercado Pago de una suscripción ya abierta. La autorizada da
+async def _quien_toca_el_plan(db_user, org, con_sid, accion: str, no_se_pudo: str, plazo: float) -> dict:
+    """Cancelar o reactivar el plan de un estudio: la dueña, o quien abrió la
+    suscripción que lo paga. Devuelve, por cuenta con suscripción, si es la que paga."""
+    sin_permiso = HTTPException(status_code=403, detail="Sólo quien administra el estudio o quien abrió "
+                                                        f"la suscripción que lo paga puede {accion}.")
+    miembro = org is not None and db_user.username != org.owner_username
+    if miembro and db_user not in con_sid:
+        raise sin_permiso
+    try:
+        paga = {cuenta: await _en_hilo_mp(_leer_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)
+                in _ESTADOS_QUE_PAGAN for cuenta in con_sid}
+    except _SuscripcionMPError as e:
+        print(f"⚠️ {db_user.username} no pudo {accion}: {e}")
+        raise HTTPException(status_code=503, detail=no_se_pudo)
+    if miembro and not paga[db_user]:
+        raise sin_permiso
+    return paga
+
+
+async def _estado_suscripcion_vieja(db: AsyncSession, db_user, cuenta, plazo: float) -> str:
+    """El estado en Mercado Pago de una suscripción ya abierta. La que paga da
     409 (puede ser un pago cuyo aviso no llegó); si no se puede leer, 503."""
     try:
-        estado_mp = await _en_hilo_mp(_leer_suscripcion_mp, cuenta.mp_preapproval_id)
+        estado_mp = await _en_hilo_mp(_leer_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)
     except _SuscripcionMPError as e:
         print(f"⚠️ Checkout de {db_user.username}: no se pudo leer la suscripción en MP: {e}")
         raise HTTPException(status_code=503, detail=_NO_SE_CONFIRMA_SUSCRIPCION)
+    if estado_mp in _ESTADOS_QUE_PAGAN and cuenta is not db_user:
+        raise HTTPException(
+            status_code=409,
+            detail=f"Tu organización ya tiene una suscripción en Mercado Pago, de {cuenta.username}. "
+                   "Para cambiar la tarjeta, la cancela quien la abrió o quien administra el estudio, "
+                   "desde «Cancelar plan».",
+        )
     if estado_mp == "authorized":
-        if cuenta is not db_user:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Tu organización ya tiene una suscripción en Mercado Pago, de {cuenta.username}. "
-                       "Se renueva sola; para cambiar la tarjeta, la tiene que cancelar quien la abrió.",
-            )
         entidad, _ = await _get_billing_entity(db, db_user)
         fin = entidad.trial_ends_at
         if fin is not None and fin.tzinfo is None:
@@ -10950,6 +10988,7 @@ async def billing_checkout(
     if plan_id not in billing_service.PLANS:
         raise HTTPException(status_code=400, detail=f"Plan invalido: {plan_id}")
 
+    plazo = anyio.current_time() + _TOPE_MP
     # Bloqueada hasta guardar la suscripción nueva: un segundo checkout a la vez
     # espera y ve la del primero.
     db_user, org, con_sid = await _cuenta_con_suscripciones(db, username)
@@ -10977,7 +11016,7 @@ async def billing_checkout(
 
     # Una sola suscripción por cuenta que paga, contando las de los otros miembros.
     # Se leen todas antes de cancelar: una autorizada frena sin haber tocado las demás.
-    estados = [await _estado_suscripcion_vieja(db, db_user, cuenta) for cuenta in con_sid]
+    estados = [await _estado_suscripcion_vieja(db, db_user, cuenta, plazo) for cuenta in con_sid]
     vivas = [cuenta for cuenta, estado_mp in zip(con_sid, estados) if estado_mp != "cancelled"]
     # Sin commit todavía: soltaría el bloqueo antes de crear la nueva.
     for cuenta in set(con_sid) - set(vivas):
@@ -10985,9 +11024,9 @@ async def billing_checkout(
     try:
         for cuenta in vivas:
             # Mientras se leían o cancelaban las otras, ésta pudo autorizarse.
-            await _estado_suscripcion_vieja(db, db_user, cuenta)
+            await _estado_suscripcion_vieja(db, db_user, cuenta, plazo)
             try:
-                await _en_hilo_mp(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id)
+                await _en_hilo_mp(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id, hasta=plazo)
             except _SuscripcionMPError as e:
                 print(f"⚠️ Checkout de {username}: no se pudo cancelar la suscripción vieja en MP: {e}")
                 raise HTTPException(status_code=503, detail=_NO_SE_CONFIRMA_SUSCRIPCION)
@@ -10998,7 +11037,7 @@ async def billing_checkout(
         raise
 
     try:
-        checkout = await _en_hilo_mp(billing_service.create_checkout, db_user, plan_id, org_id=org_id)
+        checkout = await _en_hilo_mp(billing_service.create_checkout, db_user, plan_id, org_id=org_id, hasta=plazo)
         # Guardamos el preapproval_id temporal hasta que el webhook confirme.
         if checkout.get("preapproval_id"):
             db_user.mp_preapproval_id = checkout["preapproval_id"]
@@ -11007,6 +11046,10 @@ async def billing_checkout(
         return {"success": True, **checkout}
     except HTTPException:
         raise
+    except _SuscripcionMPError as e:
+        print(f"⚠️ Checkout de {username}: {e}")
+        await db.commit()
+        raise HTTPException(status_code=503, detail="Mercado Pago no contestó. Probá de nuevo en unos minutos.")
     except Exception as e:
         print(f"Error creando checkout MP: {e}")
         # La vieja ya quedó cancelada en Mercado Pago: no se deja guardada.
