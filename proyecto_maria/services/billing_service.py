@@ -73,9 +73,10 @@ def _get_sdk():
 
 
 def sdk_mp(token: str):
-    # Sin esto el SDK espera 60 s por intento y reintenta tres veces.
+    # Por defecto espera 60 s por intento y reintenta tres veces: una consulta
+    # trabada retendría su hilo cuatro minutos. Así, unos 20 s.
     sdk = mercadopago.SDK(token)
-    sdk.request_options = RequestOptions(access_token=token, connection_timeout=10.0)
+    sdk.request_options = RequestOptions(access_token=token, connection_timeout=10.0, max_retries=1)
     return sdk
 
 

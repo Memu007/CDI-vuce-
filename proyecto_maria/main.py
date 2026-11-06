@@ -145,6 +145,7 @@ import logging
 from sqlalchemy.exc import IntegrityError
 from passlib.context import CryptContext
 
+from limits import parse as parse_limite
 from proyecto_maria.core.rate_limit import limiter, get_dynamic_rate_limit, get_client_ip
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -10651,11 +10652,15 @@ def _verify_mp_webhook_signature(request: Request, raw_body: bytes) -> bool:
         manifest.encode("utf-8"),
         _hashlib.sha256,
     ).hexdigest()
-    return _hmac.compare_digest(expected, received_v1)
+    return _hmac.compare_digest(expected.encode(), received_v1.encode())
+
+
+# Cuenta sólo avisos firmados: si contara los demás, cualquiera agotaría el cupo
+# de la IP de Mercado Pago poniéndola en X-Forwarded-For.
+_LIMITE_AVISOS_MP = parse_limite("60/minute")
 
 
 @app.post("/api/payments/webhook")
-@limiter.limit("60/minute")
 async def mercadopago_webhook(request: Request):
     """Webhook para recibir notificaciones de MercadoPago.
 
@@ -10674,7 +10679,7 @@ async def mercadopago_webhook(request: Request):
       - 200 → aplicado, o rechazado y anotado en mp_pagos_aplicados (MP no reintenta).
       - 400 → aviso sin id de pago o sin token (MP reintenta, alerta).
       - 401 → sin firma o firma inválida (MP no reintenta, ataque).
-      - 429 → más de 60 avisos por minuto desde la misma IP.
+      - 429 → más de 60 avisos firmados por minuto desde la misma IP.
       - 503 → no se pudo leer Mercado Pago (MP reintenta).
       - 500 → bug inesperado (MP reintenta).
     """
@@ -10688,6 +10693,8 @@ async def mercadopago_webhook(request: Request):
         if not _verify_mp_webhook_signature(request, raw_body):
             logger.warning("Webhook MP: sin firma válida, rechazado")
             raise HTTPException(status_code=401, detail="Firma invalida")
+        if limiter.enabled and not limiter.limiter.hit(_LIMITE_AVISOS_MP, "aviso_mp", get_client_ip(request)):
+            raise HTTPException(status_code=429, detail="Demasiados avisos")
         body = json.loads(raw_body.decode("utf-8"))
         event_type = body.get("type", "")
         payment_id = str(body.get("data", {}).get("id", ""))
