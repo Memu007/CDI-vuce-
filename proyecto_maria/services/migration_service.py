@@ -298,7 +298,7 @@ async def analyze_migration_file_async(
     """Version async para FastAPI cuando el mapeador opcional llama a Gemini.
 
     Leer el archivo y analizarlo corre en otro hilo: no frena al resto del
-    servidor (EXCEL-1). Los clientes existentes se normalizan antes, acá, para
+    servidor. Los clientes existentes se normalizan antes, acá, para
     no tocar objetos de la base desde otro hilo.
     """
     import asyncio
@@ -435,7 +435,7 @@ def _collect_rows(
         values["cuit"] = cuit
         date_column = mapping.get("fecha_inic_activ")
         if invalid_dates is not None and date_column is not None and not values.get("fecha_inic_activ"):
-            # La fecha que no sirve queda vacía y se avisa con la fila (CLIENTE-1c).
+            # La fecha que no sirve queda vacía y se avisa con la fila.
             raw_date = _cell_text(source.get(date_column, ""), limit=32)
             if raw_date:
                 invalid_dates.append({"sheet": sheet.name, "row": offset, "cuit": cuit, "value": raw_date})

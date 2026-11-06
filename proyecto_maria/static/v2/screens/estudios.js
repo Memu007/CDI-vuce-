@@ -1,5 +1,5 @@
 /* ============================================================
-   CDI v2 — Estudios de la cuenta (ESTUDIO-1)
+   CDI v2 — Estudios de la cuenta
    El CUIT del despachante (CDDTAGR) se carga por estudio en «Mi perfil»,
    «Mis estudios», y se elige en la operación. Sin estudio elegido sigue el
    CUIT del perfil. Expone CDI.estudios.render(), .listo(),
