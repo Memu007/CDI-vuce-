@@ -9,7 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-11-06 · fix: en un estudio, una sola regla de quién toca la suscripción que paga (COBRO-MP-2)
 
 - **fix(cobro):** cancelar y reactivar el plan de un estudio lo hacen la dueña o quien abrió la suscripción que paga (autorizada o pausada). Sacar a un miembro sólo se frena si su suscripción es la que paga; una pendiente suya se cancela en Mercado Pago al sacarlo. Una pausada de otro miembro frena el checkout. Todos los miembros ven en el perfil la suscripción del estudio.
-- **fix(cobro):** si Mercado Pago no contesta, cancelar, pagar y sacar a un miembro contestan 503 a los 15 s sin cambiar nada.
+- **fix(cobro):** si Mercado Pago no contesta, cancelar, reactivar, pagar y sacar a un miembro contestan 503 sin cambiar nada, a los 15 s de esperarlo (la espera de otro pedido del estudio no cuenta); la recarga también da 503.
 
 ## 2026-11-06 · fix: Mercado Pago lento no frena el servidor y el aviso de pago exige firma (COBRO-MP-3)
 

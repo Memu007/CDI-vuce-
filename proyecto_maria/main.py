@@ -2094,8 +2094,8 @@ async def cancel_billing(
     Bloquea como el checkout: si uno está en curso, espera a que guarde la
     suscripción nueva y la cancela; si no, quedaría cobrando sin que CDI la conozca.
     """
-    plazo = anyio.current_time() + _TOPE_MP
     db_user, org, con_sid = await _cuenta_con_suscripciones(db, user["username"])
+    plazo = anyio.current_time() + _TOPE_MP
     entidad = org or db_user
     no_se_pudo = "No se pudo cancelar en Mercado Pago; tu plan sigue igual. Probá de nuevo en unos minutos."
     paga = await _quien_toca_el_plan(db_user, org, con_sid, "cancelar el plan", no_se_pudo, plazo)
@@ -2158,8 +2158,8 @@ async def reactivate_billing(
     ahora y suma 30 días desde el fin del período ya pagado. Reactivar nunca
     deja la cuenta 'active' sin un pago.
     """
-    plazo = anyio.current_time() + _TOPE_MP
     db_user, org, con_sid = await _cuenta_con_suscripciones(db, user["username"])
+    plazo = anyio.current_time() + _TOPE_MP
     await _quien_toca_el_plan(db_user, org, con_sid, "reactivar el plan", _NO_SE_CONFIRMA_SUSCRIPCION, plazo)
     entidad, es_org = org or db_user, org is not None
 
@@ -10070,7 +10070,6 @@ async def remove_member(
 
     if user["username"] != org.owner_username:
         raise HTTPException(status_code=403, detail="Solo el administrador puede remover miembros")
-    plazo = anyio.current_time() + _TOPE_MP
 
     if username == org.owner_username:
         raise HTTPException(status_code=400, detail="No podés removerte a vos mismo del estudio")
@@ -10081,6 +10080,7 @@ async def remove_member(
     member = member.scalars().first()
     if not member:
         raise HTTPException(status_code=404, detail="Ese usuario no es miembro del estudio")
+    plazo = anyio.current_time() + _TOPE_MP
     if member.mp_preapproval_id:
         no_se_pudo = (f"No se pudo confirmar en Mercado Pago la suscripción de {username}; sigue en el estudio. "
                       "Probá de nuevo en unos minutos.")
@@ -10298,7 +10298,8 @@ async def payment_pending():
 _HILOS_MP = anyio.CapacityLimiter(8)
 
 
-# Segundos que espera a Mercado Pago quien cancela, reactiva, paga o saca a alguien.
+# Segundos que espera a Mercado Pago, desde que tiene el candado, quien cancela,
+# reactiva, paga o saca a alguien.
 _TOPE_MP = 15
 
 
@@ -10679,6 +10680,17 @@ def _verify_mp_webhook_signature(request: Request, raw_body: bytes) -> bool:
 _LIMITE_AVISOS_MP = parse_limite("60/minute")
 
 
+async def _aviso_mp_firmado(request: Request) -> dict:
+    """El cuerpo de un aviso con firma válida y dentro del cupo de su IP; si no, 401 o 429."""
+    raw_body = await request.body()
+    if not _verify_mp_webhook_signature(request, raw_body):
+        logging.getLogger("mp_webhook").warning("Webhook MP: sin firma válida, rechazado")
+        raise HTTPException(status_code=401, detail="Firma invalida")
+    if limiter.enabled and not limiter.limiter.hit(_LIMITE_AVISOS_MP, "aviso_mp", get_client_ip(request)):
+        raise HTTPException(status_code=429, detail="Demasiados avisos")
+    return json.loads(raw_body.decode("utf-8"))
+
+
 @app.post("/api/payments/webhook")
 async def mercadopago_webhook(request: Request):
     """Webhook para recibir notificaciones de MercadoPago.
@@ -10706,15 +10718,7 @@ async def mercadopago_webhook(request: Request):
     logger = logging.getLogger("mp_webhook")
 
     try:
-        event_type = ""
-        payment_id = ""
-        raw_body = await request.body()
-        if not _verify_mp_webhook_signature(request, raw_body):
-            logger.warning("Webhook MP: sin firma válida, rechazado")
-            raise HTTPException(status_code=401, detail="Firma invalida")
-        if limiter.enabled and not limiter.limiter.hit(_LIMITE_AVISOS_MP, "aviso_mp", get_client_ip(request)):
-            raise HTTPException(status_code=429, detail="Demasiados avisos")
-        body = json.loads(raw_body.decode("utf-8"))
+        body = await _aviso_mp_firmado(request)
         event_type = body.get("type", "")
         payment_id = str(body.get("data", {}).get("id", ""))
 
@@ -10886,6 +10890,9 @@ async def billing_topup(
         return {"success": True, **checkout}
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
+    except requests.RequestException as e:
+        print(f"⚠️ Recarga de {db_user.username}: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=503, detail="Mercado Pago no contestó. Probá de nuevo en unos minutos.")
 
 
 async def _cuenta_con_suscripciones(db: AsyncSession, username: str):
@@ -10989,10 +10996,10 @@ async def billing_checkout(
     if plan_id not in billing_service.PLANS:
         raise HTTPException(status_code=400, detail=f"Plan invalido: {plan_id}")
 
-    plazo = anyio.current_time() + _TOPE_MP
     # Bloqueada hasta guardar la suscripción nueva: un segundo checkout a la vez
     # espera y ve la del primero.
     db_user, org, con_sid = await _cuenta_con_suscripciones(db, username)
+    plazo = anyio.current_time() + _TOPE_MP
     org_id = org.id if org else None
 
     # Modo demo cuando no hay credenciales, sólo en desarrollo y pruebas
