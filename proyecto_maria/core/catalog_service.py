@@ -359,13 +359,12 @@ async def save_products(
 
     for prod in productos_in:
         desc = (prod.get("descripcion") or "").strip()
+        if not desc:
+            continue
         validar_largo(desc)
         ncm = (prod.get("ncm") or prod.get("pieza") or "").strip()
         origen = (prod.get("origen") or "").strip()
         validar_largo(origen, "El origen")
-
-        if not desc:
-            continue
 
         product_key = clave_de_producto(desc)
 

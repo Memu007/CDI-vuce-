@@ -427,7 +427,7 @@ class VendorCatalogProduct(Base):
     Reemplaza `product_catalog.json` que se perdia con cada deploy. Tenant
     aislado por `owner_username`. Para el mismo vendor, cada combinacion
     (owner, vendor_id, product_key) es unica. `product_key` es la clave
-    de identidad del producto (ver `client_memory.identidad_del_producto`).
+    de identidad del producto (ver `catalog_service.clave_de_producto`).
     """
     __tablename__ = "vendor_catalog_products"
     __table_args__ = (

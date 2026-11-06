@@ -10,6 +10,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - La memoria del cliente guarda el origen entero («TAIWAN», «JAPON»): antes guardaba las tres primeras letras, y el TXT sugerido salía con otro país. El arranque amplía la columna en Postgres.
 - Un proveedor o un origen de más de 2000 caracteres da 400 con el motivo al guardar en el catálogo, cambiar un producto o confirmar un NCM, sin guardar nada; se cuentan igual que la descripción.
+- Aprender o cargar una operación con un origen así no lo guarda en la memoria del cliente (la operación avisa que no se guardó), y una fila sin descripción no frena el resto del catálogo por su origen.
 
 ## 2026-11-06 · fix: lo que se valida con la clave actual no gana contra un cambio de clave en el medio, y contar intentos no traba la app (SESION-1, vuelta 2)
 

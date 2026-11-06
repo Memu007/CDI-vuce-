@@ -187,6 +187,10 @@ async def upsert_client_product_history(
     if producto is None or not client_id or not owner_username:
         return None
     origen = str(origen or "").strip()
+    try:
+        validar_largo(origen, "El origen")
+    except ValueError:
+        return None
     if _MEDIO_PAR.search(origen):
         return None
     ncm, descripcion, clave = producto
