@@ -16,7 +16,7 @@ import uuid
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import select, text
+from sqlalchemy import event, select, text
 
 import proyecto_maria.database.connection as conn
 import proyecto_maria.main as main_mod
@@ -151,6 +151,28 @@ def test_cambiar_clave_mal_no_revoca_nada():
     assert r.json()["detail"] == "La contraseña actual es incorrecta"
     assert _fila(u).active_jti == antes
     assert _entra(t) == 200
+
+
+def test_si_el_token_nuevo_no_sale_la_clave_no_cambia(monkeypatch):
+    """La clave nueva y el cierre de las otras sesiones se guardan juntos: no
+    hay un momento con la clave nueva y los tokens viejos adentro."""
+    u, _ = _usuario()
+    t = _login(u)
+    real = main_mod.firmar_token
+
+    def rota(_datos):
+        raise RuntimeError("la firma falló")
+
+    monkeypatch.setattr(main_mod, "firmar_token", rota)
+    r = TestClient(app, raise_server_exceptions=False).post(
+        "/api/user/change-password", headers=_bearer(t),
+        json={"current_password": CLAVE, "new_password": CLAVE2})
+    monkeypatch.setattr(main_mod, "firmar_token", real)
+    assert r.status_code == 500, r.text
+    assert _entra(t) == 200
+    entra_con = {c: _http().post("/auth/login", json={"username": u, "password": c}).status_code
+                 for c in (CLAVE2, CLAVE)}
+    assert entra_con == {CLAVE2: 401, CLAVE: 200}, "la clave cambió sin cerrar las otras sesiones"
 
 
 @pytest.mark.parametrize("ruta", ["cambiar la clave", "cambiar el email"])
@@ -427,13 +449,54 @@ def test_el_tope_de_la_clave_actual_vale_para_pedidos_a_la_vez():
     assert codigos.count(400) <= 5 and set(codigos) <= {400, 429}, codigos
 
 
+@pytest.mark.parametrize("ruta", ["perfil", "cambiar la clave", "login sin usuario",
+                                  "login con clave mala", "login", "pedir el reset"])
+def test_contar_intentos_usa_la_conexion_del_pedido(ruta):
+    """Contar o mirar el tope no toma otra conexión del pool mientras el
+    pedido tiene la suya: con más pedidos que conexiones, se trabaría.
+    Las rutas con sesión tienen dos porque get_current_user usa su propia
+    sesión de la base, aparte de la de la ruta."""
+    u, mail = _usuario()
+    t = _login(u)
+    pedidos = {
+        "perfil": ("PUT", "/api/user/profile", {"email": f"otro-{u}@example.com", "current_password": "mala-1!"}, t),
+        "cambiar la clave": ("POST", "/api/user/change-password", {"current_password": "mala-1!", "new_password": CLAVE2}, t),
+        "login sin usuario": ("POST", "/auth/login", {"username": "ses1_nadie", "password": "mala-1!"}, None),
+        "login con clave mala": ("POST", "/auth/login", {"username": u, "password": "mala-1!"}, None),
+        "login": ("POST", "/auth/login", {"username": u, "password": CLAVE}, None),
+        "pedir el reset": ("POST", "/auth/request-password-reset", {"email": mail}, None),
+    }
+    metodo, url, cuerpo, token = pedidos[ruta]
+    tomadas, maximo = 0, 0
+
+    def tomar(*_):
+        nonlocal tomadas, maximo
+        tomadas += 1
+        maximo = max(maximo, tomadas)
+
+    def devolver(*_):
+        nonlocal tomadas
+        tomadas -= 1
+
+    pool = conn.engine.sync_engine
+    event.listen(pool, "checkout", tomar)
+    event.listen(pool, "checkin", devolver)
+    try:
+        r = _http().request(metodo, url, json=cuerpo, headers=_bearer(token) if token else {})
+    finally:
+        event.remove(pool, "checkout", tomar)
+        event.remove(pool, "checkin", devolver)
+    assert r.status_code < 500, r.text
+    assert maximo == (2 if token else 1), f"{ruta}: {maximo} conexiones a la vez"
+
+
 # --- un solo lugar decide si un token vale -----------------------------------
 
 def _token_firmado(payload, clave=None):
     import jwt
     from datetime import datetime, timedelta, timezone
     datos = {"exp": datetime.now(timezone.utc) + timedelta(minutes=5), **payload}
-    return jwt.encode(datos, clave or main_mod.SECRET_KEY, algorithm=main_mod.ALGORITHM)
+    return jwt.encode(datos, clave or main_mod._CLAVE_JWT, algorithm="HS256")
 
 
 def _rutas_que_leen_la_sesion(token):

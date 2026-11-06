@@ -8,10 +8,10 @@ Cubre:
 - Rate limit después de 5 fails → 429
 """
 import pytest
-import jwt as pyjwt
 import asyncio
 
-from proyecto_maria.main import app, hash_password, SECRET_KEY, ALGORITHM
+from proyecto_maria.main import app, hash_password
+from proyecto_maria.auth.dependencies import datos_del_token
 from proyecto_maria.database.connection import AsyncSessionLocal
 from proyecto_maria.database.models import User
 from sqlalchemy import select, delete, text
@@ -103,7 +103,7 @@ def test_login_with_username(client):
     token = data["access_token"]
 
     # Decodificar JWT y verificar sub == username (no email)
-    payload = pyjwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    payload = datos_del_token(token)
     assert payload["sub"] == "logintest"
 
     # Usar el token para llamar a /auth/current_user
@@ -132,7 +132,7 @@ def test_login_with_email(client):
     token = data["access_token"]
 
     # JWT.sub DEBE ser el username, no el email
-    payload = pyjwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    payload = datos_del_token(token)
     assert payload["sub"] == "logintest", (
         f"JWT sub debería ser 'logintest' pero es '{payload['sub']}'"
     )

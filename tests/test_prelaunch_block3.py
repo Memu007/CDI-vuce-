@@ -245,8 +245,7 @@ class TestProduccionDemoUsers:
         """Una SECRET_KEY débil lanza RuntimeWarning en dev, no ValueError (que sería en prod)."""
         # Esta prueba verifica que el código de arranque NO lanzó un ValueError
         # (si hubiera fallado, el módulo no se habría importado)
-        assert main_mod.SECRET_KEY is not None
-        assert len(main_mod.SECRET_KEY) > 0
+        assert main_mod._CLAVE_JWT
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -354,7 +353,7 @@ class TestJWTSecurity:
     def test_token_expirado_401(self, anon):
         """Token expirado (exp en el pasado) → 401."""
         # Usamos la misma clave del módulo para forzar que sea solo el exp
-        secret = main_mod.SECRET_KEY
+        secret = main_mod._CLAVE_JWT
         token = pyjwt.encode(
             {"sub": "user_exp", "exp": datetime.utcnow() - timedelta(hours=1)},
             secret,
@@ -751,18 +750,6 @@ class TestJWTSecretUnificado:
     a valores distintos. Fix: config.py ahora usa AliasChoices con el
     mismo orden de prioridad que main.py.
     """
-
-    def test_settings_jwt_secret_igual_a_main_secret_key(self):
-        """settings.jwt_secret debe ser igual a main.SECRET_KEY (mismo valor en runtime)."""
-        from proyecto_maria.config import get_settings
-        # Limpiar cache para forzar re-lectura con el env actual
-        get_settings.cache_clear()
-        settings = get_settings()
-        assert settings.jwt_secret == main_mod.SECRET_KEY, (
-            f"DUAL SECRET BUG: settings.jwt_secret='{settings.jwt_secret[:8]}…' "
-            f"!= main.SECRET_KEY='{main_mod.SECRET_KEY[:8]}…'. "
-            "Los tokens se firmarían con una clave y se verificarían con otra."
-        )
 
     def test_token_generado_por_login_es_verificable_por_datos_del_token(self, client):
         """Un token emitido por /auth/login lo abre datos_del_token (settings.jwt_secret)."""

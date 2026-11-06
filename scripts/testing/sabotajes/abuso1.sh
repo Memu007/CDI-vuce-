@@ -121,7 +121,8 @@ sabotaje $M "el 429 del login no deja la IP en el log" \
   '        log_429(request, "login bloqueado")' '        pass' \
   "FAILED $T::test_s4_el_429_del_login_deja_ip_y_entradas_en_el_log"
 sabotaje $M "el login correcto no borra los fallos" \
-  '    await limites_auth.limpiar(clave_intentos)' '    pass' \
+  $'# Login exitoso: limpiar intentos fallidos\n    await limites_auth.limpiar(db, clave_intentos)' \
+  $'# Login exitoso: limpiar intentos fallidos\n    pass' \
   "FAILED $T::test_s4_el_login_correcto_borra_los_fallos" "[401, 429, 429, 429]"
 
 # --- S6: recuperar usuario
@@ -148,7 +149,7 @@ sabotaje $M "registro: 21 por día" \
 
 # --- Recuperar contraseña: pedidos simultáneos y bloqueo vencido
 sabotaje $M "recuperar contraseña vuelve a chequear y después sumar" \
-  'sumar_fallo(clave, tope=5) > 5:' 'sumar_fallo(clave, tope=5) > 10**6:' \
+  'sumar_fallo(db, clave, tope=5) > 5:' 'sumar_fallo(db, clave, tope=5) > 10**6:' \
   "FAILED $T::test_reset_pedidos_simultaneos_no_pasan_el_tope"
 sabotaje $L "vencido el bloqueo, la cuenta sigue en vez de volver al tope" \
   '    nueva = case((vencido, tope), else_=_T.c.cuenta + 1)' '    nueva = _T.c.cuenta + 1' \
@@ -166,14 +167,10 @@ sabotaje $M "eventos: hero_cta_clicked sale de la lista" \
   "FAILED $T::test_eventos_sin_sesion_permitidos_se_guardan[hero_cta_clicked-/api/session/state]"
 
 # --- Tabla: vencidas y atomicidad
-sabotaje $L "contar no borra las vencidas" \
-  $'        "cuenta": _T.c.cuenta + 1,\n    }).returning(_T.c.cuenta)\n    async with _conn.engine.begin() as conn:\n        await conn.execute(delete(_T).where(_T.c.vence <= ahora))\n' \
-  $'        "cuenta": _T.c.cuenta + 1,\n    }).returning(_T.c.cuenta)\n    async with _conn.engine.begin() as conn:\n' \
+sabotaje $L "contar y sumar no borran las vencidas" \
+  $'    await db.execute(delete(_T).where(_T.c.vence <= ahora))\n    cuenta =' $'    cuenta =' \
   "FAILED $T::test_tabla_las_vencidas_se_borran_al_escribir[/auth/recover-username]" \
-  "FAILED $T::test_s6_recuperar_usuario_tiene_limite_por_ip"
-sabotaje $L "sumar_fallo no borra las vencidas" \
-  $'        await conn.execute(delete(_T).where(_T.c.vence <= ahora))\n        return (await conn.execute(ins)).scalar_one()\n\n\nasync def contar' \
-  $'        return (await conn.execute(ins)).scalar_one()\n\n\nasync def contar' \
+  "FAILED $T::test_s6_recuperar_usuario_tiene_limite_por_ip" \
   "FAILED $T::test_tabla_las_vencidas_se_borran_al_escribir[/auth/request-password-reset]"
 sabotaje $M "al arrancar no se borran las vencidas" \
   '    await _migrate_limites_auth()' '    pass' \
@@ -194,7 +191,8 @@ sabotaje $L "segundos_bloqueado no acorta la clave" \
   $'0 si no está bloqueada."""\n    clave = _clave(clave)' $'0 si no está bloqueada."""' \
   "FAILED $T::test_s4_una_ip_larga_tambien_se_bloquea" "[401, 401, 401, 401, 401, 401]"
 sabotaje $L "limpiar no acorta la clave" \
-  $'async def limpiar(clave: str) -> None:\n    clave = _clave(clave)' $'async def limpiar(clave: str) -> None:' \
+  '    await db.execute(delete(_T).where(_T.c.clave == _clave(clave)))' \
+  '    await db.execute(delete(_T).where(_T.c.clave == clave))' \
   "FAILED $T::test_s4_el_login_correcto_borra_los_fallos[True]" "[401, 429, 429, 429]"
 
 git checkout -q -- proyecto_maria/

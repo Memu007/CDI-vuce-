@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Negativos de SESION-1: cada sabotaje deshace una regla (un solo lugar decide
-# si un token es la sesión vigente, verificar el email no abre sesión, el login
-# no pisa una clave que cambió, cambiar o resetear la contraseña y cerrar sesión
-# revocan, una revocada no vuelve, la contraseña actual da 400 y tiene tope,
+# si un token es la sesión vigente y se firma con la misma clave, sin
+# vencimiento no vale, verificar el email no abre sesión, lo que se guarda tras
+# validar la clave no pisa una que cambió en el medio, cambiar o resetear la
+# contraseña y cerrar sesión revocan, una revocada no vuelve, la contraseña
+# actual da 400 y tiene tope, contar intentos usa la conexión del pedido,
 # cambiar el email la pide, la pantalla la pide sólo si el email cambió) y
 # tests/test_sesion1.py, tests/test_user_profile_coverage.py,
 # scripts/testing/pantalla_sesion1.js o, con PG_DSN, sesion1_motores.py pg
@@ -99,6 +101,8 @@ M=proyecto_maria/main.py
 D=proyecto_maria/auth/dependencies.py
 P=proyecto_maria/static/v2/screens/profile.js
 T=tests/test_sesion1.py
+L=proyecto_maria/core/limites_auth.py
+G="FAILED $T::test_lo_que_cambia_la_clave_mientras_otro_valida_le_gana"
 
 # Sin sabotaje tiene que estar en verde: si no, cualquier «ROJO» de abajo
 # sería del rojo que ya había.
@@ -117,7 +121,7 @@ sabotaje pytest $D "un usuario sin jti (de antes de la columna) no entra" \
   'if user.active_jti is not None and payload.get("jti") != user.active_jti:' \
   'if payload.get("jti") != user.active_jti:' \
   "FAILED $T::test_cambiar_clave_rota_la_sesion_de_quien_la_cambia" "FAILED $T::test_cambiar_clave_con_cookie_conserva_el_navegador" \
-  "FAILED $T::test_cambiar_clave_revoca_en_el_mismo_commit_que_la_clave" "FAILED $T::test_cerrar_sesion_de_un_usuario_sin_jti_revoca"
+  "FAILED $T::test_cerrar_sesion_de_un_usuario_sin_jti_revoca"
 sabotaje pytest $D "abrir el token sin verificar la firma" \
   'jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])' \
   'jwt.decode(token, options={"verify_signature": False})' \
@@ -126,6 +130,13 @@ sabotaje pytest $D "el token de verificar el email vale como sesión" \
   'if payload is None or payload.get("type") is not None or not payload.get("sub"):' \
   'if payload is None or not payload.get("sub"):' \
   "FAILED $T::test_ningun_lugar_acepta_un_token_que_no_es_la_sesion_vigente" "verificación de email"
+sabotaje pytest $D "un token sin vencimiento vale" \
+  '                          options={"require": ["exp"]})' '                          )' \
+  "FAILED $T::test_un_token_sin_vencimiento_no_es_una_sesion"
+sabotaje pytest $D "se firma con una clave y se verifica con otra" \
+  '    return jwt.encode(datos, settings.jwt_secret, algorithm=settings.jwt_algorithm)' \
+  '    return jwt.encode(datos, "otra-clave-de-firma-con-mas-de-32-caracteres", algorithm=settings.jwt_algorithm)' \
+  "FAILED $T::test_se_firma_y_se_verifica_con_la_misma_clave"
 sabotaje pytest $D "el header le gana a la cookie" \
   $'    token = request.cookies.get("access_token")\n    if not token:\n        auth_header = request.headers.get("Authorization")\n        if auth_header and auth_header.startswith("Bearer "):\n            token = auth_header\n' \
   $'    token = request.headers.get("Authorization") or request.cookies.get("access_token")\n' \
@@ -135,18 +146,34 @@ sabotaje pytest $M "verificar el email abre sesión" \
   $'    await db.commit()\n    ir = RedirectResponse(url=f"{get_frontend_url()}/dashboard?verified=true")\n    await abrir_sesion(ir, db, user, user.password)\n    return ir\n' \
   "FAILED $T::test_verificar_el_email_no_abre_sesion" "vez 1: el link de verificación abrió sesión"
 
-# --- el login: la escritura del jti mira que la clave siga siendo la validada
-sabotaje pytest $M "el login escribe el jti aunque la clave haya cambiado" \
-  'User.username == user.username, User.password == hash_validado).values(active_jti=jti))' \
-  'User.username == user.username).values(active_jti=jti))' \
-  "FAILED $T::test_el_login_no_pisa_una_clave_que_cambio_mientras_validaba"
+# --- lo que se guarda después de validar la clave mira que siga siendo la validada
+sabotaje pytest $M "guardar no mira si la clave cambió" \
+  'User.username == username, User.password == hash_validado).values(**valores))' \
+  'User.username == username).values(**valores))' \
+  "FAILED $T::test_el_login_no_pisa_una_clave_que_cambio_mientras_validaba" \
+  "$G[reset-cambiar la clave]" "$G[reset-cambiar el email]" \
+  "$G[otro cambio de clave-cambiar la clave]" "$G[otro cambio de clave-cambiar el email]"
+sabotaje pytest $M "el perfil guarda el email sin mirar la clave" \
+  $'    elif not await guardar_si_la_clave_sigue(db, u.username, hash_validado, email=raw_email or None):\n        raise HTTPException(status_code=409, detail=CLAVE_CAMBIADA_EN_EL_MEDIO)\n' \
+  $'    else:\n        u.email = raw_email or None\n        await db.commit()\n' \
+  "$G[reset-cambiar el email]" "$G[otro cambio de clave-cambiar el email]"
+sabotaje pytest $M "cambiar la clave compara con la que lee al guardar" \
+  '    token = await abrir_sesion(response, db, db_user, hash_validado, password=nuevo)' \
+  $'    await db.refresh(db_user)\n    token = await abrir_sesion(response, db, db_user, db_user.password, password=nuevo)' \
+  "$G[reset-cambiar la clave]" "$G[otro cambio de clave-cambiar la clave]"
+sabotaje pytest $M "cambiar la clave da 200 aunque no se guardó" \
+  $'    if token is None:\n        raise HTTPException(status_code=409, detail=CLAVE_CAMBIADA_EN_EL_MEDIO)\n    print(' \
+  $'    print(' \
+  "$G[reset-cambiar la clave]" "$G[otro cambio de clave-cambiar la clave]"
 
-# --- cambiar la contraseña: cierra todas y devuelve un token nuevo
-sabotaje pytest $M "cambiar la clave no revoca junto con la clave" \
-  $'    revocar_sesiones(db_user)\n    await db.commit()\n    # Quien' $'    await db.commit()\n    # Quien' \
-  "FAILED $T::test_cambiar_clave_revoca_en_el_mismo_commit_que_la_clave" "la clave cambió y el token viejo sigue entrando"
+# --- cambiar la contraseña: cierra todas, en el mismo guardado, y devuelve un token nuevo
+sabotaje pytest $M "cambiar la clave la guarda antes de cerrar las otras" \
+  '    token = await abrir_sesion(response, db, db_user, hash_validado, password=nuevo)' \
+  $'    await guardar_si_la_clave_sigue(db, db_user.username, hash_validado, password=nuevo)\n    token = await abrir_sesion(response, db, db_user, nuevo)' \
+  "FAILED $T::test_si_el_token_nuevo_no_sale_la_clave_no_cambia" "la clave cambió sin cerrar las otras sesiones"
 sabotaje pytest $M "cambiar la clave no emite un token nuevo" \
-  '    token = await abrir_sesion(response, db, db_user, db_user.password)' '    token = None' \
+  '    token = await abrir_sesion(response, db, db_user, hash_validado, password=nuevo)' \
+  $'    token = "sin-token" if await guardar_si_la_clave_sigue(db, db_user.username, hash_validado, password=nuevo, active_jti=uuid.uuid4().hex) else None' \
   "FAILED $T::test_cambiar_clave_rota_la_sesion_de_quien_la_cambia" "FAILED $T::test_cambiar_clave_con_cookie_conserva_el_navegador"
 
 # --- resetear la contraseña: cierra todas
@@ -183,17 +210,31 @@ sabotaje pytest $M "la clave equivocada da 401 y manda al login" \
   'raise HTTPException(status_code=401, detail="La contraseña actual es incorrecta")' \
   "FAILED $T::test_cambiar_email_con_clave_equivocada_falla_y_no_cambia_nada" "FAILED $T::test_cambiar_clave_mal_no_revoca_nada" "assert 401 == 400"
 sabotaje pytest $M "la clave equivocada no suma al tope" \
-  $'    if not espera and await limites_auth.sumar_fallo(clave_intentos) > 5:\n        espera = await limites_auth.segundos_bloqueado(clave_intentos)\n' '' \
+  $'    if not espera and await limites_auth.sumar_fallo(db, clave_intentos) > 5:\n        espera = await limites_auth.segundos_bloqueado(db, clave_intentos)\n' '' \
   "FAILED $T::test_la_clave_actual_tiene_tope_de_intentos"
 sabotaje pytest $M "el intento se cuenta después de probar la clave" \
-  $'    if not espera and await limites_auth.sumar_fallo(clave_intentos) > 5:\n        espera = await limites_auth.segundos_bloqueado(clave_intentos)\n    if espera:\n        raise HTTPException(status_code=429, detail=f"Demasiados intentos fallidos. Intente de nuevo en {espera} segundos.")\n    if not await run_in_threadpool(verify_password, clave, hash_guardado):\n' \
-  $'    if espera:\n        raise HTTPException(status_code=429, detail=f"Demasiados intentos fallidos. Intente de nuevo en {espera} segundos.")\n    if not await run_in_threadpool(verify_password, clave, hash_guardado):\n        await limites_auth.sumar_fallo(clave_intentos)\n' \
+  $'    if not espera and await limites_auth.sumar_fallo(db, clave_intentos) > 5:\n        espera = await limites_auth.segundos_bloqueado(db, clave_intentos)\n    if espera:\n        raise HTTPException(status_code=429, detail=f"Demasiados intentos fallidos. Intente de nuevo en {espera} segundos.")\n    if not await run_in_threadpool(verify_password, clave, hash_guardado):\n' \
+  $'    if espera:\n        raise HTTPException(status_code=429, detail=f"Demasiados intentos fallidos. Intente de nuevo en {espera} segundos.")\n    if not await run_in_threadpool(verify_password, clave, hash_guardado):\n        await limites_auth.sumar_fallo(db, clave_intentos)\n' \
   "FAILED $T::test_el_tope_de_la_clave_actual_vale_para_pedidos_a_la_vez"
+
+# --- contar intentos no toma otra conexión mientras el pedido tiene la suya
+C="FAILED $T::test_contar_intentos_usa_la_conexion_del_pedido"
+sabotaje pytest $L "sumar o contar abre su propia conexión" \
+  $'async def _escribir(db: AsyncSession, ahora: float, consulta) -> int:\n    await db.execute(delete(_T).where(_T.c.vence <= ahora))\n    cuenta = (await db.execute(consulta)).scalar_one()\n    await db.commit()\n    return cuenta\n' \
+  $'async def _escribir(db: AsyncSession, ahora: float, consulta) -> int:\n    async with _conn.engine.begin() as conn:\n        await conn.execute(delete(_T).where(_T.c.vence <= ahora))\n        return (await conn.execute(consulta)).scalar_one()\n' \
+  "$C[perfil]" "$C[cambiar la clave]" "$C[login sin usuario]" "$C[login con clave mala]" "$C[pedir el reset]"
+sabotaje pytest $L "mirar el bloqueo abre su propia conexión" \
+  $'    hasta = (await db.execute(\n' $'    async with _conn.engine.connect() as conn:\n        hasta = (await conn.execute(\n' \
+  "$C[perfil]" "$C[cambiar la clave]" "$C[login sin usuario]" "$C[login con clave mala]" "$C[login]" "$C[pedir el reset]"
+sabotaje pytest $L "limpiar abre su propia conexión" \
+  $'    await db.execute(delete(_T).where(_T.c.clave == _clave(clave)))\n    await db.commit()\n' \
+  $'    async with _conn.engine.begin() as conn:\n        await conn.execute(delete(_T).where(_T.c.clave == _clave(clave)))\n' \
+  "$C[login]"
 
 # --- cambiar el email pide la contraseña actual
 sabotaje pytest $M "cambiar el email sin clave no verifica nada" \
-  $'        if not isinstance(current_password, str) or not current_password:\n            raise HTTPException(status_code=400, detail="Para cambiar el email ingresá tu contraseña actual")\n        await verificar_clave_actual(u.username, current_password, u.password)\n' \
-  $'        if current_password:\n            await verificar_clave_actual(u.username, current_password, u.password)\n' \
+  $'        if not isinstance(current_password, str) or not current_password:\n            raise HTTPException(status_code=400, detail="Para cambiar el email ingresá tu contraseña actual")\n        await verificar_clave_actual(db, u.username, current_password, hash_validado)\n' \
+  $'        if current_password:\n            await verificar_clave_actual(db, u.username, current_password, hash_validado)\n' \
   "FAILED $T::test_cambiar_email_sin_clave_falla_y_no_cambia_nada" "assert 200 == 400"
 sabotaje pytest $M "la clave actual no se mira si es texto" \
   'if not isinstance(current_password, str) or not current_password:' 'if not current_password:' \
@@ -217,8 +258,8 @@ sabotaje pytest $M "un email mal escrito pide la contraseña en vez de rechazars
 # --- la carrera del login en Postgres: sólo con un Postgres local y descartable
 if [ -n "${PG_DSN:-}" ]; then
   git checkout -q -- proyecto_maria/
-  if aplicar $M 'User.username == user.username, User.password == hash_validado).values(active_jti=jti))' \
-                'User.username == user.username).values(active_jti=jti))'; then
+  if aplicar $M 'User.username == username, User.password == hash_validado).values(**valores))' \
+                'User.username == username).values(**valores))'; then
     salida="$("$PY" scripts/testing/sesion1_motores.py pg "$PG_DSN" 2>&1)"; codigo=$?
     juzgar "pg: el login escribe el jti aunque la clave haya cambiado" "$salida" "$codigo" \
       "FALLA | 6. el login con la clave vieja no abre sesión"

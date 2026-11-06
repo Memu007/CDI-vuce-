@@ -288,7 +288,8 @@ def contar_no_agota_el_pool():
     for metodo, ruta, cuerpo, con_token in (
         ("PUT", "/api/user/profile", {"email": "pool@example.com", "current_password": "mala-1!"}, True),
         ("POST", "/api/user/change-password", {"current_password": "mala-1!", "new_password": P1}, True),
-        ("POST", "/auth/login", {"username": atacado, "password": "mala-1!"}, False),
+        # Un usuario que no existe cuenta sin pasar por bcrypt, que es CPU y no pool.
+        ("POST", "/auth/login", {"username": "ses1_motor_nadie", "password": "mala-1!"}, False),
         ("POST", "/auth/request-password-reset", {"email": "nadie@example.com"}, False),
     ):
         sql("delete from limites_auth")
