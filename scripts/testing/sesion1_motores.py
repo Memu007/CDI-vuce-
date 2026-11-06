@@ -13,8 +13,8 @@ levanta la app de verdad, con su base propia y descartable, y se recorre:
    y escribe el jti gana: el login da 401 y no pisa el jti. La fila queda
    bloqueada hasta ver al login esperándola en pg_stat_activity. En SQLite lo
    cubre tests/test_sesion1.py.
-7. (sólo pg) por cada ruta que cuenta intentos, más pedidos a la vez que
-   conexiones tiene el pool: ninguno da 500 y otro usuario entra en menos de 2 s.
+7. (sólo pg) por cada ruta que cuenta intentos, y el perfil, más pedidos a la vez
+   que conexiones tiene el pool: ninguno da 500 y otro usuario entra en menos de 2 s.
 Antes de cambiar y de resetear se pone active_jti en NULL (como un usuario de
 antes de la columna), que es el caso en el que revocar resucitaba sesiones.
 
@@ -23,6 +23,7 @@ uso (con un Postgres local y descartable, nunca el de producción):
   python scripts/testing/sesion1_motores.py pg postgresql://cdi@127.0.0.1:55432/postgres
 En pg crea una base propia con esa conexión y la borra al terminar.
 """
+import asyncio
 import json
 import os
 import socket
@@ -36,6 +37,8 @@ import urllib.error
 import urllib.request
 import uuid
 from urllib.parse import urlparse
+
+import httpx
 
 REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 MOTOR = sys.argv[1] if len(sys.argv) > 1 else ""
@@ -275,7 +278,33 @@ def carrera_del_login():
 
 
 # El pool de la app es de 20 + 30 conexiones.
-A_LA_VEZ = 60
+A_LA_VEZ = 80
+
+
+async def _a_la_vez(metodo, ruta, cuerpo, token, otro):
+    """A_LA_VEZ pedidos y el login de otro usuario salen juntos, en un solo
+    cliente: el estado de cada uno y lo que tardó el del otro."""
+    async with httpx.AsyncClient(base_url=f"http://127.0.0.1:{PUERTO}", timeout=90,
+                                 limits=httpx.Limits(max_connections=A_LA_VEZ + 1)) as c:
+        async def uno(n):
+            h = {"X-Forwarded-For": f"10.98.{n >> 8}.{n & 255}"}
+            if token:
+                h["Authorization"] = f"Bearer {token}"
+            try:
+                return (await c.request(metodo, ruta, json=cuerpo, headers=h)).status_code
+            except httpx.HTTPError as e:
+                return type(e).__name__
+
+        async def el_otro():
+            inicio = time.monotonic()
+            try:
+                r = await c.post("/auth/login", json={"username": otro, "password": P1},
+                                 headers={"X-Forwarded-For": "10.97.0.1"})
+                return r.status_code, time.monotonic() - inicio
+            except httpx.HTTPError as e:
+                return type(e).__name__, time.monotonic() - inicio
+        *estados, (s_otro, demora) = await asyncio.gather(*(uno(n) for n in range(A_LA_VEZ)), el_otro())
+    return estados, s_otro, demora
 
 
 def contar_no_agota_el_pool():
@@ -286,6 +315,7 @@ def contar_no_agota_el_pool():
         assert s == 200, (s, b)
     t = login(P1, atacado)
     for metodo, ruta, cuerpo, con_token in (
+        ("GET", "/api/user/profile", None, True),
         ("PUT", "/api/user/profile", {"email": "pool@example.com", "current_password": "mala-1!"}, True),
         ("POST", "/api/user/change-password", {"current_password": "mala-1!", "new_password": P1}, True),
         # Un usuario que no existe cuenta sin pasar por bcrypt, que es CPU y no pool.
@@ -293,33 +323,12 @@ def contar_no_agota_el_pool():
         ("POST", "/auth/request-password-reset", {"email": "nadie@example.com"}, False),
     ):
         sql("delete from limites_auth")
-        largada = threading.Barrier(A_LA_VEZ + 1)
-        estados = []
-
-        def uno():
-            largada.wait()
-            try:
-                estados.append(pedir(ruta, cuerpo, token=t if con_token else None, metodo=metodo)[0])
-            except OSError as e:
-                estados.append(type(e).__name__)
-        hilos = [threading.Thread(target=uno) for _ in range(A_LA_VEZ)]
-        for h in hilos:
-            h.start()
-        largada.wait()
-        inicio = time.monotonic()
-        try:
-            s_otro = pedir("/auth/login", {"username": otro, "password": P1})[0]
-        except OSError as e:
-            s_otro = type(e).__name__
-        demora = time.monotonic() - inicio
-        for h in hilos:
-            h.join(120)
+        estados, s_otro, demora = asyncio.run(_a_la_vez(metodo, ruta, cuerpo, t if con_token else None, otro))
         cuenta = {x: estados.count(x) for x in set(estados)}
-        chequear(len(estados) == A_LA_VEZ and 500 not in cuenta and all(isinstance(x, int) for x in cuenta),
+        chequear(500 not in cuenta and all(isinstance(x, int) for x in cuenta),
                  f"7. {A_LA_VEZ} {metodo} {ruta} a la vez: ningún 500 ({cuenta})")
         chequear(s_otro == 200 and demora < 2,
-                 f"7. con {ruta} a la vez otro usuario entra en menos de 2 s ({s_otro}, {demora:.1f} s)")
-
+                 f"7. con {metodo} {ruta} a la vez otro usuario entra en menos de 2 s ({s_otro}, {demora:.1f} s)")
 
 proc = None
 try:

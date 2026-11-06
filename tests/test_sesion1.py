@@ -449,16 +449,16 @@ def test_el_tope_de_la_clave_actual_vale_para_pedidos_a_la_vez():
     assert codigos.count(400) <= 5 and set(codigos) <= {400, 429}, codigos
 
 
-@pytest.mark.parametrize("ruta", ["perfil", "cambiar la clave", "login sin usuario",
+@pytest.mark.parametrize("ruta", ["ver el perfil", "perfil", "cambiar la clave", "login sin usuario",
                                   "login con clave mala", "login", "pedir el reset"])
 def test_contar_intentos_usa_la_conexion_del_pedido(ruta):
     """Contar o mirar el tope no toma otra conexión del pool mientras el
-    pedido tiene la suya: con más pedidos que conexiones, se trabaría.
-    Las rutas con sesión tienen dos porque get_current_user usa su propia
-    sesión de la base, aparte de la de la ruta."""
+    pedido tiene la suya: con más pedidos que conexiones, se trabaría. Vale
+    también para la sesión de get_current_user, que es aparte de la de la ruta."""
     u, mail = _usuario()
     t = _login(u)
     pedidos = {
+        "ver el perfil": ("GET", "/api/user/profile", None, t),
         "perfil": ("PUT", "/api/user/profile", {"email": f"otro-{u}@example.com", "current_password": "mala-1!"}, t),
         "cambiar la clave": ("POST", "/api/user/change-password", {"current_password": "mala-1!", "new_password": CLAVE2}, t),
         "login sin usuario": ("POST", "/auth/login", {"username": "ses1_nadie", "password": "mala-1!"}, None),
@@ -487,7 +487,7 @@ def test_contar_intentos_usa_la_conexion_del_pedido(ruta):
         event.remove(pool, "checkout", tomar)
         event.remove(pool, "checkin", devolver)
     assert r.status_code < 500, r.text
-    assert maximo == (2 if token else 1), f"{ruta}: {maximo} conexiones a la vez"
+    assert maximo == 1, f"{ruta}: {maximo} conexiones a la vez"
 
 
 # --- un solo lugar decide si un token vale -----------------------------------
