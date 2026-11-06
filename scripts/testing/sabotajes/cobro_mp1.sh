@@ -56,7 +56,7 @@ PYEOF
 }
 
 # shellcheck disable=SC2086  # $T son varios archivos
-correr() { "$PY" -m pytest -q --no-cov -p no:cacheprovider $T 2>&1; }
+correr() { "$PY" -m pytest -q --no-cov --timeout=120 -p no:cacheprovider $T 2>&1; }
 
 # sabotaje <archivo> <nombre> <original> <saboteado> [<original> <saboteado>…] <lo que el rojo tiene que decir>
 sabotaje() {
@@ -66,6 +66,10 @@ sabotaje() {
   fi
   local salida codigo
   salida="$(correr)"; codigo=$?
+  # Un caso trabado no es el rojo del sabotaje aunque el esperado también falle.
+  if grep -q "Failed: Timeout" <<<"$salida"; then
+    echo "TRABA | $nombre: un caso pasó el tope de 120 s"; FALLAS=$((FALLAS+1)); return
+  fi
   if [ "$codigo" -eq 0 ]; then
     echo "VERDE | $nombre: la prueba no lo vio"; FALLAS=$((FALLAS+1))
   elif grep -qF -- "$esperado" <<<"$salida"; then
