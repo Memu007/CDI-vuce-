@@ -1261,9 +1261,8 @@ async def _migrate_catalogo_sin_tope():
 
 
 async def _migrate_catalogo_claves():
-    """Da la clave de hoy a las filas cuya descripción no tiene letras ni números
-    latinos y tienen otra: guardarlas de nuevo buscaría por la clave de hoy y
-    armaría una segunda fila."""
+    """Da la clave de hoy a las filas sin letras ni números latinos que tienen
+    otra: guardarlas de nuevo buscaría por la de hoy y armaría una segunda fila."""
     from sqlalchemy import text
     from proyecto_maria.core import catalog_service as catalog_svc
     from proyecto_maria.database.connection import engine, IS_SQLITE
