@@ -8,7 +8,7 @@ scripts/testing/catalogo_largo2_postgres.py.
 import pytest
 
 from proyecto_maria.core.maria_generator import get_pais_codigo
-from proyecto_maria.database.models import VendorCatalogProduct
+from proyecto_maria.database.models import ClientProductHistory, VendorCatalogProduct
 from tests.test_catalogo_largo1 import _dueno
 from tests.test_guardar1 import _cliente, _sql
 from tests.test_prelaunch_block2 import client  # noqa: F401
@@ -32,8 +32,9 @@ def _filas(owner):
 
 
 def test_el_origen_y_el_proveedor_no_tienen_tope_en_la_base():
-    for columna in ("origen", "vendor_nombre"):
-        assert VendorCatalogProduct.__table__.c[columna].type.length is None, columna
+    for tabla, columna in ((VendorCatalogProduct, "origen"), (VendorCatalogProduct, "vendor_nombre"),
+                           (ClientProductHistory, "origen_frecuente")):
+        assert tabla.__table__.c[columna].type.length is None, columna
 
 
 @pytest.mark.parametrize("via", ["catalogo", "cambiar-origen", "guardar-uso", "guardar-uso-con-cliente"])
@@ -105,16 +106,19 @@ def test_cambiar_la_descripcion_a_una_sin_letras_latinas_mueve_la_clave(client):
 
 
 
-@pytest.mark.parametrize("via, origen", [("guardar-uso", "TAIWAN"), ("aprender", "CHINA"), ("operacion", "ALEMANIA")])
-def test_la_memoria_del_cliente_guarda_el_origen_entero(client, via, origen):
+@pytest.mark.parametrize("via, origenes", [
+    ("guardar-uso", ["TAIWAN"]), ("aprender", ["JAPON"]), ("operacion", ["ALEMANIA"]),
+    ("guardar-uso", ["CN", "TAIWAN"])], ids=["guardar-uso", "aprender", "operacion", "cambiar"])
+def test_la_memoria_del_cliente_guarda_el_origen_entero(client, via, origenes):
     cid = _cliente(client)
-    item = {"descripcion": "TORNILLO", "ncm": NCM, "origen": origen}
-    if via == "guardar-uso":
-        r = client.post("/api/ncm/guardar-uso", json={**item, "vendor_name": VENDOR, "client_id": cid})
-        assert r.json() == {"success": True, "historial_guardado": True}, r.text
-    else:
-        url = f"/api/clientes/{cid}/" + ("catalogo/productos/learn" if via == "aprender" else "operaciones")
-        assert client.post(url, json={"items": [item]}).status_code == 200
+    for origen in origenes:
+        item = {"descripcion": "TORNILLO", "ncm": NCM, "origen": origen}
+        if via == "guardar-uso":
+            r = client.post("/api/ncm/guardar-uso", json={**item, "vendor_name": VENDOR, "client_id": cid})
+            assert r.json() == {"success": True, "historial_guardado": True}, r.text
+        else:
+            url = f"/api/clientes/{cid}/" + ("catalogo/productos/learn" if via == "aprender" else "operaciones")
+            assert client.post(url, json={"items": [item]}).status_code == 200
 
     assert _sql("select origen_frecuente from client_product_history where client_id=:c", c=cid) == [(origen,)]
     r = client.post("/api/catalog/lookup", json={"client_id": cid, "items": [{"descripcion": "TORNILLO"}]})

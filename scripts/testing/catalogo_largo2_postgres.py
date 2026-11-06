@@ -9,11 +9,13 @@ de las columnas y el corte no se ve.
 
 Comprueba:
 - que con la tabla tomada el arranque falla en vez de seguir con el corte;
-- que origen y vendor_nombre del catálogo pasan a text y la fila vieja queda
-  igual, y que arrancar otra vez no cambia nada;
+- que origen y vendor_nombre del catálogo y el origen de la memoria del
+  cliente pasan a text y la fila vieja queda igual, y que arrancar otra vez
+  no cambia nada;
 - que el origen «TAIWAN» y un proveedor de 220 caracteres se guardan enteros
   por el catálogo, por cambiar el origen y por guardar-uso con y sin cliente,
-  y que guardar-uso con un cliente guarda también la memoria del cliente;
+  y que guardar-uso con un cliente guarda también el origen entero en la
+  memoria del cliente;
 - que guardar-uso de «螺丝» con proveedor y sin cliente guarda la fila;
 - que 2000 caracteres CJK distintos se guardan por el catálogo, por
   guardar-uso y por cambiar la descripción: la clave entra en el índice único.
@@ -92,7 +94,8 @@ def entorno(url):
 
 def columnas():
     return sql("select column_name, data_type, character_maximum_length from information_schema.columns"
-               " where table_name='vendor_catalog_products' and column_name in ('origen','vendor_nombre')"
+               " where (table_name='vendor_catalog_products' and column_name in ('origen','vendor_nombre'))"
+               " or (table_name='client_product_history' and column_name='origen_frecuente')"
                " order by column_name")
 
 
@@ -135,7 +138,8 @@ try:
         sys.exit("la versión anterior no arrancó o no guardó el producto")
     CID = r.stdout.split("vieja ok ")[1].split()[0]
     viejo = fila(VENDOR_ID, "TORNILLO")
-    chequear(columnas() == [("origen", "character varying", 5), ("vendor_nombre", "character varying", 200)]
+    chequear(columnas() == [("origen", "character varying", 5), ("origen_frecuente", "character varying", 3),
+                            ("vendor_nombre", "character varying", 200)]
              and viejo == [(VENDOR, NCM, "CN")],
              f"la base de {ANTERIOR} tiene las columnas cortas y el producto viejo: {columnas()} {viejo}")
 
@@ -172,7 +176,8 @@ try:
     for vez in ("primer", "segundo"):
         with Arranque(main_mod.app, raise_server_exceptions=False):
             pass
-        chequear(columnas() == [("origen", "text", None), ("vendor_nombre", "text", None)]
+        chequear(columnas() == [("origen", "text", None), ("origen_frecuente", "text", None),
+                                ("vendor_nombre", "text", None)]
                  and fila(VENDOR_ID, "TORNILLO") == viejo,
                  f"{vez} arranque: las columnas son text y el producto viejo queda igual: {columnas()}")
 
@@ -192,12 +197,13 @@ try:
         for desc, cliente in (("ARANDELA", {}), ("BULON", {"client_id": CID})):
             r = c.post("/api/ncm/guardar-uso", json={"descripcion": desc, "ncm": NCM, "vendor_name": LARGO,
                                                      "origen": "TAIWAN", **cliente})
-            memoria = sql("select 1 from client_product_history where client_id=%s and descripcion=%s",
-                          CID, desc)
+            memoria = sql("select origen_frecuente from client_product_history where client_id=%s"
+                          " and descripcion=%s", CID, desc)
             chequear(r.status_code == 200 and r.json() == {"success": True, "historial_guardado": True}
-                     and fila(LARGO_ID, desc) == [(LARGO, NCM, "TAIWAN")] and len(memoria) == len(cliente),
+                     and fila(LARGO_ID, desc) == [(LARGO, NCM, "TAIWAN")]
+                     and memoria == [("TAIWAN",)] * len(cliente),
                      f"guardar-uso {'con' if cliente else 'sin'} cliente guarda enteros el origen y el "
-                     f"proveedor: {r.status_code} {r.text[:120]} memoria del cliente {len(memoria)}")
+                     f"proveedor: {r.status_code} {r.text[:120]} memoria del cliente {memoria}")
 
         r = c.post("/api/ncm/guardar-uso", json={"descripcion": "螺丝", "ncm": NCM, "vendor_name": VENDOR})
         chequear(r.status_code == 200 and r.json() == {"success": True, "historial_guardado": True}

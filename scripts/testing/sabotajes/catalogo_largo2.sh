@@ -58,6 +58,9 @@ PYEOF
 M=proyecto_maria/main.py
 CS=proyecto_maria/core/catalog_service.py
 MO=proyecto_maria/database/models.py
+CM=proyecto_maria/services/client_memory.py
+MEM=test_la_memoria_del_cliente_guarda_el_origen_entero
+TOPE=test_un_proveedor_o_un_origen_de_mas_de_2000_dan_400_sin_guardar
 SIN=test_lo_que_no_tiene_letras_latinas_se_guarda_sin_cruzarse
 
 CORRE=("${PRUEBA[@]}")
@@ -73,13 +76,53 @@ sabotaje $MO "el proveedor vuelve a tener tope de 200" \
   '    vendor_nombre = Column(Text, nullable=True)' \
   '    vendor_nombre = Column(String(200), nullable=True)' \
   "FAILED $T::test_el_origen_y_el_proveedor_no_tienen_tope_en_la_base" "AssertionError: vendor_nombre"
+sabotaje $CM "la memoria del cliente recorta el origen a 3 al crear" \
+  '            origen_frecuente=origen or "XX",' \
+  '            origen_frecuente=origen[:3] or "XX",' \
+  "FAILED $T::${MEM}[guardar-uso]" "FAILED $T::${MEM}[aprender]" "FAILED $T::${MEM}[operacion]"
+sabotaje $CM "la memoria del cliente recorta el origen a 3 al cambiarlo" \
+  '        existing.origen_frecuente = origen' \
+  '        existing.origen_frecuente = origen[:3]' \
+  "FAILED $T::${MEM}[cambiar]"
+sabotaje $MO "el origen de la memoria del cliente vuelve a tener tope de 3" \
+  '    origen_frecuente = Column(Text, default="XX")' \
+  '    origen_frecuente = Column(String(3), default="XX")' \
+  "FAILED $T::test_el_origen_y_el_proveedor_no_tienen_tope_en_la_base" "AssertionError: origen_frecuente"
+sabotaje $CS "el catálogo no mide el proveedor" \
+  '    validar_largo(vendor_name, "El proveedor")' \
+  '    pass' \
+  "FAILED $T::${TOPE}[catalogo-proveedor]"
+sabotaje $CS "guardar en el catálogo no mide el origen" \
+  '        validar_largo(origen, "El origen")
+
+' \
+  '
+' \
+  "FAILED $T::${TOPE}[catalogo-origen]"
+sabotaje $CS "cambiar el origen no lo mide" \
+  '        validar_largo(origen, "El origen")
+        row.origen' \
+  '        row.origen' \
+  "FAILED $T::${TOPE}[cambiar-origen-origen]"
+sabotaje $M "guardar-uso no mide el proveedor" \
+  '        catalog_svc.validar_largo(vendor_name, "El proveedor")' \
+  '        pass' \
+  "FAILED $T::${TOPE}[guardar-uso-proveedor]"
+sabotaje $M "guardar-uso no mide el origen" \
+  '        catalog_svc.validar_largo(origin, "El origen")' \
+  '        pass' \
+  "FAILED $T::${TOPE}[guardar-uso-origen]"
 sabotaje $CS "sin letras latinas la clave queda vacía" \
   '    return "~" + hashlib.sha256(texto.encode("utf-8", "surrogatepass")).hexdigest()[:40]' \
   '    return ""' \
   "FAILED $T::${SIN}[catalogo]" "FAILED $T::${SIN}[guardar-uso]"
-sabotaje $CS "la clave junta ß con ss y ﬁ con fi" \
-  '    texto = " ".join(unicodedata.normalize("NFC", descripcion).lower().split())' \
-  '    texto = " ".join(unicodedata.normalize("NFC", descripcion).casefold().split())' \
+sabotaje $CS "la clave junta ß con ss" \
+  '    text = re.sub(r"[^a-z0-9\s]", " ", text.lower())' \
+  '    text = re.sub(r"[^a-z0-9\s]", " ", text.casefold())' \
+  "FAILED $T::${SIN}[catalogo]" "FAILED $T::${SIN}[guardar-uso]"
+sabotaje $CS "la clave junta ﬁ con fi" \
+  '    text = unicodedata.normalize("NFD", text)' \
+  '    text = unicodedata.normalize("NFKD", text)' \
   "FAILED $T::${SIN}[catalogo]" "FAILED $T::${SIN}[guardar-uso]"
 sabotaje $CS "guardar en el catálogo usa la clave vieja" \
   '        product_key = clave_de_producto(desc)' \
@@ -101,13 +144,17 @@ if [ -n "$PG_URL" ]; then
     echo "BASE  | la prueba en Postgres ya está en rojo sin sabotaje"; FALLAS=$((FALLAS+1))
   else
     sabotaje $M "el arranque no pasa el origen a text" \
-      "AND column_name IN ('product_key', 'descripcion', 'origen', 'vendor_nombre') " \
-      "AND column_name IN ('product_key', 'descripcion', 'vendor_nombre') " \
+      "column_name IN ('product_key', 'descripcion', 'origen', 'vendor_nombre')) " \
+      "column_name IN ('product_key', 'descripcion', 'vendor_nombre')) " \
       "FALLA | primer arranque: las columnas son text" "FALLA | el catálogo guarda enteros el origen"
     sabotaje $M "el arranque no pasa el proveedor a text" \
-      "AND column_name IN ('product_key', 'descripcion', 'origen', 'vendor_nombre') " \
-      "AND column_name IN ('product_key', 'descripcion', 'origen') " \
+      "column_name IN ('product_key', 'descripcion', 'origen', 'vendor_nombre')) " \
+      "column_name IN ('product_key', 'descripcion', 'origen')) " \
       "FALLA | primer arranque: las columnas son text" "FALLA | el catálogo guarda enteros el origen"
+    sabotaje $M "el arranque no pasa el origen de la memoria del cliente a text" \
+      "OR (table_name = 'client_product_history' AND column_name = 'origen_frecuente')) " \
+      ") " \
+      "FALLA | primer arranque: las columnas son text" "FALLA | guardar-uso con cliente guarda enteros"
     sabotaje $CS "sin letras latinas la clave es el texto entero y no entra en el índice" \
       '    return "~" + hashlib.sha256(texto.encode("utf-8", "surrogatepass")).hexdigest()[:40]' \
       '    return texto' \
