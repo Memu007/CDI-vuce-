@@ -363,3 +363,19 @@ PM.
 **2026-11-05 21:41 UTC, Emi en el chat de la PM principal:** «CATALOGO-LARGO-2
 sí, dale». Entra en la cola de MARIA después de SESION-1, como estaba
 propuesta.
+
+## 2026-10-28 — D38 y D39 de la Dev MARIA (PM)
+
+Decidido por la PM; el texto entero está en `git show d79a8b8:docs/pm/PARA-DEV-2.md`.
+D38 (1): con email exacto, esa cuenta; con varias y ninguna exacta, ninguna,
+con la misma respuesta que si no existe. El índice sobre `lower(email)` espera
+el conteo de Emi en producción. D39 (1): los números de 40 logins malos a la
+vez van a riesgos de CONEXIONES-1; la medición de 60 a 100 se propone a Emi.
+
+## 2026-11-06 — CATALOGO-LARGO-2: devolución y D76 a D81 (PM)
+
+Vuelve por tres causas nuevas de la pieza: un NUL o medio par rompe el lote
+entero en PG, una fila vieja queda duplicada y sin editar, y la migración puede
+trabarse con `guardar-uso` y loguea antes del commit. D79 (a) en la vuelta.
+D76, D77, D78 y D80 van a Emi como pieza CATALOGO-3, recomendada. D81 queda:
+escapar el `value` va a la cola de limpieza.
