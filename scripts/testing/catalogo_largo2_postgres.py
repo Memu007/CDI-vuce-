@@ -211,16 +211,20 @@ try:
         # termina con las columnas migradas en vez de colgar la prueba.
         tomada.cursor().execute("set idle_in_transaction_session_timeout = '30s'; "
                                 "select 1 from vendor_catalog_products limit 1")
+        log_tomada = io.StringIO()
         try:
-            with Arranque(main_mod.app, raise_server_exceptions=False):
+            with contextlib.redirect_stdout(log_tomada), \
+                    Arranque(main_mod.app, raise_server_exceptions=False):
                 arranco = True
         except Exception:
             arranco = False
             asyncio.run(engine.dispose(close=False))
     finally:
         tomada.close()
-    chequear(not arranco and {t for _, t, _ in columnas()} == {"character varying"},
-             f"con la tabla tomada el arranque falla en vez de seguir con las columnas cortas: {columnas()}")
+    migradas = [linea for linea in log_tomada.getvalue().splitlines() if "pasa a TEXT" in linea]
+    chequear(not arranco and {t for _, t, _ in columnas()} == {"character varying"} and not migradas,
+             f"con la tabla tomada el arranque falla en vez de seguir con las columnas cortas y no dice "
+             f"migrado: {columnas()} {migradas}")
 
     # Guardar-uso traba la memoria del cliente y después el catálogo.
     escritura = psycopg2.connect(URL_BASE)

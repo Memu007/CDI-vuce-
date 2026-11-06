@@ -134,6 +134,8 @@ sabotaje $CM "la memoria del cliente no mide el origen" \
 sabotaje $CS "cambiar el origen no lo mide" \
   '        ("origen", "El origen"), ("unidad_medida", "La unidad"),
     ) if updates.get(campo) is not None}
+    if updates.get("ncm") is not None:
+        textos["ncm"] = ncm_para_guardar(updates["ncm"])
 
     new_desc = textos.get("descripcion_original") or row.descripcion or ""
     if "ncm" in textos:
@@ -142,6 +144,8 @@ sabotaje $CS "cambiar el origen no lo mide" \
         row.origen = textos["origen"] or None' \
   '        ("unidad_medida", "La unidad"),
     ) if updates.get(campo) is not None}
+    if updates.get("ncm") is not None:
+        textos["ncm"] = ncm_para_guardar(updates["ncm"])
 
     new_desc = textos.get("descripcion_original") or row.descripcion or ""
     if "ncm" in textos:
@@ -246,7 +250,7 @@ if [ -n "$PG_URL" ]; then
       '                await conn.exec_driver_sql(f"ALTER TABLE {tabla} ALTER COLUMN {columna} TYPE TEXT")' \
       '                print(f"✅ Migracion: {tabla}.{columna} pasa a TEXT")
                 await conn.exec_driver_sql(f"ALTER TABLE {tabla} ALTER COLUMN {columna} TYPE TEXT")' \
-      "FALLA | el arranque y una escritura como guardar-uso andan los dos"
+      "FALLA | con la tabla tomada el arranque falla"
     sabotaje $M "la migración de claves no mueve nada" \
       '    sin_latinas = "NOT GLOB' \
       '    return
