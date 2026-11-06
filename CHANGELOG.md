@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-06 · fix: en un estudio, cancelar o pagar no toca una suscripción que no corresponde (COBRO-MP-2)
+
+- **fix(cobro):** un miembro del estudio sólo cancela el plan si su suscripción es la que paga (autorizada o pausada); con una pendiente propia da 403, y si Mercado Pago no contesta, 503 sin cambiar nada. Al pagar, si mientras se cancelaba una suscripción vieja otra se autorizó, no se cancela y da 409; y si una cancelación falla, las que ya estaban canceladas en Mercado Pago dejan de figurar.
+
 ## 2026-11-06 · fix: una respuesta tardía no escribe en la carga que sigue y regenerar no depende del disco (COBRO-CORTE-1)
 
 - **fix(cobro):** en v2, guardar en el historial y aprender el catálogo usan el cliente y el proveedor de la carga que pidió el TXT. Lo que se pide mientras otra generación espera se genera cuando ésa vuelve, y el botón ya no queda trabado. Regenerar un archivo ya entregado guarda una copia en vez de un enlace, así funciona en discos que no admiten enlaces. Si se elige el cliente mientras la generación espera, se guarda en ése, y un doble clic en «Reintentar» genera una sola vez.

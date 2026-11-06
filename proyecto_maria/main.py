@@ -2095,9 +2095,11 @@ async def cancel_billing(
     db_user, org, con_sid = await _cuenta_con_suscripciones(db, user["username"])
     entidad = org or db_user
     # Cancelar el plan de un estudio lo corta para todos sus miembros.
-    if org and db_user.username != org.owner_username and db_user not in con_sid:
-        raise HTTPException(status_code=403, detail="Sólo quien administra el estudio o quien abrió "
-                                                    "la suscripción puede cancelar el plan.")
+    sin_permiso = HTTPException(status_code=403, detail="Sólo quien administra el estudio o quien abrió "
+                                                        "la suscripción puede cancelar el plan.")
+    miembro = org and db_user.username != org.owner_username
+    if miembro and db_user not in con_sid:
+        raise sin_permiso
 
     if entidad.billing_status not in ("trial", "active", "past_due") and not con_sid:
         raise HTTPException(
@@ -2108,6 +2110,14 @@ async def cancel_billing(
     no_se_pudo = "No se pudo cancelar en Mercado Pago; tu plan sigue igual. Probá de nuevo en unos minutos."
     if con_sid and not billing_service.is_configured():
         raise HTTPException(status_code=503, detail=no_se_pudo)
+    if miembro:
+        # Una pendiente propia no es la que paga el estudio.
+        try:
+            estado_mp = await run_in_threadpool(_leer_suscripcion_mp, db_user.mp_preapproval_id)
+        except _SuscripcionMPError:
+            raise HTTPException(status_code=503, detail=no_se_pudo)
+        if estado_mp not in ("authorized", "paused"):
+            raise sin_permiso
     for cuenta in con_sid:
         try:
             await run_in_threadpool(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id)
@@ -10972,17 +10982,25 @@ async def billing_checkout(
     # Una sola suscripción por cuenta que paga, contando las de los otros miembros.
     # Se leen todas antes de cancelar: una autorizada frena sin haber tocado las demás.
     estados = [await _estado_suscripcion_vieja(db, db_user, cuenta) for cuenta in con_sid]
-    for cuenta, estado_mp in zip(con_sid, estados):
-        if estado_mp != "cancelled":
+    vivas = [cuenta for cuenta, estado_mp in zip(con_sid, estados) if estado_mp != "cancelled"]
+    # Sin commit todavía: soltaría el bloqueo antes de crear la nueva.
+    for cuenta in set(con_sid) - set(vivas):
+        cuenta.mp_preapproval_id = None
+    try:
+        for i, cuenta in enumerate(vivas):
+            if i:
+                # Mientras se cancelaba la anterior, ésta pudo autorizarse.
+                await _estado_suscripcion_vieja(db, db_user, cuenta)
             try:
                 await run_in_threadpool(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id)
             except _SuscripcionMPError as e:
                 print(f"⚠️ Checkout de {username}: no se pudo cancelar la suscripción vieja en MP: {e}")
-                # Las ya canceladas no vuelven: se guardan sin el sid.
-                await db.commit()
                 raise HTTPException(status_code=503, detail=_NO_SE_CONFIRMA_SUSCRIPCION)
-        # Sin commit todavía: soltaría el bloqueo antes de crear la nueva.
-        cuenta.mp_preapproval_id = None
+            cuenta.mp_preapproval_id = None
+    except HTTPException:
+        # Las ya canceladas no vuelven: se guardan sin el sid.
+        await db.commit()
+        raise
 
     try:
         checkout = billing_service.create_checkout(db_user, plan_id, org_id=org_id)
