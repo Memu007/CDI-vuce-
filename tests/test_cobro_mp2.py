@@ -297,8 +297,12 @@ def _estado_raro(request):
     return httpx.Response(200, json={"id": "x", "status": "otro"})
 
 
-@pytest.mark.parametrize("responder", [_contesta_500, _sin_conexion, _estado_raro],
-                         ids=["http_500", "sin_conexion", "estado_desconocido"])
+def _estado_lista(request):
+    return httpx.Response(200, json={"id": "x", "status": ["authorized"]})
+
+
+@pytest.mark.parametrize("responder", [_contesta_500, _sin_conexion, _estado_raro, _estado_lista],
+                         ids=["http_500", "sin_conexion", "estado_desconocido", "estado_lista"])
 def test_si_no_se_sabe_como_esta_la_suscripcion_no_se_crea_otra(client, responder):
     usuario, sid = _suscripto(client, "mp2_get")
     FALLA["GET"] = responder
@@ -649,5 +653,7 @@ def test_un_miembro_cuya_suscripcion_no_paga_no_cancela_el_plan_del_estudio(clie
         FALLA["GET"] = lectura
     r = client.post("/api/billing/cancel")
     assert r.status_code == codigo, r.text
+    # Abrió una suscripción: el aviso tiene que decir que no es la que paga.
+    assert codigo != 403 or "que lo paga" in r.json()["detail"], r.text
     assert _leer_org(org_id)["billing_status"] == "active" and SUS["nueva-1"] == queda
     assert _leer(nombres["miembro"])["mp_preapproval_id"] == "nueva-1"

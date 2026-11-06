@@ -128,7 +128,10 @@ sabotaje $M "si no se sabe cómo está la vieja, se crea igual" \
         estado_mp = \"cancelled\""
 sabotaje $M "un estado desconocido de Mercado Pago se acepta" \
   "FAILED $T::test_si_no_se_sabe_como_esta_la_suscripcion_no_se_crea_otra[estado_desconocido]" \
-  "    if estado not in _ESTADOS_SUSCRIPCION_MP:" "    if False:"
+  "    if not isinstance(estado, str) or estado not in _ESTADOS_SUSCRIPCION_MP:" "    if False:"
+sabotaje $M "un estado que no es texto rompe con un 500" \
+  "FAILED $T::test_si_no_se_sabe_como_esta_la_suscripcion_no_se_crea_otra[estado_lista]" \
+  "    if not isinstance(estado, str) or estado not in" "    if estado not in"
 
 # --- Una sola suscripción por organización
 sabotaje $M "el checkout no mira las suscripciones de los otros miembros" \
