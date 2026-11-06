@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-06 · fix: Mercado Pago lento no frena el servidor y el aviso de pago exige firma (COBRO-MP-3)
+
+- **fix(cobro):** las consultas a Mercado Pago (aviso de pago, checkout, recarga y cancelar) corren en hasta 8 hilos propios con un tiempo de conexión de 10 s: un Mercado Pago trabado ya no deja sin hilos al resto del servidor.
+- **fix(cobro):** el aviso de pago acepta 60 pedidos por minuto por IP y sólo atiende avisos con firma válida: sin clave configurada, sin firma (IPN) o con un cuerpo inválido contesta 401 sin cambiar nada. Hay que configurar en Mercado Pago los Webhooks con la clave.
+
 ## 2026-11-06 · fix: en un estudio, cancelar o pagar no toca una suscripción que no corresponde (COBRO-MP-2)
 
 - **fix(cobro):** un miembro del estudio sólo cancela el plan si su suscripción es la que paga (autorizada o pausada); con una pendiente propia da 403, y si Mercado Pago no contesta, 503 sin cambiar nada. Al pagar, si mientras se leían o cancelaban las suscripciones viejas una se autorizó, ésa no se cancela y da 409; y si una cancelación falla, las que ya estaban canceladas en Mercado Pago dejan de figurar.

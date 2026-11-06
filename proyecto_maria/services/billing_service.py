@@ -18,6 +18,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Tuple
 
 import mercadopago
+from mercadopago.config import RequestOptions
 
 
 # Lectura dinámica de envs para que tests con monkeypatch funcionen sin recargar módulo.
@@ -68,7 +69,14 @@ def _get_sdk():
     token = _access_token()
     if not token:
         raise RuntimeError("MP_ACCESS_TOKEN no configurado")
-    return mercadopago.SDK(token)
+    return sdk_mp(token)
+
+
+def sdk_mp(token: str):
+    # Sin esto el SDK espera 60 s por intento y reintenta tres veces.
+    sdk = mercadopago.SDK(token)
+    sdk.request_options = RequestOptions(access_token=token, connection_timeout=10.0)
+    return sdk
 
 
 def get_plan(plan_id: str) -> dict[str, Any]:
@@ -226,7 +234,7 @@ def create_checkout(user, plan_id: str, org_id: str | None = None) -> dict[str, 
             "status": "authorized",
         }
         if base_url.startswith("https://"):
-            preapproval_data["notification_url"] = f"{base_url}/api/payments/webhook"
+            preapproval_data["notification_url"] = f"{base_url}/api/payments/webhook?source_news=webhooks"
 
         resp = sdk.preapproval().create(preapproval_data)
         if resp.get("status") not in (200, 201):
@@ -266,7 +274,7 @@ def create_checkout(user, plan_id: str, org_id: str | None = None) -> dict[str, 
         preference_data["payer"] = {"email": email}
     if base_url.startswith("https://"):
         preference_data["auto_return"] = "approved"
-        preference_data["notification_url"] = f"{base_url}/api/payments/webhook"
+        preference_data["notification_url"] = f"{base_url}/api/payments/webhook?source_news=webhooks"
 
     resp = sdk.preference().create(preference_data)
     if resp.get("status") != 201:
@@ -314,7 +322,7 @@ def create_topup_checkout(user, org_id: str | None = None) -> dict[str, Any]:
     if email:
         preference_data["payer"] = {"email": email}
     if base_url.startswith("https://"):
-        preference_data["notification_url"] = f"{base_url}/api/payments/webhook"
+        preference_data["notification_url"] = f"{base_url}/api/payments/webhook?source_news=webhooks"
 
     resp = sdk.preference().create(preference_data)
     if resp.get("status") != 201:

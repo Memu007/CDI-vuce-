@@ -2111,7 +2111,7 @@ async def cancel_billing(
     if con_sid and not billing_service.is_configured():
         raise HTTPException(status_code=503, detail=no_se_pudo)
     try:
-        paga = {cuenta: await run_in_threadpool(_leer_suscripcion_mp, cuenta.mp_preapproval_id)
+        paga = {cuenta: await _en_hilo_mp(_leer_suscripcion_mp, cuenta.mp_preapproval_id)
                 in ("authorized", "paused") for cuenta in con_sid}
     except _SuscripcionMPError:
         raise HTTPException(status_code=503, detail=no_se_pudo)
@@ -2121,7 +2121,7 @@ async def cancel_billing(
     # La que paga va última: si otra falla, el plan sigue cobrando, como dice el 503.
     for cuenta in sorted(con_sid, key=paga.get):
         try:
-            await run_in_threadpool(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id)
+            await _en_hilo_mp(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id)
         except _SuscripcionMPError as e:
             print(f"⚠️ No se pudo cancelar la suscripción de {cuenta.username} en MP: {e}")
             # Una cancelada en Mercado Pago no vuelve: anotada, el perfil diría que renueva.
@@ -10116,6 +10116,8 @@ async def remove_member(
 #   b) o reemplazar todo por Stripe SetupIntent + webhook.
 # ============================================================================
 import uuid
+import functools
+import anyio
 import mercadopago
 # HTMLResponse ya se importa arriba junto con FileResponse (bugfix: antes
 # se usaba en el handler /dashboard antes de importarlo, lo que convertia
@@ -10288,6 +10290,15 @@ async def payment_pending():
     """
     return HTMLResponse(content=html)
 
+# Las llamadas a Mercado Pago bloquean: van a hilos con un tope propio, así un
+# Mercado Pago lento no ocupa los hilos que usa el resto del servidor.
+_HILOS_MP = anyio.CapacityLimiter(8)
+
+
+async def _en_hilo_mp(fn, *args, **kw):
+    return await anyio.to_thread.run_sync(functools.partial(fn, *args, **kw), limiter=_HILOS_MP)
+
+
 class _MPIlegible(Exception):
     """Lo de Mercado Pago no se pudo leer o todavía no alcanza para decidir
     (sin cuenta, sin id, pago pendiente): 503 para que reintente."""
@@ -10380,8 +10391,8 @@ def _control_de_monto_mp(sdk, pay_resp: dict, update: dict, external_ref: str) -
 
 
 # Ids de Mercado Pago (cobros, pagos y suscripciones) que llegan en un aviso
-# que puede no venir firmado, o en lo que se lee después: sólo esto, para que
-# no cambien la ruta que se le pide.
+# o en lo que se lee después: sólo esto, para que no cambien la ruta que se le
+# pide.
 _ID_COBRO_MP = re.compile(r"[0-9A-Za-z_-]{1,64}")
 
 
@@ -10394,9 +10405,9 @@ def _id_mp(valor) -> str | None:
 
 def _leer_cobro_autorizado_mp(cobro_id: str) -> dict:
     """GET /authorized_payments/{id} de Mercado Pago: el cobro de una
-    renovación de suscripción. El SDK (mercadopago 2.2.0) no lo trae. El
-    id llega en un aviso que puede no venir firmado: sólo letras, números,
-    «-» y «_», para que no cambie la ruta que se pide."""
+    renovación de suscripción. El SDK (mercadopago 2.2.0) no lo trae. Del
+    id sólo se aceptan letras, números, «-» y «_», para que no cambie la ruta
+    que se pide."""
     if not isinstance(cobro_id, str) or not _ID_COBRO_MP.fullmatch(cobro_id):
         raise ValueError(f"id de cobro inválido: {str(cobro_id)[:80]!r}")
     try:
@@ -10604,12 +10615,11 @@ def _verify_mp_webhook_signature(request: Request, raw_body: bytes) -> bool:
     el string `id:<data.id>;request-id:<req_id>;ts:<ts>;` con el secret.
     Doc: https://www.mercadopago.com/developers/es/docs/your-integrations/notifications/webhooks#bookmark_validar_el_origen_de_la_notificación
 
-    Si `MP_WEBHOOK_SECRET` no esta seteado:
-      - en produccion: rechaza (False) → defensa en profundidad.
-      - en dev/sandbox: pasa (True) para no frenar tests locales.
+    Sin `MP_WEBHOOK_SECRET` no hay con qué verificar: rechaza, en cualquier
+    entorno.
     """
     if not MP_WEBHOOK_SECRET:
-        return not IS_PRODUCTION
+        return False
 
     sig_header = request.headers.get("x-signature", "")
     req_id = request.headers.get("x-request-id", "")
@@ -10628,7 +10638,8 @@ def _verify_mp_webhook_signature(request: Request, raw_body: bytes) -> bool:
         body = json.loads(raw_body.decode("utf-8")) if raw_body else {}
     except Exception:
         return False
-    data_id = str(body.get("data", {}).get("id", ""))
+    data = body.get("data") if isinstance(body, dict) else None
+    data_id = str(data.get("id", "")) if isinstance(data, dict) else ""
     if not data_id:
         return False
 
@@ -10644,12 +10655,13 @@ def _verify_mp_webhook_signature(request: Request, raw_body: bytes) -> bool:
 
 
 @app.post("/api/payments/webhook")
+@limiter.limit("60/minute")
 async def mercadopago_webhook(request: Request):
     """Webhook para recibir notificaciones de MercadoPago.
 
     Seguridad:
-      - Valida firma HMAC contra MP_WEBHOOK_SECRET (401 si falla).
-      - En prod sin secret seteado → rechaza siempre.
+      - Sólo se atiende un aviso con firma HMAC válida contra MP_WEBHOOK_SECRET
+        (401 si falta o no verifica). Los IPN no traen firma: se rechazan.
 
     Efecto sobre billing al recibir un pago aprobado:
       - user.plan = <plan del external_reference>
@@ -10661,7 +10673,8 @@ async def mercadopago_webhook(request: Request):
     HTTP status:
       - 200 → aplicado, o rechazado y anotado en mp_pagos_aplicados (MP no reintenta).
       - 400 → aviso sin id de pago o sin token (MP reintenta, alerta).
-      - 401 → firma inválida (MP no reintenta, ataque).
+      - 401 → sin firma o firma inválida (MP no reintenta, ataque).
+      - 429 → más de 60 avisos por minuto desde la misma IP.
       - 503 → no se pudo leer Mercado Pago (MP reintenta).
       - 500 → bug inesperado (MP reintenta).
     """
@@ -10672,39 +10685,12 @@ async def mercadopago_webhook(request: Request):
         event_type = ""
         payment_id = ""
         raw_body = await request.body()
-        sig_header = request.headers.get("x-signature", "")
-        signature_ok = _verify_mp_webhook_signature(request, raw_body)
-
-        if sig_header:
-            # Si vino header de firma, debe ser válida obligatoriamente.
-            if not signature_ok:
-                logger.warning("Webhook MP: firma invalida, rechazado")
-                raise HTTPException(status_code=401, detail="Firma invalida")
-            body = json.loads(raw_body.decode("utf-8")) if raw_body else {}
-            event_type = body.get("type", "")
-            payment_id = str(body.get("data", {}).get("id", ""))
-        elif signature_ok:
-            # Sin header pero verificación pasa (dev/testing sin secret):
-            # procesamos el body JSON como webhook normal.
-            body = json.loads(raw_body.decode("utf-8")) if raw_body else {}
-            event_type = body.get("type", "")
-            payment_id = str(body.get("data", {}).get("id", ""))
-        else:
-            # Fallback: IPN clásico de MercadoPago (query string).
-            # Solo se acepta si trae id + topic (formato IPN real). Un request
-            # con body JSON pero sin firma ni query params es sospechoso → 401.
-            topic = request.query_params.get("topic", "")
-            payment_id = str(request.query_params.get("id", ""))
-            if not payment_id or not topic:
-                logger.warning("Webhook MP: sin firma y sin IPN válida, rechazado")
-                raise HTTPException(status_code=401, detail="Firma o IPN requerida")
-            logger.info("Webhook MP (IPN): topic=%s id=%s", topic, payment_id)
-            if topic in ("payment", "subscription_authorized_payment"):
-                event_type = topic
-            elif topic == "merchant_order":
-                return {"success": True, "skipped": "merchant_order, esperando payment"}
-            else:
-                return {"success": True, "skipped": f"topic={topic}"}
+        if not _verify_mp_webhook_signature(request, raw_body):
+            logger.warning("Webhook MP: sin firma válida, rechazado")
+            raise HTTPException(status_code=401, detail="Firma invalida")
+        body = json.loads(raw_body.decode("utf-8"))
+        event_type = body.get("type", "")
+        payment_id = str(body.get("data", {}).get("id", ""))
 
         logger.info("Webhook MP recibido: type=%s payment_id=%s", event_type, payment_id)
 
@@ -10723,14 +10709,15 @@ async def mercadopago_webhook(request: Request):
         # contra el monto de la suscripción (COBRO-MP-1, paso 4).
         renovacion, suscripcion_del_cobro = False, None
         if event_type == "subscription_authorized_payment":
-            payment_id, suscripcion_del_cobro = _pago_del_cobro_mp(_leer_cobro_autorizado_mp(payment_id))
+            payment_id, suscripcion_del_cobro = _pago_del_cobro_mp(
+                await _en_hilo_mp(_leer_cobro_autorizado_mp, payment_id))
             renovacion, event_type = True, "payment"
 
         if event_type != "payment":
             return {"success": True, "skipped": "not a payment event"}
 
-        sdk = mercadopago.SDK(MP_ACCESS_TOKEN)
-        pay_resp = _consultar_mp(lambda: sdk.payment().get(payment_id), f"pago {payment_id}")
+        sdk = billing_service.sdk_mp(MP_ACCESS_TOKEN)
+        pay_resp = await _en_hilo_mp(_consultar_mp, lambda: sdk.payment().get(payment_id), f"pago {payment_id}")
 
         if pay_resp.get("status") != "approved":
             # El aviso del pago puede no decir de qué cuenta es: el cobro
@@ -10747,7 +10734,7 @@ async def mercadopago_webhook(request: Request):
         if not payment_id:
             raise _MPIlegible(f"pago aprobado sin id reconocible: {str(canonico)[:80]!r}")
 
-        pay_resp = _con_referencia_mp(sdk, pay_resp, suscripcion_del_cobro)
+        pay_resp = await _en_hilo_mp(_con_referencia_mp, sdk, pay_resp, suscripcion_del_cobro)
 
         external_ref = pay_resp.get("external_reference")
         logger.info("Webhook MP: pago aprobado payment_id=%s external_ref=%s", payment_id, external_ref)
@@ -10780,7 +10767,7 @@ async def mercadopago_webhook(request: Request):
 
             org_id = update.get("org_id")
             cuenta_ref = f"org:{org_id}" if org_id else update["username"]
-            control = _control_de_monto_mp(sdk, pay_resp, update, external_ref)
+            control = await _en_hilo_mp(_control_de_monto_mp, sdk, pay_resp, update, external_ref)
             control = await _control_de_fecha_mp(session, pay_resp, control)
 
             # El candado sobre la cuenta pone en fila los pagos distintos que
@@ -10868,7 +10855,8 @@ async def billing_topup(
             f"Ya tenés {vigentes} operaciones extra y el tope es {billing_service.EXTRA_OPS_MAX}: "
             f"una recarga de {billing_service.TOPUP_OPS} no entra. Usá las que tenés y volvé a recargar."))
     try:
-        checkout = billing_service.create_topup_checkout(db_user, org_id=entidad.id if es_org else None)
+        checkout = await _en_hilo_mp(billing_service.create_topup_checkout, db_user,
+                                     org_id=entidad.id if es_org else None)
         return {"success": True, **checkout}
     except RuntimeError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -10910,7 +10898,7 @@ async def _estado_suscripcion_vieja(db: AsyncSession, db_user, cuenta) -> str:
     """El estado en Mercado Pago de una suscripción ya abierta. La autorizada da
     409 (puede ser un pago cuyo aviso no llegó); si no se puede leer, 503."""
     try:
-        estado_mp = await run_in_threadpool(_leer_suscripcion_mp, cuenta.mp_preapproval_id)
+        estado_mp = await _en_hilo_mp(_leer_suscripcion_mp, cuenta.mp_preapproval_id)
     except _SuscripcionMPError as e:
         print(f"⚠️ Checkout de {db_user.username}: no se pudo leer la suscripción en MP: {e}")
         raise HTTPException(status_code=503, detail=_NO_SE_CONFIRMA_SUSCRIPCION)
@@ -10992,7 +10980,7 @@ async def billing_checkout(
             # Mientras se leían o cancelaban las otras, ésta pudo autorizarse.
             await _estado_suscripcion_vieja(db, db_user, cuenta)
             try:
-                await run_in_threadpool(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id)
+                await _en_hilo_mp(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id)
             except _SuscripcionMPError as e:
                 print(f"⚠️ Checkout de {username}: no se pudo cancelar la suscripción vieja en MP: {e}")
                 raise HTTPException(status_code=503, detail=_NO_SE_CONFIRMA_SUSCRIPCION)
@@ -11003,7 +10991,7 @@ async def billing_checkout(
         raise
 
     try:
-        checkout = billing_service.create_checkout(db_user, plan_id, org_id=org_id)
+        checkout = await _en_hilo_mp(billing_service.create_checkout, db_user, plan_id, org_id=org_id)
         # Guardamos el preapproval_id temporal hasta que el webhook confirme.
         if checkout.get("preapproval_id"):
             db_user.mp_preapproval_id = checkout["preapproval_id"]
