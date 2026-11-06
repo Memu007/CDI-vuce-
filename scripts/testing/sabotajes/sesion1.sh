@@ -4,7 +4,8 @@
 # vencimiento no vale, verificar el email no abre sesión, lo que se guarda tras
 # validar la clave no pisa una que cambió en el medio, cambiar o resetear la
 # contraseña y cerrar sesión revocan, una revocada no vuelve, la contraseña
-# actual da 400 y tiene tope, contar intentos usa la conexión del pedido,
+# actual da 400 y tiene tope, contar intentos usa la conexión del pedido y
+# revisar la sesión devuelve la suya,
 # cambiar el email la pide, la pantalla la pide sólo si el email cambió) y
 # tests/test_sesion1.py, tests/test_user_profile_coverage.py,
 # scripts/testing/pantalla_sesion1.js o, con PG_DSN, sesion1_motores.py pg
@@ -123,8 +124,8 @@ sabotaje pytest $D "un usuario sin jti (de antes de la columna) no entra" \
   "FAILED $T::test_cambiar_clave_rota_la_sesion_de_quien_la_cambia" "FAILED $T::test_cambiar_clave_con_cookie_conserva_el_navegador" \
   "FAILED $T::test_cerrar_sesion_de_un_usuario_sin_jti_revoca"
 sabotaje pytest $D "abrir el token sin verificar la firma" \
-  'jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])' \
-  'jwt.decode(token, options={"verify_signature": False})' \
+  '                          options={"require": ["exp"]})' \
+  '                          options={"require": ["exp"], "verify_signature": False})' \
   "FAILED $T::test_ningun_lugar_acepta_un_token_que_no_es_la_sesion_vigente" "otra firma"
 sabotaje pytest $D "el token de verificar el email vale como sesión" \
   'if payload is None or payload.get("type") is not None or not payload.get("sub"):' \
@@ -222,14 +223,17 @@ C="FAILED $T::test_contar_intentos_usa_la_conexion_del_pedido"
 sabotaje pytest $L "sumar o contar abre su propia conexión" \
   $'async def _escribir(db: AsyncSession, ahora: float, consulta) -> int:\n    await db.execute(delete(_T).where(_T.c.vence <= ahora))\n    cuenta = (await db.execute(consulta)).scalar_one()\n    await db.commit()\n    return cuenta\n' \
   $'async def _escribir(db: AsyncSession, ahora: float, consulta) -> int:\n    async with _conn.engine.begin() as conn:\n        await conn.execute(delete(_T).where(_T.c.vence <= ahora))\n        return (await conn.execute(consulta)).scalar_one()\n' \
-  "$C[perfil]" "$C[cambiar la clave]" "$C[login sin usuario]" "$C[login con clave mala]" "$C[pedir el reset]"
+  "$C[login sin usuario]" "$C[login con clave mala]"
 sabotaje pytest $L "mirar el bloqueo abre su propia conexión" \
   $'    hasta = (await db.execute(\n' $'    async with _conn.engine.connect() as conn:\n        hasta = (await conn.execute(\n' \
-  "$C[perfil]" "$C[cambiar la clave]" "$C[login sin usuario]" "$C[login con clave mala]" "$C[login]" "$C[pedir el reset]"
+  "$C[perfil]" "$C[cambiar la clave]"
 sabotaje pytest $L "limpiar abre su propia conexión" \
   $'    await db.execute(delete(_T).where(_T.c.clave == _clave(clave)))\n    await db.commit()\n' \
   $'    async with _conn.engine.begin() as conn:\n        await conn.execute(delete(_T).where(_T.c.clave == _clave(clave)))\n' \
   "$C[login]"
+sabotaje pytest $D "revisar la sesión se queda con su conexión durante la ruta" \
+  $'    await db.commit()\n\n    team_owner = ' $'\n    team_owner = ' \
+  "$C[ver el perfil]" "$C[perfil]" "$C[cambiar la clave]"
 
 # --- cambiar el email pide la contraseña actual
 sabotaje pytest $M "cambiar el email sin clave no verifica nada" \
