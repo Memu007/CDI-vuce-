@@ -9,6 +9,7 @@ import asyncio
 import json
 
 import pytest
+from fastapi.testclient import TestClient
 
 import proyecto_maria.main as main
 
@@ -286,7 +287,8 @@ def test_una_fila_vieja_sin_letras_latinas_queda_una_sola_y_editable(client, des
     assert client.post(url, json={"vendor_name": VENDOR, "productos": [
         {"descripcion": "VIEJO", "ncm": NCM}]}).status_code == 200
     _escribir("update vendor_catalog_products set descripcion=:d where owner_username=:o", d=descripcion, o=owner)
-    asyncio.new_event_loop().run_until_complete(main._migrate_catalogo_claves())
+    with TestClient(main.app):  # el arranque de verdad, con sus migraciones
+        pass
 
     r = client.post(url, json={"vendor_name": VENDOR, "productos": [{"descripcion": descripcion, "ncm": "73181600"}]})
     assert r.status_code == 200, r.text
@@ -295,3 +297,22 @@ def test_una_fila_vieja_sin_letras_latinas_queda_una_sola_y_editable(client, des
     r = client.put(f"{url}/{claves[0][0]}", json={"origen": "CN"})
     assert r.status_code == 200, r.text
     assert _filas(owner) == [(VENDOR, descripcion, "73181600", "CN")]
+
+
+def test_una_fila_vieja_que_la_migracion_no_mueve_sigue_editable(client):
+    """Si la clave de hoy ya es de otra fila, la vieja queda con la suya y se
+    sigue pudiendo cambiar sin tocar la descripción."""
+    owner = _dueno(_cliente(client))
+    url = f"/api/catalog/{VENDOR_ID}/productos"
+    assert client.post(url, json={"vendor_name": VENDOR, "productos": [{"descripcion": "VIEJO"}]}).status_code == 200
+    _escribir("update vendor_catalog_products set descripcion='螺丝钉' where owner_username=:o", o=owner)
+    assert client.post(url, json={"vendor_name": VENDOR, "productos": [{"descripcion": "螺丝钉"}]}).status_code == 200
+    with TestClient(main.app):
+        pass
+
+    claves = [c for (c,) in _sql("select product_key from vendor_catalog_products where owner_username=:o "
+                                 "order by id", o=owner)]
+    assert claves[0] == "viejo" and claves[1].startswith("~"), claves
+    r = client.put(f"{url}/viejo", json={"origen": "CN"})
+    assert r.status_code == 200, f"la fila vieja no se pudo cambiar: {r.status_code} {r.text[:120]}"
+    assert [o for (*_, o) in _filas(owner)] == ["CN", None]
