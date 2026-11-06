@@ -323,8 +323,8 @@ sabotaje "sin memoria al abrir es un PDF roto" "$LECTOR" \
 " \
   "test_sin_memoria_al_abrir_el_pdf_no_se_disfraza_de_pdf_roto"
 sabotaje "sin el tope de RunLength" "$LECTOR" \
-  "        \"run_length_maximum_output_length\", " \
-  "        " \
+  "    \"run_length_maximum_output_length\", " \
+  "    " \
   "test_una_hoja_que_se_infla_con_run_length_se_saltea" \
   "test_los_topes_de_pypdf_cubren_todos_los_filtros"
 sabotaje "sin el tope de trabajo de un flujo" "$LECTOR" \
