@@ -258,6 +258,9 @@ sabotaje $M "se confirma el conteo antes de escribir" \
   $'    try:\n        # newline' $'    await db.commit()\n    try:\n        # newline'
 sabotaje $M "lo escrito a medias queda en las descargas" \
   "FAILED $T::test_lo_no_entregado_no_queda_cobrado[exportacion_al_escribir]" \
+  $'            if os.path.exists(resto):\n                os.remove(resto)' $'            pass'
+sabotaje $M "un primer commit fallido deja el archivo en las descargas" \
+  "FAILED $T::test_lo_no_entregado_no_queda_cobrado[importacion_al_confirmar]" \
   $'            os.remove(ruta)' $'            pass'
 sabotaje $M "los supuestos se arman después de contar" \
   "FAILED $T::test_lo_no_entregado_no_queda_cobrado[importacion_despues_de_contar]" \

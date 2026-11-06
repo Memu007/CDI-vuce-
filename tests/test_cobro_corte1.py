@@ -820,21 +820,30 @@ def _supuestos_que_fallan(*a, **k):
     raise RuntimeError("falla después de contar")
 
 
-# (ruta, nombre en main que falla después de contar, su reemplazo)
+async def _commit_que_falla(self):
+    raise RuntimeError("la base se cayó al confirmar")
+
+
+async def _rollback_que_falla(self):
+    raise RuntimeError("la base se cayó al deshacer")
+
+
+# (ruta, objeto y nombre que falla después de contar, su reemplazo)
 LO_QUE_FALLA = {
-    "importacion_al_escribir": ("importacion", "open", _escritura_que_falla),
-    "importacion_despues_de_contar": ("importacion", "_supuestos_maria", _supuestos_que_fallan),
-    "exportacion_al_escribir": ("exportacion", "open", _escritura_que_falla),
+    "importacion_al_escribir": ("importacion", main, "open", _escritura_que_falla),
+    "importacion_despues_de_contar": ("importacion", main, "_supuestos_maria", _supuestos_que_fallan),
+    "importacion_al_confirmar": ("importacion", main.AsyncSession, "commit", _commit_que_falla),
+    "exportacion_al_escribir": ("exportacion", main, "open", _escritura_que_falla),
 }
 
 
 @pytest.mark.parametrize("caso", list(LO_QUE_FALLA))
 def test_lo_no_entregado_no_queda_cobrado(cuenta, monkeypatch, caso):
-    ruta, nombre, reemplazo = LO_QUE_FALLA[caso]
+    ruta, objeto, nombre, reemplazo = LO_QUE_FALLA[caso]
     pedir = _generar if ruta == "importacion" else _exportar
     c, u = cuenta()
     with monkeypatch.context() as m:
-        m.setattr(main, nombre, reemplazo, raising=False)
+        m.setattr(objeto, nombre, reemplazo, raising=False)
         r = pedir(c)
     assert r.status_code == 500, r.text
     assert _leer(u)["ops"] == 0, "lo que no se entregó quedó contado"
@@ -844,14 +853,6 @@ def test_lo_no_entregado_no_queda_cobrado(cuenta, monkeypatch, caso):
     assert r.status_code == 200, r.text
     assert _leer(u)["ops"] == 1 and len(_operaciones(u)) == 1
     assert _archivos(u) == [r.json()["filename"]]
-
-
-async def _commit_que_falla(self):
-    raise RuntimeError("la base se cayó al confirmar")
-
-
-async def _rollback_que_falla(self):
-    raise RuntimeError("la base se cayó al deshacer")
 
 
 # dónde falla regenerar lo ya entregado: (objeto, nombre, reemplazo)…, y si quedó
