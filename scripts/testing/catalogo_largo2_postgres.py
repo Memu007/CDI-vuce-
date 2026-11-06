@@ -325,6 +325,8 @@ try:
                     if via == "cambio" and campo == "proveedor":
                         continue
                     bueno = f"BUENO {via} {campo} {nombre}"
+                    if isinstance(valor, str):  # único por caso: si no, el texto limpio choca con el de otro caso
+                        valor = valor.replace("x", "x " + bueno, 1)
                     clave = {"proveedor": "vendor_name", "descripción": "descripcion"}.get(campo, campo)
                     if via == "lote":
                         malo = {"descripcion": "MALO " + bueno, "ncm": NCM, "origen": "CN"}
@@ -348,12 +350,14 @@ try:
                     else:
                         mandar("POST", url, {"vendor_name": VENDOR,
                                              "productos": [{"descripcion": bueno, "ncm": NCM, "origen": "CN"}]})
-                        antes = fila(VENDOR_ID, bueno)
-                        k = sql("select product_key from vendor_catalog_products where owner_username=%s"
-                                " and descripcion=%s", USUARIO, bueno)[0][0]
+                        fila_id, k = sql("select id, product_key from vendor_catalog_products where owner_username=%s"
+                                         " and descripcion=%s", USUARIO, bueno)[0]
+                        por_id = ("select vendor_nombre, ncm, origen, descripcion from vendor_catalog_products"
+                                  " where id=%s")
+                        antes = sql(por_id, fila_id)
                         r = mandar("PUT", f"{url}/{quote(k, safe='')}",
                                    {"descripcion_original" if campo == "descripción" else "origen": valor})
-                        despues = fila(VENDOR_ID, bueno)
+                        despues = sql(por_id, fila_id)
                         guardo = r.status_code == 200 and len(despues) == 1 and sano(despues)
                         intacto = despues == antes
                     if not (guardo or (r.status_code == 400 and legible(r) and intacto)):

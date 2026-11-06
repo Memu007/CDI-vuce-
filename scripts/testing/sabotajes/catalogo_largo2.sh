@@ -62,6 +62,8 @@ CM=proyecto_maria/services/client_memory.py
 MEM=test_la_memoria_del_cliente_guarda_el_origen_entero
 TOPE=test_un_proveedor_o_un_origen_de_mas_de_2000_dan_400_sin_guardar
 SIN=test_lo_que_no_tiene_letras_latinas_se_guarda_sin_cruzarse
+MALA=test_una_entrada_mala_da_400_o_se_limpia_sin_perder_el_lote
+VIEJA=test_una_fila_vieja_sin_letras_latinas_queda_una_sola_y_editable
 
 CORRE=("${PRUEBA[@]}")
 if ! "${CORRE[@]}" >/dev/null 2>&1; then
@@ -89,24 +91,19 @@ sabotaje $MO "el origen de la memoria del cliente vuelve a tener tope de 3" \
   '    origen_frecuente = Column(String(3), default="XX")' \
   "FAILED $T::test_el_origen_y_el_proveedor_no_tienen_tope_en_la_base" "AssertionError: origen_frecuente"
 sabotaje $CS "el catálogo no mide el proveedor" \
-  '    validar_largo(vendor_name, "El proveedor")' \
-  '    pass' \
-  "FAILED $T::${TOPE}[catalogo-proveedor]"
+  '    vendor_name = texto_para_guardar(vendor_name, "El proveedor")' \
+  '    vendor_name = (vendor_name or "").strip()' \
+  "FAILED $T::${TOPE}[catalogo-proveedor]" "FAILED $T::${MALA}[lote-proveedor]"
 sabotaje $CS "guardar en el catálogo no mide el origen" \
-  '        validar_largo(origen, "El origen")
-
-' \
-  '
-' \
-  "FAILED $T::${TOPE}[catalogo-origen]"
+  '    origen = texto_para_guardar(prod.get("origen"), "El origen")' \
+  '    origen = (prod.get("origen") or "").strip()' \
+  "FAILED $T::${TOPE}[catalogo-origen]" "FAILED $T::${MALA}[lote-origen]"
 sabotaje $CS "una fila sin descripción se mide antes de saltarla" \
-  '        if not desc:
-            continue
-        validar_largo(desc)' \
-  '        validar_largo(desc)
-        validar_largo((prod.get("origen") or "").strip(), "El origen")
-        if not desc:
-            continue' \
+  '    desc = texto_para_guardar(prod.get("descripcion"))
+    if not desc:' \
+  '    desc = texto_para_guardar(prod.get("descripcion"))
+    texto_para_guardar(prod.get("origen"), "El origen")
+    if not desc:' \
   "FAILED $T::test_una_fila_sin_descripcion_no_frena_el_lote_por_su_origen"
 sabotaje $CM "la memoria del cliente no mide el origen" \
   '        validar_largo(origen, "El origen")
@@ -116,18 +113,42 @@ sabotaje $CM "la memoria del cliente no mide el origen" \
   "FAILED $T::test_la_memoria_del_cliente_no_guarda_un_origen_de_mas_de_2000[aprender]" \
   "FAILED $T::test_la_memoria_del_cliente_no_guarda_un_origen_de_mas_de_2000[operacion]"
 sabotaje $CS "cambiar el origen no lo mide" \
-  '        validar_largo(origen, "El origen")
-        row.origen' \
-  '        row.origen' \
+  '    if "origen" in textos:
+        row.origen = textos["origen"] or None' \
+  '    if updates.get("origen") is not None:
+        row.origen = updates["origen"].strip() or None' \
   "FAILED $T::${TOPE}[cambiar-origen-origen]"
 sabotaje $M "guardar-uso no mide el proveedor" \
-  '        catalog_svc.validar_largo(vendor_name, "El proveedor")' \
-  '        pass' \
-  "FAILED $T::${TOPE}[guardar-uso-proveedor]"
+  '        vendor_name = catalog_svc.texto_para_guardar(data.get("vendor_name"), "El proveedor")' \
+  '        vendor_name = (data.get("vendor_name") or "").strip()' \
+  "FAILED $T::${TOPE}[guardar-uso-proveedor]" "FAILED $T::${MALA}[uso-proveedor]"
 sabotaje $M "guardar-uso no mide el origen" \
-  '        catalog_svc.validar_largo(origin, "El origen")' \
-  '        pass' \
-  "FAILED $T::${TOPE}[guardar-uso-origen]"
+  '        origin = catalog_svc.texto_para_guardar(data.get("origen"), "El origen")' \
+  '        origin = (data.get("origen") or "").strip()' \
+  "FAILED $T::${TOPE}[guardar-uso-origen]" "FAILED $T::${MALA}[uso-origen]"
+sabotaje $CS "el NUL no se limpia" \
+  '    valor = valor.replace("\x00", "").strip()' \
+  '    valor = valor.strip()' \
+  "FAILED $T::${MALA}[lote-proveedor]" "FAILED $T::${MALA}[cambio-origen]" "FAILED $T::${MALA}[uso-ncm]" "nulo: 200"
+sabotaje $CS "el medio par no se rechaza" \
+  '    if _MEDIO_PAR.search(valor):
+        raise ValueError(AVISO_MEDIO_PAR)
+    validar_largo(valor, que)' \
+  '    validar_largo(valor, que)' \
+  "FAILED $T::${MALA}[lote-origen]" "FAILED $T::${MALA}[cambio-ncm]" "FAILED $T::${MALA}[uso-proveedor]" "medio par:"
+sabotaje $CS "lo que no es texto se toma como texto" \
+  '        raise ValueError(f"{que} tiene que ser texto.")' \
+  '        valor = str(valor)' \
+  "FAILED $T::${MALA}[lote-ncm]" "FAILED $T::${MALA}[cambio-descripci" "FAILED $T::${MALA}[uso-origen]" "false:"
+sabotaje $M "la migración de claves no mueve nada" \
+  '    sin_latinas = "NOT GLOB' \
+  '    return
+    sin_latinas = "NOT GLOB' \
+  "FAILED $T::${VIEJA}" "quedó en 2 filas"
+sabotaje $M "el arranque no llama a la migración de claves" \
+  '    await _migrate_catalogo_claves()' \
+  '    pass' \
+  "FAILED $T::${VIEJA}" "quedó en 2 filas"
 sabotaje $CS "sin letras latinas la clave queda vacía" \
   '    return "~" + hashlib.sha256(texto.encode("utf-8", "surrogatepass")).hexdigest()[:40]' \
   '    return ""' \
@@ -152,6 +173,10 @@ sabotaje $CS "cambiar un producto usa la clave vieja" \
   '        candidate = clave_de_producto(new_desc)' \
   '        candidate = _normalize(new_desc)' \
   "FAILED $T::test_cambiar_la_descripcion_a_una_sin_letras_latinas_mueve_la_clave"
+sabotaje $CS "cambiar cualquier campo mueve la clave de una fila vieja" \
+  '    if new_desc != (row.descripcion or ""):' \
+  '    if new_desc:' \
+  "FAILED $T::${VIEJA}"
 
 if [ -n "$PG_URL" ]; then
   CORRE=("${PRUEBA_PG[@]}")
@@ -160,17 +185,42 @@ if [ -n "$PG_URL" ]; then
     echo "BASE  | la prueba en Postgres ya está en rojo sin sabotaje"; FALLAS=$((FALLAS+1))
   else
     sabotaje $M "el arranque no pasa el origen a text" \
-      "column_name IN ('product_key', 'descripcion', 'origen', 'vendor_nombre')) " \
-      "column_name IN ('product_key', 'descripcion', 'vendor_nombre')) " \
+      '("product_key", "descripcion", "origen", "vendor_nombre")' \
+      '("product_key", "descripcion", "vendor_nombre")' \
       "FALLA | primer arranque: las columnas son text" "FALLA | el catálogo guarda enteros el origen"
     sabotaje $M "el arranque no pasa el proveedor a text" \
-      "column_name IN ('product_key', 'descripcion', 'origen', 'vendor_nombre')) " \
-      "column_name IN ('product_key', 'descripcion', 'origen')) " \
+      '("product_key", "descripcion", "origen", "vendor_nombre")' \
+      '("product_key", "descripcion", "origen")' \
       "FALLA | primer arranque: las columnas son text" "FALLA | el catálogo guarda enteros el origen"
     sabotaje $M "el arranque no pasa el origen de la memoria del cliente a text" \
-      "OR (table_name = 'client_product_history' AND column_name = 'origen_frecuente')) " \
-      ") " \
+      ',
+                            ("client_product_history", ("origen_frecuente",))):' \
+      ',):' \
       "FALLA | primer arranque: las columnas son text" "FALLA | guardar-uso con cliente guarda enteros"
+    sabotaje $M "el arranque traba las dos tablas en una transacción" \
+      '    for tabla, columnas in (("vendor_catalog_products"' \
+      '    async with engine.begin() as _una:
+     for tabla, columnas in (("vendor_catalog_products"' \
+      "FALLA | el arranque y una escritura como guardar-uso andan los dos"
+    sabotaje $M "el arranque espera la tabla tomada sin tope" \
+      "            await conn.exec_driver_sql(\"SET LOCAL lock_timeout = '5s'\")
+            res = await conn.exec_driver_sql(" \
+      "            res = await conn.exec_driver_sql(" \
+      "FALLA | con la tabla tomada el arranque falla"
+    sabotaje $M "el log dice migrado antes de guardar" \
+      '                await conn.exec_driver_sql(f"ALTER TABLE {tabla} ALTER COLUMN {columna} TYPE TEXT")' \
+      '                print(f"✅ Migracion: {tabla}.{columna} pasa a TEXT")
+                await conn.exec_driver_sql(f"ALTER TABLE {tabla} ALTER COLUMN {columna} TYPE TEXT")' \
+      "FALLA | el arranque y una escritura como guardar-uso andan los dos"
+    sabotaje $M "la migración de claves no mueve nada" \
+      '    sin_latinas = "NOT GLOB' \
+      '    return
+    sin_latinas = "NOT GLOB' \
+      "de una fila vieja es una sola fila y sigue editable"
+    sabotaje $CS "lo que no es texto se toma como texto" \
+      '        raise ValueError(f"{que} tiene que ser texto.")' \
+      '        valor = str(valor)' \
+      "FALLA | una entrada mala por lote no da 500" "FALLA | una entrada mala por guardar-uso no da 500"
     sabotaje $CS "sin letras latinas la clave es el texto entero y no entra en el índice" \
       '    return "~" + hashlib.sha256(texto.encode("utf-8", "surrogatepass")).hexdigest()[:40]' \
       '    return texto' \

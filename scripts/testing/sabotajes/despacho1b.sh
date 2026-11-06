@@ -762,13 +762,9 @@ sabotaje "confirmar sin medio par" proyecto_maria/main.py \
     if tiene_medio_par(data):' \
   '    if False:' \
   "test_confirmar_un_ncm_con_medio_par_da_400_y_no_guarda_nada"
-sabotaje "confirmar deja el NUL del origen" proyecto_maria/main.py \
-  'origin = _sin_nul(str(data.get("origen") or "")).strip()' \
-  'origin = str(data.get("origen") or "").strip()' \
-  "test_confirmar_un_ncm_saca_el_nul_del_origen_y_del_proveedor"
-sabotaje "confirmar deja el NUL del proveedor" proyecto_maria/main.py \
-  'vendor_name = _sin_nul(str(data.get("vendor_name") or "")).strip()' \
-  'vendor_name = str(data.get("vendor_name") or "").strip()' \
+sabotaje "confirmar deja el NUL del origen y del proveedor" proyecto_maria/core/catalog_service.py \
+  'valor = valor.replace("\x00", "").strip()' \
+  'valor = valor.strip()' \
   "test_confirmar_un_ncm_saca_el_nul_del_origen_y_del_proveedor"
 NONCM=test_confirmar_algo_que_no_es_un_ncm_da_400_y_no_guarda_nada
 sabotaje "confirmar con la clave de sugerir" proyecto_maria/main.py \

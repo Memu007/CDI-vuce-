@@ -5,7 +5,12 @@ clave propia que no se cruza con otra.
 SQLite no controla el largo de las columnas: el corte de Postgres lo prueba
 scripts/testing/catalogo_largo2_postgres.py.
 """
+import asyncio
+import json
+
 import pytest
+
+import proyecto_maria.main as main
 
 from proyecto_maria.core.maria_generator import get_pais_codigo
 from proyecto_maria.database.models import ClientProductHistory, VendorCatalogProduct
@@ -176,3 +181,95 @@ def test_una_fila_sin_descripcion_no_frena_el_lote_por_su_origen(client):
         {"descripcion": "", "ncm": NCM, "origen": GIGANTE}, {"descripcion": "TORNILLO", "ncm": NCM, "origen": "CN"}]})
     assert r.status_code == 200, r.text
     assert _filas(owner) == [(VENDOR, "TORNILLO", NCM, "CN")]
+
+
+# Un valor bueno por campo y lo que se le hace para volverlo malo.
+BUENOS = {"proveedor": VENDOR, "descripción": "TUERCA", "origen": "TAIWAN", "ncm": "73181600"}
+QUE = {"proveedor": "El proveedor", "descripción": "La descripción", "origen": "El origen", "ncm": "El NCM"}
+MALOS = {"nulo": lambda b: b[:4] + "\x00" + b[4:], "medio par": lambda b: b + "\ud800",
+         "false": lambda b: False, "lista": lambda b: [], "null": lambda b: None}
+CLAVES = {"proveedor": "vendor_name", "descripción": "descripcion", "origen": "origen", "ncm": "ncm"}
+
+
+def _mandar(client, metodo, ruta, cuerpo):
+    # Con ensure_ascii el medio par viaja escapado, como en un JSON de verdad.
+    return client.request(metodo, ruta, content=json.dumps(cuerpo), headers={"content-type": "application/json"})
+
+
+@pytest.mark.parametrize("via, campo", [
+    *(("lote", c) for c in BUENOS), *(("cambio", c) for c in ("descripción", "origen", "ncm")),
+    *(("uso", c) for c in BUENOS)])
+def test_una_entrada_mala_da_400_o_se_limpia_sin_perder_el_lote(client, via, campo):
+    """El NUL se saca, el medio par y lo que no es texto dan 400 sin escribir
+    nada, y null es vacío; en todos los campos y vías."""
+    url = f"/api/catalog/{VENDOR_ID}/productos"
+    cuerpo = {CLAVES[c]: v for c, v in BUENOS.items()}
+    fallas = []
+    for nombre, volver_malo in MALOS.items():
+        cid = _cliente(client)
+        owner = _dueno(cid)
+        malo = volver_malo(BUENOS[campo])
+        if via == "cambio":
+            # La fila arranca con otro valor en el campo, para ver si el cambio se aplicó.
+            client.post(url, json={"vendor_name": VENDOR, "productos": [{**cuerpo, CLAVES[campo]: "73181500"}]})
+            antes = _filas(owner)
+            clave = _sql("select product_key from vendor_catalog_products where owner_username=:o", o=owner)[0][0]
+            r = _mandar(client, "PUT", f"{url}/{clave}",
+                        {{"descripción": "descripcion_original"}.get(campo, CLAVES[campo]): malo})
+        elif via == "lote":
+            item = {k: v for k, v in cuerpo.items() if k != "vendor_name"}
+            lote = {"vendor_name": VENDOR, "productos": [{"descripcion": "ARANDELA", "ncm": NCM}, item]}
+            (lote if campo == "proveedor" else item)[CLAVES[campo]] = malo
+            antes = []
+            r = _mandar(client, "POST", url, lote)
+        else:
+            antes = []
+            r = _mandar(client, "POST", "/api/ncm/guardar-uso", {**cuerpo, "client_id": cid, CLAVES[campo]: malo})
+
+        filas = _filas(owner)
+        valores = [v for f in filas for v in f]
+        lote_entero = via != "lote" or "ARANDELA" in valores
+        if nombre == "nulo":
+            ok = r.status_code == 200 and lote_entero and BUENOS[campo] in valores \
+                and not any("\x00" in str(v) for v in valores)
+        elif nombre == "null":
+            ok = r.status_code == 200 and lote_entero and not {"None", "False", "[]"} & {v for v in valores if isinstance(v, str)}
+        else:
+            motivo = "Hay un carácter que no se puede guardar." if nombre == "medio par" \
+                else f"{QUE[campo]} tiene que ser texto."
+            sin_historial = _sql("select count(*) from ncm_historial where owner_username=:o", o=owner) == [(0,)]
+            ok = (r.status_code, r.json().get("detail")) == (400, motivo) and filas == antes \
+                and (via == "cambio" or sin_historial)
+        if not ok:
+            fallas.append(f"{nombre}: {r.status_code} {r.text[:100]} filas {filas}")
+    assert not fallas, fallas
+
+
+def _escribir(consulta, **params):
+    from sqlalchemy import text
+    from proyecto_maria.database.connection import engine
+
+    async def _run():
+        async with engine.begin() as conn:
+            await conn.execute(text(consulta), params)
+    asyncio.new_event_loop().run_until_complete(_run())
+
+
+@pytest.mark.parametrize("descripcion", ["螺丝钉", "🔩🔩", "螺丝🔩"])
+def test_una_fila_vieja_sin_letras_latinas_queda_una_sola_y_editable(client, descripcion):
+    """Una fila de antes guardó la descripción sin letras latinas con la clave
+    latina que tenía: después del arranque, guardarla otra vez no la duplica."""
+    owner = _dueno(_cliente(client))
+    url = f"/api/catalog/{VENDOR_ID}/productos"
+    assert client.post(url, json={"vendor_name": VENDOR, "productos": [
+        {"descripcion": "VIEJO", "ncm": NCM}]}).status_code == 200
+    _escribir("update vendor_catalog_products set descripcion=:d where owner_username=:o", d=descripcion, o=owner)
+    asyncio.new_event_loop().run_until_complete(main._migrate_catalogo_claves())
+
+    r = client.post(url, json={"vendor_name": VENDOR, "productos": [{"descripcion": descripcion, "ncm": "73181600"}]})
+    assert r.status_code == 200, r.text
+    claves = _sql("select product_key from vendor_catalog_products where owner_username=:o", o=owner)
+    assert len(claves) == 1, f"«{descripcion}» quedó en {len(claves)} filas: {claves}"
+    r = client.put(f"{url}/{claves[0][0]}", json={"origen": "CN"})
+    assert r.status_code == 200, r.text
+    assert _filas(owner) == [(VENDOR, descripcion, "73181600", "CN")]
