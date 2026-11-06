@@ -197,7 +197,7 @@ def test_si_mp_ya_la_tenia_cancelada_cancelar_sigue(client):
     FALLA["PUT"] = _contesta_500
     r = client.post("/api/billing/cancel")
     assert r.status_code == 200, r.text
-    assert [p.method for p in PEDIDOS] == ["PUT", "GET"]
+    assert [p.method for p in PEDIDOS] == ["GET", "PUT", "GET"]
     assert _leer(usuario)["billing_status"] == "canceled"
 
 
@@ -512,13 +512,11 @@ def test_en_una_org_reactivar_lo_pagado_lleva_al_checkout(client, tipo, queda):
     assert _leer_org(org_id)["billing_status"] == queda
 
 
-# Cancelar con la autorizada; el checkout, con dos pendientes que cancela antes de crear.
-@pytest.mark.parametrize("ruta, estado", [("/api/billing/cancel", "authorized"), ("/api/billing/checkout", "pending")],
-                         ids=["cancelar", "checkout"])
-def test_si_una_de_varias_no_se_cancela_la_cancelada_no_queda_anotada(client, ruta, estado):
+def test_si_una_de_varias_no_se_cancela_la_cancelada_no_queda_anotada(client):
+    """El checkout, con dos pendientes que cancela antes de crear."""
     from tests.test_cobro_mp1 import _leer_org
     nombres, sid, org_id, _ = _org_con_suscripcion(client, "duena")
-    SUS[sid] = estado
+    SUS[sid] = "pending"
     otra = f"sus-{nombres['miembro']}"
     SUS[otra] = "pending"
     _set_user(nombres["miembro"], mp_preapproval_id=otra)
@@ -533,11 +531,39 @@ def test_si_una_de_varias_no_se_cancela_la_cancelada_no_queda_anotada(client, ru
             SUS[s] = "cancelled"
         return httpx.Response(200, json={"id": s, "status": SUS[s]})
     FALLA["PUT"] = FALLA["GET"] = _falla_una
-    r = client.post(ruta, json={"plan": "premium"})
+    r = client.post("/api/billing/checkout", json={"plan": "premium"})
     assert r.status_code == 503, r.text
     assert _leer_org(org_id)["billing_status"] == "active" and CREADAS == []
     assert SUS[cancela[1]] == "cancelled" and _leer(cancela[0])["mp_preapproval_id"] is None
     assert SUS[falla[1]] != "cancelled" and _leer(falla[0])["mp_preapproval_id"] == falla[1]
+
+
+# Quien cancela, y cuál falla: la pendiente de C, o la autorizada de B, que se ordena antes.
+@pytest.mark.parametrize("quien, falla", [("duena", "pendiente"), ("abrio", "pendiente"), ("duena", "autorizada")])
+def test_al_cancelar_la_que_paga_se_cancela_ultima(client, quien, falla):
+    from tests.test_cobro_mp1 import _leer_org
+    nombres, sid, org_id, _ = _org_con_suscripcion(client, quien)
+    otra = f"sus-{nombres['miembro']}"
+    SUS[otra] = "pending"
+    _set_user(nombres["miembro"], mp_preapproval_id=otra)
+    assert nombres["abrio"] < nombres["miembro"]
+    no_cancela = otra if falla == "pendiente" else sid
+
+    def _falla_una(request):
+        s = _RUTA_SUS.fullmatch(str(request.url)).group(1)
+        if request.method == "PUT":
+            if s == no_cancela:
+                return httpx.Response(500, json={})
+            SUS[s] = "cancelled"
+        return httpx.Response(200, json={"id": s, "status": SUS[s]})
+    FALLA["PUT"] = FALLA["GET"] = _falla_una
+    r = client.post("/api/billing/cancel")
+    assert r.status_code == 503, r.text
+    assert SUS[sid] == "authorized" and _leer(nombres["abrio"])["mp_preapproval_id"] == sid
+    assert _leer_org(org_id)["billing_status"] == "active"
+    # La pendiente que sí se canceló no queda anotada.
+    queda = otra if falla == "pendiente" else None
+    assert _leer(nombres["miembro"])["mp_preapproval_id"] == queda
 
 
 def test_con_una_autorizada_de_otro_no_se_cancela_ninguna(client):

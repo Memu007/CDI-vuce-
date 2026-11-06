@@ -66,7 +66,11 @@ echo "BASE  | en verde"
 # --- Cancelar (C2)
 sabotaje $M "cancelar no llama a Mercado Pago" \
   "FAILED $T::test_cancelar_cancela_la_suscripcion_en_mp_y_sigue_hasta_el_fin" \
-  "            await run_in_threadpool(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id)" "            pass"
+  "key=paga.get):
+        try:
+            await run_in_threadpool(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id)" "key=paga.get):
+        try:
+            pass"
 sabotaje $M "si Mercado Pago falla, se cancela igual en CDI" \
   "FAILED $T::test_si_mp_no_cancela_no_se_cancela_a_medias" \
   "            await db.commit()
@@ -84,9 +88,7 @@ sabotaje $M "si el PUT falla no se pregunta el estado" \
     if _leer_suscripcion_mp(sid)"
 sabotaje $M "cancelar sin suscripción llama a Mercado Pago" \
   "FAILED $T::test_cancelar_sin_suscripcion_no_llama_a_mp" \
-  "    for cuenta in con_sid:
-        try:" "    for cuenta in con_sid or [db_user]:
-        try:"
+  "    for cuenta in sorted(con_sid, key=paga.get):" "    for cuenta in con_sid or [db_user]:"
 sabotaje $B "la cancelada no sigue hasta el fin del período" \
   "FAILED $T2::test_la_cancelada_genera_hasta_el_fin_del_periodo" \
   "    return fin > (ahora or datetime.now(timezone.utc))" "    return False"
@@ -141,7 +143,7 @@ sabotaje $M "se cancela una pendiente antes de ver la autorizada de otro" \
                 # Mientras" "            if True:
                 # Mientras"
 sabotaje $M "en el checkout, si una no se cancela, las canceladas siguen anotadas" \
-  "FAILED $T::test_si_una_de_varias_no_se_cancela_la_cancelada_no_queda_anotada[checkout]" \
+  "FAILED $T::test_si_una_de_varias_no_se_cancela_la_cancelada_no_queda_anotada" \
   "        # Las ya canceladas no vuelven: se guardan sin el sid.
         await db.commit()
         raise" "        raise"
@@ -172,19 +174,20 @@ sabotaje $M "en una org, cualquier miembro cancela el plan" \
   "    if miembro and db_user not in con_sid:" "    if False:"
 sabotaje $M "en una org, un miembro con una pendiente propia cancela el plan" \
   "FAILED $T::test_un_miembro_cuya_suscripcion_no_paga_no_cancela_el_plan_del_estudio[pending-403]" \
-  "    if miembro:
-        # Una pendiente" "    if False:
-        # Una pendiente"
+  "    if miembro and not paga[db_user]:" "    if False:"
 sabotaje $M "en una org, quien abrió una suscripción pausada no la cancela" \
   "FAILED $T::test_en_una_org_cancelar_cancela_la_suscripcion_y_sigue_hasta_el_fin[abrio-paused]" \
-  "if estado_mp not in (\"authorized\", \"paused\"):" "if estado_mp not in (\"authorized\",):"
+  "in (\"authorized\", \"paused\") for cuenta in con_sid}" "in (\"authorized\",) for cuenta in con_sid}"
+sabotaje $M "al cancelar, la que paga no va última" \
+  "FAILED $T::test_al_cancelar_la_que_paga_se_cancela_ultima[duena-pendiente]" \
+  "    for cuenta in sorted(con_sid, key=paga.get):" "    for cuenta in con_sid:"
 sabotaje $M "en una org, si no se lee la del miembro, cancela igual" \
   "FAILED $T::test_un_miembro_cuya_suscripcion_no_paga_no_cancela_el_plan_del_estudio[_contesta_500-503]" \
-  "        except _SuscripcionMPError:
-            raise HTTPException(status_code=503, detail=no_se_pudo)
-        if estado_mp" "        except _SuscripcionMPError:
-            estado_mp = \"authorized\"
-        if estado_mp"
+  "    except _SuscripcionMPError:
+        raise HTTPException(status_code=503, detail=no_se_pudo)
+    # Una pendiente" "    except _SuscripcionMPError:
+        paga = dict.fromkeys(con_sid, True)
+    # Una pendiente"
 sabotaje $M "en una org, reactivar mira al usuario y no a la org" \
   "FAILED $T::test_en_una_org_reactivar_lo_pagado_lleva_al_checkout" \
   "    entidad, es_org = await _get_billing_entity(db, db_user)
@@ -193,7 +196,7 @@ sabotaje $M "en una org, reactivar mira al usuario y no a la org" \
 
     if entidad.billing_status != \"canceled\":"
 sabotaje $M "si una de varias no se cancela, las canceladas siguen anotadas" \
-  "FAILED $T::test_si_una_de_varias_no_se_cancela_la_cancelada_no_queda_anotada[cancelar]" \
+  "FAILED $T::test_al_cancelar_la_que_paga_se_cancela_ultima[duena-autorizada]" \
   "            await db.commit()
             raise HTTPException(status_code=503, detail=no_se_pudo)" "            raise HTTPException(status_code=503, detail=no_se_pudo)"
 sabotaje $M "en una org, los pagos se buscan con el nombre del usuario" \
