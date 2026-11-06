@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-06 · fix: el checkout de una organización no cancela nada si hay una suscripción autorizada (COBRO-MP-2)
+
+- **fix(cobro):** antes de abrir una suscripción nueva se mira el estado de todas las de la organización; si una está autorizada se frena sin haber cancelado las pendientes. Si una no se puede cancelar, las que sí se cancelaron dejan de figurar como abiertas.
+
 ## 2026-11-05 · fix: lo que no se entrega no se cobra (COBRO-CORTE-1)
 
 - **fix(cobro):** generar cuenta la operación sólo si el archivo quedó escrito. Una respuesta que llega cuando ya empezó otra carga no le pone su operación a la nueva y, en v2, se guarda en el cliente de su carga. Un id de operación con caracteres que la base no guarda es una operación nueva, no un error. Borrar un cliente espera a la generación en curso de la cuenta, y su aviso dice que las operaciones quedan «Sin cliente».
