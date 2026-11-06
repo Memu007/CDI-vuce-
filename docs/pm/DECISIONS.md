@@ -396,3 +396,9 @@ técnicas sin aceptar desde `e0b8626`). Cuatro bajas a la cola de limpieza.
 La validación de 60 s que cruza cargas (`finalize.js:103-108`, de antes) se
 propone a Emi como pieza nueva.
 
+### 2026-11-06 11:40 UTC (PM)
+
+COBRO-MP-2 con devolución sobre `4f1822f`. D62 (a): una pausada de otro
+miembro frena el checkout con 409, como una autorizada; la lista de estados
+que pagan va en un solo lugar. Sacar del estudio sólo se frena por la que paga.
+

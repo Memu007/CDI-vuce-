@@ -3,6 +3,61 @@
 Este archivo es de la PM. Vos lo leés y contestás en `PARA-PM.md`. La
 historia de este canal está en Git.
 
+## Veredicto de COBRO-MP-2 (2026-11-06 PM): devolución
+
+Sobre `4f1822f`. Evidencia: `docs/pm/REPRODUCCION-COBRO-MP-2-2026-11-06.md`.
+Lo de una sola cuenta aguanta: Opus y Sonnet alto, por separado, no lograron
+cobro doble, servicio sin cobro ni días perdidos; tus casos dan `55 passed` y
+el guion de Postgres, 0 fallas. Vuelve por el estudio.
+
+**Causa 1: quién puede tocar la suscripción que paga se decide distinto en
+cada ruta.** Cancelar dice «la dueña o quien abrió la que paga (autorizada o
+pausada)», pero:
+- reactivar no pide nada: un miembro deshace la cancelación de la dueña
+  (`200 trial`, lo reproduje);
+- el checkout de un miembro cancela la pausada que paga, que cancelar le
+  niega (D62);
+- sacar del estudio a quien sólo dejó una pendiente, o una ya cancelada en
+  MP, da 409 y la única salida es cancelar el plan que sí paga;
+- el 409 del checkout dice que sólo la cancela quien la abrió, y con el
+  estudio en `past_due` dice «Se renueva sola».
+Pido: una sola regla de qué suscripción paga y quién la toca, usada por
+cancelar, reactivar, checkout y sacar miembros. Sacar a alguien sólo se frena
+por la que paga; una pendiente suya se cancela en MP al sacarlo (503 sin
+sacarlo si MP no contesta). Familia como datos, un caso: dueña, quien abrió la
+que paga, otro miembro; contra cancelar, reactivar, checkout con pausada de
+otro y sacar con pendiente, cancelada o la que paga. Reactivar toma el mismo
+candado que cancelar (sugerencia: cierra también el pago que llega en medio).
+
+**Causa 2: lo que se muestra sale de quien mira, no de la cuenta que paga.**
+En un estudio con la de otro miembro autorizada, la dueña ve `renueva False,
+suscripcion_abierta False` («Activo hasta» y sin «Cancelar plan»). Pido:
+`billing_me` calcula «Próximo cobro» y «Cancelar plan» con la suscripción que
+paga el estudio, igual para todos los miembros. Caso con dueña, quien abrió y
+otro miembro.
+
+**Causa 3: el estudio entero espera mientras se habla con MP, sin tope.** La
+creación por el SDK no tiene el `timeout=10` de las otras llamadas: con MP
+caído la espera pasa los 20 s que declaraste, y en ese tiempo no generan los
+miembros ni entra el aviso de pago. Pido: con MP sin contestar, el checkout y
+cancelar terminan en 503 dentro de un tope que digas, y nadie del estudio
+espera más que eso. Un caso con MP que no contesta.
+
+**D62: (a), decidido por la PM.** Una pausada de otro miembro frena el
+checkout con 409, igual que una autorizada: cancelar ya la trata como la que
+paga, y con (b) un miembro sin permiso la cancela por el checkout (Opus lo
+reprodujo). Un estudio con una pausada abandonada no queda trabado: la dueña
+puede cancelarla. La lista de estados que «pagan» va una sola vez, en esta
+vuelta (§6: el chequeo que quedaría en dos lugares se pone una vez).
+
+**A la cola o al riesgo ya aceptado** (no los toques): estado de MP
+desconocido (`expired`) en 503 para siempre; «Próximo cobro» con una
+cancelada desde MP; los textos de antes (`SUBSCRIPTION_PAST_DUE`, «Tu prueba
+gratis terminó», «Cancelaste tu suscripción» al miembro).
+
+Rojo antes en `4f1822f`, sabotajes, suite y chequeo-6 sobre la vuelta. Uno de
+cada familia lo pruebo yo con otro ejemplo.
+
 ## Veredicto de COBRO-CORTE-1, vuelta 4 (2026-11-06 PM): aceptada, sin integrar
 
 Sobre `ca50916`. Evidencia: `docs/pm/REPRODUCCION-COBRO-CORTE-1-v4-2026-11-06.md`.
@@ -22,9 +77,6 @@ Enter doble en «Reintentar» o «Generar» (dos generaciones, sin cobro extra),
 
 **Aparte:** la validación de 60 s cruza cargas (`finalize.js:103-108`, de
 antes). Se la propongo a Emi como pieza nueva; no la toques.
-
-**COBRO-MP-2 (`4f1822f`):** la estoy revisando, con dos adversarios. D62
-va con el veredicto.
 
 **CSRF-3: aceptada** sobre `9fe55d4` (2026-11-05 19:20 UTC), integrada. Evidencia: `docs/pm/REPRODUCCION-CSRF-3-2026-11-05.md`. Suite 4450 passed, csrf3/2/1 en rojo (8, 10, 8), chequeo-6 sin avisos; Opus y Sonnet alto sin hallazgo que bloquee. El 500 de `/dashboard` sin base y la carrera del token van a la cola de limpieza.
 
