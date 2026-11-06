@@ -134,9 +134,9 @@ sabotaje pytest $D "el token de verificar el email vale como sesión" \
 sabotaje pytest $D "un token sin vencimiento vale" \
   '                          options={"require": ["exp"]})' '                          )' \
   "FAILED $T::test_un_token_sin_vencimiento_no_es_una_sesion"
-sabotaje pytest $D "se firma con una clave y se verifica con otra" \
+sabotaje pytest $D "firmar lee la clave del entorno y verificar la de settings" \
   '    return jwt.encode(datos, settings.jwt_secret, algorithm=settings.jwt_algorithm)' \
-  '    return jwt.encode(datos, "otra-clave-de-firma-con-mas-de-32-caracteres", algorithm=settings.jwt_algorithm)' \
+  '    return jwt.encode(datos, os.getenv("JWT_SECRET_KEY") or os.getenv("SECRET_KEY", "tu-clave-secreta-super-segura-cambiar-en-produccion"), algorithm=settings.jwt_algorithm)' \
   "FAILED $T::test_se_firma_y_se_verifica_con_la_misma_clave"
 sabotaje pytest $D "el header le gana a la cookie" \
   $'    token = request.cookies.get("access_token")\n    if not token:\n        auth_header = request.headers.get("Authorization")\n        if auth_header and auth_header.startswith("Bearer "):\n            token = auth_header\n' \
