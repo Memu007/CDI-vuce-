@@ -31,7 +31,7 @@ PM la pasa a `COLA-LIMPIEZA.md`. Lo nuevo de la vuelta sí cumple §6.
 
 ## Piezas nuevas que aprobó Emi el 04/11 (PM)
 
-Tu cola queda: el orden de los veredictos del 05/11, arriba, y después SESION-1 → ABUSO-1 → SUFIJOS-2+SEGURO-1 → **SEGURO-2** → EMAIL-1 →
+Tu cola queda: CATALOGO-LARGO-2 → RESET-1 → PYPDF-1 → ABUSO-1 → SUFIJOS-2+SEGURO-1 → **SEGURO-2** → EMAIL-1 →
 CONEXIONES-1 → OBSERVABILIDAD-1 → ORG-1+D40. El detalle, al activarlas:
 
 - **CATALOGO-LARGO-1 (datos):** con cliente y proveedor, una descripción de
@@ -69,57 +69,35 @@ despachante o lo que el MARIA aceptó o rechazó). **Los TXT y la proforma de
 la reunión del 2026-10-24 tienen datos reales de un cliente: no entran al
 repositorio.** Las pruebas usan sintéticos con la misma forma.
 
-## SESION-1: devolución, sobre `c429307` (2026-11-05 23:30 UTC, PM)
+## SESION-1: aceptada sobre `2e62761`, sin integrar (2026-11-06 PM)
 
-Acta: `REPRODUCCION-SESION-1-v2-2026-11-05.md`. Tus puertas coinciden: 29
-passed (12 rojos en la base), motores pg OK, 29 sabotajes en rojo, chequeo-6
-`+108/−257` sin avisos. Mi negativo (once tokens ajenos o falsificados, cookie
-basura más Bearer de otro) da todo 401 y distingue en la base. Lo que la pieza
-promete aguanta. Vuelve por dos causas que reproduje:
+Acta: `REPRODUCCION-SESION-1-v3-2026-11-06.md`. Coincide con tu informe:
+`test_sesion1.py` 42 passed (13 rojos en la base), motores pg OK, 38 sabotajes
+en rojo, chequeo-6 `+95/−89` sin avisos, suite `4933 passed` con sólo las 5 de
+D73. Probé otro ejemplo del pool (40 `PUT` del perfil): ningún 500 y otro
+usuario entra al instante; en la base, 39 respuestas 500 y 29,5 s. Las dos
+causas quedan cerradas.
 
-**1. Lo que se autoriza con la clave actual no queda atado a esa clave.**
-`change_password` y el cambio de email validan contra el hash leído al entrar
-y guardan con un UPDATE por id. Si el dueño resetea en el medio, el reset se
-pierde, el atacante queda con una clave suya y, en el cambio de clave, sale
-con un token vigente (`abrir_sesion` recibe el hash que él mismo escribió).
-Es lo que cerraste en el login, en las rutas que validan la clave actual.
-Pido:
-- en toda ruta que valida la clave actual, si la clave guardada cambió desde
-  la validación no se guarda nada y no se emite token (mismo código para las
-  dos rutas);
-- un caso con las rutas como datos: el reset entra justo después de validar,
-  y después la clave del reset entra, la del atacante no y ningún token suyo
-  vive. Que dos cambios a la vez no den 200 con un token ya muerto.
-
-**2. El tope abre una segunda conexión con la del pedido ya tomada.**
-`limites_auth` usa `engine.connect()`/`begin()` mientras la sesión de
-`get_db` tiene la suya. Con 40 `PUT /api/user/profile` a la vez y la clave
-mala: `{400: 3, 500: 37}`, y otro usuario esperó 29,4 s. En la base, `{400:
-40}` y 0,6 s. Pido:
-- que contar intentos no pueda agotar el pool, en cada llamada a
-  `limites_auth` desde un pedido que ya tiene la base (el perfil, el cambio de
-  clave, el login y el pedido de reset);
-- un caso en Postgres con más pedidos a la vez que conexiones del pool: ningún
-  500 y otro usuario entra en menos de 2 s. Las rutas van como datos.
-
-**Menores que entran acá** (son de `datos_del_token`, que escribiste vos):
-firmar y verificar con la misma clave, desde el mismo lugar (con
-`JWT_SECRET_KEY=""` hoy el login da 200 y todo lo demás 401), y que un token
-sin `exp` no sea una sesión.
-
-- **D71: (b)**, como pieza chica aparte después de SESION-1. Decidido por la PM.
-- **Tus propuestas**: sacar `create_access_token` y unificar el secreto
-  entran con los menores. Borrar `pwd:` al reset y que el cambio de email
-  apague `is_verified` van a la cola como propuestas, igual que el arreglo de
-  `smoke_friccion.sh`. El logout de v1 sin `X-CSRF-Token` (403 con CSRF
-  activo) espera D60 de Emi.
-- **Suite**: me dio `5 failed` en `test_despacho1b.py` y
-  `test_rendimiento1c.py`, igual en la base. `pypdf>=6.19.0` instaló `6.21.4`,
-  que corta antes con su propio error. No es de SESION-1. Proponé en una D si
-  se fija la versión o se adaptan las pruebas; va después de esta vuelta.
-- Mis sabotajes de `csrf3.sh` los actualizo yo cuando acepte.
-- **Orden:** esta vuelta primero, después CATALOGO-LARGO-2 (vi que ya
-  avanzaste: entregala igual, la reviso cuando llegue). Tu próxima D es D73.
+- Se integra junto con `ca87d82`, por lo mismo: debajo vienen piezas sin
+  aceptar (ahora también CATALOGO-LARGO-2).
+- **D73:** no se fija una versión vieja a ciegas. Primero hay que ver qué
+  cambió en 6.21.4, que puede ser un arreglo de seguridad. Va como pieza chica
+  **PYPDF-1**, después de RESET-1. Decidido por la PM.
+- **D74: (a)**, se acepta así. Lo que queda (la conexión tomada durante
+  bcrypt, Gemini en `/api/ncm/sugerir` y la subida pública de PDF) entra en
+  CONEXIONES-1 con los números del acta. Decidido por la PM.
+- **D75: (a)**, a `COLA-LIMPIEZA.md`. Decidido por la PM.
+- **Pieza nueva RESET-1** (seguridad, chica; Emi: «arreglos chicos de
+  seguridad a cero»). Va después de CATALOGO-LARGO-2, antes de ABUSO-1. El
+  problema viene de antes: `reset_password` no invalida nada.
+  - Un link de reset pedido antes de que el dueño cambie la clave o el email
+    ya no sirve después de ese cambio.
+  - Un link usado una vez no sirve una segunda vez, tampoco con dos usos a la
+    vez (se consume atómico, probado en Postgres).
+  - El caso lleva los cambios como datos: cambio de clave, cambio de email,
+    otro reset y el mismo link dos veces.
+- Las anclas de `csrf3.sh` las actualizo yo al integrar.
+- **Sigue CATALOGO-LARGO-2**, como ya venías. Tus próximas D empiezan en D76.
 
 ## `ca87d82`: aceptadas RENDIMIENTO-1c, DESPACHO-1b, CATALOGO-LARGO-1 y DISCO-1, sin integrar (2026-11-05 20:45 UTC, PM)
 
