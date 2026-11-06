@@ -1240,9 +1240,9 @@ async def _migrate_catalogo_sin_tope():
 
     if IS_SQLITE:
         return
-    # Una tabla por transacción: guardar-uso escribe las dos en otro orden y,
-    # trabadas juntas, se esperaban una a la otra.
-    for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "ncm", "origen", "vendor_nombre")),
+    # Una tabla por transacción: guardar-uso escribe las dos en el orden
+    # contrario, y tomarlas juntas puede trabarse con él.
+    for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "origen", "vendor_nombre")),
                             ("client_product_history", ("origen_frecuente",))):
         async with engine.begin() as conn:
             # Si otra conexión tiene tomada la tabla, falla rápido y el reinicio
@@ -1262,7 +1262,8 @@ async def _migrate_catalogo_sin_tope():
 
 async def _migrate_catalogo_claves():
     """Da la clave de hoy a las filas cuya descripción no tiene letras ni números
-    latinos y quedaron con otra: si no, guardarla de nuevo armaba una segunda fila."""
+    latinos y tienen otra: guardarlas de nuevo buscaría por la clave de hoy y
+    armaría una segunda fila."""
     from sqlalchemy import text
     from proyecto_maria.core import catalog_service as catalog_svc
     from proyecto_maria.database.connection import engine, IS_SQLITE

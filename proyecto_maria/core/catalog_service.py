@@ -69,6 +69,17 @@ def texto_para_guardar(valor, que: str = "La descripción") -> str:
     return valor
 
 
+# Tope de la columna del NCM; se cuenta como se guarda, sin normalizar.
+MAX_NCM = 20
+
+
+def ncm_para_guardar(valor) -> str:
+    ncm = texto_para_guardar(valor, "El NCM")
+    if len(ncm) > MAX_NCM:
+        raise ValueError(f"El NCM pasa de {MAX_NCM} caracteres.")
+    return ncm
+
+
 # Patron valido para vendor_id (slug generado por _vendor_key).
 _VENDOR_ID_RE = re.compile(r"^[a-z0-9_]{1,60}$")
 
@@ -357,7 +368,7 @@ def _producto_valido(prod) -> Optional[tuple]:
     desc = texto_para_guardar(prod.get("descripcion"))
     if not desc:
         return None
-    ncm = texto_para_guardar(prod.get("ncm"), "El NCM") or texto_para_guardar(prod.get("pieza"), "El NCM")
+    ncm = ncm_para_guardar(prod.get("ncm")) or ncm_para_guardar(prod.get("pieza"))
     origen = texto_para_guardar(prod.get("origen"), "El origen")
     unidad = texto_para_guardar(prod.get("unidad_medida"), "La unidad")
     return desc, ncm, origen, unidad, _precio(prod.get("valor_unitario"))
@@ -500,9 +511,11 @@ async def update_product(
 
     # None es «no cambia»; todos los textos se validan antes de tocar la fila.
     textos = {campo: texto_para_guardar(updates.get(campo), que) for campo, que in (
-        ("descripcion_original", "La descripción"), ("ncm", "El NCM"),
+        ("descripcion_original", "La descripción"),
         ("origen", "El origen"), ("unidad_medida", "La unidad"),
     ) if updates.get(campo) is not None}
+    if updates.get("ncm") is not None:
+        textos["ncm"] = ncm_para_guardar(updates["ncm"])
 
     new_desc = textos.get("descripcion_original") or row.descripcion or ""
     if "ncm" in textos:
