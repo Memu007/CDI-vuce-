@@ -1166,7 +1166,8 @@
 
     async function saveOperationToHistory(items, mariaData, carga, foto = fotoDeLaPantalla()) {
         carga = carga || (CDI.state = CDI.state || {});
-        const cliente = foto.cliente;
+        // Sin cliente al pedir, el que se le eligió a esa carga mientras esperaba.
+        const cliente = foto.cliente || carga.clienteActivo || null;
         if (!cliente || !cliente.id) {
             console.warn('[history] no hay cliente activo, no se guarda al historial');
             return { ok: false, reason: 'sin_cliente' };
@@ -1360,7 +1361,8 @@
         const retry = e.target.closest('[data-action="retry-generate"]');
         if (retry) {
             e.preventDefault();
-            generateMaria();
+            // Oculta el error, y con él el botón: un segundo clic no pide otra generación.
+            onEnterReady();
         }
     });
 
