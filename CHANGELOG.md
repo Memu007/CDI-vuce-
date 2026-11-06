@@ -17,7 +17,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-11-05 · fix: lo que no se entrega no se cobra (COBRO-CORTE-1)
 
 - **fix(cobro):** generar cuenta la operación sólo si el archivo quedó escrito. Una respuesta que llega cuando ya empezó otra carga no le pone su operación a la nueva y, en v2, se guarda en el cliente de su carga. Un id de operación con caracteres que la base no guarda es una operación nueva, no un error. Borrar un cliente espera a la generación en curso de la cuenta, y su aviso dice que las operaciones quedan «Sin cliente».
-- **fix(cobro):** regenerar con una falla deja entero el archivo ya entregado. La respuesta tardía se guarda con el cliente y los valores de su carga también en v1, y en v2 no marca «Listo» la carga nueva. Un guardado que esperaba al borrado de su cliente da 404.
+- **fix(cobro):** regenerar con una falla deja entero el archivo ya entregado. En v2, la respuesta tardía no marca «Listo» la carga nueva. Un guardado que esperaba al borrado de su cliente da 404.
 - **fix(cobro):** si falla también deshacer la base, el archivo ya entregado vuelve igual. En v2, una carga nueva que llega a «Listo» mientras la anterior espera genera cuando ésa vuelve, y no hereda su error.
 
 ## 2026-11-05 · fix: cancelar y reactivar en una organización actúan sobre el plan del estudio (COBRO-MP-2)
@@ -35,6 +35,18 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-11-05 · fix: guardar la misma factura en otro cliente no le saca la operación al primero (COBRO-CORTE-1)
 
 - **fix(cobro):** guardar un MARIA ya generado completa la operación sólo si no tiene cliente o es del mismo; si es de otro cliente, se cuenta y se crea una nueva. El aviso de una cuenta cancelada que todavía tiene período y llegó al tope se titula «Llegaste al tope de tu plan».
+
+## 2026-11-05 · feat: se retira la interfaz vieja (v1)
+
+- **feat(ui):** `/dashboard` sirve siempre la v2. Se van `dashboard.html`, `static/app.js` y `app.css`; `?v=1` y la cookie `cdi_ui` ya no cambian la pantalla. Ninguna ruta de API cambia.
+- **test:** se destapan veinte tests que esperaban `python-magic`, instalado hace tiempo.
+
+## 2026-11-05 · chore: repositorio ordenado (LIMPIEZA-1; la primera parte, CI y Google Cloud, es del 2026-10-28)
+
+- **chore(ci):** la CI ya no excluye a mano las 10 pruebas de presupuestos públicos, CSRF y el botón de NCM automático; una prueba falla si vuelve a sacar alguna.
+- Se borran `cloudbuild.yaml`, `setup_gcp.sh`, `scripts/deployment/deploy-cloud-run.sh` y las cinco guías de Google Cloud: el sitio se publica sólo por Railway.
+- **chore(repo):** se borra lo que ya no corre ni se cita: la `static/` de la raíz, `clients.json`, el script de migración desde JSON, `tests/old/`, `landing_legacy.html`, los informes de carga, los planes de otras herramientas (`.specify/`, `plans/`), la documentación duplicada o de chat (`docs/fixes`, `docs/misc`, `docs/guides`, `proyecto_maria/documentacion_tecnica`) y los scripts huérfanos de `scripts/`. Nada del producto cambia; todo queda en Git.
+- **docs(repo):** README nuevo con el stack real, cómo correr en local, cómo correr las pruebas y dónde está cada cosa; reemplaza a `QUICK_START.md`, `ARCHITECTURE.md` y `setup.sh`. Los planes de valuación pasan a `docs/negocio/`. `.gitignore` sin entradas personales.
 
 ## 2026-11-05 · fix: una sesión sin token CSRF lo recibe sola (CSRF-3)
 
@@ -138,11 +150,6 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 - **feat(datos):** `scripts/datos/copia_base.py` saca la copia de Postgres (`pg_dump -Fc`), la restaura en una base descartable y compara, tabla por tabla, la cantidad de filas y un resumen del contenido; si no da igual, sale con error y no la marca como verificada.
 - `enviar` lleva sólo una copia verificada y sin cambios a una carpeta local de prueba. Adónde va de verdad y cuándo corre lo define Emi; todavía no corre en producción.
-
-## 2026-10-28 · chore: la CI corre la suite entera y se borra el camino a Google Cloud (LIMPIEZA-1)
-
-- **chore(ci):** la CI ya no excluye a mano las 10 pruebas de presupuestos públicos, CSRF y el botón de NCM automático; una prueba falla si vuelve a sacar alguna.
-- Se borran `cloudbuild.yaml`, `setup_gcp.sh`, `scripts/deployment/deploy-cloud-run.sh` y las cinco guías de Google Cloud: el sitio se publica sólo por Railway.
 
 ## 2026-10-28 · fix: los roles guardados como texto no dan administrador por una parte (AISLAMIENTO-2)
 

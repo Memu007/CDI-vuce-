@@ -469,9 +469,6 @@ def test_columna_con_el_nombre_del_campo_y_mapeo_a_otra_no_da_500():
 def test_lo_que_llamaba_a_las_rutas_borradas():
     import pathlib
     raiz = pathlib.Path(main.__file__).resolve().parent.parent
-    app_js = (raiz / "proyecto_maria/static/app.js").read_text(encoding="utf-8")
-    assert "/upload_excel/public" not in app_js
-    assert "El Excel se sube en la pantalla nueva" in app_js
     smoke = (raiz / "scripts/testing/smoke_test.sh").read_text(encoding="utf-8")
     assert '/upload_excel"' not in smoke and "/upload_excel_v2/" in smoke
 

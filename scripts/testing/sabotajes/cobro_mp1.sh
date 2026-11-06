@@ -12,8 +12,8 @@
 # tests/test_cobro_mp1_cde.py y la pantalla del perfil.
 # La del 2026-10-29 (vuelta 2, a a g) con tests/test_cobro_mp1_vuelta2.py,
 # tests/test_cobro_corte1.py (g), la carrera de a y de D31 y los datos que no entran en
-# su columna (b) en Postgres (scripts/testing/cobro_mp1_postgres.py) y la pantalla v1
-# (scripts/testing/pantalla_cobro_mp1_v2.js).
+# su columna (b) en Postgres (scripts/testing/cobro_mp1_postgres.py) y la pantalla
+# Listo de la v2 (scripts/testing/pantalla_cobro_mp1_v2.js; hasta el 2026-11-05, la v1).
 # Los «sin_rojo» deshacen algo que no es la garantía y la prueba tiene que
 # seguir en verde (D31: lo que frena el doble cobro es la clave primaria, no
 # mirar antes).
@@ -681,10 +681,10 @@ else
 fi
 
 # Las pantallas, con la API levantada desde el worktree y una base vacía en
-# cada corrida: C y D en el perfil, y g en la v1.
+# cada corrida: C y D en el perfil, y g en Listo.
 P=proyecto_maria/static/v2/screens/profile.js
 APP=proyecto_maria/static/v2/app_v2.js
-V1=proyecto_maria/static/app.js
+F2=proyecto_maria/static/v2/screens/finalize.js
 PUERTO="${PUERTO:-8854}"
 API=""
 trap '[ -n "$API" ] && kill $API 2>/dev/null; git -C "$REPO" worktree remove --force "$WT" >/dev/null 2>&1; rm -f -- "$TMPD/local.db" "$TMPD/api.log"; rmdir "$TMPD"' EXIT
@@ -782,12 +782,12 @@ fi
 JS=scripts/testing/pantalla_cobro_mp1_v2.js
 git checkout -q -- proyecto_maria/
 if ! correr >/dev/null; then
-  echo "BASE  | la pantalla v1 ya está en rojo sin sabotaje: no se puede medir g"; correr | grep FALLA; FALLAS=$((FALLAS+1))
+  echo "BASE  | la pantalla Listo ya está en rojo sin sabotaje: no se puede medir g"; correr | grep FALLA; FALLAS=$((FALLAS+1))
 else
-  echo "BASE  | la pantalla v1, en verde"
-  sabotaje $V1 "g: la v1 guarda la operación sin el archivo del MARIA" \
-    "        await saveOperationToHistory(items, data.filename);" \
-    "        await saveOperationToHistory(items);" \
+  echo "BASE  | la pantalla Listo, en verde"
+  sabotaje $F2 "g: Listo guarda la operación sin el archivo del MARIA" \
+    "            saveOperationToHistory(items, data).catch(err => {" \
+    "            saveOperationToHistory(items, {}).catch(err => {" \
     "FALLA: import: la pantalla hizo"
 fi
 
