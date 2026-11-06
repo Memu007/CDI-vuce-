@@ -240,3 +240,5 @@ python docs/pm/herramientas/chequeo-6.py 8a1dcdd 4f1822f
 ---
 
 /compact conservar: Dev 1, rama claude/dev-tecnica. COBRO-MP-2 entregada en 4f1822f (informe en el commit de arriba), con D62. Sigue COBRO-MP-3. Nada se publica sin el «dale» de Emi; nunca main.
+
+Corte (2026-11-06): la devolución de COBRO-MP-2 y COBRO-MP-3 está en 6ecfe06 (producto y casos commiteados y subidos), sin informe de la vuelta. En 6ecfe06 corrieron la suite («374 passed, 3 warnings in 165.66s») y 19 sabotajes de cobro_mp2.sh, todos en rojo; los demás sabotajes de MP-2 y los de MP-1, Postgres, compileall, `/code-review`, `/security-review` y chequeo-6 no se corrieron. VALIDACION-1 tiene el arreglo y el caso escritos, sin commitear.
