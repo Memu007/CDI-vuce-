@@ -154,3 +154,25 @@ def test_un_proveedor_o_un_origen_de_mas_de_2000_dan_400_sin_guardar(client, via
     esperado = [(VENDOR, "TORNILLO", NCM, "CN")] if via == "cambiar-origen" else []
     assert _filas(owner) == esperado
     assert _sql("select count(*) from ncm_historial where owner_username=:o", o=owner) == [(0,)]
+
+
+@pytest.mark.parametrize("via", ["aprender", "operacion"])
+def test_la_memoria_del_cliente_no_guarda_un_origen_de_mas_de_2000(client, via):
+    cid = _cliente(client)
+    item = {"descripcion": "TORNILLO", "ncm": NCM, "origen": GIGANTE}
+    url = f"/api/clientes/{cid}/" + ("catalogo/productos/learn" if via == "aprender" else "operaciones")
+    r = client.post(url, json={"items": [item]})
+    assert r.status_code == 200, r.text
+    if via == "aprender":
+        assert r.json()["aprendidos"] == 0, r.text
+    else:
+        assert r.json()["historial_guardado"] is False, r.text
+    assert _sql("select count(*) from client_product_history where client_id=:c", c=cid) == [(0,)]
+
+
+def test_una_fila_sin_descripcion_no_frena_el_lote_por_su_origen(client):
+    owner = _dueno(_cliente(client))
+    r = client.post(f"/api/catalog/{VENDOR_ID}/productos", json={"vendor_name": VENDOR, "productos": [
+        {"descripcion": "", "ncm": NCM, "origen": GIGANTE}, {"descripcion": "TORNILLO", "ncm": NCM, "origen": "CN"}]})
+    assert r.status_code == 200, r.text
+    assert _filas(owner) == [(VENDOR, "TORNILLO", NCM, "CN")]
