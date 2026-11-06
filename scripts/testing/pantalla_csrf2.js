@@ -1,6 +1,8 @@
 // Con el servidor exigiendo el token CSRF (CSRF_ENFORCE=true, como en producción),
-// las escrituras de la landing y de la pantalla vieja llegan con sesión abierta
-// y su «Salir» cierra la sesión. Sale con error si algo no se cumple.
+// las escrituras de la landing y de la pantalla (v2) llegan con sesión abierta y
+// su «Salir» cierra la sesión; csrf.js, que carga la landing, no manda el token a
+// otro origen ni tira antes de devolver la promesa. Hasta el 2026-11-05 la parte
+// de la pantalla se medía en la v1, que se retiró. Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_csrf2.js
 const { chromium } = require('playwright');
 function falla(m) { console.error('FALLA: ' + m); process.exit(1); }
@@ -23,17 +25,8 @@ async function escribe(p, ruta, accion, nombre) {
   if (!reg.ok()) falla('no se pudo registrar: ' + reg.status());
 
   const landing = await ctx.newPage();
-  await landing.goto(base + '/');
-  await escribe(landing, '/api/ui/event', () => landing.click('#btnHeroCta'), 'la telemetría de la landing');
-  await landing.close();
-
-  const p = await ctx.newPage();
-  // La v1 manda a la portada si no encuentra el token en localStorage.
-  const token = (await reg.json()).access_token;
-  if (!token) falla('el registro no devolvió access_token');
-  await p.addInitScript(t => localStorage.setItem('access_token', t), token);
   // La CSP corta en el navegador los pedidos a otro origen: se mira lo que csrf.js le pasa a fetch nativo.
-  await p.addInitScript(() => {
+  await landing.addInitScript(() => {
     const nativo = window.fetch;
     window.__pedidos = [];
     window.fetch = function (input, init) {
@@ -41,25 +34,31 @@ async function escribe(p, ruta, accion, nombre) {
       return nativo.apply(this, arguments);
     };
   });
-  await p.goto(base + '/dashboard?v=1');
-  await p.waitForFunction(() => typeof autoBackupLocalStorage === 'function' && typeof logout === 'function');
-  await escribe(p, '/api/backup/localStorage', () => p.evaluate(() => autoBackupLocalStorage()), 'la copia de la pantalla vieja');
+  await landing.goto(base + '/');
+  await escribe(landing, '/api/ui/event', () => landing.click('#btnHeroCta'), 'la telemetría de la landing');
   // El token no sale de su sitio: un pedido a otro origen va sin él.
-  const ajenos = await p.evaluate(async () => {
+  const ajenos = await landing.evaluate(async () => {
     await fetch('http://otro.ejemplo.test/x', { method: 'POST', body: 'x' }).catch(() => {});
     return window.__pedidos.filter(q => q.url.startsWith('http://otro.ejemplo.test/'));
   });
   if (!ajenos.length) falla('csrf.js no le pasó a fetch el pedido a otro origen');
   if (ajenos.some(q => q.headers.includes('x-csrf-token'))) falla('el token CSRF salió hacia otro origen');
   // Un pedido mal armado tiene que fallar como en fetch nativo: con la promesa, no antes.
-  const rompe = await p.evaluate(() => { try { fetch('http://[', { method: 'POST' }).catch(() => {}); return ''; } catch (e) { return String(e); } });
+  const rompe = await landing.evaluate(() => { try { fetch('http://[', { method: 'POST' }).catch(() => {}); return ''; } catch (e) { return String(e); } });
   if (rompe) falla('con una URL inválida fetch tiró antes de devolver la promesa: ' + rompe);
+  await landing.close();
 
-  await p.evaluate(() => { window.showConfirmation = async () => true; });
-  await Promise.all([p.waitForURL(u => u.pathname === '/', { timeout: 20000 }), p.evaluate(() => { logout(); })])
-    .catch(() => falla('«Salir» de la pantalla vieja no llevó al inicio'));
+  // La pantalla: una escritura con la sesión abierta llega, y «Salir» cierra la sesión.
+  const p = await ctx.newPage();
+  await p.goto(base + '/dashboard');
+  await p.waitForFunction(() => window.CDI && CDI.api && CDI.currentUser);
+  await escribe(p, '/api/clientes',
+    () => p.evaluate(() => CDI.api('/api/clientes', { method: 'POST', body: JSON.stringify({ nombre: 'Cliente CSRF-2', cuit: '30999999995' }) }).catch(() => {})),
+    'la escritura de la pantalla');
+  await Promise.all([p.waitForURL(u => u.pathname === '/', { timeout: 20000 }), p.click('#logoutBtn')])
+    .catch(() => falla('«Salir» de la pantalla no llevó al inicio'));
   const sesion = await ctx.request.get(base + '/auth/current_user');
-  if (sesion.status() !== 401) falla('«Salir» de la pantalla vieja dejó la sesión abierta (' + sesion.status() + ')');
+  if (sesion.status() !== 401) falla('«Salir» de la pantalla dejó la sesión abierta (' + sesion.status() + ')');
 
   await b.close();
   console.log('OK: CSRF-2 en el navegador');
