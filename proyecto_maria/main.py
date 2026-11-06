@@ -13,6 +13,7 @@ import json
 import math
 import os
 import re
+import shutil
 import unicodedata
 import csv
 import io
@@ -5953,24 +5954,22 @@ async def _escribir_y_confirmar(db: AsyncSession, username: str, archivo: str, t
     """El conteo se confirma sólo con el archivo escrito: lo que no se entrega no queda cobrado."""
     ruta = os.path.join(_user_downloads_dir(username), archivo)
     temporal, respaldo = ruta + ".parcial", ruta + ".anterior"
-    nuevo, enlazado = not os.path.exists(ruta), False
+    nuevo, respaldado = not os.path.exists(ruta), False
     try:
         # newline="": el archivo lleva los CRLF tal cual, sin traducir.
         with open(temporal, "w", encoding="utf-8", newline="") as f:
             f.write(txt)
         if not nuevo:
-            # Otro nombre del archivo ya entregado, para devolverlo si el commit falla;
-            # uno que quedó de un proceso cortado se descarta.
-            if os.path.exists(respaldo):
-                os.remove(respaldo)
-            os.link(ruta, respaldo)
-            enlazado = True
+            # Una copia del archivo ya entregado, para devolverlo si el commit falla;
+            # copyfile pisa la que haya quedado de un proceso cortado.
+            shutil.copyfile(ruta, respaldo)
+            respaldado = True
         # El reemplazo es atómico: el archivo ya entregado nunca queda a medias.
         os.replace(temporal, ruta)
         await db.commit()
     except BaseException:
         # Los archivos antes que el rollback: si éste también falla, lo entregado ya volvió.
-        if enlazado:
+        if respaldado:
             os.replace(respaldo, ruta)
         elif nuevo and os.path.exists(ruta):
             os.remove(ruta)

@@ -21,7 +21,7 @@
     let lastMaria = null;         // { filename, download_url, content }
     let validatingInFlight = false;
     let generateInFlight = false;
-    // Una carga nueva que llega a «Listo» mientras otra espera su respuesta genera cuando ésa vuelve.
+    // Lo que se pide mientras otra generación espera se genera cuando ésa vuelve.
     let pedidaMientrasOtra = false;
 
     function $(id) { return document.getElementById(id); }
@@ -554,7 +554,7 @@
         vIssues.innerHTML = groups.join('');
 
         // Generate button
-        vGenerate.disabled = errores.length > 0 || generateInFlight;
+        vGenerate.disabled = errores.length > 0;
         vGenerate.title = errores.length > 0 ? 'Corregí los errores antes de generar' : '';
     }
 
@@ -613,7 +613,6 @@
        Pantalla 5: ready (generar + descargar)
        ========================================================== */
     async function onGenerate() {
-        if (generateInFlight) return;
         if (lastValidation && (lastValidation.errores || []).length > 0) return;
 
         // Guardar SBT del input al estado antes de generar
@@ -724,7 +723,7 @@
                 console.warn('[history] no se pudo guardar operacion', err);
             });
             // Best-effort: aprender productos en catalogo del proveedor
-            saveCatalogLearn(items).catch(err => {
+            saveCatalogLearn(items, carga).catch(err => {
                 console.warn('[catalog] no se pudo aprender', err);
             });
         } catch (err) {
@@ -733,9 +732,10 @@
             if (carga === CDI.state) showReadyError(String(err && err.message || err));
         } finally {
             generateInFlight = false;
-            const otra = pedidaMientrasOtra && carga !== CDI.state;
+            const otra = pedidaMientrasOtra;
             pedidaMientrasOtra = false;
-            if (otra) generateMaria();
+            // Con lo que hay ahora en pantalla, que puede haber cambiado mientras ésta esperaba.
+            if (otra) onEnterReady();
         }
     }
 
@@ -1157,15 +1157,16 @@
         CDI.track && CDI.track('op_orphan_resolved', { via: via });
     }
 
-    // Totales y valores del despachante, tomados al pedir: la carga nueva no los pisa.
+    // Cliente, totales y valores del despachante, tomados al pedir: lo que cambie después no los pisa.
     function fotoDeLaPantalla() {
-        return { stats: (lastValidation && lastValidation.estadisticas) || {},
+        return { cliente: (CDI.state && CDI.state.clienteActivo) || null,
+                 stats: (lastValidation && lastValidation.estadisticas) || {},
                  maria: CDI.despachante ? CDI.despachante.valores() : {} };
     }
 
     async function saveOperationToHistory(items, mariaData, carga, foto = fotoDeLaPantalla()) {
         carga = carga || (CDI.state = CDI.state || {});
-        const cliente = carga.clienteActivo || null;
+        const cliente = foto.cliente;
         if (!cliente || !cliente.id) {
             console.warn('[history] no hay cliente activo, no se guarda al historial');
             return { ok: false, reason: 'sin_cliente' };
@@ -1268,8 +1269,8 @@
     // Expongo para que el panel huérfano u otro lugar pueda forzar un reintento.
     CDI.saveOperationToHistory = saveOperationToHistory;
 
-    async function saveCatalogLearn(items) {
-        const op = (CDI.state && CDI.state.operacion) || {};
+    async function saveCatalogLearn(items, carga) {
+        const op = (carga && carga.operacion) || {};
         const vendorName = String(op.vendedor_nombre || '').trim();
         if (!vendorName || !Array.isArray(items) || !items.length) return;
 

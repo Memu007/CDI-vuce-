@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-06 · fix: una respuesta tardía no escribe en la carga que sigue y regenerar no depende del disco (COBRO-CORTE-1)
+
+- **fix(cobro):** en v2, guardar en el historial y aprender el catálogo usan el cliente y el proveedor de la carga que pidió el TXT. Lo que se pide mientras otra generación espera se genera cuando ésa vuelve, y el botón ya no queda trabado. Regenerar un archivo ya entregado guarda una copia en vez de un enlace, así funciona en discos que no admiten enlaces.
+
 ## 2026-11-06 · fix: el checkout de una organización no cancela nada si hay una suscripción autorizada (COBRO-MP-2)
 
 - **fix(cobro):** antes de abrir una suscripción nueva se mira el estado de todas las de la organización; si una está autorizada se frena sin haber cancelado las pendientes. Si una no se puede cancelar, las que sí se cancelaron dejan de figurar como abiertas.
