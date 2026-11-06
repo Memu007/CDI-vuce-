@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-06 · fix: el token de reset vuelve en la respuesta sólo en el entorno de prueba (RESET-2)
+
+- El token de reset y el nombre de usuario sólo vuelven en la respuesta (como comodidad sin SMTP) en el entorno de prueba. Antes salían siempre que `ENVIRONMENT` no fuera «production», así que un despliegue con `ENVIRONMENT` sin poner podía filtrar el token de reset en la respuesta.
+
 ## 2026-11-06 · fix: un PDF que pasa un tope propio de pypdf da «demasiado pesado» en castellano (PYPDF-1)
 
 - Con pypdf 6.21.4 (mínimo nuevo, trae arreglos de seguridad), un PDF con un árbol de hojas enorme da 400 «El PDF es demasiado pesado para abrirlo» en vez de «Invalid PDF file» con el mensaje de pypdf en inglés.

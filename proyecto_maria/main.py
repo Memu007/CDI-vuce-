@@ -105,6 +105,12 @@ _CLAVE_JWT = get_settings().jwt_secret
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "development") == "production"
 IS_TESTING = os.getenv("ENVIRONMENT") == "testing"
 
+
+def _pista_dev_habilitada(email_sent: bool) -> bool:
+    # El token de reset o el usuario vuelven en la respuesta (ayuda sin SMTP)
+    # sólo en el entorno de prueba, nunca cuando ENVIRONMENT falta.
+    return not email_sent and IS_TESTING
+
 # --- SECURITY CHECK reforzado ---
 # 1) Default dev key nunca puede usarse en prod.
 # 2) Key demasiado corta (<32) es insegura para HS256, fail en prod, warn en dev.
@@ -1762,7 +1768,7 @@ async def request_password_reset(request: PasswordResetRequest, req: Request, db
     
     response = {"message": "Si el email existe, se envió un link."}
     
-    if not email_sent and not IS_PRODUCTION:
+    if _pista_dev_habilitada(email_sent):
         # MODO DEV: Devolver token para facilitar pruebas si no hay SMTP
         print(f"🔑 [DEV] Reset Token para {user.username}: {token}")
         response["dev_token_hint"] = token
@@ -1807,7 +1813,7 @@ async def recover_username(request: RecoverUsernameRequest, req: Request, db: As
     
     response = dict(mensaje)
     
-    if not email_sent and not IS_PRODUCTION:
+    if _pista_dev_habilitada(email_sent):
         # MODO DEV: Devolver username para facilitar pruebas
         print(f"🔑 [DEV] Username para {user.email}: {user.username}")
         response["dev_username_hint"] = user.username
