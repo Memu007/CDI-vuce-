@@ -473,18 +473,9 @@ sabotaje $M "i: una fecha de aprobación sin zona pasa" \
 # B: la exportación cuenta la operación (tests/test_cobro_corte1.py).
 T=tests/test_cobro_corte1.py
 sabotaje $M "B: la exportación no cuenta la operación" \
-  $'        await _contar_maria(db, user["username"], filename, txt_content,\n                            len(request.items or []))\n\n        with open(filepath, \'w\', encoding=\'utf-8\') as f:' \
-  $'        with open(filepath, \'w\', encoding=\'utf-8\') as f:' \
+  $'        operacion_id, filename = await _contar_maria(\n            db, user["username"], request.operacion_id, _FECHA_DE_EMISION.sub(r"\\1", txt_content),\n            txt_content, len(request.items or []), f"MARIA-EXPORT_{safe_id}")' \
+  $'        operacion_id, filename = "", f"MARIA-EXPORT_{safe_id}.TXT"\n        await _escribir_y_confirmar(db, user["username"], filename, txt_content)' \
   "la exportación no cuenta la operación"
-# Vuelta 2, g: los ids de la exportación no chocan con los de la importación.
-sabotaje $M "g: la exportación usa el prefijo de la importación" \
-  '        filename = f"MARIA-EXPORT_{safe_id}.TXT"' \
-  '        filename = f"MARIA_EXPORT_{safe_id}.TXT"' \
-  "la importación reusó la operación de la exportación"
-sabotaje $M "g: un id largo de la exportación no se reconoce" \
-  '_ARCHIVO_MARIA = re.compile(r"MARIA(?:_|-EXPORT_)[A-Za-z0-9_-]{1,50}\.TXT")' \
-  '_ARCHIVO_MARIA = re.compile(r"MARIA_[A-Za-z0-9_-]{1,50}\.TXT")' \
-  "guardar la exportación de id largo cuenta otra vez"
 
 # C y E: cancelar desde past_due y reactivar una prueba con recarga.
 T=tests/test_cobro_mp1_cde.py
@@ -525,28 +516,28 @@ sabotaje $M "E: un rechazo saca la decisión de payment_provider" \
 
 # Con una suscripción abierta se cancela desde cualquier estado.
 sabotaje $M "C: una cancelada con suscripción nueva no puede cancelarla" \
-  ' and not db_user.mp_preapproval_id:' \
+  ' and not con_sid:' \
   ':' \
   "la suscripción nueva no se puede cancelar"
 sabotaje $M "C: sólo la cancelada con suscripción puede cancelarla" \
-  ' and not db_user.mp_preapproval_id:' \
-  ' and not (db_user.billing_status == "canceled" and db_user.mp_preapproval_id):' \
+  ' and not con_sid:' \
+  ' and not (entidad.billing_status == "canceled" and con_sid):' \
   "No se puede cancelar desde el estado actual: none"
 sabotaje $M "C: una cancelada sin suscripción vuelve a cancelar" \
-  ' and not db_user.mp_preapproval_id:' \
-  ' and not (db_user.mp_preapproval_id or db_user.billing_status == "canceled"):' \
+  ' and not con_sid:' \
+  ' and not (con_sid or entidad.billing_status == "canceled"):' \
   "assert 200 == 409"
 sabotaje $M "C: /billing/me nunca dice que hay suscripción abierta" \
-  '        "suscripcion_abierta": bool(db_user.mp_preapproval_id),' \
+  '        "suscripcion_abierta": hay_sid,' \
   '        "suscripcion_abierta": False,' \
   "cancelada_con_checkout"
 sabotaje $M "C: /billing/me dice abierta a cualquier cancelada" \
-  '        "suscripcion_abierta": bool(db_user.mp_preapproval_id),' \
-  '        "suscripcion_abierta": db_user.billing_status == "canceled" or bool(db_user.mp_preapproval_id),' \
+  '        "suscripcion_abierta": hay_sid,' \
+  '        "suscripcion_abierta": billing_entity.billing_status == "canceled" or hay_sid,' \
   "cancelada_sin"
 sabotaje $M "C: /billing/me dice abierta sólo a la cancelada" \
-  '        "suscripcion_abierta": bool(db_user.mp_preapproval_id),' \
-  '        "suscripcion_abierta": db_user.billing_status == "canceled" and bool(db_user.mp_preapproval_id),' \
+  '        "suscripcion_abierta": hay_sid,' \
+  '        "suscripcion_abierta": billing_entity.billing_status == "canceled" and hay_sid,' \
   "sin_plan_con"
 sabotaje $M "C: /billing/me nunca dice que cancelar corta el acceso" \
   '        "cancelar_corta_acceso": billing_service.cancelar_corta_acceso(billing_entity),' \
@@ -584,8 +575,8 @@ sabotaje $M "D13: sin cuenta vigente, el 409 dice que se renueva sola" \
 # La salida que nombra el 409 tiene que existir en cada estado: la cuenta
 # con la autorizada guardada puede cancelarla.
 sabotaje $M "D13: la cancelada no puede cancelar la autorizada que la frena" \
-  ' and not db_user.mp_preapproval_id:' \
-  ' and not (db_user.mp_preapproval_id and db_user.billing_status != "canceled"):' \
+  ' and not con_sid:' \
+  ' and not (con_sid and entidad.billing_status != "canceled"):' \
   "FAILED $T::test_sin_cuenta_vigente_una_autorizada_frena_el_checkout_y_sale_cancelando[cancelada_vieja]"
 
 # j: Mercado Pago no conoce la suscripción guardada.
@@ -608,10 +599,10 @@ else
   sabotaje $M "D: el checkout no bloquea la cuenta" \
     $'.order_by(User.username)\n        .with_for_update()' \
     '.order_by(User.username)' \
-    "FALLA | sin suscripción anterior: queda una sola suscripción viva en Mercado Pago"
+    "FALLA | sin suscripción anterior: los dos pedidos se cruzaron"
   sabotaje $M "D: cancelar no espera al checkout en curso" \
-    '    db_user, org, con_sid = await _cuenta_con_suscripciones(db, user["username"])' \
-    '    db_user = (await db.execute(select(User).where(User.username == user["username"]))).scalars().first(); org = None; con_sid = [db_user] if db_user.mp_preapproval_id else []' \
+    $'    db_user, org, con_sid = await _cuenta_con_suscripciones(db, user["username"])\n    entidad = org or db_user' \
+    $'    db_user = (await db.execute(select(User).where(User.username == user["username"]))).scalars().first(); org = None; con_sid = [db_user] if db_user.mp_preapproval_id else []\n    entidad = org or db_user' \
     "FALLA | cancelar durante un checkout: no queda ninguna suscripción viva en Mercado Pago"
 fi
 T=scripts/testing/cobro_mp1_postgres.py
@@ -782,8 +773,8 @@ if ! correr >/dev/null; then
 else
   echo "BASE  | la pantalla Listo, en verde"
   sabotaje $F2 "g: Listo guarda la operación sin el archivo del MARIA" \
-    "            saveOperationToHistory(items, data).catch(err => {" \
-    "            saveOperationToHistory(items, {}).catch(err => {" \
+    "            saveOperationToHistory(items, data, carga, foto).catch(err => {" \
+    "            saveOperationToHistory(items, {}, carga, foto).catch(err => {" \
     "FALLA: import: la pantalla hizo"
 fi
 
