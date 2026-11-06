@@ -211,4 +211,4 @@ PY=$(which python) PG_DSN=postgresql://<u>@127.0.0.1:<puerto>/<base> scripts/tes
 python docs/pm/herramientas/chequeo-6.py fb75e41 2e62761
 ```
 
-/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP, aviso a la PM session_01B7FVQspcEHF7PqNv797WNM. SESION-1 v2 entregada en 2e62761 (informe en el commit siguiente); D73, D74 y D75 nuevas; D69 (a) y D71 (b) ya decididas; sigo con CATALOGO-LARGO-2, cuyas D empiezan en D76. Nada se publica sin el «dale» de Emi para el SHA, nunca main, sin secretos ni datos reales.
+/compact conservar: Dev MARIA (Dev 2), sesión session_01C8gCBjvn36wnYC6qG2Sixi, rama claude/dev-maria, rutina trig_01WmrC3ALqBXkD9UBv6dFGbP, aviso a la PM session_01B7FVQspcEHF7PqNv797wNM. SESION-1 v2 entregada en 2e62761 (informe en el commit siguiente); D73, D74 y D75 nuevas; D69 (a) y D71 (b) ya decididas; sigo con CATALOGO-LARGO-2, cuyas D empiezan en D76. Nada se publica sin el «dale» de Emi para el SHA, nunca main, sin secretos ni datos reales.
