@@ -2096,7 +2096,7 @@ async def cancel_billing(
     entidad = org or db_user
     # Cancelar el plan de un estudio lo corta para todos sus miembros.
     sin_permiso = HTTPException(status_code=403, detail="Sólo quien administra el estudio o quien abrió "
-                                                        "la suscripción puede cancelar el plan.")
+                                                        "la suscripción que lo paga puede cancelar el plan.")
     miembro = org and db_user.username != org.owner_username
     if miembro and db_user not in con_sid:
         raise sin_permiso
@@ -10444,7 +10444,7 @@ def _pedir_suscripcion_mp(metodo: str, sid: str, cuerpo: dict | None = None) -> 
         estado = resp.json().get("status")
     except (ValueError, AttributeError) as e:
         raise _SuscripcionMPError(f"{metodo} {sid}: respuesta ilegible") from e
-    if estado not in _ESTADOS_SUSCRIPCION_MP:
+    if not isinstance(estado, str) or estado not in _ESTADOS_SUSCRIPCION_MP:
         raise _SuscripcionMPError(f"{metodo} {sid}: estado desconocido {str(estado)[:40]!r}")
     return estado
 
