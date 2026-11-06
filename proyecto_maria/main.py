@@ -10988,10 +10988,9 @@ async def billing_checkout(
     for cuenta in set(con_sid) - set(vivas):
         cuenta.mp_preapproval_id = None
     try:
-        for i, cuenta in enumerate(vivas):
-            if i:
-                # Mientras se cancelaba la anterior, ésta pudo autorizarse.
-                await _estado_suscripcion_vieja(db, db_user, cuenta)
+        for cuenta in vivas:
+            # Mientras se leían o cancelaban las otras, ésta pudo autorizarse.
+            await _estado_suscripcion_vieja(db, db_user, cuenta)
             try:
                 await run_in_threadpool(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id)
             except _SuscripcionMPError as e:
