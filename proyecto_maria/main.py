@@ -95,7 +95,6 @@ from proyecto_maria.auth.dependencies import (
     datos_del_token,
     sesion_de_la_request,
     revocar_sesion_de_la_request,
-    revocar_sesiones,
     firmar_token,
 )
 from proyecto_maria.auth.roles import roles_de
@@ -1795,16 +1794,11 @@ async def reset_password(request: Request, data: PasswordResetConfirm, db: Async
     if not re.search(r'[\d\W_]', data.new_password):
         raise HTTPException(status_code=400, detail="La contraseña debe incluir al menos un número o símbolo")
 
-    # 4. Actualizar contraseña
-    user.password = hash_password(data.new_password)
-    # Invalidar todos los tokens anteriores (NULL los aceptaría a todos)
-    revocar_sesiones(user)
-
-    # 5. Marcar token como usado
-    reset_token.is_used = True
-    
-    await db.commit()
-    
+    # 4. Actualizar contraseña y revocar todas las sesiones (nunca NULL: aceptaría a todas)
+    if not await guardar_si_la_clave_sigue(db, user.username, user.password, consumir=data.token,
+                                           password=hash_password(data.new_password),
+                                           active_jti=uuid.uuid4().hex):
+        raise HTTPException(status_code=400, detail="Token inválido o expirado")
     return {"message": "Contraseña actualizada exitosamente"}
 
 # --- METRICS & LOGGING ---
@@ -1933,11 +1927,21 @@ def set_csrf_cookie(response: Response) -> None:
 CLAVE_CAMBIADA_EN_EL_MEDIO = "La contraseña cambió mientras se guardaba. Volvé a ingresar y probá de nuevo."
 
 
-async def guardar_si_la_clave_sigue(db: AsyncSession, username: str, hash_validado: str, **valores) -> bool:
+async def guardar_si_la_clave_sigue(db: AsyncSession, username: str, hash_validado: str,
+                                    consumir: str | None = None, **valores) -> bool:
     """Guarda `valores` y lo pendiente del pedido sólo si la clave sigue siendo
-    la validada; si no, deshace todo: un cambio de clave en el medio gana."""
+    la validada y, con `consumir`, si ese link de reset sigue sin usar; si no,
+    deshace todo: un cambio de clave en el medio gana. Cambiar la clave o el
+    email deja sin uso los links de reset pedidos antes."""
     hecho = await db.execute(sa_update(User).where(
         User.username == username, User.password == hash_validado).values(**valores))
+    links = sa_update(PasswordResetToken).where(
+        PasswordResetToken.user_username == username, PasswordResetToken.is_used == False  # noqa: E712
+    ).values(is_used=True)
+    if hecho.rowcount == 1 and consumir is not None:
+        hecho = await db.execute(links.where(PasswordResetToken.token == consumir))
+    if hecho.rowcount == 1 and valores.keys() & {"password", "email"}:
+        await db.execute(links)
     if hecho.rowcount != 1:
         await db.rollback()
         return False

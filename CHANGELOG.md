@@ -6,6 +6,11 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-06 · fix: un link para restablecer la contraseña sirve una sola vez (RESET-1)
+
+- Cambiar la clave o el email, o restablecerla con otro link, deja sin uso los links pedidos antes.
+- El mismo link usado dos veces a la vez cambia la clave una sola vez; si la clave o el email cambian en el medio, el link da 400 «Token inválido o expirado».
+
 ## 2026-11-06 · fix: el origen se recuerda entero y proveedor u origen demasiado largos dan 400 (CATALOGO-LARGO-2)
 
 - La memoria del cliente guarda el origen entero («TAIWAN», «JAPON»): antes guardaba las tres primeras letras, y el TXT sugerido salía con otro país. El arranque amplía la columna en Postgres.
