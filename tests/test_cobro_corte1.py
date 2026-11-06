@@ -898,7 +898,10 @@ def test_regenerar_funciona_en_un_disco_sin_enlaces(cuenta, monkeypatch):
     r = _generar(c)
     assert r.status_code == 200, r.text
     oid, archivo = _oid(r), r.json()["filename"]
+    ruta = os.path.join(main._user_downloads_dir(u), archivo)
+    entregado = open(ruta, "rb").read()
     monkeypatch.setattr(main.os, "link", _enlace_que_falla)
     codigos = [_generar(c, flete=200.0 + i, operacion_id=oid).status_code for i in range(3)]
     assert codigos == [200, 200, 200]
+    assert open(ruta, "rb").read() != entregado, "el archivo no tiene lo regenerado"
     assert _archivos(u) == [archivo] and _leer(u)["ops"] == 1

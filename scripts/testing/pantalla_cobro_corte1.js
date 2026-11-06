@@ -5,7 +5,8 @@
 // completa. Un 402 dice su razón en el modal y en el error de la generación;
 // los 402 se fuerzan con page.route: las pruebas del servidor cubren cuándo salen.
 // Una respuesta tardía guarda, aprende y anota con la carga que la pidió, y lo
-// pedido mientras otra espera se genera cuando ésa vuelve.
+// pedido mientras otra espera se genera cuando ésa vuelve. Un doble clic en
+// «Reintentar» genera y guarda una vez.
 // Sale con error si algo no se cumple.
 // uso: BASE_URL=http://127.0.0.1:<puerto> node scripts/testing/pantalla_cobro_corte1.js
 const { chromium } = require('playwright');
@@ -50,10 +51,10 @@ function casosTardios({ page, v1, clienteId, cargar, pedirTxt }) {
     otraCarga: () => v1.evaluate(() => cancelGrouping()),
     terminada: () => v1.generada,
     anotada: () => v1.evaluate(() => operacionIdActual) };
-  async function pedirV2(proveedor) {
+  async function pedirV2(proveedor, cliente = clienteId) {
     await cargaNuevaV2();
-    await page.evaluate(([id, prov]) => { CDI.setClienteActivo({ id, nombre: 'Cliente de prueba' });
-      if (prov) CDI.state.operacion.vendedor_nombre = prov; }, [clienteId, proveedor || '']);
+    await page.evaluate(([id, prov]) => { CDI.setClienteActivo(id ? { id, nombre: 'Cliente de prueba' } : null);
+      if (prov) CDI.state.operacion.vendedor_nombre = prov; }, [cliente, proveedor || '']);
     await pedirTxt();
   }
   const guardadoEn = (p, id) => () => p.waitForRequest(r => r.method() === 'POST' &&
@@ -78,10 +79,12 @@ function casosTardios({ page, v1, clienteId, cargar, pedirTxt }) {
       },
       anotada: () => page.evaluate(() => CDI.state.operacionId) },
     // La misma carga cambia de cliente mientras espera: se guarda en el que tenía al pedir, como en v1.
-    { que: 'v2, generar y cambiar de cliente', p: page, retenida: '**/generate_maria', pedir: pedirV2,
-      otraCarga: () => page.evaluate(() => CDI.setClienteActivo(null)),
+    // Si al pedir no tenía, se guarda en el que se le eligió mientras esperaba.
+    ...[['cambiar de cliente', clienteId, null], ['elegir el cliente', null, clienteId]].map(([como, alPedir, despues]) => ({
+      que: 'v2, generar y ' + como, p: page, retenida: '**/generate_maria', pedir: () => pedirV2('', alPedir),
+      otraCarga: () => page.evaluate(id => CDI.setClienteActivo(id ? { id, nombre: 'Cliente de prueba' } : null), despues),
       guardado: guardadoEn(page, clienteId), espera: VIEJA,
-      anotada: () => page.evaluate(() => CDI.state.operacionId) },
+      anotada: () => page.evaluate(() => CDI.state.operacionId) })),
     { que: 'v2, guardar', p: page, retenida: '**/api/clientes/*/operaciones',
       pedir: async () => { await cargaNuevaV2();
         await page.evaluate(id => {
@@ -301,6 +304,31 @@ async function respuestaTardia({ ctx, page, base, token, clienteId, cargar, pedi
   if (g4.mandada !== guardada.operacionId) falla(que + ': generar mandó «' + g4.mandada + '», no la guardada «' + guardada.operacionId + '»');
   if (await usadas() - antes !== 1) falla(que + ': guardar y generar contaron ' + (await usadas() - antes));
   console.log('OK | ' + que + ': generar completa la guardada y cuenta 1');
+
+  // 5. Un doble clic en «Reintentar» genera y guarda una vez.
+  await page.evaluate(() => CDI.goTo('upload'));
+  await page.click('#uploadManualBtn');
+  await cargar(null);
+  await page.evaluate(id => CDI.setClienteActivo({ id, nombre: 'Cliente de prueba' }), guardada.clienteId);
+  await page.route('**/generate_maria', route => route.fulfill({ status: 500, contentType: 'application/json',
+    body: JSON.stringify({ detail: 'Falla inventada de la generación' }) }));
+  await pedirTxt();
+  const reintentar = page.locator('[data-action="retry-generate"]');
+  await reintentar.waitFor({ state: 'visible', timeout: 15000 }).catch(() => falla('reintentar: no sale el error'));
+  await page.unroute('**/generate_maria');
+  const pedidos = [];
+  const anotar = r => { if (r.method() === 'POST' && (r.url().endsWith('/generate_maria') ||
+    /\/api\/clientes\/[^/]+\/operaciones$/.test(r.url()))) pedidos.push(r.url().endsWith('/generate_maria') ? 'generar' : 'guardar'); };
+  page.on('request', anotar);
+  // Una segunda generación sale en la misma vuelta que el guardado de la primera, antes de su respuesta.
+  const guardado = page.waitForResponse(r => /\/api\/clientes\/[^/]+\/operaciones$/.test(r.url()) && r.request().method() === 'POST', { timeout: 15000 });
+  await reintentar.dblclick();
+  await page.waitForFunction(() => !document.getElementById('readyDone').hidden, null, { timeout: 15000 })
+    .catch(() => falla('reintentar: no terminó'));
+  await guardado.catch(() => falla('reintentar: no guardó'));
+  page.off('request', anotar);
+  if (pedidos.join(',') !== 'generar,guardar') falla('reintentar con doble clic pidió ' + pedidos.join(', '));
+  console.log('OK | reintentar con doble clic: genera y guarda una vez');
 
   await respuestaTardia({ ctx, page, base, token: (await reg.json()).access_token, clienteId: guardada.clienteId, cargar, pedirTxt });
 

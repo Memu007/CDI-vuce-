@@ -276,6 +276,9 @@ sabotaje $M "un commit fallido deja el archivo nuevo" \
 sabotaje $M "el respaldo es un enlace y no una copia" \
   "FAILED $T::test_regenerar_funciona_en_un_disco_sin_enlaces" \
   '            shutil.copyfile(ruta, respaldo)' '            os.link(ruta, respaldo)'
+sabotaje $M "regenerar deja el archivo ya entregado" \
+  "AssertionError: el archivo no tiene lo regenerado" \
+  $'        os.replace(temporal, ruta)\n        await db.commit()' $'        if nuevo: os.replace(temporal, ruta)\n        await db.commit()'
 sabotaje $M "se deshace la base antes de devolver el archivo" \
   "FAILED $T::test_regenerar_con_una_falla_deja_entero_lo_ya_entregado[al_confirmar_y_deshacer]" \
   $'        # Los archivos antes que el rollback: si éste también falla, lo entregado ya volvió.\n' $'        await db.rollback()\n' \
@@ -367,7 +370,14 @@ sabotaje $F "v2: la respuesta tardía marca lista la carga nueva" \
   "            if (carga === CDI.state) mostrarListo(data);" "            mostrarListo(data);"
 sabotaje $F "v2: el guardado toma el cliente de la pantalla" \
   "FALLA: v2, generar: la respuesta tardía no se guardó en el cliente de su carga" \
-  "        const cliente = foto.cliente;" "        const cliente = (CDI.state && CDI.state.clienteActivo) || null;"
+  "        const cliente = foto.cliente || carga.clienteActivo || null;" "        const cliente = (CDI.state && CDI.state.clienteActivo) || null;"
+sabotaje $F "v2: sin cliente al pedir, el guardado no toma el que se le eligió a la carga" \
+  "FALLA: v2, generar y elegir el cliente" \
+  "        const cliente = foto.cliente || carga.clienteActivo || null;" "        const cliente = foto.cliente;"
+sabotaje $F "v2: un doble clic en Reintentar pide dos generaciones" \
+  "FALLA: reintentar con doble clic pidió" \
+  $'            // Oculta el error, y con él el botón: un segundo clic no pide otra generación.\n            onEnterReady();' \
+  "            generateMaria();"
 sabotaje $F "v2: el catálogo aprende en el proveedor de la pantalla" \
   "no en el de su proveedor" \
   "        const op = (carga && carga.operacion) || {};" "        const op = (CDI.state && CDI.state.operacion) || {};"
