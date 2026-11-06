@@ -28,6 +28,7 @@ from sqlalchemy.future import select
 
 from proyecto_maria.database.connection import get_async_session
 from proyecto_maria.database.models import User
+from tests.mp_firma import aviso_firmado
 from tests.test_prelaunch_block2 import _get_user, _register, _set_user, _unique, client  # noqa: F401
 
 SUS: dict = {}        # id de la suscripción → estado en Mercado Pago
@@ -329,9 +330,9 @@ def _pago(pid: str, referencia: str, monto: float = 45000.0) -> str:
     return pid
 
 
-def _aviso_ipn(client, pid: str):
+def _aviso_pago(client, pid: str):
     client.cookies.clear()
-    return client.post(f"/api/payments/webhook?topic=payment&id={pid}")
+    return client.post("/api/payments/webhook", **aviso_firmado("payment", pid, "secreto-de-prueba"))
 
 
 @pytest.mark.parametrize("estado, proveedor", [
@@ -343,7 +344,7 @@ def test_un_pago_suma_desde_el_fin_del_periodo(client, estado, proveedor):
     fin = datetime.now(timezone.utc) + timedelta(days=10)
     _set_user(usuario, billing_status=estado, trial_ends_at=fin, payment_provider=proveedor)
     pid = _pago(f"pp-{usuario}", f"{usuario}:premium")
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     despues = _get_user(usuario)
     assert despues["billing_status"] == "active", despues
     assert _cerca(_fin(despues), fin + timedelta(days=30)), (_fin(despues), fin)

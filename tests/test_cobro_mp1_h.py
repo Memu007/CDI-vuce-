@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 
 from tests.test_cobro_mp1 import (  # noqa: F401
-    COBROS, PAGOS, SUSCRIPCIONES, _aviso_cobro, _aviso_ipn, _cobros, _fin, _leer_org, _leer_pago, _mp, _org,
+    COBROS, PAGOS, SUSCRIPCIONES, _aviso_cobro, _aviso_pago, _cobros, _fin, _leer_org, _leer_pago, _mp, _org,
     _renovacion, _sin_suscripciones,
 )
 from tests.test_prelaunch_block2 import _get_user, _register, _set_user, _unique, client  # noqa: F401
@@ -68,7 +68,7 @@ def test_los_dos_avisos_de_una_renovacion_la_acreditan_una_vez(client, tipo, ord
     """Cada aviso que Mercado Pago reintenta (503) llega otra vez al final."""
     usuario, referencia, leer = _cuenta_vencida(client, tipo)
     cobro, pid = _renovacion_de(usuario, referencia, pago_dice, cobro_dice)
-    avisos = [lambda: _aviso_ipn(client, pid), lambda: _aviso_cobro(client, cobro)]
+    avisos = [lambda: _aviso_pago(client, pid), lambda: _aviso_cobro(client, cobro)]
     if orden == "cobro_primero":
         avisos.reverse()
     primero = avisos[0]()
@@ -92,7 +92,7 @@ def test_si_ningun_aviso_dice_de_quien_es_no_queda_rechazado(client, tipo):
     cuando el cobro lo dice se acredita."""
     usuario, referencia, leer = _cuenta_vencida(client, tipo)
     cobro, pid = _renovacion_de(usuario, referencia, "nada", "nada")
-    for r in (_aviso_cobro(client, cobro), _aviso_ipn(client, pid)):
+    for r in (_aviso_cobro(client, cobro), _aviso_pago(client, pid)):
         assert r.status_code == 503, r.text[:300]
     assert _leer_pago(pid) == {}
     assert leer()["billing_status"] == "past_due"
@@ -115,7 +115,7 @@ def test_un_cobro_con_el_pago_pendiente_no_se_pierde(client, tipo, pago_dice, pe
     assert r.status_code == 503, r.text[:300]
     assert _leer_pago(pid) == {}
     PAGOS[pid]["status"] = "approved"
-    r = _aviso_ipn(client, pid)
+    r = _aviso_pago(client, pid)
     assert r.status_code == (200 if pago_dice == "metadata" else 503), r.text[:300]
     r = _aviso_cobro(client, cobro)
     assert r.status_code == 200, r.text[:300]
@@ -128,7 +128,7 @@ def test_un_pago_sin_cuenta_que_otro_aviso_ya_aplico_no_reintenta_mas(client):
     usuario, referencia, leer = _cuenta_vencida(client, "usuario")
     cobro, pid = _renovacion_de(usuario, referencia, "nada", "suscripcion")
     assert _aviso_cobro(client, cobro).status_code == 200
-    r = _aviso_ipn(client, pid)
+    r = _aviso_pago(client, pid)
     assert r.status_code == 200 and r.json().get("skipped") == "payment_id ya procesado", r.text[:300]
     _acreditada_una_vez(leer, pid)
 
@@ -140,7 +140,7 @@ def test_sin_referencia_ni_en_el_pago_ni_en_la_suscripcion_reintenta(client, avi
     usuario, _, leer = _cuenta_vencida(client, "usuario")
     cobro, pid = _renovacion_de(usuario, referencia, "metadata", "suscripcion")
     PAGOS[pid]["external_reference"] = referencia
-    r = _aviso_ipn(client, pid) if aviso == "pago" else _aviso_cobro(client, cobro)
+    r = _aviso_pago(client, pid) if aviso == "pago" else _aviso_cobro(client, cobro)
     assert r.status_code == 503, r.text[:300]
     assert _leer_pago(pid) == {}
     assert leer()["billing_status"] == "past_due"
@@ -152,6 +152,6 @@ def test_una_referencia_vacia_de_otro_tipo_toma_la_de_la_suscripcion(client, avi
     usuario, buena, leer = _cuenta_vencida(client, "usuario")
     cobro, pid = _renovacion_de(usuario, buena, "metadata", "suscripcion")
     PAGOS[pid]["external_reference"] = referencia
-    r = _aviso_ipn(client, pid) if aviso == "pago" else _aviso_cobro(client, cobro)
+    r = _aviso_pago(client, pid) if aviso == "pago" else _aviso_cobro(client, cobro)
     assert r.status_code == 200 and r.json().get("skipped") is None, r.text[:300]
     _acreditada_una_vez(leer, pid)

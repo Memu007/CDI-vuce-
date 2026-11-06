@@ -22,7 +22,7 @@ import pytest
 from proyecto_maria.services import billing_service
 from tests.test_cobro_mp1 import _org
 from tests.test_cobro_mp2 import (  # noqa: F401
-    CREADAS, PAGOS, PEDIDOS, SUS, _aviso_ipn, _cerca, _fin, _leer, _mp, _pago, _suscripto,
+    CREADAS, PAGOS, PEDIDOS, SUS, _aviso_pago, _cerca, _fin, _leer, _mp, _pago, _suscripto,
 )
 from tests.test_prelaunch_block2 import _get_user, _register, _set_user, _unique, client  # noqa: F401
 
@@ -81,14 +81,14 @@ def test_si_mp_no_cancela_past_due_queda_como_estaba(client):
 # --- E: reactivar una prueba que hizo una recarga ---
 
 def _entrar(client, usuario: str) -> None:
-    # el aviso de Mercado Pago llega sin sesión: _aviso_ipn borra las cookies
+    # el aviso de Mercado Pago llega sin sesión: _aviso_pago borra las cookies
     r = client.post("/auth/login", json={"username": usuario, "password": "SecureP@ss1"})
     assert r.status_code == 200, r.text
 
 
 def _recargar(client, usuario: str) -> None:
     pid = _pago(f"rec-{usuario}", f"{usuario}:topup", monto=float(billing_service.TOPUP_PRICE_ARS))
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     assert _get_user(usuario)["extra_ops_remaining"], "la recarga no se aplicó"
 
 
@@ -115,7 +115,7 @@ def test_un_plan_pagado_con_recarga_sigue_yendo_al_checkout(client):
     usuario = _unique("cde_plan_rec")
     _register(client, usuario)
     plan = _pago(f"plan-{usuario}", f"{usuario}:premium")
-    assert _aviso_ipn(client, plan).status_code == 200
+    assert _aviso_pago(client, plan).status_code == 200
     assert _get_user(usuario)["billing_status"] == "active"
     _recargar(client, usuario)
     _entrar(client, usuario)
@@ -141,7 +141,7 @@ def test_una_cuenta_vieja_pagada_con_un_pago_rechazado_sigue_yendo_al_checkout(c
     usuario, _ = _suscripto(client, "cde_vieja_rech")
     viejo = _pago(f"viejo-{usuario}", f"{usuario}:premium")
     PAGOS[viejo]["date_approved"] = "2020-03-01T10:00:00.000-03:00"
-    assert _aviso_ipn(client, viejo).status_code == 200
+    assert _aviso_pago(client, viejo).status_code == 200
     _entrar(client, usuario)
     assert client.post("/api/billing/cancel").status_code == 200
     cuerpo = client.post("/api/billing/reactivate").json()
@@ -154,7 +154,7 @@ def test_una_prueba_con_un_pago_de_plan_rechazado_vuelve_a_la_prueba(client):
     usuario = _unique("cde_prueba_rech")
     _register(client, usuario)
     pid = _pago(f"rech-{usuario}", f"{usuario}:premium", monto=1.0)
-    assert _aviso_ipn(client, pid).status_code == 200
+    assert _aviso_pago(client, pid).status_code == 200
     assert _get_user(usuario)["billing_status"] == "trial", "el pago de 1 peso se aplicó"
     _entrar(client, usuario)
     assert client.post("/api/billing/cancel").status_code == 200

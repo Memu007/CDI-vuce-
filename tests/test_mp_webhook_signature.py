@@ -64,8 +64,8 @@ def test_signature_no_secret_in_prod_rejects(monkeypatch):
     assert m._verify_mp_webhook_signature(req, body) is False
 
 
-def test_signature_no_secret_in_dev_allows(monkeypatch):
-    """En dev sin secret → True (para no frenar tests locales)."""
+def test_signature_no_secret_in_dev_rejects(monkeypatch):
+    """Sin secret, también en dev → False: un aviso que no se puede verificar no se acepta."""
     from proyecto_maria import main as m
     m.MP_WEBHOOK_SECRET = ""
     monkeypatch.setattr(m, "IS_PRODUCTION", False)
@@ -73,4 +73,4 @@ def test_signature_no_secret_in_dev_allows(monkeypatch):
     req = MagicMock()
     req.headers = {}
     body = b''
-    assert m._verify_mp_webhook_signature(req, body) is True
+    assert m._verify_mp_webhook_signature(req, body) is False

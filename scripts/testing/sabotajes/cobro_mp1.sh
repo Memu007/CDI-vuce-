@@ -186,10 +186,6 @@ sin_rojo $M "sin mirar antes de insertar" \
   $'    if False:\n        return None'
 
 # ── Paso 4: renovaciones de una suscripción ──
-sabotaje $M "el aviso IPN de una renovación se ignora" \
-  '            if topic in ("payment", "subscription_authorized_payment"):' \
-  '            if topic in ("payment",):' \
-  "FAILED $T1::test_una_renovacion_extiende_el_periodo_una_sola_vez[ipn]"
 sabotaje $M "vuelve a decidir el estado que copia el cobro" \
   '    return pago_id, _id_mp(cobro.get("preapproval_id"))' \
   $'    if cobro.get("status") != "approved":\n        raise _MPIlegible("cobro no aprobado")\n    return pago_id, _id_mp(cobro.get("preapproval_id"))' \
@@ -229,7 +225,7 @@ sabotaje $M "un id booleano pasa" \
 sabotaje $M "la renovación no toma la referencia de la suscripción" \
   '        pay_resp = {**pay_resp, "external_reference": sus.get("external_reference")}' \
   '        pass' \
-  "FAILED $T1::test_una_renovacion_extiende_el_periodo_una_sola_vez[ipn]"
+  "FAILED $T1::test_una_renovacion_extiende_el_periodo_una_sola_vez"
 sabotaje $M "la suscripción ilegible de una renovación no reintenta" \
   '_consultar_mp(lambda: sdk.preapproval().get(suscripcion), f"suscripción {suscripcion}")' \
   '(sdk.preapproval().get(suscripcion).get("response") or {})' \

@@ -52,6 +52,7 @@ from sqlalchemy.ext.asyncio import AsyncSession  # noqa: E402
 
 import proyecto_maria.main as main_mod  # noqa: E402
 from proyecto_maria.core.rate_limit import limiter  # noqa: E402
+from tests.mp_firma import aviso_firmado  # noqa: E402
 
 PAGOS = {}
 
@@ -145,15 +146,15 @@ async def _get_con_carrera(self, entidad, *args, **kwargs):
 AsyncSession.get = _get_con_carrera
 
 
-def ipn(pid):
-    return f"/api/payments/webhook?topic=payment&id={pid}"
+def avisar(c, pid):
+    return c.post("/api/payments/webhook", **aviso_firmado("payment", pid, "secreto-de-prueba"))
 
 
 def a_la_vez(c, *pids):
     LLEGADAS.clear()
     VISTO.clear()
     with ThreadPoolExecutor(len(pids)) as hilos:
-        return list(hilos.map(lambda pid: c.post(ipn(pid)), pids))
+        return list(hilos.map(lambda pid: avisar(c, pid), pids))
 
 
 def se_cruzaron(que):
@@ -177,7 +178,7 @@ with TestClient(main_mod.app) as c:
 
     a = pago(f"pa-{usuario}", f"{usuario}:topup", recarga)
     antes = extra(usuario)
-    r1, r2 = c.post(ipn(a)), c.post(ipn(a))
+    r1, r2 = avisar(c, a), avisar(c, a)
     chequear(r1.json().get("skipped") is None and r2.json().get("skipped") == "payment_id ya procesado"
              and extra(usuario) == antes + 10, f"un pago se aplica una vez ({r1.text[:80]} / {r2.text[:80]})")
 
@@ -230,7 +231,7 @@ with TestClient(main_mod.app) as c:
 
     m = pago(f"pm-{usuario}", f"{usuario}:topup", recarga / 2)
     antes = extra(usuario)
-    r = c.post(ipn(m))
+    r = avisar(c, m)
     fila = sql("select estado, monto_esperado, motivo from mp_pagos_aplicados where payment_id=%s", m)
     chequear(r.status_code == 200 and extra(usuario) == antes and fila and fila[0][0] == "rechazado",
              f"un pago que no alcanza queda rechazado y no suma ({r.status_code}, {fila})")
@@ -259,7 +260,7 @@ with TestClient(main_mod.app) as c:
         sql("update users set extra_ops_remaining = 0 where username = %s returning 1", usuario)
         pid = pago(f"px{len(PAGOS)}-{uuid.uuid4().hex[:8]}", f"{usuario}:topup", recarga)
         PAGOS[pid].update(cambio)
-        r = c.post(ipn(pid))
+        r = avisar(c, pid)
         fila = sql("select estado from mp_pagos_aplicados where payment_id=%s", pid)
         chequear(r.status_code == 200 and fila == [(estado,)],
                  f"un pago con {nombre} queda {estado} ({r.status_code}, {fila})")
