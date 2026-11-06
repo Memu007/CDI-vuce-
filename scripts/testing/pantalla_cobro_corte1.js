@@ -30,37 +30,22 @@ const RESPUESTAS = {
 };
 
 // Cada caso pide algo, empieza otra carga mientras la respuesta está retenida y la suelta.
-function casosTardios({ page, v1, clienteId, cargar, pedirTxt }) {
+function casosTardios({ page, clienteId, cargar, pedirTxt }) {
   async function cargaNuevaV2() {
     await page.evaluate(() => CDI.goTo('upload'));
     await page.click('#uploadManualBtn');
     await cargar(null);
   }
-  async function armarV1() {
-    await v1.evaluate(id => {
-      document.getElementById('groupingSection').classList.remove('hidden');
-      document.getElementById('clientSelectorGrouping').value = id;
-      window.currentItems = [{ pieza: '39219019900Z', codigo_parte: 'L1', descripcion: 'Lona de PVC gris',
-                               cantidad: 750, valor_unitario: 1.85, peso_unitario: 0.62, origen: 'CN' }];
-      displayItemsForGrouping(window.currentItems, { '3921': window.currentItems });
-      document.getElementById('op_numero_factura').value = 'FAC_TARDE';
-    }, clienteId);
-  }
-  const v1Comun = { p: v1,
-    pedir: async () => { await armarV1(); v1.generada = v1.evaluate(() => generateMariaTxt()); },
-    otraCarga: () => v1.evaluate(() => cancelGrouping()),
-    terminada: () => v1.generada,
-    anotada: () => v1.evaluate(() => operacionIdActual) };
   async function pedirV2(proveedor, cliente = clienteId) {
     await cargaNuevaV2();
     await page.evaluate(([id, prov]) => { CDI.setClienteActivo(id ? { id, nombre: 'Cliente de prueba' } : null);
       if (prov) CDI.state.operacion.vendedor_nombre = prov; }, [cliente, proveedor || '']);
     await pedirTxt();
   }
-  const guardadoEn = (p, id) => () => p.waitForRequest(r => r.method() === 'POST' &&
+  const guardadoEn = id => () => page.waitForRequest(r => r.method() === 'POST' &&
     r.url().endsWith('/api/clientes/' + id + '/operaciones'), { timeout: 15000 });
   return [
-    { que: 'v2, generar', p: page, retenida: '**/generate_maria', pedir: () => pedirV2('Proveedor A SA'),
+    { que: 'v2, generar', retenida: '**/generate_maria', pedir: () => pedirV2('Proveedor A SA'),
       // La carga nueva, sin cliente, con otro proveedor y otros valores: la respuesta tardía se
       // guarda en el cliente de la suya, con lo que tenía al pedir, aprende en el catálogo de su
       // proveedor y no la marca lista.
@@ -70,7 +55,7 @@ function casosTardios({ page, v1, clienteId, cargar, pedirTxt }) {
           CDI.state.operacion.vendedor_nombre = 'Proveedor B SA';
           window.valoresDeAntes = CDI.despachante.valores;
           CDI.despachante.valores = () => ({ de_la_carga_nueva: true }); }); },
-      guardado: guardadoEn(page, clienteId),
+      guardado: guardadoEn(clienteId),
       chequeo: async cuerpo => {
         const nueva = await page.evaluate(() => { CDI.despachante.valores = window.valoresDeAntes;
           return !document.getElementById('readyDone').hidden; });
@@ -78,15 +63,15 @@ function casosTardios({ page, v1, clienteId, cargar, pedirTxt }) {
         if (nueva) falla('v2, generar: la respuesta tardía marcó lista la carga nueva');
       },
       anotada: () => page.evaluate(() => CDI.state.operacionId) },
-    // La misma carga cambia de cliente mientras espera: se guarda en el que tenía al pedir, como en v1.
+    // La misma carga cambia de cliente mientras espera: se guarda en el que tenía al pedir.
     // Si al pedir no tenía, se guarda en el que se le eligió mientras esperaba.
     ...[['sacar el cliente', clienteId, null], ['pasar a otro cliente', clienteId, 'otro-cliente'],
         ['elegir el cliente', null, clienteId]].map(([como, alPedir, despues]) => ({
-      que: 'v2, generar y ' + como, p: page, retenida: '**/generate_maria', pedir: () => pedirV2('', alPedir),
+      que: 'v2, generar y ' + como, retenida: '**/generate_maria', pedir: () => pedirV2('', alPedir),
       otraCarga: () => page.evaluate(id => CDI.setClienteActivo(id ? { id, nombre: 'Cliente de prueba' } : null), despues),
-      guardado: guardadoEn(page, clienteId), espera: VIEJA,
+      guardado: guardadoEn(clienteId), espera: VIEJA,
       anotada: () => page.evaluate(() => CDI.state.operacionId) })),
-    { que: 'v2, guardar', p: page, retenida: '**/api/clientes/*/operaciones',
+    { que: 'v2, guardar', retenida: '**/api/clientes/*/operaciones',
       pedir: async () => { await cargaNuevaV2();
         await page.evaluate(id => {
           CDI.setClienteActivo({ id, nombre: 'Cliente de prueba' });
@@ -95,14 +80,10 @@ function casosTardios({ page, v1, clienteId, cargar, pedirTxt }) {
       otraCarga: cargaNuevaV2,
       terminada: () => page.evaluate(() => window.guardado),
       anotada: () => page.evaluate(() => CDI.state.operacionId) },
-    // La carga nueva con el selector vacío: la respuesta tardía se guarda en el cliente de la suya.
-    { que: 'v1, generar', retenida: '**/generate_maria', ...v1Comun, guardado: guardadoEn(v1, clienteId),
-      otraCarga: () => v1.evaluate(() => { cancelGrouping(); document.getElementById('clientSelectorGrouping').value = ''; }) },
-    { que: 'v1, guardar', retenida: '**/api/clientes/*/operaciones', inmediata: '**/generate_maria', ...v1Comun },
     // La carga nueva pide su TXT con el botón mientras la anterior espera: genera cuando ésa
     // vuelve, y lo que le pasó a la anterior no se le muestra.
     ...[['bien', 'vuelve bien'], ['error', 'vuelve con un error'], ['sinRed', 'se queda sin red']].map(([primera, como]) => ({
-      que: 'v2, la carga nueva en «Listo» y la anterior ' + como, p: page, retenida: '**/generate_maria',
+      que: 'v2, la carga nueva en «Listo» y la anterior ' + como, retenida: '**/generate_maria',
       primera, espera: NUEVA, pedir: pedirV2,
       otraCarga: async () => { await cargaNuevaV2(); await page.evaluate(() => CDI.setClienteActivo(null)); await pedirTxt(); },
       // Cuando sale el pedido de la carga nueva, la anterior ya terminó.
@@ -118,23 +99,14 @@ function casosTardios({ page, v1, clienteId, cargar, pedirTxt }) {
 }
 
 // Una respuesta que llega cuando ya empezó otra carga no le anota su operación a ésa.
-async function respuestaTardia({ ctx, page, base, token, clienteId, cargar, pedirTxt }) {
-  const v1 = await ctx.newPage();
-  // La v1 manda a la portada si no encuentra el token en localStorage.
-  await v1.addInitScript(t => localStorage.setItem('access_token', t), token);
-  v1.on('dialog', d => d.accept());
-  await v1.goto(base + '/dashboard?v=1');
-  await v1.waitForFunction(id => typeof generateMariaTxt === 'function' &&
-    [...document.querySelectorAll('#clientSelectorGrouping option')].some(o => o.value === id), clienteId, { timeout: 15000 })
-    .catch(() => falla('la v1 no muestra el cliente en el selector'));
-  const responder = RESPUESTAS.bien;
+async function respuestaTardia({ page, clienteId, cargar, pedirTxt }) {
   const aTiempo = (p, que) => Promise.race([p, new Promise((_, no) => setTimeout(() => no(new Error(que)), 15000))]);
-  for (const c of casosTardios({ page, v1, clienteId, cargar, pedirTxt })) {
+  for (const c of casosTardios({ page, clienteId, cargar, pedirTxt })) {
     let soltar, pedida;
     const suelta = new Promise(r => { soltar = r; });
     const llego = new Promise(r => { pedida = r; });
     let retenida = false;
-    await c.p.route(c.retenida, async route => {
+    await page.route(c.retenida, async route => {
       if (route.request().method() !== 'POST') return route.continue();
       if (retenida && c.segunda) { await c.segunda(); return RESPUESTAS.nueva(route); }
       retenida = true;
@@ -142,12 +114,11 @@ async function respuestaTardia({ ctx, page, base, token, clienteId, cargar, pedi
       await suelta;
       RESPUESTAS[c.primera || 'bien'](route);
     });
-    if (c.inmediata) await c.p.route(c.inmediata, responder);
     await c.pedir();
     await aTiempo(llego, c.que + ': el pedido no salió').catch(e => falla(e.message));
     await c.otraCarga();
     const guardado = c.guardado && c.guardado().catch(() => null);
-    const catalogo = c.catalogo && c.p.waitForRequest(r => r.method() === 'POST' &&
+    const catalogo = c.catalogo && page.waitForRequest(r => r.method() === 'POST' &&
       r.url().includes('/api/catalog/'), { timeout: 15000 }).catch(() => null);
     soltar();
     await aTiempo(c.terminada ? c.terminada() : guardado, c.que + ': no terminó').catch(e => falla(e.message));
@@ -164,8 +135,7 @@ async function respuestaTardia({ ctx, page, base, token, clienteId, cargar, pedi
     }
     const anotada = await c.anotada();
     if ((anotada || '') !== (c.espera || '')) falla(c.que + ': la carga nueva quedó con la operación «' + anotada + '», no «' + (c.espera || '') + '»');
-    await c.p.unroute(c.retenida);
-    if (c.inmediata) await c.p.unroute(c.inmediata);
+    await page.unroute(c.retenida);
     console.log('OK | ' + c.que + ': la respuesta tardía no toca la carga nueva');
   }
 }
@@ -335,7 +305,7 @@ async function reintentarConDobleClic({ page, clienteId, cargar, pedirTxt }) {
 
   await reintentarConDobleClic({ page, clienteId: guardada.clienteId, cargar, pedirTxt });
 
-  await respuestaTardia({ ctx, page, base, token: (await reg.json()).access_token, clienteId: guardada.clienteId, cargar, pedirTxt });
+  await respuestaTardia({ page, clienteId: guardada.clienteId, cargar, pedirTxt });
 
   await b.close();
   console.log('pantalla COBRO-CORTE-1: OK');

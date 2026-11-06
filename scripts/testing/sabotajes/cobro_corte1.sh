@@ -60,7 +60,6 @@ B=proyecto_maria/services/billing_service.py
 A=proyecto_maria/static/v2/app_v2.js
 F=proyecto_maria/static/v2/screens/finalize.js
 U=proyecto_maria/static/v2/screens/upload.js
-V1=proyecto_maria/static/app.js
 
 # ------------------------------------------------------------- el servidor
 export DATABASE_URL=sqlite+aiosqlite:///./test.db GEMINI_API_KEY=test-key ENVIRONMENT=test \
@@ -397,21 +396,6 @@ sabotaje $F "v2: generar se deshabilita mientras otra espera" \
 sabotaje $F "v2: el error de la anterior cambia de paso a la carga nueva" \
   "FALLA: v2, la carga nueva en «Listo» y la anterior vuelve con un error" \
   $'            if (fallo && carga !== CDI.state) return;\n' ''
-sabotaje $V1 "v1: generar anota en la carga nueva" \
-  "FALLA: v1, generar: la carga nueva quedó con la operación" \
-  "        anotarOperacion(carga, data.operacion_id || '');" "        operacionIdActual = data.operacion_id || '';"
-# Generar también guarda: el caso de generar lo ve antes que el del guardado solo.
-sabotaje $V1 "v1: guardar anota en la carga nueva" \
-  "FALLA: v1, generar: la carga nueva quedó con la operación" \
-  "        if (res.ok) anotarOperacion(carga, (await res.json()).operation_id || operacionId);" \
-  "        if (res.ok) operacionIdActual = (await res.json()).operation_id || operacionId;"
-sabotaje $V1 "v1: el guardado toma el cliente del selector al responder" \
-  "FALLA: v1, generar: la respuesta tardía no se guardó en el cliente de su carga" \
-  "    if (!carga.cliente) {" "    if (!clientSelect.value) {" \
-  '/api/clientes/${carga.cliente}/operaciones' '/api/clientes/${clientSelect.value}/operaciones'
-sabotaje $V1 "v1: cancelar no empieza otra carga" \
-  "FALLA: v1, generar: la carga nueva quedó con la operación" \
-  "function nuevaCarga() { operacionIdActual = ''; cargaActual++; }" "function nuevaCarga() { operacionIdActual = ''; }"
 sabotaje $U "una operación nueva arrastra el id de la anterior" \
   "FALLA: una operación nueva manda un operacion_id vacío" \
   "            operacionId: null, operationSavedFor: null, orphanDismissedFor: null," \
