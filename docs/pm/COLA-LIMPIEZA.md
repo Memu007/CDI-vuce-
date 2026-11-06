@@ -60,3 +60,7 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   `SyntaxWarning` en `compileall` (Python 3.12).
 - Dos `get_db` iguales, en `proyecto_maria/main.py:165` y
   `proyecto_maria/auth/dependencies.py:21`: dejar uno (D75 de MARIA).
+- `_escribir_y_confirmar` (`main.py`): un commit que llega a la base y tira
+  error en Python cobra sin entregar, y el reintento cobra otra vez (raro).
+- `delete_cliente` bloquea usuario y después organización; sacar a un miembro
+  del estudio, al revés: deadlock posible (500, sin pérdida de datos).
