@@ -56,3 +56,5 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
   mientras habla con Gemini (medido: 28,5 s).
 - `api_logs.endpoint` es `String(200)`: un PUT o DELETE con clave larga pierde
   su métrica («value too long»).
+- `proyecto_maria/pdf_extractor.py:927` y `:936`: `'\-'` sin `r''` da
+  `SyntaxWarning` en `compileall` (Python 3.12).
