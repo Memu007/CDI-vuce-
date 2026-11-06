@@ -5,16 +5,14 @@ from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-# Mismo default débil que _DEFAULT_DEV_SECRET en main.py.
 # En producción DEBE sobreescribirse con JWT_SECRET_KEY (o SECRET_KEY).
 _DEFAULT_DEV_SECRET = "tu-clave-secreta-super-segura-cambiar-en-produccion"
 
 
 class Settings(BaseSettings):
     # JWT Configuration
-    # Lee JWT_SECRET_KEY → SECRET_KEY → JWT_SECRET (mismo orden que main.py).
-    # Esto garantiza que jwt_utils.py y main.py siempre firman/verifican
-    # con la misma clave, sin importar cuál variable setea el operador.
+    # Lee JWT_SECRET_KEY → SECRET_KEY → JWT_SECRET. Firma y verificación la
+    # toman sólo de acá (auth/dependencies.py).
     jwt_secret: str = Field(
         default=_DEFAULT_DEV_SECRET,
         validation_alias=AliasChoices("JWT_SECRET_KEY", "SECRET_KEY", "JWT_SECRET"),

@@ -69,11 +69,17 @@ def revocar_sesiones(user: User) -> None:
     user.active_jti = uuid.uuid4().hex
 
 
+def firmar_token(datos: dict) -> str:
+    """El único lugar que firma un token: con la misma clave que lo abre."""
+    return jwt.encode(datos, settings.jwt_secret, algorithm=settings.jwt_algorithm)
+
+
 def datos_del_token(token: str) -> dict | None:
     """El contenido de un JWT nuestro con la firma y el vencimiento verificados,
-    o None. Es el único lugar que abre un token."""
+    o None. Es el único lugar que abre un token; uno sin vencimiento no vale."""
     try:
-        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
+        return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm],
+                          options={"require": ["exp"]})
     except jwt.PyJWTError:
         return None
 

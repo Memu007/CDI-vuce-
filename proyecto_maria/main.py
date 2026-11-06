@@ -97,12 +97,13 @@ from proyecto_maria.auth.dependencies import (
     sesion_de_la_request,
     revocar_sesion_de_la_request,
     revocar_sesiones,
+    firmar_token,
 )
 from proyecto_maria.auth.roles import roles_de
+from proyecto_maria.config import _DEFAULT_DEV_SECRET, get_settings
 
 # ============== Configuración de Autenticación ==============
-_DEFAULT_DEV_SECRET = "tu-clave-secreta-super-segura-cambiar-en-produccion"
-SECRET_KEY = os.getenv("JWT_SECRET_KEY") or os.getenv("SECRET_KEY", _DEFAULT_DEV_SECRET)
+_CLAVE_JWT = get_settings().jwt_secret
 IS_PRODUCTION = os.getenv("ENVIRONMENT", "development") == "production"
 IS_TESTING = os.getenv("ENVIRONMENT") == "testing"
 
@@ -112,9 +113,9 @@ IS_TESTING = os.getenv("ENVIRONMENT") == "testing"
 # 3) En dev, log visible si estamos usando la default para no olvidarse al
 #    pasar a prod.
 _known_weak_substrings = ("cambiar-en-produccion", "changeme", "secret", "default", "12345")
-_is_default_key = SECRET_KEY == _DEFAULT_DEV_SECRET
-_is_obviously_weak = any(w in SECRET_KEY.lower() for w in _known_weak_substrings)
-_is_too_short = len(SECRET_KEY) < 32
+_is_default_key = _CLAVE_JWT == _DEFAULT_DEV_SECRET
+_is_obviously_weak = any(w in _CLAVE_JWT.lower() for w in _known_weak_substrings)
+_is_too_short = len(_CLAVE_JWT) < 32
 
 if IS_PRODUCTION and (_is_default_key or _is_obviously_weak or _is_too_short):
     raise ValueError(
@@ -131,7 +132,6 @@ elif _is_default_key or _is_obviously_weak or _is_too_short:
         RuntimeWarning, stacklevel=2,
     )
 
-ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24  # 24 horas
 
 # Importar middleware de seguridad
@@ -272,11 +272,7 @@ def build_email_verification_token(username: str) -> str:
     type=email_verification para no confundirlo con el access token.
     """
     expires = datetime.now(timezone.utc) + timedelta(hours=24)
-    return jwt.encode(
-        {"sub": username, "type": "email_verification", "exp": expires},
-        SECRET_KEY,
-        algorithm=ALGORITHM,
-    )
+    return firmar_token({"sub": username, "type": "email_verification", "exp": expires})
 
 
 def send_verification_email(username: str, email: str, display_name: str | None = None) -> bool:
@@ -1675,9 +1671,9 @@ async def request_password_reset(request: PasswordResetRequest, req: Request, db
     # Rate limiting: desde el quinto pedido de la IP, bloqueo de 15 minutos.
     # Se suma antes de seguir: los que llegan a la vez que el quinto y pasaron
     # el chequeo ven una cuenta mayor que el tope y también se cortan.
-    espera = await limites_auth.segundos_bloqueado(clave)
-    if not espera and await limites_auth.sumar_fallo(clave, tope=5) > 5:
-        espera = await limites_auth.segundos_bloqueado(clave)
+    espera = await limites_auth.segundos_bloqueado(db, clave)
+    if not espera and await limites_auth.sumar_fallo(db, clave, tope=5) > 5:
+        espera = await limites_auth.segundos_bloqueado(db, clave)
     if espera:
         log_429(req, "reset bloqueado")
         raise HTTPException(status_code=429, detail=f"Demasiados intentos. Intente en {espera // 60 + 1} minutos.")
@@ -1736,11 +1732,11 @@ async def recover_username(request: RecoverUsernameRequest, req: Request, db: As
     # 0. Límites (ABUSO-1, S6): 5 pedidos cada 15 minutos por IP; por email,
     # 3 por hora y después se contesta lo mismo sin buscar ni mandar nada.
     if limiter.enabled:
-        if await limites_auth.contar(f"recuperar:ip:{get_client_ip(req)}", 15 * 60) > 5:
+        if await limites_auth.contar(db, f"recuperar:ip:{get_client_ip(req)}", 15 * 60) > 5:
             log_429(req, "recuperar usuario")
             raise HTTPException(status_code=429, detail="Demasiados intentos. Intente en 15 minutos.")
         email_hash = hashlib.sha256(request.email.strip().lower().encode()).hexdigest()[:32]
-        if await limites_auth.contar(f"recuperar:email:{email_hash}", 3600) > 3:
+        if await limites_auth.contar(db, f"recuperar:email:{email_hash}", 3600) > 3:
             return mensaje
 
     # 1. Buscar usuario por email
@@ -1934,17 +1930,29 @@ def set_csrf_cookie(response: Response) -> None:
     )
 
 
-async def abrir_sesion(response: Response, db: AsyncSession, user: User, hash_validado: str) -> str | None:
-    """Emite el token, lo deja como único vigente y pone las cookies. None, sin
-    tocar nada, si la clave ya no es la validada: un cambio en el medio gana."""
+CLAVE_CAMBIADA_EN_EL_MEDIO = "La contraseña cambió mientras se guardaba. Volvé a ingresar y probá de nuevo."
+
+
+async def guardar_si_la_clave_sigue(db: AsyncSession, username: str, hash_validado: str, **valores) -> bool:
+    """Guarda `valores` y lo pendiente del pedido sólo si la clave sigue siendo
+    la validada; si no, deshace todo: un cambio de clave en el medio gana."""
+    hecho = await db.execute(sa_update(User).where(
+        User.username == username, User.password == hash_validado).values(**valores))
+    if hecho.rowcount != 1:
+        await db.rollback()
+        return False
+    await db.commit()
+    return True
+
+
+async def abrir_sesion(response: Response, db: AsyncSession, user: User, hash_validado: str,
+                       **cambios) -> str | None:
+    """Guarda `cambios`, emite el token, lo deja como único vigente y pone las
+    cookies. None, sin guardar nada, si la clave ya no es la validada."""
     jti = uuid.uuid4().hex
     vence = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    token = jwt.encode({"sub": user.username, "plan": user.plan, "exp": vence, "jti": jti},
-                       SECRET_KEY, algorithm=ALGORITHM)
-    hecho = await db.execute(sa_update(User).where(
-        User.username == user.username, User.password == hash_validado).values(active_jti=jti))
-    await db.commit()
-    if hecho.rowcount != 1:
+    token = firmar_token({"sub": user.username, "plan": user.plan, "exp": vence, "jti": jti})
+    if not await guardar_si_la_clave_sigue(db, user.username, hash_validado, active_jti=jti, **cambios):
         return None
     response.set_cookie(key="access_token", value=f"Bearer {token}", httponly=True,
                         secure=IS_PRODUCTION, samesite="strict",
@@ -2249,13 +2257,14 @@ async def update_user_profile(
     # Igual sin mirar mayúsculas no es un cambio: el email guardado queda como
     # está (EMAIL-1: una cuenta vieja con mayúsculas no se reescribe).
     cambia_email = "email" in body and raw_email != (u.email or "").strip().lower()
+    hash_validado = u.password
     if cambia_email:
         if raw_email and not re.match(r"^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$", raw_email):
             raise HTTPException(status_code=400, detail="Email no válido")
         current_password = body.get("current_password")
         if not isinstance(current_password, str) or not current_password:
             raise HTTPException(status_code=400, detail="Para cambiar el email ingresá tu contraseña actual")
-        await verificar_clave_actual(u.username, current_password, u.password)
+        await verificar_clave_actual(db, u.username, current_password, hash_validado)
 
     # Name: string libre. NO escapamos en storage (el frontend escapa al renderizar);
     # asi evitamos doble-escape de '&', comillas, etc. y caracteres validos como
@@ -2286,7 +2295,6 @@ async def update_user_profile(
             )
             if dup.scalars().first():
                 raise HTTPException(status_code=400, detail="Ese email ya está en uso por otro usuario")
-        u.email = raw_email or None
 
     # Defaults del despachante: solo letras/numeros, max 10. Vacio = limpiar.
     def _sanitize_op_default(raw, max_len=10):
@@ -2301,7 +2309,10 @@ async def update_user_profile(
     if "default_tipo_destinacion" in body:
         u.default_tipo_destinacion = _sanitize_op_default(body.get("default_tipo_destinacion"))
 
-    await db.commit()
+    if not cambia_email:
+        await db.commit()
+    elif not await guardar_si_la_clave_sigue(db, u.username, hash_validado, email=raw_email or None):
+        raise HTTPException(status_code=409, detail=CLAVE_CAMBIADA_EN_EL_MEDIO)
     await db.refresh(u)
     return {
         "success": True,
@@ -2322,21 +2333,21 @@ async def update_user_profile(
 # --- USER SECURITY: cambio de password (autenticado) ---
 
 
-async def verificar_clave_actual(username: str, clave: str, hash_guardado: str) -> None:
+async def verificar_clave_actual(db: AsyncSession, username: str, clave: str, hash_guardado: str) -> None:
     """La contraseña actual que piden el perfil y el cambio de clave, con tope
     de intentos compartido: una sesión robada no puede probar claves."""
     clave_intentos = f"pwd:{username}"
     # Se cuenta antes de probar la clave: los pedidos que llegan a la vez y
     # pasan juntos el chequeo ven una cuenta mayor que el tope.
-    espera = await limites_auth.segundos_bloqueado(clave_intentos)
-    if not espera and await limites_auth.sumar_fallo(clave_intentos) > 5:
-        espera = await limites_auth.segundos_bloqueado(clave_intentos)
+    espera = await limites_auth.segundos_bloqueado(db, clave_intentos)
+    if not espera and await limites_auth.sumar_fallo(db, clave_intentos) > 5:
+        espera = await limites_auth.segundos_bloqueado(db, clave_intentos)
     if espera:
         raise HTTPException(status_code=429, detail=f"Demasiados intentos fallidos. Intente de nuevo en {espera} segundos.")
     if not await run_in_threadpool(verify_password, clave, hash_guardado):
         # 400 y no 401: el frontend toma cualquier 401 como sesión vencida.
         raise HTTPException(status_code=400, detail="La contraseña actual es incorrecta")
-    await limites_auth.limpiar(clave_intentos)
+    await limites_auth.limpiar(db, clave_intentos)
 
 
 class ChangePasswordRequest(BaseModel):
@@ -2370,13 +2381,14 @@ async def change_password(
     if not db_user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
 
-    await verificar_clave_actual(db_user.username, body.current_password, db_user.password)
+    hash_validado = db_user.password
+    await verificar_clave_actual(db, db_user.username, body.current_password, hash_validado)
 
-    db_user.password = await run_in_threadpool(hash_password, body.new_password)
-    revocar_sesiones(db_user)
-    await db.commit()
+    nuevo = await run_in_threadpool(hash_password, body.new_password)
     # Quien la cambió sigue con un token nuevo; una copia del suyo ya no entra.
-    token = await abrir_sesion(response, db, db_user, db_user.password)
+    token = await abrir_sesion(response, db, db_user, hash_validado, password=nuevo)
+    if token is None:
+        raise HTTPException(status_code=409, detail=CLAVE_CAMBIADA_EN_EL_MEDIO)
     print(f"🔒 Password cambiada por el propio user: {db_user.username}")
     return {"success": True, "message": "Contraseña actualizada", "access_token": token}
 
@@ -3106,7 +3118,7 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
     clave_intentos = f"login:{get_client_ip(request)}"
 
     # Verificar bloqueo
-    wait_seconds = await limites_auth.segundos_bloqueado(clave_intentos)
+    wait_seconds = await limites_auth.segundos_bloqueado(db, clave_intentos)
     if wait_seconds:
         log_429(request, "login bloqueado")
         raise HTTPException(status_code=429, detail=f"Demasiados intentos fallidos. Intente de nuevo en {wait_seconds} segundos.")
@@ -3126,7 +3138,7 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
     # Función auxiliar para manejar fallo y rate limit
     # (desde el quinto fallo de la IP, bloqueo de 15 minutos)
     async def handle_failed_login():
-        await limites_auth.sumar_fallo(clave_intentos)
+        await limites_auth.sumar_fallo(db, clave_intentos)
         raise HTTPException(status_code=401, detail="Credenciales inválidas")
 
     if not user:
@@ -3176,7 +3188,7 @@ async def login(request: Request, login_request: LoginRequest, response: Respons
         )
 
     # Login exitoso: limpiar intentos fallidos
-    await limites_auth.limpiar(clave_intentos)
+    await limites_auth.limpiar(db, clave_intentos)
     
     token = await abrir_sesion(response, db, user, stored_password)
     if token is None:
@@ -3288,8 +3300,8 @@ async def register(request: RegisterRequest, req: Request, background_tasks: Bac
     # también los rechazados, para que probar datos inválidos no salga gratis.
     if limiter.enabled:
         ip = get_client_ip(req)
-        if (await limites_auth.contar(f"registro:h:{ip}", 3600) > 5
-                or await limites_auth.contar(f"registro:d:{ip}", 24 * 3600) > 20):
+        if (await limites_auth.contar(db, f"registro:h:{ip}", 3600) > 5
+                or await limites_auth.contar(db, f"registro:d:{ip}", 24 * 3600) > 20):
             log_429(req, "registro")
             raise HTTPException(status_code=429, detail="Demasiados registros desde esta conexión. Intente más tarde.")
 
