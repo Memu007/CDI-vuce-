@@ -7,8 +7,8 @@ Comprehensive test suite for all 100+ API endpoints in the CDI project.
 ## Files
 
 - **test_endpoints.py** - Main test file with 103 tests
-- **TEST_SUMMARY.md** - Detailed test results and analysis
-- **ENDPOINTS_INVENTORY.md** - Complete endpoint inventory
+- **tests_api_TEST_SUMMARY.md** - Detailed test results and analysis
+- **tests_api_ENDPOINTS_INVENTORY.md** - Complete endpoint inventory
 
 ## Quick Start
 
@@ -247,8 +247,8 @@ pytest tests/api/test_endpoints.py -v -n auto
 ## Documentation
 
 For detailed information:
-- **TEST_SUMMARY.md** - Test results and analysis
-- **ENDPOINTS_INVENTORY.md** - Complete endpoint list
+- **tests_api_TEST_SUMMARY.md** - Test results and analysis
+- **tests_api_ENDPOINTS_INVENTORY.md** - Complete endpoint list
 
 ## Support
 
