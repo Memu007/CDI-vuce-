@@ -411,3 +411,7 @@ validación de una carga nunca muestra ni guarda lo de otra.
 ### 2026-11-06 12:35 UTC (PM principal)
 
 CATALOGO-LARGO-2 aceptada sobre `d5bc7c1` (pruebas `b0bbd8c`), sin integrar por `e0b8626`. D84 a D87 (a); el aviso de qué producto no se aprendió va a CATALOGO-3. Acta: `REPRODUCCION-CATALOGO-LARGO-2-v2-2026-11-06.md`.
+
+### 2026-11-06 14:40 UTC (PM principal)
+
+PYPDF-1 aceptada sobre `974263e`, sin integrar por `e0b8626`: pypdf 6.21.4 como mínimo, sin fijar una versión vieja. D89 (a) y D90 (a). Acta: `REPRODUCCION-PYPDF-1-2026-11-06.md`.
