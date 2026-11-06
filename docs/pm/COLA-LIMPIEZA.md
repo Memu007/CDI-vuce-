@@ -67,3 +67,12 @@ un arreglo. Una línea por deuda: dónde está y qué falta.
 - `proyecto_maria/static/app.js:1945`: `value="${item.origen}"` sin escapar.
   Hoy no llega texto del catálogo ahí, pero escaparlo igual que la
   descripción (D81 de MARIA).
+- `finalize.js`: Enter doble en «Reintentar» (`:1361-1366`) o en «Generar»
+  manda dos generaciones; no cobra otra vez (reusa `operacion_id`).
+- `CDI.api` sin timeout (`finalize.js:654`): una generación colgada deja la
+  carga siguiente en el spinner.
+- `_escribir_y_confirmar` (`main.py:5933-5941`): si falla el commit y también
+  restaurar `.anterior`, se pierde el archivo ya entregado (falla doble).
+- `con_pg16.sh` guarda su puerto en `PUERTO`, que pisa el exportado por
+  `cobro_corte1.sh`, `cobro_mp1.sh`, `cobro_mp2.sh` y `backup1a.sh`:
+  renombrar a `PG_PUERTO`.
