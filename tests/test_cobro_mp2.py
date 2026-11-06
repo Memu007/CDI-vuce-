@@ -511,9 +511,13 @@ def test_en_una_org_reactivar_lo_pagado_lleva_al_checkout(client, tipo, queda):
     assert _leer_org(org_id)["billing_status"] == queda
 
 
-def test_si_una_de_varias_no_se_cancela_la_cancelada_no_queda_anotada(client):
+# Cancelar con la autorizada; el checkout, con dos pendientes que cancela antes de crear.
+@pytest.mark.parametrize("ruta, estado", [("/api/billing/cancel", "authorized"), ("/api/billing/checkout", "pending")],
+                         ids=["cancelar", "checkout"])
+def test_si_una_de_varias_no_se_cancela_la_cancelada_no_queda_anotada(client, ruta, estado):
     from tests.test_cobro_mp1 import _leer_org
     nombres, sid, org_id, _ = _org_con_suscripcion(client, "duena")
+    SUS[sid] = estado
     otra = f"sus-{nombres['miembro']}"
     SUS[otra] = "pending"
     _set_user(nombres["miembro"], mp_preapproval_id=otra)
@@ -522,17 +526,32 @@ def test_si_una_de_varias_no_se_cancela_la_cancelada_no_queda_anotada(client):
 
     def _falla_una(request):
         s = _RUTA_SUS.fullmatch(str(request.url)).group(1)
-        if s == falla[1]:
+        if s == falla[1] and request.method == "PUT":
             return httpx.Response(500, json={})
         if request.method == "PUT":
             SUS[s] = "cancelled"
         return httpx.Response(200, json={"id": s, "status": SUS[s]})
     FALLA["PUT"] = FALLA["GET"] = _falla_una
-    r = client.post("/api/billing/cancel")
+    r = client.post(ruta, json={"plan": "premium"})
     assert r.status_code == 503, r.text
-    assert _leer_org(org_id)["billing_status"] == "active"
+    assert _leer_org(org_id)["billing_status"] == "active" and CREADAS == []
     assert SUS[cancela[1]] == "cancelled" and _leer(cancela[0])["mp_preapproval_id"] is None
     assert SUS[falla[1]] != "cancelled" and _leer(falla[0])["mp_preapproval_id"] == falla[1]
+
+
+def test_con_una_autorizada_de_otro_no_se_cancela_ninguna(client):
+    # Se ordena antes que quien la abrió: si no se leen todas primero, se cancela.
+    antes = _unique("mp2_a0")
+    _register(client, antes)
+    nombres, sid, org_id, _ = _org_con_suscripcion(client, "duena")
+    assert antes < nombres["abrio"]
+    SUS[f"sus-{antes}"] = "pending"
+    _set_user(antes, organization_id=org_id, mp_preapproval_id=f"sus-{antes}")
+    r = client.post("/api/billing/checkout", json={"plan": "premium"})
+    assert r.status_code == 409, r.text
+    assert SUS == {sid: "authorized", f"sus-{antes}": "pending"} and CREADAS == []
+    assert [p.method for p in PEDIDOS if p.method == "PUT"] == []
+    assert _leer(antes)["mp_preapproval_id"] == f"sus-{antes}"
 
 
 def test_no_se_saca_del_estudio_a_quien_abrio_la_suscripcion(client):

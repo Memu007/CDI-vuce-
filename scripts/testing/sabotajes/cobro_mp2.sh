@@ -116,12 +116,12 @@ sabotaje $M "la vieja ya cancelada se vuelve a cancelar" \
   "    if estado_mp != \"cancelled\":" "    if True:"
 sabotaje $M "si no se puede cancelar la vieja, se crea igual" \
   "FAILED $T::test_si_no_se_puede_cancelar_la_vieja_no_se_crea_nada" \
-  "vieja en MP: {e}\")
-            raise HTTPException(status_code=503, detail=no_disponible)" "vieja en MP: {e}\")"
+  "                await db.commit()
+                raise HTTPException(status_code=503, detail=_NO_SE_CONFIRMA_SUSCRIPCION)" "                await db.commit()"
 sabotaje $M "si no se sabe cómo está la vieja, se crea igual" \
   "FAILED $T::test_si_no_se_sabe_como_esta_la_suscripcion_no_se_crea_otra" \
   "suscripción en MP: {e}\")
-        raise HTTPException(status_code=503, detail=no_disponible)" "suscripción en MP: {e}\")
+        raise HTTPException(status_code=503, detail=_NO_SE_CONFIRMA_SUSCRIPCION)" "suscripción en MP: {e}\")
         estado_mp = \"cancelled\""
 sabotaje $M "un estado desconocido de Mercado Pago se acepta" \
   "FAILED $T::test_si_no_se_sabe_como_esta_la_suscripcion_no_se_crea_otra[estado_desconocido]" \
@@ -131,6 +131,16 @@ sabotaje $M "un estado desconocido de Mercado Pago se acepta" \
 sabotaje $M "el checkout no mira las suscripciones de los otros miembros" \
   "FAILED $T::test_otro_miembro_no_abre_una_segunda_suscripcion_de_la_org[pending]" \
   "(u is db_user or u.organization_id == org_id)]" "u is db_user]"
+sabotaje $M "se cancela una pendiente antes de ver la autorizada de otro" \
+  "FAILED $T::test_con_una_autorizada_de_otro_no_se_cancela_ninguna" \
+  "    estados = [await _estado_suscripcion_vieja(db, db_user, cuenta) for cuenta in con_sid]
+    for cuenta, estado_mp in zip(con_sid, estados):" "    for cuenta in con_sid:
+        estado_mp = await _estado_suscripcion_vieja(db, db_user, cuenta)"
+sabotaje $M "en el checkout, si una no se cancela, las canceladas siguen anotadas" \
+  "FAILED $T::test_si_una_de_varias_no_se_cancela_la_cancelada_no_queda_anotada[checkout]" \
+  "                await db.commit()
+                raise HTTPException(status_code=503, detail=_NO_SE_CONFIRMA_SUSCRIPCION)" \
+  "                raise HTTPException(status_code=503, detail=_NO_SE_CONFIRMA_SUSCRIPCION)"
 sabotaje $M "el 409 de la autorizada de otro miembro no dice de quién es" \
   "FAILED $T::test_otro_miembro_no_abre_una_segunda_suscripcion_de_la_org[autorizada_vencida]" \
   "        if cuenta is not db_user:" "        if False:"
@@ -156,7 +166,7 @@ sabotaje $M "en una org, reactivar mira al usuario y no a la org" \
 
     if entidad.billing_status != \"canceled\":"
 sabotaje $M "si una de varias no se cancela, las canceladas siguen anotadas" \
-  "FAILED $T::test_si_una_de_varias_no_se_cancela_la_cancelada_no_queda_anotada" \
+  "FAILED $T::test_si_una_de_varias_no_se_cancela_la_cancelada_no_queda_anotada[cancelar]" \
   "            await db.commit()
             raise HTTPException(status_code=503, detail=no_se_pudo)" "            raise HTTPException(status_code=503, detail=no_se_pudo)"
 sabotaje $M "en una org, los pagos se buscan con el nombre del usuario" \
