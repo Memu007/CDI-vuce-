@@ -112,7 +112,7 @@ def entorno(url):
 
 def columnas():
     return sql("select column_name, data_type, character_maximum_length from information_schema.columns"
-               " where (table_name='vendor_catalog_products' and column_name in ('origen','vendor_nombre'))"
+               " where (table_name='vendor_catalog_products' and column_name in ('ncm','origen','vendor_nombre'))"
                " or (table_name='client_product_history' and column_name='origen_frecuente')"
                " order by column_name")
 
@@ -182,7 +182,7 @@ try:
     viejo = fila(VENDOR_ID, "TORNILLO")
     claves_viejas = sql("select descripcion, product_key from vendor_catalog_products where descripcion in %s"
                         " order by descripcion", tuple(n for _, n in VIEJAS))
-    chequear(columnas() == [("origen", "character varying", 5), ("origen_frecuente", "character varying", 3),
+    chequear(columnas() == [("ncm", "character varying", 20), ("origen", "character varying", 5), ("origen_frecuente", "character varying", 3),
                             ("vendor_nombre", "character varying", 200)]
              and viejo == [(VENDOR, NCM, "CN")]
              and sorted(k for _, k in claves_viejas) == sorted(v.lower() for v, _ in VIEJAS),
@@ -250,7 +250,7 @@ try:
     finally:
         escritura.close()
     tipos = {c: t for c, t, _ in columnas()}
-    columna_de = {"vendor_catalog_products": ("origen", "vendor_nombre"),
+    columna_de = {"vendor_catalog_products": ("ncm", "origen", "vendor_nombre"),
                   "client_product_history": ("origen_frecuente",)}
     mentiras = [linea for linea in salida.getvalue().splitlines() if "pasa a TEXT" in linea
                 and any(c in linea and tipos.get(c) != "text" for t in columna_de for c in columna_de[t]
@@ -263,7 +263,7 @@ try:
     for vez in ("primer", "segundo"):
         with Arranque(main_mod.app, raise_server_exceptions=False):
             pass
-        chequear(columnas() == [("origen", "text", None), ("origen_frecuente", "text", None),
+        chequear(columnas() == [("ncm", "text", None), ("origen", "text", None), ("origen_frecuente", "text", None),
                                 ("vendor_nombre", "text", None)]
                  and fila(VENDOR_ID, "TORNILLO") == viejo,
                  f"{vez} arranque: las columnas son text y el producto viejo queda igual: {columnas()}")
@@ -363,6 +363,26 @@ try:
                     if not (guardo or (r.status_code == 400 and legible(r) and intacto)):
                         fallas.append(f"{campo} {nombre}: {r.status_code} {r.text[:80]}")
             chequear(not fallas, f"una entrada mala por {via} no da 500 ni pierde lo bueno: {fallas}")
+
+        # Un NCM más largo que la columna vieja, y precios que no son finitos: la lectura del
+        # catálogo arma JSON estricto, así que lo guardado tiene que poder leerse después.
+        fallas = []
+        for i, (campo, valor) in enumerate((("ncm", "7" * 21), ("valor_unitario", "nan"), ("valor_unitario", "inf"),
+                                            ("valor_unitario", float("inf")), ("valor_unitario", float("nan")),
+                                            ("valor_unitario", 10 ** 400))):
+            bueno = f"BUENO raro {i}"
+            r = mandar("POST", url, {"vendor_name": VENDOR, "productos": [
+                {"descripcion": bueno, "ncm": NCM}, {"descripcion": "MALO " + bueno, "ncm": NCM, campo: valor}]})
+            k = sql("select product_key from vendor_catalog_products where owner_username=%s and descripcion=%s",
+                    USUARIO, bueno)
+            cambio = mandar("PUT", f"{url}/{quote(k[0][0], safe='')}",
+                            {"precio_ref" if campo == "valor_unitario" else campo: valor}) if k else None
+            lectura = c.get(f"/api/catalog/{VENDOR_ID}")
+            if not (r.status_code in (200, 400) and k and cambio.status_code in (200, 400)
+                    and lectura.status_code == 200):
+                fallas.append(f"{campo} {str(valor)[:20]}: lote {r.status_code}, guardó lo bueno {bool(k)}, cambio "
+                              f"{cambio.status_code if cambio else '-'}, lectura {lectura.status_code}")
+        chequear(not fallas, f"un NCM largo o un precio no finito no da 500 ni rompe la lectura: {fallas}")
 
         for via, desc in (("catálogo", CJK_LARGO[:-1] + "一"), ("guardar-uso", CJK_LARGO[1:] + "一"),
                           ("cambiar la descripción", CJK_LARGO)):

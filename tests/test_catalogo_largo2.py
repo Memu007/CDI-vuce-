@@ -245,6 +245,28 @@ def test_una_entrada_mala_da_400_o_se_limpia_sin_perder_el_lote(client, via, cam
     assert not fallas, fallas
 
 
+@pytest.mark.parametrize("via", ["lote", "cambio"])
+def test_un_precio_que_no_es_finito_no_rompe_la_lectura_del_catalogo(client, via):
+    """La lectura arma JSON estricto: un precio NaN o infinito guardado la rompe."""
+    url = f"/api/catalog/{VENDOR_ID}/productos"
+    fallas = []
+    for valor in ("nan", "inf", "-Infinity", float("inf"), float("nan"), 10 ** 400, "12.5"):
+        owner = _dueno(_cliente(client))
+        _sql("delete from vendor_catalog_products where owner_username=:o", o=owner)
+        producto = {"descripcion": "TUERCA", "ncm": NCM}
+        if via == "lote":
+            r = _mandar(client, "POST", url, {"vendor_name": VENDOR, "productos": [{**producto, "valor_unitario": valor}]})
+        else:
+            client.post(url, json={"vendor_name": VENDOR, "productos": [{**producto, "valor_unitario": 3}]})
+            r = _mandar(client, "PUT", f"{url}/tuerca", {"precio_ref": valor})
+        lectura = client.get(f"/api/catalog/{VENDOR_ID}")
+        precios = [p.get("precio_ref") for p in lectura.json()["productos"].values()] if lectura.status_code == 200 else None
+        esperado = [12.5] if valor == "12.5" else [None if via == "lote" else 3]
+        if (r.status_code, lectura.status_code, precios) != (200, 200, esperado):
+            fallas.append(f"{str(valor)[:20]}: {r.status_code}, lectura {lectura.status_code} {lectura.text[:80]}, {precios}")
+    assert not fallas, fallas
+
+
 def _escribir(consulta, **params):
     from sqlalchemy import text
     from proyecto_maria.database.connection import engine
