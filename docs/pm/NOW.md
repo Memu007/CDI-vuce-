@@ -211,6 +211,8 @@ sesión por un lado; pantallas y archivo MARIA por el otro):
    pasarle los ids de la rutina de su PM.
 
 ## Última vuelta
+2026-11-06 08:55 UTC: vuelta. Límite `allowed` en las tres; contexto 139k/121k/114k. Sin entregas nuevas ni D abiertas: MARIA sigue la devolución de CATALOGO-LARGO-2 (`04e0e70`, corriendo sabotajes), técnica corre los sabotajes de COBRO-CORTE-1 sobre `ca50916` (sin subir). CI verde sobre `d26c404`.
+
 2026-11-06 07:10 UTC: **RESET-1 aceptada** (`02a21e7`, MARIA, sin integrar como `ca87d82`): 6 passed (4 rojos en la base), Postgres sin fallas (3 en la base), 8 sabotajes en rojo, suite con sólo las 5 de pypdf (D73), dos negativos míos y dos adversarios sin hallazgos. D82 (a), D83 (a). Nueva RESET-2: el link en la respuesta sólo en prueba. **La limpieza entró** en `dd052d4` (suite, csrf2 y cobro_mp1 verdes): se va la v1 y se cierra D60. Vuelta 05:55: límite `allowed` en las cuatro.
 
 2026-11-06 05:00 UTC: **CATALOGO-LARGO-2 vuelve con devolución** (`ccfe640`, MARIA). TAIWAN y CHILE ya llegan bien al TXT. Pero en Postgres un NUL o medio par rompe el lote entero (500; en la base, 200 con lo bueno guardado; reproducido por mí). Una fila vieja queda duplicada y sin editar, y la migración puede trabarse con `guardar-uso`, con un log que miente. D76, D77, D78 y D80 van a Emi como CATALOGO-3. La limpieza (`07e7b5f`, mergeada a prueba en `27b19d9`) corre suite, csrf2 y cobro_mp1.
