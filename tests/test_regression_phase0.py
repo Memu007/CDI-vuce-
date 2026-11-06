@@ -119,10 +119,8 @@ class TestCoreEndpoints:
 
     def test_static_files_accessible(self, client):
         """Archivos estáticos deben ser accesibles"""
-        # Al menos el CSS debe existir
-        response = client.get("/app.css")
-        # 200 si existe, 404 si no (pero no 500)
-        assert response.status_code in [200, 404]
+        response = client.get("/static/v2/app_v2.css")
+        assert response.status_code == 200
         print(f"✅ Static files: {response.status_code}")
 
 

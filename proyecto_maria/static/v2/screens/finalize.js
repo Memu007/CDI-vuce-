@@ -77,9 +77,14 @@
         // Hasta que llegue la respuesta, nada de los avisos de otra operación.
         const avisosPanel = document.getElementById('validatingAvisosPanel');
         if (avisosPanel) avisosPanel.hidden = true;
-        Promise.resolve(CDI.despachante ? CDI.despachante.render() : null)
-            .catch(() => null).then(refrescarAvisos);
+        // ESTUDIO-1: el estudio elegido también cambia los avisos.
+        Promise.all([
+            Promise.resolve(CDI.despachante ? CDI.despachante.render() : null).catch(() => null),
+            Promise.resolve(CDI.estudios ? CDI.estudios.render() : null).catch(() => null),
+        ]).then(refrescarAvisos);
         enlazarAvisos();
+        enlazarValor();
+        pintarValor(null);
         refrescarAvisos();
         init();
         if (!vLoading) return;
@@ -172,6 +177,39 @@
         };
         wrap.addEventListener('change', programar);
         wrap.addEventListener('input', programar);
+        // El sufijo de la operación cambia lo que viaja por producto.
+        const sbt = document.getElementById('sbtSufijoValor');
+        if (sbt) sbt.addEventListener('input', programar);
+        const estudio = document.getElementById('estudioWrap');
+        if (estudio) estudio.addEventListener('change', programar);
+    }
+
+    // SEPARADORES-1d (D25): el flete y el seguro van al TXT con dos
+    // decimales. Si tienen más, se avisa sin frenar qué se escribió y qué
+    // lleva el TXT. Lo que no se lee o es negativo ya lo frena la revisión.
+    function avisosDeLosMontos(op) {
+        return [['Flete', op.flete], ['Seguro', op.seguro]].map(function (par) {
+            const r = CDI.montos.leer(par[1]);
+            if (r.error || r.valor === null || r.valor < 0) return null;
+            const txt = alCentavoDelTxt(r.valor);
+            if (txt === null) return null;
+            const escrito = typeof par[1] === 'string' ? par[1].trim() : CDI.montos.escribir(r.valor);
+            return par[0] + ': escribiste «' + escrito + '». El TXT lleva ' + txt + '.';
+        }).filter(Boolean);
+    }
+
+    // Como centavos() del generador: el número más corto que lo escribe
+    // (String de JS da lo mismo que repr de Python) y la mitad hacia arriba,
+    // con cuentas de texto: Math.round(2.675 * 100) da 267. null si tiene dos
+    // decimales o menos.
+    function alCentavoDelTxt(n) {
+        const s = String(n);
+        if (/e/i.test(s)) return /e-/i.test(s) ? '0,00' : null;   // menos de 0,000001 o más de 1e21
+        const [entero, dec = ''] = s.split('.');
+        if (dec.length <= 2) return null;
+        const cent = BigInt(entero + dec.slice(0, 2)) + (dec[2] >= '5' ? 1n : 0n);
+        const t = cent.toString().padStart(3, '0');
+        return t.slice(0, -2) + ',' + t.slice(-2);
     }
 
     async function refrescarAvisos() {
@@ -182,23 +220,36 @@
         if (!panel || !list) return;
         if (!(CDI.state && (CDI.state.items || []).length)) { panel.hidden = true; return; }
         let avisos;
+        let valor = null;
+        let firma = null;
+        // SUFIJOS-1: lo que dicen las celdas del sufijo (el arancel no
+        // contestó, lo escrito con otro de la operación, D23). SEPARADORES-1d:
+        // el flete o el seguro con más de dos decimales.
+        const deLaPantalla = (CDI.despachante && CDI.despachante.avisos ? CDI.despachante.avisos() : [])
+            .concat(avisosDeLosMontos((CDI.state && CDI.state.operacion) || {}));
         try {
+            const pedido = buildMariaRequest();
+            firma = firmaDelPedido(pedido);
             const res = await CDI.api('/generate_maria/avisos', {
                 method: 'POST',
-                body: JSON.stringify(buildMariaRequest())
+                body: JSON.stringify(pedido)
             });
             const data = await res.json();
             if (!res.ok) {
                 const detail = data && data.detail;
-                avisos = [typeof detail === 'string' ? detail : 'No se pudieron revisar los avisos.'];
+                avisos = deLaPantalla.concat([typeof detail === 'string' ? detail : 'No se pudieron revisar los avisos.']);
+                valor = { error: SIN_CUENTAS };
             } else {
-                avisos = (data && data.avisos) || [];
+                avisos = deLaPantalla.concat((data && data.avisos) || []);
+                valor = (data && data.valor) || null;
             }
         } catch (err) {
             console.warn('[avisos] no se pudieron pedir', err);
-            avisos = ['No se pudieron revisar los avisos; aparecen al generar.'];
+            avisos = deLaPantalla.concat(['No se pudieron revisar los avisos; aparecen al generar.']);
+            valor = { error: SIN_CUENTAS };
         }
         if (seq !== avisosSeq) return;   // llegó uno más nuevo
+        pintarValor(valor, firma);
         panel.hidden = !avisos.length;
         if (count) count.textContent = avisos.length ? '· ' + avisos.length : '';
         list.innerHTML = avisos.map(function (msg) {
@@ -209,6 +260,230 @@
                 '<span class="issue-msg">' + CDI.escapeHtml(clean) + '</span>' +
                 '</li>';
         }).join('');
+    }
+
+    /* ---------- Ajustes y seguro (VALOR-1) ---------- */
+    // Los ajustes los carga la persona: el descuento de la planilla se ofrece
+    // con un botón y nunca se pone solo. Las cuentas las hace el servidor,
+    // con la misma cuenta del MDDTFOB del TXT.
+    let valorEnlazado = false;
+    let ultimoValor = null;
+    let cuentasCon = null;   // el pedido con el que se hizo ultimoValor
+    const SIN_CUENTAS = 'No se pudieron hacer las cuentas: mirá los avisos.';
+
+    // Vacío es sin ajuste (null). Lo que no se puede leer viaja tal cual: el
+    // servidor lo dice en las cuentas y no frena el TXT (SEPARADORES-1b, D19).
+    // SEPARADORES-1: «1.500» es mil quinientos (montos_ar.js).
+    function ajusteDelPedido(v) {
+        const r = CDI.montos.leer(v);
+        return r.error ? String(v).trim() : r.valor;
+    }
+
+    // Por qué un ajuste escrito no se puede leer, o null.
+    function ajusteMalEscrito(v) {
+        const error = CDI.montos.leer(v).error;
+        if (!error) return null;
+        return error === CDI.montos.NO_ES_NUMERO ? 'no es un número.' : error;
+    }
+
+    // Flete, seguro o gastos de la revisión, que ya frena lo que no se lee.
+    // Si igual llega uno así, viaja tal cual y el servidor lo rechaza con su
+    // mensaje: nunca un 0 silencioso (SEPARADORES-1b, D19). Vacío es 0.
+    function montoDelPedido(v) {
+        const r = CDI.montos.leer(v);
+        if (r.error) return String(v).trim();
+        return r.valor === null ? 0 : r.valor;
+    }
+
+    function importeEscrito(n) {
+        return Number(n || 0).toLocaleString('es-AR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    }
+
+    // El pedido sin lo que cambia solo (el número de operación sin factura
+    // lleva la hora): si cambia, las cuentas que se hicieron con él no valen.
+    function firmaDelPedido(pedido) {
+        const resto = Object.assign({}, pedido);
+        delete resto.operation_id;
+        return JSON.stringify(resto);
+    }
+
+    // Cambió algo de la cuenta: las cuentas a la vista ya no valen, ni las
+    // que están por llegar, hasta que vuelvan las nuevas.
+    function cuentasViejas() {
+        ultimoValor = null;
+        avisosSeq++;
+        ['valorCalcularSeguro', 'valorDejarSeguro'].forEach(function (id) {
+            const boton = document.getElementById(id);
+            if (boton) boton.hidden = true;
+        });
+    }
+
+    function enlazarValor() {
+        const wrap = document.getElementById('valorWrap');
+        if (valorEnlazado || !wrap) return;
+        valorEnlazado = true;
+        const programar = () => {
+            clearTimeout(avisosTimer);
+            avisosTimer = setTimeout(refrescarAvisos, 400);
+        };
+        const campos = { valorIncluir: 'ajustes_incluir', valorDeducir: 'ajustes_deducir' };
+        Object.keys(campos).forEach(function (id) {
+            const input = document.getElementById(id);
+            if (!input) return;
+            input.addEventListener('input', function () {
+                const op = CDI.state.operacion = CDI.state.operacion || {};
+                op[campos[id]] = input.value;
+                cuentasViejas();
+                programar();
+            });
+        });
+        const usar = document.getElementById('valorUsarDescuento');
+        if (usar) usar.addEventListener('click', usarDescuento);
+        const seguro = document.getElementById('valorCalcularSeguro');
+        if (seguro) seguro.addEventListener('click', calcularSeguro);
+        const dejar = document.getElementById('valorDejarSeguro');
+        if (dejar) dejar.addEventListener('click', dejarSeguro);
+    }
+
+    // El seguro que calculó el sistema con otros importes queda como está:
+    // pasa a ser de la persona y el servidor deja de frenarlo (VALOR-1c).
+    function dejarSeguro() {
+        const op = CDI.state.operacion = CDI.state.operacion || {};
+        delete op.seguro_calculado;
+        cuentasViejas();
+        refrescarAvisos();
+    }
+
+    function usarDescuento() {
+        const op = CDI.state.operacion = CDI.state.operacion || {};
+        const descuento = Number(op.descuento);
+        if (!(descuento > 0) || otroDeducir(op, descuento)) return;
+        op.ajustes_deducir = CDI.montos.escribir(descuento);
+        const input = document.getElementById('valorDeducir');
+        if (input) input.value = op.ajustes_deducir;
+        cuentasViejas();
+        refrescarAvisos();
+    }
+
+    // Ajustes a deducir ya trae algo distinto del descuento: no se pisa.
+    function otroDeducir(op, descuento) {
+        const v = op.ajustes_deducir;
+        return v !== undefined && v !== null && String(v).trim() !== '' && ajusteDelPedido(v) !== descuento;
+    }
+
+    // El seguro sugerido lo calculó el servidor con el pedido de ahora. Si
+    // algo cambió desde entonces (un ajuste, el descuento, el seguro, otra
+    // operación), no se usa: se piden las cuentas de nuevo.
+    function calcularSeguro() {
+        if (!ultimoValor || ultimoValor.error) return;
+        let ahora = null;
+        try { ahora = firmaDelPedido(buildMariaRequest()); } catch (err) { ahora = null; }
+        if (!cuentasCon || cuentasCon !== ahora) {
+            cuentasViejas();
+            refrescarAvisos();
+            return;
+        }
+        const op = CDI.state.operacion = CDI.state.operacion || {};
+        op.seguro = ultimoValor.seguro_sugerido;
+        op.seguro_calculado = true;
+        // Ya está completo: deja de avisarse que no se leyó (MARIA-1c).
+        if (Array.isArray(op.campos_sin_leer) && op.campos_sin_leer.includes('seguro')) {
+            const completados = new Set(op.campos_completados || []);
+            completados.add('seguro');
+            op.campos_completados = Array.from(completados);
+        }
+        cuentasViejas();
+        refrescarAvisos();
+        if (CDI.semaforo && CDI.semaforo.refresh) CDI.semaforo.refresh();
+    }
+
+    function seguroSinLeer(op) {
+        return Array.isArray(op.campos_sin_leer) && op.campos_sin_leer.includes('seguro') &&
+            !(Array.isArray(op.campos_completados) && op.campos_completados.includes('seguro'));
+    }
+
+    function pintarValor(valor, firma) {
+        ultimoValor = valor;
+        cuentasCon = firma || null;
+        const op = (CDI.state && CDI.state.operacion) || {};
+        const incluir = document.getElementById('valorIncluir');
+        const deducir = document.getElementById('valorDeducir');
+        // Lo que la persona está escribiendo no se pisa, y un número mal
+        // escrito queda a la vista para que lo corrija.
+        if (incluir && document.activeElement !== incluir && !ajusteMalEscrito(op.ajustes_incluir)) {
+            incluir.value = op.ajustes_incluir == null ? '' : op.ajustes_incluir;
+        }
+        if (deducir && document.activeElement !== deducir && !ajusteMalEscrito(op.ajustes_deducir)) {
+            deducir.value = op.ajustes_deducir == null ? '' : op.ajustes_deducir;
+        }
+
+        const ofrece = document.getElementById('valorDescuento');
+        const ofreceTexto = document.getElementById('valorDescuentoTexto');
+        const descuento = Number(op.descuento);
+        // Ya usado como ajuste, no se vuelve a ofrecer.
+        if (ofrece) ofrece.hidden = !(descuento > 0) || ajusteDelPedido(op.ajustes_deducir) === descuento;
+        const otro = descuento > 0 && otroDeducir(op, descuento);
+        const usar = document.getElementById('valorUsarDescuento');
+        if (usar) usar.hidden = otro;
+        if (ofreceTexto && descuento > 0) {
+            const filas = Array.isArray(op.filas_excel_descuento) ? op.filas_excel_descuento : [];
+            ofreceTexto.textContent = 'La planilla trae un descuento de ' + importeEscrito(descuento) +
+                (filas.length ? ' (fila ' + filas.slice(0, 5).join(', ') + ')' : '') + '.' +
+                (otro ? ' Ajustes a deducir ya tiene otro importe: si el descuento va aparte, sumalo a mano.' : '');
+        }
+
+        const error = document.getElementById('valorError');
+        const errores = [];
+        if (ajusteMalEscrito(op.ajustes_incluir)) errores.push('Ajustes a incluir: ' + ajusteMalEscrito(op.ajustes_incluir));
+        if (ajusteMalEscrito(op.ajustes_deducir)) errores.push('Ajustes a deducir: ' + ajusteMalEscrito(op.ajustes_deducir));
+        if (valor && valor.error) errores.push(valor.error);
+        if (error) {
+            error.textContent = errores.join(' ');
+            error.hidden = !errores.length;
+            error.style.color = 'var(--danger,#c0392b)';
+        }
+
+        const cuentas = document.getElementById('valorCuentas');
+        const boton = document.getElementById('valorCalcularSeguro');
+        const nota = document.getElementById('valorSeguroNota');
+        const ok = valor && !valor.error;
+        if (cuentas) {
+            const filas = ok ? [
+                ['FOB de la factura (va al TXT)', valor.fob_factura],
+                ['+ Ajustes a incluir', valor.ajustes_incluir],
+                ['− Ajustes a deducir', valor.ajustes_deducir],
+                ['= FOB casillero', valor.fob_casillero],
+                ['Flete', valor.flete],
+                ['Seguro', valor.seguro]
+            ] : [];
+            cuentas.innerHTML = filas.map(function (f) {
+                return '<tr><td>' + CDI.escapeHtml(f[0]) + '</td><td style="text-align:right">' +
+                    CDI.escapeHtml(importeEscrito(f[1])) + '</td></tr>';
+            }).join('');
+        }
+        // El botón, cuando no hay seguro o cuando el que hay lo puso él.
+        const calculado = ok && op.seguro_calculado;
+        // Sobre qué FOB va el 1 % lo dice el servidor (BASE_SEGURO_SUGERIDO, D13).
+        const base = (ok && valor.base_seguro) || 'FOB';
+        const mostrar = ok && (!(valor.seguro > 0) || calculado) && valor.seguro !== valor.seguro_sugerido;
+        if (boton) {
+            boton.hidden = !mostrar;
+            boton.textContent = (calculado ? 'Recalcular seguro' : 'Calcular seguro') +
+                ' (1 % de ' + base + ' + flete): ' + (ok ? importeEscrito(valor.seguro_sugerido) : '');
+        }
+        // Lo calculó con otros importes, o ya no se puede comprobar: el
+        // servidor no genera hasta que se recalcule o se deje (VALOR-1c).
+        const dejar = document.getElementById('valorDejarSeguro');
+        if (dejar) dejar.hidden = !(valor && op.seguro_calculado &&
+            (valor.error || valor.seguro !== valor.seguro_sugerido));
+        if (nota) {
+            nota.textContent = !ok ? '' :
+                (calculado && valor.seguro !== valor.seguro_sugerido) ? 'El seguro se calculó con otros importes.' :
+                calculado ? 'Seguro calculado: 1 % de (' + base + ' + flete).' :
+                valor.seguro > 0 ? 'La operación ya trae seguro.' :
+                mostrar && seguroSinLeer(op) ? 'La factura puede traer un seguro que no pudimos leer: ' +
+                    'revisala antes de calcularlo.' : '';
+        }
     }
 
     function subitemsDelPedido(it) {
@@ -335,7 +610,7 @@
     /* ==========================================================
        Pantalla 5: ready (generar + descargar)
        ========================================================== */
-    function onGenerate() {
+    async function onGenerate() {
         if (generateInFlight) return;
         if (lastValidation && (lastValidation.errores || []).length > 0) return;
 
@@ -346,11 +621,10 @@
             CDI.state.operacion.sbt_sufijo_valor = sbtInput.value.trim();
         }
         // Validación frontend: si está vacío, mostrar error junto al campo.
-        // No hace falta si todos los productos van en subítems con sufijo
-        // propio (SUBITEMS-1; el servidor tampoco lo pide).
-        const itemsSufijo = CDI.state.items || [];
-        const todosConSufijoPropio = itemsSufijo.length > 0 && itemsSufijo.every(it =>
-            Array.isArray(it.subitems) && it.subitems.length && it.subitems.every(s => String(s.sufijo || '').trim()));
+        // No hace falta si todos los productos llevan sufijo propio, en sus
+        // subítems (SUBITEMS-1) o en «Lo que decide el despachante»
+        // (SUFIJOS-1); el servidor tampoco lo pide.
+        const todosConSufijoPropio = Boolean(CDI.despachante && CDI.despachante.todosConPropio());
         if (!CDI.state.operacion.sbt_sufijo_valor && !todosConSufijoPropio) {
             if (sbtError) {
                 sbtError.textContent = 'Ingresá el sufijo de valor SBT. Es obligatorio.';
@@ -386,6 +660,7 @@
             return;
         }
 
+        if (CDI.estudios) await CDI.estudios.listo();   // ESTUDIO-1
         const body = buildMariaRequest();
         try {
             const startedAt = Date.now();
@@ -398,15 +673,18 @@
             if (!res.ok || !data || data.success === false) {
                 const detail = (data && (data.detail || data.message)) || res.statusText;
                 // El error de un subítem (su sufijo incluido) va bajo ese
-                // subítem, en el paso de NCM (SUBITEMS-1).
-                const sub = typeof detail === 'string' && /^Item (\d+), sub-ítem (\d+): /.exec(detail);
+                // subítem, en el paso de NCM (SUBITEMS-1, MARIA-9).
+                const sub = typeof detail === 'string' &&
+                    /^(?:Item|Sufijo de valor del ítem) (\d+), sub-ítem (\d+): /.exec(detail);
                 if (sub && CDI.ncmBatch && CDI.ncmBatch.marcarErrorDeSubitem &&
                         CDI.ncmBatch.marcarErrorDeSubitem(parseInt(sub[1], 10) - 1, parseInt(sub[2], 10) - 1, detail)) {
                     CDI.goTo('ncm');
                     throw new Error(detail);
                 }
-                // Si el error es de SBT, mostrar junto al campo y volver a validación
-                if (typeof detail === 'string' && detail.toLowerCase().includes('sbt')) {
+                // Si el error es de SBT o del sufijo de la operación, mostrar
+                // junto al campo y volver a validación
+                if (typeof detail === 'string' && (detail.toLowerCase().includes('sbt') ||
+                        detail.startsWith('Sufijo de valor de la operación: '))) {
                     if (sbtError) {
                         sbtError.textContent = detail;
                         sbtError.hidden = false;
@@ -414,8 +692,16 @@
                     CDI.goTo('validating');
                     throw new Error(detail);
                 }
-                // Los controles de antes de generar llegan como {errors: [...]}.
-                const texto = (detail && Array.isArray(detail.errors)) ? detail.errors.join(' ') : detail;
+                // El seguro calculado con otros importes se resuelve en
+                // «Ajustes y seguro» (VALOR-1c).
+                if (typeof detail === 'string' && detail.startsWith('Seguro: lo calculó el sistema')) {
+                    CDI.goTo('validating');
+                    throw new Error(detail);
+                }
+                // Los controles de antes de generar llegan como {errors: [...]};
+                // el tope de regeneraciones de un mismo id, como {code, message}.
+                const texto = (detail && Array.isArray(detail.errors)) ? detail.errors.join(' ')
+                    : (detail && typeof detail === 'object' && detail.message) ? detail.message : detail;
                 throw new Error(texto || 'No se pudo generar el archivo');
             }
             lastMaria = {
@@ -441,7 +727,8 @@
         } catch (err) {
             console.error('[ready] generate error', err);
             CDI.track('maria_generate_error', { message: String(err && err.message || err) });
-            showReadyError(String(err && err.message || err));
+            // Un 402 trae la razón (impago, vencido, tope); el modal ya salió.
+            showReadyError(String((err && err.motivo) || (err && err.message) || err));
         } finally {
             generateInFlight = false;
         }
@@ -467,10 +754,13 @@
         const incoterm = (op.incoterm || '').toString().trim().toUpperCase();
 
         const factura = numeroDeFactura(op);
+        // Sin factura, el id sale de cuándo se cargó la operación: regenerar
+        // la misma no la cuenta otra vez.
+        const cargada = (CDI.state && CDI.state.uploadedAt) || new Date().toISOString();
         const operation_id = factura ? ('FAC_' + factura.replace(/[^a-zA-Z0-9_-]/g, '')) :
-            ('OP_' + new Date().toISOString().replace(/[^0-9]/g, '').slice(0, 14));
+            ('OP_' + String(cargada).replace(/[^0-9]/g, '').slice(0, 17));
 
-        const items = (CDI.state.items || []).map(it => ({
+        const items = (CDI.state.items || []).map((it, i) => ({
             pieza: String(it.pieza || '').trim(),
             descripcion: String(it.descripcion || '').trim(),
             origen: String(it.origen || 'XX').trim().toUpperCase() || 'XX',
@@ -479,9 +769,14 @@
             peso_unitario: toNumber(it.peso_unitario, 0),
             codigo_parte: String(it.codigo_parte || '').trim(),
             grupo_id: it.grupo_id || null,
-            unidad: it.unidad || null,
+            // MARIA-7: la de la factura y la estadística, elegidas en «Lo
+            // que decide el despachante».
+            ...(CDI.despachante && CDI.despachante.unidadesDe ? CDI.despachante.unidadesDe(it, i)
+                : { unidad: it.unidad || null }),
             estado: it.estado || null,
             iva_adicional: it.iva_adicional || null,
+            // El suyo o el propuesto del arancel; vacío, el de la operación (SUFIJOS-1).
+            sufijo: (CDI.despachante && CDI.despachante.sufijoDe ? CDI.despachante.sufijoDe(it, i) : '') || null,
             // Partido en subítems (SUBITEMS-1); sin subítems no va el campo.
             subitems: subitemsDelPedido(it)
         }));
@@ -497,12 +792,16 @@
 
         return {
             operation_id: operation_id,
+            // El número real, para LDVDREFDOC (MARIA-7).
+            numero_factura: factura,
             items: items,
             ...(CDI.despachante ? CDI.despachante.valores()
                 : { banco_bcra: '', empresa_digitalizacion: null, iva_adicional: null }),
             moneda: moneda,
             incoterm: incoterm,
             cuit_agr: cuit_agr,
+            // ESTUDIO-1: si hay uno elegido, su CUIT manda sobre cuit_agr.
+            estudio_id: CDI.estudios ? CDI.estudios.elegido() : '',
             vendedor_nombre: String(op.vendedor_nombre || '').trim(),
             vendedor_id: String(op.vendedor_id || '').trim(),
             comprador_nombre: String(op.comprador_nombre || '').trim(),
@@ -515,10 +814,14 @@
                 op.comprador_fecha_inic_activ ||
                 (cliente && cliente.fecha_inic_activ) || ''
             ).trim(),
-            flete: toNumber(op.flete, 0),
-            seguro: toNumber(op.seguro, 0),
+            flete: montoDelPedido(op.flete),
+            seguro: montoDelPedido(op.seguro),
+            seguro_calculado: !!op.seguro_calculado,
             // MARIA-3: el servidor decide si van al TXT (sólo EXW, FCA o FAS).
-            gastos_anteriores_fob: toNumber(op.gastos_anteriores_fob, 0),
+            gastos_anteriores_fob: montoDelPedido(op.gastos_anteriores_fob),
+            // VALOR-1: sólo para las cuentas; no van al TXT (D12).
+            ajustes_incluir: ajusteDelPedido(op.ajustes_incluir),
+            ajustes_deducir: ajusteDelPedido(op.ajustes_deducir),
             procedencia: (function () {
                 const raw = String(op.procedencia || '').trim();
                 return (raw && CDI.paisesMaria && CDI.paisesMaria.resolve(raw)) || raw;

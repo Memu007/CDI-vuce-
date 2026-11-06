@@ -182,14 +182,15 @@ def auth_headers():
 def auth_override():
     """Autentica los endpoints sobreescribiendo la dependencia get_current_user.
 
-    Evita escribir en la DB (sin locks ni flakiness por orden de tests).
-    Devuelve el dict de user falso por si el test quiere inspeccionarlo.
-    Limpia el override al terminar.
+    Crea la fila de test_user si falta. Devuelve el dict de user falso por si
+    el test quiere inspeccionarlo. Al terminar limpia el override y retira lo
+    que la prueba le contó a test_user (ver _retirar_lo_contado).
     """
     from proyecto_maria.main import get_current_user
     from proyecto_maria.database.connection import AsyncSessionLocal
     from proyecto_maria.database.models import User as DBUser
-    from sqlalchemy import select
+    from proyecto_maria.database.models import Operation as DBOperation, OperationItem as DBOperationItem
+    from sqlalchemy import delete, select, update
     import asyncio
 
     fake_user = {
@@ -224,12 +225,32 @@ def auth_override():
                 )
                 session.add(u)
                 await session.commit()
-                
-    asyncio.run(_ensure_test_user_exists())
-    
+            return u.ops_used_this_period or 0, set(
+                (await session.execute(select(DBOperation.id).where(
+                    DBOperation.owner_username == "test_user"))).scalars())
+
+    # test_user es compartido y su plan tiene tope de operaciones, y generar
+    # el MARIA de un id cuenta (COBRO-CORTE-1): al terminar, cada prueba le
+    # devuelve el cupo y retira las operaciones de MARIA que creó, para que
+    # un id fijo no acumule regeneraciones de otras pruebas.
+    async def _retirar_lo_contado(usadas, previas):
+        async with AsyncSessionLocal() as session:
+            nuevas = [i for i in (await session.execute(select(DBOperation.id).where(
+                DBOperation.owner_username == "test_user",
+                DBOperation.generated_file.is_not(None)))).scalars() if i not in previas]
+            if nuevas:
+                await session.execute(delete(DBOperationItem).where(DBOperationItem.operation_id.in_(nuevas)))
+                await session.execute(delete(DBOperation).where(DBOperation.id.in_(nuevas)))
+            await session.execute(update(DBUser).where(DBUser.username == "test_user")
+                                  .values(ops_used_this_period=usadas))
+            await session.commit()
+
+    usadas, previas = asyncio.run(_ensure_test_user_exists())
+
     app.dependency_overrides[get_current_user] = lambda: fake_user
     yield fake_user
     app.dependency_overrides.pop(get_current_user, None)
+    asyncio.run(_retirar_lo_contado(usadas, previas))
 
 @pytest.fixture(autouse=True)
 def reset_environment():

@@ -6,9 +6,329 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-05 · feat: se retira la interfaz vieja (v1)
+
+- **feat(ui):** `/dashboard` sirve siempre la v2. Se van `dashboard.html`, `static/app.js` y `app.css`; `?v=1` y la cookie `cdi_ui` ya no cambian la pantalla. Ninguna ruta de API cambia.
+- **test:** se destapan veinte tests que esperaban `python-magic`, instalado hace tiempo.
+
+## 2026-11-05 · chore: repositorio ordenado (LIMPIEZA-1; la primera parte, CI y Google Cloud, es del 2026-10-28)
+
+- **chore(ci):** la CI ya no excluye a mano las 10 pruebas de presupuestos públicos, CSRF y el botón de NCM automático; una prueba falla si vuelve a sacar alguna.
+- Se borran `cloudbuild.yaml`, `setup_gcp.sh`, `scripts/deployment/deploy-cloud-run.sh` y las cinco guías de Google Cloud: el sitio se publica sólo por Railway.
+- **chore(repo):** se borra lo que ya no corre ni se cita: la `static/` de la raíz, `clients.json`, el script de migración desde JSON, `tests/old/`, `landing_legacy.html`, los informes de carga, los planes de otras herramientas (`.specify/`, `plans/`), la documentación duplicada o de chat (`docs/fixes`, `docs/misc`, `docs/guides`, `proyecto_maria/documentacion_tecnica`) y los scripts huérfanos de `scripts/`. Nada del producto cambia; todo queda en Git.
+- **docs(repo):** README nuevo con el stack real, cómo correr en local, cómo correr las pruebas y dónde está cada cosa; reemplaza a `QUICK_START.md`, `ARCHITECTURE.md` y `setup.sh`. Los planes de valuación pasan a `docs/negocio/`. `.gitignore` sin entradas personales.
+
+## 2026-11-05 · fix: una sesión sin token CSRF lo recibe sola (CSRF-3)
+
+- **fix(seguridad):** si la sesión es válida y le falta la cookie `csrf_token`, la próxima lectura autenticada se la emite; la pantalla v2 ya la trae al abrir y escribe sin volver a entrar. Una sesión vencida, revocada o ausente no recibe nada, y un token que ya está no se cambia.
+
+## 2026-11-05 · fix: con CSRF exigido, la landing y la pantalla vieja escriben y la recuperación de cuenta anda (CSRF-2)
+
+- **fix(seguridad):** el control CSRF exenta sólo rutas exactas (login, registro y las tres de recuperación de cuenta): ya no saltea rutas que empiezan parecido ni las que dicen «webhook». `static/csrf.js` agrega el token a las escrituras de la landing y de la pantalla vieja, incluido su «Salir».
+
+## 2026-11-05 · fix: cerrar sesión desde otro sitio ya no borra la sesión (CSRF-1, vuelta 2)
+
+- **fix(seguridad):** `/auth/logout` y `/logout` sólo borran cookies si llegó la de sesión: un formulario de otro sitio, que llega sin cookies, ya no cierra la sesión, esté o no exigido el token CSRF. El alias delega en `/auth/logout` y ahora también borra `csrf_token`. Si el cierre no se confirma, «Salir» avisa y no lleva al inicio.
+
+## 2026-11-05 · fix: con CSRF exigido, la telemetría de la página llega y cerrar sesión pide el token (CSRF-1)
+
+- **fix(seguridad):** la telemetría de la pantalla nueva manda el token CSRF, así deja de rechazarse con 403; cerrar sesión (`/auth/logout`) ya no está exento y sin el token da 403. El botón «Salir» lo manda y, si el servidor rechaza el cierre, lo avisa en vez de llevar al inicio con la sesión abierta.
+
+## 2026-11-05 · fix: el aviso de cancelar mira la organización (COBRO-MP-1, vuelta 5)
+
+- **fix(cobro):** en una cuenta con organización, la confirmación de «Cancelar plan» dice si se corta el acceso según el estado de la organización, que es el que muestra el perfil y el que da el acceso, y no según la fila del usuario.
+
+## 2026-11-05 · fix: toda cuenta con una suscripción de Mercado Pago abierta puede cancelarla (COBRO-MP-1, vuelta 4)
+
+- **fix(cobro):** «Cancelar plan» aparece y funciona con una suscripción abierta sea cual sea el estado de la cuenta (sin plan, vencida u otro), así el checkout que la nombra tiene salida; cancelar no da acceso a quien no lo tenía.
+- **fix(cobro):** la confirmación de cancelar promete «el período ya pagado» sólo si cancelar no corta el acceso, como lo decide el servidor; «pago pendiente» queda para el plan vencido.
+- **fix(cobro):** esa confirmación ya no promete días a la cuenta en gracia ni a la de prueba vencida: cancelar las deja sin acceso, y su respuesta ya no trae `service_until`.
+
+## 2026-11-05 · fix: al volver del pago, la pestaña no toma los datos de otro usuario que entró (ORDEN-1b, vuelta 2)
+
+- **fix(sesión):** si mientras se volvía de Mercado Pago entró otro usuario en el mismo navegador, la pestaña ya no muestra su nombre ni sus datos, y se tapa en cuanto intenta guardar o escribir.
+- Lo mismo al abrir: si otro usuario entró antes de que la pestaña supiera de quién es, se tapa sin mostrar su nombre ni sus datos.
+
+## 2026-10-29 · fix: una renovación de Mercado Pago no se pierde por el orden de sus avisos (COBRO-MP-1, vuelta 3)
+
+- **fix(cobro):** si un aviso de pago todavía no dice de qué cuenta es (o el cobro llega con su pago pendiente), se responde para que Mercado Pago reintente en vez de anotarlo como rechazado: el otro aviso del mismo pago lo acredita una sola vez.
+- Si Mercado Pago ya no conoce la suscripción guardada (404), «Activar plan» y «Cancelar plan» siguen en vez de dar error.
+
+## 2026-10-29 · fix: el checkout no cancela una suscripción de Mercado Pago que sigue activa (COBRO-MP-1, D13)
+
+- **fix(cobro):** con la cuenta impaga, vencida o cancelada y una suscripción todavía autorizada en Mercado Pago, «Activar plan» ya no la cancela para crear otra (podía ser un pago recién hecho): avisa que esperes unos minutos o que canceles el plan primero.
+
+## 2026-10-29 · fix: una pestaña vieja no escribe a nombre del usuario que entró después (ORDEN-1b)
+
+- **fix(orden):** si entra otro usuario en el mismo navegador, la pestaña del anterior no genera, no guarda, no manda telemetría ni cierra la sesión del otro: antes de escribir pregunta quién es, y si es otro se tapa y pide recargar. Si volvés a entrar vos, sigue sin trabar.
+- La pestaña que no pudo recuperar la operación porque la sesión estaba cambiando lo avisa y la recupera cuando confirma que la sesión es tuya.
+- Con la sesión cerrada, escribir manda al login como antes; si no puede comprobar quién es, «Salir» lo avisa en vez de ir al inicio con la sesión abierta.
+
+## 2026-10-29 · fix: Mercado Pago no cobra dos veces y cuenta bien las operaciones (COBRO-MP-1, vuelta 2)
+
+- **fix(cobro):** dos pagos de la misma cuenta al mismo tiempo se acreditan los dos; si no se puede leer Mercado Pago se responde para que reintente, y un pago que no sirve queda anotado como rechazado en el panel de desarrollo, también si trae un dato que no entra en la base.
+- Si ya tenés el tope de 100 operaciones extra, la recarga no arma el link de pago y te dice por qué; un pago que no entra en el tope queda rechazado a la vista, no aplicado a medias.
+- Una exportación con cliente elegido cuenta una sola operación en la pantalla v1, y los nombres de archivo de exportación ya no chocan con los de importación.
+
+## 2026-10-29 · fix: una pestaña duplicada no pierde la operación de otra si cambia la sesión (ORDEN-1, vuelta 3)
+
+- **fix(orden):** si mientras una pestaña busca la operación que dejaste entra otro usuario, se cierra la sesión o volvés a entrar, ya no se la muestra al otro usuario ni la deja sin dueño: queda guardada a tu nombre.
+- Un clic sin mouse (con el teclado o un lector de pantalla) también cuenta como tocar la pestaña: la operación de antes de recargar no la pisa.
+- Si la consulta de quién es el usuario tarda más de 10 s, la pestaña no guarda la operación y lo avisa; vuelve a guardar cuando la consulta contesta.
+
+## 2026-10-28 · fix: una cuenta cancelada que reabrió el checkout puede cancelar la suscripción nueva (COBRO-MP-1)
+
+- **fix(cobro):** si reactivó un plan pagado, abrió el checkout y el primer cobro no entró, «Cancelar plan» vuelve a aparecer y cancela en Mercado Pago la suscripción nueva; antes daba 409 y la suscripción seguía viva.
+
+## 2026-10-28 · fix: la operación recuperada tarde no pisa lo que se está haciendo (ORDEN-1, vuelta 2)
+
+- **fix(orden):** si el usuario tarda en llegar al recargar y mientras tanto se cambió de pantalla o se empezó a subir un archivo, la operación de antes queda guardada y se avisa, sin mover la pantalla.
+- Avisa también cuando la pestaña abre con otro usuario, cuando la consulta de la sesión no contesta en 10 s y cuando el navegador no tiene lugar para recuperar la operación.
+- Tampoco la pisa si ya se tocó la pestaña (por ejemplo, con el diálogo de archivos abierto); y si el usuario no llega en 4 s, avisa que no guarda hasta que llegue.
+
+## 2026-10-28 · fix: la pestaña comprueba la sesión antes de guardar y avisa cuando no guarda (ORDEN-1, devolución 20:08)
+
+- **fix(orden):** si alguien sale y entra con otro usuario, o la sesión se cierra, la pestaña deja de guardar la operación y lo dice en un aviso arriba; si vuelve a entrar el mismo usuario, sigue guardando.
+- La operación de antes de recargar vuelve aunque la consulta del usuario tarde; también avisa cuando el navegador no tiene lugar para guardarla.
+
+## 2026-10-28 · fix: un solo pedido de pago a la vez por cuenta (COBRO-MP-1 D)
+
+- **fix(cobro):** dos pedidos de pago a la vez dejan una sola suscripción viva en Mercado Pago, la que CDI guarda; cancelar mientras corre uno espera y cancela también la que ese pedido creó.
+- «Activar plan», «Reactivar plan» y el «Activar plan» del aviso de arriba quedan deshabilitados mientras esperan el pedido y mientras el navegador va a Mercado Pago, así un segundo clic, en ese botón o en otro, no pide otro pago. Volver de Mercado Pago con «Atrás» recarga la página.
+
+## 2026-10-28 · fix: se puede cancelar un plan vencido y una prueba con recarga se reactiva como prueba (COBRO-MP-1 C y E)
+
+- **fix(cobro):** desde «plan vencido» se puede cancelar: se cancela también en Mercado Pago, así no vuelve a cobrar cuando la tarjeta pasa, y la cuenta no gana días por cancelar.
+- Reactivar una prueba que sólo compró una recarga la vuelve a la prueba con sus días; ya no pide pagar ni dice «período ya pagado».
+- Un pago rechazado no cuenta como historial de pagos: una cuenta que pagó el plan antes del registro sigue yendo al checkout al reactivar.
+
+## 2026-10-28 · fix: la exportación también cuenta la operación, una vez por id (COBRO-MP-1 B)
+
+- **fix(cobro):** generar el MARIA de exportación cuenta como el de importación: la primera vez de cada operación; con el tope lleno, la nueva da 402 y la ya contada sigue saliendo.
+
+## 2026-10-28 · fix: un pago de Mercado Pago de antes del registro no se vuelve a aplicar (COBRO-MP-1 A)
+
+- **fix(cobro):** un pago aprobado antes de que empezara el registro de pagos (o sin fecha de aprobación legible) no renueva ni reactiva la cuenta aunque se reenvíe; queda rechazado, a la vista en los pagos rechazados del admin.
+
+## 2026-10-28 · fix: la operación sin terminar es de quien la dejó y vence a los 7 días (ORDEN-1, devolución)
+
+- **fix(borrador):** al abrir sólo se recupera una operación del mismo usuario y de hace menos de 7 días; las más viejas se borran. Una pestaña duplicada no toma la operación de la original mientras sigue abierta; al recargar o restaurar se recupera la propia.
+- Si al abrir no se puede saber quién es el usuario (error del servidor o corte), la pestaña lo vuelve a pedir y la operación se sigue guardando.
+- Si mientras tanto otro usuario entra en el mismo navegador, lo cargado en esa pestaña no se guarda a su nombre ni él lo recupera.
+
+## 2026-10-28 · feat: copia de la base que se restaura y se compara antes de darla por buena (BACKUP-1a)
+
+- **feat(datos):** `scripts/datos/copia_base.py` saca la copia de Postgres (`pg_dump -Fc`), la restaura en una base descartable y compara, tabla por tabla, la cantidad de filas y un resumen del contenido; si no da igual, sale con error y no la marca como verificada.
+- `enviar` lleva sólo una copia verificada y sin cambios a una carpeta local de prueba. Adónde va de verdad y cuándo corre lo define Emi; todavía no corre en producción.
+
+## 2026-10-28 · fix: los roles guardados como texto no dan administrador por una parte (AISLAMIENTO-2)
+
+- **fix(permisos):** si la columna de roles guarda un texto o un objeto en vez de una lista, «administrador» o {"admin": false} ya no cuentan como admin, ni en las rutas de administración ni en require_role. Un texto vale como un único rol entero.
+
+## 2026-10-28 · fix: cancelar también cancela en Mercado Pago y no se paga dos veces (COBRO-MP-2)
+
+- **fix(cobro):** cancelar en CDI cancela la suscripción en Mercado Pago y la cuenta sigue hasta el fin del período; si Mercado Pago no confirma, no se cancela nada y se avisa. Con una suscripción vigente, el checkout no deja pagar otra; si la vieja no se pudo cobrar, se cancela antes de crear la nueva.
+- Un pago suma 30 días desde el fin de la prueba o del período, sin perder días. Reactivar una suscripción cancelada lleva a pagar y lo dice antes; sin el token de Mercado Pago, fuera de pruebas, no hay pago simulado ni «cuenta activada».
+
+## 2026-10-28 · fix: una operación se cuenta una vez, al generar su MARIA, y el corte dice por qué (COBRO-CORTE-1)
+
+- **fix(cobro):** la operación se crea y se cuenta la primera vez que se genera el MARIA de su id; regenerarla o guardarla después no cuenta otra vez (hasta 10 versiones distintas por id). Con el tope lleno se sigue validando y bajando lo ya contado. La cuenta se bloquea mientras se cuenta: dos pedidos a la vez no pasan el tope ni repiten el número de operación.
+- Una cuenta impaga, vencida o cancelada ya no lee facturas en PDF, ni sugiere NCM, ni arma el Excel o el MARIA, ni importa clientes, ni guarda. Cada 402 dice su razón: pago pendiente, prueba o suscripción vencida, cancelada o tope del plan.
+
+## 2026-10-28 · fix: cada pago de Mercado Pago se aplica una sola vez y por su monto (COBRO-MP-1)
+
+- **fix(cobro):** un pago se anota por su `payment_id` y no se vuelve a aplicar aunque el aviso llegue repetido, alternado con otro o dos a la vez. Pagar con la cuenta activa extiende desde el fin del período; vencida, desde hoy.
+- El monto y la moneda se comparan con el precio del link cuando se armó (o con el de la suscripción en Mercado Pago); si no coinciden, no se aplica y Emi lo ve en el panel. Las renovaciones de una suscripción ahora extienden el período (antes se ignoraban).
+- El pago se reconoce por el id que da Mercado Pago (escrito de otra forma, «0123» o «123#a», no se aplica otra vez); un id con barras se rechaza sin consultarlo, y el último pago de antes de este cambio tampoco se reaplica.
+
+## 2026-10-28 · fix: una subida chica de Excel no espera detrás de las pesadas (EXCEL-2b)
+
+- **fix(excel):** un libro chico (hasta 2 MiB de XML descomprimido sin contar las imágenes; un `.xls`, por su tamaño; umbral en `EXCEL_LIVIANO_MB`) valida y se lee en hilos propios. Antes esperaba ~30 s detrás de ocho planillas pesadas; medido ahora, 1,5 y 1,7 s. Ante cualquier duda (índice largo, zip64, un índice que no se puede leer, algo que no es zip) va al carril de siempre.
+- Un tope de subida que no sirve vale el de defecto: los cuatro de Excel en MB, `EXCEL_MAX_ELEMENTOS_ESTILOS` y `MAX_UPLOAD_MB`, si no son un número finito o si en bytes o elementos dan 0 (`1e308`, `inf`, `nan`, `-0`, `1e-9`). Antes daban error o un tope de 0. Medio MB sí es un tope (512 KiB).
+- Límite conocido hasta EXCEL-2c: un libro de 1,5 KB armado para ser lento (una celda en la fila 1.048.576) entra al carril liviano y tarda unos 10 s y 1,5 GB en leerse; mientras tanto, una subida normal espera.
+
+## 2026-10-28 · feat: reordenar productos arrastrando, también los grupos, y cada pestaña con su borrador (ORDEN-1)
+
+- **feat(revisión):** en la tabla de productos un grupo se arrastra entero y se puede soltar un producto sobre él; el orden que queda es el del pedido y el del TXT, con los ítems numerados corridos. Ctrl+Z después de arrastrar ya no vuelve el orden viejo.
+- **fix(borrador):** cada pestaña guarda su operación en su propia clave: dos pestañas abiertas no se pisan y la que queda en la carga de archivos no borra la de otra. Al abrir, se recupera la propia o la más reciente de una pestaña cerrada.
+
+## 2026-10-28 · feat: el destino de la mercadería sale de a pares en el TXT (DESTINO-1)
+
+- En la pantalla de validación, «Destino de la mercadería» ofrece comercialización o reventa (por defecto), bien de uso de la empresa o bien de uso de una persona, por operación y con cambio por producto.
+- El TXT saca GANANCIASOP3 e IVAADICIONAL1 de a pares: COMERC + NO_VALIDA, BDEUSO + IVAAD2 o USOPAR + IVAAD1. Antes GANANCIASOP3 salía siempre COMERC. Un valor fuera de esos tres no genera el archivo.
+
+## 2026-10-28 · fix: la sugerencia de NCM no pierde la SIM completa del proveedor (GUARDAR-2, D32 b)
+
+- **fix(sugerencia):** si el historial del cliente tiene el NCM de 8 dígitos y el catálogo del proveedor tiene, para el mismo producto (la misma descripción, no una parecida), la SIM completa que empieza con esos 8, el autorrelleno (`/api/catalog/lookup`) y `/api/ncm/sugerir` traen la del proveedor. Desde GUARDAR-1 llegaba `84714900` y la pantalla marcaba incompleto lo que antes llegaba listo. Sin migración.
+
+## 2026-10-28 · feat: el catálogo del cliente se baja en Excel (DESPACHO-1a)
+
+- En la pestaña Catálogo del cliente, «Descargar en Excel» baja los productos aprendidos de ese cliente, un renglón por producto y en el mismo orden que la pantalla: posición (como texto, con ceros y letra), descripción, origen, valor unitario, cantidad y peso promedio, veces usado y última vez.
+- Un texto que empieza con =, +, - o @ queda como texto, no como fórmula.
+
+## 2026-10-27 · feat: el registro con invitación viene con el email invitado (ORG-1b)
+
+- Al abrir el enlace de una invitación válida, el email del registro ya viene completo con el email invitado y no se puede cambiar; una línea lo explica. Sin invitación válida, el campo queda como antes.
+
+## 2026-10-27 · fix: invitaciones al estudio sin 500, atadas al email, con tope del plan y de un solo uso (ORG-1)
+
+- Validar o usar una invitación ya no da error 500 en Postgres. La invitación sólo sirve para registrarse con el email invitado, y el estudio no pasa de los usuarios de su plan (el dueño incluido; al invitar cuentan también las invitaciones pendientes sin vencer).
+- La invitación se gasta en la misma transacción que el alta y sólo si seguía pendiente: dos registros a la vez con el mismo enlace dejan un usuario y un 400, no dos altas ni un 500.
+
+## 2026-10-27 · fix: un cargo en plural, que no viene primero o en Item con otra descripción se avisa con su fila (EXCEL-3f)
+
+- **fix(excel):** «Fletes», «Seguros», «Bank fees» o «Fee» se leen como el cargo en singular. «Ocean freight», «Courier DHL», «2. Insurance», un cargo con su propio origen o «Freight» en Item con la descripción escrita otra vez entran al FOB como antes, pero con un aviso que nombra su fila. Una fila con su propia NCM no lleva ese aviso.
+- El aviso del flete nombra todas sus filas como los demás («filas 3, 4, … y N más»).
+- **fix(datos):** el error del script de fechas de inicio de actividad tapa la clave de la base como la escriba SQLAlchemy o el driver: con un espacio y otro carácter escapado en la misma clave, %XX en minúscula, «+» o escapes de Python y JSON (H1-bis).
+
+## 2026-10-27 · fix: miles mal formados en cantidades, precios y pesos; aviso por más de dos decimales (SEPARADORES-1d)
+
+- La factura y la planilla dejan sin leer una cantidad, un precio o un peso que sólo se puede leer como miles mal armados («0.500.000»), como ya hacían con el flete y el seguro: queda vacío y la revisión lo marca, en vez de llegar por mil al TXT.
+- Si el flete o el seguro tienen más de dos decimales, la revisión avisa sin frenar qué lleva el TXT («2500,1250» → 2500,13). El TXT no cambia.
+
+## 2026-10-27 · fix: lo que va al TXT por producto es lo que muestra su celda (SUFIJOS-1, vuelta)
+
+- Si el arancel de ARCA no contestó, todavía consulta o hay más de 500 productos, no viaja nada de la propuesta (ni sufijo ni kilos) y la celda y los avisos lo dicen. Lo escrito en el sufijo de la operación gana: la propuesta sólo agrega los códigos que faltan y avisa en la fila si propone otro valor.
+- Una celda escrita avisa si después cambia el sufijo de la operación; un grupo y un producto con sub-ítems ya no llevan un sufijo propio que no se ve. Con el de la operación vacío y todos los productos con el propio, se avisa sin frenar (D23).
+
+## 2026-10-27 · fix: miles mal formados, blancos raros y la pregunta de la pantalla (SEPARADORES-1c)
+
+- En la factura, un flete o seguro con grupos de miles mal formados («0750.000», «7500.000.000») queda sin leer con aviso, en vez de leerse por mil. En la pantalla, «01234.500» pregunta y «01.500.000» no cierra.
+- Un importe con un carácter que la pantalla no lee (\x85, \x1c a \x1f) ya no sale como 0 en el TXT: el servidor lo rechaza con mensaje.
+- La pregunta de la pantalla propone las dos formas como se leen («¿2500125 o 2500,1250?») y conserva el signo.
+
+## 2026-10-27 · fix: la importación sigue la regla del alta y el script de datos no muestra la clave (vuelta de CLIENTE-1c)
+
+- **fix(clientes):** la fecha de inicio de actividad importada pasa por la misma regla que el alta (D25 b): año de dos cifras, dígitos de ancho completo o DD-MM-AAAA quedan vacíos con aviso en su fila; una celda con formato fecha de Excel se importa.
+- **fix(datos):** el script lee la base, la clave y el lugar de lo mismo que conecta; una clave con «/», «?», «#», «[» o caracteres de ancho completo ya no se ve ni da traceback, y tapar no corta palabras del mensaje.
+
+## 2026-10-27 · fix: generar con el CUIT del perfil también cuenta como último usado (ESTUDIO-1b)
+
+- **fix(estudios):** la operación siguiente trae elegido lo último con que se generó, estudio o CUIT del perfil; un estudio único gana sólo si el perfil nunca se usó. Un `estudio_id` que no es vacío ni de la cuenta («null», espacios, un número) da 400 y no cae al perfil.
+- El nombre del estudio no admite caracteres invisibles ni controles de dirección.
+
+## 2026-10-25 · feat: el sufijo de valor de cada producto, con el arancel de ARCA (SUFIJOS-1)
+
+- En «Lo que decide el despachante» cada producto propone su sufijo (marca AA, modelo AB, código AI) según el arancel de ARCA del 07/10/2026 junto con el de la operación (CA00 y los demás quedan) y dice qué falta; una posición que no está queda vacía y se avisa, con la letra de control correcta si la que vino es otra. Sin elegir, la unidad estadística va en kilos si la posición la pide.
+- Un producto entero sale con su propio sufijo (antes, el de la operación). Un grupo exige el mismo sufijo en todos sus ítems.
+- En un grupo no hay celda de sufijo por producto (va uno para todo el grupo); si la propuesta junto con el de la operación pasa de 120 caracteres no se propone nada; una NCM de 8 dígitos se avisa como posición incompleta, no como fuera del arancel.
+
+## 2026-10-25 · fix: la fecha de inicio de actividad de la operación pasa por la regla del alta y la importación no guarda una que no sirve (CLIENTE-1c)
+
+- **fix(clientes):** la operación copia a la ficha vacía sólo una fecha válida (guardada AAAA-MM-DD); si no sirve no se copia y la operación se guarda igual. La importación deja vacía la fecha que no sirve y la vista previa avisa la fila; el año sale siempre con cuatro cifras.
+- La ficha avisa la fecha guardada con el mismo criterio que el generador del TXT (también con dígitos de ancho completo). El script de datos no muestra la clave de la base en sus errores.
+
+## 2026-10-25 · fix: un cargo con medidas «/», «-» o 0 no entra como producto (EXCEL-3e)
+
+- **fix(excel):** «/», «-», 0, un negativo («-1 m», «–1»), un texto sin cifras («N/A», «一») o vacío no cuentan como medidas ni se escriben en la descripción («ancho - m»): el flete, el seguro o el descuento con la especificación combinada y su rótulo en Item ya no pasan por renglón del grupo; se leen como flete o descuento, o quedan sin leer con aviso. Un renglón sin descripción ni medidas tampoco hereda la de arriba: queda sin leer, con aviso; con la descripción combinada y sin rótulo propio sigue siendo del grupo y conserva el código.
+
+## 2026-10-25 · feat: los estudios de la cuenta para el CUIT del despachante (ESTUDIO-1)
+
+- **feat(estudios):** en «Mi perfil», «Mis estudios» se cargan los estudios (nombre y CUIT) de la cuenta; en la operación se elige uno, con el último usado o el único ya elegido, y su CUIT va al CDDTAGR. Sin estudio sigue el CUIT del perfil; cada usuario ve, borra y usa sólo los suyos.
+- El CUIT del estudio se guarda sólo si su verificador es correcto. Sin CUIT del despachante, el aviso y el error dicen dónde cargarlo.
+
+## 2026-10-25 · fix: lo que empieza como un cargo no cambia el FOB sin avisar su fila (EXCEL-3d)
+
+- **fix(excel):** con algo copiado de una combinada, «Flete int.» o «Freight elevator» se leen como flete, con un aviso que nombra la fila; «Payment terminal POS» entra como producto con ese aviso, y un rótulo que dice más que el cargo («Gastos administrativos», «Insurance as per policy») queda sin leer o entra con él: ninguno cambia el FOB en silencio. El renglón de un grupo queda afuera o entra igual que su cabecera, y la fila que copia la descripción de un flete, seguro o gasto combinado queda afuera como esa fila aunque traiga un texto propio en Item («A2», «#3»).
+- Todo renglón que entra sin precio se avisa al subir, con sus filas (hasta cinco por número).
+
+## 2026-10-25 · fix: la proforma con combinadas, sin perder productos ni sumar cargos (EXCEL-3c)
+
+- **fix(excel):** con el origen combinado, un producto con descripción propia que empieza con «Payment», «Handling» o «Seguro» vuelve a entrar; el seguro, el pago, los gastos o el handling cuyo rótulo dice sólo el cargo («Insurance», «Seguro de carga», «Payment 30% T/T in advance») quedan sin leer, con aviso, aunque la descripción o el origen vengan combinados hasta su fila o el rótulo ocupe dos filas.
+- Una cabecera de grupo sin código vuelve a dar su descripción a los renglones con código propio. Los renglones del grupo que entran sin precio (lo trae sólo el primero o combinado) se avisan al subir.
+
+## 2026-10-25 · fix: la fecha de inicio de actividad se valida al guardar el cliente (CLIENTE-1b)
+
+- **fix(clientes):** el alta y la edición ya no guardan «None» ni una fecha cortada: aceptan AAAA-MM-DD o DD/MM/AAAA (se guarda AAAA-MM-DD), y otra cosa da un error que el formulario muestra sin guardar nada.
+- El aviso de lo que falta para el MARIA pide también la fecha guardada que no es válida; `scripts/datos/clientes_fecha_inic_activ.py` informa por id las que quedaron mal y, con `--arreglar-none`, vacía las «None».
+
+## 2026-10-25 · fix: un monto que no se pudo leer no sale como 0 (SEPARADORES-1b)
+
+- El flete, el seguro o los gastos que la pantalla no pudo leer ya no viajan como 0: el servidor no genera y dice cuál es. Tampoco toma «3.480» como 3,48 ni «1e3» como 1000. Un ajuste así se avisa en las cuentas; frena el TXT sólo si el seguro lo calculó el sistema (D19, D20).
+- «4500.000» o «2500,125»: en la factura, con el otro separador decimal, quedan sin leer y se avisa (antes salían por mil). En la pantalla se pregunta, como con «1,500», sin trabarse si se pega una cifra muy larga.
+
+## 2026-10-25 · fix: el seguro calculado con otros importes no sale sin que se elija (VALOR-1c)
+
+- Si el seguro lo calculó el sistema y los importes cambiaron, no se genera hasta recalcularlo o dejarlo como está; se avisa antes con el mismo texto. Un sufijo general que nadie usa ya no frena ni se avisa (D18).
+- Sin productos se dice «No hay productos para generar», y el error de kilos nombra a todos los renglones cuando el cero sale del ajuste.
+
+## 2026-10-25 · fix: «3.480» es tres mil cuatrocientos ochenta, en la factura y en la pantalla (SEPARADORES-1)
+
+- El flete y el seguro de la factura se leen como texto: «3.480» y «3.480,00» son 3480 (antes el TXT salía con MDDTFLE=3.48). Si la misma factura usa ese separador como decimal, el dato queda sin leer y se avisa.
+- Flete, seguro, gastos y ajustes se escriben a mano con punto de miles y coma decimal. «1,500» no se adivina: la pantalla pregunta si es 1.500 o 1,5.
+
+## 2026-10-25 · fix: «Calcular seguro» sólo usa cuentas del pedido de ahora (VALOR-1b)
+
+- «Calcular seguro» compara el pedido de ahora con el de las cuentas: si cambió un ajuste, el flete, el seguro o el descuento, pide las cuentas de nuevo en vez de usar las viejas. El seguro calculado deja de avisarse como no leído, y si la factura puede traer un seguro sin leer, la tarjeta lo avisa antes de calcularlo.
+- El 1 % del seguro sugerido va sobre el FOB de la factura (D13). Un ajuste o un renglón que no es número va en la tarjeta con un mensaje claro, sin texto de Python, y no frena el TXT.
+
+## 2026-10-25 · fix: el error de kilos nombra sólo el renglón chico (MARIA-9)
+
+- Cuando varios renglones van juntos en un ítem y uno es tan chico que sus kilos al centésimo dan cero, el error nombra ese renglón. Antes nombraba a todos los del ítem. Si ninguno da cero solo y el cero sale del ajuste del redondeo, sigue nombrando a todos.
+- Con procedencia de la operación, la generación ya no pide el sufijo general cuando cada renglón trae el suyo.
+
+## 2026-10-25 · fix: cada error de sufijo sale donde se corrige (MARIA-9)
+
+- En la pantalla de generar, el error del sufijo de la operación sale bajo su campo, y el del sufijo de un sub-ítem bajo ese sub-ítem, en el paso de NCM. Antes los dos salían como error general de la generación.
+
+## 2026-10-25 · fix: el sufijo de la operación frena sólo si alguien lo usa (MARIA-9)
+
+- Si todos los productos traen su propio sufijo de valor, un texto libre en el sufijo de la operación ya no frena el TXT (volvió a generarse con los propios). Cuando algún producto lo toma y no se puede separar, los avisos lo anticipan con el mismo texto del error.
+
+## 2026-10-25 · fix: la tarjeta de ajustes y seguro no usa cuentas viejas (VALOR-1)
+
+- «Usar como ajuste a deducir» ya no pisa un importe escrito a mano; «Calcular seguro» no usa cuentas de otra operación, y funciona aunque todavía no haya operación cargada. Si fallan los avisos, o un producto viene mal formado o fuera de rango, la tarjeta lo dice en vez de quedar vacía o dar error.
+
+## 2026-10-24 · fix: la proforma china sin leer de más (EXCEL-3b)
+
+- **fix(excel):** un subtotal con largo y sin precio, un flete o descuento sin monto y un código nuevo sin especificación ya no toman la descripción del renglón de arriba: quedan sin leer, con aviso. Una nota en «Remarks» no vuelve flete o descuento a un renglón; un «Descuento comercial -500» no entra como producto.
+- La unidad que sale de los encabezados de la cantidad y del precio («Qty (M)», «USD/M») se avisa con las dos columnas; un largo escrito «1,5m» no sale «1,5m m».
+- Las celdas combinadas de un .xls se leen como las de un .xlsx; el flete o descuento con el rótulo en una columna a la izquierda de la descripción («No.», «S/N») se lee.
+- Un origen o una especificación combinados hasta el flete o el subtotal no los vuelven producto; una nota de descuento sin precio no abre un grupo. (El seguro con la descripción combinada seguía entrando: lo arregla EXCEL-3c.)
+
+## 2026-10-24 · fix: la demo de la landing dice «3 PA SIM» (PA-1b)
+
+- **fix(landing):** el paso 3 del progreso de la demo dice «PA SIM», como la aplicación. El encabezado de la tabla de la demo sigue en «NCM» (sus valores son de 8 dígitos): lo decide la PM.
+
+## 2026-10-24 · feat: ajustes y seguro antes de generar (VALOR-1)
+
+- En la pantalla de generar, una tarjeta «Ajustes y seguro»: ajustes a incluir y a deducir que carga la persona, con las cuentas a la vista (FOB de la factura, que es el del TXT, ± ajustes = FOB casillero, flete y seguro). El descuento de la planilla se ofrece con un botón; nunca se pone solo.
+- Botón «Calcular seguro» (1 % de FOB casillero + flete) cuando la operación no trae seguro. La base del 1 % se nombra en el botón y está en un solo lugar del código (sin decidir). El TXT todavía lleva el FOB de la factura; un aviso dice que el FOB casillero va al TXT en una próxima versión.
+
+## 2026-10-24 · fix: devolución de MARIA-7
+
+- Dos sufijos de valor sin guion entre ellos se separan (`AA(ROJO) AB(AZUL)` → `AA(ROJO)-AB(AZUL)`); uno que no se puede separar en códigos (paréntesis sin cerrar, un código sin valor) no genera el TXT y dice dónde está.
+- Con la unidad estadística en kilos, el kilo neto (QARTKGRNET) sale al centésimo, igual a la cantidad estadística, como en el archivo que el MARIA aceptó. «ARABIC» o «ARBANK» ya no se toman por una cuenta del banco.
+- Un grupo compara la unidad estadística y la declarada por su código («1», «01», «kg»); una unidad de medida que no se reconoce sale 07 con un aviso. Un sufijo que separado pasa de 120 caracteres, o un kilo neto que en kilos da 0,00 al centésimo, no generan el TXT.
+
+## 2026-10-24 · fix: MARIA-8, revisión de los sub-ítems por renglón
+
+- Los renglones sin posición no se juntan; un renglón cuya cantidad o kilos dan 0,00 al centésimo no sale como sub-ítem; el unitario del ítem es el FOB sobre la cantidad declarada.
+- Los errores de peso y de sufijo dicen el número del renglón en la pantalla; el sufijo propio de un renglón se valida en el endpoint como los otros y se avisa si se limpió.
+
+## 2026-10-24 · feat: MARIA-8, sub-ítems por renglón
+
+- Los renglones de la factura con la misma posición SIM, origen, procedencia y estado (y la misma unidad, unidad estadística e IVA adicional) van en un solo ítem con un sub-ítem por renglón (`CARTSBITEM=S`), cada uno con su FOB, cantidad, unitario, kilos y sufijo propio o el de la operación.
+- Las sumas del ítem (FOB, cantidad, kilos y cantidad estadística) cierran exactas al centésimo; el redondeo sobrante va al sub-ítem más grande. Los avisos dicen qué renglones van juntos y si todos llevan el mismo sufijo. Los grupos y sub-ítems armados a mano siguen como antes.
+
+## 2026-10-24 · fix: MARIA-7, lo que el MARIA rechazó el 24/10
+
+- Sin CUIT del despachante no se genera el TXT (antes faltaba CDDTAGR en silencio); IDSO, IDDT e IARTESPAPU van con 8 caracteres y LDVDREFDOC con el número real de la factura.
+- Unidad de la factura y estadística elegibles en «Lo que decide el despachante» (m² = 03; en kilos, la cantidad estadística es el kilo neto al centésimo); en los sufijos sólo letras, números y espacios, con aviso; una cuenta del banco (IBAN verificado) no sale como IDTRIB-PROVEEDOR y el código chino de crédito social sí; una factura más larga que LDVDREFDOC se avisa antes de generar.
+- La fecha de la factura se lee en su orden: con el año adelante es año/mes/día (`2026/08/07` → `07/08/2026`); si día y mes pueden intercambiarse o el año tiene dos cifras, queda vacía y se le pregunta al usuario; la revisión respeta ese orden. La fecha de inicio de actividad del cliente sale DD/MM/AAAA (se guardaba AAAA-MM-DD y salía así); si no es una fecha, no se genera y se dice dónde corregirla.
+
+## 2026-10-24 · fix: editar un cliente no borra una fecha de inicio que no es AAAA-MM-DD (D3)
+
+- **fix(clientes):** si la fecha guardada no se puede mostrar en el campo de fecha y se deja vacío, al guardar no se manda y se conserva; el aviso no la pide. Una fecha cargada la reemplaza. Contra: esa fecha ya no se puede borrar desde el formulario.
+- Una fecha tipeada a medias no se guarda: el formulario pide completarla o borrarla (antes borraba la fecha guardada).
+
 ## 2026-10-24 · feat: alta de cliente con lo que pide el MARIA (CLIENTE-1)
 
 - **feat(clientes):** razón social, CUIT, domicilio e inicio de actividad a la vista y marcados «lo pide el MARIA»; email y teléfono en «Más datos». Se guarda sin ellos, con un aviso de cuáles faltan; el detalle muestra el inicio de actividad.
+
+## 2026-10-24 · feat: «NCM» pasa a «Posición arancelaria (PA SIM)» en pantallas (PA-1)
+
+- **feat(textos):** donde la pantalla habla de la posición de 11 dígitos con su letra (paso 3, botones, asistente y los avisos de deshacer) dice «PA SIM»; donde habla de los 8 dígitos (la memoria del cliente, el catálogo del proveedor, VUCE, la calculadora) queda «NCM».
 
 ## 2026-10-24 · fix: la proforma china se lee tal como viene (EXCEL-3)
 
@@ -296,6 +616,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-07-12 · fix: campo SBT en frontend + validación backend anti-inyección
 
 El dashboard v2 ahora tiene un campo "Sufijo de valor SBT" en la pantalla de revisión (antes de generar). Es obligatorio, con texto de ayuda "Dato obligatorio y específico del importador. Consultar al despachante." El backend valida: trim, máximo 120 caracteres, rechaza saltos de línea (`\r`, `\n`) y caracteres de control para impedir inyección de líneas en el TXT. Si el backend devuelve error de SBT, se muestra junto al campo (no como error genérico). Sin fallback VOWYNNS/VITTO. Cobertura: 39.05%, 547 tests, 0 failures.
+
 ## 2026-07-07 · feat: ficha del cliente se auto-completa (fill-if-empty) al guardar operación
 
 Al guardar una operación, si la ficha del cliente tiene `address` o `fecha_inic_activ` vacíos y la carátula trae esos datos, se rellenan. Nunca pisa valores existentes. Datos por-embarque (flete, seguro, gastos FOB, factura, etc.) no se guardan en la ficha. Excepción atrapada: si falla el fill, no rompe el guardado de la operación.
@@ -480,6 +801,7 @@ Nuevo `proyecto_maria/core/vuce_ci_client.py`: usa la API pública interna de ww
 - **feat (admin):** Implementada promoción automática a rol `admin` durante el arranque de la app para los usuarios (por username o email) listados en la variable de entorno `ADMIN_USERNAMES`. Esto desbloquea el acceso del dueño en producción sin requerir acceso directo a la BD.
 
 ---
+
 ## 2026-06-20 · Hardening Pilar B + Tests E2E
 
 - **feat (backend):** refactor en `quote_router.py` para usar `asyncio.to_thread` al llamar a Tarifar (evitando bloquear el event loop).
@@ -500,13 +822,13 @@ Nuevo `proyecto_maria/core/vuce_ci_client.py`: usa la API pública interna de ww
 
 - **feat (ui):** añadido botón inteligente "Crear cliente" en la validación de Carga Manual. Si el usuario ingresa un importador no registrado, el sistema permite crearlo y auto-asignarlo con un clic directo sin abrir modales.
 - **fix (ui):** se corrigió un bug lógico donde al seleccionar un cliente desde el panel lateral, el mensaje de error de validación en pantalla ("Falta: Cliente asignado") no se limpiaba dinámicamente.
+
 ## 2026-06-19 · Auditoría UX (Simulación 50 usuarios)
 
 - **feat (ui/ux):** añadido botón "+ Agregar producto" en NCM para evitar el punto muerto de Carga Manual.
 - **fix (ui/ux):** validación de fechas flexible. Ahora auto-completa años de 2 dígitos y acepta barras/guiones.
 - **feat (ui/ux):** Incoterms convertidos a campo abierto con sugerencias (`datalist`) para no bloquear casos atípicos (CPT, CIP).
 - **fix (ui/ux):** buffer de Deshacer (Ctrl+Z) invalidado automáticamente al editar celdas a mano, evitando pérdida de datos por colisión de historial.
-
 
 ## 2026-06-19 · Robustez de UX/UI y Persistencia de Estado
 

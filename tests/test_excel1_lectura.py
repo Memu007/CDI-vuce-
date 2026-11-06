@@ -182,12 +182,16 @@ def _cliente_con_mapeo(mapeo) -> str:
 
 
 def test_mapeo_guardado_no_deja_afuera_encabezados_nuevos():
-    """El cliente aprendió «Cantidad» y «Peso Bruto»; ahora sube «Qty» y
-    «Peso Neto». Lo detectado completa lo que el mapeo no cubre."""
+    """El cliente aprendió «Cantidad» y «Peso Bruto»; ahora sube «Qty (pcs)» y
+    «Peso Neto». Lo detectado completa lo que el mapeo no cubre.
+
+    Con la unidad entre paréntesis, porque «Qty» a secas la encuentra igual la
+    lectura por su lista de nombres, sin el mapeo; y el peso lo elige la lectura
+    sin mirar el mapeo (MARIA-5). Así la prueba no distinguía el defecto."""
     cid = _cliente_con_mapeo({"Cantidad": "cantidad", "Peso Bruto": "peso_unitario",
                               "NCM": "pieza", "Descripcion": "descripcion",
                               "Origen": "origen", "Precio": "valor_unitario"})
-    r = _subir([["NCM", "Descripcion", "Origen", "Qty", "Precio", "Peso Neto"],
+    r = _subir([["NCM", "Descripcion", "Origen", "Qty (pcs)", "Precio", "Peso Neto"],
                 ["84713000", "Laptop 14 pulgadas", "CN", 10, 350, 1.5]], cliente_id=cid)
     assert r.status_code == 200, r.text[:300]
     item = r.json()["items"][0]
@@ -465,9 +469,6 @@ def test_columna_con_el_nombre_del_campo_y_mapeo_a_otra_no_da_500():
 def test_lo_que_llamaba_a_las_rutas_borradas():
     import pathlib
     raiz = pathlib.Path(main.__file__).resolve().parent.parent
-    app_js = (raiz / "proyecto_maria/static/app.js").read_text(encoding="utf-8")
-    assert "/upload_excel/public" not in app_js
-    assert "El Excel se sube en la pantalla nueva" in app_js
     smoke = (raiz / "scripts/testing/smoke_test.sh").read_text(encoding="utf-8")
     assert '/upload_excel"' not in smoke and "/upload_excel_v2/" in smoke
 

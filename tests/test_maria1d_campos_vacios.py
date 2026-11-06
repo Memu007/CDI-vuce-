@@ -69,6 +69,8 @@ def _pedido_como_la_pantalla(op, items):
         # La revisión exige la fecha (devolución de MARIA-3).
         "fecha_emision": op.get("fecha_emision") or "22/06/2026",
         "sbt_sufijo_valor": SUF_A,
+        # Sin CUIT del despachante no se genera (MARIA-7).
+        "cuit_agr": "20111111112",
     }
 
 

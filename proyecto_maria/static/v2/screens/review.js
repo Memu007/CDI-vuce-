@@ -52,24 +52,22 @@
         return el ? (el.value || '').trim() : '';
     }
 
-    // Numero argentino con coma decimal o punto, permite miles con '.' o ',' (best effort)
-    function parseNumberAR(raw) {
-        if (raw === null || raw === undefined) return NaN;
-        let s = String(raw).trim();
-        if (!s) return NaN;
-        // Si tiene ambos separadores, asumimos que el ultimo es decimal
-        const lastDot = s.lastIndexOf('.');
-        const lastComma = s.lastIndexOf(',');
-        if (lastDot !== -1 && lastComma !== -1) {
-            if (lastComma > lastDot) {
-                s = s.replace(/\./g, '').replace(',', '.');
-            } else {
-                s = s.replace(/,/g, '');
-            }
-        } else if (lastComma !== -1) {
-            s = s.replace(',', '.');
-        }
-        return Number(s);
+    // SEPARADORES-1: flete, seguro y gastos se escriben a mano, con punto o
+    // coma (montos_ar.js). En el estado queda el número leído; lo que no se
+    // puede leer queda como texto para que el aviso lo muestre y frene.
+    const MONTOS = ['flete', 'seguro', 'gastos_anteriores_fob'];
+
+    function montoDelCampo(raw) {
+        if (raw === null || raw === undefined || String(raw).trim() === '') return 0;
+        const r = CDI.montos.leer(raw);
+        return r.error ? String(raw).trim() : r.valor;
+    }
+
+    function validarMonto(v) {
+        const r = CDI.montos.leer(v);
+        if (r.error) return r.error;
+        if (r.valor !== null && r.valor < 0) return 'No puede ser negativo.';
+        return null;
     }
 
     // Fecha de emisión válida, con las mismas reglas que el servidor
@@ -124,27 +122,9 @@
             }
             return null;
         },
-        flete: (v) => {
-            if (v === '' || v === null || v === undefined) return null;
-            const n = parseNumberAR(v);
-            if (!isFinite(n)) return 'Debe ser un numero.';
-            if (n < 0) return 'No puede ser negativo.';
-            return null;
-        },
-        seguro: (v) => {
-            if (v === '' || v === null || v === undefined) return null;
-            const n = parseNumberAR(v);
-            if (!isFinite(n)) return 'Debe ser un numero.';
-            if (n < 0) return 'No puede ser negativo.';
-            return null;
-        },
-        gastos_anteriores_fob: (v) => {
-            if (v === '' || v === null || v === undefined) return null;
-            const n = parseNumberAR(v);
-            if (!isFinite(n)) return 'Debe ser un numero.';
-            if (n < 0) return 'No puede ser negativo.';
-            return null;
-        },
+        flete: validarMonto,
+        seguro: validarMonto,
+        gastos_anteriores_fob: validarMonto,
         procedencia: (v) => {
             // MARIA-3: un país de la tabla MARIA; vacía = igual al origen.
             if (!v || !CDI.paisesMaria) return null;
@@ -182,14 +162,21 @@
     function $(id) { return document.getElementById(id); }
 
     // Normaliza fechas al formato DD/MM/AAAA sin importar como venga del PDF.
-    // Soporta: ISO YYYY-MM-DD, separadores '-' '/' '.', 8 digitos pegados.
-    // Detecta heuristicamente si el año esta primero (YYYY 1900-2100).
+    // Soporta: ISO YYYY-MM-DD, separadores '-' '/' '.' y espacio, 8 digitos
+    // pegados (en ésos detecta si el año esta primero, YYYY 1900-2100).
     function normalizeDateForInput(raw) {
         if (raw === undefined || raw === null) return '';
         const s = String(raw).trim();
         if (!s) return '';
+        const dos = (n) => n.padStart(2, '0');
+        // Con separadores se respeta el orden escrito (MARIA-7): el año
+        // adelante es año/mes/día; con el año al final, día/mes/año.
+        let m = s.match(/^(\d{4})[\s\/.\-]+(\d{1,2})[\s\/.\-]+(\d{1,2})$/);
+        if (m) return dos(m[3]) + '/' + dos(m[2]) + '/' + m[1];
+        m = s.match(/^(\d{1,2})[\s\/.\-]+(\d{1,2})[\s\/.\-]+(\d{4})$/);
+        if (m) return dos(m[1]) + '/' + dos(m[2]) + '/' + m[3];
         const digits = s.replace(/\D/g, '');
-        if (digits.length !== 8) return s;
+        if (!/^\d{8}$/.test(s)) return s;
         const first4 = parseInt(digits.slice(0, 4), 10);
         if (first4 >= 1900 && first4 <= 2100) {
             return digits.slice(6, 8) + '/' + digits.slice(4, 6) + '/' + digits.slice(0, 4);
@@ -274,9 +261,9 @@
             const m = upper.match(/\b([A-Z]{3})\b/);
             return m ? m[1] : upper.slice(0, 3);
         }
-        if (name === 'flete' || name === 'seguro') {
-            const n = Number(val);
-            return isFinite(n) ? formatNumber(n) : '';
+        if (MONTOS.includes(name)) {
+            const r = CDI.montos.leer(val);
+            return r.error ? String(val).trim() : CDI.montos.escribir(r.valor);
         }
         if (name === 'fecha_emision' || name === 'fecha_embarque') {
             return normalizeDateForInput(val);
@@ -327,7 +314,9 @@
             }
             // Sincronizar de vuelta al state (por si normalizamos USD->DOL)
             if (normalized !== op[key]) {
-                if (el.type === 'number') {
+                if (MONTOS.includes(key)) {
+                    op[key] = montoDelCampo(normalized);
+                } else if (el.type === 'number') {
                     op[key] = normalized === '' ? 0 : Number(normalized);
                 } else {
                     op[key] = normalized;
@@ -494,12 +483,6 @@
         cuitField.appendChild(btn);
     }
 
-    function formatNumber(n) {
-        // Mostrar flete/seguro limpio (sin .0 innecesario)
-        if (!isFinite(n)) return '';
-        return (n === Math.floor(n)) ? String(n) : String(Number(n).toFixed(2));
-    }
-
     function fmtUSD(n) {
         const v = Number(n);
         if (!isFinite(v)) return 'USD 0.00';
@@ -556,8 +539,8 @@
         if (!prorrateoPanel) return;
         const op = (CDI.state && CDI.state.operacion) || {};
         const items = (CDI.state && CDI.state.items) || [];
-        const flete = parseNumberAR(op.flete) || 0;
-        const seguro = parseNumberAR(op.seguro) || 0;
+        const flete = CDI.montos.leer(op.flete).valor || 0;
+        const seguro = CDI.montos.leer(op.seguro).valor || 0;
 
         // Panel visible solo si hay flete/seguro y hay items
         if ((flete <= 0 && seguro <= 0) || items.length === 0) {
@@ -620,8 +603,8 @@
         if (!incotermWarningEl) return;
         const op = (CDI.state && CDI.state.operacion) || {};
         const incoterm = String(op.incoterm || '').trim().toUpperCase();
-        const flete = parseNumberAR(op.flete) || 0;
-        const seguro = parseNumberAR(op.seguro) || 0;
+        const flete = CDI.montos.leer(op.flete).valor || 0;
+        const seguro = CDI.montos.leer(op.seguro).valor || 0;
         const tieneGastos = (flete > 0 || seguro > 0);
         const incluye = INCOTERM_INCLUYE_FLETE.indexOf(incoterm) !== -1;
 
@@ -671,12 +654,16 @@
         if (!el || !el.name) return;
         const op = CDI.state.operacion = CDI.state.operacion || {};
         let value = el.value;
-        if (el.type === 'number') {
+        if (MONTOS.includes(el.name)) {
+            value = montoDelCampo(value);
+        } else if (el.type === 'number') {
             value = value === '' ? 0 : Number(value);
         } else if (typeof value === 'string') {
             value = value.trim();
         }
         op[el.name] = value;
+        // VALOR-1: un seguro escrito a mano deja de ser el calculado.
+        if (el.name === 'seguro') delete op.seguro_calculado;
         // MARIA-1c: un campo que la factura traía sin poder leerse deja de
         // avisarse cuando la persona escribe un valor (0 incluido) y vuelve a
         // avisarse si lo borra. La lista del lector no se toca.

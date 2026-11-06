@@ -28,21 +28,40 @@
             headers['Content-Type'] = 'application/json';
         }
         const method = (options.method || 'GET').toUpperCase();
-        if (!['GET', 'HEAD', 'OPTIONS'].includes(method) && !headers['X-CSRF-Token']) {
-            const csrf = getCsrfToken();
-            if (csrf) headers['X-CSRF-Token'] = csrf;
+        if (!['GET', 'HEAD', 'OPTIONS'].includes(method)) {
+            // Si la sesión del navegador cambió desde la que se confirmó para
+            // la pestaña, la escritura no sale hasta saber que es del mismo
+            // usuario: si entró otro, saldría a su nombre. No depende de que
+            // el servidor exija CSRF.
+            if (getCsrfToken() !== (sesionDelDueno || sesionAlAbrir) && !(await sesionEsDelDueno())) {
+                throw new Error(sesionAjena ? ERROR_AJENA : ERROR_SIN_SESION);
+            }
+            if (!headers['X-CSRF-Token']) {
+                const csrf = getCsrfToken();
+                if (csrf) headers['X-CSRF-Token'] = csrf;
+            }
         }
         const res = await fetch(path, Object.assign({}, options, { headers, credentials: 'same-origin' }));
-        if (res.status === 401) {
-            window.location.href = '/?next=' + encodeURIComponent(window.location.pathname + window.location.search);
-            throw new Error('unauthorized');
-        }
+        if (res.status === 401) irAlLogin();
         if (res.status === 402) {
-            // Plan vencido o sin suscripción activa: mostrar modal con CTA a pagar.
+            // Impago, vencido, cancelado o tope del plan: el modal dice la
+            // razón que manda el servidor.
+            let detail = null;
+            try { detail = (await res.clone().json()).detail; } catch (_) {}
+            const motivo = (detail && typeof detail === 'object') ? detail : {};
+            const titulos = {
+                PLAN_LIMIT_EXCEEDED: 'Llegaste al tope de tu plan',
+                SUBSCRIPTION_PAST_DUE: 'Tenés un pago pendiente',
+                SUBSCRIPTION_INACTIVE: 'No tenés una suscripción activa',
+            };
+            const titulo = motivo.billing_status === 'canceled' ? 'Cancelaste tu suscripción'
+                : (titulos[motivo.code] || 'Tu plan venció');
+            const lead = motivo.message || (typeof detail === 'string' && detail) ||
+                'Necesitás renovar tu suscripción para seguir usando CDI.';
             if (CDI.confirm) {
                 CDI.confirm({
-                    title: 'Tu plan venció',
-                    lead: 'Necesitás renovar tu suscripción para seguir usando CDI.',
+                    title: titulo,
+                    lead: lead,
                     text: 'Después de pagar podés volver a usar todas las funciones.',
                     acceptText: 'Ir a pagar',
                     cancelText: 'Volver',
@@ -57,13 +76,33 @@
                     }
                 });
             }
-            throw new Error('payment_required');
+            const err = new Error('payment_required');
+            err.motivo = lead;
+            throw err;
         }
         return res;
     }
 
+    function irAlLogin() {
+        window.location.href = '/?next=' + encodeURIComponent(window.location.pathname + window.location.search);
+        throw new Error('unauthorized');
+    }
+
     async function logout() {
-        try { await api('/auth/logout', { method: 'POST' }); } catch (_) {}
+        try {
+            const res = await api('/auth/logout', { method: 'POST' });
+            if (!res.ok) {
+                toast('No se pudo cerrar la sesión', 'El servidor no lo aceptó (' + res.status + '). La sesión sigue abierta.', 'error');
+                return;
+            }
+        } catch (e) {
+            // Salvo un 401 (ya no había sesión), el cierre no se confirmó.
+            if (e.message !== 'unauthorized') {
+                const motivo = e.message === ERROR_SIN_SESION ? e.message : 'El cierre no se confirmó. La sesión sigue abierta.';
+                toast('No se pudo cerrar la sesión', motivo, 'error');
+                return;
+            }
+        }
         window.location.href = '/';
     }
 
@@ -166,7 +205,9 @@
     let telemetryMuted = false;
 
     function track(action, extra) {
-        if (telemetryMuted) return;
+        // Sale con fetch directo, sin el freno de api(): con la sesión
+        // cambiada se pierde el evento antes que mandarlo a nombre de otro.
+        if (telemetryMuted || getCsrfToken() !== (sesionDelDueno || sesionAlAbrir)) return;
         const payload = Object.assign({
             version: 'v2',
             screen: currentScreen || 'boot',
@@ -179,7 +220,7 @@
             fetch(TELEMETRY_ENDPOINT, {
                 method: 'POST',
                 credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': getCsrfToken() },
                 body: body,
                 keepalive: true
             }).catch(() => { telemetryMuted = true; });
@@ -304,20 +345,52 @@
         });
     }
 
-    /* ---------- 5. Toggle a v1 ---------- */
-    function goToLegacy() {
-        document.cookie = 'cdi_ui=; Path=/; Max-Age=0; SameSite=Lax';
-        track('toggle_to_v1');
-        setTimeout(() => { window.location.href = '/dashboard'; }, 100);
-    }
-
     /* ---------- 6. Usuario actual (avatar + saludo) ---------- */
     let currentUser = null;
+    // La pestaña es del primer usuario que conoce, y sólo si la sesión no
+    // cambió desde que abrió: si otro entra en el mismo navegador mientras
+    // ésta reintenta, o la consulta trae después otro usuario, lo cargado no
+    // es de él y la pestaña deja de guardar y de recuperar.
+    // La sesión se reconoce por la cookie CSRF, que cambia en cada login:
+    // sesionDelDueno es la que tenía cuando se confirmó al dueño. Si cambia,
+    // la pestaña no guarda hasta volver a preguntar quién es (revisarSesion).
+    const sesionAlAbrir = getCsrfToken();
+    let duenoPestana = null, sesionAjena = false, sinSesion = false, sesionDelDueno = null;
+    const ERROR_AJENA = 'Entró otro usuario en este navegador. Recargá la página.';
+    const ERROR_SIN_SESION = 'No se pudo comprobar la sesión. Recargá la página.';
+
+    // La pestaña deja de escribir para siempre y lo tapa todo: lo que tiene
+    // cargado es del dueño y la sesión es de otro. Sólo se sale recargando.
+    function marcarAjena() {
+        if (sesionAjena) return;
+        sesionAjena = true;
+        avisarBorrador('ajena', AVISO_AJENA);
+        const dialogo = document.getElementById('pestanaAjena');
+        if (!dialogo || dialogo.open) return;
+        dialogo.addEventListener('cancel', e => e.preventDefault());
+        document.getElementById('pestanaAjenaRecargar').addEventListener('click', () => window.location.reload());
+        try { dialogo.showModal(); } catch (_) { dialogo.setAttribute('open', ''); }
+    }
+    // Devuelve si ya se sabe quién es el usuario (sin él no hay autoguardado).
     async function loadCurrentUser() {
         try {
-            const res = await api('/auth/current_user');
-            if (!res.ok) return;
-            const user = await res.json();
+            const sesionAntes = getCsrfToken();
+            // Una consulta que no contesta cuenta como error y se reintenta.
+            const corte = new AbortController();
+            const tope = setTimeout(() => corte.abort(), ESPERA_SESION_MS);
+            let user;
+            try {
+                const res = await api('/auth/current_user', { signal: corte.signal });
+                if (!res.ok) return;
+                user = await res.json();
+            } finally {
+                clearTimeout(tope);
+            }
+            if (duenoPestana === null) {
+                duenoPestana = user.username || '';
+                if (sesionAntes !== sesionAlAbrir || getCsrfToken() !== sesionAlAbrir) marcarAjena();
+            }
+            if (!confirmarSesion(user.username, sesionAntes)) return !!currentUser;
             currentUser = user;
             CDI.currentUser = user;
             // Banner de billing (trial / past_due / activar plan).
@@ -337,7 +410,18 @@
             else if (avatar) avatar.textContent = initials;
             if (name) name.textContent = user.name || user.username || '';
         } catch (err) {
+            if (err && err.message === 'unauthorized') sinSesion = true;
             console.warn('[CDI v2] no se pudo cargar usuario:', err);
+        }
+        return !!currentUser;
+    }
+
+    // Un 500 o un corte al abrir no deja la pestaña sin dueño para siempre:
+    // reintenta de 1 a 30 segundos; un 401 o una pestaña ajena cortan, porque
+    // ya mandan al login o a recargar.
+    async function cargarUsuarioHastaTenerlo() {
+        for (let espera = 1000; !(await loadCurrentUser()) && !sinSesion && !sesionAjena; espera = Math.min(espera * 2, 30000)) {
+            await new Promise(r => setTimeout(r, espera));
         }
     }
 
@@ -442,10 +526,10 @@
 
     /* ---------- 8. Public API ---------- */
     CDI.api = api;
+    CDI.irAlCheckout = irAlCheckout;
     CDI.logout = logout;
     CDI.goTo = goTo;
     CDI.goBack = goBack;
-    CDI.goToLegacy = goToLegacy;
     CDI.track = track;
     CDI.confirm = confirmDialog;
     // Exponemos toast como funcion y tambien con .success/.error/.info
@@ -610,6 +694,47 @@
         }
     }
 
+    /* Pide el checkout del plan y lleva el navegador a Mercado Pago. El botón
+       queda deshabilitado mientras pide y mientras el navegador se va: otro
+       clic pediría un segundo checkout, que cancela la suscripción adonde va
+       (COBRO-MP-1, D). Sólo vuelve a su estado si el checkout falla; entonces
+       devuelve false. Si vuelve con «Atrás» y el navegador restaura la página
+       de su caché, se recarga: el botón y el estado de cobro quedaron viejos.
+       Lo mismo vale entre botones: el aviso de arriba y el perfil pueden estar
+       a la vista a la vez, y mientras uno pide el checkout el otro no hace
+       nada. */
+    let checkoutEnCurso = false;
+    async function irAlCheckout(plan, boton) {
+        if (checkoutEnCurso) return false;
+        checkoutEnCurso = true;
+        const textoBoton = boton.textContent;
+        boton.disabled = true;
+        boton.textContent = 'Abriendo…';
+        let motivo = 'No se pudo iniciar el cobro.';
+        try {
+            const res = await api('/api/billing/checkout', {
+                method: 'POST',
+                body: JSON.stringify({ plan })
+            });
+            const data = (await res.json().catch(() => null)) || {};
+            if (res.ok && data.init_point) {
+                window.addEventListener('pageshow', (ev) => {
+                    if (ev.persisted) window.location.reload();
+                }, { once: true });
+                window.location.href = data.init_point;
+                return true;
+            }
+            if (typeof data.detail === 'string' && data.detail) motivo = data.detail;
+        } catch (err) {
+            console.warn('[billing] checkout error', err);
+        }
+        if (CDI.toast) CDI.toast('Error', motivo, 'error');
+        boton.disabled = false;
+        boton.textContent = textoBoton;
+        checkoutEnCurso = false;
+        return false;
+    }
+
     /* ---------- Billing banner (trial / past_due / activar plan) ----------
        Renderiza un banner soft con días de trial restantes, o uno urgente si
        el trial ya venció. Click en CTA → POST /api/billing/checkout → redirige
@@ -651,29 +776,9 @@
         // Click en CTA → abrir checkout MP en la misma ventana.
         if (!cta._wired) {
             cta._wired = true;
-            cta.addEventListener('click', async () => {
-                cta.disabled = true;
-                cta.textContent = 'Abriendo...';
+            cta.addEventListener('click', () => {
                 track('billing_cta_clicked', { status: status });
-                try {
-                    const plan = (user && user.plan) || 'premium';
-                    const res = await api('/api/billing/checkout', {
-                        method: 'POST',
-                        body: JSON.stringify({ plan })
- })
-                    const data = await res.json().catch(() => ({}));
-                    if (data && data.init_point) {
-                        window.location.href = data.init_point;
-                        return;
-                    }
-                    if (CDI.toast) CDI.toast('Error', 'No se pudo iniciar el cobro. Probemos de nuevo.', 'error');
-                } catch (err) {
-                    console.warn('[billing] checkout error', err);
-                    if (CDI.toast) CDI.toast('Error', 'No se pudo iniciar el cobro.', 'error');
-                } finally {
-                    cta.disabled = false;
-                    cta.textContent = status === 'past_due' ? 'Activar plan ahora' : 'Activar plan';
-                }
+                irAlCheckout((user && user.plan) || 'premium', cta);
             });
         }
         if (close && !close._wired) {
@@ -713,17 +818,41 @@
     }
 
     /* ---------- 10. Bootstrap ---------- */
+    // Si la persona ya tocó la pestaña (un clic, una tecla, soltar un
+    // archivo), la recuperación tardía no la cambia: puede tener abierto el
+    // diálogo de archivos o haber elegido algo. 'click' cubre la activación
+    // sin puntero (tecnología asistiva o programática).
+    let pestanaTocada = false;
+    ['pointerdown', 'click', 'keydown', 'drop'].forEach(ev =>
+        document.addEventListener(ev, () => { pestanaTocada = true; }, true));
+    const recuperada = parsed => {
+        CDI.state = parsed;
+        if (parsed.clienteActivo) setClienteActivo(parsed.clienteActivo);
+        if (CDI.toast) CDI.toast.info('Recuperado', 'Se recuperó la operación en curso.');
+    };
+    // La recuperación que llega cuando la pestaña ya pudo empezar otra cosa
+    // (otra pantalla, otra operación o una subida en curso): eso no se pisa y
+    // la de antes queda guardada.
+    function adoptarTarde(b) {
+        const ocupada = pestanaTocada || currentScreen !== 'upload'
+            || (CDI.state && CDI.state.items && CDI.state.items.length > 0)
+            || (CDI.subidaEnCurso && CDI.subidaEnCurso());
+        if (ocupada) {
+            avisarBorrador('pendiente', 'Quedó guardada la operación que tenías antes de recargar. Para seguirla, abrí el sistema en otra pestaña.');
+            return;
+        }
+        const parsed = adoptarBorrador(b);
+        if (!parsed) return;
+        recuperada(parsed);
+        goTo('review');
+    }
     document.addEventListener('DOMContentLoaded', () => {
         try { localStorage.removeItem(CLIENTE_KEY); } catch (_) {}
-        loadCurrentUser();
+        const usuarioListo = cargarUsuarioHastaTenerlo();
         handleBillingReturn();
         updateClientePill();
         setupFakeSourceBanner();
         track('session_start');
-
-        // El link "Volver a la version clasica" esta en el footer como
-        // #goLegacyBtn2 con onclick inline a CDI.goToLegacy() (ver
-        // dashboard_v2.html). No necesitamos listener aca.
 
         // Click en la pill de cliente -> abre el drawer
         document.addEventListener('click', (e) => {
@@ -762,50 +891,300 @@
             }
         });
 
-        // Persistence: Load from localStorage
-        let restored = false;
-        try {
-            const savedStateStr = localStorage.getItem('cdi_v2_state');
-            if (savedStateStr) {
-                const parsed = JSON.parse(savedStateStr);
-                if (parsed && parsed.items && parsed.items.length > 0) {
-                    CDI.state = parsed;
-                    if (parsed.clienteActivo) setClienteActivo(parsed.clienteActivo);
-                    restored = true;
-                    if (CDI.toast) CDI.toast.info('Recuperado', 'Se recuperó la operación en curso.');
+        // Persistence: Load from localStorage. El borrador es de un usuario:
+        // se recupera después de saber quién entró (con tope, para no dejar la
+        // pantalla en blanco si la red no contesta). Si el usuario llega
+        // después del tope, se recupera entonces (adoptarTarde).
+        const espera = new Promise(r => setTimeout(r, ESPERA_USUARIO_MS));
+        Promise.race([usuarioListo, espera])
+            .then(() => {
+                if (!CDI.borrador.usuario()) {
+                    // Sin usuario no se guarda: se avisa hasta que llegue.
+                    if (!sinSesion) CDI.borrador.avisar('red', AVISO_RED);
+                    usuarioListo.then(() => CDI.borrador.buscar()).then(b => b && adoptarTarde(b))
+                        .catch(e => console.warn('[app_v2] failed to restore state', e));
+                    return null;
                 }
-            }
-        } catch (e) {
-            console.warn('[app_v2] failed to restore state', e);
-        }
-
-        // Si ya había items (por ej. carga asíncrona de PDF, o restaurado recién)
-        // nos vamos a review. Sino, arrancamos en upload.
-        if (CDI.state && CDI.state.items && CDI.state.items.length > 0) {
-            goTo('review');
-        } else {
-            goTo('upload');
-        }
+                return recuperarBorrador();
+            })
+            .catch(e => { console.warn('[app_v2] failed to restore state', e); return null; })
+            .then(parsed => {
+                if (parsed) recuperada(parsed);
+                // Si ya había items (por ej. carga asíncrona de PDF, o restaurado recién)
+                // nos vamos a review. Sino, arrancamos en upload.
+                if (CDI.state && CDI.state.items && CDI.state.items.length > 0) {
+                    goTo('review');
+                } else {
+                    goTo('upload');
+                }
+            });
     });
 
     /* ---------- 11. Persistence Auto-Save & BeforeUnload ---------- */
-    window.addEventListener('beforeunload', (e) => {
+    // Cada pestaña guarda su operación en su propia clave (ORDEN-1): con una
+    // sola clave, dos pestañas abiertas se pisaban y la que quedaba en la carga
+    // de archivos borraba la operación de la otra.
+    //   cdi_v2_state:<pestaña> = { v: 1, user, savedAt, closed, state }
+    // La pestaña estrena un id en cada carga y adopta el borrador del id
+    // anterior (recargar); si no lo tiene, el más reciente que nadie usa: el de
+    // una pestaña cerrada o uno que no se guarda hace rato. Adoptar copia y
+    // después borra, así que dos pestañas que adoptan el mismo a la vez lo
+    // duplican, no lo pierden.
+    // Sólo se recupera un borrador del usuario que entró y de menos de 7 días;
+    // el más viejo, y el que no tiene dueño (la clave de antes, sin pestaña),
+    // se borran al barrer.
+    // Una pestaña duplicada trae el id de la original en sessionStorage: cada
+    // pestaña retiene un Web Lock con su id mientras vive, y el borrador del id
+    // anterior se adopta sólo si ese lock se libera (recargar, o restaurar una
+    // pestaña que se cerró sin pagehide). Sin Web Locks, se adopta como antes.
+    const BORRADOR = 'cdi_v2_state';
+    const BORRADOR_PESTANA = 'cdi_v2_tab';
+    const BORRADOR_HUERFANO_MS = 3 * 60 * 1000;
+    const BORRADOR_VENCE_MS = 7 * 24 * 60 * 60 * 1000;
+    const ESPERA_USUARIO_MS = 4000;
+    const ESPERA_PESTANA_MS = 1500;
+    const ESPERA_SESION_MS = 10000;
+    const AVISO_RED = 'No se pudo comprobar la sesión: esta pestaña no guarda la operación por ahora.';
+    const AVISO_AJENA = 'Entró otro usuario en este navegador: esta pestaña ya no guarda la operación. Recargá la página.';
+    const pestanaAnterior = (() => {
+        try { return sessionStorage.getItem(BORRADOR_PESTANA); } catch (_) { return null; }
+    })();
+    const pestana = (() => {
+        try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (_) {}
+        return Date.now().toString(36) + Math.random().toString(36).slice(2);
+    })();
+    const claveBorrador = BORRADOR + ':' + pestana;
+    try { sessionStorage.setItem(BORRADOR_PESTANA, pestana); } catch (_) {}
+    const hayLocks = (() => {
+        try { return !!(navigator.locks && navigator.locks.request); } catch (_) { return false; }
+    })();
+    if (hayLocks) {
+        try { navigator.locks.request(BORRADOR_PESTANA + ':' + pestana, () => new Promise(() => {})).catch(() => {}); } catch (_) {}
+    }
+
+    // ¿Sigue viva la pestaña que usó ese id? Si su lock no se libera a tiempo,
+    // sí: esta es una copia de ella.
+    function pestanaViva(id) {
+        if (!hayLocks) return Promise.resolve(false);
+        const corte = new AbortController();
+        const reloj = setTimeout(() => corte.abort(), ESPERA_PESTANA_MS);
+        return navigator.locks.request(BORRADOR_PESTANA + ':' + id, { signal: corte.signal }, () => false)
+            .catch(() => true)
+            .finally(() => clearTimeout(reloj));
+    }
+
+    // El dueño, si la sesión de ahora es la que se confirmó con él. Si la
+    // sesión cambió, null hasta que revisarSesion diga quién es.
+    function usuarioActual() {
+        if (sesionAjena || !duenoPestana || !CDI.currentUser) return null;
+        if (getCsrfToken() !== sesionDelDueno) {
+            revisarSesion();
+            return null;
+        }
+        return duenoPestana;
+    }
+
+    // Lo que contestó /auth/current_user con la sesión `sesion` (la cookie
+    // antes del pedido; si cambió mientras tanto, no se sabe de quién es).
+    function confirmarSesion(username, sesion) {
+        if (sesionAjena || getCsrfToken() !== sesion) return false;
+        if (username !== duenoPestana) {
+            marcarAjena();
+            return false;
+        }
+        sesionDelDueno = sesion;
+        if (['sinsesion', 'red', 'comprobando'].includes(avisoBorrador)) avisarBorrador(null);
+        if (recuperarAlConfirmar) {
+            recuperarAlConfirmar = false;
+            buscarBorrador().then(b => b && adoptarTarde(b))
+                .catch(e => console.warn('[app_v2] failed to restore state', e));
+        }
+        return true;
+    }
+
+    // Con fetch directo: con un 401 api() manda al login y la pestaña
+    // perdería lo cargado. Si no contesta en ESPERA_SESION_MS, es un error.
+    function consultarUsuario() {
+        const corte = new AbortController();
+        const tope = setTimeout(() => corte.abort(), ESPERA_SESION_MS);
+        return fetch('/auth/current_user', { credentials: 'same-origin', signal: corte.signal })
+            .then(async res => ({ status: res.status, user: res.ok ? await res.json() : null }))
+            .finally(() => clearTimeout(tope));
+    }
+
+    // Antes de una escritura, con la sesión cambiada.
+    async function sesionEsDelDueno() {
+        const sesion = getCsrfToken();
+        const { status, user } = await consultarUsuario().catch(() => ({}));
+        if (status === 401) irAlLogin();
+        return !!(user && duenoPestana !== null && confirmarSesion(user.username, sesion));
+    }
+
+    // Una consulta por cada cambio de sesión.
+    let revisando = false, sesionRevisada = null, revisarDesde = 0;
+    function revisarSesion() {
+        const sesion = getCsrfToken();
+        if (revisando || sesionAjena || sesion === sesionRevisada || Date.now() < revisarDesde) return;
+        revisando = true;
+        sesionRevisada = sesion;
+        consultarUsuario()
+            .then(({ status, user }) => {
+                if (status === 401) {
+                    if (getCsrfToken() === sesion) {
+                        avisarBorrador('sinsesion', 'Se cerró la sesión: esta pestaña no guarda la operación hasta que vuelvas a entrar.');
+                    } else {
+                        sesionRevisada = null;
+                    }
+                    return;
+                }
+                if (!user) throw new Error('current_user ' + status);
+                if (getCsrfToken() !== sesion) { sesionRevisada = null; return; }
+                if (confirmarSesion(user.username, sesion)) guardarBorrador(false);
+            })
+            .catch(() => {
+                sesionRevisada = null;
+                revisarDesde = Date.now() + 10000;
+                avisarBorrador('red', AVISO_RED);
+            })
+            .finally(() => { revisando = false; });
+    }
+
+    // Un solo aviso a la vez. El de otro usuario no se va: hay que recargar.
+    let avisoBorrador = null;
+    function avisarBorrador(motivo, texto) {
+        if (avisoBorrador === 'ajena' && motivo !== 'ajena') return;
+        avisoBorrador = motivo;
+        const el = document.getElementById('avisoBorrador');
+        if (!el) return;
+        el.textContent = motivo ? texto : '';
+        el.hidden = !motivo;
+    }
+
+    function enFlujo() {
         const state = CDI.state || {};
-        if (state.items && state.items.length > 0 && currentScreen !== 'upload' && currentScreen !== 'ready') {
+        return !!(state.items && state.items.length > 0 && currentScreen !== 'upload' && currentScreen !== 'ready');
+    }
+
+    function guardarBorrador(cerrada) {
+        const user = usuarioActual();
+        if (!enFlujo() || !user) return;
+        const sobre = { v: 1, user, savedAt: Date.now(), closed: !!cerrada, state: CDI.state };
+        try {
+            localStorage.setItem(claveBorrador, JSON.stringify(sobre));
+            if (avisoBorrador === 'lleno') avisarBorrador(null);
+        } catch (_) {
+            avisarBorrador('lleno', 'El navegador no tiene lugar para guardar la operación: si cerrás o recargás esta pestaña, se pierde.');
+        }
+    }
+
+    // Lo guardado es del dueño: si la sesión ya no es la suya, no se borra.
+    function borrarBorrador() {
+        if (!usuarioActual()) return;
+        try { localStorage.removeItem(claveBorrador); } catch (_) {}
+    }
+
+    // Devuelve el borrador si es del usuario. El que no tiene dueño (la clave
+    // vieja guardaba la operación sola) o tiene más de 7 días se borra, sea de
+    // quien sea.
+    function leerBorrador(clave, user) {
+        let parsed = null;
+        try { parsed = JSON.parse(localStorage.getItem(clave) || 'null'); } catch (_) { return null; }
+        if (!parsed || typeof parsed !== 'object') return null;
+        const savedAt = Number(parsed.savedAt) || 0;
+        if (parsed.v !== 1 || typeof parsed.user !== 'string' || !parsed.user || Date.now() - savedAt > BORRADOR_VENCE_MS) {
+            try { localStorage.removeItem(clave); } catch (_) {}
+            return null;
+        }
+        if (parsed.user !== user) return null;
+        const state = parsed.state;
+        if (!state || !Array.isArray(state.items) || state.items.length === 0) return null;
+        return { clave, savedAt, closed: !!parsed.closed, state };
+    }
+
+    // Si el navegador no tiene lugar, el borrador queda donde estaba y se avisa.
+    // Si la sesión cambió desde que se buscó (mientras se miraba si la pestaña
+    // anterior vive o llegaba el usuario), usuarioActual() da null hasta
+    // confirmarla y el borrador no se toca: puede ser de otro. Se avisa, y si
+    // la sesión resulta del dueño, se recupera entonces.
+    let recuperarAlConfirmar = false;
+    function adoptarBorrador(b) {
+        const user = usuarioActual();
+        if (!user) {
+            if (duenoPestana && !sesionAjena) {
+                recuperarAlConfirmar = true;
+                avisarBorrador('comprobando', 'Comprobando la sesión antes de recuperar la operación guardada…');
+            }
+            return null;
+        }
+        try {
+            localStorage.setItem(claveBorrador, JSON.stringify({ v: 1, user, savedAt: Date.now(), closed: false, state: b.state }));
+        } catch (_) {
+            avisarBorrador('lleno', 'El navegador no tiene lugar para recuperar la operación guardada: liberá espacio y recargá la página.');
+            return null;
+        }
+        if (b.clave !== claveBorrador) {
+            try { localStorage.removeItem(b.clave); } catch (_) {}
+        }
+        return b.state;
+    }
+
+    // El borrador que le toca a esta pestaña, sin adoptarlo todavía.
+    async function buscarBorrador() {
+        const user = usuarioActual();
+        if (!user) return null;
+        if (pestanaAnterior) {
+            const propio = leerBorrador(BORRADOR + ':' + pestanaAnterior, user);
+            if (propio && !(await pestanaViva(pestanaAnterior))) return propio;
+        }
+        let claves = [];
+        try { claves = Object.keys(localStorage); } catch (_) { return null; }
+        const ahora = Date.now();
+        let elegido = null;
+        claves.forEach(clave => {
+            if (clave === claveBorrador) return;
+            if (clave !== BORRADOR && clave.indexOf(BORRADOR + ':') !== 0) return;
+            const b = leerBorrador(clave, user);
+            if (!b) return;
+            if (!b.closed && ahora - b.savedAt < BORRADOR_HUERFANO_MS) return;  // otra pestaña la está usando
+            if (!elegido || b.savedAt > elegido.savedAt) elegido = b;
+        });
+        return elegido;
+    }
+
+    async function recuperarBorrador() {
+        const b = await buscarBorrador();
+        return b ? adoptarBorrador(b) : null;
+    }
+
+    CDI.borrador = { borrar: borrarBorrador, buscar: buscarBorrador, adoptar: adoptarBorrador, avisar: avisarBorrador, usuario: usuarioActual };
+
+    window.addEventListener('beforeunload', (e) => {
+        if (enFlujo()) {
             e.preventDefault();
             e.returnValue = '';
-            try { localStorage.setItem('cdi_v2_state', JSON.stringify(state)); } catch (_) {}
+            guardarBorrador(false);
         }
     });
 
+    // Al irse de verdad la pestaña queda marcada como cerrada, para que otra la
+    // pueda recuperar; si la operación ya terminó o se canceló, se borra.
+    window.addEventListener('pagehide', () => {
+        if (enFlujo()) guardarBorrador(true);
+        else borrarBorrador();
+    });
+    // Vuelve desde la caché del navegador (atrás/adelante): sigue en uso, si
+    // la sesión es la del dueño (guardarBorrador pasa por usuarioActual).
+    window.addEventListener('pageshow', (e) => {
+        if (e.persisted) guardarBorrador(false);
+    });
+
     setInterval(() => {
-        const state = CDI.state || {};
         // Auto-guardamos si estamos a mitad de flujo
-        if (state.items && state.items.length > 0 && currentScreen !== 'upload' && currentScreen !== 'ready') {
-            try { localStorage.setItem('cdi_v2_state', JSON.stringify(state)); } catch (_) {}
+        if (enFlujo()) {
+            guardarBorrador(false);
         } else if (currentScreen === 'upload' || currentScreen === 'ready') {
-            // Limpiamos el localStorage si la operacion fue terminada o cancelada
-            try { localStorage.removeItem('cdi_v2_state'); } catch (_) {}
+            // Se borra sólo el de esta pestaña: la operación terminó o se canceló
+            borrarBorrador();
         }
     }, 2500);
 })();

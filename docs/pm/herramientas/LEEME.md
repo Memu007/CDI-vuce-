@@ -1,7 +1,14 @@
 # Herramientas de PM
 
-`medir.py` viene listo: sólo se completa la configuración de arriba (zona
-horaria y ramas).
+Vienen listos; lo que se completa, si algo, es el bloque de configuración
+de arriba:
+
+| Archivo | Qué hace | Qué se completa |
+|---|---|---|
+| `medir.py DESDE HASTA` | cuánto rinde el equipo, sacado de Git | zona horaria y ramas |
+| `chequeo-6.py <base> <SHA>` | pone `CLAUDE.md` §6 en números: avisos para mirar, no un veredicto (`/entregar` §1, `/revisar-entrega` §2) | carpetas de producto y de arnés, archivo y función de los casos |
+| `chequeo-6-js.mjs` | lo llama `chequeo-6.py` para leer JS/TS; necesita `typescript`: el del proyecto, o uno global por `NODE_PATH` | nada |
+| `sabotajes-conocidos.txt` | los sabotajes vencidos, uno por línea («Publicar» en `ONBOARDING-PM.md`) | nada: arranca vacío |
 
 El resto depende del stack de cada proyecto, así que cada proyecto escribe los
 suyos. Lo que importa es el contrato: qué hace cada uno y qué tiene que
@@ -27,7 +34,7 @@ docs/pm/herramientas/suite-y-puertas.sh <base> <SHA> > "$PM_DIR/suite.out" 2>&1 
 ```
 
 **Si un reinicio corta una corrida** (mata la corrida, la espera en
-segundo plano y los subagentes, sin avisar), lo ve la vuelta de cada hora y
+segundo plano y los subagentes, sin avisar), lo ve la vuelta siguiente y
 se relanza.
 
 Cuidados que costaron caro (ver `LECCIONES.md` del Second Brain):

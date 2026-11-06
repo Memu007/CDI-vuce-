@@ -18,7 +18,8 @@ def _pedido(**campos):
     base = {"operation_id": "OP1", "items": [dict(ITEM_BASE, estado=2)],
             "fecha_emision": "22/06/2026", "sbt_sufijo_valor": SUF_A,
             "vendedor_nombre": "Proveedor", "comprador_nombre": "Importadora",
-            "comprador_cuit": "30999999995", "moneda": "DOL", "incoterm": "FOB"}
+            "comprador_cuit": "30999999995", "moneda": "DOL", "incoterm": "FOB",
+            "cuit_agr": "20111111112"}  # sin CUIT del despachante no se genera (MARIA-7)
     return dict(base, **campos)
 
 
@@ -36,7 +37,10 @@ def test_ningun_vacio_escrito_llega_al_txt(client, auth_override, vacio):
     for basura in ("None", "NON", "null", "N/A", "NUL"):
         assert not re.search(rf"={re.escape(basura)}\b", data["content"], re.I), basura
         assert basura.lower() not in data["filename"].lower()
-    assert re.search(r"^IDSO=OP_\d+", data["content"], re.M), "sin número, el de la operación"
+    # Sin número, el de la operación: completo en la referencia interna y
+    # sus últimos 8 en IDSO (MARIA-7).
+    assert re.search(r"^MCPL=OP_\d{14} ", data["content"], re.M), "sin número, el de la operación"
+    assert re.search(r"^IDSO=\d{8}\r$", data["content"], re.M)
     avisos = " | ".join(data["supuestos"]).lower()
     for palabra in ("vendedor", "nombre del importador"):
         assert palabra in avisos, palabra

@@ -46,6 +46,7 @@ COMUN = dict(
     seguro=75.47,
     fecha_emision="22/06/2026",
     aduana_codigo="073",
+    cuit_agr="20111111112",  # sin CUIT del despachante no se genera (MARIA-7)
 )
 
 

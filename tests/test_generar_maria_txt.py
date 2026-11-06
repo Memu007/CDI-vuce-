@@ -10,6 +10,7 @@ en smoke manual. Acá protegemos la parte determinística: que el TXT que pega
 el despachante en el Kit SIM salga bien armado.
 """
 import os
+import re
 
 import pytest
 from fastapi.testclient import TestClient
@@ -36,6 +37,7 @@ ITEMS_OK = [
 ]
 
 _SBT_TEST = "AA(DEMO)-AB(DEMO)-CA00-"
+CUIT_DESPACHANTE = "20111111112"
 
 
 def _gen(*args, **kwargs):
@@ -43,6 +45,8 @@ def _gen(*args, **kwargs):
     kwargs.setdefault("sbt_sufijo_valor", _SBT_TEST)
     # Sin fecha de emisión válida no se genera (devolución de MARIA-3).
     kwargs.setdefault("fecha_emision", "18/07/2025")
+    # Sin CUIT del despachante no se genera (MARIA-7).
+    kwargs.setdefault("cuit_agr", CUIT_DESPACHANTE)
     return generate_maria_txt(*args, **kwargs)
 
 
@@ -95,10 +99,11 @@ def test_txt_incluye_cuit_agr():
     assert "CDDTAGR=20304050607" in txt
 
 
-def test_txt_sin_cuit_agr_no_emite_linea():
-    """Si no hay CUIT del despachante, no se emite la línea CDDTAGR."""
-    txt = _gen("OP1", ITEMS_OK, cuit_agr="")
-    assert "CDDTAGR=" not in txt
+def test_txt_sin_cuit_agr_no_se_genera():
+    """Sin CUIT del despachante no se genera: el MARIA rechaza el archivo
+    sin CDDTAGR (MARIA-7; antes la línea se omitía en silencio)."""
+    with pytest.raises(ValueError, match="Falta el CUIT del despachante"):
+        _gen("OP1", ITEMS_OK, cuit_agr="")
 
 
 def test_txt_defaults_aduana_destinacion():
@@ -268,12 +273,26 @@ GOLDEN_INPUTS = dict(
     fecha_embarque="02/01/2026", fecha_emision="18/07/2025",
     sbt_sufijo_valor="AA(DEMO)-AB(DEMO)-CA00-",
     aduana_codigo="001", tipo_destinacion="IC04",
+    # La referencia de la factura del archivo real (LDVDREFDOC, MARIA-7).
+    numero_factura="E001-1",
     # MARIA-4: el archivo real de 2025 trae uso particular, sin banco y Modoc.
     iva_adicional="IVAAD1", banco_bcra="", empresa_digitalizacion="PSAD06",
 )
 
 _GOLDEN_PATH = os.path.join(os.path.dirname(__file__), "fixtures",
                             "maria_golden_anon.TXT")
+
+
+def golden_con_destino(texto: str) -> str:
+    """DESTINO-1 (D28 a): el archivo de 2025 trae `GANANCIASOP3` `COMERC` con
+    `IVAAD1`, un par que no está en la tabla del despachante
+    (`PREGUNTAS-DESPACHANTE.md`, «Respuestas del 2026-10-28»). El golden no se
+    toca: se compara entero salvo esa línea, que tiene que decir `USOPAR`
+    (bien de uso de una persona). Si la pregunta 7 dice otra cosa, se reabre."""
+    nuevo, n = re.subn(r"(CCPL=GANANCIASOP3    \r?\n)MCPL=COMERC {34}(?=\r?\n)",
+                       lambda m: m.group(1) + f"MCPL={'USOPAR':<40}", texto)
+    assert n == 1, f"el golden tiene {n} GANANCIASOP3 COMERC; se esperaba uno"
+    return nuevo
 
 
 def test_golden_reproduce_estructura_real():
@@ -284,7 +303,7 @@ def test_golden_reproduce_estructura_real():
     (op 001790125) que el Kit SIM aceptó.
     """
     with open(_GOLDEN_PATH, "r", newline="") as f:
-        esperado = f.read()
+        esperado = golden_con_destino(f.read())
     generado = generate_maria_txt(**GOLDEN_INPUTS)
     assert generado == esperado
 
@@ -314,7 +333,7 @@ def test_golden_no_filtra_datos_reales():
 def test_sbt_sin_sufijo_bloquea_generacion():
     """Sin sbt_sufijo_valor, generate_maria_txt lanza ValueError con mensaje claro."""
     with pytest.raises(ValueError, match="sufijo de valor SBT"):
-        generate_maria_txt("OP1", ITEMS_OK, fecha_emision="18/07/2025")
+        generate_maria_txt("OP1", ITEMS_OK, fecha_emision="18/07/2025", cuit_agr=CUIT_DESPACHANTE)
 
 
 def test_sbt_sin_sufijo_endpoint_devuelve_400(client):
@@ -332,13 +351,15 @@ def test_sbt_sin_sufijo_endpoint_devuelve_400(client):
 
 def test_sbt_con_sufijo_explicito_genera():
     """Con sbt_sufijo_valor explícito, el TXT se genera normalmente."""
-    txt = generate_maria_txt("OP1", ITEMS_OK, sbt_sufijo_valor="AA(MICLIENTE)-AB(OTRO)-CA00-", fecha_emision="18/07/2025")
+    txt = generate_maria_txt("OP1", ITEMS_OK, sbt_sufijo_valor="AA(MICLIENTE)-AB(OTRO)-CA00-", fecha_emision="18/07/2025",
+                             cuit_agr=CUIT_DESPACHANTE)
     assert "CSBTSVL=AA(MICLIENTE)-AB(OTRO)-CA00-" in txt
 
 
 def test_sbt_no_contiene_vowynns_ni_vitto():
     """Ningún TXT generado con sufijo explícito contiene VOWYNNS ni VITTO."""
-    txt = generate_maria_txt("OP1", ITEMS_OK, sbt_sufijo_valor="AA(CLIENTE1)-AB(CLIENTE2)-CA00-", fecha_emision="18/07/2025")
+    txt = generate_maria_txt("OP1", ITEMS_OK, sbt_sufijo_valor="AA(CLIENTE1)-AB(CLIENTE2)-CA00-", fecha_emision="18/07/2025",
+                             cuit_agr=CUIT_DESPACHANTE)
     assert "VOWYNNS" not in txt
     assert "VITTO" not in txt
 
@@ -411,7 +432,7 @@ def client():
     return TestClient(app)
 
 
-def _register(client, username, cuit=None):
+def _register(client, username, cuit=CUIT_DESPACHANTE):
     payload = {
         "username": username,
         "password": "originalpass123",
@@ -421,7 +442,7 @@ def _register(client, username, cuit=None):
     resp = client.post("/auth/register", json=payload)
     assert resp.status_code in (200, 201), resp.text
     if cuit:
-        # Guardar CUIT en perfil para testear el fallback cuit_agr.
+        # El CUIT del despachante en el perfil: sin él no se genera (MARIA-7).
         r = client.put("/api/user/profile", json={"cuit": cuit})
         assert r.status_code == 200, r.text
 

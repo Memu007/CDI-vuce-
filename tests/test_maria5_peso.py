@@ -62,7 +62,8 @@ def test_el_pedido_de_la_pantalla_da_lo_que_muestra_la_validacion(client, auth_o
     pedido = {"operation_id": "OP1", "items": [item], "fecha_emision": "22/06/2026",
               "sbt_sufijo_valor": SUF_A,
               # MARIA-1b: sin moneda, incoterm ni CUIT del importador no se genera.
-              "moneda": "DOL", "incoterm": "FOB", "comprador_cuit": "30999999995"}
+              "moneda": "DOL", "incoterm": "FOB", "comprador_cuit": "30999999995",
+              "cuit_agr": "20111111112"}  # sin CUIT del despachante no se genera (MARIA-7)
     r = client.post("/generate_maria", json=pedido)
     assert r.status_code == 200, r.text
     assert _pesos(r.json()["content"]) == ["33.000"]

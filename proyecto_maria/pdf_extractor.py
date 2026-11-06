@@ -9,6 +9,8 @@ import math
 import os
 import json
 import hashlib
+import unicodedata
+from datetime import datetime
 
 # Cargar variables de entorno desde .env
 from dotenv import load_dotenv
@@ -2136,6 +2138,11 @@ def _numero_factura(raw, decimal: str | None):
     t = _MONEDA_O_CUENTA_ATRAS.sub('', t).strip()
     if not re.fullmatch(r"\d{1,3}(?:[ '\u00a0\u202f]\d{3})+(?:[.,]\d+)?|\d[\d.,]*", t):
         return None
+    # SEPARADORES-1d (D24): la regla de miles de 1c vale para todo número de
+    # la factura (flete, seguro, cantidad, precio y peso). «0.500.000» no se
+    # lee como 500000: queda vacío, como «12x3».
+    if _miles_mal_formados(t, decimal):
+        return None
     t = re.sub(r"[ '\u00a0\u202f]", '', t)
     propio = _separador_decimal(t)
     if '.' in t and ',' in t:
@@ -2165,6 +2172,45 @@ def _numero_factura(raw, decimal: str | None):
     return valor if math.isfinite(valor) else None
 
 
+def _miles_mal_formados(t: str, decimal: str | None) -> bool:
+    """SEPARADORES-1c. True si la parte entera de `t` viene en grupos de
+    miles y no están bien armados: la cabeza de una a tres cifras sin cero
+    adelante y cada grupo de tres. «0500.000» o «4500.000.000» no son miles
+    de nadie: mejor sin leer que por mil."""
+    t = re.sub(r"[ '\u00a0\u202f]", ' ', t)
+    marcas = [c for c in '.,' if c in t]
+    propio = _separador_decimal(t)
+    if len(marcas) == 2:
+        dec = propio
+    elif len(marcas) == 1 and t.count(marcas[0]) == 1 and marcas[0] in (propio, decimal):
+        dec = marcas[0]
+    else:
+        dec = None  # sin separador decimal: todos son de miles
+    entero = t.rpartition(dec)[0] if dec else t
+    grupos = re.split(r"[ .,]", entero)
+    return len(grupos) > 1 and not (
+        re.fullmatch(r"[1-9]\d{0,2}", grupos[0]) and all(re.fullmatch(r"\d{3}", g) for g in grupos[1:]))
+
+
+def _monto_factura(raw, decimal: str | None):
+    """Flete o seguro de la factura (SEPARADORES-1). Un monto no lleva tres
+    decimales: «3.480» o «1,250» separan miles. Si la factura usa ese mismo
+    separador como decimal, puede ser 3,48: None, no se adivina."""
+    t = _MONEDA_ADELANTE.sub('', str(raw).strip()) if isinstance(raw, str) else ''
+    t = _MONEDA_O_CUENTA_ATRAS.sub('', t).strip()
+    miles = re.fullmatch(r"[1-9]\d{0,2}([.,])\d{3}", t)
+    if not miles:
+        # SEPARADORES-1b. «4500.000» (o «4 500.000») con la coma decimal: no
+        # es un grupo de miles ni tres decimales de un monto. Sin leer, no ×1000.
+        sin_grupo = re.fullmatch(r"[1-9]\d{3,}([.,])\d{3}", re.sub(r"[ '\u00a0\u202f]", '', t))
+        if sin_grupo and decimal != sin_grupo.group(1):
+            return None
+        return _numero_factura(raw, decimal)
+    if decimal == miles.group(1):
+        return None
+    return float(t.replace(miles.group(1), ''))
+
+
 def _campos_sin_leer(operacion: dict, decimal) -> list:
     """Campos de la operación que la factura traía pero no se pudieron leer
     (quedaron en 0 o vacíos). La pantalla los nombra (MARIA-1c). Un dato que
@@ -2173,7 +2219,7 @@ def _campos_sin_leer(operacion: dict, decimal) -> list:
     for campo in ('flete', 'seguro'):
         raw = operacion.get(campo)
         if (raw not in (None, '') and not _no_aplica(raw, _FLETE_NO_APLICA)
-                and _numero_factura(raw, decimal) is None):
+                and _monto_factura(raw, decimal) is None):
             sin_leer.append(campo)
     pais = str(operacion.get('vendedor_pais') or '').strip()
     if pais and not _no_aplica(pais, _PAIS_NO_APLICA) and not _origen_desde_factura(pais):
@@ -2196,6 +2242,69 @@ def _texto(raw) -> str:
 
 
 _TEXTO_VACIO = {'NONE', 'NULL', 'N/A'}
+
+
+# MARIA-7, punto 8: la fecha viene tal como está escrita en la factura y el
+# orden lo decide este código, no Gemini (el 24/10 «2026/08/07» salió
+# 08/07/2026). Meses en letras: castellano, inglés y portugués.
+_MESES = {
+    'ENE': 1, 'JAN': 1, 'FEB': 2, 'FEV': 2, 'MAR': 3, 'ABR': 4, 'APR': 4,
+    'MAY': 5, 'MAI': 5, 'JUN': 6, 'JUL': 7, 'AGO': 8, 'AUG': 8, 'SEP': 9,
+    'SET': 9, 'OCT': 10, 'OUT': 10, 'NOV': 11, 'DIC': 12, 'DEC': 12, 'DEZ': 12,
+}
+_NOMBRE_DEL_MES = ('enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
+                   'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre')
+_SEP_FECHA = r"\s*[/.\-年月]\s*"
+
+
+def _fecha_o_vacia(dia: int, mes: int, anio: int) -> str:
+    try:
+        fecha = datetime(anio, mes, dia)
+    except ValueError:
+        return ""
+    return fecha.strftime("%d/%m/%Y") if fecha.year >= 1900 else ""
+
+
+def _fecha_leida(raw) -> tuple[str, str]:
+    """(fecha en DD/MM/AAAA, aviso). Con el año adelante el orden es
+    año/mes/día. Con el año al final, si uno de los dos primeros pasa de 12
+    ése es el día; si los dos son 12 o menos y distintos, o el año tiene dos
+    cifras, no se adivina: sale vacía con un aviso que pregunta (Emi,
+    2026-10-24)."""
+    texto = _texto(raw)
+    if not texto:
+        return "", ""
+    pregunta = f"Fecha de emisión: «{texto[:30]}» "
+    m = re.fullmatch(rf"([0-9]{{4}}){_SEP_FECHA}([0-9]{{1,2}}){_SEP_FECHA}([0-9]{{1,2}})\s*日?", texto)
+    if m:
+        anio, mes, dia = (int(g) for g in m.groups())
+        fecha = _fecha_o_vacia(dia, mes, anio)
+        return fecha, "" if fecha else pregunta + "no es una fecha. Cargala en la revisión."
+    m = re.fullmatch(rf"([0-9]{{1,2}}){_SEP_FECHA}([0-9]{{1,2}}){_SEP_FECHA}([0-9]{{4}}|[0-9]{{2}})", texto)
+    if m:
+        a, b, anio = (int(g) for g in m.groups())
+        if len(m.group(3)) == 2:
+            # «26/08/07» también puede ser año/mes/día: no se adivina.
+            return "", (pregunta + "tiene el año con dos cifras y el orden no se puede saber; "
+                        "no se adivina. Cargala en la revisión (DD/MM/AAAA).")
+        if 1 <= a <= 12 and 1 <= b <= 12 and a != b:
+            return "", (pregunta + f"puede ser el {a} de {_NOMBRE_DEL_MES[b - 1]} o el {b} de "
+                        f"{_NOMBRE_DEL_MES[a - 1]}; no se adivina. Cargala en la revisión (DD/MM/AAAA).")
+        dia, mes = (b, a) if b > 12 else (a, b)
+        fecha = _fecha_o_vacia(dia, mes, anio)
+        return fecha, "" if fecha else pregunta + "no es una fecha. Cargala en la revisión."
+    # Con el mes en letras no hay duda: «7 Aug 2026», «Aug 7, 2026», «7 de agosto de 2026».
+    sin_tildes = ''.join(c for c in unicodedata.normalize('NFKD', texto.upper()) if not unicodedata.combining(c))
+    m = (re.fullmatch(r"([0-9]{1,2})(?:ST|ND|RD|TH)?[\s.\-/]*(?:DE\s+)?([A-Z]{3})[A-Z]*\.?[\s.\-/,]*(?:DE\s+)?([0-9]{4})", sin_tildes)
+         or re.fullmatch(r"([A-Z]{3})[A-Z]*\.?[\s.\-/]*([0-9]{1,2})(?:ST|ND|RD|TH)?[\s,.\-/]*([0-9]{4})", sin_tildes))
+    if m:
+        g = m.groups()
+        dia, nombre = (g[0], g[1]) if g[0].isdigit() else (g[1], g[0])
+        if nombre in _MESES:
+            fecha = _fecha_o_vacia(int(dia), _MESES[nombre], int(g[2]))
+            if fecha:
+                return fecha, ""
+    return "", pregunta + "no se pudo leer como fecha. Cargala en la revisión (DD/MM/AAAA)."
 
 
 def _texto_del_producto(item_data: dict) -> tuple[str, str]:
@@ -2333,7 +2442,7 @@ SECCIÓN 1: DATOS DE LA OPERACIÓN (buscar en encabezado)
 Busca esta información en el encabezado de la factura:
 
 1. numero_factura: Número de factura/invoice (ej: "E001-1", "INV-2025-001")
-2. fecha_emision: Fecha de la factura (formato DD/MM/YYYY)
+2. fecha_emision: Fecha de la factura copiada TAL COMO ESTÁ ESCRITA (ej: "2026/08/07", "07.08.2026", "Aug 7, 2026"). NO la conviertas ni cambies el orden de día, mes y año.
 3. vendedor_nombre: Nombre del vendedor/proveedor/seller
 4. vendedor_id: ID tributario del vendedor (Tax ID, RUT, CNPJ, etc.)
 5. vendedor_pais: País del vendedor (código ISO2: CN, BR, US, PE, etc.)
@@ -2342,8 +2451,8 @@ Busca esta información en el encabezado de la factura:
 8. comprador_cuit: CUIT del comprador argentino (si aparece). REGLA CRÍTICA: CUIT argentino tiene EXACTAMENTE 11 dígitos numéricos. Formato esperado: 30-61212382-01 o 306121238201. NO agregar prefijo país. Si el PDF dice "AR306121238201", devolver "306121238201" sin "AR". Si no hay 11 dígitos, devolver "".
 9. moneda: Moneda de la factura. Devolver SIEMPRE el codigo de 3 letras: DOL, EUR, BRL, ARS, CLP, UYU, GBP, JPY, CNY. Si no aparece la palabra "moneda" o "currency" pero hay simbolos en los valores, inferir asi: $ o "USD" o "U$S" -> DOL; "EUR" o EUR$ -> EUR; "R$" o "BRL" -> BRL; "AR$" o "ARS" -> ARS. Si no hay palabra ni simbolo de moneda, null (no adivinar).
 10. incoterm: Términos de entrega (FOB, CIF, DDP, EXW, etc.). Si viene con ciudad/puerto al lado (ej: "FOB Genova", "CIF Buenos Aires"), devolver SOLO las 3 letras del codigo.
-11. flete: Valor del flete/freight (número, 0 si no aparece)
-12. seguro: Valor del seguro/insurance (número, 0 si no aparece)
+11. flete: Valor del flete/freight, copiado tal como aparece en la factura, como texto ("" si no aparece)
+12. seguro: Valor del seguro/insurance, copiado tal como aparece en la factura, como texto ("" si no aparece)
 13. comprador_domicilio: Domicilio/dirección del comprador/importador argentino (la que figura junto al nombre del importador/buyer). Si no aparece claramente, devolver "". No inventar ni usar la dirección del vendedor.
 
 ═══════════════════════════════════════════════════════════════════
@@ -2384,7 +2493,7 @@ FORMATO DE RESPUESTA (JSON estricto)
 {
   "operacion": {
     "numero_factura": "...",
-    "fecha_emision": "DD/MM/YYYY",
+    "fecha_emision": "tal como figura en la factura",
     "vendedor_nombre": "...",
     "vendedor_id": "...",
     "vendedor_pais": "XX",
@@ -2393,8 +2502,8 @@ FORMATO DE RESPUESTA (JSON estricto)
     "comprador_cuit": "...",
     "moneda": "DOL",
     "incoterm": "FOB",
-    "flete": 0.00,
-    "seguro": 0.00,
+    "flete": "",
+    "seguro": "",
     "comprador_domicilio": "..."
   },
   "items": [
@@ -2462,10 +2571,11 @@ IMPORTANTE:
 
                     # Extraer datos de operación
                     operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
+                    fecha, aviso_fecha = _fecha_leida(operacion.get('fecha_emision'))
                     operacion_data = {
                         'tipo_destinacion': documento['destinacion'],
                         'numero_factura': _texto(operacion.get('numero_factura')),
-                        'fecha_emision': _texto(operacion.get('fecha_emision')),
+                        'fecha_emision': fecha,
                         'vendedor_nombre': _texto(operacion.get('vendedor_nombre')),
                         'vendedor_id': _texto(operacion.get('vendedor_id')),
                         'vendedor_pais': _origen_desde_factura(operacion.get('vendedor_pais')),
@@ -2474,11 +2584,13 @@ IMPORTANTE:
                         'comprador_cuit': _normalize_argentine_cuit(operacion.get('comprador_cuit', '')),
                         'moneda': _texto(operacion.get('moneda'))[:3].upper(),
                         'incoterm': _texto(operacion.get('incoterm'))[:3].upper(),
-                        'flete': _numero_factura(operacion.get('flete'), decimal) or 0.0,
-                        'seguro': _numero_factura(operacion.get('seguro'), decimal) or 0.0,
+                        'flete': _monto_factura(operacion.get('flete'), decimal) or 0.0,
+                        'seguro': _monto_factura(operacion.get('seguro'), decimal) or 0.0,
                         'comprador_domicilio': _texto(operacion.get('comprador_domicilio')),
                     }
                     operacion_data['campos_sin_leer'] = _campos_sin_leer(operacion, decimal)
+                    if aviso_fecha:
+                        operacion_data['avisos_fecha'] = [aviso_fecha]
                     
                     # Extraer items
                     items = []
@@ -2573,7 +2685,7 @@ SECCIÓN 1: DATOS DE LA OPERACIÓN (buscar en encabezado)
 Busca esta información en el encabezado de la factura:
 
 1. numero_factura: Número de factura/invoice (ej: "E001-1", "INV-2025-001")
-2. fecha_emision: Fecha de la factura (formato DD/MM/YYYY)
+2. fecha_emision: Fecha de la factura copiada TAL COMO ESTÁ ESCRITA (ej: "2026/08/07", "07.08.2026", "Aug 7, 2026"). NO la conviertas ni cambies el orden de día, mes y año.
 3. vendedor_nombre: Nombre del vendedor/proveedor/seller
 4. vendedor_id: ID tributario del vendedor (Tax ID, RUT, CNPJ, etc.)
 5. vendedor_pais: País del vendedor (código ISO2: CN, BR, US, PE, etc.)
@@ -2582,8 +2694,8 @@ Busca esta información en el encabezado de la factura:
 8. comprador_cuit: CUIT del comprador argentino (si aparece). REGLA CRÍTICA: CUIT argentino tiene EXACTAMENTE 11 dígitos numéricos. Formato esperado: 30-61212382-01 o 306121238201. NO agregar prefijo país. Si el PDF dice "AR306121238201", devolver "306121238201" sin "AR". Si no hay 11 dígitos, devolver "".
 9. moneda: Moneda de la factura. Devolver SIEMPRE el codigo de 3 letras: DOL, EUR, BRL, ARS, CLP, UYU, GBP, JPY, CNY. Si no aparece la palabra "moneda" o "currency" pero hay simbolos en los valores, inferir asi: $ o "USD" o "U$S" -> DOL; "EUR" o EUR$ -> EUR; "R$" o "BRL" -> BRL; "AR$" o "ARS" -> ARS. Si no hay palabra ni simbolo de moneda, null (no adivinar).
 10. incoterm: Términos de entrega (FOB, CIF, DDP, EXW, etc.). Si viene con ciudad/puerto al lado (ej: "FOB Genova", "CIF Buenos Aires"), devolver SOLO las 3 letras del codigo.
-11. flete: Valor del flete/freight (número, 0 si no aparece)
-12. seguro: Valor del seguro/insurance (número, 0 si no aparece)
+11. flete: Valor del flete/freight, copiado tal como aparece en la factura, como texto ("" si no aparece)
+12. seguro: Valor del seguro/insurance, copiado tal como aparece en la factura, como texto ("" si no aparece)
 13. comprador_domicilio: Domicilio/dirección del comprador/importador argentino (la que figura junto al nombre del importador/buyer). Si no aparece claramente, devolver "". No inventar ni usar la dirección del vendedor.
 
 ═══════════════════════════════════════════════════════════════════
@@ -2606,7 +2718,7 @@ FORMATO DE RESPUESTA (JSON estricto)
 {
   "operacion": {
     "numero_factura": "...",
-    "fecha_emision": "DD/MM/YYYY",
+    "fecha_emision": "tal como figura en la factura",
     "vendedor_nombre": "...",
     "vendedor_id": "...",
     "vendedor_pais": "XX",
@@ -2615,8 +2727,8 @@ FORMATO DE RESPUESTA (JSON estricto)
     "comprador_cuit": "...",
     "moneda": "DOL",
     "incoterm": "FOB",
-    "flete": 0.00,
-    "seguro": 0.00,
+    "flete": "",
+    "seguro": "",
     "comprador_domicilio": "..."
   },
   "items": [
@@ -2658,10 +2770,11 @@ IMPORTANTE:
 
                         # Extraer datos de operación
                         operacion = result.get('operacion') if isinstance(result.get('operacion'), dict) else {}
+                        fecha, aviso_fecha = _fecha_leida(operacion.get('fecha_emision'))
                         operacion_data = {
                             'tipo_destinacion': documento['destinacion'],
                             'numero_factura': _texto(operacion.get('numero_factura')),
-                            'fecha_emision': _texto(operacion.get('fecha_emision')),
+                            'fecha_emision': fecha,
                             'vendedor_nombre': _texto(operacion.get('vendedor_nombre')),
                             'vendedor_id': _texto(operacion.get('vendedor_id')),
                             'vendedor_pais': _origen_desde_factura(operacion.get('vendedor_pais')),
@@ -2670,11 +2783,13 @@ IMPORTANTE:
                             'comprador_cuit': _normalize_argentine_cuit(operacion.get('comprador_cuit', '')),
                             'moneda': _texto(operacion.get('moneda'))[:3].upper(),
                             'incoterm': _texto(operacion.get('incoterm'))[:3].upper(),
-                            'flete': _numero_factura(operacion.get('flete'), decimal) or 0.0,
-                            'seguro': _numero_factura(operacion.get('seguro'), decimal) or 0.0,
+                            'flete': _monto_factura(operacion.get('flete'), decimal) or 0.0,
+                            'seguro': _monto_factura(operacion.get('seguro'), decimal) or 0.0,
                             'comprador_domicilio': _texto(operacion.get('comprador_domicilio')),
                         }
                         operacion_data['campos_sin_leer'] = _campos_sin_leer(operacion, decimal)
+                        if aviso_fecha:
+                            operacion_data['avisos_fecha'] = [aviso_fecha]
                         
                         # Extraer items
                         items = []

@@ -2,136 +2,184 @@
 
 Este archivo es mío y vos no lo tocás. Acá te informo.
 
-## CLIENTE-1 — alta de cliente con lo que pide el MARIA: entregada
+## CSRF-2, entregada en `fcd1072` (informe en el commit de arriba)
 
-**Resultado: terminada, para revisar.** Hecha según tu D2 = (a). En el alta
-se ven arriba la razón social, el CUIT, el domicilio y el inicio de
-actividad, marcados «lo pide el MARIA». El email y el teléfono quedan en
-«Más datos». El cliente se guarda igual sin esos datos, con un aviso de
-advertencia que dice cuáles faltan. Con los cuatro cargados no hay aviso. No
-cambian la API, la importación de clientes ni el alta rápida desde la
-revisión (`review.js` no se tocó).
-
-| Qué | SHA |
-|---|---|
-| Base (merge de tu rama con D2) | `cb98105` |
-| Producto | `fbc006a` + `12ff9b6` (lo que salió de la autorrevisión) |
-| Pruebas: pantalla y sabotajes | `9c53522`, `b0c920b` |
-| Informe | este commit |
-
-Archivos de producto que toqué: `proyecto_maria/templates/dashboard_v2.html`
-(formulario de cliente), `proyecto_maria/static/v2/screens/clientes.js`
-(alta y detalle) y `proyecto_maria/static/v2/app_v2.js` (una línea: el
-ícono de los avisos de advertencia, compartido).
+**Resultado.**
+- **Rutas exentas.** El control CSRF exenta sólo un conjunto exacto de rutas:
+  `/auth/login`, `/auth/register`, `/auth/request-password-reset`,
+  `/auth/recover-username` y `/auth/reset-password`.
+  - Ya no saltea rutas que empiezan parecido (`/auth/loginx`, `/healthx`,
+    `/staticx`) ni las que dicen «webhook» en cualquier parte. Ejemplo:
+    `DELETE /api/catalog/x/productos/abc-webhook`.
+  - Las tres rutas de recuperación de cuenta andan con una cookie de sesión
+    vieja.
+- **`static/csrf.js` (nuevo).** Envuelve `fetch` en la landing y en la pantalla
+  vieja: toda escritura al mismo origen lleva `X-CSRF-Token`.
+  - Con `CSRF_ENFORCE=true`, la telemetría de la landing con sesión abierta y
+    las escrituras de `app.js` dan 200.
+  - El «Salir» de `app.js` cierra la sesión: después, `/auth/current_user` da
+    401.
+- **Alias `/logout`.** Hay una prueba que exige que cierre de verdad: con
+  cookie y token, 200 y las dos cookies borradas.
+- Producto `+37/−11`.
 
 ### Decisiones
 
-- **D1 (de EXCEL-3), sigue abierta.** Son el nombre y el signo de
-  `operacion.descuento` para VALOR-1. El planteo está en el informe de
-  EXCEL-3 (`8622aab`). Recomiendo (a): queda como está, positivo.
-- **D3. ¿Arreglo que al editar un cliente se borre una fecha de inicio que
-  no está en formato AAAA-MM-DD?** Esto ya pasaba antes de CLIENTE-1; ahora
-  el campo está a la vista. Si un cliente tiene `fecha_inic_activ =
-  '01/03/2015'` (la API acepta cualquier texto de hasta 10 caracteres), el
-  campo de fecha del formulario lo muestra vacío. Al guardar cualquier
-  cambio, se manda vacío y la fecha queda en NULL, sin aviso. La
-  importación asistida normaliza a ISO, así que el caso entra por la API o
-  por datos viejos. Opciones:
-  (a) arreglarlo ahora en `clientes.js`: si la fecha guardada no es ISO y
-  el campo queda vacío, no se manda (la fecha se conserva);
-  (b) pieza aparte, que la API normalice o rechace las fechas que no son
-  ISO;
-  (c) dejarlo.
-  **Recomiendo (a)**: son unas pocas líneas en el mismo archivo y evitan
-  perder datos. (b) toca la API, que D2 dejó afuera.
+- **D58. Duplicación con `app_v2.js`.** La v2 pone el token con su propio
+  wrapper.
+  - Opciones:
+    - (a) a la cola de limpieza: cargar `csrf.js` también en `dashboard_v2` y
+      sacar el header a mano de `app_v2.js`;
+    - (b) dejarlo así.
+  - Recomiendo (a). Es una sola regla en un solo lugar, y la v2 ya está
+    cubierta por `csrf1.sh`. No lo hice acá porque la tarea no lo pide y
+    tocaría la v2.
+- **D59. Sesión con `access_token` pero sin `csrf_token`.** Una cookie de
+  sesión emitida antes de CSRF da 403 en toda escritura, «Salir» incluido,
+  hasta volver a entrar.
+  - Ningún GET vuelve a emitir `csrf_token`: sólo lo hacen login y registro.
+  - Es previo a esta pieza. Lo marcaron el `/code-review` y el adversario.
+  - Opciones:
+    - (a) pieza chica antes de activar el enforce en producción: emitir
+      `csrf_token` si falta, por ejemplo en `/auth/current_user`;
+    - (b) aceptar que esas cuentas vuelvan a entrar. Login y registro están
+      exentos, así que pueden.
+  - Recomiendo (a), si el enforce se va a prender con sesiones vivas. Si no,
+    (b).
+- **D60. El guard de la pantalla vieja depende de `localStorage`.**
+  `dashboard.html` (la v1) manda a `/` si `localStorage.access_token` está
+  vacío, y sólo `landing_legacy.html` lo llena.
+  - Con la landing nueva, `/dashboard?v=1` no abre. Es previo a esta pieza.
+  - La prueba lo esquiva poniendo el token antes de abrir.
+  - Opciones:
+    - (a) confirmar si la v1 todavía se usa y, si se usa, abrir una pieza;
+    - (b) nada, si la v1 ya no tiene usuarios.
+  - Recomiendo (a), nada más que confirmar.
 
-### Qué cambió
+Supuesto reversible: la familia de rutas de la prueba suma `/auth/register`,
+que la tarea no nombraba. Lo pidió el adversario: sin esa fila, sacar
+`/auth/register` de las exentas dejaba la prueba en verde.
 
-1. **Formulario.** CUIT, domicilio e inicio de actividad van arriba con
-   «· lo pide el MARIA»; la razón social, con «· requerido · lo pide el
-   MARIA». Debajo, la frase «Se puede guardar sin estos datos; al guardar te
-   avisamos cuáles faltan para el MARIA.TXT.». La fecha salió de «Más
-   datos», que ya no se abre sola por tener fecha.
-2. **Aviso al guardar.** Si falta el CUIT, el domicilio o el inicio de
-   actividad, el aviso es de advertencia, con «!» y «Faltan para el MARIA:
-   domicilio, inicio de actividad.». Si están los cuatro, el aviso es el
-   verde de siempre. El CUIT se evalúa ya normalizado; el domicilio y la
-   fecha, sin espacios.
-3. **Detalle del cliente** (pestaña Datos): fila nueva «Inicio de actividad»
-   en DD/MM/AAAA. Si está vacía, muestra «—». Una fecha guardada en otro
-   formato se muestra tal cual.
+### SHAs (desde `6e71766`, tu merge)
 
-### Puertas
+| SHA | Qué |
+|---|---|
+| `8abfed3` | fix: conjunto exacto de rutas exentas; `csrf.js` cargado en `landing.html` y `dashboard.html`; `CHANGELOG.md` |
+| `965a415` | test: alias `/logout` con token; familia de rutas sin token (`RUTAS_SIN_TOKEN`); `pantalla_csrf2.js`; `csrf2.sh`; el arnés común `_csrf_comun.sh`, que ahora usa también `csrf1.sh` |
+| `aa4eced` | fix: `csrf.js` mira el método primero, y un `fetch` mal armado falla en la promesa, como el nativo (hallazgos 2 y 8 del code-review) |
+| `a6af49f` | test: la pantalla vieja entra con su token en `localStorage` (hallazgo 1); caso y sabotaje de la URL inválida |
+| `fcd1072` | test: el chequeo de otro origen mira lo que `csrf.js` le pasa a `fetch` nativo, porque la CSP `connect-src 'self'` corta el pedido antes de la red y la prueba no lo veía nunca (adversario 1B); `/auth/register` entra a la familia, con su sabotaje (adversario 2) |
+| (este) | docs: informe |
+
+### Rojos antes
+
+La `tests/test_csrf.py` final, copiada sobre `6e71766`:
+
+```
+FAILED tests/test_csrf.py::test_sin_token_solo_pasan_las_rutas_exentas_exactas[DELETE /api/catalog/x/productos/abc-webhook]
+FAILED tests/test_csrf.py::test_sin_token_solo_pasan_las_rutas_exentas_exactas[POST /api/payments/webhook/x]
+FAILED tests/test_csrf.py::test_sin_token_solo_pasan_las_rutas_exentas_exactas[POST /healthx]
+FAILED tests/test_csrf.py::test_sin_token_solo_pasan_las_rutas_exentas_exactas[POST /staticx]
+FAILED tests/test_csrf.py::test_sin_token_solo_pasan_las_rutas_exentas_exactas[POST /auth/loginx]
+FAILED tests/test_csrf.py::test_sin_token_solo_pasan_las_rutas_exentas_exactas[POST /auth/request-password-reset]
+FAILED tests/test_csrf.py::test_sin_token_solo_pasan_las_rutas_exentas_exactas[POST /auth/recover-username]
+FAILED tests/test_csrf.py::test_sin_token_solo_pasan_las_rutas_exentas_exactas[POST /auth/reset-password]
+=================== 8 failed, 18 passed, 5 warnings in 8.52s ===================
+```
+
+- **Alias `/logout`.** En la base ya delega (desde CSRF-1 vuelta 2), así que
+  su prueba pasa. Lo que la mide es el sabotaje «el alias responde sin cerrar
+  la sesión».
+- **Pantalla sobre la base.** `FALLA: la telemetría de la landing dio 403 en
+  /api/ui/event…`
+
+### Puertas, sobre `fcd1072`
 
 | Puerta | Resultado |
 |---|---|
-| Rojo antes (prueba de pantalla sobre la base) | `FALLA: el rótulo de CUIT no dice «lo pide el MARIA»: CUIT` |
-| Rojo antes de lo de la autorrevisión (sobre `9c53522`) | `FALLA: el aviso de advertencia tiene el ícono «i», no «!»`; con el ícono arreglado, `FALLA: una fecha guardada que no es AAAA-MM-DD se muestra como vacía` |
-| `scripts/testing/pantalla_cliente1.js` sobre `b0c920b` | 4 líneas `OK` y `PANTALLA CLIENTE-1 OK` |
-| Sabotajes `scripts/testing/sabotajes/cliente1.sh` sobre `b0c920b` | 14 `ROJO` por el motivo esperado, `sabotajes sin rojo: 0`, exit 0 |
-| Suite completa, worktree limpio en `b0c920b`, `--no-cov --timeout=120` | `1757 passed, 102 skipped, 2 xfailed, 23 warnings in 162.46s (0:02:42)`, `FIN 0` |
-| e2e de la CI (`scripts/testing/e2e_maria.sh`) sobre `b0c920b` | «E2E MARIA OK: carga, revisión, SIM/DC, agrupación, validación, SBT, descarga y memoria verificadas.», `FIN 0` |
-| Suite y e2e sobre `9c53522` (antes de la autorrevisión) | `1757 passed, 102 skipped, 2 xfailed, 25 warnings in 165.03s`, «E2E MARIA OK», los dos exit 0 |
-| `/code-review high` sobre `cb98105..9c53522` | 6 hallazgos: 3 arreglados; 2 en parte (el ícono sí, la duración del aviso no; el detalle sí, el borrado va a D3); 1 queda como riesgo (abajo) |
-| Subagente adversario Sonnet alto | 5 hallazgos y XSS probado sin hallazgo: 1 arreglado (la prueba); 1 en parte (el detalle sí, el borrado va a D3); 3 quedan como riesgo (abajo) |
-| `/security-review` | no lo corrí: la pieza no toca plata, sesión, permisos ni API; el texto nuevo va con `textContent` y `escapeHtml` (el subagente probó XSS en el nombre y en el aviso, sin ejecución) |
+| suite completa (`pytest -q --no-cov --timeout=120`, base limpia) | `4438 passed, 121 skipped, 3 xfailed, 101 warnings in 639.62s`, salida 0. Al cerrar, asyncio imprime «Task was destroyed but it is pending!»: es ruido del cierre, no un fallo |
+| `tests/test_csrf.py` | `26 passed` |
+| `csrf2.sh fcd1072` | 10 ROJO, `sabotajes con falla: 0`, salida 0 |
+| `csrf1.sh fcd1072` | 8 ROJO, `sabotajes con falla: 0`, salida 0 (el arnés común no rompió CSRF-1) |
+| grep de historia de §6 | vacío (salida 1) |
+| `/code-review high` (yo, sobre `965a415`) | 8 hallazgos: se arreglaron 1, 2 y 8; los demás, abajo |
+| `/security-review` (subagente Sonnet, sobre `6e71766..a6af49f`) | sin hallazgos de confianza ≥7. `fcd1072` sólo toca pruebas |
+| adversario Sonnet alto (sobre `965a415`) | 4 hallazgos, abajo |
 
-### Hallazgos de la autorrevisión
+No corrí `smoke_friccion.sh` ni `ataque_aislamiento.sh`. Esta pieza toca el
+middleware CSRF y dos `<script>`, no datos ni aislamiento. Lo que cambia en el
+backend lo miden `test_csrf.py` y la suite.
 
-| Hallazgo | Quién (modelo, esfuerzo) | Qué pasó |
-|---|---|---|
-| La prueba aceptaba la fecha ISO cruda en el detalle: no veía si se formateaba | los dos | reproducido; ahora exige `01/03/2015`; sabotaje nuevo |
-| La prueba leía el detalle en una pestaña oculta | `/code-review` | reproducido; ahora abre «Datos» y exige que se vea; sabotaje nuevo |
-| El aviso de advertencia tenía el ícono «i» de información | `/code-review` | reproducido; ahora «!» (`app_v2.js`, igual que el diálogo de advertencia) |
-| Una fecha que no es ISO se mostraba «—» en el detalle | los dos | reproducido; se muestra tal cual |
-| Al editar, esa fecha se borra | los dos | ya pasaba antes de esta pieza; va a **D3** |
-| La ruta de Chromium por defecto no existe en este entorno | los dos | cambiada a `/opt/pw-browsers/chromium` (`CHROMIUM` la pisa) |
+### Hallazgos
 
-### Riesgos que quedan (no arreglados)
+| De | Modelo y esfuerzo | Hallazgo | Qué pasó |
+|---|---|---|---|
+| code-review 1 | yo, alto | la v1 redirige a `/` sin token en localStorage: la prueba pasaba sin abrir la pantalla vieja | arreglado en `a6af49f` |
+| code-review 2 y 8 | yo, alto | `csrf.js` podía tirar antes de devolver la promesa (URL inválida, `init` nulo) | arreglado en `aa4eced`, con caso y sabotaje |
+| code-review 3 / adversario «opinión» | yo, alto; Sonnet alto | sesión sin `csrf_token` trabada | previo: **D59** |
+| code-review 4 | yo, alto | `csrf.js` duplica lo que hace `app_v2.js` | **D58** |
+| code-review 5 / adversario 3 | yo, alto; Sonnet alto | exentas a mano; `POST /auth/login/` (con barra) con cookie da 403 | riesgo menor: ningún cliente usa la barra |
+| code-review 6 | yo, alto | un detalle menor de la prueba | no lo reproduje; no queda |
+| code-review 7 | yo, alto | la landing carga `csrf.js` sin `?v=` (es `FileResponse`, sin plantilla) | riesgo menor: después de un cambio de `csrf.js`, un navegador con caché puede seguir con el viejo |
+| adversario 1A | Sonnet alto | la v1 redirige y la prueba no abre la pantalla vieja | ya estaba arreglado en `a6af49f` (el adversario miró `965a415`) |
+| adversario 1B | Sonnet alto | la CSP bloquea el pedido a otro origen antes de `p.route`, así que el chequeo nunca puede ver el token | arreglado en `fcd1072`; el sabotaje del origen da ROJO con su texto |
+| adversario 2 | Sonnet alto | sacar `/auth/register` de las exentas no pone rojo | arreglado en `fcd1072`, con su sabotaje |
+| adversario 4 | Sonnet alto | `fetch(url, null)` tiraba `TypeError` | arreglado en `aa4eced` (`init \|\| {}`) |
 
-- **El aviso dura 4 s y se pisa con el siguiente** (es el toast común). Es
-  la única señal de qué falta; después, en el detalle sólo se ve «—». Baja.
-  Alargar sólo este aviso implica cambiar el toast común; no lo hice.
-- **Un CUIT de 11 dígitos con dígito verificador inválido** no se avisa:
-  el alta valida sólo el largo y el aviso mira sólo si está vacío. Lo frena
-  la generación del TXT (`controles_maria.cuit_valido`). Media-baja; se
-  puede sumar «CUIT inválido» al aviso si querés.
-- **La lista de lo que pide el MARIA está escrita a mano** en el alta, aparte
-  de lo que exige la generación (MARIA-7). Si MARIA-7 cambia los
-  obligatorios, el alta queda vieja. Baja; lo anoto para ESTUDIO-1.
-- **En el alta rápida desde la revisión** el aviso puede decir «falta
-  domicilio» aunque la carátula lo traiga: es cierto para la ficha, y
-  después la operación lo copia (fill-if-empty). Baja; `review.js` quedó
-  afuera por D2.
-- Las otras pruebas de pantalla del repositorio tienen la ruta vieja de
-  Chromium (`chromium-1194`); no las toqué.
+### Riesgos
 
-### Supuestos reversibles
+- **XHR y `sendBeacon` salen sin token.** La landing y `app.js` no los usan
+  hoy (adversario y `grep`). Uno nuevo daría 403 con el enforce prendido.
+- **Las exentas son una lista a mano, comparada exacta.** Una ruta pública
+  nueva que no use la sesión va a pedir el token hasta que se sume. Falla
+  cerrada, no abierta.
+- **Otro origen.** Lo cubren dos defensas: la comparación de origen en
+  `csrf.js` y la CSP `connect-src 'self'`. La prueba mide la primera.
+- **`POST /api/payments/webhook` dejó de estar exento.** Mercado Pago no manda
+  la cookie de sesión, y sin ella el middleware no valida. Un webhook con
+  cookie da 403 (adversario).
 
-- La fila «Inicio de actividad» en el detalle del cliente no estaba pedida
-  explícitamente: sin ella, el dato se carga y no se ve en ningún lado.
-- El ícono «!» vale para todo aviso de advertencia; hoy hay uno más
-  («Origen no reconocido», `ncm.js`).
+### chequeo-6, salida entera
 
-### Comandos para reproducir
-
-```sh
-# desde un worktree en b0c920b levantado con docs/pm/herramientas/levantar.sh
-BASE_URL=http://127.0.0.1:<puerto> CHROMIUM=/opt/pw-browsers/chromium \
-  node scripts/testing/pantalla_cliente1.js          # 4 «OK» y «PANTALLA CLIENTE-1 OK»
-PY=<venv>/bin/python CHROMIUM=/opt/pw-browsers/chromium \
-  scripts/testing/sabotajes/cliente1.sh b0c920b      # 14 «ROJO», «sabotajes sin rojo: 0»
-# rojo antes: la prueba sobre la base
-git worktree add /tmp/c1-base cb98105                # levantarla y correr la prueba de arriba:
-                                                     # «FALLA: el rótulo de CUIT no dice «lo pide el MARIA»»
+```
+chequeo-6 6e71766..fcd1072: avisos para mirar, no un veredicto
+producto +37/−11
+  AVISO producto suma 26 líneas netas: el informe dice por qué (§6: más de 20)
+arnés +218/−74
+historia (grep de §6, sin líneas movidas): vacío
+archivos de producto:
+  proyecto_maria/main.py: 11307 → 11304
+  proyecto_maria/static/csrf.js: nuevo, 27
+avisos: 1
 ```
 
-Datos reales: no entró nada de la reunión del 24/10; los clientes de las
-pruebas son inventados («Cliente Inventado Uno SA», CUIT 20-12345678-6).
+El AVISO: `main.py` resta 3 líneas. Las 29 netas de más son `csrf.js` (27,
+nuevo) y sus dos `<script>`. La landing y la v1 no tienen un wrapper de `fetch`
+propio donde poner el token. Ponerlo a mano en cada llamada eran más líneas y
+un lugar más para olvidárselo.
 
-**EXCEL-3** sigue esperando tu veredicto: el informe está en `8622aab` y
-D1, arriba. **Sigo con PA-1.**
+### Para reproducir
 
-Última vuelta: 2026-10-24 19:32 UTC
+```bash
+git checkout fcd1072
+# 1. 26 passed
+DATABASE_URL=sqlite+aiosqlite:///./t.db GEMINI_API_KEY=test-key ENVIRONMENT=test python -m pytest -q --no-cov tests/test_csrf.py
+# 2. 10 ROJO, «sabotajes con falla: 0»
+PY=$(which python) PUERTO=8879 scripts/testing/sabotajes/csrf2.sh fcd1072
+# 3. 8 ROJO, «sabotajes con falla: 0» (el arnés común no rompió CSRF-1)
+PY=$(which python) PUERTO=8880 scripts/testing/sabotajes/csrf1.sh fcd1072
+# 4. 1 AVISO, explicado arriba
+python docs/pm/herramientas/chequeo-6.py 6e71766 fcd1072
+```
 
-/compact conservar: Soy la Dev técnica (Dev 1) de CDI, sesión session_018yxeKHYQKFA3qJ2WJmQru7, rama claude/dev-tecnica (nunca main), rutina trig_011UpBfwEu9TUzoNUrviqoP5 min 15; aviso a la PM principal session_01B7FVQspcEHF7PqNv797wNM con send_message priority next empezando «Dev técnica:». CLIENTE-1 entregada: producto fbc006a+12ff9b6, pruebas 9c53522+b0c920b, base cb98105; D3 abierta (¿arreglo que editar borre una fecha no ISO?). EXCEL-3 en revisión (informe 8622aab), D1 abierta. Sigo con PA-1 (sólo textos «NCM» → «Posición arancelaria (PA SIM)»); ESTUDIO-1 espera la coordinación de la PM con MARIA-7; GUARDAR-2 más adelante desde 2d930c5. Reglas de Emi: sólo me piden la PM o Emi; nada se publica sin su «dale» para el SHA; nunca main; sin secretos ni datos reales; subagentes hasta alto, sin Fable.
+### Archivos de producto tocados
+
+`proyecto_maria/main.py`, `proyecto_maria/static/csrf.js` (nuevo),
+`proyecto_maria/templates/dashboard.html` y
+`proyecto_maria/templates/landing.html` (y `CHANGELOG.md`).
+
+---
+
+/compact conservar: Dev 1, rama claude/dev-tecnica. CSRF-2 entregada en
+fcd1072 (informe en el commit de arriba), con D58-D60. Sigue COBRO-CORTE-1, en
+tu orden. Nada se publica sin el «dale» de Emi; nunca main.

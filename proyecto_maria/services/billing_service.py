@@ -100,9 +100,47 @@ EXTRA_OPS_MAX = 100
 def _expire_extra_ops(user) -> None:
     """Si los créditos extra ya vencieron, los resetea a 0."""
     expires = getattr(user, "extra_ops_expires_at", None)
+    # La columna que agrega la migración de arranque es TIMESTAMP sin zona
+    # (y SQLite no la guarda): se lee como UTC.
+    if expires is not None and expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
     if expires and datetime.now(timezone.utc) > expires:
         user.extra_ops_remaining = 0
         user.extra_ops_expires_at = None
+
+
+def recarga_entra(cuenta) -> tuple[bool, int]:
+    """Si una recarga más entra en el tope, y cuántas extra vigentes tiene la
+    cuenta: las vencidas no cuentan (COBRO-MP-1, f)."""
+    _expire_extra_ops(cuenta)
+    vigentes = cuenta.extra_ops_remaining or 0
+    return vigentes + TOPUP_OPS <= EXTRA_OPS_MAX, vigentes
+
+
+def tiene_acceso(cuenta, ahora: datetime | None = None) -> bool:
+    """trial y active tienen acceso; canceled, hasta el fin del período ya
+    pagado (COBRO-MP-2, C2); el resto, no."""
+    status = getattr(cuenta, "billing_status", "none")
+    if status in ("trial", "active"):
+        return True
+    if status != "canceled":
+        return False
+    return vigente(getattr(cuenta, "trial_ends_at", None), ahora)
+
+
+def vigente(fin: datetime | None, ahora: datetime | None = None) -> bool:
+    if fin is None:
+        return False
+    if fin.tzinfo is None:
+        fin = fin.replace(tzinfo=timezone.utc)
+    return fin > (ahora or datetime.now(timezone.utc))
+
+
+def cancelar_corta_acceso(cuenta, ahora: datetime | None = None) -> bool:
+    """Cancelar deja canceled, que da acceso sólo hasta trial_ends_at: corta a
+    quien hoy no lo tiene y a quien ya pasó esa fecha (gracia, prueba vencida)."""
+    ahora = ahora or datetime.now(timezone.utc)
+    return not tiene_acceso(cuenta, ahora) or not vigente(getattr(cuenta, "trial_ends_at", None), ahora)
 
 
 def can_create_operation(user) -> Tuple[bool, str | None]:
@@ -110,8 +148,7 @@ def can_create_operation(user) -> Tuple[bool, str | None]:
 
     Devuelve (ok, razón).
     """
-    status = getattr(user, "billing_status", "none")
-    if status not in ("trial", "active"):
+    if not tiene_acceso(user):
         return False, "No tenés una suscripción activa o trial vigente."
 
     # Limpiar créditos extra vencidos antes de evaluar.
@@ -213,6 +250,10 @@ def create_checkout(user, plan_id: str, org_id: str | None = None) -> dict[str, 
             }
         ],
         "external_reference": external_reference,
+        # El webhook controla el pago contra este precio, el de cuando se
+        # armó el link: si el precio sube después, el pago sigue valiendo
+        # (COBRO-MP-1, D29).
+        "metadata": {"precio_esperado": plan["price"]},
         "back_urls": {
             "success": back_url,
             "failure": f"{base_url}/dashboard?billing=failure",
@@ -260,6 +301,7 @@ def create_topup_checkout(user, org_id: str | None = None) -> dict[str, Any]:
             }
         ],
         "external_reference": external_reference,
+        "metadata": {"precio_esperado": TOPUP_PRICE_ARS},
         "back_urls": {
             "success": f"{base_url}/dashboard?billing=topup_success",
             "failure": f"{base_url}/dashboard?billing=failure",
@@ -297,32 +339,28 @@ def process_payment(payment_info: dict[str, Any]) -> dict[str, Any] | None:
     if payment_info.get("status") != "approved":
         return None
 
-    external_ref = payment_info.get("external_reference", "")
-    if ":" not in external_ref:
+    external_ref = payment_info.get("external_reference")
+    if not isinstance(external_ref, str):
         return None
+    parts = external_ref.split(":")
+    if len(parts) == 3 and parts[0] == "org" and parts[1]:
+        cuenta = {"org_id": parts[1]}
+    elif len(parts) == 2 and parts[0]:
+        # «org:premium» es el plan del usuario «org» (COBRO-MP-1, b).
+        cuenta = {"username": parts[0]}
+    else:
+        return None
+    kind = parts[-1]
 
-    payer_id = str(payment_info.get("payer", {}).get("id", "") or "")
-    payment_id = str(payment_info.get("id", "") or "")
     now = datetime.now(timezone.utc)
 
     base_update = {
         "payment_provider": "mercadopago",
-        "payment_customer_id": payer_id or payment_id,
+        "payment_customer_id": cliente_mp(payment_info),
         "payment_method_last4": _last4_from_payment(payment_info),
         "payment_method_brand": _brand_from_payment(payment_info),
+        **cuenta,
     }
-
-    # Formato org: {org_id}:{kind}
-    if external_ref.startswith("org:"):
-        parts = external_ref.split(":")
-        if len(parts) != 3:
-            return None
-        org_id, kind = parts[1], parts[2]
-        base_update["org_id"] = org_id
-    else:
-        # Formato individual: {username}:{kind}
-        username, kind = external_ref.split(":", 1)
-        base_update["username"] = username
 
     if kind == "topup":
         return {
@@ -347,14 +385,28 @@ def process_payment(payment_info: dict[str, Any]) -> dict[str, Any] | None:
     return None
 
 
+def _objeto(datos: dict[str, Any], campo: str) -> dict[str, Any]:
+    """Un dato secundario del pago, que Mercado Pago puede mandar en null."""
+    valor = datos.get(campo)
+    return valor if isinstance(valor, dict) else {}
+
+
+# Lo que se copia del pago a la cuenta entra en sus columnas: un dato más
+# largo o de otro tipo da 500 en Postgres y Mercado Pago reintenta sin fin
+# (COBRO-MP-1, b).
+def cliente_mp(payment_info: dict[str, Any]) -> str:
+    return str(_objeto(payment_info, "payer").get("id", "") or payment_info.get("id", "") or "")[:100]
+
+
 def _last4_from_payment(payment_info: dict[str, Any]) -> str | None:
-    card = payment_info.get("card", {})
+    card = _objeto(payment_info, "card")
     last4 = card.get("last_four_digits") or card.get("last4")
     if last4:
-        return str(last4)
+        return str(last4)[-4:]
     return None
 
 
 def _brand_from_payment(payment_info: dict[str, Any]) -> str | None:
-    card = payment_info.get("card", {})
-    return card.get("payment_method", {}).get("name") or card.get("network")
+    card = _objeto(payment_info, "card")
+    marca = _objeto(card, "payment_method").get("name") or card.get("network")
+    return marca[:20] if isinstance(marca, str) and marca else None
