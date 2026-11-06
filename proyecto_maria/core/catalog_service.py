@@ -22,6 +22,7 @@ on-demand al construir get_vendor/get_vendor_by_id.
 
 from __future__ import annotations
 import hashlib
+import math
 import re
 import unicodedata
 from datetime import datetime, timezone
@@ -359,12 +360,16 @@ def _producto_valido(prod) -> Optional[tuple]:
     ncm = texto_para_guardar(prod.get("ncm"), "El NCM") or texto_para_guardar(prod.get("pieza"), "El NCM")
     origen = texto_para_guardar(prod.get("origen"), "El origen")
     unidad = texto_para_guardar(prod.get("unidad_medida"), "La unidad")
-    precio = prod.get("valor_unitario")
+    return desc, ncm, origen, unidad, _precio(prod.get("valor_unitario"))
+
+
+def _precio(valor) -> Optional[float]:
+    # JSON no escribe NaN ni infinito: guardado, rompería la lectura del catálogo.
     try:
-        precio = float(precio) if precio not in (None, "") else None
-    except (TypeError, ValueError):
-        precio = None
-    return desc, ncm, origen, unidad, precio
+        precio = float(valor)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return precio if math.isfinite(precio) else None
 
 
 async def save_products(
@@ -504,11 +509,9 @@ async def update_product(
         row.ncm = textos["ncm"] or None
     if "origen" in textos:
         row.origen = textos["origen"] or None
-    if "precio_ref" in updates and updates["precio_ref"] is not None:
-        try:
-            row.valor_unitario = float(updates["precio_ref"])
-        except (TypeError, ValueError):
-            pass
+    precio = _precio(updates.get("precio_ref"))
+    if precio is not None:
+        row.valor_unitario = precio
     if "unidad_medida" in textos:
         merged = dict(row.extra or {})
         merged["unidad_medida"] = textos["unidad_medida"] or None

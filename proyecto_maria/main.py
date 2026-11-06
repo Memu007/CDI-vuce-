@@ -1242,7 +1242,7 @@ async def _migrate_catalogo_sin_tope():
         return
     # Una tabla por transacción: guardar-uso escribe las dos en otro orden y,
     # trabadas juntas, se esperaban una a la otra.
-    for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "origen", "vendor_nombre")),
+    for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "ncm", "origen", "vendor_nombre")),
                             ("client_product_history", ("origen_frecuente",))):
         async with engine.begin() as conn:
             # Si otra conexión tiene tomada la tabla, falla rápido y el reinicio
@@ -10299,9 +10299,7 @@ async def guardar_uso_ncm(
         raise HTTPException(status_code=400, detail=str(e))
     if not descripcion or not ncm:
         return {"success": False}
-    from proyecto_maria.services.client_memory import (
-        ncm_para_historial, tiene_digito_no_ascii, tiene_medio_par,
-    )
+    from proyecto_maria.services.client_memory import ncm_para_historial, tiene_digito_no_ascii
     if tiene_digito_no_ascii(ncm):
         raise HTTPException(status_code=400, detail=_AVISO_DIGITOS)
     problema = _problema_historial(descripcion, ncm)
@@ -10324,9 +10322,6 @@ async def guardar_uso_ncm(
         if "\x00" in client_id or not _es_utf8(client_id):
             raise HTTPException(status_code=400, detail="El cliente tiene un carácter que no es texto válido.")
         await _get_owned_client(db, client_id, user["username"])
-    # Lo que la base no puede guardar se rechaza antes de sumar el uso.
-    if tiene_medio_par(data):
-        raise HTTPException(status_code=400, detail=_AVISO_MEDIO_PAR)
 
     # Guardar o incrementar contador (y actualizar la NCM si cambió). Se
     # confirma antes de las memorias de abajo: su rollback no lo deshace.

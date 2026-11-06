@@ -450,7 +450,7 @@ class VendorCatalogProduct(Base):
 
     product_key = Column(Text, nullable=False)
     descripcion = Column(Text, nullable=True)
-    ncm = Column(String(20), nullable=True)
+    ncm = Column(Text, nullable=True)
     origen = Column(Text, nullable=True)
     valor_unitario = Column(Float, nullable=True)
     peso_unitario = Column(Float, nullable=True)
