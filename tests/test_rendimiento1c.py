@@ -2,8 +2,8 @@
 memoria y de tiempo, al subir facturas y al leer despachos.
 
 El PDF es sintético: una hoja con 99 000 claves, repetida 200 veces en el
-árbol de hojas. Pesa menos de 1 MB y abrirlo con pypdf para contar sus hojas
-ocupa más de 1 GB.
+árbol de hojas. Pesa menos de 1 MB y contar sus hojas pasa el tope propio de
+pypdf para el árbol de hojas, que es lo que lo vuelve «demasiado pesado».
 
 Las dos pruebas de la app corren en un python nuevo: la memoria que se mide
 es la de ese proceso (VmHWM de /proc), no la de pytest.
@@ -124,7 +124,8 @@ PESADO = "El PDF es demasiado pesado para abrirlo. Probá con otro archivo."
 @solo_linux
 def test_un_pdf_que_se_infla_no_hace_crecer_la_app():
     """Facturas y despachos: el PDF de 200 repeticiones se rechaza con un 400
-    claro y la app no crece (antes crecía más de 1 GB)."""
+    claro y la app no crece. pypdf corta en su tope de árbol de hojas, muy por
+    debajo del tope de memoria del proceso aparte."""
     m = _correr("memoria")
     assert m["crecio_mb"] < 150, f"la app creció {m['crecio_mb']} MB: {m}"
     # La factura normal pasa la validación: el 503 es «sin lector con IA».
