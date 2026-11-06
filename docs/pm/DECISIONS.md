@@ -419,3 +419,7 @@ PYPDF-1 aceptada sobre `974263e`, sin integrar por `e0b8626`: pypdf 6.21.4 como 
 ### 2026-11-06 15:00 UTC (PM principal)
 
 RESET-2 aceptada sobre `99d3f69`, sin integrar por `e0b8626`. D93 (a). D91/D92, decidido por la PM bajo «arreglos chicos de seguridad a cero» (Emi): pieza ENTORNO-1 para MARIA después de ABUSO-1; con `ENVIRONMENT` ausente o desconocido no se abre ninguna puerta de desarrollo. A Emi: confirmar que Railway tiene `ENVIRONMENT=production` exacto. Acta: `REPRODUCCION-RESET-2-2026-11-06.md`.
+
+### 2026-11-06 15:57 UTC (PM principal)
+
+Corte por la regla de Emi del 04/11: las tres sesiones muestran el límite semanal en `allowed_warning` antes del 06/11 21:30 UTC. Rutinas de la PM, MARIA y técnica apagadas (`enabled false`); las dos Devs frenadas con un mensaje; el control de las 21:30 también apagado. Retomar sólo con Emi.
