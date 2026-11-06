@@ -37,9 +37,9 @@ def _filas(owner):
                 "where owner_username=:o order by id", o=owner)
 
 
-def test_el_origen_y_el_proveedor_no_tienen_tope_en_la_base():
+def test_los_textos_del_catalogo_no_tienen_tope_en_la_base():
     for tabla, columna in ((VendorCatalogProduct, "origen"), (VendorCatalogProduct, "vendor_nombre"),
-                           (ClientProductHistory, "origen_frecuente")):
+                           (VendorCatalogProduct, "ncm"), (ClientProductHistory, "origen_frecuente")):
         assert tabla.__table__.c[columna].type.length is None, columna
 
 

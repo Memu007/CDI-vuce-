@@ -64,6 +64,9 @@ TOPE=test_un_proveedor_o_un_origen_de_mas_de_2000_dan_400_sin_guardar
 SIN=test_lo_que_no_tiene_letras_latinas_se_guarda_sin_cruzarse
 MALA=test_una_entrada_mala_da_400_o_se_limpia_sin_perder_el_lote
 VIEJA=test_una_fila_vieja_sin_letras_latinas_queda_una_sola_y_editable
+CHOCA=test_una_fila_vieja_que_la_migracion_no_mueve_sigue_editable
+BASE_TOPE=test_los_textos_del_catalogo_no_tienen_tope_en_la_base
+PRECIO=test_un_precio_que_no_es_finito_no_rompe_la_lectura_del_catalogo
 
 CORRE=("${PRUEBA[@]}")
 if ! "${CORRE[@]}" >/dev/null 2>&1; then
@@ -73,11 +76,23 @@ fi
 sabotaje $MO "el origen vuelve a tener tope de 5" \
   '    origen = Column(Text, nullable=True)' \
   '    origen = Column(String(5), nullable=True)' \
-  "FAILED $T::test_el_origen_y_el_proveedor_no_tienen_tope_en_la_base" "AssertionError: origen"
+  "FAILED $T::${BASE_TOPE}" "AssertionError: origen"
 sabotaje $MO "el proveedor vuelve a tener tope de 200" \
   '    vendor_nombre = Column(Text, nullable=True)' \
   '    vendor_nombre = Column(String(200), nullable=True)' \
-  "FAILED $T::test_el_origen_y_el_proveedor_no_tienen_tope_en_la_base" "AssertionError: vendor_nombre"
+  "FAILED $T::${BASE_TOPE}" "AssertionError: vendor_nombre"
+sabotaje $MO "el NCM del catálogo vuelve a tener tope de 20" \
+  '    ncm = Column(Text, nullable=True)' \
+  '    ncm = Column(String(20), nullable=True)' \
+  "FAILED $T::${BASE_TOPE}" "AssertionError: ncm"
+sabotaje $CS "el precio guarda NaN e infinito" \
+  '    return precio if math.isfinite(precio) else None' \
+  '    return precio' \
+  "FAILED $T::${PRECIO}[lote]" "FAILED $T::${PRECIO}[cambio]"
+sabotaje $CS "un precio enorme da 500" \
+  '    except (TypeError, ValueError, OverflowError):' \
+  '    except (TypeError, ValueError):' \
+  "FAILED $T::${PRECIO}[lote]" "FAILED $T::${PRECIO}[cambio]"
 sabotaje $CM "la memoria del cliente recorta el origen a 3 al crear" \
   '            origen_frecuente=origen or "XX",' \
   '            origen_frecuente=origen[:3] or "XX",' \
@@ -89,7 +104,7 @@ sabotaje $CM "la memoria del cliente recorta el origen a 3 al cambiarlo" \
 sabotaje $MO "el origen de la memoria del cliente vuelve a tener tope de 3" \
   '    origen_frecuente = Column(Text, default="XX")' \
   '    origen_frecuente = Column(String(3), default="XX")' \
-  "FAILED $T::test_el_origen_y_el_proveedor_no_tienen_tope_en_la_base" "AssertionError: origen_frecuente"
+  "FAILED $T::${BASE_TOPE}" "AssertionError: origen_frecuente"
 sabotaje $CS "el catálogo no mide el proveedor" \
   '    vendor_name = texto_para_guardar(vendor_name, "El proveedor")' \
   '    vendor_name = (vendor_name or "").strip()' \
@@ -113,11 +128,23 @@ sabotaje $CM "la memoria del cliente no mide el origen" \
   "FAILED $T::test_la_memoria_del_cliente_no_guarda_un_origen_de_mas_de_2000[aprender]" \
   "FAILED $T::test_la_memoria_del_cliente_no_guarda_un_origen_de_mas_de_2000[operacion]"
 sabotaje $CS "cambiar el origen no lo mide" \
-  '    if "origen" in textos:
+  '        ("origen", "El origen"), ("unidad_medida", "La unidad"),
+    ) if updates.get(campo) is not None}
+
+    new_desc = textos.get("descripcion_original") or row.descripcion or ""
+    if "ncm" in textos:
+        row.ncm = textos["ncm"] or None
+    if "origen" in textos:
         row.origen = textos["origen"] or None' \
-  '    if updates.get("origen") is not None:
+  '        ("unidad_medida", "La unidad"),
+    ) if updates.get(campo) is not None}
+
+    new_desc = textos.get("descripcion_original") or row.descripcion or ""
+    if "ncm" in textos:
+        row.ncm = textos["ncm"] or None
+    if updates.get("origen") is not None:
         row.origen = updates["origen"].strip() or None' \
-  "FAILED $T::${TOPE}[cambiar-origen-origen]"
+  "FAILED $T::${TOPE}[cambiar-origen-origen]" "FAILED $T::${MALA}[cambio-origen]"
 sabotaje $M "guardar-uso no mide el proveedor" \
   '        vendor_name = catalog_svc.texto_para_guardar(data.get("vendor_name"), "El proveedor")' \
   '        vendor_name = (data.get("vendor_name") or "").strip()' \
@@ -176,7 +203,7 @@ sabotaje $CS "cambiar un producto usa la clave vieja" \
 sabotaje $CS "cambiar cualquier campo mueve la clave de una fila vieja" \
   '    if new_desc != (row.descripcion or ""):' \
   '    if new_desc:' \
-  "FAILED $T::${VIEJA}"
+  "FAILED $T::${CHOCA}"
 
 if [ -n "$PG_URL" ]; then
   CORRE=("${PRUEBA_PG[@]}")
@@ -185,12 +212,16 @@ if [ -n "$PG_URL" ]; then
     echo "BASE  | la prueba en Postgres ya está en rojo sin sabotaje"; FALLAS=$((FALLAS+1))
   else
     sabotaje $M "el arranque no pasa el origen a text" \
-      '("product_key", "descripcion", "origen", "vendor_nombre")' \
-      '("product_key", "descripcion", "vendor_nombre")' \
+      '("product_key", "descripcion", "ncm", "origen", "vendor_nombre")' \
+      '("product_key", "descripcion", "ncm", "vendor_nombre")' \
       "FALLA | primer arranque: las columnas son text" "FALLA | el catálogo guarda enteros el origen"
-    sabotaje $M "el arranque no pasa el proveedor a text" \
+    sabotaje $M "el arranque no pasa el NCM a text" \
+      '("product_key", "descripcion", "ncm", "origen", "vendor_nombre")' \
       '("product_key", "descripcion", "origen", "vendor_nombre")' \
-      '("product_key", "descripcion", "origen")' \
+      "FALLA | primer arranque: las columnas son text" "FALLA | un NCM largo o un precio no finito no da 500"
+    sabotaje $M "el arranque no pasa el proveedor a text" \
+      '("product_key", "descripcion", "ncm", "origen", "vendor_nombre")' \
+      '("product_key", "descripcion", "ncm", "origen")' \
       "FALLA | primer arranque: las columnas son text" "FALLA | el catálogo guarda enteros el origen"
     sabotaje $M "el arranque no pasa el origen de la memoria del cliente a text" \
       ',
@@ -198,9 +229,13 @@ if [ -n "$PG_URL" ]; then
       ',):' \
       "FALLA | primer arranque: las columnas son text" "FALLA | guardar-uso con cliente guarda enteros"
     sabotaje $M "el arranque traba las dos tablas en una transacción" \
-      '    for tabla, columnas in (("vendor_catalog_products"' \
-      '    async with engine.begin() as _una:
-     for tabla, columnas in (("vendor_catalog_products"' \
+      '    for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "ncm", "origen", "vendor_nombre")),
+                            ("client_product_history", ("origen_frecuente",))):
+        async with engine.begin() as conn:' \
+      '    async with engine.begin() as conn:
+     for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "ncm", "origen", "vendor_nombre")),
+                            ("client_product_history", ("origen_frecuente",))):
+        if True:' \
       "FALLA | el arranque y una escritura como guardar-uso andan los dos"
     sabotaje $M "el arranque espera la tabla tomada sin tope" \
       "            await conn.exec_driver_sql(\"SET LOCAL lock_timeout = '5s'\")

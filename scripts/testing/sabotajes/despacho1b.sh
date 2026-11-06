@@ -757,10 +757,11 @@ sabotaje "operación sin revisar el resumen" proyecto_maria/main.py \
 ' \
   '' \
   "$RES[lista]" "$RES[texto]" "$RES[numero]"
-sabotaje "confirmar sin medio par" proyecto_maria/main.py \
-  '    # Lo que la base no puede guardar se rechaza antes de sumar el uso.
-    if tiene_medio_par(data):' \
-  '    if False:' \
+sabotaje "confirmar sin medio par" proyecto_maria/core/catalog_service.py \
+  '    if _MEDIO_PAR.search(valor):
+        raise ValueError(AVISO_MEDIO_PAR)
+' \
+  '' \
   "test_confirmar_un_ncm_con_medio_par_da_400_y_no_guarda_nada"
 sabotaje "confirmar deja el NUL del origen y del proveedor" proyecto_maria/core/catalog_service.py \
   'valor = valor.replace("\x00", "").strip()' \
