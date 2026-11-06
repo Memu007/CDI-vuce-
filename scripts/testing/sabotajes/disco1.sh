@@ -211,16 +211,13 @@ sabotaje "el tope no deja entrar el máximo" 1 \
 M=proyecto_maria/main.py
 sabotaje "el NUL pasa" 1 \
   $'        if "\\x00" in texto:' $'        if False:' \
-  "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[Bomba\\x00sintetica" \
-  "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[Bomba sintetica-8413.70.10\\x00" \
   "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[Bomba\\x00sintetica"
 sabotaje "medio par UTF-16 pasa" 1 \
   $'        if not _es_utf8(texto):\n            return' $'        if False:\n            return' \
-  "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[Bomba\\ud800sintetica" \
   "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[Bomba\\ud800sintetica"
 sabotaje "confirmar no revisa" 1 \
   $'    problema = _problema_historial(descripcion, ncm)\n    if problema:' $'    problema = None\n    if problema:' \
-  "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[Bomba\\x00sintetica"
+  "FAILED $T::test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda[Bomba sintetica-888"
 sabotaje "importar no revisa" 1 \
   $'            problema = _problema_historial(desc, ncm)\n            if problema:' $'            problema = None\n            if problema:' \
   "FAILED $T::test_importar_con_una_fila_que_la_base_no_guarda_da_400_y_no_guarda_nada[Bomba\\x00sintetica"

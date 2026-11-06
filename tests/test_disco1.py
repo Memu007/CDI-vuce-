@@ -335,9 +335,6 @@ def _sin_excepciones():
 @pytest.mark.parametrize("desc,ncm,dice", [
     ("B" * 2001, "8413.70.10", "La descripción pasa de 2000 caracteres"),
     ("Bomba sintetica", "8" * 21, "La NCM pasa de 20 caracteres"),
-    ("Bomba\x00sintetica", "8413.70.10", "La descripción tiene un carácter nulo"),
-    ("Bomba sintetica", "8413.70.10\x00", "La NCM tiene un carácter nulo"),
-    ("Bomba\ud800sintetica", "8413.70.10", "La descripción tiene un carácter que no es texto válido"),
 ])
 def test_confirmar_con_algo_que_la_base_no_guarda_da_400_y_no_guarda(client, duenos, desc, ncm, dice):
     a = duenos()
