@@ -348,7 +348,7 @@ sabotaje $F "guardar no anota la operación que devolvió" \
   "                carga.operacionId = data.operation_id || '';" ''
 # Una respuesta tardía se anota en la carga que la pidió, no en la que está en pantalla.
 sabotaje $F "v2: generar anota en la carga de la pantalla" \
-  "FALLA: v2, generar: la carga nueva quedó con la operación" \
+  "FALLA: v2, generar: la respuesta tardía no se guardó en el cliente de su carga con su operación (mandó «»)" \
   "            carga.operacionId = data.operacion_id || '';" "            CDI.state.operacionId = data.operacion_id || '';"
 sabotaje $F "v2: guardar anota en la carga de la pantalla" \
   "FALLA: v2, guardar: la carga nueva quedó con la operación" \
@@ -373,14 +373,15 @@ sabotaje $F "v2: el error de la anterior cambia de paso a la carga nueva" \
   "FALLA: v2, la carga nueva en «Listo» y la anterior vuelve con un error" \
   $'            if (fallo && carga !== CDI.state) return;\n' ''
 sabotaje $F "v2: la anterior sin red le muestra el error a la carga nueva" \
-  "FALLA: v2, la carga nueva en «Listo» y la anterior se queda sin red: la carga nueva muestra el error" \
+  "FALLA: v2, la anterior se queda sin red: la carga nueva muestra el error" \
   "            if (carga === CDI.state) showReadyError(String(err && err.message || err));" \
   "            showReadyError(String(err && err.message || err));"
 sabotaje $V1 "v1: generar anota en la carga nueva" \
   "FALLA: v1, generar: la carga nueva quedó con la operación" \
   "        anotarOperacion(carga, data.operacion_id || '');" "        operacionIdActual = data.operacion_id || '';"
+# Generar también guarda: el caso de generar lo ve antes que el del guardado solo.
 sabotaje $V1 "v1: guardar anota en la carga nueva" \
-  "FALLA: v1, guardar: la carga nueva quedó con la operación" \
+  "FALLA: v1, generar: la carga nueva quedó con la operación" \
   "        if (res.ok) anotarOperacion(carga, (await res.json()).operation_id || operacionId);" \
   "        if (res.ok) operacionIdActual = (await res.json()).operation_id || operacionId;"
 sabotaje $V1 "v1: el guardado toma el cliente del selector al responder" \
