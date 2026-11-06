@@ -14,6 +14,7 @@ from fastapi.testclient import TestClient
 import proyecto_maria.main as main
 
 from proyecto_maria.core.maria_generator import get_pais_codigo
+from proyecto_maria.core import catalog_service
 from proyecto_maria.database.models import ClientProductHistory, VendorCatalogProduct
 from tests.test_catalogo_largo1 import _dueno
 from tests.test_guardar1 import _cliente, _sql
@@ -37,10 +38,11 @@ def _filas(owner):
                 "where owner_username=:o order by id", o=owner)
 
 
-def test_los_textos_del_catalogo_no_tienen_tope_en_la_base():
+def test_los_topes_del_catalogo_en_la_base():
     for tabla, columna in ((VendorCatalogProduct, "origen"), (VendorCatalogProduct, "vendor_nombre"),
-                           (VendorCatalogProduct, "ncm"), (ClientProductHistory, "origen_frecuente")):
+                           (ClientProductHistory, "origen_frecuente")):
         assert tabla.__table__.c[columna].type.length is None, columna
+    assert VendorCatalogProduct.__table__.c["ncm"].type.length == catalog_service.MAX_NCM
 
 
 @pytest.mark.parametrize("via", ["catalogo", "cambiar-origen", "guardar-uso", "guardar-uso-con-cliente"])

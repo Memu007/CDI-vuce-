@@ -60,12 +60,12 @@ CS=proyecto_maria/core/catalog_service.py
 MO=proyecto_maria/database/models.py
 CM=proyecto_maria/services/client_memory.py
 MEM=test_la_memoria_del_cliente_guarda_el_origen_entero
-TOPE=test_un_proveedor_o_un_origen_de_mas_de_2000_dan_400_sin_guardar
+TOPE=test_un_texto_de_mas_da_400_sin_guardar
 SIN=test_lo_que_no_tiene_letras_latinas_se_guarda_sin_cruzarse
 MALA=test_una_entrada_mala_da_400_o_se_limpia_sin_perder_el_lote
 VIEJA=test_una_fila_vieja_sin_letras_latinas_queda_una_sola_y_editable
 CHOCA=test_una_fila_vieja_que_la_migracion_no_mueve_sigue_editable
-BASE_TOPE=test_los_textos_del_catalogo_no_tienen_tope_en_la_base
+BASE_TOPE=test_los_topes_del_catalogo_en_la_base
 PRECIO=test_un_precio_que_no_es_finito_no_rompe_la_lectura_del_catalogo
 
 CORRE=("${PRUEBA[@]}")
@@ -81,10 +81,14 @@ sabotaje $MO "el proveedor vuelve a tener tope de 200" \
   '    vendor_nombre = Column(Text, nullable=True)' \
   '    vendor_nombre = Column(String(200), nullable=True)' \
   "FAILED $T::${BASE_TOPE}" "AssertionError: vendor_nombre"
-sabotaje $MO "el NCM del catálogo vuelve a tener tope de 20" \
-  '    ncm = Column(Text, nullable=True)' \
+sabotaje $MO "el NCM del catálogo pierde el tope de 20 en la base" \
   '    ncm = Column(String(20), nullable=True)' \
-  "FAILED $T::${BASE_TOPE}" "AssertionError: ncm"
+  '    ncm = Column(Text, nullable=True)' \
+  "FAILED $T::${BASE_TOPE}" "AssertionError"
+sabotaje $CS "no se controla el largo del NCM" \
+  '    if len(ncm) > MAX_NCM:' \
+  '    if False:' \
+  "FAILED $T::${TOPE}[catalogo-ncm]" "FAILED $T::${TOPE}[cambiar-ncm]"
 sabotaje $CS "el precio guarda NaN e infinito" \
   '    return precio if math.isfinite(precio) else None' \
   '    return precio' \
@@ -144,7 +148,7 @@ sabotaje $CS "cambiar el origen no lo mide" \
         row.ncm = textos["ncm"] or None
     if updates.get("origen") is not None:
         row.origen = updates["origen"].strip() or None' \
-  "FAILED $T::${TOPE}[cambiar-origen-origen]" "FAILED $T::${MALA}[cambio-origen]"
+  "FAILED $T::${TOPE}[cambiar-origen]" "FAILED $T::${MALA}[cambio-origen]"
 sabotaje $M "guardar-uso no mide el proveedor" \
   '        vendor_name = catalog_svc.texto_para_guardar(data.get("vendor_name"), "El proveedor")' \
   '        vendor_name = (data.get("vendor_name") or "").strip()' \
@@ -212,28 +216,24 @@ if [ -n "$PG_URL" ]; then
     echo "BASE  | la prueba en Postgres ya está en rojo sin sabotaje"; FALLAS=$((FALLAS+1))
   else
     sabotaje $M "el arranque no pasa el origen a text" \
-      '("product_key", "descripcion", "ncm", "origen", "vendor_nombre")' \
-      '("product_key", "descripcion", "ncm", "vendor_nombre")' \
-      "FALLA | primer arranque: las columnas son text" "FALLA | el catálogo guarda enteros el origen"
-    sabotaje $M "el arranque no pasa el NCM a text" \
-      '("product_key", "descripcion", "ncm", "origen", "vendor_nombre")' \
       '("product_key", "descripcion", "origen", "vendor_nombre")' \
-      "FALLA | primer arranque: las columnas son text" "FALLA | un NCM largo o un precio no finito no da 500"
+      '("product_key", "descripcion", "vendor_nombre")' \
+      "arranque: las columnas son text" "FALLA | el catálogo guarda enteros el origen"
     sabotaje $M "el arranque no pasa el proveedor a text" \
-      '("product_key", "descripcion", "ncm", "origen", "vendor_nombre")' \
-      '("product_key", "descripcion", "ncm", "origen")' \
-      "FALLA | primer arranque: las columnas son text" "FALLA | el catálogo guarda enteros el origen"
+      '("product_key", "descripcion", "origen", "vendor_nombre")' \
+      '("product_key", "descripcion", "origen")' \
+      "arranque: las columnas son text" "FALLA | el catálogo guarda enteros el origen"
     sabotaje $M "el arranque no pasa el origen de la memoria del cliente a text" \
       ',
                             ("client_product_history", ("origen_frecuente",))):' \
       ',):' \
-      "FALLA | primer arranque: las columnas son text" "FALLA | guardar-uso con cliente guarda enteros"
+      "arranque: las columnas son text" "FALLA | guardar-uso con cliente guarda enteros"
     sabotaje $M "el arranque traba las dos tablas en una transacción" \
-      '    for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "ncm", "origen", "vendor_nombre")),
+      '    for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "origen", "vendor_nombre")),
                             ("client_product_history", ("origen_frecuente",))):
         async with engine.begin() as conn:' \
       '    async with engine.begin() as conn:
-     for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "ncm", "origen", "vendor_nombre")),
+     for tabla, columnas in (("vendor_catalog_products", ("product_key", "descripcion", "origen", "vendor_nombre")),
                             ("client_product_history", ("origen_frecuente",))):
         if True:' \
       "FALLA | el arranque y una escritura como guardar-uso andan los dos"

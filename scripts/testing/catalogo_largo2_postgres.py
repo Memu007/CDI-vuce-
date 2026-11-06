@@ -253,7 +253,7 @@ try:
     finally:
         escritura.close()
     tipos = {c: t for c, t, _ in columnas()}
-    columna_de = {"vendor_catalog_products": ("ncm", "origen", "vendor_nombre"),
+    columna_de = {"vendor_catalog_products": ("origen", "vendor_nombre"),
                   "client_product_history": ("origen_frecuente",)}
     mentiras = [linea for linea in salida.getvalue().splitlines() if "pasa a TEXT" in linea
                 and any(c in linea and tipos.get(c) != "text" for t in columna_de for c in columna_de[t]
@@ -266,10 +266,11 @@ try:
     for vez in ("primer", "segundo"):
         with Arranque(main_mod.app, raise_server_exceptions=False):
             pass
-        chequear(columnas() == [("ncm", "text", None), ("origen", "text", None), ("origen_frecuente", "text", None),
-                                ("vendor_nombre", "text", None)]
+        chequear(columnas() == [("ncm", "character varying", 20), ("origen", "text", None),
+                                ("origen_frecuente", "text", None), ("vendor_nombre", "text", None)]
                  and fila(VENDOR_ID, "TORNILLO") == viejo,
-                 f"{vez} arranque: las columnas son text y el producto viejo queda igual: {columnas()}")
+                 f"{vez} arranque: las columnas son text, el NCM sigue en 20 y el producto viejo queda igual: "
+                 f"{columnas()}")
 
     with Arranque(main_mod.app, raise_server_exceptions=False) as c:
         r = c.post("/auth/login", json={"username": USUARIO, "password": CLAVE})
@@ -367,13 +368,14 @@ try:
                         fallas.append(f"{campo} {nombre}: {r.status_code} {r.text[:80]}")
             chequear(not fallas, f"una entrada mala por {via} no da 500 ni pierde lo bueno: {fallas}")
 
-        # Un NCM más largo que la columna vieja, y precios que no son finitos: la lectura del
+        # Un NCM de más de 20 y precios que no son finitos: la lectura del
         # catálogo arma JSON estricto, así que lo guardado tiene que poder leerse después.
         fallas = []
         for i, (campo, valor) in enumerate((("ncm", "7" * 21), ("valor_unitario", "nan"), ("valor_unitario", "inf"),
                                             ("valor_unitario", float("inf")), ("valor_unitario", float("nan")),
                                             ("valor_unitario", 10 ** 400))):
             bueno = f"BUENO raro {i}"
+            mandar("POST", url, {"vendor_name": VENDOR, "productos": [{"descripcion": bueno, "ncm": NCM}]})
             r = mandar("POST", url, {"vendor_name": VENDOR, "productos": [
                 {"descripcion": bueno, "ncm": NCM}, {"descripcion": "MALO " + bueno, "ncm": NCM, campo: valor}]})
             k = sql("select product_key from vendor_catalog_products where owner_username=%s and descripcion=%s",
