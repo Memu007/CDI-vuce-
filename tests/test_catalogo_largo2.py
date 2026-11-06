@@ -253,7 +253,6 @@ def test_un_precio_que_no_es_finito_no_rompe_la_lectura_del_catalogo(client, via
     fallas = []
     for valor in ("nan", "inf", "-Infinity", float("inf"), float("nan"), 10 ** 400, "12.5"):
         owner = _dueno(_cliente(client))
-        _sql("delete from vendor_catalog_products where owner_username=:o", o=owner)
         producto = {"descripcion": "TUERCA", "ncm": NCM}
         if via == "lote":
             r = _mandar(client, "POST", url, {"vendor_name": VENDOR, "productos": [{**producto, "valor_unitario": valor}]})

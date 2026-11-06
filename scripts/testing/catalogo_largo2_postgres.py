@@ -207,7 +207,10 @@ try:
 
     tomada = psycopg2.connect(URL_BASE)
     try:
-        tomada.cursor().execute("select 1 from vendor_catalog_products limit 1")
+        # Postgres suelta la tabla a los 30 s: sin el tope del arranque, éste
+        # termina con las columnas migradas en vez de colgar la prueba.
+        tomada.cursor().execute("set idle_in_transaction_session_timeout = '30s'; "
+                                "select 1 from vendor_catalog_products limit 1")
         try:
             with Arranque(main_mod.app, raise_server_exceptions=False):
                 arranco = True
