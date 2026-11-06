@@ -599,6 +599,7 @@ def validar_pdf(data: bytes, limite_cpu_s: float = _MAX_CPU_LECTURA) -> dict:
     tiene. Uno que no se abre da {"error": el motivo}; uno que gasta
     `limite_cpu_s` de CPU, `_DemasiadoTrabajo`."""
     from pypdf import PdfReader
+    from pypdf.errors import LimitReachedError
 
     try:
         with _tope_de_cpu(limite_cpu_s):
@@ -606,8 +607,9 @@ def validar_pdf(data: bytes, limite_cpu_s: float = _MAX_CPU_LECTURA) -> dict:
             if pdf.is_encrypted:
                 return {"encriptado": True, "paginas": 0}  # contar hojas de uno encriptado ya falla
             return {"encriptado": False, "paginas": len(pdf.pages)}
-    except (MemoryError, SystemError) as e:
-        # Bajo el tope de memoria, una función en C de pypdf puede fallar con SystemError.
+    except (MemoryError, SystemError, LimitReachedError) as e:
+        # Bajo el tope de memoria, una función en C de pypdf puede fallar con
+        # SystemError; un tope propio de pypdf también es un PDF demasiado pesado.
         raise MemoryError from e
     except Exception as e:
         return {"error": str(e)}

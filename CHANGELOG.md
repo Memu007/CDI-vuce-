@@ -6,6 +6,10 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 
 ---
 
+## 2026-11-06 · fix: un PDF que pasa un tope propio de pypdf da «demasiado pesado» en castellano (PYPDF-1)
+
+- Con pypdf 6.21.4 (mínimo nuevo, trae arreglos de seguridad), un PDF con un árbol de hojas enorme da 400 «El PDF es demasiado pesado para abrirlo» en vez de «Invalid PDF file» con el mensaje de pypdf en inglés.
+
 ## 2026-11-06 · fix: una entrada mala del catálogo da 400 sin perder el lote, y la fila vieja no se duplica (CATALOGO-LARGO-2, devolución)
 
 - Un campo que no es texto, con un carácter que no se puede guardar o un NCM de más de 20 caracteres da 400 con el motivo al guardar el catálogo, cambiar un producto o confirmar un NCM, y no se guarda nada del lote; el NUL se limpia, un nulo queda vacío y un precio no numérico, infinito o enorme se ignora.
