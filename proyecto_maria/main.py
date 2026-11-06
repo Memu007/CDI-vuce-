@@ -2110,15 +2110,16 @@ async def cancel_billing(
     no_se_pudo = "No se pudo cancelar en Mercado Pago; tu plan sigue igual. Probá de nuevo en unos minutos."
     if con_sid and not billing_service.is_configured():
         raise HTTPException(status_code=503, detail=no_se_pudo)
-    if miembro:
-        # Una pendiente propia no es la que paga el estudio.
-        try:
-            estado_mp = await run_in_threadpool(_leer_suscripcion_mp, db_user.mp_preapproval_id)
-        except _SuscripcionMPError:
-            raise HTTPException(status_code=503, detail=no_se_pudo)
-        if estado_mp not in ("authorized", "paused"):
-            raise sin_permiso
-    for cuenta in con_sid:
+    try:
+        paga = {cuenta: await run_in_threadpool(_leer_suscripcion_mp, cuenta.mp_preapproval_id)
+                in ("authorized", "paused") for cuenta in con_sid}
+    except _SuscripcionMPError:
+        raise HTTPException(status_code=503, detail=no_se_pudo)
+    # Una pendiente propia no es la que paga el estudio.
+    if miembro and not paga[db_user]:
+        raise sin_permiso
+    # La que paga va última: si otra falla, el plan sigue cobrando, como dice el 503.
+    for cuenta in sorted(con_sid, key=paga.get):
         try:
             await run_in_threadpool(_cancelar_suscripcion_mp, cuenta.mp_preapproval_id)
         except _SuscripcionMPError as e:

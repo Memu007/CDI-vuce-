@@ -9,6 +9,7 @@ Formato corto: fecha, 1–3 líneas, prefijo.
 ## 2026-11-06 · fix: en un estudio, cancelar o pagar no toca una suscripción que no corresponde (COBRO-MP-2)
 
 - **fix(cobro):** un miembro del estudio sólo cancela el plan si su suscripción es la que paga (autorizada o pausada); con una pendiente propia da 403, y si Mercado Pago no contesta, 503 sin cambiar nada. Al pagar, si mientras se cancelaba una suscripción vieja otra se autorizó, no se cancela y da 409; y si una cancelación falla, las que ya estaban canceladas en Mercado Pago dejan de figurar.
+- **fix(cobro):** al cancelar el plan de un estudio, la suscripción que cobra se cancela última: si falla otra, el plan sigue cobrando como dice el aviso y quien la abrió puede volver a intentarlo.
 
 ## 2026-11-06 · fix: una respuesta tardía no escribe en la carga que sigue y regenerar no depende del disco (COBRO-CORTE-1)
 
